@@ -11,6 +11,15 @@ CREATE EXTENSION IF NOT EXISTS "unaccent";   -- búsqueda sin acentos
 CREATE EXTENSION IF NOT EXISTS "pg_trgm";    -- búsqueda por similitud (productos/clientes)
 CREATE EXTENSION IF NOT EXISTS "citext";     -- emails case-insensitive
 
+-- ---------- f_unaccent() — wrapper IMMUTABLE de unaccent ----------
+-- unaccent() es STABLE, no IMMUTABLE → no puede usarse en columnas GENERATED STORED
+-- ni en índices de expresión. Este wrapper (dict fijo) sí es inmutable. Úsese en
+-- columnas de búsqueda normalizada e índices pg_trgm. (Fix de bug del doc 1B.)
+CREATE OR REPLACE FUNCTION f_unaccent(text) RETURNS text
+LANGUAGE sql IMMUTABLE STRICT PARALLEL SAFE
+AS $$ SELECT unaccent($1) $$;
+COMMENT ON FUNCTION f_unaccent(text) IS 'unaccent IMMUTABLE para columnas generadas / índices.';
+
 -- ---------- current_tenant_id() (1A §8.1, D13) ----------
 -- Extrae el tenant_id del JWT. Base de TODAS las políticas RLS.
 -- El claim lo inyecta el Custom Access Token Hook (doc 1F §3) / la Edge Function pin-login.

@@ -28,8 +28,10 @@ CREATE TYPE fondo_modo_captura AS ENUM (
 -- Tipo de movimiento de caja (§1.4 del /core)
 CREATE TYPE movimiento_tipo AS ENUM (
   'FONDO_APERTURA',
-  'SANGRIA',                   -- retiro de efectivo
-  'DEPOSITO',                  -- depósito de efectivo
+  'INYECCION_FONDO',           -- inyectar efectivo al fondo a media jornada (P-097)
+  'SANGRIA',                   -- retiro de efectivo (P-098)
+  'DEPOSITO',                  -- depósito bancario / salida de efectivo a banco (P-099)
+  'PAGO_PROVEEDOR',            -- pago a proveedor desde la caja (P-100)
   'DEVOLUCION_EFECTIVO',       -- pago de devolución en efectivo
   'AJUSTE_POSITIVO',           -- ajuste manual + (admin)
   'AJUSTE_NEGATIVO'            -- ajuste manual - (admin)
