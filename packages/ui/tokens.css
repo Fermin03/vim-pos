@@ -1,0 +1,54 @@
+/* VIM POS — design tokens como variables CSS.
+   Espejo de packages/config/tailwind-preset.js. Fuente: mockups (P-059) + doc 08.
+   Importar una vez en el root de cada app. */
+
+:root {
+  /* Marca */
+  --accent: #E8502E;
+  --accent-hover: #CF4525;
+  --accent-soft: #FBF0EC;
+
+  /* Tinta */
+  --ink: #16161A;
+  --ink-2: #5A5A60;
+  --ink-3: #8E8E94;
+
+  /* Semánticos */
+  --success: #2E7D52;
+  --warning: #9A6B12;
+  --danger: #C0392B;
+  --info: #2C5AA0;
+
+  /* Superficies / líneas */
+  --bg: #FFFFFF;
+  --surface: #FFFFFF;
+  --line: #ECECE9;
+  --line-strong: #DDDDD9;
+  --hover: #F6F6F4;
+  --sel: #FBFBFA;
+
+  /* Tipografía */
+  --font: 'Inter Tight', system-ui, sans-serif;
+  --font-display: 'Sora', system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, monospace;
+
+  /* Radios */
+  --r-sm: 4px;
+  --r: 6px;
+  --r-lg: 8px;
+
+  /* Spacing */
+  --sp-1: 4px; --sp-2: 8px; --sp-3: 12px; --sp-4: 16px;
+  --sp-5: 20px; --sp-6: 24px; --sp-8: 32px;
+}
+
+/* KDS — tema oscuro (doc 14). Aplicar en el contenedor del KDS con [data-theme="kds"]. */
+[data-theme="kds"] {
+  --bg: #1A1A1E;
+  --surface: #26262B;
+  --ink: #F0F0EC;
+  --ink-2: #B8B8B4;
+  --ink-3: #6E6E74;
+  --warning: #D4A017;
+  --danger: #E04040;
+}
