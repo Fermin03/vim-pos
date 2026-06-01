@@ -1,0 +1,24 @@
+# Supabase local config — VIM POS
+# Doc de referencia: 07-1A (BD), 07-1F (auth hook).
+
+project_id = "vim-pos"
+
+[db]
+major_version = 15
+
+[auth]
+enable_signup = true
+# El POS usa PIN (Edge Function pin-login, doc 1F §5); el admin usa email+password.
+
+# Custom Access Token Hook — inyecta tenant_id y tipo_identidad en el JWT (doc 1F §3).
+# Es el cimiento del que depende TODO el RLS.
+[auth.hook.custom_access_token]
+enabled = true
+uri = "pg-functions://postgres/public/custom_access_token_hook"
+
+[realtime]
+enabled = true
+
+[storage]
+enabled = true
+# Buckets: cfdi-xml, cfdi-pdf, logos (se crean en migración correspondiente).

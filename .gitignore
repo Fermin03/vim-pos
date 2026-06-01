@@ -1,0 +1,24 @@
+# deps
+node_modules/
+.pnpm-store/
+
+# builds
+.next/
+dist/
+.turbo/
+out/
+
+# env / secrets  (NUNCA commitear service_role ni JWT secret)
+.env
+.env.*
+!.env.example
+
+# supabase local
+supabase/.branches/
+supabase/.temp/
+
+# os / editor
+.DS_Store
+*.log
+.vscode/
+.idea/
