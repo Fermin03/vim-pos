@@ -313,6 +313,7 @@ END $$;
 DO $$
 DECLARE
   v_maria   uuid := '99999999-0000-0000-0000-000000000001';
+  v_dueno   uuid := '99999999-0000-0000-0000-0000000000e1';  -- DUEÑO (admin web)
   v_disp    uuid := '99999999-0000-0000-0000-0000000000d1';  -- cuenta de dispositivo (caja)
   v_tenant  uuid := '99999999-0000-0000-0000-0000000000aa';
   v_suc     uuid := '99999999-0000-0000-0000-0000000000bb';
@@ -368,14 +369,32 @@ BEGIN
   VALUES (v_disp, v_tenant, v_suc,
           (SELECT id FROM roles WHERE codigo = 'DISPOSITIVO' AND es_sistema = true));
 
+  -- ── DUEÑO / admin web (F4) ──────────────────────────────────────────────────
+  -- Login web por GoTrue (email/password). El hook le pone tipo_identidad='ADMIN_WEB'
+  -- (rol DUENO). Acceso tenant-wide (sucursal_id NULL = todas las sucursales).
+  INSERT INTO auth.users (instance_id, id, aud, role, email, encrypted_password,
+                          email_confirmed_at, created_at, updated_at,
+                          raw_app_meta_data, raw_user_meta_data)
+  VALUES ('00000000-0000-0000-0000-000000000000', v_dueno, 'authenticated', 'authenticated',
+          'dueno@knockout.dev', crypt('devadmin', gen_salt('bf')),
+          now(), now(), now(), '{"provider":"email","providers":["email"]}', '{}')
+  ON CONFLICT (id) DO NOTHING;
+
+  INSERT INTO usuarios_perfil (id, nombre, estado)
+  VALUES (v_dueno, 'Dueño Knock-Out', 'ACTIVO');
+
+  INSERT INTO usuarios_acceso (usuario_id, tenant_id, sucursal_id, rol_id)
+  VALUES (v_dueno, v_tenant, NULL,
+          (SELECT id FROM roles WHERE codigo = 'DUENO' AND es_sistema = true));
+
   -- GoTrue escanea estas columnas de auth.users como string NO-nullable; al insertar
   -- a mano quedan en NULL y el grant de password revienta con "Database error querying
-  -- schema". Normalizar a '' para que el login de dispositivo (y el admin web en F4) corra.
+  -- schema". Normalizar a '' para que el login de dispositivo y el admin web corran.
   UPDATE auth.users
      SET confirmation_token = '', recovery_token = '', email_change = '',
          email_change_token_new = '', email_change_token_current = '',
          phone_change = '', phone_change_token = '', reauthentication_token = ''
-   WHERE id IN (v_maria, v_disp);
+   WHERE id IN (v_maria, v_disp, v_dueno);
 
-  RAISE NOTICE 'FIXTURE DEV: María % en caja de % (PIN 1234); dispositivo %', v_maria, v_tenant, v_disp_email;
+  RAISE NOTICE 'FIXTURE DEV: María % (PIN 1234); dispositivo %; dueño dueno@knockout.dev / devadmin', v_maria, v_disp_email;
 END $$;
