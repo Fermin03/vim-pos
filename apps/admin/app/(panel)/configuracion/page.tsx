@@ -1,6 +1,5 @@
-"use client";
-import { EnConstruccion } from "../../components/en-construccion";
+import { redirect } from "next/navigation";
 
 export default function ConfiguracionPage() {
-  return <EnConstruccion titulo="Configuración" fase="F4.4" />;
+  redirect("/configuracion/negocio");
 }
