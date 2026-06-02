@@ -127,3 +127,157 @@ export async function eliminarCategoria(id: string): Promise<void> {
     .eq("id", id);
   if (error) throw new Error(error.message);
 }
+
+// ── Categorías (versión simple para selects) ─────────────────────────────────
+export type CategoriaOpcion = { id: string; nombre: string };
+export async function listarCategoriasOpciones(): Promise<CategoriaOpcion[]> {
+  const { data, error } = await supabase
+    .from("categorias")
+    .select("id, nombre")
+    .is("deleted_at", null)
+    .order("orden_visualizacion", { ascending: true });
+  if (error) throw new Error(error.message);
+  return (data ?? []) as CategoriaOpcion[];
+}
+
+// ── Productos ────────────────────────────────────────────────────────────────
+export const productoSchema = z.object({
+  nombre: z.string().trim().min(1, "El nombre es obligatorio").max(200, "Máximo 200 caracteres"),
+  categoria_id: z.string().uuid("Elige una categoría"),
+  precio_base_mxn: z.number({ invalid_type_error: "Precio inválido" }).min(0, "El precio no puede ser negativo"),
+  descripcion: z.string().trim().max(500).optional().or(z.literal("")),
+  codigo_interno: z.string().trim().max(50).optional().or(z.literal("")),
+  estado: z.enum(["ACTIVO", "PAUSADO"]),
+  agotado: z.boolean(),
+  visible_en_pos: z.boolean(),
+});
+export type ProductoInput = z.infer<typeof productoSchema>;
+
+export type EstadoProducto = "ACTIVO" | "PAUSADO" | "AGOTADO";
+export type Producto = {
+  id: string;
+  nombre: string;
+  descripcion: string | null;
+  codigo_interno: string | null;
+  precio_base_mxn: number;
+  categoria_id: string;
+  categoriaNombre: string;
+  estado: EstadoProducto;
+  agotado_manual: boolean;
+  visible_en_pos: boolean;
+};
+
+type FilaProd = Omit<Producto, "categoriaNombre"> & { categoria: { nombre: string } | null };
+
+export async function listarProductos(): Promise<Producto[]> {
+  const { data, error } = await supabase
+    .from("productos")
+    .select(
+      "id, nombre, descripcion, codigo_interno, precio_base_mxn, categoria_id, estado, agotado_manual, visible_en_pos, categoria:categorias(nombre)",
+    )
+    .is("deleted_at", null)
+    .order("orden_visualizacion", { ascending: true });
+  if (error) throw new Error(error.message);
+  return ((data ?? []) as unknown as FilaProd[]).map((f) => ({
+    id: f.id,
+    nombre: f.nombre,
+    descripcion: f.descripcion,
+    codigo_interno: f.codigo_interno,
+    precio_base_mxn: Number(f.precio_base_mxn),
+    categoria_id: f.categoria_id,
+    categoriaNombre: f.categoria?.nombre ?? "—",
+    estado: f.estado,
+    agotado_manual: f.agotado_manual,
+    visible_en_pos: f.visible_en_pos,
+  }));
+}
+
+export async function obtenerProducto(id: string): Promise<Producto | null> {
+  const { data, error } = await supabase
+    .from("productos")
+    .select(
+      "id, nombre, descripcion, codigo_interno, precio_base_mxn, categoria_id, estado, agotado_manual, visible_en_pos, categoria:categorias(nombre)",
+    )
+    .eq("id", id)
+    .is("deleted_at", null)
+    .maybeSingle();
+  if (error) throw new Error(error.message);
+  if (!data) return null;
+  const f = data as unknown as FilaProd;
+  return {
+    id: f.id,
+    nombre: f.nombre,
+    descripcion: f.descripcion,
+    codigo_interno: f.codigo_interno,
+    precio_base_mxn: Number(f.precio_base_mxn),
+    categoria_id: f.categoria_id,
+    categoriaNombre: f.categoria?.nombre ?? "—",
+    estado: f.estado,
+    agotado_manual: f.agotado_manual,
+    visible_en_pos: f.visible_en_pos,
+  };
+}
+
+// Resuelve estado final + agotado_manual respetando el CHECK estado_consistente.
+function resolverEstado(input: ProductoInput): { estado: EstadoProducto; agotado_manual: boolean } {
+  if (input.agotado) return { estado: "AGOTADO", agotado_manual: true };
+  return { estado: input.estado, agotado_manual: false };
+}
+
+export async function crearProducto(input: ProductoInput): Promise<void> {
+  const datos = productoSchema.parse(input);
+  const tid = await tenantId();
+  const { estado, agotado_manual } = resolverEstado(datos);
+  const { data: maxRow } = await supabase
+    .from("productos")
+    .select("orden_visualizacion")
+    .is("deleted_at", null)
+    .order("orden_visualizacion", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  const orden = (maxRow?.orden_visualizacion ?? 0) + 1;
+  const { error } = await supabase.from("productos").insert({
+    tenant_id: tid,
+    nombre: datos.nombre,
+    categoria_id: datos.categoria_id,
+    precio_base_mxn: datos.precio_base_mxn,
+    descripcion: datos.descripcion || null,
+    codigo_interno: datos.codigo_interno || null,
+    estado,
+    agotado_manual,
+    visible_en_pos: datos.visible_en_pos,
+    orden_visualizacion: orden,
+  });
+  if (error) throw new Error(error.message);
+}
+
+export async function actualizarProducto(id: string, input: ProductoInput): Promise<void> {
+  const datos = productoSchema.parse(input);
+  const { estado, agotado_manual } = resolverEstado(datos);
+  const { error } = await supabase
+    .from("productos")
+    .update({
+      nombre: datos.nombre,
+      categoria_id: datos.categoria_id,
+      precio_base_mxn: datos.precio_base_mxn,
+      descripcion: datos.descripcion || null,
+      codigo_interno: datos.codigo_interno || null,
+      estado,
+      agotado_manual,
+      visible_en_pos: datos.visible_en_pos,
+    })
+    .eq("id", id);
+  if (error) throw new Error(error.message);
+}
+
+export async function eliminarProducto(id: string): Promise<void> {
+  const { error } = await supabase
+    .from("productos")
+    .update({ deleted_at: new Date().toISOString() })
+    .eq("id", id);
+  if (error) throw new Error(error.message);
+}
+
+export function precioMxn(n: number): string {
+  return n.toLocaleString("es-MX", { style: "currency", currency: "MXN" });
+}
