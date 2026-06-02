@@ -419,6 +419,7 @@ CREATE OR REPLACE FUNCTION consumir_folio_cfdi(
 ) RETURNS jsonb
 LANGUAGE plpgsql
 SECURITY DEFINER
+SET search_path = public, pg_temp   -- CN-001: search_path fijo (anti escalada en SECURITY DEFINER, CWE-426)
 AS $$
 DECLARE
   v_saldo      tenant_folios_saldo%ROWTYPE;

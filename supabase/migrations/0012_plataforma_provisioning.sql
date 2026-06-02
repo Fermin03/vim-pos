@@ -85,6 +85,7 @@ CREATE OR REPLACE FUNCTION crear_tenant_con_owner(
 ) RETURNS uuid
 LANGUAGE plpgsql
 SECURITY DEFINER
+SET search_path = public, pg_temp   -- CN-001: search_path fijo (anti escalada en SECURITY DEFINER, CWE-426)
 AS $$
 DECLARE
   v_tenant_id   uuid;

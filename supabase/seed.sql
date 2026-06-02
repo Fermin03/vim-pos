@@ -69,7 +69,15 @@ INSERT INTO roles (id, tenant_id, codigo, nombre, descripcion, es_sistema, jerar
 
   (gen_random_uuid(), NULL, 'PERSONAL',  'Personal / General',
    'Personal operativo sin acceso a caja. Cocina, mesa, delivery según subtipo.',
-   true, 1, true);
+   true, 1, true),
+
+  -- Rol de sistema reservado para las cuentas de dispositivo (caja/estación POS).
+  -- Jerarquía 0, SIN permisos operativos: solo sostiene la app antes del PIN del
+  -- empleado y porta tenant_id en su JWT (Parte 1F §1.1, D75). No se le asigna
+  -- ninguna fila en rol_permisos (§9.5) — por diseño no puede operar.
+  (gen_random_uuid(), NULL, 'DISPOSITIVO', 'Dispositivo',
+   'Cuenta de caja/estación POS. Mantiene la sesión base del dispositivo; sin permisos operativos.',
+   true, 0, true);
 
 -- ============================================================================
 -- §9.3 — Subtipos de personal sugeridos (tenant_id NULL = sistema)
@@ -305,9 +313,11 @@ END $$;
 DO $$
 DECLARE
   v_maria   uuid := '99999999-0000-0000-0000-000000000001';
+  v_disp    uuid := '99999999-0000-0000-0000-0000000000d1';  -- cuenta de dispositivo (caja)
   v_tenant  uuid := '99999999-0000-0000-0000-0000000000aa';
   v_suc     uuid := '99999999-0000-0000-0000-0000000000bb';
   v_caja    uuid := '99999999-0000-0000-0000-0000000000cc';
+  v_disp_email text := 'caja-99999999-0000-0000-0000-0000000000cc@dispositivos.vimpos.mx';
 BEGIN
   -- Usuario de auth (local dev). Si ya existe, no repetir.
   INSERT INTO auth.users (instance_id, id, aud, role, email, encrypted_password,
@@ -339,5 +349,33 @@ BEGIN
                                    periodo_actual, saldo_paquetes)
   VALUES (v_tenant, 50, 0, date_trunc('month', now())::date, 0);
 
-  RAISE NOTICE 'FIXTURE DEV: María % en caja de % (PIN 1234)', v_maria, v_tenant;
+  -- ── Cuenta de dispositivo de la Caja 01 (Parte 1F §1.1 / §2.1) ──────────────
+  -- Email sintético derivado del caja_id; password de DEV (en prod se provisiona
+  -- en setup, doc 10). Rol DISPOSITIVO, sin PIN. Sostiene la sesión base antes
+  -- del PIN del empleado y porta tenant_id en su JWT vía el Custom Access Token Hook.
+  INSERT INTO auth.users (instance_id, id, aud, role, email, encrypted_password,
+                          email_confirmed_at, created_at, updated_at,
+                          raw_app_meta_data, raw_user_meta_data)
+  VALUES ('00000000-0000-0000-0000-000000000000', v_disp, 'authenticated', 'authenticated',
+          v_disp_email, crypt('vim-device-dev', gen_salt('bf')),
+          now(), now(), now(), '{"provider":"email","providers":["email"]}', '{}')
+  ON CONFLICT (id) DO NOTHING;
+
+  INSERT INTO usuarios_perfil (id, nombre, estado)
+  VALUES (v_disp, 'Caja 01', 'ACTIVO');
+
+  INSERT INTO usuarios_acceso (usuario_id, tenant_id, sucursal_id, rol_id)
+  VALUES (v_disp, v_tenant, v_suc,
+          (SELECT id FROM roles WHERE codigo = 'DISPOSITIVO' AND es_sistema = true));
+
+  -- GoTrue escanea estas columnas de auth.users como string NO-nullable; al insertar
+  -- a mano quedan en NULL y el grant de password revienta con "Database error querying
+  -- schema". Normalizar a '' para que el login de dispositivo (y el admin web en F4) corra.
+  UPDATE auth.users
+     SET confirmation_token = '', recovery_token = '', email_change = '',
+         email_change_token_new = '', email_change_token_current = '',
+         phone_change = '', phone_change_token = '', reauthentication_token = ''
+   WHERE id IN (v_maria, v_disp);
+
+  RAISE NOTICE 'FIXTURE DEV: María % en caja de % (PIN 1234); dispositivo %', v_maria, v_tenant, v_disp_email;
 END $$;

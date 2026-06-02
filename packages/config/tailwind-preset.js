@@ -49,6 +49,26 @@ module.exports = {
       spacing: {
         1: "4px", 2: "8px", 3: "12px", 4: "16px", 5: "20px", 6: "24px", 8: "32px",
       },
+      keyframes: {
+        // Animaciones de las pantallas de auth (mockups P-002/P-010/P-012).
+        "vim-shake": {
+          "0%,100%": { transform: "translateX(0)" },
+          "20%": { transform: "translateX(-7px)" },
+          "40%": { transform: "translateX(7px)" },
+          "60%": { transform: "translateX(-5px)" },
+          "80%": { transform: "translateX(5px)" },
+        },
+        "vim-fade": { from: { opacity: "0" }, to: { opacity: "1" } },
+        "vim-pop": {
+          from: { opacity: "0", transform: "translateY(8px) scale(.98)" },
+          to: { opacity: "1", transform: "none" },
+        },
+      },
+      animation: {
+        "vim-shake": "vim-shake .4s",
+        "vim-fade": "vim-fade .18s ease",
+        "vim-pop": "vim-pop .2s cubic-bezier(.22,1,.36,1)",
+      },
     },
   },
 };
