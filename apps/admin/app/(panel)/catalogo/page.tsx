@@ -1,6 +1,5 @@
-"use client";
-import { EnConstruccion } from "../../components/en-construccion";
+import { redirect } from "next/navigation";
 
 export default function CatalogoPage() {
-  return <EnConstruccion titulo="Catálogo" fase="F4.2" />;
+  redirect("/catalogo/categorias");
 }
