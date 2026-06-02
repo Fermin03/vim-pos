@@ -2,6 +2,8 @@
 
 POS SaaS multi-vertical, multi-tenant, para restaurantes en México.
 
+> 🧠 **Para retomar el proyecto, lee primero `../MEMORY.md`** (tablero de estado: dónde vamos, cómo levantar el entorno, gotchas). El plan por fases está en `../RECURSOS PARA DESARROLLO/GUÍA DE DESARROLLO/18-PLAYBOOK-DE-EJECUCION.md`.
+
 ## Fuente de verdad
 
 La especificación está en `../RECURSOS PARA DESARROLLO/`. Antes de implementar algo, consulta:

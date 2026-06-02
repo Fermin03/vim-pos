@@ -1,92 +1,173 @@
 "use client";
-import { useState, useEffect } from "react";
-import { Button, PinKeypad, StatusChip } from "@vim/ui/styles";
-import { pinLogin, employeeClient } from "./lib/supabase";
+import { useCallback, useEffect, useState } from "react";
+import {
+  deviceEmail,
+  deviceSignIn,
+  deviceSignOut,
+  cajaIdFromEmail,
+  segundosParaExpirar,
+  type Empleado,
+  type PinLoginResult,
+} from "./lib/supabase";
+import { leerCreds, olvidarCreds } from "./lib/device-creds";
+import { VincularDispositivo } from "./components/vincular-dispositivo";
+import { SelectorEmpleados } from "./components/selector-empleados";
+import { ModalPin } from "./components/modal-pin";
+import { PantallaBloqueo } from "./components/pantalla-bloqueo";
+import { ModalSesionExpirada } from "./components/modal-sesion-expirada";
+import { PosHome } from "./components/pos-home";
 
-// DEV: empleado y caja sembrados por el fixture (seed.sql). En F4 el selector real
-// listará los empleados de la sucursal vía la sesión de dispositivo.
-const DEMO_EMPLEADO = { id: "99999999-0000-0000-0000-000000000001", nombre: "María G." };
-const DEMO_CAJA = "99999999-0000-0000-0000-0000000000cc";
+// Etiquetas de la sucursal/caja del fixture (DEV). En F5 saldrán de la sesión real.
+const SUCURSAL_DEV = "Sucursal León Centro";
+const CAJA_DEV = "Caja 01";
 
-type Sesion = { nombre: string; token: string };
+type Estado =
+  | { paso: "boot" }
+  | { paso: "vincular" }
+  | { paso: "selector"; pinPara: Empleado | null }
+  | { paso: "operando"; empleado: Empleado; token: string }
+  | { paso: "bloqueo"; empleado: Empleado }
+  | { paso: "expirada"; empleado: Empleado };
 
 export default function Page() {
-  const [sesion, setSesion] = useState<Sesion | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [cargando, setCargando] = useState(false);
+  const [estado, setEstado] = useState<Estado>({ paso: "boot" });
+  const [cajaId, setCajaId] = useState<string | null>(null);
 
-  async function onPin(pin: string) {
-    setCargando(true);
-    setError(null);
-    try {
-      const r = await pinLogin(DEMO_EMPLEADO.id, pin, DEMO_CAJA);
-      setSesion({ nombre: r.usuario.nombre, token: r.access_token });
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : "Error";
-      setError(msg === "PIN_INCORRECTO" ? "PIN incorrecto" : msg);
-    } finally {
-      setCargando(false);
-    }
-  }
-
-  if (sesion) return <PosHome nombre={sesion.nombre} token={sesion.token} onSalir={() => setSesion(null)} />;
-
-  return (
-    <main className="flex min-h-screen flex-col items-center justify-center gap-8 p-6">
-      <header className="flex flex-col items-center gap-2">
-        <div className="flex h-11 w-11 items-center justify-center rounded-lg bg-ink">
-          <span className="font-display text-lg font-bold text-white">V</span>
-        </div>
-        <h1 className="font-display text-xl font-semibold">Knock-Out Burger</h1>
-        <p className="text-sm text-ink-3">Sucursal León Centro</p>
-      </header>
-
-      <div className="flex flex-col items-center gap-1">
-        <div className="flex h-14 w-14 items-center justify-center rounded-full bg-hover font-display font-semibold text-ink-2">
-          MG
-        </div>
-        <p className="mt-1 font-medium">{DEMO_EMPLEADO.nombre}</p>
-        <p className="text-sm text-ink-3">Cajera · ingresa tu PIN</p>
-      </div>
-
-      <PinKeypad length={4} onComplete={onPin} error={error} disabled={cargando} />
-    </main>
-  );
-}
-
-function PosHome({ nombre, token, onSalir }: { nombre: string; token: string; onSalir: () => void }) {
-  const [sucursal, setSucursal] = useState<string | null>(null);
-  const [estado, setEstado] = useState<"cargando" | "ok" | "error">("cargando");
-
-  // Prueba viva de RLS: con el token del empleado, leer sucursales debe devolver SOLO su tenant.
+  // ── Arranque del dispositivo (Parte 1F §2.1) ────────────────────────────────
   useEffect(() => {
     let activo = true;
-    employeeClient(token)
-      .from("sucursales")
-      .select("nombre")
-      .then(({ data, error }) => {
-        if (!activo) return;
-        if (error) { setEstado("error"); return; }
-        setSucursal(data?.map((s: { nombre: string }) => s.nombre).join(", ") ?? "—");
-        setEstado("ok");
-      });
-    return () => { activo = false; };
-  }, [token]);
+    (async () => {
+      let email = await deviceEmail();
+      if (!email) {
+        const creds = leerCreds();
+        if (creds) {
+          try {
+            await deviceSignIn(creds.email, creds.password);
+            email = creds.email;
+          } catch {
+            /* credenciales inválidas → re-vincular */
+          }
+        }
+      }
+      if (!activo) return;
+      if (email) {
+        setCajaId(cajaIdFromEmail(email));
+        setEstado({ paso: "selector", pinPara: null });
+      } else {
+        setEstado({ paso: "vincular" });
+      }
+    })();
+    return () => {
+      activo = false;
+    };
+  }, []);
 
-  return (
-    <main className="flex min-h-screen flex-col items-center justify-center gap-6 p-6">
-      <StatusChip tone="success">Sesión iniciada</StatusChip>
-      <h1 className="font-display text-2xl font-semibold">¡Hola, {nombre}!</h1>
-      <div className="rounded-lg border border-line p-5 text-center">
-        <p className="text-sm text-ink-3">Sucursales visibles (RLS por tenant):</p>
-        <p className="mt-1 font-display text-lg font-semibold">
-          {estado === "cargando" ? "Cargando…" : estado === "error" ? "Error" : sucursal}
-        </p>
-      </div>
-      <p className="max-w-xs text-center text-sm text-ink-3">
-        Esqueleto andante: PIN → JWT de empleado → datos del tenant vía RLS. El POS operativo va en F5.
-      </p>
-      <Button variant="ghost" onClick={onSalir}>Salir</Button>
+  const trasVincular = useCallback(async () => {
+    const email = await deviceEmail();
+    setCajaId(email ? cajaIdFromEmail(email) : null);
+    setEstado({ paso: "selector", pinPara: null });
+  }, []);
+
+  const desvincular = useCallback(async () => {
+    await deviceSignOut();
+    olvidarCreds();
+    setCajaId(null);
+    setEstado({ paso: "vincular" });
+  }, []);
+
+  const trasPin = useCallback((empleado: Empleado, r: PinLoginResult) => {
+    setEstado({ paso: "operando", empleado, token: r.access_token });
+  }, []);
+
+  // ── Vigilancia de expiración del token de empleado (Parte 1F §2.3, P-012) ────
+  useEffect(() => {
+    if (estado.paso !== "operando") return;
+    const restante = segundosParaExpirar(estado.token);
+    if (restante <= 0) {
+      setEstado({ paso: "expirada", empleado: estado.empleado });
+      return;
+    }
+    const id = setTimeout(
+      () => setEstado({ paso: "expirada", empleado: estado.empleado }),
+      restante * 1000,
+    );
+    return () => clearTimeout(id);
+  }, [estado]);
+
+  const sinCaja = (
+    <main className="flex h-screen items-center justify-center p-6">
+      <p className="text-sm text-danger">Dispositivo sin caja asociada. Re-vincula.</p>
     </main>
   );
+
+  switch (estado.paso) {
+    case "boot":
+      return (
+        <main className="flex h-screen items-center justify-center p-6">
+          <p className="text-sm text-ink-3">Iniciando dispositivo…</p>
+        </main>
+      );
+
+    case "vincular":
+      return <VincularDispositivo onVinculado={trasVincular} />;
+
+    case "selector":
+      return (
+        <>
+          <SelectorEmpleados
+            sucursal={SUCURSAL_DEV}
+            caja={CAJA_DEV}
+            onElegir={(empleado) => setEstado({ paso: "selector", pinPara: empleado })}
+            onDesvincular={desvincular}
+          />
+          {estado.pinPara &&
+            (cajaId ? (
+              <ModalPin
+                empleado={estado.pinPara}
+                cajaId={cajaId}
+                onExito={(r) => trasPin(estado.pinPara!, r)}
+                onCerrar={() => setEstado({ paso: "selector", pinPara: null })}
+              />
+            ) : (
+              sinCaja
+            ))}
+        </>
+      );
+
+    case "operando":
+      return (
+        <PosHome
+          empleado={estado.empleado}
+          token={estado.token}
+          sucursal={SUCURSAL_DEV}
+          caja={CAJA_DEV}
+          onBloquear={() => setEstado({ paso: "bloqueo", empleado: estado.empleado })}
+          onCambiarCajero={() => setEstado({ paso: "selector", pinPara: null })}
+          onSimularExpiracion={() => setEstado({ paso: "expirada", empleado: estado.empleado })}
+        />
+      );
+
+    case "bloqueo":
+      if (!cajaId) return sinCaja;
+      return (
+        <PantallaBloqueo
+          empleado={estado.empleado}
+          cajaId={cajaId}
+          caja={CAJA_DEV}
+          onExito={(r) => trasPin(estado.empleado, r)}
+          onCambiarUsuario={() => setEstado({ paso: "selector", pinPara: null })}
+        />
+      );
+
+    case "expirada":
+      if (!cajaId) return sinCaja;
+      return (
+        <ModalSesionExpirada
+          empleado={estado.empleado}
+          cajaId={cajaId}
+          onExito={(r) => trasPin(estado.empleado, r)}
+          onCerrarSesion={() => setEstado({ paso: "selector", pinPara: null })}
+        />
+      );
+  }
 }

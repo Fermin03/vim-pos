@@ -537,6 +537,7 @@ CREATE TRIGGER trg_cancelaciones_dia_folio
 CREATE OR REPLACE FUNCTION trg_cancelacion_marcar_ticket() RETURNS trigger
 LANGUAGE plpgsql
 SECURITY DEFINER       -- saltar trigger de validación de transición
+SET search_path = public, pg_temp   -- CN-001: search_path fijo (anti escalada en SECURITY DEFINER, CWE-426)
 AS $$
 BEGIN
   IF TG_OP = 'INSERT' THEN
@@ -844,6 +845,7 @@ CREATE TRIGGER trg_tickets_cfdi_updated_at
 CREATE OR REPLACE FUNCTION trg_cfdi_marcar_ticket_facturado() RETURNS trigger
 LANGUAGE plpgsql
 SECURITY DEFINER
+SET search_path = public, pg_temp   -- CN-001: search_path fijo (anti escalada en SECURITY DEFINER, CWE-426)
 AS $$
 BEGIN
   IF TG_OP = 'UPDATE'
@@ -1042,6 +1044,7 @@ CREATE TRIGGER trg_delivery_calcular
 CREATE OR REPLACE FUNCTION trg_delivery_sync_ticket() RETURNS trigger
 LANGUAGE plpgsql
 SECURITY DEFINER
+SET search_path = public, pg_temp   -- CN-001: search_path fijo (anti escalada en SECURITY DEFINER, CWE-426)
 AS $$
 BEGIN
   IF TG_OP = 'UPDATE' AND OLD.estado IS DISTINCT FROM NEW.estado THEN

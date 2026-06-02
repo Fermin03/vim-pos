@@ -2046,6 +2046,7 @@ CREATE OR REPLACE FUNCTION transicionar_estado_cocina_con_autorizacion(
 ) RETURNS void
 LANGUAGE plpgsql
 SECURITY DEFINER  -- permite saltar el trigger trg_tickets_validar_estado_cocina
+SET search_path = public, pg_temp   -- CN-001: search_path fijo (anti escalada en SECURITY DEFINER, CWE-426)
 AS $$
 DECLARE
   v_estado_anterior ticket_estado_cocina;

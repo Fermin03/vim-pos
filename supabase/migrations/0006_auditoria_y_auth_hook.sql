@@ -189,6 +189,11 @@ CREATE OR REPLACE FUNCTION public.custom_access_token_hook(event jsonb)
 RETURNS jsonb
 LANGUAGE plpgsql
 STABLE
+-- search_path fijo: GoTrue invoca el hook como supabase_auth_admin, cuyo search_path
+-- NO incluye public. Sin esto, las tablas sin calificar revientan con 42P01
+-- ("relation usuarios_acceso does not exist"). Se calteran además los nombres con
+-- public.* para ser inmunes a manipulación del search_path (best practice Supabase).
+SET search_path = ''
 AS $$
 DECLARE
   v_user_id    uuid := (event ->> 'user_id')::uuid;
@@ -206,8 +211,8 @@ BEGIN
            ELSE 'EMPLEADO'
          END
     INTO v_tenant_id, v_tipo
-    FROM usuarios_acceso ua
-    JOIN roles r ON r.id = ua.rol_id
+    FROM public.usuarios_acceso ua
+    JOIN public.roles r ON r.id = ua.rol_id
    WHERE ua.usuario_id = v_user_id
      AND ua.activo = true
      AND (ua.fecha_fin IS NULL OR ua.fecha_fin >= CURRENT_DATE)
@@ -240,6 +245,15 @@ REVOKE EXECUTE ON FUNCTION public.custom_access_token_hook FROM authenticated, a
 GRANT SELECT ON public.usuarios_acceso TO supabase_auth_admin;
 GRANT SELECT ON public.roles TO supabase_auth_admin;
 
+-- RLS: GoTrue ejecuta el hook como supabase_auth_admin SIN auth.uid() en contexto.
+-- Las políticas basadas en auth.uid() devuelven 0 filas → el hook no resolvería el
+-- tenant (claims null). Se concede lectura explícita a supabase_auth_admin sobre las
+-- dos tablas que lee el hook (patrón oficial Supabase RBAC: TO supabase_auth_admin).
+CREATE POLICY acceso_auth_admin ON public.usuarios_acceso
+  AS PERMISSIVE FOR SELECT TO supabase_auth_admin USING (true);
+CREATE POLICY roles_auth_admin ON public.roles
+  AS PERMISSIVE FOR SELECT TO supabase_auth_admin USING (true);
+
 -- El hook lee estas tablas saltándose RLS porque supabase_auth_admin es
 -- un rol privilegiado; aun así limitamos a SELECT.
 
@@ -253,12 +267,14 @@ CREATE OR REPLACE FUNCTION verificar_pin_login(
 ) RETURNS jsonb
 LANGUAGE plpgsql
 SECURITY DEFINER
+SET search_path = public, extensions, pg_temp   -- CN-001: search_path fijo ('extensions' por crypt() de pgcrypto)
 AS $$
 DECLARE
-  v_perfil    usuarios_perfil%ROWTYPE;
-  v_sucursal  uuid;
-  v_tenant    uuid;
-  v_acceso_ok boolean;
+  v_perfil      usuarios_perfil%ROWTYPE;
+  v_sucursal    uuid;
+  v_caja_tenant uuid;
+  v_tenant      uuid;
+  v_acceso_ok   boolean;
 BEGIN
   SELECT * INTO v_perfil FROM usuarios_perfil WHERE id = p_usuario_id AND deleted_at IS NULL;
 
@@ -268,7 +284,34 @@ BEGIN
     RETURN jsonb_build_object('ok', false, 'motivo', 'PIN_INCORRECTO');
   END IF;
 
-  -- Bloqueos
+  -- CN-002/CN-003: establecer el binding caja → tenant → acceso ANTES de verificar el
+  -- PIN o mutar el contador de bloqueo. Así un caller con un usuario_id de otro tenant
+  -- (o una caja ajena) NO puede (a) autenticar contra una caja fuera de su tenant ni
+  -- (b) bloquear a un empleado de otro tenant disparando intentos fallidos.
+  SELECT c.sucursal_id, c.tenant_id INTO v_sucursal, v_caja_tenant
+    FROM cajas c WHERE c.id = p_caja_id;
+  IF NOT FOUND THEN
+    RETURN jsonb_build_object('ok', false, 'motivo', 'SIN_ACCESO_SUCURSAL');
+  END IF;
+
+  -- El usuario debe tener acceso activo EN EL TENANT DE LA CAJA y a esa sucursal
+  -- (sucursal_id NULL = acceso a todas las sucursales de SU propio tenant).
+  SELECT bool_or(ua.sucursal_id IS NULL OR ua.sucursal_id = v_sucursal)
+    INTO v_acceso_ok
+    FROM usuarios_acceso ua
+   WHERE ua.usuario_id = p_usuario_id
+     AND ua.tenant_id  = v_caja_tenant
+     AND ua.activo = true
+     AND (ua.fecha_fin IS NULL OR ua.fecha_fin >= CURRENT_DATE);
+
+  IF NOT COALESCE(v_acceso_ok, false) THEN
+    -- Sin acceso a esta caja/tenant: NO se tocan contadores de bloqueo (anti lockout cross-tenant).
+    RETURN jsonb_build_object('ok', false, 'motivo', 'SIN_ACCESO_SUCURSAL');
+  END IF;
+
+  v_tenant := v_caja_tenant;   -- el tenant del JWT lo manda la caja, ya validado contra el acceso del usuario
+
+  -- Bloqueos (ya consta que el usuario pertenece a la caja/tenant)
   IF v_perfil.estado IN ('BLOQUEADO_ADMIN','DESACTIVADO') THEN
     RETURN jsonb_build_object('ok', false, 'motivo', 'USUARIO_BLOQUEADO');
   END IF;
@@ -288,24 +331,10 @@ BEGIN
            estado = CASE WHEN intentos_pin_fallidos + 1 >= 6
                          THEN 'BLOQUEADO_ADMIN'::usuario_estado ELSE estado END
      WHERE id = p_usuario_id;
-    INSERT INTO pin_intentos(usuario_id, caja_id, exitoso, motivo_fallo)
-    VALUES (p_usuario_id, p_caja_id, false, 'PIN_INCORRECTO');
+    INSERT INTO pin_intentos(tenant_id, usuario_id, caja_id, exitoso, motivo_fallo)
+    VALUES (v_tenant, p_usuario_id, p_caja_id, false, 'PIN_INCORRECTO');
     RETURN jsonb_build_object('ok', false, 'motivo', 'PIN_INCORRECTO',
                               'intentos_restantes', GREATEST(0, 3 - (v_perfil.intentos_pin_fallidos + 1)));
-  END IF;
-
-  -- Resolver sucursal de la caja y validar acceso
-  SELECT sucursal_id INTO v_sucursal FROM cajas WHERE id = p_caja_id;
-  SELECT ua.tenant_id,
-         bool_or(ua.sucursal_id IS NULL OR ua.sucursal_id = v_sucursal)
-    INTO v_tenant, v_acceso_ok
-    FROM usuarios_acceso ua
-   WHERE ua.usuario_id = p_usuario_id AND ua.activo = true
-     AND (ua.fecha_fin IS NULL OR ua.fecha_fin >= CURRENT_DATE)
-   GROUP BY ua.tenant_id;
-
-  IF NOT COALESCE(v_acceso_ok, false) THEN
-    RETURN jsonb_build_object('ok', false, 'motivo', 'SIN_ACCESO_SUCURSAL');
   END IF;
 
   -- Éxito: resetear contador, registrar, devolver datos

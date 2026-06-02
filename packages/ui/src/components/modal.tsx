@@ -1,15 +1,30 @@
 "use client";
 import { useEffect, useRef, type ReactNode } from "react";
+import { cn } from "../cn";
 
 export interface ModalProps {
   open: boolean;
   onClose: () => void;
   title: string;
   children: ReactNode;
+  /** Oculta el título visible (sigue en aria-label para a11y). */
+  hideTitle?: boolean;
+  /** Clases de la tarjeta (override de ancho/padding por defecto). */
+  className?: string;
+  /** Clases del velo de fondo (override del color/blur por defecto). */
+  backdropClassName?: string;
 }
 
 /** Modal accesible: role=dialog, aria-modal, Esc cierra, foco atrapado. */
-export function Modal({ open, onClose, title, children }: ModalProps) {
+export function Modal({
+  open,
+  onClose,
+  title,
+  children,
+  hideTitle,
+  className,
+  backdropClassName,
+}: ModalProps) {
   const ref = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -51,7 +66,10 @@ export function Modal({ open, onClose, title, children }: ModalProps) {
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-ink/40 p-4"
+      className={cn(
+        "fixed inset-0 z-50 flex items-center justify-center bg-ink/40 p-4 animate-vim-fade",
+        backdropClassName,
+      )}
       onClick={(e) => e.target === e.currentTarget && onClose()}
     >
       <div
@@ -59,9 +77,16 @@ export function Modal({ open, onClose, title, children }: ModalProps) {
         role="dialog"
         aria-modal="true"
         aria-label={title}
-        className="w-full max-w-md rounded-lg bg-surface p-6 shadow-xl"
+        className={cn(
+          "animate-vim-pop",
+          className ?? "w-full max-w-md rounded-lg bg-surface p-6 shadow-xl",
+        )}
       >
-        <h2 className="mb-4 font-display text-lg font-semibold text-ink">{title}</h2>
+        {hideTitle ? (
+          <h2 className="sr-only">{title}</h2>
+        ) : (
+          <h2 className="mb-4 font-display text-lg font-semibold text-ink">{title}</h2>
+        )}
         {children}
       </div>
     </div>
