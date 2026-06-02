@@ -2,6 +2,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Button, Modal } from "@vim/ui/styles";
 import { PageHeader, PageBody } from "../../../components/page-header";
+import { CatalogoTabs } from "../../../components/catalogo-tabs";
 import { ModalCategoria } from "../../../components/modal-categoria";
 import {
   ICONOS,
@@ -87,6 +88,7 @@ export default function CategoriasPage() {
           </Button>
         }
       />
+      <CatalogoTabs />
       <PageBody>
         {/* Toolbar */}
         <div className="mb-4 flex items-center gap-3">
