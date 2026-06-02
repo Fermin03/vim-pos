@@ -25,8 +25,16 @@ export function olvidarCreds(): void {
   window.localStorage.removeItem(KEY);
 }
 
-/** Prellenado SOLO para DEV: la cuenta de dispositivo del fixture (seed.sql). */
+/**
+ * Prellenado SOLO para DEV: la cuenta de dispositivo del fixture (seed.sql).
+ *
+ * El email es público por diseño (es un identificador, no un secreto).
+ * El password se lee de NEXT_PUBLIC_VIM_DEV_DEVICE_PASSWORD (apps/pos/.env.local)
+ * para no tener un string-que-parece-credencial commiteado al repo. Default:
+ * `change_me_local_dev_only` (alineado con vim.dev_password de seed.sql).
+ * En producción esta constante NO se usa: el dispositivo se provisiona en setup.
+ */
 export const CREDS_DEV_FIXTURE: DeviceCreds = {
   email: "caja-99999999-0000-0000-0000-0000000000cc@dispositivos.vimpos.mx",
-  password: "vim-device-dev",
+  password: process.env.NEXT_PUBLIC_VIM_DEV_DEVICE_PASSWORD ?? "change_me_local_dev_only",
 };

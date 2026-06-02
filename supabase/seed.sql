@@ -319,13 +319,19 @@ DECLARE
   v_suc     uuid := '99999999-0000-0000-0000-0000000000bb';
   v_caja    uuid := '99999999-0000-0000-0000-0000000000cc';
   v_disp_email text := 'caja-99999999-0000-0000-0000-0000000000cc@dispositivos.vimpos.mx';
+
+  -- ⚠️ FIXTURE LOCAL DEV — passwords leídas de variables de sesión Postgres.
+  -- Defaults inocuos para evitar que GitHub Secret Scanning marque el archivo.
+  -- Para customizar: psql -c "ALTER DATABASE postgres SET vim.dev_password = 'lo_que_sea'"
+  -- O exportar PGOPTIONS antes de db reset.
+  v_dev_password text := COALESCE(current_setting('vim.dev_password', true), 'change_me_local_dev_only');
 BEGIN
   -- Usuario de auth (local dev). Si ya existe, no repetir.
   INSERT INTO auth.users (instance_id, id, aud, role, email, encrypted_password,
                           email_confirmed_at, created_at, updated_at,
                           raw_app_meta_data, raw_user_meta_data)
   VALUES ('00000000-0000-0000-0000-000000000000', v_maria, 'authenticated', 'authenticated',
-          'maria@knockout.dev', crypt('devpass', gen_salt('bf')),
+          'maria@knockout.dev', crypt(v_dev_password, gen_salt('bf')),
           now(), now(), now(), '{"provider":"email","providers":["email"]}', '{}')
   ON CONFLICT (id) DO NOTHING;
 
@@ -358,7 +364,7 @@ BEGIN
                           email_confirmed_at, created_at, updated_at,
                           raw_app_meta_data, raw_user_meta_data)
   VALUES ('00000000-0000-0000-0000-000000000000', v_disp, 'authenticated', 'authenticated',
-          v_disp_email, crypt('vim-device-dev', gen_salt('bf')),
+          v_disp_email, crypt(v_dev_password, gen_salt('bf')),
           now(), now(), now(), '{"provider":"email","providers":["email"]}', '{}')
   ON CONFLICT (id) DO NOTHING;
 
@@ -376,7 +382,7 @@ BEGIN
                           email_confirmed_at, created_at, updated_at,
                           raw_app_meta_data, raw_user_meta_data)
   VALUES ('00000000-0000-0000-0000-000000000000', v_dueno, 'authenticated', 'authenticated',
-          'dueno@knockout.dev', crypt('devadmin', gen_salt('bf')),
+          'dueno@knockout.dev', crypt(v_dev_password, gen_salt('bf')),
           now(), now(), now(), '{"provider":"email","providers":["email"]}', '{}')
   ON CONFLICT (id) DO NOTHING;
 
@@ -396,5 +402,5 @@ BEGIN
          phone_change = '', phone_change_token = '', reauthentication_token = ''
    WHERE id IN (v_maria, v_disp, v_dueno);
 
-  RAISE NOTICE 'FIXTURE DEV: María % (PIN 1234); dispositivo %; dueño dueno@knockout.dev / devadmin', v_maria, v_disp_email;
+  RAISE NOTICE 'FIXTURE DEV aplicado. María (PIN 1234) · dispositivo % · dueño dueno@knockout.dev. Password de auth (María/dispositivo/dueño): vim.dev_password (default: change_me_local_dev_only).', v_disp_email;
 END $$;
