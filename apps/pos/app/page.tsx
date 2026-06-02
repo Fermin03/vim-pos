@@ -15,9 +15,10 @@ import { SelectorEmpleados } from "./components/selector-empleados";
 import { ModalPin } from "./components/modal-pin";
 import { PantallaBloqueo } from "./components/pantalla-bloqueo";
 import { ModalSesionExpirada } from "./components/modal-sesion-expirada";
-import { PosHome } from "./components/pos-home";
+import { PantallaTurno } from "./components/pantalla-turno";
 
-// Etiquetas de la sucursal/caja del fixture (DEV). En F5 saldrán de la sesión real.
+// Etiquetas de la sucursal/caja para vistas previas a la sesión real (selector,
+// lock). En F5.0+ el POS operativo ya las lee de la BD vía PantallaTurno.
 const SUCURSAL_DEV = "Sucursal León Centro";
 const CAJA_DEV = "Caja 01";
 
@@ -135,12 +136,12 @@ export default function Page() {
       );
 
     case "operando":
+      if (!cajaId) return sinCaja;
       return (
-        <PosHome
+        <PantallaTurno
           empleado={estado.empleado}
           token={estado.token}
-          sucursal={SUCURSAL_DEV}
-          caja={CAJA_DEV}
+          cajaId={cajaId}
           onBloquear={() => setEstado({ paso: "bloqueo", empleado: estado.empleado })}
           onCambiarCajero={() => setEstado({ paso: "selector", pinPara: null })}
           onSimularExpiracion={() => setEstado({ paso: "expirada", empleado: estado.empleado })}
