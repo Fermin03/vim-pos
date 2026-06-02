@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 const TABS = [
   { label: "Categorías", href: "/catalogo/categorias" },
   { label: "Productos", href: "/catalogo/productos" },
+  { label: "Modificadores", href: "/catalogo/modificadores" },
 ];
 
 /** Sub-navegación del módulo Catálogo. */
