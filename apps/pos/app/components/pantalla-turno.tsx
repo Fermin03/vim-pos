@@ -1,10 +1,9 @@
 "use client";
 import { useEffect, useState } from "react";
-import { Button, StatusChip } from "@vim/ui/styles";
 import { type Empleado } from "../lib/supabase";
-import { TopbarPos } from "./topbar-pos";
 import { AbrirTurno } from "./abrir-turno";
-import { fmtMxn, leerCaja, turnoAbiertoDeCaja, type DatosCaja, type Turno } from "../lib/turno";
+import { HomePos } from "./home-pos";
+import { leerCaja, turnoAbiertoDeCaja, type DatosCaja, type Turno } from "../lib/turno";
 
 /**
  * Pantalla post-login: carga datos de la caja y decide entre abrir turno o
@@ -17,7 +16,7 @@ export function PantallaTurno({
   cajaId,
   onBloquear,
   onCambiarCajero,
-  onSimularExpiracion,
+  onSimularExpiracion: _onSimularExpiracion,
 }: {
   empleado: Empleado;
   token: string;
@@ -80,37 +79,14 @@ export function PantallaTurno({
     );
   }
 
-  // Placeholder operativo (F5.1+ reemplaza con catálogo/carrito/cobro)
   return (
-    <div className="flex h-screen flex-col">
-      <TopbarPos sucursal={caja.sucursalNombre} caja={caja.nombre} />
-      <div className="flex flex-1 flex-col items-center justify-center gap-6 p-8">
-        <StatusChip tone="success">Turno abierto</StatusChip>
-        <h1 className="font-display text-2xl font-semibold tracking-tight">¡Hola, {empleado.nombre}!</h1>
-
-        <div className="grid grid-cols-2 gap-4">
-          <div className="rounded-lg border border-line bg-surface p-5 text-center">
-            <div className="text-[11px] font-bold uppercase tracking-wide text-ink-3">Turno</div>
-            <div className="mt-1 font-display text-lg font-bold tabular-nums">{turno.codigo_turno}</div>
-          </div>
-          <div className="rounded-lg border border-line bg-surface p-5 text-center">
-            <div className="text-[11px] font-bold uppercase tracking-wide text-ink-3">Fondo</div>
-            <div className="mt-1 font-display text-lg font-bold tabular-nums">{fmtMxn(turno.fondo_inicial_mxn)}</div>
-          </div>
-        </div>
-
-        <p className="max-w-md text-center text-sm text-ink-3">
-          Turno abierto · RLS por tenant. El catálogo + carrito + cobro se construyen en F5.1+.
-        </p>
-
-        {error && <p className="text-sm font-medium text-danger" role="alert">{error}</p>}
-
-        <div className="flex flex-wrap items-center justify-center gap-2">
-          <Button variant="ghost" onClick={onBloquear}>Bloquear</Button>
-          <Button variant="ghost" onClick={onCambiarCajero}>Cambiar cajero</Button>
-          <Button variant="ghost" onClick={onSimularExpiracion}>Simular sesión expirada</Button>
-        </div>
-      </div>
-    </div>
+    <HomePos
+      empleado={empleado}
+      caja={caja}
+      turno={turno}
+      token={token}
+      onBloquear={onBloquear}
+      onCambiarCajero={onCambiarCajero}
+    />
   );
 }
