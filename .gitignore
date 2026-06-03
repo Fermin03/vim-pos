@@ -7,6 +7,7 @@ node_modules/
 dist/
 .turbo/
 out/
+*.tsbuildinfo
 
 # env / secrets  (NUNCA commitear service_role ni JWT secret)
 .env
@@ -22,3 +23,6 @@ supabase/.temp/
 *.log
 .vscode/
 .idea/
+
+# claude code — config local de preview/tooling
+.claude/
