@@ -348,6 +348,7 @@ export function HomePos({
       {totalesCobro && (
         <ModalCobro
           token={token}
+          sucursalId={caja.sucursal_id}
           totalesIniciales={totalesCobro}
           onPagado={(folio, cambio) => {
             setTotalesCobro(null);

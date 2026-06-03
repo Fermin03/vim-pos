@@ -102,6 +102,43 @@ export async function leerTotales(token: string, ticketId: string): Promise<Tota
   };
 }
 
+/** F5.2b — fija la propina del ticket (RPC establecer_propina_ticket, bajo RLS). */
+export async function establecerPropina(token: string, ticketId: string, monto: number): Promise<void> {
+  const { error } = await employeeClient(token).rpc("establecer_propina_ticket", {
+    p_ticket_id: ticketId,
+    p_monto_mxn: monto,
+  });
+  if (error) throw new Error(error.message);
+}
+
+export type SugerenciasPropina = {
+  porcentajes: number[];
+  capturar: boolean;
+  libre: boolean;
+  sin: boolean;
+};
+
+/** F5.2b — lee la config de propina de la sucursal (con defaults si no hay fila). */
+export async function leerSugerenciasPropina(token: string, sucursalId: string): Promise<SugerenciasPropina> {
+  const { data } = await employeeClient(token)
+    .from("sucursal_propinas_config")
+    .select("porcentajes_sugeridos, capturar_propina, permitir_monto_libre, permitir_sin_propina")
+    .eq("sucursal_id", sucursalId)
+    .maybeSingle();
+  const cfg = data as {
+    porcentajes_sugeridos: number[] | null;
+    capturar_propina: boolean | null;
+    permitir_monto_libre: boolean | null;
+    permitir_sin_propina: boolean | null;
+  } | null;
+  return {
+    porcentajes: cfg?.porcentajes_sugeridos ?? [10, 15, 20],
+    capturar: cfg?.capturar_propina ?? true,
+    libre: cfg?.permitir_monto_libre ?? true,
+    sin: cfg?.permitir_sin_propina ?? true,
+  };
+}
+
 /** Aplica un pago contra el ticket. Devuelve los totales actualizados. */
 export async function aplicarPago(
   token: string,
