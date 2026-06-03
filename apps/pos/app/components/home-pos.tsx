@@ -20,10 +20,11 @@ import {
   type ModificadorSel,
 } from "../lib/carrito";
 import { obtenerGruposDeProducto, type GrupoModificadores } from "../lib/modificadores";
-import { persistirTicket, type TotalesTicket } from "../lib/cobro";
+import { persistirTicket, leerTotales, type TotalesTicket } from "../lib/cobro";
 import { SidebarTicket } from "./sidebar-ticket";
 import { ModalModificadores } from "./modal-modificadores";
 import { ModalCobro } from "./modal-cobro";
+import { ModalDescuento } from "./modal-descuento";
 
 /** Topbar del POS operativo (mockup P-059): marca + sucursal/turno + reloj + cajero + acciones. */
 function TopbarOperativa({
@@ -116,6 +117,10 @@ export function HomePos({
   const [totalesCobro, setTotalesCobro] = useState<TotalesTicket | null>(null);
   const [procesandoCobro, setProcesandoCobro] = useState(false);
   const [confirmacion, setConfirmacion] = useState<{ folio: string | null; cambio: number } | null>(null);
+  // Ticket ya persistido en BD por el flujo de descuento. Mientras exista, el carrito
+  // queda comprometido (bloqueado) y el cobro reusa este mismo ticket (no re-persiste).
+  const [ticketBd, setTicketBd] = useState<TotalesTicket | null>(null);
+  const [descuentoAbierto, setDescuentoAbierto] = useState(false);
 
   useEffect(() => {
     let activo = true;
@@ -142,7 +147,7 @@ export function HomePos({
 
   const onTapProducto = useCallback(
     async (p: Producto) => {
-      if (p.agotado) return;
+      if (p.agotado || ticketBd) return;
       try {
         const grupos = await obtenerGruposDeProducto(token, p.id);
         if (grupos.length === 0) {
@@ -154,7 +159,7 @@ export function HomePos({
         setError(e instanceof Error ? e.message : "Error al cargar modificadores");
       }
     },
-    [token],
+    [token, ticketBd],
   );
 
   const confirmarModificadores = useCallback(
@@ -166,8 +171,36 @@ export function HomePos({
     [modGrupos],
   );
 
+  /** Persiste el ticket si aún no existe; abre el modal de descuento sobre ese ticket. */
+  const onAplicarDescuento = useCallback(async () => {
+    if (carrito.lineas.length === 0) return;
+    setProcesandoCobro(true);
+    setError(null);
+    try {
+      if (!ticketBd) {
+        const totales = await persistirTicket(
+          { token, sucursalId: caja.sucursal_id, cajaId: turno.caja_id, turnoId: turno.id },
+          carrito.modoServicio,
+          carrito.lineas,
+          nuevoClientId(),
+        );
+        setTicketBd(totales);
+      }
+      setDescuentoAbierto(true);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Error al preparar el descuento");
+    } finally {
+      setProcesandoCobro(false);
+    }
+  }, [carrito, ticketBd, token, caja.sucursal_id, turno.caja_id, turno.id]);
+
   const iniciarCobro = useCallback(async () => {
     if (carrito.lineas.length === 0) return;
+    // Si el ticket ya se persistió (flujo de descuento), reusarlo: nada de re-abrir.
+    if (ticketBd) {
+      setTotalesCobro(ticketBd);
+      return;
+    }
     setProcesandoCobro(true);
     setError(null);
     try {
@@ -183,7 +216,9 @@ export function HomePos({
     } finally {
       setProcesandoCobro(false);
     }
-  }, [carrito, token, caja.sucursal_id, turno.caja_id, turno.id]);
+  }, [carrito, ticketBd, token, caja.sucursal_id, turno.caja_id, turno.id]);
+
+  const bloqueado = ticketBd !== null;
 
   return (
     <div className="flex h-screen flex-col">
@@ -241,11 +276,11 @@ export function HomePos({
                 <button
                   key={p.id}
                   type="button"
-                  disabled={p.agotado}
+                  disabled={p.agotado || bloqueado}
                   onClick={() => onTapProducto(p)}
                   className={[
                     "group relative flex flex-col items-stretch gap-2 rounded-lg border bg-surface p-3 text-left transition",
-                    p.agotado
+                    p.agotado || bloqueado
                       ? "cursor-not-allowed border-line opacity-50"
                       : "border-line hover:border-ink hover:shadow-sm active:scale-[.98]",
                   ].join(" ")}
@@ -274,6 +309,10 @@ export function HomePos({
           onQuitar={(id) => dispatch({ tipo: "quitar", clientId: id })}
           onModo={(m: ModoServicio) => dispatch({ tipo: "modo", modo: m })}
           onCobrar={iniciarCobro}
+          onAplicarDescuento={onAplicarDescuento}
+          descuentoMxn={ticketBd?.descuentos ?? 0}
+          totalConDescuento={ticketBd ? ticketBd.total : undefined}
+          bloqueado={bloqueado}
           procesando={procesandoCobro}
         />
       </div>
@@ -286,12 +325,33 @@ export function HomePos({
           onCancelar={() => setModGrupos(null)}
         />
       )}
+      {descuentoAbierto && ticketBd && (
+        <ModalDescuento
+          token={token}
+          empleado={empleado}
+          ticketId={ticketBd.ticketId}
+          totalActual={ticketBd.total}
+          cajaId={turno.caja_id}
+          turnoId={turno.id}
+          onAplicado={async () => {
+            try {
+              const t = await leerTotales(token, ticketBd.ticketId);
+              setTicketBd(t);
+            } catch (e) {
+              setError(e instanceof Error ? e.message : "Error al releer totales");
+            }
+            setDescuentoAbierto(false);
+          }}
+          onCerrar={() => setDescuentoAbierto(false)}
+        />
+      )}
       {totalesCobro && (
         <ModalCobro
           token={token}
           totalesIniciales={totalesCobro}
           onPagado={(folio, cambio) => {
             setTotalesCobro(null);
+            setTicketBd(null);
             dispatch({ tipo: "limpiar" });
             setConfirmacion({ folio, cambio });
           }}

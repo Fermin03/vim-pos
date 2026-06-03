@@ -20,6 +20,7 @@ export type TotalesTicket = {
   ticketId: string;
   subtotal: number;
   iva: number;
+  descuentos: number;
   total: number;
   montoPagado: number;
   cambio: number;
@@ -77,12 +78,13 @@ export async function persistirTicket(
 export async function leerTotales(token: string, ticketId: string): Promise<TotalesTicket> {
   const { data, error } = await employeeClient(token)
     .from("tickets")
-    .select("id, subtotal_mxn, iva_mxn, total_mxn, monto_pagado_mxn, cambio_mxn, monto_pendiente_mxn, estado_fiscal, folio_completo")
+    .select("id, subtotal_mxn, iva_mxn, descuentos_manuales_mxn, total_mxn, monto_pagado_mxn, cambio_mxn, monto_pendiente_mxn, estado_fiscal, folio_completo")
     .eq("id", ticketId)
     .single();
   if (error) throw new Error(error.message);
   const t = data as {
-    id: string; subtotal_mxn: string | number; iva_mxn: string | number; total_mxn: string | number;
+    id: string; subtotal_mxn: string | number; iva_mxn: string | number;
+    descuentos_manuales_mxn: string | number; total_mxn: string | number;
     monto_pagado_mxn: string | number; cambio_mxn: string | number; monto_pendiente_mxn: string | number;
     estado_fiscal: string; folio_completo: string | null;
   };
@@ -90,6 +92,7 @@ export async function leerTotales(token: string, ticketId: string): Promise<Tota
     ticketId: t.id,
     subtotal: Number(t.subtotal_mxn),
     iva: Number(t.iva_mxn),
+    descuentos: Number(t.descuentos_manuales_mxn),
     total: Number(t.total_mxn),
     montoPagado: Number(t.monto_pagado_mxn),
     cambio: Number(t.cambio_mxn),
