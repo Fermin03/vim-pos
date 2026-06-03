@@ -1,8 +1,15 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Button } from "@vim/ui/styles";
 import { fmtMxn } from "../lib/turno";
-import { aplicarPago, type MetodoPago, type TotalesTicket } from "../lib/cobro";
+import {
+  aplicarPago,
+  establecerPropina,
+  leerSugerenciasPropina,
+  type MetodoPago,
+  type SugerenciasPropina,
+  type TotalesTicket,
+} from "../lib/cobro";
 import { nuevoClientId } from "../lib/carrito";
 
 // ─── Íconos SVG inline (calcan los mockups) ────────────────────────────────
@@ -178,7 +185,7 @@ function metodoCfg(v: MetodoPago): MetodoConfig {
 
 // ─── Sub-vistas ──────────────────────────────────────────────────────────────
 
-type Vista = "selector" | "efectivo" | "otro" | "dividido";
+type Vista = "propina" | "selector" | "efectivo" | "otro" | "dividido";
 
 // ─── Tipos locales ───────────────────────────────────────────────────────────
 
@@ -831,24 +838,215 @@ function VistaDividida({
   );
 }
 
+// ─── Vista: propina (P-075) ──────────────────────────────────────────────────
+
+function VistaPropina({
+  totalBase,
+  ticketId,
+  sugerencias,
+  procesando,
+  error,
+  onConfirmar,
+  onAtras,
+}: {
+  totalBase: number;
+  ticketId: string;
+  sugerencias: SugerenciasPropina;
+  procesando: boolean;
+  error: string | null;
+  onConfirmar: (monto: number) => void;
+  onAtras: () => void;
+}) {
+  const [mode, setMode] = useState<"none" | "pct" | "free">(sugerencias.sin ? "none" : "pct");
+  const [pctSel, setPctSel] = useState<number>(sugerencias.porcentajes[0] ?? 10);
+  const [freeBuffer, setFreeBuffer] = useState<string>("");
+
+  const calcTip = (p: number) => Math.round(totalBase * p) / 100; // totalBase * p/100, a 2 decimales
+  const tip =
+    mode === "pct" ? calcTip(pctSel) : mode === "free" ? (freeBuffer ? parseInt(freeBuffer, 10) : 0) : 0;
+  const grand = Math.round((totalBase + tip) * 100) / 100;
+
+  const altBase =
+    "inline-flex items-center justify-center gap-2 px-[13px] py-[13px] border rounded text-[14.5px] font-semibold cursor-pointer transition-all";
+  const altOn = "border-ink bg-sel text-ink shadow-[inset_0_0_0_1.5px_#16161A]";
+  const altOff = "border-line bg-surface text-ink-2 hover:border-line-strong hover:text-ink";
+
+  return (
+    <div className="flex flex-col">
+      {/* Prompt */}
+      <div className="mb-5 text-center">
+        <div className="mb-1.5 text-[12px] font-bold uppercase tracking-[0.07em] text-ink-3">
+          Cobro · Ticket #{ticketId.slice(-6)}
+        </div>
+        <h1 className="font-display text-[25px] font-semibold tracking-tight">¿Agregar propina?</h1>
+        <p className="mt-1 text-[14px] text-ink-2">Se calcula sobre el total de {fmtMxn(totalBase)}</p>
+      </div>
+
+      {/* Porcentajes sugeridos */}
+      <div className="mb-3 grid grid-cols-3 gap-3">
+        {sugerencias.porcentajes.map((p) => {
+          const on = mode === "pct" && pctSel === p;
+          return (
+            <button
+              key={p}
+              type="button"
+              onClick={() => { setMode("pct"); setPctSel(p); }}
+              className={[
+                "flex flex-col items-center gap-1 rounded-lg border px-2 py-[18px] transition-all",
+                on ? "border-ink bg-sel shadow-[inset_0_0_0_1.5px_#16161A]" : "border-line bg-surface hover:border-line-strong",
+              ].join(" ")}
+            >
+              <span className="font-display text-[24px] font-bold text-ink">{p}%</span>
+              <span className={["text-[13px] font-semibold tabular-nums", on ? "text-ink-2" : "text-ink-3"].join(" ")}>
+                {fmtMxn(calcTip(p))}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Monto libre / Sin propina */}
+      {(sugerencias.libre || sugerencias.sin) && (
+        <div className={["mb-5 grid gap-3", sugerencias.libre && sugerencias.sin ? "grid-cols-2" : "grid-cols-1"].join(" ")}>
+          {sugerencias.libre && (
+            <button
+              type="button"
+              onClick={() => { setMode("free"); setFreeBuffer(""); }}
+              className={[altBase, mode === "free" ? altOn : altOff].join(" ")}
+            >
+              <IcoEfectivo cls="w-4 h-4" />
+              Monto libre
+            </button>
+          )}
+          {sugerencias.sin && (
+            <button
+              type="button"
+              onClick={() => setMode("none")}
+              className={[altBase, mode === "none" ? altOn : altOff].join(" ")}
+            >
+              <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <line x1="5" y1="12" x2="19" y2="12" />
+              </svg>
+              Sin propina
+            </button>
+          )}
+        </div>
+      )}
+
+      {/* Numpad de monto libre */}
+      {mode === "free" && (
+        <div className="mb-5">
+          <div className="mb-3 text-center font-display text-[34px] font-bold tabular-nums text-ink">
+            {fmtMxn(freeBuffer ? parseInt(freeBuffer, 10) : 0)}
+          </div>
+          <div className="mx-auto max-w-[300px]">
+            <Numpad buffer={freeBuffer} onChange={setFreeBuffer} compact />
+          </div>
+        </div>
+      )}
+
+      {/* Resumen */}
+      <div className="overflow-hidden rounded-lg border border-line">
+        <div className="flex items-center justify-between border-b border-line px-[18px] py-[13px]">
+          <span className="text-[14.5px] text-ink-2">Total del ticket</span>
+          <span className="font-display text-[16px] font-semibold tabular-nums text-ink">{fmtMxn(totalBase)}</span>
+        </div>
+        <div className="flex items-center justify-between border-b border-line px-[18px] py-[13px]">
+          <span className="text-[14.5px] font-semibold text-success">Propina</span>
+          <span className="font-display text-[16px] font-semibold tabular-nums text-success">{fmtMxn(tip)}</span>
+        </div>
+        <div className="flex items-center justify-between bg-sel px-[18px] py-[13px]">
+          <span className="text-[15px] font-bold uppercase tracking-[0.03em] text-ink">Total a cobrar</span>
+          <span className="font-display text-[28px] font-bold tabular-nums tracking-[-0.02em] text-ink">{fmtMxn(grand)}</span>
+        </div>
+      </div>
+
+      {error && <p className="mt-3 text-sm font-medium text-danger" role="alert">{error}</p>}
+
+      {/* Footer */}
+      <div className="mt-5 flex items-center justify-between gap-3">
+        <button
+          type="button"
+          onClick={onAtras}
+          disabled={procesando}
+          className="inline-flex items-center gap-2 rounded border border-line-strong px-[20px] py-[14px] text-[15px] font-semibold text-ink-2 transition-colors hover:bg-hover hover:text-ink disabled:opacity-50"
+        >
+          <IcoBack cls="w-4 h-4" />
+          Atrás
+        </button>
+        <button
+          type="button"
+          onClick={() => { if (!procesando) onConfirmar(tip); }}
+          disabled={procesando}
+          className="inline-flex items-center gap-[9px] rounded bg-accent px-[30px] py-[14px] text-[15px] font-bold text-white shadow-sm transition-colors hover:bg-accent-hover disabled:cursor-not-allowed disabled:bg-line-strong"
+        >
+          {procesando ? "Guardando…" : <>Confirmar <span className="font-display tabular-nums opacity-90">{fmtMxn(grand)}</span></>}
+        </button>
+      </div>
+    </div>
+  );
+}
+
 // ─── Componente principal ────────────────────────────────────────────────────
 
 export function ModalCobro({
   token,
+  sucursalId,
   totalesIniciales,
   onPagado,
   onCerrar,
 }: {
   token: string;
+  sucursalId: string;
   totalesIniciales: TotalesTicket;
   onPagado: (folio: string | null, cambio: number) => void;
   onCerrar: () => void;
 }) {
   const [totales, setTotales] = useState<TotalesTicket>(totalesIniciales);
-  const [vista, setVista] = useState<Vista>("selector");
+  const [vista, setVista] = useState<Vista>("propina");
   const [metodo, setMetodo] = useState<MetodoPago>("EFECTIVO");
   const [error, setError] = useState<string | null>(null);
   const [procesando, setProcesando] = useState(false);
+  // Propina (P-075): se captura antes de elegir método. El "a cobrar" pasa a total + propina.
+  const [propina, setPropina] = useState(0);
+  const [sug, setSug] = useState<SugerenciasPropina | null>(null);
+
+  useEffect(() => {
+    let activo = true;
+    leerSugerenciasPropina(token, sucursalId)
+      .then((s) => {
+        if (!activo) return;
+        setSug(s);
+        if (!s.capturar) setVista("selector"); // sucursal sin propina → salta el paso
+      })
+      .catch(() => {
+        if (!activo) return;
+        setSug({ porcentajes: [10, 15, 20], capturar: false, libre: true, sin: true });
+        setVista("selector");
+      });
+    return () => { activo = false; };
+  }, [token, sucursalId]);
+
+  // Total autoritativo (BD) + propina capturada en cliente; la propina ya quedó persistida.
+  const totalesEf: TotalesTicket = {
+    ...totales,
+    total: Math.round((totales.total + propina) * 100) / 100,
+    pendiente: Math.round((totales.pendiente + propina) * 100) / 100,
+  };
+
+  async function confirmarPropina(monto: number) {
+    setError(null);
+    setProcesando(true);
+    try {
+      await establecerPropina(token, totales.ticketId, monto);
+      setPropina(monto);
+      setVista("selector");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "No se pudo fijar la propina");
+    } finally {
+      setProcesando(false);
+    }
+  }
 
   async function aplicarUnPago(m: MetodoPago, monto: number, recibido?: number) {
     setError(null);
@@ -909,16 +1107,31 @@ export function ModalCobro({
             : "w-full max-w-[560px] max-h-[90vh] overflow-y-auto p-6",
         ].join(" ")}
       >
+        {vista === "propina" && (
+          sug ? (
+            <VistaPropina
+              totalBase={totales.total}
+              ticketId={totales.ticketId}
+              sugerencias={sug}
+              procesando={procesando}
+              error={error}
+              onConfirmar={confirmarPropina}
+              onAtras={onCerrar}
+            />
+          ) : (
+            <div className="flex items-center justify-center py-16 text-sm text-ink-3">Cargando…</div>
+          )
+        )}
         {vista === "selector" && (
           <VistaSelector
-            totales={totales}
+            totales={totalesEf}
             onElegir={elegirMetodo}
             onCerrar={onCerrar}
           />
         )}
         {vista === "efectivo" && (
           <VistaEfectivo
-            totales={totales}
+            totales={totalesEf}
             procesando={procesando}
             error={error}
             onAplicar={(monto, recibido) => aplicarUnPago("EFECTIVO", monto, recibido)}
@@ -927,7 +1140,7 @@ export function ModalCobro({
         )}
         {vista === "otro" && (
           <VistaOtro
-            totales={totales}
+            totales={totalesEf}
             metodo={metodo}
             procesando={procesando}
             error={error}
@@ -937,7 +1150,7 @@ export function ModalCobro({
         )}
         {vista === "dividido" && (
           <VistaDividida
-            totales={totales}
+            totales={totalesEf}
             procesando={procesando}
             error={error}
             onAplicarPago={aplicarPagosDivididos}
