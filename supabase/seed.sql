@@ -396,5 +396,33 @@ BEGIN
          phone_change = '', phone_change_token = '', reauthentication_token = ''
    WHERE id IN (v_maria, v_disp, v_dueno);
 
+  -- ── Catálogo de prueba (F5.2): 1 categoría + 2 productos ─────────────────────
+  INSERT INTO categorias (id, tenant_id, nombre, icono, orden_visualizacion)
+  VALUES ('a0000000-0000-0000-0000-0000000000c1', v_tenant, 'Hamburguesas', 'burger', 1);
+
+  INSERT INTO productos (id, tenant_id, categoria_id, nombre, precio_base_mxn, tasa_iva, iva_incluido_en_precio)
+  VALUES
+    ('b0000000-0000-0000-0000-0000000000f1', v_tenant, 'a0000000-0000-0000-0000-0000000000c1', 'Hamburguesa Clásica', 120.00, 16.00, true),
+    ('b0000000-0000-0000-0000-0000000000f2', v_tenant, 'a0000000-0000-0000-0000-0000000000c1', 'Papas Gajo', 55.00, 16.00, true);
+
+  -- ── Modificadores (F5.2) ─────────────────────────────────────────────────────
+  INSERT INTO grupos_modificadores (id, tenant_id, nombre, tipo_seleccion, naturaleza, orden_visualizacion)
+  VALUES
+    ('a1000000-0000-0000-0000-000000000001', v_tenant, 'Término de cocción', 'UNICA_OBLIGATORIA', 'PREPARACION', 1),
+    ('a1000000-0000-0000-0000-000000000002', v_tenant, 'Extras', 'MULTIPLE_OPCIONAL', 'EXTRA', 2);
+
+  INSERT INTO opciones_modificador (tenant_id, grupo_id, nombre, precio_extra_mxn, es_default, orden_visualizacion)
+  VALUES
+    (v_tenant, 'a1000000-0000-0000-0000-000000000001', 'Tres cuartos', 0, true, 1),
+    (v_tenant, 'a1000000-0000-0000-0000-000000000001', 'Bien cocida', 0, false, 2),
+    (v_tenant, 'a1000000-0000-0000-0000-000000000002', 'Extra queso', 15.00, false, 1),
+    (v_tenant, 'a1000000-0000-0000-0000-000000000002', 'Tocino', 20.00, false, 2);
+
+  -- Ambos grupos aplican a la Hamburguesa Clásica
+  INSERT INTO productos_grupos_modificadores (tenant_id, producto_id, grupo_id, orden_visualizacion)
+  VALUES
+    (v_tenant, 'b0000000-0000-0000-0000-0000000000f1', 'a1000000-0000-0000-0000-000000000001', 1),
+    (v_tenant, 'b0000000-0000-0000-0000-0000000000f1', 'a1000000-0000-0000-0000-000000000002', 2);
+
   RAISE NOTICE 'FIXTURE DEV: María % (PIN 1234); dispositivo %; dueño dueno@knockout.dev / devadmin', v_maria, v_disp_email;
 END $$;
