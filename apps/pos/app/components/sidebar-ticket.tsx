@@ -73,6 +73,10 @@ export function SidebarTicket({
   onQuitar,
   onModo,
   onCobrar,
+  onAplicarDescuento,
+  descuentoMxn = 0,
+  totalConDescuento,
+  bloqueado = false,
   procesando,
 }: {
   estado: EstadoCarrito;
@@ -80,11 +84,20 @@ export function SidebarTicket({
   onQuitar: (clientId: string) => void;
   onModo: (m: ModoServicio) => void;
   onCobrar: () => void;
+  onAplicarDescuento: () => void;
+  /** Monto de descuento ya aplicado en BD (autoritativo). 0 = sin descuento. */
+  descuentoMxn?: number;
+  /** Total autoritativo de la BD cuando el ticket ya está persistido; si falta, se usa el display. */
+  totalConDescuento?: number;
+  /** El ticket ya está comprometido en BD: bloquea edición del carrito para evitar desincronización. */
+  bloqueado?: boolean;
   procesando: boolean;
 }) {
   const totales = calcularTotalesDisplay(estado.lineas);
   const vacio = estado.lineas.length === 0;
   const totalProductos = estado.lineas.reduce((s, l) => s + l.cantidad, 0);
+  const hayDescuento = descuentoMxn > 0;
+  const totalFinal = totalConDescuento ?? totales.total;
 
   return (
     <aside className="flex w-[404px] flex-shrink-0 flex-col border-l border-line bg-surface">
@@ -110,8 +123,9 @@ export function SidebarTicket({
           {/* Badge de modo — clic cicla el modo */}
           <button
             type="button"
+            disabled={bloqueado}
             onClick={() => onModo(siguienteModo(estado.modoServicio))}
-            className="inline-flex cursor-pointer items-center gap-[7px] rounded-full bg-[#ECEEF1] px-[13px] py-[6px] text-[13px] font-semibold text-[#4A5568] transition-colors hover:bg-hover"
+            className="inline-flex cursor-pointer items-center gap-[7px] rounded-full bg-[#ECEEF1] px-[13px] py-[6px] text-[13px] font-semibold text-[#4A5568] transition-colors hover:bg-hover disabled:cursor-default disabled:opacity-60 disabled:hover:bg-[#ECEEF1]"
           >
             <span className="h-2 w-2 flex-shrink-0 rounded-full bg-[#4A5568]" />
             {MODO_LABELS[estado.modoServicio]}
@@ -176,8 +190,9 @@ export function SidebarTicket({
                     <button
                       type="button"
                       aria-label="Menos"
+                      disabled={bloqueado}
                       onClick={() => onCantidad(l.clientId, l.cantidad - 1)}
-                      className="flex h-9 w-9 items-center justify-center bg-surface text-[19px] leading-none text-ink-2 transition-colors hover:bg-hover"
+                      className="flex h-9 w-9 items-center justify-center bg-surface text-[19px] leading-none text-ink-2 transition-colors hover:bg-hover disabled:cursor-default disabled:opacity-40 disabled:hover:bg-surface"
                     >
                       −
                     </button>
@@ -187,16 +202,18 @@ export function SidebarTicket({
                     <button
                       type="button"
                       aria-label="Más"
+                      disabled={bloqueado}
                       onClick={() => onCantidad(l.clientId, l.cantidad + 1)}
-                      className="flex h-9 w-9 items-center justify-center bg-surface text-[19px] leading-none text-ink-2 transition-colors hover:bg-hover"
+                      className="flex h-9 w-9 items-center justify-center bg-surface text-[19px] leading-none text-ink-2 transition-colors hover:bg-hover disabled:cursor-default disabled:opacity-40 disabled:hover:bg-surface"
                     >
                       +
                     </button>
                   </span>
                   <button
                     type="button"
+                    disabled={bloqueado}
                     onClick={() => onQuitar(l.clientId)}
-                    className="rounded px-2 py-[5px] text-[13px] font-semibold text-ink-3 transition-all hover:bg-hover hover:text-danger"
+                    className="rounded px-2 py-[5px] text-[13px] font-semibold text-ink-3 transition-all hover:bg-hover hover:text-danger disabled:cursor-default disabled:opacity-40 disabled:hover:bg-transparent disabled:hover:text-ink-3"
                   >
                     Quitar
                   </button>
@@ -217,12 +234,18 @@ export function SidebarTicket({
           <span>IVA (16%)</span>
           <span className="tabular-nums text-ink font-medium">{fmtMxn(totales.iva)}</span>
         </div>
+        {hayDescuento && (
+          <div className="mb-[7px] flex justify-between text-[14.5px] font-medium text-danger">
+            <span>Descuento</span>
+            <span className="tabular-nums">−{fmtMxn(descuentoMxn)}</span>
+          </div>
+        )}
         <div className="mt-3 flex items-baseline justify-between">
           <span className="text-[15px] font-bold uppercase tracking-[0.03em] text-ink">
             Total
           </span>
           <span className="font-display text-[30px] font-bold tabular-nums tracking-[-0.02em] text-ink">
-            {fmtMxn(totales.total)}
+            {fmtMxn(totalFinal)}
           </span>
         </div>
       </div>
@@ -238,14 +261,14 @@ export function SidebarTicket({
           <IconoNota />
           Nota
         </button>
-        {/* F5.2b — diferido */}
         <button
           type="button"
-          disabled
+          disabled={vacio || hayDescuento || procesando}
+          onClick={onAplicarDescuento}
           className="inline-flex flex-1 cursor-pointer items-center justify-center gap-[7px] rounded border border-line-strong bg-surface px-[11px] py-[11px] text-[14px] font-semibold text-ink-2 transition-all hover:border-ink hover:text-ink disabled:cursor-default disabled:opacity-[.45] disabled:hover:border-line-strong disabled:hover:text-ink-2"
         >
           <IconoDescuento />
-          Descuento
+          {hayDescuento ? "Descuento aplicado" : "Descuento"}
         </button>
       </div>
 
@@ -262,7 +285,7 @@ export function SidebarTicket({
           ) : (
             <>
               Cobrar{" "}
-              <span className="font-display tabular-nums">{fmtMxn(totales.total)}</span>
+              <span className="font-display tabular-nums">{fmtMxn(totalFinal)}</span>
             </>
           )}
         </button>
