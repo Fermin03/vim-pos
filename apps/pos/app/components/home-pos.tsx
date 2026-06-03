@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useReducer, useState } from "react";
 import { Button } from "@vim/ui/styles";
 import {
   ICONOS_POS,
@@ -12,6 +12,18 @@ import {
 import { fmtMxn, type DatosCaja, type Turno } from "../lib/turno";
 import { useReloj } from "./topbar-pos";
 import { type Empleado } from "../lib/supabase";
+import {
+  reducerCarrito,
+  estadoInicial,
+  nuevoClientId,
+  type ModoServicio,
+  type ModificadorSel,
+} from "../lib/carrito";
+import { obtenerGruposDeProducto, type GrupoModificadores } from "../lib/modificadores";
+import { persistirTicket, type TotalesTicket } from "../lib/cobro";
+import { SidebarTicket } from "./sidebar-ticket";
+import { ModalModificadores } from "./modal-modificadores";
+import { ModalCobro } from "./modal-cobro";
 
 /** Topbar del POS operativo (mockup P-059): marca + sucursal/turno + reloj + cajero + acciones. */
 function TopbarOperativa({
@@ -99,6 +111,11 @@ export function HomePos({
   const [productos, setProductos] = useState<Producto[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [catSel, setCatSel] = useState<string | null>(null);
+  const [carrito, dispatch] = useReducer(reducerCarrito, estadoInicial);
+  const [modGrupos, setModGrupos] = useState<{ producto: Producto; grupos: GrupoModificadores[] } | null>(null);
+  const [totalesCobro, setTotalesCobro] = useState<TotalesTicket | null>(null);
+  const [procesandoCobro, setProcesandoCobro] = useState(false);
+  const [confirmacion, setConfirmacion] = useState<{ folio: string | null; cambio: number } | null>(null);
 
   useEffect(() => {
     let activo = true;
@@ -122,6 +139,51 @@ export function HomePos({
     () => (productos ?? []).filter((p) => !catSel || p.categoria_id === catSel),
     [productos, catSel],
   );
+
+  const onTapProducto = useCallback(
+    async (p: Producto) => {
+      if (p.agotado) return;
+      try {
+        const grupos = await obtenerGruposDeProducto(token, p.id);
+        if (grupos.length === 0) {
+          dispatch({ tipo: "agregar", linea: { clientId: nuevoClientId(), producto: p, cantidad: 1, modificadores: [], notaCocina: null } });
+        } else {
+          setModGrupos({ producto: p, grupos });
+        }
+      } catch (e) {
+        setError(e instanceof Error ? e.message : "Error al cargar modificadores");
+      }
+    },
+    [token],
+  );
+
+  const confirmarModificadores = useCallback(
+    (mods: ModificadorSel[], nota: string | null) => {
+      if (!modGrupos) return;
+      dispatch({ tipo: "agregar", linea: { clientId: nuevoClientId(), producto: modGrupos.producto, cantidad: 1, modificadores: mods, notaCocina: nota } });
+      setModGrupos(null);
+    },
+    [modGrupos],
+  );
+
+  const iniciarCobro = useCallback(async () => {
+    if (carrito.lineas.length === 0) return;
+    setProcesandoCobro(true);
+    setError(null);
+    try {
+      const totales = await persistirTicket(
+        { token, sucursalId: caja.sucursal_id, cajaId: turno.caja_id, turnoId: turno.id },
+        carrito.modoServicio,
+        carrito.lineas,
+        nuevoClientId(),
+      );
+      setTotalesCobro(totales);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Error al abrir el ticket");
+    } finally {
+      setProcesandoCobro(false);
+    }
+  }, [carrito, token, caja.sucursal_id, turno.caja_id, turno.id]);
 
   return (
     <div className="flex h-screen flex-col">
@@ -180,6 +242,7 @@ export function HomePos({
                   key={p.id}
                   type="button"
                   disabled={p.agotado}
+                  onClick={() => onTapProducto(p)}
                   className={[
                     "group relative flex flex-col items-stretch gap-2 rounded-lg border bg-surface p-3 text-left transition",
                     p.agotado
@@ -205,33 +268,47 @@ export function HomePos({
           )}
         </div>
 
-        {/* Sidebar ticket — placeholder (F5.2 implementa el carrito) */}
-        <aside className="flex w-[340px] flex-shrink-0 flex-col border-l border-line bg-surface">
-          <div className="border-b border-line p-4">
-            <div className="text-[11px] font-bold uppercase tracking-wide text-ink-3">Ticket actual</div>
-            <div className="mt-1 font-display text-[17px] font-semibold">Ticket nuevo</div>
-          </div>
-          <div className="flex flex-1 flex-col items-center justify-center gap-2 p-6 text-center">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="h-12 w-12 text-line-strong">
-              <path d="M4 2v20l2-1 2 1 2-1 2 1 2-1 2 1 2-1 2 1V2l-2 1-2-1-2 1-2-1-2 1-2-1-2 1z" />
-            </svg>
-            <p className="text-sm font-medium text-ink-2">Carrito vacío</p>
-            <p className="text-[12.5px] text-ink-3">El carrito real (líneas + modificadores + cobro) llega en F5.2+.</p>
-          </div>
-          <div className="border-t border-line p-4">
-            <div className="mb-2 flex justify-between text-[13.5px] text-ink-2">
-              <span>Subtotal</span><span className="tabular-nums">{fmtMxn(0)}</span>
-            </div>
-            <div className="mb-3 flex justify-between text-[13.5px] text-ink-3">
-              <span>IVA (16%)</span><span className="tabular-nums">{fmtMxn(0)}</span>
-            </div>
-            <div className="mb-3 flex justify-between border-t border-line pt-3 font-display text-[18px] font-bold">
-              <span>Total</span><span className="tabular-nums">{fmtMxn(0)}</span>
-            </div>
-            <Button size="lg" className="w-full" disabled>Cobrar {fmtMxn(0)}</Button>
-          </div>
-        </aside>
+        <SidebarTicket
+          estado={carrito}
+          onCantidad={(id, c) => dispatch({ tipo: "cantidad", clientId: id, cantidad: c })}
+          onQuitar={(id) => dispatch({ tipo: "quitar", clientId: id })}
+          onModo={(m: ModoServicio) => dispatch({ tipo: "modo", modo: m })}
+          onCobrar={iniciarCobro}
+          procesando={procesandoCobro}
+        />
       </div>
+
+      {modGrupos && (
+        <ModalModificadores
+          producto={modGrupos.producto}
+          grupos={modGrupos.grupos}
+          onConfirmar={confirmarModificadores}
+          onCancelar={() => setModGrupos(null)}
+        />
+      )}
+      {totalesCobro && (
+        <ModalCobro
+          token={token}
+          totalesIniciales={totalesCobro}
+          onPagado={(folio, cambio) => {
+            setTotalesCobro(null);
+            dispatch({ tipo: "limpiar" });
+            setConfirmacion({ folio, cambio });
+          }}
+          onCerrar={() => setTotalesCobro(null)}
+        />
+      )}
+      {confirmacion && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/40 p-4" role="dialog" aria-modal="true">
+          <div className="w-full max-w-sm rounded-xl bg-surface p-6 text-center shadow-xl">
+            <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-success/10 text-success">✓</div>
+            <div className="font-display text-[18px] font-semibold">Venta cobrada</div>
+            {confirmacion.folio && <div className="mt-1 text-[13px] text-ink-3">Folio {confirmacion.folio}</div>}
+            {confirmacion.cambio > 0 && <div className="mt-1 text-[14px]">Cambio: <strong className="tabular-nums">{fmtMxn(confirmacion.cambio)}</strong></div>}
+            <Button className="mt-4 w-full" onClick={() => setConfirmacion(null)}>Nuevo ticket</Button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
