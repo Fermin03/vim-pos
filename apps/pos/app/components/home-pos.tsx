@@ -25,6 +25,11 @@ import { SidebarTicket } from "./sidebar-ticket";
 import { ModalModificadores } from "./modal-modificadores";
 import { ModalCobro } from "./modal-cobro";
 import { ModalDescuento } from "./modal-descuento";
+import { obtenerImpresora } from "../lib/print/adapter";
+import { leerTicketParaImpresion } from "../lib/print/ticket-datos";
+import { construirTicketJob } from "../lib/print/ticket-builder";
+import { ReciboPreview } from "./recibo-preview";
+import type { PrintJob } from "../lib/print/tipos";
 
 /** Topbar del POS operativo (mockup P-059): marca + sucursal/turno + reloj + cajero + acciones. */
 function TopbarOperativa({
@@ -121,6 +126,10 @@ export function HomePos({
   // queda comprometido (bloqueado) y el cobro reusa este mismo ticket (no re-persiste).
   const [ticketBd, setTicketBd] = useState<TotalesTicket | null>(null);
   const [descuentoAbierto, setDescuentoAbierto] = useState(false);
+  // F5.3 — recibo del ticket (PrintJob) tras el cobro; el adapter activo es PreviewAdapter.
+  const [reciboJob, setReciboJob] = useState<PrintJob | null>(null);
+  const [mostrarRecibo, setMostrarRecibo] = useState(false);
+  const [estadoTicket, setEstadoTicket] = useState<"idle" | "lista" | "error">("idle");
 
   useEffect(() => {
     let activo = true;
@@ -350,25 +359,69 @@ export function HomePos({
           token={token}
           sucursalId={caja.sucursal_id}
           totalesIniciales={totalesCobro}
-          onPagado={(folio, cambio) => {
+          onPagado={async (folio, cambio) => {
+            const ticketId = totalesCobro.ticketId;
             setTotalesCobro(null);
             setTicketBd(null);
             dispatch({ tipo: "limpiar" });
             setConfirmacion({ folio, cambio });
+            // Armar el ticket y dejarlo "listo" (no abrir el overlay: no estorbar el flujo QS).
+            try {
+              const datos = await leerTicketParaImpresion(ticketId, {
+                token,
+                cajeroNombre: empleado.nombre,
+                cajaNombre: caja.nombre,
+              });
+              setReciboJob(construirTicketJob(datos));
+              setEstadoTicket("lista");
+            } catch {
+              setEstadoTicket("error");
+            }
           }}
           onCerrar={() => setTotalesCobro(null)}
         />
       )}
       {confirmacion && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/40 p-4" role="dialog" aria-modal="true">
-          <div className="w-full max-w-sm rounded-xl bg-surface p-6 text-center shadow-xl">
-            <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-success/10 text-success">✓</div>
-            <div className="font-display text-[18px] font-semibold">Venta cobrada</div>
-            {confirmacion.folio && <div className="mt-1 text-[13px] text-ink-3">Folio {confirmacion.folio}</div>}
-            {confirmacion.cambio > 0 && <div className="mt-1 text-[14px]">Cambio: <strong className="tabular-nums">{fmtMxn(confirmacion.cambio)}</strong></div>}
-            <Button className="mt-4 w-full" onClick={() => setConfirmacion(null)}>Nuevo ticket</Button>
+          <div className="w-full max-w-md rounded-xl bg-surface p-6 text-center shadow-xl">
+            <div className="mx-auto mb-3 flex h-16 w-16 items-center justify-center rounded-full bg-success/10 text-success">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" className="h-8 w-8"><path d="M20 6 9 17l-5-5" /></svg>
+            </div>
+            <div className="font-display text-[22px] font-semibold">Cobro completado</div>
+            {confirmacion.folio && <div className="mt-1 text-[13px] text-ink-3">Ticket {confirmacion.folio}</div>}
+            {confirmacion.cambio > 0 && (
+              <div className="mt-3 rounded-lg border border-line">
+                <div className="flex items-center justify-between px-4 py-3 text-success">
+                  <span className="text-[14px] font-semibold">Cambio a entregar</span>
+                  <span className="font-display text-[20px] font-bold tabular-nums">{fmtMxn(confirmacion.cambio)}</span>
+                </div>
+              </div>
+            )}
+            {/* Panel de impresión (1 fila: ticket del cliente) */}
+            <div className="mt-4 flex items-center gap-3 rounded-lg border border-line px-4 py-3 text-left">
+              <span className={["flex h-8 w-8 items-center justify-center rounded", estadoTicket === "lista" ? "bg-success/10 text-success" : estadoTicket === "error" ? "bg-danger/10 text-danger" : "bg-hover text-ink-3"].join(" ")}>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-4 w-4"><polyline points="6 9 6 2 18 2 18 9" /><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2" /><rect x="6" y="14" width="12" height="8" /></svg>
+              </span>
+              <div className="flex-1">
+                <div className="text-[14px] font-semibold">Ticket del cliente</div>
+                <div className="text-[12px] text-ink-3">{estadoTicket === "lista" ? "Vista previa lista · 80mm" : estadoTicket === "error" ? "No se pudo armar" : "Preparando…"}</div>
+              </div>
+              {reciboJob && (
+                <button type="button" onClick={() => setMostrarRecibo(true)} className="rounded border border-line-strong px-3 py-1.5 text-[13px] font-semibold text-ink-2 hover:border-ink hover:text-ink">
+                  Ver / Imprimir
+                </button>
+              )}
+            </div>
+            <Button className="mt-4 w-full" onClick={() => { setConfirmacion(null); setReciboJob(null); setMostrarRecibo(false); setEstadoTicket("idle"); }}>Nuevo ticket</Button>
           </div>
         </div>
+      )}
+      {mostrarRecibo && reciboJob && (
+        <ReciboPreview
+          job={reciboJob}
+          onImprimir={() => obtenerImpresora({ onMostrar: () => {} }).imprimir(reciboJob)}
+          onCerrar={() => setMostrarRecibo(false)}
+        />
       )}
     </div>
   );
