@@ -229,6 +229,14 @@ export function HomePos({
 
   const bloqueado = ticketBd !== null;
 
+  /** Cierra la confirmación/recibo y deja la caja lista para la siguiente venta. */
+  const nuevoTicket = useCallback(() => {
+    setConfirmacion(null);
+    setReciboJob(null);
+    setMostrarRecibo(false);
+    setEstadoTicket("idle");
+  }, []);
+
   return (
     <div className="flex h-screen flex-col">
       <TopbarOperativa caja={caja} turno={turno} empleado={empleado} onCambiarCajero={onCambiarCajero} onBloquear={onBloquear} />
@@ -365,15 +373,18 @@ export function HomePos({
             setTicketBd(null);
             dispatch({ tipo: "limpiar" });
             setConfirmacion({ folio, cambio });
-            // Armar el ticket y dejarlo "listo" (no abrir el overlay: no estorbar el flujo QS).
+            // Armar el ticket e IMPRIMIR automáticamente. Con PreviewAdapter abre el recibo
+            // en pantalla; al activar EpsonEposAdapter, ese mismo llamado imprime en papel.
             try {
               const datos = await leerTicketParaImpresion(ticketId, {
                 token,
                 cajeroNombre: empleado.nombre,
                 cajaNombre: caja.nombre,
               });
-              setReciboJob(construirTicketJob(datos));
+              const job = construirTicketJob(datos);
+              setReciboJob(job);
               setEstadoTicket("lista");
+              await obtenerImpresora({ onMostrar: () => setMostrarRecibo(true) }).imprimir(job);
             } catch {
               setEstadoTicket("error");
             }
@@ -412,7 +423,7 @@ export function HomePos({
                 </button>
               )}
             </div>
-            <Button className="mt-4 w-full" onClick={() => { setConfirmacion(null); setReciboJob(null); setMostrarRecibo(false); setEstadoTicket("idle"); }}>Nuevo ticket</Button>
+            <Button className="mt-4 w-full" onClick={nuevoTicket}>Nuevo ticket</Button>
           </div>
         </div>
       )}
@@ -421,6 +432,7 @@ export function HomePos({
           job={reciboJob}
           onImprimir={() => obtenerImpresora({ onMostrar: () => {} }).imprimir(reciboJob)}
           onCerrar={() => setMostrarRecibo(false)}
+          onNuevoTicket={nuevoTicket}
         />
       )}
     </div>
