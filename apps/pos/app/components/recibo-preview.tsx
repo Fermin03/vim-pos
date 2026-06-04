@@ -33,20 +33,27 @@ export function ReciboPreview({
   job,
   onImprimir,
   onCerrar,
+  onNuevoTicket,
 }: {
   job: PrintJob;
   onImprimir: () => void;
   onCerrar: () => void;
+  /** Si se provee, muestra un botón primario "Nuevo ticket" para cerrar y arrancar la siguiente venta. */
+  onNuevoTicket?: () => void;
 }) {
   return (
     <div className="fixed inset-0 z-[60] flex items-start justify-center overflow-y-auto bg-ink/40 p-6" role="dialog" aria-modal="true">
       <div className="w-full max-w-[360px]">
         {/* Barra */}
-        <div className="mb-3 flex items-center justify-between">
+        <div className="mb-3 flex items-center justify-between gap-2">
           <span className="text-[13px] font-semibold text-white">Ticket · 80mm</span>
           <div className="flex gap-2">
-            <button type="button" onClick={onImprimir} className="rounded bg-white px-3 py-1.5 text-[13px] font-semibold text-ink hover:bg-hover">Imprimir</button>
-            <button type="button" onClick={onCerrar} className="rounded border border-white/40 px-3 py-1.5 text-[13px] font-semibold text-white hover:bg-white/10">Cerrar</button>
+            <button type="button" onClick={onImprimir} className="rounded border border-white/40 px-3 py-1.5 text-[13px] font-semibold text-white hover:bg-white/10">Imprimir</button>
+            {onNuevoTicket ? (
+              <button type="button" onClick={onNuevoTicket} className="rounded bg-accent px-3 py-1.5 text-[13px] font-semibold text-white hover:bg-accent-hover">Nuevo ticket</button>
+            ) : (
+              <button type="button" onClick={onCerrar} className="rounded bg-white px-3 py-1.5 text-[13px] font-semibold text-ink hover:bg-hover">Cerrar</button>
+            )}
           </div>
         </div>
         {/* Papel */}
