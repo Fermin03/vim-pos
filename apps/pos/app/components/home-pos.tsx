@@ -28,6 +28,7 @@ import { ModalDescuento } from "./modal-descuento";
 import { obtenerImpresora } from "../lib/print/adapter";
 import { leerTicketParaImpresion } from "../lib/print/ticket-datos";
 import { construirTicketJob } from "../lib/print/ticket-builder";
+import { construirComandaJob } from "../lib/print/comanda-builder";
 import { ReciboPreview } from "./recibo-preview";
 import { PantallaCierre } from "./pantalla-cierre";
 import type { PrintJob } from "../lib/print/tipos";
@@ -142,6 +143,8 @@ export function HomePos({
   const [descuentoAbierto, setDescuentoAbierto] = useState(false);
   // F5.3 — recibo del ticket (PrintJob) tras el cobro; el adapter activo es PreviewAdapter.
   const [reciboJob, setReciboJob] = useState<PrintJob | null>(null);
+  // F5.3b — comanda de cocina (PrintJob); el preview ofrece toggle Cliente|Cocina.
+  const [comandaJob, setComandaJob] = useState<PrintJob | null>(null);
   const [mostrarRecibo, setMostrarRecibo] = useState(false);
   const [estadoTicket, setEstadoTicket] = useState<"idle" | "lista" | "error">("idle");
 
@@ -247,6 +250,7 @@ export function HomePos({
   const nuevoTicket = useCallback(() => {
     setConfirmacion(null);
     setReciboJob(null);
+    setComandaJob(null);
     setMostrarRecibo(false);
     setEstadoTicket("idle");
   }, []);
@@ -409,7 +413,17 @@ export function HomePos({
                 cajaNombre: caja.nombre,
               });
               const job = construirTicketJob(datos);
+              const comanda = construirComandaJob({
+                folio: datos.meta.folio,
+                modoServicio: datos.meta.modoServicio,
+                cajero: datos.meta.cajero,
+                caja: datos.meta.caja,
+                fechaIso: datos.meta.fechaIso,
+                lineas: datos.lineas.map((l) => ({ cantidad: l.cantidad, nombre: l.nombre, modificadores: l.modificadores, notaCocina: l.notaCocina })),
+                ancho: 80,
+              });
               setReciboJob(job);
+              setComandaJob(comanda);
               setEstadoTicket("lista");
               await obtenerImpresora({ onMostrar: () => setMostrarRecibo(true) }).imprimir(job);
             } catch {
@@ -457,6 +471,7 @@ export function HomePos({
       {mostrarRecibo && reciboJob && (
         <ReciboPreview
           job={reciboJob}
+          jobComanda={comandaJob ?? undefined}
           onImprimir={() => obtenerImpresora({ onMostrar: () => {} }).imprimir(reciboJob)}
           onCerrar={() => setMostrarRecibo(false)}
           onNuevoTicket={nuevoTicket}

@@ -1,4 +1,5 @@
 "use client";
+import { useState } from "react";
 import { QRCodeSVG } from "qrcode.react";
 import type { Bloque, PrintJob } from "../lib/print/tipos";
 
@@ -31,22 +32,28 @@ function BloqueView({ bl }: { bl: Bloque }) {
 
 export function ReciboPreview({
   job,
+  jobComanda,
   onImprimir,
   onCerrar,
   onNuevoTicket,
 }: {
   job: PrintJob;
+  /** Comanda de cocina (P-223). Si se provee, aparece un toggle Cliente|Cocina. */
+  jobComanda?: PrintJob;
   onImprimir: () => void;
   onCerrar: () => void;
   /** Si se provee, muestra un botón primario "Nuevo ticket" para cerrar y arrancar la siguiente venta. */
   onNuevoTicket?: () => void;
 }) {
+  const [vista, setVista] = useState<"cliente" | "cocina">("cliente");
+  const jobActivo = vista === "cocina" && jobComanda ? jobComanda : job;
+  const titulo = vista === "cocina" ? "Comanda · 80mm" : "Ticket · 80mm";
   return (
     <div className="fixed inset-0 z-[60] flex items-start justify-center overflow-y-auto bg-ink/40 p-6" role="dialog" aria-modal="true">
       <div className="w-full max-w-[360px]">
         {/* Barra */}
         <div className="mb-3 flex items-center justify-between gap-2">
-          <span className="text-[13px] font-semibold text-white">Ticket · 80mm</span>
+          <span className="text-[13px] font-semibold text-white">{titulo}</span>
           <div className="flex gap-2">
             <button type="button" onClick={onImprimir} className="rounded border border-white/40 px-3 py-1.5 text-[13px] font-semibold text-white hover:bg-white/10">Imprimir</button>
             {onNuevoTicket ? (
@@ -56,9 +63,28 @@ export function ReciboPreview({
             )}
           </div>
         </div>
+        {/* Toggle Cliente | Cocina (solo si hay comanda) */}
+        {jobComanda && (
+          <div className="mx-auto mb-3 inline-flex w-full overflow-hidden rounded-full border border-white/30 bg-ink/40 p-[3px]">
+            <button
+              type="button"
+              onClick={() => setVista("cliente")}
+              className={["flex-1 rounded-full px-3 py-1.5 text-[12.5px] font-semibold transition", vista === "cliente" ? "bg-white text-ink" : "text-white/85 hover:text-white"].join(" ")}
+            >
+              Cliente
+            </button>
+            <button
+              type="button"
+              onClick={() => setVista("cocina")}
+              className={["flex-1 rounded-full px-3 py-1.5 text-[12.5px] font-semibold transition", vista === "cocina" ? "bg-white text-ink" : "text-white/85 hover:text-white"].join(" ")}
+            >
+              Cocina
+            </button>
+          </div>
+        )}
         {/* Papel */}
         <div className="mx-auto w-[302px] bg-white px-5 py-6 font-mono text-[#1a1a1a] shadow-[0_4px_24px_rgba(0,0,0,.25)]">
-          {job.bloques.map((bl, i) => (
+          {jobActivo.bloques.map((bl, i) => (
             <BloqueView key={i} bl={bl} />
           ))}
         </div>
