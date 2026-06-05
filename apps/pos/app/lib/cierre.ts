@@ -107,7 +107,7 @@ export async function cerrarTurnoZ(
   const payload = (z.payload ?? {}) as Record<string, unknown>;
   const reporteZId = String(z.reporte_z_id);
   // El folio_z lo asigna un trigger al insertar; no viene en el payload de la RPC → leerlo.
-  let folioZ = (payload.folio_z as string) ?? null;
+  let folioZ: string | null = (payload.folio_z as string | undefined) ?? null;
   if (!folioZ && reporteZId) {
     const { data: row } = await employeeClient(token)
       .from("reportes_z_historico")
