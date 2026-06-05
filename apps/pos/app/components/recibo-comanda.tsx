@@ -10,7 +10,8 @@ import type { DatosComanda } from "../lib/print/comanda-builder";
 export function ReciboComanda({ datos }: { datos: DatosComanda }) {
   const f = new Date(datos.fechaIso);
   const hora = `${String(f.getHours()).padStart(2, "0")}:${String(f.getMinutes()).padStart(2, "0")}`;
-  const folioCorto = datos.folio.replace(/^[^-]+-/, "").replace(/^0+/, "") || datos.folio;
+  // Cocina solo necesita los últimos 4 dígitos para identificar el pedido (más rápido de leer).
+  const folioCorto = datos.folio.slice(-4);
 
   return (
     <div className="relative mx-auto w-[302px] bg-white pt-5 pb-6 font-mono text-[#1A1A1A] shadow-[0_4px_24px_rgba(0,0,0,.25)]">
