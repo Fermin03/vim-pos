@@ -28,10 +28,10 @@ import { ModalDescuento } from "./modal-descuento";
 import { obtenerImpresora } from "../lib/print/adapter";
 import { leerTicketParaImpresion } from "../lib/print/ticket-datos";
 import { construirTicketJob } from "../lib/print/ticket-builder";
-import { construirComandaJob } from "../lib/print/comanda-builder";
+import { construirComandaJob, type DatosComanda } from "../lib/print/comanda-builder";
 import { ReciboPreview } from "./recibo-preview";
 import { PantallaCierre } from "./pantalla-cierre";
-import type { PrintJob } from "../lib/print/tipos";
+import type { DatosTicketImpresion } from "../lib/print/tipos";
 
 /** Topbar del POS operativo (mockup P-059): marca + sucursal/turno + reloj + cajero + acciones. */
 function TopbarOperativa({
@@ -141,10 +141,9 @@ export function HomePos({
   // queda comprometido (bloqueado) y el cobro reusa este mismo ticket (no re-persiste).
   const [ticketBd, setTicketBd] = useState<TotalesTicket | null>(null);
   const [descuentoAbierto, setDescuentoAbierto] = useState(false);
-  // F5.3 — recibo del ticket (PrintJob) tras el cobro; el adapter activo es PreviewAdapter.
-  const [reciboJob, setReciboJob] = useState<PrintJob | null>(null);
-  // F5.3b — comanda de cocina (PrintJob); el preview ofrece toggle Cliente|Cocina.
-  const [comandaJob, setComandaJob] = useState<PrintJob | null>(null);
+  // F5.3c — Datos crudos del ticket; el preview los renderiza fiel a P-222/P-223.
+  const [datosTicket, setDatosTicket] = useState<DatosTicketImpresion | null>(null);
+  const [datosComanda, setDatosComanda] = useState<DatosComanda | null>(null);
   const [mostrarRecibo, setMostrarRecibo] = useState(false);
   const [estadoTicket, setEstadoTicket] = useState<"idle" | "lista" | "error">("idle");
 
@@ -249,8 +248,8 @@ export function HomePos({
   /** Cierra la confirmación/recibo y deja la caja lista para la siguiente venta. */
   const nuevoTicket = useCallback(() => {
     setConfirmacion(null);
-    setReciboJob(null);
-    setComandaJob(null);
+    setDatosTicket(null);
+    setDatosComanda(null);
     setMostrarRecibo(false);
     setEstadoTicket("idle");
   }, []);
@@ -412,8 +411,7 @@ export function HomePos({
                 cajeroNombre: empleado.nombre,
                 cajaNombre: caja.nombre,
               });
-              const job = construirTicketJob(datos);
-              const comanda = construirComandaJob({
+              const datosCom: DatosComanda = {
                 folio: datos.meta.folio,
                 modoServicio: datos.meta.modoServicio,
                 cajero: datos.meta.cajero,
@@ -421,10 +419,13 @@ export function HomePos({
                 fechaIso: datos.meta.fechaIso,
                 lineas: datos.lineas.map((l) => ({ cantidad: l.cantidad, nombre: l.nombre, modificadores: l.modificadores, notaCocina: l.notaCocina })),
                 ancho: 80,
-              });
-              setReciboJob(job);
-              setComandaJob(comanda);
+              };
+              setDatosTicket(datos);
+              setDatosComanda(datosCom);
               setEstadoTicket("lista");
+              // Auto-impresión: el PrintJob es la fuente para el papel (Epson cuando esté).
+              // Hoy con PreviewAdapter solo abre el overlay; el preview se renderiza desde los datos.
+              const job = construirTicketJob(datos);
               await obtenerImpresora({ onMostrar: () => setMostrarRecibo(true) }).imprimir(job);
             } catch {
               setEstadoTicket("error");
@@ -458,7 +459,7 @@ export function HomePos({
                 <div className="text-[14px] font-semibold">Ticket del cliente</div>
                 <div className="text-[12px] text-ink-3">{estadoTicket === "lista" ? "Vista previa lista · 80mm" : estadoTicket === "error" ? "No se pudo armar" : "Preparando…"}</div>
               </div>
-              {reciboJob && (
+              {datosTicket && (
                 <button type="button" onClick={() => setMostrarRecibo(true)} className="rounded border border-line-strong px-3 py-1.5 text-[13px] font-semibold text-ink-2 hover:border-ink hover:text-ink">
                   Ver / Imprimir
                 </button>
@@ -468,11 +469,11 @@ export function HomePos({
           </div>
         </div>
       )}
-      {mostrarRecibo && reciboJob && (
+      {mostrarRecibo && datosTicket && (
         <ReciboPreview
-          job={reciboJob}
-          jobComanda={comandaJob ?? undefined}
-          onImprimir={() => obtenerImpresora({ onMostrar: () => {} }).imprimir(reciboJob)}
+          datosTicket={datosTicket}
+          datosComanda={datosComanda ?? undefined}
+          onImprimir={() => obtenerImpresora({ onMostrar: () => {} }).imprimir(construirTicketJob(datosTicket))}
           onCerrar={() => setMostrarRecibo(false)}
           onNuevoTicket={nuevoTicket}
         />
