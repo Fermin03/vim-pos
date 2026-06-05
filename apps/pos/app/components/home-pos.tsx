@@ -29,6 +29,7 @@ import { obtenerImpresora } from "../lib/print/adapter";
 import { leerTicketParaImpresion } from "../lib/print/ticket-datos";
 import { construirTicketJob } from "../lib/print/ticket-builder";
 import { ReciboPreview } from "./recibo-preview";
+import { PantallaCierre } from "./pantalla-cierre";
 import type { PrintJob } from "../lib/print/tipos";
 
 /** Topbar del POS operativo (mockup P-059): marca + sucursal/turno + reloj + cajero + acciones. */
@@ -38,12 +39,14 @@ function TopbarOperativa({
   empleado,
   onCambiarCajero,
   onBloquear,
+  onCerrarTurno,
 }: {
   caja: DatosCaja;
   turno: Turno;
   empleado: Empleado;
   onCambiarCajero: () => void;
   onBloquear: () => void;
+  onCerrarTurno: () => void;
 }) {
   const ahora = useReloj();
   return (
@@ -92,6 +95,14 @@ function TopbarOperativa({
           >
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4"><path d="M16 3.13a4 4 0 0 1 0 7.75" /><path d="M21 21v-2a4 4 0 0 0-3-3.87" /><circle cx="9" cy="7" r="4" /><path d="M3 21v-2a4 4 0 0 1 4-4h4a4 4 0 0 1 4 4v2" /></svg>
           </button>
+          <button
+            type="button"
+            onClick={onCerrarTurno}
+            className="flex h-9 items-center gap-1.5 rounded border border-line-strong px-3 text-[13px] font-semibold text-ink-2 transition hover:border-ink hover:text-ink"
+          >
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4"><path d="M9 11l3 3L22 4" /><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" /></svg>
+            Cerrar turno
+          </button>
         </div>
       </div>
     </header>
@@ -105,6 +116,7 @@ export function HomePos({
   token,
   onBloquear,
   onCambiarCajero,
+  onCerrarTurno,
 }: {
   empleado: Empleado;
   caja: DatosCaja;
@@ -112,7 +124,9 @@ export function HomePos({
   token: string;
   onBloquear: () => void;
   onCambiarCajero: () => void;
+  onCerrarTurno: () => void;
 }) {
+  const [cerrando, setCerrando] = useState(false);
   const [categorias, setCategorias] = useState<Categoria[] | null>(null);
   const [productos, setProductos] = useState<Producto[] | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -237,9 +251,22 @@ export function HomePos({
     setEstadoTicket("idle");
   }, []);
 
+  if (cerrando) {
+    return (
+      <PantallaCierre
+        token={token}
+        empleado={empleado}
+        caja={caja}
+        turno={turno}
+        onCancelar={() => setCerrando(false)}
+        onCerrado={onCerrarTurno}
+      />
+    );
+  }
+
   return (
     <div className="flex h-screen flex-col">
-      <TopbarOperativa caja={caja} turno={turno} empleado={empleado} onCambiarCajero={onCambiarCajero} onBloquear={onBloquear} />
+      <TopbarOperativa caja={caja} turno={turno} empleado={empleado} onCambiarCajero={onCambiarCajero} onBloquear={onBloquear} onCerrarTurno={() => setCerrando(true)} />
 
       <div className="flex min-h-0 flex-1">
         {/* Sidebar categorías */}
