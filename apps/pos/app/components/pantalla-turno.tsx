@@ -87,6 +87,7 @@ export function PantallaTurno({
       token={token}
       onBloquear={onBloquear}
       onCambiarCajero={onCambiarCajero}
+      onCerrarTurno={() => setTurno(null)}
     />
   );
 }
