@@ -29,18 +29,19 @@ export async function leerTicketParaImpresion(ticketId: string, ctx: Ctx): Promi
 
   const { data: items, error: e2 } = await sb
     .from("ticket_items")
-    .select("id, producto_nombre_snapshot, cantidad, total_item_mxn, ticket_item_modificadores(opcion_nombre_snapshot)")
+    .select("id, producto_nombre_snapshot, cantidad, total_item_mxn, nota_cocina, ticket_item_modificadores(opcion_nombre_snapshot)")
     .eq("ticket_id", ticketId)
     .eq("cancelado", false)
     .order("created_at", { ascending: true });
   if (e2) throw new Error(e2.message);
   const lineas: LineaImpresion[] = (items ?? []).map((it) => {
-    const r = it as { producto_nombre_snapshot: string; cantidad: number; total_item_mxn: string | number; ticket_item_modificadores: { opcion_nombre_snapshot: string }[] | null };
+    const r = it as { producto_nombre_snapshot: string; cantidad: number; total_item_mxn: string | number; nota_cocina: string | null; ticket_item_modificadores: { opcion_nombre_snapshot: string }[] | null };
     return {
       cantidad: Number(r.cantidad),
       nombre: r.producto_nombre_snapshot,
       totalMxn: Number(r.total_item_mxn),
       modificadores: (r.ticket_item_modificadores ?? []).map((m) => m.opcion_nombre_snapshot),
+      notaCocina: r.nota_cocina ?? null,
     };
   });
 
