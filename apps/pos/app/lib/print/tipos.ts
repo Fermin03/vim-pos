@@ -23,6 +23,7 @@ export type LineaImpresion = {
   nombre: string;
   totalMxn: number;
   modificadores: string[];
+  notaCocina: string | null;
 };
 
 export type PagoImpresion = {
