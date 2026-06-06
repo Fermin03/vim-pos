@@ -156,6 +156,40 @@ export async function leerDatosFiscales(token: string, tenantId: string, sucursa
   };
 }
 
+export type MovimientosTurno = {
+  /** Suma de movimientos que ENTRAN efectivo a la caja (INYECCION_FONDO + AJUSTE_POSITIVO). */
+  depositosEntrantes: number;
+  /** Suma de movimientos que SALEN efectivo de la caja (SANGRIA + DEPOSITO + PAGO_PROVEEDOR + AJUSTE_NEGATIVO + DEVOLUCION_EFECTIVO). */
+  retirosSalientes: number;
+  /** Lista para detalle (cada movimiento individual). */
+  detalle: { tipo: string; folio: string; monto: number; motivo: string }[];
+};
+
+/** Lee los movimientos de caja del turno (suma firmada para el reporte Z). */
+export async function leerMovimientosTurno(token: string, turnoId: string): Promise<MovimientosTurno> {
+  const { data, error } = await employeeClient(token)
+    .from("movimientos_caja")
+    .select("tipo, folio, monto_mxn, motivo")
+    .eq("turno_id", turnoId)
+    .eq("cancelado", false);
+  if (error) throw new Error(error.message);
+  const rows = (data ?? []) as { tipo: string; folio: string; monto_mxn: string | number; motivo: string }[];
+  let entrantes = 0, salientes = 0;
+  const detalle: { tipo: string; folio: string; monto: number; motivo: string }[] = [];
+  for (const r of rows) {
+    const m = Number(r.monto_mxn);
+    if (r.tipo === "INYECCION_FONDO" || r.tipo === "AJUSTE_POSITIVO") entrantes += m;
+    else if (r.tipo === "FONDO_APERTURA") continue;        // el fondo va aparte
+    else salientes += m;                                    // SANGRIA, DEPOSITO, PAGO_PROVEEDOR, etc.
+    detalle.push({ tipo: r.tipo, folio: r.folio, monto: m, motivo: r.motivo });
+  }
+  return {
+    depositosEntrantes: Math.round(entrantes * 100) / 100,
+    retirosSalientes: Math.round(salientes * 100) / 100,
+    detalle,
+  };
+}
+
 export type ModoServicioVenta = { modo: string; total: number; cantidad: number; porcentaje: number };
 export type EstadisticasTurno = {
   cuentasNormales: number;        // = ticketsPagados
