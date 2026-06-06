@@ -1,6 +1,66 @@
 "use client";
 import { employeeClient } from "./supabase";
 
+// ── F6.2: Cancelar ticket completo ────────────────────────────────────────
+
+/** Motivos de cancelación de ticket completo (enum cancelacion_motivo en BD). */
+export type MotivoTicket =
+  | "ERROR_COBRO"
+  | "CLIENTE_DESISTIO"
+  | "PROBLEMA_OPERATIVO"
+  | "COBRO_DUPLICADO"
+  | "FRAUDE_DETECTADO"
+  | "PRUEBA_OPERATIVA"
+  | "OTRO";
+
+export const MOTIVOS_TICKET: { codigo: MotivoTicket; label: string }[] = [
+  { codigo: "CLIENTE_DESISTIO", label: "Cliente desistió" },
+  { codigo: "ERROR_COBRO", label: "Error de cobro" },
+  { codigo: "PROBLEMA_OPERATIVO", label: "Problema operativo" },
+  { codigo: "COBRO_DUPLICADO", label: "Cobro duplicado" },
+  { codigo: "FRAUDE_DETECTADO", label: "Fraude detectado" },
+  { codigo: "PRUEBA_OPERATIVA", label: "Prueba operativa" },
+  { codigo: "OTRO", label: "Otro" },
+];
+
+/** Cancela un ticket completo (ABIERTO o PAGADO). Si PAGADO+devolverDinero, crea devolución automática. */
+export async function cancelarTicket(
+  token: string,
+  args: {
+    ticketId: string;
+    cajaId: string;
+    turnoId: string;
+    motivo: MotivoTicket;
+    motivoTexto: string | null;
+    autorizacionPinId: string;
+    solicitanteId: string;
+    autorizoId: string;
+    devolverDinero?: boolean;
+    reversarInventario?: boolean;
+  },
+): Promise<string> {
+  const { data, error } = await employeeClient(token).rpc("cancelar_ticket_pagado", {
+    p_ticket_id: args.ticketId,
+    p_caja_id: args.cajaId,
+    p_turno_id: args.turnoId,
+    p_motivo: args.motivo,
+    p_motivo_texto: args.motivoTexto,
+    p_autorizacion_pin_id: args.autorizacionPinId,
+    p_usuario_solicitante_id: args.solicitanteId,
+    p_usuario_autorizo_id: args.autorizoId,
+    p_reversar_inventario: args.reversarInventario ?? true,
+    p_cancelar_cfdi_sat: false,
+    p_devolver_dinero: args.devolverDinero ?? false,
+    p_medio_devolucion: "EFECTIVO",
+    p_nota: null,
+    p_client_id_local: null,
+  });
+  if (error) throw new Error(error.message);
+  return String(data);
+}
+
+// ── F6.1: Cancelar ítem (existente) ───────────────────────────────────────
+
 export type MotivoCancelacion =
   | "ERROR_DEL_CAJERO"
   | "PRODUCTO_NO_DISPONIBLE"

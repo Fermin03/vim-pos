@@ -72,6 +72,8 @@ export function SidebarTicket({
   onCantidad,
   onQuitar,
   onCancelarItemPersistido,
+  onLimpiar,
+  onCancelarTicket,
   onModo,
   onCobrar,
   onAplicarDescuento,
@@ -85,6 +87,10 @@ export function SidebarTicket({
   onQuitar: (clientId: string) => void;
   /** Cuando el ticket está persistido, "Quitar" llama a este handler (cancela en BD con motivo+autorización). */
   onCancelarItemPersistido?: (clientId: string) => void;
+  /** Limpia el carrito local (sin BD). Habilitado cuando no hay ticket persistido y hay líneas. */
+  onLimpiar?: () => void;
+  /** Cuando el ticket está persistido, "Limpiar" llama a este handler para cancelar todo el ticket. */
+  onCancelarTicket?: () => void;
   onModo: (m: ModoServicio) => void;
   onCobrar: () => void;
   onAplicarDescuento: () => void;
@@ -112,10 +118,10 @@ export function SidebarTicket({
           <span className="font-display text-[18px] font-semibold leading-tight tracking-[-0.02em]">
             Ticket nuevo
           </span>
-          {/* F5.2b — diferido */}
           <button
             type="button"
-            disabled
+            disabled={vacio || procesando || (bloqueado && !onCancelarTicket) || (!bloqueado && !onLimpiar)}
+            onClick={() => (bloqueado && onCancelarTicket ? onCancelarTicket() : onLimpiar?.())}
             className="rounded px-2 py-[5px] text-[13.5px] font-semibold text-ink-3 transition-colors hover:bg-hover hover:text-danger disabled:cursor-default disabled:opacity-40"
           >
             Limpiar
