@@ -31,6 +31,8 @@ import { construirTicketJob } from "../lib/print/ticket-builder";
 import { construirComandaJob, type DatosComanda } from "../lib/print/comanda-builder";
 import { ReciboPreview } from "./recibo-preview";
 import { PantallaCierre } from "./pantalla-cierre";
+import { ModalCancelarItem } from "./modal-cancelar-item";
+import { leerItemsPersistidos, type ItemTicket } from "../lib/cancelacion";
 import type { DatosTicketImpresion } from "../lib/print/tipos";
 
 /** Topbar del POS operativo (mockup P-059): marca + sucursal/turno + reloj + cajero + acciones. */
@@ -141,6 +143,9 @@ export function HomePos({
   // queda comprometido (bloqueado) y el cobro reusa este mismo ticket (no re-persiste).
   const [ticketBd, setTicketBd] = useState<TotalesTicket | null>(null);
   const [descuentoAbierto, setDescuentoAbierto] = useState(false);
+  // F6.1 — items persistidos del ticketBd (para mapear clientId ↔ ticket_item_id real al cancelar).
+  const [itemsPersistidos, setItemsPersistidos] = useState<ItemTicket[]>([]);
+  const [cancelandoItem, setCancelandoItem] = useState<ItemTicket | null>(null);
   // F5.3c — Datos crudos del ticket; el preview los renderiza fiel a P-222/P-223.
   const [datosTicket, setDatosTicket] = useState<DatosTicketImpresion | null>(null);
   const [datosComanda, setDatosComanda] = useState<DatosComanda | null>(null);
@@ -202,15 +207,18 @@ export function HomePos({
     setProcesandoCobro(true);
     setError(null);
     try {
-      if (!ticketBd) {
-        const totales = await persistirTicket(
+      let bd = ticketBd;
+      if (!bd) {
+        bd = await persistirTicket(
           { token, sucursalId: caja.sucursal_id, cajaId: turno.caja_id, turnoId: turno.id },
           carrito.modoServicio,
           carrito.lineas,
           nuevoClientId(),
         );
-        setTicketBd(totales);
+        setTicketBd(bd);
       }
+      // Cargar items persistidos (mapping clientId ↔ ticket_item_id real para cancelaciones F6).
+      try { setItemsPersistidos(await leerItemsPersistidos(token, bd.ticketId)); } catch { /* no bloquear */ }
       setDescuentoAbierto(true);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Error al preparar el descuento");
@@ -252,7 +260,20 @@ export function HomePos({
     setDatosComanda(null);
     setMostrarRecibo(false);
     setEstadoTicket("idle");
+    setItemsPersistidos([]);
+    setCancelandoItem(null);
   }, []);
+
+  /** F6.1 — solicita cancelar un item ya persistido (abre el modal P-068). */
+  const onCancelarItemPersistido = useCallback((clientId: string) => {
+    const it = itemsPersistidos.find((x) => x.clientId === clientId);
+    if (!it) {
+      // Si no encontramos el mapping (no se cargó), no hacemos nada — fallback al quitar local.
+      dispatch({ tipo: "quitar", clientId });
+      return;
+    }
+    setCancelandoItem(it);
+  }, [itemsPersistidos]);
 
   if (cerrando) {
     return (
@@ -354,6 +375,7 @@ export function HomePos({
           estado={carrito}
           onCantidad={(id, c) => dispatch({ tipo: "cantidad", clientId: id, cantidad: c })}
           onQuitar={(id) => dispatch({ tipo: "quitar", clientId: id })}
+          onCancelarItemPersistido={ticketBd ? onCancelarItemPersistido : undefined}
           onModo={(m: ModoServicio) => dispatch({ tipo: "modo", modo: m })}
           onCobrar={iniciarCobro}
           onAplicarDescuento={onAplicarDescuento}
@@ -390,6 +412,33 @@ export function HomePos({
             setDescuentoAbierto(false);
           }}
           onCerrar={() => setDescuentoAbierto(false)}
+        />
+      )}
+      {cancelandoItem && ticketBd && (
+        <ModalCancelarItem
+          token={token}
+          empleado={empleado}
+          ticketItemId={cancelandoItem.id}
+          productoNombre={cancelandoItem.productoNombre}
+          cantidad={cancelandoItem.cantidad}
+          totalItem={cancelandoItem.totalItemMxn}
+          cajaId={turno.caja_id}
+          turnoId={turno.id}
+          estadoCocina={cancelandoItem.estadoCocina}
+          onCancelado={async () => {
+            // Reflejar en el carrito local + re-leer totales + items persistidos.
+            dispatch({ tipo: "quitar", clientId: cancelandoItem.clientId });
+            try {
+              const t = await leerTotales(token, ticketBd.ticketId);
+              setTicketBd(t);
+              const items = await leerItemsPersistidos(token, ticketBd.ticketId);
+              setItemsPersistidos(items);
+            } catch (e) {
+              setError(e instanceof Error ? e.message : "Error al re-leer el ticket");
+            }
+            setCancelandoItem(null);
+          }}
+          onCerrar={() => setCancelandoItem(null)}
         />
       )}
       {totalesCobro && (
