@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 const SECCIONES = [
   { titulo: "Negocio", items: [
     { label: "Datos del negocio", href: "/configuracion/negocio" },
+    { label: "Datos fiscales", href: "/configuracion/fiscal" },
   ]},
   { titulo: "Operación", items: [
     { label: "Sucursales", href: "/configuracion/sucursales" },
