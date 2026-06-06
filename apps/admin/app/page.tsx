@@ -147,7 +147,7 @@ export default function LoginPage() {
         </form>
 
         <p className="mt-8 text-center text-[13px] text-ink-3">
-          ¿Problemas para entrar? <span className="font-medium text-ink-2">Contacta a soporte</span>
+          ¿Aún no tienes cuenta? <a href="/registro" className="font-medium text-ink underline-offset-2 hover:underline">Crea tu negocio en VIM POS</a>
         </p>
       </div>
     </main>
