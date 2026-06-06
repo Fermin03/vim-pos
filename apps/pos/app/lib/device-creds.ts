@@ -25,8 +25,15 @@ export function olvidarCreds(): void {
   window.localStorage.removeItem(KEY);
 }
 
-/** Prellenado SOLO para DEV: la cuenta de dispositivo del fixture (seed.sql). */
-export const CREDS_DEV_FIXTURE: DeviceCreds = {
-  email: "caja-99999999-0000-0000-0000-0000000000cc@dispositivos.vimpos.mx",
-  password: "vim-device-dev",
-};
+/**
+ * Prellenado SOLO para DEV: la cuenta de dispositivo del fixture (seed.sql).
+ * SEC CN-011 (Cyber Neo): en producción es `null` para que la credencial del fixture
+ * nunca viaje en el bundle. El gate por NODE_ENV permite tree-shaking del literal.
+ */
+export const CREDS_DEV_FIXTURE: DeviceCreds | null =
+  process.env.NODE_ENV === "production"
+    ? null
+    : {
+        email: "caja-99999999-0000-0000-0000-0000000000cc@dispositivos.vimpos.mx",
+        password: "vim-device-dev",
+      };
