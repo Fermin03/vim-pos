@@ -31,6 +31,7 @@ import { construirTicketJob } from "../lib/print/ticket-builder";
 import { construirComandaJob, type DatosComanda } from "../lib/print/comanda-builder";
 import { ReciboPreview } from "./recibo-preview";
 import { PantallaCierre } from "./pantalla-cierre";
+import { PantallaKds } from "./pantalla-kds";
 import { ModalCancelarItem } from "./modal-cancelar-item";
 import { ModalCancelarTicket } from "./modal-cancelar-ticket";
 import { ModalMovimientoCaja } from "./modal-movimiento-caja";
@@ -46,6 +47,7 @@ function TopbarOperativa({
   onBloquear,
   onCerrarTurno,
   onMovimientoCaja,
+  onKds,
 }: {
   caja: DatosCaja;
   turno: Turno;
@@ -54,6 +56,7 @@ function TopbarOperativa({
   onBloquear: () => void;
   onCerrarTurno: () => void;
   onMovimientoCaja: () => void;
+  onKds: () => void;
 }) {
   const ahora = useReloj();
   return (
@@ -104,6 +107,14 @@ function TopbarOperativa({
           </button>
           <button
             type="button"
+            onClick={onKds}
+            className="flex h-9 items-center gap-1.5 rounded border border-line-strong px-3 text-[13px] font-semibold text-ink-2 transition hover:border-ink hover:text-ink"
+          >
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4"><path d="M3 11l18-5v12L3 14v-3z" /><path d="M11.6 16.8a3 3 0 1 1-5.8-1.6" /></svg>
+            Cocina
+          </button>
+          <button
+            type="button"
             onClick={onMovimientoCaja}
             className="flex h-9 items-center gap-1.5 rounded border border-line-strong px-3 text-[13px] font-semibold text-ink-2 transition hover:border-ink hover:text-ink"
           >
@@ -142,6 +153,7 @@ export function HomePos({
   onCerrarTurno: () => void;
 }) {
   const [cerrando, setCerrando] = useState(false);
+  const [enKds, setEnKds] = useState(false);
   const [categorias, setCategorias] = useState<Categoria[] | null>(null);
   const [productos, setProductos] = useState<Producto[] | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -305,9 +317,13 @@ export function HomePos({
     );
   }
 
+  if (enKds) {
+    return <PantallaKds token={token} caja={caja} onSalir={() => setEnKds(false)} />;
+  }
+
   return (
     <div className="flex h-screen flex-col">
-      <TopbarOperativa caja={caja} turno={turno} empleado={empleado} onCambiarCajero={onCambiarCajero} onBloquear={onBloquear} onCerrarTurno={() => setCerrando(true)} onMovimientoCaja={() => setMovimientoAbierto(true)} />
+      <TopbarOperativa caja={caja} turno={turno} empleado={empleado} onCambiarCajero={onCambiarCajero} onBloquear={onBloquear} onCerrarTurno={() => setCerrando(true)} onMovimientoCaja={() => setMovimientoAbierto(true)} onKds={() => setEnKds(true)} />
 
       <div className="flex min-h-0 flex-1">
         {/* Sidebar categorías */}
