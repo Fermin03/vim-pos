@@ -124,6 +124,68 @@ export async function actualizarDatosFiscales(input: DatosFiscalesInput): Promis
   if (error) throw new Error(error.message);
 }
 
+// ── CFDI / PAC emisor (P-018) ────────────────────────────────────────────────
+export const PROVEEDORES_PAC = ["FACTURAPI", "SOLUCIONFACTIBLE", "FINKOK", "EDICOM", "PRODIGIA", "OTRO"] as const;
+export type ProveedorPac = (typeof PROVEEDORES_PAC)[number];
+
+export const cfdiEmisorSchema = z.object({
+  rfc: z.string().trim().toUpperCase().regex(/^[A-ZÑ&]{3,4}[0-9]{6}[A-Z0-9]{3}$/, "RFC inválido"),
+  proveedor_pac: z.enum(PROVEEDORES_PAC),
+  facturama_issuer_ref: z.string().trim().max(100).optional().or(z.literal("")),
+  csd_vigencia_hasta: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Fecha inválida").optional().or(z.literal("")),
+  estado: z.enum(["ACTIVO", "INACTIVO", "PRUEBA"]),
+});
+export type CfdiEmisorInput = z.infer<typeof cfdiEmisorSchema>;
+export type CfdiEmisor = CfdiEmisorInput & { existe: boolean };
+
+export async function leerCfdiEmisor(): Promise<CfdiEmisor> {
+  const tid = await tenantId();
+  const { data, error } = await supabase
+    .from("tenant_cfdi_emisor")
+    .select("rfc, proveedor_pac, facturama_issuer_ref, csd_vigencia_hasta, estado")
+    .eq("tenant_id", tid)
+    .maybeSingle();
+  if (error) throw new Error(error.message);
+  if (!data) {
+    // Prefill RFC desde los datos fiscales del tenant si aún no hay emisor.
+    const ten = await supabase.from("tenants").select("rfc").eq("id", tid).maybeSingle();
+    return {
+      rfc: (ten.data as { rfc?: string } | null)?.rfc ?? "",
+      proveedor_pac: "FACTURAPI",
+      facturama_issuer_ref: "",
+      csd_vigencia_hasta: "",
+      estado: "PRUEBA",
+      existe: false,
+    };
+  }
+  const d = data as Record<string, string | null>;
+  return {
+    rfc: d.rfc ?? "",
+    proveedor_pac: (d.proveedor_pac as ProveedorPac) ?? "FACTURAPI",
+    facturama_issuer_ref: d.facturama_issuer_ref ?? "",
+    csd_vigencia_hasta: d.csd_vigencia_hasta ?? "",
+    estado: (d.estado as CfdiEmisorInput["estado"]) ?? "PRUEBA",
+    existe: true,
+  };
+}
+
+export async function guardarCfdiEmisor(input: CfdiEmisorInput): Promise<void> {
+  const datos = cfdiEmisorSchema.parse(input);
+  const tid = await tenantId();
+  const { error } = await supabase.from("tenant_cfdi_emisor").upsert(
+    {
+      tenant_id: tid,
+      rfc: datos.rfc,
+      proveedor_pac: datos.proveedor_pac,
+      facturama_issuer_ref: datos.facturama_issuer_ref || datos.rfc, // NOT NULL en BD
+      csd_vigencia_hasta: datos.csd_vigencia_hasta || null,
+      estado: datos.estado,
+    },
+    { onConflict: "tenant_id" },
+  );
+  if (error) throw new Error(error.message);
+}
+
 // ── Sucursales (P-165/166) ───────────────────────────────────────────────────
 export const sucursalSchema = z.object({
   codigo: z.string().trim().min(1, "Obligatorio").max(10).regex(/^[A-Z0-9]+$/, "Solo mayúsculas y números"),
