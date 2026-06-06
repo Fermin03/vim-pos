@@ -7,9 +7,13 @@ import {
   leerReporteX,
   arquearCaja,
   cerrarTurnoZ,
+  leerDatosFiscales,
+  leerEstadisticasTurno,
   type ReporteXResumen,
   type CorteResultado,
   type CierreZ,
+  type DatosFiscales,
+  type EstadisticasTurno,
 } from "../lib/cierre";
 import { autorizacionPropia, type Autorizacion, type PayloadAutorizacion } from "../lib/autorizacion";
 import { ModalAutorizacionPin } from "./modal-autorizacion-pin";
@@ -23,6 +27,18 @@ const METODO_LABEL: Record<string, string> = {
   TRANSFERENCIA: "Transferencia / SPEI",
   APP_RAPPI: "Rappi", APP_UBEREATS: "Uber Eats", APP_DIDI: "DiDi", APP_IFOOD: "iFood", APP_OTRO: "App externa",
 };
+
+/** Etiqueta del método en MAYÚSCULAS estilo Soft Restaurant (EFECTIVO/VISA/…). */
+const METODO_LABEL_SOFT_MAP: Record<string, string> = {
+  EFECTIVO: "EFECTIVO",
+  TARJETA_CREDITO: "TARJETA",
+  TARJETA_DEBITO: "TARJETA",
+  TRANSFERENCIA: "TRANSFERENCIA",
+  APP_RAPPI: "RAPPI", APP_UBEREATS: "UBER EATS", APP_DIDI: "DIDI", APP_IFOOD: "IFOOD", APP_OTRO: "APP EXTERNA",
+};
+const labelSoft = (m: string) => METODO_LABEL_SOFT_MAP[m] ?? m.toUpperCase();
+
+const round2 = (n: number) => Math.round(n * 100) / 100;
 const label = (m: string) => METODO_LABEL[m] ?? m;
 const ROLES_CIERRE = ["CAJERO", "SUPERVISOR", "ADMIN", "DUENO"];
 
@@ -46,6 +62,8 @@ export function PantallaCierre({
 }) {
   const [resumen, setResumen] = useState<ReporteXResumen | null>(null);
   const [negocio, setNegocio] = useState("");
+  const [fiscales, setFiscales] = useState<DatosFiscales | null>(null);
+  const [stats, setStats] = useState<EstadisticasTurno | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [paso, setPaso] = useState<Paso>("arqueo");
   const [declarado, setDeclarado] = useState<Record<string, string>>({});
@@ -59,11 +77,15 @@ export function PantallaCierre({
     Promise.all([
       leerReporteX(token, turno.id),
       employeeClient(token).from("tenants").select("nombre_comercial").limit(1).maybeSingle(),
+      leerDatosFiscales(token, caja.tenant_id, caja.sucursal_id),
+      leerEstadisticasTurno(token, turno.id),
     ])
-      .then(([x, ten]) => {
+      .then(([x, ten, fis, st]) => {
         if (!activo) return;
         setResumen(x);
         setNegocio(((ten.data as { nombre_comercial?: string } | null)?.nombre_comercial) ?? "Negocio");
+        setFiscales(fis);
+        setStats(st);
         // Prellenar declarado de métodos no-efectivo con su esperado (verificable)
         const pre: Record<string, string> = {};
         for (const p of x.pagosPorMetodo) if (p.metodo !== "EFECTIVO") pre[p.metodo] = String(p.total);
@@ -71,7 +93,7 @@ export function PantallaCierre({
       })
       .catch((e) => activo && setError(e instanceof Error ? e.message : "Error al leer el turno"));
     return () => { activo = false; };
-  }, [token, turno.id]);
+  }, [token, turno.id, caja.tenant_id, caja.sucursal_id]);
 
   const filas = useMemo<Fila[]>(() => {
     if (!resumen) return [];
@@ -145,7 +167,7 @@ export function PantallaCierre({
   }
 
   // ── Paso Z (recibo del corte, auto-impreso) ─────────────────────────────────
-  if (paso === "z" && cierre && resumen) {
+  if (paso === "z" && cierre && resumen && stats) {
     const p = cierre.payload;
     const tk = (p.tickets ?? {}) as Record<string, unknown>;
     const dev = (p.devoluciones ?? {}) as Record<string, unknown>;
@@ -154,32 +176,78 @@ export function PantallaCierre({
         nombre: String(d.nombre ?? d.usuario_nombre ?? d.usuario_id ?? "—"),
         monto: Number(d.monto_mxn ?? d.monto ?? 0),
       }));
-    // Sello: 12 chars del reporte_z_id (uuid sin guiones); el papel real lleva un hash auditable.
     const sello = cierre.reporteZId.replace(/-/g, "").slice(0, 12);
     const ticketsPagados = Number(tk.total_tickets_pagados ?? 0);
     const ticketsCancelados = Number(tk.total_tickets_cancelados ?? 0);
     const ticketsAbiertos = Number(tk.total_tickets_abiertos ?? 0);
+    // Ventas en efectivo (suma de pagos en efectivo en el turno) y desglose de tarjeta/vales/otros.
+    const efeRow = resumen.pagosPorMetodo.find((m) => m.metodo === "EFECTIVO");
+    const tarjetas = resumen.pagosPorMetodo
+      .filter((m) => m.metodo === "TARJETA_CREDITO" || m.metodo === "TARJETA_DEBITO")
+      .reduce((s, m) => s + m.total, 0);
+    const vales = 0; // no manejamos vales en MVP
+    const otrosNoEfe = resumen.pagosPorMetodo
+      .filter((m) => m.metodo !== "EFECTIVO" && m.metodo !== "TARJETA_CREDITO" && m.metodo !== "TARJETA_DEBITO")
+      .reduce((s, m) => s + m.total, 0);
+    // Declaración de cajero por método (la que el cajero ya ingresó en la pantalla de arqueo).
+    const declaracionPorMetodo = filas.map((f) => ({
+      metodo: labelSoft(f.metodo),
+      declarado: Number(declarado[f.metodo] ?? 0),
+    }));
+    const totalDeclarado = round2(declaracionPorMetodo.reduce((s, d) => s + d.declarado, 0));
+    const diferenciaTotal = corte?.diferenciaTotal ?? round2(totalDeclarado - resumen.efectivoEsperado);
     const zData: DatosReporteZ = {
-      negocio, sucursal: caja.sucursalNombre,
+      negocio,
+      razonSocial: fiscales?.razonSocial ?? "",
+      rfc: fiscales?.rfc ?? "",
+      direccionSucursal: fiscales?.direccionSucursal ?? "",
+      sucursal: caja.sucursalNombre,
       folioZ: cierre.folioZ ?? "—",
       codigoTurno: turno.codigo_turno,
+      estacionCaja: caja.nombre,
       fechaApertura: resumen.fechaApertura,
       fechaCierre: (p.fecha_cierre as string) ?? new Date().toISOString(),
-      cajero: empleado.nombre, caja: caja.nombre,
-      ticketsPagados,
-      ticketsEmitidos: ticketsPagados + ticketsCancelados + ticketsAbiertos,
-      ticketsCancelados,
-      devolucionesCantidad: Number(dev.cantidad ?? 0),
-      devolucionesMonto: Number(dev.total_mxn ?? 0),
+      cajero: empleado.nombre,
+      caja: caja.nombre,
+      // CAJA — flujo efectivo
+      efectivoInicial: resumen.fondoApertura,
+      ventasEfectivo: efeRow?.total ?? 0,
+      ventasTarjeta: tarjetas,
+      ventasVales: vales,
+      ventasOtros: otrosNoEfe,
+      depositosEfectivo: 0,
+      retirosEfectivo: 0,
+      propinasPagadas: 0,
+      // Pagos
+      pagosPorMetodo: resumen.pagosPorMetodo.map((m) => ({ metodo: labelSoft(m.metodo), total: m.total, cantidad: m.cantidad })),
+      pagosPropinaPorMetodo: resumen.propinaTotal > 0 && efeRow
+        ? [{ metodo: labelSoft("EFECTIVO"), total: resumen.propinaTotal }]
+        : [],
+      ventaPorModoServicio: stats.ventaPorModoServicio,
+      // Subtotales
       ventaNeta: Number(tk.total_neto_mxn ?? 0),
       iva: Number(tk.iva_neto_mxn ?? 0),
       descuentos: Number(tk.descuentos_manuales_mxn ?? 0),
       propinaTotal: Number(tk.propina_total_mxn ?? 0),
-      pagosPorMetodo: resumen.pagosPorMetodo.map((m) => ({ metodo: label(m.metodo), total: m.total, cantidad: m.cantidad })),
+      // Estadísticas
+      ticketsPagados,
+      ticketsEmitidos: ticketsPagados + ticketsCancelados + ticketsAbiertos,
+      ticketsCancelados,
+      cuentasConDescuento: stats.cuentasConDescuento,
+      comensales: stats.cuentasNormales,
+      ticketPromedio: stats.ticketPromedio,
+      folioInicial: stats.folioInicial,
+      folioFinal: stats.folioFinal,
+      devolucionesCantidad: Number(dev.cantidad ?? 0),
+      devolucionesMonto: Number(dev.total_mxn ?? 0),
       propinasDistribuidas: propinasDist,
+      // Declaración + arqueo
+      declaracionPorMetodo,
+      totalDeclarado,
       efectivoEsperado: resumen.efectivoEsperado,
       efectivoDeclarado,
       diferenciaEfectivo: Math.round((efectivoDeclarado - resumen.efectivoEsperado) * 100) / 100,
+      diferenciaTotal,
       sello,
       ancho: 80,
     };
