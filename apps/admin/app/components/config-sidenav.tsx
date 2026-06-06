@@ -6,6 +6,7 @@ const SECCIONES = [
   { titulo: "Negocio", items: [
     { label: "Datos del negocio", href: "/configuracion/negocio" },
     { label: "Datos fiscales", href: "/configuracion/fiscal" },
+    { label: "CFDI / PAC", href: "/configuracion/cfdi" },
   ]},
   { titulo: "Operación", items: [
     { label: "Sucursales", href: "/configuracion/sucursales" },
