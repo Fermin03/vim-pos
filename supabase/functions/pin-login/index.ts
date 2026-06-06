@@ -9,6 +9,7 @@
 
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import { create, getNumericDate } from "https://deno.land/x/djwt@v3.0.2/mod.ts";
+import { corsHeaders } from "../_shared/cors.ts";
 
 // OJO: las Edge Functions NO permiten secretos con prefijo SUPABASE_ (reservado).
 // Por eso el JWT secret del proyecto se inyecta como VIM_JWT_SECRET.
@@ -24,20 +25,11 @@ const key = await crypto.subtle.importKey(
   ["sign", "verify"],
 );
 
-const cors = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, content-type, apikey",
-  "Access-Control-Allow-Methods": "POST, OPTIONS",
-};
-
-function json(body: unknown, status = 200) {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: { ...cors, "Content-Type": "application/json" },
-  });
-}
-
 Deno.serve(async (req) => {
+  const cors = corsHeaders(req);
+  const json = (body: unknown, status = 200) =>
+    new Response(JSON.stringify(body), { status, headers: { ...cors, "Content-Type": "application/json" } });
+
   if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
   if (req.method !== "POST") return json({ error: "METHOD_NOT_ALLOWED" }, 405);
 
