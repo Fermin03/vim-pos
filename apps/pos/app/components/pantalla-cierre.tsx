@@ -9,11 +9,13 @@ import {
   cerrarTurnoZ,
   leerDatosFiscales,
   leerEstadisticasTurno,
+  leerMovimientosTurno,
   type ReporteXResumen,
   type CorteResultado,
   type CierreZ,
   type DatosFiscales,
   type EstadisticasTurno,
+  type MovimientosTurno,
 } from "../lib/cierre";
 import { autorizacionPropia, type Autorizacion, type PayloadAutorizacion } from "../lib/autorizacion";
 import { ModalAutorizacionPin } from "./modal-autorizacion-pin";
@@ -64,6 +66,7 @@ export function PantallaCierre({
   const [negocio, setNegocio] = useState("");
   const [fiscales, setFiscales] = useState<DatosFiscales | null>(null);
   const [stats, setStats] = useState<EstadisticasTurno | null>(null);
+  const [movs, setMovs] = useState<MovimientosTurno | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [paso, setPaso] = useState<Paso>("arqueo");
   const [declarado, setDeclarado] = useState<Record<string, string>>({});
@@ -79,13 +82,15 @@ export function PantallaCierre({
       employeeClient(token).from("tenants").select("nombre_comercial").limit(1).maybeSingle(),
       leerDatosFiscales(token, caja.tenant_id, caja.sucursal_id),
       leerEstadisticasTurno(token, turno.id),
+      leerMovimientosTurno(token, turno.id),
     ])
-      .then(([x, ten, fis, st]) => {
+      .then(([x, ten, fis, st, mv]) => {
         if (!activo) return;
         setResumen(x);
         setNegocio(((ten.data as { nombre_comercial?: string } | null)?.nombre_comercial) ?? "Negocio");
         setFiscales(fis);
         setStats(st);
+        setMovs(mv);
         // Prellenar declarado de métodos no-efectivo con su esperado (verificable)
         const pre: Record<string, string> = {};
         for (const p of x.pagosPorMetodo) if (p.metodo !== "EFECTIVO") pre[p.metodo] = String(p.total);
@@ -215,8 +220,8 @@ export function PantallaCierre({
       ventasTarjeta: tarjetas,
       ventasVales: vales,
       ventasOtros: otrosNoEfe,
-      depositosEfectivo: 0,
-      retirosEfectivo: 0,
+      depositosEfectivo: movs?.depositosEntrantes ?? 0,
+      retirosEfectivo: movs?.retirosSalientes ?? 0,
       propinasPagadas: 0,
       // Pagos
       pagosPorMetodo: resumen.pagosPorMetodo.map((m) => ({ metodo: labelSoft(m.metodo), total: m.total, cantidad: m.cantidad })),
