@@ -6,6 +6,7 @@ import {
   MOTIVOS,
   aplicarDescuento,
   descuentoSchema,
+  permisoDescuento,
   previewDescuento,
   type MotivoDescuento,
   type TipoDescuento,
@@ -14,7 +15,10 @@ import { autorizacionPropia, type Autorizacion, type PayloadAutorizacion } from 
 import { ModalAutorizacionPin } from "./modal-autorizacion-pin";
 import { fmtMxn } from "../lib/turno";
 
-const ROLES_CON_PERMISO = ["SUPERVISOR", "ADMIN", "DUENO"];
+// Roles que tienen `descuento.manual_aplicar` por defecto (matriz §2.2).
+const ROLES_DESCUENTO = ["SUPERVISOR", "ADMIN", "DUENO"];
+// Roles que tienen `descuento.cortesia_total` (más restrictivo, supervisor+).
+const ROLES_CORTESIA = ["SUPERVISOR", "ADMIN", "DUENO"];
 
 export function ModalDescuento({
   token,
@@ -43,7 +47,9 @@ export function ModalDescuento({
   const [aplicando, setAplicando] = useState(false);
   const [pidiendoPin, setPidiendoPin] = useState(false);
 
-  const tienePermiso = ROLES_CON_PERMISO.includes(empleado.rol);
+  const tienePermiso = tipo === "CORTESIA_TOTAL"
+    ? ROLES_CORTESIA.includes(empleado.rol)
+    : ROLES_DESCUENTO.includes(empleado.rol);
   const valorNum = Number(valor || 0);
   const descuento = previewDescuento(tipo, valorNum, totalActual);
   const nuevoTotal = Math.max(0, Math.round((totalActual - descuento) * 100) / 100);
@@ -55,8 +61,8 @@ export function ModalDescuento({
 
   function payload(): PayloadAutorizacion {
     return {
-      accion: "descuento_manual",
-      permisoCodigo: "descuento.manual_aplicar",
+      accion: tipo === "CORTESIA_TOTAL" ? "cortesia_total" : "descuento_manual",
+      permisoCodigo: permisoDescuento(tipo),
       entidadTipo: "ticket",
       entidadId: ticketId,
       monto: descuento,
@@ -144,39 +150,43 @@ export function ModalDescuento({
 
       {/* Tipo */}
       <div className="mb-4 inline-flex w-full gap-0.5 rounded border border-line bg-hover p-[3px]">
-        {(["PORCENTAJE", "MONTO_FIJO"] as TipoDescuento[]).map((t) => (
+        {(["PORCENTAJE", "MONTO_FIJO", "CORTESIA_TOTAL"] as TipoDescuento[]).map((t) => (
           <button
             key={t}
             type="button"
             onClick={() => setTipo(t)}
             className={[
-              "flex-1 rounded-[4px] px-3 py-2 text-[13px] font-semibold transition",
+              "flex-1 rounded-[4px] px-3 py-2 text-[12.5px] font-semibold transition",
               tipo === t ? "bg-surface text-ink shadow-sm" : "text-ink-2 hover:text-ink",
             ].join(" ")}
           >
-            {t === "PORCENTAJE" ? "Porcentaje" : "Monto fijo"}
+            {t === "PORCENTAJE" ? "Porcentaje" : t === "MONTO_FIJO" ? "Monto fijo" : "Cortesía 100%"}
           </button>
         ))}
       </div>
 
-      {/* Valor */}
-      <label className="mb-1.5 block text-[13px] font-medium text-ink-2" htmlFor="d-valor">
-        Valor del descuento
-      </label>
-      <div className="relative mb-4">
-        <input
-          id="d-valor"
-          className={input}
-          value={valor}
-          inputMode="decimal"
-          autoFocus
-          onChange={(e) => setValor(e.target.value.replace(/[^0-9.]/g, ""))}
-          placeholder={tipo === "PORCENTAJE" ? "10" : "50.00"}
-        />
-        <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-sm font-semibold text-ink-3">
-          {tipo === "PORCENTAJE" ? "%" : "MXN"}
-        </span>
-      </div>
+      {/* Valor (oculto para cortesía 100%) */}
+      {tipo !== "CORTESIA_TOTAL" && (
+        <>
+          <label className="mb-1.5 block text-[13px] font-medium text-ink-2" htmlFor="d-valor">
+            Valor del descuento
+          </label>
+          <div className="relative mb-4">
+            <input
+              id="d-valor"
+              className={input}
+              value={valor}
+              inputMode="decimal"
+              autoFocus
+              onChange={(e) => setValor(e.target.value.replace(/[^0-9.]/g, ""))}
+              placeholder={tipo === "PORCENTAJE" ? "10" : "50.00"}
+            />
+            <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-sm font-semibold text-ink-3">
+              {tipo === "PORCENTAJE" ? "%" : "MXN"}
+            </span>
+          </div>
+        </>
+      )}
 
       {/* Motivo */}
       <div className="mb-1.5 text-[13px] font-medium text-ink-2">Motivo</div>
