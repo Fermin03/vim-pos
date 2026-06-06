@@ -25,6 +25,27 @@ const key = await crypto.subtle.importKey(
   ["sign", "verify"],
 );
 
+// Cliente service_role: corre server-side, nunca se expone al cliente.
+const admin = createClient(
+  Deno.env.get("SUPABASE_URL")!,
+  Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
+  { auth: { persistSession: false } },
+);
+
+// El caja_id va codificado en el email sintético del dispositivo
+// (`caja-{caja_id}@dispositivos.vimpos.mx`, 1F §1.1). El dispositivo ES una caja.
+const EMAIL_DISPOSITIVO = /^caja-([0-9a-f-]{36})@dispositivos\.vimpos\.mx$/i;
+
+/** Lee los claims de un JWT cuya firma YA validó getUser (no re-verifica). */
+function leerClaims(token: string): Record<string, unknown> {
+  try {
+    const p = token.split(".")[1];
+    return p ? JSON.parse(atob(p.replace(/-/g, "+").replace(/_/g, "/"))) : {};
+  } catch {
+    return {};
+  }
+}
+
 Deno.serve(async (req) => {
   const cors = corsHeaders(req);
   const json = (body: unknown, status = 200) =>
@@ -32,6 +53,23 @@ Deno.serve(async (req) => {
 
   if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
   if (req.method !== "POST") return json({ error: "METHOD_NOT_ALLOWED" }, 405);
+
+  // 0) Autenticación del DISPOSITIVO llamante (CN-005). Espeja autorizar-pin/crear-empleado/
+  // resetear-pin. La anon key es un JWT del proyecto pero SIN usuario asociado, así que
+  // getUser la rechaza: sin esto, cualquiera con la anon key (pública) podía disparar
+  // intentos de PIN y solo el lockout del RPC frenaba la fuerza bruta.
+  const token = (req.headers.get("authorization") ?? "").replace(/^Bearer\s+/i, "");
+  if (!token) return json({ error: "NO_AUTH" }, 401);
+  const { data: u, error: uErr } = await admin.auth.getUser(token);
+  if (uErr || !u?.user) return json({ error: "AUTH_INVALIDA" }, 401);
+
+  // El llamante debe ser una cuenta de DISPOSITIVO (caja): su JWT porta
+  // tipo_identidad='DISPOSITIVO' (hook 0006) y su email codifica el caja_id.
+  const claims = leerClaims(token);
+  const cajaDelDispositivo = EMAIL_DISPOSITIVO.exec(u.user.email ?? "")?.[1] ?? null;
+  if (claims.tipo_identidad !== "DISPOSITIVO" || !cajaDelDispositivo) {
+    return json({ error: "NO_ES_DISPOSITIVO" }, 403);
+  }
 
   let body: { usuario_id?: string; pin?: string; caja_id?: string };
   try {
@@ -42,12 +80,8 @@ Deno.serve(async (req) => {
   const { usuario_id, pin, caja_id } = body;
   if (!usuario_id || !pin || !caja_id) return json({ error: "FALTAN_CAMPOS" }, 400);
 
-  // Cliente service_role: corre server-side, nunca se expone al cliente.
-  const admin = createClient(
-    Deno.env.get("SUPABASE_URL")!,
-    Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
-    { auth: { persistSession: false } },
-  );
+  // El dispositivo solo puede autenticar PINs contra SU PROPIA caja.
+  if (cajaDelDispositivo !== caja_id) return json({ error: "CAJA_NO_COINCIDE" }, 403);
 
   // 1) Verificación de PIN + anti-fuerza-bruta + validación de acceso (RPC SQL, 0006)
   const { data, error } = await admin.rpc("verificar_pin_login", {
