@@ -71,6 +71,7 @@ export function SidebarTicket({
   estado,
   onCantidad,
   onQuitar,
+  onCancelarItemPersistido,
   onModo,
   onCobrar,
   onAplicarDescuento,
@@ -82,6 +83,8 @@ export function SidebarTicket({
   estado: EstadoCarrito;
   onCantidad: (clientId: string, cantidad: number) => void;
   onQuitar: (clientId: string) => void;
+  /** Cuando el ticket está persistido, "Quitar" llama a este handler (cancela en BD con motivo+autorización). */
+  onCancelarItemPersistido?: (clientId: string) => void;
   onModo: (m: ModoServicio) => void;
   onCobrar: () => void;
   onAplicarDescuento: () => void;
@@ -211,8 +214,8 @@ export function SidebarTicket({
                   </span>
                   <button
                     type="button"
-                    disabled={bloqueado}
-                    onClick={() => onQuitar(l.clientId)}
+                    disabled={bloqueado && !onCancelarItemPersistido}
+                    onClick={() => (bloqueado && onCancelarItemPersistido ? onCancelarItemPersistido(l.clientId) : onQuitar(l.clientId))}
                     className="rounded px-2 py-[5px] text-[13px] font-semibold text-ink-3 transition-all hover:bg-hover hover:text-danger disabled:cursor-default disabled:opacity-40 disabled:hover:bg-transparent disabled:hover:text-ink-3"
                   >
                     Quitar
