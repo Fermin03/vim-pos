@@ -118,3 +118,112 @@ export async function cerrarTurnoZ(
   }
   return { estado: String(z.estado), reporteZId, folioZ, payload };
 }
+
+// ─── F5.4soft: datos extra para el Reporte Z estilo Soft ────────────────────
+
+export type DatosFiscales = {
+  /** Razón social (vacío si tenant TRIAL). */
+  razonSocial: string;
+  rfc: string;
+  /** Dirección formateada de la sucursal (línea única). */
+  direccionSucursal: string;
+  /** Teléfono de la sucursal (puede ir vacío). */
+  telefonoSucursal: string;
+};
+
+/** Lee razón social + RFC del tenant y dirección de la sucursal. Bajo RLS. */
+export async function leerDatosFiscales(token: string, tenantId: string, sucursalId: string): Promise<DatosFiscales> {
+  const sb = employeeClient(token);
+  const [tenRes, sucRes] = await Promise.all([
+    sb.from("tenants").select("razon_social, rfc").eq("id", tenantId).maybeSingle(),
+    sb.from("sucursales")
+      .select("direccion_calle, direccion_numero, direccion_colonia, ciudad, estado_geo, codigo_postal, telefono")
+      .eq("id", sucursalId).maybeSingle(),
+  ]);
+  const tn = (tenRes.data ?? {}) as Record<string, string | null>;
+  const sc = (sucRes.data ?? {}) as Record<string, string | null>;
+  const direccion = [
+    [sc.direccion_calle, sc.direccion_numero].filter(Boolean).join(" "),
+    sc.direccion_colonia,
+    [sc.ciudad, sc.estado_geo].filter(Boolean).join(", "),
+    sc.codigo_postal ? `CP ${sc.codigo_postal}` : null,
+  ].filter(Boolean).join(", ");
+  return {
+    razonSocial: tn.razon_social ?? "",
+    rfc: tn.rfc ?? "",
+    direccionSucursal: direccion,
+    telefonoSucursal: sc.telefono ?? "",
+  };
+}
+
+export type ModoServicioVenta = { modo: string; total: number; cantidad: number; porcentaje: number };
+export type EstadisticasTurno = {
+  cuentasNormales: number;        // = ticketsPagados
+  cuentasCanceladas: number;
+  cuentasConDescuento: number;    // tickets con descuentos_manuales_mxn > 0
+  ticketPromedio: number;
+  folioInicial: string | null;
+  folioFinal: string | null;
+  /** Venta por modo de servicio (COMER_AQUI / PARA_LLEVAR / DRIVE_THRU) con %. */
+  ventaPorModoServicio: ModoServicioVenta[];
+};
+
+const MODO_LABEL_SOFT: Record<string, string> = {
+  COMER_AQUI: "COMEDOR",
+  PARA_LLEVAR: "PARA LLEVAR",
+  DRIVE_THRU: "DRIVE-THRU",
+};
+
+/** Estadísticas adicionales del turno para el cierre estilo Soft. Bajo RLS. */
+export async function leerEstadisticasTurno(token: string, turnoId: string): Promise<EstadisticasTurno> {
+  const sb = employeeClient(token);
+  const { data, error } = await sb
+    .from("tickets")
+    .select("folio_completo, estado_fiscal, total_mxn, descuentos_manuales_mxn, modo_servicio, created_at")
+    .eq("turno_id", turnoId)
+    .is("deleted_at", null);
+  if (error) throw new Error(error.message);
+  const rows = (data ?? []) as {
+    folio_completo: string | null;
+    estado_fiscal: string;
+    total_mxn: string | number;
+    descuentos_manuales_mxn: string | number;
+    modo_servicio: string;
+    created_at: string;
+  }[];
+
+  const pagados = rows.filter((r) => r.estado_fiscal === "PAGADO" || r.estado_fiscal === "FACTURADO");
+  const cancelados = rows.filter((r) => r.estado_fiscal === "CANCELADO");
+  const conDescuento = pagados.filter((r) => Number(r.descuentos_manuales_mxn) > 0);
+  const totalVendido = pagados.reduce((s, r) => s + Number(r.total_mxn), 0);
+  const promedio = pagados.length > 0 ? totalVendido / pagados.length : 0;
+
+  const conFolio = pagados.filter((r) => r.folio_completo != null).sort((a, b) => a.created_at.localeCompare(b.created_at));
+  const folioInicial = conFolio[0]?.folio_completo ?? null;
+  const folioFinal = conFolio[conFolio.length - 1]?.folio_completo ?? null;
+
+  // Venta por modo de servicio
+  const porModo = new Map<string, { total: number; cantidad: number }>();
+  for (const r of pagados) {
+    const acc = porModo.get(r.modo_servicio) ?? { total: 0, cantidad: 0 };
+    acc.total += Number(r.total_mxn);
+    acc.cantidad += 1;
+    porModo.set(r.modo_servicio, acc);
+  }
+  const ventaPorModoServicio: ModoServicioVenta[] = [...porModo.entries()].map(([modo, v]) => ({
+    modo: MODO_LABEL_SOFT[modo] ?? modo,
+    total: Math.round(v.total * 100) / 100,
+    cantidad: v.cantidad,
+    porcentaje: totalVendido > 0 ? Math.round((v.total / totalVendido) * 1000) / 10 : 0,
+  })).sort((a, b) => b.total - a.total);
+
+  return {
+    cuentasNormales: pagados.length,
+    cuentasCanceladas: cancelados.length,
+    cuentasConDescuento: conDescuento.length,
+    ticketPromedio: Math.round(promedio * 100) / 100,
+    folioInicial,
+    folioFinal,
+    ventaPorModoServicio,
+  };
+}
