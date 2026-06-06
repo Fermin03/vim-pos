@@ -32,6 +32,7 @@ import { construirComandaJob, type DatosComanda } from "../lib/print/comanda-bui
 import { ReciboPreview } from "./recibo-preview";
 import { PantallaCierre } from "./pantalla-cierre";
 import { ModalCancelarItem } from "./modal-cancelar-item";
+import { ModalCancelarTicket } from "./modal-cancelar-ticket";
 import { leerItemsPersistidos, type ItemTicket } from "../lib/cancelacion";
 import type { DatosTicketImpresion } from "../lib/print/tipos";
 
@@ -146,6 +147,8 @@ export function HomePos({
   // F6.1 — items persistidos del ticketBd (para mapear clientId ↔ ticket_item_id real al cancelar).
   const [itemsPersistidos, setItemsPersistidos] = useState<ItemTicket[]>([]);
   const [cancelandoItem, setCancelandoItem] = useState<ItemTicket | null>(null);
+  // F6.2 — modal de cancelar ticket completo.
+  const [cancelandoTicket, setCancelandoTicket] = useState(false);
   // F5.3c — Datos crudos del ticket; el preview los renderiza fiel a P-222/P-223.
   const [datosTicket, setDatosTicket] = useState<DatosTicketImpresion | null>(null);
   const [datosComanda, setDatosComanda] = useState<DatosComanda | null>(null);
@@ -376,6 +379,8 @@ export function HomePos({
           onCantidad={(id, c) => dispatch({ tipo: "cantidad", clientId: id, cantidad: c })}
           onQuitar={(id) => dispatch({ tipo: "quitar", clientId: id })}
           onCancelarItemPersistido={ticketBd ? onCancelarItemPersistido : undefined}
+          onLimpiar={!ticketBd ? () => dispatch({ tipo: "limpiar" }) : undefined}
+          onCancelarTicket={ticketBd ? () => setCancelandoTicket(true) : undefined}
           onModo={(m: ModoServicio) => dispatch({ tipo: "modo", modo: m })}
           onCobrar={iniciarCobro}
           onAplicarDescuento={onAplicarDescuento}
@@ -412,6 +417,25 @@ export function HomePos({
             setDescuentoAbierto(false);
           }}
           onCerrar={() => setDescuentoAbierto(false)}
+        />
+      )}
+      {cancelandoTicket && ticketBd && (
+        <ModalCancelarTicket
+          token={token}
+          empleado={empleado}
+          ticketId={ticketBd.ticketId}
+          folio={ticketBd.folio}
+          totalActual={ticketBd.total}
+          cajaId={turno.caja_id}
+          turnoId={turno.id}
+          onCancelado={() => {
+            // Resetear todo: carrito local, ticketBd, items persistidos.
+            dispatch({ tipo: "limpiar" });
+            setTicketBd(null);
+            setItemsPersistidos([]);
+            setCancelandoTicket(false);
+          }}
+          onCerrar={() => setCancelandoTicket(false)}
         />
       )}
       {cancelandoItem && ticketBd && (
