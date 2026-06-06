@@ -11,8 +11,9 @@ import { BrandMark } from "./topbar-pos";
  * con la cuenta de dispositivo del fixture para DEV.
  */
 export function VincularDispositivo({ onVinculado }: { onVinculado: () => void }) {
-  const [email, setEmail] = useState(CREDS_DEV_FIXTURE.email);
-  const [password, setPassword] = useState(CREDS_DEV_FIXTURE.password);
+  // SEC CN-011: en producción CREDS_DEV_FIXTURE es null (no prellenamos credenciales).
+  const [email, setEmail] = useState(CREDS_DEV_FIXTURE?.email ?? "");
+  const [password, setPassword] = useState(CREDS_DEV_FIXTURE?.password ?? "");
   const [error, setError] = useState<string | null>(null);
   const [cargando, setCargando] = useState(false);
 
