@@ -5,18 +5,32 @@ export type DatosReporteZ = {
   negocio: string;
   sucursal: string;
   folioZ: string;
+  /** Código del turno (P-226 lo muestra como "Turno: Tarde / 2026-…-C01-01"). */
+  codigoTurno: string;
+  /** Hora de apertura del turno (ISO). Si null → se omite. */
+  fechaApertura: string | null;
   fechaCierre: string;
   cajero: string;
   caja: string;
   ticketsPagados: number;
+  /** Tickets emitidos durante el turno (pagados + cancelados + en espera). P-226 muestra "Tickets emitidos". */
+  ticketsEmitidos: number;
+  ticketsCancelados: number;
+  /** Devoluciones del turno: cantidad y monto neto. */
+  devolucionesCantidad: number;
+  devolucionesMonto: number;
   ventaNeta: number;
   iva: number;
   descuentos: number;
   propinaTotal: number;
   pagosPorMetodo: { metodo: string; total: number; cantidad: number }[];
+  /** Propinas distribuidas por usuario (del payload del Z). */
+  propinasDistribuidas: { nombre: string; monto: number }[];
   efectivoEsperado: number;
   efectivoDeclarado: number;
   diferenciaEfectivo: number;
+  /** Hash corto del sello del Z (8–16 chars). Derivado del reporte_z_id. */
+  sello: string;
   ancho: 58 | 80;
 };
 
