@@ -49,6 +49,81 @@ export async function actualizarNegocio(input: NegocioInput): Promise<void> {
   if (error) throw new Error(error.message);
 }
 
+// ── Datos fiscales (P-163) ───────────────────────────────────────────────────
+// Régimenes fiscales SAT soportados (enum regimen_fiscal en BD). El catálogo SAT es
+// más amplio; aquí van los relevantes para restauranteros (PM y PF).
+export const REGIMENES_FISCALES: { codigo: string; label: string; persona: "MORAL" | "FISICA" }[] = [
+  { codigo: "601", label: "General de Ley Personas Morales", persona: "MORAL" },
+  { codigo: "603", label: "Personas Morales con Fines no Lucrativos", persona: "MORAL" },
+  { codigo: "605", label: "Sueldos y Salarios e Ingresos Asimilados a Salarios", persona: "FISICA" },
+  { codigo: "612", label: "Personas Físicas con Actividades Empresariales y Profesionales", persona: "FISICA" },
+  { codigo: "621", label: "Incorporación Fiscal", persona: "FISICA" },
+  { codigo: "625", label: "Actividades Empresariales con ingresos a través de Plataformas Tecnológicas", persona: "FISICA" },
+  { codigo: "626", label: "Régimen Simplificado de Confianza (RESICO)", persona: "FISICA" },
+];
+
+const RFC_REGEX = /^[A-ZÑ&]{3,4}[0-9]{6}[A-Z0-9]{3}$/;
+
+export const datosFiscalesSchema = z.object({
+  // RFC en mayúsculas, 12 (moral) o 13 (física) caracteres, con formato SAT.
+  rfc: z.string().trim().toUpperCase().regex(RFC_REGEX, "RFC inválido (formato SAT)"),
+  razon_social: z.string().trim().min(1, "Obligatorio").max(255),
+  regimen_fiscal: z.enum(["601", "603", "605", "612", "621", "625", "626"]),
+  // CP fiscal = lugar de expedición; obligatorio en CFDI 4.0.
+  codigo_postal_fiscal: z.string().trim().regex(/^\d{5}$/, "5 dígitos"),
+  email_fiscal: z.string().trim().toLowerCase().email("Correo inválido").max(255).optional().or(z.literal("")),
+});
+export type DatosFiscalesInput = z.infer<typeof datosFiscalesSchema>;
+
+export type DatosFiscales = {
+  rfc: string;
+  razon_social: string;
+  regimen_fiscal: string | null;
+  codigo_postal_fiscal: string;
+  email_fiscal: string;
+  /** Si ya hay un emisor CFDI configurado y activo (controla el aviso "facturación activa"). */
+  facturacionActiva: boolean;
+};
+
+export async function leerDatosFiscales(): Promise<DatosFiscales> {
+  const tid = await tenantId();
+  const [tenRes, emiRes] = await Promise.all([
+    supabase
+      .from("tenants")
+      .select("rfc, razon_social, regimen_fiscal, codigo_postal_fiscal, email_fiscal")
+      .eq("id", tid)
+      .maybeSingle(),
+    supabase.from("tenant_cfdi_emisor").select("estado").eq("tenant_id", tid).maybeSingle(),
+  ]);
+  if (tenRes.error) throw new Error(tenRes.error.message);
+  const t = (tenRes.data ?? {}) as Record<string, string | null>;
+  const emi = emiRes.data as { estado?: string } | null;
+  return {
+    rfc: t.rfc ?? "",
+    razon_social: t.razon_social ?? "",
+    regimen_fiscal: t.regimen_fiscal ?? null,
+    codigo_postal_fiscal: t.codigo_postal_fiscal ?? "",
+    email_fiscal: t.email_fiscal ?? "",
+    facturacionActiva: emi?.estado === "ACTIVO",
+  };
+}
+
+export async function actualizarDatosFiscales(input: DatosFiscalesInput): Promise<void> {
+  const datos = datosFiscalesSchema.parse(input);
+  const tid = await tenantId();
+  const { error } = await supabase
+    .from("tenants")
+    .update({
+      rfc: datos.rfc,
+      razon_social: datos.razon_social,
+      regimen_fiscal: datos.regimen_fiscal,
+      codigo_postal_fiscal: datos.codigo_postal_fiscal,
+      email_fiscal: datos.email_fiscal || null,
+    })
+    .eq("id", tid);
+  if (error) throw new Error(error.message);
+}
+
 // ── Sucursales (P-165/166) ───────────────────────────────────────────────────
 export const sucursalSchema = z.object({
   codigo: z.string().trim().min(1, "Obligatorio").max(10).regex(/^[A-Z0-9]+$/, "Solo mayúsculas y números"),
