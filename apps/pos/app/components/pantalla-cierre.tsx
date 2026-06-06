@@ -13,7 +13,7 @@ import {
 } from "../lib/cierre";
 import { autorizacionPropia, type Autorizacion, type PayloadAutorizacion } from "../lib/autorizacion";
 import { ModalAutorizacionPin } from "./modal-autorizacion-pin";
-import { construirReporteZJob, type DatosReporteZ } from "../lib/print/reporte-z-builder";
+import type { DatosReporteZ } from "../lib/print/reporte-z-builder";
 import { ReciboPreview } from "./recibo-preview";
 
 const METODO_LABEL: Record<string, string> = {
@@ -148,24 +148,44 @@ export function PantallaCierre({
   if (paso === "z" && cierre && resumen) {
     const p = cierre.payload;
     const tk = (p.tickets ?? {}) as Record<string, unknown>;
+    const dev = (p.devoluciones ?? {}) as Record<string, unknown>;
+    const propinasDist = ((p.propinas_distribuidas ?? []) as Record<string, unknown>[])
+      .map((d) => ({
+        nombre: String(d.nombre ?? d.usuario_nombre ?? d.usuario_id ?? "—"),
+        monto: Number(d.monto_mxn ?? d.monto ?? 0),
+      }));
+    // Sello: 12 chars del reporte_z_id (uuid sin guiones); el papel real lleva un hash auditable.
+    const sello = cierre.reporteZId.replace(/-/g, "").slice(0, 12);
+    const ticketsPagados = Number(tk.total_tickets_pagados ?? 0);
+    const ticketsCancelados = Number(tk.total_tickets_cancelados ?? 0);
+    const ticketsAbiertos = Number(tk.total_tickets_abiertos ?? 0);
     const zData: DatosReporteZ = {
       negocio, sucursal: caja.sucursalNombre,
       folioZ: cierre.folioZ ?? "—",
+      codigoTurno: turno.codigo_turno,
+      fechaApertura: resumen.fechaApertura,
       fechaCierre: (p.fecha_cierre as string) ?? new Date().toISOString(),
       cajero: empleado.nombre, caja: caja.nombre,
-      ticketsPagados: Number(tk.total_tickets_pagados ?? 0),
+      ticketsPagados,
+      ticketsEmitidos: ticketsPagados + ticketsCancelados + ticketsAbiertos,
+      ticketsCancelados,
+      devolucionesCantidad: Number(dev.cantidad ?? 0),
+      devolucionesMonto: Number(dev.total_mxn ?? 0),
       ventaNeta: Number(tk.total_neto_mxn ?? 0),
       iva: Number(tk.iva_neto_mxn ?? 0),
       descuentos: Number(tk.descuentos_manuales_mxn ?? 0),
       propinaTotal: Number(tk.propina_total_mxn ?? 0),
       pagosPorMetodo: resumen.pagosPorMetodo.map((m) => ({ metodo: label(m.metodo), total: m.total, cantidad: m.cantidad })),
+      propinasDistribuidas: propinasDist,
       efectivoEsperado: resumen.efectivoEsperado,
       efectivoDeclarado,
       diferenciaEfectivo: Math.round((efectivoDeclarado - resumen.efectivoEsperado) * 100) / 100,
+      sello,
       ancho: 80,
     };
-    const job = construirReporteZJob(zData);
-    return <ReciboPreview job={job} onImprimir={() => {}} onCerrar={onCerrado} onNuevoTicket={onCerrado} />;
+    // El builder ESC/POS (construirReporteZJob) sigue siendo la fuente para el papel
+    // cuando enchufemos la Epson; aquí el preview se renderiza desde los datos crudos.
+    return <ReciboPreview datosZ={zData} onImprimir={() => {}} onCerrar={onCerrado} onNuevoTicket={onCerrado} />;
   }
 
   const input = "h-11 w-[150px] rounded border border-line-strong px-3 text-right font-display text-[17px] font-bold outline-none focus:border-ink focus:shadow-[0_0_0_3px_rgba(22,22,26,.06)]";
