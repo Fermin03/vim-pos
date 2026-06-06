@@ -2,34 +2,72 @@ import type { Bloque, PrintJob } from "./tipos";
 import { pesos } from "./ticket-builder";
 
 export type DatosReporteZ = {
+  // ── Encabezado fiscal ──
   negocio: string;
+  /** Razón social (puede ir vacía si tenant TRIAL). Se imprime si está presente. */
+  razonSocial: string;
+  rfc: string;
+  /** Dirección fiscal/operativa de la sucursal (línea formateada). */
+  direccionSucursal: string;
   sucursal: string;
+  // ── Identificación del reporte ──
   folioZ: string;
-  /** Código del turno (P-226 lo muestra como "Turno: Tarde / 2026-…-C01-01"). */
   codigoTurno: string;
-  /** Hora de apertura del turno (ISO). Si null → se omite. */
+  /** Estación de caja (en Soft sale "DESKTOP-CLBS4T5"; nosotros usamos el nombre de la caja). */
+  estacionCaja: string;
   fechaApertura: string | null;
   fechaCierre: string;
   cajero: string;
   caja: string;
-  ticketsPagados: number;
-  /** Tickets emitidos durante el turno (pagados + cancelados + en espera). P-226 muestra "Tickets emitidos". */
-  ticketsEmitidos: number;
-  ticketsCancelados: number;
-  /** Devoluciones del turno: cantidad y monto neto. */
-  devolucionesCantidad: number;
-  devolucionesMonto: number;
+  // ── CAJA: flujo de efectivo ──
+  /** Fondo de apertura. */
+  efectivoInicial: number;
+  /** Ventas pagadas en efectivo (suma de pagos EFECTIVO en el turno). */
+  ventasEfectivo: number;
+  /** Ventas en tarjeta + otros no-efectivo (informativo en la sección CAJA de Soft). */
+  ventasTarjeta: number;
+  ventasVales: number;
+  ventasOtros: number;
+  /** Movimientos de caja (F7 — aún 0). */
+  depositosEfectivo: number;
+  retirosEfectivo: number;
+  propinasPagadas: number;
+  // ── Formas de pago ──
+  /** Pagos por método (ventas), con etiqueta Soft (EFECTIVO/VISA/TRANSFERENCIA/…). */
+  pagosPorMetodo: { metodo: string; total: number; cantidad: number }[];
+  /** Propinas por método (en VIM la propina viaja DENTRO del pago; total = propinaTotal). */
+  pagosPropinaPorMetodo: { metodo: string; total: number }[];
+  // ── Venta por modo de servicio (con %) ──
+  ventaPorModoServicio: { modo: string; total: number; cantidad: number; porcentaje: number }[];
+  // ── Subtotales fiscales ──
   ventaNeta: number;
   iva: number;
   descuentos: number;
   propinaTotal: number;
-  pagosPorMetodo: { metodo: string; total: number; cantidad: number }[];
-  /** Propinas distribuidas por usuario (del payload del Z). */
+  // ── Operación: estadísticas ──
+  ticketsPagados: number;
+  ticketsEmitidos: number;
+  ticketsCancelados: number;
+  /** Tickets con descuento aplicado. */
+  cuentasConDescuento: number;
+  /** Comensales (Quick Service: no aplica — se reporta como cantidad de tickets pagados). */
+  comensales: number;
+  ticketPromedio: number;
+  folioInicial: string | null;
+  folioFinal: string | null;
+  // ── Devoluciones ──
+  devolucionesCantidad: number;
+  devolucionesMonto: number;
+  // ── Propinas distribuidas (legado de P-226; queda para auditoría) ──
   propinasDistribuidas: { nombre: string; monto: number }[];
+  // ── Declaración de cajero (por método) + arqueo ──
+  declaracionPorMetodo: { metodo: string; declarado: number }[];
+  totalDeclarado: number;
   efectivoEsperado: number;
   efectivoDeclarado: number;
   diferenciaEfectivo: number;
-  /** Hash corto del sello del Z (8–16 chars). Derivado del reporte_z_id. */
+  diferenciaTotal: number;
+  // ── Sello inmutable VIM ──
   sello: string;
   ancho: 58 | 80;
 };
