@@ -2,7 +2,7 @@
 import { z } from "zod";
 import { employeeClient } from "./supabase";
 
-export type TipoDescuento = "PORCENTAJE" | "MONTO_FIJO";
+export type TipoDescuento = "PORCENTAJE" | "MONTO_FIJO" | "CORTESIA_TOTAL";
 export type MotivoDescuento =
   | "CORTESIA_INVITADO"
   | "PRODUCTO_DEFECTO_LEVE"
@@ -20,8 +20,8 @@ export const MOTIVOS: { codigo: MotivoDescuento; label: string }[] = [
 
 export const descuentoSchema = z
   .object({
-    tipo: z.enum(["PORCENTAJE", "MONTO_FIJO"]),
-    valor: z.number().positive("El valor debe ser mayor a 0"),
+    tipo: z.enum(["PORCENTAJE", "MONTO_FIJO", "CORTESIA_TOTAL"]),
+    valor: z.number().nonnegative("El valor no puede ser negativo"),
     motivoCategoria: z.enum([
       "CORTESIA_INVITADO",
       "PRODUCTO_DEFECTO_LEVE",
@@ -38,8 +38,18 @@ export const descuentoSchema = z
   .refine((d) => d.tipo !== "PORCENTAJE" || d.valor <= 100, {
     message: "El porcentaje no puede pasar de 100",
     path: ["valor"],
+  })
+  .refine((d) => d.tipo === "CORTESIA_TOTAL" || d.valor > 0, {
+    message: "El valor debe ser mayor a 0",
+    path: ["valor"],
   });
 export type DescuentoInput = z.infer<typeof descuentoSchema>;
+
+/** El código del permiso requerido en BD para cada tipo de descuento. */
+export function permisoDescuento(tipo: TipoDescuento): string {
+  if (tipo === "CORTESIA_TOTAL") return "descuento.cortesia_total";
+  return "descuento.manual_aplicar";
+}
 
 /** Aplica el descuento (asume autorizacion_pin_id ya obtenido). Dispara recalcular_totales por trigger. */
 export async function aplicarDescuento(
@@ -69,6 +79,7 @@ export async function aplicarDescuento(
 
 /** Calcula el monto de descuento para PREVIEW en cliente (la BD es la autoridad). */
 export function previewDescuento(tipo: TipoDescuento, valor: number, totalActual: number): number {
+  if (tipo === "CORTESIA_TOTAL") return totalActual; // 100% off
   if (!valor || valor <= 0) return 0;
   const m = tipo === "PORCENTAJE" ? (totalActual * Math.min(valor, 100)) / 100 : Math.min(valor, totalActual);
   return Math.round(m * 100) / 100;
