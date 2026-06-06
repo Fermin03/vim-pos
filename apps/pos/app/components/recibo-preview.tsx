@@ -3,8 +3,10 @@ import { useState } from "react";
 import { QRCodeSVG } from "qrcode.react";
 import type { Bloque, DatosTicketImpresion, PrintJob } from "../lib/print/tipos";
 import type { DatosComanda } from "../lib/print/comanda-builder";
+import type { DatosReporteZ } from "../lib/print/reporte-z-builder";
 import { ReciboTicket } from "./recibo-ticket";
 import { ReciboComanda } from "./recibo-comanda";
+import { ReciboZ } from "./recibo-z";
 
 /**
  * Overlay del recibo en pantalla. Hay dos caminos:
@@ -19,6 +21,7 @@ import { ReciboComanda } from "./recibo-comanda";
 export function ReciboPreview({
   datosTicket,
   datosComanda,
+  datosZ,
   job,
   onImprimir,
   onCerrar,
@@ -28,7 +31,9 @@ export function ReciboPreview({
   datosTicket?: DatosTicketImpresion;
   /** Comanda fiel (P-223); activa el toggle Cliente|Cocina si está presente. */
   datosComanda?: DatosComanda;
-  /** Fallback genérico (e.g. Reporte Z) — usado solo si no hay datosTicket. */
+  /** Reporte Z fiel (P-226). Si se provee, se renderiza directamente. */
+  datosZ?: DatosReporteZ;
+  /** Fallback genérico — usado solo si no hay datos fieles. */
   job?: PrintJob;
   onImprimir: () => void;
   onCerrar: () => void;
@@ -37,7 +42,7 @@ export function ReciboPreview({
 }) {
   const [vista, setVista] = useState<"cliente" | "cocina">("cliente");
   const enCocina = vista === "cocina" && !!datosComanda;
-  const titulo = enCocina ? "Comanda · 80mm" : "Ticket · 80mm";
+  const titulo = datosZ ? "Reporte Z · 80mm" : enCocina ? "Comanda · 80mm" : "Ticket · 80mm";
   const usaDatos = !!datosTicket;
   const conToggle = !!(datosTicket && datosComanda);
 
@@ -57,8 +62,8 @@ export function ReciboPreview({
           </div>
         </div>
 
-        {/* Toggle Cliente | Cocina */}
-        {conToggle && (
+        {/* Toggle Cliente | Cocina (no aplica para Reporte Z) */}
+        {conToggle && !datosZ && (
           <div className="mx-auto mb-3 inline-flex w-full overflow-hidden rounded-full border border-white/30 bg-ink/40 p-[3px]">
             <button
               type="button"
@@ -78,13 +83,15 @@ export function ReciboPreview({
         )}
 
         {/* Render */}
-        {usaDatos
-          ? (enCocina && datosComanda
-              ? <ReciboComanda datos={datosComanda} />
-              : <ReciboTicket datos={datosTicket!} />)
-          : job
-            ? <PrintJobFallback job={job} />
-            : null}
+        {datosZ
+          ? <ReciboZ datos={datosZ} />
+          : usaDatos
+            ? (enCocina && datosComanda
+                ? <ReciboComanda datos={datosComanda} />
+                : <ReciboTicket datos={datosTicket!} />)
+            : job
+              ? <PrintJobFallback job={job} />
+              : null}
       </div>
     </div>
   );
