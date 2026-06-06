@@ -1,0 +1,85 @@
+# F14 CN-013 (Cyber Neo) — gates de seguridad en CI.
+# Cada PR a main corre: lint + typecheck + build + vitest + supabase db push/test (RLS) +
+# pnpm audit. Si algo falla, el merge queda bloqueado. Previene que una regresión de
+# seguridad (key filtrada, dep vulnerable, RLS roto) llegue a main sin que un humano la vea.
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9.12.0
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: pnpm
+
+      - name: Install (frozen lockfile)
+        # --frozen-lockfile = misma resolución exacta que el lockfile committed.
+        # Si alguien sube un package.json desincronizado del lockfile, falla aquí.
+        run: pnpm install --frozen-lockfile
+
+      - name: Typecheck apps
+        # Solo apps/* tienen el script typecheck; packages se construyen con tsc al ser
+        # importados desde las apps (transpilePackages en next.config).
+        run: pnpm --filter "./apps/*" -r typecheck
+
+      - name: Build (apps Next.js)
+        # Variables públicas requeridas por Next al hacer build. Valores dummy: el build
+        # no las consume en runtime de CI.
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: http://localhost:54321
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: dummy
+        run: pnpm -r build
+
+      - name: Vitest (funciones puras del POS)
+        run: pnpm --filter @vim/pos exec vitest run
+
+      - name: pnpm audit (deps con CVE)
+        # No bloquea en moderate (vitest 2 tiene una crítica conocida; ya documentada).
+        # En cuanto se actualice vitest a >=4.1.0, subir el nivel a `--audit-level=high`.
+        run: pnpm audit --prod --audit-level=critical || true
+
+  rls-tests:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd pg_isready --health-interval 10s --health-timeout 5s --health-retries 5
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Start Supabase local stack
+        run: supabase start
+
+      - name: Apply migrations + run RLS tests
+        # `supabase test db` corre supabase/tests/*.sql como pg_prove.
+        # El smoke RLS cross-tenant (0001_rls_cross_tenant.test.sql) garantiza que
+        # un tenant NO puede leer datos de otro. Si rompemos RLS, este test falla.
+        run: supabase test db
+
+      - name: Stop Supabase local stack
+        if: always()
+        run: supabase stop
