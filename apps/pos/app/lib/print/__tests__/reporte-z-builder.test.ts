@@ -3,14 +3,22 @@ import { construirReporteZJob, type DatosReporteZ } from "../reporte-z-builder";
 
 const D: DatosReporteZ = {
   negocio: "Knock-Out Burger", sucursal: "León Centro",
-  folioZ: "Z-2026-000001", fechaCierre: "2026-06-04T23:30:00.000Z",
+  folioZ: "Z-2026-000001", codigoTurno: "2026-06-04-C01-01",
+  fechaApertura: "2026-06-04T14:00:00.000Z",
+  fechaCierre: "2026-06-04T23:30:00.000Z",
   cajero: "María G.", caja: "Caja 01",
-  ticketsPagados: 87, ventaNeta: 24010, iva: 3310, descuentos: 420, propinaTotal: 900,
+  ticketsPagados: 87, ticketsEmitidos: 90, ticketsCancelados: 2,
+  devolucionesCantidad: 1, devolucionesMonto: 485,
+  ventaNeta: 24010, iva: 3310, descuentos: 420, propinaTotal: 900,
   pagosPorMetodo: [
     { metodo: "Efectivo", total: 11230, cantidad: 60 },
     { metodo: "Tarjeta de débito", total: 12780, cantidad: 27 },
   ],
+  propinasDistribuidas: [
+    { nombre: "María G. (cajero)", monto: 900 },
+  ],
   efectivoEsperado: 11230, efectivoDeclarado: 11230, diferenciaEfectivo: 0,
+  sello: "7f3a9c2e1b48",
   ancho: 80,
 };
 
