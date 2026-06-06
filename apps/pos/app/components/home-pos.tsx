@@ -33,6 +33,7 @@ import { ReciboPreview } from "./recibo-preview";
 import { PantallaCierre } from "./pantalla-cierre";
 import { ModalCancelarItem } from "./modal-cancelar-item";
 import { ModalCancelarTicket } from "./modal-cancelar-ticket";
+import { ModalMovimientoCaja } from "./modal-movimiento-caja";
 import { leerItemsPersistidos, type ItemTicket } from "../lib/cancelacion";
 import type { DatosTicketImpresion } from "../lib/print/tipos";
 
@@ -44,6 +45,7 @@ function TopbarOperativa({
   onCambiarCajero,
   onBloquear,
   onCerrarTurno,
+  onMovimientoCaja,
 }: {
   caja: DatosCaja;
   turno: Turno;
@@ -51,6 +53,7 @@ function TopbarOperativa({
   onCambiarCajero: () => void;
   onBloquear: () => void;
   onCerrarTurno: () => void;
+  onMovimientoCaja: () => void;
 }) {
   const ahora = useReloj();
   return (
@@ -98,6 +101,14 @@ function TopbarOperativa({
             className="flex h-9 w-9 items-center justify-center rounded border border-line-strong text-ink-3 transition hover:border-ink hover:text-ink"
           >
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4"><path d="M16 3.13a4 4 0 0 1 0 7.75" /><path d="M21 21v-2a4 4 0 0 0-3-3.87" /><circle cx="9" cy="7" r="4" /><path d="M3 21v-2a4 4 0 0 1 4-4h4a4 4 0 0 1 4 4v2" /></svg>
+          </button>
+          <button
+            type="button"
+            onClick={onMovimientoCaja}
+            className="flex h-9 items-center gap-1.5 rounded border border-line-strong px-3 text-[13px] font-semibold text-ink-2 transition hover:border-ink hover:text-ink"
+          >
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4"><rect x="2" y="6" width="20" height="12" rx="2" /><circle cx="12" cy="12" r="2" /><path d="M6 12h.01M18 12h.01" /></svg>
+            Caja
           </button>
           <button
             type="button"
@@ -149,6 +160,9 @@ export function HomePos({
   const [cancelandoItem, setCancelandoItem] = useState<ItemTicket | null>(null);
   // F6.2 — modal de cancelar ticket completo.
   const [cancelandoTicket, setCancelandoTicket] = useState(false);
+  // F7 — modal de movimiento de caja.
+  const [movimientoAbierto, setMovimientoAbierto] = useState(false);
+  const [movimientoToast, setMovimientoToast] = useState<{ folio: string; tipo: string; monto: number } | null>(null);
   // F5.3c — Datos crudos del ticket; el preview los renderiza fiel a P-222/P-223.
   const [datosTicket, setDatosTicket] = useState<DatosTicketImpresion | null>(null);
   const [datosComanda, setDatosComanda] = useState<DatosComanda | null>(null);
@@ -293,7 +307,7 @@ export function HomePos({
 
   return (
     <div className="flex h-screen flex-col">
-      <TopbarOperativa caja={caja} turno={turno} empleado={empleado} onCambiarCajero={onCambiarCajero} onBloquear={onBloquear} onCerrarTurno={() => setCerrando(true)} />
+      <TopbarOperativa caja={caja} turno={turno} empleado={empleado} onCambiarCajero={onCambiarCajero} onBloquear={onBloquear} onCerrarTurno={() => setCerrando(true)} onMovimientoCaja={() => setMovimientoAbierto(true)} />
 
       <div className="flex min-h-0 flex-1">
         {/* Sidebar categorías */}
@@ -418,6 +432,25 @@ export function HomePos({
           }}
           onCerrar={() => setDescuentoAbierto(false)}
         />
+      )}
+      {movimientoAbierto && (
+        <ModalMovimientoCaja
+          token={token}
+          empleado={empleado}
+          caja={caja}
+          turno={turno}
+          onRegistrado={(m) => {
+            setMovimientoAbierto(false);
+            setMovimientoToast({ folio: m.folio, tipo: m.tipo, monto: m.monto });
+            setTimeout(() => setMovimientoToast(null), 4000);
+          }}
+          onCerrar={() => setMovimientoAbierto(false)}
+        />
+      )}
+      {movimientoToast && (
+        <div className="fixed left-1/2 top-20 z-[80] -translate-x-1/2 rounded-lg bg-ink px-5 py-3 text-[13.5px] font-medium text-white shadow-xl">
+          <span className="font-semibold">{movimientoToast.folio}</span> · {movimientoToast.tipo} · {fmtMxn(movimientoToast.monto)} registrado
+        </div>
       )}
       {cancelandoTicket && ticketBd && (
         <ModalCancelarTicket
