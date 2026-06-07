@@ -15,6 +15,96 @@ export function rangoUltimosDias(n: number): { desde: string; hasta: string } {
   return { desde: d.toISOString().slice(0, 10), hasta };
 }
 
+// ── Dashboard (P-177) ───────────────────────────────────────────────────────
+export type ResumenDia = {
+  dia: string;
+  ticketsCompletados: number;
+  ticketsCancelados: number;
+  totalNeto: number;
+  ticketPromedio: number;
+  descuentos: number;
+  propinas: number;
+  devoluciones: number;
+  paraLlevar: number;
+  comerAqui: number;
+  delivery: number;
+  apps: number;
+};
+
+export type TopProducto = { nombre: string; unidades: number; total: number };
+
+export type Dashboard = {
+  hoy: ResumenDia;
+  topProductos: TopProducto[];
+  /** Serie de total_neto por día (para la mini-tendencia), del más antiguo al más reciente. */
+  tendencia: { dia: string; total: number }[];
+};
+
+/** Suma las filas (una por sucursal) de vw_estado_resultados_dia en un resumen del día. */
+function sumarDia(filas: Record<string, unknown>[], dia: string): ResumenDia {
+  const completados = filas.reduce((a, f) => a + num(f.tickets_completados), 0);
+  const totalNeto = filas.reduce((a, f) => a + num(f.total_neto_mxn), 0);
+  return {
+    dia,
+    ticketsCompletados: completados,
+    ticketsCancelados: filas.reduce((a, f) => a + num(f.tickets_cancelados), 0),
+    totalNeto,
+    ticketPromedio: completados > 0 ? Math.round((totalNeto / completados) * 100) / 100 : 0,
+    descuentos: filas.reduce((a, f) => a + num(f.descuentos_manuales_mxn), 0),
+    propinas: filas.reduce((a, f) => a + num(f.propinas_capturadas_mxn), 0),
+    devoluciones: filas.reduce((a, f) => a + num(f.devoluciones_mxn), 0),
+    paraLlevar: filas.reduce((a, f) => a + num(f.tickets_para_llevar), 0),
+    comerAqui: filas.reduce((a, f) => a + num(f.tickets_comer_aqui), 0),
+    delivery: filas.reduce((a, f) => a + num(f.tickets_delivery_propio), 0),
+    apps: filas.reduce((a, f) => a + num(f.tickets_apps), 0),
+  };
+}
+
+export async function leerDashboard(): Promise<Dashboard> {
+  const { desde, hasta } = rangoUltimosDias(7);
+
+  // Estado de resultados por día (todas las sucursales del tenant, bajo RLS).
+  const { data: er, error: e1 } = await supabase
+    .from("vw_estado_resultados_dia")
+    .select(
+      "dia_contable, tickets_completados, tickets_cancelados, total_neto_mxn, descuentos_manuales_mxn, propinas_capturadas_mxn, devoluciones_mxn, tickets_para_llevar, tickets_comer_aqui, tickets_delivery_propio, tickets_apps",
+    )
+    .gte("dia_contable", desde)
+    .lte("dia_contable", hasta);
+  if (e1) throw new Error(e1.message);
+  const filas = (er ?? []) as Record<string, unknown>[];
+
+  // Agrupa por día para la tendencia y separa el más reciente para "hoy".
+  const porDia = new Map<string, Record<string, unknown>[]>();
+  for (const f of filas) {
+    const d = String(f.dia_contable);
+    porDia.set(d, [...(porDia.get(d) ?? []), f]);
+  }
+  const dias = [...porDia.keys()].sort();
+  const tendencia = dias.map((d) => ({
+    dia: d,
+    total: (porDia.get(d) ?? []).reduce((a, f) => a + num(f.total_neto_mxn), 0),
+  }));
+  const diaReciente = dias[dias.length - 1] ?? hasta;
+  const hoy = sumarDia(porDia.get(diaReciente) ?? [], diaReciente);
+
+  // Top productos del día más reciente.
+  const { data: tp, error: e2 } = await supabase
+    .from("vw_ventas_por_producto")
+    .select("producto_nombre, unidades_vendidas, total_mxn, dia_contable")
+    .eq("dia_contable", diaReciente)
+    .order("total_mxn", { ascending: false })
+    .limit(6);
+  if (e2) throw new Error(e2.message);
+  const topProductos = ((tp ?? []) as Record<string, unknown>[]).map((r) => ({
+    nombre: String(r.producto_nombre ?? "—"),
+    unidades: num(r.unidades_vendidas),
+    total: num(r.total_mxn),
+  }));
+
+  return { hoy, topProductos, tendencia };
+}
+
 // ── Reporte Z histórico (P-181) ─────────────────────────────────────────────
 export type FilaZHistorico = {
   id: string;
