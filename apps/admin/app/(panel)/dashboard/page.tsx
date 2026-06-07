@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { PageHeader, PageBody } from "../../components/page-header";
 import { usePerfil } from "../../components/admin-shell";
 import { leerDashboard, type Dashboard } from "../../lib/reportes";
+import { leerEstadoOnboarding, type EstadoOnboarding } from "../../lib/onboarding";
 
 const ACCESOS = [
   { href: "/catalogo", nombre: "Catálogo", desc: "Productos, categorías y modificadores" },
@@ -30,10 +31,14 @@ export default function DashboardPage() {
   const primer = (perfil?.nombre ?? "").split(/\s+/)[0] || "";
   const [data, setData] = useState<Dashboard | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [onb, setOnb] = useState<EstadoOnboarding | null>(null);
 
   useEffect(() => {
     leerDashboard().then(setData).catch((e) => setError(e instanceof Error ? e.message : "No se pudo cargar"));
+    leerEstadoOnboarding().then(setOnb).catch(() => {});
   }, []);
+
+  const mostrarOnboarding = onb && onb.fase !== "GO_LIVE" && !onb.listoParaVender;
 
   const hoy = data?.hoy;
   const sinVentas = data !== null && (hoy?.ticketsCompletados ?? 0) === 0;
@@ -44,6 +49,20 @@ export default function DashboardPage() {
       <PageHeader titulo={`Hola, ${primer}`} subtitulo="Resumen de tu negocio" />
       <PageBody>
         {error && <p className="mb-4 text-sm font-medium text-danger">{error}</p>}
+
+        {mostrarOnboarding && onb && (
+          <Link href="/bienvenida" className="mb-6 flex items-center gap-4 rounded-lg border border-[#E8DCC0] bg-[#F6EEDD] p-4 transition hover:border-accent">
+            <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-accent text-white">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" className="h-5 w-5"><path d="M5 12h14M13 5l7 7-7 7" /></svg>
+            </div>
+            <div className="min-w-0 flex-1">
+              <div className="text-[14.5px] font-semibold">Termina de configurar tu negocio</div>
+              <div className="text-[12.5px] text-ink-2">{onb.obligatoriosHechos} de {onb.obligatoriosTotal} pasos · te faltan {onb.obligatoriosTotal - onb.obligatoriosHechos} para empezar a vender.</div>
+            </div>
+            <span className="text-[13px] font-semibold text-accent">Continuar →</span>
+          </Link>
+        )}
+
         {data === null && !error && <p className="text-sm text-ink-3">Cargando…</p>}
 
         {sinVentas && (
