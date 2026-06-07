@@ -10,6 +10,8 @@ export type ItemComanda = {
   nombre: string;
   modificadores: string[];
   notaCocina: string | null;
+  /** Área de cocina del ítem (para el filtro multi-área, P-109). null = sin área. */
+  area: string | null;
 };
 
 export type ComandaKds = {
@@ -32,7 +34,7 @@ export async function leerComandas(token: string, sucursalId: string): Promise<C
     .from("tickets")
     .select(
       "id, folio_completo, modo_servicio, estado_cocina, fecha_envio_cocina, " +
-        "ticket_items(id, cantidad, producto_nombre_snapshot, nota_cocina, cancelado, ticket_item_modificadores(opcion_nombre_snapshot))",
+        "ticket_items(id, cantidad, producto_nombre_snapshot, nota_cocina, cancelado, area_cocina_nombre_snapshot, ticket_item_modificadores(opcion_nombre_snapshot))",
     )
     .eq("sucursal_id", sucursalId)
     .in("estado_cocina", ["EN_COCINA", "LISTO"])
@@ -52,6 +54,7 @@ export async function leerComandas(token: string, sucursalId: string): Promise<C
           producto_nombre_snapshot: string;
           nota_cocina: string | null;
           cancelado: boolean;
+          area_cocina_nombre_snapshot: string | null;
           ticket_item_modificadores: { opcion_nombre_snapshot: string }[] | null;
         }[]
       | null;
@@ -67,6 +70,7 @@ export async function leerComandas(token: string, sucursalId: string): Promise<C
         nombre: i.producto_nombre_snapshot,
         modificadores: (i.ticket_item_modificadores ?? []).map((m) => m.opcion_nombre_snapshot),
         notaCocina: i.nota_cocina,
+        area: i.area_cocina_nombre_snapshot,
       }));
     return {
       ticketId: t.id,

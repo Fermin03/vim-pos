@@ -28,3 +28,30 @@ export function minutosEnCocina(fechaEnvio: string | null, ahora: number): numbe
   if (Number.isNaN(t)) return 0;
   return Math.max(0, Math.floor((ahora - t) / 60000));
 }
+
+// ── F15: KDS avanzado ────────────────────────────────────────────────────────
+
+/** Etiqueta canónica de "sin área" para el filtro multi-área. */
+export const SIN_AREA = "General";
+
+/**
+ * Áreas presentes en un conjunto de comandas (para el tab-bar del filtro multi-área).
+ * Cada comanda tiene items; cada item un área (o null → General). Orden alfabético estable.
+ */
+export function areasDeComandas(
+  comandas: { items: { area: string | null }[] }[],
+): string[] {
+  const set = new Set<string>();
+  for (const c of comandas) for (const it of c.items) set.add(it.area ?? SIN_AREA);
+  return [...set].sort((a, b) => a.localeCompare(b));
+}
+
+/**
+ * Detecta si hay comandas NUEVAS comparando los ticketIds previos con los actuales
+ * (para disparar el sonido de "nuevo pedido"). Devuelve cuántas comandas nuevas hay.
+ */
+export function comandasNuevas(previos: Set<string>, actualesIds: string[]): number {
+  let n = 0;
+  for (const id of actualesIds) if (!previos.has(id)) n++;
+  return n;
+}
