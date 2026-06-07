@@ -241,3 +241,87 @@ export async function leerVentasPorModo(desde: string, hasta: string): Promise<F
 export function fmtMxn(n: number): string {
   return new Intl.NumberFormat("es-MX", { style: "currency", currency: "MXN" }).format(n);
 }
+
+// ── Batch T3: reportes adicionales (vistas existentes, agregadas por entidad en el rango) ────
+
+async function leerVista(vista: string, cols: string, desde: string, hasta: string): Promise<Record<string, unknown>[]> {
+  const { data, error } = await supabase
+    .from(vista)
+    .select(cols)
+    .gte("dia_contable", desde)
+    .lte("dia_contable", hasta);
+  if (error) throw new Error(error.message);
+  return (data ?? []) as unknown as Record<string, unknown>[];
+}
+
+// Ventas por mesero (P-186)
+export type FilaMesero = { clave: string; nombre: string; tickets: number; total: number; propinas: number; promedio: number };
+export async function leerVentasPorMesero(desde: string, hasta: string): Promise<FilaMesero[]> {
+  const filas = await leerVista("vw_ventas_por_mesero", "mesero_id, mesero_email, tickets_atendidos, total_vendido_mxn, propinas_capturadas_mxn", desde, hasta);
+  const map = new Map<string, FilaMesero>();
+  for (const f of filas) {
+    const k = String(f.mesero_id ?? f.mesero_email ?? "—");
+    const cur = map.get(k) ?? { clave: k, nombre: String(f.mesero_email ?? "—"), tickets: 0, total: 0, propinas: 0, promedio: 0 };
+    cur.tickets += num(f.tickets_atendidos); cur.total += num(f.total_vendido_mxn); cur.propinas += num(f.propinas_capturadas_mxn);
+    map.set(k, cur);
+  }
+  return [...map.values()].map((m) => ({ ...m, promedio: m.tickets > 0 ? m.total / m.tickets : 0 })).sort((a, b) => b.total - a.total);
+}
+
+// Ventas por área de cocina (P-187)
+export type FilaArea = { clave: string; area: string; tickets: number; unidades: number; total: number };
+export async function leerVentasPorArea(desde: string, hasta: string): Promise<FilaArea[]> {
+  const filas = await leerVista("vw_ventas_por_area_cocina", "area_cocina, tickets_con_area, unidades_preparadas, total_vendido_mxn", desde, hasta);
+  const map = new Map<string, FilaArea>();
+  for (const f of filas) {
+    const k = String(f.area_cocina ?? "General");
+    const cur = map.get(k) ?? { clave: k, area: k, tickets: 0, unidades: 0, total: 0 };
+    cur.tickets += num(f.tickets_con_area); cur.unidades += num(f.unidades_preparadas); cur.total += num(f.total_vendido_mxn);
+    map.set(k, cur);
+  }
+  return [...map.values()].sort((a, b) => b.total - a.total);
+}
+
+// Ventas por marca virtual (P-189)
+export type FilaMarca = { clave: string; nombre: string; color: string; tickets: number; total: number; promedio: number };
+export async function leerVentasPorMarca(desde: string, hasta: string): Promise<FilaMarca[]> {
+  const filas = await leerVista("vw_ventas_por_marca", "marca_virtual_id, marca_nombre, marca_color, tickets_completados, total_neto_mxn", desde, hasta);
+  const map = new Map<string, FilaMarca>();
+  for (const f of filas) {
+    const k = String(f.marca_virtual_id ?? f.marca_nombre ?? "—");
+    const cur = map.get(k) ?? { clave: k, nombre: String(f.marca_nombre ?? "Sin marca"), color: String(f.marca_color ?? "#999"), tickets: 0, total: 0, promedio: 0 };
+    cur.tickets += num(f.tickets_completados); cur.total += num(f.total_neto_mxn);
+    map.set(k, cur);
+  }
+  return [...map.values()].map((m) => ({ ...m, promedio: m.tickets > 0 ? m.total / m.tickets : 0 })).sort((a, b) => b.total - a.total);
+}
+
+// Tiempos de cocina (P-190)
+export type FilaTiempos = { modo: string; tickets: number; promedio: number; bajo15: number; entre16y30: number; mayor30: number };
+export async function leerTiemposCocina(desde: string, hasta: string): Promise<FilaTiempos[]> {
+  const filas = await leerVista("vw_cumplimiento_tiempos_cocina_agregado", "modo_servicio, tickets_total, minutos_cocina_promedio, tickets_cocina_bajo_15min, tickets_cocina_16_30min, tickets_cocina_mayor_30min", desde, hasta);
+  const map = new Map<string, FilaTiempos & { _sumProm: number; _dias: number }>();
+  for (const f of filas) {
+    const k = String(f.modo_servicio ?? "—");
+    const cur = map.get(k) ?? { modo: k, tickets: 0, promedio: 0, bajo15: 0, entre16y30: 0, mayor30: 0, _sumProm: 0, _dias: 0 };
+    cur.tickets += num(f.tickets_total); cur.bajo15 += num(f.tickets_cocina_bajo_15min);
+    cur.entre16y30 += num(f.tickets_cocina_16_30min); cur.mayor30 += num(f.tickets_cocina_mayor_30min);
+    cur._sumProm += num(f.minutos_cocina_promedio); cur._dias += 1;
+    map.set(k, cur);
+  }
+  return [...map.values()].map((m) => ({ modo: m.modo, tickets: m.tickets, promedio: m._dias > 0 ? m._sumProm / m._dias : 0, bajo15: m.bajo15, entre16y30: m.entre16y30, mayor30: m.mayor30 }));
+}
+
+// Descuentos por usuario (P-194)
+export type FilaDescuento = { clave: string; usuario: string; cantidad: number; total: number; promedio: number };
+export async function leerDescuentosPorUsuario(desde: string, hasta: string): Promise<FilaDescuento[]> {
+  const filas = await leerVista("vw_descuentos_por_usuario", "usuario_id, usuario_email, cantidad_descuentos, total_descontado_mxn", desde, hasta);
+  const map = new Map<string, FilaDescuento>();
+  for (const f of filas) {
+    const k = String(f.usuario_id ?? f.usuario_email ?? "—");
+    const cur = map.get(k) ?? { clave: k, usuario: String(f.usuario_email ?? "—"), cantidad: 0, total: 0, promedio: 0 };
+    cur.cantidad += num(f.cantidad_descuentos); cur.total += num(f.total_descontado_mxn);
+    map.set(k, cur);
+  }
+  return [...map.values()].map((m) => ({ ...m, promedio: m.cantidad > 0 ? m.total / m.cantidad : 0 })).sort((a, b) => b.total - a.total);
+}
