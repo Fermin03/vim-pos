@@ -16,7 +16,7 @@ export const clienteSchema = z.object({
   apellido_paterno: z.string().trim().max(100).optional().or(z.literal("")),
   telefono: z.string().trim().max(20).optional().or(z.literal("")),
   email: z.string().trim().email("Correo inválido").max(150).optional().or(z.literal("")),
-  rfc: z.string().trim().toUpperCase().max(13).optional().or(z.literal("")),
+  rfc: z.string().trim().toUpperCase().regex(/^[A-ZÑ&]{3,4}[0-9]{6}[A-Z0-9]{3}$/, "RFC inválido").optional().or(z.literal("")),
   razon_social: z.string().trim().max(200).optional().or(z.literal("")),
   codigo_postal_fiscal: z.string().trim().regex(/^\d{5}$/, "CP de 5 dígitos").optional().or(z.literal("")),
   tipo_fiscal: z.enum(["PERSONA_FISICA", "PERSONA_MORAL", "EVENTUAL"]),

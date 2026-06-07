@@ -677,13 +677,14 @@ function VistaDividida({
   totales,
   procesando,
   error,
-  onAplicarPago,
+  onAplicarPagos,
   onVolver,
 }: {
   totales: TotalesTicket;
   procesando: boolean;
   error: string | null;
-  onAplicarPago: (metodo: MetodoPago, monto: number) => void;
+  /** Aplica TODOS los pagos divididos de una (secuencial en el padre, no en paralelo). */
+  onAplicarPagos: (pagos: { metodo: MetodoPago; monto: number }[]) => void | Promise<void>;
   onVolver: () => void;
 }) {
   const [pagos, setPagos] = useState<PagoAplicado[]>([]);
@@ -709,11 +710,9 @@ function VistaDividida({
 
   function completar() {
     if (!cubierto || procesando) return;
-    // Aplica el primero no aplicado (en modo dividido enviamos cada pago como aplica)
-    // La lógica real llama onAplicarPago para cada entrada en pagos
-    for (const p of pagos) {
-      onAplicarPago(p.metodo, p.monto);
-    }
+    // FIX (auditoría): se enviaban N pagos en paralelo (carrera en la ruta de dinero).
+    // Ahora se manda la lista completa y el padre los aplica SECUENCIALMENTE.
+    void onAplicarPagos(pagos.map((p) => ({ metodo: p.metodo, monto: p.monto })));
   }
 
   return (
@@ -1073,8 +1072,25 @@ export function ModalCobro({
     }
   }
 
-  async function aplicarPagosDivididos(m: MetodoPago, monto: number) {
-    await aplicarUnPago(m, monto);
+  /** Aplica una lista de pagos divididos SECUENCIALMENTE (no en paralelo). Navega solo al final. */
+  async function aplicarPagosDivididos(lista: { metodo: MetodoPago; monto: number }[]) {
+    setError(null);
+    if (lista.length === 0) return;
+    setProcesando(true);
+    try {
+      let t = totales;
+      for (const p of lista) {
+        if (!(p.monto > 0)) continue;
+        t = await aplicarPago(token, totales.ticketId, { metodo: p.metodo, monto: p.monto }, nuevoClientId());
+      }
+      setTotales(t);
+      if (t.estadoFiscal === "PAGADO") onPagado(t.folio, t.cambio);
+      else setError("Los pagos no cubrieron el total del ticket.");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Error al cobrar");
+    } finally {
+      setProcesando(false);
+    }
   }
 
   function elegirMetodo(m: MetodoPago | "dividido") {
@@ -1153,7 +1169,7 @@ export function ModalCobro({
             totales={totalesEf}
             procesando={procesando}
             error={error}
-            onAplicarPago={aplicarPagosDivididos}
+            onAplicarPagos={aplicarPagosDivididos}
             onVolver={() => { setError(null); setVista("selector"); }}
           />
         )}

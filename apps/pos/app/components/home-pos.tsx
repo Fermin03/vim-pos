@@ -256,14 +256,25 @@ export function HomePos({
   const recargarCuenta = useCallback(async () => {
     if (!ticketBd) return;
     const tId = ticketBd.ticketId;
-    const [bd, recon, items] = await Promise.all([
-      leerTotales(token, tId),
-      reconstruirCarrito(token, tId, productos ?? []),
-      leerItemsPersistidos(token, tId).catch(() => [] as ItemTicket[]),
-    ]);
-    dispatch({ tipo: "cargar", estado: { modoServicio: recon.modoServicio, lineas: recon.lineas } });
-    setTicketBd(bd);
-    setItemsPersistidos(items);
+    try {
+      const [bd, recon, items] = await Promise.all([
+        leerTotales(token, tId),
+        reconstruirCarrito(token, tId, productos ?? []),
+        leerItemsPersistidos(token, tId).catch(() => [] as ItemTicket[]),
+      ]);
+      dispatch({ tipo: "cargar", estado: { modoServicio: recon.modoServicio, lineas: recon.lineas } });
+      setTicketBd(bd);
+      setItemsPersistidos(items);
+      // Aviso si la reconstrucción no cuadra (producto fuera de catálogo): el total es autoritativo.
+      if (items.length > recon.lineas.length) {
+        setError("Algunos ítems de la cuenta no se muestran (producto fuera de catálogo), pero el total sí los incluye.");
+      } else {
+        setError(null);
+      }
+    } catch (e) {
+      // El ítem ya pudo insertarse en BD; avisamos para que el cajero recargue, sin romper la UI.
+      setError(e instanceof Error ? `Cuenta desincronizada: ${e.message}. Reabre la mesa para ver el estado real.` : "Error al sincronizar la cuenta");
+    }
   }, [ticketBd, token, productos]);
 
   const onTapProducto = useCallback(
