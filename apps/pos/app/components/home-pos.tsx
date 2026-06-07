@@ -33,6 +33,7 @@ import { ReciboPreview } from "./recibo-preview";
 import { PantallaCierre } from "./pantalla-cierre";
 import { PantallaKds } from "./pantalla-kds";
 import { PantallaMesas } from "./pantalla-mesas";
+import { PantallaDelivery } from "./pantalla-delivery";
 import { ModalCancelarItem } from "./modal-cancelar-item";
 import { ModalCancelarTicket } from "./modal-cancelar-ticket";
 import { ModalMovimientoCaja } from "./modal-movimiento-caja";
@@ -50,6 +51,7 @@ function TopbarOperativa({
   onMovimientoCaja,
   onKds,
   onMesas,
+  onDelivery,
 }: {
   caja: DatosCaja;
   turno: Turno;
@@ -60,6 +62,7 @@ function TopbarOperativa({
   onMovimientoCaja: () => void;
   onKds: () => void;
   onMesas: () => void;
+  onDelivery: () => void;
 }) {
   const ahora = useReloj();
   return (
@@ -118,6 +121,14 @@ function TopbarOperativa({
           </button>
           <button
             type="button"
+            onClick={onDelivery}
+            className="flex h-9 items-center gap-1.5 rounded border border-line-strong px-3 text-[13px] font-semibold text-ink-2 transition hover:border-ink hover:text-ink"
+          >
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4"><circle cx="12" cy="10" r="3" /><path d="M12 2a8 8 0 0 0-8 8c0 5.5 8 12 8 12s8-6.5 8-12a8 8 0 0 0-8-8z" /></svg>
+            Domicilios
+          </button>
+          <button
+            type="button"
             onClick={onKds}
             className="flex h-9 items-center gap-1.5 rounded border border-line-strong px-3 text-[13px] font-semibold text-ink-2 transition hover:border-ink hover:text-ink"
           >
@@ -166,6 +177,7 @@ export function HomePos({
   const [cerrando, setCerrando] = useState(false);
   const [enKds, setEnKds] = useState(false);
   const [enMesas, setEnMesas] = useState(false);
+  const [enDelivery, setEnDelivery] = useState(false);
   const [categorias, setCategorias] = useState<Categoria[] | null>(null);
   const [productos, setProductos] = useState<Producto[] | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -337,9 +349,13 @@ export function HomePos({
     return <PantallaMesas token={token} caja={caja} onSalir={() => setEnMesas(false)} />;
   }
 
+  if (enDelivery) {
+    return <PantallaDelivery token={token} caja={caja} turno={turno} empleado={empleado} onSalir={() => setEnDelivery(false)} />;
+  }
+
   return (
     <div className="flex h-screen flex-col">
-      <TopbarOperativa caja={caja} turno={turno} empleado={empleado} onCambiarCajero={onCambiarCajero} onBloquear={onBloquear} onCerrarTurno={() => setCerrando(true)} onMovimientoCaja={() => setMovimientoAbierto(true)} onKds={() => setEnKds(true)} onMesas={() => setEnMesas(true)} />
+      <TopbarOperativa caja={caja} turno={turno} empleado={empleado} onCambiarCajero={onCambiarCajero} onBloquear={onBloquear} onCerrarTurno={() => setCerrando(true)} onMovimientoCaja={() => setMovimientoAbierto(true)} onKds={() => setEnKds(true)} onMesas={() => setEnMesas(true)} onDelivery={() => setEnDelivery(true)} />
 
       <div className="flex min-h-0 flex-1">
         {/* Sidebar categorías */}
