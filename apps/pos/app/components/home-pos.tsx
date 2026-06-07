@@ -38,7 +38,10 @@ import { ModalCancelarItem } from "./modal-cancelar-item";
 import { ModalCancelarTicket } from "./modal-cancelar-ticket";
 import { ModalMovimientoCaja } from "./modal-movimiento-caja";
 import { leerItemsPersistidos, type ItemTicket } from "../lib/cancelacion";
+import { useConexion } from "../lib/conexion";
 import type { DatosTicketImpresion } from "../lib/print/tipos";
+
+const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
 
 /** Topbar del POS operativo (mockup P-059): marca + sucursal/turno + reloj + cajero + acciones. */
 function TopbarOperativa({
@@ -178,6 +181,8 @@ export function HomePos({
   const [enKds, setEnKds] = useState(false);
   const [enMesas, setEnMesas] = useState(false);
   const [enDelivery, setEnDelivery] = useState(false);
+  // F16 — estado de conexión (avisa al cajero si se cae la red).
+  const { online } = useConexion(SUPABASE_URL ? `${SUPABASE_URL}/auth/v1/health` : undefined);
   const [categorias, setCategorias] = useState<Categoria[] | null>(null);
   const [productos, setProductos] = useState<Producto[] | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -355,6 +360,12 @@ export function HomePos({
 
   return (
     <div className="flex h-screen flex-col">
+      {!online && (
+        <div className="flex flex-shrink-0 items-center justify-center gap-2 bg-[#9A6B12] px-4 py-1.5 text-[12.5px] font-semibold text-white" role="status">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4"><path d="M1 1l22 22M16.72 11.06A10.94 10.94 0 0 1 19 12.55M5 12.55a10.94 10.94 0 0 1 5.17-2.39M10.71 5.05A16 16 0 0 1 22.58 9M1.42 9a15.91 15.91 0 0 1 4.7-2.88M8.53 16.11a6 6 0 0 1 6.95 0M12 20h.01" /></svg>
+          Sin conexión — verifica la red. No podrás cobrar ni guardar hasta reconectar.
+        </div>
+      )}
       <TopbarOperativa caja={caja} turno={turno} empleado={empleado} onCambiarCajero={onCambiarCajero} onBloquear={onBloquear} onCerrarTurno={() => setCerrando(true)} onMovimientoCaja={() => setMovimientoAbierto(true)} onKds={() => setEnKds(true)} onMesas={() => setEnMesas(true)} onDelivery={() => setEnDelivery(true)} />
 
       <div className="flex min-h-0 flex-1">
