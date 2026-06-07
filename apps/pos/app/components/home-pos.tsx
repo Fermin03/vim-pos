@@ -35,6 +35,7 @@ import { PantallaKds } from "./pantalla-kds";
 import { PantallaMesas } from "./pantalla-mesas";
 import { PantallaDelivery } from "./pantalla-delivery";
 import { ModalCancelarItem } from "./modal-cancelar-item";
+import { ModalDescuentoItem } from "./modal-descuento-item";
 import { ModalCancelarTicket } from "./modal-cancelar-ticket";
 import { ModalMovimientoCaja } from "./modal-movimiento-caja";
 import { leerItemsPersistidos, type ItemTicket } from "../lib/cancelacion";
@@ -199,6 +200,8 @@ export function HomePos({
   // F6.1 — items persistidos del ticketBd (para mapear clientId ↔ ticket_item_id real al cancelar).
   const [itemsPersistidos, setItemsPersistidos] = useState<ItemTicket[]>([]);
   const [cancelandoItem, setCancelandoItem] = useState<ItemTicket | null>(null);
+  // F6.5 — descuento/override por ítem.
+  const [descuentoItem, setDescuentoItem] = useState<ItemTicket | null>(null);
   // F6.2 — modal de cancelar ticket completo.
   const [cancelandoTicket, setCancelandoTicket] = useState(false);
   // F7 — modal de movimiento de caja.
@@ -333,6 +336,11 @@ export function HomePos({
     setCancelandoItem(it);
   }, [itemsPersistidos]);
 
+  const onDescuentoItemSolicitado = useCallback((clientId: string) => {
+    const it = itemsPersistidos.find((x) => x.clientId === clientId);
+    if (it) setDescuentoItem(it);
+  }, [itemsPersistidos]);
+
   if (cerrando) {
     return (
       <PantallaCierre
@@ -452,6 +460,7 @@ export function HomePos({
           onCantidad={(id, c) => dispatch({ tipo: "cantidad", clientId: id, cantidad: c })}
           onQuitar={(id) => dispatch({ tipo: "quitar", clientId: id })}
           onCancelarItemPersistido={ticketBd ? onCancelarItemPersistido : undefined}
+          onDescuentoItem={ticketBd ? onDescuentoItemSolicitado : undefined}
           onLimpiar={!ticketBd ? () => dispatch({ tipo: "limpiar" }) : undefined}
           onCancelarTicket={ticketBd ? () => setCancelandoTicket(true) : undefined}
           onModo={(m: ModoServicio) => dispatch({ tipo: "modo", modo: m })}
@@ -528,6 +537,30 @@ export function HomePos({
             setCancelandoTicket(false);
           }}
           onCerrar={() => setCancelandoTicket(false)}
+        />
+      )}
+      {descuentoItem && ticketBd && (
+        <ModalDescuentoItem
+          token={token}
+          empleado={empleado}
+          ticketId={ticketBd.ticketId}
+          ticketItemId={descuentoItem.id}
+          productoNombre={descuentoItem.productoNombre}
+          cantidad={descuentoItem.cantidad}
+          totalItem={descuentoItem.totalItemMxn}
+          cajaId={turno.caja_id}
+          turnoId={turno.id}
+          onAplicado={async () => {
+            try {
+              const t = await leerTotales(token, ticketBd.ticketId);
+              setTicketBd(t);
+              setItemsPersistidos(await leerItemsPersistidos(token, ticketBd.ticketId));
+            } catch (e) {
+              setError(e instanceof Error ? e.message : "Error al releer el ticket");
+            }
+            setDescuentoItem(null);
+          }}
+          onCerrar={() => setDescuentoItem(null)}
         />
       )}
       {cancelandoItem && ticketBd && (

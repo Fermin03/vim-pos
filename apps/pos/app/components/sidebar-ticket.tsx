@@ -72,6 +72,7 @@ export function SidebarTicket({
   onCantidad,
   onQuitar,
   onCancelarItemPersistido,
+  onDescuentoItem,
   onLimpiar,
   onCancelarTicket,
   onModo,
@@ -87,6 +88,8 @@ export function SidebarTicket({
   onQuitar: (clientId: string) => void;
   /** Cuando el ticket está persistido, "Quitar" llama a este handler (cancela en BD con motivo+autorización). */
   onCancelarItemPersistido?: (clientId: string) => void;
+  /** Cuando el ticket está persistido, "%" abre el descuento/override por ítem (F6.5). */
+  onDescuentoItem?: (clientId: string) => void;
   /** Limpia el carrito local (sin BD). Habilitado cuando no hay ticket persistido y hay líneas. */
   onLimpiar?: () => void;
   /** Cuando el ticket está persistido, "Limpiar" llama a este handler para cancelar todo el ticket. */
@@ -218,6 +221,16 @@ export function SidebarTicket({
                       +
                     </button>
                   </span>
+                  {bloqueado && onDescuentoItem && (
+                    <button
+                      type="button"
+                      onClick={() => onDescuentoItem(l.clientId)}
+                      title="Descuento / precio del ítem"
+                      className="rounded px-2 py-[5px] text-[13px] font-semibold text-ink-3 transition-all hover:bg-hover hover:text-ink"
+                    >
+                      %
+                    </button>
+                  )}
                   <button
                     type="button"
                     disabled={bloqueado && !onCancelarItemPersistido}
