@@ -35,6 +35,11 @@ const REPORTES: Reporte[] = [
     descripcion: "Comer aquí · Para llevar · Drive-thru. Mix y participación %.",
     ref: "P-188",
   },
+  { href: "/reportes/ventas-mesero", titulo: "Ventas por mesero", descripcion: "Desempeño por mesero: tickets, venta y propinas.", ref: "P-186" },
+  { href: "/reportes/ventas-area", titulo: "Ventas por área de cocina", descripcion: "Carga de trabajo y venta por estación.", ref: "P-187" },
+  { href: "/reportes/ventas-marca", titulo: "Ventas por marca virtual", descripcion: "Desempeño por marca/concepto (dark kitchen, foodtruck).", ref: "P-189" },
+  { href: "/reportes/tiempos-cocina", titulo: "Tiempos de cocina", descripcion: "Cumplimiento de preparación por modo de servicio.", ref: "P-190" },
+  { href: "/reportes/descuentos", titulo: "Descuentos por usuario", descripcion: "Auditoría de descuentos y cortesías otorgados.", ref: "P-194" },
 ];
 
 export default function ReportesHub() {
