@@ -130,6 +130,19 @@ export async function eliminarCategoria(id: string): Promise<void> {
 
 // ── Categorías (versión simple para selects) ─────────────────────────────────
 export type CategoriaOpcion = { id: string; nombre: string };
+
+// F17.2 — marcas virtuales activas para el selector del producto.
+export type MarcaOpcion = { id: string; nombre: string };
+export async function listarMarcasOpciones(): Promise<MarcaOpcion[]> {
+  const { data, error } = await supabase
+    .from("marcas_virtuales")
+    .select("id, nombre")
+    .eq("activa", true)
+    .is("deleted_at", null)
+    .order("nombre", { ascending: true });
+  if (error) throw new Error(error.message);
+  return ((data ?? []) as { id: string; nombre: string }[]).map((m) => ({ id: m.id, nombre: m.nombre }));
+}
 export async function listarCategoriasOpciones(): Promise<CategoriaOpcion[]> {
   const { data, error } = await supabase
     .from("categorias")
@@ -150,6 +163,8 @@ export const productoSchema = z.object({
   estado: z.enum(["ACTIVO", "PAUSADO"]),
   agotado: z.boolean(),
   visible_en_pos: z.boolean(),
+  // F17.2 — marca virtual a la que pertenece el producto (multi-marca). "" = sin marca.
+  marca_virtual_id: z.string().uuid().optional().or(z.literal("")),
 });
 export type ProductoInput = z.infer<typeof productoSchema>;
 
@@ -165,6 +180,7 @@ export type Producto = {
   estado: EstadoProducto;
   agotado_manual: boolean;
   visible_en_pos: boolean;
+  marca_virtual_id: string | null;
 };
 
 type FilaProd = Omit<Producto, "categoriaNombre"> & { categoria: { nombre: string } | null };
@@ -173,7 +189,7 @@ export async function listarProductos(): Promise<Producto[]> {
   const { data, error } = await supabase
     .from("productos")
     .select(
-      "id, nombre, descripcion, codigo_interno, precio_base_mxn, categoria_id, estado, agotado_manual, visible_en_pos, categoria:categorias(nombre)",
+      "id, nombre, descripcion, codigo_interno, precio_base_mxn, categoria_id, estado, agotado_manual, visible_en_pos, marca_virtual_id, categoria:categorias(nombre)",
     )
     .is("deleted_at", null)
     .order("orden_visualizacion", { ascending: true });
@@ -189,6 +205,7 @@ export async function listarProductos(): Promise<Producto[]> {
     estado: f.estado,
     agotado_manual: f.agotado_manual,
     visible_en_pos: f.visible_en_pos,
+    marca_virtual_id: f.marca_virtual_id ?? null,
   }));
 }
 
@@ -196,7 +213,7 @@ export async function obtenerProducto(id: string): Promise<Producto | null> {
   const { data, error } = await supabase
     .from("productos")
     .select(
-      "id, nombre, descripcion, codigo_interno, precio_base_mxn, categoria_id, estado, agotado_manual, visible_en_pos, categoria:categorias(nombre)",
+      "id, nombre, descripcion, codigo_interno, precio_base_mxn, categoria_id, estado, agotado_manual, visible_en_pos, marca_virtual_id, categoria:categorias(nombre)",
     )
     .eq("id", id)
     .is("deleted_at", null)
@@ -215,6 +232,7 @@ export async function obtenerProducto(id: string): Promise<Producto | null> {
     estado: f.estado,
     agotado_manual: f.agotado_manual,
     visible_en_pos: f.visible_en_pos,
+    marca_virtual_id: f.marca_virtual_id ?? null,
   };
 }
 
@@ -246,6 +264,7 @@ export async function crearProducto(input: ProductoInput): Promise<void> {
     estado,
     agotado_manual,
     visible_en_pos: datos.visible_en_pos,
+    marca_virtual_id: datos.marca_virtual_id || null,
     orden_visualizacion: orden,
   });
   if (error) throw new Error(error.message);
@@ -265,6 +284,7 @@ export async function actualizarProducto(id: string, input: ProductoInput): Prom
       estado,
       agotado_manual,
       visible_en_pos: datos.visible_en_pos,
+      marca_virtual_id: datos.marca_virtual_id || null,
     })
     .eq("id", id);
   if (error) throw new Error(error.message);

@@ -6,8 +6,10 @@ import {
   actualizarProducto,
   crearProducto,
   listarCategoriasOpciones,
+  listarMarcasOpciones,
   productoSchema,
   type CategoriaOpcion,
+  type MarcaOpcion,
   type Producto,
 } from "../lib/catalogo";
 
@@ -20,8 +22,10 @@ export function ProductoForm({ producto }: { producto: Producto | null }) {
   const editar = !!producto;
 
   const [cats, setCats] = useState<CategoriaOpcion[]>([]);
+  const [marcas, setMarcas] = useState<MarcaOpcion[]>([]);
   const [nombre, setNombre] = useState(producto?.nombre ?? "");
   const [categoriaId, setCategoriaId] = useState(producto?.categoria_id ?? "");
+  const [marcaId, setMarcaId] = useState(producto?.marca_virtual_id ?? "");
   const [precio, setPrecio] = useState(producto ? String(producto.precio_base_mxn) : "");
   const [descripcion, setDescripcion] = useState(producto?.descripcion ?? "");
   const [codigo, setCodigo] = useState(producto?.codigo_interno ?? "");
@@ -37,6 +41,9 @@ export function ProductoForm({ producto }: { producto: Producto | null }) {
     listarCategoriasOpciones()
       .then(setCats)
       .catch(() => setError("No se pudieron cargar las categorías"));
+    listarMarcasOpciones()
+      .then(setMarcas)
+      .catch(() => {/* marcas opcionales: si no hay, el selector queda solo con "Sin marca" */});
   }, []);
 
   async function guardar() {
@@ -50,6 +57,7 @@ export function ProductoForm({ producto }: { producto: Producto | null }) {
       estado,
       agotado,
       visible_en_pos: visible,
+      marca_virtual_id: marcaId,
     });
     if (!parsed.success) {
       setError(parsed.error.issues[0]?.message ?? "Datos inválidos");
@@ -163,6 +171,23 @@ export function ProductoForm({ producto }: { producto: Producto | null }) {
             </select>
           </div>
         </div>
+
+        {marcas.length > 0 && (
+          <div>
+            <label className={label} htmlFor="marca">
+              Marca virtual <span className="text-ink-3">· opcional</span>
+            </label>
+            <select id="marca" className={input} value={marcaId} onChange={(e) => setMarcaId(e.target.value)}>
+              <option value="">Sin marca</option>
+              {marcas.map((m) => (
+                <option key={m.id} value={m.id}>
+                  {m.nombre}
+                </option>
+              ))}
+            </select>
+            <p className="mt-1 text-[11.5px] text-ink-3">Para operar varios conceptos desde el mismo local.</p>
+          </div>
+        )}
 
         <div className="flex flex-col gap-2.5 rounded-lg border border-line bg-surface p-4">
           <label className="flex items-center gap-2.5">
