@@ -6,12 +6,24 @@
 
 ---
 
-## 1. 🔴 Reparación del subsistema de DEVOLUCIONES (F6.3)
+## 1. ✅ RESUELTO — Subsistema de DEVOLUCIONES (F6.3, Modelo B)
 
-**Estado:** diagnosticado a fondo, **bloqueado en una decisión de diseño (#32)**. El subsistema
-`cancelar_ticket_pagado` → `crear_devolucion` → `confirmar_devolucion` → triggers **nunca se
-había ejecutado** y tiene drift de esquema sistémico. Un smoke (`smoke_devolucion.sql`) destapó
-**5 bugs encadenados**:
+**Estado:** **CERRADO** (`837b6c3`). El dueño eligió el **Modelo B** ("venta intacta + documento
+de devolución aparte"). El subsistema (`crear_devolucion` → `confirmar_devolucion` → triggers)
+nunca se había ejecutado y tenía **6 bugs encadenados #28-#33**, todos resueltos:
+- **#28** enum 'DEVOLUCION'→'VENTA' (0030) · **#30** trg_devolucion_pago_efectivo columnas reales (0031)
+- **#31** contadores_folio varchar(20)→40 (0032) · **#32** (diseño) el trigger SOLO crea el movimiento
+  de caja, no reescribe el ticket con pago negativo (0033) · **#33** (dinero) crear_devolucion sumaba
+  IVA a un precio IVA-incluido → reembolsaba de más; ahora usa total_item_mxn (0034).
+
+UI completa: `pantalla-devoluciones` + `ModalDevolucion` + `lib/devoluciones` + botón en topbar.
+Smoke verde (venta queda PAGADA/120 intacta + documento CONFIRMADA + 120 exacto + movimiento de caja).
+**Único pendiente menor:** reversa de inventario (#29) — depende del módulo producto→insumos (sección 6);
+hoy las devoluciones usan `reversar_inventario=false`.
+
+<details><summary>Diagnóstico histórico (los 5 bugs originales encontrados)</summary>
+
+Un smoke (`smoke_devolucion.sql`) destapó **5 bugs encadenados**:
 
 | Bug | Qué | Fix derivado | ¿Resuelto? |
 |-----|-----|--------------|-----------|
@@ -69,6 +81,8 @@ ALTER TABLE contadores_folio ALTER COLUMN tipo_documento TYPE varchar(40);
 **El ciclo dedicado debe:** decidir #32 (diseño de reconciliación del reembolso), aplicar #28/#30/#31,
 resolver #29 (reversa de inventario por recetas, parte del módulo de inventario), agregar
 `smoke_devolucion.sql` verde, y la UI (lista de ventas del turno P-? + modal de devolución P-228).
+
+</details>
 
 ---
 
