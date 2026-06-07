@@ -1,5 +1,5 @@
 "use client";
-import { useCallback, useEffect, useState } from "react";
+import { useState } from "react";
 
 const input =
   "h-11 w-full rounded border border-line-strong px-3 text-sm outline-none focus:border-ink focus:shadow-[0_0_0_3px_rgba(22,22,26,.06)]";
@@ -41,24 +41,12 @@ export default function PlatformHome() {
   const [resultado, setResultado] = useState<{ codigo: string; email: string; pass?: string } | null>(null);
   const [creando, setCreando] = useState(false);
 
-  const cargarTenants = useCallback(async (key: string) => {
-    try {
-      const res = await fetch("/api/tenants", { headers: { "X-Platform-Key": key } });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error ?? "No autorizado");
-      setTenants(data.tenants ?? []);
-      setAutenticado(true);
-      setError(null);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Error");
-      setAutenticado(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    if (autenticado && platformKey) cargarTenants(platformKey);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  async function cargarTenants(key: string) {
+    const res = await fetch("/api/tenants", { headers: { "X-Platform-Key": key } });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error ?? "No autorizado");
+    setTenants(data.tenants ?? []);
+  }
 
   async function entrar() {
     setError(null);
@@ -66,7 +54,12 @@ export default function PlatformHome() {
       setError("Ingresa la clave de plataforma");
       return;
     }
-    await cargarTenants(platformKey);
+    try {
+      await cargarTenants(platformKey);
+      setAutenticado(true);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Error al entrar");
+    }
   }
 
   async function provisionar() {
