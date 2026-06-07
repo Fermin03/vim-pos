@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { siguienteEstado, minutosEnCocina, labelModo } from "../kds-estado";
+import { siguienteEstado, minutosEnCocina, labelModo, areasDeComandas, comandasNuevas, SIN_AREA } from "../kds-estado";
 
 describe("kds — máquina de estados de cocina", () => {
   it("avanza EN_COCINA → LISTO → ENTREGADO y luego null", () => {
@@ -30,5 +30,25 @@ describe("kds — minutos en cocina", () => {
   });
   it("devuelve 0 con fecha inválida", () => {
     expect(minutosEnCocina("no-es-fecha", ahora)).toBe(0);
+  });
+});
+
+describe("kds — F15 multi-área + nuevos pedidos", () => {
+  it("areasDeComandas junta áreas únicas y mapea null → General", () => {
+    const comandas = [
+      { items: [{ area: "Cocina caliente" }, { area: null }] },
+      { items: [{ area: "Barra" }, { area: "Cocina caliente" }] },
+    ];
+    expect(areasDeComandas(comandas)).toEqual(["Barra", "Cocina caliente", SIN_AREA]);
+  });
+  it("areasDeComandas con todo null → solo General", () => {
+    expect(areasDeComandas([{ items: [{ area: null }, { area: null }] }])).toEqual([SIN_AREA]);
+  });
+  it("comandasNuevas cuenta solo los ids no vistos antes", () => {
+    const previos = new Set(["a", "b"]);
+    expect(comandasNuevas(previos, ["a", "b"])).toBe(0);
+    expect(comandasNuevas(previos, ["a", "b", "c"])).toBe(1);
+    expect(comandasNuevas(previos, ["c", "d"])).toBe(2);
+    expect(comandasNuevas(new Set(), ["a"])).toBe(1);
   });
 });
