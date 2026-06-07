@@ -8,10 +8,9 @@ import type { LineaCarrito, ModificadorSel, ModoServicio } from "./carrito";
 // items incrementales + reconstruir el carrito desde el ticket persistido para seguir editando.
 // Esto es ADITIVO: el flujo QS no cambia (sólo se activa cuando hay un ticket persistido).
 
-let contador = 0;
 function clientIdLocal(): string {
-  contador += 1;
-  return `cuenta-${contador}-${contador * 7}`;
+  // UUID real para idempotencia robusta (un contador en memoria se reinicia al recargar y colisiona).
+  return typeof crypto !== "undefined" && crypto.randomUUID ? `cuenta-${crypto.randomUUID()}` : `cuenta-${Date.now()}-${Math.round(Math.random() * 1e9)}`;
 }
 
 /**

@@ -33,7 +33,8 @@ export const promoSchema = z.object({
   fecha_inicio: z.string().min(1, "Indica el inicio"),
   fecha_fin: z.string().optional().or(z.literal("")),
 }).refine((d) => d.tipo === "CORTESIA_TOTAL" || (d.valor ?? 0) > 0, { message: "Indica el valor", path: ["valor"] })
-  .refine((d) => d.tipo !== "PORCENTAJE" || (d.valor ?? 0) <= 100, { message: "El % no puede pasar de 100", path: ["valor"] });
+  .refine((d) => d.tipo !== "PORCENTAJE" || (d.valor ?? 0) <= 100, { message: "El % no puede pasar de 100", path: ["valor"] })
+  .refine((d) => !d.fecha_fin || new Date(d.fecha_fin) >= new Date(d.fecha_inicio), { message: "El fin debe ser igual o posterior al inicio", path: ["fecha_fin"] });
 export type PromoInput = z.infer<typeof promoSchema>;
 
 export type Promo = {
