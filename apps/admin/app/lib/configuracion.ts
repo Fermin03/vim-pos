@@ -124,6 +124,73 @@ export async function actualizarDatosFiscales(input: DatosFiscalesInput): Promis
   if (error) throw new Error(error.message);
 }
 
+// ── Marcas virtuales (P-172) — F17/F20 ───────────────────────────────────────
+// Marcas/cocinas fantasma: un mismo local opera varias marcas (ghost kitchen, foodtruck
+// multi-concepto, dark kitchen). Cada marca tiene su identidad y se asocia a productos/áreas.
+export const marcaSchema = z.object({
+  codigo: z.string().trim().min(1, "Obligatorio").max(50).regex(/^[a-z0-9-]+$/i, "Solo letras, números o guiones"),
+  nombre: z.string().trim().min(1, "Obligatorio").max(150),
+  descripcion: z.string().trim().max(500).optional().or(z.literal("")),
+  color_primario_hex: z.string().regex(/^#[0-9A-Fa-f]{6}$/, "Color hex (#RRGGBB)").optional().or(z.literal("")),
+  activa: z.boolean(),
+});
+export type MarcaInput = z.infer<typeof marcaSchema>;
+export type Marca = MarcaInput & { id: string };
+
+export async function listarMarcas(): Promise<Marca[]> {
+  const { data, error } = await supabase
+    .from("marcas_virtuales")
+    .select("id, codigo, nombre, descripcion, color_primario_hex, activa")
+    .is("deleted_at", null)
+    .order("nombre", { ascending: true });
+  if (error) throw new Error(error.message);
+  return ((data ?? []) as Record<string, string | boolean | null>[]).map((m) => ({
+    id: String(m.id),
+    codigo: String(m.codigo),
+    nombre: String(m.nombre),
+    descripcion: (m.descripcion as string) ?? "",
+    color_primario_hex: (m.color_primario_hex as string) ?? "",
+    activa: Boolean(m.activa),
+  }));
+}
+
+export async function crearMarca(input: MarcaInput): Promise<void> {
+  const datos = marcaSchema.parse(input);
+  const tid = await tenantId();
+  const { error } = await supabase.from("marcas_virtuales").insert({
+    tenant_id: tid,
+    codigo: datos.codigo,
+    nombre: datos.nombre,
+    descripcion: datos.descripcion || null,
+    color_primario_hex: datos.color_primario_hex || null,
+    activa: datos.activa,
+  });
+  if (error) throw new Error(error.message);
+}
+
+export async function actualizarMarca(id: string, input: MarcaInput): Promise<void> {
+  const datos = marcaSchema.parse(input);
+  const { error } = await supabase
+    .from("marcas_virtuales")
+    .update({
+      codigo: datos.codigo,
+      nombre: datos.nombre,
+      descripcion: datos.descripcion || null,
+      color_primario_hex: datos.color_primario_hex || null,
+      activa: datos.activa,
+    })
+    .eq("id", id);
+  if (error) throw new Error(error.message);
+}
+
+export async function eliminarMarca(id: string): Promise<void> {
+  const { error } = await supabase
+    .from("marcas_virtuales")
+    .update({ deleted_at: new Date().toISOString() })
+    .eq("id", id);
+  if (error) throw new Error(error.message);
+}
+
 // ── CFDI / PAC emisor (P-018) ────────────────────────────────────────────────
 export const PROVEEDORES_PAC = ["FACTURAPI", "SOLUCIONFACTIBLE", "FINKOK", "EDICOM", "PRODIGIA", "OTRO"] as const;
 export type ProveedorPac = (typeof PROVEEDORES_PAC)[number];
