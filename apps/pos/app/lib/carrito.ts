@@ -32,12 +32,16 @@ export type AccionCarrito =
   | { tipo: "cantidad"; clientId: string; cantidad: number }
   | { tipo: "quitar"; clientId: string }
   | { tipo: "modo"; modo: ModoServicio }
+  | { tipo: "cargar"; estado: EstadoCarrito }
   | { tipo: "limpiar" };
 
 export function reducerCarrito(estado: EstadoCarrito, accion: AccionCarrito): EstadoCarrito {
   switch (accion.tipo) {
     case "agregar":
       return { ...estado, lineas: [...estado.lineas, accion.linea] };
+    case "cargar":
+      // T2 — reemplaza el carrito completo (reconstrucción desde un ticket persistido de mesa).
+      return accion.estado;
     case "cantidad":
       return {
         ...estado,

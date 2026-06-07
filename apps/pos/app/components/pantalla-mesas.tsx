@@ -22,10 +22,16 @@ export function PantallaMesas({
   token,
   caja,
   onSalir,
+  onAbrirCuenta,
+  onRetomar,
 }: {
   token: string;
   caja: DatosCaja;
   onSalir: () => void;
+  /** T2 — abrir cuenta en una mesa LIBRE (crea ticket MESA + asigna). */
+  onAbrirCuenta?: (mesaId: string) => void;
+  /** T2 — retomar la cuenta (ticket activo) de una mesa OCUPADA. */
+  onRetomar?: (ticketId: string) => void;
 }) {
   const [mesas, setMesas] = useState<MesaVista[] | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -126,6 +132,10 @@ export function PantallaMesas({
                       <button
                         key={m.mesaId}
                         type="button"
+                        onClick={() => {
+                          if (m.estado === "OCUPADA" && m.ticketActivoId) onRetomar?.(m.ticketActivoId);
+                          else if (m.estado === "LIBRE") onAbrirCuenta?.(m.mesaId);
+                        }}
                         className="flex flex-col items-start gap-1 border p-3.5 text-left transition hover:shadow-[0_4px_14px_rgba(22,22,26,.08)]"
                         style={{ background: st.bg, borderColor: st.line, borderRadius: esRedonda ? "16px" : "8px" }}
                       >
