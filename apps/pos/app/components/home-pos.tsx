@@ -400,6 +400,15 @@ export function HomePos({
 
   const bloqueado = ticketBd !== null;
 
+  /** Descarta el overlay de confirmación/recibo (sin tocar el carrito en curso).
+   *  Se llama al navegar por el topbar para que un recibo viejo no reaparezca apilado. */
+  const cerrarRecibo = useCallback(() => {
+    setConfirmacion(null);
+    setDatosTicket(null);
+    setDatosComanda(null);
+    setMostrarRecibo(false);
+  }, []);
+
   /** Cierra la confirmación/recibo y deja la caja lista para la siguiente venta. */
   const nuevoTicket = useCallback(() => {
     setConfirmacion(null);
@@ -472,7 +481,7 @@ export function HomePos({
           Sin conexión — verifica la red. No podrás cobrar ni guardar hasta reconectar.
         </div>
       )}
-      <TopbarOperativa caja={caja} turno={turno} empleado={empleado} onCambiarCajero={onCambiarCajero} onBloquear={onBloquear} onCerrarTurno={() => setCerrando(true)} onMovimientoCaja={() => setMovimientoAbierto(true)} onKds={() => setEnKds(true)} onMesas={() => setEnMesas(true)} onDelivery={() => setEnDelivery(true)} onDevoluciones={() => setEnDevoluciones(true)} />
+      <TopbarOperativa caja={caja} turno={turno} empleado={empleado} onCambiarCajero={onCambiarCajero} onBloquear={onBloquear} onCerrarTurno={() => setCerrando(true)} onMovimientoCaja={() => setMovimientoAbierto(true)} onKds={() => { cerrarRecibo(); setEnKds(true); }} onMesas={() => { cerrarRecibo(); setEnMesas(true); }} onDelivery={() => { cerrarRecibo(); setEnDelivery(true); }} onDevoluciones={() => { cerrarRecibo(); setEnDevoluciones(true); }} />
 
       <div className="flex min-h-0 flex-1">
         {/* Sidebar categorías */}
