@@ -72,12 +72,18 @@ export default function ProductosPage() {
         subtitulo="El menú que se vende en el POS."
         migas={[{ label: "Catálogo" }, { label: "Productos" }]}
         right={
-          <Button onClick={() => router.push("/catalogo/productos/nuevo")}>
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" className="h-[17px] w-[17px]">
-              <path d="M12 5v14M5 12h14" />
-            </svg>
-            Nuevo producto
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button variant="ghost" onClick={() => router.push("/catalogo/importar")}>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-[16px] w-[16px]"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3" /></svg>
+              Importar menú
+            </Button>
+            <Button onClick={() => router.push("/catalogo/productos/nuevo")}>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" className="h-[17px] w-[17px]">
+                <path d="M12 5v14M5 12h14" />
+              </svg>
+              Nuevo producto
+            </Button>
+          </div>
         }
       />
       <CatalogoTabs />
