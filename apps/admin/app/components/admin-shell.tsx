@@ -30,6 +30,7 @@ const NAV: Seccion[] = [
     items: [
       { label: "Panel", href: "/dashboard", minJerarquia: 0, icon: I.panel },
       { label: "Catálogo", href: "/catalogo", minJerarquia: 4, icon: I.catalogo },
+      { label: "Promociones", href: "/promociones", minJerarquia: 4, icon: I.catalogo },
       { label: "Inventario", href: "/inventario", minJerarquia: 4, icon: I.inventario },
       { label: "Clientes", href: "/clientes", minJerarquia: 4, icon: I.clientes },
       { label: "Reservaciones", href: "/reservaciones", minJerarquia: 3, icon: I.clientes },
