@@ -40,6 +40,7 @@ import { ModalDescuentoItem } from "./modal-descuento-item";
 import { ModalCancelarTicket } from "./modal-cancelar-ticket";
 import { ModalMovimientoCaja } from "./modal-movimiento-caja";
 import { leerItemsPersistidos, type ItemTicket } from "../lib/cancelacion";
+import { abrirCuentaEnMesa, agregarItemAlTicket, reconstruirCarrito } from "../lib/cuenta-mesa";
 import { useConexion } from "../lib/conexion";
 import type { DatosTicketImpresion } from "../lib/print/tipos";
 
@@ -208,6 +209,9 @@ export function HomePos({
   // Ticket ya persistido en BD por el flujo de descuento. Mientras exista, el carrito
   // queda comprometido (bloqueado) y el cobro reusa este mismo ticket (no re-persiste).
   const [ticketBd, setTicketBd] = useState<TotalesTicket | null>(null);
+  // T2 — modo "cuenta por mesa": el carrito refleja un ticket persistido y los taps agregan
+  // incrementalmente. Sólo se activa al abrir/retomar una mesa; QS no cambia.
+  const [enModoMesa, setEnModoMesa] = useState(false);
   const [descuentoAbierto, setDescuentoAbierto] = useState(false);
   // F6.1 — items persistidos del ticketBd (para mapear clientId ↔ ticket_item_id real al cancelar).
   const [itemsPersistidos, setItemsPersistidos] = useState<ItemTicket[]>([]);
@@ -248,13 +252,33 @@ export function HomePos({
     [productos, catSel],
   );
 
+  // T2 — re-lee el ticket de mesa y reconstruye el carrito tras un agregado incremental.
+  const recargarCuenta = useCallback(async () => {
+    if (!ticketBd) return;
+    const tId = ticketBd.ticketId;
+    const [bd, recon, items] = await Promise.all([
+      leerTotales(token, tId),
+      reconstruirCarrito(token, tId, productos ?? []),
+      leerItemsPersistidos(token, tId).catch(() => [] as ItemTicket[]),
+    ]);
+    dispatch({ tipo: "cargar", estado: { modoServicio: recon.modoServicio, lineas: recon.lineas } });
+    setTicketBd(bd);
+    setItemsPersistidos(items);
+  }, [ticketBd, token, productos]);
+
   const onTapProducto = useCallback(
     async (p: Producto) => {
-      if (p.agotado || ticketBd) return;
+      if (p.agotado) return;
       try {
         const grupos = await obtenerGruposDeProducto(token, p.id);
         if (grupos.length === 0) {
-          dispatch({ tipo: "agregar", linea: { clientId: nuevoClientId(), producto: p, cantidad: 1, modificadores: [], notaCocina: null } });
+          if (ticketBd) {
+            // Modo cuenta de mesa: agrega al ticket abierto y re-sincroniza.
+            await agregarItemAlTicket(token, { ticketId: ticketBd.ticketId, productoId: p.id, cantidad: 1, modificadores: [], nota: null });
+            await recargarCuenta();
+          } else {
+            dispatch({ tipo: "agregar", linea: { clientId: nuevoClientId(), producto: p, cantidad: 1, modificadores: [], notaCocina: null } });
+          }
         } else {
           setModGrupos({ producto: p, grupos });
         }
@@ -262,17 +286,56 @@ export function HomePos({
         setError(e instanceof Error ? e.message : "Error al cargar modificadores");
       }
     },
-    [token, ticketBd],
+    [token, ticketBd, recargarCuenta],
   );
 
   const confirmarModificadores = useCallback(
-    (mods: ModificadorSel[], nota: string | null) => {
+    async (mods: ModificadorSel[], nota: string | null) => {
       if (!modGrupos) return;
-      dispatch({ tipo: "agregar", linea: { clientId: nuevoClientId(), producto: modGrupos.producto, cantidad: 1, modificadores: mods, notaCocina: nota } });
+      const prod = modGrupos.producto;
       setModGrupos(null);
+      if (ticketBd) {
+        try {
+          await agregarItemAlTicket(token, { ticketId: ticketBd.ticketId, productoId: prod.id, cantidad: 1, modificadores: mods, nota });
+          await recargarCuenta();
+        } catch (e) {
+          setError(e instanceof Error ? e.message : "No se pudo agregar el ítem");
+        }
+        return;
+      }
+      dispatch({ tipo: "agregar", linea: { clientId: nuevoClientId(), producto: prod, cantidad: 1, modificadores: mods, notaCocina: nota } });
     },
-    [modGrupos],
+    [modGrupos, ticketBd, token, recargarCuenta],
   );
+
+  /** Entra en modo cuenta de mesa: carga el ticket persistido al carrito para seguir editando. */
+  const entrarCuenta = useCallback(async (ticketId: string) => {
+    try {
+      const [bd, recon, items] = await Promise.all([
+        leerTotales(token, ticketId),
+        reconstruirCarrito(token, ticketId, productos ?? []),
+        leerItemsPersistidos(token, ticketId).catch(() => [] as ItemTicket[]),
+      ]);
+      dispatch({ tipo: "cargar", estado: { modoServicio: recon.modoServicio, lineas: recon.lineas } });
+      setTicketBd(bd);
+      setItemsPersistidos(items);
+      setEnModoMesa(true);
+      setEnMesas(false);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "No se pudo cargar la cuenta");
+    }
+  }, [token, productos]);
+
+  const onAbrirCuentaMesa = useCallback(async (mesaId: string) => {
+    try {
+      const ticketId = await abrirCuentaEnMesa(token, {
+        sucursalId: caja.sucursal_id, cajaId: turno.caja_id, turnoId: turno.id, mesaId, usuarioId: empleado.id,
+      });
+      await entrarCuenta(ticketId);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "No se pudo abrir la cuenta");
+    }
+  }, [token, caja.sucursal_id, turno.caja_id, turno.id, empleado.id, entrarCuenta]);
 
   /** Persiste el ticket si aún no existe; abre el modal de descuento sobre ese ticket. */
   const onAplicarDescuento = useCallback(async () => {
@@ -371,7 +434,15 @@ export function HomePos({
   }
 
   if (enMesas) {
-    return <PantallaMesas token={token} caja={caja} onSalir={() => setEnMesas(false)} />;
+    return (
+      <PantallaMesas
+        token={token}
+        caja={caja}
+        onSalir={() => setEnMesas(false)}
+        onAbrirCuenta={onAbrirCuentaMesa}
+        onRetomar={entrarCuenta}
+      />
+    );
   }
 
   if (enDelivery) {
@@ -550,6 +621,7 @@ export function HomePos({
             dispatch({ tipo: "limpiar" });
             setTicketBd(null);
             setItemsPersistidos([]);
+            setEnModoMesa(false);
             setCancelandoTicket(false);
           }}
           onCerrar={() => setCancelandoTicket(false)}
@@ -615,6 +687,7 @@ export function HomePos({
             const ticketId = totalesCobro.ticketId;
             setTotalesCobro(null);
             setTicketBd(null);
+            setEnModoMesa(false);
             dispatch({ tipo: "limpiar" });
             setConfirmacion({ folio, cambio });
             // Armar el ticket e IMPRIMIR automáticamente. Con PreviewAdapter abre el recibo
