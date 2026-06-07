@@ -7,11 +7,11 @@ import {
   confirmarSalida,
   labelDeliveryEstado,
   leerDeliveries,
-  liquidarDelivery,
   siguienteAccionDelivery,
   type DeliveryAsignacion,
   type DeliveryEstado,
 } from "../lib/delivery";
+import { ModalLiquidarDelivery } from "./modal-liquidar-delivery";
 
 const REFRESCO_MS = 8000;
 
@@ -40,6 +40,7 @@ export function PantallaDelivery({
   const [items, setItems] = useState<DeliveryAsignacion[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [procesando, setProcesando] = useState<Set<string>>(new Set());
+  const [liquidando, setLiquidando] = useState<DeliveryAsignacion | null>(null);
   const montado = useRef(true);
 
   const recargar = useCallback(async () => {
@@ -71,9 +72,16 @@ export function PantallaDelivery({
     try {
       if (acc.destino === "salida") await confirmarSalida(token, d.id);
       else if (acc.destino === "entrega") await confirmarEntrega(token, d.id, 0);
-      else if (acc.destino === "liquidar")
-        // MVP: liquida todo el monto en efectivo (el split efectivo/tarjeta es F19.2).
-        await liquidarDelivery(token, { asignacionId: d.id, efectivo: d.montoALiquidar, tarjeta: 0, liquidadoPorId: empleado.id });
+      else if (acc.destino === "liquidar") {
+        // F19.2: la liquidación abre un modal para desglosar efectivo/tarjeta.
+        setLiquidando(d);
+        setProcesando((p) => {
+          const n = new Set(p);
+          n.delete(d.id);
+          return n;
+        });
+        return;
+      }
       await recargar();
     } catch (e) {
       setError(e instanceof Error ? e.message : "No se pudo actualizar el domicilio");
@@ -154,6 +162,19 @@ export function PantallaDelivery({
           </div>
         )}
       </div>
+
+      {liquidando && (
+        <ModalLiquidarDelivery
+          token={token}
+          asignacion={liquidando}
+          liquidadoPorId={empleado.id}
+          onLiquidado={() => {
+            setLiquidando(null);
+            recargar();
+          }}
+          onCerrar={() => setLiquidando(null)}
+        />
+      )}
     </div>
   );
 }
