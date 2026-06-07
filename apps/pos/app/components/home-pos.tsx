@@ -34,6 +34,7 @@ import { PantallaCierre } from "./pantalla-cierre";
 import { PantallaKds } from "./pantalla-kds";
 import { PantallaMesas } from "./pantalla-mesas";
 import { PantallaDelivery } from "./pantalla-delivery";
+import { PantallaDevoluciones } from "./pantalla-devoluciones";
 import { ModalCancelarItem } from "./modal-cancelar-item";
 import { ModalDescuentoItem } from "./modal-descuento-item";
 import { ModalCancelarTicket } from "./modal-cancelar-ticket";
@@ -56,6 +57,7 @@ function TopbarOperativa({
   onKds,
   onMesas,
   onDelivery,
+  onDevoluciones,
 }: {
   caja: DatosCaja;
   turno: Turno;
@@ -67,6 +69,7 @@ function TopbarOperativa({
   onKds: () => void;
   onMesas: () => void;
   onDelivery: () => void;
+  onDevoluciones: () => void;
 }) {
   const ahora = useReloj();
   return (
@@ -141,6 +144,14 @@ function TopbarOperativa({
           </button>
           <button
             type="button"
+            onClick={onDevoluciones}
+            className="flex h-9 items-center gap-1.5 rounded border border-line-strong px-3 text-[13px] font-semibold text-ink-2 transition hover:border-ink hover:text-ink"
+          >
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4"><path d="M9 14l-4-4 4-4M5 10h11a4 4 0 0 1 0 8h-1" /></svg>
+            Devoluciones
+          </button>
+          <button
+            type="button"
             onClick={onMovimientoCaja}
             className="flex h-9 items-center gap-1.5 rounded border border-line-strong px-3 text-[13px] font-semibold text-ink-2 transition hover:border-ink hover:text-ink"
           >
@@ -182,6 +193,7 @@ export function HomePos({
   const [enKds, setEnKds] = useState(false);
   const [enMesas, setEnMesas] = useState(false);
   const [enDelivery, setEnDelivery] = useState(false);
+  const [enDevoluciones, setEnDevoluciones] = useState(false);
   // F16 — estado de conexión (avisa al cajero si se cae la red).
   const { online } = useConexion(SUPABASE_URL ? `${SUPABASE_URL}/auth/v1/health` : undefined);
   const [categorias, setCategorias] = useState<Categoria[] | null>(null);
@@ -366,6 +378,10 @@ export function HomePos({
     return <PantallaDelivery token={token} caja={caja} turno={turno} empleado={empleado} onSalir={() => setEnDelivery(false)} />;
   }
 
+  if (enDevoluciones) {
+    return <PantallaDevoluciones token={token} caja={caja} turno={turno} empleado={empleado} onSalir={() => setEnDevoluciones(false)} />;
+  }
+
   return (
     <div className="flex h-screen flex-col">
       {!online && (
@@ -374,7 +390,7 @@ export function HomePos({
           Sin conexión — verifica la red. No podrás cobrar ni guardar hasta reconectar.
         </div>
       )}
-      <TopbarOperativa caja={caja} turno={turno} empleado={empleado} onCambiarCajero={onCambiarCajero} onBloquear={onBloquear} onCerrarTurno={() => setCerrando(true)} onMovimientoCaja={() => setMovimientoAbierto(true)} onKds={() => setEnKds(true)} onMesas={() => setEnMesas(true)} onDelivery={() => setEnDelivery(true)} />
+      <TopbarOperativa caja={caja} turno={turno} empleado={empleado} onCambiarCajero={onCambiarCajero} onBloquear={onBloquear} onCerrarTurno={() => setCerrando(true)} onMovimientoCaja={() => setMovimientoAbierto(true)} onKds={() => setEnKds(true)} onMesas={() => setEnMesas(true)} onDelivery={() => setEnDelivery(true)} onDevoluciones={() => setEnDevoluciones(true)} />
 
       <div className="flex min-h-0 flex-1">
         {/* Sidebar categorías */}
