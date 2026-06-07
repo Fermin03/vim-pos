@@ -1,6 +1,11 @@
 /** @type {import('next').NextConfig} */
 
 // Cabeceras de seguridad (mismo set que pos/admin — SEC CN-003).
+// En dev, Next usa eval() para el HMR/react-refresh; sin 'unsafe-eval' la CSP rompe la
+// hidratación (los botones dejan de responder). Por eso 'unsafe-eval' SOLO en desarrollo.
+const isDev = process.env.NODE_ENV !== "production";
+const scriptSrc = isDev ? "script-src 'self' 'unsafe-inline' 'unsafe-eval'" : "script-src 'self' 'unsafe-inline'";
+
 const securityHeaders = [
   { key: "X-Frame-Options", value: "DENY" },
   { key: "X-Content-Type-Options", value: "nosniff" },
@@ -15,10 +20,10 @@ const securityHeaders = [
       "base-uri 'self'",
       "form-action 'self'",
       "img-src 'self' data: blob:",
-      "font-src 'self' data:",
-      "style-src 'self' 'unsafe-inline'",
-      "script-src 'self' 'unsafe-inline'",
-      "connect-src 'self' https://*.supabase.co https://*.supabase.in http://127.0.0.1:54321",
+      "font-src 'self' data: https://fonts.gstatic.com",
+      "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+      scriptSrc,
+      "connect-src 'self' https://*.supabase.co https://*.supabase.in http://127.0.0.1:54321 ws://localhost:* http://localhost:*",
     ].join("; "),
   },
 ];
