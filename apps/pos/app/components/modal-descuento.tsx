@@ -116,8 +116,8 @@ export function ModalDescuento({
     return (
       <ModalAutorizacionPin
         token={token}
-        accion="descuento_manual"
-        permisoCodigo="descuento.manual_aplicar"
+        accion={tipo === "CORTESIA_TOTAL" ? "cortesia_total" : "descuento_manual"}
+        permisoCodigo={permisoDescuento(tipo)}
         descripcion={`Descuento de ${fmtMxn(descuento)} · ${labelMotivo()}`}
         ejecutaNombre={empleado.nombre}
         monto={descuento}

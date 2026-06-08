@@ -117,5 +117,7 @@ export function siguienteAccionDelivery(e: DeliveryEstado): { destino: "salida" 
   if (e === "ASIGNADO") return { destino: "salida", label: "Marcar salida" };
   if (e === "EN_RUTA" || e === "EN_DESTINO") return { destino: "entrega", label: "Confirmar entrega" };
   if (e === "ENTREGADO") return { destino: "liquidar", label: "Liquidar" };
+  // liquidar_delivery también acepta NO_ENTREGADO y EN_REGRESO; sin esto quedaban colgados sin acción.
+  if (e === "NO_ENTREGADO" || e === "EN_REGRESO") return { destino: "liquidar", label: "Liquidar" };
   return null;
 }
