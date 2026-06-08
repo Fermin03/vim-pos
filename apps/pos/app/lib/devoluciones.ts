@@ -75,10 +75,15 @@ export const MOTIVOS_DEV: { codigo: MotivoDevolucion; label: string }[] = [
   { codigo: "TIEMPO_EXCEDIDO", label: "Tardó demasiado" },
   { codigo: "OTRO", label: "Otro" },
 ];
-export const MEDIOS_DEV: { codigo: MedioDevolucion; label: string }[] = [
+// Solo se ofrecen los medios con efecto real:
+//  - EFECTIVO: sale efectivo del cajón (movimiento DEVOLUCION_EFECTIVO).
+//  - MISMO_METODO_PAGO: el reembolso a tarjeta se procesa en la terminal manualmente (el sistema
+//    deja el documento de devolución como registro).
+// VALE_PROXIMA_COMPRA se omite hasta que exista el módulo de vales/saldo a favor (si no, sería un
+// pasivo sin registro: el cliente queda con saldo y el sistema no lo guarda).
+export const MEDIOS_DEV: { codigo: MedioDevolucion; label: string; nota?: string }[] = [
   { codigo: "EFECTIVO", label: "Efectivo" },
-  { codigo: "MISMO_METODO_PAGO", label: "Mismo método" },
-  { codigo: "VALE_PROXIMA_COMPRA", label: "Vale" },
+  { codigo: "MISMO_METODO_PAGO", label: "Mismo método", nota: "Procesa el reembolso en la terminal de pago." },
 ];
 
 /**
