@@ -399,6 +399,9 @@ export function HomePos({
   }, [carrito, ticketBd, token, caja.sucursal_id, turno.caja_id, turno.id]);
 
   const bloqueado = ticketBd !== null;
+  // En modo cuenta de mesa el ticket está persistido (ticketBd) PERO el menú debe seguir activo
+  // para agregar ítems incrementalmente. Solo se bloquea el menú en el flujo QS post-cobro/descuento.
+  const menuBloqueado = bloqueado && !enModoMesa;
 
   /** Descarta el overlay de confirmación/recibo (sin tocar el carrito en curso).
    *  Se llama al navegar por el topbar para que un recibo viejo no reaparezca apilado. */
@@ -408,6 +411,19 @@ export function HomePos({
     setDatosComanda(null);
     setMostrarRecibo(false);
   }, []);
+
+  /** Navegación por el topbar: descarta el recibo y, si estás en una cuenta de mesa, SALE de
+   *  ella (la cuenta queda abierta en la mesa, persistida en BD, y se retoma desde Mesas).
+   *  Sin esto, ticketBd quedaba colgado y el POS no volvía a un ticket QS limpio. */
+  const salirNavegacion = useCallback(() => {
+    cerrarRecibo();
+    if (enModoMesa) {
+      setEnModoMesa(false);
+      setTicketBd(null);
+      setItemsPersistidos([]);
+      dispatch({ tipo: "limpiar" });
+    }
+  }, [cerrarRecibo, enModoMesa]);
 
   /** Cierra la confirmación/recibo y deja la caja lista para la siguiente venta. */
   const nuevoTicket = useCallback(() => {
@@ -481,7 +497,7 @@ export function HomePos({
           Sin conexión — verifica la red. No podrás cobrar ni guardar hasta reconectar.
         </div>
       )}
-      <TopbarOperativa caja={caja} turno={turno} empleado={empleado} onCambiarCajero={onCambiarCajero} onBloquear={onBloquear} onCerrarTurno={() => setCerrando(true)} onMovimientoCaja={() => setMovimientoAbierto(true)} onKds={() => { cerrarRecibo(); setEnKds(true); }} onMesas={() => { cerrarRecibo(); setEnMesas(true); }} onDelivery={() => { cerrarRecibo(); setEnDelivery(true); }} onDevoluciones={() => { cerrarRecibo(); setEnDevoluciones(true); }} />
+      <TopbarOperativa caja={caja} turno={turno} empleado={empleado} onCambiarCajero={onCambiarCajero} onBloquear={onBloquear} onCerrarTurno={() => setCerrando(true)} onMovimientoCaja={() => setMovimientoAbierto(true)} onKds={() => { salirNavegacion(); setEnKds(true); }} onMesas={() => { salirNavegacion(); setEnMesas(true); }} onDelivery={() => { salirNavegacion(); setEnDelivery(true); }} onDevoluciones={() => { salirNavegacion(); setEnDevoluciones(true); }} />
 
       <div className="flex min-h-0 flex-1">
         {/* Sidebar categorías */}
@@ -535,11 +551,11 @@ export function HomePos({
                 <button
                   key={p.id}
                   type="button"
-                  disabled={p.agotado || bloqueado}
+                  disabled={p.agotado || menuBloqueado}
                   onClick={() => onTapProducto(p)}
                   className={[
                     "group relative flex flex-col items-stretch gap-2 rounded-lg border bg-surface p-3 text-left transition",
-                    p.agotado || bloqueado
+                    p.agotado || menuBloqueado
                       ? "cursor-not-allowed border-line opacity-50"
                       : "border-line hover:border-ink hover:shadow-sm active:scale-[.98]",
                   ].join(" ")}
