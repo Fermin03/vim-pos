@@ -1,23 +1,24 @@
 import { NextResponse } from "next/server";
-import { createServiceClient } from "@vim/db/service";
+import { autorizar } from "../../lib/server";
 
-// Lista los tenants (cross-tenant) para el dashboard de VIM. service_role server-side.
-// Protegido por el mismo secreto que el provisioning (header X-Platform-Key) para no exponer
-// el catálogo de clientes sin autorización.
+// Lista los tenants (cross-tenant) para el panel de VIM. service_role server-side, gated por
+// X-Platform-Key. Incluye plan y fase de onboarding para la tabla de Empresas.
 
 export async function GET(req: Request) {
-  const key = process.env.PLATFORM_PROVISION_KEY;
-  if (!key) return NextResponse.json({ error: "PROVISION_DESHABILITADO" }, { status: 503 });
-  if (req.headers.get("x-platform-key") !== key) {
-    return NextResponse.json({ error: "NO_AUTORIZADO" }, { status: 401 });
-  }
+  const auth = autorizar(req);
+  if ("error" in auth) return auth.error;
+  const sb = auth.sb;
 
-  const sb = createServiceClient();
   const { data, error } = await sb
     .from("tenants")
-    .select("id, codigo, nombre_comercial, estado, vertical_principal, created_at")
+    .select(
+      "id, codigo, nombre_comercial, estado, vertical_principal, fecha_alta, created_at, " +
+        "plan:planes(codigo, nombre, precio_mensual_mxn), " +
+        "onboarding:tenant_onboarding_estado(fase, fecha_go_live)",
+    )
+    .is("deleted_at", null)
     .order("created_at", { ascending: false })
-    .limit(200);
+    .limit(300);
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   return NextResponse.json({ tenants: data ?? [] });
 }
