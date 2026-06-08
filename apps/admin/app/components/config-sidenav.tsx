@@ -11,6 +11,7 @@ const SECCIONES = [
   { titulo: "Operación", items: [
     { label: "Sucursales", href: "/configuracion/sucursales" },
     { label: "Cajas", href: "/configuracion/cajas" },
+    { label: "Mesas", href: "/configuracion/mesas" },
     { label: "Propinas", href: "/configuracion/propinas" },
     { label: "Marcas virtuales", href: "/configuracion/marcas" },
   ]},

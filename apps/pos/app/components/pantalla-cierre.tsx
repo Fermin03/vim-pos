@@ -5,6 +5,7 @@ import { employeeClient, type Empleado } from "../lib/supabase";
 import { fmtMxn, type DatosCaja, type Turno } from "../lib/turno";
 import {
   leerReporteX,
+  contarTicketsAbiertos,
   arquearCaja,
   cerrarTurnoZ,
   leerDatosFiscales,
@@ -74,6 +75,7 @@ export function PantallaCierre({
   const [corte, setCorte] = useState<CorteResultado | null>(null);
   const [pidiendoPin, setPidiendoPin] = useState(false);
   const [cierre, setCierre] = useState<CierreZ | null>(null);
+  const [ticketsAbiertos, setTicketsAbiertos] = useState(0);
 
   useEffect(() => {
     let activo = true;
@@ -83,14 +85,16 @@ export function PantallaCierre({
       leerDatosFiscales(token, caja.tenant_id, caja.sucursal_id),
       leerEstadisticasTurno(token, turno.id),
       leerMovimientosTurno(token, turno.id),
+      contarTicketsAbiertos(token, turno.id),
     ])
-      .then(([x, ten, fis, st, mv]) => {
+      .then(([x, ten, fis, st, mv, abiertos]) => {
         if (!activo) return;
         setResumen(x);
         setNegocio(((ten.data as { nombre_comercial?: string } | null)?.nombre_comercial) ?? "Negocio");
         setFiscales(fis);
         setStats(st);
         setMovs(mv);
+        setTicketsAbiertos(abiertos);
         // Prellenar declarado de métodos no-efectivo con su esperado (verificable)
         const pre: Record<string, string> = {};
         for (const p of x.pagosPorMetodo) if (p.metodo !== "EFECTIVO") pre[p.metodo] = String(p.total);
@@ -107,7 +111,8 @@ export function PantallaCierre({
   }, [resumen]);
 
   const efectivoDeclarado = Number(declarado["EFECTIVO"] || 0);
-  const puedeGenerar = (declarado["EFECTIVO"] ?? "").trim() !== "";
+  // BUG B: no se puede cerrar el turno con cuentas abiertas (quedarían huérfanas).
+  const puedeGenerar = (declarado["EFECTIVO"] ?? "").trim() !== "" && ticketsAbiertos === 0;
 
   function dif(metodo: string, esperado: number): number | null {
     const v = declarado[metodo];
@@ -341,6 +346,17 @@ export function PantallaCierre({
               </div>
             </div>
             <div className="border-t border-line p-4">
+              {ticketsAbiertos > 0 && (
+                <div className="mb-3 rounded-lg border border-danger/30 bg-danger/5 px-3.5 py-3" role="alert">
+                  <div className="flex items-start gap-2.5">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" className="mt-px h-[18px] w-[18px] flex-shrink-0 text-danger"><path d="M12 9v4M12 17h.01M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z" /></svg>
+                    <div className="text-[12.5px] leading-snug">
+                      <span className="font-semibold text-danger">{ticketsAbiertos} {ticketsAbiertos === 1 ? "cuenta abierta" : "cuentas abiertas"} sin cobrar.</span>
+                      <span className="text-ink-2"> Cóbralas o cancélalas antes de cerrar el turno; si no, quedarían sin registrar y la mesa trabada.</span>
+                    </div>
+                  </div>
+                </div>
+              )}
               <Button className="w-full" onClick={generarCorte} disabled={!puedeGenerar || procesando}>
                 {procesando ? "Generando…" : "Generar corte"}
               </Button>

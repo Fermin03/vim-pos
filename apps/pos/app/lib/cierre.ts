@@ -45,6 +45,22 @@ export async function leerReporteX(token: string, turnoId: string): Promise<Repo
   };
 }
 
+/**
+ * Cuenta tickets ABIERTOS (sin cobrar) del turno: cuentas de mesa/domicilio que siguen vivas.
+ * Cerrar el turno con tickets abiertos los deja huérfanos (mesa trabada, venta sin cobrar),
+ * así que el arqueo lo usa para advertir y bloquear el corte hasta resolverlos.
+ */
+export async function contarTicketsAbiertos(token: string, turnoId: string): Promise<number> {
+  const { count, error } = await employeeClient(token)
+    .from("tickets")
+    .select("id", { count: "exact", head: true })
+    .eq("turno_id", turnoId)
+    .eq("estado_fiscal", "ABIERTO")
+    .is("deleted_at", null);
+  if (error) throw new Error(error.message);
+  return count ?? 0;
+}
+
 export type DeclaracionMetodo = { metodoPago: string; montoDeclarado: number; nota?: string };
 export type CorteDetalle = { metodo: string; esperado: number; declarado: number; diferencia: number };
 export type CorteResultado = {

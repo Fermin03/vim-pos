@@ -116,7 +116,7 @@ export function PantallaMesas({
           <div className="flex h-full flex-col items-center justify-center gap-2 text-center text-ink-3">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="h-12 w-12"><rect x="3" y="3" width="18" height="18" rx="2" /><path d="M3 9h18M9 3v18" /></svg>
             <p className="text-[17px] font-semibold text-ink-2">No hay mesas configuradas</p>
-            <p className="text-[13px]">El dueño las da de alta en el admin (editor de mesas).</p>
+            <p className="text-[13px]">El dueño las da de alta en el admin: Configuración → Mesas.</p>
           </div>
         )}
         {mesas !== null && mesas.length > 0 && (
