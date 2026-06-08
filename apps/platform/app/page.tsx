@@ -205,6 +205,17 @@ function DetalleDrawer({ api, id, onCerrar, onCambio }: { api: Api; id: string; 
     finally { setBusy(false); }
   }
 
+  async function impersonar() {
+    const motivo = prompt("Motivo del acceso de soporte (se audita):") ?? "";
+    if (!motivo.trim()) return;
+    setBusy(true); setError(null);
+    try {
+      const r = await api(`/api/tenants/${id}/impersonar`, { method: "POST", body: JSON.stringify({ motivo }) });
+      if (r.link) window.open(r.link as string, "_blank");
+    } catch (e) { setError(e instanceof Error ? e.message : "Error"); }
+    finally { setBusy(false); }
+  }
+
   const t = d?.tenant as Record<string, unknown> | undefined;
   const estado = String(t?.estado ?? "");
 
@@ -310,6 +321,13 @@ function DetalleDrawer({ api, id, onCerrar, onCambio }: { api: Api; id: string; 
                 {estado !== "SUSPENDIDO" && <button onClick={() => accion({ accion: "cambiar_estado", estado: "SUSPENDIDO", motivo })} disabled={busy} className="h-9 rounded bg-warning px-3 text-[13px] font-semibold text-white disabled:opacity-50">Suspender</button>}
                 {estado !== "CANCELADO" && <button onClick={() => { if (confirm("¿Cancelar este cliente?")) accion({ accion: "cambiar_estado", estado: "CANCELADO", motivo }); }} disabled={busy} className="h-9 rounded bg-danger px-3 text-[13px] font-semibold text-white disabled:opacity-50">Cancelar</button>}
               </div>
+            </div>
+
+            {/* Soporte: impersonar */}
+            <div className="mt-5 border-t border-line pt-4">
+              <label className={label}>Soporte</label>
+              <button onClick={impersonar} disabled={busy} className="h-9 w-full rounded border border-line-strong px-3 text-[13px] font-semibold transition hover:bg-hover disabled:opacity-50">Impersonar (entrar como este cliente)</button>
+              <p className="mt-1 text-[11.5px] text-ink-3">Genera un acceso al admin del cliente. Queda auditado en super_admin_accesos.</p>
             </div>
 
             <button onClick={onCerrar} className="mt-6 h-10 w-full rounded border border-line-strong text-[13px] font-semibold transition hover:bg-hover">Cerrar</button>
