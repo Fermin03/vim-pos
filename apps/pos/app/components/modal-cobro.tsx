@@ -195,6 +195,11 @@ type PagoAplicado = {
   monto: number;
 };
 
+// El numpad trabaja en CENTAVOS (estándar POS): cada dígito desplaza los decimales, así se
+// capturan totales fraccionarios (p.ej. $49.50 tras un % de descuento) sin tecla de punto.
+const aMonto = (buf: string) => (buf ? parseInt(buf, 10) : 0) / 100; // buffer de centavos → pesos
+const aBuffer = (v: number) => String(Math.round(v * 100));          // pesos → buffer de centavos
+
 // ─── Numpad mini ─────────────────────────────────────────────────────────────
 
 function Numpad({
@@ -212,8 +217,8 @@ function Numpad({
 
   function press(key: string) {
     if (key === "back") onChange(buffer.slice(0, -1));
-    else if (key === "00") onChange((buffer + "00").slice(0, 7));
-    else onChange((buffer + key).slice(0, 7));
+    else if (key === "00") onChange((buffer + "00").slice(0, 8));
+    else onChange((buffer + key).slice(0, 8));
   }
 
   const keys = ["1","2","3","4","5","6","7","8","9","00","0","back"];
@@ -334,18 +339,18 @@ function VistaEfectivo({
   onVolver: () => void;
 }) {
   const pendiente = totales.pendiente;
-  const [buffer, setBuffer] = useState<string>(String(Math.round(pendiente)));
+  const [buffer, setBuffer] = useState<string>(aBuffer(pendiente));
   const [recibBuffer, setRecibBuffer] = useState<string>("");
 
-  // Atajos de denominación
+  // Atajos de denominación (billetes en pesos → centavos)
   const denominaciones = [50, 100, 200, 500, 1000];
   function addDenom(d: number) {
     const cur = recibBuffer ? parseInt(recibBuffer, 10) : 0;
-    setRecibBuffer(String(cur + d));
+    setRecibBuffer(String(cur + d * 100));
   }
 
-  const monto = buffer ? parseInt(buffer, 10) : 0;
-  const recibido = recibBuffer ? parseInt(recibBuffer, 10) : 0;
+  const monto = aMonto(buffer);
+  const recibido = aMonto(recibBuffer);
   const cambio = recibido > 0 ? recibido - monto : 0;
   const puedeCobrar = recibido >= monto && monto > 0;
 
@@ -455,7 +460,7 @@ function VistaEfectivo({
           ))}
           <button
             type="button"
-            onClick={() => { setRecibBuffer(String(Math.round(pendiente))); }}
+            onClick={() => { setRecibBuffer(aBuffer(pendiente)); }}
             className="col-span-3 py-[13px] border border-dashed border-line-strong bg-surface rounded font-sans text-[15px] font-semibold text-ink-2 cursor-pointer transition-all hover:text-ink hover:bg-hover tabular-nums"
           >
             Pago exacto · {fmtMxn(pendiente)}
@@ -508,9 +513,9 @@ function VistaOtro({
   onVolver: () => void;
 }) {
   const pendiente = totales.pendiente;
-  const [buffer, setBuffer] = useState<string>(String(Math.round(pendiente)));
+  const [buffer, setBuffer] = useState<string>(aBuffer(pendiente));
   const cfg = metodoCfg(metodo);
-  const monto = buffer ? parseInt(buffer, 10) : 0;
+  const monto = aMonto(buffer);
 
   return (
     <div className="flex h-full min-h-0">
@@ -547,7 +552,7 @@ function VistaOtro({
         <div className="mb-3">
           <button
             type="button"
-            onClick={() => setBuffer(String(Math.round(pendiente)))}
+            onClick={() => setBuffer(aBuffer(pendiente))}
             className="w-full py-[13px] border border-dashed border-line-strong bg-surface rounded font-sans text-[15px] font-semibold text-ink-2 cursor-pointer transition-all hover:text-ink hover:bg-hover tabular-nums"
           >
             Monto exacto · {fmtMxn(pendiente)}
@@ -592,7 +597,7 @@ function ModalAgregarPago({
   const [metodo, setMetodo] = useState<MetodoPago>("EFECTIVO");
   const [buffer, setBuffer] = useState<string>("");
 
-  const monto = buffer ? parseInt(buffer, 10) : 0;
+  const monto = aMonto(buffer);
 
   function handleAgregar() {
     if (monto <= 0) return;
@@ -646,7 +651,7 @@ function ModalAgregarPago({
             Restante por cubrir: <span className="tabular-nums">{fmtMxn(pendiente)}</span>
             <button
               type="button"
-              onClick={() => setBuffer(String(Math.round(pendiente)))}
+              onClick={() => setBuffer(aBuffer(pendiente))}
               className="ml-[6px] border-none bg-hover text-ink-2 font-sans text-[12px] font-semibold px-[11px] py-[4px] rounded-full cursor-pointer hover:bg-line hover:text-ink transition-colors"
             >
               Usar todo el restante
@@ -862,7 +867,7 @@ function VistaPropina({
 
   const calcTip = (p: number) => Math.round(totalBase * p) / 100; // totalBase * p/100, a 2 decimales
   const tip =
-    mode === "pct" ? calcTip(pctSel) : mode === "free" ? (freeBuffer ? parseInt(freeBuffer, 10) : 0) : 0;
+    mode === "pct" ? calcTip(pctSel) : mode === "free" ? (aMonto(freeBuffer)) : 0;
   const grand = Math.round((totalBase + tip) * 100) / 100;
 
   const altBase =
@@ -936,7 +941,7 @@ function VistaPropina({
       {mode === "free" && (
         <div className="mb-5">
           <div className="mb-3 text-center font-display text-[34px] font-bold tabular-nums text-ink">
-            {fmtMxn(freeBuffer ? parseInt(freeBuffer, 10) : 0)}
+            {fmtMxn(aMonto(freeBuffer))}
           </div>
           <div className="mx-auto max-w-[300px]">
             <Numpad buffer={freeBuffer} onChange={setFreeBuffer} compact />
