@@ -245,6 +245,26 @@ function DetalleDrawer({ api, id, onCerrar, onCambio }: { api: Api; id: string; 
               </select>
             </div>
 
+            {/* Suscripción */}
+            {(() => {
+              const subs = (t.suscripcion as { estado: string; precio_mensual_mxn: number; proxima_fecha_cobro: string | null; ciclo_facturacion?: string }[]) ?? [];
+              const sub = subs.find((s) => s.estado === "ACTIVA" || s.estado === "PAUSADA") ?? null;
+              return (
+                <div className="mt-4 rounded-lg border border-line p-3">
+                  <div className="mb-1.5 flex items-center justify-between">
+                    <span className="text-[11px] font-bold uppercase tracking-wide text-ink-3">Suscripción</span>
+                    {sub ? <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${sub.estado === "ACTIVA" ? "bg-[#EAF3EE] text-success" : "bg-[#FCF3E6] text-warning"}`}>{sub.estado}</span> : <span className="text-[12px] text-ink-3">sin cobro</span>}
+                  </div>
+                  {sub && <div className="mb-2 text-[12.5px] text-ink-2">{fmtMxn(sub.precio_mensual_mxn)}/mes{sub.proxima_fecha_cobro ? ` · próximo cobro ${sub.proxima_fecha_cobro}` : ""}</div>}
+                  <div className="flex flex-wrap gap-2">
+                    {(!sub || sub.estado === "PAUSADA") && <button onClick={() => accion(sub ? { accion: "suscripcion_estado", estado: "ACTIVA" } : { accion: "suscripcion_activar" })} disabled={busy} className="h-8 rounded bg-success px-3 text-[12.5px] font-semibold text-white disabled:opacity-50">{sub ? "Reanudar" : "Activar cobro"}</button>}
+                    {sub?.estado === "ACTIVA" && <button onClick={() => accion({ accion: "suscripcion_estado", estado: "PAUSADA" })} disabled={busy} className="h-8 rounded border border-line-strong px-3 text-[12.5px] font-semibold hover:bg-hover disabled:opacity-50">Pausar</button>}
+                    {sub && <button onClick={() => { if (confirm("¿Cancelar la suscripción?")) accion({ accion: "suscripcion_estado", estado: "CANCELADA" }); }} disabled={busy} className="h-8 rounded border border-line-strong px-3 text-[12.5px] font-semibold text-ink-3 hover:text-danger disabled:opacity-50">Cancelar</button>}
+                  </div>
+                </div>
+              );
+            })()}
+
             {/* Onboarding */}
             {(() => {
               const ob = t.onboarding as { fase?: string } | null;
