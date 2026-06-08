@@ -1,5 +1,7 @@
 import type { PrintJob, PrintResult } from "./tipos";
 import { PreviewAdapter } from "./preview-adapter";
+import { EpsonEposAdapter } from "./epson-epos-adapter";
+import { leerConfigImpresora } from "./config";
 
 export interface PrinterAdapter {
   nombre: string;
@@ -9,9 +11,13 @@ export interface PrinterAdapter {
 }
 
 /**
- * Devuelve la impresora activa. Sin config de impresora de red (caso actual, P-174 diferido)
- * → PreviewAdapter (muestra el recibo en pantalla). `onMostrar` lo provee la UI.
+ * Devuelve la impresora activa según la config del dispositivo (C3):
+ *  - tipo 'epson' + IP → EpsonEposAdapter (imprime al hardware de red).
+ *  - en cualquier otro caso → PreviewAdapter (muestra el recibo en pantalla); `onMostrar` lo da la UI.
+ * Sin config, sigue siendo Preview (comportamiento previo).
  */
 export function obtenerImpresora(opts: { onMostrar: (job: PrintJob) => void }): PrinterAdapter {
+  const cfg = leerConfigImpresora();
+  if (cfg.tipo === "epson" && cfg.ip) return new EpsonEposAdapter(cfg.ip, cfg.ancho ?? 80);
   return new PreviewAdapter(opts.onMostrar);
 }
