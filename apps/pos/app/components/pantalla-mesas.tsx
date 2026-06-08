@@ -128,15 +128,22 @@ export function PantallaMesas({
                   {lista.map((m) => {
                     const st = ESTILO[m.estado];
                     const esRedonda = m.forma === "REDONDA" || m.forma === "CIRCULAR";
+                    // Solo LIBRE (abrir) u OCUPADA con ticket (retomar) son accionables; el resto
+                    // (RESERVADA/EN_LIMPIEZA/FUERA_DE_SERVICIO/OCUPADA sin ticket) no debe parecer clickable.
+                    const accionable = (m.estado === "OCUPADA" && !!m.ticketActivoId) || m.estado === "LIBRE";
                     return (
                       <button
                         key={m.mesaId}
                         type="button"
+                        disabled={!accionable}
                         onClick={() => {
                           if (m.estado === "OCUPADA" && m.ticketActivoId) onRetomar?.(m.ticketActivoId);
                           else if (m.estado === "LIBRE") onAbrirCuenta?.(m.mesaId);
                         }}
-                        className="flex flex-col items-start gap-1 border p-3.5 text-left transition hover:shadow-[0_4px_14px_rgba(22,22,26,.08)]"
+                        className={[
+                          "flex flex-col items-start gap-1 border p-3.5 text-left transition",
+                          accionable ? "cursor-pointer hover:shadow-[0_4px_14px_rgba(22,22,26,.08)]" : "cursor-default",
+                        ].join(" ")}
                         style={{ background: st.bg, borderColor: st.line, borderRadius: esRedonda ? "16px" : "8px" }}
                       >
                         <div className="flex w-full items-center justify-between">
