@@ -26,6 +26,7 @@ import { ModalModificadores } from "./modal-modificadores";
 import { ModalCobro } from "./modal-cobro";
 import { ModalDescuento } from "./modal-descuento";
 import { obtenerImpresora } from "../lib/print/adapter";
+import { ModalConfigImpresora } from "./modal-config-impresora";
 import { leerTicketParaImpresion } from "../lib/print/ticket-datos";
 import { construirTicketJob } from "../lib/print/ticket-builder";
 import { construirComandaJob, type DatosComanda } from "../lib/print/comanda-builder";
@@ -59,6 +60,7 @@ function TopbarOperativa({
   onMesas,
   onDelivery,
   onDevoluciones,
+  onImpresora,
 }: {
   caja: DatosCaja;
   turno: Turno;
@@ -71,6 +73,7 @@ function TopbarOperativa({
   onMesas: () => void;
   onDelivery: () => void;
   onDevoluciones: () => void;
+  onImpresora: () => void;
 }) {
   const ahora = useReloj();
   return (
@@ -118,6 +121,14 @@ function TopbarOperativa({
             className="flex h-9 w-9 items-center justify-center rounded border border-line-strong text-ink-3 transition hover:border-ink hover:text-ink"
           >
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4"><path d="M16 3.13a4 4 0 0 1 0 7.75" /><path d="M21 21v-2a4 4 0 0 0-3-3.87" /><circle cx="9" cy="7" r="4" /><path d="M3 21v-2a4 4 0 0 1 4-4h4a4 4 0 0 1 4 4v2" /></svg>
+          </button>
+          <button
+            type="button"
+            onClick={onImpresora}
+            aria-label="Configurar impresora"
+            className="flex h-9 w-9 items-center justify-center rounded border border-line-strong text-ink-3 transition hover:border-ink hover:text-ink"
+          >
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4"><path d="M6 9V2h12v7M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2M6 14h12v8H6z" /></svg>
           </button>
           <button
             type="button"
@@ -212,6 +223,7 @@ export function HomePos({
   // T2 — modo "cuenta por mesa": el carrito refleja un ticket persistido y los taps agregan
   // incrementalmente. Sólo se activa al abrir/retomar una mesa; QS no cambia.
   const [enModoMesa, setEnModoMesa] = useState(false);
+  const [configImpresoraAbierto, setConfigImpresoraAbierto] = useState(false);
   const [descuentoAbierto, setDescuentoAbierto] = useState(false);
   // F6.1 — items persistidos del ticketBd (para mapear clientId ↔ ticket_item_id real al cancelar).
   const [itemsPersistidos, setItemsPersistidos] = useState<ItemTicket[]>([]);
@@ -497,7 +509,8 @@ export function HomePos({
           Sin conexión — verifica la red. No podrás cobrar ni guardar hasta reconectar.
         </div>
       )}
-      <TopbarOperativa caja={caja} turno={turno} empleado={empleado} onCambiarCajero={onCambiarCajero} onBloquear={onBloquear} onCerrarTurno={() => setCerrando(true)} onMovimientoCaja={() => setMovimientoAbierto(true)} onKds={() => { salirNavegacion(); setEnKds(true); }} onMesas={() => { salirNavegacion(); setEnMesas(true); }} onDelivery={() => { salirNavegacion(); setEnDelivery(true); }} onDevoluciones={() => { salirNavegacion(); setEnDevoluciones(true); }} />
+      <TopbarOperativa caja={caja} turno={turno} empleado={empleado} onCambiarCajero={onCambiarCajero} onBloquear={onBloquear} onCerrarTurno={() => setCerrando(true)} onMovimientoCaja={() => setMovimientoAbierto(true)} onKds={() => { salirNavegacion(); setEnKds(true); }} onMesas={() => { salirNavegacion(); setEnMesas(true); }} onDelivery={() => { salirNavegacion(); setEnDelivery(true); }} onDevoluciones={() => { salirNavegacion(); setEnDevoluciones(true); }} onImpresora={() => setConfigImpresoraAbierto(true)} />
+      {configImpresoraAbierto && <ModalConfigImpresora onCerrar={() => setConfigImpresoraAbierto(false)} />}
 
       <div className="flex min-h-0 flex-1">
         {/* Sidebar categorías */}
