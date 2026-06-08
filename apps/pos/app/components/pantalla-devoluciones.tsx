@@ -281,6 +281,9 @@ function ModalDevolucion({
           </button>
         ))}
       </div>
+      {MEDIOS_DEV.find((m) => m.codigo === medio)?.nota && (
+        <p className="mb-4 -mt-2 text-[12px] text-ink-3">{MEDIOS_DEV.find((m) => m.codigo === medio)?.nota}</p>
+      )}
 
       <div className={["mb-4 rounded border px-3 py-2 text-[12.5px] font-medium", tienePermiso ? "border-[#D6E8DD] bg-[#EAF3EE] text-success" : "border-[#E8DCC0] bg-[#F6EEDD] text-warning"].join(" ")}>
         {tienePermiso ? "Dentro de tu rol · no requiere autorización." : "Requiere PIN de un supervisor."}
