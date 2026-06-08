@@ -26,3 +26,6 @@ supabase/.temp/
 
 # claude code — config local de preview/tooling
 .claude/
+
+# Vercel
+.vercel
