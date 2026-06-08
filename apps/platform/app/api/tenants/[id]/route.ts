@@ -116,5 +116,37 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
     return NextResponse.json({ ok: true });
   }
 
+  if (accion === "suscripcion_activar") {
+    // Convierte un cliente en pagador: una suscripción ACTIVA con el precio del plan actual.
+    const { data: t } = await sb.from("tenants").select("plan_actual_id, plan:planes(precio_mensual_mxn)").eq("id", id).maybeSingle();
+    const planId = (t as { plan_actual_id?: string } | null)?.plan_actual_id;
+    if (!planId) return NextResponse.json({ error: "TENANT_SIN_PLAN" }, { status: 400 });
+    const precio = Number((body.precio as number | undefined) ?? (t as { plan?: { precio_mensual_mxn?: number } } | null)?.plan?.precio_mensual_mxn ?? 0);
+    const ciclo = String(body.ciclo ?? "MENSUAL");
+    const prox = new Date(); prox.setMonth(prox.getMonth() + (ciclo === "ANUAL" ? 12 : 1));
+    // Expira cualquier suscripción ACTIVA previa para que solo haya una vigente.
+    await sb.from("suscripciones").update({ estado: "EXPIRADA", fecha_fin: new Date().toISOString() }).eq("tenant_id", id).eq("estado", "ACTIVA");
+    const { error } = await sb.from("suscripciones").insert({
+      tenant_id: id, plan_id: planId, fecha_inicio: new Date().toISOString().slice(0, 10),
+      estado: "ACTIVA", precio_mensual_mxn: precio, ciclo_facturacion: ciclo, proxima_fecha_cobro: prox.toISOString().slice(0, 10),
+    });
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    // Al activar el cobro, el tenant pasa a ACTIVO si estaba en TRIAL.
+    await sb.from("tenants").update({ estado: "ACTIVO" }).eq("id", id).eq("estado", "TRIAL");
+    await auditar(sb, { accion: "tenant.suscripcion_activar", tenantId: id, payload: { precio, ciclo } });
+    return NextResponse.json({ ok: true });
+  }
+
+  if (accion === "suscripcion_estado") {
+    const nuevo = String(body.estado ?? "");
+    if (!["ACTIVA", "PAUSADA", "CANCELADA", "EXPIRADA"].includes(nuevo)) return NextResponse.json({ error: "ESTADO_INVALIDO" }, { status: 400 });
+    const patch: Record<string, unknown> = { estado: nuevo };
+    if (nuevo === "CANCELADA" || nuevo === "EXPIRADA") patch.fecha_fin = new Date().toISOString();
+    const { error } = await sb.from("suscripciones").update(patch).eq("tenant_id", id).in("estado", ["ACTIVA", "PAUSADA"]);
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    await auditar(sb, { accion: `tenant.suscripcion_${nuevo.toLowerCase()}`, tenantId: id });
+    return NextResponse.json({ ok: true });
+  }
+
   return NextResponse.json({ error: "ACCION_DESCONOCIDA" }, { status: 400 });
 }
