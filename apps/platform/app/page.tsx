@@ -224,7 +224,7 @@ function DetalleDrawer({ api, id, onCerrar, onCambio }: { api: Api; id: string; 
       <div className="h-full w-[480px] overflow-y-auto bg-surface p-6 shadow-xl" onClick={(e) => e.stopPropagation()}>
         {!d && <p className="text-sm text-ink-3">Cargando…</p>}
         {error && <p className="mb-3 text-sm text-danger">{error}</p>}
-        {t && (
+        {d && t && (
           <>
             <div className="mb-1 flex items-start justify-between">
               <div>
