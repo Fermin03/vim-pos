@@ -71,9 +71,19 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
     return NextResponse.json({ ok: true });
   }
 
+  if (accion === "marcar_fase") {
+    const fase = String(body.fase ?? "");
+    if (!["INVITADO", "EN_CONFIGURACION", "GO_LIVE", "ABANDONADO"].includes(fase)) return NextResponse.json({ error: "FASE_INVALIDA" }, { status: 400 });
+    // upsert: algunos tenants (sembrados/INTERNO) no tienen fila de onboarding.
+    const { error } = await sb.from("tenant_onboarding_estado").upsert({ tenant_id: id, fase }, { onConflict: "tenant_id" });
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    await auditar(sb, { accion: "tenant.marcar_fase", tenantId: id, payload: { fase } });
+    return NextResponse.json({ ok: true });
+  }
+
   if (accion === "notas") {
     const notas = (body.notas as string | undefined) ?? "";
-    const { error } = await sb.from("tenant_onboarding_estado").update({ notas_internas: notas }).eq("tenant_id", id);
+    const { error } = await sb.from("tenant_onboarding_estado").upsert({ tenant_id: id, notas_internas: notas }, { onConflict: "tenant_id" });
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
     await auditar(sb, { accion: "tenant.notas", tenantId: id });
     return NextResponse.json({ ok: true });

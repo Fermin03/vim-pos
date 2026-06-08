@@ -245,6 +245,25 @@ function DetalleDrawer({ api, id, onCerrar, onCambio }: { api: Api; id: string; 
               </select>
             </div>
 
+            {/* Onboarding */}
+            {(() => {
+              const ob = t.onboarding as { fase?: string } | null;
+              const fase = ob?.fase ?? "—";
+              return (
+                <div className="mt-4 rounded-lg border border-line p-3">
+                  <div className="mb-1.5 flex items-center justify-between">
+                    <span className="text-[11px] font-bold uppercase tracking-wide text-ink-3">Onboarding</span>
+                    <span className="rounded-full bg-sel px-2 py-0.5 text-[11px] font-semibold text-ink-2">{fase}</span>
+                  </div>
+                  <div className="flex gap-2">
+                    {fase !== "ABANDONADO" && <button onClick={() => accion({ accion: "marcar_fase", fase: "ABANDONADO" })} disabled={busy} className="h-8 rounded border border-line-strong px-3 text-[12.5px] font-semibold text-ink-3 hover:text-danger disabled:opacity-50">Marcar abandonado</button>}
+                    {fase === "ABANDONADO" && <button onClick={() => accion({ accion: "marcar_fase", fase: "EN_CONFIGURACION" })} disabled={busy} className="h-8 rounded border border-line-strong px-3 text-[12.5px] font-semibold hover:bg-hover disabled:opacity-50">Reactivar onboarding</button>}
+                    {fase !== "GO_LIVE" && fase !== "ABANDONADO" && <button onClick={() => accion({ accion: "marcar_fase", fase: "GO_LIVE" })} disabled={busy} className="h-8 rounded border border-line-strong px-3 text-[12.5px] font-semibold hover:bg-hover disabled:opacity-50">Marcar GO_LIVE</button>}
+                  </div>
+                </div>
+              );
+            })()}
+
             {/* Folios CFDI: regalar/ajustar */}
             <div className="mt-4">
               <label className={label}>Folios CFDI (saldo {d.foliosSaldo})</label>
