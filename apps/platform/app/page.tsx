@@ -185,6 +185,7 @@ function DetalleDrawer({ api, id, onCerrar, onCambio }: { api: Api; id: string; 
   const [error, setError] = useState<string | null>(null);
   const [notas, setNotas] = useState("");
   const [motivo, setMotivo] = useState("");
+  const [folioAdj, setFolioAdj] = useState("");
   const [busy, setBusy] = useState(false);
 
   const cargar = useCallback(async () => {
@@ -242,6 +243,16 @@ function DetalleDrawer({ api, id, onCerrar, onCambio }: { api: Api; id: string; 
                 <option value="">— elegir —</option>
                 {planes.map((p) => <option key={p.id} value={p.id}>{p.codigo} · {p.nombre} ({fmtMxn(p.precio_mensual_mxn)})</option>)}
               </select>
+            </div>
+
+            {/* Folios CFDI: regalar/ajustar */}
+            <div className="mt-4">
+              <label className={label}>Folios CFDI (saldo {d.foliosSaldo})</label>
+              <div className="flex gap-2">
+                <input className={input} inputMode="numeric" placeholder="+50 ó -10" value={folioAdj} onChange={(e) => setFolioAdj(e.target.value.replace(/[^0-9-]/g, ""))} />
+                <button onClick={() => { const n = Number(folioAdj); if (n) { accion({ accion: "ajustar_folios", cantidad: n, motivo: "Ajuste desde plataforma" }); setFolioAdj(""); } }} disabled={busy || !folioAdj} className="h-11 shrink-0 rounded bg-ink px-4 text-[13px] font-semibold text-white disabled:opacity-50">Aplicar</button>
+              </div>
+              <p className="mt-1 text-[11.5px] text-ink-3">Positivo = regalar folios · negativo = descontar. Queda como AJUSTE_MANUAL auditado.</p>
             </div>
 
             {/* Notas internas */}

@@ -79,6 +79,24 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
     return NextResponse.json({ ok: true });
   }
 
+  if (accion === "ajustar_folios") {
+    const cantidad = Math.trunc(Number(body.cantidad ?? 0));
+    if (!cantidad) return NextResponse.json({ error: "CANTIDAD_REQUERIDA" }, { status: 400 });
+    const motivo = (body.motivo as string | undefined)?.trim() || "Ajuste manual desde plataforma";
+    // Saldo previo = saldo del último movimiento; el nuevo saldo lo recalcula sumando la cantidad.
+    const { data: ult } = await sb.from("folios_movimientos").select("saldo_paquetes_resultante").eq("tenant_id", id).order("created_at", { ascending: false }).limit(1).maybeSingle();
+    const saldoPrevio = Number(ult?.saldo_paquetes_resultante ?? 0);
+    const saldoNuevo = saldoPrevio + cantidad;
+    if (saldoNuevo < 0) return NextResponse.json({ error: "SALDO_NEGATIVO" }, { status: 400 });
+    const { error } = await sb.from("folios_movimientos").insert({
+      tenant_id: id, tipo: "AJUSTE_MANUAL", cantidad, saldo_paquetes_resultante: saldoNuevo,
+      dia_contable: new Date().toISOString().slice(0, 10),
+    });
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    await auditar(sb, { accion: "tenant.ajustar_folios", tenantId: id, motivo, payload: { cantidad, saldo: saldoNuevo } });
+    return NextResponse.json({ ok: true, saldo: saldoNuevo });
+  }
+
   if (accion === "cambiar_plan") {
     const planId = String(body.plan_id ?? "");
     if (!planId) return NextResponse.json({ error: "PLAN_REQUERIDO" }, { status: 400 });
