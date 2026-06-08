@@ -12,8 +12,8 @@ El plano de control de VIM. Corre con `service_role` fuera de RLS, gated por `PL
 - ✅ **A1 — Shell + Empresas:** nav del panel + lista/buscar tenants + detalle (drawer) + suspender/reactivar/cancelar + notas internas + cambiar plan. Auditado en `super_admin_accesos`.
 - ✅ **A2 — Métricas globales:** tenants por estado/vertical, MRR, folios vendidos 30d. (Falta: churn histórico.)
 - ✅ **A3 — Folios CFDI:** regalar/ajustar folios (`AJUSTE_MANUAL`) desde el drawer del tenant, auditado.
-- ⬜ **A4 — Feature flags:** activar/desactivar `tenant_feature_flags` por tenant.
-- ⬜ **A5 — Onboarding:** ver fase (INVITADO/EN_CONFIGURACION), reenviar invitación, marcar ABANDONADO.
+- ⏸️ **A4 — Feature flags:** DIFERIDO — ningún consumidor en el runtime lee `tenant_feature_flags` aún; el toggle sería un control sin efecto. Construir cuando el app consuma flags.
+- ✅ **A5 — Onboarding:** ver fase + marcar ABANDONADO/GO_LIVE/reactivar (upsert, auditado). (Falta: reenviar invitación por email.)
 - ⬜ **A6 — Suscripciones:** plan, próximo cobro, historial; (Fase 3) conciliar Stripe.
 - ⬜ **A7 — Soporte / Impersonación auditada (doc 12 §9.2):** entrar como un tenant para diagnosticar.
 - ⬜ **A8 — Login real de super-admin** (reemplazar la clave compartida por cuentas individuales).
