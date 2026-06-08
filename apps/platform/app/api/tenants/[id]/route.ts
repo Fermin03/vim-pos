@@ -27,13 +27,14 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }
   if (!tenant) return NextResponse.json({ error: "NO_EXISTE" }, { status: 404 });
 
   // Saldo de folios (último movimiento) + sucursales/usuarios para contexto.
-  const { data: ultFolio } = await sb
+  const { data: ultFolioRaw } = await sb
     .from("folios_movimientos")
     .select("saldo_paquetes_resultante, created_at")
     .eq("tenant_id", id)
     .order("created_at", { ascending: false })
     .limit(1)
     .maybeSingle();
+  const ultFolio = ultFolioRaw as unknown as { saldo_paquetes_resultante: number } | null;
   const { count: nSucursales } = await sb.from("sucursales").select("id", { count: "exact", head: true }).eq("tenant_id", id).is("deleted_at", null);
 
   return NextResponse.json({
@@ -94,7 +95,8 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
     if (!cantidad) return NextResponse.json({ error: "CANTIDAD_REQUERIDA" }, { status: 400 });
     const motivo = (body.motivo as string | undefined)?.trim() || "Ajuste manual desde plataforma";
     // Saldo previo = saldo del último movimiento; el nuevo saldo lo recalcula sumando la cantidad.
-    const { data: ult } = await sb.from("folios_movimientos").select("saldo_paquetes_resultante").eq("tenant_id", id).order("created_at", { ascending: false }).limit(1).maybeSingle();
+    const { data: ultRaw } = await sb.from("folios_movimientos").select("saldo_paquetes_resultante").eq("tenant_id", id).order("created_at", { ascending: false }).limit(1).maybeSingle();
+    const ult = ultRaw as unknown as { saldo_paquetes_resultante: number } | null;
     const saldoPrevio = Number(ult?.saldo_paquetes_resultante ?? 0);
     const saldoNuevo = saldoPrevio + cantidad;
     if (saldoNuevo < 0) return NextResponse.json({ error: "SALDO_NEGATIVO" }, { status: 400 });
