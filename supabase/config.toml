@@ -22,3 +22,14 @@ enabled = true
 [storage]
 enabled = true
 # Buckets: cfdi-xml, cfdi-pdf, logos (se crean en migración correspondiente).
+
+# Edge Functions pre-auth (se invocan SIN JWT de usuario): el gateway no debe exigir JWT.
+# Validan su propia autorización (PIN de dispositivo / clave de provisioning / signup público).
+[functions.pin-login]
+verify_jwt = false
+
+[functions.signup-tenant]
+verify_jwt = false
+
+[functions.provisionar-tenant]
+verify_jwt = false
