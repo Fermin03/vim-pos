@@ -37,7 +37,6 @@ Deno.serve(async (req) => {
     nombre_comercial,
     nombre_owner,
     email_owner,
-    password_owner,
     telefono_owner,
     vertical,
     plan_codigo,
@@ -54,20 +53,18 @@ Deno.serve(async (req) => {
     auth: { persistSession: false },
   });
 
-  // 1) Crear (o reusar) la cuenta del dueño. Password temporal si no se da uno.
-  const tempPass = password_owner && password_owner.length >= 8
-    ? password_owner
-    : crypto.randomUUID().slice(0, 12) + "A1!";
-  const { data: created, error: cErr } = await admin.auth.admin.createUser({
-    email: email_owner,
-    password: tempPass,
-    email_confirm: true,
-    user_metadata: { nombre: nombre_owner },
+  // 1) Invitar al dueño por correo: crea la cuenta y envía un email con un link para que
+  //    el dueño fije SU contraseña (página /establecer-acceso del admin). No viaja ninguna
+  //    contraseña por correo. Requiere SMTP configurado en el proyecto para enviar de verdad.
+  const adminUrl = Deno.env.get("ADMIN_APP_URL") ?? "http://localhost:3001";
+  const { data: invited, error: cErr } = await admin.auth.admin.inviteUserByEmail(email_owner, {
+    data: { nombre: nombre_owner },
+    redirectTo: `${adminUrl}/establecer-acceso`,
   });
-  if (cErr || !created?.user) {
-    return json({ error: "ALTA_OWNER_FALLO", detalle: cErr?.message ?? "no se creó el usuario" }, 400);
+  if (cErr || !invited?.user) {
+    return json({ error: "ALTA_OWNER_FALLO", detalle: cErr?.message ?? "no se pudo invitar al usuario" }, 400);
   }
-  const ownerId = created.user.id;
+  const ownerId = invited.user.id;
 
   // 2) Provisionar el tenant + andamiaje (RPC SECURITY DEFINER).
   const { data: tenantId, error: pErr } = await admin.rpc("crear_tenant_con_owner", {
@@ -92,7 +89,6 @@ Deno.serve(async (req) => {
     tenant_id: tenantId,
     owner_id: ownerId,
     owner_email: email_owner,
-    // El password temporal solo se devuelve si VIM lo dejó autogenerar (para comunicárselo al cliente).
-    password_temporal: password_owner ? undefined : tempPass,
+    invitacion_enviada: true,
   });
 });
