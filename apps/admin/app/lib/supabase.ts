@@ -53,3 +53,13 @@ export async function entrar(email: string, password: string): Promise<void> {
 export async function salir(): Promise<void> {
   await supabase.auth.signOut();
 }
+
+/**
+ * Fija/cambia la contraseña del usuario de la sesión actual. Se usa tanto en el
+ * aterrizaje de la invitación (el link de Supabase ya dejó una sesión) como en
+ * "cambiar contraseña" dentro del panel. Lanza Error con mensaje si falla.
+ */
+export async function establecerPassword(password: string): Promise<void> {
+  const { error } = await supabase.auth.updateUser({ password });
+  if (error) throw new Error(error.message);
+}

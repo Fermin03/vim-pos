@@ -343,7 +343,7 @@ function NuevoCliente({ api, onCreado }: { api: Api; onCreado: () => void }) {
   const [ownerNombre, setOwnerNombre] = useState(""); const [ownerEmail, setOwnerEmail] = useState(""); const [ownerTel, setOwnerTel] = useState("");
   const [vertical, setVertical] = useState("QUICK_SERVICE");
   const [error, setError] = useState<string | null>(null);
-  const [resultado, setResultado] = useState<{ email: string; pass?: string } | null>(null);
+  const [resultado, setResultado] = useState<{ email: string } | null>(null);
   const [creando, setCreando] = useState(false);
 
   async function provisionar() {
@@ -354,7 +354,7 @@ function NuevoCliente({ api, onCreado }: { api: Api; onCreado: () => void }) {
     try {
       const data = await api("/api/provisionar", { method: "POST", body: JSON.stringify({ codigo, nombre_comercial: nombre, nombre_owner: ownerNombre, email_owner: ownerEmail, telefono_owner: ownerTel, vertical, plan_codigo: plan }) });
       if (!data.ok) throw new Error(String(data.detalle ?? data.error ?? "No se pudo crear"));
-      setResultado({ email: ownerEmail, pass: data.password_temporal as string | undefined });
+      setResultado({ email: ownerEmail });
       setCodigo(""); setNombre(""); setOwnerNombre(""); setOwnerEmail(""); setOwnerTel("");
       onCreado();
     } catch (e) { setError(e instanceof Error ? e.message : "Error"); }
@@ -374,7 +374,7 @@ function NuevoCliente({ api, onCreado }: { api: Api; onCreado: () => void }) {
         <div><label className={label} htmlFor="oe">Correo del dueño</label><input id="oe" type="email" className={input} value={ownerEmail} onChange={(e) => setOwnerEmail(e.target.value)} placeholder="dueno@negocio.mx" /></div>
         <div><label className={label} htmlFor="ot">Teléfono · opcional</label><input id="ot" className={input} value={ownerTel} maxLength={20} onChange={(e) => setOwnerTel(e.target.value)} /></div>
         {error && <p className="text-sm font-medium text-danger" role="alert">{error}</p>}
-        {resultado && <div className="rounded border border-[#D6E8DD] bg-[#EAF3EE] px-3 py-2.5 text-[12.5px] text-success"><div className="font-semibold">Cliente creado.</div><div className="mt-1 text-ink-2">Dueño: {resultado.email}</div>{resultado.pass && <div className="mt-0.5 text-ink-2">Contraseña temporal: <code className="font-mono">{resultado.pass}</code></div>}</div>}
+        {resultado && <div className="rounded border border-[#D6E8DD] bg-[#EAF3EE] px-3 py-2.5 text-[12.5px] text-success"><div className="font-semibold">Cliente creado.</div><div className="mt-1 text-ink-2">Invitación enviada a <b>{resultado.email}</b>. El dueño recibirá un correo para crear su contraseña y entrar al panel.</div></div>}
         <button onClick={provisionar} disabled={creando} className="mt-1 h-11 w-full rounded bg-ink text-sm font-semibold text-white transition hover:opacity-90 disabled:opacity-60">{creando ? "Creando…" : "Provisionar cliente"}</button>
       </div>
     </div>
