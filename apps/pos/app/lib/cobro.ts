@@ -48,6 +48,7 @@ export async function persistirTicket(
   ticketClientId: string,
   clienteId?: string | null,
   direccionEntregaId?: string | null,
+  notaOrden?: string | null,
 ): Promise<TotalesTicket> {
   const sb = employeeClient(ctx.token);
 
@@ -65,6 +66,11 @@ export async function persistirTicket(
   // Domicilio: persistir QUÉ dirección del cliente es la entrega (requiere cliente_id, ya puesto).
   if (direccionEntregaId && clienteId) {
     await sb.from("tickets").update({ direccion_entrega_id: direccionEntregaId }).eq("id", tid);
+  }
+
+  // Nota de cocina de TODA la orden → tickets.nota_general (la lee el KDS y la comanda).
+  if (notaOrden?.trim()) {
+    await sb.from("tickets").update({ nota_general: notaOrden.trim(), nota_imprime_en_comanda: true }).eq("id", tid);
   }
 
   for (const l of lineas) {

@@ -22,6 +22,8 @@ export type ComandaKds = {
   estadoCocina: EstadoCocina;
   /** Cuándo entró a cocina (para el cronómetro). */
   fechaEnvio: string | null;
+  /** Nota de cocina de TODA la orden (tickets.nota_general). */
+  notaOrden: string | null;
   items: ItemComanda[];
 };
 
@@ -33,7 +35,7 @@ export async function leerComandas(token: string, sucursalId: string): Promise<C
   const { data, error } = await employeeClient(token)
     .from("tickets")
     .select(
-      "id, folio_completo, modo_servicio, estado_cocina, fecha_envio_cocina, " +
+      "id, folio_completo, modo_servicio, estado_cocina, fecha_envio_cocina, nota_general, " +
         "ticket_items(id, cantidad, producto_nombre_snapshot, nota_cocina, cancelado, area_cocina_nombre_snapshot, ticket_item_modificadores(opcion_nombre_snapshot))",
     )
     .eq("sucursal_id", sucursalId)
@@ -47,6 +49,7 @@ export async function leerComandas(token: string, sucursalId: string): Promise<C
     modo_servicio: string;
     estado_cocina: EstadoCocina;
     fecha_envio_cocina: string | null;
+    nota_general: string | null;
     ticket_items:
       | {
           id: string;
@@ -79,6 +82,7 @@ export async function leerComandas(token: string, sucursalId: string): Promise<C
       modoServicio: t.modo_servicio,
       estadoCocina: t.estado_cocina,
       fechaEnvio: t.fecha_envio_cocina,
+      notaOrden: t.nota_general,
       items,
     };
   });
