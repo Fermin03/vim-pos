@@ -20,7 +20,7 @@ El plano de control de VIM. Corre con `service_role` fuera de RLS, gated por `PL
 
 ## B. Verticales — completar la pieza insignia de cada una
 - 🟡 **B1 — Full Service · App de mesero** (P-120..127): ✅ **pieza insignia lista** — enviar la mesa a cocina ANTES de cobrar (estado_cocina→EN_COCINA, aparece en KDS; P-124) + atribución de mesero al ticket (alimenta vw_ventas_por_mesero) + "Mis propinas" del turno (P-127). Sin migración (RLS permite los updates; smoke_mesero). Sobre el flujo de mesas existente. **Pendiente:** la app de mesero handheld dedicada (ruta /mesero móvil con las 8 pantallas P-120..127, login propio) = pulido posterior.
-- ⬜ **B2 — Dark Kitchen · Conciliación de apps** (P-204..211): cuadrar depósitos de Rappi/Uber/DiDi vs ventas; matching de pedidos. (Marcas + delivery ya existen.)
+- 🟡 **B2 — Dark Kitchen · Conciliación de apps** (P-210/211): ✅ motor de conciliación (match por folio exacto + monto/fecha, sin doble-match, %match/diferencia/estado; 6 tests vitest) + lib sobre `apps_liquidaciones`/`items` + página admin Delivery→Conciliación (lista + nueva liquidación con pegado de renglones + conciliar al vuelo + detalle matched/sin-match). Sin migración. **Pendiente:** smoke contra datos reales (Docker), subir CSV-archivo a Storage (P-209) y resolución manual avanzada (P-211).
 - ⬜ **B3 — Foodtruck · Eventos** (modo EVENTO_PRIVADO): gestión de evento por turno/ubicación.
 - ⬜ **B4 — Café/Bar · Cuentas prolongadas + alertas** (tabs largos con avisos de tiempo). (Happy hour ya existe vía promociones.)
 - ⬜ **B5 — Enterprise · Multi-sucursal consolidado:** dashboards corporativos, reportes consolidados.
