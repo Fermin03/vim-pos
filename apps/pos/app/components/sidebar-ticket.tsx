@@ -73,6 +73,7 @@ export function SidebarTicket({
   onLimpiar,
   onCancelarTicket,
   onModo,
+  onEditarCliente,
   onCobrar,
   onAplicarDescuento,
   descuentoMxn = 0,
@@ -92,6 +93,8 @@ export function SidebarTicket({
   /** Cuando el ticket está persistido, "Limpiar" llama a este handler para cancelar todo el ticket. */
   onCancelarTicket?: () => void;
   onModo: (m: ModoServicio) => void;
+  /** Abre el modal de cliente para domicilio (solo aplica en modo Domicilio). */
+  onEditarCliente?: () => void;
   onCobrar: () => void;
   onAplicarDescuento: () => void;
   /** Monto de descuento ya aplicado en BD (autoritativo). 0 = sin descuento. */
@@ -149,6 +152,24 @@ export function SidebarTicket({
               );
             })}
           </div>
+          {estado.modoServicio === "DELIVERY_PROPIO" && (
+            <button
+              type="button"
+              disabled={bloqueado}
+              onClick={() => onEditarCliente?.()}
+              className="mt-2 flex w-full items-start gap-2 rounded-md border border-line-strong bg-sel px-3 py-2 text-left transition hover:border-ink disabled:opacity-60"
+            >
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="mt-0.5 h-4 w-4 flex-shrink-0 text-ink-3"><path d="M12 2a8 8 0 0 0-8 8c0 5.5 8 12 8 12s8-6.5 8-12a8 8 0 0 0-8-8z" /><circle cx="12" cy="10" r="3" /></svg>
+              {estado.clienteDomicilio ? (
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-[13px] font-semibold">{estado.clienteDomicilio.nombre || "Cliente"}</span>
+                  <span className="block truncate text-[11.5px] text-ink-3">{estado.clienteDomicilio.direccionPreview ?? estado.clienteDomicilio.telefono ?? "Sin domicilio"}</span>
+                </span>
+              ) : (
+                <span className="flex-1 text-[13px] font-semibold text-accent">Asignar cliente y domicilio</span>
+              )}
+            </button>
+          )}
           <div className="mt-1.5 text-right text-[12.5px] font-semibold text-ink-3">
             {totalProductos} {totalProductos === 1 ? "producto" : "productos"}
           </div>
