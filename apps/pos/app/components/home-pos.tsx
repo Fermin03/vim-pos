@@ -422,6 +422,7 @@ export function HomePos({
           carrito.lineas,
           nuevoClientId(),
           carrito.clienteDomicilio?.clienteId ?? null,
+          carrito.clienteDomicilio?.direccionId ?? null,
         );
         setTicketBd(bd);
       }
