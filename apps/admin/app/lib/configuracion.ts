@@ -8,6 +8,26 @@ async function tenantId(): Promise<string> {
   return s.tenantId;
 }
 
+// ── Credenciales de dispositivo de una caja (provisionar-dispositivo) ─────────
+const SB_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+const SB_ANON = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+
+export type CredencialesDispositivo = { identificador: string; clave: string; caja_nombre: string };
+
+/** Genera/regenera las credenciales del dispositivo de una caja (DUEÑO/ADMIN). Se muestran una vez. */
+export async function provisionarDispositivo(cajaId: string): Promise<CredencialesDispositivo> {
+  const { data: sess } = await supabase.auth.getSession();
+  const token = sess.session?.access_token ?? SB_ANON;
+  const res = await fetch(`${SB_URL}/functions/v1/provisionar-dispositivo`, {
+    method: "POST",
+    headers: { apikey: SB_ANON, Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ caja_id: cajaId }),
+  });
+  const data = (await res.json().catch(() => ({}))) as { identificador?: string; clave?: string; caja_nombre?: string; error?: string };
+  if (!res.ok || !data.identificador || !data.clave) throw new Error(data.error ?? `HTTP ${res.status}`);
+  return { identificador: data.identificador, clave: data.clave, caja_nombre: data.caja_nombre ?? "" };
+}
+
 // ── Negocio (P-162) ──────────────────────────────────────────────────────────
 export const negocioSchema = z.object({
   nombre_comercial: z.string().trim().min(1, "Obligatorio").max(150),

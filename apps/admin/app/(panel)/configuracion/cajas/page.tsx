@@ -3,7 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Button, Modal } from "@vim/ui/styles";
 import { PageHeader, PageBody } from "../../../components/page-header";
 import { ModalCaja } from "../../../components/modal-caja";
-import { eliminarCaja, listarCajas, type Caja } from "../../../lib/configuracion";
+import { eliminarCaja, listarCajas, provisionarDispositivo, type Caja, type CredencialesDispositivo } from "../../../lib/configuracion";
 
 export default function CajasPage() {
   const [list, setList] = useState<Caja[] | null>(null);
@@ -11,6 +11,20 @@ export default function CajasPage() {
   const [modal, setModal] = useState<{ caja: Caja | null } | null>(null);
   const [borrar, setBorrar] = useState<Caja | null>(null);
   const [borrando, setBorrando] = useState(false);
+  const [generando, setGenerando] = useState<string | null>(null);
+  const [creds, setCreds] = useState<CredencialesDispositivo | null>(null);
+
+  async function generarDispositivo(caja: Caja) {
+    setError(null);
+    setGenerando(caja.id);
+    try {
+      setCreds(await provisionarDispositivo(caja.id));
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "No se pudieron generar las credenciales");
+    } finally {
+      setGenerando(null);
+    }
+  }
 
   async function recargar() {
     setError(null);
@@ -111,6 +125,9 @@ export default function CajasPage() {
                         </td>
                         <td className="px-4 py-3 text-right" onClick={(e) => e.stopPropagation()}>
                           <span className="inline-flex gap-1 opacity-0 transition-opacity group-hover:opacity-100">
+                            <button type="button" title="Generar credenciales del dispositivo" disabled={generando === c.id} onClick={() => generarDispositivo(c)} className="flex h-8 w-8 items-center justify-center rounded border border-transparent text-ink-3 transition hover:border-line-strong hover:bg-surface hover:text-ink disabled:opacity-40">
+                              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4"><rect x="5" y="2" width="14" height="20" rx="2" /><path d="M12 18h.01" /></svg>
+                            </button>
                             <button type="button" title="Editar" onClick={() => setModal({ caja: c })} className="flex h-8 w-8 items-center justify-center rounded border border-transparent text-ink-3 transition hover:border-line-strong hover:bg-surface hover:text-ink">
                               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-4 w-4"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" /><path d="M18.5 2.5a2.1 2.1 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" /></svg>
                             </button>
@@ -149,6 +166,41 @@ export default function CajasPage() {
           </div>
         </Modal>
       )}
+
+      {creds && (
+        <Modal open onClose={() => setCreds(null)} title="Credenciales del dispositivo" className="w-[480px] rounded-lg border border-line bg-surface p-6 shadow-xl">
+          <p className="text-[13px] text-ink-2">Captura esto <b>una sola vez</b> en el POS de la tablet de <b className="text-ink">{creds.caja_nombre}</b> (pantalla «Vincular este dispositivo»).</p>
+          <div className="mt-4 space-y-3">
+            <CampoCopiable label="Identificador del dispositivo" valor={creds.identificador} />
+            <CampoCopiable label="Clave del dispositivo" valor={creds.clave} />
+          </div>
+          <div className="mt-4 rounded border border-[#E8DCC0] bg-[#F6EEDD] px-3 py-2 text-[12.5px] font-medium text-warning">
+            La clave no se vuelve a mostrar. Si la pierdes, vuelve a generar (se invalida la anterior).
+          </div>
+          <div className="mt-5 flex justify-end">
+            <Button onClick={() => setCreds(null)}>Listo</Button>
+          </div>
+        </Modal>
+      )}
     </>
+  );
+}
+
+function CampoCopiable({ label, valor }: { label: string; valor: string }) {
+  const [copiado, setCopiado] = useState(false);
+  return (
+    <div>
+      <div className="mb-1 text-[12px] font-medium text-ink-3">{label}</div>
+      <div className="flex items-center gap-2">
+        <code className="flex-1 truncate rounded border border-line-strong bg-sel px-3 py-2 font-mono text-[13px]">{valor}</code>
+        <button
+          type="button"
+          onClick={() => { navigator.clipboard?.writeText(valor); setCopiado(true); setTimeout(() => setCopiado(false), 1500); }}
+          className="shrink-0 rounded border border-line-strong px-3 py-2 text-[12.5px] font-semibold text-ink-2 transition hover:border-ink hover:text-ink"
+        >
+          {copiado ? "Copiado ✓" : "Copiar"}
+        </button>
+      </div>
+    </div>
   );
 }
