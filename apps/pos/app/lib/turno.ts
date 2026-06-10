@@ -10,13 +10,15 @@ export type Turno = {
   fondo_inicial_mxn: number;
   fecha_apertura: string;
   estado: "ABIERTO" | "PENDIENTE_VALIDACION" | "CERRADO";
+  /** B3 Foodtruck — etiqueta de evento del turno (null = operación normal). */
+  evento_nombre?: string | null;
 };
 
 /** Turno ABIERTO de una caja (o null). Hay UNIQUE constraint que garantiza ≤1. */
 export async function turnoAbiertoDeCaja(token: string, cajaId: string): Promise<Turno | null> {
   const { data, error } = await employeeClient(token)
     .from("turnos")
-    .select("id, codigo_turno, caja_id, sucursal_id, dia_contable, fondo_inicial_mxn, fecha_apertura, estado")
+    .select("id, codigo_turno, caja_id, sucursal_id, dia_contable, fondo_inicial_mxn, fecha_apertura, estado, evento_nombre")
     .eq("caja_id", cajaId)
     .eq("estado", "ABIERTO")
     .maybeSingle();
@@ -79,7 +81,33 @@ export type AbrirTurnoInput = {
   cajaNumero: number;
   fondoInicial: number;
   notas?: string;
+  /** B3 Foodtruck — etiqueta de evento/ubicación del turno (Flujos §4). */
+  eventoNombre?: string | null;
+  eventoNotas?: string | null;
 };
+
+/** B3 — nombres de eventos recientes del tenant (sugerencias en la apertura). */
+export async function eventosRecientes(token: string): Promise<string[]> {
+  const { data } = await employeeClient(token)
+    .from("turnos")
+    .select("evento_nombre, fecha_apertura")
+    .not("evento_nombre", "is", null)
+    .order("fecha_apertura", { ascending: false })
+    .limit(20);
+  const vistos = new Set<string>();
+  for (const r of (data ?? []) as { evento_nombre: string | null }[]) {
+    if (r.evento_nombre) vistos.add(r.evento_nombre);
+    if (vistos.size >= 5) break;
+  }
+  return [...vistos];
+}
+
+/** B3 — registra la comisión del organizador al cerrar el turno de evento. */
+export async function registrarComisionEvento(token: string, turnoId: string, montoMxn: number): Promise<void> {
+  if (montoMxn < 0) throw new Error("COMISION_INVALIDA");
+  const { error } = await employeeClient(token).from("turnos").update({ evento_comision_mxn: montoMxn }).eq("id", turnoId);
+  if (error) throw new Error(error.message);
+}
 
 /** Abre turno. Devuelve el turno creado. Lanza con motivo si UNIQUE colisiona o si ya hay uno abierto. */
 export async function abrirTurno(token: string, input: AbrirTurnoInput): Promise<Turno> {
@@ -105,6 +133,8 @@ export async function abrirTurno(token: string, input: AbrirTurnoInput): Promise
       fondo_inicial_mxn: input.fondoInicial,
       fondo_modo: "TOTAL",
       notas_apertura: input.notas ?? null,
+      evento_nombre: input.eventoNombre?.trim() || null,
+      evento_notas: input.eventoNotas?.trim() || null,
     })
     .select("id, codigo_turno, caja_id, sucursal_id, dia_contable, fondo_inicial_mxn, fecha_apertura, estado")
     .single();

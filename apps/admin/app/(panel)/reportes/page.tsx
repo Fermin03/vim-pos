@@ -24,6 +24,12 @@ const REPORTES: Reporte[] = [
     ref: "P-185",
   },
   {
+    href: "/reportes/eventos",
+    titulo: "Ventas por evento",
+    descripcion: "Ferias y eventos (Foodtruck): venta, comisión del organizador y neto por evento.",
+    ref: "Flujos FT §4",
+  },
+  {
     href: "/reportes/ventas-categoria",
     titulo: "Ventas por categoría",
     descripcion: "Mix de venta por categoría del catálogo.",

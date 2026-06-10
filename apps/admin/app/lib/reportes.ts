@@ -325,3 +325,24 @@ export async function leerDescuentosPorUsuario(desde: string, hasta: string): Pr
   }
   return [...map.values()].map((m) => ({ ...m, promedio: m.cantidad > 0 ? m.total / m.cantidad : 0 })).sort((a, b) => b.total - a.total);
 }
+
+// B3 Foodtruck — ventas por evento (vw_ventas_por_evento, 0049)
+export type FilaEvento = {
+  evento: string; tipo: string | null; turnos: number; primerDia: string; ultimoDia: string;
+  tickets: number; total: number; propinas: number; comision: number; neto: number;
+};
+export async function leerVentasPorEvento(): Promise<FilaEvento[]> {
+  const { data, error } = await supabase
+    .from("vw_ventas_por_evento")
+    .select("evento_nombre, evento_tipo, turnos, primer_dia, ultimo_dia, tickets, total_vendido_mxn, propinas_mxn, comision_mxn, neto_mxn")
+    .order("ultimo_dia", { ascending: false });
+  if (error) throw new Error(error.message);
+  return (data ?? []).map((r) => {
+    const f = r as Record<string, unknown>;
+    return {
+      evento: String(f.evento_nombre), tipo: (f.evento_tipo as string) ?? null, turnos: num(f.turnos),
+      primerDia: String(f.primer_dia ?? ""), ultimoDia: String(f.ultimo_dia ?? ""), tickets: num(f.tickets),
+      total: num(f.total_vendido_mxn), propinas: num(f.propinas_mxn), comision: num(f.comision_mxn), neto: num(f.neto_mxn),
+    };
+  });
+}

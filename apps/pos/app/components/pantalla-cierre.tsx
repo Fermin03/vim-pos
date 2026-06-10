@@ -2,7 +2,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Button } from "@vim/ui/styles";
 import { employeeClient, type Empleado } from "../lib/supabase";
-import { fmtMxn, type DatosCaja, type Turno } from "../lib/turno";
+import { fmtMxn, registrarComisionEvento, type DatosCaja, type Turno } from "../lib/turno";
 import {
   leerReporteX,
   contarTicketsAbiertos,
@@ -71,6 +71,7 @@ export function PantallaCierre({
   const [error, setError] = useState<string | null>(null);
   const [paso, setPaso] = useState<Paso>("arqueo");
   const [declarado, setDeclarado] = useState<Record<string, string>>({});
+  const [comisionEvento, setComisionEvento] = useState(""); // B3 — comisión del organizador (turno de evento)
   const [procesando, setProcesando] = useState(false);
   const [corte, setCorte] = useState<CorteResultado | null>(null);
   const [pidiendoPin, setPidiendoPin] = useState(false);
@@ -125,6 +126,10 @@ export function PantallaCierre({
     setProcesando(true);
     setError(null);
     try {
+      // B3 — turno de evento: registrar la comisión del organizador antes del corte.
+      if (turno.evento_nombre && comisionEvento.trim() !== "") {
+        await registrarComisionEvento(token, turno.id, Number(comisionEvento) || 0);
+      }
       const declaraciones = filas.map((f) => ({ metodoPago: f.metodo, montoDeclarado: Number(declarado[f.metodo] || 0) }));
       const r = await arquearCaja(token, { turnoId: turno.id, declaraciones, usuarioId: empleado.id });
       setCorte(r);
@@ -346,6 +351,23 @@ export function PantallaCierre({
               </div>
             </div>
             <div className="border-t border-line p-4">
+              {/* B3 — turno de evento: comisión del organizador */}
+              {turno.evento_nombre && (
+                <div className="mb-3 rounded-lg border border-line bg-sel px-3.5 py-3">
+                  <div className="text-[12px] font-semibold text-ink-2">Evento: {turno.evento_nombre}</div>
+                  <label className="mt-1.5 block text-[12px] text-ink-3" htmlFor="comision-evento">
+                    Comisión del organizador (MXN) · opcional
+                  </label>
+                  <input
+                    id="comision-evento"
+                    className="mt-1 h-10 w-full rounded border border-line-strong px-3 text-sm tabular-nums outline-none focus:border-ink"
+                    inputMode="decimal"
+                    value={comisionEvento}
+                    onChange={(e) => setComisionEvento(e.target.value.replace(/[^0-9.]/g, ""))}
+                    placeholder="0.00"
+                  />
+                </div>
+              )}
               {ticketsAbiertos > 0 && (
                 <div className="mb-3 rounded-lg border border-danger/30 bg-danger/5 px-3.5 py-3" role="alert">
                   <div className="flex items-start gap-2.5">
