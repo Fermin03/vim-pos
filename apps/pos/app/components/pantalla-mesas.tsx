@@ -1,7 +1,7 @@
 "use client";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { type DatosCaja } from "../lib/turno";
-import { labelEstadoMesa, leerMesas, type MesaEstado, type MesaVista } from "../lib/mesas";
+import { alertaDeMesa, labelEstadoMesa, leerMesas, type MesaEstado, type MesaVista } from "../lib/mesas";
 
 const REFRESCO_MS = 8000;
 
@@ -16,6 +16,25 @@ const ESTILO: Record<MesaEstado, { bg: string; line: string; text: string }> = {
 
 function fmtMxn(n: number): string {
   return new Intl.NumberFormat("es-MX", { style: "currency", currency: "MXN" }).format(n);
+}
+
+/** B4 Café/Bar — alerta informativa de cuenta prolongada (Flujos §5). No bloquea nada. */
+function AlertaCuenta({ m }: { m: MesaVista }) {
+  const a = alertaDeMesa(m);
+  if (!a) return null;
+  const horas = Math.floor(m.minutosOcupada / 60);
+  const cfg =
+    a === "OCUPADA_4H"
+      ? { bg: "#FBECEA", text: "#C0392B", msg: `Cuenta muy larga (${horas} h) — avisa al supervisor` }
+      : a === "OCUPADA_2H"
+        ? { bg: "#F6EEDD", text: "#9A6B12", msg: `Cliente lleva ${horas} h, ¿todo OK?` }
+        : { bg: "#F6EEDD", text: "#9A6B12", msg: `Sin pedidos nuevos hace ${m.minutosSinMovimiento} min` };
+  return (
+    <div className="mt-1.5 flex w-full items-center gap-1.5 rounded px-2 py-1 text-[10.5px] font-bold leading-tight" style={{ background: cfg.bg, color: cfg.text }}>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" className="h-3 w-3 flex-shrink-0"><path d="M12 9v4M12 17h.01M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z" /></svg>
+      {cfg.msg}
+    </div>
+  );
 }
 
 export function PantallaMesas({
@@ -161,6 +180,8 @@ export function PantallaMesas({
                             <span className="tabular-nums" style={{ color: st.text }}>{fmtMxn(m.ticketTotal)}</span>
                           </div>
                         )}
+                        {/* B4 Café/Bar — alerta informativa de cuenta prolongada (Flujos §5) */}
+                        <AlertaCuenta m={m} />
                       </button>
                     );
                   })}
