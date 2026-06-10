@@ -10,8 +10,10 @@ describe("kds — máquina de estados de cocina", () => {
   });
 
   it("labelModo traduce los modos conocidos y deja pasar el resto", () => {
-    expect(labelModo("COMER_AQUI")).toBe("Comer aquí");
+    expect(labelModo("COMER_AQUI")).toBe("Comedor");
     expect(labelModo("PARA_LLEVAR")).toBe("Para llevar");
+    expect(labelModo("DRIVE_THRU")).toBe("Pick-up");
+    expect(labelModo("DELIVERY_PROPIO")).toBe("Domicilio");
     expect(labelModo("DESCONOCIDO")).toBe("DESCONOCIDO");
   });
 });

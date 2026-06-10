@@ -2,7 +2,7 @@
 import type { Producto } from "./catalogo";
 import type { GrupoModificadores, OpcionModificador } from "./modificadores";
 
-export type ModoServicio = "COMER_AQUI" | "PARA_LLEVAR" | "DRIVE_THRU";
+export type ModoServicio = "COMER_AQUI" | "PARA_LLEVAR" | "DRIVE_THRU" | "DELIVERY_PROPIO";
 
 export type ModificadorSel = {
   opcionId: string;

@@ -61,6 +61,7 @@ export async function reconstruirCarrito(
 function mapearModo(m: string): ModoServicio {
   if (m === "PARA_LLEVAR") return "PARA_LLEVAR";
   if (m === "DRIVE_THRU") return "DRIVE_THRU";
+  if (m === "DELIVERY_PROPIO") return "DELIVERY_PROPIO";
   return "COMER_AQUI"; // MESA/BARRA/etc. se muestran como COMER_AQUI en el selector QS
 }
 
