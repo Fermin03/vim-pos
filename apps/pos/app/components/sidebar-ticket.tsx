@@ -75,6 +75,9 @@ export function SidebarTicket({
   onModo,
   onEditarCliente,
   onCobrar,
+  onEnviarCocina,
+  cocinaEnviada = false,
+  enviandoCocina = false,
   onAplicarDescuento,
   descuentoMxn = 0,
   totalConDescuento,
@@ -96,6 +99,10 @@ export function SidebarTicket({
   /** Abre el modal de cliente para domicilio (solo aplica en modo Domicilio). */
   onEditarCliente?: () => void;
   onCobrar: () => void;
+  /** B1 Full Service — enviar la mesa a cocina antes de cobrar (solo en cuenta de mesa). */
+  onEnviarCocina?: () => void;
+  cocinaEnviada?: boolean;
+  enviandoCocina?: boolean;
   onAplicarDescuento: () => void;
   /** Monto de descuento ya aplicado en BD (autoritativo). 0 = sin descuento. */
   descuentoMxn?: number;
@@ -339,14 +346,35 @@ export function SidebarTicket({
             </>
           )}
         </button>
-        {/* F5.2b — diferido */}
-        <button
-          type="button"
-          disabled
-          className="w-full rounded border border-line-strong bg-transparent px-5 py-[13px] text-[14.5px] font-semibold text-ink-2 transition-all hover:border-ink hover:text-ink disabled:cursor-default disabled:opacity-[.45]"
-        >
-          Poner pedido en espera
-        </button>
+        {onEnviarCocina ? (
+          /* B1 Full Service — enviar la mesa a cocina antes de cobrar */
+          <button
+            type="button"
+            disabled={vacio || enviandoCocina || cocinaEnviada}
+            onClick={onEnviarCocina}
+            className={[
+              "flex w-full items-center justify-center gap-2 rounded border px-5 py-[13px] text-[14.5px] font-semibold transition-all disabled:cursor-default",
+              cocinaEnviada
+                ? "border-success/40 bg-[#EAF3EE] text-success disabled:opacity-100"
+                : "border-line-strong text-ink-2 hover:border-ink hover:text-ink disabled:opacity-[.45]",
+            ].join(" ")}
+          >
+            {cocinaEnviada ? (
+              <><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="h-4 w-4"><path d="M20 6 9 17l-5-5" /></svg> Enviado a cocina</>
+            ) : enviandoCocina ? "Enviando…" : (
+              <><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4"><path d="M3 11l19-9-9 19-2-8-8-2z" /></svg> Enviar a cocina</>
+            )}
+          </button>
+        ) : (
+          /* F5.2b — diferido */
+          <button
+            type="button"
+            disabled
+            className="w-full rounded border border-line-strong bg-transparent px-5 py-[13px] text-[14.5px] font-semibold text-ink-2 transition-all hover:border-ink hover:text-ink disabled:cursor-default disabled:opacity-[.45]"
+          >
+            Poner pedido en espera
+          </button>
+        )}
       </div>
     </aside>
   );
