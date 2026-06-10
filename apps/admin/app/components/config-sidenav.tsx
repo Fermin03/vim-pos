@@ -15,6 +15,9 @@ const SECCIONES = [
     { label: "Propinas", href: "/configuracion/propinas" },
     { label: "Marcas virtuales", href: "/configuracion/marcas" },
   ]},
+  { titulo: "Cuenta", items: [
+    { label: "Seguridad", href: "/configuracion/seguridad" },
+  ]},
 ];
 
 /** Sub-navegación lateral del módulo Configuración (mockups P-162+). */
