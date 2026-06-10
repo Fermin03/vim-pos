@@ -4,6 +4,7 @@ import { useParams } from "next/navigation";
 import { PageHeader, PageBody } from "../../../../components/page-header";
 import { CatalogoTabs } from "../../../../components/catalogo-tabs";
 import { ProductoForm } from "../../../../components/producto-form";
+import { ProductoModificadores } from "../../../../components/producto-modificadores";
 import { obtenerProducto, type Producto } from "../../../../lib/catalogo";
 
 export default function EditarProductoPage() {
@@ -30,7 +31,12 @@ export default function EditarProductoPage() {
       <PageBody>
         {prod === undefined && <p className="text-sm text-ink-3">Cargando…</p>}
         {prod === null && <p className="text-sm text-danger">Producto no encontrado.</p>}
-        {prod && <ProductoForm producto={prod} />}
+        {prod && (
+          <>
+            <ProductoForm producto={prod} />
+            <ProductoModificadores productoId={prod.id} />
+          </>
+        )}
       </PageBody>
     </>
   );

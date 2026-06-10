@@ -5,6 +5,7 @@ import { PageHeader, PageBody } from "../../../../components/page-header";
 import { CatalogoTabs } from "../../../../components/catalogo-tabs";
 import { GrupoForm } from "../../../../components/grupo-form";
 import { OpcionesEditor } from "../../../../components/opciones-editor";
+import { AsignacionMasivaGrupo } from "../../../../components/asignacion-masiva-grupo";
 import { obtenerGrupo, type Grupo } from "../../../../lib/modificadores";
 
 export default function EditarGrupoPage() {
@@ -35,6 +36,7 @@ export default function EditarGrupoPage() {
           <>
             <GrupoForm grupo={grupo} />
             <OpcionesEditor grupoId={grupo.id} />
+            <AsignacionMasivaGrupo grupoId={grupo.id} grupoNombre={grupo.nombre} />
           </>
         )}
       </PageBody>
