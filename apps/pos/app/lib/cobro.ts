@@ -47,6 +47,7 @@ export async function persistirTicket(
   lineas: LineaCarrito[],
   ticketClientId: string,
   clienteId?: string | null,
+  direccionEntregaId?: string | null,
 ): Promise<TotalesTicket> {
   const sb = employeeClient(ctx.token);
 
@@ -60,6 +61,11 @@ export async function persistirTicket(
   });
   if (e1) throw new Error(e1.message);
   const tid = ticketId as string;
+
+  // Domicilio: persistir QUÉ dirección del cliente es la entrega (requiere cliente_id, ya puesto).
+  if (direccionEntregaId && clienteId) {
+    await sb.from("tickets").update({ direccion_entrega_id: direccionEntregaId }).eq("id", tid);
+  }
 
   for (const l of lineas) {
     const { error } = await sb.rpc("agregar_item_a_ticket", {
