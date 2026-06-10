@@ -5,15 +5,12 @@ import { fmtMxn } from "../lib/turno";
 
 /* ── helpers ─────────────────────────────────────────────────── */
 const MODO_LABELS: Record<ModoServicio, string> = {
-  COMER_AQUI: "Comer aquí",
+  COMER_AQUI: "Comedor",
   PARA_LLEVAR: "Para llevar",
-  DRIVE_THRU: "Drive-thru",
+  DRIVE_THRU: "Pick-up",
+  DELIVERY_PROPIO: "Domicilio",
 };
-const MODO_ORDEN: ModoServicio[] = ["COMER_AQUI", "PARA_LLEVAR", "DRIVE_THRU"];
-function siguienteModo(m: ModoServicio): ModoServicio {
-  const idx = MODO_ORDEN.indexOf(m);
-  return MODO_ORDEN[(idx + 1) % MODO_ORDEN.length] ?? "COMER_AQUI";
-}
+const MODO_ORDEN: ModoServicio[] = ["COMER_AQUI", "PARA_LLEVAR", "DRIVE_THRU", "DELIVERY_PROPIO"];
 
 /* ── Íconos SVG inline (del mockup P-066) ────────────────────── */
 function IconoTicket() {
@@ -130,21 +127,31 @@ export function SidebarTicket({
             Limpiar
           </button>
         </div>
-        {/* fila de modo + conteo */}
-        <div className="mt-3 flex items-center gap-2">
-          {/* Badge de modo — clic cicla el modo */}
-          <button
-            type="button"
-            disabled={bloqueado}
-            onClick={() => onModo(siguienteModo(estado.modoServicio))}
-            className="inline-flex cursor-pointer items-center gap-[7px] rounded-full bg-[#ECEEF1] px-[13px] py-[6px] text-[13px] font-semibold text-[#4A5568] transition-colors hover:bg-hover disabled:cursor-default disabled:opacity-60 disabled:hover:bg-[#ECEEF1]"
-          >
-            <span className="h-2 w-2 flex-shrink-0 rounded-full bg-[#4A5568]" />
-            {MODO_LABELS[estado.modoServicio]}
-          </button>
-          <span className="ml-auto text-[12.5px] font-semibold text-ink-3">
+        {/* Modo de servicio — fila tocable directa (sin ciclar) */}
+        <div className="mt-3">
+          <div className="grid grid-cols-4 gap-1">
+            {MODO_ORDEN.map((m) => {
+              const activo = estado.modoServicio === m;
+              return (
+                <button
+                  key={m}
+                  type="button"
+                  disabled={bloqueado}
+                  onClick={() => onModo(m)}
+                  aria-pressed={activo}
+                  className={[
+                    "flex min-h-[40px] items-center justify-center rounded-md px-1 py-1.5 text-center text-[11.5px] font-semibold leading-tight transition-colors disabled:cursor-default disabled:opacity-50",
+                    activo ? "bg-ink text-white" : "bg-[#ECEEF1] text-[#4A5568] hover:bg-hover",
+                  ].join(" ")}
+                >
+                  {MODO_LABELS[m]}
+                </button>
+              );
+            })}
+          </div>
+          <div className="mt-1.5 text-right text-[12.5px] font-semibold text-ink-3">
             {totalProductos} {totalProductos === 1 ? "producto" : "productos"}
-          </span>
+          </div>
         </div>
       </div>
 

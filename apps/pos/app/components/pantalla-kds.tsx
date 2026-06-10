@@ -40,6 +40,7 @@ const MODO_BADGE: Record<string, string> = {
   COMER_AQUI: "bg-[#2C5AA0]",
   PARA_LLEVAR: "bg-[#2E7D52]",
   DRIVE_THRU: "bg-[#6B4FA0]",
+  DELIVERY_PROPIO: "bg-[#B8651B]",
 };
 
 function colorEdad(min: number): { borde: string; pulso: boolean } {

@@ -5,9 +5,10 @@
 export type EstadoCocina = "EN_COCINA" | "LISTO" | "ENTREGADO" | "EN_RUTA" | "ENTREGADO_DOMICILIO" | "SIN_ENVIAR";
 
 const MODO_LABEL: Record<string, string> = {
-  COMER_AQUI: "Comer aquí",
+  COMER_AQUI: "Comedor",
   PARA_LLEVAR: "Para llevar",
-  DRIVE_THRU: "Drive-thru",
+  DRIVE_THRU: "Pick-up",
+  DELIVERY_PROPIO: "Domicilio",
 };
 
 export function labelModo(m: string): string {

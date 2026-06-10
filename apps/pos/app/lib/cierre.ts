@@ -221,7 +221,8 @@ export type EstadisticasTurno = {
 const MODO_LABEL_SOFT: Record<string, string> = {
   COMER_AQUI: "COMEDOR",
   PARA_LLEVAR: "PARA LLEVAR",
-  DRIVE_THRU: "DRIVE-THRU",
+  DRIVE_THRU: "PICK-UP",
+  DELIVERY_PROPIO: "DOMICILIO",
 };
 
 /** Estadísticas adicionales del turno para el cierre estilo Soft. Bajo RLS. */

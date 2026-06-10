@@ -10,7 +10,7 @@ const METODO_LABEL: Record<string, string> = {
   APP_RAPPI: "Rappi", APP_UBEREATS: "Uber Eats", APP_DIDI: "DiDi", APP_IFOOD: "iFood", APP_OTRO: "App externa",
 };
 const MODO_LABEL: Record<string, string> = {
-  COMER_AQUI: "Comer aquí", PARA_LLEVAR: "Para llevar", DRIVE_THRU: "Drive-thru",
+  COMER_AQUI: "Comedor", PARA_LLEVAR: "Para llevar", DRIVE_THRU: "Pick-up", DELIVERY_PROPIO: "Domicilio",
 };
 
 type Ctx = { token: string; cajeroNombre: string; cajaNombre: string };
