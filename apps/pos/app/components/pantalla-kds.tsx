@@ -2,11 +2,10 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { type DatosCaja } from "../lib/turno";
 import {
-  avanzarCocina,
+  cerrarComanda,
   labelModo,
   leerComandas,
   minutosEnCocina,
-  siguienteEstado,
   type ComandaKds,
 } from "../lib/kds";
 import { areasDeComandas, comandasNuevas, SIN_AREA } from "../lib/kds-estado";
@@ -121,11 +120,10 @@ export function PantallaKds({
   }, []);
 
   async function avanzar(c: ComandaKds) {
-    const destino = siguienteEstado(c.estadoCocina);
-    if (!destino) return;
     setProcesando((p) => new Set(p).add(c.ticketId));
     try {
-      await avanzarCocina(token, c.ticketId, destino);
+      // Un toque: LISTO cierra la comanda (queda ENTREGADO y sale del panel).
+      await cerrarComanda(token, c.ticketId, c.estadoCocina);
       // Optimista: quita/actualiza local y re-sincroniza.
       await recargar();
     } catch (e) {
@@ -251,16 +249,16 @@ export function PantallaKds({
           </div>
         )}
         {comandas !== null && comandasFiltradas.length > 0 && (
-          <div className="grid grid-cols-[repeat(auto-fill,minmax(280px,1fr))] gap-3">
+          /* items-start: cada tarjeta mide lo que mide su contenido (1 ítem = chica, 10 = alta) */
+          <div className="grid grid-cols-[repeat(auto-fill,minmax(300px,1fr))] items-start gap-3">
             {comandasFiltradas.map((c) => {
               const min = minutosEnCocina(c.fechaEnvio, ahora);
               const { borde, pulso } = colorEdad(min);
               const enProceso = procesando.has(c.ticketId);
-              const esListo = c.estadoCocina === "LISTO";
               return (
                 <div
                   key={c.ticketId}
-                  className="flex max-h-[440px] flex-col overflow-hidden rounded-lg"
+                  className="flex max-h-[85vh] flex-col overflow-hidden rounded-lg"
                   style={{
                     background: tema.surface,
                     borderLeft: `5px solid ${borde}`,
@@ -268,51 +266,45 @@ export function PantallaKds({
                   }}
                 >
                   {/* Header de tarjeta */}
-                  <div className="flex items-center justify-between px-3.5 pt-3">
+                  <div className="flex items-center justify-between px-4 pt-3">
                     <div className="flex items-center gap-2">
-                      <span className="font-display text-[20px] font-extrabold tabular-nums">#{c.folioCorto}</span>
-                      <span className={`rounded px-2 py-0.5 text-[11px] font-bold text-white ${MODO_BADGE[c.modoServicio] ?? "bg-[#9A6B12]"}`}>
+                      <span className="font-display text-[24px] font-extrabold tabular-nums">#{c.folioCorto}</span>
+                      <span className={`rounded px-2.5 py-1 text-[13px] font-bold text-white ${MODO_BADGE[c.modoServicio] ?? "bg-[#9A6B12]"}`}>
                         {labelModo(c.modoServicio)}
                       </span>
-                      {esListo && (
-                        <span className="rounded bg-[#2E7D52] px-2 py-0.5 text-[11px] font-bold text-white">LISTO</span>
-                      )}
                     </div>
-                    <span className="font-display text-[15px] font-bold tabular-nums" style={{ color: borde }}>
+                    <span className="font-display text-[20px] font-bold tabular-nums" style={{ color: borde }}>
                       {reloj(c.fechaEnvio, ahora)}
                     </span>
                   </div>
 
-                  {/* Ítems */}
-                  <div className="min-h-0 flex-1 overflow-y-auto px-3.5 py-2.5">
+                  {/* Ítems — tipografía para leer a ~80 cm */}
+                  <div className="min-h-0 overflow-y-auto px-4 py-2.5">
                     {c.items.map((it) => (
-                      <div key={it.id} className="flex gap-2.5 border-b border-[#2C2C32] py-2 last:border-b-0">
-                        <span className="font-display min-w-[32px] text-[22px] font-extrabold leading-none text-[#F0F0EC]">{it.cantidad}</span>
+                      <div key={it.id} className="flex gap-3 border-b border-[#2C2C32] py-2.5 last:border-b-0">
+                        <span className="font-display min-w-[44px] text-[30px] font-extrabold leading-none text-[#F0F0EC]">{it.cantidad}</span>
                         <div className="min-w-0 flex-1">
-                          <div className="text-[15px] font-semibold leading-tight">{it.nombre}</div>
+                          <div className="text-[22px] font-bold leading-snug">{it.nombre}</div>
                           {it.modificadores.length > 0 && (
-                            <div className="mt-0.5 text-[12.5px] leading-tight text-[#A0A0A6]">{it.modificadores.join(" · ")}</div>
+                            <div className="mt-1 text-[16px] font-medium leading-snug text-[#B8B8C0]">{it.modificadores.join(" · ")}</div>
                           )}
                           {it.notaCocina && (
-                            <div className="mt-0.5 text-[12.5px] font-medium italic text-[#D4A017]">“{it.notaCocina}”</div>
+                            <div className="mt-1 text-[16px] font-semibold italic text-[#E0B33A]">“{it.notaCocina}”</div>
                           )}
                         </div>
                       </div>
                     ))}
                   </div>
 
-                  {/* Botón avanzar */}
+                  {/* Un toque: LISTO cierra la comanda (queda ENTREGADO y sale del panel) */}
                   <div className="p-2.5">
                     <button
                       type="button"
                       disabled={enProceso}
                       onClick={() => avanzar(c)}
-                      className={[
-                        "font-display flex h-12 w-full items-center justify-center gap-2 rounded text-[17px] font-extrabold tracking-wide text-white transition active:scale-[0.97] disabled:opacity-60",
-                        esListo ? "bg-[#2C5AA0] hover:bg-[#244e8c]" : "bg-[#2E7D52] hover:bg-[#267045]",
-                      ].join(" ")}
+                      className="font-display flex h-14 w-full items-center justify-center gap-2 rounded bg-[#2E7D52] text-[20px] font-extrabold tracking-wide text-white transition hover:bg-[#267045] active:scale-[0.97] disabled:opacity-60"
                     >
-                      {enProceso ? "…" : esListo ? "ENTREGAR" : "LISTO"}
+                      {enProceso ? "…" : "LISTO"}
                     </button>
                   </div>
                 </div>
