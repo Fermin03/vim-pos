@@ -12,6 +12,12 @@ type Reporte = {
 
 const REPORTES: Reporte[] = [
   {
+    href: "/reportes/consolidado",
+    titulo: "Consolidado por sucursal",
+    descripcion: "Comparativo central de la cadena: venta, tickets y participación por sucursal.",
+    ref: "Enterprise",
+  },
+  {
     href: "/reportes/z-historico",
     titulo: "Reporte Z histórico",
     descripcion: "Cierres de turno: ventas, propinas, tickets, diferencias de efectivo.",
