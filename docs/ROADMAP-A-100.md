@@ -26,10 +26,10 @@ El plano de control de VIM. Corre con `service_role` fuera de RLS, gated por `PL
 - ⬜ **B5 — Enterprise · Multi-sucursal consolidado:** dashboards corporativos, reportes consolidados.
 
 ## C. Cierre de huecos de UI del piloto (de la revisión pre-deploy)
-- ⬜ **C1 — Recuperar/activar credenciales** (P-003..006, 014): reset password admin + activación.
+- ✅ **C1 — Recuperar/activar credenciales:** invitación por correo (SMTP Hostinger) + página /establecer-acceso + cambiar contraseña en Configuración→Seguridad. Validado E2E en prod.
 - ⬜ **C2 — Cambio de PIN del cajero** (P-007).
 - ✅ **C3 — Config de impresión + Epson activable:** `obtenerImpresora()` ya no está hardcodeada a Preview — lee config por-dispositivo (localStorage); modal en el POS para elegir Preview o Epson de red (IP + ancho) con prueba de conexión. Falta validar con hardware real.
-- ⬜ **C4 — Recibo de devolución impreso** (P-228).
+- ✅ **C4 — Recibo de devolución (P-228):** comprobante de reembolso tras devolver (ReciboDevolucion + construirDevolucionJob para Epson); overlay con Imprimir/Cerrar. Golden test.
 - ⬜ **C5 — Pantallas de error/mantenimiento** (P-216..219) + conflictos de sync (P-215).
 
 ## D. Infra de go-live (manual / externo — fuera de código)

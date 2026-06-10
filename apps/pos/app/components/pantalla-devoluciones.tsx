@@ -16,6 +16,10 @@ import {
 } from "../lib/devoluciones";
 import { autorizacionPropia, type Autorizacion } from "../lib/autorizacion";
 import { ModalAutorizacionPin } from "./modal-autorizacion-pin";
+import { leerTicketParaImpresion } from "../lib/print/ticket-datos";
+import { obtenerImpresora } from "../lib/print/adapter";
+import { construirDevolucionJob, type DatosDevolucion } from "../lib/print/devolucion-builder";
+import { OverlayReciboDevolucion } from "./recibo-devolucion";
 
 const ROLES_DEVOLUCION = ["SUPERVISOR", "ADMIN", "DUENO"];
 
@@ -35,6 +39,7 @@ export function PantallaDevoluciones({
   const [ventas, setVentas] = useState<VentaTurno[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [sel, setSel] = useState<VentaTurno | null>(null);
+  const [reciboDev, setReciboDev] = useState<DatosDevolucion | null>(null);
   const montado = useRef(true);
 
   const recargar = useCallback(async () => {
@@ -114,11 +119,20 @@ export function PantallaDevoluciones({
           turno={turno}
           empleado={empleado}
           venta={sel}
-          onHecho={() => {
+          onHecho={(d) => {
             setSel(null);
+            if (d) setReciboDev(d);
             recargar();
           }}
           onCerrar={() => setSel(null)}
+        />
+      )}
+
+      {reciboDev && (
+        <OverlayReciboDevolucion
+          d={reciboDev}
+          onImprimir={() => { obtenerImpresora({ onMostrar: () => {} }).imprimir(construirDevolucionJob(reciboDev)); }}
+          onCerrar={() => setReciboDev(null)}
         />
       )}
     </div>
@@ -139,7 +153,7 @@ function ModalDevolucion({
   turno: Turno;
   empleado: Empleado;
   venta: VentaTurno;
-  onHecho: () => void;
+  onHecho: (d?: DatosDevolucion) => void;
   onCerrar: () => void;
 }) {
   const [items, setItems] = useState<ItemVenta[] | null>(null);
@@ -178,7 +192,26 @@ function ModalDevolucion({
         solicitanteId: empleado.id,
         autorizoId: a.autorizoId,
       });
-      onHecho();
+      // Comprobante de devolución (best-effort: si falla armarlo, la devolución ya quedó).
+      let dDev: DatosDevolucion | undefined;
+      try {
+        const datos = await leerTicketParaImpresion(venta.ticketId, { token, cajeroNombre: empleado.nombre, cajaNombre: caja.nombre });
+        dDev = {
+          negocio: { nombre: datos.negocio.nombre, rfc: datos.negocio.rfc },
+          sucursal: { direccion: datos.sucursal.direccion, telefono: datos.sucursal.telefono },
+          folioOriginal: datos.meta.folio,
+          fechaIso: new Date().toISOString(),
+          cajero: empleado.nombre,
+          caja: caja.nombre,
+          autorizo: null,
+          items: datos.lineas.map((l) => ({ cantidad: l.cantidad, nombre: l.nombre, totalMxn: l.totalMxn })),
+          motivo: labelMotivo(),
+          medio: MEDIOS_DEV.find((m) => m.codigo === medio)?.label ?? medio,
+          totalReembolso: venta.total,
+          ancho: 80,
+        };
+      } catch { /* recibo opcional */ }
+      onHecho(dDev);
     } catch (e) {
       setError(e instanceof Error ? e.message : "No se pudo devolver");
       setProcesando(false);
