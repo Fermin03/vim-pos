@@ -96,3 +96,14 @@ export async function avanzarCocina(token: string, ticketId: string, nuevoEstado
     .eq("id", ticketId);
   if (error) throw new Error(error.message);
 }
+
+/**
+ * Un solo toque "LISTO" cierra la comanda: queda ENTREGADO y sale del panel.
+ * El validador exige pasos (EN_COCINA→LISTO→ENTREGADO), así que encadena los updates.
+ */
+export async function cerrarComanda(token: string, ticketId: string, estadoActual: EstadoCocina): Promise<void> {
+  if (estadoActual === "EN_COCINA") {
+    await avanzarCocina(token, ticketId, "LISTO");
+  }
+  await avanzarCocina(token, ticketId, "ENTREGADO");
+}
