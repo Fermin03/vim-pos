@@ -27,6 +27,7 @@ import { ModalCobro } from "./modal-cobro";
 import { ModalDescuento } from "./modal-descuento";
 import { obtenerImpresora } from "../lib/print/adapter";
 import { ModalConfigImpresora } from "./modal-config-impresora";
+import { ModalClienteDomicilio } from "./modal-cliente-domicilio";
 import { leerTicketParaImpresion } from "../lib/print/ticket-datos";
 import { construirTicketJob } from "../lib/print/ticket-builder";
 import { construirComandaJob, type DatosComanda } from "../lib/print/comanda-builder";
@@ -224,6 +225,7 @@ export function HomePos({
   // incrementalmente. Sólo se activa al abrir/retomar una mesa; QS no cambia.
   const [enModoMesa, setEnModoMesa] = useState(false);
   const [configImpresoraAbierto, setConfigImpresoraAbierto] = useState(false);
+  const [clienteDomAbierto, setClienteDomAbierto] = useState(false);
   const [descuentoAbierto, setDescuentoAbierto] = useState(false);
   // F6.1 — items persistidos del ticketBd (para mapear clientId ↔ ticket_item_id real al cancelar).
   const [itemsPersistidos, setItemsPersistidos] = useState<ItemTicket[]>([]);
@@ -373,6 +375,7 @@ export function HomePos({
           carrito.modoServicio,
           carrito.lineas,
           nuevoClientId(),
+          carrito.clienteDomicilio?.clienteId ?? null,
         );
         setTicketBd(bd);
       }
@@ -511,6 +514,15 @@ export function HomePos({
       )}
       <TopbarOperativa caja={caja} turno={turno} empleado={empleado} onCambiarCajero={onCambiarCajero} onBloquear={onBloquear} onCerrarTurno={() => setCerrando(true)} onMovimientoCaja={() => setMovimientoAbierto(true)} onKds={() => { salirNavegacion(); setEnKds(true); }} onMesas={() => { salirNavegacion(); setEnMesas(true); }} onDelivery={() => { salirNavegacion(); setEnDelivery(true); }} onDevoluciones={() => { salirNavegacion(); setEnDevoluciones(true); }} onImpresora={() => setConfigImpresoraAbierto(true)} />
       {configImpresoraAbierto && <ModalConfigImpresora onCerrar={() => setConfigImpresoraAbierto(false)} />}
+      {clienteDomAbierto && (
+        <ModalClienteDomicilio
+          token={token}
+          tenantId={caja.tenant_id}
+          sucursalId={caja.sucursal_id}
+          onSeleccionar={(c) => { dispatch({ tipo: "cliente", cliente: c }); setClienteDomAbierto(false); }}
+          onCerrar={() => setClienteDomAbierto(false)}
+        />
+      )}
 
       <div className="flex min-h-0 flex-1">
         {/* Sidebar categorías */}
@@ -599,7 +611,8 @@ export function HomePos({
           onDescuentoItem={ticketBd ? onDescuentoItemSolicitado : undefined}
           onLimpiar={!ticketBd ? () => dispatch({ tipo: "limpiar" }) : undefined}
           onCancelarTicket={ticketBd ? () => setCancelandoTicket(true) : undefined}
-          onModo={(m: ModoServicio) => dispatch({ tipo: "modo", modo: m })}
+          onModo={(m: ModoServicio) => { dispatch({ tipo: "modo", modo: m }); if (m === "DELIVERY_PROPIO") setClienteDomAbierto(true); }}
+          onEditarCliente={() => setClienteDomAbierto(true)}
           onCobrar={iniciarCobro}
           onAplicarDescuento={onAplicarDescuento}
           descuentoMxn={ticketBd?.descuentos ?? 0}

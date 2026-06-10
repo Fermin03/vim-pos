@@ -46,6 +46,7 @@ export async function persistirTicket(
   modoServicio: ModoServicio,
   lineas: LineaCarrito[],
   ticketClientId: string,
+  clienteId?: string | null,
 ): Promise<TotalesTicket> {
   const sb = employeeClient(ctx.token);
 
@@ -54,6 +55,7 @@ export async function persistirTicket(
     p_caja_id: ctx.cajaId,
     p_turno_id: ctx.turnoId,
     p_modo_servicio: modoServicio,
+    p_cliente_id: clienteId ?? null,
     p_client_id_local: ticketClientId,
   });
   if (e1) throw new Error(e1.message);

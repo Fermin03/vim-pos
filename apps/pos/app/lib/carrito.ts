@@ -1,6 +1,7 @@
 "use client";
 import type { Producto } from "./catalogo";
 import type { GrupoModificadores, OpcionModificador } from "./modificadores";
+import type { ClienteDomicilio } from "./clientes-domicilio";
 
 export type ModoServicio = "COMER_AQUI" | "PARA_LLEVAR" | "DRIVE_THRU" | "DELIVERY_PROPIO";
 
@@ -23,15 +24,17 @@ export type LineaCarrito = {
 export type EstadoCarrito = {
   modoServicio: ModoServicio;
   lineas: LineaCarrito[];
+  clienteDomicilio?: ClienteDomicilio | null;
 };
 
-export const estadoInicial: EstadoCarrito = { modoServicio: "COMER_AQUI", lineas: [] };
+export const estadoInicial: EstadoCarrito = { modoServicio: "COMER_AQUI", lineas: [], clienteDomicilio: null };
 
 export type AccionCarrito =
   | { tipo: "agregar"; linea: LineaCarrito }
   | { tipo: "cantidad"; clientId: string; cantidad: number }
   | { tipo: "quitar"; clientId: string }
   | { tipo: "modo"; modo: ModoServicio }
+  | { tipo: "cliente"; cliente: ClienteDomicilio | null }
   | { tipo: "cargar"; estado: EstadoCarrito }
   | { tipo: "limpiar" };
 
@@ -52,9 +55,12 @@ export function reducerCarrito(estado: EstadoCarrito, accion: AccionCarrito): Es
     case "quitar":
       return { ...estado, lineas: estado.lineas.filter((l) => l.clientId !== accion.clientId) };
     case "modo":
-      return { ...estado, modoServicio: accion.modo };
+      // Al salir de Domicilio se limpia el cliente asociado.
+      return { ...estado, modoServicio: accion.modo, clienteDomicilio: accion.modo === "DELIVERY_PROPIO" ? estado.clienteDomicilio ?? null : null };
+    case "cliente":
+      return { ...estado, clienteDomicilio: accion.cliente };
     case "limpiar":
-      return { modoServicio: estado.modoServicio, lineas: [] };
+      return { modoServicio: estado.modoServicio, lineas: [], clienteDomicilio: estado.clienteDomicilio ?? null };
     default:
       return estado;
   }
