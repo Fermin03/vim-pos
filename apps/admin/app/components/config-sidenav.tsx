@@ -17,6 +17,7 @@ const SECCIONES = [
   ]},
   { titulo: "Cuenta", items: [
     { label: "Seguridad", href: "/configuracion/seguridad" },
+    { label: "Sincronización", href: "/configuracion/sincronizacion" },
   ]},
 ];
 
