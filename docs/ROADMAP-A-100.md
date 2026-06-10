@@ -19,7 +19,7 @@ El plano de control de VIM. Corre con `service_role` fuera de RLS, gated por `PL
 - ⏸️ **A8 — Login real de super-admin:** DIFERIDO (post-verticales, roadmap) — la clave compartida sirve para 1 operador VIM; sustituir por cuentas individuales cuando crezca el equipo.
 
 ## B. Verticales — completar la pieza insignia de cada una
-- ⬜ **B1 — Full Service · App de mesero** (P-120..127): toma de orden handheld, enviar a cocina, asignar mesa/mesero. (El núcleo de mesas ya existe.)
+- 🟡 **B1 — Full Service · App de mesero** (P-120..127): ✅ **pieza insignia lista** — enviar la mesa a cocina ANTES de cobrar (estado_cocina→EN_COCINA, aparece en KDS; P-124) + atribución de mesero al ticket (alimenta vw_ventas_por_mesero) + "Mis propinas" del turno (P-127). Sin migración (RLS permite los updates; smoke_mesero). Sobre el flujo de mesas existente. **Pendiente:** la app de mesero handheld dedicada (ruta /mesero móvil con las 8 pantallas P-120..127, login propio) = pulido posterior.
 - ⬜ **B2 — Dark Kitchen · Conciliación de apps** (P-204..211): cuadrar depósitos de Rappi/Uber/DiDi vs ventas; matching de pedidos. (Marcas + delivery ya existen.)
 - ⬜ **B3 — Foodtruck · Eventos** (modo EVENTO_PRIVADO): gestión de evento por turno/ubicación.
 - ⬜ **B4 — Café/Bar · Cuentas prolongadas + alertas** (tabs largos con avisos de tiempo). (Happy hour ya existe vía promociones.)
