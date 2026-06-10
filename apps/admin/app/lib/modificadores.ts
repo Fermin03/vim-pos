@@ -245,3 +245,77 @@ export function precioExtra(n: number): string {
   const s = n.toLocaleString("es-MX", { style: "currency", currency: "MXN" });
   return n > 0 ? `+${s}` : s;
 }
+
+// ── Asignación de grupos a productos (productos_grupos_modificadores) ─────────
+
+/** IDs de grupos asignados a un producto. */
+export async function gruposDeProducto(productoId: string): Promise<string[]> {
+  const { data, error } = await supabase
+    .from("productos_grupos_modificadores")
+    .select("grupo_id")
+    .eq("producto_id", productoId);
+  if (error) throw new Error(error.message);
+  return (data ?? []).map((r) => String((r as { grupo_id: string }).grupo_id));
+}
+
+/** Sincroniza los grupos de UN producto: deja exactamente los grupoIds dados. */
+export async function asignarGruposAProducto(productoId: string, grupoIds: string[]): Promise<void> {
+  const tid = await tenantId();
+  const actuales = await gruposDeProducto(productoId);
+  const quitar = actuales.filter((g) => !grupoIds.includes(g));
+  const poner = grupoIds.filter((g) => !actuales.includes(g));
+  if (quitar.length > 0) {
+    const { error } = await supabase
+      .from("productos_grupos_modificadores")
+      .delete()
+      .eq("producto_id", productoId)
+      .in("grupo_id", quitar);
+    if (error) throw new Error(error.message);
+  }
+  if (poner.length > 0) {
+    const { error } = await supabase.from("productos_grupos_modificadores").insert(
+      poner.map((g, i) => ({ tenant_id: tid, producto_id: productoId, grupo_id: g, orden_visualizacion: actuales.length + i + 1 })),
+    );
+    if (error) throw new Error(error.message);
+  }
+}
+
+/** Asignación EN MASA: agrega el grupo a muchos productos (ignora los que ya lo tienen). Devuelve cuántos se agregaron. */
+export async function asignarGrupoEnMasa(grupoId: string, productoIds: string[]): Promise<number> {
+  if (productoIds.length === 0) return 0;
+  const tid = await tenantId();
+  const { data: ya } = await supabase
+    .from("productos_grupos_modificadores")
+    .select("producto_id")
+    .eq("grupo_id", grupoId)
+    .in("producto_id", productoIds);
+  const existentes = new Set((ya ?? []).map((r) => String((r as { producto_id: string }).producto_id)));
+  const nuevos = productoIds.filter((p) => !existentes.has(p));
+  if (nuevos.length === 0) return 0;
+  const { error } = await supabase.from("productos_grupos_modificadores").insert(
+    nuevos.map((p) => ({ tenant_id: tid, producto_id: p, grupo_id: grupoId, orden_visualizacion: 1 })),
+  );
+  if (error) throw new Error(error.message);
+  return nuevos.length;
+}
+
+/** Quita el grupo de muchos productos a la vez. */
+export async function quitarGrupoEnMasa(grupoId: string, productoIds: string[]): Promise<void> {
+  if (productoIds.length === 0) return;
+  const { error } = await supabase
+    .from("productos_grupos_modificadores")
+    .delete()
+    .eq("grupo_id", grupoId)
+    .in("producto_id", productoIds);
+  if (error) throw new Error(error.message);
+}
+
+/** Productos que ya tienen el grupo (para pintar la selección en la asignación masiva). */
+export async function productosConGrupo(grupoId: string): Promise<string[]> {
+  const { data, error } = await supabase
+    .from("productos_grupos_modificadores")
+    .select("producto_id")
+    .eq("grupo_id", grupoId);
+  if (error) throw new Error(error.message);
+  return (data ?? []).map((r) => String((r as { producto_id: string }).producto_id));
+}
