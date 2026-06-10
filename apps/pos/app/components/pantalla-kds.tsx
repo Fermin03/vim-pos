@@ -278,6 +278,13 @@ export function PantallaKds({
                     </span>
                   </div>
 
+                  {/* Nota de TODA la orden — banda destacada */}
+                  {c.notaOrden && (
+                    <div className="mx-4 mt-2 rounded border-l-4 border-[#E0B33A] bg-[#332A12] px-3 py-2 text-[17px] font-bold leading-snug text-[#F2CB5C]">
+                      {c.notaOrden}
+                    </div>
+                  )}
+
                   {/* Ítems — tipografía para leer a ~80 cm */}
                   <div className="min-h-0 overflow-y-auto px-4 py-2.5">
                     {c.items.map((it) => (

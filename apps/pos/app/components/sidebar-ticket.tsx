@@ -1,4 +1,5 @@
 "use client";
+import { useState } from "react";
 import type { EstadoCarrito, LineaCarrito, ModoServicio } from "../lib/carrito";
 import { calcularTotalesDisplay, totalLinea } from "../lib/carrito";
 import { fmtMxn } from "../lib/turno";
@@ -74,6 +75,8 @@ export function SidebarTicket({
   onCancelarTicket,
   onModo,
   onEditarCliente,
+  onNotaLinea,
+  onNotaOrden,
   onCobrar,
   onEnviarCocina,
   cocinaEnviada = false,
@@ -98,6 +101,10 @@ export function SidebarTicket({
   onModo: (m: ModoServicio) => void;
   /** Abre el modal de cliente para domicilio (solo aplica en modo Domicilio). */
   onEditarCliente?: () => void;
+  /** Edita la nota de cocina de una línea (carrito local, pre-cobro). */
+  onNotaLinea?: (clientId: string, nota: string | null) => void;
+  /** Edita la nota de cocina de TODA la orden. */
+  onNotaOrden?: (nota: string | null) => void;
   onCobrar: () => void;
   /** B1 Full Service — enviar la mesa a cocina antes de cobrar (solo en cuenta de mesa). */
   onEnviarCocina?: () => void;
@@ -115,6 +122,9 @@ export function SidebarTicket({
   const totales = calcularTotalesDisplay(estado.lineas);
   const vacio = estado.lineas.length === 0;
   const totalProductos = estado.lineas.reduce((s, l) => s + l.cantidad, 0);
+  // Notas de cocina: qué línea se está editando + si el input de nota de orden está abierto.
+  const [editandoNota, setEditandoNota] = useState<string | null>(null);
+  const [notaOrdenAbierta, setNotaOrdenAbierta] = useState(false);
   const hayDescuento = descuentoMxn > 0;
   const totalFinal = totalConDescuento ?? totales.total;
 
@@ -177,9 +187,37 @@ export function SidebarTicket({
               )}
             </button>
           )}
-          <div className="mt-1.5 text-right text-[12.5px] font-semibold text-ink-3">
-            {totalProductos} {totalProductos === 1 ? "producto" : "productos"}
+          <div className="mt-1.5 flex items-center justify-between">
+            {onNotaOrden && !bloqueado ? (
+              <button
+                type="button"
+                onClick={() => setNotaOrdenAbierta((v) => !v)}
+                className={["rounded px-1.5 py-0.5 text-[12.5px] font-semibold transition hover:bg-hover", estado.notaOrden ? "text-[#9A6B12]" : "text-ink-3 hover:text-ink"].join(" ")}
+              >
+                {estado.notaOrden ? "✎ Nota de la orden" : "+ Nota de la orden"}
+              </button>
+            ) : <span />}
+            <span className="text-[12.5px] font-semibold text-ink-3">
+              {totalProductos} {totalProductos === 1 ? "producto" : "productos"}
+            </span>
           </div>
+          {/* Nota de cocina de TODA la orden (va a tickets.nota_general → KDS y comanda) */}
+          {notaOrdenAbierta && !bloqueado && (
+            <input
+              autoFocus
+              defaultValue={estado.notaOrden ?? ""}
+              maxLength={300}
+              placeholder="Nota para cocina de toda la orden…"
+              className="mt-1.5 h-10 w-full rounded border border-line-strong px-3 text-[13px] outline-none focus:border-ink"
+              onBlur={(e) => { onNotaOrden?.(e.target.value.trim() || null); setNotaOrdenAbierta(false); }}
+              onKeyDown={(e) => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }}
+            />
+          )}
+          {estado.notaOrden && !notaOrdenAbierta && (
+            <div className="mt-1.5 rounded border-l-2 border-[#D4A017] bg-[#FBF6E8] px-2.5 py-1.5 text-[12.5px] font-medium italic text-[#7A5A10]">
+              “{estado.notaOrden}”
+            </div>
+          )}
         </div>
       </div>
 
@@ -266,6 +304,15 @@ export function SidebarTicket({
                       %
                     </button>
                   )}
+                  {!bloqueado && onNotaLinea && (
+                    <button
+                      type="button"
+                      onClick={() => setEditandoNota(editandoNota === l.clientId ? null : l.clientId)}
+                      className={["rounded px-2 py-[5px] text-[13px] font-semibold transition-all hover:bg-hover", l.notaCocina ? "text-[#9A6B12]" : "text-ink-3 hover:text-ink"].join(" ")}
+                    >
+                      Nota
+                    </button>
+                  )}
                   <button
                     type="button"
                     disabled={bloqueado && !onCancelarItemPersistido}
@@ -275,6 +322,20 @@ export function SidebarTicket({
                     Quitar
                   </button>
                 </div>
+                {/* Input inline de nota del ítem */}
+                {editandoNota === l.clientId && !bloqueado && (
+                  <div className="mt-2 pl-10">
+                    <input
+                      autoFocus
+                      defaultValue={l.notaCocina ?? ""}
+                      maxLength={200}
+                      placeholder="Nota para cocina de este producto…"
+                      className="h-10 w-full rounded border border-line-strong px-3 text-[13px] outline-none focus:border-ink"
+                      onBlur={(e) => { onNotaLinea?.(l.clientId, e.target.value.trim() || null); setEditandoNota(null); }}
+                      onKeyDown={(e) => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }}
+                    />
+                  </div>
+                )}
               </li>
             ))}
           </ul>

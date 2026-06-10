@@ -423,6 +423,7 @@ export function HomePos({
           nuevoClientId(),
           carrito.clienteDomicilio?.clienteId ?? null,
           carrito.clienteDomicilio?.direccionId ?? null,
+          carrito.notaOrden ?? null,
         );
         setTicketBd(bd);
       }
@@ -666,6 +667,8 @@ export function HomePos({
           onCancelarTicket={ticketBd ? () => setCancelandoTicket(true) : undefined}
           onModo={(m: ModoServicio) => { dispatch({ tipo: "modo", modo: m }); if (m === "DELIVERY_PROPIO") setClienteDomAbierto(true); }}
           onEditarCliente={() => setClienteDomAbierto(true)}
+          onNotaLinea={(id, nota) => dispatch({ tipo: "nota_linea", clientId: id, nota })}
+          onNotaOrden={(nota) => dispatch({ tipo: "nota_orden", nota })}
           onCobrar={iniciarCobro}
           onEnviarCocina={enModoMesa && ticketBd ? onEnviarCocina : undefined}
           cocinaEnviada={cocinaEnviada}

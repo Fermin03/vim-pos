@@ -25,9 +25,11 @@ export type EstadoCarrito = {
   modoServicio: ModoServicio;
   lineas: LineaCarrito[];
   clienteDomicilio?: ClienteDomicilio | null;
+  /** Nota de cocina de TODA la orden (va a tickets.nota_general). */
+  notaOrden?: string | null;
 };
 
-export const estadoInicial: EstadoCarrito = { modoServicio: "COMER_AQUI", lineas: [], clienteDomicilio: null };
+export const estadoInicial: EstadoCarrito = { modoServicio: "COMER_AQUI", lineas: [], clienteDomicilio: null, notaOrden: null };
 
 export type AccionCarrito =
   | { tipo: "agregar"; linea: LineaCarrito }
@@ -35,6 +37,8 @@ export type AccionCarrito =
   | { tipo: "quitar"; clientId: string }
   | { tipo: "modo"; modo: ModoServicio }
   | { tipo: "cliente"; cliente: ClienteDomicilio | null }
+  | { tipo: "nota_linea"; clientId: string; nota: string | null }
+  | { tipo: "nota_orden"; nota: string | null }
   | { tipo: "cargar"; estado: EstadoCarrito }
   | { tipo: "limpiar" };
 
@@ -59,8 +63,16 @@ export function reducerCarrito(estado: EstadoCarrito, accion: AccionCarrito): Es
       return { ...estado, modoServicio: accion.modo, clienteDomicilio: accion.modo === "DELIVERY_PROPIO" ? estado.clienteDomicilio ?? null : null };
     case "cliente":
       return { ...estado, clienteDomicilio: accion.cliente };
+    case "nota_linea":
+      return {
+        ...estado,
+        lineas: estado.lineas.map((l) => (l.clientId === accion.clientId ? { ...l, notaCocina: accion.nota } : l)),
+      };
+    case "nota_orden":
+      return { ...estado, notaOrden: accion.nota };
     case "limpiar":
-      return { modoServicio: estado.modoServicio, lineas: [], clienteDomicilio: estado.clienteDomicilio ?? null };
+      // La nota de orden es de ESTE pedido: se limpia con él.
+      return { modoServicio: estado.modoServicio, lineas: [], clienteDomicilio: estado.clienteDomicilio ?? null, notaOrden: null };
     default:
       return estado;
   }
