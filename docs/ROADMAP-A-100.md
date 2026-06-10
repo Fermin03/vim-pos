@@ -27,10 +27,10 @@ El plano de control de VIM. Corre con `service_role` fuera de RLS, gated por `PL
 
 ## C. Cierre de huecos de UI del piloto (de la revisión pre-deploy)
 - ✅ **C1 — Recuperar/activar credenciales:** invitación por correo (SMTP Hostinger) + página /establecer-acceso + cambiar contraseña en Configuración→Seguridad. Validado E2E en prod.
-- ⬜ **C2 — Cambio de PIN del cajero** (P-007).
+- ✅ **C2 — Cambio de PIN del cajero** (P-007): RPC `cambiar_pin_propio` (verifica PIN actual vía crypt, identifica por auth.uid()) + botón de llave en el topbar del POS → modal-cambiar-pin. Smoke + desplegado a cloud (migración 0047).
 - ✅ **C3 — Config de impresión + Epson activable:** `obtenerImpresora()` ya no está hardcodeada a Preview — lee config por-dispositivo (localStorage); modal en el POS para elegir Preview o Epson de red (IP + ancho) con prueba de conexión. Falta validar con hardware real.
 - ✅ **C4 — Recibo de devolución (P-228):** comprobante de reembolso tras devolver (ReciboDevolucion + construirDevolucionJob para Epson); overlay con Imprimir/Cerrar. Golden test.
-- ⬜ **C5 — Pantallas de error/mantenimiento** (P-216..219) + conflictos de sync (P-215).
+- 🟡 **C5 — Pantallas de error/mantenimiento** (P-216..219): ✅ POS (not-found 404, error boundary 500 con referencia, global-error, /mantenimiento) + admin (404/500) vía componente PantallaEstado fiel a mockups. Pendiente: **P-215 resolución de conflictos de sync** (feature mayor: detección offline vs servidor, no solo pantalla).
 
 ## D. Infra de go-live (manual / externo — fuera de código)
 Supabase cloud Pro + deploy + secretos + DNS/TLS + PAC/CSD (si factura) + Epson + tablets +
