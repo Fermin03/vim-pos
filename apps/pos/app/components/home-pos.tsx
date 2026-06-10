@@ -28,6 +28,7 @@ import { ModalDescuento } from "./modal-descuento";
 import { obtenerImpresora } from "../lib/print/adapter";
 import { ModalConfigImpresora } from "./modal-config-impresora";
 import { ModalClienteDomicilio } from "./modal-cliente-domicilio";
+import { ModalCambiarPin } from "./modal-cambiar-pin";
 import { leerTicketParaImpresion } from "../lib/print/ticket-datos";
 import { construirTicketJob } from "../lib/print/ticket-builder";
 import { construirComandaJob, type DatosComanda } from "../lib/print/comanda-builder";
@@ -62,6 +63,7 @@ function TopbarOperativa({
   onDelivery,
   onDevoluciones,
   onImpresora,
+  onCambiarPin,
 }: {
   caja: DatosCaja;
   turno: Turno;
@@ -75,6 +77,7 @@ function TopbarOperativa({
   onDelivery: () => void;
   onDevoluciones: () => void;
   onImpresora: () => void;
+  onCambiarPin: () => void;
 }) {
   const ahora = useReloj();
   return (
@@ -122,6 +125,14 @@ function TopbarOperativa({
             className="flex h-9 w-9 items-center justify-center rounded border border-line-strong text-ink-3 transition hover:border-ink hover:text-ink"
           >
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4"><path d="M16 3.13a4 4 0 0 1 0 7.75" /><path d="M21 21v-2a4 4 0 0 0-3-3.87" /><circle cx="9" cy="7" r="4" /><path d="M3 21v-2a4 4 0 0 1 4-4h4a4 4 0 0 1 4 4v2" /></svg>
+          </button>
+          <button
+            type="button"
+            onClick={onCambiarPin}
+            aria-label="Cambiar mi PIN"
+            className="flex h-9 w-9 items-center justify-center rounded border border-line-strong text-ink-3 transition hover:border-ink hover:text-ink"
+          >
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4"><circle cx="7.5" cy="15.5" r="4.5" /><path d="m10.5 12.5 8-8" /><path d="m16 7 2 2" /><path d="m19 4 2 2" /></svg>
           </button>
           <button
             type="button"
@@ -226,6 +237,7 @@ export function HomePos({
   const [enModoMesa, setEnModoMesa] = useState(false);
   const [configImpresoraAbierto, setConfigImpresoraAbierto] = useState(false);
   const [clienteDomAbierto, setClienteDomAbierto] = useState(false);
+  const [cambiarPinAbierto, setCambiarPinAbierto] = useState(false);
   const [descuentoAbierto, setDescuentoAbierto] = useState(false);
   // F6.1 — items persistidos del ticketBd (para mapear clientId ↔ ticket_item_id real al cancelar).
   const [itemsPersistidos, setItemsPersistidos] = useState<ItemTicket[]>([]);
@@ -512,7 +524,7 @@ export function HomePos({
           Sin conexión — verifica la red. No podrás cobrar ni guardar hasta reconectar.
         </div>
       )}
-      <TopbarOperativa caja={caja} turno={turno} empleado={empleado} onCambiarCajero={onCambiarCajero} onBloquear={onBloquear} onCerrarTurno={() => setCerrando(true)} onMovimientoCaja={() => setMovimientoAbierto(true)} onKds={() => { salirNavegacion(); setEnKds(true); }} onMesas={() => { salirNavegacion(); setEnMesas(true); }} onDelivery={() => { salirNavegacion(); setEnDelivery(true); }} onDevoluciones={() => { salirNavegacion(); setEnDevoluciones(true); }} onImpresora={() => setConfigImpresoraAbierto(true)} />
+      <TopbarOperativa caja={caja} turno={turno} empleado={empleado} onCambiarCajero={onCambiarCajero} onBloquear={onBloquear} onCerrarTurno={() => setCerrando(true)} onMovimientoCaja={() => setMovimientoAbierto(true)} onKds={() => { salirNavegacion(); setEnKds(true); }} onMesas={() => { salirNavegacion(); setEnMesas(true); }} onDelivery={() => { salirNavegacion(); setEnDelivery(true); }} onDevoluciones={() => { salirNavegacion(); setEnDevoluciones(true); }} onImpresora={() => setConfigImpresoraAbierto(true)} onCambiarPin={() => setCambiarPinAbierto(true)} />
       {configImpresoraAbierto && <ModalConfigImpresora onCerrar={() => setConfigImpresoraAbierto(false)} />}
       {clienteDomAbierto && (
         <ModalClienteDomicilio
@@ -522,6 +534,9 @@ export function HomePos({
           onSeleccionar={(c) => { dispatch({ tipo: "cliente", cliente: c }); setClienteDomAbierto(false); }}
           onCerrar={() => setClienteDomAbierto(false)}
         />
+      )}
+      {cambiarPinAbierto && (
+        <ModalCambiarPin token={token} onListo={() => setCambiarPinAbierto(false)} onCerrar={() => setCambiarPinAbierto(false)} />
       )}
 
       <div className="flex min-h-0 flex-1">

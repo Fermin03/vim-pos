@@ -122,6 +122,12 @@ export function employeeClient(token: string): SupabaseClient {
   });
 }
 
+/** C2 — el propio cajero cambia su PIN (verifica el actual). Errores: PIN_ACTUAL_INCORRECTO, PIN_INVALIDO, PIN_IGUAL. */
+export async function cambiarPinPropio(token: string, pinActual: string, pinNuevo: string): Promise<void> {
+  const { error } = await employeeClient(token).rpc("cambiar_pin_propio", { p_pin_actual: pinActual, p_pin_nuevo: pinNuevo });
+  if (error) throw new Error(error.message);
+}
+
 /** Segundos restantes de vida del token de empleado (exp del JWT − ahora). */
 export function segundosParaExpirar(token: string): number {
   try {
