@@ -81,8 +81,9 @@ export function VincularDispositivo({ onVinculado }: { onVinculado: () => void }
       </form>
 
       <p className="max-w-sm text-center text-xs text-ink-3">
-        DEV: prellenado con la caja del fixture. En producción estas credenciales se
-        provisionan en el alta de la sucursal (doc 10).
+        {CREDS_DEV_FIXTURE
+          ? "DEV: prellenado con la caja del fixture."
+          : "¿No tienes estas credenciales? Genéralas en tu panel de administración, en Configuración → Cajas → botón del dispositivo."}
       </p>
     </main>
   );
