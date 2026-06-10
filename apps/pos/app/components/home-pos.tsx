@@ -29,6 +29,7 @@ import { obtenerImpresora } from "../lib/print/adapter";
 import { ModalConfigImpresora } from "./modal-config-impresora";
 import { ModalClienteDomicilio } from "./modal-cliente-domicilio";
 import { ModalCambiarPin } from "./modal-cambiar-pin";
+import { ModalMisPropinas } from "./modal-mis-propinas";
 import { leerTicketParaImpresion } from "../lib/print/ticket-datos";
 import { construirTicketJob } from "../lib/print/ticket-builder";
 import { construirComandaJob, type DatosComanda } from "../lib/print/comanda-builder";
@@ -44,6 +45,7 @@ import { ModalCancelarTicket } from "./modal-cancelar-ticket";
 import { ModalMovimientoCaja } from "./modal-movimiento-caja";
 import { leerItemsPersistidos, type ItemTicket } from "../lib/cancelacion";
 import { abrirCuentaEnMesa, agregarItemAlTicket, reconstruirCarrito } from "../lib/cuenta-mesa";
+import { atribuirMesero, enviarACocina, leerEstadoCocina } from "../lib/mesero";
 import { useConexion } from "../lib/conexion";
 import type { DatosTicketImpresion } from "../lib/print/tipos";
 
@@ -64,6 +66,7 @@ function TopbarOperativa({
   onDevoluciones,
   onImpresora,
   onCambiarPin,
+  onMisPropinas,
 }: {
   caja: DatosCaja;
   turno: Turno;
@@ -78,6 +81,7 @@ function TopbarOperativa({
   onDevoluciones: () => void;
   onImpresora: () => void;
   onCambiarPin: () => void;
+  onMisPropinas: () => void;
 }) {
   const ahora = useReloj();
   return (
@@ -133,6 +137,14 @@ function TopbarOperativa({
             className="flex h-9 w-9 items-center justify-center rounded border border-line-strong text-ink-3 transition hover:border-ink hover:text-ink"
           >
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4"><circle cx="7.5" cy="15.5" r="4.5" /><path d="m10.5 12.5 8-8" /><path d="m16 7 2 2" /><path d="m19 4 2 2" /></svg>
+          </button>
+          <button
+            type="button"
+            onClick={onMisPropinas}
+            aria-label="Mis propinas"
+            className="flex h-9 w-9 items-center justify-center rounded border border-line-strong text-ink-3 transition hover:border-ink hover:text-ink"
+          >
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4"><circle cx="12" cy="12" r="9" /><path d="M14.5 9.5a2.5 2.5 0 0 0-2.5-1.5c-1.4 0-2.5.8-2.5 2s1.1 1.6 2.5 2 2.5.9 2.5 2-1.1 2-2.5 2a2.5 2.5 0 0 1-2.5-1.5M12 6.5v1M12 16.5v1" /></svg>
           </button>
           <button
             type="button"
@@ -238,6 +250,9 @@ export function HomePos({
   const [configImpresoraAbierto, setConfigImpresoraAbierto] = useState(false);
   const [clienteDomAbierto, setClienteDomAbierto] = useState(false);
   const [cambiarPinAbierto, setCambiarPinAbierto] = useState(false);
+  const [cocinaEnviada, setCocinaEnviada] = useState(false);
+  const [enviandoCocina, setEnviandoCocina] = useState(false);
+  const [misPropinasAbierto, setMisPropinasAbierto] = useState(false);
   const [descuentoAbierto, setDescuentoAbierto] = useState(false);
   // F6.1 — items persistidos del ticketBd (para mapear clientId ↔ ticket_item_id real al cancelar).
   const [itemsPersistidos, setItemsPersistidos] = useState<ItemTicket[]>([]);
@@ -358,6 +373,8 @@ export function HomePos({
       setItemsPersistidos(items);
       setEnModoMesa(true);
       setEnMesas(false);
+      // B1 — saber si la mesa ya fue enviada a cocina (para el botón).
+      leerEstadoCocina(token, ticketId).then((ec) => setCocinaEnviada(ec !== null && ec !== "SIN_ENVIAR")).catch(() => {});
     } catch (e) {
       setError(e instanceof Error ? e.message : "No se pudo cargar la cuenta");
     }
@@ -368,11 +385,28 @@ export function HomePos({
       const ticketId = await abrirCuentaEnMesa(token, {
         sucursalId: caja.sucursal_id, cajaId: turno.caja_id, turnoId: turno.id, mesaId, usuarioId: empleado.id,
       });
+      // B1 — atribuir la mesa al mesero que la abre (para reportes y "mis propinas").
+      atribuirMesero(token, ticketId, empleado.id).catch(() => {});
       await entrarCuenta(ticketId);
     } catch (e) {
       setError(e instanceof Error ? e.message : "No se pudo abrir la cuenta");
     }
   }, [token, caja.sucursal_id, turno.caja_id, turno.id, empleado.id, entrarCuenta]);
+
+  /** B1 — envía la mesa a cocina (KDS) antes de cobrar. */
+  const onEnviarCocina = useCallback(async () => {
+    if (!ticketBd) return;
+    setEnviandoCocina(true);
+    setError(null);
+    try {
+      await enviarACocina(token, ticketBd.ticketId);
+      setCocinaEnviada(true);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "No se pudo enviar a cocina");
+    } finally {
+      setEnviandoCocina(false);
+    }
+  }, [token, ticketBd]);
 
   /** Persiste el ticket si aún no existe; abre el modal de descuento sobre ese ticket. */
   const onAplicarDescuento = useCallback(async () => {
@@ -524,7 +558,7 @@ export function HomePos({
           Sin conexión — verifica la red. No podrás cobrar ni guardar hasta reconectar.
         </div>
       )}
-      <TopbarOperativa caja={caja} turno={turno} empleado={empleado} onCambiarCajero={onCambiarCajero} onBloquear={onBloquear} onCerrarTurno={() => setCerrando(true)} onMovimientoCaja={() => setMovimientoAbierto(true)} onKds={() => { salirNavegacion(); setEnKds(true); }} onMesas={() => { salirNavegacion(); setEnMesas(true); }} onDelivery={() => { salirNavegacion(); setEnDelivery(true); }} onDevoluciones={() => { salirNavegacion(); setEnDevoluciones(true); }} onImpresora={() => setConfigImpresoraAbierto(true)} onCambiarPin={() => setCambiarPinAbierto(true)} />
+      <TopbarOperativa caja={caja} turno={turno} empleado={empleado} onCambiarCajero={onCambiarCajero} onBloquear={onBloquear} onCerrarTurno={() => setCerrando(true)} onMovimientoCaja={() => setMovimientoAbierto(true)} onKds={() => { salirNavegacion(); setEnKds(true); }} onMesas={() => { salirNavegacion(); setEnMesas(true); }} onDelivery={() => { salirNavegacion(); setEnDelivery(true); }} onDevoluciones={() => { salirNavegacion(); setEnDevoluciones(true); }} onImpresora={() => setConfigImpresoraAbierto(true)} onCambiarPin={() => setCambiarPinAbierto(true)} onMisPropinas={() => setMisPropinasAbierto(true)} />
       {configImpresoraAbierto && <ModalConfigImpresora onCerrar={() => setConfigImpresoraAbierto(false)} />}
       {clienteDomAbierto && (
         <ModalClienteDomicilio
@@ -537,6 +571,9 @@ export function HomePos({
       )}
       {cambiarPinAbierto && (
         <ModalCambiarPin token={token} onListo={() => setCambiarPinAbierto(false)} onCerrar={() => setCambiarPinAbierto(false)} />
+      )}
+      {misPropinasAbierto && (
+        <ModalMisPropinas token={token} meseroId={empleado.id} meseroNombre={empleado.nombre} onCerrar={() => setMisPropinasAbierto(false)} />
       )}
 
       <div className="flex min-h-0 flex-1">
@@ -629,6 +666,9 @@ export function HomePos({
           onModo={(m: ModoServicio) => { dispatch({ tipo: "modo", modo: m }); if (m === "DELIVERY_PROPIO") setClienteDomAbierto(true); }}
           onEditarCliente={() => setClienteDomAbierto(true)}
           onCobrar={iniciarCobro}
+          onEnviarCocina={enModoMesa && ticketBd ? onEnviarCocina : undefined}
+          cocinaEnviada={cocinaEnviada}
+          enviandoCocina={enviandoCocina}
           onAplicarDescuento={onAplicarDescuento}
           descuentoMxn={ticketBd?.descuentos ?? 0}
           totalConDescuento={ticketBd ? ticketBd.total : undefined}
