@@ -34,6 +34,7 @@ const NAV: Seccion[] = [
       { label: "Inventario", href: "/inventario", minJerarquia: 4, icon: I.inventario },
       { label: "Clientes", href: "/clientes", minJerarquia: 4, icon: I.clientes },
       { label: "Reservaciones", href: "/reservaciones", minJerarquia: 3, icon: I.clientes },
+      { label: "Conciliación apps", href: "/conciliacion", minJerarquia: 3, icon: I.reportes },
     ],
   },
   {
