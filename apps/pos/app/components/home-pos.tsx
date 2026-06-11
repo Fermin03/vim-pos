@@ -50,6 +50,7 @@ import { atribuirMesero, enviarACocina, leerEstadoCocina } from "../lib/mesero";
 import { useConexion } from "../lib/conexion";
 import { cacheGet, cachePut, contarPendientes } from "../lib/outbox";
 import { sincronizar } from "../lib/sync";
+import { notificarEventoCritico } from "../lib/push-eventos";
 import type { DatosTicketImpresion } from "../lib/print/tipos";
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
@@ -250,8 +251,17 @@ export function HomePos({
       if (online && n > 0 && !sincronizando.current) {
         sincronizando.current = true;
         try {
-          await sincronizar(token, `caja-${turno.caja_id}`, caja.nombre);
+          const r = await sincronizar(token, `caja-${turno.caja_id}`, caja.nombre);
           if (vivo) setPendientesSync(await contarPendientes());
+          // Evento crítico: el sync detectó conflictos → avisar a los dispositivos del dueño.
+          if (r.conflictos > 0) {
+            notificarEventoCritico(
+              token,
+              "⚠️ Conflictos de sincronización",
+              `${r.conflictos} operación${r.conflictos === 1 ? "" : "es"} de ${caja.nombre} chocaron con el servidor. Resuélvelo en Configuración → Sincronización.`,
+              "/configuracion/sincronizacion",
+            );
+          }
         } catch { /* se reintenta en el próximo tick / reconexión */ }
         finally { sincronizando.current = false; }
       }

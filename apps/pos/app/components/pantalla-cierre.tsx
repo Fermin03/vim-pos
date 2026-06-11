@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Button } from "@vim/ui/styles";
 import { employeeClient, type Empleado } from "../lib/supabase";
 import { fmtMxn, registrarComisionEvento, type DatosCaja, type Turno } from "../lib/turno";
+import { notificarEventoCritico } from "../lib/push-eventos";
 import {
   leerReporteX,
   contarTicketsAbiertos,
@@ -134,6 +135,15 @@ export function PantallaCierre({
       const r = await arquearCaja(token, { turnoId: turno.id, declaraciones, usuarioId: empleado.id });
       setCorte(r);
       setPaso("resultado");
+      // Evento crítico: el corte tiene diferencia → avisar a los dispositivos del dueño.
+      if (Math.abs(r.diferenciaTotal) > 0.01) {
+        notificarEventoCritico(
+          token,
+          "💰 Cierre con diferencia",
+          `Turno ${turno.codigo_turno} (${caja.nombre}): diferencia de ${fmtMxn(r.diferenciaTotal)} en el corte.`,
+          "/reportes/z-historico",
+        );
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : "No se pudo generar el corte");
     } finally {
