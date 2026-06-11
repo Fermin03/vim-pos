@@ -30,6 +30,7 @@ import { ModalConfigImpresora } from "./modal-config-impresora";
 import { ModalClienteDomicilio } from "./modal-cliente-domicilio";
 import { ModalCambiarPin } from "./modal-cambiar-pin";
 import { ModalMisPropinas } from "./modal-mis-propinas";
+import { ModalCobroOffline } from "./modal-cobro-offline";
 import { leerTicketParaImpresion } from "../lib/print/ticket-datos";
 import { construirTicketJob } from "../lib/print/ticket-builder";
 import { construirComandaJob, type DatosComanda } from "../lib/print/comanda-builder";
@@ -236,6 +237,7 @@ export function HomePos({
   const { online } = useConexion(SUPABASE_URL ? `${SUPABASE_URL}/auth/v1/health` : undefined);
   // Fase 3 — outbox offline: pendientes por sincronizar + auto-sync al reconectar.
   const [pendientesSync, setPendientesSync] = useState(0);
+  const [cobroOfflineAbierto, setCobroOfflineAbierto] = useState(false);
   const sincronizando = useRef(false);
 
   // Empuja el outbox cuando hay red. Idempotente; se reintenta al volver online.
@@ -470,6 +472,11 @@ export function HomePos({
       setTotalesCobro(ticketBd);
       return;
     }
+    // Fase 3 — sin conexión: cobro offline (encola en el outbox; sincroniza al reconectar).
+    if (!online) {
+      setCobroOfflineAbierto(true);
+      return;
+    }
     setProcesandoCobro(true);
     setError(null);
     try {
@@ -478,6 +485,9 @@ export function HomePos({
         carrito.modoServicio,
         carrito.lineas,
         nuevoClientId(),
+        carrito.clienteDomicilio?.clienteId ?? null,
+        carrito.clienteDomicilio?.direccionId ?? null,
+        carrito.notaOrden ?? null,
       );
       setTotalesCobro(totales);
     } catch (e) {
@@ -485,7 +495,7 @@ export function HomePos({
     } finally {
       setProcesandoCobro(false);
     }
-  }, [carrito, ticketBd, token, caja.sucursal_id, turno.caja_id, turno.id]);
+  }, [carrito, ticketBd, token, caja.sucursal_id, turno.caja_id, turno.id, online]);
 
   const bloqueado = ticketBd !== null;
   // En modo cuenta de mesa el ticket está persistido (ticketBd) PERO el menú debe seguir activo
@@ -583,7 +593,7 @@ export function HomePos({
       {!online && (
         <div className="flex flex-shrink-0 items-center justify-center gap-2 bg-[#9A6B12] px-4 py-1.5 text-[12.5px] font-semibold text-white" role="status">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4"><path d="M1 1l22 22M16.72 11.06A10.94 10.94 0 0 1 19 12.55M5 12.55a10.94 10.94 0 0 1 5.17-2.39M10.71 5.05A16 16 0 0 1 22.58 9M1.42 9a15.91 15.91 0 0 1 4.7-2.88M8.53 16.11a6 6 0 0 1 6.95 0M12 20h.01" /></svg>
-          Sin conexión — verifica la red. No podrás cobrar ni guardar hasta reconectar.
+          Sin conexión — modo offline activo: puedes seguir cobrando; las ventas se sincronizan al reconectar.
         </div>
       )}
       {online && pendientesSync > 0 && (
@@ -608,6 +618,14 @@ export function HomePos({
       )}
       {misPropinasAbierto && (
         <ModalMisPropinas token={token} meseroId={empleado.id} meseroNombre={empleado.nombre} onCerrar={() => setMisPropinasAbierto(false)} />
+      )}
+      {cobroOfflineAbierto && (
+        <ModalCobroOffline
+          ctx={{ sucursalId: caja.sucursal_id, cajaId: turno.caja_id, turnoId: turno.id, usuarioId: empleado.id }}
+          carrito={carrito}
+          onCobrado={() => { setCobroOfflineAbierto(false); dispatch({ tipo: "limpiar" }); }}
+          onCerrar={() => setCobroOfflineAbierto(false)}
+        />
       )}
 
       <div className="flex min-h-0 flex-1">
