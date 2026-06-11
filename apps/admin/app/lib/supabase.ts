@@ -20,6 +20,7 @@ export const supabase: SupabaseClient = createClient(URL, ANON, {
 
 export type Sesion = {
   email: string;
+  userId: string;
   tenantId: string | null;
   tipoIdentidad: string | null;
 };
@@ -41,7 +42,7 @@ export async function leerSesion(): Promise<Sesion | null> {
   } catch {
     /* ignore */
   }
-  return { email: s.user.email ?? "", tenantId, tipoIdentidad };
+  return { email: s.user.email ?? "", userId: s.user.id, tenantId, tipoIdentidad };
 }
 
 /** Login con email/password. Lanza Error con mensaje si falla. */
