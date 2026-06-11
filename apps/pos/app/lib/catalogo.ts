@@ -16,6 +16,13 @@ export type Producto = {
   precio_base_mxn: number;
   categoria_id: string;
   agotado: boolean;
+  /** Snapshots fiscales/cocina (Fase 3): el cobro offline los necesita para reconstruir el ítem al sincronizar. */
+  sku: string | null;
+  tasaIva: number;
+  ivaIncluido: boolean;
+  claveSat: string | null;
+  unidadSat: string | null;
+  categoriaNombre: string | null;
 };
 
 /** Lista de categorías activas del tenant, ordenadas. RLS por tenant. */
@@ -40,20 +47,29 @@ export async function listarCategoriasPos(token: string): Promise<Categoria[]> {
 export async function listarProductosPos(token: string): Promise<Producto[]> {
   const { data, error } = await employeeClient(token)
     .from("productos")
-    .select("id, nombre, descripcion, precio_base_mxn, categoria_id, estado, agotado_manual, agotado_automatico, visible_en_pos")
+    .select("id, nombre, descripcion, precio_base_mxn, categoria_id, estado, agotado_manual, agotado_automatico, visible_en_pos, codigo_interno, tasa_iva, iva_incluido_en_precio, clave_sat, unidad_sat, categoria:categorias(nombre)")
     .is("deleted_at", null)
     .eq("visible_en_pos", true)
     .in("estado", ["ACTIVO", "AGOTADO"])
     .order("orden_visualizacion", { ascending: true });
   if (error) throw new Error(error.message);
-  return (data ?? []).map((p: { id: string; nombre: string; descripcion: string | null; precio_base_mxn: string | number; categoria_id: string; estado: string; agotado_manual: boolean; agotado_automatico: boolean }) => ({
-    id: p.id,
-    nombre: p.nombre,
-    descripcion: p.descripcion,
-    precio_base_mxn: Number(p.precio_base_mxn),
-    categoria_id: p.categoria_id,
-    agotado: p.estado === "AGOTADO" || p.agotado_manual || p.agotado_automatico,
-  }));
+  return (data ?? []).map((row) => {
+    const p = row as Record<string, unknown>;
+    return {
+      id: String(p.id),
+      nombre: String(p.nombre),
+      descripcion: (p.descripcion as string) ?? null,
+      precio_base_mxn: Number(p.precio_base_mxn),
+      categoria_id: String(p.categoria_id),
+      agotado: p.estado === "AGOTADO" || Boolean(p.agotado_manual) || Boolean(p.agotado_automatico),
+      sku: (p.codigo_interno as string) ?? null,
+      tasaIva: Number(p.tasa_iva ?? 16),
+      ivaIncluido: Boolean(p.iva_incluido_en_precio),
+      claveSat: (p.clave_sat as string) ?? null,
+      unidadSat: (p.unidad_sat as string) ?? null,
+      categoriaNombre: ((p.categoria as { nombre?: string } | null)?.nombre) ?? null,
+    };
+  });
 }
 
 // Paleta de fallback si la categoría no tiene color asignado
