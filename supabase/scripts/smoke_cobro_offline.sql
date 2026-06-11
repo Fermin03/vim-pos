@@ -2,9 +2,8 @@
 -- (ticket BORRADOR → UPDATE ABIERTO[folio] → item[snapshots] → pago) pasan por
 -- sync_procesar_push y RECONSTRUYEN la venta en el servidor: ticket con folio, items, pago,
 -- total y monto pagado correctos, e idempotente. ROLLBACK.
--- NOTA: el flip final a PAGADO vive en el RPC aplicar_pago (no en trigger) y el sync bloquea
--- cambiar estado_fiscal por UPDATE crudo → la venta sincronizada queda ABIERTA totalmente
--- pagada (monto_pagado = total). Cerrar a PAGADO al sincronizar = cambio de backend pendiente.
+-- Desde 0051: el trigger trg_pagos_zz_cerrar_si_pagado finaliza el ticket a PAGADO al insertar
+-- el pago (mismo cerrar_ticket_si_pagado que usa aplicar_pago) → la venta offline queda PAGADA.
 \set ON_ERROR_STOP on
 BEGIN;
 SET LOCAL ROLE authenticated;
@@ -40,6 +39,7 @@ BEGIN
   RAISE NOTICE 'reconstruido: estado=% folio=% total=% pagado=% items=% pagos=%', r.estado_fiscal, r.tiene_folio, r.total_mxn, r.monto_pagado_mxn, r.n_items, r.n_pagos;
   IF NOT r.tiene_folio OR r.n_items<>1 OR r.n_pagos<>1 THEN RAISE EXCEPTION 'no se reconstruyó la venta'; END IF;
   IF r.total_mxn <> v_prod.precio_base_mxn*2 OR r.monto_pagado_mxn <> v_prod.precio_base_mxn*2 THEN RAISE EXCEPTION 'total/pagado incorrecto'; END IF;
+  IF r.estado_fiscal <> 'PAGADO' THEN RAISE EXCEPTION 'la venta offline no finalizó a PAGADO (quedó %)', r.estado_fiscal; END IF;
 
   -- Idempotencia: reenviar no duplica
   PERFORM sync_procesar_push('caja-off','Caja 01', jsonb_build_array(
@@ -48,6 +48,6 @@ BEGIN
   SELECT count(*) INTO r FROM tickets WHERE client_id_local='off-tk';
   IF r.count <> 1 THEN RAISE EXCEPTION 'el reenvío duplicó el ticket'; END IF;
 
-  RAISE NOTICE 'SMOKE COBRO-OFFLINE OK: venta reconstruida (folio+items+pago, total/pagado correctos) e idempotente. (Flip a PAGADO = backend pendiente.)';
+  RAISE NOTICE 'SMOKE COBRO-OFFLINE OK: venta reconstruida PAGADA (folio+items+pago, total/pagado correctos) e idempotente.';
 END $$;
 ROLLBACK;
