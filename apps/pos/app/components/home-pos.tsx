@@ -48,7 +48,7 @@ import { leerItemsPersistidos, type ItemTicket } from "../lib/cancelacion";
 import { abrirCuentaEnMesa, agregarItemAlTicket, reconstruirCarrito } from "../lib/cuenta-mesa";
 import { atribuirMesero, enviarACocina, leerEstadoCocina } from "../lib/mesero";
 import { useConexion } from "../lib/conexion";
-import { contarPendientes } from "../lib/outbox";
+import { cacheGet, cachePut, contarPendientes } from "../lib/outbox";
 import { sincronizar } from "../lib/sync";
 import type { DatosTicketImpresion } from "../lib/print/tipos";
 
@@ -306,9 +306,19 @@ export function HomePos({
         setCategorias(cs);
         setProductos(ps);
         if (cs.length > 0) setCatSel(cs[0]!.id);
+        // Fase 3 — cache de lectura: el menú sobrevive sin red (recargas offline).
+        cachePut("catalogo", { categorias: cs, productos: ps });
       })
-      .catch((e) => {
+      .catch(async (e) => {
         if (!activo) return;
+        // Sin red: servir el catálogo desde el cache local (Dexie).
+        const cacheado = await cacheGet<{ categorias: Categoria[]; productos: Producto[] }>("catalogo");
+        if (cacheado && activo) {
+          setCategorias(cacheado.categorias);
+          setProductos(cacheado.productos);
+          if (cacheado.categorias.length > 0) setCatSel(cacheado.categorias[0]!.id);
+          return;
+        }
         setError(e instanceof Error ? e.message : "Error");
       });
     return () => {

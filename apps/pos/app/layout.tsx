@@ -1,9 +1,11 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
+import { RegistrarSw } from "./components/registrar-sw";
 
 export const metadata: Metadata = {
   title: "VIM POS",
   description: "Punto de venta",
+  manifest: "/manifest.webmanifest",
 };
 
 // width=device-width SIN maximum-scale → zoom permitido (a11y, doc 16).
@@ -20,7 +22,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           rel="stylesheet"
         />
       </head>
-      <body>{children}</body>
+      <body>
+        <RegistrarSw />
+        {children}
+      </body>
     </html>
   );
 }

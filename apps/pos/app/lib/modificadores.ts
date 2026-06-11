@@ -1,5 +1,6 @@
 "use client";
 import { employeeClient } from "./supabase";
+import { cacheGet, cachePut } from "./outbox";
 
 export type TipoSeleccion =
   | "UNICA_OBLIGATORIA"
@@ -59,10 +60,15 @@ export async function obtenerGruposDeProducto(
     )
     .eq("producto_id", productoId)
     .order("orden_visualizacion", { ascending: true });
-  if (error) throw new Error(error.message);
+  if (error) {
+    // Fase 3 — sin red: servir los modificadores del cache local (última lectura buena).
+    const cacheado = await cacheGet<GrupoModificadores[]>(`mods:${productoId}`);
+    if (cacheado) return cacheado;
+    throw new Error(error.message);
+  }
 
   const filas = (data ?? []) as unknown as FilaUnion[];
-  return filas
+  const grupos = filas
     .map((f) => f.grupo)
     .filter((g): g is NonNullable<FilaUnion["grupo"]> => !!g && g.activo && g.deleted_at === null)
     .map((g) => ({
@@ -82,4 +88,6 @@ export async function obtenerGruposDeProducto(
           agotada: o.agotada,
         })),
     }));
+  cachePut(`mods:${productoId}`, grupos);
+  return grupos;
 }
