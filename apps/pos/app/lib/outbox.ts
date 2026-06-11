@@ -16,11 +16,16 @@ export type OperacionOffline = {
   intentos: number;
 };
 
+type EntradaCache = { clave: string; valor: unknown; guardadoAt: string };
+
 class OutboxDB extends Dexie {
   operaciones!: Table<OperacionOffline, string>;
+  cache!: Table<EntradaCache, string>;
   constructor() {
     super("vimpos_outbox");
     this.version(1).stores({ operaciones: "clientIdLocal, fechaOperacion" });
+    // v2 — cache de lectura offline (catálogo, modificadores): clave→valor.
+    this.version(2).stores({ operaciones: "clientIdLocal, fechaOperacion", cache: "clave" });
   }
 }
 
@@ -54,4 +59,17 @@ export async function marcarIntento(clientIds: string[]): Promise<void> {
       if (o) await db().operaciones.put({ ...o, intentos: o.intentos + 1 });
     }
   });
+}
+
+// ── Cache de lectura offline (catálogo, modificadores) ───────────────────────
+
+export async function cachePut(clave: string, valor: unknown): Promise<void> {
+  try { await db().cache.put({ clave, valor, guardadoAt: new Date().toISOString() }); } catch { /* cache best-effort */ }
+}
+
+export async function cacheGet<T>(clave: string): Promise<T | null> {
+  try {
+    const e = await db().cache.get(clave);
+    return e ? (e.valor as T) : null;
+  } catch { return null; }
 }

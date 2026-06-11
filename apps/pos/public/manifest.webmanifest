@@ -1,0 +1,13 @@
+{
+  "name": "VIM POS",
+  "short_name": "VIM POS",
+  "description": "Punto de venta para restaurantes",
+  "start_url": "/",
+  "display": "standalone",
+  "orientation": "landscape",
+  "background_color": "#FFFFFF",
+  "theme_color": "#16161A",
+  "icons": [
+    { "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
+  ]
+}
