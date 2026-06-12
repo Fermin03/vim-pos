@@ -41,6 +41,7 @@ const NAV: Seccion[] = [
     titulo: "Administración",
     items: [
       { label: "Usuarios", href: "/usuarios", minJerarquia: 4, icon: I.usuarios },
+      { label: "Facturación", href: "/facturacion", minJerarquia: 4, icon: I.reportes },
       { label: "Configuración", href: "/configuracion", minJerarquia: 4, icon: I.config },
       { label: "Reportes", href: "/reportes", minJerarquia: 3, icon: I.reportes },
     ],
