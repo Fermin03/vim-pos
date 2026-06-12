@@ -951,7 +951,12 @@ export function HomePos({
         <ReciboPreview
           datosTicket={datosTicket}
           datosComanda={datosComanda ?? undefined}
-          onImprimir={() => obtenerImpresora({ onMostrar: () => {} }).imprimir(construirTicketJob(datosTicket))}
+          onImprimir={(vista) => {
+            // Con Epson manda ESC/POS; con Preview, window.print() imprime el recibo visible.
+            const imp = obtenerImpresora({ onMostrar: () => window.print() });
+            if (vista === "cocina" && datosComanda) imp.imprimir(construirComandaJob(datosComanda));
+            else imp.imprimir(construirTicketJob(datosTicket));
+          }}
           onCerrar={() => setMostrarRecibo(false)}
           onNuevoTicket={nuevoTicket}
         />

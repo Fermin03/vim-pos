@@ -21,7 +21,8 @@ import {
 } from "../lib/cierre";
 import { autorizacionPropia, type Autorizacion, type PayloadAutorizacion } from "../lib/autorizacion";
 import { ModalAutorizacionPin } from "./modal-autorizacion-pin";
-import type { DatosReporteZ } from "../lib/print/reporte-z-builder";
+import { construirReporteZJob, type DatosReporteZ } from "../lib/print/reporte-z-builder";
+import { obtenerImpresora } from "../lib/print/adapter";
 import { ReciboPreview } from "./recibo-preview";
 
 const METODO_LABEL: Record<string, string> = {
@@ -276,9 +277,15 @@ export function PantallaCierre({
       sello,
       ancho: 80,
     };
-    // El builder ESC/POS (construirReporteZJob) sigue siendo la fuente para el papel
-    // cuando enchufemos la Epson; aquí el preview se renderiza desde los datos crudos.
-    return <ReciboPreview datosZ={zData} onImprimir={() => {}} onCerrar={onCerrado} onNuevoTicket={onCerrado} />;
+    // Imprimir: Epson recibe el job ESC/POS; Preview imprime el recibo visible vía window.print().
+    return (
+      <ReciboPreview
+        datosZ={zData}
+        onImprimir={() => { obtenerImpresora({ onMostrar: () => window.print() }).imprimir(construirReporteZJob(zData)); }}
+        onCerrar={onCerrado}
+        onNuevoTicket={onCerrado}
+      />
+    );
   }
 
   const input = "h-11 w-[150px] rounded border border-line-strong px-3 text-right font-display text-[17px] font-bold outline-none focus:border-ink focus:shadow-[0_0_0_3px_rgba(22,22,26,.06)]";

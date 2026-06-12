@@ -11,3 +11,23 @@ body {
   -webkit-font-smoothing: antialiased;
   letter-spacing: -0.01em;
 }
+
+/* Impresión de respaldo (config "Preview", sin Epson): window.print() imprime SOLO
+   el recibo visible del overlay (ticket/comanda/Z/devolución), no la pantalla. */
+@media print {
+  body * { visibility: hidden; }
+  [data-overlay-imprimible] {
+    position: static !important;
+    overflow: visible !important;
+    padding: 0 !important;
+    background: white !important;
+  }
+  [data-imprimible], [data-imprimible] * { visibility: visible; }
+  [data-imprimible] {
+    position: absolute;
+    left: 0;
+    top: 0;
+    margin: 0;
+    box-shadow: none !important;
+  }
+}

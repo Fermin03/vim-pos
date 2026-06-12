@@ -131,7 +131,7 @@ export function PantallaDevoluciones({
       {reciboDev && (
         <OverlayReciboDevolucion
           d={reciboDev}
-          onImprimir={() => { obtenerImpresora({ onMostrar: () => {} }).imprimir(construirDevolucionJob(reciboDev)); }}
+          onImprimir={() => { obtenerImpresora({ onMostrar: () => window.print() }).imprimir(construirDevolucionJob(reciboDev)); }}
           onCerrar={() => setReciboDev(null)}
         />
       )}
