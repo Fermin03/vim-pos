@@ -79,6 +79,7 @@ export function SidebarTicket({
   onNotaOrden,
   onCobrar,
   onEnviarCocina,
+  onPonerEnEspera,
   cocinaEnviada = false,
   enviandoCocina = false,
   onAplicarDescuento,
@@ -108,6 +109,8 @@ export function SidebarTicket({
   onCobrar: () => void;
   /** B1 Full Service — enviar la mesa a cocina antes de cobrar (solo en cuenta de mesa). */
   onEnviarCocina?: () => void;
+  /** D45 §12 — guarda el pedido en espera con etiqueta (flujo QS, sin cuenta de mesa). */
+  onPonerEnEspera?: () => void;
   cocinaEnviada?: boolean;
   enviandoCocina?: boolean;
   onAplicarDescuento: () => void;
@@ -427,11 +430,12 @@ export function SidebarTicket({
             )}
           </button>
         ) : (
-          /* F5.2b — diferido */
+          /* D45 §12 — guarda el pedido con etiqueta para retomarlo después */
           <button
             type="button"
-            disabled
-            className="w-full rounded border border-line-strong bg-transparent px-5 py-[13px] text-[14.5px] font-semibold text-ink-2 transition-all hover:border-ink hover:text-ink disabled:cursor-default disabled:opacity-[.45]"
+            disabled={vacio || procesando || !onPonerEnEspera}
+            onClick={onPonerEnEspera}
+            className="w-full rounded border border-line-strong bg-transparent px-5 py-[13px] text-[14.5px] font-semibold text-ink-2 transition-all hover:border-ink hover:text-ink disabled:cursor-default disabled:opacity-[.45] disabled:hover:border-line-strong disabled:hover:text-ink-2"
           >
             Poner pedido en espera
           </button>
