@@ -16,7 +16,7 @@ const admin = createClient(
 );
 
 const ROLES_ADMINISTRADORES = ["DUENO", "ADMIN"];
-const ROLES_ASIGNABLES = ["ADMIN", "SUPERVISOR", "CAJERO", "PERSONAL"]; // DUENO solo vía crear_tenant_con_owner
+const ROLES_ASIGNABLES = ["ADMIN", "SUPERVISOR", "CAJERO", "PERSONAL", "PERSONALIZADO"]; // DUENO solo vía crear_tenant_con_owner
 
 Deno.serve(async (req) => {
   const cors = corsHeaders(req);

@@ -3,7 +3,7 @@ import { useCallback, useEffect, useState } from "react";
 import { PageBody, PageHeader } from "../../../components/page-header";
 import { RangoFechas } from "../../../components/rango-fechas";
 import { fmtMxn, rangoUltimosDias } from "../../../lib/reportes";
-import { leerConsolidadoPorSucursal, type Consolidado } from "../../../lib/consolidado";
+import { leerConsolidadoPorSucursal, type AgruparPor, type Consolidado } from "../../../lib/consolidado";
 
 /** B5 Enterprise — reporteo central: comparativo consolidado por sucursal. */
 export default function ConsolidadoPage() {
@@ -11,19 +11,31 @@ export default function ConsolidadoPage() {
   const [desde, setDesde] = useState(r0.desde);
   const [hasta, setHasta] = useState(r0.hasta);
   const [datos, setDatos] = useState<Consolidado | null>(null);
+  const [agrupar, setAgrupar] = useState<AgruparPor>("sucursal");
   const [error, setError] = useState<string | null>(null);
 
-  const cargar = useCallback(async (d: string, h: string) => {
+  const cargar = useCallback(async (d: string, h: string, a: AgruparPor) => {
     setDatos(null); setError(null);
-    try { setDatos(await leerConsolidadoPorSucursal(d, h)); } catch (e) { setError(e instanceof Error ? e.message : "Error"); }
+    try { setDatos(await leerConsolidadoPorSucursal(d, h, a)); } catch (e) { setError(e instanceof Error ? e.message : "Error"); }
   }, []);
-  useEffect(() => { cargar(desde, hasta); }, [cargar, desde, hasta]);
+  useEffect(() => { cargar(desde, hasta, agrupar); }, [cargar, desde, hasta, agrupar]);
 
   return (
     <>
       <PageHeader titulo="Consolidado por sucursal" subtitulo="Comparativo central de la cadena: venta, tickets y participación de cada sucursal." migas={[{ label: "Reportes" }, { label: "Consolidado" }]} />
       <PageBody>
-        <div className="mb-4"><RangoFechas desde={desde} hasta={hasta} onCambio={(d, h) => { setDesde(d); setHasta(h); }} /></div>
+        <div className="mb-4 flex flex-wrap items-center gap-3">
+          <RangoFechas desde={desde} hasta={hasta} onCambio={(d, h) => { setDesde(d); setHasta(h); }} />
+          {/* Fase 5 — agrupar el consolidado por franquicia */}
+          <div className="flex gap-1 rounded-lg bg-sel p-0.5">
+            {(["sucursal", "franquicia"] as const).map((a) => (
+              <button key={a} type="button" onClick={() => setAgrupar(a)}
+                className={["rounded px-3 py-1.5 text-[12.5px] font-semibold transition", agrupar === a ? "bg-ink text-white" : "text-ink-2"].join(" ")}>
+                {a === "sucursal" ? "Por sucursal" : "Por franquicia"}
+              </button>
+            ))}
+          </div>
+        </div>
         {datos === null && !error && <p className="text-sm text-ink-3">Cargando…</p>}
         {error && <p className="text-sm font-medium text-danger" role="alert">{error}</p>}
         {datos && (
@@ -46,7 +58,7 @@ export default function ConsolidadoPage() {
             <div className="overflow-hidden rounded-lg border border-line bg-surface">
               <table className="w-full text-[13px]">
                 <thead><tr className="border-b border-line bg-sel text-left text-[11.5px] font-bold uppercase tracking-wide text-ink-3">
-                  <th className="px-4 py-2.5">Sucursal</th><th className="px-4 py-2.5 text-right">Tickets</th><th className="px-4 py-2.5 text-right">Venta</th><th className="px-4 py-2.5 text-right">Ticket prom.</th><th className="px-4 py-2.5 text-right">Propinas</th><th className="px-4 py-2.5 text-right">Descuentos</th><th className="px-4 py-2.5 text-right">Devoluciones</th><th className="px-4 py-2.5 text-right">Participación</th>
+                  <th className="px-4 py-2.5">{agrupar === "sucursal" ? "Sucursal" : "Franquicia"}</th><th className="px-4 py-2.5 text-right">Tickets</th><th className="px-4 py-2.5 text-right">Venta</th><th className="px-4 py-2.5 text-right">Ticket prom.</th><th className="px-4 py-2.5 text-right">Propinas</th><th className="px-4 py-2.5 text-right">Descuentos</th><th className="px-4 py-2.5 text-right">Devoluciones</th><th className="px-4 py-2.5 text-right">Participación</th>
                 </tr></thead>
                 <tbody>
                   {datos.filas.length === 0 && <tr><td colSpan={8} className="px-4 py-6 text-center text-ink-3">Sin ventas en el rango.</td></tr>}
