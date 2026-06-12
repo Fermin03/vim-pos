@@ -346,3 +346,75 @@ export async function leerVentasPorEvento(): Promise<FilaEvento[]> {
     };
   });
 }
+
+// Antifraude — reimpresiones de comanda por cajero (vw_reimpresiones_por_cajero, doc 11 §8).
+// Reimpresión frecuente = posible salida de producto sin cobrar.
+export type FilaReimpresion = { clave: string; cajero: string; reimpresiones: number; ticketsDistintos: number };
+export async function leerReimpresionesPorCajero(desde: string, hasta: string): Promise<FilaReimpresion[]> {
+  const { data, error } = await supabase
+    .from("vw_reimpresiones_por_cajero")
+    .select("cajero_id, cajero_email, reimpresiones_count, tickets_distintos, dia")
+    .gte("dia", desde)
+    .lte("dia", hasta);
+  if (error) throw new Error(error.message);
+  const map = new Map<string, FilaReimpresion>();
+  for (const r of (data ?? []) as unknown as Record<string, unknown>[]) {
+    const k = String(r.cajero_id ?? r.cajero_email ?? "—");
+    const cur = map.get(k) ?? { clave: k, cajero: String(r.cajero_email ?? "—"), reimpresiones: 0, ticketsDistintos: 0 };
+    cur.reimpresiones += num(r.reimpresiones_count);
+    cur.ticketsDistintos += num(r.tickets_distintos);
+    map.set(k, cur);
+  }
+  return [...map.values()].sort((a, b) => b.reimpresiones - a.reimpresiones);
+}
+
+// Apps externas — ventas Rappi/Uber/DiDi con estado de conciliación (vw_ventas_apps_externas).
+export type FilaAppExterna = {
+  ticketId: string; folioPos: string | null; folioApp: string | null; app: string; dia: string;
+  totalPos: number; comision: number; netoApp: number; estado: string;
+};
+export async function leerVentasAppsExternas(desde: string, hasta: string): Promise<FilaAppExterna[]> {
+  const { data, error } = await supabase
+    .from("vw_ventas_apps_externas")
+    .select("ticket_id, folio_pos, folio_app, app_externa, dia_contable, total_pos_mxn, comision_app, monto_neto_liquidado_app, estado_conciliacion")
+    .gte("dia_contable", desde)
+    .lte("dia_contable", hasta)
+    .order("dia_contable", { ascending: false });
+  if (error) throw new Error(error.message);
+  return ((data ?? []) as unknown as Record<string, unknown>[]).map((r) => ({
+    ticketId: String(r.ticket_id),
+    folioPos: (r.folio_pos as string) ?? null,
+    folioApp: (r.folio_app as string) ?? null,
+    app: String(r.app_externa ?? "—").replace(/^APP_/, ""),
+    dia: String(r.dia_contable),
+    totalPos: num(r.total_pos_mxn),
+    comision: num(r.comision_app),
+    netoApp: num(r.monto_neto_liquidado_app),
+    estado: String(r.estado_conciliacion ?? "—"),
+  }));
+}
+
+// Reservaciones — no-shows por día (vw_no_shows_reservaciones).
+export type FilaNoShow = {
+  dia: string; total: number; llegaron: number; terminadas: number; canceladas: number;
+  noShows: number; tasaPct: number; comensalesPerdidos: number;
+};
+export async function leerNoShows(desde: string, hasta: string): Promise<FilaNoShow[]> {
+  const { data, error } = await supabase
+    .from("vw_no_shows_reservaciones")
+    .select("dia_reserva, reservas_total, llegaron, terminadas, canceladas, no_shows, tasa_no_show_pct, comensales_no_show")
+    .gte("dia_reserva", desde)
+    .lte("dia_reserva", hasta)
+    .order("dia_reserva", { ascending: false });
+  if (error) throw new Error(error.message);
+  return ((data ?? []) as unknown as Record<string, unknown>[]).map((r) => ({
+    dia: String(r.dia_reserva),
+    total: num(r.reservas_total),
+    llegaron: num(r.llegaron),
+    terminadas: num(r.terminadas),
+    canceladas: num(r.canceladas),
+    noShows: num(r.no_shows),
+    tasaPct: num(r.tasa_no_show_pct),
+    comensalesPerdidos: num(r.comensales_no_show),
+  }));
+}

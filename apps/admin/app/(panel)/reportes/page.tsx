@@ -52,6 +52,9 @@ const REPORTES: Reporte[] = [
   { href: "/reportes/ventas-marca", titulo: "Ventas por marca virtual", descripcion: "Desempeño por marca/concepto (dark kitchen, foodtruck).", ref: "P-189" },
   { href: "/reportes/tiempos-cocina", titulo: "Tiempos de cocina", descripcion: "Cumplimiento de preparación por modo de servicio.", ref: "P-190" },
   { href: "/reportes/descuentos", titulo: "Descuentos por usuario", descripcion: "Auditoría de descuentos y cortesías otorgados.", ref: "P-194" },
+  { href: "/reportes/reimpresiones", titulo: "Reimpresiones por cajero", descripcion: "Antifraude: reimpresión frecuente de comandas puede indicar salida sin cobrar.", ref: "doc 11 §8" },
+  { href: "/reportes/apps-externas", titulo: "Ventas por apps externas", descripcion: "Rappi/Uber/DiDi: venta, comisión y estado de conciliación por pedido.", ref: "doc 09" },
+  { href: "/reportes/no-shows", titulo: "No-shows de reservaciones", descripcion: "Reservas que no llegaron: tasa diaria y comensales perdidos.", ref: "doc 11 §8" },
 ];
 
 export default function ReportesHub() {
