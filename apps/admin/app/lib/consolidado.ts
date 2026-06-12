@@ -68,17 +68,35 @@ export function consolidarFilas(
   };
 }
 
-export async function leerConsolidadoPorSucursal(desde: string, hasta: string): Promise<Consolidado> {
-  const [{ data: er, error: e1 }, { data: sucs, error: e2 }] = await Promise.all([
+export type AgruparPor = "sucursal" | "franquicia";
+
+export async function leerConsolidadoPorSucursal(desde: string, hasta: string, agrupar: AgruparPor = "sucursal"): Promise<Consolidado> {
+  const [{ data: er, error: e1 }, { data: sucs, error: e2 }, { data: frs, error: e3 }] = await Promise.all([
     supabase
       .from("vw_estado_resultados_dia")
       .select("sucursal_id, tickets_completados, tickets_cancelados, total_neto_mxn, propinas_capturadas_mxn, descuentos_manuales_mxn, devoluciones_mxn")
       .gte("dia_contable", desde)
       .lte("dia_contable", hasta),
-    supabase.from("sucursales").select("id, nombre").is("deleted_at", null),
+    supabase.from("sucursales").select("id, nombre, franquicia_id").is("deleted_at", null),
+    supabase.from("franquicias").select("id, nombre"),
   ]);
   if (e1) throw new Error(e1.message);
   if (e2) throw new Error(e2.message);
-  const nombres = new Map((sucs ?? []).map((s) => [String((s as { id: string }).id), String((s as { nombre: string }).nombre)]));
-  return consolidarFilas((er ?? []) as Parameters<typeof consolidarFilas>[0], nombres);
+  if (e3) throw new Error(e3.message);
+
+  const filas = (er ?? []) as Parameters<typeof consolidarFilas>[0];
+  const sucursales = (sucs ?? []) as { id: string; nombre: string; franquicia_id: string | null }[];
+
+  if (agrupar === "sucursal") {
+    const nombres = new Map(sucursales.map((s) => [s.id, s.nombre]));
+    return consolidarFilas(filas, nombres);
+  }
+
+  // Fase 5 — agrupar por franquicia: re-mapea cada fila sucursal→franquicia (o "propia")
+  // y reusa el MISMO agregador puro.
+  const franquiciaDe = new Map(sucursales.map((s) => [s.id, s.franquicia_id ?? "__propia__"]));
+  const nombres = new Map<string, string>([["__propia__", "Operación propia"]]);
+  for (const f of (frs ?? []) as { id: string; nombre: string }[]) nombres.set(f.id, f.nombre);
+  const reMapeadas = filas.map((f) => ({ ...f, sucursal_id: franquiciaDe.get(f.sucursal_id) ?? "__propia__" }));
+  return consolidarFilas(reMapeadas, nombres);
 }
