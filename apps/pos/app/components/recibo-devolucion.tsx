@@ -83,7 +83,7 @@ function Row({ label, value }: { label: string; value: string }) {
 /** Overlay a pantalla completa con el comprobante + Imprimir/Cerrar (mismo patrón que ReciboPreview). */
 export function OverlayReciboDevolucion({ d, onImprimir, onCerrar }: { d: DatosDevolucion; onImprimir: () => void; onCerrar: () => void }) {
   return (
-    <div className="fixed inset-0 z-[60] flex flex-col bg-ink/70">
+    <div data-overlay-imprimible className="fixed inset-0 z-[60] flex flex-col bg-ink/70">
       <div className="flex items-center justify-between px-5 py-3">
         <span className="text-[14px] font-semibold text-white">Comprobante de devolución</span>
         <div className="flex gap-2">
@@ -91,7 +91,7 @@ export function OverlayReciboDevolucion({ d, onImprimir, onCerrar }: { d: DatosD
           <button type="button" onClick={onCerrar} className="rounded bg-white px-3 py-1.5 text-[13px] font-semibold text-ink hover:bg-hover">Cerrar</button>
         </div>
       </div>
-      <div className="min-h-0 flex-1 overflow-y-auto py-6">
+      <div data-imprimible className="min-h-0 flex-1 overflow-y-auto py-6">
         <ReciboDevolucion d={d} />
       </div>
     </div>
