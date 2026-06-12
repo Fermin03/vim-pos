@@ -52,6 +52,7 @@ export function AdminShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const [perfil, setPerfil] = useState<Perfil | null>(null);
   const [listo, setListo] = useState(false);
+  const [sinAcceso, setSinAcceso] = useState<string | null>(null);
 
   useEffect(() => {
     (async () => {
@@ -60,10 +61,38 @@ export function AdminShell({ children }: { children: ReactNode }) {
         router.replace("/");
         return;
       }
+      // Fase 4 (SSO): sesión válida pero SIN tenant = correo no invitado a ningún negocio.
+      if (!s.tenantId) {
+        setSinAcceso(s.email);
+        setListo(true);
+        return;
+      }
       setPerfil(await cargarPerfil());
       setListo(true);
     })();
   }, [router]);
+
+  if (listo && sinAcceso) {
+    return (
+      <main className="flex h-screen flex-col items-center justify-center gap-3 px-6 text-center">
+        <div className="flex h-12 w-12 items-center justify-center rounded-full bg-[#F6EEDD] text-warning">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-6 w-6"><circle cx="12" cy="12" r="9" /><path d="M12 8v4M12 16h.01" /></svg>
+        </div>
+        <h1 className="font-display text-[22px] font-semibold tracking-tight">Tu correo no tiene acceso todavía</h1>
+        <p className="max-w-md text-[14px] leading-relaxed text-ink-3">
+          Entraste como <b className="text-ink-2">{sinAcceso}</b>, pero ese correo no está invitado a ningún negocio en VIM POS.
+          Pide al dueño que te invite desde su panel (Usuarios) con este mismo correo, o crea tu negocio.
+        </p>
+        <div className="mt-2 flex gap-2">
+          <a href="/registro" className="rounded-lg bg-accent px-5 py-2.5 text-[14px] font-semibold text-white transition hover:brightness-95">Crear mi negocio</a>
+          <button type="button" onClick={async () => { const { supabase } = await import("../lib/supabase"); await supabase.auth.signOut(); router.replace("/"); }}
+            className="rounded-lg border border-line-strong px-5 py-2.5 text-[14px] font-semibold text-ink-2 transition hover:border-ink">
+            Salir
+          </button>
+        </div>
+      </main>
+    );
+  }
 
   if (!listo) {
     return (

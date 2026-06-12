@@ -9,7 +9,7 @@
 // Local: supabase functions serve timbrar-cfdi --env-file supabase/functions/.env
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import { corsHeaders } from "../_shared/cors.ts";
-import { obtenerPac } from "../_shared/pac/index.ts";
+import { timbrarConFailover } from "../_shared/pac/index.ts";
 
 const ROLES_FACTURA = ["DUENO", "ADMIN"];
 
@@ -75,9 +75,8 @@ Deno.serve(async (req) => {
   const c = cfdi as Record<string, unknown>;
   const num = (v: unknown) => Number(v ?? 0);
 
-  // Llamar al PAC (mock o Facturapi).
-  const pac = obtenerPac();
-  const res = await pac.timbrar({
+  // Llamar al PAC con redundancia (Fase 4): principal → respaldo solo ante fallo de transporte.
+  const res = await timbrarConFailover({
     cfdiId: String(c.id),
     tipoComprobante: String(c.tipo_comprobante),
     emisor: {
@@ -107,7 +106,7 @@ Deno.serve(async (req) => {
       p_cfdi_id: cfdiId,
       p_codigo_error: res.codigoError,
       p_mensaje_error: res.mensajeError,
-      p_request_payload: { pac: pac.nombre },
+      p_request_payload: { pac: res.pacUsado, failover: res.failover },
       p_response_payload: res.responsePayload,
     });
     return json({ ok: false, estado: "ERROR_TIMBRADO", error: res.codigoError, mensaje: res.mensajeError }, 502);
@@ -129,7 +128,7 @@ Deno.serve(async (req) => {
     p_pdf_storage_path: pdfPath,
     p_pac_referencia: res.pacReferencia,
     p_pac_costo_centavos: res.costoCentavos,
-    p_request_payload: { pac: pac.nombre },
+    p_request_payload: { pac: res.pacUsado, failover: res.failover },
     p_response_payload: res.responsePayload,
   });
   if (tErr) return json({ error: "MARCAR_TIMBRADO_ERROR", detalle: tErr.message }, 500);
@@ -140,6 +139,7 @@ Deno.serve(async (req) => {
     uuid_fiscal: res.uuidFiscal,
     serie: res.serie,
     folio_fiscal: res.folioFiscal,
-    pac: pac.nombre,
+    pac: res.pacUsado,
+    failover: res.failover,
   });
 });

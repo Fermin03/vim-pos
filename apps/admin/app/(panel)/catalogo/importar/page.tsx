@@ -3,7 +3,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { Button } from "@vim/ui/styles";
 import { PageBody, PageHeader } from "../../../components/page-header";
-import { importarMenu, parsearMenu, type ResultadoImport, type ResultadoParse } from "../../../lib/importar-menu";
+import { FORMATOS_ORIGEN, importarMenu, parsearConFormato, type FormatoOrigen, type ResultadoImport, type ResultadoParse } from "../../../lib/importar-menu";
 
 const EJEMPLO = `Categoría,Producto,Precio,Descripción
 Hamburguesas,Clásica,120,Carne 150g con queso
@@ -15,6 +15,8 @@ const fmt = (n: number) => new Intl.NumberFormat("es-MX", { style: "currency", c
 
 export default function ImportarMenuPage() {
   const [texto, setTexto] = useState("");
+  const [formato, setFormato] = useState<FormatoOrigen>("AUTO");
+  const [formatoUsado, setFormatoUsado] = useState<string | null>(null);
   const [parse, setParse] = useState<ResultadoParse | null>(null);
   const [resultado, setResultado] = useState<ResultadoImport | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -23,9 +25,10 @@ export default function ImportarMenuPage() {
   function revisar() {
     setError(null);
     setResultado(null);
-    const r = parsearMenu(texto);
+    const r = parsearConFormato(texto, formato);
     setParse(r);
-    if (r.filas.length === 0) setError("No se detectaron productos. Revisa el formato.");
+    setFormatoUsado(r.formatoUsado);
+    if (r.filas.length === 0) setError("No se detectaron productos. Revisa el formato u origen seleccionado.");
   }
 
   async function importar() {
@@ -45,7 +48,7 @@ export default function ImportarMenuPage() {
     <>
       <PageHeader
         titulo="Importar menú"
-        subtitulo="Pega tu menú en formato CSV (categoría, producto, precio, descripción) y crea todo de una vez."
+        subtitulo="Migra desde tu POS anterior (Square, Toast, Loyverse, Clip) pegando su export, o usa el formato simple de VIM."
         migas={[{ label: "Catálogo", href: "/catalogo" }, { label: "Importar" }]}
       />
       <PageBody>
@@ -67,8 +70,25 @@ export default function ImportarMenuPage() {
                 Una fila por producto. Separadores: coma, punto y coma o tabulador. La primera fila puede ser encabezado.
                 Las categorías que no existan se crean solas.
               </p>
-              <div className="mt-3">
+              {/* Fase 4 — POS de origen (preset de columnas, con autodetección) */}
+              <div className="mt-3 flex items-center gap-2">
+                <label className="text-[12.5px] font-medium text-ink-2" htmlFor="origen">POS de origen</label>
+                <select
+                  id="origen"
+                  value={formato}
+                  onChange={(e) => { setFormato(e.target.value as FormatoOrigen); setParse(null); }}
+                  className="h-10 rounded border border-line-strong bg-surface px-3 text-[13px] outline-none focus:border-ink"
+                >
+                  {FORMATOS_ORIGEN.map((f) => <option key={f.codigo} value={f.codigo}>{f.label}</option>)}
+                </select>
+              </div>
+              <div className="mt-3 flex items-center gap-3">
                 <Button onClick={revisar} disabled={!texto.trim()}>Revisar</Button>
+                {parse && formatoUsado && (
+                  <span className="rounded-full bg-sel px-2.5 py-1 text-[11.5px] font-semibold text-ink-3">
+                    Formato detectado: {formatoUsado}
+                  </span>
+                )}
               </div>
             </div>
 

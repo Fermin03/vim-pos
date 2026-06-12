@@ -45,6 +45,19 @@ export async function leerSesion(): Promise<Sesion | null> {
   return { email: s.user.email ?? "", userId: s.user.id, tenantId, tipoIdentidad };
 }
 
+/**
+ * Fase 4 — SSO empresarial. Redirige al proveedor (Google/Microsoft) y vuelve al panel.
+ * Supabase vincula automáticamente la identidad si el correo verificado coincide con un
+ * usuario ya invitado; un correo sin invitación entra SIN tenant (el guard lo detecta).
+ */
+export async function entrarConProveedor(proveedor: "google" | "azure"): Promise<void> {
+  const { error } = await supabase.auth.signInWithOAuth({
+    provider: proveedor,
+    options: { redirectTo: `${window.location.origin}/dashboard` },
+  });
+  if (error) throw new Error(error.message);
+}
+
 /** Login con email/password. Lanza Error con mensaje si falla. */
 export async function entrar(email: string, password: string): Promise<void> {
   const { error } = await supabase.auth.signInWithPassword({ email, password });
