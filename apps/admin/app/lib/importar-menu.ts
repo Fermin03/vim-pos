@@ -68,6 +68,115 @@ export function parsearMenu(texto: string): ResultadoParse {
   return { filas, errores };
 }
 
+// ── Fase 4 · Migración desde otros POS ───────────────────────────────────────
+// Presets de formato: el dueño pega el EXPORT de su POS anterior tal cual; el mapeo
+// de columnas se resuelve por encabezados (sinónimos por origen) con autodetección.
+
+export type FormatoOrigen = "AUTO" | "VIM" | "SQUARE" | "TOAST" | "LOYVERSE" | "CLIP";
+
+type MapaCampos = { categoria: string[]; nombre: string[]; precio: string[]; descripcion: string[] };
+
+const MAPEOS: Record<Exclude<FormatoOrigen, "AUTO" | "VIM">, MapaCampos> = {
+  SQUARE: {
+    categoria: ["category", "categories", "reporting category"],
+    nombre: ["item name", "item"],
+    precio: ["price", "price point price", "variation price"],
+    descripcion: ["description"],
+  },
+  TOAST: {
+    categoria: ["menu group", "group name", "menu"],
+    nombre: ["menu item", "item name", "name"],
+    precio: ["price", "base price"],
+    descripcion: ["description"],
+  },
+  // CLIP antes que LOYVERSE: los encabezados en español son de Clip; Loyverse exporta en inglés.
+  CLIP: {
+    categoria: ["categoría", "categoria"],
+    nombre: ["nombre", "producto", "artículo", "articulo"],
+    precio: ["precio", "precio de venta"],
+    descripcion: ["descripción", "descripcion"],
+  },
+  LOYVERSE: {
+    categoria: ["category"],
+    nombre: ["name"],
+    precio: ["default price", "price"],
+    descripcion: ["description"],
+  },
+};
+
+export const FORMATOS_ORIGEN: { codigo: FormatoOrigen; label: string }[] = [
+  { codigo: "AUTO", label: "Detectar automáticamente" },
+  { codigo: "VIM", label: "VIM (categoría, producto, precio, descripción)" },
+  { codigo: "SQUARE", label: "Square (export de catálogo)" },
+  { codigo: "TOAST", label: "Toast (export de menú)" },
+  { codigo: "LOYVERSE", label: "Loyverse (export de artículos)" },
+  { codigo: "CLIP", label: "Clip (export de productos)" },
+];
+
+function indicesPorEncabezado(headers: string[], mapa: MapaCampos): { categoria: number; nombre: number; precio: number; descripcion: number } | null {
+  const h = headers.map((x) => x.trim().toLowerCase());
+  const buscar = (sins: string[]) => h.findIndex((col) => sins.includes(col));
+  const idx = {
+    categoria: buscar(mapa.categoria),
+    nombre: buscar(mapa.nombre),
+    precio: buscar(mapa.precio),
+    descripcion: buscar(mapa.descripcion),
+  };
+  // nombre y precio son indispensables; categoría puede faltar (va a "Importados").
+  if (idx.nombre < 0 || idx.precio < 0) return null;
+  return idx;
+}
+
+/** Detecta el POS de origen por los encabezados de la primera línea. */
+export function detectarFormato(texto: string): Exclude<FormatoOrigen, "AUTO"> {
+  const primera = texto.split(/\r?\n/).find((l) => l.trim() !== "") ?? "";
+  const headers = dividirCSV(primera);
+  for (const [codigo, mapa] of Object.entries(MAPEOS) as [Exclude<FormatoOrigen, "AUTO" | "VIM">, MapaCampos][]) {
+    if (indicesPorEncabezado(headers, mapa)) return codigo;
+  }
+  return "VIM";
+}
+
+/** Parsea con el preset del POS de origen (o el formato VIM posicional). */
+export function parsearConFormato(texto: string, formato: FormatoOrigen): ResultadoParse & { formatoUsado: Exclude<FormatoOrigen, "AUTO"> } {
+  const f = formato === "AUTO" ? detectarFormato(texto) : formato;
+  if (f === "VIM") return { ...parsearMenu(texto), formatoUsado: "VIM" };
+
+  const mapa = MAPEOS[f];
+  const filas: FilaMenu[] = [];
+  const errores: ResultadoParse["errores"] = [];
+  const lineas = texto.split(/\r?\n/).filter((l) => l.trim() !== "");
+  if (lineas.length === 0) return { filas, errores, formatoUsado: f };
+
+  const idx = indicesPorEncabezado(dividirCSV(lineas[0]!), mapa);
+  if (!idx) {
+    errores.push({ linea: 1, texto: lineas[0]!.slice(0, 80), motivo: `Los encabezados no coinciden con el formato ${f}` });
+    return { filas, errores, formatoUsado: f };
+  }
+
+  lineas.slice(1).forEach((raw, i) => {
+    const cols = dividirCSV(raw);
+    const nombre = cols[idx.nombre]?.trim();
+    const precioRaw = cols[idx.precio]?.trim();
+    if (!nombre) return; // filas de variantes/sin nombre (frecuentes en Square) se omiten en silencio
+    // "abc" limpiado quedaría "" y Number("")===0: exigir que sobre algo numérico real.
+    const limpio = String(precioRaw ?? "").replace(/[^0-9.]/g, "");
+    const precio = Number(limpio);
+    if (limpio === "" || !Number.isFinite(precio)) {
+      errores.push({ linea: i + 2, texto: raw.slice(0, 80), motivo: `Precio inválido: "${precioRaw ?? ""}"` });
+      return;
+    }
+    filas.push({
+      categoria: (idx.categoria >= 0 ? cols[idx.categoria]?.trim() : "") || "Importados",
+      nombre: nombre.slice(0, 200),
+      precio: Math.round(precio * 100) / 100,
+      descripcion: (idx.descripcion >= 0 ? (cols[idx.descripcion] ?? "") : "").slice(0, 500),
+    });
+  });
+
+  return { filas, errores, formatoUsado: f };
+}
+
 export type ResultadoImport = { categoriasCreadas: number; productosCreados: number; fallos: { nombre: string; motivo: string }[] };
 
 /** Crea categorías faltantes + productos en lote. La BD es la autoridad (RLS + validaciones). */

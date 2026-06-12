@@ -2,7 +2,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@vim/ui/styles";
-import { entrar, leerSesion } from "./lib/supabase";
+import { entrar, entrarConProveedor, leerSesion } from "./lib/supabase";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -145,6 +145,31 @@ export default function LoginPage() {
             {cargando ? "Entrando…" : "Entrar"}
           </Button>
         </form>
+
+        {/* Fase 4 — SSO empresarial (Google / Microsoft) */}
+        <div className="mt-6 flex items-center gap-3">
+          <span className="h-px flex-1 bg-line" />
+          <span className="text-[12px] text-ink-3">o continúa con</span>
+          <span className="h-px flex-1 bg-line" />
+        </div>
+        <div className="mt-4 grid grid-cols-2 gap-2.5">
+          <button
+            type="button"
+            onClick={() => entrarConProveedor("google").catch(() => setAlerta("No se pudo iniciar con Google. ¿El proveedor está habilitado?"))}
+            className="flex h-11 items-center justify-center gap-2 rounded border border-line-strong text-[13.5px] font-semibold text-ink-2 transition hover:border-ink hover:text-ink"
+          >
+            <svg viewBox="0 0 24 24" className="h-[17px] w-[17px]"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.27-4.74 3.27-8.1z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84A11 11 0 0 0 12 23z"/><path fill="#FBBC05" d="M5.84 14.1A6.6 6.6 0 0 1 5.49 12c0-.73.13-1.44.35-2.1V7.06H2.18a11 11 0 0 0 0 9.88l3.66-2.84z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15A11 11 0 0 0 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"/></svg>
+            Google
+          </button>
+          <button
+            type="button"
+            onClick={() => entrarConProveedor("azure").catch(() => setAlerta("No se pudo iniciar con Microsoft. ¿El proveedor está habilitado?"))}
+            className="flex h-11 items-center justify-center gap-2 rounded border border-line-strong text-[13.5px] font-semibold text-ink-2 transition hover:border-ink hover:text-ink"
+          >
+            <svg viewBox="0 0 24 24" className="h-[16px] w-[16px]"><rect x="2" y="2" width="9.5" height="9.5" fill="#F25022"/><rect x="12.5" y="2" width="9.5" height="9.5" fill="#7FBA00"/><rect x="2" y="12.5" width="9.5" height="9.5" fill="#00A4EF"/><rect x="12.5" y="12.5" width="9.5" height="9.5" fill="#FFB900"/></svg>
+            Microsoft
+          </button>
+        </div>
 
         <p className="mt-8 text-center text-[13px] text-ink-3">
           ¿Aún no tienes cuenta? <a href="/registro" className="font-medium text-ink underline-offset-2 hover:underline">Crea tu negocio en VIM POS</a>
