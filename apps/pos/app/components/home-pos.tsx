@@ -44,6 +44,8 @@ import { ModalCancelarItem } from "./modal-cancelar-item";
 import { ModalDescuentoItem } from "./modal-descuento-item";
 import { ModalCancelarTicket } from "./modal-cancelar-ticket";
 import { ModalMovimientoCaja } from "./modal-movimiento-caja";
+import { listarTicketsEnEspera, ponerTicketEnEspera, retomarTicketEnEspera } from "../lib/espera";
+import { ModalEtiquetaEspera, ModalListaEspera } from "./modal-espera";
 import { leerItemsPersistidos, type ItemTicket } from "../lib/cancelacion";
 import { abrirCuentaEnMesa, agregarItemAlTicket, reconstruirCarrito } from "../lib/cuenta-mesa";
 import { atribuirMesero, enviarACocina, leerEstadoCocina } from "../lib/mesero";
@@ -71,6 +73,8 @@ function TopbarOperativa({
   onImpresora,
   onCambiarPin,
   onMisPropinas,
+  onEnEspera,
+  nEnEspera,
 }: {
   caja: DatosCaja;
   turno: Turno;
@@ -86,6 +90,9 @@ function TopbarOperativa({
   onImpresora: () => void;
   onCambiarPin: () => void;
   onMisPropinas: () => void;
+  /** D45 §12 — abre la lista de pedidos en espera de esta caja. */
+  onEnEspera: () => void;
+  nEnEspera: number;
 }) {
   const ahora = useReloj();
   return (
@@ -157,6 +164,17 @@ function TopbarOperativa({
             className="flex h-9 w-9 items-center justify-center rounded border border-line-strong text-ink-3 transition hover:border-ink hover:text-ink"
           >
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4"><path d="M6 9V2h12v7M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2M6 14h12v8H6z" /></svg>
+          </button>
+          <button
+            type="button"
+            onClick={onEnEspera}
+            className="relative flex h-9 items-center gap-1.5 rounded border border-line-strong px-3 text-[13px] font-semibold text-ink-2 transition hover:border-ink hover:text-ink"
+          >
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4"><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 3" /></svg>
+            En espera
+            {nEnEspera > 0 && (
+              <span className="ml-0.5 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-accent px-1 text-[11px] font-bold text-white">{nEnEspera}</span>
+            )}
           </button>
           <button
             type="button"
@@ -307,6 +325,12 @@ export function HomePos({
   const [datosComanda, setDatosComanda] = useState<DatosComanda | null>(null);
   const [mostrarRecibo, setMostrarRecibo] = useState(false);
   const [estadoTicket, setEstadoTicket] = useState<"idle" | "lista" | "error">("idle");
+  // D45 §12 — pedidos en espera: modal de etiqueta (guardar), lista (retomar) y contador del chip.
+  const [esperaPidiendoEtiqueta, setEsperaPidiendoEtiqueta] = useState(false);
+  const [esperaListaAbierta, setEsperaListaAbierta] = useState(false);
+  const [esperaProcesando, setEsperaProcesando] = useState(false);
+  const [esperaError, setEsperaError] = useState<string | null>(null);
+  const [nEnEspera, setNEnEspera] = useState(0);
 
   useEffect(() => {
     let activo = true;
@@ -522,6 +546,59 @@ export function HomePos({
   // para agregar ítems incrementalmente. Solo se bloquea el menú en el flujo QS post-cobro/descuento.
   const menuBloqueado = bloqueado && !enModoMesa;
 
+  // ── D45 §12 — Pedidos en espera ───────────────────────────────────────────
+  const refrescarEspera = useCallback(() => {
+    listarTicketsEnEspera(token, turno.caja_id).then((ts) => setNEnEspera(ts.length)).catch(() => {});
+  }, [token, turno.caja_id]);
+  useEffect(() => { refrescarEspera(); }, [refrescarEspera]);
+
+  /** Persiste el carrito (si hace falta) y lo marca en espera con la etiqueta capturada. */
+  const confirmarEspera = useCallback(async (etiqueta: string) => {
+    setEsperaProcesando(true);
+    setEsperaError(null);
+    try {
+      let bd = ticketBd;
+      if (!bd) {
+        bd = await persistirTicket(
+          { token, sucursalId: caja.sucursal_id, cajaId: turno.caja_id, turnoId: turno.id },
+          carrito.modoServicio,
+          carrito.lineas,
+          nuevoClientId(),
+          carrito.clienteDomicilio?.clienteId ?? null,
+          carrito.clienteDomicilio?.direccionId ?? null,
+          carrito.notaOrden ?? null,
+        );
+      }
+      await ponerTicketEnEspera(token, bd.ticketId, etiqueta);
+      // La caja queda libre para la siguiente venta; el pedido vive en BD.
+      dispatch({ tipo: "limpiar" });
+      setTicketBd(null);
+      setItemsPersistidos([]);
+      setEsperaPidiendoEtiqueta(false);
+      refrescarEspera();
+    } catch (e) {
+      setEsperaError(e instanceof Error ? e.message : "No se pudo poner en espera");
+    } finally {
+      setEsperaProcesando(false);
+    }
+  }, [carrito, ticketBd, token, caja.sucursal_id, turno.caja_id, turno.id, refrescarEspera]);
+
+  /** Retoma un pedido en espera: lo carga al carrito como cuenta editable (misma maquinaria de mesas). */
+  const retomarEspera = useCallback(async (ticketId: string) => {
+    setEsperaProcesando(true);
+    setEsperaError(null);
+    try {
+      await retomarTicketEnEspera(token, ticketId);
+      await entrarCuenta(ticketId);
+      setEsperaListaAbierta(false);
+      refrescarEspera();
+    } catch (e) {
+      setEsperaError(e instanceof Error ? e.message : "No se pudo retomar el pedido");
+    } finally {
+      setEsperaProcesando(false);
+    }
+  }, [token, entrarCuenta, refrescarEspera]);
+
   /** Descarta el overlay de confirmación/recibo (sin tocar el carrito en curso).
    *  Se llama al navegar por el topbar para que un recibo viejo no reaparezca apilado. */
   const cerrarRecibo = useCallback(() => {
@@ -622,7 +699,7 @@ export function HomePos({
           Sincronizando {pendientesSync} operación{pendientesSync === 1 ? "" : "es"} pendiente{pendientesSync === 1 ? "" : "s"}…
         </div>
       )}
-      <TopbarOperativa caja={caja} turno={turno} empleado={empleado} onCambiarCajero={onCambiarCajero} onBloquear={onBloquear} onCerrarTurno={() => setCerrando(true)} onMovimientoCaja={() => setMovimientoAbierto(true)} onKds={() => { salirNavegacion(); setEnKds(true); }} onMesas={() => { salirNavegacion(); setEnMesas(true); }} onDelivery={() => { salirNavegacion(); setEnDelivery(true); }} onDevoluciones={() => { salirNavegacion(); setEnDevoluciones(true); }} onImpresora={() => setConfigImpresoraAbierto(true)} onCambiarPin={() => setCambiarPinAbierto(true)} onMisPropinas={() => setMisPropinasAbierto(true)} />
+      <TopbarOperativa caja={caja} turno={turno} empleado={empleado} onCambiarCajero={onCambiarCajero} onBloquear={onBloquear} onCerrarTurno={() => setCerrando(true)} onMovimientoCaja={() => setMovimientoAbierto(true)} onKds={() => { salirNavegacion(); setEnKds(true); }} onMesas={() => { salirNavegacion(); setEnMesas(true); }} onDelivery={() => { salirNavegacion(); setEnDelivery(true); }} onDevoluciones={() => { salirNavegacion(); setEnDevoluciones(true); }} onImpresora={() => setConfigImpresoraAbierto(true)} onCambiarPin={() => setCambiarPinAbierto(true)} onMisPropinas={() => setMisPropinasAbierto(true)} onEnEspera={() => { setEsperaError(null); setEsperaListaAbierta(true); }} nEnEspera={nEnEspera} />
       {configImpresoraAbierto && <ModalConfigImpresora onCerrar={() => setConfigImpresoraAbierto(false)} />}
       {clienteDomAbierto && (
         <ModalClienteDomicilio
@@ -740,6 +817,7 @@ export function HomePos({
           onNotaLinea={(id, nota) => dispatch({ tipo: "nota_linea", clientId: id, nota })}
           onNotaOrden={(nota) => dispatch({ tipo: "nota_orden", nota })}
           onCobrar={iniciarCobro}
+          onPonerEnEspera={online ? () => { setEsperaError(null); setEsperaPidiendoEtiqueta(true); } : undefined}
           onEnviarCocina={enModoMesa && ticketBd ? onEnviarCocina : undefined}
           cocinaEnviada={cocinaEnviada}
           enviandoCocina={enviandoCocina}
@@ -751,6 +829,24 @@ export function HomePos({
         />
       </div>
 
+      {esperaPidiendoEtiqueta && (
+        <ModalEtiquetaEspera
+          onConfirmar={confirmarEspera}
+          onCerrar={() => setEsperaPidiendoEtiqueta(false)}
+          procesando={esperaProcesando}
+          error={esperaError}
+        />
+      )}
+      {esperaListaAbierta && (
+        <ModalListaEspera
+          token={token}
+          cajaId={turno.caja_id}
+          onRetomar={retomarEspera}
+          onCerrar={() => setEsperaListaAbierta(false)}
+          procesando={esperaProcesando}
+          error={esperaError}
+        />
+      )}
       {modGrupos && (
         <ModalModificadores
           producto={modGrupos.producto}
