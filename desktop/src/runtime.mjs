@@ -1,0 +1,112 @@
+// Fase 1 · Runtime local del POS de escritorio.
+// Gestiona el "backend en la caja": Postgres embebido (sin Docker) + migraciones idempotentes
+// + PostgREST como sidecar. Es el mismo stack validado en la Fase 0, ahora como módulo
+// reusable que arranca el proceso main de Electron (o el verify headless).
+import EmbeddedPostgres from "embedded-postgres";
+import pg from "pg";
+import { spawn } from "node:child_process";
+import { readFileSync, readdirSync, existsSync, openSync, writeFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
+import path from "node:path";
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const root = path.resolve(__dirname, "..");
+const repoRoot = path.resolve(root, "..");
+const MIGRATIONS = path.join(repoRoot, "supabase", "migrations");
+const SEED = path.join(repoRoot, "supabase", "seed.sql");
+const SHIM = path.join(root, "sql", "00-compat-shim.sql");
+const PG_BIN = path.join(root, "node_modules", "@embedded-postgres", "windows-x64", "native", "bin");
+
+const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+
+/** Arranca el backend local y devuelve puertos + pool + stop(). Idempotente entre arranques. */
+export async function startLocalBackend(opts = {}) {
+  const dataDir = opts.dataDir ?? path.join(root, "pgdata");
+  const pgPort = opts.pgPort ?? 54329;
+  const restPort = opts.restPort ?? 54331;
+  const secret = opts.jwtSecret ?? "vim-pos-local-jwt-secret-cambia-en-produccion-32+";
+  const seedIfEmpty = opts.seedIfEmpty ?? true;
+  const log = opts.log ?? (() => {});
+
+  const database = new EmbeddedPostgres({ databaseDir: dataDir, user: "postgres", password: "postgres", port: pgPort, persistent: true });
+  if (!existsSync(path.join(dataDir, "PG_VERSION"))) { log("initdb (primer arranque)…"); await database.initialise(); }
+  await database.start();
+  log(`Postgres embebido en localhost:${pgPort}`);
+
+  // 1) Asegurar la BD vimpos en UTF8 (Windows arranca el clúster en WIN1252).
+  const su = new pg.Client({ host: "localhost", port: pgPort, user: "postgres", password: "postgres", database: "postgres" });
+  await su.connect();
+  const existe = (await su.query("SELECT 1 FROM pg_database WHERE datname='vimpos'")).rowCount > 0;
+  if (!existe) await su.query("CREATE DATABASE vimpos WITH ENCODING 'UTF8' TEMPLATE template0 LC_COLLATE 'C' LC_CTYPE 'C'");
+  await su.end();
+
+  const db = new pg.Client({ host: "localhost", port: pgPort, user: "postgres", password: "postgres", database: "vimpos" });
+  await db.connect();
+  await db.query("SET client_encoding TO 'UTF8'");
+
+  // 2) Shim de compatibilidad Supabase (idempotente).
+  await db.query(readFileSync(SHIM, "utf8"));
+
+  // 3) Migraciones idempotentes (registradas en _vim_migraciones).
+  await db.query("CREATE TABLE IF NOT EXISTS _vim_migraciones (nombre text PRIMARY KEY, aplicada_at timestamptz DEFAULT now())");
+  const aplicadas = new Set((await db.query("SELECT nombre FROM _vim_migraciones")).rows.map((r) => r.nombre));
+  const files = readdirSync(MIGRATIONS).filter((f) => f.endsWith(".sql")).sort();
+  let nuevas = 0;
+  for (const f of files) {
+    if (aplicadas.has(f)) continue;
+    try {
+      await db.query(readFileSync(path.join(MIGRATIONS, f), "utf8"));
+      await db.query("INSERT INTO _vim_migraciones(nombre) VALUES ($1)", [f]);
+      nuevas++;
+    } catch (e) {
+      throw new Error(`Migración ${f} falló: ${e.message}`);
+    }
+  }
+  if (nuevas) log(`${nuevas} migraciones nuevas aplicadas`);
+
+  // 4) Grants a los roles API (lo que Supabase da fuera de las migraciones).
+  await db.query(`
+    GRANT USAGE ON SCHEMA public TO anon, authenticated, service_role;
+    GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO authenticated, service_role;
+    GRANT SELECT ON ALL TABLES IN SCHEMA public TO anon;
+    GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO authenticated, service_role;
+  `);
+
+  // 5) Seed de fixtures solo si la BD está vacía (en producción llega por sync/provisioning).
+  const vacia = (await db.query("SELECT count(*)::int n FROM tenants")).rows[0].n === 0;
+  if (vacia && seedIfEmpty) {
+    await db.query("TRUNCATE planes, folios_paquetes, roles, permisos, rol_permisos RESTART IDENTITY CASCADE");
+    await db.query(readFileSync(SEED, "utf8"));
+    log("seed de fixtures aplicado (BD estaba vacía)");
+  }
+  await db.end();
+
+  // 6) PostgREST como sidecar (con libpq.dll del propio Postgres embebido).
+  const confPath = path.join(root, "bin", "postgrest.conf");
+  writeFileSync(confPath, [
+    `db-uri = "postgres://authenticator:postgres@localhost:${pgPort}/vimpos"`,
+    `db-schemas = "public"`,
+    `db-anon-role = "anon"`,
+    `jwt-secret = "${secret}"`,
+    `server-port = ${restPort}`,
+    ``,
+  ].join("\n"));
+  const logFd = openSync(path.join(root, "bin", "postgrest.log"), "w");
+  const rest = spawn(path.join(root, "bin", "postgrest.exe"), [confPath], {
+    stdio: ["ignore", logFd, logFd],
+    env: { ...process.env, PATH: `${PG_BIN}${path.delimiter}${process.env.PATH}` },
+  });
+  let ready = false;
+  for (let i = 0; i < 40; i++) {
+    try { if ((await fetch(`http://localhost:${restPort}/`)).ok) { ready = true; break; } } catch { /* aún no */ }
+    await wait(500);
+  }
+  if (!ready) throw new Error("PostgREST no respondió");
+  log(`PostgREST en localhost:${restPort}`);
+
+  // Pool para el auth local (device sign-in, pin-login) — service_role local.
+  const pool = new pg.Pool({ host: "localhost", port: pgPort, user: "postgres", password: "postgres", database: "vimpos", max: 4 });
+
+  const stop = async () => { try { rest.kill(); } catch { /* */ } try { await pool.end(); } catch { /* */ } await database.stop(); };
+  return { pgPort, restPort, secret, pool, stop };
+}

@@ -1,0 +1,10 @@
+# Artefactos pesados — se regeneran con npm install + primer arranque
+node_modules/
+pgdata/
+dist/
+out/
+bin/postgrest.exe
+bin/*.zip
+bin/*.dll
+bin/postgrest.conf
+bin/postgrest.log
