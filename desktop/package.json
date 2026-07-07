@@ -4,13 +4,18 @@
   "private": true,
   "type": "module",
   "description": "Fase 1 — VIM POS de escritorio local-first: Postgres embebido + PostgREST + gateway compatible con Supabase + auth PIN local, empaquetado en Electron.",
+  "main": "src/main.mjs",
   "scripts": {
     "verify": "node src/verify-e2e.mjs",
-    "backend": "node src/backend.mjs"
+    "backend": "node src/backend.mjs",
+    "start": "electron ."
   },
   "dependencies": {
     "embedded-postgres": "17.10.0-beta.17",
     "jsonwebtoken": "^9.0.2",
     "pg": "^8.13.1"
+  },
+  "devDependencies": {
+    "electron": "^33.2.1"
   }
 }

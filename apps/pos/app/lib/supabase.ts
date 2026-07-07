@@ -1,8 +1,14 @@
 "use client";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 
-const URL = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const ANON = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+// Fase 1 (escritorio local-first): en Electron, el preload inyecta el endpoint del gateway
+// local (window.__VIM_SUPABASE_URL). En el navegador/nube cae al env de build. Mismo código,
+// dos destinos: apuntar a localhost hace que TODO el POS corra offline sin más cambios.
+const runtime = typeof window !== "undefined"
+  ? (window as unknown as { __VIM_SUPABASE_URL?: string; __VIM_SUPABASE_ANON?: string })
+  : undefined;
+const URL = runtime?.__VIM_SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL!;
+const ANON = runtime?.__VIM_SUPABASE_ANON || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
 
 /**
  * Cliente del DISPOSITIVO (caja). Sostiene la sesión base de GoTrue (signInWithPassword
