@@ -1,0 +1,9 @@
+# Artefactos pesados del spike — NO se commitean (se regeneran con npm install + npm run bootstrap)
+node_modules/
+pgdata/
+bin/postgrest.exe
+bin/*.zip
+bin/*.dll
+bin/postgrest.conf
+bin/postgrest.log
+bin/help.txt

@@ -1,0 +1,17 @@
+{
+  "name": "vim-pos-spike-local-first",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Fase 0 — valida el stack local-first shippable: Postgres embebido (sin Docker) + migraciones VIM + PostgREST + venta 100% offline.",
+  "scripts": {
+    "bootstrap": "node run/01-bootstrap.mjs",
+    "venta": "node run/02-venta-sql.mjs",
+    "rest": "node run/03-postgrest.mjs"
+  },
+  "dependencies": {
+    "embedded-postgres": "17.10.0-beta.17",
+    "pg": "^8.13.1",
+    "jsonwebtoken": "^9.0.2"
+  }
+}
