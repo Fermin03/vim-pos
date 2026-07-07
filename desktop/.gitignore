@@ -8,3 +8,4 @@ bin/*.zip
 bin/*.dll
 bin/postgrest.conf
 bin/postgrest.log
+bin/*.out
