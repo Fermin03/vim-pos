@@ -83,9 +83,28 @@ async function syncBestEffort() {
   }
 }
 
-app.whenReady().then(boot).catch((e) => { console.error("Boot falló:", e); app.quit(); });
+let cerrando = false;
+/** Apagado idempotente: detiene UI server + backend (Postgres/PostgREST). Sin esto quedan huérfanos. */
+async function cerrarTodo() {
+  if (cerrando) return;
+  cerrando = true;
+  try { if (uiServer) uiServer.close(); } catch { /* */ }
+  try { if (backend) await backend.stop(); } catch { /* */ }
+}
 
-app.on("activate", () => { if (BrowserWindow.getAllWindows().length === 0) boot(); });
-app.on("window-all-closed", async () => {
-  try { if (uiServer) uiServer.close(); if (backend) await backend.stop(); } finally { app.quit(); }
-});
+// Instancia única: dos cajas abiertas a la vez chocarían en los puertos y corromperían el estado.
+if (!app.requestSingleInstanceLock()) {
+  app.quit();
+} else {
+  app.on("second-instance", () => {
+    if (win) { if (win.isMinimized()) win.restore(); win.focus(); }
+  });
+
+  app.whenReady().then(boot).catch((e) => { console.error("Boot falló:", e); app.quit(); });
+  app.on("activate", () => { if (BrowserWindow.getAllWindows().length === 0) boot(); });
+  app.on("window-all-closed", async () => { await cerrarTodo(); app.quit(); });
+  // Cierre por menú/atajo/OS: apagar el backend ANTES de salir (evita procesos huérfanos).
+  app.on("before-quit", (e) => {
+    if (!cerrando) { e.preventDefault(); cerrarTodo().finally(() => app.exit(0)); }
+  });
+}

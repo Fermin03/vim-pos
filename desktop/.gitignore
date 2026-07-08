@@ -11,3 +11,4 @@ bin/postgrest.log
 bin/*.out
 pos-ui/
 apps-pos-out/
+bin/.pids.json
