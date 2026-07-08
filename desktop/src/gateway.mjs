@@ -10,8 +10,9 @@ import { deviceSignIn, refreshSession, getUser, pinLogin } from "./auth.mjs";
 const CORS = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Methods": "GET,POST,PATCH,PUT,DELETE,OPTIONS,HEAD",
-  "Access-Control-Allow-Headers": "authorization,apikey,content-type,prefer,accept,accept-profile,content-profile,range,x-client-info",
+  "Access-Control-Allow-Headers": "authorization,apikey,content-type,prefer,accept,accept-profile,content-profile,range,x-client-info,x-supabase-api-version",
   "Access-Control-Expose-Headers": "content-range,content-profile,range",
+  "Access-Control-Max-Age": "86400",
 };
 
 const readBody = (req) => new Promise((resolve) => {
@@ -37,7 +38,13 @@ export function crearGateway(backend) {
       const url = new URL(req.url, "http://localhost");
       const p = url.pathname;
 
-      if (req.method === "OPTIONS") return send(res, 204, "");
+      if (req.method === "OPTIONS") {
+        // Reflejar los headers que pide el preflight (supabase-js manda x-supabase-api-version,
+        // x-client-info, etc.). Así el gateway nunca rompe por un header nuevo del cliente.
+        const pedidos = req.headers["access-control-request-headers"];
+        res.writeHead(204, { ...CORS, ...(pedidos ? { "Access-Control-Allow-Headers": pedidos } : {}) });
+        return res.end("");
+      }
       if (p === "/health") return send(res, 200, { ok: true });
 
       // ── Auth (GoTrue emulado) ──────────────────────────────────────────────
