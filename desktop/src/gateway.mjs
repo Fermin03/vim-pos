@@ -5,7 +5,7 @@
 //   /functions/v1/pin-login      → pin-login local                          [reemplaza Edge]
 //   /rest/v1/*                   → PostgREST (proxy)                         [datos + RPC + RLS]
 import http from "node:http";
-import { deviceSignIn, refreshSession, getUser, pinLogin } from "./auth.mjs";
+import { deviceSignIn, refreshSession, getUser, pinLogin, autorizarPin } from "./auth.mjs";
 
 const CORS = {
   "Access-Control-Allow-Origin": "*",
@@ -67,6 +67,11 @@ export function crearGateway(backend) {
       if (p === "/functions/v1/pin-login") {
         const body = JSON.parse((await readBody(req)).toString() || "{}");
         const out = await pinLogin(pool, secret, body);
+        return send(res, out.error ?? 200, out.body);
+      }
+      if (p === "/functions/v1/autorizar-pin") {
+        const body = JSON.parse((await readBody(req)).toString() || "{}");
+        const out = await autorizarPin(pool, secret, bearer(req), body);
         return send(res, out.error ?? 200, out.body);
       }
       if (p.startsWith("/functions/v1/")) {
