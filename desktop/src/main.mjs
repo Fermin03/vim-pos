@@ -8,6 +8,7 @@ import { fileURLToPath } from "node:url";
 import { startBackend } from "./backend.mjs";
 import { startUiServer } from "./ui-server.mjs";
 import { pullFromCloud } from "./sync-pull.mjs";
+import { pushToCloud } from "./sync-push.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const UI_DIR = path.join(__dirname, "..", "pos-ui");
@@ -45,30 +46,40 @@ async function boot() {
   posUrl = posUrl || "https://pos.vimpos.com.mx";
   await win.loadURL(posUrl);
 
-  // 4) Sync PULL best-effort al arrancar (si hay red + credenciales). NO bloquea la operación:
-  //    si falla u ofline, la caja sigue con lo que ya tiene local. El PUSH de ventas es aparte.
-  pullBestEffort().catch(() => {});
+  // 4) Sync best-effort al arrancar (si hay red + credenciales). NO bloquea la operación:
+  //    si falla u offline, la caja sigue con lo local. Ciclo completo: PULL baja referencia
+  //    (catálogo/config/empleados), PUSH sube las ventas que se generaron offline.
+  syncBestEffort().catch(() => {});
 }
 
-/** Baja la rebanada del tenant de la nube al Postgres local. Gated por env; best-effort. */
-async function pullBestEffort() {
+/** Sincroniza con la nube: PULL (referencia ↓) + PUSH (ventas ↑). Gated por env; best-effort. */
+async function syncBestEffort() {
   const cloudUrl = process.env.VIM_CLOUD_URL;         // p.ej. https://<proj>.supabase.co
   const anon = process.env.VIM_CLOUD_ANON;
   const email = process.env.VIM_DEVICE_EMAIL;         // caja-<id>@dispositivos.vimpos.mx
   const pass = process.env.VIM_DEVICE_PASS;
-  if (!cloudUrl || !anon || !email || !pass) { console.log("· [sync] pull omitido (sin credenciales de nube configuradas)"); return; }
+  if (!cloudUrl || !anon || !email || !pass) { console.log("· [sync] omitido (sin credenciales de nube configuradas)"); return; }
   try {
     const r = await fetch(`${cloudUrl}/auth/v1/token?grant_type=password`, {
       method: "POST", headers: { apikey: anon, "Content-Type": "application/json" },
       body: JSON.stringify({ email, password: pass }),
     });
     const s = await r.json();
-    if (!s.access_token) { console.log("· [sync] pull omitido (login de dispositivo en la nube falló)"); return; }
-    console.log("· [sync] bajando rebanada del tenant…");
-    const resumen = await pullFromCloud(backend.pool, { cloudUrl, anonKey: anon, deviceToken: s.access_token }, (m) => console.log("· [sync]", m));
-    console.log(`· [sync] pull OK: ${Object.keys(resumen).length} tablas actualizadas`);
+    if (!s.access_token) { console.log("· [sync] omitido (login de dispositivo en la nube falló)"); return; }
+    const deviceToken = s.access_token;
+    const opts = { cloudUrl, anonKey: anon, deviceToken };
+    try {
+      console.log("· [sync] PULL: bajando rebanada del tenant…");
+      const rp = await pullFromCloud(backend.pool, opts, (m) => console.log("· [sync]", m));
+      console.log(`· [sync] PULL OK: ${Object.keys(rp).length} tablas`);
+    } catch (e) { console.log("· [sync] PULL omitido:", e.message); }
+    try {
+      console.log("· [sync] PUSH: subiendo ventas offline…");
+      const rs = await pushToCloud(backend.pool, opts, (m) => console.log("· [sync]", m));
+      console.log(`· [sync] PUSH OK: ${rs.subidos} ventas subidas`);
+    } catch (e) { console.log("· [sync] PUSH omitido:", e.message); }
   } catch (e) {
-    console.log("· [sync] pull best-effort omitido:", e.message);
+    console.log("· [sync] best-effort omitido:", e.message);
   }
 }
 
