@@ -8,6 +8,7 @@
   "scripts": {
     "verify": "node src/verify-e2e.mjs",
     "backend": "node src/backend.mjs",
+    "build:ui": "node scripts/build-ui.mjs",
     "start": "electron ."
   },
   "dependencies": {

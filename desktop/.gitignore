@@ -9,3 +9,5 @@ bin/*.dll
 bin/postgrest.conf
 bin/postgrest.log
 bin/*.out
+pos-ui/
+apps-pos-out/
