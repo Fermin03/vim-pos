@@ -23,7 +23,7 @@ const CSP = [
   "font-src 'self' data: https://fonts.gstatic.com",
   "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
   "script-src 'self' 'unsafe-inline'",
-  "connect-src 'self' https://*.supabase.co https://*.supabase.in http://localhost:* ws://localhost:*",
+  "connect-src 'self' https://*.supabase.co https://*.supabase.in http://localhost:* ws://localhost:* https://fonts.googleapis.com https://fonts.gstatic.com",
 ].join("; ");
 
 /** Arranca el servidor del UI sobre `dir` (el pos-ui/). Devuelve el http.Server. */

@@ -97,11 +97,15 @@ export async function startLocalBackend(opts = {}) {
     env: { ...process.env, PATH: `${PG_BIN}${path.delimiter}${process.env.PATH}` },
   });
   let ready = false;
-  for (let i = 0; i < 40; i++) {
+  for (let i = 0; i < 120; i++) { // hasta ~60s: bajo carga, el schema cache tarda en cargar
     try { if ((await fetch(`http://localhost:${restPort}/`)).ok) { ready = true; break; } } catch { /* aún no */ }
     await wait(500);
   }
-  if (!ready) throw new Error("PostgREST no respondió");
+  if (!ready) {
+    let tail = "";
+    try { tail = readFileSync(path.join(root, "bin", "postgrest.log"), "utf8").split("\n").slice(-6).join("\n"); } catch { /* */ }
+    throw new Error(`PostgREST no respondió.\n${tail}`);
+  }
   log(`PostgREST en localhost:${restPort}`);
 
   // Pool para el auth local (device sign-in, pin-login) — service_role local.
