@@ -7,6 +7,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { startBackend } from "./backend.mjs";
 import { startUiServer } from "./ui-server.mjs";
+import { pullFromCloud } from "./sync-pull.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const UI_DIR = path.join(__dirname, "..", "pos-ui");
@@ -43,6 +44,32 @@ async function boot() {
   }
   posUrl = posUrl || "https://pos.vimpos.com.mx";
   await win.loadURL(posUrl);
+
+  // 4) Sync PULL best-effort al arrancar (si hay red + credenciales). NO bloquea la operación:
+  //    si falla u ofline, la caja sigue con lo que ya tiene local. El PUSH de ventas es aparte.
+  pullBestEffort().catch(() => {});
+}
+
+/** Baja la rebanada del tenant de la nube al Postgres local. Gated por env; best-effort. */
+async function pullBestEffort() {
+  const cloudUrl = process.env.VIM_CLOUD_URL;         // p.ej. https://<proj>.supabase.co
+  const anon = process.env.VIM_CLOUD_ANON;
+  const email = process.env.VIM_DEVICE_EMAIL;         // caja-<id>@dispositivos.vimpos.mx
+  const pass = process.env.VIM_DEVICE_PASS;
+  if (!cloudUrl || !anon || !email || !pass) { console.log("· [sync] pull omitido (sin credenciales de nube configuradas)"); return; }
+  try {
+    const r = await fetch(`${cloudUrl}/auth/v1/token?grant_type=password`, {
+      method: "POST", headers: { apikey: anon, "Content-Type": "application/json" },
+      body: JSON.stringify({ email, password: pass }),
+    });
+    const s = await r.json();
+    if (!s.access_token) { console.log("· [sync] pull omitido (login de dispositivo en la nube falló)"); return; }
+    console.log("· [sync] bajando rebanada del tenant…");
+    const resumen = await pullFromCloud(backend.pool, { cloudUrl, anonKey: anon, deviceToken: s.access_token }, (m) => console.log("· [sync]", m));
+    console.log(`· [sync] pull OK: ${Object.keys(resumen).length} tablas actualizadas`);
+  } catch (e) {
+    console.log("· [sync] pull best-effort omitido:", e.message);
+  }
 }
 
 app.whenReady().then(boot).catch((e) => { console.error("Boot falló:", e); app.quit(); });
