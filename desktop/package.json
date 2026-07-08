@@ -9,6 +9,7 @@
     "verify": "node src/verify-e2e.mjs",
     "verify:sync": "node src/verify-sync.mjs",
     "verify:push": "node src/verify-push.mjs",
+    "verify:dia": "node src/verify-dia.mjs",
     "backend": "node src/backend.mjs",
     "build:ui": "node scripts/build-ui.mjs",
     "start": "electron ."

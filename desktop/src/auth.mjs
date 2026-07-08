@@ -79,6 +79,27 @@ export async function getUser(pool, secret, token) {
   return { body: goTrueUser({ ...row, tipo_identidad: row.rol === "DISPOSITIVO" ? "DISPOSITIVO" : "EMPLEADO" }) };
 }
 
+/** Autorización por PIN de un superior (reemplaza la Edge autorizar-pin). El solicitante sale
+ *  del JWT del empleado; la RPC valida el PIN del autorizante y su permiso/jerarquía. */
+export async function autorizarPin(pool, secret, token, body) {
+  let dec;
+  try { dec = jwt.verify(token, secret); } catch { return { error: 401, body: { error: "AUTH_INVALIDA" } }; }
+  const { pin, accion, permiso_codigo, entidad_tipo, entidad_id, monto, motivo, caja_id, turno_id } = body ?? {};
+  if (!pin || !accion || !permiso_codigo || !caja_id) return { error: 400, body: { error: "FALTAN_CAMPOS" } };
+  if (!/^\d{4,6}$/.test(String(pin))) return { error: 400, body: { error: "PIN_INVALIDO" } };
+  const { rows } = await pool.query("SELECT verificar_autorizacion_pin($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) AS r", [
+    String(pin), accion, permiso_codigo, entidad_tipo ?? null, entidad_id ?? null,
+    monto ?? null, motivo ?? "", caja_id, turno_id ?? null, dec.sub,
+  ]);
+  const r = rows[0].r;
+  if (!r?.ok) {
+    const motivoR = r?.motivo ?? "PIN_INCORRECTO";
+    const status = motivoR === "USUARIO_BLOQUEADO" ? 423 : motivoR === "SIN_PERMISO" ? 403 : 401;
+    return { error: status, body: { error: motivoR } };
+  }
+  return { body: { ok: true, autorizacion_pin_id: r.autorizacion_pin_id, autorizo_id: r.autorizo_id } };
+}
+
 /** Login del EMPLEADO por PIN (reemplaza la Edge Function pin-login). */
 export async function pinLogin(pool, secret, { usuario_id, pin, caja_id }) {
   if (!usuario_id || !pin || !caja_id) return { error: 400, body: { error: "FALTAN_CAMPOS" } };
