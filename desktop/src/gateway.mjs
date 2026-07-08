@@ -81,7 +81,7 @@ export function crearGateway(backend) {
 
       // ── Datos (PostgREST proxy) ────────────────────────────────────────────
       if (p.startsWith("/rest/v1/")) {
-        const target = `http://localhost:${restPort}${p.replace("/rest/v1", "")}${url.search}`;
+        const target = `http://127.0.0.1:${restPort}${p.replace("/rest/v1", "")}${url.search}`; // 127.0.0.1: PostgREST solo IPv4
         const headers = {};
         for (const h of ["authorization", "prefer", "content-type", "accept", "accept-profile", "content-profile", "range"]) {
           if (req.headers[h]) headers[h] = req.headers[h];

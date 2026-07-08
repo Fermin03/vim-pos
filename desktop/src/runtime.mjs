@@ -5,7 +5,7 @@
 import EmbeddedPostgres from "embedded-postgres";
 import pg from "pg";
 import { spawn } from "node:child_process";
-import { readFileSync, readdirSync, existsSync, openSync, writeFileSync, rmSync } from "node:fs";
+import { readFileSync, readdirSync, existsSync, openSync, writeFileSync, rmSync, mkdirSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
 
@@ -26,14 +26,14 @@ const wait = (ms) => new Promise((r) => setTimeout(r, ms));
  * Con la instancia única de Electron, aquí no hay riesgo de matar la instancia viva. Exportada
  * para poder probarla. Idempotente.
  */
-export function matarHuerfanos(dataDir, log = () => {}) {
+export function matarHuerfanos(dataDir, log = () => {}, pidfile = PIDFILE) {
   try {
-    if (existsSync(PIDFILE)) {
-      const { pids = [] } = JSON.parse(readFileSync(PIDFILE, "utf8"));
+    if (existsSync(pidfile)) {
+      const { pids = [] } = JSON.parse(readFileSync(pidfile, "utf8"));
       for (const pid of pids) {
         try { process.kill(pid, "SIGKILL"); log(`huérfano ${pid} terminado`); } catch { /* ya no existe */ }
       }
-      rmSync(PIDFILE, { force: true });
+      rmSync(pidfile, { force: true });
     }
   } catch { /* pidfile ilegible: ignorar */ }
   // postmaster.pid: un Postgres previo sobre el MISMO data dir bloquearía el arranque.
@@ -48,7 +48,20 @@ export function matarHuerfanos(dataDir, log = () => {}) {
 
 /** Arranca el backend local y devuelve puertos + pool + stop(). Idempotente entre arranques. */
 export async function startLocalBackend(opts = {}) {
-  const dataDir = opts.dataDir ?? path.join(root, "pgdata");
+  // Empaquetado (Electron): recursos read-only en resDir (extraResources) y datos escribibles en
+  // dataRoot (userData). Dev: todo bajo el repo (comportamiento original). Rutas resueltas aquí.
+  const resDir = opts.resDir ?? null;      // null = dev
+  const dataRoot = opts.dataRoot ?? root;  // escribible
+  const migrationsDir = resDir ? path.join(resDir, "migrations") : MIGRATIONS;
+  const seedFile = resDir ? path.join(resDir, "seed.sql") : SEED;
+  const shimFile = resDir ? path.join(resDir, "sql", "00-compat-shim.sql") : SHIM;
+  const pgBin = resDir ? path.join(resDir, "pg-bin") : PG_BIN;
+  const postgrestExe = resDir ? path.join(resDir, "bin", "postgrest.exe") : path.join(root, "bin", "postgrest.exe");
+  const confPath = path.join(dataRoot, "bin", "postgrest.conf");
+  const logPath = path.join(dataRoot, "bin", "postgrest.log");
+  const pidfile = path.join(dataRoot, "bin", ".pids.json");
+
+  const dataDir = opts.dataDir ?? path.join(dataRoot, "pgdata");
   const pgPort = opts.pgPort ?? 54329;
   const restPort = opts.restPort ?? 54331;
   const secret = opts.jwtSecret ?? "vim-pos-local-jwt-secret-cambia-en-produccion-32+";
@@ -56,7 +69,7 @@ export async function startLocalBackend(opts = {}) {
   const log = opts.log ?? (() => {});
 
   // Antes de arrancar: limpiar cualquier Postgres/PostgREST huérfano de un cierre no limpio.
-  matarHuerfanos(dataDir, (m) => log(`limpieza: ${m}`));
+  matarHuerfanos(dataDir, (m) => log(`limpieza: ${m}`), pidfile);
 
   const database = new EmbeddedPostgres({ databaseDir: dataDir, user: "postgres", password: "postgres", port: pgPort, persistent: true });
   if (!existsSync(path.join(dataDir, "PG_VERSION"))) { log("initdb (primer arranque)…"); await database.initialise(); }
@@ -77,17 +90,17 @@ export async function startLocalBackend(opts = {}) {
   await db.query("SET client_encoding TO 'UTF8'");
 
   // 2) Shim de compatibilidad Supabase (idempotente).
-  await db.query(readFileSync(SHIM, "utf8"));
+  await db.query(readFileSync(shimFile, "utf8"));
 
   // 3) Migraciones idempotentes (registradas en _vim_migraciones).
   await db.query("CREATE TABLE IF NOT EXISTS _vim_migraciones (nombre text PRIMARY KEY, aplicada_at timestamptz DEFAULT now())");
   const aplicadas = new Set((await db.query("SELECT nombre FROM _vim_migraciones")).rows.map((r) => r.nombre));
-  const files = readdirSync(MIGRATIONS).filter((f) => f.endsWith(".sql")).sort();
+  const files = readdirSync(migrationsDir).filter((f) => f.endsWith(".sql")).sort();
   let nuevas = 0;
   for (const f of files) {
     if (aplicadas.has(f)) continue;
     try {
-      await db.query(readFileSync(path.join(MIGRATIONS, f), "utf8"));
+      await db.query(readFileSync(path.join(migrationsDir, f), "utf8"));
       await db.query("INSERT INTO _vim_migraciones(nombre) VALUES ($1)", [f]);
       nuevas++;
     } catch (e) {
@@ -108,13 +121,13 @@ export async function startLocalBackend(opts = {}) {
   const vacia = (await db.query("SELECT count(*)::int n FROM tenants")).rows[0].n === 0;
   if (vacia && seedIfEmpty) {
     await db.query("TRUNCATE planes, folios_paquetes, roles, permisos, rol_permisos RESTART IDENTITY CASCADE");
-    await db.query(readFileSync(SEED, "utf8"));
+    await db.query(readFileSync(seedFile, "utf8"));
     log("seed de fixtures aplicado (BD estaba vacía)");
   }
   await db.end();
 
   // 6) PostgREST como sidecar (con libpq.dll del propio Postgres embebido).
-  const confPath = path.join(root, "bin", "postgrest.conf");
+  mkdirSync(path.dirname(confPath), { recursive: true }); // dataRoot/bin (userData en empaquetado)
   writeFileSync(confPath, [
     `db-uri = "postgres://authenticator:postgres@localhost:${pgPort}/vimpos"`,
     `db-schemas = "public"`,
@@ -123,25 +136,27 @@ export async function startLocalBackend(opts = {}) {
     `server-port = ${restPort}`,
     ``,
   ].join("\n"));
-  const logFd = openSync(path.join(root, "bin", "postgrest.log"), "w");
-  const rest = spawn(path.join(root, "bin", "postgrest.exe"), [confPath], {
+  const logFd = openSync(logPath, "w");
+  const rest = spawn(postgrestExe, [confPath], {
     stdio: ["ignore", logFd, logFd],
-    env: { ...process.env, PATH: `${PG_BIN}${path.delimiter}${process.env.PATH}` },
+    env: { ...process.env, PATH: `${pgBin}${path.delimiter}${process.env.PATH}` },
   });
   let ready = false;
   for (let i = 0; i < 120; i++) { // hasta ~60s: bajo carga, el schema cache tarda en cargar
-    try { if ((await fetch(`http://localhost:${restPort}/`)).ok) { ready = true; break; } } catch { /* aún no */ }
+    // 127.0.0.1 (no 'localhost'): PostgREST escucha 0.0.0.0 (IPv4); en el Electron empaquetado
+    // 'localhost' resuelve a ::1 (IPv6) primero → nunca conectaría.
+    try { if ((await fetch(`http://127.0.0.1:${restPort}/`)).ok) { ready = true; break; } } catch { /* aún no */ }
     await wait(500);
   }
   if (!ready) {
     let tail = "";
-    try { tail = readFileSync(path.join(root, "bin", "postgrest.log"), "utf8").split("\n").slice(-6).join("\n"); } catch { /* */ }
+    try { tail = readFileSync(logPath, "utf8").split("\n").slice(-6).join("\n"); } catch { /* */ }
     throw new Error(`PostgREST no respondió.\n${tail}`);
   }
   log(`PostgREST en localhost:${restPort}`);
 
   // Registrar los PIDs para poder limpiarlos si el próximo arranque descubre que este no cerró bien.
-  try { writeFileSync(PIDFILE, JSON.stringify({ pids: [pgPid, rest.pid].filter(Boolean), at: Date.now() })); } catch { /* */ }
+  try { writeFileSync(pidfile, JSON.stringify({ pids: [pgPid, rest.pid].filter(Boolean), at: Date.now() })); } catch { /* */ }
 
   // Pool para el auth local (device sign-in, pin-login) — service_role local.
   const pool = new pg.Pool({ host: "localhost", port: pgPort, user: "postgres", password: "postgres", database: "vimpos", max: 4 });
@@ -150,7 +165,7 @@ export async function startLocalBackend(opts = {}) {
     try { rest.kill(); } catch { /* */ }
     try { await pool.end(); } catch { /* */ }
     try { await database.stop(); } catch { /* */ }
-    try { rmSync(PIDFILE, { force: true }); } catch { /* */ } // cierre limpio → sin huérfanos que limpiar
+    try { rmSync(pidfile, { force: true }); } catch { /* */ } // cierre limpio → sin huérfanos que limpiar
   };
   return { pgPort, restPort, secret, pool, stop };
 }

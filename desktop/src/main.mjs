@@ -11,15 +11,26 @@ import { pullFromCloud } from "./sync-pull.mjs";
 import { pushToCloud } from "./sync-push.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const UI_DIR = path.join(__dirname, "..", "pos-ui");
 const UI_PORT = 54360;
+// Empaquetado: recursos en process.resourcesPath (extraResources); datos escribibles en userData.
+const EMPAQUETADO = app.isPackaged;
+const RES_DIR = EMPAQUETADO ? process.resourcesPath : null;
+const UI_DIR = EMPAQUETADO ? path.join(process.resourcesPath, "pos-ui") : path.join(__dirname, "..", "pos-ui");
 let backend;
 let uiServer;
 let win;
 
 async function boot() {
-  // 1) Levantar el backend en la caja.
-  backend = await startBackend({ log: (m) => console.log("· [backend]", m) });
+  // 1) Levantar el backend en la caja (rutas empaquetadas si aplica).
+  // Datos escribibles: userData por defecto. VIM_DATA_DIR permite reubicarlos si el perfil del
+  // usuario está en un volumen que no soporta los renames de Postgres (p. ej. perfiles con junction
+  // o carpetas redirigidas/sincronizadas) — Postgres initdb falla ahí con "Improper link".
+  const dataRoot = EMPAQUETADO ? (process.env.VIM_DATA_DIR || app.getPath("userData")) : (process.env.VIM_DATA_DIR || undefined);
+  backend = await startBackend({
+    log: (m) => console.log("· [backend]", m),
+    resDir: RES_DIR ?? undefined,
+    dataRoot,
+  });
   console.log(`· [backend] gateway local: ${backend.url}`);
 
   // 2) Ventana del POS. contextIsolation:false para que el preload inyecte el endpoint
