@@ -49,11 +49,21 @@ cajera **María G. PIN 1234**; dueño `dueno@knockout.dev` / `devadmin`.
 - Shell de Electron que arranca el backend y carga el POS inyectándole el endpoint local.
 - **UI 100% offline**: `npm run build:ui` exporta el POS estático a `pos-ui/` y el servidor local
   (`ui-server.mjs`) lo sirve con CSP. Verificado: UI + datos conviven offline (ui:54360 + gateway:54350).
+- **Sync PULL**: `sync-pull.mjs` (motor de upsert idempotente en orden de FKs, modo réplica) +
+  RPC `sync_pull_snapshot` (migración 0055, arma la rebanada del tenant en jsonb) + Edge Function
+  `sync-pull` (fuente en la nube, autenticada como dispositivo). `main.mjs` hace pull best-effort al
+  arrancar (gated por env de nube). Verificado (`npm run verify:sync`): cambio de precio + producto
+  nuevo + **empleado nuevo con PIN entrando en el login local**; snapshot real de la RPC round-tripea.
+
+  Env para el pull en la nube (opcional; sin ellas la caja opera offline con lo que tiene):
+  `VIM_CLOUD_URL`, `VIM_CLOUD_ANON`, `VIM_DEVICE_EMAIL`, `VIM_DEVICE_PASS`.
 
 **🔜 Pendiente para cerrar Fase 1 al 100%:**
 1. **Impresión Epson nativa** (USB/serial) por IPC del main (hoy el POS ya tiene el adapter de red).
-2. **Sync bidireccional**: el *push* idempotente ya existe; falta el *pull* de la rebanada del
-   tenant (catálogo/config/usuarios) desde la nube al arrancar/reconectar.
+2. **Sync PUSH**: el outbox del POS ya sube ventas por `sync_procesar_push`; validar el ciclo
+   completo desde el device (push de ventas locales → nube) end-to-end.
 3. **Apertura de caja/turno** desde el POS local (el flujo existe; validar por el gateway).
 4. **Instalador firmado + auto-update** y **hardening** (contextIsolation, secreto JWT por
    dispositivo) → esto último es Fase 3.
+5. **Deploy** de la Edge `sync-pull` a la nube + probar el pull real con tu cloud (hoy la fuente
+   está verificada localmente vía la RPC 0055).
