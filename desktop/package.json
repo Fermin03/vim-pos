@@ -4,6 +4,7 @@
   "private": true,
   "type": "module",
   "description": "Fase 1 — VIM POS de escritorio local-first: Postgres embebido + PostgREST + gateway compatible con Supabase + auth PIN local, empaquetado en Electron.",
+  "author": "VIM Marketing <ferminvillalobos16@gmail.com>",
   "main": "src/main.mjs",
   "scripts": {
     "verify": "node src/verify-e2e.mjs",
@@ -13,7 +14,8 @@
     "verify:robustez": "node src/verify-robustez.mjs",
     "backend": "node src/backend.mjs",
     "build:ui": "node scripts/build-ui.mjs",
-    "start": "electron ."
+    "start": "electron .",
+    "dist": "npm run build:ui && electron-builder --win nsis"
   },
   "dependencies": {
     "embedded-postgres": "17.10.0-beta.17",
@@ -21,6 +23,24 @@
     "pg": "^8.13.1"
   },
   "devDependencies": {
-    "electron": "^33.2.1"
+    "electron": "^33.2.1",
+    "electron-builder": "^25.1.8"
+  },
+  "build": {
+    "appId": "com.vimpos.desktop",
+    "productName": "VIM POS",
+    "directories": { "output": "dist" },
+    "files": ["src/**/*", "package.json"],
+    "asar": false,
+    "extraResources": [
+      { "from": "../supabase/migrations", "to": "migrations" },
+      { "from": "../supabase/seed.sql", "to": "seed.sql" },
+      { "from": "sql", "to": "sql" },
+      { "from": "bin/postgrest.exe", "to": "bin/postgrest.exe" },
+      { "from": "node_modules/@embedded-postgres/windows-x64/native/bin", "to": "pg-bin" },
+      { "from": "pos-ui", "to": "pos-ui" }
+    ],
+    "win": { "target": ["nsis"] },
+    "nsis": { "oneClick": false, "perMachine": false, "allowToChangeInstallationDirectory": true }
   }
 }

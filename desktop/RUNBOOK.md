@@ -39,6 +39,36 @@ existe `pos-ui/` (no corriste `build:ui`), cae a `VIM_POS_URL` o al dominio desp
 Fixtures de dev (seed): dispositivo `caja-99999999-…cc@dispositivos.vimpos.mx` / `vim-device-dev`;
 cajera **María G. PIN 1234**; dueño `dueno@knockout.dev` / `devadmin`.
 
+## Empaquetar (probado)
+
+```bash
+npm run build:ui                                   # exporta el POS a pos-ui/
+ELECTRON_CACHE=D:/electron-cache ELECTRON_BUILDER_CACHE=D:/electron-builder-cache \
+  npx electron-builder --win dir                   # → dist/win-unpacked/VIM POS.exe (app corrible)
+# instalador NSIS (requiere Modo Desarrollador o admin en Windows, ver abajo):
+npm run dist                                        # → dist/VIM POS Setup <ver>.exe
+```
+
+**✅ VALIDADO en vivo:** `dist/win-unpacked/VIM POS.exe` arranca Postgres embebido + PostgREST +
+gateway + UI y autentica (device sign-in), corriendo desde el build. Config: `asar:false` (para que
+los binarios nativos ejecuten), recursos en `resources/` (migraciones, seed, sql, postgrest.exe,
+`pg-bin/`, `pos-ui/`), datos escribibles en `dataRoot`. `runtime.mjs` resuelve rutas por `app.isPackaged`.
+
+**Gotchas resueltos al empaquetar (para no repetirlos):**
+1. **asar** rompía el spawn/chmod de los binarios nativos de Postgres → `"asar": false`.
+2. **Perfil con junction / carpeta redirigida** (el `%APPDATA%` de esta PC) rompe los renames de
+   Postgres en `initdb` (*"Improper link"*) → **`VIM_DATA_DIR`** reubica los datos a un volumen sano
+   (p. ej. `D:`). En una PC normal `userData` funciona; con junction/redirect, setear `VIM_DATA_DIR`.
+3. **`localhost` → IPv6 (::1)** en el Electron empaquetado, pero PostgREST escucha `0.0.0.0` (IPv4) →
+   usar **`127.0.0.1`** (ya aplicado en runtime + gateway).
+4. **Caches de electron-builder en `D:`** (`ELECTRON_CACHE`/`ELECTRON_BUILDER_CACHE`) por el junction
+   del perfil C: (rename cross-disk falla).
+
+**Pendiente (setting de Windows, no código):** el instalador **NSIS** falla al extraer `winCodeSign`
+(crea symlinks) sin **Modo Desarrollador** o admin. Habilita Modo Desarrollador (Configuración →
+Privacidad y seguridad → Para desarrolladores) y `npm run dist` produce el `.exe`. El `win-unpacked`
+ya es distribuible (zip + acceso directo) mientras tanto.
+
 ## Estado Fase 1
 
 **✅ Hecho y verificado (headless):**
