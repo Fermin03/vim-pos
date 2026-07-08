@@ -5,7 +5,7 @@
 import EmbeddedPostgres from "embedded-postgres";
 import pg from "pg";
 import { spawn } from "node:child_process";
-import { readFileSync, readdirSync, existsSync, openSync, writeFileSync } from "node:fs";
+import { readFileSync, readdirSync, existsSync, openSync, writeFileSync, rmSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
 
@@ -16,8 +16,35 @@ const MIGRATIONS = path.join(repoRoot, "supabase", "migrations");
 const SEED = path.join(repoRoot, "supabase", "seed.sql");
 const SHIM = path.join(root, "sql", "00-compat-shim.sql");
 const PG_BIN = path.join(root, "node_modules", "@embedded-postgres", "windows-x64", "native", "bin");
+const PIDFILE = path.join(root, "bin", ".pids.json");
 
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+
+/**
+ * Mata procesos huérfanos (Postgres/PostgREST) que quedaron de un arranque anterior que no cerró
+ * limpio (crash / kill forzado). Lee el pidfile del run previo + el postmaster.pid del data dir.
+ * Con la instancia única de Electron, aquí no hay riesgo de matar la instancia viva. Exportada
+ * para poder probarla. Idempotente.
+ */
+export function matarHuerfanos(dataDir, log = () => {}) {
+  try {
+    if (existsSync(PIDFILE)) {
+      const { pids = [] } = JSON.parse(readFileSync(PIDFILE, "utf8"));
+      for (const pid of pids) {
+        try { process.kill(pid, "SIGKILL"); log(`huérfano ${pid} terminado`); } catch { /* ya no existe */ }
+      }
+      rmSync(PIDFILE, { force: true });
+    }
+  } catch { /* pidfile ilegible: ignorar */ }
+  // postmaster.pid: un Postgres previo sobre el MISMO data dir bloquearía el arranque.
+  try {
+    const pm = path.join(dataDir, "postmaster.pid");
+    if (existsSync(pm)) {
+      const pid = parseInt(readFileSync(pm, "utf8").split("\n")[0], 10);
+      if (pid > 0) { try { process.kill(pid, "SIGKILL"); log(`postgres previo ${pid} terminado`); } catch { /* */ } }
+    }
+  } catch { /* */ }
+}
 
 /** Arranca el backend local y devuelve puertos + pool + stop(). Idempotente entre arranques. */
 export async function startLocalBackend(opts = {}) {
@@ -28,9 +55,14 @@ export async function startLocalBackend(opts = {}) {
   const seedIfEmpty = opts.seedIfEmpty ?? true;
   const log = opts.log ?? (() => {});
 
+  // Antes de arrancar: limpiar cualquier Postgres/PostgREST huérfano de un cierre no limpio.
+  matarHuerfanos(dataDir, (m) => log(`limpieza: ${m}`));
+
   const database = new EmbeddedPostgres({ databaseDir: dataDir, user: "postgres", password: "postgres", port: pgPort, persistent: true });
   if (!existsSync(path.join(dataDir, "PG_VERSION"))) { log("initdb (primer arranque)…"); await database.initialise(); }
   await database.start();
+  let pgPid = 0;
+  try { pgPid = parseInt(readFileSync(path.join(dataDir, "postmaster.pid"), "utf8").split("\n")[0], 10) || 0; } catch { /* */ }
   log(`Postgres embebido en localhost:${pgPort}`);
 
   // 1) Asegurar la BD vimpos en UTF8 (Windows arranca el clúster en WIN1252).
@@ -108,9 +140,17 @@ export async function startLocalBackend(opts = {}) {
   }
   log(`PostgREST en localhost:${restPort}`);
 
+  // Registrar los PIDs para poder limpiarlos si el próximo arranque descubre que este no cerró bien.
+  try { writeFileSync(PIDFILE, JSON.stringify({ pids: [pgPid, rest.pid].filter(Boolean), at: Date.now() })); } catch { /* */ }
+
   // Pool para el auth local (device sign-in, pin-login) — service_role local.
   const pool = new pg.Pool({ host: "localhost", port: pgPort, user: "postgres", password: "postgres", database: "vimpos", max: 4 });
 
-  const stop = async () => { try { rest.kill(); } catch { /* */ } try { await pool.end(); } catch { /* */ } await database.stop(); };
+  const stop = async () => {
+    try { rest.kill(); } catch { /* */ }
+    try { await pool.end(); } catch { /* */ }
+    try { await database.stop(); } catch { /* */ }
+    try { rmSync(PIDFILE, { force: true }); } catch { /* */ } // cierre limpio → sin huérfanos que limpiar
+  };
   return { pgPort, restPort, secret, pool, stop };
 }
