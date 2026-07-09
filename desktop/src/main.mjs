@@ -50,9 +50,9 @@ async function boot() {
   //    Los DATOS siempre van al gateway local.
   let posUrl = process.env.VIM_POS_URL;
   if (!posUrl && existsSync(path.join(UI_DIR, "index.html"))) {
-    uiServer = await startUiServer(UI_DIR, UI_PORT);
+    uiServer = await startUiServer(UI_DIR, UI_PORT, backend.gatewayPort);
     posUrl = `http://localhost:${UI_PORT}`;
-    console.log(`· [ui] POS servido offline desde ${posUrl}`);
+    console.log(`· [ui] POS servido offline desde ${posUrl} · KDS/2ª caja en la LAN: http://${backend.lanIp}:${UI_PORT}`);
   }
   posUrl = posUrl || "https://pos.vimpos.com.mx";
   await win.loadURL(posUrl);
