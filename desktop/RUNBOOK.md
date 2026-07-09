@@ -69,6 +69,31 @@ los binarios nativos ejecuten), recursos en `resources/` (migraciones, seed, sql
 Privacidad y seguridad → Para desarrolladores) y `npm run dist` produce el `.exe`. El `win-unpacked`
 ya es distribuible (zip + acceso directo) mientras tanto.
 
+## Conectar a la nube (deploy del sync real) — #3
+
+Requiere: (a) **despausar** el proyecto Supabase (plan FREE se pausa) desde el dashboard;
+(b) `SUPABASE_ACCESS_TOKEN` (o `supabase login`) + la DB password. Proyecto ya linkeado (`pbiaxzvmssjsxdwqrumb`).
+
+```bash
+cd vim-pos
+export SUPABASE_ACCESS_TOKEN=sbp_…          # token del dashboard (transitorio)
+supabase db push                             # aplica migraciones 0055 + 0056 a la nube
+supabase functions deploy sync-pull sync-push
+```
+
+Luego probar el sync real desde el device:
+```bash
+cd desktop
+VIM_CLOUD_URL=https://pbiaxzvmssjsxdwqrumb.supabase.co \
+VIM_CLOUD_ANON=<anon key del proyecto> \
+VIM_DEVICE_EMAIL=caja-<caja_id>@dispositivos.vimpos.mx \
+VIM_DEVICE_PASS=<clave del dispositivo> \
+  npm run verify:cloud        # device sign-in en la nube → PULL (referencia↓) + PUSH (ventas↑)
+```
+
+Las mismas env, puestas al lanzar la app (`npm start` / el .exe), activan el `syncBestEffort`
+al arrancar (pull + push automáticos cuando hay red). Sin ellas, la caja opera 100% offline.
+
 ## Estado Fase 1
 
 **✅ Hecho y verificado (headless):**
