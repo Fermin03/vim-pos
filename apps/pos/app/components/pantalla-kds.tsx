@@ -102,7 +102,7 @@ export function PantallaKds({
     }
   }, [token, caja.sucursal_id, sonido]);
 
-  // Polling de comandas
+  // Polling de comandas (respaldo robusto; el SSE del hub da el tiempo real)
   useEffect(() => {
     montado.current = true;
     recargar();
@@ -112,6 +112,18 @@ export function PantallaKds({
       clearInterval(id);
     };
   }, [recargar]);
+
+  // Fase 2 (Hub del local) — tiempo real por SSE cuando el KDS corre contra la caja-hub de
+  // escritorio: al cambiar un ticket de estado de cocina, recarga al instante (sin esperar el
+  // polling). Solo en el desktop (window.__VIM_DESKTOP); en navegador/nube no aplica (sin endpoint).
+  useEffect(() => {
+    const w = typeof window !== "undefined" ? (window as unknown as { __VIM_SUPABASE_URL?: string; __VIM_DESKTOP?: boolean }) : undefined;
+    if (!w?.__VIM_DESKTOP || !w.__VIM_SUPABASE_URL || typeof EventSource === "undefined") return;
+    const es = new EventSource(`${w.__VIM_SUPABASE_URL}/kds/stream?sucursal=${caja.sucursal_id}`);
+    es.addEventListener("cocina", () => { recargar(); });
+    es.onerror = () => { /* EventSource reconecta solo; el polling cubre el hueco */ };
+    return () => es.close();
+  }, [recargar, caja.sucursal_id]);
 
   // Tick del reloj (1s) para los cronómetros, sin re-leer BD
   useEffect(() => {

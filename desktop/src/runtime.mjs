@@ -55,6 +55,7 @@ export async function startLocalBackend(opts = {}) {
   const migrationsDir = resDir ? path.join(resDir, "migrations") : MIGRATIONS;
   const seedFile = resDir ? path.join(resDir, "seed.sql") : SEED;
   const shimFile = resDir ? path.join(resDir, "sql", "00-compat-shim.sql") : SHIM;
+  const kdsNotifyFile = resDir ? path.join(resDir, "sql", "kds-notify.sql") : path.join(root, "sql", "kds-notify.sql");
   const pgBin = resDir ? path.join(resDir, "pg-bin") : PG_BIN;
   const postgrestExe = resDir ? path.join(resDir, "bin", "postgrest.exe") : path.join(root, "bin", "postgrest.exe");
   const confPath = path.join(dataRoot, "bin", "postgrest.conf");
@@ -116,6 +117,9 @@ export async function startLocalBackend(opts = {}) {
     GRANT SELECT ON ALL TABLES IN SCHEMA public TO anon;
     GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO authenticated, service_role;
   `);
+
+  // 4b) Trigger de tiempo real del KDS (Fase 2, local-only): NOTIFY al cambiar estado de cocina.
+  await db.query(readFileSync(kdsNotifyFile, "utf8"));
 
   // 5) Seed de fixtures solo si la BD está vacía (en producción llega por sync/provisioning).
   const vacia = (await db.query("SELECT count(*)::int n FROM tenants")).rows[0].n === 0;
