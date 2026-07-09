@@ -73,6 +73,19 @@ en D: (`ELECTRON_CACHE`/`ELECTRON_BUILDER_CACHE`) por el junction del perfil.
 esta PC (perfil con junction) eso rompe `initdb` → lanzar con **`VIM_DATA_DIR=D:\ruta`** (o setear esa
 env de sistema). En una **PC normal del piloto** `userData` funciona sin tocar nada.
 
+## Hub del local — KDS en tiempo real por LAN (Fase 2)
+
+La caja hace de **servidor en la LAN**: el gateway escucha en `0.0.0.0` y al arrancar loguea
+`Hub en la LAN: http://<ip>:54350`. Otro equipo (pantalla de cocina, 2ª caja) apunta ahí.
+
+- **Tiempo real:** trigger `pg_notify('vim_kds', …)` al cambiar el estado de cocina de un ticket →
+  el backend hace `LISTEN` y reenvía por **SSE** (`GET /kds/stream?sucursal=<id>`). El KDS del POS
+  se suscribe (EventSource) y recarga al instante; el polling de 5s queda como respaldo.
+- Verificado: `npm run verify:hub` (KDS recibe EN_COCINA/LISTO en vivo + acceso por IP de LAN).
+- **Un KDS en otra máquina:** carga el POS apuntando `window.__VIM_SUPABASE_URL` al hub
+  (`http://<ip-caja>:54350`) y entra a Cocina. Pendiente de Fase 2: descubrimiento automático del
+  hub (mDNS) y servir el UI del KDS por la LAN; hoy se configura la IP a mano.
+
 ## Conectar a la nube (deploy del sync real) — #3
 
 Requiere: (a) **despausar** el proyecto Supabase (plan FREE se pausa) desde el dashboard;
