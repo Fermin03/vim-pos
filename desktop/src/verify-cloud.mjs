@@ -35,11 +35,21 @@ try {
   const opts = { cloudUrl, anonKey, deviceToken };
   console.log("· device sign-in contra la NUBE OK");
 
+  // Tenant real del cloud (del claim del JWT del dispositivo).
+  const tenantCloud = JSON.parse(atob(deviceToken.split(".")[1].replace(/-/g, "+").replace(/_/g, "/"))).tenant_id;
+
   // 2) PULL real: baja la rebanada del tenant desde la nube al Postgres local
   const rp = await pullFromCloud(backend.pool, opts, (m) => console.log("  [pull]", m));
   console.log(`· PULL real OK: ${Object.keys(rp).length} tablas bajadas de la nube`);
+  // Mostrar QUÉ bajó (datos reales de tu cloud, ahora en la caja local):
+  const q = async (sql, p) => (await backend.pool.query(sql, p)).rows;
+  const ten = (await q("SELECT nombre_comercial FROM tenants WHERE id=$1", [tenantCloud]))[0];
+  const nSuc = (await q("SELECT count(*)::int n FROM sucursales WHERE tenant_id=$1", [tenantCloud]))[0].n;
+  const nProd = (await q("SELECT count(*)::int n FROM productos WHERE tenant_id=$1", [tenantCloud]))[0].n;
+  const nEmp = (await q("SELECT count(*)::int n FROM usuarios_acceso WHERE tenant_id=$1", [tenantCloud]))[0].n;
+  console.log(`  → tenant real "${ten?.nombre_comercial ?? tenantCloud}": ${nSuc} sucursales · ${nProd} productos · ${nEmp} accesos, ahora en la caja local`);
 
-  // 3) PUSH real: sube las ventas terminales locales a la nube
+  // 3) PUSH real: sube las ventas terminales locales a la nube (0 si la caja local no tiene ventas del tenant real)
   const rs = await pushToCloud(backend.pool, opts, (m) => console.log("  [push]", m));
   console.log(`· PUSH real OK: ${rs.subidos} ventas subidas a la nube`);
 
