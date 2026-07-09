@@ -64,10 +64,14 @@ los binarios nativos ejecuten), recursos en `resources/` (migraciones, seed, sql
 4. **Caches de electron-builder en `D:`** (`ELECTRON_CACHE`/`ELECTRON_BUILDER_CACHE`) por el junction
    del perfil C: (rename cross-disk falla).
 
-**Pendiente (setting de Windows, no código):** el instalador **NSIS** falla al extraer `winCodeSign`
-(crea symlinks) sin **Modo Desarrollador** o admin. Habilita Modo Desarrollador (Configuración →
-Privacidad y seguridad → Para desarrolladores) y `npm run dist` produce el `.exe`. El `win-unpacked`
-ya es distribuible (zip + acceso directo) mientras tanto.
+**✅ Instalador construido:** `dist/VIM POS Setup <ver>.exe` (NSIS, ~138 MB). El fix del bloqueo de
+`winCodeSign` (symlinks que Windows bloquea sin Modo Desarrollador) fue **`win.signAndEditExecutable:
+false`** — no firmamos el ejecutable, así electron-builder no baja winCodeSign. Correr con los caches
+en D: (`ELECTRON_CACHE`/`ELECTRON_BUILDER_CACHE`) por el junction del perfil.
+
+**Datos en la máquina de Fermín:** la app *instalada* usa `userData` (`%APPDATA%`) por defecto; en
+esta PC (perfil con junction) eso rompe `initdb` → lanzar con **`VIM_DATA_DIR=D:\ruta`** (o setear esa
+env de sistema). En una **PC normal del piloto** `userData` funciona sin tocar nada.
 
 ## Conectar a la nube (deploy del sync real) — #3
 

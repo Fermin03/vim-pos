@@ -1,6 +1,6 @@
 {
   "name": "vim-pos-desktop",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "private": true,
   "type": "module",
   "description": "Fase 1 — VIM POS de escritorio local-first: Postgres embebido + PostgREST + gateway compatible con Supabase + auth PIN local, empaquetado en Electron.",
@@ -41,7 +41,7 @@
       { "from": "node_modules/@embedded-postgres/windows-x64/native/bin", "to": "pg-bin" },
       { "from": "pos-ui", "to": "pos-ui" }
     ],
-    "win": { "target": ["nsis"] },
+    "win": { "target": ["nsis"], "signAndEditExecutable": false },
     "nsis": { "oneClick": false, "perMachine": false, "allowToChangeInstallationDirectory": true }
   }
 }
