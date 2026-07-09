@@ -29,9 +29,9 @@ const send = (res, status, body, extra = {}) => {
 
 const bearer = (req) => (req.headers["authorization"] ?? "").replace(/^Bearer\s+/i, "");
 
-/** Crea (sin arrancar) el gateway HTTP. `backend` = { restPort, secret, pool }. */
+/** Crea (sin arrancar) el gateway HTTP. `backend` = { restPort, secret, pool, kds? }. */
 export function crearGateway(backend) {
-  const { restPort, secret, pool } = backend;
+  const { restPort, secret, pool, kds } = backend;
 
   return http.createServer(async (req, res) => {
     try {
@@ -46,6 +46,12 @@ export function crearGateway(backend) {
         return res.end("");
       }
       if (p === "/health") return send(res, 200, { ok: true });
+
+      // ── Fase 2 · Hub — stream de cocina en tiempo real (SSE por LAN) ─────────
+      if (p === "/kds/stream") {
+        if (!kds) return send(res, 503, { error: "KDS_STREAM_NO_DISPONIBLE" });
+        return kds.handleSse(req, res, url);
+      }
 
       // ── Auth (GoTrue emulado) ──────────────────────────────────────────────
       if (p === "/auth/v1/token") {
