@@ -1,6 +1,7 @@
-// Fase 1 · Servidor local del UI del POS (export estático).
-// Sirve desktop/pos-ui/ (el `out/` de Next) por http://localhost para que la UI viva OFFLINE
-// junto con los datos. Sirve la CSP por cabecera (en export, next.config.headers() no aplica).
+// Fase 1/2 · Servidor del UI del POS (export estático), servido por LAN desde la caja-hub.
+// Sirve desktop/pos-ui/ y AUTO-CONFIGURA el endpoint: inyecta en el HTML un script que apunta el
+// gateway a `location.hostname:GATEWAY` — así funciona igual en Electron (localhost) y en un
+// navegador de cocina/2ª caja que carga desde la LAN (http://<ip-hub>:UI). Sin teclear nada.
 import http from "node:http";
 import { readFile, stat } from "node:fs/promises";
 import path from "node:path";
@@ -13,21 +14,32 @@ const MIME = {
   ".webmanifest": "application/manifest+json", ".map": "application/json",
 };
 
-// Misma política que el POS web (CN-003); connect-src ya permite localhost (gateway) y Supabase (sync).
-const CSP = [
-  "default-src 'self'",
-  "frame-ancestors 'none'",
-  "base-uri 'self'",
-  "form-action 'self'",
-  "img-src 'self' data: blob:",
-  "font-src 'self' data: https://fonts.gstatic.com",
-  "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
-  "script-src 'self' 'unsafe-inline'",
-  "connect-src 'self' https://*.supabase.co https://*.supabase.in http://localhost:* ws://localhost:* https://fonts.googleapis.com https://fonts.gstatic.com",
-].join("; ");
+/** CSP por-request: el KDS/2ª caja conecta al gateway del MISMO host que sirvió el UI. Sin esto
+ *  (connect-src) el navegador bloquearía http://<ip-hub>:GATEWAY. Mantiene localhost + Supabase. */
+function cspFor(host) {
+  const hostname = String(host || "").split(":")[0] || "localhost";
+  const lan = hostname && hostname !== "localhost" && hostname !== "127.0.0.1" ? ` http://${hostname}:* ws://${hostname}:*` : "";
+  return [
+    "default-src 'self'",
+    "frame-ancestors 'none'",
+    "base-uri 'self'",
+    "form-action 'self'",
+    "img-src 'self' data: blob:",
+    "font-src 'self' data: https://fonts.gstatic.com",
+    "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+    "script-src 'self' 'unsafe-inline'",
+    `connect-src 'self' https://*.supabase.co https://*.supabase.in http://localhost:* ws://localhost:*${lan} https://fonts.googleapis.com https://fonts.gstatic.com`,
+  ].join("; ");
+}
 
-/** Arranca el servidor del UI sobre `dir` (el pos-ui/). Devuelve el http.Server. */
-export async function startUiServer(dir, port) {
+/** Script que auto-configura el endpoint del gateway desde la URL con la que el navegador llegó. */
+function configScript(gatewayPort) {
+  return `<script>(function(){var l=location;window.__VIM_SUPABASE_URL=l.protocol+"//"+l.hostname+":${gatewayPort}";window.__VIM_SUPABASE_ANON="local-anon";window.__VIM_DESKTOP=true;})();</script>`;
+}
+
+/** Arranca el servidor del UI. host '0.0.0.0' = accesible por la LAN (modo hub). */
+export async function startUiServer(dir, port, gatewayPort = 54350, host = "0.0.0.0") {
+  const inject = configScript(gatewayPort);
   const server = http.createServer(async (req, res) => {
     try {
       let rel = decodeURIComponent(new URL(req.url, "http://x").pathname);
@@ -43,12 +55,20 @@ export async function startUiServer(dir, port) {
         data = await readFile(path.join(dir, "index.html")); // SPA fallback
         file = "index.html";
       }
-      res.writeHead(200, { "Content-Type": MIME[path.extname(file).toLowerCase()] || "application/octet-stream", "Content-Security-Policy": CSP });
+      const ext = path.extname(file).toLowerCase();
+      // En el HTML: inyectar el auto-config ANTES del bundle (para que window.__VIM_* exista al cargar).
+      if (ext === ".html") {
+        const html = data.toString("utf8");
+        const out = html.includes("<head>") ? html.replace("<head>", "<head>" + inject) : inject + html;
+        res.writeHead(200, { "Content-Type": MIME[".html"], "Content-Security-Policy": cspFor(req.headers.host) });
+        return res.end(out);
+      }
+      res.writeHead(200, { "Content-Type": MIME[ext] || "application/octet-stream", "Content-Security-Policy": cspFor(req.headers.host) });
       res.end(data);
     } catch (e) {
       res.writeHead(500); res.end(String(e?.message ?? e));
     }
   });
-  await new Promise((r) => server.listen(port, "127.0.0.1", r));
+  await new Promise((r) => server.listen(port, host, r));
   return server;
 }
