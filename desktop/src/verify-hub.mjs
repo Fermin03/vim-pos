@@ -5,7 +5,10 @@
 import { startBackend } from "./backend.mjs";
 
 const GW_PORT = 54350;
+const GW = `http://127.0.0.1:${GW_PORT}`;
 const CAJA = "99999999-0000-0000-0000-0000000000cc";
+const DEVICE_EMAIL = "caja-99999999-0000-0000-0000-0000000000cc@dispositivos.vimpos.mx";
+const DEVICE_PASS = "vim-device-dev";
 const TENANT = "99999999-0000-0000-0000-0000000000aa";
 const SUC = "99999999-0000-0000-0000-0000000000bb";
 const CAJERO = "99999999-0000-0000-0000-000000000001";
@@ -81,6 +84,18 @@ try {
   if (!listo) throw new Error("el KDS NO recibió el evento LISTO");
   console.log(`· ⚡ KDS recibió LISTO en tiempo real (${Date.now() - t1}ms después)`);
   c.release();
+
+  // Modo KDS: un token de DISPOSITIVO lee las comandas por el gateway (sin PIN de empleado) —
+  // es lo que hace la pantalla de cocina dedicada (?kds). tickets_select es por tenant, no identidad.
+  const dev = await fetch(`${GW}/auth/v1/token?grant_type=password`, {
+    method: "POST", headers: { "content-type": "application/json" },
+    body: JSON.stringify({ email: DEVICE_EMAIL, password: DEVICE_PASS }),
+  }).then((r) => r.json());
+  const comandas = await fetch(`${GW}/rest/v1/tickets?select=id,folio_completo,estado_cocina&estado_cocina=in.(EN_COCINA,LISTO)`, {
+    headers: { Authorization: `Bearer ${dev.access_token}`, apikey: "anon" },
+  }).then((r) => r.json());
+  if (!Array.isArray(comandas) || !comandas.find((x) => x.id === ticket)) throw new Error(`el token de DISPOSITIVO no leyó la comanda: ${JSON.stringify(comandas).slice(0, 150)}`);
+  console.log(`· Modo KDS: el token de DISPOSITIVO lee ${comandas.length} comanda(s) por el gateway (sin PIN) ✓`);
 
   console.log("\n✅ HUB OK — la caja hace de servidor en la LAN y el KDS ve las órdenes AL INSTANTE");
   console.log("   por LISTEN/NOTIFY (sin polling), 100% offline. Base de la Fase 2.");

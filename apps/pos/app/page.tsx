@@ -4,11 +4,13 @@ import {
   deviceEmail,
   deviceSignIn,
   deviceSignOut,
+  deviceToken,
   cajaIdFromEmail,
   segundosParaExpirar,
   type Empleado,
   type PinLoginResult,
 } from "./lib/supabase";
+import { leerCaja, type DatosCaja } from "./lib/turno";
 import { leerCreds, olvidarCreds } from "./lib/device-creds";
 import { VincularDispositivo } from "./components/vincular-dispositivo";
 import { SelectorEmpleados } from "./components/selector-empleados";
@@ -16,6 +18,7 @@ import { ModalPin } from "./components/modal-pin";
 import { PantallaBloqueo } from "./components/pantalla-bloqueo";
 import { ModalSesionExpirada } from "./components/modal-sesion-expirada";
 import { PantallaTurno } from "./components/pantalla-turno";
+import { PantallaKds } from "./components/pantalla-kds";
 
 // Etiquetas de la sucursal/caja para vistas previas a la sesión real (selector,
 // lock). En F5.0+ el POS operativo ya las lee de la BD vía PantallaTurno.
@@ -28,7 +31,12 @@ type Estado =
   | { paso: "selector"; pinPara: Empleado | null }
   | { paso: "operando"; empleado: Empleado; token: string }
   | { paso: "bloqueo"; empleado: Empleado }
-  | { paso: "expirada"; empleado: Empleado };
+  | { paso: "expirada"; empleado: Empleado }
+  | { paso: "kds"; token: string; caja: DatosCaja };
+
+/** Fase 2 · pantalla de cocina dedicada: abre con ?kds (una tablet/PC de cocina apuntando al hub
+ *  entra directo a Cocina con la sesión de DISPOSITIVO, sin PIN de empleado). */
+const MODO_KDS = typeof window !== "undefined" && new URLSearchParams(window.location.search).has("kds");
 
 export default function Page() {
   const [estado, setEstado] = useState<Estado>({ paso: "boot" });
@@ -52,7 +60,19 @@ export default function Page() {
       }
       if (!activo) return;
       if (email) {
-        setCajaId(cajaIdFromEmail(email));
+        const cid = cajaIdFromEmail(email);
+        setCajaId(cid);
+        // Modo KDS: entrar directo a Cocina con el token del dispositivo (sin PIN).
+        if (MODO_KDS && cid) {
+          const tok = await deviceToken();
+          if (activo && tok) {
+            try {
+              const caja = await leerCaja(tok, cid);
+              setEstado({ paso: "kds", token: tok, caja });
+              return;
+            } catch { /* si falla, cae al flujo normal */ }
+          }
+        }
         setEstado({ paso: "selector", pinPara: null });
       } else {
         setEstado({ paso: "vincular" });
@@ -111,6 +131,16 @@ export default function Page() {
 
     case "vincular":
       return <VincularDispositivo onVinculado={trasVincular} />;
+
+    case "kds":
+      // Pantalla de cocina dedicada (Fase 2). "Salir" vuelve al POS normal (quita ?kds).
+      return (
+        <PantallaKds
+          token={estado.token}
+          caja={estado.caja}
+          onSalir={() => { window.location.href = window.location.pathname; }}
+        />
+      );
 
     case "selector":
       return (

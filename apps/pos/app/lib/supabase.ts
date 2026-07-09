@@ -45,6 +45,13 @@ export async function deviceSignOut(): Promise<void> {
   await deviceClient.auth.signOut();
 }
 
+/** Token de la sesión de dispositivo (para el Modo KDS: lee/avanza comandas sin PIN de empleado,
+ *  ya que tickets_select/update es por tenant, no por identidad). supabase-js lo auto-refresca. */
+export async function deviceToken(): Promise<string | null> {
+  const { data } = await deviceClient.auth.getSession();
+  return data.session?.access_token ?? null;
+}
+
 /**
  * El caja_id va codificado en el email sintético del dispositivo
  * (`caja-{caja_id}@dispositivos.vimpos.mx`, Parte 1F §1.1). El dispositivo ES una caja.
