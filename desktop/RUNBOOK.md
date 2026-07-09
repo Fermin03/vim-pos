@@ -82,9 +82,15 @@ La caja hace de **servidor en la LAN**: el gateway escucha en `0.0.0.0` y al arr
   el backend hace `LISTEN` y reenvía por **SSE** (`GET /kds/stream?sucursal=<id>`). El KDS del POS
   se suscribe (EventSource) y recarga al instante; el polling de 5s queda como respaldo.
 - Verificado: `npm run verify:hub` (KDS recibe EN_COCINA/LISTO en vivo + acceso por IP de LAN).
-- **Un KDS en otra máquina:** carga el POS apuntando `window.__VIM_SUPABASE_URL` al hub
-  (`http://<ip-caja>:54350`) y entra a Cocina. Pendiente de Fase 2: descubrimiento automático del
-  hub (mDNS) y servir el UI del KDS por la LAN; hoy se configura la IP a mano.
+- **UI servido por la LAN (auto-configurable):** el hub sirve el POS en `http://<ip-caja>:54360`;
+  el `ui-server` inyecta el endpoint del gateway desde `location` → cualquier navegador de la LAN
+  funciona sin teclear URLs. La CSP incluye el host del hub para permitir la conexión.
+- **Modo KDS dedicado:** abre **`http://<ip-caja>:54360/?kds`** en la tablet/PC de cocina → entra
+  directo a Cocina con la sesión de DISPOSITIVO, **sin PIN de empleado** (una vez vinculado el
+  dispositivo). Recibe las órdenes en vivo por SSE.
+- **Pendiente Fase 2 (comodidad, no riesgo):** descubrimiento mDNS del hub (hoy IP a mano); refresco
+  del token del device para KDS 24/7 (hoy TTL 12h cubre un turno, reinicio diario lo renueva);
+  probar 2ª caja en la LAN.
 
 ## Conectar a la nube (deploy del sync real) — #3
 
