@@ -133,7 +133,10 @@ export async function startLocalBackend(opts = {}) {
   // 6) PostgREST como sidecar (con libpq.dll del propio Postgres embebido).
   mkdirSync(path.dirname(confPath), { recursive: true }); // dataRoot/bin (userData en empaquetado)
   writeFileSync(confPath, [
-    `db-uri = "postgres://authenticator:postgres@localhost:${pgPort}/vimpos"`,
+    // 127.0.0.1 (no 'localhost'): bajo Electron, la resolución de 'localhost' del proceso hijo
+    // postgrest puede no alcanzar el Postgres (mismo motivo por el que readiness/proxy usan IPv4).
+    // Con IP literal, libpq no hace getaddrinfo y conecta directo → schema cache carga siempre.
+    `db-uri = "postgres://authenticator:postgres@127.0.0.1:${pgPort}/vimpos"`,
     `db-schemas = "public"`,
     `db-anon-role = "anon"`,
     `jwt-secret = "${secret}"`,
@@ -145,6 +148,13 @@ export async function startLocalBackend(opts = {}) {
     stdio: ["ignore", logFd, logFd],
     env: { ...process.env, PATH: `${pgBin}${path.delimiter}${process.env.PATH}` },
   });
+
+  // Registrar los PIDs YA, ANTES del readiness. Si el arranque falla aquí (readiness expira),
+  // el postgrest recién lanzado queda rastreado en el pidfile → el próximo arranque lo mata en
+  // matarHuerfanos. Sin esto, un boot fallido deja un postgrest huérfano ocupando restPort que
+  // hace fallar TODOS los reintentos siguientes (el nuevo postgrest no puede enlazar el puerto).
+  try { writeFileSync(pidfile, JSON.stringify({ pids: [pgPid, rest.pid].filter(Boolean), at: Date.now() })); } catch { /* */ }
+
   let ready = false;
   for (let i = 0; i < 120; i++) { // hasta ~60s: bajo carga, el schema cache tarda en cargar
     // 127.0.0.1 (no 'localhost'): PostgREST escucha 0.0.0.0 (IPv4); en el Electron empaquetado
@@ -153,14 +163,12 @@ export async function startLocalBackend(opts = {}) {
     await wait(500);
   }
   if (!ready) {
+    try { rest.kill(); } catch { /* */ } // no dejarlo colgado como huérfano ocupando restPort
     let tail = "";
     try { tail = readFileSync(logPath, "utf8").split("\n").slice(-6).join("\n"); } catch { /* */ }
     throw new Error(`PostgREST no respondió.\n${tail}`);
   }
   log(`PostgREST en localhost:${restPort}`);
-
-  // Registrar los PIDs para poder limpiarlos si el próximo arranque descubre que este no cerró bien.
-  try { writeFileSync(pidfile, JSON.stringify({ pids: [pgPid, rest.pid].filter(Boolean), at: Date.now() })); } catch { /* */ }
 
   // Pool para el auth local (device sign-in, pin-login) — service_role local.
   const pool = new pg.Pool({ host: "localhost", port: pgPort, user: "postgres", password: "postgres", database: "vimpos", max: 4 });
