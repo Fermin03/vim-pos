@@ -36,7 +36,7 @@ import { construirTicketJob } from "../lib/print/ticket-builder";
 import { construirComandaJob, type DatosComanda } from "../lib/print/comanda-builder";
 import { ReciboPreview } from "./recibo-preview";
 import { PantallaCierre } from "./pantalla-cierre";
-import { PantallaKds } from "./pantalla-kds";
+import { PantallaKds } from "@vim/kds-core";
 import { PantallaMesas } from "./pantalla-mesas";
 import { PantallaDelivery } from "./pantalla-delivery";
 import { PantallaDevoluciones } from "./pantalla-devoluciones";

@@ -18,7 +18,7 @@ import { ModalPin } from "./components/modal-pin";
 import { PantallaBloqueo } from "./components/pantalla-bloqueo";
 import { ModalSesionExpirada } from "./components/modal-sesion-expirada";
 import { PantallaTurno } from "./components/pantalla-turno";
-import { PantallaKds } from "./components/pantalla-kds";
+import { PantallaKds } from "@vim/kds-core";
 
 // Etiquetas de la sucursal/caja para vistas previas a la sesión real (selector,
 // lock). En F5.0+ el POS operativo ya las lee de la BD vía PantallaTurno.
