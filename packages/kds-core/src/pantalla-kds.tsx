@@ -1,16 +1,16 @@
 "use client";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { type DatosCaja } from "../lib/turno";
+import { type CajaKds } from "./caja";
 import {
   cerrarComanda,
   labelModo,
   leerComandas,
   minutosEnCocina,
   type ComandaKds,
-} from "../lib/kds";
-import { areasDeComandas, comandasNuevas, SIN_AREA } from "../lib/kds-estado";
+} from "./comandas";
+import { areasDeComandas, comandasNuevas, SIN_AREA } from "./estado";
 
-const REFRESCO_MS = 5000; // re-lee comandas de BD cada 5s (polling robusto + Realtime futuro)
+const REFRESCO_MS = 5000; // re-lee comandas de BD cada 5s (polling robusto + Realtime del hub)
 const UMBRAL_MEDIO = 8; // min → ámbar
 const UMBRAL_VENCIDO = 15; // min → rojo (pulso)
 const TODAS = "__todas__";
@@ -63,14 +63,14 @@ export function PantallaKds({
   onSalir,
 }: {
   token: string;
-  caja: DatosCaja;
+  caja: CajaKds;
   onSalir: () => void;
 }) {
   const [comandas, setComandas] = useState<ComandaKds[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [ahora, setAhora] = useState<number>(() => Date.now());
   const [procesando, setProcesando] = useState<Set<string>>(new Set());
-  // F15 — filtro multi-área, alto contraste, sonido, toasts.
+  // Filtro multi-área, alto contraste, sonido, toasts.
   const [areaSel, setAreaSel] = useState<string>(TODAS);
   const [altoContraste, setAltoContraste] = useState(false);
   const [sonido, setSonido] = useState(true);
@@ -113,9 +113,9 @@ export function PantallaKds({
     };
   }, [recargar]);
 
-  // Fase 2 (Hub del local) — tiempo real por SSE cuando el KDS corre contra la caja-hub de
-  // escritorio: al cambiar un ticket de estado de cocina, recarga al instante (sin esperar el
-  // polling). Solo en el desktop (window.__VIM_DESKTOP); en navegador/nube no aplica (sin endpoint).
+  // Tiempo real por SSE cuando el KDS corre contra la caja-hub de escritorio: al cambiar un ticket
+  // de estado de cocina, recarga al instante (sin esperar el polling). Solo en el desktop
+  // (window.__VIM_DESKTOP); en navegador/nube no aplica (sin endpoint).
   useEffect(() => {
     const w = typeof window !== "undefined" ? (window as unknown as { __VIM_SUPABASE_URL?: string; __VIM_DESKTOP?: boolean }) : undefined;
     if (!w?.__VIM_DESKTOP || !w.__VIM_SUPABASE_URL || typeof EventSource === "undefined") return;
@@ -136,7 +136,6 @@ export function PantallaKds({
     try {
       // Un toque: LISTO cierra la comanda (queda ENTREGADO y sale del panel).
       await cerrarComanda(token, c.ticketId, c.estadoCocina);
-      // Optimista: quita/actualiza local y re-sincroniza.
       await recargar();
     } catch (e) {
       setError(e instanceof Error ? e.message : "No se pudo actualizar la comanda");
@@ -149,7 +148,7 @@ export function PantallaKds({
     }
   }
 
-  // Paleta: alto contraste (P-111) sube el contraste del fondo/texto para cocinas con luz fuerte.
+  // Paleta: alto contraste sube el contraste del fondo/texto para cocinas con luz fuerte.
   const tema = altoContraste
     ? { bg: "#000000", surface: "#15151A", line: "#444", text: "#FFFFFF", text2: "#D0D0D6", text3: "#9090A0" }
     : { bg: "#1A1A1E", surface: "#242429", line: "#333338", text: "#F0F0EC", text2: "#A0A0A6", text3: "#6E6E74" };

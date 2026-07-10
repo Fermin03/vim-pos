@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { siguienteEstado, minutosEnCocina, labelModo, areasDeComandas, comandasNuevas, SIN_AREA } from "../kds-estado";
+import { siguienteEstado, minutosEnCocina, labelModo, areasDeComandas, comandasNuevas, SIN_AREA } from "@vim/kds-core";
 
 describe("kds — máquina de estados de cocina", () => {
   it("avanza EN_COCINA → LISTO → ENTREGADO y luego null", () => {

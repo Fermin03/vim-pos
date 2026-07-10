@@ -10,5 +10,7 @@ bin/postgrest.conf
 bin/postgrest.log
 bin/*.out
 pos-ui/
+kds-ui/
 apps-pos-out/
 bin/.pids.json
+kds-hub.json

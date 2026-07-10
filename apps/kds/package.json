@@ -1,26 +1,21 @@
 {
-  "name": "@vim/pos",
+  "name": "@vim/kds",
   "version": "0.0.0",
   "private": true,
   "scripts": {
-    "dev": "next dev --port 3000",
+    "dev": "next dev --port 3003",
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "typecheck": "tsc --noEmit",
-    "test": "vitest run"
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.45.0",
-    "@vim/db": "workspace:*",
     "@vim/kds-core": "workspace:*",
     "@vim/ui": "workspace:*",
-    "dexie": "^4.0.0",
     "next": "^15.0.0",
-    "qrcode.react": "^4.0.0",
     "react": "^19.0.0",
-    "react-dom": "^19.0.0",
-    "zod": "^3.23.0"
+    "react-dom": "^19.0.0"
   },
   "devDependencies": {
     "@vim/config": "workspace:*",
@@ -30,7 +25,6 @@
     "autoprefixer": "^10.4.0",
     "postcss": "^8.4.0",
     "tailwindcss": "^3.4.0",
-    "typescript": "^5.6.0",
-    "vitest": "^2.1.0"
+    "typescript": "^5.6.0"
   }
 }

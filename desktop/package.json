@@ -16,8 +16,10 @@
     "verify:hub": "node src/verify-hub.mjs",
     "backend": "node src/backend.mjs",
     "build:ui": "node scripts/build-ui.mjs",
+    "build:kds-ui": "node scripts/build-kds-ui.mjs",
     "start": "electron .",
-    "dist": "npm run build:ui && electron-builder --win nsis"
+    "start:cocina": "electron . --role=cocina",
+    "dist": "npm run build:ui && npm run build:kds-ui && electron-builder --win nsis"
   },
   "dependencies": {
     "embedded-postgres": "17.10.0-beta.17",
@@ -40,9 +42,15 @@
       { "from": "sql", "to": "sql" },
       { "from": "bin/postgrest.exe", "to": "bin/postgrest.exe" },
       { "from": "node_modules/@embedded-postgres/windows-x64/native/bin", "to": "pg-bin" },
-      { "from": "pos-ui", "to": "pos-ui" }
+      { "from": "pos-ui", "to": "pos-ui" },
+      { "from": "kds-ui", "to": "kds-ui" }
     ],
     "win": { "target": ["nsis"], "signAndEditExecutable": false },
-    "nsis": { "oneClick": false, "perMachine": false, "allowToChangeInstallationDirectory": true }
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "include": "build/installer.nsh"
+    }
   }
 }

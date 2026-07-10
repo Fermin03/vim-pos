@@ -1,6 +1,5 @@
-// F9 — Helpers PUROS del KDS (sin dependencias de cliente/red, para testear con vitest).
-// La máquina de estados de cocina y los cálculos de tiempo viven aquí; kds.ts (que sí
-// habla con Supabase) los reexporta.
+// Helpers PUROS del KDS (sin dependencias de cliente/red, testeables). Máquina de estados de
+// cocina y cálculos de tiempo. comandas.ts (que sí habla con Supabase) los reexporta.
 
 export type EstadoCocina = "EN_COCINA" | "LISTO" | "ENTREGADO" | "EN_RUTA" | "ENTREGADO_DOMICILIO" | "SIN_ENVIAR";
 
@@ -30,26 +29,22 @@ export function minutosEnCocina(fechaEnvio: string | null, ahora: number): numbe
   return Math.max(0, Math.floor((ahora - t) / 60000));
 }
 
-// ── F15: KDS avanzado ────────────────────────────────────────────────────────
-
 /** Etiqueta canónica de "sin área" para el filtro multi-área. */
 export const SIN_AREA = "General";
 
 /**
  * Áreas presentes en un conjunto de comandas (para el tab-bar del filtro multi-área).
- * Cada comanda tiene items; cada item un área (o null → General). Orden alfabético estable.
+ * Orden alfabético estable.
  */
-export function areasDeComandas(
-  comandas: { items: { area: string | null }[] }[],
-): string[] {
+export function areasDeComandas(comandas: { items: { area: string | null }[] }[]): string[] {
   const set = new Set<string>();
   for (const c of comandas) for (const it of c.items) set.add(it.area ?? SIN_AREA);
   return [...set].sort((a, b) => a.localeCompare(b));
 }
 
 /**
- * Detecta si hay comandas NUEVAS comparando los ticketIds previos con los actuales
- * (para disparar el sonido de "nuevo pedido"). Devuelve cuántas comandas nuevas hay.
+ * Detecta cuántas comandas NUEVAS hay comparando los ticketIds previos con los actuales
+ * (para disparar el sonido de "nuevo pedido").
  */
 export function comandasNuevas(previos: Set<string>, actualesIds: string[]): number {
   let n = 0;

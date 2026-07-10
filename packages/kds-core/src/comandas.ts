@@ -1,8 +1,8 @@
 "use client";
-import { employeeClient } from "./supabase";
-import { type EstadoCocina } from "./kds-estado";
+import { clienteConToken } from "./cliente";
+import { type EstadoCocina } from "./estado";
 
-export { labelModo, siguienteEstado, minutosEnCocina, type EstadoCocina } from "./kds-estado";
+export { labelModo, siguienteEstado, minutosEnCocina, type EstadoCocina } from "./estado";
 
 export type ItemComanda = {
   id: string;
@@ -10,7 +10,7 @@ export type ItemComanda = {
   nombre: string;
   modificadores: string[];
   notaCocina: string | null;
-  /** Área de cocina del ítem (para el filtro multi-área, P-109). null = sin área. */
+  /** Área de cocina del ítem (para el filtro multi-área). null = sin área. */
   area: string | null;
 };
 
@@ -32,7 +32,7 @@ export type ComandaKds = {
  * con sus ítems no cancelados y modificadores. Orden: más antiguo primero (FIFO de cocina).
  */
 export async function leerComandas(token: string, sucursalId: string): Promise<ComandaKds[]> {
-  const { data, error } = await employeeClient(token)
+  const { data, error } = await clienteConToken(token)
     .from("tickets")
     .select(
       "id, folio_completo, modo_servicio, estado_cocina, fecha_envio_cocina, nota_general, " +
@@ -89,12 +89,12 @@ export async function leerComandas(token: string, sucursalId: string): Promise<C
 }
 
 /**
- * Avanza el estado de cocina de un ticket (UPDATE normal — el validador permite avances
- * hacia adelante sin PIN y pone los timestamps; las reversas exigen autorización).
+ * Avanza el estado de cocina de un ticket (UPDATE normal — el validador permite avances hacia
+ * adelante sin PIN y pone los timestamps; las reversas exigen autorización).
  *   EN_COCINA → LISTO → ENTREGADO
  */
 export async function avanzarCocina(token: string, ticketId: string, nuevoEstado: EstadoCocina): Promise<void> {
-  const { error } = await employeeClient(token)
+  const { error } = await clienteConToken(token)
     .from("tickets")
     .update({ estado_cocina: nuevoEstado })
     .eq("id", ticketId);

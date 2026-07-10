@@ -70,6 +70,52 @@ importers:
         specifier: ^2.1.0
         version: 2.1.9(@types/node@20.19.41)
 
+  apps/kds:
+    dependencies:
+      '@supabase/supabase-js':
+        specifier: ^2.45.0
+        version: 2.106.2
+      '@vim/kds-core':
+        specifier: workspace:*
+        version: link:../../packages/kds-core
+      '@vim/ui':
+        specifier: workspace:*
+        version: link:../../packages/ui
+      next:
+        specifier: ^15.0.0
+        version: 15.5.18(react-dom@19.2.6(react@19.2.6))(react@19.2.6)
+      react:
+        specifier: ^19.0.0
+        version: 19.2.6
+      react-dom:
+        specifier: ^19.0.0
+        version: 19.2.6(react@19.2.6)
+    devDependencies:
+      '@types/node':
+        specifier: ^20
+        version: 20.19.41
+      '@types/react':
+        specifier: ^19
+        version: 19.2.15
+      '@types/react-dom':
+        specifier: ^19
+        version: 19.2.3(@types/react@19.2.15)
+      '@vim/config':
+        specifier: workspace:*
+        version: link:../../packages/config
+      autoprefixer:
+        specifier: ^10.4.0
+        version: 10.5.0(postcss@8.5.15)
+      postcss:
+        specifier: ^8.4.0
+        version: 8.5.15
+      tailwindcss:
+        specifier: ^3.4.0
+        version: 3.4.19
+      typescript:
+        specifier: ^5.6.0
+        version: 5.9.3
+
   apps/platform:
     dependencies:
       '@vim/db':
@@ -121,6 +167,9 @@ importers:
       '@vim/db':
         specifier: workspace:*
         version: link:../../packages/db
+      '@vim/kds-core':
+        specifier: workspace:*
+        version: link:../../packages/kds-core
       '@vim/ui':
         specifier: workspace:*
         version: link:../../packages/ui
@@ -184,6 +233,28 @@ importers:
       zod:
         specifier: ^3.23.0
         version: 3.25.76
+
+  packages/kds-core:
+    dependencies:
+      '@supabase/supabase-js':
+        specifier: ^2.45.0
+        version: 2.106.2
+    devDependencies:
+      '@types/react':
+        specifier: ^19
+        version: 19.2.15
+      '@types/react-dom':
+        specifier: ^19
+        version: 19.2.3(@types/react@19.2.15)
+      react:
+        specifier: ^19
+        version: 19.2.6
+      react-dom:
+        specifier: ^19
+        version: 19.2.6(react@19.2.6)
+      typescript:
+        specifier: ^5.6.0
+        version: 5.9.3
 
   packages/ui:
     devDependencies:
