@@ -28,10 +28,29 @@ cd desktop
 npm install                 # baja Postgres embebido + Electron; postgrest.exe/libpq ya vienen
 npm run verify              # E2E headless: device→empleados(RLS)→pin-login→venta(RPC)→PAGADO
 npm run build:ui            # exporta el POS estático → desktop/pos-ui/ (UI 100% offline)
-npm start                   # la app de escritorio: sirve pos-ui/ offline + backend local
+npm run build:kds-ui        # exporta la COCINA (apps/kds) → desktop/kds-ui/
+npm start                   # rol CAJA: sirve pos-ui/ offline + backend local (hace de hub)
+npm run start:cocina        # rol COCINA: cliente delgado del hub (pantalla de cocina dedicada)
 #   npm run backend                                # solo el backend (apuntar un POS dev a :54350)
 #   VIM_POS_URL=http://localhost:3000 npm start    # cargar un POS dev en vez del pos-ui/ empaquetado
+#   VIM_HUB_URL=http://<ip-caja>:54350 npm run start:cocina   # cocina apuntando a un hub sin setup
 ```
+
+## Dos roles, un ejecutable (caja / cocina)
+
+El mismo `.exe` arranca en dos roles (el instalador crea un acceso directo por cada uno):
+
+- **CAJA** (por defecto): el POS local-first con backend embebido; hace de **hub** en la LAN.
+- **COCINA** (`--role=cocina`): la **pantalla de cocina dedicada** (`apps/kds`), **cliente delgado**
+  del hub — SIN Postgres/sync local. Sirve `kds-ui/` apuntándolo al gateway de la caja por LAN.
+  La primera vez muestra un **setup** para teclear la IP de la caja (se guarda en
+  `userData/kds-hub.json`); luego arranca directo en Cocina con la sesión de DISPOSITIVO (sin PIN).
+
+Código compartido en **`packages/kds-core`** (PantallaKds, vincular, cliente de dispositivo,
+comandas): lo consumen el POS (botón Cocina) y `apps/kds` → sin duplicación. La cocina lee y avanza
+comandas con el token del DISPOSITIVO (RLS por tenant, no por identidad) y recibe el tiempo real por
+SSE del hub (`__VIM_DESKTOP`). Instancia única solo para la caja; la cocina no toma el lock, así una
+caja y una cocina pueden convivir en la misma PC.
 
 El UI se sirve en `localhost:54360` (offline) y el gateway de datos en `localhost:54350`; si no
 existe `pos-ui/` (no corriste `build:ui`), cae a `VIM_POS_URL` o al dominio desplegado.
@@ -46,8 +65,12 @@ npm run build:ui                                   # exporta el POS a pos-ui/
 ELECTRON_CACHE=D:/electron-cache ELECTRON_BUILDER_CACHE=D:/electron-builder-cache \
   npx electron-builder --win dir                   # → dist/win-unpacked/VIM POS.exe (app corrible)
 # instalador NSIS (requiere Modo Desarrollador o admin en Windows, ver abajo):
-npm run dist                                        # → dist/VIM POS Setup <ver>.exe
+npm run dist                                        # build:ui + build:kds-ui + NSIS → dist/VIM POS Setup <ver>.exe
 ```
+
+**Un instalador, dos accesos directos.** `build/installer.nsh` crea, además del acceso directo
+"VIM POS" (rol caja), un segundo **"VIM POS Cocina"** que abre el mismo `.exe` con `--role=cocina`.
+`kds-ui/` va en `extraResources`. Así la misma instalación sirve la caja y la pantalla de cocina.
 
 **✅ VALIDADO en vivo:** `dist/win-unpacked/VIM POS.exe` arranca Postgres embebido + PostgREST +
 gateway + UI y autentica (device sign-in), corriendo desde el build. Config: `asar:false` (para que
