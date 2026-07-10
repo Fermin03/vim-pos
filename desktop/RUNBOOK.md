@@ -59,9 +59,16 @@ los binarios nativos ejecuten), recursos en `resources/` (migraciones, seed, sql
 2. **Perfil con junction / carpeta redirigida** (el `%APPDATA%` de esta PC) rompe los renames de
    Postgres en `initdb` (*"Improper link"*) → **`VIM_DATA_DIR`** reubica los datos a un volumen sano
    (p. ej. `D:`). En una PC normal `userData` funciona; con junction/redirect, setear `VIM_DATA_DIR`.
-3. **`localhost` → IPv6 (::1)** en el Electron empaquetado, pero PostgREST escucha `0.0.0.0` (IPv4) →
-   usar **`127.0.0.1`** (ya aplicado en runtime + gateway).
-4. **Caches de electron-builder en `D:`** (`ELECTRON_CACHE`/`ELECTRON_BUILDER_CACHE`) por el junction
+3. **`localhost` → IPv6 (::1)** bajo Electron, pero PostgREST escucha `0.0.0.0` (IPv4) → usar
+   **`127.0.0.1`** en TODO: readiness, proxy del gateway, **y el `db-uri` postgrest→postgres**. Este
+   último fue sutil: bajo Electron el hijo postgrest resolvía `localhost`→`::1` y NO alcanzaba
+   Postgres (se colgaba mudo tras "listening", readiness expiraba a 60s); bajo `node` sí conectaba.
+   Con IP literal libpq conecta directo. Si el hub no arranca, revisa `bin/postgrest.log`: si se
+   corta en "listening" sin "Successfully connected", es esto.
+4. **Boot fallido dejaba postgrest huérfano** ocupando `restPort` → los reintentos fallaban en
+   cascada. Ahora el PID se registra en el pidfile ANTES del readiness y se mata el postgrest si
+   expira, para que `matarHuerfanos` del próximo arranque lo limpie.
+5. **Caches de electron-builder en `D:`** (`ELECTRON_CACHE`/`ELECTRON_BUILDER_CACHE`) por el junction
    del perfil C: (rename cross-disk falla).
 
 **✅ Instalador construido:** `dist/VIM POS Setup <ver>.exe` (NSIS, ~138 MB). El fix del bloqueo de
