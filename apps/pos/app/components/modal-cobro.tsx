@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Button } from "@vim/ui/styles";
 import { fmtMxn } from "../lib/turno";
 import {
@@ -206,10 +206,16 @@ function Numpad({
   buffer,
   onChange,
   compact = false,
+  onEnter,
+  capturarTeclado = true,
 }: {
   buffer: string;
   onChange: (b: string) => void;
   compact?: boolean;
+  /** Enter confirma (p. ej. cobrar). */
+  onEnter?: () => void;
+  /** Si es false, no escucha el teclado (por si convivieran dos numpads). */
+  capturarTeclado?: boolean;
 }) {
   const nkBase = compact
     ? "border border-line-strong rounded bg-surface font-display text-xl font-semibold cursor-pointer min-h-[48px] flex items-center justify-center text-ink transition-colors hover:bg-hover active:bg-line"
@@ -220,6 +226,28 @@ function Numpad({
     else if (key === "00") onChange((buffer + "00").slice(0, 8));
     else onChange((buffer + key).slice(0, 8));
   }
+
+  // Teclado físico además del táctil: números + Backspace (+ Enter para confirmar). El buffer es en
+  // CENTAVOS, así que teclear "4950" = $49.50 igual que tocando; se ignoran '.'/','. Refs para no
+  // re-registrar el listener en cada cambio de buffer.
+  const onChangeRef = useRef(onChange);
+  const bufferRef = useRef(buffer);
+  const onEnterRef = useRef(onEnter);
+  onChangeRef.current = onChange;
+  bufferRef.current = buffer;
+  onEnterRef.current = onEnter;
+  useEffect(() => {
+    if (!capturarTeclado) return;
+    function onKey(e: KeyboardEvent) {
+      const t = e.target as HTMLElement | null;
+      if (t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.isContentEditable)) return;
+      if (e.key >= "0" && e.key <= "9") { e.preventDefault(); onChangeRef.current((bufferRef.current + e.key).slice(0, 8)); }
+      else if (e.key === "Backspace" || e.key === "Delete") { e.preventDefault(); onChangeRef.current(bufferRef.current.slice(0, -1)); }
+      else if (e.key === "Enter") { e.preventDefault(); onEnterRef.current?.(); }
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [capturarTeclado]);
 
   const keys = ["1","2","3","4","5","6","7","8","9","00","0","back"];
 
@@ -469,7 +497,7 @@ function VistaEfectivo({
 
         {/* Numpad recibido */}
         <div className="flex-1">
-          <Numpad buffer={recibBuffer} onChange={setRecibBuffer} />
+          <Numpad buffer={recibBuffer} onChange={setRecibBuffer} onEnter={handleCobrar} />
         </div>
 
         {/* Botón cobrar */}
@@ -559,7 +587,7 @@ function VistaOtro({
           </button>
         </div>
         <div className="flex-1">
-          <Numpad buffer={buffer} onChange={setBuffer} />
+          <Numpad buffer={buffer} onChange={setBuffer} onEnter={() => { if (monto > 0 && !procesando) onAplicar(monto); }} />
         </div>
         <button
           type="button"

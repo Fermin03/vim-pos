@@ -72,6 +72,20 @@ export function PinKeypad({
     [disabled, length],
   );
 
+  // Teclado físico: además del táctil, se puede teclear con números y Backspace (P-002/010/012).
+  // Útil en caja con teclado; en tablet el táctil sigue igual. Ignora si el foco está en un input.
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if (disabled) return;
+      const t = e.target as HTMLElement | null;
+      if (t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.isContentEditable)) return;
+      if (e.key >= "0" && e.key <= "9") { e.preventDefault(); press(e.key); }
+      else if (e.key === "Backspace" || e.key === "Delete") { e.preventDefault(); press("del"); }
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [press, disabled]);
+
   return (
     <div className={cn("flex flex-col items-center gap-3", className)}>
       {/* Puntos del PIN */}
