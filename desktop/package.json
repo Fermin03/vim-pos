@@ -21,7 +21,9 @@
     "start:cocina": "electron . --role=cocina",
     "backup": "node scripts/backup-cli.mjs",
     "restore": "node scripts/restore.mjs",
+    "release-manifest": "node scripts/release-manifest.mjs",
     "verify:robustez3": "node src/verify-robustez3.mjs",
+    "verify:updater": "node src/verify-updater.mjs",
     "dist": "npm run build:ui && npm run build:kds-ui && electron-builder --win nsis"
   },
   "dependencies": {

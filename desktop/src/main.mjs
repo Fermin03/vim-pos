@@ -3,7 +3,7 @@
 //    gateway) + UI del POS. Hace de HUB en la LAN. Fase 3: bandeja (no se apaga por accidente) +
 //    watchdog (se auto-recupera) + respaldo del pgdata al cerrar y bajo demanda.
 //  • COCINA (--role=cocina): pantalla de cocina como CLIENTE DELGADO del hub. SIN backend local.
-import { app, BrowserWindow, Tray, Menu, nativeImage, clipboard } from "electron";
+import { app, BrowserWindow, Tray, Menu, nativeImage, clipboard, Notification, dialog, shell } from "electron";
 import { existsSync, readFileSync, writeFileSync, mkdirSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -13,6 +13,7 @@ import { pullFromCloud } from "./sync-pull.mjs";
 import { pushToCloud } from "./sync-push.mjs";
 import { respaldar } from "./backup.mjs";
 import { crearWatchdog } from "./watchdog.mjs";
+import { buscarActualizacion, descargarInstalador } from "./updater.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const UI_PORT = 54360;       // UI del POS (caja)
@@ -28,6 +29,10 @@ const ROL = process.argv.includes("--role=cocina") ? "cocina" : "caja";
 const CONFIG_DIR = process.env.VIM_DATA_DIR || app.getPath("userData");
 const HUB_CFG = path.join(CONFIG_DIR, "kds-hub.json");
 
+// Auto-actualización (Opción B, sin firma): feed del manifiesto. Por defecto el bucket público de
+// Supabase Storage del proyecto; se puede override con VIM_UPDATE_FEED.
+const UPDATE_FEED = process.env.VIM_UPDATE_FEED || "https://pbiaxzvmssjsxdwqrumb.supabase.co/storage/v1/object/public/actualizaciones/latest.json";
+
 let backend;
 let uiServer;
 let win;
@@ -37,6 +42,8 @@ let opcionesBackend = {};   // para poder re-arrancar el backend igual (watchdog
 let backupsDir = null;
 let saliendoDeVerdad = false; // distinguir "cerrar ventana" (→ bandeja) de "salir de verdad"
 let respaldando = false;
+let updateInfo = null;        // manifiesto de la actualización disponible (o null)
+let descargandoUpdate = false;
 
 // ── Config del hub (rol cocina) ──────────────────────────────────────────────
 function leerHubUrl() {
@@ -89,6 +96,7 @@ async function bootCaja() {
   watchdog = crearWatchdog({ url: backend.url, alReiniciar: reiniciarBackend, log: (m) => console.log("· [watchdog]", m) });
 
   syncBestEffort().catch(() => {});
+  revisarActualizacion().catch(() => {}); // best-effort, no bloquea
 }
 
 // ── Rol COCINA: cliente delgado del hub ──────────────────────────────────────
@@ -107,6 +115,7 @@ async function bootCocina() {
   console.log(`· [cocina] UI de cocina en http://localhost:${KDS_UI_PORT} · hub: ${hub ?? "(sin configurar → setup)"}`);
   win = crearVentana([]);
   await win.loadURL(`http://localhost:${KDS_UI_PORT}`);
+  revisarActualizacion().catch(() => {}); // la cocina también se actualiza (sin bandeja: notificación)
 }
 
 async function boot() {
@@ -151,9 +160,18 @@ function crearTray() {
     const img = nativeImage.createFromPath(TRAY_ICON);
     tray = new Tray(img.isEmpty() ? nativeImage.createEmpty() : img);
   } catch { return; }
+  tray.on("double-click", () => { if (win) { win.show(); win.focus(); } });
+  refrescarMenuTray();
+}
+
+/** (Re)construye el menú de la bandeja — incluye el ítem de actualización si hay una disponible. */
+function refrescarMenuTray() {
+  if (!tray) return;
   const ip = backend?.lanIp ?? "127.0.0.1";
   tray.setToolTip(`VIM POS — Caja (servidor del local). La cocina se conecta a ${ip}. No la cierres durante el servicio.`);
-  tray.setContextMenu(Menu.buildFromTemplate([
+  const items = [];
+  if (updateInfo) items.push({ label: `⬇ Actualización v${updateInfo.version} — instalar`, click: () => ofrecerInstalar() }, { type: "separator" });
+  items.push(
     { label: `IP de esta caja (para la cocina): ${ip}`, enabled: false },
     { label: "Copiar IP", click: () => clipboard.writeText(ip) },
     { type: "separator" },
@@ -161,8 +179,65 @@ function crearTray() {
     { label: "Respaldar ahora", click: () => respaldarAhora() },
     { type: "separator" },
     { label: "Salir (apaga la caja)", click: () => { saliendoDeVerdad = true; app.quit(); } },
-  ]));
-  tray.on("double-click", () => { if (win) { win.show(); win.focus(); } });
+  );
+  tray.setContextMenu(Menu.buildFromTemplate(items));
+}
+
+/** Revisa el feed al arrancar (best-effort). Si hay versión nueva: notifica + ítem en la bandeja. */
+async function revisarActualizacion() {
+  try {
+    const info = await buscarActualizacion(UPDATE_FEED, app.getVersion());
+    if (!info.hay) { console.log(`· [update] al día (v${app.getVersion()})`); return; }
+    updateInfo = info;
+    console.log(`· [update] disponible v${info.version}`);
+    refrescarMenuTray();
+    if (Notification.isSupported()) {
+      const n = new Notification({ title: "VIM POS — Actualización disponible", body: `Versión ${info.version}. Haz clic para instalar.` });
+      n.on("click", () => ofrecerInstalar());
+      n.show();
+    }
+  } catch (e) {
+    console.log("· [update] chequeo omitido:", e.message);
+  }
+}
+
+/** Descarga (verificando SHA-512), y en la app empaquetada cierra e instala. Datos se conservan. */
+async function ofrecerInstalar() {
+  if (!updateInfo || descargandoUpdate) return;
+  const q = await dialog.showMessageBox(win ?? undefined, {
+    type: "info", buttons: ["Descargar e instalar", "Después"], defaultId: 0, cancelId: 1,
+    title: "Actualización disponible",
+    message: `Hay una nueva versión: ${updateInfo.version}`,
+    detail: (updateInfo.notas ? updateInfo.notas + "\n\n" : "") + "Se descargará (verificando su integridad) y luego VIM POS se cerrará para instalar. Tus datos se conservan.",
+  });
+  if (q.response !== 0) return;
+  descargandoUpdate = true;
+  const destino = path.join(app.getPath("temp"), `VIM-POS-Setup-${updateInfo.version}.exe`);
+  try {
+    if (win) win.setProgressBar(0.02);
+    const { path: instalador } = await descargarInstalador(updateInfo.url, updateInfo.sha512, destino, (frac) => { if (win) win.setProgressBar(frac); });
+    if (win) win.setProgressBar(-1);
+    if (!app.isPackaged) {
+      await dialog.showMessageBox(win ?? undefined, { type: "info", message: "Descargada y verificada (modo dev — no se instala)", detail: instalador });
+      shell.showItemInFolder(instalador);
+      descargandoUpdate = false;
+      return;
+    }
+    const c = await dialog.showMessageBox(win ?? undefined, {
+      type: "question", buttons: ["Instalar ahora", "Cancelar"], defaultId: 0, cancelId: 1,
+      title: "Listo para instalar", message: `Actualización ${updateInfo.version} descargada y verificada.`,
+      detail: "VIM POS se cerrará para instalar. Vuelve a abrirlo cuando termine.",
+    });
+    if (c.response !== 0) { descargandoUpdate = false; return; }
+    await shell.openPath(instalador);       // lanza el instalador NSIS
+    saliendoDeVerdad = true;
+    setTimeout(() => app.quit(), 1200);     // en la caja, cerrarTodo respalda antes de salir
+  } catch (e) {
+    if (win) win.setProgressBar(-1);
+    descargandoUpdate = false;
+    console.error("· [update] error:", e.message);
+    try { await dialog.showMessageBox(win ?? undefined, { type: "error", message: "No se pudo actualizar", detail: e.message }); } catch { /* */ }
+  }
 }
 
 /** Sincroniza con la nube: PULL (referencia ↓) + PUSH (ventas ↑). Gated por env; best-effort. */

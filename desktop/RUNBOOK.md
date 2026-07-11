@@ -102,7 +102,31 @@ npm run verify:robustez3       # prueba headless: respaldo restaurable + watchdo
 ```
 `restore` mueve el `pgdata` actual a `pgdata.pre-restauracion-<fecha>` por si acaso.
 
-### 🔜 Firma del instalador + auto-update (DIFERIDOS — requieren certificado)
+### Actualizaciones in-app (Opción B — sin firma) ✅
+
+La app **avisa** cuando hay versión nueva y ofrece **descargar + verificar (SHA-512) + instalar** —
+sin necesitar certificado de firma. La integridad está garantizada por el hash aunque no haya firma;
+los datos (`pgdata` en `userData`/`VIM_DATA_DIR`) se conservan al actualizar, y las **migraciones de
+BD nuevas se aplican solas** al arrancar. Al arrancar (caja y cocina) revisa el feed; si hay update:
+notificación + (en la caja) ítem en la bandeja "⬇ Actualización vX — instalar". Verificado headless
+(`npm run verify:updater`): detección de versión + descarga con SHA-512 + rechazo de descarga corrupta.
+
+**Publicar una versión nueva:**
+1. Sube la versión en `desktop/package.json` (p. ej. `0.1.0` → `0.2.0`).
+2. `npm run dist` → `dist/VIM POS Setup 0.2.0.exe`.
+3. `npm run release-manifest -- "Qué cambió en esta versión"` → genera `dist/latest.json`
+   (calcula el SHA-512 y arma la URL del bucket).
+4. Sube **AMBOS** al bucket **público** `actualizaciones` de Supabase Storage (crea el bucket una
+   vez, marcado *Public*): `VIM POS Setup 0.2.0.exe` y `latest.json` (reemplazando el anterior).
+
+Las cajas/cocinas detectan la nueva versión en su próximo arranque. Feed por defecto:
+`https://pbiaxzvmssjsxdwqrumb.supabase.co/storage/v1/object/public/actualizaciones/latest.json`
+(override con `VIM_UPDATE_FEED`; base del `.exe` con `VIM_UPDATE_BASE` en release-manifest).
+
+> Sin firma, al instalar la actualización Windows puede mostrar SmartScreen/UAC una vez ("Ejecutar
+> de todos modos") — molesto, no bloqueante. Con firma EV desaparece (ver abajo).
+
+### 🔜 Firma del instalador + auto-update SILENCIOSO (DIFERIDOS — requieren certificado)
 
 Hoy el instalador **no está firmado** → Windows muestra "editor desconocido" (se sortea con *Más
 información → Ejecutar de todos modos*). Para activarlo cuando tengas un **certificado de firma de
