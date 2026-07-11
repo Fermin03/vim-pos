@@ -72,6 +72,50 @@ npm run dist                                        # build:ui + build:kds-ui + 
 "VIM POS" (rol caja), un segundo **"VIM POS Cocina"** que abre el mismo `.exe` con `--role=cocina`.
 `kds-ui/` va en `extraResources`. Así la misma instalación sirve la caja y la pantalla de cocina.
 
+## Fase 3 — Endurecer
+
+**Bandeja (systray) — la caja no se apaga por accidente.** En rol caja, cerrar la ventana la **oculta
+a la bandeja** (no apaga el backend). Solo "Salir (apaga la caja)" desde el menú de la bandeja, o
+apagar la PC, la cierran de verdad. El menú de la bandeja muestra **la IP de la caja** (para teclear
+en la cocina) con "Copiar IP", "Abrir caja", "Respaldar ahora" y "Salir". Resuelve el incidente de
+que cerrar la ventana tumbaba todo el servidor del local.
+
+**Watchdog — auto-recuperación.** `watchdog.mjs` hace ping a `GET /health/deep` (que toca Postgres
+*y* PostgREST, no un ok estático) cada 20s; si falla 3 veces seguidas, reinicia el backend solo.
+Verificado (`npm run verify:robustez3`): matando `postgrest.exe`, el backend revive en ~12s.
+
+**Respaldo local del pgdata.** El bin de Postgres embebido no trae `pg_dump`, así que el respaldo es
+**físico en frío**: se copia el `pgdata` con Postgres detenido → copia 100% consistente. Se dispara:
+- **al cerrar la caja** ("Salir" / apagar la PC) — automático, sin costo (ya está cerrando);
+- **bajo demanda** — "Respaldar ahora" en la bandeja (pausa el watchdog, detiene el backend, copia,
+  lo vuelve a levantar; breve interrupción, pensado para el fin de turno).
+
+Los respaldos van a `<dataRoot>/backups/pgdata-<fecha>_<hora>/`, rotando los **últimos 7**. La nube
+(sync PUSH) sigue siendo el respaldo offsite de las ventas; esto protege el estado completo local.
+
+```bash
+# Con la caja CERRADA (respeta VIM_DATA_DIR si reubicaste los datos):
+npm run backup                 # respaldo manual en frío
+npm run restore                # restaura el MÁS RECIENTE
+npm run restore -- pgdata-2026-07-11_14-30-05   # restaura uno específico
+npm run verify:robustez3       # prueba headless: respaldo restaurable + watchdog
+```
+`restore` mueve el `pgdata` actual a `pgdata.pre-restauracion-<fecha>` por si acaso.
+
+### 🔜 Firma del instalador + auto-update (DIFERIDOS — requieren certificado)
+
+Hoy el instalador **no está firmado** → Windows muestra "editor desconocido" (se sortea con *Más
+información → Ejecutar de todos modos*). Para activarlo cuando tengas un **certificado de firma de
+código** (.pfx; ~$200–400/año, o EV en token):
+
+1. **Firma:** en `package.json` → `build.win`, quita `"signAndEditExecutable": false` y exporta
+   `CSC_LINK=file:///D:/ruta/cert.pfx` + `CSC_KEY_PASSWORD=…` antes de `npm run dist`. electron-builder
+   firma solo. (Con EV en token, se usa el flujo de firma del proveedor.)
+2. **Auto-update:** instala `electron-updater`, agrega en `build` un `publish` (p. ej. GitHub Releases
+   o un bucket S3/Spaces), y en `main.mjs` llama `autoUpdater.checkForUpdatesAndNotify()` al arrancar
+   (gated a `app.isPackaged`). El `dist` genera `latest.yml` que el updater consulta. **La firma (#1)
+   es prácticamente requisito** — sin firma, Windows/SmartScreen bloquea el auto-update.
+
 **✅ VALIDADO en vivo:** `dist/win-unpacked/VIM POS.exe` arranca Postgres embebido + PostgREST +
 gateway + UI y autentica (device sign-in), corriendo desde el build. Config: `asar:false` (para que
 los binarios nativos ejecuten), recursos en `resources/` (migraciones, seed, sql, postgrest.exe,

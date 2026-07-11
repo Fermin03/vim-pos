@@ -179,5 +179,5 @@ export async function startLocalBackend(opts = {}) {
     try { await database.stop(); } catch { /* */ }
     try { rmSync(pidfile, { force: true }); } catch { /* */ } // cierre limpio → sin huérfanos que limpiar
   };
-  return { pgPort, restPort, secret, pool, stop };
+  return { pgPort, restPort, secret, pool, stop, dataDir, dataRoot };
 }

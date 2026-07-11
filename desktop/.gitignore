@@ -14,3 +14,6 @@ kds-ui/
 apps-pos-out/
 bin/.pids.json
 kds-hub.json
+backups/
+backups-verify/
+pgdata.pre-restauracion-*/

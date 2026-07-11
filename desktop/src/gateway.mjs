@@ -46,6 +46,17 @@ export function crearGateway(backend) {
         return res.end("");
       }
       if (p === "/health") return send(res, 200, { ok: true });
+      // Salud PROFUNDA (Fase 3, watchdog): toca Postgres (pool) y PostgREST. 503 si algo cayó.
+      if (p === "/health/deep") {
+        try {
+          await pool.query("SELECT 1");
+          const r = await fetch(`http://127.0.0.1:${restPort}/`, { signal: AbortSignal.timeout(4000) });
+          if (!r.ok) throw new Error(`postgrest ${r.status}`);
+          return send(res, 200, { ok: true, pg: true, rest: true });
+        } catch (e) {
+          return send(res, 503, { ok: false, error: String(e?.message ?? e) });
+        }
+      }
 
       // ── Fase 2 · Hub — stream de cocina en tiempo real (SSE por LAN) ─────────
       if (p === "/kds/stream") {
