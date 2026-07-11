@@ -6,14 +6,21 @@ import { startLocalBackend } from "./runtime.mjs";
 import { crearGateway } from "./gateway.mjs";
 import { crearKdsStream } from "./kds-stream.mjs";
 
-/** IPv4 de la LAN (para que el KDS sepa a qué caja-hub conectarse). */
+/** IPv4 de la LAN real (para que el KDS sepa a qué caja-hub conectarse). Evita adaptadores
+ *  virtuales (Hyper-V/WSL/VMware/Docker — típicamente 172.x host-only que otra PC NO alcanza) y
+ *  prefiere una dirección privada de LAN casera/PyME (192.168.x, luego 10.x). */
 function ipLan() {
-  for (const ifs of Object.values(os.networkInterfaces())) {
+  const cands = [];
+  for (const [nombre, ifs] of Object.entries(os.networkInterfaces())) {
     for (const i of ifs ?? []) {
-      if (i.family === "IPv4" && !i.internal) return i.address;
+      if (i.family !== "IPv4" || i.internal) continue;
+      const virtual = /vethernet|virtual|vmware|virtualbox|hyper-?v|wsl|docker|loopback|default switch|tailscale|zerotier/i.test(nombre);
+      cands.push({ addr: i.address, virtual });
     }
   }
-  return "127.0.0.1";
+  const puntaje = (c) => (c.virtual ? 0 : 4) + (c.addr.startsWith("192.168.") ? 2 : 0) + (c.addr.startsWith("10.") ? 1 : 0);
+  cands.sort((a, b) => puntaje(b) - puntaje(a));
+  return cands[0]?.addr ?? "127.0.0.1";
 }
 
 export async function startBackend(opts = {}) {

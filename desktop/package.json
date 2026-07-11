@@ -19,6 +19,9 @@
     "build:kds-ui": "node scripts/build-kds-ui.mjs",
     "start": "electron .",
     "start:cocina": "electron . --role=cocina",
+    "backup": "node scripts/backup-cli.mjs",
+    "restore": "node scripts/restore.mjs",
+    "verify:robustez3": "node src/verify-robustez3.mjs",
     "dist": "npm run build:ui && npm run build:kds-ui && electron-builder --win nsis"
   },
   "dependencies": {
@@ -43,7 +46,8 @@
       { "from": "bin/postgrest.exe", "to": "bin/postgrest.exe" },
       { "from": "node_modules/@embedded-postgres/windows-x64/native/bin", "to": "pg-bin" },
       { "from": "pos-ui", "to": "pos-ui" },
-      { "from": "kds-ui", "to": "kds-ui" }
+      { "from": "kds-ui", "to": "kds-ui" },
+      { "from": "build/tray.png", "to": "tray.png" }
     ],
     "win": { "target": ["nsis"], "signAndEditExecutable": false },
     "nsis": {
