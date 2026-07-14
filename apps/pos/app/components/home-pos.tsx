@@ -39,6 +39,7 @@ import { PantallaCierre } from "./pantalla-cierre";
 import { PantallaKds } from "@vim/kds-core";
 import { PantallaMesas } from "./pantalla-mesas";
 import { PantallaPickup } from "./pantalla-pickup";
+import { PantallaConsultaCuentas } from "./pantalla-consulta-cuentas";
 import { PantallaDomicilioCuentas } from "./pantalla-domicilio-cuentas";
 import { PantallaDevoluciones } from "./pantalla-devoluciones";
 import { ModalCancelarItem } from "./modal-cancelar-item";
@@ -101,6 +102,7 @@ function TopbarOperativa({
   onCambiarPin,
   onMisPropinas,
   onEnEspera,
+  onCuentas,
   nEnEspera,
 }: {
   caja: DatosCaja;
@@ -115,6 +117,8 @@ function TopbarOperativa({
   onImpresora: () => void;
   onCambiarPin: () => void;
   onMisPropinas: () => void;
+  /** Abre la Consulta de cuentas (historial de cuentas cerradas/canceladas). */
+  onCuentas: () => void;
   /** D45 §12 — abre la lista de pedidos en espera de esta caja. */
   onEnEspera: () => void;
   nEnEspera: number;
@@ -170,6 +174,14 @@ function TopbarOperativa({
             {nEnEspera > 0 && (
               <span className="ml-0.5 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-accent px-1 text-[11px] font-bold text-white">{nEnEspera}</span>
             )}
+          </button>
+          <button
+            type="button"
+            onClick={onCuentas}
+            className="flex h-9 items-center gap-1.5 rounded border border-line-strong px-3 text-[13px] font-semibold text-ink-2 transition hover:border-ink hover:text-ink"
+          >
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4"><path d="M6 2h9l3 3v15a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V3a1 1 0 0 1 1-1z" /><path d="M9 8h6M9 12h6M9 16h4" /></svg>
+            Cuentas
           </button>
 
           {/* Menú: todo lo demás, agrupado, para no saturar la barra. */}
@@ -254,6 +266,7 @@ export function HomePos({
   const [enMesas, setEnMesas] = useState(false);
   const [enDelivery, setEnDelivery] = useState(false);
   const [enPickup, setEnPickup] = useState(false);
+  const [enConsultaCuentas, setEnConsultaCuentas] = useState(false);
   const [enDevoluciones, setEnDevoluciones] = useState(false);
   // F16 — estado de conexión (avisa al cajero si se cae la red).
   const { online } = useConexion(SUPABASE_URL ? `${SUPABASE_URL}/auth/v1/health` : undefined);
@@ -617,6 +630,13 @@ export function HomePos({
     }
   }, [carrito, ticketBd, token, caja.sucursal_id, turno.caja_id, turno.id]);
 
+  /** Reimprime el ticket de una cuenta cerrada (desde la Consulta de cuentas). */
+  const reimprimirCuenta = useCallback(async (ticketId: string) => {
+    const datos = await leerTicketParaImpresion(ticketId, { token, cajeroNombre: empleado.nombre, cajaNombre: caja.nombre });
+    const imp = obtenerImpresora({ onMostrar: () => window.print() });
+    imp.imprimir(construirTicketJob(datos));
+  }, [token, empleado.nombre, caja.nombre]);
+
   /** Retoma un pedido en espera: lo carga al carrito como cuenta editable (misma maquinaria de mesas). */
   const retomarEspera = useCallback(async (ticketId: string) => {
     setEsperaProcesando(true);
@@ -719,6 +739,10 @@ export function HomePos({
     return <PantallaPickup token={token} caja={caja} onSalir={() => setEnPickup(false)} onRetomar={entrarCuenta} />;
   }
 
+  if (enConsultaCuentas) {
+    return <PantallaConsultaCuentas token={token} caja={caja} turno={turno} empleado={empleado} onSalir={() => setEnConsultaCuentas(false)} onReimprimir={reimprimirCuenta} />;
+  }
+
   if (enDevoluciones) {
     return <PantallaDevoluciones token={token} caja={caja} turno={turno} empleado={empleado} onSalir={() => setEnDevoluciones(false)} />;
   }
@@ -737,7 +761,7 @@ export function HomePos({
           Sincronizando {pendientesSync} operación{pendientesSync === 1 ? "" : "es"} pendiente{pendientesSync === 1 ? "" : "s"}…
         </div>
       )}
-      <TopbarOperativa caja={caja} turno={turno} empleado={empleado} onCambiarCajero={onCambiarCajero} onBloquear={onBloquear} onCerrarTurno={() => setCerrando(true)} onMovimientoCaja={() => setMovimientoAbierto(true)} onKds={() => { salirNavegacion(); setEnKds(true); }} onDevoluciones={() => { salirNavegacion(); setEnDevoluciones(true); }} onImpresora={() => setConfigImpresoraAbierto(true)} onCambiarPin={() => setCambiarPinAbierto(true)} onMisPropinas={() => setMisPropinasAbierto(true)} onEnEspera={() => { setEsperaError(null); setEsperaListaAbierta(true); }} nEnEspera={nEnEspera} />
+      <TopbarOperativa caja={caja} turno={turno} empleado={empleado} onCambiarCajero={onCambiarCajero} onBloquear={onBloquear} onCerrarTurno={() => setCerrando(true)} onMovimientoCaja={() => setMovimientoAbierto(true)} onKds={() => { salirNavegacion(); setEnKds(true); }} onDevoluciones={() => { salirNavegacion(); setEnDevoluciones(true); }} onImpresora={() => setConfigImpresoraAbierto(true)} onCambiarPin={() => setCambiarPinAbierto(true)} onMisPropinas={() => setMisPropinasAbierto(true)} onEnEspera={() => { setEsperaError(null); setEsperaListaAbierta(true); }} onCuentas={() => { salirNavegacion(); setEnConsultaCuentas(true); }} nEnEspera={nEnEspera} />
       {configImpresoraAbierto && <ModalConfigImpresora onCerrar={() => setConfigImpresoraAbierto(false)} />}
       {clienteDomAbierto && (
         <ModalClienteDomicilio
