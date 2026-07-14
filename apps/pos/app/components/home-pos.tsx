@@ -39,7 +39,7 @@ import { PantallaCierre } from "./pantalla-cierre";
 import { PantallaKds } from "@vim/kds-core";
 import { PantallaMesas } from "./pantalla-mesas";
 import { PantallaPickup } from "./pantalla-pickup";
-import { PantallaDelivery } from "./pantalla-delivery";
+import { PantallaDomicilioCuentas } from "./pantalla-domicilio-cuentas";
 import { PantallaDevoluciones } from "./pantalla-devoluciones";
 import { ModalCancelarItem } from "./modal-cancelar-item";
 import { ModalDescuentoItem } from "./modal-descuento-item";
@@ -588,6 +588,35 @@ export function HomePos({
     }
   }, [carrito, ticketBd, token, caja.sucursal_id, turno.caja_id, turno.id, refrescarEspera]);
 
+  /** Pick-up / Domicilio — persiste la orden, la envía a cocina y la deja ABIERTA (sin cobrar).
+   *  Queda en "Ver cuentas" del modo; se cobra al recoger / al regresar el repartidor. */
+  const enviarACocinaAbierto = useCallback(async () => {
+    setProcesandoCobro(true);
+    setError(null);
+    try {
+      let bd = ticketBd;
+      if (!bd) {
+        bd = await persistirTicket(
+          { token, sucursalId: caja.sucursal_id, cajaId: turno.caja_id, turnoId: turno.id },
+          carrito.modoServicio,
+          carrito.lineas,
+          nuevoClientId(),
+          carrito.clienteDomicilio?.clienteId ?? null,
+          carrito.clienteDomicilio?.direccionId ?? null,
+          carrito.notaOrden ?? null,
+        );
+      }
+      await enviarACocina(token, bd.ticketId);
+      dispatch({ tipo: "limpiar" });
+      setTicketBd(null);
+      setItemsPersistidos([]);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "No se pudo enviar a cocina");
+    } finally {
+      setProcesandoCobro(false);
+    }
+  }, [carrito, ticketBd, token, caja.sucursal_id, turno.caja_id, turno.id]);
+
   /** Retoma un pedido en espera: lo carga al carrito como cuenta editable (misma maquinaria de mesas). */
   const retomarEspera = useCallback(async (ticketId: string) => {
     setEsperaProcesando(true);
@@ -683,7 +712,7 @@ export function HomePos({
   }
 
   if (enDelivery) {
-    return <PantallaDelivery token={token} caja={caja} turno={turno} empleado={empleado} onSalir={() => setEnDelivery(false)} />;
+    return <PantallaDomicilioCuentas token={token} caja={caja} onSalir={() => setEnDelivery(false)} onRetomar={entrarCuenta} />;
   }
 
   if (enPickup) {
@@ -834,6 +863,11 @@ export function HomePos({
           onCobrar={iniciarCobro}
           onPonerEnEspera={online ? () => { setEsperaError(null); setEsperaPidiendoEtiqueta(true); } : undefined}
           onEnviarCocina={enModoMesa && ticketBd ? onEnviarCocina : undefined}
+          onEnviarCocinaAbierto={
+            !enModoMesa && (carrito.modoServicio === "DRIVE_THRU" || carrito.modoServicio === "DELIVERY_PROPIO")
+              ? enviarACocinaAbierto
+              : undefined
+          }
           cocinaEnviada={cocinaEnviada}
           enviandoCocina={enviandoCocina}
           onAplicarDescuento={onAplicarDescuento}
