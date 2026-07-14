@@ -74,6 +74,7 @@ export function SidebarTicket({
   onLimpiar,
   onCancelarTicket,
   onModo,
+  onVerCuentas,
   onEditarCliente,
   onNotaLinea,
   onNotaOrden,
@@ -100,6 +101,9 @@ export function SidebarTicket({
   /** Cuando el ticket está persistido, "Limpiar" llama a este handler para cancelar todo el ticket. */
   onCancelarTicket?: () => void;
   onModo: (m: ModoServicio) => void;
+  /** Abre la vista de CUENTAS ABIERTAS del modo actual (Comedor→mesas, Pick-up→por recolectar,
+   *  Domicilio→pedidos activos). No aplica a "Para llevar" (se cobra de inmediato). */
+  onVerCuentas?: (m: ModoServicio) => void;
   /** Abre el modal de cliente para domicilio (solo aplica en modo Domicilio). */
   onEditarCliente?: () => void;
   /** Edita la nota de cocina de una línea (carrito local, pre-cobro). */
@@ -172,6 +176,16 @@ export function SidebarTicket({
               );
             })}
           </div>
+          {estado.modoServicio !== "PARA_LLEVAR" && onVerCuentas && (
+            <button
+              type="button"
+              onClick={() => onVerCuentas(estado.modoServicio)}
+              className="mt-2 flex w-full items-center justify-center gap-2 rounded-md border border-line-strong px-3 py-2 text-[13px] font-semibold text-ink-2 transition hover:border-ink hover:text-ink"
+            >
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01" /></svg>
+              Ver cuentas{estado.modoServicio === "COMER_AQUI" ? " · Mesas" : estado.modoServicio === "DRIVE_THRU" ? " · Por recolectar" : " · Domicilios"}
+            </button>
+          )}
           {estado.modoServicio === "DELIVERY_PROPIO" && (
             <button
               type="button"
