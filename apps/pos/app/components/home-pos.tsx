@@ -1,5 +1,5 @@
 "use client";
-import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useReducer, useRef, useState, type ReactNode } from "react";
 import { Button } from "@vim/ui/styles";
 import {
   ICONOS_POS,
@@ -57,7 +57,34 @@ import type { DatosTicketImpresion } from "../lib/print/tipos";
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
 
-/** Topbar del POS operativo (mockup P-059): marca + sucursal/turno + reloj + cajero + acciones. */
+/** Fila de acción dentro del menú desplegable del topbar. */
+function ItemMenu({ icon, label, onClick, peligro }: { icon: ReactNode; label: string; onClick: () => void; peligro?: boolean }) {
+  return (
+    <button
+      type="button"
+      role="menuitem"
+      onClick={onClick}
+      className={`flex w-full items-center gap-3 px-3.5 py-2.5 text-left text-[13.5px] font-medium transition hover:bg-hover ${peligro ? "text-danger" : "text-ink-2 hover:text-ink"}`}
+    >
+      <span className={`flex h-[18px] w-[18px] flex-shrink-0 items-center justify-center ${peligro ? "text-danger" : "text-ink-3"}`}>{icon}</span>
+      {label}
+    </button>
+  );
+}
+
+/** Grupo con título dentro del menú desplegable. */
+function GrupoMenu({ titulo, children }: { titulo: string; children: ReactNode }) {
+  return (
+    <div className="py-1">
+      <div className="px-3.5 pb-1 pt-1.5 text-[10.5px] font-semibold uppercase tracking-[0.04em] text-ink-3">{titulo}</div>
+      {children}
+    </div>
+  );
+}
+
+/** Topbar del POS operativo (mockup P-059): marca + sucursal/turno + reloj + cajero + acciones.
+ *  Solo En espera / Mesas / Domicilios quedan a la vista; el resto vive en el menú (☰) para no
+ *  saturar la barra. */
 function TopbarOperativa({
   caja,
   turno,
@@ -95,6 +122,14 @@ function TopbarOperativa({
   nEnEspera: number;
 }) {
   const ahora = useReloj();
+  const [menuAbierto, setMenuAbierto] = useState(false);
+  useEffect(() => {
+    if (!menuAbierto) return;
+    const onEsc = (e: KeyboardEvent) => { if (e.key === "Escape") setMenuAbierto(false); };
+    window.addEventListener("keydown", onEsc);
+    return () => window.removeEventListener("keydown", onEsc);
+  }, [menuAbierto]);
+  const conMenu = (fn: () => void) => () => { setMenuAbierto(false); fn(); };
   return (
     <header className="flex h-[68px] flex-shrink-0 items-center justify-between border-b border-line px-6">
       <div className="flex items-center gap-4">
@@ -124,47 +159,8 @@ function TopbarOperativa({
             <div className="text-[11px] text-ink-3">{empleado.rol === "CAJERO" ? "Cajero" : empleado.rol}</div>
           </div>
         </div>
-        <div className="flex gap-1">
-          <button
-            type="button"
-            onClick={onBloquear}
-            aria-label="Bloquear"
-            className="flex h-9 w-9 items-center justify-center rounded border border-line-strong text-ink-3 transition hover:border-ink hover:text-ink"
-          >
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-4 w-4"><rect x="4" y="11" width="16" height="9" rx="1.5" /><path d="M8 11V7a4 4 0 0 1 8 0v4" /></svg>
-          </button>
-          <button
-            type="button"
-            onClick={onCambiarCajero}
-            aria-label="Cambiar cajero"
-            className="flex h-9 w-9 items-center justify-center rounded border border-line-strong text-ink-3 transition hover:border-ink hover:text-ink"
-          >
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4"><path d="M16 3.13a4 4 0 0 1 0 7.75" /><path d="M21 21v-2a4 4 0 0 0-3-3.87" /><circle cx="9" cy="7" r="4" /><path d="M3 21v-2a4 4 0 0 1 4-4h4a4 4 0 0 1 4 4v2" /></svg>
-          </button>
-          <button
-            type="button"
-            onClick={onCambiarPin}
-            aria-label="Cambiar mi PIN"
-            className="flex h-9 w-9 items-center justify-center rounded border border-line-strong text-ink-3 transition hover:border-ink hover:text-ink"
-          >
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4"><circle cx="7.5" cy="15.5" r="4.5" /><path d="m10.5 12.5 8-8" /><path d="m16 7 2 2" /><path d="m19 4 2 2" /></svg>
-          </button>
-          <button
-            type="button"
-            onClick={onMisPropinas}
-            aria-label="Mis propinas"
-            className="flex h-9 w-9 items-center justify-center rounded border border-line-strong text-ink-3 transition hover:border-ink hover:text-ink"
-          >
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4"><circle cx="12" cy="12" r="9" /><path d="M14.5 9.5a2.5 2.5 0 0 0-2.5-1.5c-1.4 0-2.5.8-2.5 2s1.1 1.6 2.5 2 2.5.9 2.5 2-1.1 2-2.5 2a2.5 2.5 0 0 1-2.5-1.5M12 6.5v1M12 16.5v1" /></svg>
-          </button>
-          <button
-            type="button"
-            onClick={onImpresora}
-            aria-label="Configurar impresora"
-            className="flex h-9 w-9 items-center justify-center rounded border border-line-strong text-ink-3 transition hover:border-ink hover:text-ink"
-          >
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4"><path d="M6 9V2h12v7M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2M6 14h12v8H6z" /></svg>
-          </button>
+        <div className="relative flex items-center gap-1">
+          {/* Se quedan SIEMPRE a la vista (mockup: acciones de sala más usadas). */}
           <button
             type="button"
             onClick={onEnEspera}
@@ -192,38 +188,45 @@ function TopbarOperativa({
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4"><circle cx="12" cy="10" r="3" /><path d="M12 2a8 8 0 0 0-8 8c0 5.5 8 12 8 12s8-6.5 8-12a8 8 0 0 0-8-8z" /></svg>
             Domicilios
           </button>
+
+          {/* Menú: todo lo demás, agrupado, para no saturar la barra. */}
           <button
             type="button"
-            onClick={onKds}
-            className="flex h-9 items-center gap-1.5 rounded border border-line-strong px-3 text-[13px] font-semibold text-ink-2 transition hover:border-ink hover:text-ink"
+            onClick={() => setMenuAbierto((v) => !v)}
+            aria-haspopup="menu"
+            aria-expanded={menuAbierto}
+            className={`flex h-9 items-center gap-1.5 rounded border px-3 text-[13px] font-semibold transition ${menuAbierto ? "border-ink bg-ink text-white" : "border-line-strong text-ink-2 hover:border-ink hover:text-ink"}`}
           >
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4"><path d="M3 11l18-5v12L3 14v-3z" /><path d="M11.6 16.8a3 3 0 1 1-5.8-1.6" /></svg>
-            Cocina
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" className="h-4 w-4"><path d="M4 6h16M4 12h16M4 18h16" /></svg>
+            Menú
           </button>
-          <button
-            type="button"
-            onClick={onDevoluciones}
-            className="flex h-9 items-center gap-1.5 rounded border border-line-strong px-3 text-[13px] font-semibold text-ink-2 transition hover:border-ink hover:text-ink"
-          >
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4"><path d="M9 14l-4-4 4-4M5 10h11a4 4 0 0 1 0 8h-1" /></svg>
-            Devoluciones
-          </button>
-          <button
-            type="button"
-            onClick={onMovimientoCaja}
-            className="flex h-9 items-center gap-1.5 rounded border border-line-strong px-3 text-[13px] font-semibold text-ink-2 transition hover:border-ink hover:text-ink"
-          >
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4"><rect x="2" y="6" width="20" height="12" rx="2" /><circle cx="12" cy="12" r="2" /><path d="M6 12h.01M18 12h.01" /></svg>
-            Caja
-          </button>
-          <button
-            type="button"
-            onClick={onCerrarTurno}
-            className="flex h-9 items-center gap-1.5 rounded border border-line-strong px-3 text-[13px] font-semibold text-ink-2 transition hover:border-ink hover:text-ink"
-          >
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4"><path d="M9 11l3 3L22 4" /><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" /></svg>
-            Cerrar turno
-          </button>
+
+          {menuAbierto && (
+            <>
+              <div className="fixed inset-0 z-40" onClick={() => setMenuAbierto(false)} aria-hidden="true" />
+              <div role="menu" className="absolute right-0 top-[calc(100%+8px)] z-50 w-64 overflow-hidden rounded-lg border border-line-strong bg-surface shadow-xl">
+                <GrupoMenu titulo="Operación">
+                  <ItemMenu label="Cocina" onClick={conMenu(onKds)} icon={<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-[18px] w-[18px]"><path d="M3 11l18-5v12L3 14v-3z" /><path d="M11.6 16.8a3 3 0 1 1-5.8-1.6" /></svg>} />
+                  <ItemMenu label="Devoluciones" onClick={conMenu(onDevoluciones)} icon={<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-[18px] w-[18px]"><path d="M9 14l-4-4 4-4M5 10h11a4 4 0 0 1 0 8h-1" /></svg>} />
+                  <ItemMenu label="Movimientos de caja" onClick={conMenu(onMovimientoCaja)} icon={<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-[18px] w-[18px]"><rect x="2" y="6" width="20" height="12" rx="2" /><circle cx="12" cy="12" r="2" /><path d="M6 12h.01M18 12h.01" /></svg>} />
+                </GrupoMenu>
+                <div className="border-t border-line" />
+                <GrupoMenu titulo="Cuenta">
+                  <ItemMenu label="Cambiar cajero" onClick={conMenu(onCambiarCajero)} icon={<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="h-[18px] w-[18px]"><path d="M16 3.13a4 4 0 0 1 0 7.75" /><path d="M21 21v-2a4 4 0 0 0-3-3.87" /><circle cx="9" cy="7" r="4" /><path d="M3 21v-2a4 4 0 0 1 4-4h4a4 4 0 0 1 4 4v2" /></svg>} />
+                  <ItemMenu label="Bloquear pantalla" onClick={conMenu(onBloquear)} icon={<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-[18px] w-[18px]"><rect x="4" y="11" width="16" height="9" rx="1.5" /><path d="M8 11V7a4 4 0 0 1 8 0v4" /></svg>} />
+                  <ItemMenu label="Cambiar mi PIN" onClick={conMenu(onCambiarPin)} icon={<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="h-[18px] w-[18px]"><circle cx="7.5" cy="15.5" r="4.5" /><path d="m10.5 12.5 8-8" /><path d="m16 7 2 2" /><path d="m19 4 2 2" /></svg>} />
+                  <ItemMenu label="Mis propinas" onClick={conMenu(onMisPropinas)} icon={<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="h-[18px] w-[18px]"><circle cx="12" cy="12" r="9" /><path d="M14.5 9.5a2.5 2.5 0 0 0-2.5-1.5c-1.4 0-2.5.8-2.5 2s1.1 1.6 2.5 2 2.5.9 2.5 2-1.1 2-2.5 2a2.5 2.5 0 0 1-2.5-1.5M12 6.5v1M12 16.5v1" /></svg>} />
+                </GrupoMenu>
+                <div className="border-t border-line" />
+                <GrupoMenu titulo="Ajustes">
+                  <ItemMenu label="Configurar impresora" onClick={conMenu(onImpresora)} icon={<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-[18px] w-[18px]"><path d="M6 9V2h12v7M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2M6 14h12v8H6z" /></svg>} />
+                </GrupoMenu>
+                <div className="border-t border-line">
+                  <ItemMenu label="Cerrar turno" onClick={conMenu(onCerrarTurno)} peligro icon={<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-[18px] w-[18px]"><path d="M9 11l3 3L22 4" /><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" /></svg>} />
+                </div>
+              </div>
+            </>
+          )}
         </div>
       </div>
     </header>
