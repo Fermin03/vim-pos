@@ -850,7 +850,7 @@ export function HomePos({
           onDescuentoItem={ticketBd ? onDescuentoItemSolicitado : undefined}
           onLimpiar={!ticketBd ? () => dispatch({ tipo: "limpiar" }) : undefined}
           onCancelarTicket={ticketBd ? () => setCancelandoTicket(true) : undefined}
-          onModo={(m: ModoServicio) => { dispatch({ tipo: "modo", modo: m }); if (m === "DELIVERY_PROPIO") setClienteDomAbierto(true); }}
+          onModo={(m: ModoServicio) => dispatch({ tipo: "modo", modo: m })}
           onVerCuentas={(m) => {
             salirNavegacion();
             if (m === "COMER_AQUI") setEnMesas(true);
