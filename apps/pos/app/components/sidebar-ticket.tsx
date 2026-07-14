@@ -80,6 +80,7 @@ export function SidebarTicket({
   onNotaOrden,
   onCobrar,
   onEnviarCocina,
+  onEnviarCocinaAbierto,
   onPonerEnEspera,
   cocinaEnviada = false,
   enviandoCocina = false,
@@ -113,6 +114,9 @@ export function SidebarTicket({
   onCobrar: () => void;
   /** B1 Full Service — enviar la mesa a cocina antes de cobrar (solo en cuenta de mesa). */
   onEnviarCocina?: () => void;
+  /** Pick-up / Domicilio — envía a cocina y deja la cuenta ABIERTA (sin cobrar); se cobra después
+   *  desde "Ver cuentas". Cuando se pasa, es la acción principal del pie. */
+  onEnviarCocinaAbierto?: () => void;
   /** D45 §12 — guarda el pedido en espera con etiqueta (flujo QS, sin cuenta de mesa). */
   onPonerEnEspera?: () => void;
   cocinaEnviada?: boolean;
@@ -409,6 +413,31 @@ export function SidebarTicket({
 
       {/* ── Pie: Cobrar + En espera ───────────────────────────── */}
       <div className="flex flex-shrink-0 flex-col gap-2 px-5 pb-5 pt-4">
+        {onEnviarCocinaAbierto ? (
+          /* Pick-up / Domicilio — la orden va a cocina y queda ABIERTA; se cobra al recoger o al
+             regresar el repartidor (desde "Ver cuentas"). Acción principal = enviar a cocina. */
+          <>
+            <button
+              type="button"
+              disabled={vacio || procesando}
+              onClick={onEnviarCocinaAbierto}
+              className="flex w-full items-center justify-center gap-[10px] rounded-lg bg-accent px-5 py-[18px] text-[17px] font-bold text-white shadow-[0_1px_3px_rgba(232,80,46,.3)] transition-colors hover:bg-accent-hover disabled:cursor-not-allowed disabled:bg-line-strong disabled:shadow-none"
+            >
+              {procesando ? "Enviando…" : (
+                <><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5"><path d="M3 11l19-9-9 19-2-8-8-2z" /></svg> Enviar a cocina</>
+              )}
+            </button>
+            <button
+              type="button"
+              disabled={vacio || procesando}
+              onClick={onCobrar}
+              className="w-full rounded border border-line-strong bg-transparent px-5 py-[13px] text-[14.5px] font-semibold text-ink-2 transition-all hover:border-ink hover:text-ink disabled:cursor-default disabled:opacity-[.45]"
+            >
+              Cobrar ahora <span className="font-display tabular-nums">{fmtMxn(totalFinal)}</span>
+            </button>
+          </>
+        ) : (
+        <>
         <button
           type="button"
           disabled={vacio || procesando}
@@ -453,6 +482,8 @@ export function SidebarTicket({
           >
             Poner pedido en espera
           </button>
+        )}
+        </>
         )}
       </div>
     </aside>

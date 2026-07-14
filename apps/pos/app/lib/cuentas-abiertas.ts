@@ -45,6 +45,16 @@ export async function listarCuentasAbiertas(token: string, sucursalId: string, m
   }));
 }
 
+/** Domicilio: marca que la orden SALIÓ (imprime la comanda). Pasa de "En preparación" a "En
+ *  entrega". Usa comanda_impresa_at; el UPDATE a tickets lo permite el RLS del tenant. */
+export async function marcarSalidaDomicilio(token: string, ticketId: string): Promise<void> {
+  const { error } = await employeeClient(token)
+    .from("tickets")
+    .update({ comanda_impresa_at: new Date().toISOString() })
+    .eq("id", ticketId);
+  if (error) throw new Error(error.message);
+}
+
 /** Minutos desde que se abrió la cuenta (para la lista). Puro. */
 export function minutosAbierta(desdeIso: string | null, ahora: Date = new Date()): number {
   if (!desdeIso) return 0;
