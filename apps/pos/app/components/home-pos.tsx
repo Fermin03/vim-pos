@@ -38,6 +38,7 @@ import { ReciboPreview } from "./recibo-preview";
 import { PantallaCierre } from "./pantalla-cierre";
 import { PantallaKds } from "@vim/kds-core";
 import { PantallaMesas } from "./pantalla-mesas";
+import { PantallaPickup } from "./pantalla-pickup";
 import { PantallaDelivery } from "./pantalla-delivery";
 import { PantallaDevoluciones } from "./pantalla-devoluciones";
 import { ModalCancelarItem } from "./modal-cancelar-item";
@@ -95,8 +96,6 @@ function TopbarOperativa({
   onCerrarTurno,
   onMovimientoCaja,
   onKds,
-  onMesas,
-  onDelivery,
   onDevoluciones,
   onImpresora,
   onCambiarPin,
@@ -112,8 +111,6 @@ function TopbarOperativa({
   onCerrarTurno: () => void;
   onMovimientoCaja: () => void;
   onKds: () => void;
-  onMesas: () => void;
-  onDelivery: () => void;
   onDevoluciones: () => void;
   onImpresora: () => void;
   onCambiarPin: () => void;
@@ -161,7 +158,8 @@ function TopbarOperativa({
           </div>
         </div>
         <div className="relative flex items-center gap-1">
-          {/* Se quedan SIEMPRE a la vista (mockup: acciones de sala más usadas). */}
+          {/* En espera queda a la vista; el acceso a cuentas (Mesas/Pick-up/Domicilios) vive ahora en
+              cada pestaña de modo ("Ver cuentas"). */}
           <button
             type="button"
             onClick={onEnEspera}
@@ -172,22 +170,6 @@ function TopbarOperativa({
             {nEnEspera > 0 && (
               <span className="ml-0.5 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-accent px-1 text-[11px] font-bold text-white">{nEnEspera}</span>
             )}
-          </button>
-          <button
-            type="button"
-            onClick={onMesas}
-            className="flex h-9 items-center gap-1.5 rounded border border-line-strong px-3 text-[13px] font-semibold text-ink-2 transition hover:border-ink hover:text-ink"
-          >
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4"><rect x="3" y="3" width="18" height="18" rx="2" /><path d="M3 9h18M9 3v18" /></svg>
-            Mesas
-          </button>
-          <button
-            type="button"
-            onClick={onDelivery}
-            className="flex h-9 items-center gap-1.5 rounded border border-line-strong px-3 text-[13px] font-semibold text-ink-2 transition hover:border-ink hover:text-ink"
-          >
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4"><circle cx="12" cy="10" r="3" /><path d="M12 2a8 8 0 0 0-8 8c0 5.5 8 12 8 12s8-6.5 8-12a8 8 0 0 0-8-8z" /></svg>
-            Domicilios
           </button>
 
           {/* Menú: todo lo demás, agrupado, para no saturar la barra. */}
@@ -271,6 +253,7 @@ export function HomePos({
   const [enKds, setEnKds] = useState(false);
   const [enMesas, setEnMesas] = useState(false);
   const [enDelivery, setEnDelivery] = useState(false);
+  const [enPickup, setEnPickup] = useState(false);
   const [enDevoluciones, setEnDevoluciones] = useState(false);
   // F16 — estado de conexión (avisa al cajero si se cae la red).
   const { online } = useConexion(SUPABASE_URL ? `${SUPABASE_URL}/auth/v1/health` : undefined);
@@ -465,6 +448,8 @@ export function HomePos({
       setItemsPersistidos(items);
       setEnModoMesa(true);
       setEnMesas(false);
+      setEnPickup(false);
+      setEnDelivery(false);
       // B1 — saber si la mesa ya fue enviada a cocina (para el botón).
       leerEstadoCocina(token, ticketId).then((ec) => setCocinaEnviada(ec !== null && ec !== "SIN_ENVIAR")).catch(() => {});
     } catch (e) {
@@ -701,6 +686,10 @@ export function HomePos({
     return <PantallaDelivery token={token} caja={caja} turno={turno} empleado={empleado} onSalir={() => setEnDelivery(false)} />;
   }
 
+  if (enPickup) {
+    return <PantallaPickup token={token} caja={caja} onSalir={() => setEnPickup(false)} onRetomar={entrarCuenta} />;
+  }
+
   if (enDevoluciones) {
     return <PantallaDevoluciones token={token} caja={caja} turno={turno} empleado={empleado} onSalir={() => setEnDevoluciones(false)} />;
   }
@@ -719,7 +708,7 @@ export function HomePos({
           Sincronizando {pendientesSync} operación{pendientesSync === 1 ? "" : "es"} pendiente{pendientesSync === 1 ? "" : "s"}…
         </div>
       )}
-      <TopbarOperativa caja={caja} turno={turno} empleado={empleado} onCambiarCajero={onCambiarCajero} onBloquear={onBloquear} onCerrarTurno={() => setCerrando(true)} onMovimientoCaja={() => setMovimientoAbierto(true)} onKds={() => { salirNavegacion(); setEnKds(true); }} onMesas={() => { salirNavegacion(); setEnMesas(true); }} onDelivery={() => { salirNavegacion(); setEnDelivery(true); }} onDevoluciones={() => { salirNavegacion(); setEnDevoluciones(true); }} onImpresora={() => setConfigImpresoraAbierto(true)} onCambiarPin={() => setCambiarPinAbierto(true)} onMisPropinas={() => setMisPropinasAbierto(true)} onEnEspera={() => { setEsperaError(null); setEsperaListaAbierta(true); }} nEnEspera={nEnEspera} />
+      <TopbarOperativa caja={caja} turno={turno} empleado={empleado} onCambiarCajero={onCambiarCajero} onBloquear={onBloquear} onCerrarTurno={() => setCerrando(true)} onMovimientoCaja={() => setMovimientoAbierto(true)} onKds={() => { salirNavegacion(); setEnKds(true); }} onDevoluciones={() => { salirNavegacion(); setEnDevoluciones(true); }} onImpresora={() => setConfigImpresoraAbierto(true)} onCambiarPin={() => setCambiarPinAbierto(true)} onMisPropinas={() => setMisPropinasAbierto(true)} onEnEspera={() => { setEsperaError(null); setEsperaListaAbierta(true); }} nEnEspera={nEnEspera} />
       {configImpresoraAbierto && <ModalConfigImpresora onCerrar={() => setConfigImpresoraAbierto(false)} />}
       {clienteDomAbierto && (
         <ModalClienteDomicilio
@@ -833,6 +822,12 @@ export function HomePos({
           onLimpiar={!ticketBd ? () => dispatch({ tipo: "limpiar" }) : undefined}
           onCancelarTicket={ticketBd ? () => setCancelandoTicket(true) : undefined}
           onModo={(m: ModoServicio) => { dispatch({ tipo: "modo", modo: m }); if (m === "DELIVERY_PROPIO") setClienteDomAbierto(true); }}
+          onVerCuentas={(m) => {
+            salirNavegacion();
+            if (m === "COMER_AQUI") setEnMesas(true);
+            else if (m === "DRIVE_THRU") setEnPickup(true);
+            else if (m === "DELIVERY_PROPIO") setEnDelivery(true);
+          }}
           onEditarCliente={() => setClienteDomAbierto(true)}
           onNotaLinea={(id, nota) => dispatch({ tipo: "nota_linea", clientId: id, nota })}
           onNotaOrden={(nota) => dispatch({ tipo: "nota_orden", nota })}
