@@ -10,6 +10,7 @@ import {
   type Producto,
 } from "../lib/catalogo";
 import { fmtMxn, type DatosCaja, type Turno } from "../lib/turno";
+import { buscarActualizacion, esEscritorio } from "../lib/actualizacion";
 import { useReloj } from "./topbar-pos";
 import { type Empleado } from "../lib/supabase";
 import {
@@ -125,6 +126,24 @@ function TopbarOperativa({
 }) {
   const ahora = useReloj();
   const [menuAbierto, setMenuAbierto] = useState(false);
+  // Actualización: solo dentro de la app de escritorio. Se resuelve en un efecto porque el export
+  // estático se prerenderiza sin window y la bandera la inyecta Electron al servir el HTML.
+  const [enEscritorio, setEnEscritorio] = useState(false);
+  const [buscandoUpd, setBuscandoUpd] = useState(false);
+  const [avisoUpd, setAvisoUpd] = useState<string | null>(null);
+  useEffect(() => { setEnEscritorio(esEscritorio()); }, []);
+
+  const revisarActualizacion = useCallback(async () => {
+    setBuscandoUpd(true);
+    setAvisoUpd(null);
+    const r = await buscarActualizacion();
+    setBuscandoUpd(false);
+    // Si hay versión nueva, Electron abre su diálogo encima: cerramos el menú para no taparlo.
+    if (r.estado === "hay") setMenuAbierto(false);
+    else if (r.estado === "al-dia") setAvisoUpd(`Ya tienes la última versión (v${r.version}).`);
+    else if (r.estado === "descargando") setAvisoUpd("La actualización ya se está descargando.");
+    else setAvisoUpd(r.error);
+  }, []);
   useEffect(() => {
     if (!menuAbierto) return;
     const onEsc = (e: KeyboardEvent) => { if (e.key === "Escape") setMenuAbierto(false); };
@@ -232,8 +251,18 @@ function TopbarOperativa({
                   </SeccionMenu>
                   <SeccionMenu titulo="Ajustes">
                     <TileMenu label="Configurar impresora" onClick={conMenu(onImpresora)} icon={<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" className="h-8 w-8"><path d="M6 9V2h12v7M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2M6 14h12v8H6z" /></svg>} />
+                    {enEscritorio && (
+                      <TileMenu
+                        label={buscandoUpd ? "Buscando…" : "Buscar actualizaciones"}
+                        onClick={() => { if (!buscandoUpd) revisarActualizacion(); }}
+                        icon={<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" className="h-8 w-8"><path d="M21 12a9 9 0 1 1-2.6-6.4" /><path d="M21 3v5h-5" /><path d="M12 8v5" /><path d="m9.5 11 2.5 2.5 2.5-2.5" /></svg>}
+                      />
+                    )}
                     <TileMenu label="Cerrar turno" onClick={conMenu(onCerrarTurno)} peligro icon={<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" className="h-8 w-8"><path d="M9 11l3 3L22 4" /><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" /></svg>} />
                   </SeccionMenu>
+                  {avisoUpd && (
+                    <p className="-mt-4 text-[13px] font-medium text-ink-2" role="status">{avisoUpd}</p>
+                  )}
                 </div>
               </div>
             </div>

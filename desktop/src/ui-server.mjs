@@ -33,7 +33,11 @@ function csp(host, hubHost) {
     "font-src 'self' data: https://fonts.gstatic.com",
     "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
     "script-src 'self' 'unsafe-inline'",
-    `connect-src 'self' https://*.supabase.co https://*.supabase.in http://localhost:* ws://localhost:*${lan}${hub} https://fonts.googleapis.com https://fonts.gstatic.com`,
+    // 127.0.0.1 va explícito: para el navegador NO es lo mismo que localhost, y el gateway se
+    // inyecta con el hostname con el que se abrió la página. Sin esto, abrir el POS por
+    // 127.0.0.1 bloquea toda llamada al backend y el login falla con "Failed to fetch"
+    // (que en pantalla se lee como "credenciales incorrectas").
+    `connect-src 'self' https://*.supabase.co https://*.supabase.in http://localhost:* ws://localhost:* http://127.0.0.1:* ws://127.0.0.1:*${lan}${hub} https://fonts.googleapis.com https://fonts.gstatic.com`,
   ].join("; ");
 }
 
@@ -94,6 +98,9 @@ function normalizarHub(entrada, puertoDefault = 54350) {
  * opts.kds=true → modo COCINA (cliente delgado): opts.hub (URL inicial o null) + opts.onSetHub(url)
  * para persistir la IP tecleada en el setup.
  */
+/** Direcciones que cuentan como "la propia máquina" (IPv4, IPv6 y IPv4 mapeada en IPv6). */
+const LOCALES = new Set(["127.0.0.1", "::1", "::ffff:127.0.0.1"]);
+
 export async function startUiServer(dir, port, gatewayPort = 54350, host = "0.0.0.0", opts = {}) {
   const kds = !!opts.kds;
   let hub = opts.hub || null; // COCINA: gateway remoto (mutable; lo fija el setup)
@@ -114,6 +121,19 @@ export async function startUiServer(dir, port, gatewayPort = 54350, host = "0.0.
         try { opts.onSetHub?.(url); } catch { /* */ }
         res.writeHead(200, { "Content-Type": "application/json" });
         return res.end(JSON.stringify({ ok: true }));
+      }
+
+      // CAJA: el menú del POS pide un chequeo de actualización. Solo desde la propia caja: el
+      // servidor escucha en la LAN y esto abre diálogos modales sobre la pantalla de cobro.
+      if (!kds && req.method === "POST" && req.url.startsWith("/__actualizar")) {
+        res.writeHead(LOCALES.has(req.socket.remoteAddress ?? "") ? 200 : 403, { "Content-Type": "application/json" });
+        if (!LOCALES.has(req.socket.remoteAddress ?? "")) return res.end(JSON.stringify({ ok: false, error: "Solo desde la caja." }));
+        try {
+          const r = await opts.onActualizar?.();
+          return res.end(JSON.stringify({ ok: true, ...(r ?? { estado: "no-disponible" }) }));
+        } catch (e) {
+          return res.end(JSON.stringify({ ok: false, error: e?.message ?? "No se pudo revisar" }));
+        }
       }
 
       let rel = decodeURIComponent(new URL(req.url, "http://x").pathname);
