@@ -1,6 +1,6 @@
 {
   "name": "vim-pos-desktop",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "private": true,
   "type": "module",
   "description": "Fase 1 — VIM POS de escritorio local-first: Postgres embebido + PostgREST + gateway compatible con Supabase + auth PIN local, empaquetado en Electron.",
@@ -24,7 +24,7 @@
     "release-manifest": "node scripts/release-manifest.mjs",
     "verify:robustez3": "node src/verify-robustez3.mjs",
     "verify:updater": "node src/verify-updater.mjs",
-    "dist": "npm run build:ui && npm run build:kds-ui && electron-builder --win nsis"
+    "dist": "npm run build:ui && npm run build:kds-ui && node scripts/dist.mjs"
   },
   "dependencies": {
     "embedded-postgres": "17.10.0-beta.17",
@@ -38,20 +38,54 @@
   "build": {
     "appId": "com.vimpos.desktop",
     "productName": "VIM POS",
-    "directories": { "output": "dist" },
-    "files": ["src/**/*", "package.json"],
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "src/**/*",
+      "package.json"
+    ],
     "asar": false,
     "extraResources": [
-      { "from": "../supabase/migrations", "to": "migrations" },
-      { "from": "../supabase/seed.sql", "to": "seed.sql" },
-      { "from": "sql", "to": "sql" },
-      { "from": "bin/postgrest.exe", "to": "bin/postgrest.exe" },
-      { "from": "node_modules/@embedded-postgres/windows-x64/native/bin", "to": "pg-bin" },
-      { "from": "pos-ui", "to": "pos-ui" },
-      { "from": "kds-ui", "to": "kds-ui" },
-      { "from": "build/tray.png", "to": "tray.png" }
+      {
+        "from": "../supabase/migrations",
+        "to": "migrations"
+      },
+      {
+        "from": "../supabase/seed.sql",
+        "to": "seed.sql"
+      },
+      {
+        "from": "sql",
+        "to": "sql"
+      },
+      {
+        "from": "bin/postgrest.exe",
+        "to": "bin/postgrest.exe"
+      },
+      {
+        "from": "node_modules/@embedded-postgres/windows-x64/native/bin",
+        "to": "pg-bin"
+      },
+      {
+        "from": "pos-ui",
+        "to": "pos-ui"
+      },
+      {
+        "from": "kds-ui",
+        "to": "kds-ui"
+      },
+      {
+        "from": "build/tray.png",
+        "to": "tray.png"
+      }
     ],
-    "win": { "target": ["nsis"], "signAndEditExecutable": false },
+    "win": {
+      "target": [
+        "nsis"
+      ],
+      "signAndEditExecutable": false
+    },
     "nsis": {
       "oneClick": false,
       "perMachine": false,
