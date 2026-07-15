@@ -24,6 +24,7 @@ export function ModalCancelarTicket({
   totalActual,
   cajaId,
   turnoId,
+  pagada = false,
   onCancelado,
   onCerrar,
 }: {
@@ -34,16 +35,21 @@ export function ModalCancelarTicket({
   totalActual: number;
   cajaId: string;
   turnoId: string;
+  /** El ticket ya está PAGADO (Consulta de cuentas): cancelar devuelve el dinero (devolución total)
+   *  y requiere permiso venta.cancelar_pagada (más restringido). */
+  pagada?: boolean;
   onCancelado: () => void;
   onCerrar: () => void;
 }) {
+  const rolesPermiso = pagada ? ["SUPERVISOR", "ADMIN", "DUENO"] : ROLES_CANCELAR;
+  const permisoCancelar = pagada ? "venta.cancelar_pagada" : "venta.cancelar_abierta";
   const [motivo, setMotivo] = useState<MotivoTicket>("CLIENTE_DESISTIO");
   const [motivoTexto, setMotivoTexto] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [procesando, setProcesando] = useState(false);
   const [pidiendoPin, setPidiendoPin] = useState(false);
 
-  const tienePermisoRol = ROLES_CANCELAR.includes(empleado.rol);
+  const tienePermisoRol = rolesPermiso.includes(empleado.rol);
 
   function labelMotivo(): string {
     if (motivo === "OTRO") return motivoTexto.trim() || "Otro";
@@ -53,7 +59,7 @@ export function ModalCancelarTicket({
   function payload(): PayloadAutorizacion {
     return {
       accion: "cancelar_ticket",
-      permisoCodigo: "venta.cancelar_abierta",
+      permisoCodigo: permisoCancelar,
       entidadTipo: "ticket",
       entidadId: ticketId,
       monto: totalActual,
@@ -76,7 +82,7 @@ export function ModalCancelarTicket({
         autorizacionPinId: a.autorizacionPinId,
         solicitanteId: empleado.id,
         autorizoId: a.autorizoId,
-        devolverDinero: false,
+        devolverDinero: pagada,
         reversarInventario: true,
       });
       onCancelado();
@@ -112,8 +118,8 @@ export function ModalCancelarTicket({
       <ModalAutorizacionPin
         token={token}
         accion="cancelar_ticket"
-        permisoCodigo="venta.cancelar_abierta"
-        descripcion={`Cancelar ticket ${folio ?? ""} · ${fmtMxn(totalActual)} · ${labelMotivo()}`}
+        permisoCodigo={permisoCancelar}
+        descripcion={`Cancelar folio ${folio ?? ""} · ${fmtMxn(totalActual)} · ${labelMotivo()}`}
         ejecutaNombre={empleado.nombre}
         monto={totalActual}
         entidadTipo="ticket"
@@ -139,14 +145,16 @@ export function ModalCancelarTicket({
       className="w-[480px] rounded-lg border border-line bg-surface p-6 shadow-[0_18px_44px_rgba(22,22,26,.18)]"
     >
       <div className="mb-5">
-        <h2 className="font-display text-xl font-semibold tracking-tight">Cancelar ticket</h2>
+        <h2 className="font-display text-xl font-semibold tracking-tight">{pagada ? "Cancelar folio" : "Cancelar ticket"}</h2>
         <p className="mt-0.5 text-[13px] text-ink-3">
           {folio ? `${folio} · ` : ""}{fmtMxn(totalActual)}
         </p>
       </div>
 
       <div className="mb-4 rounded border border-[#E8DCC0] bg-[#F6EEDD] px-3 py-2 text-[12.5px] font-medium text-warning">
-        Esta acción cancela el ticket completo. Es <b>irreversible</b>. El inventario regresa al stock.
+        {pagada
+          ? <>Cancela el folio <b>pagado</b>: se registra una <b>devolución total</b> (el dinero se devuelve) y la cuenta queda cancelada. Es <b>irreversible</b>. El inventario regresa al stock.</>
+          : <>Esta acción cancela el ticket completo. Es <b>irreversible</b>. El inventario regresa al stock.</>}
       </div>
 
       <div className="mb-1.5 text-[13px] font-medium text-ink-2">Motivo</div>
@@ -191,7 +199,7 @@ export function ModalCancelarTicket({
       <div className="flex items-center justify-end gap-2">
         <Button variant="ghost" onClick={onCerrar} disabled={procesando}>Volver</Button>
         <Button onClick={onConfirmar} disabled={procesando}>
-          {procesando ? "Cancelando…" : "Cancelar ticket"}
+          {procesando ? "Cancelando…" : pagada ? "Cancelar folio" : "Cancelar ticket"}
         </Button>
       </div>
     </Modal>
