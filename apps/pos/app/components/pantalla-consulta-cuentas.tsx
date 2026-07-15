@@ -5,6 +5,7 @@ import { type Empleado } from "../lib/supabase";
 import { listarCuentas, labelModoCuenta, type CuentaCerrada, type FiltroCuentas } from "../lib/consulta-cuentas";
 import { leerTicketParaImpresion } from "../lib/print/ticket-datos";
 import { type DatosTicketImpresion } from "../lib/print/tipos";
+import { ModalCancelarTicket } from "./modal-cancelar-ticket";
 
 function fechaCorta(iso: string | null): string {
   if (!iso) return "—";
@@ -43,6 +44,9 @@ export function PantallaConsultaCuentas({
   const [detalle, setDetalle] = useState<DatosTicketImpresion | null>(null);
   const [cargandoDet, setCargandoDet] = useState(false);
   const [imprimiendo, setImprimiendo] = useState(false);
+  const [cancelando, setCancelando] = useState<CuentaCerrada | null>(null);
+
+  const cuentaSel = cuentas?.find((c) => c.ticketId === sel) ?? null;
 
   const recargar = useCallback(async () => {
     try {
@@ -156,15 +160,27 @@ export function PantallaConsultaCuentas({
                   <div className="font-display text-[22px] font-bold tabular-nums">{detalle.meta.folio}</div>
                   <div className="text-[12.5px] text-ink-3">{fechaCorta(detalle.meta.fechaIso)} · {labelModoCuenta(detalle.meta.modoServicio)} · Cajero: {detalle.meta.cajero}</div>
                 </div>
-                <button
-                  type="button"
-                  disabled={imprimiendo}
-                  onClick={reimprimir}
-                  className="flex h-10 items-center gap-2 rounded-lg border border-line-strong px-4 text-[13.5px] font-semibold text-ink-2 transition hover:border-ink hover:text-ink disabled:opacity-60"
-                >
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4"><path d="M6 9V2h12v7M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2M6 14h12v8H6z" /></svg>
-                  {imprimiendo ? "Imprimiendo…" : "Reimprimir"}
-                </button>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    disabled={imprimiendo}
+                    onClick={reimprimir}
+                    className="flex h-10 items-center gap-2 rounded-lg border border-line-strong px-4 text-[13.5px] font-semibold text-ink-2 transition hover:border-ink hover:text-ink disabled:opacity-60"
+                  >
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4"><path d="M6 9V2h12v7M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2M6 14h12v8H6z" /></svg>
+                    {imprimiendo ? "Imprimiendo…" : "Reimprimir"}
+                  </button>
+                  {cuentaSel?.estado === "PAGADO" && (
+                    <button
+                      type="button"
+                      onClick={() => setCancelando(cuentaSel)}
+                      className="flex h-10 items-center gap-2 rounded-lg border border-danger/40 px-4 text-[13.5px] font-semibold text-danger transition hover:border-danger hover:bg-danger/[0.06]"
+                    >
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4"><path d="M18 6 6 18M6 6l12 12" /></svg>
+                      Cancelar folio
+                    </button>
+                  )}
+                </div>
               </div>
 
               {/* Productos — ocupa el alto disponible con scroll interno (mini-ventana) */}
@@ -215,6 +231,21 @@ export function PantallaConsultaCuentas({
           )}
         </div>
       </div>
+
+      {cancelando && (
+        <ModalCancelarTicket
+          token={token}
+          empleado={empleado}
+          ticketId={cancelando.ticketId}
+          folio={cancelando.folio}
+          totalActual={cancelando.total}
+          cajaId={turno.caja_id}
+          turnoId={turno.id}
+          pagada
+          onCancelado={() => { setCancelando(null); setSel(null); setDetalle(null); recargar(); }}
+          onCerrar={() => setCancelando(null)}
+        />
+      )}
     </div>
   );
 }
