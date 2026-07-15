@@ -145,13 +145,13 @@ export function PantallaConsultaCuentas({
         </div>
 
         {/* Detalle */}
-        <div className="min-h-0 flex-1 overflow-y-auto p-6">
-          {!sel && <div className="flex h-full items-center justify-center text-center text-[13px] text-ink-3">Elige una cuenta de la lista para ver su detalle.</div>}
-          {sel && cargandoDet && <p className="text-center text-ink-3">Cargando detalle…</p>}
+        <div className="flex min-h-0 flex-1 flex-col p-5">
+          {!sel && <div className="flex flex-1 items-center justify-center text-center text-[13px] text-ink-3">Elige una cuenta de la lista para ver su detalle.</div>}
+          {sel && cargandoDet && <div className="flex flex-1 items-center justify-center text-center text-ink-3">Cargando detalle…</div>}
           {sel && detalle && (
-            <div className="mx-auto max-w-[640px]">
-              {/* Meta */}
-              <div className="mb-4 flex items-start justify-between">
+            <div className="flex min-h-0 flex-1 flex-col">
+              {/* Encabezado — fijo */}
+              <div className="flex flex-shrink-0 items-start justify-between">
                 <div>
                   <div className="font-display text-[22px] font-bold tabular-nums">{detalle.meta.folio}</div>
                   <div className="text-[12.5px] text-ink-3">{fechaCorta(detalle.meta.fechaIso)} · {labelModoCuenta(detalle.meta.modoServicio)} · Cajero: {detalle.meta.cajero}</div>
@@ -167,28 +167,30 @@ export function PantallaConsultaCuentas({
                 </button>
               </div>
 
-              {/* Items */}
-              <div className="overflow-hidden rounded-lg border border-line">
-                <div className="grid grid-cols-[40px_1fr_auto] gap-2 border-b border-line bg-hover px-3 py-2 text-[11px] font-bold uppercase tracking-wide text-ink-3">
-                  <span>Cant.</span><span>Descripción</span><span>Importe</span>
+              {/* Productos — ocupa el alto disponible con scroll interno (mini-ventana) */}
+              <div className="mt-4 flex min-h-0 flex-1 flex-col overflow-hidden rounded-lg border border-line">
+                <div className="grid flex-shrink-0 grid-cols-[56px_1fr_110px] gap-2 border-b border-line bg-hover px-4 py-2.5 text-[11px] font-bold uppercase tracking-wide text-ink-3">
+                  <span>Cant.</span><span>Descripción</span><span className="text-right">Importe</span>
                 </div>
-                {detalle.lineas.map((l, i) => (
-                  <div key={i} className="grid grid-cols-[40px_1fr_auto] gap-2 border-b border-line px-3 py-2 last:border-b-0">
-                    <span className="font-display font-bold tabular-nums">{l.cantidad}</span>
-                    <span className="min-w-0">
-                      <span className="block text-[14px] font-medium">{l.nombre}</span>
-                      {l.modificadores.length > 0 && <span className="block text-[12px] text-ink-3">{l.modificadores.join(" · ")}</span>}
-                      {l.notaCocina && <span className="block text-[12px] italic text-ink-3">“{l.notaCocina}”</span>}
-                    </span>
-                    <span className="font-display tabular-nums">{fmtMxn(l.totalMxn)}</span>
-                  </div>
-                ))}
+                <div className="min-h-0 flex-1 overflow-y-auto">
+                  {detalle.lineas.map((l, i) => (
+                    <div key={i} className="grid grid-cols-[56px_1fr_110px] gap-2 border-b border-line px-4 py-2.5 last:border-b-0">
+                      <span className="font-display text-[15px] font-bold tabular-nums">{l.cantidad}</span>
+                      <span className="min-w-0">
+                        <span className="block text-[14px] font-medium">{l.nombre}</span>
+                        {l.modificadores.length > 0 && <span className="block text-[12px] text-ink-3">{l.modificadores.join(" · ")}</span>}
+                        {l.notaCocina && <span className="block text-[12px] italic text-ink-3">“{l.notaCocina}”</span>}
+                      </span>
+                      <span className="text-right font-display tabular-nums">{fmtMxn(l.totalMxn)}</span>
+                    </div>
+                  ))}
+                </div>
               </div>
 
-              {/* Pagos + totales */}
-              <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
-                <div className="rounded-lg border border-line p-3">
-                  <div className="mb-1.5 text-[11px] font-bold uppercase tracking-wide text-ink-3">Forma de pago</div>
+              {/* Forma de pago + totales — fijos abajo */}
+              <div className="mt-4 grid flex-shrink-0 grid-cols-1 gap-4 sm:grid-cols-2">
+                <div className="rounded-lg border border-line p-3.5">
+                  <div className="mb-2 text-[11px] font-bold uppercase tracking-wide text-ink-3">Forma de pago</div>
                   {detalle.pagos.length === 0 ? (
                     <div className="text-[13px] text-ink-3">Sin pagos registrados.</div>
                   ) : detalle.pagos.map((p, i) => (
@@ -198,14 +200,14 @@ export function PantallaConsultaCuentas({
                     </div>
                   ))}
                 </div>
-                <div className="rounded-lg border border-line p-3">
+                <div className="rounded-lg border border-line p-3.5">
                   <Row k="Subtotal" v={detalle.totales.subtotal} />
                   {detalle.totales.descuentos > 0 && <Row k="Descuento" v={-detalle.totales.descuentos} />}
                   <Row k="IVA" v={detalle.totales.iva} />
                   {detalle.totales.propina > 0 && <Row k="Propina" v={detalle.totales.propina} />}
-                  <div className="mt-1 flex items-center justify-between border-t border-line pt-1.5">
+                  <div className="mt-1.5 flex items-center justify-between border-t border-line pt-2">
                     <span className="text-[14px] font-bold uppercase tracking-wide">Total</span>
-                    <span className="font-display text-[18px] font-bold tabular-nums">{fmtMxn(detalle.totales.total + detalle.totales.propina)}</span>
+                    <span className="font-display text-[19px] font-bold tabular-nums">{fmtMxn(detalle.totales.total + detalle.totales.propina)}</span>
                   </div>
                 </div>
               </div>
