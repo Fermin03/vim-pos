@@ -18,8 +18,11 @@ nunca se había ejecutado y tenía **6 bugs encadenados #28-#33**, todos resuelt
 
 UI completa: `pantalla-devoluciones` + `ModalDevolucion` + `lib/devoluciones` + botón en topbar.
 Smoke verde (venta queda PAGADA/120 intacta + documento CONFIRMADA + 120 exacto + movimiento de caja).
-**Único pendiente menor:** reversa de inventario (#29) — depende del módulo producto→insumos (sección 6);
-hoy las devoluciones usan `reversar_inventario=false`.
+**Reversa de inventario (#29): resuelta en 0057.** La reversa explota la receta activa del producto
+(igual que la venta) y aplica `REVERSA_CANCELACION` por insumo; si el módulo de inventario está
+apagado no hace nada, que es lo correcto (si no se descontó al vender, no hay qué regresar). Las
+existencias reales siguen dependiendo del módulo producto→insumos (sección 6): sin recetas cargadas
+la reversa no tiene qué mover, pero ya no revienta.
 
 <details><summary>Diagnóstico histórico (los 5 bugs originales encontrados)</summary>
 
@@ -28,7 +31,7 @@ Un smoke (`smoke_devolucion.sql`) destapó **5 bugs encadenados**:
 | Bug | Qué | Fix derivado | ¿Resuelto? |
 |-----|-----|--------------|-----------|
 | #28 | `trg_devolucion_audit` usa categoria `'DEVOLUCION'` (no existe en `evento_categoria`) | → `'VENTA'` (ver SQL abajo) | Fix listo |
-| #29 | `reversar_inventario_por_devolucion` llama `aplicar_movimiento_inventario` con `p_producto_id`/`p_tipo_movimiento`/`p_origen_referencia_*` pero la función espera `p_insumo_id`/`p_tipo`/`p_cantidad`/`p_usuario_id`. Requiere mapear producto→insumos (recetas) = **módulo de inventario** | Diseño: reversa vía recetas | Pendiente (módulo inventario) |
+| #29 | `reversar_inventario_por_devolucion` llama `aplicar_movimiento_inventario` con `p_producto_id`/`p_tipo_movimiento`/`p_origen_referencia_*` pero la función espera `p_insumo_id`/`p_tipo`/`p_cantidad`/`p_usuario_id`. Requiere mapear producto→insumos (recetas) = **módulo de inventario** | Reversa vía recetas (0057), espejo de `descontar_inventario_por_venta`; tipo real `REVERSA_CANCELACION`; no-op si el módulo está apagado | **Resuelto (0057)** — también en `reversar_inventario_por_cancelacion`, que tenía el mismo bug y abortaba toda cancelación de folio pagado |
 | #30 | `trg_devolucion_pago_efectivo` inserta en `movimientos_caja` con `tipo_movimiento` (col es `tipo`), `referencia_documento_tipo/id` (no existen), `usuario_id`+`created_by` (col es `usuario_solicitante_id`, no hay created_by) y sin `dia_contable` (NOT NULL). En `pagos` faltaba `dia_contable` | Re-crear trigger contra esquema real (SQL abajo) | Fix listo |
 | #31 | `trg_movs_caja_folio` arma `'MOV_'||tipo` = `'MOV_DEVOLUCION_EFECTIVO'` (23) en `contadores_folio.tipo_documento` varchar(20) | Ampliar a varchar(40) | Fix listo |
 | #32 | El pago negativo (`-total_devuelto`) que inserta el trigger viola `tickets_monto_pagado_mxn_check`. **Decisión de diseño:** ¿cómo reconcilia un reembolso con `monto_pagado_mxn`/`total_mxn` del ticket original? ¿pago negativo, columna `monto_devuelto`, o ticket espejo? | **Requiere diseño** | 🔴 Bloqueante |
