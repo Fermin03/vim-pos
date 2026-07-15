@@ -84,7 +84,9 @@ async function bootCaja() {
 
   let posUrl = process.env.VIM_POS_URL;
   if (!posUrl && existsSync(path.join(UI_DIR, "index.html"))) {
-    uiServer = await startUiServer(UI_DIR, UI_PORT, backend.gatewayPort);
+    uiServer = await startUiServer(UI_DIR, UI_PORT, backend.gatewayPort, "0.0.0.0", {
+      onActualizar: () => buscarActualizacionManual(),
+    });
     posUrl = `http://localhost:${UI_PORT}`;
     console.log(`· [ui] POS servido offline desde ${posUrl} · KDS/2ª caja en la LAN: http://${backend.lanIp}:${UI_PORT}`);
   }
@@ -199,6 +201,20 @@ async function revisarActualizacion() {
   } catch (e) {
     console.log("· [update] chequeo omitido:", e.message);
   }
+}
+
+/** Chequeo a petición del usuario (botón del menú del POS). A diferencia del automático, este SÍ
+ *  informa el resultado: la UI necesita decir "ya estás al día" en vez de quedarse callada. Si hay
+ *  versión nueva abre el mismo diálogo que la bandeja, pero contesta primero para que el botón deje
+ *  de girar antes de que el modal bloquee la ventana. */
+async function buscarActualizacionManual() {
+  if (descargandoUpdate) return { estado: "descargando" };
+  const info = await buscarActualizacion(UPDATE_FEED, app.getVersion());
+  if (!info.hay) return { estado: "al-dia", version: app.getVersion() };
+  updateInfo = info;
+  refrescarMenuTray();
+  setTimeout(() => { ofrecerInstalar().catch(() => {}); }, 150);
+  return { estado: "hay", version: info.version, notas: info.notas ?? "" };
 }
 
 /** Descarga (verificando SHA-512), y en la app empaquetada cierra e instala. Datos se conservan. */
