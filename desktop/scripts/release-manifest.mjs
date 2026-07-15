@@ -3,7 +3,18 @@
 // manifiesto que consume el actualizador in-app. Uso:
 //   npm run dist                          # construye dist/VIM POS Setup <ver>.exe
 //   npm run release-manifest -- "Notas de esta versión"
-// Luego sube AMBOS (el .exe y latest.json) al bucket público 'actualizaciones' de Supabase Storage.
+//
+// Dónde vive cada archivo (y por qué están separados):
+//   • latest.json → bucket público 'actualizaciones' de Supabase Storage. Esta URL NO se puede
+//     mover: es la que las versiones ya instaladas traen grabada y donde van a buscar.
+//   • el .exe     → GitHub Releases. Supabase (plan Free) rechaza archivos de más de 50 MB y el
+//     instalador pesa ~138 MB. El destino del .exe es solo un campo del manifiesto, así que puede
+//     estar en cualquier host público.
+//
+// VIM_UPDATE_URL fija la URL completa del .exe (GitHub renombra los espacios a puntos, así que no
+// se puede derivar del nombre local). VIM_UPDATE_BASE sirve si algún día el .exe vuelve al bucket.
+//   VIM_UPDATE_URL="https://github.com/<user>/<repo>/releases/download/v<ver>/VIM.POS.Setup.<ver>.exe" \
+//     npm run release-manifest -- "Notas"
 import crypto from "node:crypto";
 import { readFileSync, writeFileSync, existsSync } from "node:fs";
 import path from "node:path";
@@ -25,7 +36,7 @@ const BASE = (process.env.VIM_UPDATE_BASE || "https://pbiaxzvmssjsxdwqrumb.supab
 const fileName = path.basename(exe);
 const manifest = {
   version,
-  url: `${BASE}/${encodeURIComponent(fileName)}`,
+  url: process.env.VIM_UPDATE_URL || `${BASE}/${encodeURIComponent(fileName)}`,
   sha512,
   notas: process.argv.slice(2).join(" "),
   fecha: new Date().toISOString().slice(0, 10),
@@ -35,6 +46,6 @@ const out = path.join(root, "dist", "latest.json");
 writeFileSync(out, JSON.stringify(manifest, null, 2));
 console.log(`✅ ${out}\n`);
 console.log(JSON.stringify(manifest, null, 2));
-console.log(`\nSube AMBOS al bucket público 'actualizaciones' de Supabase Storage:`);
-console.log(`  • ${fileName}`);
-console.log(`  • latest.json`);
+console.log(`\nPublicar:`);
+console.log(`  • ${fileName} → GitHub Releases (pesa más de los 50 MB que acepta Supabase Free)`);
+console.log(`  • latest.json → bucket público 'actualizaciones' de Supabase Storage (URL fija)`);
