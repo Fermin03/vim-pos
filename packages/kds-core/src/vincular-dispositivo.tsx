@@ -21,8 +21,17 @@ export function VincularDispositivo({ onVinculado }: { onVinculado: () => void }
       await deviceSignIn(email.trim(), password);
       guardarCreds({ email: email.trim(), password });
       onVinculado();
-    } catch {
-      setError("No se pudo vincular. Revisa las credenciales del dispositivo y la conexión con la caja.");
+    } catch (e) {
+      // Distinguir "no llegué a la caja" de "la caja dijo que no". Culpar siempre a las credenciales
+      // manda a revisar lo que no es: cuando la caja está apagada, las credenciales están bien y el
+      // cajero las reescribe una y otra vez sin que nada cambie.
+      const msg = e instanceof Error ? e.message : String(e);
+      const esRed = /fetch|network|load failed|ECONN|timeout|NetworkError/i.test(msg);
+      setError(
+        esRed
+          ? "No se pudo contactar la caja. Revisa que VIM POS esté abierto en la caja y que ambas pantallas estén en la misma red."
+          : `La caja rechazó las credenciales del dispositivo: ${msg}`,
+      );
     } finally {
       setCargando(false);
     }
