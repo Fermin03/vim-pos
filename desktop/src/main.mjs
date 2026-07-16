@@ -4,7 +4,8 @@
 //    watchdog (se auto-recupera) + respaldo del pgdata al cerrar y bajo demanda.
 //  • COCINA (--role=cocina): pantalla de cocina como CLIENTE DELGADO del hub. SIN backend local.
 import { app, BrowserWindow, Tray, Menu, nativeImage, clipboard, Notification, dialog, shell } from "electron";
-import { existsSync, readFileSync, writeFileSync, mkdirSync } from "node:fs";
+import { existsSync, readFileSync, writeFileSync, mkdirSync, openSync, writeSync } from "node:fs";
+import { inspect } from "node:util";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { startBackend } from "./backend.mjs";
@@ -28,6 +29,28 @@ const TRAY_ICON = EMPAQUETADO ? path.join(process.resourcesPath, "tray.png") : p
 const ROL = process.argv.includes("--role=cocina") ? "cocina" : "caja";
 const CONFIG_DIR = process.env.VIM_DATA_DIR || app.getPath("userData");
 const HUB_CFG = path.join(CONFIG_DIR, "kds-hub.json");
+const LOG_PATH = path.join(CONFIG_DIR, "vim-pos.log");
+
+/**
+ * Espeja console.log/error a un archivo. La app empaquetada no tiene consola: sin esto, un fallo
+ * de arranque en la caja de un cliente no deja NINGÚN rastro (la ventana solo se cierra). Aprendido
+ * a la mala: un EPERM al instalar en Program Files costó una tarde de diagnóstico a ciegas.
+ */
+function iniciarLog() {
+  try {
+    mkdirSync(CONFIG_DIR, { recursive: true });
+    const fd = openSync(LOG_PATH, "a");
+    const volcar = (nivel, args) => {
+      const txt = args.map((a) => (typeof a === "string" ? a : inspect(a, { depth: 3 }))).join(" ");
+      try { writeSync(fd, `[${new Date().toISOString()}] ${nivel} ${txt}\n`); } catch { /* */ }
+    };
+    for (const [nivel, orig] of [["INFO", console.log], ["ERROR", console.error]]) {
+      console[nivel === "INFO" ? "log" : "error"] = (...a) => { try { orig(...a); } catch { /* */ } volcar(nivel, a); };
+    }
+    console.log(`=== VIM POS ${app.getVersion()} · rol ${ROL} · ${EMPAQUETADO ? "empaquetado" : "dev"} · ${process.platform} ===`);
+    console.log(`ejecutable: ${app.getPath("exe")}`);
+  } catch { /* si ni el log se puede escribir, seguimos: no es motivo para no arrancar */ }
+}
 
 // Auto-actualización (Opción B, sin firma): feed del manifiesto. Por defecto el bucket público de
 // Supabase Storage del proyecto; se puede override con VIM_UPDATE_FEED.
@@ -41,6 +64,7 @@ let watchdog;
 let opcionesBackend = {};   // para poder re-arrancar el backend igual (watchdog / respaldo)
 let backupsDir = null;
 let saliendoDeVerdad = false; // distinguir "cerrar ventana" (→ bandeja) de "salir de verdad"
+let arrancado = false;        // ya terminó el boot: después, un rechazo suelto no debe matar la caja
 let respaldando = false;
 let updateInfo = null;        // manifiesto de la actualización disponible (o null)
 let descargandoUpdate = false;
@@ -305,15 +329,41 @@ async function cerrarTodo() {
   try { tray?.destroy(); } catch { /* */ }
 }
 
+/** Un arranque fallido tiene que DECIR por qué: antes solo parpadeaba una ventana y se cerraba,
+ *  dejando al cajero (y a quien lo soporte) sin nada que reportar. */
+function falloElArranque(causa) {
+  const msg = causa instanceof Error ? causa.message : String(causa);
+  console.error("Boot falló:", causa);
+  // Permisos = casi siempre instalación en Program Files: el Postgres embebido ajusta el modo de
+  // sus binarios al arrancar y ahí no puede escribir. Decirlo evita otra tarde de diagnóstico.
+  const pista = /EPERM|EACCES|operation not permitted/i.test(msg)
+    ? "Parece un problema de permisos.\n\nVIM POS debe instalarse en la carpeta que propone el instalador (dentro de tu usuario). Si está en \"Archivos de programa\" / \"Program Files\", desinstálalo y vuelve a instalarlo sin cambiar la carpeta.\n\n"
+    : "";
+  try {
+    dialog.showErrorBox("VIM POS no pudo iniciar", `${pista}${msg}\n\nDetalle completo del arranque:\n${LOG_PATH}`);
+  } catch { /* */ }
+  app.quit();
+}
+
+iniciarLog();
+
+// Un rechazo sin manejar durante el arranque dejaba la app colgada y muda (así se veía el EPERM de
+// Program Files: solo un warning en una consola que nadie tiene). Si aún no arrancamos, es fatal.
+process.on("unhandledRejection", (causa) => {
+  if (arrancado) { console.error("Rechazo no manejado (ya arrancado):", causa); return; }
+  falloElArranque(causa);
+});
+
 // Instancia única SOLO para la caja (la que arranca Postgres). La cocina es cliente delgado.
 if (ROL === "caja" && !app.requestSingleInstanceLock()) {
+  console.log("Ya hay otra instancia abierta: esta se cierra.");
   app.quit();
 } else {
   app.on("second-instance", () => {
     if (win) { win.show(); if (win.isMinimized()) win.restore(); win.focus(); }
   });
 
-  app.whenReady().then(boot).catch((e) => { console.error("Boot falló:", e); app.quit(); });
+  app.whenReady().then(boot).then(() => { arrancado = true; }).catch(falloElArranque);
   app.on("activate", () => { if (BrowserWindow.getAllWindows().length === 0) boot(); });
   // Con bandeja (caja), cerrar la ventana la oculta (no dispara esto). En cocina sí cierra la app.
   app.on("window-all-closed", async () => { await cerrarTodo(); app.quit(); });
