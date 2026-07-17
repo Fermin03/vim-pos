@@ -1,7 +1,8 @@
 import type { PrintJob, PrintResult } from "./tipos";
 import { PreviewAdapter } from "./preview-adapter";
 import { EpsonEposAdapter } from "./epson-epos-adapter";
-import { leerConfigImpresora } from "./config";
+import { RawSocketAdapter } from "./raw-socket-adapter";
+import { leerConfigImpresora, PUERTO_RAW } from "./config";
 
 export interface PrinterAdapter {
   nombre: string;
@@ -18,6 +19,7 @@ export interface PrinterAdapter {
  */
 export function obtenerImpresora(opts: { onMostrar: (job: PrintJob) => void }): PrinterAdapter {
   const cfg = leerConfigImpresora();
+  if (cfg.tipo === "generica" && cfg.ip) return new RawSocketAdapter(cfg.ip, cfg.puerto ?? PUERTO_RAW, cfg.ancho ?? 80);
   if (cfg.tipo === "epson" && cfg.ip) return new EpsonEposAdapter(cfg.ip, cfg.ancho ?? 80);
   return new PreviewAdapter(opts.onMostrar);
 }
