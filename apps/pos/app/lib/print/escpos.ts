@@ -82,3 +82,9 @@ export function jobAEscpos(job: PrintJob): Uint8Array {
   for (const bl of job.bloques) out.push(...bloqueABytes(bl, job.ancho));
   return Uint8Array.from(out);
 }
+
+/** Pulso para abrir el cajón de dinero (ESC p m t1 t2). El cajón se conecta al puerto DK de la
+ *  impresora, no a la PC; la impresora traduce este comando en el pulso eléctrico. pin 0, ~100ms. */
+export function bytesCajon(): Uint8Array {
+  return Uint8Array.from([ESC, 0x70, 0x00, 0x19, 0xfa]);
+}

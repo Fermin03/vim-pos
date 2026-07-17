@@ -110,6 +110,7 @@ async function bootCaja() {
   if (!posUrl && existsSync(path.join(UI_DIR, "index.html"))) {
     uiServer = await startUiServer(UI_DIR, UI_PORT, backend.gatewayPort, "0.0.0.0", {
       onActualizar: () => buscarActualizacionManual(),
+      onImprimir: (p) => imprimirRaw(p),
     });
     posUrl = `http://localhost:${UI_PORT}`;
     console.log(`· [ui] POS servido offline desde ${posUrl} · KDS/2ª caja en la LAN: http://${backend.lanIp}:${UI_PORT}`);
@@ -225,6 +226,31 @@ async function revisarActualizacion() {
   } catch (e) {
     console.log("· [update] chequeo omitido:", e.message);
   }
+}
+
+/** Relay de impresión RAW (ESC/POS por el puerto 9100). La UI arma los bytes y los manda al
+ *  ui-server; aquí se abren al socket de la impresora y se escriben. `soloConectar` = prueba de
+ *  alcance (abre y cierra sin escribir). Clasifica el fallo para que la UI diga la verdad:
+ *  no se alcanza la impresora (OFFLINE) vs. otro error. */
+async function imprimirRaw({ ip, puerto = 9100, datosB64 = "", soloConectar = false } = {}) {
+  if (!ip) return { ok: false, motivo: "ERROR", error: "Falta la IP de la impresora." };
+  const { Socket } = await import("node:net");
+  return new Promise((resolve) => {
+    const sock = new Socket();
+    let resuelto = false;
+    const fin = (r) => { if (resuelto) return; resuelto = true; try { sock.destroy(); } catch { /* */ } resolve(r); };
+    sock.setTimeout(6000);
+    sock.on("timeout", () => fin({ ok: false, motivo: "OFFLINE", error: "La impresora no respondió (timeout)." }));
+    sock.on("error", (e) => fin({ ok: false, motivo: "OFFLINE", error: e?.message ?? "No se pudo conectar." }));
+    sock.connect(puerto, ip, () => {
+      if (soloConectar) return fin({ ok: true });
+      const buf = Buffer.from(datosB64, "base64");
+      sock.write(buf, () => {
+        // Dar un instante a que la impresora drene antes de cerrar; si no, se corta el ticket.
+        setTimeout(() => fin({ ok: true }), 350);
+      });
+    });
+  });
 }
 
 /** Chequeo a petición del usuario (botón del menú del POS). A diferencia del automático, este SÍ
