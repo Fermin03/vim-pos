@@ -6,6 +6,9 @@ import { listarCuentas, labelModoCuenta, type CuentaCerrada, type FiltroCuentas 
 import { leerTicketParaImpresion } from "../lib/print/ticket-datos";
 import { type DatosTicketImpresion } from "../lib/print/tipos";
 import { ModalCancelarTicket } from "./modal-cancelar-ticket";
+import { ModalCambiarPago } from "./modal-cambiar-pago";
+import { ModalReabrirCuenta } from "./modal-reabrir-cuenta";
+import { METODOS_PAGO } from "../lib/cuentas-acciones";
 
 function fechaCorta(iso: string | null): string {
   if (!iso) return "—";
@@ -45,8 +48,14 @@ export function PantallaConsultaCuentas({
   const [cargandoDet, setCargandoDet] = useState(false);
   const [imprimiendo, setImprimiendo] = useState(false);
   const [cancelando, setCancelando] = useState<CuentaCerrada | null>(null);
+  const [cambiandoPago, setCambiandoPago] = useState<CuentaCerrada | null>(null);
+  const [reabriendo, setReabriendo] = useState<CuentaCerrada | null>(null);
 
   const cuentaSel = cuentas?.find((c) => c.ticketId === sel) ?? null;
+  // Método actual: el detalle trae la etiqueta legible ("Efectivo"); la mapeo de vuelta al código
+  // enum para prellenar/filtrar el modal de cambio de pago (null si no está en la lista conocida).
+  const etiquetaPago = detalle?.pagos[0]?.metodo ?? null;
+  const metodoActual = METODOS_PAGO.find((m) => m.label === etiquetaPago)?.codigo ?? null;
 
   const recargar = useCallback(async () => {
     try {
@@ -171,14 +180,32 @@ export function PantallaConsultaCuentas({
                     {imprimiendo ? "Imprimiendo…" : "Reimprimir"}
                   </button>
                   {cuentaSel?.estado === "PAGADO" && (
-                    <button
-                      type="button"
-                      onClick={() => setCancelando(cuentaSel)}
-                      className="flex h-10 items-center gap-2 rounded-lg border border-danger/40 px-4 text-[13.5px] font-semibold text-danger transition hover:border-danger hover:bg-danger/[0.06]"
-                    >
-                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4"><path d="M18 6 6 18M6 6l12 12" /></svg>
-                      Cancelar folio
-                    </button>
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => setCambiandoPago(cuentaSel)}
+                        className="flex h-10 items-center gap-2 rounded-lg border border-line-strong px-4 text-[13.5px] font-semibold text-ink-2 transition hover:border-ink hover:text-ink"
+                      >
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4"><rect x="2" y="6" width="20" height="12" rx="2" /><path d="M2 10h20M7 15h4" /></svg>
+                        Cambiar pago
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setReabriendo(cuentaSel)}
+                        className="flex h-10 items-center gap-2 rounded-lg border border-line-strong px-4 text-[13.5px] font-semibold text-ink-2 transition hover:border-ink hover:text-ink"
+                      >
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4"><path d="M3 12a9 9 0 1 0 3-6.7L3 8m0-5v5h5" /></svg>
+                        Reabrir
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setCancelando(cuentaSel)}
+                        className="flex h-10 items-center gap-2 rounded-lg border border-danger/40 px-4 text-[13.5px] font-semibold text-danger transition hover:border-danger hover:bg-danger/[0.06]"
+                      >
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4"><path d="M18 6 6 18M6 6l12 12" /></svg>
+                        Cancelar folio
+                      </button>
+                    </>
                   )}
                 </div>
               </div>
@@ -244,6 +271,35 @@ export function PantallaConsultaCuentas({
           pagada
           onCancelado={() => { setCancelando(null); setSel(null); setDetalle(null); recargar(); }}
           onCerrar={() => setCancelando(null)}
+        />
+      )}
+
+      {cambiandoPago && (
+        <ModalCambiarPago
+          token={token}
+          empleado={empleado}
+          ticketId={cambiandoPago.ticketId}
+          folio={cambiandoPago.folio}
+          total={cambiandoPago.total}
+          metodoActual={metodoActual}
+          cajaId={turno.caja_id}
+          turnoId={turno.id}
+          onCambiado={() => { setCambiandoPago(null); seleccionar(cambiandoPago.ticketId); recargar(); }}
+          onCerrar={() => setCambiandoPago(null)}
+        />
+      )}
+
+      {reabriendo && (
+        <ModalReabrirCuenta
+          token={token}
+          empleado={empleado}
+          ticketId={reabriendo.ticketId}
+          folio={reabriendo.folio}
+          total={reabriendo.total}
+          cajaId={turno.caja_id}
+          turnoId={turno.id}
+          onReabierto={() => { setReabriendo(null); setSel(null); setDetalle(null); recargar(); }}
+          onCerrar={() => setReabriendo(null)}
         />
       )}
     </div>
