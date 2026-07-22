@@ -29,10 +29,12 @@ export function PosSkeletonBg({ variant = "caja" }: { variant?: "caja" | "app" }
           </div>
         </div>
       ) : (
-        <div className="flex min-h-0 flex-1">
-          <div className="flex w-[200px] flex-col gap-3.5 border-r border-line p-5">
-            {[0, 1, 2, 3, 4].map((i) => (
-              <div key={i} className={i % 2 ? "h-3 w-2/3 rounded-full bg-line" : "h-3 rounded-full bg-line"} />
+        // El POS ya no tiene riel lateral de categorías: van en pestañas horizontales sobre el
+        // catálogo (mockup P-059). El fondo lo refleja para no evocar un layout que ya no existe.
+        <div className="flex min-h-0 flex-1 flex-col">
+          <div className="flex flex-shrink-0 gap-2 border-b border-line px-6 py-3.5">
+            {[0, 1, 2].map((i) => (
+              <div key={i} className={i === 0 ? "h-8 w-28 rounded-lg bg-line" : "h-8 w-24 rounded-lg border border-line"} />
             ))}
           </div>
           <div className="grid flex-1 auto-rows-[130px] grid-cols-3 content-start gap-4 p-6">

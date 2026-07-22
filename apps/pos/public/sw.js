@@ -2,7 +2,14 @@
 //   • Navegaciones: red primero; sin red → shell cacheado ('/').
 //   • Estáticos de Next (/_next/static, hasheados e inmutables) y fuentes: cache-first.
 //   • NUNCA toca llamadas a Supabase ni peticiones no-GET (los datos viven en Dexie, no aquí).
-const CACHE = "vimpos-shell-v1";
+// La caché lleva la VERSIÓN de la app: el build del escritorio sustituye el marcador
+// (scripts/build-ui.mjs). Sin versionar, el nombre era fijo y `activate` nunca borraba nada, así
+// que los chunks de TODAS las versiones se acumulaban para siempre en la caja. Al cambiar el
+// nombre por versión, la activación purga los de versiones anteriores.
+// Si el marcador no se sustituye (build web), queda "dev" y se comporta como antes.
+const VERSION = "__VIM_SW_VERSION__".startsWith("__") ? "dev" : "__VIM_SW_VERSION__";
+const PREFIJO = "vimpos-shell-";
+const CACHE = PREFIJO + VERSION;
 
 self.addEventListener("install", (e) => {
   e.waitUntil(caches.open(CACHE).then((c) => c.add("/")).catch(() => {}));
@@ -11,7 +18,10 @@ self.addEventListener("install", (e) => {
 
 self.addEventListener("activate", (e) => {
   e.waitUntil(
-    caches.keys().then((keys) => Promise.all(keys.filter((k) => k !== CACHE).map((k) => caches.delete(k)))).then(() => self.clients.claim()),
+    caches
+      .keys()
+      .then((keys) => Promise.all(keys.filter((k) => k.startsWith(PREFIJO) && k !== CACHE).map((k) => caches.delete(k))))
+      .then(() => self.clients.claim()),
   );
 });
 
