@@ -2,7 +2,7 @@
 // Exporta apps/pos como sitio estático (VIM_DESKTOP_EXPORT=1) y lo copia a desktop/pos-ui/.
 // El main de Electron sirve esa carpeta offline. Correr: `npm run build:ui`.
 import { spawn } from "node:child_process";
-import { cp, rm, access } from "node:fs/promises";
+import { cp, rm, access, readFile, writeFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
 
@@ -35,4 +35,18 @@ await access(outDir).catch(() => { throw new Error(`No se generó ${outDir}`); }
 console.log("· Copiando out/ → desktop/pos-ui/…");
 await rm(uiDir, { recursive: true, force: true });
 await cp(outDir, uiDir, { recursive: true });
+
+// Sellar el service worker con la versión de la app: su caché pasa a llamarse
+// "vimpos-shell-<versión>", y al activarse purga las de versiones anteriores. Sin esto el nombre
+// era fijo y los chunks de todas las versiones se acumulaban en la caja para siempre.
+const pkg = JSON.parse(await readFile(path.join(root, "package.json"), "utf8"));
+const swPath = path.join(uiDir, "sw.js");
+try {
+  const sw = await readFile(swPath, "utf8");
+  await writeFile(swPath, sw.replaceAll("__VIM_SW_VERSION__", pkg.version));
+  console.log(`· Service worker sellado con la versión ${pkg.version}.`);
+} catch {
+  console.warn("· Aviso: no se pudo sellar sw.js con la versión (la caché no se purgará por versión).");
+}
+
 console.log("✅ UI del POS lista en desktop/pos-ui/. `npm start` la sirve offline.");

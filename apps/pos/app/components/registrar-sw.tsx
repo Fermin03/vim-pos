@@ -5,7 +5,12 @@ import { useEffect } from "react";
 export function RegistrarSw() {
   useEffect(() => {
     if ("serviceWorker" in navigator) {
-      navigator.serviceWorker.register("/sw.js").catch(() => { /* sin SW se degrada a online-only */ });
+      // updateViaCache:"none" → el navegador revalida sw.js en cada registro en vez de servirlo de
+      // su propia caché (que puede retenerlo hasta 24 h). Sin esto, una versión nueva del SW puede
+      // tardar un día en tomarse, y con ella la purga de cachés viejas.
+      navigator.serviceWorker
+        .register("/sw.js", { updateViaCache: "none" })
+        .catch(() => { /* sin SW se degrada a online-only */ });
     }
   }, []);
   return null;
