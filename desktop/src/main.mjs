@@ -64,7 +64,12 @@ const UPDATE_FEED = process.env.VIM_UPDATE_FEED || "https://pbiaxzvmssjsxdwqrumb
 // (la protege RLS) y debe hornearse en el build para que el cliente no teclee nada; si falta, la
 // vinculación por nube lo dice con todas sus letras en vez de fallar en silencio.
 const CLOUD_URL = process.env.VIM_CLOUD_URL || "https://pbiaxzvmssjsxdwqrumb.supabase.co";
-const CLOUD_ANON = process.env.VIM_CLOUD_ANON || "";
+// Llave anon del proyecto: pública por diseño (viaja en el cliente de cualquier app Supabase; lo
+// que protege los datos es RLS, no el secreto de esta llave). Va horneada para que dar de alta una
+// caja no dependa de configurar nada en la máquina del cliente.
+const CLOUD_ANON =
+  process.env.VIM_CLOUD_ANON ||
+  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBiaWF4enZtc3Nqc3hkd3FydW1iIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODAyNTMyMzIsImV4cCI6MjA5NTgyOTIzMn0.OsfFcqw-jrj-qZtFkUPQCrLgYtnDmsOxC93iLJShpKs";
 
 let backend;
 let uiServer;
