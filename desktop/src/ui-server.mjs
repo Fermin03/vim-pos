@@ -156,6 +156,26 @@ export async function startUiServer(dir, port, gatewayPort = 54350, host = "0.0.
         }
       }
 
+      // CAJA: alta de la caja contra la nube (valida credenciales del dispositivo y baja el
+      // tenant al Postgres local). Lo hace el main porque el navegador no puede escribir en la BD.
+      if (!kds && req.method === "POST" && req.url.startsWith("/__vincular-nube")) {
+        if (!LOCALES.has(req.socket.remoteAddress ?? "")) {
+          res.writeHead(403, { "Content-Type": "application/json" });
+          return res.end(JSON.stringify({ ok: false, error: "Solo desde la caja." }));
+        }
+        let body = "";
+        for await (const chunk of req) body += chunk;
+        let p = {};
+        try { p = JSON.parse(body || "{}"); } catch { /* */ }
+        res.writeHead(200, { "Content-Type": "application/json" });
+        try {
+          const r = await opts.onVincularNube?.(p);
+          return res.end(JSON.stringify(r ?? { ok: false, error: "No disponible." }));
+        } catch (e) {
+          return res.end(JSON.stringify({ ok: false, error: e?.message ?? "Falló el alta" }));
+        }
+      }
+
       let rel = decodeURIComponent(new URL(req.url, "http://x").pathname);
       if (rel === "/" || rel === "") rel = "/index.html";
       let file = path.normalize(path.join(dir, rel));
