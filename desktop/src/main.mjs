@@ -451,21 +451,22 @@ function falloElArranque(causa) {
 
 iniciarLog();
 
-/** Ruido conocido y benigno de embedded-postgres: su hook de salida (AsyncExitHook) llama a un
- *  `done` que en Node moderno ya no recibe, y revienta al apagar una instancia previa. No tiene
- *  nada que ver con el arranque; tratarlo como fatal tumbaba la caja sin motivo. */
-function esRuidoDeApagado(causa) {
-  const msg = causa instanceof Error ? `${causa.message}\n${causa.stack ?? ""}` : String(causa);
-  return /done is not a function/i.test(msg) || /embedded-postgres/i.test(msg);
+/** ¿El rechazo es un problema de permisos? Es el único que justifica abortar el arranque: significa
+ *  que la app no puede escribir donde está instalada (típicamente Program Files) y NADA va a
+ *  funcionar. Ver falloElArranque, que además explica cómo resolverlo. */
+function esFalloDePermisos(causa) {
+  const msg = causa instanceof Error ? `${causa.message}\n${causa.stack ?? ""}` : String(causa ?? "");
+  return /EPERM|EACCES|operation not permitted|access is denied/i.test(msg);
 }
 
-// Un rechazo sin manejar durante el arranque dejaba la app colgada y muda (así se veía el EPERM de
-// Program Files: solo un warning en una consola que nadie tiene). Si aún no arrancamos, es fatal
-// —salvo el ruido de apagado de embedded-postgres, que se registra y se ignora.
+// Los rechazos sin manejar se REGISTRAN siempre (antes se perdían: la app empaquetada no tiene
+// consola, y por eso el EPERM de Program Files era invisible). Pero NO se aborta el arranque por
+// ellos: el backend produce ruido benigno —el hook de salida de embedded-postgres rechaza con
+// "done is not a function" y a veces con undefined— y matar el boot por eso dejaba la caja sin
+// abrir. Solo los fallos de permisos son fatales; el resto lo decide el catch del propio boot.
 process.on("unhandledRejection", (causa) => {
-  if (esRuidoDeApagado(causa)) { console.log("· [aviso] rechazo benigno de embedded-postgres ignorado:", causa?.message ?? causa); return; }
-  if (arrancado) { console.error("Rechazo no manejado (ya arrancado):", causa); return; }
-  falloElArranque(causa);
+  console.error("Rechazo no manejado:", causa ?? "(sin detalle)");
+  if (!arrancado && esFalloDePermisos(causa)) falloElArranque(causa);
 });
 
 // Instancia única SOLO para la caja (la que arranca Postgres). La cocina es cliente delgado.
