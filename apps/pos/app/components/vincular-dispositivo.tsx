@@ -3,6 +3,7 @@ import { useState } from "react";
 import { Button } from "@vim/ui/styles";
 import { deviceSignIn } from "../lib/supabase";
 import { guardarCreds, CREDS_DEV_FIXTURE } from "../lib/device-creds";
+import { darDeAltaDesdeNube, esEscritorio } from "../lib/alta-nube";
 import { BrandMark } from "./topbar-pos";
 
 /**
@@ -16,18 +17,50 @@ export function VincularDispositivo({ onVinculado }: { onVinculado: () => void }
   const [password, setPassword] = useState(CREDS_DEV_FIXTURE?.password ?? "");
   const [error, setError] = useState<string | null>(null);
   const [cargando, setCargando] = useState(false);
+  const [paso, setPaso] = useState<string | null>(null);
+
+  /** Login contra la base LOCAL. Es el que decide si la caja queda vinculada. */
+  async function intentarLocal(correo: string, clave: string): Promise<boolean> {
+    try {
+      await deviceSignIn(correo, clave);
+      guardarCreds({ email: correo, password: clave });
+      return true;
+    } catch {
+      return false;
+    }
+  }
 
   async function vincular() {
+    const correo = email.trim();
     setCargando(true);
     setError(null);
+    setPaso(null);
     try {
-      await deviceSignIn(email.trim(), password);
-      guardarCreds({ email: email.trim(), password });
-      onVinculado();
-    } catch {
-      setError("No se pudo vincular. Revisa las credenciales del dispositivo.");
+      // 1) Local: si esta caja ya tiene los datos del negocio, entra directo.
+      if (await intentarLocal(correo, password)) { onVinculado(); return; }
+
+      // 2) Primera vez: las credenciales se crearon en el Admin (nube) y aquí todavía no existen.
+      //    Se validan contra la nube y se baja la rebanada del negocio; luego se reintenta local.
+      if (!esEscritorio()) {
+        setError("No se pudo vincular. Revisa las credenciales del dispositivo.");
+        return;
+      }
+      setPaso("Consultando la nube de VIM…");
+      const alta = await darDeAltaDesdeNube(correo, password);
+      if (!alta.ok) {
+        setError(
+          alta.motivo === "CREDENCIALES"
+            ? "La nube rechazó estas credenciales. Genéralas de nuevo en Configuración → Cajas."
+            : alta.error,
+        );
+        return;
+      }
+      setPaso("Datos del negocio descargados. Vinculando…");
+      if (await intentarLocal(correo, password)) { onVinculado(); return; }
+      setError("Se descargaron los datos del negocio, pero la caja no pudo vincularse. Vuelve a intentar.");
     } finally {
       setCargando(false);
+      setPaso(null);
     }
   }
 
@@ -68,6 +101,12 @@ export function VincularDispositivo({ onVinculado }: { onVinculado: () => void }
             className="h-11 rounded border border-line-strong px-3 text-sm outline-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-ink"
           />
         </label>
+
+        {paso && (
+          <p className="text-sm font-medium text-ink-2" role="status">
+            {paso}
+          </p>
+        )}
 
         {error && (
           <p className="text-sm font-medium text-danger" role="alert">

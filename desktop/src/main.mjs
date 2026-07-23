@@ -29,6 +29,10 @@ const TRAY_ICON = EMPAQUETADO ? path.join(process.resourcesPath, "tray.png") : p
 const ROL = process.argv.includes("--role=cocina") ? "cocina" : "caja";
 const CONFIG_DIR = process.env.VIM_DATA_DIR || app.getPath("userData");
 const HUB_CFG = path.join(CONFIG_DIR, "kds-hub.json");
+// Credenciales de la nube de esta caja, guardadas al vincular el dispositivo. Antes solo se podían
+// dar por variables de entorno, lo que hacía imposible dar de alta la caja de un cliente desde la
+// interfaz (un restaurantero no define env vars). Ahora la pantalla de vinculación las persiste.
+const NUBE_CFG = path.join(CONFIG_DIR, "nube.json");
 const LOG_PATH = path.join(CONFIG_DIR, "vim-pos.log");
 
 /**
@@ -56,6 +60,12 @@ function iniciarLog() {
 // Supabase Storage del proyecto; se puede override con VIM_UPDATE_FEED.
 const UPDATE_FEED = process.env.VIM_UPDATE_FEED || "https://pbiaxzvmssjsxdwqrumb.supabase.co/storage/v1/object/public/actualizaciones/latest.json";
 
+// Nube de VIM: mismo proyecto que el feed de actualizaciones. La anon key es pública por diseño
+// (la protege RLS) y debe hornearse en el build para que el cliente no teclee nada; si falta, la
+// vinculación por nube lo dice con todas sus letras en vez de fallar en silencio.
+const CLOUD_URL = process.env.VIM_CLOUD_URL || "https://pbiaxzvmssjsxdwqrumb.supabase.co";
+const CLOUD_ANON = process.env.VIM_CLOUD_ANON || "";
+
 let backend;
 let uiServer;
 let win;
@@ -76,6 +86,73 @@ function leerHubUrl() {
 }
 function guardarHubUrl(url) {
   try { mkdirSync(CONFIG_DIR, { recursive: true }); writeFileSync(HUB_CFG, JSON.stringify({ hubUrl: url }, null, 2)); } catch { /* */ }
+}
+
+// ── Credenciales de la nube de esta caja ─────────────────────────────────────
+// El env manda (útil para pruebas y para el verify headless); si no, lo persistido al vincular.
+function leerNube() {
+  const env = {
+    cloudUrl: process.env.VIM_CLOUD_URL,
+    anon: process.env.VIM_CLOUD_ANON,
+    email: process.env.VIM_DEVICE_EMAIL,
+    pass: process.env.VIM_DEVICE_PASS,
+  };
+  if (env.cloudUrl && env.anon && env.email && env.pass) return env;
+  try {
+    const c = JSON.parse(readFileSync(NUBE_CFG, "utf8"));
+    return c.email && c.pass ? { cloudUrl: c.cloudUrl || CLOUD_URL, anon: c.anon || CLOUD_ANON, email: c.email, pass: c.pass } : null;
+  } catch { return null; }
+}
+function guardarNube({ cloudUrl, anon, email, pass }) {
+  try {
+    mkdirSync(CONFIG_DIR, { recursive: true });
+    writeFileSync(NUBE_CFG, JSON.stringify({ cloudUrl, anon, email, pass }, null, 2));
+  } catch (e) { console.error("No se pudieron guardar las credenciales de nube:", e.message); }
+}
+
+/**
+ * Da de alta esta caja desde la nube: valida las credenciales del dispositivo contra el Supabase
+ * de VIM y, si son buenas, baja la rebanada del tenant (catálogo, empleados+PIN, org y el propio
+ * usuario-dispositivo) al Postgres local. Después de esto el login local de la pantalla de
+ * vinculación ya encuentra al dispositivo. Es el puente que faltaba: las credenciales se crean en
+ * el Admin de la nube, pero el POS valida contra su base local.
+ */
+async function vincularConNube({ email, password } = {}) {
+  if (!email || !password) return { ok: false, motivo: "FALTAN_DATOS", error: "Faltan las credenciales del dispositivo." };
+  if (!CLOUD_ANON) {
+    return { ok: false, motivo: "SIN_CONFIG", error: "Esta instalación no trae la llave pública de la nube (VIM_CLOUD_ANON). Avisa a soporte de VIM." };
+  }
+  if (!backend?.pool) return { ok: false, motivo: "SIN_BACKEND", error: "El backend local no está listo." };
+
+  let token;
+  try {
+    const r = await fetch(`${CLOUD_URL}/auth/v1/token?grant_type=password`, {
+      method: "POST",
+      headers: { apikey: CLOUD_ANON, "Content-Type": "application/json" },
+      body: JSON.stringify({ email, password }),
+      signal: AbortSignal.timeout(15000),
+    });
+    const s = await r.json().catch(() => ({}));
+    token = s.access_token;
+    if (!token) {
+      // La nube contestó y dijo que no: son las credenciales, no la red.
+      return { ok: false, motivo: "CREDENCIALES", error: "La nube rechazó estas credenciales del dispositivo." };
+    }
+  } catch (e) {
+    return { ok: false, motivo: "RED", error: `No se pudo contactar la nube de VIM: ${e?.message ?? "sin conexión"}` };
+  }
+
+  try {
+    console.log("· [alta] credenciales válidas en la nube; bajando datos del negocio…");
+    const r = await pullFromCloud(backend.pool, { cloudUrl: CLOUD_URL, anonKey: CLOUD_ANON, deviceToken: token }, (m) => console.log("· [alta]", m));
+    guardarNube({ cloudUrl: CLOUD_URL, anon: CLOUD_ANON, email, pass: password });
+    const tablas = Object.keys(r ?? {}).length;
+    console.log(`· [alta] OK: ${tablas} tablas sincronizadas; la caja ya puede vincularse.`);
+    return { ok: true, tablas };
+  } catch (e) {
+    console.error("· [alta] falló la bajada de datos:", e.message);
+    return { ok: false, motivo: "PULL", error: `Se validaron las credenciales, pero no se pudieron bajar los datos: ${e.message}` };
+  }
 }
 
 function crearVentana(preloadArgs) {
@@ -111,6 +188,7 @@ async function bootCaja() {
     uiServer = await startUiServer(UI_DIR, UI_PORT, backend.gatewayPort, "0.0.0.0", {
       onActualizar: () => buscarActualizacionManual(),
       onImprimir: (p) => imprimirRaw(p),
+      onVincularNube: (p) => vincularConNube(p),
     });
     posUrl = `http://localhost:${UI_PORT}`;
     console.log(`· [ui] POS servido offline desde ${posUrl} · KDS/2ª caja en la LAN: http://${backend.lanIp}:${UI_PORT}`);
@@ -308,11 +386,11 @@ async function ofrecerInstalar() {
 
 /** Sincroniza con la nube: PULL (referencia ↓) + PUSH (ventas ↑). Gated por env; best-effort. */
 async function syncBestEffort() {
-  const cloudUrl = process.env.VIM_CLOUD_URL;
-  const anon = process.env.VIM_CLOUD_ANON;
-  const email = process.env.VIM_DEVICE_EMAIL;
-  const pass = process.env.VIM_DEVICE_PASS;
-  if (!cloudUrl || !anon || !email || !pass) { console.log("· [sync] omitido (sin credenciales de nube configuradas)"); return; }
+  // Del env o de lo persistido al vincular la caja (ver vincularConNube).
+  const nube = leerNube();
+  if (!nube) { console.log("· [sync] omitido (esta caja aún no se ha vinculado con la nube)"); return; }
+  const { cloudUrl, anon, email, pass } = nube;
+  if (!cloudUrl || !anon || !email || !pass) { console.log("· [sync] omitido (configuración de nube incompleta)"); return; }
   try {
     const r = await fetch(`${cloudUrl}/auth/v1/token?grant_type=password`, {
       method: "POST", headers: { apikey: anon, "Content-Type": "application/json" },
@@ -373,9 +451,19 @@ function falloElArranque(causa) {
 
 iniciarLog();
 
+/** Ruido conocido y benigno de embedded-postgres: su hook de salida (AsyncExitHook) llama a un
+ *  `done` que en Node moderno ya no recibe, y revienta al apagar una instancia previa. No tiene
+ *  nada que ver con el arranque; tratarlo como fatal tumbaba la caja sin motivo. */
+function esRuidoDeApagado(causa) {
+  const msg = causa instanceof Error ? `${causa.message}\n${causa.stack ?? ""}` : String(causa);
+  return /done is not a function/i.test(msg) || /embedded-postgres/i.test(msg);
+}
+
 // Un rechazo sin manejar durante el arranque dejaba la app colgada y muda (así se veía el EPERM de
-// Program Files: solo un warning en una consola que nadie tiene). Si aún no arrancamos, es fatal.
+// Program Files: solo un warning en una consola que nadie tiene). Si aún no arrancamos, es fatal
+// —salvo el ruido de apagado de embedded-postgres, que se registra y se ignora.
 process.on("unhandledRejection", (causa) => {
+  if (esRuidoDeApagado(causa)) { console.log("· [aviso] rechazo benigno de embedded-postgres ignorado:", causa?.message ?? causa); return; }
   if (arrancado) { console.error("Rechazo no manejado (ya arrancado):", causa); return; }
   falloElArranque(causa);
 });
