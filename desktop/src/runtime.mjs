@@ -4,7 +4,7 @@
 // reusable que arranca el proceso main de Electron (o el verify headless).
 import EmbeddedPostgres from "embedded-postgres";
 import pg from "pg";
-import { spawn } from "node:child_process";
+import { spawn, execFileSync } from "node:child_process";
 import { readFileSync, readdirSync, existsSync, openSync, writeFileSync, rmSync, mkdirSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
@@ -42,8 +42,36 @@ export function matarHuerfanos(dataDir, log = () => {}, pidfile = PIDFILE) {
     if (existsSync(pm)) {
       const pid = parseInt(readFileSync(pm, "utf8").split("\n")[0], 10);
       if (pid > 0) { try { process.kill(pid, "SIGKILL"); log(`postgres previo ${pid} terminado`); } catch { /* */ } }
+      // Borrar SIEMPRE el candado: si el proceso ya no existe (corte de luz, cierre forzado, o
+      // Windows matando la app), el archivo queda huérfano e impide que Postgres vuelva a arrancar.
+      rmSync(pm, { force: true });
+      log("candado postmaster.pid retirado");
     }
   } catch { /* */ }
+}
+
+/**
+ * Último recurso antes de arrancar: si el puerto de Postgres sigue ocupado, es por un postgres.exe
+ * que sobrevivió sin quedar registrado (el pidfile se borró, o murió la app pero no su hijo). Sin
+ * esto la caja no abre y el error no dice nada útil ("Boot falló: undefined"), porque
+ * embedded-postgres rechaza sin motivo cuando no puede enlazar el puerto.
+ * Windows-only (la app se distribuye para Windows); si algo falla, se ignora y el arranque sigue.
+ */
+function matarQuienOcupaElPuerto(puerto, log = () => {}) {
+  if (process.platform !== "win32") return;
+  try {
+    const salida = execFileSync("netstat", ["-ano", "-p", "TCP"], { encoding: "utf8", timeout: 8000 });
+    const pids = new Set();
+    for (const linea of salida.split("\n")) {
+      // "  TCP    127.0.0.1:54329   0.0.0.0:0   LISTENING   1234"
+      const m = linea.match(/^\s*TCP\s+\S+:(\d+)\s+\S+\s+LISTENING\s+(\d+)\s*$/i);
+      if (m && Number(m[1]) === puerto) pids.add(Number(m[2]));
+    }
+    for (const pid of pids) {
+      if (!pid || pid === process.pid) continue;
+      try { process.kill(pid, "SIGKILL"); log(`proceso ${pid} liberado del puerto ${puerto}`); } catch { /* */ }
+    }
+  } catch { /* netstat no disponible: seguimos */ }
 }
 
 /** Arranca el backend local y devuelve puertos + pool + stop(). Idempotente entre arranques. */
@@ -71,6 +99,9 @@ export async function startLocalBackend(opts = {}) {
 
   // Antes de arrancar: limpiar cualquier Postgres/PostgREST huérfano de un cierre no limpio.
   matarHuerfanos(dataDir, (m) => log(`limpieza: ${m}`), pidfile);
+  // Y si aun así el puerto sigue tomado (huérfano no registrado), liberarlo: si no, Postgres no
+  // enlaza y el arranque muere sin explicación.
+  matarQuienOcupaElPuerto(pgPort, (m) => log(`limpieza: ${m}`));
 
   const database = new EmbeddedPostgres({ databaseDir: dataDir, user: "postgres", password: "postgres", port: pgPort, persistent: true });
   if (!existsSync(path.join(dataDir, "PG_VERSION"))) { log("initdb (primer arranque)…"); await database.initialise(); }
