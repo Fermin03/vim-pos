@@ -94,7 +94,13 @@ export async function startLocalBackend(opts = {}) {
   const pgPort = opts.pgPort ?? 54329;
   const restPort = opts.restPort ?? 54331;
   const secret = opts.jwtSecret ?? "vim-pos-local-jwt-secret-cambia-en-produccion-32+";
-  const seedIfEmpty = opts.seedIfEmpty ?? true;
+  // El fixture de desarrollo (Knock-Out Burger de demo) SOLO va en dev. En una instalación real
+  // sembrarlo hacía dos daños: metía datos de demostración en la caja del cliente, y —peor— el
+  // TRUNCATE+reseed de los catálogos globales recreaba los roles de sistema con IDs aleatorios,
+  // distintos de los de la nube. Al bajar la rebanada del tenant, los empleados llegaban con un
+  // rol_id inexistente aquí y el POS no los listaba. Una caja real arranca vacía y se llena con el
+  // alta contra la nube (ver vincularConNube en main.mjs).
+  const seedIfEmpty = opts.seedIfEmpty ?? !resDir;
   const log = opts.log ?? (() => {});
 
   // Antes de arrancar: limpiar cualquier Postgres/PostgREST huérfano de un cierre no limpio.
