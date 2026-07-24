@@ -80,34 +80,48 @@ async function upsertTabla(client, schema, tabla, filas) {
  * (sin triggers). Idempotente: re-aplicar el mismo snapshot no cambia nada. Devuelve el resumen.
  */
 /**
- * Alinea los roles locales con los de la nube ANTES de insertarlos.
+ * Catálogos globales que existen a la vez en la nube y en la caja (los siembran las migraciones),
+ * y que tienen CLAVE NATURAL además del id. Sus ids pueden diferir entre bases —basta con que una
+ * migración los inserte sin id fijo, como PERSONALIZADO en la 0053— y entonces el upsert genérico
+ * (que resuelve por PK) choca contra el índice único de la clave natural y REVIENTA TODO EL PULL:
+ * la caja se queda sin empleados y el error habla de una "unique constraint" que no orienta a nada.
  *
- * El upsert genérico resuelve conflictos por PK (id), pero `roles` tiene además índices únicos por
- * código (rol_codigo_sistema_uq con tenant_id NULL, rol_codigo_tenant_uq por tenant). Si la nube
- * manda un rol con el mismo código pero otro id —pasa con los que se siembran sin id fijo, como
- * PERSONALIZADO (migración 0053)— el INSERT choca contra ese índice y REVIENTA TODO EL PULL:
- * la caja se queda sin empleados y el mensaje habla de una "unique constraint" que no dice nada.
- *
- * Aquí la nube manda: se borra el rol local que colisiona por código (y sus permisos, que el mismo
- * pull vuelve a traer) para que el de la nube entre con su id. Es seguro porque una caja real no
- * tiene datos de negocio propios: todo viene de la nube.
+ * Para cada uno se listan las columnas de su clave natural. `dependientes` son las tablas que
+ * apuntan al id que se va a borrar y que el propio pull vuelve a traer.
  */
-async function reconciliarRoles(client, filas, log = () => {}) {
-  let borrados = 0;
-  for (const r of filas) {
-    if (!r?.id || !r?.codigo) continue;
+const CLAVES_NATURALES = {
+  roles: { claves: ["codigo", "tenant_id"], dependientes: [{ tabla: "rol_permisos", col: "rol_id" }] },
+  permisos: { claves: ["codigo"], dependientes: [{ tabla: "rol_permisos", col: "permiso_id" }] },
+  rol_permisos: { claves: ["rol_id", "permiso_id"], dependientes: [] },
+};
+
+/**
+ * Alinea un catálogo local con el de la nube ANTES de insertarlo: borra la fila local que colisiona
+ * por clave natural con una entrante de distinto id, para que entre la de la nube con su id.
+ * La nube manda. Es seguro porque una caja real no tiene datos propios: todo viene de allá.
+ */
+async function reconciliarCatalogo(client, tabla, filas, log = () => {}) {
+  const cfg = CLAVES_NATURALES[tabla];
+  if (!cfg) return;
+  let borradas = 0;
+  for (const f of filas) {
+    if (!f?.id) continue;
+    // IS NOT DISTINCT FROM: trata NULL = NULL (los catálogos globales llevan tenant_id NULL).
+    const cond = cfg.claves.map((c, i) => `"${c}" IS NOT DISTINCT FROM $${i + 1}`).join(" AND ");
+    const params = cfg.claves.map((c) => f[c] ?? null);
     const { rows } = await client.query(
-      `SELECT id FROM roles
-        WHERE codigo = $1 AND tenant_id IS NOT DISTINCT FROM $2 AND id <> $3`,
-      [r.codigo, r.tenant_id ?? null, r.id],
+      `SELECT id FROM ${tabla} WHERE ${cond} AND id <> $${cfg.claves.length + 1}`,
+      [...params, f.id],
     );
     for (const vieja of rows) {
-      await client.query(`DELETE FROM rol_permisos WHERE rol_id = $1`, [vieja.id]);
-      await client.query(`DELETE FROM roles WHERE id = $1`, [vieja.id]);
-      borrados++;
+      for (const d of cfg.dependientes) {
+        await client.query(`DELETE FROM ${d.tabla} WHERE "${d.col}" = $1`, [vieja.id]);
+      }
+      await client.query(`DELETE FROM ${tabla} WHERE id = $1`, [vieja.id]);
+      borradas++;
     }
   }
-  if (borrados) log(`  roles realineados con la nube: ${borrados}`);
+  if (borradas) log(`  ${tabla}: ${borradas} realineada(s) con la nube`);
 }
 
 export async function pullSnapshot(pool, snapshot, log = () => {}) {
@@ -119,7 +133,7 @@ export async function pullSnapshot(pool, snapshot, log = () => {}) {
     for (const { t, schema = "public" } of PULL_ORDER) {
       const filas = snapshot[t] ?? snapshot[`${schema}.${t}`];
       if (!filas?.length) continue;
-      if (t === "roles") await reconciliarRoles(client, filas, log);
+      await reconciliarCatalogo(client, t, filas, log);
       const n = await upsertTabla(client, schema, t, filas);
       resumen[t] = n;
       if (n) log(`  ${schema}.${t}: ${n}`);
