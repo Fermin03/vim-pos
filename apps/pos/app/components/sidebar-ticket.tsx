@@ -364,38 +364,42 @@ export function SidebarTicket({
       </div>
 
       {/* ── Totales ───────────────────────────────────────────── */}
-      <div className="flex-shrink-0 border-t border-line bg-sel px-5 py-4">
-        <div className="mb-[7px] flex justify-between text-[14.5px] text-ink-2">
+      {/* Compactado respecto al mockup P-059 (que usa py-4, filas de 14.5px y TOTAL de 30px): en la
+          caja real el alto del pie le comía espacio a la lista de productos, que es lo que el
+          cajero necesita ver. Subtotal/IVA son informativos → tipografía menor y filas apretadas;
+          el TOTAL sigue siendo el número dominante. */}
+      <div className="flex-shrink-0 border-t border-line bg-sel px-5 py-3">
+        <div className="mb-1 flex justify-between text-[13px] text-ink-2">
           <span>Subtotal</span>
-          <span className="tabular-nums text-ink font-medium">{fmtMxn(totales.subtotal)}</span>
+          <span className="tabular-nums font-medium text-ink">{fmtMxn(totales.subtotal)}</span>
         </div>
-        <div className="mb-[7px] flex justify-between text-[14.5px] text-ink-2">
+        <div className="mb-1 flex justify-between text-[13px] text-ink-2">
           <span>IVA (16%)</span>
-          <span className="tabular-nums text-ink font-medium">{fmtMxn(totales.iva)}</span>
+          <span className="tabular-nums font-medium text-ink">{fmtMxn(totales.iva)}</span>
         </div>
         {hayDescuento && (
-          <div className="mb-[7px] flex justify-between text-[14.5px] font-medium text-danger">
+          <div className="mb-1 flex justify-between text-[13px] font-medium text-danger">
             <span>Descuento</span>
             <span className="tabular-nums">−{fmtMxn(descuentoMxn)}</span>
           </div>
         )}
-        <div className="mt-3 flex items-baseline justify-between">
-          <span className="text-[15px] font-bold uppercase tracking-[0.03em] text-ink">
+        <div className="mt-1.5 flex items-baseline justify-between">
+          <span className="text-[14px] font-bold uppercase tracking-[0.03em] text-ink">
             Total
           </span>
-          <span className="font-display text-[30px] font-bold tabular-nums tracking-[-0.02em] text-ink">
+          <span className="font-display text-[25px] font-bold leading-none tabular-nums tracking-[-0.02em] text-ink">
             {fmtMxn(totalFinal)}
           </span>
         </div>
       </div>
 
       {/* ── Acciones secundarias ──────────────────────────────── */}
-      <div className="flex flex-shrink-0 gap-2 px-5 pt-3">
+      <div className="flex flex-shrink-0 gap-2 px-5 pt-2">
         {/* F5.2b — diferido */}
         <button
           type="button"
           disabled
-          className="inline-flex flex-1 cursor-pointer items-center justify-center gap-[7px] rounded border border-line-strong bg-surface px-[11px] py-[11px] text-[14px] font-semibold text-ink-2 transition-all hover:border-ink hover:text-ink disabled:cursor-default disabled:opacity-[.45] disabled:hover:border-line-strong disabled:hover:text-ink-2"
+          className="inline-flex flex-1 cursor-pointer items-center justify-center gap-[7px] rounded border border-line-strong bg-surface px-[11px] py-2 text-[13.5px] font-semibold text-ink-2 transition-all hover:border-ink hover:text-ink disabled:cursor-default disabled:opacity-[.45] disabled:hover:border-line-strong disabled:hover:text-ink-2"
         >
           <IconoNota />
           Nota
@@ -404,7 +408,7 @@ export function SidebarTicket({
           type="button"
           disabled={vacio || hayDescuento || procesando}
           onClick={onAplicarDescuento}
-          className="inline-flex flex-1 cursor-pointer items-center justify-center gap-[7px] rounded border border-line-strong bg-surface px-[11px] py-[11px] text-[14px] font-semibold text-ink-2 transition-all hover:border-ink hover:text-ink disabled:cursor-default disabled:opacity-[.45] disabled:hover:border-line-strong disabled:hover:text-ink-2"
+          className="inline-flex flex-1 cursor-pointer items-center justify-center gap-[7px] rounded border border-line-strong bg-surface px-[11px] py-2 text-[13.5px] font-semibold text-ink-2 transition-all hover:border-ink hover:text-ink disabled:cursor-default disabled:opacity-[.45] disabled:hover:border-line-strong disabled:hover:text-ink-2"
         >
           <IconoDescuento />
           {hayDescuento ? "Descuento aplicado" : "Descuento"}
@@ -412,7 +416,9 @@ export function SidebarTicket({
       </div>
 
       {/* ── Pie: Cobrar + En espera ───────────────────────────── */}
-      <div className="flex flex-shrink-0 flex-col gap-2 px-5 pb-5 pt-4">
+      {/* Pie compactado (mockup: pt-4 pb-5, Cobrar py-18px). "Cobrar" conserva un alto cómodo para
+          usar con el dedo; lo que se recorta es el aire alrededor y los botones secundarios. */}
+      <div className="flex flex-shrink-0 flex-col gap-1.5 px-5 pb-3.5 pt-2.5">
         {onEnviarCocinaAbierto ? (
           /* Pick-up / Domicilio — la orden va a cocina y queda ABIERTA; se cobra al recoger o al
              regresar el repartidor (desde "Ver cuentas"). Acción principal = enviar a cocina. */
@@ -421,7 +427,7 @@ export function SidebarTicket({
               type="button"
               disabled={vacio || procesando}
               onClick={onEnviarCocinaAbierto}
-              className="flex w-full items-center justify-center gap-[10px] rounded-lg bg-accent px-5 py-[18px] text-[17px] font-bold text-white shadow-[0_1px_3px_rgba(232,80,46,.3)] transition-colors hover:bg-accent-hover disabled:cursor-not-allowed disabled:bg-line-strong disabled:shadow-none"
+              className="flex w-full items-center justify-center gap-[10px] rounded-lg bg-accent px-5 py-[14px] text-[16.5px] font-bold text-white shadow-[0_1px_3px_rgba(232,80,46,.3)] transition-colors hover:bg-accent-hover disabled:cursor-not-allowed disabled:bg-line-strong disabled:shadow-none"
             >
               {procesando ? "Enviando…" : (
                 <><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5"><path d="M3 11l19-9-9 19-2-8-8-2z" /></svg> Enviar a cocina</>
@@ -431,7 +437,7 @@ export function SidebarTicket({
               type="button"
               disabled={vacio || procesando}
               onClick={onCobrar}
-              className="w-full rounded border border-line-strong bg-transparent px-5 py-[13px] text-[14.5px] font-semibold text-ink-2 transition-all hover:border-ink hover:text-ink disabled:cursor-default disabled:opacity-[.45]"
+              className="w-full rounded border border-line-strong bg-transparent px-5 py-[10px] text-[14px] font-semibold text-ink-2 transition-all hover:border-ink hover:text-ink disabled:cursor-default disabled:opacity-[.45]"
             >
               Cobrar ahora <span className="font-display tabular-nums">{fmtMxn(totalFinal)}</span>
             </button>
@@ -442,7 +448,7 @@ export function SidebarTicket({
           type="button"
           disabled={vacio || procesando}
           onClick={onCobrar}
-          className="flex w-full items-center justify-center gap-[10px] rounded-lg bg-accent px-5 py-[18px] text-[18px] font-bold text-white shadow-[0_1px_3px_rgba(232,80,46,.3)] transition-colors hover:bg-accent-hover disabled:cursor-not-allowed disabled:bg-line-strong disabled:shadow-none"
+          className="flex w-full items-center justify-center gap-[10px] rounded-lg bg-accent px-5 py-[14px] text-[17px] font-bold text-white shadow-[0_1px_3px_rgba(232,80,46,.3)] transition-colors hover:bg-accent-hover disabled:cursor-not-allowed disabled:bg-line-strong disabled:shadow-none"
         >
           {procesando ? (
             "Procesando…"
@@ -460,7 +466,7 @@ export function SidebarTicket({
             disabled={vacio || enviandoCocina || cocinaEnviada}
             onClick={onEnviarCocina}
             className={[
-              "flex w-full items-center justify-center gap-2 rounded border px-5 py-[13px] text-[14.5px] font-semibold transition-all disabled:cursor-default",
+              "flex w-full items-center justify-center gap-2 rounded border px-5 py-[10px] text-[14px] font-semibold transition-all disabled:cursor-default",
               cocinaEnviada
                 ? "border-success/40 bg-[#EAF3EE] text-success disabled:opacity-100"
                 : "border-line-strong text-ink-2 hover:border-ink hover:text-ink disabled:opacity-[.45]",
@@ -478,7 +484,7 @@ export function SidebarTicket({
             type="button"
             disabled={vacio || procesando || !onPonerEnEspera}
             onClick={onPonerEnEspera}
-            className="w-full rounded border border-line-strong bg-transparent px-5 py-[13px] text-[14.5px] font-semibold text-ink-2 transition-all hover:border-ink hover:text-ink disabled:cursor-default disabled:opacity-[.45] disabled:hover:border-line-strong disabled:hover:text-ink-2"
+            className="w-full rounded border border-line-strong bg-transparent px-5 py-[10px] text-[14px] font-semibold text-ink-2 transition-all hover:border-ink hover:text-ink disabled:cursor-default disabled:opacity-[.45] disabled:hover:border-line-strong disabled:hover:text-ink-2"
           >
             Poner pedido en espera
           </button>
