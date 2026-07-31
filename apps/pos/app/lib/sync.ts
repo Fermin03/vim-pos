@@ -1,4 +1,6 @@
 "use client";
+// @deprecated (Remediación Fase 3) — CONGELADO junto con el outbox de escritura. El sync de
+// operación lo hace el escritorio (sync-push/sync-pull). No agregar usos nuevos.
 import { employeeClient } from "./supabase";
 import { pendientes, quitarEnviadas, marcarIntento } from "./outbox";
 

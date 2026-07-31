@@ -1,4 +1,8 @@
 "use client";
+// @deprecated (Remediación Fase 3) — CONGELADO. El cobro offline por outbox web quedó fuera de
+// operación: el escritorio (Postgres local + sync snapshot) es el único camino, y siempre habla con
+// su gateway local. Ya no está cableado en home-pos.tsx. Se conserva 1 release por si hay que
+// revertir; borrar en el siguiente. No agregar usos nuevos.
 import { useState } from "react";
 import { Button, Modal } from "@vim/ui/styles";
 import { calcularTotalesDisplay, type EstadoCarrito } from "../lib/carrito";
