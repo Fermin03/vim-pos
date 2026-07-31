@@ -1,4 +1,8 @@
 "use client";
+// @deprecated PARCIAL (Remediación Fase 3) — el outbox de ESCRITURA (op-log de cobros que subía
+// sync_procesar_push) quedó CONGELADO: el escritorio persiste en Postgres local y sube por
+// sync-push. SÍ se conserva el CACHE DE LECTURA (cachePut/cacheGet), que modificadores.ts usa para
+// recargar el catálogo sin red. No agregar escrituras nuevas al op-log.
 import Dexie, { type Table } from "dexie";
 
 // Fase 3 · outbox offline-first. Cola persistente (IndexedDB vía Dexie) de operaciones

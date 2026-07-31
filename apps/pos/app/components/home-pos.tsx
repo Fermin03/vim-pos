@@ -31,7 +31,6 @@ import { ModalConfigImpresora } from "./modal-config-impresora";
 import { ModalClienteDomicilio } from "./modal-cliente-domicilio";
 import { ModalCambiarPin } from "./modal-cambiar-pin";
 import { ModalMisPropinas } from "./modal-mis-propinas";
-import { ModalCobroOffline } from "./modal-cobro-offline";
 import { leerTicketParaImpresion } from "../lib/print/ticket-datos";
 import { construirTicketJob } from "../lib/print/ticket-builder";
 import { construirComandaJob, type DatosComanda } from "../lib/print/comanda-builder";
@@ -301,7 +300,6 @@ export function HomePos({
   const { online } = useConexion(SUPABASE_URL ? `${SUPABASE_URL}/auth/v1/health` : undefined);
   // Fase 3 — outbox offline: pendientes por sincronizar + auto-sync al reconectar.
   const [pendientesSync, setPendientesSync] = useState(0);
-  const [cobroOfflineAbierto, setCobroOfflineAbierto] = useState(false);
   const sincronizando = useRef(false);
 
   // Empuja el outbox cuando hay red. Idempotente; se reintenta al volver online.
@@ -563,11 +561,9 @@ export function HomePos({
       setTotalesCobro(ticketBd);
       return;
     }
-    // Fase 3 — sin conexión: cobro offline (encola en el outbox; sincroniza al reconectar).
-    if (!online) {
-      setCobroOfflineAbierto(true);
-      return;
-    }
+    // Remediación Fase 3 — el cobro offline por outbox web quedó CONGELADO: el escritorio es el
+    // único camino de operación y siempre habla con su gateway local. El cobro usa siempre la ruta
+    // online (persistirTicket + aplicarPago). Ver cobro-offline.ts / modal-cobro-offline.tsx (@deprecated).
     setProcesandoCobro(true);
     setError(null);
     try {
@@ -806,14 +802,6 @@ export function HomePos({
       )}
       {misPropinasAbierto && (
         <ModalMisPropinas token={token} meseroId={empleado.id} meseroNombre={empleado.nombre} onCerrar={() => setMisPropinasAbierto(false)} />
-      )}
-      {cobroOfflineAbierto && (
-        <ModalCobroOffline
-          ctx={{ sucursalId: caja.sucursal_id, cajaId: turno.caja_id, turnoId: turno.id, usuarioId: empleado.id }}
-          carrito={carrito}
-          onCobrado={() => { setCobroOfflineAbierto(false); dispatch({ tipo: "limpiar" }); }}
-          onCerrar={() => setCobroOfflineAbierto(false)}
-        />
       )}
 
       <div className="flex min-h-0 flex-1">
