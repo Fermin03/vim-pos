@@ -45,8 +45,13 @@ jobs:
           NEXT_PUBLIC_SUPABASE_ANON_KEY: dummy
         run: pnpm -r build
 
-      - name: Vitest (funciones puras del POS)
-        run: pnpm --filter @vim/pos exec vitest run
+      - name: Vitest (POS + Admin)
+        # Remediación Fase 6: antes solo corría @vim/pos; ahora también los tests de admin
+        # (conciliación, consolidado, facturación). `pnpm -r test` ejecuta el script `test` de
+        # cada paquete que lo define (pos + admin); kds/platform no tienen tests.
+        # Pendiente (documentado en docs/REMEDIACION.md Fase 6): montar ESLint (hoy ninguna app lo
+        # tiene configurado, `next lint` es interactivo) y un job de CI para el desktop.
+        run: pnpm -r test
 
       - name: pnpm audit (deps con CVE)
         # No bloquea en moderate (vitest 2 tiene una crítica conocida; ya documentada).

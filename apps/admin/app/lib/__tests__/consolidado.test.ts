@@ -23,9 +23,9 @@ describe("B5 Enterprise — consolidado por sucursal", () => {
   });
 
   it("calcula ticket promedio y participación por sucursal", () => {
-    expect(c.filas[0].ticketPromedio).toBe(100); // 3000/30
-    expect(c.filas[0].participacionPct).toBe(75); // 3000/4000
-    expect(c.filas[1].participacionPct).toBe(25);
+    expect(c.filas[0]!.ticketPromedio).toBe(100); // 3000/30
+    expect(c.filas[0]!.participacionPct).toBe(75); // 3000/4000
+    expect(c.filas[1]!.participacionPct).toBe(25);
   });
 
   it("fila total consolida el tenant completo", () => {
