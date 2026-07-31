@@ -24,7 +24,8 @@
     "release-manifest": "node scripts/release-manifest.mjs",
     "verify:robustez3": "node src/verify-robustez3.mjs",
     "verify:updater": "node src/verify-updater.mjs",
-    "dist": "npm run build:ui && npm run build:kds-ui && node scripts/dist.mjs"
+    "dist": "npm run build:ui && npm run build:kds-ui && node scripts/dist.mjs",
+    "verify:concurrencia": "node src/verify-concurrencia.mjs"
   },
   "dependencies": {
     "embedded-postgres": "17.10.0-beta.17",
