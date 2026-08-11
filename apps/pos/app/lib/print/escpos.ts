@@ -55,14 +55,22 @@ function bloqueABytes(bl: Bloque, ancho: 58 | 80): number[] {
       const sz = bl.size === 3 ? 0x22 : bl.size === 2 ? 0x11 : 0x00;
       out.push(GS, 0x21, sz);
       out.push(ESC, 0x45, bl.bold ? 1 : 0);
+      if (bl.invertido) out.push(GS, 0x42, 1); // blanco sobre negro (encabezados tipo comanda)
       out.push(...bytesDe(bl.valor));
       // reset a normal/izquierda ANTES del salto (si no, contamina la línea siguiente)
       out.push(GS, 0x21, 0x00, ESC, 0x45, 0x00, ESC, 0x61, 0x00);
+      if (bl.invertido) out.push(GS, 0x42, 0);
       out.push(LF);
       return out;
     }
-    case "fila":
-      return [...fila(bl.izq, bl.der, ancho), LF];
+    case "fila": {
+      const out: number[] = [];
+      if (bl.bold) out.push(ESC, 0x45, 1);
+      out.push(...fila(bl.izq, bl.der, ancho));
+      if (bl.bold) out.push(ESC, 0x45, 0);
+      out.push(LF);
+      return out;
+    }
     case "separador":
       return [...bytesDe((bl.estilo === "solido" ? "=" : "-").repeat(cols(ancho))), LF];
     case "qr": {

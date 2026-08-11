@@ -5,7 +5,14 @@ export function pesos(n: number): string {
   return new Intl.NumberFormat("es-MX", { style: "currency", currency: "MXN" }).format(n);
 }
 
-/** Construye el PrintJob TICKET (P-222) desde datos planos. Función PURA. */
+/** Folio corto: quita el prefijo "XX-" y los ceros a la izquierda. Igual que ReciboTicket en pantalla. */
+function folioCorto(folio: string): string {
+  return folio.replace(/^[^-]+-/, "").replace(/^0+/, "");
+}
+
+/** Construye el PrintJob TICKET (P-222) desde datos planos. Función PURA.
+ *  Debe quedar idéntico —contenido y orden— a ReciboTicket (recibo-ticket.tsx), que es
+ *  lo que ve el cajero en pantalla. Solo cambia cómo se expresa cada bloque en papel. */
 export function construirTicketJob(d: DatosTicketImpresion): PrintJob {
   const b: Bloque[] = [];
 
@@ -19,17 +26,20 @@ export function construirTicketJob(d: DatosTicketImpresion): PrintJob {
 
   // 2. Meta
   b.push({ t: "fila", izq: "Fecha", der: formatoFecha(d.meta.fechaIso) });
-  b.push({ t: "fila", izq: "Ticket", der: d.meta.folio });
+  b.push({ t: "fila", izq: "Ticket", der: `#${folioCorto(d.meta.folio)}` });
   b.push({ t: "fila", izq: "Cajero", der: d.meta.cajero });
   b.push({ t: "fila", izq: "Caja", der: d.meta.caja });
-  b.push({ t: "fila", izq: "Servicio", der: d.meta.modoServicio });
+  if (d.meta.modoServicio) b.push({ t: "fila", izq: "Servicio", der: d.meta.modoServicio });
 
   b.push({ t: "separador", estilo: "punteado" });
 
   // 3. Líneas
   for (const l of d.lineas) {
     b.push({ t: "fila", izq: `${l.cantidad}x ${l.nombre}`, der: pesos(l.totalMxn) });
-    for (const m of l.modificadores) b.push({ t: "texto", valor: `  ${m}`, size: 1 });
+    for (const m of l.modificadores) b.push({ t: "texto", valor: `  + ${m}`, size: 1 });
+    if (l.notaCocina && l.notaCocina.trim().length > 0) {
+      b.push({ t: "texto", valor: `  > ${l.notaCocina.trim()}`, size: 1 });
+    }
   }
 
   b.push({ t: "separador", estilo: "punteado" });
@@ -38,13 +48,13 @@ export function construirTicketJob(d: DatosTicketImpresion): PrintJob {
   b.push({ t: "fila", izq: "Subtotal", der: pesos(d.totales.subtotal) });
   if (d.totales.descuentos > 0) b.push({ t: "fila", izq: "Descuento", der: `-${pesos(d.totales.descuentos)}` });
   b.push({ t: "fila", izq: "IVA (16%)", der: pesos(d.totales.iva) });
-  b.push({ t: "fila", izq: "TOTAL", der: pesos(d.totales.total) });
+  b.push({ t: "fila", izq: "TOTAL", der: pesos(d.totales.total), bold: true });
 
   b.push({ t: "separador", estilo: "punteado" });
 
-  // 5. Pago(s)
+  // 5. Pago(s) — misma info que ReciboTicket: forma de pago, y si es efectivo, recibido/cambio.
   for (const p of d.pagos) {
-    b.push({ t: "fila", izq: p.metodo, der: pesos(p.montoMxn) });
+    b.push({ t: "fila", izq: "Forma de pago", der: p.metodo });
     if (p.recibidoMxn != null) {
       b.push({ t: "fila", izq: "Recibido", der: pesos(p.recibidoMxn) });
       b.push({ t: "fila", izq: "Cambio", der: pesos(p.cambioMxn) });

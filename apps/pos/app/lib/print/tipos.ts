@@ -1,8 +1,8 @@
 // Modelo lógico de impresión (doc 16 §2), subconjunto TICKET. Independiente del transporte.
 
 export type Bloque =
-  | { t: "texto"; valor: string; align?: "izq" | "centro" | "der"; size?: 1 | 2 | 3; bold?: boolean }
-  | { t: "fila"; izq: string; der: string }
+  | { t: "texto"; valor: string; align?: "izq" | "centro" | "der"; size?: 1 | 2 | 3; bold?: boolean; invertido?: boolean }
+  | { t: "fila"; izq: string; der: string; bold?: boolean }
   | { t: "separador"; estilo: "solido" | "punteado" }
   | { t: "qr"; valor: string }
   | { t: "corte" };
@@ -10,7 +10,8 @@ export type Bloque =
 export type PrintJob = {
   tipo: "TICKET";
   ancho: 58 | 80;
-  destino: "CAJA";
+  /** A qué estación va: CAJA (ticket, corte, devolución) o COCINA (comanda). */
+  destino: "CAJA" | "COCINA";
   abrir_cajon?: boolean;
   bloques: Bloque[];
 };

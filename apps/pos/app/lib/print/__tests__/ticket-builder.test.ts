@@ -25,18 +25,20 @@ describe("construirTicketJob", () => {
 
     // Encabezado
     expect(job.bloques[0]).toEqual({ t: "texto", valor: "Knock-Out Burger", align: "centro", size: 2, bold: true });
+    // Folio corto (mismo criterio que ReciboTicket en pantalla)
+    expect(job.bloques).toContainEqual({ t: "fila", izq: "Ticket", der: "#2026-000001" });
     // La línea aparece como fila nombre/precio
     expect(job.bloques).toContainEqual({ t: "fila", izq: "1x Hamburguesa Clásica", der: "$120.00" });
-    // Modificadores como texto chico
-    expect(job.bloques).toContainEqual({ t: "texto", valor: "  Tres cuartos", size: 1 });
-    expect(job.bloques).toContainEqual({ t: "texto", valor: "  Extra queso", size: 1 });
+    // Modificadores prefijados "+" (igual que ReciboTicket)
+    expect(job.bloques).toContainEqual({ t: "texto", valor: "  + Tres cuartos", size: 1 });
+    expect(job.bloques).toContainEqual({ t: "texto", valor: "  + Extra queso", size: 1 });
     // Totales
     expect(job.bloques).toContainEqual({ t: "fila", izq: "Subtotal", der: "$103.45" });
     expect(job.bloques).toContainEqual({ t: "fila", izq: "Descuento", der: "-$12.00" });
     expect(job.bloques).toContainEqual({ t: "fila", izq: "IVA (16%)", der: "$16.55" });
-    expect(job.bloques).toContainEqual({ t: "fila", izq: "TOTAL", der: "$108.00" });
-    // Pago
-    expect(job.bloques).toContainEqual({ t: "fila", izq: "Efectivo", der: "$126.00" });
+    expect(job.bloques).toContainEqual({ t: "fila", izq: "TOTAL", der: "$108.00", bold: true });
+    // Pago — igual que ReciboTicket: forma de pago (no el monto), luego recibido/cambio
+    expect(job.bloques).toContainEqual({ t: "fila", izq: "Forma de pago", der: "Efectivo" });
     expect(job.bloques).toContainEqual({ t: "fila", izq: "Recibido", der: "$200.00" });
     expect(job.bloques).toContainEqual({ t: "fila", izq: "Cambio", der: "$74.00" });
     expect(job.bloques).toContainEqual({ t: "fila", izq: "Propina", der: "$18.00" });
@@ -55,5 +57,14 @@ describe("construirTicketJob", () => {
     const sinProp = { ...DATOS, totales: { ...DATOS.totales, propina: 0 } };
     const job = construirTicketJob(sinProp);
     expect(job.bloques.find((b) => b.t === "fila" && b.izq === "Propina")).toBeUndefined();
+  });
+
+  it("imprime la nota de cocina de la línea (antes se perdía en papel)", () => {
+    const conNota = {
+      ...DATOS,
+      lineas: [{ ...DATOS.lineas[0]!, notaCocina: "Sin cebolla" }],
+    };
+    const job = construirTicketJob(conNota);
+    expect(job.bloques).toContainEqual({ t: "texto", valor: "  > Sin cebolla", size: 1 });
   });
 });

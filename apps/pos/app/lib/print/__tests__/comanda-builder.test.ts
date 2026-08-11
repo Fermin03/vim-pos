@@ -20,21 +20,20 @@ describe("construirComandaJob", () => {
     expect(job.tipo).toBe("TICKET");
     expect(job.ancho).toBe(80);
 
-    // Encabezado: COMANDA + modo + orden + hora
-    expect(job.bloques).toContainEqual({ t: "texto", valor: "COMANDA", align: "centro", size: 3, bold: true });
-    expect(job.bloques).toContainEqual({ t: "texto", valor: "PARA LLEVAR", align: "centro", size: 2, bold: true });
-    expect(job.bloques).toContainEqual({ t: "fila", izq: "Orden", der: "KC-2026-000001" });
+    // Encabezado: modo invertido (bloque negro en pantalla) + orden (folio corto) + hora
+    expect(job.bloques).toContainEqual({ t: "texto", valor: "PARA LLEVAR", align: "centro", size: 3, bold: true, invertido: true });
+    expect(job.bloques).toContainEqual({ t: "fila", izq: "Orden", der: "#0001", bold: true });
 
     // Líneas grandes con cantidad+nombre
     expect(job.bloques).toContainEqual({ t: "texto", valor: "1x Hamburguesa Clásica", size: 2, bold: true });
     expect(job.bloques).toContainEqual({ t: "texto", valor: "2x Papas Gajo", size: 2, bold: true });
 
-    // Modificadores indentados (sin precios)
-    expect(job.bloques).toContainEqual({ t: "texto", valor: "  - Tres cuartos", size: 1 });
-    expect(job.bloques).toContainEqual({ t: "texto", valor: "  - Extra queso", size: 1 });
+    // Modificadores "add" prefijados "+" (igual que ReciboComanda)
+    expect(job.bloques).toContainEqual({ t: "texto", valor: "  + Tres cuartos", size: 1, bold: false });
+    expect(job.bloques).toContainEqual({ t: "texto", valor: "  + Extra queso", size: 1, bold: false });
 
     // Nota cocina prominente
-    expect(job.bloques).toContainEqual({ t: "texto", valor: "  Nota: Sin cebolla", size: 1, bold: true });
+    expect(job.bloques).toContainEqual({ t: "texto", valor: "  > Sin cebolla", size: 1, bold: true });
 
     // Pie con cajero
     expect(job.bloques).toContainEqual({ t: "fila", izq: "Cajero", der: "María G." });
@@ -52,6 +51,15 @@ describe("construirComandaJob", () => {
   it("omite la línea de nota cuando no hay nota", () => {
     const sinNota: DatosComanda = { ...D, lineas: [{ cantidad: 1, nombre: "X", modificadores: [], notaCocina: null }] };
     const job = construirComandaJob(sinNota);
-    expect(job.bloques.find((b) => b.t === "texto" && b.valor.startsWith("  Nota:"))).toBeUndefined();
+    expect(job.bloques.find((b) => b.t === "texto" && b.valor.startsWith("  >"))).toBeUndefined();
+  });
+
+  it("resalta un modificador de quita (Sin/No/Quitar) en mayúsculas y negrita", () => {
+    const conQuita: DatosComanda = {
+      ...D,
+      lineas: [{ cantidad: 1, nombre: "Hamburguesa", modificadores: ["Sin cebolla"], notaCocina: null }],
+    };
+    const job = construirComandaJob(conQuita);
+    expect(job.bloques).toContainEqual({ t: "texto", valor: "  SIN CEBOLLA", size: 1, bold: true });
   });
 });
