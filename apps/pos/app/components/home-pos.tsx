@@ -27,6 +27,7 @@ import { ModalModificadores } from "./modal-modificadores";
 import { ModalCobro } from "./modal-cobro";
 import { ModalDescuento } from "./modal-descuento";
 import { obtenerImpresora } from "../lib/print/adapter";
+import { hayEstacionDeCocinaDedicada } from "../lib/print/config";
 import { ModalConfigImpresora } from "./modal-config-impresora";
 import { ModalClienteDomicilio } from "./modal-cliente-domicilio";
 import { ModalCambiarPin } from "./modal-cambiar-pin";
@@ -658,7 +659,7 @@ export function HomePos({
   /** Reimprime el ticket de una cuenta cerrada (desde la Consulta de cuentas). */
   const reimprimirCuenta = useCallback(async (ticketId: string) => {
     const datos = await leerTicketParaImpresion(ticketId, { token, cajeroNombre: empleado.nombre, cajaNombre: caja.nombre });
-    const imp = obtenerImpresora({ onMostrar: () => window.print() });
+    const imp = obtenerImpresora("CAJA", { onMostrar: () => window.print() });
     imp.imprimir(construirTicketJob(datos));
   }, [token, empleado.nombre, caja.nombre]);
 
@@ -1094,10 +1095,17 @@ export function HomePos({
               setDatosTicket(datos);
               setDatosComanda(datosCom);
               setEstadoTicket("lista");
-              // Auto-impresión: el PrintJob es la fuente para el papel (Epson cuando esté).
+              // Auto-impresión: el PrintJob es la fuente para el papel (Epson/genérica cuando esté).
               // Hoy con PreviewAdapter solo abre el overlay; el preview se renderiza desde los datos.
               const job = construirTicketJob(datos);
-              await obtenerImpresora({ onMostrar: () => setMostrarRecibo(true) }).imprimir(job);
+              await obtenerImpresora("CAJA", { onMostrar: () => setMostrarRecibo(true) }).imprimir(job);
+              // Comanda automática a la estación de cocina — solo si hay una estación dedicada
+              // distinta de la de caja (si es la misma impresora, ya salió el ticket; no duplicar).
+              if (hayEstacionDeCocinaDedicada()) {
+                obtenerImpresora("COCINA", { onMostrar: () => {} })
+                  .imprimir(construirComandaJob(datosCom))
+                  .catch(() => {});
+              }
             } catch {
               setEstadoTicket("error");
             }
@@ -1145,10 +1153,12 @@ export function HomePos({
           datosTicket={datosTicket}
           datosComanda={datosComanda ?? undefined}
           onImprimir={(vista) => {
-            // Con Epson manda ESC/POS; con Preview, window.print() imprime el recibo visible.
-            const imp = obtenerImpresora({ onMostrar: () => window.print() });
-            if (vista === "cocina" && datosComanda) imp.imprimir(construirComandaJob(datosComanda));
-            else imp.imprimir(construirTicketJob(datosTicket));
+            // Con Epson/genérica manda ESC/POS; con Preview, window.print() imprime el recibo visible.
+            if (vista === "cocina" && datosComanda) {
+              obtenerImpresora("COCINA", { onMostrar: () => window.print() }).imprimir(construirComandaJob(datosComanda));
+            } else {
+              obtenerImpresora("CAJA", { onMostrar: () => window.print() }).imprimir(construirTicketJob(datosTicket));
+            }
           }}
           onCerrar={() => setMostrarRecibo(false)}
           onNuevoTicket={nuevoTicket}

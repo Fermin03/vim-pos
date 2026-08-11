@@ -281,7 +281,7 @@ export function PantallaCierre({
     return (
       <ReciboPreview
         datosZ={zData}
-        onImprimir={() => { obtenerImpresora({ onMostrar: () => window.print() }).imprimir(construirReporteZJob(zData)); }}
+        onImprimir={() => { obtenerImpresora("CAJA", { onMostrar: () => window.print() }).imprimir(construirReporteZJob(zData)); }}
         onCerrar={onCerrado}
         onNuevoTicket={onCerrado}
       />
