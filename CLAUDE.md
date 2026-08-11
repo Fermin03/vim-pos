@@ -23,7 +23,7 @@ La especificación está en `../RECURSOS PARA DESARROLLO/`. Antes de implementar
 2. **Dinero nunca en float.** `numeric(12,2)` en BD; enteros/decimal validado en TS.
 3. **Español en el dominio** (igual que el SQL `snake_case`). Archivos `kebab-case`, componentes `PascalCase`.
 4. **Sin `any`.** `unknown` + Zod.
-5. **El POS no habla directo a Supabase** en operación: pasa por la capa repositorio sobre Dexie y sincroniza por batch (doc 1C.2 §10).
+5. **El POS escribe directo por RPC bajo RLS** (no hay capa Dexie de escritura en operación). El offline-first lo da el **escritorio**: Postgres local + gateway compatible con supabase-js, y sync por **snapshot** (migraciones 0055 pull / 0056 push), no un op-log. *(Corregido en la remediación Fase 3: la versión anterior —"pasa por Dexie y sincroniza por batch"— describía el outbox web, hoy congelado. Justificación: el doc manda, así que se versiona el cambio; ver `apps/pos/app/lib/outbox.ts` @deprecated. El único Dexie que queda es el **cache de lectura** del catálogo.)*
 
 ## Convenciones de migraciones
 
