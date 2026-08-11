@@ -165,7 +165,10 @@ function crearVentana(preloadArgs) {
     width: 1440, height: 900, backgroundColor: "#1a1a1e", show: false,
     webPreferences: {
       preload: path.join(__dirname, "preload.cjs"),
-      contextIsolation: false, nodeIntegration: false, sandbox: false,
+      // Endurecimiento (remediación Fase 4.1): contextIsolation:true aísla el mundo del preload del
+      // de la página. La config se pasa por contextBridge (ver preload.cjs). nodeIntegration:false
+      // ya evitaba node en el renderer; con isolation activado se cierra el anti-patrón de Electron.
+      contextIsolation: true, nodeIntegration: false, sandbox: false,
       additionalArguments: preloadArgs,
     },
   });

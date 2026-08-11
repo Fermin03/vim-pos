@@ -25,7 +25,7 @@ describe("conciliación Dark Kitchen — motor de match", () => {
 
   it("empareja por monto+fecha cuando no hay folio", () => {
     expect(res[2]).toMatchObject({ itemId: "i3", ticketId: "t3", metodo: "MONTO_FECHA" });
-    expect(res[2].diferenciaMxn).toBeCloseTo(-0.01, 2);
+    expect(res[2]!.diferenciaMxn).toBeCloseTo(-0.01, 2);
   });
 
   it("deja sin match lo que no coincide", () => {
