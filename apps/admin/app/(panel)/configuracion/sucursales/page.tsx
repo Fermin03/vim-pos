@@ -42,7 +42,7 @@ export default function SucursalesPage() {
     <>
       <PageHeader
         titulo="Sucursales"
-        subtitulo="Cada local donde operas. Cada sucursal puede tener varias cajas."
+        subtitulo="Cada local físico de tu negocio. Cada sucursal tiene sus propias cajas, áreas de cocina y equipo."
         migas={[{ label: "Configuración" }, { label: "Sucursales" }]}
         right={
           <Button onClick={() => setModal({ sucursal: null })}>
@@ -65,6 +65,7 @@ export default function SucursalesPage() {
                   <th className="border-b border-line bg-sel px-4 py-[13px] text-left text-[11.5px] font-bold uppercase tracking-wide text-ink-3">Sucursal</th>
                   <th className="w-[260px] border-b border-line bg-sel px-4 py-[13px] text-left text-[11.5px] font-bold uppercase tracking-wide text-ink-3">Dirección</th>
                   <th className="w-[100px] border-b border-line bg-sel px-4 py-[13px] text-left text-[11.5px] font-bold uppercase tracking-wide text-ink-3">Cajas</th>
+                  <th className="w-[100px] border-b border-line bg-sel px-4 py-[13px] text-left text-[11.5px] font-bold uppercase tracking-wide text-ink-3">Áreas</th>
                   <th className="w-[110px] border-b border-line bg-sel px-4 py-[13px] text-left text-[11.5px] font-bold uppercase tracking-wide text-ink-3">Estado</th>
                   <th className="w-[104px] border-b border-line bg-sel px-4 py-[13px]"></th>
                 </tr>
@@ -91,6 +92,10 @@ export default function SucursalesPage() {
                     <td className="px-4 py-3.5">
                       <span className="font-display text-[15px] font-semibold tabular-nums">{s.nCajas}</span>{" "}
                       <span className="text-xs text-ink-3">{s.nCajas === 1 ? "caja" : "cajas"}</span>
+                    </td>
+                    <td className="px-4 py-3.5">
+                      <span className="font-display text-[15px] font-semibold tabular-nums">{s.nAreas}</span>{" "}
+                      <span className="text-xs text-ink-3">{s.nAreas === 1 ? "área" : "áreas"}</span>
                     </td>
                     <td className="px-4 py-3.5">
                       <span className={["inline-flex items-center gap-1.5 rounded-full px-[11px] py-1 text-[12.5px] font-semibold", s.activa ? "bg-[#EAF3EE] text-success" : "bg-hover text-ink-3"].join(" ")}>

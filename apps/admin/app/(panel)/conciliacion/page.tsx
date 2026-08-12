@@ -40,7 +40,7 @@ export default function ConciliacionPage() {
 
   return (
     <>
-      <PageHeader titulo="Conciliación de apps" subtitulo="Cuadra los depósitos de Rappi/Uber/DiDi contra tus ventas del POS" migas={[{ label: "Delivery" }, { label: "Conciliación apps" }]} />
+      <PageHeader titulo="Conciliación de apps" subtitulo="Tus tickets del POS comparados con la liquidación de la plataforma." migas={[{ label: "Delivery" }, { label: "Conciliación apps" }]} />
       <PageBody>
         <div className="mb-4 flex justify-end">
           <Button onClick={() => setNueva(true)}>Nueva liquidación</Button>
@@ -158,8 +158,39 @@ function ModalNueva({ onCerrar, onCreada }: { onCerrar: () => void; onCreada: ()
   );
 }
 
+type FiltroItem = "TODOS" | "CONCILIADOS" | "PROBLEMAS";
+
+/** Tarjeta del desglose de conciliación (P-210). */
+function ResumenCard({ n, titulo, pie, tono }: { n: number; titulo: string; pie: string; tono: "ok" | "warn" | "bad" | "neutro" }) {
+  const color = tono === "ok" ? "text-success" : tono === "warn" ? "text-warning" : tono === "bad" ? "text-danger" : "text-ink-3";
+  return (
+    <div className="rounded-lg border border-line bg-surface p-3">
+      <div className={`font-display text-[22px] font-bold tabular-nums ${color}`}>{n}</div>
+      <div className="text-[12px] font-semibold">{titulo}</div>
+      <div className="mt-px text-[11px] text-ink-3">{pie}</div>
+    </div>
+  );
+}
+
 function ModalDetalle({ liq, items, onCerrar }: { liq: Liquidacion; items: ItemConciliado[] | null; onCerrar: () => void }) {
-  const sinMatch = (items ?? []).filter((i) => !i.ticketIdMatch);
+  const [filtro, setFiltro] = useState<FiltroItem>("TODOS");
+  const todos = items ?? [];
+
+  // Un renglón de la app puede estar: sin ticket en el POS (sin match), cuadrado al peso, o
+  // cruzado pero con diferencia de monto — que es el caso que hay que reclamar a la plataforma.
+  const sinMatch = todos.filter((i) => !i.ticketIdMatch);
+  const conMatch = todos.filter((i) => i.ticketIdMatch);
+  const conDiferencia = conMatch.filter((i) => Math.abs(i.diferenciaMxn ?? 0) >= 0.01);
+  const conciliados = conMatch.filter((i) => Math.abs(i.diferenciaMxn ?? 0) < 0.01);
+
+  const suma = (xs: ItemConciliado[]) => xs.reduce((s, i) => s + i.montoVentaMxn, 0);
+  const montoConciliado = suma(conciliados);
+  const montoSinMatch = suma(sinMatch);
+  const montoDiferencia = conDiferencia.reduce((s, i) => s + Math.abs(i.diferenciaMxn ?? 0), 0);
+
+  const visibles =
+    filtro === "CONCILIADOS" ? conciliados : filtro === "PROBLEMAS" ? [...conDiferencia, ...sinMatch] : todos;
+
   return (
     <Modal open onClose={onCerrar} title="Detalle de conciliación" className="w-[620px] rounded-lg border border-line bg-surface p-6 shadow-xl">
       <div className="mb-4 flex items-start justify-between">
@@ -173,25 +204,47 @@ function ModalDetalle({ liq, items, onCerrar }: { liq: Liquidacion; items: ItemC
         <p className="py-6 text-center text-[13px] text-ink-3">Cargando…</p>
       ) : (
         <>
-          {sinMatch.length > 0 && (
-            <p className="mb-3 rounded border border-[#E8C5C0] bg-[#FBF1EF] px-3 py-2 text-[12.5px] font-medium text-danger">
-              {sinMatch.length} registro(s) sin coincidencia en el POS — revisa o reclama a la plataforma.
-            </p>
-          )}
+          {/* Desglose del cuadre (P-210): a dónde se fue cada peso de la liquidación. */}
+          <div className="mb-4 grid grid-cols-3 gap-2">
+            <ResumenCard n={conciliados.length} titulo="Conciliados" pie={`${mxn(montoConciliado)} coinciden`} tono="ok" />
+            <ResumenCard n={conDiferencia.length} titulo="Con diferencia" pie={`${mxn(montoDiferencia)} de descuadre`} tono={conDiferencia.length > 0 ? "warn" : "neutro"} />
+            <ResumenCard n={sinMatch.length} titulo="En app, no en POS" pie={`${mxn(montoSinMatch)} a revisar`} tono={sinMatch.length > 0 ? "bad" : "neutro"} />
+          </div>
+
+          <div className="mb-3 inline-flex gap-0.5 rounded border border-line bg-hover p-[3px]">
+            {([
+              { v: "TODOS", l: `Todos ${items.length}` },
+              { v: "CONCILIADOS", l: `Conciliados ${conciliados.length}` },
+              { v: "PROBLEMAS", l: `Con problemas ${conDiferencia.length + sinMatch.length}` },
+            ] as { v: FiltroItem; l: string }[]).map((t) => (
+              <button
+                key={t.v}
+                type="button"
+                onClick={() => setFiltro(t.v)}
+                className={["rounded-[4px] px-3 py-1.5 text-[12.5px] font-semibold transition", filtro === t.v ? "bg-surface text-ink shadow-sm" : "text-ink-2 hover:text-ink"].join(" ")}
+              >
+                {t.l}
+              </button>
+            ))}
+          </div>
+
           <div className="max-h-[340px] overflow-y-auto rounded border border-line">
             <table className="w-full text-[13px]">
               <thead className="sticky top-0 bg-sel text-[11px] font-bold uppercase text-ink-3">
                 <tr><th className="px-3 py-2 text-left">Folio app</th><th className="px-3 py-2 text-right">Monto</th><th className="px-3 py-2 text-left">Ticket POS</th><th className="px-3 py-2 text-right">Dif.</th></tr>
               </thead>
               <tbody>
-                {items.map((i) => (
+                {visibles.map((i) => (
                   <tr key={i.id} className="border-t border-line">
                     <td className="px-3 py-2 font-mono">{i.folioExternoApp}</td>
                     <td className="px-3 py-2 text-right tabular-nums">{mxn(i.montoVentaMxn)}</td>
                     <td className="px-3 py-2">{i.ticketFolio ? <span className="text-ink-2">{i.ticketFolio} <span className="text-[10px] text-ink-3">({i.matchMetodo})</span></span> : <span className="font-semibold text-danger">Sin match</span>}</td>
-                    <td className={["px-3 py-2 text-right tabular-nums", (i.diferenciaMxn ?? 0) === 0 ? "text-ink-3" : "text-danger"].join(" ")}>{i.diferenciaMxn == null ? "—" : mxn(i.diferenciaMxn)}</td>
+                    <td className={["px-3 py-2 text-right tabular-nums", Math.abs(i.diferenciaMxn ?? 0) < 0.01 ? "text-ink-3" : "text-danger"].join(" ")}>{i.diferenciaMxn == null ? "—" : mxn(i.diferenciaMxn)}</td>
                   </tr>
                 ))}
+                {visibles.length === 0 && (
+                  <tr><td colSpan={4} className="px-3 py-8 text-center text-[12.5px] text-ink-3">Sin registros en este filtro.</td></tr>
+                )}
               </tbody>
             </table>
           </div>

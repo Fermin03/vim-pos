@@ -288,14 +288,18 @@ export type SucursalInput = z.infer<typeof sucursalSchema>;
 export type Sucursal = SucursalInput & {
   id: string;
   nCajas: number;
+  nAreas: number;
 };
 
-type FilaSuc = Omit<Sucursal, "nCajas"> & { cajas: { count: number }[] | null };
+type FilaSuc = Omit<Sucursal, "nCajas" | "nAreas"> & {
+  cajas: { count: number }[] | null;
+  areas_cocina: { count: number }[] | null;
+};
 
 export async function listarSucursales(): Promise<Sucursal[]> {
   const { data, error } = await supabase
     .from("sucursales")
-    .select("id, codigo, nombre, direccion_calle, ciudad, estado_geo, telefono, activa, cajas(count)")
+    .select("id, codigo, nombre, direccion_calle, ciudad, estado_geo, telefono, activa, cajas(count), areas_cocina(count)")
     .is("deleted_at", null)
     .order("nombre", { ascending: true });
   if (error) throw new Error(error.message);
@@ -309,13 +313,14 @@ export async function listarSucursales(): Promise<Sucursal[]> {
     telefono: f.telefono ?? "",
     activa: f.activa,
     nCajas: f.cajas?.[0]?.count ?? 0,
+    nAreas: f.areas_cocina?.[0]?.count ?? 0,
   }));
 }
 
 export async function obtenerSucursal(id: string): Promise<Sucursal | null> {
   const { data, error } = await supabase
     .from("sucursales")
-    .select("id, codigo, nombre, direccion_calle, ciudad, estado_geo, telefono, activa, cajas(count)")
+    .select("id, codigo, nombre, direccion_calle, ciudad, estado_geo, telefono, activa, cajas(count), areas_cocina(count)")
     .eq("id", id)
     .is("deleted_at", null)
     .maybeSingle();
@@ -332,6 +337,7 @@ export async function obtenerSucursal(id: string): Promise<Sucursal | null> {
     telefono: f.telefono ?? "",
     activa: f.activa,
     nCajas: f.cajas?.[0]?.count ?? 0,
+    nAreas: f.areas_cocina?.[0]?.count ?? 0,
   };
 }
 
