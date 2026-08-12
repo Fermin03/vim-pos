@@ -33,11 +33,28 @@ export type ResumenDia = {
 
 export type TopProducto = { nombre: string; unidades: number; total: number };
 
+/** Venta acumulada en una hora del día contable (P-177: gráfica de ventas por hora). */
+export type VentaHora = { hora: number; total: number };
+
+/**
+ * Variación porcentual de hoy vs. el día previo, redondeada a entero (P-177 §KPIs).
+ * Devuelve null cuando no hay base de comparación: sin día previo, o con base 0 —
+ * "subió infinito%" no es información útil para el dueño, y dividir entre 0 daría Infinity.
+ */
+export function variacionPct(actual: number, previo: number | null | undefined): number | null {
+  if (previo === null || previo === undefined || previo === 0) return null;
+  return Math.round(((actual - previo) / previo) * 100);
+}
+
 export type Dashboard = {
   hoy: ResumenDia;
+  /** Mismo resumen del día anterior con ventas, para los deltas % del P-177. */
+  ayer: ResumenDia | null;
   topProductos: TopProducto[];
   /** Serie de total_neto por día (para la mini-tendencia), del más antiguo al más reciente. */
   tendencia: { dia: string; total: number }[];
+  /** Ventas por hora del día más reciente (solo horas con venta, ordenadas). */
+  ventasPorHora: VentaHora[];
 };
 
 /** Suma las filas (una por sucursal) de vw_estado_resultados_dia en un resumen del día. */
@@ -87,6 +104,8 @@ export async function leerDashboard(): Promise<Dashboard> {
   }));
   const diaReciente = dias[dias.length - 1] ?? hasta;
   const hoy = sumarDia(porDia.get(diaReciente) ?? [], diaReciente);
+  const diaPrevio = dias[dias.length - 2];
+  const ayer = diaPrevio ? sumarDia(porDia.get(diaPrevio) ?? [], diaPrevio) : null;
 
   // Top productos del día más reciente.
   const { data: tp, error: e2 } = await supabase
@@ -102,7 +121,26 @@ export async function leerDashboard(): Promise<Dashboard> {
     total: num(r.total_mxn),
   }));
 
-  return { hoy, topProductos, tendencia };
+  // Ventas por hora del día más reciente (P-177). No hay vista SQL agregada por hora, así que se
+  // agrupa en el cliente desde los tickets pagados del día: son decenas, no miles, por día/sucursal.
+  const { data: th, error: e3 } = await supabase
+    .from("tickets")
+    .select("fecha_pago, total_mxn")
+    .eq("dia_contable", diaReciente)
+    .eq("estado_fiscal", "PAGADO")
+    .is("deleted_at", null)
+    .not("fecha_pago", "is", null);
+  if (e3) throw new Error(e3.message);
+  const porHora = new Map<number, number>();
+  for (const r of (th ?? []) as Record<string, unknown>[]) {
+    const h = new Date(String(r.fecha_pago)).getHours();
+    porHora.set(h, (porHora.get(h) ?? 0) + num(r.total_mxn));
+  }
+  const ventasPorHora = [...porHora.entries()]
+    .map(([hora, total]) => ({ hora, total: Math.round(total * 100) / 100 }))
+    .sort((a, b) => a.hora - b.hora);
+
+  return { hoy, ayer, topProductos, tendencia, ventasPorHora };
 }
 
 // ── Reporte Z histórico (P-181) ─────────────────────────────────────────────

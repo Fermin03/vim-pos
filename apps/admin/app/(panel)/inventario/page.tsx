@@ -27,6 +27,32 @@ const fmt = (n: number) => new Intl.NumberFormat("es-MX", { style: "currency", c
 type FormDatos = { nombre: string; unidad_medida_id: string; categoria: (typeof CATEGORIAS_INSUMO)[number]; costo: string; stockMin: string };
 const VACIO: FormDatos = { nombre: "", unidad_medida_id: "", categoria: "OTROS", costo: "", stockMin: "" };
 
+const POR_PAGINA = 12;
+
+/** Estado de existencias de un insumo (P-143): agotado / bajo el mínimo / en nivel. */
+type EstadoStock = "AGOTADO" | "BAJO" | "EN_NIVEL";
+function estadoDe(i: Insumo): EstadoStock {
+  if (i.stockActual <= 0) return "AGOTADO";
+  if (i.alerta || (i.stockMinimo > 0 && i.stockActual < i.stockMinimo)) return "BAJO";
+  return "EN_NIVEL";
+}
+
+const BADGE: Record<EstadoStock, { texto: string; clase: string }> = {
+  AGOTADO: { texto: "Agotado", clase: "bg-[#FBECEA] text-danger" },
+  BAJO: { texto: "Stock bajo", clase: "bg-[#FDF3E2] text-warning" },
+  EN_NIVEL: { texto: "En nivel", clase: "bg-[#E8F1EC] text-success" },
+};
+
+function KpiInsumos({ label: etiqueta, valor, pie }: { label: string; valor: number; pie: string }) {
+  return (
+    <div className="rounded-lg border border-line bg-surface p-4">
+      <div className="text-[11.5px] font-semibold uppercase tracking-[0.04em] text-ink-3">{etiqueta}</div>
+      <div className="mt-1 font-display text-[26px] font-bold tabular-nums">{valor}</div>
+      <div className="mt-0.5 text-[11.5px] text-ink-3">{pie}</div>
+    </div>
+  );
+}
+
 export default function InventarioPage() {
   const [insumos, setInsumos] = useState<Insumo[] | null>(null);
   const [unidades, setUnidades] = useState<Unidad[]>([]);
@@ -36,6 +62,9 @@ export default function InventarioPage() {
   const [editando, setEditando] = useState<{ id: string | null; datos: FormDatos } | null>(null);
   const [moviendo, setMoviendo] = useState<Insumo | null>(null);
   const [guardando, setGuardando] = useState(false);
+  const [busqueda, setBusqueda] = useState("");
+  const [filtro, setFiltro] = useState<"TODOS" | EstadoStock>("TODOS");
+  const [pagina, setPagina] = useState(1);
 
   async function recargar() {
     try {
@@ -106,11 +135,36 @@ export default function InventarioPage() {
     if (editando) setEditando({ ...editando, datos: { ...editando.datos, [k]: v } });
   }
 
+  const todos = insumos ?? [];
+  const conteo = {
+    total: todos.length,
+    enNivel: todos.filter((i) => estadoDe(i) === "EN_NIVEL").length,
+    bajo: todos.filter((i) => estadoDe(i) === "BAJO").length,
+    agotado: todos.filter((i) => estadoDe(i) === "AGOTADO").length,
+  };
+
+  const q = busqueda.trim().toLowerCase();
+  const filtrados = todos.filter((i) => {
+    if (filtro !== "TODOS" && estadoDe(i) !== filtro) return false;
+    return q === "" || i.nombre.toLowerCase().includes(q);
+  });
+  const totalPaginas = Math.max(1, Math.ceil(filtrados.length / POR_PAGINA));
+  const paginaActual = Math.min(pagina, totalPaginas);
+  const visibles = filtrados.slice((paginaActual - 1) * POR_PAGINA, paginaActual * POR_PAGINA);
+
+  const TABS: { v: "TODOS" | EstadoStock; l: string }[] = [
+    { v: "TODOS", l: "Todos" },
+    { v: "EN_NIVEL", l: "En nivel" },
+    { v: "BAJO", l: "Stock bajo" },
+    { v: "AGOTADO", l: "Agotados" },
+  ];
+
   return (
     <>
       <PageHeader
-        titulo="Inventario"
-        subtitulo="Insumos, existencias por sucursal y movimientos (entradas, mermas, ajustes)."
+        titulo="Stock actual"
+        subtitulo="Existencias de ingredientes y productos. El stock baja solo al vender."
+        migas={[{ label: "Inventario" }, { label: "Stock actual" }]}
         right={<Button onClick={nuevo} disabled={unidades.length === 0}>Nuevo insumo</Button>}
       />
       <PageBody>
@@ -118,43 +172,108 @@ export default function InventarioPage() {
         {error && !editando && !moviendo && <p className="mb-3 text-sm font-medium text-danger">{error}</p>}
 
         {insumos === null && <p className="text-sm text-ink-3">Cargando…</p>}
+
+        {insumos && insumos.length > 0 && (
+          <div className="mb-5 grid grid-cols-2 gap-4 lg:grid-cols-4">
+            <KpiInsumos label="Total de insumos" valor={conteo.total} pie="ingredientes y productos" />
+            <KpiInsumos label="En nivel" valor={conteo.enNivel} pie="por encima del mínimo" />
+            <KpiInsumos label="Stock bajo" valor={conteo.bajo} pie="conviene reabastecer" />
+            <KpiInsumos label="Agotados" valor={conteo.agotado} pie="sin existencias" />
+          </div>
+        )}
+
         {insumos && insumos.length === 0 && !editando && (
           <div className="rounded-lg border border-line bg-surface p-8 text-center text-ink-3">
             <p className="text-[15px] font-semibold text-ink-2">Sin insumos todavía</p>
             <p className="mt-1 text-[13px]">Agrega los insumos que compras para controlar existencias y mermas.</p>
           </div>
         )}
+
         {insumos && insumos.length > 0 && (
           <div className="overflow-hidden rounded-lg border border-line bg-surface">
+            {/* Filtros por estado + búsqueda */}
+            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line px-4 py-3">
+              <div className="inline-flex gap-0.5 rounded border border-line bg-hover p-[3px]">
+                {TABS.map((t) => (
+                  <button
+                    key={t.v}
+                    type="button"
+                    onClick={() => { setFiltro(t.v); setPagina(1); }}
+                    className={["rounded-[4px] px-3 py-1.5 text-[12.5px] font-semibold transition", filtro === t.v ? "bg-surface text-ink shadow-sm" : "text-ink-2 hover:text-ink"].join(" ")}
+                  >
+                    {t.l}
+                  </button>
+                ))}
+              </div>
+              <input
+                className="h-9 w-[220px] rounded border border-line-strong px-3 text-[13px] outline-none focus:border-ink"
+                value={busqueda}
+                onChange={(e) => { setBusqueda(e.target.value); setPagina(1); }}
+                placeholder="Buscar insumo…"
+                aria-label="Buscar insumo"
+              />
+            </div>
+
             <table className="w-full text-[13.5px]">
               <thead>
                 <tr className="border-b border-line bg-sel text-left text-[11.5px] uppercase tracking-wide text-ink-3">
                   <th className="px-4 py-2.5 font-semibold">Insumo</th>
                   <th className="px-4 py-2.5 font-semibold">Categoría</th>
-                  <th className="px-4 py-2.5 text-right font-semibold">Stock</th>
+                  <th className="px-4 py-2.5 text-right font-semibold">Stock actual</th>
+                  <th className="px-4 py-2.5 text-right font-semibold">Mínimo</th>
+                  <th className="px-4 py-2.5 font-semibold">Estado</th>
                   <th className="px-4 py-2.5 text-right font-semibold">Costo</th>
                   <th className="px-4 py-2.5"></th>
                 </tr>
               </thead>
               <tbody>
-                {insumos.map((i) => (
-                  <tr key={i.id} className="border-b border-line last:border-b-0">
-                    <td className="px-4 py-2.5 font-medium">{i.nombre}</td>
-                    <td className="px-4 py-2.5 text-ink-2">{LABEL_CATEGORIA[i.categoria as keyof typeof LABEL_CATEGORIA] ?? (i.categoria || "—")}</td>
-                    <td className="px-4 py-2.5 text-right tabular-nums">
-                      <span className={i.alerta ? "font-bold text-danger" : ""}>{i.stockActual} {i.unidadSimbolo}</span>
-                      {i.alerta && <span className="ml-1.5 rounded-full bg-[#FBECEA] px-1.5 py-0.5 text-[10px] font-bold text-danger">bajo</span>}
-                    </td>
-                    <td className="px-4 py-2.5 text-right tabular-nums text-ink-2">{fmt(i.costoUnitario)}</td>
-                    <td className="px-4 py-2.5 text-right">
-                      <button type="button" onClick={() => setMoviendo(i)} className="text-[12.5px] font-semibold text-ink-2 hover:text-ink">Movimiento</button>
-                      <button type="button" onClick={() => editar(i)} className="ml-3 text-[12.5px] font-semibold text-ink-3 hover:text-ink">Editar</button>
-                      <button type="button" onClick={() => borrar(i)} className="ml-3 text-[12.5px] font-semibold text-ink-3 hover:text-danger">Eliminar</button>
+                {visibles.map((i) => {
+                  const est = estadoDe(i);
+                  return (
+                    <tr key={i.id} className="border-b border-line last:border-b-0">
+                      <td className="px-4 py-2.5 font-medium">{i.nombre}</td>
+                      <td className="px-4 py-2.5 text-ink-2">{LABEL_CATEGORIA[i.categoria as keyof typeof LABEL_CATEGORIA] ?? (i.categoria || "—")}</td>
+                      <td className="px-4 py-2.5 text-right tabular-nums">
+                        <span className={est === "AGOTADO" ? "font-bold text-danger" : est === "BAJO" ? "font-bold text-warning" : ""}>
+                          {i.stockActual} {i.unidadSimbolo}
+                        </span>
+                      </td>
+                      <td className="px-4 py-2.5 text-right tabular-nums text-ink-3">{i.stockMinimo} {i.unidadSimbolo}</td>
+                      <td className="px-4 py-2.5">
+                        <span className={`inline-block rounded-full px-2 py-0.5 text-[11px] font-bold ${BADGE[est].clase}`}>{BADGE[est].texto}</span>
+                      </td>
+                      <td className="px-4 py-2.5 text-right tabular-nums text-ink-2">{fmt(i.costoUnitario)}</td>
+                      <td className="px-4 py-2.5 text-right whitespace-nowrap">
+                        <button type="button" onClick={() => setMoviendo(i)} className="text-[12.5px] font-semibold text-ink-2 hover:text-ink">Movimiento</button>
+                        <button type="button" onClick={() => editar(i)} className="ml-3 text-[12.5px] font-semibold text-ink-3 hover:text-ink">Editar</button>
+                        <button type="button" onClick={() => borrar(i)} className="ml-3 text-[12.5px] font-semibold text-ink-3 hover:text-danger">Eliminar</button>
+                      </td>
+                    </tr>
+                  );
+                })}
+                {visibles.length === 0 && (
+                  <tr>
+                    <td colSpan={7} className="px-4 py-10 text-center">
+                      <p className="text-[14px] font-semibold text-ink-2">Sin resultados</p>
+                      <p className="mt-1 text-[12.5px] text-ink-3">No hay insumos que coincidan con tu búsqueda o filtro.</p>
                     </td>
                   </tr>
-                ))}
+                )}
               </tbody>
             </table>
+
+            <div className="flex items-center justify-between gap-3 border-t border-line px-4 py-3">
+              <span className="text-[12.5px] text-ink-3">Mostrando {visibles.length} de {filtrados.length} insumos</span>
+              {totalPaginas > 1 && (
+                <div className="flex items-center gap-1">
+                  <button type="button" onClick={() => setPagina((p) => Math.max(1, p - 1))} disabled={paginaActual === 1}
+                    className="rounded border border-line-strong px-2.5 py-1 text-[13px] font-semibold text-ink-2 transition hover:border-ink disabled:opacity-40 disabled:hover:border-line-strong">‹</button>
+                  <span className="px-2 text-[12.5px] font-semibold tabular-nums">{paginaActual} / {totalPaginas}</span>
+                  <button type="button" onClick={() => setPagina((p) => Math.min(totalPaginas, p + 1))} disabled={paginaActual === totalPaginas}
+                    className="rounded border border-line-strong px-2.5 py-1 text-[13px] font-semibold text-ink-2 transition hover:border-ink disabled:opacity-40 disabled:hover:border-line-strong">›</button>
+                </div>
+              )}
+            </div>
           </div>
         )}
 
