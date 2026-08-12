@@ -68,7 +68,7 @@ export function ModalCategoria({
           {editar ? "Editar categoría" : "Nueva categoría"}
         </h2>
         <p className="mt-0.5 text-[13px] text-ink-3">
-          {editar ? "Actualiza los datos del grupo." : "Agrega un grupo al menú de León Centro."}
+          {editar ? "Actualiza los datos del grupo." : "Agrega un grupo a tu menú."}
         </p>
       </div>
 

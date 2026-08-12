@@ -61,6 +61,10 @@ export default function UsuariosPage() {
 
   const totalActivos = (usuarios ?? []).filter((u) => u.activo).length;
   const totalInactivos = (usuarios ?? []).filter((u) => !u.activo).length;
+  // El P-155 muestra "Invitados · pendientes de aceptar", pero `usuario_estado` (mig. 0004) no
+  // tiene un estado INVITADO: el alta crea el usuario ya ACTIVO. Se reporta en su lugar el estado
+  // que sí existe y sí necesita atención del dueño: cuentas bloqueadas (por intentos o por admin).
+  const totalBloqueados = (usuarios ?? []).filter((u) => u.estado === "BLOQUEADO_TEMP" || u.estado === "BLOQUEADO_ADMIN").length;
 
   async function aplicarActivar(u: Usuario, activar: boolean) {
     try {
@@ -87,8 +91,8 @@ export default function UsuariosPage() {
   return (
     <>
       <PageHeader
-        titulo="Usuarios"
-        subtitulo="Empleados y permisos del negocio."
+        titulo="Usuarios y permisos"
+        subtitulo="Quién opera VIM POS en tu negocio y qué puede hacer cada quien."
         migas={[{ label: "Administración" }, { label: "Usuarios" }]}
         right={
           <Button onClick={() => setNuevo(true)}>
@@ -102,15 +106,21 @@ export default function UsuariosPage() {
       <PageBody>
         {/* KPIs */}
         {usuarios !== null && (
-          <div className="mb-6 grid grid-cols-3 gap-4">
+          <div className="mb-6 grid grid-cols-2 gap-4 lg:grid-cols-4">
             <div className="rounded-lg border border-line bg-surface p-4">
-              <div className="text-[11.5px] font-bold uppercase tracking-wide text-ink-3">Total</div>
+              <div className="text-[11.5px] font-bold uppercase tracking-wide text-ink-3">Total usuarios</div>
               <div className="mt-1 font-display text-2xl font-bold tabular-nums">{usuarios.length}</div>
+              <div className="text-[11.5px] text-ink-3">con acceso al negocio</div>
             </div>
             <div className="rounded-lg border border-line bg-surface p-4">
               <div className="text-[11.5px] font-bold uppercase tracking-wide text-ink-3">Activos</div>
               <div className="mt-1 font-display text-2xl font-bold tabular-nums text-success">{totalActivos}</div>
               <div className="text-[11.5px] text-ink-3">pueden iniciar sesión</div>
+            </div>
+            <div className="rounded-lg border border-line bg-surface p-4">
+              <div className="text-[11.5px] font-bold uppercase tracking-wide text-ink-3">Bloqueados</div>
+              <div className={`mt-1 font-display text-2xl font-bold tabular-nums ${totalBloqueados > 0 ? "text-warning" : "text-ink-3"}`}>{totalBloqueados}</div>
+              <div className="text-[11.5px] text-ink-3">requieren desbloqueo</div>
             </div>
             <div className="rounded-lg border border-line bg-surface p-4">
               <div className="text-[11.5px] font-bold uppercase tracking-wide text-ink-3">Inactivos</div>

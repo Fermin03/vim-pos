@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { Button } from "@vim/ui/styles";
 import { entrar, entrarConProveedor, leerSesion } from "./lib/supabase";
 
@@ -122,9 +123,9 @@ export default function LoginPage() {
           </div>
 
           <div className="mb-6 text-right">
-            <span className="cursor-not-allowed text-[13px] font-medium text-ink-3" title="Próximamente">
+            <Link href="/recuperar" className="text-[13px] font-medium text-ink-2 transition-colors hover:text-ink">
               ¿Olvidaste tu contraseña?
-            </span>
+            </Link>
           </div>
 
           {alerta && (
