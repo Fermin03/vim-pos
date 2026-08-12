@@ -335,19 +335,62 @@ export async function leerVentasPorMarca(desde: string, hasta: string): Promise<
 }
 
 // Tiempos de cocina (P-190)
-export type FilaTiempos = { modo: string; tickets: number; promedio: number; bajo15: number; entre16y30: number; mayor30: number };
+export type FilaTiempos = {
+  modo: string;
+  tickets: number;
+  promedio: number;
+  /** Peor p95 de los días del rango: el 95% de las comandas salió en menos de esto. */
+  p95: number;
+  bajo15: number;
+  entre16y30: number;
+  mayor30: number;
+};
+
+/**
+ * Agrega por modo de servicio los días del rango.
+ *
+ * El promedio se pondera por número de comandas. Antes se promediaban los promedios diarios
+ * sin peso, así que un día flojo con 2 comandas movía la cifra igual que un sábado con 200 —
+ * y el dueño veía un tiempo de cocina que no correspondía a su operación real.
+ *
+ * El p95 sí se toma como el MÁXIMO de los p95 diarios: no se puede recomponer un percentil
+ * exacto desde percentiles ya agregados, y para detectar cuellos de botella conviene quedarse
+ * con el peor día antes que inventar un número intermedio que suavice el problema.
+ */
 export async function leerTiemposCocina(desde: string, hasta: string): Promise<FilaTiempos[]> {
-  const filas = await leerVista("vw_cumplimiento_tiempos_cocina_agregado", "modo_servicio, tickets_total, minutos_cocina_promedio, tickets_cocina_bajo_15min, tickets_cocina_16_30min, tickets_cocina_mayor_30min", desde, hasta);
-  const map = new Map<string, FilaTiempos & { _sumProm: number; _dias: number }>();
+  const filas = await leerVista(
+    "vw_cumplimiento_tiempos_cocina_agregado",
+    "modo_servicio, tickets_total, minutos_cocina_promedio, minutos_cocina_p95, tickets_cocina_bajo_15min, tickets_cocina_16_30min, tickets_cocina_mayor_30min",
+    desde,
+    hasta,
+  );
+  return agregarTiemposCocina(filas);
+}
+
+/** Agregación pura de las filas día×modo de la vista (separada de la consulta para poder probarla). */
+export function agregarTiemposCocina(filas: Record<string, unknown>[]): FilaTiempos[] {
+  const map = new Map<string, FilaTiempos & { _minutosTotales: number }>();
   for (const f of filas) {
     const k = String(f.modo_servicio ?? "—");
-    const cur = map.get(k) ?? { modo: k, tickets: 0, promedio: 0, bajo15: 0, entre16y30: 0, mayor30: 0, _sumProm: 0, _dias: 0 };
-    cur.tickets += num(f.tickets_total); cur.bajo15 += num(f.tickets_cocina_bajo_15min);
-    cur.entre16y30 += num(f.tickets_cocina_16_30min); cur.mayor30 += num(f.tickets_cocina_mayor_30min);
-    cur._sumProm += num(f.minutos_cocina_promedio); cur._dias += 1;
+    const cur = map.get(k) ?? { modo: k, tickets: 0, promedio: 0, p95: 0, bajo15: 0, entre16y30: 0, mayor30: 0, _minutosTotales: 0 };
+    const ticketsDia = num(f.tickets_total);
+    cur.tickets += ticketsDia;
+    cur.bajo15 += num(f.tickets_cocina_bajo_15min);
+    cur.entre16y30 += num(f.tickets_cocina_16_30min);
+    cur.mayor30 += num(f.tickets_cocina_mayor_30min);
+    cur._minutosTotales += num(f.minutos_cocina_promedio) * ticketsDia; // ponderado
+    cur.p95 = Math.max(cur.p95, num(f.minutos_cocina_p95));
     map.set(k, cur);
   }
-  return [...map.values()].map((m) => ({ modo: m.modo, tickets: m.tickets, promedio: m._dias > 0 ? m._sumProm / m._dias : 0, bajo15: m.bajo15, entre16y30: m.entre16y30, mayor30: m.mayor30 }));
+  return [...map.values()].map((m) => ({
+    modo: m.modo,
+    tickets: m.tickets,
+    promedio: m.tickets > 0 ? m._minutosTotales / m.tickets : 0,
+    p95: m.p95,
+    bajo15: m.bajo15,
+    entre16y30: m.entre16y30,
+    mayor30: m.mayor30,
+  }));
 }
 
 // Descuentos por usuario (P-194)

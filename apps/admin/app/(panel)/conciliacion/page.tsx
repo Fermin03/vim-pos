@@ -71,7 +71,7 @@ export default function ConciliacionPage() {
                     <td className="px-4 py-3 text-ink-2">{l.periodoInicio} – {l.periodoFin}</td>
                     <td className="px-4 py-3 text-right tabular-nums">{mxn(l.totalLiquidadoMxn)}</td>
                     <td className="px-4 py-3 text-right tabular-nums">{l.totalPosMxn == null ? "—" : mxn(l.totalPosMxn)}</td>
-                    <td className={["px-4 py-3 text-right tabular-nums font-semibold", (l.diferenciaMxn ?? 0) === 0 ? "text-ink-3" : "text-danger"].join(" ")}>
+                    <td className={["px-4 py-3 text-right tabular-nums font-semibold", Math.abs(l.diferenciaMxn ?? 0) < 0.01 ? "text-ink-3" : "text-danger"].join(" ")}>
                       {l.diferenciaMxn == null ? "—" : mxn(l.diferenciaMxn)}
                     </td>
                     <td className="px-4 py-3 text-center tabular-nums">{l.porcentajeMatch == null ? "—" : `${l.porcentajeMatch}%`}</td>
