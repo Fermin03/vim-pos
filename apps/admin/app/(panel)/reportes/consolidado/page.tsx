@@ -4,6 +4,7 @@ import { PageBody, PageHeader } from "../../../components/page-header";
 import { RangoFechas } from "../../../components/rango-fechas";
 import { fmtMxn, rangoUltimosDias } from "../../../lib/reportes";
 import { leerConsolidadoPorSucursal, type AgruparPor, type Consolidado } from "../../../lib/consolidado";
+import { mensajeError } from "../../../lib/errores";
 
 /** B5 Enterprise — reporteo central: comparativo consolidado por sucursal. */
 export default function ConsolidadoPage() {
@@ -16,7 +17,7 @@ export default function ConsolidadoPage() {
 
   const cargar = useCallback(async (d: string, h: string, a: AgruparPor) => {
     setDatos(null); setError(null);
-    try { setDatos(await leerConsolidadoPorSucursal(d, h, a)); } catch (e) { setError(e instanceof Error ? e.message : "Error"); }
+    try { setDatos(await leerConsolidadoPorSucursal(d, h, a)); } catch (e) { setError(mensajeError(e, "Error")); }
   }, []);
   useEffect(() => { cargar(desde, hasta, agrupar); }, [cargar, desde, hasta, agrupar]);
 

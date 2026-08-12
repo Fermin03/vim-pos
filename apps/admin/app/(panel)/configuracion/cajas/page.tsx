@@ -4,6 +4,7 @@ import { Button, Modal } from "@vim/ui/styles";
 import { PageHeader, PageBody } from "../../../components/page-header";
 import { ModalCaja } from "../../../components/modal-caja";
 import { eliminarCaja, listarCajas, provisionarDispositivo, type Caja, type CredencialesDispositivo } from "../../../lib/configuracion";
+import { mensajeError } from "../../../lib/errores";
 
 export default function CajasPage() {
   const [list, setList] = useState<Caja[] | null>(null);
@@ -20,7 +21,7 @@ export default function CajasPage() {
     try {
       setCreds(await provisionarDispositivo(caja.id));
     } catch (e) {
-      setError(e instanceof Error ? e.message : "No se pudieron generar las credenciales");
+      setError(mensajeError(e, "No se pudieron generar las credenciales"));
     } finally {
       setGenerando(null);
     }
@@ -31,7 +32,7 @@ export default function CajasPage() {
     try {
       setList(await listarCajas());
     } catch (e) {
-      setError(e instanceof Error ? e.message : "No se pudo cargar");
+      setError(mensajeError(e, "No se pudo cargar"));
     }
   }
   useEffect(() => {
@@ -58,7 +59,7 @@ export default function CajasPage() {
       setBorrando(false);
       await recargar();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "No se pudo eliminar");
+      setError(mensajeError(e, "No se pudo eliminar"));
       setBorrando(false);
     }
   }
@@ -67,7 +68,7 @@ export default function CajasPage() {
     <>
       <PageHeader
         titulo="Cajas"
-        subtitulo="Estaciones de cobro de cada sucursal."
+        subtitulo="Los puntos de cobro de cada sucursal. Cada caja maneja su propio turno, fondo y arqueo."
         migas={[{ label: "Configuración" }, { label: "Cajas" }]}
         right={
           <Button onClick={() => setModal({ caja: null })}>

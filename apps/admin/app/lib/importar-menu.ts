@@ -1,5 +1,6 @@
 "use client";
 import { crearCategoria, crearProducto, listarCategoriasOpciones } from "./catalogo";
+import { mensajeError } from "./errores";
 
 // Tier1 — Importador de menú. La fricción #1 del alta de un cliente nuevo es capturar el menú.
 // El dueño pega un CSV (categoría, producto, precio[, descripción]) y se crean categorías faltantes
@@ -220,7 +221,7 @@ export async function importarMenu(filas: FilaMenu[]): Promise<ResultadoImport> 
       });
       productosCreados++;
     } catch (e) {
-      fallos.push({ nombre: f.nombre, motivo: e instanceof Error ? e.message : "Error" });
+      fallos.push({ nombre: f.nombre, motivo: mensajeError(e, "Error") });
     }
   }
 

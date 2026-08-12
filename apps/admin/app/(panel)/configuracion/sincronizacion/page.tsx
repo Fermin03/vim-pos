@@ -4,6 +4,7 @@ import { Button } from "@vim/ui/styles";
 import { PageHeader, PageBody } from "../../../components/page-header";
 import { ConfigSideNav } from "../../../components/config-sidenav";
 import { listarConflictosPendientes, resolverConflicto, type ConflictoSync } from "../../../lib/sync-conflictos";
+import { mensajeError } from "../../../lib/errores";
 
 type Eleccion = "local" | "servidor";
 
@@ -39,7 +40,7 @@ export default function SincronizacionPage() {
 
   async function cargar() {
     setError(null);
-    try { setConflictos(await listarConflictosPendientes()); } catch (e) { setError(e instanceof Error ? e.message : "Error"); }
+    try { setConflictos(await listarConflictosPendientes()); } catch (e) { setError(mensajeError(e, "Error")); }
   }
   useEffect(() => { cargar(); }, []);
 
@@ -55,7 +56,7 @@ export default function SincronizacionPage() {
       setElec({});
       await cargar();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "No se pudo aplicar");
+      setError(mensajeError(e, "No se pudo aplicar"));
     } finally {
       setAplicando(false);
     }

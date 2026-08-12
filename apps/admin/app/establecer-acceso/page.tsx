@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@vim/ui/styles";
 import { supabase, establecerPassword } from "../lib/supabase";
+import { mensajeError } from "../lib/errores";
 
 const inputCls =
   "w-full rounded border border-line-strong bg-surface px-[13px] py-3 pr-11 text-[15px] outline-none transition focus:border-ink focus:shadow-[0_0_0_3px_rgba(22,22,26,.06)]";
@@ -61,7 +62,7 @@ export default function EstablecerAccesoPage() {
       await establecerPassword(pass);
       router.replace("/dashboard");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "No se pudo guardar la contraseña.");
+      setError(mensajeError(err, "No se pudo guardar la contraseña."));
       setGuardando(false);
     }
   }

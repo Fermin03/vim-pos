@@ -3,6 +3,7 @@ import { useCallback, useEffect, useState } from "react";
 import { PageBody, PageHeader } from "../../../components/page-header";
 import { RangoFechas } from "../../../components/rango-fechas";
 import { fmtMxn, leerVentasPorMarca, rangoUltimosDias, type FilaMarca } from "../../../lib/reportes";
+import { mensajeError } from "../../../lib/errores";
 
 export default function VentasPorMarcaPage() {
   const r0 = rangoUltimosDias(30);
@@ -13,13 +14,13 @@ export default function VentasPorMarcaPage() {
 
   const cargar = useCallback(async (d: string, h: string) => {
     setFilas(null); setError(null);
-    try { setFilas(await leerVentasPorMarca(d, h)); } catch (e) { setError(e instanceof Error ? e.message : "Error"); }
+    try { setFilas(await leerVentasPorMarca(d, h)); } catch (e) { setError(mensajeError(e, "Error")); }
   }, []);
   useEffect(() => { cargar(desde, hasta); }, [cargar, desde, hasta]);
 
   return (
     <>
-      <PageHeader titulo="Ventas por marca virtual" subtitulo="Desempeño por marca/concepto (dark kitchen, foodtruck)." migas={[{ label: "Reportes" }, { label: "Ventas por marca" }]} />
+      <PageHeader titulo="Ventas por marca virtual" subtitulo="Desempeño de cada marca que opera desde esta cocina. Disponible para cocinas con marcas virtuales activas." migas={[{ label: "Reportes" }, { label: "Ventas por marca" }]} />
       <PageBody>
         <div className="mb-4"><RangoFechas desde={desde} hasta={hasta} onCambio={(d, h) => { setDesde(d); setHasta(h); }} /></div>
         {filas === null && !error && <p className="text-sm text-ink-3">Cargando…</p>}

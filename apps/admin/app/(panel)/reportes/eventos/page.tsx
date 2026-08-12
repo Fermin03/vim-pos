@@ -2,6 +2,7 @@
 import { useEffect, useState } from "react";
 import { PageBody, PageHeader } from "../../../components/page-header";
 import { fmtMxn, leerVentasPorEvento, type FilaEvento } from "../../../lib/reportes";
+import { mensajeError } from "../../../lib/errores";
 
 const TIPO: Record<string, string> = {
   FERIA: "Feria", FESTIVAL: "Festival", CONCIERTO: "Concierto", PRIVADO: "Privado", CORPORATIVO: "Corporativo", OTRO: "Otro",
@@ -13,7 +14,7 @@ export default function VentasPorEventoPage() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    leerVentasPorEvento().then(setFilas).catch((e) => setError(e instanceof Error ? e.message : "Error"));
+    leerVentasPorEvento().then(setFilas).catch((e) => setError(mensajeError(e, "Error")));
   }, []);
 
   return (

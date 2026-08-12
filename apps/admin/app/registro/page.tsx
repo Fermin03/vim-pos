@@ -3,6 +3,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@vim/ui/styles";
 import { entrar } from "../lib/supabase";
+import { mensajeError } from "../lib/errores";
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
 const ANON = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? "";
@@ -86,7 +87,7 @@ export default function RegistroPage() {
       await entrar(email.trim().toLowerCase(), pass);
       router.replace("/dashboard");
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Error de red");
+      setError(mensajeError(e, "Error de red"));
       setCreando(false);
     }
   }

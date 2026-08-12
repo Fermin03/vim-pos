@@ -4,6 +4,7 @@ import { Button, Modal } from "@vim/ui/styles";
 import { PageHeader, PageBody } from "../../../components/page-header";
 import { ModalSucursal } from "../../../components/modal-sucursal";
 import { eliminarSucursal, listarSucursales, type Sucursal } from "../../../lib/configuracion";
+import { mensajeError } from "../../../lib/errores";
 
 export default function SucursalesPage() {
   const [list, setList] = useState<Sucursal[] | null>(null);
@@ -17,7 +18,7 @@ export default function SucursalesPage() {
     try {
       setList(await listarSucursales());
     } catch (e) {
-      setError(e instanceof Error ? e.message : "No se pudo cargar");
+      setError(mensajeError(e, "No se pudo cargar"));
     }
   }
   useEffect(() => {
@@ -33,7 +34,7 @@ export default function SucursalesPage() {
       setBorrando(false);
       await recargar();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "No se pudo eliminar");
+      setError(mensajeError(e, "No se pudo eliminar"));
       setBorrando(false);
     }
   }

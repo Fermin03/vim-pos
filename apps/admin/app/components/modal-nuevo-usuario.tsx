@@ -2,6 +2,7 @@
 import { useState } from "react";
 import { Button, Modal } from "@vim/ui/styles";
 import { ROL_LABEL, crearEmpleado, nuevoUsuarioSchema } from "../lib/usuarios";
+import { mensajeError } from "../lib/errores";
 
 const input =
   "h-11 w-full rounded border border-line-strong px-3 text-sm outline-none focus:border-ink focus:shadow-[0_0_0_3px_rgba(22,22,26,.06)]";
@@ -43,7 +44,7 @@ export function ModalNuevoUsuario({
       await crearEmpleado(parsed.data);
       onCreado();
     } catch (e) {
-      const msg = e instanceof Error ? e.message : "Error";
+      const msg = mensajeError(e, "Error");
       setError(
         msg === "EMAIL_DUPLICADO"
           ? "Ya existe un usuario con ese email."

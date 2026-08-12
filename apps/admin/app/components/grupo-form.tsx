@@ -12,6 +12,7 @@ import {
   type Naturaleza,
   type TipoSeleccion,
 } from "../lib/modificadores";
+import { mensajeError } from "../lib/errores";
 
 const input =
   "h-11 w-full rounded border border-line-strong px-3 text-sm outline-none focus:border-ink focus:shadow-[0_0_0_3px_rgba(22,22,26,.06)]";
@@ -58,7 +59,7 @@ export function GrupoForm({ grupo }: { grupo: Grupo | null }) {
         router.push(`/catalogo/modificadores/${id}`);
       }
     } catch (e) {
-      setError(e instanceof Error ? e.message : "No se pudo guardar");
+      setError(mensajeError(e, "No se pudo guardar"));
       setGuardando(false);
     }
   }

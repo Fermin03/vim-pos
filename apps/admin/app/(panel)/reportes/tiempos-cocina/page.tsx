@@ -3,6 +3,7 @@ import { useCallback, useEffect, useState } from "react";
 import { PageBody, PageHeader } from "../../../components/page-header";
 import { RangoFechas } from "../../../components/rango-fechas";
 import { leerTiemposCocina, rangoUltimosDias, type FilaTiempos } from "../../../lib/reportes";
+import { mensajeError } from "../../../lib/errores";
 
 const MODO: Record<string, string> = { COMER_AQUI: "Comer aquí", PARA_LLEVAR: "Para llevar", DRIVE_THRU: "Drive-thru", MESA: "Mesa", DELIVERY_PROPIO: "Domicilio" };
 
@@ -33,7 +34,7 @@ export default function TiemposCocinaPage() {
 
   const cargar = useCallback(async (d: string, h: string) => {
     setFilas(null); setError(null);
-    try { setFilas(await leerTiemposCocina(d, h)); } catch (e) { setError(e instanceof Error ? e.message : "Error"); }
+    try { setFilas(await leerTiemposCocina(d, h)); } catch (e) { setError(mensajeError(e, "Error")); }
   }, []);
   useEffect(() => { cargar(desde, hasta); }, [cargar, desde, hasta]);
 

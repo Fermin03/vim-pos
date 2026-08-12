@@ -6,6 +6,7 @@ import {
   listarLiquidaciones, crearLiquidacion, conciliarLiquidacion, leerItemsConciliados,
   APPS, LABEL_APP, type Liquidacion, type ItemConciliado, type Renglon, type AppExterna,
 } from "../../lib/conciliacion";
+import { mensajeError } from "../../lib/errores";
 
 const mxn = (n: number) => n.toLocaleString("es-MX", { style: "currency", currency: "MXN" });
 const input = "h-10 w-full rounded border border-line-strong px-3 text-sm outline-none focus:border-ink";
@@ -29,13 +30,13 @@ export default function ConciliacionPage() {
 
   async function recargar() {
     setError(null);
-    try { setList(await listarLiquidaciones()); } catch (e) { setError(e instanceof Error ? e.message : "Error"); }
+    try { setList(await listarLiquidaciones()); } catch (e) { setError(mensajeError(e, "Error")); }
   }
   useEffect(() => { recargar(); }, []);
 
   async function abrirDetalle(l: Liquidacion) {
     setSel(l); setItems(null);
-    try { setItems(await leerItemsConciliados(l.id)); } catch (e) { setError(e instanceof Error ? e.message : "Error"); }
+    try { setItems(await leerItemsConciliados(l.id)); } catch (e) { setError(mensajeError(e, "Error")); }
   }
 
   return (
@@ -118,7 +119,7 @@ function ModalNueva({ onCerrar, onCreada }: { onCerrar: () => void; onCreada: ()
       await conciliarLiquidacion(id); // conciliar de inmediato
       onCreada();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "No se pudo crear"); setGuardando(false);
+      setError(mensajeError(e, "No se pudo crear")); setGuardando(false);
     }
   }
 

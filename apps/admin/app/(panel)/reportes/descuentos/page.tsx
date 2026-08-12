@@ -3,6 +3,7 @@ import { useCallback, useEffect, useState } from "react";
 import { PageBody, PageHeader } from "../../../components/page-header";
 import { RangoFechas } from "../../../components/rango-fechas";
 import { fmtMxn, leerDescuentosPorUsuario, rangoUltimosDias, type FilaDescuento } from "../../../lib/reportes";
+import { mensajeError } from "../../../lib/errores";
 
 export default function DescuentosPage() {
   const r0 = rangoUltimosDias(30);
@@ -13,7 +14,7 @@ export default function DescuentosPage() {
 
   const cargar = useCallback(async (d: string, h: string) => {
     setFilas(null); setError(null);
-    try { setFilas(await leerDescuentosPorUsuario(d, h)); } catch (e) { setError(e instanceof Error ? e.message : "Error"); }
+    try { setFilas(await leerDescuentosPorUsuario(d, h)); } catch (e) { setError(mensajeError(e, "Error")); }
   }, []);
   useEffect(() => { cargar(desde, hasta); }, [cargar, desde, hasta]);
 

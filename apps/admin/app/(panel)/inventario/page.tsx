@@ -19,6 +19,7 @@ import {
   type TipoMovimientoUI,
   type Unidad,
 } from "../../lib/inventario";
+import { mensajeError } from "../../lib/errores";
 
 const input = "h-11 w-full rounded border border-line-strong px-3 text-sm outline-none focus:border-ink focus:shadow-[0_0_0_3px_rgba(22,22,26,.06)]";
 const label = "mb-1.5 block text-[13px] font-medium text-ink-2";
@@ -70,7 +71,7 @@ export default function InventarioPage() {
     try {
       setInsumos(await listarInsumos());
     } catch (e) {
-      setError(e instanceof Error ? e.message : "No se pudo cargar");
+      setError(mensajeError(e, "No se pudo cargar"));
       setInsumos([]);
     }
   }
@@ -115,7 +116,7 @@ export default function InventarioPage() {
       setEditando(null);
       recargar();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "No se pudo guardar");
+      setError(mensajeError(e, "No se pudo guardar"));
     } finally {
       setGuardando(false);
     }
@@ -127,7 +128,7 @@ export default function InventarioPage() {
       await eliminarInsumo(i.id);
       recargar();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "No se pudo eliminar");
+      setError(mensajeError(e, "No se pudo eliminar"));
     }
   }
 
@@ -377,7 +378,7 @@ function ModalMovimiento({
       });
       onHecho();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "No se pudo registrar");
+      setError(mensajeError(e, "No se pudo registrar"));
       setProcesando(false);
     }
   }

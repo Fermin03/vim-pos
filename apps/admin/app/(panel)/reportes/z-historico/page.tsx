@@ -3,6 +3,7 @@ import { useCallback, useEffect, useState } from "react";
 import { PageBody, PageHeader } from "../../../components/page-header";
 import { RangoFechas } from "../../../components/rango-fechas";
 import { fmtMxn, leerZHistorico, rangoUltimosDias, type FilaZHistorico } from "../../../lib/reportes";
+import { mensajeError } from "../../../lib/errores";
 
 export default function ZHistoricoPage() {
   const r0 = rangoUltimosDias(30);
@@ -18,7 +19,7 @@ export default function ZHistoricoPage() {
     try {
       setFilas(await leerZHistorico(d, h));
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Error al cargar");
+      setError(mensajeError(e, "Error al cargar"));
     }
   }, []);
 

@@ -4,6 +4,7 @@ import { Button } from "@vim/ui/styles";
 import { PageHeader, PageBody } from "../../../components/page-header";
 import { ConfigSideNav } from "../../../components/config-sidenav";
 import { activarNotificaciones, desactivarNotificaciones, enviarPrueba, estadoSuscripcion, pushSoportado } from "../../../lib/push";
+import { mensajeError } from "../../../lib/errores";
 
 /** Fase 2 — notificaciones push de eventos críticos (conflictos de sync, cierres con diferencia). */
 export default function NotificacionesPage() {
@@ -21,7 +22,7 @@ export default function NotificacionesPage() {
   async function correr(fn: () => Promise<void>, ok: string) {
     setTrabajando(true); setError(null); setMsg(null);
     try { await fn(); setActivo(await estadoSuscripcion()); setMsg(ok); }
-    catch (e) { setError(e instanceof Error ? e.message : "Error"); }
+    catch (e) { setError(mensajeError(e, "Error")); }
     finally { setTrabajando(false); }
   }
 

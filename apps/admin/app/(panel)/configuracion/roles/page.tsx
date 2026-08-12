@@ -7,6 +7,7 @@ import {
   asignarPermisosUsuario, leerMatriz, permisosDeUsuario, quitarPermiso, restaurarPermiso,
   usuariosPersonalizados, type MatrizPermisos, type UsuarioPersonalizado,
 } from "../../../lib/roles-permisos";
+import { mensajeError } from "../../../lib/errores";
 
 /**
  * Fase 5 · Roles y permisos (doc 09 §7).
@@ -33,7 +34,7 @@ export default function RolesPermisosPage() {
       setMatriz(m);
       setPersonalizados(us);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Error");
+      setError(mensajeError(e, "Error"));
     }
   }
   useEffect(() => { cargar(); }, []);
@@ -61,7 +62,7 @@ export default function RolesPermisosPage() {
       else await restaurarPermiso(rolId, permisoId);
       await cargar();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "No se pudo actualizar");
+      setError(mensajeError(e, "No se pudo actualizar"));
     } finally {
       setOcupado(null);
     }
@@ -77,7 +78,7 @@ export default function RolesPermisosPage() {
       setMsgPers("Permisos del usuario guardados.");
       setTimeout(() => setMsgPers(null), 2500);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "No se pudo guardar");
+      setError(mensajeError(e, "No se pudo guardar"));
     } finally {
       setGuardandoPers(false);
     }

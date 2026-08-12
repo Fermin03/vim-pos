@@ -4,6 +4,7 @@ import Link from "next/link";
 import { Button } from "@vim/ui/styles";
 import { PageBody, PageHeader } from "../../../components/page-header";
 import { FORMATOS_ORIGEN, importarMenu, parsearConFormato, type FormatoOrigen, type ResultadoImport, type ResultadoParse } from "../../../lib/importar-menu";
+import { mensajeError } from "../../../lib/errores";
 
 const EJEMPLO = `Categoría,Producto,Precio,Descripción
 Hamburguesas,Clásica,120,Carne 150g con queso
@@ -38,7 +39,7 @@ export default function ImportarMenuPage() {
     try {
       setResultado(await importarMenu(parse.filas));
     } catch (e) {
-      setError(e instanceof Error ? e.message : "No se pudo importar");
+      setError(mensajeError(e, "No se pudo importar"));
     } finally {
       setImportando(false);
     }

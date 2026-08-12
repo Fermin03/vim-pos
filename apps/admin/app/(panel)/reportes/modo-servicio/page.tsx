@@ -3,6 +3,7 @@ import { useCallback, useEffect, useState } from "react";
 import { PageBody, PageHeader } from "../../../components/page-header";
 import { RangoFechas } from "../../../components/rango-fechas";
 import { fmtMxn, leerVentasPorModo, rangoUltimosDias, type FilaModo } from "../../../lib/reportes";
+import { mensajeError } from "../../../lib/errores";
 
 const MODO_LABEL: Record<string, string> = {
   COMER_AQUI: "Comer aquí",
@@ -20,7 +21,7 @@ export default function VentasPorModoServicioPage() {
   const cargar = useCallback(async (d: string, h: string) => {
     setFilas(null); setError(null);
     try { setFilas(await leerVentasPorModo(d, h)); }
-    catch (e) { setError(e instanceof Error ? e.message : "Error"); }
+    catch (e) { setError(mensajeError(e, "Error")); }
   }, []);
   useEffect(() => { cargar(desde, hasta); }, [cargar, desde, hasta]);
 

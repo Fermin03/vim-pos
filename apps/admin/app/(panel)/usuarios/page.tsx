@@ -13,6 +13,7 @@ import {
   setActivo,
   type Usuario,
 } from "../../lib/usuarios";
+import { mensajeError } from "../../lib/errores";
 
 const ROLES_FILTRO = ["all", "DUENO", "ADMIN", "SUPERVISOR", "CAJERO", "PERSONAL"] as const;
 type RolFiltro = (typeof ROLES_FILTRO)[number];
@@ -42,7 +43,7 @@ export default function UsuariosPage() {
     try {
       setUsuarios(await listarUsuarios());
     } catch (e) {
-      setError(e instanceof Error ? e.message : "No se pudieron cargar los usuarios");
+      setError(mensajeError(e, "No se pudieron cargar los usuarios"));
     }
   }
   useEffect(() => {
@@ -72,7 +73,7 @@ export default function UsuariosPage() {
       setConfirmar(null);
       await recargar();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "No se pudo cambiar el estado");
+      setError(mensajeError(e, "No se pudo cambiar el estado"));
       setConfirmar(null);
     }
   }
@@ -83,7 +84,7 @@ export default function UsuariosPage() {
       setCambiarRolModal(null);
       await recargar();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "No se pudo cambiar el rol");
+      setError(mensajeError(e, "No se pudo cambiar el rol"));
       setCambiarRolModal(null);
     }
   }

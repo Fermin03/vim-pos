@@ -9,6 +9,7 @@ import {
   leerEstadoOnboarding,
   type EstadoOnboarding,
 } from "../../lib/onboarding";
+import { mensajeError } from "../../lib/errores";
 
 function IconCheck() {
   return (
@@ -33,7 +34,7 @@ export default function BienvenidaPage() {
         await actualizarFase("EN_CONFIGURACION", 1).catch(() => {});
       }
     } catch (e) {
-      setError(e instanceof Error ? e.message : "No se pudo cargar");
+      setError(mensajeError(e, "No se pudo cargar"));
     }
   }, []);
 
@@ -47,7 +48,7 @@ export default function BienvenidaPage() {
       await actualizarFase("GO_LIVE");
       router.push("/dashboard");
     } catch (e) {
-      setError(e instanceof Error ? e.message : "No se pudo finalizar");
+      setError(mensajeError(e, "No se pudo finalizar"));
       setFinalizando(false);
     }
   }

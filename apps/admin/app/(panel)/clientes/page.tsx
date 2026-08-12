@@ -12,6 +12,7 @@ import {
   type Cliente,
   type ClienteConResumen,
 } from "../../lib/clientes";
+import { mensajeError } from "../../lib/errores";
 
 const input =
   "h-11 w-full rounded border border-line-strong px-3 text-sm outline-none focus:border-ink focus:shadow-[0_0_0_3px_rgba(22,22,26,.06)]";
@@ -56,7 +57,7 @@ export default function ClientesPage() {
     try {
       setClientes(await listarClientesConResumen(b));
     } catch (e) {
-      setError(e instanceof Error ? e.message : "No se pudo cargar");
+      setError(mensajeError(e, "No se pudo cargar"));
       setClientes([]);
     }
   }
@@ -97,7 +98,7 @@ export default function ClientesPage() {
       setEditando(null);
       recargar();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "No se pudo guardar");
+      setError(mensajeError(e, "No se pudo guardar"));
     } finally {
       setGuardando(false);
     }
@@ -108,7 +109,7 @@ export default function ClientesPage() {
       await cambiarEstadoCliente(c.id, c.estado === "ACTIVO" ? "BLOQUEADO" : "ACTIVO");
       recargar();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "No se pudo cambiar el estado");
+      setError(mensajeError(e, "No se pudo cambiar el estado"));
     }
   }
 
@@ -118,7 +119,7 @@ export default function ClientesPage() {
       await eliminarCliente(c.id);
       recargar();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "No se pudo eliminar");
+      setError(mensajeError(e, "No se pudo eliminar"));
     }
   }
 

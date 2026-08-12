@@ -3,6 +3,7 @@ import { useCallback, useEffect, useState } from "react";
 import { PageBody, PageHeader } from "../../../components/page-header";
 import { RangoFechas } from "../../../components/rango-fechas";
 import { leerReimpresionesPorCajero, rangoUltimosDias, type FilaReimpresion } from "../../../lib/reportes";
+import { mensajeError } from "../../../lib/errores";
 
 /** Antifraude: cajeros que reimprimen comandas con frecuencia (posible salida sin cobrar). */
 export default function ReimpresionesPage() {
@@ -14,7 +15,7 @@ export default function ReimpresionesPage() {
 
   const cargar = useCallback(async (d: string, h: string) => {
     setFilas(null); setError(null);
-    try { setFilas(await leerReimpresionesPorCajero(d, h)); } catch (e) { setError(e instanceof Error ? e.message : "Error"); }
+    try { setFilas(await leerReimpresionesPorCajero(d, h)); } catch (e) { setError(mensajeError(e, "Error")); }
   }, []);
   useEffect(() => { cargar(desde, hasta); }, [cargar, desde, hasta]);
 

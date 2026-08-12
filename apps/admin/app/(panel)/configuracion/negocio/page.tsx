@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { Button } from "@vim/ui/styles";
 import { PageHeader, PageBody } from "../../../components/page-header";
 import { actualizarNegocio, leerNegocio, negocioSchema, type Negocio } from "../../../lib/configuracion";
+import { mensajeError } from "../../../lib/errores";
 
 const input =
   "h-11 w-full rounded border border-line-strong px-3 text-sm outline-none focus:border-ink focus:shadow-[0_0_0_3px_rgba(22,22,26,.06)]";
@@ -47,7 +48,7 @@ export default function NegocioPage() {
         setHora((n.hora_cierre_dia_contable ?? "03:00:00").slice(0, 5));
       }
     } catch (e) {
-      setError(e instanceof Error ? e.message : "No se pudo cargar");
+      setError(mensajeError(e, "No se pudo cargar"));
       setNeg(null);
     }
   }
@@ -75,7 +76,7 @@ export default function NegocioPage() {
       setTimeout(() => setOkMsg(null), 2500);
       recargar();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "No se pudo guardar");
+      setError(mensajeError(e, "No se pudo guardar"));
     } finally {
       setGuardando(false);
     }
