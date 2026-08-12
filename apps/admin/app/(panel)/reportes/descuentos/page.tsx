@@ -21,7 +21,7 @@ export default function DescuentosPage() {
 
   return (
     <>
-      <PageHeader titulo="Descuentos por usuario" subtitulo="Control de descuentos y cortesías otorgados (auditoría)." migas={[{ label: "Reportes" }, { label: "Descuentos" }]} />
+      <PageHeader titulo="Descuentos por usuario" subtitulo="Auditoría de descuentos y cortesías otorgados. Revísalos para descartar o confirmar abusos." migas={[{ label: "Reportes" }, { label: "Auditoría" }, { label: "Descuentos" }]} />
       <PageBody>
         <div className="mb-4"><RangoFechas desde={desde} hasta={hasta} onCambio={(d, h) => { setDesde(d); setHasta(h); }} /></div>
         {filas === null && !error && <p className="text-sm text-ink-3">Cargando…</p>}

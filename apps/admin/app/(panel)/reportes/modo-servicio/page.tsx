@@ -27,8 +27,8 @@ export default function VentasPorModoServicioPage() {
   return (
     <>
       <PageHeader
-        titulo="Ventas por tipo de servicio"
-        subtitulo="Mix entre Comer aquí, Para llevar y Drive-thru."
+        titulo="Ventas por modo de servicio"
+        subtitulo="Comparativa entre comer aquí, para llevar, domicilio propio y apps de delivery."
         migas={[{ label: "Reportes" }, { label: "Tipo de servicio" }]}
       />
       <PageBody>

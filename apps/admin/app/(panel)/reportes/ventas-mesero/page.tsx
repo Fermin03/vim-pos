@@ -19,7 +19,7 @@ export default function VentasPorMeseroPage() {
 
   return (
     <>
-      <PageHeader titulo="Ventas por mesero" subtitulo="Desempeño por mesero: tickets, venta, propinas." migas={[{ label: "Reportes" }, { label: "Ventas por mesero" }]} />
+      <PageHeader titulo="Desempeño del equipo" subtitulo="Ventas, tickets y propinas por empleado. Compara el rendimiento de tu personal." migas={[{ label: "Reportes" }, { label: "Ventas" }, { label: "Por mesero" }]} />
       <PageBody>
         <div className="mb-4"><RangoFechas desde={desde} hasta={hasta} onCambio={(d, h) => { setDesde(d); setHasta(h); }} /></div>
         {filas === null && !error && <p className="text-sm text-ink-3">Cargando…</p>}
