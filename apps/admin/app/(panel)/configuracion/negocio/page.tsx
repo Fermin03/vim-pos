@@ -85,7 +85,7 @@ export default function NegocioPage() {
     <>
       <PageHeader
         titulo="Datos del negocio"
-        subtitulo="Identidad comercial y zona horaria."
+        subtitulo="La información comercial básica de tu restaurante. Aparece en los tickets, reportes y comunicaciones del sistema."
         migas={[{ label: "Configuración" }, { label: "Datos del negocio" }]}
       />
       <PageBody>

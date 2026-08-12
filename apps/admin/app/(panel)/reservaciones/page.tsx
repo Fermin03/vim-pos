@@ -90,7 +90,7 @@ export default function ReservacionesPage() {
     <>
       <PageHeader
         titulo="Reservaciones"
-        subtitulo="Agenda del día: confirma llegadas, marca no-shows y cancela."
+        subtitulo="Agenda de reservaciones: confirma llegadas, marca no-shows y cancela."
         right={<Button onClick={() => { setCreando(true); setForm({ ...VACIO, fecha_hora: `${dia}T20:00` }); }}>Nueva reservación</Button>}
       />
       <PageBody>
