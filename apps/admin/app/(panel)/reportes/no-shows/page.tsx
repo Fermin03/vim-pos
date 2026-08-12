@@ -3,6 +3,7 @@ import { useCallback, useEffect, useState } from "react";
 import { PageBody, PageHeader } from "../../../components/page-header";
 import { RangoFechas } from "../../../components/rango-fechas";
 import { leerNoShows, rangoUltimosDias, type FilaNoShow } from "../../../lib/reportes";
+import { mensajeError } from "../../../lib/errores";
 
 /** Reservaciones: cuánta gente reserva y no llega (no-show) por día. */
 export default function NoShowsPage() {
@@ -14,7 +15,7 @@ export default function NoShowsPage() {
 
   const cargar = useCallback(async (d: string, h: string) => {
     setFilas(null); setError(null);
-    try { setFilas(await leerNoShows(d, h)); } catch (e) { setError(e instanceof Error ? e.message : "Error"); }
+    try { setFilas(await leerNoShows(d, h)); } catch (e) { setError(mensajeError(e, "Error")); }
   }, []);
   useEffect(() => { cargar(desde, hasta); }, [cargar, desde, hasta]);
 

@@ -15,6 +15,7 @@ import {
   type Mesa,
   type Sucursal,
 } from "../../../lib/mesas";
+import { mensajeError } from "../../../lib/errores";
 
 const input = "h-11 w-full rounded border border-line-strong px-3 text-sm outline-none focus:border-ink focus:shadow-[0_0_0_3px_rgba(22,22,26,.06)]";
 const label = "mb-1.5 block text-[13px] font-medium text-ink-2";
@@ -39,7 +40,7 @@ export default function MesasPage() {
     try {
       const [m, s] = await Promise.all([listarMesas(), listarSucursalesMesas()]);
       setMesas(m); setSucursales(s);
-    } catch (e) { setError(e instanceof Error ? e.message : "No se pudo cargar"); setMesas([]); }
+    } catch (e) { setError(mensajeError(e, "No se pudo cargar")); setMesas([]); }
   }
   useEffect(() => { recargar(); }, []);
 
@@ -75,7 +76,7 @@ export default function MesasPage() {
       if (editando.id) await actualizarMesa(editando.id, parsed.data);
       else await crearMesa(parsed.data);
       setEditando(null); recargar();
-    } catch (e) { setError(e instanceof Error ? e.message : "No se pudo guardar"); }
+    } catch (e) { setError(mensajeError(e, "No se pudo guardar")); }
     finally { setGuardando(false); }
   }
 
@@ -83,7 +84,7 @@ export default function MesasPage() {
     if (!borrar) return;
     setGuardando(true);
     try { await eliminarMesa(borrar.id); setBorrar(null); recargar(); }
-    catch (e) { setError(e instanceof Error ? e.message : "No se pudo eliminar"); }
+    catch (e) { setError(mensajeError(e, "No se pudo eliminar")); }
     finally { setGuardando(false); }
   }
 

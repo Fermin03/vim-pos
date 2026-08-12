@@ -9,6 +9,7 @@ import {
   REGIMENES_FISCALES,
   type DatosFiscales,
 } from "../../../lib/configuracion";
+import { mensajeError } from "../../../lib/errores";
 
 const input =
   "h-11 w-full rounded border border-line-strong px-3 text-sm outline-none focus:border-ink focus:shadow-[0_0_0_3px_rgba(22,22,26,.06)]";
@@ -46,7 +47,7 @@ export default function FiscalPage() {
       setCp(d.codigo_postal_fiscal);
       setEmail(d.email_fiscal);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "No se pudo cargar");
+      setError(mensajeError(e, "No se pudo cargar"));
       setDatos(null);
     }
   }
@@ -75,7 +76,7 @@ export default function FiscalPage() {
       setTimeout(() => setOkMsg(null), 2500);
       recargar();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "No se pudo guardar");
+      setError(mensajeError(e, "No se pudo guardar"));
     } finally {
       setGuardando(false);
     }

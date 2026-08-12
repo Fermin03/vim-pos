@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Button } from "@vim/ui/styles";
 import { listarProductos, type Producto } from "../lib/catalogo";
 import { asignarGrupoEnMasa, quitarGrupoEnMasa, productosConGrupo } from "../lib/modificadores";
+import { mensajeError } from "../lib/errores";
 
 /**
  * Asignación EN MASA de un grupo de modificadores: filtra por categoría/búsqueda,
@@ -24,7 +25,7 @@ export function AsignacionMasivaGrupo({ grupoId, grupoNombre }: { grupoId: strin
       setProductos(prods);
       setConGrupo(new Set(asignados));
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Error");
+      setError(mensajeError(e, "Error"));
     }
   }
   useEffect(() => { cargar(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [grupoId]);
@@ -68,7 +69,7 @@ export function AsignacionMasivaGrupo({ grupoId, grupoNombre }: { grupoId: strin
       setSel(new Set());
       await cargar();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "No se pudo aplicar");
+      setError(mensajeError(e, "No se pudo aplicar"));
     } finally {
       setTrabajando(false);
     }

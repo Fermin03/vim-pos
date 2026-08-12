@@ -7,6 +7,7 @@ import {
   asignarFranquicia, crearFranquicia, eliminarFranquicia, listarFranquicias,
   listarSucursalesConFranquicia, type Franquicia, type SucursalFranquicia,
 } from "../../../lib/franquicias";
+import { mensajeError } from "../../../lib/errores";
 
 /** Fase 5 · Franquicias: agrupa sucursales para el reporteo central (consolidado por franquicia). */
 export default function FranquiciasPage() {
@@ -23,14 +24,14 @@ export default function FranquiciasPage() {
       setFranquicias(fs);
       setSucursales(ss);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Error");
+      setError(mensajeError(e, "Error"));
     }
   }
   useEffect(() => { cargar(); }, []);
 
   async function correr(fn: () => Promise<void>) {
     setTrabajando(true); setError(null);
-    try { await fn(); await cargar(); } catch (e) { setError(e instanceof Error ? e.message : "Error"); }
+    try { await fn(); await cargar(); } catch (e) { setError(mensajeError(e, "Error")); }
     finally { setTrabajando(false); }
   }
 

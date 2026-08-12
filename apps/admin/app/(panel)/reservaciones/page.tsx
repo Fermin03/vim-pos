@@ -16,6 +16,7 @@ import {
   type Reservacion,
   type ReservacionEstado,
 } from "../../lib/reservaciones";
+import { mensajeError } from "../../lib/errores";
 
 const input = "h-11 w-full rounded border border-line-strong px-3 text-sm outline-none focus:border-ink focus:shadow-[0_0_0_3px_rgba(22,22,26,.06)]";
 const label = "mb-1.5 block text-[13px] font-medium text-ink-2";
@@ -45,7 +46,7 @@ export default function ReservacionesPage() {
     try {
       setLista(await listarReservaciones(d));
     } catch (e) {
-      setError(e instanceof Error ? e.message : "No se pudo cargar");
+      setError(mensajeError(e, "No se pudo cargar"));
       setLista([]);
     }
   }, []);
@@ -70,7 +71,7 @@ export default function ReservacionesPage() {
       setForm({ ...VACIO });
       recargar(dia);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "No se pudo crear");
+      setError(mensajeError(e, "No se pudo crear"));
     } finally {
       setGuardando(false);
     }
@@ -82,7 +83,7 @@ export default function ReservacionesPage() {
       await fn();
       recargar(dia);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "No se pudo actualizar");
+      setError(mensajeError(e, "No se pudo actualizar"));
     }
   }
 

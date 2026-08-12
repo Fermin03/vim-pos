@@ -10,6 +10,7 @@ import {
   actualizarCategoria,
   type Categoria,
 } from "../lib/catalogo";
+import { mensajeError } from "../lib/errores";
 
 function IconoSvg({ name, className }: { name: string; className?: string }) {
   return (
@@ -50,7 +51,7 @@ export function ModalCategoria({
       else await crearCategoria(parsed.data);
       onGuardado();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "No se pudo guardar");
+      setError(mensajeError(e, "No se pudo guardar"));
       setGuardando(false);
     }
   }

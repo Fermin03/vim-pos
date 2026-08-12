@@ -9,6 +9,7 @@ import {
   PROVEEDORES_PAC,
   type CfdiEmisor,
 } from "../../../lib/configuracion";
+import { mensajeError } from "../../../lib/errores";
 
 const input =
   "h-11 w-full rounded border border-line-strong px-3 text-sm outline-none focus:border-ink focus:shadow-[0_0_0_3px_rgba(22,22,26,.06)]";
@@ -50,7 +51,7 @@ export default function CfdiPage() {
       setVig(e.csd_vigencia_hasta ?? "");
       setEstado(e.estado);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "No se pudo cargar");
+      setError(mensajeError(e, "No se pudo cargar"));
       setEmisor(null);
     }
   }
@@ -79,7 +80,7 @@ export default function CfdiPage() {
       setTimeout(() => setOkMsg(null), 2500);
       recargar();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "No se pudo guardar");
+      setError(mensajeError(e, "No se pudo guardar"));
     } finally {
       setGuardando(false);
     }
@@ -88,8 +89,8 @@ export default function CfdiPage() {
   return (
     <>
       <PageHeader
-        titulo="CFDI / PAC"
-        subtitulo="Proveedor de timbrado (PAC) y emisor con el que se certifican tus facturas ante el SAT."
+        titulo="Facturación electrónica"
+        subtitulo="Conecta tu PAC (Proveedor Autorizado de Certificación) para que VIM POS timbre facturas CFDI 4.0 automáticamente al cobrar."
         migas={[{ label: "Configuración" }, { label: "CFDI / PAC" }]}
       />
       <PageBody>

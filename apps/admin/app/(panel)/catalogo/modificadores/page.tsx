@@ -5,6 +5,7 @@ import { Button, Modal } from "@vim/ui/styles";
 import { PageHeader, PageBody } from "../../../components/page-header";
 import { CatalogoTabs } from "../../../components/catalogo-tabs";
 import { TIPO_SELECCION, eliminarGrupo, listarGrupos, type Grupo } from "../../../lib/modificadores";
+import { mensajeError } from "../../../lib/errores";
 
 export default function ModificadoresPage() {
   const router = useRouter();
@@ -18,7 +19,7 @@ export default function ModificadoresPage() {
     try {
       setGrupos(await listarGrupos());
     } catch (e) {
-      setError(e instanceof Error ? e.message : "No se pudieron cargar los grupos");
+      setError(mensajeError(e, "No se pudieron cargar los grupos"));
     }
   }
   useEffect(() => {
@@ -34,7 +35,7 @@ export default function ModificadoresPage() {
       setBorrando(false);
       await recargar();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "No se pudo eliminar");
+      setError(mensajeError(e, "No se pudo eliminar"));
       setBorrando(false);
     }
   }

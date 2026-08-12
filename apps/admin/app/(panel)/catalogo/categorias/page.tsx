@@ -11,6 +11,7 @@ import {
   listarCategorias,
   type Categoria,
 } from "../../../lib/catalogo";
+import { mensajeError } from "../../../lib/errores";
 
 type Filtro = "all" | "on" | "off";
 
@@ -41,7 +42,7 @@ export default function CategoriasPage() {
     try {
       setCats(await listarCategorias());
     } catch (e) {
-      setError(e instanceof Error ? e.message : "No se pudieron cargar las categorías");
+      setError(mensajeError(e, "No se pudieron cargar las categorías"));
     }
   }
   useEffect(() => {
@@ -66,7 +67,7 @@ export default function CategoriasPage() {
       setBorrando(false);
       await recargar();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "No se pudo eliminar");
+      setError(mensajeError(e, "No se pudo eliminar"));
       setBorrando(false);
     }
   }

@@ -3,6 +3,7 @@ import Link from "next/link";
 import { useState } from "react";
 import { Button } from "@vim/ui/styles";
 import { enviarEnlaceRecuperacion } from "../lib/supabase";
+import { mensajeError } from "../lib/errores";
 
 const inputCls =
   "w-full rounded border border-line-strong bg-surface px-[13px] py-3 text-[15px] outline-none transition focus:border-ink focus:shadow-[0_0_0_3px_rgba(22,22,26,.06)]";
@@ -41,7 +42,7 @@ export default function RecuperarPage() {
     } catch (err) {
       // Los errores de red de supabase-js llegan como "Failed to fetch": crudo, en inglés y sin
       // decirle al dueño qué hacer. Se traduce a algo accionable y se deja pasar el resto.
-      const msg = err instanceof Error ? err.message : "";
+      const msg = mensajeError(err, "");
       setError(
         /failed to fetch|networkerror|load failed/i.test(msg)
           ? "No hay conexión con el servidor. Revisa tu internet e inténtalo de nuevo."

@@ -10,6 +10,7 @@ import {
   precioExtra,
   type Opcion,
 } from "../lib/modificadores";
+import { mensajeError } from "../lib/errores";
 
 const input =
   "h-11 w-full rounded border border-line-strong px-3 text-sm outline-none focus:border-ink focus:shadow-[0_0_0_3px_rgba(22,22,26,.06)]";
@@ -46,7 +47,7 @@ function ModalOpcion({
       else await crearOpcion(grupoId, parsed.data);
       onGuardado();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "No se pudo guardar");
+      setError(mensajeError(e, "No se pudo guardar"));
       setGuardando(false);
     }
   }
@@ -91,7 +92,7 @@ export function OpcionesEditor({ grupoId }: { grupoId: string }) {
     try {
       setOpciones(await listarOpciones(grupoId));
     } catch (e) {
-      setError(e instanceof Error ? e.message : "No se pudieron cargar las opciones");
+      setError(mensajeError(e, "No se pudieron cargar las opciones"));
     }
   }
   useEffect(() => {
@@ -103,7 +104,7 @@ export function OpcionesEditor({ grupoId }: { grupoId: string }) {
       await eliminarOpcion(o.id);
       await recargar();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "No se pudo eliminar");
+      setError(mensajeError(e, "No se pudo eliminar"));
     }
   }
 

@@ -9,6 +9,7 @@ import {
   propinasSchema,
   type Sucursal,
 } from "../../../lib/configuracion";
+import { mensajeError } from "../../../lib/errores";
 
 const input =
   "h-11 w-full rounded border border-line-strong px-3 text-sm outline-none focus:border-ink focus:shadow-[0_0_0_3px_rgba(22,22,26,.06)]";
@@ -33,7 +34,7 @@ export default function PropinasPage() {
         setSucursales(ss);
         if (ss.length > 0) setSucId(ss[0]!.id);
       })
-      .catch((e) => setError(e instanceof Error ? e.message : "Error"));
+      .catch((e) => setError(mensajeError(e, "Error")));
   }, []);
 
   useEffect(() => {
@@ -56,7 +57,7 @@ export default function PropinasPage() {
           setRedondear(true);
         }
       })
-      .catch((e) => setError(e instanceof Error ? e.message : "Error"))
+      .catch((e) => setError(mensajeError(e, "Error")))
       .finally(() => setCargandoConfig(false));
   }, [sucId]);
 
@@ -87,7 +88,7 @@ export default function PropinasPage() {
       setOkMsg("Guardado.");
       setTimeout(() => setOkMsg(null), 2500);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "No se pudo guardar");
+      setError(mensajeError(e, "No se pudo guardar"));
     } finally {
       setGuardando(false);
     }
@@ -97,7 +98,7 @@ export default function PropinasPage() {
     <>
       <PageHeader
         titulo="Propinas"
-        subtitulo="Cómo se sugieren y se cobran las propinas en cada sucursal."
+        subtitulo="Cómo VIM POS sugiere la propina al cobrar y cómo se reparte entre tu equipo. Se configura por sucursal."
         migas={[{ label: "Configuración" }, { label: "Propinas" }]}
       />
       <PageBody>

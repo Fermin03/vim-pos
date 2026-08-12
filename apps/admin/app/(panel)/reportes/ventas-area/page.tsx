@@ -3,6 +3,7 @@ import { useCallback, useEffect, useState } from "react";
 import { PageBody, PageHeader } from "../../../components/page-header";
 import { RangoFechas } from "../../../components/rango-fechas";
 import { fmtMxn, leerVentasPorArea, rangoUltimosDias, type FilaArea } from "../../../lib/reportes";
+import { mensajeError } from "../../../lib/errores";
 
 export default function VentasPorAreaPage() {
   const r0 = rangoUltimosDias(30);
@@ -13,13 +14,13 @@ export default function VentasPorAreaPage() {
 
   const cargar = useCallback(async (d: string, h: string) => {
     setFilas(null); setError(null);
-    try { setFilas(await leerVentasPorArea(d, h)); } catch (e) { setError(e instanceof Error ? e.message : "Error"); }
+    try { setFilas(await leerVentasPorArea(d, h)); } catch (e) { setError(mensajeError(e, "Error")); }
   }, []);
   useEffect(() => { cargar(desde, hasta); }, [cargar, desde, hasta]);
 
   return (
     <>
-      <PageHeader titulo="Ventas por área de cocina" subtitulo="Carga de trabajo y venta por área/estación." migas={[{ label: "Reportes" }, { label: "Ventas por área" }]} />
+      <PageHeader titulo="Ventas por área de preparación" subtitulo="Qué genera cada área de cocina. Útil para dimensionar la carga de trabajo de tu operación." migas={[{ label: "Reportes" }, { label: "Ventas por área" }]} />
       <PageBody>
         <div className="mb-4"><RangoFechas desde={desde} hasta={hasta} onCambio={(d, h) => { setDesde(d); setHasta(h); }} /></div>
         {filas === null && !error && <p className="text-sm text-ink-3">Cargando…</p>}

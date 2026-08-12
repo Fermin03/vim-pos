@@ -5,6 +5,7 @@ import { Button } from "@vim/ui/styles";
 import {
   asignarGruposAProducto, gruposDeProducto, listarGrupos, TIPO_SELECCION, type Grupo,
 } from "../lib/modificadores";
+import { mensajeError } from "../lib/errores";
 
 /** Asignación de grupos de modificadores a UN producto (checkboxes + guardar). */
 export function ProductoModificadores({ productoId }: { productoId: string }) {
@@ -23,7 +24,7 @@ export function ProductoModificadores({ productoId }: { productoId: string }) {
         setSel(new Set(s));
         setOriginal(s);
       })
-      .catch((e) => setError(e instanceof Error ? e.message : "Error"));
+      .catch((e) => setError(mensajeError(e, "Error")));
   }, [productoId]);
 
   const cambio = grupos !== null && (sel.size !== original.size || [...sel].some((g) => !original.has(g)));
@@ -38,7 +39,7 @@ export function ProductoModificadores({ productoId }: { productoId: string }) {
       setMsg("Modificadores guardados.");
       setTimeout(() => setMsg(null), 2500);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "No se pudo guardar");
+      setError(mensajeError(e, "No se pudo guardar"));
     } finally {
       setGuardando(false);
     }

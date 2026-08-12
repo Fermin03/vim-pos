@@ -9,6 +9,7 @@ import {
   facturarTicket, FORMAS_PAGO_SAT, listarTicketsFacturables, RECEPTOR_PUBLICO_GENERAL,
   receptorSchema, USOS_CFDI, type ReceptorInput, type ResultadoTimbrado, type TicketFacturable,
 } from "../../lib/facturacion";
+import { mensajeError } from "../../lib/errores";
 
 const ESTADO_CFDI_BADGE: Record<string, { label: string; cls: string }> = {
   TIMBRADO: { label: "Facturado", cls: "bg-[#EAF3EE] text-success" },
@@ -31,7 +32,7 @@ export default function FacturacionPage() {
   const cargar = useCallback(async (d: string, h: string, f: string) => {
     setTickets(null); setError(null);
     try { setTickets(await listarTicketsFacturables(d, h, f || undefined)); }
-    catch (e) { setError(e instanceof Error ? e.message : "Error"); }
+    catch (e) { setError(mensajeError(e, "Error")); }
   }, []);
   useEffect(() => { cargar(desde, hasta, folio); }, [cargar, desde, hasta, folio]);
 
@@ -129,7 +130,7 @@ function PanelFacturar({ ticket, onCerrar }: { ticket: TicketFacturable; onCerra
       setResultado(res);
       if (!res.ok) setError(res.error);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Error al timbrar");
+      setError(mensajeError(e, "Error al timbrar"));
     } finally {
       setProcesando(false);
     }

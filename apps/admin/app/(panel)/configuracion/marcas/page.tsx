@@ -10,6 +10,7 @@ import {
   marcaSchema,
   type Marca,
 } from "../../../lib/configuracion";
+import { mensajeError } from "../../../lib/errores";
 
 const input =
   "h-11 w-full rounded border border-line-strong px-3 text-sm outline-none focus:border-ink focus:shadow-[0_0_0_3px_rgba(22,22,26,.06)]";
@@ -28,7 +29,7 @@ export default function MarcasPage() {
     try {
       setMarcas(await listarMarcas());
     } catch (e) {
-      setError(e instanceof Error ? e.message : "No se pudo cargar");
+      setError(mensajeError(e, "No se pudo cargar"));
       setMarcas([]);
     }
   }
@@ -65,7 +66,7 @@ export default function MarcasPage() {
       setEditando(null);
       recargar();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "No se pudo guardar");
+      setError(mensajeError(e, "No se pudo guardar"));
     } finally {
       setGuardando(false);
     }
@@ -77,7 +78,7 @@ export default function MarcasPage() {
       await eliminarMarca(m.id);
       recargar();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "No se pudo eliminar");
+      setError(mensajeError(e, "No se pudo eliminar"));
     }
   }
 
@@ -85,7 +86,7 @@ export default function MarcasPage() {
     <>
       <PageHeader
         titulo="Marcas virtuales"
-        subtitulo="Cocinas fantasma: un mismo local opera varias marcas (multi-concepto, dark kitchen, foodtruck)."
+        subtitulo="Marcas adicionales que operan desde la misma cocina, vendiendo en apps de delivery con identidad propia."
         migas={[{ label: "Configuración" }, { label: "Marcas virtuales" }]}
         right={<Button onClick={nueva}>Nueva marca</Button>}
       />

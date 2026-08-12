@@ -14,6 +14,7 @@ import {
   type Promo,
   type TipoPromo,
 } from "../../lib/promociones";
+import { mensajeError } from "../../lib/errores";
 
 const input = "h-11 w-full rounded border border-line-strong px-3 text-sm outline-none focus:border-ink focus:shadow-[0_0_0_3px_rgba(22,22,26,.06)]";
 const label = "mb-1.5 block text-[13px] font-medium text-ink-2";
@@ -59,7 +60,7 @@ export default function PromocionesPage() {
   const [guardando, setGuardando] = useState(false);
 
   async function recargar() {
-    try { setPromos(await listarPromos()); } catch (e) { setError(e instanceof Error ? e.message : "No se pudo cargar"); setPromos([]); }
+    try { setPromos(await listarPromos()); } catch (e) { setError(mensajeError(e, "No se pudo cargar")); setPromos([]); }
   }
   useEffect(() => { recargar(); }, []);
 
@@ -83,17 +84,17 @@ export default function PromocionesPage() {
       else await crearPromo(parsed.data);
       setOkMsg("Promoción guardada."); setTimeout(() => setOkMsg(null), 2500);
       setEditando(null); recargar();
-    } catch (e) { setError(e instanceof Error ? e.message : "No se pudo guardar"); }
+    } catch (e) { setError(mensajeError(e, "No se pudo guardar")); }
     finally { setGuardando(false); }
   }
 
   async function alternar(p: Promo) {
     try { await cambiarEstadoPromo(p.id, p.estado === "ACTIVA" ? "PAUSADA" : "ACTIVA"); recargar(); }
-    catch (e) { setError(e instanceof Error ? e.message : "Error"); }
+    catch (e) { setError(mensajeError(e, "Error")); }
   }
   async function borrar(p: Promo) {
     if (!confirm(`¿Eliminar "${p.nombre}"?`)) return;
-    try { await eliminarPromo(p.id); recargar(); } catch (e) { setError(e instanceof Error ? e.message : "Error"); }
+    try { await eliminarPromo(p.id); recargar(); } catch (e) { setError(mensajeError(e, "Error")); }
   }
 
   function set<K extends keyof FormDatos>(k: K, v: FormDatos[K]) {

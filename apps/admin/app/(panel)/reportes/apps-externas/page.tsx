@@ -3,6 +3,7 @@ import { useCallback, useEffect, useState } from "react";
 import { PageBody, PageHeader } from "../../../components/page-header";
 import { RangoFechas } from "../../../components/rango-fechas";
 import { fmtMxn, leerVentasAppsExternas, rangoUltimosDias, type FilaAppExterna } from "../../../lib/reportes";
+import { mensajeError } from "../../../lib/errores";
 
 const ESTADO_BADGE: Record<string, { label: string; cls: string }> = {
   CONCILIADO_OK: { label: "Conciliado", cls: "bg-[#EAF3EE] text-success" },
@@ -21,7 +22,7 @@ export default function AppsExternasPage() {
 
   const cargar = useCallback(async (d: string, h: string) => {
     setFilas(null); setError(null);
-    try { setFilas(await leerVentasAppsExternas(d, h)); } catch (e) { setError(e instanceof Error ? e.message : "Error"); }
+    try { setFilas(await leerVentasAppsExternas(d, h)); } catch (e) { setError(mensajeError(e, "Error")); }
   }, []);
   useEffect(() => { cargar(desde, hasta); }, [cargar, desde, hasta]);
 

@@ -6,6 +6,7 @@ import { usePerfil } from "../../components/admin-shell";
 import { leerDashboard, variacionPct, type Dashboard, type ResumenDia } from "../../lib/reportes";
 import { leerEstadoOnboarding, type EstadoOnboarding } from "../../lib/onboarding";
 import { listarSucursales } from "../../lib/configuracion";
+import { mensajeError } from "../../lib/errores";
 
 // Accesos rápidos del P-177: son de Reportes, no navegación genérica.
 const REPORTES_RAPIDOS = [
@@ -123,7 +124,7 @@ export default function DashboardPage() {
   const [sucursal, setSucursal] = useState<string | null>(null);
 
   useEffect(() => {
-    leerDashboard().then(setData).catch((e) => setError(e instanceof Error ? e.message : "No se pudo cargar"));
+    leerDashboard().then(setData).catch((e) => setError(mensajeError(e, "No se pudo cargar")));
     leerEstadoOnboarding().then(setOnb).catch(() => {});
     listarSucursales()
       .then((s) => setSucursal(s.length === 1 ? s[0]!.nombre : null))

@@ -11,6 +11,7 @@ import {
   type EstadoProducto,
   type Producto,
 } from "../../../lib/catalogo";
+import { mensajeError } from "../../../lib/errores";
 
 type Filtro = "all" | "ACTIVO" | "PAUSADO" | "AGOTADO";
 
@@ -34,7 +35,7 @@ export default function ProductosPage() {
     try {
       setProds(await listarProductos());
     } catch (e) {
-      setError(e instanceof Error ? e.message : "No se pudieron cargar los productos");
+      setError(mensajeError(e, "No se pudieron cargar los productos"));
     }
   }
   useEffect(() => {
@@ -58,7 +59,7 @@ export default function ProductosPage() {
       setBorrando(false);
       await recargar();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "No se pudo eliminar");
+      setError(mensajeError(e, "No se pudo eliminar"));
       setBorrando(false);
     }
   }
@@ -69,7 +70,7 @@ export default function ProductosPage() {
     <>
       <PageHeader
         titulo="Productos"
-        subtitulo="El menú que se vende en el POS."
+        subtitulo="El menú completo de tu negocio. Aquí sí se muestran los precios."
         migas={[{ label: "Catálogo" }, { label: "Productos" }]}
         right={
           <div className="flex items-center gap-2">

@@ -3,6 +3,7 @@ import { useCallback, useEffect, useState } from "react";
 import { PageBody, PageHeader } from "../../../components/page-header";
 import { RangoFechas } from "../../../components/rango-fechas";
 import { fmtMxn, leerVentasPorProducto, rangoUltimosDias, type FilaProducto } from "../../../lib/reportes";
+import { mensajeError } from "../../../lib/errores";
 
 export default function VentasPorProductoPage() {
   const r0 = rangoUltimosDias(30);
@@ -14,7 +15,7 @@ export default function VentasPorProductoPage() {
   const cargar = useCallback(async (d: string, h: string) => {
     setFilas(null); setError(null);
     try { setFilas(await leerVentasPorProducto(d, h)); }
-    catch (e) { setError(e instanceof Error ? e.message : "Error"); }
+    catch (e) { setError(mensajeError(e, "Error")); }
   }, []);
   useEffect(() => { cargar(desde, hasta); }, [cargar, desde, hasta]);
 
