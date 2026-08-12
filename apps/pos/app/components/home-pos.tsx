@@ -47,6 +47,7 @@ import { ModalCancelarItem } from "./modal-cancelar-item";
 import { ModalDescuentoItem } from "./modal-descuento-item";
 import { ModalCancelarTicket } from "./modal-cancelar-ticket";
 import { ModalMovimientoCaja } from "./modal-movimiento-caja";
+import { ModalAbrirCaja } from "./modal-abrir-caja";
 import { listarTicketsEnEspera, ponerTicketEnEspera, retomarTicketEnEspera } from "../lib/espera";
 import { ModalEtiquetaEspera, ModalListaEspera } from "./modal-espera";
 import { leerItemsPersistidos, type ItemTicket } from "../lib/cancelacion";
@@ -97,6 +98,7 @@ function TopbarOperativa({
   onBloquear,
   onCerrarTurno,
   onMovimientoCaja,
+  onAbrirCaja,
   onKds,
   onDevoluciones,
   onImpresora,
@@ -113,6 +115,8 @@ function TopbarOperativa({
   onBloquear: () => void;
   onCerrarTurno: () => void;
   onMovimientoCaja: () => void;
+  /** Abre el cajón de dinero sin venta (pide PIN de DUEÑO/ADMIN). */
+  onAbrirCaja: () => void;
   onKds: () => void;
   onDevoluciones: () => void;
   onImpresora: () => void;
@@ -242,6 +246,7 @@ function TopbarOperativa({
                     <TileMenu label="Cocina" onClick={conMenu(onKds)} icon={<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" className="h-8 w-8"><path d="M3 11l18-5v12L3 14v-3z" /><path d="M11.6 16.8a3 3 0 1 1-5.8-1.6" /></svg>} />
                     <TileMenu label="Devoluciones" onClick={conMenu(onDevoluciones)} icon={<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" className="h-8 w-8"><path d="M9 14l-4-4 4-4M5 10h11a4 4 0 0 1 0 8h-1" /></svg>} />
                     <TileMenu label="Movimientos de caja" onClick={conMenu(onMovimientoCaja)} icon={<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" className="h-8 w-8"><rect x="2" y="6" width="20" height="12" rx="2" /><circle cx="12" cy="12" r="2" /><path d="M6 12h.01M18 12h.01" /></svg>} />
+                    <TileMenu label="Abrir caja" onClick={conMenu(onAbrirCaja)} peligro icon={<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" className="h-8 w-8"><rect x="2" y="7" width="20" height="13" rx="1.5" /><path d="M2 12h20" /><path d="M8 12v4M16 12v4" /></svg>} />
                   </SeccionMenu>
                   <SeccionMenu titulo="Cuenta">
                     <TileMenu label="Cambiar cajero" onClick={conMenu(onCambiarCajero)} icon={<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" className="h-8 w-8"><path d="M16 3.13a4 4 0 0 1 0 7.75" /><path d="M21 21v-2a4 4 0 0 0-3-3.87" /><circle cx="9" cy="7" r="4" /><path d="M3 21v-2a4 4 0 0 1 4-4h4a4 4 0 0 1 4 4v2" /></svg>} />
@@ -364,6 +369,7 @@ export function HomePos({
   // F7 — modal de movimiento de caja.
   const [movimientoAbierto, setMovimientoAbierto] = useState(false);
   const [movimientoToast, setMovimientoToast] = useState<{ folio: string; tipo: string; monto: number } | null>(null);
+  const [abrirCajaAbierto, setAbrirCajaAbierto] = useState(false);
   // F5.3c — Datos crudos del ticket; el preview los renderiza fiel a P-222/P-223.
   const [datosTicket, setDatosTicket] = useState<DatosTicketImpresion | null>(null);
   const [datosComanda, setDatosComanda] = useState<DatosComanda | null>(null);
@@ -787,7 +793,7 @@ export function HomePos({
           Sincronizando {pendientesSync} operación{pendientesSync === 1 ? "" : "es"} pendiente{pendientesSync === 1 ? "" : "s"}…
         </div>
       )}
-      <TopbarOperativa caja={caja} turno={turno} empleado={empleado} onCambiarCajero={onCambiarCajero} onBloquear={onBloquear} onCerrarTurno={() => setCerrando(true)} onMovimientoCaja={() => setMovimientoAbierto(true)} onKds={() => { salirNavegacion(); setEnKds(true); }} onDevoluciones={() => { salirNavegacion(); setEnDevoluciones(true); }} onImpresora={() => setConfigImpresoraAbierto(true)} onCambiarPin={() => setCambiarPinAbierto(true)} onMisPropinas={() => setMisPropinasAbierto(true)} onEnEspera={() => { setEsperaError(null); setEsperaListaAbierta(true); }} onCuentas={() => { salirNavegacion(); setEnConsultaCuentas(true); }} nEnEspera={nEnEspera} />
+      <TopbarOperativa caja={caja} turno={turno} empleado={empleado} onCambiarCajero={onCambiarCajero} onBloquear={onBloquear} onCerrarTurno={() => setCerrando(true)} onMovimientoCaja={() => setMovimientoAbierto(true)} onAbrirCaja={() => setAbrirCajaAbierto(true)} onKds={() => { salirNavegacion(); setEnKds(true); }} onDevoluciones={() => { salirNavegacion(); setEnDevoluciones(true); }} onImpresora={() => setConfigImpresoraAbierto(true)} onCambiarPin={() => setCambiarPinAbierto(true)} onMisPropinas={() => setMisPropinasAbierto(true)} onEnEspera={() => { setEsperaError(null); setEsperaListaAbierta(true); }} onCuentas={() => { salirNavegacion(); setEnConsultaCuentas(true); }} nEnEspera={nEnEspera} />
       {configImpresoraAbierto && <ModalConfigImpresora onCerrar={() => setConfigImpresoraAbierto(false)} />}
       {clienteDomAbierto && (
         <ModalClienteDomicilio
@@ -987,6 +993,15 @@ export function HomePos({
           onCerrar={() => setMovimientoAbierto(false)}
         />
       )}
+      {abrirCajaAbierto && (
+        <ModalAbrirCaja
+          token={token}
+          empleado={empleado}
+          cajaId={turno.caja_id}
+          turnoId={turno.id}
+          onCerrar={() => setAbrirCajaAbierto(false)}
+        />
+      )}
       {movimientoToast && (
         <div className="fixed left-1/2 top-20 z-[80] -translate-x-1/2 rounded-lg bg-ink px-5 py-3 text-[13.5px] font-medium text-white shadow-xl">
           <span className="font-semibold">{movimientoToast.folio}</span> · {movimientoToast.tipo} · {fmtMxn(movimientoToast.monto)} registrado
@@ -1105,6 +1120,12 @@ export function HomePos({
                 obtenerImpresora("COCINA", { onMostrar: () => {} })
                   .imprimir(construirComandaJob(datosCom))
                   .catch(() => {});
+              }
+              // Cajón automático: solo si hubo efectivo de por medio (hay cambio que dar o
+              // fondo que actualizar). Tarjeta/otros no mueven billetes — abrirlo ahí solo
+              // expone el efectivo sin necesidad.
+              if (datos.pagos.some((p) => p.metodo === "Efectivo")) {
+                obtenerImpresora("CAJA", { onMostrar: () => {} }).abrirCajon();
               }
             } catch {
               setEstadoTicket("error");

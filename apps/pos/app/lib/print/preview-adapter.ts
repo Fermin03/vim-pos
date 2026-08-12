@@ -16,7 +16,9 @@ export class PreviewAdapter implements PrinterAdapter {
   async estado() {
     return "LISTO" as const;
   }
-  async abrirCajon() {
-    /* cajón diferido (cuelga de la impresora física) */
+  async abrirCajon(): Promise<PrintResult> {
+    // Sin impresora física no hay cajón que abrir; decir "listo" sería falso para una acción
+    // de efectivo. El cajero necesita ver "no se pudo" y saber que hace falta configurar una.
+    return { ok: false, motivo: "OFFLINE" };
   }
 }
