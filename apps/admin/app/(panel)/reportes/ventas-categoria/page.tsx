@@ -24,8 +24,8 @@ export default function VentasPorCategoriaPage() {
     <>
       <PageHeader
         titulo="Ventas por categoría"
-        subtitulo="Mix de venta del menú agrupado por categoría."
-        migas={[{ label: "Reportes" }, { label: "Ventas por categoría" }]}
+        subtitulo="Qué categorías de tu menú generan más ingresos en el período."
+        migas={[{ label: "Reportes" }, { label: "Ventas" }, { label: "Por categoría" }]}
       />
       <PageBody>
         <div className="mb-4"><RangoFechas desde={desde} hasta={hasta} onCambio={(d, h) => { setDesde(d); setHasta(h); }} /></div>
@@ -65,6 +65,17 @@ export default function VentasPorCategoriaPage() {
                   );
                 })}
               </tbody>
+              {filas.length > 0 && (
+                <tfoot>
+                  <tr className="border-t-2 border-line-strong bg-sel font-bold">
+                    <td className="px-4 py-2.5">Total</td>
+                    <td className="px-4 py-2.5 text-right tabular-nums">{filas.reduce((s, f) => s + f.unidades, 0)}</td>
+                    <td className="px-4 py-2.5 text-right tabular-nums">{filas.reduce((s, f) => s + f.tickets, 0)}</td>
+                    <td className="px-4 py-2.5 text-right tabular-nums">{fmtMxn(filas.reduce((s, f) => s + f.total_mxn, 0))}</td>
+                    <td className="px-4 py-2.5 text-right text-[11.5px] tabular-nums">100%</td>
+                  </tr>
+                </tfoot>
+              )}
             </table>
           </div>
         )}

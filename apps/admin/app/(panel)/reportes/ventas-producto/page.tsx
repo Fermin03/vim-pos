@@ -24,8 +24,8 @@ export default function VentasPorProductoPage() {
     <>
       <PageHeader
         titulo="Ventas por producto"
-        subtitulo="Qué se vende más, ordenado por ingreso. Top 200."
-        migas={[{ label: "Reportes" }, { label: "Ventas por producto" }]}
+        subtitulo="Ranking de productos por unidades vendidas e ingresos."
+        migas={[{ label: "Reportes" }, { label: "Ventas" }, { label: "Por producto" }]}
       />
       <PageBody>
         <div className="mb-4"><RangoFechas desde={desde} hasta={hasta} onCambio={(d, h) => { setDesde(d); setHasta(h); }} /></div>

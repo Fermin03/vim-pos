@@ -8,8 +8,9 @@ import {
   clienteSchema,
   crearCliente,
   eliminarCliente,
-  listarClientes,
+  listarClientesConResumen,
   type Cliente,
+  type ClienteConResumen,
 } from "../../lib/clientes";
 
 const input =
@@ -32,17 +33,28 @@ const TIPOS = [
   { v: "EVENTUAL", l: "Eventual" },
 ];
 
+const fmt = (n: number) => new Intl.NumberFormat("es-MX", { style: "currency", currency: "MXN" }).format(n);
+
+/** Fecha corta de la última visita; "—" si el cliente aún no compra. */
+function fmtVisita(iso: string | null): string {
+  if (!iso) return "—";
+  return new Intl.DateTimeFormat("es-MX", { day: "2-digit", month: "short", year: "2-digit" }).format(new Date(iso));
+}
+
+type FiltroCliente = "TODOS" | "CON_RFC" | "RECURRENTES";
+
 export default function ClientesPage() {
-  const [clientes, setClientes] = useState<Cliente[] | null>(null);
+  const [clientes, setClientes] = useState<ClienteConResumen[] | null>(null);
   const [busqueda, setBusqueda] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [okMsg, setOkMsg] = useState<string | null>(null);
   const [editando, setEditando] = useState<{ id: string | null; datos: typeof VACIO } | null>(null);
   const [guardando, setGuardando] = useState(false);
+  const [filtro, setFiltro] = useState<FiltroCliente>("TODOS");
 
   async function recargar(b = busqueda) {
     try {
-      setClientes(await listarClientes(b));
+      setClientes(await listarClientesConResumen(b));
     } catch (e) {
       setError(e instanceof Error ? e.message : "No se pudo cargar");
       setClientes([]);
@@ -114,20 +126,76 @@ export default function ClientesPage() {
     if (editando) setEditando({ ...editando, datos: { ...editando.datos, [k]: v } });
   }
 
+  const todos = clientes ?? [];
+  const conRfc = todos.filter((c) => (c.rfc ?? "").trim() !== "").length;
+  const recurrentes = todos.filter((c) => c.compras >= 3).length;
+  // Ticket promedio del negocio: gasto total entre compras totales. Solo cuenta a quien ya
+  // compró — promediar los ceros de clientes recién dados de alta lo hundiría sin razón.
+  const comprasTotales = todos.reduce((a, c) => a + c.compras, 0);
+  const gastoTotal = todos.reduce((a, c) => a + c.gastoTotal, 0);
+  const ticketPromedio = comprasTotales > 0 ? gastoTotal / comprasTotales : 0;
+
+  const visibles = todos.filter((c) => {
+    if (filtro === "CON_RFC") return (c.rfc ?? "").trim() !== "";
+    if (filtro === "RECURRENTES") return c.compras >= 3;
+    return true;
+  });
+
   return (
     <>
       <PageHeader
         titulo="Clientes"
-        subtitulo="Datos de clientes frecuentes para facturación y CRM."
+        subtitulo="Quienes han comprado o facturado en tu negocio. Se registran al pedir factura o por delivery."
         right={<Button onClick={nuevo}>Nuevo cliente</Button>}
       />
       <PageBody>
         {okMsg && <p className="mb-3 text-sm font-medium text-success">{okMsg}</p>}
         {error && !editando && <p className="mb-3 text-sm font-medium text-danger">{error}</p>}
 
-        <div className="mb-4 max-w-sm">
+        {clientes !== null && clientes.length > 0 && (
+          <div className="mb-5 grid grid-cols-2 gap-4 lg:grid-cols-4">
+            <div className="rounded-lg border border-line bg-surface p-4">
+              <div className="text-[11.5px] font-bold uppercase tracking-wide text-ink-3">Total clientes</div>
+              <div className="mt-1 font-display text-2xl font-bold tabular-nums">{clientes.length}</div>
+              <div className="text-[11.5px] text-ink-3">registrados</div>
+            </div>
+            <div className="rounded-lg border border-line bg-surface p-4">
+              <div className="text-[11.5px] font-bold uppercase tracking-wide text-ink-3">Con factura</div>
+              <div className="mt-1 font-display text-2xl font-bold tabular-nums">{conRfc}</div>
+              <div className="text-[11.5px] text-ink-3">tienen RFC capturado</div>
+            </div>
+            <div className="rounded-lg border border-line bg-surface p-4">
+              <div className="text-[11.5px] font-bold uppercase tracking-wide text-ink-3">Recurrentes</div>
+              <div className="mt-1 font-display text-2xl font-bold tabular-nums">{recurrentes}</div>
+              <div className="text-[11.5px] text-ink-3">3+ compras</div>
+            </div>
+            <div className="rounded-lg border border-line bg-surface p-4">
+              <div className="text-[11.5px] font-bold uppercase tracking-wide text-ink-3">Ticket promedio</div>
+              <div className="mt-1 font-display text-2xl font-bold tabular-nums">{fmt(ticketPromedio)}</div>
+              <div className="text-[11.5px] text-ink-3">por visita</div>
+            </div>
+          </div>
+        )}
+
+        <div className="mb-4 flex flex-wrap items-center gap-3">
+          <div className="inline-flex gap-0.5 rounded border border-line bg-hover p-[3px]">
+            {([
+              { v: "TODOS", l: "Todos los clientes" },
+              { v: "CON_RFC", l: "Con factura (RFC)" },
+              { v: "RECURRENTES", l: "Recurrentes (3+)" },
+            ] as { v: FiltroCliente; l: string }[]).map((t) => (
+              <button
+                key={t.v}
+                type="button"
+                onClick={() => setFiltro(t.v)}
+                className={["rounded-[4px] px-3 py-1.5 text-[12.5px] font-semibold transition", filtro === t.v ? "bg-surface text-ink shadow-sm" : "text-ink-2 hover:text-ink"].join(" ")}
+              >
+                {t.l}
+              </button>
+            ))}
+          </div>
           <input
-            className={input}
+            className="h-9 max-w-sm flex-1 rounded border border-line-strong px-3 text-[13px] outline-none focus:border-ink"
             value={busqueda}
             placeholder="Buscar por nombre, teléfono, RFC o correo…"
             onChange={(e) => {
@@ -149,33 +217,54 @@ export default function ClientesPage() {
             <table className="w-full text-[13.5px]">
               <thead>
                 <tr className="border-b border-line bg-sel text-left text-[11.5px] uppercase tracking-wide text-ink-3">
-                  <th className="px-4 py-2.5 font-semibold">Nombre</th>
+                  <th className="px-4 py-2.5 font-semibold">Cliente</th>
                   <th className="px-4 py-2.5 font-semibold">Contacto</th>
-                  <th className="px-4 py-2.5 font-semibold">RFC</th>
-                  <th className="px-4 py-2.5 font-semibold">Estado</th>
+                  <th className="px-4 py-2.5 text-right font-semibold">Compras</th>
+                  <th className="px-4 py-2.5 text-right font-semibold">Gasto total</th>
+                  <th className="px-4 py-2.5 font-semibold">Última visita</th>
                   <th className="px-4 py-2.5"></th>
                 </tr>
               </thead>
               <tbody>
-                {clientes.map((c) => (
+                {visibles.map((c) => (
                   <tr key={c.id} className="border-b border-line last:border-b-0">
-                    <td className="px-4 py-2.5 font-medium">{c.nombre} {c.apellido_paterno}</td>
-                    <td className="px-4 py-2.5 text-ink-2">{c.telefono || c.email || "—"}</td>
-                    <td className="px-4 py-2.5 font-mono text-[12px] text-ink-2">{c.rfc || "—"}</td>
                     <td className="px-4 py-2.5">
-                      <span className={`rounded-full px-2 py-0.5 text-[11px] font-bold ${c.estado === "ACTIVO" ? "bg-[#EAF3EE] text-success" : "bg-[#FBECEA] text-danger"}`}>
-                        {c.estado === "ACTIVO" ? "Activo" : "Bloqueado"}
-                      </span>
+                      <div className="font-medium">
+                        {c.nombre} {c.apellido_paterno}
+                        {c.estado !== "ACTIVO" && (
+                          <span className="ml-2 rounded-full bg-[#FBECEA] px-2 py-0.5 text-[11px] font-bold text-danger">Bloqueado</span>
+                        )}
+                      </div>
+                      {c.rfc && <div className="mt-px font-mono text-[11.5px] text-ink-3">{c.rfc}</div>}
                     </td>
-                    <td className="px-4 py-2.5 text-right">
+                    <td className="px-4 py-2.5 text-ink-2">{c.telefono || c.email || "—"}</td>
+                    <td className="px-4 py-2.5 text-right tabular-nums">
+                      {c.compras > 0 ? c.compras : <span className="text-ink-3">—</span>}
+                    </td>
+                    <td className="px-4 py-2.5 text-right font-medium tabular-nums">
+                      {c.compras > 0 ? fmt(c.gastoTotal) : <span className="font-normal text-ink-3">—</span>}
+                    </td>
+                    <td className="px-4 py-2.5 text-ink-2">{fmtVisita(c.ultimaVisita)}</td>
+                    <td className="px-4 py-2.5 text-right whitespace-nowrap">
                       <button type="button" onClick={() => editar(c)} className="text-[12.5px] font-semibold text-ink-2 hover:text-ink">Editar</button>
                       <button type="button" onClick={() => alternarBloqueo(c)} className="ml-3 text-[12.5px] font-semibold text-ink-3 hover:text-ink">{c.estado === "ACTIVO" ? "Bloquear" : "Activar"}</button>
                       <button type="button" onClick={() => borrar(c)} className="ml-3 text-[12.5px] font-semibold text-ink-3 hover:text-danger">Eliminar</button>
                     </td>
                   </tr>
                 ))}
+                {visibles.length === 0 && (
+                  <tr>
+                    <td colSpan={6} className="px-4 py-10 text-center">
+                      <p className="text-[14px] font-semibold text-ink-2">Sin resultados</p>
+                      <p className="mt-1 text-[12.5px] text-ink-3">No hay clientes que coincidan con tu búsqueda o filtro.</p>
+                    </td>
+                  </tr>
+                )}
               </tbody>
             </table>
+            <div className="border-t border-line px-4 py-3 text-[12.5px] text-ink-3">
+              Mostrando <b className="text-ink-2">{visibles.length}</b> de <b className="text-ink-2">{todos.length}</b> clientes
+            </div>
           </div>
         )}
 
