@@ -16,7 +16,7 @@
 -- Se corre con:  supabase test db
 -- ============================================================================
 begin;
-select plan(3);
+select plan(4);
 
 -- #1 — pgTAP cargado.
 select has_extension('pgtap');
@@ -58,6 +58,21 @@ select is_empty($$
     and c.relname not in (select tabla from _rls_exentas)
   order by 1
 $$, 'Toda tabla con tenant_id y RLS tiene al menos una política (o está exenta a propósito)');
+
+-- #4 — CRÍTICA: toda vista vw_* declara security_invoker=on.
+-- Sin esa opción la vista se ejecuta con los permisos de su DUEÑO (superusuario) y SALTA el RLS
+-- de las tablas base: un tenant leería los datos de todos los demás a través de la vista. Es un
+-- olvido fácil (la opción no se hereda ni se avisa) y silencioso: la vista "funciona" igual.
+select is_empty($$
+  select c.relname as vista_SIN_security_invoker
+  from pg_class c
+  join pg_namespace n on n.oid = c.relnamespace
+  where n.nspname = 'public'
+    and c.relkind = 'v'
+    and c.relname like 'vw\_%'
+    and not coalesce(array_to_string(c.reloptions, ',') like '%security_invoker=on%', false)
+  order by 1
+$$, 'Toda vista vw_* declara security_invoker=on (respeta el RLS de sus tablas base)');
 
 select * from finish();
 rollback;

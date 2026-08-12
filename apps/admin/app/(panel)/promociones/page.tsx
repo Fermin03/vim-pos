@@ -31,10 +31,30 @@ const COLOR_ESTADO: Record<EstadoPromo, string> = {
   EXPIRADA: "bg-[#F2F2F0] text-ink-3", AGOTADA: "bg-[#FBECEA] text-danger",
 };
 
+/**
+ * Estado mostrado en la lista (P-139: Activas / Programadas / Inactivas).
+ *
+ * `promociones.estado` no tiene PROGRAMADA: una promo con fecha_inicio a futuro se guarda
+ * como ACTIVA y la lista la mostraba como "Activa" aunque todavía no aplicara en el POS.
+ * Se deriva aquí para que el dueño no crea que ya está corriendo.
+ */
+type EstadoVista = EstadoPromo | "PROGRAMADA";
+function estadoVista(p: { estado: EstadoPromo; fechaInicio: string }): EstadoVista {
+  if (p.estado === "ACTIVA" && new Date(p.fechaInicio).getTime() > Date.now()) return "PROGRAMADA";
+  return p.estado;
+}
+const COLOR_VISTA: Record<EstadoVista, string> = { ...COLOR_ESTADO, PROGRAMADA: "bg-[#EAEFF7] text-info" };
+const LABEL_VISTA: Record<EstadoVista, string> = {
+  ACTIVA: "Activa", PAUSADA: "Pausada", EXPIRADA: "Expirada", AGOTADA: "Agotada", PROGRAMADA: "Programada",
+};
+
+type FiltroPromo = "TODAS" | "ACTIVAS" | "PROGRAMADAS" | "INACTIVAS";
+
 export default function PromocionesPage() {
   const [promos, setPromos] = useState<Promo[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [okMsg, setOkMsg] = useState<string | null>(null);
+  const [filtro, setFiltro] = useState<FiltroPromo>("TODAS");
   const [editando, setEditando] = useState<{ id: string | null; datos: FormDatos } | null>(null);
   const [guardando, setGuardando] = useState(false);
 
@@ -80,9 +100,23 @@ export default function PromocionesPage() {
     if (editando) setEditando({ ...editando, datos: { ...editando.datos, [k]: v } });
   }
 
+  const todas = promos ?? [];
+  const visibles = todas.filter((p) => {
+    const e = estadoVista(p);
+    if (filtro === "ACTIVAS") return e === "ACTIVA";
+    if (filtro === "PROGRAMADAS") return e === "PROGRAMADA";
+    if (filtro === "INACTIVAS") return e === "PAUSADA" || e === "EXPIRADA" || e === "AGOTADA";
+    return true;
+  });
+
   return (
     <>
-      <PageHeader titulo="Promociones" subtitulo="Descuentos, precios especiales y cortesías con vigencia (happy hour)." right={<Button onClick={() => setEditando({ id: null, datos: VACIO() })}>Nueva promoción</Button>} />
+      <PageHeader
+        titulo="Promociones"
+        subtitulo="Ofertas y descuentos que se aplican automáticamente en el POS según sus condiciones."
+        migas={[{ label: "Catálogo" }, { label: "Promociones" }]}
+        right={<Button onClick={() => setEditando({ id: null, datos: VACIO() })}>Nueva promoción</Button>}
+      />
       <PageBody>
         {okMsg && <p className="mb-3 text-sm font-medium text-success">{okMsg}</p>}
         {error && !editando && <p className="mb-3 text-sm font-medium text-danger">{error}</p>}
@@ -96,19 +130,38 @@ export default function PromocionesPage() {
         )}
         {promos && promos.length > 0 && (
           <div className="overflow-hidden rounded-lg border border-line bg-surface">
+            <div className="border-b border-line px-4 py-3">
+              <div className="inline-flex gap-0.5 rounded border border-line bg-hover p-[3px]">
+                {([
+                  { v: "TODAS", l: "Todas" },
+                  { v: "ACTIVAS", l: "Activas" },
+                  { v: "PROGRAMADAS", l: "Programadas" },
+                  { v: "INACTIVAS", l: "Inactivas" },
+                ] as { v: FiltroPromo; l: string }[]).map((t) => (
+                  <button
+                    key={t.v}
+                    type="button"
+                    onClick={() => setFiltro(t.v)}
+                    className={["rounded-[4px] px-3 py-1.5 text-[12.5px] font-semibold transition", filtro === t.v ? "bg-surface text-ink shadow-sm" : "text-ink-2 hover:text-ink"].join(" ")}
+                  >
+                    {t.l}
+                  </button>
+                ))}
+              </div>
+            </div>
             <table className="w-full text-[13.5px]">
               <thead><tr className="border-b border-line bg-sel text-left text-[11.5px] font-bold uppercase tracking-wide text-ink-3">
                 <th className="px-4 py-2.5">Promoción</th><th className="px-4 py-2.5">Beneficio</th><th className="px-4 py-2.5">Vigencia</th><th className="px-4 py-2.5">Estado</th><th className="px-4 py-2.5"></th>
               </tr></thead>
               <tbody>
-                {promos.map((p) => (
+                {visibles.map((p) => (
                   <tr key={p.id} className="border-b border-line last:border-b-0">
                     <td className="px-4 py-2.5"><div className="font-medium">{p.nombre}</div>{p.descripcion && <div className="text-[12px] text-ink-3">{p.descripcion}</div>}</td>
                     <td className="px-4 py-2.5 font-semibold tabular-nums">{p.valorTexto}</td>
                     <td className="px-4 py-2.5 text-[12.5px] text-ink-2">
                       {new Date(p.fechaInicio).toLocaleDateString("es-MX")}{p.fechaFin ? ` → ${new Date(p.fechaFin).toLocaleDateString("es-MX")}` : " → sin fin"}
                     </td>
-                    <td className="px-4 py-2.5"><span className={`rounded-full px-2 py-0.5 text-[11px] font-bold ${COLOR_ESTADO[p.estado]}`}>{p.estado}</span></td>
+                    <td className="px-4 py-2.5"><span className={`rounded-full px-2 py-0.5 text-[11px] font-bold ${COLOR_VISTA[estadoVista(p)]}`}>{LABEL_VISTA[estadoVista(p)]}</span></td>
                     <td className="px-4 py-2.5 text-right">
                       <button type="button" onClick={() => setEditando({ id: p.id, datos: { nombre: p.nombre, descripcion: p.descripcion, tipo: p.tipo, valor: p.valorTexto.replace(/[^0-9.]/g, ""), fecha_inicio: p.fechaInicio.slice(0, 16), fecha_fin: p.fechaFin ? p.fechaFin.slice(0, 16) : "" } })} className="text-[12.5px] font-semibold text-ink-2 hover:text-ink">Editar</button>
                       {(p.estado === "ACTIVA" || p.estado === "PAUSADA") && <button type="button" onClick={() => alternar(p)} className="ml-3 text-[12.5px] font-semibold text-ink-3 hover:text-ink">{p.estado === "ACTIVA" ? "Pausar" : "Activar"}</button>}
@@ -116,8 +169,19 @@ export default function PromocionesPage() {
                     </td>
                   </tr>
                 ))}
+                {visibles.length === 0 && (
+                  <tr>
+                    <td colSpan={5} className="px-4 py-10 text-center">
+                      <p className="text-[14px] font-semibold text-ink-2">Sin resultados</p>
+                      <p className="mt-1 text-[12.5px] text-ink-3">No hay promociones que coincidan con tu filtro.</p>
+                    </td>
+                  </tr>
+                )}
               </tbody>
             </table>
+            <div className="border-t border-line px-4 py-3 text-[12.5px] text-ink-3">
+              Mostrando <b className="text-ink-2">{visibles.length}</b> de <b className="text-ink-2">{todas.length}</b> promociones
+            </div>
           </div>
         )}
 

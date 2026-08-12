@@ -25,6 +25,16 @@ export const clienteSchema = z.object({
 export type ClienteInput = z.infer<typeof clienteSchema>;
 export type Cliente = ClienteInput & { id: string; estado: "ACTIVO" | "BLOQUEADO" };
 
+/** Comportamiento de compra del cliente (P-151), desde vw_clientes_resumen (mig. 0061). */
+export type ResumenCliente = {
+  compras: number;
+  gastoTotal: number;
+  ticketPromedio: number;
+  ultimaVisita: string | null;
+};
+
+export type ClienteConResumen = Cliente & ResumenCliente;
+
 const S = (v: unknown) => (v == null ? "" : String(v));
 
 export async function listarClientes(busqueda = ""): Promise<Cliente[]> {
@@ -53,6 +63,33 @@ export async function listarClientes(busqueda = ""): Promise<Cliente[]> {
     notas_internas: S(c.notas_internas),
     estado: (c.estado as Cliente["estado"]) ?? "ACTIVO",
   }));
+}
+
+/**
+ * Lista de clientes con su comportamiento de compra (P-151). Dos consultas en paralelo en vez
+ * de un join anidado: vw_clientes_resumen agrupa por cliente y PostgREST no la puede embeber
+ * como relación de `clientes` (es una vista, no una FK). Se cruzan por id en el cliente.
+ *
+ * Un cliente sin compras queda en ceros (la vista usa LEFT JOIN), no desaparece de la lista.
+ */
+export async function listarClientesConResumen(busqueda = ""): Promise<ClienteConResumen[]> {
+  const [clientes, { data: res, error }] = await Promise.all([
+    listarClientes(busqueda),
+    supabase.from("vw_clientes_resumen").select("cliente_id, compras, gasto_total_mxn, ticket_promedio_mxn, ultima_visita"),
+  ]);
+  if (error) throw new Error(error.message);
+
+  const porId = new Map<string, ResumenCliente>();
+  for (const r of (res ?? []) as Record<string, unknown>[]) {
+    porId.set(String(r.cliente_id), {
+      compras: Number(r.compras ?? 0),
+      gastoTotal: Number(r.gasto_total_mxn ?? 0),
+      ticketPromedio: Number(r.ticket_promedio_mxn ?? 0),
+      ultimaVisita: r.ultima_visita ? String(r.ultima_visita) : null,
+    });
+  }
+  const VACIO: ResumenCliente = { compras: 0, gastoTotal: 0, ticketPromedio: 0, ultimaVisita: null };
+  return clientes.map((c) => ({ ...c, ...(porId.get(c.id) ?? VACIO) }));
 }
 
 function payload(d: ClienteInput) {
