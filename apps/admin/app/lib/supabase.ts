@@ -69,6 +69,20 @@ export async function salir(): Promise<void> {
 }
 
 /**
+ * Envía el correo con el enlace para restablecer la contraseña (P-003).
+ * El enlace aterriza en /establecer-acceso, que ya sabe recibir la sesión del link.
+ *
+ * No distingue si el correo existe o no: la UI siempre responde igual ("si existe una
+ * cuenta, enviamos…"), para no filtrar qué correos están registrados en el sistema.
+ */
+export async function enviarEnlaceRecuperacion(email: string): Promise<void> {
+  const { error } = await supabase.auth.resetPasswordForEmail(email, {
+    redirectTo: `${window.location.origin}/establecer-acceso`,
+  });
+  if (error) throw new Error(error.message);
+}
+
+/**
  * Fija/cambia la contraseña del usuario de la sesión actual. Se usa tanto en el
  * aterrizaje de la invitación (el link de Supabase ya dejó una sesión) como en
  * "cambiar contraseña" dentro del panel. Lanza Error con mensaje si falla.

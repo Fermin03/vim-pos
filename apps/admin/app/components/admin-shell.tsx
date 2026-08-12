@@ -5,6 +5,7 @@ import Link from "next/link";
 import { leerSesion } from "../lib/supabase";
 import { cargarPerfil, iniciales, type Perfil } from "../lib/perfil";
 import { salir } from "../lib/supabase";
+import { listarSucursales } from "../lib/configuracion";
 
 const PerfilCtx = createContext<Perfil | null>(null);
 export const usePerfil = () => useContext(PerfilCtx);
@@ -54,6 +55,7 @@ export function AdminShell({ children }: { children: ReactNode }) {
   const [perfil, setPerfil] = useState<Perfil | null>(null);
   const [listo, setListo] = useState(false);
   const [sinAcceso, setSinAcceso] = useState<string | null>(null);
+  const [sucursales, setSucursales] = useState<{ nombre: string; total: number } | null>(null);
 
   useEffect(() => {
     (async () => {
@@ -70,6 +72,15 @@ export function AdminShell({ children }: { children: ReactNode }) {
       }
       setPerfil(await cargarPerfil());
       setListo(true);
+      // El selector del sidebar muestra la sucursal real del tenant (antes decía "León Centro"
+      // fijo, que es el dato del mockup: cualquier cliente nuevo veía el nombre equivocado).
+      listarSucursales()
+        .then((subs) => {
+          const activas = subs.filter((x) => x.activa);
+          const lista = activas.length > 0 ? activas : subs;
+          if (lista.length > 0) setSucursales({ nombre: lista[0]!.nombre, total: lista.length });
+        })
+        .catch(() => {});
     })();
   }, [router]);
 
@@ -123,8 +134,10 @@ export function AdminShell({ children }: { children: ReactNode }) {
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-4 w-4"><path d="M3 21h18M5 21V7l8-4v18M19 21V11l-6-3" /></svg>
             </div>
             <div className="min-w-0 flex-1">
-              <div className="text-[13.5px] font-semibold text-white">León Centro</div>
-              <div className="mt-px text-[11.5px] text-[#76767E]">1 de 1 sucursal</div>
+              <div className="truncate text-[13.5px] font-semibold text-white">{sucursales?.nombre ?? "—"}</div>
+              <div className="mt-px text-[11.5px] text-[#76767E]">
+                {sucursales ? `1 de ${sucursales.total} ${sucursales.total === 1 ? "sucursal" : "sucursales"}` : "Cargando…"}
+              </div>
             </div>
           </div>
 

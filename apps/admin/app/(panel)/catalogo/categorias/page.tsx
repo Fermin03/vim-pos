@@ -77,7 +77,7 @@ export default function CategoriasPage() {
     <>
       <PageHeader
         titulo="Categorías"
-        subtitulo="Los grupos en los que se ordena tu menú."
+        subtitulo="Los grupos en los que se ordena tu menú. El orden define cómo aparecen en el POS."
         migas={[{ label: "Catálogo" }, { label: "Categorías" }]}
         right={
           <Button onClick={() => setModal({ cat: null })}>
@@ -205,7 +205,7 @@ export default function CategoriasPage() {
                 </p>
                 <p className="max-w-sm text-sm text-ink-2">
                   {sinNada
-                    ? "Crea tu primera categoría para empezar a ordenar el menú de Knock-Out."
+                    ? "Crea tu primera categoría para empezar a ordenar tu menú."
                     : "No hay categorías que coincidan con tu búsqueda o filtro."}
                 </p>
                 {sinNada && <Button onClick={() => setModal({ cat: null })}>Crear la primera categoría</Button>}
