@@ -132,8 +132,11 @@ export function SidebarTicket({
   const hayDescuento = descuentoMxn > 0;
   const totalFinal = totalConDescuento ?? totales.total;
 
+  // Ancho del carrito: era fijo en 404px, y en una caja de 1024px se comía el 40% de la pantalla
+  // dejando el catálogo apretado. Ahora escala (32vw) con topes: nunca menos de 320px —por debajo
+  // no cabe una línea con cantidad, nombre y precio— ni más de 420px.
   return (
-    <aside className="flex w-[404px] flex-shrink-0 flex-col border-l border-line bg-surface">
+    <aside className="flex w-[clamp(20rem,32vw,26.25rem)] flex-shrink-0 flex-col border-l border-line bg-surface">
 
       {/* ── Cabecera ─────────────────────────────────────────── */}
       <div className="flex-shrink-0 border-b border-line px-5 pb-3 pt-4">

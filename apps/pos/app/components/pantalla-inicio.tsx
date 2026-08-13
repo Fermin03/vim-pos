@@ -82,7 +82,7 @@ export function PantallaInicio({
   return (
     <main className="flex h-screen flex-col bg-bg">
       {/* Barra: quién opera, dónde y desde cuándo */}
-      <header className="flex h-[68px] flex-shrink-0 items-center justify-between border-b border-line px-6">
+      <header className="flex h-[clamp(3rem,7.5vh,4.25rem)] flex-shrink-0 items-center justify-between gap-3 border-b border-line px-[clamp(0.75rem,2vw,1.5rem)]">
         <div className="flex items-center gap-4">
           <div className="relative flex h-[34px] w-[34px] items-center justify-center rounded-lg bg-ink">
             <span className="font-display text-base font-bold leading-none tracking-tight text-white">V</span>
@@ -126,31 +126,37 @@ export function PantallaInicio({
         </div>
       </header>
 
-      <div className="flex-1 overflow-y-auto px-8 py-8">
-        <div className="mx-auto max-w-5xl">
+      {/* Sin scroll: el cuerpo reparte la altura que sobra entre las dos secciones. `min-h-0` es
+          obligatorio — un hijo flex trae min-height:auto y se negaría a encogerse, empujando el
+          contenido fuera de la pantalla en monitores bajos (1024×768 típico de caja). */}
+      <div className="flex min-h-0 flex-1 flex-col gap-[clamp(0.5rem,2vh,1.75rem)] px-[clamp(1rem,3vw,2rem)] py-[clamp(0.75rem,2.5vh,2rem)]">
+        <div className="mx-auto flex min-h-0 w-full max-w-5xl flex-1 flex-col gap-[clamp(0.5rem,2vh,1.75rem)]">
           {/* Sin turno: se dice por qué no se puede vender y cuál es el siguiente paso. */}
           {sinTurno && (
             <button
               type="button"
               onClick={onAbrirTurno}
-              className="mb-6 flex w-full items-center gap-4 rounded-xl border border-[#E8DCC0] bg-[#F6EEDD] p-5 text-left transition hover:border-warning"
+              className="flex w-full flex-shrink-0 items-center gap-3 rounded-xl border border-[#E8DCC0] bg-[#F6EEDD] p-[clamp(0.75rem,1.6vh,1.25rem)] text-left transition hover:border-warning"
             >
-              <span className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-full bg-warning/15 text-warning">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-6 w-6"><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></svg>
+              <span className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-warning/15 text-warning">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5"><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></svg>
               </span>
               <span className="min-w-0 flex-1">
-                <span className="block font-display text-[17px] font-semibold tracking-tight">Abre el turno para empezar a vender</span>
-                <span className="mt-0.5 block text-[13px] text-ink-2">
+                <span className="block font-display text-[clamp(0.95rem,1.6vh,1.1rem)] font-semibold tracking-tight">Abre el turno para empezar a vender</span>
+                <span className="mt-0.5 block text-[clamp(0.72rem,1.3vh,0.82rem)] text-ink-2">
                   Declara el fondo con el que arranca la caja. Hasta entonces no se pueden tomar pedidos.
                 </span>
               </span>
-              <span className="flex-shrink-0 rounded-lg bg-ink px-4 py-2.5 text-[14px] font-semibold text-white">Abrir turno</span>
+              <span className="flex-shrink-0 rounded-lg bg-ink px-4 py-2.5 text-[clamp(0.8rem,1.4vh,0.9rem)] font-semibold text-white">Abrir turno</span>
             </button>
           )}
 
-          {/* Los 4 modos de venta: lo que se toca 100 veces al día, en botones grandes */}
-          <h2 className="mb-3 text-[12px] font-bold uppercase tracking-[0.06em] text-ink-3">Tomar pedido</h2>
-          <div className={["mb-8 grid grid-cols-2 gap-4 lg:grid-cols-4", sinTurno ? "pointer-events-none opacity-40" : ""].join(" ")} aria-disabled={sinTurno}>
+          {/* Los 4 modos de venta: lo que se toca 100 veces al día. La sección crece con la
+              pantalla (flex-[5] vs flex-[4] de Caja) para que los botones grandes se lleven
+              la mayor parte del espacio sobrante. */}
+          <section className="flex min-h-0 flex-[5] flex-col gap-[clamp(0.3rem,1vh,0.75rem)]">
+            <h2 className="flex-shrink-0 text-[clamp(0.65rem,1.2vh,0.75rem)] font-bold uppercase tracking-[0.06em] text-ink-3">Tomar pedido</h2>
+            <div className={["grid min-h-0 flex-1 grid-cols-2 gap-[clamp(0.5rem,1.4vh,1rem)] lg:grid-cols-4", sinTurno ? "pointer-events-none opacity-40" : ""].join(" ")} aria-disabled={sinTurno}>
             <BotonModo
               label="Comedor"
               sub={nCuentasComedor > 0 ? `${nCuentasComedor} mesa${nCuentasComedor === 1 ? "" : "s"} abierta${nCuentasComedor === 1 ? "" : "s"}` : "Ver mesas"}
@@ -179,11 +185,13 @@ export function PantallaInicio({
               onClick={onDomicilio}
               icon={<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="h-9 w-9"><path d="M1 9h13v8H1z" /><path d="M14 12h4l3 3v2h-7" /><circle cx="5" cy="18" r="2" /><circle cx="17" cy="18" r="2" /></svg>}
             />
-          </div>
+            </div>
+          </section>
 
           {/* Operación de caja */}
-          <h2 className="mb-3 text-[12px] font-bold uppercase tracking-[0.06em] text-ink-3">Caja</h2>
-          <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+          <section className="flex min-h-0 flex-[4] flex-col gap-[clamp(0.3rem,1vh,0.75rem)]">
+            <h2 className="flex-shrink-0 text-[clamp(0.65rem,1.2vh,0.75rem)] font-bold uppercase tracking-[0.06em] text-ink-3">Caja</h2>
+            <div className="grid min-h-0 flex-1 grid-cols-2 gap-[clamp(0.5rem,1.4vh,1rem)] lg:grid-cols-4">
             <BotonOperacion
               label="Monitor de ventas"
               sub={sinTurno ? "Requiere turno abierto" : ventaTurno === null ? "Cargando…" : `${fmtMxn(ventaTurno)} en el turno`}
@@ -221,7 +229,8 @@ export function PantallaInicio({
                 icon={<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" className="h-7 w-7"><path d="M9 11l3 3L22 4" /><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" /></svg>}
               />
             )}
-          </div>
+            </div>
+          </section>
         </div>
       </div>
     </main>
@@ -237,19 +246,21 @@ function BotonModo({
       type="button"
       onClick={onClick}
       className={[
-        "relative flex min-h-[150px] flex-col items-start justify-between rounded-xl border p-5 text-left transition",
+        // h-full: llena la celda del grid, que ya reparte la altura disponible. Sin alto fijo:
+        // en un monitor bajo el botón se comprime en vez de empujar la página fuera de cuadro.
+        "relative flex h-full min-h-0 flex-col items-start justify-between overflow-hidden rounded-xl border p-[clamp(0.6rem,1.6vh,1.25rem)] text-left transition",
         acento
           ? "border-ink bg-ink text-white hover:brightness-110"
           : "border-line-strong bg-surface hover:border-ink hover:bg-sel",
       ].join(" ")}
     >
-      <span className={acento ? "text-white" : "text-ink-2"}>{icon}</span>
-      <span className="w-full">
-        <span className="block font-display text-[19px] font-semibold tracking-tight">{label}</span>
-        <span className={["mt-0.5 block text-[12.5px]", acento ? "text-white/70" : "text-ink-3"].join(" ")}>{sub}</span>
+      <span className={["[&>svg]:h-[clamp(1.4rem,3.4vh,2.25rem)] [&>svg]:w-auto", acento ? "text-white" : "text-ink-2"].join(" ")}>{icon}</span>
+      <span className="w-full min-w-0">
+        <span className="block truncate font-display text-[clamp(0.95rem,2.1vh,1.2rem)] font-semibold tracking-tight">{label}</span>
+        <span className={["mt-0.5 block truncate text-[clamp(0.7rem,1.35vh,0.8rem)]", acento ? "text-white/70" : "text-ink-3"].join(" ")}>{sub}</span>
       </span>
       {badge != null && badge > 0 && (
-        <span className="absolute right-4 top-4 flex h-7 min-w-[28px] items-center justify-center rounded-full bg-accent px-2 font-display text-[13px] font-bold text-white">
+        <span className="absolute right-3 top-3 flex h-[clamp(1.25rem,2.6vh,1.75rem)] min-w-[clamp(1.25rem,2.6vh,1.75rem)] items-center justify-center rounded-full bg-accent px-1.5 font-display text-[clamp(0.7rem,1.4vh,0.82rem)] font-bold text-white">
           {badge}
         </span>
       )}
@@ -266,15 +277,15 @@ function BotonOperacion({
       onClick={onClick}
       disabled={deshabilitado}
       className={[
-        "flex min-h-[110px] flex-col items-start justify-between rounded-xl border border-line-strong bg-surface p-4 text-left transition",
+        "flex h-full min-h-0 flex-col items-start justify-between overflow-hidden rounded-xl border border-line-strong bg-surface p-[clamp(0.5rem,1.4vh,1rem)] text-left transition",
         "disabled:cursor-default disabled:opacity-40 disabled:hover:border-line-strong disabled:hover:bg-surface",
         peligro ? "hover:border-danger hover:bg-[#FBF1EF]" : "hover:border-ink hover:bg-sel",
       ].join(" ")}
     >
-      <span className={peligro ? "text-danger" : "text-ink-2"}>{icon}</span>
-      <span>
-        <span className={["block text-[14.5px] font-semibold", peligro ? "text-danger" : ""].join(" ")}>{label}</span>
-        <span className="mt-0.5 block text-[12px] text-ink-3">{sub}</span>
+      <span className={["[&>svg]:h-[clamp(1.15rem,2.6vh,1.75rem)] [&>svg]:w-auto", peligro ? "text-danger" : "text-ink-2"].join(" ")}>{icon}</span>
+      <span className="w-full min-w-0">
+        <span className={["block truncate text-[clamp(0.8rem,1.7vh,0.95rem)] font-semibold", peligro ? "text-danger" : ""].join(" ")}>{label}</span>
+        <span className="mt-0.5 block truncate text-[clamp(0.65rem,1.3vh,0.78rem)] text-ink-3">{sub}</span>
       </span>
     </button>
   );
