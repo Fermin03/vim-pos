@@ -8,7 +8,9 @@ export interface PrinterAdapter {
   nombre: string;
   imprimir(job: PrintJob): Promise<PrintResult>;
   estado(): Promise<"LISTO" | "SIN_PAPEL" | "OFFLINE" | "ERROR">;
-  abrirCajon(): Promise<void>;
+  /** Pulso al cajón de dinero. Devuelve si de verdad llegó — nunca lo des por hecho en silencio,
+   *  es dinero: el cajero necesita saber si la impresora no respondió. */
+  abrirCajon(): Promise<PrintResult>;
 }
 
 /**

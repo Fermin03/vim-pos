@@ -2,7 +2,6 @@
 import { useCallback, useEffect, useState } from "react";
 import {
   deviceEmail,
-  deviceSignIn,
   deviceSignOut,
   deviceToken,
   cajaIdFromEmail,
@@ -11,7 +10,7 @@ import {
   type PinLoginResult,
 } from "./lib/supabase";
 import { leerCaja, type DatosCaja } from "./lib/turno";
-import { leerCreds, olvidarCreds } from "./lib/device-creds";
+import { olvidarCreds } from "./lib/device-creds";
 import { VincularDispositivo } from "./components/vincular-dispositivo";
 import { SelectorEmpleados } from "./components/selector-empleados";
 import { ModalPin } from "./components/modal-pin";
@@ -46,18 +45,13 @@ export default function Page() {
   useEffect(() => {
     let activo = true;
     (async () => {
-      let email = await deviceEmail();
-      if (!email) {
-        const creds = leerCreds();
-        if (creds) {
-          try {
-            await deviceSignIn(creds.email, creds.password);
-            email = creds.email;
-          } catch {
-            /* credenciales inválidas → re-vincular */
-          }
-        }
-      }
+      // SEC CN-006 — antes, si no había sesión viva, aquí se hacía un re-login automático con la
+      // contraseña del dispositivo guardada en localStorage. Esa contraseña vale también contra la
+      // nube (sync-pull expone los pin_hash del tenant entero), así que ya no se guarda.
+      // En operación normal no se nota: deviceClient persiste la sesión y la auto-refresca, así que
+      // este camino solo se toma si la sesión se perdió de verdad — y entonces toca la pantalla de
+      // vinculación, que ya viene con el correo puesto.
+      const email = await deviceEmail();
       if (!activo) return;
       if (email) {
         const cid = cajaIdFromEmail(email);

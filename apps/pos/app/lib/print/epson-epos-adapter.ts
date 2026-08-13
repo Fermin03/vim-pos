@@ -37,13 +37,20 @@ export class EpsonEposAdapter implements PrinterAdapter {
     }
   }
 
-  async abrirCajon() {
+  async abrirCajon(): Promise<PrintResult> {
     const xml = sobreEpos(`<pulse drawer="drawer1" time="pulse_100" />`);
-    await fetch(`http://${this.ip}/cgi-bin/epos/service.cgi?devid=local_printer`, {
-      method: "POST",
-      headers: { "Content-Type": "text/xml; charset=utf-8", "SOAPAction": '""' },
-      body: xml,
-    }).catch(() => {});
+    try {
+      const res = await fetch(`http://${this.ip}/cgi-bin/epos/service.cgi?devid=local_printer`, {
+        method: "POST",
+        headers: { "Content-Type": "text/xml; charset=utf-8", "SOAPAction": '""' },
+        body: xml,
+      });
+      if (!res.ok) return { ok: false, motivo: "ERROR" };
+      const body = await res.text();
+      return /success="true"/.test(body) ? { ok: true } : { ok: false, motivo: "ERROR" };
+    } catch {
+      return { ok: false, motivo: "OFFLINE" };
+    }
   }
 }
 

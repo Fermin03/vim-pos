@@ -50,10 +50,16 @@ try {
   await c.query("SELECT set_config('request.jwt.claims',$1,true)", [JSON.stringify({ sub: cajeroAcc.usuario_id, tenant_id: dev.body.user.app_metadata.tenant_id, role: "authenticated" })]);
   const suc = (await c.query("SELECT sucursal_id FROM cajas WHERE id=$1", [CAJA])).rows[0].sucursal_id;
   const abierto = (await c.query("SELECT id FROM turnos WHERE caja_id=$1 AND estado='ABIERTO' ORDER BY fecha_apertura DESC LIMIT 1", [CAJA])).rows[0];
+  // El código del turno se genera único por corrida. Antes era el literal 'F1-VERIFY' y la tabla
+  // tiene UNIQUE (sucursal_id, codigo_turno): mientras quedara un turno ABIERTO se reutilizaba y
+  // no se notaba, pero en cuanto algo lo cerraba —verify:dia cierra todos los abiertos al empezar—
+  // la siguiente corrida de este verify moría con "duplicate key codigo_turno_unico". Es decir:
+  // `npm run verify:dia && npm run verify` fallaba siempre, y parecía una regresión del producto.
+  const codigoTurno = `F1-VERIFY-${Date.now().toString(36).toUpperCase()}`;
   const turno = abierto ? abierto.id : (await c.query(
     `INSERT INTO turnos(tenant_id,sucursal_id,caja_id,codigo_turno,dia_contable,usuario_apertura_id,fondo_inicial_mxn,fondo_modo)
-     VALUES($1,$2,$3,'F1-VERIFY',CURRENT_DATE,$4,500,'TOTAL') RETURNING id`,
-    [dev.body.user.app_metadata.tenant_id, suc, CAJA, cajeroAcc.usuario_id])).rows[0].id;
+     VALUES($1,$2,$3,$5,CURRENT_DATE,$4,500,'TOTAL') RETURNING id`,
+    [dev.body.user.app_metadata.tenant_id, suc, CAJA, cajeroAcc.usuario_id, codigoTurno])).rows[0].id;
   await c.query("COMMIT"); c.release();
 
   // 4) VENTA por RPC como EMPLEADO (idéntico a supabase.rpc del POS)

@@ -32,7 +32,11 @@ export async function startBackend(opts = {}) {
   // Fase 2 — puente de tiempo real del KDS (LISTEN 'vim_kds' → SSE).
   const kds = await crearKdsStream({ pgPort: backend.pgPort, log });
 
-  const gateway = crearGateway({ ...backend, kds });
+  // SEC CN-004 — puertos desde los que se sirve el UI (POS 54360 / cocina 54361). Definen qué
+  // orígenes reciben cabeceras CORS: cualquier otro puede llamar al gateway pero no leer la
+  // respuesta. Los valores coinciden con UI_PORT / KDS_UI_PORT de main.mjs.
+  const uiPorts = opts.uiPorts ?? [54360, 54361];
+  const gateway = crearGateway({ ...backend, kds, uiPorts });
   await new Promise((resolve) => gateway.listen(gatewayPort, host, resolve));
   const lan = ipLan();
   log(`Gateway Supabase-compat en http://localhost:${gatewayPort}`);
