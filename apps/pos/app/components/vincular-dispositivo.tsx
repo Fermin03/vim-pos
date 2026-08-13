@@ -11,7 +11,14 @@ import { BrandMark } from "./topbar-pos";
  * y abre su sesión base. En producción esto lo hace el setup (doc 10); aquí prellenamos
  * con la cuenta de dispositivo del fixture para DEV.
  */
-export function VincularDispositivo({ onVinculado }: { onVinculado: () => void }) {
+export function VincularDispositivo({
+  onVinculado,
+  motivo,
+}: {
+  onVinculado: () => void;
+  /** "sesion-invalida": no es una caja nueva — la sesión guardada dejó de valer y hay que re-vincular. */
+  motivo?: "sesion-invalida";
+}) {
   // SEC CN-011: en producción CREDS_DEV_FIXTURE es null (no prellenamos credenciales).
   // SEC CN-006: si esta caja ya estuvo vinculada, se recuerda el correo (nunca la contraseña),
   // así reconectar tras perder la sesión es teclear una clave, no descifrar cuál era el correo.
@@ -70,11 +77,24 @@ export function VincularDispositivo({ onVinculado }: { onVinculado: () => void }
     <main className="flex min-h-screen flex-col items-center justify-center gap-7 p-6">
       <header className="flex max-w-sm flex-col items-center gap-2 text-center">
         <BrandMark size={44} />
-        <h1 className="mt-1 font-display text-xl font-semibold tracking-tight">Vincular este dispositivo</h1>
+        <h1 className="mt-1 font-display text-xl font-semibold tracking-tight">
+          {motivo === "sesion-invalida" ? "Vuelve a vincular esta caja" : "Vincular este dispositivo"}
+        </h1>
         <p className="text-sm text-ink-3">
-          Conecta esta caja a tu sucursal una sola vez. Después, tu equipo entra con su PIN.
+          {motivo === "sesion-invalida"
+            ? "La sesión guardada de esta caja dejó de ser válida tras actualizar. Vuelve a capturar la clave del dispositivo para reconectarla; no se pierde ninguna venta."
+            : "Conecta esta caja a tu sucursal una sola vez. Después, tu equipo entra con su PIN."}
         </p>
       </header>
+
+      {motivo === "sesion-invalida" && (
+        <div className="flex w-full max-w-sm items-start gap-2.5 rounded border border-[#E8DCC0] bg-[#F6EEDD] px-3 py-2.5 text-[12.5px] text-ink-2" role="status">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="mt-px h-4 w-4 flex-shrink-0 text-warning"><circle cx="12" cy="12" r="9" /><path d="M12 8v4M12 16h.01" /></svg>
+          <span>
+            ¿No tienes la clave? Se genera de nuevo desde el panel: <b>Configuración → Cajas → Generar credenciales</b>.
+          </span>
+        </div>
+      )}
 
       <form
         className="flex w-full max-w-sm flex-col gap-3"
