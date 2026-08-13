@@ -51,7 +51,14 @@ Deno.serve(async (req) => {
     .from("push_suscripciones").select("id, endpoint, p256dh, auth").eq("tenant_id", tenantId);
   if (subErr) return json({ error: "DB_ERROR", detalle: subErr.message }, 500);
 
-  const payload = JSON.stringify({ titulo, cuerpo, url: body.url ?? "/" });
+  // SEC CN-014 — `titulo` y `cuerpo` se recortaban pero `url` iba tal cual, y esta función la puede
+  // disparar cualquier usuario autenticado del tenant (incluido un dispositivo comprometido). Eso
+  // permitía mandar a TODAS las pantallas del negocio una notificación de aspecto legítimo
+  // ("Diferencia en el cierre de caja") cuyo clic llevaba a un dominio de phishing.
+  // Solo se aceptan rutas internas: "/algo" y nunca "//host" (que el navegador trata como absoluta).
+  const rutaSegura =
+    typeof body.url === "string" && /^\/(?!\/)[\w\-./?=&%#]*$/.test(body.url) ? body.url : "/";
+  const payload = JSON.stringify({ titulo, cuerpo, url: rutaSegura });
   let enviadas = 0, muertas = 0;
   for (const s of (subs ?? []) as { id: string; endpoint: string; p256dh: string; auth: string }[]) {
     try {

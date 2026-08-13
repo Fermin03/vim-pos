@@ -34,7 +34,8 @@ INSERT INTO planes (codigo, nombre, descripcion, vertical, precio_mensual_mxn, m
   ('ENT', 'Enterprise',
    'Cadenas, franquiciantes. Multi-sucursal avanzado, reporteo central. (Fase 5)',
    'ENTERPRISE', 2499.00, NULL, 200,
-   '{"multi_sucursal_avanzado": true, "reporteo_central": true, "franquicias": true}'::jsonb, 6);
+   '{"multi_sucursal_avanzado": true, "reporteo_central": true, "franquicias": true}'::jsonb, 6)
+ON CONFLICT DO NOTHING;
 
 -- ============================================================================
 -- §9.1.bis — Paquetes de folios CFDI prepagados
@@ -45,7 +46,8 @@ INSERT INTO folios_paquetes (codigo, nombre, cantidad_folios, precio_mxn, precio
   ('PACK_250',  'Paquete 250 folios',   250,  450.00, 1.8000, 2),
   ('PACK_500',  'Paquete 500 folios',   500,  750.00, 1.5000, 3),
   ('PACK_1000', 'Paquete 1,000 folios', 1000, 1300.00, 1.3000, 4),
-  ('PACK_5000', 'Paquete 5,000 folios', 5000, 5000.00, 1.0000, 5);
+  ('PACK_5000', 'Paquete 5,000 folios', 5000, 5000.00, 1.0000, 5)
+ON CONFLICT DO NOTHING;
 
 -- ============================================================================
 -- §9.2 — Roles base del sistema (tenant_id NULL = compartidos, es_sistema=true)
@@ -77,7 +79,8 @@ INSERT INTO roles (id, tenant_id, codigo, nombre, descripcion, es_sistema, jerar
   -- ninguna fila en rol_permisos (§9.5) — por diseño no puede operar.
   (gen_random_uuid(), NULL, 'DISPOSITIVO', 'Dispositivo',
    'Cuenta de caja/estación POS. Mantiene la sesión base del dispositivo; sin permisos operativos.',
-   true, 0, true);
+   true, 0, true)
+ON CONFLICT DO NOTHING;
 
 -- ============================================================================
 -- §9.3 — Subtipos de personal sugeridos (tenant_id NULL = sistema)
@@ -197,7 +200,8 @@ INSERT INTO permisos (codigo, nombre, descripcion, categoria, permite_autorizaci
   ('factura.global_masiva',       'Emitir facturación global / masiva', NULL, 'CONFIGURACION', false, NULL),
 
   -- Plan SaaS
-  ('saas.cambiar_plan',           'Cancelar/contratar plan SaaS', NULL, 'CONFIGURACION', false, NULL);
+  ('saas.cambiar_plan',           'Cancelar/contratar plan SaaS', NULL, 'CONFIGURACION', false, NULL)
+ON CONFLICT DO NOTHING;
 
 -- ============================================================================
 -- §9.5 — Matriz rol_permisos (§2.2). Referencia roles y permisos por código.
@@ -218,11 +222,13 @@ BEGIN
 
   -- Dueño y Admin: todos los permisos (auto-grant via función)
   INSERT INTO rol_permisos (rol_id, permiso_id, concedido)
-  SELECT v_rol_dueno, p.id, true FROM permisos p;
+  SELECT v_rol_dueno, p.id, true FROM permisos p
+  ON CONFLICT (rol_id, permiso_id) DO NOTHING;
 
   INSERT INTO rol_permisos (rol_id, permiso_id, concedido)
   SELECT v_rol_admin, p.id, true FROM permisos p
-  WHERE p.codigo NOT IN ('config.fiscal', 'saas.cambiar_plan');
+  WHERE p.codigo NOT IN ('config.fiscal', 'saas.cambiar_plan')
+  ON CONFLICT (rol_id, permiso_id) DO NOTHING;
 
   -- Supervisor: subset según matriz §2.2
   INSERT INTO rol_permisos (rol_id, permiso_id, concedido)
@@ -236,7 +242,8 @@ BEGIN
     'cocina.marcar_listo', 'cocina.marcar_entregado', 'cocina.reimprimir_comanda', 'cocina.reimprimir_ticket',
     'delivery.asignar_pedido',
     'reporte.turno_propio'
-  );
+  )
+  ON CONFLICT (rol_id, permiso_id) DO NOTHING;
 
   -- Cajero: ventas básicas, NO autoriza solo
   INSERT INTO rol_permisos (rol_id, permiso_id, concedido)
@@ -249,7 +256,8 @@ BEGIN
     'cocina.marcar_listo', 'cocina.marcar_entregado', 'cocina.reimprimir_ticket',
     'delivery.asignar_pedido',
     'reporte.turno_propio'
-  );
+  )
+  ON CONFLICT (rol_id, permiso_id) DO NOTHING;
 
   -- Personal: lo mínimo
   INSERT INTO rol_permisos (rol_id, permiso_id, concedido)
@@ -258,7 +266,8 @@ BEGIN
     'auth.login_pin', 'auth.asistencia_registrar',
     'cocina.marcar_listo', 'cocina.marcar_entregado',
     'delivery.asignar_pedido'
-  );
+  )
+  ON CONFLICT (rol_id, permiso_id) DO NOTHING;
 END $$;
 
 -- ============================================================================

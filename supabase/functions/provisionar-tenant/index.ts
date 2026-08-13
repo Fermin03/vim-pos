@@ -13,6 +13,19 @@ import { corsHeaders } from "../_shared/cors.ts";
 
 const VERTICALES = ["FOODTRUCK", "QUICK_SERVICE", "FULL_SERVICE", "CAFE_BAR", "DARK_KITCHEN", "ENTERPRISE"];
 
+/** SEC CN-024 — comparación de secretos en tiempo constante (WebCrypto, disponible en Deno). */
+async function igualSeguro(a: string, b: string): Promise<boolean> {
+  const enc = new TextEncoder();
+  const [ha, hb] = await Promise.all([
+    crypto.subtle.digest("SHA-256", enc.encode(a)),
+    crypto.subtle.digest("SHA-256", enc.encode(b)),
+  ]);
+  const x = new Uint8Array(ha), y = new Uint8Array(hb);
+  let dif = 0;
+  for (let i = 0; i < x.length; i++) dif |= x[i]! ^ y[i]!;
+  return dif === 0;
+}
+
 Deno.serve(async (req) => {
   const cors = corsHeaders(req);
   const json = (body: unknown, status = 200) =>
@@ -24,7 +37,12 @@ Deno.serve(async (req) => {
   // Gate por secreto compartido (fail-closed).
   const expected = Deno.env.get("PLATFORM_PROVISION_KEY");
   if (!expected) return json({ error: "PROVISION_DESHABILITADO" }, 503);
-  if (req.headers.get("x-platform-key") !== expected) return json({ error: "NO_AUTORIZADO" }, 401);
+  // SEC CN-024 — comparación en tiempo constante. `!==` corta en el primer byte distinto, así que
+  // el tiempo de respuesta filtra cuánto prefijo se acertó. Se hashean ambos primero: timingSafeEqual
+  // exige la misma longitud, y así tampoco se filtra el tamaño del secreto.
+  if (!(await igualSeguro(req.headers.get("x-platform-key") ?? "", expected))) {
+    return json({ error: "NO_AUTORIZADO" }, 401);
+  }
 
   let b: Record<string, string | undefined>;
   try {

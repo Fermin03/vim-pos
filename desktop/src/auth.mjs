@@ -7,6 +7,51 @@ import jwt from "jsonwebtoken";
 
 const ahora = () => Math.floor(Date.now() / 1000);
 
+/** El caja_id va codificado en el email sintético del dispositivo (1F §1.1). El dispositivo ES una caja. */
+const EMAIL_DISPOSITIVO = /^caja-([0-9a-f-]{36})@dispositivos\.vimpos\.mx$/i;
+
+/**
+ * SEC CN-017 — verificación de JWT endurecida, en un solo sitio.
+ *   · `algorithms` fijo: no dejar que el token elija con qué se valida.
+ *   · rechazo de los refresh: se acuñan con 30 días de vida y `typ:"refresh"`, pero antes ningún
+ *     consumidor miraba ese campo, así que un refresh robado servía de access token durante un mes.
+ */
+function verificarAcceso(token, secret) {
+  const dec = jwt.verify(token, secret, { algorithms: ["HS256"] });
+  if (dec?.typ === "refresh") throw new Error("refresh token no es un access token");
+  return dec;
+}
+
+/**
+ * SEC CN-005 — exige que el bearer sea el JWT de un DISPOSITIVO y devuelve SU caja.
+ *
+ * Espeja el control que la Edge Function de la nube (supabase/functions/pin-login) ya hacía y que
+ * aquí faltaba por completo: el gateway escucha en 0.0.0.0, así que sin esto cualquiera en la LAN
+ * —o cualquier página web, por el CORS abierto de CN-004— podía disparar intentos de PIN contra la
+ * caja, con el lockout del RPC como único freno (y ese lockout también sirve para dejar fuera a un
+ * cajero a las malas).
+ *
+ * El tipo de identidad se resuelve contra la BD, no contra el claim del token: así revocar el
+ * acceso (usuarios_acceso.activo = false) surte efecto de inmediato y no al expirar el JWT.
+ */
+export async function exigirDispositivo(pool, secret, token) {
+  if (!token) return { error: 401, body: { error: "NO_AUTH" } };
+  let dec;
+  try { dec = verificarAcceso(token, secret); } catch { return { error: 401, body: { error: "AUTH_INVALIDA" } }; }
+
+  const { rows } = await pool.query(
+    `SELECT u.email, ua.tenant_id, r.codigo AS rol
+       FROM auth.users u
+       JOIN usuarios_acceso ua ON ua.usuario_id = u.id AND ua.activo = true
+       LEFT JOIN roles r ON r.id = ua.rol_id
+      WHERE u.id = $1 LIMIT 1`, [dec.sub]);
+  if (rows.length === 0) return { error: 401, body: { error: "AUTH_INVALIDA" } };
+
+  const cajaId = EMAIL_DISPOSITIVO.exec(rows[0].email ?? "")?.[1] ?? null;
+  if (rows[0].rol !== "DISPOSITIVO" || !cajaId) return { error: 403, body: { error: "NO_ES_DISPOSITIVO" } };
+  return { cajaId, tenantId: rows[0].tenant_id, sub: dec.sub };
+}
+
 function mintAccess(secret, { sub, tenant_id, tipo_identidad, ttl = 12 * 3600, sucursal_id = null }) {
   const iat = ahora();
   const payload = { sub, aud: "authenticated", role: "authenticated", tenant_id, tipo_identidad, iat, exp: iat + ttl };
@@ -49,7 +94,12 @@ export async function deviceSignIn(pool, secret, { email, password }) {
 /** Refresco de sesión del dispositivo (supabase-js lo llama solo). */
 export async function refreshSession(pool, secret, refresh_token) {
   let dec;
-  try { dec = jwt.verify(refresh_token, secret); } catch { return { error: 400, body: { error: "invalid_grant", error_description: "refresh inválido" } }; }
+  // Aquí SÍ se espera un refresh (no se usa verificarAcceso, que los rechaza), pero se exige que
+  // lo sea: un access token no debe poder renovarse a sí mismo indefinidamente.
+  try {
+    dec = jwt.verify(refresh_token, secret, { algorithms: ["HS256"] });
+    if (dec?.typ !== "refresh") throw new Error("no es un refresh token");
+  } catch { return { error: 400, body: { error: "invalid_grant", error_description: "refresh inválido" } }; }
   const { rows } = await pool.query(
     `SELECT u.id, u.email, ua.tenant_id, ua.sucursal_id, r.codigo AS rol
        FROM auth.users u JOIN usuarios_acceso ua ON ua.usuario_id=u.id AND ua.activo=true
@@ -69,7 +119,7 @@ export async function refreshSession(pool, secret, refresh_token) {
 /** Devuelve el user desde un access_token (supabase.auth.getUser). */
 export async function getUser(pool, secret, token) {
   let dec;
-  try { dec = jwt.verify(token, secret); } catch { return { error: 401, body: { error: "invalid_token" } }; }
+  try { dec = verificarAcceso(token, secret); } catch { return { error: 401, body: { error: "invalid_token" } }; }
   const { rows } = await pool.query(
     `SELECT u.id, u.email, ua.tenant_id, r.codigo AS rol FROM auth.users u
        JOIN usuarios_acceso ua ON ua.usuario_id=u.id AND ua.activo=true
@@ -83,7 +133,7 @@ export async function getUser(pool, secret, token) {
  *  del JWT del empleado; la RPC valida el PIN del autorizante y su permiso/jerarquía. */
 export async function autorizarPin(pool, secret, token, body) {
   let dec;
-  try { dec = jwt.verify(token, secret); } catch { return { error: 401, body: { error: "AUTH_INVALIDA" } }; }
+  try { dec = verificarAcceso(token, secret); } catch { return { error: 401, body: { error: "AUTH_INVALIDA" } }; }
   const { pin, accion, permiso_codigo, entidad_tipo, entidad_id, monto, motivo, caja_id, turno_id } = body ?? {};
   if (!pin || !accion || !permiso_codigo || !caja_id) return { error: 400, body: { error: "FALTAN_CAMPOS" } };
   if (!/^\d{4,6}$/.test(String(pin))) return { error: 400, body: { error: "PIN_INVALIDO" } };

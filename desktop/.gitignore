@@ -13,6 +13,7 @@ pos-ui/
 kds-ui/
 apps-pos-out/
 bin/.pids.json
+bin/.jwt-secret
 kds-hub.json
 backups/
 backups-verify/

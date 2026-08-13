@@ -50,7 +50,7 @@ export class RawSocketAdapter implements PrinterAdapter {
     return r.ok ? "LISTO" : r.motivo === "OFFLINE" ? "OFFLINE" : "ERROR";
   }
 
-  async abrirCajon(): Promise<void> {
-    await this.enviar(bytesCajon());
+  async abrirCajon(): Promise<PrintResult> {
+    return this.enviar(bytesCajon());
   }
 }
