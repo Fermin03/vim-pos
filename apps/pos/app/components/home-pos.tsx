@@ -818,6 +818,7 @@ export function HomePos({
           onMonitorVentas={() => { setEnInicio(false); setEnMonitor(true); }}
           onConsultarCuentas={() => { setEnInicio(false); setEnConsultaCuentas(true); }}
           onMovimientoCaja={() => setMovimientoAbierto(true)}
+          onAbrirTurno={() => { /* aquí siempre hay turno abierto: el botón no se muestra */ }}
           onCerrarTurno={() => setCerrando(true)}
           onMenu={() => setEnInicio(false)}
         />
