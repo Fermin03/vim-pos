@@ -156,7 +156,7 @@ export function PantallaInicio({
               la mayor parte del espacio sobrante. */}
           <section className="flex min-h-0 flex-[5] flex-col gap-[clamp(0.3rem,1vh,0.75rem)]">
             <h2 className="flex-shrink-0 text-[clamp(0.65rem,1.2vh,0.75rem)] font-bold uppercase tracking-[0.06em] text-ink-3">Tomar pedido</h2>
-            <div className={["grid min-h-0 flex-1 grid-cols-2 gap-[clamp(0.5rem,1.4vh,1rem)] lg:grid-cols-4", sinTurno ? "pointer-events-none opacity-40" : ""].join(" ")} aria-disabled={sinTurno}>
+            <div className={["grid min-h-0 flex-1 grid-cols-4 gap-[clamp(0.4rem,1.2vw,1rem)]", sinTurno ? "pointer-events-none opacity-40" : ""].join(" ")} aria-disabled={sinTurno}>
             <BotonModo
               label="Comedor"
               sub={nCuentasComedor > 0 ? `${nCuentasComedor} mesa${nCuentasComedor === 1 ? "" : "s"} abierta${nCuentasComedor === 1 ? "" : "s"}` : "Ver mesas"}
@@ -191,7 +191,7 @@ export function PantallaInicio({
           {/* Operación de caja */}
           <section className="flex min-h-0 flex-[4] flex-col gap-[clamp(0.3rem,1vh,0.75rem)]">
             <h2 className="flex-shrink-0 text-[clamp(0.65rem,1.2vh,0.75rem)] font-bold uppercase tracking-[0.06em] text-ink-3">Caja</h2>
-            <div className="grid min-h-0 flex-1 grid-cols-2 gap-[clamp(0.5rem,1.4vh,1rem)] lg:grid-cols-4">
+            <div className="grid min-h-0 flex-1 grid-cols-4 gap-[clamp(0.4rem,1.2vw,1rem)]">
             <BotonOperacion
               label="Monitor de ventas"
               sub={sinTurno ? "Requiere turno abierto" : ventaTurno === null ? "Cargando…" : `${fmtMxn(ventaTurno)} en el turno`}
