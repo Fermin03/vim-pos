@@ -44,11 +44,26 @@ Deno.serve(async (req) => {
   const cfdiId = body.cfdi_id;
   if (!cfdiId) return json({ error: "FALTA_CFDI_ID" }, 400);
 
-  // Verificar rol DUEÑO/ADMIN del tenant del CFDI (vía usuarios_acceso + roles).
+  // Cargar el borrador (RLS del llamante restringe al tenant).
+  const { data: cfdi, error: cErr } = await sb
+    .from("tickets_cfdi")
+    .select(
+      "id, tenant_id, tipo_comprobante, estado_sat, emisor_rfc, emisor_razon_social, emisor_regimen_fiscal, emisor_lugar_expedicion, receptor_rfc, receptor_razon_social, receptor_uso_cfdi, receptor_codigo_postal, receptor_regimen_fiscal, receptor_email, metodo_pago_sat, forma_pago_sat, subtotal_mxn, descuento_mxn, iva_mxn, total_mxn",
+    )
+    .eq("id", cfdiId)
+    .maybeSingle();
+  if (cErr) return json({ error: "RLS_ERROR", detalle: cErr.message }, 500);
+  if (!cfdi) return json({ error: "CFDI_NO_EXISTE" }, 404);
+
+  // SEC CN-026 — el rol se comprueba EN EL TENANT DEL CFDI, no en cualquiera del llamante.
+  // Antes bastaba con ser DUEÑO/ADMIN en algún tenant: quien fuera dueño de A y cajero de B podía
+  // timbrar facturas de B (el RLS le deja leer el borrador porque tiene acceso a B, y el chequeo
+  // de rol se satisfacía con su rol en A). Se comprueba primero el CFDI y luego el rol en SU tenant.
   const { data: acc } = await sb
     .from("usuarios_acceso")
     .select("rol:roles(codigo)")
     .eq("usuario_id", u.user.id)
+    .eq("tenant_id", (cfdi as { tenant_id: string }).tenant_id)
     .eq("activo", true);
   const roles = ((acc ?? []) as { rol: { codigo: string } | null }[])
     .map((a) => a.rol?.codigo)
@@ -56,17 +71,6 @@ Deno.serve(async (req) => {
   if (!roles.some((r) => ROLES_FACTURA.includes(r))) {
     return json({ error: "SIN_PERMISO", detalle: "Solo DUEÑO/ADMIN pueden facturar" }, 403);
   }
-
-  // Cargar el borrador (RLS del llamante restringe al tenant).
-  const { data: cfdi, error: cErr } = await sb
-    .from("tickets_cfdi")
-    .select(
-      "id, tipo_comprobante, estado_sat, emisor_rfc, emisor_razon_social, emisor_regimen_fiscal, emisor_lugar_expedicion, receptor_rfc, receptor_razon_social, receptor_uso_cfdi, receptor_codigo_postal, receptor_regimen_fiscal, receptor_email, metodo_pago_sat, forma_pago_sat, subtotal_mxn, descuento_mxn, iva_mxn, total_mxn",
-    )
-    .eq("id", cfdiId)
-    .maybeSingle();
-  if (cErr) return json({ error: "RLS_ERROR", detalle: cErr.message }, 500);
-  if (!cfdi) return json({ error: "CFDI_NO_EXISTE" }, 404);
   if (cfdi.estado_sat === "TIMBRADO") return json({ error: "YA_TIMBRADO" }, 409);
   if (cfdi.estado_sat !== "BORRADOR" && cfdi.estado_sat !== "ERROR_TIMBRADO") {
     return json({ error: "ESTADO_NO_TIMBRABLE", estado: cfdi.estado_sat }, 409);
