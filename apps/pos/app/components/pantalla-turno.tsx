@@ -3,7 +3,11 @@ import { useEffect, useState } from "react";
 import { type Empleado } from "../lib/supabase";
 import { AbrirTurno } from "./abrir-turno";
 import { HomePos } from "./home-pos";
+import { PantallaInicio } from "./pantalla-inicio";
 import { leerCaja, turnoAbiertoDeCaja, type DatosCaja, type Turno } from "../lib/turno";
+
+/** Acciones del inicio que no aplican sin turno: los botones ya salen deshabilitados. */
+const noop = () => {};
 
 /**
  * Pantalla post-login: carga datos de la caja y decide entre abrir turno o
@@ -28,6 +32,8 @@ export function PantallaTurno({
   const [caja, setCaja] = useState<DatosCaja | null | undefined>(undefined);
   const [turno, setTurno] = useState<Turno | null | undefined>(undefined);
   const [error, setError] = useState<string | null>(null);
+  /** El formulario de apertura solo se muestra cuando el cajero lo pide desde el inicio. */
+  const [abriendoTurno, setAbriendoTurno] = useState(false);
 
   useEffect(() => {
     let activo = true;
@@ -64,7 +70,35 @@ export function PantallaTurno({
     );
   }
 
+  // Sin turno abierto NO se salta directo a "Abrir turno": el cajero aterriza igual en el
+  // inicio (ve su caja, su nombre, dónde está parado) y abre el turno cuando lo decide, con
+  // el botón. Entrar con un formulario de fondo de caja encima era una interrupción que nadie
+  // pidió — a veces solo se entra a consultar algo o a cambiar de cajero.
   if (turno === null) {
+    if (!abriendoTurno) {
+      return (
+        <PantallaInicio
+          token={token}
+          caja={caja}
+          turno={null}
+          empleado={empleado}
+          nCuentasComedor={0}
+          nCuentasPickup={0}
+          nCuentasDomicilio={0}
+          nEnEspera={0}
+          onComedor={noop}
+          onParaLlevar={noop}
+          onPickup={noop}
+          onDomicilio={noop}
+          onMonitorVentas={noop}
+          onConsultarCuentas={noop}
+          onMovimientoCaja={noop}
+          onAbrirTurno={() => setAbriendoTurno(true)}
+          onCerrarTurno={noop}
+          onMenu={onCambiarCajero}
+        />
+      );
+    }
     return (
       <AbrirTurno
         empleado={empleado}
@@ -73,7 +107,7 @@ export function PantallaTurno({
         cajaNumero={caja.numero}
         cajaLabel={caja.nombre}
         sucursalLabel={caja.sucursalNombre}
-        onTurnoAbierto={setTurno}
+        onTurnoAbierto={(t) => { setAbriendoTurno(false); setTurno(t); }}
         onCambiarCajero={onCambiarCajero}
       />
     );
