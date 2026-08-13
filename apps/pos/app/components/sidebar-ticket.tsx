@@ -11,7 +11,6 @@ const MODO_LABELS: Record<ModoServicio, string> = {
   DRIVE_THRU: "Pick-up",
   DELIVERY_PROPIO: "Domicilio",
 };
-const MODO_ORDEN: ModoServicio[] = ["COMER_AQUI", "PARA_LLEVAR", "DRIVE_THRU", "DELIVERY_PROPIO"];
 
 /* ── Íconos SVG inline (del mockup P-066) ────────────────────── */
 function IconoTicket() {
@@ -73,8 +72,6 @@ export function SidebarTicket({
   onDescuentoItem,
   onLimpiar,
   onCancelarTicket,
-  onModo,
-  onVerCuentas,
   onEditarCliente,
   onNotaLinea,
   onNotaOrden,
@@ -101,10 +98,6 @@ export function SidebarTicket({
   onLimpiar?: () => void;
   /** Cuando el ticket está persistido, "Limpiar" llama a este handler para cancelar todo el ticket. */
   onCancelarTicket?: () => void;
-  onModo: (m: ModoServicio) => void;
-  /** Abre la vista de CUENTAS ABIERTAS del modo actual (Comedor→mesas, Pick-up→por recolectar,
-   *  Domicilio→pedidos activos). No aplica a "Para llevar" (se cobra de inmediato). */
-  onVerCuentas?: (m: ModoServicio) => void;
   /** Abre el modal de cliente para domicilio (solo aplica en modo Domicilio). */
   onEditarCliente?: () => void;
   /** Edita la nota de cocina de una línea (carrito local, pre-cobro). */
@@ -158,38 +151,14 @@ export function SidebarTicket({
             Limpiar
           </button>
         </div>
-        {/* Modo de servicio — fila tocable directa (sin ciclar) */}
+        {/* Modo de servicio — SOLO LECTURA. El modo se elige en la pantalla de inicio (una venta
+            no cambia de modo a media captura); aquí se muestra para que el cajero no pierda de
+            vista en qué está capturando. Para cambiarlo: volver al inicio y entrar por el otro modo. */}
         <div className="mt-3">
-          <div className="grid grid-cols-4 gap-1">
-            {MODO_ORDEN.map((m) => {
-              const activo = estado.modoServicio === m;
-              return (
-                <button
-                  key={m}
-                  type="button"
-                  disabled={bloqueado}
-                  onClick={() => onModo(m)}
-                  aria-pressed={activo}
-                  className={[
-                    "flex min-h-[40px] items-center justify-center rounded-md px-1 py-1.5 text-center text-[11.5px] font-semibold leading-tight transition-colors disabled:cursor-default disabled:opacity-50",
-                    activo ? "bg-ink text-white" : "bg-[#ECEEF1] text-[#4A5568] hover:bg-hover",
-                  ].join(" ")}
-                >
-                  {MODO_LABELS[m]}
-                </button>
-              );
-            })}
+          <div className="flex items-center gap-2 rounded-md bg-[#ECEEF1] px-3 py-2">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4 flex-shrink-0 text-[#4A5568]"><path d="M20 6 9 17l-5-5" /></svg>
+            <span className="text-[13px] font-semibold text-[#4A5568]">{MODO_LABELS[estado.modoServicio]}</span>
           </div>
-          {estado.modoServicio !== "PARA_LLEVAR" && onVerCuentas && (
-            <button
-              type="button"
-              onClick={() => onVerCuentas(estado.modoServicio)}
-              className="mt-2 flex w-full items-center justify-center gap-2 rounded-md border border-line-strong px-3 py-2 text-[13px] font-semibold text-ink-2 transition hover:border-ink hover:text-ink"
-            >
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01" /></svg>
-              Ver cuentas{estado.modoServicio === "COMER_AQUI" ? " · Mesas" : estado.modoServicio === "DRIVE_THRU" ? " · Por recolectar" : " · Domicilios"}
-            </button>
-          )}
           {estado.modoServicio === "DELIVERY_PROPIO" && (
             <button
               type="button"

@@ -159,3 +159,31 @@ function subDeToken(token: string): string {
 export function fmtMxn(n: number): string {
   return n.toLocaleString("es-MX", { style: "currency", currency: "MXN" });
 }
+
+/** Cuentas ABIERTAS (sin cobrar) del turno, agrupadas por modo de servicio. */
+export type CuentasAbiertasPorModo = { comedor: number; pickup: number; domicilio: number };
+
+/**
+ * Cuenta las cuentas vivas de cada modo para los badges de la pantalla de inicio.
+ *
+ * Solo ABIERTO: un BORRADOR es un carrito a medio capturar que todavía no es una cuenta que
+ * alguien deba ir a atender, y contarlo inflaría el número que el cajero usa para decidir
+ * a dónde entrar.
+ */
+export async function contarCuentasAbiertasPorModo(token: string, turnoId: string): Promise<CuentasAbiertasPorModo> {
+  const { data, error } = await employeeClient(token)
+    .from("tickets")
+    .select("modo_servicio")
+    .eq("turno_id", turnoId)
+    .eq("estado_fiscal", "ABIERTO")
+    .is("deleted_at", null);
+  if (error) throw new Error(error.message);
+
+  const filas = (data ?? []) as { modo_servicio: string }[];
+  const n = (modo: string) => filas.filter((f) => f.modo_servicio === modo).length;
+  return {
+    comedor: n("COMER_AQUI"),
+    pickup: n("DRIVE_THRU"),
+    domicilio: n("DELIVERY_PROPIO"),
+  };
+}
