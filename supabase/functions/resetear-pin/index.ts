@@ -41,22 +41,38 @@ Deno.serve(async (req) => {
   // Verificar que caller es admin de un tenant donde el target tiene acceso
   const { data: accesoCaller } = await admin
     .from("usuarios_acceso")
-    .select("tenant_id, rol:roles(codigo)")
+    .select("tenant_id, rol:roles(codigo, jerarquia)")
     .eq("usuario_id", callerId)
     .eq("activo", true);
-  type Acc = { tenant_id: string; rol: { codigo: string } | null };
-  const tenantsAdmin = ((accesoCaller ?? []) as unknown as Acc[])
+  type Acc = { tenant_id: string; rol: { codigo: string; jerarquia: number } | null };
+  const accesosCaller = (accesoCaller ?? []) as unknown as Acc[];
+  const tenantsAdmin = accesosCaller
     .filter((a) => a.rol?.codigo && ROLES_ADMINISTRADORES.includes(a.rol.codigo))
     .map((a) => a.tenant_id);
   if (tenantsAdmin.length === 0) return json({ error: "SIN_PERMISO" }, 403);
 
   const { data: accesoTarget } = await admin
     .from("usuarios_acceso")
-    .select("tenant_id")
-    .eq("usuario_id", usuario_id);
-  const tenantsTarget = ((accesoTarget ?? []) as { tenant_id: string }[]).map((a) => a.tenant_id);
-  if (!tenantsTarget.some((t) => tenantsAdmin.includes(t)))
+    .select("tenant_id, rol:roles(jerarquia)")
+    .eq("usuario_id", usuario_id)
+    .eq("activo", true);
+  type AccT = { tenant_id: string; rol: { jerarquia: number } | null };
+  const accesosTarget = (accesoTarget ?? []) as unknown as AccT[];
+  if (!accesosTarget.some((a) => tenantsAdmin.includes(a.tenant_id)))
     return json({ error: "EMPLEADO_FUERA_DE_TENANT" }, 403);
+
+  // SEC CN-016 — jerarquía. Sin esto un ADMIN (4) reseteaba el PIN del DUEÑO (5), se ponía el suyo
+  // y operaba como dueño. Se exige jerarquía ESTRICTAMENTE mayor: ni siquiera un DUEÑO resetea a
+  // otro DUEÑO. Si un dueño pierde su PIN, va por soporte (service_role), no por aquí.
+  // La RPC resetear_pin_empleado repite el chequeo (migración 0064): defensa en profundidad.
+  const jerarquiaCaller = Math.max(0, ...accesosCaller.map((a) => a.rol?.jerarquia ?? 0));
+  const jerarquiaTarget = Math.max(0, ...accesosTarget.map((a) => a.rol?.jerarquia ?? 0));
+  if (jerarquiaCaller <= jerarquiaTarget) {
+    return json({
+      error: "JERARQUIA_INSUFICIENTE",
+      detalle: "No puedes resetear el PIN de alguien con tu mismo nivel o superior.",
+    }, 403);
+  }
 
   const { error: rpcErr } = await admin.rpc("resetear_pin_empleado", {
     p_usuario_id: usuario_id,
