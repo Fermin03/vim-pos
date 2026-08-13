@@ -11,8 +11,17 @@
 //
 // Uso (con Postgres del dev en 54329):  node src/verify-concurrencia.mjs
 import pg from "pg";
+import { readFileSync } from "node:fs";
+// SEC CN-018 — la contraseña del Postgres local ya no es fija: runtime.mjs genera una por
+// instalación y la guarda en bin/.pg-password. Se lee de ahí; 'postgres' solo cubre un clúster
+// anterior a la rotación.
+function passLocal() {
+  try { return readFileSync(new URL("../bin/.pg-password", import.meta.url), "utf8").trim() || "postgres"; }
+  catch { return "postgres"; }
+}
 
-const PG = { host: "127.0.0.1", port: 54329, user: "postgres", password: "postgres", database: "vimpos" };
+
+const PG = { host: "127.0.0.1", port: 54329, user: "postgres", password: passLocal(), database: "vimpos" };
 const espera = (ms) => new Promise((r) => setTimeout(r, ms));
 
 async function claims(client, sub, tenant) {

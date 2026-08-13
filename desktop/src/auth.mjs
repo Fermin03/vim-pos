@@ -82,7 +82,11 @@ export async function deviceSignIn(pool, secret, { email, password }) {
   const row = rows[0];
   const tipo = row.rol === "DISPOSITIVO" ? "DISPOSITIVO" : "EMPLEADO";
   const { token, iat, ttl } = mintAccess(secret, { sub: row.id, tenant_id: row.tenant_id, tipo_identidad: tipo, sucursal_id: row.sucursal_id, ttl: 12 * 3600 });
-  const refresh = jwt.sign({ sub: row.id, typ: "refresh" }, secret, { algorithm: "HS256", expiresIn: "30d" });
+  // SEC CN-007 — 7 días, no 30. Todo el tráfico del hub viaja por HTTP plano en la LAN del local
+  // (la solución de fondo es separar la red; ver el informe), así que este token es interceptable
+  // con un portátil en el mismo Wi-Fi. Acortar la ventana no lo impide, pero reduce a una cuarta
+  // parte el tiempo que sirve uno capturado. La caja lo renueva sola en cada uso: no se nota.
+  const refresh = jwt.sign({ sub: row.id, typ: "refresh" }, secret, { algorithm: "HS256", expiresIn: "7d" });
   return {
     body: {
       access_token: token, token_type: "bearer", expires_in: ttl, expires_at: iat + ttl,
