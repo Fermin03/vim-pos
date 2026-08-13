@@ -37,7 +37,11 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
-          node-version: "20"
+          # 22, no 20: @supabase/realtime-js exige WebSocket NATIVO, que llega en Node 22. Con 20
+          # los tests de admin fallan al importar app/lib/supabase.ts ("Node.js 20 detected without
+          # native WebSocket support"), porque createClient() corre al cargar el módulo. No se ve en
+          # local si ahí se usa Node 22+; se destapó al actualizar dependencias (CN-009).
+          node-version: "22"
           cache: pnpm
 
       - name: Install (frozen lockfile)
@@ -87,6 +91,8 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
+          # Aquí SÍ se queda en 20, a propósito: es el Node que empaqueta Electron 33, así que
+          # `node --check` comprueba las fuentes contra la versión que de verdad las va a ejecutar.
           node-version: "20"
 
       - name: Auditoría de deps de producción del escritorio
