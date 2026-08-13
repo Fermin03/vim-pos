@@ -52,6 +52,52 @@ export function matarHuerfanos(dataDir, log = () => {}, pidfile = PIDFILE) {
 }
 
 /**
+ * Barre los postgres.exe DE ESTA INSTALACIÓN que hayan quedado vivos, escuchen o no.
+ *
+ * El hueco que cierra: cuando la app muere sin cierre limpio, sobrevive un hijo
+ * `postgres.exe --forkchild="startup"` cuyo padre ya no existe. Ese proceso retiene el segmento de
+ * memoria compartida del pgdata, así que el siguiente arranque muere con "pre-existing shared
+ * memory block is still in use" y la caja no abre. Ninguna de las dos limpiezas previas lo ve:
+ * `matarHuerfanos` mira el pidfile (que se borra al cerrar bien) y el postmaster.pid (él no lo es),
+ * y `matarQuienOcupaElPuerto` filtra por LISTENING (un forkchild en arranque no escucha).
+ *
+ * Se filtra por RUTA, no por nombre: matar cualquier postgres.exe de la máquina tumbaría otro
+ * Postgres que el usuario tenga instalado para algo distinto.
+ *
+ * Se mira ExecutablePath Y CommandLine porque en estos huérfanos ExecutablePath viene VACÍO
+ * (medido: un `--forkchild="startup"` cuyo padre ya murió devuelve cadena vacía en CIM). El
+ * CommandLine sí conserva la ruta completa —con barras normales, tal como lo lanzó
+ * embedded-postgres—, así que la comparación normaliza separadores en ambos lados.
+ *
+ * Windows-only, como el resto de la limpieza; si algo falla, se ignora y el arranque sigue.
+ */
+export function matarPostgresDeEstaInstalacion(pgBin, log = () => {}) {
+  if (process.platform !== "win32" || !pgBin) return;
+  const norm = (p) => String(p || "").replace(/\//g, "\\").toLowerCase();
+  const raiz = norm(pgBin);
+  try {
+    const salida = execFileSync("powershell", [
+      "-NoProfile", "-NonInteractive", "-Command",
+      "Get-CimInstance Win32_Process -Filter \"Name='postgres.exe'\" | " +
+        "ForEach-Object { \"$($_.ProcessId)|$($_.ExecutablePath)|$($_.CommandLine)\" }",
+    ], { encoding: "utf8", timeout: 15000 });
+
+    for (const linea of salida.split("\n")) {
+      const partes = linea.trim().split("|");
+      if (partes.length < 2) continue;
+      const n = Number(partes[0]);
+      // El CommandLine puede traer '|' dentro: se reensambla todo lo que sigue al 2º separador.
+      const ruta = partes[1];
+      const cmd = partes.slice(2).join("|");
+      if (!n || n === process.pid) continue;
+      const nuestro = norm(ruta).startsWith(raiz) || norm(cmd).includes(raiz);
+      if (!nuestro) continue; // de otra instalación (o sin datos): no se toca
+      try { process.kill(n, "SIGKILL"); log(`postgres huérfano ${n} terminado`); } catch { /* ya murió */ }
+    }
+  } catch { /* powershell no disponible o CIM falló: seguimos */ }
+}
+
+/**
  * Último recurso antes de arrancar: si el puerto de Postgres sigue ocupado, es por un postgres.exe
  * que sobrevivió sin quedar registrado (el pidfile se borró, o murió la app pero no su hijo). Sin
  * esto la caja no abre y el error no dice nada útil ("Boot falló: undefined"), porque
@@ -134,6 +180,9 @@ export async function startLocalBackend(opts = {}) {
 
   // Antes de arrancar: limpiar cualquier Postgres/PostgREST huérfano de un cierre no limpio.
   matarHuerfanos(dataDir, (m) => log(`limpieza: ${m}`), pidfile);
+  // Los forkchild sobrevivientes no están en el pidfile ni escuchan en ningún puerto, pero
+  // retienen la memoria compartida del pgdata y bloquean el arranque. Se barren por ruta.
+  matarPostgresDeEstaInstalacion(pgBin, (m) => log(`limpieza: ${m}`));
   // Y si aun así el puerto sigue tomado (huérfano no registrado), liberarlo: si no, Postgres no
   // enlaza y el arranque muere sin explicación.
   matarQuienOcupaElPuerto(pgPort, (m) => log(`limpieza: ${m}`));
