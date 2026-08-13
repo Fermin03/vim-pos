@@ -9,7 +9,7 @@ import {
   type Categoria,
   type Producto,
 } from "../lib/catalogo";
-import { fmtMxn, type DatosCaja, type Turno } from "../lib/turno";
+import { fmtMxn, contarCuentasAbiertasPorModo, type CuentasAbiertasPorModo, type DatosCaja, type Turno } from "../lib/turno";
 import { buscarActualizacion, esEscritorio } from "../lib/actualizacion";
 import { useReloj } from "./topbar-pos";
 import { type Empleado } from "../lib/supabase";
@@ -17,7 +17,6 @@ import {
   reducerCarrito,
   estadoInicial,
   nuevoClientId,
-  type ModoServicio,
   type ModificadorSel,
 } from "../lib/carrito";
 import { obtenerGruposDeProducto, type GrupoModificadores } from "../lib/modificadores";
@@ -48,6 +47,8 @@ import { ModalDescuentoItem } from "./modal-descuento-item";
 import { ModalCancelarTicket } from "./modal-cancelar-ticket";
 import { ModalMovimientoCaja } from "./modal-movimiento-caja";
 import { ModalAbrirCaja } from "./modal-abrir-caja";
+import { PantallaInicio } from "./pantalla-inicio";
+import { PantallaMonitorVentas } from "./pantalla-monitor-ventas";
 import { listarTicketsEnEspera, ponerTicketEnEspera, retomarTicketEnEspera } from "../lib/espera";
 import { ModalEtiquetaEspera, ModalListaEspera } from "./modal-espera";
 import { leerItemsPersistidos, type ItemTicket } from "../lib/cancelacion";
@@ -99,6 +100,7 @@ function TopbarOperativa({
   onCerrarTurno,
   onMovimientoCaja,
   onAbrirCaja,
+  onInicio,
   onKds,
   onDevoluciones,
   onImpresora,
@@ -117,6 +119,8 @@ function TopbarOperativa({
   onMovimientoCaja: () => void;
   /** Abre el cajón de dinero sin venta (pide PIN de DUEÑO/ADMIN). */
   onAbrirCaja: () => void;
+  /** Vuelve a la pantalla de inicio (elegir modo u operación). */
+  onInicio: () => void;
   onKds: () => void;
   onDevoluciones: () => void;
   onImpresora: () => void;
@@ -187,6 +191,14 @@ function TopbarOperativa({
         <div className="relative flex items-center gap-1">
           {/* En espera queda a la vista; el acceso a cuentas (Mesas/Pick-up/Domicilios) vive ahora en
               cada pestaña de modo ("Ver cuentas"). */}
+          <button
+            type="button"
+            onClick={onInicio}
+            className="flex h-9 items-center gap-1.5 rounded border border-line-strong px-3 text-[13px] font-semibold text-ink-2 transition hover:border-ink hover:text-ink"
+          >
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4"><path d="M3 10.5 12 3l9 7.5" /><path d="M5 9.5V21h14V9.5" /></svg>
+            Inicio
+          </button>
           <button
             type="button"
             onClick={onEnEspera}
@@ -297,6 +309,10 @@ export function HomePos({
 }) {
   const [cerrando, setCerrando] = useState(false);
   const [enKds, setEnKds] = useState(false);
+  // El POS arranca en la pantalla de inicio: el cajero elige primero a qué viene.
+  const [enInicio, setEnInicio] = useState(true);
+  const [enMonitor, setEnMonitor] = useState(false);
+  const [cuentasAbiertas, setCuentasAbiertas] = useState<CuentasAbiertasPorModo>({ comedor: 0, pickup: 0, domicilio: 0 });
   const [enMesas, setEnMesas] = useState(false);
   const [enDelivery, setEnDelivery] = useState(false);
   const [enPickup, setEnPickup] = useState(false);
@@ -707,6 +723,33 @@ export function HomePos({
     }
   }, [cerrarRecibo, enModoMesa]);
 
+  /** Vuelve a la pantalla de inicio dejando la caja limpia (sale de la cuenta de mesa si la hubiera). */
+  const volverAlInicio = useCallback(() => {
+    salirNavegacion();
+    setEnMesas(false);
+    setEnPickup(false);
+    setEnDelivery(false);
+    setEnConsultaCuentas(false);
+    setEnDevoluciones(false);
+    setEnMonitor(false);
+    setEnInicio(true);
+  }, [salirNavegacion]);
+
+  // Badges del inicio: sólo se refrescan mientras el inicio está a la vista, para no consultar
+  // la BD cada 15 s mientras el cajero está capturando una venta.
+  useEffect(() => {
+    if (!enInicio) return;
+    let vivo = true;
+    const cargar = () => {
+      contarCuentasAbiertasPorModo(token, turno.id)
+        .then((c) => { if (vivo) setCuentasAbiertas(c); })
+        .catch(() => { /* el badge es informativo; su fallo no debe romper el inicio */ });
+    };
+    cargar();
+    const id = setInterval(cargar, 15000);
+    return () => { vivo = false; clearInterval(id); };
+  }, [enInicio, token, turno.id]);
+
   /** Cierra la confirmación/recibo y deja la caja lista para la siguiente venta. */
   const nuevoTicket = useCallback(() => {
     setConfirmacion(null);
@@ -751,12 +794,71 @@ export function HomePos({
     return <PantallaKds token={token} caja={caja} onSalir={() => setEnKds(false)} />;
   }
 
+  // Pantalla de inicio: punto de entrada del turno. Desde aquí se elige modo u operación.
+  if (enInicio) {
+    return (
+      <>
+        <PantallaInicio
+          token={token}
+          caja={caja}
+          turno={turno}
+          empleado={empleado}
+          nCuentasComedor={cuentasAbiertas.comedor}
+          nCuentasPickup={cuentasAbiertas.pickup}
+          nCuentasDomicilio={cuentasAbiertas.domicilio}
+          nEnEspera={nEnEspera}
+          onComedor={() => { setEnInicio(false); setEnMesas(true); }}
+          onPickup={() => { setEnInicio(false); setEnPickup(true); }}
+          onDomicilio={() => { setEnInicio(false); setEnDelivery(true); }}
+          onParaLlevar={() => {
+            // Venta de mostrador: el modo queda fijado y se entra directo a capturar.
+            dispatch({ tipo: "modo", modo: "PARA_LLEVAR" });
+            setEnInicio(false);
+          }}
+          onMonitorVentas={() => { setEnInicio(false); setEnMonitor(true); }}
+          onConsultarCuentas={() => { setEnInicio(false); setEnConsultaCuentas(true); }}
+          onMovimientoCaja={() => setMovimientoAbierto(true)}
+          onCerrarTurno={() => setCerrando(true)}
+          onMenu={() => setEnInicio(false)}
+        />
+        {movimientoAbierto && (
+          <ModalMovimientoCaja
+            token={token}
+            empleado={empleado}
+            caja={caja}
+            turno={turno}
+            onRegistrado={(m) => {
+              setMovimientoAbierto(false);
+              setMovimientoToast({ folio: m.folio, tipo: m.tipo, monto: m.monto });
+              setTimeout(() => setMovimientoToast(null), 4000);
+            }}
+            onCerrar={() => setMovimientoAbierto(false)}
+          />
+        )}
+        {cerrando && (
+          <PantallaCierre
+            token={token}
+            empleado={empleado}
+            caja={caja}
+            turno={turno}
+            onCancelar={() => setCerrando(false)}
+            onCerrado={onCerrarTurno}
+          />
+        )}
+      </>
+    );
+  }
+
+  if (enMonitor) {
+    return <PantallaMonitorVentas token={token} caja={caja} turno={turno} onSalir={volverAlInicio} />;
+  }
+
   if (enMesas) {
     return (
       <PantallaMesas
         token={token}
         caja={caja}
-        onSalir={() => setEnMesas(false)}
+        onSalir={volverAlInicio}
         onAbrirCuenta={onAbrirCuentaMesa}
         onRetomar={entrarCuenta}
       />
@@ -764,19 +866,19 @@ export function HomePos({
   }
 
   if (enDelivery) {
-    return <PantallaDomicilioCuentas token={token} caja={caja} onSalir={() => setEnDelivery(false)} onRetomar={entrarCuenta} />;
+    return <PantallaDomicilioCuentas token={token} caja={caja} onSalir={volverAlInicio} onRetomar={entrarCuenta} />;
   }
 
   if (enPickup) {
-    return <PantallaPickup token={token} caja={caja} onSalir={() => setEnPickup(false)} onRetomar={entrarCuenta} />;
+    return <PantallaPickup token={token} caja={caja} onSalir={volverAlInicio} onRetomar={entrarCuenta} />;
   }
 
   if (enConsultaCuentas) {
-    return <PantallaConsultaCuentas token={token} caja={caja} turno={turno} empleado={empleado} onSalir={() => setEnConsultaCuentas(false)} onReimprimir={reimprimirCuenta} />;
+    return <PantallaConsultaCuentas token={token} caja={caja} turno={turno} empleado={empleado} onSalir={volverAlInicio} onReimprimir={reimprimirCuenta} />;
   }
 
   if (enDevoluciones) {
-    return <PantallaDevoluciones token={token} caja={caja} turno={turno} empleado={empleado} onSalir={() => setEnDevoluciones(false)} />;
+    return <PantallaDevoluciones token={token} caja={caja} turno={turno} empleado={empleado} onSalir={volverAlInicio} />;
   }
 
   return (
@@ -793,7 +895,7 @@ export function HomePos({
           Sincronizando {pendientesSync} operación{pendientesSync === 1 ? "" : "es"} pendiente{pendientesSync === 1 ? "" : "s"}…
         </div>
       )}
-      <TopbarOperativa caja={caja} turno={turno} empleado={empleado} onCambiarCajero={onCambiarCajero} onBloquear={onBloquear} onCerrarTurno={() => setCerrando(true)} onMovimientoCaja={() => setMovimientoAbierto(true)} onAbrirCaja={() => setAbrirCajaAbierto(true)} onKds={() => { salirNavegacion(); setEnKds(true); }} onDevoluciones={() => { salirNavegacion(); setEnDevoluciones(true); }} onImpresora={() => setConfigImpresoraAbierto(true)} onCambiarPin={() => setCambiarPinAbierto(true)} onMisPropinas={() => setMisPropinasAbierto(true)} onEnEspera={() => { setEsperaError(null); setEsperaListaAbierta(true); }} onCuentas={() => { salirNavegacion(); setEnConsultaCuentas(true); }} nEnEspera={nEnEspera} />
+      <TopbarOperativa caja={caja} turno={turno} empleado={empleado} onCambiarCajero={onCambiarCajero} onBloquear={onBloquear} onCerrarTurno={() => setCerrando(true)} onMovimientoCaja={() => setMovimientoAbierto(true)} onAbrirCaja={() => setAbrirCajaAbierto(true)} onInicio={volverAlInicio} onKds={() => { salirNavegacion(); setEnKds(true); }} onDevoluciones={() => { salirNavegacion(); setEnDevoluciones(true); }} onImpresora={() => setConfigImpresoraAbierto(true)} onCambiarPin={() => setCambiarPinAbierto(true)} onMisPropinas={() => setMisPropinasAbierto(true)} onEnEspera={() => { setEsperaError(null); setEsperaListaAbierta(true); }} onCuentas={() => { salirNavegacion(); setEnConsultaCuentas(true); }} nEnEspera={nEnEspera} />
       {configImpresoraAbierto && <ModalConfigImpresora onCerrar={() => setConfigImpresoraAbierto(false)} />}
       {clienteDomAbierto && (
         <ModalClienteDomicilio
@@ -905,13 +1007,6 @@ export function HomePos({
           onDescuentoItem={ticketBd ? onDescuentoItemSolicitado : undefined}
           onLimpiar={!ticketBd ? () => dispatch({ tipo: "limpiar" }) : undefined}
           onCancelarTicket={ticketBd ? () => setCancelandoTicket(true) : undefined}
-          onModo={(m: ModoServicio) => dispatch({ tipo: "modo", modo: m })}
-          onVerCuentas={(m) => {
-            salirNavegacion();
-            if (m === "COMER_AQUI") setEnMesas(true);
-            else if (m === "DRIVE_THRU") setEnPickup(true);
-            else if (m === "DELIVERY_PROPIO") setEnDelivery(true);
-          }}
           onEditarCliente={() => setClienteDomAbierto(true)}
           onNotaLinea={(id, nota) => dispatch({ tipo: "nota_linea", clientId: id, nota })}
           onNotaOrden={(nota) => dispatch({ tipo: "nota_orden", nota })}
