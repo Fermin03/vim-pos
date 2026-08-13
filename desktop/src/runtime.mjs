@@ -5,6 +5,7 @@
 import EmbeddedPostgres from "embedded-postgres";
 import pg from "pg";
 import { spawn, execFileSync } from "node:child_process";
+import { randomBytes } from "node:crypto";
 import { readFileSync, readdirSync, existsSync, openSync, writeFileSync, rmSync, mkdirSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
@@ -74,6 +75,34 @@ function matarQuienOcupaElPuerto(puerto, log = () => {}) {
   } catch { /* netstat no disponible: seguimos */ }
 }
 
+/**
+ * SEC CN-001 — secreto JWT propio de CADA instalación.
+ *
+ * Antes había un literal por defecto commiteado en el repositorio, y NADIE pasaba `opts.jwtSecret`
+ * (ni backend.mjs ni main.mjs), así que TODAS las cajas del mundo firmaban y validaban con el mismo
+ * secreto público. Como PostgREST lo usa como `jwt-secret`, cualquiera en la LAN del local podía
+ * acuñar un JWT con `role: service_role` y saltarse el RLS entero contra la base de la caja.
+ *
+ * Ahora se genera uno de 32 bytes en el primer arranque y se persiste junto al resto del estado
+ * escribible (dataRoot/bin). base64url: sin comillas ni backslashes, seguro de interpolar en el
+ * .conf. 43 caracteres > los 32 que PostgREST exige para HS256.
+ *
+ * OJO: el modo 0o600 solo aplica de verdad en POSIX; en Windows la protección real es la ACL del
+ * perfil de usuario (dataRoot vive en userData). Quien ya tenga acceso a esa carpeta también tiene
+ * el pgdata, así que no es una regresión — pero por eso el secreto NO es el último control.
+ */
+function secretoDeInstalacion(dataRoot) {
+  const f = path.join(dataRoot, "bin", ".jwt-secret");
+  try {
+    const previo = readFileSync(f, "utf8").trim();
+    if (previo.length >= 32) return previo;
+  } catch { /* primer arranque, o archivo ilegible → se regenera abajo */ }
+  const s = randomBytes(32).toString("base64url");
+  mkdirSync(path.dirname(f), { recursive: true });
+  writeFileSync(f, s, { mode: 0o600 });
+  return s;
+}
+
 /** Arranca el backend local y devuelve puertos + pool + stop(). Idempotente entre arranques. */
 export async function startLocalBackend(opts = {}) {
   // Empaquetado (Electron): recursos read-only en resDir (extraResources) y datos escribibles en
@@ -93,7 +122,7 @@ export async function startLocalBackend(opts = {}) {
   const dataDir = opts.dataDir ?? path.join(dataRoot, "pgdata");
   const pgPort = opts.pgPort ?? 54329;
   const restPort = opts.restPort ?? 54331;
-  const secret = opts.jwtSecret ?? "vim-pos-local-jwt-secret-cambia-en-produccion-32+";
+  const secret = opts.jwtSecret ?? secretoDeInstalacion(dataRoot);
   // El fixture de desarrollo (Knock-Out Burger de demo) SOLO va en dev. En una instalación real
   // sembrarlo hacía dos daños: metía datos de demostración en la caja del cliente, y —peor— el
   // TRUNCATE+reseed de los catálogos globales recreaba los roles de sistema con IDs aleatorios,
@@ -178,8 +207,12 @@ export async function startLocalBackend(opts = {}) {
     `db-anon-role = "anon"`,
     `jwt-secret = "${secret}"`,
     `server-port = ${restPort}`,
+    // SEC CN-001 — sin server-host, PostgREST usa su default `!4` y escucha en TODAS las
+    // interfaces IPv4: quedaba accesible desde la LAN, saltándose el gateway. Nadie lo necesita
+    // ahí fuera — el único cliente es el proxy /rest/v1 del gateway, que ya usa 127.0.0.1.
+    `server-host = "127.0.0.1"`,
     ``,
-  ].join("\n"));
+  ].join("\n"), { mode: 0o600 }); // el .conf lleva el jwt-secret y las credenciales de la BD
   const logFd = openSync(logPath, "w");
   const rest = spawn(postgrestExe, [confPath], {
     stdio: ["ignore", logFd, logFd],
