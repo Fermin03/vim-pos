@@ -3,7 +3,7 @@
 //    gateway) + UI del POS. Hace de HUB en la LAN. Fase 3: bandeja (no se apaga por accidente) +
 //    watchdog (se auto-recupera) + respaldo del pgdata al cerrar y bajo demanda.
 //  • COCINA (--role=cocina): pantalla de cocina como CLIENTE DELGADO del hub. SIN backend local.
-import { app, BrowserWindow, Tray, Menu, nativeImage, clipboard, Notification, dialog, shell } from "electron";
+import { app, BrowserWindow, Tray, Menu, nativeImage, clipboard, Notification, dialog, shell, safeStorage } from "electron";
 import { existsSync, readFileSync, writeFileSync, mkdirSync, openSync, writeSync } from "node:fs";
 import { inspect } from "node:util";
 import path from "node:path";
@@ -95,6 +95,12 @@ function guardarHubUrl(url) {
 
 // ── Credenciales de la nube de esta caja ─────────────────────────────────────
 // El env manda (útil para pruebas y para el verify headless); si no, lo persistido al vincular.
+// SEC CN-006 — la contraseña del dispositivo se guardaba en claro en nube.json. Con ella se puede
+// llamar a sync-pull contra la nube, que devuelve el snapshot COMPLETO del tenant (incluidos los
+// pin_hash de toda la plantilla), y a sync-push, que reescribe el histórico de ventas. Un equipo
+// robado o un empleado con acceso al archivo bastaba.
+// Ahora se cifra con safeStorage de Electron (DPAPI en Windows: ligado a la cuenta de usuario).
+// Los archivos viejos en claro se leen igual y se reescriben cifrados al vuelo.
 function leerNube() {
   const env = {
     cloudUrl: process.env.VIM_CLOUD_URL,
@@ -104,14 +110,40 @@ function leerNube() {
   };
   if (env.cloudUrl && env.anon && env.email && env.pass) return env;
   try {
-    const c = JSON.parse(readFileSync(NUBE_CFG, "utf8"));
-    return c.email && c.pass ? { cloudUrl: c.cloudUrl || CLOUD_URL, anon: c.anon || CLOUD_ANON, email: c.email, pass: c.pass } : null;
+    const crudo = readFileSync(NUBE_CFG);
+    let texto = null;
+    let enClaro = false;
+    if (crudo.length > 0 && crudo[0] === 0x7b) {
+      texto = crudo.toString("utf8"); // '{' → formato viejo sin cifrar
+      enClaro = true;
+    } else if (safeStorage.isEncryptionAvailable()) {
+      texto = safeStorage.decryptString(crudo);
+    } else {
+      console.error("· [nube] hay credenciales cifradas pero el cifrado del sistema no está disponible.");
+      return null;
+    }
+    const c = JSON.parse(texto);
+    if (!c.email || !c.pass) return null;
+    const cfg = { cloudUrl: c.cloudUrl || CLOUD_URL, anon: c.anon || CLOUD_ANON, email: c.email, pass: c.pass };
+    // Migración silenciosa: si venía en claro, se reescribe cifrado en cuanto se lee.
+    if (enClaro && safeStorage.isEncryptionAvailable()) {
+      guardarNube(cfg);
+      console.log("· [nube] credenciales migradas a almacenamiento cifrado");
+    }
+    return cfg;
   } catch { return null; }
 }
 function guardarNube({ cloudUrl, anon, email, pass }) {
   try {
     mkdirSync(CONFIG_DIR, { recursive: true });
-    writeFileSync(NUBE_CFG, JSON.stringify({ cloudUrl, anon, email, pass }, null, 2));
+    const texto = JSON.stringify({ cloudUrl, anon, email, pass }, null, 2);
+    if (safeStorage.isEncryptionAvailable()) {
+      writeFileSync(NUBE_CFG, safeStorage.encryptString(texto), { mode: 0o600 });
+    } else {
+      // Degradación explícita: mejor que la caja funcione y quede constancia, a que no arranque.
+      console.error("· [nube] cifrado del sistema NO disponible: las credenciales quedan en claro.");
+      writeFileSync(NUBE_CFG, texto, { mode: 0o600 });
+    }
   } catch (e) { console.error("No se pudieron guardar las credenciales de nube:", e.message); }
 }
 

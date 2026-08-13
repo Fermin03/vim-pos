@@ -2,7 +2,7 @@
 import { useState } from "react";
 import { Button } from "@vim/ui/styles";
 import { deviceSignIn } from "../lib/supabase";
-import { guardarCreds, CREDS_DEV_FIXTURE } from "../lib/device-creds";
+import { guardarIdent, leerIdent, CREDS_DEV_FIXTURE } from "../lib/device-creds";
 import { darDeAltaDesdeNube, esEscritorio } from "../lib/alta-nube";
 import { BrandMark } from "./topbar-pos";
 
@@ -13,7 +13,9 @@ import { BrandMark } from "./topbar-pos";
  */
 export function VincularDispositivo({ onVinculado }: { onVinculado: () => void }) {
   // SEC CN-011: en producción CREDS_DEV_FIXTURE es null (no prellenamos credenciales).
-  const [email, setEmail] = useState(CREDS_DEV_FIXTURE?.email ?? "");
+  // SEC CN-006: si esta caja ya estuvo vinculada, se recuerda el correo (nunca la contraseña),
+  // así reconectar tras perder la sesión es teclear una clave, no descifrar cuál era el correo.
+  const [email, setEmail] = useState(() => leerIdent()?.email ?? CREDS_DEV_FIXTURE?.email ?? "");
   const [password, setPassword] = useState(CREDS_DEV_FIXTURE?.password ?? "");
   const [error, setError] = useState<string | null>(null);
   const [cargando, setCargando] = useState(false);
@@ -23,7 +25,7 @@ export function VincularDispositivo({ onVinculado }: { onVinculado: () => void }
   async function intentarLocal(correo: string, clave: string): Promise<boolean> {
     try {
       await deviceSignIn(correo, clave);
-      guardarCreds({ email: correo, password: clave });
+      guardarIdent({ email: correo }); // SEC CN-006: solo el correo; la sesión la sostiene supabase-js
       return true;
     } catch {
       return false;

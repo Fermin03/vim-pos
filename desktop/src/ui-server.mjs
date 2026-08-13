@@ -101,6 +101,41 @@ function normalizarHub(entrada, puertoDefault = 54350) {
 /** Direcciones que cuentan como "la propia máquina" (IPv4, IPv6 y IPv4 mapeada en IPv6). */
 const LOCALES = new Set(["127.0.0.1", "::1", "::ffff:127.0.0.1"]);
 
+/**
+ * SEC CN-020 — defensa CSRF de los endpoints locales (__imprimir, __actualizar, __vincular-nube,
+ * __set-hub).
+ *
+ * El único control era que la petición viniera de 127.0.0.1, y eso no distingue "lo pidió el POS"
+ * de "lo pidió una web cualquiera abierta en el navegador de la caja": esa web también sale de
+ * 127.0.0.1. Un POST con Content-Type text/plain no dispara preflight, así que llegaba y se
+ * ejecutaba (imprimir basura, abrir diálogos sobre la pantalla de cobro, intentar revincular).
+ *
+ * Se comprueba por capas, sin depender de que UNA cabecera esté siempre presente —romper la
+ * impresión de tickets sería peor que el propio agujero:
+ *   · Sec-Fetch-Site: la pone el navegador y JS no puede falsificarla (cabecera prohibida).
+ *     Si viene y no dice same-origin, es CSRF.
+ *   · Origin: en POST el navegador siempre la manda. Si viene y no es la nuestra, fuera.
+ *   · Content-Type: solo para los que llevan cuerpo. application/json obliga a preflight
+ *     cross-origin, y este servidor no contesta preflight con CORS → el navegador lo bloquea.
+ *     (/__actualizar no manda cuerpo ni Content-Type, por eso el chequeo es opcional.)
+ */
+function mismaProcedencia(req, port, { exigirJson = true } = {}) {
+  const sitio = req.headers["sec-fetch-site"];
+  if (sitio && sitio !== "same-origin" && sitio !== "none") return false;
+
+  const origin = req.headers["origin"];
+  if (origin) {
+    let u;
+    try { u = new URL(origin); } catch { return false; }
+    const propio = LOCALES.has(u.hostname) || u.hostname === "localhost" ||
+      u.hostname === (req.headers.host ?? "").split(":")[0];
+    if (!propio || Number(u.port) !== Number(port)) return false;
+  }
+
+  if (exigirJson && !(req.headers["content-type"] ?? "").includes("application/json")) return false;
+  return true;
+}
+
 export async function startUiServer(dir, port, gatewayPort = 54350, host = "0.0.0.0", opts = {}) {
   const kds = !!opts.kds;
   let hub = opts.hub || null; // COCINA: gateway remoto (mutable; lo fija el setup)
@@ -109,6 +144,10 @@ export async function startUiServer(dir, port, gatewayPort = 54350, host = "0.0.
     try {
       // COCINA: recibir la IP del hub desde la pantalla de setup.
       if (kds && req.method === "POST" && req.url.startsWith("/__set-hub")) {
+        if (!mismaProcedencia(req, port)) {
+          res.writeHead(403, { "Content-Type": "application/json" });
+          return res.end(JSON.stringify({ ok: false, error: "Origen no permitido." }));
+        }
         let body = "";
         for await (const chunk of req) body += chunk;
         let url = null;
@@ -126,8 +165,16 @@ export async function startUiServer(dir, port, gatewayPort = 54350, host = "0.0.
       // CAJA: el menú del POS pide un chequeo de actualización. Solo desde la propia caja: el
       // servidor escucha en la LAN y esto abre diálogos modales sobre la pantalla de cobro.
       if (!kds && req.method === "POST" && req.url.startsWith("/__actualizar")) {
-        res.writeHead(LOCALES.has(req.socket.remoteAddress ?? "") ? 200 : 403, { "Content-Type": "application/json" });
-        if (!LOCALES.has(req.socket.remoteAddress ?? "")) return res.end(JSON.stringify({ ok: false, error: "Solo desde la caja." }));
+        if (!LOCALES.has(req.socket.remoteAddress ?? "")) {
+          res.writeHead(403, { "Content-Type": "application/json" });
+          return res.end(JSON.stringify({ ok: false, error: "Solo desde la caja." }));
+        }
+        // Sin cuerpo: el cliente no manda Content-Type, así que aquí no se exige (SEC CN-020).
+        if (!mismaProcedencia(req, port, { exigirJson: false })) {
+          res.writeHead(403, { "Content-Type": "application/json" });
+          return res.end(JSON.stringify({ ok: false, error: "Origen no permitido." }));
+        }
+        res.writeHead(200, { "Content-Type": "application/json" });
         try {
           const r = await opts.onActualizar?.();
           return res.end(JSON.stringify({ ok: true, ...(r ?? { estado: "no-disponible" }) }));
@@ -139,7 +186,7 @@ export async function startUiServer(dir, port, gatewayPort = 54350, host = "0.0.
       // CAJA: relay de impresión RAW. El navegador no abre sockets TCP; el main sí. La UI arma los
       // bytes ESC/POS y los manda aquí; el main los escribe a la impresora en ip:9100. Solo local.
       if (!kds && req.method === "POST" && req.url.startsWith("/__imprimir")) {
-        if (!LOCALES.has(req.socket.remoteAddress ?? "")) {
+        if (!LOCALES.has(req.socket.remoteAddress ?? "") || !mismaProcedencia(req, port)) {
           res.writeHead(403, { "Content-Type": "application/json" });
           return res.end(JSON.stringify({ ok: false, error: "Solo desde la caja." }));
         }
@@ -159,7 +206,7 @@ export async function startUiServer(dir, port, gatewayPort = 54350, host = "0.0.
       // CAJA: alta de la caja contra la nube (valida credenciales del dispositivo y baja el
       // tenant al Postgres local). Lo hace el main porque el navegador no puede escribir en la BD.
       if (!kds && req.method === "POST" && req.url.startsWith("/__vincular-nube")) {
-        if (!LOCALES.has(req.socket.remoteAddress ?? "")) {
+        if (!LOCALES.has(req.socket.remoteAddress ?? "") || !mismaProcedencia(req, port)) {
           res.writeHead(403, { "Content-Type": "application/json" });
           return res.end(JSON.stringify({ ok: false, error: "Solo desde la caja." }));
         }
@@ -179,7 +226,11 @@ export async function startUiServer(dir, port, gatewayPort = 54350, host = "0.0.
       let rel = decodeURIComponent(new URL(req.url, "http://x").pathname);
       if (rel === "/" || rel === "") rel = "/index.html";
       let file = path.normalize(path.join(dir, rel));
-      if (!file.startsWith(dir)) { res.writeHead(403); return res.end("forbidden"); } // anti path-traversal
+      // SEC CN-025 — anti path-traversal. `startsWith(dir)` comparaba cadenas, así que
+      // C:\...\pos-ui-otro\x pasaba el filtro por ser prefijo de C:\...\pos-ui. path.relative
+      // razona sobre segmentos: si el resultado sale del directorio, empieza por ".." o es absoluto.
+      const dentro = path.relative(dir, file);
+      if (dentro.startsWith("..") || path.isAbsolute(dentro)) { res.writeHead(403); return res.end("forbidden"); }
 
       // COCINA sin hub configurado → pantalla de setup para CUALQUIER ruta HTML.
       if (kds && !hub && (rel === "/index.html" || rel.endsWith(".html"))) {
