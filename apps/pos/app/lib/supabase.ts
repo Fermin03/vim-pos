@@ -45,6 +45,38 @@ export async function deviceSignOut(): Promise<void> {
   await deviceClient.auth.signOut();
 }
 
+/** Error de "la sesión del dispositivo ya no vale": obliga a re-vincular la caja. */
+export class SesionDispositivoInvalida extends Error {
+  constructor() {
+    super("SESION_DISPOSITIVO_INVALIDA");
+    this.name = "SesionDispositivoInvalida";
+  }
+}
+
+/**
+ * ¿Este error de PostgREST/GoTrue significa que el token del dispositivo ya no sirve?
+ *
+ * Caso real (v0.4.1): el backend local pasó de firmar con un literal commiteado a un secreto
+ * propio por instalación (SEC CN-001). Correcto, pero las cajas ya instaladas tenían su sesión
+ * firmada con el secreto viejo, y al actualizar PostgREST empezó a rechazarla con 401. La app
+ * se quedaba en "No se pudieron cargar los empleados" sin salida, porque en la misma versión se
+ * quitó la contraseña guardada que antes permitía re-loguear en silencio.
+ *
+ * Por eso esto NO se trata como un error de red: es una sesión muerta, y la única salida real
+ * es re-vincular el dispositivo.
+ */
+export function esSesionDispositivoInvalida(e: unknown): boolean {
+  const msg = e instanceof Error ? e.message : typeof e === "string" ? e : "";
+  const code = (e as { code?: string } | null)?.code ?? "";
+  const status = (e as { status?: number } | null)?.status ?? 0;
+  return (
+    status === 401 ||
+    code === "PGRST301" || // JWT inválido/expirado
+    code === "42501" ||
+    /jwt|jws|invalid token|invalid claim|unauthorized|no autorizado/i.test(msg)
+  );
+}
+
 /** Token de la sesión de dispositivo (para el Modo KDS: lee/avanza comandas sin PIN de empleado,
  *  ya que tickets_select/update es por tenant, no por identidad). supabase-js lo auto-refresca. */
 export async function deviceToken(): Promise<string | null> {
@@ -77,6 +109,10 @@ export async function listarEmpleados(): Promise<Empleado[]> {
     .from("usuarios_acceso")
     .select("usuario_id, rol:roles(codigo)")
     .eq("activo", true);
+  // Esta es la PRIMERA lectura que hace la caja al arrancar: si el token ya no vale, aquí se
+  // entera. Se distingue de un error cualquiera para poder mandar a re-vincular en vez de
+  // dejar la pantalla muerta.
+  if (e1 && esSesionDispositivoInvalida(e1)) throw new SesionDispositivoInvalida();
   if (e1) throw new Error(e1.message);
   type Acceso = { usuario_id: string; rol: { codigo: string } | null };
   const operativos = ((accesos ?? []) as unknown as Acceso[]).filter(
@@ -90,6 +126,7 @@ export async function listarEmpleados(): Promise<Empleado[]> {
     .select("id, nombre, estado")
     .in("id", Array.from(rolPorId.keys()))
     .eq("estado", "ACTIVO");
+  if (e2 && esSesionDispositivoInvalida(e2)) throw new SesionDispositivoInvalida();
   if (e2) throw new Error(e2.message);
   type Perfil = { id: string; nombre: string; estado: string };
   return ((perfiles ?? []) as unknown as Perfil[]).map((p) => ({

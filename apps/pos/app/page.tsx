@@ -26,7 +26,7 @@ const CAJA_DEV = "Caja 01";
 
 type Estado =
   | { paso: "boot" }
-  | { paso: "vincular" }
+  | { paso: "vincular"; motivo?: "sesion-invalida" }
   | { paso: "selector"; pinPara: Empleado | null }
   | { paso: "operando"; empleado: Empleado; token: string }
   | { paso: "bloqueo"; empleado: Empleado }
@@ -90,6 +90,18 @@ export default function Page() {
     setEstado({ paso: "vincular" });
   }, []);
 
+  /**
+   * La sesión guardada del dispositivo dejó de ser válida (el backend local ya no la reconoce).
+   * Pasó de verdad al actualizar a 0.4.1: el secreto de firma pasó a ser propio de cada
+   * instalación (SEC CN-001) y las sesiones firmadas con el anterior quedaron muertas. Se limpia
+   * la sesión y se manda a re-vincular explicando por qué, en vez de dejar la caja atorada.
+   */
+  const sesionDispositivoInvalida = useCallback(async () => {
+    await deviceSignOut();
+    setCajaId(null);
+    setEstado({ paso: "vincular", motivo: "sesion-invalida" });
+  }, []);
+
   const trasPin = useCallback((empleado: Empleado, r: PinLoginResult) => {
     setEstado({ paso: "operando", empleado, token: r.access_token });
   }, []);
@@ -124,7 +136,7 @@ export default function Page() {
       );
 
     case "vincular":
-      return <VincularDispositivo onVinculado={trasVincular} />;
+      return <VincularDispositivo onVinculado={trasVincular} motivo={estado.motivo} />;
 
     case "kds":
       // Pantalla de cocina dedicada (Fase 2). "Salir" vuelve al POS normal (quita ?kds).
@@ -144,6 +156,7 @@ export default function Page() {
             caja={CAJA_DEV}
             onElegir={(empleado) => setEstado({ paso: "selector", pinPara: empleado })}
             onDesvincular={desvincular}
+            onSesionInvalida={sesionDispositivoInvalida}
           />
           {estado.pinPara &&
             (cajaId ? (

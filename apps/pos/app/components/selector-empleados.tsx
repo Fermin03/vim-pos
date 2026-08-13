@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import { TopbarPos } from "./topbar-pos";
-import { listarEmpleados, type Empleado } from "../lib/supabase";
+import { listarEmpleados, SesionDispositivoInvalida, type Empleado } from "../lib/supabase";
 
 export const ROL_LABEL: Record<string, string> = {
   CAJERO: "Cajero",
@@ -26,11 +26,14 @@ export function SelectorEmpleados({
   caja,
   onElegir,
   onDesvincular,
+  onSesionInvalida,
 }: {
   sucursal: string;
   caja: string;
   onElegir: (e: Empleado) => void;
   onDesvincular: () => void;
+  /** La sesión del dispositivo ya no es válida: hay que re-vincular la caja. */
+  onSesionInvalida?: () => void;
 }) {
   const [empleados, setEmpleados] = useState<Empleado[] | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -39,11 +42,21 @@ export function SelectorEmpleados({
     let activo = true;
     listarEmpleados()
       .then((e) => activo && setEmpleados(e))
-      .catch(() => activo && setError("No se pudieron cargar los empleados."));
+      .catch((e) => {
+        if (!activo) return;
+        // Sesión muerta (p. ej. el backend rotó su secreto de firma al actualizar): no es un
+        // error que el cajero pueda resolver reintentando, así que se manda a re-vincular en
+        // vez de dejarlo mirando un mensaje sin salida.
+        if (e instanceof SesionDispositivoInvalida) {
+          onSesionInvalida?.();
+          return;
+        }
+        setError("No se pudieron cargar los empleados.");
+      });
     return () => {
       activo = false;
     };
-  }, []);
+  }, [onSesionInvalida]);
 
   return (
     <div className="flex h-screen flex-col">
