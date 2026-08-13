@@ -187,26 +187,67 @@ export async function startLocalBackend(opts = {}) {
   // enlaza y el arranque muere sin explicación.
   matarQuienOcupaElPuerto(pgPort, (m) => log(`limpieza: ${m}`));
 
-  const database = new EmbeddedPostgres({ databaseDir: dataDir, user: "postgres", password: "postgres", port: pgPort, persistent: true });
-  if (!existsSync(path.join(dataDir, "PG_VERSION"))) { log("initdb (primer arranque)…"); await database.initialise(); }
+  // SEC CN-018 — credencial del Postgres local, propia de cada instalación.
+  // Estaba fija en 'postgres' en cinco sitios, y el pg_hba del clúster exige contraseña (no es
+  // `trust`), así que era una credencial de superusuario REAL, idéntica en todas las cajas y
+  // publicada en el repositorio. Postgres solo escucha en loopback, lo que acota el alcance a
+  // procesos de la propia máquina — pero ahí dentro daba acceso total, incluidos los pin_hash.
+  const rutaPass = path.join(dataRoot, "bin", ".pg-password");
+  const nuevaClave = () => randomBytes(24).toString("base64url"); // [A-Za-z0-9_-]: seguro en el .conf y en la URI
+  let passGuardada = null;
+  try { const p = readFileSync(rutaPass, "utf8").trim(); if (p.length >= 24) passGuardada = p; } catch { /* aún no existe */ }
+  const guardarPass = (v) => { mkdirSync(path.dirname(rutaPass), { recursive: true }); writeFileSync(rutaPass, v, { mode: 0o600 }); };
+
+  const clusterNuevo = !existsSync(path.join(dataDir, "PG_VERSION"));
+  // Clúster nuevo → nace con credencial propia. Existente → arranca con la que ya funciona
+  // ('postgres' si nunca se rotó) y se rota más abajo, una sola vez.
+  let password = clusterNuevo ? nuevaClave() : (passGuardada ?? "postgres");
+
+  const database = new EmbeddedPostgres({
+    databaseDir: dataDir, user: "postgres", password, port: pgPort, persistent: true,
+    // scram-sha-256 en vez del 'password' (contraseña EN CLARO por el socket) que trae por
+    // defecto embedded-postgres. Solo aplica al initdb: los clústeres ya creados conservan su
+    // pg_hba, y reescribirlo en caliente arriesga dejar la caja sin poder conectarse a su BD.
+    ...(clusterNuevo ? { authMethod: "scram-sha-256" } : {}),
+  });
+  if (clusterNuevo) {
+    log("initdb (primer arranque)…");
+    await database.initialise();
+    guardarPass(password); // ya es la del clúster: persistir antes de seguir
+  }
   await database.start();
   let pgPid = 0;
   try { pgPid = parseInt(readFileSync(path.join(dataDir, "postmaster.pid"), "utf8").split("\n")[0], 10) || 0; } catch { /* */ }
   log(`Postgres embebido en localhost:${pgPort}`);
 
   // 1) Asegurar la BD vimpos en UTF8 (Windows arranca el clúster en WIN1252).
-  const su = new pg.Client({ host: "localhost", port: pgPort, user: "postgres", password: "postgres", database: "postgres" });
+  const su = new pg.Client({ host: "localhost", port: pgPort, user: "postgres", password, database: "postgres" });
   await su.connect();
   const existe = (await su.query("SELECT 1 FROM pg_database WHERE datname='vimpos'")).rowCount > 0;
   if (!existe) await su.query("CREATE DATABASE vimpos WITH ENCODING 'UTF8' TEMPLATE template0 LC_COLLATE 'C' LC_CTYPE 'C'");
+
+  // Caja ya instalada que sigue con la contraseña publicada: se rota aquí, una única vez.
+  // Se persiste DESPUÉS del ALTER: si algo fallara, el próximo arranque vuelve a intentarlo con
+  // la anterior en vez de quedarse con un archivo que no corresponde a la BD.
+  if (!clusterNuevo && !passGuardada) {
+    const nueva = nuevaClave();
+    await su.query(`ALTER ROLE postgres PASSWORD '${nueva}'`); // base64url: sin comillas ni backslashes
+    guardarPass(nueva);
+    password = nueva;
+    log("credencial local de Postgres rotada (era la publicada por defecto)");
+  }
   await su.end();
 
-  const db = new pg.Client({ host: "localhost", port: pgPort, user: "postgres", password: "postgres", database: "vimpos" });
+  const db = new pg.Client({ host: "localhost", port: pgPort, user: "postgres", password, database: "vimpos" });
   await db.connect();
   await db.query("SET client_encoding TO 'UTF8'");
 
   // 2) Shim de compatibilidad Supabase (idempotente).
   await db.query(readFileSync(shimFile, "utf8"));
+  // El shim crea `authenticator` con la contraseña fija del repositorio y no la toca si ya existe
+  // (CREATE ROLE ... EXCEPTION duplicate_object). Se alinea siempre con la de esta instalación:
+  // es el rol con el que PostgREST se conecta, así que su credencial también estaba publicada.
+  await db.query(`ALTER ROLE authenticator PASSWORD '${password}'`);
 
   // 3) Migraciones idempotentes (registradas en _vim_migraciones).
   await db.query("CREATE TABLE IF NOT EXISTS _vim_migraciones (nombre text PRIMARY KEY, aplicada_at timestamptz DEFAULT now())");
@@ -251,7 +292,7 @@ export async function startLocalBackend(opts = {}) {
     // 127.0.0.1 (no 'localhost'): bajo Electron, la resolución de 'localhost' del proceso hijo
     // postgrest puede no alcanzar el Postgres (mismo motivo por el que readiness/proxy usan IPv4).
     // Con IP literal, libpq no hace getaddrinfo y conecta directo → schema cache carga siempre.
-    `db-uri = "postgres://authenticator:postgres@127.0.0.1:${pgPort}/vimpos"`,
+    `db-uri = "postgres://authenticator:${password}@127.0.0.1:${pgPort}/vimpos"`,
     `db-schemas = "public"`,
     `db-anon-role = "anon"`,
     `jwt-secret = "${secret}"`,
@@ -290,7 +331,7 @@ export async function startLocalBackend(opts = {}) {
   log(`PostgREST en localhost:${restPort}`);
 
   // Pool para el auth local (device sign-in, pin-login) — service_role local.
-  const pool = new pg.Pool({ host: "localhost", port: pgPort, user: "postgres", password: "postgres", database: "vimpos", max: 4 });
+  const pool = new pg.Pool({ host: "localhost", port: pgPort, user: "postgres", password, database: "vimpos", max: 4 });
 
   const stop = async () => {
     try { rest.kill(); } catch { /* */ }
@@ -298,5 +339,5 @@ export async function startLocalBackend(opts = {}) {
     try { await database.stop(); } catch { /* */ }
     try { rmSync(pidfile, { force: true }); } catch { /* */ } // cierre limpio → sin huérfanos que limpiar
   };
-  return { pgPort, restPort, secret, pool, stop, dataDir, dataRoot };
+  return { pgPort, restPort, secret, pool, stop, dataDir, dataRoot, pgPassword: password };
 }

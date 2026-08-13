@@ -30,7 +30,7 @@ export async function startBackend(opts = {}) {
   const backend = await startLocalBackend({ ...opts, log });
 
   // Fase 2 — puente de tiempo real del KDS (LISTEN 'vim_kds' → SSE).
-  const kds = await crearKdsStream({ pgPort: backend.pgPort, log });
+  const kds = await crearKdsStream({ pgPort: backend.pgPort, pgPassword: backend.pgPassword, log });
 
   // SEC CN-004 — puertos desde los que se sirve el UI (POS 54360 / cocina 54361). Definen qué
   // orígenes reciben cabeceras CORS: cualquier otro puede llamar al gateway pero no leer la

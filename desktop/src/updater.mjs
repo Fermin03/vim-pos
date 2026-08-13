@@ -26,7 +26,15 @@ export async function buscarActualizacion(feedUrl, versionActual) {
   if (!r.ok) throw new Error(`feed respondió ${r.status}`);
   const m = await r.json();
   if (!m || !m.version || !m.url) throw new Error("manifiesto inválido (falta version/url)");
-  return { version: m.version, url: m.url, sha512: m.sha512 || null, notas: m.notas || "", fecha: m.fecha || null, hay: esMasNueva(m.version, versionActual) };
+  // SEC CN-008 — el sha512 era OPCIONAL: un manifiesto sin ese campo hacía que se descargara y
+  // ejecutara CUALQUIER binario sin verificar nada. Ahora falta el campo = no hay actualización.
+  // Sigue sin ser una defensa completa (el hash viaja en el mismo manifiesto que la URL, así que
+  // quien controle el bucket controla las dos mitades); lo que cierra es el agujero de "sin hash,
+  // barra libre". La firma asimétrica del manifiesto queda pendiente — ver el encabezado.
+  if (!m.sha512 || !/^[0-9a-f]{128}$/i.test(String(m.sha512))) {
+    throw new Error("manifiesto sin un sha512 válido: no se instala nada sin poder verificarlo");
+  }
+  return { version: m.version, url: m.url, sha512: m.sha512, notas: m.notas || "", fecha: m.fecha || null, hay: esMasNueva(m.version, versionActual) };
 }
 
 /**
@@ -57,9 +65,15 @@ export async function descargarInstalador(url, sha512Esperado, destPath, onProgr
     throw e;
   }
   const suma = hash.digest("hex");
-  if (sha512Esperado && suma.toLowerCase() !== String(sha512Esperado).toLowerCase()) {
+  // SEC CN-008 — sin hash esperado NO se instala. Antes `sha512Esperado` podía ser null y este
+  // if se saltaba entero, devolviendo `verificado: false` que nadie miraba.
+  if (!sha512Esperado) {
+    try { rmSync(destPath, { force: true }); } catch { /* */ }
+    throw new Error("descarga sin SHA-512 de referencia: se descartó sin instalar");
+  }
+  if (suma.toLowerCase() !== String(sha512Esperado).toLowerCase()) {
     try { rmSync(destPath, { force: true }); } catch { /* */ }
     throw new Error("el SHA-512 no coincide — descarga corrupta o alterada; se descartó");
   }
-  return { path: destPath, sha512: suma, verificado: !!sha512Esperado };
+  return { path: destPath, sha512: suma, verificado: true };
 }

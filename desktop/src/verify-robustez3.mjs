@@ -8,7 +8,7 @@ import { crearWatchdog } from "./watchdog.mjs";
 import EmbeddedPostgres from "embedded-postgres";
 import pg from "pg";
 import { execSync } from "node:child_process";
-import { existsSync, rmSync } from "node:fs";
+import { existsSync, rmSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -35,9 +35,9 @@ try {
   if (!dest || !existsSync(path.join(dest, "PG_VERSION"))) fail("el respaldo no se creó / sin PG_VERSION");
   else {
     // Arrancar un Postgres SOBRE la copia (otro puerto) y consultar → prueba que es válido.
-    const pgCopia = new EmbeddedPostgres({ databaseDir: dest, user: "postgres", password: "postgres", port: 54339, persistent: true });
+    const pgCopia = new EmbeddedPostgres({ databaseDir: dest, user: "postgres", password: backend?.pgPassword ?? passRespaldo, port: 54339, persistent: true });
     await pgCopia.start();
-    const c = new pg.Client({ host: "127.0.0.1", port: 54339, user: "postgres", password: "postgres", database: "vimpos" });
+    const c = new pg.Client({ host: "127.0.0.1", port: 54339, user: "postgres", password: backend?.pgPassword ?? passRespaldo, database: "vimpos" });
     await c.connect();
     const despues = (await c.query("SELECT count(*)::int n FROM tenants")).rows[0].n;
     await c.end(); await pgCopia.stop();
