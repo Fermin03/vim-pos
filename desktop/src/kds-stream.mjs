@@ -29,14 +29,18 @@ export async function crearKdsStream({ pgPort, log = () => {} }) {
   }, 20000);
 
   return {
-    /** Maneja GET /kds/stream[?sucursal=<uuid>] como SSE. */
-    handleSse(req, res, url) {
+    /**
+     * Maneja GET /kds/stream[?sucursal=<uuid>] como SSE.
+     * `cors` lo calcula el gateway con su allowlist (SEC CN-004): aquí había un
+     * "Access-Control-Allow-Origin: *" propio que se saltaba cualquier control del gateway.
+     */
+    handleSse(req, res, url, cors = {}) {
       const sucursal = url.searchParams.get("sucursal");
       res.writeHead(200, {
+        ...cors,
         "Content-Type": "text/event-stream",
         "Cache-Control": "no-cache",
         Connection: "keep-alive",
-        "Access-Control-Allow-Origin": "*",
         "X-Accel-Buffering": "no",
       });
       res.write(`event: hola\ndata: {"ok":true}\n\n`);
