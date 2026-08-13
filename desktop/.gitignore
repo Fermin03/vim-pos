@@ -18,3 +18,4 @@ kds-hub.json
 backups/
 backups-verify/
 pgdata.pre-restauracion-*/
+bin/.pg-password

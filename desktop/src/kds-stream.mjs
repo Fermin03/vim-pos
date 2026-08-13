@@ -5,9 +5,11 @@
 import pg from "pg";
 
 /** Crea el puente LISTEN→SSE. Devuelve { handleSse(req,res,url), stop() }. */
-export async function crearKdsStream({ pgPort, log = () => {} }) {
+export async function crearKdsStream({ pgPort, pgPassword = "postgres", log = () => {} }) {
   // Conexión dedicada: LISTEN retiene la conexión, no puede compartir el pool.
-  const client = new pg.Client({ host: "127.0.0.1", port: pgPort, user: "postgres", password: "postgres", database: "vimpos" });
+  // pgPassword la genera runtime.mjs por instalación (SEC CN-018); el default solo cubre
+  // llamadas antiguas que no la pasen.
+  const client = new pg.Client({ host: "127.0.0.1", port: pgPort, user: "postgres", password: pgPassword, database: "vimpos" });
   await client.connect();
   await client.query("LISTEN vim_kds");
 
