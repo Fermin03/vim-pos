@@ -2,6 +2,15 @@
 # Cada PR a main corre: lint + typecheck + build + vitest + supabase db push/test (RLS) +
 # pnpm audit. Si algo falla, el merge queda bloqueado. Previene que una regresión de
 # seguridad (key filtrada, dep vulnerable, RLS roto) llegue a main sin que un humano la vea.
+#
+# SEC CN-015 — tres arreglos sobre la versión anterior:
+#   1) El gate de dependencias terminaba en `|| true`, así que NUNCA bloqueaba nada. Se justificaba
+#      con una crítica conocida de vitest, pero `--prod` ya excluye devDependencies: el `|| true`
+#      no hacía falta ni para eso. Ahora bloquea de verdad (el árbol está en 0 vulnerabilidades).
+#   2) Sin bloque `permissions`, el GITHUB_TOKEN heredaba el default del repositorio. Ahora es
+#      read-only y explícito.
+#   3) Las acciones iban por tag (`@v4`), que es mutable: quien controle el repo de la acción puede
+#      reapuntarlo. Ahora van pinneadas al SHA del commit, con el tag en el comentario.
 name: CI
 
 on:
@@ -10,19 +19,23 @@ on:
   push:
     branches: [main]
 
+# Mínimo privilegio: ningún job de este workflow escribe en el repo.
+permissions:
+  contents: read
+
 jobs:
   build-and-test:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
       - name: Setup pnpm
-        uses: pnpm/action-setup@v4
+        uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
         with:
           version: 9.12.0
 
       - name: Setup Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: "20"
           cache: pnpm
@@ -46,17 +59,45 @@ jobs:
         run: pnpm -r build
 
       - name: Vitest (POS + Admin)
-        # Remediación Fase 6: antes solo corría @vim/pos; ahora también los tests de admin
-        # (conciliación, consolidado, facturación). `pnpm -r test` ejecuta el script `test` de
-        # cada paquete que lo define (pos + admin); kds/platform no tienen tests.
-        # Pendiente (documentado en docs/REMEDIACION.md Fase 6): montar ESLint (hoy ninguna app lo
-        # tiene configurado, `next lint` es interactivo) y un job de CI para el desktop.
+        # `pnpm -r test` ejecuta el script `test` de cada paquete que lo define (pos + admin);
+        # kds/platform no tienen tests.
+        # Pendiente (docs/REMEDIACION.md Fase 6): montar ESLint (hoy ninguna app lo tiene
+        # configurado, `next lint` es interactivo).
         run: pnpm -r test
 
-      - name: pnpm audit (deps con CVE)
-        # No bloquea en moderate (vitest 2 tiene una crítica conocida; ya documentada).
-        # En cuanto se actualice vitest a >=4.1.0, subir el nivel a `--audit-level=high`.
-        run: pnpm audit --prod --audit-level=critical || true
+      - name: Auditoría de dependencias — BLOQUEANTE (lo que se despliega)
+        # Sin `|| true`: si una dependencia de producción tiene una CVE alta, el merge se detiene.
+        run: pnpm audit --prod --audit-level=high
+
+      - name: Auditoría completa — informativa (incluye dev)
+        # Las de desarrollo no viajan al cliente, así que no bloquean el merge; pero se
+        # imprimen para que no pasen desapercibidas. Si alguna afecta al build (por ejemplo la
+        # cadena de electron-builder, que sí produce el instalador), súbela al paso bloqueante.
+        run: pnpm audit || true
+
+  desktop:
+    # SEC CN-015 — el CI no cubría desktop/, que es justo donde vivían los hallazgos de mayor
+    # impacto (secreto JWT, gateway en la LAN, actualizador). Cobertura mínima: que las deps de
+    # producción estén limpias y que las fuentes parseen. Los verify:* de extremo a extremo
+    # necesitan el Postgres embebido de Windows y quedan fuera de este job a propósito.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - name: Setup Node
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: "20"
+
+      - name: Auditoría de deps de producción del escritorio
+        # npm audit lee package-lock.json: no hace falta instalar (electron y el Postgres
+        # embebido son pesados y específicos de plataforma).
+        working-directory: desktop
+        run: npm audit --omit=dev --audit-level=high
+
+      - name: Las fuentes parsean
+        working-directory: desktop
+        run: node --check src/main.mjs && for f in src/*.mjs scripts/*.mjs; do node --check "$f"; done
 
   rls-tests:
     runs-on: ubuntu-latest
@@ -69,20 +110,24 @@ jobs:
         options: >-
           --health-cmd pg_isready --health-interval 10s --health-timeout 5s --health-retries 5
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
       - name: Setup Supabase CLI
-        uses: supabase/setup-cli@v1
+        uses: supabase/setup-cli@ab058987d8d6c725971f6cf9d0b5c98467e30bd1 # v1.7.1
         with:
-          version: latest
+          # Versión fija en vez de `latest`: un CI reproducible no debe cambiar de herramienta
+          # sola. Súbela a conciencia cuando haga falta.
+          version: 2.114.0
 
       - name: Start Supabase local stack
         run: supabase start
 
       - name: Apply migrations + run RLS tests
-        # `supabase test db` corre supabase/tests/*.sql como pg_prove.
-        # El smoke RLS cross-tenant (0001_rls_cross_tenant.test.sql) garantiza que
-        # un tenant NO puede leer datos de otro. Si rompemos RLS, este test falla.
+        # `supabase test db` corre supabase/tests/*.sql como pg_prove:
+        #   0001 — smoke RLS cross-tenant: un tenant NO puede leer datos de otro.
+        #   0002 — cobertura: toda tabla con tenant_id tiene RLS y política.
+        #   0003 — SEC CN-002: ninguna RPC exclusiva de service_role es ejecutable por
+        #          authenticated/anon (atrapa la reincidencia del GRANT masivo de la 0045).
         run: supabase test db
 
       - name: Stop Supabase local stack
