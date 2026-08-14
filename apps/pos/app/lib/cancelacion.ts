@@ -96,22 +96,32 @@ export type ItemTicket = {
   estadoCocina: string | null;
 };
 
-/** Lee los items NO cancelados del ticket persistido (mapea client_id_local ↔ id). */
+/**
+ * Lee los items NO cancelados del ticket persistido (mapea client_id_local ↔ id).
+ *
+ * El estado de cocina se toma del TICKET, no del renglón: `ticket_items` no tiene
+ * `estado_cocina` —vive en `tickets`— y pedirlo hacía fallar la consulta entera. Como el
+ * error se atrapaba río arriba, la lista salía vacía y parecía que la cuenta no tenía
+ * productos; de paso, cancelar un renglón dejaba de funcionar porque no había qué cancelar.
+ */
 export async function leerItemsPersistidos(token: string, ticketId: string): Promise<ItemTicket[]> {
-  const { data, error } = await employeeClient(token)
-    .from("ticket_items")
-    .select("id, client_id_local, producto_nombre_snapshot, cantidad, total_item_mxn, estado_cocina")
-    .eq("ticket_id", ticketId)
-    .eq("cancelado", false)
-    .order("created_at", { ascending: true });
-  if (error) throw new Error(error.message);
-  const rows = (data ?? []) as {
+  const sb = employeeClient(token);
+  const [itemsRes, ticketRes] = await Promise.all([
+    sb.from("ticket_items")
+      .select("id, client_id_local, producto_nombre_snapshot, cantidad, total_item_mxn")
+      .eq("ticket_id", ticketId)
+      .eq("cancelado", false)
+      .order("created_at", { ascending: true }),
+    sb.from("tickets").select("estado_cocina").eq("id", ticketId).maybeSingle(),
+  ]);
+  if (itemsRes.error) throw new Error(itemsRes.error.message);
+  const estadoCocina = ((ticketRes.data ?? null) as { estado_cocina: string | null } | null)?.estado_cocina ?? null;
+  const rows = (itemsRes.data ?? []) as {
     id: string;
     client_id_local: string | null;
     producto_nombre_snapshot: string;
     cantidad: number;
     total_item_mxn: string | number;
-    estado_cocina: string | null;
   }[];
   return rows.map((r) => ({
     id: r.id,
@@ -119,6 +129,6 @@ export async function leerItemsPersistidos(token: string, ticketId: string): Pro
     productoNombre: r.producto_nombre_snapshot,
     cantidad: Number(r.cantidad),
     totalItemMxn: Number(r.total_item_mxn),
-    estadoCocina: r.estado_cocina,
+    estadoCocina,
   }));
 }

@@ -85,14 +85,14 @@ export type RenglonCuenta = {
 export async function leerRenglonesCuenta(token: string, ticketId: string): Promise<RenglonCuenta[]> {
   const { data, error } = await employeeClient(token)
     .from("ticket_items")
-    .select("id, producto_nombre_snapshot, cantidad, total_item_mxn, estado_cocina, nota_cocina, ticket_item_modificadores(opcion_nombre_snapshot)")
+    .select("id, producto_nombre_snapshot, cantidad, total_item_mxn, nota_cocina, ticket_item_modificadores(opcion_nombre_snapshot)")
     .eq("ticket_id", ticketId)
     .eq("cancelado", false)
     .order("created_at", { ascending: true });
   if (error) throw new Error(error.message);
   type Fila = {
     id: string; producto_nombre_snapshot: string; cantidad: number | string;
-    total_item_mxn: number | string; estado_cocina: string | null; nota_cocina: string | null;
+    total_item_mxn: number | string; nota_cocina: string | null;
     ticket_item_modificadores: { opcion_nombre_snapshot: string }[] | null;
   };
   return ((data ?? []) as unknown as Fila[]).map((r) => ({
@@ -100,7 +100,7 @@ export async function leerRenglonesCuenta(token: string, ticketId: string): Prom
     productoNombre: r.producto_nombre_snapshot,
     cantidad: Number(r.cantidad),
     totalItemMxn: Number(r.total_item_mxn),
-    estadoCocina: r.estado_cocina,
+    estadoCocina: null, // vive en el ticket, no en el renglón; lo aporta quien llama
     modificadores: (r.ticket_item_modificadores ?? []).map((m) => m.opcion_nombre_snapshot),
     notaCocina: r.nota_cocina,
   }));
