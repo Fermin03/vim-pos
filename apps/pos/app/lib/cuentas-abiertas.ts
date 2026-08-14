@@ -62,3 +62,46 @@ export function minutosAbierta(desdeIso: string | null, ahora: Date = new Date()
   if (Number.isNaN(d)) return 0;
   return Math.max(0, Math.floor((ahora.getTime() - d) / 60000));
 }
+
+/** Renglón de una cuenta con TODO lo que el cajero necesita ver antes de cobrar. */
+export type RenglonCuenta = {
+  id: string;
+  productoNombre: string;
+  cantidad: number;
+  totalItemMxn: number;
+  estadoCocina: string | null;
+  modificadores: string[];
+  notaCocina: string | null;
+};
+
+/**
+ * Detalle de los renglones de una cuenta abierta.
+ *
+ * `leerItemsPersistidos` (cancelacion.ts) trae lo mínimo para poder cancelar un renglón; aquí
+ * se agregan modificadores y nota de cocina, porque el panel de detalle sirve para VERIFICAR
+ * el pedido con el cliente delante ("¿pidió la hamburguesa sin cebolla?") y sin eso hay que
+ * abrir la cuenta en el carrito para saberlo.
+ */
+export async function leerRenglonesCuenta(token: string, ticketId: string): Promise<RenglonCuenta[]> {
+  const { data, error } = await employeeClient(token)
+    .from("ticket_items")
+    .select("id, producto_nombre_snapshot, cantidad, total_item_mxn, estado_cocina, nota_cocina, ticket_item_modificadores(opcion_nombre_snapshot)")
+    .eq("ticket_id", ticketId)
+    .eq("cancelado", false)
+    .order("created_at", { ascending: true });
+  if (error) throw new Error(error.message);
+  type Fila = {
+    id: string; producto_nombre_snapshot: string; cantidad: number | string;
+    total_item_mxn: number | string; estado_cocina: string | null; nota_cocina: string | null;
+    ticket_item_modificadores: { opcion_nombre_snapshot: string }[] | null;
+  };
+  return ((data ?? []) as unknown as Fila[]).map((r) => ({
+    id: r.id,
+    productoNombre: r.producto_nombre_snapshot,
+    cantidad: Number(r.cantidad),
+    totalItemMxn: Number(r.total_item_mxn),
+    estadoCocina: r.estado_cocina,
+    modificadores: (r.ticket_item_modificadores ?? []).map((m) => m.opcion_nombre_snapshot),
+    notaCocina: r.nota_cocina,
+  }));
+}

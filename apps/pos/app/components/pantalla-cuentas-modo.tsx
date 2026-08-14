@@ -2,9 +2,11 @@
 import { useCallback, useEffect, useState } from "react";
 import { Button } from "@vim/ui/styles";
 import { fmtMxn, type DatosCaja, type Turno } from "../lib/turno";
-import { listarCuentasAbiertas, minutosAbierta, type CuentaAbierta } from "../lib/cuentas-abiertas";
-import { leerItemsPersistidos, type ItemTicket } from "../lib/cancelacion";
+import { listarCuentasAbiertas, leerRenglonesCuenta, minutosAbierta, type CuentaAbierta, type RenglonCuenta } from "../lib/cuentas-abiertas";
+import { leerTotales, type TotalesTicket } from "../lib/cobro";
 import { ModalCancelarItem } from "./modal-cancelar-item";
+import { ModalCancelarTicket } from "./modal-cancelar-ticket";
+import { ModalDescuento } from "./modal-descuento";
 import { ModalAutorizacionPin } from "./modal-autorizacion-pin";
 import type { Empleado } from "../lib/supabase";
 import type { ModoServicio } from "../lib/carrito";
@@ -82,11 +84,14 @@ export function PantallaCuentasModo({
   const [items, setItems] = useState<CuentaAbierta[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [selId, setSelId] = useState<string | null>(null);
-  const [detalle, setDetalle] = useState<ItemTicket[] | null>(null);
+  const [detalle, setDetalle] = useState<RenglonCuenta[] | null>(null);
+  const [totales, setTotales] = useState<TotalesTicket | null>(null);
+  const [descontando, setDescontando] = useState(false);
+  const [cancelandoCuenta, setCancelandoCuenta] = useState(false);
   const [ahora, setAhora] = useState(() => new Date());
   const [imprimiendo, setImprimiendo] = useState(false);
   const [pidiendoPinReimpresion, setPidiendoPinReimpresion] = useState(false);
-  const [cancelando, setCancelando] = useState<ItemTicket | null>(null);
+  const [cancelando, setCancelando] = useState<RenglonCuenta | null>(null);
   // Impresiones hechas en esta sesión: la primera es libre, de ahí en adelante pide PIN.
   const [yaImpresas, setYaImpresas] = useState<Set<string>>(new Set());
 
@@ -106,20 +111,29 @@ export function PantallaCuentasModo({
     return () => clearInterval(id);
   }, []);
 
-  // Detalle de la cuenta seleccionada.
+  /** Relee el detalle de la cuenta: renglones + totales AUTORITATIVOS de la BD (no del carrito:
+   *  el descuento y el IVA los recalcula el servidor y aquí se cobra con esa cifra). */
+  const recargarDetalle = useCallback(async (ticketId: string) => {
+    const [rs, ts] = await Promise.all([
+      leerRenglonesCuenta(token, ticketId),
+      leerTotales(token, ticketId).catch(() => null),
+    ]);
+    setDetalle(rs);
+    setTotales(ts);
+  }, [token]);
+
   useEffect(() => {
-    if (!selId) { setDetalle(null); return; }
+    if (!selId) { setDetalle(null); setTotales(null); return; }
     let vivo = true;
-    setDetalle(null);
-    leerItemsPersistidos(token, selId)
-      .then((its) => { if (vivo) setDetalle(its); })
-      .catch(() => { if (vivo) setDetalle([]); });
+    setDetalle(null); setTotales(null);
+    recargarDetalle(selId).catch(() => { if (vivo) setDetalle([]); });
     return () => { vivo = false; };
-  }, [token, selId]);
+  }, [selId, recargarDetalle]);
 
   const sel = (items ?? []).find((c) => c.ticketId === selId) ?? null;
   // "Ya se imprimió" = lo hicimos en esta sesión, o el ticket trae marca de impresión previa.
   const yaSeImprimio = sel != null && (yaImpresas.has(sel.ticketId) || sel.impresaAt != null);
+  const hayDescuento = (totales?.descuentos ?? 0) > 0;
 
   const imprimir = useCallback(async (ticketId: string) => {
     setImprimiendo(true);
@@ -215,10 +229,12 @@ export function PantallaCuentasModo({
                   <div className="truncate font-display text-[16px] font-semibold">{sel.cliente ?? sel.folio ?? "Cuenta"}</div>
                   <div className="text-[12px] text-ink-3">{sel.folio ? `${sel.folio} · ` : ""}{fmtMxn(sel.total)}</div>
                 </div>
-                <Accion label={yaSeImprimio ? "Reimprimir" : "Imprimir ticket"} onClick={() => (yaSeImprimio ? setPidiendoPinReimpresion(true) : imprimir(sel.ticketId))} ocupado={imprimiendo} />
                 <Accion label="Agregar producto" onClick={() => onAgregarProductos(sel.ticketId)} />
-                <Accion label="Cobrar" onClick={() => onCobrar(sel.ticketId)} destacado />
+                <Accion label={hayDescuento ? "Descuento aplicado" : "Descuento"} onClick={() => setDescontando(true)} inactivo={hayDescuento} />
+                <Accion label={yaSeImprimio ? "Reimprimir" : "Imprimir ticket"} onClick={() => (yaSeImprimio ? setPidiendoPinReimpresion(true) : imprimir(sel.ticketId))} ocupado={imprimiendo} />
                 {extraPorCuenta?.(sel, recargar)}
+                <Accion label="Cancelar cuenta" onClick={() => setCancelandoCuenta(true)} peligro />
+                <Accion label={`Cobrar ${fmtMxn(totales?.total ?? sel.total)}`} onClick={() => onCobrar(sel.ticketId)} destacado />
               </div>
 
               {/* Lo que se ordenó */}
@@ -227,9 +243,17 @@ export function PantallaCuentasModo({
                 {detalle?.length === 0 && <p className="text-sm text-ink-3">Esta cuenta no tiene productos.</p>}
                 <div className="flex flex-col divide-y divide-line">
                   {detalle?.map((it) => (
-                    <div key={it.id} className="flex items-center gap-3 py-2.5">
+                    <div key={it.id} className="flex items-start gap-3 py-2.5">
                       <span className="w-8 flex-shrink-0 font-display text-[15px] font-bold tabular-nums text-ink-2">{it.cantidad}×</span>
-                      <span className="min-w-0 flex-1 truncate text-[14px]">{it.productoNombre}</span>
+                      <div className="min-w-0 flex-1">
+                        <div className="text-[14px]">{it.productoNombre}</div>
+                        {/* Modificadores y nota: el panel sirve para verificar el pedido con el
+                            cliente delante, y sin esto habría que abrir la cuenta para saberlo. */}
+                        {it.modificadores.map((m, i) => (
+                          <div key={i} className="text-[12px] text-ink-3">+ {m}</div>
+                        ))}
+                        {it.notaCocina && <div className="text-[12px] italic text-[#9A6B12]">» {it.notaCocina}</div>}
+                      </div>
                       <span className="flex-shrink-0 text-[14px] font-semibold tabular-nums">{fmtMxn(it.totalItemMxn)}</span>
                       <button
                         type="button"
@@ -243,6 +267,27 @@ export function PantallaCuentasModo({
                   ))}
                 </div>
               </div>
+
+              {/* Totales de la BD: es la cifra con la que se va a cobrar. */}
+              {totales && (
+                <div className="flex-shrink-0 border-t border-line bg-sel px-4 py-3">
+                  <div className="flex justify-between text-[13px] text-ink-2">
+                    <span>Subtotal</span><span className="font-medium tabular-nums text-ink">{fmtMxn(totales.subtotal)}</span>
+                  </div>
+                  <div className="mt-0.5 flex justify-between text-[13px] text-ink-2">
+                    <span>IVA (16%)</span><span className="font-medium tabular-nums text-ink">{fmtMxn(totales.iva)}</span>
+                  </div>
+                  {hayDescuento && (
+                    <div className="mt-0.5 flex justify-between text-[13px] font-medium text-danger">
+                      <span>Descuento</span><span className="tabular-nums">−{fmtMxn(totales.descuentos)}</span>
+                    </div>
+                  )}
+                  <div className="mt-1.5 flex items-baseline justify-between">
+                    <span className="text-[14px] font-bold uppercase tracking-[0.03em]">Total</span>
+                    <span className="font-display text-[25px] font-bold leading-none tabular-nums">{fmtMxn(totales.total)}</span>
+                  </div>
+                </div>
+              )}
             </>
           )}
         </div>
@@ -262,10 +307,44 @@ export function PantallaCuentasModo({
           onCancelado={async () => {
             setCancelando(null);
             await recargar();
-            // Releer el detalle: el total y las líneas cambiaron.
-            leerItemsPersistidos(token, sel.ticketId).then(setDetalle).catch(() => {});
+            await recargarDetalle(sel.ticketId).catch(() => {});
           }}
           onCerrar={() => setCancelando(null)}
+        />
+      )}
+
+      {descontando && sel && (
+        <ModalDescuento
+          token={token}
+          empleado={empleado}
+          ticketId={sel.ticketId}
+          totalActual={totales?.total ?? sel.total}
+          cajaId={turno.caja_id}
+          turnoId={turno.id}
+          onAplicado={async () => {
+            setDescontando(false);
+            await recargar();
+            await recargarDetalle(sel.ticketId).catch(() => {});
+          }}
+          onCerrar={() => setDescontando(false)}
+        />
+      )}
+
+      {cancelandoCuenta && sel && (
+        <ModalCancelarTicket
+          token={token}
+          empleado={empleado}
+          ticketId={sel.ticketId}
+          folio={sel.folio}
+          totalActual={totales?.total ?? sel.total}
+          cajaId={turno.caja_id}
+          turnoId={turno.id}
+          onCancelado={async () => {
+            setCancelandoCuenta(false);
+            setSelId(null); // la cuenta ya no existe: no dejar el detalle colgado
+            await recargar();
+          }}
+          onCerrar={() => setCancelandoCuenta(false)}
         />
       )}
 
@@ -290,17 +369,21 @@ export function PantallaCuentasModo({
   );
 }
 
-function Accion({ label, onClick, destacado, ocupado }: { label: string; onClick: () => void; destacado?: boolean; ocupado?: boolean }) {
+function Accion({
+  label, onClick, destacado, ocupado, inactivo, peligro,
+}: { label: string; onClick: () => void; destacado?: boolean; ocupado?: boolean; inactivo?: boolean; peligro?: boolean }) {
   return (
     <button
       type="button"
       onClick={onClick}
-      disabled={ocupado}
+      disabled={ocupado || inactivo}
       className={[
-        "flex h-9 flex-shrink-0 items-center rounded px-3 text-[13px] font-semibold transition disabled:opacity-50",
+        "flex h-9 flex-shrink-0 items-center rounded px-3 text-[13px] font-semibold transition disabled:cursor-default disabled:opacity-45",
         destacado
           ? "bg-accent text-white hover:bg-accent-hover"
-          : "border border-line-strong text-ink-2 hover:border-ink hover:text-ink",
+          : peligro
+            ? "border border-line-strong text-ink-3 hover:border-danger hover:text-danger"
+            : "border border-line-strong text-ink-2 hover:border-ink hover:text-ink",
       ].join(" ")}
     >
       {ocupado ? "Imprimiendo…" : label}
