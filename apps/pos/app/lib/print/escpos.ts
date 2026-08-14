@@ -49,6 +49,19 @@ function qr(valor: string): number[] {
 
 function bloqueABytes(bl: Bloque, ancho: 58 | 80): number[] {
   switch (bl.t) {
+    case "raster": {
+      // GS v 0 m xL xH yL yH — imagen de trama. m=0 (densidad normal, sin escalar).
+      // xL/xH van en BYTES de ancho; yL/yH en puntos de alto. Ambos little-endian.
+      const bytesPorFila = bl.ancho / 8;
+      const out: number[] = [];
+      out.push(ESC, 0x61, bl.align === "izq" ? 0 : bl.align === "der" ? 2 : 1);
+      out.push(GS, 0x76, 0x30, 0x00);
+      out.push(bytesPorFila & 0xff, (bytesPorFila >> 8) & 0xff);
+      out.push(bl.alto & 0xff, (bl.alto >> 8) & 0xff);
+      for (const b of bl.datos) out.push(b);
+      out.push(ESC, 0x61, 0x00); // volver a alineación izquierda
+      return out;
+    }
     case "texto": {
       const out: number[] = [];
       out.push(ESC, 0x61, bl.align === "centro" ? 1 : bl.align === "der" ? 2 : 0);

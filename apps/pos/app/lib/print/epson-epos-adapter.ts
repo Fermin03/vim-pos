@@ -60,6 +60,11 @@ function esc(s: string): string {
 
 function bloqueAEposXml(bl: Bloque): string {
   switch (bl.t) {
+    // El logo se rasteriza para ESC/POS crudo; la Epson ePOS usa <image> en base64 y ese
+    // camino no está verificado con hardware, así que aquí se omite en vez de arriesgar un
+    // XML que la impresora rechace y tumbe el ticket entero.
+    case "raster":
+      return "";
     case "texto": {
       const al = bl.align ?? "izq";
       const align = al === "centro" ? "center" : al === "der" ? "right" : "left";

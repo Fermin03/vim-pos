@@ -179,16 +179,24 @@ export function PantallaInicio({
           </button>
         )}
 
-        {/* Marca del negocio. Hoy es el nombre en grande: `logo_url` sólo existe en
-            marcas_virtuales, el tenant no tiene logo propio todavía. Cuando lo tenga,
-            aquí entra la imagen sin tocar el resto de la pantalla. */}
+        {/* Marca del negocio: su logo si lo subió en el panel (Configuración → Datos del
+            negocio), y si no, la marca VIM como respaldo para no dejar el hueco vacío. */}
         <div className="flex select-none flex-col items-center gap-2 opacity-90">
-          <div className="relative flex h-[clamp(3.5rem,11vh,6rem)] w-[clamp(3.5rem,11vh,6rem)] items-center justify-center rounded-[1.25rem] bg-ink">
-            <span className="font-display text-[clamp(1.75rem,5.5vh,3rem)] font-bold leading-none tracking-tight text-white">V</span>
-            <span className="absolute bottom-[14%] right-[14%] h-[7%] w-[7%] rounded-full bg-accent" aria-hidden="true" />
-          </div>
+          {caja.logoUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element -- data URI local: sin red, sin optimizador
+            <img
+              src={caja.logoUrl}
+              alt={caja.negocioNombre}
+              className="h-[clamp(4rem,16vh,9rem)] w-auto max-w-[min(60vw,22rem)] object-contain"
+            />
+          ) : (
+            <div className="relative flex h-[clamp(3.5rem,11vh,6rem)] w-[clamp(3.5rem,11vh,6rem)] items-center justify-center rounded-[1.25rem] bg-ink">
+              <span className="font-display text-[clamp(1.75rem,5.5vh,3rem)] font-bold leading-none tracking-tight text-white">V</span>
+              <span className="absolute bottom-[14%] right-[14%] h-[7%] w-[7%] rounded-full bg-accent" aria-hidden="true" />
+            </div>
+          )}
           <div className="text-center">
-            <div className="font-display text-[clamp(1.25rem,3.6vh,2rem)] font-bold tracking-tight">{caja.sucursalNombre}</div>
+            <div className="font-display text-[clamp(1.25rem,3.6vh,2rem)] font-bold tracking-tight">{caja.negocioNombre}</div>
             {!sinTurno && ventaTurno !== null && (
               <div className="mt-0.5 text-[clamp(0.75rem,1.5vh,0.9rem)] text-ink-3">
                 Venta del turno · <b className="font-semibold text-ink-2 tabular-nums">{fmtMxn(ventaTurno)}</b>

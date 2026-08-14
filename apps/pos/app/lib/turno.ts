@@ -33,18 +33,27 @@ export type DatosCaja = {
   numero: number;
   nombre: string;
   sucursalNombre: string;
+  /** Nombre comercial del negocio (la marca que ve el cliente), distinto del de la sucursal. */
+  negocioNombre: string;
+  /** Logo del negocio como data URI, o null. Viaja embebido en `tenants` (mig. 0066) para
+   *  que la caja pueda mostrarlo e imprimirlo sin conexión. */
+  logoUrl: string | null;
 };
 
 /** Lee datos completos de la caja (caja + sucursal). Usa RLS por tenant. */
 export async function leerCaja(token: string, cajaId: string): Promise<DatosCaja> {
   const { data, error } = await employeeClient(token)
     .from("cajas")
-    .select("tenant_id, sucursal_id, numero, nombre, sucursal:sucursales(nombre)")
+    .select("tenant_id, sucursal_id, numero, nombre, sucursal:sucursales(nombre), tenant:tenants(nombre_comercial, logo_url)")
     .eq("id", cajaId)
     .maybeSingle();
   if (error) throw new Error(error.message);
   if (!data) throw new Error("Caja no encontrada");
-  type Fila = { tenant_id: string; sucursal_id: string; numero: number; nombre: string; sucursal: { nombre: string } | null };
+  type Fila = {
+    tenant_id: string; sucursal_id: string; numero: number; nombre: string;
+    sucursal: { nombre: string } | null;
+    tenant: { nombre_comercial: string | null; logo_url: string | null } | null;
+  };
   const f = data as unknown as Fila;
   return {
     tenant_id: f.tenant_id,
@@ -52,6 +61,8 @@ export async function leerCaja(token: string, cajaId: string): Promise<DatosCaja
     numero: f.numero,
     nombre: f.nombre,
     sucursalNombre: f.sucursal?.nombre ?? "—",
+    negocioNombre: f.tenant?.nombre_comercial ?? f.sucursal?.nombre ?? "—",
+    logoUrl: f.tenant?.logo_url ?? null,
   };
 }
 

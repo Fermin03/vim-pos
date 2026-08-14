@@ -41,13 +41,15 @@ export type Negocio = NegocioInput & {
   id: string;
   vertical_principal: string;
   estado: string;
+  /** Logo como data URI, o null. Ver `guardarLogoNegocio` para el porqué de no usar Storage. */
+  logo_url: string | null;
 };
 
 export async function leerNegocio(): Promise<Negocio | null> {
   const tid = await tenantId();
   const { data, error } = await supabase
     .from("tenants")
-    .select("id, nombre_comercial, codigo, timezone, hora_cierre_dia_contable, vertical_principal, estado")
+    .select("id, nombre_comercial, codigo, timezone, hora_cierre_dia_contable, vertical_principal, estado, logo_url")
     .eq("id", tid)
     .maybeSingle();
   if (error) throw new Error(error.message);
@@ -66,6 +68,27 @@ export async function actualizarNegocio(input: NegocioInput): Promise<void> {
       hora_cierre_dia_contable: datos.hora_cierre_dia_contable,
     })
     .eq("id", tid);
+  if (error) throw new Error(error.message);
+}
+
+/** Tope del data URI, alineado con el CHECK de la migración 0066 (512 KB). */
+export const LOGO_MAX_BYTES = 524288;
+
+/**
+ * Guarda (o quita, con null) el logo del negocio.
+ *
+ * Se almacena el data URI en `tenants.logo_url` en vez de subirlo a Storage porque la caja
+ * es local-first: `tenants` viaja completo en el snapshot de sync (mig. 0055), así que el
+ * logo llega solo y el POS puede mostrarlo E IMPRIMIRLO sin conexión. Una URL de Storage
+ * dejaría el ticket sin logo justo cuando el local se queda sin internet.
+ */
+export async function guardarLogoNegocio(dataUri: string | null): Promise<void> {
+  if (dataUri !== null) {
+    if (!/^data:image\/(png|jpeg|webp);base64,/.test(dataUri)) throw new Error("El archivo no es una imagen válida.");
+    if (dataUri.length > LOGO_MAX_BYTES) throw new Error("La imagen es demasiado grande, incluso después de reducirla.");
+  }
+  const tid = await tenantId();
+  const { error } = await supabase.from("tenants").update({ logo_url: dataUri }).eq("id", tid);
   if (error) throw new Error(error.message);
 }
 

@@ -77,13 +77,13 @@ export async function leerTicketParaImpresion(ticketId: string, ctx: Ctx): Promi
 
   const { data: ten } = await sb
     .from("tenants")
-    .select("codigo, nombre_comercial, razon_social, rfc")
+    .select("codigo, nombre_comercial, razon_social, rfc, logo_url")
     .eq("id", tk.tenant_id as string)
     .single();
   const tn = (ten ?? {}) as Record<string, string | null>;
 
   return {
-    negocio: { nombre: tn.nombre_comercial ?? "Negocio", razonSocial: tn.razon_social ?? null, rfc: tn.rfc ?? null },
+    negocio: { nombre: tn.nombre_comercial ?? "Negocio", razonSocial: tn.razon_social ?? null, rfc: tn.rfc ?? null, logoUrl: tn.logo_url ?? null },
     sucursal: { nombre: (s.nombre as string) ?? ctx.cajaNombre, direccion, telefono: s.telefono ?? null },
     meta: {
       folio: (tk.folio_completo as string) ?? "—",

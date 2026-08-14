@@ -2,7 +2,8 @@
 import { useEffect, useState } from "react";
 import { Button } from "@vim/ui/styles";
 import { PageHeader, PageBody } from "../../../components/page-header";
-import { actualizarNegocio, leerNegocio, negocioSchema, type Negocio } from "../../../lib/configuracion";
+import { actualizarNegocio, guardarLogoNegocio, leerNegocio, negocioSchema, LOGO_MAX_BYTES, type Negocio } from "../../../lib/configuracion";
+import { reescalarImagen } from "../../../lib/imagen";
 import { mensajeError } from "../../../lib/errores";
 
 const input =
@@ -33,6 +34,7 @@ export default function NegocioPage() {
   const [guardando, setGuardando] = useState(false);
 
   const [nombre, setNombre] = useState("");
+  const [logoOcupado, setLogoOcupado] = useState(false);
   const [codigo, setCodigo] = useState("");
   const [tz, setTz] = useState("America/Mexico_City");
   const [hora, setHora] = useState("03:00");
@@ -103,6 +105,68 @@ export default function NegocioPage() {
                 <div>
                   <div className="text-[11.5px] font-bold uppercase tracking-wide text-ink-3">Estado</div>
                   <div className="mt-0.5 font-medium">{neg.estado}</div>
+                </div>
+              </div>
+            </div>
+
+            {/* Logo del negocio — sale en la pantalla principal del POS y encima del ticket. */}
+            <div className="mb-5 rounded-lg border border-line bg-surface p-4">
+              <div className="text-[13px] font-semibold">Logotipo</div>
+              <p className="mt-0.5 text-[12.5px] text-ink-3">
+                Aparece en la pantalla principal de la caja y en la parte superior del ticket del cliente.
+                PNG o JPG, preferentemente cuadrado. Se reduce solo antes de guardarse.
+              </p>
+              <div className="mt-3 flex items-center gap-4">
+                <div className="flex h-20 w-20 flex-shrink-0 items-center justify-center overflow-hidden rounded-lg border border-line bg-hover">
+                  {neg.logo_url ? (
+                    // eslint-disable-next-line @next/next/no-img-element -- data URI local, no remoto
+                    <img src={neg.logo_url} alt="Logotipo del negocio" className="h-full w-full object-contain" />
+                  ) : (
+                    <span className="text-[11px] text-ink-3">Sin logo</span>
+                  )}
+                </div>
+                <div className="flex flex-col gap-2">
+                  <label className={["inline-flex cursor-pointer items-center justify-center rounded border border-line-strong px-3 py-2 text-[13px] font-semibold text-ink-2 transition hover:border-ink hover:text-ink", logoOcupado ? "pointer-events-none opacity-50" : ""].join(" ")}>
+                    {logoOcupado ? "Procesando…" : neg.logo_url ? "Cambiar logotipo" : "Subir logotipo"}
+                    <input
+                      type="file"
+                      accept="image/png,image/jpeg,image/webp"
+                      className="sr-only"
+                      onChange={async (e) => {
+                        const f = e.target.files?.[0];
+                        e.target.value = ""; // permite volver a elegir el MISMO archivo tras un error
+                        if (!f) return;
+                        setError(null); setOkMsg(null); setLogoOcupado(true);
+                        try {
+                          const dataUri = await reescalarImagen(f, { ladoMax: 512, maxBytes: LOGO_MAX_BYTES });
+                          await guardarLogoNegocio(dataUri);
+                          setOkMsg("Logotipo actualizado. Aparecerá en la caja al sincronizar.");
+                          setTimeout(() => setOkMsg(null), 3500);
+                          await recargar();
+                        } catch (err) {
+                          setError(mensajeError(err, "No se pudo guardar el logotipo"));
+                        } finally { setLogoOcupado(false); }
+                      }}
+                    />
+                  </label>
+                  {neg.logo_url && (
+                    <button
+                      type="button"
+                      disabled={logoOcupado}
+                      onClick={async () => {
+                        setError(null); setOkMsg(null); setLogoOcupado(true);
+                        try {
+                          await guardarLogoNegocio(null);
+                          await recargar();
+                        } catch (err) {
+                          setError(mensajeError(err, "No se pudo quitar el logotipo"));
+                        } finally { setLogoOcupado(false); }
+                      }}
+                      className="text-[12.5px] font-semibold text-ink-3 transition hover:text-danger disabled:opacity-50"
+                    >
+                      Quitar
+                    </button>
+                  )}
                 </div>
               </div>
             </div>
