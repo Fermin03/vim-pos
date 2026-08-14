@@ -63,3 +63,19 @@ describe("construirComandaJob", () => {
     expect(job.bloques).toContainEqual({ t: "texto", valor: "  SIN CEBOLLA", size: 1, bold: true });
   });
 });
+
+describe("construirComandaJob — a nombre de quién", () => {
+  it("imprime el cliente debajo de la hora, para rotular la bolsa", () => {
+    const filas = construirComandaJob({ ...D, cliente: "Juan" })
+      .bloques.filter((b) => b.t === "fila") as { izq: string; der: string }[];
+    const i = filas.findIndex((f) => f.izq === "Cliente");
+    expect(i).toBeGreaterThan(-1);
+    expect(filas[i].der).toBe("Juan");
+    expect(filas[i - 1].izq).toBe("Hora");
+  });
+
+  it("no imprime la fila cuando el pedido no tiene nombre", () => {
+    const filas = construirComandaJob(D).bloques.filter((b) => b.t === "fila") as { izq: string }[];
+    expect(filas.some((f) => f.izq === "Cliente")).toBe(false);
+  });
+});

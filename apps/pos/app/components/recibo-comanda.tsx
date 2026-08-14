@@ -34,6 +34,10 @@ export function ReciboComanda({ datos }: { datos: DatosComanda }) {
         </div>
       </div>
 
+      {datos.cliente && (
+        <div className="mt-2 px-[18px] font-sans text-[17px] font-bold leading-tight">{datos.cliente}</div>
+      )}
+
       <hr className="mx-[18px] my-3.5 border-0 border-t-2 border-dashed border-[#999]" />
 
       {/* Items grandes */}

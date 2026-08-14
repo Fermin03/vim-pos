@@ -13,6 +13,8 @@ export type DatosComanda = {
   cajero: string;
   caja: string;
   fechaIso: string;
+  /** A nombre de quién va (Pick-up / domicilio). Cocina lo necesita para rotular la bolsa. */
+  cliente?: string | null;
   lineas: LineaComanda[];
   ancho: 58 | 80;
 };
@@ -38,6 +40,7 @@ export function construirComandaJob(d: DatosComanda): PrintJob {
 
   b.push({ t: "fila", izq: "Orden", der: `#${folioCorto}`, bold: true });
   b.push({ t: "fila", izq: "Hora", der: hora });
+  if (d.cliente) b.push({ t: "fila", izq: "Cliente", der: d.cliente, bold: true });
   b.push({ t: "separador", estilo: "punteado" });
 
   for (const l of d.lineas) {

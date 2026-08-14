@@ -321,6 +321,45 @@ export function HomePos({
     }
   }, [token, caja.sucursal_id, turno.caja_id, turno.id, empleado.id, entrarCuenta]);
 
+  /**
+   * Manda la comanda a la estación de cocina al enviar el pedido.
+   *
+   * Antes la comanda solo salía al COBRAR, que en mesas, Pick-up y domicilio ocurre mucho
+   * después —o nunca, si el cliente no llega—: la cocina se enteraba solo por el KDS y sin
+   * papel para acompañar el platillo. Aquí se imprime en el momento en que el pedido entra.
+   *
+   * A diferencia del cobro NO se exige estación dedicada: allá el filtro evita duplicar el
+   * ticket que acaba de salir por la misma impresora; aquí no hay nada que duplicar, y en un
+   * local de una sola impresora la comanda debe salir igual.
+   */
+  const imprimirComandaCocina = useCallback(async (ticketId: string) => {
+    try {
+      const datos = await leerTicketParaImpresion(ticketId, {
+        token, cajeroNombre: empleado.nombre, cajaNombre: caja.nombre,
+      });
+      const dc: DatosComanda = {
+        folio: datos.meta.folio,
+        modoServicio: datos.meta.modoServicio,
+        cajero: datos.meta.cajero,
+        caja: datos.meta.caja,
+        fechaIso: datos.meta.fechaIso,
+        cliente: datos.entrega?.cliente ?? datos.meta.nombreCliente ?? null,
+        lineas: datos.lineas.map((l) => ({
+          cantidad: l.cantidad, nombre: l.nombre, modificadores: l.modificadores, notaCocina: l.notaCocina,
+        })),
+        ancho: 80,
+      };
+      // onMostrar vacío: si la estación de cocina no está configurada (adaptador de preview) no
+      // se abre ningún diálogo encima del cajero; simplemente no hay papel.
+      const r = await obtenerImpresora("COCINA", { onMostrar: () => {} }).imprimir(construirComandaJob(dc));
+      // El pedido YA está en cocina (KDS): un fallo de papel no debe deshacer nada ni bloquear.
+      // Pero tampoco se calla: si nadie avisa, la cocina se queda sin comanda y nadie se entera.
+      if (!r.ok) setError("El pedido se envió a cocina, pero no se pudo imprimir la comanda (impresora de cocina sin responder).");
+    } catch {
+      setError("El pedido se envió a cocina, pero no se pudo imprimir la comanda.");
+    }
+  }, [token, empleado.nombre, caja.nombre]);
+
   /** B1 — envía la mesa a cocina (KDS) antes de cobrar. */
   const onEnviarCocina = useCallback(async () => {
     if (!ticketBd) return;
@@ -329,12 +368,13 @@ export function HomePos({
     try {
       await enviarACocina(token, ticketBd.ticketId);
       setCocinaEnviada(true);
+      await imprimirComandaCocina(ticketBd.ticketId);
     } catch (e) {
       setError(e instanceof Error ? e.message : "No se pudo enviar a cocina");
     } finally {
       setEnviandoCocina(false);
     }
-  }, [token, ticketBd]);
+  }, [token, ticketBd, imprimirComandaCocina]);
 
   /** Persiste el ticket si aún no existe; abre el modal de descuento sobre ese ticket. */
   const onAplicarDescuento = useCallback(async () => {
@@ -364,7 +404,7 @@ export function HomePos({
     } finally {
       setProcesandoCobro(false);
     }
-  }, [carrito, ticketBd, token, caja.sucursal_id, turno.caja_id, turno.id]);
+  }, [carrito, ticketBd, token, caja.sucursal_id, turno.caja_id, turno.id, imprimirComandaCocina]);
 
   const iniciarCobro = useCallback(async () => {
     if (carrito.lineas.length === 0) return;
@@ -460,6 +500,7 @@ export function HomePos({
         );
       }
       await enviarACocina(token, bd.ticketId);
+      await imprimirComandaCocina(bd.ticketId);
       dispatch({ tipo: "limpiar" });
       setTicketBd(null);
       setItemsPersistidos([]);
