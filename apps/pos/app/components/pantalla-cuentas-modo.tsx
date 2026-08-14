@@ -2,7 +2,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { Button } from "@vim/ui/styles";
 import { fmtMxn, type DatosCaja, type Turno } from "../lib/turno";
-import { listarCuentasAbiertas, leerRenglonesCuenta, minutosAbierta, type CuentaAbierta, type RenglonCuenta } from "../lib/cuentas-abiertas";
+import { listarCuentasAbiertas, leerRenglonesCuenta, marcarSalidaDomicilio, minutosAbierta, type CuentaAbierta, type RenglonCuenta } from "../lib/cuentas-abiertas";
 import { leerTotales, type TotalesTicket } from "../lib/cobro";
 import { ModalCancelarItem } from "./modal-cancelar-item";
 import { ModalCancelarTicket } from "./modal-cancelar-ticket";
@@ -140,12 +140,24 @@ export function PantallaCuentasModo({
     try {
       await onImprimirTicket(ticketId);
       setYaImpresas((s) => new Set(s).add(ticketId));
+      // En domicilio, imprimir el ticket ES el momento en que la orden sale con el repartidor.
+      // Se persiste (comanda_impresa_at) para que el naranja siga ahí tras recargar y lo vea
+      // cualquier caja de la sucursal, no solo la que imprimió. Si el UPDATE falla, la orden
+      // ya se imprimió: se deja la marca local y no se molesta al cajero con un error.
+      if (modo === "DELIVERY_PROPIO") {
+        try {
+          await marcarSalidaDomicilio(token, ticketId);
+          await recargar();
+        } catch {
+          /* la marca local ya pintó la cuenta */
+        }
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : "No se pudo imprimir");
     } finally {
       setImprimiendo(false);
     }
-  }, [onImprimirTicket]);
+  }, [onImprimirTicket, modo, token, recargar]);
 
   return (
     <main className="flex h-screen flex-col bg-bg">
@@ -188,6 +200,9 @@ export function PantallaCuentasModo({
             <div className="flex flex-col gap-2">
               {items?.map((c) => {
                 const activa = c.ticketId === selId;
+                // Ticket ya impreso = la orden salió. Se pinta en naranja para distinguir de un
+                // vistazo lo que ya va en camino de lo que sigue pendiente de imprimir.
+                const salio = yaImpresas.has(c.ticketId) || c.impresaAt != null;
                 return (
                   <button
                     key={c.ticketId}
@@ -195,14 +210,18 @@ export function PantallaCuentasModo({
                     onClick={() => setSelId(c.ticketId)}
                     className={[
                       "w-full rounded-lg border p-3 text-left transition",
-                      activa ? "border-ink bg-sel" : "border-line-strong bg-surface hover:border-ink",
+                      salio
+                        ? `bg-accent text-white ${activa ? "border-ink" : "border-accent hover:brightness-105"}`
+                        : activa
+                          ? "border-ink bg-sel"
+                          : "border-line-strong bg-surface hover:border-ink",
                     ].join(" ")}
                   >
                     <div className="flex items-baseline justify-between gap-2">
                       <span className="truncate font-display text-[15px] font-semibold">{c.cliente ?? c.folio ?? "Cuenta"}</span>
                       <span className="flex-shrink-0 font-display text-[15px] font-bold tabular-nums">{fmtMxn(c.total)}</span>
                     </div>
-                    <div className="mt-0.5 flex items-center justify-between gap-2 text-[12px] text-ink-3">
+                    <div className={["mt-0.5 flex items-center justify-between gap-2 text-[12px]", salio ? "text-white/75" : "text-ink-3"].join(" ")}>
                       <span className="truncate">{c.nItems} {c.nItems === 1 ? "producto" : "productos"}</span>
                       <span className="flex-shrink-0">{minutosAbierta(c.desdeIso, ahora)} min</span>
                     </div>
