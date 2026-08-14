@@ -93,6 +93,7 @@ export function PantallaTurno({
           onMonitorVentas={noop}
           onConsultarCuentas={noop}
           onMovimientoCaja={noop}
+          onCorteX={noop}
           onAbrirTurno={() => setAbriendoTurno(true)}
           onCerrarTurno={noop}
           onMenu={onCambiarCajero}
