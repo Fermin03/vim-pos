@@ -34,7 +34,7 @@ const COPIA: Record<"DRIVE_THRU" | "DELIVERY_PROPIO", Copia> = {
     subtitulo: (n) => `${n} ${n === 1 ? "pedido activo" : "pedidos activos"}`,
     vacioTitulo: "Sin pedidos a domicilio",
     vacioTexto: "Abre una cuenta para tomar un pedido a domicilio.",
-    nuevaCuenta: "Nuevo domicilio",
+    nuevaCuenta: "Nueva orden",
   },
 };
 

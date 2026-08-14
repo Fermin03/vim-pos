@@ -831,6 +831,10 @@ export function HomePos({
           setItemsPersistidos([]);
           setEnPickup(false);
           setEnDelivery(false);
+          // Domicilio: lo primero que se pregunta por teléfono es a nombre de quién y a dónde
+          // va, antes de anotar qué quiere. Se abre el modal de una vez para no obligar al
+          // cajero a acordarse de asignarlo después (y que el pedido salga sin dirección).
+          if (modo === "DELIVERY_PROPIO") setClienteDomAbierto(true);
         }}
         onAgregarProductos={entrarCuenta}
         onCobrar={async (ticketId) => {
