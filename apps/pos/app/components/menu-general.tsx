@@ -13,6 +13,9 @@ export function MenuGeneral({
   onCerrar,
   onKds,
   onDevoluciones,
+  onEnEspera,
+  onAbrirCajon,
+  nEnEspera,
   onCambiarCajero,
   onBloquear,
   onCambiarPin,
@@ -23,6 +26,9 @@ export function MenuGeneral({
   onCerrar: () => void;
   onKds: () => void;
   onDevoluciones: () => void;
+  onEnEspera: () => void;
+  onAbrirCajon: () => void;
+  nEnEspera: number;
   onCambiarCajero: () => void;
   onBloquear: () => void;
   onCambiarPin: () => void;
@@ -83,6 +89,10 @@ export function MenuGeneral({
           <SeccionMenu titulo="Operación">
             <TileMenu label="Cocina" onClick={con(onKds)} icon={<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" className="h-8 w-8"><path d="M3 11l18-5v12L3 14v-3z" /><path d="M11.6 16.8a3 3 0 1 1-5.8-1.6" /></svg>} />
             <TileMenu label="Devoluciones" onClick={con(onDevoluciones)} icon={<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" className="h-8 w-8"><path d="M9 14l-4-4 4-4M5 10h11a4 4 0 0 1 0 8h-1" /></svg>} />
+            {/* Estas dos vivían en el topbar de la pantalla de venta. Al quitarlo se quedaron sin
+                puerta: se podía dejar un pedido en espera pero ya no recuperarlo. */}
+            <TileMenu label="Pedidos en espera" badge={nEnEspera} onClick={con(onEnEspera)} icon={<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" className="h-8 w-8"><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></svg>} />
+            <TileMenu label="Abrir cajón" onClick={con(onAbrirCajon)} icon={<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" className="h-8 w-8"><rect x="3" y="8" width="18" height="11" rx="1.5" /><path d="M3 12h18M10 15.5h4" /><path d="M7 8V6a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v2" /></svg>} />
           </SeccionMenu>
           <SeccionMenu titulo="Cuenta">
             <TileMenu label="Cambiar cajero" onClick={con(onCambiarCajero)} icon={<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" className="h-8 w-8"><path d="M16 3.13a4 4 0 0 1 0 7.75" /><path d="M21 21v-2a4 4 0 0 0-3-3.87" /><circle cx="9" cy="7" r="4" /><path d="M3 21v-2a4 4 0 0 1 4-4h4a4 4 0 0 1 4 4v2" /></svg>} />
@@ -109,14 +119,17 @@ export function MenuGeneral({
 }
 
 /** Tarjeta grande del menú: icono minimalista + etiqueta. */
-function TileMenu({ icon, label, onClick, peligro }: { icon: ReactNode; label: string; onClick: () => void; peligro?: boolean }) {
+function TileMenu({ icon, label, onClick, peligro, badge }: { icon: ReactNode; label: string; onClick: () => void; peligro?: boolean; badge?: number }) {
   return (
     <button
       type="button"
       role="menuitem"
       onClick={onClick}
-      className={`flex min-h-[140px] flex-col items-center justify-center gap-4 rounded-2xl border p-6 transition ${peligro ? "border-danger/30 text-danger hover:border-danger hover:bg-danger/[0.06]" : "border-line-strong text-ink-2 hover:border-ink hover:bg-hover hover:text-ink"}`}
+      className={`relative flex min-h-[140px] flex-col items-center justify-center gap-4 rounded-2xl border p-6 transition ${peligro ? "border-danger/30 text-danger hover:border-danger hover:bg-danger/[0.06]" : "border-line-strong text-ink-2 hover:border-ink hover:bg-hover hover:text-ink"}`}
     >
+      {badge != null && badge > 0 && (
+        <span className="absolute right-3 top-3 flex h-[22px] min-w-[22px] items-center justify-center rounded-full bg-accent px-1.5 text-[12px] font-bold text-white">{badge}</span>
+      )}
       <span className="flex h-10 w-10 items-center justify-center">{icon}</span>
       <span className="text-center text-[14.5px] font-semibold leading-tight">{label}</span>
     </button>
