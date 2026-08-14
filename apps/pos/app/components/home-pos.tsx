@@ -32,6 +32,7 @@ import { ModalCambiarPin } from "./modal-cambiar-pin";
 import { ModalMisPropinas } from "./modal-mis-propinas";
 import { leerTicketParaImpresion } from "../lib/print/ticket-datos";
 import { construirTicketJob } from "../lib/print/ticket-builder";
+import { rasterizarImagen } from "../lib/print/rasterizar";
 import { construirComandaJob, type DatosComanda } from "../lib/print/comanda-builder";
 import { ReciboPreview } from "./recibo-preview";
 import { PantallaCierre } from "./pantalla-cierre";
@@ -600,11 +601,19 @@ export function HomePos({
     }
   }, [carrito, ticketBd, token, caja.sucursal_id, turno.caja_id, turno.id]);
 
+  /** Logo del negocio listo para la térmica. Se rasteriza al vuelo (es rápido y evita
+   *  guardar estado que se desincronice si cambian el logo desde el panel). Si no hay logo
+   *  o la imagen falla, devuelve null y el ticket sale sin él. */
+  const logoParaTicket = useCallback(async (ancho: 58 | 80) => {
+    if (!caja.logoUrl) return null;
+    return rasterizarImagen(caja.logoUrl, ancho);
+  }, [caja.logoUrl]);
+
   /** Reimprime el ticket de una cuenta cerrada (desde la Consulta de cuentas). */
   const reimprimirCuenta = useCallback(async (ticketId: string) => {
     const datos = await leerTicketParaImpresion(ticketId, { token, cajeroNombre: empleado.nombre, cajaNombre: caja.nombre });
     const imp = obtenerImpresora("CAJA", { onMostrar: () => window.print() });
-    imp.imprimir(construirTicketJob(datos));
+    imp.imprimir(construirTicketJob(datos, await logoParaTicket(datos.ancho)));
   }, [token, empleado.nombre, caja.nombre]);
 
   /** Retoma un pedido en espera: lo carga al carrito como cuenta editable (misma maquinaria de mesas). */
@@ -1146,7 +1155,7 @@ export function HomePos({
               setEstadoTicket("lista");
               // Auto-impresión: el PrintJob es la fuente para el papel (Epson/genérica cuando esté).
               // Hoy con PreviewAdapter solo abre el overlay; el preview se renderiza desde los datos.
-              const job = construirTicketJob(datos);
+              const job = construirTicketJob(datos, await logoParaTicket(datos.ancho));
               await obtenerImpresora("CAJA", { onMostrar: () => setMostrarRecibo(true) }).imprimir(job);
               // Comanda automática a la estación de cocina — solo si hay una estación dedicada
               // distinta de la de caja (si es la misma impresora, ya salió el ticket; no duplicar).
@@ -1212,7 +1221,9 @@ export function HomePos({
             if (vista === "cocina" && datosComanda) {
               obtenerImpresora("COCINA", { onMostrar: () => window.print() }).imprimir(construirComandaJob(datosComanda));
             } else {
-              obtenerImpresora("CAJA", { onMostrar: () => window.print() }).imprimir(construirTicketJob(datosTicket));
+              logoParaTicket(datosTicket.ancho).then((logo) =>
+                obtenerImpresora("CAJA", { onMostrar: () => window.print() }).imprimir(construirTicketJob(datosTicket, logo)),
+              );
             }
           }}
           onCerrar={() => setMostrarRecibo(false)}

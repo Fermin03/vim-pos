@@ -13,8 +13,12 @@ function folioCorto(folio: string): string {
 /** Construye el PrintJob TICKET (P-222) desde datos planos. Función PURA.
  *  Debe quedar idéntico —contenido y orden— a ReciboTicket (recibo-ticket.tsx), que es
  *  lo que ve el cajero en pantalla. Solo cambia cómo se expresa cada bloque en papel. */
-export function construirTicketJob(d: DatosTicketImpresion): PrintJob {
+export function construirTicketJob(d: DatosTicketImpresion, logo?: Bloque | null): PrintJob {
   const b: Bloque[] = [];
+
+  // 0. Logo del negocio, si la caja alcanzó a rasterizarlo. Va ANTES del nombre: es lo primero
+  //    que el cliente ve del ticket. Si falta (sin logo, o imagen ilegible) el ticket sale igual.
+  if (logo) b.push(logo);
 
   // 1. Encabezado del negocio
   b.push({ t: "texto", valor: d.negocio.nombre, align: "centro", size: 2, bold: true });

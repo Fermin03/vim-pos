@@ -19,9 +19,20 @@ export function ReciboTicket({ datos }: { datos: DatosTicketImpresion }) {
     <ReciboPapel>
       {/* Cabecera del negocio */}
       <div className="text-center">
-        <div className="mx-auto mb-2.5 flex h-[46px] w-[46px] items-center justify-center rounded-[10px] bg-[#1A1A1A]">
-          <span className="font-display text-[24px] font-bold tracking-[-0.04em] text-white">V</span>
-        </div>
+        {datos.negocio.logoUrl ? (
+          // Logo del negocio (Configuración → Datos del negocio). Alto acotado: en papel de
+          // 80 mm un logo alto empuja el ticket entero y desperdicia rollo.
+          // eslint-disable-next-line @next/next/no-img-element -- data URI local, sin red
+          <img
+            src={datos.negocio.logoUrl}
+            alt={datos.negocio.nombre}
+            className="mx-auto mb-2.5 h-[52px] w-auto max-w-[180px] object-contain"
+          />
+        ) : (
+          <div className="mx-auto mb-2.5 flex h-[46px] w-[46px] items-center justify-center rounded-[10px] bg-[#1A1A1A]">
+            <span className="font-display text-[24px] font-bold tracking-[-0.04em] text-white">V</span>
+          </div>
+        )}
         <div className="font-sans text-[16px] font-bold tracking-[-0.01em] text-[#1A1A1A]">{datos.negocio.nombre}</div>
         {(datos.sucursal.direccion || datos.sucursal.telefono || datos.negocio.rfc) && (
           <div className="mt-1 text-[10.5px] leading-[1.55] text-[#333]">
