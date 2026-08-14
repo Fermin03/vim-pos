@@ -28,6 +28,7 @@ import { obtenerImpresora } from "../lib/print/adapter";
 import { hayEstacionDeCocinaDedicada } from "../lib/print/config";
 import { ModalConfigImpresora } from "./modal-config-impresora";
 import { ModalClienteDomicilio } from "./modal-cliente-domicilio";
+import { ModalNombreCuenta } from "./modal-nombre-cuenta";
 import { ModalCambiarPin } from "./modal-cambiar-pin";
 import { ModalMisPropinas } from "./modal-mis-propinas";
 import { leerTicketParaImpresion } from "../lib/print/ticket-datos";
@@ -65,151 +66,9 @@ const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
 
 
 
-/** Topbar del POS operativo (mockup P-059): marca + sucursal/turno + reloj + cajero + acciones.
- *  Solo En espera / Mesas / Domicilios quedan a la vista; el resto vive en el menú (☰) para no
- *  saturar la barra. */
-function TopbarOperativa({
-  caja,
-  turno,
-  empleado,
-  onCambiarCajero,
-  onBloquear,
-  onCerrarTurno,
-  onMovimientoCaja,
-  onAbrirCaja,
-  onInicio,
-  onKds,
-  onDevoluciones,
-  onImpresora,
-  onCambiarPin,
-  onMisPropinas,
-  onEnEspera,
-  onCuentas,
-  nEnEspera,
-}: {
-  caja: DatosCaja;
-  turno: Turno;
-  empleado: Empleado;
-  onCambiarCajero: () => void;
-  onBloquear: () => void;
-  onCerrarTurno: () => void;
-  onMovimientoCaja: () => void;
-  /** Abre el cajón de dinero sin venta (pide PIN de DUEÑO/ADMIN). */
-  onAbrirCaja: () => void;
-  /** Vuelve a la pantalla de inicio (elegir modo u operación). */
-  onInicio: () => void;
-  onKds: () => void;
-  onDevoluciones: () => void;
-  onImpresora: () => void;
-  onCambiarPin: () => void;
-  onMisPropinas: () => void;
-  /** Abre la Consulta de cuentas (historial de cuentas cerradas/canceladas). */
-  onCuentas: () => void;
-  /** D45 §12 — abre la lista de pedidos en espera de esta caja. */
-  onEnEspera: () => void;
-  nEnEspera: number;
-}) {
-  const ahora = useReloj();
-  const [menuAbierto, setMenuAbierto] = useState(false);
-  // Actualización: solo dentro de la app de escritorio. Se resuelve en un efecto porque el export
-  // estático se prerenderiza sin window y la bandera la inyecta Electron al servir el HTML.
 
-  useEffect(() => {
-    if (!menuAbierto) return;
-    const onEsc = (e: KeyboardEvent) => { if (e.key === "Escape") setMenuAbierto(false); };
-    window.addEventListener("keydown", onEsc);
-    return () => window.removeEventListener("keydown", onEsc);
-  }, [menuAbierto]);
-  return (
-    <header className="flex h-[68px] flex-shrink-0 items-center justify-between border-b border-line px-6">
-      <div className="flex items-center gap-4">
-        <div className="relative flex h-[34px] w-[34px] items-center justify-center rounded-lg bg-ink">
-          <span className="font-display text-base font-bold leading-none tracking-tight text-white">V</span>
-          <span className="absolute bottom-1.5 right-1.5 h-1 w-1 rounded-full bg-accent" aria-hidden="true" />
-        </div>
-        <div className="h-[26px] w-px bg-line-strong" />
-        <div>
-          <div className="font-display text-[15px] font-semibold tracking-tight">Knock-Out Burger</div>
-          <div className="mt-px text-xs text-ink-3">
-            {caja.sucursalNombre} · {caja.nombre} · <span className="text-success">Turno {turno.codigo_turno}</span>
-          </div>
-        </div>
-      </div>
-      <div className="flex items-center gap-5">
-        <div className="font-display text-[15px] font-semibold tabular-nums text-ink-2">
-          {ahora ? ahora.toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit", hour12: false }) : "—"}
-        </div>
-        <div className="h-[26px] w-px bg-line-strong" />
-        <div className="flex items-center gap-2">
-          <span className="flex h-9 w-9 items-center justify-center rounded-full bg-hover font-display text-[13px] font-semibold text-ink-2">
-            {empleado.nombre.split(/\s+/).slice(0, 2).map((p) => p[0]).join("").toUpperCase()}
-          </span>
-          <div>
-            <div className="text-[13px] font-semibold leading-tight">{empleado.nombre}</div>
-            <div className="text-[11px] text-ink-3">{empleado.rol === "CAJERO" ? "Cajero" : empleado.rol}</div>
-          </div>
-        </div>
-        <div className="relative flex items-center gap-1">
-          {/* En espera queda a la vista; el acceso a cuentas (Mesas/Pick-up/Domicilios) vive ahora en
-              cada pestaña de modo ("Ver cuentas"). */}
-          <button
-            type="button"
-            onClick={onInicio}
-            className="flex h-9 items-center gap-1.5 rounded border border-line-strong px-3 text-[13px] font-semibold text-ink-2 transition hover:border-ink hover:text-ink"
-          >
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4"><path d="M3 10.5 12 3l9 7.5" /><path d="M5 9.5V21h14V9.5" /></svg>
-            Inicio
-          </button>
-          <button
-            type="button"
-            onClick={onEnEspera}
-            className="relative flex h-9 items-center gap-1.5 rounded border border-line-strong px-3 text-[13px] font-semibold text-ink-2 transition hover:border-ink hover:text-ink"
-          >
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4"><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 3" /></svg>
-            En espera
-            {nEnEspera > 0 && (
-              <span className="ml-0.5 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-accent px-1 text-[11px] font-bold text-white">{nEnEspera}</span>
-            )}
-          </button>
-          <button
-            type="button"
-            onClick={onCuentas}
-            className="flex h-9 items-center gap-1.5 rounded border border-line-strong px-3 text-[13px] font-semibold text-ink-2 transition hover:border-ink hover:text-ink"
-          >
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4"><path d="M6 2h9l3 3v15a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V3a1 1 0 0 1 1-1z" /><path d="M9 8h6M9 12h6M9 16h4" /></svg>
-            Cuentas
-          </button>
-
-          {/* Menú: todo lo demás, agrupado, para no saturar la barra. */}
-          <button
-            type="button"
-            onClick={() => setMenuAbierto((v) => !v)}
-            aria-haspopup="menu"
-            aria-expanded={menuAbierto}
-            className={`flex h-9 items-center gap-1.5 rounded border px-3 text-[13px] font-semibold transition ${menuAbierto ? "border-ink bg-ink text-white" : "border-line-strong text-ink-2 hover:border-ink hover:text-ink"}`}
-          >
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" className="h-4 w-4"><path d="M4 6h16M4 12h16M4 18h16" /></svg>
-            Menú
-          </button>
-
-          {menuAbierto && (
-            <MenuGeneral
-              onCerrar={() => setMenuAbierto(false)}
-              onKds={onKds}
-              onDevoluciones={onDevoluciones}
-              onCambiarCajero={onCambiarCajero}
-              onBloquear={onBloquear}
-              onCambiarPin={onCambiarPin}
-              onMisPropinas={onMisPropinas}
-              onImpresora={onImpresora}
-              onCerrarTurno={onCerrarTurno}
-            />
-          )}
-        </div>
-      </div>
-    </header>
-  );
-}
+/** Pantalla desde la que se entró a capturar; a esa regresa el botón "Volver". */
+type Origen = "inicio" | "mesas" | "pickup" | "domicilio";
 
 export function HomePos({
   empleado,
@@ -238,6 +97,10 @@ export function HomePos({
   const [enDelivery, setEnDelivery] = useState(false);
   const [enPickup, setEnPickup] = useState(false);
   const [enConsultaCuentas, setEnConsultaCuentas] = useState(false);
+  // Pantalla desde la que se entró a capturar. "Volver" regresa AHÍ, no al inicio: si el
+  // cajero venía de la lista de domicilios, mandarlo al inicio le cuesta dos toques extra
+  // para seguir atendiendo la misma lista.
+  const [volverA, setVolverA] = useState<Origen>("inicio");
   const [enDevoluciones, setEnDevoluciones] = useState(false);
   // F16 — estado de conexión (avisa al cajero si se cae la red).
   const { online } = useConexion(SUPABASE_URL ? `${SUPABASE_URL}/auth/v1/health` : undefined);
@@ -291,6 +154,7 @@ export function HomePos({
   const [enModoMesa, setEnModoMesa] = useState(false);
   const [configImpresoraAbierto, setConfigImpresoraAbierto] = useState(false);
   const [clienteDomAbierto, setClienteDomAbierto] = useState(false);
+  const [nombreCuentaAbierto, setNombreCuentaAbierto] = useState(false);
   const [cambiarPinAbierto, setCambiarPinAbierto] = useState(false);
   const [cocinaEnviada, setCocinaEnviada] = useState(false);
   const [enviandoCocina, setEnviandoCocina] = useState(false);
@@ -422,7 +286,7 @@ export function HomePos({
   );
 
   /** Entra en modo cuenta de mesa: carga el ticket persistido al carrito para seguir editando. */
-  const entrarCuenta = useCallback(async (ticketId: string) => {
+  const entrarCuenta = useCallback(async (ticketId: string, origen: Origen = "inicio") => {
     try {
       const [bd, recon, items] = await Promise.all([
         leerTotales(token, ticketId),
@@ -430,6 +294,7 @@ export function HomePos({
         leerItemsPersistidos(token, ticketId).catch(() => [] as ItemTicket[]),
       ]);
       dispatch({ tipo: "cargar", estado: { modoServicio: recon.modoServicio, lineas: recon.lineas } });
+      setVolverA(origen);
       setTicketBd(bd);
       setItemsPersistidos(items);
       setEnModoMesa(true);
@@ -450,7 +315,7 @@ export function HomePos({
       });
       // B1 — atribuir la mesa al mesero que la abre (para reportes y "mis propinas").
       atribuirMesero(token, ticketId, empleado.id).catch(() => {});
-      await entrarCuenta(ticketId);
+      await entrarCuenta(ticketId, "mesas");
     } catch (e) {
       setError(e instanceof Error ? e.message : "No se pudo abrir la cuenta");
     }
@@ -487,6 +352,7 @@ export function HomePos({
           carrito.clienteDomicilio?.clienteId ?? null,
           carrito.clienteDomicilio?.direccionId ?? null,
           carrito.notaOrden ?? null,
+          carrito.nombreCuenta ?? null,
         );
         setTicketBd(bd);
       }
@@ -521,6 +387,7 @@ export function HomePos({
         carrito.clienteDomicilio?.clienteId ?? null,
         carrito.clienteDomicilio?.direccionId ?? null,
         carrito.notaOrden ?? null,
+        carrito.nombreCuenta ?? null,
       );
       setTotalesCobro(totales);
     } catch (e) {
@@ -556,6 +423,7 @@ export function HomePos({
           carrito.clienteDomicilio?.clienteId ?? null,
           carrito.clienteDomicilio?.direccionId ?? null,
           carrito.notaOrden ?? null,
+          carrito.nombreCuenta ?? null,
         );
       }
       await ponerTicketEnEspera(token, bd.ticketId, etiqueta);
@@ -588,6 +456,7 @@ export function HomePos({
           carrito.clienteDomicilio?.clienteId ?? null,
           carrito.clienteDomicilio?.direccionId ?? null,
           carrito.notaOrden ?? null,
+          carrito.nombreCuenta ?? null,
         );
       }
       await enviarACocina(token, bd.ticketId);
@@ -653,6 +522,15 @@ export function HomePos({
       dispatch({ tipo: "limpiar" });
     }
   }, [cerrarRecibo, enModoMesa]);
+
+  /** Sale de la captura y regresa a la pantalla de la que se vino (no al inicio). */
+  const volverAtras = useCallback(() => {
+    salirNavegacion();
+    setEnMesas(volverA === "mesas");
+    setEnPickup(volverA === "pickup");
+    setEnDelivery(volverA === "domicilio");
+    setEnInicio(volverA === "inicio");
+  }, [salirNavegacion, volverA]);
 
   /** Vuelve a la pantalla de inicio dejando la caja limpia (sale de la cuenta de mesa si la hubiera). */
   const volverAlInicio = useCallback(() => {
@@ -721,6 +599,35 @@ export function HomePos({
     );
   }
 
+  /**
+   * Modales que se abren desde el menú general y desde la captura. Se definen una vez porque el
+   * componente tiene un `return` por pantalla: si vivieran dentro del JSX del catálogo —donde
+   * estaban— abrirlos desde el inicio no mostraría nada.
+   */
+  const modalesCompartidos = (
+    <>
+      {esperaListaAbierta && (
+        <ModalListaEspera
+          token={token}
+          cajaId={turno.caja_id}
+          onRetomar={retomarEspera}
+          onCerrar={() => setEsperaListaAbierta(false)}
+          procesando={esperaProcesando}
+          error={esperaError}
+        />
+      )}
+      {abrirCajaAbierto && (
+        <ModalAbrirCaja
+          token={token}
+          empleado={empleado}
+          cajaId={turno.caja_id}
+          turnoId={turno.id}
+          onCerrar={() => setAbrirCajaAbierto(false)}
+        />
+      )}
+    </>
+  );
+
   if (enKds) {
     return <PantallaKds token={token} caja={caja} onSalir={() => setEnKds(false)} />;
   }
@@ -744,6 +651,7 @@ export function HomePos({
           onParaLlevar={() => {
             // Venta de mostrador: el modo queda fijado y se entra directo a capturar.
             dispatch({ tipo: "modo", modo: "PARA_LLEVAR" });
+            setVolverA("inicio");
             setEnInicio(false);
           }}
           onMonitorVentas={() => { setEnInicio(false); setEnMonitor(true); }}
@@ -774,6 +682,9 @@ export function HomePos({
             onCerrar={() => setMenuGeneralAbierto(false)}
             onKds={() => { setMenuGeneralAbierto(false); setEnInicio(false); setEnKds(true); }}
             onDevoluciones={() => { setMenuGeneralAbierto(false); setEnInicio(false); setEnDevoluciones(true); }}
+            onEnEspera={() => { setEsperaError(null); setEsperaListaAbierta(true); }}
+            onAbrirCajon={() => setAbrirCajaAbierto(true)}
+            nEnEspera={nEnEspera}
             onCambiarCajero={onCambiarCajero}
             onBloquear={onBloquear}
             onCambiarPin={() => setCambiarPinAbierto(true)}
@@ -783,6 +694,7 @@ export function HomePos({
           />
         )}
         {configImpresoraAbierto && <ModalConfigImpresora onCerrar={() => setConfigImpresoraAbierto(false)} />}
+        {modalesCompartidos}
         {cerrando && (
           <PantallaCierre
             token={token}
@@ -808,7 +720,7 @@ export function HomePos({
         caja={caja}
         onSalir={volverAlInicio}
         onAbrirCuenta={onAbrirCuentaMesa}
-        onRetomar={entrarCuenta}
+        onRetomar={(ticketId: string) => entrarCuenta(ticketId, "mesas")}
       />
     );
   }
@@ -829,17 +741,19 @@ export function HomePos({
           dispatch({ tipo: "modo", modo });
           setTicketBd(null);
           setItemsPersistidos([]);
+          setVolverA(modo === "DRIVE_THRU" ? "pickup" : "domicilio");
           setEnPickup(false);
           setEnDelivery(false);
           // Domicilio: lo primero que se pregunta por teléfono es a nombre de quién y a dónde
           // va, antes de anotar qué quiere. Se abre el modal de una vez para no obligar al
           // cajero a acordarse de asignarlo después (y que el pedido salga sin dirección).
+          if (modo === "DRIVE_THRU") setNombreCuentaAbierto(true);
           if (modo === "DELIVERY_PROPIO") setClienteDomAbierto(true);
         }}
-        onAgregarProductos={entrarCuenta}
+        onAgregarProductos={(ticketId: string) => entrarCuenta(ticketId, enPickup ? "pickup" : "domicilio")}
         onCobrar={async (ticketId) => {
           // Cargar la cuenta y abrir el cobro de inmediato: el cajero ya decidió cobrarla.
-          await entrarCuenta(ticketId);
+          await entrarCuenta(ticketId, enPickup ? "pickup" : "domicilio");
           try {
             setTotalesCobro(await leerTotales(token, ticketId));
           } catch (e) {
@@ -887,7 +801,19 @@ export function HomePos({
           Sincronizando {pendientesSync} operación{pendientesSync === 1 ? "" : "es"} pendiente{pendientesSync === 1 ? "" : "s"}…
         </div>
       )}
-      <TopbarOperativa caja={caja} turno={turno} empleado={empleado} onCambiarCajero={onCambiarCajero} onBloquear={onBloquear} onCerrarTurno={() => setCerrando(true)} onMovimientoCaja={() => setMovimientoAbierto(true)} onAbrirCaja={() => setAbrirCajaAbierto(true)} onInicio={volverAlInicio} onKds={() => { salirNavegacion(); setEnKds(true); }} onDevoluciones={() => { salirNavegacion(); setEnDevoluciones(true); }} onImpresora={() => setConfigImpresoraAbierto(true)} onCambiarPin={() => setCambiarPinAbierto(true)} onMisPropinas={() => setMisPropinasAbierto(true)} onEnEspera={() => { setEsperaError(null); setEsperaListaAbierta(true); }} onCuentas={() => { salirNavegacion(); setEnConsultaCuentas(true); }} nEnEspera={nEnEspera} />
+      {/* Barra de captura: aquí no van menú, KDS, cuentas ni pedidos en espera. El cajero está
+          anotando un pedido y cada ícono de más es una salida en falso; todo eso vive en el
+          inicio. Lo único que hace falta es regresar a donde estaba. */}
+      <div className="flex flex-shrink-0 items-center gap-3 border-b border-line bg-surface px-3 py-2">
+        <button
+          type="button"
+          onClick={volverAtras}
+          className="flex h-10 items-center gap-2 rounded border border-line-strong px-3 text-[13.5px] font-semibold text-ink transition hover:border-ink hover:bg-hover"
+        >
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4" aria-hidden="true"><path d="M19 12H5M12 19l-7-7 7-7" /></svg>
+          Volver
+        </button>
+      </div>
       {configImpresoraAbierto && <ModalConfigImpresora onCerrar={() => setConfigImpresoraAbierto(false)} />}
       {clienteDomAbierto && (
         <ModalClienteDomicilio
@@ -896,6 +822,12 @@ export function HomePos({
           sucursalId={caja.sucursal_id}
           onSeleccionar={(c) => { dispatch({ tipo: "cliente", cliente: c }); setClienteDomAbierto(false); }}
           onCerrar={() => setClienteDomAbierto(false)}
+        />
+      )}
+      {nombreCuentaAbierto && (
+        <ModalNombreCuenta
+          onListo={(n) => { dispatch({ tipo: "nombre_cuenta", nombre: n }); setNombreCuentaAbierto(false); }}
+          onOmitir={() => setNombreCuentaAbierto(false)}
         />
       )}
       {cambiarPinAbierto && (
@@ -1028,16 +960,7 @@ export function HomePos({
           error={esperaError}
         />
       )}
-      {esperaListaAbierta && (
-        <ModalListaEspera
-          token={token}
-          cajaId={turno.caja_id}
-          onRetomar={retomarEspera}
-          onCerrar={() => setEsperaListaAbierta(false)}
-          procesando={esperaProcesando}
-          error={esperaError}
-        />
-      )}
+      {modalesCompartidos}
       {modGrupos && (
         <ModalModificadores
           producto={modGrupos.producto}
@@ -1078,15 +1001,6 @@ export function HomePos({
             setTimeout(() => setMovimientoToast(null), 4000);
           }}
           onCerrar={() => setMovimientoAbierto(false)}
-        />
-      )}
-      {abrirCajaAbierto && (
-        <ModalAbrirCaja
-          token={token}
-          empleado={empleado}
-          cajaId={turno.caja_id}
-          turnoId={turno.id}
-          onCerrar={() => setAbrirCajaAbierto(false)}
         />
       )}
       {movimientoToast && (
