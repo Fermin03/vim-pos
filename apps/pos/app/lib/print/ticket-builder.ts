@@ -35,6 +35,18 @@ export function construirTicketJob(d: DatosTicketImpresion, logo?: Bloque | null
   b.push({ t: "fila", izq: "Caja", der: d.meta.caja });
   if (d.meta.modoServicio) b.push({ t: "fila", izq: "Servicio", der: d.meta.modoServicio });
 
+  // 2.b Datos de entrega (solo domicilio). Va ANTES de los productos y en tamaño grande:
+  //      el repartidor lee la dirección de un vistazo, sin buscarla entre los renglones.
+  if (d.entrega) {
+    b.push({ t: "separador", estilo: "punteado" });
+    b.push({ t: "texto", valor: "DATOS DE ENTREGA", align: "centro", bold: true, invertido: true });
+    if (d.entrega.cliente) b.push({ t: "texto", valor: d.entrega.cliente, size: 2, bold: true });
+    if (d.entrega.telefono) b.push({ t: "texto", valor: `Tel. ${d.entrega.telefono}`, size: 2, bold: true });
+    if (d.entrega.direccion) b.push({ t: "texto", valor: d.entrega.direccion, bold: true });
+    if (d.entrega.referencias) b.push({ t: "texto", valor: `Ref: ${d.entrega.referencias}`, size: 1 });
+    if (d.entrega.notasRepartidor) b.push({ t: "texto", valor: `Nota: ${d.entrega.notasRepartidor}`, size: 1 });
+  }
+
   b.push({ t: "separador", estilo: "punteado" });
 
   // 3. Líneas
