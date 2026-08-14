@@ -1,0 +1,309 @@
+"use client";
+import { useCallback, useEffect, useState } from "react";
+import { Button } from "@vim/ui/styles";
+import { fmtMxn, type DatosCaja, type Turno } from "../lib/turno";
+import { listarCuentasAbiertas, minutosAbierta, type CuentaAbierta } from "../lib/cuentas-abiertas";
+import { leerItemsPersistidos, type ItemTicket } from "../lib/cancelacion";
+import { ModalCancelarItem } from "./modal-cancelar-item";
+import { ModalAutorizacionPin } from "./modal-autorizacion-pin";
+import type { Empleado } from "../lib/supabase";
+import type { ModoServicio } from "../lib/carrito";
+
+const PERMISO_REIMPRIMIR = "venta.reimprimir_ticket";
+
+type Copia = {
+  titulo: string;
+  subtitulo: (n: number) => string;
+  vacioTitulo: string;
+  vacioTexto: string;
+  nuevaCuenta: string;
+};
+
+const COPIA: Record<"DRIVE_THRU" | "DELIVERY_PROPIO", Copia> = {
+  DRIVE_THRU: {
+    titulo: "Pick-up",
+    subtitulo: (n) => `${n} ${n === 1 ? "orden por recolectar" : "órdenes por recolectar"}`,
+    vacioTitulo: "Sin órdenes por recolectar",
+    vacioTexto: "Abre una cuenta para tomar un pedido de Pick-up.",
+    nuevaCuenta: "Nueva orden",
+  },
+  DELIVERY_PROPIO: {
+    titulo: "Domicilios",
+    subtitulo: (n) => `${n} ${n === 1 ? "pedido activo" : "pedidos activos"}`,
+    vacioTitulo: "Sin pedidos a domicilio",
+    vacioTexto: "Abre una cuenta para tomar un pedido a domicilio.",
+    nuevaCuenta: "Nuevo domicilio",
+  },
+};
+
+/**
+ * Cuentas abiertas de un modo (Pick-up / Domicilio), en maestro-detalle.
+ *
+ * Antes estas pantallas solo listaban las cuentas y cualquier acción obligaba a "retomar" —
+ * es decir, cargar la cuenta al carrito y salir a la pantalla de venta— aunque solo se
+ * quisiera ver qué pidió el cliente o cobrar. Ahora la lista queda a la izquierda, el detalle
+ * a la derecha, y las acciones sobre la cuenta seleccionada arriba.
+ *
+ * Las dos acciones que necesitan el catálogo (agregar producto) o el flujo de cobro siguen
+ * saliendo a la pantalla de venta: ahí vive esa maquinaria y duplicarla sería pedir que dos
+ * copias del carrito se mantengan iguales para siempre.
+ */
+export function PantallaCuentasModo({
+  token,
+  caja,
+  turno,
+  empleado,
+  modo,
+  onSalir,
+  onAbrirCuenta,
+  onAgregarProductos,
+  onCobrar,
+  onImprimirTicket,
+  extraPorCuenta,
+}: {
+  token: string;
+  caja: DatosCaja;
+  turno: Turno;
+  empleado: Empleado;
+  modo: Extract<ModoServicio, "DRIVE_THRU" | "DELIVERY_PROPIO">;
+  onSalir: () => void;
+  /** Abre una cuenta NUEVA en este modo (entra al catálogo con el modo ya fijado). */
+  onAbrirCuenta: () => void;
+  /** Carga la cuenta en el carrito para agregarle productos (sale a la pantalla de venta). */
+  onAgregarProductos: (ticketId: string) => void;
+  /** Carga la cuenta y abre el cobro. */
+  onCobrar: (ticketId: string) => void;
+  /** Imprime el ticket del cliente de esa cuenta. */
+  onImprimirTicket: (ticketId: string) => Promise<void>;
+  /** Acciones propias del modo (p. ej. "Marcar salida" en domicilio). */
+  extraPorCuenta?: (c: CuentaAbierta, recargar: () => void) => React.ReactNode;
+}) {
+  const copia = COPIA[modo];
+  const [items, setItems] = useState<CuentaAbierta[] | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [selId, setSelId] = useState<string | null>(null);
+  const [detalle, setDetalle] = useState<ItemTicket[] | null>(null);
+  const [ahora, setAhora] = useState(() => new Date());
+  const [imprimiendo, setImprimiendo] = useState(false);
+  const [pidiendoPinReimpresion, setPidiendoPinReimpresion] = useState(false);
+  const [cancelando, setCancelando] = useState<ItemTicket | null>(null);
+  // Impresiones hechas en esta sesión: la primera es libre, de ahí en adelante pide PIN.
+  const [yaImpresas, setYaImpresas] = useState<Set<string>>(new Set());
+
+  const recargar = useCallback(async () => {
+    setError(null);
+    try {
+      setItems(await listarCuentasAbiertas(token, caja.sucursal_id, modo));
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "No se pudieron cargar las cuentas");
+      setItems([]);
+    }
+  }, [token, caja.sucursal_id, modo]);
+
+  useEffect(() => { recargar(); }, [recargar]);
+  useEffect(() => {
+    const id = setInterval(() => setAhora(new Date()), 30000);
+    return () => clearInterval(id);
+  }, []);
+
+  // Detalle de la cuenta seleccionada.
+  useEffect(() => {
+    if (!selId) { setDetalle(null); return; }
+    let vivo = true;
+    setDetalle(null);
+    leerItemsPersistidos(token, selId)
+      .then((its) => { if (vivo) setDetalle(its); })
+      .catch(() => { if (vivo) setDetalle([]); });
+    return () => { vivo = false; };
+  }, [token, selId]);
+
+  const sel = (items ?? []).find((c) => c.ticketId === selId) ?? null;
+  // "Ya se imprimió" = lo hicimos en esta sesión, o el ticket trae marca de impresión previa.
+  const yaSeImprimio = sel != null && (yaImpresas.has(sel.ticketId) || sel.impresaAt != null);
+
+  const imprimir = useCallback(async (ticketId: string) => {
+    setImprimiendo(true);
+    try {
+      await onImprimirTicket(ticketId);
+      setYaImpresas((s) => new Set(s).add(ticketId));
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "No se pudo imprimir");
+    } finally {
+      setImprimiendo(false);
+    }
+  }, [onImprimirTicket]);
+
+  return (
+    <main className="flex h-screen flex-col bg-bg">
+      <header className="flex h-[clamp(3rem,7.5vh,4.25rem)] flex-shrink-0 items-center justify-between gap-3 border-b border-line px-[clamp(0.75rem,2vw,1.5rem)]">
+        <div className="flex min-w-0 items-center gap-3">
+          <div className="relative flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg bg-ink">
+            <span className="font-display text-[15px] font-bold leading-none tracking-tight text-white">V</span>
+            <span className="absolute bottom-1 right-1 h-1 w-1 rounded-full bg-accent" aria-hidden="true" />
+          </div>
+          <div className="min-w-0">
+            <div className="truncate font-display text-[15px] font-semibold tracking-tight">{copia.titulo} · {caja.nombre}</div>
+            <div className="truncate text-[12px] text-ink-3">{copia.subtitulo((items ?? []).length)}</div>
+          </div>
+        </div>
+        <div className="flex flex-shrink-0 items-center gap-2">
+          <Button onClick={onAbrirCuenta}>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" className="h-[17px] w-[17px]"><path d="M12 5v14M5 12h14" /></svg>
+            {copia.nuevaCuenta}
+          </Button>
+          <button type="button" onClick={onSalir} className="flex h-9 items-center gap-1.5 rounded border border-line-strong px-3 text-[13px] font-semibold text-ink-2 transition hover:border-ink hover:text-ink">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4"><path d="M19 12H5M12 19l-7-7 7-7" /></svg>
+            Salir
+          </button>
+        </div>
+      </header>
+
+      {error && <p className="flex-shrink-0 bg-[#FBF1EF] px-4 py-2 text-[13px] font-medium text-danger" role="alert">{error}</p>}
+
+      <div className="flex min-h-0 flex-1">
+        {/* ── Lista de cuentas ─────────────────────────────────────────── */}
+        <div className="flex w-[clamp(18rem,30vw,24rem)] flex-shrink-0 flex-col border-r border-line">
+          <div className="min-h-0 flex-1 overflow-y-auto p-3">
+            {items === null && <p className="p-3 text-sm text-ink-3">Cargando…</p>}
+            {items?.length === 0 && (
+              <div className="flex h-full flex-col items-center justify-center gap-2 px-4 text-center">
+                <p className="text-[14px] font-semibold text-ink-2">{copia.vacioTitulo}</p>
+                <p className="text-[12.5px] text-ink-3">{copia.vacioTexto}</p>
+              </div>
+            )}
+            <div className="flex flex-col gap-2">
+              {items?.map((c) => {
+                const activa = c.ticketId === selId;
+                return (
+                  <button
+                    key={c.ticketId}
+                    type="button"
+                    onClick={() => setSelId(c.ticketId)}
+                    className={[
+                      "w-full rounded-lg border p-3 text-left transition",
+                      activa ? "border-ink bg-sel" : "border-line-strong bg-surface hover:border-ink",
+                    ].join(" ")}
+                  >
+                    <div className="flex items-baseline justify-between gap-2">
+                      <span className="truncate font-display text-[15px] font-semibold">{c.cliente ?? c.folio ?? "Cuenta"}</span>
+                      <span className="flex-shrink-0 font-display text-[15px] font-bold tabular-nums">{fmtMxn(c.total)}</span>
+                    </div>
+                    <div className="mt-0.5 flex items-center justify-between gap-2 text-[12px] text-ink-3">
+                      <span className="truncate">{c.nItems} {c.nItems === 1 ? "producto" : "productos"}</span>
+                      <span className="flex-shrink-0">{minutosAbierta(c.desdeIso, ahora)} min</span>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+
+        {/* ── Detalle de la cuenta ─────────────────────────────────────── */}
+        <div className="flex min-w-0 flex-1 flex-col">
+          {!sel ? (
+            <div className="flex flex-1 flex-col items-center justify-center gap-2 px-6 text-center">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.4" className="h-10 w-10 text-line-strong"><path d="M6 2h9l3 3v15a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V3a1 1 0 0 1 1-1z" /><path d="M9 8h6M9 12h6M9 16h4" /></svg>
+              <p className="text-[14px] font-semibold text-ink-2">Elige una cuenta</p>
+              <p className="text-[12.5px] text-ink-3">Verás lo que se ordenó y podrás cobrarla o modificarla.</p>
+            </div>
+          ) : (
+            <>
+              {/* Barra de acciones sobre la cuenta seleccionada */}
+              <div className="flex flex-shrink-0 flex-wrap items-center gap-2 border-b border-line px-4 py-3">
+                <div className="mr-auto min-w-0">
+                  <div className="truncate font-display text-[16px] font-semibold">{sel.cliente ?? sel.folio ?? "Cuenta"}</div>
+                  <div className="text-[12px] text-ink-3">{sel.folio ? `${sel.folio} · ` : ""}{fmtMxn(sel.total)}</div>
+                </div>
+                <Accion label={yaSeImprimio ? "Reimprimir" : "Imprimir ticket"} onClick={() => (yaSeImprimio ? setPidiendoPinReimpresion(true) : imprimir(sel.ticketId))} ocupado={imprimiendo} />
+                <Accion label="Agregar producto" onClick={() => onAgregarProductos(sel.ticketId)} />
+                <Accion label="Cobrar" onClick={() => onCobrar(sel.ticketId)} destacado />
+                {extraPorCuenta?.(sel, recargar)}
+              </div>
+
+              {/* Lo que se ordenó */}
+              <div className="min-h-0 flex-1 overflow-y-auto p-4">
+                {detalle === null && <p className="text-sm text-ink-3">Cargando productos…</p>}
+                {detalle?.length === 0 && <p className="text-sm text-ink-3">Esta cuenta no tiene productos.</p>}
+                <div className="flex flex-col divide-y divide-line">
+                  {detalle?.map((it) => (
+                    <div key={it.id} className="flex items-center gap-3 py-2.5">
+                      <span className="w-8 flex-shrink-0 font-display text-[15px] font-bold tabular-nums text-ink-2">{it.cantidad}×</span>
+                      <span className="min-w-0 flex-1 truncate text-[14px]">{it.productoNombre}</span>
+                      <span className="flex-shrink-0 text-[14px] font-semibold tabular-nums">{fmtMxn(it.totalItemMxn)}</span>
+                      <button
+                        type="button"
+                        onClick={() => setCancelando(it)}
+                        title="Eliminar producto"
+                        className="flex-shrink-0 rounded px-2 py-1 text-[12.5px] font-semibold text-ink-3 transition hover:bg-hover hover:text-danger"
+                      >
+                        Eliminar
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </>
+          )}
+        </div>
+      </div>
+
+      {cancelando && sel && (
+        <ModalCancelarItem
+          token={token}
+          empleado={empleado}
+          ticketItemId={cancelando.id}
+          productoNombre={cancelando.productoNombre}
+          cantidad={cancelando.cantidad}
+          totalItem={cancelando.totalItemMxn}
+          cajaId={turno.caja_id}
+          turnoId={turno.id}
+          estadoCocina={cancelando.estadoCocina}
+          onCancelado={async () => {
+            setCancelando(null);
+            await recargar();
+            // Releer el detalle: el total y las líneas cambiaron.
+            leerItemsPersistidos(token, sel.ticketId).then(setDetalle).catch(() => {});
+          }}
+          onCerrar={() => setCancelando(null)}
+        />
+      )}
+
+      {pidiendoPinReimpresion && sel && (
+        <ModalAutorizacionPin
+          token={token}
+          accion="reimprimir_ticket"
+          permisoCodigo={PERMISO_REIMPRIMIR}
+          descripcion={`Reimprimir el ticket de ${sel.cliente ?? sel.folio ?? "la cuenta"} · ${fmtMxn(sel.total)}`}
+          ejecutaNombre={empleado.nombre}
+          monto={sel.total}
+          entidadTipo="ticket"
+          entidadId={sel.ticketId}
+          cajaId={turno.caja_id}
+          turnoId={turno.id}
+          motivo="Reimpresión de ticket"
+          onAutorizado={() => { setPidiendoPinReimpresion(false); imprimir(sel.ticketId); }}
+          onCancelar={() => setPidiendoPinReimpresion(false)}
+        />
+      )}
+    </main>
+  );
+}
+
+function Accion({ label, onClick, destacado, ocupado }: { label: string; onClick: () => void; destacado?: boolean; ocupado?: boolean }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={ocupado}
+      className={[
+        "flex h-9 flex-shrink-0 items-center rounded px-3 text-[13px] font-semibold transition disabled:opacity-50",
+        destacado
+          ? "bg-accent text-white hover:bg-accent-hover"
+          : "border border-line-strong text-ink-2 hover:border-ink hover:text-ink",
+      ].join(" ")}
+    >
+      {ocupado ? "Imprimiendo…" : label}
+    </button>
+  );
+}

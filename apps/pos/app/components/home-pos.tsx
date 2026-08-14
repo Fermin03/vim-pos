@@ -38,9 +38,7 @@ import { ReciboPreview } from "./recibo-preview";
 import { PantallaCierre } from "./pantalla-cierre";
 import { PantallaKds } from "@vim/kds-core";
 import { PantallaMesas } from "./pantalla-mesas";
-import { PantallaPickup } from "./pantalla-pickup";
 import { PantallaConsultaCuentas } from "./pantalla-consulta-cuentas";
-import { PantallaDomicilioCuentas } from "./pantalla-domicilio-cuentas";
 import { PantallaDevoluciones } from "./pantalla-devoluciones";
 import { ModalCancelarItem } from "./modal-cancelar-item";
 import { ModalDescuentoItem } from "./modal-descuento-item";
@@ -49,6 +47,8 @@ import { ModalMovimientoCaja } from "./modal-movimiento-caja";
 import { ModalAbrirCaja } from "./modal-abrir-caja";
 import { MenuGeneral } from "./menu-general";
 import { PantallaInicio } from "./pantalla-inicio";
+import { PantallaCuentasModo } from "./pantalla-cuentas-modo";
+import { marcarSalidaDomicilio } from "../lib/cuentas-abiertas";
 import { PantallaMonitorVentas } from "./pantalla-monitor-ventas";
 import { listarTicketsEnEspera, ponerTicketEnEspera, retomarTicketEnEspera } from "../lib/espera";
 import { ModalEtiquetaEspera, ModalListaEspera } from "./modal-espera";
@@ -813,12 +813,52 @@ export function HomePos({
     );
   }
 
-  if (enDelivery) {
-    return <PantallaDomicilioCuentas token={token} caja={caja} onSalir={volverAlInicio} onRetomar={entrarCuenta} />;
-  }
-
-  if (enPickup) {
-    return <PantallaPickup token={token} caja={caja} onSalir={volverAlInicio} onRetomar={entrarCuenta} />;
+  if (enDelivery || enPickup) {
+    const modo = enPickup ? "DRIVE_THRU" : "DELIVERY_PROPIO";
+    return (
+      <PantallaCuentasModo
+        token={token}
+        caja={caja}
+        turno={turno}
+        empleado={empleado}
+        modo={modo}
+        onSalir={volverAlInicio}
+        onAbrirCuenta={() => {
+          // Cuenta nueva: se fija el modo y se entra al catálogo con el carrito limpio.
+          dispatch({ tipo: "limpiar" });
+          dispatch({ tipo: "modo", modo });
+          setTicketBd(null);
+          setItemsPersistidos([]);
+          setEnPickup(false);
+          setEnDelivery(false);
+        }}
+        onAgregarProductos={entrarCuenta}
+        onCobrar={async (ticketId) => {
+          // Cargar la cuenta y abrir el cobro de inmediato: el cajero ya decidió cobrarla.
+          await entrarCuenta(ticketId);
+          try {
+            setTotalesCobro(await leerTotales(token, ticketId));
+          } catch (e) {
+            setError(e instanceof Error ? e.message : "No se pudo abrir el cobro");
+          }
+        }}
+        onImprimirTicket={reimprimirCuenta}
+        extraPorCuenta={
+          enDelivery
+            ? (c, recargar) =>
+                c.estadoCocina === "LISTO" ? (
+                  <button
+                    type="button"
+                    onClick={async () => { await marcarSalidaDomicilio(token, c.ticketId); recargar(); }}
+                    className="flex h-9 flex-shrink-0 items-center rounded border border-line-strong px-3 text-[13px] font-semibold text-ink-2 transition hover:border-ink hover:text-ink"
+                  >
+                    Marcar salida
+                  </button>
+                ) : null
+            : undefined
+        }
+      />
+    );
   }
 
   if (enConsultaCuentas) {
