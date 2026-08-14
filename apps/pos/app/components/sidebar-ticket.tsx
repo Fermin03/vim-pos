@@ -131,6 +131,14 @@ export function SidebarTicket({
   const [notaOrdenAbierta, setNotaOrdenAbierta] = useState(false);
   const hayDescuento = descuentoMxn > 0;
   const totalFinal = totalConDescuento ?? totales.total;
+  /**
+   * Cuenta que NO se cobra aquí: Pick-up y Domicilio mandan a cocina y se cobran después,
+   * desde su pantalla de cuentas. En ese flujo la caja solo captura, así que se ocultan
+   * Cobrar, Descuento y Nota — el descuento y la nota se aplican al cobrar, y tenerlos aquí
+   * invita a "cobrar ahora" una orden que todavía no sale de cocina. De paso, quitar esa fila
+   * le devuelve alto a la lista de productos, que es lo que el cajero necesita ver.
+   */
+  const seCobraDespues = onEnviarCocinaAbierto != null;
 
   // Ancho del carrito: era fijo en 404px, y en una caja de 1024px se comía el 40% de la pantalla
   // dejando el catálogo apretado. Ahora escala (32vw) con topes: nunca menos de 320px —por debajo
@@ -366,6 +374,7 @@ export function SidebarTicket({
       </div>
 
       {/* ── Acciones secundarias ──────────────────────────────── */}
+      {!seCobraDespues && (
       <div className="flex flex-shrink-0 gap-2 px-5 pt-2">
         {/* F5.2b — diferido */}
         <button
@@ -386,6 +395,7 @@ export function SidebarTicket({
           {hayDescuento ? "Descuento aplicado" : "Descuento"}
         </button>
       </div>
+      )}
 
       {/* ── Pie: Cobrar + En espera ───────────────────────────── */}
       {/* Pie compactado (mockup: pt-4 pb-5, Cobrar py-18px). "Cobrar" conserva un alto cómodo para
@@ -404,14 +414,6 @@ export function SidebarTicket({
               {procesando ? "Enviando…" : (
                 <><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5"><path d="M3 11l19-9-9 19-2-8-8-2z" /></svg> Enviar a cocina</>
               )}
-            </button>
-            <button
-              type="button"
-              disabled={vacio || procesando}
-              onClick={onCobrar}
-              className="w-full rounded border border-line-strong bg-transparent px-5 py-[10px] text-[14px] font-semibold text-ink-2 transition-all hover:border-ink hover:text-ink disabled:cursor-default disabled:opacity-[.45]"
-            >
-              Cobrar ahora <span className="font-display tabular-nums">{fmtMxn(totalFinal)}</span>
             </button>
           </>
         ) : (
