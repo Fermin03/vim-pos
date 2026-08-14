@@ -23,7 +23,7 @@ export type CuentaAbierta = {
 export async function listarCuentasAbiertas(token: string, sucursalId: string, modo: ModoServicio): Promise<CuentaAbierta[]> {
   const { data, error } = await employeeClient(token)
     .from("tickets")
-    .select("id, folio_completo, total_mxn, monto_pendiente_mxn, fecha_apertura, estado_cocina, comanda_impresa_at, cliente:clientes(nombre), ticket_items(cantidad, cancelado)")
+    .select("id, folio_completo, total_mxn, monto_pendiente_mxn, fecha_apertura, estado_cocina, comanda_impresa_at, nombre_cliente, cliente:clientes(nombre), ticket_items(cantidad, cancelado)")
     .eq("sucursal_id", sucursalId)
     .eq("modo_servicio", modo)
     .eq("en_espera", false)
@@ -41,7 +41,8 @@ export async function listarCuentasAbiertas(token: string, sucursalId: string, m
     desdeIso: (t.fecha_apertura as string) ?? null,
     estadoCocina: String(t.estado_cocina ?? "SIN_ENVIAR"),
     impresaAt: (t.comanda_impresa_at as string) ?? null,
-    cliente: ((t.cliente as { nombre?: string } | null)?.nombre) ?? null,
+    // Cliente registrado (domicilio) manda; si no, el nombre suelto de Pick-up.
+    cliente: ((t.cliente as { nombre?: string } | null)?.nombre) ?? ((t.nombre_cliente as string) ?? null),
   }));
 }
 

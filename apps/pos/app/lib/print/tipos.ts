@@ -50,7 +50,7 @@ export type DatosEntrega = {
 export type DatosTicketImpresion = {
   negocio: { nombre: string; razonSocial: string | null; rfc: string | null; logoUrl: string | null };
   sucursal: { nombre: string; direccion: string | null; telefono: string | null };
-  meta: { folio: string; fechaIso: string; cajero: string; caja: string; modoServicio: string };
+  meta: { folio: string; fechaIso: string; cajero: string; caja: string; modoServicio: string; nombreCliente?: string | null };
   /** Datos del cliente para el repartidor. Solo se llena en DOMICILIO; null en el resto. */
   entrega: DatosEntrega | null;
   lineas: LineaImpresion[];

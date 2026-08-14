@@ -32,6 +32,8 @@ export type ExtrasCobro = {
   clienteId?: string | null;
   direccionEntregaId?: string | null;
   notaOrden?: string | null;
+  /** Pick-up: nombre suelto para identificar la cuenta (no es un cliente registrado). */
+  nombreCliente?: string | null;
 };
 
 type Op = Omit<OperacionOffline, "intentos">;
@@ -68,6 +70,7 @@ export function construirOpsCobro(
       modo_servicio: modoServicio,
       cliente_id: extras.clienteId ?? null,
       direccion_entrega_id: extras.direccionEntregaId ?? null,
+      nombre_cliente: extras.nombreCliente ?? null,
       nota_general: extras.notaOrden ?? null,
       nota_imprime_en_comanda: Boolean(extras.notaOrden),
       usuario_apertura_id: ctx.usuarioId,

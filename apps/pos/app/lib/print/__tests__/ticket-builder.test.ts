@@ -120,3 +120,22 @@ describe("construirTicketJob — datos de entrega (domicilio)", () => {
     expect(texto.some((v) => v.startsWith("Ref: "))).toBe(false);
   });
 });
+
+describe("construirTicketJob — nombre suelto de la cuenta (Pick-up)", () => {
+  it("imprime el nombre debajo del servicio, para identificar el pedido al entregarlo", () => {
+    const job = construirTicketJob({
+      ...DATOS,
+      meta: { ...DATOS.meta, modoServicio: "Pick-up", nombreCliente: "Juan" },
+    });
+    const filas = job.bloques.filter((b) => b.t === "fila") as { izq: string; der: string }[];
+    const i = filas.findIndex((f) => f.izq === "Cliente");
+    expect(i).toBeGreaterThan(-1);
+    expect(filas[i].der).toBe("Juan");
+    expect(filas[i - 1].izq).toBe("Servicio");
+  });
+
+  it("no imprime la fila cuando no se capturó nombre", () => {
+    const filas = construirTicketJob(DATOS).bloques.filter((b) => b.t === "fila") as { izq: string }[];
+    expect(filas.some((f) => f.izq === "Cliente")).toBe(false);
+  });
+});
