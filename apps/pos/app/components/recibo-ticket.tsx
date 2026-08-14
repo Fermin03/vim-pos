@@ -54,6 +54,23 @@ export function ReciboTicket({ datos }: { datos: DatosTicketImpresion }) {
         {datos.meta.modoServicio && <MetaRow label="Servicio:" value={datos.meta.modoServicio} />}
       </div>
 
+      {/* Datos de entrega (domicilio). Espejo exacto de construirTicketJob. */}
+      {datos.entrega && (
+        <>
+          <DividerDashed />
+          <div className="text-[11px] leading-[1.5]">
+            <div className="mb-1 bg-[#1A1A1A] px-1 py-[2px] text-center text-[10.5px] font-bold text-white">
+              DATOS DE ENTREGA
+            </div>
+            {datos.entrega.cliente && <div className="text-[14px] font-bold">{datos.entrega.cliente}</div>}
+            {datos.entrega.telefono && <div className="text-[14px] font-bold">Tel. {datos.entrega.telefono}</div>}
+            {datos.entrega.direccion && <div className="font-bold">{datos.entrega.direccion}</div>}
+            {datos.entrega.referencias && <div className="text-[10.5px]">Ref: {datos.entrega.referencias}</div>}
+            {datos.entrega.notasRepartidor && <div className="text-[10.5px]">Nota: {datos.entrega.notasRepartidor}</div>}
+          </div>
+        </>
+      )}
+
       <DividerDashed />
 
       {/* Items */}

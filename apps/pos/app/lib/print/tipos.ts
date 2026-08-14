@@ -38,10 +38,21 @@ export type PagoImpresion = {
   cambioMxn: number;
 };
 
+/** Lo que el repartidor necesita para llegar y para que le abran la puerta. */
+export type DatosEntrega = {
+  cliente: string | null;
+  telefono: string | null;
+  direccion: string | null;
+  referencias: string | null;
+  notasRepartidor: string | null;
+};
+
 export type DatosTicketImpresion = {
   negocio: { nombre: string; razonSocial: string | null; rfc: string | null; logoUrl: string | null };
   sucursal: { nombre: string; direccion: string | null; telefono: string | null };
   meta: { folio: string; fechaIso: string; cajero: string; caja: string; modoServicio: string };
+  /** Datos del cliente para el repartidor. Solo se llena en DOMICILIO; null en el resto. */
+  entrega: DatosEntrega | null;
   lineas: LineaImpresion[];
   totales: { subtotal: number; descuentos: number; iva: number; total: number; propina: number };
   pagos: PagoImpresion[];

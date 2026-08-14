@@ -1,6 +1,6 @@
 "use client";
 import { employeeClient } from "../supabase";
-import type { DatosTicketImpresion, LineaImpresion, PagoImpresion } from "./tipos";
+import type { DatosEntrega, DatosTicketImpresion, LineaImpresion, PagoImpresion } from "./tipos";
 
 const METODO_LABEL: Record<string, string> = {
   EFECTIVO: "Efectivo",
@@ -21,7 +21,7 @@ export async function leerTicketParaImpresion(ticketId: string, ctx: Ctx): Promi
 
   const { data: t, error: e1 } = await sb
     .from("tickets")
-    .select("folio_completo, modo_servicio, subtotal_mxn, descuentos_manuales_mxn, iva_mxn, total_mxn, propina_mxn, fecha_pago, created_at, sucursal_id, tenant_id")
+    .select("folio_completo, modo_servicio, cliente_id, direccion_entrega_id, subtotal_mxn, descuentos_manuales_mxn, iva_mxn, total_mxn, propina_mxn, fecha_pago, created_at, sucursal_id, tenant_id")
     .eq("id", ticketId)
     .single();
   if (e1 || !t) throw new Error(e1?.message ?? "Ticket no encontrado");
@@ -75,6 +75,13 @@ export async function leerTicketParaImpresion(ticketId: string, ctx: Ctx): Promi
     s.codigo_postal ? `CP ${s.codigo_postal}` : null,
   ].filter(Boolean).join(", ") || null;
 
+  // Datos de entrega: solo en domicilio. El repartidor necesita a quién buscar, dónde y con
+  // qué referencias; sin esto el ticket no le sirve para entregar. En los demás modos no se
+  // imprime —el cliente está enfrente y sus datos no tienen por qué salir en papel.
+  const entrega = tk.modo_servicio === "DELIVERY_PROPIO"
+    ? await leerEntrega(sb, tk.cliente_id as string | null, tk.direccion_entrega_id as string | null)
+    : null;
+
   const { data: ten } = await sb
     .from("tenants")
     .select("codigo, nombre_comercial, razon_social, rfc, logo_url")
@@ -92,6 +99,7 @@ export async function leerTicketParaImpresion(ticketId: string, ctx: Ctx): Promi
       caja: ctx.cajaNombre,
       modoServicio: MODO_LABEL[tk.modo_servicio as string] ?? (tk.modo_servicio as string) ?? "",
     },
+    entrega,
     lineas,
     totales: {
       subtotal: Number(tk.subtotal_mxn), descuentos: Number(tk.descuentos_manuales_mxn),
@@ -101,4 +109,50 @@ export async function leerTicketParaImpresion(ticketId: string, ctx: Ctx): Promi
     qrUrl: `https://factura.vimpos.mx/${tn.codigo ?? "negocio"}?folio=${tk.folio_completo ?? ""}`,
     ancho: 80,
   };
+}
+
+/** Cliente + dirección de entrega. Si algo falla, el ticket sale igual: entregar sin
+ *  referencias es peor que no imprimirlas, pero no imprimir NADA es peor todavía. */
+async function leerEntrega(
+  sb: ReturnType<typeof employeeClient>,
+  clienteId: string | null,
+  direccionId: string | null,
+): Promise<DatosEntrega | null> {
+  if (!clienteId && !direccionId) return null;
+
+  let cliente: string | null = null;
+  let telefono: string | null = null;
+  if (clienteId) {
+    const { data } = await sb
+      .from("clientes")
+      .select("nombre, apellido_paterno, apellido_materno, telefono")
+      .eq("id", clienteId)
+      .maybeSingle();
+    const c = (data ?? {}) as Record<string, string | null>;
+    cliente = [c.nombre, c.apellido_paterno, c.apellido_materno].filter(Boolean).join(" ") || null;
+    telefono = c.telefono ?? null;
+  }
+
+  let direccion: string | null = null;
+  let referencias: string | null = null;
+  let notasRepartidor: string | null = null;
+  if (direccionId) {
+    const { data } = await sb
+      .from("direcciones_cliente")
+      .select("calle, numero_exterior, numero_interior, colonia, ciudad, estado_geo, codigo_postal, referencias, notas_repartidor")
+      .eq("id", direccionId)
+      .maybeSingle();
+    const d = (data ?? {}) as Record<string, string | null>;
+    direccion = [
+      [d.calle, d.numero_exterior].filter(Boolean).join(" ") + (d.numero_interior ? ` int. ${d.numero_interior}` : ""),
+      d.colonia,
+      [d.ciudad, d.estado_geo].filter(Boolean).join(", "),
+      d.codigo_postal ? `CP ${d.codigo_postal}` : null,
+    ].map((x) => (x ?? "").trim()).filter(Boolean).join(", ") || null;
+    referencias = d.referencias ?? null;
+    notasRepartidor = d.notas_repartidor ?? null;
+  }
+
+  if (!cliente && !telefono && !direccion) return null;
+  return { cliente, telefono, direccion, referencias, notasRepartidor };
 }
