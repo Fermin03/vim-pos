@@ -51,6 +51,16 @@ export function ModalClienteDomicilio({
   const [buscando, setBuscando] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const debounce = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const campoBusqueda = useRef<HTMLInputElement | null>(null);
+
+  // Foco al buscador en cuanto aparece. `autoFocus` no basta: este modal se abre a la vez que
+  // se entra al catálogo (botón "Nueva orden"), y en esa transición el navegador puede dar el
+  // foco a otro elemento. Con el frame de espera el cajero teclea el teléfono sin tocar nada.
+  useEffect(() => {
+    if (modo !== "buscar") return;
+    const id = requestAnimationFrame(() => campoBusqueda.current?.focus());
+    return () => cancelAnimationFrame(id);
+  }, [modo]);
 
   // formulario cliente nuevo
   const [nombre, setNombre] = useState("");
@@ -137,7 +147,7 @@ export function ModalClienteDomicilio({
         </div>
       ) : modo === "buscar" ? (
         <>
-          <input autoFocus className={input} placeholder="Teléfono o nombre…" value={q} onChange={(e) => setQ(e.target.value)} />
+          <input ref={campoBusqueda} className={input} placeholder="Teléfono o nombre…" value={q} onChange={(e) => setQ(e.target.value)} />
           <div className="mt-3 max-h-[300px] overflow-y-auto">
             {buscando && <p className="py-3 text-center text-[13px] text-ink-3">Buscando…</p>}
             {!buscando && q.trim().length >= 2 && res.length === 0 && (
