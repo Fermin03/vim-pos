@@ -49,6 +49,7 @@ export async function persistirTicket(
   clienteId?: string | null,
   direccionEntregaId?: string | null,
   notaOrden?: string | null,
+  nombreCliente?: string | null,
 ): Promise<TotalesTicket> {
   const sb = employeeClient(ctx.token);
 
@@ -66,6 +67,12 @@ export async function persistirTicket(
   // Domicilio: persistir QUÉ dirección del cliente es la entrega (requiere cliente_id, ya puesto).
   if (direccionEntregaId && clienteId) {
     await sb.from("tickets").update({ direccion_entrega_id: direccionEntregaId }).eq("id", tid);
+  }
+
+  // Pick-up: nombre suelto para identificar la cuenta. Etiqueta del ticket, no un cliente
+  // registrado (no se toca `clientes` ni `cliente_id`).
+  if (nombreCliente?.trim()) {
+    await sb.from("tickets").update({ nombre_cliente: nombreCliente.trim().slice(0, 100) }).eq("id", tid);
   }
 
   // Nota de cocina de TODA la orden → tickets.nota_general (la lee el KDS y la comanda).

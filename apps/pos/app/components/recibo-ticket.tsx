@@ -52,6 +52,7 @@ export function ReciboTicket({ datos }: { datos: DatosTicketImpresion }) {
         <MetaRow label="Cajero:" value={datos.meta.cajero} />
         <MetaRow label="Caja:" value={datos.meta.caja} />
         {datos.meta.modoServicio && <MetaRow label="Servicio:" value={datos.meta.modoServicio} />}
+        {datos.meta.nombreCliente && <MetaRow label="Cliente:" value={datos.meta.nombreCliente} />}
       </div>
 
       {/* Datos de entrega (domicilio). Espejo exacto de construirTicketJob. */}

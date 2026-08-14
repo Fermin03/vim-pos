@@ -27,9 +27,11 @@ export type EstadoCarrito = {
   clienteDomicilio?: ClienteDomicilio | null;
   /** Nota de cocina de TODA la orden (va a tickets.nota_general). */
   notaOrden?: string | null;
+  /** Pick-up: nombre suelto para identificar la cuenta. NO es un cliente registrado. */
+  nombreCuenta?: string | null;
 };
 
-export const estadoInicial: EstadoCarrito = { modoServicio: "COMER_AQUI", lineas: [], clienteDomicilio: null, notaOrden: null };
+export const estadoInicial: EstadoCarrito = { modoServicio: "COMER_AQUI", lineas: [], clienteDomicilio: null, notaOrden: null, nombreCuenta: null };
 
 export type AccionCarrito =
   | { tipo: "agregar"; linea: LineaCarrito }
@@ -39,6 +41,7 @@ export type AccionCarrito =
   | { tipo: "cliente"; cliente: ClienteDomicilio | null }
   | { tipo: "nota_linea"; clientId: string; nota: string | null }
   | { tipo: "nota_orden"; nota: string | null }
+  | { tipo: "nombre_cuenta"; nombre: string | null }
   | { tipo: "cargar"; estado: EstadoCarrito }
   | { tipo: "limpiar" };
 
@@ -60,9 +63,11 @@ export function reducerCarrito(estado: EstadoCarrito, accion: AccionCarrito): Es
       return { ...estado, lineas: estado.lineas.filter((l) => l.clientId !== accion.clientId) };
     case "modo":
       // Al salir de Domicilio se limpia el cliente asociado.
-      return { ...estado, modoServicio: accion.modo, clienteDomicilio: accion.modo === "DELIVERY_PROPIO" ? estado.clienteDomicilio ?? null : null };
+      return { ...estado, modoServicio: accion.modo, clienteDomicilio: accion.modo === "DELIVERY_PROPIO" ? estado.clienteDomicilio ?? null : null, nombreCuenta: accion.modo === "DRIVE_THRU" ? estado.nombreCuenta ?? null : null };
     case "cliente":
       return { ...estado, clienteDomicilio: accion.cliente };
+    case "nombre_cuenta":
+      return { ...estado, nombreCuenta: accion.nombre };
     case "nota_linea":
       return {
         ...estado,
@@ -72,7 +77,7 @@ export function reducerCarrito(estado: EstadoCarrito, accion: AccionCarrito): Es
       return { ...estado, notaOrden: accion.nota };
     case "limpiar":
       // La nota de orden es de ESTE pedido: se limpia con él.
-      return { modoServicio: estado.modoServicio, lineas: [], clienteDomicilio: estado.clienteDomicilio ?? null, notaOrden: null };
+      return { modoServicio: estado.modoServicio, lineas: [], clienteDomicilio: estado.clienteDomicilio ?? null, notaOrden: null, nombreCuenta: null };
     default:
       return estado;
   }

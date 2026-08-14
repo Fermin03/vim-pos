@@ -21,7 +21,7 @@ export async function leerTicketParaImpresion(ticketId: string, ctx: Ctx): Promi
 
   const { data: t, error: e1 } = await sb
     .from("tickets")
-    .select("folio_completo, modo_servicio, cliente_id, direccion_entrega_id, subtotal_mxn, descuentos_manuales_mxn, iva_mxn, total_mxn, propina_mxn, fecha_pago, created_at, sucursal_id, tenant_id")
+    .select("folio_completo, modo_servicio, cliente_id, direccion_entrega_id, nombre_cliente, subtotal_mxn, descuentos_manuales_mxn, iva_mxn, total_mxn, propina_mxn, fecha_pago, created_at, sucursal_id, tenant_id")
     .eq("id", ticketId)
     .single();
   if (e1 || !t) throw new Error(e1?.message ?? "Ticket no encontrado");
@@ -98,6 +98,7 @@ export async function leerTicketParaImpresion(ticketId: string, ctx: Ctx): Promi
       cajero: ctx.cajeroNombre,
       caja: ctx.cajaNombre,
       modoServicio: MODO_LABEL[tk.modo_servicio as string] ?? (tk.modo_servicio as string) ?? "",
+      nombreCliente: (tk.nombre_cliente as string) ?? null,
     },
     entrega,
     lineas,

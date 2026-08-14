@@ -34,6 +34,8 @@ export function construirTicketJob(d: DatosTicketImpresion, logo?: Bloque | null
   b.push({ t: "fila", izq: "Cajero", der: d.meta.cajero });
   b.push({ t: "fila", izq: "Caja", der: d.meta.caja });
   if (d.meta.modoServicio) b.push({ t: "fila", izq: "Servicio", der: d.meta.modoServicio });
+  // Nombre suelto de la cuenta (Pick-up): es como se identifica el pedido al entregarlo.
+  if (d.meta.nombreCliente) b.push({ t: "fila", izq: "Cliente", der: d.meta.nombreCliente, bold: true });
 
   // 2.b Datos de entrega (solo domicilio). Va ANTES de los productos y en tamaño grande:
   //      el repartidor lee la dirección de un vistazo, sin buscarla entre los renglones.

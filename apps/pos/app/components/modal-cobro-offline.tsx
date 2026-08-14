@@ -56,6 +56,7 @@ export function ModalCobroOffline({
           clienteId: carrito.clienteDomicilio?.clienteId ?? null,
           direccionEntregaId: carrito.clienteDomicilio?.direccionId ?? null,
           notaOrden: carrito.notaOrden ?? null,
+          nombreCliente: carrito.nombreCuenta ?? null,
         },
       );
       setListo(true);
