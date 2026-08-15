@@ -1,8 +1,7 @@
 "use client";
-import { useEffect, useState, type ReactNode } from "react";
+import type { ReactNode } from "react";
 import { useReloj } from "./topbar-pos";
-import { fmtMxn, type DatosCaja, type Turno } from "../lib/turno";
-import { leerReporteX } from "../lib/cierre";
+import type { DatosCaja, Turno } from "../lib/turno";
 import type { Empleado } from "../lib/supabase";
 
 /**
@@ -25,7 +24,6 @@ export function PantallaInicio({
   nCuentasPickup,
   nCuentasDomicilio,
   nEnEspera,
-  token,
   online = true,
   onComedor,
   onParaLlevar,
@@ -47,7 +45,6 @@ export function PantallaInicio({
   nCuentasPickup: number;
   nCuentasDomicilio: number;
   nEnEspera: number;
-  token: string;
   /** Estado de red, para la barra de estado inferior (la caja opera igual sin internet). */
   online?: boolean;
   onComedor: () => void;
@@ -63,25 +60,10 @@ export function PantallaInicio({
   onMenu: () => void;
 }) {
   const ahora = useReloj();
-  const [ventaTurno, setVentaTurno] = useState<number | null>(null);
-
   // Sin turno abierto no hay dónde colgar un ticket (tickets.turno_id es obligatorio), así que
   // vender queda bloqueado hasta abrirlo: los accesos de venta salen apagados y "Abrir turno"
   // toma el lugar de "Cerrar turno".
   const sinTurno = turno === null;
-
-  useEffect(() => {
-    if (!turno) { setVentaTurno(null); return; }
-    let vivo = true;
-    const cargar = () => {
-      leerReporteX(token, turno.id)
-        .then((x) => { if (vivo) setVentaTurno(x.ventaNeta); })
-        .catch(() => { /* el monitor da el detalle y el error; aquí es solo un vistazo */ });
-    };
-    cargar();
-    const id = setInterval(cargar, 30000);
-    return () => { vivo = false; clearInterval(id); };
-  }, [token, turno]);
 
   return (
     <main className="flex h-screen flex-col bg-bg">
@@ -195,13 +177,12 @@ export function PantallaInicio({
               <span className="absolute bottom-[14%] right-[14%] h-[7%] w-[7%] rounded-full bg-accent" aria-hidden="true" />
             </div>
           )}
+          {/* Solo el nombre del negocio. La venta del turno NO se muestra aquí: la pantalla de
+              inicio está a la vista de clientes y de cualquiera que pase por el mostrador, y
+              cuánto ha vendido el local no es información para ellos. Sigue disponible bajo
+              demanda en "Monitor ventas" y en el corte X, que sí exigen entrar a verlos. */}
           <div className="text-center">
             <div className="font-display text-[clamp(1.25rem,3.6vh,2rem)] font-bold tracking-tight">{caja.negocioNombre}</div>
-            {!sinTurno && ventaTurno !== null && (
-              <div className="mt-0.5 text-[clamp(0.75rem,1.5vh,0.9rem)] text-ink-3">
-                Venta del turno · <b className="font-semibold text-ink-2 tabular-nums">{fmtMxn(ventaTurno)}</b>
-              </div>
-            )}
           </div>
         </div>
       </div>

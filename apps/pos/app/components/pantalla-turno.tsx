@@ -78,7 +78,6 @@ export function PantallaTurno({
     if (!abriendoTurno) {
       return (
         <PantallaInicio
-          token={token}
           caja={caja}
           turno={null}
           empleado={empleado}
