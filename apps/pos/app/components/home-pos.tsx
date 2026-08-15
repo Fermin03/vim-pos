@@ -55,7 +55,7 @@ import { listarTicketsEnEspera, ponerTicketEnEspera, retomarTicketEnEspera } fro
 import { ModalEtiquetaEspera, ModalListaEspera } from "./modal-espera";
 import { leerItemsPersistidos, type ItemTicket } from "../lib/cancelacion";
 import { abrirCuentaEnMesa, agregarItemAlTicket, reconstruirCarrito } from "../lib/cuenta-mesa";
-import { atribuirMesero, enviarACocina, leerEstadoCocina } from "../lib/mesero";
+import { atribuirMesero, contarPendientesCocina, enviarACocina } from "../lib/mesero";
 import { useConexion } from "../lib/conexion";
 import { cacheGet, cachePut, contarPendientes } from "../lib/outbox";
 import { sincronizar } from "../lib/sync";
@@ -230,6 +230,9 @@ export function HomePos({
       ]);
       dispatch({ tipo: "cargar", estado: { modoServicio: recon.modoServicio, lineas: recon.lineas } });
       setTicketBd(bd);
+      // Un renglón agregado después del primer envío deja el botón habilitado otra vez: si no,
+      // lo nuevo se queda sin mandar y la cocina nunca se entera.
+      contarPendientesCocina(token, tId).then((n) => setCocinaEnviada(n === 0)).catch(() => {});
       setItemsPersistidos(items);
       // Aviso si la reconstrucción no cuadra (producto fuera de catálogo): el total es autoritativo.
       if (items.length > recon.lineas.length) {
@@ -302,7 +305,7 @@ export function HomePos({
       setEnPickup(false);
       setEnDelivery(false);
       // B1 — saber si la mesa ya fue enviada a cocina (para el botón).
-      leerEstadoCocina(token, ticketId).then((ec) => setCocinaEnviada(ec !== null && ec !== "SIN_ENVIAR")).catch(() => {});
+      contarPendientesCocina(token, ticketId).then((n) => setCocinaEnviada(n === 0)).catch(() => {});
     } catch (e) {
       setError(e instanceof Error ? e.message : "No se pudo cargar la cuenta");
     }
@@ -332,7 +335,8 @@ export function HomePos({
    * ticket que acaba de salir por la misma impresora; aquí no hay nada que duplicar, y en un
    * local de una sola impresora la comanda debe salir igual.
    */
-  const imprimirComandaCocina = useCallback(async (ticketId: string) => {
+  const imprimirComandaCocina = useCallback(async (ticketId: string, soloItems: string[], esAgregado: boolean) => {
+    if (soloItems.length === 0) return; // nada nuevo que mandar: no se gasta papel
     try {
       const datos = await leerTicketParaImpresion(ticketId, {
         token, cajeroNombre: empleado.nombre, cajaNombre: caja.nombre,
@@ -344,9 +348,12 @@ export function HomePos({
         caja: datos.meta.caja,
         fechaIso: datos.meta.fechaIso,
         cliente: datos.entrega?.cliente ?? datos.meta.nombreCliente ?? null,
-        lineas: datos.lineas.map((l) => ({
-          cantidad: l.cantidad, nombre: l.nombre, modificadores: l.modificadores, notaCocina: l.notaCocina,
-        })),
+        esAgregado,
+        lineas: datos.lineas
+          .filter((l) => soloItems.includes(l.id))
+          .map((l) => ({
+            cantidad: l.cantidad, nombre: l.nombre, modificadores: l.modificadores, notaCocina: l.notaCocina,
+          })),
         ancho: 80,
       };
       // onMostrar vacío: si la estación de cocina no está configurada (adaptador de preview) no
@@ -366,15 +373,16 @@ export function HomePos({
     setEnviandoCocina(true);
     setError(null);
     try {
-      await enviarACocina(token, ticketBd.ticketId);
+      const yaEstaba = cocinaEnviada;
+      const enviados = await enviarACocina(token, ticketBd.ticketId);
       setCocinaEnviada(true);
-      await imprimirComandaCocina(ticketBd.ticketId);
+      await imprimirComandaCocina(ticketBd.ticketId, enviados, yaEstaba);
     } catch (e) {
       setError(e instanceof Error ? e.message : "No se pudo enviar a cocina");
     } finally {
       setEnviandoCocina(false);
     }
-  }, [token, ticketBd, imprimirComandaCocina]);
+  }, [token, ticketBd, cocinaEnviada, imprimirComandaCocina]);
 
   /** Persiste el ticket si aún no existe; abre el modal de descuento sobre ese ticket. */
   const onAplicarDescuento = useCallback(async () => {
@@ -499,8 +507,8 @@ export function HomePos({
           carrito.nombreCuenta ?? null,
         );
       }
-      await enviarACocina(token, bd.ticketId);
-      await imprimirComandaCocina(bd.ticketId);
+      const enviados = await enviarACocina(token, bd.ticketId);
+      await imprimirComandaCocina(bd.ticketId, enviados, cocinaEnviada);
       dispatch({ tipo: "limpiar" });
       setTicketBd(null);
       setItemsPersistidos([]);
@@ -509,7 +517,7 @@ export function HomePos({
     } finally {
       setProcesandoCobro(false);
     }
-  }, [carrito, ticketBd, token, caja.sucursal_id, turno.caja_id, turno.id]);
+  }, [carrito, ticketBd, token, caja.sucursal_id, turno.caja_id, turno.id, cocinaEnviada, imprimirComandaCocina]);
 
   /** Logo del negocio listo para la térmica. Se rasteriza al vuelo (es rápido y evita
    *  guardar estado que se desincronice si cambian el logo desde el panel). Si no hay logo

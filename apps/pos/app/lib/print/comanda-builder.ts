@@ -15,6 +15,8 @@ export type DatosComanda = {
   fechaIso: string;
   /** A nombre de quién va (Pick-up / domicilio). Cocina lo necesita para rotular la bolsa. */
   cliente?: string | null;
+  /** true si el pedido ya estaba en cocina y esto es un agregado posterior. */
+  esAgregado?: boolean;
   lineas: LineaComanda[];
   ancho: 58 | 80;
 };
@@ -36,6 +38,9 @@ export function construirComandaJob(d: DatosComanda): PrintJob {
 
   const b: Bloque[] = [];
   b.push({ t: "texto", valor: d.modoServicio.toUpperCase(), align: "centro", size: 3, bold: true, invertido: true });
+  // Sin este aviso la cocina no distingue una comanda nueva de un agregado y vuelve a preparar
+  // el pedido entero. Va pegado al encabezado, antes que cualquier producto.
+  if (d.esAgregado) b.push({ t: "texto", valor: "*** AGREGADO A LA ORDEN ***", align: "centro", size: 2, bold: true });
   b.push({ t: "separador", estilo: "punteado" });
 
   b.push({ t: "fila", izq: "Orden", der: `#${folioCorto}`, bold: true });

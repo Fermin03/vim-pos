@@ -79,3 +79,18 @@ describe("construirComandaJob — a nombre de quién", () => {
     expect(filas.some((f) => f.izq === "Cliente")).toBe(false);
   });
 });
+
+describe("construirComandaJob — agregado a una orden en curso", () => {
+  it("avisa que es un agregado, antes de cualquier producto", () => {
+    const b = construirComandaJob({ ...D, esAgregado: true }).bloques;
+    const iAviso = b.findIndex((x) => x.t === "texto" && (x as { valor: string }).valor.includes("AGREGADO"));
+    const iProducto = b.findIndex((x) => x.t === "texto" && (x as { valor: string }).valor.includes("Hamburguesa"));
+    expect(iAviso).toBeGreaterThan(-1);
+    expect(iAviso).toBeLessThan(iProducto);
+  });
+
+  it("no lo avisa en la primera comanda: ahí no hay nada previo que la cocina confunda", () => {
+    const hay = construirComandaJob(D).bloques.some((x) => x.t === "texto" && (x as { valor: string }).valor.includes("AGREGADO"));
+    expect(hay).toBe(false);
+  });
+});
