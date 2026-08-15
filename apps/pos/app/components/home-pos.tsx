@@ -686,7 +686,6 @@ export function HomePos({
     return (
       <>
         <PantallaInicio
-          token={token}
           caja={caja}
           turno={turno}
           empleado={empleado}
