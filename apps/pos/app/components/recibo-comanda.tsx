@@ -22,6 +22,12 @@ export function ReciboComanda({ datos }: { datos: DatosComanda }) {
         {datos.modoServicio.toUpperCase()}
       </div>
 
+      {datos.esAgregado && (
+        <div className="mt-2 px-[18px] text-center font-sans text-[15px] font-extrabold tracking-wide">
+          *** AGREGADO A LA ORDEN ***
+        </div>
+      )}
+
       {/* Orden + Hora */}
       <div className="mt-3 flex items-end justify-between px-[18px]">
         <div className="font-sans text-[15px] font-bold leading-none">

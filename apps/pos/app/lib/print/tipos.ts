@@ -24,6 +24,8 @@ export type PrintResult = { ok: true } | { ok: false; motivo: "SIN_PAPEL" | "OFF
 
 // ── Datos planos para construir el ticket (sin dependencia de Supabase) ──
 export type LineaImpresion = {
+  /** id del ticket_item; permite imprimir solo ciertos renglones (comanda de agregado). */
+  id: string;
   cantidad: number;
   nombre: string;
   totalMxn: number;
