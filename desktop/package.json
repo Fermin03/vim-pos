@@ -1,6 +1,6 @@
 {
   "name": "vim-pos-desktop",
-  "version": "0.4.14",
+  "version": "0.4.15",
   "private": true,
   "type": "module",
   "description": "Fase 1 — VIM POS de escritorio local-first: Postgres embebido + PostgREST + gateway compatible con Supabase + auth PIN local, empaquetado en Electron.",
@@ -26,7 +26,8 @@
     "verify:robustez3": "node src/verify-robustez3.mjs",
     "verify:updater": "node src/verify-updater.mjs",
     "dist": "npm run build:ui && npm run build:kds-ui && node scripts/dist.mjs",
-    "verify:concurrencia": "node src/verify-concurrencia.mjs"
+    "verify:concurrencia": "node src/verify-concurrencia.mjs",
+    "verify:electron": "electron src/verify-electron.mjs"
   },
   "dependencies": {
     "embedded-postgres": "17.10.0-beta.17",
@@ -34,7 +35,7 @@
     "pg": "^8.13.1"
   },
   "devDependencies": {
-    "electron": "^33.2.1",
+    "electron": "^43.4.0",
     "electron-builder": "^26.15.3"
   },
   "build": {
