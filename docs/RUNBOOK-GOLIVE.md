@@ -26,7 +26,20 @@ Cyber-Neo aplicado (RLS, headers, CORS allowlist, fixture gate, .npmrc).
 - [ ] **Generar secretos nuevos y fuertes** (NO reutilizar los de dev):
   - `SUPABASE_SERVICE_ROLE_KEY`, `SUPABASE_JWT_SECRET` (del dashboard del proyecto cloud).
   - `PLATFORM_PROVISION_KEY` = `openssl rand -hex 32`.
-- [ ] `supabase secrets set VIM_JWT_SECRET=<jwt secret> FACTURAPI_API_KEY=<...> PLATFORM_PROVISION_KEY=<...> VIM_CORS_ORIGINS="https://pos.vimpos.mx,https://admin.vimpos.mx,https://app.vimpos.mx"`
+- [ ] `supabase secrets set VIM_JWT_SECRET=<jwt secret> FACTURAPI_API_KEY=<...> PLATFORM_PROVISION_KEY=<...> VIM_CORS_ORIGINS="https://pos.vimpos.com.mx,https://admin.vimpos.com.mx,https://platform.vimpos.com.mx"`
+
+  > **Dominios (verificado 17 ago 2026).** El dominio comprado es **`vimpos.com.mx`**, no
+  > `vimpos.mx` — este runbook decía `vimpos.mx` y ninguno de esos tres hosts resuelve. La
+  > tercera app además no es `app.`, es `platform.`. Los que responden 200 hoy:
+  >
+  > | App | Host |
+  > |---|---|
+  > | POS | `https://pos.vimpos.com.mx` |
+  > | Admin | `https://admin.vimpos.com.mx` |
+  > | Plataforma | `https://platform.vimpos.com.mx` |
+  >
+  > Importa más que un typo: si `VIM_CORS_ORIGINS` se fija con los hosts viejos, las Edge
+  > Functions rechazan a las apps reales y el POS deja de poder llamarlas.
 - [ ] `.env.local` de cada app (pos/admin/platform) con las públicas (URL + anon) y, para platform, las secretas server-side.
 - [ ] **Rotar** cualquier secreto que haya tocado disco en dev (CN del reporte cyber-neo).
 
@@ -76,7 +89,9 @@ Cyber-Neo aplicado (RLS, headers, CORS allowlist, fixture gate, .npmrc).
 - [ ] **Tablet Android** para la caja (o monitor para el navegador del POS).
 - [ ] **Pantalla de cocina** para el KDS (`Cocina` en la topbar del POS → tablero P-107).
 - [ ] Red estable en el local (el POS hoy es online; offline robusto es F16).
-- [ ] Dominios + TLS: `pos.vimpos.mx`, `admin.vimpos.mx`, `app.vimpos.mx` (o subdominios por tenant).
+- [x] Dominios + TLS: `pos.vimpos.com.mx`, `admin.vimpos.com.mx`, `platform.vimpos.com.mx`
+      (o subdominios por tenant). Los tres responden 200 con TLS (verificado 17 ago 2026).
+      El apex `vimpos.com.mx` todavía sirve la página por defecto del hosting — pendiente.
 
 ## 8. Checklist de smoke E2E en producción (antes de abrir caja real)
 

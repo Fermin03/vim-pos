@@ -1,6 +1,6 @@
 // SEC CN-004 (Cyber Neo) — CORS por-request con allowlist.
 // Configuración de prod:
-//   supabase secrets set VIM_CORS_ORIGINS="https://pos.vimpos.mx,https://admin.vimpos.mx"
+//   supabase secrets set VIM_CORS_ORIGINS="https://pos.vimpos.com.mx,https://admin.vimpos.com.mx,https://platform.vimpos.com.mx"
 // Solo esos orígenes reciben su propio Origin reflejado; el resto recibe el primero (no su
 // Origin) → el navegador bloquea la lectura.
 //

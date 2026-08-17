@@ -14,6 +14,7 @@ import { pullFromCloud } from "./sync-pull.mjs";
 import { pushToCloud } from "./sync-push.mjs";
 import { respaldar } from "./backup.mjs";
 import { crearWatchdog } from "./watchdog.mjs";
+import { crearCicloSync } from "./sync-ciclo.mjs";
 import { buscarActualizacion, descargarInstalador } from "./updater.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -240,7 +241,7 @@ async function bootCaja() {
   // Watchdog: si Postgres/PostgREST se caen, reinicia el backend solo (auto-recuperación).
   watchdog = crearWatchdog({ url: backend.url, alReiniciar: reiniciarBackend, log: (m) => console.log("· [watchdog]", m) });
 
-  syncBestEffort().catch(() => {});
+  iniciarSync();
   revisarActualizacion().catch(() => {}); // best-effort, no bloquea
 }
 
@@ -424,35 +425,69 @@ async function ofrecerInstalar() {
   }
 }
 
-/** Sincroniza con la nube: PULL (referencia ↓) + PUSH (ventas ↑). Gated por env; best-effort. */
-async function syncBestEffort() {
+/**
+ * Sincroniza con la nube: PULL (referencia ↓) + PUSH (ventas ↑). Gated por env; best-effort.
+ *
+ * Devuelve true si el PUSH llegó a ejecutarse. El ciclo periódico lo usa para decidir si
+ * reintenta antes de tiempo: sin este dato, un corte de red dejaba las ventas en tierra hasta
+ * el siguiente arranque de la app y nadie se enteraba.
+ *
+ * `conPull` permite subir sin volver a bajar el catálogo. El PULL reescribe productos, precios
+ * y permisos; hacerlo cada 10 minutos es churn innecesario sobre la base de una caja que está
+ * cobrando, mientras que subir las ventas cuanto antes sí urge.
+ */
+async function syncBestEffort({ conPull = true } = {}) {
   // Del env o de lo persistido al vincular la caja (ver vincularConNube).
   const nube = leerNube();
-  if (!nube) { console.log("· [sync] omitido (esta caja aún no se ha vinculado con la nube)"); return; }
+  if (!nube) { console.log("· [sync] omitido (esta caja aún no se ha vinculado con la nube)"); return false; }
   const { cloudUrl, anon, email, pass } = nube;
-  if (!cloudUrl || !anon || !email || !pass) { console.log("· [sync] omitido (configuración de nube incompleta)"); return; }
+  if (!cloudUrl || !anon || !email || !pass) { console.log("· [sync] omitido (configuración de nube incompleta)"); return false; }
   try {
     const r = await fetch(`${cloudUrl}/auth/v1/token?grant_type=password`, {
       method: "POST", headers: { apikey: anon, "Content-Type": "application/json" },
       body: JSON.stringify({ email, password: pass }),
     });
     const s = await r.json();
-    if (!s.access_token) { console.log("· [sync] omitido (login de dispositivo en la nube falló)"); return; }
+    if (!s.access_token) { console.log("· [sync] omitido (login de dispositivo en la nube falló)"); return false; }
     const deviceToken = s.access_token;
     const opts = { cloudUrl, anonKey: anon, deviceToken };
-    try {
-      console.log("· [sync] PULL: bajando rebanada del tenant…");
-      const rp = await pullFromCloud(backend.pool, opts, (m) => console.log("· [sync]", m));
-      console.log(`· [sync] PULL OK: ${Object.keys(rp).length} tablas`);
-    } catch (e) { console.log("· [sync] PULL omitido:", e.message); }
+    if (conPull) {
+      try {
+        console.log("· [sync] PULL: bajando rebanada del tenant…");
+        const rp = await pullFromCloud(backend.pool, opts, (m) => console.log("· [sync]", m));
+        console.log(`· [sync] PULL OK: ${Object.keys(rp).length} tablas`);
+      } catch (e) { console.log("· [sync] PULL omitido:", e.message); }
+    }
     try {
       console.log("· [sync] PUSH: subiendo ventas offline…");
       const rs = await pushToCloud(backend.pool, opts, (m) => console.log("· [sync]", m));
       console.log(`· [sync] PUSH OK: ${rs.subidos} ventas subidas`);
-    } catch (e) { console.log("· [sync] PUSH omitido:", e.message); }
+      return true;
+    } catch (e) { console.log("· [sync] PUSH omitido:", e.message); return false; }
   } catch (e) {
     console.log("· [sync] best-effort omitido:", e.message);
+    return false;
   }
+}
+
+// ── Ciclo de sincronización ──────────────────────────────────────────────────
+// Antes solo se sincronizaba al arrancar la app. Un restaurante que no apaga la computadora
+// —lo normal— no volvía a subir una venta en toda la semana: quedaban únicamente en el disco
+// local, sin respaldo en la nube y sin aparecer en el panel del dueño.
+// La política (ritmo, backoff, no solaparse, cada cuánto toca PULL) vive en sync-ciclo.mjs,
+// que se puede probar sin Electron.
+const ciclo = crearCicloSync({
+  ejecutar: ({ conPull }) => syncBestEffort({ conPull }),
+  log: (m) => console.log("· [sync]", m),
+});
+
+/** Arranca el ciclo: una sincronización completa ya, y de ahí en adelante cada 10 minutos. */
+function iniciarSync() {
+  ciclo.iniciar();
+}
+
+function detenerSync() {
+  ciclo.detener();
 }
 
 let cerrando = false;
@@ -460,6 +495,7 @@ let cerrando = false;
 async function cerrarTodo() {
   if (cerrando) return;
   cerrando = true;
+  try { detenerSync(); } catch { /* */ }
   try { watchdog?.stop(); } catch { /* */ }
   try { if (uiServer) uiServer.close(); } catch { /* */ }
   try {
