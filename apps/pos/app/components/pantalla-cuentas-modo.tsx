@@ -73,7 +73,8 @@ export function PantallaCuentasModo({
   /** Abre una cuenta NUEVA en este modo (entra al catálogo con el modo ya fijado). */
   onAbrirCuenta: () => void;
   /** Carga la cuenta en el carrito para agregarle productos (sale a la pantalla de venta). */
-  onAgregarProductos: (ticketId: string) => void;
+  /** El folio viaja para que el modal pueda titularse sin volver a consultarlo. */
+  onAgregarProductos: (ticketId: string, folio: string | null) => void;
   /** Carga la cuenta y abre el cobro. */
   onCobrar: (ticketId: string) => void;
   /** Imprime el ticket del cliente de esa cuenta. */
@@ -246,7 +247,7 @@ export function PantallaCuentasModo({
                   <div className="truncate font-display text-[16px] font-semibold">{sel.cliente ?? sel.folio ?? "Cuenta"}</div>
                   <div className="text-[12px] text-ink-3">{sel.folio ? `${sel.folio} · ` : ""}{fmtMxn(sel.total)}</div>
                 </div>
-                <Accion label="Agregar producto" onClick={() => onAgregarProductos(sel.ticketId)} />
+                <Accion label="Agregar producto" onClick={() => onAgregarProductos(sel.ticketId, sel.folio)} />
                 <Accion label={hayDescuento ? "Descuento aplicado" : "Descuento"} onClick={() => setDescontando(true)} inactivo={hayDescuento} />
                 <Accion label={yaSeImprimio ? "Reimprimir" : "Imprimir ticket"} onClick={() => (yaSeImprimio ? setPidiendoPinReimpresion(true) : imprimir(sel.ticketId))} ocupado={imprimiendo} />
                 {extraPorCuenta?.(sel, recargar)}
