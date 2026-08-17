@@ -44,6 +44,10 @@ export function crearCicloSync({
   let detenido = false;
   let fallos = 0;
   let ciclos = 0;
+  // Último resultado, para que la caja pueda MOSTRARLE al cajero si sus ventas están subiendo.
+  // Sin esto solo lo sabe el log, que nadie abre.
+  let ultimoOkIso = null;
+  let ultimoIntentoIso = null;
 
   function programar(ms) {
     if (timer) clearTimeoutFn(timer);
@@ -68,6 +72,8 @@ export function crearCicloSync({
     } finally {
       enCurso = false;
     }
+    ultimoIntentoIso = new Date().toISOString();
+    if (ok) ultimoOkIso = ultimoIntentoIso;
     fallos = ok ? 0 : fallos + 1;
     const espera = esperaSiguiente(fallos, { cadaMs, reintentoMs });
     if (!ok) log(`reintento en ${Math.round(espera / 60000)} min (fallo ${fallos})`);
@@ -78,7 +84,14 @@ export function crearCicloSync({
     /** Sincroniza ya y deja el ciclo corriendo. */
     iniciar() { detenido = false; tick().catch(() => {}); },
     detener() { detenido = true; if (timer) clearTimeoutFn(timer); timer = null; },
-    /** Solo para pruebas/diagnóstico. */
-    estado() { return { fallos, ciclos, enCurso, detenido, armado: timer !== null }; },
+    /** Estado para diagnóstico y para la barra del POS. */
+    estado() {
+      return {
+        fallos, ciclos, enCurso, detenido, armado: timer !== null,
+        ultimaSincronizacion: ultimoOkIso,
+        ultimoIntento: ultimoIntentoIso,
+        sincronizando: enCurso,
+      };
+    },
   };
 }

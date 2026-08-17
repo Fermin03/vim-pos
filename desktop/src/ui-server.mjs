@@ -142,6 +142,15 @@ export async function startUiServer(dir, port, gatewayPort = 54350, host = "0.0.
 
   const server = http.createServer(async (req, res) => {
     try {
+      // Estado de sincronización, para que el POS pueda avisarle al cajero si sus ventas
+      // llevan días sin subir. Va por HTTP y no por IPC de Electron a propósito: la 2ª caja y
+      // la cocina cargan la interfaz desde este mismo servidor y no tienen preload.
+      // Solo lectura y sin datos sensibles: nombres de fechas, nada del negocio.
+      if (!kds && req.method === "GET" && req.url.startsWith("/__estado-sync")) {
+        res.writeHead(200, { "Content-Type": "application/json", "Cache-Control": "no-store" });
+        return res.end(JSON.stringify(opts.estadoSync ? opts.estadoSync() : { disponible: false }));
+      }
+
       // COCINA: recibir la IP del hub desde la pantalla de setup.
       if (kds && req.method === "POST" && req.url.startsWith("/__set-hub")) {
         if (!mismaProcedencia(req, port)) {

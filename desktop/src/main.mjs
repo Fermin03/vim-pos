@@ -230,6 +230,7 @@ async function bootCaja() {
       onActualizar: () => buscarActualizacionManual(),
       onImprimir: (p) => imprimirRaw(p),
       onVincularNube: (p) => vincularConNube(p),
+      estadoSync: () => ({ disponible: true, vinculada: leerNube() !== null, ...ciclo.estado() }),
     });
     posUrl = `http://localhost:${UI_PORT}`;
     console.log(`· [ui] POS servido offline desde ${posUrl} · KDS/2ª caja en la LAN: http://${backend.lanIp}:${UI_PORT}`);

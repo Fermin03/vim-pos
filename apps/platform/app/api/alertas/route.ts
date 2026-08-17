@@ -9,11 +9,16 @@ import { autorizar } from "../../lib/server";
  * son cosas que solo se descubren si alguien las busca — y en un SaaS de un solo operador nadie
  * las busca hasta que el cliente llama enojado. Esto las trae al frente, ordenadas por urgencia.
  *
- * La señal de vida de un cliente es LA ÚLTIMA VENTA QUE LLEGÓ A LA NUBE, no un "last seen":
- * `cajas.ultima_conexion` está declarada desde la migración 0003 pero ningún código la escribe,
- * y `sync_eventos` no lo llena el push del escritorio. El ticket sí sube, así que su fecha es lo
- * único que prueba a la vez que el negocio opera y que la sincronización funciona — que son
- * justo las dos formas de perder a un cliente sin enterarse.
+ * Se distinguen DOS problemas que parecen el mismo:
+ *
+ *   · Caja muda  — hace días que no sincroniza. Urge aunque el negocio esté cerrado: significa
+ *                  que sus ventas viven solo en esa computadora y el respaldo dejó de existir.
+ *   · Sin ventas — sincroniza al día, pero no vende. Es información de negocio, no una falla.
+ *
+ * Antes se confundían porque solo se miraba la fecha del último ticket. Desde la migración 0070
+ * `sync_push_snapshot` deja rastro en `sync_eventos`, así que se sabe cuándo reportó la caja
+ * aunque no haya vendido nada. Para quien todavía no tiene ni un evento —cajas sin actualizar—
+ * se cae al criterio viejo, que no da falsos positivos aunque sea menos preciso.
  */
 
 export type Severidad = "critica" | "alta" | "media";
@@ -60,7 +65,7 @@ export async function GET(req: Request) {
   const nombreDe = new Map(tenants.map((t) => [t.id, t.nombre_comercial]));
   const activos = new Set(tenants.filter((t) => t.estado !== "CANCELADO" && t.estado !== "BAJA").map((t) => t.id));
 
-  const [cajasRes, subsRes, foliosRes, onbRes, ventasRes] = await Promise.all([
+  const [cajasRes, subsRes, foliosRes, onbRes, ventasRes, syncRes] = await Promise.all([
     sb.from("cajas").select("id, nombre, tenant_id, activa, bloqueada, bloqueo_motivo").is("deleted_at", null).limit(2000),
     sb.from("suscripciones").select("tenant_id, estado, fecha_fin, proxima_fecha_cobro, precio_mensual_mxn").limit(1000),
     sb.from("tenant_folios_saldo").select("tenant_id, folios_base_mensuales, folios_base_consumidos, saldo_paquetes, umbral_alerta").limit(1000),
@@ -68,11 +73,18 @@ export async function GET(req: Request) {
     // Una sola pasada por los tickets recientes: basta la fecha más nueva por tenant.
     sb.from("tickets").select("tenant_id, created_at").is("deleted_at", null)
       .order("created_at", { ascending: false }).limit(5000),
+    sb.from("sync_eventos").select("tenant_id, fecha_recepcion, operaciones_error")
+      .order("fecha_recepcion", { ascending: false }).limit(2000),
   ]);
 
   const ultimaVenta = new Map<string, string>();
   for (const t of (ventasRes.data ?? []) as { tenant_id: string; created_at: string }[]) {
     if (!ultimaVenta.has(t.tenant_id)) ultimaVenta.set(t.tenant_id, t.created_at);
+  }
+
+  const ultimoSync = new Map<string, string>();
+  for (const e of (syncRes.data ?? []) as { tenant_id: string; fecha_recepcion: string }[]) {
+    if (!ultimoSync.has(e.tenant_id)) ultimoSync.set(e.tenant_id, e.fecha_recepcion);
   }
 
   const alertas: Alerta[] = [];
@@ -115,20 +127,37 @@ export async function GET(req: Request) {
       }
       continue;
     }
+    const diasSync = diasDesde(ultimoSync.get(t.id) ?? null);
+
+    // Caja muda: reportaba y dejó de hacerlo. Es un fallo técnico, no comercial.
+    if (diasSync !== null && diasSync >= 1) {
+      alertas.push({
+        id: `muda-${t.id}`, severidad: diasSync >= 3 ? "critica" : "alta", tipo: "Caja sin sincronizar",
+        tenantId: t.id, tenant: t.nombre_comercial,
+        titulo: `Sin sincronizar desde hace ${plural(diasSync, "día", "días")}`,
+        detalle: "Sus ventas se están quedando solo en la computadora del negocio: si falla ese equipo, se pierden. Revisa que la caja esté encendida y con internet.",
+        orden: 1000 - diasSync,
+      });
+      continue; // no duplicar con "sin ventas": la causa raíz es esta
+    }
+
+    // Sin ventas teniendo la sincronización al día → el negocio no vendió. Informativo.
     if (dias >= 7) {
       alertas.push({
-        id: `mudo-${t.id}`, severidad: "critica", tipo: "Sin ventas en la nube",
+        id: `mudo-${t.id}`, severidad: diasSync === null ? "critica" : "alta", tipo: "Sin ventas",
         tenantId: t.id, tenant: t.nombre_comercial,
         titulo: `Sin ventas desde hace ${plural(dias, "día", "días")}`,
-        detalle: "O dejó de operar, o su caja no está subiendo lo que vende. Si es lo segundo, esas ventas solo existen en su computadora y se pierden si falla.",
+        detalle: diasSync === null
+          ? "Y no hay registro de sincronización, así que no se puede saber si dejó de vender o dejó de reportar. Su caja probablemente aún no se actualiza."
+          : "La caja sí está reportando, así que el negocio simplemente no ha vendido. Vale una llamada.",
         orden: 1000 - dias,
       });
     } else if (dias >= 3) {
       alertas.push({
-        id: `tibio-${t.id}`, severidad: "alta", tipo: "Sin ventas en la nube",
+        id: `tibio-${t.id}`, severidad: "media", tipo: "Sin ventas",
         tenantId: t.id, tenant: t.nombre_comercial,
         titulo: `Sin ventas desde hace ${plural(dias, "día", "días")}`,
-        detalle: "Puede ser cierre por descanso. Si mañana sigue igual, conviene llamar.",
+        detalle: "La caja reporta al día. Puede ser cierre por descanso.",
         orden: 1000 - dias,
       });
     }
