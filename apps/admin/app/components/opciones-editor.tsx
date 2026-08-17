@@ -53,7 +53,7 @@ function ModalOpcion({
   }
 
   return (
-    <Modal open onClose={onCerrar} title={editar ? "Editar opción" : "Nueva opción"} className="w-[400px] rounded-lg border border-line bg-surface p-6 shadow-xl">
+    <Modal open onClose={onCerrar} title={editar ? "Editar opción" : "Nueva opción"} className="w-full max-w-[400px] rounded-lg border border-line bg-surface p-6 shadow-xl">
       <div className="flex flex-col gap-4">
         <div>
           <label className="mb-1.5 block text-[13px] font-medium text-ink-2" htmlFor="op-nombre">Nombre</label>
@@ -110,7 +110,7 @@ export function OpcionesEditor({ grupoId }: { grupoId: string }) {
 
   return (
     <div className="mt-8 max-w-[640px] border-t border-line pt-6">
-      <div className="mb-3 flex items-center justify-between">
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-x-3 gap-y-2.5">
         <div>
           <h2 className="font-display text-base font-semibold">Opciones del grupo</h2>
           <p className="text-[12.5px] text-ink-3">Lo que el cliente puede elegir dentro de este grupo.</p>
@@ -140,11 +140,11 @@ export function OpcionesEditor({ grupoId }: { grupoId: string }) {
                 {!o.activa && <span className="ml-2 rounded-full bg-hover px-2 py-0.5 text-[11px] font-semibold text-ink-3">Inactiva</span>}
               </div>
               <span className="text-[14px] font-semibold tabular-nums text-ink-2">{precioExtra(o.precio_extra_mxn)}</span>
-              <span className="flex gap-1 opacity-0 transition-opacity group-hover:opacity-100">
-                <button type="button" title="Editar" onClick={() => setModal({ opcion: o })} className="flex h-8 w-8 items-center justify-center rounded border border-transparent text-ink-3 transition hover:border-line-strong hover:bg-surface hover:text-ink">
+              <span className="flex gap-1 transition-opacity lg:opacity-0 lg:group-hover:opacity-100">
+                <button type="button" title="Editar" onClick={() => setModal({ opcion: o })} className="flex h-10 w-10 items-center justify-center rounded border border-transparent lg:h-8 lg:w-8 text-ink-3 transition hover:border-line-strong hover:bg-surface hover:text-ink">
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-[15px] w-[15px]"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" /><path d="M18.5 2.5a2.1 2.1 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" /></svg>
                 </button>
-                <button type="button" title="Eliminar" onClick={() => borrar(o)} className="flex h-8 w-8 items-center justify-center rounded border border-transparent text-ink-3 transition hover:border-[#E8C5C0] hover:text-danger">
+                <button type="button" title="Eliminar" onClick={() => borrar(o)} className="flex h-10 w-10 items-center justify-center rounded border border-transparent lg:h-8 lg:w-8 text-ink-3 transition hover:border-[#E8C5C0] hover:text-danger">
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-[15px] w-[15px]"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" /></svg>
                 </button>
               </span>

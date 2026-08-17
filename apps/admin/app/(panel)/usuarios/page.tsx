@@ -133,7 +133,7 @@ export default function UsuariosPage() {
 
         {/* Toolbar */}
         <div className="mb-4 flex flex-wrap items-center gap-3">
-          <div className="relative max-w-[340px] flex-1">
+          <div className="relative w-full flex-1 sm:max-w-[340px]">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="pointer-events-none absolute left-[13px] top-1/2 h-[17px] w-[17px] -translate-y-1/2 text-ink-3">
               <circle cx="11" cy="11" r="7" />
               <path d="M21 21l-4.3-4.3" />
@@ -155,14 +155,14 @@ export default function UsuariosPage() {
               <option key={r} value={r}>{ROL_LABEL[r]}</option>
             ))}
           </select>
-          <div className="inline-flex gap-0.5 rounded border border-line bg-hover p-[3px]">
+          <div className="scroll-x-limpio inline-flex max-w-full gap-0.5 overflow-x-auto rounded border border-line bg-hover p-[3px] lg:max-w-none lg:overflow-x-visible">
             {(["all", "activos", "inactivos"] as const).map((s) => (
               <button
                 key={s}
                 type="button"
                 onClick={() => setEstado(s)}
                 className={[
-                  "rounded-[4px] px-3 py-[7px] text-[13px] font-semibold transition",
+                  "flex-shrink-0 whitespace-nowrap rounded-[4px] px-3 py-2.5 text-[13px] font-semibold transition lg:py-[7px]",
                   estado === s ? "bg-surface text-ink shadow-sm" : "text-ink-2 hover:text-ink",
                 ].join(" ")}
               >
@@ -179,7 +179,7 @@ export default function UsuariosPage() {
         {usuarios === null && <p className="text-sm text-ink-3">Cargando…</p>}
 
         {usuarios !== null && (
-          <div className="overflow-hidden rounded-lg border border-line bg-surface">
+          <div className="tabla-caja overflow-hidden rounded-lg border border-line bg-surface">
             <table className="w-full border-collapse">
               <thead>
                 <tr>
@@ -212,13 +212,13 @@ export default function UsuariosPage() {
                     </td>
                     <td className="px-4 py-3.5 text-[13.5px] text-ink-3">{fechaCorta(u.fechaUltimoLoginPin)}</td>
                     <td className="px-4 py-3.5 text-right">
-                      <span className="inline-flex gap-1 opacity-0 transition-opacity group-hover:opacity-100">
+                      <span className="inline-flex gap-1 transition-opacity lg:opacity-0 lg:group-hover:opacity-100">
                         <button
                           type="button"
                           title="Cambiar rol"
                           onClick={() => setCambiarRolModal(u)}
                           disabled={u.rolCodigo === "DUENO"}
-                          className="flex h-8 w-8 items-center justify-center rounded border border-transparent text-ink-3 transition hover:border-line-strong hover:bg-surface hover:text-ink disabled:opacity-30 disabled:hover:border-transparent disabled:hover:bg-transparent disabled:hover:text-ink-3"
+                          className="flex h-10 w-10 items-center justify-center rounded border border-transparent lg:h-8 lg:w-8 text-ink-3 transition hover:border-line-strong hover:bg-surface hover:text-ink disabled:opacity-30 disabled:hover:border-transparent disabled:hover:bg-transparent disabled:hover:text-ink-3"
                         >
                           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-4 w-4"><circle cx="9" cy="8" r="3.5" /><path d="M2.5 20v-1a5 5 0 0 1 5-5h3a5 5 0 0 1 5 5v1M17 7a3 3 0 0 1 0 6" /></svg>
                         </button>
@@ -226,7 +226,7 @@ export default function UsuariosPage() {
                           type="button"
                           title="Resetear PIN"
                           onClick={() => setReset(u)}
-                          className="flex h-8 w-8 items-center justify-center rounded border border-transparent text-ink-3 transition hover:border-line-strong hover:bg-surface hover:text-ink"
+                          className="flex h-10 w-10 items-center justify-center rounded border border-transparent lg:h-8 lg:w-8 text-ink-3 transition hover:border-line-strong hover:bg-surface hover:text-ink"
                         >
                           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-4 w-4"><rect x="4" y="11" width="16" height="9" rx="1.5" /><path d="M8 11V7a4 4 0 0 1 8 0v4" /></svg>
                         </button>
@@ -235,7 +235,7 @@ export default function UsuariosPage() {
                           title={u.activo ? "Desactivar" : "Activar"}
                           onClick={() => setConfirmar({ u, activar: !u.activo })}
                           disabled={u.rolCodigo === "DUENO"}
-                          className={["flex h-8 w-8 items-center justify-center rounded border border-transparent text-ink-3 transition hover:border-line-strong hover:bg-surface", u.activo ? "hover:text-danger" : "hover:text-success", "disabled:opacity-30 disabled:hover:border-transparent disabled:hover:bg-transparent disabled:hover:text-ink-3"].join(" ")}
+                          className={["flex h-10 w-10 items-center justify-center rounded border border-transparent lg:h-8 lg:w-8 text-ink-3 transition hover:border-line-strong hover:bg-surface", u.activo ? "hover:text-danger" : "hover:text-success", "disabled:opacity-30 disabled:hover:border-transparent disabled:hover:bg-transparent disabled:hover:text-ink-3"].join(" ")}
                         >
                           {u.activo ? (
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-4 w-4"><circle cx="12" cy="12" r="9" /><path d="M4.5 4.5l15 15" /></svg>
@@ -299,7 +299,7 @@ export default function UsuariosPage() {
           open
           onClose={() => setConfirmar(null)}
           title={confirmar.activar ? "Activar usuario" : "Desactivar usuario"}
-          className="w-[400px] rounded-lg border border-line bg-surface p-6 shadow-xl"
+          className="w-full max-w-[400px] rounded-lg border border-line bg-surface p-6 shadow-xl"
         >
           <p className="text-sm text-ink-2">
             {confirmar.activar ? "Activar " : "Desactivar "}
@@ -320,7 +320,7 @@ export default function UsuariosPage() {
           open
           onClose={() => setCambiarRolModal(null)}
           title={`Cambiar rol de ${cambiarRolModal.nombre}`}
-          className="w-[400px] rounded-lg border border-line bg-surface p-6 shadow-xl"
+          className="w-full max-w-[400px] rounded-lg border border-line bg-surface p-6 shadow-xl"
         >
           <h2 className="mb-4 font-display text-lg font-semibold tracking-tight">Cambiar rol</h2>
           <p className="mb-4 text-sm text-ink-2">

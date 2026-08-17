@@ -106,7 +106,7 @@ export default function CfdiPage() {
 
             <div className="mb-6 rounded-lg border border-line bg-surface p-5">
               <div className="mb-4 font-display text-[16px] font-semibold tracking-tight">Emisor</div>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div>
                   <label className={label} htmlFor="c-rfc">RFC emisor *</label>
                   <input id="c-rfc" className={input} value={rfc} maxLength={13}
@@ -123,7 +123,7 @@ export default function CfdiPage() {
 
             <div className="mb-6 rounded-lg border border-line bg-surface p-5">
               <div className="mb-4 font-display text-[16px] font-semibold tracking-tight">Proveedor de timbrado (PAC)</div>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div>
                   <label className={label} htmlFor="c-pac">PAC</label>
                   <select id="c-pac" className={input} value={pac} onChange={(e) => setPac(e.target.value)}>

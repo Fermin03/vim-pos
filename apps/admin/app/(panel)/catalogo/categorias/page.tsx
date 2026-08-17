@@ -92,8 +92,8 @@ export default function CategoriasPage() {
       <CatalogoTabs />
       <PageBody>
         {/* Toolbar */}
-        <div className="mb-4 flex items-center gap-3">
-          <div className="relative max-w-[340px] flex-1">
+        <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center">
+          <div className="relative w-full flex-1 sm:max-w-[340px]">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="pointer-events-none absolute left-[13px] top-1/2 h-[17px] w-[17px] -translate-y-1/2 text-ink-3">
               <circle cx="11" cy="11" r="7" />
               <path d="M21 21l-4.3-4.3" />
@@ -105,14 +105,14 @@ export default function CategoriasPage() {
               className="h-10 w-full rounded border border-line-strong pl-[38px] pr-3 text-sm outline-none focus:border-ink"
             />
           </div>
-          <div className="inline-flex gap-0.5 rounded border border-line bg-hover p-[3px]">
+          <div className="scroll-x-limpio inline-flex max-w-full gap-0.5 overflow-x-auto rounded border border-line bg-hover p-[3px] lg:max-w-none lg:overflow-x-visible">
             {(["all", "on", "off"] as Filtro[]).map((f) => (
               <button
                 key={f}
                 type="button"
                 onClick={() => setFiltro(f)}
                 className={[
-                  "rounded-[4px] px-3 py-[7px] text-[13px] font-semibold transition",
+                  "flex-shrink-0 whitespace-nowrap rounded-[4px] px-3 py-2.5 text-[13px] font-semibold transition lg:py-[7px]",
                   filtro === f ? "bg-surface text-ink shadow-sm" : "text-ink-2 hover:text-ink",
                 ].join(" ")}
               >
@@ -131,7 +131,7 @@ export default function CategoriasPage() {
         {cats === null && <p className="text-sm text-ink-3">Cargando…</p>}
 
         {cats !== null && (
-          <div className="overflow-hidden rounded-lg border border-line bg-surface">
+          <div className="tabla-caja overflow-hidden rounded-lg border border-line bg-surface">
             <table className="w-full border-collapse">
               <thead>
                 <tr>
@@ -175,12 +175,12 @@ export default function CategoriasPage() {
                       </span>
                     </td>
                     <td className="px-4 py-3.5 text-right">
-                      <span className="inline-flex gap-1 opacity-0 transition-opacity group-hover:opacity-100">
+                      <span className="inline-flex gap-1 transition-opacity lg:opacity-0 lg:group-hover:opacity-100">
                         <button
                           type="button"
                           title="Editar"
                           onClick={() => setModal({ cat: c })}
-                          className="flex h-8 w-8 items-center justify-center rounded border border-transparent text-ink-3 transition hover:border-line-strong hover:bg-surface hover:text-ink"
+                          className="flex h-10 w-10 items-center justify-center rounded border border-transparent lg:h-8 lg:w-8 text-ink-3 transition hover:border-line-strong hover:bg-surface hover:text-ink"
                         >
                           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-4 w-4"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" /><path d="M18.5 2.5a2.1 2.1 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" /></svg>
                         </button>
@@ -188,7 +188,7 @@ export default function CategoriasPage() {
                           type="button"
                           title="Eliminar"
                           onClick={() => setBorrar(c)}
-                          className="flex h-8 w-8 items-center justify-center rounded border border-transparent text-ink-3 transition hover:border-[#E8C5C0] hover:text-danger"
+                          className="flex h-10 w-10 items-center justify-center rounded border border-transparent lg:h-8 lg:w-8 text-ink-3 transition hover:border-[#E8C5C0] hover:text-danger"
                         >
                           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-4 w-4"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" /></svg>
                         </button>
@@ -238,7 +238,7 @@ export default function CategoriasPage() {
           open
           onClose={() => setBorrar(null)}
           title="Eliminar categoría"
-          className="w-[400px] rounded-lg border border-line bg-surface p-6 shadow-xl"
+          className="w-full max-w-[400px] rounded-lg border border-line bg-surface p-6 shadow-xl"
         >
           <p className="text-sm text-ink-2">
             ¿Eliminar <b className="text-ink">{borrar.nombre}</b>? Esta acción la oculta del catálogo y del POS.

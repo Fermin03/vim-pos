@@ -66,33 +66,33 @@ export default function ZHistoricoPage() {
             <div className="mb-4 grid grid-cols-2 gap-3 lg:grid-cols-4">
               <div className="rounded-lg border border-line bg-surface p-4">
                 <div className="text-[11.5px] font-bold uppercase tracking-wide text-ink-3">Cortes en el período</div>
-                <div className="font-display mt-1 text-[22px] font-bold tabular-nums">{filas.length}</div>
+                <div className="font-display mt-1 text-[18px] font-bold tabular-nums lg:text-[22px]">{filas.length}</div>
                 <div className="mt-0.5 text-[11.5px] text-ink-3">
                   {dias > 0 ? `${(filas.length / dias).toFixed(1).replace(/\.0$/, "")} turno${filas.length / dias === 1 ? "" : "s"} por día` : "sin cierres"}
                 </div>
               </div>
               <div className="rounded-lg border border-line bg-surface p-4">
                 <div className="text-[11.5px] font-bold uppercase tracking-wide text-ink-3">Total acumulado</div>
-                <div className="font-display mt-1 text-[22px] font-bold tabular-nums">{fmtMxn(totales.ventas)}</div>
+                <div className="font-display mt-1 text-[18px] font-bold tabular-nums lg:text-[22px]">{fmtMxn(totales.ventas)}</div>
                 <div className="mt-0.5 text-[11.5px] text-ink-3">ventas brutas</div>
               </div>
               <div className="rounded-lg border border-line bg-surface p-4">
                 <div className="text-[11.5px] font-bold uppercase tracking-wide text-ink-3">Diferencia acumulada</div>
-                <div className={`font-display mt-1 text-[22px] font-bold tabular-nums ${colorDif(totales.dif)}`}>{fmtMxn(totales.dif)}</div>
+                <div className={`font-display mt-1 text-[18px] font-bold tabular-nums lg:text-[22px] ${colorDif(totales.dif)}`}>{fmtMxn(totales.dif)}</div>
                 <div className="mt-0.5 text-[11.5px] text-ink-3">
                   {Math.abs(totales.dif) < 0.01 ? "sin diferencia" : totales.dif < 0 ? "faltante neto" : "sobrante neto"}
                 </div>
               </div>
               <div className="rounded-lg border border-line bg-surface p-4">
                 <div className="text-[11.5px] font-bold uppercase tracking-wide text-ink-3">Cortes con faltante</div>
-                <div className={`font-display mt-1 text-[22px] font-bold tabular-nums ${conFaltante > 0 ? "text-danger" : ""}`}>
+                <div className={`font-display mt-1 text-[18px] font-bold tabular-nums lg:text-[22px] ${conFaltante > 0 ? "text-danger" : ""}`}>
                   {conFaltante} de {filas.length}
                 </div>
                 <div className="mt-0.5 text-[11.5px] text-ink-3">{conFaltante > 0 ? "requieren revisión" : "todo cuadrado"}</div>
               </div>
             </div>
 
-            <div className="mb-3 inline-flex gap-0.5 rounded border border-line bg-hover p-[3px]">
+            <div className="mb-3 scroll-x-limpio inline-flex max-w-full gap-0.5 overflow-x-auto rounded border border-line bg-hover p-[3px] lg:max-w-none lg:overflow-x-visible">
               {[
                 { v: false, l: "Todos" },
                 { v: true, l: "Con diferencia" },
@@ -101,14 +101,14 @@ export default function ZHistoricoPage() {
                   key={String(t.v)}
                   type="button"
                   onClick={() => setSoloDiferencia(t.v)}
-                  className={["rounded-[4px] px-3 py-1.5 text-[12.5px] font-semibold transition", soloDiferencia === t.v ? "bg-surface text-ink shadow-sm" : "text-ink-2 hover:text-ink"].join(" ")}
+                  className={["flex-shrink-0 whitespace-nowrap rounded-[4px] px-3 py-[11px] text-[12.5px] font-semibold transition lg:py-1.5", soloDiferencia === t.v ? "bg-surface text-ink shadow-sm" : "text-ink-2 hover:text-ink"].join(" ")}
                 >
                   {t.l}
                 </button>
               ))}
             </div>
 
-            <div className="overflow-hidden rounded-lg border border-line bg-surface">
+            <div className="tabla-caja tabla-caja-xl overflow-hidden rounded-lg border border-line bg-surface">
               <table className="w-full text-[13px]">
                 <thead>
                   <tr className="border-b border-line bg-sel text-left text-[11.5px] font-bold uppercase tracking-wide text-ink-3">

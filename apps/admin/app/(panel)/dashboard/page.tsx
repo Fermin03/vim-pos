@@ -54,13 +54,13 @@ function Kpi({
   primario?: boolean;
 }) {
   return (
-    <div className={`relative rounded-lg border p-5 ${primario ? "border-ink bg-ink" : "border-line bg-surface"}`}>
-      <div className="flex items-center justify-between">
-        <span className={`text-[12px] font-semibold uppercase tracking-[0.04em] ${primario ? "text-white/60" : "text-ink-3"}`}>{label}</span>
-        <span className={`flex h-[30px] w-[30px] items-center justify-center rounded ${primario ? "bg-white/10 text-white" : "bg-hover text-ink-2"}`}>{icono}</span>
+    <div className={`relative min-w-0 rounded-lg border p-4 lg:p-5 ${primario ? "border-ink bg-ink" : "border-line bg-surface"}`}>
+      <div className="flex items-center justify-between gap-2">
+        <span className={`min-w-0 truncate text-[11.5px] font-semibold uppercase tracking-[0.04em] lg:text-[12px] ${primario ? "text-white/60" : "text-ink-3"}`}>{label}</span>
+        <span className={`flex h-[30px] w-[30px] flex-shrink-0 items-center justify-center rounded ${primario ? "bg-white/10 text-white" : "bg-hover text-ink-2"}`}>{icono}</span>
       </div>
-      <div className={`mt-3.5 font-display text-[30px] font-bold tracking-[-0.025em] tabular-nums ${primario ? "text-white" : ""}`}>{valor}</div>
-      <div className="mt-2 flex items-center gap-[7px]">
+      <div className={`mt-3 font-display text-[22px] font-bold tracking-[-0.025em] tabular-nums lg:mt-3.5 lg:text-[30px] ${primario ? "text-white" : ""}`}>{valor}</div>
+      <div className="mt-2 flex flex-wrap items-center gap-x-[7px] gap-y-1">
         <Delta pct={pct} comparativo={comparativo} sobreOscuro={primario} />
       </div>
     </div>
@@ -82,7 +82,9 @@ function GraficaPorHora({ datos }: { datos: { hora: number; total: number }[] })
 
   return (
     <>
-      <div className="flex h-[240px] items-end gap-1.5 pt-4">
+      {/* En móvil la gráfica se desliza en horizontal: 24 barras en 343px serían ilegibles. */}
+      <div className="-mx-5 overflow-x-auto px-5 lg:mx-0 lg:overflow-x-visible lg:px-0">
+      <div className="grafica-min flex h-[200px] items-end gap-1.5 pt-4 lg:h-[240px]">
         {datos.map((d) => {
           const esPico = d.hora === pico.hora;
           return (
@@ -101,7 +103,8 @@ function GraficaPorHora({ datos }: { datos: { hora: number; total: number }[] })
           );
         })}
       </div>
-      <div className="mt-4 flex items-center gap-5 border-t border-line pt-4">
+      </div>
+      <div className="mt-4 flex flex-wrap items-center gap-x-5 gap-y-2 border-t border-line pt-4">
         <div className="flex items-center gap-[7px] text-[12px] text-ink-2">
           <span className="h-[11px] w-[11px] rounded-[3px] bg-ink" />
           Hora pico <span className="font-semibold">{pico.hora}:00 ({fmt(pico.total)})</span>

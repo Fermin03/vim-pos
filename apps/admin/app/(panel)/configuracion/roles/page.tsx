@@ -2,7 +2,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Button } from "@vim/ui/styles";
 import { PageHeader, PageBody } from "../../../components/page-header";
-import { ConfigSideNav } from "../../../components/config-sidenav";
 import {
   asignarPermisosUsuario, leerMatriz, permisosDeUsuario, quitarPermiso, restaurarPermiso,
   usuariosPersonalizados, type MatrizPermisos, type UsuarioPersonalizado,
@@ -87,9 +86,7 @@ export default function RolesPermisosPage() {
   return (
     <>
       <PageHeader titulo="Roles y permisos" subtitulo="Ajusta qué puede hacer cada rol en tu negocio (solo restringir) y los permisos de usuarios personalizados." migas={[{ label: "Configuración" }, { label: "Roles y permisos" }]} />
-      <div className="flex">
-        <ConfigSideNav />
-        <PageBody>
+      <PageBody>
           {error && <p className="mb-3 text-sm font-medium text-danger" role="alert">{error}</p>}
           {matriz === null && !error && <p className="text-sm text-ink-3">Cargando matriz…</p>}
 
@@ -200,8 +197,7 @@ export default function RolesPermisosPage() {
               </section>
             </>
           )}
-        </PageBody>
-      </div>
+      </PageBody>
     </>
   );
 }

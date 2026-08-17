@@ -38,7 +38,7 @@ export default function VentasPorModoServicioPage() {
         {error && <p className="text-sm font-medium text-danger" role="alert">{error}</p>}
         {filas && filas.length === 0 && <p className="rounded-lg border border-line bg-surface p-6 text-center text-sm text-ink-3">Sin ventas en el rango.</p>}
         {filas && filas.length > 0 && (
-          <div className="grid grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
             {filas.map((f) => (
               <div key={f.modo} className="rounded-lg border border-line bg-surface p-5">
                 <div className="text-[11.5px] font-bold uppercase tracking-wide text-ink-3">{MODO_LABEL[f.modo] ?? f.modo}</div>

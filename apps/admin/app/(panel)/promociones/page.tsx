@@ -132,7 +132,7 @@ export default function PromocionesPage() {
         {promos && promos.length > 0 && (
           <div className="overflow-hidden rounded-lg border border-line bg-surface">
             <div className="border-b border-line px-4 py-3">
-              <div className="inline-flex gap-0.5 rounded border border-line bg-hover p-[3px]">
+              <div className="scroll-x-limpio inline-flex max-w-full gap-0.5 overflow-x-auto rounded border border-line bg-hover p-[3px] lg:max-w-none lg:overflow-x-visible">
                 {([
                   { v: "TODAS", l: "Todas" },
                   { v: "ACTIVAS", l: "Activas" },
@@ -143,43 +143,45 @@ export default function PromocionesPage() {
                     key={t.v}
                     type="button"
                     onClick={() => setFiltro(t.v)}
-                    className={["rounded-[4px] px-3 py-1.5 text-[12.5px] font-semibold transition", filtro === t.v ? "bg-surface text-ink shadow-sm" : "text-ink-2 hover:text-ink"].join(" ")}
+                    className={["flex-shrink-0 whitespace-nowrap rounded-[4px] px-3 py-[11px] text-[12.5px] font-semibold transition lg:py-1.5", filtro === t.v ? "bg-surface text-ink shadow-sm" : "text-ink-2 hover:text-ink"].join(" ")}
                   >
                     {t.l}
                   </button>
                 ))}
               </div>
             </div>
-            <table className="w-full text-[13.5px]">
-              <thead><tr className="border-b border-line bg-sel text-left text-[11.5px] font-bold uppercase tracking-wide text-ink-3">
-                <th className="px-4 py-2.5">Promoción</th><th className="px-4 py-2.5">Beneficio</th><th className="px-4 py-2.5">Vigencia</th><th className="px-4 py-2.5">Estado</th><th className="px-4 py-2.5"></th>
-              </tr></thead>
-              <tbody>
-                {visibles.map((p) => (
-                  <tr key={p.id} className="border-b border-line last:border-b-0">
-                    <td className="px-4 py-2.5"><div className="font-medium">{p.nombre}</div>{p.descripcion && <div className="text-[12px] text-ink-3">{p.descripcion}</div>}</td>
-                    <td className="px-4 py-2.5 font-semibold tabular-nums">{p.valorTexto}</td>
-                    <td className="px-4 py-2.5 text-[12.5px] text-ink-2">
-                      {new Date(p.fechaInicio).toLocaleDateString("es-MX")}{p.fechaFin ? ` → ${new Date(p.fechaFin).toLocaleDateString("es-MX")}` : " → sin fin"}
-                    </td>
-                    <td className="px-4 py-2.5"><span className={`rounded-full px-2 py-0.5 text-[11px] font-bold ${COLOR_VISTA[estadoVista(p)]}`}>{LABEL_VISTA[estadoVista(p)]}</span></td>
-                    <td className="px-4 py-2.5 text-right">
-                      <button type="button" onClick={() => setEditando({ id: p.id, datos: { nombre: p.nombre, descripcion: p.descripcion, tipo: p.tipo, valor: p.valorTexto.replace(/[^0-9.]/g, ""), fecha_inicio: p.fechaInicio.slice(0, 16), fecha_fin: p.fechaFin ? p.fechaFin.slice(0, 16) : "" } })} className="text-[12.5px] font-semibold text-ink-2 hover:text-ink">Editar</button>
-                      {(p.estado === "ACTIVA" || p.estado === "PAUSADA") && <button type="button" onClick={() => alternar(p)} className="ml-3 text-[12.5px] font-semibold text-ink-3 hover:text-ink">{p.estado === "ACTIVA" ? "Pausar" : "Activar"}</button>}
-                      <button type="button" onClick={() => borrar(p)} className="ml-3 text-[12.5px] font-semibold text-ink-3 hover:text-danger">Eliminar</button>
-                    </td>
-                  </tr>
-                ))}
-                {visibles.length === 0 && (
-                  <tr>
-                    <td colSpan={5} className="px-4 py-10 text-center">
-                      <p className="text-[14px] font-semibold text-ink-2">Sin resultados</p>
-                      <p className="mt-1 text-[12.5px] text-ink-3">No hay promociones que coincidan con tu filtro.</p>
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
+            <div className="tabla-caja">
+              <table className="w-full text-[13.5px]">
+                <thead><tr className="border-b border-line bg-sel text-left text-[11.5px] font-bold uppercase tracking-wide text-ink-3">
+                  <th className="px-4 py-2.5">Promoción</th><th className="px-4 py-2.5">Beneficio</th><th className="px-4 py-2.5">Vigencia</th><th className="px-4 py-2.5">Estado</th><th className="px-4 py-2.5"></th>
+                </tr></thead>
+                <tbody>
+                  {visibles.map((p) => (
+                    <tr key={p.id} className="border-b border-line last:border-b-0">
+                      <td className="px-4 py-2.5"><div className="font-medium">{p.nombre}</div>{p.descripcion && <div className="text-[12px] text-ink-3">{p.descripcion}</div>}</td>
+                      <td className="px-4 py-2.5 font-semibold tabular-nums">{p.valorTexto}</td>
+                      <td className="px-4 py-2.5 text-[12.5px] text-ink-2">
+                        {new Date(p.fechaInicio).toLocaleDateString("es-MX")}{p.fechaFin ? ` → ${new Date(p.fechaFin).toLocaleDateString("es-MX")}` : " → sin fin"}
+                      </td>
+                      <td className="px-4 py-2.5"><span className={`rounded-full px-2 py-0.5 text-[11px] font-bold ${COLOR_VISTA[estadoVista(p)]}`}>{LABEL_VISTA[estadoVista(p)]}</span></td>
+                      <td className="px-4 py-2.5 text-right">
+                        <button type="button" onClick={() => setEditando({ id: p.id, datos: { nombre: p.nombre, descripcion: p.descripcion, tipo: p.tipo, valor: p.valorTexto.replace(/[^0-9.]/g, ""), fecha_inicio: p.fechaInicio.slice(0, 16), fecha_fin: p.fechaFin ? p.fechaFin.slice(0, 16) : "" } })} className="text-[12.5px] font-semibold text-ink-2 hover:text-ink">Editar</button>
+                        {(p.estado === "ACTIVA" || p.estado === "PAUSADA") && <button type="button" onClick={() => alternar(p)} className="ml-3 text-[12.5px] font-semibold text-ink-3 hover:text-ink">{p.estado === "ACTIVA" ? "Pausar" : "Activar"}</button>}
+                        <button type="button" onClick={() => borrar(p)} className="ml-3 text-[12.5px] font-semibold text-ink-3 hover:text-danger">Eliminar</button>
+                      </td>
+                    </tr>
+                  ))}
+                  {visibles.length === 0 && (
+                    <tr>
+                      <td colSpan={5} className="px-4 py-10 text-center">
+                        <p className="text-[14px] font-semibold text-ink-2">Sin resultados</p>
+                        <p className="mt-1 text-[12.5px] text-ink-3">No hay promociones que coincidan con tu filtro.</p>
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
             <div className="border-t border-line px-4 py-3 text-[12.5px] text-ink-3">
               Mostrando <b className="text-ink-2">{visibles.length}</b> de <b className="text-ink-2">{todas.length}</b> promociones
             </div>
@@ -198,7 +200,7 @@ export default function PromocionesPage() {
                 <label className={label} htmlFor="p-desc">Descripción · opcional</label>
                 <input id="p-desc" className={input} value={editando.datos.descripcion} maxLength={300} onChange={(e) => set("descripcion", e.target.value)} />
               </div>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div>
                   <label className={label} htmlFor="p-tipo">Tipo</label>
                   <select id="p-tipo" className={input} value={editando.datos.tipo} onChange={(e) => set("tipo", e.target.value as TipoPromo)}>
@@ -212,7 +214,7 @@ export default function PromocionesPage() {
                   </div>
                 )}
               </div>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div>
                   <label className={label} htmlFor="p-fi">Inicio</label>
                   <input id="p-fi" type="datetime-local" className={input} value={editando.datos.fecha_inicio} onChange={(e) => set("fecha_inicio", e.target.value)} />

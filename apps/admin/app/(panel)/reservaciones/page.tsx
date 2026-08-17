@@ -98,7 +98,7 @@ export default function ReservacionesPage() {
         {okMsg && <p className="mb-3 text-sm font-medium text-success">{okMsg}</p>}
         {error && !creando && <p className="mb-3 text-sm font-medium text-danger">{error}</p>}
 
-        <div className="mb-4 flex items-center gap-3">
+        <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center">
           <label className="text-[13px] font-medium text-ink-2" htmlFor="dia">Día</label>
           <input id="dia" type="date" className={`${input} w-44`} value={dia} onChange={(e) => setDia(e.target.value)} />
           <span className="text-[13px] text-ink-3">{lista?.length ?? 0} reservaciones</span>
@@ -117,12 +117,12 @@ export default function ReservacionesPage() {
               const hora = new Date(r.fechaHora).toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit" });
               const activa = r.estado === "CONFIRMADA";
               return (
-                <div key={r.id} className="flex items-center gap-4 rounded-lg border border-line bg-surface p-4">
+                <div key={r.id} className="flex flex-wrap items-center gap-x-4 gap-y-3 rounded-lg border border-line bg-surface p-4">
                   <div className="text-center">
                     <div className="font-display text-[18px] font-bold tabular-nums">{hora}</div>
                     <div className="text-[11px] text-ink-3">{r.comensales} pers.</div>
                   </div>
-                  <div className="min-w-0 flex-1">
+                  <div className="min-w-[140px] flex-1">
                     <div className="flex items-center gap-2">
                       <span className="font-semibold">{r.clienteNombre}</span>
                       <span className={`rounded-full px-2 py-0.5 text-[10.5px] font-bold ${COLOR[r.estado]}`}>{labelEstadoReserva(r.estado)}</span>
@@ -132,7 +132,7 @@ export default function ReservacionesPage() {
                     </div>
                   </div>
                   {activa && (
-                    <div className="flex gap-1.5">
+                    <div className="flex flex-wrap gap-1.5">
                       <button type="button" onClick={() => accion(() => confirmarLlegada(r.id))} className="rounded border border-line-strong px-2.5 py-1.5 text-[12px] font-semibold text-success hover:border-success">Llegó</button>
                       <button type="button" onClick={() => accion(() => marcarNoShow(r.id))} className="rounded border border-line-strong px-2.5 py-1.5 text-[12px] font-semibold text-ink-2 hover:border-ink">No llegó</button>
                       <button type="button" onClick={() => { const m = prompt("Motivo de cancelación:"); if (m) accion(() => cancelarReservacion(r.id, m)); }} className="rounded border border-line-strong px-2.5 py-1.5 text-[12px] font-semibold text-ink-3 hover:text-danger">Cancelar</button>
@@ -148,7 +148,7 @@ export default function ReservacionesPage() {
           <div className="mt-5 max-w-[560px] rounded-lg border border-line bg-surface p-5">
             <div className="mb-4 font-display text-[16px] font-semibold tracking-tight">Nueva reservación</div>
             <div className="flex flex-col gap-3.5">
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div>
                   <label className={label} htmlFor="r-nom">Nombre del cliente</label>
                   <input id="r-nom" className={input} value={form.cliente_nombre} maxLength={150} onChange={(e) => setForm({ ...form, cliente_nombre: e.target.value })} placeholder="María López" />
@@ -158,8 +158,8 @@ export default function ReservacionesPage() {
                   <input id="r-tel" className={input} value={form.cliente_telefono} maxLength={20} onChange={(e) => setForm({ ...form, cliente_telefono: e.target.value.replace(/[^0-9+ ]/g, "") })} placeholder="477 123 4567" />
                 </div>
               </div>
-              <div className="grid grid-cols-3 gap-4">
-                <div className="col-span-2">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+                <div className="sm:col-span-2">
                   <label className={label} htmlFor="r-fh">Fecha y hora</label>
                   <input id="r-fh" type="datetime-local" className={input} value={form.fecha_hora} onChange={(e) => setForm({ ...form, fecha_hora: e.target.value })} />
                 </div>
@@ -168,7 +168,7 @@ export default function ReservacionesPage() {
                   <input id="r-com" className={input} value={form.comensales} inputMode="numeric" onChange={(e) => setForm({ ...form, comensales: e.target.value.replace(/\D/g, "") })} />
                 </div>
               </div>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div>
                   <label className={label} htmlFor="r-canal">Canal</label>
                   <select id="r-canal" className={input} value={form.canal} onChange={(e) => setForm({ ...form, canal: e.target.value as CanalReservacion })}>

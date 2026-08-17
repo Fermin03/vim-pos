@@ -11,3 +11,60 @@ body {
   -webkit-font-smoothing: antialiased;
   letter-spacing: -0.01em;
 }
+
+/* ============================================================
+   Responsive móvil. TODO lo de aquí vive dentro de un media
+   query < 1024px (breakpoint `lg` de Tailwind): en escritorio
+   el admin queda exactamente igual que antes.
+   ============================================================ */
+/* Tiras de navegación deslizables: sin barra de scroll visible. */
+.scroll-x-limpio { scrollbar-width: none; -ms-overflow-style: none; }
+.scroll-x-limpio::-webkit-scrollbar { display: none; }
+
+@media (max-width: 1023.98px) {
+  /* Ancho mínimo de las tablas dentro de <TablaScroll>. */
+  .tabla-min { min-width: var(--tabla-min, 720px); }
+
+  /* Tablas: en vez de aplastar las columnas, la tarjeta se desliza en horizontal.
+     El ancho mínimo depende del número de columnas (sm / normal / xl). */
+  .tabla-caja {
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    -webkit-overflow-scrolling: touch;
+  }
+  .tabla-caja > table { min-width: 720px; }
+  .tabla-caja-sm > table { min-width: 560px; }
+  .tabla-caja-xl > table { min-width: 900px; }
+
+  /* Gráfica de barras por hora del panel: se desliza en vez de comprimirse. */
+  .grafica-min { min-width: 620px; }
+
+  /* iOS hace zoom automático al enfocar un input con font-size < 16px.
+     Los `:not([...])` están para ganarle en especificidad a las clases de
+     Tailwind (text-sm, text-[13px]…) sin recurrir a !important. */
+  input:not([type="checkbox"]):not([type="radio"]),
+  select:not([hidden]),
+  textarea:not([hidden]) {
+    font-size: 16px;
+  }
+
+  /* Altura mínima cómoda para el dedo (Apple HIG / Material: 44px). */
+  input:not([type="checkbox"]):not([type="radio"]):not([type="file"]),
+  select:not([hidden]) {
+    min-height: 44px;
+  }
+
+  /* Modales altos: que quepan en la pantalla y hagan scroll dentro,
+     en vez de desbordarse por arriba y por abajo. */
+  [aria-modal="true"] {
+    max-height: calc(100dvh - 2rem);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+
+  /* Quita el delay de 300ms del tap y evita el resaltado azul de iOS. */
+  a, button, [role="button"], summary {
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+  }
+}

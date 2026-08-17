@@ -181,7 +181,7 @@ export default function NegocioPage() {
                 <input id="n-codigo" className={input} value={codigo} maxLength={50} onChange={(e) => setCodigo(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ""))} />
                 <p className="mt-1 text-[11.5px] text-ink-3">Usado en subdominios y prefijos de folio. Solo minúsculas, números y guiones.</p>
               </div>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div>
                   <label className={label} htmlFor="n-tz">Zona horaria</label>
                   <select id="n-tz" className={input} value={tz} onChange={(e) => setTz(e.target.value)}>

@@ -70,7 +70,7 @@ export function ModalSucursal({
       onClose={onCerrar}
       title={editar ? "Editar sucursal" : "Nueva sucursal"}
       hideTitle
-      className="w-[520px] rounded-lg border border-line bg-surface p-6 shadow-[0_18px_44px_rgba(22,22,26,.18)]"
+      className="w-full max-w-[520px] rounded-lg border border-line bg-surface p-6 shadow-[0_18px_44px_rgba(22,22,26,.18)]"
     >
       <div className="mb-5">
         <h2 className="font-display text-xl font-semibold tracking-tight">
@@ -78,7 +78,7 @@ export function ModalSucursal({
         </h2>
       </div>
 
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         <div>
           <label className={label} htmlFor="s-cod">Código</label>
           <input
@@ -91,7 +91,7 @@ export function ModalSucursal({
             placeholder="K, KC"
           />
         </div>
-        <div className="col-span-2">
+        <div className="sm:col-span-2">
           <label className={label} htmlFor="s-nom">Nombre</label>
           <input id="s-nom" className={input} value={nombre} maxLength={150} onChange={(e) => setNombre(e.target.value)} placeholder="León Centro" />
         </div>
@@ -102,7 +102,7 @@ export function ModalSucursal({
         <input id="s-calle" className={input} value={calle} maxLength={255} onChange={(e) => setCalle(e.target.value)} placeholder="Av. López Mateos 1234" />
       </div>
 
-      <div className="mt-4 grid grid-cols-2 gap-4">
+      <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
         <div>
           <label className={label} htmlFor="s-ciudad">Ciudad</label>
           <input id="s-ciudad" className={input} value={ciudad} maxLength={100} onChange={(e) => setCiudad(e.target.value)} placeholder="León" />
@@ -113,7 +113,7 @@ export function ModalSucursal({
         </div>
       </div>
 
-      <div className="mt-4 grid grid-cols-2 gap-4">
+      <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
         <div>
           <label className={label} htmlFor="s-tel">Teléfono <span className="text-ink-3">· opcional</span></label>
           <input id="s-tel" className={input} value={tel} maxLength={20} onChange={(e) => setTel(e.target.value)} placeholder="477 123 4567" />

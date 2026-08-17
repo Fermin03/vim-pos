@@ -2,7 +2,6 @@
 import { useEffect, useState } from "react";
 import { Button } from "@vim/ui/styles";
 import { PageHeader, PageBody } from "../../../components/page-header";
-import { ConfigSideNav } from "../../../components/config-sidenav";
 import {
   asignarFranquicia, crearFranquicia, eliminarFranquicia, listarFranquicias,
   listarSucursalesConFranquicia, type Franquicia, type SucursalFranquicia,
@@ -38,9 +37,7 @@ export default function FranquiciasPage() {
   return (
     <>
       <PageHeader titulo="Franquicias" subtitulo="Agrupa sucursales por franquiciatario para el reporteo central." migas={[{ label: "Configuración" }, { label: "Franquicias" }]} />
-      <div className="flex">
-        <ConfigSideNav />
-        <PageBody>
+      <PageBody>
           {error && <p className="mb-3 text-sm font-medium text-danger" role="alert">{error}</p>}
 
           {/* Crear */}
@@ -50,7 +47,7 @@ export default function FranquiciasPage() {
               onChange={(e) => setNombre(e.target.value)}
               maxLength={150}
               placeholder="Nombre de la franquicia, p.ej. Franquicia Bajío"
-              className="h-11 w-80 rounded border border-line-strong px-3 text-sm outline-none focus:border-ink"
+              className="h-11 w-full rounded border sm:w-80 border-line-strong px-3 text-sm outline-none focus:border-ink"
               onKeyDown={(e) => { if (e.key === "Enter" && nombre.trim()) correr(async () => { await crearFranquicia(nombre); setNombre(""); }); }}
             />
             <Button onClick={() => correr(async () => { await crearFranquicia(nombre); setNombre(""); })} disabled={!nombre.trim() || trabajando}>
@@ -66,7 +63,7 @@ export default function FranquiciasPage() {
                 <div className="border-b border-line px-4 py-2.5 text-[11.5px] font-bold uppercase tracking-wide text-ink-3">Franquicias</div>
                 {franquicias.length === 0 && <p className="px-4 py-6 text-center text-[13px] text-ink-3">Sin franquicias aún. La operación propia no necesita una.</p>}
                 {franquicias.map((f) => (
-                  <div key={f.id} className="flex items-center justify-between border-b border-line px-4 py-3 last:border-b-0">
+                  <div key={f.id} className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2 border-b border-line px-4 py-3 last:border-b-0">
                     <div>
                       <div className="text-[14px] font-semibold">{f.nombre}</div>
                       <div className="text-[12px] text-ink-3">{f.nSucursales} sucursal{f.nSucursales === 1 ? "" : "es"}</div>
@@ -104,8 +101,7 @@ export default function FranquiciasPage() {
             El acceso del franquiciatario se da en <b>Usuarios</b>: invítalo con rol Admin/Supervisor asignado a sus sucursales.
             El reporte <b>Consolidado</b> puede agruparse por franquicia.
           </p>
-        </PageBody>
-      </div>
+      </PageBody>
     </>
   );
 }

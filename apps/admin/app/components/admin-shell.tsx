@@ -56,6 +56,26 @@ export function AdminShell({ children }: { children: ReactNode }) {
   const [listo, setListo] = useState(false);
   const [sinAcceso, setSinAcceso] = useState<string | null>(null);
   const [sucursales, setSucursales] = useState<{ nombre: string; total: number } | null>(null);
+  // Cajón lateral: solo existe por debajo de `lg`. En escritorio el <aside> es estático.
+  const [menuAbierto, setMenuAbierto] = useState(false);
+
+  // Navegar cierra el cajón (si no, queda tapando la pantalla nueva).
+  useEffect(() => {
+    setMenuAbierto(false);
+  }, [pathname]);
+
+  // Bloquea el scroll del documento y permite cerrar con Esc mientras el cajón está abierto.
+  useEffect(() => {
+    if (!menuAbierto) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && setMenuAbierto(false);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.body.style.overflow = prev;
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [menuAbierto]);
 
   useEffect(() => {
     (async () => {
@@ -86,7 +106,7 @@ export function AdminShell({ children }: { children: ReactNode }) {
 
   if (listo && sinAcceso) {
     return (
-      <main className="flex h-screen flex-col items-center justify-center gap-3 px-6 text-center">
+      <main className="flex min-h-[100dvh] flex-col items-center justify-center gap-3 px-6 py-10 text-center">
         <div className="flex h-12 w-12 items-center justify-center rounded-full bg-[#F6EEDD] text-warning">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-6 w-6"><circle cx="12" cy="12" r="9" /><path d="M12 8v4M12 16h.01" /></svg>
         </div>
@@ -108,7 +128,7 @@ export function AdminShell({ children }: { children: ReactNode }) {
 
   if (!listo) {
     return (
-      <main className="flex h-screen items-center justify-center">
+      <main className="flex h-[100dvh] items-center justify-center">
         <p className="text-sm text-ink-3">Cargando…</p>
       </main>
     );
@@ -118,15 +138,41 @@ export function AdminShell({ children }: { children: ReactNode }) {
 
   return (
     <PerfilCtx.Provider value={perfil}>
-      <div className="flex h-screen">
-        {/* ===== Sidebar ===== */}
-        <aside className="flex w-[248px] flex-shrink-0 flex-col bg-ink text-[#C8C8CC]">
-          <div className="flex h-16 flex-shrink-0 items-center gap-[11px] border-b border-[#2C2C32] px-5">
+      <div className="flex h-[100dvh] lg:h-screen">
+        {/* Velo del cajón (solo móvil/tablet). */}
+        <div
+          onClick={() => setMenuAbierto(false)}
+          aria-hidden="true"
+          className={[
+            "fixed inset-0 z-40 bg-ink/50 transition-opacity duration-200 lg:hidden",
+            menuAbierto ? "opacity-100" : "pointer-events-none opacity-0",
+          ].join(" ")}
+        />
+
+        {/* ===== Sidebar (cajón deslizable por debajo de lg, estático en escritorio) ===== */}
+        <aside
+          id="menu-lateral"
+          className={[
+            "fixed inset-y-0 left-0 z-50 flex w-[min(280px,85vw)] flex-shrink-0 flex-col bg-ink text-[#C8C8CC]",
+            "transition-transform duration-200 ease-out",
+            menuAbierto ? "translate-x-0" : "-translate-x-full",
+            "lg:static lg:z-auto lg:w-[248px] lg:translate-x-0 lg:transition-none",
+          ].join(" ")}
+        >
+          <div className="flex h-14 flex-shrink-0 items-center gap-[11px] border-b border-[#2C2C32] px-5 lg:h-16">
             <div className="relative flex h-8 w-8 items-center justify-center rounded-lg bg-white">
               <span className="font-display text-base font-bold leading-none tracking-tight text-ink">V</span>
               <span className="absolute bottom-1.5 right-[5px] h-[3.5px] w-[3.5px] rounded-full bg-accent" aria-hidden="true" />
             </div>
             <div className="font-display text-base font-bold tracking-tight text-white">VIM POS</div>
+            <button
+              type="button"
+              aria-label="Cerrar menú"
+              onClick={() => setMenuAbierto(false)}
+              className="-mr-2 ml-auto flex h-11 w-11 items-center justify-center rounded text-[#76767E] transition-colors hover:text-white lg:hidden"
+            >
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-5 w-5"><path d="M18 6L6 18M6 6l12 12" /></svg>
+            </button>
           </div>
 
           <div className="mx-3 mb-2 mt-4 flex items-center gap-2.5 rounded border border-[#2C2C32] bg-[#1E1E23] px-3 py-2.5">
@@ -158,7 +204,7 @@ export function AdminShell({ children }: { children: ReactNode }) {
                         href={it.href}
                         aria-current={active ? "page" : undefined}
                         className={[
-                          "flex items-center gap-[11px] rounded px-3 py-[9px] text-sm font-medium transition-colors [&_svg]:h-[18px] [&_svg]:w-[18px] [&_svg]:stroke-current",
+                          "flex min-h-[44px] items-center gap-[11px] rounded px-3 py-[9px] text-sm font-medium transition-colors lg:min-h-0 [&_svg]:h-[18px] [&_svg]:w-[18px] [&_svg]:flex-shrink-0 [&_svg]:stroke-current",
                           active
                             ? "bg-white font-semibold text-ink"
                             : "text-[#C8C8CC] hover:bg-[#1E1E23] hover:text-white",
@@ -174,7 +220,7 @@ export function AdminShell({ children }: { children: ReactNode }) {
             })}
           </nav>
 
-          <div className="flex flex-shrink-0 items-center gap-2.5 border-t border-[#2C2C32] p-3">
+          <div className="flex flex-shrink-0 items-center gap-2.5 border-t border-[#2C2C32] p-3 pb-[max(12px,env(safe-area-inset-bottom))] lg:pb-3">
             <div className="flex h-[34px] w-[34px] flex-shrink-0 items-center justify-center rounded-full border border-[#2C2C32] bg-[#2A2A30] font-display text-[13px] font-semibold text-white">
               {iniciales(perfil?.nombre ?? "U")}
             </div>
@@ -189,7 +235,7 @@ export function AdminShell({ children }: { children: ReactNode }) {
                 await salir();
                 router.replace("/");
               }}
-              className="text-[#76767E] transition-colors hover:text-white"
+              className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded text-[#76767E] transition-colors hover:text-white lg:h-auto lg:w-auto"
             >
               <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9" /></svg>
             </button>
@@ -197,7 +243,33 @@ export function AdminShell({ children }: { children: ReactNode }) {
         </aside>
 
         {/* ===== Main ===== */}
-        <div className="flex min-w-0 flex-1 flex-col bg-bg">{children}</div>
+        <div className="flex min-w-0 flex-1 flex-col bg-bg">
+          {/* Barra superior móvil: abre el cajón. Oculta en escritorio (el sidebar ya está visible). */}
+          <header className="flex h-14 flex-shrink-0 items-center gap-3 border-b border-[#2C2C32] bg-ink px-2 pr-4 lg:hidden">
+            <button
+              type="button"
+              aria-label="Abrir menú"
+              aria-expanded={menuAbierto}
+              aria-controls="menu-lateral"
+              onClick={() => setMenuAbierto(true)}
+              className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded text-white transition-colors hover:bg-[#1E1E23]"
+            >
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-[22px] w-[22px]"><path d="M3 6h18M3 12h18M3 18h18" /></svg>
+            </button>
+            <div className="relative flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-lg bg-white">
+              <span className="font-display text-[13px] font-bold leading-none tracking-tight text-ink">V</span>
+              <span className="absolute bottom-1 right-1 h-[3px] w-[3px] rounded-full bg-accent" aria-hidden="true" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <div className="truncate font-display text-[14px] font-bold leading-tight tracking-tight text-white">VIM POS</div>
+              <div className="truncate text-[11.5px] leading-tight text-[#76767E]">{sucursales?.nombre ?? "—"}</div>
+            </div>
+            <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full border border-[#2C2C32] bg-[#2A2A30] font-display text-[12px] font-semibold text-white">
+              {iniciales(perfil?.nombre ?? "U")}
+            </div>
+          </header>
+          {children}
+        </div>
       </div>
     </PerfilCtx.Provider>
   );

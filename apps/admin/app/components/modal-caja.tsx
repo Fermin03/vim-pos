@@ -73,7 +73,7 @@ export function ModalCaja({
       onClose={onCerrar}
       title={editar ? "Editar caja" : "Nueva caja"}
       hideTitle
-      className="w-[460px] rounded-lg border border-line bg-surface p-6 shadow-[0_18px_44px_rgba(22,22,26,.18)]"
+      className="w-full max-w-[460px] rounded-lg border border-line bg-surface p-6 shadow-[0_18px_44px_rgba(22,22,26,.18)]"
     >
       <div className="mb-5">
         <h2 className="font-display text-xl font-semibold tracking-tight">{editar ? "Editar caja" : "Nueva caja"}</h2>
@@ -90,12 +90,12 @@ export function ModalCaja({
           </select>
         </div>
 
-        <div className="grid grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
           <div>
             <label className={label} htmlFor="c-num">Número</label>
             <input id="c-num" className={input} value={numero} inputMode="numeric" onChange={(e) => setNumero(e.target.value.replace(/[^0-9]/g, ""))} placeholder="1" />
           </div>
-          <div className="col-span-2">
+          <div className="sm:col-span-2">
             <label className={label} htmlFor="c-nom">Nombre</label>
             <input id="c-nom" className={input} value={nombre} maxLength={100} onChange={(e) => setNombre(e.target.value)} placeholder="Caja 01" />
           </div>

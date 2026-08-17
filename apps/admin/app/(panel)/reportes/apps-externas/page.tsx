@@ -43,7 +43,7 @@ export default function AppsExternasPage() {
                 Venta por apps en el rango: <b>{fmtMxn(totVenta)}</b> · Comisiones registradas: <b>{fmtMxn(totComision)}</b>
               </p>
             )}
-            <div className="overflow-hidden rounded-lg border border-line bg-surface">
+            <div className="tabla-caja tabla-caja-xl overflow-hidden rounded-lg border border-line bg-surface">
               <table className="w-full text-[13px]">
                 <thead><tr className="border-b border-line bg-sel text-left text-[11.5px] font-bold uppercase tracking-wide text-ink-3">
                   <th className="px-4 py-2.5">Día</th><th className="px-4 py-2.5">App</th><th className="px-4 py-2.5">Folio POS</th><th className="px-4 py-2.5">Folio app</th><th className="px-4 py-2.5 text-right">Total POS</th><th className="px-4 py-2.5 text-right">Comisión</th><th className="px-4 py-2.5 text-right">Neto app</th><th className="px-4 py-2.5">Conciliación</th>

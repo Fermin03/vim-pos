@@ -33,7 +33,7 @@ export default function VentasPorCategoriaPage() {
         {filas === null && !error && <p className="text-sm text-ink-3">Cargando…</p>}
         {error && <p className="text-sm font-medium text-danger" role="alert">{error}</p>}
         {filas && (
-          <div className="overflow-hidden rounded-lg border border-line bg-surface">
+          <div className="tabla-caja overflow-hidden rounded-lg border border-line bg-surface">
             <table className="w-full text-[13px]">
               <thead>
                 <tr className="border-b border-line bg-sel text-left text-[11.5px] font-bold uppercase tracking-wide text-ink-3">

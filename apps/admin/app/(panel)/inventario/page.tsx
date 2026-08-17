@@ -194,20 +194,20 @@ export default function InventarioPage() {
           <div className="overflow-hidden rounded-lg border border-line bg-surface">
             {/* Filtros por estado + búsqueda */}
             <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line px-4 py-3">
-              <div className="inline-flex gap-0.5 rounded border border-line bg-hover p-[3px]">
+              <div className="scroll-x-limpio inline-flex max-w-full gap-0.5 overflow-x-auto rounded border border-line bg-hover p-[3px] lg:max-w-none lg:overflow-x-visible">
                 {TABS.map((t) => (
                   <button
                     key={t.v}
                     type="button"
                     onClick={() => { setFiltro(t.v); setPagina(1); }}
-                    className={["rounded-[4px] px-3 py-1.5 text-[12.5px] font-semibold transition", filtro === t.v ? "bg-surface text-ink shadow-sm" : "text-ink-2 hover:text-ink"].join(" ")}
+                    className={["flex-shrink-0 whitespace-nowrap rounded-[4px] px-3 py-[11px] text-[12.5px] font-semibold transition lg:py-1.5", filtro === t.v ? "bg-surface text-ink shadow-sm" : "text-ink-2 hover:text-ink"].join(" ")}
                   >
                     {t.l}
                   </button>
                 ))}
               </div>
               <input
-                className="h-9 w-[220px] rounded border border-line-strong px-3 text-[13px] outline-none focus:border-ink"
+                className="h-9 w-full rounded border sm:w-[220px] border-line-strong px-3 text-[13px] outline-none focus:border-ink"
                 value={busqueda}
                 onChange={(e) => { setBusqueda(e.target.value); setPagina(1); }}
                 placeholder="Buscar insumo…"
@@ -215,55 +215,57 @@ export default function InventarioPage() {
               />
             </div>
 
-            <table className="w-full text-[13.5px]">
-              <thead>
-                <tr className="border-b border-line bg-sel text-left text-[11.5px] uppercase tracking-wide text-ink-3">
-                  <th className="px-4 py-2.5 font-semibold">Insumo</th>
-                  <th className="px-4 py-2.5 font-semibold">Categoría</th>
-                  <th className="px-4 py-2.5 text-right font-semibold">Stock actual</th>
-                  <th className="px-4 py-2.5 text-right font-semibold">Mínimo</th>
-                  <th className="px-4 py-2.5 font-semibold">Estado</th>
-                  <th className="px-4 py-2.5 text-right font-semibold">Costo</th>
-                  <th className="px-4 py-2.5"></th>
-                </tr>
-              </thead>
-              <tbody>
-                {visibles.map((i) => {
-                  const est = estadoDe(i);
-                  return (
-                    <tr key={i.id} className="border-b border-line last:border-b-0">
-                      <td className="px-4 py-2.5 font-medium">{i.nombre}</td>
-                      <td className="px-4 py-2.5 text-ink-2">{LABEL_CATEGORIA[i.categoria as keyof typeof LABEL_CATEGORIA] ?? (i.categoria || "—")}</td>
-                      <td className="px-4 py-2.5 text-right tabular-nums">
-                        <span className={est === "AGOTADO" ? "font-bold text-danger" : est === "BAJO" ? "font-bold text-warning" : ""}>
-                          {i.stockActual} {i.unidadSimbolo}
-                        </span>
-                      </td>
-                      <td className="px-4 py-2.5 text-right tabular-nums text-ink-3">{i.stockMinimo} {i.unidadSimbolo}</td>
-                      <td className="px-4 py-2.5">
-                        <span className={`inline-block rounded-full px-2 py-0.5 text-[11px] font-bold ${BADGE[est].clase}`}>{BADGE[est].texto}</span>
-                      </td>
-                      <td className="px-4 py-2.5 text-right tabular-nums text-ink-2">{fmt(i.costoUnitario)}</td>
-                      <td className="px-4 py-2.5 text-right whitespace-nowrap">
-                        <button type="button" onClick={() => setMoviendo(i)} className="text-[12.5px] font-semibold text-ink-2 hover:text-ink">Movimiento</button>
-                        <button type="button" onClick={() => editar(i)} className="ml-3 text-[12.5px] font-semibold text-ink-3 hover:text-ink">Editar</button>
-                        <button type="button" onClick={() => borrar(i)} className="ml-3 text-[12.5px] font-semibold text-ink-3 hover:text-danger">Eliminar</button>
+            <div className="tabla-caja tabla-caja-xl">
+              <table className="w-full text-[13.5px]">
+                <thead>
+                  <tr className="border-b border-line bg-sel text-left text-[11.5px] uppercase tracking-wide text-ink-3">
+                    <th className="px-4 py-2.5 font-semibold">Insumo</th>
+                    <th className="px-4 py-2.5 font-semibold">Categoría</th>
+                    <th className="px-4 py-2.5 text-right font-semibold">Stock actual</th>
+                    <th className="px-4 py-2.5 text-right font-semibold">Mínimo</th>
+                    <th className="px-4 py-2.5 font-semibold">Estado</th>
+                    <th className="px-4 py-2.5 text-right font-semibold">Costo</th>
+                    <th className="px-4 py-2.5"></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {visibles.map((i) => {
+                    const est = estadoDe(i);
+                    return (
+                      <tr key={i.id} className="border-b border-line last:border-b-0">
+                        <td className="px-4 py-2.5 font-medium">{i.nombre}</td>
+                        <td className="px-4 py-2.5 text-ink-2">{LABEL_CATEGORIA[i.categoria as keyof typeof LABEL_CATEGORIA] ?? (i.categoria || "—")}</td>
+                        <td className="px-4 py-2.5 text-right tabular-nums">
+                          <span className={est === "AGOTADO" ? "font-bold text-danger" : est === "BAJO" ? "font-bold text-warning" : ""}>
+                            {i.stockActual} {i.unidadSimbolo}
+                          </span>
+                        </td>
+                        <td className="px-4 py-2.5 text-right tabular-nums text-ink-3">{i.stockMinimo} {i.unidadSimbolo}</td>
+                        <td className="px-4 py-2.5">
+                          <span className={`inline-block rounded-full px-2 py-0.5 text-[11px] font-bold ${BADGE[est].clase}`}>{BADGE[est].texto}</span>
+                        </td>
+                        <td className="px-4 py-2.5 text-right tabular-nums text-ink-2">{fmt(i.costoUnitario)}</td>
+                        <td className="px-4 py-2.5 text-right whitespace-nowrap">
+                          <button type="button" onClick={() => setMoviendo(i)} className="text-[12.5px] font-semibold text-ink-2 hover:text-ink">Movimiento</button>
+                          <button type="button" onClick={() => editar(i)} className="ml-3 text-[12.5px] font-semibold text-ink-3 hover:text-ink">Editar</button>
+                          <button type="button" onClick={() => borrar(i)} className="ml-3 text-[12.5px] font-semibold text-ink-3 hover:text-danger">Eliminar</button>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                  {visibles.length === 0 && (
+                    <tr>
+                      <td colSpan={7} className="px-4 py-10 text-center">
+                        <p className="text-[14px] font-semibold text-ink-2">Sin resultados</p>
+                        <p className="mt-1 text-[12.5px] text-ink-3">No hay insumos que coincidan con tu búsqueda o filtro.</p>
                       </td>
                     </tr>
-                  );
-                })}
-                {visibles.length === 0 && (
-                  <tr>
-                    <td colSpan={7} className="px-4 py-10 text-center">
-                      <p className="text-[14px] font-semibold text-ink-2">Sin resultados</p>
-                      <p className="mt-1 text-[12.5px] text-ink-3">No hay insumos que coincidan con tu búsqueda o filtro.</p>
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
+                  )}
+                </tbody>
+              </table>
+            </div>
 
-            <div className="flex items-center justify-between gap-3 border-t border-line px-4 py-3">
+            <div className="flex flex-wrap items-center justify-between gap-3 border-t border-line px-4 py-3">
               <span className="text-[12.5px] text-ink-3">Mostrando {visibles.length} de {filtrados.length} insumos</span>
               {totalPaginas > 1 && (
                 <div className="flex items-center gap-1">
@@ -287,7 +289,7 @@ export default function InventarioPage() {
                 <label className={label} htmlFor="i-nombre">Nombre</label>
                 <input id="i-nombre" className={input} value={editando.datos.nombre} maxLength={150} onChange={(e) => set("nombre", e.target.value)} placeholder="Carne molida" />
               </div>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div>
                   <label className={label} htmlFor="i-cat">Categoría</label>
                   <select id="i-cat" className={input} value={editando.datos.categoria} onChange={(e) => set("categoria", e.target.value as FormDatos["categoria"])}>
@@ -301,7 +303,7 @@ export default function InventarioPage() {
                   </select>
                 </div>
               </div>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div>
                   <label className={label} htmlFor="i-costo">Costo por unidad</label>
                   <input id="i-costo" className={input} value={editando.datos.costo} inputMode="decimal" onChange={(e) => set("costo", e.target.value.replace(/[^0-9.]/g, ""))} placeholder="0.00" />
@@ -384,8 +386,8 @@ function ModalMovimiento({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/30 p-4" role="dialog">
-      <div className="w-[420px] rounded-lg border border-line bg-surface p-6 shadow-[0_18px_44px_rgba(22,22,26,.18)]">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/30 p-4">
+      <div role="dialog" aria-modal="true" aria-label="Movimiento de inventario" className="w-full max-w-[420px] rounded-lg border border-line bg-surface p-6 shadow-[0_18px_44px_rgba(22,22,26,.18)]">
         <div className="mb-4">
           <h2 className="font-display text-xl font-semibold tracking-tight">Movimiento de inventario</h2>
           <p className="mt-0.5 text-[13px] text-ink-3">{insumo.nombre} · stock {insumo.stockActual} {insumo.unidadSimbolo}</p>
@@ -409,7 +411,7 @@ function ModalMovimiento({
           </div>
         )}
 
-        <div className="mb-3 grid grid-cols-2 gap-4">
+        <div className="mb-3 grid grid-cols-1 gap-4 sm:grid-cols-2">
           <div>
             <label className={label} htmlFor="m-cant">Cantidad ({insumo.unidadSimbolo})</label>
             <input id="m-cant" className={input} value={cantidad} inputMode="decimal" autoFocus onChange={(e) => setCantidad(e.target.value.replace(/[^0-9.]/g, ""))} placeholder="0" />
