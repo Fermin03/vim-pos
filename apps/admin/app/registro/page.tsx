@@ -93,7 +93,7 @@ export default function RegistroPage() {
   }
 
   return (
-    <main className="flex min-h-screen flex-col items-center justify-center bg-sel p-6">
+    <main className="flex min-h-[100dvh] flex-col items-center justify-center bg-sel px-5 py-10 sm:p-6">
       <div className="flex w-full max-w-[460px] flex-col">
         <div className="mb-8 flex flex-col items-center gap-4">
           <div className="relative flex h-[46px] w-[46px] items-center justify-center rounded-[11px] bg-ink">

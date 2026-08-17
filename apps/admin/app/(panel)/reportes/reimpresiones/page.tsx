@@ -27,7 +27,7 @@ export default function ReimpresionesPage() {
         {filas === null && !error && <p className="text-sm text-ink-3">Cargando…</p>}
         {error && <p className="text-sm font-medium text-danger" role="alert">{error}</p>}
         {filas && (
-          <div className="overflow-hidden rounded-lg border border-line bg-surface">
+          <div className="tabla-caja tabla-caja-sm overflow-hidden rounded-lg border border-line bg-surface">
             <table className="w-full text-[13px]">
               <thead><tr className="border-b border-line bg-sel text-left text-[11.5px] font-bold uppercase tracking-wide text-ink-3">
                 <th className="px-4 py-2.5">Cajero</th><th className="px-4 py-2.5 text-right">Reimpresiones</th><th className="px-4 py-2.5 text-right">Tickets distintos</th><th className="px-4 py-2.5 text-right">Reimp. por ticket</th>

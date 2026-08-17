@@ -45,7 +45,7 @@ export function ModalResetearPin({
       onClose={onCerrar}
       title={`Resetear PIN de ${usuario.nombre}`}
       hideTitle
-      className="w-[400px] rounded-lg border border-line bg-surface p-6 shadow-xl"
+      className="w-full max-w-[400px] rounded-lg border border-line bg-surface p-6 shadow-xl"
     >
       <div className="mb-5">
         <h2 className="font-display text-xl font-semibold tracking-tight">Resetear PIN</h2>

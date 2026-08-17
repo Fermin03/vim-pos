@@ -30,7 +30,7 @@ export default function DescuentosPage() {
         {filas && (
           <>
             {filas.length > 0 && <p className="mb-3 text-[13px] text-ink-2">Total descontado en el rango: <b>{fmtMxn(totalGeneral)}</b></p>}
-            <div className="overflow-hidden rounded-lg border border-line bg-surface">
+            <div className="tabla-caja tabla-caja-sm overflow-hidden rounded-lg border border-line bg-surface">
               <table className="w-full text-[13px]">
                 <thead><tr className="border-b border-line bg-sel text-left text-[11.5px] font-bold uppercase tracking-wide text-ink-3">
                   <th className="px-4 py-2.5">Usuario</th><th className="px-4 py-2.5 text-right">Descuentos</th><th className="px-4 py-2.5 text-right">Total</th><th className="px-4 py-2.5 text-right">Promedio</th>

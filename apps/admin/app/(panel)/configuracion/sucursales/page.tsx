@@ -59,7 +59,7 @@ export default function SucursalesPage() {
         {list === null && <p className="text-sm text-ink-3">Cargando…</p>}
 
         {list !== null && (
-          <div className="overflow-hidden rounded-lg border border-line bg-surface">
+          <div className="tabla-caja overflow-hidden rounded-lg border border-line bg-surface">
             <table className="w-full border-collapse">
               <thead>
                 <tr>
@@ -105,11 +105,11 @@ export default function SucursalesPage() {
                       </span>
                     </td>
                     <td className="px-4 py-3.5 text-right" onClick={(e) => e.stopPropagation()}>
-                      <span className="inline-flex gap-1 opacity-0 transition-opacity group-hover:opacity-100">
-                        <button type="button" title="Editar" onClick={() => setModal({ sucursal: s })} className="flex h-8 w-8 items-center justify-center rounded border border-transparent text-ink-3 transition hover:border-line-strong hover:bg-surface hover:text-ink">
+                      <span className="inline-flex gap-1 transition-opacity lg:opacity-0 lg:group-hover:opacity-100">
+                        <button type="button" title="Editar" onClick={() => setModal({ sucursal: s })} className="flex h-10 w-10 items-center justify-center rounded border border-transparent lg:h-8 lg:w-8 text-ink-3 transition hover:border-line-strong hover:bg-surface hover:text-ink">
                           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-4 w-4"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" /><path d="M18.5 2.5a2.1 2.1 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" /></svg>
                         </button>
-                        <button type="button" title="Eliminar" onClick={() => setBorrar(s)} className="flex h-8 w-8 items-center justify-center rounded border border-transparent text-ink-3 transition hover:border-[#E8C5C0] hover:text-danger">
+                        <button type="button" title="Eliminar" onClick={() => setBorrar(s)} className="flex h-10 w-10 items-center justify-center rounded border border-transparent lg:h-8 lg:w-8 text-ink-3 transition hover:border-[#E8C5C0] hover:text-danger">
                           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-4 w-4"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" /></svg>
                         </button>
                       </span>
@@ -142,7 +142,7 @@ export default function SucursalesPage() {
       )}
 
       {borrar && (
-        <Modal open onClose={() => setBorrar(null)} title="Eliminar sucursal" className="w-[400px] rounded-lg border border-line bg-surface p-6 shadow-xl">
+        <Modal open onClose={() => setBorrar(null)} title="Eliminar sucursal" className="w-full max-w-[400px] rounded-lg border border-line bg-surface p-6 shadow-xl">
           <p className="text-sm text-ink-2">
             ¿Eliminar <b className="text-ink">{borrar.nombre}</b>?
             {borrar.nCajas > 0 && <> Tiene <b>{borrar.nCajas}</b> caja(s).</>}

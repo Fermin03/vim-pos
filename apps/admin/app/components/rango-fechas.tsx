@@ -26,7 +26,7 @@ export function RangoFechas({
   }
 
   const input =
-    "h-9 rounded border border-line-strong px-2.5 text-[12.5px] outline-none focus:border-ink";
+    "h-10 rounded border border-line-strong px-2.5 text-[12.5px] outline-none focus:border-ink lg:h-9";
 
   return (
     <div className="flex flex-wrap items-center gap-2 rounded-lg border border-line bg-surface p-3">
@@ -37,11 +37,11 @@ export function RangoFechas({
       <button
         type="button"
         onClick={() => onCambio(d, h)}
-        className="h-9 rounded bg-ink px-3 text-[12.5px] font-semibold text-white transition hover:opacity-90"
+        className="h-10 rounded bg-ink px-3.5 text-[12.5px] font-semibold text-white transition hover:opacity-90 lg:h-9 lg:px-3"
       >
         Aplicar
       </button>
-      <div className="ml-1 flex gap-1">
+      <div className="flex gap-1 lg:ml-1">
         {[
           { l: "Hoy", n: 1 },
           { l: "7 días", n: 7 },
@@ -52,7 +52,7 @@ export function RangoFechas({
             key={p.l}
             type="button"
             onClick={() => presetUltimos(p.n)}
-            className="h-9 rounded border border-line-strong px-2.5 text-[12px] font-semibold text-ink-2 transition hover:border-ink hover:text-ink"
+            className="h-10 rounded border border-line-strong px-2.5 text-[12px] font-semibold text-ink-2 transition hover:border-ink hover:text-ink lg:h-9"
           >
             {p.l}
           </button>

@@ -62,7 +62,7 @@ export function ModalCategoria({
       onClose={onCerrar}
       title={editar ? "Editar categoría" : "Nueva categoría"}
       hideTitle
-      className="w-[460px] rounded-lg border border-line bg-surface p-6 shadow-[0_18px_44px_rgba(22,22,26,.18)]"
+      className="w-full max-w-[460px] rounded-lg border border-line bg-surface p-6 shadow-[0_18px_44px_rgba(22,22,26,.18)]"
     >
       <div className="mb-5">
         <h2 className="font-display text-xl font-semibold tracking-tight">

@@ -51,12 +51,12 @@ export default function ConsolidadoPage() {
               ].map((k) => (
                 <div key={k.label} className="rounded-lg border border-line bg-surface px-4 py-3">
                   <div className="text-[11.5px] font-bold uppercase tracking-wide text-ink-3">{k.label}</div>
-                  <div className="mt-1 font-display text-[22px] font-bold tabular-nums">{k.valor}</div>
+                  <div className="mt-1 font-display text-[18px] font-bold tabular-nums lg:text-[22px]">{k.valor}</div>
                 </div>
               ))}
             </div>
 
-            <div className="overflow-hidden rounded-lg border border-line bg-surface">
+            <div className="tabla-caja tabla-caja-xl overflow-hidden rounded-lg border border-line bg-surface">
               <table className="w-full text-[13px]">
                 <thead><tr className="border-b border-line bg-sel text-left text-[11.5px] font-bold uppercase tracking-wide text-ink-3">
                   <th className="px-4 py-2.5">{agrupar === "sucursal" ? "Sucursal" : "Franquicia"}</th><th className="px-4 py-2.5 text-right">Tickets</th><th className="px-4 py-2.5 text-right">Venta</th><th className="px-4 py-2.5 text-right">Ticket prom.</th><th className="px-4 py-2.5 text-right">Propinas</th><th className="px-4 py-2.5 text-right">Descuentos</th><th className="px-4 py-2.5 text-right">Devoluciones</th><th className="px-4 py-2.5 text-right">Participación</th>

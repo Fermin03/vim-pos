@@ -53,7 +53,7 @@ export default function FacturacionPage() {
         {error && <p className="mb-3 text-sm font-medium text-danger" role="alert">{error}</p>}
         {tickets === null && !error && <p className="text-sm text-ink-3">Cargando…</p>}
         {tickets !== null && (
-          <div className="overflow-hidden rounded-lg border border-line bg-surface">
+          <div className="tabla-caja overflow-hidden rounded-lg border border-line bg-surface">
             <table className="w-full text-[13px]">
               <thead><tr className="border-b border-line bg-sel text-left text-[11.5px] font-bold uppercase tracking-wide text-ink-3">
                 <th className="px-4 py-2.5">Folio</th><th className="px-4 py-2.5">Día</th><th className="px-4 py-2.5 text-right">Total</th><th className="px-4 py-2.5">CFDI</th><th className="px-4 py-2.5 text-right">Acción</th>
@@ -142,7 +142,7 @@ function PanelFacturar({ ticket, onCerrar }: { ticket: TicketFacturable; onCerra
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/40 p-4" role="dialog" aria-modal="true" aria-label="Facturar ticket">
       <div className="w-full max-w-xl rounded-lg bg-surface p-6 shadow-xl">
-        <div className="mb-4 flex items-center justify-between">
+        <div className="mb-4 flex flex-wrap items-start justify-between gap-x-3 gap-y-2 sm:items-center">
           <h2 className="font-display text-lg font-semibold">Facturar {ticket.folio ?? "ticket"} · {fmtMxn(ticket.total)}</h2>
           <button type="button" onClick={() => onCerrar(resultado?.ok === true)} className="rounded px-2 py-1 text-[13px] font-semibold text-ink-3 hover:bg-hover hover:text-ink">Cerrar</button>
         </div>

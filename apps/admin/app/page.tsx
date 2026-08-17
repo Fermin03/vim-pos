@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@vim/ui/styles";
 import { entrar, entrarConProveedor, leerSesion } from "./lib/supabase";
+import { mensajeError } from "./lib/errores";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -34,14 +35,16 @@ export default function LoginPage() {
     try {
       await entrar(email.trim(), password);
       router.replace("/dashboard");
-    } catch {
-      setAlerta("Email o contraseña incorrectos. Revisa tus datos e intenta de nuevo.");
+    } catch (e) {
+      // Antes cualquier fallo decía "contraseña incorrecta", incluso cuando el backend
+      // estaba caído: el usuario revisaba sus datos una y otra vez sin razón.
+      setAlerta(mensajeError(e, "No se pudo iniciar sesión. Inténtalo de nuevo."));
       setCargando(false);
     }
   }
 
   return (
-    <main className="flex h-screen flex-col items-center justify-center p-6">
+    <main className="flex min-h-[100dvh] flex-col items-center justify-center px-5 py-10 sm:p-6">
       <div className="flex w-full max-w-[380px] flex-col">
         {/* Marca */}
         <div className="mb-8 flex flex-col items-center gap-4">

@@ -55,7 +55,7 @@ export default function ConciliacionPage() {
             <p className="mt-1 text-[13px] text-ink-3">Sube el reporte de Rappi/Uber/DiDi para cuadrarlo contra tus ventas del POS.</p>
           </div>
         ) : (
-          <div className="overflow-hidden rounded-lg border border-line">
+          <div className="tabla-caja tabla-caja-xl overflow-hidden rounded-lg border border-line">
             <table className="w-full text-sm">
               <thead className="bg-sel text-[11.5px] font-bold uppercase tracking-wide text-ink-3">
                 <tr>
@@ -124,9 +124,9 @@ function ModalNueva({ onCerrar, onCreada }: { onCerrar: () => void; onCreada: ()
   }
 
   return (
-    <Modal open onClose={onCerrar} title="Nueva liquidación" className="w-[560px] rounded-lg border border-line bg-surface p-6 shadow-xl">
+    <Modal open onClose={onCerrar} title="Nueva liquidación" className="w-full max-w-[560px] rounded-lg border border-line bg-surface p-6 shadow-xl">
       <h2 className="mb-4 font-display text-xl font-semibold">Nueva liquidación</h2>
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <label className="text-[12.5px] font-medium text-ink-2">App
           <select className={input} value={app} onChange={(e) => setApp(e.target.value as AppExterna)}>
             {APPS.map((a) => <option key={a} value={a}>{LABEL_APP[a]}</option>)}
@@ -141,10 +141,10 @@ function ModalNueva({ onCerrar, onCreada }: { onCerrar: () => void; onCreada: ()
         <label className="text-[12.5px] font-medium text-ink-2">Período fin
           <input type="date" className={input} value={fin} onChange={(e) => setFin(e.target.value)} />
         </label>
-        <label className="col-span-2 text-[12.5px] font-medium text-ink-2">Total depositado por la app
+        <label className="sm:col-span-2 text-[12.5px] font-medium text-ink-2">Total depositado por la app
           <input className={input} inputMode="decimal" value={liquidado} onChange={(e) => setLiquidado(e.target.value)} placeholder="0.00" />
         </label>
-        <label className="col-span-2 text-[12.5px] font-medium text-ink-2">Renglones del reporte (uno por línea: <code>folio,monto,neto,fecha</code>)
+        <label className="sm:col-span-2 text-[12.5px] font-medium text-ink-2">Renglones del reporte (uno por línea: <code>folio,monto,neto,fecha</code>)
           <textarea className="mt-1 h-32 w-full rounded border border-line-strong p-2 font-mono text-[12px] outline-none focus:border-ink"
             value={renglones} onChange={(e) => setRenglones(e.target.value)}
             placeholder={"R-A4F92B,150.00,128.50,2026-05-22\nR-B81C03,200.00,171.00,2026-05-22"} />
@@ -166,7 +166,7 @@ function ResumenCard({ n, titulo, pie, tono }: { n: number; titulo: string; pie:
   const color = tono === "ok" ? "text-success" : tono === "warn" ? "text-warning" : tono === "bad" ? "text-danger" : "text-ink-3";
   return (
     <div className="rounded-lg border border-line bg-surface p-3">
-      <div className={`font-display text-[22px] font-bold tabular-nums ${color}`}>{n}</div>
+      <div className={`font-display text-[18px] font-bold tabular-nums lg:text-[22px] ${color}`}>{n}</div>
       <div className="text-[12px] font-semibold">{titulo}</div>
       <div className="mt-px text-[11px] text-ink-3">{pie}</div>
     </div>
@@ -193,7 +193,7 @@ function ModalDetalle({ liq, items, onCerrar }: { liq: Liquidacion; items: ItemC
     filtro === "CONCILIADOS" ? conciliados : filtro === "PROBLEMAS" ? [...conDiferencia, ...sinMatch] : todos;
 
   return (
-    <Modal open onClose={onCerrar} title="Detalle de conciliación" className="w-[620px] rounded-lg border border-line bg-surface p-6 shadow-xl">
+    <Modal open onClose={onCerrar} title="Detalle de conciliación" className="w-full max-w-[620px] rounded-lg border border-line bg-surface p-6 shadow-xl">
       <div className="mb-4 flex items-start justify-between">
         <div>
           <h2 className="font-display text-xl font-semibold">{LABEL_APP[liq.appExterna]} · {liq.periodoInicio}–{liq.periodoFin}</h2>
@@ -206,13 +206,13 @@ function ModalDetalle({ liq, items, onCerrar }: { liq: Liquidacion; items: ItemC
       ) : (
         <>
           {/* Desglose del cuadre (P-210): a dónde se fue cada peso de la liquidación. */}
-          <div className="mb-4 grid grid-cols-3 gap-2">
+          <div className="mb-4 grid grid-cols-1 gap-2 sm:grid-cols-3">
             <ResumenCard n={conciliados.length} titulo="Conciliados" pie={`${mxn(montoConciliado)} coinciden`} tono="ok" />
             <ResumenCard n={conDiferencia.length} titulo="Con diferencia" pie={`${mxn(montoDiferencia)} de descuadre`} tono={conDiferencia.length > 0 ? "warn" : "neutro"} />
             <ResumenCard n={sinMatch.length} titulo="En app, no en POS" pie={`${mxn(montoSinMatch)} a revisar`} tono={sinMatch.length > 0 ? "bad" : "neutro"} />
           </div>
 
-          <div className="mb-3 inline-flex gap-0.5 rounded border border-line bg-hover p-[3px]">
+          <div className="mb-3 scroll-x-limpio inline-flex max-w-full gap-0.5 overflow-x-auto rounded border border-line bg-hover p-[3px] lg:max-w-none lg:overflow-x-visible">
             {([
               { v: "TODOS", l: `Todos ${items.length}` },
               { v: "CONCILIADOS", l: `Conciliados ${conciliados.length}` },
@@ -222,14 +222,14 @@ function ModalDetalle({ liq, items, onCerrar }: { liq: Liquidacion; items: ItemC
                 key={t.v}
                 type="button"
                 onClick={() => setFiltro(t.v)}
-                className={["rounded-[4px] px-3 py-1.5 text-[12.5px] font-semibold transition", filtro === t.v ? "bg-surface text-ink shadow-sm" : "text-ink-2 hover:text-ink"].join(" ")}
+                className={["flex-shrink-0 whitespace-nowrap rounded-[4px] px-3 py-[11px] text-[12.5px] font-semibold transition lg:py-1.5", filtro === t.v ? "bg-surface text-ink shadow-sm" : "text-ink-2 hover:text-ink"].join(" ")}
               >
                 {t.l}
               </button>
             ))}
           </div>
 
-          <div className="max-h-[340px] overflow-y-auto rounded border border-line">
+          <div className="tabla-caja tabla-caja-sm max-h-[340px] overflow-y-auto rounded border border-line">
             <table className="w-full text-[13px]">
               <thead className="sticky top-0 bg-sel text-[11px] font-bold uppercase text-ink-3">
                 <tr><th className="px-3 py-2 text-left">Folio app</th><th className="px-3 py-2 text-right">Monto</th><th className="px-3 py-2 text-left">Ticket POS</th><th className="px-3 py-2 text-right">Dif.</th></tr>

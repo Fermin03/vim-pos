@@ -62,7 +62,7 @@ export function ModalNuevoUsuario({
       onClose={onCerrar}
       title="Invitar usuario"
       hideTitle
-      className="w-[480px] rounded-lg border border-line bg-surface p-6 shadow-[0_18px_44px_rgba(22,22,26,.18)]"
+      className="w-full max-w-[480px] rounded-lg border border-line bg-surface p-6 shadow-[0_18px_44px_rgba(22,22,26,.18)]"
     >
       <div className="mb-5">
         <h2 className="font-display text-xl font-semibold tracking-tight">Invitar usuario</h2>

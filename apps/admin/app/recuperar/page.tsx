@@ -61,7 +61,7 @@ export default function RecuperarPage() {
   }
 
   return (
-    <main className="flex h-screen flex-col items-center justify-center p-6">
+    <main className="flex min-h-[100dvh] flex-col items-center justify-center px-5 py-10 sm:p-6">
       <div className="flex w-full max-w-[380px] flex-col">
         <div className="mb-8 flex flex-col items-center gap-4">
           <div className="relative flex h-[46px] w-[46px] items-center justify-center rounded-[11px] bg-ink">
