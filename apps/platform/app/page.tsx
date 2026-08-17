@@ -1,5 +1,9 @@
 "use client";
 import { useCallback, useEffect, useState } from "react";
+import { Atencion } from "./components/atencion";
+import { Bitacora } from "./components/bitacora";
+import { SaludTenant } from "./components/salud-tenant";
+import type { Api } from "./lib/tipos";
 
 const input = "h-11 w-full rounded border border-line-strong px-3 text-sm outline-none focus:border-ink focus:shadow-[0_0_0_3px_rgba(22,22,26,.06)]";
 const label = "mb-1.5 block text-[13px] font-medium text-ink-2";
@@ -32,7 +36,9 @@ export default function PlatformHome() {
   const [platformKey, setPlatformKey] = useState("");
   const [autenticado, setAutenticado] = useState(false);
   const [keyError, setKeyError] = useState<string | null>(null);
-  const [tab, setTab] = useState<"metricas" | "empresas" | "nuevo">("metricas");
+  const [tab, setTab] = useState<"atencion" | "metricas" | "empresas" | "bitacora" | "nuevo">("atencion");
+  // Empresa a abrir directo desde una alerta: evita ir a buscarla a mano en la lista.
+  const [tenantFoco, setTenantFoco] = useState<string | null>(null);
 
   const api = useCallback(
     async (path: string, init?: RequestInit) => {
@@ -77,21 +83,21 @@ export default function PlatformHome() {
           <span className="font-display text-[17px] font-bold tracking-tight">VIM Plataforma</span>
         </div>
         <nav className="ml-4 flex gap-1">
-          {([["metricas", "Métricas"], ["empresas", "Empresas"], ["nuevo", "Nuevo cliente"]] as const).map(([k, l]) => (
+          {([["atencion", "Atención"], ["metricas", "Métricas"], ["empresas", "Empresas"], ["bitacora", "Bitácora"], ["nuevo", "Nuevo cliente"]] as const).map(([k, l]) => (
             <button key={k} onClick={() => setTab(k)} className={["rounded px-3 py-1.5 text-[13px] font-semibold transition", tab === k ? "bg-ink text-white" : "text-ink-2 hover:bg-hover"].join(" ")}>{l}</button>
           ))}
         </nav>
       </header>
       <main className="mx-auto max-w-[1100px] p-8">
+        {tab === "atencion" && <Atencion api={api} onAbrirEmpresa={(id) => { setTenantFoco(id); setTab("empresas"); }} />}
         {tab === "metricas" && <Metricas api={api} />}
-        {tab === "empresas" && <Empresas api={api} />}
+        {tab === "empresas" && <Empresas api={api} foco={tenantFoco} onFocoUsado={() => setTenantFoco(null)} />}
+        {tab === "bitacora" && <Bitacora api={api} />}
         {tab === "nuevo" && <NuevoCliente api={api} onCreado={() => setTab("empresas")} />}
       </main>
     </div>
   );
 }
-
-type Api = (path: string, init?: RequestInit) => Promise<Record<string, unknown>>;
 
 function Card({ titulo, valor, sub }: { titulo: string; valor: string; sub?: string }) {
   return (
@@ -131,11 +137,15 @@ function Metricas({ api }: { api: Api }) {
   );
 }
 
-function Empresas({ api }: { api: Api }) {
+function Empresas({ api, foco, onFocoUsado }: { api: Api; foco?: string | null; onFocoUsado?: () => void }) {
   const [tenants, setTenants] = useState<Tenant[] | null>(null);
   const [q, setQ] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [sel, setSel] = useState<string | null>(null);
+
+  // Al llegar desde una alerta, la empresa se abre sola: el objetivo de la bandeja es que un
+  // pendiente se convierta en acción sin pasos intermedios.
+  useEffect(() => { if (foco) { setSel(foco); onFocoUsado?.(); } }, [foco, onFocoUsado]);
 
   const recargar = useCallback(async () => {
     try { setTenants(((await api("/api/tenants")).tenants ?? []) as Tenant[]); } catch (e) { setError(e instanceof Error ? e.message : "Error"); }
@@ -294,6 +304,14 @@ function DetalleDrawer({ api, id, onCerrar, onCambio }: { api: Api; id: string; 
                 </div>
               );
             })()}
+
+            {/* Salud operativa: va ARRIBA de las acciones a propósito. Antes de cambiarle el plan
+                o suspenderlo, lo primero que hay que saber de un cliente es si está usando el
+                sistema y si sus ventas están subiendo. */}
+            <div className="mt-4 border-t border-line pt-4">
+              <label className={label}>Salud operativa</label>
+              <SaludTenant api={api} id={id} />
+            </div>
 
             {/* Folios CFDI: regalar/ajustar */}
             <div className="mt-4">
