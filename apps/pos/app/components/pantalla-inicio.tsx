@@ -1,6 +1,7 @@
 "use client";
-import type { ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { useReloj } from "./topbar-pos";
+import { evaluarSync, leerEstadoSync, type NivelSync } from "../lib/estado-sync";
 import type { DatosCaja, Turno } from "../lib/turno";
 import type { Empleado } from "../lib/supabase";
 
@@ -60,6 +61,18 @@ export function PantallaInicio({
   onMenu: () => void;
 }) {
   const ahora = useReloj();
+
+  // Estado de sincronización: el cajero necesita poder ver que sus ventas están subiendo. Se
+  // relee cada minuto —el ciclo del escritorio corre cada 10— para que el aviso no se quede
+  // pegado tras recuperar la conexión.
+  const [sync, setSync] = useState<{ nivel: NivelSync; texto: string }>({ nivel: "desconocido", texto: "" });
+  useEffect(() => {
+    let vivo = true;
+    const cargar = () => { leerEstadoSync().then((e) => { if (vivo) setSync(evaluarSync(e)); }).catch(() => {}); };
+    cargar();
+    const id = setInterval(cargar, 60000);
+    return () => { vivo = false; clearInterval(id); };
+  }, []);
   // Sin turno abierto no hay dónde colgar un ticket (tickets.turno_id es obligatorio), así que
   // vender queda bloqueado hasta abrirlo: los accesos de venta salen apagados y "Abrir turno"
   // toma el lugar de "Cerrar turno".
@@ -196,6 +209,28 @@ export function PantallaInicio({
           <span className={["h-1.5 w-1.5 rounded-full", online ? "bg-success" : "bg-warning"].join(" ")} aria-hidden="true" />
           {online ? "Conectado" : "Sin conexión · modo offline"}
         </span>
+        {/* Solo aparece en la caja de escritorio (en el POS web no hay servidor local que
+            responda). Si lleva más de un día sin subir se pinta en rojo: ahí ya hay un turno
+            entero de ventas viviendo únicamente en esta computadora. */}
+        {sync.nivel !== "desconocido" && (
+          <span
+            className={[
+              "flex flex-shrink-0 items-center gap-1.5",
+              sync.nivel === "muda" || sync.nivel === "sin-vincular" ? "font-semibold text-danger" : "",
+              sync.nivel === "atrasada" ? "text-warning" : "",
+            ].join(" ")}
+            title={sync.nivel === "muda" ? "Las ventas no están llegando a la nube. Avisa a soporte." : undefined}
+          >
+            <span
+              className={[
+                "h-1.5 w-1.5 rounded-full",
+                sync.nivel === "ok" ? "bg-success" : sync.nivel === "atrasada" ? "bg-warning" : "bg-danger",
+              ].join(" ")}
+              aria-hidden="true"
+            />
+            {sync.texto}
+          </span>
+        )}
         <span className="flex-shrink-0 tabular-nums">
           {ahora ? ahora.toLocaleDateString("es-MX", { day: "2-digit", month: "2-digit", year: "numeric" }) : "—"}
           {" · "}
