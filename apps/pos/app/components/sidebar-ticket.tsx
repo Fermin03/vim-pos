@@ -79,6 +79,7 @@ export function SidebarTicket({
   onEnviarCocina,
   onEnviarCocinaAbierto,
   onPonerEnEspera,
+  folioCuenta,
   cocinaEnviada = false,
   enviandoCocina = false,
   onAplicarDescuento,
@@ -112,6 +113,8 @@ export function SidebarTicket({
   onEnviarCocinaAbierto?: () => void;
   /** D45 §12 — guarda el pedido en espera con etiqueta (flujo QS, sin cuenta de mesa). */
   onPonerEnEspera?: () => void;
+  /** Folio de la cuenta que se está editando. Ausente = ticket nuevo. */
+  folioCuenta?: string | null;
   cocinaEnviada?: boolean;
   enviandoCocina?: boolean;
   onAplicarDescuento: () => void;
@@ -150,8 +153,11 @@ export function SidebarTicket({
       <div className="flex-shrink-0 border-b border-line px-5 pb-3 pt-4">
         {/* fila superior: título + Limpiar */}
         <div className="flex items-center justify-between">
-          <span className="font-display text-[18px] font-semibold leading-tight tracking-[-0.02em]">
-            Ticket nuevo
+          {/* El título decía siempre "Ticket nuevo", incluso editando una cuenta ya abierta:
+              el cajero no tenía forma de saber si estaba agregando a un pedido existente o
+              capturando uno nuevo, que es justo la diferencia entre mandar a cocina y cobrar. */}
+          <span className="truncate font-display text-[18px] font-semibold leading-tight tracking-[-0.02em]">
+            {folioCuenta ? `Cuenta ${folioCuenta}` : "Ticket nuevo"}
           </span>
           <button
             type="button"

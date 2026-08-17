@@ -219,6 +219,51 @@ export function HomePos({
   );
 
   // T2 — re-lee el ticket de mesa y reconstruye el carrito tras un agregado incremental.
+  // Navegación: definidas aquí arriba a propósito. Los callbacks de "enviar a cocina"
+  // las listan en sus dependencias, y esas se evalúan durante el render — con la
+  // definición más abajo, la referencia caía en la zona muerta temporal del const.
+  const cerrarRecibo = useCallback(() => {
+    setConfirmacion(null);
+    setDatosTicket(null);
+    setDatosComanda(null);
+    setMostrarRecibo(false);
+  }, []);
+
+  /** Navegación por el topbar: descarta el recibo y, si estás en una cuenta de mesa, SALE de
+   *  ella (la cuenta queda abierta en la mesa, persistida en BD, y se retoma desde Mesas).
+   *  Sin esto, ticketBd quedaba colgado y el POS no volvía a un ticket QS limpio. */
+  const salirNavegacion = useCallback(() => {
+    cerrarRecibo();
+    if (enModoMesa) {
+      setEnModoMesa(false);
+      setTicketBd(null);
+      setItemsPersistidos([]);
+      setCocinaEnviada(false);
+      dispatch({ tipo: "limpiar" });
+    }
+  }, [cerrarRecibo, enModoMesa]);
+
+  /** Sale de la captura y regresa a la pantalla de la que se vino (no al inicio). */
+  const volverAtras = useCallback(() => {
+    salirNavegacion();
+    setEnMesas(volverA === "mesas");
+    setEnPickup(volverA === "pickup");
+    setEnDelivery(volverA === "domicilio");
+    setEnInicio(volverA === "inicio");
+  }, [salirNavegacion, volverA]);
+
+  /** Vuelve a la pantalla de inicio dejando la caja limpia (sale de la cuenta de mesa si la hubiera). */
+  const volverAlInicio = useCallback(() => {
+    salirNavegacion();
+    setEnMesas(false);
+    setEnPickup(false);
+    setEnDelivery(false);
+    setEnConsultaCuentas(false);
+    setEnDevoluciones(false);
+    setEnMonitor(false);
+    setEnInicio(true);
+  }, [salirNavegacion]);
+
   const recargarCuenta = useCallback(async () => {
     if (!ticketBd) return;
     const tId = ticketBd.ticketId;
@@ -290,6 +335,9 @@ export function HomePos({
 
   /** Entra en modo cuenta de mesa: carga el ticket persistido al carrito para seguir editando. */
   const entrarCuenta = useCallback(async (ticketId: string, origen: Origen = "inicio") => {
+    // Se arranca en "no enviado" y la consulta de abajo lo corrige. Dejar el valor de la cuenta
+    // anterior hacía que una cuenta nueva apareciera como ya enviada, con el botón inutilizable.
+    setCocinaEnviada(false);
     try {
       const [bd, recon, items] = await Promise.all([
         leerTotales(token, ticketId),
@@ -377,12 +425,16 @@ export function HomePos({
       const enviados = await enviarACocina(token, ticketBd.ticketId);
       setCocinaEnviada(true);
       await imprimirComandaCocina(ticketBd.ticketId, enviados, yaEstaba);
+      // El pedido ya está en cocina: quedarse en el catálogo obliga a buscar la salida a mano y
+      // se presta a seguir agregando productos a una comanda que ya salió. Se vuelve a la
+      // pantalla de la que se vino (mesas, pick-up o domicilio).
+      volverAtras();
     } catch (e) {
       setError(e instanceof Error ? e.message : "No se pudo enviar a cocina");
     } finally {
       setEnviandoCocina(false);
     }
-  }, [token, ticketBd, cocinaEnviada, imprimirComandaCocina]);
+  }, [token, ticketBd, cocinaEnviada, imprimirComandaCocina, volverAtras]);
 
   /** Persiste el ticket si aún no existe; abre el modal de descuento sobre ese ticket. */
   const onAplicarDescuento = useCallback(async () => {
@@ -512,12 +564,15 @@ export function HomePos({
       dispatch({ tipo: "limpiar" });
       setTicketBd(null);
       setItemsPersistidos([]);
+      setCocinaEnviada(false);
+      // Vuelve a la lista de cuentas del modo, que es donde el cajero sigue trabajando.
+      volverAtras();
     } catch (e) {
       setError(e instanceof Error ? e.message : "No se pudo enviar a cocina");
     } finally {
       setProcesandoCobro(false);
     }
-  }, [carrito, ticketBd, token, caja.sucursal_id, turno.caja_id, turno.id, cocinaEnviada, imprimirComandaCocina]);
+  }, [carrito, ticketBd, token, caja.sucursal_id, turno.caja_id, turno.id, cocinaEnviada, imprimirComandaCocina, volverAtras]);
 
   /** Logo del negocio listo para la térmica. Se rasteriza al vuelo (es rápido y evita
    *  guardar estado que se desincronice si cambian el logo desde el panel). Si no hay logo
@@ -552,47 +607,6 @@ export function HomePos({
 
   /** Descarta el overlay de confirmación/recibo (sin tocar el carrito en curso).
    *  Se llama al navegar por el topbar para que un recibo viejo no reaparezca apilado. */
-  const cerrarRecibo = useCallback(() => {
-    setConfirmacion(null);
-    setDatosTicket(null);
-    setDatosComanda(null);
-    setMostrarRecibo(false);
-  }, []);
-
-  /** Navegación por el topbar: descarta el recibo y, si estás en una cuenta de mesa, SALE de
-   *  ella (la cuenta queda abierta en la mesa, persistida en BD, y se retoma desde Mesas).
-   *  Sin esto, ticketBd quedaba colgado y el POS no volvía a un ticket QS limpio. */
-  const salirNavegacion = useCallback(() => {
-    cerrarRecibo();
-    if (enModoMesa) {
-      setEnModoMesa(false);
-      setTicketBd(null);
-      setItemsPersistidos([]);
-      dispatch({ tipo: "limpiar" });
-    }
-  }, [cerrarRecibo, enModoMesa]);
-
-  /** Sale de la captura y regresa a la pantalla de la que se vino (no al inicio). */
-  const volverAtras = useCallback(() => {
-    salirNavegacion();
-    setEnMesas(volverA === "mesas");
-    setEnPickup(volverA === "pickup");
-    setEnDelivery(volverA === "domicilio");
-    setEnInicio(volverA === "inicio");
-  }, [salirNavegacion, volverA]);
-
-  /** Vuelve a la pantalla de inicio dejando la caja limpia (sale de la cuenta de mesa si la hubiera). */
-  const volverAlInicio = useCallback(() => {
-    salirNavegacion();
-    setEnMesas(false);
-    setEnPickup(false);
-    setEnDelivery(false);
-    setEnConsultaCuentas(false);
-    setEnDevoluciones(false);
-    setEnMonitor(false);
-    setEnInicio(true);
-  }, [salirNavegacion]);
-
   // Badges del inicio: sólo se refrescan mientras el inicio está a la vista, para no consultar
   // la BD cada 15 s mientras el cajero está capturando una venta.
   useEffect(() => {
@@ -699,6 +713,7 @@ export function HomePos({
           onParaLlevar={() => {
             // Venta de mostrador: el modo queda fijado y se entra directo a capturar.
             dispatch({ tipo: "modo", modo: "PARA_LLEVAR" });
+            setCocinaEnviada(false);
             setVolverA("inicio");
             setEnInicio(false);
           }}
@@ -789,6 +804,7 @@ export function HomePos({
           dispatch({ tipo: "modo", modo });
           setTicketBd(null);
           setItemsPersistidos([]);
+          setCocinaEnviada(false);
           setVolverA(modo === "DRIVE_THRU" ? "pickup" : "domicilio");
           setEnPickup(false);
           setEnDelivery(false);
@@ -990,6 +1006,7 @@ export function HomePos({
               ? enviarACocinaAbierto
               : undefined
           }
+          folioCuenta={ticketBd?.folio ?? null}
           cocinaEnviada={cocinaEnviada}
           enviandoCocina={enviandoCocina}
           onAplicarDescuento={onAplicarDescuento}
