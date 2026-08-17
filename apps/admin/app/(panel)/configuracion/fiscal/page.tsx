@@ -112,12 +112,12 @@ export default function FiscalPage() {
               <p className="mb-4 text-[12.5px] text-ink-3">Tal como aparece en tu Constancia de Situación Fiscal (CSF).</p>
 
               {/* Segmento persona (derivado del RFC) */}
-              <div className="mb-4 inline-flex gap-0.5 rounded border border-line bg-hover p-[3px]">
+              <div className="mb-4 scroll-x-limpio inline-flex max-w-full gap-0.5 overflow-x-auto rounded border border-line bg-hover p-[3px] lg:max-w-none lg:overflow-x-visible">
                 {(["MORAL", "FISICA"] as const).map((p) => (
                   <span
                     key={p}
                     className={[
-                      "rounded-[4px] px-4 py-1.5 text-[12.5px] font-semibold transition",
+                      "flex-shrink-0 whitespace-nowrap rounded-[4px] px-4 py-[11px] text-[12.5px] font-semibold transition lg:py-1.5",
                       personaPorRfc === p ? "bg-surface text-ink shadow-sm" : "text-ink-3",
                     ].join(" ")}
                   >
@@ -129,7 +129,7 @@ export default function FiscalPage() {
                 )}
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div>
                   <label className={label} htmlFor="f-rfc">RFC *</label>
                   <input
@@ -179,7 +179,7 @@ export default function FiscalPage() {
               <p className="mb-4 text-[12.5px] text-ink-3">
                 El código postal del domicilio fiscal registrado ante el SAT. Es obligatorio en el CFDI 4.0 (lugar de expedición).
               </p>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div>
                   <label className={label} htmlFor="f-cp">Código postal fiscal *</label>
                   <input

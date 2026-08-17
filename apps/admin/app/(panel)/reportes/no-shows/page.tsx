@@ -38,7 +38,7 @@ export default function NoShowsPage() {
                 {tot.reservas} reservas en el rango · <b>{tot.noShows} no-shows</b> · {tot.comensales} comensales perdidos
               </p>
             )}
-            <div className="overflow-hidden rounded-lg border border-line bg-surface">
+            <div className="tabla-caja tabla-caja-xl overflow-hidden rounded-lg border border-line bg-surface">
               <table className="w-full text-[13px]">
                 <thead><tr className="border-b border-line bg-sel text-left text-[11.5px] font-bold uppercase tracking-wide text-ink-3">
                   <th className="px-4 py-2.5">Día</th><th className="px-4 py-2.5 text-right">Reservas</th><th className="px-4 py-2.5 text-right">Llegaron</th><th className="px-4 py-2.5 text-right">Canceladas</th><th className="px-4 py-2.5 text-right">No-shows</th><th className="px-4 py-2.5 text-right">Tasa</th><th className="px-4 py-2.5 text-right">Comensales perdidos</th>

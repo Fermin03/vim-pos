@@ -2,7 +2,6 @@
 import { useEffect, useState } from "react";
 import { Button } from "@vim/ui/styles";
 import { PageHeader, PageBody } from "../../../components/page-header";
-import { ConfigSideNav } from "../../../components/config-sidenav";
 import { activarNotificaciones, desactivarNotificaciones, enviarPrueba, estadoSuscripcion, pushSoportado } from "../../../lib/push";
 import { mensajeError } from "../../../lib/errores";
 
@@ -29,9 +28,7 @@ export default function NotificacionesPage() {
   return (
     <>
       <PageHeader titulo="Notificaciones" subtitulo="Avisos push de eventos críticos en este dispositivo." migas={[{ label: "Configuración" }, { label: "Notificaciones" }]} />
-      <div className="flex">
-        <ConfigSideNav />
-        <PageBody>
+      <PageBody>
           <div className="max-w-[560px] rounded-lg border border-line bg-surface p-5">
             <h2 className="font-display text-[16px] font-semibold tracking-tight">Eventos críticos</h2>
             <p className="mt-1 text-[13px] text-ink-3">
@@ -47,7 +44,7 @@ export default function NotificacionesPage() {
             )}
 
             {soportado && activo !== null && (
-              <div className="mt-4 flex items-center justify-between rounded-lg border border-line bg-sel px-4 py-3">
+              <div className="mt-4 flex flex-wrap items-center justify-between gap-x-3 gap-y-2.5 rounded-lg border border-line bg-sel px-4 py-3">
                 <div className="flex items-center gap-2.5">
                   <span className={["h-2.5 w-2.5 rounded-full", activo ? "bg-success" : "bg-ink-3"].join(" ")} />
                   <span className="text-[13.5px] font-semibold">{activo ? "Activas en este dispositivo" : "Desactivadas"}</span>
@@ -65,7 +62,7 @@ export default function NotificacionesPage() {
             )}
 
             {activo && (
-              <div className="mt-3 flex items-center justify-between rounded-lg border border-line px-4 py-3">
+              <div className="mt-3 flex flex-wrap items-center justify-between gap-x-3 gap-y-2.5 rounded-lg border border-line px-4 py-3">
                 <span className="text-[13px] text-ink-2">Verifica que llegan correctamente:</span>
                 <Button variant="ghost" disabled={trabajando}
                   onClick={() => correr(async () => { const r = await enviarPrueba(); setMsg(`Prueba enviada a ${r.enviadas} dispositivo${r.enviadas === 1 ? "" : "s"}.`); }, "")}>
@@ -77,8 +74,7 @@ export default function NotificacionesPage() {
             {msg && <p className="mt-3 text-sm font-medium text-success">{msg}</p>}
             {error && <p className="mt-3 text-sm font-medium text-danger" role="alert">{error}</p>}
           </div>
-        </PageBody>
-      </div>
+      </PageBody>
     </>
   );
 }

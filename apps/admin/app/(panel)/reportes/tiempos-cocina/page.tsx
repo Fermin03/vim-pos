@@ -63,7 +63,7 @@ export default function TiemposCocinaPage() {
           </div>
         )}
         {filas && (
-          <div className="overflow-hidden rounded-lg border border-line bg-surface">
+          <div className="tabla-caja tabla-caja-xl overflow-hidden rounded-lg border border-line bg-surface">
             <table className="w-full text-[13px]">
               <thead><tr className="border-b border-line bg-sel text-left text-[11.5px] font-bold uppercase tracking-wide text-ink-3">
                 <th className="px-4 py-2.5">Modo</th><th className="px-4 py-2.5 text-right">Comandas</th><th className="px-4 py-2.5 text-right">Prom. (min)</th><th className="px-4 py-2.5 text-right">p95 (min)</th><th className="px-4 py-2.5 text-right text-success">&le;15 min</th><th className="px-4 py-2.5 text-right text-warning">16-30</th><th className="px-4 py-2.5 text-right text-danger">&gt;30</th>

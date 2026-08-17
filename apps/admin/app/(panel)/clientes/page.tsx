@@ -179,7 +179,7 @@ export default function ClientesPage() {
         )}
 
         <div className="mb-4 flex flex-wrap items-center gap-3">
-          <div className="inline-flex gap-0.5 rounded border border-line bg-hover p-[3px]">
+          <div className="scroll-x-limpio inline-flex max-w-full gap-0.5 overflow-x-auto rounded border border-line bg-hover p-[3px] lg:max-w-none lg:overflow-x-visible">
             {([
               { v: "TODOS", l: "Todos los clientes" },
               { v: "CON_RFC", l: "Con factura (RFC)" },
@@ -189,7 +189,7 @@ export default function ClientesPage() {
                 key={t.v}
                 type="button"
                 onClick={() => setFiltro(t.v)}
-                className={["rounded-[4px] px-3 py-1.5 text-[12.5px] font-semibold transition", filtro === t.v ? "bg-surface text-ink shadow-sm" : "text-ink-2 hover:text-ink"].join(" ")}
+                className={["flex-shrink-0 whitespace-nowrap rounded-[4px] px-3 py-[11px] text-[12.5px] font-semibold transition lg:py-1.5", filtro === t.v ? "bg-surface text-ink shadow-sm" : "text-ink-2 hover:text-ink"].join(" ")}
               >
                 {t.l}
               </button>
@@ -214,7 +214,7 @@ export default function ClientesPage() {
           </div>
         )}
         {clientes && clientes.length > 0 && (
-          <div className="overflow-hidden rounded-lg border border-line bg-surface">
+          <div className="tabla-caja overflow-hidden rounded-lg border border-line bg-surface">
             <table className="w-full text-[13.5px]">
               <thead>
                 <tr className="border-b border-line bg-sel text-left text-[11.5px] uppercase tracking-wide text-ink-3">
@@ -274,7 +274,7 @@ export default function ClientesPage() {
           <div className="mt-5 max-w-[620px] rounded-lg border border-line bg-surface p-5">
             <div className="mb-4 font-display text-[16px] font-semibold tracking-tight">{editando.id ? "Editar cliente" : "Nuevo cliente"}</div>
             <div className="flex flex-col gap-3.5">
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div>
                   <label className={label} htmlFor="c-nombre">Nombre</label>
                   <input id="c-nombre" className={input} value={editando.datos.nombre} maxLength={150} onChange={(e) => set("nombre", e.target.value)} placeholder="Juan" />
@@ -284,7 +284,7 @@ export default function ClientesPage() {
                   <input id="c-ap" className={input} value={editando.datos.apellido_paterno} maxLength={100} onChange={(e) => set("apellido_paterno", e.target.value)} placeholder="Pérez" />
                 </div>
               </div>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div>
                   <label className={label} htmlFor="c-tel">Teléfono</label>
                   <input id="c-tel" className={input} value={editando.datos.telefono} maxLength={20} onChange={(e) => set("telefono", e.target.value.replace(/[^0-9+ ]/g, ""))} placeholder="477 123 4567" />
@@ -296,7 +296,7 @@ export default function ClientesPage() {
               </div>
 
               <div className="border-t border-line pt-3 text-[12.5px] font-semibold uppercase tracking-wide text-ink-3">Datos fiscales · opcional</div>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div>
                   <label className={label} htmlFor="c-tipo">Tipo</label>
                   <select id="c-tipo" className={input} value={editando.datos.tipo_fiscal} onChange={(e) => set("tipo_fiscal", e.target.value as typeof VACIO.tipo_fiscal)}>

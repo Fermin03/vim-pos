@@ -56,9 +56,9 @@ export default function BienvenidaPage() {
   const pct = estado ? Math.round((estado.obligatoriosHechos / Math.max(1, estado.obligatoriosTotal)) * 100) : 0;
 
   return (
-    <div className="mx-auto flex min-h-full w-full max-w-[680px] flex-col px-6 py-10">
+    <div className="mx-auto flex min-h-full w-full max-w-[680px] flex-col px-4 py-8 sm:px-6 sm:py-10">
       <div className="mb-1 text-[13px] font-semibold uppercase tracking-[0.08em] text-accent">Bienvenido a VIM POS</div>
-      <h1 className="font-display text-[30px] font-bold leading-tight tracking-tight">
+      <h1 className="font-display text-[24px] font-bold leading-tight tracking-tight sm:text-[30px]">
         {primer ? `Hola, ${primer}.` : "¡Hola!"} Pongamos tu negocio a vender.
       </h1>
       <p className="mt-2 text-[14.5px] text-ink-2">
@@ -87,7 +87,7 @@ export default function BienvenidaPage() {
             {estado.pasos.map((p, i) => (
               <div
                 key={p.clave}
-                className={`flex items-center gap-4 rounded-lg border p-4 ${p.completo ? "border-line bg-sel" : "border-line-strong bg-surface"}`}
+                className={`flex flex-col items-start gap-3 rounded-lg border p-4 sm:flex-row sm:items-center sm:gap-4 ${p.completo ? "border-line bg-sel" : "border-line-strong bg-surface"}`}
               >
                 <div className={`flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full ${p.completo ? "bg-success text-white" : "border border-line-strong text-ink-3"}`}>
                   {p.completo ? <IconCheck /> : <span className="text-[13px] font-bold">{i + 1}</span>}
@@ -99,8 +99,8 @@ export default function BienvenidaPage() {
                   </div>
                   <div className="mt-0.5 text-[12.5px] text-ink-3">{p.descripcion}</div>
                 </div>
-                <Link href={p.href}>
-                  <Button variant={p.completo ? "ghost" : "primary"}>{p.completo ? "Revisar" : "Configurar"}</Button>
+                <Link href={p.href} className="w-full sm:w-auto">
+                  <Button variant={p.completo ? "ghost" : "primary"} className="w-full sm:w-auto">{p.completo ? "Revisar" : "Configurar"}</Button>
                 </Link>
               </div>
             ))}

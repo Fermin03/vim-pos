@@ -77,7 +77,7 @@ export function GrupoForm({ grupo }: { grupo: Grupo | null }) {
           <input id="desc" className={input} value={descripcion} maxLength={300} onChange={(e) => setDescripcion(e.target.value)} placeholder="Nota breve para tu equipo" />
         </div>
 
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <div>
             <label className={label} htmlFor="tipo">Cómo se elige</label>
             <select id="tipo" className={input} value={tipo} onChange={(e) => setTipo(e.target.value as TipoSeleccion)}>
@@ -97,7 +97,7 @@ export function GrupoForm({ grupo }: { grupo: Grupo | null }) {
         </div>
 
         {esRango && (
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div>
               <label className={label} htmlFor="min">Mínimo a elegir</label>
               <input id="min" className={input} value={minimo} inputMode="numeric" onChange={(e) => setMinimo(e.target.value.replace(/[^0-9]/g, ""))} />

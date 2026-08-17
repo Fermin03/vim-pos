@@ -2,7 +2,6 @@
 import { useEffect, useState } from "react";
 import { Button } from "@vim/ui/styles";
 import { PageHeader, PageBody } from "../../../components/page-header";
-import { ConfigSideNav } from "../../../components/config-sidenav";
 import { listarConflictosPendientes, resolverConflicto, type ConflictoSync } from "../../../lib/sync-conflictos";
 import { mensajeError } from "../../../lib/errores";
 
@@ -65,9 +64,7 @@ export default function SincronizacionPage() {
   return (
     <>
       <PageHeader titulo="Sincronización" subtitulo="Conflictos cuando dos dispositivos modifican lo mismo sin conexión." migas={[{ label: "Configuración" }, { label: "Sincronización" }]} />
-      <div className="flex">
-        <ConfigSideNav />
-        <PageBody>
+      <PageBody>
           {error && <p className="mb-3 text-sm font-medium text-danger" role="alert">{error}</p>}
           {msg && <p className="mb-3 text-sm font-medium text-success">{msg}</p>}
           {conflictos === null && !error && <p className="text-sm text-ink-3">Cargando…</p>}
@@ -84,7 +81,7 @@ export default function SincronizacionPage() {
 
           {conflictos !== null && conflictos.length > 0 && (
             <>
-              <div className="mb-4 flex items-center justify-between rounded-lg border border-[#E8DCC0] bg-[#F6EEDD] px-4 py-3">
+              <div className="mb-4 flex flex-wrap items-center justify-between gap-x-3 gap-y-2.5 rounded-lg border border-[#E8DCC0] bg-[#F6EEDD] px-4 py-3">
                 <p className="text-[13px] font-medium text-warning">
                   {conflictos.length} conflicto{conflictos.length === 1 ? "" : "s"} por resolver · {elegidos} elegido{elegidos === 1 ? "" : "s"}
                 </p>
@@ -110,8 +107,7 @@ export default function SincronizacionPage() {
               </div>
             </>
           )}
-        </PageBody>
-      </div>
+      </PageBody>
     </>
   );
 }

@@ -56,7 +56,7 @@ export default function ImportarMenuPage() {
         {!resultado && (
           <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
             <div>
-              <div className="mb-2 flex items-center justify-between">
+              <div className="mb-2 flex flex-wrap items-center justify-between gap-x-3 gap-y-1.5">
                 <label className="text-[13px] font-medium text-ink-2" htmlFor="csv">Pega aquí tu menú</label>
                 <button type="button" className="text-[12px] font-semibold text-ink-3 hover:text-ink" onClick={() => { setTexto(EJEMPLO); setParse(null); }}>Usar ejemplo</button>
               </div>
@@ -72,7 +72,7 @@ export default function ImportarMenuPage() {
                 Las categorías que no existan se crean solas.
               </p>
               {/* Fase 4 — POS de origen (preset de columnas, con autodetección) */}
-              <div className="mt-3 flex items-center gap-2">
+              <div className="mt-3 flex flex-wrap items-center gap-2">
                 <label className="text-[12.5px] font-medium text-ink-2" htmlFor="origen">POS de origen</label>
                 <select
                   id="origen"
@@ -83,7 +83,7 @@ export default function ImportarMenuPage() {
                   {FORMATOS_ORIGEN.map((f) => <option key={f.codigo} value={f.codigo}>{f.label}</option>)}
                 </select>
               </div>
-              <div className="mt-3 flex items-center gap-3">
+              <div className="mt-3 flex flex-wrap items-center gap-3">
                 <Button onClick={revisar} disabled={!texto.trim()}>Revisar</Button>
                 {parse && formatoUsado && (
                   <span className="rounded-full bg-sel px-2.5 py-1 text-[11.5px] font-semibold text-ink-3">

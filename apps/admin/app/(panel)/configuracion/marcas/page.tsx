@@ -128,7 +128,7 @@ export default function MarcasPage() {
           <div className="mt-5 max-w-[560px] rounded-lg border border-line bg-surface p-5">
             <div className="mb-4 font-display text-[16px] font-semibold tracking-tight">{editando.id ? "Editar marca" : "Nueva marca"}</div>
             <div className="flex flex-col gap-3.5">
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div>
                   <label className={label} htmlFor="m-codigo">Código</label>
                   <input id="m-codigo" className={input} value={editando.datos.codigo} maxLength={50}
