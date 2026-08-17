@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { permitida } from "./ip-allowlist";
 import { createHash, timingSafeEqual } from "node:crypto";
 import { createServiceClient } from "@vim/db/service";
 
@@ -87,11 +88,10 @@ export function autorizar(req: Request): { sb: SbClient } | { error: NextRespons
 
   const ip = ipDe(req);
 
-  const allowlist = (process.env.PLATFORM_IP_ALLOWLIST ?? "")
-    .split(",")
-    .map((s) => s.trim())
-    .filter(Boolean);
-  if (allowlist.length > 0 && !allowlist.includes(ip)) {
+  // Acepta IPs exactas y prefijos CIDR. Lo segundo no es un lujo: los proveedores entregan IPv6
+  // cuya segunda mitad rota a diario por privacidad, y los navegadores prefieren IPv6, así que
+  // una lista de direcciones exactas deja fuera al dueño del panel en cuestión de horas.
+  if (!permitida(ip, process.env.PLATFORM_IP_ALLOWLIST)) {
     console.warn(`[SEC CN-003] acceso al panel desde IP fuera de la allowlist: ${ip}`);
     return { error: NextResponse.json({ error: "NO_AUTORIZADO" }, { status: 401 }) };
   }
