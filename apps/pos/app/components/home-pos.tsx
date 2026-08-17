@@ -2,8 +2,6 @@
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState, type ReactNode } from "react";
 import { Button } from "@vim/ui/styles";
 import {
-  ICONOS_POS,
-  colorCategoria,
   listarCategoriasPos,
   listarProductosPos,
   type Categoria,
@@ -47,6 +45,8 @@ import { ModalCancelarTicket } from "./modal-cancelar-ticket";
 import { ModalMovimientoCaja } from "./modal-movimiento-caja";
 import { ModalAbrirCaja } from "./modal-abrir-caja";
 import { BotonVolver } from "./boton-volver";
+import { CatalogoProductos } from "./catalogo-productos";
+import { ModalAgregarProductos } from "./modal-agregar-productos";
 import { MenuGeneral } from "./menu-general";
 import { PantallaInicio } from "./pantalla-inicio";
 import { PantallaCuentasModo } from "./pantalla-cuentas-modo";
@@ -141,13 +141,15 @@ export function HomePos({
   const [categorias, setCategorias] = useState<Categoria[] | null>(null);
   const [productos, setProductos] = useState<Producto[] | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [catSel, setCatSel] = useState<string | null>(null);
   const [carrito, dispatch] = useReducer(reducerCarrito, estadoInicial);
   const [modGrupos, setModGrupos] = useState<{ producto: Producto; grupos: GrupoModificadores[] } | null>(null);
   const [totalesCobro, setTotalesCobro] = useState<TotalesTicket | null>(null);
   // Al cobrar desde la lista ya no se navega, así que la lista no se remonta sola y seguiría
   // mostrando la cuenta recién pagada. Este contador la fuerza a releerse.
   const [cuentasVersion, setCuentasVersion] = useState(0);
+  // Agregar productos a una cuenta abierta es su propio modal: la pantalla de venta tiene el
+  // botón Cobrar como acción dominante, y no es lo que se quiere al anotar una segunda tanda.
+  const [agregandoA, setAgregandoA] = useState<{ ticketId: string; folio: string | null } | null>(null);
   const [procesandoCobro, setProcesandoCobro] = useState(false);
   const [confirmacion, setConfirmacion] = useState<{ folio: string | null; cambio: number } | null>(null);
   // Ticket ya persistido en BD por el flujo de descuento. Mientras exista, el carrito
@@ -196,7 +198,6 @@ export function HomePos({
         if (!activo) return;
         setCategorias(cs);
         setProductos(ps);
-        if (cs.length > 0) setCatSel(cs[0]!.id);
         // Fase 3 — cache de lectura: el menú sobrevive sin red (recargas offline).
         cachePut("catalogo", { categorias: cs, productos: ps });
       })
@@ -207,7 +208,6 @@ export function HomePos({
         if (cacheado && activo) {
           setCategorias(cacheado.categorias);
           setProductos(cacheado.productos);
-          if (cacheado.categorias.length > 0) setCatSel(cacheado.categorias[0]!.id);
           return;
         }
         setError(e instanceof Error ? e.message : "Error");
@@ -217,10 +217,6 @@ export function HomePos({
     };
   }, [token]);
 
-  const prodsVisibles = useMemo(
-    () => (productos ?? []).filter((p) => !catSel || p.categoria_id === catSel),
-    [productos, catSel],
-  );
 
   // T2 — re-lee el ticket de mesa y reconstruye el carrito tras un agregado incremental.
   // Navegación: definidas aquí arriba a propósito. Los callbacks de "enviar a cocina"
@@ -943,7 +939,7 @@ export function HomePos({
           if (modo === "DRIVE_THRU") setNombreCuentaAbierto(true);
           if (modo === "DELIVERY_PROPIO") setClienteDomAbierto(true);
         }}
-        onAgregarProductos={(ticketId: string) => entrarCuenta(ticketId, enPickup ? "pickup" : "domicilio")}
+        onAgregarProductos={(ticketId: string, folio: string | null) => setAgregandoA({ ticketId, folio })}
         onCobrar={async (ticketId) => {
           // El cobro se abre ENCIMA de la lista, sin cargar la cuenta ni saltar al catálogo:
           // el cajero pidió cobrar, no capturar productos. El modal solo necesita los totales.
@@ -972,6 +968,23 @@ export function HomePos({
         {/* El cobro va aquí también: sin esto, abrirlo desde la lista no mostraría nada, porque
             el componente tiene un return por pantalla. */}
         {modalesCobro}
+        {agregandoA && (
+          <ModalAgregarProductos
+            token={token}
+            ticketId={agregandoA.ticketId}
+            folio={agregandoA.folio}
+            categorias={categorias}
+            productos={productos}
+            onCerrar={(huboCambios) => {
+              setAgregandoA(null);
+              if (huboCambios) setCuentasVersion((v) => v + 1); // totales y conteos cambiaron
+            }}
+            onEnviarCocina={async (ticketId) => {
+              const enviados = await enviarACocina(token, ticketId);
+              await imprimirComandaCocina(ticketId, enviados, true);
+            }}
+          />
+        )}
       </>
     );
   }
@@ -1028,91 +1041,12 @@ export function HomePos({
       )}
 
       <div className="flex min-h-0 flex-1">
-        <div className="flex min-w-0 flex-1 flex-col">
-          {/* Categorías en pestañas horizontales (.cat-tabs del mockup P-059). Antes eran una barra
-              lateral de 200px que el mockup no tiene: en una pantalla de 1024 dejaba el catálogo en
-              380px, y las fichas se achicaban hasta desbordar el nombre del producto. */}
-          <div className="flex flex-shrink-0 items-center gap-2 overflow-x-auto border-b border-line bg-surface px-5 py-3">
-            {categorias === null && <p className="text-sm text-ink-3">Cargando…</p>}
-            {categorias?.map((c, i) => {
-              const col = colorCategoria(c, i);
-              const active = catSel === c.id;
-              return (
-                <button
-                  key={c.id}
-                  type="button"
-                  onClick={() => setCatSel(c.id)}
-                  aria-current={active ? "true" : undefined}
-                  className={[
-                    "inline-flex flex-shrink-0 items-center gap-2.5 whitespace-nowrap rounded-lg border px-4 py-2.5 text-[14px] transition",
-                    active
-                      ? "border-ink bg-ink font-bold text-white"
-                      : "border-line font-semibold text-ink-2 hover:border-line-strong hover:text-ink",
-                  ].join(" ")}
-                >
-                  <span
-                    className="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded"
-                    style={active ? { background: "rgba(255,255,255,0.15)", color: "#fff" } : { background: col.bg, color: col.ink }}
-                  >
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-3.5 w-3.5">
-                      <path d={ICONOS_POS[c.icono ?? "tag"] ?? ICONOS_POS.tag} />
-                    </svg>
-                  </span>
-                  {c.nombre}
-                </button>
-              );
-            })}
-            {categorias?.length === 0 && (
-              <p className="text-xs text-ink-3">Sin categorías. Créalas en el admin.</p>
-            )}
-          </div>
-
-          {/* Grid de productos */}
-          <div className="flex-1 overflow-y-auto bg-bg p-5">
-          {error && <p className="mb-4 text-sm font-medium text-danger" role="alert">{error}</p>}
-          {productos === null && <p className="text-sm text-ink-3">Cargando productos…</p>}
-          {productos !== null && prodsVisibles.length === 0 && (
-            <div className="flex h-full flex-col items-center justify-center gap-2 text-center">
-              <p className="font-display text-lg font-semibold">Sin productos en esta categoría</p>
-              <p className="max-w-md text-sm text-ink-3">Crea productos en el admin para empezar a vender.</p>
-            </div>
-          )}
-          {prodsVisibles.length > 0 && (
-            // Rejilla del mockup P-059: las columnas las decide el ANCHO DEL CATÁLOGO, no el de la
-            // ventana. Con cortes por viewport (lg:/xl:) una pantalla de 1024 pedía 4 columnas
-            // dentro de una columna de ~380px → fichas de 87px y el nombre desbordado.
-            <div className="grid gap-3 [grid-template-columns:repeat(auto-fill,minmax(150px,1fr))]">
-              {prodsVisibles.map((p) => (
-                <button
-                  key={p.id}
-                  type="button"
-                  disabled={p.agotado || menuBloqueado}
-                  onClick={() => onTapProducto(p)}
-                  className={[
-                    "group relative flex min-h-[150px] flex-col items-center justify-center gap-2.5 overflow-hidden rounded-lg border bg-surface px-3 py-4 text-center transition",
-                    p.agotado || menuBloqueado
-                      ? "cursor-not-allowed border-line opacity-50"
-                      : "border-line hover:border-ink hover:shadow-sm active:scale-[.98]",
-                  ].join(" ")}
-                >
-                  {p.agotado && (
-                    <span className="absolute right-2 top-2 rounded-full bg-danger/10 px-2 py-0.5 text-[10.5px] font-bold uppercase tracking-wide text-danger">
-                      Agotado
-                    </span>
-                  )}
-                  <span className="flex h-[52px] w-[52px] flex-shrink-0 items-center justify-center rounded-xl bg-hover">
-                    <span className="font-display text-[22px] font-bold text-ink-3">{p.nombre.charAt(0)}</span>
-                  </span>
-                  {/* break-words: sin esto un nombre largo sin espacios se sale de la ficha. */}
-                  <span className="break-words text-[14px] font-semibold leading-tight">{p.nombre}</span>
-                  <span className="font-display text-[15px] font-bold tabular-nums">{fmtMxn(p.precio_base_mxn)}</span>
-                </button>
-              ))}
-            </div>
-          )}
-          </div>
-        </div>
-
+          <CatalogoProductos
+            categorias={categorias}
+            productos={productos}
+            bloqueado={menuBloqueado}
+            onTapProducto={onTapProducto}
+          />
         <SidebarTicket
           estado={carrito}
           onCantidad={(id, c) => dispatch({ tipo: "cantidad", clientId: id, cantidad: c })}
