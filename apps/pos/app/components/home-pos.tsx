@@ -46,6 +46,7 @@ import { ModalDescuentoItem } from "./modal-descuento-item";
 import { ModalCancelarTicket } from "./modal-cancelar-ticket";
 import { ModalMovimientoCaja } from "./modal-movimiento-caja";
 import { ModalAbrirCaja } from "./modal-abrir-caja";
+import { BotonVolver } from "./boton-volver";
 import { MenuGeneral } from "./menu-general";
 import { PantallaInicio } from "./pantalla-inicio";
 import { PantallaCuentasModo } from "./pantalla-cuentas-modo";
@@ -1001,14 +1002,7 @@ export function HomePos({
           anotando un pedido y cada ícono de más es una salida en falso; todo eso vive en el
           inicio. Lo único que hace falta es regresar a donde estaba. */}
       <div className="flex flex-shrink-0 items-center gap-3 border-b border-line bg-surface px-3 py-2">
-        <button
-          type="button"
-          onClick={volverAtras}
-          className="flex h-10 items-center gap-2 rounded border border-line-strong px-3 text-[13.5px] font-semibold text-ink transition hover:border-ink hover:bg-hover"
-        >
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4" aria-hidden="true"><path d="M19 12H5M12 19l-7-7 7-7" /></svg>
-          Volver
-        </button>
+        <BotonVolver onClick={volverAtras} />
       </div>
       {configImpresoraAbierto && <ModalConfigImpresora onCerrar={() => setConfigImpresoraAbierto(false)} />}
       {clienteDomAbierto && (

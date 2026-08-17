@@ -1,5 +1,6 @@
 "use client";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { BotonVolver } from "./boton-volver";
 import { Button, Modal } from "@vim/ui/styles";
 import { type DatosCaja, type Turno, fmtMxn } from "../lib/turno";
 import { type Empleado } from "../lib/supabase";
@@ -64,18 +65,15 @@ export function PantallaDevoluciones({
 
   return (
     <div className="flex h-screen flex-col">
-      <header className="flex flex-shrink-0 items-center justify-between border-b border-line bg-surface px-6 py-3.5">
-        <div className="flex items-center gap-3">
+      <header className="flex flex-shrink-0 items-center justify-between border-b border-line bg-surface px-3 py-3.5">
+        <BotonVolver onClick={onSalir} />
+        <div className="mr-auto flex items-center gap-3">
           <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-ink"><span className="font-display text-[15px] font-bold text-white">V</span></div>
           <div>
             <div className="font-display text-[16px] font-bold leading-tight">Devoluciones · {caja.nombre}</div>
             <div className="text-[11.5px] text-ink-3">Selecciona la venta a devolver. La venta queda en el historial; el reembolso sale de la caja.</div>
           </div>
         </div>
-        <button type="button" onClick={onSalir} className="flex h-9 items-center gap-1.5 rounded border border-line-strong px-3 text-[13px] font-semibold text-ink-2 transition hover:border-ink hover:text-ink">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4"><path d="M19 12H5M12 19l-7-7 7-7" /></svg>
-          Salir
-        </button>
       </header>
 
       {error && <div className="mx-6 mt-3 rounded border border-[#EDC4BE] bg-[#FBECEA] px-3 py-2 text-[13px] font-medium text-danger" role="alert">{error}</div>}

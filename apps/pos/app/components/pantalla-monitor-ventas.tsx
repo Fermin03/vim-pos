@@ -1,5 +1,6 @@
 "use client";
 import { useCallback, useEffect, useState } from "react";
+import { BotonVolver } from "./boton-volver";
 import { Button } from "@vim/ui/styles";
 import { fmtMxn, type DatosCaja, type Turno } from "../lib/turno";
 import {
@@ -79,15 +80,15 @@ export function PantallaMonitorVentas({
 
   return (
     <main className="flex h-screen flex-col bg-bg">
-      <header className="flex h-[68px] flex-shrink-0 items-center justify-between border-b border-line px-6">
-        <div>
+      <header className="flex h-[68px] flex-shrink-0 items-center justify-between border-b border-line px-3">
+        <BotonVolver onClick={onSalir} />
+        <div className="mr-auto">
           <h1 className="font-display text-[19px] font-semibold tracking-tight">Monitor de ventas</h1>
           <p className="text-[12.5px] text-ink-3">
             {caja.nombre} · Turno {turno.codigo_turno}
             {x?.fechaApertura ? ` · desde las ${new Date(x.fechaApertura).toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit", hour12: false })}` : ""}
           </p>
         </div>
-        <Button variant="ghost" onClick={onSalir}>Volver</Button>
       </header>
 
       <div className="flex-1 overflow-y-auto px-6 py-6">

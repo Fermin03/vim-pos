@@ -1,5 +1,6 @@
 "use client";
 import { useCallback, useEffect, useState } from "react";
+import { BotonVolver } from "./boton-volver";
 import { fmtMxn, type DatosCaja, type Turno } from "../lib/turno";
 import { type Empleado } from "../lib/supabase";
 import { listarCuentas, labelModoCuenta, type CuentaCerrada, type FiltroCuentas } from "../lib/consulta-cuentas";
@@ -95,8 +96,9 @@ export function PantallaConsultaCuentas({
   return (
     <div className="flex h-screen flex-col bg-bg">
       {/* Encabezado */}
-      <header className="flex flex-shrink-0 flex-wrap items-center justify-between gap-3 border-b border-line bg-surface px-6 py-3">
-        <div className="flex items-center gap-3">
+      <header className="flex flex-shrink-0 flex-wrap items-center justify-between gap-3 border-b border-line bg-surface px-3 py-3">
+        <BotonVolver onClick={onSalir} />
+        <div className="mr-auto flex items-center gap-3">
           <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-ink"><span className="font-display text-[15px] font-bold text-white">V</span></div>
           <div>
             <div className="font-display text-[16px] font-bold leading-tight">Cuentas · {caja.nombre}</div>
@@ -118,10 +120,6 @@ export function PantallaConsultaCuentas({
           <button type="button" onClick={recargar} className="flex h-9 items-center gap-1.5 rounded border border-line-strong px-3 text-[13px] font-semibold text-ink-2 transition hover:border-ink hover:text-ink">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4"><path d="M23 4v6h-6M1 20v-6h6" /><path d="M3.5 9a9 9 0 0 1 14.9-3.4L23 10M1 14l4.6 4.4A9 9 0 0 0 20.5 15" /></svg>
             Actualizar
-          </button>
-          <button type="button" onClick={onSalir} className="flex h-9 items-center gap-1.5 rounded border border-line-strong px-3 text-[13px] font-semibold text-ink-2 transition hover:border-ink hover:text-ink">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4"><path d="M19 12H5M12 19l-7-7 7-7" /></svg>
-            Salir
           </button>
         </div>
       </header>
