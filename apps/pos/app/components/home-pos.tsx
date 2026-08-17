@@ -144,6 +144,9 @@ export function HomePos({
   const [carrito, dispatch] = useReducer(reducerCarrito, estadoInicial);
   const [modGrupos, setModGrupos] = useState<{ producto: Producto; grupos: GrupoModificadores[] } | null>(null);
   const [totalesCobro, setTotalesCobro] = useState<TotalesTicket | null>(null);
+  // Al cobrar desde la lista ya no se navega, así que la lista no se remonta sola y seguiría
+  // mostrando la cuenta recién pagada. Este contador la fuerza a releerse.
+  const [cuentasVersion, setCuentasVersion] = useState(0);
   const [procesandoCobro, setProcesandoCobro] = useState(false);
   const [confirmacion, setConfirmacion] = useState<{ folio: string | null; cambio: number } | null>(null);
   // Ticket ya persistido en BD por el flujo de descuento. Mientras exista, el carrito
@@ -667,6 +670,129 @@ export function HomePos({
    * componente tiene un `return` por pantalla: si vivieran dentro del JSX del catálogo —donde
    * estaban— abrirlos desde el inicio no mostraría nada.
    */
+  /**
+   * Cobro, confirmación y recibo. Se definen aquí, fuera del JSX de la pantalla de captura,
+   * porque el cobro se dispara TAMBIÉN desde la lista de cuentas. Antes vivían dentro de ese
+   * return y por eso cobrar desde la lista obligaba a cargar la cuenta y saltar al catálogo
+   * —el cajero terminaba en la pantalla de tomar productos sin haberla pedido—. El modal no
+   * necesita el carrito: le basta el ticket y sus totales.
+   */
+  const modalesCobro = (
+    <>
+      {totalesCobro && (
+        <ModalCobro
+          token={token}
+          sucursalId={caja.sucursal_id}
+          totalesIniciales={totalesCobro}
+          onPagado={async (folio, cambio) => {
+            const ticketId = totalesCobro.ticketId;
+            setTotalesCobro(null);
+            setTicketBd(null);
+            setEnModoMesa(false);
+            setCocinaEnviada(false);
+            dispatch({ tipo: "limpiar" });
+            setCuentasVersion((v) => v + 1); // la cuenta pagada ya no va en la lista
+            setConfirmacion({ folio, cambio });
+            // Armar el ticket e IMPRIMIR automáticamente. Con PreviewAdapter abre el recibo
+            // en pantalla; al activar EpsonEposAdapter, ese mismo llamado imprime en papel.
+            try {
+              const datos = await leerTicketParaImpresion(ticketId, {
+                token,
+                cajeroNombre: empleado.nombre,
+                cajaNombre: caja.nombre,
+              });
+              const datosCom: DatosComanda = {
+                folio: datos.meta.folio,
+                modoServicio: datos.meta.modoServicio,
+                cajero: datos.meta.cajero,
+                caja: datos.meta.caja,
+                fechaIso: datos.meta.fechaIso,
+                lineas: datos.lineas.map((l) => ({ cantidad: l.cantidad, nombre: l.nombre, modificadores: l.modificadores, notaCocina: l.notaCocina })),
+                ancho: 80,
+              };
+              setDatosTicket(datos);
+              setDatosComanda(datosCom);
+              setEstadoTicket("lista");
+              // Auto-impresión: el PrintJob es la fuente para el papel (Epson/genérica cuando esté).
+              // Hoy con PreviewAdapter solo abre el overlay; el preview se renderiza desde los datos.
+              const job = construirTicketJob(datos, await logoParaTicket(datos.ancho));
+              await obtenerImpresora("CAJA", { onMostrar: () => setMostrarRecibo(true) }).imprimir(job);
+              // Comanda automática a la estación de cocina — solo si hay una estación dedicada
+              // distinta de la de caja (si es la misma impresora, ya salió el ticket; no duplicar).
+              if (hayEstacionDeCocinaDedicada()) {
+                obtenerImpresora("COCINA", { onMostrar: () => {} })
+                  .imprimir(construirComandaJob(datosCom))
+                  .catch(() => {});
+              }
+              // Cajón automático: solo si hubo efectivo de por medio (hay cambio que dar o
+              // fondo que actualizar). Tarjeta/otros no mueven billetes — abrirlo ahí solo
+              // expone el efectivo sin necesidad.
+              if (datos.pagos.some((p) => p.metodo === "Efectivo")) {
+                obtenerImpresora("CAJA", { onMostrar: () => {} }).abrirCajon();
+              }
+            } catch {
+              setEstadoTicket("error");
+            }
+          }}
+          onCerrar={() => setTotalesCobro(null)}
+        />
+      )}
+      {confirmacion && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/40 p-4" role="dialog" aria-modal="true">
+          <div className="w-full max-w-md rounded-xl bg-surface p-6 text-center shadow-xl">
+            <div className="mx-auto mb-3 flex h-16 w-16 items-center justify-center rounded-full bg-success/10 text-success">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" className="h-8 w-8"><path d="M20 6 9 17l-5-5" /></svg>
+            </div>
+            <div className="font-display text-[22px] font-semibold">Cobro completado</div>
+            {confirmacion.folio && <div className="mt-1 text-[13px] text-ink-3">Ticket {confirmacion.folio}</div>}
+            {confirmacion.cambio > 0 && (
+              <div className="mt-3 rounded-lg border border-line">
+                <div className="flex items-center justify-between px-4 py-3 text-success">
+                  <span className="text-[14px] font-semibold">Cambio a entregar</span>
+                  <span className="font-display text-[20px] font-bold tabular-nums">{fmtMxn(confirmacion.cambio)}</span>
+                </div>
+              </div>
+            )}
+            {/* Panel de impresión (1 fila: ticket del cliente) */}
+            <div className="mt-4 flex items-center gap-3 rounded-lg border border-line px-4 py-3 text-left">
+              <span className={["flex h-8 w-8 items-center justify-center rounded", estadoTicket === "lista" ? "bg-success/10 text-success" : estadoTicket === "error" ? "bg-danger/10 text-danger" : "bg-hover text-ink-3"].join(" ")}>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-4 w-4"><polyline points="6 9 6 2 18 2 18 9" /><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2" /><rect x="6" y="14" width="12" height="8" /></svg>
+              </span>
+              <div className="flex-1">
+                <div className="text-[14px] font-semibold">Ticket del cliente</div>
+                <div className="text-[12px] text-ink-3">{estadoTicket === "lista" ? "Vista previa lista · 80mm" : estadoTicket === "error" ? "No se pudo armar" : "Preparando…"}</div>
+              </div>
+              {datosTicket && (
+                <button type="button" onClick={() => setMostrarRecibo(true)} className="rounded border border-line-strong px-3 py-1.5 text-[13px] font-semibold text-ink-2 hover:border-ink hover:text-ink">
+                  Ver / Imprimir
+                </button>
+              )}
+            </div>
+            <Button className="mt-4 w-full" onClick={nuevoTicket}>Nuevo ticket</Button>
+          </div>
+        </div>
+      )}
+      {mostrarRecibo && datosTicket && (
+        <ReciboPreview
+          datosTicket={datosTicket}
+          datosComanda={datosComanda ?? undefined}
+          onImprimir={(vista) => {
+            // Con Epson/genérica manda ESC/POS; con Preview, window.print() imprime el recibo visible.
+            if (vista === "cocina" && datosComanda) {
+              obtenerImpresora("COCINA", { onMostrar: () => window.print() }).imprimir(construirComandaJob(datosComanda));
+            } else {
+              logoParaTicket(datosTicket.ancho).then((logo) =>
+                obtenerImpresora("CAJA", { onMostrar: () => window.print() }).imprimir(construirTicketJob(datosTicket, logo)),
+              );
+            }
+          }}
+          onCerrar={() => setMostrarRecibo(false)}
+          onNuevoTicket={nuevoTicket}
+        />
+      )}
+    </>
+  );
+
   const modalesCompartidos = (
     <>
       {esperaListaAbierta && (
@@ -791,7 +917,9 @@ export function HomePos({
   if (enDelivery || enPickup) {
     const modo = enPickup ? "DRIVE_THRU" : "DELIVERY_PROPIO";
     return (
-      <PantallaCuentasModo
+      <>
+        <PantallaCuentasModo
+        key={`cuentas-${modo}-${cuentasVersion}`}
         token={token}
         caja={caja}
         turno={turno}
@@ -816,8 +944,8 @@ export function HomePos({
         }}
         onAgregarProductos={(ticketId: string) => entrarCuenta(ticketId, enPickup ? "pickup" : "domicilio")}
         onCobrar={async (ticketId) => {
-          // Cargar la cuenta y abrir el cobro de inmediato: el cajero ya decidió cobrarla.
-          await entrarCuenta(ticketId, enPickup ? "pickup" : "domicilio");
+          // El cobro se abre ENCIMA de la lista, sin cargar la cuenta ni saltar al catálogo:
+          // el cajero pidió cobrar, no capturar productos. El modal solo necesita los totales.
           try {
             setTotalesCobro(await leerTotales(token, ticketId));
           } catch (e) {
@@ -839,7 +967,11 @@ export function HomePos({
                 ) : null
             : undefined
         }
-      />
+        />
+        {/* El cobro va aquí también: sin esto, abrirlo desde la lista no mostraría nada, porque
+            el componente tiene un return por pantalla. */}
+        {modalesCobro}
+      </>
     );
   }
 
@@ -1026,6 +1158,7 @@ export function HomePos({
         />
       )}
       {modalesCompartidos}
+      {modalesCobro}
       {modGrupos && (
         <ModalModificadores
           producto={modGrupos.producto}
@@ -1142,115 +1275,6 @@ export function HomePos({
             setCancelandoItem(null);
           }}
           onCerrar={() => setCancelandoItem(null)}
-        />
-      )}
-      {totalesCobro && (
-        <ModalCobro
-          token={token}
-          sucursalId={caja.sucursal_id}
-          totalesIniciales={totalesCobro}
-          onPagado={async (folio, cambio) => {
-            const ticketId = totalesCobro.ticketId;
-            setTotalesCobro(null);
-            setTicketBd(null);
-            setEnModoMesa(false);
-            dispatch({ tipo: "limpiar" });
-            setConfirmacion({ folio, cambio });
-            // Armar el ticket e IMPRIMIR automáticamente. Con PreviewAdapter abre el recibo
-            // en pantalla; al activar EpsonEposAdapter, ese mismo llamado imprime en papel.
-            try {
-              const datos = await leerTicketParaImpresion(ticketId, {
-                token,
-                cajeroNombre: empleado.nombre,
-                cajaNombre: caja.nombre,
-              });
-              const datosCom: DatosComanda = {
-                folio: datos.meta.folio,
-                modoServicio: datos.meta.modoServicio,
-                cajero: datos.meta.cajero,
-                caja: datos.meta.caja,
-                fechaIso: datos.meta.fechaIso,
-                lineas: datos.lineas.map((l) => ({ cantidad: l.cantidad, nombre: l.nombre, modificadores: l.modificadores, notaCocina: l.notaCocina })),
-                ancho: 80,
-              };
-              setDatosTicket(datos);
-              setDatosComanda(datosCom);
-              setEstadoTicket("lista");
-              // Auto-impresión: el PrintJob es la fuente para el papel (Epson/genérica cuando esté).
-              // Hoy con PreviewAdapter solo abre el overlay; el preview se renderiza desde los datos.
-              const job = construirTicketJob(datos, await logoParaTicket(datos.ancho));
-              await obtenerImpresora("CAJA", { onMostrar: () => setMostrarRecibo(true) }).imprimir(job);
-              // Comanda automática a la estación de cocina — solo si hay una estación dedicada
-              // distinta de la de caja (si es la misma impresora, ya salió el ticket; no duplicar).
-              if (hayEstacionDeCocinaDedicada()) {
-                obtenerImpresora("COCINA", { onMostrar: () => {} })
-                  .imprimir(construirComandaJob(datosCom))
-                  .catch(() => {});
-              }
-              // Cajón automático: solo si hubo efectivo de por medio (hay cambio que dar o
-              // fondo que actualizar). Tarjeta/otros no mueven billetes — abrirlo ahí solo
-              // expone el efectivo sin necesidad.
-              if (datos.pagos.some((p) => p.metodo === "Efectivo")) {
-                obtenerImpresora("CAJA", { onMostrar: () => {} }).abrirCajon();
-              }
-            } catch {
-              setEstadoTicket("error");
-            }
-          }}
-          onCerrar={() => setTotalesCobro(null)}
-        />
-      )}
-      {confirmacion && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/40 p-4" role="dialog" aria-modal="true">
-          <div className="w-full max-w-md rounded-xl bg-surface p-6 text-center shadow-xl">
-            <div className="mx-auto mb-3 flex h-16 w-16 items-center justify-center rounded-full bg-success/10 text-success">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" className="h-8 w-8"><path d="M20 6 9 17l-5-5" /></svg>
-            </div>
-            <div className="font-display text-[22px] font-semibold">Cobro completado</div>
-            {confirmacion.folio && <div className="mt-1 text-[13px] text-ink-3">Ticket {confirmacion.folio}</div>}
-            {confirmacion.cambio > 0 && (
-              <div className="mt-3 rounded-lg border border-line">
-                <div className="flex items-center justify-between px-4 py-3 text-success">
-                  <span className="text-[14px] font-semibold">Cambio a entregar</span>
-                  <span className="font-display text-[20px] font-bold tabular-nums">{fmtMxn(confirmacion.cambio)}</span>
-                </div>
-              </div>
-            )}
-            {/* Panel de impresión (1 fila: ticket del cliente) */}
-            <div className="mt-4 flex items-center gap-3 rounded-lg border border-line px-4 py-3 text-left">
-              <span className={["flex h-8 w-8 items-center justify-center rounded", estadoTicket === "lista" ? "bg-success/10 text-success" : estadoTicket === "error" ? "bg-danger/10 text-danger" : "bg-hover text-ink-3"].join(" ")}>
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-4 w-4"><polyline points="6 9 6 2 18 2 18 9" /><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2" /><rect x="6" y="14" width="12" height="8" /></svg>
-              </span>
-              <div className="flex-1">
-                <div className="text-[14px] font-semibold">Ticket del cliente</div>
-                <div className="text-[12px] text-ink-3">{estadoTicket === "lista" ? "Vista previa lista · 80mm" : estadoTicket === "error" ? "No se pudo armar" : "Preparando…"}</div>
-              </div>
-              {datosTicket && (
-                <button type="button" onClick={() => setMostrarRecibo(true)} className="rounded border border-line-strong px-3 py-1.5 text-[13px] font-semibold text-ink-2 hover:border-ink hover:text-ink">
-                  Ver / Imprimir
-                </button>
-              )}
-            </div>
-            <Button className="mt-4 w-full" onClick={nuevoTicket}>Nuevo ticket</Button>
-          </div>
-        </div>
-      )}
-      {mostrarRecibo && datosTicket && (
-        <ReciboPreview
-          datosTicket={datosTicket}
-          datosComanda={datosComanda ?? undefined}
-          onImprimir={(vista) => {
-            // Con Epson/genérica manda ESC/POS; con Preview, window.print() imprime el recibo visible.
-            if (vista === "cocina" && datosComanda) {
-              obtenerImpresora("COCINA", { onMostrar: () => window.print() }).imprimir(construirComandaJob(datosComanda));
-            } else {
-              logoParaTicket(datosTicket.ancho).then((logo) =>
-                obtenerImpresora("CAJA", { onMostrar: () => window.print() }).imprimir(construirTicketJob(datosTicket, logo)),
-              );
-            }
-          }}
-          onCerrar={() => setMostrarRecibo(false)}
-          onNuevoTicket={nuevoTicket}
         />
       )}
     </div>
