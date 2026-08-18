@@ -108,6 +108,7 @@ export async function leerTicketParaImpresion(ticketId: string, ctx: Ctx): Promi
       cajero: ctx.cajeroNombre,
       caja: ctx.cajaNombre,
       modoServicio: MODO_LABEL[tk.modo_servicio as string] ?? (tk.modo_servicio as string) ?? "",
+      modo: (tk.modo_servicio as string) ?? "",
       nombreCliente: (tk.nombre_cliente as string) ?? null,
     },
     entrega,

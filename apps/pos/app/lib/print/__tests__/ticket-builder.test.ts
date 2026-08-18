@@ -5,7 +5,7 @@ import type { DatosTicketImpresion } from "../tipos";
 const DATOS: DatosTicketImpresion = {
   negocio: { nombre: "Knock-Out Burger", razonSocial: "Knock-Out SA de CV", rfc: "KOB210101AAA" },
   sucursal: { nombre: "León Centro", direccion: "Av. Insurgentes 234, Centro, León, Gto. CP 37000", telefono: "477 712 5500" },
-  meta: { folio: "KC-2026-000001", fechaIso: "2026-06-03T00:14:00.000Z", cajero: "María G.", caja: "Caja 01", modoServicio: "Para llevar" },
+  meta: { folio: "KC-2026-000001", fechaIso: "2026-06-03T00:14:00.000Z", cajero: "María G.", caja: "Caja 01", modoServicio: "Para llevar", modo: "PARA_LLEVAR" },
   lineas: [
     { cantidad: 1, nombre: "Hamburguesa Clásica", totalMxn: 120, modificadores: ["Tres cuartos", "Extra queso"], notaCocina: null },
   ],
