@@ -56,7 +56,7 @@ import { listarTicketsEnEspera, ponerTicketEnEspera, retomarTicketEnEspera } fro
 import { ModalEtiquetaEspera, ModalListaEspera } from "./modal-espera";
 import { leerItemsPersistidos, type ItemTicket } from "../lib/cancelacion";
 import { abrirCuentaEnMesa, agregarItemAlTicket, reconstruirCarrito } from "../lib/cuenta-mesa";
-import { atribuirMesero, contarPendientesCocina, enviarACocina } from "../lib/mesero";
+import { atribuirMesero, contarPendientesCocina, enviarACocina, yaEnviadoACocina } from "../lib/mesero";
 import { useConexion } from "../lib/conexion";
 import { cacheGet, cachePut, contarPendientes } from "../lib/outbox";
 import { sincronizar } from "../lib/sync";
@@ -979,8 +979,11 @@ export function HomePos({
               if (huboCambios) setCuentasVersion((v) => v + 1); // totales y conteos cambiaron
             }}
             onEnviarCocina={async (ticketId) => {
+              // Se consulta ANTES de mandar: después el ticket ya está EN_COCINA y toda comanda
+              // parecería un agregado, incluso la primera.
+              const esAgregado = await yaEnviadoACocina(token, ticketId);
               const enviados = await enviarACocina(token, ticketId);
-              await imprimirComandaCocina(ticketId, enviados, true);
+              await imprimirComandaCocina(ticketId, enviados, esAgregado);
             }}
           />
         )}
