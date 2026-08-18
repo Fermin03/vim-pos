@@ -84,9 +84,13 @@ export function construirTicketJob(d: DatosTicketImpresion, logo?: Bloque | null
 
   // 6. Pie fiscal
   b.push({ t: "texto", valor: "¡Gracias por su compra!", align: "centro" });
-  b.push({ t: "texto", valor: "¿Necesitas factura? Escanea el código:", align: "centro", size: 1 });
-  b.push({ t: "qr", valor: d.qrUrl });
-  b.push({ t: "texto", valor: d.qrUrl.replace(/^https?:\/\//, ""), align: "centro", size: 1 });
+  // El QR solo si el negocio lo activó. Imprimir "¿Necesitas factura?" sin portal detrás es
+  // prometerle algo al cliente que nadie puede cumplir.
+  if (d.qrUrl) {
+    b.push({ t: "texto", valor: "¿Necesitas factura? Escanea el código:", align: "centro", size: 1 });
+    b.push({ t: "qr", valor: d.qrUrl });
+    b.push({ t: "texto", valor: d.qrUrl.replace(/^https?:\/\//, ""), align: "centro", size: 1 });
+  }
 
   b.push({ t: "corte" });
 

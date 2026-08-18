@@ -514,3 +514,37 @@ export async function guardarPropinas(sucursalId: string, input: PropinasInput):
     );
   if (error) throw new Error(error.message);
 }
+
+// ── Ajustes del ticket del cliente ────────────────────────────────────────────
+
+export type AjustesTicket = {
+  /** Imprimir el QR de autofacturación. Apagado mientras no haya portal ni CSD. */
+  mostrarQrFactura: boolean;
+};
+
+/**
+ * Lee los ajustes de ticket del tenant.
+ *
+ * La mayoría de los tenants todavía NO tiene fila en `configuracion_tenant`, así que la
+ * ausencia se trata como "todo apagado" — el valor seguro: un negocio sin facturación
+ * configurada no debe imprimir la promesa de factura en su ticket.
+ */
+export async function leerAjustesTicket(): Promise<AjustesTicket> {
+  const tid = await tenantId();
+  const { data, error } = await supabase
+    .from("configuracion_tenant")
+    .select("mostrar_qr_factura_ticket")
+    .eq("tenant_id", tid)
+    .maybeSingle();
+  if (error) throw new Error(error.message);
+  const fila = (data ?? null) as { mostrar_qr_factura_ticket: boolean } | null;
+  return { mostrarQrFactura: fila?.mostrar_qr_factura_ticket === true };
+}
+
+export async function guardarAjustesTicket(ajustes: AjustesTicket): Promise<void> {
+  const tid = await tenantId();
+  const { error } = await supabase
+    .from("configuracion_tenant")
+    .upsert({ tenant_id: tid, mostrar_qr_factura_ticket: ajustes.mostrarQrFactura }, { onConflict: "tenant_id" });
+  if (error) throw new Error(error.message);
+}

@@ -132,13 +132,17 @@ export function ReciboTicket({ datos }: { datos: DatosTicketImpresion }) {
       {/* Pie + QR fiscal */}
       <div className="text-center">
         <div className="mb-2.5 font-sans text-[12.5px] font-semibold">¡Gracias por su compra!</div>
-        <div className="mb-2 text-[9.5px] leading-[1.5] text-[#555]">
-          ¿Necesitas factura? Escanea el código<br />o visita el portal con tu folio.
-        </div>
-        <div className="mx-auto mb-1.5 w-[84px] bg-white p-[5px]">
-          <QRCodeSVG value={datos.qrUrl} size={74} level="M" />
-        </div>
-        <div className="break-all text-[9.5px] text-[#333]">{datos.qrUrl.replace(/^https?:\/\//, "")}</div>
+        {datos.qrUrl && (
+          <>
+            <div className="mb-2 text-[9.5px] leading-[1.5] text-[#555]">
+              ¿Necesitas factura? Escanea el código<br />o visita el portal con tu folio.
+            </div>
+            <div className="mx-auto mb-1.5 w-[84px] bg-white p-[5px]">
+              <QRCodeSVG value={datos.qrUrl} size={74} level="M" />
+            </div>
+            <div className="break-all text-[9.5px] text-[#333]">{datos.qrUrl.replace(/^https?:\/\//, "")}</div>
+          </>
+        )}
       </div>
 
       {/* Corte */}
