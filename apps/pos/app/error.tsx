@@ -1,14 +1,17 @@
 "use client";
 import { useEffect } from "react";
 import { PantallaEstado } from "./components/pantalla-estado";
+import { reportarErrorSinEsperar } from "./lib/reportar-error";
 
 const btnAccent = "inline-flex items-center gap-2 rounded-lg bg-accent px-5 py-2.5 text-[14px] font-semibold text-white transition hover:brightness-95";
 const btnGhost = "inline-flex items-center gap-2 rounded-lg border border-line-strong px-5 py-2.5 text-[14px] font-semibold text-ink-2 transition hover:border-ink";
 
 export default function Error({ error, reset }: { error: Error & { digest?: string }; reset: () => void }) {
   useEffect(() => {
-    // Telemetría mínima en consola; en prod lo recoge Vercel.
     console.error("[POS error boundary]", error);
+    // Y a la bitácora, que es lo que VIM sí puede ver: en la caja del cliente la consola no
+    // la mira nadie. `digest` permite cruzar lo que ve el cajero en pantalla con el registro.
+    reportarErrorSinEsperar(error, { origen: "error-boundary", digest: error.digest ?? null });
   }, [error]);
 
   const referencia = error.digest ? `ERR-${error.digest.slice(0, 8).toUpperCase()}` : undefined;

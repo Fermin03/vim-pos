@@ -44,6 +44,7 @@ import { ModalDescuentoItem } from "./modal-descuento-item";
 import { ModalCancelarTicket } from "./modal-cancelar-ticket";
 import { ModalMovimientoCaja } from "./modal-movimiento-caja";
 import { ModalAbrirCaja } from "./modal-abrir-caja";
+import { fijarContextoErrores, reportarErrorSinEsperar } from "../lib/reportar-error";
 import { BotonVolver } from "./boton-volver";
 import { CatalogoProductos } from "./catalogo-productos";
 import { ModalAgregarProductos } from "./modal-agregar-productos";
@@ -222,6 +223,31 @@ export function HomePos({
   // Navegación: definidas aquí arriba a propósito. Los callbacks de "enviar a cocina"
   // las listan en sus dependencias, y esas se evalúan durante el render — con la
   // definición más abajo, la referencia caía en la zona muerta temporal del const.
+  // Bitácora de errores: se registra quién opera para que los boundaries de React —que no
+  // reciben props— puedan reportar con tenant y caja. Se capturan además los errores que NO
+  // pasan por React (promesas sin catch, fallos en handlers del navegador): en una caja esos
+  // son justo los que dejan la pantalla congelada sin que nadie se entere.
+  useEffect(() => {
+    fijarContextoErrores({
+      token,
+      tenantId: caja.tenant_id,
+      sucursalId: caja.sucursal_id,
+      cajaId: turno.caja_id,
+      usuarioId: empleado.id,
+    });
+    const onRechazo = (e: PromiseRejectionEvent) =>
+      reportarErrorSinEsperar(e.reason, { origen: "unhandledrejection" });
+    const onError = (e: ErrorEvent) =>
+      reportarErrorSinEsperar(e.error ?? e.message, { origen: "window.onerror", archivo: e.filename ?? null, linea: e.lineno ?? null });
+    window.addEventListener("unhandledrejection", onRechazo);
+    window.addEventListener("error", onError);
+    return () => {
+      window.removeEventListener("unhandledrejection", onRechazo);
+      window.removeEventListener("error", onError);
+      fijarContextoErrores(null);
+    };
+  }, [token, caja.tenant_id, caja.sucursal_id, turno.caja_id, empleado.id]);
+
   const cerrarRecibo = useCallback(() => {
     setConfirmacion(null);
     setDatosTicket(null);

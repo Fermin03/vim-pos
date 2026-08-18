@@ -1,8 +1,15 @@
 "use client";
+import { useEffect } from "react";
+import { reportarErrorSinEsperar } from "./lib/reportar-error";
 // Último recurso: error en el layout raíz. Reemplaza todo el árbol, así que incluye <html><body>
 // y usa estilos inline (no se garantiza el CSS global). Mantiene la marca y un botón de reintento.
 export default function GlobalError({ error, reset }: { error: Error & { digest?: string }; reset: () => void }) {
   const ref = error.digest ? `ERR-${error.digest.slice(0, 8).toUpperCase()}` : null;
+  // Este boundary reemplaza el árbol entero; si algo llega hasta aquí, la caja quedó inservible.
+  // Es el error que más urge que VIM vea, así que se reporta antes de pintar nada.
+  useEffect(() => {
+    reportarErrorSinEsperar(error, { origen: "global-error", digest: error.digest ?? null });
+  }, [error]);
   return (
     <html lang="es">
       <body style={{ margin: 0, fontFamily: "system-ui, -apple-system, Segoe UI, sans-serif", background: "#FFFFFF", color: "#16161A" }}>

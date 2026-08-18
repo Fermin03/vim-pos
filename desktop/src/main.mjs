@@ -15,6 +15,7 @@ import { pushToCloud } from "./sync-push.mjs";
 import { respaldar } from "./backup.mjs";
 import { crearWatchdog } from "./watchdog.mjs";
 import { crearCicloSync } from "./sync-ciclo.mjs";
+import { registrarErrorLocal, subirErrores } from "./sync-errores.mjs";
 import { buscarActualizacion, descargarInstalador } from "./updater.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -463,6 +464,11 @@ async function syncBestEffort({ conPull = true } = {}) {
       console.log("· [sync] PUSH: subiendo ventas offline…");
       const rs = await pushToCloud(backend.pool, opts, (m) => console.log("· [sync]", m));
       console.log(`· [sync] PUSH OK: ${rs.subidos} ventas subidas`);
+      // La bitácora va DESPUÉS y en su propio try: si falla, las ventas ya se subieron y el
+      // ciclo debe contarse como exitoso. Perder un reporte de error no justifica un reintento.
+      try {
+        await subirErrores(backend.pool, opts, (m) => console.log("· [sync]", m));
+      } catch (e) { console.log("· [sync] bitácora de errores omitida:", e.message); }
       return true;
     } catch (e) { console.log("· [sync] PUSH omitido:", e.message); return false; }
   } catch (e) {
@@ -544,6 +550,15 @@ function esFalloDePermisos(causa) {
 process.on("unhandledRejection", (causa) => {
   console.error("Rechazo no manejado:", causa ?? "(sin detalle)");
   if (!arrancado && esFalloDePermisos(causa)) falloElArranque(causa);
+  // A la bitácora que VIM sí puede ver. El ruido benigno documentado se filtra dentro.
+  if (backend?.pool) {
+    registrarErrorLocal(backend.pool, {
+      mensaje: causa?.message ?? String(causa ?? "(sin detalle)"),
+      stack: causa?.stack ?? null,
+      contexto: { origen: "unhandledRejection", rol: ROL },
+      version: app.getVersion(),
+    }).catch(() => {});
+  }
 });
 
 // Instancia única SOLO para la caja (la que arranca Postgres). La cocina es cliente delgado.
