@@ -43,6 +43,7 @@ export async function listarCuentasAbiertas(
     .select("id, folio_completo, total_mxn, monto_pendiente_mxn, fecha_apertura, estado_cocina, comanda_impresa_at, nombre_cliente, cliente:clientes(nombre), tickets_mesas(fecha_liberacion, mesas!mesa_id(numero)), ticket_items(cantidad, cancelado)")
     .eq("sucursal_id", sucursalId)
     .in("modo_servicio", modos)
+    .is("deleted_at", null)
     .eq("en_espera", false)
     .in("estado_fiscal", ["BORRADOR", "ABIERTO"])
     .order("fecha_apertura", { ascending: true });
@@ -125,4 +126,52 @@ export async function leerRenglonesCuenta(token: string, ticketId: string): Prom
     modificadores: (r.ticket_item_modificadores ?? []).map((m) => m.opcion_nombre_snapshot),
     notaCocina: r.nota_cocina,
   }));
+}
+
+/**
+ * Borra una cuenta que quedó VACÍA (mesa equivocada, nombre mal escrito, orden abierta por error).
+ *
+ * Distinta de cancelar: cancelar deja un folio CANCELADO en los reportes, con su motivo y su
+ * autorización, porque hubo una venta que se echó atrás. Una cuenta sin un solo producto no es
+ * una venta cancelada, es un error de captura; ensuciar el corte con ella no ayuda a nadie.
+ *
+ * NO se destruye la fila: se marca `deleted_at`. Sale de la lista operativa pero queda para
+ * auditar quién la borró y cuándo — que es justo lo que se querría revisar si alguien empezara
+ * a borrar cuentas de más.
+ *
+ * Se revalida que esté vacía aquí y no solo en el botón: entre que la pantalla se pintó y el
+ * cajero pulsó, otra caja pudo haberle agregado productos a la misma cuenta.
+ */
+export async function borrarCuentaVacia(
+  token: string,
+  ticketId: string,
+  usuarioId: string,
+): Promise<void> {
+  const sb = employeeClient(token);
+
+  const { count, error: eCount } = await sb
+    .from("ticket_items")
+    .select("id", { count: "exact", head: true })
+    .eq("ticket_id", ticketId)
+    .eq("cancelado", false);
+  if (eCount) throw new Error(eCount.message);
+  if ((count ?? 0) > 0) {
+    throw new Error("La cuenta ya tiene productos. Cancélalos primero o cancela la cuenta.");
+  }
+
+  // Liberar la mesa ANTES de borrar: el trigger que la pone LIBRE escucha a `tickets_mesas`, no
+  // al borrado del ticket. Sin esto, borrar una cuenta de comedor dejaba la mesa ocupada para
+  // siempre y sin forma de volver a usarla.
+  const { error: eMesa } = await sb
+    .from("tickets_mesas")
+    .update({ fecha_liberacion: new Date().toISOString(), motivo_liberacion: "CUENTA_BORRADA" })
+    .eq("ticket_id", ticketId)
+    .is("fecha_liberacion", null);
+  if (eMesa) throw new Error(eMesa.message);
+
+  const { error } = await sb
+    .from("tickets")
+    .update({ deleted_at: new Date().toISOString(), deleted_by: usuarioId })
+    .eq("id", ticketId);
+  if (error) throw new Error(error.message);
 }
