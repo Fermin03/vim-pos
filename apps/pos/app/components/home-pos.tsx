@@ -622,6 +622,14 @@ export function HomePos({
 
   /** Retoma un pedido en espera: lo carga al carrito como cuenta editable (misma maquinaria de mesas). */
   const retomarEspera = useCallback(async (ticketId: string) => {
+    // Retomar SUSTITUYE el carrito. Mientras la lista solo se abría desde el inicio esto daba
+    // igual, porque ahí el carrito siempre está vacío; con el botón en la barra de captura, un
+    // cajero a media comanda podía perder lo capturado sin un solo aviso. Se avisa en vez de
+    // sustituir: lo que está a medias es trabajo que nadie más puede rehacer.
+    if (carrito.lineas.length > 0) {
+      setEsperaError("Tienes un pedido a medias. Cóbralo o déjalo en espera antes de retomar otro.");
+      return;
+    }
     setEsperaProcesando(true);
     setEsperaError(null);
     try {
@@ -634,7 +642,7 @@ export function HomePos({
     } finally {
       setEsperaProcesando(false);
     }
-  }, [token, entrarCuenta, refrescarEspera]);
+  }, [carrito.lineas.length, token, entrarCuenta, refrescarEspera]);
 
   /** Descarta el overlay de confirmación/recibo (sin tocar el carrito en curso).
    *  Se llama al navegar por el topbar para que un recibo viejo no reaparezca apilado. */
@@ -1071,11 +1079,36 @@ export function HomePos({
           Sincronizando {pendientesSync} operación{pendientesSync === 1 ? "" : "es"} pendiente{pendientesSync === 1 ? "" : "s"}…
         </div>
       )}
-      {/* Barra de captura: aquí no van menú, KDS, cuentas ni pedidos en espera. El cajero está
-          anotando un pedido y cada ícono de más es una salida en falso; todo eso vive en el
-          inicio. Lo único que hace falta es regresar a donde estaba. */}
+      {/* Barra de captura: aquí no van menú, KDS ni cuentas. El cajero está anotando un pedido y
+          cada ícono de más es una salida en falso; todo eso vive en el inicio.
+
+          La excepción son los pedidos en espera, y SOLO en "Para llevar". Es el único modo sin
+          lista de cuentas propia: lo que se deja en espera ahí no aparece en ninguna otra
+          pantalla, y recuperarlo obligaba a volver al inicio y entrar al menú. En mostrador, que
+          es donde se atiende de pie y por turnos, ese viaje es justo el que no hay tiempo de
+          hacer. Los demás modos ya tienen su lista de cuentas abiertas y no lo necesitan.
+
+          Va a la derecha, opuesto a "Volver": son acciones distintas y pegarlas invitaría a
+          pulsar la equivocada con prisa. */}
       <div className="flex flex-shrink-0 items-center gap-3 border-b border-line bg-surface px-3 py-2">
         <BotonVolver onClick={volverAtras} />
+        {carrito.modoServicio === "PARA_LLEVAR" && (
+          <button
+            type="button"
+            onClick={() => { setEsperaError(null); setEsperaListaAbierta(true); }}
+            className="ml-auto flex h-10 flex-shrink-0 items-center gap-2 rounded border border-line-strong px-3 text-[13.5px] font-semibold text-ink transition hover:border-ink hover:bg-hover"
+          >
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4" aria-hidden="true">
+              <circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" />
+            </svg>
+            Cuentas en espera
+            {nEnEspera > 0 && (
+              <span className="flex h-[22px] min-w-[22px] items-center justify-center rounded-full bg-ink px-1.5 text-[12px] font-bold tabular-nums text-white">
+                {nEnEspera}
+              </span>
+            )}
+          </button>
+        )}
       </div>
       {configImpresoraAbierto && <ModalConfigImpresora onCerrar={() => setConfigImpresoraAbierto(false)} />}
       {clienteDomAbierto && (
