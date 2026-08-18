@@ -1,16 +1,16 @@
 "use client";
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Button } from "@vim/ui/styles";
 import { CatalogoProductos } from "./catalogo-productos";
 import { ModalModificadores } from "./modal-modificadores";
 import { agregarItemAlTicket } from "../lib/cuenta-mesa";
+import { leerRenglonesCuenta, type RenglonCuenta } from "../lib/cuentas-abiertas";
+import { RenglonItem } from "./renglon-item";
 import { obtenerGruposDeProducto } from "../lib/modificadores";
 import type { Categoria, Producto } from "../lib/catalogo";
 import type { GrupoModificadores } from "../lib/modificadores";
 import type { ModificadorSel } from "../lib/carrito";
 import { fmtMxn } from "../lib/turno";
-
-type Agregado = { clave: string; nombre: string; cantidad: number; precioMxn: number; nota: string | null };
 
 /**
  * Agregar productos a una cuenta YA abierta, sin salir de la lista.
@@ -43,24 +43,23 @@ export function ModalAgregarProductos({
   /** Manda a cocina lo pendiente de la cuenta e imprime su comanda. */
   onEnviarCocina: (ticketId: string) => Promise<void>;
 }) {
-  const [agregados, setAgregados] = useState<Agregado[]>([]);
+  // Lo pendiente de mandar se lee de la CUENTA, no de una lista local: así el precio incluye
+  // los modificadores (lo calcula la BD) y se ven también los renglones que quedaron pendientes
+  // de una captura anterior, que es justo lo que el botón va a mandar.
+  const [pendientes, setPendientes] = useState<RenglonCuenta[]>([]);
   const [modGrupos, setModGrupos] = useState<{ producto: Producto; grupos: GrupoModificadores[] } | null>(null);
   const [ocupado, setOcupado] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const anotar = useCallback((p: Producto, mods: ModificadorSel[], nota: string | null) => {
-    // Se agrupan los repetidos idénticos para que la lista no se vuelva ilegible al pedir 4 iguales.
-    const clave = `${p.id}|${mods.map((m) => m.opcionId).sort().join(",")}|${nota ?? ""}`;
-    setAgregados((prev) => {
-      const i = prev.findIndex((a) => a.clave === clave);
-      if (i >= 0) {
-        const copia = [...prev];
-        copia[i] = { ...copia[i]!, cantidad: copia[i]!.cantidad + 1 };
-        return copia;
-      }
-      return [...prev, { clave, nombre: p.nombre, cantidad: 1, precioMxn: p.precio_base_mxn, nota }];
-    });
-  }, []);
+  const recargarPendientes = useCallback(async () => {
+    try {
+      setPendientes(await leerRenglonesCuenta(token, ticketId, { soloPendientes: true }));
+    } catch {
+      /* el catálogo sigue usable; el importe se refresca al siguiente toque */
+    }
+  }, [token, ticketId]);
+
+  useEffect(() => { recargarPendientes(); }, [recargarPendientes]);
 
   const agregar = useCallback(
     async (p: Producto, mods: ModificadorSel[], nota: string | null) => {
@@ -68,14 +67,14 @@ export function ModalAgregarProductos({
       setError(null);
       try {
         await agregarItemAlTicket(token, { ticketId, productoId: p.id, cantidad: 1, modificadores: mods, nota });
-        anotar(p, mods, nota);
+        await recargarPendientes();
       } catch (e) {
         setError(e instanceof Error ? e.message : "No se pudo agregar el producto");
       } finally {
         setOcupado(false);
       }
     },
-    [token, ticketId, anotar],
+    [token, ticketId, recargarPendientes],
   );
 
   const onTap = useCallback(
@@ -92,8 +91,8 @@ export function ModalAgregarProductos({
     [token, agregar],
   );
 
-  const nuevos = agregados.reduce((a, x) => a + x.cantidad, 0);
-  const importe = agregados.reduce((a, x) => a + x.precioMxn * x.cantidad, 0);
+  const nuevos = pendientes.reduce((a, r) => a + r.cantidad, 0);
+  const importe = pendientes.reduce((a, r) => a + r.totalItemMxn, 0);
 
   return (
     <div className="fixed inset-0 z-50 flex flex-col bg-bg" role="dialog" aria-modal="true" aria-label="Agregar productos">
@@ -128,18 +127,18 @@ export function ModalAgregarProductos({
           </div>
 
           <div className="min-h-0 flex-1 overflow-y-auto px-5 py-3">
-            {agregados.length === 0 ? (
+            {pendientes.length === 0 ? (
               <p className="mt-6 text-center text-[13px] text-ink-3">Toca un producto para agregarlo a la cuenta.</p>
             ) : (
-              agregados.map((a) => (
-                <div key={a.clave} className="flex items-baseline justify-between gap-2 border-b border-line py-2 last:border-0">
-                  <span className="min-w-0 flex-1 truncate text-[13.5px]">
-                    <b className="font-semibold">{a.cantidad}×</b> {a.nombre}
-                    {a.nota && <span className="block truncate text-[11.5px] text-ink-3">{a.nota}</span>}
-                  </span>
-                  <span className="flex-shrink-0 font-display text-[13.5px] font-bold tabular-nums">
-                    {fmtMxn(a.precioMxn * a.cantidad)}
-                  </span>
+              pendientes.map((r) => (
+                <div key={r.id} className="border-b border-line py-3 last:border-0">
+                  <RenglonItem
+                    cantidad={r.cantidad}
+                    nombre={r.productoNombre}
+                    modificadores={r.modificadores}
+                    notaCocina={r.notaCocina}
+                    totalMxn={r.totalItemMxn}
+                  />
                 </div>
               ))
             )}

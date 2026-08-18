@@ -83,13 +83,21 @@ export type RenglonCuenta = {
  * el pedido con el cliente delante ("¿pidió la hamburguesa sin cebolla?") y sin eso hay que
  * abrir la cuenta en el carrito para saberlo.
  */
-export async function leerRenglonesCuenta(token: string, ticketId: string): Promise<RenglonCuenta[]> {
-  const { data, error } = await employeeClient(token)
+export async function leerRenglonesCuenta(
+  token: string,
+  ticketId: string,
+  opts: { soloPendientes?: boolean } = {},
+): Promise<RenglonCuenta[]> {
+  let q = employeeClient(token)
     .from("ticket_items")
     .select("id, producto_nombre_snapshot, cantidad, total_item_mxn, nota_cocina, ticket_item_modificadores(opcion_nombre_snapshot)")
     .eq("ticket_id", ticketId)
-    .eq("cancelado", false)
-    .order("created_at", { ascending: true });
+    .eq("cancelado", false);
+  // `soloPendientes`: lo que todavía no se ha mandado a cocina. Es lo que se muestra al agregar
+  // una segunda tanda — y el total viene de la BD, así que incluye el precio de los
+  // modificadores; calcularlo con el precio base del producto se quedaba corto.
+  if (opts.soloPendientes) q = q.is("enviado_cocina_at", null);
+  const { data, error } = await q.order("created_at", { ascending: true });
   if (error) throw new Error(error.message);
   type Fila = {
     id: string; producto_nombre_snapshot: string; cantidad: number | string;
