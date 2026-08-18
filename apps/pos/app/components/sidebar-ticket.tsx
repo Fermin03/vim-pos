@@ -3,6 +3,7 @@ import { useState } from "react";
 import type { EstadoCarrito, LineaCarrito, ModoServicio } from "../lib/carrito";
 import { calcularTotalesDisplay, totalLinea } from "../lib/carrito";
 import { fmtMxn } from "../lib/turno";
+import { RenglonItem } from "./renglon-item";
 
 /* ── helpers ─────────────────────────────────────────────────── */
 const MODO_LABELS: Record<ModoServicio, string> = {
@@ -248,33 +249,13 @@ export function SidebarTicket({
                 key={l.clientId}
                 className="-ml-1 cursor-pointer border-b border-line border-l-4 border-l-transparent py-3 pl-3 transition-colors hover:bg-sel"
               >
-                {/* Fila principal */}
-                <div className="flex items-start gap-3">
-                  {/* cantidad× */}
-                  <span className="font-display min-w-[28px] text-[16px] font-semibold tabular-nums text-ink-2">
-                    {l.cantidad}×
-                  </span>
-                  {/* nombre + mods */}
-                  <div className="min-w-0 flex-1">
-                    <div className="text-[15.5px] font-semibold leading-tight text-ink">
-                      {l.producto.nombre}
-                    </div>
-                    {l.modificadores.length > 0 && (
-                      <div className="mt-[3px] text-[13px] leading-[1.4] text-ink-2">
-                        {l.modificadores.map((m) => m.opcionNombre).join(" · ")}
-                      </div>
-                    )}
-                    {l.notaCocina && (
-                      <div className="mt-1 text-[12.5px] italic text-ink-3">
-                        "{l.notaCocina}"
-                      </div>
-                    )}
-                  </div>
-                  {/* precio total de línea */}
-                  <span className="font-display whitespace-nowrap text-[15.5px] font-semibold tabular-nums text-ink">
-                    {fmtMxn(totalLinea(l))}
-                  </span>
-                </div>
+                <RenglonItem
+                  cantidad={l.cantidad}
+                  nombre={l.producto.nombre}
+                  modificadores={l.modificadores.map((m) => m.opcionNombre)}
+                  notaCocina={l.notaCocina}
+                  totalMxn={totalLinea(l)}
+                />
 
                 {/* Controles: stepper + Quitar */}
                 <div className="mt-2 flex items-center gap-3 pl-10">

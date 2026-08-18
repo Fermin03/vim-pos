@@ -1,6 +1,7 @@
 "use client";
 import { useCallback, useEffect, useState } from "react";
 import { BotonVolver } from "./boton-volver";
+import { RenglonItem } from "./renglon-item";
 import { Button } from "@vim/ui/styles";
 import { fmtMxn, type DatosCaja, type Turno } from "../lib/turno";
 import { listarCuentasAbiertas, leerRenglonesCuenta, marcarSalidaDomicilio, minutosAbierta, type CuentaAbierta, type RenglonCuenta } from "../lib/cuentas-abiertas";
@@ -261,18 +262,19 @@ export function PantallaCuentasModo({
                 {detalle?.length === 0 && <p className="text-sm text-ink-3">Esta cuenta no tiene productos.</p>}
                 <div className="flex flex-col divide-y divide-line">
                   {detalle?.map((it) => (
-                    <div key={it.id} className="flex items-start gap-3 py-2.5">
-                      <span className="w-8 flex-shrink-0 font-display text-[15px] font-bold tabular-nums text-ink-2">{it.cantidad}×</span>
+                    <div key={it.id} className="flex items-start gap-2 py-2.5">
+                      {/* Mismo renglón que el carrito y que "Agregar productos": el cajero
+                          verifica el pedido con el cliente delante y no debería tener que
+                          reinterpretar tres formatos distintos de la misma información. */}
                       <div className="min-w-0 flex-1">
-                        <div className="text-[14px]">{it.productoNombre}</div>
-                        {/* Modificadores y nota: el panel sirve para verificar el pedido con el
-                            cliente delante, y sin esto habría que abrir la cuenta para saberlo. */}
-                        {it.modificadores.map((m, i) => (
-                          <div key={i} className="text-[12px] text-ink-3">+ {m}</div>
-                        ))}
-                        {it.notaCocina && <div className="text-[12px] italic text-[#9A6B12]">» {it.notaCocina}</div>}
+                        <RenglonItem
+                          cantidad={it.cantidad}
+                          nombre={it.productoNombre}
+                          modificadores={it.modificadores}
+                          notaCocina={it.notaCocina}
+                          totalMxn={it.totalItemMxn}
+                        />
                       </div>
-                      <span className="flex-shrink-0 text-[14px] font-semibold tabular-nums">{fmtMxn(it.totalItemMxn)}</span>
                       <button
                         type="button"
                         onClick={() => setCancelando(it)}
