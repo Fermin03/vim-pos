@@ -4,7 +4,7 @@ import { BotonVolver } from "./boton-volver";
 import { RenglonItem } from "./renglon-item";
 import { Button } from "@vim/ui/styles";
 import { fmtMxn, type DatosCaja, type Turno } from "../lib/turno";
-import { listarCuentasAbiertas, leerRenglonesCuenta, marcarSalidaDomicilio, minutosAbierta, type CuentaAbierta, type RenglonCuenta } from "../lib/cuentas-abiertas";
+import { borrarCuentaVacia, listarCuentasAbiertas, leerRenglonesCuenta, marcarSalidaDomicilio, minutosAbierta, type CuentaAbierta, type RenglonCuenta } from "../lib/cuentas-abiertas";
 import { leerTotales, type TotalesTicket } from "../lib/cobro";
 import { ModalCancelarItem } from "./modal-cancelar-item";
 import { ModalCancelarTicket } from "./modal-cancelar-ticket";
@@ -105,6 +105,8 @@ export function PantallaCuentasModo({
   const [cancelando, setCancelando] = useState<RenglonCuenta | null>(null);
   // Impresiones hechas en esta sesión: la primera es libre, de ahí en adelante pide PIN.
   const [yaImpresas, setYaImpresas] = useState<Set<string>>(new Set());
+  const [borrandoCuenta, setBorrandoCuenta] = useState(false);
+  const [borrando, setBorrando] = useState(false);
 
   const recargar = useCallback(async () => {
     setError(null);
@@ -144,6 +146,8 @@ export function PantallaCuentasModo({
   const sel = (items ?? []).find((c) => c.ticketId === selId) ?? null;
   // "Ya se imprimió" = lo hicimos en esta sesión, o el ticket trae marca de impresión previa.
   const yaSeImprimio = sel != null && (yaImpresas.has(sel.ticketId) || sel.impresaAt != null);
+  // null = todavía no se sabe. Solo `true` habilita el borrado.
+  const vacia = detalle === null ? null : detalle.length === 0;
   const hayDescuento = (totales?.descuentos ?? 0) > 0;
 
   const imprimir = useCallback(async (ticketId: string) => {
@@ -260,6 +264,16 @@ export function PantallaCuentasModo({
                 <Accion label={hayDescuento ? "Descuento aplicado" : "Descuento"} onClick={() => setDescontando(true)} inactivo={hayDescuento} />
                 <Accion label={yaSeImprimio ? "Reimprimir" : "Imprimir ticket"} onClick={() => (yaSeImprimio ? setPidiendoPinReimpresion(true) : imprimir(sel.ticketId))} ocupado={imprimiendo} />
                 {extraPorCuenta?.(sel, recargar)}
+                {/* Borrar es para la cuenta abierta POR ERROR (mesa equivocada, nombre mal
+                    escrito). Solo con cero productos: con productos lo correcto es cancelarlos
+                    uno por uno —queda el rastro de qué se echó atrás— o cancelar la cuenta. */}
+                <Accion
+                  label="Borrar cuenta"
+                  onClick={() => setBorrandoCuenta(true)}
+                  inactivo={vacia !== true}
+                  ocupado={borrando}
+                  peligro
+                />
                 <Accion label="Cancelar cuenta" onClick={() => setCancelandoCuenta(true)} peligro />
                 <Accion label={`Cobrar ${fmtMxn(totales?.total ?? sel.total)}`} onClick={() => onCobrar(sel.ticketId)} destacado />
               </div>
@@ -358,6 +372,51 @@ export function PantallaCuentasModo({
         />
       )}
 
+      {borrandoCuenta && sel && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" role="dialog" aria-modal="true">
+          <div className="w-full max-w-[420px] rounded-lg bg-surface p-5 shadow-lg">
+            <h2 className="font-display text-[17px] font-bold">¿Borrar esta cuenta?</h2>
+            <p className="mt-2 text-[13px] text-ink-2">
+              {sel.mesa ? `Mesa ${sel.mesa}` : (sel.cliente ?? sel.folio ?? "La cuenta")} está vacía y
+              desaparecerá de la lista. Si es de comedor, la mesa queda libre.
+            </p>
+            <p className="mt-2 text-[12.5px] text-ink-3">
+              No es una cancelación: al no tener productos, no ensucia el corte con un folio cancelado.
+            </p>
+            {error && <p className="mt-3 text-[13px] font-medium text-danger" role="alert">{error}</p>}
+            <div className="mt-4 flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setBorrandoCuenta(false)}
+                className="h-10 rounded border border-line-strong px-4 text-[13.5px] font-semibold text-ink-2 transition hover:border-ink hover:text-ink"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                disabled={borrando}
+                onClick={async () => {
+                  setBorrando(true);
+                  setError(null);
+                  try {
+                    await borrarCuentaVacia(token, sel.ticketId, empleado.id);
+                    setBorrandoCuenta(false);
+                    setSelId(null);
+                    await recargar();
+                  } catch (e) {
+                    setError(e instanceof Error ? e.message : "No se pudo borrar la cuenta");
+                  } finally {
+                    setBorrando(false);
+                  }
+                }}
+                className="h-10 rounded bg-danger px-4 text-[13.5px] font-semibold text-white transition hover:brightness-95 disabled:opacity-50"
+              >
+                {borrando ? "Borrando…" : "Borrar cuenta"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       {cancelandoCuenta && sel && (
         <ModalCancelarTicket
           token={token}
