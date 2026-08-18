@@ -40,6 +40,20 @@ export async function enviarACocina(token: string, ticketId: string): Promise<st
   return ids;
 }
 
+/**
+ * ¿A este ticket ya se le mandó algo a cocina alguna vez?
+ *
+ * Decide si la comanda se rotula como AGREGADO. Rotular de más es tan malo como de menos: la
+ * cocina lee "agregado" y da por hecho que el resto del pedido ya lo está preparando, cuando en
+ * realidad esa era la primera comanda.
+ */
+export async function yaEnviadoACocina(token: string, ticketId: string): Promise<boolean> {
+  const { data } = await employeeClient(token)
+    .from("tickets").select("estado_cocina").eq("id", ticketId).maybeSingle();
+  const estado = (data as { estado_cocina: string | null } | null)?.estado_cocina ?? null;
+  return estado !== null && estado !== "SIN_ENVIAR";
+}
+
 /** Cuántos renglones del ticket siguen sin mandarse a cocina (habilita "Enviar a cocina"). */
 export async function contarPendientesCocina(token: string, ticketId: string): Promise<number> {
   const { count, error } = await employeeClient(token)
