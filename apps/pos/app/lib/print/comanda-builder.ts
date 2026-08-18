@@ -65,3 +65,20 @@ export function construirComandaJob(d: DatosComanda): PrintJob {
 
   return { tipo: "TICKET", ancho: d.ancho, destino: "COCINA", abrir_cajon: false, bloques: b };
 }
+
+/**
+ * ¿Debe salir la comanda de cocina al COBRAR?
+ *
+ * Solo en "Para llevar". Es el único modo cuyo pedido va del carrito al cobro sin pasar por
+ * "Enviar a cocina", así que si la comanda no sale en ese momento, la cocina no se entera nunca.
+ *
+ * Comedor (`COMER_AQUI` y `MESA`), Pick-up (`DRIVE_THRU`) y Domicilio (`DELIVERY_PROPIO`) ya
+ * mandaron su comanda al enviar el pedido. Repetirla al cobrar le entregaba a la cocina el mismo
+ * pedido dos veces, con el riesgo de que se prepare otra vez.
+ *
+ * La segunda condición es de hardware: si la cocina no tiene impresora propia, la comanda saldría
+ * por la de caja, justo detrás del ticket que acaba de imprimirse. Sería papel duplicado, no aviso.
+ */
+export function debeImprimirComandaAlCobrar(modo: string, hayEstacionDedicada: boolean): boolean {
+  return modo === "PARA_LLEVAR" && hayEstacionDedicada;
+}

@@ -32,7 +32,7 @@ import { ModalMisPropinas } from "./modal-mis-propinas";
 import { leerTicketParaImpresion } from "../lib/print/ticket-datos";
 import { construirTicketJob } from "../lib/print/ticket-builder";
 import { rasterizarImagen } from "../lib/print/rasterizar";
-import { construirComandaJob, type DatosComanda } from "../lib/print/comanda-builder";
+import { construirComandaJob, debeImprimirComandaAlCobrar, type DatosComanda } from "../lib/print/comanda-builder";
 import { ReciboPreview } from "./recibo-preview";
 import { PantallaCierre } from "./pantalla-cierre";
 import { PantallaKds } from "@vim/kds-core";
@@ -745,9 +745,19 @@ export function HomePos({
               // Hoy con PreviewAdapter solo abre el overlay; el preview se renderiza desde los datos.
               const job = construirTicketJob(datos, await logoParaTicket(datos.ancho));
               await obtenerImpresora("CAJA", { onMostrar: () => setMostrarRecibo(true) }).imprimir(job);
-              // Comanda automática a la estación de cocina — solo si hay una estación dedicada
-              // distinta de la de caja (si es la misma impresora, ya salió el ticket; no duplicar).
-              if (hayEstacionDeCocinaDedicada()) {
+              // Comanda automática a la estación de cocina.
+              //
+              // SOLO en "Para llevar". Es el único modo donde el pedido va del carrito al cobro sin
+              // pasar por "Enviar a cocina": si no saliera aquí, la cocina no se enteraría nunca.
+              //
+              // En comedor, Pick-up y Domicilio la comanda YA salió al enviar el pedido, y volver a
+              // imprimirla al cobrar hacía que la cocina recibiera dos veces lo mismo —con el riesgo
+              // real de que alguien prepare el pedido otra vez, además del papel de más. Al cobrar,
+              // esos modos imprimen únicamente el ticket del cliente.
+              //
+              // Y solo si la estación de cocina es una impresora distinta de la de caja: con una
+              // sola impresora, el ticket que acaba de salir ya es el papel.
+              if (debeImprimirComandaAlCobrar(datos.meta.modo, hayEstacionDeCocinaDedicada())) {
                 obtenerImpresora("COCINA", { onMostrar: () => {} })
                   .imprimir(construirComandaJob(datosCom))
                   .catch(() => {});

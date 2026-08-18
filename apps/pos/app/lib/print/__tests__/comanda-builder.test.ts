@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { construirComandaJob, type DatosComanda } from "../comanda-builder";
+import { construirComandaJob, debeImprimirComandaAlCobrar, type DatosComanda } from "../comanda-builder";
 
 const D: DatosComanda = {
   folio: "KC-2026-000001",
@@ -92,5 +92,26 @@ describe("construirComandaJob — agregado a una orden en curso", () => {
   it("no lo avisa en la primera comanda: ahí no hay nada previo que la cocina confunda", () => {
     const hay = construirComandaJob(D).bloques.some((x) => x.t === "texto" && (x as { valor: string }).valor.includes("AGREGADO"));
     expect(hay).toBe(false);
+  });
+});
+
+describe("debeImprimirComandaAlCobrar", () => {
+  it("imprime en Para llevar: es el único modo que nunca pasa por 'Enviar a cocina'", () => {
+    expect(debeImprimirComandaAlCobrar("PARA_LLEVAR", true)).toBe(true);
+  });
+
+  it("NO imprime en comedor, Pick-up ni Domicilio: su comanda ya salió al enviar el pedido", () => {
+    for (const modo of ["COMER_AQUI", "MESA", "DRIVE_THRU", "DELIVERY_PROPIO"]) {
+      expect(debeImprimirComandaAlCobrar(modo, true)).toBe(false);
+    }
+  });
+
+  it("sin estación de cocina propia no imprime: saldría por la de caja, detrás del ticket", () => {
+    expect(debeImprimirComandaAlCobrar("PARA_LLEVAR", false)).toBe(false);
+  });
+
+  it("un modo desconocido no imprime: ante la duda, papel de menos y no una comanda repetida", () => {
+    expect(debeImprimirComandaAlCobrar("", true)).toBe(false);
+    expect(debeImprimirComandaAlCobrar("MODO_NUEVO", true)).toBe(false);
   });
 });

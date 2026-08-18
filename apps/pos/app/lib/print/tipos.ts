@@ -52,7 +52,16 @@ export type DatosEntrega = {
 export type DatosTicketImpresion = {
   negocio: { nombre: string; razonSocial: string | null; rfc: string | null; logoUrl: string | null };
   sucursal: { nombre: string; direccion: string | null; telefono: string | null };
-  meta: { folio: string; fechaIso: string; cajero: string; caja: string; modoServicio: string; nombreCliente?: string | null };
+  meta: {
+    folio: string; fechaIso: string; cajero: string; caja: string;
+    /** Etiqueta para el papel ("Comedor", "Pick-up"). */
+    modoServicio: string;
+    /** El enum crudo (`COMER_AQUI`, `MESA`, `PARA_LLEVAR`, …). Va aparte de la etiqueta porque
+     *  quien decide QUÉ imprimir necesita comparar contra un valor estable, no contra un texto
+     *  que existe para leerse y que cambiaría con cualquier retoque de redacción. */
+    modo: string;
+    nombreCliente?: string | null;
+  };
   /** Datos del cliente para el repartidor. Solo se llena en DOMICILIO; null en el resto. */
   entrega: DatosEntrega | null;
   lineas: LineaImpresion[];
