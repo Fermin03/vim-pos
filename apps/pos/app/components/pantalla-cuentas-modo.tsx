@@ -23,7 +23,15 @@ type Copia = {
   nuevaCuenta: string;
 };
 
-const COPIA: Record<"DRIVE_THRU" | "DELIVERY_PROPIO", Copia> = {
+/** Comedor entra aquí con el mismo flujo que Pick-up y domicilio: lista + "Nueva orden". */
+const COPIA: Record<"DRIVE_THRU" | "DELIVERY_PROPIO" | "COMER_AQUI", Copia> = {
+  COMER_AQUI: {
+    titulo: "Comedor",
+    subtitulo: (n) => `${n} ${n === 1 ? "mesa abierta" : "mesas abiertas"}`,
+    vacioTitulo: "Sin mesas abiertas",
+    vacioTexto: "Abre una cuenta escribiendo el número de mesa.",
+    nuevaCuenta: "Nueva orden",
+  },
   DRIVE_THRU: {
     titulo: "Pick-up",
     subtitulo: (n) => `${n} ${n === 1 ? "orden por recolectar" : "órdenes por recolectar"}`,
@@ -69,7 +77,7 @@ export function PantallaCuentasModo({
   caja: DatosCaja;
   turno: Turno;
   empleado: Empleado;
-  modo: Extract<ModoServicio, "DRIVE_THRU" | "DELIVERY_PROPIO">;
+  modo: Extract<ModoServicio, "DRIVE_THRU" | "DELIVERY_PROPIO" | "COMER_AQUI">;
   onSalir: () => void;
   /** Abre una cuenta NUEVA en este modo (entra al catálogo con el modo ya fijado). */
   onAbrirCuenta: () => void;
@@ -83,6 +91,7 @@ export function PantallaCuentasModo({
   extraPorCuenta?: (c: CuentaAbierta, recargar: () => void) => React.ReactNode;
 }) {
   const copia = COPIA[modo];
+  const esComedor = modo === "COMER_AQUI";
   const [items, setItems] = useState<CuentaAbierta[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [selId, setSelId] = useState<string | null>(null);
@@ -100,12 +109,12 @@ export function PantallaCuentasModo({
   const recargar = useCallback(async () => {
     setError(null);
     try {
-      setItems(await listarCuentasAbiertas(token, caja.sucursal_id, modo));
+      setItems(await listarCuentasAbiertas(token, caja.sucursal_id, esComedor ? ["MESA", "COMER_AQUI"] : modo));
     } catch (e) {
       setError(e instanceof Error ? e.message : "No se pudieron cargar las cuentas");
       setItems([]);
     }
-  }, [token, caja.sucursal_id, modo]);
+  }, [token, caja.sucursal_id, modo, esComedor]);
 
   useEffect(() => { recargar(); }, [recargar]);
   useEffect(() => {
@@ -217,7 +226,7 @@ export function PantallaCuentasModo({
                     ].join(" ")}
                   >
                     <div className="flex items-baseline justify-between gap-2">
-                      <span className="truncate font-display text-[15px] font-semibold">{c.cliente ?? c.folio ?? "Cuenta"}</span>
+                      <span className="truncate font-display text-[15px] font-semibold">{(esComedor && c.mesa ? `Mesa ${c.mesa}` : null) ?? c.cliente ?? c.folio ?? "Cuenta"}</span>
                       <span className="flex-shrink-0 font-display text-[15px] font-bold tabular-nums">{fmtMxn(c.total)}</span>
                     </div>
                     <div className={["mt-0.5 flex items-center justify-between gap-2 text-[12px]", salio ? "text-white/75" : "text-ink-3"].join(" ")}>

@@ -48,6 +48,7 @@ import { fijarContextoErrores, reportarErrorSinEsperar } from "../lib/reportar-e
 import { BotonVolver } from "./boton-volver";
 import { CatalogoProductos } from "./catalogo-productos";
 import { ModalAgregarProductos } from "./modal-agregar-productos";
+import { ModalNumeroMesa } from "./modal-numero-mesa";
 import { MenuGeneral } from "./menu-general";
 import { PantallaInicio } from "./pantalla-inicio";
 import { PantallaCuentasModo } from "./pantalla-cuentas-modo";
@@ -151,6 +152,10 @@ export function HomePos({
   // Agregar productos a una cuenta abierta es su propio modal: la pantalla de venta tiene el
   // botón Cobrar como acción dominante, y no es lo que se quiere al anotar una segunda tanda.
   const [agregandoA, setAgregandoA] = useState<string | null>(null);
+  // Comedor: se escribe el número de mesa en vez de buscarla en el mapa. El mapa queda como
+  // consulta opcional desde el propio modal.
+  const [pidiendoMesa, setPidiendoMesa] = useState(false);
+  const [viendoMapaMesas, setViendoMapaMesas] = useState(false);
   const [procesandoCobro, setProcesandoCobro] = useState(false);
   const [confirmacion, setConfirmacion] = useState<{ folio: string | null; cambio: number } | null>(null);
   // Ticket ya persistido en BD por el flujo de descuento. Mientras exista, el carrito
@@ -925,20 +930,8 @@ export function HomePos({
     return <PantallaMonitorVentas token={token} caja={caja} turno={turno} onSalir={volverAlInicio} />;
   }
 
-  if (enMesas) {
-    return (
-      <PantallaMesas
-        token={token}
-        caja={caja}
-        onSalir={volverAlInicio}
-        onAbrirCuenta={onAbrirCuentaMesa}
-        onRetomar={(ticketId: string) => entrarCuenta(ticketId, "mesas")}
-      />
-    );
-  }
-
-  if (enDelivery || enPickup) {
-    const modo = enPickup ? "DRIVE_THRU" : "DELIVERY_PROPIO";
+  if (enDelivery || enPickup || enMesas) {
+    const modo = enPickup ? "DRIVE_THRU" : enMesas ? "COMER_AQUI" : "DELIVERY_PROPIO";
     return (
       <>
         <PantallaCuentasModo
@@ -956,7 +949,10 @@ export function HomePos({
           setTicketBd(null);
           setItemsPersistidos([]);
           setCocinaEnviada(false);
-          setVolverA(modo === "DRIVE_THRU" ? "pickup" : "domicilio");
+          setVolverA(modo === "DRIVE_THRU" ? "pickup" : modo === "COMER_AQUI" ? "mesas" : "domicilio");
+          // Comedor NO entra al catálogo todavía: primero hay que saber a qué mesa. El modal se
+          // encarga y, al resolverla, abre la cuenta y entra.
+          if (modo === "COMER_AQUI") { setPidiendoMesa(true); return; }
           setEnPickup(false);
           setEnDelivery(false);
           // Domicilio: lo primero que se pregunta por teléfono es a nombre de quién y a dónde
@@ -994,6 +990,32 @@ export function HomePos({
         {/* El cobro va aquí también: sin esto, abrirlo desde la lista no mostraría nada, porque
             el componente tiene un return por pantalla. */}
         {modalesCobro}
+        {pidiendoMesa && (
+          <ModalNumeroMesa
+            token={token}
+            tenantId={caja.tenant_id}
+            sucursalId={caja.sucursal_id}
+            onVerMesas={() => { setPidiendoMesa(false); setViendoMapaMesas(true); }}
+            onCerrar={() => setPidiendoMesa(false)}
+            onMesaElegida={async (mesaId) => {
+              setPidiendoMesa(false);
+              await onAbrirCuentaMesa(mesaId);
+            }}
+          />
+        )}
+        {viendoMapaMesas && (
+          // El mapa como CONSULTA opcional, no como paso obligatorio: sirve para ver qué está
+          // ocupado cuando no te acuerdas del número.
+          <div className="fixed inset-0 z-50 bg-bg">
+            <PantallaMesas
+              token={token}
+              caja={caja}
+              onSalir={() => { setViendoMapaMesas(false); setPidiendoMesa(true); }}
+              onAbrirCuenta={async (mesaId: string) => { setViendoMapaMesas(false); await onAbrirCuentaMesa(mesaId); }}
+              onRetomar={(ticketId: string) => { setViendoMapaMesas(false); entrarCuenta(ticketId, "mesas"); }}
+            />
+          </div>
+        )}
         {agregandoA && (
           <ModalAgregarProductos
             token={token}

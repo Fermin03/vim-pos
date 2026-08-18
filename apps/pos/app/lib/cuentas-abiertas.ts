@@ -15,17 +15,30 @@ export type CuentaAbierta = {
   desdeIso: string | null;        // fecha_apertura
   estadoCocina: string;           // SIN_ENVIAR | EN_COCINA | LISTO | ENTREGADO…
   impresaAt: string | null;       // comanda_impresa_at → ya salió/se imprimió
-  cliente: string | null;         // nombre del cliente (domicilio)
+  cliente: string | null;         // nombre del cliente (domicilio) o nombre suelto (Pick-up)
+  mesa: string | null;            // número de mesa (comedor), desde tickets_mesas
 };
 
 /** Cuentas abiertas de un modo en la SUCURSAL (Pick-up: DRIVE_THRU, Domicilio: DELIVERY_PROPIO).
  *  Sucursal-wide para que cualquier caja pueda completarlas. */
-export async function listarCuentasAbiertas(token: string, sucursalId: string, modo: ModoServicio): Promise<CuentaAbierta[]> {
+/**
+ * Cuentas abiertas de uno o varios modos.
+ *
+ * Comedor pasa DOS modos: los tickets nacen como `MESA` cuando se abren desde una mesa, pero
+ * hay `COMER_AQUI` de la ruta de mostrador. Filtrar por uno solo escondería cuentas abiertas
+ * —y una cuenta que no se ve es una que no se cobra.
+ */
+export async function listarCuentasAbiertas(
+  token: string,
+  sucursalId: string,
+  modo: ModoServicio | readonly string[],
+): Promise<CuentaAbierta[]> {
+  const modos = typeof modo === "string" ? [modo] : [...modo];
   const { data, error } = await employeeClient(token)
     .from("tickets")
-    .select("id, folio_completo, total_mxn, monto_pendiente_mxn, fecha_apertura, estado_cocina, comanda_impresa_at, nombre_cliente, cliente:clientes(nombre), ticket_items(cantidad, cancelado)")
+    .select("id, folio_completo, total_mxn, monto_pendiente_mxn, fecha_apertura, estado_cocina, comanda_impresa_at, nombre_cliente, cliente:clientes(nombre), tickets_mesas(fecha_liberacion, mesas(numero)), ticket_items(cantidad, cancelado)")
     .eq("sucursal_id", sucursalId)
-    .eq("modo_servicio", modo)
+    .in("modo_servicio", modos)
     .eq("en_espera", false)
     .in("estado_fiscal", ["BORRADOR", "ABIERTO"])
     .order("fecha_apertura", { ascending: true });
@@ -43,6 +56,9 @@ export async function listarCuentasAbiertas(token: string, sucursalId: string, m
     impresaAt: (t.comanda_impresa_at as string) ?? null,
     // Cliente registrado (domicilio) manda; si no, el nombre suelto de Pick-up.
     cliente: ((t.cliente as { nombre?: string } | null)?.nombre) ?? ((t.nombre_cliente as string) ?? null),
+    // Solo la asignación viva: una mesa liberada (cuenta transferida) no debe seguir rotulando.
+    mesa: (((t.tickets_mesas as { fecha_liberacion: string | null; mesas: { numero: string } | null }[] | null) ?? [])
+      .find((m) => m.fecha_liberacion === null)?.mesas?.numero) ?? null,
   }));
 }
 
