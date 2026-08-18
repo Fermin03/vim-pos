@@ -149,7 +149,7 @@ export function HomePos({
   const [cuentasVersion, setCuentasVersion] = useState(0);
   // Agregar productos a una cuenta abierta es su propio modal: la pantalla de venta tiene el
   // botón Cobrar como acción dominante, y no es lo que se quiere al anotar una segunda tanda.
-  const [agregandoA, setAgregandoA] = useState<{ ticketId: string; folio: string | null } | null>(null);
+  const [agregandoA, setAgregandoA] = useState<string | null>(null);
   const [procesandoCobro, setProcesandoCobro] = useState(false);
   const [confirmacion, setConfirmacion] = useState<{ folio: string | null; cambio: number } | null>(null);
   // Ticket ya persistido en BD por el flujo de descuento. Mientras exista, el carrito
@@ -939,7 +939,7 @@ export function HomePos({
           if (modo === "DRIVE_THRU") setNombreCuentaAbierto(true);
           if (modo === "DELIVERY_PROPIO") setClienteDomAbierto(true);
         }}
-        onAgregarProductos={(ticketId: string, folio: string | null) => setAgregandoA({ ticketId, folio })}
+        onAgregarProductos={(ticketId: string) => setAgregandoA(ticketId)}
         onCobrar={async (ticketId) => {
           // El cobro se abre ENCIMA de la lista, sin cargar la cuenta ni saltar al catálogo:
           // el cajero pidió cobrar, no capturar productos. El modal solo necesita los totales.
@@ -971,8 +971,7 @@ export function HomePos({
         {agregandoA && (
           <ModalAgregarProductos
             token={token}
-            ticketId={agregandoA.ticketId}
-            folio={agregandoA.folio}
+            ticketId={agregandoA}
             categorias={categorias}
             productos={productos}
             onCerrar={(huboCambios) => {
