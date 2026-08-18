@@ -2,6 +2,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { Atencion } from "./components/atencion";
 import { Bitacora } from "./components/bitacora";
+import { Errores } from "./components/errores";
 import { SaludTenant } from "./components/salud-tenant";
 import type { Api } from "./lib/tipos";
 
@@ -36,7 +37,7 @@ export default function PlatformHome() {
   const [platformKey, setPlatformKey] = useState("");
   const [autenticado, setAutenticado] = useState(false);
   const [keyError, setKeyError] = useState<string | null>(null);
-  const [tab, setTab] = useState<"atencion" | "metricas" | "empresas" | "bitacora" | "nuevo">("atencion");
+  const [tab, setTab] = useState<"atencion" | "metricas" | "empresas" | "errores" | "bitacora" | "nuevo">("atencion");
   // Empresa a abrir directo desde una alerta: evita ir a buscarla a mano en la lista.
   const [tenantFoco, setTenantFoco] = useState<string | null>(null);
 
@@ -83,7 +84,7 @@ export default function PlatformHome() {
           <span className="font-display text-[17px] font-bold tracking-tight">VIM Plataforma</span>
         </div>
         <nav className="ml-4 flex gap-1">
-          {([["atencion", "Atención"], ["metricas", "Métricas"], ["empresas", "Empresas"], ["bitacora", "Bitácora"], ["nuevo", "Nuevo cliente"]] as const).map(([k, l]) => (
+          {([["atencion", "Atención"], ["metricas", "Métricas"], ["empresas", "Empresas"], ["errores", "Errores"], ["bitacora", "Bitácora"], ["nuevo", "Nuevo cliente"]] as const).map(([k, l]) => (
             <button key={k} onClick={() => setTab(k)} className={["rounded px-3 py-1.5 text-[13px] font-semibold transition", tab === k ? "bg-ink text-white" : "text-ink-2 hover:bg-hover"].join(" ")}>{l}</button>
           ))}
         </nav>
@@ -92,6 +93,7 @@ export default function PlatformHome() {
         {tab === "atencion" && <Atencion api={api} onAbrirEmpresa={(id) => { setTenantFoco(id); setTab("empresas"); }} />}
         {tab === "metricas" && <Metricas api={api} />}
         {tab === "empresas" && <Empresas api={api} foco={tenantFoco} onFocoUsado={() => setTenantFoco(null)} />}
+        {tab === "errores" && <Errores api={api} />}
         {tab === "bitacora" && <Bitacora api={api} />}
         {tab === "nuevo" && <NuevoCliente api={api} onCreado={() => setTab("empresas")} />}
       </main>
