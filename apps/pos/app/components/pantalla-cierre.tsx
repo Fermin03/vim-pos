@@ -160,6 +160,12 @@ export function PantallaCierre({
     };
   }
 
+  // El cajón se abre al ENTRAR, no al confirmar: para declarar el efectivo hay que contarlo
+  // primero, y contarlo exige tenerlo a la mano. Abrirlo después del cierre llegaría tarde.
+  useEffect(() => {
+    obtenerImpresora("CAJA", { onMostrar: () => {} }).abrirCajon().catch(() => {});
+  }, []);
+
   async function ejecutarCierre(a: Autorizacion) {
     setProcesando(true);
     setError(null);
