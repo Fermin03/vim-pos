@@ -36,7 +36,11 @@ export async function listarCuentasAbiertas(
   const modos = typeof modo === "string" ? [modo] : [...modo];
   const { data, error } = await employeeClient(token)
     .from("tickets")
-    .select("id, folio_completo, total_mxn, monto_pendiente_mxn, fecha_apertura, estado_cocina, comanda_impresa_at, nombre_cliente, cliente:clientes(nombre), tickets_mesas(fecha_liberacion, mesas(numero)), ticket_items(cantidad, cancelado)")
+    // `mesas!mesa_id` NO es opcional: tickets_mesas tiene DOS llaves foráneas a mesas
+    // (`mesa_id` y `mesa_anterior_id`, esta última para transferencias). Sin la pista,
+    // PostgREST no sabe cuál seguir y rechaza la consulta entera con "more than one
+    // relationship was found" — dejando sin lista a los TRES modos, no solo a comedor.
+    .select("id, folio_completo, total_mxn, monto_pendiente_mxn, fecha_apertura, estado_cocina, comanda_impresa_at, nombre_cliente, cliente:clientes(nombre), tickets_mesas(fecha_liberacion, mesas!mesa_id(numero)), ticket_items(cantidad, cancelado)")
     .eq("sucursal_id", sucursalId)
     .in("modo_servicio", modos)
     .eq("en_espera", false)
