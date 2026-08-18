@@ -139,3 +139,24 @@ describe("construirTicketJob — nombre suelto de la cuenta (Pick-up)", () => {
     expect(filas.some((f) => f.izq === "Cliente")).toBe(false);
   });
 });
+
+describe("construirTicketJob — QR de autofacturación opcional", () => {
+  it("lo imprime cuando el negocio lo tiene activado", () => {
+    const b = construirTicketJob(DATOS).bloques;
+    expect(b.some((x) => x.t === "qr")).toBe(true);
+    expect(b.some((x) => x.t === "texto" && (x as { valor: string }).valor.includes("¿Necesitas factura?"))).toBe(true);
+  });
+
+  it("apagado: ni QR ni la leyenda que lo acompaña", () => {
+    // Sin portal detrás, ofrecer factura es prometer algo que nadie puede cumplir.
+    const b = construirTicketJob({ ...DATOS, qrUrl: null }).bloques;
+    expect(b.some((x) => x.t === "qr")).toBe(false);
+    expect(b.some((x) => x.t === "texto" && (x as { valor: string }).valor.includes("factura"))).toBe(false);
+  });
+
+  it("apagado, el ticket sigue completo: gracias y corte", () => {
+    const b = construirTicketJob({ ...DATOS, qrUrl: null }).bloques;
+    expect(b.some((x) => x.t === "texto" && (x as { valor: string }).valor.includes("¡Gracias por su compra!"))).toBe(true);
+    expect(b[b.length - 1]!.t).toBe("corte");
+  });
+});

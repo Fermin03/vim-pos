@@ -83,6 +83,15 @@ export async function leerTicketParaImpresion(ticketId: string, ctx: Ctx): Promi
     ? await leerEntrega(sb, tk.cliente_id as string | null, tk.direccion_entrega_id as string | null)
     : null;
 
+  // El QR de autofacturación es opcional por tenant. Sin fila de configuración se trata como
+  // APAGADO: es el estado de casi todos hoy, y prometer factura sin portal es peor que callar.
+  const { data: cfg } = await sb
+    .from("configuracion_tenant")
+    .select("mostrar_qr_factura_ticket")
+    .eq("tenant_id", tk.tenant_id as string)
+    .maybeSingle();
+  const qrActivo = ((cfg ?? null) as { mostrar_qr_factura_ticket: boolean } | null)?.mostrar_qr_factura_ticket === true;
+
   const { data: ten } = await sb
     .from("tenants")
     .select("codigo, nombre_comercial, razon_social, rfc, logo_url")
@@ -108,7 +117,7 @@ export async function leerTicketParaImpresion(ticketId: string, ctx: Ctx): Promi
       iva: Number(tk.iva_mxn), total: Number(tk.total_mxn), propina: Number(tk.propina_mxn),
     },
     pagos: pagosImp,
-    qrUrl: `https://factura.vimpos.mx/${tn.codigo ?? "negocio"}?folio=${tk.folio_completo ?? ""}`,
+    qrUrl: qrActivo ? `https://factura.vimpos.mx/${tn.codigo ?? "negocio"}?folio=${tk.folio_completo ?? ""}` : null,
     ancho: 80,
   };
 }

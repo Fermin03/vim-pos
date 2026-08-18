@@ -4,7 +4,9 @@ import { Button } from "@vim/ui/styles";
 import { PageHeader, PageBody } from "../../../components/page-header";
 import {
   cfdiEmisorSchema,
+  guardarAjustesTicket,
   guardarCfdiEmisor,
+  leerAjustesTicket,
   leerCfdiEmisor,
   PROVEEDORES_PAC,
   type CfdiEmisor,
@@ -34,6 +36,7 @@ export default function CfdiPage() {
   const [error, setError] = useState<string | null>(null);
   const [okMsg, setOkMsg] = useState<string | null>(null);
   const [guardando, setGuardando] = useState(false);
+  const [qrTicket, setQrTicket] = useState(false);
 
   const [rfc, setRfc] = useState("");
   const [pac, setPac] = useState("FACTURAPI");
@@ -50,6 +53,7 @@ export default function CfdiPage() {
       setRef(e.facturama_issuer_ref ?? "");
       setVig(e.csd_vigencia_hasta ?? "");
       setEstado(e.estado);
+      setQrTicket((await leerAjustesTicket()).mostrarQrFactura);
     } catch (e) {
       setError(mensajeError(e, "No se pudo cargar"));
       setEmisor(null);
@@ -76,6 +80,7 @@ export default function CfdiPage() {
     setGuardando(true);
     try {
       await guardarCfdiEmisor(parsed.data);
+      await guardarAjustesTicket({ mostrarQrFactura: qrTicket });
       setOkMsg("Configuración CFDI guardada.");
       setTimeout(() => setOkMsg(null), 2500);
       recargar();
@@ -141,6 +146,35 @@ export default function CfdiPage() {
                   onChange={(e) => setRef(e.target.value)} placeholder="ID del emisor en el PAC (se asigna al subir el CSD)" />
                 <p className="mt-1.5 text-[11.5px] text-ink-3">Opcional · se completa cuando el PAC provisiona el emisor con tu CSD.</p>
               </div>
+            </div>
+
+            <div className="mb-6 rounded-lg border border-line bg-surface p-5">
+              <div className="mb-1 font-display text-[16px] font-semibold tracking-tight">Ticket del cliente</div>
+              <p className="mb-4 text-[12.5px] text-ink-3">
+                Qué se imprime en el ticket respecto a facturación.
+              </p>
+              <label className="flex cursor-pointer items-start gap-3">
+                <input
+                  type="checkbox"
+                  className="mt-[3px] h-4 w-4 flex-shrink-0 accent-[#E8502E]"
+                  checked={qrTicket}
+                  onChange={(e) => setQrTicket(e.target.checked)}
+                />
+                <span className="min-w-0">
+                  <span className="block text-[14px] font-semibold">Imprimir el QR de autofacturación</span>
+                  <span className="block text-[12.5px] leading-[1.5] text-ink-3">
+                    Agrega al pie del ticket &quot;¿Necesitas factura? Escanea el código&quot; con el enlace al
+                    portal. Actívalo solo cuando el portal esté publicado y el CSD cargado: si no, el
+                    cliente escanea y no encuentra nada.
+                  </span>
+                </span>
+              </label>
+              {qrTicket && estado !== "ACTIVO" && (
+                <p className="mt-3 rounded border border-[#F0DCC0] bg-[#FCF3E6] px-3 py-2 text-[12.5px] font-medium text-warning">
+                  El emisor no está en modo <b>Activo (producción)</b>, así que hoy no se pueden generar
+                  CFDI válidos. El ticket ofrecerá una factura que el negocio todavía no puede emitir.
+                </p>
+              )}
             </div>
 
             {error && <p className="mb-3 text-sm font-medium text-danger" role="alert">{error}</p>}

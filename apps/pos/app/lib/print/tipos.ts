@@ -58,6 +58,7 @@ export type DatosTicketImpresion = {
   lineas: LineaImpresion[];
   totales: { subtotal: number; descuentos: number; iva: number; total: number; propina: number };
   pagos: PagoImpresion[];
-  qrUrl: string;
+  /** Portal de autofacturación. null = el negocio lo tiene apagado y el ticket no lo imprime. */
+  qrUrl: string | null;
   ancho: 58 | 80;
 };
