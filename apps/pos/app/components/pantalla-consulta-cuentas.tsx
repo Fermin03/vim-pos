@@ -10,6 +10,7 @@ import { ModalCancelarTicket } from "./modal-cancelar-ticket";
 import { ModalCambiarPago } from "./modal-cambiar-pago";
 import { ModalReabrirCuenta } from "./modal-reabrir-cuenta";
 import { METODOS_PAGO } from "../lib/cuentas-acciones";
+import { hoyMx } from "@vim/fecha";
 
 function fechaCorta(iso: string | null): string {
   if (!iso) return "—";
@@ -17,7 +18,9 @@ function fechaCorta(iso: string | null): string {
   if (Number.isNaN(d.getTime())) return "—";
   return d.toLocaleString("es-MX", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit", hour12: true });
 }
-const hoyISO = () => new Date().toISOString().slice(0, 10);
+// Hora de México, no UTC: con `toISOString()` esta pantalla se abría en la fecha de MAÑANA a
+// partir de las 18:00 hora local —y salía vacía— justo durante el servicio de la cena.
+const hoyISO = () => hoyMx();
 
 /**
  * Consulta de cuentas — historial de cuentas cerradas (PAGADO) y canceladas. Lista + detalle

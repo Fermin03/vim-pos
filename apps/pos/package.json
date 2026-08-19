@@ -13,6 +13,7 @@
   "dependencies": {
     "@supabase/supabase-js": "^2.45.0",
     "@vim/db": "workspace:*",
+    "@vim/fecha": "workspace:*",
     "@vim/kds-core": "workspace:*",
     "@vim/ui": "workspace:*",
     "dexie": "^4.0.0",

@@ -1,5 +1,6 @@
 "use client";
 import { supabase } from "./supabase";
+import { hoyMx, sumarDias } from "@vim/fecha";
 
 // F13 — Reportes y analítica. Las vistas SQL ya existen (0011/0012); el admin solo las
 // consume bajo RLS (heredan del tenant_id de las tablas base). Rangos por día_contable.
@@ -8,11 +9,10 @@ const num = (v: unknown) => Number(v ?? 0);
 
 /** Rango "últimos N días contables" (incluye hoy). */
 export function rangoUltimosDias(n: number): { desde: string; hasta: string } {
-  const hoy = new Date();
-  const hasta = hoy.toISOString().slice(0, 10);
-  const d = new Date(hoy);
-  d.setDate(d.getDate() - (n - 1));
-  return { desde: d.toISOString().slice(0, 10), hasta };
+  // En hora de México. Con `toISOString()` el "hoy" del reporte se adelantaba un día a partir de
+  // las 18:00 hora local, que en un restaurante es cuando empieza lo bueno.
+  const hasta = hoyMx();
+  return { desde: sumarDias(hasta, -(n - 1)), hasta };
 }
 
 // ── Dashboard (P-177) ───────────────────────────────────────────────────────
