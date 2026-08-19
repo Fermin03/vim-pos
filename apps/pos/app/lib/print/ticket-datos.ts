@@ -118,7 +118,10 @@ export async function leerTicketParaImpresion(ticketId: string, ctx: Ctx): Promi
       iva: Number(tk.iva_mxn), total: Number(tk.total_mxn), propina: Number(tk.propina_mxn),
     },
     pagos: pagosImp,
-    qrUrl: qrActivo ? `https://factura.vimpos.mx/${tn.codigo ?? "negocio"}?folio=${tk.folio_completo ?? ""}` : null,
+    // Dominio .com.mx: el que VIM tiene registrado. Antes decía `factura.vimpos.mx`, sin el
+    // `.com`, que es de alguien más — cada ticket impreso habría mandado a los clientes del
+    // restaurante a una dirección ajena en cuanto se encendiera el QR.
+    qrUrl: qrActivo ? `https://factura.vimpos.com.mx/${tn.codigo ?? "negocio"}?folio=${tk.folio_completo ?? ""}` : null,
     ancho: 80,
   };
 }
