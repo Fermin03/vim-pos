@@ -12,7 +12,7 @@ const DATOS: DatosTicketImpresion = {
   totales: { subtotal: 103.45, descuentos: 12, iva: 16.55, total: 108, propina: 18 },
   pagos: [{ metodo: "Efectivo", montoMxn: 126, recibidoMxn: 200, cambioMxn: 74 }],
   entrega: null,
-  qrUrl: "https://factura.vimpos.mx/knockout?folio=KC-2026-000001",
+  qrUrl: "https://factura.vimpos.com.mx/knockout?folio=KC-2026-000001",
   ancho: 80,
 };
 
@@ -44,7 +44,7 @@ describe("construirTicketJob", () => {
     expect(job.bloques).toContainEqual({ t: "fila", izq: "Cambio", der: "$74.00" });
     expect(job.bloques).toContainEqual({ t: "fila", izq: "Propina", der: "$18.00" });
     // QR + corte
-    expect(job.bloques).toContainEqual({ t: "qr", valor: "https://factura.vimpos.mx/knockout?folio=KC-2026-000001" });
+    expect(job.bloques).toContainEqual({ t: "qr", valor: "https://factura.vimpos.com.mx/knockout?folio=KC-2026-000001" });
     expect(job.bloques[job.bloques.length - 1]).toEqual({ t: "corte" });
   });
 
