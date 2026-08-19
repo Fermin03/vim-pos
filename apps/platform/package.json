@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "@vim/db": "workspace:*",
+    "@vim/fecha": "workspace:*",
     "@vim/ui": "workspace:*",
     "next": "^15.5.23",
     "react": "^19.0.0",

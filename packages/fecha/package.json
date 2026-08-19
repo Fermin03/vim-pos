@@ -1,0 +1,17 @@
+{
+  "name": "@vim/fecha",
+  "version": "0.0.0",
+  "private": true,
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "vitest": "^3.0.5",
+    "typescript": "^5.7.3",
+    "@vim/config": "workspace:*"
+  }
+}

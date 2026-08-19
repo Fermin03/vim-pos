@@ -1,5 +1,6 @@
 "use client";
 import { useState } from "react";
+import { hoyMx, sumarDias } from "@vim/fecha";
 
 /** Selector compacto de rango de días contables con presets rápidos. */
 export function RangoFechas({
@@ -15,11 +16,10 @@ export function RangoFechas({
   const [h, setH] = useState(hasta);
 
   function presetUltimos(n: number) {
-    const hoy = new Date();
-    const hasta = hoy.toISOString().slice(0, 10);
-    const inicio = new Date(hoy);
-    inicio.setDate(inicio.getDate() - (n - 1));
-    const desde = inicio.toISOString().slice(0, 10);
+    // Hora de México: con `toISOString()` el rango arrancaba en la fecha de mañana a partir de
+    // las 18:00, y el reporte salía vacío justo en las horas de más venta.
+    const hasta = hoyMx();
+    const desde = sumarDias(hasta, -(n - 1));
     setD(desde);
     setH(hasta);
     onCambio(desde, hasta);
