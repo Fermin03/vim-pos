@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { autorizar } from "../../../../lib/server";
+import { señalDeCaja, estadoDeCaja } from "../../../../lib/senal-caja";
 
 /**
  * Salud operativa de una empresa: ¿está usando el producto?
@@ -25,18 +26,32 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }
       .eq("tenant_id", id).is("deleted_at", null).limit(500),
     // Últimas sincronizaciones: sirven para ver si además de conectarse, los datos SUBEN.
     sb.from("sync_eventos")
-      .select("id, created_at, operaciones_total, operaciones_exitosas, operaciones_error, operaciones_conflicto, dispositivo_descripcion, duracion_ms")
+      .select("id, created_at, caja_id, operaciones_total, operaciones_exitosas, operaciones_error, operaciones_conflicto, dispositivo_descripcion, duracion_ms")
       .eq("tenant_id", id).order("created_at", { ascending: false }).limit(20),
     // Señal REAL de vida: el último ticket que llegó a la nube. `cajas.ultima_conexion` nunca
     // se escribe (declarada en la mig. 0003 y sin ningún writer) y `sync_eventos` no lo llena
     // el push del escritorio, así que la venta es lo único que prueba que la caja opera Y sube.
+    // Varios, no uno: hace falta el último de CADA caja para saber cuál está viva y cuál no.
+    // Con `limit(1)` una caja activa tapaba a las demás y todas quedaban sin señal propia.
     sb.from("tickets").select("id, created_at, total_mxn, caja_id")
       .eq("tenant_id", id).is("deleted_at", null)
-      .order("created_at", { ascending: false }).limit(1),
+      .order("created_at", { ascending: false }).limit(500),
     sb.from("turnos").select("id, created_at, caja_id, estado")
       .eq("tenant_id", id).order("created_at", { ascending: false }).limit(1),
   ]);
-  const ultimaVenta = ((ventaRes.data ?? [])[0] ?? null) as { created_at: string; total_mxn: number | null; caja_id: string | null } | null;
+  const ventas = (ventaRes.data ?? []) as { created_at: string; total_mxn: number | null; caja_id: string | null }[];
+  const ultimaVenta = ventas[0] ?? null;
+
+  // Última señal REAL por caja. `cajas.ultima_conexion` solo empezó a sellarse con la migración
+  // 0073, y aun así únicamente cuando hay ventas que subir: una caja encendida en un día flojo
+  // no la mueve. Sin este relleno el panel pintaba de rojo "Nunca conectó" a cajas que llevaban
+  // semanas subiendo sin fallar — y una alarma que siempre suena deja de mirarse.
+  const ultimaVentaPorCaja = new Map<string, string>();
+  for (const v of ventas) if (v.caja_id && !ultimaVentaPorCaja.has(v.caja_id)) ultimaVentaPorCaja.set(v.caja_id, v.created_at);
+  const ultimoSyncPorCaja = new Map<string, string>();
+  for (const e of ((syncRes.data ?? []) as { caja_id: string | null; created_at: string }[])) {
+    if (e.caja_id && !ultimoSyncPorCaja.has(e.caja_id)) ultimoSyncPorCaja.set(e.caja_id, e.created_at);
+  }
   const ultimoTurno = ((turnoRes.data ?? [])[0] ?? null) as { created_at: string; estado: string | null } | null;
 
   const sucursales = (sucRes.data ?? []) as { id: string; nombre: string; activa: boolean }[];
@@ -46,8 +61,11 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }
     id: string; nombre: string; sucursal_id: string; activa: boolean;
     bloqueada: boolean; bloqueo_motivo: string | null; ultima_conexion: string | null; ultima_ip: string | null;
   }[]).map((c) => {
-    const t = c.ultima_conexion ? new Date(c.ultima_conexion).getTime() : NaN;
-    const horas = Number.isNaN(t) ? null : Math.floor((Date.now() - t) / 3600_000);
+    const { señal, origen: origenSenal, horas } = señalDeCaja({
+      ultimaConexion: c.ultima_conexion,
+      ultimoSync: ultimoSyncPorCaja.get(c.id) ?? null,
+      ultimaVenta: ultimaVentaPorCaja.get(c.id) ?? null,
+    });
     return {
       id: c.id,
       nombre: c.nombre,
@@ -55,13 +73,14 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }
       activa: c.activa,
       bloqueada: c.bloqueada,
       bloqueoMotivo: c.bloqueo_motivo,
-      ultimaConexion: c.ultima_conexion,
+      ultimaConexion: señal ?? null,
+      // De dónde salió el dato. Sin esto el panel afirmaría "Conectada" apoyado en una venta de
+      // hace tres horas, que no es lo mismo — y en soporte esa diferencia importa.
+      origenSenal,
       ultimaIp: c.ultima_ip,
       horasSinConexion: horas,
       // Semáforo: el mismo criterio que usa la bandeja de alertas, para que no se contradigan.
-      estado: c.bloqueada ? "bloqueada" : !c.activa ? "inactiva"
-        : horas === null ? "nunca"
-        : horas >= 72 ? "caida" : horas >= 24 ? "tibia" : "ok",
+      estado: estadoDeCaja(c, horas),
     };
   });
 

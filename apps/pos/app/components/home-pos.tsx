@@ -697,6 +697,9 @@ export function HomePos({
         turno={turno}
         onCancelar={() => setCerrando(false)}
         onCerrado={onCerrarTurno}
+        // Sale del cierre y abre la cuenta que lo bloquea. Sin esto, saber CUÁL es solo cambia
+        // dónde empieza la búsqueda: modos como "Para llevar" no tienen lista donde encontrarla.
+        onIrACuenta={async (ticketId) => { setCerrando(false); await entrarCuenta(ticketId, "inicio"); }}
       />
     );
   }

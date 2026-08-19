@@ -81,7 +81,17 @@ export function SaludTenant({ api, id }: { api: Api; id: string }) {
                     </span>
                     {c.bloqueoMotivo && <span className="ml-1 text-[11px] text-ink-3">{c.bloqueoMotivo}</span>}
                   </td>
-                  <td className="p-2 text-right tabular-nums text-ink-2">{hace(c.ultimaConexion)}</td>
+                  <td className="p-2 text-right tabular-nums text-ink-2">
+                    {hace(c.ultimaConexion)}
+                    {/* De dónde sale el dato. "Conectada" apoyado en una venta de hace tres horas
+                        no es lo mismo que la caja reportando ahora, y en soporte esa diferencia
+                        decide si hay que llamar al cliente. */}
+                    {c.origenSenal && c.origenSenal !== "conexion" && (
+                      <span className="ml-1.5 text-[11px] font-normal text-ink-3">
+                        ({c.origenSenal === "sync" ? "por sync" : "por su última venta"})
+                      </span>
+                    )}
+                  </td>
                 </tr>
               ))}
             </tbody>

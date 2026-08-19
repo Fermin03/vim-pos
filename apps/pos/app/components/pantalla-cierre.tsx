@@ -24,6 +24,7 @@ import { ModalAutorizacionPin } from "./modal-autorizacion-pin";
 import { construirReporteZJob, type DatosReporteZ } from "../lib/print/reporte-z-builder";
 import { obtenerImpresora } from "../lib/print/adapter";
 import { ReciboPreview } from "./recibo-preview";
+import { listarCuentasQueBloqueanCorte, type CuentaBloqueante } from "../lib/cuentas-abiertas";
 
 const METODO_LABEL: Record<string, string> = {
   EFECTIVO: "Efectivo",
@@ -57,6 +58,7 @@ export function PantallaCierre({
   turno,
   onCancelar,
   onCerrado,
+  onIrACuenta,
 }: {
   token: string;
   empleado: Empleado;
@@ -64,6 +66,8 @@ export function PantallaCierre({
   turno: Turno;
   onCancelar: () => void;
   onCerrado: () => void;
+  /** Lleva a la cuenta que bloquea el corte, para cobrarla o cancelarla ahí mismo. */
+  onIrACuenta?: (ticketId: string) => void;
 }) {
   const [resumen, setResumen] = useState<ReporteXResumen | null>(null);
   const [negocio, setNegocio] = useState("");
@@ -112,6 +116,18 @@ export function PantallaCierre({
     const noEfectivo = resumen.pagosPorMetodo.filter((p) => p.metodo !== "EFECTIVO").map((p) => ({ metodo: p.metodo, esperado: p.total }));
     return [{ metodo: "EFECTIVO", esperado: resumen.efectivoEsperado }, ...noEfectivo];
   }, [resumen]);
+
+  // Qué cuentas bloquean, no solo cuántas. Se cargan solo cuando estorban: si el corte sale
+  // limpio, esta consulta no tiene por qué correr.
+  const [bloqueantes, setBloqueantes] = useState<CuentaBloqueante[] | null>(null);
+  useEffect(() => {
+    if (ticketsAbiertos === 0) { setBloqueantes(null); return; }
+    let vivo = true;
+    listarCuentasQueBloqueanCorte(token, turno.id)
+      .then((c) => { if (vivo) setBloqueantes(c); })
+      .catch(() => { if (vivo) setBloqueantes([]); }); // el aviso ya se dio; su detalle no debe romper el cierre
+    return () => { vivo = false; };
+  }, [ticketsAbiertos, token, turno.id]);
 
   const efectivoDeclarado = Number(declarado["EFECTIVO"] || 0);
   // BUG B: no se puede cerrar el turno con cuentas abiertas (quedarían huérfanas).
@@ -400,6 +416,42 @@ export function PantallaCierre({
                       <span className="text-ink-2"> Cóbralas o cancélalas antes de cerrar el turno; si no, quedarían sin registrar y la mesa trabada.</span>
                     </div>
                   </div>
+
+                  {/* CUÁLES son. Antes solo se decía cuántas, y hay modos sin lista propia
+                      —"Para llevar" no tiene dónde verse—, así que una cuenta olvidada ahí no
+                      aparecía en ninguna pantalla: el corte quedaba trabado sin pista de por qué. */}
+                  {bloqueantes === null ? (
+                    <div className="mt-2.5 pl-[26px] text-[12px] text-ink-3">Buscando cuáles son…</div>
+                  ) : bloqueantes.length === 0 ? (
+                    <div className="mt-2.5 pl-[26px] text-[12px] text-ink-3">
+                      No se pudo listar cuáles. Revisa las cuentas abiertas de cada modo y los pedidos en espera.
+                    </div>
+                  ) : (
+                    <ul className="mt-2.5 flex flex-col gap-1.5 pl-[26px]">
+                      {bloqueantes.map((c) => (
+                        <li key={c.ticketId} className="flex items-center gap-2 rounded border border-line bg-surface px-2.5 py-2">
+                          <span className="min-w-0 flex-1">
+                            <span className="block truncate font-display text-[13px] font-semibold">
+                              {c.folio ?? "Sin folio"} · {c.modo}
+                              {c.enEspera && <span className="ml-1.5 rounded bg-sel px-1.5 py-px text-[11px] font-semibold text-ink-3">en espera</span>}
+                            </span>
+                            <span className="block text-[11.5px] text-ink-3">
+                              {c.nItems} {c.nItems === 1 ? "producto" : "productos"} · {fmtMxn(c.total)}
+                            </span>
+                          </span>
+                          {onIrACuenta && (
+                            <button
+                              type="button"
+                              onClick={() => onIrACuenta(c.ticketId)}
+                              className="flex-shrink-0 rounded border border-line-strong px-2.5 py-1 text-[12px] font-semibold text-ink-2 transition hover:border-ink hover:text-ink"
+                            >
+                              Ir a la cuenta
+                            </button>
+                          )}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
                 </div>
               )}
               <Button className="w-full" onClick={generarCorte} disabled={!puedeGenerar || procesando}>

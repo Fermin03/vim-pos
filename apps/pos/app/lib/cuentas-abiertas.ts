@@ -175,3 +175,57 @@ export async function borrarCuentaVacia(
     .eq("id", ticketId);
   if (error) throw new Error(error.message);
 }
+
+/** Una cuenta que impide cerrar el turno. */
+export type CuentaBloqueante = {
+  ticketId: string;
+  folio: string | null;
+  modo: string;
+  total: number;
+  nItems: number;
+  enEspera: boolean;
+  desdeIso: string | null;
+};
+
+const MODO_LABEL: Record<string, string> = {
+  COMER_AQUI: "Comedor", MESA: "Comedor", PARA_LLEVAR: "Para llevar",
+  DRIVE_THRU: "Pick-up", DELIVERY_PROPIO: "Domicilio",
+};
+
+/**
+ * Las cuentas abiertas que bloquean el corte de ESTE turno.
+ *
+ * El aviso del cierre decía cuántas había, nunca cuáles. Suena a detalle y no lo es: hay modos
+ * sin lista propia —"Para llevar" no tiene dónde verse— así que una cuenta olvidada ahí es
+ * invisible en todo el POS. El cajero se queda con un corte trabado, buscando a ciegas algo que
+ * ninguna pantalla muestra. Pasó en el piloto: una cuenta de $160 detuvo el corte cinco días.
+ *
+ * Mismo criterio que `preview_cierre_turno` (migración 0011): BORRADOR y ABIERTO, sin borrar, de
+ * este turno. Incluye las que están en espera, porque el corte también las cuenta.
+ */
+export async function listarCuentasQueBloqueanCorte(
+  token: string,
+  turnoId: string,
+): Promise<CuentaBloqueante[]> {
+  const { data, error } = await employeeClient(token)
+    .from("tickets")
+    .select("id, folio_completo, modo_servicio, total_mxn, en_espera, fecha_apertura, created_at, ticket_items(cantidad, cancelado)")
+    .eq("turno_id", turnoId)
+    .is("deleted_at", null)
+    .in("estado_fiscal", ["BORRADOR", "ABIERTO"])
+    .order("created_at", { ascending: true });
+  if (error) throw new Error(error.message);
+  return ((data ?? []) as unknown as Record<string, unknown>[]).map((t) => {
+    const items = (t.ticket_items as { cantidad: number; cancelado: boolean }[] | null) ?? [];
+    const modo = String(t.modo_servicio ?? "");
+    return {
+      ticketId: String(t.id),
+      folio: (t.folio_completo as string) ?? null,
+      modo: MODO_LABEL[modo] ?? modo,
+      total: Number(t.total_mxn ?? 0),
+      nItems: items.filter((i) => !i.cancelado).length,
+      enEspera: t.en_espera === true,
+      desdeIso: (t.fecha_apertura as string) ?? (t.created_at as string) ?? null,
+    };
+  });
+}
