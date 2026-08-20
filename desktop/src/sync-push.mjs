@@ -90,6 +90,33 @@ export async function marcarTurnosPushed(pool, turnos) {
 }
 
 /**
+ * Traduce las filas que la nube rechazó a los IDS QUE NO DEBEN MARCARSE COMO SUBIDOS.
+ *
+ * No basta con excluir el id rechazado: si lo que falló fue un renglón o un pago, el ticket
+ * llegó incompleto. Darlo por subido dejaría en la nube una venta a la que le falta la mitad,
+ * y nadie volvería a intentarlo. Por eso se sube por la cadena hasta el ticket dueño.
+ */
+function rechazadosPorTicket(errores, snapshot) {
+  const fuera = new Set();
+  if (!errores?.length) return fuera;
+  const itemATicket = new Map((snapshot.ticket_items ?? []).map((i) => [i.id, i.ticket_id]));
+  for (const e of errores) {
+    if (!e?.id) continue;
+    if (e.tabla === "ticket_item_modificadores") {
+      const item = (snapshot.ticket_item_modificadores ?? []).find((m) => m.id === e.id);
+      const ticket = item && itemATicket.get(item.ticket_item_id);
+      if (ticket) fuera.add(ticket);
+    } else if (e.tabla === "ticket_items" || e.tabla === "pagos") {
+      const fila = (snapshot[e.tabla] ?? []).find((x) => x.id === e.id);
+      if (fila?.ticket_id) fuera.add(fila.ticket_id);
+    } else {
+      fuera.add(e.id); // tickets, turnos y movimientos_caja: el id ya es el que importa
+    }
+  }
+  return fuera;
+}
+
+/**
  * PUSH a la nube: envía el snapshot pendiente a la Edge Function sync-push (autenticada como el
  * dispositivo). Al confirmar, marca los tickets como subidos. Best-effort. Devuelve el resumen.
  */
@@ -109,7 +136,18 @@ export async function pushToCloud(pool, { cloudUrl, anonKey, deviceToken }, log 
     body: JSON.stringify({ snapshot }),
   });
   if (!res.ok) throw new Error(`sync-push HTTP ${res.status}: ${await res.text().catch(() => "")}`);
-  await marcarPushed(pool, ids);
-  await marcarTurnosPushed(pool, turnos);
-  return { subidos: ids.length, turnos: turnos.length, resultado: await res.json().catch(() => ({})) };
+
+  // La nube ahora aísla las filas conflictivas en vez de rechazar el paquete entero (migración
+  // 0074) y devuelve cuáles se quedaron fuera. Marcarlas como subidas sería peor que el fallo
+  // original: se perderían en silencio, sin reintento y sin nadie mirando.
+  const cuerpo = await res.json().catch(() => ({}));
+  const errores = cuerpo?.resultado?._errores ?? [];
+  const rechazados = rechazadosPorTicket(errores, snapshot);
+  await marcarPushed(pool, ids.filter((id) => !rechazados.has(id)));
+  await marcarTurnosPushed(pool, turnos.filter((t) => !rechazados.has(t.id)));
+  if (errores.length) {
+    const muestra = errores.slice(0, 3).map((e) => `${e.tabla}/${String(e.id).slice(0, 8)}: ${e.error}`).join(" · ");
+    log(`la nube rechazó ${errores.length} fila(s), se reintentarán: ${muestra}`);
+  }
+  return { subidos: ids.length - rechazados.size, turnos: turnos.length, rechazados: errores.length, resultado: cuerpo };
 }
