@@ -91,6 +91,11 @@ export function HomePos({
   onCerrarTurno: () => void;
 }) {
   const [cerrando, setCerrando] = useState(false);
+  // Confirmación previa al cierre. "Cerrar turno" vive en el menú general, a un dedo de
+  // opciones inofensivas como "Abrir cajón" o "Cambiar mi PIN", y arrancaba el corte de
+  // inmediato. Un toque accidental a media comida mandaba al cajero a una pantalla de arqueo
+  // que no pidió, con la fila esperando.
+  const [confirmandoCierre, setConfirmandoCierre] = useState(false);
   const [enKds, setEnKds] = useState(false);
   // El POS arranca en la pantalla de inicio: el cajero elige primero a qué viene.
   const [enInicio, setEnInicio] = useState(true);
@@ -844,6 +849,29 @@ export function HomePos({
 
   const modalesCompartidos = (
     <>
+      {confirmandoCierre && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/40 p-4" role="dialog" aria-modal="true">
+          <div className="w-full max-w-md rounded-xl bg-surface p-6 shadow-xl">
+            <div className="font-display text-[19px] font-semibold">¿Cerrar el turno actual?</div>
+            <p className="mt-2 text-[13.5px] leading-snug text-ink-2">
+              Vas a pasar al arqueo de caja: contar el efectivo, declararlo y generar el corte.
+              El turno queda cerrado y hay que abrir uno nuevo para seguir vendiendo.
+            </p>
+            <div className="mt-5 flex gap-2">
+              <button
+                type="button"
+                onClick={() => setConfirmandoCierre(false)}
+                className="h-11 flex-1 rounded border border-line-strong text-[14px] font-semibold text-ink-2 transition hover:border-ink hover:text-ink"
+              >
+                Cancelar
+              </button>
+              <Button className="h-11 flex-1" onClick={() => { setConfirmandoCierre(false); setCerrando(true); }}>
+                Sí, cerrar turno
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
       {esperaListaAbierta && (
         <ModalListaEspera
           token={token}
@@ -897,7 +925,7 @@ export function HomePos({
           onMovimientoCaja={() => setMovimientoAbierto(true)}
           onCorteX={() => { setEnInicio(false); setEnMonitor(true); }}
           onAbrirTurno={() => { /* aquí siempre hay turno abierto: el botón no se muestra */ }}
-          onCerrarTurno={() => setCerrando(true)}
+          onCerrarTurno={() => setConfirmandoCierre(true)}
           onMenu={() => setMenuGeneralAbierto(true)}
           online={online}
         />
@@ -928,7 +956,7 @@ export function HomePos({
             onCambiarPin={() => setCambiarPinAbierto(true)}
             onMisPropinas={() => setMisPropinasAbierto(true)}
             onImpresora={() => setConfigImpresoraAbierto(true)}
-            onCerrarTurno={() => setCerrando(true)}
+            onCerrarTurno={() => setConfirmandoCierre(true)}
           />
         )}
         {configImpresoraAbierto && <ModalConfigImpresora onCerrar={() => setConfigImpresoraAbierto(false)} />}
