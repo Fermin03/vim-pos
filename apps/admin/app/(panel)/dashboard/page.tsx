@@ -139,7 +139,19 @@ export default function DashboardPage() {
   const hoy: ResumenDia | undefined = data?.hoy;
   const ayer = data?.ayer ?? null;
   const sinVentas = data !== null && (hoy?.ticketsCompletados ?? 0) === 0;
-  const fechaCorta = new Intl.DateTimeFormat("es-MX", { day: "numeric", month: "short" }).format(new Date());
+  // La fecha del DÍA CONTABLE que se está mostrando, no la del reloj del navegador. Antes se
+  // pintaba `new Date()` junto a cifras que podían ser de días atrás: el rótulo decía "hoy" y los
+  // números eran del 17. Además el día contable cierra a las 3 am, así que a la 1 de la mañana
+  // esto sigue diciendo —correctamente— la fecha de ayer.
+  const fmtDia = (iso: string) => {
+    const p = iso.split("-").map(Number);
+    // Se construye la fecha en hora LOCAL a partir de las partes, no con `new Date(iso)`: esa
+    // ruta interpreta "2026-08-19" como medianoche UTC y en México lo pinta como el día 18.
+    const fecha = new Date(p[0] ?? 1970, (p[1] ?? 1) - 1, p[2] ?? 1);
+    return new Intl.DateTimeFormat("es-MX", { day: "numeric", month: "short" }).format(fecha);
+  };
+  const fechaCorta = data ? fmtDia(data.dia) : "—";
+  const ultimaVenta = data?.ultimoDiaConVentas ?? null;
 
   return (
     <>
@@ -182,6 +194,15 @@ export default function DashboardPage() {
               Las métricas en vivo aparecerán en cuanto el POS registre la primera venta del día.
               Mientras, administra tu negocio desde los accesos de abajo.
             </p>
+            {/* Cuándo fue la última vez que sí hubo ventas. Un cero puede significar "todavía no
+                abrimos" o "la caja lleva días sin subir nada", y son cosas muy distintas: sin este
+                dato, la segunda pasa desapercibida hasta que las cuentas no cuadran. */}
+            {ultimaVenta && ultimaVenta !== data?.dia && (
+              <p className="mt-3 rounded border border-[#F0DCC0] bg-[#FCF3E6] px-3 py-2 text-[13px] font-medium text-warning">
+                La última venta registrada es del {fmtDia(ultimaVenta)}. Si el negocio ha vendido
+                desde entonces, la caja no está enviando sus ventas.
+              </p>
+            )}
           </div>
         )}
 
