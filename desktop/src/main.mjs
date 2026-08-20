@@ -26,6 +26,11 @@ const RES_DIR = EMPAQUETADO ? process.resourcesPath : null;
 const UI_DIR = EMPAQUETADO ? path.join(process.resourcesPath, "pos-ui") : path.join(__dirname, "..", "pos-ui");
 const KDS_UI_DIR = EMPAQUETADO ? path.join(process.resourcesPath, "kds-ui") : path.join(__dirname, "..", "kds-ui");
 const TRAY_ICON = EMPAQUETADO ? path.join(process.resourcesPath, "tray.png") : path.join(__dirname, "..", "build", "tray.png");
+// Icono de la ventana y de la barra de tareas. Se pone en caliente porque no depende de que
+// electron-builder pueda editar los recursos del .exe (eso necesita winCodeSign, que en Windows
+// exige Modo Desarrollador): aunque el archivo ejecutable quede con el icono por defecto, lo que
+// el cajero ve mientras trabaja sale de aquí.
+const APP_ICON = EMPAQUETADO ? path.join(process.resourcesPath, "icon.png") : path.join(__dirname, "..", "build", "icon.png");
 
 // Rol de esta instancia. El acceso directo "VIM POS Cocina" pasa --role=cocina.
 const ROL = process.argv.includes("--role=cocina") ? "cocina" : "caja";
@@ -197,6 +202,7 @@ async function vincularConNube({ email, password } = {}) {
 function crearVentana(preloadArgs) {
   const w = new BrowserWindow({
     width: 1440, height: 900, backgroundColor: "#1a1a1e", show: false,
+    icon: APP_ICON,
     webPreferences: {
       preload: path.join(__dirname, "preload.cjs"),
       // Endurecimiento (remediación Fase 4.1): contextIsolation:true aísla el mundo del preload del

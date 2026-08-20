@@ -29,7 +29,8 @@
     "verify:concurrencia": "node src/verify-concurrencia.mjs",
     "verify:electron": "electron src/verify-electron.mjs",
     "verify:cierre-turno": "node src/verify-cierre-turno.mjs",
-    "verify:push-aislado": "node src/verify-push-aislado.mjs"
+    "verify:push-aislado": "node src/verify-push-aislado.mjs",
+    "iconos": "node scripts/generar-iconos.mjs"
   },
   "dependencies": {
     "embedded-postgres": "17.10.0-beta.17",
@@ -38,7 +39,8 @@
   },
   "devDependencies": {
     "electron": "^43.4.0",
-    "electron-builder": "^26.15.3"
+    "electron-builder": "^26.15.3",
+    "sharp": "^0.35.3"
   },
   "build": {
     "appId": "com.vimpos.desktop",
@@ -83,19 +85,26 @@
       {
         "from": "build/tray.png",
         "to": "tray.png"
+      },
+      {
+        "from": "build/icon.png",
+        "to": "icon.png"
       }
     ],
     "win": {
       "target": [
         "nsis"
       ],
-      "signAndEditExecutable": false
+      "signAndEditExecutable": true,
+      "icon": "build/icon.png"
     },
     "nsis": {
       "oneClick": false,
       "perMachine": false,
       "allowToChangeInstallationDirectory": true,
-      "include": "build/installer.nsh"
+      "include": "build/installer.nsh",
+      "installerIcon": "build/icon.ico",
+      "uninstallerIcon": "build/icon.ico"
     }
   }
 }
