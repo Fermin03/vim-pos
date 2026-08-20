@@ -46,9 +46,42 @@ export function variacionPct(actual: number, previo: number | null | undefined):
   return Math.round(((actual - previo) / previo) * 100);
 }
 
+/**
+ * Elige qué días muestra el panel. Pura y aparte para poder probarla: es la regla que estuvo mal
+ * y el fallo era invisible mientras hubiera ventas todos los días.
+ *
+ *  · `hoy` es HOY siempre, con ceros si no ha vendido — nunca "el último día con datos".
+ *  · `ayer` es el día anterior REAL, no el previo con ventas: comparar contra un día de la semana
+ *    pasada disfraza una caída en lugar de mostrarla.
+ *  · `ultimoDiaConVentas` permite distinguir "todavía no abrimos" de "la caja lleva días sin
+ *    subir", que se ven idénticos en un cero.
+ */
+export function elegirDias<T, R>(
+  porDia: Map<string, T[]>,
+  tendencia: { dia: string; total: number }[],
+  hoyContable: string,
+  resumir: (filas: T[], dia: string) => R,
+): { hoy: R; ayer: R | null; ultimoDiaConVentas: string | null } {
+  const ayerContable = sumarDias(hoyContable, -1);
+  return {
+    hoy: resumir(porDia.get(hoyContable) ?? [], hoyContable),
+    ayer: porDia.has(ayerContable) ? resumir(porDia.get(ayerContable) ?? [], ayerContable) : null,
+    ultimoDiaConVentas: [...tendencia].reverse().find((d) => d.total > 0)?.dia ?? null,
+  };
+}
+
 export type Dashboard = {
+  /** El día contable que se está mostrando (`YYYY-MM-DD`). Es HOY, tenga ventas o no. */
+  dia: string;
+  /**
+   * Día contable más reciente CON ventas, o null si no hubo en el rango.
+   *
+   * Existe para poder decir "hoy no ha vendido, la última venta fue el 17" en vez de enseñar las
+   * cifras del 17 rotuladas como si fueran de hoy. Ver el porqué en `leerDashboard`.
+   */
+  ultimoDiaConVentas: string | null;
   hoy: ResumenDia;
-  /** Mismo resumen del día anterior con ventas, para los deltas % del P-177. */
+  /** Resumen del día contable ANTERIOR a hoy (no "el previo con ventas"), para los deltas %. */
   ayer: ResumenDia | null;
   topProductos: TopProducto[];
   /** Serie de total_neto por día (para la mini-tendencia), del más antiguo al más reciente. */
@@ -77,8 +110,37 @@ function sumarDia(filas: Record<string, unknown>[], dia: string): ResumenDia {
   };
 }
 
+/**
+ * Datos del panel para el DÍA CONTABLE DE HOY.
+ *
+ * Antes tomaba el día más reciente que tuviera datos y lo rotulaba "Hoy". Mientras hay ventas
+ * todos los días nadie lo nota; en cuanto la caja deja de sincronizar, el panel presenta cifras
+ * de días atrás como si fueran de hoy y en vivo. Le pasó al piloto: mostraba $1,080 de "hoy"
+ * cuando eran del 17 y la caja llevaba dos días sin subir nada. Para un dueño eso es peor que un
+ * cero — un cero se investiga, un número creíble se cree.
+ *
+ * El día lo resuelve la base con `calcular_dia_contable`, que respeta la hora de cierre del
+ * negocio (3:00 por defecto) y su zona horaria: a la 1 de la mañana todavía se está vendiendo
+ * "ayer", y calcularlo aquí por calendario mostraría un cero falso a media noche de trabajo.
+ */
 export async function leerDashboard(): Promise<Dashboard> {
-  const { desde, hasta } = rangoUltimosDias(7);
+  const { data: ten, error: eTen } = await supabase
+    .from("tenants").select("id, timezone").limit(1).maybeSingle();
+  if (eTen) throw new Error(eTen.message);
+  const tenantId = (ten as { id?: string } | null)?.id ?? null;
+  const zona = (ten as { timezone?: string } | null)?.timezone || "America/Mexico_City";
+
+  let hoyContable: string;
+  if (tenantId) {
+    const { data: d, error: eDia } = await supabase.rpc("calcular_dia_contable", { p_tenant_id: tenantId });
+    if (eDia) throw new Error(eDia.message);
+    hoyContable = String(d);
+  } else {
+    hoyContable = hoyMx(); // sin tenant a la vista no hay hora de cierre que consultar
+  }
+  const ayerContable = sumarDias(hoyContable, -1);
+  const desde = sumarDias(hoyContable, -6);
+  const hasta = hoyContable;
 
   // Estado de resultados por día (todas las sucursales del tenant, bajo RLS).
   const { data: er, error: e1 } = await supabase
@@ -102,16 +164,13 @@ export async function leerDashboard(): Promise<Dashboard> {
     dia: d,
     total: (porDia.get(d) ?? []).reduce((a, f) => a + num(f.total_neto_mxn), 0),
   }));
-  const diaReciente = dias[dias.length - 1] ?? hasta;
-  const hoy = sumarDia(porDia.get(diaReciente) ?? [], diaReciente);
-  const diaPrevio = dias[dias.length - 2];
-  const ayer = diaPrevio ? sumarDia(porDia.get(diaPrevio) ?? [], diaPrevio) : null;
+  const { hoy, ayer, ultimoDiaConVentas } = elegirDias(porDia, tendencia, hoyContable, sumarDia);
 
   // Top productos del día más reciente.
   const { data: tp, error: e2 } = await supabase
     .from("vw_ventas_por_producto")
     .select("producto_nombre, unidades_vendidas, total_mxn, dia_contable")
-    .eq("dia_contable", diaReciente)
+    .eq("dia_contable", hoyContable)
     .order("total_mxn", { ascending: false })
     .limit(6);
   if (e2) throw new Error(e2.message);
@@ -126,21 +185,25 @@ export async function leerDashboard(): Promise<Dashboard> {
   const { data: th, error: e3 } = await supabase
     .from("tickets")
     .select("fecha_pago, total_mxn")
-    .eq("dia_contable", diaReciente)
+    .eq("dia_contable", hoyContable)
     .eq("estado_fiscal", "PAGADO")
     .is("deleted_at", null)
     .not("fecha_pago", "is", null);
   if (e3) throw new Error(e3.message);
+  // La hora, en la zona del NEGOCIO. `getHours()` daba la del navegador: el mismo ticket salía
+  // en una hora distinta según desde dónde se mirara el panel, y la "hora pico" dejaba de
+  // significar algo. Un dueño revisando desde otro estado veía su cocina llena a deshoras.
+  const hora = new Intl.DateTimeFormat("en-US", { timeZone: zona, hour: "2-digit", hour12: false });
   const porHora = new Map<number, number>();
   for (const r of (th ?? []) as Record<string, unknown>[]) {
-    const h = new Date(String(r.fecha_pago)).getHours();
+    const h = Number(hora.format(new Date(String(r.fecha_pago))));
     porHora.set(h, (porHora.get(h) ?? 0) + num(r.total_mxn));
   }
   const ventasPorHora = [...porHora.entries()]
     .map(([hora, total]) => ({ hora, total: Math.round(total * 100) / 100 }))
     .sort((a, b) => a.hora - b.hora);
 
-  return { hoy, ayer, topProductos, tendencia, ventasPorHora };
+  return { dia: hoyContable, ultimoDiaConVentas, hoy, ayer, topProductos, tendencia, ventasPorHora };
 }
 
 // ── Reporte Z histórico (P-181) ─────────────────────────────────────────────
