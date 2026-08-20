@@ -99,6 +99,43 @@ export function SaludTenant({ api, id }: { api: Api; id: string }) {
         </div>
       )}
 
+      {/* El último envío que falló, A LA VISTA. Antes esto vivía dentro de un desplegable y
+          resumido a "3 err": para saber QUÉ se rechazó había que entrar a la máquina del cliente
+          y leer su log. Una noche entera del piloto se fue en eso, con 27 ventas retenidas por un
+          turno viejo que el panel nunca mencionó. */}
+      {(() => {
+        const fallido = s.sync.find((e) => e.errores > 0);
+        if (!fallido) return null;
+        return (
+          <div className="mt-3 rounded-lg border border-danger/30 bg-danger/5 p-3.5" role="alert">
+            <div className="flex items-baseline justify-between gap-2">
+              <span className="font-display text-[13.5px] font-semibold text-danger">
+                La nube rechazó {fallido.errores} {fallido.errores === 1 ? "fila" : "filas"} al sincronizar
+              </span>
+              <span className="flex-shrink-0 text-[11.5px] text-ink-3">
+                {hace(fallido.fecha)}{fallido.dispositivo ? ` · ${fallido.dispositivo}` : ""}
+              </span>
+            </div>
+            <p className="mt-1 text-[12px] text-ink-2">
+              Entraron {fallido.exitosas} de {fallido.total}. Lo rechazado se reintenta solo; si el
+              motivo no se corrige, se quedará ahí.
+            </p>
+            {fallido.detalles.length > 0 && (
+              <ul className="mt-2 flex flex-col gap-1">
+                {fallido.detalles.map((d, i) => (
+                  <li key={`${d.id}-${i}`} className="rounded border border-line bg-surface px-2.5 py-1.5">
+                    <span className="font-mono text-[11px] font-semibold text-ink-2">
+                      {d.tabla}{d.id ? ` · ${d.id.slice(0, 8)}` : ""}
+                    </span>
+                    <span className="mt-0.5 block break-words text-[11.5px] leading-snug text-ink-3">{d.error}</span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        );
+      })()}
+
       {s.sync.length > 0 && (
         <details className="mt-2">
           <summary className="cursor-pointer text-[12px] font-semibold text-ink-2">Últimas sincronizaciones</summary>
@@ -111,7 +148,11 @@ export function SaludTenant({ api, id }: { api: Api; id: string }) {
                 </span>
                 <span className="flex-shrink-0 tabular-nums">
                   {e.exitosas}/{e.total}
-                  {e.errores > 0 && <b className="ml-1 text-danger">{e.errores} err</b>}
+                  {e.errores > 0 && (
+                    <b className="ml-1 text-danger" title={e.detalles.map((d) => d.tabla + ": " + d.error).join(" | ")}>
+                      {e.errores} err
+                    </b>
+                  )}
                   {e.conflictos > 0 && <b className="ml-1 text-warning">{e.conflictos} conf</b>}
                 </span>
               </div>
