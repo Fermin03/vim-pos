@@ -26,7 +26,10 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }
       .eq("tenant_id", id).is("deleted_at", null).limit(500),
     // Últimas sincronizaciones: sirven para ver si además de conectarse, los datos SUBEN.
     sb.from("sync_eventos")
-      .select("id, created_at, caja_id, operaciones_total, operaciones_exitosas, operaciones_error, operaciones_conflicto, dispositivo_descripcion, duracion_ms")
+      // `response_summary` trae el detalle de lo que la nube rechazó (migración 0074). Sin él el
+      // panel solo puede decir "3 errores", que no basta para actuar: la diferencia entre un
+      // folio duplicado y un turno en conflicto decide qué se hace.
+      .select("id, created_at, caja_id, operaciones_total, operaciones_exitosas, operaciones_error, operaciones_conflicto, dispositivo_descripcion, duracion_ms, response_summary")
       .eq("tenant_id", id).order("created_at", { ascending: false }).limit(20),
     // Señal REAL de vida: el último ticket que llegó a la nube. `cajas.ultima_conexion` nunca
     // se escribe (declarada en la mig. 0003 y sin ningún writer) y `sync_eventos` no lo llena
@@ -88,6 +91,7 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }
     id: string; created_at: string; operaciones_total: number | null; operaciones_exitosas: number | null;
     operaciones_error: number | null; operaciones_conflicto: number | null;
     dispositivo_descripcion: string | null; duracion_ms: number | null;
+    response_summary: { _errores?: { tabla?: string; id?: string; error?: string }[] } | null;
   }[]).map((s) => ({
     id: s.id,
     fecha: s.created_at,
@@ -97,6 +101,13 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }
     conflictos: Number(s.operaciones_conflicto ?? 0),
     dispositivo: s.dispositivo_descripcion,
     duracionMs: Number(s.duracion_ms ?? 0),
+    // Qué falló exactamente. Se recortan a 5: si algo se rompe en serie, el patrón se ve en los
+    // primeros y la lista completa solo estorba.
+    detalles: (s.response_summary?._errores ?? []).slice(0, 5).map((e) => ({
+      tabla: String(e.tabla ?? "—"),
+      id: String(e.id ?? ""),
+      error: String(e.error ?? "").slice(0, 300),
+    })),
   }));
 
   const ultimaSync = sync[0]?.fecha ?? null;

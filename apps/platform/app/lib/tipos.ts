@@ -37,6 +37,8 @@ export type SyncEvento = {
   errores: number;
   conflictos: number;
   dispositivo: string | null;
+  /** Qué filas rechazó la nube y por qué. Vacío cuando el envío entró completo. */
+  detalles: { tabla: string; id: string; error: string }[];
 };
 
 export type Salud = {

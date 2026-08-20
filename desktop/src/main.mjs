@@ -470,7 +470,26 @@ async function syncBestEffort({ conPull = true } = {}) {
         await subirErrores(backend.pool, opts, (m) => console.log("· [sync]", m));
       } catch (e) { console.log("· [sync] bitácora de errores omitida:", e.message); }
       return true;
-    } catch (e) { console.log("· [sync] PUSH omitido:", e.message); return false; }
+    } catch (e) {
+      console.log("· [sync] PUSH omitido:", e.message);
+      // Un push que falla NO deja rastro en la nube: la RPC rechaza y no llega a registrar nada,
+      // así que el panel no tiene qué mostrar y el único testimonio vive en este log, dentro de
+      // la máquina del cliente. Así se perdió una noche entera en el piloto —27 ventas retenidas
+      // 16 reintentos— hasta que alguien leyó el log a mano.
+      //
+      // La bitácora de errores sube por su propio camino (REST directo, no esta RPC), así que
+      // este reporte sí llega aunque el push siga rechazado. Se intenta subirla en el acto: si el
+      // problema persiste, esperar al próximo ciclo solo retrasa la noticia.
+      try {
+        await registrarErrorLocal(backend.pool, {
+          mensaje: `Sincronización rechazada: ${e.message}`,
+          contexto: { fase: "push" },
+          version: app.getVersion(),
+        });
+        await subirErrores(backend.pool, opts, (m) => console.log("· [sync]", m));
+      } catch (e2) { console.log("· [sync] no se pudo reportar el fallo:", e2.message); }
+      return false;
+    }
   } catch (e) {
     console.log("· [sync] best-effort omitido:", e.message);
     return false;
