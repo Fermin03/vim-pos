@@ -28,7 +28,8 @@
     "dist": "npm run build:ui && npm run build:kds-ui && node scripts/dist.mjs",
     "verify:concurrencia": "node src/verify-concurrencia.mjs",
     "verify:electron": "electron src/verify-electron.mjs",
-    "verify:cierre-turno": "node src/verify-cierre-turno.mjs"
+    "verify:cierre-turno": "node src/verify-cierre-turno.mjs",
+    "verify:push-aislado": "node src/verify-push-aislado.mjs"
   },
   "dependencies": {
     "embedded-postgres": "17.10.0-beta.17",
