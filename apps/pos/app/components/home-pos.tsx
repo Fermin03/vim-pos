@@ -96,6 +96,18 @@ export function HomePos({
   // inmediato. Un toque accidental a media comida mandaba al cajero a una pantalla de arqueo
   // que no pidió, con la fila esperando.
   const [confirmandoCierre, setConfirmandoCierre] = useState(false);
+  /**
+   * Salida pendiente de la pantalla de captura cuando la cuenta ya está guardada en la base.
+   *
+   * "Para llevar" no tiene lista de cuentas: si el cliente se arrepiente a media captura y el
+   * cajero presiona Volver, el ticket ya persistido se queda vivo y NINGUNA pantalla lo muestra.
+   * Aparece días después, trabando el corte, y hay que ir a leer la base de datos para hallarlo.
+   * Pasó dos veces en el piloto.
+   *
+   * Se pregunta en el momento del abandono, que es cuando el cajero sabe qué pasó y puede
+   * decidir en un segundo. Después ya nadie se acuerda.
+   */
+  const [salidaPendiente, setSalidaPendiente] = useState<null | "atras" | "inicio">(null);
   const [enKds, setEnKds] = useState(false);
   // El POS arranca en la pantalla de inicio: el cajero elige primero a qué viene.
   const [enInicio, setEnInicio] = useState(true);
@@ -299,6 +311,25 @@ export function HomePos({
     setEnMonitor(false);
     setEnInicio(true);
   }, [salirNavegacion]);
+
+  /** Ejecuta la salida que quedó en pausa mientras se decidía qué hacer con la cuenta. */
+  const consumirSalidaPendiente = useCallback(() => {
+    setSalidaPendiente((d) => {
+      if (d === "atras") volverAtras();
+      else if (d === "inicio") volverAlInicio();
+      return null;
+    });
+  }, [volverAtras, volverAlInicio]);
+
+  /**
+   * Salir de la captura. Si la cuenta ya está guardada y su modo no tiene lista donde volver a
+   * encontrarla, se pregunta antes en vez de dejarla huérfana.
+   */
+  const intentarSalirDeCaptura = useCallback((destino: "atras" | "inicio") => {
+    const huerfanaPosible = ticketBd !== null && carrito.modoServicio === "PARA_LLEVAR";
+    if (huerfanaPosible) { setSalidaPendiente(destino); return; }
+    if (destino === "atras") volverAtras(); else volverAlInicio();
+  }, [ticketBd, carrito.modoServicio, volverAtras, volverAlInicio]);
 
   const recargarCuenta = useCallback(async () => {
     if (!ticketBd) return;
@@ -569,6 +600,7 @@ export function HomePos({
       setItemsPersistidos([]);
       setEsperaPidiendoEtiqueta(false);
       refrescarEspera();
+      consumirSalidaPendiente();
     } catch (e) {
       setEsperaError(e instanceof Error ? e.message : "No se pudo poner en espera");
     } finally {
@@ -849,6 +881,40 @@ export function HomePos({
 
   const modalesCompartidos = (
     <>
+      {/* Cuenta guardada que se está abandonando. Sin esto quedaba viva en la base y sin ninguna
+          pantalla que la mostrara: "Para llevar" no tiene lista de cuentas, así que reaparecía
+          días después trabando el corte. Se pregunta aquí, que es cuando el cajero sabe qué pasó. */}
+      {salidaPendiente && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/40 p-4" role="dialog" aria-modal="true">
+          <div className="w-full max-w-md rounded-xl bg-surface p-6 shadow-xl">
+            <div className="font-display text-[19px] font-semibold">Esta cuenta ya está guardada</div>
+            <p className="mt-2 text-[13.5px] leading-snug text-ink-2">
+              {ticketBd?.folio ? <><span className="font-semibold">{ticketBd.folio}</span> · </> : null}
+              {fmtMxn(ticketBd?.total ?? 0)}. Si sales sin resolverla, queda abierta y no vas a
+              poder verla en ninguna pantalla — solo aparecería al cerrar el turno, trabándolo.
+            </p>
+            <div className="mt-5 flex flex-col gap-2">
+              <Button onClick={() => { setEsperaError(null); setEsperaPidiendoEtiqueta(true); }}>
+                Dejarla en espera
+              </Button>
+              <button
+                type="button"
+                onClick={() => setCancelandoTicket(true)}
+                className="h-11 rounded border border-danger/40 text-[14px] font-semibold text-danger transition hover:bg-danger/5"
+              >
+                Cancelar la cuenta
+              </button>
+              <button
+                type="button"
+                onClick={() => setSalidaPendiente(null)}
+                className="h-11 rounded border border-line-strong text-[14px] font-semibold text-ink-2 transition hover:border-ink hover:text-ink"
+              >
+                Seguir capturando
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       {confirmandoCierre && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/40 p-4" role="dialog" aria-modal="true">
           <div className="w-full max-w-md rounded-xl bg-surface p-6 shadow-xl">
@@ -1122,7 +1188,7 @@ export function HomePos({
           Va a la derecha, opuesto a "Volver": son acciones distintas y pegarlas invitaría a
           pulsar la equivocada con prisa. */}
       <div className="flex flex-shrink-0 items-center gap-3 border-b border-line bg-surface px-3 py-2">
-        <BotonVolver onClick={volverAtras} />
+        <BotonVolver onClick={() => intentarSalirDeCaptura("atras")} />
         {carrito.modoServicio === "PARA_LLEVAR" && (
           <button
             type="button"
@@ -1274,6 +1340,7 @@ export function HomePos({
             setItemsPersistidos([]);
             setEnModoMesa(false);
             setCancelandoTicket(false);
+            consumirSalidaPendiente();
           }}
           onCerrar={() => setCancelandoTicket(false)}
         />
