@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { obtenerImpresora } from "../lib/print/adapter";
 import { Button } from "@vim/ui/styles";
 import { TopbarPos } from "./topbar-pos";
@@ -43,6 +43,21 @@ export function AbrirTurno({
     eventosRecientes(token).then(setSugerenciasEvento).catch(() => {});
   }, [token]);
 
+  // El cajón se abre AL ENTRAR, no al terminar.
+  //
+  // Antes se abría después de declarar el fondo, y el orden real es el contrario: el cajero
+  // necesita el cajón abierto para contar lo que hay dentro —o meter lo que trae— y ESO es lo
+  // que luego escribe. Abrirlo al final lo obligaba a declarar de memoria y corregir después.
+  //
+  // Una sola vez por montaje: un re-render no debe volver a abrirlo. Best-effort — si la
+  // impresora no responde el cajero lo ve al instante, porque está parado frente al cajón.
+  const cajonAbierto = useRef(false);
+  useEffect(() => {
+    if (cajonAbierto.current) return;
+    cajonAbierto.current = true;
+    obtenerImpresora("CAJA", { onMostrar: () => {} }).abrirCajon().catch(() => {});
+  }, []);
+
   const monto = Number(fondo || 0);
   const valido = monto > 0 && (!esEvento || eventoNombre.trim().length > 0);
 
@@ -58,11 +73,6 @@ export function AbrirTurno({
         eventoNombre: esEvento ? eventoNombre : null,
         eventoNotas: esEvento ? eventoNotas : null,
       });
-      // El fondo inicial que se acaba de declarar hay que METERLO al cajón, así que se abre solo.
-      // Sin PIN a propósito: abrir turno ya es una acción autorizada, y pedir una segunda
-      // autorización para el mismo acto solo estorba. Best-effort — si la impresora no responde
-      // el cajero lo ve al instante, porque está parado frente al cajón esperándolo.
-      obtenerImpresora("CAJA", { onMostrar: () => {} }).abrirCajon().catch(() => {});
       onTurnoAbierto(t);
     } catch (e) {
       const msg = e instanceof Error ? e.message : "Error";
