@@ -39,8 +39,7 @@
   },
   "devDependencies": {
     "electron": "^43.4.0",
-    "electron-builder": "^26.15.3",
-    "sharp": "^0.35.3"
+    "electron-builder": "^26.15.3"
   },
   "build": {
     "appId": "com.vimpos.desktop",
@@ -95,16 +94,14 @@
       "target": [
         "nsis"
       ],
-      "signAndEditExecutable": true,
+      "signAndEditExecutable": false,
       "icon": "build/icon.png"
     },
     "nsis": {
       "oneClick": false,
       "perMachine": false,
       "allowToChangeInstallationDirectory": true,
-      "include": "build/installer.nsh",
-      "installerIcon": "build/icon.ico",
-      "uninstallerIcon": "build/icon.ico"
+      "include": "build/installer.nsh"
     }
   }
 }
