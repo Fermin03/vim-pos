@@ -10,11 +10,12 @@ export const ROL_LABEL: Record<string, string> = {
   ADMIN: "Administrador",
   SUPERVISOR: "Supervisor",
   CAJERO: "Cajero",
+  REPARTIDOR: "Repartidor",
   PERSONAL: "Personal",
   PERSONALIZADO: "Personalizado",
 };
 
-export const ROLES_ASIGNABLES = ["ADMIN", "SUPERVISOR", "CAJERO", "PERSONAL", "PERSONALIZADO"] as const;
+export const ROLES_ASIGNABLES = ["ADMIN", "SUPERVISOR", "CAJERO", "REPARTIDOR", "PERSONAL", "PERSONALIZADO"] as const;
 
 export type EstadoUsuario = "ACTIVO" | "BLOQUEADO_TEMP" | "BLOQUEADO_ADMIN" | "DESACTIVADO";
 
@@ -90,7 +91,7 @@ export const nuevoUsuarioSchema = z.object({
   nombre: z.string().trim().min(1, "El nombre es obligatorio").max(100),
   email: z.string().trim().email("Email inválido"),
   pin: z.string().regex(/^\d{4,6}$/, "El PIN debe tener 4 a 6 dígitos"),
-  rol_codigo: z.enum(["ADMIN", "SUPERVISOR", "CAJERO", "PERSONAL", "PERSONALIZADO"]),
+  rol_codigo: z.enum(["ADMIN", "SUPERVISOR", "CAJERO", "REPARTIDOR", "PERSONAL", "PERSONALIZADO"]),
 });
 export type NuevoUsuarioInput = z.infer<typeof nuevoUsuarioSchema>;
 

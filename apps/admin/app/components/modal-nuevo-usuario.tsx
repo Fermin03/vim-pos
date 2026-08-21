@@ -12,10 +12,14 @@ const ROL_DESC: Record<string, string> = {
   ADMIN: "Configura el sistema y gestiona al equipo",
   SUPERVISOR: "Autoriza con PIN: descuentos, cancelaciones, ajustes",
   CAJERO: "Cobra, abre y cierra turno, mueve caja",
-  PERSONAL: "Cocina, mesa, delivery (según subtipo)",
+  REPARTIDOR: "Lleva pedidos a domicilio; se le liquida el dinero al volver",
+  PERSONAL: "Cocina, mesa o apoyo en piso",
 };
 
-const ROLES = ["ADMIN", "SUPERVISOR", "CAJERO", "PERSONAL"] as const;
+// REPARTIDOR va después de CAJERO: comparten jerarquía (2) y ninguno entra al panel. Sin este
+// rol en la lista, el módulo de reparto a domicilio no tiene a quién asignarle un pedido — que es
+// exactamente por lo que estuvo meses sin poder usarse.
+const ROLES = ["ADMIN", "SUPERVISOR", "CAJERO", "REPARTIDOR", "PERSONAL"] as const;
 type Rol = (typeof ROLES)[number];
 
 export function ModalNuevoUsuario({

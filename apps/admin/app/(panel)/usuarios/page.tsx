@@ -15,7 +15,7 @@ import {
 } from "../../lib/usuarios";
 import { mensajeError } from "../../lib/errores";
 
-const ROLES_FILTRO = ["all", "DUENO", "ADMIN", "SUPERVISOR", "CAJERO", "PERSONAL"] as const;
+const ROLES_FILTRO = ["all", "DUENO", "ADMIN", "SUPERVISOR", "CAJERO", "REPARTIDOR", "PERSONAL"] as const;
 type RolFiltro = (typeof ROLES_FILTRO)[number];
 
 function iniciales(nombre: string): string {

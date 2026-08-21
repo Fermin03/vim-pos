@@ -16,7 +16,10 @@ const admin = createClient(
 );
 
 const ROLES_ADMINISTRADORES = ["DUENO", "ADMIN"];
-const ROLES_ASIGNABLES = ["ADMIN", "SUPERVISOR", "CAJERO", "PERSONAL", "PERSONALIZADO"]; // DUENO solo vía crear_tenant_con_owner
+// REPARTIDOR (migración 0076) comparte jerarquía con CAJERO y tampoco entra al panel. Sin él en
+// esta lista, el alta se rechazaba con ROL_INVALIDO aunque la pantalla lo ofreciera — la misma
+// trampa de dos capas que ya bloqueó el PIN del dueño: arreglar una y olvidar la otra.
+const ROLES_ASIGNABLES = ["ADMIN", "SUPERVISOR", "CAJERO", "REPARTIDOR", "PERSONAL", "PERSONALIZADO"]; // DUENO solo vía crear_tenant_con_owner
 
 Deno.serve(async (req) => {
   const cors = corsHeaders(req);
