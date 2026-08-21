@@ -114,11 +114,26 @@ export default function PromocionesPage() {
     <>
       <PageHeader
         titulo="Promociones"
-        subtitulo="Ofertas y descuentos que se aplican automáticamente en el POS según sus condiciones."
+        subtitulo="Ofertas y descuentos del negocio, con su vigencia."
         migas={[{ label: "Catálogo" }, { label: "Promociones" }]}
         right={<Button onClick={() => setEditando({ id: null, datos: VACIO() })}>Nueva promoción</Button>}
       />
       <PageBody>
+        {/* Decir la verdad sobre lo que hace esta pantalla.
+            El POS todavía no evalúa promociones: se registran aquí, pero al cobrar no se aplican
+            solas. Sin este aviso, una promoción queda ACTIVA meses y el dueño cree que está
+            corriendo — pasó con un "2x1" creado en junio que nunca descontó un peso. Un cartel
+            incómodo es mejor que una promesa silenciosa. Se retira al conectar la evaluación. */}
+        <div className="mb-4 rounded-lg border border-[#F0DCC0] bg-[#FCF3E6] px-4 py-3" role="status">
+          <p className="text-[13px] font-semibold text-warning">
+            Estas promociones todavía no se aplican solas en el POS.
+          </p>
+          <p className="mt-1 text-[12.5px] leading-snug text-ink-2">
+            Aquí quedan registradas con su vigencia, pero al cobrar no se descuentan
+            automáticamente: por ahora aplícalas con el botón <b>Descuento</b> del POS. Te
+            avisaremos en cuanto la aplicación automática esté disponible.
+          </p>
+        </div>
         {okMsg && <p className="mb-3 text-sm font-medium text-success">{okMsg}</p>}
         {error && !editando && <p className="mb-3 text-sm font-medium text-danger">{error}</p>}
 

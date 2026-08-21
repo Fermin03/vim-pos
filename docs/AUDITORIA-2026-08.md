@@ -19,6 +19,7 @@ que estaban bien—, así que cada hallazgo se confirmó leyendo el caso concret
 | Tres archivos muertos, uno con jerga a la vista: *"Sucursales visibles (RLS por tenant)"*, *"El POS operativo va en F5"* | POS y `/admin` |
 | El código del cliente se deriva del nombre comercial (nació un `vim-pruevas` por teclearlo aparte) | `/platform` |
 | *"Crea el tenant… Queda en TRIAL, fase INVITADO"* → texto en español llano | `/platform` |
+| Se retiran las dos promesas incumplidas (A1 y A2): aviso visible en Promociones y subtítulo corregido en Propinas | `/admin` |
 
 ---
 
@@ -127,8 +128,10 @@ Ordenado por lo que más cuesta dejar como está.
 
 | # | Qué | Por qué primero | Tamaño |
 |---|---|---|---|
-| 1 | **Decidir sobre promociones**: conectarlas o retirar la promesa de la interfaz | Un cliente ya creó una. Mientras siga ahí, el producto miente | Conectar: medio · Retirar: minutos |
-| 2 | **Igual con el reparto de propinas** | Misma clase de problema, afecta al pago del personal | Conectar: medio · Retirar: minutos |
+| ~~1~~ | ~~Retirar la promesa de promociones~~ — **hecho**: aviso visible en la pantalla, indicando usar Descuento mientras tanto | | |
+| ~~2~~ | ~~Retirar la promesa del reparto de propinas~~ — **hecho**: el subtítulo ya solo habla de la captura | | |
+| 1 | **Conectar las promociones al POS** (pendiente de fondo) | El aviso deja el producto honesto, no completo | Medio |
+| 2 | **Conectar el reparto de propinas** (pendiente de fondo) | Igual | Medio |
 | 3 | **Filtrar el menú de `/admin` por rol** | Es lo que se ve al dar acceso a un gerente | Pequeño |
 | 4 | **Conectar la liquidación de domicilio** | Knock-Out hace domicilio hoy y no cuadra el efectivo del repartidor | Medio |
 | 5 | **Verificar que RLS cubre lo que el menú expone** | Determina si C1 es cosmético o una fuga | Pequeño |
