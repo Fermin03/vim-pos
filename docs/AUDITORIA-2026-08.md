@@ -20,6 +20,7 @@ que estaban bien—, así que cada hallazgo se confirmó leyendo el caso concret
 | El código del cliente se deriva del nombre comercial (nació un `vim-pruevas` por teclearlo aparte) | `/platform` |
 | *"Crea el tenant… Queda en TRIAL, fase INVITADO"* → texto en español llano | `/platform` |
 | Se retiran las dos promesas incumplidas (A1 y A2): aviso visible en Promociones y subtítulo corregido en Propinas | `/admin` |
+| Guardián de rutas por rol, con la misma tabla que el menú (antes se llegaba tecleando la URL) | `/admin` |
 
 ---
 
@@ -81,15 +82,32 @@ descuentos por usuario, pero la detección automática no corre.
 
 ## C · Permisos
 
-### C1 · El menú de `/admin` no distingue roles
+### C1 · Las rutas del panel no estaban protegidas *(corregido)*
 
-Hay **siete roles con jerarquía** definida en la base (Dueño 5, Administrador 4, Supervisor 3,
-Cajero 2, Personal 1, Personalizado 1, Dispositivo 0). El menú lateral los ignora: cualquiera que
-entre ve Facturación, Configuración fiscal, Usuarios y Reportes.
+**Corrección de un hallazgo mal reportado en la primera versión de este informe:** se dijo que el
+menú no filtraba por rol. Sí lo hacía —`jer >= it.minJerarquia`—; el barrido buscó las palabras
+"rol" y "permiso" y el código usa `minJerarquia`. Un cajero solo veía "Panel".
 
-Falta comprobar si RLS bloquea los datos detrás. Aun si los bloquea, el resultado sería una pantalla
-vacía o un error — no un "no tienes acceso". Es lo primero que va a notar un cliente que le dé
-acceso a su gerente.
+El hueco real era otro: **ocultar un enlace no impide teclear la dirección.** No había guardián de
+rutas ni middleware, así que un cajero llegaba a `/configuracion/fiscal` o al reporte Z
+escribiéndolos en la barra del navegador.
+
+Corregido: el mínimo de cada sección vive ahora en una sola tabla (`app/lib/acceso.ts`) que usan
+el menú **y** un guardián de rutas, con una pantalla que explica el rol y a quién pedirle acceso.
+Con dos listas separadas, la primera sección nueva rompía una de las dos sin que se notara.
+
+### C2 · RLS filtra por tenant, no por rol *(abierto — es la frontera de verdad)*
+
+Las políticas de las tablas sensibles —`tenants` (RFC y razón social), `usuarios_perfil`,
+`usuarios_acceso`, `suscripciones`, `tickets`— filtran **solo por tenant**. Quien tenga sesión del
+negocio puede leer sus datos aunque la pantalla no se los muestre.
+
+Y no es hipotético: Knock-Out tiene hoy una **cajera con cuenta de correo y contraseña**
+(`angelavim2009@…`, rol CAJERO) que puede iniciar sesión en `/admin`. El guardián nuevo le cierra
+la interfaz; la capa de datos sigue abierta para quien sepa consultarla directamente.
+
+**El guardián es conveniencia, no seguridad.** Cerrar esto de verdad exige políticas conscientes
+del rol, y es trabajo de la capa de datos.
 
 ---
 
@@ -132,9 +150,8 @@ Ordenado por lo que más cuesta dejar como está.
 | ~~2~~ | ~~Retirar la promesa del reparto de propinas~~ — **hecho**: el subtítulo ya solo habla de la captura | | |
 | 1 | **Conectar las promociones al POS** (pendiente de fondo) | El aviso deja el producto honesto, no completo | Medio |
 | 2 | **Conectar el reparto de propinas** (pendiente de fondo) | Igual | Medio |
-| 3 | **Filtrar el menú de `/admin` por rol** | Es lo que se ve al dar acceso a un gerente | Pequeño |
+| 3 | **Políticas RLS conscientes del rol** (C2) | El guardián de rutas es conveniencia; esto es la frontera real, y hay una cajera con acceso hoy | Medio-grande |
 | 4 | **Conectar la liquidación de domicilio** | Knock-Out hace domicilio hoy y no cuadra el efectivo del repartidor | Medio |
-| 5 | **Verificar que RLS cubre lo que el menú expone** | Determina si C1 es cosmético o una fuga | Pequeño |
 | 6 | **Dividir cuenta** | Petición habitual en comedor; la función ya existe | Medio |
 | 7 | **IVA por producto en el desglose de pantalla** | Antes de vender a una vertical con tasa 0 | Pequeño |
 
