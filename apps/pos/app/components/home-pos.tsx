@@ -1229,6 +1229,7 @@ export function HomePos({
         {saliendoDomicilio && (
           <ModalSalidaDomicilio
             token={token}
+            sucursalId={caja.sucursal_id}
             ticketId={saliendoDomicilio.ticketId}
             folio={saliendoDomicilio.folio}
             total={saliendoDomicilio.total}

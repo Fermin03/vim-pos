@@ -44,7 +44,47 @@ export async function leerDeliveries(token: string, sucursalId: string): Promise
   }));
 }
 
-/** Repartidores activos del tenant (rol REPARTIDOR). */
+/**
+ * Nombres de repartidores ya usados, para sugerirlos en vez de teclearlos cada vez.
+ *
+ * Los repartidores NO tienen cuenta en el sistema: la app para ellos está por hacerse, y exigir
+ * usuario con correo y PIN convertía anotar quién se llevó un pedido en un trámite. Se guarda el
+ * nombre y basta; las sugerencias evitan que el mismo "Luis" acabe escrito de cuatro maneras y
+ * deje de poder cuadrarse.
+ */
+export async function nombresDeRepartidores(token: string, sucursalId: string): Promise<string[]> {
+  const { data, error } = await employeeClient(token)
+    .from("delivery_asignaciones")
+    .select("repartidor_nombre, fecha_asignacion")
+    .eq("sucursal_id", sucursalId)
+    .not("repartidor_nombre", "is", null)
+    .order("fecha_asignacion", { ascending: false })
+    .limit(200);
+  if (error) throw new Error(error.message);
+  const vistos = new Set<string>();
+  for (const r of (data ?? []) as { repartidor_nombre: string | null }[]) {
+    const n = (r.repartidor_nombre ?? "").trim();
+    if (n) vistos.add(n);
+  }
+  return [...vistos];
+}
+
+/** Asigna el pedido a un repartidor identificado solo por su nombre. */
+export async function asignarDeliveryPorNombre(
+  token: string,
+  args: { ticketId: string; nombre: string; montoALiquidar: number; tiempoPromesa?: number | null },
+): Promise<string> {
+  const { data, error } = await employeeClient(token).rpc("asignar_delivery_por_nombre", {
+    p_ticket_id: args.ticketId,
+    p_repartidor_nombre: args.nombre,
+    p_monto_a_liquidar_mxn: args.montoALiquidar,
+    p_tiempo_promesa_minutos: args.tiempoPromesa ?? null,
+  });
+  if (error) throw new Error(error.message);
+  return String(data);
+}
+
+/** Repartidores CON cuenta en el sistema (rol REPARTIDOR). Hoy no se usa: ver `nombresDeRepartidores`. */
 export async function leerRepartidores(token: string): Promise<{ id: string; nombre: string }[]> {
   const { data, error } = await employeeClient(token)
     .from("usuarios_acceso")
