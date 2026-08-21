@@ -65,9 +65,16 @@ Deno.serve(async (req) => {
   // y operaba como dueño. Se exige jerarquía ESTRICTAMENTE mayor: ni siquiera un DUEÑO resetea a
   // otro DUEÑO. Si un dueño pierde su PIN, va por soporte (service_role), no por aquí.
   // La RPC resetear_pin_empleado repite el chequeo (migración 0064): defensa en profundidad.
+  //
+  // EXCEPCIÓN: fijarse el PIN A UNO MISMO. La jerarquía protege de que alguien toque la cuenta de
+  // otro por encima suyo; contra uno mismo no protege de nada, y sin esta salida el DUEÑO de un
+  // tenant nuevo queda atrapado: nadie está por encima para dárselo, y `cambiar_pin_propio` exige
+  // el PIN anterior, que todavía no existe. Todo cliente recién dado de alta nacía sin poder
+  // autorizar nada. Quien pide ya viene autenticado como ese usuario (su JWT es el que llega).
+  const esUnoMismo = usuario_id === callerId;
   const jerarquiaCaller = Math.max(0, ...accesosCaller.map((a) => a.rol?.jerarquia ?? 0));
   const jerarquiaTarget = Math.max(0, ...accesosTarget.map((a) => a.rol?.jerarquia ?? 0));
-  if (jerarquiaCaller <= jerarquiaTarget) {
+  if (!esUnoMismo && jerarquiaCaller <= jerarquiaTarget) {
     return json({
       error: "JERARQUIA_INSUFICIENTE",
       detalle: "No puedes resetear el PIN de alguien con tu mismo nivel o superior.",
