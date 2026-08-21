@@ -121,3 +121,62 @@ export function siguienteAccionDelivery(e: DeliveryEstado): { destino: "salida" 
   if (e === "NO_ENTREGADO" || e === "EN_REGRESO") return { destino: "liquidar", label: "Liquidar" };
   return null;
 }
+
+/** La asignación viva de un ticket, si la tiene. Null si el pedido salió sin repartidor. */
+export async function asignacionDeTicket(
+  token: string,
+  ticketId: string,
+): Promise<{ id: string; estado: DeliveryEstado; montoALiquidar: number } | null> {
+  const { data, error } = await employeeClient(token)
+    .from("delivery_asignaciones")
+    .select("id, estado, monto_a_liquidar_mxn")
+    .eq("ticket_id", ticketId)
+    .not("estado", "in", "(LIQUIDADO,CANCELADO)")
+    .order("fecha_asignacion", { ascending: false })
+    .limit(1);
+  if (error) throw new Error(error.message);
+  const f = (data ?? [])[0] as Record<string, unknown> | undefined;
+  if (!f) return null;
+  return {
+    id: String(f.id),
+    estado: (f.estado as DeliveryEstado) ?? "ASIGNADO",
+    montoALiquidar: Number(f.monto_a_liquidar_mxn ?? 0),
+  };
+}
+
+/**
+ * Cierra el reparto con el dinero que de verdad entró: confirma la entrega si hacía falta y
+ * liquida al repartidor.
+ *
+ * Se llama al COBRAR, no en un paso aparte. En este negocio el repartidor cobra en la puerta y el
+ * cajero registra el ticket cuando vuelve: ese momento ya es la entrega del dinero, y pedir una
+ * segunda confirmación por la misma plata solo invita a que se salte.
+ *
+ * Best-effort a propósito: la venta ya está cobrada y registrada. Si esto falla, se pierde el
+ * detalle de la liquidación —molesto— pero no el dinero, y tumbar un cobro cerrado por eso sería
+ * mucho peor.
+ */
+export async function cerrarRepartoAlCobrar(
+  token: string,
+  args: { ticketId: string; efectivo: number; tarjeta: number; liquidadoPorId: string },
+): Promise<{ liquidada: boolean; motivo?: string }> {
+  try {
+    const a = await asignacionDeTicket(token, args.ticketId);
+    if (!a) return { liquidada: false, motivo: "sin asignación" };
+    // liquidar_delivery exige ENTREGADO/NO_ENTREGADO/EN_REGRESO. Si el pedido sigue marcado en
+    // ruta, el cobro ES la prueba de que se entregó.
+    if (a.estado === "ASIGNADO" || a.estado === "EN_RUTA" || a.estado === "EN_DESTINO") {
+      await confirmarEntrega(token, a.id, 0);
+    }
+    await liquidarDelivery(token, {
+      asignacionId: a.id,
+      efectivo: args.efectivo,
+      tarjeta: args.tarjeta,
+      liquidadoPorId: args.liquidadoPorId,
+      nota: "Liquidado automáticamente al cobrar el ticket",
+    });
+    return { liquidada: true };
+  } catch (e) {
+    return { liquidada: false, motivo: e instanceof Error ? e.message : "error" };
+  }
+}

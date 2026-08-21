@@ -1,6 +1,7 @@
 "use client";
 import { employeeClient } from "./supabase";
 import type { ModoServicio } from "./carrito";
+import { leerEntrega } from "./print/ticket-datos";
 
 // Cuentas ABIERTAS por modo de servicio: tickets comprometidos (BORRADOR/ABIERTO) que NO están en
 // espera ni pagados. Se usan en "Ver cuentas" de cada pestaña: Pick-up (por recolectar) y Domicilio
@@ -228,4 +229,30 @@ export async function listarCuentasQueBloqueanCorte(
       desdeIso: (t.fecha_apertura as string) ?? (t.created_at as string) ?? null,
     };
   });
+}
+
+/**
+ * Datos de entrega de una cuenta de domicilio, para mostrarlos en pantalla.
+ *
+ * El cajero los necesita a la vista mientras atiende: confirmar la dirección por teléfono, dictar
+ * la referencia al repartidor, llamar si nadie abre. Estaban solo en el papel del ticket, así que
+ * para consultarlos había que reimprimir — gastando papel y tiempo por un dato que ya se tenía.
+ *
+ * Reutiliza la misma lectura que arma el ticket: dos consultas que devuelvan direcciones distintas
+ * para el mismo pedido sería peor que no tener ninguna.
+ */
+export async function leerEntregaCuenta(
+  token: string,
+  ticketId: string,
+): Promise<{ cliente: string | null; telefono: string | null; direccion: string | null; referencias: string | null; notasRepartidor: string | null } | null> {
+  const sb = employeeClient(token);
+  const { data, error } = await sb
+    .from("tickets")
+    .select("cliente_id, direccion_entrega_id, modo_servicio")
+    .eq("id", ticketId)
+    .maybeSingle();
+  if (error) throw new Error(error.message);
+  const t = (data ?? null) as { cliente_id: string | null; direccion_entrega_id: string | null; modo_servicio: string } | null;
+  if (!t || t.modo_servicio !== "DELIVERY_PROPIO") return null;
+  return leerEntrega(sb, t.cliente_id, t.direccion_entrega_id);
 }

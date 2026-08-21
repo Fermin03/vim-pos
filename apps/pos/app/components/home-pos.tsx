@@ -52,7 +52,6 @@ import { ModalNumeroMesa } from "./modal-numero-mesa";
 import { MenuGeneral } from "./menu-general";
 import { PantallaInicio } from "./pantalla-inicio";
 import { PantallaCuentasModo } from "./pantalla-cuentas-modo";
-import { marcarSalidaDomicilio } from "../lib/cuentas-abiertas";
 import { PantallaMonitorVentas } from "./pantalla-monitor-ventas";
 import { listarTicketsEnEspera, ponerTicketEnEspera, retomarTicketEnEspera } from "../lib/espera";
 import { ModalEtiquetaEspera, ModalListaEspera } from "./modal-espera";
@@ -65,6 +64,8 @@ import { sincronizar } from "../lib/sync";
 import { notificarEventoCritico } from "../lib/push-eventos";
 import type { DatosTicketImpresion } from "../lib/print/tipos";
 import { useEscape } from "../lib/use-escape";
+import { ModalSalidaDomicilio } from "./modal-salida-domicilio";
+import { cerrarRepartoAlCobrar } from "../lib/delivery";
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
 
@@ -109,6 +110,10 @@ export function HomePos({
    * decidir en un segundo. Después ya nadie se acuerda.
    */
   const [salidaPendiente, setSalidaPendiente] = useState<null | "atras" | "inicio">(null);
+  /** Pedido de domicilio que está por salir: se pregunta quién se lo lleva antes de marcarlo. */
+  const [saliendoDomicilio, setSaliendoDomicilio] = useState<
+    null | { ticketId: string; folio: string | null; total: number; recargar: () => void }
+  >(null);
   const [enKds, setEnKds] = useState(false);
   // El POS arranca en la pantalla de inicio: el cajero elige primero a qué viene.
   const [enInicio, setEnInicio] = useState(true);
@@ -568,8 +573,24 @@ export function HomePos({
     }
   }, [carrito, ticketBd, token, caja.sucursal_id, turno.caja_id, turno.id, imprimirComandaCocina]);
 
+  /**
+   * Abre el cajón al empezar el cobro.
+   *
+   * Antes se abría al final, con el pago ya aplicado, y el cajero terminaba esperando al cajón
+   * con el cliente enfrente y el billete en la mano. Contar el cambio empieza al abrir la
+   * gaveta, no al cerrar la venta.
+   *
+   * Se abre SIEMPRE, sin saber todavía el método de pago: es lo que se pidió desde la caja, y a
+   * cambio expone el efectivo también en los cobros con tarjeta. Vale la pena tenerlo presente
+   * si el cajón queda a la vista del público.
+   */
+  const abrirCajonParaCobrar = useCallback(() => {
+    obtenerImpresora("CAJA", { onMostrar: () => {} }).abrirCajon().catch(() => {});
+  }, []);
+
   const iniciarCobro = useCallback(async () => {
     if (carrito.lineas.length === 0) return;
+    abrirCajonParaCobrar();
     // Si el ticket ya se persistió (flujo de descuento), reusarlo: nada de re-abrir.
     if (ticketBd) {
       setTotalesCobro(ticketBd);
@@ -872,10 +893,16 @@ export function HomePos({
               setDatosTicket(datos);
               setDatosComanda(datosCom);
               setEstadoTicket("lista");
-              // Auto-impresión: el PrintJob es la fuente para el papel (Epson/genérica cuando esté).
-              // Hoy con PreviewAdapter solo abre el overlay; el preview se renderiza desde los datos.
-              const job = construirTicketJob(datos, await logoParaTicket(datos.ancho));
-              await obtenerImpresora("CAJA", { onMostrar: () => setMostrarRecibo(true) }).imprimir(job);
+              // El ticket del cliente SOLO se imprime solo en "Para llevar".
+              //
+              // En comedor, Pick-up y domicilio el papel casi nunca se entrega: la mesa ya tiene su
+              // cuenta, el de Pick-up se lleva su bolsa y el de domicilio recibió el suyo con el
+              // pedido. Imprimirlo en cada cobro tiraba un ticket por venta a la basura. Para
+              // quien sí lo pida está el botón "Ver / Imprimir" de la confirmación.
+              if (datos.meta.modo === "PARA_LLEVAR") {
+                const job = construirTicketJob(datos, await logoParaTicket(datos.ancho));
+                await obtenerImpresora("CAJA", { onMostrar: () => setMostrarRecibo(true) }).imprimir(job);
+              }
               // Comanda automática a la estación de cocina.
               //
               // SOLO en "Para llevar". Es el único modo donde el pedido va del carrito al cobro sin
@@ -892,6 +919,18 @@ export function HomePos({
                 obtenerImpresora("COCINA", { onMostrar: () => {} })
                   .imprimir(construirComandaJob(datosCom))
                   .catch(() => {});
+              }
+              // Reparto a domicilio: se cierra con lo que de verdad entró. Best-effort — la venta
+              // ya quedó cobrada y un fallo aquí no debe deshacerla.
+              if (datos.meta.modo === "DELIVERY_PROPIO") {
+                const efectivo = datos.pagos.filter((p) => p.metodo === "Efectivo").reduce((a, p) => a + p.montoMxn, 0);
+                const otros = datos.pagos.filter((p) => p.metodo !== "Efectivo").reduce((a, p) => a + p.montoMxn, 0);
+                const r = await cerrarRepartoAlCobrar(token, {
+                  ticketId, efectivo, tarjeta: otros, liquidadoPorId: empleado.id,
+                });
+                if (!r.liquidada && r.motivo && r.motivo !== "sin asignación") {
+                  setError(`La venta se cobró, pero no se pudo liquidar al repartidor: ${r.motivo}`);
+                }
               }
               // Cajón automático: solo si hubo efectivo de por medio (hay cambio que dar o
               // fondo que actualizar). Tarjeta/otros no mueven billetes — abrirlo ahí solo
@@ -1161,6 +1200,7 @@ export function HomePos({
         }}
         onAgregarProductos={(ticketId: string) => setAgregandoA(ticketId)}
         onCobrar={async (ticketId) => {
+          abrirCajonParaCobrar();
           // El cobro se abre ENCIMA de la lista, sin cargar la cuenta ni saltar al catálogo:
           // el cajero pidió cobrar, no capturar productos. El modal solo necesita los totales.
           try {
@@ -1177,7 +1217,7 @@ export function HomePos({
                 c.estadoCocina === "LISTO" ? (
                   <button
                     type="button"
-                    onClick={async () => { await marcarSalidaDomicilio(token, c.ticketId); recargar(); }}
+                    onClick={() => setSaliendoDomicilio({ ticketId: c.ticketId, folio: c.folio, total: c.total, recargar })}
                     className="flex h-9 flex-shrink-0 items-center rounded border border-line-strong px-3 text-[13px] font-semibold text-ink-2 transition hover:border-ink hover:text-ink"
                   >
                     Marcar salida
@@ -1186,6 +1226,16 @@ export function HomePos({
             : undefined
         }
         />
+        {saliendoDomicilio && (
+          <ModalSalidaDomicilio
+            token={token}
+            ticketId={saliendoDomicilio.ticketId}
+            folio={saliendoDomicilio.folio}
+            total={saliendoDomicilio.total}
+            onListo={() => { const r = saliendoDomicilio.recargar; setSaliendoDomicilio(null); r(); }}
+            onCerrar={() => setSaliendoDomicilio(null)}
+          />
+        )}
         {/* El cobro va aquí también: sin esto, abrirlo desde la lista no mostraría nada, porque
             el componente tiene un return por pantalla. */}
         {modalesCobro}
