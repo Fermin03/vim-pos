@@ -6,11 +6,12 @@ import { leerSesion } from "../lib/supabase";
 import { cargarPerfil, iniciales, type Perfil } from "../lib/perfil";
 import { salir } from "../lib/supabase";
 import { listarSucursales } from "../lib/configuracion";
+import { puedeVer } from "../lib/acceso";
 
 const PerfilCtx = createContext<Perfil | null>(null);
 export const usePerfil = () => useContext(PerfilCtx);
 
-type Item = { label: string; href: string; minJerarquia: number; icon: ReactNode };
+type Item = { label: string; href: string; icon: ReactNode };
 type Seccion = { titulo: string; items: Item[] };
 
 const I = {
@@ -29,25 +30,46 @@ const NAV: Seccion[] = [
   {
     titulo: "Operación",
     items: [
-      { label: "Panel", href: "/dashboard", minJerarquia: 0, icon: I.panel },
-      { label: "Catálogo", href: "/catalogo", minJerarquia: 4, icon: I.catalogo },
-      { label: "Promociones", href: "/promociones", minJerarquia: 4, icon: I.catalogo },
-      { label: "Inventario", href: "/inventario", minJerarquia: 4, icon: I.inventario },
-      { label: "Clientes", href: "/clientes", minJerarquia: 4, icon: I.clientes },
-      { label: "Reservaciones", href: "/reservaciones", minJerarquia: 3, icon: I.clientes },
-      { label: "Conciliación apps", href: "/conciliacion", minJerarquia: 3, icon: I.reportes },
+      { label: "Panel", href: "/dashboard", icon: I.panel },
+      { label: "Catálogo", href: "/catalogo", icon: I.catalogo },
+      { label: "Promociones", href: "/promociones", icon: I.catalogo },
+      { label: "Inventario", href: "/inventario", icon: I.inventario },
+      { label: "Clientes", href: "/clientes", icon: I.clientes },
+      { label: "Reservaciones", href: "/reservaciones", icon: I.clientes },
+      { label: "Conciliación apps", href: "/conciliacion", icon: I.reportes },
     ],
   },
   {
     titulo: "Administración",
     items: [
-      { label: "Usuarios", href: "/usuarios", minJerarquia: 4, icon: I.usuarios },
-      { label: "Facturación", href: "/facturacion", minJerarquia: 4, icon: I.reportes },
-      { label: "Configuración", href: "/configuracion", minJerarquia: 4, icon: I.config },
-      { label: "Reportes", href: "/reportes", minJerarquia: 3, icon: I.reportes },
+      { label: "Usuarios", href: "/usuarios", icon: I.usuarios },
+      { label: "Facturación", href: "/facturacion", icon: I.reportes },
+      { label: "Configuración", href: "/configuracion", icon: I.config },
+      { label: "Reportes", href: "/reportes", icon: I.reportes },
     ],
   },
 ];
+
+/** Lo que ve quien llega a una sección que su rol no alcanza. */
+function SinAcceso({ rol }: { rol: string }) {
+  return (
+    <main className="flex flex-1 flex-col items-center justify-center gap-3 px-6 py-16 text-center">
+      <div className="flex h-12 w-12 items-center justify-center rounded-full bg-[#F6EEDD] text-warning">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-6 w-6" aria-hidden="true">
+          <rect x="4" y="11" width="16" height="9" rx="1.5" /><path d="M8 11V7a4 4 0 0 1 8 0v4" />
+        </svg>
+      </div>
+      <h1 className="font-display text-[19px] font-semibold tracking-tight">Esta sección no está disponible para ti</h1>
+      <p className="max-w-sm text-[13.5px] leading-snug text-ink-2">
+        Tu cuenta tiene el rol <b>{rol}</b>. Si necesitas entrar aquí, pídele al dueño del negocio
+        que ajuste tus permisos.
+      </p>
+      <Link href="/dashboard" className="mt-2 inline-flex h-10 items-center rounded border border-line-strong px-4 text-[13.5px] font-semibold text-ink-2 transition hover:border-ink hover:text-ink">
+        Ir al panel
+      </Link>
+    </main>
+  );
+}
 
 export function AdminShell({ children }: { children: ReactNode }) {
   const router = useRouter();
@@ -189,7 +211,7 @@ export function AdminShell({ children }: { children: ReactNode }) {
 
           <nav className="flex flex-1 flex-col gap-px overflow-y-auto px-3 pb-4 pt-3">
             {NAV.map((sec) => {
-              const items = sec.items.filter((it) => jer >= it.minJerarquia);
+              const items = sec.items.filter((it) => puedeVer(jer, it.href));
               if (items.length === 0) return null;
               return (
                 <div key={sec.titulo} className="contents">
@@ -268,7 +290,13 @@ export function AdminShell({ children }: { children: ReactNode }) {
               {iniciales(perfil?.nombre ?? "U")}
             </div>
           </header>
-          {children}
+          {/* Guardián de rutas. El menú ya oculta lo que no corresponde al rol, pero ocultar un
+              enlace no impide teclear la dirección: sin esto, un cajero llegaba a la configuración
+              fiscal o al reporte Z escribiéndolos en la barra. Usa la MISMA tabla que el menú.
+
+              Mientras el perfil carga no se bloquea nada: hacerlo mostraría un "sin acceso" de un
+              parpadeo a todo el mundo, y enseñar a ignorar ese aviso es peor que no tenerlo. */}
+          {perfil && !puedeVer(jer, pathname) ? <SinAcceso rol={perfil.rolNombre} /> : children}
         </div>
       </div>
     </PerfilCtx.Provider>
