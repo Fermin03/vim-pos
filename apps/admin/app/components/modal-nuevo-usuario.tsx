@@ -12,7 +12,7 @@ const ROL_DESC: Record<string, string> = {
   ADMIN: "Configura el sistema y gestiona al equipo",
   SUPERVISOR: "Autoriza con PIN: descuentos, cancelaciones, ajustes",
   CAJERO: "Cobra, abre y cierra turno, mueve caja",
-  REPARTIDOR: "Lleva pedidos a domicilio; se le liquida el dinero al volver",
+  REPARTIDOR: "Lleva pedidos a domicilio. Solo hace falta darlo de alta si va a usar el sistema",
   PERSONAL: "Cocina, mesa o apoyo en piso",
 };
 
