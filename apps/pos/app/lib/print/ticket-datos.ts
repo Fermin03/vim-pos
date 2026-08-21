@@ -128,7 +128,7 @@ export async function leerTicketParaImpresion(ticketId: string, ctx: Ctx): Promi
 
 /** Cliente + dirección de entrega. Si algo falla, el ticket sale igual: entregar sin
  *  referencias es peor que no imprimirlas, pero no imprimir NADA es peor todavía. */
-async function leerEntrega(
+export async function leerEntrega(
   sb: ReturnType<typeof employeeClient>,
   clienteId: string | null,
   direccionId: string | null,

@@ -4,7 +4,7 @@ import { BotonVolver } from "./boton-volver";
 import { RenglonItem } from "./renglon-item";
 import { Button } from "@vim/ui/styles";
 import { fmtMxn, type DatosCaja, type Turno } from "../lib/turno";
-import { borrarCuentaVacia, listarCuentasAbiertas, leerRenglonesCuenta, marcarSalidaDomicilio, minutosAbierta, type CuentaAbierta, type RenglonCuenta } from "../lib/cuentas-abiertas";
+import { borrarCuentaVacia, leerEntregaCuenta, listarCuentasAbiertas, leerRenglonesCuenta, marcarSalidaDomicilio, minutosAbierta, type CuentaAbierta, type RenglonCuenta } from "../lib/cuentas-abiertas";
 import { leerTotales, type TotalesTicket } from "../lib/cobro";
 import { ModalCancelarItem } from "./modal-cancelar-item";
 import { ModalCancelarItems, type LineaCancelada } from "./modal-cancelar-items";
@@ -112,6 +112,8 @@ export function PantallaCuentasModo({
   const [yaImpresas, setYaImpresas] = useState<Set<string>>(new Set());
   const [borrandoCuenta, setBorrandoCuenta] = useState(false);
   const [cancelandoItems, setCancelandoItems] = useState(false);
+  /** A quién y dónde se entrega. Solo en domicilio; en los demás modos el cliente está enfrente. */
+  const [entrega, setEntrega] = useState<Awaited<ReturnType<typeof leerEntregaCuenta>>>(null);
   const [borrando, setBorrando] = useState(false);
 
   const recargar = useCallback(async () => {
@@ -133,18 +135,22 @@ export function PantallaCuentasModo({
   /** Relee el detalle de la cuenta: renglones + totales AUTORITATIVOS de la BD (no del carrito:
    *  el descuento y el IVA los recalcula el servidor y aquí se cobra con esa cifra). */
   const recargarDetalle = useCallback(async (ticketId: string) => {
-    const [rs, ts] = await Promise.all([
+    // Los datos de entrega van en el mismo viaje pero con su propio `catch`: un domicilio sin
+    // dirección a la vista es incómodo; sin lista de productos es inservible. No deben caer juntos.
+    const [rs, ts, en] = await Promise.all([
       leerRenglonesCuenta(token, ticketId),
       leerTotales(token, ticketId).catch(() => null),
+      leerEntregaCuenta(token, ticketId).catch(() => null),
     ]);
     setDetalle(rs);
     setTotales(ts);
+    setEntrega(en);
   }, [token]);
 
   useEffect(() => {
-    if (!selId) { setDetalle(null); setTotales(null); return; }
+    if (!selId) { setDetalle(null); setTotales(null); setEntrega(null); return; }
     let vivo = true;
-    setDetalle(null); setTotales(null);
+    setDetalle(null); setTotales(null); setEntrega(null);
     recargarDetalle(selId).catch(() => { if (vivo) setDetalle([]); });
     return () => { vivo = false; };
   }, [selId, recargarDetalle]);
@@ -306,6 +312,29 @@ export function PantallaCuentasModo({
                 <Accion label="Cancelar cuenta" onClick={() => setCancelandoCuenta(true)} peligro />
                 <Accion label={`Cobrar ${fmtMxn(totales?.total ?? sel.total)}`} onClick={() => onCobrar(sel.ticketId)} destacado />
               </div>
+
+              {/* A quién y dónde se entrega. Va ARRIBA de los productos porque es lo que se
+                  consulta con el cliente al teléfono o al dictarle la dirección al repartidor;
+                  antes solo existía en el papel del ticket, así que verlo obligaba a reimprimir. */}
+              {entrega && (entrega.cliente || entrega.telefono || entrega.direccion) && (
+                <div className="border-b border-line bg-sel px-4 py-3">
+                  <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+                    {entrega.cliente && <span className="font-display text-[14px] font-semibold">{entrega.cliente}</span>}
+                    {entrega.telefono && (
+                      <a href={`tel:${entrega.telefono}`} className="text-[13px] font-semibold text-info underline-offset-2 hover:underline">
+                        {entrega.telefono}
+                      </a>
+                    )}
+                  </div>
+                  {entrega.direccion && <p className="mt-1 text-[13px] leading-snug text-ink-2">{entrega.direccion}</p>}
+                  {entrega.referencias && <p className="mt-0.5 text-[12.5px] leading-snug text-ink-3">Referencias: {entrega.referencias}</p>}
+                  {entrega.notasRepartidor && (
+                    <p className="mt-1 rounded border border-[#F0DCC0] bg-[#FCF3E6] px-2 py-1 text-[12.5px] leading-snug text-ink-2">
+                      Para el repartidor: {entrega.notasRepartidor}
+                    </p>
+                  )}
+                </div>
+              )}
 
               {/* Lo que se ordenó */}
               <div className="min-h-0 flex-1 overflow-y-auto p-4">
