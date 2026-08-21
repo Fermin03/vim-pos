@@ -98,7 +98,7 @@ export default function PropinasPage() {
     <>
       <PageHeader
         titulo="Propinas"
-        subtitulo="Cómo VIM POS sugiere la propina al cobrar y cómo se reparte entre tu equipo. Se configura por sucursal."
+        subtitulo="Cómo VIM POS sugiere la propina al cobrar. Se configura por sucursal."
         migas={[{ label: "Configuración" }, { label: "Propinas" }]}
       />
       <PageBody>
