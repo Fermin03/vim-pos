@@ -115,3 +115,35 @@ describe("debeImprimirComandaAlCobrar", () => {
     expect(debeImprimirComandaAlCobrar("MODO_NUEVO", true)).toBe(false);
   });
 });
+
+describe("comanda de CANCELACIÓN", () => {
+  const cancelada: DatosComanda = {
+    folio: "KO1C-2026-000042", modoServicio: "COMER AQUÍ", cajero: "María", caja: "Caja 01",
+    fechaIso: "2026-08-19T20:00:00.000Z", esCancelacion: true, ancho: 80,
+    lineas: [{ cantidad: 2, nombre: "Chiken Crunch", modificadores: ["Sin cebolla"], notaCocina: null }],
+  };
+  const textos = (d: DatosComanda) =>
+    construirComandaJob(d).bloques.filter((b) => b.t === "texto").map((b) => String((b as { valor: string }).valor));
+
+  it("lo primero que se ve es CANCELADO y NO PREPARAR", () => {
+    const t = textos(cancelada);
+    expect(t[0]).toBe("CANCELADO");
+    expect(t[1]).toBe("NO PREPARAR");
+  });
+
+  it("cada renglón se marca por su cuenta, por si el papel se lee a medias", () => {
+    expect(textos(cancelada).some((v) => v.startsWith("CANCELA 2x Chiken Crunch"))).toBe(true);
+  });
+
+  it("una comanda normal NO dice nada de cancelación", () => {
+    const t = textos({ ...cancelada, esCancelacion: false });
+    expect(t.some((v) => /CANCELA/.test(v))).toBe(false);
+    expect(t[0]).toBe("COMER AQUÍ");
+  });
+
+  it("cancelación y agregado no se mezclan: manda el aviso de cancelación", () => {
+    const t = textos({ ...cancelada, esAgregado: true });
+    expect(t.some((v) => /AGREGADO A LA ORDEN/.test(v))).toBe(false);
+    expect(t[0]).toBe("CANCELADO");
+  });
+});
