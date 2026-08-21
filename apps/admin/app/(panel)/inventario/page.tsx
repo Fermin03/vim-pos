@@ -163,9 +163,9 @@ export default function InventarioPage() {
   return (
     <>
       <PageHeader
-        titulo="Stock actual"
-        subtitulo="Existencias de ingredientes y productos. El stock baja solo al vender."
-        migas={[{ label: "Inventario" }, { label: "Stock actual" }]}
+        titulo="Inventario"
+        subtitulo="Existencias de ingredientes y productos. Bajan solas al vender."
+        migas={[{ label: "Inventario" }]}
         right={<Button onClick={nuevo} disabled={unidades.length === 0}>Nuevo insumo</Button>}
       />
       <PageBody>
