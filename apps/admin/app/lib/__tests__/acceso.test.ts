@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { puedeVer, jerarquiaRequerida } from "../acceso";
+import { puedeVer, jerarquiaRequerida, JERARQUIA_MINIMA_PANEL } from "../acceso";
 
 // Jerarquías reales de la base.
 const DUENO = 5, ADMIN = 4, SUPERVISOR = 3, CAJERO = 2;
@@ -42,5 +42,21 @@ describe("puedeVer", () => {
   it("una ruta desconocida no se bloquea: una página nueva no debe volverse un muro", () => {
     expect(jerarquiaRequerida("/seccion-nueva")).toBeNull();
     expect(puedeVer(CAJERO, "/seccion-nueva")).toBe(true);
+  });
+});
+
+describe("JERARQUIA_MINIMA_PANEL", () => {
+  it("cajero y personal quedan fuera del panel", () => {
+    expect(CAJERO < JERARQUIA_MINIMA_PANEL).toBe(true);
+    expect(1 < JERARQUIA_MINIMA_PANEL).toBe(true); // PERSONAL
+  });
+
+  it("supervisor, administrador y dueño entran", () => {
+    for (const j of [SUPERVISOR, ADMIN, DUENO]) expect(j >= JERARQUIA_MINIMA_PANEL).toBe(true);
+  });
+
+  it("el mínimo del panel coincide con la sección menos restrictiva que sirve de algo", () => {
+    // Si alguien bajara el mínimo por debajo de esto, entraría gente sin ninguna sección útil.
+    expect(JERARQUIA_MINIMA_PANEL).toBe(3);
   });
 });

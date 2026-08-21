@@ -47,3 +47,13 @@ export function puedeVer(jerarquia: number, ruta: string): boolean {
   const min = jerarquiaRequerida(ruta);
   return min === null || jerarquia >= min;
 }
+
+/**
+ * Jerarquía mínima para entrar al panel.
+ *
+ * Por debajo de SUPERVISOR (3) no hay nada que hacer aquí: cajero y personal operan el punto de
+ * venta, donde entran con su PIN. Dejarlos pasar los ponía frente a la venta del día y, como las
+ * políticas de la base filtran por NEGOCIO y no por rol, con los datos al alcance de quien supiera
+ * consultarlos directamente.
+ */
+export const JERARQUIA_MINIMA_PANEL = 3;

@@ -21,6 +21,7 @@ que estaban bien—, así que cada hallazgo se confirmó leyendo el caso concret
 | *"Crea el tenant… Queda en TRIAL, fase INVITADO"* → texto en español llano | `/platform` |
 | Se retiran las dos promesas incumplidas (A1 y A2): aviso visible en Promociones y subtítulo corregido en Propinas | `/admin` |
 | Guardián de rutas por rol, con la misma tabla que el menú (antes se llegaba tecleando la URL) | `/admin` |
+| El panel rechaza a cajero y personal en la puerta: su herramienta es el POS | `/admin` |
 
 ---
 
@@ -108,6 +109,11 @@ la interfaz; la capa de datos sigue abierta para quien sepa consultarla directam
 
 **El guardián es conveniencia, no seguridad.** Cerrar esto de verdad exige políticas conscientes
 del rol, y es trabajo de la capa de datos.
+
+**Mitigado en parte:** el panel ahora rechaza en la puerta a cajero y personal (por debajo de
+SUPERVISOR). La cajera de Knock-Out ya no entra, y no se le tocó la cuenta — su acceso al POS es
+por PIN y no depende de ese correo. Quedan dentro supervisor, administrador y dueño; para ellos la
+capa de datos sigue sin distinguir rol, que es lo que falta cerrar.
 
 ---
 
