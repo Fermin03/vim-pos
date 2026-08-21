@@ -2,59 +2,60 @@
 import Link from "next/link";
 import { PageBody, PageHeader } from "../../components/page-header";
 
-type Reporte = {
-  href: string;
-  titulo: string;
-  descripcion: string;
-  /** Etiqueta del mockup de referencia (para trazabilidad). */
-  ref: string;
-};
+/**
+ * Hub de reportes.
+ *
+ * Antes cada tarjeta mostraba la referencia interna del mockup con el que se diseñó —"P-181",
+ * "doc 09", "Flujos FT §4"—. Para quien usa el sistema eso no significa nada: parece un código de
+ * error o una versión inacabada, y ensucia una pantalla que debería inspirar confianza.
+ *
+ * En su lugar, las tarjetas se agrupan por la PREGUNTA que responden. Catorce reportes en una
+ * rejilla plana obligan a leerlos todos para encontrar uno; agrupados, se salta directo al bloque
+ * correcto. La trazabilidad con los mockups vive en el repositorio, que es donde le sirve a quien
+ * desarrolla.
+ */
+type Reporte = { href: string; titulo: string; descripcion: string };
+type Grupo = { titulo: string; ayuda: string; reportes: Reporte[] };
 
-const REPORTES: Reporte[] = [
+const GRUPOS: Grupo[] = [
   {
-    href: "/reportes/consolidado",
-    titulo: "Consolidado por sucursal",
-    descripcion: "Comparativo central de la cadena: venta, tickets y participación por sucursal.",
-    ref: "Enterprise",
+    titulo: "Qué se vende",
+    ayuda: "Composición de la venta: por producto, por categoría y por canal.",
+    reportes: [
+      { href: "/reportes/ventas-producto", titulo: "Ventas por producto", descripcion: "Qué productos venden más, ingreso por producto y unidades." },
+      { href: "/reportes/ventas-categoria", titulo: "Ventas por categoría", descripcion: "Mix de venta por categoría del catálogo." },
+      { href: "/reportes/modo-servicio", titulo: "Ventas por tipo de servicio", descripcion: "Comer aquí, para llevar y drive-thru: mix y participación." },
+      { href: "/reportes/ventas-marca", titulo: "Ventas por marca virtual", descripcion: "Desempeño por marca o concepto, para dark kitchen y foodtruck." },
+      { href: "/reportes/apps-externas", titulo: "Ventas por apps externas", descripcion: "Rappi, Uber y DiDi: venta, comisión y estado de conciliación." },
+      { href: "/reportes/eventos", titulo: "Ventas por evento", descripcion: "Ferias y eventos: venta, comisión del organizador y neto." },
+    ],
   },
   {
-    href: "/reportes/z-historico",
-    titulo: "Reporte Z histórico",
-    descripcion: "Cierres de turno: ventas, propinas, tickets, diferencias de efectivo.",
-    ref: "P-181",
+    titulo: "Cómo va la operación",
+    ayuda: "Cierres de caja, desempeño del equipo y tiempos de cocina.",
+    reportes: [
+      { href: "/reportes/z-historico", titulo: "Cortes de turno", descripcion: "Historial de cierres: ventas, propinas, tickets y diferencias de efectivo." },
+      { href: "/reportes/ventas-mesero", titulo: "Ventas por mesero", descripcion: "Desempeño del equipo: tickets, venta y propinas." },
+      { href: "/reportes/ventas-area", titulo: "Ventas por área de cocina", descripcion: "Carga de trabajo y venta por estación." },
+      { href: "/reportes/tiempos-cocina", titulo: "Tiempos de cocina", descripcion: "Cumplimiento de los tiempos de preparación por modo de servicio." },
+    ],
   },
   {
-    href: "/reportes/ventas-producto",
-    titulo: "Ventas por producto",
-    descripcion: "Qué productos venden más, ingreso por producto, unidades.",
-    ref: "P-185",
+    titulo: "Qué vigilar",
+    ayuda: "Señales que conviene revisar de cerca: descuentos, reimpresiones y reservas perdidas.",
+    reportes: [
+      { href: "/reportes/descuentos", titulo: "Descuentos por usuario", descripcion: "Quién otorga descuentos y cortesías, y por cuánto." },
+      { href: "/reportes/reimpresiones", titulo: "Reimpresiones por cajero", descripcion: "Reimprimir comandas con frecuencia puede indicar salidas sin cobrar." },
+      { href: "/reportes/no-shows", titulo: "Reservas que no llegaron", descripcion: "Tasa diaria de no-shows y comensales perdidos." },
+    ],
   },
   {
-    href: "/reportes/eventos",
-    titulo: "Ventas por evento",
-    descripcion: "Ferias y eventos (Foodtruck): venta, comisión del organizador y neto por evento.",
-    ref: "Flujos FT §4",
+    titulo: "Varias sucursales",
+    ayuda: "Comparativo central de la cadena.",
+    reportes: [
+      { href: "/reportes/consolidado", titulo: "Consolidado por sucursal", descripcion: "Venta, tickets y participación de cada sucursal, una junto a otra." },
+    ],
   },
-  {
-    href: "/reportes/ventas-categoria",
-    titulo: "Ventas por categoría",
-    descripcion: "Mix de venta por categoría del catálogo.",
-    ref: "P-184",
-  },
-  {
-    href: "/reportes/modo-servicio",
-    titulo: "Ventas por tipo de servicio",
-    descripcion: "Comer aquí · Para llevar · Drive-thru. Mix y participación %.",
-    ref: "P-188",
-  },
-  { href: "/reportes/ventas-mesero", titulo: "Ventas por mesero", descripcion: "Desempeño por mesero: tickets, venta y propinas.", ref: "P-186" },
-  { href: "/reportes/ventas-area", titulo: "Ventas por área de cocina", descripcion: "Carga de trabajo y venta por estación.", ref: "P-187" },
-  { href: "/reportes/ventas-marca", titulo: "Ventas por marca virtual", descripcion: "Desempeño por marca/concepto (dark kitchen, foodtruck).", ref: "P-189" },
-  { href: "/reportes/tiempos-cocina", titulo: "Tiempos de cocina", descripcion: "Cumplimiento de preparación por modo de servicio.", ref: "P-190" },
-  { href: "/reportes/descuentos", titulo: "Descuentos por usuario", descripcion: "Auditoría de descuentos y cortesías otorgados.", ref: "P-194" },
-  { href: "/reportes/reimpresiones", titulo: "Reimpresiones por cajero", descripcion: "Antifraude: reimpresión frecuente de comandas puede indicar salida sin cobrar.", ref: "doc 11 §8" },
-  { href: "/reportes/apps-externas", titulo: "Ventas por apps externas", descripcion: "Rappi/Uber/DiDi: venta, comisión y estado de conciliación por pedido.", ref: "doc 09" },
-  { href: "/reportes/no-shows", titulo: "No-shows de reservaciones", descripcion: "Reservas que no llegaron: tasa diaria y comensales perdidos.", ref: "doc 11 §8" },
 ];
 
 export default function ReportesHub() {
@@ -66,22 +67,30 @@ export default function ReportesHub() {
         migas={[{ label: "Reportes" }]}
       />
       <PageBody>
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {REPORTES.map((r) => (
-            <Link
-              key={r.href}
-              href={r.href}
-              className="group rounded-lg border border-line bg-surface p-5 transition hover:border-ink hover:shadow-[0_4px_14px_rgba(22,22,26,.06)]"
-            >
-              <div className="mb-1.5 flex items-center justify-between">
-                <span className="font-display text-[16px] font-semibold tracking-tight">{r.titulo}</span>
-                <span className="rounded-full bg-sel px-2 py-0.5 text-[10.5px] font-bold uppercase tracking-wide text-ink-3">{r.ref}</span>
+        <div className="flex flex-col gap-8">
+          {GRUPOS.map((g) => (
+            <section key={g.titulo}>
+              <h2 className="font-display text-[15px] font-semibold tracking-tight">{g.titulo}</h2>
+              <p className="mb-3 mt-0.5 text-[12.5px] text-ink-3">{g.ayuda}</p>
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                {g.reportes.map((r) => (
+                  <Link
+                    key={r.href}
+                    href={r.href}
+                    className="group flex flex-col rounded-lg border border-line bg-surface p-5 transition hover:border-ink hover:shadow-[0_4px_14px_rgba(22,22,26,.06)]"
+                  >
+                    <span className="mb-1.5 font-display text-[16px] font-semibold tracking-tight">{r.titulo}</span>
+                    <p className="flex-1 text-[12.5px] leading-snug text-ink-3">{r.descripcion}</p>
+                    <span className="mt-3 inline-flex items-center gap-1 text-[12px] font-semibold text-ink">
+                      Abrir
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5" aria-hidden="true">
+                        <path d="M5 12h14M13 6l6 6-6 6" />
+                      </svg>
+                    </span>
+                  </Link>
+                ))}
               </div>
-              <p className="text-[12.5px] leading-snug text-ink-3">{r.descripcion}</p>
-              <span className="mt-3 inline-flex items-center gap-1 text-[12px] font-semibold text-ink transition-colors group-hover:text-ink">
-                Abrir →
-              </span>
-            </Link>
+            </section>
           ))}
         </div>
       </PageBody>
