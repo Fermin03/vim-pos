@@ -64,6 +64,7 @@ import { cacheGet, cachePut, contarPendientes } from "../lib/outbox";
 import { sincronizar } from "../lib/sync";
 import { notificarEventoCritico } from "../lib/push-eventos";
 import type { DatosTicketImpresion } from "../lib/print/tipos";
+import { useEscape } from "../lib/use-escape";
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
 
@@ -482,6 +483,40 @@ export function HomePos({
     }
   }, [token, empleado.nombre, caja.nombre]);
 
+  /**
+   * Avisa a cocina de productos CANCELADOS.
+   *
+   * Sin este papel, cocina sigue preparando lo que el cliente ya canceló: el KDS puede mostrarlo,
+   * pero en un local donde la cocina trabaja con la comanda impresa nadie mira una pantalla a
+   * media plancha. El desperdicio es de comida y de tiempo, y se descubre al entregar.
+   *
+   * Va a la estación de cocina aunque sea la misma impresora de caja: aquí no hay riesgo de
+   * duplicar un ticket —es un papel que no existía— y el aviso es más importante que el papel.
+   */
+  const imprimirComandaCancelacion = useCallback(async (ticketId: string, lineas: DatosComanda["lineas"]) => {
+    if (lineas.length === 0) return;
+    try {
+      const datos = await leerTicketParaImpresion(ticketId, {
+        token, cajeroNombre: empleado.nombre, cajaNombre: caja.nombre,
+      });
+      const dc: DatosComanda = {
+        folio: datos.meta.folio,
+        modoServicio: datos.meta.modoServicio,
+        cajero: datos.meta.cajero,
+        caja: datos.meta.caja,
+        fechaIso: new Date().toISOString(), // la hora de la CANCELACIÓN, no la de la orden
+        cliente: datos.entrega?.cliente ?? datos.meta.nombreCliente ?? null,
+        esCancelacion: true,
+        lineas,
+        ancho: 80,
+      };
+      const r = await obtenerImpresora("COCINA", { onMostrar: () => {} }).imprimir(construirComandaJob(dc));
+      if (!r.ok) setError("Los productos se cancelaron, pero NO se pudo avisar a cocina. Avísales a mano.");
+    } catch {
+      setError("Los productos se cancelaron, pero NO se pudo avisar a cocina. Avísales a mano.");
+    }
+  }, [token, empleado.nombre, caja.nombre]);
+
   /** B1 — envía la mesa a cocina (KDS) antes de cobrar. */
   const onEnviarCocina = useCallback(async () => {
     if (!ticketBd) return;
@@ -724,6 +759,54 @@ export function HomePos({
     const it = itemsPersistidos.find((x) => x.clientId === clientId);
     if (it) setDescuentoItem(it);
   }, [itemsPersistidos]);
+
+  /**
+   * Escape = cerrar lo que esté encima, o volver si no hay nada abierto.
+   *
+   * Centralizado en vez de repetido en cada modal: así la PRECEDENCIA se lee de un vistazo y no
+   * hay dos capas cerrándose con la misma tecla. El orden es del más interno al más externo, que
+   * es lo que espera cualquiera que haya usado un teclado.
+   *
+   * No cierra nada mientras un cobro está en curso: interrumpir a media aplicación de pago es
+   * justo lo que no debe poder hacerse por reflejo.
+   */
+  const alEscapar = useMemo(() => {
+    const capas: [boolean, () => void][] = [
+      [cancelandoItem != null, () => setCancelandoItem(null)],
+      [descuentoItem != null, () => setDescuentoItem(null)],
+      [cancelandoTicket, () => setCancelandoTicket(false)],
+      [mostrarRecibo, () => setMostrarRecibo(false)],
+      [confirmacion != null, nuevoTicket],
+      [totalesCobro != null && !procesandoCobro, () => setTotalesCobro(null)],
+      [agregandoA != null, () => setAgregandoA(null)],
+      [viendoMapaMesas, () => { setViendoMapaMesas(false); setPidiendoMesa(true); }],
+      [pidiendoMesa, () => setPidiendoMesa(false)],
+      [nombreCuentaAbierto, () => setNombreCuentaAbierto(false)],
+      [clienteDomAbierto, () => setClienteDomAbierto(false)],
+      [esperaPidiendoEtiqueta, () => setEsperaPidiendoEtiqueta(false)],
+      [esperaListaAbierta, () => setEsperaListaAbierta(false)],
+      [movimientoAbierto, () => setMovimientoAbierto(false)],
+      [abrirCajaAbierto, () => setAbrirCajaAbierto(false)],
+      [cambiarPinAbierto, () => setCambiarPinAbierto(false)],
+      [misPropinasAbierto, () => setMisPropinasAbierto(false)],
+      [configImpresoraAbierto, () => setConfigImpresoraAbierto(false)],
+      [salidaPendiente != null, () => setSalidaPendiente(null)],
+      [confirmandoCierre, () => setConfirmandoCierre(false)],
+      [menuGeneralAbierto, () => setMenuGeneralAbierto(false)],
+      [cerrando, () => setCerrando(false)],
+      // Nada abierto: Escape equivale al botón Volver de la pantalla de captura.
+      [!enInicio && !enKds && !enMonitor && !enConsultaCuentas && !enDevoluciones
+        && !enDelivery && !enPickup && !enMesas, () => intentarSalirDeCaptura("atras")],
+    ];
+    return capas.find(([visible]) => visible)?.[1] ?? null;
+  }, [cancelandoItem, descuentoItem, cancelandoTicket, mostrarRecibo, confirmacion, totalesCobro,
+      procesandoCobro, agregandoA, viendoMapaMesas, pidiendoMesa, nombreCuentaAbierto,
+      clienteDomAbierto, esperaPidiendoEtiqueta, esperaListaAbierta, movimientoAbierto,
+      abrirCajaAbierto, cambiarPinAbierto, misPropinasAbierto, configImpresoraAbierto,
+      salidaPendiente, confirmandoCierre, menuGeneralAbierto, cerrando, enInicio, enKds, enMonitor,
+      enConsultaCuentas, enDevoluciones, enDelivery, enPickup, enMesas, nuevoTicket,
+      intentarSalirDeCaptura]);
+  useEscape(alEscapar);
 
   if (cerrando) {
     return (
@@ -1087,6 +1170,7 @@ export function HomePos({
           }
         }}
         onImprimirTicket={reimprimirCuenta}
+        onComandaCancelacion={imprimirComandaCancelacion}
         extraPorCuenta={
           enDelivery
             ? (c, recargar) =>
@@ -1250,11 +1334,17 @@ export function HomePos({
           onNotaOrden={(nota) => dispatch({ tipo: "nota_orden", nota })}
           onCobrar={iniciarCobro}
           onPonerEnEspera={online ? () => { setEsperaError(null); setEsperaPidiendoEtiqueta(true); } : undefined}
-          onEnviarCocina={enModoMesa && ticketBd ? onEnviarCocina : undefined}
+          // Comedor va por la MISMA rama que Pick-up y domicilio: su cuenta también queda
+          // abierta y se cobra después desde la lista. Antes entraba por la otra, que pinta
+          // "Cobrar" como acción principal y "Enviar a cocina" debajo — invitando a cobrar una
+          // mesa que apenas está ordenando, que es justo lo que no se quiere en comedor.
+          onEnviarCocina={undefined}
           onEnviarCocinaAbierto={
-            !enModoMesa && (carrito.modoServicio === "DRIVE_THRU" || carrito.modoServicio === "DELIVERY_PROPIO")
-              ? enviarACocinaAbierto
-              : undefined
+            enModoMesa && ticketBd
+              ? onEnviarCocina
+              : !enModoMesa && (carrito.modoServicio === "DRIVE_THRU" || carrito.modoServicio === "DELIVERY_PROPIO")
+                ? enviarACocinaAbierto
+                : undefined
           }
           folioCuenta={ticketBd?.folio ?? null}
           cocinaEnviada={cocinaEnviada}

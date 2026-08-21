@@ -17,6 +17,14 @@ export type DatosComanda = {
   cliente?: string | null;
   /** true si el pedido ya estaba en cocina y esto es un agregado posterior. */
   esAgregado?: boolean;
+  /**
+   * true si esta comanda anuncia productos CANCELADOS, no productos a preparar.
+   *
+   * Es la distinción más peligrosa del papel: si la cocina la lee como una comanda normal,
+   * prepara justo lo que se acaba de cancelar. Por eso el aviso va invertido, a tamaño máximo y
+   * antes que nada, y cada renglón lleva su propia marca.
+   */
+  esCancelacion?: boolean;
   lineas: LineaComanda[];
   ancho: 58 | 80;
 };
@@ -37,10 +45,17 @@ export function construirComandaJob(d: DatosComanda): PrintJob {
   const folioCorto = d.folio.slice(-4);
 
   const b: Bloque[] = [];
-  b.push({ t: "texto", valor: d.modoServicio.toUpperCase(), align: "centro", size: 3, bold: true, invertido: true });
+  if (d.esCancelacion) {
+    // Lo primero que se ve al arrancar el papel, sin depender de que alguien lea más abajo.
+    b.push({ t: "texto", valor: "CANCELADO", align: "centro", size: 3, bold: true, invertido: true });
+    b.push({ t: "texto", valor: "NO PREPARAR", align: "centro", size: 3, bold: true, invertido: true });
+    b.push({ t: "texto", valor: d.modoServicio.toUpperCase(), align: "centro", size: 1, bold: true });
+  } else {
+    b.push({ t: "texto", valor: d.modoServicio.toUpperCase(), align: "centro", size: 3, bold: true, invertido: true });
+  }
   // Sin este aviso la cocina no distingue una comanda nueva de un agregado y vuelve a preparar
   // el pedido entero. Va pegado al encabezado, antes que cualquier producto.
-  if (d.esAgregado) b.push({ t: "texto", valor: "*** AGREGADO A LA ORDEN ***", align: "centro", size: 2, bold: true });
+  if (d.esAgregado && !d.esCancelacion) b.push({ t: "texto", valor: "*** AGREGADO A LA ORDEN ***", align: "centro", size: 2, bold: true });
   b.push({ t: "separador", estilo: "punteado" });
 
   b.push({ t: "fila", izq: "Orden", der: `#${folioCorto}`, bold: true });
@@ -49,7 +64,10 @@ export function construirComandaJob(d: DatosComanda): PrintJob {
   b.push({ t: "separador", estilo: "punteado" });
 
   for (const l of d.lineas) {
-    b.push({ t: "texto", valor: `${l.cantidad}x ${l.nombre}`, size: 2, bold: true });
+    // El prefijo por renglón evita el peor caso: que el papel se corte o se lea a medias y la
+    // cocina tome la lista por un pedido nuevo.
+    const marca = d.esCancelacion ? "CANCELA " : "";
+    b.push({ t: "texto", valor: `${marca}${l.cantidad}x ${l.nombre}`, size: 2, bold: true });
     for (const m of l.modificadores) {
       b.push({ t: "texto", valor: esQuita(m) ? `  ${m.trim().toUpperCase()}` : `  + ${m}`, size: 1, bold: esQuita(m) });
     }

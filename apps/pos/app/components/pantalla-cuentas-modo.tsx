@@ -1,5 +1,5 @@
 "use client";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { BotonVolver } from "./boton-volver";
 import { RenglonItem } from "./renglon-item";
 import { Button } from "@vim/ui/styles";
@@ -7,11 +7,13 @@ import { fmtMxn, type DatosCaja, type Turno } from "../lib/turno";
 import { borrarCuentaVacia, listarCuentasAbiertas, leerRenglonesCuenta, marcarSalidaDomicilio, minutosAbierta, type CuentaAbierta, type RenglonCuenta } from "../lib/cuentas-abiertas";
 import { leerTotales, type TotalesTicket } from "../lib/cobro";
 import { ModalCancelarItem } from "./modal-cancelar-item";
+import { ModalCancelarItems, type LineaCancelada } from "./modal-cancelar-items";
 import { ModalCancelarTicket } from "./modal-cancelar-ticket";
 import { ModalDescuento } from "./modal-descuento";
 import { ModalAutorizacionPin } from "./modal-autorizacion-pin";
 import type { Empleado } from "../lib/supabase";
 import type { ModoServicio } from "../lib/carrito";
+import { useEscape } from "../lib/use-escape";
 
 const PERMISO_REIMPRIMIR = "venta.reimprimir_ticket";
 
@@ -71,6 +73,7 @@ export function PantallaCuentasModo({
   onAgregarProductos,
   onCobrar,
   onImprimirTicket,
+  onComandaCancelacion,
   extraPorCuenta,
 }: {
   token: string;
@@ -87,6 +90,8 @@ export function PantallaCuentasModo({
   onCobrar: (ticketId: string) => void;
   /** Imprime el ticket del cliente de esa cuenta. */
   onImprimirTicket: (ticketId: string) => Promise<void>;
+  /** Avisa a cocina de lo que se acaba de cancelar. Sin esto la cocina prepara lo cancelado. */
+  onComandaCancelacion: (ticketId: string, lineas: LineaCancelada[]) => Promise<void>;
   /** Acciones propias del modo (p. ej. "Marcar salida" en domicilio). */
   extraPorCuenta?: (c: CuentaAbierta, recargar: () => void) => React.ReactNode;
 }) {
@@ -106,6 +111,7 @@ export function PantallaCuentasModo({
   // Impresiones hechas en esta sesión: la primera es libre, de ahí en adelante pide PIN.
   const [yaImpresas, setYaImpresas] = useState<Set<string>>(new Set());
   const [borrandoCuenta, setBorrandoCuenta] = useState(false);
+  const [cancelandoItems, setCancelandoItems] = useState(false);
   const [borrando, setBorrando] = useState(false);
 
   const recargar = useCallback(async () => {
@@ -147,6 +153,21 @@ export function PantallaCuentasModo({
   // "Ya se imprimió" = lo hicimos en esta sesión, o el ticket trae marca de impresión previa.
   const yaSeImprimio = sel != null && (yaImpresas.has(sel.ticketId) || sel.impresaAt != null);
   // null = todavía no se sabe. Solo `true` habilita el borrado.
+  // Escape: cierra lo que esté encima; si no hay nada, vuelve al inicio (mismo orden que el POS).
+  const alEscapar = useMemo(() => {
+    const capas: [boolean, () => void][] = [
+      [cancelandoItems, () => setCancelandoItems(false)],
+      [borrandoCuenta, () => setBorrandoCuenta(false)],
+      [cancelandoCuenta, () => setCancelandoCuenta(false)],
+      [descontando, () => setDescontando(false)],
+      [pidiendoPinReimpresion, () => setPidiendoPinReimpresion(false)],
+      [selId != null, () => setSelId(null)],
+      [true, onSalir],
+    ];
+    return capas.find(([visible]) => visible)?.[1] ?? null;
+  }, [borrandoCuenta, cancelandoCuenta, descontando, pidiendoPinReimpresion, selId, onSalir]);
+  useEscape(alEscapar);
+
   const vacia = detalle === null ? null : detalle.length === 0;
   const hayDescuento = (totales?.descuentos ?? 0) > 0;
 
@@ -272,6 +293,14 @@ export function PantallaCuentasModo({
                   onClick={() => setBorrandoCuenta(true)}
                   inactivo={vacia !== true}
                   ocupado={borrando}
+                  peligro
+                />
+                {/* Cancelar VARIOS renglones de una vez. Uno por uno eran seis modales con la
+                    gente esperando, y en la prisa se cancelaba de más. Inactivo sin productos. */}
+                <Accion
+                  label="Cancelar productos"
+                  onClick={() => setCancelandoItems(true)}
+                  inactivo={!detalle || detalle.length === 0}
                   peligro
                 />
                 <Accion label="Cancelar cuenta" onClick={() => setCancelandoCuenta(true)} peligro />
@@ -416,6 +445,33 @@ export function PantallaCuentasModo({
             </div>
           </div>
         </div>
+      )}
+      {cancelandoItems && sel && detalle && (
+        <ModalCancelarItems
+          token={token}
+          empleado={empleado}
+          ticketId={sel.ticketId}
+          folio={sel.folio}
+          estadoCocina={sel.estadoCocina}
+          cajaId={turno.caja_id}
+          turnoId={turno.id}
+          items={detalle.map((r) => ({
+            ticketItemId: r.id,
+            nombre: r.productoNombre,
+            cantidad: r.cantidad,
+            total: r.totalItemMxn,
+            modificadores: r.modificadores,
+            notaCocina: r.notaCocina,
+          }))}
+          onCancelados={async (lineas) => {
+            setCancelandoItems(false);
+            // La comanda va ANTES de recargar: avisar a cocina es lo urgente, y si la impresora
+            // falla no debe impedir que la pantalla refleje lo que ya se canceló.
+            try { await onComandaCancelacion(sel.ticketId, lineas); } catch { /* el aviso en pantalla ya lo dio el modal */ }
+            await recargar();
+          }}
+          onCerrar={() => setCancelandoItems(false)}
+        />
       )}
       {cancelandoCuenta && sel && (
         <ModalCancelarTicket
