@@ -358,8 +358,22 @@ function DetalleDrawer({ api, id, onCerrar, onCambio }: { api: Api; id: string; 
   );
 }
 
+/** Nombre comercial → slug: minúsculas, sin acentos, guiones en vez de espacios. */
+function aSlug(texto: string): string {
+  return texto
+    .normalize("NFD").replace(/[̀-ͯ]/g, "")   // quita acentos y diéresis
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 50);
+}
+
 function NuevoCliente({ api, onCreado }: { api: Api; onCreado: () => void }) {
   const [codigo, setCodigo] = useState(""); const [nombre, setNombre] = useState("");
+  // El código se deriva del nombre mientras nadie lo edite a mano. Se tecleaba aparte y ya costó
+  // un "vim-pruevas" que quedó permanente: el código va en URLs y datos, y corregirlo después es
+  // más caro que evitarlo. Quien necesite otro distinto lo escribe y deja de derivarse.
+  const [codigoTocado, setCodigoTocado] = useState(false);
   const [ownerNombre, setOwnerNombre] = useState(""); const [ownerEmail, setOwnerEmail] = useState(""); const [ownerTel, setOwnerTel] = useState("");
   const [vertical, setVertical] = useState("QUICK_SERVICE");
   const [error, setError] = useState<string | null>(null);
@@ -375,7 +389,7 @@ function NuevoCliente({ api, onCreado }: { api: Api; onCreado: () => void }) {
       const data = await api("/api/provisionar", { method: "POST", body: JSON.stringify({ codigo, nombre_comercial: nombre, nombre_owner: ownerNombre, email_owner: ownerEmail, telefono_owner: ownerTel, vertical, plan_codigo: plan }) });
       if (!data.ok) throw new Error(String(data.detalle ?? data.error ?? "No se pudo crear"));
       setResultado({ email: ownerEmail });
-      setCodigo(""); setNombre(""); setOwnerNombre(""); setOwnerEmail(""); setOwnerTel("");
+      setCodigo(""); setNombre(""); setCodigoTocado(false); setOwnerNombre(""); setOwnerEmail(""); setOwnerTel("");
       onCreado();
     } catch (e) { setError(e instanceof Error ? e.message : "Error"); }
     finally { setCreando(false); }
@@ -384,10 +398,10 @@ function NuevoCliente({ api, onCreado }: { api: Api; onCreado: () => void }) {
   return (
     <div className="max-w-[460px]">
       <h2 className="mb-1 font-display text-[18px] font-semibold tracking-tight">Nuevo cliente</h2>
-      <p className="mb-4 text-[12.5px] text-ink-3">Crea el tenant y la cuenta del dueño. Queda en TRIAL, fase INVITADO.</p>
+      <p className="mb-4 text-[12.5px] text-ink-3">Da de alta el negocio y la cuenta de su dueño. Queda en periodo de prueba, y al dueño le llega una invitación por correo para entrar.</p>
       <div className="flex flex-col gap-3.5 rounded-lg border border-line bg-surface p-5">
-        <div><label className={label} htmlFor="codigo">Código (slug)</label><input id="codigo" className={input} value={codigo} maxLength={50} onChange={(e) => setCodigo(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ""))} placeholder="knockout-burger" /></div>
-        <div><label className={label} htmlFor="nombre">Nombre comercial</label><input id="nombre" className={input} value={nombre} maxLength={150} onChange={(e) => setNombre(e.target.value)} placeholder="Knock-Out Burger" /></div>
+        <div><label className={label} htmlFor="codigo">Código (slug)</label><input id="codigo" className={input} value={codigo} maxLength={50} onChange={(e) => { setCodigoTocado(true); setCodigo(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, "")); }} placeholder="knockout-burger" /></div>
+        <div><label className={label} htmlFor="nombre">Nombre comercial</label><input id="nombre" className={input} value={nombre} maxLength={150} onChange={(e) => { const v = e.target.value; setNombre(v); if (!codigoTocado) setCodigo(aSlug(v)); }} placeholder="Knock-Out Burger" /></div>
         <div><label className={label} htmlFor="vertical">Vertical</label><select id="vertical" className={input} value={vertical} onChange={(e) => setVertical(e.target.value)}>{VERTICALES.map((x) => <option key={x.v} value={x.v}>{x.l} · plan {x.plan}</option>)}</select></div>
         <div className="h-px bg-line" />
         <div><label className={label} htmlFor="on">Nombre del dueño</label><input id="on" className={input} value={ownerNombre} maxLength={150} onChange={(e) => setOwnerNombre(e.target.value)} /></div>
