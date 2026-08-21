@@ -1,0 +1,225 @@
+# Design system de VIM POS
+
+Este documento describe **lo que el código hace hoy**, no un ideal. Donde la realidad y la
+intención no coinciden, se dice y se marca como deuda — un design system que describe una versión
+imaginaria del producto no sirve para decidir nada.
+
+**Fuente de verdad, en este orden:**
+
+1. `packages/config/tailwind-preset.js` — los tokens que consumen las cuatro apps.
+2. `packages/ui/tokens.css` — los mismos valores como variables CSS, para lo que no pasa por Tailwind.
+3. Este documento — el porqué y las reglas de uso.
+
+Los dos primeros deben mantenerse en espejo. Si cambias uno y no el otro, la app y el ticket
+impreso dejan de parecerse.
+
+---
+
+## 1. Color
+
+### Marca
+
+| Token | Valor | Uso |
+|---|---|---|
+| `accent` | `#E8502E` | **Una sola acción dominante por pantalla.** Cobrar, Enviar a cocina, Confirmar. |
+| `accent-hover` | `#CF4525` | Estado hover del anterior. |
+| `accent-soft` | `#FBF0EC` | Fondos de realce muy suaves. Nunca texto. |
+
+El naranja es la señal de "esto es lo que sigue". Si una pantalla tiene tres botones naranjas, no
+tiene ninguno: el cajero pierde el segundo de orientación que el color estaba comprando.
+
+### Tinta
+
+| Token | Valor | Uso |
+|---|---|---|
+| `ink` | `#16161A` | Texto principal, cifras, títulos. |
+| `ink-2` | `#5A5A60` | Texto secundario, etiquetas de campo. |
+| `ink-3` | `#8E8E94` | Texto de apoyo, ayudas, marcas de tiempo. |
+
+Tres niveles bastan. Un cuarto tono intermedio siempre acaba usándose "porque el otro no se veía
+bien", que es la manera educada de decir que la jerarquía se rompió.
+
+### Semánticos
+
+| Token | Valor | Significa |
+|---|---|---|
+| `success` | `#2E7D52` | Cobrado, entregado, cuadrado. |
+| `warning` | `#9A6B12` | Requiere atención pero no bloquea. Sin conexión, cuenta vieja. |
+| `danger` | `#C0392B` | Destructivo o bloqueante. Cancelar, borrar, diferencia de caja. |
+| `info` | `#2C5AA0` | Neutro informativo. Sincronizando, avisos del sistema. |
+
+**Regla dura:** `danger` es para lo que **destruye o impide**, no para lo que "se ve mal". Un
+faltante de caja es rojo; una cuenta abierta hace dos horas es `warning`. Si todo lo incómodo es
+rojo, el rojo deja de detener a nadie.
+
+### Superficies y líneas
+
+| Token | Valor | Uso |
+|---|---|---|
+| `bg` / `surface` | `#FFFFFF` | Fondo y tarjetas. |
+| `line` | `#ECECE9` | Separadores dentro de un bloque. |
+| `line-strong` | `#DDDDD9` | Bordes de controles: inputs, botones fantasma. |
+| `hover` | `#F6F6F4` | Fondo al pasar el cursor. |
+| `sel` | `#FBFBFA` | Fila o tarjeta seleccionada. |
+
+### Paleta funcional (categorías y gráficas)
+
+`cat-blue #2C5AA0` · `cat-green #2E7D52` · `cat-teal #1F7A82` · `cat-violet #6B4FA0` ·
+`cat-amber #B5701A` · `cat-wine #9A3050`
+
+**Nunca el naranja de marca para datos.** Una barra naranja en una gráfica compite con el botón
+Cobrar por el mismo significado, y el ojo no puede sostener dos.
+
+> **Deuda:** estos seis tokens están definidos y **no se usan en ninguna parte**. Las categorías
+> del catálogo guardan su propio `color_hex` libre, así que hoy no hay nada que garantice contraste
+> ni coherencia. Al construir la vista de gráficas conviene decidir: o se adopta la paleta, o se
+> borra del preset. Tenerla ahí sin uso solo confunde a quien la lea.
+
+### Tema oscuro (KDS)
+
+El KDS invierte superficies bajo `[data-theme="kds"]`: fondo `#1A1A1E`, tarjetas `#26262B`, texto
+`#F0F0EC`, y `warning`/`danger` aclarados (`#D4A017`, `#E04040`) porque los originales no
+sobreviven sobre negro.
+
+Es el único tema alternativo. **No se usa para la web ni para el POS de caja**: en cocina la
+pantalla está lejos, con grasa y luz difícil; en la caja no.
+
+---
+
+## 2. Tipografía
+
+Tres familias, cargadas desde Google Fonts en el `layout` de cada app:
+
+| Familia | Token | Para qué |
+|---|---|---|
+| **Inter Tight** | `font-sans` | Todo el texto de interfaz. Es la voz por defecto. |
+| **Sora** | `font-display` | Títulos, botones y **cifras de dinero**. |
+| **JetBrains Mono** | `font-mono` | Tickets, reportes, folios, cualquier cosa que se alinee en columnas. |
+
+**Por qué Sora en el dinero:** los totales se leen de reojo, a un metro, mientras se cuenta
+efectivo. Necesitan peso y anchura constante. Siempre acompañados de `tabular-nums`, o las cifras
+bailan al actualizarse y obligan a releer.
+
+### Escala real
+
+La escala **no está tokenizada**. El código usa valores literales, y estos son los que de verdad
+aparecen en el POS:
+
+| Tamaño | Apariciones | Papel de hecho |
+|---|---|---|
+| `13px` | 116 | El caballo de batalla: texto de interfaz. |
+| `12.5px` | 84 | Texto secundario y ayudas. |
+| `15px` | 49 | Texto destacado dentro de un bloque. |
+| `12px` | 42 | Etiquetas, metadatos. |
+| `14px` | 38 | Botones y controles. |
+| `11px`–`11.5px` | 51 | Chips, marcas de tiempo, notas al pie. |
+
+> **Deuda:** que existan `12px`, `12.5px` y `13px` conviviendo es señal de decisiones tomadas de a
+> una. Para la web conviene fijar una escala corta (12 / 13 / 15 / 18 / 24 / 32) y respetarla; en
+> el POS, migrar es caro y de bajo retorno — funciona y nadie se queja.
+
+---
+
+## 3. Espaciado y radios
+
+**Espaciado** en múltiplos de 4: `4 · 8 · 12 · 16 · 20 · 24 · 32`. No hay valores intermedios y no
+deberían agregarse: la mitad del orden visual de una interfaz sale de que las distancias se
+repitan.
+
+**Radios:** `sm 4px` · `base 6px` · `lg 8px`. El radio grande es para contenedores (tarjetas,
+modales); el base para controles. Nada redondeado por completo salvo chips e indicadores.
+
+---
+
+## 4. Controles y superficie táctil
+
+Alturas usadas, por frecuencia: `h-11` (44px) · `h-10` (40px) · `h-12` (48px) · `h-9` (36px) ·
+`h-14` (56px).
+
+| Altura | Cuándo |
+|---|---|
+| `h-14` | Acción dominante en pantalla de captura. Se toca con el pulgar sin mirar. |
+| `h-12` | Botones grandes de catálogo y teclado numérico. |
+| `h-11` | **Predeterminado** de botones e inputs. |
+| `h-10` | Acciones secundarias en barras densas. |
+| `h-9` | Solo dentro de tarjetas o modales, para acciones terciarias. |
+
+**Nada por debajo de 36px en superficies que se tocan.** El POS se opera de pie, con prisa y a
+veces con guantes; un objetivo de 32px se falla lo suficiente como para que el cajero deje de
+confiar en la pantalla.
+
+---
+
+## 5. Componentes compartidos
+
+Viven en `packages/ui/src/components` y se importan desde `@vim/ui/styles`:
+
+- **`Button`** — variantes `primary` (naranja), `ghost` (borde), `danger` (rojo); tamaños `md`
+  (h-11) y `lg` (h-14). Siempre un `<button>` real, con foco visible por teclado.
+- **`Modal`** — contenedor de diálogo con título opcional.
+- **`PinKeypad`** — teclado numérico para PIN.
+- **`StatusChip`** — etiqueta de estado.
+
+**Regla:** si un patrón aparece en dos apps, sube a `@vim/ui`. Si aparece dos veces en la misma
+app, sube a `app/components`. Copiar y pegar la tercera vez es cuando el sistema empieza a
+divergir sin que nadie lo note.
+
+> **Deuda:** hay componentes que deberían estar aquí y viven sueltos en `apps/pos` — `BotonVolver`,
+> `RenglonItem`. Se quedaron ahí porque nacieron en el POS; no hay razón de fondo.
+
+---
+
+## 6. Reglas de interacción propias de una caja
+
+Estas no son preferencias estéticas: salen de errores que ya costaron dinero en el piloto.
+
+**Una acción dominante por pantalla.** Si hay dos naranjas, hay cero.
+
+**El botón "Volver" siempre en el mismo sitio** — extremo izquierdo de la cabecera, mismo tamaño en
+todas las pantallas. El cajero no lee la pantalla: va al lugar donde *sabe* que está el botón. Si
+cambia de sitio, cada regreso cuesta una búsqueda.
+
+**Escape cierra lo que esté encima; si no hay nada, vuelve.** Con una excepción deliberada: no
+interrumpe un cobro en curso.
+
+**Lo destructivo pregunta, y dice qué va a pasar.** No "¿Estás seguro?", sino qué se pierde y qué
+se puede deshacer.
+
+**Los avisos a cocina son inequívocos.** Una comanda de cancelación abre con `CANCELADO` /
+`NO PREPARAR` invertido y a tamaño máximo, y **cada renglón** repite la marca — por si el papel se
+corta o se lee a medias. Que la cocina confunda una cancelación con un pedido nuevo es el peor
+desenlace posible.
+
+**Un cero honesto vale más que un número creíble.** Si no hay datos de hoy, se dice; no se muestran
+los de anteayer con la etiqueta "hoy".
+
+---
+
+## 7. Para el sitio web de VIM POS
+
+Lo que **se hereda** sin discusión: la paleta completa, las tres familias tipográficas, los radios
+y la escala de espaciado. Es lo que hará que la web y el producto se reconozcan como la misma cosa.
+
+Lo que **no** se hereda:
+
+- **Las alturas de control.** 44px de alto por defecto es correcto para un dedo con prisa y
+  excesivo para un mouse. En web, 36–40px.
+- **La densidad.** El POS aprieta información porque cada scroll es tiempo frente a un cliente. Una
+  landing necesita aire; copiar la densidad del POS la haría ver como un panel de administración.
+- **El tema oscuro del KDS.** Está calibrado para una pantalla lejana en una cocina, no para una
+  web.
+
+Y una decisión que conviene tomar a propósito: el naranja de marca en el producto significa "esta
+es la acción". En la web va a ser el color de la marca a secas, presente en más lugares. Está bien
+que difieran — pero que sea una decisión y no un descuido, porque las capturas de pantalla del
+producto van a convivir con la web en la misma página.
+
+---
+
+## 8. Cómo cambiar esto
+
+1. Se toca `tailwind-preset.js` **y** `tokens.css` en el mismo commit. Siempre los dos.
+2. Si el cambio afecta a lo impreso —el ticket, la comanda—, se revisa el papel, no solo la
+   pantalla: la impresora térmica no tiene color y el contraste se comporta distinto.
+3. Este documento se actualiza en el mismo commit. Un design system que va por detrás del código
+   es peor que no tenerlo: la gente lo lee, decide en falso, y descubre el desfase tarde.
