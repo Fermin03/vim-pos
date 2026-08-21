@@ -6,7 +6,7 @@ import { leerSesion } from "../lib/supabase";
 import { cargarPerfil, iniciales, type Perfil } from "../lib/perfil";
 import { salir } from "../lib/supabase";
 import { listarSucursales } from "../lib/configuracion";
-import { puedeVer } from "../lib/acceso";
+import { JERARQUIA_MINIMA_PANEL, puedeVer } from "../lib/acceso";
 
 const PerfilCtx = createContext<Perfil | null>(null);
 export const usePerfil = () => useContext(PerfilCtx);
@@ -152,6 +152,40 @@ export function AdminShell({ children }: { children: ReactNode }) {
     return (
       <main className="flex h-[100dvh] items-center justify-center">
         <p className="text-sm text-ink-3">Cargando…</p>
+      </main>
+    );
+  }
+
+  // El panel no es para quien opera la caja.
+  //
+  // Un cajero con correo y contraseña podía entrar: el menú le mostraba solo "Panel", pero el
+  // panel enseña la venta del día, y las políticas de la base filtran por NEGOCIO, no por rol —
+  // así que los datos seguían a su alcance para quien supiera consultarlos. Se corta en la
+  // puerta: su herramienta es el POS, donde entra con su PIN.
+  //
+  // No se le quita la cuenta: su acceso al punto de venta no depende de este correo, y borrarla
+  // sería irreversible por un problema que se resuelve cerrando una puerta.
+  if (perfil && perfil.jerarquia < JERARQUIA_MINIMA_PANEL) {
+    return (
+      <main className="flex min-h-[100dvh] flex-col items-center justify-center gap-3 px-6 py-10 text-center">
+        <div className="flex h-12 w-12 items-center justify-center rounded-full bg-[#F6EEDD] text-warning">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-6 w-6" aria-hidden="true">
+            <rect x="4" y="11" width="16" height="9" rx="1.5" /><path d="M8 11V7a4 4 0 0 1 8 0v4" />
+          </svg>
+        </div>
+        <h1 className="font-display text-[22px] font-semibold tracking-tight">Este panel es para la administración</h1>
+        <p className="max-w-md text-[14px] leading-relaxed text-ink-3">
+          Tu cuenta tiene el rol <b className="text-ink-2">{perfil.rolNombre}</b>, que opera el
+          punto de venta. Entra desde la caja con tu PIN. Si necesitas ver reportes o
+          configuración, pídele al dueño del negocio que ajuste tus permisos.
+        </p>
+        <button
+          type="button"
+          onClick={async () => { const { supabase } = await import("../lib/supabase"); await supabase.auth.signOut(); router.replace("/"); }}
+          className="mt-2 rounded-lg border border-line-strong px-5 py-2.5 text-[14px] font-semibold text-ink-2 transition hover:border-ink"
+        >
+          Salir
+        </button>
       </main>
     );
   }
