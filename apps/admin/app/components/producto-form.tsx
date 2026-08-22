@@ -12,6 +12,7 @@ import {
   type MarcaOpcion,
   type Producto,
 } from "../lib/catalogo";
+import { listarAreasCocina, type AreaCocina } from "../lib/areas-cocina";
 import { mensajeError } from "../lib/errores";
 
 const input =
@@ -24,9 +25,11 @@ export function ProductoForm({ producto }: { producto: Producto | null }) {
 
   const [cats, setCats] = useState<CategoriaOpcion[]>([]);
   const [marcas, setMarcas] = useState<MarcaOpcion[]>([]);
+  const [areas, setAreas] = useState<AreaCocina[]>([]);
   const [nombre, setNombre] = useState(producto?.nombre ?? "");
   const [categoriaId, setCategoriaId] = useState(producto?.categoria_id ?? "");
   const [marcaId, setMarcaId] = useState(producto?.marca_virtual_id ?? "");
+  const [areaId, setAreaId] = useState(producto?.area_cocina_id ?? "");
   const [precio, setPrecio] = useState(producto ? String(producto.precio_base_mxn) : "");
   const [descripcion, setDescripcion] = useState(producto?.descripcion ?? "");
   const [codigo, setCodigo] = useState(producto?.codigo_interno ?? "");
@@ -45,6 +48,8 @@ export function ProductoForm({ producto }: { producto: Producto | null }) {
     listarMarcasOpciones()
       .then(setMarcas)
       .catch(() => {/* marcas opcionales: si no hay, el selector queda solo con "Sin marca" */});
+    // Estaciones: si no hay ninguna, el selector no se muestra y el producto imprime en cocina.
+    listarAreasCocina().then((a) => setAreas(a.filter((x) => x.activa))).catch(() => setAreas([]));
   }, []);
 
   async function guardar() {
@@ -59,6 +64,7 @@ export function ProductoForm({ producto }: { producto: Producto | null }) {
       agotado,
       visible_en_pos: visible,
       marca_virtual_id: marcaId,
+      area_cocina_id: areaId,
     });
     if (!parsed.success) {
       setError(parsed.error.issues[0]?.message ?? "Datos inválidos");
@@ -187,6 +193,26 @@ export function ProductoForm({ producto }: { producto: Producto | null }) {
               ))}
             </select>
             <p className="mt-1 text-[11.5px] text-ink-3">Para operar varios conceptos desde el mismo local.</p>
+          </div>
+        )}
+
+        {areas.length > 0 && (
+          <div>
+            <label className={label} htmlFor="area">
+              Estación de preparación <span className="text-ink-3">· opcional</span>
+            </label>
+            <select id="area" className={input} value={areaId} onChange={(e) => setAreaId(e.target.value)}>
+              <option value="">La de su categoría</option>
+              {areas.map((a) => (
+                <option key={a.id} value={a.id}>
+                  {a.nombre}
+                </option>
+              ))}
+            </select>
+            <p className="mt-1 text-[11.5px] text-ink-3">
+              Dónde se imprime su comanda. Normalmente se deja heredada de la categoría; esto es
+              para la excepción — una limonada preparada en cocina dentro de Bebidas, por ejemplo.
+            </p>
           </div>
         )}
 

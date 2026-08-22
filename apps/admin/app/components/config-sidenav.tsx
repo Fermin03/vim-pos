@@ -12,6 +12,7 @@ const SECCIONES = [
     { label: "Sucursales", href: "/configuracion/sucursales" },
     { label: "Cajas", href: "/configuracion/cajas" },
     { label: "Mesas", href: "/configuracion/mesas" },
+    { label: "Estaciones de preparación", href: "/configuracion/areas" },
     { label: "Propinas", href: "/configuracion/propinas" },
     { label: "Marcas virtuales", href: "/configuracion/marcas" },
     { label: "Franquicias", href: "/configuracion/franquicias" },

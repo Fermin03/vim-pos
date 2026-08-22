@@ -31,6 +31,13 @@ export type LineaImpresion = {
   totalMxn: number;
   modificadores: string[];
   notaCocina: string | null;
+  /**
+   * Estación que prepara este renglón. `null` = ninguna asignada: va a la impresora de cocina de
+   * siempre. Se resuelve producto → categoría, así que un negocio que no configure nada imprime
+   * exactamente como antes.
+   */
+  areaId?: string | null;
+  areaNombre?: string | null;
 };
 
 export type PagoImpresion = {

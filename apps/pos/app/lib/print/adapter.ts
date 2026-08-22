@@ -2,7 +2,7 @@ import type { PrintJob, PrintResult } from "./tipos";
 import { PreviewAdapter } from "./preview-adapter";
 import { EpsonEposAdapter } from "./epson-epos-adapter";
 import { RawSocketAdapter } from "./raw-socket-adapter";
-import { leerConfigParaDestino, PUERTO_RAW, type Destino } from "./config";
+import { leerConfigDeEstacion, leerConfigParaDestino, PUERTO_RAW, type ConfigImpresora, type Destino, type IdEstacion } from "./config";
 
 export interface PrinterAdapter {
   nombre: string;
@@ -21,8 +21,16 @@ export interface PrinterAdapter {
  *  - en cualquier otro caso → PreviewAdapter (muestra el recibo en pantalla); `onMostrar` lo da la UI.
  * Sin config, sigue siendo Preview (comportamiento previo).
  */
+/** Impresora de una estación concreta. La usa la comanda partida por área de preparación. */
+export function obtenerImpresoraDeEstacion(est: IdEstacion, opts: { onMostrar: (job: PrintJob) => void }): PrinterAdapter {
+  return desdeConfig(leerConfigDeEstacion(est), opts);
+}
+
 export function obtenerImpresora(destino: Destino, opts: { onMostrar: (job: PrintJob) => void }): PrinterAdapter {
-  const cfg = leerConfigParaDestino(destino);
+  return desdeConfig(leerConfigParaDestino(destino), opts);
+}
+
+function desdeConfig(cfg: ConfigImpresora, opts: { onMostrar: (job: PrintJob) => void }): PrinterAdapter {
   if (cfg.tipo === "generica" && cfg.ip) return new RawSocketAdapter(cfg.ip, cfg.puerto ?? PUERTO_RAW, cfg.ancho ?? 80);
   if (cfg.tipo === "epson" && cfg.ip) return new EpsonEposAdapter(cfg.ip, cfg.ancho ?? 80);
   return new PreviewAdapter(opts.onMostrar);

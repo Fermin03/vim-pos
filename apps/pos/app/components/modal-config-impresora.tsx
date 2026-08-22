@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Button, Modal } from "@vim/ui/styles";
 import { EpsonEposAdapter } from "../lib/print/epson-epos-adapter";
 import { RawSocketAdapter } from "../lib/print/raw-socket-adapter";
@@ -16,6 +16,7 @@ import {
   type Destino,
 } from "../lib/print/config";
 import type { PrintJob } from "../lib/print/tipos";
+import { listarAreasCocina, type AreaCocina } from "../lib/areas-cocina";
 
 const input = "h-11 w-full rounded border border-line-strong px-3 text-sm outline-none focus:border-ink focus:shadow-[0_0_0_3px_rgba(22,22,26,.06)]";
 
@@ -39,10 +40,17 @@ function jobPrueba(ancho: 58 | 80, estacion: string): PrintJob {
 
 /** C3 — Configura las 2 estaciones de impresión del dispositivo (Preview / Epson red / Genérica
  *  RAW 9100) + a qué estación va cada tipo de documento (caja o cocina) + prueba física. */
-export function ModalConfigImpresora({ onCerrar }: { onCerrar: () => void }) {
+export function ModalConfigImpresora({ token, sucursalId, onCerrar }: { token: string; sucursalId: string; onCerrar: () => void }) {
   const inicial = leerConfigImpresoras();
+  const [areas, setAreas] = useState<AreaCocina[]>([]);
   const [cfg, setCfg] = useState<ConfigImpresoras>(inicial);
   const [estacionActiva, setEstacionActiva] = useState<IdEstacion>("estacion1");
+
+  useEffect(() => {
+    // Si falla, la sección de áreas no aparece y todo sigue imprimiendo por la estación de cocina:
+    // no es motivo para impedir configurar la impresora.
+    listarAreasCocina(token, sucursalId).then(setAreas).catch(() => setAreas([]));
+  }, [token, sucursalId]);
   const [prueba, setPrueba] = useState<string | null>(null);
   const [probando, setProbando] = useState(false);
 
@@ -146,12 +154,48 @@ export function ModalConfigImpresora({ onCerrar }: { onCerrar: () => void }) {
           )}
         </div>
 
+        {/* Dónde imprime cada estación de preparación. Solo aparece si el negocio dio de alta
+            áreas en el panel: sin ellas no hay nada que repartir y la sección sobraría. */}
+        {areas.length > 0 && (
+          <div className="mt-1 rounded border border-line p-3">
+            <p className="mb-1 text-[12.5px] font-semibold text-ink-2">¿Dónde imprime cada estación de preparación?</p>
+            <p className="mb-2 text-[11.5px] leading-snug text-ink-3">
+              Las bebidas pueden salir en la impresora de la caja y la comida en la de cocina. Cada
+              pedido se parte en un papel por estación.
+            </p>
+            {areas.map((a) => (
+              <AreaRow
+                key={a.id}
+                label={a.nombre}
+                valor={cfg.areas?.[a.id] ?? cfg.asignacion.COCINA}
+                onCambiar={(e) => setCfg({ ...cfg, areas: { ...(cfg.areas ?? {}), [a.id]: e } })}
+              />
+            ))}
+          </div>
+        )}
+
         <div className="mt-2 flex items-center justify-end gap-2 border-t border-line pt-4">
           <Button variant="ghost" onClick={onCerrar}>Cancelar</Button>
           <Button onClick={guardar}>Guardar</Button>
         </div>
       </div>
     </Modal>
+  );
+}
+
+/** Misma fila que AsignacionRow pero para un área de preparación (la clave es su id, no un destino). */
+function AreaRow({ label, valor, onCambiar }: { label: string; valor: IdEstacion; onCambiar: (e: IdEstacion) => void }) {
+  return (
+    <div className="mb-1.5 flex items-center justify-between gap-2 last:mb-0">
+      <span className="text-[12.5px] text-ink-2">{label}</span>
+      <div className="flex gap-1">
+        {ESTACIONES.map((e) => (
+          <button key={e} type="button" onClick={() => onCambiar(e)} className={["rounded border px-2 py-1 text-[11.5px] font-semibold transition", valor === e ? "border-ink bg-ink text-white" : "border-line-strong text-ink-2 hover:border-ink"].join(" ")}>
+            {NOMBRE_ESTACION[e]}
+          </button>
+        ))}
+      </div>
+    </div>
   );
 }
 

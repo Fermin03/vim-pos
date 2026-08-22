@@ -62,7 +62,11 @@ export async function construirSnapshotPush(pool) {
         'ticket_items',              (SELECT jsonb_agg(to_jsonb(x)) FROM ticket_items x WHERE x.ticket_id IN (SELECT id FROM tk)),
         'ticket_item_modificadores', (SELECT jsonb_agg(to_jsonb(x)) FROM ticket_item_modificadores x WHERE x.ticket_item_id IN (SELECT id FROM ticket_items WHERE ticket_id IN (SELECT id FROM tk))),
         'pagos',                     (SELECT jsonb_agg(to_jsonb(x)) FROM pagos x WHERE x.ticket_id IN (SELECT id FROM tk)),
-        'movimientos_caja',          (SELECT jsonb_agg(to_jsonb(x)) FROM movimientos_caja x WHERE x.turno_id IN (SELECT id FROM tn))
+        'movimientos_caja',          (SELECT jsonb_agg(to_jsonb(x)) FROM movimientos_caja x WHERE x.turno_id IN (SELECT id FROM tn)),
+        -- Quién repartió cada domicilio. Viaja con su ticket: la asignación se anota al marcar la
+        -- salida, antes de cobrar, así que para cuando el ticket entra en esta rebanada ya está
+        -- liquidada y sube completa.
+        'delivery_asignaciones',     (SELECT jsonb_agg(to_jsonb(x)) FROM delivery_asignaciones x WHERE x.ticket_id IN (SELECT id FROM tk))
       )) AS snapshot
   `, [TERMINALES]);
   return { snapshot: rows[0].snapshot ?? {}, ids: rows[0].ids ?? [], turnos: rows[0].turnos ?? [] };
@@ -106,6 +110,10 @@ function rechazadosPorTicket(errores, snapshot) {
       const item = (snapshot.ticket_item_modificadores ?? []).find((m) => m.id === e.id);
       const ticket = item && itemATicket.get(item.ticket_item_id);
       if (ticket) fuera.add(ticket);
+    } else if (e.tabla === "delivery_asignaciones") {
+      // Que no suba quién repartió no invalida la venta. Retener el ticket por esto lo dejaría
+      // reintentándose para siempre si la asignación nunca puede aplicarse.
+      continue;
     } else if (e.tabla === "ticket_items" || e.tabla === "pagos") {
       const fila = (snapshot[e.tabla] ?? []).find((x) => x.id === e.id);
       if (fila?.ticket_id) fuera.add(fila.ticket_id);
