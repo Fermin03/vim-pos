@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import { Button, Modal } from "@vim/ui/styles";
 import { PageHeader, PageBody } from "../../components/page-header";
 import { ModalNuevoUsuario } from "../../components/modal-nuevo-usuario";
@@ -15,7 +16,7 @@ import {
 } from "../../lib/usuarios";
 import { mensajeError } from "../../lib/errores";
 
-const ROLES_FILTRO = ["all", "DUENO", "ADMIN", "SUPERVISOR", "CAJERO", "REPARTIDOR", "PERSONAL"] as const;
+const ROLES_FILTRO = ["all", "DUENO", "ADMIN", "SUPERVISOR", "CAJERO", "PERSONAL"] as const;
 type RolFiltro = (typeof ROLES_FILTRO)[number];
 
 function iniciales(nombre: string): string {
@@ -96,12 +97,20 @@ export default function UsuariosPage() {
         subtitulo="Quién opera VIM POS en tu negocio y qué puede hacer cada quien."
         migas={[{ label: "Administración" }, { label: "Usuarios" }]}
         right={
-          <Button onClick={() => setNuevo(true)}>
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" className="h-[17px] w-[17px]">
-              <path d="M12 5v14M5 12h14" />
-            </svg>
-            Nuevo usuario
-          </Button>
+          <>
+            <Link
+              href="/usuarios/repartidores"
+              className="flex h-11 items-center rounded border border-line-strong px-3.5 text-[14px] font-semibold text-ink-2 transition hover:border-ink hover:text-ink"
+            >
+              Repartidores
+            </Link>
+            <Button onClick={() => setNuevo(true)}>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" className="h-[17px] w-[17px]">
+                <path d="M12 5v14M5 12h14" />
+              </svg>
+              Nuevo usuario
+            </Button>
+          </>
         }
       />
       <PageBody>

@@ -44,39 +44,38 @@ export async function leerDeliveries(token: string, sucursalId: string): Promise
   }));
 }
 
+/** Un repartidor del catálogo del negocio (se dan de alta en el panel). */
+export type Repartidor = { id: string; nombre: string; telefono: string | null };
+
 /**
- * Nombres de repartidores ya usados, para sugerirlos en vez de teclearlos cada vez.
+ * Repartidores dados de alta y activos.
  *
- * Los repartidores NO tienen cuenta en el sistema: la app para ellos está por hacerse, y exigir
- * usuario con correo y PIN convertía anotar quién se llevó un pedido en un trámite. Se guarda el
- * nombre y basta; las sugerencias evitan que el mismo "Luis" acabe escrito de cuatro maneras y
- * deje de poder cuadrarse.
+ * Se eligen de una lista en vez de teclear el nombre en cada salida: además de más rápido, evita
+ * que el mismo "Luis" acabe escrito de cuatro maneras y deje de poder cuadrarse.
  */
-export async function nombresDeRepartidores(token: string, sucursalId: string): Promise<string[]> {
+export async function listarRepartidores(token: string): Promise<Repartidor[]> {
   const { data, error } = await employeeClient(token)
-    .from("delivery_asignaciones")
-    .select("repartidor_nombre, fecha_asignacion")
-    .eq("sucursal_id", sucursalId)
-    .not("repartidor_nombre", "is", null)
-    .order("fecha_asignacion", { ascending: false })
-    .limit(200);
+    .from("repartidores")
+    .select("id, nombre, telefono")
+    .eq("activo", true)
+    .is("deleted_at", null)
+    .order("nombre");
   if (error) throw new Error(error.message);
-  const vistos = new Set<string>();
-  for (const r of (data ?? []) as { repartidor_nombre: string | null }[]) {
-    const n = (r.repartidor_nombre ?? "").trim();
-    if (n) vistos.add(n);
-  }
-  return [...vistos];
+  return ((data ?? []) as Record<string, unknown>[]).map((r) => ({
+    id: String(r.id),
+    nombre: String(r.nombre),
+    telefono: (r.telefono as string) ?? null,
+  }));
 }
 
-/** Asigna el pedido a un repartidor identificado solo por su nombre. */
-export async function asignarDeliveryPorNombre(
+/** Asigna el pedido a un repartidor del catálogo. */
+export async function asignarRepartidor(
   token: string,
-  args: { ticketId: string; nombre: string; montoALiquidar: number; tiempoPromesa?: number | null },
+  args: { ticketId: string; repartidorId: string; montoALiquidar: number; tiempoPromesa?: number | null },
 ): Promise<string> {
-  const { data, error } = await employeeClient(token).rpc("asignar_delivery_por_nombre", {
+  const { data, error } = await employeeClient(token).rpc("asignar_delivery_repartidor", {
     p_ticket_id: args.ticketId,
-    p_repartidor_nombre: args.nombre,
+    p_repartidor_id: args.repartidorId,
     p_monto_a_liquidar_mxn: args.montoALiquidar,
     p_tiempo_promesa_minutos: args.tiempoPromesa ?? null,
   });
@@ -84,21 +83,10 @@ export async function asignarDeliveryPorNombre(
   return String(data);
 }
 
-/** Repartidores CON cuenta en el sistema (rol REPARTIDOR). Hoy no se usa: ver `nombresDeRepartidores`. */
-export async function leerRepartidores(token: string): Promise<{ id: string; nombre: string }[]> {
-  const { data, error } = await employeeClient(token)
-    .from("usuarios_acceso")
-    .select("usuario_id, perfil:usuarios_perfil!usuario_id(nombre), rol:roles(codigo)")
-    .eq("activo", true);
-  if (error) throw new Error(error.message);
-  return ((data ?? []) as unknown as Record<string, unknown>[])
-    .filter((r) => (r.rol as { codigo?: string } | null)?.codigo === "REPARTIDOR")
-    .map((r) => ({
-      id: String(r.usuario_id),
-      nombre: ((r.perfil as { nombre?: string } | null)?.nombre) ?? "Repartidor",
-    }));
-}
-
+/**
+ * Asignación contra una CUENTA de usuario. No se usa hoy —los repartidores no entran al sistema—
+ * y se conserva para cuando exista la app del repartidor, que sí tendrá cuentas propias.
+ */
 export async function asignarDelivery(
   token: string,
   args: { ticketId: string; repartidorId: string; montoALiquidar: number; tiempoPromesa?: number | null },
