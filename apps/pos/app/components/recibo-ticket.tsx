@@ -65,7 +65,7 @@ export function ReciboTicket({ datos }: { datos: DatosTicketImpresion }) {
             </div>
             {datos.entrega.cliente && <div className="text-[14px] font-bold">{datos.entrega.cliente}</div>}
             {datos.entrega.telefono && <div className="text-[14px] font-bold">Tel. {datos.entrega.telefono}</div>}
-            {datos.entrega.direccion && <div className="font-bold">{datos.entrega.direccion}</div>}
+            {datos.entrega.direccion && <div className="text-[14px] font-bold">{datos.entrega.direccion}</div>}
             {datos.entrega.referencias && <div className="text-[10.5px]">Ref: {datos.entrega.referencias}</div>}
             {datos.entrega.notasRepartidor && <div className="text-[10.5px]">Nota: {datos.entrega.notasRepartidor}</div>}
           </div>

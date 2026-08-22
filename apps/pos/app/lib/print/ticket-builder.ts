@@ -44,7 +44,11 @@ export function construirTicketJob(d: DatosTicketImpresion, logo?: Bloque | null
     b.push({ t: "texto", valor: "DATOS DE ENTREGA", align: "centro", bold: true, invertido: true });
     if (d.entrega.cliente) b.push({ t: "texto", valor: d.entrega.cliente, size: 2, bold: true });
     if (d.entrega.telefono) b.push({ t: "texto", valor: `Tel. ${d.entrega.telefono}`, size: 2, bold: true });
-    if (d.entrega.direccion) b.push({ t: "texto", valor: d.entrega.direccion, bold: true });
+    // La dirección va en el MISMO tamaño que el nombre y el teléfono. Estaba en tamaño normal, es
+    // decir el dato más pequeño de los tres siendo el único que el repartidor tiene que leer en la
+    // calle, muchas veces de noche y sobre papel térmico. Si no cabe en el renglón, la impresora la
+    // parte sola: se lee en dos líneas, no se recorta.
+    if (d.entrega.direccion) b.push({ t: "texto", valor: d.entrega.direccion, size: 2, bold: true });
     if (d.entrega.referencias) b.push({ t: "texto", valor: `Ref: ${d.entrega.referencias}`, size: 1 });
     if (d.entrega.notasRepartidor) b.push({ t: "texto", valor: `Nota: ${d.entrega.notasRepartidor}`, size: 1 });
   }
@@ -105,4 +109,22 @@ function formatoFecha(iso: string): string {
   const hh = String(f.getHours()).padStart(2, "0");
   const mi = String(f.getMinutes()).padStart(2, "0");
   return `${dd}/${mm}/${yyyy} ${hh}:${mi}`;
+}
+
+/**
+ * ¿Se imprime el ticket del cliente al COBRAR? Solo en "Para llevar".
+ *
+ *  · PARA LLEVAR — el pedido va del carrito al cobro directo, sin pasar por la lista de cuentas.
+ *    No hay un momento anterior donde el cajero pueda darle a "Imprimir ticket": si no sale aquí,
+ *    el cliente se va sin comprobante.
+ *
+ *  · COMEDOR, PICK-UP y DOMICILIO — el ticket se imprime antes desde la cuenta y se entrega; solo
+ *    entonces se cobra. Volver a imprimirlo al cobrar sacaba un segundo papel idéntico.
+ *
+ * Vive aquí, con nombre y con pruebas, porque es una regla de operación del negocio que se cambió
+ * tres veces en dos días: la 0.4.39 la puso en todos los modos y la 0.4.40 la quitó de todos.
+ * Escondida dentro de un `if` en la pantalla, cada giro costaba una versión y un servicio.
+ */
+export function debeImprimirTicketAlCobrar(modo: string): boolean {
+  return modo === "PARA_LLEVAR";
 }
