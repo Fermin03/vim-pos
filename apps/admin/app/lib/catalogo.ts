@@ -33,6 +33,8 @@ export const categoriaSchema = z.object({
   color_hex: z.string().regex(/^#[0-9A-Fa-f]{6}$/, "Color inválido").nullable().optional(),
   icono: z.string().max(50).nullable().optional(),
   activa: z.boolean(),
+  /** Estación de preparación por defecto de la categoría. "" = ninguna (va a cocina). */
+  area_cocina_id: z.string().uuid().optional().or(z.literal("")),
 });
 export type CategoriaInput = z.infer<typeof categoriaSchema>;
 
@@ -44,6 +46,7 @@ export type Categoria = {
   icono: string | null;
   orden_visualizacion: number;
   activa: boolean;
+  area_cocina_id: string | null;
   nProductos: number;
 };
 
@@ -52,7 +55,7 @@ type Fila = Omit<Categoria, "nProductos"> & { productos: { count: number }[] | n
 export async function listarCategorias(): Promise<Categoria[]> {
   const { data, error } = await supabase
     .from("categorias")
-    .select("id, nombre, descripcion, color_hex, icono, orden_visualizacion, activa, productos(count)")
+    .select("id, nombre, descripcion, color_hex, icono, orden_visualizacion, activa, area_cocina_id, productos(count)")
     .is("deleted_at", null)
     .order("orden_visualizacion", { ascending: true });
   if (error) throw new Error(error.message);
@@ -61,6 +64,7 @@ export async function listarCategorias(): Promise<Categoria[]> {
     nombre: f.nombre,
     descripcion: f.descripcion,
     color_hex: f.color_hex,
+    area_cocina_id: f.area_cocina_id ?? null,
     icono: f.icono,
     orden_visualizacion: f.orden_visualizacion,
     activa: f.activa,
@@ -94,6 +98,7 @@ export async function crearCategoria(input: CategoriaInput): Promise<void> {
     color_hex: datos.color_hex ?? null,
     icono: datos.icono ?? null,
     activa: datos.activa,
+    area_cocina_id: datos.area_cocina_id || null,
     orden_visualizacion: orden,
   });
   if (error) throw new Error(error.message);
@@ -109,6 +114,7 @@ export async function actualizarCategoria(id: string, input: CategoriaInput): Pr
       color_hex: datos.color_hex ?? null,
       icono: datos.icono ?? null,
       activa: datos.activa,
+      area_cocina_id: datos.area_cocina_id || null,
     })
     .eq("id", id);
   if (error) throw new Error(error.message);
@@ -165,6 +171,11 @@ export const productoSchema = z.object({
   visible_en_pos: z.boolean(),
   // F17.2 — marca virtual a la que pertenece el producto (multi-marca). "" = sin marca.
   marca_virtual_id: z.string().uuid().optional().or(z.literal("")),
+  /**
+   * Estación de preparación. "" = hereda la de su categoría, que es lo normal; solo se fija aquí
+   * cuando el producto es la excepción (una limonada preparada en cocina dentro de Bebidas).
+   */
+  area_cocina_id: z.string().uuid().optional().or(z.literal("")),
 });
 export type ProductoInput = z.infer<typeof productoSchema>;
 
@@ -181,6 +192,7 @@ export type Producto = {
   agotado_manual: boolean;
   visible_en_pos: boolean;
   marca_virtual_id: string | null;
+  area_cocina_id: string | null;
 };
 
 type FilaProd = Omit<Producto, "categoriaNombre"> & { categoria: { nombre: string } | null };
@@ -189,7 +201,7 @@ export async function listarProductos(): Promise<Producto[]> {
   const { data, error } = await supabase
     .from("productos")
     .select(
-      "id, nombre, descripcion, codigo_interno, precio_base_mxn, categoria_id, estado, agotado_manual, visible_en_pos, marca_virtual_id, categoria:categorias(nombre)",
+      "id, nombre, descripcion, codigo_interno, precio_base_mxn, categoria_id, estado, agotado_manual, visible_en_pos, marca_virtual_id, area_cocina_id, categoria:categorias(nombre)",
     )
     .is("deleted_at", null)
     .order("orden_visualizacion", { ascending: true });
@@ -206,6 +218,7 @@ export async function listarProductos(): Promise<Producto[]> {
     agotado_manual: f.agotado_manual,
     visible_en_pos: f.visible_en_pos,
     marca_virtual_id: f.marca_virtual_id ?? null,
+    area_cocina_id: f.area_cocina_id ?? null,
   }));
 }
 
@@ -213,7 +226,7 @@ export async function obtenerProducto(id: string): Promise<Producto | null> {
   const { data, error } = await supabase
     .from("productos")
     .select(
-      "id, nombre, descripcion, codigo_interno, precio_base_mxn, categoria_id, estado, agotado_manual, visible_en_pos, marca_virtual_id, categoria:categorias(nombre)",
+      "id, nombre, descripcion, codigo_interno, precio_base_mxn, categoria_id, estado, agotado_manual, visible_en_pos, marca_virtual_id, area_cocina_id, categoria:categorias(nombre)",
     )
     .eq("id", id)
     .is("deleted_at", null)
@@ -233,6 +246,7 @@ export async function obtenerProducto(id: string): Promise<Producto | null> {
     agotado_manual: f.agotado_manual,
     visible_en_pos: f.visible_en_pos,
     marca_virtual_id: f.marca_virtual_id ?? null,
+    area_cocina_id: f.area_cocina_id ?? null,
   };
 }
 
@@ -265,6 +279,7 @@ export async function crearProducto(input: ProductoInput): Promise<void> {
     agotado_manual,
     visible_en_pos: datos.visible_en_pos,
     marca_virtual_id: datos.marca_virtual_id || null,
+    area_cocina_id: datos.area_cocina_id || null,
     orden_visualizacion: orden,
   });
   if (error) throw new Error(error.message);
@@ -285,6 +300,7 @@ export async function actualizarProducto(id: string, input: ProductoInput): Prom
       agotado_manual,
       visible_en_pos: datos.visible_en_pos,
       marca_virtual_id: datos.marca_virtual_id || null,
+      area_cocina_id: datos.area_cocina_id || null,
     })
     .eq("id", id);
   if (error) throw new Error(error.message);

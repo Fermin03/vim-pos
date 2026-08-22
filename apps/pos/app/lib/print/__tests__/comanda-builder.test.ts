@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { construirComandaJob, debeImprimirComandaAlCobrar, type DatosComanda } from "../comanda-builder";
+import { agruparComandaPorArea, construirComandaJob, debeImprimirComandaAlCobrar, type DatosComanda } from "../comanda-builder";
 
 const D: DatosComanda = {
   folio: "KC-2026-000001",
@@ -145,5 +145,52 @@ describe("comanda de CANCELACIÓN", () => {
     const t = textos({ ...cancelada, esAgregado: true });
     expect(t.some((v) => /AGREGADO A LA ORDEN/.test(v))).toBe(false);
     expect(t[0]).toBe("CANCELADO");
+  });
+});
+
+describe("agruparComandaPorArea — la comanda se parte por estación", () => {
+  const L = (nombre: string, areaId: string | null, areaNombre: string | null) => ({
+    cantidad: 1, nombre, modificadores: [], notaCocina: null, areaId, areaNombre,
+  });
+
+  it("manda cada producto a su estación, conservando el orden de captura", () => {
+    const g = agruparComandaPorArea([
+      L("Hamburguesa", "a-cocina", "Cocina"),
+      L("Refresco", "a-barra", "Barra"),
+      L("Papas", "a-cocina", "Cocina"),
+    ]);
+    expect(g).toHaveLength(2);
+    expect(g[0]?.areaNombre).toBe("Cocina");
+    expect(g[0]?.lineas.map((l) => l.nombre)).toEqual(["Hamburguesa", "Papas"]);
+    expect(g[1]?.areaNombre).toBe("Barra");
+    expect(g[1]?.lineas.map((l) => l.nombre)).toEqual(["Refresco"]);
+  });
+
+  it("un negocio sin estaciones configuradas imprime UN solo papel, sin rótulo", () => {
+    // Es el caso de quien no ha tocado nada: debe seguir imprimiendo exactamente como antes.
+    const g = agruparComandaPorArea([L("Hamburguesa", null, null), L("Refresco", null, null)]);
+    expect(g).toHaveLength(1);
+    expect(g[0]?.areaId).toBeNull();
+    expect(g[0]?.areaNombre).toBeNull();
+    expect(g[0]?.lineas).toHaveLength(2);
+  });
+
+  it("los productos sin estación no se pierden: salen en su propio papel", () => {
+    // Si un producto nuevo se queda sin asignar, tiene que imprimirse igual. Perderlo dejaría a
+    // la cocina sin enterarse de un renglón del pedido.
+    const g = agruparComandaPorArea([L("Refresco", "a-barra", "Barra"), L("Producto nuevo", null, null)]);
+    expect(g).toHaveLength(2);
+    const sinArea = g.find((x) => x.areaId === null);
+    expect(sinArea?.lineas.map((l) => l.nombre)).toEqual(["Producto nuevo"]);
+  });
+
+  it("el rótulo de la estación se imprime en el encabezado", () => {
+    const job = construirComandaJob({
+      folio: "KO1C-2026-000001", modoServicio: "Para llevar", cajero: "María", caja: "Caja 01",
+      fechaIso: "2026-08-21T18:00:00.000Z", area: "Barra",
+      lineas: [{ cantidad: 1, nombre: "Refresco", modificadores: [], notaCocina: null }], ancho: 80,
+    });
+    const texto = job.bloques.filter((b) => b.t === "texto").map((b) => (b as { valor: string }).valor);
+    expect(texto).toContain("BARRA");
   });
 });

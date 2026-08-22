@@ -22,17 +22,17 @@ import { SidebarTicket } from "./sidebar-ticket";
 import { ModalModificadores } from "./modal-modificadores";
 import { ModalCobro } from "./modal-cobro";
 import { ModalDescuento } from "./modal-descuento";
-import { obtenerImpresora } from "../lib/print/adapter";
-import { hayEstacionDeCocinaDedicada } from "../lib/print/config";
+import { obtenerImpresora, obtenerImpresoraDeEstacion } from "../lib/print/adapter";
+import { estacionParaArea, hayEstacionDeCocinaDedicada } from "../lib/print/config";
 import { ModalConfigImpresora } from "./modal-config-impresora";
 import { ModalClienteDomicilio } from "./modal-cliente-domicilio";
 import { ModalNombreCuenta } from "./modal-nombre-cuenta";
 import { ModalCambiarPin } from "./modal-cambiar-pin";
 import { ModalMisPropinas } from "./modal-mis-propinas";
-import { leerTicketParaImpresion } from "../lib/print/ticket-datos";
-import { construirTicketJob } from "../lib/print/ticket-builder";
+import { leerAreasDeItems, leerTicketParaImpresion } from "../lib/print/ticket-datos";
+import { construirTicketJob, debeImprimirTicketAlCobrar } from "../lib/print/ticket-builder";
 import { rasterizarImagen } from "../lib/print/rasterizar";
-import { construirComandaJob, debeImprimirComandaAlCobrar, type DatosComanda } from "../lib/print/comanda-builder";
+import { agruparComandaPorArea, construirComandaJob, debeImprimirComandaAlCobrar, type DatosComanda, type LineaConArea } from "../lib/print/comanda-builder";
 import { ReciboPreview } from "./recibo-preview";
 import { PantallaCierre } from "./pantalla-cierre";
 import { PantallaKds } from "@vim/kds-core";
@@ -65,6 +65,7 @@ import { notificarEventoCritico } from "../lib/push-eventos";
 import type { DatosTicketImpresion } from "../lib/print/tipos";
 import { useEscape } from "../lib/use-escape";
 import { ModalSalidaDomicilio } from "./modal-salida-domicilio";
+import type { LineaCancelada } from "./modal-cancelar-items";
 import { cerrarRepartoAlCobrar } from "../lib/delivery";
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
@@ -456,6 +457,35 @@ export function HomePos({
    * ticket que acaba de salir por la misma impresora; aquí no hay nada que duplicar, y en un
    * local de una sola impresora la comanda debe salir igual.
    */
+  /**
+   * Imprime la comanda repartida por estación de preparación.
+   *
+   * Las bebidas salían en el mismo papel que la comida, así que la barra tenía que leer la comanda
+   * entera para encontrar lo suyo. Ahora cada estación recibe solo sus renglones, en su impresora.
+   *
+   * Se imprime en SERIE, no en paralelo: son dos impresoras de red y lanzarlas a la vez multiplica
+   * los tiempos de espera cuando una no responde. Un fallo no cancela las demás — que la barra se
+   * quede sin papel no es razón para que la cocina tampoco lo reciba.
+   *
+   * Devuelve los nombres de las estaciones cuyo papel NO salió, para avisarle al cajero cuál falta.
+   */
+  const imprimirComandaPorAreas = useCallback(async (dc: DatosComanda, lineas: LineaConArea[]): Promise<string[]> => {
+    const fallidas: string[] = [];
+    for (const g of agruparComandaPorArea(lineas)) {
+      const job = construirComandaJob({ ...dc, area: g.areaNombre, lineas: g.lineas });
+      // onMostrar vacío: si la estación no está configurada (adaptador de preview) no se abre
+      // ningún diálogo encima del cajero; simplemente no hay papel.
+      const imp = obtenerImpresoraDeEstacion(estacionParaArea(g.areaId), { onMostrar: () => {} });
+      try {
+        const r = await imp.imprimir(job);
+        if (!r.ok) fallidas.push(g.areaNombre ?? "cocina");
+      } catch {
+        fallidas.push(g.areaNombre ?? "cocina");
+      }
+    }
+    return fallidas;
+  }, []);
+
   const imprimirComandaCocina = useCallback(async (ticketId: string, soloItems: string[], esAgregado: boolean) => {
     if (soloItems.length === 0) return; // nada nuevo que mandar: no se gasta papel
     try {
@@ -477,12 +507,12 @@ export function HomePos({
           })),
         ancho: 80,
       };
-      // onMostrar vacío: si la estación de cocina no está configurada (adaptador de preview) no
-      // se abre ningún diálogo encima del cajero; simplemente no hay papel.
-      const r = await obtenerImpresora("COCINA", { onMostrar: () => {} }).imprimir(construirComandaJob(dc));
+      const fallidas = await imprimirComandaPorAreas(dc, datos.lineas.filter((l) => soloItems.includes(l.id)));
       // El pedido YA está en cocina (KDS): un fallo de papel no debe deshacer nada ni bloquear.
       // Pero tampoco se calla: si nadie avisa, la cocina se queda sin comanda y nadie se entera.
-      if (!r.ok) setError("El pedido se envió a cocina, pero no se pudo imprimir la comanda (impresora de cocina sin responder).");
+      if (fallidas.length > 0) {
+        setError(`El pedido se envió a cocina, pero no se pudo imprimir la comanda de ${fallidas.join(" y ")}.`);
+      }
     } catch {
       setError("El pedido se envió a cocina, pero no se pudo imprimir la comanda.");
     }
@@ -498,7 +528,7 @@ export function HomePos({
    * Va a la estación de cocina aunque sea la misma impresora de caja: aquí no hay riesgo de
    * duplicar un ticket —es un papel que no existía— y el aviso es más importante que el papel.
    */
-  const imprimirComandaCancelacion = useCallback(async (ticketId: string, lineas: DatosComanda["lineas"]) => {
+  const imprimirComandaCancelacion = useCallback(async (ticketId: string, lineas: LineaCancelada[]) => {
     if (lineas.length === 0) return;
     try {
       const datos = await leerTicketParaImpresion(ticketId, {
@@ -515,12 +545,18 @@ export function HomePos({
         lineas,
         ancho: 80,
       };
-      const r = await obtenerImpresora("COCINA", { onMostrar: () => {} }).imprimir(construirComandaJob(dc));
-      if (!r.ok) setError("Los productos se cancelaron, pero NO se pudo avisar a cocina. Avísales a mano.");
+      // El aviso va a la MISMA estación donde salió el original: si una bebida se preparó en la
+      // barra y la cancelación se imprime en cocina, la barra la sigue preparando.
+      const areas = await leerAreasDeItems(token, lineas.map((l) => l.ticketItemId));
+      const conArea: LineaConArea[] = lineas.map((l) => ({ ...l, ...(areas.get(l.ticketItemId) ?? {}) }));
+      const fallidas = await imprimirComandaPorAreas(dc, conArea);
+      if (fallidas.length > 0) {
+        setError(`Los productos se cancelaron, pero NO se pudo avisar a ${fallidas.join(" y ")}. Avísales a mano.`);
+      }
     } catch {
       setError("Los productos se cancelaron, pero NO se pudo avisar a cocina. Avísales a mano.");
     }
-  }, [token, empleado.nombre, caja.nombre]);
+  }, [token, empleado.nombre, caja.nombre, imprimirComandaPorAreas]);
 
   /** B1 — envía la mesa a cocina (KDS) antes de cobrar. */
   const onEnviarCocina = useCallback(async () => {
@@ -706,11 +742,20 @@ export function HomePos({
     return rasterizarImagen(caja.logoUrl, ancho);
   }, [caja.logoUrl]);
 
-  /** Reimprime el ticket de una cuenta cerrada (desde la Consulta de cuentas). */
+  /**
+   * Imprime el ticket de una cuenta (botón "Imprimir ticket" y Consulta de cuentas).
+   *
+   * El envío se ESPERA. Antes se disparaba sin `await`: la promesa se resolvía al instante, la
+   * pantalla daba el ticket por impreso aunque la impresora estuviera apagada o sin papel, y el
+   * botón pasaba a "Reimprimir" —que pide PIN de supervisor—. El cajero se quedaba sin poder
+   * imprimir un ticket que nunca salió, y en plena hora pico eso es la caja detenida.
+   *
+   * Si falla, la excepción sube a quien llamó: ahí se avisa y NO se marca como impreso.
+   */
   const reimprimirCuenta = useCallback(async (ticketId: string) => {
     const datos = await leerTicketParaImpresion(ticketId, { token, cajeroNombre: empleado.nombre, cajaNombre: caja.nombre });
     const imp = obtenerImpresora("CAJA", { onMostrar: () => window.print() });
-    imp.imprimir(construirTicketJob(datos, await logoParaTicket(datos.ancho)));
+    await imp.imprimir(construirTicketJob(datos, await logoParaTicket(datos.ancho)));
   }, [token, empleado.nombre, caja.nombre]);
 
   /** Retoma un pedido en espera: lo carga al carrito como cuenta editable (misma maquinaria de mesas). */
@@ -893,15 +938,18 @@ export function HomePos({
               setDatosTicket(datos);
               setDatosComanda(datosCom);
               setEstadoTicket("lista");
-              // El ticket del cliente SOLO se imprime solo en "Para llevar".
-              //
-              // En comedor, Pick-up y domicilio el papel casi nunca se entrega: la mesa ya tiene su
-              // cuenta, el de Pick-up se lleva su bolsa y el de domicilio recibió el suyo con el
-              // pedido. Imprimirlo en cada cobro tiraba un ticket por venta a la basura. Para
-              // quien sí lo pida está el botón "Ver / Imprimir" de la confirmación.
-              if (datos.meta.modo === "PARA_LLEVAR") {
-                const job = construirTicketJob(datos, await logoParaTicket(datos.ancho));
-                await obtenerImpresora("CAJA", { onMostrar: () => setMostrarRecibo(true) }).imprimir(job);
+              // Solo "Para llevar": es el único modo que va del carrito al cobro sin pasar por la
+              // lista de cuentas, así que no hay un momento anterior para imprimirlo. La regla y su
+              // historia están en `debeImprimirTicketAlCobrar`.
+              if (debeImprimirTicketAlCobrar(datos.meta.modo)) {
+                try {
+                  const job = construirTicketJob(datos, await logoParaTicket(datos.ancho));
+                  await obtenerImpresora("CAJA", { onMostrar: () => setMostrarRecibo(true) }).imprimir(job);
+                } catch {
+                  // Un fallo de la impresora no puede llevarse por delante lo que viene después:
+                  // la comanda, el cajón y la liquidación del reparto van detrás.
+                  setEstadoTicket("error");
+                }
               }
               // Comanda automática a la estación de cocina.
               //
@@ -916,9 +964,8 @@ export function HomePos({
               // Y solo si la estación de cocina es una impresora distinta de la de caja: con una
               // sola impresora, el ticket que acaba de salir ya es el papel.
               if (debeImprimirComandaAlCobrar(datos.meta.modo, hayEstacionDeCocinaDedicada())) {
-                obtenerImpresora("COCINA", { onMostrar: () => {} })
-                  .imprimir(construirComandaJob(datosCom))
-                  .catch(() => {});
+                // También repartida: en Para llevar la bebida va a la barra igual que en el resto.
+                imprimirComandaPorAreas(datosCom, datos.lineas).catch(() => {});
               }
               // Reparto a domicilio: se cierra con lo que de verdad entró. Best-effort — la venta
               // ya quedó cobrada y un fallo aquí no debe deshacerla.
@@ -936,7 +983,7 @@ export function HomePos({
               // fondo que actualizar). Tarjeta/otros no mueven billetes — abrirlo ahí solo
               // expone el efectivo sin necesidad.
               if (datos.pagos.some((p) => p.metodo === "Efectivo")) {
-                obtenerImpresora("CAJA", { onMostrar: () => {} }).abrirCajon();
+                obtenerImpresora("CAJA", { onMostrar: () => {} }).abrirCajon().catch(() => {});
               }
             } catch {
               setEstadoTicket("error");
@@ -1147,7 +1194,7 @@ export function HomePos({
             onCerrarTurno={() => setConfirmandoCierre(true)}
           />
         )}
-        {configImpresoraAbierto && <ModalConfigImpresora onCerrar={() => setConfigImpresoraAbierto(false)} />}
+        {configImpresoraAbierto && <ModalConfigImpresora token={token} sucursalId={caja.sucursal_id} onCerrar={() => setConfigImpresoraAbierto(false)} />}
         {modalesCompartidos}
         {cerrando && (
           <PantallaCierre
@@ -1229,7 +1276,6 @@ export function HomePos({
         {saliendoDomicilio && (
           <ModalSalidaDomicilio
             token={token}
-            sucursalId={caja.sucursal_id}
             ticketId={saliendoDomicilio.ticketId}
             folio={saliendoDomicilio.folio}
             total={saliendoDomicilio.total}
@@ -1342,7 +1388,7 @@ export function HomePos({
           </button>
         )}
       </div>
-      {configImpresoraAbierto && <ModalConfigImpresora onCerrar={() => setConfigImpresoraAbierto(false)} />}
+      {configImpresoraAbierto && <ModalConfigImpresora token={token} sucursalId={caja.sucursal_id} onCerrar={() => setConfigImpresoraAbierto(false)} />}
       {clienteDomAbierto && (
         <ModalClienteDomicilio
           token={token}

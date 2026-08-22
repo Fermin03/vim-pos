@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Button, Modal } from "@vim/ui/styles";
 import {
   COLORES,
@@ -10,6 +10,7 @@ import {
   actualizarCategoria,
   type Categoria,
 } from "../lib/catalogo";
+import { listarAreasCocina, type AreaCocina } from "../lib/areas-cocina";
 import { mensajeError } from "../lib/errores";
 
 function IconoSvg({ name, className }: { name: string; className?: string }) {
@@ -35,12 +36,20 @@ export function ModalCategoria({
   const [color, setColor] = useState<string | null>(cat?.color_hex ?? COLORES[0]!.hex);
   const [icono, setIcono] = useState<string>(cat?.icono ?? "tag");
   const [activa, setActiva] = useState<boolean>(cat?.activa ?? true);
+  const [area, setArea] = useState<string>(cat?.area_cocina_id ?? "");
+  const [areas, setAreas] = useState<AreaCocina[]>([]);
+
+  useEffect(() => {
+    // Sin estaciones dadas de alta el selector no aparece: no hay nada que elegir y sería una
+    // pregunta sin respuesta posible.
+    listarAreasCocina().then((a) => setAreas(a.filter((x) => x.activa))).catch(() => setAreas([]));
+  }, []);
   const [error, setError] = useState<string | null>(null);
   const [guardando, setGuardando] = useState(false);
 
   async function guardar() {
     setError(null);
-    const parsed = categoriaSchema.safeParse({ nombre, descripcion, color_hex: color, icono, activa });
+    const parsed = categoriaSchema.safeParse({ nombre, descripcion, color_hex: color, icono, activa, area_cocina_id: area });
     if (!parsed.success) {
       setError(parsed.error.issues[0]?.message ?? "Datos inválidos");
       return;
@@ -147,6 +156,27 @@ export function ModalCategoria({
             </div>
           </div>
         </div>
+
+        {areas.length > 0 && (
+          <div>
+            <label className="mb-1.5 block text-[13px] font-medium text-ink-2" htmlFor="area-cat">
+              Estación de preparación
+            </label>
+            <select
+              id="area-cat"
+              className="h-11 w-full rounded border border-line-strong px-3 text-sm outline-none focus:border-ink focus:shadow-[0_0_0_3px_rgba(22,22,26,.06)]"
+              value={area}
+              onChange={(e) => setArea(e.target.value)}
+            >
+              <option value="">Cocina (por defecto)</option>
+              {areas.map((a) => <option key={a.id} value={a.id}>{a.nombre}</option>)}
+            </select>
+            <p className="mt-1 text-[12px] leading-snug text-ink-3">
+              Dónde se imprime la comanda de los productos de esta categoría. Cada producto puede
+              llevar la contraria desde su ficha.
+            </p>
+          </div>
+        )}
 
         <label className="flex items-center gap-2.5">
           <input

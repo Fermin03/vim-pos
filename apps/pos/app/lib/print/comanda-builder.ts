@@ -15,6 +15,13 @@ export type DatosComanda = {
   fechaIso: string;
   /** A nombre de quién va (Pick-up / domicilio). Cocina lo necesita para rotular la bolsa. */
   cliente?: string | null;
+  /**
+   * Estación que prepara esta comanda ("Barra", "Cocina"). Se imprime en el encabezado.
+   *
+   * Cuando un pedido se parte en dos papeles, cada uno lleva solo lo suyo: sin el rótulo, quien
+   * lo levanta no sabe si le falta algo o si el resto salió en otra impresora.
+   */
+  area?: string | null;
   /** true si el pedido ya estaba en cocina y esto es un agregado posterior. */
   esAgregado?: boolean;
   /**
@@ -53,6 +60,8 @@ export function construirComandaJob(d: DatosComanda): PrintJob {
   } else {
     b.push({ t: "texto", valor: d.modoServicio.toUpperCase(), align: "centro", size: 3, bold: true, invertido: true });
   }
+  // Estación, debajo del modo de servicio: el papel se levanta de la impresora sin más contexto.
+  if (d.area) b.push({ t: "texto", valor: d.area.toUpperCase(), align: "centro", size: 2, bold: true });
   // Sin este aviso la cocina no distingue una comanda nueva de un agregado y vuelve a preparar
   // el pedido entero. Va pegado al encabezado, antes que cualquier producto.
   if (d.esAgregado && !d.esCancelacion) b.push({ t: "texto", valor: "*** AGREGADO A LA ORDEN ***", align: "centro", size: 2, bold: true });
@@ -99,4 +108,40 @@ export function construirComandaJob(d: DatosComanda): PrintJob {
  */
 export function debeImprimirComandaAlCobrar(modo: string, hayEstacionDedicada: boolean): boolean {
   return modo === "PARA_LLEVAR" && hayEstacionDedicada;
+}
+
+/** Un renglón con la estación que lo prepara (lo mínimo que hace falta para repartir el papel). */
+export type LineaConArea = LineaComanda & { areaId?: string | null; areaNombre?: string | null };
+
+/** Un grupo de renglones que van juntos a la misma impresora. */
+export type GrupoComanda = { areaId: string | null; areaNombre: string | null; lineas: LineaComanda[] };
+
+/**
+ * Reparte los renglones de un pedido por estación de preparación.
+ *
+ * Las bebidas salían en el mismo papel que la comida y la barra tenía que leer la comanda entera
+ * para encontrar lo suyo. Cada grupo se imprime después en la impresora de su estación.
+ *
+ * Devuelve UN SOLO grupo (sin área) cuando ningún producto tiene estación asignada, que es el caso
+ * de un negocio que no ha configurado nada: mismo papel de siempre, sin rótulo de más.
+ *
+ * El orden de los renglones se conserva dentro de cada grupo, y los grupos salen en el orden en
+ * que aparece su primer producto: así el papel se lee en el orden en que se capturó el pedido.
+ */
+export function agruparComandaPorArea(lineas: LineaConArea[]): GrupoComanda[] {
+  const sinArea = lineas.every((l) => !l.areaId);
+  if (sinArea) return [{ areaId: null, areaNombre: null, lineas: lineas.map(limpiar) }];
+
+  const grupos = new Map<string, GrupoComanda>();
+  for (const l of lineas) {
+    const clave = l.areaId ?? "__sin_area__";
+    const g = grupos.get(clave);
+    if (g) g.lineas.push(limpiar(l));
+    else grupos.set(clave, { areaId: l.areaId ?? null, areaNombre: l.areaNombre ?? null, lineas: [limpiar(l)] });
+  }
+  return [...grupos.values()];
+}
+
+function limpiar(l: LineaConArea): LineaComanda {
+  return { cantidad: l.cantidad, nombre: l.nombre, modificadores: l.modificadores, notaCocina: l.notaCocina };
 }

@@ -22,6 +22,8 @@ export type ItemCancelable = {
 
 /** Lo que se canceló, listo para armar la comanda que avisa a cocina. */
 export type LineaCancelada = {
+  /** Renglón del que salió: con él se averigua a qué estación hay que avisar la cancelación. */
+  ticketItemId: string;
   cantidad: number;
   nombre: string;
   modificadores: string[];
@@ -121,6 +123,7 @@ export function ModalCancelarItems({
           autorizacionPinId: a?.autorizacionPinId ?? null,
         });
         hechos.push({
+          ticketItemId: it.ticketItemId,
           cantidad: it.cantidad,
           nombre: it.nombre,
           modificadores: it.modificadores,

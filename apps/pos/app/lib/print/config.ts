@@ -20,6 +20,18 @@ export type ConfigImpresoras = {
   estaciones: Record<IdEstacion, ConfigImpresora>;
   /** Qué estación imprime cada tipo de documento. */
   asignacion: Record<Destino, IdEstacion>;
+  /**
+   * Estación física de cada área de preparación (`areas_cocina.id` → estación).
+   *
+   * Vive AQUÍ y no en la nube, como el resto de la configuración de impresoras: qué impresora hay
+   * y dónde está es propio de cada caja. `areas_cocina` tiene una columna `impresora_config` que
+   * no se usa por esa misma razón — una segunda caja del mismo negocio heredaría IPs que no son
+   * las suyas.
+   *
+   * Un área sin entrada aquí imprime en la estación de COCINA. Es lo que hace que un negocio que
+   * no configure nada siga imprimiendo igual que siempre.
+   */
+  areas?: Record<string, IdEstacion>;
 };
 
 export const ESTACIONES: IdEstacion[] = ["estacion1", "estacion2"];
@@ -69,10 +81,36 @@ export function leerConfigImpresoras(): ConfigImpresoras {
         CAJA: asignacion.CAJA === "estacion2" ? "estacion2" : "estacion1",
         COCINA: asignacion.COCINA === "estacion2" ? "estacion2" : "estacion1",
       },
+      areas: normalizarAreas(parsed.areas),
     };
   } catch {
     return CONFIG_POR_DEFECTO;
   }
+}
+
+function normalizarAreas(v: unknown): Record<string, IdEstacion> {
+  if (!v || typeof v !== "object") return {};
+  const out: Record<string, IdEstacion> = {};
+  for (const [area, est] of Object.entries(v as Record<string, unknown>)) {
+    if (est === "estacion1" || est === "estacion2") out[area] = est;
+  }
+  return out;
+}
+
+/**
+ * Estación que imprime la comanda de un área. Sin área, o con un área que esta caja no tiene
+ * mapeada, cae en la de COCINA: una comanda que no sabemos dónde va se imprime igual, en el sitio
+ * de siempre. Perderla sería mucho peor que imprimirla en la impresora equivocada.
+ */
+export function estacionParaArea(areaId: string | null | undefined): IdEstacion {
+  const cfg = leerConfigImpresoras();
+  const asignada = areaId ? cfg.areas?.[areaId] : undefined;
+  return asignada ?? cfg.asignacion.COCINA;
+}
+
+/** Config de la impresora de una estación concreta (para imprimir por área). */
+export function leerConfigDeEstacion(est: IdEstacion): ConfigImpresora {
+  return leerConfigImpresoras().estaciones[est];
 }
 
 export function guardarConfigImpresoras(c: ConfigImpresoras): void {

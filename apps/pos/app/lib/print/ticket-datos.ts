@@ -29,13 +29,29 @@ export async function leerTicketParaImpresion(ticketId: string, ctx: Ctx): Promi
 
   const { data: items, error: e2 } = await sb
     .from("ticket_items")
-    .select("id, producto_nombre_snapshot, cantidad, total_item_mxn, nota_cocina, ticket_item_modificadores(opcion_nombre_snapshot)")
+    .select(
+      "id, producto_nombre_snapshot, cantidad, total_item_mxn, nota_cocina, " +
+        "ticket_item_modificadores(opcion_nombre_snapshot), " +
+        // El área se resuelve aquí, con el ticket: producto primero, categoría si el producto no
+        // tiene. Traerla en la misma consulta evita una segunda vuelta por renglón en hora pico.
+        "producto:productos(area_cocina_id, area:areas_cocina(nombre), " +
+        "categoria:categorias(area_cocina_id, area:areas_cocina(nombre)))",
+    )
     .eq("ticket_id", ticketId)
     .eq("cancelado", false)
     .order("created_at", { ascending: true });
   if (e2) throw new Error(e2.message);
   const lineas: LineaImpresion[] = (items ?? []).map((it) => {
-    const r = it as { id: string; producto_nombre_snapshot: string; cantidad: number; total_item_mxn: string | number; nota_cocina: string | null; ticket_item_modificadores: { opcion_nombre_snapshot: string }[] | null };
+    type Area = { nombre: string } | null;
+    type Prod = { area_cocina_id: string | null; area: Area; categoria: { area_cocina_id: string | null; area: Area } | null } | null;
+    // `as unknown as`: con el select anidado supabase-js no infiere la forma y devuelve su tipo
+    // de error genérico. La forma real es la de abajo.
+    const r = it as unknown as { id: string; producto_nombre_snapshot: string; cantidad: number; total_item_mxn: string | number; nota_cocina: string | null; ticket_item_modificadores: { opcion_nombre_snapshot: string }[] | null; producto: Prod };
+    const prod = r.producto;
+    // El producto manda sobre la categoría: la categoría es el valor por defecto y el producto la
+    // excepción (una limonada preparada en cocina dentro de la categoría Bebidas, por ejemplo).
+    const areaId = prod?.area_cocina_id ?? prod?.categoria?.area_cocina_id ?? null;
+    const areaNombre = prod?.area_cocina_id ? (prod.area?.nombre ?? null) : (prod?.categoria?.area?.nombre ?? null);
     return {
       id: r.id,
       cantidad: Number(r.cantidad),
@@ -43,6 +59,8 @@ export async function leerTicketParaImpresion(ticketId: string, ctx: Ctx): Promi
       totalMxn: Number(r.total_item_mxn),
       modificadores: (r.ticket_item_modificadores ?? []).map((m) => m.opcion_nombre_snapshot),
       notaCocina: r.nota_cocina ?? null,
+      areaId,
+      areaNombre,
     };
   });
 
@@ -170,4 +188,38 @@ export async function leerEntrega(
 
   if (!cliente && !telefono && !direccion) return null;
   return { cliente, telefono, direccion, referencias, notasRepartidor };
+}
+
+/**
+ * Estación de preparación de unos renglones concretos.
+ *
+ * Hace falta para la comanda de CANCELACIÓN: esos renglones ya están marcados como cancelados, así
+ * que `leerTicketParaImpresion` —que los filtra— no los devuelve. Y el aviso tiene que llegar a la
+ * misma impresora donde salió el original: si una bebida se pidió en la barra y la cancelación se
+ * imprime en cocina, la barra la sigue preparando.
+ */
+export async function leerAreasDeItems(
+  token: string,
+  itemIds: string[],
+): Promise<Map<string, { areaId: string | null; areaNombre: string | null }>> {
+  const mapa = new Map<string, { areaId: string | null; areaNombre: string | null }>();
+  if (itemIds.length === 0) return mapa;
+  const { data, error } = await employeeClient(token)
+    .from("ticket_items")
+    .select(
+      "id, producto:productos(area_cocina_id, area:areas_cocina(nombre), " +
+        "categoria:categorias(area_cocina_id, area:areas_cocina(nombre)))",
+    )
+    .in("id", itemIds);
+  if (error) throw new Error(error.message);
+  type Area = { nombre: string } | null;
+  type Fila = { id: string; producto: { area_cocina_id: string | null; area: Area; categoria: { area_cocina_id: string | null; area: Area } | null } | null };
+  for (const f of (data ?? []) as unknown as Fila[]) {
+    const prod = f.producto;
+    mapa.set(f.id, {
+      areaId: prod?.area_cocina_id ?? prod?.categoria?.area_cocina_id ?? null,
+      areaNombre: prod?.area_cocina_id ? (prod.area?.nombre ?? null) : (prod?.categoria?.area?.nombre ?? null),
+    });
+  }
+  return mapa;
 }
