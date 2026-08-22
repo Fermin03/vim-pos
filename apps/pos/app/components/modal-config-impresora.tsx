@@ -91,10 +91,21 @@ export function ModalConfigImpresora({ token, sucursalId, onCerrar }: { token: s
     } finally { setProbando(false); }
   }
 
+  // Apaisado, no en columna: en el monitor de una caja sobra ancho y falta alto, y con la sección
+  // de estaciones de preparación el panel vertical ya no cabía —se comía el botón de Guardar—. El
+  // `max-h` + scroll es la red de seguridad para una pantalla pequeña o para cuando haya muchas
+  // estaciones dadas de alta.
   return (
-    <Modal open onClose={onCerrar} title="Impresoras de esta caja" className="w-[460px] rounded-lg border border-line bg-surface p-6 shadow-xl">
-      <p className="mb-4 text-[12.5px] text-ink-3">Las impresoras son por dispositivo: se guardan solo en esta caja.</p>
+    <Modal
+      open
+      onClose={onCerrar}
+      title="Impresoras de esta caja"
+      className="flex max-h-[calc(100vh-2rem)] w-[880px] max-w-[calc(100vw-2rem)] flex-col rounded-lg border border-line bg-surface p-6 shadow-xl"
+    >
+      <p className="mb-4 flex-shrink-0 text-[12.5px] text-ink-3">Las impresoras son por dispositivo: se guardan solo en esta caja.</p>
 
+      <div className="grid flex-1 gap-x-6 gap-y-3 overflow-y-auto md:grid-cols-2">
+      <div className="min-w-0">
       {/* Selector de estación a configurar */}
       <div className="mb-3 flex gap-2">
         {ESTACIONES.map((e) => (
@@ -144,8 +155,13 @@ export function ModalConfigImpresora({ token, sucursalId, onCerrar }: { token: s
           </>
         )}
 
+      </div>
+      </div>
+
+      {/* Columna derecha: el reparto del trabajo entre estaciones. */}
+      <div className="min-w-0 space-y-3">
         {/* Qué imprime cada estación */}
-        <div className="mt-1 rounded border border-line p-3">
+        <div className="rounded border border-line p-3">
           <p className="mb-2 text-[12.5px] font-semibold text-ink-2">¿Qué imprime cada estación?</p>
           <AsignacionRow label="Tickets y cortes (caja)" destino="CAJA" valor={cfg.asignacion.CAJA} onCambiar={(e) => asignar("CAJA", e)} />
           <AsignacionRow label="Comandas (cocina)" destino="COCINA" valor={cfg.asignacion.COCINA} onCambiar={(e) => asignar("COCINA", e)} />
@@ -157,7 +173,7 @@ export function ModalConfigImpresora({ token, sucursalId, onCerrar }: { token: s
         {/* Dónde imprime cada estación de preparación. Solo aparece si el negocio dio de alta
             áreas en el panel: sin ellas no hay nada que repartir y la sección sobraría. */}
         {areas.length > 0 && (
-          <div className="mt-1 rounded border border-line p-3">
+          <div className="rounded border border-line p-3">
             <p className="mb-1 text-[12.5px] font-semibold text-ink-2">¿Dónde imprime cada estación de preparación?</p>
             <p className="mb-2 text-[11.5px] leading-snug text-ink-3">
               Las bebidas pueden salir en la impresora de la caja y la comida en la de cocina. Cada
@@ -174,10 +190,13 @@ export function ModalConfigImpresora({ token, sucursalId, onCerrar }: { token: s
           </div>
         )}
 
-        <div className="mt-2 flex items-center justify-end gap-2 border-t border-line pt-4">
-          <Button variant="ghost" onClick={onCerrar}>Cancelar</Button>
-          <Button onClick={guardar}>Guardar</Button>
-        </div>
+      </div>
+      </div>
+
+      {/* El pie va fuera del área que hace scroll: Guardar siempre a la vista. */}
+      <div className="mt-4 flex flex-shrink-0 items-center justify-end gap-2 border-t border-line pt-4">
+        <Button variant="ghost" onClick={onCerrar}>Cancelar</Button>
+        <Button onClick={guardar}>Guardar</Button>
       </div>
     </Modal>
   );
