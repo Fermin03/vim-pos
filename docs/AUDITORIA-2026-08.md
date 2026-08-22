@@ -59,15 +59,26 @@ configurar cómo se reparte; el reparto nunca ocurre.
 Trabajo terminado que no está enchufado. No engaña a nadie —no se promete en la interfaz— pero es
 valor ya pagado que no rinde.
 
-### B1 · Reparto a domicilio completo
+### B1 · Reparto a domicilio completo *(cableado)*
 
-`apps/pos/app/lib/delivery.ts` tiene ocho funciones: asignar repartidor, confirmar salida,
-confirmar entrega, liquidar. Más `modal-liquidar-delivery.tsx`, con desglose efectivo/tarjeta para
-cuando el repartidor regresa con dinero. La tabla `delivery_asignaciones` existe en producción, con
-0 filas.
+`apps/pos/app/lib/delivery.ts` tenía ocho funciones —asignar, confirmar salida, confirmar entrega,
+liquidar— y `modal-liquidar-delivery.tsx` con el desglose efectivo/tarjeta. Nada estaba conectado:
+la tabla `delivery_asignaciones` llevaba 0 filas en producción y, cuando el repartidor volvía con
+efectivo, no había dónde cuadrarlo.
 
-**Nada de eso está cableado.** Knock-Out hace domicilio hoy con un mecanismo mucho más simple: se
-marca que el pedido salió, y ya. Cuando el repartidor vuelve con efectivo, no hay dónde cuadrarlo.
+Ya está enchufado, con dos cambios respecto a lo que estaba construido:
+
+- **Se liquida al cobrar**, no en un paso aparte. En este negocio el repartidor cobra en la puerta
+  y el cajero registra el ticket cuando vuelve: ese momento ya es la entrega del dinero, y pedir
+  una segunda confirmación por la misma plata solo invita a que se salte.
+- **Los repartidores no son usuarios del sistema.** El diseño original exigía cuenta con correo y
+  PIN para anotar quién llevó un pedido, y eso —no la falta de código— es lo que tenía el módulo
+  parado. Ahora se dan de alta en un catálogo propio (`/admin` → Usuarios → Repartidores) y el
+  cajero los elige de una lista. No aparecen en la pantalla donde se elige quién opera la caja.
+
+De paso salió que `delivery_asignaciones` **no estaba en el push**: lo que la caja anotaba se
+quedaba en la caja. Ya sube, y el reporte de tiempos volvió a nombrar al repartidor (unía por
+`repartidor_id`, hoy vacío).
 
 ### B2 · Dividir la cuenta entre comensales
 
@@ -157,7 +168,7 @@ Ordenado por lo que más cuesta dejar como está.
 | 1 | **Conectar las promociones al POS** (pendiente de fondo) | El aviso deja el producto honesto, no completo | Medio |
 | 2 | **Conectar el reparto de propinas** (pendiente de fondo) | Igual | Medio |
 | 3 | **Políticas RLS conscientes del rol** (C2) | El guardián de rutas es conveniencia; esto es la frontera real, y hay una cajera con acceso hoy | Medio-grande |
-| 4 | **Conectar la liquidación de domicilio** | Knock-Out hace domicilio hoy y no cuadra el efectivo del repartidor | Medio |
+| ~~4~~ | ~~Conectar la liquidación de domicilio~~ — **hecho**: se liquida al cobrar, con catálogo de repartidores y la asignación subiendo a la nube | | |
 | 6 | **Dividir cuenta** | Petición habitual en comedor; la función ya existe | Medio |
 | 7 | **IVA por producto en el desglose de pantalla** | Antes de vender a una vertical con tasa 0 | Pequeño |
 
