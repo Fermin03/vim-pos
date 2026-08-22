@@ -979,12 +979,15 @@ export function HomePos({
                   setError(`La venta se cobró, pero no se pudo liquidar al repartidor: ${r.motivo}`);
                 }
               }
-              // Cajón automático: solo si hubo efectivo de por medio (hay cambio que dar o
-              // fondo que actualizar). Tarjeta/otros no mueven billetes — abrirlo ahí solo
-              // expone el efectivo sin necesidad.
-              if (datos.pagos.some((p) => p.metodo === "Efectivo")) {
-                obtenerImpresora("CAJA", { onMostrar: () => {} }).abrirCajon().catch(() => {});
-              }
+              // El cajón NO se abre aquí. Ya se abrió al presionar "Cobrar" (`abrirCajonParaCobrar`),
+              // que es lo que la caja pidió: contar el cambio empieza al abrir la gaveta, no al
+              // cerrar la venta. Esta segunda apertura es de cuando era la única, y desde la 0.4.36
+              // convivían las dos: el cajón se abría, el cajero lo cerraba, y al imprimirse el
+              // ticket se volvía a abrir solo.
+              //
+              // Los dos caminos que llegan al cobro —capturar y cobrar, o cobrar desde la lista de
+              // cuentas— abren el cajón antes, así que quitarlo de aquí no deja ningún flujo sin
+              // apertura.
             } catch {
               setEstadoTicket("error");
             }
