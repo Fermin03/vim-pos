@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { construirTicketJob } from "../ticket-builder";
+import { debeImprimirTicketAlCobrar, construirTicketJob } from "../ticket-builder";
 import type { DatosTicketImpresion } from "../tipos";
 
 const DATOS: DatosTicketImpresion = {
@@ -95,6 +95,20 @@ describe("construirTicketJob — datos de entrega (domicilio)", () => {
     expect(texto).toContain("Nota: El timbre no sirve, hablar por teléfono");
   });
 
+  it("imprime la dirección en el mismo tamaño que el nombre y el teléfono", () => {
+    // El repartidor lee esto en la calle, de noche y sobre papel térmico. Estuvo en tamaño normal
+    // —el más pequeño de los tres— hasta que la caja pidió agrandarlo.
+    const bloques = construirTicketJob(CON_ENTREGA).bloques.filter((b) => b.t === "texto") as {
+      valor: string; size?: number;
+    }[];
+    const dir = bloques.find((b) => b.valor.includes("Jardines del Moral"));
+    // Por número, no por "Tel.": el encabezado del ticket ya trae el teléfono de la SUCURSAL y
+    // sale antes, así que buscar por prefijo devolvía ese y no el del cliente.
+    const tel = bloques.find((b) => b.valor.includes("477 100 2030"));
+    expect(dir?.size).toBe(2);
+    expect(dir?.size).toBe(tel?.size);
+  });
+
   it("pone la entrega ANTES de los productos, para que el repartidor la lea primero", () => {
     const b = construirTicketJob(CON_ENTREGA).bloques;
     const iEntrega = b.findIndex((x) => x.t === "texto" && (x as { valor: string }).valor === "DATOS DE ENTREGA");
@@ -158,5 +172,23 @@ describe("construirTicketJob — QR de autofacturación opcional", () => {
     const b = construirTicketJob({ ...DATOS, qrUrl: null }).bloques;
     expect(b.some((x) => x.t === "texto" && (x as { valor: string }).valor.includes("¡Gracias por su compra!"))).toBe(true);
     expect(b[b.length - 1]!.t).toBe("corte");
+  });
+});
+
+describe("debeImprimirTicketAlCobrar — qué modo saca papel al cobrar", () => {
+  it("Para llevar SÍ: va del carrito al cobro y no hay otro momento para imprimirlo", () => {
+    expect(debeImprimirTicketAlCobrar("PARA_LLEVAR")).toBe(true);
+  });
+
+  it("comedor, Pick-up y domicilio NO: su ticket ya se imprimió desde la cuenta", () => {
+    // Imprimirlo aquí sacaba un segundo papel idéntico del mismo pedido.
+    for (const modo of ["COMER_AQUI", "MESA", "DRIVE_THRU", "DELIVERY_PROPIO"]) {
+      expect(debeImprimirTicketAlCobrar(modo)).toBe(false);
+    }
+  });
+
+  it("un modo desconocido no imprime: ante la duda, no se gasta papel de más", () => {
+    expect(debeImprimirTicketAlCobrar("")).toBe(false);
+    expect(debeImprimirTicketAlCobrar("MODO_NUEVO")).toBe(false);
   });
 });
