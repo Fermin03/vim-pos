@@ -1,7 +1,7 @@
 "use client";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { Button, Modal } from "@vim/ui/styles";
-import { asignarDeliveryPorNombre, confirmarSalida, nombresDeRepartidores } from "../lib/delivery";
+import { asignarRepartidor, confirmarSalida, listarRepartidores, type Repartidor } from "../lib/delivery";
 import { marcarSalidaDomicilio } from "../lib/cuentas-abiertas";
 import { fmtMxn } from "../lib/turno";
 import { useEscape } from "../lib/use-escape";
@@ -13,17 +13,16 @@ import { useEscape } from "../lib/use-escape";
  * dinero no había contra qué cuadrarlo: si faltaba algo, no había forma de saber de qué pedido ni
  * de quién.
  *
- * Se pide solo el NOMBRE. Los repartidores no tienen cuenta en el sistema —la app para ellos está
- * por hacerse— y exigir usuario con correo y PIN convertía una anotación de segundos en un
- * trámite; por eso el módulo llevaba meses sin usarse. Los nombres ya usados se ofrecen como
- * sugerencia para que el mismo "Luis" no acabe escrito de cuatro maneras y deje de poder cuadrarse.
+ * Se ELIGE de la lista de repartidores dados de alta en el panel; no se teclea el nombre. Teclear
+ * en cada salida es lento en hora pico y hace que el mismo "Luis" acabe escrito de cuatro maneras
+ * y deje de poder cuadrarse. Tampoco son usuarios del sistema: no entran al POS ni aparecen en la
+ * pantalla donde se elige quién opera la caja.
  *
- * Se puede salir sin nombre: el pedido tiene que poder salir aunque el cajero ande a las prisas.
- * Lo que no se hace es fingir que se registró.
+ * Se puede salir sin repartidor: el pedido tiene que poder salir aunque el cajero ande a las
+ * prisas. Lo que no se hace es fingir que se registró.
  */
 export function ModalSalidaDomicilio({
   token,
-  sucursalId,
   ticketId,
   folio,
   total,
@@ -31,7 +30,6 @@ export function ModalSalidaDomicilio({
   onCerrar,
 }: {
   token: string;
-  sucursalId: string;
   ticketId: string;
   folio: string | null;
   /** Lo que el repartidor debe traer de vuelta si el cliente paga en la puerta. */
@@ -39,33 +37,32 @@ export function ModalSalidaDomicilio({
   onListo: () => void;
   onCerrar: () => void;
 }) {
-  const [nombre, setNombre] = useState("");
-  const [sugerencias, setSugerencias] = useState<string[]>([]);
+  const [repartidores, setRepartidores] = useState<Repartidor[] | null>(null);
+  const [elegido, setElegido] = useState<string | null>(null);
   const [minutos, setMinutos] = useState<string>("30");
   const [error, setError] = useState<string | null>(null);
   const [procesando, setProcesando] = useState(false);
-  const campo = useRef<HTMLInputElement | null>(null);
   useEscape(() => { if (!procesando) onCerrar(); });
 
   useEffect(() => {
-    campo.current?.focus();
-    const id = requestAnimationFrame(() => campo.current?.focus());
-    return () => cancelAnimationFrame(id);
-  }, []);
-
-  useEffect(() => {
-    nombresDeRepartidores(token, sucursalId).then(setSugerencias).catch(() => setSugerencias([]));
-  }, [token, sucursalId]);
+    listarRepartidores(token)
+      .then((r) => {
+        setRepartidores(r);
+        // Con un solo repartidor dado de alta no hay nada que decidir: se preselecciona para que
+        // la salida sea un toque.
+        if (r.length === 1 && r[0]) setElegido(r[0].id);
+      })
+      .catch(() => setRepartidores([]));
+  }, [token]);
 
   async function confirmar() {
     setProcesando(true);
     setError(null);
     try {
-      const n = nombre.trim();
-      if (n) {
-        const asignacionId = await asignarDeliveryPorNombre(token, {
+      if (elegido) {
+        const asignacionId = await asignarRepartidor(token, {
           ticketId,
-          nombre: n,
+          repartidorId: elegido,
           montoALiquidar: total,
           tiempoPromesa: minutos.trim() ? Number(minutos) : null,
         });
@@ -80,9 +77,6 @@ export function ModalSalidaDomicilio({
       setProcesando(false);
     }
   }
-
-  const input =
-    "h-11 w-full rounded border border-line-strong px-3 text-sm outline-none focus:border-ink focus:shadow-[0_0_0_3px_rgba(22,22,26,.06)]";
 
   return (
     <Modal
@@ -99,36 +93,47 @@ export function ModalSalidaDomicilio({
       </p>
 
       <div className="mt-4">
-        <label className="mb-1 block text-[12.5px] font-semibold text-ink-2" htmlFor="rep">Repartidor</label>
-        <input
-          id="rep"
-          ref={campo}
-          className={input}
-          list="repartidores-usados"
-          value={nombre}
-          maxLength={100}
-          placeholder="Nombre del repartidor"
-          onChange={(e) => setNombre(e.target.value)}
-          onKeyDown={(e) => { if (e.key === "Enter" && !procesando) { e.preventDefault(); confirmar(); } }}
-        />
-        <datalist id="repartidores-usados">
-          {sugerencias.map((s) => <option key={s} value={s} />)}
-        </datalist>
-        {sugerencias.length > 0 && (
-          <div className="mt-2 flex flex-wrap gap-1.5">
-            {sugerencias.slice(0, 6).map((s) => (
-              <button
-                key={s}
-                type="button"
-                onClick={() => setNombre(s)}
-                className={[
-                  "h-8 rounded-full border px-3 text-[12.5px] font-semibold transition",
-                  nombre.trim() === s ? "border-ink bg-sel text-ink" : "border-line-strong text-ink-2 hover:border-ink hover:text-ink",
-                ].join(" ")}
-              >
-                {s}
-              </button>
-            ))}
+        {repartidores === null && <p className="text-[13px] text-ink-3">Cargando repartidores…</p>}
+
+        {repartidores !== null && repartidores.length === 0 && (
+          <p className="rounded border border-line bg-bg px-3 py-2.5 text-[12.5px] leading-snug text-ink-2">
+            No hay repartidores dados de alta. Se dan de alta una sola vez en el panel, en{" "}
+            <span className="font-semibold">Usuarios → Repartidores</span>. El pedido puede salir
+            igual, pero al regresar no vas a poder cuadrarle a nadie en particular.
+          </p>
+        )}
+
+        {repartidores !== null && repartidores.length > 0 && (
+          <div className="max-h-[240px] overflow-y-auto rounded border border-line">
+            {repartidores.map((r) => {
+              const activo = elegido === r.id;
+              return (
+                <button
+                  key={r.id}
+                  type="button"
+                  onClick={() => setElegido(activo ? null : r.id)}
+                  aria-pressed={activo}
+                  className={[
+                    "flex w-full items-center gap-3 border-b border-line px-3 py-2.5 text-left transition last:border-b-0",
+                    activo ? "bg-sel" : "hover:bg-bg",
+                  ].join(" ")}
+                >
+                  <span
+                    className={[
+                      "grid h-5 w-5 flex-shrink-0 place-items-center rounded-full border",
+                      activo ? "border-ink bg-ink text-surface" : "border-line-strong",
+                    ].join(" ")}
+                    aria-hidden
+                  >
+                    {activo ? "✓" : ""}
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-[14px] font-semibold text-ink">{r.nombre}</span>
+                    {r.telefono && <span className="block text-[12px] text-ink-3">{r.telefono}</span>}
+                  </span>
+                </button>
+              );
+            })}
           </div>
         )}
       </div>
@@ -139,7 +144,7 @@ export function ModalSalidaDomicilio({
         </label>
         <input
           id="min"
-          className={input}
+          className="h-11 w-full rounded border border-line-strong px-3 text-sm outline-none focus:border-ink focus:shadow-[0_0_0_3px_rgba(22,22,26,.06)]"
           inputMode="numeric"
           value={minutos}
           maxLength={3}
@@ -147,12 +152,6 @@ export function ModalSalidaDomicilio({
         />
       </div>
 
-      {!nombre.trim() && (
-        <p className="mt-3 text-[12.5px] leading-snug text-ink-3">
-          Sin nombre el pedido sale igual, pero al regresar no vas a poder cuadrarle a nadie en
-          particular.
-        </p>
-      )}
       {error && <p className="mt-3 text-[13px] font-medium text-danger" role="alert">{error}</p>}
 
       <div className="mt-5 flex gap-2">
@@ -165,7 +164,7 @@ export function ModalSalidaDomicilio({
           Cancelar
         </button>
         <Button className="flex-1" onClick={confirmar} disabled={procesando}>
-          {procesando ? "Registrando…" : "Marcar salida"}
+          {procesando ? "Registrando…" : elegido ? "Marcar salida" : "Salir sin repartidor"}
         </Button>
       </div>
     </Modal>

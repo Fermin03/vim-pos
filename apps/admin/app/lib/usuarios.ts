@@ -15,7 +15,13 @@ export const ROL_LABEL: Record<string, string> = {
   PERSONALIZADO: "Personalizado",
 };
 
-export const ROLES_ASIGNABLES = ["ADMIN", "SUPERVISOR", "CAJERO", "REPARTIDOR", "PERSONAL", "PERSONALIZADO"] as const;
+/**
+ * REPARTIDOR no se ofrece aquí. Los repartidores no usan el sistema: darles cuenta los pondría en
+ * la pantalla donde el cajero elige quién opera la caja, junto al personal que sí entra. Se dan de
+ * alta en su propio catálogo (Usuarios → Repartidores). El rol sigue existiendo en la base para
+ * cuando haya app de repartidor con sesión propia.
+ */
+export const ROLES_ASIGNABLES = ["ADMIN", "SUPERVISOR", "CAJERO", "PERSONAL", "PERSONALIZADO"] as const;
 
 export type EstadoUsuario = "ACTIVO" | "BLOQUEADO_TEMP" | "BLOQUEADO_ADMIN" | "DESACTIVADO";
 
