@@ -1,4 +1,5 @@
 "use client";
+import { LogoVim } from "@vim/ui/styles";
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import Link from "next/link";
@@ -216,10 +217,7 @@ export function AdminShell({ children }: { children: ReactNode }) {
           ].join(" ")}
         >
           <div className="flex h-14 flex-shrink-0 items-center gap-[11px] border-b border-[#2C2C32] px-5 lg:h-16">
-            <div className="relative flex h-8 w-8 items-center justify-center rounded-lg bg-white">
-              <span className="font-display text-base font-bold leading-none tracking-tight text-ink">V</span>
-              <span className="absolute bottom-1.5 right-[5px] h-[3.5px] w-[3.5px] rounded-full bg-accent" aria-hidden="true" />
-            </div>
+            <LogoVim className="h-8 w-8 flex-shrink-0" />
             <div className="font-display text-base font-bold tracking-tight text-white">VIM POS</div>
             <button
               type="button"
@@ -312,10 +310,7 @@ export function AdminShell({ children }: { children: ReactNode }) {
             >
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-[22px] w-[22px]"><path d="M3 6h18M3 12h18M3 18h18" /></svg>
             </button>
-            <div className="relative flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-lg bg-white">
-              <span className="font-display text-[13px] font-bold leading-none tracking-tight text-ink">V</span>
-              <span className="absolute bottom-1 right-1 h-[3px] w-[3px] rounded-full bg-accent" aria-hidden="true" />
-            </div>
+            <LogoVim className="h-7 w-7 flex-shrink-0" />
             <div className="min-w-0 flex-1">
               <div className="truncate font-display text-[14px] font-bold leading-tight tracking-tight text-white">VIM POS</div>
               <div className="truncate text-[11.5px] leading-tight text-[#76767E]">{sucursales?.nombre ?? "—"}</div>
