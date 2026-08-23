@@ -4,7 +4,7 @@ import type { Alerta, Api, Severidad } from "../lib/tipos";
 
 const SEV: Record<Severidad, { punto: string; caja: string; texto: string }> = {
   critica: { punto: "bg-danger", caja: "border-danger/30 bg-[#FBECEA]", texto: "text-danger" },
-  alta: { punto: "bg-accent", caja: "border-accent/30 bg-[#FBF0EC]", texto: "text-[#CF4525]" },
+  alta: { punto: "bg-accent", caja: "border-accent/30 bg-[#EAF3FB]", texto: "text-[#0063A8]" },
   media: { punto: "bg-warning", caja: "border-line-strong bg-surface", texto: "text-warning" },
 };
 

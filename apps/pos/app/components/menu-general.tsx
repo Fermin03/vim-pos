@@ -1,4 +1,5 @@
 "use client";
+import { LogoVim } from "@vim/ui/styles";
 import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { buscarActualizacion, esEscritorio } from "../lib/actualizacion";
 
@@ -68,10 +69,7 @@ export function MenuGeneral({
     <div className="fixed inset-0 z-50 flex flex-col bg-bg" role="dialog" aria-modal="true" aria-label="Menú">
       <div className="flex h-[68px] flex-shrink-0 items-center justify-between border-b border-line px-8">
         <div className="flex items-center gap-3">
-          <div className="relative flex h-[34px] w-[34px] items-center justify-center rounded-lg bg-ink">
-            <span className="font-display text-base font-bold leading-none tracking-tight text-white">V</span>
-            <span className="absolute bottom-1.5 right-1.5 h-1 w-1 rounded-full bg-accent" aria-hidden="true" />
-          </div>
+          <LogoVim className="h-[34px] w-[34px]" />
           <span className="font-display text-[17px] font-semibold tracking-tight">Menú</span>
         </div>
         <button

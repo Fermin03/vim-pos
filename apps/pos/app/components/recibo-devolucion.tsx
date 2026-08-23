@@ -1,4 +1,5 @@
 "use client";
+import { LogoVim } from "@vim/ui/styles";
 import type { DatosDevolucion } from "../lib/print/devolucion-builder";
 
 const fmt = (n: number) => new Intl.NumberFormat("es-MX", { style: "currency", currency: "MXN" }).format(n);
@@ -12,9 +13,7 @@ export function ReciboDevolucion({ d }: { d: DatosDevolucion }) {
   return (
     <div className="relative mx-auto w-[302px] bg-white px-5 pb-[26px] pt-[22px] font-mono text-[#1A1A1A] shadow-[0_4px_24px_rgba(0,0,0,.25)]">
       <div className="text-center">
-        <div className="mx-auto mb-2.5 flex h-[46px] w-[46px] items-center justify-center rounded-[10px] bg-[#1A1A1A]">
-          <span className="font-display text-[24px] font-bold tracking-[-0.04em] text-white">V</span>
-        </div>
+        <LogoVim className="mx-auto mb-2.5 h-[46px] w-[46px]" />
         <div className="font-sans text-[16px] font-bold tracking-[-0.01em]">{d.negocio.nombre}</div>
         {(d.sucursal.direccion || d.sucursal.telefono || d.negocio.rfc) && (
           <div className="mt-1 text-[10.5px] leading-[1.55] text-[#333]">

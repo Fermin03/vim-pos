@@ -156,7 +156,7 @@ export default function CfdiPage() {
               <label className="flex cursor-pointer items-start gap-3">
                 <input
                   type="checkbox"
-                  className="mt-[3px] h-4 w-4 flex-shrink-0 accent-[#E8502E]"
+                  className="mt-[3px] h-4 w-4 flex-shrink-0 accent-[#0078C9]"
                   checked={qrTicket}
                   onChange={(e) => setQrTicket(e.target.checked)}
                 />

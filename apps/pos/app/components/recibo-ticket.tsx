@@ -1,4 +1,5 @@
 "use client";
+import { LogoVim } from "@vim/ui/styles";
 import { QRCodeSVG } from "qrcode.react";
 import type { DatosTicketImpresion } from "../lib/print/tipos";
 
@@ -29,9 +30,7 @@ export function ReciboTicket({ datos }: { datos: DatosTicketImpresion }) {
             className="mx-auto mb-2.5 h-[52px] w-auto max-w-[180px] object-contain"
           />
         ) : (
-          <div className="mx-auto mb-2.5 flex h-[46px] w-[46px] items-center justify-center rounded-[10px] bg-[#1A1A1A]">
-            <span className="font-display text-[24px] font-bold tracking-[-0.04em] text-white">V</span>
-          </div>
+          <LogoVim className="mx-auto mb-2.5 h-[46px] w-[46px]" />
         )}
         <div className="font-sans text-[16px] font-bold tracking-[-0.01em] text-[#1A1A1A]">{datos.negocio.nombre}</div>
         {(datos.sucursal.direccion || datos.sucursal.telefono || datos.negocio.rfc) && (

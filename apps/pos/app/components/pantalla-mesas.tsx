@@ -1,4 +1,5 @@
 "use client";
+import { LogoVim } from "@vim/ui/styles";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { BotonVolver } from "./boton-volver";
 import { type DatosCaja } from "../lib/turno";
@@ -96,9 +97,7 @@ export function PantallaMesas({
       <header className="flex flex-shrink-0 items-center justify-between border-b border-line bg-surface px-3 py-3.5">
         <BotonVolver onClick={onSalir} />
         <div className="mr-auto flex items-center gap-3">
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-ink">
-            <span className="font-display text-[15px] font-bold text-white">V</span>
-          </div>
+          <LogoVim className="h-8 w-8" />
           <div>
             <div className="font-display text-[16px] font-bold leading-tight">Mesas · {caja.nombre}</div>
             <div className="text-[11.5px] text-ink-3">

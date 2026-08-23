@@ -1,7 +1,7 @@
 "use client";
 import Link from "next/link";
 import { useState } from "react";
-import { Button } from "@vim/ui/styles";
+import { Button, LogoVim } from "@vim/ui/styles";
 import { enviarEnlaceRecuperacion } from "../lib/supabase";
 import { mensajeError } from "../lib/errores";
 
@@ -64,10 +64,7 @@ export default function RecuperarPage() {
     <main className="flex min-h-[100dvh] flex-col items-center justify-center px-5 py-10 sm:p-6">
       <div className="flex w-full max-w-[380px] flex-col">
         <div className="mb-8 flex flex-col items-center gap-4">
-          <div className="relative flex h-[46px] w-[46px] items-center justify-center rounded-[11px] bg-ink">
-            <span className="font-display text-2xl font-bold leading-none tracking-tight text-white">V</span>
-            <span className="absolute bottom-[9px] right-2 h-[5px] w-[5px] rounded-full bg-accent" aria-hidden="true" />
-          </div>
+          <LogoVim className="h-[46px] w-[46px]" />
           <div className="font-display text-[19px] font-bold tracking-tight">VIM POS<span className="text-accent">.</span></div>
         </div>
 

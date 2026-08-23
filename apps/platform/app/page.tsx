@@ -19,7 +19,7 @@ const VERTICALES = [
 ];
 
 const COLOR_ESTADO: Record<string, string> = {
-  ACTIVO: "bg-[#EAF3EE] text-success", TRIAL: "bg-[#FBF0EC] text-[#CF4525]",
+  ACTIVO: "bg-[#EAF3EE] text-success", TRIAL: "bg-[#EAF3FB] text-[#0063A8]",
   SUSPENDIDO: "bg-[#FCF3E6] text-warning", CANCELADO: "bg-[#FBECEA] text-danger", INTERNO: "bg-sel text-ink-3",
 };
 const fmtMxn = (n: number) => new Intl.NumberFormat("es-MX", { style: "currency", currency: "MXN" }).format(n || 0);
