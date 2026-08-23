@@ -1,4 +1,5 @@
 "use client";
+import { LogoVim } from "@vim/ui/styles";
 import { useCallback, useEffect, useState } from "react";
 import { Atencion } from "./components/atencion";
 import { Bitacora } from "./components/bitacora";
@@ -63,7 +64,7 @@ export default function PlatformHome() {
       <div className="flex min-h-screen items-center justify-center bg-sel p-6">
         <div className="w-[400px] rounded-lg border border-line bg-surface p-6 shadow-sm">
           <div className="mb-1 flex items-center gap-2">
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-ink"><span className="font-display text-[15px] font-bold text-white">V</span></div>
+            <LogoVim className="h-8 w-8" />
             <span className="font-display text-[17px] font-bold tracking-tight">VIM Plataforma</span>
           </div>
           <p className="mb-5 text-[13px] text-ink-3">Panel de control interno de VIM. Acceso restringido.</p>
@@ -80,7 +81,7 @@ export default function PlatformHome() {
     <div className="min-h-screen bg-bg">
       <header className="flex items-center gap-4 border-b border-line bg-surface px-8 py-3.5">
         <div className="flex items-center gap-2">
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-ink"><span className="font-display text-[15px] font-bold text-white">V</span></div>
+          <LogoVim className="h-8 w-8" />
           <span className="font-display text-[17px] font-bold tracking-tight">VIM Plataforma</span>
         </div>
         <nav className="ml-4 flex gap-1">
