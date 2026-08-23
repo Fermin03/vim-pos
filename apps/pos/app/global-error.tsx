@@ -20,7 +20,7 @@ export default function GlobalError({ error, reset }: { error: Error & { digest?
           <p style={{ fontSize: 15, color: "#76767E", maxWidth: 420, margin: "8px 0 0" }}>
             Tuvimos un problema técnico. Vuelve a intentarlo en un momento.
           </p>
-          <button onClick={reset} style={{ marginTop: 24, background: "#E8502E", color: "#fff", border: "none", borderRadius: 10, padding: "11px 22px", fontSize: 14, fontWeight: 600, cursor: "pointer" }}>
+          <button onClick={reset} style={{ marginTop: 24, background: "#0078C9", color: "#fff", border: "none", borderRadius: 10, padding: "11px 22px", fontSize: 14, fontWeight: 600, cursor: "pointer" }}>
             Reintentar
           </button>
           {ref && <code style={{ marginTop: 24, fontSize: 13, color: "#8E8E94" }}>{ref}</code>}

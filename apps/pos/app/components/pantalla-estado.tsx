@@ -35,7 +35,7 @@ export function PantallaEstado({
             <span className="font-display text-[88px] font-bold leading-none tracking-tighter text-[#ECECE9] select-none">{codigo}</span>
           )}
           {icono && (
-            <span className={["flex h-14 w-14 items-center justify-center rounded-2xl bg-[#FBF0EC] text-accent", codigo ? "absolute" : ""].join(" ")}>
+            <span className={["flex h-14 w-14 items-center justify-center rounded-2xl bg-[#EAF3FB] text-accent", codigo ? "absolute" : ""].join(" ")}>
               {icono}
             </span>
           )}

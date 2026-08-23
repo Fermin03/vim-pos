@@ -21,12 +21,38 @@ impreso dejan de parecerse.
 
 | Token | Valor | Uso |
 |---|---|---|
-| `accent` | `#E8502E` | **Una sola acción dominante por pantalla.** Cobrar, Enviar a cocina, Confirmar. |
-| `accent-hover` | `#CF4525` | Estado hover del anterior. |
-| `accent-soft` | `#FBF0EC` | Fondos de realce muy suaves. Nunca texto. |
+| `accent` | `#0078C9` | **Una sola acción dominante por pantalla.** Cobrar, Enviar a cocina, Confirmar. |
+| `accent-hover` | `#0063A8` | Estado hover del anterior. |
+| `accent-soft` | `#EAF3FB` | Fondos de realce muy suaves. Nunca texto. |
 
-El naranja es la señal de "esto es lo que sigue". Si una pantalla tiene tres botones naranjas, no
-tiene ninguno: el cajero pierde el segundo de orientación que el color estaba comprando.
+El azul es la señal de "esto es lo que sigue". Si una pantalla tiene tres botones azules, no tiene
+ninguno: el cajero pierde el segundo de orientación que el color estaba comprando.
+
+**Era naranja `#E8502E` hasta agosto de 2026**, cuando llegó el logotipo definitivo y la marca pasó
+a azul. Se cambió el token, no solo el logotipo: un logotipo azul junto a botones naranjas se lee
+como dos marcas en la misma pantalla. De paso se salda una deuda de accesibilidad — blanco sobre el
+naranja daba 3.74:1 y no alcanzaba el AA de WCAG; sobre este azul da 4.64:1 y sí.
+
+### Logotipo
+
+Un cuadrado azul con el borde inferior en zigzag —el corte del papel del ticket— y la "V" en
+blanco. Un solo archivo manda y de ahí sale todo lo demás:
+
+| Qué | Dónde | Cómo se obtiene |
+|---|---|---|
+| **Maestro** | `apps/admin/public/icon.svg` | el archivo de diseño |
+| Favicon del POS | `apps/pos/public/icon.svg` | copia del maestro |
+| En pantalla | `<LogoVim />` de `@vim/ui/styles` | el vector, en línea |
+| Icono de app e instalador | `desktop/build/icon.png` (1024) | `npm run iconos` |
+| Bandeja del sistema | `desktop/build/tray.png` (32) | `npm run iconos` |
+
+**No se dibuja a mano.** Hasta agosto de 2026 la marca estaba escrita en HTML en doce pantallas —un
+cuadrado negro, una "V" de texto y un punto de color— así que cambiar el logotipo obligaba a tocar
+doce archivos, y además dependía de que el dispositivo tuviera la tipografía instalada. Si hace
+falta la marca en un sitio nuevo, se usa `<LogoVim />`.
+
+**Sus colores van literales, no por token.** Un logotipo no cambia con el tema ni sigue al acento
+de la interfaz. Hoy coinciden en el mismo azul, pero son dos decisiones distintas.
 
 ### Tinta
 
@@ -67,7 +93,7 @@ rojo, el rojo deja de detener a nadie.
 `cat-blue #2C5AA0` · `cat-green #2E7D52` · `cat-teal #1F7A82` · `cat-violet #6B4FA0` ·
 `cat-amber #B5701A` · `cat-wine #9A3050`
 
-**Nunca el naranja de marca para datos.** Una barra naranja en una gráfica compite con el botón
+**Nunca el azul de marca para datos.** Una barra azul de marca en una gráfica compite con el botón
 Cobrar por el mismo significado, y el ojo no puede sostener dos.
 
 > **Deuda:** estos seis tokens están definidos y **no se usan en ninguna parte**. Las categorías
@@ -154,7 +180,7 @@ confiar en la pantalla.
 
 Viven en `packages/ui/src/components` y se importan desde `@vim/ui/styles`:
 
-- **`Button`** — variantes `primary` (naranja), `ghost` (borde), `danger` (rojo); tamaños `md`
+- **`Button`** — variantes `primary` (azul), `ghost` (borde), `danger` (rojo); tamaños `md`
   (h-11) y `lg` (h-14). Siempre un `<button>` real, con foco visible por teclado.
 - **`Modal`** — contenedor de diálogo con título opcional.
 - **`PinKeypad`** — teclado numérico para PIN.
@@ -173,7 +199,7 @@ divergir sin que nadie lo note.
 
 Estas no son preferencias estéticas: salen de errores que ya costaron dinero en el piloto.
 
-**Una acción dominante por pantalla.** Si hay dos naranjas, hay cero.
+**Una acción dominante por pantalla.** Si hay dos azules, hay cero.
 
 **El botón "Volver" siempre en el mismo sitio** — extremo izquierdo de la cabecera, mismo tamaño en
 todas las pantallas. El cajero no lee la pantalla: va al lugar donde *sabe* que está el botón. Si
@@ -209,8 +235,8 @@ Lo que **no** se hereda:
 - **El tema oscuro del KDS.** Está calibrado para una pantalla lejana en una cocina, no para una
   web.
 
-Y una decisión que conviene tomar a propósito: el naranja de marca en el producto significa "esta
-es la acción". En la web va a ser el color de la marca a secas, presente en más lugares. Está bien
+Y una decisión que conviene tomar a propósito: el azul de marca en el producto significa "esta es
+la acción". En la web va a ser el color de la marca a secas, presente en más lugares. Está bien
 que difieran — pero que sea una decisión y no un descuido, porque las capturas de pantalla del
 producto van a convivir con la web en la misma página.
 

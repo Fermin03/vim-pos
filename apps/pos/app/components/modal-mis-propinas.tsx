@@ -29,7 +29,7 @@ export function ModalMisPropinas({ token, meseroId, meseroNombre, onCerrar }: { 
         <p className="py-6 text-center text-[13px] text-ink-3">Cargando…</p>
       ) : (
         <>
-          <div className="rounded-xl border border-line bg-[#FBF0EC] px-5 py-6 text-center">
+          <div className="rounded-xl border border-line bg-[#EAF3FB] px-5 py-6 text-center">
             <div className="text-[12.5px] font-medium uppercase tracking-wide text-ink-3">Propinas acumuladas hoy</div>
             <div className="mt-1 font-display text-[40px] font-bold tabular-nums text-accent">{fmtMxn(datos.totalMxn)}</div>
           </div>

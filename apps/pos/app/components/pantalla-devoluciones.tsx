@@ -1,7 +1,7 @@
 "use client";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { BotonVolver } from "./boton-volver";
-import { Button, Modal } from "@vim/ui/styles";
+import { Button, LogoVim, Modal } from "@vim/ui/styles";
 import { type DatosCaja, type Turno, fmtMxn } from "../lib/turno";
 import { type Empleado } from "../lib/supabase";
 import {
@@ -68,7 +68,7 @@ export function PantallaDevoluciones({
       <header className="flex flex-shrink-0 items-center justify-between border-b border-line bg-surface px-3 py-3.5">
         <BotonVolver onClick={onSalir} />
         <div className="mr-auto flex items-center gap-3">
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-ink"><span className="font-display text-[15px] font-bold text-white">V</span></div>
+          <LogoVim className="h-8 w-8" />
           <div>
             <div className="font-display text-[16px] font-bold leading-tight">Devoluciones · {caja.nombre}</div>
             <div className="text-[11.5px] text-ink-3">Selecciona la venta a devolver. La venta queda en el historial; el reembolso sale de la caja.</div>

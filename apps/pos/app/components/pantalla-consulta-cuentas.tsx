@@ -1,4 +1,5 @@
 "use client";
+import { LogoVim } from "@vim/ui/styles";
 import { useCallback, useEffect, useState } from "react";
 import { BotonVolver } from "./boton-volver";
 import { fmtMxn, type DatosCaja, type Turno } from "../lib/turno";
@@ -102,7 +103,7 @@ export function PantallaConsultaCuentas({
       <header className="flex flex-shrink-0 flex-wrap items-center justify-between gap-3 border-b border-line bg-surface px-3 py-3">
         <BotonVolver onClick={onSalir} />
         <div className="mr-auto flex items-center gap-3">
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-ink"><span className="font-display text-[15px] font-bold text-white">V</span></div>
+          <LogoVim className="h-8 w-8" />
           <div>
             <div className="font-display text-[16px] font-bold leading-tight">Cuentas · {caja.nombre}</div>
             <div className="text-[11.5px] text-ink-3">{cuentas?.length ?? 0} cuentas</div>

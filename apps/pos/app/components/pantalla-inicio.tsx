@@ -1,4 +1,5 @@
 "use client";
+import { LogoVim } from "@vim/ui/styles";
 import { useEffect, useState, type ReactNode } from "react";
 import { useReloj } from "./topbar-pos";
 import { evaluarSync, leerEstadoSync, type NivelSync } from "../lib/estado-sync";
@@ -83,10 +84,7 @@ export function PantallaInicio({
       {/* ── Barra superior: quién opera y dónde ─────────────────────────────── */}
       <header className="flex h-[clamp(2.75rem,6.5vh,3.5rem)] flex-shrink-0 items-center justify-between gap-3 border-b border-line px-[clamp(0.75rem,2vw,1.25rem)]">
         <div className="flex min-w-0 items-center gap-3">
-          <div className="relative flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg bg-ink">
-            <span className="font-display text-[15px] font-bold leading-none tracking-tight text-white">V</span>
-            <span className="absolute bottom-1 right-1 h-1 w-1 rounded-full bg-accent" aria-hidden="true" />
-          </div>
+          <LogoVim className="h-8 w-8 flex-shrink-0" />
           <div className="min-w-0">
             <div className="truncate font-display text-[13.5px] font-semibold tracking-tight">{caja.sucursalNombre}</div>
             <div className="truncate text-[11px] text-ink-3">
@@ -185,10 +183,7 @@ export function PantallaInicio({
               className="h-[clamp(4rem,16vh,9rem)] w-auto max-w-[min(60vw,22rem)] object-contain"
             />
           ) : (
-            <div className="relative flex h-[clamp(3.5rem,11vh,6rem)] w-[clamp(3.5rem,11vh,6rem)] items-center justify-center rounded-[1.25rem] bg-ink">
-              <span className="font-display text-[clamp(1.75rem,5.5vh,3rem)] font-bold leading-none tracking-tight text-white">V</span>
-              <span className="absolute bottom-[14%] right-[14%] h-[7%] w-[7%] rounded-full bg-accent" aria-hidden="true" />
-            </div>
+            <LogoVim className="h-[clamp(3.5rem,11vh,6rem)] w-[clamp(3.5rem,11vh,6rem)]" />
           )}
           {/* Solo el nombre del negocio. La venta del turno NO se muestra aquí: la pantalla de
               inicio está a la vista de clientes y de cualquiera que pase por el mostrador, y

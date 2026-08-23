@@ -2,7 +2,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { BotonVolver } from "./boton-volver";
 import { RenglonItem } from "./renglon-item";
-import { Button } from "@vim/ui/styles";
+import { Button, LogoVim } from "@vim/ui/styles";
 import { fmtMxn, type DatosCaja, type Turno } from "../lib/turno";
 import { borrarCuentaVacia, leerEntregaCuenta, listarCuentasAbiertas, leerRenglonesCuenta, marcarSalidaDomicilio, minutosAbierta, type CuentaAbierta, type RenglonCuenta } from "../lib/cuentas-abiertas";
 import { leerTotales, type TotalesTicket } from "../lib/cobro";
@@ -206,10 +206,7 @@ export function PantallaCuentasModo({
       <header className="flex h-[clamp(3rem,7.5vh,4.25rem)] flex-shrink-0 items-center justify-between gap-3 border-b border-line px-3">
         <BotonVolver onClick={onSalir} />
         <div className="mr-auto flex min-w-0 items-center gap-3">
-          <div className="relative flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg bg-ink">
-            <span className="font-display text-[15px] font-bold leading-none tracking-tight text-white">V</span>
-            <span className="absolute bottom-1 right-1 h-1 w-1 rounded-full bg-accent" aria-hidden="true" />
-          </div>
+          <LogoVim className="h-8 w-8 flex-shrink-0" />
           <div className="min-w-0">
             <div className="truncate font-display text-[15px] font-semibold tracking-tight">{copia.titulo} · {caja.nombre}</div>
             <div className="truncate text-[12px] text-ink-3">{copia.subtitulo((items ?? []).length)}</div>

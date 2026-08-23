@@ -16,7 +16,7 @@ type ErrorAgrupado = {
 
 const COLOR_APP: Record<string, string> = {
   caja: "bg-[#FBECEA] text-danger",
-  pos: "bg-[#FBF0EC] text-[#CF4525]",
+  pos: "bg-[#EAF3FB] text-[#0063A8]",
   admin: "bg-[#EEF5FC] text-info",
   kds: "bg-[#FCF3E6] text-warning",
 };
