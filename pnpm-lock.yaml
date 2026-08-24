@@ -77,6 +77,55 @@ importers:
         specifier: ^3.2.7
         version: 3.2.7(@types/debug@4.1.13)(@types/node@20.19.41)(jiti@1.21.7)
 
+  apps/factura:
+    dependencies:
+      '@vim/db':
+        specifier: workspace:*
+        version: link:../../packages/db
+      '@vim/fecha':
+        specifier: workspace:*
+        version: link:../../packages/fecha
+      '@vim/ui':
+        specifier: workspace:*
+        version: link:../../packages/ui
+      next:
+        specifier: ^15.5.23
+        version: 15.5.23(@types/node@20.19.41)(react-dom@19.2.6(react@19.2.6))(react@19.2.6)
+      react:
+        specifier: ^19.0.0
+        version: 19.2.6
+      react-dom:
+        specifier: ^19.0.0
+        version: 19.2.6(react@19.2.6)
+    devDependencies:
+      '@types/node':
+        specifier: ^20
+        version: 20.19.41
+      '@types/react':
+        specifier: ^19
+        version: 19.2.15
+      '@types/react-dom':
+        specifier: ^19
+        version: 19.2.3(@types/react@19.2.15)
+      '@vim/config':
+        specifier: workspace:*
+        version: link:../../packages/config
+      autoprefixer:
+        specifier: ^10.4.0
+        version: 10.5.0(postcss@8.5.26)
+      postcss:
+        specifier: ^8.5.26
+        version: 8.5.26
+      tailwindcss:
+        specifier: ^3.4.0
+        version: 3.4.19
+      typescript:
+        specifier: ^5.6.0
+        version: 5.9.3
+      vitest:
+        specifier: ^3.2.7
+        version: 3.2.7(@types/debug@4.1.13)(@types/node@20.19.41)(jiti@2.7.0)
+
   apps/kds:
     dependencies:
       '@supabase/supabase-js':
