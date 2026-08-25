@@ -1,0 +1,723 @@
+<!doctype html>
+<html lang="es-MX">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+
+<title>VIM POS — El punto de venta que no se detiene sin internet</title>
+<meta name="description" content="Punto de venta para restaurantes en México. Corre en tu caja, no en la nube: cobras, imprimes y mandas a cocina aunque no haya señal. Cuando vuelve, todo sube solo.">
+<link rel="canonical" href="https://vimpos.com.mx/">
+
+<meta property="og:type" content="website">
+<meta property="og:locale" content="es_MX">
+<meta property="og:site_name" content="VIM POS">
+<meta property="og:title" content="El punto de venta que no se detiene sin internet">
+<meta property="og:description" content="Corre en tu caja, no en la nube. Cobras, imprimes y mandas a cocina aunque no haya señal.">
+<meta property="og:url" content="https://vimpos.com.mx/">
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@400;500;600&family=JetBrains+Mono:wght@400;600&family=Sora:wght@600;700&display=swap">
+
+<link rel="icon" href="assets/img/logo.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="assets/img/apple-touch-icon-1024.png">
+<link rel="manifest" href="site.webmanifest">
+<meta name="theme-color" content="#0078C9">
+
+<link rel="stylesheet" href="assets/css/vim.css">
+</head>
+<body>
+
+<a href="#contenido" class="solo-lectores">Saltar al contenido</a>
+
+<header class="nav">
+  <div class="contenedor">
+    <div class="nav-fila">
+      <a href="index.html" class="nav-logo" aria-label="VIM POS, inicio">
+        <img src="assets/img/logo-horizontal.svg" alt="VIM POS" width="120" height="26">
+      </a>
+      <nav class="nav-enlaces" aria-label="Principal">
+        <a class="nav-enlace" href="sin-internet.html">Sin internet</a>
+        <a class="nav-enlace" href="precios.html">Precios</a>
+      </nav>
+      <div class="nav-acciones">
+        <a class="btn btn-primario" href="demo.html">Pide una demo</a>
+        <button class="nav-hamburguesa" data-menu-boton type="button"
+                aria-expanded="false" aria-controls="menu-movil" aria-label="Abrir menú">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+               stroke-width="2" stroke-linecap="round" aria-hidden="true">
+            <path d="M4 7h16M4 12h16M4 17h16"/>
+          </svg>
+        </button>
+      </div>
+    </div>
+  </div>
+  <div class="nav-movil" id="menu-movil" data-menu data-abierto="false">
+    <div>
+      <div class="contenedor">
+        <div class="nav-movil-lista">
+          <a href="sin-internet.html">Sin internet</a>
+          <a href="precios.html">Precios</a>
+          <a href="demo.html">Pide una demo</a>
+        </div>
+      </div>
+    </div>
+  </div>
+</header>
+
+<main id="contenido">
+
+  <!-- ═══ 2 · Hero ═══════════════════════════════════════════════════════ -->
+  <section class="hero">
+    <div class="contenedor">
+      <div class="hero-rejilla">
+        <div class="pila pila-5">
+          <h1>El punto de venta que no se detiene cuando se cae el internet.</h1>
+          <p class="entradilla">
+            VIM POS corre en tu caja, no en la nube. Cobras, imprimes y mandas a cocina aunque no
+            haya señal. Cuando vuelve, todo sube solo — con los mismos folios.
+          </p>
+          <div class="fila">
+            <a class="btn btn-primario btn-hero" href="demo.html">Pide una demo</a>
+            <a class="btn btn-fantasma btn-hero" href="https://wa.me/524761273020">Escríbenos por WhatsApp</a>
+          </div>
+          <span class="prueba-social">En operación en Knock-Out Burger, León, Gto.</span>
+        </div>
+
+        <div class="monitor-envoltura">
+          <div class="monitor">
+            <div class="monitor-barra" aria-hidden="true">
+              <span class="monitor-punto"></span><span class="monitor-punto"></span><span class="monitor-punto"></span>
+            </div>
+            <div class="hueco">
+              <strong>Captura: home del POS</strong>
+              <span>Pendiente · se genera con <code>_capturas/render.mjs</code></span>
+            </div>
+          </div>
+          <span class="chip-offline">Sin conexión · sigue vendiendo</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══ 3 · Hechos duros ═══════════════════════════════════════════════
+       Cuatro datos sin adjetivos. La competencia apoya su confianza en el
+       tamaño —42,000 restaurantes, 25 años—; con un piloto ese camino está
+       cerrado y fingirlo se descubre en la primera llamada. Cada dato de aquí
+       se puede enseñar en pantalla en una demo de veinte minutos. -->
+  <section class="hechos" aria-label="Hechos verificables">
+    <div class="hecho"><p>La misma base de datos que la nube, en tu caja — no un caché</p></div>
+    <div class="hecho"><p>Cualquier impresora ESC/POS</p></div>
+    <div class="hecho"><p>Corte Z sellado, con arqueo, sobrante y faltante</p></div>
+    <div class="hecho"><p>14 reportes en el panel del dueño</p></div>
+  </section>
+
+  <!-- ═══ 4 · El problema ════════════════════════════════════════════════ -->
+  <section class="seccion">
+    <div class="contenedor pila pila-8">
+      <div class="pila pila-4">
+        <p class="eyebrow">Por qué existe</p>
+        <h2>Lo que hay hoy para un restaurante mexicano</h2>
+      </div>
+      <div class="tres">
+        <div class="tarjeta pila pila-3">
+          <h3>Los de fuera</h3>
+          <p>
+            Caros, en dólares, y con el SAT como una idea vaga. Pagas por funciones pensadas para
+            otro país y luego resuelves la factura por tu cuenta.
+          </p>
+        </div>
+        <div class="tarjeta pila pila-3">
+          <h3>Los de siempre</h3>
+          <p>
+            Sistemas que llevan quince años funcionando y lo hacen bien, pero viven en una sola
+            computadora: sin respaldo, sin ver tus números desde el celular y sin nada que hacer si
+            se moja el disco duro.
+          </p>
+        </div>
+        <div class="tarjeta pila pila-3">
+          <h3>El cuaderno</h3>
+          <p>
+            Funciona hasta que hay dos cajas, o un socio, o alguien pregunta cuánto se vendió el
+            martes pasado. Entonces deja de funcionar de golpe.
+          </p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══ 5 · Cómo funciona ══════════════════════════════════════════════
+       El diagrama es la pieza que explica el producto entero. El botón corta la
+       línea con la nube: es la única animación de la página que no responde a
+       una navegación, y existe porque enseñarlo convence más que explicarlo. -->
+  <section class="seccion destacada-suave">
+    <div class="contenedor pila pila-8">
+      <div class="pila pila-4">
+        <p class="eyebrow">Cómo funciona</p>
+        <h2>Tu caja es el centro. La nube es el respaldo, no el motor.</h2>
+        <p>
+          Casi todos los puntos de venta modernos viven en la nube: si se cae el internet, se cae tu
+          negocio. Aquí es al revés — la base de datos completa está en la computadora de tu
+          mostrador, y la nube cuelga de una línea que se puede cortar sin que pase nada.
+        </p>
+      </div>
+
+      <div class="pila pila-5">
+        <!-- El SVG va INCRUSTADO, no en un <img>: dentro de un img queda aislado,
+             así que ni el botón puede cambiarle la clase ni hereda los tokens de
+             color de la página. Su fuente está en assets/img/arquitectura.svg;
+             si se toca allá, hay que traerlo aquí. -->
+        <svg viewBox="0 0 720 460" role="img" aria-labelledby="arq-titulo arq-desc"
+                     class="diagrama-arquitectura" data-diagrama>
+          <title id="arq-titulo">Cómo funciona VIM POS sin internet</title>
+          <desc id="arq-desc">
+            La caja del local es el centro: tiene su propia base de datos y de ella cuelgan, por la red del
+            negocio, la pantalla de cocina y una segunda caja. La nube está conectada por una línea de
+            puntos, y cuando esa línea se corta todo lo del local sigue funcionando.
+          </desc>
+
+          <style>
+            /* Los colores se toman de la página cuando el SVG va incrustado; los valores
+               de reserva son los tokens del producto, para que el archivo también se vea
+               bien abierto suelto. */
+            .d-linea   { stroke: var(--line-strong, #DDDDD9); stroke-width: 1.5; fill: none; }
+            .d-caja    { fill: var(--surface, #FBFBFA); stroke: var(--line-strong, #DDDDD9); stroke-width: 1.5; }
+            .d-hub     { fill: var(--accent-soft, #EAF3FB); stroke: var(--accent, #0078C9); stroke-width: 2; }
+            .d-titulo  { font: 600 15px 'Inter Tight', system-ui, sans-serif; fill: var(--ink, #16161A); }
+            .d-sub     { font: 400 12px 'Inter Tight', system-ui, sans-serif; fill: var(--ink-3, #8E8E94); }
+            .d-etq     { font: 600 10px 'JetBrains Mono', ui-monospace, monospace;
+                         fill: var(--ink-3, #8E8E94); letter-spacing: .08em; }
+
+            /* El enlace con la nube es lo único punteado: se ve distinto de las líneas
+               del local aunque nadie lea la leyenda. */
+            .d-nube-linea { stroke: var(--ink-3, #8E8E94); stroke-width: 1.5; stroke-dasharray: 5 5; fill: none; }
+            .d-nube       { fill: none; stroke: var(--ink-3, #8E8E94); stroke-width: 1.5; }
+            .d-nube-txt   { font: 400 12px 'Inter Tight', system-ui, sans-serif; fill: var(--ink-3, #8E8E94); }
+
+            /* Estado "sin internet": la nube se atenúa y aparece el corte. Lo enciende
+               la página añadiendo la clase, y la transición va en opacidad —lo único
+               que se puede animar barato— con la curva del sitio. */
+            .d-corte { opacity: 0; }
+            .diagrama-arquitectura.sin-red .d-nube,
+            .diagrama-arquitectura.sin-red .d-nube-linea,
+            .diagrama-arquitectura.sin-red .d-nube-txt { opacity: .28; }
+            .diagrama-arquitectura.sin-red .d-corte { opacity: 1; }
+
+            .d-nube, .d-nube-linea, .d-nube-txt, .d-corte {
+              transition: opacity 240ms cubic-bezier(0.23, 1, 0.32, 1);
+            }
+            @media (prefers-reduced-motion: reduce) {
+              .d-nube, .d-nube-linea, .d-nube-txt, .d-corte { transition: none; }
+            }
+          </style>
+
+          <!-- ── La nube, arriba y colgando ─────────────────────────────────────── -->
+          <g>
+            <path class="d-nube" d="M318 44a26 26 0 0 1 50-8 20 20 0 0 1 34 14 18 18 0 0 1-2 36h-78a21 21 0 0 1-4-42z"/>
+            <text class="d-nube-txt" x="360" y="62" text-anchor="middle">Nube</text>
+            <text class="d-sub" x="360" y="96" text-anchor="middle">Respaldo · panel del dueño · reportes</text>
+          </g>
+
+          <!-- El enlace, punteado, y su corte -->
+          <path class="d-nube-linea" d="M360 108 L360 168"/>
+          <g class="d-corte">
+            <line x1="342" y1="130" x2="378" y2="146" stroke="var(--danger, #C0392B)" stroke-width="2.5" stroke-linecap="round"/>
+            <line x1="378" y1="130" x2="342" y2="146" stroke="var(--danger, #C0392B)" stroke-width="2.5" stroke-linecap="round"/>
+            <text class="d-etq" x="392" y="142" fill="var(--danger, #C0392B)">SIN INTERNET</text>
+          </g>
+
+          <!-- ── La caja: el centro de todo ─────────────────────────────────────── -->
+          <g>
+            <rect class="d-hub" x="248" y="168" width="224" height="96" rx="8"/>
+            <text class="d-etq" x="360" y="192" text-anchor="middle" fill="var(--accent, #0078C9)">EN TU MOSTRADOR</text>
+            <text class="d-titulo" x="360" y="216" text-anchor="middle">La caja</text>
+            <text class="d-sub" x="360" y="238" text-anchor="middle">Base de datos propia · cobra e imprime</text>
+            <text class="d-sub" x="360" y="254" text-anchor="middle">aunque no haya señal</text>
+          </g>
+
+          <!-- ── Lo que cuelga de la caja, por la red del local ──────────────────── -->
+          <path class="d-linea" d="M300 264 L300 300 L168 300 L168 336"/>
+          <path class="d-linea" d="M420 264 L420 300 L552 300 L552 336"/>
+          <path class="d-linea" d="M360 264 L360 336"/>
+
+          <text class="d-etq" x="360" y="292" text-anchor="middle">RED DEL NEGOCIO</text>
+
+          <g>
+            <rect class="d-caja" x="88" y="336" width="160" height="76" rx="8"/>
+            <text class="d-titulo" x="168" y="366" text-anchor="middle">Cocina</text>
+            <text class="d-sub" x="168" y="388" text-anchor="middle">Las comandas, en pantalla</text>
+          </g>
+
+          <g>
+            <rect class="d-caja" x="280" y="336" width="160" height="76" rx="8"/>
+            <text class="d-titulo" x="360" y="366" text-anchor="middle">Impresoras</text>
+            <text class="d-sub" x="360" y="388" text-anchor="middle">Tickets y comandas por área</text>
+          </g>
+
+          <g>
+            <rect class="d-caja" x="472" y="336" width="160" height="76" rx="8"/>
+            <text class="d-titulo" x="552" y="366" text-anchor="middle">Segunda caja</text>
+            <text class="d-sub" x="552" y="388" text-anchor="middle">Comparte el mismo turno</text>
+          </g>
+        </svg>
+        <div class="fila">
+          <button class="btn btn-fantasma" type="button" data-diagrama-boton aria-pressed="false">
+            Cortar el internet
+          </button>
+          <span style="font-size:var(--t-13);color:var(--ink-3)">
+            Pruébalo: se apaga la nube y el local sigue entero.
+          </span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══ 6 · Lo que hace ════════════════════════════════════════════════ -->
+  <section class="seccion">
+    <div class="contenedor pila pila-8">
+      <div class="pila pila-4">
+        <p class="eyebrow">Lo que hace</p>
+        <h2>Cuatro cosas, bien</h2>
+      </div>
+
+      <div class="alterna">
+        <div class="alterna-texto pila pila-3">
+          <h3>Vender</h3>
+          <p>
+            Catálogo por categorías, modificadores con precio —queso extra, sin cebolla, término de
+            la carne— y cobro en efectivo, tarjeta o transferencia. Con propina y con cambio
+            calculado.
+          </p>
+        </div>
+        <div class="monitor">
+          <div class="monitor-barra" aria-hidden="true"><span class="monitor-punto"></span><span class="monitor-punto"></span><span class="monitor-punto"></span></div>
+          <div class="hueco"><strong>Captura: catálogo con modificadores</strong><span>Pendiente</span></div>
+        </div>
+      </div>
+
+      <div class="alterna invertido">
+        <div class="alterna-texto pila pila-3">
+          <h3>Mandar a cocina</h3>
+          <p>
+            La comanda sale impresa donde tiene que salir: las bebidas en la barra y la comida en
+            cocina, cada papel con el rótulo de su estación. Y en pantalla, si prefieres el KDS.
+          </p>
+        </div>
+        <div class="monitor">
+          <div class="monitor-barra" aria-hidden="true"><span class="monitor-punto"></span><span class="monitor-punto"></span><span class="monitor-punto"></span></div>
+          <div class="hueco"><strong>Captura: pantalla de cocina</strong><span>Pendiente</span></div>
+        </div>
+      </div>
+
+      <div class="alterna">
+        <div class="alterna-texto pila pila-3">
+          <h3>Cerrar el turno</h3>
+          <p>
+            Arqueo contra lo que dice el sistema, con sobrante y faltante a la vista, y corte Z
+            sellado. Con el mismo formato de siempre, para que nadie tenga que reaprender a leerlo.
+          </p>
+        </div>
+        <div class="monitor">
+          <div class="monitor-barra" aria-hidden="true"><span class="monitor-punto"></span><span class="monitor-punto"></span><span class="monitor-punto"></span></div>
+          <div class="hueco"><strong>Captura: arqueo y corte</strong><span>Pendiente</span></div>
+        </div>
+      </div>
+
+      <div class="alterna invertido">
+        <div class="alterna-texto pila pila-3">
+          <h3>Ver tu negocio</h3>
+          <p>
+            Desde el celular: cuánto llevas hoy contra ayer, qué se vende y qué no, inventario con
+            costo, y catorce reportes. Con aviso si tu caja lleva días sin subir las ventas.
+          </p>
+        </div>
+        <div class="monitor">
+          <div class="monitor-barra" aria-hidden="true"><span class="monitor-punto"></span><span class="monitor-punto"></span><span class="monitor-punto"></span></div>
+          <div class="hueco"><strong>Captura: dashboard del panel</strong><span>Pendiente</span></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══ 7 · Sin internet ═══════════════════════════════════════════════ -->
+  <section class="seccion destacada-suave">
+    <div class="contenedor pila pila-5">
+      <p class="eyebrow">El diferenciador</p>
+      <h2>No es un «modo offline». Es que no depende del internet.</h2>
+      <p>
+        Un POS en nube con modo offline guarda tus ventas en el navegador y reza para que suban
+        después. Aquí la caja tiene un Postgres completo con las mismas tablas y las mismas
+        funciones que la nube: no es un caché ni una versión reducida. Cuando vuelve la señal, lo
+        del día sube solo y conserva los folios que ya imprimiste.
+      </p>
+      <div class="fila">
+        <a class="btn btn-fantasma" href="sin-internet.html">Cómo funciona por dentro</a>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══ 8 · Para tu giro ═══════════════════════════════════════════════ -->
+  <section class="seccion">
+    <div class="contenedor pila pila-8">
+      <div class="pila pila-4">
+        <p class="eyebrow">Para tu giro</p>
+        <h2>Seis formas de vender comida, seis configuraciones</h2>
+        <p>
+          El sistema se configura según tu giro: cambian los modos de servicio, las pantallas y lo
+          que se imprime. Donde hay un límite, está escrito.
+        </p>
+      </div>
+
+      <div class="acordeon">
+        <div class="acordeon-item" data-acordeon-item data-abierto="false">
+          <button class="acordeon-boton" data-acordeon-boton type="button" aria-expanded="false">
+            Quick Service
+            <svg class="acordeon-signo" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+          </button>
+          <div class="acordeon-panel" data-acordeon-panel><div>
+            <p>Mostrador y pickup. Cola rápida, comanda directa a cocina y modos de servicio para separar lo que se come aquí de lo que se lleva — que además cambia el IVA.</p>
+          </div></div>
+        </div>
+
+        <div class="acordeon-item" data-acordeon-item data-abierto="false">
+          <button class="acordeon-boton" data-acordeon-boton type="button" aria-expanded="false">
+            Foodtruck
+            <svg class="acordeon-signo" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+          </button>
+          <div class="acordeon-panel" data-acordeon-panel><div>
+            <p>Turno por evento y operación sin señal en la calle, que es donde el argumento del producto deja de ser teórico. Una sola caja, un solo turno, cierre al terminar.</p>
+          </div></div>
+        </div>
+
+        <div class="acordeon-item" data-acordeon-item data-abierto="false">
+          <button class="acordeon-boton" data-acordeon-boton type="button" aria-expanded="false">
+            Café &amp; Bar
+            <svg class="acordeon-signo" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+          </button>
+          <div class="acordeon-panel" data-acordeon-panel><div>
+            <p>Cuentas abiertas en barra, modificadores con precio y cierres por turno. La cuenta se queda abierta hasta que el cliente pide, no hasta que se cierra el sistema.</p>
+          </div></div>
+        </div>
+
+        <div class="acordeon-item" data-acordeon-item data-abierto="false">
+          <button class="acordeon-boton" data-acordeon-boton type="button" aria-expanded="false">
+            Full Service
+            <svg class="acordeon-signo" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+          </button>
+          <div class="acordeon-panel" data-acordeon-panel><div>
+            <p>Mapa de mesas, meseros y propinas.</p>
+            <p style="margin-top:var(--sp-3);font-size:var(--t-13)"><b>El límite:</b> no hay app de mesero en tableta. Se opera desde la caja.</p>
+          </div></div>
+        </div>
+
+        <div class="acordeon-item" data-acordeon-item data-abierto="false">
+          <button class="acordeon-boton" data-acordeon-boton type="button" aria-expanded="false">
+            Dark Kitchen
+            <svg class="acordeon-signo" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+          </button>
+          <div class="acordeon-panel" data-acordeon-panel><div>
+            <p>Varias marcas virtuales desde una cocina, y conciliación de lo que te liquidan Rappi, Uber y DiDi contra lo que registró tu caja.</p>
+            <p style="margin-top:var(--sp-3);font-size:var(--t-13)"><b>El límite:</b> la liquidación se pega a mano; todavía no se sube el archivo.</p>
+          </div></div>
+        </div>
+
+        <div class="acordeon-item" data-acordeon-item data-abierto="false">
+          <button class="acordeon-boton" data-acordeon-boton type="button" aria-expanded="false">
+            Cadenas
+            <svg class="acordeon-signo" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+          </button>
+          <div class="acordeon-panel" data-acordeon-panel><div>
+            <p>Varias sucursales con catálogo propio o compartido, franquicias, y un consolidado que suma todo sin tener que abrir cada una.</p>
+          </div></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══ 9 · Migración ══════════════════════════════════════════════════
+       Los dos argumentos están verificados en el código: el parser de los
+       cuatro formatos y el formato del corte Z. No se escribe nada aquí que no
+       se pueda enseñar. -->
+  <section class="seccion">
+    <div class="contenedor pila pila-6">
+      <div class="pila pila-4">
+        <p class="eyebrow">Si ya usas otro</p>
+        <h2>¿Vienes de Soft Restaurant, Square, Toast, Loyverse o Clip?</h2>
+      </div>
+      <div class="tres">
+        <div class="tarjeta pila pila-3">
+          <h3>Tu menú se pega y ya</h3>
+          <p>
+            El importador lee el export de esos cuatro sistemas tal cual sale. No hay que reescribir
+            trescientos productos a mano ni pagar por una migración.
+          </p>
+        </div>
+        <div class="tarjeta pila pila-3">
+          <h3>Tu corte se ve igual</h3>
+          <p>
+            El formato del corte Z está calcado del que ya conoces, a propósito. Quien lo lee cada
+            noche no tiene que reaprender dónde mirar.
+          </p>
+        </div>
+        <div class="tarjeta pila pila-3">
+          <h3>La comanda se parte</h3>
+          <p>
+            Bebidas en la barra, comida en cocina, cada una en su impresora. Es lo mismo que ya
+            hacías, y ya opera así en el piloto.
+          </p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══ 10 · Precios ═══════════════════════════════════════════════════ -->
+  <section class="seccion destacada-suave">
+    <div class="contenedor pila pila-8">
+      <div class="pila pila-4">
+        <p class="eyebrow">Precios</p>
+        <h2>Precio de lista, publicado</h2>
+        <p>Mensual, en pesos, más IVA. Sin cotización ni «contáctanos para conocer el precio».</p>
+      </div>
+
+      <div class="planes">
+        <div class="plan pila">
+          <div>
+            <h3>Esencial</h3>
+            <div class="plan-precio">$699</div>
+          </div>
+          <ul class="plan-lista">
+            <li>1 sucursal · 1 caja</li>
+            <li>Implementación en autoservicio guiado</li>
+            <li>Soporte por chat</li>
+          </ul>
+        </div>
+
+        <div class="plan destacado pila">
+          <div>
+            <p class="eyebrow" style="color:var(--accent)">El más elegido</p>
+            <h3>Negocio</h3>
+            <div class="plan-precio">$1,299</div>
+          </div>
+          <ul class="plan-lista">
+            <li>1 sucursal · 3 cajas</li>
+            <li>Implementación acompañada</li>
+            <li>Carga de tu menú y capacitación</li>
+          </ul>
+        </div>
+
+        <div class="plan pila">
+          <div>
+            <h3>Cadena</h3>
+            <div class="plan-precio">$2,499</div>
+          </div>
+          <ul class="plan-lista">
+            <li>3 sucursales · cajas ilimitadas</li>
+            <li>Reporte consolidado</li>
+            <li>Acompañamiento con visita</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="fila">
+        <a class="btn btn-fantasma" href="precios.html">Ver todo lo que incluye</a>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══ 11 · Preguntas frecuentes ══════════════════════════════════════ -->
+  <section class="seccion">
+    <div class="contenedor pila pila-8">
+      <div class="pila pila-4">
+        <p class="eyebrow">Preguntas frecuentes</p>
+        <h2>Lo que nos preguntan antes de la demo</h2>
+      </div>
+
+      <div class="acordeon">
+        <div class="acordeon-item" data-acordeon-item data-abierto="false">
+          <button class="acordeon-boton" data-acordeon-boton type="button" aria-expanded="false">
+            ¿De verdad funciona sin internet?
+            <svg class="acordeon-signo" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+          </button>
+          <div class="acordeon-panel" data-acordeon-panel><div>
+            <p>Sí, con la aplicación de escritorio. La base de datos vive en tu caja, así que cobrar, imprimir y mandar a cocina no pasan por internet en ningún momento. La señal solo hace falta para respaldar y para ver tus números desde fuera.</p>
+          </div></div>
+        </div>
+
+        <div class="acordeon-item" data-acordeon-item data-abierto="false">
+          <button class="acordeon-boton" data-acordeon-boton type="button" aria-expanded="false">
+            ¿Qué necesito comprar?
+            <svg class="acordeon-signo" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+          </button>
+          <div class="acordeon-panel" data-acordeon-panel><div>
+            <p>Una PC con Windows, una impresora de tickets ESC/POS, un cajón de dinero y un router. VIM no vende hardware: te decimos qué modelos funcionan y lo compras donde te salga mejor.</p>
+          </div></div>
+        </div>
+
+        <div class="acordeon-item" data-acordeon-item data-abierto="false">
+          <button class="acordeon-boton" data-acordeon-boton type="button" aria-expanded="false">
+            ¿Puedo traer mi menú de otro sistema?
+            <svg class="acordeon-signo" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+          </button>
+          <div class="acordeon-panel" data-acordeon-panel><div>
+            <p>Sí, pegando el export de Square, Toast, Loyverse o Clip tal cual. Si vienes de otro sistema, mándanos el archivo en la demo y lo vemos.</p>
+          </div></div>
+        </div>
+
+        <div class="acordeon-item" data-acordeon-item data-abierto="false">
+          <button class="acordeon-boton" data-acordeon-boton type="button" aria-expanded="false">
+            ¿Emite facturas?
+            <svg class="acordeon-signo" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+          </button>
+          <div class="acordeon-panel" data-acordeon-panel><div>
+            <p>El módulo está terminado —factura global, timbrado individual y portal de autofacturación por QR— y estamos cerrando la activación con el PAC. En la demo te decimos la fecha real; no la ponemos aquí hasta que sea firme.</p>
+          </div></div>
+        </div>
+
+        <div class="acordeon-item" data-acordeon-item data-abierto="false">
+          <button class="acordeon-boton" data-acordeon-boton type="button" aria-expanded="false">
+            ¿Cuánto tarda la implementación?
+            <svg class="acordeon-signo" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+          </button>
+          <div class="acordeon-panel" data-acordeon-panel><div>
+            <p>Alrededor de un día: carga del menú, configuración y tres horas de capacitación. En el plan Esencial lo haces tú con una guía; desde Negocio lo hacemos nosotros y te acompañamos el día del arranque.</p>
+          </div></div>
+        </div>
+
+        <div class="acordeon-item" data-acordeon-item data-abierto="false">
+          <button class="acordeon-boton" data-acordeon-boton type="button" aria-expanded="false">
+            ¿Y si se va la luz o alguien cierra el programa?
+            <svg class="acordeon-signo" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+          </button>
+          <div class="acordeon-panel" data-acordeon-panel><div>
+            <p>El programa vive en la bandeja del sistema y se levanta solo si alguien lo cierra. Hay respaldos automáticos de la base local, y las ventas que no alcanzaron a subir suben en cuanto vuelve la señal.</p>
+          </div></div>
+        </div>
+
+        <div class="acordeon-item" data-acordeon-item data-abierto="false">
+          <button class="acordeon-boton" data-acordeon-boton type="button" aria-expanded="false">
+            ¿Funciona con varias sucursales?
+            <svg class="acordeon-signo" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+          </button>
+          <div class="acordeon-panel" data-acordeon-panel><div>
+            <p>Sí. Cada sucursal opera con su propia caja y su propio turno, y el panel suma todo en un reporte consolidado. El catálogo puede ser común o propio de cada una.</p>
+          </div></div>
+        </div>
+
+        <div class="acordeon-item" data-acordeon-item data-abierto="false">
+          <button class="acordeon-boton" data-acordeon-boton type="button" aria-expanded="false">
+            ¿Puedo cobrar con tarjeta desde el sistema?
+            <svg class="acordeon-signo" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+          </button>
+          <div class="acordeon-panel" data-acordeon-panel><div>
+            <p>No. La tarjeta se registra como forma de pago para que el corte cuadre, pero el cobro lo haces con tu terminal bancaria de siempre. No hay terminal integrada y preferimos decirlo antes de que lo descubras instalando.</p>
+          </div></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══ 12 · Cierre ════════════════════════════════════════════════════ -->
+  <section class="seccion">
+    <div class="contenedor">
+      <div class="cierre pila pila-5" style="align-items:center">
+        <h2>Te lo enseñamos en 20 minutos, con tu menú.</h2>
+        <p style="max-width:46ch">
+          Sin presentación ni compromiso. Traes tu carta, la cargamos y ves cómo se ve tu propio
+          negocio en pantalla.
+        </p>
+        <div class="fila" style="justify-content:center">
+          <a class="btn btn-primario btn-hero" href="demo.html">Pide una demo</a>
+          <a class="btn btn-fantasma btn-hero" href="https://wa.me/524761273020">WhatsApp</a>
+        </div>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<footer class="pie">
+  <div class="contenedor">
+    <div class="pie-rejilla">
+      <div class="pila pila-3">
+        <img src="assets/img/logo-horizontal.svg" alt="VIM POS" width="120" height="26">
+        <p style="font-size:var(--t-15)">
+          El punto de venta que no se detiene cuando se cae el internet.
+          Hecho en León, Guanajuato.
+        </p>
+      </div>
+      <div>
+        <h4>Producto</h4>
+        <ul class="pie-lista">
+          <li><a href="sin-internet.html">Sin internet</a></li>
+          <li><a href="precios.html">Precios</a></li>
+          <li><a href="demo.html">Pide una demo</a></li>
+        </ul>
+      </div>
+      <div>
+        <h4>Contacto</h4>
+        <ul class="pie-lista">
+          <li><a href="mailto:hola@vimpos.com.mx">hola@vimpos.com.mx</a></li>
+          <li><a href="https://wa.me/524761273020">WhatsApp 476 127 3020</a></li>
+        </ul>
+      </div>
+    </div>
+    <div class="pie-legal">
+      <span>© 2026 Fermín Villalobos Martínez</span>
+      <span class="fila" style="gap:var(--sp-5)">
+        <a href="aviso-privacidad.html" style="color:inherit">Aviso de privacidad</a>
+        <a href="terminos.html" style="color:inherit">Términos</a>
+      </span>
+    </div>
+  </div>
+</footer>
+
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "Organization",
+      "@id": "https://vimpos.com.mx/#organizacion",
+      "name": "VIM POS",
+      "url": "https://vimpos.com.mx/",
+      "logo": "https://vimpos.com.mx/assets/img/logo.svg",
+      "email": "hola@vimpos.com.mx",
+      "areaServed": "MX",
+      "address": {
+        "@type": "PostalAddress",
+        "addressLocality": "León",
+        "addressRegion": "Guanajuato",
+        "addressCountry": "MX"
+      }
+    },
+    {
+      "@type": "SoftwareApplication",
+      "name": "VIM POS",
+      "applicationCategory": "BusinessApplication",
+      "operatingSystem": "Windows",
+      "inLanguage": "es-MX",
+      "description": "Punto de venta para restaurantes que opera sin conexión a internet, con base de datos local y sincronización a la nube.",
+      "offers": [
+        { "@type": "Offer", "name": "Esencial", "price": "699", "priceCurrency": "MXN" },
+        { "@type": "Offer", "name": "Negocio", "price": "1299", "priceCurrency": "MXN" },
+        { "@type": "Offer", "name": "Cadena", "price": "2499", "priceCurrency": "MXN" }
+      ]
+    },
+    {
+      "@type": "FAQPage",
+      "mainEntity": [
+        { "@type": "Question", "name": "¿De verdad funciona sin internet?", "acceptedAnswer": { "@type": "Answer", "text": "Sí, con la aplicación de escritorio. La base de datos vive en tu caja, así que cobrar, imprimir y mandar a cocina no pasan por internet en ningún momento." } },
+        { "@type": "Question", "name": "¿Qué necesito comprar?", "acceptedAnswer": { "@type": "Answer", "text": "Una PC con Windows, una impresora de tickets ESC/POS, un cajón de dinero y un router. VIM no vende hardware." } },
+        { "@type": "Question", "name": "¿Puedo traer mi menú de otro sistema?", "acceptedAnswer": { "@type": "Answer", "text": "Sí, pegando el export de Square, Toast, Loyverse o Clip tal cual." } },
+        { "@type": "Question", "name": "¿Cuánto tarda la implementación?", "acceptedAnswer": { "@type": "Answer", "text": "Alrededor de un día: carga del menú, configuración y tres horas de capacitación." } },
+        { "@type": "Question", "name": "¿Funciona con varias sucursales?", "acceptedAnswer": { "@type": "Answer", "text": "Sí. Cada sucursal opera con su propia caja y su propio turno, y el panel suma todo en un reporte consolidado." } },
+        { "@type": "Question", "name": "¿Puedo cobrar con tarjeta desde el sistema?", "acceptedAnswer": { "@type": "Answer", "text": "No. La tarjeta se registra como forma de pago para que el corte cuadre, pero el cobro se hace con la terminal bancaria del negocio." } }
+      ]
+    }
+  ]
+}
+</script>
+
+<script src="assets/js/vim.js" defer></script>
+</body>
+</html>
