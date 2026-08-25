@@ -7,8 +7,17 @@ module.exports = {
   theme: {
     extend: {
       colors: {
-        // Marca
-        accent: { DEFAULT: "#E8502E", hover: "#CF4525", soft: "#FBF0EC" },
+        // Marca — DEBE COINCIDIR CON packages/ui/tokens.css
+        //
+        // Son dos fuentes de verdad porque el modificador de opacidad de Tailwind (`accent/30`)
+        // no funciona con `var(--accent)` en formato hexadecimal, y hay usos así. Si algún día se
+        // pasan los tokens a canales RGB, esto puede referenciar la variable y el problema
+        // desaparece.
+        //
+        // Mientras tanto: si cambias uno, cambia el otro. Al migrar la marca a azul se actualizó
+        // `tokens.css` y esto se quedó en el naranja anterior, así que TODO lo que usa `bg-accent`
+        // —el panel entero y el portal— estuvo saliendo del color viejo sin que nadie lo notara.
+        accent: { DEFAULT: "#0078C9", hover: "#0063A8", soft: "#EAF3FB" },
         // Tinta
         ink: { DEFAULT: "#16161A", 2: "#5A5A60", 3: "#8E8E94" },
         // Semánticos
@@ -22,7 +31,7 @@ module.exports = {
         line: { DEFAULT: "#ECECE9", strong: "#DDDDD9" },
         hover: "#F6F6F4",
         sel: "#FBFBFA",
-        // Paleta funcional de categorías / gráficas (NUNCA el naranja de marca)
+        // Paleta funcional de categorías / gráficas (NUNCA el color de marca)
         cat: {
           blue: "#2C5AA0",
           green: "#2E7D52",
