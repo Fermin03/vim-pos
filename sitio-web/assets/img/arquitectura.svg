@@ -1,0 +1,93 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 720 460" role="img"
+     aria-labelledby="arq-titulo arq-desc" class="diagrama-arquitectura">
+  <title id="arq-titulo">Cómo funciona VIM POS sin internet</title>
+  <desc id="arq-desc">
+    La caja del local es el centro: tiene su propia base de datos y de ella cuelgan, por la red del
+    negocio, la pantalla de cocina y una segunda caja. La nube está conectada por una línea de
+    puntos, y cuando esa línea se corta todo lo del local sigue funcionando.
+  </desc>
+
+  <style>
+    /* Los colores se toman de la página cuando el SVG va incrustado; los valores
+       de reserva son los tokens del producto, para que el archivo también se vea
+       bien abierto suelto. */
+    .d-linea   { stroke: var(--line-strong, #DDDDD9); stroke-width: 1.5; fill: none; }
+    .d-caja    { fill: var(--surface, #FBFBFA); stroke: var(--line-strong, #DDDDD9); stroke-width: 1.5; }
+    .d-hub     { fill: var(--accent-soft, #EAF3FB); stroke: var(--accent, #0078C9); stroke-width: 2; }
+    .d-titulo  { font: 600 15px 'Inter Tight', system-ui, sans-serif; fill: var(--ink, #16161A); }
+    .d-sub     { font: 400 12px 'Inter Tight', system-ui, sans-serif; fill: var(--ink-3, #8E8E94); }
+    .d-etq     { font: 600 10px 'JetBrains Mono', ui-monospace, monospace;
+                 fill: var(--ink-3, #8E8E94); letter-spacing: .08em; }
+
+    /* El enlace con la nube es lo único punteado: se ve distinto de las líneas
+       del local aunque nadie lea la leyenda. */
+    .d-nube-linea { stroke: var(--ink-3, #8E8E94); stroke-width: 1.5; stroke-dasharray: 5 5; fill: none; }
+    .d-nube       { fill: none; stroke: var(--ink-3, #8E8E94); stroke-width: 1.5; }
+    .d-nube-txt   { font: 400 12px 'Inter Tight', system-ui, sans-serif; fill: var(--ink-3, #8E8E94); }
+
+    /* Estado "sin internet": la nube se atenúa y aparece el corte. Lo enciende
+       la página añadiendo la clase, y la transición va en opacidad —lo único
+       que se puede animar barato— con la curva del sitio. */
+    .d-corte { opacity: 0; }
+    .diagrama-arquitectura.sin-red .d-nube,
+    .diagrama-arquitectura.sin-red .d-nube-linea,
+    .diagrama-arquitectura.sin-red .d-nube-txt { opacity: .28; }
+    .diagrama-arquitectura.sin-red .d-corte { opacity: 1; }
+
+    .d-nube, .d-nube-linea, .d-nube-txt, .d-corte {
+      transition: opacity 240ms cubic-bezier(0.23, 1, 0.32, 1);
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .d-nube, .d-nube-linea, .d-nube-txt, .d-corte { transition: none; }
+    }
+  </style>
+
+  <!-- ── La nube, arriba y colgando ─────────────────────────────────────── -->
+  <g>
+    <path class="d-nube" d="M318 44a26 26 0 0 1 50-8 20 20 0 0 1 34 14 18 18 0 0 1-2 36h-78a21 21 0 0 1-4-42z"/>
+    <text class="d-nube-txt" x="360" y="62" text-anchor="middle">Nube</text>
+    <text class="d-sub" x="360" y="96" text-anchor="middle">Respaldo · panel del dueño · reportes</text>
+  </g>
+
+  <!-- El enlace, punteado, y su corte -->
+  <path class="d-nube-linea" d="M360 108 L360 168"/>
+  <g class="d-corte">
+    <line x1="342" y1="130" x2="378" y2="146" stroke="var(--danger, #C0392B)" stroke-width="2.5" stroke-linecap="round"/>
+    <line x1="378" y1="130" x2="342" y2="146" stroke="var(--danger, #C0392B)" stroke-width="2.5" stroke-linecap="round"/>
+    <text class="d-etq" x="392" y="142" fill="var(--danger, #C0392B)">SIN INTERNET</text>
+  </g>
+
+  <!-- ── La caja: el centro de todo ─────────────────────────────────────── -->
+  <g>
+    <rect class="d-hub" x="248" y="168" width="224" height="96" rx="8"/>
+    <text class="d-etq" x="360" y="192" text-anchor="middle" fill="var(--accent, #0078C9)">EN TU MOSTRADOR</text>
+    <text class="d-titulo" x="360" y="216" text-anchor="middle">La caja</text>
+    <text class="d-sub" x="360" y="238" text-anchor="middle">Base de datos propia · cobra e imprime</text>
+    <text class="d-sub" x="360" y="254" text-anchor="middle">aunque no haya señal</text>
+  </g>
+
+  <!-- ── Lo que cuelga de la caja, por la red del local ──────────────────── -->
+  <path class="d-linea" d="M300 264 L300 300 L168 300 L168 336"/>
+  <path class="d-linea" d="M420 264 L420 300 L552 300 L552 336"/>
+  <path class="d-linea" d="M360 264 L360 336"/>
+
+  <text class="d-etq" x="360" y="292" text-anchor="middle">RED DEL NEGOCIO</text>
+
+  <g>
+    <rect class="d-caja" x="88" y="336" width="160" height="76" rx="8"/>
+    <text class="d-titulo" x="168" y="366" text-anchor="middle">Cocina</text>
+    <text class="d-sub" x="168" y="388" text-anchor="middle">Las comandas, en pantalla</text>
+  </g>
+
+  <g>
+    <rect class="d-caja" x="280" y="336" width="160" height="76" rx="8"/>
+    <text class="d-titulo" x="360" y="366" text-anchor="middle">Impresoras</text>
+    <text class="d-sub" x="360" y="388" text-anchor="middle">Tickets y comandas por área</text>
+  </g>
+
+  <g>
+    <rect class="d-caja" x="472" y="336" width="160" height="76" rx="8"/>
+    <text class="d-titulo" x="552" y="366" text-anchor="middle">Segunda caja</text>
+    <text class="d-sub" x="552" y="388" text-anchor="middle">Comparte el mismo turno</text>
+  </g>
+</svg>

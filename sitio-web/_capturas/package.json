@@ -1,0 +1,16 @@
+{
+  "name": "vim-capturas",
+  "private": true,
+  "type": "module",
+  "description": "Captura las pantallas del producto real para el sitio. NO se sube a Hostinger y NO es parte del workspace de pnpm.",
+  "scripts": {
+    "capturar": "node render.mjs",
+    "navegador": "playwright install chromium"
+  },
+  "devDependencies": {
+    "playwright": "^1.49.0"
+  },
+  "optionalDependencies": {
+    "sharp": "^0.33.5"
+  }
+}
