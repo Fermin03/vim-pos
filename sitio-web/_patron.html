@@ -1,0 +1,213 @@
+<!doctype html>
+<html lang="es-MX">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Patrón — VIM POS</title>
+
+<!--
+  PÁGINA DE REFERENCIA. No se sube a Hostinger (empieza con guion bajo).
+
+  Existe para dos cosas:
+    1. Ser el patrón que se copia y pega al crear cada página. No hay build ni
+       includes, así que el encabezado y el pie viven duplicados en los seis
+       archivos: es el precio de no tener paso de compilación, y es barato
+       mientras el patrón esté en un solo sitio de donde copiarlo.
+    2. Ver los componentes juntos. Los errores de espaciado y de escala se
+       notan cuando las piezas están una al lado de otra, no repartidas por
+       cinco páginas.
+-->
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@400;500;600&family=JetBrains+Mono:wght@400;600&family=Sora:wght@600;700&display=swap">
+
+<link rel="icon" href="assets/img/logo.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="assets/img/apple-touch-icon-1024.png">
+<link rel="manifest" href="site.webmanifest">
+<meta name="theme-color" content="#0078C9">
+
+<link rel="stylesheet" href="assets/css/vim.css">
+</head>
+<body>
+
+<a href="#contenido" class="solo-lectores">Saltar al contenido</a>
+
+<!-- ══ ENCABEZADO — se copia tal cual en cada página ══════════════════════ -->
+<header class="nav">
+  <div class="contenedor">
+    <div class="nav-fila">
+      <a href="index.html" class="nav-logo" aria-label="VIM POS, inicio">
+        <img src="assets/img/logo-horizontal.svg" alt="VIM POS" width="120" height="26">
+      </a>
+
+      <nav class="nav-enlaces" aria-label="Principal">
+        <a class="nav-enlace" href="sin-internet.html">Sin internet</a>
+        <a class="nav-enlace" href="precios.html">Precios</a>
+      </nav>
+
+      <div class="nav-acciones">
+        <a class="btn btn-primario" href="demo.html">Pide una demo</a>
+        <button class="nav-hamburguesa" data-menu-boton type="button"
+                aria-expanded="false" aria-controls="menu-movil" aria-label="Abrir menú">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+               stroke-width="2" stroke-linecap="round" aria-hidden="true">
+            <path d="M4 7h16M4 12h16M4 17h16"/>
+          </svg>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <div class="nav-movil" id="menu-movil" data-menu data-abierto="false">
+    <div>
+      <div class="contenedor">
+        <div class="nav-movil-lista">
+          <a href="sin-internet.html">Sin internet</a>
+          <a href="precios.html">Precios</a>
+          <a href="demo.html">Pide una demo</a>
+        </div>
+      </div>
+    </div>
+  </div>
+</header>
+
+<main id="contenido">
+  <div class="contenedor">
+
+    <section class="seccion pila pila-5">
+      <p class="eyebrow">Fundación · fase 1</p>
+      <h1>Los componentes, juntos</h1>
+      <p>
+        Esta página no se publica. Sirve para copiar el patrón al crear cada
+        archivo y para ver si la escala y el espaciado aguantan cuando las piezas
+        están una junto a otra.
+      </p>
+      <div class="fila">
+        <a class="btn btn-primario btn-hero" href="#">Pide una demo</a>
+        <a class="btn btn-fantasma btn-hero" href="#">Escríbenos por WhatsApp</a>
+      </div>
+    </section>
+
+    <section class="seccion pila pila-5" style="border-top:1px solid var(--line)">
+      <p class="eyebrow">Escala tipográfica</p>
+      <h2>Ocho pasos y ni uno más</h2>
+      <p>
+        La escala es fija: 12 · 13 · 15 · 18 · 24 · 32 · 44 · 60. El sistema del
+        producto la tenía como deuda pendiente; aquí se cierra de entrada para no
+        acabar inventando tamaños intermedios página por página.
+      </p>
+      <div class="pila pila-3">
+        <div style="font-size:var(--t-60);font-family:var(--font-display);font-weight:700;letter-spacing:-.02em;line-height:1.1">60 · Titular del hero</div>
+        <div style="font-size:var(--t-44);font-family:var(--font-display);font-weight:600;letter-spacing:-.02em;line-height:1.1">44 · Título de sección</div>
+        <div style="font-size:var(--t-32);font-family:var(--font-display);font-weight:600;letter-spacing:-.02em">32 · Subtítulo</div>
+        <div style="font-size:var(--t-24);font-family:var(--font-display);font-weight:600">24 · Encabezado menor</div>
+        <div style="font-size:var(--t-18)">18 · Entradilla, texto destacado</div>
+        <div style="font-size:var(--t-15)">15 · Texto corrido, el tamaño por omisión</div>
+        <div style="font-size:var(--t-13);color:var(--ink-2)">13 · Pie de tabla, nota al margen</div>
+        <div class="eyebrow">12 · Etiqueta en versalitas</div>
+      </div>
+    </section>
+
+    <section class="seccion pila pila-5" style="border-top:1px solid var(--line)">
+      <p class="eyebrow">Botones</p>
+      <h2>Un solo azul lleno por pantalla</h2>
+      <p>
+        El acento aquí es color de marca, no «la acción» como en el POS. Si hay
+        dos botones azules compitiendo, ninguno gana — y encima pelean con las
+        capturas del producto, que ya llevan su propio azul dentro.
+      </p>
+      <div class="fila">
+        <button class="btn btn-primario" type="button">Pide una demo</button>
+        <button class="btn btn-fantasma" type="button">Ver precios</button>
+      </div>
+      <p style="font-size:var(--t-13)">
+        Presiónalos: bajan a <code>scale(0.97)</code> en 140 ms. Es la señal de
+        que la interfaz escuchó, y es lo único que se anima en táctil — el hover
+        va detrás de <code>hover: hover</code> porque en un teléfono se queda
+        pegado después de soltar.
+      </p>
+    </section>
+
+    <section class="seccion pila pila-5" style="border-top:1px solid var(--line)">
+      <p class="eyebrow">Color</p>
+      <h2>Heredado del producto, sin tocar</h2>
+      <p>
+        Los tokens se copian de <code>vim-pos/packages/ui/tokens.css</code>. Que
+        el sitio y el producto se vean como la misma cosa no es estética: es lo
+        que evita que el prospecto sienta que la demo es otro programa.
+      </p>
+      <div class="fila" style="gap:var(--sp-4)">
+        <div class="pila pila-2" style="align-items:center">
+          <div style="width:72px;height:48px;border-radius:var(--r);background:var(--accent)"></div>
+          <span style="font-family:var(--font-mono);font-size:var(--t-12)">#0078C9</span>
+        </div>
+        <div class="pila pila-2" style="align-items:center">
+          <div style="width:72px;height:48px;border-radius:var(--r);background:var(--accent-hover)"></div>
+          <span style="font-family:var(--font-mono);font-size:var(--t-12)">#0063A8</span>
+        </div>
+        <div class="pila pila-2" style="align-items:center">
+          <div style="width:72px;height:48px;border-radius:var(--r);background:var(--accent-soft);border:1px solid var(--line)"></div>
+          <span style="font-family:var(--font-mono);font-size:var(--t-12)">#EAF3FB</span>
+        </div>
+        <div class="pila pila-2" style="align-items:center">
+          <div style="width:72px;height:48px;border-radius:var(--r);background:var(--ink)"></div>
+          <span style="font-family:var(--font-mono);font-size:var(--t-12)">#16161A</span>
+        </div>
+        <div class="pila pila-2" style="align-items:center">
+          <div style="width:72px;height:48px;border-radius:var(--r);background:var(--ink-2)"></div>
+          <span style="font-family:var(--font-mono);font-size:var(--t-12)">#5A5A60</span>
+        </div>
+        <div class="pila pila-2" style="align-items:center">
+          <div style="width:72px;height:48px;border-radius:var(--r);background:var(--surface);border:1px solid var(--line-strong)"></div>
+          <span style="font-family:var(--font-mono);font-size:var(--t-12)">#FBFBFA</span>
+        </div>
+      </div>
+    </section>
+
+  </div>
+</main>
+
+<!-- ══ PIE — se copia tal cual en cada página ═════════════════════════════ -->
+<footer class="pie">
+  <div class="contenedor">
+    <div class="pie-rejilla">
+      <div class="pila pila-3">
+        <img src="assets/img/logo-horizontal.svg" alt="VIM POS" width="120" height="26">
+        <p style="font-size:var(--t-15)">
+          El punto de venta que no se detiene cuando se cae el internet.
+          Hecho en León, Guanajuato.
+        </p>
+      </div>
+
+      <div>
+        <h4>Producto</h4>
+        <ul class="pie-lista">
+          <li><a href="sin-internet.html">Sin internet</a></li>
+          <li><a href="precios.html">Precios</a></li>
+          <li><a href="demo.html">Pide una demo</a></li>
+        </ul>
+      </div>
+
+      <div>
+        <h4>Contacto</h4>
+        <ul class="pie-lista">
+          <li><a href="mailto:hola@vimpos.com.mx">hola@vimpos.com.mx</a></li>
+          <li><a href="https://wa.me/524761273020">WhatsApp 476 127 3020</a></li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="pie-legal">
+      <span>© 2026 Fermín Villalobos Martínez</span>
+      <span class="fila" style="gap:var(--sp-5)">
+        <a href="aviso-privacidad.html" style="color:inherit">Aviso de privacidad</a>
+        <a href="terminos.html" style="color:inherit">Términos</a>
+      </span>
+    </div>
+  </div>
+</footer>
+
+<script src="assets/js/vim.js" defer></script>
+</body>
+</html>
