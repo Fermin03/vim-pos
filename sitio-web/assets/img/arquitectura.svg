@@ -1,93 +1,92 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 720 460" role="img"
-     aria-labelledby="arq-titulo arq-desc" class="diagrama-arquitectura">
-  <title id="arq-titulo">Cómo funciona VIM POS sin internet</title>
+<svg viewBox="0 0 760 468" role="img" aria-labelledby="arq-titulo arq-desc"
+     class="diagrama-arquitectura" xmlns="http://www.w3.org/2000/svg">
+  <title id="arq-titulo">Qué sigue funcionando cuando se cae el internet</title>
   <desc id="arq-desc">
-    La caja del local es el centro: tiene su propia base de datos y de ella cuelgan, por la red del
-    negocio, la pantalla de cocina y una segunda caja. La nube está conectada por una línea de
-    puntos, y cuando esa línea se corta todo lo del local sigue funcionando.
+    Todo lo que hace falta para vender —la caja, las impresoras, la pantalla de cocina y una
+    segunda caja— vive dentro del local y funciona sin conexión. La nube queda fuera de esa
+    frontera, unida por una sola línea que se puede cortar.
   </desc>
 
   <style>
-    /* Los colores se toman de la página cuando el SVG va incrustado; los valores
-       de reserva son los tokens del producto, para que el archivo también se vea
-       bien abierto suelto. */
-    .d-linea   { stroke: var(--line-strong, #DDDDD9); stroke-width: 1.5; fill: none; }
-    .d-caja    { fill: var(--surface, #FBFBFA); stroke: var(--line-strong, #DDDDD9); stroke-width: 1.5; }
-    .d-hub     { fill: var(--accent-soft, #EAF3FB); stroke: var(--accent, #0078C9); stroke-width: 2; }
-    .d-titulo  { font: 600 15px 'Inter Tight', system-ui, sans-serif; fill: var(--ink, #16161A); }
-    .d-sub     { font: 400 12px 'Inter Tight', system-ui, sans-serif; fill: var(--ink-3, #8E8E94); }
-    .d-etq     { font: 600 10px 'JetBrains Mono', ui-monospace, monospace;
-                 fill: var(--ink-3, #8E8E94); letter-spacing: .08em; }
+    .a-t-titulo { font: 600 15px 'Inter Tight', system-ui, sans-serif; fill: var(--ink, #16161A); }
+    .a-t-sub    { font: 400 12.5px 'Inter Tight', system-ui, sans-serif; fill: var(--ink-3, #8E8E94); }
+    .a-t-etq    { font: 600 10px 'JetBrains Mono', ui-monospace, monospace;
+                  letter-spacing: .12em; fill: var(--ink-3, #8E8E94); }
 
-    /* El enlace con la nube es lo único punteado: se ve distinto de las líneas
-       del local aunque nadie lea la leyenda. */
-    .d-nube-linea { stroke: var(--ink-3, #8E8E94); stroke-width: 1.5; stroke-dasharray: 5 5; fill: none; }
-    .d-nube       { fill: none; stroke: var(--ink-3, #8E8E94); stroke-width: 1.5; }
-    .d-nube-txt   { font: 400 12px 'Inter Tight', system-ui, sans-serif; fill: var(--ink-3, #8E8E94); }
+    /* La frontera del local es la pieza que carga el argumento: lo de dentro no
+       depende de lo de fuera. Por eso es lo único con relleno propio. */
+    .a-local   { fill: var(--accent-soft, #EAF3FB); stroke: none; }
+    .a-tarjeta { fill: var(--bg, #FFFFFF); stroke: var(--line-strong, #DDDDD9); stroke-width: 1; }
+    .a-caja    { fill: var(--bg, #FFFFFF); stroke: var(--accent, #0078C9); stroke-width: 1.5; }
+    .a-hilo    { stroke: var(--accent, #0078C9); stroke-width: 1.25; fill: none; opacity: .45; }
 
-    /* Estado "sin internet": la nube se atenúa y aparece el corte. Lo enciende
-       la página añadiendo la clase, y la transición va en opacidad —lo único
-       que se puede animar barato— con la curva del sitio. */
-    .d-corte { opacity: 0; }
-    .diagrama-arquitectura.sin-red .d-nube,
-    .diagrama-arquitectura.sin-red .d-nube-linea,
-    .diagrama-arquitectura.sin-red .d-nube-txt { opacity: .28; }
-    .diagrama-arquitectura.sin-red .d-corte { opacity: 1; }
+    /* Lo de fuera: gris, sin relleno y unido por puntos. Se lee como "opcional"
+       antes de leer ninguna palabra. */
+    .a-fuera   { fill: none; stroke: var(--line-strong, #DDDDD9); stroke-width: 1; }
+    .a-enlace  { stroke: var(--ink-3, #8E8E94); stroke-width: 1.25; stroke-dasharray: 4 4; fill: none; }
 
-    .d-nube, .d-nube-linea, .d-nube-txt, .d-corte {
-      transition: opacity 240ms cubic-bezier(0.23, 1, 0.32, 1);
-    }
+    .a-corte { opacity: 0; }
+    .a-nube-grupo, .a-enlace, .a-corte { transition: opacity 240ms cubic-bezier(0.23, 1, 0.32, 1); }
+
+    .diagrama-arquitectura.sin-red .a-nube-grupo,
+    .diagrama-arquitectura.sin-red .a-enlace { opacity: .3; }
+    .diagrama-arquitectura.sin-red .a-corte  { opacity: 1; }
+
     @media (prefers-reduced-motion: reduce) {
-      .d-nube, .d-nube-linea, .d-nube-txt, .d-corte { transition: none; }
+      .a-nube-grupo, .a-enlace, .a-corte { transition: none; }
     }
   </style>
 
-  <!-- ── La nube, arriba y colgando ─────────────────────────────────────── -->
-  <g>
-    <path class="d-nube" d="M318 44a26 26 0 0 1 50-8 20 20 0 0 1 34 14 18 18 0 0 1-2 36h-78a21 21 0 0 1-4-42z"/>
-    <text class="d-nube-txt" x="360" y="62" text-anchor="middle">Nube</text>
-    <text class="d-sub" x="360" y="96" text-anchor="middle">Respaldo · panel del dueño · reportes</text>
+  <!-- ── Fuera del local ──────────────────────────────────────────────────
+       Una tarjeta gris y vacía, no un dibujo de nube: el símbolo caricaturesco
+       es justo lo que hacía que esto pareciera una lámina de manual. -->
+  <g class="a-nube-grupo">
+    <rect class="a-fuera" x="252" y="8" width="256" height="60" rx="8"/>
+    <text class="a-t-etq" x="272" y="30">FUERA · OPCIONAL</text>
+    <text class="a-t-sub" x="272" y="52">Respaldo, panel del dueño y reportes</text>
   </g>
 
-  <!-- El enlace, punteado, y su corte -->
-  <path class="d-nube-linea" d="M360 108 L360 168"/>
-  <g class="d-corte">
-    <line x1="342" y1="130" x2="378" y2="146" stroke="var(--danger, #C0392B)" stroke-width="2.5" stroke-linecap="round"/>
-    <line x1="378" y1="130" x2="342" y2="146" stroke="var(--danger, #C0392B)" stroke-width="2.5" stroke-linecap="round"/>
-    <text class="d-etq" x="392" y="142" fill="var(--danger, #C0392B)">SIN INTERNET</text>
+  <!-- El único hilo que cruza la frontera. Y el corte. -->
+  <path class="a-enlace" d="M380 68 L380 116"/>
+  <g class="a-corte">
+    <circle cx="380" cy="92" r="13" fill="var(--bg, #FFFFFF)"/>
+    <path d="M374 86 L386 98 M386 86 L374 98"
+          stroke="var(--danger, #C0392B)" stroke-width="2" stroke-linecap="round"/>
+    <text class="a-t-etq" x="402" y="96" fill="var(--danger, #C0392B)">SE CAYÓ EL INTERNET</text>
   </g>
 
-  <!-- ── La caja: el centro de todo ─────────────────────────────────────── -->
+  <!-- ── Dentro del local ─────────────────────────────────────────────────
+       Todo lo que hace falta para vender cabe aquí dentro. -->
+  <rect class="a-local" x="16" y="116" width="728" height="336" rx="12"/>
+  <text class="a-t-etq" x="40" y="146" fill="var(--accent-hover, #0063A8)">EN TU LOCAL</text>
+
+  <!-- La caja, que es el centro -->
+  <rect class="a-caja" x="230" y="166" width="300" height="86" rx="10"/>
+  <text class="a-t-titulo" x="254" y="198">La caja</text>
+  <text class="a-t-sub" x="254" y="220">Base de datos completa, aquí dentro.</text>
+  <text class="a-t-sub" x="254" y="238">Cobra e imprime sin señal.</text>
+
+  <!-- Del centro a cada pieza. Curvas suaves en vez de ángulos rectos: los
+       ángulos rectos son lo que da aire de organigrama. -->
+  <path class="a-hilo" d="M380 252 v28 q0 12 -12 12 H160 q-12 0 -12 12 v18"/>
+  <path class="a-hilo" d="M380 252 v70"/>
+  <path class="a-hilo" d="M380 252 v28 q0 12 12 12 H600 q12 0 12 12 v18"/>
+
+  <!-- Las tres piezas, con el texto alineado a la izquierda como en una ficha,
+       no centrado como en una caja de diagrama. -->
   <g>
-    <rect class="d-hub" x="248" y="168" width="224" height="96" rx="8"/>
-    <text class="d-etq" x="360" y="192" text-anchor="middle" fill="var(--accent, #0078C9)">EN TU MOSTRADOR</text>
-    <text class="d-titulo" x="360" y="216" text-anchor="middle">La caja</text>
-    <text class="d-sub" x="360" y="238" text-anchor="middle">Base de datos propia · cobra e imprime</text>
-    <text class="d-sub" x="360" y="254" text-anchor="middle">aunque no haya señal</text>
+    <rect class="a-tarjeta" x="48" y="340" width="200" height="80" rx="10"/>
+    <text class="a-t-titulo" x="70" y="372">Cocina</text>
+    <text class="a-t-sub" x="70" y="394">Comandas en pantalla</text>
   </g>
-
-  <!-- ── Lo que cuelga de la caja, por la red del local ──────────────────── -->
-  <path class="d-linea" d="M300 264 L300 300 L168 300 L168 336"/>
-  <path class="d-linea" d="M420 264 L420 300 L552 300 L552 336"/>
-  <path class="d-linea" d="M360 264 L360 336"/>
-
-  <text class="d-etq" x="360" y="292" text-anchor="middle">RED DEL NEGOCIO</text>
-
   <g>
-    <rect class="d-caja" x="88" y="336" width="160" height="76" rx="8"/>
-    <text class="d-titulo" x="168" y="366" text-anchor="middle">Cocina</text>
-    <text class="d-sub" x="168" y="388" text-anchor="middle">Las comandas, en pantalla</text>
+    <rect class="a-tarjeta" x="280" y="340" width="200" height="80" rx="10"/>
+    <text class="a-t-titulo" x="302" y="372">Impresoras</text>
+    <text class="a-t-sub" x="302" y="394">Tickets y comandas por área</text>
   </g>
-
   <g>
-    <rect class="d-caja" x="280" y="336" width="160" height="76" rx="8"/>
-    <text class="d-titulo" x="360" y="366" text-anchor="middle">Impresoras</text>
-    <text class="d-sub" x="360" y="388" text-anchor="middle">Tickets y comandas por área</text>
-  </g>
-
-  <g>
-    <rect class="d-caja" x="472" y="336" width="160" height="76" rx="8"/>
-    <text class="d-titulo" x="552" y="366" text-anchor="middle">Segunda caja</text>
-    <text class="d-sub" x="552" y="388" text-anchor="middle">Comparte el mismo turno</text>
+    <rect class="a-tarjeta" x="512" y="340" width="200" height="80" rx="10"/>
+    <text class="a-t-titulo" x="534" y="372">Segunda caja</text>
+    <text class="a-t-sub" x="534" y="394">Comparte el mismo turno</text>
   </g>
 </svg>
