@@ -28,10 +28,13 @@ export async function leerVentasTurno(token: string, turnoId: string): Promise<V
   if (ids.length > 0) {
     const { data: devs } = await employeeClient(token)
       .from("devoluciones")
-      .select("ticket_id")
-      .in("ticket_id", ids)
+      // `ticket_original_id`, no `ticket_id`: la columna nunca se llamó así. Con el nombre
+      // equivocado PostgREST devolvía error, y como aquí solo se lee `data`, el error se perdía y
+      // el conjunto quedaba vacío — la UI nunca avisaba de que un ticket ya tenía devolución.
+      .select("ticket_original_id")
+      .in("ticket_original_id", ids)
       .eq("estado", "CONFIRMADA");
-    for (const d of (devs ?? []) as { ticket_id: string }[]) conDev.add(d.ticket_id);
+    for (const d of (devs ?? []) as { ticket_original_id: string }[]) conDev.add(d.ticket_original_id);
   }
 
   return ((data ?? []) as Record<string, unknown>[]).map((t) => ({

@@ -22,9 +22,15 @@ export type DeliveryAsignacion = {
 export async function leerDeliveries(token: string, sucursalId: string): Promise<DeliveryAsignacion[]> {
   const { data, error } = await employeeClient(token)
     .from("delivery_asignaciones")
+    // El nombre del repartidor NO se puede traer con un embed: `repartidor_id` apunta a
+    // `auth.users`, no a `usuarios_perfil`, así que no hay clave foránea que PostgREST pueda
+    // recorrer y respondía PGRST200. Se resuelve abajo con una segunda consulta.
+    //
+    // `repartidor_catalogo_id` (0078) es el camino nuevo y ese sí tiene FK al catálogo, así que
+    // para los repartidores dados de alta ahí el nombre llega directo.
     .select(
-      "id, ticket_id, repartidor_id, estado, monto_a_liquidar_mxn, propina_repartidor_mxn, tiempo_promesa_minutos, fecha_asignacion, " +
-        "ticket:tickets(folio_completo), repartidor:usuarios_perfil!repartidor_id(nombre)",
+      "id, ticket_id, repartidor_id, repartidor_nombre, estado, monto_a_liquidar_mxn, propina_repartidor_mxn, tiempo_promesa_minutos, fecha_asignacion, " +
+        "ticket:tickets(folio_completo), catalogo:repartidores(nombre)",
     )
     .eq("sucursal_id", sucursalId)
     .not("estado", "in", "(LIQUIDADO,CANCELADO)")
@@ -35,7 +41,12 @@ export async function leerDeliveries(token: string, sucursalId: string): Promise
     ticketId: String(r.ticket_id),
     ticketFolio: ((r.ticket as { folio_completo?: string } | null)?.folio_completo) ?? null,
     repartidorId: (r.repartidor_id as string) ?? null,
-    repartidorNombre: ((r.repartidor as { nombre?: string } | null)?.nombre) ?? "—",
+    // Orden de preferencia: el catálogo (0078), luego el nombre que se guardó al asignar, y solo
+    // entonces el guion. Antes venía del embed roto, así que siempre salía "—".
+    repartidorNombre:
+      ((r.catalogo as { nombre?: string } | null)?.nombre)
+      ?? (r.repartidor_nombre as string | null)
+      ?? "—",
     estado: (r.estado as DeliveryEstado) ?? "ASIGNADO",
     montoALiquidar: Number(r.monto_a_liquidar_mxn ?? 0),
     propinaRepartidor: Number(r.propina_repartidor_mxn ?? 0),

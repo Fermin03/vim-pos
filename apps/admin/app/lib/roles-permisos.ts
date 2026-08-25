@@ -70,14 +70,28 @@ export type UsuarioPersonalizado = { usuarioId: string; nombre: string };
 
 /** Usuarios del tenant con rol PERSONALIZADO. */
 export async function usuariosPersonalizados(): Promise<UsuarioPersonalizado[]> {
+  // El nombre se lee en DOS consultas, no con un embed.
+  //
+  // `usuarios_acceso.usuario_id` y `usuarios_perfil.id` apuntan los dos a `auth.users`, pero NO hay
+  // una clave foránea entre ellas, así que PostgREST no puede recorrer ese camino: el embed
+  // `perfil:usuarios_perfil(nombre)` respondía PGRST200 y esta pantalla no cargaba nunca.
   const { data, error } = await supabase
     .from("usuarios_acceso")
-    .select("usuario_id, rol:roles(codigo), perfil:usuarios_perfil(nombre)")
+    .select("usuario_id, rol:roles(codigo)")
     .eq("activo", true);
   if (error) throw new Error(error.message);
-  return ((data ?? []) as unknown as { usuario_id: string; rol: { codigo: string } | null; perfil: { nombre: string } | null }[])
-    .filter((r) => r.rol?.codigo === "PERSONALIZADO")
-    .map((r) => ({ usuarioId: r.usuario_id, nombre: r.perfil?.nombre ?? "(sin nombre)" }));
+
+  const accesos = ((data ?? []) as unknown as { usuario_id: string; rol: { codigo: string } | null }[])
+    .filter((r) => r.rol?.codigo === "PERSONALIZADO");
+  if (accesos.length === 0) return [];
+
+  const { data: perfiles } = await supabase
+    .from("usuarios_perfil")
+    .select("id, nombre")
+    .in("id", accesos.map((a) => a.usuario_id));
+  const nombres = new Map(((perfiles ?? []) as { id: string; nombre: string }[]).map((p) => [p.id, p.nombre]));
+
+  return accesos.map((r) => ({ usuarioId: r.usuario_id, nombre: nombres.get(r.usuario_id) ?? "(sin nombre)" }));
 }
 
 export async function permisosDeUsuario(usuarioId: string): Promise<string[]> {
