@@ -63,7 +63,7 @@
   <!-- La caja, que es el centro -->
   <rect class="a-caja" x="230" y="166" width="300" height="86" rx="10"/>
   <text class="a-t-titulo" x="254" y="198">La caja</text>
-  <text class="a-t-sub" x="254" y="220">Base de datos completa, aquí dentro.</text>
+  <text class="a-t-sub" x="254" y="220">Tus ventas y tu menú viven aquí.</text>
   <text class="a-t-sub" x="254" y="238">Cobra e imprime sin señal.</text>
 
   <!-- Del centro a cada pieza. Curvas suaves en vez de ángulos rectos: los
