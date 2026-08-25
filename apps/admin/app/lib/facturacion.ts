@@ -156,7 +156,10 @@ export async function facturarTicket(ticketId: string, receptor: ReceptorInput):
     p_emisor_lugar_expedicion: t.codigo_postal_fiscal,
     p_metodo_pago_sat: "PUE",
     p_forma_pago_sat: r.forma_pago_sat,
-    p_pac_proveedor: emisor.proveedor_pac ?? "FACTURAPI",
+    // El PAC real lo decide el servidor y la Edge Function corrige este valor tras timbrar. Aquí
+    // solo hace falta algo válido para el borrador; tomarlo de `emisor.proveedor_pac` era peor,
+    // porque el cliente podía elegir uno y timbrar otro.
+    p_pac_proveedor: "FACTURAMA",
   });
   if (eB) return { ok: false, cfdiId: null, error: eB.message };
   const id = String(cfdiId);
