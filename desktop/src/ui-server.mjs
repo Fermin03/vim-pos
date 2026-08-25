@@ -151,6 +151,24 @@ export async function startUiServer(dir, port, gatewayPort = 54350, host = "0.0.
         return res.end(JSON.stringify(opts.estadoSync ? opts.estadoSync() : { disponible: false }));
       }
 
+      // CAJA: folios de facturación que le quedan al negocio.
+      //
+      // Se pregunta a la NUBE en el momento, no al Postgres local. El saldo lo mueve el panel de
+      // plataforma cuando VIM acredita un paquete, y el PULL del catálogo baja cada hora: leerlo
+      // de la copia local haría que el cliente pagara sus folios y siguiera viendo cero.
+      //
+      // Va por aquí y no desde la página porque el token de nube del dispositivo vive en el main.
+      // Solo lectura y solo dos números; nada que no vea ya el propio negocio.
+      if (!kds && req.method === "GET" && req.url.startsWith("/__folios")) {
+        res.writeHead(200, { "Content-Type": "application/json", "Cache-Control": "no-store" });
+        try {
+          const r = await opts.onFolios?.();
+          return res.end(JSON.stringify(r ?? { ok: false, aplica: false }));
+        } catch (e) {
+          return res.end(JSON.stringify({ ok: false, error: e?.message ?? "No se pudo consultar" }));
+        }
+      }
+
       // COCINA: recibir la IP del hub desde la pantalla de setup.
       if (kds && req.method === "POST" && req.url.startsWith("/__set-hub")) {
         if (!mismaProcedencia(req, port)) {

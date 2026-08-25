@@ -217,6 +217,11 @@ export async function importarMenu(filas: FilaMenu[]): Promise<ResultadoImport> 
         estado: "ACTIVO",
         agotado: false,
         visible_en_pos: true,
+        // La importación masiva no trae datos fiscales: quedan en el estándar del giro y se
+        // ajustan por producto si el contador lo pide. Mejor eso que frenar la importación.
+        clave_sat: "",
+        tasa_iva: 16,
+        iva_incluido_en_precio: true,
         marca_virtual_id: "",
       });
       productosCreados++;

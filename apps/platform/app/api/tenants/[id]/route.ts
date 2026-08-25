@@ -27,20 +27,49 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   if (!tenant) return NextResponse.json({ error: "NO_EXISTE" }, { status: 404 });
 
-  // Saldo de folios (último movimiento) + sucursales/usuarios para contexto.
-  const { data: ultFolioRaw } = await sb
-    .from("folios_movimientos")
-    .select("saldo_paquetes_resultante, created_at")
+  // Saldo de folios: se lee de `tenant_folios_saldo`, que es la tabla que consulta el timbrado.
+  //
+  // Antes se derivaba del último movimiento del ledger. Parecía equivalente y no lo era: acreditar
+  // solo insertaba en el ledger sin tocar el saldo, así que el panel enseñaba un número que el
+  // timbrado no reconocía. La migración 0081 unificó las dos y esto lee la que manda.
+  const { data: saldoRaw } = await sb
+    .from("tenant_folios_saldo")
+    .select("saldo_paquetes, folios_base_mensuales, folios_base_consumidos, periodo_actual")
     .eq("tenant_id", id)
-    .order("created_at", { ascending: false })
-    .limit(1)
     .maybeSingle();
-  const ultFolio = ultFolioRaw as unknown as { saldo_paquetes_resultante: number } | null;
+  const saldo = saldoRaw as unknown as {
+    saldo_paquetes: number; folios_base_mensuales: number; folios_base_consumidos: number; periodo_actual: string;
+  } | null;
+
+  const { data: addonsRaw } = await sb
+    .from("tenant_addons")
+    .select("id, activo, fecha_inicio, fecha_fin, precio_mensual_mxn, addon:addons(id, codigo, nombre, precio_mensual_mxn)")
+    .eq("tenant_id", id)
+    .order("fecha_inicio", { ascending: false });
+
+  const { data: catalogoAddons } = await sb
+    .from("addons")
+    .select("id, codigo, nombre, descripcion, precio_mensual_mxn")
+    .eq("activo", true)
+    .order("orden_visualizacion");
+
+  const { data: paquetes } = await sb
+    .from("folios_paquetes")
+    .select("id, codigo, nombre, cantidad_folios, precio_mxn")
+    .eq("activo", true)
+    .order("orden_visualizacion");
+
   const { count: nSucursales } = await sb.from("sucursales").select("id", { count: "exact", head: true }).eq("tenant_id", id).is("deleted_at", null);
 
   return NextResponse.json({
     tenant,
-    foliosSaldo: ultFolio?.saldo_paquetes_resultante ?? 0,
+    foliosSaldo: saldo?.saldo_paquetes ?? 0,
+    foliosBase: saldo
+      ? { mensuales: saldo.folios_base_mensuales, consumidos: saldo.folios_base_consumidos, periodo: saldo.periodo_actual }
+      : null,
+    addons: addonsRaw ?? [],
+    catalogoAddons: catalogoAddons ?? [],
+    paquetes: paquetes ?? [],
     nSucursales: nSucursales ?? 0,
   });
 }
@@ -91,25 +120,109 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
     return NextResponse.json({ ok: true });
   }
 
-  if (accion === "ajustar_folios") {
-    const cantidad = Math.trunc(Number(body.cantidad ?? 0));
-    if (!cantidad) return NextResponse.json({ error: "CANTIDAD_REQUERIDA" }, { status: 400 });
-    const motivo = (body.motivo as string | undefined)?.trim() || "Ajuste manual desde plataforma";
-    // Saldo previo = saldo del último movimiento; el nuevo saldo lo recalcula sumando la cantidad.
-    const { data: ultRaw } = await sb.from("folios_movimientos").select("saldo_paquetes_resultante").eq("tenant_id", id).order("created_at", { ascending: false }).limit(1).maybeSingle();
-    const ult = ultRaw as unknown as { saldo_paquetes_resultante: number } | null;
-    const saldoPrevio = Number(ult?.saldo_paquetes_resultante ?? 0);
-    const saldoNuevo = saldoPrevio + cantidad;
-    if (saldoNuevo < 0) return NextResponse.json({ error: "SALDO_NEGATIVO" }, { status: 400 });
-    const { error } = await sb.from("folios_movimientos").insert({
-      tenant_id: id, tipo: "AJUSTE_MANUAL", cantidad, saldo_paquetes_resultante: saldoNuevo,
-      // Día contable en hora de México: este endpoint corre en un servidor en UTC, así que
-      // después de las 18:00 hora local un ajuste de folios se asentaba en el día siguiente.
-      dia_contable: hoyMx(),
+  // Ajuste manual y venta de paquete son la misma operación con distinto origen, así que las dos
+  // pasan por `acreditar_folios_cfdi`. Esa función mueve el saldo Y el ledger en una transacción,
+  // con bloqueo de fila: antes esto insertaba en el ledger a mano, dejaba el saldo intacto —el
+  // timbrado nunca veía los folios acreditados— y calculaba el saldo previo con un SELECT que dos
+  // pestañas simultáneas podían leer igual.
+  if (accion === "ajustar_folios" || accion === "acreditar_paquete") {
+    let cantidad: number;
+    let paqueteId: string | null = null;
+    let precio: number | null = null;
+    let tipo: "AJUSTE_MANUAL" | "COMPRA_PAQUETE" = "AJUSTE_MANUAL";
+    let motivo = (body.motivo as string | undefined)?.trim() || "Ajuste manual desde plataforma";
+
+    if (accion === "acreditar_paquete") {
+      paqueteId = String(body.paquete_id ?? "");
+      if (!paqueteId) return NextResponse.json({ error: "PAQUETE_REQUERIDO" }, { status: 400 });
+      const { data: paqRaw } = await sb
+        .from("folios_paquetes")
+        .select("cantidad_folios, precio_mxn, nombre")
+        .eq("id", paqueteId)
+        .maybeSingle();
+      const paq = paqRaw as unknown as { cantidad_folios: number; precio_mxn: number; nombre: string } | null;
+      if (!paq) return NextResponse.json({ error: "PAQUETE_NO_EXISTE" }, { status: 404 });
+      // La cantidad y el precio salen del catálogo, NUNCA del cuerpo de la petición: si vinieran
+      // de fuera, quien alcance este endpoint podría acreditar mil folios al precio de cien.
+      cantidad = paq.cantidad_folios;
+      precio = Number(paq.precio_mxn);
+      tipo = "COMPRA_PAQUETE";
+      motivo = (body.motivo as string | undefined)?.trim() || `Alta de ${paq.nombre}`;
+    } else {
+      cantidad = Math.trunc(Number(body.cantidad ?? 0));
+      if (!cantidad) return NextResponse.json({ error: "CANTIDAD_REQUERIDA" }, { status: 400 });
+    }
+
+    const { data, error } = await sb.rpc("acreditar_folios_cfdi", {
+      p_tenant_id: id,
+      p_cantidad: cantidad,
+      p_tipo: tipo,
+      p_paquete_id: paqueteId,
+      p_precio_pagado_mxn: precio,
+    });
+    if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+    const res = data as unknown as { saldo_paquetes: number };
+    await auditar(sb, {
+      accion: accion === "acreditar_paquete" ? "tenant.acreditar_paquete" : "tenant.ajustar_folios",
+      tenantId: id, motivo,
+      payload: { cantidad, tipo, paquete_id: paqueteId, precio, saldo: res.saldo_paquetes },
+    });
+    return NextResponse.json({ ok: true, saldo: res.saldo_paquetes });
+  }
+
+  // ── Add-ons ────────────────────────────────────────────────────────────────────────────────
+  //
+  // Activar escribe en `tenant_addons`; el efecto en el producto lo resuelve `tenant_addon_activo()`.
+  // Desactivar NO borra la fila: le pone fecha de fin. La historia de qué tuvo contratado un
+  // cliente y hasta cuándo es justamente lo que hace falta cuando reclama un cobro.
+  if (accion === "addon_activar") {
+    const codigo = String(body.addon_codigo ?? "");
+    if (!codigo) return NextResponse.json({ error: "ADDON_REQUERIDO" }, { status: 400 });
+    const { data: addonRaw } = await sb
+      .from("addons")
+      .select("id, nombre, precio_mensual_mxn")
+      .eq("codigo", codigo)
+      .maybeSingle();
+    const addon = addonRaw as unknown as { id: string; nombre: string; precio_mensual_mxn: number } | null;
+    if (!addon) return NextResponse.json({ error: "ADDON_NO_EXISTE" }, { status: 404 });
+
+    // Un add-on ya vigente no se vuelve a dar de alta: la restricción de la base solo impide
+    // repetir la MISMA fecha de inicio, así que sin esto un doble clic al día siguiente dejaría
+    // dos filas activas y el cliente aparecería pagándolo dos veces.
+    const { data: yaRaw } = await sb
+      .from("tenant_addons")
+      .select("id")
+      .eq("tenant_id", id)
+      .eq("addon_id", addon.id)
+      .eq("activo", true)
+      .maybeSingle();
+    if (yaRaw) return NextResponse.json({ ok: true, yaEstaba: true });
+
+    const precio = body.precio_mensual_mxn != null ? Number(body.precio_mensual_mxn) : Number(addon.precio_mensual_mxn);
+    const { error } = await sb.from("tenant_addons").insert({
+      tenant_id: id, addon_id: addon.id, fecha_inicio: hoyMx(), activo: true,
+      precio_mensual_mxn: precio, notas: (body.motivo as string | undefined)?.trim() || null,
     });
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-    await auditar(sb, { accion: "tenant.ajustar_folios", tenantId: id, motivo, payload: { cantidad, saldo: saldoNuevo } });
-    return NextResponse.json({ ok: true, saldo: saldoNuevo });
+    await auditar(sb, { accion: "tenant.addon_activar", tenantId: id, motivo: `Alta del add-on ${addon.nombre}`, payload: { codigo, precio } });
+    return NextResponse.json({ ok: true });
+  }
+
+  if (accion === "addon_desactivar") {
+    const codigo = String(body.addon_codigo ?? "");
+    if (!codigo) return NextResponse.json({ error: "ADDON_REQUERIDO" }, { status: 400 });
+    const { data: addonRaw } = await sb.from("addons").select("id, nombre").eq("codigo", codigo).maybeSingle();
+    const addon = addonRaw as unknown as { id: string; nombre: string } | null;
+    if (!addon) return NextResponse.json({ error: "ADDON_NO_EXISTE" }, { status: 404 });
+    const { error } = await sb
+      .from("tenant_addons")
+      .update({ activo: false, fecha_fin: hoyMx() })
+      .eq("tenant_id", id)
+      .eq("addon_id", addon.id)
+      .eq("activo", true);
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    await auditar(sb, { accion: "tenant.addon_desactivar", tenantId: id, motivo: `Baja del add-on ${addon.nombre}`, payload: { codigo } });
+    return NextResponse.json({ ok: true });
   }
 
   if (accion === "cambiar_plan") {

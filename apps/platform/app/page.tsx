@@ -31,7 +31,21 @@ type Tenant = {
   onboarding?: { fase: string; fecha_go_live: string | null } | null;
 };
 type Metricas = { totalTenants: number; activos: number; trial: number; suspendidos: number; cancelados: number; porVertical: Record<string, number>; mrr: number; foliosVendidos30d: number };
-type Detalle = { tenant: Record<string, unknown>; foliosSaldo: number; nSucursales: number };
+type AddonCatalogo = { id: string; codigo: string; nombre: string; descripcion: string | null; precio_mensual_mxn: number };
+type AddonContratado = {
+  id: string; activo: boolean; fecha_inicio: string; fecha_fin: string | null; precio_mensual_mxn: number;
+  addon: { id: string; codigo: string; nombre: string; precio_mensual_mxn: number } | null;
+};
+type Paquete = { id: string; codigo: string; nombre: string; cantidad_folios: number; precio_mxn: number };
+type Detalle = {
+  tenant: Record<string, unknown>;
+  foliosSaldo: number;
+  foliosBase: { mensuales: number; consumidos: number; periodo: string } | null;
+  addons: AddonContratado[];
+  catalogoAddons: AddonCatalogo[];
+  paquetes: Paquete[];
+  nSucursales: number;
+};
 type Plan = { id: string; codigo: string; nombre: string; vertical: string; precio_mensual_mxn: number };
 
 export default function PlatformHome() {
@@ -199,6 +213,7 @@ function DetalleDrawer({ api, id, onCerrar, onCambio }: { api: Api; id: string; 
   const [notas, setNotas] = useState("");
   const [motivo, setMotivo] = useState("");
   const [folioAdj, setFolioAdj] = useState("");
+  const [paqueteSel, setPaqueteSel] = useState("");
   const [busy, setBusy] = useState(false);
 
   const cargar = useCallback(async () => {
@@ -249,7 +264,13 @@ function DetalleDrawer({ api, id, onCerrar, onCambio }: { api: Api; id: string; 
 
             <div className="mt-4 grid grid-cols-2 gap-3">
               <Card titulo="Plan" valor={String((t.plan as { codigo?: string } | null)?.codigo ?? "—")} sub={fmtMxn(Number((t.plan as { precio_mensual_mxn?: number } | null)?.precio_mensual_mxn ?? 0)) + "/mes"} />
-              <Card titulo="Folios" valor={String(d.foliosSaldo)} sub={`${d.nSucursales} sucursal(es)`} />
+              <Card
+                titulo="Folios"
+                valor={String(d.foliosSaldo)}
+                sub={d.foliosBase
+                  ? `+${Math.max(d.foliosBase.mensuales - d.foliosBase.consumidos, 0)} de base este mes`
+                  : `${d.nSucursales} sucursal(es)`}
+              />
             </div>
 
             {/* Datos fiscales */}
@@ -316,9 +337,72 @@ function DetalleDrawer({ api, id, onCerrar, onCambio }: { api: Api; id: string; 
               <SaludTenant api={api} id={id} />
             </div>
 
-            {/* Folios CFDI: regalar/ajustar */}
+            {/* Add-ons contratados. El de facturación es el que enciende el CFDI en cascada:
+                la sección de facturas en /admin, el QR del ticket y el portal público. */}
+            <div className="mt-4 border-t border-line pt-4">
+              <label className={label}>Add-ons</label>
+              <div className="flex flex-col gap-2">
+                {d.catalogoAddons.length === 0 && (
+                  <p className="text-[12px] text-ink-3">No hay add-ons en el catálogo.</p>
+                )}
+                {d.catalogoAddons.map((a) => {
+                  const contratado = d.addons.find((x) => x.addon?.codigo === a.codigo && x.activo);
+                  return (
+                    <div key={a.id} className="flex items-center justify-between gap-3 rounded border border-line px-3 py-2">
+                      <div className="min-w-0">
+                        <div className="text-[13px] font-semibold">{a.nombre}</div>
+                        <div className="text-[11.5px] text-ink-3">
+                          ${Number(a.precio_mensual_mxn).toLocaleString("es-MX")}/mes
+                          {contratado ? ` · activo desde ${contratado.fecha_inicio}` : ""}
+                        </div>
+                      </div>
+                      <button
+                        onClick={() => accion({
+                          accion: contratado ? "addon_desactivar" : "addon_activar",
+                          addon_codigo: a.codigo,
+                        })}
+                        disabled={busy}
+                        className={`h-9 shrink-0 rounded px-3 text-[12.5px] font-semibold transition disabled:opacity-50 ${
+                          contratado
+                            ? "border border-line-strong hover:bg-hover"
+                            : "bg-ink text-white"
+                        }`}
+                      >
+                        {contratado ? "Dar de baja" : "Activar"}
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Acreditar un paquete de folios. La cantidad y el precio salen del catálogo, no de
+                este formulario: aquí solo se elige cuál se le vendió. */}
             <div className="mt-4">
-              <label className={label}>Folios CFDI (saldo {d.foliosSaldo})</label>
+              <label className={label}>Acreditar paquete de folios</label>
+              <div className="flex gap-2">
+                <select className={input} value={paqueteSel} onChange={(e) => setPaqueteSel(e.target.value)}>
+                  <option value="">Elige un paquete…</option>
+                  {d.paquetes.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.nombre} · ${Number(p.precio_mxn).toLocaleString("es-MX")}
+                    </option>
+                  ))}
+                </select>
+                <button
+                  onClick={() => { if (paqueteSel) { accion({ accion: "acreditar_paquete", paquete_id: paqueteSel }); setPaqueteSel(""); } }}
+                  disabled={busy || !paqueteSel}
+                  className="h-11 shrink-0 rounded bg-ink px-4 text-[13px] font-semibold text-white disabled:opacity-50"
+                >
+                  Acreditar
+                </button>
+              </div>
+              <p className="mt-1 text-[11.5px] text-ink-3">Queda como COMPRA_PAQUETE con su precio, auditado.</p>
+            </div>
+
+            {/* Ajuste manual: para correcciones y cortesías, no para vender. */}
+            <div className="mt-4">
+              <label className={label}>Ajuste manual de folios (saldo {d.foliosSaldo})</label>
               <div className="flex gap-2">
                 <input className={input} inputMode="numeric" placeholder="+50 ó -10" value={folioAdj} onChange={(e) => setFolioAdj(e.target.value.replace(/[^0-9-]/g, ""))} />
                 <button onClick={() => { const n = Number(folioAdj); if (n) { accion({ accion: "ajustar_folios", cantidad: n, motivo: "Ajuste desde plataforma" }); setFolioAdj(""); } }} disabled={busy || !folioAdj} className="h-11 shrink-0 rounded bg-ink px-4 text-[13px] font-semibold text-white disabled:opacity-50">Aplicar</button>

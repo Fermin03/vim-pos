@@ -7,11 +7,6 @@ export type Json =
   | Json[]
 
 export type Database = {
-  // Allows to automatically instantiate createClient with right options
-  // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
-  __InternalSupabase: {
-    PostgrestVersion: "14.5"
-  }
   graphql_public: {
     Tables: {
       [_ in never]: never
@@ -895,6 +890,7 @@ export type Database = {
       categorias: {
         Row: {
           activa: boolean
+          area_cocina_id: string | null
           codigo: string | null
           color_hex: string | null
           created_at: string
@@ -916,6 +912,7 @@ export type Database = {
         }
         Insert: {
           activa?: boolean
+          area_cocina_id?: string | null
           codigo?: string | null
           color_hex?: string | null
           created_at?: string
@@ -937,6 +934,7 @@ export type Database = {
         }
         Update: {
           activa?: boolean
+          area_cocina_id?: string | null
           codigo?: string | null
           color_hex?: string | null
           created_at?: string
@@ -958,6 +956,13 @@ export type Database = {
         }
         Relationships: [
           {
+            foreignKeyName: "categorias_area_cocina_id_fkey"
+            columns: ["area_cocina_id"]
+            isOneToOne: false
+            referencedRelation: "areas_cocina"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "categorias_parent_id_fkey"
             columns: ["parent_id"]
             isOneToOne: false
@@ -966,6 +971,123 @@ export type Database = {
           },
           {
             foreignKeyName: "categorias_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      cfdi_global_tickets: {
+        Row: {
+          cfdi_id: string
+          created_at: string
+          tenant_id: string
+          ticket_id: string
+        }
+        Insert: {
+          cfdi_id: string
+          created_at?: string
+          tenant_id: string
+          ticket_id: string
+        }
+        Update: {
+          cfdi_id?: string
+          created_at?: string
+          tenant_id?: string
+          ticket_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cfdi_global_tickets_cfdi_id_fkey"
+            columns: ["cfdi_id"]
+            isOneToOne: false
+            referencedRelation: "tickets_cfdi"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cfdi_global_tickets_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cfdi_global_tickets_ticket_id_fkey"
+            columns: ["ticket_id"]
+            isOneToOne: false
+            referencedRelation: "tickets"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cfdi_global_tickets_ticket_id_fkey"
+            columns: ["ticket_id"]
+            isOneToOne: false
+            referencedRelation: "vw_cumplimiento_tiempos_cocina"
+            referencedColumns: ["ticket_id"]
+          },
+          {
+            foreignKeyName: "cfdi_global_tickets_ticket_id_fkey"
+            columns: ["ticket_id"]
+            isOneToOne: false
+            referencedRelation: "vw_ventas_apps_externas"
+            referencedColumns: ["ticket_id"]
+          },
+        ]
+      }
+      cfdi_periodos_globales: {
+        Row: {
+          cerrado_at: string | null
+          cfdi_id: string | null
+          created_at: string
+          desde: string
+          estado: string
+          hasta: string
+          id: string
+          n_tickets: number
+          periodicidad: string
+          tenant_id: string
+          total_mxn: number
+          updated_at: string
+        }
+        Insert: {
+          cerrado_at?: string | null
+          cfdi_id?: string | null
+          created_at?: string
+          desde: string
+          estado?: string
+          hasta: string
+          id?: string
+          n_tickets?: number
+          periodicidad: string
+          tenant_id: string
+          total_mxn?: number
+          updated_at?: string
+        }
+        Update: {
+          cerrado_at?: string | null
+          cfdi_id?: string | null
+          created_at?: string
+          desde?: string
+          estado?: string
+          hasta?: string
+          id?: string
+          n_tickets?: number
+          periodicidad?: string
+          tenant_id?: string
+          total_mxn?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cfdi_periodos_globales_cfdi_id_fkey"
+            columns: ["cfdi_id"]
+            isOneToOne: false
+            referencedRelation: "tickets_cfdi"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cfdi_periodos_globales_tenant_id_fkey"
             columns: ["tenant_id"]
             isOneToOne: false
             referencedRelation: "tenants"
@@ -1444,6 +1566,7 @@ export type Database = {
           modulo_display_cliente_activo: boolean
           modulo_inventario_activo: boolean
           mostrar_nota_producto_ticket: boolean
+          mostrar_qr_factura_ticket: boolean
           pac_credenciales_encrypted: string | null
           pac_proveedor: string | null
           pie_ticket: string | null
@@ -1481,6 +1604,7 @@ export type Database = {
           modulo_display_cliente_activo?: boolean
           modulo_inventario_activo?: boolean
           mostrar_nota_producto_ticket?: boolean
+          mostrar_qr_factura_ticket?: boolean
           pac_credenciales_encrypted?: string | null
           pac_proveedor?: string | null
           pie_ticket?: string | null
@@ -1518,6 +1642,7 @@ export type Database = {
           modulo_display_cliente_activo?: boolean
           modulo_inventario_activo?: boolean
           mostrar_nota_producto_ticket?: boolean
+          mostrar_qr_factura_ticket?: boolean
           pac_credenciales_encrypted?: string | null
           pac_proveedor?: string | null
           pie_ticket?: string | null
@@ -2076,7 +2201,9 @@ export type Database = {
             | null
           no_entrega_nota: string | null
           propina_repartidor_mxn: number
-          repartidor_id: string
+          repartidor_catalogo_id: string | null
+          repartidor_id: string | null
+          repartidor_nombre: string | null
           sucursal_id: string
           tenant_id: string
           ticket_id: string
@@ -2113,7 +2240,9 @@ export type Database = {
             | null
           no_entrega_nota?: string | null
           propina_repartidor_mxn?: number
-          repartidor_id: string
+          repartidor_catalogo_id?: string | null
+          repartidor_id?: string | null
+          repartidor_nombre?: string | null
           sucursal_id: string
           tenant_id: string
           ticket_id: string
@@ -2150,7 +2279,9 @@ export type Database = {
             | null
           no_entrega_nota?: string | null
           propina_repartidor_mxn?: number
-          repartidor_id?: string
+          repartidor_catalogo_id?: string | null
+          repartidor_id?: string | null
+          repartidor_nombre?: string | null
           sucursal_id?: string
           tenant_id?: string
           ticket_id?: string
@@ -2160,6 +2291,13 @@ export type Database = {
           updated_by?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "delivery_asignaciones_repartidor_catalogo_id_fkey"
+            columns: ["repartidor_catalogo_id"]
+            isOneToOne: false
+            referencedRelation: "repartidores"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "delivery_asignaciones_sucursal_id_fkey"
             columns: ["sucursal_id"]
@@ -2734,6 +2872,70 @@ export type Database = {
           },
           {
             foreignKeyName: "direcciones_cliente_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      errores_app: {
+        Row: {
+          app: string
+          caja_id: string | null
+          contexto: Json
+          created_at: string
+          id: string
+          mensaje: string
+          stack: string | null
+          sucursal_id: string | null
+          tenant_id: string
+          usuario_id: string | null
+          version: string | null
+        }
+        Insert: {
+          app: string
+          caja_id?: string | null
+          contexto?: Json
+          created_at?: string
+          id?: string
+          mensaje: string
+          stack?: string | null
+          sucursal_id?: string | null
+          tenant_id: string
+          usuario_id?: string | null
+          version?: string | null
+        }
+        Update: {
+          app?: string
+          caja_id?: string | null
+          contexto?: Json
+          created_at?: string
+          id?: string
+          mensaje?: string
+          stack?: string | null
+          sucursal_id?: string | null
+          tenant_id?: string
+          usuario_id?: string | null
+          version?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "errores_app_caja_id_fkey"
+            columns: ["caja_id"]
+            isOneToOne: false
+            referencedRelation: "cajas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "errores_app_sucursal_id_fkey"
+            columns: ["sucursal_id"]
+            isOneToOne: false
+            referencedRelation: "sucursales"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "errores_app_tenant_id_fkey"
             columns: ["tenant_id"]
             isOneToOne: false
             referencedRelation: "tenants"
@@ -4805,6 +5007,50 @@ export type Database = {
           },
         ]
       }
+      repartidores: {
+        Row: {
+          activo: boolean
+          created_at: string
+          deleted_at: string | null
+          id: string
+          nombre: string
+          notas: string | null
+          telefono: string | null
+          tenant_id: string
+          updated_at: string
+        }
+        Insert: {
+          activo?: boolean
+          created_at?: string
+          deleted_at?: string | null
+          id?: string
+          nombre: string
+          notas?: string | null
+          telefono?: string | null
+          tenant_id: string
+          updated_at?: string
+        }
+        Update: {
+          activo?: boolean
+          created_at?: string
+          deleted_at?: string | null
+          id?: string
+          nombre?: string
+          notas?: string | null
+          telefono?: string | null
+          tenant_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "repartidores_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       reportes_z_historico: {
         Row: {
           autorizacion_pin_id: string | null
@@ -5975,9 +6221,12 @@ export type Database = {
       tenant_cfdi_emisor: {
         Row: {
           created_at: string
+          csd_numero_certificado: string | null
+          csd_subido_at: string | null
           csd_vigencia_hasta: string | null
           estado: string
           facturama_issuer_ref: string
+          periodicidad_global: string
           proveedor_pac: Database["public"]["Enums"]["cfdi_proveedor_pac"]
           rfc: string
           tenant_id: string
@@ -5985,9 +6234,12 @@ export type Database = {
         }
         Insert: {
           created_at?: string
+          csd_numero_certificado?: string | null
+          csd_subido_at?: string | null
           csd_vigencia_hasta?: string | null
           estado?: string
           facturama_issuer_ref: string
+          periodicidad_global?: string
           proveedor_pac?: Database["public"]["Enums"]["cfdi_proveedor_pac"]
           rfc: string
           tenant_id: string
@@ -5995,9 +6247,12 @@ export type Database = {
         }
         Update: {
           created_at?: string
+          csd_numero_certificado?: string | null
+          csd_subido_at?: string | null
           csd_vigencia_hasta?: string | null
           estado?: string
           facturama_issuer_ref?: string
+          periodicidad_global?: string
           proveedor_pac?: Database["public"]["Enums"]["cfdi_proveedor_pac"]
           rfc?: string
           tenant_id?: string
@@ -6170,6 +6425,7 @@ export type Database = {
           fecha_baja: string | null
           hora_cierre_dia_contable: string
           id: string
+          logo_png_url: string | null
           logo_url: string | null
           motivo_baja: string | null
           nombre_comercial: string
@@ -6195,6 +6451,7 @@ export type Database = {
           fecha_baja?: string | null
           hora_cierre_dia_contable?: string
           id?: string
+          logo_png_url?: string | null
           logo_url?: string | null
           motivo_baja?: string | null
           nombre_comercial: string
@@ -6220,6 +6477,7 @@ export type Database = {
           fecha_baja?: string | null
           hora_cierre_dia_contable?: string
           id?: string
+          logo_png_url?: string | null
           logo_url?: string | null
           motivo_baja?: string | null
           nombre_comercial?: string
@@ -7001,6 +7259,7 @@ export type Database = {
       tickets_cfdi: {
         Row: {
           acuse_xml_storage_path: string | null
+          cancelacion_solicitada_at: string | null
           cfdi_sustituye_id: string | null
           created_at: string
           created_by: string | null
@@ -7011,6 +7270,7 @@ export type Database = {
           emisor_regimen_fiscal: string
           emisor_rfc: string
           error_es_permanente: boolean
+          es_global: boolean
           estado_sat: Database["public"]["Enums"]["cfdi_estado_sat"]
           fecha_emision: string | null
           fecha_timbrado: string | null
@@ -7021,6 +7281,7 @@ export type Database = {
           intentos_timbrado: number
           iva_mxn: number
           metodo_pago_sat: string
+          motivo_cancelacion_sat: string | null
           pac_costo_centavos: number | null
           pac_proveedor: Database["public"]["Enums"]["cfdi_proveedor_pac"]
           pac_referencia: string | null
@@ -7035,7 +7296,7 @@ export type Database = {
           serie: string | null
           subtotal_mxn: number
           tenant_id: string
-          ticket_id: string
+          ticket_id: string | null
           tipo_comprobante: Database["public"]["Enums"]["cfdi_tipo_comprobante"]
           total_mxn: number
           ultimo_error_codigo: string | null
@@ -7049,6 +7310,7 @@ export type Database = {
         }
         Insert: {
           acuse_xml_storage_path?: string | null
+          cancelacion_solicitada_at?: string | null
           cfdi_sustituye_id?: string | null
           created_at?: string
           created_by?: string | null
@@ -7059,6 +7321,7 @@ export type Database = {
           emisor_regimen_fiscal: string
           emisor_rfc: string
           error_es_permanente?: boolean
+          es_global?: boolean
           estado_sat?: Database["public"]["Enums"]["cfdi_estado_sat"]
           fecha_emision?: string | null
           fecha_timbrado?: string | null
@@ -7069,6 +7332,7 @@ export type Database = {
           intentos_timbrado?: number
           iva_mxn?: number
           metodo_pago_sat: string
+          motivo_cancelacion_sat?: string | null
           pac_costo_centavos?: number | null
           pac_proveedor: Database["public"]["Enums"]["cfdi_proveedor_pac"]
           pac_referencia?: string | null
@@ -7083,7 +7347,7 @@ export type Database = {
           serie?: string | null
           subtotal_mxn: number
           tenant_id: string
-          ticket_id: string
+          ticket_id?: string | null
           tipo_comprobante?: Database["public"]["Enums"]["cfdi_tipo_comprobante"]
           total_mxn: number
           ultimo_error_codigo?: string | null
@@ -7097,6 +7361,7 @@ export type Database = {
         }
         Update: {
           acuse_xml_storage_path?: string | null
+          cancelacion_solicitada_at?: string | null
           cfdi_sustituye_id?: string | null
           created_at?: string
           created_by?: string | null
@@ -7107,6 +7372,7 @@ export type Database = {
           emisor_regimen_fiscal?: string
           emisor_rfc?: string
           error_es_permanente?: boolean
+          es_global?: boolean
           estado_sat?: Database["public"]["Enums"]["cfdi_estado_sat"]
           fecha_emision?: string | null
           fecha_timbrado?: string | null
@@ -7117,6 +7383,7 @@ export type Database = {
           intentos_timbrado?: number
           iva_mxn?: number
           metodo_pago_sat?: string
+          motivo_cancelacion_sat?: string | null
           pac_costo_centavos?: number | null
           pac_proveedor?: Database["public"]["Enums"]["cfdi_proveedor_pac"]
           pac_referencia?: string | null
@@ -7131,7 +7398,7 @@ export type Database = {
           serie?: string | null
           subtotal_mxn?: number
           tenant_id?: string
-          ticket_id?: string
+          ticket_id?: string | null
           tipo_comprobante?: Database["public"]["Enums"]["cfdi_tipo_comprobante"]
           total_mxn?: number
           ultimo_error_codigo?: string | null
@@ -8628,6 +8895,10 @@ export type Database = {
         Args: { p_rows: Json; p_tabla: string; p_tenant: string }
         Returns: number
       }
+      _vim_apply_rows_detalle: {
+        Args: { p_rows: Json; p_tabla: string; p_tenant: string }
+        Returns: Json
+      }
       abrir_cuenta: {
         Args: {
           p_caja_id: string
@@ -8652,6 +8923,16 @@ export type Database = {
           p_usuario_id?: string
         }
         Returns: string
+      }
+      acreditar_folios_cfdi: {
+        Args: {
+          p_cantidad: number
+          p_paquete_id?: string
+          p_precio_pagado_mxn?: number
+          p_tenant_id: string
+          p_tipo?: Database["public"]["Enums"]["folio_movimiento_tipo"]
+        }
+        Returns: Json
       }
       agregar_item_a_ticket: {
         Args: {
@@ -8727,6 +9008,24 @@ export type Database = {
           p_destino_lat?: number
           p_destino_lng?: number
           p_distancia_km_estimada?: number
+          p_monto_a_liquidar_mxn: number
+          p_repartidor_id: string
+          p_ticket_id: string
+          p_tiempo_promesa_minutos?: number
+        }
+        Returns: string
+      }
+      asignar_delivery_por_nombre: {
+        Args: {
+          p_monto_a_liquidar_mxn: number
+          p_repartidor_nombre: string
+          p_ticket_id: string
+          p_tiempo_promesa_minutos?: number
+        }
+        Returns: string
+      }
+      asignar_delivery_repartidor: {
+        Args: {
           p_monto_a_liquidar_mxn: number
           p_repartidor_id: string
           p_ticket_id: string
@@ -8839,6 +9138,7 @@ export type Database = {
         }
         Returns: string
       }
+      cfdi_es_cancelable: { Args: { p_cfdi_id: string }; Returns: boolean }
       cfdi_marcar_cancelado_sat: {
         Args: {
           p_acuse_storage_path: string
@@ -8873,6 +9173,26 @@ export type Database = {
           p_xml_storage_path: string
         }
         Returns: undefined
+      }
+      cfdi_registrar_cancelacion: {
+        Args: {
+          p_acuse_storage_path?: string
+          p_cfdi_id: string
+          p_estado: Database["public"]["Enums"]["cfdi_estado_sat"]
+          p_motivo?: string
+          p_pac_mensaje?: string
+          p_response_payload?: Json
+        }
+        Returns: undefined
+      }
+      cfdi_tomar_periodo_global: {
+        Args: {
+          p_desde: string
+          p_hasta: string
+          p_periodicidad: string
+          p_tenant_id: string
+        }
+        Returns: string
       }
       confirmar_devolucion: {
         Args: { p_devolucion_id: string; p_usuario_id: string }
@@ -9070,6 +9390,13 @@ export type Database = {
         }
         Returns: undefined
       }
+      periodo_global_de: {
+        Args: { p_fecha: string; p_periodicidad: string }
+        Returns: {
+          desde: string
+          hasta: string
+        }[]
+      }
       poner_ticket_en_espera: {
         Args: { p_etiqueta: string; p_ticket_id: string }
         Returns: undefined
@@ -9198,6 +9525,19 @@ export type Database = {
         }
         Returns: undefined
       }
+      tenant_addon_activo: {
+        Args: { p_codigo: string; p_tenant_id: string }
+        Returns: boolean
+      }
+      ticket_autofacturable: { Args: { p_ticket_id: string }; Returns: boolean }
+      tickets_de_periodo_global: {
+        Args: { p_desde: string; p_hasta: string; p_tenant_id: string }
+        Returns: {
+          folio: string
+          ticket_id: string
+          total_mxn: number
+        }[]
+      }
       top_meseros: {
         Args: {
           p_fecha_desde: string
@@ -9289,6 +9629,7 @@ export type Database = {
         | "EDICOM"
         | "PRODIGIA"
         | "OTRO"
+        | "FACTURAMA"
       cfdi_sat_evento:
         | "TIMBRADO_SOLICITADO"
         | "TIMBRADO_CONFIRMADO"
@@ -9706,6 +10047,7 @@ export const Constants = {
         "EDICOM",
         "PRODIGIA",
         "OTRO",
+        "FACTURAMA",
       ],
       cfdi_sat_evento: [
         "TIMBRADO_SOLICITADO",
@@ -9995,3 +10337,4 @@ export const Constants = {
     },
   },
 } as const
+

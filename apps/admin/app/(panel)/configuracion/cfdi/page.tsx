@@ -9,8 +9,12 @@ import {
   leerAjustesTicket,
   leerCfdiEmisor,
   PROVEEDORES_PAC,
+  borrarCsd,
+  cargarCsd,
+  diasParaVencer,
   type CfdiEmisor,
 } from "../../../lib/configuracion";
+import { PERIODICIDADES } from "../../../lib/facturacion";
 import { mensajeError } from "../../../lib/errores";
 
 const input =
@@ -18,6 +22,7 @@ const input =
 const label = "mb-1.5 block text-[13px] font-medium text-ink-2";
 
 const PAC_LABEL: Record<string, string> = {
+  FACTURAMA: "Facturama",
   FACTURAPI: "Facturapi",
   SOLUCIONFACTIBLE: "Solución Factible",
   FINKOK: "Finkok",
@@ -43,6 +48,12 @@ export default function CfdiPage() {
   const [ref, setRef] = useState("");
   const [vig, setVig] = useState("");
   const [estado, setEstado] = useState("PRUEBA");
+  const [cer, setCer] = useState<File | null>(null);
+  const [llave, setLlave] = useState<File | null>(null);
+  // La contraseña de la llave vive en este estado solo hasta que se envía; se limpia al terminar.
+  const [passCsd, setPassCsd] = useState("");
+  const [subiendo, setSubiendo] = useState(false);
+  const [periodicidad, setPeriodicidad] = useState("04");
 
   async function recargar() {
     try {
@@ -53,6 +64,7 @@ export default function CfdiPage() {
       setRef(e.facturama_issuer_ref ?? "");
       setVig(e.csd_vigencia_hasta ?? "");
       setEstado(e.estado);
+      setPeriodicidad(e.periodicidad_global);
       setQrTicket((await leerAjustesTicket()).mostrarQrFactura);
     } catch (e) {
       setError(mensajeError(e, "No se pudo cargar"));
@@ -72,6 +84,7 @@ export default function CfdiPage() {
       facturama_issuer_ref: ref,
       csd_vigencia_hasta: vig,
       estado,
+      periodicidad_global: periodicidad,
     });
     if (!parsed.success) {
       setError(parsed.error.issues[0]?.message ?? "Datos inválidos");
@@ -88,6 +101,46 @@ export default function CfdiPage() {
       setError(mensajeError(e, "No se pudo guardar"));
     } finally {
       setGuardando(false);
+    }
+  }
+
+  async function subirSello() {
+    setError(null);
+    setOkMsg(null);
+    if (!cer || !llave || !passCsd) {
+      setError("Faltan el .cer, el .key o la contraseña de la llave.");
+      return;
+    }
+    setSubiendo(true);
+    try {
+      const r = await cargarCsd(cer, llave, passCsd);
+      setOkMsg(`${r.reemplazado ? "Sello renovado" : "Sello cargado"}. Certificado ${r.numeroCertificado}, vigente hasta el ${r.vigenciaHasta}.`);
+      setCer(null);
+      setLlave(null);
+      setPassCsd("");
+      recargar();
+    } catch (e) {
+      setError(mensajeError(e, "No se pudo cargar el sello"));
+    } finally {
+      // Pase lo que pase, la contraseña no se queda en memoria más de lo necesario.
+      setPassCsd("");
+      setSubiendo(false);
+    }
+  }
+
+  async function quitarSello() {
+    if (!confirm("¿Retirar el sello digital de este negocio? Dejará de poder facturar hasta que se cargue de nuevo.")) return;
+    setError(null);
+    setOkMsg(null);
+    setSubiendo(true);
+    try {
+      await borrarCsd();
+      setOkMsg("Sello retirado.");
+      recargar();
+    } catch (e) {
+      setError(mensajeError(e, "No se pudo retirar el sello"));
+    } finally {
+      setSubiendo(false);
     }
   }
 
@@ -136,15 +189,102 @@ export default function CfdiPage() {
                   </select>
                 </div>
                 <div>
-                  <label className={label} htmlFor="c-vig">Vigencia del CSD</label>
-                  <input id="c-vig" type="date" className={input} value={vig} onChange={(e) => setVig(e.target.value)} />
+                  <label className={label} htmlFor="c-per">Periodicidad de la factura global</label>
+                  <select id="c-per" className={input} value={periodicidad} onChange={(e) => setPeriodicidad(e.target.value)}>
+                    {PERIODICIDADES.map((p) => <option key={p.v} value={p.v}>{p.l}</option>)}
+                  </select>
+                  <p className="mt-1.5 text-[11.5px] text-ink-3">
+                    Cada cuánto emites la factura que ampara las ventas sin comprobante.{" "}
+                    <b>Define hasta cuándo puede facturar tu cliente</b>: con periodicidad diaria, el
+                    ticket de ayer ya no se puede facturar hoy.
+                  </p>
+                  {periodicidad === "05" && (
+                    <p className="mt-2 rounded border border-[#F0DCC0] bg-[#FCF3E6] px-3 py-2 text-[12.5px] font-medium text-warning">
+                      El SAT solo admite periodicidad bimestral si tu régimen fiscal es <b>621
+                      (Incorporación Fiscal)</b>. Con cualquier otro, el timbrado se rechaza.
+                    </p>
+                  )}
+                </div>
+              </div>
+              <p className="mt-4 text-[11.5px] text-ink-3">
+                Con Facturama no hace falta dar de alta el emisor a mano: se identifica por su RFC en
+                cuanto se carga el sello.
+              </p>
+            </div>
+
+            {/* ── Sello digital (CSD) ───────────────────────────────────────────────────────
+                Los datos del sello se LEEN del propio certificado al cargarlo. Antes la vigencia
+                se tecleaba, y una fecha mal escrita hacía creer que el negocio podía facturar
+                cuando su sello ya había vencido. */}
+            <div className="mb-6 rounded-lg border border-line bg-surface p-5">
+              <div className="mb-1 font-display text-[16px] font-semibold tracking-tight">Sello digital (CSD)</div>
+              <p className="mb-4 text-[12.5px] text-ink-3">
+                Son los dos archivos que el SAT te entrega al tramitar tu Certificado de Sello Digital:
+                uno <b>.cer</b> y uno <b>.key</b>, más la contraseña que capturaste al generarlos.
+                <b> No es tu e.firma.</b>
+              </p>
+
+              {emisor.csd.numeroCertificado ? (
+                <div className="mb-4 rounded border border-line bg-bg px-4 py-3">
+                  <div className="flex flex-wrap items-baseline justify-between gap-2">
+                    <span className="text-[13px] font-semibold">Certificado {emisor.csd.numeroCertificado}</span>
+                    {emisor.csd.vigenciaHasta && (() => {
+                      const dias = diasParaVencer(emisor.csd.vigenciaHasta);
+                      const tono = dias < 0 ? "text-danger" : dias <= 60 ? "text-warning" : "text-ink-3";
+                      return (
+                        <span className={`text-[12.5px] font-medium ${tono}`}>
+                          {dias < 0
+                            ? `Venció el ${emisor.csd.vigenciaHasta}`
+                            : `Vigente hasta el ${emisor.csd.vigenciaHasta} · ${dias} días`}
+                        </span>
+                      );
+                    })()}
+                  </div>
+                  {emisor.csd.vigenciaHasta && diasParaVencer(emisor.csd.vigenciaHasta) <= 60 && (
+                    <p className="mt-2 text-[12.5px] font-medium text-warning">
+                      Tramita la renovación en el SAT antes de que venza: sin sello vigente no se puede
+                      timbrar ninguna factura.
+                    </p>
+                  )}
+                  <button
+                    type="button"
+                    onClick={quitarSello}
+                    disabled={subiendo}
+                    className="mt-3 text-[12.5px] font-medium text-danger underline underline-offset-2 disabled:opacity-50"
+                  >
+                    Retirar el sello
+                  </button>
+                </div>
+              ) : (
+                <p className="mb-4 rounded border border-[#F0DCC0] bg-[#FCF3E6] px-3 py-2 text-[12.5px] font-medium text-warning">
+                  Todavía no hay sello cargado. Sin él no se puede emitir ninguna factura.
+                </p>
+              )}
+
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <div>
+                  <label className={label} htmlFor="c-cer">Archivo .cer</label>
+                  <input id="c-cer" type="file" accept=".cer" className={`${input} pt-2.5`}
+                    onChange={(e) => setCer(e.target.files?.[0] ?? null)} />
+                </div>
+                <div>
+                  <label className={label} htmlFor="c-key">Archivo .key</label>
+                  <input id="c-key" type="file" accept=".key" className={`${input} pt-2.5`}
+                    onChange={(e) => setLlave(e.target.files?.[0] ?? null)} />
                 </div>
               </div>
               <div className="mt-4">
-                <label className={label} htmlFor="c-ref">Referencia del emisor en el PAC</label>
-                <input id="c-ref" className={input} value={ref} maxLength={100}
-                  onChange={(e) => setRef(e.target.value)} placeholder="ID del emisor en el PAC (se asigna al subir el CSD)" />
-                <p className="mt-1.5 text-[11.5px] text-ink-3">Opcional · se completa cuando el PAC provisiona el emisor con tu CSD.</p>
+                <label className={label} htmlFor="c-pass">Contraseña de la llave privada</label>
+                <input id="c-pass" type="password" className={input} value={passCsd} autoComplete="off"
+                  onChange={(e) => setPassCsd(e.target.value)} />
+                <p className="mt-1.5 text-[11.5px] text-ink-3">
+                  No la guardamos: viaja cifrada hasta el PAC y se descarta. Tampoco guardamos tu archivo .key.
+                </p>
+              </div>
+              <div className="mt-4 flex justify-end">
+                <Button onClick={subirSello} disabled={subiendo || !cer || !llave || !passCsd}>
+                  {subiendo ? "Cargando…" : emisor.csd.numeroCertificado ? "Reemplazar sello" : "Cargar sello"}
+                </Button>
               </div>
             </div>
 

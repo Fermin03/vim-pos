@@ -59,12 +59,17 @@ export type TicketFacturable = {
   /** Estado del CFDI más reciente del ticket (null = sin factura). */
   cfdiEstado: string | null;
   cfdiUuid: string | null;
+  cfdiId: string | null;
 };
 
 export async function listarTicketsFacturables(desde: string, hasta: string, folioBusqueda?: string): Promise<TicketFacturable[]> {
   let q = supabase
     .from("tickets")
-    .select("id, folio_completo, total_mxn, dia_contable, pagos(metodo_pago, monto_mxn), tickets_cfdi(estado_sat, uuid_fiscal, created_at)")
+    .select(
+      "id, folio_completo, total_mxn, dia_contable, pagos(metodo_pago, monto_mxn), " +
+        // Ver la nota de arriba: sin `!tickets_cfdi_ticket_id_fkey` esto es ambiguo.
+        "tickets_cfdi!tickets_cfdi_ticket_id_fkey(id, estado_sat, uuid_fiscal, created_at)",
+    )
     .eq("estado_fiscal", "PAGADO")
     .gte("dia_contable", desde)
     .lte("dia_contable", hasta)
@@ -78,7 +83,7 @@ export async function listarTicketsFacturables(desde: string, hasta: string, fol
       metodo: p.metodo_pago,
       monto: Number(p.monto_mxn),
     }));
-    const cfdis = ((t.tickets_cfdi as { estado_sat: string; uuid_fiscal: string | null; created_at: string }[]) ?? [])
+    const cfdis = ((t.tickets_cfdi as { id: string; estado_sat: string; uuid_fiscal: string | null; created_at: string }[]) ?? [])
       .sort((a, b) => (a.created_at < b.created_at ? 1 : -1));
     return {
       ticketId: String(t.id),
@@ -88,6 +93,7 @@ export async function listarTicketsFacturables(desde: string, hasta: string, fol
       formaPagoSugerida: formaPagoSatDe(pagos),
       cfdiEstado: cfdis[0]?.estado_sat ?? null,
       cfdiUuid: cfdis[0]?.uuid_fiscal ?? null,
+      cfdiId: cfdis[0]?.id ?? null,
     };
   });
 }
@@ -169,4 +175,160 @@ export async function facturarTicket(ticketId: string, receptor: ReceptorInput):
     return { ok: false, cfdiId: id, error: data.mensaje ?? data.detalle ?? data.error ?? `HTTP ${res.status}` };
   }
   return { ok: true, cfdiId: id, uuidFiscal: data.uuid_fiscal, serie: data.serie ?? null, folioFiscal: data.folio_fiscal ?? null };
+}
+
+async function tenantId(): Promise<string> {
+  const s = await leerSesion();
+  if (!s?.tenantId) throw new Error("Sesión sin tenant");
+  return s.tenantId;
+}
+
+// ── Factura global (fase 6) ──────────────────────────────────────────────────
+//
+// La que ampara todas las ventas del periodo en las que nadie pidió comprobante. Es obligación
+// ante el SAT y se emite dentro de las 24 horas siguientes al cierre del periodo.
+//
+// El detalle importante, y por eso está aquí y no escondido en la Edge Function: al timbrarla, sus
+// tickets DEJAN de poder autofacturarse. Quien la emite tiene que saber que está cerrando la
+// ventana de sus clientes.
+
+export const PERIODICIDADES = [
+  { v: "01", l: "Diario" },
+  { v: "02", l: "Semanal (lunes a domingo)" },
+  { v: "03", l: "Quincenal (1–15 y 16–fin)" },
+  { v: "04", l: "Mensual" },
+  { v: "05", l: "Bimestral (solo régimen 621)" },
+] as const;
+
+export type EstadoPeriodo = "ABIERTO" | "EN_PROCESO" | "TIMBRADA" | "ERROR";
+
+export type PeriodoGlobal = {
+  id: string;
+  desde: string;
+  hasta: string;
+  periodicidad: string;
+  estado: EstadoPeriodo;
+  nTickets: number;
+  totalMxn: number;
+  cerradoAt: string | null;
+};
+
+export async function listarPeriodosGlobales(limite = 12): Promise<PeriodoGlobal[]> {
+  const { data, error } = await supabase
+    .from("cfdi_periodos_globales")
+    .select("id, desde, hasta, periodicidad, estado, n_tickets, total_mxn, cerrado_at")
+    .order("hasta", { ascending: false })
+    .limit(limite);
+  if (error) throw new Error(error.message);
+  return ((data ?? []) as Record<string, unknown>[]).map((f) => ({
+    id: String(f.id),
+    desde: String(f.desde),
+    hasta: String(f.hasta),
+    periodicidad: String(f.periodicidad),
+    estado: f.estado as EstadoPeriodo,
+    nTickets: Number(f.n_tickets ?? 0),
+    totalMxn: Number(f.total_mxn ?? 0),
+    cerradoAt: (f.cerrado_at as string) ?? null,
+  }));
+}
+
+/** El periodo anterior al vigente: el que toca cerrar. */
+export async function periodoPorCerrar(
+  periodicidad: string,
+): Promise<{ desde: string; hasta: string; nTickets: number; totalMxn: number } | null> {
+  const tid = await tenantId();
+  const hoy = new Date(Date.now() - 6 * 3600_000).toISOString().slice(0, 10);
+  const vig = await supabase.rpc("periodo_global_de", { p_periodicidad: periodicidad, p_fecha: hoy });
+  const vigente = (vig.data as { desde: string }[] | null)?.[0];
+  if (!vigente) return null;
+
+  const antes = new Date(`${vigente.desde}T12:00:00Z`);
+  antes.setUTCDate(antes.getUTCDate() - 1);
+  const prevQ = await supabase.rpc("periodo_global_de", {
+    p_periodicidad: periodicidad,
+    p_fecha: antes.toISOString().slice(0, 10),
+  });
+  const prev = (prevQ.data as { desde: string; hasta: string }[] | null)?.[0];
+  if (!prev) return null;
+
+  const { data, error } = await supabase.rpc("tickets_de_periodo_global", {
+    p_tenant_id: tid, p_desde: prev.desde, p_hasta: prev.hasta,
+  });
+  if (error) throw new Error(error.message);
+  const filas = (data ?? []) as { total_mxn: number }[];
+  return {
+    desde: prev.desde,
+    hasta: prev.hasta,
+    nTickets: filas.length,
+    totalMxn: filas.reduce((a, f) => a + Number(f.total_mxn ?? 0), 0),
+  };
+}
+
+export type ResultadoGlobal =
+  | { ok: true; sinVentas: boolean; uuidFiscal?: string; tickets?: number; total?: number }
+  | { ok: false; error: string };
+
+export async function timbrarFacturaGlobal(desde: string, hasta: string): Promise<ResultadoGlobal> {
+  const { data: sess } = await supabase.auth.getSession();
+  const token = sess.session?.access_token;
+  if (!token) return { ok: false, error: "Sesión expirada, vuelve a entrar" };
+  const tid = await tenantId();
+
+  const res = await fetch(`${SB_URL}/functions/v1/timbrar-global`, {
+    method: "POST",
+    headers: { apikey: SB_ANON, Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ tenant_id: tid, desde, hasta }),
+  });
+  const d = (await res.json().catch(() => ({}))) as Record<string, unknown>;
+  if (!res.ok || !d.ok) {
+    return { ok: false, error: String(d.mensaje ?? d.detalle ?? d.error ?? `HTTP ${res.status}`) };
+  }
+  return {
+    ok: true,
+    sinVentas: d.sinVentas === true,
+    uuidFiscal: d.uuid_fiscal as string | undefined,
+    tickets: d.tickets as number | undefined,
+    total: d.total as number | undefined,
+  };
+}
+
+// ── Cancelación (fase 8) ─────────────────────────────────────────────────────
+//
+// Cancelar no es borrar: el SAT pide un motivo y, según el caso, la aceptación del receptor. Por
+// eso el resultado puede ser "cancelado" o "en proceso", y la UI tiene que decir cuál es.
+
+export const MOTIVOS_CANCELACION = [
+  { v: "02", l: "Comprobante emitido con errores", ayuda: "El más común: datos equivocados y no habrá otro que lo sustituya." },
+  { v: "03", l: "No se llevó a cabo la operación", ayuda: "La venta se canceló y el cliente no pagó." },
+  { v: "01", l: "Con errores, con comprobante que lo sustituye", ayuda: "Requiere el folio fiscal de la factura que lo reemplaza." },
+  { v: "04", l: "Operación ya incluida en la factura global", ayuda: "Se facturó aparte algo que ya iba en la global." },
+] as const;
+
+export type ResultadoCancelacion =
+  | { ok: true; estado: "CANCELADO" | "EN_PROCESO_CANCELACION"; mensaje: string }
+  | { ok: false; error: string };
+
+export async function cancelarCfdi(
+  cfdiId: string,
+  motivo: string,
+  uuidSustituto?: string,
+): Promise<ResultadoCancelacion> {
+  const { data: sess } = await supabase.auth.getSession();
+  const token = sess.session?.access_token;
+  if (!token) return { ok: false, error: "Sesión expirada, vuelve a entrar" };
+
+  const res = await fetch(`${SB_URL}/functions/v1/cancelar-cfdi`, {
+    method: "POST",
+    headers: { apikey: SB_ANON, Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ cfdi_id: cfdiId, motivo, uuid_sustituto: uuidSustituto || undefined }),
+  });
+  const d = (await res.json().catch(() => ({}))) as Record<string, unknown>;
+  if (!res.ok || !d.ok) {
+    return { ok: false, error: String(d.mensaje ?? d.detalle ?? d.error ?? `HTTP ${res.status}`) };
+  }
+  return {
+    ok: true,
+    estado: d.estado as "CANCELADO" | "EN_PROCESO_CANCELACION",
+    mensaje: String(d.mensaje ?? ""),
+  };
 }

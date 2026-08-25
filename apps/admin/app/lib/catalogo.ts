@@ -176,6 +176,17 @@ export const productoSchema = z.object({
    * cuando el producto es la excepción (una limonada preparada en cocina dentro de Bebidas).
    */
   area_cocina_id: z.string().uuid().optional().or(z.literal("")),
+  /**
+   * Clave del catálogo c_ClaveProdServ del SAT. Vacía = el CFDI usa la genérica del giro
+   * (90101500, servicios de restaurantes), que es lo que un contador pondría de todos modos.
+   */
+  clave_sat: z.string().trim().regex(/^\d{8}$/, "La clave del SAT son 8 dígitos").optional().or(z.literal("")),
+  /**
+   * Tasa de IVA del producto. No es siempre 16: la comida para llevar va a tasa 0, y hasta que
+   * esto se pudo capturar el CFDI declaraba 16 % de todo.
+   */
+  tasa_iva: z.number({ invalid_type_error: "Tasa inválida" }).min(0).max(100),
+  iva_incluido_en_precio: z.boolean(),
 });
 export type ProductoInput = z.infer<typeof productoSchema>;
 
@@ -193,6 +204,9 @@ export type Producto = {
   visible_en_pos: boolean;
   marca_virtual_id: string | null;
   area_cocina_id: string | null;
+  clave_sat: string | null;
+  tasa_iva: number;
+  iva_incluido_en_precio: boolean;
 };
 
 type FilaProd = Omit<Producto, "categoriaNombre"> & { categoria: { nombre: string } | null };
@@ -201,7 +215,7 @@ export async function listarProductos(): Promise<Producto[]> {
   const { data, error } = await supabase
     .from("productos")
     .select(
-      "id, nombre, descripcion, codigo_interno, precio_base_mxn, categoria_id, estado, agotado_manual, visible_en_pos, marca_virtual_id, area_cocina_id, categoria:categorias(nombre)",
+      "id, nombre, descripcion, codigo_interno, precio_base_mxn, categoria_id, estado, agotado_manual, visible_en_pos, marca_virtual_id, area_cocina_id, clave_sat, tasa_iva, iva_incluido_en_precio, categoria:categorias(nombre)",
     )
     .is("deleted_at", null)
     .order("orden_visualizacion", { ascending: true });
@@ -219,6 +233,9 @@ export async function listarProductos(): Promise<Producto[]> {
     visible_en_pos: f.visible_en_pos,
     marca_virtual_id: f.marca_virtual_id ?? null,
     area_cocina_id: f.area_cocina_id ?? null,
+    clave_sat: f.clave_sat ?? null,
+    tasa_iva: Number(f.tasa_iva),
+    iva_incluido_en_precio: f.iva_incluido_en_precio,
   }));
 }
 
@@ -226,7 +243,7 @@ export async function obtenerProducto(id: string): Promise<Producto | null> {
   const { data, error } = await supabase
     .from("productos")
     .select(
-      "id, nombre, descripcion, codigo_interno, precio_base_mxn, categoria_id, estado, agotado_manual, visible_en_pos, marca_virtual_id, area_cocina_id, categoria:categorias(nombre)",
+      "id, nombre, descripcion, codigo_interno, precio_base_mxn, categoria_id, estado, agotado_manual, visible_en_pos, marca_virtual_id, area_cocina_id, clave_sat, tasa_iva, iva_incluido_en_precio, categoria:categorias(nombre)",
     )
     .eq("id", id)
     .is("deleted_at", null)
@@ -247,6 +264,9 @@ export async function obtenerProducto(id: string): Promise<Producto | null> {
     visible_en_pos: f.visible_en_pos,
     marca_virtual_id: f.marca_virtual_id ?? null,
     area_cocina_id: f.area_cocina_id ?? null,
+    clave_sat: f.clave_sat ?? null,
+    tasa_iva: Number(f.tasa_iva),
+    iva_incluido_en_precio: f.iva_incluido_en_precio,
   };
 }
 
@@ -280,6 +300,9 @@ export async function crearProducto(input: ProductoInput): Promise<void> {
     visible_en_pos: datos.visible_en_pos,
     marca_virtual_id: datos.marca_virtual_id || null,
     area_cocina_id: datos.area_cocina_id || null,
+    clave_sat: datos.clave_sat || null,
+    tasa_iva: datos.tasa_iva,
+    iva_incluido_en_precio: datos.iva_incluido_en_precio,
     orden_visualizacion: orden,
   });
   if (error) throw new Error(error.message);
@@ -301,6 +324,9 @@ export async function actualizarProducto(id: string, input: ProductoInput): Prom
       visible_en_pos: datos.visible_en_pos,
       marca_virtual_id: datos.marca_virtual_id || null,
       area_cocina_id: datos.area_cocina_id || null,
+      clave_sat: datos.clave_sat || null,
+      tasa_iva: datos.tasa_iva,
+      iva_incluido_en_precio: datos.iva_incluido_en_precio,
     })
     .eq("id", id);
   if (error) throw new Error(error.message);

@@ -29,3 +29,4 @@ supabase/.temp/
 
 # Vercel
 .vercel
+supabase/functions/.env
