@@ -1,0 +1,495 @@
+<!doctype html>
+<html lang="es-MX">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+
+<title>Se cae el internet y tú sigues cobrando — VIM POS</title>
+<meta name="description" content="Qué pasa exactamente en tu caja cuando se va la señal, qué pasa cuando vuelve, y qué hace el sistema si algo falla. Sin modo reducido y sin ventas a medias.">
+<link rel="canonical" href="https://vimpos.com.mx/sin-internet.html">
+
+<meta property="og:type" content="article">
+<meta property="og:locale" content="es_MX">
+<meta property="og:site_name" content="VIM POS">
+<meta property="og:title" content="Se cae el internet y tú sigues cobrando">
+<meta property="og:description" content="Qué pasa en tu caja cuando se va la señal, qué pasa cuando vuelve, y qué hace el sistema si algo falla.">
+<meta property="og:url" content="https://vimpos.com.mx/sin-internet.html">
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@400;500;600&family=JetBrains+Mono:wght@400;600&family=Sora:wght@600;700&display=swap">
+
+<link rel="icon" href="assets/img/logo.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="assets/img/apple-touch-icon-1024.png">
+<link rel="manifest" href="site.webmanifest">
+<meta name="theme-color" content="#0078C9">
+
+<link rel="stylesheet" href="assets/css/vim.css">
+</head>
+<body>
+
+<a href="#contenido" class="solo-lectores">Saltar al contenido</a>
+
+<header class="nav">
+  <div class="contenedor">
+    <div class="nav-fila">
+      <a href="index.html" class="nav-logo" aria-label="VIM POS, inicio">
+        <img src="assets/img/logo.svg" alt="" width="30" height="30" aria-hidden="true">
+        <span>VIM POS</span>
+      </a>
+      <nav class="nav-enlaces" aria-label="Principal">
+        <a class="nav-enlace" href="sin-internet.html" aria-current="page">Sin internet</a>
+        <a class="nav-enlace" href="precios.html">Precios</a>
+      </nav>
+      <div class="nav-acciones">
+        <a class="btn btn-primario" href="demo.html">Pide una demo</a>
+        <button class="nav-hamburguesa" data-menu-boton type="button"
+                aria-expanded="false" aria-controls="menu-movil" aria-label="Abrir menú">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+               stroke-width="2" stroke-linecap="round" aria-hidden="true">
+            <path d="M4 7h16M4 12h16M4 17h16"/>
+          </svg>
+        </button>
+      </div>
+    </div>
+  </div>
+  <div class="nav-movil" id="menu-movil" data-menu data-abierto="false">
+    <div>
+      <div class="contenedor">
+        <div class="nav-movil-lista">
+          <a href="sin-internet.html">Sin internet</a>
+          <a href="precios.html">Precios</a>
+          <a href="demo.html">Pide una demo</a>
+        </div>
+      </div>
+    </div>
+  </div>
+</header>
+
+<main id="contenido">
+
+  <!-- ═══ 1 · Entrada ════════════════════════════════════════════════════
+       Sin la retícula de dos columnas del home. Quien entra aquí ya vio el
+       argumento y viene a que se lo demuestren; una imagen grande al lado del
+       titular solo retrasa la primera afirmación concreta. -->
+  <section class="hero">
+    <div class="contenedor pila pila-5">
+      <p class="eyebrow">El diferenciador</p>
+      <h1>Se cae el internet y tú sigues cobrando</h1>
+      <p class="entradilla">
+        No es una promesa de folleto: es la diferencia entre que el sistema viva en tu caja o
+        viva en internet. Esta página cuenta qué pasa exactamente cuando se va la señal, qué pasa
+        cuando vuelve y qué hace el sistema si algo se rompe.
+      </p>
+      <div class="fila">
+        <a class="btn btn-primario btn-hero" href="demo.html">Pide una demo</a>
+        <a class="btn btn-fantasma btn-hero" href="precios.html">Ver precios</a>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══ 2 · La tabla de tres columnas ══════════════════════════════════
+       Tres columnas y no dos, y esa decisión es del plan (§2.3). Soft
+       Restaurant también funciona sin internet: contra ellos "sin internet" no
+       diferencia nada, y una tabla de dos columnas le habla a la mitad del
+       mercado mientras deja pensando al que ya los vio que decimos lo mismo.
+       Lo que nos separa de un sistema local viejo es la otra mitad de la tabla. -->
+  <section class="seccion destacada-suave">
+    <div class="contenedor pila pila-8">
+      <div class="pila pila-4">
+        <p class="eyebrow">La comparación honesta</p>
+        <h2>Contra el que vive en internet y contra el de siempre</h2>
+        <p>
+          Hay dos formas de vender punto de venta en México, y las dos tienen un problema. Los
+          sistemas que viven en internet se detienen cuando se cae la señal. Los sistemas de
+          siempre no se detienen, pero te obligan a ir al local para ver cómo va el día y el
+          respaldo es el que tú te acuerdes de hacer.
+        </p>
+      </div>
+
+      <div class="tabla-envoltura">
+        <table class="tabla">
+          <caption class="solo-lectores">
+            Comparación entre un punto de venta que vive en internet, un sistema instalado
+            de los de siempre, y VIM POS.
+          </caption>
+          <thead>
+            <tr>
+              <th scope="col"><span class="solo-lectores">Situación</span></th>
+              <th scope="col">Punto de venta en internet</th>
+              <th scope="col">El sistema instalado de siempre</th>
+              <th scope="col" class="col-vim">VIM POS</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <th scope="row">Se cae el internet</th>
+              <td><span class="marca marca-no">Se detiene o pasa a apuntar en papel</span></td>
+              <td><span class="marca marca-si">Sigue vendiendo</span></td>
+              <td class="col-vim"><span class="marca marca-si">Sigue vendiendo</span></td>
+            </tr>
+            <tr>
+              <th scope="row">Ver cómo va el día sin estar ahí</th>
+              <td><span class="marca marca-si">Sí, desde el celular</span></td>
+              <td><span class="marca marca-no">No, hay que ir al local</span></td>
+              <td class="col-vim"><span class="marca marca-si">Sí, desde el celular</span></td>
+            </tr>
+            <tr>
+              <th scope="row">Si se muere la computadora</th>
+              <td><span class="marca marca-si">Tus datos están fuera</span></td>
+              <td><span class="marca marca-no">El respaldo que hayas hecho tú</span></td>
+              <td class="col-vim"><span class="marca marca-si">Copia diaria en el local y fuera de él</span></td>
+            </tr>
+            <tr>
+              <th scope="row">Actualizaciones</th>
+              <td><span class="marca marca-si">Solas</span></td>
+              <td><span class="marca marca-mas">Visita del técnico</span></td>
+              <td class="col-vim"><span class="marca marca-si">Solas, sin que nadie vaya</span></td>
+            </tr>
+            <tr>
+              <th scope="row">Varias sucursales sumadas</th>
+              <td><span class="marca marca-si">Sí</span></td>
+              <td><span class="marca marca-mas">Depende de la versión</span></td>
+              <td class="col-vim"><span class="marca marca-si">Sí, un reporte con todo</span></td>
+            </tr>
+            <tr>
+              <th scope="row">Dónde vive tu información</th>
+              <td>Solo fuera</td>
+              <td>Solo en tu local</td>
+              <td class="col-vim">En tu local, con copia fuera</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <p style="font-size:var(--t-13);color:var(--ink-3)">
+        La columna de en medio existe porque es honesta: hay sistemas instalados que tampoco se
+        detienen sin internet. Ahí no ganamos por seguir vendiendo — ganamos por el resto de la
+        tabla.
+      </p>
+    </div>
+  </section>
+
+  <!-- ═══ 3 · Por qué funciona ═══════════════════════════════════════════
+       El plan (§2.3) decía que aquí sí cabían los detalles técnicos porque
+       quien llega los está buscando. Se descartó: la instrucción posterior es
+       que el sitio no menciona nada de por dentro, y en este punto pesa más —
+       el restaurantero que llega aquí busca que le prueben la afirmación, no
+       que le nombren la pieza. -->
+  <section class="seccion">
+    <div class="contenedor pila pila-8">
+      <div class="pila pila-4">
+        <p class="eyebrow">Por qué funciona</p>
+        <h2>El sistema no está en internet. Está en tu caja.</h2>
+        <p>
+          Un punto de venta en internet es una ventana: lo que ves en pantalla vive en otro lado y
+          cada cobro tiene que viajar hasta allá y volver. Si el camino se corta, la ventana se
+          queda en blanco. Aquí el sistema completo está instalado en la computadora de tu caja,
+          así que el cobro no viaja a ningún lado: se hace ahí mismo.
+        </p>
+      </div>
+
+      <div class="tres">
+        <div class="tarjeta pila pila-3">
+          <h3>No es un modo reducido</h3>
+          <p>
+            No hay «versión sin conexión» con la mitad de las cosas apagadas. Es el mismo sistema,
+            con tu menú, tus precios, tus descuentos y tus impuestos, haya señal o no.
+          </p>
+        </div>
+        <div class="tarjeta pila pila-3">
+          <h3>Nada se queda a medias</h3>
+          <p>
+            El ticket se cierra, se cobra y se imprime completo en el momento. No queda una venta
+            «pendiente de subir» que puedas perder si se apaga la computadora antes.
+          </p>
+        </div>
+        <div class="tarjeta pila pila-3">
+          <h3>La cocina tampoco se entera</h3>
+          <p>
+            Las comandas van de la caja a la impresora y a la pantalla de cocina por la red de tu
+            local. Nunca salen a internet, ni siquiera cuando lo hay.
+          </p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══ 4 · El hub del local ═══════════════════════════════════════════
+       El diagrama en grande. Es el mismo archivo que el home, inline para que
+       herede los colores de la marca y para que el JS pueda cortarle el
+       internet cuando el lector pulsa el botón. -->
+  <section class="seccion destacada-suave">
+    <div class="contenedor pila pila-8">
+      <div class="pila pila-4">
+        <p class="eyebrow">Cómo se acomoda en tu local</p>
+        <h2>Una computadora manda, las demás cuelgan de ella</h2>
+        <p>
+          La caja principal hace de centro. La pantalla de cocina, las impresoras de las distintas
+          áreas y la segunda caja se conectan a ella por la red del local — el mismo módem que ya
+          tienes, sin salir a internet. Por eso todo el conjunto sigue trabajando cuando la señal
+          se va: nunca dependía de ella.
+        </p>
+      </div>
+
+      <div class="pila pila-5">
+        <div>
+<svg viewBox="0 0 760 468" role="img" aria-labelledby="arq2-titulo arq2-desc"
+     class="diagrama-arquitectura" data-diagrama xmlns="http://www.w3.org/2000/svg">
+  <title id="arq2-titulo">Qué sigue funcionando cuando se cae el internet</title>
+  <desc id="arq2-desc">
+    Todo lo que hace falta para vender —la caja, las impresoras, la pantalla de cocina y una
+    segunda caja— vive dentro del local y funciona sin conexión. Lo de fuera queda al otro lado
+    de esa frontera, unido por una sola línea que se puede cortar.
+  </desc>
+
+  <style>
+    .a-t-titulo { font: 600 15px 'Inter Tight', system-ui, sans-serif; fill: var(--ink, #16161A); }
+    .a-t-sub    { font: 400 12.5px 'Inter Tight', system-ui, sans-serif; fill: var(--ink-3, #8E8E94); }
+    .a-t-etq    { font: 600 10px 'JetBrains Mono', ui-monospace, monospace;
+                  letter-spacing: .12em; fill: var(--ink-3, #8E8E94); }
+
+    .a-local   { fill: var(--accent-soft, #EAF3FB); stroke: none; }
+    .a-tarjeta { fill: var(--bg, #FFFFFF); stroke: var(--line-strong, #DDDDD9); stroke-width: 1; }
+    .a-caja    { fill: var(--bg, #FFFFFF); stroke: var(--accent, #0078C9); stroke-width: 1.5; }
+    .a-hilo    { stroke: var(--accent, #0078C9); stroke-width: 1.25; fill: none; opacity: .45; }
+
+    .a-fuera   { fill: none; stroke: var(--line-strong, #DDDDD9); stroke-width: 1; }
+    .a-enlace  { stroke: var(--ink-3, #8E8E94); stroke-width: 1.25; stroke-dasharray: 4 4; fill: none; }
+
+    .a-corte { opacity: 0; }
+    .a-nube-grupo, .a-enlace, .a-corte { transition: opacity 240ms cubic-bezier(0.23, 1, 0.32, 1); }
+
+    .diagrama-arquitectura.sin-red .a-nube-grupo,
+    .diagrama-arquitectura.sin-red .a-enlace { opacity: .3; }
+    .diagrama-arquitectura.sin-red .a-corte  { opacity: 1; }
+
+    @media (prefers-reduced-motion: reduce) {
+      .a-nube-grupo, .a-enlace, .a-corte { transition: none; }
+    }
+  </style>
+
+  <g class="a-nube-grupo">
+    <rect class="a-fuera" x="252" y="8" width="256" height="60" rx="8"/>
+    <text class="a-t-etq" x="272" y="30">FUERA · OPCIONAL</text>
+    <text class="a-t-sub" x="272" y="52">Respaldo, panel del dueño y reportes</text>
+  </g>
+
+  <path class="a-enlace" d="M380 68 L380 116"/>
+  <g class="a-corte">
+    <circle cx="380" cy="92" r="13" fill="var(--bg, #FFFFFF)"/>
+    <path d="M374 86 L386 98 M386 86 L374 98"
+          stroke="var(--danger, #C0392B)" stroke-width="2" stroke-linecap="round"/>
+    <text class="a-t-etq" x="402" y="96" fill="var(--danger, #C0392B)">SE CAYÓ EL INTERNET</text>
+  </g>
+
+  <rect class="a-local" x="16" y="116" width="728" height="336" rx="12"/>
+  <text class="a-t-etq" x="40" y="146" fill="var(--accent-hover, #0063A8)">EN TU LOCAL</text>
+
+  <rect class="a-caja" x="230" y="166" width="300" height="86" rx="10"/>
+  <text class="a-t-titulo" x="254" y="198">La caja</text>
+  <text class="a-t-sub" x="254" y="220">Tus ventas y tu menú viven aquí.</text>
+  <text class="a-t-sub" x="254" y="238">Cobra e imprime sin señal.</text>
+
+  <path class="a-hilo" d="M380 252 v28 q0 12 -12 12 H160 q-12 0 -12 12 v18"/>
+  <path class="a-hilo" d="M380 252 v70"/>
+  <path class="a-hilo" d="M380 252 v28 q0 12 12 12 H600 q12 0 12 12 v18"/>
+
+  <g>
+    <rect class="a-tarjeta" x="48" y="340" width="200" height="80" rx="10"/>
+    <text class="a-t-titulo" x="70" y="372">Cocina</text>
+    <text class="a-t-sub" x="70" y="394">Comandas en pantalla</text>
+  </g>
+  <g>
+    <rect class="a-tarjeta" x="280" y="340" width="200" height="80" rx="10"/>
+    <text class="a-t-titulo" x="302" y="372">Impresoras</text>
+    <text class="a-t-sub" x="302" y="394">Tickets y comandas por área</text>
+  </g>
+  <g>
+    <rect class="a-tarjeta" x="512" y="340" width="200" height="80" rx="10"/>
+    <text class="a-t-titulo" x="534" y="372">Segunda caja</text>
+    <text class="a-t-sub" x="534" y="394">Comparte el mismo turno</text>
+  </g>
+</svg>
+        </div>
+        <div class="fila">
+          <button class="btn btn-fantasma" type="button" data-diagrama-boton aria-pressed="false">
+            Cortar el internet
+          </button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══ 5 · Cuando vuelve ══════════════════════════════════════════════
+       Los números aquí sí son una secuencia real, así que numerarlos dice
+       algo verdadero en vez de decorar. -->
+  <section class="seccion">
+    <div class="contenedor pila pila-8">
+      <div class="pila pila-4">
+        <p class="eyebrow">Cuando vuelve la señal</p>
+        <h2>Sube solo, y sube tal cual quedó</h2>
+        <p>
+          Ésta es la parte donde los sistemas con «modo sin conexión» fallan de verdad: al
+          reconectarse vuelven a numerar los tickets, recalculan totales y te dejan dos folios con
+          el mismo número. Aquí lo que sube es exactamente lo que se imprimió.
+        </p>
+      </div>
+
+      <ol class="pasos">
+        <li class="paso">
+          <h3>Vuelve la señal</h3>
+          <p>La caja lo nota sola. Nadie tiene que apretar nada ni volver a entrar.</p>
+        </li>
+        <li class="paso">
+          <h3>Sube lo del día</h3>
+          <p>
+            Cada pocos minutos manda lo nuevo. Si el internet vuelve a irse a medias, reintenta
+            y espera cada vez un poco más, en lugar de insistir hasta atorarse.
+          </p>
+        </li>
+        <li class="paso">
+          <h3>Los folios no se tocan</h3>
+          <p>
+            El número de ticket, los totales y el estado de la venta suben tal cual se generaron.
+            No se vuelven a calcular al llegar.
+          </p>
+        </li>
+        <li class="paso">
+          <h3>Si algo choca, se aparta</h3>
+          <p>
+            Una venta con un problema no detiene a las demás: se aparta sola y la revisas desde el
+            panel cuando puedas.
+          </p>
+        </li>
+      </ol>
+    </div>
+  </section>
+
+  <!-- ═══ 6 · Si algo falla ══════════════════════════════════════════════ -->
+  <section class="seccion destacada-suave">
+    <div class="contenedor pila pila-8">
+      <div class="pila pila-4">
+        <p class="eyebrow">Si algo falla</p>
+        <h2>Lo que pasa a las once de la noche, cuando no hay a quién llamar</h2>
+        <p>
+          Un sistema que vive en tu local también puede fallar. La diferencia está en si se
+          arregla solo o si tienes que cerrar la caja hasta que llegue alguien.
+        </p>
+      </div>
+
+      <div class="dos">
+        <div class="tarjeta pila pila-3">
+          <h3>Se revisa a sí mismo</h3>
+          <p>
+            La caja comprueba cada pocos segundos que todo responda. Si algo se cayó, lo levanta
+            sola y sigue. Nadie del turno de noche tiene que saber qué pasó.
+          </p>
+        </div>
+        <div class="tarjeta pila pila-3">
+          <h3>Siete copias, siempre</h3>
+          <p>
+            Guarda una copia completa al cerrar el día y conserva las siete más recientes. Además
+            de la copia fuera del local: si se muere la computadora, no se muere el negocio.
+          </p>
+        </div>
+        <div class="tarjeta pila pila-3">
+          <h3>No se apaga por accidente</h3>
+          <p>
+            Si alguien cierra la ventana en plena hora pico, la caja sigue trabajando: se queda
+            junto al reloj de Windows. Para apagarla de verdad hay que decirlo a propósito.
+          </p>
+        </div>
+        <div class="tarjeta pila pila-3">
+          <h3>Se actualiza sin visita</h3>
+          <p>
+            Las versiones nuevas llegan solas y se comprueban antes de instalarse, para que lo que
+            entra a tu caja sea lo que mandamos y nada más. No tienes que agendar a un técnico.
+          </p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══ 7 · Letra chica ════════════════════════════════════════════════
+       Va en la misma página y no escondida. Lo que NO va aquí (§2.3): el aviso
+       de que Windows muestra una advertencia la primera vez. Es cierto, pero
+       se dice antes de instalar y en persona — aquí solo sembraría duda a
+       escala por algo que pasa una sola vez. -->
+  <section class="seccion">
+    <div class="contenedor pila pila-5">
+      <div class="letra-chica">
+        <p>
+          Todo lo de esta página lo hace el programa que se instala en la computadora de tu caja,
+          con Windows. Si abres el punto de venta desde el navegador y se cae el internet, te
+          avisa en pantalla, pero ahí no cobra sin conexión.
+        </p>
+        <p>
+          El panel para ver el negocio desde fuera sí necesita internet, porque está fuera. Que no
+          lo tengas no detiene la caja: solo no ves el reporte hasta que vuelva.
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══ 8 · Cierre ═════════════════════════════════════════════════════ -->
+  <section class="seccion">
+    <div class="contenedor">
+      <div class="cierre pila pila-5" style="align-items:center">
+        <h2>Pruébalo cortándole el internet</h2>
+        <p style="max-width:52ch">
+          Es la demo que pedimos que nos hagas: desconecta el cable delante de nosotros y sigue
+          cobrando. Si no pasa, no compres.
+        </p>
+        <div class="fila" style="justify-content:center">
+          <a class="btn btn-primario btn-hero" href="demo.html">Pide una demo</a>
+          <a class="btn btn-fantasma btn-hero" href="precios.html">Ver precios</a>
+        </div>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<footer class="pie">
+  <div class="contenedor">
+    <div class="pie-rejilla">
+      <div class="pila pila-3">
+        <span class="nav-logo" style="pointer-events:none">
+          <img src="assets/img/logo.svg" alt="" width="30" height="30" aria-hidden="true">
+          <span>VIM POS</span>
+        </span>
+        <p style="font-size:var(--t-15)">
+          El punto de venta que no se detiene cuando se cae el internet.
+          Hecho en León, Guanajuato.
+        </p>
+      </div>
+      <div>
+        <h4>Producto</h4>
+        <ul class="pie-lista">
+          <li><a href="sin-internet.html">Sin internet</a></li>
+          <li><a href="precios.html">Precios</a></li>
+          <li><a href="demo.html">Pide una demo</a></li>
+        </ul>
+      </div>
+      <div>
+        <h4>Contacto</h4>
+        <ul class="pie-lista">
+          <li><a href="mailto:hola@vimpos.com.mx">hola@vimpos.com.mx</a></li>
+          <li><a href="https://wa.me/524761273020">WhatsApp 476 127 3020</a></li>
+        </ul>
+      </div>
+    </div>
+    <div class="pie-legal">
+      <span>© 2026 Fermín Villalobos Martínez</span>
+      <span class="fila" style="gap:var(--sp-5)">
+        <a href="aviso-privacidad.html" style="color:inherit">Aviso de privacidad</a>
+        <a href="terminos.html" style="color:inherit">Términos</a>
+      </span>
+    </div>
+  </div>
+</footer>
+
+<script src="assets/js/vim.js" defer></script>
+</body>
+</html>

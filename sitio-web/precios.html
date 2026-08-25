@@ -1,0 +1,644 @@
+<!doctype html>
+<html lang="es-MX">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+
+<title>Precios de VIM POS — publicados, sin cotización</title>
+<meta name="description" content="Tres planes en pesos, más IVA: Esencial $699, Negocio $1,299 y Cadena $2,499 al mes. La implementación, la carga de tu menú y la capacitación van incluidas en todos.">
+<link rel="canonical" href="https://vimpos.com.mx/precios.html">
+
+<meta property="og:type" content="website">
+<meta property="og:locale" content="es_MX">
+<meta property="og:site_name" content="VIM POS">
+<meta property="og:title" content="Precios de VIM POS — publicados, sin cotización">
+<meta property="og:description" content="Tres planes en pesos, más IVA. La implementación, la carga de tu menú y la capacitación van incluidas en todos.">
+<meta property="og:url" content="https://vimpos.com.mx/precios.html">
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@400;500;600&family=JetBrains+Mono:wght@400;600&family=Sora:wght@600;700&display=swap">
+
+<link rel="icon" href="assets/img/logo.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="assets/img/apple-touch-icon-1024.png">
+<link rel="manifest" href="site.webmanifest">
+<meta name="theme-color" content="#0078C9">
+
+<link rel="stylesheet" href="assets/css/vim.css">
+</head>
+<body>
+
+<a href="#contenido" class="solo-lectores">Saltar al contenido</a>
+
+<header class="nav">
+  <div class="contenedor">
+    <div class="nav-fila">
+      <a href="index.html" class="nav-logo" aria-label="VIM POS, inicio">
+        <img src="assets/img/logo.svg" alt="" width="30" height="30" aria-hidden="true">
+        <span>VIM POS</span>
+      </a>
+      <nav class="nav-enlaces" aria-label="Principal">
+        <a class="nav-enlace" href="sin-internet.html">Sin internet</a>
+        <a class="nav-enlace" href="precios.html" aria-current="page">Precios</a>
+      </nav>
+      <div class="nav-acciones">
+        <a class="btn btn-primario" href="demo.html">Pide una demo</a>
+        <button class="nav-hamburguesa" data-menu-boton type="button"
+                aria-expanded="false" aria-controls="menu-movil" aria-label="Abrir menú">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+               stroke-width="2" stroke-linecap="round" aria-hidden="true">
+            <path d="M4 7h16M4 12h16M4 17h16"/>
+          </svg>
+        </button>
+      </div>
+    </div>
+  </div>
+  <div class="nav-movil" id="menu-movil" data-menu data-abierto="false">
+    <div>
+      <div class="contenedor">
+        <div class="nav-movil-lista">
+          <a href="sin-internet.html">Sin internet</a>
+          <a href="precios.html">Precios</a>
+          <a href="demo.html">Pide una demo</a>
+        </div>
+      </div>
+    </div>
+  </div>
+</header>
+
+<main id="contenido">
+
+  <!-- ═══ 1 · Entrada ════════════════════════════════════════════════════
+       El precio se publica y punto. Soft Restaurant también publica el suyo y
+       está a nuestro nivel ($799 y $1,099), así que la página NO se apoya en
+       ser la barata —no lo somos y decirlo sería mentira—: se apoya en qué
+       incluye el precio. -->
+  <section class="hero">
+    <div class="contenedor pila pila-5">
+      <p class="eyebrow">Precios</p>
+      <h1>Precio de lista, publicado</h1>
+      <p class="entradilla">
+        En pesos y más IVA. Sin «contáctanos para conocer el precio», sin costo de instalación y
+        sin contrato forzoso. Lo que ves es lo que pagas.
+      </p>
+      <p class="prueba-social">La implementación va incluida en los tres planes</p>
+    </div>
+  </section>
+
+  <!-- ═══ 2 · Los tres planes ════════════════════════════════════════════
+       Se destaca Negocio, no Esencial. Si el plan de entrada solo aguanta una
+       hora de soporte al mes, no conviene que sea al que todos miran primero:
+       Esencial existe para el negocio de una sola caja y para que Negocio se
+       vea razonable al lado. -->
+  <section class="seccion destacada-suave">
+    <div class="contenedor pila pila-8">
+
+      <div class="fila" style="justify-content:space-between;align-items:center;gap:var(--sp-5)">
+        <div class="conmutador" role="group" aria-label="Periodo de pago">
+          <button type="button" data-periodo="mensual" aria-pressed="true">Mensual</button>
+          <button type="button" data-periodo="anual" aria-pressed="false">Anual · −17%</button>
+        </div>
+        <p style="font-size:var(--t-13);color:var(--ink-3);margin:0">
+          Pagando el año completo te ahorras dos meses.
+        </p>
+      </div>
+
+      <div class="planes">
+        <div class="plan pila">
+          <div class="pila pila-2">
+            <p class="eyebrow" style="color:var(--ink-3)">Una sola caja</p>
+            <h3>Esencial</h3>
+            <div class="plan-precio" data-precio data-mensual="$699" data-anual="$580">$699</div>
+            <span class="plan-periodo" data-nota-periodo>al mes, más IVA</span>
+          </div>
+          <ul class="plan-lista">
+            <li>1 sucursal · 1 caja</li>
+            <li>Pantalla de cocina y mesas</li>
+            <li>Reportes y corte de caja</li>
+            <li>10 folios de factura al mes</li>
+            <li>Cargas tu menú con nuestra guía</li>
+            <li>Soporte por chat y WhatsApp</li>
+          </ul>
+          <a class="btn btn-fantasma" href="demo.html">Pide una demo</a>
+        </div>
+
+        <div class="plan destacado pila">
+          <div class="pila pila-2">
+            <p class="eyebrow" style="color:var(--accent)">El que recomendamos</p>
+            <h3>Negocio</h3>
+            <div class="plan-precio" data-precio data-mensual="$1,299" data-anual="$1,078">$1,299</div>
+            <span class="plan-periodo" data-nota-periodo>al mes, más IVA</span>
+          </div>
+          <ul class="plan-lista">
+            <li>1 sucursal · 3 cajas</li>
+            <li>Todo lo de Esencial</li>
+            <li>Inventario y control de mermas</li>
+            <li>20 folios de factura al mes</li>
+            <li><strong>Nosotros cargamos tu menú</strong></li>
+            <li>Te acompañamos el día del arranque</li>
+          </ul>
+          <a class="btn btn-primario" href="demo.html">Pide una demo</a>
+        </div>
+
+        <div class="plan pila">
+          <div class="pila pila-2">
+            <p class="eyebrow" style="color:var(--ink-3)">Varias sucursales</p>
+            <h3>Cadena</h3>
+            <div class="plan-precio" data-precio data-mensual="$2,499" data-anual="$2,074">$2,499</div>
+            <span class="plan-periodo" data-nota-periodo>al mes, más IVA</span>
+          </div>
+          <ul class="plan-lista">
+            <li>3 sucursales · cajas ilimitadas</li>
+            <li>Todo lo de Negocio</li>
+            <li>Un reporte que suma todas</li>
+            <li>40 folios de factura al mes</li>
+            <li>Menú compartido o propio por sucursal</li>
+            <li>Visita presencial el día del arranque</li>
+          </ul>
+          <a class="btn btn-fantasma" href="demo.html">Pide una demo</a>
+        </div>
+      </div>
+
+      <p style="font-size:var(--t-13);color:var(--ink-3)">
+        ¿Más de tres sucursales? Es el mismo plan Cadena con sucursales de más; escríbenos y te
+        decimos el número exacto.
+      </p>
+    </div>
+  </section>
+
+  <!-- ═══ 3 · La comparación completa ════════════════════════════════════
+       La fila de implementación es la que separa de verdad los escalones, y es
+       la que cuesta dinero: en Esencial el cliente carga su menú siguiendo una
+       guía; desde Negocio lo hacemos nosotros. No es un recorte disfrazado —a
+       diez horas de arranque por alta, un cliente de $699 con acompañamiento
+       completo tarda medio año en pagar su propio arranque. -->
+  <section class="seccion">
+    <div class="contenedor pila pila-8">
+      <div class="pila pila-4">
+        <p class="eyebrow">Lado a lado</p>
+        <h2>Qué cambia de un plan a otro</h2>
+        <p>
+          Casi todo el sistema está en los tres. Lo que cambia es cuántas cajas y sucursales
+          maneja, y —sobre todo— cuánto trabajo hacemos nosotros por ti al arrancar.
+        </p>
+      </div>
+
+      <div class="tabla-envoltura">
+        <table class="tabla">
+          <caption class="solo-lectores">Comparación de los tres planes de VIM POS.</caption>
+          <thead>
+            <tr>
+              <th scope="col"><span class="solo-lectores">Concepto</span></th>
+              <th scope="col">Esencial</th>
+              <th scope="col" class="col-vim">Negocio</th>
+              <th scope="col">Cadena</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <th scope="row">Al mes, más IVA</th>
+              <td>$699</td>
+              <td class="col-vim">$1,299</td>
+              <td>$2,499</td>
+            </tr>
+            <tr>
+              <th scope="row">Sucursales</th>
+              <td>1</td>
+              <td class="col-vim">1</td>
+              <td>3</td>
+            </tr>
+            <tr>
+              <th scope="row">Cajas</th>
+              <td>1</td>
+              <td class="col-vim">3</td>
+              <td>Sin límite</td>
+            </tr>
+            <tr>
+              <th scope="row">Cobrar sin internet</th>
+              <td><span class="marca marca-si">Sí</span></td>
+              <td class="col-vim"><span class="marca marca-si">Sí</span></td>
+              <td><span class="marca marca-si">Sí</span></td>
+            </tr>
+            <tr>
+              <th scope="row">Pantalla de cocina</th>
+              <td><span class="marca marca-si">Sí</span></td>
+              <td class="col-vim"><span class="marca marca-si">Sí</span></td>
+              <td><span class="marca marca-si">Sí</span></td>
+            </tr>
+            <tr>
+              <th scope="row">Mesas y cuentas abiertas</th>
+              <td><span class="marca marca-si">Sí</span></td>
+              <td class="col-vim"><span class="marca marca-si">Sí</span></td>
+              <td><span class="marca marca-si">Sí</span></td>
+            </tr>
+            <tr>
+              <th scope="row">Inventario y mermas</th>
+              <td><span class="marca marca-no">No</span></td>
+              <td class="col-vim"><span class="marca marca-si">Sí</span></td>
+              <td><span class="marca marca-si">Sí</span></td>
+            </tr>
+            <tr>
+              <th scope="row">Reporte que suma sucursales</th>
+              <td><span class="marca marca-no">No</span></td>
+              <td class="col-vim"><span class="marca marca-no">No</span></td>
+              <td><span class="marca marca-si">Sí</span></td>
+            </tr>
+            <tr>
+              <th scope="row">Folios de factura al mes</th>
+              <td>10</td>
+              <td class="col-vim">20</td>
+              <td>40</td>
+            </tr>
+            <tr>
+              <th scope="row">Quién carga tu menú</th>
+              <td>Tú, con nuestra guía</td>
+              <td class="col-vim">Nosotros</td>
+              <td>Nosotros</td>
+            </tr>
+            <tr>
+              <th scope="row">Capacitación</th>
+              <td>Videos y guía escrita</td>
+              <td class="col-vim">3 horas con tu equipo</td>
+              <td>3 horas con tu equipo</td>
+            </tr>
+            <tr>
+              <th scope="row">El día del arranque</th>
+              <td>Soporte por chat</td>
+              <td class="col-vim">Te acompañamos en línea</td>
+              <td>Vamos a tu local</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══ 4 · Lo incluido ════════════════════════════════════════════════
+       Esto también está en el home, y a propósito. Soft Restaurant pone
+       "soporte y capacitación gratuita" entre sus funciones principales con el
+       mismo peso visual que los inventarios; nosotros lo regalábamos y lo
+       teníamos escondido en la página a la que menos gente llega. -->
+  <section class="seccion destacada-suave">
+    <div class="contenedor pila pila-8">
+      <div class="pila pila-4">
+        <p class="eyebrow">Sin costo aparte</p>
+        <h2>Lo que otros cobran como «implementación»</h2>
+        <p>
+          Va incluido en los tres planes. No hay pago inicial ni factura sorpresa el primer mes.
+        </p>
+      </div>
+
+      <div class="tres">
+        <div class="tarjeta pila pila-3">
+          <h3>Poner el sistema a andar</h3>
+          <p>
+            Instalación en tu caja, conexión de las impresoras y de la pantalla de cocina, y dejar
+            todo trabajando antes de que abras.
+          </p>
+        </div>
+        <div class="tarjeta pila pila-3">
+          <h3>Tu menú, cargado</h3>
+          <p>
+            Con precios, categorías, extras y términos. Si vienes de otro sistema, lo traemos de
+            ahí en lugar de teclearlo de nuevo.
+          </p>
+        </div>
+        <div class="tarjeta pila pila-3">
+          <h3>Tus datos fiscales</h3>
+          <p>
+            Configurados una vez y bien, para que los tickets y los reportes salgan como el
+            contador los necesita.
+          </p>
+        </div>
+        <div class="tarjeta pila pila-3">
+          <h3>Capacitación de tu equipo</h3>
+          <p>
+            Tres horas con quien va a estar en la caja y en la cocina. No un video y suerte.
+          </p>
+        </div>
+        <div class="tarjeta pila pila-3">
+          <h3>Actualizaciones</h3>
+          <p>
+            Todas, siempre. Llegan solas a tu caja y no hay que agendar a nadie ni pagar la
+            versión nueva.
+          </p>
+        </div>
+        <div class="tarjeta pila pila-3">
+          <h3>Respaldos</h3>
+          <p>
+            Copia diaria en tu local y copia fuera de él. Sin que tengas que acordarte.
+          </p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══ 5 · Extras ═════════════════════════════════════════════════════ -->
+  <section class="seccion">
+    <div class="contenedor pila pila-8">
+      <div class="pila pila-4">
+        <p class="eyebrow">Si necesitas más</p>
+        <h2>Extras, con su precio</h2>
+        <p>
+          Se agregan y se quitan cuando quieras, y se cobran junto con tu plan.
+        </p>
+      </div>
+
+      <div class="tres">
+        <div class="tarjeta pila pila-3">
+          <h3>Sucursal adicional</h3>
+          <div class="plan-precio">$799</div>
+          <p>Al mes, más IVA. Entra al reporte que suma todas.</p>
+        </div>
+        <div class="tarjeta pila pila-3">
+          <h3>Caja adicional</h3>
+          <div class="plan-precio">$249</div>
+          <p>Al mes, más IVA. Comparte turno y comandas con la principal.</p>
+        </div>
+        <div class="tarjeta pila pila-3">
+          <div class="fila" style="justify-content:space-between;align-items:center">
+            <h3>Facturación</h3>
+            <span class="pastilla pastilla-pronto">Muy pronto</span>
+          </div>
+          <div class="plan-precio">$349</div>
+          <p>
+            Al mes, más IVA. Está construido y probado; estamos cerrando la activación con el
+            proveedor autorizado. En la demo te damos la fecha real.
+          </p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══ 6 · Facturación ════════════════════════════════════════════════
+       Va marcado "Muy pronto" de principio a fin, y esa disciplina es del plan
+       (§10): el módulo existe y está verificado, pero lo que hoy se emite son
+       comprobantes de prueba. Se describe en futuro hasta que la activación
+       con el proveedor esté cerrada. -->
+  <section class="seccion destacada-suave">
+    <div class="contenedor pila pila-8">
+      <div class="pila pila-4">
+        <div class="fila" style="align-items:center;gap:var(--sp-4)">
+          <p class="eyebrow" style="margin:0">Facturación</p>
+          <span class="pastilla pastilla-pronto">Muy pronto</span>
+        </div>
+        <h2>Tus clientes se facturan solos, desde el ticket</h2>
+        <p>
+          El comensal escanea el código del ticket, pone sus datos y recibe su factura por correo.
+          Tu cajero no vuelve a parar la fila para eso, y tú no vuelves a recibir mensajes de
+          «me pueden facturar lo del sábado».
+        </p>
+      </div>
+
+      <div class="dos">
+        <div class="tarjeta pila pila-3">
+          <h3>La factura del día, automática</h3>
+          <p>
+            Lo que nadie facturó se junta en una sola factura al cerrar el periodo que tú elijas:
+            diario, semanal, quincenal o mensual. Es lo que el SAT te pide, y sale sin que hagas
+            nada.
+          </p>
+        </div>
+        <div class="tarjeta pila pila-3">
+          <h3>Hasta cuándo pueden facturar</h3>
+          <p>
+            No es «el mes en curso», como en otros sistemas. Tu cliente puede facturar hasta que
+            tú cierres tu periodo — y ese periodo lo decides tú.
+          </p>
+        </div>
+        <div class="tarjeta pila pila-3">
+          <h3>Qué necesitas dar</h3>
+          <p>
+            Solo tu sello del SAT y su contraseña, más tu RFC vigente. <strong>Tu e.firma
+            no</strong>: ésa es tu llave maestra y no tenemos por qué pedírtela.
+          </p>
+        </div>
+        <div class="tarjeta pila pila-3">
+          <h3>Tu sello no se queda con nosotros</h3>
+          <p>
+            Pasa del panel al proveedor autorizado y se descarta. De nuestro lado solo guardamos
+            cuál es y cuándo vence, para avisarte antes de que caduque.
+          </p>
+        </div>
+      </div>
+
+      <div class="pila pila-5">
+        <div class="pila pila-3">
+          <h3>Si se te acaban los folios del plan</h3>
+          <p>
+            Compras un paquete y se suma a tu saldo. No caducan mientras tengas tu suscripción
+            activa.
+          </p>
+        </div>
+        <div class="tabla-envoltura">
+          <table class="tabla" style="min-width:520px">
+            <caption class="solo-lectores">Precios de los paquetes de folios de factura.</caption>
+            <thead>
+              <tr>
+                <th scope="col">Paquete</th>
+                <th scope="col">Precio</th>
+                <th scope="col">Sale a</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr><th scope="row">100 folios</th><td>$200</td><td>$2.00 cada uno</td></tr>
+              <tr><th scope="row">250 folios</th><td>$450</td><td>$1.80 cada uno</td></tr>
+              <tr><th scope="row">500 folios</th><td>$750</td><td>$1.50 cada uno</td></tr>
+              <tr><th scope="row">1,000 folios</th><td>$1,300</td><td>$1.30 cada uno</td></tr>
+              <tr><th scope="row">5,000 folios</th><td>$5,000</td><td>$1.00 cada uno</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p style="font-size:var(--t-13);color:var(--ink-3)">
+          Precios más IVA. Los folios que trae tu plan son para la factura del periodo — el
+          cumplimiento ante el SAT —, no para facturarle a cada cliente.
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══ 7 · Lo que no incluye ══════════════════════════════════════════
+       Decirlo aquí evita una llamada de soporte y una devolución. No se
+       inventan modelos ni precios de equipo: no tenemos de dónde sostenerlos. -->
+  <section class="seccion">
+    <div class="contenedor pila pila-8">
+      <div class="pila pila-4">
+        <p class="eyebrow">Para que no haya sorpresas</p>
+        <h2>Lo que el precio no incluye</h2>
+      </div>
+
+      <div class="dos">
+        <div class="tarjeta pila pila-3">
+          <h3>El equipo</h3>
+          <p>
+            Necesitas una computadora con Windows, una impresora de tickets, un cajón de dinero y
+            el módem que ya tienes. No vendemos equipo: te decimos exactamente qué buscar y lo
+            compras donde te salga mejor. Si ya tienes algo, casi siempre sirve.
+          </p>
+        </div>
+        <div class="tarjeta pila pila-3">
+          <h3>La terminal del banco</h3>
+          <p>
+            La tarjeta se cobra en tu terminal de siempre y en el sistema se registra como forma
+            de pago, para que el corte cuadre. El cobro no pasa por nosotros y no te cobramos
+            comisión por venta.
+          </p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══ 8 · Preguntas ══════════════════════════════════════════════════ -->
+  <section class="seccion destacada-suave">
+    <div class="contenedor pila pila-8">
+      <div class="pila pila-4">
+        <p class="eyebrow">Preguntas</p>
+        <h2>Lo que nos preguntan del precio</h2>
+      </div>
+
+      <div class="acordeon">
+        <div class="acordeon-item" data-acordeon-item data-abierto="false">
+          <button class="acordeon-boton" data-acordeon-boton type="button" aria-expanded="false">
+            ¿Hay contrato forzoso?
+            <svg class="acordeon-signo" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                 stroke-width="2" stroke-linecap="round" aria-hidden="true">
+              <path d="M12 5v14M5 12h14"/>
+            </svg>
+          </button>
+          <div class="acordeon-panel" data-acordeon-panel><div>
+            <p>
+              No. Es mes a mes y lo cancelas cuando quieras. Si pagas el año por adelantado para
+              aprovechar el descuento, ése sí es un año.
+            </p>
+          </div></div>
+        </div>
+
+        <div class="acordeon-item" data-acordeon-item data-abierto="false">
+          <button class="acordeon-boton" data-acordeon-boton type="button" aria-expanded="false">
+            ¿Puedo cambiar de plan después?
+            <svg class="acordeon-signo" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                 stroke-width="2" stroke-linecap="round" aria-hidden="true">
+              <path d="M12 5v14M5 12h14"/>
+            </svg>
+          </button>
+          <div class="acordeon-panel" data-acordeon-panel><div>
+            <p>
+              Sí, para arriba o para abajo, y sin volver a configurar nada. Lo normal es abrir una
+              segunda caja o una segunda sucursal y subir por eso.
+            </p>
+          </div></div>
+        </div>
+
+        <div class="acordeon-item" data-acordeon-item data-abierto="false">
+          <button class="acordeon-boton" data-acordeon-boton type="button" aria-expanded="false">
+            ¿Me cobran comisión por cada venta?
+            <svg class="acordeon-signo" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                 stroke-width="2" stroke-linecap="round" aria-hidden="true">
+              <path d="M12 5v14M5 12h14"/>
+            </svg>
+          </button>
+          <div class="acordeon-panel" data-acordeon-panel><div>
+            <p>
+              No. Pagas tu plan y ya. Vendas lo que vendas, el precio es el mismo — que es
+              justamente lo que no pasa cuando el punto de venta también te procesa la tarjeta.
+            </p>
+          </div></div>
+        </div>
+
+        <div class="acordeon-item" data-acordeon-item data-abierto="false">
+          <button class="acordeon-boton" data-acordeon-boton type="button" aria-expanded="false">
+            ¿Y si soy un negocio de una sola caja?
+            <svg class="acordeon-signo" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                 stroke-width="2" stroke-linecap="round" aria-hidden="true">
+              <path d="M12 5v14M5 12h14"/>
+            </svg>
+          </button>
+          <div class="acordeon-panel" data-acordeon-panel><div>
+            <p>
+              Ése es Esencial. Llevas el mismo sistema completo, incluido cobrar sin internet; la
+              diferencia es que la carga del menú la haces tú siguiendo una guía, en vez de que la
+              hagamos nosotros contigo.
+            </p>
+          </div></div>
+        </div>
+
+        <div class="acordeon-item" data-acordeon-item data-abierto="false">
+          <button class="acordeon-boton" data-acordeon-boton type="button" aria-expanded="false">
+            ¿Cuánto tarda en estar funcionando?
+            <svg class="acordeon-signo" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                 stroke-width="2" stroke-linecap="round" aria-hidden="true">
+              <path d="M12 5v14M5 12h14"/>
+            </svg>
+          </button>
+          <div class="acordeon-panel" data-acordeon-panel><div>
+            <p>
+              Alrededor de un día: cargar el menú, dejar configurado lo fiscal y las tres horas de
+              capacitación con tu equipo. Se agenda para que caiga en tu día flojo, no en viernes.
+            </p>
+          </div></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══ 9 · Cierre ═════════════════════════════════════════════════════ -->
+  <section class="seccion">
+    <div class="contenedor">
+      <div class="cierre pila pila-5" style="align-items:center">
+        <h2>¿Cuál te toca?</h2>
+        <p style="max-width:52ch">
+          Dinos cuántas cajas y cuántas sucursales tienes y te decimos el plan en el mismo
+          mensaje. Contestamos el mismo día hábil.
+        </p>
+        <div class="fila" style="justify-content:center">
+          <a class="btn btn-primario btn-hero" href="demo.html">Pide una demo</a>
+          <a class="btn btn-fantasma btn-hero" href="https://wa.me/524761273020">Escríbenos por WhatsApp</a>
+        </div>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<footer class="pie">
+  <div class="contenedor">
+    <div class="pie-rejilla">
+      <div class="pila pila-3">
+        <span class="nav-logo" style="pointer-events:none">
+          <img src="assets/img/logo.svg" alt="" width="30" height="30" aria-hidden="true">
+          <span>VIM POS</span>
+        </span>
+        <p style="font-size:var(--t-15)">
+          El punto de venta que no se detiene cuando se cae el internet.
+          Hecho en León, Guanajuato.
+        </p>
+      </div>
+      <div>
+        <h4>Producto</h4>
+        <ul class="pie-lista">
+          <li><a href="sin-internet.html">Sin internet</a></li>
+          <li><a href="precios.html">Precios</a></li>
+          <li><a href="demo.html">Pide una demo</a></li>
+        </ul>
+      </div>
+      <div>
+        <h4>Contacto</h4>
+        <ul class="pie-lista">
+          <li><a href="mailto:hola@vimpos.com.mx">hola@vimpos.com.mx</a></li>
+          <li><a href="https://wa.me/524761273020">WhatsApp 476 127 3020</a></li>
+        </ul>
+      </div>
+    </div>
+    <div class="pie-legal">
+      <span>© 2026 Fermín Villalobos Martínez</span>
+      <span class="fila" style="gap:var(--sp-5)">
+        <a href="aviso-privacidad.html" style="color:inherit">Aviso de privacidad</a>
+        <a href="terminos.html" style="color:inherit">Términos</a>
+      </span>
+    </div>
+  </div>
+</footer>
+
+<script src="assets/js/vim.js" defer></script>
+</body>
+</html>
