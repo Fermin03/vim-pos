@@ -323,11 +323,23 @@ Deno.serve(async (req) => {
     ? await Promise.all([pac.descargar(res.pacReferencia, "xml"), pac.descargar(res.pacReferencia, "pdf")])
     : [null, null];
 
+  // El correo lo manda Facturama con los adjuntos. Si falla, NO se rompe nada: la factura está
+  // timbrada y el comensal la tiene ahí para descargar. Se avisa en la respuesta y se deja rastro
+  // en el log, que es lo único que hace falta para investigarlo después.
+  let correoEnviado = false;
+  if (email && pac) {
+    const envio = await pac.enviarPorCorreo(res.pacReferencia, email);
+    correoEnviado = envio.ok;
+    if (!envio.ok) console.error(`[autofactura] CFDI ${cfdiId} timbrado pero sin enviar a ${email}: ${envio.mensaje}`);
+  }
+
   return json({
     estado: "TIMBRADO",
     uuid: res.uuidFiscal,
     negocio: tenant.nombre_comercial,
     total: armado.total,
+    correoEnviado,
+    correo: correoEnviado ? email : null,
     xml,   // base64
     pdf,   // base64
   });

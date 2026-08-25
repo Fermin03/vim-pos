@@ -43,10 +43,17 @@ function ipDe(req: Request): string {
   return req.headers.get("x-real-ip") ?? "desconocida";
 }
 
-/** Compara en tiempo constante. Hashea primero para que las longitudes no difieran nunca. */
+/**
+ * Compara en tiempo constante. Hashea primero para que las longitudes no difieran nunca.
+ *
+ * Recorta espacios en LOS DOS lados antes de comparar. No debilita nada —un secreto no tiene
+ * espacios significativos al principio ni al final— y elimina un modo de fallo invisible: un
+ * salto de línea al pegar el valor en el panel de Vercel o de Supabase rompe la comparación para
+ * siempre, y el síntoma es un 401 que parece de permisos. Costó un rato de diagnóstico.
+ */
 function igualSeguro(a: string, b: string): boolean {
-  const ha = createHash("sha256").update(a, "utf8").digest();
-  const hb = createHash("sha256").update(b, "utf8").digest();
+  const ha = createHash("sha256").update(a.trim(), "utf8").digest();
+  const hb = createHash("sha256").update(b.trim(), "utf8").digest();
   return timingSafeEqual(ha, hb);
 }
 

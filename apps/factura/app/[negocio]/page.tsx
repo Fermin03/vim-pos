@@ -104,6 +104,13 @@ export default function PortalFactura({
           </p>
           <p className="mt-1 break-all text-[11.5px] text-ink-3">Folio fiscal {timbrado.uuid}</p>
 
+          {timbrado.correoEnviado && (
+            <p className="mt-4 rounded-lg border border-line bg-surface px-3.5 py-2.5 text-[13px] leading-relaxed">
+              También te la mandamos a <b>{timbrado.correo}</b>. Si no llega en unos minutos, revisa
+              tu carpeta de correo no deseado.
+            </p>
+          )}
+
           <div className="mt-6 flex flex-col gap-2.5">
             {timbrado.pdf && (
               <button
@@ -256,6 +263,10 @@ export default function PortalFactura({
             id="email" className={input} value={r.email} type="email" inputMode="email"
             onChange={(e) => setR({ ...r, email: e.target.value })}
           />
+          <p className="mt-1.5 text-[11.5px] text-ink-3">
+            Si lo dejas, te mandamos la factura ahí con el XML y el PDF. Si no, la descargas en la
+            siguiente pantalla.
+          </p>
         </div>
 
         {error && (
