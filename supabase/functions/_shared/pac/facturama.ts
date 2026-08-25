@@ -180,6 +180,36 @@ export class FacturamaPac implements PacAdapter {
   }
 
   /**
+   * Manda la factura por correo al receptor, con el XML y el PDF adjuntos. Lo hace Facturama: no
+   * hace falta proveedor de correo propio, ni verificar dominios, ni cuidar la entregabilidad.
+   *
+   * DOS TRAMPAS, las dos verificadas contra el sandbox:
+   *
+   * 1. **Siempre responde HTTP 200.** El resultado real viene en `success` dentro del cuerpo. Un
+   *    id inexistente, un correo mal escrito o la falta del correo devuelven 200 con
+   *    `success:false` y un mensaje. Quien mire solo el código HTTP creería que envía y no
+   *    enviaría nunca — sin un solo error en los logs.
+   *
+   * 2. **El tipo es `issuedLite`**, el de Multiemisor. Con `issued` (la modalidad web) responde
+   *    404, porque ahí el comprobante no existe.
+   */
+  async enviarPorCorreo(id: string, correo: string): Promise<{ ok: boolean; mensaje: string }> {
+    const params = new URLSearchParams({ cfdiType: "issuedLite", cfdiId: id, email: correo });
+    let res: Response;
+    try {
+      res = await fetch(`${this.baseUrl}/cfdi?${params}`, {
+        method: "POST",
+        headers: { Authorization: this.autorizacion, Accept: "application/json" },
+      });
+    } catch (e) {
+      return { ok: false, mensaje: e instanceof Error ? e.message : String(e) };
+    }
+    const d = await res.json().catch(() => null) as { msj?: string; success?: boolean } | null;
+    // `success` manda sobre el código HTTP, no al revés.
+    return { ok: d?.success === true, mensaje: d?.msj ?? `HTTP ${res.status}` };
+  }
+
+  /**
    * Acuse de cancelación del SAT. Es el único documento que prueba que un comprobante se canceló,
    * así que se descarga y se archiva: en Multiemisor el PAC no guarda nada.
    *

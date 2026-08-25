@@ -17,8 +17,10 @@ const VERTICALES = ["FOODTRUCK", "QUICK_SERVICE", "FULL_SERVICE", "CAFE_BAR", "D
 async function igualSeguro(a: string, b: string): Promise<boolean> {
   const enc = new TextEncoder();
   const [ha, hb] = await Promise.all([
-    crypto.subtle.digest("SHA-256", enc.encode(a)),
-    crypto.subtle.digest("SHA-256", enc.encode(b)),
+    // `.trim()` en los dos lados: un salto de línea al pegar el secreto en el panel rompería la
+    // comparación para siempre, con un 401 que parece de permisos. Ver la nota en platform/server.ts.
+    crypto.subtle.digest("SHA-256", enc.encode(a.trim())),
+    crypto.subtle.digest("SHA-256", enc.encode(b.trim())),
   ]);
   const x = new Uint8Array(ha), y = new Uint8Array(hb);
   let dif = 0;

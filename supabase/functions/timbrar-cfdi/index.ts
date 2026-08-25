@@ -9,7 +9,7 @@
 // Local: supabase functions serve timbrar-cfdi --env-file supabase/functions/.env
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import { corsHeaders } from "../_shared/cors.ts";
-import { timbrarConFailover } from "../_shared/pac/index.ts";
+import { timbrarConFailover, obtenerFacturama } from "../_shared/pac/index.ts";
 import { armarConceptos, ConceptosIncoherentes, type LineaTicket } from "../_shared/pac/conceptos.ts";
 
 const ROLES_FACTURA = ["DUENO", "ADMIN"];
@@ -244,6 +244,17 @@ Deno.serve(async (req) => {
     p_response_payload: res.responsePayload,
   });
   if (tErr) return json({ error: "MARCAR_TIMBRADO_ERROR", detalle: tErr.message }, 500);
+
+  // Si el receptor dejó correo, Facturama le manda la factura con sus adjuntos. Un fallo aquí no
+  // toca el timbrado: el comprobante existe y se puede reenviar.
+  const correoReceptor = (c.receptor_email as string | null) ?? null;
+  if (correoReceptor) {
+    const pac = obtenerFacturama();
+    if (pac) {
+      const envio = await pac.enviarPorCorreo(res.pacReferencia, correoReceptor);
+      if (!envio.ok) console.error(`[cfdi] ${cfdiId} timbrado pero sin enviar a ${correoReceptor}: ${envio.mensaje}`);
+    }
+  }
 
   // Dejar constancia del PAC que REALMENTE timbró. Importa cuando entra el failover: el borrador
   // se creó apuntando al principal y el comprobante lo acabó sellando el respaldo, así que sin

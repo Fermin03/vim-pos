@@ -26,7 +26,13 @@ export type Receptor = {
   email: string;
 };
 
-export type Timbrado = { uuid: string; negocio: string; total: number; xml: string | null; pdf: string | null };
+export type Timbrado = {
+  uuid: string; negocio: string; total: number;
+  xml: string | null; pdf: string | null;
+  /** El correo lo manda el PAC con los adjuntos; puede fallar sin que la factura se vea afectada. */
+  correoEnviado: boolean;
+  correo: string | null;
+};
 
 /** Un fallo con la forma que la pantalla necesita: qué decir y qué campo señalar. */
 export class ErrorPortal extends Error {
@@ -77,6 +83,8 @@ export async function timbrar(negocio: string, folio: string, receptor: Receptor
     total: Number(d.total ?? 0),
     xml: (d.xml as string) ?? null,
     pdf: (d.pdf as string) ?? null,
+    correoEnviado: d.correoEnviado === true,
+    correo: (d.correo as string) ?? null,
   };
 }
 
