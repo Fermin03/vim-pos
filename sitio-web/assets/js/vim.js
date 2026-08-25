@@ -111,6 +111,36 @@
     });
   }
 
+  /* ---- Mensual / anual en la página de precios ----------------------------
+     El descuento anual es del 17 %, que nadie calcula de cabeza. En vez de
+     pedirle al lector que lo haga, los dos precios ya están escritos en el
+     HTML y el botón solo elige cuál se enseña: así la página sigue diciendo la
+     verdad aunque este archivo no cargue.
+
+     Sin animación a propósito. Un número que se desvanece y vuelve tarda más
+     en poder leerse que en cambiar, y aquí el lector está comparando cifras. */
+  var periodos = document.querySelectorAll("[data-periodo]");
+
+  if (periodos.length) {
+    periodos.forEach(function (b) {
+      b.addEventListener("click", function () {
+        var anual = b.getAttribute("data-periodo") === "anual";
+
+        periodos.forEach(function (otro) {
+          otro.setAttribute("aria-pressed", String(otro === b));
+        });
+
+        document.querySelectorAll("[data-precio]").forEach(function (p) {
+          p.textContent = p.getAttribute(anual ? "data-anual" : "data-mensual");
+        });
+
+        document.querySelectorAll("[data-nota-periodo]").forEach(function (n) {
+          n.textContent = anual ? "al mes, pagando el año, más IVA" : "al mes, más IVA";
+        });
+      });
+    });
+  }
+
   /* ---- La página actual se marca sola -------------------------------------
      Evita tener que acordarse de poner aria-current a mano en cada archivo, que
      es exactamente el tipo de cosa que se olvida en la quinta página. */

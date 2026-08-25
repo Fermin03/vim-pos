@@ -561,4 +561,156 @@ a { color: var(--ink); text-underline-offset: 3px; }
 }
 
 /* Fondo suave para la sección de sin internet, que es la de más peso. */
-.destacada-suave { background: var(--sel); border-block: 1px solid var(--line); }
+.destacada-suave { background: var(--surface); border-block: 1px solid var(--line); }
+
+/* ==========================================================================
+   Rejilla de dos
+   ========================================================================== */
+
+.dos { display: grid; gap: var(--sp-6); }
+@media (min-width: 800px) { .dos { grid-template-columns: repeat(2, 1fr); } }
+
+/* ==========================================================================
+   Tablas comparativas
+
+   Son el argumento entero de dos páginas, así que no se dejan al estilo por
+   omisión del navegador. Dos decisiones que cargan el peso:
+
+     · La columna de VIM POS lleva fondo propio y se marca con `scope="col"`.
+       El lector no debería tener que contar columnas para saber cuál es la
+       nuestra, y quien usa lector de pantalla tampoco.
+     · En móvil la tabla NO se reordena en tarjetas. Una comparativa se lee
+       comparando, y partirla en tres bloques apilados destruye justo eso; se
+       desplaza en horizontal dentro de su propia caja, con la primera columna
+       fija para no perder de vista de qué fila se habla.
+   ========================================================================== */
+
+.tabla-envoltura { overflow-x: auto; border: 1px solid var(--line); border-radius: var(--r-lg); }
+
+.tabla {
+  width: 100%;
+  min-width: 620px;
+  border-collapse: collapse;
+  font-size: var(--t-15);
+  font-variant-numeric: tabular-nums;
+}
+
+.tabla th, .tabla td {
+  padding: var(--sp-4) var(--sp-5);
+  text-align: left;
+  vertical-align: top;
+  border-bottom: 1px solid var(--line);
+}
+.tabla tbody tr:last-child th,
+.tabla tbody tr:last-child td { border-bottom: 0; }
+
+.tabla thead th {
+  font-family: var(--font-display);
+  font-size: var(--t-15);
+  font-weight: 600;
+  color: var(--ink);
+  background: var(--surface);
+  white-space: nowrap;
+}
+
+/* La primera columna dice de qué trata la fila: se queda fija al desplazar. */
+.tabla tbody th {
+  font-weight: 500;
+  color: var(--ink);
+  position: sticky;
+  left: 0;
+  background: var(--bg);
+  min-width: 190px;
+}
+.tabla thead th:first-child { position: sticky; left: 0; z-index: 1; }
+
+.tabla td { color: var(--ink-2); }
+
+.tabla .col-vim { background: var(--accent-soft); color: var(--ink); }
+.tabla thead .col-vim { color: var(--accent-hover); }
+
+/* Marcas de sí / no. El color no va solo: lleva glifo, porque el 8 % de los
+   hombres no distingue el verde del rojo y una tabla ilegible para ellos es
+   una tabla que no cumple su función. */
+.marca { display: inline-flex; align-items: center; gap: var(--sp-2); }
+.marca::before { font-weight: 700; font-size: var(--t-18); line-height: 1; }
+.marca-si::before  { content: "✓"; color: var(--success); }
+.marca-no::before  { content: "✕"; color: var(--danger); }
+.marca-mas::before { content: "~"; color: var(--warning); }
+
+/* ==========================================================================
+   Pasos numerados
+
+   El número aquí no es decoración: la secuencia es real —vuelve la señal,
+   sube lo del día, se revisa, queda— y leerla en desorden la vuelve falsa.
+   ========================================================================== */
+
+.pasos { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--sp-5); counter-reset: paso; }
+@media (min-width: 860px) { .pasos { grid-template-columns: repeat(4, 1fr); } }
+
+.paso { counter-increment: paso; display: flex; flex-direction: column; gap: var(--sp-3); }
+.paso::before {
+  content: counter(paso);
+  display: flex; align-items: center; justify-content: center;
+  width: 30px; height: 30px; flex-shrink: 0;
+  border-radius: 999px;
+  background: var(--accent-soft); color: var(--accent-hover);
+  font-family: var(--font-mono); font-size: var(--t-13); font-weight: 600;
+}
+.paso h3 { font-size: var(--t-18); }
+.paso p { font-size: var(--t-15); }
+
+/* ==========================================================================
+   Pastilla de estado y letra chica
+   ========================================================================== */
+
+.pastilla {
+  display: inline-flex; align-items: center;
+  padding: 2px var(--sp-3);
+  border-radius: 999px;
+  background: var(--hover); border: 1px solid var(--line-strong);
+  font-size: var(--t-12); font-weight: 600; color: var(--ink-2);
+  letter-spacing: 0; white-space: nowrap;
+}
+.pastilla-pronto { background: #FDF6E7; border-color: #EBD9AE; color: var(--warning); }
+
+/* Lo que hay que decir aunque no venda. Se marca como aparte —no como nota al
+   pie diminuta— porque esconder la letra chica es exactamente lo que hace que
+   el prospecto deje de creerte el resto de la página. */
+.letra-chica {
+  border-left: 2px solid var(--line-strong);
+  padding-left: var(--sp-5);
+  display: flex; flex-direction: column; gap: var(--sp-3);
+}
+.letra-chica p { font-size: var(--t-13); color: var(--ink-3); }
+
+/* ==========================================================================
+   Conmutador mensual / anual
+
+   Dos botones, no un interruptor: un interruptor no dice cuál de los dos
+   estados está activo sin que el usuario ya sepa qué significa cada lado.
+   ========================================================================== */
+
+.conmutador {
+  display: inline-flex; gap: 2px; padding: 3px;
+  background: var(--hover); border: 1px solid var(--line);
+  border-radius: 999px;
+}
+.conmutador button {
+  padding: var(--sp-2) var(--sp-5);
+  border: 0; border-radius: 999px; background: none; cursor: pointer;
+  font-family: var(--font); font-size: var(--t-13); font-weight: 600;
+  color: var(--ink-2);
+  transition: background var(--v-corta) ease, color var(--v-corta) ease;
+}
+.conmutador button[aria-pressed="true"] {
+  background: var(--bg); color: var(--ink);
+  box-shadow: 0 1px 2px rgba(22,22,26,.08);
+}
+.conmutador button:active { transform: scale(0.97); }
+@media (prefers-reduced-motion: reduce) {
+  .conmutador button { transition: none; }
+  .conmutador button:active { transform: none; }
+}
+
+.plan-periodo { font-size: var(--t-13); color: var(--ink-3); }
