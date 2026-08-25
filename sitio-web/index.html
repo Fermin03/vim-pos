@@ -92,7 +92,7 @@
             </div>
             <div class="hueco">
               <strong>Captura: home del POS</strong>
-              <span>Pendiente · se genera con <code>_capturas/render.mjs</code></span>
+              <span>Pendiente</span>
             </div>
           </div>
           <span class="chip-offline">Sin conexión · sigue vendiendo</span>
@@ -107,8 +107,8 @@
        cerrado y fingirlo se descubre en la primera llamada. Cada dato de aquí
        se puede enseñar en pantalla en una demo de veinte minutos. -->
   <section class="hechos" aria-label="Hechos verificables">
-    <div class="hecho"><p>La misma base de datos que la nube, en tu caja — no un caché</p></div>
-    <div class="hecho"><p>Cualquier impresora ESC/POS</p></div>
+    <div class="hecho"><p>Todo tu sistema vive en tu caja, no en internet</p></div>
+    <div class="hecho"><p>Funciona con las impresoras de tickets de siempre</p></div>
     <div class="hecho"><p>Corte Z sellado, con arqueo, sobrante y faltante</p></div>
     <div class="hecho"><p>14 reportes en el panel del dueño</p></div>
   </section>
@@ -157,9 +157,9 @@
         <p class="eyebrow">Cómo funciona</p>
         <h2>Tu caja es el centro. La nube es el respaldo, no el motor.</h2>
         <p>
-          Casi todos los puntos de venta modernos viven en la nube: si se cae el internet, se cae tu
-          negocio. Aquí es al revés — la base de datos completa está en la computadora de tu
-          mostrador, y la nube cuelga de una línea que se puede cortar sin que pase nada.
+          Casi todos los puntos de venta de hoy viven en internet: si se cae la señal, se cae tu
+          negocio. Aquí es al revés — el sistema entero está en la computadora de tu mostrador, y lo
+          que está fuera cuelga de un hilo que se puede cortar sin que pase nada.
         </p>
       </div>
 
@@ -233,7 +233,7 @@
           <!-- La caja, que es el centro -->
           <rect class="a-caja" x="230" y="166" width="300" height="86" rx="10"/>
           <text class="a-t-titulo" x="254" y="198">La caja</text>
-          <text class="a-t-sub" x="254" y="220">Base de datos completa, aquí dentro.</text>
+          <text class="a-t-sub" x="254" y="220">Tus ventas y tu menú viven aquí.</text>
           <text class="a-t-sub" x="254" y="238">Cobra e imprime sin señal.</text>
 
           <!-- Del centro a cada pieza. Curvas suaves en vez de ángulos rectos: los
@@ -300,7 +300,8 @@
           <h3>Mandar a cocina</h3>
           <p>
             La comanda sale impresa donde tiene que salir: las bebidas en la barra y la comida en
-            cocina, cada papel con el rótulo de su estación. Y en pantalla, si prefieres el KDS.
+            cocina, cada papel con el rótulo de su estación. O en una pantalla, si prefieres no
+            imprimir.
           </p>
         </div>
         <div class="monitor">
@@ -345,10 +346,10 @@
       <p class="eyebrow">El diferenciador</p>
       <h2>No es un «modo offline». Es que no depende del internet.</h2>
       <p>
-        Un POS en nube con modo offline guarda tus ventas en el navegador y reza para que suban
-        después. Aquí la caja tiene un Postgres completo con las mismas tablas y las mismas
-        funciones que la nube: no es un caché ni una versión reducida. Cuando vuelve la señal, lo
-        del día sube solo y conserva los folios que ya imprimiste.
+        Los sistemas que se anuncian con «modo sin conexión» guardan tus ventas a medias en el
+        navegador y esperan a que suban después. Aquí no hay modo ni versión reducida: el sistema
+        completo está en tu caja y hace exactamente lo mismo haya señal o no. Cuando vuelve, lo del
+        día sube solo y conserva los folios que ya imprimiste.
       </p>
       <div class="fila">
         <a class="btn btn-fantasma" href="sin-internet.html">Cómo funciona por dentro</a>
@@ -448,8 +449,8 @@
         <div class="tarjeta pila pila-3">
           <h3>Tu menú se pega y ya</h3>
           <p>
-            El importador lee el export de esos cuatro sistemas tal cual sale. No hay que reescribir
-            trescientos productos a mano ni pagar por una migración.
+            Descargas tu menú del sistema que usas hoy y lo pegas aquí tal cual. No hay que
+            recapturar trescientos productos a mano ni pagar por la mudanza.
           </p>
         </div>
         <div class="tarjeta pila pila-3">
@@ -539,7 +540,7 @@
             <svg class="acordeon-signo" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
           </button>
           <div class="acordeon-panel" data-acordeon-panel><div>
-            <p>Sí, con la aplicación de escritorio. La base de datos vive en tu caja, así que cobrar, imprimir y mandar a cocina no pasan por internet en ningún momento. La señal solo hace falta para respaldar y para ver tus números desde fuera.</p>
+            <p>Sí. El programa se instala en la computadora de tu caja y trabaja ahí, así que cobrar, imprimir y mandar a cocina no pasan por internet en ningún momento. La señal solo hace falta para respaldar tus ventas y para que puedas ver tus números desde fuera del local.</p>
           </div></div>
         </div>
 
@@ -549,7 +550,7 @@
             <svg class="acordeon-signo" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
           </button>
           <div class="acordeon-panel" data-acordeon-panel><div>
-            <p>Una PC con Windows, una impresora de tickets ESC/POS, un cajón de dinero y un router. VIM no vende hardware: te decimos qué modelos funcionan y lo compras donde te salga mejor.</p>
+            <p>Una computadora con Windows, una impresora de tickets, un cajón de dinero y el módem que ya tienes. VIM no vende equipo: te decimos qué modelos funcionan y lo compras donde te salga mejor.</p>
           </div></div>
         </div>
 
@@ -559,7 +560,7 @@
             <svg class="acordeon-signo" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
           </button>
           <div class="acordeon-panel" data-acordeon-panel><div>
-            <p>Sí, pegando el export de Square, Toast, Loyverse o Clip tal cual. Si vienes de otro sistema, mándanos el archivo en la demo y lo vemos.</p>
+            <p>Sí. Descargas tu menú de Square, Toast, Loyverse o Clip y lo pegas tal cual. Si vienes de otro sistema, tráete el archivo a la demo y lo vemos juntos.</p>
           </div></div>
         </div>
 
@@ -589,7 +590,7 @@
             <svg class="acordeon-signo" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
           </button>
           <div class="acordeon-panel" data-acordeon-panel><div>
-            <p>El programa vive en la bandeja del sistema y se levanta solo si alguien lo cierra. Hay respaldos automáticos de la base local, y las ventas que no alcanzaron a subir suben en cuanto vuelve la señal.</p>
+            <p>El programa se queda junto al reloj de Windows y se vuelve a abrir solo si alguien lo cierra. Guarda copias de tus ventas por su cuenta, y las que no alcanzaron a subir suben en cuanto vuelve la señal.</p>
           </div></div>
         </div>
 
@@ -699,7 +700,7 @@
       "applicationCategory": "BusinessApplication",
       "operatingSystem": "Windows",
       "inLanguage": "es-MX",
-      "description": "Punto de venta para restaurantes que opera sin conexión a internet, con base de datos local y sincronización a la nube.",
+      "description": "Punto de venta para restaurantes que sigue cobrando, imprimiendo y mandando a cocina cuando no hay internet.",
       "offers": [
         { "@type": "Offer", "name": "Esencial", "price": "699", "priceCurrency": "MXN" },
         { "@type": "Offer", "name": "Negocio", "price": "1299", "priceCurrency": "MXN" },
@@ -709,9 +710,9 @@
     {
       "@type": "FAQPage",
       "mainEntity": [
-        { "@type": "Question", "name": "¿De verdad funciona sin internet?", "acceptedAnswer": { "@type": "Answer", "text": "Sí, con la aplicación de escritorio. La base de datos vive en tu caja, así que cobrar, imprimir y mandar a cocina no pasan por internet en ningún momento." } },
-        { "@type": "Question", "name": "¿Qué necesito comprar?", "acceptedAnswer": { "@type": "Answer", "text": "Una PC con Windows, una impresora de tickets ESC/POS, un cajón de dinero y un router. VIM no vende hardware." } },
-        { "@type": "Question", "name": "¿Puedo traer mi menú de otro sistema?", "acceptedAnswer": { "@type": "Answer", "text": "Sí, pegando el export de Square, Toast, Loyverse o Clip tal cual." } },
+        { "@type": "Question", "name": "¿De verdad funciona sin internet?", "acceptedAnswer": { "@type": "Answer", "text": "Sí. El programa se instala en la computadora de tu caja y trabaja ahí, así que cobrar, imprimir y mandar a cocina no pasan por internet en ningún momento." } },
+        { "@type": "Question", "name": "¿Qué necesito comprar?", "acceptedAnswer": { "@type": "Answer", "text": "Una computadora con Windows, una impresora de tickets, un cajón de dinero y el módem que ya tienes. VIM no vende equipo." } },
+        { "@type": "Question", "name": "¿Puedo traer mi menú de otro sistema?", "acceptedAnswer": { "@type": "Answer", "text": "Sí. Descargas tu menú de Square, Toast, Loyverse o Clip y lo pegas tal cual." } },
         { "@type": "Question", "name": "¿Cuánto tarda la implementación?", "acceptedAnswer": { "@type": "Answer", "text": "Alrededor de un día: carga del menú, configuración y tres horas de capacitación." } },
         { "@type": "Question", "name": "¿Funciona con varias sucursales?", "acceptedAnswer": { "@type": "Answer", "text": "Sí. Cada sucursal opera con su propia caja y su propio turno, y el panel suma todo en un reporte consolidado." } },
         { "@type": "Question", "name": "¿Puedo cobrar con tarjeta desde el sistema?", "acceptedAnswer": { "@type": "Answer", "text": "No. La tarjeta se registra como forma de pago para que el corte cuadre, pero el cobro se hace con la terminal bancaria del negocio." } }
