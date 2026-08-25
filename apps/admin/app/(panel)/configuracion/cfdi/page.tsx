@@ -8,7 +8,6 @@ import {
   guardarCfdiEmisor,
   leerAjustesTicket,
   leerCfdiEmisor,
-  PROVEEDORES_PAC,
   borrarCsd,
   cargarCsd,
   diasParaVencer,
@@ -21,15 +20,6 @@ const input =
   "h-11 w-full rounded border border-line-strong px-3 text-sm outline-none focus:border-ink focus:shadow-[0_0_0_3px_rgba(22,22,26,.06)]";
 const label = "mb-1.5 block text-[13px] font-medium text-ink-2";
 
-const PAC_LABEL: Record<string, string> = {
-  FACTURAMA: "Facturama",
-  FACTURAPI: "Facturapi",
-  SOLUCIONFACTIBLE: "Solución Factible",
-  FINKOK: "Finkok",
-  EDICOM: "EDICOM",
-  PRODIGIA: "Prodigia",
-  OTRO: "Otro",
-};
 const ESTADOS = [
   { v: "PRUEBA", l: "Pruebas (sandbox)" },
   { v: "ACTIVO", l: "Activo (producción)" },
@@ -44,7 +34,11 @@ export default function CfdiPage() {
   const [qrTicket, setQrTicket] = useState(false);
 
   const [rfc, setRfc] = useState("");
-  const [pac, setPac] = useState("FACTURAPI");
+  // El PAC lo decide VIM en el entorno del servidor: `obtenerPac()` elige según qué credenciales
+  // existen e IGNORA este campo. El selector que había aquí no controlaba nada y encima escribía
+  // la elección en `tickets_cfdi.pac_proveedor`, así que el registro del comprobante podía decir
+  // "Finkok" mientras timbraba Facturama. Se conserva el valor para no pisarlo al guardar.
+  const [pac, setPac] = useState("FACTURAMA");
   const [ref, setRef] = useState("");
   const [vig, setVig] = useState("");
   const [estado, setEstado] = useState("PRUEBA");
@@ -180,36 +174,27 @@ export default function CfdiPage() {
             </div>
 
             <div className="mb-6 rounded-lg border border-line bg-surface p-5">
-              <div className="mb-4 font-display text-[16px] font-semibold tracking-tight">Proveedor de timbrado (PAC)</div>
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                <div>
-                  <label className={label} htmlFor="c-pac">PAC</label>
-                  <select id="c-pac" className={input} value={pac} onChange={(e) => setPac(e.target.value)}>
-                    {PROVEEDORES_PAC.map((p) => <option key={p} value={p}>{PAC_LABEL[p] ?? p}</option>)}
-                  </select>
-                </div>
-                <div>
-                  <label className={label} htmlFor="c-per">Periodicidad de la factura global</label>
-                  <select id="c-per" className={input} value={periodicidad} onChange={(e) => setPeriodicidad(e.target.value)}>
-                    {PERIODICIDADES.map((p) => <option key={p.v} value={p.v}>{p.l}</option>)}
-                  </select>
-                  <p className="mt-1.5 text-[11.5px] text-ink-3">
-                    Cada cuánto emites la factura que ampara las ventas sin comprobante.{" "}
-                    <b>Define hasta cuándo puede facturar tu cliente</b>: con periodicidad diaria, el
-                    ticket de ayer ya no se puede facturar hoy.
-                  </p>
-                  {periodicidad === "05" && (
-                    <p className="mt-2 rounded border border-[#F0DCC0] bg-[#FCF3E6] px-3 py-2 text-[12.5px] font-medium text-warning">
-                      El SAT solo admite periodicidad bimestral si tu régimen fiscal es <b>621
-                      (Incorporación Fiscal)</b>. Con cualquier otro, el timbrado se rechaza.
-                    </p>
-                  )}
-                </div>
-              </div>
-              <p className="mt-4 text-[11.5px] text-ink-3">
-                Con Facturama no hace falta dar de alta el emisor a mano: se identifica por su RFC en
-                cuanto se carga el sello.
+              <div className="mb-1 font-display text-[16px] font-semibold tracking-tight">Factura global</div>
+              <p className="mb-4 text-[12.5px] text-ink-3">
+                La factura que ampara las ventas del periodo en las que nadie pidió comprobante.
               </p>
+              <div className="max-w-[380px]">
+                <label className={label} htmlFor="c-per">Periodicidad</label>
+                <select id="c-per" className={input} value={periodicidad} onChange={(e) => setPeriodicidad(e.target.value)}>
+                  {PERIODICIDADES.map((p) => <option key={p.v} value={p.v}>{p.l}</option>)}
+                </select>
+                <p className="mt-1.5 text-[11.5px] text-ink-3">
+                  Cada cuánto la emites.{" "}
+                  <b>Define hasta cuándo puede facturar tu cliente</b>: con periodicidad diaria, el
+                  ticket de ayer ya no se puede facturar hoy.
+                </p>
+                {periodicidad === "05" && (
+                  <p className="mt-2 rounded border border-[#F0DCC0] bg-[#FCF3E6] px-3 py-2 text-[12.5px] font-medium text-warning">
+                    El SAT solo admite periodicidad bimestral si tu régimen fiscal es <b>621
+                    (Incorporación Fiscal)</b>. Con cualquier otro, el timbrado se rechaza.
+                  </p>
+                )}
+              </div>
             </div>
 
             {/* ── Sello digital (CSD) ───────────────────────────────────────────────────────

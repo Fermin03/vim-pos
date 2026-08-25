@@ -245,6 +245,16 @@ Deno.serve(async (req) => {
   });
   if (tErr) return json({ error: "MARCAR_TIMBRADO_ERROR", detalle: tErr.message }, 500);
 
+  // Dejar constancia del PAC que REALMENTE timbró. Importa cuando entra el failover: el borrador
+  // se creó apuntando al principal y el comprobante lo acabó sellando el respaldo, así que sin
+  // esto el registro diría el equivocado justo en el caso raro que alguien va a investigar.
+  //
+  // El mock no está en el enum de la base (es una herramienta de desarrollo, no un PAC), así que
+  // cae en OTRO en vez de reventar el update.
+  const PAC_EN_BD = ["FACTURAPI", "SOLUCIONFACTIBLE", "FINKOK", "EDICOM", "PRODIGIA", "FACTURAMA"];
+  const pacReal = PAC_EN_BD.includes(res.pacUsado) ? res.pacUsado : "OTRO";
+  await sb.from("tickets_cfdi").update({ pac_proveedor: pacReal }).eq("id", cfdiId);
+
   // El CFDI ya existe ante el SAT. Si el descuento falla, NO se deshace el timbrado ni se devuelve
   // error: el comprobante es real y tiene que quedar registrado. Se avisa en la respuesta para que
   // el descuadre se vea en vez de perderse.
