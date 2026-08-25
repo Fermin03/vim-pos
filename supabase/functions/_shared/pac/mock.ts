@@ -22,6 +22,19 @@ export class MockPac implements PacAdapter {
       `<cfdi:Receptor Rfc="${req.receptor.rfc}" Nombre="${req.receptor.razonSocial}" ` +
       `UsoCFDI="${req.receptor.usoCfdi}" DomicilioFiscalReceptor="${req.receptor.codigoPostal}" ` +
       `RegimenFiscalReceptor="${req.receptor.regimenFiscal}"/>` +
+      // Los conceptos van también en el mock: si el XML de desarrollo tiene otra forma que el de
+      // producción, los problemas de desglose no aparecen hasta que hay dinero de por medio.
+      `<cfdi:Conceptos>` +
+      req.conceptos
+        .map((c) =>
+          `<cfdi:Concepto ClaveProdServ="${c.claveProdServ}" ClaveUnidad="${c.claveUnidad}" ` +
+          `Cantidad="${c.cantidad}" Descripcion="${c.descripcion.replace(/[<>&"]/g, "")}" ` +
+          `ValorUnitario="${c.valorUnitario}" Importe="${c.importe.toFixed(2)}" ` +
+          (c.descuento > 0 ? `Descuento="${c.descuento.toFixed(2)}" ` : "") +
+          `ObjetoImp="02"/>`
+        )
+        .join("") +
+      `</cfdi:Conceptos>` +
       `<cfdi:Complemento><tfd:TimbreFiscalDigital UUID="${uuid}" FechaTimbrado="${now}"/></cfdi:Complemento>` +
       `</cfdi:Comprobante>`;
 

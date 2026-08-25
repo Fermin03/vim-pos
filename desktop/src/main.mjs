@@ -238,6 +238,7 @@ async function bootCaja() {
       onImprimir: (p) => imprimirRaw(p),
       onVincularNube: (p) => vincularConNube(p),
       estadoSync: () => ({ disponible: true, vinculada: leerNube() !== null, ...ciclo.estado() }),
+      onFolios: () => consultarFolios(),
     });
     posUrl = `http://localhost:${UI_PORT}`;
     console.log(`· [ui] POS servido offline desde ${posUrl} · KDS/2ª caja en la LAN: http://${backend.lanIp}:${UI_PORT}`);
@@ -444,6 +445,69 @@ async function ofrecerInstalar() {
  * y permisos; hacerlo cada 10 minutos es churn innecesario sobre la base de una caja que está
  * cobrando, mientras que subir las ventas cuanto antes sí urge.
  */
+/**
+ * Token de nube del dispositivo, para la consulta de folios.
+ *
+ * Se pide en cada llamada en vez de cachearlo: el cajero pulsa el botón de vez en cuando, y un
+ * token cacheado que caduca daría un fallo intermitente carísimo de diagnosticar a cambio de
+ * ahorrar una petición.
+ *
+ * `syncBestEffort` hace este mismo login y NO se refactorizó para usar esta función: allí cada
+ * modo de fallo escribe su propio mensaje en el log —sin vincular, credenciales incompletas, login
+ * rechazado— y esa granularidad es lo único que permitió diagnosticar la noche que el piloto
+ * retuvo 27 ventas. Unificarlas ahorraría diez líneas y costaría el diagnóstico.
+ */
+async function tokenDeNube() {
+  const nube = leerNube();
+  if (!nube) return null;
+  const { cloudUrl, anon, email, pass } = nube;
+  if (!cloudUrl || !anon || !email || !pass) return null;
+  try {
+    const r = await fetch(`${cloudUrl}/auth/v1/token?grant_type=password`, {
+      method: "POST", headers: { apikey: anon, "Content-Type": "application/json" },
+      body: JSON.stringify({ email, password: pass }),
+      signal: AbortSignal.timeout(10000),
+    });
+    const s = await r.json();
+    return s.access_token ? { cloudUrl, anonKey: anon, deviceToken: s.access_token } : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Folios que le quedan al negocio, preguntados a la nube en el momento.
+ *
+ * `aplica:false` cuando la caja no está vinculada o el tenant no tiene fila de saldo: en ese caso
+ * el POS no pinta el indicador, en vez de enseñar un cero que asustaría sin motivo a un negocio
+ * que ni siquiera contrató facturación.
+ */
+async function consultarFolios() {
+  const opts = await tokenDeNube();
+  if (!opts) return { ok: false, aplica: false };
+  try {
+    const r = await fetch(
+      `${opts.cloudUrl}/rest/v1/tenant_folios_saldo?select=saldo_paquetes,folios_base_mensuales,folios_base_consumidos`,
+      {
+        headers: { apikey: opts.anonKey, Authorization: `Bearer ${opts.deviceToken}` },
+        signal: AbortSignal.timeout(10000),
+      },
+    );
+    if (!r.ok) return { ok: false, error: `HTTP ${r.status}` };
+    // RLS acota la respuesta al tenant del dispositivo, así que viene una fila o ninguna.
+    const [f] = await r.json();
+    if (!f) return { ok: false, aplica: false };
+    return {
+      ok: true,
+      aplica: true,
+      paquetes: Number(f.saldo_paquetes ?? 0),
+      base_restante: Number(f.folios_base_mensuales ?? 0) - Number(f.folios_base_consumidos ?? 0),
+    };
+  } catch (e) {
+    return { ok: false, error: e?.message ?? "sin conexión" };
+  }
+}
+
 async function syncBestEffort({ conPull = true } = {}) {
   // Del env o de lo persistido al vincular la caja (ver vincularConNube).
   const nube = leerNube();

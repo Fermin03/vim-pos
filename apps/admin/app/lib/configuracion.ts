@@ -235,7 +235,9 @@ export async function eliminarMarca(id: string): Promise<void> {
 }
 
 // ── CFDI / PAC emisor (P-018) ────────────────────────────────────────────────
-export const PROVEEDORES_PAC = ["FACTURAPI", "SOLUCIONFACTIBLE", "FINKOK", "EDICOM", "PRODIGIA", "OTRO"] as const;
+// FACTURAMA va primero porque es el PAC del producto (migración 0080). Los demás quedan por
+// compatibilidad con emisores dados de alta antes de la decisión.
+export const PROVEEDORES_PAC = ["FACTURAMA", "FACTURAPI", "SOLUCIONFACTIBLE", "FINKOK", "EDICOM", "PRODIGIA", "OTRO"] as const;
 export type ProveedorPac = (typeof PROVEEDORES_PAC)[number];
 
 export const cfdiEmisorSchema = z.object({
@@ -244,15 +246,33 @@ export const cfdiEmisorSchema = z.object({
   facturama_issuer_ref: z.string().trim().max(100).optional().or(z.literal("")),
   csd_vigencia_hasta: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Fecha inválida").optional().or(z.literal("")),
   estado: z.enum(["ACTIVO", "INACTIVO", "PRUEBA"]),
+  /**
+   * Periodicidad de la factura global (c_Periodicidad del SAT). No es un dato administrativo:
+   * decide HASTA CUÁNDO un comensal puede autofacturar su ticket. Un negocio que cierra a diario
+   * deja de aceptar la factura del ticket de ayer.
+   */
+  periodicidad_global: z.enum(["01", "02", "03", "04", "05"]),
 });
 export type CfdiEmisorInput = z.infer<typeof cfdiEmisorSchema>;
-export type CfdiEmisor = CfdiEmisorInput & { existe: boolean };
+
+/**
+ * Estado del sello digital. Es de SOLO LECTURA en el panel: sale de leer el .cer al cargarlo, no
+ * de que alguien teclee la fecha. Antes la vigencia se capturaba a mano, con lo que podía decir
+ * cualquier cosa —incluida una fecha válida sobre un sello que ya venció—.
+ */
+export type EstadoCsd = {
+  numeroCertificado: string | null;
+  vigenciaHasta: string | null;
+  subidoAt: string | null;
+};
+
+export type CfdiEmisor = CfdiEmisorInput & { existe: boolean; csd: EstadoCsd };
 
 export async function leerCfdiEmisor(): Promise<CfdiEmisor> {
   const tid = await tenantId();
   const { data, error } = await supabase
     .from("tenant_cfdi_emisor")
-    .select("rfc, proveedor_pac, facturama_issuer_ref, csd_vigencia_hasta, estado")
+    .select("rfc, proveedor_pac, facturama_issuer_ref, csd_vigencia_hasta, estado, csd_numero_certificado, csd_subido_at, periodicidad_global")
     .eq("tenant_id", tid)
     .maybeSingle();
   if (error) throw new Error(error.message);
@@ -261,21 +281,29 @@ export async function leerCfdiEmisor(): Promise<CfdiEmisor> {
     const ten = await supabase.from("tenants").select("rfc").eq("id", tid).maybeSingle();
     return {
       rfc: (ten.data as { rfc?: string } | null)?.rfc ?? "",
-      proveedor_pac: "FACTURAPI",
+      proveedor_pac: "FACTURAMA",
       facturama_issuer_ref: "",
       csd_vigencia_hasta: "",
       estado: "PRUEBA",
+      periodicidad_global: "04",
       existe: false,
+      csd: { numeroCertificado: null, vigenciaHasta: null, subidoAt: null },
     };
   }
   const d = data as Record<string, string | null>;
   return {
     rfc: d.rfc ?? "",
-    proveedor_pac: (d.proveedor_pac as ProveedorPac) ?? "FACTURAPI",
+    proveedor_pac: (d.proveedor_pac as ProveedorPac) ?? "FACTURAMA",
     facturama_issuer_ref: d.facturama_issuer_ref ?? "",
     csd_vigencia_hasta: d.csd_vigencia_hasta ?? "",
     estado: (d.estado as CfdiEmisorInput["estado"]) ?? "PRUEBA",
+    periodicidad_global: (d.periodicidad_global as CfdiEmisorInput["periodicidad_global"]) ?? "04",
     existe: true,
+    csd: {
+      numeroCertificado: d.csd_numero_certificado ?? null,
+      vigenciaHasta: d.csd_vigencia_hasta ?? null,
+      subidoAt: d.csd_subido_at ?? null,
+    },
   };
 }
 
@@ -290,10 +318,81 @@ export async function guardarCfdiEmisor(input: CfdiEmisorInput): Promise<void> {
       facturama_issuer_ref: datos.facturama_issuer_ref || datos.rfc, // NOT NULL en BD
       csd_vigencia_hasta: datos.csd_vigencia_hasta || null,
       estado: datos.estado,
+      periodicidad_global: datos.periodicidad_global,
     },
     { onConflict: "tenant_id" },
   );
   if (error) throw new Error(error.message);
+}
+
+// ── Sello digital (CSD) ──────────────────────────────────────────────────────
+//
+// La carga pasa SIEMPRE por la Edge Function `cargar-csd`. Nunca desde aquí contra el PAC: la
+// credencial de Facturama es una sola para todos los negocios, y ponerla en el navegador
+// permitiría facturar a nombre de cualquier otro cliente nuestro.
+//
+// El `.key` y su contraseña se leen del disco, se mandan y se olvidan. No se guardan en estado de
+// React más allá del envío, ni en localStorage, ni llegan a nuestra base de datos.
+
+/** Lee un archivo binario como base64, que es como lo espera el PAC. */
+export function archivoABase64(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const fr = new FileReader();
+    fr.onerror = () => reject(new Error(`No se pudo leer ${file.name}`));
+    fr.onload = () => {
+      const r = String(fr.result);
+      resolve(r.slice(r.indexOf(",") + 1)); // quitar el prefijo data:...;base64,
+    };
+    fr.readAsDataURL(file);
+  });
+}
+
+export type ResultadoCsd = {
+  numeroCertificado: string;
+  vigenciaDesde: string;
+  vigenciaHasta: string;
+  /** true = se renovó uno existente. Los CSD del SAT caducan cada 4 años, así que pasa. */
+  reemplazado: boolean;
+};
+
+async function llamarCargarCsd(cuerpo: Record<string, unknown>): Promise<Record<string, unknown>> {
+  const { data: sess } = await supabase.auth.getSession();
+  const token = sess.session?.access_token;
+  if (!token) throw new Error("Sesión expirada, vuelve a entrar");
+  const tid = await tenantId();
+  const res = await fetch(`${SB_URL}/functions/v1/cargar-csd`, {
+    method: "POST",
+    headers: { apikey: SB_ANON, Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ tenant_id: tid, ...cuerpo }),
+  });
+  const data = (await res.json().catch(() => ({}))) as Record<string, unknown>;
+  if (!res.ok || !data.ok) {
+    throw new Error(String(data.mensaje ?? data.detalle ?? data.error ?? `HTTP ${res.status}`));
+  }
+  return data;
+}
+
+export async function cargarCsd(cer: File, llave: File, password: string): Promise<ResultadoCsd> {
+  const [cerB64, keyB64] = await Promise.all([archivoABase64(cer), archivoABase64(llave)]);
+  const d = await llamarCargarCsd({ cer_base64: cerB64, key_base64: keyB64, password });
+  return {
+    numeroCertificado: String(d.numero_certificado),
+    vigenciaDesde: String(d.vigencia_desde),
+    vigenciaHasta: String(d.vigencia_hasta),
+    reemplazado: Boolean(d.reemplazado),
+  };
+}
+
+/** Retira el sello de nuestra cuenta del PAC. Va con la baja del cliente. */
+export async function borrarCsd(): Promise<void> {
+  await llamarCargarCsd({ accion: "borrar" });
+}
+
+/** Días que le quedan al sello. Negativo = ya venció. */
+export function diasParaVencer(vigenciaHasta: string, hoy = new Date()): number {
+  const fin = new Date(`${vigenciaHasta}T00:00:00Z`).getTime();
+  const dia = new Date(`${hoy.toISOString().slice(0, 10)}T00:00:00Z`).getTime();
+  return Math.round((fin - dia) / 86_400_000);
 }
 
 // ── Sucursales (P-165/166) ───────────────────────────────────────────────────

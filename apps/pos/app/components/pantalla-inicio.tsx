@@ -1,8 +1,9 @@
 "use client";
 import { LogoVim } from "@vim/ui/styles";
-import { useEffect, useState, type ReactNode } from "react";
+import { type ReactNode, useCallback, useEffect, useState } from "react";
 import { useReloj } from "./topbar-pos";
 import { evaluarSync, leerEstadoSync, type NivelSync } from "../lib/estado-sync";
+import { evaluarFolios, leerFolios, type NivelFolios } from "../lib/folios";
 import type { DatosCaja, Turno } from "../lib/turno";
 import type { Empleado } from "../lib/supabase";
 
@@ -74,6 +75,24 @@ export function PantallaInicio({
     const id = setInterval(cargar, 60000);
     return () => { vivo = false; clearInterval(id); };
   }, []);
+  // Folios de facturación. A DEMANDA, no en un intervalo: cada lectura es una ida a la nube, y el
+  // producto es local-first justamente para que la caja no dependa de la conexión. Se consulta una
+  // vez al abrir la pantalla y luego solo si el cajero lo pide.
+  const [folios, setFolios] = useState<{ nivel: NivelFolios; texto: string } | null>(null);
+  const [consultandoFolios, setConsultandoFolios] = useState(false);
+  const consultarFolios = useCallback(async () => {
+    setConsultandoFolios(true);
+    try {
+      const r = await leerFolios();
+      // "no-aplica" (el negocio no tiene facturación) deja el indicador oculto en vez de mostrar
+      // un cero alarmante a quien nunca contrató el add-on.
+      setFolios(r.estado === "ok" ? evaluarFolios(r.saldo) : null);
+    } finally {
+      setConsultandoFolios(false);
+    }
+  }, []);
+  useEffect(() => { consultarFolios(); }, [consultarFolios]);
+
   // Sin turno abierto no hay dónde colgar un ticket (tickets.turno_id es obligatorio), así que
   // vender queda bloqueado hasta abrirlo: los accesos de venta salen apagados y "Abrir turno"
   // toma el lugar de "Cerrar turno".
@@ -224,6 +243,41 @@ export function PantallaInicio({
               aria-hidden="true"
             />
             {sync.texto}
+          </span>
+        )}
+        {/* Folios de facturación. Solo si el negocio tiene facturación activa. El botón vuelve a
+            preguntarle a la nube: cuando VIM acredita un paquete, el cajero lo ve al pulsarlo y no
+            una hora después, que es lo que tardaría la sincronización del catálogo. */}
+        {folios && (
+          <span
+            className={[
+              "flex flex-shrink-0 items-center gap-1.5",
+              folios.nivel === "agotados" ? "font-semibold text-danger" : "",
+              folios.nivel === "pocos" ? "text-warning" : "",
+            ].join(" ")}
+            title={
+              folios.nivel === "agotados"
+                ? "No se pueden emitir facturas. Pídele folios a VIM."
+                : "Folios de facturación disponibles"
+            }
+          >
+            <span
+              className={[
+                "h-1.5 w-1.5 rounded-full",
+                folios.nivel === "ok" ? "bg-success" : folios.nivel === "pocos" ? "bg-warning" : "bg-danger",
+              ].join(" ")}
+              aria-hidden="true"
+            />
+            {folios.texto}
+            <button
+              type="button"
+              onClick={consultarFolios}
+              disabled={consultandoFolios}
+              className="underline underline-offset-2 disabled:opacity-50"
+              aria-label="Actualizar folios"
+            >
+              {consultandoFolios ? "…" : "actualizar"}
+            </button>
           </span>
         )}
         <span className="flex-shrink-0 tabular-nums">

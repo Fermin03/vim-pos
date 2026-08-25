@@ -8,7 +8,11 @@ import { REGIMENES_FISCALES } from "../../lib/configuracion";
 import {
   facturarTicket, FORMAS_PAGO_SAT, listarTicketsFacturables, RECEPTOR_PUBLICO_GENERAL,
   receptorSchema, USOS_CFDI, type ReceptorInput, type ResultadoTimbrado, type TicketFacturable,
+  listarPeriodosGlobales, periodoPorCerrar, timbrarFacturaGlobal,
+  cancelarCfdi, MOTIVOS_CANCELACION,
+  type PeriodoGlobal,
 } from "../../lib/facturacion";
+import { leerCfdiEmisor } from "../../lib/configuracion";
 import { mensajeError } from "../../lib/errores";
 
 const ESTADO_CFDI_BADGE: Record<string, { label: string; cls: string }> = {
@@ -29,6 +33,54 @@ export default function FacturacionPage() {
   const [error, setError] = useState<string | null>(null);
   const [sel, setSel] = useState<TicketFacturable | null>(null);
 
+  // ── Factura global ───────────────────────────────────────────────────────
+  const [periodos, setPeriodos] = useState<PeriodoGlobal[]>([]);
+  const [porCerrar, setPorCerrar] = useState<{ desde: string; hasta: string; nTickets: number; totalMxn: number } | null>(null);
+  const [timbrandoGlobal, setTimbrandoGlobal] = useState(false);
+  const [cancelando, setCancelando] = useState<TicketFacturable | null>(null);
+  const [avisoGlobal, setAvisoGlobal] = useState<string | null>(null);
+
+  const cargarGlobal = useCallback(async () => {
+    try {
+      const emisor = await leerCfdiEmisor();
+      const [lista, pendiente] = await Promise.all([
+        listarPeriodosGlobales(),
+        periodoPorCerrar(emisor.periodicidad_global),
+      ]);
+      setPeriodos(lista);
+      setPorCerrar(pendiente);
+    } catch {
+      // La global es una sección secundaria de esta pantalla: si no carga, no debe impedir
+      // facturar un ticket, que es a lo que la gente entra aquí.
+    }
+  }, []);
+  useEffect(() => { cargarGlobal(); }, [cargarGlobal]);
+
+  async function emitirGlobal() {
+    if (!porCerrar) return;
+    const ok = confirm(
+      `Vas a emitir la factura global del ${porCerrar.desde} al ${porCerrar.hasta}: ` +
+        `${porCerrar.nTickets} ventas por ${fmtMxn(porCerrar.totalMxn)}.
+
+` +
+        "A partir de ese momento tus clientes YA NO podrán facturar esos tickets. ¿Continuar?",
+    );
+    if (!ok) return;
+    setTimbrandoGlobal(true);
+    setAvisoGlobal(null);
+    try {
+      const r = await timbrarFacturaGlobal(porCerrar.desde, porCerrar.hasta);
+      setAvisoGlobal(
+        !r.ok ? r.error
+          : r.sinVentas ? "No había ventas sin facturar en ese periodo."
+          : `Factura global timbrada: ${r.tickets} ventas por ${fmtMxn(r.total ?? 0)}.`,
+      );
+      cargarGlobal();
+    } finally {
+      setTimbrandoGlobal(false);
+    }
+  }
+
   const cargar = useCallback(async (d: string, h: string, f: string) => {
     setTickets(null); setError(null);
     try { setTickets(await listarTicketsFacturables(d, h, f || undefined)); }
@@ -40,6 +92,68 @@ export default function FacturacionPage() {
     <>
       <PageHeader titulo="Facturación" subtitulo="Emite el CFDI de un ticket pagado: captura los datos fiscales del cliente y timbra." migas={[{ label: "Facturación" }]} />
       <PageBody>
+        {/* ── Factura global ────────────────────────────────────────────────
+            Va arriba porque es una obligación con fecha límite —24 horas tras cerrar el periodo—
+            mientras que facturar un ticket suelto es a demanda. */}
+        <div className="mb-6 rounded-lg border border-line bg-surface p-5">
+          <div className="mb-1 font-display text-[16px] font-semibold tracking-tight">Factura global</div>
+          <p className="mb-4 text-[12.5px] text-ink-3">
+            Ampara las ventas del periodo en las que nadie pidió factura. Debe emitirse dentro de las
+            24 horas siguientes al cierre del periodo. <b>Al timbrarla, esos tickets dejan de poder
+            facturarse por tus clientes.</b>
+          </p>
+
+          {porCerrar ? (
+            <div className="flex flex-wrap items-center justify-between gap-3 rounded border border-line bg-bg px-4 py-3">
+              <div>
+                <div className="text-[13px] font-semibold">
+                  Periodo del {porCerrar.desde} al {porCerrar.hasta}
+                </div>
+                <div className="text-[12px] text-ink-3">
+                  {porCerrar.nTickets === 0
+                    ? "Sin ventas pendientes de amparar"
+                    : `${porCerrar.nTickets} ventas · ${fmtMxn(porCerrar.totalMxn)}`}
+                </div>
+              </div>
+              <Button onClick={emitirGlobal} disabled={timbrandoGlobal || porCerrar.nTickets === 0}>
+                {timbrandoGlobal ? "Timbrando… (puede tardar un minuto)" : "Emitir factura global"}
+              </Button>
+            </div>
+          ) : (
+            <p className="text-[12.5px] text-ink-3">Configura tus datos fiscales para emitir la global.</p>
+          )}
+
+          {avisoGlobal && <p className="mt-3 text-[13px] font-medium">{avisoGlobal}</p>}
+
+          {periodos.length > 0 && (
+            <div className="mt-4 border-t border-line pt-3">
+              <div className="mb-2 text-[12px] font-medium text-ink-2">Periodos anteriores</div>
+              <div className="flex flex-col gap-1.5">
+                {periodos.map((p) => (
+                  <div key={p.id} className="flex items-center justify-between gap-3 text-[12.5px]">
+                    <span className="text-ink-2">{p.desde} → {p.hasta}</span>
+                    <span className="flex items-center gap-3">
+                      {p.estado === "TIMBRADA" && (
+                        <span className="text-ink-3">{p.nTickets} ventas · {fmtMxn(p.totalMxn)}</span>
+                      )}
+                      <span className={[
+                        "rounded px-2 py-0.5 text-[11.5px] font-medium",
+                        p.estado === "TIMBRADA" ? "bg-[#EAF3EE] text-success"
+                          : p.estado === "ERROR" ? "bg-[#FBECEA] text-danger"
+                          : "bg-sel text-ink-2",
+                      ].join(" ")}>
+                        {p.estado === "TIMBRADA" ? "Timbrada"
+                          : p.estado === "EN_PROCESO" ? "En proceso"
+                          : p.estado === "ERROR" ? "Error" : "Abierto"}
+                      </span>
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+
         <div className="mb-4 flex flex-wrap items-center gap-3">
           <RangoFechas desde={desde} hasta={hasta} onCambio={(d, h) => { setDesde(d); setHasta(h); }} />
           <input
@@ -74,7 +188,17 @@ export default function FacturacionPage() {
                       </td>
                       <td className="px-4 py-2.5 text-right">
                         {t.cfdiEstado === "TIMBRADO"
-                          ? <span className="text-[12px] text-ink-3" title={t.cfdiUuid ?? ""}>UUID {t.cfdiUuid ? `${t.cfdiUuid.slice(0, 8)}…` : ""}</span>
+                          ? (
+                            <span className="flex items-center justify-end gap-3">
+                              <span className="text-[12px] text-ink-3" title={t.cfdiUuid ?? ""}>UUID {t.cfdiUuid ? `${t.cfdiUuid.slice(0, 8)}…` : ""}</span>
+                              <button
+                                onClick={() => setCancelando(t)}
+                                className="text-[12.5px] font-medium text-danger underline underline-offset-2"
+                              >
+                                Cancelar
+                              </button>
+                            </span>
+                          )
                           : <Button size="md" onClick={() => setSel(t)}>Facturar</Button>}
                       </td>
                     </tr>
@@ -83,6 +207,13 @@ export default function FacturacionPage() {
               </tbody>
             </table>
           </div>
+        )}
+
+        {cancelando && (
+          <PanelCancelar
+            ticket={cancelando}
+            onCerrar={(cambio) => { setCancelando(null); if (cambio) cargar(desde, hasta, folio); }}
+          />
         )}
 
         {sel && (
@@ -190,6 +321,109 @@ function PanelFacturar({ ticket, onCerrar }: { ticket: TicketFacturable; onCerra
             <div className="mt-5 flex justify-end gap-2">
               <Button variant="ghost" onClick={() => onCerrar(false)} disabled={procesando}>Cancelar</Button>
               <Button onClick={timbrar} disabled={procesando}>{procesando ? "Timbrando…" : "Crear y timbrar CFDI"}</Button>
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Cancelación de un CFDI ya timbrado.
+ *
+ * Deliberadamente incómodo de usar: exige elegir un motivo del catálogo del SAT y confirmar. No es
+ * fricción gratuita — una cancelación es un acto fiscal, queda registrada ante el SAT y no se
+ * deshace. Un botón directo sería más cómodo y más peligroso.
+ */
+function PanelCancelar({ ticket, onCerrar }: { ticket: TicketFacturable; onCerrar: (cambio: boolean) => void }) {
+  const [motivo, setMotivo] = useState<string>("02");
+  const [sustituto, setSustituto] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [aviso, setAviso] = useState<string | null>(null);
+  const [ocupado, setOcupado] = useState(false);
+
+  const elegido = MOTIVOS_CANCELACION.find((m) => m.v === motivo);
+  const faltaSustituto = motivo === "01" && sustituto.trim().length < 36;
+
+  async function ejecutar() {
+    setOcupado(true);
+    setError(null);
+    const r = await cancelarCfdi(ticket.cfdiId!, motivo, sustituto.trim() || undefined);
+    setOcupado(false);
+    if (!r.ok) { setError(r.error); return; }
+    setAviso(r.mensaje);
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 px-4">
+      <div className="w-full max-w-[440px] rounded-lg border border-line bg-surface p-5 shadow-lg">
+        <div className="font-display text-[17px] font-semibold tracking-tight">Cancelar factura</div>
+        <p className="mt-1 text-[12.5px] text-ink-3">
+          Ticket {ticket.folio} · UUID {ticket.cfdiUuid?.slice(0, 8)}…
+        </p>
+
+        {aviso ? (
+          <>
+            <p className="mt-4 rounded border border-line bg-bg px-3 py-2.5 text-[13.5px] leading-relaxed">{aviso}</p>
+            <div className="mt-4 flex justify-end">
+              <Button onClick={() => onCerrar(true)}>Entendido</Button>
+            </div>
+          </>
+        ) : (
+          <>
+            <div className="mt-4">
+              <label className="mb-1.5 block text-[13px] font-medium text-ink-2" htmlFor="motivo">Motivo</label>
+              <select
+                id="motivo"
+                className="h-11 w-full rounded border border-line-strong px-3 text-sm outline-none focus:border-ink"
+                value={motivo}
+                onChange={(e) => setMotivo(e.target.value)}
+              >
+                {MOTIVOS_CANCELACION.map((m) => <option key={m.v} value={m.v}>{m.v} · {m.l}</option>)}
+              </select>
+              {elegido && <p className="mt-1.5 text-[11.5px] text-ink-3">{elegido.ayuda}</p>}
+            </div>
+
+            {motivo === "01" && (
+              <div className="mt-4">
+                <label className="mb-1.5 block text-[13px] font-medium text-ink-2" htmlFor="sust">
+                  Folio fiscal (UUID) del comprobante que lo sustituye
+                </label>
+                <input
+                  id="sust"
+                  className="h-11 w-full rounded border border-line-strong px-3 font-mono text-[13px] outline-none focus:border-ink"
+                  value={sustituto}
+                  onChange={(e) => setSustituto(e.target.value)}
+                  placeholder="00000000-0000-0000-0000-000000000000"
+                />
+                <p className="mt-1.5 text-[11.5px] text-ink-3">
+                  Emite primero la factura correcta y pega aquí su folio fiscal.
+                </p>
+              </div>
+            )}
+
+            <p className="mt-4 rounded border border-[#F0DCC0] bg-[#FCF3E6] px-3 py-2 text-[12.5px] font-medium leading-relaxed text-warning">
+              Si tu cliente ya usó esta factura, el SAT puede pedirle que acepte la cancelación. En
+              ese caso queda <b>en proceso</b> hasta que responda.
+            </p>
+
+            {error && <p className="mt-3 text-[13px] font-medium text-danger" role="alert">{error}</p>}
+
+            <div className="mt-5 flex justify-end gap-2">
+              <button
+                onClick={() => onCerrar(false)}
+                className="h-10 rounded border border-line-strong px-4 text-[13px] font-semibold transition hover:bg-hover"
+              >
+                Volver
+              </button>
+              <button
+                onClick={ejecutar}
+                disabled={ocupado || faltaSustituto}
+                className="h-10 rounded bg-danger px-4 text-[13px] font-semibold text-white transition disabled:opacity-50"
+              >
+                {ocupado ? "Enviando…" : "Cancelar factura"}
+              </button>
             </div>
           </>
         )}

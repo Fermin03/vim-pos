@@ -12,6 +12,9 @@
     "lint": "turbo run lint",
     "typecheck": "turbo run typecheck",
     "test": "turbo run test",
+    "_comment_test_functions": "supabase/functions es codigo Deno y no esta en el workspace de pnpm; sus modulos puros se prueban con el runner de Node",
+    "auditar:consultas": "node scripts/auditar-consultas.mjs",
+    "test:functions": "node --test --experimental-strip-types supabase/functions/_shared/pac/*.test.ts",
     "db:reset": "supabase db reset",
     "db:types": "supabase gen types typescript --local > packages/db/src/database.types.ts"
   },

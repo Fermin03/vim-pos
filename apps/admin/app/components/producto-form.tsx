@@ -38,6 +38,9 @@ export function ProductoForm({ producto }: { producto: Producto | null }) {
   );
   const [agotado, setAgotado] = useState(producto?.estado === "AGOTADO" || (producto?.agotado_manual ?? false));
   const [visible, setVisible] = useState(producto?.visible_en_pos ?? true);
+  const [claveSat, setClaveSat] = useState(producto?.clave_sat ?? "");
+  const [tasaIva, setTasaIva] = useState(producto ? String(producto.tasa_iva) : "16");
+  const [ivaIncluido, setIvaIncluido] = useState(producto?.iva_incluido_en_precio ?? true);
   const [error, setError] = useState<string | null>(null);
   const [guardando, setGuardando] = useState(false);
 
@@ -65,6 +68,9 @@ export function ProductoForm({ producto }: { producto: Producto | null }) {
       visible_en_pos: visible,
       marca_virtual_id: marcaId,
       area_cocina_id: areaId,
+      clave_sat: claveSat,
+      tasa_iva: Number(tasaIva),
+      iva_incluido_en_precio: ivaIncluido,
     });
     if (!parsed.success) {
       setError(parsed.error.issues[0]?.message ?? "Datos inválidos");
@@ -130,7 +136,9 @@ export function ProductoForm({ producto }: { producto: Producto | null }) {
               onChange={(e) => setPrecio(e.target.value.replace(/[^0-9.]/g, ""))}
               placeholder="0.00"
             />
-            <p className="mt-1 text-[11.5px] text-ink-3">IVA 16% incluido en el precio.</p>
+            <p className="mt-1 text-[11.5px] text-ink-3">
+              {ivaIncluido ? `IVA ${tasaIva}% incluido en el precio.` : `Se le suma ${tasaIva}% de IVA al cobrar.`}
+            </p>
           </div>
         </div>
 
@@ -215,6 +223,57 @@ export function ProductoForm({ producto }: { producto: Producto | null }) {
             </p>
           </div>
         )}
+
+        {/* Datos fiscales (P-131). Alimentan el CFDI: hasta que esto se pudo capturar, cada factura
+            declaraba la clave genérica del giro y 16 % de IVA sobre todo, incluida la comida para
+            llevar, que va a tasa 0. */}
+        <div className="rounded-lg border border-line bg-surface p-4">
+          <p className="mb-3 text-[13px] font-medium text-ink-2">Datos fiscales</p>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <div>
+              <label className={label} htmlFor="clave-sat">
+                Clave de producto SAT <span className="text-ink-3">· opcional</span>
+              </label>
+              <input
+                id="clave-sat"
+                className={input}
+                value={claveSat}
+                inputMode="numeric"
+                maxLength={8}
+                onChange={(e) => setClaveSat(e.target.value.replace(/\D/g, ""))}
+                placeholder="90101500"
+              />
+              <p className="mt-1 text-[11.5px] text-ink-3">
+                Si la dejas vacía se factura como servicio de restaurante. Cámbiala si tu contador lo indica.
+              </p>
+            </div>
+            <div>
+              <label className={label} htmlFor="tasa-iva">
+                Tasa de IVA
+              </label>
+              <select id="tasa-iva" className={input} value={tasaIva} onChange={(e) => setTasaIva(e.target.value)}>
+                <option value="16">16% · consumo en el lugar</option>
+                <option value="0">0% · alimentos para llevar</option>
+                <option value="8">8% · región fronteriza</option>
+              </select>
+              <p className="mt-1 text-[11.5px] text-ink-3">
+                Ante la duda, 16%. La tasa 0 solo aplica a alimentos no preparados.
+              </p>
+            </div>
+          </div>
+          <label className="mt-3 flex items-center gap-2.5">
+            <input
+              type="checkbox"
+              className="h-4 w-4 accent-[#16161A]"
+              checked={ivaIncluido}
+              onChange={(e) => setIvaIncluido(e.target.checked)}
+            />
+            <span className="text-sm">
+              <span className="font-medium">IVA incluido en el precio</span>{" "}
+              <span className="text-ink-3">(como se acostumbra en restaurante)</span>
+            </span>
+          </label>
+        </div>
 
         <div className="flex flex-col gap-2.5 rounded-lg border border-line bg-surface p-4">
           <label className="flex items-center gap-2.5">

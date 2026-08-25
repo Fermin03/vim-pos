@@ -25,19 +25,22 @@ export class FacturapiPac implements PacAdapter {
         address: { zip: req.receptor.codigoPostal },
         email: req.receptor.email ?? undefined,
       },
-      // Un solo concepto agregado por el total (MVP). En producción se mapea ítem por ítem.
-      items: [
-        {
-          quantity: 1,
-          product: {
-            description: "Consumo en restaurante",
-            product_key: "90101500", // Servicios de restaurantes y banquetes (SAT)
-            price: Number((req.subtotal).toFixed(2)),
-            tax_included: false,
-            taxes: [{ type: "IVA", rate: 0.16 }],
-          },
+      // Los mismos conceptos que van al PAC principal. Antes esto mandaba un concepto agregado
+      // con IVA fijo al 16 %; como este adaptador es el RESPALDO, ese atajo significaba que un
+      // fallo de Facturama producía un CFDI con un desglose distinto —y equivocado— del que el
+      // cliente habría recibido. El respaldo tiene que emitir lo mismo, no algo parecido.
+      items: req.conceptos.map((c) => ({
+        quantity: c.cantidad,
+        discount: c.descuento > 0 ? c.descuento : undefined,
+        product: {
+          description: c.descripcion,
+          product_key: c.claveProdServ,
+          unit_key: c.claveUnidad,
+          price: c.valorUnitario,
+          tax_included: false,
+          taxes: [{ type: "IVA", rate: Number((c.tasaIva / 100).toFixed(6)) }],
         },
-      ],
+      })),
     };
 
     let res: Response;

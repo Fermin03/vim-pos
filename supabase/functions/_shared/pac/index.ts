@@ -1,6 +1,14 @@
 // F8 / Fase 4 — Selector de PAC con REDUNDANCIA (multi-PAC).
-// PAC principal: Facturapi si hay FACTURAPI_API_KEY; si no, mock (dev/piloto).
-// PAC de respaldo (opcional): env PAC_RESPALDO = "mock" | "facturapi".
+//
+// PAC principal, en orden: Facturama si hay credenciales (el PAC elegido del proyecto), Facturapi
+// si hay API key, y mock si no hay nada.
+//
+// Facturama va primero porque es el único que sirve para multi-tenant: lleva el emisor en el
+// payload, así que una sola credencial timbra a nombre de cualquier cliente. Facturapi deduce el
+// emisor de la llave, de modo que con una llave global TODO saldría con nuestro RFC — se conserva
+// como respaldo, no como principal.
+//
+// PAC de respaldo (opcional): env PAC_RESPALDO = "mock" | "facturapi" | "facturama".
 //
 // Política de failover (conservadora, anti doble-timbrado):
 //   • Solo se intenta el respaldo si el principal FALLA EN TRANSPORTE (excepción/red).
@@ -10,12 +18,43 @@
 import type { PacAdapter, PacTimbradoRequest, PacTimbradoResult } from "./tipos.ts";
 import { MockPac } from "./mock.ts";
 import { FacturapiPac } from "./facturapi.ts";
+import { FacturamaPac } from "./facturama.ts";
+
+function credencialesFacturama(): { usuario: string; password: string; base: string } | null {
+  const usuario = Deno.env.get("FACTURAMA_API_USER") ?? "";
+  const password = Deno.env.get("FACTURAMA_API_PASSWORD") ?? "";
+  if (!usuario || !password) return null;
+  return {
+    usuario,
+    password,
+    // Sin URL configurada se apunta al sandbox: si alguien despliega a medias, que timbre en
+    // pruebas y no contra el SAT de verdad.
+    base: Deno.env.get("FACTURAMA_BASE_URL") || "https://apisandbox.facturama.mx",
+  };
+}
+
+/**
+ * Facturama en concreto, para lo que no es timbrar: cargar y quitar sellos.
+ *
+ * `obtenerPac()` devuelve la interfaz común, que a propósito no sabe de CSD — cargar un sello es
+ * una operación de Multiemisor, no algo que todo PAC haga igual. Devuelve `null` si no hay
+ * credenciales, y quien llame decide qué decirle al usuario.
+ */
+export function obtenerFacturama(): FacturamaPac | null {
+  const c = credencialesFacturama();
+  return c ? new FacturamaPac(c.usuario, c.password, c.base) : null;
+}
 
 function construir(nombre: string | undefined): PacAdapter | null {
-  const key = Deno.env.get("FACTURAPI_API_KEY");
   switch ((nombre ?? "").toLowerCase()) {
-    case "facturapi":
+    case "facturama": {
+      const c = credencialesFacturama();
+      return c ? new FacturamaPac(c.usuario, c.password, c.base) : null;
+    }
+    case "facturapi": {
+      const key = Deno.env.get("FACTURAPI_API_KEY");
       return key && key.length > 0 ? new FacturapiPac(key) : null;
+    }
     case "mock":
       return new MockPac();
     default:
@@ -24,6 +63,8 @@ function construir(nombre: string | undefined): PacAdapter | null {
 }
 
 export function obtenerPac(): PacAdapter {
+  const c = credencialesFacturama();
+  if (c) return new FacturamaPac(c.usuario, c.password, c.base);
   const key = Deno.env.get("FACTURAPI_API_KEY");
   if (key && key.length > 0) return new FacturapiPac(key);
   return new MockPac();
