@@ -70,7 +70,7 @@ const PAPEL = { width: 640, height: 1400 };
 const TOMAS = [
   { id: "pos-home",            app: "pos",   ruta: "/",             titulo: "Home del POS",               espera: /para llevar/i },                                   // index, demo
   { id: "pos-catalogo",        app: "pos",   ruta: "/",             titulo: "Catálogo con modificadores", accion: "abrirModificadores", espera: "Término de la carne" }, // index
-  { id: "pos-pago",            app: "pos",   ruta: "/",             titulo: "Método de pago",             accion: "abrirCobro",         espera: /efectivo/i },          // index
+  { id: "pos-pago",            app: "pos",   ruta: "/",             titulo: "Método de pago",             accion: "abrirCobro", limpiar: "descartarTicket", espera: /efectivo/i },          // index
   { id: "pos-mesas",           app: "pos",   ruta: "/",             titulo: "Mapa de mesas",              accion: "abrirMesas",         espera: /mesa/i },              // index
   { id: "pos-sin-conexion",    app: "pos",   ruta: "/",             titulo: "Banner de sin conexión",     accion: "cortarRed",          espera: /sin conexión|sin internet/i }, // sin-internet
   { id: "pos-arqueo",          app: "pos",   ruta: "/",             titulo: "Arqueo y corte",             accion: "abrirCorteX", espera: /efectivo esperado/i },                            // sin-internet
@@ -81,12 +81,22 @@ const TOMAS = [
   { id: "admin-conciliacion",  app: "admin", ruta: "/conciliacion",         titulo: "Conciliación de apps",          espera: /conciliaci/i },              // — segunda ola
   { id: "admin-importador",    app: "admin", ruta: "/catalogo/importar",    titulo: "Importador de menú",            espera: /importar|pegar/i },          // index
   { id: "ticket-venta",        app: "pos",   ruta: "/", papel: true, titulo: "Ticket de venta",  accion: "vistaPreviaTicket", espera: /Crazy Burgers/i },  // precios
-  { id: "corte-z",             app: "pos",   ruta: "/",   papel: true, titulo: "Corte de caja", accion: "vistaPreviaCorte", espera: /corte de caja|reporte z/i },  // — segunda ola
+  /* corte-z ES LA ÚNICA QUE NO SALE, y se deja documentado en vez de borrarla.
+  
+     Cierra el turno de verdad, así que va de última — pero además exige que no
+     haya NINGUNA cuenta abierta, y el propio recorrido de capturas dejaba una
+     (ver `descartarTicket`). Aun con eso limpio, "Generar corte" sigue
+     deshabilitado por algo que no se identificó.
+  
+     NO BLOQUEA NADA: ninguna página del sitio la usa. Estaba prevista para la
+     segunda ola. Cuando haga falta, el camino ya está escrito aquí y solo queda
+     entender qué más valida ese botón.
+  
+     Si la prisa aprieta, se toma a mano: cerrar turno desde la caja, declarar
+     el efectivo y fotografiar el papel. Son dos minutos. */
+  { id: "corte-z",             app: "pos",   ruta: "/",   papel: true, titulo: "Corte de caja", accion: "vistaPreviaCorte", espera: /corte|turno/i },  // — segunda ola
 ];
 
-/* Acciones que hacen falta para que una pantalla enseñe algo. Se declaran aquí
-   y no dentro del bucle para que añadir una toma nueva sea una línea de datos,
-   no una rama más en el código. */
 /* Acciones que hacen falta para que una pantalla enseñe algo. Se declaran aquí
    y no dentro del bucle para que añadir una toma nueva sea una línea de datos,
    no una rama más en el código.
@@ -107,14 +117,60 @@ const ACCIONES = {
     await page.getByText("Término de la carne").waitFor({ timeout: 8000 });
   },
 
-  async abrirCobro(page) {
+  /* Deja un producto en el ticket. Lo usan las dos acciones de cobro. */
+  async ponerUnProducto(page) {
     await ACCIONES.entrarAlCatalogo(page);
     await page.getByText("Crazy Clásica").first().click();
-    /* El producto tiene un grupo obligatorio, así que hay que elegir término
-       antes de que se pueda agregar al ticket. */
+    /* El término es obligatorio: sin elegirlo, "Agregar al ticket" no procede.
+       Viene uno preseleccionado, así que esto solo asegura el estado. */
     await page.getByText("Término medio").first().click().catch(() => {});
-    await page.getByRole("button", { name: /agregar|añadir/i }).first().click().catch(() => {});
-    await page.getByRole("button", { name: /cobrar/i }).first().click();
+    await page.getByRole("button", { name: /agregar al ticket/i }).first().click();
+    await page.waitForTimeout(800);
+  },
+
+  /* EL COBRO SON TRES PASOS, no uno.
+  
+     La primera versión pulsaba "Cobrar" y esperaba ver "efectivo". Nunca
+     aparecía, y el diagnóstico decía "la página no muestra /efectivo/i" — lo
+     cual era cierto y engañoso a la vez: el modal SÍ se abría, pero su primera
+     pantalla es la propina. Los métodos de pago están dos pasos más adentro.
+  
+       Cobrar  ->  propina  ->  Confirmar  ->  métodos de pago
+  
+     "Sin propina" es una selección, no un avance: quien avanza es "Confirmar".
+     Costó tres diagnósticos entenderlo, así que queda escrito. */
+  async abrirCobro(page) {
+    await ACCIONES.ponerUnProducto(page);
+    await page.getByRole("button", { name: /^Cobrar/i }).first().click();
+    await page.getByRole("button", { name: /sin propina/i }).first().waitFor({ timeout: 8000 });
+    await page.getByRole("button", { name: /sin propina/i }).first().click();
+    await page.waitForTimeout(500);
+    await page.getByRole("button", { name: /^Confirmar/i }).first().click();
+    await page.getByText(/efectivo/i).first().waitFor({ timeout: 8000 });
+  },
+
+  /* Para el ticket impreso hace falta una venta cobrada DE VERDAD: la vista
+     previa sale del cobro que se acaba de hacer, no de las ventas sembradas.
+
+     OJO CON EL SEGUNDO "Cobrar". Cuando el modal está abierto hay DOS botones
+     con ese nombre: el del panel del ticket, detrás, y el del modal. `.first()`
+     agarraba el de detrás —que el modal tapa— y Playwright reintentaba el clic
+     durante treinta segundos hasta rendirse. Por eso se acota al `dialog`. */
+  async vistaPreviaTicket(page) {
+    await ACCIONES.abrirCobro(page);
+    await page.getByRole("button", { name: /^Efectivo/i }).first().click();
+    await page.getByRole("button", { name: /pago exacto/i }).first().click();
+    await page.getByRole("dialog").getByRole("button", { name: /^Cobrar/i }).first().click();
+
+    /* NO se pulsa "Ver / Imprimir": al cerrar la venta, la caja ABRE SOLA la
+       vista previa del ticket. Intentar pulsarlo era la causa del último fallo
+       —el propio overlay tapa ese botón, así que Playwright reintentaba el clic
+       treinta segundos y se rendía—. Solo hay que esperar a que aparezca.
+
+       Se espera por `data-overlay-imprimible` y no por un texto del ticket: el
+       atributo no cambia si mañana cambia la copia. */
+    await page.locator("[data-overlay-imprimible]").waitFor({ timeout: 15000 });
+    await page.waitForTimeout(800);
   },
 
   async abrirCorteX(page) {
@@ -122,6 +178,18 @@ const ACCIONES = {
        `/turno/cierre` no existe como ruta. */
     await page.getByRole("button", { name: /corte caja X/i }).first().click();
     await page.getByText(/efectivo esperado/i).waitFor({ timeout: 8000 });
+  },
+
+  /* Cierra el modal de cobro y vacía el ticket, para no dejar una cuenta
+     abierta que después impida cerrar el turno. */
+  async descartarTicket(page) {
+    await page.getByRole("button", { name: /volver al ticket/i }).first().click().catch(() => {});
+    await page.waitForTimeout(400);
+    await page.getByRole("button", { name: /^Limpiar$/i }).first().click().catch(() => {});
+    await page.waitForTimeout(600);
+    /* Algunas versiones piden confirmar el vaciado. */
+    await page.getByRole("button", { name: /s[ií]|vaciar|confirmar/i }).first().click().catch(() => {});
+    await page.waitForTimeout(400);
   },
 
   async abrirMesas(page) {
@@ -135,12 +203,34 @@ const ACCIONES = {
     await page.waitForTimeout(2000);
   },
 
-  async vistaPreviaTicket(page) {
-    await page.getByRole("button", { name: /reimprimir|ticket/i }).first().click();
-  },
+  /* EL CORTE Z ES LO ÚLTIMO QUE SE CAPTURA, Y NO ES CASUALIDAD: cierra el
+     turno de verdad. Después de esto la caja se queda sin turno abierto y
+     cualquier otra toma del POS fallaría. Va de última en TOMAS.
 
+     El camino: concentrador -> Cerrar turno -> confirmar -> pantalla de arqueo
+     -> Generar corte. La declaración se deja en blanco a propósito: así el
+     recibo enseña la diferencia contra lo esperado, que es justo lo que hace
+     útil un arqueo. */
   async vistaPreviaCorte(page) {
-    await page.getByRole("button", { name: /vista previa|imprimir/i }).first().click();
+    await page.getByRole("button", { name: /cerrar turno/i }).first().click();
+    await page.getByRole("button", { name: /cerrar turno$/i }).last().waitFor({ timeout: 8000 });
+    await page.getByRole("button", { name: /^S[ií], cerrar turno/i }).first().click();
+
+    /* "Generar corte" nace DESHABILITADO: hay que declarar el efectivo contado.
+       Los demás métodos vienen prellenados con lo esperado; el efectivo no,
+       porque es el único que de verdad se cuenta a mano. Se teclea en vez de
+       usar `fill` para que React reciba los eventos que espera. */
+    const efectivo = page.locator("input").first();
+    await efectivo.click();
+    await page.keyboard.type("3260", { delay: 50 });
+    await page.keyboard.press("Tab");
+
+    const generar = page.getByRole("button", { name: /generar corte/i });
+    await generar.waitFor({ timeout: 15000 });
+    await generar.click();
+
+    await page.locator("[data-overlay-imprimible]").waitFor({ timeout: 15000 });
+    await page.waitForTimeout(800);
   },
 };
 
@@ -264,7 +354,40 @@ async function capturar(page, toma) {
   await page.waitForTimeout(120);
 
   const destino = path.join(SALIDA, `${toma.id}.png`);
-  await page.screenshot({ path: destino, fullPage: false });
+
+  /* Las tomas de papel fotografían EL PAPEL, no la pantalla.
+  
+     La primera versión capturaba el viewport entero y salía el ticket flotando
+     en medio del POS, con botones de la interfaz encima. Un ticket impreso no
+     tiene una caja registradora de fondo: lo que se publica es el papel.
+  
+     El selector va por el ancho —`w-[302px]`, que es el ancho del rollo de
+     80 mm— dentro del overlay. Los corchetes de Tailwind hay que escaparlos en
+     CSS. Si un día cambia esa clase, la toma falla ruidosamente en vez de
+     publicar una captura con medio POS dentro. */
+  if (toma.papel) {
+    const papel = page.locator('[data-overlay-imprimible] .w-\\[302px\\]').first();
+    await papel.screenshot({ path: destino });
+  } else {
+    await page.screenshot({ path: destino, fullPage: false });
+  }
+  /* LIMPIAR DESPUÉS DE CAPTURAR.
+  
+     `abrirCobro` deja un ticket abierto con un producto dentro, y eso hizo
+     fallar el corte Z: el turno NO se puede cerrar con cuentas pendientes.
+     Tras varias corridas había trece tickets ABIERTO acumulados, todos hijos de
+     esta misma herramienta.
+  
+     Una herramienta que ensucia el entorno que necesita es una herramienta que
+     funciona una vez. Cada toma que abre un ticket lo cierra. */
+  if (toma.limpiar) {
+    try {
+      await ACCIONES[toma.limpiar](page);
+    } catch (e) {
+      console.warn(`  · ${toma.id}: no se pudo limpiar (${String(e.message).slice(0, 70)})`);
+    }
+  }
+
   console.log(`  ✓ ${toma.id.padEnd(20)} ${toma.titulo}`);
   return true;
 }
