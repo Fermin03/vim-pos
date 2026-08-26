@@ -100,7 +100,7 @@
           <button type="button" data-periodo="mensual" aria-pressed="true">Mensual</button>
           <button type="button" data-periodo="anual" aria-pressed="false">Anual · −17%</button>
         </div>
-        <p style="font-size:var(--t-13);color:var(--ink-3);margin:0">
+        <p style="font-size:var(--t-13);color:var(--ink-2);margin:0">
           Pagando el año completo te ahorras dos meses.
         </p>
       </div>
@@ -108,7 +108,7 @@
       <div class="planes">
         <div class="plan pila">
           <div class="pila pila-2">
-            <p class="eyebrow" style="color:var(--ink-3)">Una sola caja</p>
+            <p class="eyebrow" style="color:var(--ink-2)">Una sola caja</p>
             <h3>Esencial</h3>
             <div class="plan-precio" data-precio data-mensual="$699" data-anual="$580">$699</div>
             <span class="plan-periodo" data-nota-periodo>al mes, más IVA</span>
@@ -126,7 +126,7 @@
 
         <div class="plan destacado pila">
           <div class="pila pila-2">
-            <p class="eyebrow" style="color:var(--accent)">El que recomendamos</p>
+            <p class="eyebrow" style="color:var(--accent-hover)">El que recomendamos</p>
             <h3>Negocio</h3>
             <div class="plan-precio" data-precio data-mensual="$999" data-anual="$829">$999</div>
             <span class="plan-periodo" data-nota-periodo>al mes, más IVA</span>
@@ -144,7 +144,7 @@
 
         <div class="plan pila">
           <div class="pila pila-2">
-            <p class="eyebrow" style="color:var(--ink-3)">Varias sucursales</p>
+            <p class="eyebrow" style="color:var(--ink-2)">Varias sucursales</p>
             <h3>Cadena</h3>
             <div class="plan-precio" data-precio data-mensual="$1,999" data-anual="$1,659">$1,999</div>
             <span class="plan-periodo" data-nota-periodo>al mes, más IVA</span>
@@ -161,7 +161,7 @@
         </div>
       </div>
 
-      <p style="font-size:var(--t-13);color:var(--ink-3)">
+      <p style="font-size:var(--t-13);color:var(--ink-2)">
         ¿Más de tres sucursales? Es el mismo plan Cadena con sucursales de más; escríbenos y te
         decimos el número exacto.
       </p>
@@ -278,6 +278,19 @@
           </tbody>
         </table>
       </div>
+
+      <figure class="figura" data-captura="admin-dashboard">
+          <div class="monitor">
+            <div class="monitor-barra" aria-hidden="true">
+              <span class="monitor-punto"></span><span class="monitor-punto"></span><span class="monitor-punto"></span>
+            </div>
+            <div class="hueco">
+              <strong>Captura: el panel del dueño</strong>
+              <span>Pendiente</span>
+            </div>
+          </div>
+          <figcaption>El panel, incluido en los tres planes: cómo va el día, cuánto lleva cada caja y qué se está vendiendo, desde el celular o desde la computadora.</figcaption>
+        </figure>
     </div>
   </section>
 
@@ -338,6 +351,25 @@
           </p>
         </div>
       </div>
+    </div>
+  </section>
+
+  <!-- Inventario es la otra fila que separa Esencial de Negocio, y es un
+       concepto que no se entiende hasta que se ve. -->
+  <section class="seccion">
+    <div class="contenedor pila pila-5">
+      <figure class="figura" data-captura="admin-inventario">
+          <div class="monitor">
+            <div class="monitor-barra" aria-hidden="true">
+              <span class="monitor-punto"></span><span class="monitor-punto"></span><span class="monitor-punto"></span>
+            </div>
+            <div class="hueco">
+              <strong>Captura: inventario y mermas</strong>
+              <span>Pendiente</span>
+            </div>
+          </div>
+          <figcaption>Desde el plan Negocio: cuánto insumo entró, cuánto salió con las ventas y cuánto se fue en mermas. Es donde se ve el dinero que se pierde sin que nadie lo apunte.</figcaption>
+        </figure>
     </div>
   </section>
 
@@ -435,6 +467,19 @@
         </div>
       </div>
 
+      <figure class="figura figura-papel" data-captura="ticket-venta">
+          <div class="monitor">
+            <div class="monitor-barra" aria-hidden="true">
+              <span class="monitor-punto"></span><span class="monitor-punto"></span><span class="monitor-punto"></span>
+            </div>
+            <div class="hueco">
+              <strong>Captura: el ticket con su código</strong>
+              <span>Pendiente</span>
+            </div>
+          </div>
+          <figcaption>El comensal escanea el código del ticket, pone su RFC y le llega la factura. Tu cajero no vuelve a parar la fila para eso.</figcaption>
+        </figure>
+
       <div class="pila pila-5">
         <div class="pila pila-3">
           <h3>Si se te acaban los folios del plan</h3>
@@ -462,7 +507,7 @@
             </tbody>
           </table>
         </div>
-        <p style="font-size:var(--t-13);color:var(--ink-3)">
+        <p style="font-size:var(--t-13);color:var(--ink-2)">
           Precios más IVA. Los folios que trae tu plan son para la factura del periodo — el
           cumplimiento ante el SAT —, no para facturarle a cada cliente.
         </p>

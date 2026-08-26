@@ -104,7 +104,7 @@
             <div class="monitor-barra" aria-hidden="true">
               <span class="monitor-punto"></span><span class="monitor-punto"></span><span class="monitor-punto"></span>
             </div>
-            <div class="hueco">
+            <div class="hueco" data-captura="pos-home">
               <strong>Captura: home del POS</strong>
               <span>Pendiente</span>
             </div>
@@ -277,7 +277,7 @@
           <button class="btn btn-fantasma" type="button" data-diagrama-boton aria-pressed="false">
             Cortar el internet
           </button>
-          <span style="font-size:var(--t-13);color:var(--ink-3)">
+          <span style="font-size:var(--t-13);color:var(--ink-2)">
             Pruébalo: se apaga la nube y el local sigue entero.
           </span>
         </div>
@@ -304,7 +304,7 @@
         </div>
         <div class="monitor">
           <div class="monitor-barra" aria-hidden="true"><span class="monitor-punto"></span><span class="monitor-punto"></span><span class="monitor-punto"></span></div>
-          <div class="hueco"><strong>Captura: catálogo con modificadores</strong><span>Pendiente</span></div>
+          <div class="hueco" data-captura="pos-catalogo"><strong>Captura: catálogo con modificadores</strong><span>Pendiente</span></div>
         </div>
       </div>
 
@@ -319,7 +319,7 @@
         </div>
         <div class="monitor">
           <div class="monitor-barra" aria-hidden="true"><span class="monitor-punto"></span><span class="monitor-punto"></span><span class="monitor-punto"></span></div>
-          <div class="hueco"><strong>Captura: pantalla de cocina</strong><span>Pendiente</span></div>
+          <div class="hueco" data-captura="kds"><strong>Captura: pantalla de cocina</strong><span>Pendiente</span></div>
         </div>
       </div>
 
@@ -333,7 +333,7 @@
         </div>
         <div class="monitor">
           <div class="monitor-barra" aria-hidden="true"><span class="monitor-punto"></span><span class="monitor-punto"></span><span class="monitor-punto"></span></div>
-          <div class="hueco"><strong>Captura: arqueo y corte</strong><span>Pendiente</span></div>
+          <div class="hueco" data-captura="pos-arqueo"><strong>Captura: arqueo y corte</strong><span>Pendiente</span></div>
         </div>
       </div>
 
@@ -347,7 +347,7 @@
         </div>
         <div class="monitor">
           <div class="monitor-barra" aria-hidden="true"><span class="monitor-punto"></span><span class="monitor-punto"></span><span class="monitor-punto"></span></div>
-          <div class="hueco"><strong>Captura: dashboard del panel</strong><span>Pendiente</span></div>
+          <div class="hueco" data-captura="admin-dashboard"><strong>Captura: dashboard del panel</strong><span>Pendiente</span></div>
         </div>
       </div>
     </div>
@@ -458,6 +458,22 @@
         <p class="eyebrow">Si ya usas otro</p>
         <h2>¿Vienes de Soft Restaurant, Square, Toast, Loyverse o Clip?</h2>
       </div>
+      <figure class="figura" data-captura="admin-importador">
+        <div class="monitor">
+          <div class="monitor-barra" aria-hidden="true">
+            <span class="monitor-punto"></span><span class="monitor-punto"></span><span class="monitor-punto"></span>
+          </div>
+          <div class="hueco">
+            <strong>Captura: importador de menú</strong>
+            <span>Pendiente</span>
+          </div>
+        </div>
+        <figcaption>
+          Pegas el menú del sistema que usas hoy y lo ves antes de aceptarlo: qué producto entra,
+          con qué precio y en qué categoría. Nada se guarda hasta que tú lo confirmas.
+        </figcaption>
+      </figure>
+
       <div class="tres">
         <div class="tarjeta pila pila-3">
           <h3>Tu menú se pega y ya</h3>
@@ -508,7 +524,7 @@
 
         <div class="plan destacado pila">
           <div>
-            <p class="eyebrow" style="color:var(--accent)">El que recomendamos</p>
+            <p class="eyebrow" style="color:var(--accent-hover)">El que recomendamos</p>
             <h3>Negocio</h3>
             <div class="plan-precio">$999</div>
           </div>

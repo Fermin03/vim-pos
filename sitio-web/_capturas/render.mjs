@@ -47,22 +47,32 @@ const PANTALLA = { width: 1440, height: 900 };
 const PAPEL = { width: 640, height: 1400 };
 
 /* Las catorce tomas del plan (§3.1). El orden importa: las del POS comparten
-   sesión, así que van seguidas para no volver a entrar en cada una. */
+   sesión, así que van seguidas para no volver a entrar en cada una.
+
+   `usadaEn` dice qué página del sitio la espera. No es documentación de
+   adorno: el hueco del sitio lleva `data-captura="<id>"`, así que los dos
+   extremos se pueden cruzar con un grep y saber si falta alguna o si sobra
+   una toma que ya nadie usa. */
 const TOMAS = [
-  { id: "pos-home",            app: "pos",   ruta: "/",                        titulo: "Home del POS" },
-  { id: "pos-catalogo",        app: "pos",   ruta: "/",                        titulo: "Catálogo con modificadores", accion: "abrirModificadores" },
-  { id: "pos-pago",            app: "pos",   ruta: "/",                        titulo: "Método de pago",             accion: "abrirCobro" },
-  { id: "pos-mesas",           app: "pos",   ruta: "/mesas",                   titulo: "Mapa de mesas" },
-  { id: "pos-sin-conexion",    app: "pos",   ruta: "/",                        titulo: "Banner de sin conexión",     accion: "cortarRed" },
-  { id: "pos-arqueo",          app: "pos",   ruta: "/turno/cierre",            titulo: "Arqueo y corte" },
-  { id: "kds",                 app: "pos",   ruta: "/kds",                     titulo: "Pantalla de cocina" },
-  { id: "admin-dashboard",     app: "admin", ruta: "/dashboard",               titulo: "Dashboard del panel" },
-  { id: "admin-resultados",    app: "admin", ruta: "/reportes/consolidado",    titulo: "Estado de resultados del día" },
-  { id: "admin-inventario",    app: "admin", ruta: "/inventario",              titulo: "Inventario" },
-  { id: "admin-conciliacion",  app: "admin", ruta: "/conciliacion",            titulo: "Conciliación de apps" },
-  { id: "admin-importador",    app: "admin", ruta: "/catalogo/importar",       titulo: "Importador de menú" },
-  { id: "ticket-venta",        app: "pos",   ruta: "/",   papel: true,         titulo: "Ticket de venta",  accion: "vistaPreviaTicket" },
-  { id: "corte-z",             app: "pos",   ruta: "/turno/cierre", papel: true, titulo: "Corte de caja",  accion: "vistaPreviaCorte" },
+  { id: "pos-home",            app: "pos",   ruta: "/",                        titulo: "Home del POS" },  // index, demo
+  { id: "pos-catalogo",        app: "pos",   ruta: "/",                        titulo: "Catálogo con modificadores", accion: "abrirModificadores" },  // index
+  { id: "pos-pago",            app: "pos",   ruta: "/",                        titulo: "Método de pago",             accion: "abrirCobro" },  // index
+  { id: "pos-mesas",           app: "pos",   ruta: "/mesas",                   titulo: "Mapa de mesas" },  // index
+  { id: "pos-sin-conexion",    app: "pos",   ruta: "/",                        titulo: "Banner de sin conexión",     accion: "cortarRed" },  // sin-internet
+  { id: "pos-arqueo",          app: "pos",   ruta: "/turno/cierre",            titulo: "Arqueo y corte" },  // sin-internet
+  { id: "kds",                 app: "pos",   ruta: "/kds",                     titulo: "Pantalla de cocina" },  // index
+  { id: "admin-dashboard",     app: "admin", ruta: "/dashboard",               titulo: "Dashboard del panel" },  // precios
+  { id: "admin-resultados",    app: "admin", ruta: "/reportes/consolidado",    titulo: "Estado de resultados del día" },  // index
+  { id: "admin-inventario",    app: "admin", ruta: "/inventario",              titulo: "Inventario" },  // precios
+  /* Estas cinco todavía no tienen hueco en ninguna página: van a producto.html,
+     giros.html y facturacion.html, que son de la segunda ola (§7 del plan, fase
+     8). Se capturan igual — cuestan lo mismo dentro del mismo recorrido y estar
+     ya listas es lo que evita volver a montar todo el entorno dentro de dos
+     meses. Cruce sitio ↔ herramienta: grep de `data-captura` en sitio-web/. */
+  { id: "admin-conciliacion",  app: "admin", ruta: "/conciliacion",            titulo: "Conciliación de apps" },  // — sin usar todavía
+  { id: "admin-importador",    app: "admin", ruta: "/catalogo/importar",       titulo: "Importador de menú" },  // index
+  { id: "ticket-venta",        app: "pos",   ruta: "/",   papel: true,         titulo: "Ticket de venta",  accion: "vistaPreviaTicket" },  // precios
+  { id: "corte-z",             app: "pos",   ruta: "/turno/cierre", papel: true, titulo: "Corte de caja",  accion: "vistaPreviaCorte" },  // — sin usar todavía
 ];
 
 /* Acciones que hacen falta para que una pantalla enseñe algo. Se declaran aquí
