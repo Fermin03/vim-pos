@@ -1,6 +1,7 @@
 "use client";
 import { supabase } from "./supabase";
 import { hoyMx, sumarDias } from "@vim/fecha";
+import { LABEL_APP, type AppExterna } from "./conciliacion";
 
 // F13 — Reportes y analítica. Las vistas SQL ya existen (0011/0012); el admin solo las
 // consume bajo RLS (heredan del tenant_id de las tablas base). Rangos por día_contable.
@@ -550,7 +551,11 @@ export async function leerVentasAppsExternas(desde: string, hasta: string): Prom
     ticketId: String(r.ticket_id),
     folioPos: (r.folio_pos as string) ?? null,
     folioApp: (r.folio_app as string) ?? null,
-    app: String(r.app_externa ?? "—").replace(/^APP_/, ""),
+    // Nombre comercial, no el valor del enum: recortar el prefijo con una expresión
+    // regular dejaba "UBEREATS" y "DIDI" en la tabla. LABEL_APP ya tiene los nombres
+    // como los escribe cada app, y es el mismo que usa la pantalla de Conciliación —
+    // que el mismo pedido se llame igual en los dos sitios importa al conciliar.
+    app: LABEL_APP[r.app_externa as AppExterna] ?? String(r.app_externa ?? "—"),
     dia: String(r.dia_contable),
     totalPos: num(r.total_pos_mxn),
     comision: num(r.comision_app),

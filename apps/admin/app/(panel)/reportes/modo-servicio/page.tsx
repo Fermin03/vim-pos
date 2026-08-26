@@ -4,12 +4,7 @@ import { PageBody, PageHeader } from "../../../components/page-header";
 import { RangoFechas } from "../../../components/rango-fechas";
 import { fmtMxn, leerVentasPorModo, rangoUltimosDias, type FilaModo } from "../../../lib/reportes";
 import { mensajeError } from "../../../lib/errores";
-
-const MODO_LABEL: Record<string, string> = {
-  COMER_AQUI: "Comer aquí",
-  PARA_LLEVAR: "Para llevar",
-  DRIVE_THRU: "Drive-thru",
-};
+import { etiquetaModo } from "../../../lib/modo-servicio";
 
 export default function VentasPorModoServicioPage() {
   const r0 = rangoUltimosDias(30);
@@ -41,7 +36,7 @@ export default function VentasPorModoServicioPage() {
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
             {filas.map((f) => (
               <div key={f.modo} className="rounded-lg border border-line bg-surface p-5">
-                <div className="text-[11.5px] font-bold uppercase tracking-wide text-ink-3">{MODO_LABEL[f.modo] ?? f.modo}</div>
+                <div className="text-[11.5px] font-bold uppercase tracking-wide text-ink-3">{etiquetaModo(f.modo)}</div>
                 <div className="font-display mt-2 text-[26px] font-bold tabular-nums">{fmtMxn(f.total_mxn)}</div>
                 <div className="mt-1 text-[12.5px] text-ink-2 tabular-nums">{f.tickets} tickets · {f.porcentaje}%</div>
                 <div className="mt-3 h-2 rounded-full bg-hover">
