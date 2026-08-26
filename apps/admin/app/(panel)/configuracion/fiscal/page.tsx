@@ -72,8 +72,19 @@ export default function FiscalPage() {
     setGuardando(true);
     try {
       await actualizarDatosFiscales(parsed.data);
-      setOkMsg("Datos fiscales guardados.");
-      setTimeout(() => setOkMsg(null), 2500);
+      /* La advertencia sobre las facturas ya timbradas se dice AQUÍ, al guardar,
+         y no en un cartel permanente arriba de la pantalla.
+
+         Es cierta y no es obvia —cambiar el RFC no reescribe lo ya emitido—,
+         pero un aviso que está siempre deja de leerse: se convierte en parte
+         del decorado y ocupa el sitio del contenido. Dicho justo después del
+         cambio, llega cuando de verdad aplica. */
+      setOkMsg(
+        datos?.facturacionActiva
+          ? "Datos fiscales guardados. Aplican solo a las facturas nuevas: las ya emitidas conservan los datos con que se timbraron."
+          : "Datos fiscales guardados.",
+      );
+      setTimeout(() => setOkMsg(null), datos?.facturacionActiva ? 7000 : 2500);
       recargar();
     } catch (e) {
       setError(mensajeError(e, "No se pudo guardar"));
@@ -99,13 +110,6 @@ export default function FiscalPage() {
         {datos === null && error && <p className="text-sm font-medium text-danger">{error}</p>}
         {datos && (
           <div className="max-w-[680px]">
-            {datos.facturacionActiva && (
-              <div className="mb-5 rounded-lg border border-[#E8DCC0] bg-[#F6EEDD] px-4 py-3 text-[12.5px] font-medium text-warning">
-                La facturación electrónica está activa. Si cambias estos datos, solo aplicarán a las facturas
-                nuevas; las ya emitidas conservan los datos con que se timbraron.
-              </div>
-            )}
-
             {/* ── Identificación fiscal ── */}
             <div className="mb-6 rounded-lg border border-line bg-surface p-5">
               <div className="mb-1 font-display text-[16px] font-semibold tracking-tight">Identificación fiscal</div>

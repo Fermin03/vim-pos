@@ -150,12 +150,6 @@ export default function CfdiPage() {
         {emisor === null && error && <p className="text-sm font-medium text-danger">{error}</p>}
         {emisor && (
           <div className="max-w-[680px]">
-            <div className="mb-5 rounded-lg border border-[#CDE0F0] bg-[#EEF5FC] px-4 py-3 text-[12.5px] font-medium text-info">
-              Mientras no haya credenciales de PAC configuradas en el servidor, el timbrado usa un
-              <b> emisor de pruebas</b> (no genera CFDI válidos ante el SAT). Para producción se carga el CSD
-              y la API key del PAC del lado del servidor.
-            </div>
-
             <div className="mb-6 rounded-lg border border-line bg-surface p-5">
               <div className="mb-4 font-display text-[16px] font-semibold tracking-tight">Emisor</div>
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
