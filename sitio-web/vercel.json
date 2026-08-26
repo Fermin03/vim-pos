@@ -22,6 +22,30 @@
     "existía como segundo cerrojo porque la subida era manual."
   ],
 
+  "_comentario_build": [
+    "AQUI NO HAY BUILD, y hay que decirlo explicitamente.",
+    "",
+    "El primer intento fallo asi: Vercel clono el repo, detecto Turbo en la",
+    "raiz, corrio `pnpm install` de los 11 workspaces, no ejecuto ninguna tarea",
+    "—porque no hay ninguna que le corresponda a esta carpeta— y despues busco",
+    "una carpeta `public` con el resultado. No existe: el sitio ES el resultado.",
+    "",
+    "  Error: No Output Directory named \"public\" found after the Build completed.",
+    "",
+    "Con estas tres claves no depende de lo que detecte:",
+    "  framework null    -> que no adivine",
+    "  buildCommand \"\"  -> que no construya nada",
+    "  outputDirectory . -> lo que se publica es esta misma carpeta",
+    "",
+    "Y EN EL PANEL hace falta ademas Root Directory = sitio-web. Sin eso, Vercel",
+    "nunca llega a leer este archivo: lo busca dentro del Root Directory."
+  ],
+
+  "framework": null,
+  "buildCommand": "",
+  "outputDirectory": ".",
+  "installCommand": "",
+
   "cleanUrls": false,
   "trailingSlash": false,
 
