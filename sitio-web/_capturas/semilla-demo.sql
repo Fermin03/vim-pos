@@ -15,7 +15,50 @@
 --
 -- Es idempotente: borra su propio tenant y lo vuelve a crear. Solo toca el
 -- suyo, así que el fixture de desarrollo se queda como está.
+--
+-- CÓMO BORRA, Y POR QUÉ ASÍ
+--
+-- `DELETE FROM tenants` no funciona: 69 tablas apuntan a `tenants` con
+-- RESTRICT, así que la primera sucursal ya lo bloquea. Borrarlas a mano en
+-- orden de dependencias es una lista de 69 nombres que se rompe con la
+-- siguiente migración.
+--
+-- En vez de eso se recorren TODAS las tablas que tengan una columna
+-- `tenant_id` con los disparadores de clave foránea desactivados
+-- (`session_replication_role = replica`, el mismo modo que usa
+-- `sync_push_snapshot` en la 0056). Es seguro porque se borra el tenant
+-- ENTERO: no queda ninguna fila apuntando a algo que ya no existe.
+--
+-- Requiere superusuario, que en el Supabase local sí eres. Contra producción
+-- esto no corre — y no debe.
 -- ============================================================================
+
+-- ── Borrado previo del tenant de demostración ───────────────────────────────
+DO $limpieza$
+DECLARE
+  v_tenant uuid := '9c3a71e0-0000-4000-8000-000000000001';
+  t        record;
+BEGIN
+  SET session_replication_role = replica;
+
+  FOR t IN
+    SELECT c.table_schema, c.table_name
+      FROM information_schema.columns c
+      JOIN information_schema.tables tb
+        ON tb.table_schema = c.table_schema AND tb.table_name = c.table_name
+     WHERE c.column_name = 'tenant_id'
+       AND c.table_schema = 'public'
+       AND tb.table_type = 'BASE TABLE'
+  LOOP
+    EXECUTE format('DELETE FROM %I.%I WHERE tenant_id = $1', t.table_schema, t.table_name)
+      USING v_tenant;
+  END LOOP;
+
+  DELETE FROM tenants WHERE id = v_tenant;
+
+  SET session_replication_role = origin;
+END
+$limpieza$;
 
 DO $$
 DECLARE
@@ -25,9 +68,11 @@ DECLARE
   v_turno   uuid := '9c3a71e0-0000-4000-8000-000000000004';
   v_ana     uuid := '9c3a71e0-0000-4000-8000-000000000010';
   v_beto    uuid := '9c3a71e0-0000-4000-8000-000000000011';
+  v_duena   uuid := '9c3a71e0-0000-4000-8000-000000000013';
   v_disp    uuid := '9c3a71e0-0000-4000-8000-000000000012';
   v_rol_dis uuid;
   v_rol_caj uuid;
+  v_rol_due uuid;
   v_plan    uuid;
   v_cat_ham uuid; v_cat_ali uuid; v_cat_beb uuid; v_cat_pos uuid;
   v_g_term  uuid; v_g_extra uuid;
@@ -35,13 +80,14 @@ DECLARE
   v_ticket  uuid;
   v_hoy     date := current_date;
 BEGIN
-  -- ── Limpieza previa, para poder recorrer esto tantas veces como haga falta ──
-  DELETE FROM tenants WHERE id = v_tenant;
-  DELETE FROM auth.users WHERE id IN (v_ana, v_beto, v_disp);
+  -- El tenant ya lo borró el bloque de arriba. Aquí solo las cuentas, que
+  -- viven en `auth` y no llevan tenant_id.
+  DELETE FROM auth.users WHERE id IN (v_ana, v_beto, v_disp, v_duena);
 
   SELECT id INTO v_plan FROM planes WHERE codigo = 'QS';
   SELECT id INTO v_rol_caj FROM roles WHERE codigo = 'CAJERO' AND es_sistema = true;
   SELECT id INTO v_rol_dis FROM roles WHERE codigo = 'DISPOSITIVO' AND es_sistema = true;
+  SELECT id INTO v_rol_due FROM roles WHERE codigo = 'DUENO' AND es_sistema = true;
 
   INSERT INTO tenants (id, codigo, nombre_comercial, estado, vertical_principal, plan_actual_id,
                        razon_social, rfc, regimen_fiscal, codigo_postal_fiscal)
@@ -57,27 +103,40 @@ BEGIN
   -- ── Gente inventada ────────────────────────────────────────────────────────
   -- `usuarios_perfil` cuelga de `auth.users`, así que las cuentas van primero.
   -- Los PIN son de desarrollo y este tenant nunca sale del Supabase local.
+  -- Los cuatro campos de token van en CADENA VACÍA, no en NULL, y no es un
+  -- detalle: GoTrue los lee en `string` de Go, que no admite nulos, así que un
+  -- NULL le devuelve 500 al intentar iniciar sesión. El síntoma es «No se pudo
+  -- vincular. Revisa las credenciales» — que apunta a la contraseña y no tiene
+  -- nada que ver con ella. El fixture de desarrollo (supabase/seed.sql) los
+  -- pone vacíos por esta misma razón.
   INSERT INTO auth.users (instance_id, id, aud, role, email, encrypted_password,
                           email_confirmed_at, created_at, updated_at,
-                          raw_app_meta_data, raw_user_meta_data) VALUES
+                          raw_app_meta_data, raw_user_meta_data,
+                          confirmation_token, recovery_token,
+                          email_change_token_new, email_change) VALUES
     ('00000000-0000-0000-0000-000000000000', v_ana, 'authenticated', 'authenticated',
      'ana@crazyburgers.demo', crypt('demo1234', gen_salt('bf')), now(), now(), now(),
-     '{"provider":"email","providers":["email"]}', '{}'),
+     '{"provider":"email","providers":["email"]}', '{}', '', '', '', ''),
     ('00000000-0000-0000-0000-000000000000', v_beto, 'authenticated', 'authenticated',
      'beto@crazyburgers.demo', crypt('demo1234', gen_salt('bf')), now(), now(), now(),
-     '{"provider":"email","providers":["email"]}', '{}'),
+     '{"provider":"email","providers":["email"]}', '{}', '', '', '', ''),
     ('00000000-0000-0000-0000-000000000000', v_disp, 'authenticated', 'authenticated',
-     'caja01@crazyburgers.demo', crypt('demo-dispositivo', gen_salt('bf')), now(), now(), now(),
-     '{"provider":"email","providers":["email"]}', '{}');
+     'caja-9c3a71e0-0000-4000-8000-000000000003@dispositivos.vimpos.mx', crypt('demo-dispositivo', gen_salt('bf')), now(), now(), now(),
+     '{"provider":"email","providers":["email"]}', '{}', '', '', '', ''),
+    ('00000000-0000-0000-0000-000000000000', v_duena, 'authenticated', 'authenticated',
+     'duena@crazyburgers.demo', crypt('demo1234', gen_salt('bf')), now(), now(), now(),
+     '{"provider":"email","providers":["email"]}', '{}', '', '', '', '');
 
   INSERT INTO usuarios_perfil (id, nombre, pin_hash, estado) VALUES
     (v_ana,  'Ana Ruiz',     crypt('1234', gen_salt('bf')), 'ACTIVO'),
     (v_beto, 'Beto Salazar', crypt('5678', gen_salt('bf')), 'ACTIVO'),
-    (v_disp, 'Caja 01',      NULL,                          'ACTIVO');
+    (v_disp, 'Caja 01',      NULL,                          'ACTIVO'),
+    (v_duena,'Carla Méndez', crypt('9999', gen_salt('bf')), 'ACTIVO');
   INSERT INTO usuarios_acceso (usuario_id, tenant_id, sucursal_id, rol_id) VALUES
     (v_ana,  v_tenant, v_suc, v_rol_caj),
     (v_beto, v_tenant, v_suc, v_rol_caj),
-    (v_disp, v_tenant, v_suc, v_rol_dis);
+    (v_disp, v_tenant, v_suc, v_rol_dis),
+    (v_duena, v_tenant, NULL, v_rol_due);
 
   INSERT INTO tenant_folios_saldo (tenant_id, folios_base_mensuales, folios_base_consumidos,
                                    periodo_actual, saldo_paquetes)
@@ -140,5 +199,5 @@ BEGIN
                       usuario_apertura_id, fondo_inicial_mxn)
   VALUES (v_turno, v_tenant, v_suc, v_caja, 'T-01', v_hoy, v_ana, 1500);
 
-  RAISE NOTICE 'Crazy Burgers creado. Caja: caja01@crazyburgers.demo / demo-dispositivo. PIN de Ana: 1234';
+  RAISE NOTICE 'Crazy Burgers creado. Caja: caja-9c3a71e0-...-000000000003@dispositivos.vimpos.mx / demo-dispositivo. PIN de Ana: 1234. Panel: duena@crazyburgers.demo / demo1234';
 END $$;
