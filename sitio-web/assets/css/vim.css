@@ -71,6 +71,7 @@
      usuario está mirando, así que a igual duración se SIENTE más lenta. */
   --sal: cubic-bezier(0.23, 1, 0.32, 1);        /* entra o sale */
   --mueve: cubic-bezier(0.77, 0, 0.175, 1);     /* se desplaza en pantalla */
+  --cajon: cubic-bezier(0.32, 0.72, 0, 1);      /* panel lateral, curva de iOS */
 
   /* ---- Duraciones ----
      Todo por debajo de 300 ms. Un desplegable de 180 ms se siente más
@@ -86,7 +87,21 @@
 
 *, *::before, *::after { box-sizing: border-box; }
 
-html { -webkit-text-size-adjust: 100%; scroll-behavior: smooth; }
+html {
+  -webkit-text-size-adjust: 100%;
+  scroll-behavior: smooth;
+
+  /* Red de seguridad contra el scroll horizontal. La causa real de que
+     apareciera —el cajón atrapado dentro del header— está arreglada en el
+     HTML; esto queda porque un sitio con carruseles y tablas anchas es
+     terreno fértil para que vuelva por otro lado, y de lado la página no se
+     debe mover nunca.
+
+     `clip` y NO `hidden`: los dos recortan, pero `hidden` convierte al elemento
+     en un contenedor de scroll y eso rompe el `position: sticky` del
+     encabezado, que dejaría de quedarse arriba al bajar. */
+  overflow-x: clip;
+}
 
 @media (prefers-reduced-motion: reduce) {
   html { scroll-behavior: auto; }
@@ -104,6 +119,20 @@ body {
 }
 
 img, svg { max-width: 100%; height: auto; display: block; }
+
+/* `hidden` tiene que ganar SIEMPRE.
+   
+   El navegador lo aplica como `[hidden] { display: none }`, que es la
+   especificidad de un atributo y por tanto pierde contra cualquier regla de
+   clase que ponga `display`. Fue un bug real: en demo.html la confirmación de
+   envío lleva `hidden` y también la clase `.pila` (`display: flex`), así que
+   ganaba la clase y el mensaje de "ya nos llegó" salía debajo del formulario
+   desde que cargaba la página, sin que nadie hubiera enviado nada.
+   
+   Es de los pocos sitios donde `!important` es lo correcto: no hay ningún caso
+   en el que un elemento con `hidden` deba verse, así que no hay nada que se
+   pueda romper por encima. */
+[hidden] { display: none !important; }
 
 h1, h2, h3 {
   font-family: var(--font-display);
@@ -298,47 +327,138 @@ a { color: var(--ink); text-underline-offset: 3px; }
 .nav-hamburguesa:active { transform: scale(0.97); }
 @media (min-width: 900px) { .nav-hamburguesa { display: none; } }
 
-/* Menú móvil: se despliega hacia abajo desde el encabezado, que es de donde
-   sale.
-   
-   LA ALTURA LA ESCRIBE EL JS EN LÍNEA, en píxeles. Aquí solo viven la
-   transición y el estado cerrado.
-   
-   Se eligió así, y no el truco de `grid-template-rows: 0fr → 1fr` que evitaría
-   el JS, por una razón de soporte: dos valores en píxeles interpolan en
-   cualquier navegador, mientras que animar `grid-template-rows` pide Chrome 107
-   o superior y no funciona en todos los motores. Un sitio de venta lo abre
-   gente con el navegador que tenga.
-   
-   PENDIENTE DE VERIFICAR EN PANTALLA. La transición no se ha podido comprobar
-   visualmente todavía; cuando se revise el sitio en un navegador de verdad,
-   mírese que abra y cierre suave y que se pueda interrumpir a media apertura. */
+/* ==========================================================================
+   Menú móvil — cajón lateral
+
+   Antes se desplegaba hacia abajo empujando la página. Dos problemas: el
+   contenido saltaba bajo el dedo justo cuando el usuario iba a tocar algo, y
+   con cuatro enlaces el encabezado ocupaba media pantalla.
+
+   Ahora entra desde la derecha —el lado donde está la hamburguesa, así que
+   sale de donde lo pediste— y va POR ENCIMA de la página: nada se mueve
+   debajo.
+
+   El alto ya no lo escribe el JS. Un `translateX` entre dos valores fijos
+   interpola en cualquier navegador y corre fuera del hilo principal, cosa que
+   animar `height` nunca hizo. El JS se queda solo con lo que CSS no puede: el
+   foco y el bloqueo del scroll.
+
+   EL CAJÓN VIVE FUERA DEL <header>, Y NO SE PUEDE MOVER DENTRO.
+
+   `.nav` lleva `backdrop-filter`, y eso —igual que `transform` o `filter`—
+   convierte al elemento en bloque contenedor de sus descendientes `fixed`. Con
+   el cajón dentro del header, su `position: fixed` se resolvía contra el
+   header: medía 320×64 px en vez de ocupar la pantalla de arriba abajo, y sus
+   320 px de ancho fuera de pantalla sumaban al scroll horizontal de la página.
+
+   Si algún día alguien lo devuelve al header "porque es donde va el menú",
+   reaparecen las dos cosas a la vez.
+   ========================================================================== */
+
 .nav-movil {
-  height: 0;
-  overflow: hidden;
-  border-top: 1px solid transparent;
+  position: fixed;
+  inset: 0 0 0 auto;                    /* pegado a la derecha, de arriba abajo */
+  width: min(320px, 86vw);
+  z-index: 60;                          /* por encima del encabezado (50) */
+
+  background: var(--bg);
+  border-left: 1px solid var(--line);
+  box-shadow: -24px 0 48px -24px rgba(22, 22, 26, .18);
+
+  /* Fuera de pantalla del todo, y no a `scale(0)` ni a `opacity: 0`: un cajón
+     se desliza, no aparece. */
+  transform: translateX(100%);
+  visibility: hidden;
+
+  overflow-y: auto;
+  overscroll-behavior: contain;         /* al llegar al final no arrastra la página */
+
   transition:
-    height var(--v-media) var(--sal),
-    border-top-color var(--v-media) ease;
+    transform var(--v-media) var(--cajon),
+    visibility 0s linear var(--v-media);
 }
-.nav-movil[data-abierto="true"] { border-top-color: var(--line); }
+
+.nav-movil[data-abierto="true"] {
+  transform: translateX(0);
+  visibility: visible;
+  transition:
+    transform var(--v-media) var(--cajon),
+    visibility 0s;                      /* al abrir, visible YA; al cerrar, tras la animación */
+}
+
+/* El velo cuelga del BODY, no del cajón.
+   
+   La primera versión lo puso como `::before` del propio cajón para no añadir
+   un nodo, y no cubría la pantalla: el cajón lleva `transform`, y un ancestro
+   transformado hace que `position: fixed` se resuelva contra ÉL en vez de
+   contra la ventana. El velo salía de 320 px de ancho y se movía con el cajón,
+   así que tocar fuera no cerraba nada — el toque llegaba al texto de debajo.
+   
+   El body no está transformado, así que aquí `fixed` sí significa fixed. */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  background: rgba(22, 22, 26, .32);
+  opacity: 0;
+  visibility: hidden;
+  z-index: 55;                          /* bajo el cajón (60), sobre el encabezado (50) */
+  transition: opacity var(--v-media) ease, visibility 0s linear var(--v-media);
+}
+body[data-menu-abierto="true"]::before {
+  opacity: 1;
+  visibility: visible;
+  transition: opacity var(--v-media) ease, visibility 0s;
+}
 
 .nav-movil-lista {
   display: flex;
   flex-direction: column;
   gap: var(--sp-1);
-  padding-block: var(--sp-4);
+  padding: var(--sp-10) var(--sp-5) var(--sp-5);   /* arriba, hueco para el botón de cerrar */
 }
 .nav-movil-lista a {
   padding: var(--sp-3) 0;
-  color: var(--ink-2);
+  color: var(--ink);
   text-decoration: none;
   font-size: var(--t-18);
   font-weight: 500;
+  border-bottom: 1px solid var(--line);
 }
+.nav-movil-lista a:last-child { border-bottom: 0; }
+.nav-movil-lista a[aria-current="page"] { color: var(--accent-hover); }
+
+/* El botón de cerrar vive dentro del cajón: con el menú abierto, la
+   hamburguesa del encabezado queda debajo del velo y no se puede tocar. */
+.nav-cerrar {
+  position: absolute;
+  top: var(--sp-4);
+  right: var(--sp-4);
+  width: 40px; height: 40px;
+  display: flex; align-items: center; justify-content: center;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r);
+  background: var(--bg);
+  color: var(--ink-2);
+  cursor: pointer;
+  transition: transform var(--v-toque) var(--sal);
+}
+.nav-cerrar:active { transform: scale(0.94); }
+
+/* Mientras el cajón está abierto, la página de debajo no se desplaza. */
+body[data-menu-abierto="true"] { overflow: hidden; }
 
 @media (prefers-reduced-motion: reduce) {
-  .nav-movil { transition: none; }
+  .nav-movil, body::before, .nav-cerrar { transition: none; }
+}
+
+/* El cajón se apaga en el MISMO punto en que desaparece la hamburguesa (900).
+   Con 860 quedaba una franja de 40 px donde el botón seguía a la vista y no
+   abría nada. */
+@media (min-width: 900px) {
+  .nav-movil, .nav-movil[data-abierto="true"] {
+    display: none;
+  }
 }
 
 /* ==========================================================================
@@ -886,6 +1006,62 @@ a { color: var(--ink); text-underline-offset: 3px; }
 
 .hecho { text-align: center; }
 .hecho p { margin-inline: auto; }
+
+/* ==========================================================================
+   Franja de hechos en móvil — marquesina
+
+   Apilados, los cuatro hechos son cuatro pantallazos de una lista vertical
+   antes de llegar a lo siguiente, y son frases sueltas: no se leen en orden ni
+   hace falta. Desfilando de lado ocupan una línea y se leen igual.
+
+   No es un carrusel: no se toca, no tiene puntos y no se detiene. Por eso va
+   con `animation` y `linear` —movimiento constante— y no con scroll-snap.
+
+   CÓMO SE CIERRA EL BUCLE: el JS duplica los cuatro hechos, así que la pista
+   contiene ocho. La animación recorre exactamente la mitad (-50%) y vuelve a
+   empezar: en ese instante el quinto elemento está justo donde estaba el
+   primero, así que el salto es invisible. Sin duplicar, al llegar al final
+   habría un hueco y un tirón.
+   ========================================================================== */
+
+@media (max-width: 619px) {
+  .hechos {
+    display: flex;
+    grid-template-columns: none;
+    width: max-content;
+    gap: 0;
+    animation: desfile 26s linear infinite;
+  }
+  /* La franja recorta lo que sobresale; la pista de dentro es la que se mueve. */
+  .hechos-marco { overflow: hidden; border-block: 1px solid var(--line); }
+
+  .hecho {
+    flex: 0 0 auto;
+    padding-inline: var(--sp-6);
+    border-right: 1px solid var(--line);
+    white-space: nowrap;
+  }
+  .hecho p { font-size: var(--t-15); }
+}
+
+/* Fuera de la marquesina, las copias sobran: en la rejilla de escritorio se
+   verían los cuatro hechos DOS VECES. Las pone el JS para cerrar el bucle y
+   solo tienen sentido mientras el bucle existe. */
+@media (min-width: 620px) {
+  .hecho[aria-hidden="true"] { display: none; }
+}
+
+@keyframes desfile {
+  from { transform: translateX(0); }
+  to   { transform: translateX(-50%); }
+}
+
+/* Quien pide menos movimiento no ve nada moverse solo. Se para y se deja que
+   la franja se desplace con el dedo, que sigue siendo mejor que apilarla. */
+@media (max-width: 619px) and (prefers-reduced-motion: reduce) {
+  .hechos { animation: none; }
+  .hechos-marco { overflow-x: auto; }
+}
 
 /* ==========================================================================
    Carrusel en móvil

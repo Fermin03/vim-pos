@@ -245,10 +245,17 @@ Se sobrescriben los archivos que cambiaron. No hay build ni caché de servidor q
 `vim.js`, así que un visitante que ya estuvo aquí se queda con la versión vieja hasta que caduque.
 
 - Si cambias **solo HTML**: nada que hacer, el HTML caduca en una hora.
-- Si cambias **`vim.css` o `vim.js`**: renómbralos con una versión (`vim.2.css`) y actualiza el
-  `<link>` y el `<script>` de las siete páginas. Es a mano y es feo, pero es lo que corresponde a
-  un sitio que se despliega a mano. El día que esto se automatice, se pone la versión en el nombre
-  del archivo y se olvida el asunto.
+- Si cambias **`vim.css` o `vim.js`**: sube el número de versión de la URL. Las siete páginas los
+  cargan como `assets/css/vim.css?v=2` y `assets/js/vim.js?v=2`; se cambia el `2` por el `3` en
+  todas y listo. Para el navegador es otra URL, así que la caché de un año no estorba.
+
+  ```bash
+  cd sitio-web && sed -i 's/vim\.css?v=[0-9]*/vim.css?v=3/; s/vim\.js?v=[0-9]*/vim.js?v=3/' *.html
+  ```
+
+  **No es opcional.** Sin subir la versión, quien ya visitó el sitio se queda con el CSS y el JS
+  viejos hasta que caduquen — y eso pasa de verdad: durante el desarrollo costó tres diagnósticos
+  en falso creyendo que el código estaba mal cuando lo que corría era la versión anterior.
 
 Cuando cambie una página de verdad, actualiza su `lastmod` en `sitemap.xml`. No en cada
 despliegue: un `lastmod` que miente entrena al rastreador a no creerle.
