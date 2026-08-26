@@ -1451,6 +1451,7 @@ export function HomePos({
           enviandoCocina={enviandoCocina}
           onAplicarDescuento={onAplicarDescuento}
           descuentoMxn={ticketBd?.descuentos ?? 0}
+            promocionMxn={ticketBd?.promociones ?? 0}
           totalConDescuento={ticketBd ? ticketBd.total : undefined}
           bloqueado={bloqueado}
           procesando={procesandoCobro}

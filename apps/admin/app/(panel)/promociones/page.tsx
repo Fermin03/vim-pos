@@ -2,7 +2,6 @@
 import { useEffect, useState } from "react";
 import { Button } from "@vim/ui/styles";
 import { PageBody, PageHeader } from "../../components/page-header";
-import { AvisoSinConectar } from "../../components/aviso-sin-conectar";
 import {
   actualizarPromo,
   cambiarEstadoPromo,
@@ -124,11 +123,11 @@ export default function PromocionesPage() {
             compartido para que Reservaciones se vea igual y el patrón viva en
             un solo sitio. El texto no cambia: dice qué no pasa y con qué se
             suple mientras tanto, que es lo que hay que decir. */}
-        <AvisoSinConectar titulo="Estas promociones todavía no se aplican solas en el POS.">
-          Aquí quedan registradas con su vigencia, pero al cobrar no se descuentan
-          automáticamente: por ahora aplícalas con el botón <b>Descuento</b> del POS. Te
-          avisaremos en cuanto la aplicación automática esté disponible.
-        </AvisoSinConectar>
+        <p className="mb-4 max-w-[70ch] text-[13px] text-ink-2">
+          Mientras estén vigentes, aparecen en la caja al momento de cobrar: el cajero las
+          aplica de un toque, sin pedir autorización. Salen en el ticket como
+          <b> Promoción</b>, separadas de los descuentos que se hacen a mano.
+        </p>
         {okMsg && <p className="mb-3 text-sm font-medium text-success">{okMsg}</p>}
         {error && !editando && <p className="mb-3 text-sm font-medium text-danger">{error}</p>}
 
