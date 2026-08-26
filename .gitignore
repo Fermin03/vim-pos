@@ -34,3 +34,7 @@ supabase/functions/.env
 # Carpeta que arma _capturas/empaquetar.mjs para subir a Hostinger.
 # Es un artefacto derivado de sitio-web/, no fuente.
 _publicar/
+
+# Guiones de diagnostico de las capturas: se escriben al vuelo para entender
+# un flujo y se tiran. No son parte de la herramienta.
+sitio-web/_capturas/diag*.mjs
