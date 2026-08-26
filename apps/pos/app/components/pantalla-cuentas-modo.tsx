@@ -69,6 +69,7 @@ export function PantallaCuentasModo({
   empleado,
   modo,
   onSalir,
+  onVerReservaciones,
   onAbrirCuenta,
   onAgregarProductos,
   onCobrar,
@@ -82,6 +83,9 @@ export function PantallaCuentasModo({
   empleado: Empleado;
   modo: Extract<ModoServicio, "DRIVE_THRU" | "DELIVERY_PROPIO" | "COMER_AQUI">;
   onSalir: () => void;
+  /** Agenda de reservaciones del día. Solo llega con valor en Comedor: Pick-up y
+   *  domicilio no reservan mesa, y un botón muerto ahí sería ruido. */
+  onVerReservaciones?: () => void;
   /** Abre una cuenta NUEVA en este modo (entra al catálogo con el modo ya fijado). */
   onAbrirCuenta: () => void;
   /** Carga la cuenta en el carrito para agregarle productos (sale a la pantalla de venta). */
@@ -213,6 +217,19 @@ export function PantallaCuentasModo({
           </div>
         </div>
         <div className="flex flex-shrink-0 items-center gap-2">
+          {onVerReservaciones && (
+            <button
+              type="button"
+              onClick={onVerReservaciones}
+              className="flex h-10 items-center gap-2 rounded border border-line-strong bg-surface px-3.5 text-[13.5px] font-semibold text-ink-2 transition hover:border-ink hover:text-ink"
+            >
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" className="h-[17px] w-[17px]">
+                <rect x="3" y="4" width="18" height="17" rx="2" />
+                <path d="M3 10h18M8 2v4M16 2v4" />
+              </svg>
+              Reservaciones
+            </button>
+          )}
           <Button onClick={onAbrirCuenta}>
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" className="h-[17px] w-[17px]"><path d="M12 5v14M5 12h14" /></svg>
             {copia.nuevaCuenta}

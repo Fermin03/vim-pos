@@ -45,6 +45,7 @@ export function PantallaMesas({
   onSalir,
   onAbrirCuenta,
   onRetomar,
+  onVerReservaciones,
 }: {
   token: string;
   caja: DatosCaja;
@@ -53,6 +54,9 @@ export function PantallaMesas({
   onAbrirCuenta?: (mesaId: string) => void;
   /** T2 — retomar la cuenta (ticket activo) de una mesa OCUPADA. */
   onRetomar?: (ticketId: string) => void;
+  /** Abre la agenda de reservaciones del día. Vive dentro de Comedor porque es
+   *  donde el mesero ya está mirando cuando llega quien reservó. */
+  onVerReservaciones?: () => void;
 }) {
   const [mesas, setMesas] = useState<MesaVista[] | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -105,6 +109,19 @@ export function PantallaMesas({
             </div>
           </div>
         </div>
+        {onVerReservaciones && (
+          <button
+            type="button"
+            onClick={onVerReservaciones}
+            className="flex h-10 items-center gap-2 rounded border border-line-strong bg-surface px-3.5 text-[13.5px] font-semibold text-ink-2 transition hover:border-ink hover:text-ink"
+          >
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" className="h-4 w-4">
+              <rect x="3" y="4" width="18" height="17" rx="2" />
+              <path d="M3 10h18M8 2v4M16 2v4" />
+            </svg>
+            Reservaciones
+          </button>
+        )}
       </header>
 
       {error && (

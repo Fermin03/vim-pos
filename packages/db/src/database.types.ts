@@ -9470,6 +9470,17 @@ export type Database = {
         Returns: undefined
       }
       marcar_pedido_listo: { Args: { p_ticket_id: string }; Returns: undefined }
+      modificar_reservacion: {
+        Args: {
+          p_cliente_nombre?: string
+          p_cliente_telefono?: string
+          p_comensales?: number
+          p_fecha_hora?: string
+          p_nota?: string
+          p_reservacion_id: string
+        }
+        Returns: undefined
+      }
       obtener_reporte_z: { Args: { p_turno_id: string }; Returns: Json }
       onboarding_actualizar_fase: {
         Args: {
