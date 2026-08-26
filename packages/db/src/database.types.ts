@@ -4848,6 +4848,63 @@ export type Database = {
           },
         ]
       }
+      prospectos: {
+        Row: {
+          atendido_en: string | null
+          cajas: number
+          creado_en: string
+          estado: string
+          giro: string | null
+          id: string
+          mensaje: string | null
+          negocio: string
+          nombre: string
+          notas: string | null
+          origen: string
+          sucursales: number
+          usa_hoy: string | null
+          utm_campaign: string | null
+          utm_source: string | null
+          whatsapp: string
+        }
+        Insert: {
+          atendido_en?: string | null
+          cajas: number
+          creado_en?: string
+          estado?: string
+          giro?: string | null
+          id?: string
+          mensaje?: string | null
+          negocio: string
+          nombre: string
+          notas?: string | null
+          origen?: string
+          sucursales: number
+          usa_hoy?: string | null
+          utm_campaign?: string | null
+          utm_source?: string | null
+          whatsapp: string
+        }
+        Update: {
+          atendido_en?: string | null
+          cajas?: number
+          creado_en?: string
+          estado?: string
+          giro?: string | null
+          id?: string
+          mensaje?: string | null
+          negocio?: string
+          nombre?: string
+          notas?: string | null
+          origen?: string
+          sucursales?: number
+          usa_hoy?: string | null
+          utm_campaign?: string | null
+          utm_source?: string | null
+          whatsapp?: string
+        }
+        Relationships: []
+      }
       push_suscripciones: {
         Row: {
           auth: string
@@ -9043,6 +9100,7 @@ export type Database = {
         Returns: string
       }
       auto_marcar_no_shows: { Args: never; Returns: number }
+      borrar_prospectos_viejos: { Args: { p_meses?: number }; Returns: number }
       buscar_clientes: {
         Args: { p_limit?: number; p_query: string; p_tenant_id: string }
         Returns: {
