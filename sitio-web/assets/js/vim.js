@@ -23,56 +23,96 @@
   var ANON = "";
   var WHATSAPP = "524761273020";
 
-  /* ---- Menú móvil ----------------------------------------------------------
-     El botón alterna un atributo; la transición la hace el CSS, que corre fuera
-     del hilo principal y sigue siendo interrumpible —se puede cerrar a media
-     apertura sin saltos—.
-     
-     Lo único que hace falta de JS es la altura, porque `height: auto` no
-     interpola. Ver la nota en vim.css sobre por qué se mide en vez de usar el
-     truco de `grid-template-rows`. */
+  /* ---- Menú móvil: cajón lateral ------------------------------------------
+     La animación es CSS puro (`translateX`), así que aquí no se mide ni se
+     escribe ningún alto — eso era la versión anterior, que se desplegaba hacia
+     abajo empujando la página.
+
+     Lo que queda es lo que CSS no puede hacer y que un cajón necesita para no
+     ser una trampa:
+
+       · Atrapar el foco. Sin esto, tabular desde el último enlace del menú
+         lleva al contenido de detrás, que está tapado por el velo: el foco
+         desaparece de la pantalla y quien navega con teclado se queda perdido.
+       · Bloquear el scroll de fondo. Sin esto, deslizar sobre el velo mueve la
+         página de debajo y al cerrar el menú ya no estás donde estabas.
+       · Devolver el foco a la hamburguesa al cerrar. */
   var boton = document.querySelector("[data-menu-boton]");
   var menu = document.querySelector("[data-menu]");
-
-  /* El alto real se mide justo antes de abrir y se escribe en el propio
-     elemento. Medir en cada apertura, y no una vez al cargar, es lo que hace
-     que siga siendo correcto si cambia el ancho de la ventana o el contenido.
-
-     La variable va en el elemento y no en un ancestro: cambiarla en un padre
-     recalcularía el estilo de todos sus hijos. */
-  function abrir() {
-    menu.style.height = menu.scrollHeight + "px";
-    menu.setAttribute("data-abierto", "true");
-    boton.setAttribute("aria-expanded", "true");
-    boton.setAttribute("aria-label", "Cerrar menú");
-  }
-
-  function cerrar(devolverFoco) {
-    menu.style.height = "0px";
-    menu.setAttribute("data-abierto", "false");
-    boton.setAttribute("aria-expanded", "false");
-    boton.setAttribute("aria-label", "Abrir menú");
-    if (devolverFoco) boton.focus();
-  }
+  var botonCerrar = document.querySelector("[data-menu-cerrar]");
 
   if (boton && menu) {
+    var FOCABLES = 'a[href], button:not([disabled]), input, select, textarea, [tabindex]:not([tabindex="-1"])';
+
+    function abrir() {
+      menu.setAttribute("data-abierto", "true");
+      menu.removeAttribute("aria-hidden");
+      boton.setAttribute("aria-expanded", "true");
+      document.body.setAttribute("data-menu-abierto", "true");
+
+      /* Al primer enlace, no al botón de cerrar: quien abre el menú quiere ir
+         a algún sitio, no cerrarlo. */
+      var primero = menu.querySelector(".nav-movil-lista a");
+      if (primero) primero.focus();
+    }
+
+    function cerrar(devolverFoco) {
+      menu.setAttribute("data-abierto", "false");
+      menu.setAttribute("aria-hidden", "true");
+      boton.setAttribute("aria-expanded", "false");
+      document.body.removeAttribute("data-menu-abierto");
+      if (devolverFoco) boton.focus();
+    }
+
+    var abierto = function () { return menu.getAttribute("data-abierto") === "true"; };
+
     boton.addEventListener("click", function () {
-      if (menu.getAttribute("data-abierto") === "true") cerrar(false);
-      else abrir();
+      if (abierto()) cerrar(true); else abrir();
     });
 
-    /* Escape cierra, como cualquier cosa que se despliega. Que no lo haga es de
-       esos detalles que nadie agradece y todos notan cuando falta. */
-    document.addEventListener("keydown", function (e) {
-      if (e.key !== "Escape") return;
-      if (menu.getAttribute("data-abierto") !== "true") return;
-      cerrar(true);
-    });
+    if (botonCerrar) botonCerrar.addEventListener("click", function () { cerrar(true); });
 
-    /* Al navegar dentro de la página, el menú se cierra solo. */
+    /* Navegar cierra el cajón. */
     menu.addEventListener("click", function (e) {
-      if (!e.target.closest("a")) return;
+      if (e.target.closest("a")) cerrar(false);
+    });
+
+    /* Tocar fuera cierra. Se escucha en el documento porque el velo es un
+       pseudo-elemento del body: no puede tener su propio listener, y un toque
+       sobre él llega con `target` = body. Se excluye la hamburguesa para que su
+       propio manejador no lo vuelva a abrir en el mismo clic. */
+    document.addEventListener("click", function (e) {
+      if (!abierto()) return;
+      if (menu.contains(e.target) || boton.contains(e.target)) return;
       cerrar(false);
+    });
+
+    document.addEventListener("keydown", function (e) {
+      if (!abierto()) return;
+
+      if (e.key === "Escape") { cerrar(true); return; }
+
+      if (e.key !== "Tab") return;
+
+      /* El aro del foco: del último se salta al primero y al revés. */
+      var f = Array.prototype.slice.call(menu.querySelectorAll(FOCABLES));
+      if (!f.length) return;
+      var primero = f[0], ultimo = f[f.length - 1];
+
+      if (e.shiftKey && document.activeElement === primero) {
+        e.preventDefault(); ultimo.focus();
+      } else if (!e.shiftKey && document.activeElement === ultimo) {
+        e.preventDefault(); primero.focus();
+      } else if (!menu.contains(document.activeElement)) {
+        e.preventDefault(); primero.focus();
+      }
+    });
+
+    /* Si la ventana se ensancha hasta que el cajón deja de existir, hay que
+       cerrarlo: si no, el body se queda con el scroll bloqueado y la página
+       no se mueve, sin nada en pantalla que explique por qué. */
+    window.addEventListener("resize", function () {
+      if (abierto() && window.innerWidth >= 900) cerrar(false);
     });
   }
 
@@ -288,6 +328,31 @@
             (err.message || "No se pudo enviar.") +
             " Escríbenos por WhatsApp al 476 127 3020 y lo resolvemos ahí.";
         });
+    });
+  }
+
+  /* ---- Marquesina de la franja de hechos ----------------------------------
+     Los cuatro hechos se duplican para que el bucle cierre sin salto (ver la
+     nota en vim.css). Las copias van con `aria-hidden`: para quien usa lector
+     de pantalla son la misma información dos veces, y oírla repetida no es un
+     detalle menor sino ruido que hay que atravesar.
+
+     Se hace aquí y no en el HTML porque duplicar cuatro nodos a mano es
+     contenido repetido en el archivo, que es peor de mantener y peor para
+     quien lea el código. Si el JS no carga, la franja se queda como una
+     rejilla normal — que es exactamente lo que era antes. */
+  var hechos = document.querySelector(".hechos");
+
+  if (hechos && !hechos.parentElement.classList.contains("hechos-marco")) {
+    var marco = document.createElement("div");
+    marco.className = "hechos-marco";
+    hechos.parentElement.insertBefore(marco, hechos);
+    marco.appendChild(hechos);
+
+    Array.prototype.slice.call(hechos.children).forEach(function (h) {
+      var copia = h.cloneNode(true);
+      copia.setAttribute("aria-hidden", "true");
+      hechos.appendChild(copia);
     });
   }
 
