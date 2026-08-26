@@ -2,6 +2,7 @@
 import { useEffect, useState } from "react";
 import { Button } from "@vim/ui/styles";
 import { PageBody, PageHeader } from "../../components/page-header";
+import { AvisoSinConectar } from "../../components/aviso-sin-conectar";
 import {
   actualizarPromo,
   cambiarEstadoPromo,
@@ -119,21 +120,15 @@ export default function PromocionesPage() {
         right={<Button onClick={() => setEditando({ id: null, datos: VACIO() })}>Nueva promoción</Button>}
       />
       <PageBody>
-        {/* Decir la verdad sobre lo que hace esta pantalla.
-            El POS todavía no evalúa promociones: se registran aquí, pero al cobrar no se aplican
-            solas. Sin este aviso, una promoción queda ACTIVA meses y el dueño cree que está
-            corriendo — pasó con un "2x1" creado en junio que nunca descontó un peso. Un cartel
-            incómodo es mejor que una promesa silenciosa. Se retira al conectar la evaluación. */}
-        <div className="mb-4 rounded-lg border border-[#F0DCC0] bg-[#FCF3E6] px-4 py-3" role="status">
-          <p className="text-[13px] font-semibold text-warning">
-            Estas promociones todavía no se aplican solas en el POS.
-          </p>
-          <p className="mt-1 text-[12.5px] leading-snug text-ink-2">
-            Aquí quedan registradas con su vigencia, pero al cobrar no se descuentan
-            automáticamente: por ahora aplícalas con el botón <b>Descuento</b> del POS. Te
-            avisaremos en cuanto la aplicación automática esté disponible.
-          </p>
-        </div>
+        {/* Este aviso ya existía y era correcto; solo se movió al componente
+            compartido para que Reservaciones se vea igual y el patrón viva en
+            un solo sitio. El texto no cambia: dice qué no pasa y con qué se
+            suple mientras tanto, que es lo que hay que decir. */}
+        <AvisoSinConectar titulo="Estas promociones todavía no se aplican solas en el POS.">
+          Aquí quedan registradas con su vigencia, pero al cobrar no se descuentan
+          automáticamente: por ahora aplícalas con el botón <b>Descuento</b> del POS. Te
+          avisaremos en cuanto la aplicación automática esté disponible.
+        </AvisoSinConectar>
         {okMsg && <p className="mb-3 text-sm font-medium text-success">{okMsg}</p>}
         {error && !editando && <p className="mb-3 text-sm font-medium text-danger">{error}</p>}
 
