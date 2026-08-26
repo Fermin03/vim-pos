@@ -1,131 +1,50 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-
-  "_comentario": [
-    "Esto reemplaza al .htaccess cuando el sitio se sirve desde Vercel.",
-    "",
-    "EL .htaccess SE QUEDA EN EL REPOSITORIO. No estorba —Vercel lo ignora— y es",
-    "la única forma de volver a Hostinger sin rehacer el trabajo si algún día",
-    "hace falta. Los dos archivos tienen que decir lo mismo; si se toca uno,",
-    "se toca el otro.",
-    "",
-    "LO QUE VERCEL YA HACE SOLO, y por eso no aparece aquí:",
-    "  · Forzar HTTPS y emitir el certificado.",
-    "  · Comprimir con Brotli y gzip.",
-    "  · Servir 404.html cuando la ruta no existe.",
-    "  · No listar el contenido de las carpetas.",
-    "  · Los tipos MIME de .webp, .woff2 y .webmanifest.",
-    "",
-    "LO QUE NO HACE FALTA BLOQUEAR: las rutas que empiezan con guion bajo. El",
-    "empaquetador no las sube y Vercel despliega lo que hay en la carpeta, así",
-    "que _patron.html y _capturas/ no llegan al servidor. En Apache el bloqueo",
-    "existía como segundo cerrojo porque la subida era manual."
-  ],
-
-  "_comentario_build": [
-    "AQUI NO HAY BUILD, y hay que decirlo explicitamente.",
-    "",
-    "El primer intento fallo asi: Vercel clono el repo, detecto Turbo en la",
-    "raiz, corrio `pnpm install` de los 11 workspaces, no ejecuto ninguna tarea",
-    "—porque no hay ninguna que le corresponda a esta carpeta— y despues busco",
-    "una carpeta `public` con el resultado. No existe: el sitio ES el resultado.",
-    "",
-    "  Error: No Output Directory named \"public\" found after the Build completed.",
-    "",
-    "Con estas tres claves no depende de lo que detecte:",
-    "  framework null    -> que no adivine",
-    "  buildCommand \"\"  -> que no construya nada",
-    "  outputDirectory . -> lo que se publica es esta misma carpeta",
-    "",
-    "Y EN EL PANEL hace falta ademas Root Directory = sitio-web. Sin eso, Vercel",
-    "nunca llega a leer este archivo: lo busca dentro del Root Directory."
-  ],
-
   "framework": null,
   "buildCommand": "",
   "outputDirectory": ".",
   "installCommand": "",
-
   "cleanUrls": false,
   "trailingSlash": false,
-
   "headers": [
     {
       "source": "/(.*)",
       "headers": [
-        {
-          "key": "X-Content-Type-Options",
-          "value": "nosniff"
-        },
-        {
-          "key": "X-Frame-Options",
-          "value": "SAMEORIGIN"
-        },
-        {
-          "key": "Referrer-Policy",
-          "value": "strict-origin-when-cross-origin"
-        },
-        {
-          "key": "Permissions-Policy",
-          "value": "camera=(), microphone=(), geolocation=(), interest-cohort=()"
-        }
-      ]
-    },
-
-    {
-      "_comentario": "El HTML caduca en una hora: es lo que cambia al corregir un precio o una frase, y es justo lo que no puede quedarse pegado en el navegador de un prospecto.",
-      "source": "/(.*).html",
-      "headers": [
-        {
-          "key": "Cache-Control",
-          "value": "public, max-age=3600, must-revalidate"
-        }
+        { "key": "X-Content-Type-Options", "value": "nosniff" },
+        { "key": "X-Frame-Options", "value": "SAMEORIGIN" },
+        { "key": "Referrer-Policy", "value": "strict-origin-when-cross-origin" },
+        { "key": "Permissions-Policy", "value": "camera=(), microphone=(), geolocation=(), interest-cohort=()" }
       ]
     },
     {
       "source": "/",
       "headers": [
-        {
-          "key": "Cache-Control",
-          "value": "public, max-age=3600, must-revalidate"
-        }
+        { "key": "Cache-Control", "value": "public, max-age=3600, must-revalidate" }
       ]
     },
-
     {
-      "_comentario": "CSS y JS un año, y es correcto SOLO porque llevan ?v=N en la URL. Si algún día se quita ese número, hay que bajar esto o quien ya visitó el sitio se queda con la versión vieja durante un año.",
+      "source": "/(.*).html",
+      "headers": [
+        { "key": "Cache-Control", "value": "public, max-age=3600, must-revalidate" }
+      ]
+    },
+    {
       "source": "/assets/(css|js)/(.*)",
       "headers": [
-        {
-          "key": "Cache-Control",
-          "value": "public, max-age=31536000, immutable"
-        }
+        { "key": "Cache-Control", "value": "public, max-age=31536000, immutable" }
       ]
     },
-
     {
-      "_comentario": "Las tipografías llevan el hash del contenido en el nombre por parte de Google, así que un año es seguro. El Access-Control-Allow-Origin hace falta AUNQUE se sirvan del mismo dominio: el <link rel=preload as=font> va con crossorigin —lo exige la especificación— y sin esta cabecera el navegador descarta la precarga y vuelve a pedir el archivo.",
       "source": "/assets/fonts/(.*)",
       "headers": [
-        {
-          "key": "Cache-Control",
-          "value": "public, max-age=31536000, immutable"
-        },
-        {
-          "key": "Access-Control-Allow-Origin",
-          "value": "*"
-        }
+        { "key": "Cache-Control", "value": "public, max-age=31536000, immutable" },
+        { "key": "Access-Control-Allow-Origin", "value": "*" }
       ]
     },
-
     {
-      "_comentario": "Las imágenes no llevan versión en el nombre, así que un año sería una trampa: al reemplazar una captura, quien ya la vio seguiría con la vieja. Un mes es el punto donde la caché sirve y el riesgo se acota.",
       "source": "/assets/img/(.*)",
       "headers": [
-        {
-          "key": "Cache-Control",
-          "value": "public, max-age=2592000"
-        }
+        { "key": "Cache-Control", "value": "public, max-age=2592000" }
       ]
     }
   ]
