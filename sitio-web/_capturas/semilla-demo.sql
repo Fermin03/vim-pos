@@ -199,5 +199,111 @@ BEGIN
                       usuario_apertura_id, fondo_inicial_mxn)
   VALUES (v_turno, v_tenant, v_suc, v_caja, 'T-01', v_hoy, v_ana, 1500);
 
+  -- ── Un día de ventas ───────────────────────────────────────────────────────
+  --
+  -- POR QUÉ HACEN FALTA VENTAS DE VERDAD
+  --
+  -- Sin ellas, tres capturas del sitio no se pueden tomar (el cobro, el ticket
+  -- impreso y el corte Z) y las del panel salen con todo en cero, que no
+  -- enseña nada de lo que el panel hace.
+  --
+  -- POR QUÉ SE INSERTA ASÍ Y NO CON LOS TOTALES YA PUESTOS
+  --
+  -- `tickets`, `ticket_items` y `pagos` tienen veinte disparadores encima que
+  -- asignan el folio, recalculan subtotal/IVA/total y cierran el ticket cuando
+  -- queda saldado. Escribir los totales a mano los pelearía y produciría un
+  -- ticket que no cuadra con sus propias líneas — justo el defecto que estas
+  -- capturas irían a publicar.
+  --
+  -- Así que se inserta como lo hace la caja: ticket vacío, líneas, y el pago al
+  -- final. Los números salen del mismo código que en producción.
+  DECLARE
+    v_t         uuid;
+    v_it        uuid;
+    v_venta     record;
+    v_linea     record;
+  BEGIN
+    FOR v_venta IN
+      -- Las horas van HACIA ATRÁS desde ahora, no a horas fijas del día: hay
+      -- una restricción (`fecha_pago_implica_apertura`) que exige que el pago
+      -- no sea anterior a la apertura, y el disparador del pago escribe
+      -- `now()`. Con horas fijas, cualquier venta posterior a la hora real de
+      -- ejecución nacía pagada antes de abrirse y la semilla reventaba.
+      SELECT * FROM (VALUES
+        --  hace N h, modo,          método,           quién
+        ( 11, 'PARA_LLEVAR',  'EFECTIVO',         v_ana),
+        (  9, 'COMER_AQUI',   'TARJETA_DEBITO',   v_ana),
+        (  7, 'COMER_AQUI',   'EFECTIVO',         v_beto),
+        (  6, 'PARA_LLEVAR',  'TARJETA_CREDITO',  v_beto),
+        (  5, 'APP_RAPPI',    'APP_RAPPI',        v_ana),
+        (  3, 'COMER_AQUI',   'EFECTIVO',         v_ana),
+        (  2, 'PARA_LLEVAR',  'TRANSFERENCIA',    v_beto),
+        (  1, 'COMER_AQUI',   'TARJETA_DEBITO',   v_ana)
+      ) AS x(hace, modo, metodo, usuario)
+    LOOP
+      INSERT INTO tickets (tenant_id, sucursal_id, caja_id, turno_id, dia_contable,
+                           modo_servicio, usuario_apertura_id, fecha_apertura)
+      VALUES (v_tenant, v_suc, v_caja, v_turno, v_hoy,
+              v_venta.modo::modo_servicio, v_venta.usuario,
+              now() - make_interval(hours => v_venta.hace))
+      RETURNING id INTO v_t;
+
+      -- Dos o tres líneas por ticket, tomadas del catálogo real para que los
+      -- nombres y los precios del ticket impreso sean los del menú.
+      FOR v_linea IN
+        SELECT p.id, p.nombre, p.precio_base_mxn, p.tasa_iva, p.iva_incluido_en_precio,
+               c.nombre AS categoria,
+               1 + (v_venta.hace + row_number() OVER ()) % 2 AS cant
+          FROM productos p
+          JOIN categorias c ON c.id = p.categoria_id
+         WHERE p.tenant_id = v_tenant
+         ORDER BY (v_venta.hace * 7 + p.orden_visualizacion * 13) % 11
+         LIMIT 2 + (v_venta.hace % 2)
+      LOOP
+        INSERT INTO ticket_items (tenant_id, ticket_id, producto_id, cantidad,
+                                  producto_nombre_snapshot, precio_unitario_snapshot,
+                                  tasa_iva_snapshot, iva_incluido_en_precio_snapshot,
+                                  categoria_nombre_snapshot, orden_visualizacion)
+        VALUES (v_tenant, v_t, v_linea.id, v_linea.cant,
+                v_linea.nombre, v_linea.precio_base_mxn,
+                v_linea.tasa_iva, v_linea.iva_incluido_en_precio,
+                v_linea.categoria, 1)
+        RETURNING id INTO v_it;
+      END LOOP;
+
+      -- El pago cierra el ticket: `trg_pagos_zz_cerrar_si_pagado` lo pasa a
+      -- PAGADO solo si el monto cubre el total, así que se lee el total que ya
+      -- calcularon los disparadores en vez de suponerlo.
+      INSERT INTO pagos (tenant_id, sucursal_id, caja_id, turno_id, ticket_id,
+                         dia_contable, metodo_pago, monto_mxn, usuario_id, fecha_pago)
+      SELECT v_tenant, v_suc, v_caja, v_turno, v_t, v_hoy,
+             v_venta.metodo::metodo_pago, t.total_mxn, v_venta.usuario,
+             now() - make_interval(hours => v_venta.hace, mins => -12)
+        FROM tickets t WHERE t.id = v_t;
+    END LOOP;
+
+    -- Repartir las ventas por el día.
+    --
+    -- El disparador del pago escribe `fecha_pago = now()`, así que las ocho
+    -- caían en el mismo minuto y la gráfica de "ventas por hora" del panel
+    -- salía con UNA barra solitaria — que en una captura de marketing dice lo
+    -- contrario de lo que se quiere enseñar.
+    --
+    -- Se corrige después de insertar, no antes: durante la venta el valor
+    -- correcto ES `now()`, y adelantarlo pelearía con la restricción que exige
+    -- que el pago no preceda a la apertura. En modo réplica porque
+    -- `trg_tickets_proteger_inmutables` protege esta columna, y con razón: en
+    -- producción la hora de pago de un ticket no se toca jamás.
+    SET session_replication_role = replica;
+    UPDATE tickets t
+       SET fecha_pago = t.fecha_apertura + interval '12 minutes'
+     WHERE t.tenant_id = v_tenant AND t.fecha_pago IS NOT NULL;
+    UPDATE pagos g
+       SET fecha_pago = t.fecha_apertura + interval '12 minutes'
+      FROM tickets t
+     WHERE g.ticket_id = t.id AND g.tenant_id = v_tenant;
+    SET session_replication_role = origin;
+  END;
+
   RAISE NOTICE 'Crazy Burgers creado. Caja: caja-9c3a71e0-...-000000000003@dispositivos.vimpos.mx / demo-dispositivo. PIN de Ana: 1234. Panel: duena@crazyburgers.demo / demo1234';
 END $$;
