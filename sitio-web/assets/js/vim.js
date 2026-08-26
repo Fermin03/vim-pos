@@ -46,7 +46,11 @@
 
     function abrir() {
       menu.setAttribute("data-abierto", "true");
-      menu.removeAttribute("aria-hidden");
+      /* `inert` y no `aria-hidden`: aria-hidden lo esconde del lector de
+         pantalla pero deja sus enlaces en el orden de tabulación, así que se
+         podía tabular hasta contenido invisible y el foco desaparecía de la
+         pantalla. `inert` quita las dos cosas de una vez. */
+      menu.removeAttribute("inert");
       boton.setAttribute("aria-expanded", "true");
       document.body.setAttribute("data-menu-abierto", "true");
 
@@ -58,7 +62,10 @@
 
     function cerrar(devolverFoco) {
       menu.setAttribute("data-abierto", "false");
-      menu.setAttribute("aria-hidden", "true");
+      /* Al marcarlo inerte, el navegador saca el foco de dentro y lo manda al
+         body. Por eso justo después se lleva a la hamburguesa —que está FUERA
+         del cajón— y no se queda perdido en ninguna parte. */
+      menu.setAttribute("inert", "");
       boton.setAttribute("aria-expanded", "false");
       document.body.removeAttribute("data-menu-abierto");
       if (devolverFoco) boton.focus();
