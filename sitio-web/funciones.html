@@ -1,0 +1,577 @@
+<!doctype html>
+<html lang="es-MX">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+
+<title>Qué hace VIM POS — funciones del punto de venta</title>
+<meta name="description" content="Caja, cocina, mesas, inventario, reportes y conciliación de apps de reparto. Lo que hace el sistema, sección por sección y con capturas del producto real.">
+<link rel="canonical" href="https://vimpos.com.mx/funciones.html">
+
+<meta property="og:type" content="website">
+<meta property="og:locale" content="es_MX">
+<meta property="og:site_name" content="VIM POS">
+<meta property="og:title" content="Qué hace VIM POS">
+<meta property="og:description" content="Caja, cocina, mesas, inventario, reportes y conciliación de apps de reparto.">
+<meta property="og:url" content="https://vimpos.com.mx/funciones.html">
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@400;500;600&family=JetBrains+Mono:wght@400;600&family=Sora:wght@600;700&display=swap">
+
+<link rel="icon" href="assets/img/logo.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="assets/img/apple-touch-icon-1024.png">
+<link rel="manifest" href="site.webmanifest">
+<meta name="theme-color" content="#0078C9">
+
+<link rel="stylesheet" href="assets/css/vim.css?v=8">
+</head>
+<body>
+
+<a href="#contenido" class="solo-lectores">Saltar al contenido</a>
+
+<header class="nav">
+  <div class="contenedor">
+    <div class="nav-fila">
+      <a href="index.html" class="nav-logo" aria-label="VIM POS, inicio">
+        <img src="assets/img/logo.svg" alt="" width="30" height="30" aria-hidden="true">
+        <span>VIM POS</span>
+      </a>
+      <nav class="nav-enlaces" aria-label="Principal">
+        <a class="nav-enlace" href="funciones.html">Funciones</a>
+        <a class="nav-enlace" href="sin-internet.html">Sin internet</a>
+        <a class="nav-enlace" href="precios.html">Precios</a>
+      </nav>
+      <div class="nav-acciones">
+        <a class="btn btn-primario" href="demo.html">Pide una demo</a>
+        <button class="nav-hamburguesa" data-menu-boton type="button"
+                aria-expanded="false" aria-controls="menu-movil" aria-label="Abrir menú">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+               stroke-width="2" stroke-linecap="round" aria-hidden="true">
+            <path d="M4 7h16M4 12h16M4 17h16"/>
+          </svg>
+        </button>
+      </div>
+    </div>
+  </div>
+</header>
+
+  <div class="nav-movil" id="menu-movil" data-menu data-abierto="false" inert>
+    <button class="nav-cerrar" data-menu-cerrar type="button" aria-label="Cerrar menú">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+           stroke-width="2" stroke-linecap="round" aria-hidden="true">
+        <path d="M6 6l12 12M18 6L6 18"/>
+      </svg>
+    </button>
+    <nav aria-label="Menú">
+      <div class="nav-movil-lista">
+          <a href="funciones.html">Funciones</a>
+          <a href="sin-internet.html">Sin internet</a>
+          <a href="precios.html">Precios</a>
+          <a href="demo.html">Pide una demo</a>
+      </div>
+    </nav>
+  </div>
+
+<!-- ═══════════════════════════════════════════════════════════════════════
+     ESTA PÁGINA NO HACE PROMESAS NUEVAS. Existe para ENSEÑAR lo que las demás
+     afirman, y por eso cada sección lleva una captura del producto real.
+
+     Todo lo que se describe aquí se verificó mirando el sistema funcionando
+     mientras se tomaban esas capturas — no leyendo los mockups, que se
+     separaron del producto hace tiempo. Lo que no se pudo ver, no está.
+
+     DOS COSAS QUE NO APARECEN, Y ES A PROPÓSITO: promociones y reservaciones.
+     Las dos tienen pantalla completa en el panel de administración, pero la
+     caja no las conoce — se crean y nunca se aplican. Hasta que el POS las
+     soporte, no se anuncian.
+     ═══════════════════════════════════════════════════════════════════════ -->
+
+<main id="contenido">
+
+  <section class="hero">
+    <div class="contenedor pila pila-5">
+      <p class="eyebrow">Funciones</p>
+      <h1>Qué hace, sección por sección</h1>
+      <p class="entradilla">
+        Todo lo que ves aquí son capturas del sistema funcionando, no dibujos. Y si algo todavía
+        no está, lo dice.
+      </p>
+      <div class="fila">
+        <a class="btn btn-primario btn-hero" href="demo.html">Pide una demo</a>
+        <a class="btn btn-fantasma btn-hero" href="precios.html">Ver precios</a>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══ 1 · La caja ════════════════════════════════════════════════════ -->
+  <section class="seccion" id="caja">
+    <div class="contenedor pila pila-8">
+      <div class="pila pila-4">
+        <p class="eyebrow">La caja</p>
+        <h2>Cobrar rápido y sin equivocarse</h2>
+        <p>
+          Es la pantalla donde tu cajero pasa el turno entero. Empieza eligiendo cómo se va el
+          pedido —comedor, para llevar, pick-up o domicilio— porque de eso dependen el ticket, la
+          comanda y el reporte.
+        </p>
+      </div>
+
+      <figure class="figura" data-captura="pos-catalogo">
+        <div class="monitor">
+          <div class="monitor-barra" aria-hidden="true">
+            <span class="monitor-punto"></span><span class="monitor-punto"></span><span class="monitor-punto"></span>
+          </div>
+          <img src="assets/img/capturas/pos-catalogo.webp"
+               alt="Un producto abierto con sus opciones: el término de la carne y los extras con su precio."
+               width="1440" height="900" loading="lazy" decoding="async">
+        </div>
+        <figcaption>
+          Los modificadores del producto. El término es obligatorio y el sistema no deja agregarlo
+          al ticket sin elegir uno; los extras suman su precio a la vista.
+        </figcaption>
+      </figure>
+
+      <div class="tres">
+        <div class="tarjeta pila pila-3">
+          <h3>Modificadores que obligan</h3>
+          <p>
+            Si una hamburguesa necesita término, no se manda a cocina sin él. El error se evita
+            antes de llegar a la plancha, no después.
+          </p>
+        </div>
+        <div class="tarjeta pila pila-3">
+          <h3>Notas donde toca</h3>
+          <p>
+            Una nota para la cocina va en la comanda; una nota de la orden va en el ticket. Son
+            campos distintos porque son lecturas distintas.
+          </p>
+        </div>
+        <div class="tarjeta pila pila-3">
+          <h3>Descuentos con motivo</h3>
+          <p>
+            Quedan registrados y salen en el reporte de descuentos del panel, para que se puedan
+            revisar al cierre en vez de descubrirlos al cuadrar.
+          </p>
+        </div>
+        <div class="tarjeta pila pila-3">
+          <h3>Pedidos en espera</h3>
+          <p>
+            El cliente se lo piensa y no bloquea la caja: el pedido se aparta y se retoma después
+            sin volver a capturarlo.
+          </p>
+        </div>
+        <div class="tarjeta pila pila-3">
+          <h3>Las formas de pago de verdad</h3>
+          <p>
+            Efectivo, débito, crédito, transferencia, vales y las apps de reparto. La tarjeta se
+            registra para que el corte cuadre; el cobro va por tu terminal de siempre.
+          </p>
+        </div>
+        <div class="tarjeta pila pila-3">
+          <h3>Se puede dividir</h3>
+          <p>
+            Una parte en efectivo y otra con tarjeta en el mismo ticket, sin tener que inventar dos
+            ventas para que cuadre.
+          </p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══ 2 · La cocina ══════════════════════════════════════════════════ -->
+  <section class="seccion destacada-suave" id="cocina">
+    <div class="contenedor pila pila-8">
+      <div class="pila pila-4">
+        <p class="eyebrow">La cocina</p>
+        <h2>La comanda llega sola, y a la estación correcta</h2>
+        <p>
+          Cada producto sabe de qué estación sale. Las bebidas se imprimen en la barra y la comida
+          en cocina, en lugar de un papel largo que hay que leer entero para encontrar lo tuyo.
+        </p>
+      </div>
+
+      <figure class="figura" data-captura="kds">
+        <div class="monitor">
+          <div class="monitor-barra" aria-hidden="true">
+            <span class="monitor-punto"></span><span class="monitor-punto"></span><span class="monitor-punto"></span>
+          </div>
+          <img src="assets/img/capturas/kds.webp"
+               alt="Pantalla de cocina con las comandas pendientes."
+               width="1440" height="900" loading="lazy" decoding="async">
+        </div>
+        <figcaption>
+          La pantalla de cocina. Si tu cocina prefiere papel, la misma comanda sale por la
+          impresora de cada área; las dos cosas conviven.
+        </figcaption>
+      </figure>
+
+      <div class="tres">
+        <div class="tarjeta pila pila-3">
+          <h3>Pantalla o papel</h3>
+          <p>
+            Lo que le funcione a tu cocina, y no es una decisión de por vida: se cambia en la
+            configuración cuando quieras.
+          </p>
+        </div>
+        <div class="tarjeta pila pila-3">
+          <h3>Por estación</h3>
+          <p>
+            La categoría decide a dónde va cada cosa por omisión, y un producto puede llevar la
+            contraria cuando es la excepción.
+          </p>
+        </div>
+        <div class="tarjeta pila pila-3">
+          <h3>Sin pasar por internet</h3>
+          <p>
+            La comanda viaja de la caja a la cocina por la red de tu local. No sale afuera ni
+            siquiera cuando hay señal.
+          </p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══ 3 · Comedor ════════════════════════════════════════════════════ -->
+  <section class="seccion" id="mesas">
+    <div class="contenedor pila pila-8">
+      <div class="pila pila-4">
+        <p class="eyebrow">Comedor</p>
+        <h2>Mesas, con la cuenta abierta</h2>
+        <p>
+          Para el restaurante con meseros: el mapa del comedor, la cuenta que crece mientras la
+          mesa sigue ahí, y el pedido que sale a cocina cuando se toma y no cuando se paga.
+        </p>
+      </div>
+
+      <figure class="figura" data-captura="pos-mesas">
+        <div class="monitor">
+          <div class="monitor-barra" aria-hidden="true">
+            <span class="monitor-punto"></span><span class="monitor-punto"></span><span class="monitor-punto"></span>
+          </div>
+          <img src="assets/img/capturas/pos-mesas.webp"
+               alt="Mapa de mesas del comedor con el estado de cada una."
+               width="1440" height="900" loading="lazy" decoding="async">
+        </div>
+        <figcaption>
+          El mapa del comedor por secciones: qué mesa está ocupada, cuál lleva más tiempo y cuánto
+          va consumido.
+        </figcaption>
+      </figure>
+
+      <div class="tres">
+        <div class="tarjeta pila pila-3">
+          <h3>A cocina antes de cobrar</h3>
+          <p>
+            El pedido de la mesa sale en cuanto se toma. Es como funciona un comedor de verdad, y
+            es donde fallan los sistemas pensados para mostrador.
+          </p>
+        </div>
+        <div class="tarjeta pila pila-3">
+          <h3>Quién atendió</h3>
+          <p>
+            El ticket guarda su mesero, y de ahí salen el reporte de ventas por mesero y el de
+            propinas del turno.
+          </p>
+        </div>
+        <div class="tarjeta pila pila-3">
+          <h3>Tiempos de cocina</h3>
+          <p>
+            Cuánto tardó cada comanda desde que entró hasta que salió, en su propio reporte. Sirve
+            para discutir con datos en vez de con impresiones.
+          </p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══ 4 · Inventario ═════════════════════════════════════════════════ -->
+  <section class="seccion destacada-suave" id="inventario">
+    <div class="contenedor pila pila-8">
+      <div class="pila pila-4">
+        <p class="eyebrow">Inventario</p>
+        <h2>Cuánto insumo se fue de verdad</h2>
+        <p>
+          Cada producto tiene su receta, así que al vender una hamburguesa bajan la carne, el pan y
+          el queso. Lo que no cuadra al contar es merma — y ahí es donde se ve el dinero que se va
+          sin que nadie lo apunte. Va incluido desde el plan Negocio.
+        </p>
+      </div>
+
+      <figure class="figura" data-captura="admin-inventario">
+        <div class="monitor">
+          <div class="monitor-barra" aria-hidden="true">
+            <span class="monitor-punto"></span><span class="monitor-punto"></span><span class="monitor-punto"></span>
+          </div>
+          <img src="assets/img/capturas/admin-inventario.webp"
+               alt="Listado de insumos con sus existencias."
+               width="1440" height="900" loading="lazy" decoding="async">
+        </div>
+        <figcaption>
+          Los insumos con su existencia. Lo que se descuenta sale de la receta del producto, no de
+          un conteo a mano.
+        </figcaption>
+      </figure>
+
+      <div class="tres">
+        <div class="tarjeta pila pila-3">
+          <h3>Receta por producto</h3>
+          <p>
+            Y también por modificador: si el queso extra se cobra, el queso extra también se
+            descuenta.
+          </p>
+        </div>
+        <div class="tarjeta pila pila-3">
+          <h3>Mermas aparte</h3>
+          <p>
+            Con su motivo y separadas de las ventas. Una cosa es lo que vendiste y otra lo que se
+            te echó a perder.
+          </p>
+        </div>
+        <div class="tarjeta pila pila-3">
+          <h3>Avisos de existencia baja</h3>
+          <p>
+            Antes de quedarte sin algo en plena hora pico, no cuando ya te quedaste.
+          </p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══ 5 · Reportes ═══════════════════════════════════════════════════ -->
+  <section class="seccion" id="reportes">
+    <div class="contenedor pila pila-8">
+      <div class="pila pila-4">
+        <p class="eyebrow">Reportes y corte</p>
+        <h2>El corte que ya conoces, y catorce reportes más</h2>
+        <p>
+          El corte Z está calcado del formato que tu equipo ya lee cada noche, a propósito: quien
+          lo revisa no tiene que reaprender dónde mirar. Y el panel suma catorce reportes para
+          cuando quieras entender algo concreto.
+        </p>
+      </div>
+
+      <figure class="figura" data-captura="pos-arqueo">
+        <div class="monitor">
+          <div class="monitor-barra" aria-hidden="true">
+            <span class="monitor-punto"></span><span class="monitor-punto"></span><span class="monitor-punto"></span>
+          </div>
+          <img src="assets/img/capturas/pos-arqueo.webp"
+               alt="Corte del turno con el desglose por forma de pago y por tipo de servicio."
+               width="1440" height="900" loading="lazy" decoding="async">
+        </div>
+        <figcaption>
+          El corte del turno: venta, ticket promedio, efectivo esperado con su fondo, IVA,
+          descuentos y devoluciones. Abajo, el desglose por forma de pago y por tipo de servicio.
+        </figcaption>
+      </figure>
+
+      <figure class="figura" data-captura="admin-dashboard">
+        <div class="monitor">
+          <div class="monitor-barra" aria-hidden="true">
+            <span class="monitor-punto"></span><span class="monitor-punto"></span><span class="monitor-punto"></span>
+          </div>
+          <img src="assets/img/capturas/admin-dashboard.webp"
+               alt="Panel del dueño con las ventas del día, el ticket promedio y el top de productos."
+               width="1440" height="900" loading="lazy" decoding="async">
+        </div>
+        <figcaption>
+          El panel, desde el celular o la computadora. Sin tener que ir al local a preguntar cómo
+          va el día.
+        </figcaption>
+      </figure>
+
+      <div class="tres">
+        <div class="tarjeta pila pila-3">
+          <h3>Arqueo con sobrante y faltante</h3>
+          <p>
+            Cuentas el cajón, el sistema dice lo que debería haber, y la diferencia queda
+            registrada junto con quién cerró el turno.
+          </p>
+        </div>
+        <div class="tarjeta pila pila-3">
+          <h3>Catorce reportes</h3>
+          <p>
+            Por producto, categoría, mesero, área, marca, tipo de servicio, tiempos de cocina,
+            descuentos, reimpresiones, no-shows y el histórico de cortes.
+          </p>
+        </div>
+        <div class="tarjeta pila pila-3">
+          <h3>Estado de resultados del día</h3>
+          <p>
+            Ventas, IVA, descuentos, devoluciones y comisiones de apps en una sola pantalla, por
+            sucursal y por día.
+          </p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══ 6 · Apps de reparto ════════════════════════════════════════════ -->
+  <section class="seccion destacada-suave" id="reparto">
+    <div class="contenedor pila pila-8">
+      <div class="pila pila-4">
+        <p class="eyebrow">Apps de reparto</p>
+        <h2>Revisa lo que la app te depositó</h2>
+        <p>
+          Rappi, DiDi y Uber Eats te mandan un reporte de liquidación. Pegas ese reporte aquí y el
+          sistema lo cruza pedido por pedido contra lo que vendiste, y te marca aquéllos en los que
+          el depósito no coincide.
+        </p>
+      </div>
+
+      <figure class="figura" data-captura="admin-conciliacion">
+        <div class="monitor">
+          <div class="monitor-barra" aria-hidden="true">
+            <span class="monitor-punto"></span><span class="monitor-punto"></span><span class="monitor-punto"></span>
+          </div>
+          <img src="assets/img/capturas/admin-conciliacion.webp"
+               alt="Pantalla de conciliación de apps con la diferencia por pedido."
+               width="1440" height="900" loading="lazy" decoding="async">
+        </div>
+        <figcaption>
+          Cada renglón del reporte de la app, cruzado con su ticket. Los que no cuadran salen
+          marcados: ésos son los que se reclaman.
+        </figcaption>
+      </figure>
+
+      <div class="tres">
+        <div class="tarjeta pila pila-3">
+          <h3>Cruce por folio y monto</h3>
+          <p>
+            Y sin doble asignación: un ticket no se puede casar con dos renglones distintos del
+            reporte.
+          </p>
+        </div>
+        <div class="tarjeta pila pila-3">
+          <h3>Lo que falta, a la vista</h3>
+          <p>
+            Pedidos sin depósito, depósitos sin pedido y diferencias de monto, cada grupo por
+            separado.
+          </p>
+        </div>
+        <div class="tarjeta pila pila-3">
+          <h3>La comisión, en el reporte</h3>
+          <p>
+            Entra en el estado de resultados del día, así que la venta por apps se ve neta y no
+            bruta.
+          </p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══ 7 · Traer tu menú ══════════════════════════════════════════════ -->
+  <section class="seccion" id="migracion">
+    <div class="contenedor pila pila-8">
+      <div class="pila pila-4">
+        <p class="eyebrow">Si ya usas otro</p>
+        <h2>Tu menú se pega y ya</h2>
+        <p>
+          Descargas el menú del sistema que usas hoy y lo pegas aquí tal cual. No hay que
+          recapturar trescientos productos a mano ni pagar por la mudanza.
+        </p>
+      </div>
+
+      <figure class="figura" data-captura="admin-importador">
+        <div class="monitor">
+          <div class="monitor-barra" aria-hidden="true">
+            <span class="monitor-punto"></span><span class="monitor-punto"></span><span class="monitor-punto"></span>
+          </div>
+          <img src="assets/img/capturas/admin-importador.webp"
+               alt="Importador de menú mostrando lo que se va a dar de alta antes de confirmar."
+               width="1440" height="900" loading="lazy" decoding="async">
+        </div>
+        <figcaption>
+          Lo que se va a crear, a la vista antes de confirmar: qué producto, con qué precio y en
+          qué categoría. Nada se guarda hasta que tú lo aceptas.
+        </figcaption>
+      </figure>
+    </div>
+  </section>
+
+  <!-- ═══ 8 · Facturación ════════════════════════════════════════════════
+       En futuro y con su pastilla, igual que en precios.html. El módulo existe
+       y está probado, pero lo que hoy se emite son comprobantes de prueba: no
+       se anuncia como disponible hasta cerrar la activación con el proveedor. -->
+  <section class="seccion" id="facturacion">
+    <div class="contenedor pila pila-8">
+      <div class="pila pila-4">
+        <div class="fila" style="align-items:center;gap:var(--sp-4)">
+          <p class="eyebrow" style="margin:0">Facturación</p>
+          <span class="pastilla pastilla-pronto">Muy pronto</span>
+        </div>
+        <h2>Tus clientes se facturan solos, desde el ticket</h2>
+        <p>
+          El comensal escanea el código del ticket, pone sus datos y recibe su factura por correo.
+          Va incluida desde el plan Negocio. Está construida y probada; estamos cerrando la
+          activación con el proveedor autorizado, así que todavía no la encendemos.
+        </p>
+      </div>
+      <div class="fila">
+        <a class="btn btn-fantasma" href="precios.html">Cómo funcionará y qué cuesta</a>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══ 9 · Cierre ═════════════════════════════════════════════════════ -->
+  <section class="seccion">
+    <div class="contenedor">
+      <div class="cierre pila pila-5" style="align-items:center">
+        <h2>Míralo funcionando</h2>
+        <p style="max-width:52ch">
+          Media hora con tus productos y tus precios cargados. Sin presentación y sin compromiso.
+        </p>
+        <div class="fila" style="justify-content:center">
+          <a class="btn btn-primario btn-hero" href="demo.html">Pide una demo</a>
+          <a class="btn btn-fantasma btn-hero" href="sin-internet.html">Qué pasa sin internet</a>
+        </div>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<footer class="pie">
+  <div class="contenedor">
+    <div class="pie-rejilla">
+      <div class="pila pila-3">
+        <span class="nav-logo" style="pointer-events:none">
+          <img src="assets/img/logo.svg" alt="" width="30" height="30" aria-hidden="true">
+          <span>VIM POS</span>
+        </span>
+        <p style="font-size:var(--t-15)">
+          El sistema completo para tu restaurante: caja, cocina, mesas, inventario y
+          facturación. Hecho en León, Guanajuato.
+        </p>
+      </div>
+      <div>
+        <h4>Producto</h4>
+        <ul class="pie-lista">
+          <li><a href="funciones.html">Funciones</a></li>
+          <li><a href="sin-internet.html">Sin internet</a></li>
+          <li><a href="precios.html">Precios</a></li>
+          <li><a href="demo.html">Pide una demo</a></li>
+        </ul>
+      </div>
+      <div>
+        <h4>Contacto</h4>
+        <ul class="pie-lista">
+          <li><a href="mailto:hola@vimpos.com.mx">hola@vimpos.com.mx</a></li>
+          <li><a href="https://wa.me/524761273020">WhatsApp 476 127 3020</a></li>
+        </ul>
+      </div>
+    </div>
+    <div class="pie-legal">
+      <span>© 2026 VIM POS</span>
+      <span class="fila" style="gap:var(--sp-5)">
+        <a href="aviso-privacidad.html" style="color:inherit">Aviso de privacidad</a>
+        <a href="terminos.html" style="color:inherit">Términos</a>
+      </span>
+    </div>
+  </div>
+</footer>
+
+<script src="assets/js/vim.js?v=8" defer></script>
+</body>
+</html>
