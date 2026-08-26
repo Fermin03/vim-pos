@@ -4,8 +4,7 @@ import { PageBody, PageHeader } from "../../../components/page-header";
 import { RangoFechas } from "../../../components/rango-fechas";
 import { leerTiemposCocina, rangoUltimosDias, type FilaTiempos } from "../../../lib/reportes";
 import { mensajeError } from "../../../lib/errores";
-
-const MODO: Record<string, string> = { COMER_AQUI: "Comer aquí", PARA_LLEVAR: "Para llevar", DRIVE_THRU: "Drive-thru", MESA: "Mesa", DELIVERY_PROPIO: "Domicilio" };
+import { etiquetaModo } from "../../../lib/modo-servicio";
 
 /**
  * Objetivo de preparación en minutos. La vista SQL corta en 15 (tickets_cocina_bajo_15min),
@@ -72,7 +71,7 @@ export default function TiemposCocinaPage() {
                 {filas.length === 0 && <tr><td colSpan={7} className="px-4 py-6 text-center text-ink-3">Sin datos de cocina en el rango.</td></tr>}
                 {filas.map((f) => (
                   <tr key={f.modo} className="border-b border-line last:border-b-0">
-                    <td className="px-4 py-2.5 font-medium">{MODO[f.modo] ?? f.modo}</td>
+                    <td className="px-4 py-2.5 font-medium">{etiquetaModo(f.modo)}</td>
                     <td className="px-4 py-2.5 text-right tabular-nums">{f.tickets}</td>
                     <td className="px-4 py-2.5 text-right font-semibold tabular-nums">{f.promedio.toFixed(1)}</td>
                     <td className="px-4 py-2.5 text-right tabular-nums text-ink-2">{f.p95.toFixed(0)}</td>
