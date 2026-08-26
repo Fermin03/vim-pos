@@ -4298,7 +4298,7 @@ export type Database = {
           precio_mensual_mxn: number
           timbres_cfdi_mensuales: number | null
           updated_at: string
-          vertical: Database["public"]["Enums"]["vertical_tipo"]
+          vertical: Database["public"]["Enums"]["vertical_tipo"] | null
           visible_publico: boolean
         }
         Insert: {
@@ -4316,7 +4316,7 @@ export type Database = {
           precio_mensual_mxn: number
           timbres_cfdi_mensuales?: number | null
           updated_at?: string
-          vertical: Database["public"]["Enums"]["vertical_tipo"]
+          vertical?: Database["public"]["Enums"]["vertical_tipo"] | null
           visible_publico?: boolean
         }
         Update: {
@@ -4334,7 +4334,7 @@ export type Database = {
           precio_mensual_mxn?: number
           timbres_cfdi_mensuales?: number | null
           updated_at?: string
-          vertical?: Database["public"]["Enums"]["vertical_tipo"]
+          vertical?: Database["public"]["Enums"]["vertical_tipo"] | null
           visible_publico?: boolean
         }
         Relationships: []
