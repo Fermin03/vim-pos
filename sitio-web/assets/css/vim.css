@@ -874,3 +874,171 @@ a { color: var(--ink); text-underline-offset: 3px; }
 .figura-papel .monitor { max-width: 340px; background: var(--bg); }
 .figura-papel .monitor-barra { display: none; }
 .figura-papel .hueco { min-height: 380px; }
+
+/* ==========================================================================
+   Franja de hechos — centrada
+
+   Las cuatro frases se alineaban a la izquierda dentro de celdas que ocupan un
+   cuarto de pantalla cada una, así que cada una empezaba en un sitio distinto y
+   la franja se leía como cuatro cosas sueltas en vez de como una fila. Van
+   centradas en su propia celda.
+   ========================================================================== */
+
+.hecho { text-align: center; }
+.hecho p { margin-inline: auto; }
+
+/* ==========================================================================
+   Carrusel en móvil
+
+   Cualquier rejilla de tarjetas se convierte en una tira que se desliza de
+   lado por debajo de 700 px. Apiladas, tres tarjetas son tres pantallazos de
+   scroll vertical antes de llegar a lo siguiente; de lado se recorren con el
+   pulgar y se ve de un vistazo que hay más de una.
+
+   La pista de que se desliza es que la siguiente tarjeta asoma —por eso el
+   ancho es 82% y no 100%—. Es más honesto que unos puntitos debajo: el corte
+   se ve sin tener que interpretarlo.
+
+   El margen negativo saca la tira del padding del contenedor para que llegue
+   al borde de la pantalla, y el padding se lo devuelve por dentro: así la
+   primera tarjeta sigue alineada con el texto de arriba y la última no queda
+   pegada al canto.
+   ========================================================================== */
+
+/* Cada rejilla deja de ser carrusel EXACTAMENTE donde empieza a tener columnas
+   propias, y no todas en el mismo punto: `.tira` a 760, `.tres` y `.dos` a 800,
+   `.planes` a 860.
+
+   Con un corte único a 700 quedaba una franja entre 700 y 800 —el iPad en
+   vertical— donde ya no había carrusel pero tampoco columnas, así que las
+   tarjetas se apilaban a lo ancho de toda la pantalla.
+
+   Se escriben tres bloques casi iguales en vez de uno con reglas de reseteo
+   encima. Es más largo, pero cada rejilla se activa y se apaga en su propio
+   bloque y no hay que seguir la cascada para saber qué gana. */
+
+@media (max-width: 759px) {
+  .tira {
+    grid-template-columns: none;
+    grid-auto-flow: column;
+    grid-auto-columns: 82%;
+
+    overflow-x: auto;
+    overscroll-behavior-x: contain;    /* no arrastra la página al llegar al final */
+    scroll-snap-type: x mandatory;
+    scroll-padding-inline-start: var(--sp-5);
+
+    margin-inline: calc(-1 * var(--sp-5));
+    padding-inline: var(--sp-5);
+    padding-block: 2px;                /* que no se recorte la sombra ni el borde de 2 px */
+
+    scrollbar-width: none;
+  }
+  .tira::-webkit-scrollbar { display: none; }
+  .tira > * { scroll-snap-align: start; }
+
+  @media (prefers-reduced-motion: reduce) {
+    .tira { scroll-snap-type: none; }   /* sin el tirón al soltar */
+  }
+}
+
+@media (max-width: 799px) {
+  .tres, .dos {
+    grid-template-columns: none;
+    grid-auto-flow: column;
+    grid-auto-columns: 82%;
+
+    overflow-x: auto;
+    overscroll-behavior-x: contain;    /* no arrastra la página al llegar al final */
+    scroll-snap-type: x mandatory;
+    scroll-padding-inline-start: var(--sp-5);
+
+    margin-inline: calc(-1 * var(--sp-5));
+    padding-inline: var(--sp-5);
+    padding-block: 2px;                /* que no se recorte la sombra ni el borde de 2 px */
+
+    scrollbar-width: none;
+  }
+  .tres::-webkit-scrollbar, .dos::-webkit-scrollbar { display: none; }
+  .tres > *, .dos > * { scroll-snap-align: start; }
+
+  @media (prefers-reduced-motion: reduce) {
+    .tres, .dos { scroll-snap-type: none; }   /* sin el tirón al soltar */
+  }
+}
+
+@media (max-width: 859px) {
+  .planes {
+    grid-template-columns: none;
+    grid-auto-flow: column;
+    grid-auto-columns: 82%;
+
+    overflow-x: auto;
+    overscroll-behavior-x: contain;    /* no arrastra la página al llegar al final */
+    scroll-snap-type: x mandatory;
+    scroll-padding-inline-start: var(--sp-5);
+
+    margin-inline: calc(-1 * var(--sp-5));
+    padding-inline: var(--sp-5);
+    padding-block: 2px;                /* que no se recorte la sombra ni el borde de 2 px */
+
+    scrollbar-width: none;
+  }
+  .planes::-webkit-scrollbar { display: none; }
+  .planes > * { scroll-snap-align: start; }
+
+  @media (prefers-reduced-motion: reduce) {
+    .planes { scroll-snap-type: none; }   /* sin el tirón al soltar */
+  }
+}
+
+/* ==========================================================================
+   Puntos del carrusel
+
+   La tarjeta cortada por el borde ya dice que hay más, pero solo si te fijas.
+   Los puntos lo dicen antes de deslizar y además sirven de mapa: cuántas hay y
+   en cuál vas.
+
+   Los pinta el JS, no el HTML, y a propósito: el número de tarjetas cambia por
+   sección y duplicarlo a mano en seis páginas es garantía de que un día habrá
+   cuatro puntos para tres tarjetas. Si el JS no carga, el carrusel se sigue
+   deslizando igual — los puntos son un extra, no el mecanismo.
+   ========================================================================== */
+
+.puntos {
+  display: none;                       /* solo cuando su carrusel está activo */
+  justify-content: center;
+  gap: var(--sp-2);
+  margin-top: var(--sp-5);
+}
+
+/* Cada tira de puntos aparece en el mismo corte que su rejilla. */
+@media (max-width: 759px) { .puntos[data-hasta="759"] { display: flex; } }
+@media (max-width: 799px) { .puntos[data-hasta="799"] { display: flex; } }
+@media (max-width: 859px) { .puntos[data-hasta="859"] { display: flex; } }
+
+.punto {
+  /* El botón mide 24 px aunque el punto se vea de 7: por debajo de 24 el dedo
+     falla más de lo que acierta, y un control que hay que apuntar con cuidado
+     es peor que no tenerlo. */
+  width: 24px; height: 24px;
+  padding: 0; border: 0; background: none; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+}
+.punto::before {
+  content: "";
+  width: 7px; height: 7px;
+  border-radius: 999px;
+  background: var(--line-strong);
+  transition: background var(--v-corta) ease, width var(--v-corta) var(--sal);
+}
+.punto[aria-current="true"]::before {
+  width: 20px;                          /* se alarga en vez de crecer: dice
+                                           "estás aquí" sin empujar a los demás */
+  background: var(--ink);
+}
+.punto:active::before { background: var(--ink-2); }
+
+@media (prefers-reduced-motion: reduce) {
+  .punto::before { transition: none; }
+}

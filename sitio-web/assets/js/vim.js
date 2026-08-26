@@ -291,6 +291,75 @@
     });
   }
 
+  /* ---- Puntos de los carruseles -------------------------------------------
+     El carrusel es CSS puro (scroll-snap): esto solo le añade los puntos y no
+     lo hace funcionar. Si este archivo falla en cargar, la tira se sigue
+     deslizando — que es la razón de haberlo hecho con scroll nativo y no con
+     un widget de JavaScript.
+
+     Ver abajo la nota sobre por qué el punto activo se calcula del scroll y no
+     con IntersectionObserver. */
+  var CORTES = { tira: 759, tres: 799, dos: 799, planes: 859 };
+
+  document.querySelectorAll(".tres, .dos, .planes, .tira").forEach(function (pista) {
+    var tarjetas = Array.prototype.slice.call(pista.children);
+    if (tarjetas.length < 2) return;
+
+    var hasta = null;
+    Object.keys(CORTES).forEach(function (c) {
+      if (pista.classList.contains(c)) hasta = CORTES[c];
+    });
+    if (!hasta) return;
+
+    var tira = document.createElement("div");
+    tira.className = "puntos";
+    tira.setAttribute("data-hasta", String(hasta));
+    /* `tablist` sería mentir: esto no son pestañas y un lector de pantalla
+       anunciaría controles que no se comportan como tales. Es un grupo de
+       botones que llevan a un sitio. */
+    tira.setAttribute("role", "group");
+    tira.setAttribute("aria-label", "Ir a una tarjeta");
+
+    var puntos = tarjetas.map(function (tarjeta, i) {
+      var b = document.createElement("button");
+      b.type = "button";
+      b.className = "punto";
+      b.setAttribute("aria-label", "Tarjeta " + (i + 1) + " de " + tarjetas.length);
+      b.setAttribute("aria-current", i === 0 ? "true" : "false");
+      b.addEventListener("click", function () {
+        /* `scrollIntoView` con `block: nearest` para que llevar el carrusel de
+           lado no arrastre también la página en vertical. */
+        tarjeta.scrollIntoView({ behavior: "smooth", inline: "start", block: "nearest" });
+      });
+      tira.appendChild(b);
+      return b;
+    });
+
+    pista.insertAdjacentElement("afterend", tira);
+
+    /* El punto activo se calcula del `scrollLeft`, no con IntersectionObserver.
+       El observador es más elegante y era la primera versión, pero su callback
+       se entrega en el ciclo de render del navegador: en cualquier contexto
+       donde ese ciclo esté suspendido —una pestaña en segundo plano, un panel
+       oculto— los puntos se quedan congelados en el primero mientras la tira
+       sí se desliza. Un indicador que miente es peor que no tenerlo.
+
+       Esto lee dos números y no toca el layout, así que el evento `scroll` sale
+       barato aunque dispare seguido. */
+    function marcarActivo() {
+      var ancho = tarjetas[0].offsetWidth + parseFloat(getComputedStyle(pista).columnGap || 0);
+      var i = ancho > 0 ? Math.round(pista.scrollLeft / ancho) : 0;
+      if (i < 0) i = 0;
+      if (i > tarjetas.length - 1) i = tarjetas.length - 1;
+      puntos.forEach(function (b, j) {
+        b.setAttribute("aria-current", j === i ? "true" : "false");
+      });
+    }
+
+    pista.addEventListener("scroll", marcarActivo, { passive: true });
+    marcarActivo();
+  });
+
   /* ---- La página actual se marca sola -------------------------------------
      Evita tener que acordarse de poner aria-current a mano en cada archivo, que
      es exactamente el tipo de cosa que se olvida en la quinta página. */
