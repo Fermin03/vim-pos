@@ -35,6 +35,27 @@
   RewriteRule ^ https://vimpos.com.mx%{REQUEST_URI} [R=301,L]
 </IfModule>
 
+# ── URLs sin .html ──────────────────────────────────────────────────────────
+# Los enlaces del sitio apuntan a /precios, no a /precios.html. En Vercel esto
+# lo hace `cleanUrls`; aquí hay que escribirlo.
+#
+# Son dos reglas y las dos hacen falta:
+#   1. /precios  ->  sirve precios.html SIN cambiar la URL (rewrite interno).
+#   2. /precios.html  ->  redirige a /precios con un 301, para que la versión
+#      con extensión no quede como una segunda URL con el mismo contenido.
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+
+  # 2 primero: si alguien llega con .html, se le manda a la limpia.
+  RewriteCond %{THE_REQUEST} "\s/+(.+)\.html[\s?]" [NC]
+  RewriteRule ^ /%1 [R=301,L]
+
+  # 1: la limpia sirve el archivo, sin que se note.
+  RewriteCond %{REQUEST_FILENAME} !-d
+  RewriteCond %{REQUEST_FILENAME}\.html -f
+  RewriteRule ^(.+)$ $1.html [L]
+</IfModule>
+
 # ── Página de error ─────────────────────────────────────────────────────────
 ErrorDocument 404 /404.html
 

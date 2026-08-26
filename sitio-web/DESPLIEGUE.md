@@ -78,6 +78,18 @@ Y por eso no aparece en el archivo: forzar HTTPS, emitir el certificado, comprim
 servir `404.html` cuando la ruta no existe, no listar el contenido de las carpetas, y los tipos
 MIME de `.webp`, `.woff2` y `.webmanifest`.
 
+### URLs sin `.html`
+
+`cleanUrls: true`. Los enlaces del sitio, los `canonical`, los `og:url` y el sitemap apuntan a
+`/precios`, no a `/precios.html`; Vercel sirve el archivo y redirige la versión con extensión.
+
+**Se decidió antes de publicar, y ése era el momento.** Después de que Google indexe
+`precios.html`, cambiarlo significa arrastrar redirecciones para siempre. Hacerlo con el sitio
+todavía sin indexar costó diez minutos y cero deuda.
+
+El `.htaccess` lleva las dos reglas equivalentes por si algún día se vuelve a Hostinger: un
+*rewrite* interno para servir el archivo y un 301 de la versión con extensión hacia la limpia.
+
 ### Lo que no hace falta bloquear
 
 Las rutas que empiezan con guion bajo. Vercel publica lo que hay en `sitio-web/`, y `_patron.html`
