@@ -62,16 +62,38 @@ supabase functions deploy solicitar-demo
 ojo y nada más. El paso 6.3 de abajo es su primera prueba real — hazlo antes de mandarle el enlace
 a nadie.
 
-### 0.4 — Los correos de aviso (opcional, pero decide algo)
+### 0.4 — El correo de aviso, por el SMTP de Hostinger
 
-Sin `RESEND_API_KEY` los prospectos **solo llegan a la tabla** y hay que ir a mirarlos. El sitio
-promete «te contestamos el mismo día hábil», así que o pones la llave o te acostumbras a revisar.
+Sin esto los prospectos **solo llegan a la tabla** y hay que acordarse de ir a mirarlos. El sitio
+promete «te contestamos el mismo día hábil», así que conviene configurarlo.
+
+Va por el buzón de Hostinger que ya existe —el mismo que usa Supabase Auth para las
+invitaciones—, no por un proveedor transaccional aparte.
 
 ```bash
-supabase secrets set RESEND_API_KEY="re_..." VIM_AVISOS_A="hola@vimpos.com.mx" VIM_AVISOS_DE="VIM POS <hola@vimpos.com.mx>"
+supabase secrets set VIM_SMTP_HOST="smtp.hostinger.com" VIM_SMTP_PORT="465" VIM_SMTP_USER="hola@vimpos.com.mx" VIM_AVISOS_A="hola@vimpos.com.mx"
 ```
 
-El dominio de `VIM_AVISOS_DE` tiene que estar verificado en Resend o los correos salen a spam.
+Y la contraseña, **en su propio comando** para que no quede en el historial junto al resto:
+
+```bash
+supabase secrets set VIM_SMTP_PASS="<la contraseña del buzón>"
+```
+
+> **La contraseña del buzón no se pega en un chat, ni en un ticket, ni en un commit.** Va de tu
+> gestor de contraseñas a esa terminal y nada más. Si alguna vez se comparte, se cambia en hPanel
+> antes de seguir.
+
+**Tres detalles que importan:**
+
+- **El puerto decide el modo de cifrado.** 465 es TLS desde el primer byte, que es lo que la
+  función asume. Si Hostinger te da el 587, la conexión empieza en claro y sube con STARTTLS; la
+  función lo distingue sola por el número de puerto.
+- **El remitente tiene que ser el buzón autenticado.** Hostinger rechaza mandar «de parte de» otra
+  dirección, así que la función usa `VIM_SMTP_USER` como remitente y no un `from` inventado.
+- **Es para avisos internos, no para envíos masivos.** Un SMTP compartido no da métricas de
+  entrega ni reputación propia, y los planes traen un tope de correos al día. Para un aviso por
+  lead sobra; el día que quieras escribirle al prospecto en volumen, esto se queda corto.
 
 ### 0.5 — Las capturas siguen pendientes
 
@@ -213,7 +235,9 @@ funcionar el menú móvil, el acordeón y el formulario.
       SELECT nombre, whatsapp, negocio, cajas, sucursales, creado_en
         FROM prospectos ORDER BY creado_en DESC LIMIT 5;
       ```
-- [ ] Si pusiste `RESEND_API_KEY`, llegó el correo a `hola@vimpos.com.mx`.
+- [ ] Llegó el correo de aviso a `hola@vimpos.com.mx`. Si no llega, mira los logs de la función
+      en el dashboard de Supabase: el motivo está escrito ahí — `SIN_SMTP` son variables que
+      faltan, `SMTP: ...` es que el buzón rechazó la conexión (normalmente puerto o contraseña).
 - [ ] **Recarga y manda otro** (al enviar, el formulario se oculta y sale el acuse, así que hay
       que recargar para volver a probar). El tope es de 5 por hora desde la misma IP: del sexto en
       adelante debe salir «Inténtalo más tarde». Tarda al menos 3 segundos en llenarlo — por debajo

@@ -17,20 +17,28 @@
 // un campo de correo solo para poder acusar recibo cuesta conversión y no da nada. El acuse va en
 // pantalla al enviar, que es donde la persona ya está mirando.
 //
-// EL CORREO ES OPCIONAL A PROPÓSITO
+// EL CORREO SALE POR EL SMTP DE HOSTINGER
 //
-// Este proyecto no tiene proveedor transaccional: los únicos correos que salen hoy son los de
-// Supabase Auth (invitaciones), que no sirven para mandar texto arbitrario. Si RESEND_API_KEY
-// está configurada, se avisa por correo; si no, la función lo registra y sigue. Así el formulario
-// funciona desde el primer día y el correo se enciende cuando haya llave, sin tocar el sitio.
+// No por un proveedor transaccional tipo Resend: el buzón de Hostinger ya existe y ya se usa para
+// las invitaciones de Supabase Auth, así que no hace falta dar de alta un servicio más ni
+// verificar un dominio otra vez.
 //
-//   supabase secrets set RESEND_API_KEY="re_..."
+// La contrapartida, para que conste: un SMTP compartido no da métricas de entrega ni reputación
+// propia. Para avisos internos —que van a nuestro propio buzón— eso da igual. El día que haya que
+// mandar correo AL PROSPECTO en volumen, esto se queda corto y toca un proveedor de verdad.
+//
+//   supabase secrets set VIM_SMTP_HOST="smtp.hostinger.com"
+//   supabase secrets set VIM_SMTP_PORT="465"
+//   supabase secrets set VIM_SMTP_USER="hola@vimpos.com.mx"
+//   supabase secrets set VIM_SMTP_PASS="<la del buzón>"
 //   supabase secrets set VIM_AVISOS_A="hola@vimpos.com.mx"
-//   supabase secrets set VIM_AVISOS_DE="VIM POS <hola@vimpos.com.mx>"   # dominio verificado en Resend
 //
-// MIENTRAS NO HAYA LLAVE, LOS PROSPECTOS SOLO LLEGAN A LA TABLA. La promesa del sitio —«te
-// contestamos el mismo día hábil»— depende entonces de que alguien mire /platform. Es un
-// compromiso operativo, no copy.
+// El puerto 465 es TLS implícito (`tls: true`). Si se usa el 587, hay que poner `tls: false`,
+// porque ahí la conexión empieza en claro y sube a TLS con STARTTLS.
+//
+// SIN ESAS VARIABLES LOS PROSPECTOS SOLO LLEGAN A LA TABLA. La función no falla —el lead ya está
+// guardado— pero la promesa del sitio, «te contestamos el mismo día hábil», dependería entonces
+// de que alguien mire /platform. Es un compromiso operativo, no copy.
 //
 // DEFENSAS CONTRA BOTS, Y LO QUE NO CUBREN
 //
@@ -103,24 +111,44 @@ function esc(s: string): string {
   );
 }
 
-async function enviarCorreo(payload: { to: string; subject: string; html: string; replyTo?: string }) {
-  const key = Deno.env.get("RESEND_API_KEY");
-  if (!key) return { enviado: false, motivo: "SIN_PROVEEDOR" };
+async function enviarCorreo(payload: { to: string; subject: string; html: string }) {
+  const host = Deno.env.get("VIM_SMTP_HOST");
+  const user = Deno.env.get("VIM_SMTP_USER");
+  const pass = Deno.env.get("VIM_SMTP_PASS");
+  if (!host || !user || !pass) return { enviado: false, motivo: "SIN_SMTP" };
 
-  const from = Deno.env.get("VIM_AVISOS_DE") ?? "VIM POS <onboarding@resend.dev>";
-  const r = await fetch("https://api.resend.com/emails", {
-    method: "POST",
-    headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
-    body: JSON.stringify({
-      from,
-      to: [payload.to],
+  const port = Number(Deno.env.get("VIM_SMTP_PORT") ?? "465");
+
+  /* El cliente se importa aquí dentro y no arriba del archivo: si un día falta
+     la configuración de SMTP, la función no paga la descarga de una librería
+     que no va a usar en cada arranque en frío. */
+  const { SMTPClient } = await import("https://deno.land/x/denomailer@1.6.0/mod.ts");
+
+  const cliente = new SMTPClient({
+    connection: {
+      hostname: host,
+      port,
+      tls: port === 465,      // 465 = TLS desde el primer byte; 587 = STARTTLS
+      auth: { username: user, password: pass },
+    },
+  });
+
+  try {
+    await cliente.send({
+      from: user,             // Hostinger rechaza un `from` que no sea el buzón autenticado
+      to: payload.to,
       subject: payload.subject,
       html: payload.html,
-      ...(payload.replyTo ? { reply_to: payload.replyTo } : {}),
-    }),
-  });
-  if (!r.ok) return { enviado: false, motivo: `HTTP_${r.status}: ${await r.text()}` };
-  return { enviado: true, motivo: "" };
+    });
+    return { enviado: true, motivo: "" };
+  } catch (e) {
+    return { enviado: false, motivo: `SMTP: ${e instanceof Error ? e.message : String(e)}` };
+  } finally {
+    /* Cerrar siempre. Una conexión SMTP abierta mantiene viva la instancia de
+       la función y acaba agotando las conexiones simultáneas que permite el
+       buzón, que en un plan compartido son pocas. */
+    await cliente.close().catch(() => {});
+  }
 }
 
 Deno.serve(async (req) => {
