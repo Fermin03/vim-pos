@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import { TopbarPos } from "./topbar-pos";
-import { listarEmpleados, SesionDispositivoInvalida, type Empleado } from "../lib/supabase";
+import { listarEmpleados, nombreDelNegocio, SesionDispositivoInvalida, type Empleado } from "../lib/supabase";
 
 export const ROL_LABEL: Record<string, string> = {
   CAJERO: "Cajero",
@@ -22,12 +22,14 @@ export function iniciales(nombre: string): string {
 
 /** Login en POS (P-002): shell + grid de usuarios de la sucursal (RLS bajo el dispositivo). */
 export function SelectorEmpleados({
+  negocio: negocioProp,
   sucursal,
   caja,
   onElegir,
   onDesvincular,
   onSesionInvalida,
 }: {
+  negocio?: string;
   sucursal: string;
   caja: string;
   onElegir: (e: Empleado) => void;
@@ -37,6 +39,15 @@ export function SelectorEmpleados({
 }) {
   const [empleados, setEmpleados] = useState<Empleado[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  /* El nombre del negocio se lee aquí y no se recibe por prop porque en esta
+     pantalla todavía no hay sesión de empleado —solo la del dispositivo— y es
+     la primera vez que se puede saber de qué negocio es esta caja. */
+  const [negocio, setNegocio] = useState<string | undefined>(negocioProp);
+  useEffect(() => {
+    if (negocioProp) return;
+    nombreDelNegocio().then((n) => { if (n) setNegocio(n); }).catch(() => { /* el topbar tiene fallback */ });
+  }, [negocioProp]);
 
   useEffect(() => {
     let activo = true;
@@ -60,7 +71,7 @@ export function SelectorEmpleados({
 
   return (
     <div className="flex h-screen flex-col">
-      <TopbarPos sucursal={sucursal} caja={caja} />
+      <TopbarPos negocio={negocio} sucursal={sucursal} caja={caja} />
 
       <div className="flex flex-1 flex-col items-center justify-center overflow-y-auto p-8">
         <div className="w-full max-w-[720px]">

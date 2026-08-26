@@ -17,6 +17,7 @@ export function AbrirTurno({
   cajaNumero,
   cajaLabel,
   sucursalLabel,
+  negocioLabel,
   onTurnoAbierto,
   onCambiarCajero,
 }: {
@@ -26,6 +27,7 @@ export function AbrirTurno({
   cajaNumero: number;
   cajaLabel: string;
   sucursalLabel: string;
+  negocioLabel?: string;
   onTurnoAbierto: (t: Turno) => void;
   onCambiarCajero: () => void;
 }) {
@@ -99,7 +101,7 @@ export function AbrirTurno({
 
   return (
     <div className="flex h-screen flex-col">
-      <TopbarPos sucursal={sucursalLabel} caja={cajaLabel} />
+      <TopbarPos negocio={negocioLabel} sucursal={sucursalLabel} caja={cajaLabel} />
 
       <div className="flex-1 overflow-y-auto p-6">
         <div className="mx-auto max-w-[560px]">

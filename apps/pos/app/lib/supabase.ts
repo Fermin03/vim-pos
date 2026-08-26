@@ -100,6 +100,18 @@ export type Empleado = { id: string; nombre: string; rol: string };
  * tenant: la política acceso_tenant deja al dispositivo ver los accesos de su tenant).
  * Excluye la propia cuenta de dispositivo. Nunca expone pin_hash.
  */
+/** Nombre comercial del negocio, para el encabezado. Devuelve null si no se
+ *  puede leer: el topbar tiene su propio valor por omisión y una caja no debe
+ *  quedarse en blanco porque falle una etiqueta. */
+export async function nombreDelNegocio(): Promise<string | null> {
+  const { data } = await deviceClient
+    .from("tenants")
+    .select("nombre_comercial")
+    .limit(1)
+    .maybeSingle();
+  return (data as { nombre_comercial?: string } | null)?.nombre_comercial ?? null;
+}
+
 export async function listarEmpleados(): Promise<Empleado[]> {
   // No hay FK directa usuarios_acceso → usuarios_perfil (ambas apuntan a auth.users),
   // así que PostgREST no puede embeber el perfil. Dos queries + join en cliente:
