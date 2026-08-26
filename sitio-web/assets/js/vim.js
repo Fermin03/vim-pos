@@ -20,7 +20,7 @@
      ya escritos. Un formulario que falla en silencio pierde el lead; uno que
      abre WhatsApp lo entrega igual, solo que por otro camino. */
   var API = "https://pbiaxzvmssjsxdwqrumb.supabase.co";
-  var ANON = "";
+  var ANON = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBiaWF4enZtc3Nqc3hkd3FydW1iIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODAyNTMyMzIsImV4cCI6MjA5NTgyOTIzMn0.OsfFcqw-jrj-qZtFkUPQCrLgYtnDmsOxC93iLJShpKs";
   var WHATSAPP = "524761273020";
 
   /* ---- Menú móvil: cajón lateral ------------------------------------------
