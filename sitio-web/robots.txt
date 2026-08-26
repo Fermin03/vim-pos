@@ -6,6 +6,6 @@
 
 User-agent: *
 Allow: /
-Disallow: /404.html
+Disallow: /404
 
 Sitemap: https://vimpos.com.mx/sitemap.xml
