@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Seis URLs. Sin `changefreq` ni `priority`: Google lleva años diciendo que los
+  ignora, y publicarlos solo añade dos campos que se quedan desactualizados.
+
+  `lastmod` sí se respeta, así que hay que tocarlo cuando la página cambie de
+  verdad — no en cada despliegue. Un lastmod que miente entrena al rastreador a
+  no creerle.
+-->
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url>
+    <loc>https://vimpos.com.mx/</loc>
+    <lastmod>2026-08-25</lastmod>
+  </url>
+  <url>
+    <loc>https://vimpos.com.mx/precios.html</loc>
+    <lastmod>2026-08-25</lastmod>
+  </url>
+  <url>
+    <loc>https://vimpos.com.mx/sin-internet.html</loc>
+    <lastmod>2026-08-25</lastmod>
+  </url>
+  <url>
+    <loc>https://vimpos.com.mx/demo.html</loc>
+    <lastmod>2026-08-25</lastmod>
+  </url>
+  <url>
+    <loc>https://vimpos.com.mx/aviso-privacidad.html</loc>
+    <lastmod>2026-08-25</lastmod>
+  </url>
+  <url>
+    <loc>https://vimpos.com.mx/terminos.html</loc>
+    <lastmod>2026-08-25</lastmod>
+  </url>
+</urlset>

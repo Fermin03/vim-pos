@@ -1,0 +1,99 @@
+# ============================================================================
+# vimpos.com.mx — Apache (Hostinger)
+#
+# Se sube a `public_html/` junto con el resto. Ojo: empieza con punto, así que
+# el cliente de FTP puede estar ocultándolo. Si el sitio se ve pero no fuerza
+# HTTPS, lo primero que hay que revisar es si este archivo llegó.
+#
+# Lo que NO está aquí, a propósito:
+#
+#   · HSTS (`Strict-Transport-Security`). Es correcto ponerlo, pero es la única
+#     cabecera de esta lista que NO se puede deshacer: el navegador la recuerda
+#     durante el max-age aunque la quites del servidor. Con el dominio recién
+#     apuntado, un certificado mal renovado dejaría el sitio inaccesible sin
+#     forma de arreglarlo desde aquí. Se activa cuando lleve unos meses estable.
+#   · Content-Security-Policy. El sitio carga fuentes de Google y llama a
+#     Supabase; una CSP escrita a ciegas rompe una de las dos y el fallo se ve
+#     solo en producción. Merece su propia pasada con la consola abierta.
+# ============================================================================
+
+# ── HTTPS y dominio único ───────────────────────────────────────────────────
+# Una sola redirección encadenada en vez de dos saltos: www + http llega al
+# apex con https en un solo 301.
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+
+  RewriteCond %{HTTPS} !=on [OR]
+  RewriteCond %{HTTP_HOST} ^www\. [NC]
+  RewriteRule ^ https://vimpos.com.mx%{REQUEST_URI} [R=301,L]
+</IfModule>
+
+# ── Página de error ─────────────────────────────────────────────────────────
+ErrorDocument 404 /404.html
+
+# ── Cabeceras ───────────────────────────────────────────────────────────────
+<IfModule mod_headers.c>
+  # El navegador no adivina el tipo de archivo. Corta la vía por la que un
+  # archivo subido se acaba ejecutando como script.
+  Header always set X-Content-Type-Options "nosniff"
+
+  # Nadie mete el sitio en un iframe ajeno.
+  Header always set X-Frame-Options "SAMEORIGIN"
+
+  # Al salir a otro dominio se manda el origen, no la URL completa. Aquí no
+  # hay nada sensible en las rutas, pero es gratis y es el valor correcto.
+  Header always set Referrer-Policy "strict-origin-when-cross-origin"
+
+  # El sitio no usa cámara, micrófono ni ubicación. Decirlo cierra la puerta
+  # por si algún día se cuela un script de terceros que sí quiera pedirlos.
+  Header always set Permissions-Policy "camera=(), microphone=(), geolocation=(), interest-cohort=()"
+</IfModule>
+
+# ── Caché ───────────────────────────────────────────────────────────────────
+# Los assets llevan un año; el HTML, una hora.
+#
+# Un año en CSS y JS es correcto SOLO porque el sitio se despliega entero y a
+# mano: si algún día se automatiza, hay que ponerle una versión al nombre del
+# archivo (`vim.abc123.css`) antes de tocar esto. Sin eso, un visitante que ya
+# estuvo aquí se queda con el CSS viejo hasta que caduque.
+<IfModule mod_expires.c>
+  ExpiresActive On
+
+  ExpiresByType text/css                "access plus 1 year"
+  ExpiresByType application/javascript  "access plus 1 year"
+  ExpiresByType image/svg+xml           "access plus 1 year"
+  ExpiresByType image/webp              "access plus 1 year"
+  ExpiresByType image/png               "access plus 1 year"
+  ExpiresByType image/jpeg              "access plus 1 year"
+  ExpiresByType font/woff2              "access plus 1 year"
+
+  # El HTML corto: es lo que cambia cuando se corrige un precio o una frase, y
+  # es justo lo que no puede quedarse pegado en el navegador de un prospecto.
+  ExpiresByType text/html               "access plus 1 hour"
+</IfModule>
+
+# ── Compresión ──────────────────────────────────────────────────────────────
+# Solo texto. Comprimir un WebP o un PNG gasta CPU para no ganar nada.
+<IfModule mod_deflate.c>
+  AddOutputFilterByType DEFLATE text/html text/css text/plain text/xml
+  AddOutputFilterByType DEFLATE application/javascript application/json
+  AddOutputFilterByType DEFLATE image/svg+xml application/xml
+</IfModule>
+
+# ── Tipos que Apache viejo no siempre conoce ────────────────────────────────
+<IfModule mod_mime.c>
+  AddType image/webp     .webp
+  AddType font/woff2     .woff2
+  AddType application/manifest+json .webmanifest
+</IfModule>
+
+# ── Nada de listar carpetas ─────────────────────────────────────────────────
+Options -Indexes
+
+# ── Lo que no se publica ────────────────────────────────────────────────────
+# `_patron.html` y `_capturas/` son herramientas de desarrollo. Lo correcto es
+# no subirlos; esto es el segundo cerrojo por si se suben sin querer.
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+  RewriteRule ^_ - [F,L]
+</IfModule>

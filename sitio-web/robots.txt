@@ -1,0 +1,11 @@
+# vimpos.com.mx
+#
+# Todo abierto salvo el 404. No hay panel ni zona privada en este dominio: el
+# producto vive en otros subdominios y esos no se listan aquí — que un archivo
+# público enumere dónde está lo interesante es un favor que no hace falta.
+
+User-agent: *
+Allow: /
+Disallow: /404.html
+
+Sitemap: https://vimpos.com.mx/sitemap.xml
