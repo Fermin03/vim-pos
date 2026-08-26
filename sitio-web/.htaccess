@@ -12,9 +12,16 @@
 #     durante el max-age aunque la quites del servidor. Con el dominio recién
 #     apuntado, un certificado mal renovado dejaría el sitio inaccesible sin
 #     forma de arreglarlo desde aquí. Se activa cuando lleve unos meses estable.
-#   · Content-Security-Policy. El sitio carga fuentes de Google y llama a
-#     Supabase; una CSP escrita a ciegas rompe una de las dos y el fallo se ve
-#     solo en producción. Merece su propia pasada con la consola abierta.
+#   · Content-Security-Policy. Desde que las tipografías se auto-alojan, el
+#     ÚNICO destino externo del sitio es la Edge Function de Supabase, así que
+#     escribir la CSP ya es viable de verdad — antes había que abrirle la puerta
+#     a dos dominios de Google además. Sigue sin ponerse porque una CSP mal
+#     escrita se ve solo en producción y merece su propia pasada con la consola
+#     abierta; el borrador sería algo como:
+#       default-src 'self'; connect-src 'self' https://*.supabase.co;
+#       img-src 'self' data:; style-src 'self'; script-src 'self'
+#     Ojo con los `style="..."` en línea de las páginas: obligarían a
+#     'unsafe-inline' o a moverlos al CSS, que es lo correcto.
 # ============================================================================
 
 # ── HTTPS y dominio único ───────────────────────────────────────────────────

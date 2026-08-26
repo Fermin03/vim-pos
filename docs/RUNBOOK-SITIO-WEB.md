@@ -10,12 +10,16 @@
 
 ## 0. Antes de subir nada
 
-Estas cuatro cosas se hacen **primero**. Las tres primeras están rotas hoy y el sitio publicado
-con ellas rotas se ve bien y no funciona, que es la peor combinación.
+**Actualizado el 26-ago-2026: los pasos 0.1 a 0.4 YA ESTÁN HECHOS Y VERIFICADOS.** Se dejan
+escritos porque explican qué comprobar si algo falla, y porque el mismo trámite hará falta el día
+que se levante un entorno nuevo. Lo único pendiente de esta sección es 0.5.
 
-### 0.1 — El CORS de producción no incluye el apex ⚠️ **bloqueante**
+### 0.1 — El CORS de producción ✅ **hecho**
 
-Hoy `VIM_CORS_ORIGINS` en Supabase vale, según `docs/RUNBOOK-GOLIVE.md`:
+Verificado el 26-ago: los cinco orígenes reciben el suyo y un dominio ajeno recibe otro, así que
+el navegador lo bloquea. `VIM_CORS_ORIGINS` incluye el apex y `www`.
+
+Lo que había antes, y por qué era bloqueante:
 
 ```
 https://pos.vimpos.com.mx,https://admin.vimpos.com.mx,https://platform.vimpos.com.mx
@@ -33,7 +37,7 @@ supabase secrets set VIM_CORS_ORIGINS="https://vimpos.com.mx,https://www.vimpos.
 Va `www` también aunque el `.htaccess` redirija: la redirección ocurre en el navegador, pero si
 alguien llega por `www` y el JS se ejecuta antes del salto, la petición sale con ese origen.
 
-### 0.2 — Falta el anon key en `vim.js` ⚠️ **bloqueante**
+### 0.2 — El anon key en `vim.js` ✅ **hecho**
 
 En `sitio-web/assets/js/vim.js`, arriba del todo:
 
@@ -50,7 +54,7 @@ Lo que **nunca** va aquí es la `service_role`.
 Mientras esté vacía el formulario no se rompe: cae a WhatsApp con los datos ya escritos. Pero
 entonces el prospecto no queda en la tabla, que era el punto.
 
-### 0.3 — La Edge Function no está desplegada
+### 0.3 — La Edge Function ✅ **desplegada y probada**
 
 ```bash
 supabase functions deploy solicitar-demo
@@ -58,11 +62,15 @@ supabase functions deploy solicitar-demo
 
 `supabase/config.toml` ya la declara con `verify_jwt = false`.
 
-**No se ha ejecutado ni una vez**: se escribió con Docker Desktop caído, así que está revisada a
-ojo y nada más. El paso 6.3 de abajo es su primera prueba real — hazlo antes de mandarle el enlace
-a nadie.
+Probada contra producción el 26-ago: envío válido devuelve 200 con id en 1.1 s, el honeypot
+responde 200 sin guardar, los datos inválidos dan 400 con los campos malos, el sexto envío desde
+una IP da 429, y **el correo llega al buzón**.
 
-### 0.4 — El correo de aviso, por el SMTP de Hostinger
+Costó tres despliegues: el envío por SMTP no resolvía su promesa —Hostinger mantiene la conexión
+abierta— y la función agotaba su tiempo CON EL CORREO YA ENTREGADO. Ahora el envío va en segundo
+plano con `EdgeRuntime.waitUntil` y la respuesta no lo espera.
+
+### 0.4 — El correo de aviso, por el SMTP de Hostinger ✅ **hecho**
 
 Sin esto los prospectos **solo llegan a la tabla** y hay que acordarse de ir a mirarlos. El sitio
 promete «te contestamos el mismo día hábil», así que conviene configurarlo.
