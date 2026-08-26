@@ -1,0 +1,277 @@
+<!doctype html>
+<html lang="es-MX">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+
+<title>Pide una demo de VIM POS</title>
+<meta name="description" content="Dinos cuántas cajas y cuántas sucursales tienes y te enseñamos el sistema funcionando, con tus productos y tus precios. Contestamos el mismo día hábil.">
+<link rel="canonical" href="https://vimpos.com.mx/demo.html">
+
+<meta property="og:type" content="website">
+<meta property="og:locale" content="es_MX">
+<meta property="og:site_name" content="VIM POS">
+<meta property="og:title" content="Pide una demo de VIM POS">
+<meta property="og:description" content="Te enseñamos el sistema funcionando, con tus productos y tus precios.">
+<meta property="og:url" content="https://vimpos.com.mx/demo.html">
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@400;500;600&family=JetBrains+Mono:wght@400;600&family=Sora:wght@600;700&display=swap">
+
+<link rel="icon" href="assets/img/logo.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="assets/img/apple-touch-icon-1024.png">
+<link rel="manifest" href="site.webmanifest">
+<meta name="theme-color" content="#0078C9">
+
+<link rel="stylesheet" href="assets/css/vim.css">
+</head>
+<body>
+
+<a href="#contenido" class="solo-lectores">Saltar al contenido</a>
+
+<header class="nav">
+  <div class="contenedor">
+    <div class="nav-fila">
+      <a href="index.html" class="nav-logo" aria-label="VIM POS, inicio">
+        <img src="assets/img/logo.svg" alt="" width="30" height="30" aria-hidden="true">
+        <span>VIM POS</span>
+      </a>
+      <nav class="nav-enlaces" aria-label="Principal">
+        <a class="nav-enlace" href="sin-internet.html">Sin internet</a>
+        <a class="nav-enlace" href="precios.html">Precios</a>
+      </nav>
+      <div class="nav-acciones">
+        <a class="btn btn-primario" href="demo.html">Pide una demo</a>
+        <button class="nav-hamburguesa" data-menu-boton type="button"
+                aria-expanded="false" aria-controls="menu-movil" aria-label="Abrir menú">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+               stroke-width="2" stroke-linecap="round" aria-hidden="true">
+            <path d="M4 7h16M4 12h16M4 17h16"/>
+          </svg>
+        </button>
+      </div>
+    </div>
+  </div>
+  <div class="nav-movil" id="menu-movil" data-menu data-abierto="false">
+    <div>
+      <div class="contenedor">
+        <div class="nav-movil-lista">
+          <a href="sin-internet.html">Sin internet</a>
+          <a href="precios.html">Precios</a>
+          <a href="demo.html">Pide una demo</a>
+        </div>
+      </div>
+    </div>
+  </div>
+</header>
+
+<main id="contenido">
+
+  <!-- ═══ Formulario ═════════════════════════════════════════════════════
+       Dos columnas: el formulario a la izquierda y a la derecha lo que quita
+       el miedo a llenarlo. Poner las objeciones AL LADO y no debajo importa —
+       debajo no se leen, y la que las tiene abandona antes de bajar.
+
+       El botón dice "Pide una demo" en las seis páginas y aquí también. El
+       plan descartó incrustar una agenda: prometer calendario y entregar
+       formulario es la primera fricción que ve el prospecto. -->
+  <section class="hero">
+    <div class="contenedor">
+      <div class="hero-rejilla">
+
+        <div class="pila pila-5">
+          <p class="eyebrow">Pide una demo</p>
+          <h1>Te lo enseñamos funcionando</h1>
+          <p class="entradilla">
+            Media hora, sin compromiso y sin presentación. Vemos tu carta, montamos un par de
+            productos tuyos y te dejamos cobrar una venta de prueba en el sistema de verdad.
+            Después preguntas lo que quieras y te decimos qué plan te toca.
+          </p>
+
+          <form class="formulario pila pila-5" data-form novalidate>
+            <div class="campos">
+              <div class="campo">
+                <label for="f-nombre">Tu nombre</label>
+                <input id="f-nombre" name="nombre" type="text" required autocomplete="name"
+                       maxlength="120" placeholder="Como te decimos">
+              </div>
+
+              <div class="campo">
+                <label for="f-whatsapp">WhatsApp</label>
+                <input id="f-whatsapp" name="whatsapp" type="tel" required autocomplete="tel"
+                       inputmode="tel" maxlength="20" placeholder="10 dígitos">
+              </div>
+
+              <div class="campo campo-ancho">
+                <label for="f-negocio">Nombre del negocio</label>
+                <input id="f-negocio" name="negocio" type="text" required maxlength="150"
+                       autocomplete="organization" placeholder="Como está en el letrero">
+              </div>
+
+              <!-- Las dos que deciden el plan. Van obligatorias: sin ellas la llamada empieza a
+                   ciegas y hay que preguntarlo igual, solo que gastando el tiempo de los dos. -->
+              <div class="campo">
+                <label for="f-cajas">¿Cuántas cajas?</label>
+                <input id="f-cajas" name="cajas" type="number" required min="1" max="99" value="1"
+                       inputmode="numeric">
+              </div>
+
+              <div class="campo">
+                <label for="f-sucursales">¿Cuántas sucursales?</label>
+                <input id="f-sucursales" name="sucursales" type="number" required min="1" max="99"
+                       value="1" inputmode="numeric">
+              </div>
+
+              <div class="campo campo-ancho">
+                <label for="f-giro">¿Qué tipo de negocio es?</label>
+                <select id="f-giro" name="giro">
+                  <option value="">Prefiero decirlo en la llamada</option>
+                  <option value="QUICK_SERVICE">Comida rápida o de mostrador</option>
+                  <option value="FULL_SERVICE">Restaurante con meseros</option>
+                  <option value="CAFE_BAR">Cafetería o bar</option>
+                  <option value="FOODTRUCK">Food truck</option>
+                  <option value="DARK_KITCHEN">Solo reparto</option>
+                  <option value="ENTERPRISE">Cadena o franquicia</option>
+                </select>
+              </div>
+
+              <div class="campo campo-ancho">
+                <label for="f-usa">¿Qué usas hoy?</label>
+                <input id="f-usa" name="usa_hoy" type="text" maxlength="300"
+                       placeholder="Otro sistema, una libreta, Excel… lo que sea">
+                <p class="campo-ayuda">
+                  Si vienes de otro sistema, con esto llegamos a la llamada sabiendo si podemos
+                  traer tu menú tal cual.
+                </p>
+              </div>
+            </div>
+
+            <!-- Trampa para robots. Nadie lo ve ni lo tabula; si llega lleno, se descarta.
+                 `aria-hidden` + `tabindex` porque un lector de pantalla tampoco debe encontrarlo. -->
+            <div class="trampa" aria-hidden="true">
+              <label for="f-sitio">No llenar este campo</label>
+              <input id="f-sitio" name="sitio_web" type="text" tabindex="-1" autocomplete="off">
+            </div>
+
+            <p class="form-error" data-form-error role="alert" hidden></p>
+
+            <div class="pila pila-3">
+              <button class="btn btn-primario btn-hero" type="submit" data-form-enviar>
+                Pide una demo
+              </button>
+              <p style="font-size:var(--t-13);color:var(--ink-3)">
+                Te contestamos por WhatsApp el mismo día hábil. Al enviar aceptas nuestro
+                <a href="aviso-privacidad.html">aviso de privacidad</a>.
+              </p>
+            </div>
+          </form>
+
+          <!-- Lo que se ve al enviar. Es el acuse: no hay correo de confirmación porque no
+               pedimos correo, así que esta pantalla ES la confirmación. -->
+          <div class="form-listo pila pila-4" data-form-listo hidden>
+            <h2>Listo, ya nos llegó</h2>
+            <p>
+              Te escribimos por WhatsApp el mismo día hábil. Si tienes prisa, escríbenos tú y
+              contestamos antes.
+            </p>
+            <div class="fila">
+              <a class="btn btn-primario" href="https://wa.me/524761273020">Escríbenos por WhatsApp</a>
+              <a class="btn btn-fantasma" href="precios.html">Ver precios mientras</a>
+            </div>
+          </div>
+        </div>
+
+        <!-- ── La columna que quita el miedo ────────────────────────────── -->
+        <div class="pila pila-6">
+          <div class="tarjeta pila pila-5">
+            <h2 style="font-size:var(--t-24)">Qué pasa después de enviar</h2>
+            <ol class="pasos pasos-columna">
+              <li class="paso">
+                <h3>Te escribimos por WhatsApp</h3>
+                <p>El mismo día hábil. No un correo automático a las tres semanas.</p>
+              </li>
+              <li class="paso">
+                <h3>Media hora, cuando puedas</h3>
+                <p>
+                  En videollamada o en tu local si estás por León. La agendamos a tu hora floja,
+                  no a la nuestra.
+                </p>
+              </li>
+              <li class="paso">
+                <h3>Lo usas tú</h3>
+                <p>
+                  Con tus productos y tus precios, no con una demostración de juguete. Ahí es donde
+                  se ve si te sirve.
+                </p>
+              </li>
+              <li class="paso">
+                <h3>Te decimos qué plan te toca</h3>
+                <p>
+                  Con el precio de la página, sin cotización inflada. Si no te sirve, te lo
+                  decimos y no insistimos.
+                </p>
+              </li>
+            </ol>
+          </div>
+
+          <div class="letra-chica">
+            <p>
+              <strong>No te va a llamar un vendedor.</strong> Somos un equipo chico de León: te
+              contesta quien construyó el sistema.
+            </p>
+            <p>
+              Tus datos son solo para contactarte por esto. No los vendemos, no los compartimos y
+              no te vamos a meter a una lista de correos.
+            </p>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<footer class="pie">
+  <div class="contenedor">
+    <div class="pie-rejilla">
+      <div class="pila pila-3">
+        <span class="nav-logo" style="pointer-events:none">
+          <img src="assets/img/logo.svg" alt="" width="30" height="30" aria-hidden="true">
+          <span>VIM POS</span>
+        </span>
+        <p style="font-size:var(--t-15)">
+          El sistema completo para tu restaurante: caja, cocina, mesas, inventario y
+          facturación. Hecho en León, Guanajuato.
+        </p>
+      </div>
+      <div>
+        <h4>Producto</h4>
+        <ul class="pie-lista">
+          <li><a href="sin-internet.html">Sin internet</a></li>
+          <li><a href="precios.html">Precios</a></li>
+          <li><a href="demo.html">Pide una demo</a></li>
+        </ul>
+      </div>
+      <div>
+        <h4>Contacto</h4>
+        <ul class="pie-lista">
+          <li><a href="mailto:hola@vimpos.com.mx">hola@vimpos.com.mx</a></li>
+          <li><a href="https://wa.me/524761273020">WhatsApp 476 127 3020</a></li>
+        </ul>
+      </div>
+    </div>
+    <div class="pie-legal">
+      <span>© 2026 VIM POS</span>
+      <span class="fila" style="gap:var(--sp-5)">
+        <a href="aviso-privacidad.html" style="color:inherit">Aviso de privacidad</a>
+        <a href="terminos.html" style="color:inherit">Términos</a>
+      </span>
+    </div>
+  </div>
+</footer>
+
+<script src="assets/js/vim.js" defer></script>
+</body>
+</html>
