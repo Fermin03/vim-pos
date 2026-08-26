@@ -126,8 +126,22 @@ export default function DashboardPage() {
   const [onb, setOnb] = useState<EstadoOnboarding | null>(null);
   const [sucursal, setSucursal] = useState<string | null>(null);
 
+  /* El día que se está mirando. `null` = hoy, que es lo que se ve al entrar.
+     Se guarda aparte de `data` porque el selector tiene que responder al
+     instante aunque la consulta tarde: si se leyera de `data`, al elegir una
+     fecha el campo se quedaría en la anterior hasta que llegaran los datos. */
+  const [dia, setDia] = useState<string | null>(null);
+  const [cargandoDia, setCargandoDia] = useState(false);
+
   useEffect(() => {
-    leerDashboard().then(setData).catch((e) => setError(mensajeError(e, "No se pudo cargar")));
+    setCargandoDia(true);
+    leerDashboard(dia ?? undefined)
+      .then(setData)
+      .catch((e) => setError(mensajeError(e, "No se pudo cargar")))
+      .finally(() => setCargandoDia(false));
+  }, [dia]);
+
+  useEffect(() => {
     leerEstadoOnboarding().then(setOnb).catch(() => {});
     listarSucursales()
       .then((s) => setSucursal(s.length === 1 ? s[0]!.nombre : null))
@@ -157,16 +171,56 @@ export default function DashboardPage() {
     <>
       <PageHeader
         titulo={`Hola, ${primer}`}
-        subtitulo={sucursal ? `Esto es lo que pasa hoy en ${sucursal}` : "Esto es lo que pasa hoy en tu negocio"}
+        subtitulo={
+          data && !data.esHoy
+            ? `Lo que pasó el ${fechaCorta}${sucursal ? ` en ${sucursal}` : ""}`
+            : sucursal
+              ? `Esto es lo que pasa hoy en ${sucursal}`
+              : "Esto es lo que pasa hoy en tu negocio"
+        }
         right={
-          <span className="inline-flex items-center gap-2 rounded border border-line-strong bg-surface px-3.5 py-[9px] text-[13px] font-semibold">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-[15px] w-[15px] text-ink-3"><rect x="3" y="5" width="18" height="16" rx="2" /><path d="M16 3v4M8 3v4M3 10h18" /></svg>
-            Hoy · {fechaCorta}
-            <span className="inline-flex items-center gap-[5px] text-[11px] font-semibold text-success">
-              <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-success" />
-              En vivo
-            </span>
-          </span>
+          /* ANTES ESTO ERA UN <span>. Tenía borde, icono de calendario y aire de
+             control, pero no era clicable: solo pintaba la fecha. Quien lo veía
+             intentaba cambiar el día y no pasaba nada.
+
+             Ahora es un `<input type="date">` de verdad. Nativo y no un
+             calendario propio: en el teléfono abre el selector del sistema, que
+             el dueño ya sabe usar, y no hay que mantener un widget. */
+          <div className="flex items-center gap-2">
+            <label className="inline-flex items-center gap-2 rounded border border-line-strong bg-surface px-3 py-[7px] text-[13px] font-semibold focus-within:border-ink focus-within:shadow-[0_0_0_3px_rgba(22,22,26,.06)]">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-[15px] w-[15px] flex-shrink-0 text-ink-3" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2" /><path d="M16 3v4M8 3v4M3 10h18" /></svg>
+              <span className="sr-only">Día que se muestra</span>
+              <input
+                type="date"
+                className="bg-transparent text-[13px] font-semibold outline-none"
+                value={dia ?? data?.hoyContable ?? ""}
+                /* Sin tope, se puede elegir mañana y la pantalla sale en cero
+                   sin explicar por qué. El tope es el día contable del negocio,
+                   no el del reloj del navegador. */
+                max={data?.hoyContable}
+                onChange={(e) => setDia(e.target.value || null)}
+                disabled={!data}
+              />
+            </label>
+
+            {data?.esHoy ? (
+              <span className="inline-flex items-center gap-[5px] text-[11px] font-semibold text-success">
+                <span className={`h-1.5 w-1.5 rounded-full bg-success ${cargandoDia ? "" : "animate-pulse"}`} />
+                En vivo
+              </span>
+            ) : (
+              /* «En vivo» mintiendo sobre un día pasado sería peor que no
+                 decir nada: se cambia por la salida a hoy, que es lo que hace
+                 falta cuando ya miraste el día que querías. */
+              <button
+                type="button"
+                onClick={() => setDia(null)}
+                className="text-[12px] font-semibold text-accent transition-colors hover:text-accent-hover"
+              >
+                Volver a hoy
+              </button>
+            )}
+          </div>
         }
       />
       <PageBody>
@@ -208,36 +262,41 @@ export default function DashboardPage() {
 
         {hoy && !sinVentas && (
           <>
-            {/* KPIs con variación vs. ayer (P-177) */}
+            {/* KPIs con variación contra el día anterior (P-177).
+
+                Las etiquetas y los comparativos dicen "hoy" y "ayer" solo
+                cuando de verdad se mira hoy. Mirando el 25, una tarjeta que
+                dijera "Ventas hoy" estaría mintiendo sobre la cifra que enseña
+                — y "vs ayer" tampoco: es el día anterior AL QUE SE MIRA. */}
             <div className="mb-5 grid grid-cols-2 gap-4 lg:grid-cols-4">
               <Kpi
                 primario
-                label="Ventas hoy"
+                label={data?.esHoy ? "Ventas hoy" : "Ventas del día"}
                 valor={fmt(hoy.totalNeto)}
                 icono={ICONOS.ventas}
                 pct={variacionPct(hoy.totalNeto, ayer?.totalNeto)}
-                comparativo={ayer ? `vs ayer (${fmt(ayer.totalNeto)})` : "sin día previo"}
+                comparativo={ayer ? `vs ${data?.esHoy ? "ayer" : "el día previo"} (${fmt(ayer.totalNeto)})` : "sin día previo"}
               />
               <Kpi
                 label="Tickets"
                 valor={fmtInt(hoy.ticketsCompletados)}
                 icono={ICONOS.tickets}
                 pct={variacionPct(hoy.ticketsCompletados, ayer?.ticketsCompletados)}
-                comparativo={ayer ? `vs ayer (${fmtInt(ayer.ticketsCompletados)})` : "sin día previo"}
+                comparativo={ayer ? `vs ${data?.esHoy ? "ayer" : "el día previo"} (${fmtInt(ayer.ticketsCompletados)})` : "sin día previo"}
               />
               <Kpi
                 label="Ticket promedio"
                 valor={fmt(hoy.ticketPromedio)}
                 icono={ICONOS.promedio}
                 pct={variacionPct(hoy.ticketPromedio, ayer?.ticketPromedio)}
-                comparativo={ayer ? `vs ayer (${fmt(ayer.ticketPromedio)})` : "sin día previo"}
+                comparativo={ayer ? `vs ${data?.esHoy ? "ayer" : "el día previo"} (${fmt(ayer.ticketPromedio)})` : "sin día previo"}
               />
               <Kpi
                 label="Propinas"
                 valor={fmt(hoy.propinas)}
                 icono={ICONOS.propinas}
                 pct={variacionPct(hoy.propinas, ayer?.propinas)}
-                comparativo={ayer ? `vs ayer (${fmt(ayer.propinas)})` : "sin día previo"}
+                comparativo={ayer ? `vs ${data?.esHoy ? "ayer" : "el día previo"} (${fmt(ayer.propinas)})` : "sin día previo"}
               />
             </div>
 
@@ -262,25 +321,36 @@ export default function DashboardPage() {
               <div className="rounded-lg border border-line bg-surface">
                 <div className="border-b border-line px-5 py-4">
                   <div className="flex items-center justify-between gap-3">
-                    <div className="font-display text-[15px] font-semibold">Top productos hoy</div>
+                    <div className="font-display text-[15px] font-semibold">Top productos{data?.esHoy ? " hoy" : ""}</div>
                     <Link href="/reportes/ventas-producto" className="text-[12px] font-semibold text-ink-3 transition-colors hover:text-ink">Ver todos</Link>
                   </div>
                 </div>
                 <div className="px-5 py-2">
                   {(data?.topProductos.length ?? 0) > 0 ? (
                     <div className="flex flex-col">
+                      {/* LA LISTA VIENE ORDENADA POR IMPORTE, así que la cifra
+                          grande y la barra son el IMPORTE.
+
+                          Antes se ordenaba por dinero y se enseñaban unidades:
+                          el número 1 podía tener menos piezas que el 3 y la
+                          lista parecía rota. No lo estaba — decía una cosa y
+                          medía otra. Las unidades siguen, en pequeño, porque el
+                          dato sirve; lo que no puede es mandar sobre el orden. */}
                       {data!.topProductos.map((p, i) => {
-                        const maxU = Math.max(1, ...data!.topProductos.map((t) => t.unidades));
+                        const maxTotal = Math.max(1, ...data!.topProductos.map((t) => t.total));
                         return (
                           <div key={p.nombre} className="flex items-center gap-[11px] border-b border-line py-[11px] last:border-b-0">
                             <span className={`flex h-[22px] w-[22px] flex-shrink-0 items-center justify-center rounded-full font-display text-[11px] font-bold ${i === 0 ? "bg-ink text-white" : "bg-hover text-ink-2"}`}>{i + 1}</span>
                             <div className="min-w-0 flex-1">
                               <div className="truncate text-[13px] font-semibold">{p.nombre}</div>
                               <div className="mt-[5px] h-1 overflow-hidden rounded-full bg-hover">
-                                <span className="block h-full rounded-full bg-ink-3" style={{ width: `${(p.unidades / maxU) * 100}%` }} />
+                                <span className="block h-full rounded-full bg-ink-3" style={{ width: `${(p.total / maxTotal) * 100}%` }} />
                               </div>
                             </div>
-                            <span className="flex-shrink-0 text-[13px] font-bold tabular-nums">{fmtInt(p.unidades)}</span>
+                            <div className="flex-shrink-0 text-right">
+                              <div className="text-[13px] font-bold tabular-nums">{fmt(p.total)}</div>
+                              <div className="text-[11.5px] text-ink-3 tabular-nums">{fmtInt(p.unidades)} u.</div>
+                            </div>
                           </div>
                         );
                       })}

@@ -71,8 +71,12 @@ export function elegirDias<T, R>(
 }
 
 export type Dashboard = {
-  /** El día contable que se está mostrando (`YYYY-MM-DD`). Es HOY, tenga ventas o no. */
+  /** El día contable que se está mostrando (`YYYY-MM-DD`). Por omisión hoy; otro si se eligió en el selector. */
   dia: string;
+  /** El día contable de HOY según el negocio. Sirve de tope del selector: no se elige el futuro. */
+  hoyContable: string;
+  /** Si lo que se ve es hoy. Solo entonces tiene sentido el distintivo «En vivo». */
+  esHoy: boolean;
   /**
    * Día contable más reciente CON ventas, o null si no hubo en el rango.
    *
@@ -123,13 +127,22 @@ function sumarDia(filas: Record<string, unknown>[], dia: string): ResumenDia {
  * negocio (3:00 por defecto) y su zona horaria: a la 1 de la mañana todavía se está vendiendo
  * "ayer", y calcularlo aquí por calendario mostraría un cero falso a media noche de trabajo.
  */
-export async function leerDashboard(): Promise<Dashboard> {
+/** Datos del panel para UN día contable.
+ *
+ *  `diaElegido` llegó con el selector de fecha del encabezado. Antes esta
+ *  función no recibía nada y siempre calculaba "hoy", que es la razón por la
+ *  que el selector no hacía nada: no había a dónde mandar la fecha.
+ *
+ *  Sin argumento sigue siendo "hoy", así que el resto de llamadas no cambian. */
+export async function leerDashboard(diaElegido?: string): Promise<Dashboard> {
   const { data: ten, error: eTen } = await supabase
     .from("tenants").select("id, timezone").limit(1).maybeSingle();
   if (eTen) throw new Error(eTen.message);
   const tenantId = (ten as { id?: string } | null)?.id ?? null;
   const zona = (ten as { timezone?: string } | null)?.timezone || "America/Mexico_City";
 
+  /* El día de HOY según el negocio, que no es el del reloj: un bar que cierra
+     a las 3 a.m. sigue en el día de ayer a la 1 a.m. */
   let hoyContable: string;
   if (tenantId) {
     const { data: d, error: eDia } = await supabase.rpc("calcular_dia_contable", { p_tenant_id: tenantId });
@@ -138,9 +151,14 @@ export async function leerDashboard(): Promise<Dashboard> {
   } else {
     hoyContable = hoyMx(); // sin tenant a la vista no hay hora de cierre que consultar
   }
-  const ayerContable = sumarDias(hoyContable, -1);
-  const desde = sumarDias(hoyContable, -6);
-  const hasta = hoyContable;
+
+  /* El día que se está MIRANDO. Normalmente hoy; otro si lo eligieron arriba.
+     Todo lo de abajo —comparativa, tendencia, top y ventas por hora— se ancla
+     aquí, así que elegir una fecha mueve la pantalla entera y no solo un dato. */
+  const diaVista = diaElegido ?? hoyContable;
+  const ayerContable = sumarDias(diaVista, -1);
+  const desde = sumarDias(diaVista, -6);
+  const hasta = diaVista;
 
   // Estado de resultados por día (todas las sucursales del tenant, bajo RLS).
   const { data: er, error: e1 } = await supabase
@@ -164,13 +182,16 @@ export async function leerDashboard(): Promise<Dashboard> {
     dia: d,
     total: (porDia.get(d) ?? []).reduce((a, f) => a + num(f.total_neto_mxn), 0),
   }));
-  const { hoy, ayer, ultimoDiaConVentas } = elegirDias(porDia, tendencia, hoyContable, sumarDia);
+  const { hoy, ayer, ultimoDiaConVentas } = elegirDias(porDia, tendencia, diaVista, sumarDia);
 
-  // Top productos del día más reciente.
+  /* Top productos del día que se mira. Se pide ordenado por IMPORTE, y la
+     pantalla enseña el importe: antes ordenaba por dinero y mostraba unidades,
+     así que la lista parecía desordenada — el número 1 podía tener menos piezas
+     que el 3. Orden y cifra tienen que hablar de lo mismo. */
   const { data: tp, error: e2 } = await supabase
     .from("vw_ventas_por_producto")
     .select("producto_nombre, unidades_vendidas, total_mxn, dia_contable")
-    .eq("dia_contable", hoyContable)
+    .eq("dia_contable", diaVista)
     .order("total_mxn", { ascending: false })
     .limit(6);
   if (e2) throw new Error(e2.message);
@@ -185,7 +206,7 @@ export async function leerDashboard(): Promise<Dashboard> {
   const { data: th, error: e3 } = await supabase
     .from("tickets")
     .select("fecha_pago, total_mxn")
-    .eq("dia_contable", hoyContable)
+    .eq("dia_contable", diaVista)
     .eq("estado_fiscal", "PAGADO")
     .is("deleted_at", null)
     .not("fecha_pago", "is", null);
@@ -203,7 +224,7 @@ export async function leerDashboard(): Promise<Dashboard> {
     .map(([hora, total]) => ({ hora, total: Math.round(total * 100) / 100 }))
     .sort((a, b) => a.hora - b.hora);
 
-  return { dia: hoyContable, ultimoDiaConVentas, hoy, ayer, topProductos, tendencia, ventasPorHora };
+  return { dia: diaVista, hoyContable, esHoy: diaVista === hoyContable, ultimoDiaConVentas, hoy, ayer, topProductos, tendencia, ventasPorHora };
 }
 
 // ── Reporte Z histórico (P-181) ─────────────────────────────────────────────
