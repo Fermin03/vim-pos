@@ -1,0 +1,86 @@
+/* ==========================================================================
+   Tipografias auto-alojadas
+
+   POR QUE NO SE CARGAN DE GOOGLE. Dos motivos, y el segundo pesa mas:
+
+   1. RENDIMIENTO. La hoja de Google bloquea el primer pintado: el navegador
+      resuelve fonts.googleapis.com, baja el CSS, descubre ahi las URLs de
+      fonts.gstatic.com y vuelve a conectar. Medido con Lighthouse, eso dejaba
+      el First Contentful Paint en 2.7 s con todo lo demas en verde.
+
+   2. PRIVACIDAD, y aqui es coherencia. El aviso del sitio dice que no hay
+      terceros siguiendo al visitante. Google Fonts no pone cookies, pero cada
+      visita le entrega su IP a Google. Auto-alojarlas hace que esa frase sea
+      literalmente cierta en vez de casi cierta.
+
+   Solo el subconjunto `latin`, y esto se comprobo en vez de suponerlo: TODO el
+   espanol cabe ahi. Las acentuadas y la n van de U+00C1 a U+00FA, y el rango de
+   `latin` empieza en U+0000-00FF. `latin-ext` (U+0100 en adelante) es para
+   polaco, rumano y companyia; el cirilico, el griego y el vietnamita, igual.
+
+   Se descartaron 296 KB de archivos que `unicode-range` nunca habria llegado a
+   pedir. No costaban nada en runtime, pero viajaban en cada despliegue.
+
+   `font-display: swap` se conserva: el texto se pinta con la tipografia del
+   sistema y se recompone al llegar la buena. Un parrafo legible tarde es peor
+   que un parrafo legible ya.
+
+   Las tres familias son SIL OFL, asi que alojarlas es parte de su licencia.
+   ========================================================================== */
+
+@font-face {
+  font-family: 'Inter Tight';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('../fonts/inter-tight-400-latin.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: 'Inter Tight';
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url('../fonts/inter-tight-500-latin.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: 'Inter Tight';
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url('../fonts/inter-tight-600-latin.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: 'JetBrains Mono';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('../fonts/jetbrains-mono-400-latin.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: 'JetBrains Mono';
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url('../fonts/jetbrains-mono-600-latin.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: 'Sora';
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url('../fonts/sora-600-latin.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: 'Sora';
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url('../fonts/sora-700-latin.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
