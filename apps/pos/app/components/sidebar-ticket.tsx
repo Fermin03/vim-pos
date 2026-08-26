@@ -86,6 +86,7 @@ export function SidebarTicket({
   onAplicarDescuento,
   descuentoMxn = 0,
   totalConDescuento,
+  promocionMxn = 0,
   bloqueado = false,
   procesando,
 }: {
@@ -123,6 +124,9 @@ export function SidebarTicket({
   descuentoMxn?: number;
   /** Total autoritativo de la BD cuando el ticket ya está persistido; si falta, se usa el display. */
   totalConDescuento?: number;
+  /** Rebajado por promociones del negocio. Renglón propio: si se sumara al descuento, el
+   *  cliente vería bajar el total sin que nada en pantalla diga por qué. */
+  promocionMxn?: number;
   /** El ticket ya está comprometido en BD: bloquea edición del carrito para evitar desincronización. */
   bloqueado?: boolean;
   procesando: boolean;
@@ -134,6 +138,7 @@ export function SidebarTicket({
   const [editandoNota, setEditandoNota] = useState<string | null>(null);
   const [notaOrdenAbierta, setNotaOrdenAbierta] = useState(false);
   const hayDescuento = descuentoMxn > 0;
+  const hayPromocion = promocionMxn > 0;
   const totalFinal = totalConDescuento ?? totales.total;
   /**
    * Cuenta que NO se cobra aquí: Pick-up y Domicilio mandan a cocina y se cobran después,
@@ -344,6 +349,12 @@ export function SidebarTicket({
           <span>IVA (16%)</span>
           <span className="tabular-nums font-medium text-ink">{fmtMxn(totales.iva)}</span>
         </div>
+        {hayPromocion && (
+          <div className="mb-1 flex justify-between text-[13px] font-medium text-success">
+            <span>Promoción</span>
+            <span className="tabular-nums">−{fmtMxn(promocionMxn)}</span>
+          </div>
+        )}
         {hayDescuento && (
           <div className="mb-1 flex justify-between text-[13px] font-medium text-danger">
             <span>Descuento</span>

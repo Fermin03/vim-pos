@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Button, Modal } from "@vim/ui/styles";
 import { type Empleado } from "../lib/supabase";
 import {
@@ -14,6 +14,14 @@ import {
 import { autorizacionPropia, type Autorizacion, type PayloadAutorizacion } from "../lib/autorizacion";
 import { ModalAutorizacionPin } from "./modal-autorizacion-pin";
 import { fmtMxn } from "../lib/turno";
+import {
+  aplicarPromo,
+  leerPromosAplicables,
+  leerPromosAplicadas,
+  quitarPromo,
+  type PromoAplicable,
+  type PromoAplicada,
+} from "../lib/promociones";
 
 // Roles que tienen `descuento.manual_aplicar` por defecto (matriz §2.2).
 const ROLES_DESCUENTO = ["SUPERVISOR", "ADMIN", "DUENO"];
@@ -46,6 +54,61 @@ export function ModalDescuento({
   const [error, setError] = useState<string | null>(null);
   const [aplicando, setAplicando] = useState(false);
   const [pidiendoPin, setPidiendoPin] = useState(false);
+  // Promociones del negocio que aplican a este ticket ahora mismo.
+  const [promos, setPromos] = useState<PromoAplicable[]>([]);
+  const [puestas, setPuestas] = useState<PromoAplicada[]>([]);
+  const [promoOcupada, setPromoOcupada] = useState<string | null>(null);
+
+  const cargarPromos = useCallback(async () => {
+    try {
+      const [a, b] = await Promise.all([
+        leerPromosAplicables(token, ticketId),
+        leerPromosAplicadas(token, ticketId),
+      ]);
+      // Las ya puestas no se vuelven a ofrecer: la base las rechazaría, y un botón
+      // que solo sirve para sacar un error no debería estar en pantalla.
+      const yaEstan = new Set(b.map((x) => x.nombre));
+      setPromos(a.filter((p) => !yaEstan.has(p.nombre)));
+      setPuestas(b);
+    } catch {
+      /* Sin promociones no se bloquea el descuento manual, que es lo que el cajero
+         vino a hacer. El bloque simplemente no aparece. */
+    }
+  }, [token, ticketId]);
+
+  useEffect(() => { void cargarPromos(); }, [cargarPromos]);
+
+  async function onPonerPromo(p: PromoAplicable) {
+    setPromoOcupada(p.id);
+    setError(null);
+    try {
+      await aplicarPromo(token, { ticketId, promocionId: p.id });
+      await cargarPromos();
+      onAplicado();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "No se pudo aplicar la promoción");
+    } finally {
+      setPromoOcupada(null);
+    }
+  }
+
+  async function onQuitarPromo(p: PromoAplicada) {
+    setPromoOcupada(p.aplicacionId);
+    setError(null);
+    try {
+      await quitarPromo(token, {
+        aplicacionId: p.aplicacionId,
+        motivo: "Quitada en caja",
+        usuarioId: empleado.id,
+      });
+      await cargarPromos();
+      onAplicado();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "No se pudo quitar la promoción");
+    } finally {
+      setPromoOcupada(null);
+    }
+  }
 
   const tienePermiso = tipo === "CORTESIA_TOTAL"
     ? ROLES_CORTESIA.includes(empleado.rol)
@@ -147,6 +210,63 @@ export function ModalDescuento({
         <h2 className="font-display text-xl font-semibold tracking-tight">Aplicar descuento</h2>
         <p className="mt-0.5 text-[13px] text-ink-3">Total actual {fmtMxn(totalActual)}</p>
       </div>
+
+      {/* ── Promociones del negocio ──────────────────────────────
+          Van ARRIBA del descuento manual y a un toque, porque es lo que más se
+          usa y lo que no requiere autorización: la promoción ya la aprobó el
+          dueño al registrarla en el panel. El descuento a mano —el que sí pide
+          PIN— queda abajo, para lo que no estaba previsto.
+
+          Si no hay ninguna vigente, este bloque NO se pinta. Una sección vacía
+          que dice "no hay promociones" solo le quita sitio al teclado en una
+          pantalla de caja. */}
+      {(promos.length > 0 || puestas.length > 0) && (
+        <div className="mb-5">
+          <div className="mb-2 text-[11.5px] font-bold uppercase tracking-wide text-ink-3">
+            Promociones
+          </div>
+
+          {puestas.map((p) => (
+            <div
+              key={p.aplicacionId}
+              className="mb-1.5 flex items-center justify-between gap-3 rounded border border-[#D6E8DD] bg-[#EAF3EE] px-3 py-2"
+            >
+              <div className="min-w-0">
+                <div className="truncate text-[13px] font-semibold text-success">{p.nombre}</div>
+                <div className="text-[12px] tabular-nums text-ink-2">−{fmtMxn(p.monto)} aplicado</div>
+              </div>
+              <button
+                type="button"
+                disabled={promoOcupada != null}
+                onClick={() => void onQuitarPromo(p)}
+                className="flex-shrink-0 rounded border border-line-strong bg-surface px-2.5 py-1.5 text-[12px] font-semibold text-ink-2 transition hover:border-ink hover:text-ink disabled:opacity-40"
+              >
+                Quitar
+              </button>
+            </div>
+          ))}
+
+          {promos.map((p) => (
+            <button
+              key={p.id}
+              type="button"
+              disabled={promoOcupada != null}
+              onClick={() => void onPonerPromo(p)}
+              className="mb-1.5 flex w-full items-center justify-between gap-3 rounded border border-line-strong bg-surface px-3 py-2.5 text-left transition hover:border-ink disabled:opacity-40"
+            >
+              <span className="min-w-0 truncate text-[13px] font-semibold">{p.nombre}</span>
+              <span className="flex-shrink-0 text-[12.5px] font-semibold tabular-nums text-ink-2">
+                −{fmtMxn(p.descuentoEstimado)}
+              </span>
+            </button>
+          ))}
+
+          <div className="mt-3 h-px bg-line" />
+          <div className="mt-3 text-[11.5px] font-bold uppercase tracking-wide text-ink-3">
+            Descuento a mano
+          </div>
+        </div>
+      )}
 
       {/* Tipo */}
       <div className="mb-4 inline-flex w-full gap-0.5 rounded border border-line bg-hover p-[3px]">
