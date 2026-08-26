@@ -1,0 +1,232 @@
+// Edge Function: solicitar-demo — el formulario del sitio público (sitio-web/demo.html).
+//
+// Pública como signup-tenant: la llama cualquier visitante con la anon key, así que valida su
+// propia entrada y no confía en nada de lo que recibe.
+//
+// EL ORDEN IMPORTA: PRIMERO LA FILA, DESPUÉS EL CORREO
+//
+// La fila en `prospectos` es la fuente de verdad y el correo es solo el aviso. Si el correo falla
+// —o si todavía no hay proveedor configurado— la función devuelve éxito igual, porque el prospecto
+// YA está guardado y se puede atender desde /platform. Al revés sería tirar un lead por un fallo
+// de un tercero, y un lead perdido cuesta más que todo el sitio.
+//
+// UN SOLO CORREO, NO DOS
+//
+// El plan del sitio pedía "aviso interno y acuse al prospecto". El acuse no se puede mandar: el
+// formulario no pide correo —pide WhatsApp, que es por donde contesta un restaurantero— y añadir
+// un campo de correo solo para poder acusar recibo cuesta conversión y no da nada. El acuse va en
+// pantalla al enviar, que es donde la persona ya está mirando.
+//
+// EL CORREO ES OPCIONAL A PROPÓSITO
+//
+// Este proyecto no tiene proveedor transaccional: los únicos correos que salen hoy son los de
+// Supabase Auth (invitaciones), que no sirven para mandar texto arbitrario. Si RESEND_API_KEY
+// está configurada, se avisa por correo; si no, la función lo registra y sigue. Así el formulario
+// funciona desde el primer día y el correo se enciende cuando haya llave, sin tocar el sitio.
+//
+//   supabase secrets set RESEND_API_KEY="re_..."
+//   supabase secrets set VIM_AVISOS_A="hola@vimpos.com.mx"
+//   supabase secrets set VIM_AVISOS_DE="VIM POS <hola@vimpos.com.mx>"   # dominio verificado en Resend
+//
+// MIENTRAS NO HAYA LLAVE, LOS PROSPECTOS SOLO LLEGAN A LA TABLA. La promesa del sitio —«te
+// contestamos el mismo día hábil»— depende entonces de que alguien mire /platform. Es un
+// compromiso operativo, no copy.
+//
+// DEFENSAS CONTRA BOTS, Y LO QUE NO CUBREN
+//
+//   · Honeypot: un campo que ningún humano ve. Si viene lleno, se responde 200 y se tira.
+//     Responder 200 y no 400 es deliberado — un bot que recibe error reintenta con otra forma.
+//   · Tiempo mínimo de llenado: el formulario manda cuándo se abrió. Menos de 3 s es un guion.
+//     El dato lo pone el cliente, así que un bot decente lo falsea; filtra a los que no se
+//     molestan, que son la mayoría.
+//   · Límite por IP en memoria. Cada instancia tiene su propio contador y las instancias van y
+//     vienen, así que esto NO es un rate-limit fuerte: es un tope al accidente y al bot torpe.
+//     El día que haya spam de verdad, la respuesta es un captcha o el WAF de delante, no esto.
+
+import { createClient } from "jsr:@supabase/supabase-js@2";
+import { corsHeaders } from "../_shared/cors.ts";
+
+const GIROS = ["FOODTRUCK", "QUICK_SERVICE", "FULL_SERVICE", "CAFE_BAR", "DARK_KITCHEN", "ENTERPRISE"];
+
+const GIRO_ETIQUETA: Record<string, string> = {
+  FOODTRUCK: "Food truck",
+  QUICK_SERVICE: "Comida rápida / mostrador",
+  FULL_SERVICE: "Restaurante con meseros",
+  CAFE_BAR: "Cafetería o bar",
+  DARK_KITCHEN: "Cocina fantasma / solo reparto",
+  ENTERPRISE: "Cadena",
+};
+
+const MIN_SEGUNDOS_LLENADO = 3;
+const MAX_POR_IP = 5;
+const VENTANA_MS = 60 * 60 * 1000; // una hora
+
+/** IP → marcas de tiempo de los envíos recientes. Ver la nota del encabezado sobre su alcance. */
+const porIp = new Map<string, number[]>();
+
+function demasiados(ip: string): boolean {
+  const ahora = Date.now();
+  const recientes = (porIp.get(ip) ?? []).filter((t) => ahora - t < VENTANA_MS);
+  recientes.push(ahora);
+  porIp.set(ip, recientes);
+
+  // Sin esto el Map crece hasta que la instancia muere. Barato porque solo corre al recibir algo.
+  if (porIp.size > 5000) {
+    for (const [k, v] of porIp) {
+      if (v.every((t) => ahora - t >= VENTANA_MS)) porIp.delete(k);
+    }
+  }
+  return recientes.length > MAX_POR_IP;
+}
+
+/** Deja solo dígitos y quita el 52 / +52 de lada para guardar los 10 de siempre. */
+function normalizarWhatsapp(v: string): string {
+  const d = v.replace(/\D/g, "");
+  if (d.length === 12 && d.startsWith("52")) return d.slice(2);
+  if (d.length === 13 && d.startsWith("521")) return d.slice(3);
+  return d;
+}
+
+function texto(v: unknown, max: number): string {
+  return typeof v === "string" ? v.trim().slice(0, max) : "";
+}
+
+function entero(v: unknown): number | null {
+  const n = typeof v === "number" ? v : Number.parseInt(String(v ?? ""), 10);
+  return Number.isInteger(n) ? n : null;
+}
+
+/** Escapa lo que va dentro del correo HTML. El nombre y el negocio los escribe un desconocido. */
+function esc(s: string): string {
+  return s.replace(/[&<>"']/g, (c) =>
+    ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]!
+  );
+}
+
+async function enviarCorreo(payload: { to: string; subject: string; html: string; replyTo?: string }) {
+  const key = Deno.env.get("RESEND_API_KEY");
+  if (!key) return { enviado: false, motivo: "SIN_PROVEEDOR" };
+
+  const from = Deno.env.get("VIM_AVISOS_DE") ?? "VIM POS <onboarding@resend.dev>";
+  const r = await fetch("https://api.resend.com/emails", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+    body: JSON.stringify({
+      from,
+      to: [payload.to],
+      subject: payload.subject,
+      html: payload.html,
+      ...(payload.replyTo ? { reply_to: payload.replyTo } : {}),
+    }),
+  });
+  if (!r.ok) return { enviado: false, motivo: `HTTP_${r.status}: ${await r.text()}` };
+  return { enviado: true, motivo: "" };
+}
+
+Deno.serve(async (req) => {
+  const cors = corsHeaders(req);
+  const json = (body: unknown, status = 200) =>
+    new Response(JSON.stringify(body), { status, headers: { ...cors, "Content-Type": "application/json" } });
+
+  if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
+  if (req.method !== "POST") return json({ error: "METHOD_NOT_ALLOWED" }, 405);
+
+  let b: Record<string, unknown>;
+  try {
+    b = await req.json();
+  } catch {
+    return json({ error: "BAD_JSON" }, 400);
+  }
+
+  // ── Honeypot ──────────────────────────────────────────────────────────────
+  // 200 y silencio: que el bot crea que funcionó y no vuelva a probar de otra forma.
+  if (texto(b.sitio_web, 200)) return json({ ok: true });
+
+  // ── Tiempo de llenado ─────────────────────────────────────────────────────
+  const abierto = entero(b.abierto_en);
+  if (abierto !== null && (Date.now() - abierto) / 1000 < MIN_SEGUNDOS_LLENADO) {
+    return json({ ok: true });
+  }
+
+  // ── Límite por IP ─────────────────────────────────────────────────────────
+  const ip = (req.headers.get("x-forwarded-for") ?? "").split(",")[0]!.trim() || "desconocida";
+  if (demasiados(ip)) {
+    return json({ error: "DEMASIADOS_ENVIOS", detalle: "Inténtalo más tarde o escríbenos por WhatsApp." }, 429);
+  }
+
+  // ── Validación ────────────────────────────────────────────────────────────
+  // A mano y no con Zod, como el resto de las funciones de este proyecto (ver signup-tenant).
+  const nombre = texto(b.nombre, 120);
+  const whatsapp = normalizarWhatsapp(texto(b.whatsapp, 40));
+  const negocio = texto(b.negocio, 150);
+  const giro = texto(b.giro, 30) || null;
+  const usa_hoy = texto(b.usa_hoy, 300) || null;
+  const mensaje = texto(b.mensaje, 1000) || null;
+  const cajas = entero(b.cajas);
+  const sucursales = entero(b.sucursales);
+
+  const faltan: string[] = [];
+  if (nombre.length < 2) faltan.push("nombre");
+  if (whatsapp.length < 10 || whatsapp.length > 15) faltan.push("whatsapp");
+  if (negocio.length < 2) faltan.push("negocio");
+  if (cajas === null || cajas < 1 || cajas > 99) faltan.push("cajas");
+  if (sucursales === null || sucursales < 1 || sucursales > 99) faltan.push("sucursales");
+  if (giro !== null && !GIROS.includes(giro)) faltan.push("giro");
+  if (faltan.length) return json({ error: "DATOS_INVALIDOS", campos: faltan }, 400);
+
+  // ── La fila ───────────────────────────────────────────────────────────────
+  const admin = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!, {
+    auth: { persistSession: false },
+  });
+
+  const { data: fila, error } = await admin
+    .from("prospectos")
+    .insert({
+      nombre,
+      whatsapp,
+      negocio,
+      cajas,
+      sucursales,
+      giro,
+      usa_hoy,
+      mensaje,
+      origen: texto(b.origen, 60) || "sitio-web",
+      utm_source: texto(b.utm_source, 100) || null,
+      utm_campaign: texto(b.utm_campaign, 100) || null,
+    })
+    .select("id")
+    .single();
+
+  if (error) {
+    console.error("[solicitar-demo] no se pudo guardar el prospecto:", error.message);
+    return json({ error: "NO_GUARDADO", detalle: "Escríbenos por WhatsApp mientras lo arreglamos." }, 500);
+  }
+
+  // ── El aviso ──────────────────────────────────────────────────────────────
+  // A partir de aquí nada puede devolver un error al visitante: su solicitud ya quedó registrada.
+  const avisoA = Deno.env.get("VIM_AVISOS_A") ?? "hola@vimpos.com.mx";
+  const escalon = sucursales! > 1 ? "Cadena" : cajas! > 1 ? "Negocio" : "Esencial";
+
+  const interno = await enviarCorreo({
+    to: avisoA,
+    subject: `Demo: ${negocio} · ${cajas} caja(s), ${sucursales} sucursal(es) → ${escalon}`,
+    html: `
+      <h2 style="font-family:sans-serif">${esc(negocio)}</h2>
+      <table style="font-family:sans-serif;font-size:14px;border-collapse:collapse">
+        <tr><td><b>Nombre</b></td><td>${esc(nombre)}</td></tr>
+        <tr><td><b>WhatsApp</b></td><td><a href="https://wa.me/52${esc(whatsapp)}">${esc(whatsapp)}</a></td></tr>
+        <tr><td><b>Cajas</b></td><td>${cajas}</td></tr>
+        <tr><td><b>Sucursales</b></td><td>${sucursales}</td></tr>
+        <tr><td><b>Giro</b></td><td>${esc(giro ? (GIRO_ETIQUETA[giro] ?? giro) : "no dijo")}</td></tr>
+        <tr><td><b>Usa hoy</b></td><td>${esc(usa_hoy ?? "no dijo")}</td></tr>
+        <tr><td><b>Mensaje</b></td><td>${esc(mensaje ?? "")}</td></tr>
+        <tr><td><b>Escalón sugerido</b></td><td>${escalon}</td></tr>
+      </table>`,
+  });
+
+  if (!interno.enviado) {
+    console.warn(`[solicitar-demo] prospecto ${fila.id} guardado, aviso NO enviado (${interno.motivo}).`);
+  }
+
+  return json({ ok: true, id: fila.id, aviso: interno.enviado });
+});

@@ -714,3 +714,111 @@ a { color: var(--ink); text-underline-offset: 3px; }
 }
 
 .plan-periodo { font-size: var(--t-13); color: var(--ink-3); }
+
+/* ==========================================================================
+   Formulario
+
+   Siete campos y ni uno más. Cada campo extra cuesta conversión, así que los
+   que están se ganaron el sitio: nombre y WhatsApp para poder contestar,
+   negocio para saber con quién hablamos, y cajas + sucursales porque son las
+   dos que deciden el plan — sin ellas la llamada empieza a ciegas.
+   ========================================================================== */
+
+.formulario { max-width: 560px; }
+
+.campos { display: grid; gap: var(--sp-5); }
+@media (min-width: 560px) { .campos { grid-template-columns: 1fr 1fr; } }
+.campo-ancho { grid-column: 1 / -1; }
+
+.campo { display: flex; flex-direction: column; gap: var(--sp-2); }
+
+.campo label {
+  font-size: var(--t-13); font-weight: 600; color: var(--ink);
+  letter-spacing: 0;
+}
+
+.campo input, .campo select {
+  width: 100%;
+  padding: 0 var(--sp-4);
+  height: 44px;                     /* 44 y no 40: se llena con el pulgar */
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r);
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font); font-size: var(--t-15);
+  letter-spacing: -0.01em;
+  transition: border-color var(--v-corta) ease, box-shadow var(--v-corta) ease;
+}
+.campo select { appearance: none; padding-right: var(--sp-8); cursor: pointer;
+  /* La flecha va como fondo para no meter un elemento más que posicionar. */
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%235A5A60' stroke-width='2' stroke-linecap='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat; background-position: right var(--sp-4) center;
+}
+
+.campo input::placeholder { color: var(--ink-3); }
+
+.campo input:focus-visible, .campo select:focus-visible {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+
+/* El error se marca al soltar el campo, no mientras se escribe: avisar a la
+   tercera letra de que el nombre es inválido es regañar a quien todavía no
+   termina de escribirlo. */
+.campo[data-mal] input, .campo[data-mal] select { border-color: var(--danger); }
+.campo-error { font-size: var(--t-13); color: var(--danger); }
+
+.campo-ayuda { font-size: var(--t-13); color: var(--ink-3); max-width: none; }
+
+/* La trampa para robots. `display: none` la saltan los bots que leen el CSS,
+   así que se saca de la pantalla en vez de ocultarla. */
+.trampa {
+  position: absolute; left: -9999px;
+  width: 1px; height: 1px; overflow: hidden;
+}
+
+.form-error {
+  padding: var(--sp-4) var(--sp-5);
+  border: 1px solid var(--danger);
+  border-radius: var(--r);
+  background: #FDF1EF;
+  font-size: var(--t-15); color: var(--danger);
+  max-width: none;
+}
+
+.form-listo {
+  padding: var(--sp-6);
+  border: 1px solid var(--success);
+  border-radius: var(--r-lg);
+  background: #F1F8F4;
+}
+.form-listo h2 { font-size: var(--t-24); }
+
+/* Mientras se envía. Sin spinner: el botón cambia de texto y se desactiva, que
+   dice lo mismo con una pieza menos y no parpadea si la respuesta es rápida. */
+.btn[aria-busy="true"] { opacity: .7; pointer-events: none; }
+
+/* Los pasos en columna, para la barra lateral de la página de demo. */
+.pasos-columna { grid-template-columns: 1fr; gap: var(--sp-5); }
+@media (min-width: 860px) { .pasos-columna { grid-template-columns: 1fr; } }
+
+/* ==========================================================================
+   Páginas legales
+
+   Medida de lectura estrecha y nada más. Un aviso de privacidad a todo el
+   ancho de la pantalla no se lee, y no leerlo es exactamente lo que hace que
+   la gente firme cosas que no entiende.
+   ========================================================================== */
+
+.texto-legal { max-width: 72ch; }
+.texto-legal h2 { font-size: var(--t-24); }
+.texto-legal p, .texto-legal li { max-width: none; }
+.texto-legal a { color: var(--accent); }
+
+.lista-legal {
+  margin: 0; padding-left: var(--sp-5);
+  display: flex; flex-direction: column; gap: var(--sp-3);
+  color: var(--ink-2); font-size: var(--t-15);
+}
+.lista-legal li::marker { color: var(--ink-3); }

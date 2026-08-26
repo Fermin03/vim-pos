@@ -33,3 +33,6 @@ verify_jwt = false
 
 [functions.provisionar-tenant]
 verify_jwt = false
+
+[functions.solicitar-demo]
+verify_jwt = false
