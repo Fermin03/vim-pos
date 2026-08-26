@@ -9049,6 +9049,14 @@ export type Database = {
         }
         Returns: string
       }
+      aplicar_promocion: {
+        Args: {
+          p_client_id_local?: string
+          p_promocion_id: string
+          p_ticket_id: string
+        }
+        Returns: string
+      }
       arquear_caja: {
         Args: {
           p_autorizacion_pin_id?: string
@@ -9144,6 +9152,14 @@ export type Database = {
           p_autorizacion_pin_id?: string
           p_motivo: string
           p_ticket_item_id: string
+        }
+        Returns: undefined
+      }
+      cancelar_promocion_ticket: {
+        Args: {
+          p_aplicacion_id: string
+          p_motivo: string
+          p_usuario_id?: string
         }
         Returns: undefined
       }
