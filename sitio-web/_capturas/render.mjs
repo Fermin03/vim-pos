@@ -73,7 +73,7 @@ const TOMAS = [
   { id: "pos-pago",            app: "pos",   ruta: "/",             titulo: "Método de pago",             accion: "abrirCobro",         espera: /efectivo/i },          // index
   { id: "pos-mesas",           app: "pos",   ruta: "/",             titulo: "Mapa de mesas",              accion: "abrirMesas",         espera: /mesa/i },              // index
   { id: "pos-sin-conexion",    app: "pos",   ruta: "/",             titulo: "Banner de sin conexión",     accion: "cortarRed",          espera: /sin conexión|sin internet/i }, // sin-internet
-  { id: "pos-arqueo",          app: "pos",   ruta: "/turno/cierre", titulo: "Arqueo y corte",             espera: /arqueo|cierre|corte/i },                            // sin-internet
+  { id: "pos-arqueo",          app: "pos",   ruta: "/",             titulo: "Arqueo y corte",             accion: "abrirCorteX", espera: /efectivo esperado/i },                            // sin-internet
   { id: "kds",                 app: "kds",   ruta: "/",             titulo: "Pantalla de cocina",         espera: /cocina|comanda|pedido|sin pedidos/i },              // index
   { id: "admin-dashboard",     app: "admin", ruta: "/dashboard",            titulo: "Dashboard del panel",           espera: /ventas|hoy|resumen/i },      // precios, index
   { id: "admin-resultados",    app: "admin", ruta: "/reportes/consolidado", titulo: "Estado de resultados del día",  espera: /resultados|consolidado/i },  // index
@@ -81,7 +81,7 @@ const TOMAS = [
   { id: "admin-conciliacion",  app: "admin", ruta: "/conciliacion",         titulo: "Conciliación de apps",          espera: /conciliaci/i },              // — segunda ola
   { id: "admin-importador",    app: "admin", ruta: "/catalogo/importar",    titulo: "Importador de menú",            espera: /importar|pegar/i },          // index
   { id: "ticket-venta",        app: "pos",   ruta: "/", papel: true, titulo: "Ticket de venta",  accion: "vistaPreviaTicket", espera: /Crazy Burgers/i },  // precios
-  { id: "corte-z",             app: "pos",   ruta: "/turno/cierre", papel: true, titulo: "Corte de caja", accion: "vistaPreviaCorte", espera: /corte/i },  // — segunda ola
+  { id: "corte-z",             app: "pos",   ruta: "/",   papel: true, titulo: "Corte de caja", accion: "vistaPreviaCorte", espera: /corte de caja|reporte z/i },  // — segunda ola
 ];
 
 /* Acciones que hacen falta para que una pantalla enseñe algo. Se declaran aquí
@@ -115,6 +115,13 @@ const ACCIONES = {
     await page.getByText("Término medio").first().click().catch(() => {});
     await page.getByRole("button", { name: /agregar|añadir/i }).first().click().catch(() => {});
     await page.getByRole("button", { name: /cobrar/i }).first().click();
+  },
+
+  async abrirCorteX(page) {
+    /* El corte del turno se abre desde el concentrador, no por URL:
+       `/turno/cierre` no existe como ruta. */
+    await page.getByRole("button", { name: /corte caja X/i }).first().click();
+    await page.getByText(/efectivo esperado/i).waitFor({ timeout: 8000 });
   },
 
   async abrirMesas(page) {
@@ -203,7 +210,14 @@ async function capturar(page, toma) {
      Conclusión práctica: cada `goto` al POS devuelve al selector de empleados,
      así que hay que volver a entrar. `entrarAlPos` comprueba antes de actuar,
      de modo que llamarla de más no cuesta nada. */
-  if (toma.app === "pos") await entrarAlPos(page);
+  if (toma.app === "pos") {
+    await entrarAlPos(page);
+    /* `entrarAlPos` empieza yendo a "/", así que si la toma pedía otra ruta hay
+       que volver a ella. Sin esto la captura sale del concentrador con el
+       nombre de otra pantalla — y como el concentrador tiene botones con
+       palabras como "corte", la verificación la daba por buena. */
+    if (toma.ruta !== "/") await page.goto(base + toma.ruta, { waitUntil: "networkidle" });
+  }
 
   if (toma.accion) {
     try {
