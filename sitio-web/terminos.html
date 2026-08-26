@@ -8,16 +8,29 @@
 <meta name="description" content="Qué contratas, qué incluye, cómo se cobra, de quién son tus datos y cómo cancelar. Sin contrato forzoso.">
 <link rel="canonical" href="https://vimpos.com.mx/terminos.html">
 
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@400;500;600&family=JetBrains+Mono:wght@400;600&family=Sora:wght@600;700&display=swap">
+<meta property="og:type" content="website">
+<meta property="og:locale" content="es_MX">
+<meta property="og:site_name" content="VIM POS">
+<meta property="og:image" content="https://vimpos.com.mx/assets/img/og/legal.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="VIM POS, punto de venta para restaurantes en Mexico">
+<meta name="twitter:card" content="summary_large_image">
+
+<!-- Se precargan SOLO las dos que se ven en el primer pantallazo: el titular
+     (Sora 700) y el texto corrido (Inter Tight 400). Precargar las siete haría
+     lo contrario de lo que se busca — competirían entre ellas por el ancho de
+     banda y ninguna llegaría antes. -->
+<link rel="preload" href="assets/fonts/sora-700-latin.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="assets/fonts/inter-tight-400-latin.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="assets/css/fuentes.css?v=9">
 
 <link rel="icon" href="assets/img/logo.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="assets/img/apple-touch-icon-1024.png">
 <link rel="manifest" href="site.webmanifest">
 <meta name="theme-color" content="#0078C9">
 
-<link rel="stylesheet" href="assets/css/vim.css?v=8">
+<link rel="stylesheet" href="assets/css/vim.css?v=9">
 </head>
 <body>
 
@@ -252,7 +265,7 @@
         </p>
       </div>
       <div>
-        <h4>Producto</h4>
+        <h2 class="pie-titulo">Producto</h2>
         <ul class="pie-lista">
           <li><a href="funciones.html">Funciones</a></li>
           <li><a href="sin-internet.html">Sin internet</a></li>
@@ -261,7 +274,7 @@
         </ul>
       </div>
       <div>
-        <h4>Contacto</h4>
+        <h2 class="pie-titulo">Contacto</h2>
         <ul class="pie-lista">
           <li><a href="mailto:hola@vimpos.com.mx">hola@vimpos.com.mx</a></li>
           <li><a href="https://wa.me/524761273020">WhatsApp 476 127 3020</a></li>
@@ -278,6 +291,6 @@
   </div>
 </footer>
 
-<script src="assets/js/vim.js?v=8" defer></script>
+<script src="assets/js/vim.js?v=9" defer></script>
 </body>
 </html>

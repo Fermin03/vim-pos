@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 
 <title>VIM POS — Todo lo que tu restaurante necesita</title>
-<meta name="description" content="Punto de venta para restaurantes en México: caja, cocina, mesas, inventario y facturación en un solo sistema. Implementación y capacitación incluidas, precio publicado y sin contrato forzoso.">
+<meta name="description" content="Punto de venta para restaurantes en México: caja, cocina, mesas, inventario y facturación en un solo sistema. Implementación y capacitación incluidas.">
 <link rel="canonical" href="https://vimpos.com.mx/">
 
 <meta property="og:type" content="website">
@@ -14,17 +14,26 @@
 <meta property="og:title" content="Todo lo que tu restaurante necesita, sin letra chica">
 <meta property="og:description" content="Caja, cocina, mesas, inventario y facturación. Implementación incluida y el precio publicado.">
 <meta property="og:url" content="https://vimpos.com.mx/">
+<meta property="og:image" content="https://vimpos.com.mx/assets/img/og/home.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="VIM POS, punto de venta para restaurantes en Mexico">
+<meta name="twitter:card" content="summary_large_image">
 
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@400;500;600&family=JetBrains+Mono:wght@400;600&family=Sora:wght@600;700&display=swap">
+<!-- Se precargan SOLO las dos que se ven en el primer pantallazo: el titular
+     (Sora 700) y el texto corrido (Inter Tight 400). Precargar las siete haría
+     lo contrario de lo que se busca — competirían entre ellas por el ancho de
+     banda y ninguna llegaría antes. -->
+<link rel="preload" href="assets/fonts/sora-700-latin.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="assets/fonts/inter-tight-400-latin.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="assets/css/fuentes.css?v=9">
 
 <link rel="icon" href="assets/img/logo.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="assets/img/apple-touch-icon-1024.png">
 <link rel="manifest" href="site.webmanifest">
 <meta name="theme-color" content="#0078C9">
 
-<link rel="stylesheet" href="assets/css/vim.css?v=8">
+<link rel="stylesheet" href="assets/css/vim.css?v=9">
 </head>
 <body>
 
@@ -112,7 +121,7 @@
               <span class="monitor-punto"></span><span class="monitor-punto"></span><span class="monitor-punto"></span>
             </div>
             <img src="assets/img/capturas/pos-home.webp" alt="Pantalla principal de la caja con los modos de servicio: comedor, para llevar, pick-up y domicilio."
-                 width="1440" height="900" loading="lazy" decoding="async">
+                 width="1600" height="1000" fetchpriority="high" decoding="async">
           </div>
         </div>
       </div>
@@ -310,7 +319,7 @@
         <div class="monitor">
           <div class="monitor-barra" aria-hidden="true"><span class="monitor-punto"></span><span class="monitor-punto"></span><span class="monitor-punto"></span></div>
           <img src="assets/img/capturas/pos-catalogo.webp" alt="Un producto abierto con sus opciones: término de la carne y extras con su precio."
-                 width="1440" height="900" loading="lazy" decoding="async">
+                 width="1600" height="1000" loading="lazy" decoding="async">
         </div>
       </div>
 
@@ -326,7 +335,7 @@
         <div class="monitor">
           <div class="monitor-barra" aria-hidden="true"><span class="monitor-punto"></span><span class="monitor-punto"></span><span class="monitor-punto"></span></div>
           <img src="assets/img/capturas/kds.webp" alt="Pantalla de cocina con las comandas pendientes."
-                 width="1440" height="900" loading="lazy" decoding="async">
+                 width="1600" height="1000" loading="lazy" decoding="async">
         </div>
       </div>
 
@@ -341,7 +350,7 @@
         <div class="monitor">
           <div class="monitor-barra" aria-hidden="true"><span class="monitor-punto"></span><span class="monitor-punto"></span><span class="monitor-punto"></span></div>
           <img src="assets/img/capturas/pos-arqueo.webp" alt="Pantalla de cierre de turno con el conteo del efectivo."
-                 width="1440" height="900" loading="lazy" decoding="async">
+                 width="1600" height="1000" loading="lazy" decoding="async">
         </div>
       </div>
 
@@ -356,7 +365,7 @@
         <div class="monitor">
           <div class="monitor-barra" aria-hidden="true"><span class="monitor-punto"></span><span class="monitor-punto"></span><span class="monitor-punto"></span></div>
           <img src="assets/img/capturas/admin-dashboard.webp" alt="Panel del dueño con las ventas del día y el estado de las cajas."
-                 width="1440" height="900" loading="lazy" decoding="async">
+                 width="1600" height="1000" loading="lazy" decoding="async">
         </div>
       </div>
     </div>
@@ -473,7 +482,7 @@
             <span class="monitor-punto"></span><span class="monitor-punto"></span><span class="monitor-punto"></span>
           </div>
           <img src="assets/img/capturas/admin-importador.webp" alt="Importador de menú mostrando lo que se va a dar de alta antes de confirmar."
-                 width="1440" height="900" loading="lazy" decoding="async">
+                 width="1600" height="1000" loading="lazy" decoding="async">
         </div>
         <figcaption>
           Pegas el menú del sistema que usas hoy y lo ves antes de aceptarlo: qué producto entra,
@@ -686,7 +695,7 @@
         </p>
       </div>
       <div>
-        <h4>Producto</h4>
+        <h2 class="pie-titulo">Producto</h2>
         <ul class="pie-lista">
           <li><a href="funciones.html">Funciones</a></li>
           <li><a href="sin-internet.html">Sin internet</a></li>
@@ -695,7 +704,7 @@
         </ul>
       </div>
       <div>
-        <h4>Contacto</h4>
+        <h2 class="pie-titulo">Contacto</h2>
         <ul class="pie-lista">
           <li><a href="mailto:hola@vimpos.com.mx">hola@vimpos.com.mx</a></li>
           <li><a href="https://wa.me/524761273020">WhatsApp 476 127 3020</a></li>
@@ -759,6 +768,6 @@
 }
 </script>
 
-<script src="assets/js/vim.js?v=8" defer></script>
+<script src="assets/js/vim.js?v=9" defer></script>
 </body>
 </html>

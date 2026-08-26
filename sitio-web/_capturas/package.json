@@ -5,6 +5,7 @@
   "description": "Captura las pantallas del producto real para el sitio. NO se sube a Hostinger y NO es parte del workspace de pnpm.",
   "scripts": {
     "capturar": "node render.mjs",
+    "og": "node og.mjs",
     "navegador": "playwright install chromium"
   },
   "devDependencies": {

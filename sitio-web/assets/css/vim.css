@@ -478,7 +478,9 @@ body[data-menu-abierto="true"] { overflow: hidden; }
 }
 @media (min-width: 700px) { .pie-rejilla { grid-template-columns: 1.4fr 1fr 1fr; } }
 
-.pie h4 {
+.pie .pie-titulo {
+  /* Es un h2 —el nivel que le toca en el esquema del documento— pero se ve
+     como una etiqueta pequeña. El nivel es semántica; el tamaño, diseño. */
   font-family: var(--font-mono);
   font-size: var(--t-12);
   font-weight: 600;

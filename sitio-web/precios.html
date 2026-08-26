@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 
 <title>Precios de VIM POS — publicados, sin cotización</title>
-<meta name="description" content="Tres planes en pesos, más IVA: Esencial $699, Negocio $999 y Cadena $1,999 al mes. La implementación y la capacitación van incluidas en todos, y desde Negocio la facturación también.">
+<meta name="description" content="Tres planes en pesos más IVA: Esencial $699, Negocio $999 y Cadena $1,999 al mes. Implementación y capacitación incluidas en los tres.">
 <link rel="canonical" href="https://vimpos.com.mx/precios.html">
 
 <meta property="og:type" content="website">
@@ -14,17 +14,26 @@
 <meta property="og:title" content="Precios de VIM POS — publicados, sin cotización">
 <meta property="og:description" content="Tres planes en pesos, más IVA. La implementación, la carga de tu menú y la capacitación van incluidas en todos.">
 <meta property="og:url" content="https://vimpos.com.mx/precios.html">
+<meta property="og:image" content="https://vimpos.com.mx/assets/img/og/precios.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="VIM POS, punto de venta para restaurantes en Mexico">
+<meta name="twitter:card" content="summary_large_image">
 
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@400;500;600&family=JetBrains+Mono:wght@400;600&family=Sora:wght@600;700&display=swap">
+<!-- Se precargan SOLO las dos que se ven en el primer pantallazo: el titular
+     (Sora 700) y el texto corrido (Inter Tight 400). Precargar las siete haría
+     lo contrario de lo que se busca — competirían entre ellas por el ancho de
+     banda y ninguna llegaría antes. -->
+<link rel="preload" href="assets/fonts/sora-700-latin.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="assets/fonts/inter-tight-400-latin.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="assets/css/fuentes.css?v=9">
 
 <link rel="icon" href="assets/img/logo.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="assets/img/apple-touch-icon-1024.png">
 <link rel="manifest" href="site.webmanifest">
 <meta name="theme-color" content="#0078C9">
 
-<link rel="stylesheet" href="assets/css/vim.css?v=8">
+<link rel="stylesheet" href="assets/css/vim.css?v=9">
 </head>
 <body>
 
@@ -112,6 +121,7 @@
         </p>
       </div>
 
+      <h2 class="solo-lectores">Los tres planes</h2>
       <div class="planes">
         <div class="plan pila">
           <div class="pila pila-2">
@@ -292,7 +302,7 @@
               <span class="monitor-punto"></span><span class="monitor-punto"></span><span class="monitor-punto"></span>
             </div>
             <img src="assets/img/capturas/admin-dashboard.webp" alt="Panel del dueño con las ventas del día y el estado de las cajas."
-                 width="1440" height="900" loading="lazy" decoding="async">
+                 width="1600" height="1000" fetchpriority="high" decoding="async">
           </div>
           <figcaption>El panel, incluido en los tres planes: cómo va el día, cuánto lleva cada caja y qué se está vendiendo, desde el celular o desde la computadora.</figcaption>
         </figure>
@@ -369,7 +379,7 @@
               <span class="monitor-punto"></span><span class="monitor-punto"></span><span class="monitor-punto"></span>
             </div>
             <img src="assets/img/capturas/admin-inventario.webp" alt="Listado de insumos con existencias y mermas."
-                 width="1440" height="900" loading="lazy" decoding="async">
+                 width="1600" height="1000" loading="lazy" decoding="async">
           </div>
           <figcaption>Desde el plan Negocio: cuánto insumo entró, cuánto salió con las ventas y cuánto se fue en mermas. Es donde se ve el dinero que se pierde sin que nadie lo apunte.</figcaption>
         </figure>
@@ -675,7 +685,7 @@
         </p>
       </div>
       <div>
-        <h4>Producto</h4>
+        <h2 class="pie-titulo">Producto</h2>
         <ul class="pie-lista">
           <li><a href="funciones.html">Funciones</a></li>
           <li><a href="sin-internet.html">Sin internet</a></li>
@@ -684,7 +694,7 @@
         </ul>
       </div>
       <div>
-        <h4>Contacto</h4>
+        <h2 class="pie-titulo">Contacto</h2>
         <ul class="pie-lista">
           <li><a href="mailto:hola@vimpos.com.mx">hola@vimpos.com.mx</a></li>
           <li><a href="https://wa.me/524761273020">WhatsApp 476 127 3020</a></li>
@@ -701,6 +711,6 @@
   </div>
 </footer>
 
-<script src="assets/js/vim.js?v=8" defer></script>
+<script src="assets/js/vim.js?v=9" defer></script>
 </body>
 </html>
