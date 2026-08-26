@@ -166,9 +166,37 @@ export default function InventarioPage() {
         titulo="Inventario"
         subtitulo="Existencias de ingredientes y productos. Bajan solas al vender."
         migas={[{ label: "Inventario" }]}
-        right={<Button onClick={nuevo} disabled={unidades.length === 0}>Nuevo insumo</Button>}
+        /* El botón se apaga si el negocio no tiene unidades de medida, porque
+           `insumos.unidad_medida_id` es NOT NULL y no habría qué elegir.
+
+           Eso ya pasaba antes; lo que no había era ninguna explicación. Un
+           botón gris sin motivo hace pensar al dueño que el inventario está
+           roto o que él hizo algo mal — así se reportó este fallo. La causa de
+           fondo se arregló en la migración 0085 (el alta de un negocio ahora
+           siembra sus unidades), pero el aviso se queda: si el dato vuelve a
+           faltar por lo que sea, la pantalla lo dice en vez de callarse. */
+        right={
+          <Button onClick={nuevo} disabled={unidades.length === 0} title={unidades.length === 0 ? "Faltan las unidades de medida de tu negocio" : undefined}>
+            Nuevo insumo
+          </Button>
+        }
       />
       <PageBody>
+        {/* Sin unidades no se puede dar de alta nada, así que se dice arriba
+            del todo y con qué hacer al respecto — no un botón gris y silencio. */}
+        {unidades.length === 0 && (
+          <div role="status" className="mb-4 rounded-lg border border-[#F0DCC0] bg-[#FCF3E6] px-4 py-3">
+            <p className="text-[13px] font-semibold text-warning">
+              Tu negocio no tiene unidades de medida, y sin ellas no se puede crear un insumo.
+            </p>
+            <p className="mt-1 text-[12.5px] leading-snug text-ink-2">
+              Es un asunto nuestro, no tuyo: se siembran al dar de alta el negocio y a éste le
+              faltaron. Escríbenos y lo dejamos listo en minutos — no se pierde nada de lo que ya
+              tengas cargado.
+            </p>
+          </div>
+        )}
+
         {okMsg && <p className="mb-3 text-sm font-medium text-success">{okMsg}</p>}
         {error && !editando && !moviendo && <p className="mb-3 text-sm font-medium text-danger">{error}</p>}
 
