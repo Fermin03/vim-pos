@@ -37,6 +37,7 @@ import { ReciboPreview } from "./recibo-preview";
 import { PantallaCierre } from "./pantalla-cierre";
 import { PantallaKds } from "@vim/kds-core";
 import { PantallaMesas } from "./pantalla-mesas";
+import { PantallaReservaciones } from "./pantalla-reservaciones";
 import { PantallaConsultaCuentas } from "./pantalla-consulta-cuentas";
 import { PantallaDevoluciones } from "./pantalla-devoluciones";
 import { ModalCancelarItem } from "./modal-cancelar-item";
@@ -196,6 +197,8 @@ export function HomePos({
   const [enviandoCocina, setEnviandoCocina] = useState(false);
   const [misPropinasAbierto, setMisPropinasAbierto] = useState(false);
   const [descuentoAbierto, setDescuentoAbierto] = useState(false);
+  // Agenda de reservaciones, abierta desde el mapa de Comedor.
+  const [viendoReservaciones, setViendoReservaciones] = useState(false);
   // F6.1 — items persistidos del ticketBd (para mapear clientId ↔ ticket_item_id real al cancelar).
   const [itemsPersistidos, setItemsPersistidos] = useState<ItemTicket[]>([]);
   const [cancelandoItem, setCancelandoItem] = useState<ItemTicket | null>(null);
@@ -1229,6 +1232,8 @@ export function HomePos({
         empleado={empleado}
         modo={modo}
         onSalir={volverAlInicio}
+        // Solo Comedor: pick-up y domicilio no apartan mesa, y un botón muerto ahí sería ruido.
+        onVerReservaciones={modo === "COMER_AQUI" ? () => setViendoReservaciones(true) : undefined}
         onAbrirCuenta={() => {
           // Cuenta nueva: se fija el modo y se entra al catálogo con el carrito limpio.
           dispatch({ tipo: "limpiar" });
@@ -1312,7 +1317,15 @@ export function HomePos({
               onSalir={() => { setViendoMapaMesas(false); setPidiendoMesa(true); }}
               onAbrirCuenta={async (mesaId: string) => { setViendoMapaMesas(false); await onAbrirCuentaMesa(mesaId); }}
               onRetomar={(ticketId: string) => { setViendoMapaMesas(false); entrarCuenta(ticketId, "mesas"); }}
+              onVerReservaciones={() => setViendoReservaciones(true)}
             />
+          </div>
+        )}
+        {viendoReservaciones && (
+          // Encima del mapa: al cerrar se vuelve a las mesas, que es de donde
+          // se entró y donde el mesero sigue trabajando.
+          <div className="fixed inset-0 z-[55] bg-bg">
+            <PantallaReservaciones token={token} caja={caja} onSalir={() => setViendoReservaciones(false)} />
           </div>
         )}
         {agregandoA && (

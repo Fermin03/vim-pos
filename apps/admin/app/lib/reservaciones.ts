@@ -36,13 +36,21 @@ async function sucursalPorDefecto(): Promise<string> {
 
 /** Reservaciones de un día (YYYY-MM-DD), de todas las sucursales del tenant. */
 export async function listarReservaciones(dia: string): Promise<Reservacion[]> {
-  const desde = `${dia}T00:00:00`;
-  const hasta = `${dia}T23:59:59`;
+  // Instantes reales, no cadenas sin zona. `fecha_hora_reserva` es timestamptz y
+  // PostgREST lee "2026-08-26T23:59:59" como UTC: una reserva de las 20:00 en
+  // México se guarda como las 02:00 del día SIGUIENTE en UTC, así que caía fuera
+  // del rango. El panel enseñaba el día equivocado justo en las horas en las que
+  // un restaurante tiene reservas — y sin dar ningún error.
+  const inicio = new Date(`${dia}T00:00:00`);
+  const fin = new Date(inicio);
+  fin.setDate(fin.getDate() + 1);
+  const desde = inicio.toISOString();
+  const hasta = fin.toISOString();
   const { data, error } = await supabase
     .from("reservaciones")
     .select("id, folio_completo, cliente_nombre_snapshot, cliente_telefono_snapshot, fecha_hora_reserva, comensales, canal, estado, nota")
     .gte("fecha_hora_reserva", desde)
-    .lte("fecha_hora_reserva", hasta)
+    .lt("fecha_hora_reserva", hasta)
     .is("deleted_at", null)
     .order("fecha_hora_reserva", { ascending: true });
   if (error) throw new Error(error.message);
