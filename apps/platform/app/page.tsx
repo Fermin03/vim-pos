@@ -11,13 +11,17 @@ import type { Api } from "./lib/tipos";
 const input = "h-11 w-full rounded border border-line-strong px-3 text-sm outline-none focus:border-ink focus:shadow-[0_0_0_3px_rgba(22,22,26,.06)]";
 const label = "mb-1.5 block text-[13px] font-medium text-ink-2";
 
+// La vertical configura el producto; el PLAN pone el precio. Iban juntos —cada vertical
+// arrastraba su plan— y por eso una taquería de tres sucursales pagaba menos que un
+// restaurante de mantel de una sola. Desde la migración 0086 son dos decisiones separadas y
+// el catálogo de planes se lee de la base, no de esta lista (ver `planes` en el formulario).
 const VERTICALES = [
-  { v: "QUICK_SERVICE", l: "Quick Service", plan: "QS" },
-  { v: "FULL_SERVICE", l: "Full Service", plan: "FS" },
-  { v: "CAFE_BAR", l: "Café & Bar", plan: "CB" },
-  { v: "DARK_KITCHEN", l: "Dark Kitchen", plan: "DK" },
-  { v: "FOODTRUCK", l: "Foodtruck", plan: "FT" },
-  { v: "ENTERPRISE", l: "Enterprise", plan: "ENT" },
+  { v: "QUICK_SERVICE", l: "Quick Service" },
+  { v: "FULL_SERVICE", l: "Full Service" },
+  { v: "CAFE_BAR", l: "Café & Bar" },
+  { v: "DARK_KITCHEN", l: "Dark Kitchen" },
+  { v: "FOODTRUCK", l: "Foodtruck" },
+  { v: "ENTERPRISE", l: "Enterprise" },
 ];
 
 const COLOR_ESTADO: Record<string, string> = {
@@ -47,7 +51,8 @@ type Detalle = {
   paquetes: Paquete[];
   nSucursales: number;
 };
-type Plan = { id: string; codigo: string; nombre: string; vertical: string; precio_mensual_mxn: number };
+// `vertical` es null en los planes por tamaño (0086) y solo trae valor en los heredados.
+type Plan = { id: string; codigo: string; nombre: string; vertical: string | null; precio_mensual_mxn: number };
 
 export default function PlatformHome() {
   const [platformKey, setPlatformKey] = useState("");
@@ -283,14 +288,36 @@ function DetalleDrawer({ api, id, onCerrar, onCambio }: { api: Api; id: string; 
               <div>Régimen: {String(t.regimen_fiscal ?? "—")} · CP {String(t.codigo_postal_fiscal ?? "—")}</div>
             </div>
 
-            {/* Cambiar plan */}
-            <div className="mt-4">
-              <label className={label}>Plan</label>
-              <select className={input} value={String((t.plan as { id?: string } | null)?.id ?? "")} onChange={(e) => accion({ accion: "cambiar_plan", plan_id: e.target.value })} disabled={busy}>
-                <option value="">— elegir —</option>
-                {planes.map((p) => <option key={p.id} value={p.id}>{p.codigo} · {p.nombre} ({fmtMxn(p.precio_mensual_mxn)})</option>)}
-              </select>
-            </div>
+            {/* Cambiar plan.
+
+                La lista trae los planes vigentes MÁS el que tenga este cliente aunque esté
+                retirado. Sin eso, quien siguiera en uno de los planes por vertical —retirados en
+                la 0086— veía el selector en "— elegir —", porque un <select> cuyo valor no
+                corresponde a ninguna opción cae a la primera. Parecía un cliente sin plan, que es
+                justo lo contrario de lo que pasa: lo tiene, y sigue pagándolo. */}
+            {(() => {
+              const actual = t.plan as { id?: string; codigo?: string; nombre?: string; precio_mensual_mxn?: number } | null;
+              const retirado = actual?.id && !planes.some((p) => p.id === actual.id) ? actual : null;
+              return (
+                <div className="mt-4">
+                  <label className={label}>Plan</label>
+                  <select className={input} value={String(actual?.id ?? "")} onChange={(e) => accion({ accion: "cambiar_plan", plan_id: e.target.value })} disabled={busy}>
+                    <option value="">— elegir —</option>
+                    {retirado && (
+                      <option value={String(retirado.id)}>
+                        {retirado.codigo} · {retirado.nombre} ({fmtMxn(Number(retirado.precio_mensual_mxn ?? 0))}) — plan retirado
+                      </option>
+                    )}
+                    {planes.map((p) => <option key={p.id} value={p.id}>{p.codigo} · {p.nombre} ({fmtMxn(p.precio_mensual_mxn)})</option>)}
+                  </select>
+                  {retirado && (
+                    <p className="mt-1 text-[12px] text-ink-3">
+                      Está en un plan que ya no se vende. Se le respeta mientras no se acuerde el cambio con él.
+                    </p>
+                  )}
+                </div>
+              );
+            })()}
 
             {/* Suscripción */}
             {(() => {
@@ -463,17 +490,36 @@ function NuevoCliente({ api, onCreado }: { api: Api; onCreado: () => void }) {
   const [codigoTocado, setCodigoTocado] = useState(false);
   const [ownerNombre, setOwnerNombre] = useState(""); const [ownerEmail, setOwnerEmail] = useState(""); const [ownerTel, setOwnerTel] = useState("");
   const [vertical, setVertical] = useState("QUICK_SERVICE");
+  // El plan sale del catálogo de la base, no de una lista escrita aquí: los precios los cambia
+  // una migración y el panel tiene que enseñar los vigentes sin que nadie recuerde tocar este
+  // archivo. Arranca en Negocio, que es el que se recomienda en la página de precios.
+  const [planes, setPlanes] = useState<Plan[]>([]);
+  const [planCodigo, setPlanCodigo] = useState("NEGOCIO");
   const [error, setError] = useState<string | null>(null);
   const [resultado, setResultado] = useState<{ email: string } | null>(null);
   const [creando, setCreando] = useState(false);
 
+  useEffect(() => {
+    (async () => {
+      try {
+        const lista = ((await api("/api/planes")).planes ?? []) as Plan[];
+        setPlanes(lista);
+        // Si el catálogo cambiara y Negocio ya no existiera, se cae al primero antes que
+        // mandar un código que el provisioning no reconoce.
+        if (lista.length > 0 && !lista.some((p) => p.codigo === "NEGOCIO")) setPlanCodigo(lista[0]!.codigo);
+      } catch {
+        /* el error se ve al intentar crear; no vale la pena un aviso extra en el formulario */
+      }
+    })();
+  }, [api]);
+
   async function provisionar() {
     setError(null); setResultado(null);
     if (!codigo || !nombre || !ownerNombre || !ownerEmail) { setError("Completa código, nombre, dueño y correo"); return; }
-    const plan = VERTICALES.find((x) => x.v === vertical)?.plan ?? "QS";
+    if (!planCodigo) { setError("Elige un plan"); return; }
     setCreando(true);
     try {
-      const data = await api("/api/provisionar", { method: "POST", body: JSON.stringify({ codigo, nombre_comercial: nombre, nombre_owner: ownerNombre, email_owner: ownerEmail, telefono_owner: ownerTel, vertical, plan_codigo: plan }) });
+      const data = await api("/api/provisionar", { method: "POST", body: JSON.stringify({ codigo, nombre_comercial: nombre, nombre_owner: ownerNombre, email_owner: ownerEmail, telefono_owner: ownerTel, vertical, plan_codigo: planCodigo }) });
       if (!data.ok) throw new Error(String(data.detalle ?? data.error ?? "No se pudo crear"));
       setResultado({ email: ownerEmail });
       setCodigo(""); setNombre(""); setCodigoTocado(false); setOwnerNombre(""); setOwnerEmail(""); setOwnerTel("");
@@ -489,7 +535,8 @@ function NuevoCliente({ api, onCreado }: { api: Api; onCreado: () => void }) {
       <div className="flex flex-col gap-3.5 rounded-lg border border-line bg-surface p-5">
         <div><label className={label} htmlFor="codigo">Código (slug)</label><input id="codigo" className={input} value={codigo} maxLength={50} onChange={(e) => { setCodigoTocado(true); setCodigo(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, "")); }} placeholder="knockout-burger" /></div>
         <div><label className={label} htmlFor="nombre">Nombre comercial</label><input id="nombre" className={input} value={nombre} maxLength={150} onChange={(e) => { const v = e.target.value; setNombre(v); if (!codigoTocado) setCodigo(aSlug(v)); }} placeholder="Knock-Out Burger" /></div>
-        <div><label className={label} htmlFor="vertical">Vertical</label><select id="vertical" className={input} value={vertical} onChange={(e) => setVertical(e.target.value)}>{VERTICALES.map((x) => <option key={x.v} value={x.v}>{x.l} · plan {x.plan}</option>)}</select></div>
+        <div><label className={label} htmlFor="vertical">Vertical</label><select id="vertical" className={input} value={vertical} onChange={(e) => setVertical(e.target.value)}>{VERTICALES.map((x) => <option key={x.v} value={x.v}>{x.l}</option>)}</select><p className="mt-1 text-[12px] text-ink-3">Configura el producto. No influye en el precio.</p></div>
+        <div><label className={label} htmlFor="plan">Plan</label><select id="plan" className={input} value={planCodigo} onChange={(e) => setPlanCodigo(e.target.value)}>{planes.length === 0 && <option value="">Cargando…</option>}{planes.map((p) => <option key={p.id} value={p.codigo}>{p.nombre} · {fmtMxn(Number(p.precio_mensual_mxn))} al mes</option>)}</select><p className="mt-1 text-[12px] text-ink-3">Esto es lo que paga. Los precios son los publicados en el sitio.</p></div>
         <div className="h-px bg-line" />
         <div><label className={label} htmlFor="on">Nombre del dueño</label><input id="on" className={input} value={ownerNombre} maxLength={150} onChange={(e) => setOwnerNombre(e.target.value)} /></div>
         <div><label className={label} htmlFor="oe">Correo del dueño</label><input id="oe" type="email" className={input} value={ownerEmail} onChange={(e) => setOwnerEmail(e.target.value)} placeholder="dueno@negocio.mx" /></div>
