@@ -2,6 +2,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { Button } from "@vim/ui/styles";
 import { PageBody, PageHeader } from "../../components/page-header";
+import { AvisoSinConectar } from "../../components/aviso-sin-conectar";
 import {
   cancelarReservacion,
   CANALES,
@@ -95,6 +96,17 @@ export default function ReservacionesPage() {
         right={<Button onClick={() => { setCreando(true); setForm({ ...VACIO, fecha_hora: `${dia}T20:00` }); }}>Nueva reservación</Button>}
       />
       <PageBody>
+        {/* El POS no conoce las reservaciones: `mesas.reservacion_actual_id`
+            existe en la base con su clave foránea, pero ninguna pantalla de la
+            caja lo lee. Sin este aviso, un anfitrión reserva la mesa 4 aquí y
+            el cajero la ocupa sin enterarse. */}
+        <AvisoSinConectar titulo="La caja todavía no ve estas reservaciones.">
+          Aquí llevas la agenda —confirmar llegadas, marcar no-shows, cancelar— y sirve
+          para eso. Lo que aún no pasa es que el mapa de mesas del POS muestre la mesa
+          como reservada: por ahora hay que avisarle al cajero. Te avisaremos en cuanto
+          la caja las lea.
+        </AvisoSinConectar>
+
         {okMsg && <p className="mb-3 text-sm font-medium text-success">{okMsg}</p>}
         {error && !creando && <p className="mb-3 text-sm font-medium text-danger">{error}</p>}
 
