@@ -9330,6 +9330,20 @@ export type Database = {
       crear_tenant_con_owner: {
         Args: {
           p_codigo: string
+          p_estado: Database["public"]["Enums"]["tenant_estado"]
+          p_nombre_comercial: string
+          p_nombre_owner: string
+          p_notas_internas: string
+          p_owner_user_id: string
+          p_plan_codigo: string
+          p_telefono_owner: string
+          p_vertical: Database["public"]["Enums"]["vertical_tipo"]
+        }
+        Returns: string
+      }
+      crear_tenant_con_owner_base: {
+        Args: {
+          p_codigo: string
           p_estado?: Database["public"]["Enums"]["tenant_estado"]
           p_nombre_comercial: string
           p_nombre_owner: string
