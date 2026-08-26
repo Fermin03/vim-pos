@@ -3,7 +3,7 @@
 // Pública como signup-tenant: la llama cualquier visitante con la anon key, así que valida su
 // propia entrada y no confía en nada de lo que recibe.
 //
-// EL ORDEN IMPORTA: PRIMERO LA FILA, DESPUÉS EL CORREO
+// EL ORDEN IMPORTA: PRIMERO LA FILA, DESPUÉS EL CORREO — Y SIN ESPERARLO
 //
 // La fila en `prospectos` es la fuente de verdad y el correo es solo el aviso. Si el correo falla
 // —o si todavía no hay proveedor configurado— la función devuelve éxito igual, porque el prospecto
@@ -104,6 +104,15 @@ function entero(v: unknown): number | null {
   return Number.isInteger(n) ? n : null;
 }
 
+/** Quita acentos y cualquier cosa fuera de ASCII, para el asunto del correo.
+ *  Ver la nota en el `subject` sobre por qué esto no es opcional. */
+function soloAscii(v: string): string {
+  return v
+    .normalize("NFD").replace(/[̀-ͯ]/g, "")   // "México" -> "Mexico"
+    .replace(/[^ -~]/g, "")                       // lo que quede fuera, fuera
+    .slice(0, 160);                                      // asuntos largos se pliegan y se rompen
+}
+
 /** Escapa lo que va dentro del correo HTML. El nombre y el negocio los escribe un desconocido. */
 function esc(s: string): string {
   return s.replace(/[&<>"']/g, (c) =>
@@ -119,22 +128,32 @@ async function enviarCorreo(payload: { to: string; subject: string; html: string
 
   const port = Number(Deno.env.get("VIM_SMTP_PORT") ?? "465");
 
-  /* El cliente se importa aquí dentro y no arriba del archivo: si un día falta
-     la configuración de SMTP, la función no paga la descarga de una librería
-     que no va a usar en cada arranque en frío. */
-  const { SMTPClient } = await import("https://deno.land/x/denomailer@1.6.0/mod.ts");
-
-  const cliente = new SMTPClient({
-    connection: {
-      hostname: host,
-      port,
-      tls: port === 465,      // 465 = TLS desde el primer byte; 587 = STARTTLS
-      auth: { username: user, password: pass },
-    },
-  });
+  /* TODO dentro del try, incluidos el import y el constructor.
+  
+     La primera versión los dejó fuera "porque no lanzan", y sí lanzan: en el
+     primer intento contra producción el import reventó y la excepción subió
+     hasta el handler, que devolvió un 500 crudo — con el prospecto YA guardado
+     en la base. Es decir, el visitante veía un error por un fallo que no le
+     afectaba y que él no podía arreglar reintentando.
+  
+     La regla de este archivo es que después del insert nada puede devolver un
+     error al visitante. Escribirla en un comentario no la hace cumplirse; hay
+     que envolver el bloque entero. */
+  let cliente: { send: (m: unknown) => Promise<unknown>; close: () => Promise<void> } | null = null;
 
   try {
-    await cliente.send({
+    const { SMTPClient } = await import("https://deno.land/x/denomailer@1.6.0/mod.ts");
+
+    cliente = new SMTPClient({
+      connection: {
+        hostname: host,
+        port,
+        tls: port === 465,    // 465 = TLS desde el primer byte; 587 = STARTTLS
+        auth: { username: user, password: pass },
+      },
+    }) as unknown as typeof cliente;
+
+    await cliente!.send({
       from: user,             // Hostinger rechaza un `from` que no sea el buzón autenticado
       to: payload.to,
       subject: payload.subject,
@@ -144,10 +163,21 @@ async function enviarCorreo(payload: { to: string; subject: string; html: string
   } catch (e) {
     return { enviado: false, motivo: `SMTP: ${e instanceof Error ? e.message : String(e)}` };
   } finally {
-    /* Cerrar siempre. Una conexión SMTP abierta mantiene viva la instancia de
-       la función y acaba agotando las conexiones simultáneas que permite el
-       buzón, que en un plan compartido son pocas. */
-    await cliente.close().catch(() => {});
+    /* Cerrar la conexión, PERO CON PRISA.
+
+       En el primer intento contra producción el correo se envió y aun así la
+       función devolvió 500: `close()` se quedó colgado, y como estaba en un
+       `finally`, el valor de retorno nunca llegó a salir. El lead guardado, el
+       correo enviado, y el visitante viendo un error.
+
+       Dos segundos y seguimos. Dejar la conexión sin cerrar del todo es un mal
+       menor —la instancia se recicla sola— comparado con tumbar la respuesta. */
+    if (cliente) {
+      await Promise.race([
+        cliente.close().catch(() => {}),
+        new Promise((r) => setTimeout(r, 2000)),
+      ]);
+    }
   }
 }
 
@@ -235,9 +265,31 @@ Deno.serve(async (req) => {
   const avisoA = Deno.env.get("VIM_AVISOS_A") ?? "hola@vimpos.com.mx";
   const escalon = sucursales! > 1 ? "Cadena" : cajas! > 1 ? "Negocio" : "Esencial";
 
-  const interno = await enviarCorreo({
+  /* EL CORREO NO BLOQUEA LA RESPUESTA. Ya no se espera.
+
+     Con `await`, dos intentos seguidos contra producción devolvieron 500 CON EL
+     CORREO YA ENTREGADO: el `send()` de denomailer no resuelve su promesa
+     —Hostinger mantiene la conexión abierta— así que la función agotaba su
+     tiempo aunque su trabajo estuviera hecho. Acortar el cierre no arregló
+     nada porque el cuelgue estaba antes.
+
+     `EdgeRuntime.waitUntil` deja el envío corriendo después de responder, que
+     es lo que corresponde: el lead ya está en la base y el visitante no tiene
+     por qué esperar a un servidor de correo para ver su acuse. Si el correo
+     falla, se entera el log, no él. */
+  const envio = enviarCorreo({
     to: avisoA,
-    subject: `Demo: ${negocio} · ${cajas} caja(s), ${sucursales} sucursal(es) → ${escalon}`,
+    /* ASCII puro, y no es purismo: la primera versión llevaba `·` y `→`, que
+       viajan en la cabecera como palabra codificada MIME. denomailer la genera
+       mal, el cliente no puede decodificarla y —esto es lo grave— al romperse
+       el `Subject` se pierde la separación entre cabeceras y cuerpo: el correo
+       llegó enseñando el MIME crudo y el HTML sin renderizar.
+
+       Un asunto sin acentos ni símbolos no necesita codificarse en absoluto.
+       Es la solución más aburrida y la única que no depende de que la librería
+       lo haga bien. `negocio` lo escribe un desconocido, así que también se
+       limpia. */
+    subject: soloAscii(`Demo: ${negocio} - ${cajas} caja(s), ${sucursales} sucursal(es) - ${escalon}`),
     html: `
       <h2 style="font-family:sans-serif">${esc(negocio)}</h2>
       <table style="font-family:sans-serif;font-size:14px;border-collapse:collapse">
@@ -250,11 +302,22 @@ Deno.serve(async (req) => {
         <tr><td><b>Mensaje</b></td><td>${esc(mensaje ?? "")}</td></tr>
         <tr><td><b>Escalón sugerido</b></td><td>${escalon}</td></tr>
       </table>`,
+  }).then((r) => {
+    if (!r.enviado) console.warn(`[solicitar-demo] prospecto ${fila.id}: aviso NO enviado (${r.motivo}).`);
+    else console.log(`[solicitar-demo] prospecto ${fila.id}: aviso enviado.`);
+  }).catch((e) => {
+    console.error(`[solicitar-demo] prospecto ${fila.id}: el envío reventó — ${e?.message ?? e}`);
   });
 
-  if (!interno.enviado) {
-    console.warn(`[solicitar-demo] prospecto ${fila.id} guardado, aviso NO enviado (${interno.motivo}).`);
-  }
+  /* `waitUntil` mantiene viva la instancia hasta que el envío termine, sin
+     retrasar la respuesta. Si no existe —otro runtime, o una versión sin él—
+     el envío queda en segundo plano de todos modos y en el peor caso se corta
+     al reciclarse la instancia: peor para el aviso, pero nunca para el lead. */
+  const rt = (globalThis as { EdgeRuntime?: { waitUntil?: (p: Promise<unknown>) => void } }).EdgeRuntime;
+  if (typeof rt?.waitUntil === "function") rt.waitUntil(envio);
 
-  return json({ ok: true, id: fila.id, aviso: interno.enviado });
+  /* Ya no se puede decir si el aviso salió: se está mandando mientras esto
+     responde. El resultado va al log de la función, que es donde toca mirarlo.
+     El visitante nunca necesitó ese dato. */
+  return json({ ok: true, id: fila.id });
 });
