@@ -30,3 +30,7 @@ supabase/.temp/
 # Vercel
 .vercel
 supabase/functions/.env
+
+# Carpeta que arma _capturas/empaquetar.mjs para subir a Hostinger.
+# Es un artefacto derivado de sitio-web/, no fuente.
+_publicar/
