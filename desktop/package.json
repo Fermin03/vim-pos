@@ -30,7 +30,11 @@
     "verify:electron": "electron src/verify-electron.mjs",
     "verify:cierre-turno": "node src/verify-cierre-turno.mjs",
     "verify:push-aislado": "node src/verify-push-aislado.mjs",
-    "iconos": "node scripts/generar-iconos.mjs"
+    "verify:push-lotes": "node src/verify-push-lotes.mjs",
+    "iconos": "node scripts/generar-iconos.mjs",
+    "carga:plantilla": "node scripts/capturar-plantilla.mjs",
+    "carga": "node scripts/carga-nube.mjs",
+    "resincronizar-cortes": "node scripts/resincronizar-cortes.mjs"
   },
   "dependencies": {
     "embedded-postgres": "17.10.0-beta.17",
