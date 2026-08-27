@@ -1,3 +1,6 @@
+// ⚠ Este archivo entró en un commit cuyo mensaje habla de otra cosa (7cbff81, «el rescate de
+// cortes va automatico»): se arrastró sin querer con `git add -A`. Ver docs/ATRIBUCION-COMMITS.md.
+
 // Verificación de que el PUSH se parte en lotes y no se atora con un pendiente grande.
 //
 // Vive sin Postgres a propósito, igual que verify-sync-ciclo: lo que hay que probar aquí es la
@@ -84,6 +87,17 @@ function crearPoolFalso({ nTickets = 450, nTurnos = 5, turnosCambiados = [] } = 
       if (sql.includes("_vim_turnos_ok(turno_id")) {
         for (const t of JSON.parse(params[0])) turnosMarcados.set(t.id, t.huella);
         return { rows: [] };
+      }
+
+      /* Rescate de cortes (0.4.50): `asegurarTabla` lo llama una vez por caja. Aquí se
+         responde "ya corrió" para que no intente nada — lo que esta prueba mide es la
+         política de LOTES, y el rescate tiene su propia verificación contra la base real.
+         Se contestan explícitamente en vez de aflojar el `throw` de abajo: que el pool
+         falso reviente ante una consulta que nadie previó es justo lo que hace fiable a
+         esta prueba. */
+      if (sql.includes("_vim_migraciones_sync")) {
+        // SELECT de comprobación → devuelve una fila = "ya se hizo, no repetir".
+        return sql.trim().toUpperCase().startsWith("SELECT") ? { rows: [{}], rowCount: 1 } : { rows: [], rowCount: 0 };
       }
 
       throw new Error(`consulta no prevista por el pool falso: ${sql.slice(0, 80)}`);
