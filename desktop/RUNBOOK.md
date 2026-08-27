@@ -150,27 +150,29 @@ Las cajas/cocinas detectan la nueva versión en su próximo arranque. Feed por d
 `https://pbiaxzvmssjsxdwqrumb.supabase.co/storage/v1/object/public/actualizaciones/latest.json`
 (override con `VIM_UPDATE_FEED`; base del `.exe` con `VIM_UPDATE_BASE` en release-manifest).
 
-### Rescatar los cortes que se quedaron en una caja
+### Los cortes que se quedaron en una caja (se rescatan solos)
 
 Hasta la versión 0.4.50 la sincronización **no subía los cortes de caja ni el reporte Z**: se
 generaban en la caja, se imprimían, y no salían nunca. En el piloto quedaron trece turnos cerrados
 sin un solo corte en la nube, y «Reportes → Cortes Z históricos» del panel estaba vacío.
 
-Actualizar la caja arregla los cortes NUEVOS, pero **no rescata los viejos**: la caja lleva una
-huella por turno para no reenviar lo ya subido, y esos turnos no han cambiado desde entonces.
+Arreglar el snapshot no bastaba para recuperarlos: la caja rastrea los turnos por huella para no
+reenviar lo ya subido, y esos turnos no habían cambiado.
 
-Después de actualizar la caja a 0.4.50 o superior, en esa máquina:
+**Al actualizar a 0.4.50 la caja lo resuelve sola**, una sola vez: borra la huella de los turnos
+que tienen corte, y en el siguiente ciclo suben con su cierre. No se pierde ningún dato, y re-subir
+un turno es inofensivo (la nube hace `ON CONFLICT DO UPDATE`). Un marcador impide que se repita —
+sin él, la caja re-subiría su historia entera cada diez minutos.
 
-```bash
-npm run resincronizar-cortes             # vista previa: qué turnos volverían a subir
-npm run resincronizar-cortes -- --hacer  # aplicar
-```
+Va automático a propósito: pedirle a alguien que abra una terminal en la caja de un restaurante es
+pedir que no se haga. Y no le pasa solo al piloto, sino a toda caja que haya cerrado un turno antes
+de actualizar.
 
-Borra solo la huella de los turnos que tienen corte; en el siguiente ciclo de sincronización
-(unos minutos) suben con su cierre. No borra datos ni toca la nube, y re-subir un turno es
-inofensivo: la nube hace `ON CONFLICT DO UPDATE`. Se puede correr dos veces.
+Se confirma en el panel, en **Reportes → Cortes Z históricos**, unos minutos después.
 
-Se confirma en el panel, en **Reportes → Cortes Z históricos**.
+> Si hiciera falta forzarlo desde el repositorio (diagnóstico, o repetirlo tras una restauración):
+> `npm run resincronizar-cortes` muestra qué subiría, y `-- --hacer` lo aplica. Ese script NO va
+> dentro del instalador; el rescate automático de arriba es el camino normal.
 
 > Sin firma, al instalar la actualización Windows puede mostrar SmartScreen/UAC una vez ("Ejecutar
 > de todos modos") — molesto, no bloqueante. Con firma EV desaparece (ver abajo).

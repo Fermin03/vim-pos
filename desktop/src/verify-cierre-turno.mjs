@@ -38,11 +38,17 @@ try {
       efectivo_contado_mxn numeric(12,2));
     CREATE TABLE tickets (
       id uuid PRIMARY KEY, turno_id uuid NOT NULL REFERENCES turnos(id),
-      estado_fiscal text NOT NULL, folio_completo text);
+      estado_fiscal text NOT NULL, folio_completo text,
+      -- El push ordena lo pendiente por esta fecha para subirlo en orden cronológico.
+      fecha_apertura timestamptz NOT NULL DEFAULT now());
     CREATE TABLE ticket_items (id uuid PRIMARY KEY, ticket_id uuid REFERENCES tickets(id));
     CREATE TABLE ticket_item_modificadores (id uuid PRIMARY KEY, ticket_item_id uuid REFERENCES ticket_items(id));
     CREATE TABLE pagos (id uuid PRIMARY KEY, ticket_id uuid REFERENCES tickets(id));
     CREATE TABLE movimientos_caja (id uuid PRIMARY KEY, turno_id uuid REFERENCES turnos(id), monto numeric(12,2));
+    -- Faltaba: se sumó a la rebanada del push después de escribirse esta prueba, y sin la tabla
+    -- el snapshot ni siquiera se puede armar aquí. Si mañana el push aprende otra tabla, este
+    -- laboratorio también tiene que aprenderla.
+    CREATE TABLE delivery_asignaciones (id uuid PRIMARY KEY, ticket_id uuid REFERENCES tickets(id));
   `);
 
   const T1 = "11111111-1111-1111-1111-111111111111";
