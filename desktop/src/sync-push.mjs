@@ -46,6 +46,57 @@ async function asegurarTabla(pool) {
   // pero un turno sí —se abre, se cierra, se le cuenta el efectivo— y cada cambio tiene que
   // volver a viajar. Ver el porqué en el comentario de `construirSnapshotPush`.
   await pool.query("CREATE TABLE IF NOT EXISTS _vim_turnos_ok (turno_id uuid PRIMARY KEY, huella text NOT NULL, pushed_at timestamptz DEFAULT now())");
+
+  await rescatarCortesUnaVez(pool);
+}
+
+/**
+ * Sube los cortes que se quedaron atrapados en esta caja. UNA sola vez por caja.
+ *
+ * Hasta la 0.4.50 el snapshot no incluía `cortes_caja` ni el reporte Z: se generaban aquí, se
+ * imprimían, y no salían nunca. En el piloto quedaron trece turnos cerrados sin un solo corte en
+ * la nube, y «Cortes Z históricos» del panel vacío para siempre.
+ *
+ * Arreglar el snapshot no basta para recuperarlos. La caja rastrea los turnos por HUELLA para no
+ * reenviar lo ya subido, y esos turnos no han cambiado desde entonces: su huella coincide, así que
+ * no se volverían a mandar y sus cortes seguirían aquí.
+ *
+ * Basta con borrar su huella: en el siguiente ciclo se ven como "cambiados" y suben otra vez, esta
+ * vez arrastrando el cierre. No se borra ningún dato, y re-subir un turno es inofensivo — la nube
+ * hace `ON CONFLICT (id) DO UPDATE`.
+ *
+ * VA AUTOMÁTICO, NO EN UN SCRIPT
+ *
+ * Pedirle a alguien que abra una terminal en la caja de un restaurante para correr un comando es
+ * pedir que no se haga. Y esto no le pasa solo al piloto: le pasa a TODA caja que haya cerrado un
+ * turno antes de actualizar. Se arregla solo al actualizar, que es cuando toca.
+ *
+ * El marcador impide que se repita: sin él, cada ciclo volvería a marcar todos los turnos con
+ * corte y la caja estaría re-subiendo su historia entera cada diez minutos, para siempre.
+ */
+async function rescatarCortesUnaVez(pool) {
+  await pool.query(
+    "CREATE TABLE IF NOT EXISTS _vim_migraciones_sync (clave text PRIMARY KEY, aplicada_at timestamptz DEFAULT now())",
+  );
+  const { rowCount: yaCorrio } = await pool.query(
+    "SELECT 1 FROM _vim_migraciones_sync WHERE clave = 'rescate_cortes_0089'",
+  );
+  if (yaCorrio) return;
+
+  // Se marca ANTES de tocar nada: si el borrado fallara a medias, el peor caso es que algunos
+  // cortes no suban — no una caja que reintenta el rescate en cada ciclo indefinidamente.
+  await pool.query(
+    "INSERT INTO _vim_migraciones_sync(clave) VALUES ('rescate_cortes_0089') ON CONFLICT DO NOTHING",
+  );
+
+  const { rowCount: n } = await pool.query(`
+    DELETE FROM _vim_turnos_ok o
+     WHERE EXISTS (SELECT 1 FROM cortes_caja c          WHERE c.turno_id = o.turno_id)
+        OR EXISTS (SELECT 1 FROM reportes_z_historico z WHERE z.turno_id = o.turno_id)
+  `);
+  if (n > 0) {
+    console.log(`[sync] rescate de cortes: ${n} turno(s) volverán a subir con su cierre.`);
+  }
 }
 
 /** Parte una lista en trozos de a lo más `tamano`. */

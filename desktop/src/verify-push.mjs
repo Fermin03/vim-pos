@@ -39,6 +39,49 @@ try {
   }
   console.log(`· folios/estados intactos tras el push (verbatim). Ej: ${despues[0].folio_completo}=${despues[0].estado_fiscal}, ${despues[despues.length - 1].folio_completo}=${despues[despues.length - 1].estado_fiscal}`);
 
+  // 3.bis) El armado POR LOTE contra el esquema real.
+  //
+  // El pool falso de verify-push-lotes prueba la política (cuántos, qué se marca, qué pasa si
+  // uno falla), pero no puede probar el SQL. Esto sí: que pedir un subconjunto de ids devuelva
+  // EXACTAMENTE ese subconjunto, que cada lote arrastre los turnos que sus tickets referencian
+  // —sin eso la FK los rechaza en la nube— y que juntando los lotes no falte ni sobre una venta.
+  const mitad = Math.ceil(ids.length / 2);
+  const loteA = ids.slice(0, mitad);
+  const loteB = ids.slice(mitad);
+  const sA = await construirSnapshotPush(pool, { ticketIds: loteA, turnoIds: [] });
+  const sB = await construirSnapshotPush(pool, { ticketIds: loteB, turnoIds: [] });
+
+  if (sA.ids.length !== loteA.length || sB.ids.length !== loteB.length) {
+    throw new Error(`el armado por lote no respetó la lista: pedí ${loteA.length}/${loteB.length}, vinieron ${sA.ids.length}/${sB.ids.length}`);
+  }
+  const juntos = new Set([...sA.ids, ...sB.ids]);
+  if (juntos.size !== ids.length) throw new Error(`juntando los lotes hay ${juntos.size} ventas y deberían ser ${ids.length}`);
+
+  for (const [nombre, s] of [["A", sA], ["B", sB]]) {
+    const turnosDelLote = new Set((s.snapshot.turnos ?? []).map((t) => t.id));
+    for (const t of s.snapshot.tickets ?? []) {
+      if (!turnosDelLote.has(t.turno_id)) {
+        throw new Error(`lote ${nombre}: el ticket ${t.folio_completo} viaja sin su turno (la nube lo rechazaría por FK)`);
+      }
+    }
+    const idsLote = new Set(s.ids);
+    for (const it of s.snapshot.ticket_items ?? []) {
+      if (!idsLote.has(it.ticket_id)) throw new Error(`lote ${nombre}: llegó un renglón de un ticket que no va en el lote`);
+    }
+  }
+  console.log(`· armado por lote OK: ${sA.ids.length}+${sB.ids.length} ventas, cada lote con sus turnos (${sA.snapshot.turnos?.length ?? 0} y ${sB.snapshot.turnos?.length ?? 0}) y sin renglones huérfanos`);
+
+  // Y que un turno forzado (el caso "cerró el turno pero no vendió nada nuevo") sí se cuele.
+  const turnoSuelto = (await q("SELECT id FROM turnos LIMIT 1"))[0].id;
+  const sForzado = await construirSnapshotPush(pool, { ticketIds: [], turnoIds: [turnoSuelto] });
+  if (!(sForzado.snapshot.turnos ?? []).some((t) => t.id === turnoSuelto)) {
+    throw new Error("un turno pedido explícitamente no viajó en el lote");
+  }
+  if ((sForzado.snapshot.tickets ?? []).length !== 0) {
+    throw new Error("un lote sin ventas trajo tickets de todos modos");
+  }
+  console.log("· lote de solo-turnos OK: viaja el turno pedido y ninguna venta");
+
   // 4) Marcar subidos y confirmar que ya no hay pendientes (no re-sube)
   await marcarPushed(pool, ids);
   const otra = await construirSnapshotPush(pool);
