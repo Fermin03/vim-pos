@@ -299,13 +299,24 @@ export function PantallaCierre({
       sello,
       ancho: 80,
     };
-    // Imprimir: Epson recibe el job ESC/POS; Preview imprime el recibo visible vía window.print().
+    /* El corte sale SOLO, y el botón dice "Volver".
+     *
+     * Se imprime al aparecer porque un corte Z siempre se imprime: se firma y se guarda
+     * con el efectivo. Pedírselo al cajero era un paso de más al final de la jornada,
+     * y si se le olvidaba, el turno quedaba cerrado sin papel. La vista se queda en
+     * pantalla para reimprimir si la impresora falló.
+     *
+     * Y ya no dice "Nuevo ticket": aquí el turno ACABA de cerrarse, así que ese botón
+     * ofrecía justo lo único que en ese momento no se puede hacer.
+     *
+     * Imprimir: Epson recibe el job ESC/POS; Preview usa window.print() sobre lo visible. */
     return (
       <ReciboPreview
         datosZ={zData}
+        autoImprimir
+        etiquetaCerrar="Volver"
         onImprimir={() => { obtenerImpresora("CAJA", { onMostrar: () => window.print() }).imprimir(construirReporteZJob(zData)); }}
         onCerrar={onCerrado}
-        onNuevoTicket={onCerrado}
       />
     );
   }

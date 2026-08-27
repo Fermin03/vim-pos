@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { QRCodeSVG } from "qrcode.react";
 import type { Bloque, DatosTicketImpresion, PrintJob } from "../lib/print/tipos";
 import type { DatosComanda } from "../lib/print/comanda-builder";
@@ -26,6 +26,8 @@ export function ReciboPreview({
   onImprimir,
   onCerrar,
   onNuevoTicket,
+  etiquetaCerrar = "Cerrar",
+  autoImprimir = false,
 }: {
   /** Camino preferido (P-222 fiel). */
   datosTicket?: DatosTicketImpresion;
@@ -40,8 +42,32 @@ export function ReciboPreview({
   onCerrar: () => void;
   /** Si se provee, muestra un botón primario "Nuevo ticket" para cerrar y arrancar la siguiente venta. */
   onNuevoTicket?: () => void;
+  /** Texto del botón que cierra la vista. "Cerrar" sirve para un ticket que se está
+   *  consultando; en el corte de turno lo que se hace es VOLVER, y decirlo así evita
+   *  que el cajero dude de si "cerrar" le cierra algo más. */
+  etiquetaCerrar?: string;
+  /** Manda a imprimir sola al aparecer, una única vez.
+   *
+   *  Para el corte de turno: es un documento que SIEMPRE se imprime —se firma y se
+   *  guarda con el efectivo— así que hacer que el cajero lo pida es un paso de más al
+   *  final de la jornada, justo cuando tiene prisa. La vista queda en pantalla para
+   *  poder reimprimir si la impresora falló. */
+  autoImprimir?: boolean;
 }) {
   const [vista, setVista] = useState<"cliente" | "cocina">("cliente");
+
+  /* Una sola vez por montaje: un re-render no debe sacar un segundo papel. Mismo
+     patrón que la apertura del cajón al abrir turno. */
+  const yaImprimio = useRef(false);
+  useEffect(() => {
+    if (!autoImprimir || yaImprimio.current) return;
+    yaImprimio.current = true;
+    onImprimir("cliente");
+    // `onImprimir` suele venir como función en línea (identidad nueva en cada render);
+    // incluirla en las dependencias volvería a disparar la impresión. El ref ya
+    // garantiza la vez única, y la intención es "al aparecer".
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoImprimir]);
   const enCocina = vista === "cocina" && !!datosComanda;
   const titulo = datosZ ? "Reporte Z · 80mm" : enCocina ? "Comanda · 80mm" : "Ticket · 80mm";
   const usaDatos = !!datosTicket;
@@ -58,7 +84,7 @@ export function ReciboPreview({
             {onNuevoTicket ? (
               <button type="button" onClick={onNuevoTicket} className="rounded bg-accent px-3 py-1.5 text-[13px] font-semibold text-white hover:bg-accent-hover">Nuevo ticket</button>
             ) : (
-              <button type="button" onClick={onCerrar} className="rounded bg-white px-3 py-1.5 text-[13px] font-semibold text-ink hover:bg-hover">Cerrar</button>
+              <button type="button" onClick={onCerrar} className="rounded bg-white px-3 py-1.5 text-[13px] font-semibold text-ink hover:bg-hover">{etiquetaCerrar}</button>
             )}
           </div>
         </div>
