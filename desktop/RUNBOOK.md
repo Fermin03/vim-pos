@@ -112,16 +112,65 @@ notificación + (en la caja) ítem en la bandeja "⬇ Actualización vX — inst
 (`npm run verify:updater`): detección de versión + descarga con SHA-512 + rechazo de descarga corrupta.
 
 **Publicar una versión nueva:**
-1. Sube la versión en `desktop/package.json` (p. ej. `0.1.0` → `0.2.0`).
-2. `npm run dist` → `dist/VIM POS Setup 0.2.0.exe`.
-3. `npm run release-manifest -- "Qué cambió en esta versión"` → genera `dist/latest.json`
-   (calcula el SHA-512 y arma la URL del bucket).
-4. Sube **AMBOS** al bucket **público** `actualizaciones` de Supabase Storage (crea el bucket una
-   vez, marcado *Public*): `VIM POS Setup 0.2.0.exe` y `latest.json` (reemplazando el anterior).
+
+> El instalador pesa ~150 MB y **Supabase Free rechaza archivos de más de 50 MB**, así que el `.exe`
+> va a **GitHub Releases** y solo el `latest.json` al bucket. (El script te lo recuerda al final.)
+
+1. Sube la versión en `desktop/package.json` (p. ej. `0.4.49` → `0.4.50`).
+2. `npm run dist` → `dist/VIM POS Setup 0.4.50.exe`.
+   **Tarda más de diez minutos.** Antes de seguir, comprueba la FECHA del `.exe`: es fácil publicar
+   el binario anterior creyendo que el nuevo ya salió.
+3. **Sube el `.exe` PRIMERO**, y solo después genera el manifiesto:
+
+   ```bash
+   gh release create v0.4.50 "dist/VIM POS Setup 0.4.50.exe" --title "VIM POS 0.4.50" --notes "…"
+   gh release view v0.4.50 --json assets -q '.assets[].url'   # la URL REAL, no la supuesta
+   ```
+
+   El orden importa: así el manifiesto no puede apuntar a un archivo que no existe. GitHub además
+   cambia los espacios por puntos en el nombre (`VIM.POS.Setup.0.4.50.exe`), otra razón para leer la
+   URL en vez de escribirla a mano.
+
+   Comprueba que el tamaño que reporta GitHub sea idéntico al del archivo local: es la prueba de
+   que allá está exactamente el binario que vas a hashear.
+
+4. `VIM_UPDATE_URL="<la URL real>" npm run release-manifest -- "Qué cambió"` → `dist/latest.json`
+   (calcula el SHA-512 del `.exe` local y fija esa URL).
+5. Sube `latest.json` al bucket **público** `actualizaciones` con un PUT:
+
+   ```bash
+   curl -X PUT -H "apikey: $SERVICE_ROLE" -H "Authorization: Bearer $SERVICE_ROLE"      -H "Content-Type: application/json" -H "x-upsert: true"      --data-binary @dist/latest.json      "https://pbiaxzvmssjsxdwqrumb.supabase.co/storage/v1/object/actualizaciones/latest.json"
+   ```
+
+   **El feed tarda un par de minutos en propagarse.** Justo después de subirlo, la URL pública sigue
+   devolviendo la versión anterior: es caché de borde, no un fallo de la subida. Confírmalo leyendo
+   el objeto autenticado (sin CDN) o con `?v=$(date +%s)`, y vuelve a mirar la URL limpia al rato.
 
 Las cajas/cocinas detectan la nueva versión en su próximo arranque. Feed por defecto:
 `https://pbiaxzvmssjsxdwqrumb.supabase.co/storage/v1/object/public/actualizaciones/latest.json`
 (override con `VIM_UPDATE_FEED`; base del `.exe` con `VIM_UPDATE_BASE` en release-manifest).
+
+### Rescatar los cortes que se quedaron en una caja
+
+Hasta la versión 0.4.50 la sincronización **no subía los cortes de caja ni el reporte Z**: se
+generaban en la caja, se imprimían, y no salían nunca. En el piloto quedaron trece turnos cerrados
+sin un solo corte en la nube, y «Reportes → Cortes Z históricos» del panel estaba vacío.
+
+Actualizar la caja arregla los cortes NUEVOS, pero **no rescata los viejos**: la caja lleva una
+huella por turno para no reenviar lo ya subido, y esos turnos no han cambiado desde entonces.
+
+Después de actualizar la caja a 0.4.50 o superior, en esa máquina:
+
+```bash
+npm run resincronizar-cortes             # vista previa: qué turnos volverían a subir
+npm run resincronizar-cortes -- --hacer  # aplicar
+```
+
+Borra solo la huella de los turnos que tienen corte; en el siguiente ciclo de sincronización
+(unos minutos) suben con su cierre. No borra datos ni toca la nube, y re-subir un turno es
+inofensivo: la nube hace `ON CONFLICT DO UPDATE`. Se puede correr dos veces.
+
+Se confirma en el panel, en **Reportes → Cortes Z históricos**.
 
 > Sin firma, al instalar la actualización Windows puede mostrar SmartScreen/UAC una vez ("Ejecutar
 > de todos modos") — molesto, no bloqueante. Con firma EV desaparece (ver abajo).
