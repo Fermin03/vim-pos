@@ -15,7 +15,31 @@ export interface ModalProps {
   backdropClassName?: string;
 }
 
-/** Modal accesible: role=dialog, aria-modal, Esc cierra, foco atrapado. */
+/** Modal accesible: role=dialog, aria-modal, Esc cierra, foco atrapado.
+ *
+ * EL FOCO SOLO SE COLOCA AL ABRIR — Y ESO COSTÓ UN BUG FEO
+ *
+ * Este efecto dependía de `[open, onClose]`. Parece inofensivo y no lo era:
+ * casi todas las pantallas pasan `onClose={() => setAlgo(false)}` en línea, o
+ * sea una función NUEVA en cada render del padre. Y el POS re-renderiza solo:
+ * `useConexion` comprueba la red cada 20 segundos y mueve estado al hacerlo.
+ *
+ * Resultado, cada 20 segundos y sin que nadie toque nada:
+ *   · se ejecuta la limpieza del efecto → devuelve el foco a lo que estaba
+ *     enfocado antes,
+ *   · se vuelve a ejecutar el efecto → manda el foco al PRIMER enfocable del
+ *     modal, que casi siempre es un botón.
+ *
+ * Para el cajero eso es: está capturando al cliente de un domicilio, de pronto
+ * el cursor desaparece del campo y lo que teclea no entra a ningún lado. Y como
+ * el foco quedó en un botón, la siguiente barra espaciadora lo PULSA. En el
+ * modal de cliente el primer botón es «Buscar», así que el formulario entero
+ * desaparece con todo lo capturado — y parece que el modal se cerró solo.
+ *
+ * La dependencia era el bug. `onClose` vive ahora en una ref: el efecto solo
+ * depende de `open`, así que el foco se coloca al abrir y no se vuelve a tocar.
+ * El teclado sigue leyendo siempre la última versión del callback.
+ */
 export function Modal({
   open,
   onClose,
@@ -27,6 +51,10 @@ export function Modal({
 }: ModalProps) {
   const ref = useRef<HTMLDivElement>(null);
 
+  // La ref se actualiza en cada render, pero cambiarla NO reinicia el efecto.
+  const cerrar = useRef(onClose);
+  cerrar.current = onClose;
+
   useEffect(() => {
     if (!open) return;
     const node = ref.current;
@@ -37,15 +65,22 @@ export function Modal({
         'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])',
       ) ?? [];
 
-    focusables()[0]?.focus();
+    /* Al abrir, el foco va al primer CAMPO si el modal tiene alguno; si no, al
+       primer enfocable. Antes iba siempre al primer enfocable, que suele ser un
+       botón de la cabecera: en un modal de captura eso obliga a tabular o a
+       tocar la pantalla antes de escribir la primera letra, y en uno de
+       confirmación deja el dedo sobre un botón que quizá borra algo. */
+    const els = Array.from(focusables());
+    const campo = els.find((e) => /^(INPUT|TEXTAREA|SELECT)$/.test(e.tagName));
+    (campo ?? els[0])?.focus();
 
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
+      if (e.key === "Escape") cerrar.current();
       if (e.key === "Tab") {
-        const els = Array.from(focusables());
-        if (els.length === 0) return;
-        const first = els[0]!;
-        const last = els[els.length - 1]!;
+        const actuales = Array.from(focusables());
+        if (actuales.length === 0) return;
+        const first = actuales[0]!;
+        const last = actuales[actuales.length - 1]!;
         if (e.shiftKey && document.activeElement === first) {
           e.preventDefault();
           last.focus();
@@ -58,9 +93,10 @@ export function Modal({
     document.addEventListener("keydown", onKey);
     return () => {
       document.removeEventListener("keydown", onKey);
+      // Solo al cerrar de verdad: devuelve el foco a lo que lo tenía antes.
       prevFocus?.focus();
     };
-  }, [open, onClose]);
+  }, [open]);
 
   if (!open) return null;
 
