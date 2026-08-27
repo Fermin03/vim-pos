@@ -18,8 +18,9 @@ export function AbrirTurno({
   cajaLabel,
   sucursalLabel,
   negocioLabel,
+  vertical,
   onTurnoAbierto,
-  onCambiarCajero,
+  onVolver,
 }: {
   empleado: Empleado;
   token: string;
@@ -28,8 +29,11 @@ export function AbrirTurno({
   cajaLabel: string;
   sucursalLabel: string;
   negocioLabel?: string;
+  /** Vertical del negocio: decide si se ofrece el bloque de evento (solo foodtruck). */
+  vertical?: string | null;
   onTurnoAbierto: (t: Turno) => void;
-  onCambiarCajero: () => void;
+  /** Regresa a la pantalla anterior sin abrir nada. */
+  onVolver: () => void;
 }) {
   const [fondo, setFondo] = useState<string>("500");
   const [notas, setNotas] = useState("");
@@ -89,15 +93,10 @@ export function AbrirTurno({
     }
   }
 
-  const ahora = new Date();
-  const fechaHora = ahora.toLocaleString("es-MX", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: false,
-  });
+  /* El bloque de evento es de la vertical FOODTRUCK (Flujos B3 §4): un camión que hoy
+     vende en una feria y mañana en otra. A un local fijo no le aplica nunca, y le
+     ocupaba sitio en la pantalla que más prisa tiene del turno. */
+  const ofreceEvento = vertical === "FOODTRUCK";
 
   return (
     <div className="flex h-screen flex-col">
@@ -108,24 +107,10 @@ export function AbrirTurno({
           <div className="mb-6 text-center">
             <h1 className="font-display text-2xl font-semibold tracking-tight">Abrir turno</h1>
             <p className="mt-1 text-sm text-ink-2">
-              Cuenta el efectivo con el que inicia la caja para registrar el fondo.
+              Cuenta el efectivo con el que arranca la caja. El turno queda a nombre de{" "}
+              <b className="font-semibold text-ink">{empleado.nombre}</b>
+              {empleado.nombre.endsWith(".") ? "" : "."}
             </p>
-          </div>
-
-          {/* Resumen del turno */}
-          <div className="mb-6 grid grid-cols-3 divide-x divide-line rounded-lg border border-line bg-surface">
-            <div className="p-4">
-              <div className="text-[11px] font-bold uppercase tracking-wide text-ink-3">Cajero</div>
-              <div className="mt-1 text-[14px] font-semibold">{empleado.nombre}</div>
-            </div>
-            <div className="p-4">
-              <div className="text-[11px] font-bold uppercase tracking-wide text-ink-3">Caja</div>
-              <div className="mt-1 text-[14px] font-semibold">{cajaLabel}</div>
-            </div>
-            <div className="p-4">
-              <div className="text-[11px] font-bold uppercase tracking-wide text-ink-3">Fecha y hora</div>
-              <div className="mt-1 text-[14px] font-semibold tabular-nums">{fechaHora}</div>
-            </div>
           </div>
 
           {/* Captura del fondo */}
@@ -169,6 +154,7 @@ export function AbrirTurno({
             />
 
             {/* B3 — ¿Es un evento o ubicación especial? (Foodtruck §4) */}
+            {ofreceEvento && (
             <div className="mt-5 border-t border-line pt-4">
               <label className="flex cursor-pointer items-center gap-2.5 text-[13.5px] font-medium text-ink-2">
                 <input
@@ -216,6 +202,7 @@ export function AbrirTurno({
                 </div>
               )}
             </div>
+            )}
 
             {error && (
               <p className="mt-3 text-sm font-medium text-danger" role="alert">{error}</p>
@@ -224,12 +211,16 @@ export function AbrirTurno({
 
           {/* Acciones */}
           <div className="mt-5 flex items-center justify-between">
+            {/* Volver, no "cambiar cajero": desde aquí lo que se necesita es salir sin
+                abrir nada y regresar a donde estabas. Cambiar de usuario sigue estando
+                en el menú del inicio, que es su sitio. */}
             <button
               type="button"
-              onClick={onCambiarCajero}
-              className="text-[13px] font-medium text-ink-3 transition-colors hover:text-ink-2"
+              onClick={onVolver}
+              className="flex h-11 items-center gap-2 rounded border border-line-strong px-4 text-[13.5px] font-semibold text-ink-2 transition hover:border-ink hover:text-ink"
             >
-              ← Cambiar cajero
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4"><path d="M19 12H5M12 19l-7-7 7-7" /></svg>
+              Volver
             </button>
             <div className="flex items-center gap-3">
               <span className="text-[13px] text-ink-3">Total fondo</span>

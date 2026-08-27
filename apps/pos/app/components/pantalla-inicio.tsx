@@ -142,24 +142,24 @@ export function PantallaInicio({
         aria-label="Accesos principales"
         className="flex flex-shrink-0 items-stretch gap-px overflow-hidden border-b border-line bg-line"
       >
-        <Acceso label="Comedor" badge={nCuentasComedor} onClick={onComedor} deshabilitado={sinTurno}
+        <Acceso label="Comedor" badge={nCuentasComedor} onClick={onComedor} requiereTurno={sinTurno}
           icon={<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M3 11h18M5 11V8a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v3M6 11v7M18 11v7M9 6V4M15 6V4" /></svg>} />
-        <Acceso label="Para llevar" onClick={onParaLlevar} deshabilitado={sinTurno} destacado
+        <Acceso label="Para llevar" onClick={onParaLlevar} requiereTurno={sinTurno} destacado
           icon={<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M6 2h12l1.5 5H4.5L6 2z" /><path d="M4.5 7h15l-1 13a2 2 0 0 1-2 2H7.5a2 2 0 0 1-2-2L4.5 7z" /><path d="M9 12h6" /></svg>} />
-        <Acceso label="Pick-up" badge={nCuentasPickup} onClick={onPickup} deshabilitado={sinTurno}
+        <Acceso label="Pick-up" badge={nCuentasPickup} onClick={onPickup} requiereTurno={sinTurno}
           icon={<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M20 7H4a1 1 0 0 0-1 1v11a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V8a1 1 0 0 0-1-1z" /><path d="M8 7V5a4 4 0 0 1 8 0v2" /></svg>} />
-        <Acceso label="Domicilio" badge={nCuentasDomicilio} onClick={onDomicilio} deshabilitado={sinTurno}
+        <Acceso label="Domicilio" badge={nCuentasDomicilio} onClick={onDomicilio} requiereTurno={sinTurno}
           icon={<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M1 9h13v8H1z" /><path d="M14 12h4l3 3v2h-7" /><circle cx="5" cy="18" r="2" /><circle cx="17" cy="18" r="2" /></svg>} />
 
         <span className="w-px flex-shrink-0 bg-line-strong" aria-hidden="true" />
 
-        <Acceso label="Retiro / Depósito" onClick={onMovimientoCaja} deshabilitado={sinTurno}
+        <Acceso label="Retiro / Depósito" onClick={onMovimientoCaja} requiereTurno={sinTurno}
           icon={<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="6" width="20" height="12" rx="2" /><circle cx="12" cy="12" r="2.5" /><path d="M6 12h.01M18 12h.01" /></svg>} />
-        <Acceso label="Consultar ctas." badge={nEnEspera} onClick={onConsultarCuentas} deshabilitado={sinTurno}
+        <Acceso label="Consultar ctas." badge={nEnEspera} onClick={onConsultarCuentas} requiereTurno={sinTurno}
           icon={<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M6 2h9l3 3v15a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V3a1 1 0 0 1 1-1z" /><path d="M9 8h6M9 12h6M9 16h4" /></svg>} />
-        <Acceso label="Monitor ventas" onClick={onMonitorVentas} deshabilitado={sinTurno}
+        <Acceso label="Monitor ventas" onClick={onMonitorVentas} requiereTurno={sinTurno}
           icon={<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M3 3v18h18" /><path d="M7 15l4-5 3 3 5-7" /></svg>} />
-        <Acceso label="Corte caja X" onClick={onCorteX} deshabilitado={sinTurno}
+        <Acceso label="Corte caja X" onClick={onCorteX} requiereTurno={sinTurno}
           icon={<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M6 2h12v20l-3-2-3 2-3-2-3 2V2z" /><path d="M9 7h6M9 11h6M9 15h3" /></svg>} />
 
         <span className="w-px flex-shrink-0 bg-line-strong" aria-hidden="true" />
@@ -296,13 +296,19 @@ export function PantallaInicio({
  * sin importar el tamaño, y el contenido escala con la altura disponible.
  */
 function Acceso({
-  label, icon, onClick, badge, deshabilitado, destacado, peligro, resaltado,
+  label, icon, onClick, badge, requiereTurno, destacado, peligro, resaltado,
 }: {
   label: string;
   icon: ReactNode;
   onClick: () => void;
   badge?: number;
-  deshabilitado?: boolean;
+  /** Necesita un turno abierto: se pinta apagado, pero SIGUE respondiendo.
+   *
+   *  Antes esto era `deshabilitado` y ponía `disabled` en el botón. El cajero tocaba
+   *  "Comedor" sin turno y no ocurría nada — que es como se ve un sistema colgado.
+   *  Apagado pero vivo dice las dos cosas: que todavía no se puede vender, y qué
+   *  hacer al respecto (el toque lleva a abrir el turno). */
+  requiereTurno?: boolean;
   /** Acción más frecuente (venta de mostrador): se pinta en el color de marca. */
   destacado?: boolean;
   peligro?: boolean;
@@ -313,18 +319,17 @@ function Acceso({
     <button
       type="button"
       onClick={onClick}
-      disabled={deshabilitado}
-      title={label}
+      title={requiereTurno ? `${label} · abre el turno primero` : label}
       className={[
         "relative flex min-w-0 flex-1 flex-col items-center justify-center gap-1 px-1 py-[clamp(0.4rem,1.4vh,0.7rem)] transition",
-        "disabled:cursor-default disabled:opacity-35",
+        requiereTurno ? "opacity-40" : "",
         destacado
-          ? "bg-accent text-white hover:bg-accent-hover disabled:hover:bg-accent"
+          ? "bg-accent text-white hover:bg-accent-hover"
           : resaltado
-            ? "bg-ink text-white hover:brightness-110 disabled:hover:brightness-100"
+            ? "bg-ink text-white hover:brightness-110"
             : peligro
-              ? "bg-surface text-danger hover:bg-[#FBF1EF] disabled:hover:bg-surface"
-              : "bg-surface text-ink-2 hover:bg-sel hover:text-ink disabled:hover:bg-surface",
+              ? "bg-surface text-danger hover:bg-[#FBF1EF]"
+              : "bg-surface text-ink-2 hover:bg-sel hover:text-ink",
       ].join(" ")}
     >
       <span className="[&>svg]:h-[clamp(1.15rem,2.8vh,1.6rem)] [&>svg]:w-auto">{icon}</span>
