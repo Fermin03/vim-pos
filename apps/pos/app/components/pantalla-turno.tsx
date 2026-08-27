@@ -6,8 +6,6 @@ import { HomePos } from "./home-pos";
 import { PantallaInicio } from "./pantalla-inicio";
 import { leerCaja, turnoAbiertoDeCaja, type DatosCaja, type Turno } from "../lib/turno";
 
-/** Acciones del inicio que no aplican sin turno: los botones ya salen deshabilitados. */
-const noop = () => {};
 
 /**
  * Pantalla post-login: carga datos de la caja y decide entre abrir turno o
@@ -76,6 +74,20 @@ export function PantallaTurno({
   // pidió — a veces solo se entra a consultar algo o a cambiar de cajero.
   if (turno === null) {
     if (!abriendoTurno) {
+      /* EL MENÚ RESPONDE SIEMPRE.
+       *
+       * Antes, sin turno, los ocho accesos llevaban a `noop`: el cajero tocaba
+       * "Comedor" y no pasaba nada. Un botón que no reacciona se lee como que el
+       * sistema se colgó, y el aviso de "abre el turno" quedaba abajo, fuera de
+       * donde estaba mirando.
+       *
+       * No es que faltara cablearlos: vender sin turno es IMPOSIBLE, y no por una
+       * decisión de pantalla — `tickets.turno_id` es NOT NULL, así que un ticket sin
+       * turno no existe en la base. Lo que se puede arreglar es la reacción: tocar
+       * cualquiera de ellos lleva a abrir el turno, que es exactamente el paso que
+       * falta para hacer lo que el cajero acaba de pedir.
+       */
+      const abrir = () => setAbriendoTurno(true);
       return (
         <PantallaInicio
           caja={caja}
@@ -85,16 +97,16 @@ export function PantallaTurno({
           nCuentasPickup={0}
           nCuentasDomicilio={0}
           nEnEspera={0}
-          onComedor={noop}
-          onParaLlevar={noop}
-          onPickup={noop}
-          onDomicilio={noop}
-          onMonitorVentas={noop}
-          onConsultarCuentas={noop}
-          onMovimientoCaja={noop}
-          onCorteX={noop}
-          onAbrirTurno={() => setAbriendoTurno(true)}
-          onCerrarTurno={noop}
+          onComedor={abrir}
+          onParaLlevar={abrir}
+          onPickup={abrir}
+          onDomicilio={abrir}
+          onMonitorVentas={abrir}
+          onConsultarCuentas={abrir}
+          onMovimientoCaja={abrir}
+          onCorteX={abrir}
+          onAbrirTurno={abrir}
+          onCerrarTurno={abrir}
           onMenu={onCambiarCajero}
         />
       );
@@ -107,8 +119,10 @@ export function PantallaTurno({
         cajaNumero={caja.numero}
         cajaLabel={caja.nombre}
         sucursalLabel={caja.sucursalNombre}
+        negocioLabel={caja.negocioNombre}
+        vertical={caja.vertical}
         onTurnoAbierto={(t) => { setAbriendoTurno(false); setTurno(t); }}
-        onCambiarCajero={onCambiarCajero}
+        onVolver={() => setAbriendoTurno(false)}
       />
     );
   }
