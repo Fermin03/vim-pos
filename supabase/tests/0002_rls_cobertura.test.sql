@@ -59,10 +59,18 @@ select is_empty($$
   order by 1
 $$, 'Toda tabla con tenant_id y RLS tiene al menos una política (o está exenta a propósito)');
 
--- #4 — CRÍTICA: toda vista vw_* declara security_invoker=on.
+-- #4 — CRÍTICA: toda vista vw_* declara security_invoker.
 -- Sin esa opción la vista se ejecuta con los permisos de su DUEÑO (superusuario) y SALTA el RLS
 -- de las tablas base: un tenant leería los datos de todos los demás a través de la vista. Es un
 -- olvido fácil (la opción no se hereda ni se avisa) y silencioso: la vista "funciona" igual.
+--
+-- Se LEE el valor de la opción, no se busca la cadena "security_invoker=on" dentro de reloptions.
+-- Es un booleano y Postgres lo guarda como lo recibió: `SET (security_invoker = on)` queda como
+-- `on`, y `WITH (security_invoker = true)` queda como `true`. Significan lo mismo, pero la
+-- comparación de texto solo reconocía una de las dos formas y marcaba como insegura una vista que
+-- sí estaba protegida (`vw_cumplimiento_tiempos_delivery`, creada así en la 0078). El test llevaba
+-- días en rojo por eso, y un test que grita sin motivo se acaba ignorando — que es justo lo peor
+-- que le puede pasar a la comprobación que impide una fuga entre tenants.
 select is_empty($$
   select c.relname as vista_SIN_security_invoker
   from pg_class c
@@ -70,9 +78,12 @@ select is_empty($$
   where n.nspname = 'public'
     and c.relkind = 'v'
     and c.relname like 'vw\_%'
-    and not coalesce(array_to_string(c.reloptions, ',') like '%security_invoker=on%', false)
+    and lower(coalesce(
+      (select option_value from pg_options_to_table(c.reloptions) where option_name = 'security_invoker'),
+      ''
+    )) not in ('on', 'true')
   order by 1
-$$, 'Toda vista vw_* declara security_invoker=on (respeta el RLS de sus tablas base)');
+$$, 'Toda vista vw_* declara security_invoker (respeta el RLS de sus tablas base)');
 
 select * from finish();
 rollback;
