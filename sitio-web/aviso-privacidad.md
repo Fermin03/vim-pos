@@ -1,6 +1,6 @@
 # Aviso de privacidad
 
-> Qué datos pedimos, para qué los usamos, cuánto los guardamos y cómo ejercer tus derechos ARCO.
+> Qué datos pedimos, para qué los usamos, cuánto los guardamos y cómo ejercer tus derechos ARCO. No vendemos ni rentamos tus datos.
 
 **VIM POS** · punto de venta para restaurantes en México · versión en HTML: https://vimpos.com.mx/aviso-privacidad
 

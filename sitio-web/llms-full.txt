@@ -853,7 +853,7 @@ Todas las formas de contacto, con qué canal sirve para qué, están en la [pág
 
 # Escríbenos y contesta una persona
 
-> WhatsApp 476 127 3020, hola@vimpos.com.mx y domicilio en San Francisco del Rincón, Guanajuato. Contestamos el mismo día hábil, y aquí dice qué canal sirve para qué.
+> WhatsApp 476 127 3020, hola@vimpos.com.mx y domicilio en San Francisco del Rincón, Guanajuato. Contestamos el mismo día hábil y no te contesta un vendedor.
 
 **VIM POS** · punto de venta para restaurantes en México · versión en HTML: https://vimpos.com.mx/contacto
 
@@ -897,7 +897,7 @@ Este sitio publica su contenido también en Markdown y describe qué es VIM POS 
 
 # Aviso de privacidad
 
-> Qué datos pedimos, para qué los usamos, cuánto los guardamos y cómo ejercer tus derechos ARCO.
+> Qué datos pedimos, para qué los usamos, cuánto los guardamos y cómo ejercer tus derechos ARCO. No vendemos ni rentamos tus datos.
 
 **VIM POS** · punto de venta para restaurantes en México · versión en HTML: https://vimpos.com.mx/aviso-privacidad
 
@@ -976,7 +976,7 @@ Si cambia, se publica aquí con la fecha nueva arriba. Si el cambio afecta a par
 
 # Términos del servicio
 
-> Qué contratas, qué incluye, cómo se cobra, de quién son tus datos y cómo cancelar. Sin contrato forzoso.
+> Qué contratas, qué incluye, cómo se cobra, de quién son tus datos y cómo cancelar. Sin contrato forzoso ni penalización: cancelas cuando quieras.
 
 **VIM POS** · punto de venta para restaurantes en México · versión en HTML: https://vimpos.com.mx/terminos
 

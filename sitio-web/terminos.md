@@ -1,6 +1,6 @@
 # Términos del servicio
 
-> Qué contratas, qué incluye, cómo se cobra, de quién son tus datos y cómo cancelar. Sin contrato forzoso.
+> Qué contratas, qué incluye, cómo se cobra, de quién son tus datos y cómo cancelar. Sin contrato forzoso ni penalización: cancelas cuando quieras.
 
 **VIM POS** · punto de venta para restaurantes en México · versión en HTML: https://vimpos.com.mx/terminos
 
