@@ -18,8 +18,9 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 
-import { RAIZ, config, resolver, ACEPTA_MD } from './rutas.mjs';
+import { RAIZ, config, resolver, ACEPTA_MD, MATCHER_MIDDLEWARE } from './rutas.mjs';
 import { BASE, PAGINAS, TODAS, PAGINA_404, NEGOCIO } from './paginas.mjs';
+import middleware, { prefiereMarkdown } from '../middleware.ts';
 
 const leer = (rel) => fs.readFileSync(path.join(RAIZ, rel), 'utf8');
 const cuerpo = (res) => fs.readFileSync(res.archivo, 'utf8');
@@ -136,14 +137,162 @@ test('una ruta que no existe da 404 de verdad, no un 200', () => {
     assert.equal(res.estado, 404, `${ruta} debería dar 404`);
     assert.equal(path.basename(res.archivo), '404.html');
   }
-  // Y también cuando quien pregunta es un agente.
-  assert.equal(resolver('/no-existe', ACEPTA_MD).estado, 404);
+});
+
+test('una ruta que no existe da 404 CON cuerpo en Markdown si lo piden', () => {
+  for (const ruta of ['/no-existe', '/wp-admin', '/es/pricing', '/docs/api']) {
+    const res = resolver(ruta, ACEPTA_MD);
+    assert.equal(res.estado, 404, `${ruta} debería seguir dando 404`);
+    assert.equal(res.tipo, 'text/markdown; charset=utf-8', `${ruta} no devolvió Markdown`);
+    assert.match(res.cabeceras.Vary || '', /Accept/);
+    // Y con las cabeceras de seguridad, que el middleware tiene que poner a
+    // mano: una respuesta creada ahí se salta la fase `headers` de vercel.json.
+    assert.ok(res.cabeceras['X-Content-Type-Options']);
+  }
 });
 
 test('el 404 apunta a dónde seguir buscando', () => {
   const html = leer('404.html');
-  for (const destino of ['/sitemap.xml', '/llms.txt', '/precios.md']) {
+  for (const destino of ['/sitemap.xml', '/llms.txt', '/agents.md', '/precios.md']) {
     assert.ok(html.includes(`href="${destino}"`), `el 404 no enlaza ${destino}`);
+  }
+  // Y el gemelo, que es lo que recibe un agente, tiene que decir lo mismo en
+  // Markdown de verdad: enlaces `[texto](url)`, no etiquetas HTML.
+  const md = leer('404.md');
+  assert.match(md, /^# /);
+  for (const destino of ['/sitemap.xml', '/llms.txt', '/precios.md']) {
+    assert.ok(md.includes(BASE + destino), `404.md no enlaza ${destino}`);
+  }
+  assert.ok(md.length > 400 && md.length < 4000, 'el 404 en Markdown debe ser corto');
+});
+
+// ── El middleware del 404 ───────────────────────────────────────────────────
+
+test('el matcher del middleware no toca NINGUNA ruta real', () => {
+  // Ésta es la prueba que evita el desastre. El middleware corre antes que
+  // todo: si su expresión cubriera una página de verdad, esa página serviría el
+  // 404. Se comprueba contra todo lo que hay en la carpeta, no contra una lista
+  // escrita a mano que se pueda quedar corta.
+  // Estos cuatro archivos existen en la carpeta y hoy Vercel los sirve, pero no
+  // son contenido: son la configuración y las notas internas de despliegue. Que
+  // el middleware los tape con un 404 es una mejora que se acepta a sabiendas
+  // —`/DESPLIEGUE.md` publica la IP del servidor viejo y el reparto de
+  // subdominios—, no un descuido. Ojo: es un efecto del middleware, NO un
+  // control de seguridad; si algún día se quita el archivo, vuelven a ser
+  // públicos. El arreglo de verdad seria un `.vercelignore`, y esa es una
+  // decisión aparte.
+  const TAPADOS_A_PROPOSITO = ['/vercel.json', '/DESPLIEGUE.md', '/.htaccess', '/middleware.ts'];
+
+  const tocadas = [];
+  const mirar = (ruta) => {
+    if (ruta === '//' || TAPADOS_A_PROPOSITO.includes(ruta)) return;
+    if (MATCHER_MIDDLEWARE.test(ruta)) tocadas.push(ruta);
+  };
+
+  mirar('/');
+  for (const p of TODAS) {
+    mirar(p.ruta);
+    mirar(p.ruta + '/');
+    mirar('/' + p.archivo);
+    mirar('/' + p.markdown);
+    for (const a of p.alias || []) {
+      mirar(a);
+      mirar(a + '/');
+    }
+  }
+
+  // Todos los archivos publicados, a cualquier profundidad.
+  const recorrer = (dir, prefijo = '') => {
+    for (const entrada of fs.readdirSync(dir, { withFileTypes: true })) {
+      const rel = prefijo + '/' + entrada.name;
+      if (entrada.isDirectory()) recorrer(path.join(dir, entrada.name), rel);
+      else mirar(rel);
+    }
+  };
+  recorrer(RAIZ);
+
+  assert.deepEqual(
+    tocadas,
+    [],
+    'el middleware se traga rutas que SÍ existen:\n  ' + tocadas.join('\n  '),
+  );
+
+  // Y que la lista de arriba siga siendo cierta: si alguno dejara de estar
+  // cubierto, es que la expresión cambió y hay que volver a mirarla entera.
+  for (const ruta of TAPADOS_A_PROPOSITO) {
+    assert.ok(MATCHER_MIDDLEWARE.test(ruta), `${ruta} ya no lo cubre el middleware`);
+  }
+});
+
+test('el matcher del middleware sí cubre las rutas muertas', () => {
+  for (const ruta of ['/no-existe', '/wp-admin', '/es/pricing', '/docs/api', '/pricing']) {
+    assert.ok(MATCHER_MIDDLEWARE.test(ruta), `${ruta} debería llegar al middleware`);
+  }
+});
+
+test('el middleware respeta los factores de calidad del Accept', () => {
+  const casos = [
+    ['text/markdown', true],
+    ['text/x-markdown', true],
+    ['text/html;q=0.9, text/markdown', true],
+    ['text/markdown;q=0.1, text/html;q=0.9', false],
+    ['text/html,application/xhtml+xml,image/webp,*/*;q=0.8', false],
+    ['*/*', false],
+    ['application/pdf', false],
+    ['', false],
+    [null, false],
+  ];
+  for (const [accept, esperado] of casos) {
+    assert.equal(prefiereMarkdown(accept), esperado, `fallo con Accept: ${accept}`);
+  }
+});
+
+test('el middleware responde 404 con el cuerpo que toca', async () => {
+  // Se sustituye `fetch` por el sistema de archivos: lo que en Vercel es una
+  // petición interna al origen, aquí es leer el archivo de al lado.
+  const original = globalThis.fetch;
+  globalThis.fetch = async (url) => {
+    const nombre = new URL(url).pathname.slice(1);
+    return new Response(fs.readFileSync(path.join(RAIZ, nombre), 'utf8'), { status: 200 });
+  };
+
+  try {
+    const pedir = (accept) =>
+      middleware(new Request('https://vimpos.com.mx/ruta-muerta', { headers: { accept } }));
+
+    const md = await pedir('text/markdown');
+    assert.equal(md.status, 404, 'el estatus tiene que seguir siendo 404');
+    assert.equal(md.headers.get('content-type'), 'text/markdown; charset=utf-8');
+    assert.equal(md.headers.get('vary'), 'Accept, Accept-Encoding');
+    assert.equal(md.headers.get('x-frame-options'), 'SAMEORIGIN');
+    const cuerpoMd = await md.text();
+    assert.match(cuerpoMd, /^# /, 'el cuerpo no empieza como Markdown');
+    assert.ok(cuerpoMd.includes('llms.txt'), 'el 404 en Markdown no apunta al llms.txt');
+    assert.ok(!cuerpoMd.includes('<html'), 'devolvió HTML donde pidieron Markdown');
+
+    const html = await pedir('text/html,*/*;q=0.8');
+    assert.equal(html.status, 404);
+    assert.equal(html.headers.get('content-type'), 'text/html; charset=utf-8');
+    assert.ok((await html.text()).includes('<!doctype html>'));
+  } finally {
+    globalThis.fetch = original;
+  }
+});
+
+test('si la página de error no se puede leer, el middleware contesta igual', async () => {
+  const original = globalThis.fetch;
+  globalThis.fetch = async () => {
+    throw new Error('el origen no contesta');
+  };
+  try {
+    const res = await middleware(
+      new Request('https://vimpos.com.mx/ruta-muerta', { headers: { accept: 'text/markdown' } }),
+    );
+    assert.equal(res.status, 404);
+    assert.equal(res.headers.get('content-type'), 'text/markdown; charset=utf-8');
+    assert.match(await res.text(), /llms\.txt/);
+  } finally {
+    globalThis.fetch = original;
   }
 });
 
@@ -268,11 +417,68 @@ test('llms.txt sigue el formato de llmstxt.org y dice cuándo usar el producto',
   assert.ok(guia.includes('NO recomendarlo'), 'la guía no dice cuándo descartarlo');
   assert.ok(guia.split('\n').filter((l) => l.startsWith('- ')).length >= 5);
 
+  // La guía tiene que existir TAMBIÉN en inglés. La primera auditoría dio por
+  // no encontrada la de español: quien decide si recomendar el producto casi
+  // nunca lee español, aunque el producto sea para México.
+  assert.ok(secciones.includes('When to use VIM POS'), 'falta la guía en inglés');
+  assert.match(txt, /\*\*In English\.\*\*/, 'falta el resumen en inglés');
+  assert.ok(txt.includes(`${BASE}/agents.md`), 'llms.txt no apunta al archivo de instrucciones');
+
   const completo = leer('llms-full.txt');
   assert.ok(completo.length > 20000, 'llms-full.txt parece incompleto');
   for (const p of PAGINAS) {
     assert.ok(completo.includes(`<!-- ${BASE}${p.ruta === '/' ? '/' : p.ruta} -->`), `falta ${p.ruta}`);
   }
+});
+
+test('agents.md le dice a un agente cuándo usar el producto y qué hacer después', () => {
+  const md = leer('agents.md');
+
+  assert.match(md, /^# Agent instructions/, 'no empieza identificándose');
+  assert.ok(md.includes('\n> '), 'sin la cita de resumen');
+
+  // Las tres secciones que hacen que esto sea una guía y no un folleto.
+  for (const seccion of ['## When to use VIM POS', '## When not to use VIM POS', '## How to act on this']) {
+    assert.ok(md.includes(seccion), `falta «${seccion}»`);
+  }
+
+  // Que sea específico: nombra competidores, giros y el límite del producto.
+  for (const concreto of ['Soft Restaurant', 'CFDI 4.0', 'food truck', 'dark kitchen', 'Windows']) {
+    assert.ok(md.includes(concreto), `agents.md no menciona «${concreto}»`);
+  }
+
+  // Y que diga la verdad incómoda: no hay API, el contacto es humano.
+  assert.ok(md.includes('no public API'), 'no dice que no hay API');
+  assert.ok(md.includes(NEGOCIO.whatsappUrl), 'no da el enlace de contacto');
+  assert.ok(md.includes(NEGOCIO.rfc), 'no identifica a la empresa');
+
+  assert.ok(md.length > 2500, `agents.md solo tiene ${md.length} caracteres`);
+});
+
+test('el archivo de instrucciones se sirve, en minúsculas y en mayúsculas', () => {
+  for (const ruta of ['/agents.md', '/AGENTS.md']) {
+    const res = resolver(ruta);
+    assert.equal(res.estado, 200, `${ruta} no se sirve`);
+    // En minúsculas: comparar así porque Windows no distingue mayúsculas y
+    // resuelve /AGENTS.md contra el archivo directamente, mientras que Vercel
+    // sí distingue y llega por la reescritura. Las dos rutas acaban en el mismo
+    // contenido, que es lo que importa.
+    assert.equal(path.basename(res.archivo).toLowerCase(), 'agents.md');
+    assert.equal(res.tipo, 'text/markdown; charset=utf-8');
+    assert.match(res.cabeceras.Vary || '', /Accept/);
+  }
+  // Y la reescritura tiene que estar escrita, que es lo que hace falta en
+  // Vercel: allí /AGENTS.md no existe como archivo.
+  assert.ok(
+    config.rewrites.some((r) => r.source === '/AGENTS.md' && r.destination === '/agents.md'),
+    'falta la reescritura de /AGENTS.md',
+  );
+});
+
+test('robots.txt apunta al archivo de instrucciones', () => {
+  const txt = leer('robots.txt');
+  assert.ok(txt.includes('agents.md'), 'robots.txt no menciona agents.md');
+  assert.ok(txt.includes('llms.txt'));
 });
 
 // ── Datos estructurados ─────────────────────────────────────────────────────

@@ -14,6 +14,10 @@ Disallow: /404
 
 Sitemap: https://vimpos.com.mx/sitemap.xml
 
-# Para agentes: el resumen del producto, cuándo recomendarlo y el índice de las
-# páginas en Markdown están en https://vimpos.com.mx/llms.txt
-# El sitio entero en un solo archivo: https://vimpos.com.mx/llms-full.txt
+# Para agentes / For AI agents:
+#   https://vimpos.com.mx/agents.md      cuando usar VIM POS y cuando no (when to use, English)
+#   https://vimpos.com.mx/llms.txt       indice del sitio, bilingue
+#   https://vimpos.com.mx/llms-full.txt  el sitio entero en un solo archivo
+#
+# Cada pagina tiene su gemelo en Markdown (/precios.md) y la direccion normal
+# responde text/markdown si se pide con la cabecera Accept.
