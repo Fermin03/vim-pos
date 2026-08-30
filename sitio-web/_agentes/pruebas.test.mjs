@@ -20,7 +20,7 @@ import { execFileSync } from 'node:child_process';
 
 import { RAIZ, config, resolver, ACEPTA_MD, MATCHER_MIDDLEWARE } from './rutas.mjs';
 import { BASE, PAGINAS, TODAS, PAGINA_404, NEGOCIO } from './paginas.mjs';
-import middleware, { prefiereMarkdown } from '../middleware.ts';
+import middleware, { prefiereHtml } from '../middleware.ts';
 
 const leer = (rel) => fs.readFileSync(path.join(RAIZ, rel), 'utf8');
 const cuerpo = (res) => (res.cuerpo != null ? res.cuerpo : fs.readFileSync(res.archivo, 'utf8'));
@@ -132,10 +132,29 @@ test('los alias en inglés sirven la página en español', () => {
 });
 
 test('una ruta que no existe da 404 de verdad, no un 200', () => {
+  const navegador = {
+    accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
+  };
   for (const ruta of ['/no-existe', '/precios/plan-oro', '/wp-admin', '/es/pricing']) {
-    const res = resolver(ruta);
-    assert.equal(res.estado, 404, `${ruta} debería dar 404`);
-    assert.equal(path.basename(res.archivo), '404.html');
+    // Pase lo que pase con el cuerpo, el estatus es 404. Es la mitad del punto:
+    // un 200 en una ruta muerta le hace creer al agente que todas existen.
+    for (const cabeceras of [{}, navegador, ACEPTA_MD, { accept: '*/*' }]) {
+      assert.equal(resolver(ruta, cabeceras).estado, 404, `${ruta} debería dar 404`);
+    }
+    // Y a un navegador se le sigue dando la página diseñada.
+    assert.equal(path.basename(resolver(ruta, navegador).archivo), '404.html');
+  }
+});
+
+test('el 404 de un curl pelado ya viene en Markdown', () => {
+  // Ésta es la prueba del punto que quedaba a medias. La auditoría comprueba
+  // con `curl -s -o /dev/null -w "%{http_code}" .../ruta-que-no-existe`, y curl
+  // manda `Accept: */*`. Antes recibía la página en HTML.
+  for (const cabeceras of [{}, { accept: '*/*' }, { accept: 'application/json' }]) {
+    const res = resolver('/some-path-that-does-not-exist', cabeceras);
+    assert.equal(res.estado, 404);
+    assert.equal(res.tipo, 'text/markdown; charset=utf-8', `con ${JSON.stringify(cabeceras)}`);
+    assert.match(cuerpo(res), /^# /);
   }
 });
 
@@ -243,20 +262,40 @@ test('el matcher del middleware sí cubre las rutas muertas', () => {
   }
 });
 
-test('el middleware respeta los factores de calidad del Accept', () => {
+test('en un 404, el HTML solo gana si el cliente lo nombró', () => {
+  // El caso que dejaba el punto a medias en la auditoría: su comprobación es un
+  // `curl` pelado, y curl manda `Accept: */*`. Un comodín no es una
+  // preferencia — y lo que un agente perdido necesita es un mapa legible.
   const casos = [
-    ['text/markdown', true],
-    ['text/x-markdown', true],
-    ['text/html;q=0.9, text/markdown', true],
-    ['text/markdown;q=0.1, text/html;q=0.9', false],
-    ['text/html,application/xhtml+xml,image/webp,*/*;q=0.8', false],
-    ['*/*', false],
-    ['application/pdf', false],
+    // [Accept, ¿gana el HTML?]
+    ['text/html,application/xhtml+xml,image/avif,image/webp,*/*;q=0.8', true], // navegador
+    ['text/html', true],
+    ['application/xhtml+xml', true],
+    ['text/markdown;q=0.1, text/html;q=0.9', true],
+    ['*/*', false], // curl
+    [null, false], // sin cabecera
     ['', false],
-    [null, false],
+    ['text/markdown', false],
+    ['text/x-markdown', false],
+    ['text/html;q=0.9, text/markdown', false],
+    ['application/json', false],
+    ['text/*', false],
   ];
   for (const [accept, esperado] of casos) {
-    assert.equal(prefiereMarkdown(accept), esperado, `fallo con Accept: ${accept}`);
+    assert.equal(prefiereHtml(accept), esperado, `fallo con Accept: ${JSON.stringify(accept)}`);
+  }
+});
+
+test('las páginas de verdad NO cambian de criterio: con */* sirven HTML', () => {
+  // El 404 es la excepción. Para una página real, la representación canónica es
+  // su HTML, y el Markdown hay que pedirlo por su nombre. Lo decide vercel.json,
+  // no el middleware, y esta prueba está para que nadie los confunda.
+  for (const p of TODAS) {
+    for (const accept of ['*/*', 'text/html,*/*;q=0.8']) {
+      const res = resolver(p.ruta, { accept });
+      assert.equal(res.estado, 200, `${p.ruta} con «${accept}»`);
+      assert.match(res.tipo, /text\/html/, `${p.ruta} sirvió Markdown con «${accept}»`);
+    }
   }
 });
 
@@ -517,6 +556,27 @@ test('el archivo de instrucciones se sirve, en minúsculas y en mayúsculas', ()
     config.rewrites.some((r) => r.source === '/AGENTS.md' && r.destination === '/agents.md'),
     'falta la reescritura de /AGENTS.md',
   );
+});
+
+test('la clave de IndexNow está publicada y es alcanzable', () => {
+  const archivos = fs.readdirSync(RAIZ).filter((f) => /^indexnow-[a-z0-9-]+\.txt$/.test(f));
+  assert.equal(archivos.length, 1, 'tiene que haber exactamente un archivo de clave');
+
+  const [archivo] = archivos;
+  const clave = archivo.replace(/\.txt$/, '');
+  assert.equal(
+    leer(archivo).trim(),
+    clave,
+    'el archivo tiene que contener exactamente su propio nombre, sin extensión',
+  );
+  assert.ok(clave.length >= 8 && clave.length <= 128, 'la clave debe medir entre 8 y 128 caracteres');
+  assert.match(clave, /^[a-zA-Z0-9-]+$/, 'la clave solo admite letras, números y guiones');
+
+  // Lo que de verdad se rompe en silencio: que el middleware del 404 se coma el
+  // archivo. Sin él alcanzable, el buscador rechaza el aviso y no dice por qué.
+  const res = resolver('/' + archivo);
+  assert.equal(res.estado, 200, `/${archivo} no se sirve`);
+  assert.ok(!MATCHER_MIDDLEWARE.test('/' + archivo), 'el middleware se come la clave de IndexNow');
 });
 
 test('robots.txt apunta al archivo de instrucciones', () => {

@@ -21,7 +21,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { config as configMiddleware, prefiereMarkdown, CUERPO_MARKDOWN } from '../middleware.ts';
+import { config as configMiddleware, prefiereHtml, CUERPO_MARKDOWN } from '../middleware.ts';
 
 export const RAIZ = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -100,7 +100,11 @@ export function resolver(ruta, cabeceras = {}) {
   //    existen: devuelve el 404 en Markdown o en HTML según lo que se pida, y
   //    en los dos casos con estatus 404 de verdad.
   if (MATCHER_MIDDLEWARE.test(ruta)) {
-    const enMarkdown = prefiereMarkdown(normalizadas.accept ?? null);
+    // En un 404 el Markdown es lo normal: el HTML solo gana si alguien lo
+    // nombró. Un  no es una preferencia, es «lo que tengas».
+    // En un 404 el Markdown es lo normal y el HTML la excepción: solo gana si
+    // alguien lo nombró. Un comodín no es una preferencia, es «lo que tengas».
+    const enMarkdown = !prefiereHtml(normalizadas.accept ?? null);
     return {
       estado: 404,
       // El cuerpo en Markdown va escrito dentro del middleware; el de HTML es
@@ -113,6 +117,7 @@ export function resolver(ruta, cabeceras = {}) {
         'Referrer-Policy': 'strict-origin-when-cross-origin',
         'Permissions-Policy': 'camera=(), microphone=(), geolocation=(), interest-cohort=()',
         Vary: 'Accept, Accept-Encoding',
+        Link: '<https://vimpos.com.mx/404.md>; rel="alternate"; type="text/markdown"',
         'Cache-Control': 'public, max-age=0, must-revalidate',
       },
     };
