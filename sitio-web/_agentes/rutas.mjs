@@ -21,7 +21,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { config as configMiddleware, prefiereMarkdown } from '../middleware.ts';
+import { config as configMiddleware, prefiereMarkdown, CUERPO_MARKDOWN } from '../middleware.ts';
 
 export const RAIZ = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -103,7 +103,9 @@ export function resolver(ruta, cabeceras = {}) {
     const enMarkdown = prefiereMarkdown(normalizadas.accept ?? null);
     return {
       estado: 404,
-      archivo: path.join(RAIZ, enMarkdown ? '404.md' : '404.html'),
+      // El cuerpo en Markdown va escrito dentro del middleware; el de HTML es
+      // la pagina de error de siempre.
+      ...(enMarkdown ? { cuerpo: CUERPO_MARKDOWN } : { archivo: path.join(RAIZ, '404.html') }),
       tipo: enMarkdown ? TIPOS['.md'] : TIPOS['.html'],
       cabeceras: {
         'X-Content-Type-Options': 'nosniff',

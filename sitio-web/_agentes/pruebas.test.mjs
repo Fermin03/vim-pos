@@ -23,7 +23,7 @@ import { BASE, PAGINAS, TODAS, PAGINA_404, NEGOCIO } from './paginas.mjs';
 import middleware, { prefiereMarkdown } from '../middleware.ts';
 
 const leer = (rel) => fs.readFileSync(path.join(RAIZ, rel), 'utf8');
-const cuerpo = (res) => fs.readFileSync(res.archivo, 'utf8');
+const cuerpo = (res) => (res.cuerpo != null ? res.cuerpo : fs.readFileSync(res.archivo, 'utf8'));
 const soloTexto = (html) =>
   html
     .replace(/<!--[\s\S]*?-->/g, '')
@@ -148,6 +148,15 @@ test('una ruta que no existe da 404 CON cuerpo en Markdown si lo piden', () => {
     // Y con las cabeceras de seguridad, que el middleware tiene que poner a
     // mano: una respuesta creada ahí se salta la fase `headers` de vercel.json.
     assert.ok(res.cabeceras['X-Content-Type-Options']);
+
+    // El cuerpo tiene que ser Markdown corto y útil: título, y a dónde ir.
+    const md = cuerpo(res);
+    assert.match(md, /^# /);
+    assert.ok(md.length < 2000, 'el 404 en Markdown tiene que ser corto');
+    for (const destino of ['/agents.md', '/llms.txt', '/sitemap.xml', '/precios.md']) {
+      assert.ok(md.includes(BASE + destino), `el 404 en Markdown no enlaza ${destino}`);
+    }
+    assert.ok(!md.includes('<'), 'se coló HTML en el cuerpo en Markdown');
   }
 });
 
@@ -248,10 +257,13 @@ test('el middleware respeta los factores de calidad del Accept', () => {
 });
 
 test('el middleware responde 404 con el cuerpo que toca', async () => {
-  // Se sustituye `fetch` por el sistema de archivos: lo que en Vercel es una
-  // petición interna al origen, aquí es leer el archivo de al lado.
+  // `fetch` se sustituye por el sistema de archivos: lo que en Vercel es una
+  // petición interna al origen, aquí es leer el archivo de al lado. Se cuenta
+  // cuántas veces se llama, porque la respuesta en Markdown NO debe llamarlo.
   const original = globalThis.fetch;
+  let llamadas = 0;
   globalThis.fetch = async (url) => {
+    llamadas++;
     const nombre = new URL(url).pathname.slice(1);
     return new Response(fs.readFileSync(path.join(RAIZ, nombre), 'utf8'), { status: 200 });
   };
@@ -265,32 +277,55 @@ test('el middleware responde 404 con el cuerpo que toca', async () => {
     assert.equal(md.headers.get('content-type'), 'text/markdown; charset=utf-8');
     assert.equal(md.headers.get('vary'), 'Accept, Accept-Encoding');
     assert.equal(md.headers.get('x-frame-options'), 'SAMEORIGIN');
+    assert.equal(llamadas, 0, 'el 404 en Markdown no debe depender del origen');
     const cuerpoMd = await md.text();
     assert.match(cuerpoMd, /^# /, 'el cuerpo no empieza como Markdown');
     assert.ok(cuerpoMd.includes('llms.txt'), 'el 404 en Markdown no apunta al llms.txt');
-    assert.ok(!cuerpoMd.includes('<html'), 'devolvió HTML donde pidieron Markdown');
+    assert.ok(!cuerpoMd.includes('<'), 'se coló HTML donde pidieron Markdown');
 
     const html = await pedir('text/html,*/*;q=0.8');
     assert.equal(html.status, 404);
     assert.equal(html.headers.get('content-type'), 'text/html; charset=utf-8');
-    assert.ok((await html.text()).includes('<!doctype html>'));
+    assert.equal(llamadas, 1, 'el 404 en HTML sí pide la página de error');
+    assert.ok((await html.text()).includes('Esta página no existe'));
   } finally {
     globalThis.fetch = original;
   }
 });
 
 test('si la página de error no se puede leer, el middleware contesta igual', async () => {
+  // El caso que descubrió el despliegue de preview: la petición interna vuelve
+  // con otra cosa —una pantalla de acceso— o directamente falla.
   const original = globalThis.fetch;
-  globalThis.fetch = async () => {
-    throw new Error('el origen no contesta');
-  };
   try {
-    const res = await middleware(
+    globalThis.fetch = async () => {
+      throw new Error('el origen no contesta');
+    };
+    const roto = await middleware(
+      new Request('https://vimpos.com.mx/ruta-muerta', { headers: { accept: 'text/html' } }),
+    );
+    assert.equal(roto.status, 404);
+    assert.equal(roto.headers.get('content-type'), 'text/html; charset=utf-8');
+    const cuerpoRoto = await roto.text();
+    assert.match(cuerpoRoto, /^<!doctype html>/i, 'la versión mínima tampoco es HTML');
+    assert.ok(cuerpoRoto.includes('Esta página no existe'));
+
+    // Y si vuelve con algo que no es la página —200, pero HTML ajeno—, tampoco
+    // se sirve: se prefiere la versión mínima antes que contenido de otro.
+    globalThis.fetch = async () =>
+      new Response('<html><body>Inicia sesión en Vercel</body></html>', { status: 200 });
+    const ajeno = await middleware(
+      new Request('https://vimpos.com.mx/ruta-muerta', { headers: { accept: 'text/html' } }),
+    );
+    assert.equal(ajeno.status, 404);
+    assert.ok(!(await ajeno.text()).includes('Inicia sesión'), 'sirvió una página ajena');
+
+    // El Markdown no depende de nada de esto y sigue saliendo bien.
+    const md = await middleware(
       new Request('https://vimpos.com.mx/ruta-muerta', { headers: { accept: 'text/markdown' } }),
     );
-    assert.equal(res.status, 404);
-    assert.equal(res.headers.get('content-type'), 'text/markdown; charset=utf-8');
-    assert.match(await res.text(), /llms\.txt/);
+    assert.equal(md.status, 404);
+    assert.match(await md.text(), /llms\.txt/);
   } finally {
     globalThis.fetch = original;
   }

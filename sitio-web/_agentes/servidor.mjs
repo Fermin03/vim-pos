@@ -39,14 +39,14 @@ http
       return;
     }
 
-    const cuerpo = fs.readFileSync(res.archivo);
+    const cuerpo = res.cuerpo != null ? Buffer.from(res.cuerpo, 'utf8') : fs.readFileSync(res.archivo);
     respuesta.writeHead(res.estado, {
       ...res.cabeceras,
       'Content-Type': res.tipo,
       'Content-Length': cuerpo.length,
     });
     respuesta.end(peticion.method === 'HEAD' ? undefined : cuerpo);
-    console.log(res.estado, ruta, '→', res.archivo.split(/[\\/]/).pop());
+    console.log(res.estado, ruta, '→', res.archivo ? res.archivo.split(/[\\/]/).pop() : 'cuerpo del middleware');
   })
   .listen(puerto, () => {
     console.log(`El sitio está en http://localhost:${puerto}`);
