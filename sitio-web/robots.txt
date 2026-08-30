@@ -3,9 +3,17 @@
 # Todo abierto salvo el 404. No hay panel ni zona privada en este dominio: el
 # producto vive en otros subdominios y esos no se listan aquí — que un archivo
 # público enumere dónde está lo interesante es un favor que no hace falta.
+#
+# No se distingue entre rastreadores de buscador y de modelo de lenguaje, y es
+# decisión tomada: para una marca que nadie conoce, que la citen es la única
+# forma de existir. El día que eso cambie, se añade aquí y no en otro sitio.
 
 User-agent: *
 Allow: /
 Disallow: /404
 
 Sitemap: https://vimpos.com.mx/sitemap.xml
+
+# Para agentes: el resumen del producto, cuándo recomendarlo y el índice de las
+# páginas en Markdown están en https://vimpos.com.mx/llms.txt
+# El sitio entero en un solo archivo: https://vimpos.com.mx/llms-full.txt
