@@ -93,10 +93,17 @@ export async function abrirCuentaEnMesa(
   return tId;
 }
 
-/** Agrega un ítem a un ticket abierto (incremental). El trigger recalcula totales. */
+/**
+ * Agrega un ítem a un ticket abierto (incremental). El trigger recalcula totales.
+ *
+ * `clientId` es opcional pero importa cuando se guarda una tanda completa de golpe: la RPC es
+ * idempotente por `client_id_local`, así que si el guardado se corta a la mitad, reintentarlo
+ * vuelve a mandar todo sin duplicar lo que ya entró. Sin él, cada intento inventa un id nuevo y
+ * el reintento cobraría dos veces los renglones que sí habían pasado.
+ */
 export async function agregarItemAlTicket(
   token: string,
-  args: { ticketId: string; productoId: string; cantidad: number; modificadores: ModificadorSel[]; nota: string | null },
+  args: { ticketId: string; productoId: string; cantidad: number; modificadores: ModificadorSel[]; nota: string | null; clientId?: string },
 ): Promise<void> {
   const mods = args.modificadores.map((m) => ({ opcion_modificador_id: m.opcionId, cantidad: m.cantidad }));
   const { error } = await employeeClient(token).rpc("agregar_item_a_ticket", {
@@ -105,7 +112,7 @@ export async function agregarItemAlTicket(
     p_cantidad: args.cantidad,
     p_nota_cocina: args.nota,
     p_modificadores: mods,
-    p_client_id_local: clientIdLocal(),
+    p_client_id_local: args.clientId ?? clientIdLocal(),
   });
   if (error) throw new Error(error.message);
 }
