@@ -182,19 +182,23 @@ test('el matcher del middleware no toca NINGUNA ruta real', () => {
   // todo: si su expresión cubriera una página de verdad, esa página serviría el
   // 404. Se comprueba contra todo lo que hay en la carpeta, no contra una lista
   // escrita a mano que se pueda quedar corta.
-  // Estos cuatro archivos existen en la carpeta y hoy Vercel los sirve, pero no
-  // son contenido: son la configuración y las notas internas de despliegue. Que
-  // el middleware los tape con un 404 es una mejora que se acepta a sabiendas
-  // —`/DESPLIEGUE.md` publica la IP del servidor viejo y el reparto de
-  // subdominios—, no un descuido. Ojo: es un efecto del middleware, NO un
-  // control de seguridad; si algún día se quita el archivo, vuelven a ser
-  // públicos. El arreglo de verdad seria un `.vercelignore`, y esa es una
-  // decisión aparte.
-  const TAPADOS_A_PROPOSITO = ['/vercel.json', '/DESPLIEGUE.md', '/.htaccess', '/middleware.ts'];
+  // El middleware puede cubrir lo que no llega a publicarse —está en el
+  // `.vercelignore`— y los dos archivos que sí se suben pero no son contenido:
+  // `vercel.json`, que Vercel lee para enrutar, y `middleware.ts`, que hay que
+  // subir para que lo construya. La lista se deriva del propio `.vercelignore`
+  // para que no haya dos sitios que mantener.
+  const excluidos = leer('.vercelignore')
+    .split('\n')
+    .map((l) => l.trim())
+    .filter((l) => l && !l.startsWith('#'))
+    .map((l) => '/' + l.replace(/\/$/, ''));
+  const TAPADOS_A_PROPOSITO = [...excluidos, '/vercel.json', '/middleware.ts'];
 
   const tocadas = [];
   const mirar = (ruta) => {
-    if (ruta === '//' || TAPADOS_A_PROPOSITO.includes(ruta)) return;
+    if (ruta === '//') return;
+    // Lo que está dentro de una carpeta excluida tampoco cuenta.
+    if (TAPADOS_A_PROPOSITO.some((t) => ruta === t || ruta.startsWith(t + '/'))) return;
     if (MATCHER_MIDDLEWARE.test(ruta)) tocadas.push(ruta);
   };
 
@@ -226,9 +230,9 @@ test('el matcher del middleware no toca NINGUNA ruta real', () => {
     'el middleware se traga rutas que SÍ existen:\n  ' + tocadas.join('\n  '),
   );
 
-  // Y que la lista de arriba siga siendo cierta: si alguno dejara de estar
-  // cubierto, es que la expresión cambió y hay que volver a mirarla entera.
-  for (const ruta of TAPADOS_A_PROPOSITO) {
+  // Los dos que SÍ se suben y no son contenido dependen del middleware para no
+  // quedar a la vista: si dejaran de estar cubiertos, habría que enterarse.
+  for (const ruta of ['/vercel.json', '/middleware.ts']) {
     assert.ok(MATCHER_MIDDLEWARE.test(ruta), `${ruta} ya no lo cubre el middleware`);
   }
 });
@@ -620,6 +624,57 @@ test('robots.txt deja pasar y apunta al sitemap y al llms.txt', () => {
   assert.match(txt, /^Allow: \/$/m);
   assert.ok(txt.includes('llms.txt'), 'robots.txt no menciona el llms.txt');
   assert.ok(!/^Disallow: \/$/m.test(txt), 'robots.txt está bloqueando el sitio entero');
+});
+
+test('.vercelignore deja fuera lo interno y nada de lo que el sitio necesita', () => {
+  const lineas = leer('.vercelignore')
+    .split('\n')
+    .map((l) => l.trim())
+    .filter((l) => l && !l.startsWith('#'));
+
+  // Lo que no tiene por qué estar en un servidor público.
+  for (const interno of ['_agentes/', '_capturas/', '_patron.html', 'DESPLIEGUE.md', '.htaccess']) {
+    assert.ok(lineas.includes(interno), `.vercelignore no excluye ${interno}`);
+  }
+
+  // Y lo que se caería si alguien lo añadiera por descuido. `vercel.json` lo
+  // lee Vercel para enrutar; `middleware.ts` hay que subirlo para que lo
+  // construya; el resto es, literalmente, el sitio.
+  const imprescindibles = [
+    'vercel.json',
+    'middleware.ts',
+    'index.html',
+    'robots.txt',
+    'sitemap.xml',
+    'llms.txt',
+    'llms-full.txt',
+    'agents.md',
+    'assets',
+    'assets/',
+    'site.webmanifest',
+    '404.html',
+    ...TODAS.map((p) => p.archivo),
+    ...TODAS.map((p) => p.markdown),
+  ];
+  for (const necesario of imprescindibles) {
+    assert.ok(
+      !lineas.includes(necesario),
+      `.vercelignore excluye ${necesario}, que el sitio necesita`,
+    );
+  }
+
+  // Ninguna regla puede empezar por `assets`: ahí están el CSS, el JS, las
+  // tipografías y las capturas del producto.
+  for (const l of lineas) {
+    assert.ok(!l.replace(/^\//, '').startsWith('assets'), `la regla «${l}» se lleva los assets`);
+  }
+
+  // Y todo lo que se excluye tiene que existir de verdad: una regla que apunta
+  // a algo que ya no está es una regla que nadie va a mantener.
+  for (const l of lineas) {
+    const destino = path.join(RAIZ, l.replace(/\/$/, ''));
+    assert.ok(fs.existsSync(destino), `.vercelignore nombra ${l}, que no existe`);
+  }
 });
 
 test('vercel.json no volvió a activar cleanUrls', () => {

@@ -114,12 +114,23 @@ recibe las visitas. Así que `/` negocia Markdown con una **redirección tempora
 
 El `.htaccess` lleva las reglas equivalentes por si algún día se vuelve a Hostinger.
 
-### Lo que no hace falta bloquear
+### Lo que no se sube: `.vercelignore`
 
-Las rutas que empiezan con guion bajo. Vercel publica lo que hay en `sitio-web/`, y `_patron.html`
-y `_capturas/` están ahí — pero al no estar enlazados desde ninguna página, no se indexan. Si
-molesta que sean alcanzables, se añade una regla `redirects`. En Apache el bloqueo existía porque
-la subida era manual y podían colarse.
+**Esto cambió el 30 de agosto de 2026, y la versión anterior de este apartado estaba equivocada.**
+Decía que las rutas con guion bajo no hacía falta bloquearlas porque, al no estar enlazadas, no se
+indexan. No estar indexado y no ser alcanzable son cosas distintas: `https://vimpos.com.mx/DESPLIEGUE.md`
+respondía 200 a cualquiera, y en este archivo están la IP del servidor viejo, el reparto de
+subdominios y el aviso de no tocar los registros MX.
+
+Ahora hay un `.vercelignore` que deja fuera `_agentes/`, `_capturas/`, `_patron.html`,
+`DESPLIEGUE.md` y `.htaccess`. El porqué de cada uno está escrito dentro del propio archivo.
+
+Dos no pueden entrar en esa lista: **`vercel.json`**, porque Vercel lo lee para enrutar, y
+**`middleware.ts`**, porque hay que subirlo para que lo construya. Al primero lo tapa hoy el
+middleware del 404; el segundo no revela nada que no esté ya en el repositorio.
+
+Una prueba comprueba que en el `.vercelignore` esté todo lo interno y **no** esté nada que el
+sitio necesite. Es la parte que importa: una regla de más ahí tumba el sitio entero.
 
 ---
 
@@ -189,7 +200,7 @@ que hay que saber aquí: **si algo sale mal, se borra el archivo y se publica** 
 node --test sitio-web/_agentes/pruebas.test.mjs
 ```
 
-Veinticuatro pruebas, sin instalar nada. Reproducen el enrutador de Vercel (`_agentes/rutas.mjs`)
+Treinta y cuatro pruebas, sin instalar nada. Reproducen el enrutador de Vercel (`_agentes/rutas.mjs`)
 y comprueban lo que se rompe en silencio: una ruta mal escrita, un enlace interno a una página
 que ya no existe, un gemelo desactualizado, un JSON-LD que dejó de parsear, el sitemap
 descuadrado.
