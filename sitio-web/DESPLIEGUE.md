@@ -160,7 +160,7 @@ Tampoco se tocan `pos.`, `admin.` ni `platform.`, que ya apuntan a sus propios p
 ## Lo que se genera, y por qué `vercel.json` ya no se edita a mano
 
 Desde el 30 de agosto de 2026 hay una carpeta `_agentes/` con el índice del sitio
-(`paginas.mjs`) y un generador. De esa lista salen **cinco cosas**:
+(`paginas.mjs`) y un generador. De esa lista salen **cinco archivos**:
 
 | Archivo | Qué es |
 |---|---|
@@ -193,6 +193,20 @@ cabecera `Accept`, y la página de siempre a un navegador. Una petición a `/pre
 El porqué, el peligro del `matcher` y cómo revertirlo están en `_agentes/MIDDLEWARE.md`. Lo único
 que hay que saber aquí: **si algo sale mal, se borra el archivo y se publica** — el sitio vuelve al
 404 de antes y ninguna otra pieza depende de él.
+
+## Avisar a los buscadores
+
+```bash
+pnpm sitio:indexnow --probar   # enseña lo que mandaria
+pnpm sitio:indexnow            # lo manda
+```
+
+IndexNow avisa a **Bing, Yandex, Seznam y Naver** de que hay direcciones nuevas. **Google no
+participa**: para Google el camino es Search Console y los enlaces entrantes.
+
+Se usa cuando se publica una pagina nueva, no en cada despliegue. La clave vive en un archivo
+`indexnow-….txt` en la raiz, publicado a proposito — asi es como el buscador comprueba que quien
+avisa manda en el dominio. El detalle esta dentro de `_agentes/indexnow.mjs`.
 
 ## Las pruebas
 

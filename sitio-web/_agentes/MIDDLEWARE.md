@@ -5,9 +5,32 @@ intento descartado. Aquí está por qué existe, por qué es como es, y qué se 
 
 ## Qué hace, y nada más
 
-Devuelve el 404 con **cuerpo en Markdown** cuando quien pregunta manda
-`Accept: text/markdown`, y con la página de siempre cuando es un navegador. En los dos casos con
-estatus **404 de verdad**.
+Devuelve el 404 con **cuerpo en Markdown**, salvo que el cliente haya pedido HTML **por su
+nombre** — entonces devuelve la página de siempre. En los dos casos con estatus **404 de verdad**.
+
+### En un 404, el Markdown es lo normal y el HTML la excepción
+
+Esto se corrigió el 30 de agosto de 2026, después de que la auditoría dejara el punto a medias
+**aunque el Markdown ya funcionaba**. Su comprobación es un `curl` pelado, y curl manda
+`Accept: */*` — así que recibía la página en HTML y daba el punto por medio cumplido.
+
+Y tenía razón. Un comodín no es una preferencia: es «lo que tengas». Lo que un agente perdido
+necesita es un mapa que pueda leer, no una página maquetada. Así que en un 404:
+
+| `Accept` | Respuesta |
+|---|---|
+| *(sin cabecera)* | Markdown |
+| `*/*` (curl, casi cualquier librería) | Markdown |
+| `text/markdown` | Markdown |
+| `application/json`, `text/*`, cualquier otra | Markdown |
+| `text/html,…,*/*;q=0.8` (navegador) | **HTML** |
+| `text/markdown;q=0.1, text/html;q=0.9` | **HTML** |
+| `text/html;q=0.9, text/markdown` | Markdown |
+
+**Esto vale SOLO para el 404.** Las páginas de verdad las negocia `vercel.json`, y ahí sigue
+haciendo falta nombrar `text/markdown`: la representación canónica de una página es su HTML, y
+`/precios` con `*/*` devuelve HTML como siempre. Hay una prueba que lo fija, para que nadie
+confunda las dos reglas.
 
 Eso no se puede hacer de forma declarativa: Vercel sirve `404.html` para toda ruta desconocida sin
 mirar la cabecera `Accept`, y una reescritura a `/404.md` respondería **200** — que es justo lo

@@ -49,16 +49,35 @@ const SEGURIDAD = {
   // una caché compartida guarda la primera de las dos y se la da a todos.
   Vary: 'Accept, Accept-Encoding',
   'Cache-Control': 'public, max-age=0, must-revalidate',
+  // Para quien reciba el HTML y no sepa que hay otra versión. Es la misma
+  // cabecera que llevan las páginas normales apuntando a su gemelo.
+  Link: '<https://vimpos.com.mx/404.md>; rel="alternate"; type="text/markdown"',
 };
 
-// ¿Este cliente prefiere Markdown a HTML?
+// ¿Este cliente ha pedido HTML de forma EXPLÍCITA?
 //
-// Mira los factores de calidad de verdad, que es donde fallan casi todas las
-// implementaciones: `text/html;q=0.9, text/markdown` pide Markdown, mientras
-// que `text/markdown;q=0.1, text/html` NO lo pide aunque lo nombre. Y el
-// comodín de «acepto cualquier cosa» tampoco cuenta como pedir Markdown: un
-// cliente que acepta todo se queda con el HTML, que es lo que espera.
-export function prefiereMarkdown(accept: string | null): boolean {
+// La respuesta decide qué cuerpo lleva el 404, y el matiz está en «explícita».
+// La primera versión servía HTML salvo que pidieran Markdown por su nombre, y
+// eso dejaba el punto a medias en la auditoría: su comprobación es un `curl`
+// pelado, y curl manda `Accept: */*`, así que recibía la página en HTML. Un
+// comodín no es una preferencia — es «lo que tengas». Y lo que un agente
+// perdido necesita es un mapa que pueda leer, no una página maquetada.
+//
+// Así que en un 404 el HTML solo gana si alguien lo nombró:
+//
+//   (sin cabecera)                          → Markdown
+//   `*/*`                                   → Markdown
+//   `text/markdown`                         → Markdown
+//   `application/json`                      → Markdown
+//   `text/html,...,*/*;q=0.8` (navegador)   → HTML
+//   `text/markdown;q=0.1, text/html;q=0.9`  → HTML
+//   `text/html;q=0.9, text/markdown`        → Markdown
+//
+// Los factores de calidad se miran de verdad, que es donde falla casi todo el
+// mundo. Y ojo: esto vale SOLO para el 404. Las páginas de verdad las negocia
+// `vercel.json`, y ahí sigue haciendo falta nombrar `text/markdown`: la
+// representación canónica de una página es su HTML.
+export function prefiereHtml(accept: string | null): boolean {
   if (!accept) return false;
 
   let markdown = 0;
@@ -76,17 +95,13 @@ export function prefiereMarkdown(accept: string | null): boolean {
 
     if (tipo === 'text/markdown' || tipo === 'text/x-markdown') {
       markdown = Math.max(markdown, calidad);
-    } else if (
-      tipo === 'text/html' ||
-      tipo === 'application/xhtml+xml' ||
-      tipo === 'text/*' ||
-      tipo === '*/*'
-    ) {
+    } else if (tipo === 'text/html' || tipo === 'application/xhtml+xml') {
+      // `*/*` y `text/*` NO cuentan: son comodines, no una petición de HTML.
       html = Math.max(html, calidad);
     }
   }
 
-  return markdown > 0 && markdown >= html;
+  return html > markdown;
 }
 
 // El 404 en Markdown va escrito aquí y no se pide al origen. Se probó de la
@@ -135,7 +150,7 @@ const CUERPO_HTML_MINIMO = `<!doctype html>
 `;
 
 export default async function middleware(peticion: Request): Promise<Response> {
-  if (prefiereMarkdown(peticion.headers.get('accept'))) {
+  if (!prefiereHtml(peticion.headers.get('accept'))) {
     return new Response(CUERPO_MARKDOWN, {
       status: 404,
       headers: { ...SEGURIDAD, 'Content-Type': 'text/markdown; charset=utf-8' },
