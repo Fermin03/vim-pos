@@ -1,6 +1,6 @@
 # Qué hace, sección por sección
 
-> Caja, cocina, mesas, inventario, reportes y conciliación de apps de reparto. Lo que hace el sistema, sección por sección y con capturas del producto real.
+> Caja, cocina, mesas, inventario, reportes, facturación CFDI y conciliación de apps de reparto. Lo que hace el sistema, sección por sección, con capturas reales.
 
 **VIM POS** · punto de venta para restaurantes en México · versión en HTML: https://vimpos.com.mx/funciones
 
@@ -178,7 +178,9 @@ Muy pronto
 
 ## Tus clientes se facturan solos, desde el ticket
 
-El comensal escanea el código del ticket, pone sus datos y recibe su factura por correo. Va incluida desde el plan Negocio. Está construida y probada; estamos cerrando la activación con el proveedor autorizado, así que todavía no la encendemos.
+El comensal escanea el código del ticket, pone sus datos y recibe su **CFDI 4.0** por correo. Nadie en el mostrador captura un RFC ni abre otro programa. Va incluida desde el plan Negocio.
+
+El módulo cubre las tres cosas que un restaurante necesita ante el SAT: el **timbrado** de cada ticket que pida factura, la **factura global** con el resto de las ventas del día, y el portal de **autofacturación** por QR donde el cliente hace el trámite solo. Está construido y probado; estamos cerrando la activación con el PAC —el proveedor autorizado de certificación—, así que todavía no lo encendemos.
 
 [Cómo funcionará y qué cuesta](https://vimpos.com.mx/precios)
 
