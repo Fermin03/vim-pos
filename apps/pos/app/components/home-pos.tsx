@@ -208,7 +208,7 @@ export function HomePos({
   const [cancelandoTicket, setCancelandoTicket] = useState(false);
   // F7 — modal de movimiento de caja.
   const [movimientoAbierto, setMovimientoAbierto] = useState(false);
-  const [movimientoToast, setMovimientoToast] = useState<{ folio: string; tipo: string; monto: number } | null>(null);
+  const [movimientoToast, setMovimientoToast] = useState<{ folio: string; etiqueta: string; monto: number } | null>(null);
   const [abrirCajaAbierto, setAbrirCajaAbierto] = useState(false);
   // El menú se abre también desde el inicio; su estado vive aquí porque ambas pantallas lo usan.
   const [menuGeneralAbierto, setMenuGeneralAbierto] = useState(false);
@@ -1178,7 +1178,7 @@ export function HomePos({
             turno={turno}
             onRegistrado={(m) => {
               setMovimientoAbierto(false);
-              setMovimientoToast({ folio: m.folio, tipo: m.tipo, monto: m.monto });
+              setMovimientoToast({ folio: m.folio, etiqueta: m.etiqueta, monto: m.monto });
               setTimeout(() => setMovimientoToast(null), 4000);
             }}
             onCerrar={() => setMovimientoAbierto(false)}
@@ -1518,7 +1518,7 @@ export function HomePos({
           turno={turno}
           onRegistrado={(m) => {
             setMovimientoAbierto(false);
-            setMovimientoToast({ folio: m.folio, tipo: m.tipo, monto: m.monto });
+            setMovimientoToast({ folio: m.folio, etiqueta: m.etiqueta, monto: m.monto });
             setTimeout(() => setMovimientoToast(null), 4000);
           }}
           onCerrar={() => setMovimientoAbierto(false)}
@@ -1526,7 +1526,7 @@ export function HomePos({
       )}
       {movimientoToast && (
         <div className="fixed left-1/2 top-20 z-[80] -translate-x-1/2 rounded-lg bg-ink px-5 py-3 text-[13.5px] font-medium text-white shadow-xl">
-          <span className="font-semibold">{movimientoToast.folio}</span> · {movimientoToast.tipo} · {fmtMxn(movimientoToast.monto)} registrado
+          <span className="font-semibold">{movimientoToast.folio}</span> · {movimientoToast.etiqueta} · {fmtMxn(movimientoToast.monto)} registrado
         </div>
       )}
       {cancelandoTicket && ticketBd && (

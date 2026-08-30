@@ -21,10 +21,10 @@ module.exports = {
         // Tinta
         ink: { DEFAULT: "#16161A", 2: "#5A5A60", 3: "#8E8E94" },
         // Semánticos
-        success: "#2E7D52",
-        warning: "#9A6B12",
-        danger: "#C0392B",
-        info: "#2C5AA0",
+        success: { DEFAULT: "#2E7D52", soft: "#E7F2EC" },
+        warning: { DEFAULT: "#9A6B12", soft: "#FCF6E8" },
+        danger: { DEFAULT: "#C0392B", soft: "#FBEBE9" },
+        info: { DEFAULT: "#2C5AA0", soft: "#EAF0F8" },
         // Superficies / líneas
         bg: "#FFFFFF",
         surface: "#FFFFFF",
