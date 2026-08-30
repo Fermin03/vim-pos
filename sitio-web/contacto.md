@@ -1,6 +1,6 @@
 # Escríbenos y contesta una persona
 
-> WhatsApp hola@vimpos.com.mx, hola@vimpos.com.mx y domicilio en Guanajuato, Guanajuato. Contestamos el mismo día hábil, y aquí dice qué canal sirve para qué.
+> WhatsApp hola@vimpos.com.mx, hola@vimpos.com.mx y domicilio en Guanajuato, Guanajuato. Contestamos el mismo día hábil y no te contesta un vendedor.
 
 **VIM POS** · punto de venta para restaurantes en México · versión en HTML: https://vimpos.com.mx/contacto
 
