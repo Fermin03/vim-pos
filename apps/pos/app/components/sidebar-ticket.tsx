@@ -77,6 +77,8 @@ export function SidebarTicket({
   onNotaLinea,
   onNotaOrden,
   onCobrar,
+  titulo,
+  accionSecundaria,
   onEnviarCocina,
   onEnviarCocinaAbierto,
   onPonerEnEspera,
@@ -107,7 +109,11 @@ export function SidebarTicket({
   onNotaLinea?: (clientId: string, nota: string | null) => void;
   /** Edita la nota de cocina de TODA la orden. */
   onNotaOrden?: (nota: string | null) => void;
-  onCobrar: () => void;
+  onCobrar?: () => void;
+  /** Sustituye el título de la cabecera. Sin esto: "Cuenta <folio>" o "Ticket nuevo". */
+  titulo?: string;
+  /** Botón extra bajo la acción principal del pie (p. ej. "Guardar sin mandar"). */
+  accionSecundaria?: { etiqueta: string; onClick: () => void; deshabilitado?: boolean };
   /** B1 Full Service — enviar la mesa a cocina antes de cobrar (solo en cuenta de mesa). */
   onEnviarCocina?: () => void;
   /** Pick-up / Domicilio — envía a cocina y deja la cuenta ABIERTA (sin cobrar); se cobra después
@@ -119,7 +125,7 @@ export function SidebarTicket({
   folioCuenta?: string | null;
   cocinaEnviada?: boolean;
   enviandoCocina?: boolean;
-  onAplicarDescuento: () => void;
+  onAplicarDescuento?: () => void;
   /** Monto de descuento ya aplicado en BD (autoritativo). 0 = sin descuento. */
   descuentoMxn?: number;
   /** Total autoritativo de la BD cuando el ticket ya está persistido; si falta, se usa el display. */
@@ -163,7 +169,7 @@ export function SidebarTicket({
               el cajero no tenía forma de saber si estaba agregando a un pedido existente o
               capturando uno nuevo, que es justo la diferencia entre mandar a cocina y cobrar. */}
           <span className="truncate font-display text-[18px] font-semibold leading-tight tracking-[-0.02em]">
-            {folioCuenta ? `Cuenta ${folioCuenta}` : "Ticket nuevo"}
+            {titulo ?? (folioCuenta ? `Cuenta ${folioCuenta}` : "Ticket nuevo")}
           </span>
           <button
             type="button"
@@ -182,7 +188,8 @@ export function SidebarTicket({
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4 flex-shrink-0 text-[#4A5568]"><path d="M20 6 9 17l-5-5" /></svg>
             <span className="text-[13px] font-semibold text-[#4A5568]">{MODO_LABELS[estado.modoServicio]}</span>
           </div>
-          {estado.modoServicio === "DELIVERY_PROPIO" && (
+          {/* Sin handler no se pinta: un boton que no hace nada es peor que no tenerlo. */}
+          {estado.modoServicio === "DELIVERY_PROPIO" && onEditarCliente && (
             <button
               type="button"
               disabled={bloqueado}
@@ -385,8 +392,8 @@ export function SidebarTicket({
         </button>
         <button
           type="button"
-          disabled={vacio || hayDescuento || procesando}
-          onClick={onAplicarDescuento}
+          disabled={vacio || hayDescuento || procesando || !onAplicarDescuento}
+          onClick={() => onAplicarDescuento?.()}
           className="inline-flex flex-1 cursor-pointer items-center justify-center gap-[7px] rounded border border-line-strong bg-surface px-[11px] py-2 text-[13.5px] font-semibold text-ink-2 transition-all hover:border-ink hover:text-ink disabled:cursor-default disabled:opacity-[.45] disabled:hover:border-line-strong disabled:hover:text-ink-2"
         >
           <IconoDescuento />
@@ -413,13 +420,23 @@ export function SidebarTicket({
                 <><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5"><path d="M3 11l19-9-9 19-2-8-8-2z" /></svg> Enviar a cocina</>
               )}
             </button>
+            {accionSecundaria && (
+              <button
+                type="button"
+                disabled={accionSecundaria.deshabilitado || procesando}
+                onClick={accionSecundaria.onClick}
+                className="w-full rounded border border-line-strong bg-transparent px-5 py-[10px] text-[14px] font-semibold text-ink-2 transition-all hover:border-ink hover:text-ink disabled:cursor-default disabled:opacity-[.45] disabled:hover:border-line-strong disabled:hover:text-ink-2"
+              >
+                {accionSecundaria.etiqueta}
+              </button>
+            )}
           </>
         ) : (
         <>
         <button
           type="button"
-          disabled={vacio || procesando}
-          onClick={onCobrar}
+          disabled={vacio || procesando || !onCobrar}
+          onClick={() => onCobrar?.()}
           className="flex w-full items-center justify-center gap-[10px] rounded-lg bg-accent px-5 py-[14px] text-[17px] font-bold text-white shadow-[0_1px_3px_rgba(232,80,46,.3)] transition-colors hover:bg-accent-hover disabled:cursor-not-allowed disabled:bg-line-strong disabled:shadow-none"
         >
           {procesando ? (

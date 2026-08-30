@@ -1332,6 +1332,7 @@ export function HomePos({
           <ModalAgregarProductos
             token={token}
             ticketId={agregandoA}
+            modo={modo}
             categorias={categorias}
             productos={productos}
             onCerrar={(huboCambios) => {
