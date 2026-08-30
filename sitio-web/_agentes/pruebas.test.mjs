@@ -663,6 +663,40 @@ test('las páginas nuevas declaran su tipo y cuelgan de la organización', () =>
   }
 });
 
+// Todo bloque de JSON-LD del sitio tiene que parsear, no solo el de la portada.
+// Un JSON-LD roto no se ve en el navegador: la página se pinta igual y el error
+// solo aparece semanas después, en el informe de Search Console.
+test('todos los bloques de JSON-LD del sitio parsean', () => {
+  for (const p of PAGINAS) {
+    const html = cuerpo(resolver(p.ruta));
+    const bloques = [...html.matchAll(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/g)];
+    assert.ok(bloques.length > 0, `${p.ruta} se quedó sin datos estructurados`);
+    for (const [i, b] of bloques.entries()) {
+      assert.doesNotThrow(() => JSON.parse(b[1]), `${p.ruta}, bloque ${i}: JSON-LD roto`);
+    }
+  }
+});
+
+// La miga va en todas MENOS en la portada: un rastro de un solo escalón no dice
+// nada, y Google pide expresamente no ponerla en la raíz.
+test('cada página lleva su miga de pan, y la portada no', () => {
+  for (const p of PAGINAS) {
+    const nodos = jsonLd(p.ruta).flatMap((d) => d['@graph'] ?? [d]);
+    const miga = nodos.find((n) => n['@type'] === 'BreadcrumbList');
+
+    if (p.ruta === '/') {
+      assert.equal(miga, undefined, 'la portada no debería llevar miga de pan');
+      continue;
+    }
+
+    assert.ok(miga, `${p.ruta} no tiene BreadcrumbList`);
+    const [inicio, actual] = miga.itemListElement;
+    assert.equal(inicio.item, `${BASE}/`);
+    assert.equal(actual.item, `${BASE}${p.ruta}`, `la miga de ${p.ruta} no apunta a sí misma`);
+    assert.equal(actual.name, p.nombre, `la miga de ${p.ruta} no usa el nombre de paginas.mjs`);
+  }
+});
+
 // ── Índices ─────────────────────────────────────────────────────────────────
 
 test('el sitemap lista exactamente las páginas indexables', () => {
