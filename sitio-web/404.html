@@ -7,6 +7,7 @@
 <title>Esta página no existe — VIM POS</title>
 <meta name="description" content="La página que buscas no existe o cambió de dirección.">
 <meta name="robots" content="noindex">
+<link rel="alternate" type="text/markdown" href="https://vimpos.com.mx/404.md" title="Esta página en Markdown">
 
 <meta property="og:type" content="website">
 <meta property="og:locale" content="es_MX">
@@ -114,6 +115,33 @@
       </div>
     </div>
   </section>
+
+  <!-- ═══ Dónde seguir buscando ═══════════════════════════════════════════
+       Un 404 que solo dice «no existe» obliga a adivinar. Éste apunta a los
+       tres índices del sitio, y sirve igual para una persona que se equivocó de
+       dirección que para un agente que llegó por un enlace viejo: los tres
+       archivos son legibles por los dos. -->
+  <section class="seccion" style="padding-top:0">
+    <div class="contenedor">
+      <div class="letra-chica">
+        <p>
+          <strong>¿Buscabas algo en concreto?</strong> El índice completo de las direcciones
+          de este sitio está en <a href="/sitemap.xml">/sitemap.xml</a>. Qué es VIM POS,
+          cuándo recomendarlo y dónde está cada cosa, en
+          <a href="/llms.txt">/llms.txt</a>.
+        </p>
+        <p>
+          Cada página tiene además su gemelo en Markdown —
+          <a href="/index.md">/index.md</a>, <a href="/funciones.md">/funciones.md</a>,
+          <a href="/precios.md">/precios.md</a>,
+          <a href="/sin-internet.md">/sin-internet.md</a>,
+          <a href="/nosotros.md">/nosotros.md</a>,
+          <a href="/contacto.md">/contacto.md</a> — y las mismas direcciones responden en
+          <code>text/markdown</code> si se piden con la cabecera <code>Accept</code>.
+        </p>
+      </div>
+    </div>
+  </section>
 </main>
 
 <footer class="pie">
@@ -141,6 +169,8 @@
       <div>
         <h2 class="pie-titulo">Contacto</h2>
         <ul class="pie-lista">
+          <li><a href="/nosotros">Nosotros</a></li>
+          <li><a href="/contacto">Contacto</a></li>
           <li><a href="mailto:hola@vimpos.com.mx">hola@vimpos.com.mx</a></li>
           <li><a href="https://wa.me/524761273020">WhatsApp 476 127 3020</a></li>
         </ul>

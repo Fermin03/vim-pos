@@ -35,22 +35,42 @@
   RewriteRule ^ https://vimpos.com.mx%{REQUEST_URI} [R=301,L]
 </IfModule>
 
-# ── URLs sin .html ──────────────────────────────────────────────────────────
-# Los enlaces del sitio apuntan a /precios, no a /precios.html. En Vercel esto
-# lo hace `cleanUrls`; aquí hay que escribirlo.
+# ── URLs sin .html, alias y Markdown ────────────────────────────────────────
+# En Vercel esto son `redirects` y `rewrites` en vercel.json —`cleanUrls` se
+# apagó a propósito, ver DESPLIEGUE.md—; aquí hay que escribirlo.
 #
-# Son dos reglas y las dos hacen falta:
-#   1. /precios  ->  sirve precios.html SIN cambiar la URL (rewrite interno).
-#   2. /precios.html  ->  redirige a /precios con un 301, para que la versión
-#      con extensión no quede como una segunda URL con el mismo contenido.
+# El orden de los bloques es el orden en que Apache los evalúa, y no es
+# intercambiable: la negociación de Markdown va ANTES de servir el .html,
+# porque si el .html se sirve primero ya no hay nada que negociar.
 <IfModule mod_rewrite.c>
   RewriteEngine On
 
-  # 2 primero: si alguien llega con .html, se le manda a la limpia.
+  # 1. Si alguien llega con .html, se le manda a la limpia.
   RewriteCond %{THE_REQUEST} "\s/+(.+)\.html[\s?]" [NC]
   RewriteRule ^ /%1 [R=301,L]
 
-  # 1: la limpia sirve el archivo, sin que se note.
+  # 2. Los alias en inglés, que existen para las herramientas que buscan
+  #    /about, /contact y /privacy por convención. Son la misma página: el
+  #    canonical de cada una apunta a su dirección en español.
+  RewriteRule ^about/?$   /nosotros         [L]
+  RewriteRule ^contact/?$ /contacto         [L]
+  RewriteRule ^privacy/?$ /aviso-privacidad [L]
+  RewriteRule ^terms/?$   /terminos         [L]
+
+  # 3. Markdown, si el cliente lo pide con la cabecera Accept. La misma
+  #    dirección devuelve HTML a un navegador y Markdown a un agente; por eso
+  #    más abajo se manda `Vary: Accept`, sin el cual una caché intermedia le
+  #    puede dar a uno lo del otro.
+  RewriteCond %{HTTP_ACCEPT} text/markdown [NC]
+  RewriteCond %{DOCUMENT_ROOT}/index.md -f
+  RewriteRule ^$ /index.md [L]
+
+  RewriteCond %{HTTP_ACCEPT} text/markdown [NC]
+  RewriteCond %{REQUEST_FILENAME} !-f
+  RewriteCond %{DOCUMENT_ROOT}/$1.md -f
+  RewriteRule ^(.+?)/?$ /$1.md [L]
+
+  # 4. Y si no, la dirección limpia sirve el .html sin que se note.
   RewriteCond %{REQUEST_FILENAME} !-d
   RewriteCond %{REQUEST_FILENAME}\.html -f
   RewriteRule ^(.+)$ $1.html [L]
@@ -75,6 +95,13 @@ ErrorDocument 404 /404.html
   # El sitio no usa cámara, micrófono ni ubicación. Decirlo cierra la puerta
   # por si algún día se cuela un script de terceros que sí quiera pedirlos.
   Header always set Permissions-Policy "camera=(), microphone=(), geolocation=(), interest-cohort=()"
+
+  # La misma dirección devuelve HTML o Markdown según la cabecera Accept. Sin
+  # este Vary, una caché compartida guarda la primera de las dos versiones que
+  # pase por ella y se la sirve a todo el mundo.
+  <FilesMatch "\.(html|md)$">
+    Header always set Vary "Accept, Accept-Encoding"
+  </FilesMatch>
 </IfModule>
 
 # ── Caché ───────────────────────────────────────────────────────────────────
@@ -113,6 +140,12 @@ ErrorDocument 404 /404.html
   AddType image/webp     .webp
   AddType font/woff2     .woff2
   AddType application/manifest+json .webmanifest
+
+  # Los gemelos en Markdown. Sin esto Apache los manda como
+  # application/octet-stream y el navegador los descarga en vez de mostrarlos —
+  # y un agente que pidió text/markdown recibe algo que no es lo que pidió.
+  AddType text/markdown  .md
+  AddCharset UTF-8       .md
 </IfModule>
 
 # ── Nada de listar carpetas ─────────────────────────────────────────────────

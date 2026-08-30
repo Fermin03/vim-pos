@@ -7,6 +7,7 @@
 <title>VIM POS — Todo lo que tu restaurante necesita</title>
 <meta name="description" content="Punto de venta para restaurantes en México: caja, cocina, mesas, inventario y facturación en un solo sistema. Implementación y capacitación incluidas.">
 <link rel="canonical" href="https://vimpos.com.mx/">
+<link rel="alternate" type="text/markdown" href="https://vimpos.com.mx/index.md" title="Esta página en Markdown">
 
 <meta property="og:type" content="website">
 <meta property="og:locale" content="es_MX">
@@ -706,6 +707,8 @@
       <div>
         <h2 class="pie-titulo">Contacto</h2>
         <ul class="pie-lista">
+          <li><a href="/nosotros">Nosotros</a></li>
+          <li><a href="/contacto">Contacto</a></li>
           <li><a href="mailto:hola@vimpos.com.mx">hola@vimpos.com.mx</a></li>
           <li><a href="https://wa.me/524761273020">WhatsApp 476 127 3020</a></li>
         </ul>
@@ -726,35 +729,149 @@
   "@context": "https://schema.org",
   "@graph": [
     {
+      "@type": "WebSite",
+      "@id": "https://vimpos.com.mx/#sitio",
+      "url": "https://vimpos.com.mx/",
+      "name": "VIM POS",
+      "description": "Punto de venta para restaurantes en México: caja, cocina, mesas, inventario y facturación en un solo sistema.",
+      "inLanguage": "es-MX",
+      "publisher": { "@id": "https://vimpos.com.mx/#organizacion" }
+    },
+    {
       "@type": "Organization",
       "@id": "https://vimpos.com.mx/#organizacion",
       "name": "VIM POS",
+      "legalName": "Fermín Villalobos Martínez",
+      "alternateName": "VIM Punto de Venta",
       "url": "https://vimpos.com.mx/",
-      "logo": "https://vimpos.com.mx/assets/img/logo.svg",
+      "logo": {
+        "@type": "ImageObject",
+        "url": "https://vimpos.com.mx/assets/img/logo.svg",
+        "caption": "VIM POS"
+      },
+      "image": "https://vimpos.com.mx/assets/img/og/home.png",
+      "description": "VIM POS desarrolla y da soporte a un sistema de punto de venta para restaurantes en México. El sistema completo se instala en la computadora de la caja, así que cobra, imprime y manda a cocina sin depender del internet; la nube es el respaldo y el panel del dueño.",
       "email": "hola@vimpos.com.mx",
-      "areaServed": "MX",
+      "telephone": "+524761273020",
+      "taxID": "VIMF0308282D7",
+      "areaServed": { "@type": "Country", "name": "México" },
+      "knowsLanguage": "es-MX",
+      "sameAs": ["https://www.instagram.com/vimpos_mx/"],
       "address": {
         "@type": "PostalAddress",
-        "addressLocality": "León",
+        "streetAddress": "Melchor Ocampo 341",
+        "addressLocality": "San Francisco del Rincón",
         "addressRegion": "Guanajuato",
         "addressCountry": "MX"
-      }
+      },
+      "contactPoint": [
+        {
+          "@type": "ContactPoint",
+          "contactType": "sales",
+          "name": "Ventas y demostraciones",
+          "telephone": "+524761273020",
+          "email": "hola@vimpos.com.mx",
+          "url": "https://vimpos.com.mx/contacto",
+          "availableLanguage": ["es-MX"],
+          "areaServed": "MX"
+        },
+        {
+          "@type": "ContactPoint",
+          "contactType": "customer support",
+          "name": "Soporte a clientes",
+          "telephone": "+524761273020",
+          "email": "hola@vimpos.com.mx",
+          "url": "https://vimpos.com.mx/contacto",
+          "availableLanguage": ["es-MX"],
+          "areaServed": "MX"
+        }
+      ]
     },
     {
       "@type": "SoftwareApplication",
+      "@id": "https://vimpos.com.mx/#producto",
       "name": "VIM POS",
+      "url": "https://vimpos.com.mx/",
       "applicationCategory": "BusinessApplication",
-      "operatingSystem": "Windows",
+      "applicationSubCategory": "Punto de venta para restaurantes",
+      "operatingSystem": "Windows 10, Windows 11",
       "inLanguage": "es-MX",
+      "softwareRequirements": "Computadora con Windows, impresora de tickets y cajón de dinero. El cobro no depende de la conexión a internet.",
+      "countriesSupported": "MX",
+      "publisher": { "@id": "https://vimpos.com.mx/#organizacion" },
+      "screenshot": "https://vimpos.com.mx/assets/img/capturas/pos-home.png",
       "description": "Sistema de punto de venta para restaurantes en México: caja, cocina, mesas, inventario y facturación, con la implementación y la capacitación incluidas.",
+      "featureList": [
+        "Cobrar sin internet: el sistema completo vive en la computadora de la caja",
+        "Catálogo con categorías y modificadores con precio",
+        "Comandas impresas por estación o pantalla de cocina",
+        "Mapa de mesas, cuentas abiertas y propinas",
+        "Arqueo y corte Z sellado",
+        "Inventario con costo y control de mermas",
+        "Panel del dueño con 14 reportes y consolidado por sucursal",
+        "Conciliación de Rappi, Uber Eats y DiDi Food",
+        "Importación del menú desde Square, Toast, Loyverse o Clip",
+        "Facturación electrónica CFDI 4.0 con autofactura por QR (en activación)"
+      ],
       "offers": [
-        { "@type": "Offer", "name": "Esencial", "price": "699", "priceCurrency": "MXN" },
-        { "@type": "Offer", "name": "Negocio", "price": "999", "priceCurrency": "MXN" },
-        { "@type": "Offer", "name": "Cadena", "price": "1999", "priceCurrency": "MXN" }
+        {
+          "@type": "Offer",
+          "name": "Esencial",
+          "description": "1 sucursal y 1 caja. Implementación en autoservicio guiado.",
+          "url": "https://vimpos.com.mx/precios",
+          "price": "699",
+          "priceCurrency": "MXN",
+          "availability": "https://schema.org/InStock",
+          "priceSpecification": {
+            "@type": "UnitPriceSpecification",
+            "price": "699",
+            "priceCurrency": "MXN",
+            "valueAddedTaxIncluded": false,
+            "referenceQuantity": { "@type": "QuantitativeValue", "value": 1, "unitCode": "MON" }
+          }
+        },
+        {
+          "@type": "Offer",
+          "name": "Negocio",
+          "description": "1 sucursal y 3 cajas. Inventario, facturación incluida y carga del menú.",
+          "url": "https://vimpos.com.mx/precios",
+          "price": "999",
+          "priceCurrency": "MXN",
+          "availability": "https://schema.org/InStock",
+          "priceSpecification": {
+            "@type": "UnitPriceSpecification",
+            "price": "999",
+            "priceCurrency": "MXN",
+            "valueAddedTaxIncluded": false,
+            "referenceQuantity": { "@type": "QuantitativeValue", "value": 1, "unitCode": "MON" }
+          }
+        },
+        {
+          "@type": "Offer",
+          "name": "Cadena",
+          "description": "3 sucursales y cajas ilimitadas. Reporte consolidado y visita presencial.",
+          "url": "https://vimpos.com.mx/precios",
+          "price": "1999",
+          "priceCurrency": "MXN",
+          "availability": "https://schema.org/InStock",
+          "priceSpecification": {
+            "@type": "UnitPriceSpecification",
+            "price": "1999",
+            "priceCurrency": "MXN",
+            "valueAddedTaxIncluded": false,
+            "referenceQuantity": { "@type": "QuantitativeValue", "value": 1, "unitCode": "MON" }
+          }
+        }
       ]
     },
     {
       "@type": "FAQPage",
+      "@id": "https://vimpos.com.mx/#preguntas",
+      "url": "https://vimpos.com.mx/",
+      "name": "Lo que nos preguntan antes de la demo",
+      "inLanguage": "es-MX",
+      "isPartOf": { "@id": "https://vimpos.com.mx/#sitio" },
+      "about": { "@id": "https://vimpos.com.mx/#producto" },
       "mainEntity": [
         { "@type": "Question", "name": "¿De verdad funciona sin internet?", "acceptedAnswer": { "@type": "Answer", "text": "Sí. El programa se instala en la computadora de tu caja y trabaja ahí, así que cobrar, imprimir y mandar a cocina no pasan por internet en ningún momento." } },
         { "@type": "Question", "name": "¿Qué necesito comprar?", "acceptedAnswer": { "@type": "Answer", "text": "Una computadora con Windows, una impresora de tickets, un cajón de dinero y el módem que ya tienes. VIM no vende equipo." } },

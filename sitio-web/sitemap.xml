@@ -1,39 +1,52 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!--
-  Seis URLs. Sin `changefreq` ni `priority`: Google lleva años diciendo que los
+  Nueve URLs. Sin `changefreq` ni `priority`: Google lleva años diciendo que los
   ignora, y publicarlos solo añade dos campos que se quedan desactualizados.
 
   `lastmod` sí se respeta, así que hay que tocarlo cuando la página cambie de
   verdad — no en cada despliegue. Un lastmod que miente entrena al rastreador a
-  no creerle.
+  no creerle. El 30 de agosto de 2026 cambiaron todas: se añadió el pie con
+  «Nosotros» y «Contacto», y el enlace al gemelo en Markdown de cada una.
+
+  Aquí NO van: /404 (no se indexa) ni los alias en inglés /about, /contact y
+  /privacy, que sirven el mismo contenido y declaran su canonical en español.
+  Una prueba comprueba que esta lista y `_agentes/paginas.mjs` digan lo mismo.
 -->
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url>
     <loc>https://vimpos.com.mx/</loc>
-    <lastmod>2026-08-25</lastmod>
+    <lastmod>2026-08-30</lastmod>
   </url>
   <url>
     <loc>https://vimpos.com.mx/funciones</loc>
-    <lastmod>2026-08-26</lastmod>
-  </url>
-  <url>
-    <loc>https://vimpos.com.mx/precios</loc>
-    <lastmod>2026-08-25</lastmod>
+    <lastmod>2026-08-30</lastmod>
   </url>
   <url>
     <loc>https://vimpos.com.mx/sin-internet</loc>
-    <lastmod>2026-08-25</lastmod>
+    <lastmod>2026-08-30</lastmod>
+  </url>
+  <url>
+    <loc>https://vimpos.com.mx/precios</loc>
+    <lastmod>2026-08-30</lastmod>
   </url>
   <url>
     <loc>https://vimpos.com.mx/demo</loc>
-    <lastmod>2026-08-25</lastmod>
+    <lastmod>2026-08-30</lastmod>
+  </url>
+  <url>
+    <loc>https://vimpos.com.mx/nosotros</loc>
+    <lastmod>2026-08-30</lastmod>
+  </url>
+  <url>
+    <loc>https://vimpos.com.mx/contacto</loc>
+    <lastmod>2026-08-30</lastmod>
   </url>
   <url>
     <loc>https://vimpos.com.mx/aviso-privacidad</loc>
-    <lastmod>2026-08-25</lastmod>
+    <lastmod>2026-08-30</lastmod>
   </url>
   <url>
     <loc>https://vimpos.com.mx/terminos</loc>
-    <lastmod>2026-08-25</lastmod>
+    <lastmod>2026-08-30</lastmod>
   </url>
 </urlset>

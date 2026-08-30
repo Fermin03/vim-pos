@@ -78,17 +78,41 @@ Y por eso no aparece en el archivo: forzar HTTPS, emitir el certificado, comprim
 servir `404.html` cuando la ruta no existe, no listar el contenido de las carpetas, y los tipos
 MIME de `.webp`, `.woff2` y `.webmanifest`.
 
-### URLs sin `.html`
+### URLs sin `.html` — y por qué `cleanUrls` está **apagado**
 
-`cleanUrls: true`. Los enlaces del sitio, los `canonical`, los `og:url` y el sitemap apuntan a
-`/precios`, no a `/precios.html`; Vercel sirve el archivo y redirige la versión con extensión.
+Los enlaces del sitio, los `canonical`, los `og:url` y el sitemap apuntan a `/precios`, no a
+`/precios.html`. Eso no ha cambiado. Lo que cambió es **quién** lo resuelve.
 
-**Se decidió antes de publicar, y ése era el momento.** Después de que Google indexe
-`precios.html`, cambiarlo significa arrastrar redirecciones para siempre. Hacerlo con el sitio
-todavía sin indexar costó diez minutos y cero deuda.
+Hasta el 30 de agosto de 2026 lo hacía `cleanUrls: true`. Ahora está en `false` y las mismas dos
+reglas están escritas a mano en `redirects` y `rewrites`. **No es un capricho: `cleanUrls` hacía
+imposible servir Markdown.**
 
-El `.htaccess` lleva las dos reglas equivalentes por si algún día se vuelve a Hostinger: un
-*rewrite* interno para servir el archivo y un 301 de la versión con extensión hacia la limpia.
+El enrutador de Vercel evalúa en este orden —comprobado contra producción con `curl`, no solo
+leído en la documentación:
+
+1. `redirects` — cortan la petición y **no llevan las cabeceras propias** (el 308 de
+   `/precios.html` no traía ninguna de las cuatro de seguridad).
+2. `headers` — se casan contra la ruta **pedida**, no contra la servida.
+3. **Sistema de archivos** — y aquí está el problema: con `cleanUrls`, `/precios` se resolvía en
+   este paso.
+4. `rewrites` — solo se evalúan si el paso 3 no encontró archivo.
+5. `404.html`, con estatus 404.
+
+Como el paso 3 ganaba, la reescritura condicional que sirve `precios.md` cuando llega
+`Accept: text/markdown` **nunca llegaba a evaluarse**. Con `cleanUrls: false`, `/precios` deja de
+ser un archivo y las reescrituras vuelven a tener turno.
+
+Lo que se conserva idéntico: `/precios.html` sigue devolviendo un 308 a `/precios`. Ahora es una
+redirección escrita en lugar de una implícita.
+
+**La portada es la única excepción, y no tiene arreglo limpio.** El sistema de archivos sirve
+`index.html` para `/` pase lo que pase; eso no depende de `cleanUrls` y solo se quitaría
+renombrando el archivo, que es exactamente el tipo de riesgo que no se corre con la página que
+recibe las visitas. Así que `/` negocia Markdown con una **redirección temporal (307) a
+`/index.md`**, que sí corre antes del sistema de archivos. Solo se dispara con la cabecera
+`Accept`, así que un navegador nunca la ve.
+
+El `.htaccess` lleva las reglas equivalentes por si algún día se vuelve a Hostinger.
 
 ### Lo que no hace falta bloquear
 
@@ -122,6 +146,50 @@ Tampoco se tocan `pos.`, `admin.` ni `platform.`, que ya apuntan a sus propios p
 
 ---
 
+## Lo que se genera, y por qué `vercel.json` ya no se edita a mano
+
+Desde el 30 de agosto de 2026 hay una carpeta `_agentes/` con el índice del sitio
+(`paginas.mjs`) y un generador. De esa lista salen **cinco cosas**:
+
+| Archivo | Qué es |
+|---|---|
+| `<pagina>.md` | El gemelo en Markdown de cada página, convertido desde su `<main>` |
+| `llms.txt` | El índice para agentes, con la guía de cuándo recomendar el producto |
+| `llms-full.txt` | Las nueve páginas concatenadas, para cargar el contexto de una vez |
+| `vercel.json` | Las redirecciones, reescrituras y cabeceras — todas literales, sin comodines |
+| — | El `sitemap.xml` **no** se genera, pero una prueba comprueba que diga lo mismo |
+
+**Después de tocar cualquier `.html` hay que regenerar:**
+
+```bash
+cd sitio-web && node _agentes/generar.mjs
+```
+
+Si no, el Markdown se queda con el texto viejo y un agente acaba citando un precio que ya no
+existe. La prueba `los archivos generados coinciden con el HTML` falla si se olvida.
+
+`vercel.json` se genera por la misma razón por la que existe este documento: JSON no admite
+comentarios, y una ruta mal escrita ahí no se ve en el navegador de quien la escribió — se ve
+cuando un prospecto abre `/precios` y encuentra un 404.
+
+## Las pruebas
+
+```bash
+node --test sitio-web/_agentes/pruebas.test.mjs
+```
+
+Veinticuatro pruebas, sin instalar nada. Reproducen el enrutador de Vercel (`_agentes/rutas.mjs`)
+y comprueban lo que se rompe en silencio: una ruta mal escrita, un enlace interno a una página
+que ya no existe, un gemelo desactualizado, un JSON-LD que dejó de parsear, el sitemap
+descuadrado.
+
+Para mirarlo con `curl` antes de publicar, el sitio se levanta en local **con estas mismas
+reglas**:
+
+```bash
+node sitio-web/_agentes/servidor.mjs
+```
+
 ## Publicar un cambio
 
 `git push` a `main`. No hay más.
@@ -134,3 +202,50 @@ cd sitio-web && sed -i 's/vim\.css?v=[0-9]*/vim.css?v=10/; s/vim\.js?v=[0-9]*/vi
 
 No es opcional: la caché de esos dos archivos es de un año. Durante el desarrollo costó tres
 diagnósticos en falso creer que el código estaba mal cuando lo que corría era la versión anterior.
+
+---
+
+## Lista de verificación después de publicar
+
+Las pruebas locales cubren la lógica, pero hay tres cosas que **solo se ven contra Vercel**.
+Conviene correr esto justo después del primer despliegue con `cleanUrls: false` — y, mejor
+todavía, contra la URL de *preview* de una rama antes de fusionar a `main`.
+
+```bash
+D=https://vimpos.com.mx
+for r in / /funciones /sin-internet /precios /demo /nosotros /contacto /aviso-privacidad /terminos; do
+  printf '%-20s %s\n' "$r" "$(curl -s -o /dev/null -w '%{http_code}' $D$r)"
+done
+```
+
+**1. Las nueve páginas siguen dando 200.** Es la comprobación que importa: es lo único que
+`cleanUrls` hacía por su cuenta y ahora está escrito a mano. Si alguna da 404, se revierte
+poniendo `"cleanUrls": true` en `vercel.json` —el sitio vuelve a estar entero al instante— y se
+mira la reescritura que falta.
+
+**2. El Markdown sale con su tipo de contenido.**
+
+```bash
+curl -sI -H "Accept: text/markdown" https://vimpos.com.mx/precios | grep -i -E 'content-type|vary'
+```
+
+Tiene que decir `content-type: text/markdown; charset=utf-8` y `vary: Accept, Accept-Encoding`.
+El tipo lo pone Vercel a partir de la extensión del archivo servido; si por lo que sea llegara
+como `text/plain` o como `application/octet-stream`, se arregla añadiendo la cabecera
+`Content-Type` explícita a las reglas de las páginas en el generador.
+
+**3. La portada redirige, y solo para quien pide Markdown.**
+
+```bash
+curl -sI -H "Accept: text/markdown" https://vimpos.com.mx/ | head -2   # 307 → /index.md
+curl -sI https://vimpos.com.mx/ | head -2                              # 200, HTML
+```
+
+Y el resto, que es rápido de mirar de una vez:
+
+```bash
+curl -s -o /dev/null -w '404: %{http_code}\n' https://vimpos.com.mx/ruta-que-no-existe
+curl -s -o /dev/null -w 'about: %{http_code}\n' https://vimpos.com.mx/about
+curl -s -o /dev/null -w 'llms: %{http_code}\n'  https://vimpos.com.mx/llms.txt
+curl -sI https://vimpos.com.mx/precios.html | head -2   # 308 → /precios
+```

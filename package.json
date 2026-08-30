@@ -15,6 +15,10 @@
     "_comment_test_functions": "supabase/functions es codigo Deno y no esta en el workspace de pnpm; sus modulos puros se prueban con el runner de Node",
     "auditar:consultas": "node scripts/auditar-consultas.mjs",
     "test:functions": "node --test --experimental-strip-types supabase/functions/_shared/pac/*.test.ts",
+    "_comment_sitio": "sitio-web es HTML estatico sin build ni dependencias; se genera y se prueba con Node pelado",
+    "sitio:generar": "node sitio-web/_agentes/generar.mjs",
+    "sitio:servir": "node sitio-web/_agentes/servidor.mjs",
+    "test:sitio": "node --test sitio-web/_agentes/pruebas.test.mjs",
     "db:reset": "supabase db reset",
     "db:types": "supabase gen types typescript --local > packages/db/src/database.types.ts"
   },
