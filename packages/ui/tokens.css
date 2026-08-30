@@ -13,11 +13,17 @@
   --ink-2: #5A5A60;
   --ink-3: #8E8E94;
 
-  /* Semánticos */
+  /* Semánticos. Los tonos `-soft` son los fondos de aviso del design system: estaban en el
+     :root de todos los mockups y nunca se habían portado, asi que cada pantalla que necesitaba
+     uno lo escribia a mano en hexadecimal y no habia forma de cambiarlos en un solo sitio. */
   --success: #2E7D52;
+  --success-soft: #E7F2EC;
   --warning: #9A6B12;
+  --warning-soft: #FCF6E8;
   --danger: #C0392B;
+  --danger-soft: #FBEBE9;
   --info: #2C5AA0;
+  --info-soft: #EAF0F8;
 
   /* Superficies / líneas */
   --bg: #FFFFFF;
