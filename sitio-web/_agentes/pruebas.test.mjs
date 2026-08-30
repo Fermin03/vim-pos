@@ -384,13 +384,40 @@ test('los archivos estáticos se siguen sirviendo con su caché', () => {
   assert.equal(css.estado, 200);
   assert.match(css.cabeceras['Cache-Control'], /immutable/);
 
-  const fuente = resolver('/assets/fonts/sora-700-latin.woff2');
+  const fuente = resolver('/assets/fonts/sora-var-latin.woff2');
   assert.equal(fuente.estado, 200);
   assert.equal(fuente.cabeceras['Access-Control-Allow-Origin'], '*');
 
   for (const ruta of ['/robots.txt', '/sitemap.xml', '/site.webmanifest', '/llms.txt']) {
     assert.equal(resolver(ruta).estado, 200, `${ruta} no se sirve`);
   }
+});
+
+// Renombrar una tipografía y olvidar un `src` o un `preload` no se ve en local
+// —el navegador cae en la del sistema y la página sigue leyéndose— pero deja el
+// sitio con la tipografía equivocada en producción. Aquí se comprueba que TODO
+// woff2 nombrado en el CSS o en el HTML exista de verdad.
+test('todas las tipografías que se nombran existen', () => {
+  const css = leer('assets/css/fuentes.css');
+  const enCss = [...css.matchAll(/url\('\.\.\/fonts\/([^']+)'\)/g)].map((m) => m[1]);
+  assert.ok(enCss.length > 0, 'fuentes.css no declara ninguna tipografía');
+
+  for (const archivo of enCss) {
+    assert.equal(resolver(`/assets/fonts/${archivo}`).estado, 200, `fuentes.css apunta a ${archivo}, que no existe`);
+  }
+
+  for (const p of TODAS) {
+    const html = leer(p.archivo);
+    for (const [, ruta] of html.matchAll(/rel="preload"\s+href="([^"]+\.woff2)"/g)) {
+      const archivo = ruta.replace(/^assets\/fonts\//, '');
+      assert.ok(enCss.includes(archivo), `${p.archivo} precarga ${archivo}, que fuentes.css no declara`);
+    }
+  }
+
+  // Un archivo suelto en la carpeta que nadie declara es peso muerto que viaja
+  // en cada despliegue: fue justo lo que pasó con los cuatro duplicados.
+  const enDisco = fs.readdirSync(path.join(RAIZ, 'assets/fonts')).filter((f) => f.endsWith('.woff2'));
+  assert.deepEqual(enDisco.sort(), [...enCss].sort(), 'hay tipografías en disco que el CSS no declara, o al revés');
 });
 
 test('las cuatro cabeceras de seguridad siguen en todas las respuestas', () => {

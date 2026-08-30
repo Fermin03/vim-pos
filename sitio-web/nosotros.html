@@ -21,20 +21,22 @@
 <meta property="og:image:alt" content="VIM POS, punto de venta para restaurantes en Mexico">
 <meta name="twitter:card" content="summary_large_image">
 
-<!-- Se precargan SOLO las dos que se ven en el primer pantallazo: el titular
-     (Sora 700) y el texto corrido (Inter Tight 400). Precargar las siete haría
-     lo contrario de lo que se busca — competirían entre ellas por el ancho de
-     banda y ninguna llegaría antes. -->
-<link rel="preload" href="assets/fonts/sora-700-latin.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="preload" href="assets/fonts/inter-tight-400-latin.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="stylesheet" href="assets/css/fuentes.css?v=10">
+<!-- Se precargan SOLO las dos familias que se ven en el primer pantallazo: el
+     titular (Sora) y el texto corrido (Inter Tight). JetBrains Mono aparece más
+     abajo y puede esperar; precargar las tres haría lo contrario de lo que se
+     busca — competirían entre ellas por el ancho de banda y ninguna llegaría
+     antes. Cada archivo es una fuente VARIABLE, así que precargarlo cubre todos
+     los pesos de su familia: no hay un archivo por peso que precargar. -->
+<link rel="preload" href="assets/fonts/sora-var-latin.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="assets/fonts/inter-tight-var-latin.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="assets/css/fuentes.css?v=11">
 
 <link rel="icon" href="assets/img/logo.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="assets/img/apple-touch-icon-1024.png">
 <link rel="manifest" href="site.webmanifest">
 <meta name="theme-color" content="#0078C9">
 
-<link rel="stylesheet" href="assets/css/vim.css?v=10">
+<link rel="stylesheet" href="assets/css/vim.css?v=11">
 </head>
 <body>
 
@@ -279,7 +281,7 @@
 }
 </script>
 
-<script src="assets/js/vim.js?v=10" defer></script>
+<script src="assets/js/vim.js?v=11" defer></script>
 <script type="application/ld+json">
 {
   "@context": "https://schema.org",
