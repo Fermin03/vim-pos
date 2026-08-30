@@ -18,69 +18,68 @@
    `latin` empieza en U+0000-00FF. `latin-ext` (U+0100 en adelante) es para
    polaco, rumano y companyia; el cirilico, el griego y el vietnamita, igual.
 
-   Se descartaron 296 KB de archivos que `unicode-range` nunca habria llegado a
-   pedir. No costaban nada en runtime, pero viajaban en cada despliegue.
-
    `font-display: swap` se conserva: el texto se pinta con la tipografia del
    sistema y se recompone al llegar la buena. Un parrafo legible tarde es peor
    que un parrafo legible ya.
 
    Las tres familias son SIL OFL, asi que alojarlas es parte de su licencia.
+
+   ---------------------------------------------------------------------------
+   UN ARCHIVO POR FAMILIA, Y SON VARIABLES (cambio del 30-ago-2026)
+
+   Hasta hoy habia SIETE archivos declarados en siete bloques, uno por peso:
+   inter-tight-400/500/600, jetbrains-mono-400/600 y sora-600/700. Los siete
+   nombres apuntaban en realidad a TRES archivos: los md5 coincidian.
+
+       f5af7a76…  inter-tight-400  =  inter-tight-500  =  inter-tight-600
+       b636a65d…  jetbrains-400    =  jetbrains-600
+       fc575ebf…  sora-600         =  sora-700
+
+   La causa: la API css2 de Google sirve la MISMA fuente variable para todos los
+   pesos que le pidas, y quien las descargo guardo el mismo archivo con tres
+   nombres distintos. Cada bloque tenia su propia URL, asi que el navegador se
+   bajaba el mismo archivo hasta tres veces: 134 KB de Inter Tight para 44 KB de
+   tipografia util.
+
+   OJO CON EL DIAGNOSTICO FACIL: los pesos 500 y 600 NUNCA fueron falsos. Como
+   son fuentes variables, declarar `font-weight: 500` en el @font-face instancia
+   el eje wght en 500 de verdad (CSS Fonts 4). El defecto era de ancho de banda,
+   no de dibujo, y el aspecto de la pagina no cambia con este arreglo.
+
+   Los rangos de abajo estan leidos de la tabla `fvar` de cada archivo, no
+   supuestos:
+
+       Inter Tight     wght 100-900
+       JetBrains Mono  wght 400-800
+       Sora            wght 400-800
+
+   Por eso los archivos ya no llevan un peso en el nombre — decia una cosa que
+   no era cierta — sino `-var-`. Si algun dia se reemplazan, hay que volver a
+   leer el `fvar`: declarar un rango mas ancho del que la fuente soporta hace
+   que el navegador finja los extremos, y ESO si se ve.
    ========================================================================== */
 
 @font-face {
   font-family: 'Inter Tight';
   font-style: normal;
-  font-weight: 400;
+  font-weight: 100 900;
   font-display: swap;
-  src: url('../fonts/inter-tight-400-latin.woff2') format('woff2');
-  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
-}
-@font-face {
-  font-family: 'Inter Tight';
-  font-style: normal;
-  font-weight: 500;
-  font-display: swap;
-  src: url('../fonts/inter-tight-500-latin.woff2') format('woff2');
-  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
-}
-@font-face {
-  font-family: 'Inter Tight';
-  font-style: normal;
-  font-weight: 600;
-  font-display: swap;
-  src: url('../fonts/inter-tight-600-latin.woff2') format('woff2');
+  src: url('../fonts/inter-tight-var-latin.woff2') format('woff2');
   unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
 }
 @font-face {
   font-family: 'JetBrains Mono';
   font-style: normal;
-  font-weight: 400;
+  font-weight: 400 800;
   font-display: swap;
-  src: url('../fonts/jetbrains-mono-400-latin.woff2') format('woff2');
-  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
-}
-@font-face {
-  font-family: 'JetBrains Mono';
-  font-style: normal;
-  font-weight: 600;
-  font-display: swap;
-  src: url('../fonts/jetbrains-mono-600-latin.woff2') format('woff2');
+  src: url('../fonts/jetbrains-mono-var-latin.woff2') format('woff2');
   unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
 }
 @font-face {
   font-family: 'Sora';
   font-style: normal;
-  font-weight: 600;
+  font-weight: 400 800;
   font-display: swap;
-  src: url('../fonts/sora-600-latin.woff2') format('woff2');
-  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
-}
-@font-face {
-  font-family: 'Sora';
-  font-style: normal;
-  font-weight: 700;
-  font-display: swap;
-  src: url('../fonts/sora-700-latin.woff2') format('woff2');
+  src: url('../fonts/sora-var-latin.woff2') format('woff2');
   unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
 }
