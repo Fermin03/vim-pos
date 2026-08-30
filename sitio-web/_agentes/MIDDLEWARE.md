@@ -41,8 +41,21 @@ muertas, siempre devuelve una respuesta propia — y así no hace falta `next()`
 habría obligado a meter un `package.json`, un `installCommand` y una dependencia de npm en un
 sitio que a propósito no tiene ninguna de las tres.
 
-Para el caso HTML pide `/404.html` a su propio origen con `fetch`. Es un salto de más, pero solo
-en direcciones que ya son un error.
+## El cuerpo en Markdown va escrito dentro, y eso lo enseñó el preview
+
+La primera versión pedía `/404.md` a su propio origen con `fetch`. El despliegue de preview lo
+tumbó de inmediato: como está detrás del SSO de Vercel, esa petición interna no lleva sesión y
+volvía **200 con la pantalla de inicio de sesión** — 340 KB de HTML servidos como
+`text/markdown`. En producción habría funcionado y nadie se habría enterado.
+
+Ahora el Markdown es una constante del propio archivo: corto, sin depender de que el servidor
+pueda hablar consigo mismo, y es lo que se pide («a short markdown body»). La versión larga —el
+gemelo de la página de error— sigue en `/404.md` para quien la quiera.
+
+Para el caso HTML sí se pide `/404.html`, porque esa página está diseñada y no tiene sentido
+duplicarla. Pero se comprueba que lo que vuelve **empiece por `<!doctype html>`**; si no, se sirve
+una versión mínima escrita aquí. Servir cualquier cosa con estatus 404 es peor que servir algo
+feo.
 
 ## Por qué está en TypeScript
 

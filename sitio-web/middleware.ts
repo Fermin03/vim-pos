@@ -89,46 +89,76 @@ export function prefiereMarkdown(accept: string | null): boolean {
   return markdown > 0 && markdown >= html;
 }
 
+// El 404 en Markdown va escrito aquí y no se pide al origen. Se probó de la
+// otra forma —un `fetch` a /404.md— y el despliegue de preview lo dejó al
+// descubierto: como está detrás del SSO de Vercel, esa petición interna no
+// lleva sesión y volvía con la página de inicio de sesión, 340 KB de HTML
+// servidos como `text/markdown`. En producción habría funcionado, pero un 404
+// que depende de que el servidor pueda hablar consigo mismo es un 404 frágil.
+//
+// Y encaja con lo que se pide: un cuerpo CORTO que diga a dónde ir. La versión
+// larga —el gemelo de la página de error— sigue existiendo en /404.md.
+export const CUERPO_MARKDOWN = [
+  '# 404 — esta dirección no existe',
+  '',
+  '> VIM POS · punto de venta para restaurantes en México. La dirección que pediste no',
+  '> existe o cambió de sitio. Aquí está por dónde seguir.',
+  '',
+  '## Por dónde seguir',
+  '',
+  '- [Instrucciones para agentes](https://vimpos.com.mx/agents.md): cuándo usar VIM POS, cuándo no, y qué hacer después.',
+  '- [Índice del sitio para agentes](https://vimpos.com.mx/llms.txt): todo lo que hay y dónde está.',
+  '- [El sitio entero en un archivo](https://vimpos.com.mx/llms-full.txt).',
+  '- [Índice de direcciones](https://vimpos.com.mx/sitemap.xml): el sitemap en XML.',
+  '',
+  '## Las páginas, en Markdown',
+  '',
+  '- [Inicio](https://vimpos.com.mx/index.md)',
+  '- [Funciones](https://vimpos.com.mx/funciones.md)',
+  '- [Sin internet](https://vimpos.com.mx/sin-internet.md)',
+  '- [Precios](https://vimpos.com.mx/precios.md)',
+  '- [Pide una demo](https://vimpos.com.mx/demo.md)',
+  '- [Nosotros](https://vimpos.com.mx/nosotros.md)',
+  '- [Contacto](https://vimpos.com.mx/contacto.md)',
+  '',
+  'Contacto: hola@vimpos.com.mx · WhatsApp +52 476 127 3020',
+  '',
+].join('\n');
+
+const CUERPO_HTML_MINIMO = `<!doctype html>
+<html lang="es-MX"><head><meta charset="utf-8"><title>Esta página no existe — VIM POS</title>
+<meta name="viewport" content="width=device-width, initial-scale=1"><meta name="robots" content="noindex"></head>
+<body><h1>Esta página no existe</h1>
+<p>O la dirección está mal escrita, o algo se movió de sitio.</p>
+<ul><li><a href="/">Inicio</a></li><li><a href="/precios">Precios</a></li>
+<li><a href="/contacto">Contacto</a></li><li><a href="/sitemap.xml">Mapa del sitio</a></li></ul></body></html>
+`;
+
 export default async function middleware(peticion: Request): Promise<Response> {
-  const url = new URL(peticion.url);
-  const enMarkdown = prefiereMarkdown(peticion.headers.get('accept'));
-  const origen = new URL(enMarkdown ? '/404.md' : '/404.html', url);
-
-  try {
-    // Ninguno de los dos destinos despierta al middleware —«404» está en la
-    // lista de exclusión—, así que esto no se llama a sí mismo.
-    const respuesta = await fetch(origen);
-    if (!respuesta.ok) throw new Error(`${origen.pathname} devolvió ${respuesta.status}`);
-
-    return new Response(await respuesta.text(), {
+  if (prefiereMarkdown(peticion.headers.get('accept'))) {
+    return new Response(CUERPO_MARKDOWN, {
       status: 404,
-      headers: {
-        ...SEGURIDAD,
-        'Content-Type': enMarkdown
-          ? 'text/markdown; charset=utf-8'
-          : 'text/html; charset=utf-8',
-      },
+      headers: { ...SEGURIDAD, 'Content-Type': 'text/markdown; charset=utf-8' },
     });
-  } catch {
-    // Si la página de error no se puede leer, se contesta igual: un 404 con lo
-    // mínimo para que quien preguntó sepa a dónde ir. Quedarse callado sería
-    // peor que quedarse feo.
-    return new Response(
-      [
-        '# 404 — esta dirección no existe',
-        '',
-        'VIM POS · punto de venta para restaurantes en México.',
-        '',
-        '- [Mapa para agentes](https://vimpos.com.mx/llms.txt)',
-        '- [Instrucciones para agentes](https://vimpos.com.mx/agents.md)',
-        '- [Índice de direcciones](https://vimpos.com.mx/sitemap.xml)',
-        '- [Inicio](https://vimpos.com.mx/index.md)',
-        '',
-      ].join('\n'),
-      {
-        status: 404,
-        headers: { ...SEGURIDAD, 'Content-Type': 'text/markdown; charset=utf-8' },
-      },
-    );
   }
+
+  // Para un navegador sí se pide la página de error de verdad, que es la que
+  // está diseñada. «404» está en la lista de exclusión del matcher, así que
+  // esta petición no vuelve a despertar al middleware.
+  let html = CUERPO_HTML_MINIMO;
+  try {
+    const respuesta = await fetch(new URL('/404.html', peticion.url));
+    const texto = await respuesta.text();
+    // Se comprueba que sea la página y no otra cosa —una pantalla de acceso,
+    // un error del origen—: servir cualquier cosa con estatus 404 es peor que
+    // servir la versión mínima de aquí abajo.
+    if (respuesta.ok && /^\s*<!doctype html>/i.test(texto)) html = texto;
+  } catch {
+    // Se queda la mínima.
+  }
+
+  return new Response(html, {
+    status: 404,
+    headers: { ...SEGURIDAD, 'Content-Type': 'text/html; charset=utf-8' },
+  });
 }
