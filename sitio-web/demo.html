@@ -304,5 +304,47 @@
 </footer>
 
 <script src="assets/js/vim.js?v=10" defer></script>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "WebPage",
+      "@id": "https://vimpos.com.mx/demo#pagina",
+      "url": "https://vimpos.com.mx/demo",
+      "name": "Pide una demo de VIM POS",
+      "description": "Te enseñamos el sistema funcionando, con tus productos y tus precios.",
+      "inLanguage": "es-MX",
+      "isPartOf": {
+        "@id": "https://vimpos.com.mx/#sitio"
+      },
+      "about": {
+        "@id": "https://vimpos.com.mx/#producto"
+      },
+      "mainEntity": {
+        "@id": "https://vimpos.com.mx/#producto"
+      }
+    },
+    {
+      "@type": "BreadcrumbList",
+      "@id": "https://vimpos.com.mx/demo#miga",
+      "itemListElement": [
+        {
+          "@type": "ListItem",
+          "position": 1,
+          "name": "Inicio",
+          "item": "https://vimpos.com.mx/"
+        },
+        {
+          "@type": "ListItem",
+          "position": 2,
+          "name": "Pide una demo",
+          "item": "https://vimpos.com.mx/demo"
+        }
+      ]
+    }
+  ]
+}
+</script>
 </body>
 </html>
