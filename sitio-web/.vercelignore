@@ -1,0 +1,48 @@
+# Lo que NO se sube a Vercel.
+#
+# Hasta ahora el sitio publicaba también sus herramientas y su documentación,
+# porque Vercel sube la carpeta entera y nadie le había dicho lo contrario.
+# `https://vimpos.com.mx/DESPLIEGUE.md` era legible por cualquiera, y ahí está
+# la IP del servidor viejo, el reparto de subdominios y el aviso de no tocar los
+# registros MX. No es una catástrofe, pero tampoco hay ninguna razón para
+# regalarlo.
+#
+# El middleware del 404 ya tapaba algunos de estos archivos, y eso NO bastaba:
+# tapar no es lo mismo que no publicar. El día que se quite el middleware
+# —cosa que el propio `_agentes/MIDDLEWARE.md` propone como forma de revertir—
+# volverían a estar ahí. Esto sí los quita.
+#
+# ⚠️ Dos archivos NO pueden entrar en esta lista aunque apetezca:
+#
+#   · `vercel.json`, porque Vercel lo lee para saber cómo enrutar. Sigue siendo
+#     alcanzable en teoría; hoy lo tapa el middleware.
+#   · `middleware.ts`, porque hay que subirlo para que Vercel lo construya. Su
+#     código fuente no revela nada que no esté en el repositorio público.
+#
+# Se comprueba en `_agentes/pruebas.test.mjs`: una prueba verifica que aquí esté
+# todo lo interno y que NO esté nada que el sitio necesite para funcionar.
+
+# Las herramientas del sitio: el generador, el enrutador de pruebas y el
+# servidor local. Solo se usan desde esta máquina; en el servidor no pintan nada.
+_agentes/
+
+# Los scripts que arman las capturas y las imágenes de Open Graph. Traen su
+# propio package.json, y publicarlo es enseñar la cocina sin motivo.
+_capturas/
+
+# La página de referencia con los componentes juntos. Es una herramienta de
+# diseño, no una página del sitio.
+_patron.html
+
+# La documentación de despliegue. Es la que más pesa de todas las razones por
+# las que existe este archivo.
+DESPLIEGUE.md
+
+# Las reglas de Apache. Vercel las ignora; existen por si algún día se vuelve a
+# Hostinger, y viven en el repositorio, no en el servidor.
+.htaccess
+
+# El propio archivo de exclusiones y los atributos de git: son del
+# repositorio, no del sitio.
+.vercelignore
+.gitattributes

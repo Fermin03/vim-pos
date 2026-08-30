@@ -1,0 +1,17 @@
+# Finales de línea: LF, siempre, en todo lo de esta carpeta.
+#
+# Sin esto, con `core.autocrlf=true` en Windows, cada `git checkout` reescribe
+# los archivos con CRLF — y el generador (`_agentes/generar.mjs`) los escribe
+# con LF. El resultado es que después de cambiar de rama TODOS los archivos
+# generados parecen desactualizados y la prueba `los archivos generados
+# coinciden con el HTML` falla sin que nadie haya tocado nada.
+#
+# Se descubrió justo así: al fusionar la rama del 404 en Markdown.
+* text=auto eol=lf
+
+# Binarios: que git no se meta.
+*.woff2 binary
+*.png   binary
+*.webp  binary
+*.jpg   binary
+*.ico   binary
