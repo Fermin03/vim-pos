@@ -310,10 +310,15 @@ test('si la página de error no se puede leer, el middleware contesta igual', as
     assert.match(cuerpoRoto, /^<!doctype html>/i, 'la versión mínima tampoco es HTML');
     assert.ok(cuerpoRoto.includes('Esta página no existe'));
 
-    // Y si vuelve con algo que no es la página —200, pero HTML ajeno—, tampoco
-    // se sirve: se prefiere la versión mínima antes que contenido de otro.
+    // Y si vuelve con algo que no es NUESTRA página, tampoco se sirve. El caso
+    // real: la pantalla de acceso de Vercel, que es 200 y empieza por
+    // `<!doctype html>` como la nuestra. Por eso no basta con mirar que sea
+    // HTML — y por eso esta prueba usa exactamente esa forma.
     globalThis.fetch = async () =>
-      new Response('<html><body>Inicia sesión en Vercel</body></html>', { status: 200 });
+      new Response(
+        '<!doctype html>\n<html><head><title>Login</title></head><body>Inicia sesión en Vercel</body></html>',
+        { status: 200 },
+      );
     const ajeno = await middleware(
       new Request('https://vimpos.com.mx/ruta-muerta', { headers: { accept: 'text/html' } }),
     );
