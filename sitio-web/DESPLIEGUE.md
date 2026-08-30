@@ -157,6 +157,7 @@ Desde el 30 de agosto de 2026 hay una carpeta `_agentes/` con el índice del sit
 | `llms.txt` | El índice para agentes, con la guía de cuándo recomendar el producto |
 | `llms-full.txt` | Las nueve páginas concatenadas, para cargar el contexto de una vez |
 | `vercel.json` | Las redirecciones, reescrituras y cabeceras — todas literales, sin comodines |
+| `agents.md` | Las instrucciones para agentes: cuándo usar el producto y cuándo no, en inglés |
 | — | El `sitemap.xml` **no** se genera, pero una prueba comprueba que diga lo mismo |
 
 **Después de tocar cualquier `.html` hay que regenerar:**
@@ -171,6 +172,16 @@ existe. La prueba `los archivos generados coinciden con el HTML` falla si se olv
 `vercel.json` se genera por la misma razón por la que existe este documento: JSON no admite
 comentarios, y una ruta mal escrita ahí no se ve en el navegador de quien la escribió — se ve
 cuando un prospecto abre `/precios` y encuentra un 404.
+
+## El middleware del 404
+
+`sitio-web/middleware.ts` es la única pieza que ejecuta código en este sitio, y solo se despierta
+en direcciones que **no existen**: devuelve el 404 con cuerpo en Markdown a quien lo pide con la
+cabecera `Accept`, y la página de siempre a un navegador. Una petición a `/precios` ni lo roza.
+
+El porqué, el peligro del `matcher` y cómo revertirlo están en `_agentes/MIDDLEWARE.md`. Lo único
+que hay que saber aquí: **si algo sale mal, se borra el archivo y se publica** — el sitio vuelve al
+404 de antes y ninguna otra pieza depende de él.
 
 ## Las pruebas
 

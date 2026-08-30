@@ -21,10 +21,16 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { config as configMiddleware, prefiereMarkdown } from '../middleware.ts';
 
 export const RAIZ = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
 export const config = JSON.parse(fs.readFileSync(path.join(RAIZ, 'vercel.json'), 'utf8'));
+
+// El middleware corre ANTES que todo lo demás, incluidas las redirecciones. Su
+// `matcher` sale del propio archivo, sin copiarlo, para que no puedan
+// separarse: si allí se añade una exclusión, aquí se entera sola.
+export const MATCHER_MIDDLEWARE = new RegExp('^' + configMiddleware.matcher[0] + '$');
 
 // Un `source` de Vercel es una ruta literal donde los paréntesis se dejan pasar
 // como expresión regular. Se escapa todo lo de fuera y se respeta lo de dentro.
@@ -89,6 +95,26 @@ export function resolver(ruta, cabeceras = {}) {
   const normalizadas = Object.fromEntries(
     Object.entries(cabeceras).map(([k, v]) => [k.toLowerCase(), v]),
   );
+
+  // 0. El middleware, que corre antes que todo. Solo cubre rutas que no
+  //    existen: devuelve el 404 en Markdown o en HTML según lo que se pida, y
+  //    en los dos casos con estatus 404 de verdad.
+  if (MATCHER_MIDDLEWARE.test(ruta)) {
+    const enMarkdown = prefiereMarkdown(normalizadas.accept ?? null);
+    return {
+      estado: 404,
+      archivo: path.join(RAIZ, enMarkdown ? '404.md' : '404.html'),
+      tipo: enMarkdown ? TIPOS['.md'] : TIPOS['.html'],
+      cabeceras: {
+        'X-Content-Type-Options': 'nosniff',
+        'X-Frame-Options': 'SAMEORIGIN',
+        'Referrer-Policy': 'strict-origin-when-cross-origin',
+        'Permissions-Policy': 'camera=(), microphone=(), geolocation=(), interest-cohort=()',
+        Vary: 'Accept, Accept-Encoding',
+        'Cache-Control': 'public, max-age=0, must-revalidate',
+      },
+    };
+  }
 
   // 1. Redirecciones. Cortan aquí, y sin cabeceras propias.
   for (const r of config.redirects || []) {
