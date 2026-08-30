@@ -149,10 +149,15 @@ export default async function middleware(peticion: Request): Promise<Response> {
   try {
     const respuesta = await fetch(new URL('/404.html', peticion.url));
     const texto = await respuesta.text();
-    // Se comprueba que sea la página y no otra cosa —una pantalla de acceso,
-    // un error del origen—: servir cualquier cosa con estatus 404 es peor que
-    // servir la versión mínima de aquí abajo.
-    if (respuesta.ok && /^\s*<!doctype html>/i.test(texto)) html = texto;
+    // Se comprueba que sea NUESTRA página y no otra cosa. «Que sea HTML» no
+    // basta: en el despliegue de preview volvía la pantalla de acceso de
+    // Vercel, que también empieza por `<!doctype html>` y se colaba entera con
+    // estatus 404. Se busca además el ancla del salto al contenido, que está en
+    // todas las páginas de este sitio y en ninguna ajena. Es una marca
+    // estructural, así que sobrevive a que se reescriba el texto de la página.
+    const esNuestra =
+      /^\s*<!doctype html>/i.test(texto) && texto.includes('id="contenido"');
+    if (respuesta.ok && esNuestra) html = texto;
   } catch {
     // Se queda la mínima.
   }
