@@ -36,6 +36,15 @@ export const PAGINAS = [
     enSitemap: true,
   },
   {
+    ruta: '/facturacion-cfdi',
+    archivo: 'facturacion-cfdi.html',
+    markdown: 'facturacion-cfdi.md',
+    nombre: 'Facturación CFDI',
+    resumen:
+      'Cómo factura un restaurante con VIM POS: autofactura por QR desde el ticket, factura global automática al cerrar el periodo, y el plazo para facturar lo decide el negocio. Módulo construido, pendiente de activación con el PAC.',
+    enSitemap: true,
+  },
+  {
     ruta: '/precios',
     archivo: 'precios.html',
     markdown: 'precios.md',
