@@ -106,7 +106,7 @@ Varias sucursales con catálogo propio o compartido, franquicias, y un consolida
 
 _Si ya usas otro_
 
-## ¿Vienes de Soft Restaurant, Square, Toast, Loyverse o Clip?
+## Cambiar de punto de venta sin volver a capturar tu menú
 
 ![Importador de menú mostrando lo que se va a dar de alta antes de confirmar.](https://vimpos.com.mx/assets/img/capturas/admin-importador.webp)
 
@@ -166,7 +166,7 @@ Sí. El programa se instala en la computadora de tu caja y trabaja ahí, así qu
 
 Una computadora con Windows, una impresora de tickets, un cajón de dinero y el módem que ya tienes. VIM no vende equipo: te decimos qué modelos funcionan y lo compras donde te salga mejor.
 
-Sí. Descargas tu menú de Square, Toast, Loyverse o Clip y lo pegas tal cual. Si vienes de otro sistema, tráete el archivo a la demo y lo vemos juntos.
+Sí. Descargas tu menú del sistema que usas hoy y lo pegas tal cual. Si el formato no cuadra, tráete el archivo a la demo y lo vemos juntos.
 
 El módulo está terminado —factura global, timbrado individual y portal de autofacturación por QR— y estamos cerrando la activación con el PAC. En la demo te decimos la fecha real; no la ponemos aquí hasta que sea firme.
 
