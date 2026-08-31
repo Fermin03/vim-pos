@@ -80,10 +80,21 @@ Se anuncia como incluida en el precio, sin fecha inventada. Esa es la decisión 
    `funciones.html`, `facturacion-cfdi.html`, y la prosa de `index.html` y `nosotros.html` que
    presume de decirlo. Regenerar después los `.md` y `llms.txt` con `pnpm sitio:generar`.
 
-## Recomendación pendiente de decidir
+## La guarda del mock — **hecha el 31/08/2026**
 
-Que `timbrar-cfdi` **se niegue a timbrar con el mock** cuando no esté en desarrollo, en vez de
-simular el éxito. Hoy la única defensa es que nadie escanee el QR. Es un cambio chico y convierte
-un fallo silencioso en un error visible.
+El mock ya no entra solo. Hay que pedirlo con `PAC_PERMITIR_MOCK=1`; sin eso y sin credenciales
+reales, `elegirPac()` devuelve `NINGUNO` y no se timbra nada.
 
-No se ha hecho: es una decisión de Fermín, no una corrección obvia.
+Cuando no hay PAC, `timbrarConFailover` devuelve un fallo normal con código `PAC_NO_CONFIGURADO`,
+así que el CFDI se marca en `ERROR` por el camino que ya existía y nadie se queda con un
+comprobante a medias. El panel recibe un 502 con el motivo; el portal público, un 503 con un
+mensaje propio —*«La facturación de este restaurante todavía no está activa. Guarda tu ticket y
+pídesela en el negocio»*— porque el mensaje genérico mandaba al comensal a revisar su Constancia
+por un fallo que no es suyo.
+
+La decisión vive en `_shared/pac/seleccion.ts`, aparte y sin imports, con **nueve pruebas** que
+cubren lo que importa: que media credencial no cuente, que un permiso que no sea exactamente `1`
+no valga, y que dejar la variable puesta no degrade un PAC real.
+
+Con esto, un despliegue al que le falte un secret falla ruidoso en vez de emitir facturas falsas.
+**Lo que sigue faltando es contratar el PAC** — la guarda no activa nada, solo impide el daño.

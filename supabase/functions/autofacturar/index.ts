@@ -21,7 +21,7 @@
 // Local: supabase functions serve autofacturar --env-file supabase/functions/.env
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import { corsHeaders } from "../_shared/cors.ts";
-import { timbrarConFailover, obtenerFacturama } from "../_shared/pac/index.ts";
+import { timbrarConFailover, obtenerFacturama, PAC_NO_CONFIGURADO } from "../_shared/pac/index.ts";
 import { armarConceptos, ConceptosIncoherentes, type LineaTicket } from "../_shared/pac/conceptos.ts";
 
 /**
@@ -297,6 +297,17 @@ Deno.serve(async (req) => {
       p_request_payload: { origen: "portal" },
       p_response_payload: res.responsePayload,
     });
+    /* Esto NO es un rechazo del SAT: es que a nosotros nos falta el PAC. Mandarlo por el camino
+       de siempre le diría al comensal que revise su Constancia por un fallo que no es suyo, y lo
+       tendría reintentando sin que nada pueda cambiar. Se separa a propósito. */
+    if (res.codigoError === PAC_NO_CONFIGURADO) {
+      console.error(`[autofactura] ${cfdiId}: sin PAC configurado, no se timbró`);
+      return json({
+        estado: "NO_DISPONIBLE",
+        campo: null,
+        mensaje: "La facturación de este restaurante todavía no está activa. Guarda tu ticket y pídesela directamente en el negocio.",
+      }, 503);
+    }
     return json({ estado: "RECHAZO", campo: campoDelRechazo(res.mensajeError), mensaje: traducir(res.mensajeError) }, 400);
   }
 
