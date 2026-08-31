@@ -182,7 +182,9 @@ El comensal escanea el código del ticket, pone sus datos y recibe su **CFDI 4.0
 
 El módulo cubre las tres cosas que un restaurante necesita ante el SAT: el **timbrado** de cada ticket que pida factura, la **factura global** con el resto de las ventas del día, y el portal de **autofacturación** por QR donde el cliente hace el trámite solo. Está construido y probado; estamos cerrando la activación con el PAC —el proveedor autorizado de certificación—, así que todavía no lo encendemos.
 
-[Cómo funcionará y qué cuesta](https://vimpos.com.mx/precios)
+[Cómo funciona la facturación](https://vimpos.com.mx/facturacion-cfdi)
+
+[Qué cuesta](https://vimpos.com.mx/precios)
 
 ## Míralo funcionando
 
@@ -194,7 +196,7 @@ Media hora con tus productos y tus precios cargados. Sin presentación y sin com
 
 ---
 
-**Otras páginas en Markdown:** [Inicio](https://vimpos.com.mx/index.md) · [Sin internet](https://vimpos.com.mx/sin-internet.md) · [Precios](https://vimpos.com.mx/precios.md) · [Pide una demo](https://vimpos.com.mx/demo.md) · [Nosotros](https://vimpos.com.mx/nosotros.md) · [Contacto](https://vimpos.com.mx/contacto.md) · [Aviso de privacidad](https://vimpos.com.mx/aviso-privacidad.md) · [Términos del servicio](https://vimpos.com.mx/terminos.md)
+**Otras páginas en Markdown:** [Inicio](https://vimpos.com.mx/index.md) · [Sin internet](https://vimpos.com.mx/sin-internet.md) · [Facturación CFDI](https://vimpos.com.mx/facturacion-cfdi.md) · [Precios](https://vimpos.com.mx/precios.md) · [Pide una demo](https://vimpos.com.mx/demo.md) · [Nosotros](https://vimpos.com.mx/nosotros.md) · [Contacto](https://vimpos.com.mx/contacto.md) · [Aviso de privacidad](https://vimpos.com.mx/aviso-privacidad.md) · [Términos del servicio](https://vimpos.com.mx/terminos.md)
 
 **Contacto:** hola@vimpos.com.mx · WhatsApp +52 476 127 3020 · https://vimpos.com.mx/contacto
 

@@ -35,6 +35,11 @@
       "permanent": true
     },
     {
+      "source": "/facturacion-cfdi.html",
+      "destination": "/facturacion-cfdi",
+      "permanent": true
+    },
+    {
       "source": "/precios.html",
       "destination": "/precios",
       "permanent": true
@@ -92,6 +97,17 @@
         }
       ],
       "destination": "/sin-internet.md"
+    },
+    {
+      "source": "/facturacion-cfdi",
+      "has": [
+        {
+          "type": "header",
+          "key": "accept",
+          "value": ".*(text/markdown|text/x-markdown).*"
+        }
+      ],
+      "destination": "/facturacion-cfdi.md"
     },
     {
       "source": "/precios",
@@ -223,6 +239,10 @@
       "destination": "/sin-internet.html"
     },
     {
+      "source": "/facturacion-cfdi",
+      "destination": "/facturacion-cfdi.html"
+    },
+    {
       "source": "/precios",
       "destination": "/precios.html"
     },
@@ -341,6 +361,23 @@
         {
           "key": "Link",
           "value": "<https://vimpos.com.mx/sin-internet.md>; rel=\"alternate\"; type=\"text/markdown\""
+        }
+      ]
+    },
+    {
+      "source": "/facturacion-cfdi",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=3600, must-revalidate"
+        },
+        {
+          "key": "Vary",
+          "value": "Accept, Accept-Encoding"
+        },
+        {
+          "key": "Link",
+          "value": "<https://vimpos.com.mx/facturacion-cfdi.md>; rel=\"alternate\"; type=\"text/markdown\""
         }
       ]
     },
@@ -559,6 +596,19 @@
     },
     {
       "source": "/sin-internet.md",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=3600, must-revalidate"
+        },
+        {
+          "key": "Vary",
+          "value": "Accept, Accept-Encoding"
+        }
+      ]
+    },
+    {
+      "source": "/facturacion-cfdi.md",
       "headers": [
         {
           "key": "Cache-Control",

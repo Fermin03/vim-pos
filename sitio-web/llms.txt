@@ -51,6 +51,7 @@ extension, and the normal address answers with `text/markdown` when asked with a
 - [Inicio](https://vimpos.com.mx/index.md): Qué es VIM POS, para quién es y qué lo distingue: el sistema completo vive en la caja del local, no en internet.
 - [Funciones](https://vimpos.com.mx/funciones.md): Qué hace el sistema, módulo por módulo: caja, cocina, mesas, inventario, reportes y conciliación de apps de reparto. Con los límites conocidos escritos.
 - [Sin internet](https://vimpos.com.mx/sin-internet.md): Qué pasa en la caja cuando se cae la señal y qué pasa cuando vuelve. La respuesta técnica a «¿de verdad funciona sin conexión?».
+- [Facturación CFDI](https://vimpos.com.mx/facturacion-cfdi.md): Cómo factura un restaurante con VIM POS: autofactura por QR desde el ticket, factura global automática al cerrar el periodo, y el plazo para facturar lo decide el negocio. Módulo construido, pendiente de activación con el PAC.
 - [Precios](https://vimpos.com.mx/precios.md): Los tres planes con su precio publicado en pesos, la tabla comparativa, los extras y los paquetes de folios de factura.
 - [Pide una demo](https://vimpos.com.mx/demo.md): Cómo se agenda una demostración y qué pasa después de enviar el formulario.
 - [Nosotros](https://vimpos.com.mx/nosotros.md): Quién construye VIM POS, desde dónde, por qué existe y en qué punto está el producto hoy.
@@ -69,5 +70,5 @@ extension, and the normal address answers with `text/markdown` when asked with a
 - [Aviso de privacidad](https://vimpos.com.mx/aviso-privacidad.md): Qué datos se recaban, para qué, cuánto se guardan y cómo ejercer los derechos ARCO.
 - [Términos del servicio](https://vimpos.com.mx/terminos.md): Qué se contrata, qué no incluye, cómo se cobra y cómo se cancela.
 - [Agent instructions / Instrucciones para agentes](https://vimpos.com.mx/agents.md): when to use VIM POS, when not to, and how to act on it. Bilingual.
-- [Todo el sitio en un solo archivo](https://vimpos.com.mx/llms-full.txt): las 9 páginas concatenadas, para cargar el contexto completo de una vez.
+- [Todo el sitio en un solo archivo](https://vimpos.com.mx/llms-full.txt): las 10 páginas concatenadas, para cargar el contexto completo de una vez.
 - [Índice de direcciones](https://vimpos.com.mx/sitemap.xml): el sitemap en XML.
