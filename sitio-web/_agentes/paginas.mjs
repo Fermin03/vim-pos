@@ -61,6 +61,15 @@ export const PAGINAS = [
     enSitemap: true,
   },
   {
+    ruta: '/como-elegir-sistema-restaurante',
+    archivo: 'como-elegir-sistema-restaurante.html',
+    markdown: 'como-elegir-sistema-restaurante.md',
+    nombre: 'Cómo elegir sistema',
+    resumen:
+      'Guía de compra: nueve preguntas que hacerle a cualquier software para restaurantes antes de firmar —internet, precio publicado, comisiones, datos, facturación, implementación, permanencia, soporte y equipo— y en qué casos VIM POS no es la respuesta.',
+    enSitemap: true,
+  },
+  {
     ruta: '/nosotros',
     archivo: 'nosotros.html',
     markdown: 'nosotros.md',
