@@ -12,13 +12,12 @@ Cada archivo dice **qué decía el plan, qué hacemos hoy y por qué**. Manda lo
 | [0006](0006-agregar-productos-usa-la-pantalla-de-venta.md) | Agregar productos usa la misma pantalla de venta | 30/08/2026 |
 | [0007](0007-movimientos-de-caja-dos-no-cuatro.md) | Movimientos de caja: dos, no cuatro | 30/08/2026 |
 | [0008](0008-una-sola-fuente-de-tokens.md) | Los tokens tienen una sola fuente | 31/08/2026 |
+| [0009](0009-el-cfdi-esta-construido-pero-no-activado.md) | El CFDI está construido y NO está activado | 31/08/2026 |
 
 ## Pendientes de escribir
 
 Decisiones que ya se tomaron en los hechos pero que nadie ha registrado. Si trabajas en alguna,
 escribe el ADR de paso:
 
-- **El estado real del CFDI.** El sitio anuncia facturación incluida y el timbrado no está
-  operativo (Facturama sin contratar). Hoy eso solo vive en la cabeza de Fermín.
 - **La sincronización es de escritorio único.** Está explicado dentro de 0004, pero merece el
   suyo si algún día se intenta multi-dispositivo.

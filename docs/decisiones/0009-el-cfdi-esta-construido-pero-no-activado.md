@@ -1,0 +1,89 @@
+# 0009 — El CFDI está construido y NO está activado
+
+**Fecha:** 31 de agosto de 2026 · **Estado:** vigente · **Revisar antes de:** vender a un cliente
+que facture
+
+## Por qué existe este documento
+
+Porque hoy esto solo vive en la cabeza de Fermín, y es de las cosas que, mal entendidas, pueden
+terminar en un comprobante fiscal inválido en manos de un cliente.
+
+Que la especificación describa el timbrado con detalle (`13-ORQUESTACION-TIMBRADO-CFDI.md`) y que
+el código esté completo hace fácil suponer que funciona. **No funciona todavía.**
+
+## Qué SÍ está construido
+
+Prácticamente todo:
+
+- Cinco Edge Functions: `timbrar-cfdi`, `timbrar-global`, `cancelar-cfdi`, `cargar-csd`,
+  `autofacturar`.
+- Un selector de PAC con redundancia y tres adaptadores: Facturama (principal, el único que sirve
+  multi-tenant), Facturapi (respaldo) y un mock de desarrollo.
+- Nueve migraciones: orquestación, emisor por tenant, add-on y folios, factura global,
+  cancelación, QR en el ticket.
+- El portal público de autofactura (`apps/factura`), con validación de régimen contra uso de CFDI.
+- **26 pruebas en verde** (`pnpm test:functions`).
+
+## Qué falta, exactamente
+
+**Las credenciales del PAC.** `FACTURAMA_API_USER` y `FACTURAMA_API_PASSWORD` no están
+contratadas. Sin ellas, `obtenerPac()` no falla: cae al siguiente de la lista.
+
+Eso es lo peligroso. El mock **simula un timbrado exitoso**: inventa un UUID, arma un XML con la
+forma correcta, el CFDI queda en estado `TIMBRADO`, se consume un folio y se le manda el correo
+al cliente. No revienta nada. Solo que ese comprobante **no existe ante el SAT**.
+
+En la base queda como `pac_proveedor = 'OTRO'`, que es la única señal de que algo iba mal — y hay
+que saber buscarla.
+
+## El estado real en producción (verificado el 31/08/2026)
+
+| Dato | Valor |
+|---|---|
+| Tenants con el add-on CFDI **activo** | **2** |
+| CFDI emitidos, de cualquier tipo, alguna vez | **0** |
+| Emisores dados de alta | 1, `estado: ACTIVO`, sin vigencia de CSD registrada |
+| PAC anotado en ese emisor | `FACTURAPI` |
+
+`autofacturar` solo exige que el add-on esté activo. **No comprueba que haya CSD ni que el PAC sea
+real.** O sea: el camino está abierto para esos dos tenants. Que no haya salido un solo CFDI es
+porque nadie lo ha intentado, no porque algo lo impida.
+
+## Lo que el sitio le dice al cliente
+
+Aquí no hay problema: el sitio **lo dice**. `precios.html`, `funciones.html` y la página dedicada
+`facturacion-cfdi.html` marcan la facturación como «Muy pronto», y el home lo explica en voz alta:
+*«facturación dice "muy pronto" en vez de fingir que ya está»*.
+
+Se anuncia como incluida en el precio, sin fecha inventada. Esa es la decisión y se sostiene.
+
+## Lo que NO se puede hacer
+
+- **Activar el add-on a un cliente nuevo** sin haber contratado antes el PAC. Activarlo es abrir
+  el portal público de autofactura.
+- **Dar por bueno un CFDI de pruebas.** Si `pac_proveedor` dice `OTRO`, ese comprobante es del
+  mock.
+- Suponer que Facturapi sirve de sustituto: deduce el emisor de la llave, así que con una llave
+  global **todo saldría con nuestro RFC**, no con el del restaurante. Está para respaldo, no para
+  operar.
+
+## Para activarlo
+
+1. Contratar Facturama **Multiemisor** (no la cuenta normal: la multiemisor es la que lleva el
+   emisor en el payload y permite timbrar a nombre de cada cliente).
+2. Poner `FACTURAMA_API_USER`, `FACTURAMA_API_PASSWORD` y `FACTURAMA_BASE_URL` en los secrets de
+   las Edge Functions. **Sin `FACTURAMA_BASE_URL` se apunta al sandbox a propósito**, para que un
+   despliegue a medias timbre en pruebas y no contra el SAT de verdad.
+3. Cargar el CSD de cada emisor con `cargar-csd`.
+4. Timbrar uno real y comprobarlo en el portal del SAT antes de decirle a nadie que ya está.
+5. Quitar los «Muy pronto» del sitio. Están en `sitio-web/precios.html` (tres),
+   `funciones.html`, `facturacion-cfdi.html`, y la prosa de `index.html` y `nosotros.html` que
+   presume de decirlo. Regenerar después los `.md` y `llms.txt` con `pnpm sitio:generar`.
+
+## Recomendación pendiente de decidir
+
+Que `timbrar-cfdi` **se niegue a timbrar con el mock** cuando no esté en desarrollo, en vez de
+simular el éxito. Hoy la única defensa es que nadie escanee el QR. Es un cambio chico y convierte
+un fallo silencioso en un error visible.
+
+No se ha hecho: es una decisión de Fermín, no una corrección obvia.
