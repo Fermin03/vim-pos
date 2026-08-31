@@ -22,9 +22,9 @@ AA de WCAG; sobre este azul da 4.64:1 y sí.
 ## Consecuencias
 
 - Los 231 mockups quedaron en el color viejo. Fue una de las razones de 0001.
-- **Hay dos fuentes de verdad de los tokens** (`tailwind-preset.js` y `tokens.css`) que se
-  sincronizan a mano. En esta misma migración se actualizó una y no la otra, y todo lo que usa
+- **Había dos fuentes de verdad de los tokens** (`tailwind-preset.js` y `tokens.css`) que se
+  sincronizaban a mano. En esta misma migración se actualizó una y no la otra, y todo lo que usa
   `bg-accent` —el panel entero y el portal— estuvo saliendo del naranja viejo sin que nadie lo
-  notara. Unificarlas en una sola fuente sigue pendiente.
+  notara. **Resuelto el 31/08/2026 en [`0008`](0008-una-sola-fuente-de-tokens.md).**
 - Quedan literales del naranja en el código como sombras (`rgba(232,80,46,.3)`), inofensivas
   pero delatoras.

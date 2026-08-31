@@ -23,7 +23,7 @@ import {
  */
 
 const input =
-  "h-12 w-full rounded-lg border border-line-strong px-3.5 text-[15px] outline-none focus:border-accent focus:shadow-[0_0_0_3px_var(--accent-soft)]";
+  "h-12 w-full rounded-lg border border-line-strong px-3.5 text-[15px] outline-none focus:border-accent focus:shadow-[0_0_0_3px_rgb(var(--accent-soft))]";
 const label = "mb-1.5 block text-[13px] font-medium text-ink-2";
 
 const mxn = (n: number) => n.toLocaleString("es-MX", { style: "currency", currency: "MXN" });

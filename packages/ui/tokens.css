@@ -1,60 +1,97 @@
-/* VIM POS — design tokens como variables CSS.
-   Espejo de packages/config/tailwind-preset.js. Fuente: mockups (P-059) + doc 08.
-   Importar una vez en el root de cada app. */
+/* VIM POS — LOS TOKENS. Este archivo es la única fuente de verdad.
+ *
+ * Antes eran dos: aquí los valores como variables CSS, y otra vez los mismos en
+ * `packages/config/tailwind-preset.js` para que Tailwind los conociera. Había que tocar los dos
+ * a mano y el propio preset lo advertía. No sirvió: en la migración de naranja a azul se
+ * actualizó este archivo y no el otro, y TODO lo que usa `bg-accent` —el panel entero y el
+ * portal— estuvo saliendo del color viejo sin que nadie lo notara.
+ * Ver `docs/decisiones/0003-la-marca-es-azul.md`.
+ *
+ * Ahora el preset no tiene valores: apunta aquí con `rgb(var(--token) / <alpha-value>)`.
+ * Cambiar un color es cambiar UNA línea de este archivo.
+ *
+ * POR QUÉ LOS COLORES VAN EN CANALES Y NO EN HEXADECIMAL
+ *
+ * Porque Tailwind necesita poder meter la opacidad dentro: `bg-ink/40` se compila a
+ * `rgb(var(--ink) / 0.4)`, y eso solo funciona si la variable trae `22 22 26` y no `#16161A`.
+ * Era justo la razón por la que existían dos archivos. El hexadecimal va al lado en un
+ * comentario para que se pueda leer y copiar.
+ *
+ * SI USAS UNA VARIABLE A MANO, ENVUÉLVELA: `color: rgb(var(--ink))`. Sola no es un color.
+ *
+ * Importar una vez en el root de cada app (todas lo hacen en su `globals.css`).
+ */
 
 :root {
-  /* Marca */
-  --accent: #0078C9;
-  --accent-hover: #0063A8;
-  --accent-soft: #EAF3FB;
+  /* ── Marca ─────────────────────────────────────────────────────────── */
+  --accent: 0 120 201;          /* #0078C9 */
+  --accent-hover: 0 99 168;     /* #0063A8 */
+  --accent-soft: 234 243 251;   /* #EAF3FB */
 
-  /* Tinta */
-  --ink: #16161A;
-  --ink-2: #5A5A60;
-  --ink-3: #8E8E94;
+  /* ── Tinta ─────────────────────────────────────────────────────────── */
+  --ink: 22 22 26;              /* #16161A */
+  --ink-2: 90 90 96;            /* #5A5A60 */
+  --ink-3: 142 142 148;         /* #8E8E94 */
 
-  /* Semánticos. Los tonos `-soft` son los fondos de aviso del design system: estaban en el
-     :root de todos los mockups y nunca se habían portado, asi que cada pantalla que necesitaba
-     uno lo escribia a mano en hexadecimal y no habia forma de cambiarlos en un solo sitio. */
-  --success: #2E7D52;
-  --success-soft: #E7F2EC;
-  --warning: #9A6B12;
-  --warning-soft: #FCF6E8;
-  --danger: #C0392B;
-  --danger-soft: #FBEBE9;
-  --info: #2C5AA0;
-  --info-soft: #EAF0F8;
+  /* ── Semánticos. Los `-soft` son los fondos de aviso del design system. ── */
+  --success: 46 125 82;         /* #2E7D52 */
+  --success-soft: 231 242 236;  /* #E7F2EC */
+  --warning: 154 107 18;        /* #9A6B12 */
+  --warning-soft: 252 246 232;  /* #FCF6E8 */
+  --danger: 192 57 43;          /* #C0392B */
+  --danger-soft: 251 235 233;   /* #FBEBE9 */
+  --info: 44 90 160;            /* #2C5AA0 */
+  --info-soft: 234 240 248;     /* #EAF0F8 */
 
-  /* Superficies / líneas */
-  --bg: #FFFFFF;
-  --surface: #FFFFFF;
-  --line: #ECECE9;
-  --line-strong: #DDDDD9;
-  --hover: #F6F6F4;
-  --sel: #FBFBFA;
+  /* ── Superficies y líneas ──────────────────────────────────────────── */
+  --bg: 255 255 255;            /* #FFFFFF */
+  --surface: 255 255 255;       /* #FFFFFF */
+  --line: 236 236 233;          /* #ECECE9 */
+  --line-strong: 221 221 217;   /* #DDDDD9 */
+  --hover: 246 246 244;         /* #F6F6F4 */
+  --sel: 251 251 250;           /* #FBFBFA */
 
-  /* Tipografía */
+  /* ── Paleta funcional de categorías y gráficas ─────────────────────────
+     NUNCA el color de marca: el azul de marca significa "esta es la acción", y
+     una barra de una gráfica no es una acción. */
+  --cat-blue: 44 90 160;        /* #2C5AA0 */
+  --cat-green: 46 125 82;       /* #2E7D52 */
+  --cat-teal: 31 122 130;       /* #1F7A82 */
+  --cat-violet: 107 79 160;     /* #6B4FA0 */
+  --cat-amber: 181 112 26;      /* #B5701A */
+  --cat-wine: 154 48 80;        /* #9A3050 */
+
+  /* ── KDS: colores propios del tema de cocina (doc 14) ──────────────── */
+  --kds-bg: 26 26 30;           /* #1A1A1E */
+  --kds-surface: 38 38 43;      /* #26262B */
+  --kds-text: 240 240 236;      /* #F0F0EC */
+  --kds-warning: 212 160 23;    /* #D4A017 */
+  --kds-danger: 224 64 64;      /* #E04040 */
+
+  /* ── Tipografía ────────────────────────────────────────────────────── */
   --font: 'Inter Tight', system-ui, sans-serif;
   --font-display: 'Sora', system-ui, sans-serif;
   --font-mono: 'JetBrains Mono', ui-monospace, monospace;
 
-  /* Radios */
+  /* ── Radios ────────────────────────────────────────────────────────── */
   --r-sm: 4px;
   --r: 6px;
   --r-lg: 8px;
 
-  /* Spacing */
+  /* ── Espaciado ─────────────────────────────────────────────────────── */
   --sp-1: 4px; --sp-2: 8px; --sp-3: 12px; --sp-4: 16px;
   --sp-5: 20px; --sp-6: 24px; --sp-8: 32px;
 }
 
-/* KDS — tema oscuro (doc 14). Aplicar en el contenedor del KDS con [data-theme="kds"]. */
+/* KDS — tema oscuro (doc 14). Aplicar en el contenedor del KDS con [data-theme="kds"].
+   Redefine los MISMOS tokens: por eso una pantalla del KDS puede reusar cualquier componente
+   compartido y sale con los colores de cocina sin tocar una línea del componente. */
 [data-theme="kds"] {
-  --bg: #1A1A1E;
-  --surface: #26262B;
-  --ink: #F0F0EC;
-  --ink-2: #B8B8B4;
-  --ink-3: #6E6E74;
-  --warning: #D4A017;
-  --danger: #E04040;
+  --bg: 26 26 30;               /* #1A1A1E */
+  --surface: 38 38 43;          /* #26262B */
+  --ink: 240 240 236;           /* #F0F0EC */
+  --ink-2: 184 184 180;         /* #B8B8B4 */
+  --ink-3: 110 110 116;         /* #6E6E74 */
+  --warning: 212 160 23;        /* #D4A017 — aclarado: sobre negro el del tema claro se apaga */
+  --danger: 224 64 64;          /* #E04040 */
 }

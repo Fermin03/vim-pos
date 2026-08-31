@@ -1,52 +1,58 @@
-// Design tokens de VIM POS — extraídos de los mockups (P-059 y design system).
-// Fuente de verdad visual: ../RECURSOS PARA DESARROLLO/MOCKUPS + doc 08.
-// Usado como preset por apps/pos, apps/admin, apps/platform y packages/ui.
+// Preset de Tailwind de VIM POS.
+//
+// AQUÍ NO HAY VALORES. La única fuente de los tokens es `packages/ui/tokens.css`; esto solo
+// apunta a sus variables. Cambiar un color es cambiar una línea allá, y las cinco apps se
+// enteran solas.
+//
+// Antes sí había valores: los mismos hexadecimales repetidos en los dos archivos, sincronizados
+// a mano. En la migración de naranja a azul se actualizó uno y no el otro, y todo lo que usa
+// `bg-accent` estuvo saliendo del color viejo. Ver `docs/decisiones/0003-la-marca-es-azul.md`.
+//
+// El `<alpha-value>` es lo que hace que sigan funcionando `bg-ink/40` y compañía: Tailwind lo
+// sustituye por la opacidad de la clase. Por eso los tokens de color son canales (`22 22 26`) y
+// no hexadecimal — un hex no se puede meter dentro de `rgb(… / .4)`.
+//
+// Usado como preset por apps/pos, apps/admin, apps/platform, apps/kds, apps/factura y packages/ui.
+
+/** Un color que sale de una variable de `tokens.css` y admite el modificador de opacidad. */
+const token = (nombre) => `rgb(var(--${nombre}) / <alpha-value>)`;
 
 /** @type {import('tailwindcss').Config} */
 module.exports = {
   theme: {
     extend: {
       colors: {
-        // Marca — DEBE COINCIDIR CON packages/ui/tokens.css
-        //
-        // Son dos fuentes de verdad porque el modificador de opacidad de Tailwind (`accent/30`)
-        // no funciona con `var(--accent)` en formato hexadecimal, y hay usos así. Si algún día se
-        // pasan los tokens a canales RGB, esto puede referenciar la variable y el problema
-        // desaparece.
-        //
-        // Mientras tanto: si cambias uno, cambia el otro. Al migrar la marca a azul se actualizó
-        // `tokens.css` y esto se quedó en el naranja anterior, así que TODO lo que usa `bg-accent`
-        // —el panel entero y el portal— estuvo saliendo del color viejo sin que nadie lo notara.
-        accent: { DEFAULT: "#0078C9", hover: "#0063A8", soft: "#EAF3FB" },
+        // Marca
+        accent: { DEFAULT: token("accent"), hover: token("accent-hover"), soft: token("accent-soft") },
         // Tinta
-        ink: { DEFAULT: "#16161A", 2: "#5A5A60", 3: "#8E8E94" },
+        ink: { DEFAULT: token("ink"), 2: token("ink-2"), 3: token("ink-3") },
         // Semánticos
-        success: { DEFAULT: "#2E7D52", soft: "#E7F2EC" },
-        warning: { DEFAULT: "#9A6B12", soft: "#FCF6E8" },
-        danger: { DEFAULT: "#C0392B", soft: "#FBEBE9" },
-        info: { DEFAULT: "#2C5AA0", soft: "#EAF0F8" },
+        success: { DEFAULT: token("success"), soft: token("success-soft") },
+        warning: { DEFAULT: token("warning"), soft: token("warning-soft") },
+        danger: { DEFAULT: token("danger"), soft: token("danger-soft") },
+        info: { DEFAULT: token("info"), soft: token("info-soft") },
         // Superficies / líneas
-        bg: "#FFFFFF",
-        surface: "#FFFFFF",
-        line: { DEFAULT: "#ECECE9", strong: "#DDDDD9" },
-        hover: "#F6F6F4",
-        sel: "#FBFBFA",
+        bg: token("bg"),
+        surface: token("surface"),
+        line: { DEFAULT: token("line"), strong: token("line-strong") },
+        hover: token("hover"),
+        sel: token("sel"),
         // Paleta funcional de categorías / gráficas (NUNCA el color de marca)
         cat: {
-          blue: "#2C5AA0",
-          green: "#2E7D52",
-          teal: "#1F7A82",
-          violet: "#6B4FA0",
-          amber: "#B5701A",
-          wine: "#9A3050",
+          blue: token("cat-blue"),
+          green: token("cat-green"),
+          teal: token("cat-teal"),
+          violet: token("cat-violet"),
+          amber: token("cat-amber"),
+          wine: token("cat-wine"),
         },
         // KDS (tema oscuro, doc 14) — colores aclarados para fondo negro
         kds: {
-          bg: "#1A1A1E",
-          surface: "#26262B",
-          text: "#F0F0EC",
-          warning: "#D4A017",
-          danger: "#E04040",
+          bg: token("kds-bg"),
+          surface: token("kds-surface"),
+          text: token("kds-text"),
+          warning: token("kds-warning"),
+          danger: token("kds-danger"),
         },
       },
       fontFamily: {
