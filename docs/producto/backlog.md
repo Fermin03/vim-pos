@@ -111,7 +111,7 @@ son para FS con varios meseros y delivery con flota. Dependen en parte del #2 (c
 
 ## 4. 🟠 Offline-first completo + Capacitor (F16.2)
 
-Ya documentado en `docs/OFFLINE-ARQUITECTURA.md`. Capa repositorio Dexie + cola de mutaciones +
+Ya documentado en `docs/bitacora/diseno-offline-dexie-SUPERADO.md` (superado por `decisiones/0004`). Capa repositorio Dexie + cola de mutaciones +
 worker de sync por batch + empaquetado Capacitor. Toca toda la capa de escritura del POS. El backend
 ya es idempotente (todas las RPCs aceptan `p_client_id_local`).
 

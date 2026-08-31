@@ -1,7 +1,7 @@
 // ⚠ `git blame` de este archivo MIENTE. El envío por lotes de aquí abajo entró en el commit
 // 2383b29, cuyo mensaje habla de cortes de caja: se arrastró sin querer con `git add -A`. La
 // historia no se reescribió porque de ese SHA salió la versión 0.4.50 ya publicada.
-// El detalle está en docs/ATRIBUCION-COMMITS.md.
+// El detalle está en docs/bitacora/2026-08-commits-mal-etiquetados.md.
 //
 // Fase 1 · Sync PUSH — sube a la nube las ventas que la caja generó offline.
 // En el desktop las ventas se escriben directo al Postgres LOCAL (no al outbox de Dexie del POS

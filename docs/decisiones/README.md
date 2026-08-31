@@ -1,0 +1,25 @@
+# Decisiones que superaron al plan original
+
+Cada archivo dice **qué decía el plan, qué hacemos hoy y por qué**. Manda lo que esté aquí.
+
+| # | Decisión | Fecha |
+|---|---|---|
+| [0001](0001-los-mockups-dejan-de-mandar.md) | Los mockups dejan de ser fuente de verdad | 30/08/2026 |
+| [0002](0002-precios-por-paquete-no-por-vertical.md) | El precio lo fija el paquete, no la vertical | 08/2026 |
+| [0003](0003-la-marca-es-azul.md) | La marca es azul, no naranja | 23/08/2026 |
+| [0004](0004-el-offline-lo-da-el-escritorio.md) | El offline lo da el escritorio, no un outbox en la web | 2026 |
+| [0005](0005-comedor-entra-por-lista-de-cuentas.md) | Comedor entra por lista; el mapa de mesas es consulta | 08/2026 |
+| [0006](0006-agregar-productos-usa-la-pantalla-de-venta.md) | Agregar productos usa la misma pantalla de venta | 30/08/2026 |
+| [0007](0007-movimientos-de-caja-dos-no-cuatro.md) | Movimientos de caja: dos, no cuatro | 30/08/2026 |
+
+## Pendientes de escribir
+
+Decisiones que ya se tomaron en los hechos pero que nadie ha registrado. Si trabajas en alguna,
+escribe el ADR de paso:
+
+- **El estado real del CFDI.** El sitio anuncia facturación incluida y el timbrado no está
+  operativo (Facturama sin contratar). Hoy eso solo vive en la cabeza de Fermín.
+- **Los tonos `-soft` del design system**, que estaban en los mockups y nunca se portaron hasta
+  el 30/08/2026.
+- **La sincronización es de escritorio único.** Está explicado dentro de 0004, pero merece el
+  suyo si algún día se intenta multi-dispositivo.

@@ -5,7 +5,7 @@ import { useEffect, useState } from "react";
  * F16 — Estado de conexión. Hoy el POS habla directo a Supabase (online-first); este hook
  * detecta cuando se cae la red para avisar al cajero que NO puede cobrar hasta reconectar
  * (mejor que un error silencioso). El offline-first completo (cola Dexie + sync por batch,
- * doc 1C.2 §10) es la siguiente arquitectura — ver docs/OFFLINE-ARQUITECTURA.md.
+ * doc 1C.2 §10) es la siguiente arquitectura — ver docs/decisiones/0004-el-offline-lo-da-el-escritorio.md.
  *
  * Combina navigator.onLine (instantáneo pero a veces miente) con un ping ligero a Supabase
  * para confirmar que la API responde de verdad.

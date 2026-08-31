@@ -1,5 +1,5 @@
 // ⚠ Este archivo entró en un commit cuyo mensaje habla de otra cosa (7cbff81, «el rescate de
-// cortes va automatico»): se arrastró sin querer con `git add -A`. Ver docs/ATRIBUCION-COMMITS.md.
+// cortes va automatico»): se arrastró sin querer con `git add -A`. Ver docs/bitacora/2026-08-commits-mal-etiquetados.md.
 
 // Verificación de que el PUSH se parte en lotes y no se atora con un pendiente grande.
 //

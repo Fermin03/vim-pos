@@ -9,7 +9,7 @@
 
 ## Contexto — qué encontró la revisión (reencuadre de alcance)
 
-El [ANALISIS-BRECHAS.md](ANALISIS-BRECHAS.md) (7-jun) está **desactualizado**. Verificado el 31-jul,
+El [ANALISIS-BRECHAS.md](2026-08-analisis-brechas.md) (7-jun) está **desactualizado**. Verificado el 31-jul,
 las tres "brechas del piloto" ya **están construidas y funcionales**, no son stubs:
 
 | Brecha (según doc viejo) | Estado real (31-jul) | Evidencia |
@@ -80,7 +80,7 @@ en el PR de arranque. Nada se "arregla" en esta fase.
 **Objetivo:** los secretos reales dejan de vivir en texto plano junto al código y se rotan (fueron
 expuestos: quedaron visibles en la sesión de revisión).
 
-**Contexto:** [.env.local](../.env.local) contiene `SUPABASE_SERVICE_ROLE_KEY` (ignora TODO el RLS) y
+**Contexto:** [.env.local](../../.env.local) contiene `SUPABASE_SERVICE_ROLE_KEY` (ignora TODO el RLS) y
 `SUPABASE_JWT_SECRET` (permite forjar un token de cualquier tenant). Está gitignored (correcto), pero
 ambos deben rotarse y salir del disco local para operación.
 
@@ -106,7 +106,7 @@ con el secreto viejo es **rechazado**. Las Edge Functions (`pin-login`, `sync-pu
 
 **Objetivo:** eliminar la ventana de **doble cobro** cuando dos pagos concurren sobre el mismo ticket.
 
-**Contexto:** [aplicar_pago](../supabase/migrations/0008_operacion_venta.sql:1841) hace
+**Contexto:** [aplicar_pago](../../supabase/migrations/0008_operacion_venta.sql:1841) hace
 `SELECT * INTO v_ticket FROM tickets WHERE id = …` **sin `FOR UPDATE`**. Dos llamadas concurrentes
 (multi-caja, liquidación de delivery, reabrir cuenta) leen el mismo `monto_pagado_mxn` viejo, ambas
 pasan el guard de sobrepago y cobran de más.
@@ -133,12 +133,12 @@ pagos al mismo ticket y afirma que el segundo o espera o falla el guard (no cobr
 redundante ahora que la caja siempre corre el escritorio con Postgres local.
 
 **Contexto:** hay dos modelos: (a) web outbox → `sync_procesar_push` (servidor re-deriva con triggers);
-(b) escritorio snapshot replica verbatim con triggers OFF ([0056](../supabase/migrations/0056_sync_push_snapshot.sql)).
+(b) escritorio snapshot replica verbatim con triggers OFF ([0056](../../supabase/migrations/0056_sync_push_snapshot.sql)).
 En el escritorio, `useConexion` apunta al gateway local → la rama offline del navegador casi nunca
 se dispara. Se congela, no se opera desde navegador puro.
 
 **Pasos**
-1. En [home-pos.tsx](../apps/pos/app/components/home-pos.tsx): eliminar la rama `if (!online) → cobrarOffline(...)`
+1. En [home-pos.tsx](../../apps/pos/app/components/home-pos.tsx): eliminar la rama `if (!online) → cobrarOffline(...)`
    y el uso de `ModalCobroOffline`. El POS online (escritorio contra gateway local, o web contra nube)
    usa siempre `persistirTicket` + `aplicarPago`.
 2. Marcar como **DEPRECATED** (no borrar aún; congelar 1 release) con encabezado claro:
@@ -147,7 +147,7 @@ se dispara. Se congela, no se opera desde navegador puro.
    y sus tests. **Recomendación:** congelar con nota + issue de borrado en el siguiente release.
 3. Conservar la **cache de lectura offline** (`cachePut`/`cacheGet` del catálogo en `outbox.ts`) si el
    POS web la usa para recargar el menú sin red — separar esa parte del outbox de escritura.
-4. **Reconciliar la documentación:** la regla #5 de [CLAUDE.md](../CLAUDE.md) ("el POS no habla directo a
+4. **Reconciliar la documentación:** la regla #5 de [CLAUDE.md](../../CLAUDE.md) ("el POS no habla directo a
    Supabase; pasa por Dexie y sincroniza por batch") ya **no** describe la arquitectura. Reescribirla:
    *el POS escribe directo (RPC bajo RLS); el offline-first lo da el escritorio con Postgres local +
    sync snapshot (docs 0055/0056)*. Anotar el cambio con justificación (la regla del doc manda).
@@ -165,14 +165,14 @@ verde tras quitar/congelar los tests del outbox.
 **Objetivo:** cerrar el anti-patrón de seguridad de Electron y sumar backup portable.
 
 ### 4.1 `contextIsolation: true`
-**Contexto:** [main.mjs:168](../desktop/src/main.mjs) usa `contextIsolation:false`. El preload
-([preload.cjs](../desktop/src/preload.cjs)) setea `window.__VIM_SUPABASE_URL` directo, lo que exige
+**Contexto:** [main.mjs:168](../../desktop/src/main.mjs) usa `contextIsolation:false`. El preload
+([preload.cjs](../../desktop/src/preload.cjs)) setea `window.__VIM_SUPABASE_URL` directo, lo que exige
 isolation off.
 
 **Pasos**
 1. Reescribir `preload.cjs` con `contextBridge.exposeInMainWorld("__VIM_SUPABASE_URL", urlArg)` (y los
    otros dos globals) — así el valor sigue visible como `window.__VIM_SUPABASE_URL` en el mundo aislado,
-   sin cambiar el POS ([supabase.ts](../apps/pos/app/lib/supabase.ts) lo lee igual).
+   sin cambiar el POS ([supabase.ts](../../apps/pos/app/lib/supabase.ts) lo lee igual).
 2. En `main.mjs`: `contextIsolation: true`. Confirmar que la inyección por HTML del `ui-server`
    (script inline, corre en contexto de página) sigue funcionando en el modo LAN.
 3. Revisar que nada más dependa de node en el renderer (ya está `nodeIntegration:false`).
@@ -245,7 +245,7 @@ en `RUNBOOK.md`.
 
 **Objetivo:** que el CI atrape las regresiones que hoy deja pasar, y que el test de RLS sea exhaustivo.
 
-**Contexto (huecos en [ci.yml](../.github/workflows/ci.yml)):** `typecheck` solo en `apps/*` (no
+**Contexto (huecos en [ci.yml](../../.github/workflows/ci.yml)):** `typecheck` solo en `apps/*` (no
 `packages/db`); `lint` no corre; `vitest` solo `@vim/pos` (no los tests de admin); `pnpm audit` termina en
 `|| true`; el desktop no tiene CI. Y el test de RLS cubre **2 tablas de 89**.
 
@@ -278,7 +278,7 @@ código existe), y actualizar el doc de brechas al estado real.
    cancelación/devolución (#29, mig. 0057).
 3. **Round-trip:** abrir cuenta en mesa → agregar ítems → cerrar pantalla → **retomar** la cuenta y ver el
    carrito reconstruido (con modificadores; cancelados omitidos; producto fuera de catálogo omitido).
-4. Actualizar [ANALISIS-BRECHAS.md](ANALISIS-BRECHAS.md) al estado 31-jul (marcar estas 3 como hechas).
+4. Actualizar [ANALISIS-BRECHAS.md](2026-08-analisis-brechas.md) al estado 31-jul (marcar estas 3 como hechas).
 
 **Verificación:** las 3 rutas pasan un smoke manual documentado; cualquier bug encontrado se corrige aquí.
 
@@ -290,7 +290,7 @@ código existe), y actualizar el doc de brechas al estado real.
 
 **Objetivo:** listar y destrabar lo que no es código y bloquea el arranque real de Knock-Out.
 
-**Prerrequisitos** (de [ANALISIS-BRECHAS.md](ANALISIS-BRECHAS.md) §Go-live; ~~tachado~~ = ya resuelto):
+**Prerrequisitos** (de [ANALISIS-BRECHAS.md](2026-08-analisis-brechas.md) §Go-live; ~~tachado~~ = ya resuelto):
 - Supabase Pro (despausar el proyecto free) · Vercel · ~~repo privado~~ (hoy público; decidido así) · **rotar secretos (Fase 1)**.
 - **Facturama/Facturapi** + **CSD del SAT** de Knock-Out (bloquean CFDI real).
 - ~~Impresora Epson TM-m30III~~ → **la caja usa una genérica ESC/POS de red (puerto 9100)**, ya soportada (0.3.2). Falta prueba física + confirmar que caja e impresora están en la misma subred. · red local estable · ~~menú real capturado~~ (ya cargado y operando).

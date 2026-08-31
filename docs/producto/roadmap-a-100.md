@@ -34,7 +34,7 @@ El plano de control de VIM. Corre con `service_role` fuera de RLS, gated por `PL
 
 ## D. Infra de go-live (manual / externo — fuera de código)
 Supabase cloud Pro + deploy + secretos + DNS/TLS + PAC/CSD (si factura) + Epson + tablets +
-Sentry + backups. Ver `docs/RUNBOOK-GOLIVE.md` y la revisión pre-deploy.
+Sentry + backups. Ver `docs/operacion/go-live.md` y la revisión pre-deploy.
 
 ---
 **Orden sugerido:** A (panel, lo que pediste primero) → C3 (Epson, riesgo #1) → B1/B2 (verticales de mayor

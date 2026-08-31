@@ -65,7 +65,7 @@ jobs:
       - name: Vitest (POS + Admin)
         # `pnpm -r test` ejecuta el script `test` de cada paquete que lo define (pos + admin);
         # kds/platform no tienen tests.
-        # Pendiente (docs/REMEDIACION.md Fase 6): montar ESLint (hoy ninguna app lo tiene
+        # Pendiente (docs/bitacora/2026-08-remediacion.md Fase 6): montar ESLint (hoy ninguna app lo tiene
         # configurado, `next lint` es interactivo).
         run: pnpm -r test
 
