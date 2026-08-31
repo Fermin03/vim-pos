@@ -1,17 +1,38 @@
-# Design system de VIM POS
+# Núcleo del design system
 
-Este documento describe **lo que el código hace hoy**, no un ideal. Donde la realidad y la
-intención no coinciden, se dice y se marca como deuda — un design system que describe una versión
-imaginaria del producto no sirve para decidir nada.
+Lo que comparten **todas** las apps de VIM POS: color, tipografía, espaciado, radios y los
+componentes que se usan en más de una. Describe **lo que el código hace hoy**, no un ideal. Donde
+la realidad y la intención no coinciden, se dice y se marca como deuda — un design system que
+describe una versión imaginaria del producto no sirve para decidir nada.
+
+## Esto es la capa de abajo
+
+Cada app tiene además su propio documento, porque lo que de verdad las diferencia no es el color:
+es quién las usa y en qué condiciones.
+
+| App | Documento | Quién y dónde |
+|---|---|---|
+| POS | [`pos.md`](pos.md) | Cajero · táctil 15" · de pie, con prisa |
+| Admin | [`admin.md`](admin.md) | Dueño · laptop · sentado, analizando |
+| KDS | [`kds.md`](kds.md) | Cocinero · pantalla a 2 m · sin mouse |
+| Factura | [`factura.md`](factura.md) | Cliente final · teléfono · una sola vez |
+| Platform | [`platform.md`](platform.md) | VIM interno · acciones peligrosas |
+| Sitio | [`sitio.md`](sitio.md) | Visitante · marketing · sin build |
+
+Si una regla aplica a todos, va aquí. Si aplica a uno, va en el suyo. Ante duda, gana el documento
+de la app.
 
 **Fuente de verdad, en este orden:**
 
-1. `packages/config/tailwind-preset.js` — los tokens que consumen las cuatro apps.
+1. `packages/config/tailwind-preset.js` — los tokens que consumen las apps.
 2. `packages/ui/tokens.css` — los mismos valores como variables CSS, para lo que no pasa por Tailwind.
-3. Este documento — el porqué y las reglas de uso.
+3. Este documento y el de cada app — el porqué y las reglas de uso.
 
 Los dos primeros deben mantenerse en espejo. Si cambias uno y no el otro, la app y el ticket
-impreso dejan de parecerse.
+impreso dejan de parecerse. Ya pasó: ver [`decisiones/0003`](../decisiones/0003-la-marca-es-azul.md).
+
+> Los mockups **ya no mandan**. Se archivaron el 30/08/2026; ver
+> [`decisiones/0001`](../decisiones/0001-los-mockups-dejan-de-mandar.md).
 
 ---
 
@@ -195,57 +216,14 @@ divergir sin que nadie lo note.
 
 ---
 
-## 6. Reglas de interacción propias de una caja
-
-Estas no son preferencias estéticas: salen de errores que ya costaron dinero en el piloto.
-
-**Una acción dominante por pantalla.** Si hay dos azules, hay cero.
-
-**El botón "Volver" siempre en el mismo sitio** — extremo izquierdo de la cabecera, mismo tamaño en
-todas las pantallas. El cajero no lee la pantalla: va al lugar donde *sabe* que está el botón. Si
-cambia de sitio, cada regreso cuesta una búsqueda.
-
-**Escape cierra lo que esté encima; si no hay nada, vuelve.** Con una excepción deliberada: no
-interrumpe un cobro en curso.
-
-**Lo destructivo pregunta, y dice qué va a pasar.** No "¿Estás seguro?", sino qué se pierde y qué
-se puede deshacer.
-
-**Los avisos a cocina son inequívocos.** Una comanda de cancelación abre con `CANCELADO` /
-`NO PREPARAR` invertido y a tamaño máximo, y **cada renglón** repite la marca — por si el papel se
-corta o se lee a medias. Que la cocina confunda una cancelación con un pedido nuevo es el peor
-desenlace posible.
-
-**Un cero honesto vale más que un número creíble.** Si no hay datos de hoy, se dice; no se muestran
-los de anteayer con la etiqueta "hoy".
-
----
-
-## 7. Para el sitio web de VIM POS
-
-Lo que **se hereda** sin discusión: la paleta completa, las tres familias tipográficas, los radios
-y la escala de espaciado. Es lo que hará que la web y el producto se reconozcan como la misma cosa.
-
-Lo que **no** se hereda:
-
-- **Las alturas de control.** 44px de alto por defecto es correcto para un dedo con prisa y
-  excesivo para un mouse. En web, 36–40px.
-- **La densidad.** El POS aprieta información porque cada scroll es tiempo frente a un cliente. Una
-  landing necesita aire; copiar la densidad del POS la haría ver como un panel de administración.
-- **El tema oscuro del KDS.** Está calibrado para una pantalla lejana en una cocina, no para una
-  web.
-
-Y una decisión que conviene tomar a propósito: el azul de marca en el producto significa "esta es
-la acción". En la web va a ser el color de la marca a secas, presente en más lugares. Está bien
-que difieran — pero que sea una decisión y no un descuido, porque las capturas de pantalla del
-producto van a convivir con la web en la misma página.
-
----
-
-## 8. Cómo cambiar esto
+## 6. Cómo cambiar esto
 
 1. Se toca `tailwind-preset.js` **y** `tokens.css` en el mismo commit. Siempre los dos.
 2. Si el cambio afecta a lo impreso —el ticket, la comanda—, se revisa el papel, no solo la
    pantalla: la impresora térmica no tiene color y el contraste se comporta distinto.
 3. Este documento se actualiza en el mismo commit. Un design system que va por detrás del código
    es peor que no tenerlo: la gente lo lee, decide en falso, y descubre el desfase tarde.
+
+4. Si la regla solo aplica a una app, no la escribas aquí: va en `docs/diseno/<app>.md`. Este
+   documento se hizo grande justo por eso, y las reglas de caja acabaron mezcladas con las de
+   marca.

@@ -6,16 +6,33 @@ POS SaaS multi-vertical, multi-tenant, para restaurantes en México.
 
 ## Fuente de verdad
 
-La especificación está en `../RECURSOS PARA DESARROLLO/`. Antes de implementar algo, consulta:
+**La regla de precedencia, en este orden:**
 
-- `00-PLAN-MAESTRO-VIM-POS.md` — visión, verticales, pricing, roadmap, índice de docs
+1. **`docs/decisiones/`** — lo que cambió respecto al plan original. Manda siempre.
+2. **`../RECURSOS PARA DESARROLLO/`** — la especificación original. Manda en todo lo que ningún
+   ADR haya superado.
+3. **`docs/diseno/`** y el código — mandan en cómo se ve y cómo se comporta.
+
+Si el código contradice a los tres, es un bug **o un ADR que nadie escribió**. Averigua cuál antes
+de "arreglarlo".
+
+> Esta regla decía antes *"el documento de arquitectura manda; el código lo implementa"*. Dejó de
+> ser cierta: el plan maestro sigue cobrando por vertical cuando la BD cobra por paquete, y así
+> varias más. Una fuente de verdad que miente es peor que ninguna, porque se obedece.
+> Empieza siempre por `docs/README.md`.
+
+La especificación sigue siendo válida en la mayor parte. Antes de implementar algo, consulta:
+
+- `00-PLAN-MAESTRO-VIM-POS.md` — visión, verticales, roadmap, índice de docs
+  (**los precios están superados por `decisiones/0002`**)
 - `ARQUITECTURA/07-1A…1F` — modelo de datos (SQL ejecutable), auth/JWT
 - `ARQUITECTURA/11-GUIA-DE-DESARROLLO.md` — convenciones, estructura, testing, CI
 - `ARQUITECTURA/09-MATRIZ-ROLES-PERMISOS.md` — permisos
 - `ARQUITECTURA/13`/`14`/`16` — CFDI, Realtime/KDS, impresión
-- `MOCKUPS/` — 231 pantallas (P-XXX) como referencia visual
+- `FLUJOS/` — flujos por vertical
 
-**Regla:** el documento de arquitectura manda; el código lo implementa. Si difieren, se corrige el código (o se versiona el doc con justificación).
+**Diseño:** `docs/diseno/nucleo.md` (marca compartida) + un documento por app. Los **mockups ya no
+mandan**: se archivaron el 30/08/2026 en `respaldos/`, ver `decisiones/0001`.
 
 ## Reglas duras
 

@@ -2,7 +2,7 @@
  * Fase 3 · empaquetado nativo del POS (Capacitor, modo "remote shell").
  * La app nativa carga pos.vimpos.com.mx; el offline lo dan el service worker
  * (app-shell) + Dexie (outbox/cache), igual que en la PWA. Build: ver
- * docs/RUNBOOK-CAPACITOR.md (requiere Android Studio en la máquina local).
+ * docs/operacion/capacitor.md (requiere Android Studio en la máquina local).
  * (Sin import de tipos: @capacitor/cli se instala hasta el build nativo.)
  */
 const config = {
