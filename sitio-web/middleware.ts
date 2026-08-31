@@ -33,8 +33,41 @@ export const config = {
   // La prueba `el matcher del middleware no toca ninguna ruta real` comprueba
   // esta expresión contra TODOS los archivos que hay en la carpeta. Si se añade
   // una página y se olvida este renglón, falla ahí y no en producción.
+  // La SEGUNDA condición es la del 30-ago-2026, y arregla una trampa que no se
+  // veía: la lista de arriba protege las páginas que existen HOY, así que
+  // cualquier archivo nuevo en la raíz caía al middleware y devolvía 404 aunque
+  // estuviera en su sitio. Comprobado antes de arreglarlo:
+  //
+  //     /indexnow-913…txt   200   se salvaba SOLO por empezar con «index»
+  //     /google1a2b3c.html  404   verificación de Search Console por archivo
+  //     /BingSiteAuth.xml   404
+  //     /ads.txt            404
+  //
+  // Que IndexNow funcionara era una casualidad. Y explica por qué verificar
+  // Search Console con el método de «sube este archivo HTML» habría fallado sin
+  // decir por qué.
+  //
+  // La regla: si el ÚLTIMO segmento tiene extensión, no es una página — es un
+  // archivo, y el sistema de archivos sabe qué hacer con él. Se exceptúa `.md`
+  // porque los gemelos para agentes sí son páginas, y una ruta muerta acabada
+  // en `.md` merece el 404 en Markdown igual que una sin extensión.
+  //
+  // `[.]` en vez de `\.` NO es manía: esto es un string literal, y en JS `'\.'`
+  // se convierte en `'.'` sin avisar. Con la barra perdida el patrón casa con
+  // cualquier cosa, el lookahead falla siempre y el middleware deja de correr
+  // en TODAS las rutas muertas. Se descubrió escribiendo esta misma línea.
+  //
+  // `[^/]*` y no `.*` para que solo mire el último segmento: en `/foo.bar/baz`
+  // lo que cuenta es `baz`, que no tiene extensión y sí es una ruta muerta.
+  //
+  // Y la excepción de la excepción: `vercel.json` y `middleware.ts` TIENEN que
+  // seguir cubiertos. No pueden ir en `.vercelignore` —Vercel lee el primero
+  // para enrutar y construye el segundo— así que esto es lo único que los tapa.
+  // La primera versión de esta regla los destapaba, y lo cazó la prueba «el
+  // matcher del middleware no toca NINGUNA ruta real» antes de llegar a
+  // producción. Habría reabierto justo el agujero que se cerró el 30 de agosto.
   matcher: [
-    '/((?!assets|_|404|about|agents|AGENTS|apple-touch|aviso-privacidad|contact|demo|favicon|funciones|index|llms|nosotros|precios|privacy|robots|sin-internet|site|terminos|terms).+)',
+    '/((?!assets|_|404|about|agents|AGENTS|apple-touch|aviso-privacidad|contact|demo|favicon|funciones|index|llms|nosotros|precios|privacy|robots|sin-internet|site|terminos|terms)(?!(?!vercel[.]json$|middleware[.]ts$)[^/]*[.](?!md$)[A-Za-z0-9]+$).+)',
   ],
 };
 
