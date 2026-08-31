@@ -260,6 +260,45 @@ test('el matcher del middleware sí cubre las rutas muertas', () => {
   for (const ruta of ['/no-existe', '/wp-admin', '/es/pricing', '/docs/api', '/pricing']) {
     assert.ok(MATCHER_MIDDLEWARE.test(ruta), `${ruta} debería llegar al middleware`);
   }
+  // Una ruta muerta acabada en `.md` también: los gemelos para agentes son
+  // páginas, así que quien pida una que no existe merece el 404 en Markdown.
+  assert.ok(MATCHER_MIDDLEWARE.test('/pagina-que-no-existe.md'));
+  // Pero el último segmento es lo que manda: en `/foo.bar/baz` cuenta `baz`.
+  assert.ok(MATCHER_MIDDLEWARE.test('/foo.bar/baz'));
+});
+
+// La prueba de arriba mira los archivos que YA están. Ésta mira los que no:
+// un archivo nuevo en la raíz caía al middleware y devolvía 404 aunque
+// existiera, porque la lista de exclusiones solo nombraba las páginas de hoy.
+// Es lo que rompía la verificación de Search Console por archivo HTML, y lo que
+// habría roto ads.txt o security.txt el día que hicieran falta.
+test('un archivo nuevo en la raíz se sirve, no se lo traga el middleware', () => {
+  const futuros = [
+    'google1a2b3c4d5e6f7890.html', // verificación de Search Console
+    'BingSiteAuth.xml', // verificación de Bing
+    'ads.txt',
+    'security.txt',
+    'apple-app-site-association.json',
+  ];
+
+  for (const nombre of futuros) {
+    assert.ok(
+      !MATCHER_MIDDLEWARE.test(`/${nombre}`),
+      `el middleware se tragaría /${nombre} aunque el archivo existiera`,
+    );
+  }
+
+  // Y no solo en teoría: se crea uno de verdad y se comprueba que el router
+  // completo lo sirve con 200.
+  const prueba = path.join(RAIZ, 'google-prueba-del-matcher.html');
+  fs.writeFileSync(prueba, 'google-site-verification: google-prueba-del-matcher.html');
+  try {
+    const res = resolver('/google-prueba-del-matcher.html');
+    assert.equal(res.estado, 200, 'un archivo real de la raíz debería servirse');
+    assert.match(res.tipo, /text\/html/);
+  } finally {
+    fs.unlinkSync(prueba);
+  }
 });
 
 test('en un 404, el HTML solo gana si el cliente lo nombró', () => {
