@@ -50,6 +50,11 @@
       "permanent": true
     },
     {
+      "source": "/cuanto-cuesta-un-sistema-para-restaurante.html",
+      "destination": "/cuanto-cuesta-un-sistema-para-restaurante",
+      "permanent": true
+    },
+    {
       "source": "/como-elegir-sistema-restaurante.html",
       "destination": "/como-elegir-sistema-restaurante",
       "permanent": true
@@ -135,6 +140,17 @@
         }
       ],
       "destination": "/demo.md"
+    },
+    {
+      "source": "/cuanto-cuesta-un-sistema-para-restaurante",
+      "has": [
+        {
+          "type": "header",
+          "key": "accept",
+          "value": ".*(text/markdown|text/x-markdown).*"
+        }
+      ],
+      "destination": "/cuanto-cuesta-un-sistema-para-restaurante.md"
     },
     {
       "source": "/como-elegir-sistema-restaurante",
@@ -265,6 +281,10 @@
     {
       "source": "/demo",
       "destination": "/demo.html"
+    },
+    {
+      "source": "/cuanto-cuesta-un-sistema-para-restaurante",
+      "destination": "/cuanto-cuesta-un-sistema-para-restaurante.html"
     },
     {
       "source": "/como-elegir-sistema-restaurante",
@@ -432,6 +452,23 @@
         {
           "key": "Link",
           "value": "<https://vimpos.com.mx/demo.md>; rel=\"alternate\"; type=\"text/markdown\""
+        }
+      ]
+    },
+    {
+      "source": "/cuanto-cuesta-un-sistema-para-restaurante",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=3600, must-revalidate"
+        },
+        {
+          "key": "Vary",
+          "value": "Accept, Accept-Encoding"
+        },
+        {
+          "key": "Link",
+          "value": "<https://vimpos.com.mx/cuanto-cuesta-un-sistema-para-restaurante.md>; rel=\"alternate\"; type=\"text/markdown\""
         }
       ]
     },
@@ -672,6 +709,19 @@
     },
     {
       "source": "/demo.md",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=3600, must-revalidate"
+        },
+        {
+          "key": "Vary",
+          "value": "Accept, Accept-Encoding"
+        }
+      ]
+    },
+    {
+      "source": "/cuanto-cuesta-un-sistema-para-restaurante.md",
       "headers": [
         {
           "key": "Cache-Control",

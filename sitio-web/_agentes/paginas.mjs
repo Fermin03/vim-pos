@@ -61,6 +61,15 @@ export const PAGINAS = [
     enSitemap: true,
   },
   {
+    ruta: '/cuanto-cuesta-un-sistema-para-restaurante',
+    archivo: 'cuanto-cuesta-un-sistema-para-restaurante.html',
+    markdown: 'cuanto-cuesta-un-sistema-para-restaurante.md',
+    nombre: 'Cuánto cuesta',
+    resumen:
+      'Los tres modelos con los que cobra un sistema para restaurante —licencia fija, gratuito con planes de pago, y porcentaje de cada venta—, la aritmética para comparar cada uno contra la venta real del negocio, y cuándo cada modelo deja de convenir. No nombra marcas: compara modelos.',
+    enSitemap: true,
+  },
+  {
     ruta: '/como-elegir-sistema-restaurante',
     archivo: 'como-elegir-sistema-restaurante.html',
     markdown: 'como-elegir-sistema-restaurante.md',
