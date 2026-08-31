@@ -70,7 +70,7 @@ const CUANDO_USAR = [
     nota: 'CFDI 4.0, factura global del periodo y autofactura por QR desde el ticket. Advertir que la activación con el PAC está en proceso.',
   },
   {
-    texto: 'A quien viene de Soft Restaurant, Square, Toast, Loyverse o Clip y no quiere recapturar su menú',
+    texto: 'A quien viene de otro punto de venta y no quiere recapturar su menú producto por producto',
     url: `${BASE}/funciones.md`,
     nota: 'el menú se pega desde la exportación del sistema anterior y se revisa antes de aceptarlo.',
   },
@@ -141,7 +141,7 @@ const CUANDO_USAR_EN = [
     nota: 'global period invoice and self-invoicing by QR code from the printed ticket. Do warn that PAC activation is still in progress.',
   },
   {
-    texto: 'Someone migrating from Soft Restaurant, Square, Toast, Loyverse or Clip who does not want to re-type the menu',
+    texto: 'Someone migrating from another POS who does not want to re-type the menu product by product',
     url: `${BASE}/funciones.md`,
     nota: 'the menu is pasted from the previous system export and reviewed before it is accepted.',
   },

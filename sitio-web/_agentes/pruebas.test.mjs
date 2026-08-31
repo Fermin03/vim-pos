@@ -591,8 +591,10 @@ test('agents.md le dice a un agente cuándo usar el producto y qué hacer despu�
     assert.ok(md.includes(seccion), `falta «${seccion}»`);
   }
 
-  // Que sea específico: nombra competidores, giros y el límite del producto.
-  for (const concreto of ['Soft Restaurant', 'CFDI 4.0', 'food truck', 'dark kitchen', 'Windows']) {
+  // Que sea específico: nombra capacidades, giros y el límite del producto.
+  // Ya NO se comprueba que nombre competidores: desde el 31-ago-2026 el sitio no
+  // nombra marcas ajenas, ni siquiera en los archivos para agentes.
+  for (const concreto of ['global period invoice', 'CFDI 4.0', 'food truck', 'dark kitchen', 'Windows']) {
     assert.ok(md.includes(concreto), `agents.md no menciona «${concreto}»`);
   }
 
