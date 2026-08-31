@@ -50,6 +50,11 @@
       "permanent": true
     },
     {
+      "source": "/como-elegir-sistema-restaurante.html",
+      "destination": "/como-elegir-sistema-restaurante",
+      "permanent": true
+    },
+    {
       "source": "/nosotros.html",
       "destination": "/nosotros",
       "permanent": true
@@ -130,6 +135,17 @@
         }
       ],
       "destination": "/demo.md"
+    },
+    {
+      "source": "/como-elegir-sistema-restaurante",
+      "has": [
+        {
+          "type": "header",
+          "key": "accept",
+          "value": ".*(text/markdown|text/x-markdown).*"
+        }
+      ],
+      "destination": "/como-elegir-sistema-restaurante.md"
     },
     {
       "source": "/nosotros",
@@ -249,6 +265,10 @@
     {
       "source": "/demo",
       "destination": "/demo.html"
+    },
+    {
+      "source": "/como-elegir-sistema-restaurante",
+      "destination": "/como-elegir-sistema-restaurante.html"
     },
     {
       "source": "/nosotros",
@@ -412,6 +432,23 @@
         {
           "key": "Link",
           "value": "<https://vimpos.com.mx/demo.md>; rel=\"alternate\"; type=\"text/markdown\""
+        }
+      ]
+    },
+    {
+      "source": "/como-elegir-sistema-restaurante",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=3600, must-revalidate"
+        },
+        {
+          "key": "Vary",
+          "value": "Accept, Accept-Encoding"
+        },
+        {
+          "key": "Link",
+          "value": "<https://vimpos.com.mx/como-elegir-sistema-restaurante.md>; rel=\"alternate\"; type=\"text/markdown\""
         }
       ]
     },
@@ -635,6 +672,19 @@
     },
     {
       "source": "/demo.md",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=3600, must-revalidate"
+        },
+        {
+          "key": "Vary",
+          "value": "Accept, Accept-Encoding"
+        }
+      ]
+    },
+    {
+      "source": "/como-elegir-sistema-restaurante.md",
       "headers": [
         {
           "key": "Cache-Control",

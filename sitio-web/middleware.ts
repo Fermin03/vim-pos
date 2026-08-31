@@ -67,7 +67,7 @@ export const config = {
   // matcher del middleware no toca NINGUNA ruta real» antes de llegar a
   // producción. Habría reabierto justo el agujero que se cerró el 30 de agosto.
   matcher: [
-    '/((?!assets|_|404|about|agents|AGENTS|apple-touch|aviso-privacidad|contact|demo|facturacion-cfdi|favicon|funciones|index|llms|nosotros|precios|privacy|robots|sin-internet|site|terminos|terms)(?!(?!vercel[.]json$|middleware[.]ts$)[^/]*[.](?!md$)[A-Za-z0-9]+$).+)',
+    '/((?!assets|_|404|about|agents|AGENTS|apple-touch|aviso-privacidad|como-elegir-sistema-restaurante|contact|demo|facturacion-cfdi|favicon|funciones|index|llms|nosotros|precios|privacy|robots|sin-internet|site|terminos|terms)(?!(?!vercel[.]json$|middleware[.]ts$)[^/]*[.](?!md$)[A-Za-z0-9]+$).+)',
   ],
 };
 

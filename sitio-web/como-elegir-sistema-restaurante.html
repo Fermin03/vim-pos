@@ -1,0 +1,388 @@
+<!doctype html>
+<html lang="es-MX">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+
+<title>Cómo elegir el sistema para tu restaurante — VIM POS</title>
+<meta name="description" content="Nueve preguntas que conviene hacerle a cualquier software para restaurantes antes de firmar, por qué importa cada una, y en qué casos VIM POS no es la respuesta.">
+<link rel="canonical" href="https://vimpos.com.mx/como-elegir-sistema-restaurante">
+<link rel="alternate" type="text/markdown" href="https://vimpos.com.mx/como-elegir-sistema-restaurante.md" title="Esta página en Markdown">
+
+<meta property="og:type" content="article">
+<meta property="og:locale" content="es_MX">
+<meta property="og:site_name" content="VIM POS">
+<meta property="og:title" content="Cómo elegir el sistema para tu restaurante">
+<meta property="og:description" content="Nueve preguntas que conviene hacerle a cualquier proveedor antes de firmar. Incluye en qué casos VIM POS no es la respuesta.">
+<meta property="og:url" content="https://vimpos.com.mx/como-elegir-sistema-restaurante">
+<meta property="og:image" content="https://vimpos.com.mx/assets/img/og/home.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="VIM POS, punto de venta para restaurantes en Mexico">
+<meta name="twitter:card" content="summary_large_image">
+
+<!-- Se precargan SOLO las dos familias que se ven en el primer pantallazo: el
+     titular (Sora) y el texto corrido (Inter Tight). JetBrains Mono aparece más
+     abajo y puede esperar; precargar las tres haría lo contrario de lo que se
+     busca — competirían entre ellas por el ancho de banda y ninguna llegaría
+     antes. Cada archivo es una fuente VARIABLE, así que precargarlo cubre todos
+     los pesos de su familia: no hay un archivo por peso que precargar. -->
+<link rel="preload" href="assets/fonts/sora-var-latin.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="assets/fonts/inter-tight-var-latin.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="assets/css/fuentes.css?v=11">
+
+<link rel="icon" href="assets/img/logo.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="assets/img/apple-touch-icon-1024.png">
+<link rel="manifest" href="site.webmanifest">
+<meta name="theme-color" content="#0078C9">
+
+<link rel="stylesheet" href="assets/css/vim.css?v=11">
+</head>
+<body>
+
+<a href="#contenido" class="solo-lectores">Saltar al contenido</a>
+
+<header class="nav">
+  <div class="contenedor">
+    <div class="nav-fila">
+      <a href="/" class="nav-logo" aria-label="VIM POS, inicio">
+        <img src="assets/img/logo.svg" alt="" width="30" height="30" aria-hidden="true">
+        <span>VIM POS</span>
+      </a>
+      <nav class="nav-enlaces" aria-label="Principal">
+        <a class="nav-enlace" href="/funciones">Funciones</a>
+        <a class="nav-enlace" href="/sin-internet">Sin internet</a>
+        <a class="nav-enlace" href="/precios">Precios</a>
+      </nav>
+      <div class="nav-acciones">
+        <a class="btn btn-primario" href="/demo">Pide una demo</a>
+        <button class="nav-hamburguesa" data-menu-boton type="button"
+                aria-expanded="false" aria-controls="menu-movil" aria-label="Abrir menú">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+               stroke-width="2" stroke-linecap="round" aria-hidden="true">
+            <path d="M4 7h16M4 12h16M4 17h16"/>
+          </svg>
+        </button>
+      </div>
+    </div>
+  </div>
+</header>
+
+  <div class="nav-movil" id="menu-movil" data-menu data-abierto="false" inert>
+    <button class="nav-cerrar" data-menu-cerrar type="button" aria-label="Cerrar menú">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+           stroke-width="2" stroke-linecap="round" aria-hidden="true">
+        <path d="M6 6l12 12M18 6L6 18"/>
+      </svg>
+    </button>
+    <nav aria-label="Menú">
+      <div class="nav-movil-lista">
+          <a href="/funciones">Funciones</a>
+          <a href="/sin-internet">Sin internet</a>
+          <a href="/precios">Precios</a>
+          <a href="/demo">Pide una demo</a>
+      </div>
+    </nav>
+  </div>
+
+<!-- ═══════════════════════════════════════════════════════════════════════
+     Esta página es INFORMATIVA, y esa distinción es la razón de que exista
+     como página aparte en vez de como otra sección de la portada.
+
+     La portada compite por «punto de venta para restaurantes»: quien la busca
+     ya sabe qué quiere y va a comprar. Ésta compite por «cómo elegir», «qué
+     debe tener», «qué preguntar» — la fase de investigación, semanas antes.
+     Si las dos apuntaran a lo mismo se estorbarían, y en el informe de la
+     auditoría eso tiene nombre: canibalización.
+
+     Por eso el texto NO es un argumentario de venta disfrazado de guía. Las
+     nueve preguntas sirven aunque el lector acabe con otro proveedor, y la
+     última sección dice en qué casos VIM POS no es la respuesta. Una guía de
+     compra escrita por un vendedor solo vale si el lector puede usarla EN
+     CONTRA de quien la escribió; si no, se nota a los dos párrafos.
+     ═══════════════════════════════════════════════════════════════════════ -->
+
+<main id="contenido">
+
+  <section class="hero">
+    <div class="contenedor pila pila-5">
+      <p class="eyebrow">Guía de compra</p>
+      <h1>Cómo elegir el sistema para tu restaurante</h1>
+      <p class="entradilla">
+        Nueve preguntas que conviene hacerle a cualquier proveedor antes de firmar, y por qué cada
+        una importa. Sirven igual si acabas contratando a otro — de hecho, para eso están.
+      </p>
+      <p style="font-size:var(--t-15);color:var(--ink-2)">
+        Al final está la parte que casi nadie escribe: en qué casos <strong>VIM POS no es la
+        respuesta</strong>.
+      </p>
+    </div>
+  </section>
+
+  <section class="seccion">
+    <div class="contenedor pila pila-8">
+      <div class="pila pila-4">
+        <p class="eyebrow">Lo primero</p>
+        <h2>Un software para restaurantes no es un punto de venta genérico</h2>
+        <p>
+          Un sistema de tienda cobra y saca ticket. Un restaurante necesita cosas que una tienda no:
+          que la comanda llegue a la estación correcta de la cocina, que una mesa tenga la cuenta
+          abierta hasta que el cliente pida la cuenta, que un platillo lleve modificadores con
+          precio, que las propinas se repartan, y que el corte cuadre con lo que hay en el cajón.
+        </p>
+        <p>
+          Si el vendedor te enseña una demo de retail y te dice que «también sirve para
+          restaurantes», estás comprando lo primero y esperando lo segundo.
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <section class="seccion">
+    <div class="contenedor pila pila-8">
+      <div class="pila pila-4">
+        <p class="eyebrow">Las nueve preguntas</p>
+        <h2>Qué preguntar antes de firmar</h2>
+      </div>
+
+      <div class="pila pila-6">
+        <div class="pila pila-3">
+          <h3>1 · ¿Sigo cobrando si se cae el internet?</h3>
+          <p>
+            La respuesta importante no es «sí», es <em>qué</em> sigue funcionando. Muchos sistemas
+            tienen un «modo offline» que cobra pero no manda a cocina, o que guarda la venta y la
+            pierde si el navegador se cierra. Pregunta si imprime comanda, si el corte cuadra y qué
+            pasa con lo cobrado cuando vuelve la señal.
+          </p>
+          <p style="font-size:var(--t-13);color:var(--ink-2)">
+            Cómo comprobarlo: en la demo, pide que le quiten el internet a la computadora y sigue
+            vendiendo. Es la prueba que ningún folleto sustituye.
+          </p>
+        </div>
+
+        <div class="pila pila-3">
+          <h3>2 · ¿El precio está publicado?</h3>
+          <p>
+            Si hay que pedir cotización, el precio depende de lo que el vendedor calcule que puedes
+            pagar. No es ilegal ni raro, pero conviene saberlo. Un precio publicado también es un
+            precio que no te pueden subir en la renovación sin que te enteres.
+          </p>
+        </div>
+
+        <div class="pila pila-3">
+          <h3>3 · ¿Me cobran comisión por cada venta?</h3>
+          <p>
+            Hay sistemas que además de la mensualidad se llevan un porcentaje, normalmente cuando
+            también te procesan la tarjeta. Haz la cuenta con tu venta real de un mes bueno, no con
+            la de un mes flojo: la comisión crece justo cuando te va bien.
+          </p>
+        </div>
+
+        <div class="pila pila-3">
+          <h3>4 · ¿De quién son mis datos y me los puedo llevar?</h3>
+          <p>
+            Tu menú, tus ventas y tu histórico son tuyos. Pregunta en qué formato te los entregan si
+            te vas, cuánto tardan y si cuesta. Si la respuesta es vaga, ya sabes cuánto va a costar
+            salirte dentro de dos años.
+          </p>
+        </div>
+
+        <div class="pila pila-3">
+          <h3>5 · ¿La facturación va incluida o es aparte?</h3>
+          <p>
+            En México esto casi nunca está incluido del todo. Pregunta si el timbrado se cobra por
+            folio, si la factura global del periodo sale sola, y hasta cuándo puede facturar tu
+            cliente. La diferencia entre «el mes en curso» y «hasta que tú cierres el periodo» son
+            llamadas que acabas atendiendo tú.
+          </p>
+        </div>
+
+        <div class="pila pila-3">
+          <h3>6 · ¿La implementación y la capacitación se cobran aparte?</h3>
+          <p>
+            Es el costo que más se esconde. Cargar tu menú, configurar lo fiscal y entrenar a tu
+            equipo lleva horas, y alguien las paga. Pide el número por escrito antes de firmar, no
+            después.
+          </p>
+        </div>
+
+        <div class="pila pila-3">
+          <h3>7 · ¿Hay contrato forzoso?</h3>
+          <p>
+            Un año de permanencia no es señal de nada bueno: si el producto funciona, no hace falta
+            amarrar a nadie. Pregunta también qué pasa con tu información si dejas de pagar.
+          </p>
+        </div>
+
+        <div class="pila pila-3">
+          <h3>8 · ¿Quién contesta cuando falla un viernes a las once?</h3>
+          <p>
+            No preguntes si hay soporte: pregunta el canal, el horario real y quién está del otro
+            lado. Un distribuidor que revende el sistema no puede arreglar un error del sistema,
+            solo puede reportarlo.
+          </p>
+        </div>
+
+        <div class="pila pila-3">
+          <h3>9 · ¿Tengo que comprarles el equipo?</h3>
+          <p>
+            Computadora, impresora de tickets y cajón se consiguen en cualquier lado. Si el sistema
+            solo funciona con el equipo que ellos venden, estás comprando dos cosas y solo
+            comparaste una.
+          </p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="seccion">
+    <div class="contenedor pila pila-8">
+      <div class="pila pila-4">
+        <p class="eyebrow">La parte incómoda</p>
+        <h2>En qué casos VIM POS no es la respuesta</h2>
+        <p>
+          Una guía de compra escrita por un proveedor solo sirve si se puede usar en su contra.
+          Éstas son las respuestas nuestras que hoy no son las mejores del mercado, y están escritas
+          aquí y en la <a href="/funciones">página de funciones</a>, no en una nota al pie.
+        </p>
+      </div>
+
+      <div class="pila pila-5">
+        <div class="pila pila-3">
+          <h3>Si necesitas que el mesero tome la orden en una tableta</h3>
+          <p>
+            No hay app de mesero. La orden se captura en la caja. Si tu operación depende de tomar
+            la comanda en la mesa, hoy no somos la opción.
+          </p>
+        </div>
+
+        <div class="pila pila-3">
+          <h3>Si quieres cobrar la tarjeta desde el mismo sistema</h3>
+          <p>
+            No hay terminal bancaria integrada. La tarjeta se cobra en tu terminal de siempre y en el
+            sistema se registra como forma de pago para que el corte cuadre. A cambio no cobramos
+            comisión por venta, pero es un paso más para el cajero.
+          </p>
+        </div>
+
+        <div class="pila pila-3">
+          <h3>Si vives de las apps de reparto y quieres todo automático</h3>
+          <p>
+            El sistema te ayuda a revisar lo que la app te depositó, pero la liquidación se pega a
+            mano. Si tienes cientos de pedidos diarios por app, eso es trabajo real.
+          </p>
+        </div>
+
+        <div class="pila pila-3">
+          <h3>Si necesitas facturar mañana</h3>
+          <p>
+            El módulo de facturación está construido y probado, pero estamos cerrando la activación
+            con el PAC y todavía no lo encendemos. Está explicado en
+            <a href="/facturacion-cfdi">la página de facturación</a>. Si facturar es tu urgencia de
+            esta semana, hoy no llegamos.
+          </p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="seccion">
+    <div class="contenedor">
+      <div class="cierre pila pila-5" style="align-items:center">
+        <h2>Y si después de las nueve preguntas te sigue cuadrando</h2>
+        <p style="max-width:54ch">
+          Media hora con tus productos y tus precios cargados. Puedes traer esta lista y hacérnosla
+          entera — es la idea. Y si quieres empezar por la primera, dile al que te atienda que le
+          quite el internet a la computadora.
+        </p>
+        <div class="fila" style="justify-content:center">
+          <a class="btn btn-primario btn-hero" href="/demo">Pide una demo</a>
+          <a class="btn btn-fantasma btn-hero" href="/precios">Ver los precios publicados</a>
+        </div>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<footer class="pie">
+  <div class="contenedor">
+    <div class="pie-rejilla">
+      <div class="pila pila-3">
+        <span class="nav-logo" style="pointer-events:none">
+          <img src="assets/img/logo.svg" alt="" width="30" height="30" aria-hidden="true">
+          <span>VIM POS</span>
+        </span>
+        <p style="font-size:var(--t-15)">
+          El sistema completo para tu restaurante: caja, cocina, mesas, inventario y
+          facturación. Hecho en León, Guanajuato.
+        </p>
+      </div>
+
+      <div>
+        <h2 class="pie-titulo">Producto</h2>
+        <ul class="pie-lista">
+          <li><a href="/funciones">Funciones</a></li>
+          <li><a href="/sin-internet">Sin internet</a></li>
+          <li><a href="/facturacion-cfdi">Facturación CFDI</a></li>
+          <li><a href="/precios">Precios</a></li>
+          <li><a href="/demo">Pide una demo</a></li>
+        </ul>
+      </div>
+
+      <div>
+        <h2 class="pie-titulo">Contacto</h2>
+        <ul class="pie-lista">
+          <li><a href="/como-elegir-sistema-restaurante">Cómo elegir sistema</a></li>
+          <li><a href="/nosotros">Nosotros</a></li>
+          <li><a href="/contacto">Contacto</a></li>
+          <li><a href="mailto:hola@vimpos.com.mx">hola@vimpos.com.mx</a></li>
+          <li><a href="https://wa.me/524761273020">WhatsApp 476 127 3020</a></li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="pie-legal">
+      <span>© 2026 VIM POS</span>
+      <span class="fila" style="gap:var(--sp-5)">
+        <a href="/aviso-privacidad" style="color:inherit">Aviso de privacidad</a>
+        <a href="/terminos" style="color:inherit">Términos</a>
+      </span>
+    </div>
+  </div>
+</footer>
+
+<script src="assets/js/vim.js?v=11" defer></script>
+
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "Article",
+      "@id": "https://vimpos.com.mx/como-elegir-sistema-restaurante#articulo",
+      "url": "https://vimpos.com.mx/como-elegir-sistema-restaurante",
+      "headline": "Cómo elegir el sistema para tu restaurante",
+      "description": "Nueve preguntas que conviene hacerle a cualquier software para restaurantes antes de firmar, y en qué casos VIM POS no es la respuesta.",
+      "inLanguage": "es-MX",
+      "datePublished": "2026-08-31",
+      "dateModified": "2026-08-31",
+      "author": { "@id": "https://vimpos.com.mx/#organizacion" },
+      "publisher": { "@id": "https://vimpos.com.mx/#organizacion" },
+      "image": "https://vimpos.com.mx/assets/img/og/home.png",
+      "isPartOf": { "@id": "https://vimpos.com.mx/#sitio" },
+      "about": { "@id": "https://vimpos.com.mx/#producto" }
+    },
+    {
+      "@type": "BreadcrumbList",
+      "@id": "https://vimpos.com.mx/como-elegir-sistema-restaurante#miga",
+      "itemListElement": [
+        { "@type": "ListItem", "position": 1, "name": "Inicio", "item": "https://vimpos.com.mx/" },
+        { "@type": "ListItem", "position": 2, "name": "Cómo elegir sistema", "item": "https://vimpos.com.mx/como-elegir-sistema-restaurante" }
+      ]
+    }
+  ]
+}
+</script>
+</body>
+</html>
