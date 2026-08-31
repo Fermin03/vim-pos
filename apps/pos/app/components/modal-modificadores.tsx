@@ -266,7 +266,7 @@ export function ModalModificadores({
                             : atMax
                             ? "cursor-not-allowed border-line opacity-45"
                             : checked
-                            ? "border-ink bg-sel shadow-[inset_0_0_0_1px_theme(colors.ink)]"
+                            ? "border-ink bg-sel shadow-[inset_0_0_0_1px_rgb(var(--ink))]"
                             : "border-line hover:border-line-strong",
                         ].join(" ")}
                       >
@@ -324,7 +324,7 @@ export function ModalModificadores({
               onChange={(e) => setNota(e.target.value)}
               placeholder="Ej. bien dorada, partir a la mitad, poca sal"
               rows={2}
-              className="w-full resize-y rounded border border-line-strong px-[13px] py-[11px] font-sans text-[15px] text-ink outline-none placeholder:text-ink-3 focus:border-ink focus:shadow-[inset_0_0_0_1px_theme(colors.ink)]"
+              className="w-full resize-y rounded border border-line-strong px-[13px] py-[11px] font-sans text-[15px] text-ink outline-none placeholder:text-ink-3 focus:border-ink focus:shadow-[inset_0_0_0_1px_rgb(var(--ink))]"
             />
           </div>
         </div>

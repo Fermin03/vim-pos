@@ -20,6 +20,11 @@ de las lámparas.
 `warning` y `danger` van aclarados respecto al resto del producto (`#D4A017`, `#E04040`): sobre
 fondo negro, los tonos del tema claro se apagan.
 
+> **Deuda:** hoy `[data-theme="kds"]` no se aplica en ninguna parte. La pantalla usa `bg-white`
+> y estilos en línea, así que el tema vive en `tokens.css` sin que nadie lo encienda. Desde la
+> unificación de tokens ([`0008`](../decisiones/0008-una-sola-fuente-de-tokens.md)) basta con
+> poner el atributo en el contenedor para que TODAS las clases compartidas se retematicen.
+
 ## El color es tiempo, no decoración
 
 La antigüedad del pedido es la única información que se codifica en color. Verde reciente, ámbar

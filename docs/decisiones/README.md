@@ -11,6 +11,7 @@ Cada archivo dice **qué decía el plan, qué hacemos hoy y por qué**. Manda lo
 | [0005](0005-comedor-entra-por-lista-de-cuentas.md) | Comedor entra por lista; el mapa de mesas es consulta | 08/2026 |
 | [0006](0006-agregar-productos-usa-la-pantalla-de-venta.md) | Agregar productos usa la misma pantalla de venta | 30/08/2026 |
 | [0007](0007-movimientos-de-caja-dos-no-cuatro.md) | Movimientos de caja: dos, no cuatro | 30/08/2026 |
+| [0008](0008-una-sola-fuente-de-tokens.md) | Los tokens tienen una sola fuente | 31/08/2026 |
 
 ## Pendientes de escribir
 
@@ -19,7 +20,5 @@ escribe el ADR de paso:
 
 - **El estado real del CFDI.** El sitio anuncia facturación incluida y el timbrado no está
   operativo (Facturama sin contratar). Hoy eso solo vive en la cabeza de Fermín.
-- **Los tonos `-soft` del design system**, que estaban en los mockups y nunca se portaron hasta
-  el 30/08/2026.
 - **La sincronización es de escritorio único.** Está explicado dentro de 0004, pero merece el
   suyo si algún día se intenta multi-dispositivo.

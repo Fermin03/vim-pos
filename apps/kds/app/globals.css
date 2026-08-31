@@ -6,8 +6,9 @@
 html, body { height: 100%; }
 body {
   font-family: var(--font);
-  background: #1A1A1E;
-  color: #F0F0EC;
+  /* Los del tema de cocina, no los del tema claro: el KDS nace oscuro, no lo conmuta. */
+  background: rgb(var(--kds-bg));
+  color: rgb(var(--kds-text));
   -webkit-font-smoothing: antialiased;
   letter-spacing: -0.01em;
 }

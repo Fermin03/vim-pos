@@ -22,14 +22,14 @@ es quién las usa y en qué condiciones.
 Si una regla aplica a todos, va aquí. Si aplica a uno, va en el suyo. Ante duda, gana el documento
 de la app.
 
-**Fuente de verdad, en este orden:**
+**Fuente de verdad:**
 
-1. `packages/config/tailwind-preset.js` — los tokens que consumen las apps.
-2. `packages/ui/tokens.css` — los mismos valores como variables CSS, para lo que no pasa por Tailwind.
-3. Este documento y el de cada app — el porqué y las reglas de uso.
+1. **`packages/ui/tokens.css`** — los valores. Uno solo, y ningún otro archivo los repite.
+   `packages/config/tailwind-preset.js` apunta ahí; no tiene valores propios.
+2. Este documento y el de cada app — el porqué y las reglas de uso.
 
-Los dos primeros deben mantenerse en espejo. Si cambias uno y no el otro, la app y el ticket
-impreso dejan de parecerse. Ya pasó: ver [`decisiones/0003`](../decisiones/0003-la-marca-es-azul.md).
+Hasta el 31/08/2026 eran dos archivos sincronizados a mano, y eso ya nos costó una migración de
+marca a medias: ver [`decisiones/0008`](../decisiones/0008-una-sola-fuente-de-tokens.md).
 
 > Los mockups **ya no mandan**. Se archivaron el 30/08/2026; ver
 > [`decisiones/0001`](../decisiones/0001-los-mockups-dejan-de-mandar.md).
@@ -218,7 +218,9 @@ divergir sin que nadie lo note.
 
 ## 6. Cómo cambiar esto
 
-1. Se toca `tailwind-preset.js` **y** `tokens.css` en el mismo commit. Siempre los dos.
+1. Se toca **`packages/ui/tokens.css`**, y solo ese. El preset de Tailwind no tiene valores.
+   Los colores van en canales (`22 22 26`), con el hexadecimal al lado en un comentario; si usas
+   una variable a mano, envuélvela: `color: rgb(var(--ink))`.
 2. Si el cambio afecta a lo impreso —el ticket, la comanda—, se revisa el papel, no solo la
    pantalla: la impresora térmica no tiene color y el contraste se comporta distinto.
 3. Este documento se actualiza en el mismo commit. Un design system que va por detrás del código
