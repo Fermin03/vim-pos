@@ -1,0 +1,343 @@
+<!doctype html>
+<html lang="es-MX">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+
+<title>Cuánto cuesta de verdad un sistema para restaurante</title>
+<meta name="description" content="Las tres formas de cobrarte: licencia fija, gratuito y porcentaje por venta. La aritmética para comparar cada una con tu venta real, y cuándo deja de convenir.">
+<link rel="canonical" href="https://vimpos.com.mx/cuanto-cuesta-un-sistema-para-restaurante">
+<link rel="alternate" type="text/markdown" href="https://vimpos.com.mx/cuanto-cuesta-un-sistema-para-restaurante.md" title="Esta página en Markdown">
+
+<meta property="og:type" content="article">
+<meta property="og:locale" content="es_MX">
+<meta property="og:site_name" content="VIM POS">
+<meta property="og:title" content="Cuánto cuesta de verdad un sistema para restaurante">
+<meta property="og:description" content="Licencia fija, gratuito o porcentaje por venta. La aritmética para comparar los tres con tu venta real.">
+<meta property="og:url" content="https://vimpos.com.mx/cuanto-cuesta-un-sistema-para-restaurante">
+<meta property="og:image" content="https://vimpos.com.mx/assets/img/og/precios.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="VIM POS, punto de venta para restaurantes en Mexico">
+<meta name="twitter:card" content="summary_large_image">
+
+<!-- Se precargan SOLO las dos familias que se ven en el primer pantallazo: el
+     titular (Sora) y el texto corrido (Inter Tight). JetBrains Mono aparece más
+     abajo y puede esperar; precargar las tres haría lo contrario de lo que se
+     busca — competirían entre ellas por el ancho de banda y ninguna llegaría
+     antes. Cada archivo es una fuente VARIABLE, así que precargarlo cubre todos
+     los pesos de su familia: no hay un archivo por peso que precargar. -->
+<link rel="preload" href="assets/fonts/sora-var-latin.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="assets/fonts/inter-tight-var-latin.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="assets/css/fuentes.css?v=11">
+
+<link rel="icon" href="assets/img/logo.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="assets/img/apple-touch-icon-1024.png">
+<link rel="manifest" href="site.webmanifest">
+<meta name="theme-color" content="#0078C9">
+
+<link rel="stylesheet" href="assets/css/vim.css?v=11">
+</head>
+<body>
+
+<a href="#contenido" class="solo-lectores">Saltar al contenido</a>
+
+<header class="nav">
+  <div class="contenedor">
+    <div class="nav-fila">
+      <a href="/" class="nav-logo" aria-label="VIM POS, inicio">
+        <img src="assets/img/logo.svg" alt="" width="30" height="30" aria-hidden="true">
+        <span>VIM POS</span>
+      </a>
+      <nav class="nav-enlaces" aria-label="Principal">
+        <a class="nav-enlace" href="/funciones">Funciones</a>
+        <a class="nav-enlace" href="/sin-internet">Sin internet</a>
+        <a class="nav-enlace" href="/precios">Precios</a>
+      </nav>
+      <div class="nav-acciones">
+        <a class="btn btn-primario" href="/demo">Pide una demo</a>
+        <button class="nav-hamburguesa" data-menu-boton type="button"
+                aria-expanded="false" aria-controls="menu-movil" aria-label="Abrir menú">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+               stroke-width="2" stroke-linecap="round" aria-hidden="true">
+            <path d="M4 7h16M4 12h16M4 17h16"/>
+          </svg>
+        </button>
+      </div>
+    </div>
+  </div>
+</header>
+
+  <div class="nav-movil" id="menu-movil" data-menu data-abierto="false" inert>
+    <button class="nav-cerrar" data-menu-cerrar type="button" aria-label="Cerrar menú">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+           stroke-width="2" stroke-linecap="round" aria-hidden="true">
+        <path d="M6 6l12 12M18 6L6 18"/>
+      </svg>
+    </button>
+    <nav aria-label="Menú">
+      <div class="nav-movil-lista">
+          <a href="/funciones">Funciones</a>
+          <a href="/sin-internet">Sin internet</a>
+          <a href="/precios">Precios</a>
+          <a href="/demo">Pide una demo</a>
+      </div>
+    </nav>
+  </div>
+
+<!-- ═══════════════════════════════════════════════════════════════════════
+     La comparativa, sin nombrar a nadie. Decisión del 31-ago-2026, y es de
+     Fermín: se compara contra MODELOS DE COBRO, no contra marcas.
+
+     Cuesta tráfico y conviene tenerlo escrito: «alternativa a [marca]» solo se
+     captura nombrando la marca, así que esa consulta queda fuera. A cambio no
+     hay ninguna afirmación sobre una empresa concreta que pueda quedarse vieja
+     o ser rebatida, y la página no caduca cuando alguien cambia su tarifa.
+
+     Tampoco repite la comparación de arquitectura —«el que vive en internet»—
+     porque ésa ya está en /sin-internet, y duplicarla sería competir contra una
+     página propia.
+
+     Las cifras del modelo por porcentaje se comprobaron contra las tarifas
+     publicadas en México en agosto de 2026: rondan el 3.5-3.6 % más IVA. Van
+     como rango y con fecha, precisamente porque cambian. Si algún día se
+     actualizan, se actualiza la fecha o se quita el número.
+     ═══════════════════════════════════════════════════════════════════════ -->
+
+<main id="contenido">
+
+  <section class="hero">
+    <div class="contenedor pila pila-5">
+      <p class="eyebrow">Guía de compra</p>
+      <h1>Cuánto cuesta de verdad un sistema para restaurante</h1>
+      <p class="entradilla">
+        Hay tres formas de cobrarte, y la que parece más barata casi nunca lo es a los dos años.
+        Esto explica las tres, con la aritmética para comparar cada una contra tu venta real.
+      </p>
+      <p style="font-size:var(--t-15);color:var(--ink-2)">
+        Sin nombres. Los modelos son lo que importa: una marca puede cambiar su tarifa mañana sin
+        que cambie el modelo con el que te cobra.
+      </p>
+    </div>
+  </section>
+
+  <section class="seccion">
+    <div class="contenedor pila pila-8">
+      <div class="pila pila-4">
+        <p class="eyebrow">Modelo 1</p>
+        <h2>Licencia fija al mes</h2>
+        <p>
+          Pagas lo mismo vendas lo que vendas. Es el modelo más viejo y el más fácil de presupuestar:
+          sabes en enero lo que vas a pagar en diciembre.
+        </p>
+        <p>
+          Entre proveedores de este tipo la diferencia rara vez está en la mensualidad — suelen
+          parecerse bastante. Está en <strong>qué se cobra aparte</strong>: la puesta en marcha, la
+          carga de tu menú, la capacitación de tu equipo, los módulos de inventario o facturación, y
+          el nodo adicional cuando abres la segunda caja. Ahí es donde dos sistemas que anuncian
+          precios parecidos acaban costando muy distinto.
+        </p>
+        <p style="font-size:var(--t-13);color:var(--ink-2)">
+          Qué preguntar: «además de la mensualidad, ¿qué voy a pagar el primer mes, y qué el día que
+          abra otra caja?».
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <section class="seccion">
+    <div class="contenedor pila pila-8">
+      <div class="pila pila-4">
+        <p class="eyebrow">Modelo 2</p>
+        <h2>El gratuito</h2>
+        <p>
+          El programa no cuesta. Se cobra lo que necesitas cuando dejas de ser un puesto: control de
+          empleados con permisos, inventario con costos, reportes que sirvan para decidir algo, más
+          de una caja. Cada cosa suele ser un plan de pago aparte.
+        </p>
+        <p>
+          <strong>Y conviene decirlo claro: si tienes una sola caja, no manejas inventario y no
+          necesitas controlar a nadie, el gratuito es la respuesta correcta.</strong> Pagar por un
+          sistema completo para eso es tirar dinero. Deja de serlo el día que abres la segunda caja o
+          contratas al tercer empleado — y ahí el precio suele dejar de ser gratuito de golpe.
+        </p>
+        <p style="font-size:var(--t-13);color:var(--ink-2)">
+          Qué preguntar: «¿cuánto costaría hoy con dos cajas, cinco empleados y control de
+          inventario?». Ésa es la cifra que hay que comparar, no el cero.
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <section class="seccion">
+    <div class="contenedor pila pila-8">
+      <div class="pila pila-4">
+        <p class="eyebrow">Modelo 3</p>
+        <h2>El que se lleva un porcentaje de cada venta</h2>
+        <p>
+          Aquí el programa sale gratis o casi, porque el proveedor también te procesa la tarjeta y
+          cobra por ahí. En México esas tarifas rondaban el <strong>3.5 % a 3.6 % más IVA</strong> por
+          transacción en agosto de 2026, y suben bastante en los pagos a meses sin intereses.
+        </p>
+        <p>
+          Eso <em>no</em> es malo por sí solo: comisión de tarjeta vas a pagar igual, la cobre quien
+          la cobre. La pregunta correcta no es «¿cuánto cobran?», es <strong>«¿cuánto más que lo que
+          ya me cobra mi banco?»</strong>. Esa diferencia es el precio real del software — y es el
+          único que crece justo cuando te va bien.
+        </p>
+      </div>
+
+      <div class="pila pila-4">
+        <h3>La aritmética, con tus números</h3>
+        <p>
+          Toma lo que cobras con tarjeta en un mes bueno y multiplícalo por la diferencia de tarifa.
+          Un solo punto porcentual pesa más de lo que parece:
+        </p>
+        <div style="overflow-x:auto">
+          <table class="tabla" style="min-width:480px">
+            <caption class="solo-lectores">Coste de un punto porcentual de diferencia según la venta con tarjeta.</caption>
+            <thead>
+              <tr>
+                <th scope="col">Venta con tarjeta al mes</th>
+                <th scope="col">1 punto de diferencia</th>
+                <th scope="col">Al año</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr><th scope="row">$50,000</th><td>$500</td><td>$6,000</td></tr>
+              <tr><th scope="row">$150,000</th><td>$1,500</td><td>$18,000</td></tr>
+              <tr><th scope="row">$300,000</th><td>$3,000</td><td>$36,000</td></tr>
+              <tr><th scope="row">$500,000</th><td>$5,000</td><td>$60,000</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p style="font-size:var(--t-13);color:var(--ink-2)">
+          Compara esa columna con la mensualidad de un sistema de licencia fija. A partir de cierto
+          volumen no hay comparación, y ese punto llega antes de lo que casi nadie calcula.
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <section class="seccion">
+    <div class="contenedor pila pila-8">
+      <div class="pila pila-4">
+        <p class="eyebrow">Dónde queda VIM POS</p>
+        <h2>Licencia fija, cero comisión, y lo que no incluye</h2>
+        <p>
+          Somos el primer modelo. El precio está <a href="/precios">publicado</a>; la implementación,
+          la carga de tu menú y la capacitación van incluidas en los tres planes; y no nos llevamos
+          ni un peso de tus ventas: la tarjeta se cobra en tu terminal de siempre y en el sistema se
+          registra como forma de pago para que el corte cuadre.
+        </p>
+        <p>
+          <strong>Y dónde no conviene.</strong> Si tienes una sola caja, sin inventario y sin
+          empleados que controlar, el modelo gratuito te sale más barato y no vamos a fingir lo
+          contrario. Tampoco somos la opción si necesitas que el mesero capture en tableta o que la
+          tarjeta se cobre desde el mismo sistema: eso y el resto de los límites están en
+          <a href="/como-elegir-sistema-restaurante">la guía de compra</a>.
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <section class="seccion">
+    <div class="contenedor">
+      <div class="cierre pila pila-5" style="align-items:center">
+        <h2>Haz la cuenta con tus números</h2>
+        <p style="max-width:54ch">
+          Trae tu venta con tarjeta de un mes bueno y la calculamos juntos en la demo, sin
+          compromiso. Si te sale mejor otro modelo, te lo decimos.
+        </p>
+        <div class="fila" style="justify-content:center">
+          <a class="btn btn-primario btn-hero" href="/demo">Pide una demo</a>
+          <a class="btn btn-fantasma btn-hero" href="/precios">Ver los precios publicados</a>
+        </div>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<footer class="pie">
+  <div class="contenedor">
+    <div class="pie-rejilla">
+      <div class="pila pila-3">
+        <span class="nav-logo" style="pointer-events:none">
+          <img src="assets/img/logo.svg" alt="" width="30" height="30" aria-hidden="true">
+          <span>VIM POS</span>
+        </span>
+        <p style="font-size:var(--t-15)">
+          El sistema completo para tu restaurante: caja, cocina, mesas, inventario y
+          facturación. Hecho en León, Guanajuato.
+        </p>
+      </div>
+
+      <div>
+        <h2 class="pie-titulo">Producto</h2>
+        <ul class="pie-lista">
+          <li><a href="/funciones">Funciones</a></li>
+          <li><a href="/sin-internet">Sin internet</a></li>
+          <li><a href="/facturacion-cfdi">Facturación CFDI</a></li>
+          <li><a href="/precios">Precios</a></li>
+          <li><a href="/demo">Pide una demo</a></li>
+        </ul>
+      </div>
+
+      <div>
+        <h2 class="pie-titulo">Contacto</h2>
+        <ul class="pie-lista">
+          <li><a href="/como-elegir-sistema-restaurante">Cómo elegir sistema</a></li>
+          <li><a href="/cuanto-cuesta-un-sistema-para-restaurante">Cuánto cuesta</a></li>
+          <li><a href="/nosotros">Nosotros</a></li>
+          <li><a href="/contacto">Contacto</a></li>
+          <li><a href="mailto:hola@vimpos.com.mx">hola@vimpos.com.mx</a></li>
+          <li><a href="https://wa.me/524761273020">WhatsApp 476 127 3020</a></li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="pie-legal">
+      <span>© 2026 VIM POS</span>
+      <span class="fila" style="gap:var(--sp-5)">
+        <a href="/aviso-privacidad" style="color:inherit">Aviso de privacidad</a>
+        <a href="/terminos" style="color:inherit">Términos</a>
+      </span>
+    </div>
+  </div>
+</footer>
+
+<script src="assets/js/vim.js?v=11" defer></script>
+
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "Article",
+      "@id": "https://vimpos.com.mx/cuanto-cuesta-un-sistema-para-restaurante#articulo",
+      "url": "https://vimpos.com.mx/cuanto-cuesta-un-sistema-para-restaurante",
+      "headline": "Cuánto cuesta de verdad un sistema para restaurante",
+      "description": "Las tres formas de cobrarte que existen: licencia fija, gratuito y porcentaje por venta. La aritmética para comparar cada una con tu venta real.",
+      "inLanguage": "es-MX",
+      "datePublished": "2026-08-31",
+      "dateModified": "2026-08-31",
+      "author": { "@id": "https://vimpos.com.mx/#organizacion" },
+      "publisher": { "@id": "https://vimpos.com.mx/#organizacion" },
+      "image": "https://vimpos.com.mx/assets/img/og/precios.png",
+      "isPartOf": { "@id": "https://vimpos.com.mx/#sitio" },
+      "about": { "@id": "https://vimpos.com.mx/#producto" }
+    },
+    {
+      "@type": "BreadcrumbList",
+      "@id": "https://vimpos.com.mx/cuanto-cuesta-un-sistema-para-restaurante#miga",
+      "itemListElement": [
+        { "@type": "ListItem", "position": 1, "name": "Inicio", "item": "https://vimpos.com.mx/" },
+        { "@type": "ListItem", "position": 2, "name": "Cuánto cuesta", "item": "https://vimpos.com.mx/cuanto-cuesta-un-sistema-para-restaurante" }
+      ]
+    }
+  ]
+}
+</script>
+</body>
+</html>
