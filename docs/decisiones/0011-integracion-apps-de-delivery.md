@@ -13,6 +13,8 @@ credenciales. 1C.2 §8: conciliación por CSV con `ingesta_metodo 'API'` reserva
 1. **VIM registra una sola aplicación por plataforma** (Uber Eats, DiDi Food, Rappi). Sus
    credenciales son de VIM y viven en secrets de Supabase; el comercio nunca captura
    credenciales: **autoriza su tienda** (OAuth en Uber/Rappi, URL de autorización en DiDi).
+   La pantalla del admin y la Edge Function que lo hacen para Uber están en el spec
+   `docs/superpowers/specs/2026-09-02-delivery-f1b-conectar-uber-design.md` (F1b).
 2. Tablas nuevas con RLS: `delivery_conexiones` (sucursal × app), `delivery_pedidos` (pedido crudo
    y normalizado, independiente del ticket), `delivery_eventos` (bitácora de webhooks y llamadas),
    `delivery_credenciales_app` (token de aplicación cacheado, solo service_role).

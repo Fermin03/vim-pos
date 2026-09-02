@@ -29,15 +29,31 @@ cuenta de desarrollador de Uber** (sandbox) para la prueba de punta a punta. Dis
 
 ```bash
 # Secrets (si `supabase secrets set` falla en esta máquina, usar el dashboard → Edge Functions → Secrets)
-supabase secrets set UBER_ENTORNO=sandbox UBER_CLIENT_ID=<client_id> UBER_CLIENT_SECRET=<client_secret> UBER_WEBHOOK_SIGNING_KEY=<signing_key>
+supabase secrets set UBER_ENTORNO=sandbox UBER_CLIENT_ID=<client_id> UBER_CLIENT_SECRET=<client_secret> UBER_WEBHOOK_SIGNING_KEY=<signing_key> UBER_REDIRECT_URI=https://admin.vimpos.com.mx/configuracion/integraciones/uber/callback
 # La signing key la inventa uno (32+ caracteres aleatorios, del gestor de contraseñas) y se pega
 # igual en Uber dashboard → Webhooks → Add New Webhook → Basic HMAC → Signing Key.
 supabase functions deploy delivery-webhook-uber --no-verify-jwt
 supabase functions deploy delivery-accion
+supabase functions deploy delivery-uber-conexion
 supabase db push
 ```
 
-## 3. Vincular la tienda de prueba a la sucursal (manual mientras no exista la pantalla de admin, F1b)
+Variables públicas del **admin** (Vercel, proyecto admin, y `apps/admin/.env.local` en desarrollo):
+`NEXT_PUBLIC_UBER_CLIENT_ID=<client_id>` y `NEXT_PUBLIC_UBER_ENTORNO=sandbox`. En la app de Uber
+(Setup → Redirect URIs) registrar `https://admin.vimpos.com.mx/configuracion/integraciones/uber/callback`
+y, para desarrollo, `http://localhost:3001/configuracion/integraciones/uber/callback`.
+
+## 3. Vincular la tienda a la sucursal (desde el admin, F1b)
+
+1. Admin → Configuración → **Apps de delivery** → **Conectar con Uber Eats**.
+2. Entrar en Uber con la cuenta del **dueño** (la que administra el restaurante en Uber Eats Manager)
+   y autorizar. Uber regresa al asistente del admin.
+3. Por cada tienda de Uber elegir la sucursal de VIM, auto-aceptar (sí por defecto) y minutos de
+   preparación; marcar la casilla de autorización a VIM POS y pulsar **Activar**.
+4. En la tabla, **Comprobar** confirma con Uber que `integrator_store_id` es la sucursal y que la
+   integración está encendida. **Pausar** apaga la inyección de pedidos sin desconectar.
+
+### Respaldo manual (si el admin no está disponible)
 
 Con el token del **dueño** (OAuth `authorization_code`, scope `eats.pos_provisioning`; ver
 `docs/integraciones/delivery/03-uber-eats-resumen.md §4`):

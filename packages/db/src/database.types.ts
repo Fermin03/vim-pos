@@ -2335,6 +2335,47 @@ export type Database = {
           },
         ]
       }
+      delivery_autorizaciones: {
+        Row: {
+          access_token: string
+          app: Database["public"]["Enums"]["modo_servicio"]
+          creado_por: string
+          created_at: string
+          entorno: string
+          id: string
+          tenant_id: string
+          vence_at: string
+        }
+        Insert: {
+          access_token: string
+          app: Database["public"]["Enums"]["modo_servicio"]
+          creado_por: string
+          created_at?: string
+          entorno: string
+          id?: string
+          tenant_id: string
+          vence_at: string
+        }
+        Update: {
+          access_token?: string
+          app?: Database["public"]["Enums"]["modo_servicio"]
+          creado_por?: string
+          created_at?: string
+          entorno?: string
+          id?: string
+          tenant_id?: string
+          vence_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "delivery_autorizaciones_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       delivery_conexiones: {
         Row: {
           app: Database["public"]["Enums"]["modo_servicio"]

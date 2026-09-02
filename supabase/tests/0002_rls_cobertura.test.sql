@@ -25,7 +25,8 @@ select has_extension('pgtap');
 -- service_role). Documentar aquí cualquier tabla nueva de este tipo, con su justificación.
 create temporary table _rls_exentas (tabla text) on commit drop;
 insert into _rls_exentas (tabla) values
-  ('super_admin_accesos');   -- SEC CN-002: bitácora de plataforma, solo service_role (mig. 0024).
+  ('super_admin_accesos'),      -- SEC CN-002: bitácora de plataforma, solo service_role (mig. 0024).
+  ('delivery_autorizaciones');  -- Token OAuth del dueño para activar tiendas; solo la Edge Function (mig. 0092, spec F1b).
 
 -- #2 — CRÍTICA: ninguna tabla con tenant_id tiene RLS deshabilitado.
 select is_empty($$
