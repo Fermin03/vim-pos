@@ -1,0 +1,644 @@
+{
+  "openapi": "3.0.0",
+  "info": {
+    "title": "Uber Eats Integration Activation & Configuration API Suite",
+    "version": "1.0.0",
+    "description": "This API suite can be used for associating an application to a location, configuring an integration, retrieving an integration's store setup, and removing the association of an application to your store.\n\nNote: The [Activate Integration](#tag/Integration-Activation) endpoint requires a unique merchant user's access token, obtained via an `authorization_code` grant in OAuth. This token is specifically used to associate your application with the user's store, following the retrieval of their store list from the [Get Stores](/docs/eats/api/store_suite/#tag/getStores) endpoint.\n\nFor detailed information on the authentication process, refer to our [Authentication Guide](/docs/eats/guides/authentication).\n\n# Table of Contents\n- [Activate Integration](#tag/Integration-Activation)\n- [Update Integration Configuration](#tag/Update-Integration-Config)\n- [Retrieve Integration Configuration](#tag/Retrieve-Integration-Config)\n- [Remove Integration Configuration](#tag/Remove-Integration-Config)\n"
+  },
+  "servers": [
+    {
+      "url": "https://api.uber.com"
+    }
+  ],
+  "paths": {
+    "/v1/eats/stores/{store_id}/pos_data": {
+      "post": {
+        "summary": "Associate an application with a location on Uber.",
+        "description": "Link application with a location within Uber's platform. Note that the token for this endpoint requires the `eats.pos_provisioning` scope. For generating a token with this scope, please refer to the [Authentication](https://developer.uber.com/docs/eats/guides/authentication) and [Integration Configuration Guide](https://developer.uber.com/docs/eats/guides/integration-activation-flows) for more information.",
+        "operationId": "activationIntegration",
+        "tags": [
+          "Integration Activation"
+        ],
+        "security": [
+          {
+            "auth": [
+              "eats.pos_provisioning"
+            ]
+          }
+        ],
+        "parameters": [
+          {
+            "name": "store_id",
+            "in": "path",
+            "description": "ID of the store",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "example": "1d2b3c4e-5f6a-7890-ab12-c3d4e5f67890"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/IntegrationRequestBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/bad_request_error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/unauthorized_error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/not_found_error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/internal_server_error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "summary": "Update an integration's configuration",
+        "description": "Update an integration's configuration. Note that the token for this endpoint requires the `eats.store` scope. Configurations can only be updated for locations which you are already associated.",
+        "operationId": "updateIntegration",
+        "tags": [
+          "Update Integration Config"
+        ],
+        "security": [
+          {
+            "auth": [
+              "eats.store"
+            ]
+          }
+        ],
+        "parameters": [
+          {
+            "name": "store_id",
+            "in": "path",
+            "description": "ID of the store",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "example": "1d2b3c4e-5f6a-7890-ab12-c3d4e5f67890"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PatchIntegrationRequestBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": "POS integration configuration updated successfully."
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/bad_request_error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/unauthorized_error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/not_found_error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/internal_server_error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "summary": "Retrieve a location's integration configuration.",
+        "description": "Retrieves a location configuration that is pertinent to your application.",
+        "operationId": "retrieveIntegration",
+        "tags": [
+          "Retrieve Integration Config"
+        ],
+        "security": [
+          {
+            "auth": [
+              "eats.store"
+            ]
+          }
+        ],
+        "parameters": [
+          {
+            "name": "store_id",
+            "in": "path",
+            "description": "ID of the store",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "example": "1d2b3c4e-5f6a-7890-ab12-c3d4e5f67890"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GetPOSIntegrationResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/bad_request_error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/unauthorized_error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/not_found_error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/internal_server_error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "summary": "Remove an application from a location.",
+        "description": "Removes your application configuration from a store and removes access for your developer token.",
+        "operationId": "removeIntegration",
+        "tags": [
+          "Remove Integration Config"
+        ],
+        "security": [
+          {
+            "auth": [
+              "eats.pos_provisioning"
+            ]
+          }
+        ],
+        "parameters": [
+          {
+            "name": "store_id",
+            "in": "path",
+            "description": "ID of the store",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "example": "1d2b3c4e-5f6a-7890-ab12-c3d4e5f67890"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/bad_request_error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/unauthorized_error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/not_found_error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/internal_server_error"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "auth": {
+        "type": "oauth2",
+        "description": "This API uses OAuth 2 with the implicit grant flow. [More info](https://developer.uber.com/docs/eats/guides/authentication)\n",
+        "flows": {
+          "implicit": {
+            "authorizationUrl": "https://login.uber.com/oauth/v2/token",
+            "scopes": {
+              "eats.store": "Developer access token for store related endpoints.",
+              "eats.pos_provisioning": "User access token that is generated through Uber user login."
+            }
+          }
+        }
+      }
+    },
+    "schemas": {
+      "PatchIntegrationRequestBody": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/IntegrationRequestBody"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "integration_enabled": {
+                "type": "boolean",
+                "description": "This toggles on order fulfillment webhooks including `orders.notification`, `orders.scheduled.notification`, and `orders.release`.",
+                "example": true
+              }
+            }
+          }
+        ]
+      },
+      "IntegrationRequestBody": {
+        "type": "object",
+        "properties": {
+          "allowed_customer_requests": {
+            "type": "object",
+            "properties": {
+              "allow_single_use_items_requests": {
+                "description": "Indicates if this location will support the single-use items indicator. This does not enable the single-use but must be set to true if able to be ingested.",
+                "type": "boolean",
+                "example": false
+              },
+              "allow_special_instruction_requests": {
+                "description": "Indicates if this location will support and accommodate special instructions passed by the customer. This does not enable the instructions but must be set to true if able to be ingested.",
+                "type": "boolean",
+                "example": false
+              }
+            }
+          },
+          "integrator_brand_id": {
+            "description": "A brand-level identifier key for your application.",
+            "type": "string",
+            "example": "app-brand-1jj9th32"
+          },
+          "integrator_store_id": {
+            "description": "An identifier for the location that is present within your application database.",
+            "type": "string",
+            "example": "app-1f2a3b4c-5d6e-7f8g-9h01-i2j3k4l5m6n7"
+          },
+          "is_order_manager": {
+            "description": "Enables your application to be the primary order manager on a store.",
+            "type": "boolean",
+            "example": true
+          },
+          "merchant_store_id": {
+            "description": "A merchant's specified store number.",
+            "type": "string",
+            "example": "UberStore1"
+          },
+          "require_manual_acceptance": {
+            "description": "Typically set false. When enabled, merchant must accept orders on the Uber Eats Order software prior to webhook notifications being passed to the configured webhook URL.",
+            "type": "boolean",
+            "example": false
+          },
+          "store_configuration_data": {
+            "description": "Update your arbitrary data blob that your app uses to configure this store’s integration. Persisting this data with Uber facilitates a single source-of-truth; and allows support teams to debug variations in behaviors across stores. DO NOT STORE PII IN THIS BLOB.",
+            "type": "string"
+          },
+          "webhooks_config": {
+            "type": "object",
+            "properties": {
+              "order_release_webhooks": {
+                "description": "Common for quick-service restaurants. Indicates if you would like to an `order.release` webhook when a courier has reached an estimated 4 minutes from the location.",
+                "type": "object",
+                "properties": {
+                  "is_enabled": {
+                    "type": "boolean"
+                  }
+                }
+              },
+              "schedule_order_webhooks": {
+                "description": "Indicates that you wish to receive webhooks for scheduled orders at the time of placement. Scheduled orders must be accepted twice by your application. First, within 10 minutes of `orders.scheduled.notification` and again within 10 minutes of `orders.notification` event type.",
+                "type": "object",
+                "properties": {
+                  "is_enabled": {
+                    "type": "boolean"
+                  }
+                }
+              },
+              "delivery_status_webhooks": {
+                "description": "Indicates that you wish to receive webhooks for order delivery status updates. Event type `delivery.state_changed` tracks the courier location (e.g. `ARRIVED_AT_DROPOFF`).",
+                "type": "object",
+                "properties": {
+                  "is_enabled": {
+                    "type": "boolean"
+                  }
+                }
+              },
+              "webhooks_version": {
+                "description": "The `webhooks_version` field not only specifies the API version of the `resource_href` included in our webhook payload but also determines the types of webhooks you will receive. This field indicates which version of the Uber API endpoint the client should use for subsequent calls, and it affects the webhook content according to the specified version. Note that our versioning has been restarted from v1. - For webhooks related to the newer API (https://api.uber.com/v1/delivery/order/{order_id}), set this field to \"1.0.0\". Setting it to \"1.0.0\" means that the `resource_href` in the webhook is formatted according to the newer v1 API standards and you will receive webhooks specific to this version. - For webhooks associated with the previous version of the API (https://api.uber.com/v2/eats/order/{order_id}), you can set this field as null or omit it. This indicates that the `resource_href` in the webhook conforms to the older v2 API standards, and the webhook content will be based on this version.\n",
+                "type": "string",
+                "example": "1.0.0"
+              }
+            }
+          }
+        }
+      },
+      "error": {
+        "type": "object",
+        "description": "bad_request",
+        "properties": {
+          "metadata": {
+            "type": "object",
+            "description": "Error message not standardized. Application code will provide contextual error message"
+          }
+        }
+      },
+      "bad_request_error": {
+        "type": "object",
+        "description": "bad_request",
+        "properties": {
+          "code": {
+            "type": "string",
+            "example": "bad_request",
+            "description": "Description of the error."
+          },
+          "message": {
+            "type": "string",
+            "example": "Error message not standardized. Application code will provide contextual error message",
+            "description": "Description details of the error."
+          }
+        }
+      },
+      "unauthorized_error": {
+        "type": "object",
+        "description": "unauthorized",
+        "properties": {
+          "code": {
+            "type": "string",
+            "example": "unauthorized",
+            "description": "Description of the error."
+          },
+          "message": {
+            "type": "string",
+            "example": "Invalid OAuth 2.0 credentials provided. | Error message not standardized. Application code will provide contextual error message",
+            "description": "Description details of the error."
+          }
+        }
+      },
+      "not_found_error": {
+        "type": "object",
+        "description": "not_found",
+        "properties": {
+          "code": {
+            "type": "string",
+            "example": "not_found",
+            "description": "Description of the error."
+          },
+          "message": {
+            "type": "string",
+            "example": "Order not found | Error message not standardized. Application code will provide contextual error message",
+            "description": "Description details of the error."
+          }
+        }
+      },
+      "internal_server_error": {
+        "type": "object",
+        "description": "internal_server_error",
+        "properties": {
+          "code": {
+            "type": "string",
+            "example": "internal_server_error",
+            "description": "Description of the error."
+          },
+          "message": {
+            "type": "string",
+            "example": "An internal error has occurred. Please contact support if this persists.",
+            "description": "Description details of the error."
+          }
+        }
+      },
+      "GetPOSIntegrationResponse": {
+        "type": "object",
+        "description": "Response schema for retrieving POS integration configuration",
+        "properties": {
+          "allowed_customer_requests": {
+            "type": "object",
+            "properties": {
+              "allow_single_use_items_requests": {
+                "type": "boolean",
+                "description": "Indicates if this location will support the single-use items indicator."
+              },
+              "allow_special_instruction_requests": {
+                "type": "boolean",
+                "description": "Indicates if this location will support and accommodate special instructions."
+              }
+            }
+          },
+          "integrator_brand_id": {
+            "type": "string",
+            "description": "A brand-level identifier key for your application."
+          },
+          "integrator_store_id": {
+            "type": "string",
+            "description": "An identifier for the location that is present within your application database."
+          },
+          "is_order_manager": {
+            "type": "boolean",
+            "description": "Enables your application to be the primary order manager on a store."
+          },
+          "merchant_store_id": {
+            "type": "string",
+            "description": "A merchant's specified store number."
+          },
+          "require_manual_acceptance": {
+            "type": "boolean",
+            "description": "When enabled, merchant must accept orders on the Uber Eats Order software prior to webhook notifications."
+          },
+          "store_configuration_data": {
+            "type": "string",
+            "description": "Arbitrary data blob that your app uses to configure this store's integration."
+          },
+          "webhooks_config": {
+            "type": "object",
+            "description": "Webhook configuration settings."
+          },
+          "store_id": {
+            "type": "string",
+            "description": "Store UUID identifier.",
+            "example": "1d2b3c4e-5f6a-7890-ab12-c3d4e5f67890"
+          },
+          "pos_integration_enabled": {
+            "type": "boolean",
+            "description": "Flag indicating if POS integration is enabled for this store.",
+            "example": true
+          },
+          "online_status": {
+            "type": "string",
+            "enum": [
+              "offline",
+              "online",
+              "unknown"
+            ],
+            "description": "Current online status of the store.",
+            "example": "online"
+          },
+          "partner_store_id": {
+            "type": "string",
+            "description": "Partner's internal store identifier.",
+            "example": "partner-store-123"
+          },
+          "order_release_enabled": {
+            "type": "boolean",
+            "description": "Flag indicating if order release notifications are enabled.",
+            "example": true
+          },
+          "auto_accept_enabled": {
+            "type": "boolean",
+            "description": "Flag indicating if automatic order acceptance is enabled.",
+            "example": false
+          },
+          "pos_metadata": {
+            "type": "object",
+            "description": "Additional POS-specific metadata.",
+            "properties": {
+              "pos_provider": {
+                "type": "string",
+                "description": "Name of the POS provider."
+              },
+              "pos_version": {
+                "type": "string",
+                "description": "Version of the POS system."
+              },
+              "last_sync_time": {
+                "type": "string",
+                "format": "date-time",
+                "description": "Last synchronization timestamp."
+              }
+            }
+          },
+          "order_manager_client_id": {
+            "type": "string",
+            "description": "Client ID for the order manager integration.",
+            "example": "client-abc123"
+          },
+          "is_order_manager_pending": {
+            "type": "boolean",
+            "description": "Flag indicating if order manager setup is pending.",
+            "example": false
+          },
+          "integration_enabled": {
+            "type": "boolean",
+            "description": "Overall integration enabled status.",
+            "example": true
+          }
+        }
+      }
+    }
+  }
+}

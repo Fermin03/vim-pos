@@ -38,3 +38,7 @@ _publicar/
 # Guiones de diagnostico de las capturas: se escriben al vuelo para entender
 # un flujo y se tiran. No son parte de la herramienta.
 sitio-web/_capturas/diag*.mjs
+
+# Imagenes capturadas de los portales de delivery (40 MB de GIF): quedan en disco, no en git
+docs/integraciones/delivery/didi-food/adjuntos/imagenes/*
+!docs/integraciones/delivery/didi-food/adjuntos/imagenes/_urls.txt
