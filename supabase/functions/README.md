@@ -66,3 +66,25 @@ Invoke-RestMethod -Method Post -Uri "$base/functions/v1/pin-login" `
 
 Si el paso 2 devuelve solo la sucursal de Knock-Out, **la cadena de auth está validada**:
 PIN → JWT de empleado → RLS por tenant. 🎉
+
+## `delivery-webhook-uber` y `delivery-accion` (ADR 0011)
+
+`delivery-webhook-uber` recibe los webhooks de Uber Eats. Sin JWT; valida `X-Uber-Signature`
+(HMAC-SHA256 del cuerpo con el client secret). `delivery-accion` recibe las acciones del cajero
+(aceptar / rechazar / listo) con el JWT del empleado. Secrets de las dos: `UBER_ENTORNO`
+(`sandbox` | `produccion`), `UBER_CLIENT_ID`, `UBER_CLIENT_SECRET`.
+
+Prueba local (stack arriba, `supabase db reset`, una `delivery_conexion` ACTIVA con
+`tienda_id_externo = 'store-1'` para la sucursal de Knock-Out y un turno abierto):
+
+```powershell
+supabase functions serve delivery-webhook-uber --env-file supabase/functions/.env --no-verify-jwt
+$body = '{"event_id":"ev-1","event_type":"orders.notification","event_time":1,"meta":{"user_id":"store-1","resource_id":"ord-1","status":"pos"},"resource_href":"x"}'
+$sig = (node -e "const c=require('crypto');process.stdout.write(c.createHmac('sha256',process.argv[1]).update(process.argv[2]).digest('hex'))" "$env:UBER_CLIENT_SECRET" $body)
+Invoke-RestMethod -Method Post -Uri "http://127.0.0.1:54321/functions/v1/delivery-webhook-uber" -Headers @{ "X-Uber-Signature" = $sig } -ContentType "application/json" -Body $body
+```
+
+Esperado: 200 vacío; una fila en `delivery_eventos` con `firma_valida = true`; con el sandbox real
+de Uber, una fila en `delivery_pedidos` y (si hay turno) un ticket PAGADO. Firma incorrecta → 401 y
+fila con `firma_valida = false`. Cómo se leen los errores: `delivery_eventos.error` y
+`delivery_pedidos.ultimo_error`.

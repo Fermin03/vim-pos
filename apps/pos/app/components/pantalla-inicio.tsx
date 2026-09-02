@@ -27,11 +27,13 @@ export function PantallaInicio({
   nCuentasPickup,
   nCuentasDomicilio,
   nEnEspera,
+  nPedidosApps = 0,
   online = true,
   onComedor,
   onParaLlevar,
   onPickup,
   onDomicilio,
+  onPedidosApps,
   onMonitorVentas,
   onConsultarCuentas,
   onMovimientoCaja,
@@ -48,12 +50,15 @@ export function PantallaInicio({
   nCuentasPickup: number;
   nCuentasDomicilio: number;
   nEnEspera: number;
+  /** Pedidos de apps de delivery (Uber/DiDi/Rappi) esperando que el cajero los acepte. ADR 0011. */
+  nPedidosApps?: number;
   /** Estado de red, para la barra de estado inferior (la caja opera igual sin internet). */
   online?: boolean;
   onComedor: () => void;
   onParaLlevar: () => void;
   onPickup: () => void;
   onDomicilio: () => void;
+  onPedidosApps?: () => void;
   onMonitorVentas: () => void;
   onConsultarCuentas: () => void;
   onMovimientoCaja: () => void;
@@ -150,6 +155,10 @@ export function PantallaInicio({
           icon={<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M20 7H4a1 1 0 0 0-1 1v11a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V8a1 1 0 0 0-1-1z" /><path d="M8 7V5a4 4 0 0 1 8 0v2" /></svg>} />
         <Acceso label="Domicilio" badge={nCuentasDomicilio} onClick={onDomicilio} requiereTurno={sinTurno}
           icon={<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M1 9h13v8H1z" /><path d="M14 12h4l3 3v2h-7" /><circle cx="5" cy="18" r="2" /><circle cx="17" cy="18" r="2" /></svg>} />
+        {onPedidosApps && (
+          <Acceso label="Pedidos de apps" badge={nPedidosApps} onClick={onPedidosApps} requiereTurno={sinTurno}
+            icon={<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><rect x="5" y="2" width="14" height="20" rx="2" /><path d="M9 6h6M12 18h.01" /></svg>} />
+        )}
 
         <span className="w-px flex-shrink-0 bg-line-strong" aria-hidden="true" />
 

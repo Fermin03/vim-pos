@@ -1,0 +1,1674 @@
+{
+  "openapi": "3.0.0",
+  "info": {
+    "title": "Uber Eats Marketplace Store API",
+    "version": "1.0.0",
+    "description": "For API testing via Postman, ensure your application's scopes are approved.\n\n# Table of contents\n- [Get Stores](#tag/GetStores)\n- [Get Store Details](#tag/GetStoreDetails)\n- [Update Store Information](#tag/SetStoreDetails)\n- [Retrieve Store Status](#tag/GetStoreStatus)\n- [Set Store Status](#tag/SetStoreStatus)\n- [Update Prep Time](#tag/SetPrepTime)\n- [Update Fulfillment Configuration](#tag/SetFulfillmentConfiguration)\n"
+  },
+  "servers": [
+    {
+      "url": "https://api.uber.com"
+    }
+  ],
+  "paths": {
+    "/v1/delivery/stores": {
+      "get": {
+        "summary": "Get Stores",
+        "description": "This endpoint allows a partner to enumerate the stores that this token is authorized against. Tokens generated via client_credentials grant will return stores linked to your client ID. Tokens generated via authorization_code grant will return stores linked to the user authorizing the client ID.",
+        "operationId": "getStores",
+        "tags": [
+          "GetStores"
+        ],
+        "security": [
+          {
+            "auth": [
+              "eats.store",
+              "eats.pos_provisioning"
+            ]
+          }
+        ],
+        "parameters": [
+          {
+            "name": "next_page_token",
+            "in": "query",
+            "description": "Token used for requesting a specific page for a list of stores. Will be provided by pagination_data in the response if there is a next page.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "example": "ab1232ni31"
+            }
+          },
+          {
+            "name": "page_size",
+            "in": "query",
+            "description": "The maximum number of stores that appear per page. Default value is 50.",
+            "required": false,
+            "schema": {
+              "type": "number",
+              "example": 10
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "stores": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/StoreArray"
+                      },
+                      "description": "An array of all the stores associated to Access token used (Developer Access Token vs Merchant User Access Token)"
+                    },
+                    "pagination_data": {
+                      "type": "object",
+                      "description": "Pagination information",
+                      "$ref": "#/components/schemas/PaginationData"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/bad_request_error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/unauthorized_error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/not_found_error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/internal_server_error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/delivery/store/{store_id}": {
+      "get": {
+        "summary": "Get Store Details",
+        "description": "Retrieves the details of a single location.",
+        "operationId": "getStore",
+        "tags": [
+          "GetStoreDetails"
+        ],
+        "security": [
+          {
+            "auth": [
+              "eats.store"
+            ]
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "store_id",
+            "required": true,
+            "description": "ID of the store to retrieve",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "expand",
+            "in": "query",
+            "description": "Comma-separated list of fields to expand. Expected values 'holiday_hours' and/or 'internal_contact_emails'. By default, these fields in the Store are omitted from the response unless specified. For example ‘holiday_hours,internal_contact_emails’ returns a store with the ‘holiday_hours’ and ‘internal_contact_emails’ fields included.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Store"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/bad_request_error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/unauthorized_error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/not_found_error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/internal_server_error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Update Store Information",
+        "description": "Allows application to update the metadata for a unique location. Only \"Contact\", \"Location\", and \"Pickup Instructions\" can be updated.",
+        "operationId": "updateStoreInfo",
+        "tags": [
+          "SetStoreDetails"
+        ],
+        "security": [
+          {
+            "auth": [
+              "eats.store"
+            ]
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "store_id",
+            "required": true,
+            "description": "ID of the store to update",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Authorization",
+            "required": true,
+            "description": "Access token with 'store:write' scope",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "description": "Store information to update",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StoreInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Store"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/bad_request_error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/unauthorized_error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/not_found_error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/internal_server_error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/delivery/store/{store_id}/status": {
+      "get": {
+        "summary": "Retrieve Store Status",
+        "description": "The Get Store Status endpoint retrieves the orderability status of a location.",
+        "operationId": "getStoreStatus",
+        "tags": [
+          "GetStoreStatus"
+        ],
+        "security": [
+          {
+            "auth": [
+              "eats.store"
+            ]
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "store_id",
+            "required": true,
+            "description": "ID of the store to get status",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Authorization",
+            "required": true,
+            "description": "Access token with 'store.store' scope",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successfully get status of store",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "ONLINE",
+                        "OFFLINE"
+                      ]
+                    },
+                    "is_offline_until": {
+                      "type": "string",
+                      "description": "Timestamp in RFC3339 format. The time at which the store will be online again. Only applies to stores that are currently offline due to pauses initiated by the merchant or Uber.",
+                      "example": "2024-01-01T02:07:14.000Z"
+                    },
+                    "offline_reason": {
+                      "type": "string",
+                      "description": "The reason the store is offline. Only applies to a store in the OFFLINE status",
+                      "example": "store is closed for day"
+                    },
+                    "offline_reason_metadata": {
+                      "type": "string",
+                      "description": "If needed, the offline reason metadata indicates why the store was paused. If the store is ONLINE, then this field will be nil or empty. It will be UNKNOWN if it is set as offline due to an unknown reason by partner",
+                      "enum": [
+                        "UNFULFILL_RATE",
+                        "INCIDENT_DETECTED_ON_ORDER_MANAGEMENT_APPLICATION",
+                        "PCA_ERROR_RATE",
+                        "PCA_LATENCY",
+                        "FULFILLMENT_LATENCY",
+                        "CLOSING_EARLY",
+                        "PROBLEM_IN_RESTAURANT",
+                        "OUT_OF_ITEM",
+                        "NO_COURIER_AVAILABLE",
+                        "UPTIME_CHECK_TIMEOUT",
+                        "UPTIME_CHECK_OFFLINE",
+                        "IS_ONLINE",
+                        "INVALID",
+                        "OTHER",
+                        "UNKNOWN_SET_BY_PARTNER"
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/bad_request_error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/unauthorized_error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/not_found_error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/internal_server_error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/delivery/store/{store_id}/update-store-status": {
+      "post": {
+        "summary": "Set Store Status",
+        "description": "The Set Restaurant Status endpoint sets the online status of a restaurant.",
+        "operationId": "updateStoreStatus",
+        "tags": [
+          "SetStoreStatus"
+        ],
+        "security": [
+          {
+            "auth": [
+              "eats.store"
+            ]
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "store_id",
+            "required": true,
+            "description": "ID of the store to set status",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "Authorization",
+            "required": true,
+            "description": "Access token with 'store.store.status.write' scope",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "description": "Parameters to update the status of a store ID.",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateStoreStatus"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "ONLINE",
+                        "OFFLINE"
+                      ]
+                    },
+                    "is_offline_until": {
+                      "type": "string",
+                      "description": "Timestamp in RFC3339 format. The time at which the store will be online again. Only applies to stores that are currently offline due to pauses initiated by the merchant or Uber."
+                    },
+                    "previous_status": {
+                      "type": "string",
+                      "enum": [
+                        "ONLINE",
+                        "OFFLINE"
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/bad_request_error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/unauthorized_error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/not_found_error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/internal_server_error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/delivery/store/{store_id}/update-store-prep-time": {
+      "post": {
+        "summary": "Update Prep Time",
+        "description": "Updates the preptime of a given store",
+        "operationId": "updateStorePrepTime",
+        "tags": [
+          "SetPrepTime"
+        ],
+        "security": [
+          {
+            "auth": [
+              "eats.store"
+            ]
+          }
+        ],
+        "parameters": [
+          {
+            "in": "header",
+            "name": "Authorization",
+            "required": true,
+            "description": "Access token with 'store:write' scope",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "store_id",
+            "in": "path",
+            "description": "A unique identifier for a store. This is the identifier that is expected to be quoted for support queries and is otherwise known as the ‘store id’.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "oneOf": [
+                  {
+                    "$ref": "#/components/schemas/UpdatePrepTime"
+                  },
+                  {
+                    "$ref": "#/components/schemas/SetBusyMode"
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "prep_times": {
+                      "type": "object",
+                      "$ref": "#/components/schemas/PreparationTimes"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/bad_request_error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/unauthorized_error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/not_found_error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/internal_server_error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/delivery/store/{store_id}/update-fulfillment-configuration": {
+      "post": {
+        "summary": "Update Fulfillment Configuration",
+        "description": "Updates the fulfillment configuration for a store that uses Bring-Your-Own-Courier (BYOC). This endpoint is only available when the merchant is configured to handle BYOC orders.",
+        "operationId": "updateStoreFulfillmentConfiguration",
+        "tags": [
+          "SetFulfillmentConfiguration"
+        ],
+        "security": [
+          {
+            "auth": [
+              "eats.byoc.fulfillment.config"
+            ]
+          }
+        ],
+        "parameters": [
+          {
+            "in": "header",
+            "name": "Authorization",
+            "required": true,
+            "description": "Access token with 'eats.byoc.fulfillment.config' scope",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "store_id",
+            "in": "path",
+            "description": "A unique identifier for a store. This is the identifier that is expected to be quoted for support queries and is otherwise known as the ‘store id’.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateFulfillmentConfiguration"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/bad_request_error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/unauthorized_error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/not_found_error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/internal_server_error"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "auth": {
+        "type": "oauth2",
+        "description": "This API uses OAuth 2 with the implicit grant flow. [More info](https://developer.uber.com/docs/eats/guides/authentication)",
+        "flows": {
+          "implicit": {
+            "authorizationUrl": "https://auth.uber.com/oauth/v2/token",
+            "scopes": {
+              "eats.store": "Indicates a token has permission to update and retrieve store information.",
+              "eats.store.status": "Indicates a token has permission receive store status webhooks.",
+              "eats.byoc.fulfillment.config": "Indicates a token has permission to update BYOC store fulfillment configuration."
+            }
+          }
+        }
+      }
+    },
+    "schemas": {
+      "UpdateFulfillmentConfiguration": {
+        "type": "object",
+        "properties": {
+          "override_config": {
+            "type": "object",
+            "properties": {
+              "custom_min_etd_minutes": {
+                "type": "number",
+                "description": "The default delivery time for the store, specified in minutes. The maximum allowed value is 160 minutes.",
+                "example": 30
+              }
+            }
+          }
+        }
+      },
+      "UpdatePrepTime": {
+        "type": "object",
+        "properties": {
+          "default_prep_time": {
+            "type": "number",
+            "description": "The default preparation time for the store, specified in seconds. The maximum allowed value is 10,800 seconds (3 hours).",
+            "example": 500
+          }
+        }
+      },
+      "error": {
+        "type": "object",
+        "description": "bad_request",
+        "properties": {
+          "metadata": {
+            "type": "object",
+            "description": "Error message not standardized. Application code will provide contextual error message"
+          }
+        }
+      },
+      "SetBusyMode": {
+        "type": "object",
+        "properties": {
+          "delay_config": {
+            "description": "The prep time delay configurations for the store",
+            "properties": {
+              "delay_until": {
+                "type": "string",
+                "description": "Timestamp in RFC3339 format. Must be within an hour (inclusive) - past time indicates no delay set.",
+                "format": "date",
+                "example": "2016-09-01T10:11:12.123456-0500"
+              },
+              "delay_duration": {
+                "type": "number",
+                "description": "Time in seconds to further delay the preparation time of each order by. The maximum allowed value is 1,800 seconds (30 minutes).",
+                "format": "number",
+                "example": 600
+              }
+            }
+          }
+        }
+      },
+      "Store": {
+        "type": "object",
+        "description": "details of the store",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Unique identifier for a given store",
+            "example": "bd1ed236-ee79-11ed-a05b-0242ac120003"
+          },
+          "name": {
+            "type": "string",
+            "description": "Name of the store",
+            "example": "Uber's Pizza Palace"
+          },
+          "contact": {
+            "type": "object",
+            "$ref": "#/components/schemas/Contact"
+          },
+          "location": {
+            "type": "object",
+            "$ref": "#/components/schemas/Location"
+          },
+          "pickup_instructions": {
+            "type": "string",
+            "description": "pickup instructions for the store",
+            "example": "Enter from the north side marked by Delivery Pickup Arrows"
+          },
+          "timezone": {
+            "type": "string",
+            "description": "timezone the store is in",
+            "example": "America/New_York"
+          },
+          "fulfillment_type_availability": {
+            "type": "object",
+            "description": "fulfillment types that are available for the store",
+            "properties": {
+              "DELIVERY_BY_UBER": {
+                "type": "boolean",
+                "description": "Whether delivery by Uber is available.",
+                "example": true
+              },
+              "DELIVERY_BY_MERCHANT": {
+                "type": "boolean",
+                "description": "Whether delivery by the merchant is available.",
+                "example": false
+              },
+              "DINE_IN": {
+                "type": "boolean",
+                "description": "Whether dine-in is available.",
+                "example": false
+              },
+              "PICKUP": {
+                "type": "boolean",
+                "description": "Whether pickup is available.",
+                "example": true
+              }
+            },
+            "example": {
+              "DELIVERY_BY_UBER": true,
+              "DELIVERY_BY_MERCHANT": false,
+              "DINE_IN": false,
+              "PICKUP": true
+            }
+          },
+          "prep_times": {
+            "type": "object",
+            "$ref": "#/components/schemas/PreparationTimes"
+          },
+          "onboarding_status": {
+            "type": "string",
+            "description": "The onboarding status of the store\n| String    | Description |\n| ---- | ---- |\n| ACTIVE  | activated |\n| REMOVED | smushed from lost |\n| PENDING | everything else |\n| UNKNOWN | fallback |\n"
+          },
+          "auto_accept": {
+            "type": "boolean",
+            "description": "Whether auto accept is enabled for the store. This feature is only enabled by Uber for special cases.",
+            "example": false
+          },
+          "holiday_hours": {
+            "type": "object",
+            "description": "List of holidays and hours for the store, contains a collection of time periods",
+            "properties": {
+              "opening_hours": {
+                "type": "object",
+                "$ref": "#/components/schemas/TimeRange"
+              },
+              "date": {
+                "type": "string",
+                "description": "The date in YYYY-MM-DD format",
+                "example": "2023-02-20T00:00:00.000Z"
+              }
+            }
+          },
+          "ooi_config": {
+            "type": "object",
+            "$ref": "#/components/schemas/OOIConfig"
+          },
+          "merchant_contact_emails": {
+            "type": "string",
+            "description": "List of emails of internal contacts"
+          },
+          "orderability": {
+            "type": "object",
+            "description": "orderability-related configs for the store",
+            "$ref": "#/components/schemas/orderability"
+          },
+          "max_delivery_partners_allowed": {
+            "type": "number",
+            "description": "The maximum number of delivery partners/couriers allowed for the store",
+            "example": 1
+          },
+          "support_number": {
+            "type": "string",
+            "description": "The phone number Merchants can call for getting support",
+            "example": "1-833-275-3023"
+          },
+          "adjustment_config": {
+            "type": "object",
+            "description": "The config for performing price adjustment",
+            "$ref": "#/components/schemas/PriceAdjustmentConfig"
+          },
+          "partner_identifiers": {
+            "type": "object",
+            "$ref": "#/components/schemas/partner_identifiers"
+          },
+          "tax_configuration": {
+            "type": "object",
+            "description": "Tax configuration details specific to the store, such as Tax Area ID",
+            "$ref": "#/components/schemas/TaxConfiguration"
+          },
+          "uber_merchant_type": {
+            "type": "object",
+            "description": "Uber's internal standardized categorization of merchants.",
+            "$ref": "#/components/schemas/UberMerchantType"
+          }
+        }
+      },
+      "PreparationTimes": {
+        "type": "object",
+        "description": "Holds the default prep time and overrides for a store",
+        "properties": {
+          "default_value": {
+            "type": "number",
+            "description": "Default preparation time in seconds",
+            "example": 540
+          },
+          "rules": {
+            "type": "object",
+            "description": "Preparation times on specific days and times of week. Denotes a time period with a potentially different prep time for a Store",
+            "properties": {
+              "preparation_interval": {
+                "type": "object",
+                "$ref": "#/components/schemas/PreparationInterval"
+              }
+            }
+          },
+          "delay": {
+            "type": "object",
+            "description": "On-demand preparation time delays to apply during a fixed time window",
+            "properties": {
+              "status": {
+                "type": "object",
+                "$ref": "#/components/schemas/PreparationTimeDelayStatus"
+              },
+              "allowed": {
+                "type": "boolean",
+                "description": "Whether or not this store is allowed to set delays"
+              }
+            }
+          }
+        }
+      },
+      "PreparationInterval": {
+        "type": "object",
+        "properties": {
+          "default_value": {
+            "type": "number",
+            "description": "Default preparation time in seconds",
+            "example": 600
+          },
+          "start_time": {
+            "type": "object",
+            "$ref": "#/components/schemas/TimeOfWeek"
+          },
+          "end_time": {
+            "type": "object",
+            "$ref": "#/components/schemas/TimeOfWeek"
+          },
+          "preparation_time": {
+            "type": "number",
+            "description": "Preparation time in seconds",
+            "example": 600
+          }
+        }
+      },
+      "TimeOfWeek": {
+        "type": "object",
+        "description": "Time and day of week where the specified preparation time starts taking effect",
+        "properties": {
+          "day": {
+            "type": "string"
+          },
+          "hour": {
+            "type": "number"
+          },
+          "min": {
+            "type": "number"
+          }
+        }
+      },
+      "PreparationTimeDelayStatus": {
+        "type": "object",
+        "description": "The type of status, when the delay will end and the length of delay",
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "NORMAL",
+              "BUSY",
+              "VERY_BUSY"
+            ],
+            "description": "Values for the type of the delay status\n | String    | Description |\n | --------- | ----------- |\n | NORMAL | no delays applied because the store is operating at normal capacity |\n | BUSY    | moderate delays applied because the store is busy |\n | VERY_BUSY | large delays applied because the store is very busy |\n"
+          },
+          "is_active_until": {
+            "type": "string",
+            "description": "The time at which the delays will end. Only available if `type` is not NORMAL. NOTE timestamp in RFC3339 format.",
+            "example": "2016-09-01T10:11:12.123456-0500"
+          },
+          "delay_duration": {
+            "type": "number",
+            "description": "Time in seconds to delay the preparation time of each order by. Only available if `type` is not NORMAL",
+            "example": 540
+          }
+        }
+      },
+      "TimeRange": {
+        "type": "object",
+        "description": "Contain sorted, non-overlapping intervals for the store.",
+        "properties": {
+          "menu_hours": {
+            "type": "object",
+            "properties": {
+              "menu_hours": {
+                "type": "object",
+                "additionalProperties": {
+                  "type": "object",
+                  "properties": {
+                    "menu_hour_intervals": {
+                      "type": "object",
+                      "additionalProperties": {
+                        "type": "object",
+                        "properties": {
+                          "time_ranges": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "start_time": {
+                                  "type": "string",
+                                  "description": "The start time of the interval.",
+                                  "example": "12:00 AM"
+                                },
+                                "end_time": {
+                                  "type": "string",
+                                  "description": "The end time of the interval.",
+                                  "example": "11:59 PM"
+                                }
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "partner_identifiers": {
+        "type": "object",
+        "properties": {
+          "value": {
+            "type": "string",
+            "description": "Value of the identifier",
+            "example": "kxxx-fyBAlGAou3XgqZ5MH0J4f12"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "UNKNOWN",
+              "MERCHANT_STORE_ID",
+              "INTEGRATOR_STORE_ID",
+              "INTEGRATOR_BRAND_ID",
+              "ORDER_MANAGER_CLIENT_ID"
+            ],
+            "description": "Type of the identifier\n | String    | Description |\n | --------- | ----------- |\n | UNKNOWN | unknown type |\n | MERCHANT_STORE_ID | the storeID provided to Uber by the Partner |\n | INTEGRATOR_STORE_ID |  the storeID provided to Uber by the Integrator |\n | INTEGRATOR_BRAND_ID | the brandID provided to Uber by the Integrator that groups (i.e. chains) the store to a brand |\n | ORDER_MANAGER_CLIENT_ID | the orderManagerClientID provided to Uber that identifies the order manager in instances where a location has multiple devices configured |\n",
+            "example": "ORDER_MANAGER_CLIENT_ID"
+          }
+        }
+      },
+      "OOIConfig": {
+        "type": "object",
+        "description": "Holds the config for Out Of Item",
+        "properties": {
+          "is_substitute_item_enabled": {
+            "type": "boolean",
+            "description": "The customer can choose a substitute item from a pre-selected list in OOI case"
+          },
+          "is_store_replace_item_enabled": {
+            "type": "boolean",
+            "description": "The customer can choose that the store can replace the item in OOI case"
+          },
+          "is_cancel_order_enabled": {
+            "type": "boolean",
+            "description": "The customer can choose that the store can cancel an order in OOI case"
+          },
+          "is_remove_item_enabled": {
+            "type": "boolean",
+            "description": "The customer can choose that the store can remove the item in OOI case"
+          },
+          "ooi_eligibility": {
+            "type": "object",
+            "$ref": "#/components/schemas/OOIEligibility"
+          }
+        }
+      },
+      "GetStoresQueryParams": {
+        "type": "object",
+        "description": "Query parameters for Get Stores",
+        "properties": {
+          "next_page_token": {
+            "description": "Token used for requesting a specific page for a list of stores. Will be provided by pagination_data in the response if there is a next page.",
+            "type": "string",
+            "example": "ab1232ni31"
+          },
+          "page_size": {
+            "description": "The maximum number of stores that appear per page. Default value is 50.",
+            "type": "number",
+            "example": 10
+          }
+        }
+      },
+      "orderability": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "ONLINE",
+              "OFFLINE"
+            ],
+            "description": "The status of the store\n | String    | Description |\n | --------- | ----------- |\n | ONLINE | Store is online |\n | OFFLINE | Store is offline. Refer to `offline_reason` for the exact reason |\n"
+          },
+          "offline_reason": {
+            "type": "string",
+            "enum": [
+              "INVISIBLE",
+              "PAUSED_BY_UBER",
+              "PAUSED_BY_RESTAURANT",
+              "PAUSED_BY_API_INTEGRATION",
+              "OUT_OF_MENU_HOURS",
+              "UNKNOWN"
+            ],
+            "description": "The reason  the store is offline. Only applies to a store in the OFFLINE status\n | String    | Description |\n | --------- | ----------- |\n | INVISIBLE | Store is hidden from customers. This can only be toggled by Uber support. |\n | PAUSED_BY_UBER | Temporarily offline due to an Uber-initiated action; might still be visible to customers on the Uber Eats app, but shows as “Currently Unavailable” |\n | PAUSED_BY_RESTAURANT | Temporarily offline due to a merchant-initiated action; might still be visible to customers on the Uber Eats app, but shows as “Currently Unavailable” |\n | PAUSED_BY_API_INTEGRATION | Temporarily offline due to an api-initiated action; might still be visible to customers on the Uber Eats app, but shows as “Currently Unavailable” |\n | OUT_OF_MENU_HOURS | Outside of menu hours |\n | UNKNOWN | default fallback |\n"
+          },
+          "offline_reason_metadata": {
+            "type": "string",
+            "description": "if needed, the offline reason metadata corresponds to any of the PAUSED_BY_* reasons, indicating why the store was paused. If the store is ONLINE, then this field will be nil or empty. It will be UNKNOWN if it is set as offline due to an unknown reason by partner",
+            "enum": [
+              "UNFULFILL_RATE",
+              "INCIDENT_DETECTED_ON_ORDER_MANAGEMENT_APPLICATION",
+              "PCA_ERROR_RATE",
+              "PCA_LATENCY",
+              "FULFILLMENT_LATENCY",
+              "CLOSING_EARLY",
+              "PROBLEM_IN_RESTAURANT",
+              "OUT_OF_ITEM",
+              "NO_COURIER_AVAILABLE",
+              "UPTIME_CHECK_TIMEOUT",
+              "UPTIME_CHECK_OFFLINE"
+            ]
+          },
+          "is_visible": {
+            "type": "boolean",
+            "description": "Whether the store is visible to customers"
+          },
+          "is_orderable": {
+            "type": "boolean",
+            "description": "Whether the store can be ordered from"
+          },
+          "is_offline_until": {
+            "type": "string",
+            "description": "The time at which the store will be online again. Only applies to stores that are currently offline due to pauses initiated by the merchant or Uber.Note timestamp in RFC3339 format"
+          },
+          "next_open_time": {
+            "type": "string",
+            "description": "The next time that the store will be open.Note timestamp in RFC3339 format"
+          },
+          "next_close_time": {
+            "type": "string",
+            "description": "The next time that the store will be closed.Note timestamp in RFC3339 format"
+          }
+        }
+      },
+      "PriceAdjustmentConfig": {
+        "type": "object",
+        "properties": {
+          "is_price_adjustment_enabled": {
+            "type": "boolean",
+            "description": "Determines whether or not price adjustments are enabled on this order. By default, it is enabled",
+            "example": true
+          },
+          "maximum_price_adjustment": {
+            "type": "number",
+            "description": "The maximum price (in the local currency) the order can be adjusted.Note in amount_e5 format",
+            "example": 5
+          },
+          "requires_tax_rate_for_adjustment": {
+            "type": "boolean",
+            "description": "Determines whether store requires tax rate as input for performing price adjustments",
+            "example": true
+          },
+          "is_tax_inclusive": {
+            "type": "boolean",
+            "description": "Determines whether store is tax inclusive/exclusive",
+            "example": false
+          },
+          "positive_price_adjustment_reasons": {
+            "type": "string",
+            "enum": [
+              "REQUESTED_ADD_ONS",
+              "BIGGER_SIZE",
+              "NEW_ITEM_ADDED",
+              "OTHER"
+            ],
+            "description": "List of all selectable positive price adjustment reasons. For positive price adjustment\n | String    | Description |\n | --------- | ----------- |\n | REQUESTED_ADD_ONS | Customer requested an add on  |\n | BIGGER_SIZE | Customer requested bigger size item |\n | NEW_ITEM_ADDED |  A new item is added to the order |\n | OTHER | Other reasons. Note that the description field below must be populated if this is specified. |\n"
+          },
+          "negative_price_adjustment_reasons": {
+            "type": "string",
+            "enum": [
+              "ITEM_SOLD_OUT",
+              "REMOVED_ITEM",
+              "ADD_ON_UNAVAILABLE",
+              "OTHER"
+            ],
+            "description": "List of all selectable negative price adjustment reasons. For  negative price adjustment\n | String    | Description |\n | --------- | ----------- |\n | ITEM_SOLD_OUT | An item is sold out |\n | REMOVED_ITEM | An  item is removed from the order |\n | ADD_ON_UNAVAILABLE |  A requested add on is unavailable |\n | OTHER | Other reasons. Note that the description field below must be populated if this is specified. |\n"
+          }
+        }
+      },
+      "OOIEligibility": {
+        "type": "object",
+        "description": "Whether the store has Out of Item enabled and the reason if not",
+        "properties": {
+          "enabled": {
+            "type": "boolean",
+            "description": "Whether Out Of Item functions are enabled for the store"
+          },
+          "not_eligible_reason": {
+            "type": "string",
+            "description": "If not enabled, the reason why the store cannot have Out of Item functions"
+          }
+        }
+      },
+      "StoreInput": {
+        "type": "object",
+        "properties": {
+          "contact": {
+            "type": "object",
+            "$ref": "#/components/schemas/Contact"
+          },
+          "location": {
+            "type": "object",
+            "$ref": "#/components/schemas/Location"
+          },
+          "pickup_instructions": {
+            "type": "string",
+            "description": "pickup instructions for the store",
+            "example": "Enter from the north side marked by Delivery Pickup Arrows"
+          }
+        }
+      },
+      "Contact": {
+        "description": "Contact info for the store",
+        "properties": {
+          "email": {
+            "type": "string",
+            "description": "email of the contact",
+            "example": "abc@restaurant.com"
+          },
+          "name": {
+            "type": "string",
+            "description": "name of the contact",
+            "example": "Jane Doe"
+          },
+          "phone_number": {
+            "type": "string",
+            "description": "phone number of the contact",
+            "example": "+1-800-999-9999"
+          }
+        }
+      },
+      "Location": {
+        "description": "business location of the store",
+        "properties": {
+          "latitude": {
+            "type": "string",
+            "description": "latitude coordinate of the location",
+            "example": 25.525202
+          },
+          "longitude": {
+            "type": "string",
+            "description": "longitude coordinate of the location",
+            "example": -16.4636
+          },
+          "street_address_line_one": {
+            "type": "string",
+            "description": "full street address (line one)",
+            "example": "175 Greenwich St"
+          },
+          "street_address_line_two": {
+            "type": "string",
+            "description": "full street address continued (line two)",
+            "example": "2nd floor"
+          },
+          "city": {
+            "type": "string",
+            "description": "city of the location",
+            "example": "New York"
+          },
+          "country": {
+            "type": "string",
+            "description": "country of the location",
+            "example": "US"
+          },
+          "postal_code": {
+            "type": "string",
+            "example": 10007
+          },
+          "unit_number": {
+            "type": "string",
+            "description": "unit number of the location. NOTE that this is Customer provided. In the case of Google Places data, this may not be equal to what Google produces.",
+            "example": 2
+          },
+          "business_name": {
+            "type": "string",
+            "description": "the name of the business/building. NOTE that this is used in places like Japan where there isn’t really an address but rather a building/apartment name that is provided in the app.",
+            "example": "Uber Technologies Inc."
+          }
+        }
+      },
+      "PaginationData": {
+        "type": "object",
+        "properties": {
+          "next_page_token": {
+            "type": "string",
+            "description": "Token to retrieve the next page. This is only returned if there is a next page.",
+            "example": "abzxni31"
+          },
+          "page_size": {
+            "type": "number",
+            "description": "Number of stores in the response for this page",
+            "example": 20
+          }
+        }
+      },
+      "GetStores": {
+        "type": "object",
+        "properties": {
+          "next_page_token": {
+            "type": "string",
+            "description": "Key used for requesting a specific page for a list of stores. The next_key in the response is used to retrieve the next page",
+            "example": "abzxni31"
+          },
+          "page_size": {
+            "type": "number",
+            "description": "The maximum number of stores that appear per page. Note Default value is 50",
+            "example": 15
+          }
+        }
+      },
+      "StoreArray": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Unique identifier for a given store",
+            "example": "bd1ed236-ee79-11ed-a05b-0242ac120003"
+          },
+          "name": {
+            "type": "string",
+            "description": "Name of the store",
+            "example": "Uber's Pizza Palace"
+          },
+          "contact": {
+            "type": "object",
+            "$ref": "#/components/schemas/Contact"
+          },
+          "location": {
+            "type": "object",
+            "$ref": "#/components/schemas/Location"
+          },
+          "pickup_instructions": {
+            "type": "string",
+            "description": "Pickup instructions for the store",
+            "example": "Enter from the north side marked by Delivery Pickup Arrows"
+          },
+          "timezone": {
+            "type": "string",
+            "description": "Timezone the store is in",
+            "example": "America/New_York"
+          },
+          "onboarding_status": {
+            "type": "string",
+            "description": "The onboarding status of the store\n | String    | Description |\n | --------- | ----------- |\n | ACTIVE | activated |\n | REMOVED    | smushed from lost |\n | PENDING | everything else |\n | UNKNOWN | fallback |\n",
+            "example": "ACTIVE"
+          },
+          "merchant_contact_emails": {
+            "type": "array",
+            "description": "List of emails of internal contacts",
+            "items": {
+              "type": "string"
+            }
+          },
+          "prep_times": {
+            "type": "object",
+            "$ref": "#/components/schemas/PreparationTimes"
+          },
+          "tax_config": {
+            "type": "object",
+            "description": "Tax configuration details specific to the store, such as Tax Area ID",
+            "$ref": "#/components/schemas/TaxConfiguration"
+          },
+          "uber_merchant_type": {
+            "type": "object",
+            "description": "Uber's internal standardized categorization of merchants.",
+            "$ref": "#/components/schemas/UberMerchantType"
+          }
+        }
+      },
+      "UpdateStoreStatus": {
+        "type": "object",
+        "properties": {
+          "is_offline_until": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Timestamp in RFC3339 format. Indicates until when the store is offline.",
+            "example": "2023-06-21T17:08:30+00:00"
+          },
+          "status": {
+            "type": "string",
+            "description": "The status of the store.",
+            "enum": [
+              "ONLINE",
+              "OFFLINE"
+            ],
+            "example": "OFFLINE"
+          },
+          "reason": {
+            "type": "string",
+            "description": "The reason for the status change.",
+            "example": "Scheduled maintenance"
+          }
+        }
+      },
+      "TaxConfiguration": {
+        "type": "object",
+        "properties": {
+          "tax_configuration": {
+            "type": "string",
+            "description": "The tax identifier that represents a given store location. Depending on a given location’s tax configuration, this value may be used for tax calculation."
+          }
+        }
+      },
+      "UberMerchantType": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "description": "Uber's internal standardized categorization of merchants.",
+            "enum": [
+              "MERCHANT_TYPE_UNKNOWN",
+              "MERCHANT_TYPE_RESTAURANT",
+              "MERCHANT_TYPE_GROCERY",
+              "MERCHANT_TYPE_LIQUOR",
+              "MERCHANT_TYPE_SPECIALTY_FOOD",
+              "MERCHANT_TYPE_CONVENIENCE",
+              "MERCHANT_TYPE_PHARMACY",
+              "MERCHANT_TYPE_FLORIST",
+              "MERCHANT_TYPE_PET_SUPPLY",
+              "MERCHANT_TYPE_RETAIL",
+              "MERCHANT_TYPE_VIRTUAL_RESTAURANT"
+            ],
+            "example": "MERCHANT_TYPE_RESTAURANT"
+          }
+        }
+      },
+      "bad_request_error": {
+        "type": "object",
+        "description": "bad_request",
+        "properties": {
+          "code": {
+            "type": "string",
+            "example": "bad_request",
+            "description": "Description of the error."
+          },
+          "message": {
+            "type": "string",
+            "example": "Error message not standardized. Application code will provide contextual error message",
+            "description": "Description details of the error."
+          },
+          "metadata": {
+            "type": "object",
+            "description": "Additional metadata about the error.",
+            "properties": {
+              "field_violations": {
+                "type": "array",
+                "description": "A list of invalid or missing fields passed in the request.",
+                "items": {
+                  "type": "string",
+                  "example": "order_id, expand"
+                }
+              },
+              "should_retry": {
+                "type": "boolean",
+                "example": true,
+                "description": "Only provided for API Version 2.0.0 and higher. Indicates if the request should be retried."
+              },
+              "recommended_retry_interval_secs": {
+                "type": "integer",
+                "example": 60,
+                "description": "Only provided for API Version 2.0.0 and higher. The recommended wait interval in seconds between retries. Only provided if should_retry is true."
+              },
+              "reference_documentation_url": {
+                "type": "string",
+                "example": "https://developer.uber.com/docs/eats/references/api/order_suite",
+                "description": "Only provided for API Version 2.0.0 and higher. Link to reference documentation about the error."
+              },
+              "erroneous_field": {
+                "type": "string",
+                "example": "order_id",
+                "description": "Only provided for API Version 2.0.0 and higher. Indicates which field passed in could be changed to fix the error."
+              }
+            }
+          }
+        }
+      },
+      "unauthorized_error": {
+        "type": "object",
+        "description": "unauthorized",
+        "properties": {
+          "code": {
+            "type": "string",
+            "example": "unauthorized",
+            "description": "Description of the error."
+          },
+          "message": {
+            "type": "string",
+            "example": "Invalid OAuth 2.0 credentials provided. | Error message not standardized. Application code will provide contextual error message",
+            "description": "Description details of the error."
+          },
+          "metadata": {
+            "type": "object",
+            "description": "Additional metadata about the error.",
+            "$ref": "#/components/schemas/error_metadata"
+          }
+        }
+      },
+      "not_found_error": {
+        "type": "object",
+        "description": "not_found",
+        "properties": {
+          "code": {
+            "type": "string",
+            "example": "not_found",
+            "description": "Description of the error."
+          },
+          "message": {
+            "type": "string",
+            "example": "Please pass a valid identifier for the store. Please check and fix before retrying.",
+            "description": "Description details of the error."
+          }
+        }
+      },
+      "internal_server_error": {
+        "type": "object",
+        "description": "internal_server_error",
+        "properties": {
+          "code": {
+            "type": "string",
+            "example": "internal_server_error",
+            "description": "Description of the error."
+          },
+          "message": {
+            "type": "string",
+            "example": "An internal error has occurred. Please contact support if this persists.",
+            "description": "Description details of the error."
+          },
+          "metadata": {
+            "type": "object",
+            "description": "Additional metadata about the error.",
+            "$ref": "#/components/schemas/error_metadata"
+          }
+        }
+      },
+      "error_metadata": {
+        "type": "object",
+        "description": "Only provided for API Version 2.0.0 and higher. Additional metadata about an error.",
+        "properties": {
+          "should_retry": {
+            "type": "boolean",
+            "example": true,
+            "description": "Indicates if the request should be retried."
+          },
+          "recommended_retry_interval_secs": {
+            "type": "integer",
+            "example": 60,
+            "description": "The recommended wait interval in seconds between retries. Only provided if should_retry is true."
+          },
+          "reference_documentation_url": {
+            "type": "string",
+            "example": "https://developer.uber.com/docs/eats/references/api/store_suite",
+            "description": "Link to reference documentation about the error."
+          },
+          "erroneous_field": {
+            "type": "string",
+            "example": "order_id",
+            "description": "Indicates which field passed in could be changed to fix the error."
+          }
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,764 @@
+{
+ "data": {
+  "tree": {
+   "left_list": [
+    {
+     "id": 1884,
+     "name": "Introduction",
+     "title": "Introduction",
+     "content": "",
+     "is_leaf": 0,
+     "children": [
+      {
+       "id": 1886,
+       "name": "Introduction",
+       "title": "Introduction",
+       "content": "",
+       "is_leaf": 1,
+       "children": []
+      }
+     ]
+    },
+    {
+     "id": 1888,
+     "name": "Integration Guide",
+     "title": "Integration Guide",
+     "content": "",
+     "is_leaf": 0,
+     "children": [
+      {
+       "id": 1890,
+       "name": "Basic Process Overview",
+       "title": "Basic Process Overview",
+       "content": "",
+       "is_leaf": 1,
+       "children": []
+      },
+      {
+       "id": 2060,
+       "name": "Obtaining Credentials",
+       "title": "Obtaining Credentials",
+       "content": "",
+       "is_leaf": 1,
+       "children": []
+      },
+      {
+       "id": 1892,
+       "name": "Before Start Coding",
+       "title": "Before Start Coding",
+       "content": "",
+       "is_leaf": 1,
+       "children": []
+      },
+      {
+       "id": 1894,
+       "name": "Our Authorization API Module",
+       "title": "Our Authorization API Module",
+       "content": "",
+       "is_leaf": 1,
+       "children": []
+      },
+      {
+       "id": 1896,
+       "name": "Our Store API Module",
+       "title": "Our Store API Module",
+       "content": "",
+       "is_leaf": 1,
+       "children": []
+      },
+      {
+       "id": 1898,
+       "name": "Our Menu API Module",
+       "title": "Our Menu API Module",
+       "content": "",
+       "is_leaf": 1,
+       "children": []
+      },
+      {
+       "id": 2058,
+       "name": "Our Grocery Menu API Module",
+       "title": "Our Grocery Menu API Module",
+       "content": "",
+       "is_leaf": 1,
+       "children": []
+      },
+      {
+       "id": 2052,
+       "name": "Our Stock API Module",
+       "title": "Our Stock API Module",
+       "content": "",
+       "is_leaf": 1,
+       "children": []
+      },
+      {
+       "id": 1900,
+       "name": "Our Orders API Module",
+       "title": "Our Orders API Module",
+       "content": "",
+       "is_leaf": 1,
+       "children": []
+      },
+      {
+       "id": 1902,
+       "name": "Webhooks",
+       "title": "Webhooks",
+       "content": "",
+       "is_leaf": 1,
+       "children": []
+      },
+      {
+       "id": 1904,
+       "name": "Before Going Live",
+       "title": "Before Going Live",
+       "content": "",
+       "is_leaf": 1,
+       "children": []
+      }
+     ]
+    },
+    {
+     "id": 1906,
+     "name": "Authorization API",
+     "title": "Authorization API",
+     "content": "",
+     "is_leaf": 0,
+     "children": [
+      {
+       "id": 1908,
+       "name": "Get Authtoken",
+       "title": "Get Authtoken",
+       "content": "",
+       "is_leaf": 1,
+       "children": []
+      },
+      {
+       "id": 1910,
+       "name": "Refresh Authtoken",
+       "title": "Refresh Authtoken",
+       "content": "",
+       "is_leaf": 1,
+       "children": []
+      },
+      {
+       "id": 1912,
+       "name": "Get Authorization Web Page",
+       "title": "Get Authorization Web Page",
+       "content": "",
+       "is_leaf": 1,
+       "children": []
+      }
+     ]
+    },
+    {
+     "id": 1914,
+     "name": "Store API",
+     "title": "Store API",
+     "content": "",
+     "is_leaf": 0,
+     "children": [
+      {
+       "id": 1916,
+       "name": "Bind/Unbind Store",
+       "title": "Bind/Unbind Store",
+       "content": "",
+       "is_leaf": 1,
+       "children": []
+      },
+      {
+       "id": 1918,
+       "name": "Set Store Order Confirmation Method",
+       "title": "Set Store Order Confirmation Method",
+       "content": "",
+       "is_leaf": 1,
+       "children": []
+      },
+      {
+       "id": 1920,
+       "name": "Get Store Details",
+       "title": "Get Store Details(recommend)",
+       "content": "",
+       "is_leaf": 1,
+       "children": []
+      },
+      {
+       "id": 1922,
+       "name": "Update Store Information",
+       "title": "Update Store Information(recommend)",
+       "content": "",
+       "is_leaf": 1,
+       "children": []
+      },
+      {
+       "id": 1924,
+       "name": "Get Store Categories",
+       "title": "Get Store Categories",
+       "content": "",
+       "is_leaf": 1,
+       "children": []
+      },
+      {
+       "id": 1926,
+       "name": "Set Store Status",
+       "title": "Set Store Status(recommend)",
+       "content": "",
+       "is_leaf": 1,
+       "children": []
+      },
+      {
+       "id": 1928,
+       "name": "Set Store Cancellation/Refund",
+       "title": "Set Store Cancellation/Refund",
+       "content": "",
+       "is_leaf": 1,
+       "children": []
+      },
+      {
+       "id": 1930,
+       "name": "Set Store Delivery Area",
+       "title": "Set Store Delivery Area",
+       "content": "",
+       "is_leaf": 1,
+       "children": []
+      },
+      {
+       "id": 1932,
+       "name": "List All Stores",
+       "title": "List Bind Stores",
+       "content": "",
+       "is_leaf": 1,
+       "children": []
+      },
+      {
+       "id": 1934,
+       "name": "Store Webhooks",
+       "title": "List Authorized Stores",
+       "content": "",
+       "is_leaf": 1,
+       "children": []
+      },
+      {
+       "id": 2040,
+       "name": "List Authorized Stores",
+       "title": "Store Webhooks",
+       "content": "",
+       "is_leaf": 1,
+       "children": []
+      }
+     ]
+    },
+    {
+     "id": 1936,
+     "name": "Menu API",
+     "title": "Food Menu API",
+     "content": "",
+     "is_leaf": 0,
+     "children": [
+      {
+       "id": 1938,
+       "name": "Get Store Menu Details",
+       "title": "Get Store Menu Details",
+       "content": "",
+       "is_leaf": 1,
+       "children": []
+      },
+      {
+       "id": 1940,
+       "name": "Upload Store Menu Details",
+       "title": "Upload Store Menu Details(recommend)",
+       "content": "",
+       "is_leaf": 1,
+       "children": []
+      },
+      {
+       "id": 1942,
+       "name": "Get Menu Upload Task Info",
+       "title": "Get Menu Upload Task Info(recommend)",
+       "content": "",
+       "is_leaf": 1,
+       "children": []
+      },
+      {
+       "id": 1944,
+       "name": "Update One Item",
+       "title": "Update One Item",
+       "content": "",
+       "is_leaf": 1,
+       "children": []
+      },
+      {
+       "id": 1946,
+       "name": "Update Item Status",
+       "title": "Update Item Status",
+       "content": "",
+       "is_leaf": 1,
+       "children": []
+      },
+      {
+       "id": 1948,
+       "name": "Update Modifier Group",
+       "title": "Update Modifier Group",
+       "content": "",
+       "is_leaf": 1,
+       "children": []
+      },
+      {
+       "id": 2030,
+       "name": "Upload Image",
+       "title": "Upload Image",
+       "content": "",
+       "is_leaf": 1,
+       "children": []
+      },
+      {
+       "id": 2034,
+       "name": "Get Image Url List",
+       "title": "Get Image Url List",
+       "content": "",
+       "is_leaf": 1,
+       "children": []
+      },
+      {
+       "id": 2036,
+       "name": "Menu Webhooks",
+       "title": "Menu Webhooks",
+       "content": "",
+       "is_leaf": 1,
+       "children": []
+      }
+     ]
+    },
+    {
+     "id": 2054,
+     "name": "Grocery Menu API",
+     "title": "Grocery Menu API",
+     "content": "",
+     "is_leaf": 0,
+     "children": [
+      {
+       "id": 2056,
+       "name": "Upload Grocery Menu Details",
+       "title": "Upload Grocery Menu Details",
+       "content": "",
+       "is_leaf": 1,
+       "children": []
+      },
+      {
+       "id": 2064,
+       "name": "Get Grocery Menu Upload Task Info(recommend)",
+       "title": "Get Grocery Menu Upload Task Info(recommend)",
+       "content": "",
+       "is_leaf": 1,
+       "children": []
+      },
+      {
+       "id": 2066,
+       "name": "Grocery Menu Webhooks",
+       "title": "Grocery Menu Webhooks",
+       "content": "",
+       "is_leaf": 1,
+       "children": []
+      },
+      {
+       "id": 2069,
+       "name": "SFTP Menu Sycn",
+       "title": "SFTP Menu Sycn",
+       "content": "",
+       "is_leaf": 1,
+       "children": []
+      }
+     ]
+    },
+    {
+     "id": 2048,
+     "name": "Stock API",
+     "title": "Stock API",
+     "content": "",
+     "is_leaf": 0,
+     "children": [
+      {
+       "id": 2050,
+       "name": "Update One Store Stock",
+       "title": "Update One Store Stock",
+       "content": "",
+       "is_leaf": 1,
+       "children": []
+      }
+     ]
+    },
+    {
+     "id": 1952,
+     "name": "Order API",
+     "title": "Order API",
+     "content": "",
+     "is_leaf": 0,
+     "children": [
+      {
+       "id": 1954,
+       "name": "Get Order Details",
+       "title": "Get Order Details",
+       "content": "",
+       "is_leaf": 1,
+       "children": []
+      },
+      {
+       "id": 1956,
+       "name": "Confirm Order",
+       "title": "Confirm Order(recommend)",
+       "content": "",
+       "is_leaf": 1,
+       "children": []
+      },
+      {
+       "id": 2046,
+       "name": "Confirm Cash Payment",
+       "title": "Confirm Cash Payment",
+       "content": "",
+       "is_leaf": 1,
+       "children": []
+      },
+      {
+       "id": 1958,
+       "name": "Cancel Order",
+       "title": "Cancel Order(recommend)",
+       "content": "",
+       "is_leaf": 1,
+       "children": []
+      },
+      {
+       "id": 2073,
+       "name": "Order Partial Cancel",
+       "title": "Order Partial Cancel",
+       "content": "",
+       "is_leaf": 1,
+       "children": []
+      },
+      {
+       "id": 1960,
+       "name": "Promotions",
+       "title": "Promotions",
+       "content": "",
+       "is_leaf": 1,
+       "children": []
+      },
+      {
+       "id": 1962,
+       "name": "Handle Cancellation Requests",
+       "title": "Handle Cancellation Requests",
+       "content": "",
+       "is_leaf": 1,
+       "children": []
+      },
+      {
+       "id": 1964,
+       "name": "Handle Refund Requests",
+       "title": "Handle Refund Requests",
+       "content": "",
+       "is_leaf": 1,
+       "children": []
+      },
+      {
+       "id": 2026,
+       "name": "Order Ready",
+       "title": "Order Ready",
+       "content": "",
+       "is_leaf": 1,
+       "children": []
+      },
+      {
+       "id": 2028,
+       "name": "Order Delivered",
+       "title": "Order Delivered",
+       "content": "",
+       "is_leaf": 1,
+       "children": []
+      },
+      {
+       "id": 2038,
+       "name": "Order Webhooks",
+       "title": "Order Webhooks(recommend)",
+       "content": "",
+       "is_leaf": 1,
+       "children": []
+      },
+      {
+       "id": 2068,
+       "name": "Order Verification",
+       "title": "Order Verification",
+       "content": "",
+       "is_leaf": 1,
+       "children": []
+      },
+      {
+       "id": 2075,
+       "name": "Adjust Order Items",
+       "title": "Adjust Order Items",
+       "content": "",
+       "is_leaf": 1,
+       "children": []
+      }
+     ]
+    },
+    {
+     "id": 2042,
+     "name": "Reports API",
+     "title": "Reports API",
+     "content": "",
+     "is_leaf": 0,
+     "children": [
+      {
+       "id": 2044,
+       "name": "Get Payment Reconciliation Report",
+       "title": "Payment Reconciliation Report",
+       "content": "",
+       "is_leaf": 1,
+       "children": []
+      }
+     ]
+    },
+    {
+     "id": 1968,
+     "name": "Testing and Debugging",
+     "title": "Testing and Debugging",
+     "content": "",
+     "is_leaf": 0,
+     "children": [
+      {
+       "id": 1970,
+       "name": "API Reference",
+       "title": "API Reference",
+       "content": "",
+       "is_leaf": 1,
+       "children": []
+      },
+      {
+       "id": 1972,
+       "name": "Testing the Integration",
+       "title": "Testing the Integration",
+       "content": "",
+       "is_leaf": 1,
+       "children": []
+      },
+      {
+       "id": 1974,
+       "name": "Error Handling and Solving Issues",
+       "title": "Error Handling and Solving Issues",
+       "content": "",
+       "is_leaf": 1,
+       "children": []
+      }
+     ]
+    },
+    {
+     "id": 1976,
+     "name": "Tools Introduction",
+     "title": "Tools Introduction",
+     "content": "",
+     "is_leaf": 0,
+     "children": [
+      {
+       "id": 1978,
+       "name": "Our Tools",
+       "title": "Our Tools",
+       "content": "",
+       "is_leaf": 1,
+       "children": []
+      },
+      {
+       "id": 1980,
+       "name": "Qualifications Management",
+       "title": "Qualifications Management",
+       "content": "",
+       "is_leaf": 1,
+       "children": []
+      },
+      {
+       "id": 1982,
+       "name": "Application Management",
+       "title": "Application Management",
+       "content": "",
+       "is_leaf": 1,
+       "children": []
+      },
+      {
+       "id": 1984,
+       "name": "Order Monitoring",
+       "title": "Order Monitoring",
+       "content": "",
+       "is_leaf": 1,
+       "children": []
+      },
+      {
+       "id": 1986,
+       "name": "API Monitoring",
+       "title": "API Monitoring",
+       "content": "",
+       "is_leaf": 1,
+       "children": []
+      },
+      {
+       "id": 1988,
+       "name": "Store Management",
+       "title": "Store Management",
+       "content": "",
+       "is_leaf": 1,
+       "children": []
+      },
+      {
+       "id": 1990,
+       "name": "Sandbox Environment",
+       "title": "Sandbox Environment",
+       "content": "",
+       "is_leaf": 1,
+       "children": []
+      },
+      {
+       "id": 1992,
+       "name": "Permissions Management",
+       "title": "Permissions Management",
+       "content": "",
+       "is_leaf": 1,
+       "children": []
+      },
+      {
+       "id": 1994,
+       "name": "Q&A System",
+       "title": "Q&A System",
+       "content": "",
+       "is_leaf": 1,
+       "children": []
+      }
+     ]
+    },
+    {
+     "id": 1996,
+     "name": "Glossary",
+     "title": "Glossary",
+     "content": "",
+     "is_leaf": 0,
+     "children": [
+      {
+       "id": 1998,
+       "name": "Glossary",
+       "title": "Glossary",
+       "content": "",
+       "is_leaf": 1,
+       "children": []
+      }
+     ]
+    },
+    {
+     "id": 2000,
+     "name": "Changelog",
+     "title": "Changelog",
+     "content": "",
+     "is_leaf": 0,
+     "children": [
+      {
+       "id": 2002,
+       "name": "Changelog",
+       "title": "Changelog",
+       "content": "",
+       "is_leaf": 1,
+       "children": []
+      }
+     ]
+    },
+    {
+     "id": 2004,
+     "name": "Old Endpoint Versions",
+     "title": "Old Endpoint Versions",
+     "content": "",
+     "is_leaf": 0,
+     "children": [
+      {
+       "id": 2006,
+       "name": "Upload Store Menu Details",
+       "title": "Upload Store Menu Details",
+       "content": "",
+       "is_leaf": 1,
+       "children": []
+      },
+      {
+       "id": 2008,
+       "name": "Get Store Menu Details",
+       "title": "Get Store Menu Details",
+       "content": "",
+       "is_leaf": 1,
+       "children": []
+      },
+      {
+       "id": 2010,
+       "name": "Update One Item",
+       "title": "Update One Item",
+       "content": "",
+       "is_leaf": 1,
+       "children": []
+      },
+      {
+       "id": 2012,
+       "name": "Update Item Status",
+       "title": "Update Item Status",
+       "content": "",
+       "is_leaf": 1,
+       "children": []
+      }
+     ]
+    },
+    {
+     "id": 2014,
+     "name": "FAQ",
+     "title": "FAQ",
+     "content": "",
+     "is_leaf": 0,
+     "children": [
+      {
+       "id": 2016,
+       "name": "Authorization and Testing",
+       "title": "Authorization and Testing",
+       "content": "",
+       "is_leaf": 1,
+       "children": []
+      },
+      {
+       "id": 2018,
+       "name": "Stores",
+       "title": "Stores",
+       "content": "",
+       "is_leaf": 1,
+       "children": []
+      },
+      {
+       "id": 2020,
+       "name": "Orders",
+       "title": "Orders",
+       "content": "",
+       "is_leaf": 1,
+       "children": []
+      },
+      {
+       "id": 2022,
+       "name": "Payments",
+       "title": "Payments",
+       "content": "",
+       "is_leaf": 1,
+       "children": []
+      },
+      {
+       "id": 2024,
+       "name": "Menus",
+       "title": "Menus",
+       "content": "",
+       "is_leaf": 1,
+       "children": []
+      }
+     ]
+    }
+   ],
+   "root_id": 2
+  },
+  "tree_1st_left_leaf": 1886
+ },
+ "errmsg": "Request succeeded",
+ "errno": 0,
+ "traceid": "0a9dc0de6a97b502000005f5076afbda"
+}
