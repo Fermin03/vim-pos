@@ -14,7 +14,7 @@
     "test": "turbo run test",
     "_comment_test_functions": "supabase/functions es codigo Deno y no esta en el workspace de pnpm; sus modulos puros se prueban con el runner de Node",
     "auditar:consultas": "node scripts/auditar-consultas.mjs",
-    "test:functions": "node --test --experimental-strip-types supabase/functions/_shared/pac/*.test.ts",
+    "test:functions": "node --test --experimental-strip-types supabase/functions/_shared/pac/*.test.ts supabase/functions/_shared/delivery/*.test.ts",
     "_comment_sitio": "sitio-web es HTML estatico sin build ni dependencias; se genera y se prueba con Node pelado",
     "sitio:generar": "node sitio-web/_agentes/generar.mjs",
     "sitio:servir": "node sitio-web/_agentes/servidor.mjs",

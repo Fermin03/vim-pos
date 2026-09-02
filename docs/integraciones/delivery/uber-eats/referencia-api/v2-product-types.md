@@ -1,0 +1,365 @@
+<!-- fuente: https://developer.uber.com/docs/eats/references/api/v2/product-types -->
+## Uber Product Types
+
+**Access to These APIs May Require Written Approval From Uber**
+
+Uber’s APIs are always under development and as such are subject to changes according to our Versioning & Upgrade policy. As part of Uber’s ongoing privacy improvements, we’ve updated our Developer API program with new scope access policies for third party applications. For further information, please refer to our Getting Started guide in the navigation panel.
+
+## Uber Product Types
+
+The following lists the different product types an item can be classified as. Be as specific as possible
+
+-   ANIMALS\_AND\_PET\_SUPPLIES
+    -   LIVE\_ANIMALS
+    -   BIRD\_SUPPLIES
+    -   CAT\_SUPPLIES
+    -   DOG\_SUPPLIES
+    -   FISH\_SUPPLIES
+    -   REPTILE\_AND\_AMPHIBIAN\_SUPPLIES
+    -   SMALL\_ANIMAL\_SUPPLIES
+    -   OTHER\_PET\_SUPPLIES
+-   APPAREL\_AND\_ACCESSORIES
+-   ARTS\_AND\_ENTERTAINMENT
+    -   ARTS\_AND\_CRAFTS
+    -   MUSICAL\_INSTRUMENTS\_AND\_ACCESSORIES
+    -   PARTY\_AND\_OCCASION
+-   BABY\_AND\_TODDLER
+    -   BABY\_BATH\_AND\_BODY\_CARE
+    -   BABY\_DIAPERING\_AND\_WIPES
+    -   BABY\_NURSING\_AND\_FEEDING
+    -   BABY\_STROLLERS
+    -   BABY\_CAR\_SEATS
+    -   BABY\_CARRIERS
+    -   BABY\_TRANSPORT\_ACCESSORIES
+    -   BABY\_BEDDING\_AND\_DECOR
+    -   BABY\_FURNITURE\_AND\_SAFETY\_ACCESSORIES
+    -   BABY\_CLOTHING\_AND\_ACCESSORIES
+    -   BABY\_TOYS\_AND\_ACTIVITY\_EQUIPMENT
+-   BEVERAGE
+    -   BEVERAGE\_ALCOHOLIC
+        -   BEVERAGE\_ALCOHOLIC\_BEER
+        -   BEVERAGE\_ALCOHOLIC\_WINE
+        -   LIQUORS\_AND\_SPIRITS
+        -   BEVERAGE\_ALCOHOLIC\_HARD\_SELTZERS\_AND\_ALTERNATIVES
+        -   HARD\_CIDER
+        -   SAKE
+        -   SHOCHU
+    -   BEVERAGE\_NON-ALCOHOLIC
+        -   BEVERAGE\_NON-ALCOHOLIC\_SOFT\_DRINKS
+        -   BEVERAGE\_NON-ALCOHOLIC\_COFFEE
+        -   BEVERAGE\_NON-ALCOHOLIC\_TEA
+        -   BEVERAGE\_NON-ALCOHOLIC\_WATER\_AND\_SELTZER
+        -   JUICE
+        -   POWDERED\_DRINK\_MIXES
+        -   SPORTS\_ENERGY\_AND\_ELECTROLYTE\_DRINKS
+        -   MILK\_EGGNOG\_AND\_BUTTERMILK
+        -   MEAL\_REPLACEMENTS\_AND\_PROTEIN\_DRINKS
+        -   BEVERAGE\_NON-ALCOHOLIC\_WINE
+        -   BEVERAGE\_NON-ALCOHOLIC\_BEER
+        -   BEVERAGE\_NON-ALCOHOLIC\_SPIRITS
+        -   NON-ALCOHOLIC\_COCKTAIL\_MIXERS
+-   BUSINESS\_AND\_INDUSTRIAL
+-   CAMERAS\_AND\_OPTICS
+-   CANNABIS
+    -   CANNABIS\_VAPE
+    -   CANNABIS\_EDIBLE
+    -   CANNABIS\_BEVERAGE
+    -   CANNABIS\_TOPICAL
+    -   CANNABIS\_EXTRACT
+    -   CANNABIS\_FLOWER
+    -   CANNABIS\_PRE-ROLL
+    -   CANNABIS\_OIL
+    -   CANNABIS\_CAPSULE
+    -   CANNABIS\_SPRAY
+    -   CANNABIS\_OTHER
+-   ELECTRONICS
+-   FOOD
+    -   FOOD\_RAW\_MEATS\_AND\_FISH
+        -   PORK
+        -   BEEF
+        -   CHICKEN
+        -   TURKEY
+        -   OTHER\_POULTRY
+        -   FISH\_AND\_SEAFOOD
+        -   LAMB
+        -   HOT\_DOGS\_SAUSAGES\_AND\_BACON
+        -   LUNCH\_AND\_DELI\_MEAT
+        -   MEAT\_AND\_SEAFOOD\_GIFTS
+    -   TOFU\_SOY\_AND\_MEAT\_ALTERNATIVES
+        -   MEAT\_ALTERNATIVES
+        -   SEITAN
+        -   TEMPEH
+        -   TOFU
+    -   FOOD\_PRODUCE
+        -   FRESH\_FRUIT
+        -   FRESH\_VEGETABLES
+        -   FRESH\_HERBS
+        -   PRE-PACKAGED\_FRUIT\_AND\_VEGETABLES
+    -   FOOD\_BAKERY
+        -   BAGELS
+        -   BAKERY\_ASSORTMENTS
+        -   BREADS\_AND\_BUNS
+        -   CAKES\_AND\_DESSERT\_BARS
+        -   COFFEE\_CAKES
+        -   CUPCAKES
+        -   DONUTS
+        -   ICE\_CREAM\_CONES
+        -   MUFFINS
+        -   PASTRIES\_AND\_SCONES
+        -   PIES\_AND\_TARTS
+        -   TACO\_SHELLS\_AND\_TOSTADAS
+        -   TORTILLAS\_AND\_WRAPS
+    -   CANDIED\_AND\_CHOCOLATE\_COVERED\_FRUIT
+    -   CANDY\_COOKIES\_AND\_CHOCOLATE
+        -   CANDY\_AND\_CHOCOLATE
+        -   COOKIES\_AND\_SWEET\_BISCUITS
+    -   FOOD\_SNACKS\_AND\_CANDY
+        -   APPLESAUCE\_AND\_FRUIT\_CUPS
+        -   BREADSTICKS
+        -   BARS
+        -   CHEESE\_PUFFS
+        -   CHIPS\_AND\_CRISPS
+        -   CRACKERS
+        -   CROUTONS
+        -   DRIED\_FRUIT\_AND\_RAISINS
+        -   FRUIT\_LEATHER
+        -   FRUIT\_SNACKS
+        -   GUMN\_AND\_MINTS
+        -   ICE\_CREAM\_CONES\_AND\_TOPPINGS
+        -   JERKY\_AND\_PORK\_RINDS
+        -   NUTS\_AND\_SEEDS
+        -   POPCORN
+        -   PRETZELS
+        -   PUDDING\_AND\_GELATIN\_SNACKS
+        -   PUFFED\_RICE\_CAKES
+        -   SALAD\_TOPPINGS
+        -   SESAME\_STICKS
+        -   SNACK\_CAKES
+        -   STICKY\_RICE\_CAKES
+        -   TRAIL\_AND\_SNACK\_MIXES
+    -   FOOD\_FROZEN\_FOODS
+        -   FROZEN\_APPETIZERS\_AND\_SNACKS
+        -   FROZEN\_BREAD\_AND\_DOUGH
+        -   FROZEN\_BREAKFAST\_FOODS
+        -   FROZEN\_DESSERTS\_AND\_TOPPINGS
+        -   FROZEN\_FRUIT
+        -   ICE
+        -   ICE\_CREAM\_AND\_NOVELTIES
+        -   FROZEN\_JUICE
+        -   FROZEN\_MEALS\_AND\_ENTREES
+        -   FROZEN\_MEATS
+        -   FROZEN\_PASTA\_AND\_SAUCES
+        -   FROZEN\_PIZZA
+        -   FROZEN\_POTATOES\_AND\_ONION\_RINGS
+        -   FROZEN\_FISH\_AND\_SEAFOOD
+        -   FROZEN\_VEGETABLES
+    -   FOOD\_DAIRY
+        -   BUTTER\_AND\_MARGARINE
+        -   CHEESE
+        -   COFFEE\_CREAMER
+        -   COTTAGE\_CHEESE
+        -   CREAM
+        -   EGGS
+        -   SOUR\_CREAM
+        -   WHIPPED\_CREAM
+        -   YOGURT
+    -   FOOD\_CONDIMENTS
+        -   COCKTAIL\_SAUCE
+        -   CURRY\_SAUCE
+        -   DESSERT\_TOPPINGS
+        -   FISH\_SAUCE
+        -   GRAVY
+        -   HONEY
+        -   HORSERADISH\_SAUCE
+        -   HOT\_SAUCE
+        -   KETCHUP
+        -   MARINADES\_AND\_GRILLING\_SAUCES
+        -   MAYONNAISE
+        -   MUSTARD
+        -   OLIVES\_AND\_CAPERS
+        -   PASTA\_SAUCE
+        -   PICKLED\_FRUITS\_AND\_VEGETABLES
+        -   PIZZA\_SAUCE
+        -   RELISH\_AND\_CHUTNEY
+        -   SALAD\_DRESSING
+        -   SATAY\_SAUCE
+        -   SOY\_SAUCE
+        -   SWEET\_AND\_SOUR\_SAUCES
+        -   SYRUP
+        -   TAHINI
+        -   TARTAR\_SAUCE
+        -   WHITE\_AND\_CREAM\_SAUCES
+        -   WORCESTERSHIRE\_SAUCE
+    -   COOKING\_AND\_BAKING\_INGREDIENTS
+        -   BAKING\_CHIPS
+        -   BAKING\_CHOCOLATE
+        -   BAKING\_FLAVORS\_AND\_EXTRACTS
+        -   BAKING\_MIXERS
+        -   BAKING\_POWDER
+        -   BAKING\_SODA
+        -   BATTER\_AND\_COATING\_MIXES
+        -   BEAN\_PASTE
+        -   BREAD\_CRUMBS
+        -   CANNED\_AND\_DRY\_MILK
+        -   COOKIE\_DECORATING\_KITS
+        -   COOKING\_OILS
+        -   COOKING\_STARCH
+        -   COOKING\_WINE
+        -   CORN\_SYRUP
+        -   DOUGH
+        -   EDIBLE\_BAKING\_DECORATIONS
+        -   EGG\_REPLACERS
+        -   FLOSS\_SUGAR
+        -   FLOUR
+        -   FOOD\_COLORING
+        -   FROSTING\_AND\_ICING
+        -   LEMON\_AND\_LIME\_JUICE
+        -   MARSHMALLOWS
+        -   MEAL
+        -   MOLASSES
+        -   PIE\_AND\_PASTRY\_FILLINGS
+        -   SHORTENING\_AND\_LARD
+        -   STARTER\_CULTURES
+        -   SUGAR\_AND\_SWEETENERS
+        -   TAPIOCA\_PEARLS
+        -   TOMATO\_PASTE
+        -   UNFLAVORED\_GELATIN
+        -   VINEGAR
+        -   WAFFLE\_AND\_PANCAKE\_MIXES
+        -   YEAST
+    -   DIPS\_AND\_SPREADS
+        -   APPLE\_BUTTER
+        -   CHEESE\_DIPS\_AND\_SPREADS
+        -   CREAM\_CHEESE
+        -   GUACAMOLE
+        -   HUMMUS
+        -   JAMS\_AND\_JELLIES
+        -   NUT\_BUTTERS
+        -   SALSA
+        -   TAPENADE
+        -   VEGETABLE\_DIP
+    -   GRAINS\_RICE\_AND\_LEGUMES
+        -   AMARANTH
+        -   BARLEY
+        -   BUCKWHEAT
+        -   MILLET
+        -   QUINOA
+        -   RICE
+        -   RYE
+        -   WHEAT
+        -   DRIED\_BEANS
+        -   DRIED\_LENTILS\_AND\_PEAS
+        -   CEREAL\_AND\_GRANOLA
+        -   OATS\_GRITS\_AND\_HOT\_CEREAL
+    -   CEREAL\_OATMEAL\_AND\_GRANOLA
+        -   CEREAL\_AND\_GRANOLA
+        -   OATS\_GRITS\_AND\_HOT\_CEREAL
+    -   FOOD\_PREPARED\_FOOD
+    -   INSTANT\_MEALS
+    -   PASTA\_AND\_NOODLES
+    -   SEASONINGS\_AND\_SPICES
+    -   CANNED\_PRODUCE\_AND\_SOUPS
+        -   CANNED\_AND\_PREPARED\_BEANS\_LENTILS\_AND\_PEAS
+        -   CANNED\_AND\_JARRED\_FRUITS
+        -   CANNED\_MEAT\_AND\_SEAFOOD
+        -   CANNED\_AND\_BOXED\_SOUP\_STOCKS\_AND\_BROTHS
+    -   FOOD\_AND\_NON-ALCOHOLIC\_BEVERAGE\_COMBO
+    -   FOOD\_AND\_ALCOHOLIC\_BEVERAGE\_COMBO
+-   FURNITURE
+-   HARDWARE
+-   HEALTH\_AND\_BEAUTY
+    -   HEALTH\_AND\_BEAUTY\_FAMILY\_PLANNING
+        -   MATURE\_CONDOMS
+        -   MATURE\_LUBRICANTS
+    -   HEALTH\_AND\_BEAUTY\_FIRST\_AID
+    -   VITAMINS\_AND\_SUPPLEMENTS
+    -   MEDICAL\_SUPPLIES\_AND\_MONITORS
+    -   HEALTH\_AND\_BEAUTY\_MEDICINE\_AND\_DRUGS
+        -   HEALTH\_AND\_BEAUTY\_MEDICINE\_AND\_DRUGS
+        -   HEALTH\_AND\_BEAUTY\_MEDICINE\_AND\_DRUGS
+        -   HEALTH\_AND\_BEAUTY\_MEDICINE\_AND\_DRUGS
+        -   HEALTH\_AND\_BEAUTY\_MEDICINE\_AND\_DRUGS
+        -   HEALTH\_AND\_BEAUTY\_MEDICINE\_AND\_DRUGS
+        -   HEALTH\_AND\_BEAUTY\_MEDICINE\_AND\_DRUGS\_ANTACIDS\_AND\_ANTIFLATULENTS
+        -   HEALTH\_AND\_BEAUTY\_MEDICINE\_AND\_DRUGS\_ANTACIDS\_AND\_ANTIFLATULENTS
+        -   HEALTH\_AND\_BEAUTY\_MEDICINE\_AND\_DRUGS\_COUGH\_SUPRESSANTS
+        -   HEALTH\_AND\_BEAUTY\_MEDICINE\_AND\_DRUGS\_COLD\_AND\_FLU\_MEDICINES
+        -   HEALTH\_AND\_BEAUTY\_MEDICINE\_AND\_DRUGS\_COLD\_AND\_FLU\_MEDICINES
+        -   HEALTH\_AND\_BEAUTY\_MEDICINE\_AND\_DRUGS\_PRESCRIPTION\_DRUGS
+-   HEALTH\_AND\_BEAUTY\_MEDICINE\_AND\_DRUGS\_PRESCRIPTION\_DRUGS
+    -   BATH\_AND\_BODY
+    -   COTTON\_SWABS\_AND\_BALLS
+    -   DEODORANT\_AND\_ANTIPERSPIRANT
+    -   EYE\_AND\_EAR\_CARE
+    -   FEMININE\_CARE
+    -   HAIR\_CARE
+    -   HAND\_AND\_FOOT\_CARE
+    -   JEWELRY\_CLEANING\_AND\_CARE
+    -   MAKEUP\_NAILS\_AND\_COSMETIC\_TOOLS
+    -   ORAL\_CARE
+    -   PERFUME\_AND\_COLOGNE
+    -   SHAVING\_AND\_GROOMING
+    -   SKINCARE
+    -   SLEEP\_AND\_MASSAGE
+-   HOUSEHOLD\_ESSENTIALS
+    -   HOUSEHOLD\_CLEANING\_SUPPLIES
+    -   HOUSEHOLD\_PAPER\_PRODUCTS
+    -   LAUNDRY\_SUPPLIES
+    -   TRASH\_BINS\_AND\_BAGS
+    -   FOOD\_STORAGE\_AND\_ACCESSORIES
+    -   AIR\_FRESHENERS\_CANDLES\_AND\_FRAGRANCE
+    -   INSECT\_AND\_PEST\_CONTROL
+    -   SHOE\_CARE\_AND\_TOOLS
+    -   LIGHTERS\_AND\_MATCHES
+-   HOME\_AND\_GARDEN
+    -   HOME\_AND\_GARDEN\_BATHROOM\_ACCESSORIES
+    -   HOME\_AND\_GARDEN\_DECOR
+    -   ORGANIZERS
+    -   HOME\_AND\_GARDEN\_KITCHEN\_AND\_DINING
+    -   HOME\_AND\_GARDEN\_LAWN\_AND\_GARDEN
+    -   HOME\_AND\_GARDEN\_LIGHTING\_AND\_LIGHTING\_ACCESSORIES
+    -   HOME\_AND\_GARDEN\_LINENS\_AND\_BEDDING
+    -   HOME\_AND\_GARDEN\_POOL\_AND\_SPA
+    -   HOME\_AND\_GARDEN\_SMOKING\_ACCESSORIES
+    -   HOME\_AND\_GARDEN\_GARDEN\_CHEMICALS
+    -   HOME\_AND\_GARDEN\_FUEL
+-   FLOWERS\_AND\_PLANTS
+    -   FLOWERS\_AND\_BOUQUETS
+    -   HOME\_AND\_GARDEN\_PLANTS
+-   LUGGAGE\_AND\_BAGS
+-   MATURE
+    -   MATURE\_ADULT\_GAMES
+    -   MATURE\_VIBRATORS
+    -   LINGERIE
+    -   LOTTERY
+-   MEDIA
+    -   MEDIA\_BOOKS
+    -   MEDIA\_DVD’S\_AND\_VIDEOS
+    -   MEDIA\_MAGAZINES\_AND\_NEWSPAPERS
+    -   MEDIA\_MUSIC\_AND\_SOUND\_RECORDINGS
+-   OFFICE\_SUPPLIES
+-   SOFTWARE
+-   SPORTING\_GOODS
+-   TOBACCO
+    -   TOBACCO\_CIGARETTES
+    -   TOBACCO\_CIGARS
+    -   TOBACCO\_E-CIGARETTE
+    -   TOBACCO\_VAPES
+    -   TOBACCO\_SMOKELESS\_TOBACCO
+-   TOYS\_AND\_GAMES
+-   VEHICLES\_AND\_PARTS
+
+## Uber Mixin Types
+
+-   CONTAINS\_ALCOHOL
+-   CONTAINS\_CANNABIS
+
+[
+
+Uber Product Types
+
+](#uber-product-types)[
+
+Uber Mixin Types
+
+](#uber-mixin-types)
