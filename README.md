@@ -3,7 +3,7 @@
 POS SaaS multi-vertical y multi-tenant para restauranteros mexicanos.
 
 Monorepo (pnpm + Turborepo). La **especificación completa** vive en
-`../RECURSOS PARA DESARROLLO/` (24 documentos). Empieza por el Plan Maestro
+`docs/especificacion/` (26 documentos, en git desde el 31/08/2026). Empieza por el Plan Maestro
 (`00-PLAN-MAESTRO-VIM-POS.md`).
 
 ## Estructura

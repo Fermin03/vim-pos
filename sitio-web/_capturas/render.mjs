@@ -3,7 +3,7 @@
 
    POR QUÉ ESTO EXISTE Y NO SE USAN LOS MOCKUPS
 
-   Hay 231 mockups de alta fidelidad en RECURSOS PARA DESARROLLO/MOCKUPS y sería
+   Hay 231 mockups de alta fidelidad archivados en respaldos/mockups-2026-08-hasta-aqui-mandaron (ya no mandan) y sería
    mucho más rápido renderizarlos. Son bocetos, no el producto, y ya se
    separaron de él: la página de Reportes se reescribió entera, cambió el título
    de Inventario, y varios mockups dibujan funciones que el sitio admite que no
