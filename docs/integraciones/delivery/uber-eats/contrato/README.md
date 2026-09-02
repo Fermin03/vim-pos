@@ -8,14 +8,18 @@ Uber**: si algo del ADR 0011 o del código lo contradice, se corrige el código.
 
 | Archivo | Qué es |
 |---|---|
-| `2026-09-02-uber-api-licensing-agreement-copia-en-proceso-sin-firmas.pdf` | El contrato completo (14 páginas) tal como lo descargó Fermín de DocuSign. **Ojo:** es la copia "In Process": tiene marca de agua, `Firmas: 0` y los campos del formulario (razón social, dirección, casillas de APIs, firma) salen como marcadores `/n1/`, `/ch1/`, `/sn1/`. El texto legal es el definitivo; lo que falta es la versión completada. |
+| `2026-09-02-uber-api-licensing-agreement-firmado.pdf` | El contrato completo (14 páginas), **versión completada de DocuSign** con los datos del Provider, las casillas de APIs y la firma de Fermín (2 sep 2026). Contiene datos personales (RFC, dirección, teléfono): no sale de este repo privado. |
 | `2026-09-02-docusign-certificado-de-firma.pdf` | Certificado de DocuSign del sobre `BE49223E-42E1-8187-816B-696076163E3A`. Estado al descargarlo: *Entregado* (enviado y visto el 2 sep 2026 a las 17:18–17:19, hora del centro). |
 | `uber-eats-api-terms-of-use-row.md` | Los *API Terms of Use* (versión ROW/EU, feb 2021) que el contrato incorpora por referencia. Texto íntegro. |
 
-**Pendiente de Fermín:** cuando llegue el correo de DocuSign "Completed" (o desde el dashboard de
-Uber → Legal Agreement), bajar el PDF firmado y guardarlo aquí como
-`2026-09-02-uber-api-licensing-agreement-firmado.pdf`. Con esa copia hay que confirmar qué
-casillas de APIs quedaron marcadas (ver "Alcance" abajo), porque cada casilla trae obligaciones.
+**Quién firma y qué se marcó** (tomado de la copia firmada):
+
+- Provider: **Fermín Villalobos Martínez**, persona física (Founder & CEO), con RFC; contacto
+  `integraciones@vimpos.com.mx`. Es decir, hoy el contrato obliga a Fermín a título personal, no a
+  una sociedad. Si VIM se constituye como empresa habrá que pedir a Uber la cesión del contrato.
+- APIs marcadas: **Integration Configuration, Store, Menu, Order, Reporting y Promotions**.
+  **Catalog API no** (es retail). Por tanto aplican las obligaciones específicas de Order API
+  (alergias e instrucciones, A7) y de Reporting API (autorización expresa del merchant, B3).
 
 ## Qué documentos forman el contrato (para México)
 
@@ -70,7 +74,7 @@ pendientes. La columna "dónde" dice qué parte del sistema o del negocio la cub
 | A2 | Cumplir los **Quality & Performance Standards** (Uber los puede cambiar) | 4.2 | ⚠️ | Ver sección "Estándares de calidad" abajo |
 | A3 | Aceptar/rechazar/cancelar con **POST explícitos y motivos de los tipos soportados** | 4.1 + estándares | ✅ | `motivoRechazoUber` mapea AGOTADO/CERRADO/SATURADO/POS_OFFLINE/OTRO a los `deny_reason` de Uber |
 | A4 | Soportar webhooks `orders.notification` **y** `orders.failure` | estándares | ✅ | El webhook procesa notification, scheduled.notification, failure y cancel |
-| A5 | Soportar *Activate / Retrieve config / Remove integration* | estándares | ⬜ | F1b: pantalla "Conectar Uber" en admin + desconexión |
+| A5 | Soportar *Activate / Retrieve config / Remove integration* | estándares | ✅ | Edge Function `delivery-uber-conexion`: activar (POST pos_data), verificar (GET pos_data), pausar/reanudar (PATCH) y desconectar (DELETE); pantalla Apps de delivery en el admin (F1b) |
 | A6 | Soportar *Get/Set Store Status* y *Update Prep Time* | estándares | ⬜ | F1b/F4: pausar tienda desde el POS, tiempo de preparación |
 | A7 | **Retransmitir alergias e instrucciones especiales**; si no se pueden retransmitir, **rechazar el pedido** | tabla Order API; estándares | ⚠️ | Instrucciones de carrito → `tickets.nota_general`; de ítem → nota del `ticket_item`. Falta verificar el campo de alérgenos del `GetOrder` y mostrarlo en caja/KDS |
 | A8 | Uber puede compartir nuestras métricas de rendimiento con merchants | 4.2 | — | Informativo: nuestra tasa de aceptación es pública para clientes potenciales |
@@ -83,7 +87,7 @@ pendientes. La columna "dónde" dice qué parte del sistema o del negocio la cub
 |---|---|---|---|---|
 | B1 | **Soportar que el merchant siga aceptando pedidos en la tablet de Uber** (Device), que debe quedarse en el local, accesible al personal de mostrador. **No promover reemplazar la tablet** ni desplegar una alternativa sin aprobación escrita de Uber | 4.3.2 | ⚠️ | Producto: el POS es *complemento*, no sustituto. **Marketing/sitio web: prohibido decir "olvídate de la tablet de Uber"** o similar. Revisar copy de `sitio-web/` antes de anunciar la integración |
 | B2 | Confirmar, de forma continua, que **cada merchant tiene un Uber Eats Agreement vigente** con Uber | 3.2.1 | ⬜ | La conexión OAuth solo funciona con cuenta de merchant activa; documentarlo como control y guardar `conectada_at`/`tienda_id_externo` como evidencia |
-| B3 | Que **cada merchant autorice expresamente** a VIM a acceder a sus datos de Uber y **acepte términos al menos tan restrictivos** que este contrato sobre el uso de esos datos | 3.2.1, 4.3.1(a) | ⬜ | **Términos de servicio de VIM POS** (cláusula de apps de delivery) + aceptación registrada al conectar la tienda (checkbox con fecha en `delivery_conexiones.config`) |
+| B3 | Que **cada merchant autorice expresamente** a VIM a acceder a sus datos de Uber y **acepte términos al menos tan restrictivos** que este contrato sobre el uso de esos datos | 3.2.1, 4.3.1(a) | ⚠️ | Registro: casilla obligatoria en el asistente de conexión, con fecha y usuario en `delivery_conexiones.config.terminos_aceptados_*` (F1b). Falta la cláusula en los **términos de servicio de VIM POS** |
 | B4 | No firmar contratos que impidan cumplir este acuerdo o limiten derechos de Uber | 4.3.1(b)(c) | ✅ | Revisar al firmar exclusividades con otras apps (DiDi/Rappi) |
 | B5 | Ofrecer de buena fe la integración a **todos** los clientes de VIM que usen Uber Eats y ayudar a Uber a identificarlos | 4.3.3 | ✅ | La integración va incluida en el producto, no es un add-on por cliente |
 | B6 | **VIM da todo el soporte** de la integración al merchant (implementación y técnico, continuo). Uber solo ayuda por correo, a su criterio | 5.2 | ⬜ | Runbook de soporte + FAQ para clientes; registrar `ultimo_error` visible en admin |
@@ -167,12 +171,12 @@ mapeo. Pendiente: alerta cuando una sucursal rechaza o deja expirar pedidos (F1b
 1. Guardar la copia **firmada** del contrato aquí y confirmar las casillas de APIs (Fermín).
 2. Añadir a los **términos de servicio de VIM POS** la cláusula de apps de delivery (B3): el
    merchant autoriza a VIM a acceder a sus datos de Uber y acepta usarlos solo para operar sus
-   pedidos. Registrar la aceptación al conectar la tienda.
+   pedidos. (La aceptación al conectar la tienda ya se registra desde F1b.)
 3. Revisar el **copy del sitio y de ventas** para no prometer reemplazar la tablet de Uber (B1) ni
    presentarse como "socio" de Uber (B10).
 4. Escribir el **plan de respuesta a incidentes** con el aviso a Uber en 24 h (C12, D5) y el
    procedimiento para solicitudes de titulares (C6, C7). Va en `docs/operacion/`.
 5. Definir la **retención** de datos personales de pedidos de apps (C4) y programar el job.
-6. Completar en F1b los endpoints obligatorios que faltan (A5, A6) y verificar alérgenos (A7).
+6. ~~A5 (hecho en F1b)~~. Completar los endpoints de estado de tienda y tiempo de preparación (A6) y verificar alérgenos (A7).
 7. Documentar subencargados, accesos a producción y el programa de seguridad (C5, C9–C11) para
    poder firmar el certificado anual (C13) sin sustos.

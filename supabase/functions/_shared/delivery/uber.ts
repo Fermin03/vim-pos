@@ -124,12 +124,26 @@ export function motivoRechazoUber(motivo: MotivoRechazo, detalle?: string): { de
   return { deny_reason: detalle ? { type, info: detalle } : { type } };
 }
 
+/** Integración de una tienda (Integration Activation API). `crear` va con el token del dueño; el resto con el de aplicación. */
+export type PosDataUber = {
+  crear(tokenDueno: string, cuerpo: unknown): Promise<void>;
+  actualizar(cuerpo: unknown): Promise<void>;
+  leer(): Promise<unknown>;
+  borrar(): Promise<void>;
+};
+
 export type ClienteUber = {
   obtenerToken(): Promise<string>;
   obtenerOrden(id: string): Promise<unknown>;
   aceptar(id: string, readyTime: string, folio: string): Promise<void>;
   rechazar(id: string, cuerpo: unknown): Promise<void>;
   marcarLista(id: string): Promise<void>;
+  /** OAuth authorization_code (scope eats.pos_provisioning): code → token del dueño. */
+  canjearCodigo(code: string, redirectUri: string): Promise<{ accessToken: string; venceAt: Date }>;
+  /** GET /v1/delivery/stores con el token del dueño, todas las páginas; objetos crudos. */
+  listarTiendas(tokenDueno: string): Promise<unknown[]>;
+  posData(tiendaId: string): PosDataUber;
+  estadoTienda(tiendaId: string): Promise<unknown>;
 };
 
 export function crearClienteUber(cfg: {
@@ -163,8 +177,9 @@ export function crearClienteUber(cfg: {
     return token;
   };
 
-  const llamar = async (metodo: "GET" | "POST", ruta: string, cuerpo?: unknown): Promise<Response> => {
-    const token = await obtenerToken();
+  type Metodo = "GET" | "POST" | "PATCH" | "DELETE";
+  const llamar = async (metodo: Metodo, ruta: string, cuerpo?: unknown, tokenExplicito?: string): Promise<Response> => {
+    const token = tokenExplicito ?? await obtenerToken();
     const r = await f(`${dom.api}${ruta}`, {
       method: metodo,
       headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
@@ -175,8 +190,48 @@ export function crearClienteUber(cfg: {
     return r;
   };
 
+  const canjearCodigo = async (code: string, redirectUri: string) => {
+    const body = new URLSearchParams({
+      client_id: cfg.clientId, client_secret: cfg.clientSecret,
+      grant_type: "authorization_code", code, redirect_uri: redirectUri,
+    });
+    const r = await f(`${dom.auth}/oauth/v2/token`, { method: "POST", body });
+    if (!r.ok) throw new Error(`UBER_CANJE_${r.status}:${(await r.text()).slice(0, 300)}`);
+    const j = obj(await r.json());
+    const accessToken = str(j.access_token);
+    if (!accessToken) throw new Error("UBER_CANJE_SIN_ACCESS_TOKEN");
+    return { accessToken, venceAt: new Date(Date.now() + Math.max(60, num(j.expires_in)) * 1000) };
+  };
+
+  const listarTiendas = async (tokenDueno: string): Promise<unknown[]> => {
+    const todas: unknown[] = [];
+    let pagina: string | null = null;
+    for (let i = 0; i < 20; i++) {
+      const q = pagina ? `?page_size=50&next_page_token=${encodeURIComponent(pagina)}` : "?page_size=50";
+      const j = obj(await (await llamar("GET", `/v1/delivery/stores${q}`, undefined, tokenDueno)).json());
+      todas.push(...arr(j.stores));
+      pagina = str(obj(j.pagination_data).next_page_token);
+      if (!pagina) break;
+    }
+    return todas;
+  };
+
+  const posData = (tiendaId: string): PosDataUber => {
+    const ruta = `/v1/eats/stores/${encodeURIComponent(tiendaId)}/pos_data`;
+    return {
+      crear: async (tokenDueno, cuerpo) => { await llamar("POST", ruta, cuerpo, tokenDueno); },
+      actualizar: async (cuerpo) => { await llamar("PATCH", ruta, cuerpo); },
+      leer: async () => (await llamar("GET", ruta)).json(),
+      borrar: async () => { await llamar("DELETE", ruta); },
+    };
+  };
+
   return {
     obtenerToken,
+    canjearCodigo,
+    listarTiendas,
+    posData,
+    estadoTienda: async (tiendaId) => (await llamar("GET", `/v1/delivery/store/${encodeURIComponent(tiendaId)}/status`)).json(),
     obtenerOrden: async (id) => (await llamar("GET", `/v1/delivery/order/${encodeURIComponent(id)}?expand=carts,deliveries,payment`)).json(),
     aceptar: async (id, readyTime, folio) => {
       await llamar("POST", `/v1/delivery/order/${encodeURIComponent(id)}/accept`, { ready_for_pickup_time: readyTime, external_reference_id: folio });

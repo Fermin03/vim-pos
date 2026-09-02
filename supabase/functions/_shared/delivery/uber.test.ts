@@ -131,3 +131,66 @@ test("crearClienteUber: 409 al aceptar se reporta como YA_PROCESADA", async () =
   const c = crearClienteUber({ entorno: "sandbox", clientId: "i", clientSecret: "s", fetchFn });
   await assert.rejects(() => c.aceptar("o", "2026-09-02T10:15:00.000Z", "f"), /YA_PROCESADA/);
 });
+
+// --- F1b: activación de tiendas ---------------------------------------------------------------
+function fetchGrabador(respuestas: (url: string, init: RequestInit) => Response) {
+  const llamadas: { url: string; init: RequestInit }[] = [];
+  const fetchFn: typeof fetch = async (url, init) => { const i = init ?? {}; llamadas.push({ url: String(url), init: i }); return respuestas(String(url), i); };
+  return { fetchFn, llamadas };
+}
+
+test("canjearCodigo: grant authorization_code contra el dominio de auth, con redirect_uri", async () => {
+  const { fetchFn, llamadas } = fetchGrabador(() => new Response(JSON.stringify({ access_token: "USER", expires_in: 2592000 }), { status: 200 }));
+  const c = crearClienteUber({ entorno: "sandbox", clientId: "i", clientSecret: "s", fetchFn });
+  const r = await c.canjearCodigo("CODE1", "http://localhost:3001/cb");
+  assert.equal(r.accessToken, "USER");
+  assert.ok(r.venceAt.getTime() > Date.now() + 29 * 86_400_000);
+  assert.equal(llamadas[0].url, "https://sandbox-login.uber.com/oauth/v2/token");
+  const body = llamadas[0].init.body as URLSearchParams;
+  assert.equal(body.get("grant_type"), "authorization_code");
+  assert.equal(body.get("code"), "CODE1");
+  assert.equal(body.get("redirect_uri"), "http://localhost:3001/cb");
+  assert.equal(body.get("client_secret"), "s");
+});
+
+test("canjearCodigo: error de Uber se reporta como UBER_CANJE_<status>", async () => {
+  const { fetchFn } = fetchGrabador(() => new Response(JSON.stringify({ error: "invalid_grant" }), { status: 400 }));
+  const c = crearClienteUber({ entorno: "sandbox", clientId: "i", clientSecret: "s", fetchFn });
+  await assert.rejects(() => c.canjearCodigo("x", "u"), /UBER_CANJE_400/);
+});
+
+test("listarTiendas: usa el token del dueño y sigue next_page_token", async () => {
+  const { fetchFn, llamadas } = fetchGrabador((url) =>
+    url.includes("next_page_token=p2")
+      ? new Response(JSON.stringify({ stores: [{ id: "s2" }], pagination_data: {} }), { status: 200 })
+      : new Response(JSON.stringify({ stores: [{ id: "s1" }], pagination_data: { next_page_token: "p2" } }), { status: 200 }));
+  const c = crearClienteUber({ entorno: "sandbox", clientId: "i", clientSecret: "s", fetchFn });
+  const t = await c.listarTiendas("USER");
+  assert.deepEqual(t.map((x) => (x as { id: string }).id), ["s1", "s2"]);
+  assert.equal(llamadas.length, 2, "no pidió token de aplicación");
+  assert.equal((llamadas[0].init.headers as Record<string, string>).Authorization, "Bearer USER");
+  assert.ok(llamadas[0].url.startsWith("https://test-api.uber.com/v1/delivery/stores"));
+});
+
+test("posData: crear va con token del dueño; leer/actualizar/borrar con token de aplicación", async () => {
+  const { fetchFn, llamadas } = fetchGrabador((url) =>
+    url.endsWith("/token") ? new Response(JSON.stringify({ access_token: "APP", expires_in: 2592000 }), { status: 200 })
+      : new Response(JSON.stringify({ integration_enabled: true }), { status: 200 }));
+  const c = crearClienteUber({ entorno: "sandbox", clientId: "i", clientSecret: "s", fetchFn });
+  const pd = c.posData("st-1");
+  await pd.crear("USER", { integrator_store_id: "suc" });
+  assert.equal(llamadas[0].url, "https://test-api.uber.com/v1/eats/stores/st-1/pos_data");
+  assert.equal(llamadas[0].init.method, "POST");
+  assert.equal((llamadas[0].init.headers as Record<string, string>).Authorization, "Bearer USER");
+  const leido = await pd.leer();
+  assert.equal(llamadas[1].url, "https://sandbox-login.uber.com/oauth/v2/token");
+  assert.equal(llamadas[2].init.method, "GET");
+  assert.equal((llamadas[2].init.headers as Record<string, string>).Authorization, "Bearer APP");
+  assert.deepEqual(leido, { integration_enabled: true });
+  await pd.actualizar({ integration_enabled: false });
+  assert.equal(llamadas[3].init.method, "PATCH");
+  await pd.borrar();
+  assert.equal(llamadas[4].init.method, "DELETE");
+  await c.estadoTienda("st-1");
+  assert.equal(llamadas[5].url, "https://test-api.uber.com/v1/delivery/store/st-1/status");
+});
