@@ -332,14 +332,30 @@ export function HomePos({
   }, [volverAtras, volverAlInicio]);
 
   /**
-   * Salir de la captura. Si la cuenta ya está guardada y su modo no tiene lista donde volver a
-   * encontrarla, se pregunta antes en vez de dejarla huérfana.
+   * Salir de la captura.
+   *
+   * Si hay un ticket guardado que NUNCA se mandó a cocina, se pregunta antes de irse. Es la
+   * cuenta que existe solo porque se abrió el cobro (o un descuento) y el cliente se arrepintió:
+   * ya tiene folio, y si se abandona queda ABIERTA en el corte como si fuera una venta real.
+   *
+   * Aplica a TODOS los modos, no solo a "Para llevar" como antes. Es cierto que en pick-up o
+   * domicilio la cuenta abandonada se vería en su lista — pero se vería como un pedido real, y
+   * el cajero acaba de decir que no lo es. Lo que se protege es el corte, no la visibilidad.
+   *
+   * La que SÍ se mandó a cocina no pregunta: esa es una cuenta legítima que se cobra después
+   * desde su lista, y preguntar en cada salida de una mesa sería insoportable.
+   *
+   * Si no se puede consultar (sin red), se pregunta igual: el costo de preguntar de más es un
+   * toque; el de no preguntar es un folio fantasma.
    */
-  const intentarSalirDeCaptura = useCallback((destino: "atras" | "inicio") => {
-    const huerfanaPosible = ticketBd !== null && carrito.modoServicio === "PARA_LLEVAR";
-    if (huerfanaPosible) { setSalidaPendiente(destino); return; }
+  const intentarSalirDeCaptura = useCallback(async (destino: "atras" | "inicio") => {
+    if (ticketBd !== null) {
+      let enviada = false;
+      try { enviada = await yaEnviadoACocina(token, ticketBd.ticketId); } catch { enviada = false; }
+      if (!enviada) { setSalidaPendiente(destino); return; }
+    }
     if (destino === "atras") volverAtras(); else volverAlInicio();
-  }, [ticketBd, carrito.modoServicio, volverAtras, volverAlInicio]);
+  }, [ticketBd, token, volverAtras, volverAlInicio]);
 
   const recargarCuenta = useCallback(async () => {
     if (!ticketBd) return;
@@ -651,6 +667,15 @@ export function HomePos({
         carrito.notaOrden ?? null,
         carrito.nombreCuenta ?? null,
       );
+      /* EL TICKET YA EXISTE, CON FOLIO. La pantalla tiene que saberlo desde este instante.
+
+         Antes solo se guardaba en `totalesCobro` (para el modal), y `ticketBd` se quedaba en
+         null. Si el cajero cerraba el cobro sin pagar —el cliente se arrepintió, era para la
+         otra sucursal—, la pantalla creía que no había nada guardado y "Volver" se iba sin
+         preguntar. El ticket quedaba ABIERTO en la base; en "Para llevar", que no tiene lista
+         de cuentas, era invisible en todas partes y reaparecía días después trabando el corte.
+         Y la guarda de salida, que existe justo para eso, miraba `ticketBd`... en null. */
+      setTicketBd(totales);
       setTotalesCobro(totales);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Error al abrir el ticket");
@@ -721,6 +746,10 @@ export function HomePos({
           carrito.notaOrden ?? null,
           carrito.nombreCuenta ?? null,
         );
+        // Desde aquí el ticket es real. Si lo de abajo falla —la impresora, la red— el error se
+        // muestra y el cajero sigue en la pantalla; sin esto la pantalla no sabía que el ticket
+        // existía y "Volver" lo abandonaba sin preguntar.
+        setTicketBd(bd);
       }
       const enviados = await enviarACocina(token, bd.ticketId);
       await imprimirComandaCocina(bd.ticketId, enviados, cocinaEnviada);
@@ -1062,16 +1091,23 @@ export function HomePos({
       {salidaPendiente && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/40 p-4" role="dialog" aria-modal="true">
           <div className="w-full max-w-md rounded-xl bg-surface p-6 shadow-xl">
-            <div className="font-display text-[19px] font-semibold">Esta cuenta ya está guardada</div>
+            <div className="font-display text-[19px] font-semibold">Esta cuenta ya tiene folio</div>
             <p className="mt-2 text-[13.5px] leading-snug text-ink-2">
               {ticketBd?.folio ? <><span className="font-semibold">{ticketBd.folio}</span> · </> : null}
-              {fmtMxn(ticketBd?.total ?? 0)}. Si sales sin resolverla, queda abierta y no vas a
-              poder verla en ninguna pantalla — solo aparecería al cerrar el turno, trabándolo.
+              {fmtMxn(ticketBd?.total ?? 0)}.{" "}
+              {carrito.modoServicio === "PARA_LLEVAR"
+                ? "Si sales sin resolverla, queda abierta y no vas a poder verla en ninguna pantalla — solo aparecería al cerrar el turno, trabándolo."
+                : "Si sales sin resolverla, queda abierta en la lista como si fuera un pedido real, y aparece en el corte como cuenta sin cobrar."}
             </p>
             <div className="mt-5 flex flex-col gap-2">
-              <Button onClick={() => { setEsperaError(null); setEsperaPidiendoEtiqueta(true); }}>
-                Dejarla en espera
-              </Button>
+              {/* En espera solo tiene sentido donde hay lista de espera: "Para llevar". En los
+                  demás modos la cuenta en espera desaparece de su lista (filtran en_espera=false)
+                  y sería otra forma de perderla. */}
+              {carrito.modoServicio === "PARA_LLEVAR" && (
+                <Button onClick={() => { setEsperaError(null); setEsperaPidiendoEtiqueta(true); }}>
+                  Dejarla en espera
+                </Button>
+              )}
               <button
                 type="button"
                 onClick={() => setCancelandoTicket(true)}
