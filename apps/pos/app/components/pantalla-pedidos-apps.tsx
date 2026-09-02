@@ -30,6 +30,7 @@ function mensajeError(codigo: string, detalle?: string): string {
     case "ITEM_SIN_MAPEAR": return "El pedido trae un producto que no existe en el catálogo. Configura un producto genérico de apps o rechaza.";
     case "YA_PROCESADA": return "La app ya cerró este pedido.";
     case "SIN_RED": return "Sin conexión con la nube. Reintenta en unos segundos.";
+    case "UBER_ERROR": return `No se pudo avisar a Uber Eats${detalle ? ` (${detalle})` : ""}. Reintenta; si sigue, revisa la conexión en el panel de administración.`;
     default: return detalle ? `${codigo}: ${detalle}` : codigo;
   }
 }
@@ -95,7 +96,7 @@ export function PantallaPedidosApps({ token, caja, onSalir }: { token: string; c
           Sin pedidos de apps por ahora.<br />Aquí aparecen solos cuando llegan.
         </p>
       ) : (
-        <ul className="grid flex-1 grid-cols-1 gap-3 overflow-y-auto p-4 md:grid-cols-2 xl:grid-cols-3">
+        <ul className="grid flex-1 auto-rows-min grid-cols-1 content-start gap-3 overflow-y-auto p-4 md:grid-cols-2 xl:grid-cols-3">
           {pedidos.map((p) => {
             const seg = p.estado === "RECIBIDO" ? segundosRestantes(p.venceAceptacion, ahora) : null;
             const urgente = seg !== null && seg < 120;
