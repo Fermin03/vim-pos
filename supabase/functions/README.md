@@ -77,6 +77,18 @@ PIN → JWT de empleado → RLS por tenant. 🎉
 el webhook con "Basic HMAC"; opcional `UBER_WEBHOOK_SIGNING_KEY_2` para rotarla). La firma
 `X-Uber-Signature` se valida contra la signing key y, como respaldo, contra el client secret.
 
+### `delivery-uber-conexion` — conectar tiendas de Uber Eats desde el admin (F1b)
+
+JWT del admin (jerarquía ≥ 4, se lee de `usuarios_acceso` → `roles.jerarquia`). Cuerpo
+`{ accion, ... }`: `intercambiar` (`code` OAuth → token del dueño en `delivery_autorizaciones` +
+lista de tiendas), `tiendas`, `activar` (`tienda_id`, `sucursal_id`, `auto_aceptar`,
+`tiempo_prep_min`, `terminos_aceptados`), `pausar`, `reanudar`, `desconectar` y `verificar`
+(`conexion_id`). Secrets: los de F1 más `UBER_REDIRECT_URI` (la URL de callback registrada en la
+app de Uber: `https://admin.vimpos.com.mx/configuracion/integraciones/uber/callback`). Errores:
+`SIN_PERMISO` 403, `SIN_AUTORIZACION` 409, `SUCURSAL_YA_CONECTADA` / `TIENDA_YA_CONECTADA` 409,
+`TERMINOS_NO_ACEPTADOS` 400, `CONEXION_NO_EXISTE` 404, `UBER_ERROR` 502. Spec:
+`docs/superpowers/specs/2026-09-02-delivery-f1b-conectar-uber-design.md`.
+
 Prueba local (stack arriba, `supabase db reset`, una `delivery_conexion` ACTIVA con
 `tienda_id_externo = 'store-1'` para la sucursal de Knock-Out y un turno abierto):
 
