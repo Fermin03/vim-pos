@@ -40,6 +40,8 @@ import { PantallaMesas } from "./pantalla-mesas";
 import { PantallaReservaciones } from "./pantalla-reservaciones";
 import { PantallaConsultaCuentas } from "./pantalla-consulta-cuentas";
 import { PantallaDevoluciones } from "./pantalla-devoluciones";
+import { PantallaPedidosApps } from "./pantalla-pedidos-apps";
+import { leerPedidosApps } from "../lib/pedidos-apps";
 import { ModalCancelarItem } from "./modal-cancelar-item";
 import { ModalDescuentoItem } from "./modal-descuento-item";
 import { ModalCancelarTicket } from "./modal-cancelar-ticket";
@@ -130,6 +132,10 @@ export function HomePos({
   // para seguir atendiendo la misma lista.
   const [volverA, setVolverA] = useState<Origen>("inicio");
   const [enDevoluciones, setEnDevoluciones] = useState(false);
+  // ADR 0011 — pedidos de apps de delivery: pantalla, badge del inicio y sonido al llegar uno nuevo.
+  const [enPedidosApps, setEnPedidosApps] = useState(false);
+  const [nPedidosApps, setNPedidosApps] = useState(0);
+  const idsAppsVistos = useRef<Set<string> | null>(null);
   // F16 — estado de conexión (avisa al cajero si se cae la red).
   const { online } = useConexion(SUPABASE_URL ? `${SUPABASE_URL}/auth/v1/health` : undefined);
   // Fase 3 — outbox offline: pendientes por sincronizar + auto-sync al reconectar.
@@ -318,6 +324,7 @@ export function HomePos({
     setEnDelivery(false);
     setEnConsultaCuentas(false);
     setEnDevoluciones(false);
+    setEnPedidosApps(false);
     setEnMonitor(false);
     setEnInicio(true);
   }, [salirNavegacion]);
@@ -831,6 +838,36 @@ export function HomePos({
     return () => { vivo = false; clearInterval(id); };
   }, [enInicio, token, turno.id]);
 
+  // ADR 0011 — pedidos de apps: se consultan SIEMPRE (no solo en el inicio) porque un pedido de
+  // Uber tiene minutos para aceptarse y el cajero puede estar en medio de una venta. Una consulta
+  // ligera cada 10 s; el sonido suena una vez por pedido nuevo pendiente.
+  useEffect(() => {
+    let vivo = true;
+    const cargar = () => {
+      leerPedidosApps(token, caja.sucursal_id)
+        .then((ps) => {
+          if (!vivo) return;
+          const pendientes = ps.filter((p) => p.estado === "RECIBIDO" || p.estado === "ERROR");
+          setNPedidosApps(pendientes.length);
+          const vistos = idsAppsVistos.current;
+          if (vistos === null) {
+            // Primera carga: lo que ya estaba no suena, solo lo que llegue a partir de ahora.
+            idsAppsVistos.current = new Set(ps.map((p) => p.id));
+            return;
+          }
+          const nuevos = ps.filter((p) => !vistos.has(p.id));
+          ps.forEach((p) => vistos.add(p.id));
+          if (nuevos.length > 0) {
+            try { void new Audio("/sonidos/pedido-app.wav").play().catch(() => {}); } catch { /* sin audio: el badge basta */ }
+          }
+        })
+        .catch(() => { /* informativo: sin red la caja sigue vendiendo */ });
+    };
+    cargar();
+    const id = setInterval(cargar, 10000);
+    return () => { vivo = false; clearInterval(id); };
+  }, [token, caja.sucursal_id]);
+
   /** Cierra la confirmación/recibo y deja la caja lista para la siguiente venta. */
   const nuevoTicket = useCallback(() => {
     setConfirmacion(null);
@@ -893,7 +930,7 @@ export function HomePos({
       [menuGeneralAbierto, () => setMenuGeneralAbierto(false)],
       [cerrando, () => setCerrando(false)],
       // Nada abierto: Escape equivale al botón Volver de la pantalla de captura.
-      [!enInicio && !enKds && !enMonitor && !enConsultaCuentas && !enDevoluciones
+      [!enInicio && !enKds && !enMonitor && !enConsultaCuentas && !enDevoluciones && !enPedidosApps
         && !enDelivery && !enPickup && !enMesas, () => intentarSalirDeCaptura("atras")],
     ];
     return capas.find(([visible]) => visible)?.[1] ?? null;
@@ -902,7 +939,7 @@ export function HomePos({
       clienteDomAbierto, esperaPidiendoEtiqueta, esperaListaAbierta, movimientoAbierto,
       abrirCajaAbierto, cambiarPinAbierto, misPropinasAbierto, configImpresoraAbierto,
       salidaPendiente, confirmandoCierre, menuGeneralAbierto, cerrando, enInicio, enKds, enMonitor,
-      enConsultaCuentas, enDevoluciones, enDelivery, enPickup, enMesas, nuevoTicket,
+      enConsultaCuentas, enDevoluciones, enPedidosApps, enDelivery, enPickup, enMesas, nuevoTicket,
       intentarSalirDeCaptura]);
   useEscape(alEscapar);
 
@@ -1187,6 +1224,8 @@ export function HomePos({
           nCuentasPickup={cuentasAbiertas.pickup}
           nCuentasDomicilio={cuentasAbiertas.domicilio}
           nEnEspera={nEnEspera}
+          nPedidosApps={nPedidosApps}
+          onPedidosApps={() => { setEnInicio(false); setEnPedidosApps(true); }}
           onComedor={() => { setEnInicio(false); setEnMesas(true); }}
           onPickup={() => { setEnInicio(false); setEnPickup(true); }}
           onDomicilio={() => { setEnInicio(false); setEnDelivery(true); }}
@@ -1394,6 +1433,10 @@ export function HomePos({
 
   if (enDevoluciones) {
     return <PantallaDevoluciones token={token} caja={caja} turno={turno} empleado={empleado} onSalir={volverAlInicio} />;
+  }
+
+  if (enPedidosApps) {
+    return <PantallaPedidosApps token={token} caja={caja} onSalir={volverAlInicio} />;
   }
 
   return (
