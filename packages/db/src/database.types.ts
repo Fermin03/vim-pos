@@ -2335,6 +2335,371 @@ export type Database = {
           },
         ]
       }
+      delivery_conexiones: {
+        Row: {
+          app: Database["public"]["Enums"]["modo_servicio"]
+          auto_aceptar: boolean
+          conectada_at: string | null
+          config: Json
+          created_at: string
+          created_by: string | null
+          credencial_tienda: string | null
+          credencial_vence: string | null
+          desconectada_at: string | null
+          estado: string
+          id: string
+          marca_virtual_id: string | null
+          sucursal_id: string
+          tenant_id: string
+          tiempo_prep_min: number
+          tienda_id_externo: string | null
+          tienda_nombre_app: string | null
+          ultimo_error: string | null
+          ultimo_evento_at: string | null
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          app: Database["public"]["Enums"]["modo_servicio"]
+          auto_aceptar?: boolean
+          conectada_at?: string | null
+          config?: Json
+          created_at?: string
+          created_by?: string | null
+          credencial_tienda?: string | null
+          credencial_vence?: string | null
+          desconectada_at?: string | null
+          estado?: string
+          id?: string
+          marca_virtual_id?: string | null
+          sucursal_id: string
+          tenant_id: string
+          tiempo_prep_min?: number
+          tienda_id_externo?: string | null
+          tienda_nombre_app?: string | null
+          ultimo_error?: string | null
+          ultimo_evento_at?: string | null
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          app?: Database["public"]["Enums"]["modo_servicio"]
+          auto_aceptar?: boolean
+          conectada_at?: string | null
+          config?: Json
+          created_at?: string
+          created_by?: string | null
+          credencial_tienda?: string | null
+          credencial_vence?: string | null
+          desconectada_at?: string | null
+          estado?: string
+          id?: string
+          marca_virtual_id?: string | null
+          sucursal_id?: string
+          tenant_id?: string
+          tiempo_prep_min?: number
+          tienda_id_externo?: string | null
+          tienda_nombre_app?: string | null
+          ultimo_error?: string | null
+          ultimo_evento_at?: string | null
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "delivery_conexiones_marca_virtual_id_fkey"
+            columns: ["marca_virtual_id"]
+            isOneToOne: false
+            referencedRelation: "marcas_virtuales"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "delivery_conexiones_sucursal_id_fkey"
+            columns: ["sucursal_id"]
+            isOneToOne: false
+            referencedRelation: "sucursales"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "delivery_conexiones_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      delivery_credenciales_app: {
+        Row: {
+          access_token: string
+          app: Database["public"]["Enums"]["modo_servicio"]
+          entorno: string
+          updated_at: string
+          vence_at: string
+        }
+        Insert: {
+          access_token: string
+          app: Database["public"]["Enums"]["modo_servicio"]
+          entorno: string
+          updated_at?: string
+          vence_at: string
+        }
+        Update: {
+          access_token?: string
+          app?: Database["public"]["Enums"]["modo_servicio"]
+          entorno?: string
+          updated_at?: string
+          vence_at?: string
+        }
+        Relationships: []
+      }
+      delivery_eventos: {
+        Row: {
+          app: Database["public"]["Enums"]["modo_servicio"]
+          conexion_id: string | null
+          created_at: string
+          direccion: string
+          error: string | null
+          evento_id_externo: string | null
+          firma_valida: boolean | null
+          http_status: number | null
+          id: number
+          id_externo: string | null
+          payload: Json | null
+          procesado: boolean
+          respuesta: Json | null
+          tenant_id: string | null
+          tipo: string
+        }
+        Insert: {
+          app: Database["public"]["Enums"]["modo_servicio"]
+          conexion_id?: string | null
+          created_at?: string
+          direccion: string
+          error?: string | null
+          evento_id_externo?: string | null
+          firma_valida?: boolean | null
+          http_status?: number | null
+          id?: number
+          id_externo?: string | null
+          payload?: Json | null
+          procesado?: boolean
+          respuesta?: Json | null
+          tenant_id?: string | null
+          tipo: string
+        }
+        Update: {
+          app?: Database["public"]["Enums"]["modo_servicio"]
+          conexion_id?: string | null
+          created_at?: string
+          direccion?: string
+          error?: string | null
+          evento_id_externo?: string | null
+          firma_valida?: boolean | null
+          http_status?: number | null
+          id?: number
+          id_externo?: string | null
+          payload?: Json | null
+          procesado?: boolean
+          respuesta?: Json | null
+          tenant_id?: string | null
+          tipo?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "delivery_eventos_conexion_id_fkey"
+            columns: ["conexion_id"]
+            isOneToOne: false
+            referencedRelation: "delivery_conexiones"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "delivery_eventos_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      delivery_pedidos: {
+        Row: {
+          aceptado_at: string | null
+          app: Database["public"]["Enums"]["modo_servicio"]
+          cancelado_at: string | null
+          cancelado_por: string | null
+          cliente_nombre: string | null
+          cliente_telefono: string | null
+          cliente_telefono_pin: string | null
+          conexion_id: string
+          created_at: string
+          descuento_app_mxn: number | null
+          descuento_tienda_mxn: number | null
+          direccion_texto: string | null
+          efectivo_a_cobrar_mxn: number
+          entregado_at: string | null
+          envio_mxn: number | null
+          estado: string
+          estado_app: string | null
+          folio_corto: string | null
+          id: string
+          id_externo: string
+          items: Json
+          items_sin_mapear: Json | null
+          listo_at: string | null
+          motivo_cancelacion: string | null
+          nota_cliente: string | null
+          payload_raw: Json
+          programado_para: string | null
+          propina_mxn: number | null
+          recibido_at: string
+          repartidor_estado: string | null
+          repartidor_nombre: string | null
+          repartidor_telefono: string | null
+          subtotal_mxn: number | null
+          sucursal_id: string
+          tenant_id: string
+          ticket_id: string | null
+          tipo_entrega: string | null
+          total_cliente_mxn: number | null
+          total_restaurante_mxn: number | null
+          ultimo_error: string | null
+          updated_at: string
+          vence_aceptacion: string | null
+        }
+        Insert: {
+          aceptado_at?: string | null
+          app: Database["public"]["Enums"]["modo_servicio"]
+          cancelado_at?: string | null
+          cancelado_por?: string | null
+          cliente_nombre?: string | null
+          cliente_telefono?: string | null
+          cliente_telefono_pin?: string | null
+          conexion_id: string
+          created_at?: string
+          descuento_app_mxn?: number | null
+          descuento_tienda_mxn?: number | null
+          direccion_texto?: string | null
+          efectivo_a_cobrar_mxn?: number
+          entregado_at?: string | null
+          envio_mxn?: number | null
+          estado?: string
+          estado_app?: string | null
+          folio_corto?: string | null
+          id?: string
+          id_externo: string
+          items?: Json
+          items_sin_mapear?: Json | null
+          listo_at?: string | null
+          motivo_cancelacion?: string | null
+          nota_cliente?: string | null
+          payload_raw?: Json
+          programado_para?: string | null
+          propina_mxn?: number | null
+          recibido_at?: string
+          repartidor_estado?: string | null
+          repartidor_nombre?: string | null
+          repartidor_telefono?: string | null
+          subtotal_mxn?: number | null
+          sucursal_id: string
+          tenant_id: string
+          ticket_id?: string | null
+          tipo_entrega?: string | null
+          total_cliente_mxn?: number | null
+          total_restaurante_mxn?: number | null
+          ultimo_error?: string | null
+          updated_at?: string
+          vence_aceptacion?: string | null
+        }
+        Update: {
+          aceptado_at?: string | null
+          app?: Database["public"]["Enums"]["modo_servicio"]
+          cancelado_at?: string | null
+          cancelado_por?: string | null
+          cliente_nombre?: string | null
+          cliente_telefono?: string | null
+          cliente_telefono_pin?: string | null
+          conexion_id?: string
+          created_at?: string
+          descuento_app_mxn?: number | null
+          descuento_tienda_mxn?: number | null
+          direccion_texto?: string | null
+          efectivo_a_cobrar_mxn?: number
+          entregado_at?: string | null
+          envio_mxn?: number | null
+          estado?: string
+          estado_app?: string | null
+          folio_corto?: string | null
+          id?: string
+          id_externo?: string
+          items?: Json
+          items_sin_mapear?: Json | null
+          listo_at?: string | null
+          motivo_cancelacion?: string | null
+          nota_cliente?: string | null
+          payload_raw?: Json
+          programado_para?: string | null
+          propina_mxn?: number | null
+          recibido_at?: string
+          repartidor_estado?: string | null
+          repartidor_nombre?: string | null
+          repartidor_telefono?: string | null
+          subtotal_mxn?: number | null
+          sucursal_id?: string
+          tenant_id?: string
+          ticket_id?: string | null
+          tipo_entrega?: string | null
+          total_cliente_mxn?: number | null
+          total_restaurante_mxn?: number | null
+          ultimo_error?: string | null
+          updated_at?: string
+          vence_aceptacion?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "delivery_pedidos_conexion_id_fkey"
+            columns: ["conexion_id"]
+            isOneToOne: false
+            referencedRelation: "delivery_conexiones"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "delivery_pedidos_sucursal_id_fkey"
+            columns: ["sucursal_id"]
+            isOneToOne: false
+            referencedRelation: "sucursales"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "delivery_pedidos_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "delivery_pedidos_ticket_id_fkey"
+            columns: ["ticket_id"]
+            isOneToOne: false
+            referencedRelation: "tickets"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "delivery_pedidos_ticket_id_fkey"
+            columns: ["ticket_id"]
+            isOneToOne: false
+            referencedRelation: "vw_cumplimiento_tiempos_cocina"
+            referencedColumns: ["ticket_id"]
+          },
+          {
+            foreignKeyName: "delivery_pedidos_ticket_id_fkey"
+            columns: ["ticket_id"]
+            isOneToOne: false
+            referencedRelation: "vw_ventas_apps_externas"
+            referencedColumns: ["ticket_id"]
+          },
+        ]
+      }
       denominaciones_conteo: {
         Row: {
           cantidad: number
@@ -9371,9 +9736,14 @@ export type Database = {
         }
         Returns: string
       }
+      crear_ticket_desde_app: { Args: { p_pedido_id: string }; Returns: string }
       current_sucursal_id: { Args: never; Returns: string }
       current_tenant_id: { Args: never; Returns: string }
       custom_access_token_hook: { Args: { event: Json }; Returns: Json }
+      delivery_pedido_transicion: {
+        Args: { p_detalle?: string; p_estado: string; p_pedido_id: string }
+        Returns: undefined
+      }
       descontar_inventario_por_venta: {
         Args: { p_ticket_id: string }
         Returns: undefined
