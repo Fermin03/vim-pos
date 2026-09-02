@@ -3,6 +3,9 @@
 ## A. Trámites que solo Fermín puede iniciar (tardan semanas, conviene arrancarlos ya)
 
 ### Uber Eats (el más rápido para empezar)
+> **Hecho el 2 sep 2026:** cuenta creada, app `wx152HzVuqgaoXH6V4GXskfZrAUwKxMq`, API Licensing
+> Agreement firmado y sandbox concedido. Ver `uber-eats/contrato/README.md` para las obligaciones.
+> Sigue pendiente el punto 2 (tiendas de prueba).
 1. Crear cuenta en <https://developer.uber.com/dashboard> con un correo de VIM (no personal), crear
    aplicación tipo **Testing** de la suite *Eats Marketplace* y guardar `client_id`/`client_secret`
    de sandbox en un gestor de contraseñas (no en el repo).
