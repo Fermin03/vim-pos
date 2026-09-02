@@ -215,7 +215,11 @@
 
   if (form) {
     var abiertoEn = Date.now();
-    var boton = form.querySelector("[data-form-enviar]");
+    /* `botonEnviar`, no `boton`: este archivo es UNA función y `var` no hace ámbito por
+       bloque, así que `boton` es la MISMA variable que la hamburguesa del menú de arriba. En
+       la única página con formulario (/demo) esta línea la pisaba, y desde entonces el menú
+       ponía aria-expanded y el foco en el botón de enviar. */
+    var botonEnviar = form.querySelector("[data-form-enviar]");
     var cajaError = form.querySelector("[data-form-error]");
     var listo = document.querySelector("[data-form-listo]");
 
@@ -304,8 +308,8 @@
 
       if (!ANON) { porWhatsapp(datos); return; }
 
-      boton.setAttribute("aria-busy", "true");
-      boton.textContent = "Enviando…";
+      botonEnviar.setAttribute("aria-busy", "true");
+      botonEnviar.textContent = "Enviando…";
 
       datos.abierto_en = abiertoEn;
       datos.origen = "sitio-web";
@@ -328,8 +332,8 @@
         .catch(function (err) {
           /* El error no deja al visitante sin salida: se le ofrece WhatsApp,
              que es a donde iba a acabar de todos modos. */
-          boton.removeAttribute("aria-busy");
-          boton.textContent = "Pide una demo";
+          botonEnviar.removeAttribute("aria-busy");
+          botonEnviar.textContent = "Pide una demo";
           cajaError.hidden = false;
           cajaError.textContent =
             (err.message || "No se pudo enviar.") +
