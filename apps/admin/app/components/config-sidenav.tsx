@@ -15,6 +15,7 @@ const SECCIONES = [
     { label: "Estaciones de preparación", href: "/configuracion/areas" },
     { label: "Propinas", href: "/configuracion/propinas" },
     { label: "Marcas virtuales", href: "/configuracion/marcas" },
+    { label: "Apps de delivery", href: "/configuracion/integraciones" },
     { label: "Franquicias", href: "/configuracion/franquicias" },
     { label: "Roles y permisos", href: "/configuracion/roles" },
   ]},
