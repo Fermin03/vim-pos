@@ -5,7 +5,7 @@
 Cuando dos documentos digan cosas distintas —y van a decirlas— este es el orden:
 
 1. **`decisiones/`** — lo que cambió respecto al plan original. Manda siempre.
-2. **`../../RECURSOS PARA DESARROLLO/`** — la especificación original. Manda en todo lo que
+2. **`especificacion/`** — la especificación original, ya dentro del repo. Manda en todo lo que
    ningún ADR haya superado.
 3. **`diseno/`** y el código — mandan en cómo se ve y cómo se comporta.
 

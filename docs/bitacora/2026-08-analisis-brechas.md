@@ -1,6 +1,6 @@
 # 🔍 Análisis de brechas — VIM POS (7 Jun 2026)
 
-Comparación entre la **especificación** (`RECURSOS PARA DESARROLLO/`: plan maestro, playbook F0-F25, 6 docs de flujos, 16 docs de arquitectura, 231 mockups) y **lo construido** (monorepo `vim-pos`).
+Comparación entre la **especificación** (`docs/especificacion/`, entonces fuera del repo: plan maestro, playbook F0-F25, 6 docs de flujos, 16 docs de arquitectura, 231 mockups) y **lo construido** (monorepo `vim-pos`).
 
 > **Lectura clave:** la métrica "23% de mockups implementados" **subestima** la realidad funcional. Una pantalla como `home-pos` cubre varios mockups (P-059..P-077) y los modales cubren los métodos de pago (P-070..P-074). La **ruta crítica de Quick Service** (login→venta→cobro→cocina→cierre→CFDI) está **~80% funcional**. Lo que está bajo es la **amplitud**: las otras 5 verticales, el onboarding y varios módulos de admin.
 

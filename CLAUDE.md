@@ -2,14 +2,14 @@
 
 POS SaaS multi-vertical, multi-tenant, para restaurantes en México.
 
-> 🧠 **Para retomar el proyecto, lee primero `../MEMORY.md`** (tablero de estado: dónde vamos, cómo levantar el entorno, gotchas). El plan por fases está en `../RECURSOS PARA DESARROLLO/GUÍA DE DESARROLLO/18-PLAYBOOK-DE-EJECUCION.md`.
+> 🧠 **Para retomar el proyecto, lee primero `../MEMORY.md`** (tablero de estado: dónde vamos, cómo levantar el entorno, gotchas). El plan por fases está en `docs/especificacion/guia-de-desarrollo/18-PLAYBOOK-DE-EJECUCION.md`.
 
 ## Fuente de verdad
 
 **La regla de precedencia, en este orden:**
 
 1. **`docs/decisiones/`** — lo que cambió respecto al plan original. Manda siempre.
-2. **`../RECURSOS PARA DESARROLLO/`** — la especificación original. Manda en todo lo que ningún
+2. **`docs/especificacion/`** — la especificación original. Manda en todo lo que ningún
    ADR haya superado.
 3. **`docs/diseno/`** y el código — mandan en cómo se ve y cómo se comporta.
 
@@ -25,11 +25,11 @@ La especificación sigue siendo válida en la mayor parte. Antes de implementar 
 
 - `00-PLAN-MAESTRO-VIM-POS.md` — visión, verticales, roadmap, índice de docs
   (**los precios están superados por `decisiones/0002`**)
-- `ARQUITECTURA/07-1A…1F` — modelo de datos (SQL ejecutable), auth/JWT
-- `ARQUITECTURA/11-GUIA-DE-DESARROLLO.md` — convenciones, estructura, testing, CI
-- `ARQUITECTURA/09-MATRIZ-ROLES-PERMISOS.md` — permisos
-- `ARQUITECTURA/13`/`14`/`16` — CFDI, Realtime/KDS, impresión
-- `FLUJOS/` — flujos por vertical
+- `arquitectura/07-…-1A…1F` — modelo de datos (SQL ejecutable), auth/JWT
+- `guia-de-desarrollo/11-GUIA-DE-DESARROLLO.md` — convenciones, estructura, testing, CI
+- `arquitectura/09-MATRIZ-ROLES-PERMISOS.md` — permisos
+- `arquitectura/13`/`14`/`16` — CFDI, Realtime/KDS, impresión
+- `flujos/` — flujos por vertical
 
 **Diseño:** `docs/diseno/nucleo.md` (marca compartida) + un documento por app. Los **mockups ya no
 mandan**: se archivaron el 30/08/2026 en `respaldos/`, ver `decisiones/0001`.
