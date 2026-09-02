@@ -72,7 +72,10 @@ PIN → JWT de empleado → RLS por tenant. 🎉
 `delivery-webhook-uber` recibe los webhooks de Uber Eats. Sin JWT; valida `X-Uber-Signature`
 (HMAC-SHA256 del cuerpo con el client secret). `delivery-accion` recibe las acciones del cajero
 (aceptar / rechazar / listo) con el JWT del empleado. Secrets de las dos: `UBER_ENTORNO`
-(`sandbox` | `produccion`), `UBER_CLIENT_ID`, `UBER_CLIENT_SECRET`.
+(`sandbox` | `produccion`), `UBER_CLIENT_ID`, `UBER_CLIENT_SECRET`, y para el webhook
+`UBER_WEBHOOK_SIGNING_KEY` (la *Signing Key* que se captura en el dashboard de Uber al dar de alta
+el webhook con "Basic HMAC"; opcional `UBER_WEBHOOK_SIGNING_KEY_2` para rotarla). La firma
+`X-Uber-Signature` se valida contra la signing key y, como respaldo, contra el client secret.
 
 Prueba local (stack arriba, `supabase db reset`, una `delivery_conexion` ACTIVA con
 `tienda_id_externo = 'store-1'` para la sucursal de Knock-Out y un turno abierto):

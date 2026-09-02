@@ -29,7 +29,9 @@ cuenta de desarrollador de Uber** (sandbox) para la prueba de punta a punta. Dis
 
 ```bash
 # Secrets (si `supabase secrets set` falla en esta máquina, usar el dashboard → Edge Functions → Secrets)
-supabase secrets set UBER_ENTORNO=sandbox UBER_CLIENT_ID=<client_id> UBER_CLIENT_SECRET=<client_secret>
+supabase secrets set UBER_ENTORNO=sandbox UBER_CLIENT_ID=<client_id> UBER_CLIENT_SECRET=<client_secret> UBER_WEBHOOK_SIGNING_KEY=<signing_key>
+# La signing key la inventa uno (32+ caracteres aleatorios, del gestor de contraseñas) y se pega
+# igual en Uber dashboard → Webhooks → Add New Webhook → Basic HMAC → Signing Key.
 supabase functions deploy delivery-webhook-uber --no-verify-jwt
 supabase functions deploy delivery-accion
 supabase db push

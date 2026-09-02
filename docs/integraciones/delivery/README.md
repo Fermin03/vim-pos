@@ -66,6 +66,9 @@ Cuando el resumen y la fuente cruda no coincidan, manda la fuente cruda.
   Las suites Promotions, Reporting, Delivery Partner y BYOC solo están resumidas en
   `03-uber-eats-resumen.md` (rutas y propósito); su JSON se puede extraer igual que estos si hace
   falta.
+- `contrato/` — el **API Licensing Agreement firmado el 2 sep 2026** (PDF + certificado de
+  DocuSign), los API Terms of Use que incorpora, y `contrato/README.md` con **todas las
+  obligaciones desglosadas y su estado en el producto**. Manda sobre el ADR 0011.
 - Cómo se capturó: las páginas se bajan con `curl` **solo** si se manda `Accept: text/html`
   (sin ese header el servidor responde 404). Las suites Redoc se sacaron del objeto `store.spec`
   del componente React en el navegador.

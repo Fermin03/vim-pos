@@ -14,6 +14,13 @@ const admin = createClient(
 const ENTORNO = (Deno.env.get("UBER_ENTORNO") ?? "sandbox") === "produccion" ? "produccion" : "sandbox";
 const CLIENT_ID = Deno.env.get("UBER_CLIENT_ID") ?? "";
 const CLIENT_SECRET = Deno.env.get("UBER_CLIENT_SECRET") ?? "";
+// El dashboard nuevo de Uber ("Basic HMAC") pide una Signing Key propia para firmar los webhooks;
+// la guía vieja firmaba con el client secret. Se aceptan ambas (y una llave secundaria para rotar).
+const LLAVES_FIRMA = [
+  Deno.env.get("UBER_WEBHOOK_SIGNING_KEY") ?? "",
+  Deno.env.get("UBER_WEBHOOK_SIGNING_KEY_2") ?? "",
+  CLIENT_SECRET,
+].filter((k) => k !== "");
 const MAX_BODY = 256 * 1024;
 
 const uber = crearClienteUber({
@@ -38,14 +45,18 @@ type EventoUber = { event_id?: string; event_type?: string; meta?: { user_id?: s
 
 Deno.serve(async (req) => {
   if (req.method !== "POST") return new Response("method not allowed", { status: 405 });
-  if (!CLIENT_SECRET) return new Response("webhook no configurado", { status: 503 });
+  if (LLAVES_FIRMA.length === 0) return new Response("webhook no configurado", { status: 503 });
 
   const cuerpoTexto = await req.text();
   if (cuerpoTexto.length > MAX_BODY) return new Response("payload too large", { status: 413 });
 
   const firmaRecibida = (req.headers.get("x-uber-signature") ?? "").trim().toLowerCase();
-  const firmaEsperada = await hmacSha256Hex(CLIENT_SECRET, cuerpoTexto);
-  const firmaValida = firmaRecibida !== "" && igualesEnTiempoConstante(firmaRecibida, firmaEsperada);
+  let firmaValida = false;
+  if (firmaRecibida !== "") {
+    for (const llave of LLAVES_FIRMA) {
+      if (igualesEnTiempoConstante(firmaRecibida, await hmacSha256Hex(llave, cuerpoTexto))) { firmaValida = true; break; }
+    }
+  }
 
   let cuerpo: unknown;
   try { cuerpo = JSON.parse(cuerpoTexto); } catch { return new Response("bad json", { status: 400 }); }
