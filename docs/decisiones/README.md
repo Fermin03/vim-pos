@@ -13,6 +13,7 @@ Cada archivo dice **qué decía el plan, qué hacemos hoy y por qué**. Manda lo
 | [0007](0007-movimientos-de-caja-dos-no-cuatro.md) | Movimientos de caja: dos, no cuatro | 30/08/2026 |
 | [0008](0008-una-sola-fuente-de-tokens.md) | Los tokens tienen una sola fuente | 31/08/2026 |
 | [0009](0009-el-cfdi-esta-construido-pero-no-activado.md) | El CFDI está construido y NO está activado | 31/08/2026 |
+| [0010](0010-el-demo-estatico-se-retira.md) | El demo estático se retira; la demo es el producto real | 02/09/2026 |
 
 ## Pendientes de escribir
 

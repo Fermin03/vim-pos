@@ -37,6 +37,5 @@ existe. Una fuente de verdad que miente es peor que no tener ninguna, porque se 
   nueva se diseña contra `docs/diseno/`, que es texto y reglas, no imágenes.
 - Siguen sirviendo como referencia de **estructura e intención** — varias pantallas salieron
   bien portándolas, la última fue el retiro de efectivo (P-098).
-- `demo/_build/build.mjs` apunta al archivo para poder regenerar el demo del cliente. **Ojo:**
-  regenerarlo produce el producto viejo. El demo ya construido (`demo/screens/`) no depende de
-  esa carpeta.
+- El demo estático del cliente, que se generaba desde estos mockups, **se retiró el 02/09/2026**
+  y vive en `respaldos/demo-2026-09-retirado/`. Ver [`0010`](0010-el-demo-estatico-se-retira.md).
