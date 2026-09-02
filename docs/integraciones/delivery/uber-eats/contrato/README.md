@@ -8,14 +8,18 @@ Uber**: si algo del ADR 0011 o del código lo contradice, se corrige el código.
 
 | Archivo | Qué es |
 |---|---|
-| `2026-09-02-uber-api-licensing-agreement-copia-en-proceso-sin-firmas.pdf` | El contrato completo (14 páginas) tal como lo descargó Fermín de DocuSign. **Ojo:** es la copia "In Process": tiene marca de agua, `Firmas: 0` y los campos del formulario (razón social, dirección, casillas de APIs, firma) salen como marcadores `/n1/`, `/ch1/`, `/sn1/`. El texto legal es el definitivo; lo que falta es la versión completada. |
+| `2026-09-02-uber-api-licensing-agreement-firmado.pdf` | El contrato completo (14 páginas), **versión completada de DocuSign** con los datos del Provider, las casillas de APIs y la firma de Fermín (2 sep 2026). Contiene datos personales (RFC, dirección, teléfono): no sale de este repo privado. |
 | `2026-09-02-docusign-certificado-de-firma.pdf` | Certificado de DocuSign del sobre `BE49223E-42E1-8187-816B-696076163E3A`. Estado al descargarlo: *Entregado* (enviado y visto el 2 sep 2026 a las 17:18–17:19, hora del centro). |
 | `uber-eats-api-terms-of-use-row.md` | Los *API Terms of Use* (versión ROW/EU, feb 2021) que el contrato incorpora por referencia. Texto íntegro. |
 
-**Pendiente de Fermín:** cuando llegue el correo de DocuSign "Completed" (o desde el dashboard de
-Uber → Legal Agreement), bajar el PDF firmado y guardarlo aquí como
-`2026-09-02-uber-api-licensing-agreement-firmado.pdf`. Con esa copia hay que confirmar qué
-casillas de APIs quedaron marcadas (ver "Alcance" abajo), porque cada casilla trae obligaciones.
+**Quién firma y qué se marcó** (tomado de la copia firmada):
+
+- Provider: **Fermín Villalobos Martínez**, persona física (Founder & CEO), con RFC; contacto
+  `integraciones@vimpos.com.mx`. Es decir, hoy el contrato obliga a Fermín a título personal, no a
+  una sociedad. Si VIM se constituye como empresa habrá que pedir a Uber la cesión del contrato.
+- APIs marcadas: **Integration Configuration, Store, Menu, Order, Reporting y Promotions**.
+  **Catalog API no** (es retail). Por tanto aplican las obligaciones específicas de Order API
+  (alergias e instrucciones, A7) y de Reporting API (autorización expresa del merchant, B3).
 
 ## Qué documentos forman el contrato (para México)
 
