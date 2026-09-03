@@ -8,9 +8,9 @@
 > Sigue pendiente el punto 2 (tiendas de prueba).
 > **3 sep 2026:** Uber contestó (caso 59818999, `eats-partner-tech-support@uber.com`) pidiendo los
 > datos de las tiendas de prueba. Respuesta: 2 tiendas en Av. Universidad 101 y 301, León;
-> dueños `uber-test1@vimpos.com.mx` (tienda 1, **integrada por Uber** con el client_id) y
+> dueños `uber-test@vimpos.com.mx` (tienda 1, **integrada por Uber** con el client_id) y
 > `uber-test2@vimpos.com.mx` (tienda 2, **sin integrar**: se conecta desde el admin para probar el
-> OAuth). Son un buzón de Hostinger y su alias. Se pidió también cuenta de consumidor de prueba.
+> OAuth). Son un buzón de Hostinger (`uber-test@`) y su alias (`uber-test2@`); ambos caen al mismo buzón. Se pidió también cuenta de consumidor de prueba.
 > Contraseñas de esas cuentas de Uber: en el gestor de contraseñas, nunca aquí.
 1. Crear cuenta en <https://developer.uber.com/dashboard> con un correo de VIM (no personal), crear
    aplicación tipo **Testing** de la suite *Eats Marketplace* y guardar `client_id`/`client_secret`
