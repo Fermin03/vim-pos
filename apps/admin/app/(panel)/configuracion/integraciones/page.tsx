@@ -4,8 +4,8 @@ import { Button, Modal } from "@vim/ui/styles";
 import { PageHeader, PageBody } from "../../../components/page-header";
 import { listarSucursales, type Sucursal } from "../../../lib/configuracion";
 import {
-  accionConexion, actualizarConexion, etiquetaEstado, iniciarConexionUber, listarConexiones,
-  mensajeErrorIntegracion, type ConexionApp, type EstadoConexion, type Verificacion,
+  accionConexion, actualizarConexion, etiquetaEstado, etiquetaTienda, iniciarConexionUber, listarConexiones,
+  listarExpiradosHoy, mensajeErrorIntegracion, type ConexionApp, type EstadoConexion, type Verificacion,
 } from "../../../lib/integraciones";
 import { mensajeError } from "../../../lib/errores";
 
@@ -13,6 +13,7 @@ import { mensajeError } from "../../../lib/errores";
 export default function IntegracionesPage() {
   const [sucursales, setSucursales] = useState<Sucursal[] | null>(null);
   const [conexiones, setConexiones] = useState<ConexionApp[] | null>(null);
+  const [expirados, setExpirados] = useState<Record<string, number>>({});
   const [error, setError] = useState<string | null>(null);
   const [aviso, setAviso] = useState<string | null>(null);
   const [ocupada, setOcupada] = useState<string | null>(null); // id de la conexión con acción en curso
@@ -21,9 +22,10 @@ export default function IntegracionesPage() {
   async function recargar() {
     setError(null);
     try {
-      const [s, c] = await Promise.all([listarSucursales(), listarConexiones()]);
+      const [s, c, x] = await Promise.all([listarSucursales(), listarConexiones(), listarExpiradosHoy().catch(() => ({}))]);
       setSucursales(s);
       setConexiones(c);
+      setExpirados(x);
     } catch (e) {
       setError(mensajeError(e, "No se pudo cargar"));
     }
@@ -39,7 +41,7 @@ export default function IntegracionesPage() {
       if (accion === "verificar") {
         const v: Verificacion = await accionConexion("verificar", { conexion_id: cx.id });
         setAviso(v.integracion_activa
-          ? `Conexión correcta. La tienda en Uber está ${v.tienda_online ? "en línea" : "fuera de línea" + (v.offline_reason ? ` (${v.offline_reason})` : "")}.`
+          ? `Conexión correcta. Tienda en Uber: ${etiquetaTienda(v.tienda ?? null).toLowerCase()}${v.offline_reason ? ` (${v.offline_reason})` : ""}.`
           : `Hay un problema: ${v.detalle ?? "la integración no está activa en Uber"}.`);
       } else {
         await accionConexion(accion, { conexion_id: cx.id });
@@ -55,10 +57,20 @@ export default function IntegracionesPage() {
     }
   }
 
-  async function cambiar(cx: ConexionApp, cambios: { auto_aceptar?: boolean; tiempo_prep_min?: number }) {
+  async function cambiar(cx: ConexionApp, cambios: { auto_aceptar?: boolean }) {
     setError(null);
     try { await actualizarConexion(cx.id, cambios); await recargar(); }
     catch (e) { setError(mensajeError(e, "No se pudo guardar")); }
+  }
+
+  /** Los minutos se sincronizan a Uber (spec A6); si Uber falla, el campo vuelve al valor anterior. */
+  async function cambiarPrep(cx: ConexionApp, input: HTMLInputElement) {
+    const v = Number(input.value);
+    if (!(v >= 1 && v <= 180) || v === cx.tiempo_prep_min) { input.value = String(cx.tiempo_prep_min); return; }
+    setError(null); setOcupada(cx.id);
+    try { await accionConexion("prep", { conexion_id: cx.id, minutos: v }); await recargar(); }
+    catch (e) { input.value = String(cx.tiempo_prep_min); setError(mensajeErrorIntegracion(e)); }
+    finally { setOcupada(null); }
   }
 
   const th = "border-b border-line bg-sel px-4 py-[13px] text-left text-[11.5px] font-bold uppercase tracking-wide text-ink-3";
@@ -85,6 +97,7 @@ export default function IntegracionesPage() {
                   <th className={th}>Uber Eats</th>
                   <th className={`${th} w-[120px]`}>Auto-aceptar</th>
                   <th className={`${th} w-[110px]`}>Prep (min)</th>
+                  <th className={`${th} w-[110px]`}>Expirados hoy</th>
                   <th className={`${th} w-[320px]`}></th>
                 </tr>
               </thead>
@@ -99,6 +112,12 @@ export default function IntegracionesPage() {
                       <td className="px-4 py-3.5">
                         <Estado estado={cx?.estado ?? "SIN_CONECTAR"} />
                         {conectada && cx?.tienda_nombre_app && <div className="mt-1 text-[13px] text-ink-2">{cx.tienda_nombre_app}</div>}
+                        {conectada && cx && (
+                          <div className={`mt-1 inline-flex items-center gap-1.5 text-[12.5px] font-semibold ${cx.tienda?.estado === "EN_LINEA" ? "text-success" : cx.tienda?.estado === "PAUSADA" ? "text-warning" : "text-ink-3"}`}>
+                            <span className={`h-1.5 w-1.5 rounded-full ${cx.tienda?.estado === "EN_LINEA" ? "bg-success" : cx.tienda?.estado === "PAUSADA" ? "bg-warning" : "bg-ink-3"}`} />
+                            Tienda: {etiquetaTienda(cx.tienda)}
+                          </div>
+                        )}
                         {cx?.estado === "ERROR" && cx.ultimo_error && <div className="mt-1 text-[12.5px] text-danger">{cx.ultimo_error}</div>}
                       </td>
                       <td className="px-4 py-3.5">
@@ -112,11 +131,16 @@ export default function IntegracionesPage() {
                       <td className="px-4 py-3.5">
                         {conectada && cx && (
                           <input
-                            type="number" min={1} max={180} defaultValue={cx.tiempo_prep_min} aria-label="Minutos de preparación"
-                            onBlur={(e) => { const v = Number(e.target.value); if (v >= 1 && v <= 180 && v !== cx.tiempo_prep_min) cambiar(cx, { tiempo_prep_min: v }); }}
-                            className="h-9 w-[76px] rounded border border-line bg-surface px-2 text-right text-[13.5px] tabular-nums"
+                            type="number" min={1} max={180} defaultValue={cx.tiempo_prep_min} aria-label="Minutos de preparación" disabled={trabajando}
+                            onBlur={(e) => cambiarPrep(cx, e.target)}
+                            className="h-9 w-[76px] rounded border border-line bg-surface px-2 text-right text-[13.5px] tabular-nums disabled:opacity-50"
                           />
                         )}
+                      </td>
+                      <td className="px-4 py-3.5 text-right">
+                        {(expirados[s.id] ?? 0) > 0
+                          ? <span className="font-display text-[15px] font-semibold tabular-nums text-danger">{expirados[s.id]}</span>
+                          : <span className="text-ink-3">—</span>}
                       </td>
                       <td className="px-4 py-3.5 text-right">
                         {!conectada && <Button variant="ghost" onClick={conectar}>Conectar</Button>}
