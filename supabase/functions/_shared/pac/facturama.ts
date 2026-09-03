@@ -26,6 +26,15 @@ type RespuestaFacturama = {
   [k: string]: unknown;
 };
 
+/** Lo que devuelve `verificarCuenta()`: nunca incluye la credencial ni nada de un sello. */
+export type EstadoCuentaPac = {
+  entorno: "produccion" | "sandbox" | "otro";
+  baseUrl: string;
+  credencial: "ok" | "rechazada" | "error";
+  multiemisor: "ok" | "no_activo" | "error" | "no_probado";
+  detalle: string;
+};
+
 export class FacturamaPac implements PacAdapter {
   readonly nombre = "FACTURAMA";
 
@@ -305,6 +314,48 @@ export class FacturamaPac implements PacAdapter {
       headers: { Authorization: this.autorizacion, Accept: "application/json" },
     });
     return res.ok;
+  }
+
+  /**
+   * Comprueba la cuenta sin gastar folios: que la credencial entra y que la modalidad Multiemisor
+   * está activa. Dos lecturas inofensivas —un catálogo del SAT y el listado de CFDI emitidos por
+   * Multiemisor— bastan; ninguna descuenta folio ni toca sellos. Sirve para el primer día en
+   * producción y para saber, cuando algo falla, si el problema es la credencial, la activación
+   * comercial o la red.
+   */
+  async verificarCuenta(): Promise<EstadoCuentaPac> {
+    const entorno: EstadoCuentaPac["entorno"] = /apisandbox\./.test(this.baseUrl)
+      ? "sandbox"
+      : /\/\/api\.facturama\.mx/.test(this.baseUrl) ? "produccion" : "otro";
+    const cabeceras = { Authorization: this.autorizacion, Accept: "application/json" };
+    const leer = async (ruta: string): Promise<{ status: number; texto: string }> => {
+      try {
+        const r = await fetch(`${this.baseUrl}${ruta}`, { headers: cabeceras });
+        return { status: r.status, texto: (await r.text()).slice(0, 300) };
+      } catch (e) {
+        return { status: -1, texto: String(e instanceof Error ? e.message : e) };
+      }
+    };
+
+    const cat = await leer("/catalogs/PaymentForms");
+    const credencial: EstadoCuentaPac["credencial"] = cat.status === 200
+      ? "ok"
+      : cat.status === 401 || cat.status === 403 ? "rechazada" : "error";
+    if (credencial !== "ok") {
+      return { entorno, baseUrl: this.baseUrl, credencial, multiemisor: "no_probado", detalle: `catálogo → HTTP ${cat.status} ${cat.texto}` };
+    }
+
+    const multi = await leer("/cfdi?type=issuedLite&page=1");
+    const multiemisor: EstadoCuentaPac["multiemisor"] = multi.status === 200
+      ? "ok"
+      : multi.status === 400 || multi.status === 401 || multi.status === 403 ? "no_activo" : "error";
+    return {
+      entorno,
+      baseUrl: this.baseUrl,
+      credencial,
+      multiemisor,
+      detalle: multiemisor === "ok" ? "credencial válida y Multiemisor activo" : `listado Multiemisor → HTTP ${multi.status} ${multi.texto}`,
+    };
   }
 
   /** Arma el CFDI 4.0 en la forma que Facturama espera. */

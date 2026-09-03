@@ -9,8 +9,8 @@ en manos de un cliente (ADR `docs/decisiones/0009`).
 - [x] Cuenta de **producción** en `https://app.facturama.mx` (la de sandbox no sirve; son cuentas
       distintas). RFC de la cuenta: el de VIM (Fermín, persona física). Hecho 3 sep 2026.
 - [ ] Correo de la cuenta cambiado a `integraciones@vimpos.com.mx` (Cuentas → datos de la cuenta).
-- [ ] Confirmar por escrito que la modalidad **Multiemisor** está activa en la cuenta (Fermín ya
-      confirmó que viene incluida en el plan; pedir que lo dejen por correo).
+- [x] Modalidad **Multiemisor** activa: verificado el 3 sep 2026 contra `api.facturama.mx`
+      (`GET /cfdi?type=issuedLite` responde 200 con la credencial de producción).
 - [ ] Precio por folio: publicado $0.50 (1–10,000). Comprar el primer paquete de folios desde la web
       de Facturama. Nuestro margen: los paquetes VIM van de $2.00 a $1.00 por folio.
 - [ ] Guardar usuario y contraseña de la API en el gestor de contraseñas. **Nunca en el chat ni en
@@ -24,8 +24,23 @@ en manos de un cliente (ADR `docs/decisiones/0009`).
 | `FACTURAMA_API_PASSWORD` | contraseña de la cuenta de producción |
 | `FACTURAMA_BASE_URL` | `https://api.facturama.mx` |
 
-`elegirPac()` toma Facturama en cuanto existen las dos primeras. Verificar después con un timbrado
-de prueba, no con el listado de secrets.
+`elegirPac()` toma Facturama en cuanto existen las dos primeras. **Hecho y verificado el 3 sep 2026.**
+
+Cómo se verifica sin gastar folios (sirve cada vez que se roten credenciales): la función
+`cargar-csd` acepta `{"accion":"verificar"}`, ya sea con el JWT de un dueño/admin (cuerpo con
+`tenant_id`) o por el camino interno con `x-vim-interno`. Desde el SQL editor o `supabase db query --linked`:
+
+```sql
+select net.http_post(
+  url := rtrim(_vim_secreto('vim_functions_url'), '/') || '/cargar-csd',
+  body := '{"accion":"verificar"}'::jsonb,
+  headers := jsonb_build_object('Content-Type', 'application/json', 'x-vim-interno', _vim_secreto('vim_interno')));
+-- unos segundos después:
+select status_code, content from net._http_response order by id desc limit 1;
+```
+
+Respuesta esperada: `entorno: produccion`, `credencial: ok`, `multiemisor: ok`. Nunca devuelve la
+credencial ni datos de sellos.
 
 ## 3. Emisor de Knock-Out (Fermín con el dueño; admin → Configuración → CFDI)
 

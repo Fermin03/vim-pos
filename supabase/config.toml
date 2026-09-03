@@ -43,5 +43,10 @@ verify_jwt = false
 
 # enviar-push valida por sí misma (JWT de usuario o secreto interno x-vim-interno para el camino
 # base de datos → pg_net, mig. 0097); la verificación del gateway rechazaría la llamada interna.
+[functions.cargar-csd]
+# La función valida el JWT del usuario por sí misma (getUser) y acepta además el camino interno
+# `x-vim-interno` (verificar cuenta del PAC), que no trae JWT.
+verify_jwt = false
+
 [functions.enviar-push]
 verify_jwt = false
