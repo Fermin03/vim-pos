@@ -6,6 +6,8 @@ import { createClient } from "jsr:@supabase/supabase-js@2";
 import { corsHeaders } from "../_shared/cors.ts";
 import { crearClienteUber } from "../_shared/delivery/uber.ts";
 import { cuerpoPosData, normalizarTiendasUber, transicionConexion, type EstadoConexion } from "../_shared/delivery/uber-activacion.ts";
+import { cambiarPrepTienda, consultarEstadoTienda, type ConexionTienda } from "../_shared/delivery/tienda-uber-acciones.ts";
+import type { DbMinima } from "../_shared/delivery/procesar-uber.ts";
 
 const admin = createClient(
   Deno.env.get("SUPABASE_URL")!,
@@ -36,7 +38,7 @@ const uber = crearClienteUber({
 
 type Cuerpo = {
   accion?: string; code?: string; tienda_id?: string; sucursal_id?: string; conexion_id?: string;
-  auto_aceptar?: boolean; tiempo_prep_min?: number; terminos_aceptados?: boolean;
+  auto_aceptar?: boolean; tiempo_prep_min?: number; terminos_aceptados?: boolean; minutos?: number;
 };
 type Conexion = {
   id: string; tenant_id: string; sucursal_id: string; estado: EstadoConexion;
@@ -102,6 +104,15 @@ Deno.serve(async (req) => {
     }
     return tiendas.map((t) => ({ ...t, conectada_a: porTienda.get(t.id) ?? null }));
   };
+
+  const comoTienda = async (cx: Conexion): Promise<ConexionTienda> => {
+    const { data: fila } = await admin.from("delivery_conexiones").select("tiempo_prep_min").eq("id", cx.id).maybeSingle();
+    return {
+      id: cx.id, tenant_id: cx.tenant_id, sucursal_id: cx.sucursal_id, tienda_id_externo: cx.tienda_id_externo ?? "",
+      tiempo_prep_min: Number((fila as { tiempo_prep_min?: number } | null)?.tiempo_prep_min ?? 15), config: cx.config,
+    };
+  };
+  const depsTienda = () => ({ db: admin as unknown as DbMinima, uber, ahora: () => new Date() });
 
   const conexionDelTenant = async (id: string | undefined): Promise<Conexion | null> => {
     if (!id) return null;
@@ -211,21 +222,31 @@ Deno.serve(async (req) => {
         await registrar("pos_data_borrar", true, {}, cx.id, cx.tienda_id_externo);
         return json({ estado: nuevo });
       }
+      case "prep": {
+        const cx = await conexionDelTenant(body.conexion_id);
+        if (!cx || !cx.tienda_id_externo) return json({ error: "CONEXION_NO_EXISTE" }, 404);
+        try {
+          return json(await cambiarPrepTienda(depsTienda(), await comoTienda(cx), Number(body.minutos)));
+        } catch (e) {
+          const m = msg(e);
+          return m === "PREP_FUERA_DE_RANGO" ? json({ error: "PREP_FUERA_DE_RANGO" }, 400) : json({ error: "UBER_ERROR", detalle: m }, 502);
+        }
+      }
       case "verificar": {
         const cx = await conexionDelTenant(body.conexion_id);
         if (!cx || !cx.tienda_id_externo) return json({ error: "CONEXION_NO_EXISTE" }, 404);
         let pos: Record<string, unknown> = {};
-        let status: Record<string, unknown> = {};
+        let tienda: Awaited<ReturnType<typeof consultarEstadoTienda>>;
         try {
           pos = (await uber.posData(cx.tienda_id_externo).leer()) as Record<string, unknown>;
-          status = (await uber.estadoTienda(cx.tienda_id_externo)) as Record<string, unknown>;
+          tienda = await consultarEstadoTienda(depsTienda(), await comoTienda(cx), true);
         } catch (e) {
           await admin.from("delivery_conexiones").update({ ultimo_error: msg(e), ultimo_evento_at: new Date().toISOString() }).eq("id", cx.id);
           await registrar("verificar", false, msg(e), cx.id, cx.tienda_id_externo);
           return json({ error: "UBER_ERROR", detalle: msg(e) }, 502);
         }
         const integracionActiva = pos.integration_enabled === true && pos.integrator_store_id === cx.sucursal_id;
-        const tiendaOnline = status.status === "ONLINE";
+        const tiendaOnline = tienda.estado === "EN_LINEA";
         const detalle = integracionActiva ? null
           : pos.integrator_store_id !== cx.sucursal_id ? `El integrator_store_id en Uber (${String(pos.integrator_store_id)}) no es esta sucursal`
           : "La integración está apagada en Uber";
@@ -233,8 +254,8 @@ Deno.serve(async (req) => {
           ultimo_evento_at: new Date().toISOString(), ultimo_error: detalle,
           estado: integracionActiva ? (cx.estado === "ERROR" ? "ACTIVA" : cx.estado) : "ERROR",
         }).eq("id", cx.id);
-        await registrar("verificar", true, { integracionActiva, tiendaOnline, offline_reason: status.offline_reason ?? null }, cx.id, cx.tienda_id_externo);
-        return json({ integracion_activa: integracionActiva, tienda_online: tiendaOnline, offline_reason: status.offline_reason ?? null, detalle });
+        await registrar("verificar", true, { integracionActiva, tiendaOnline, offline_reason: tienda.motivo }, cx.id, cx.tienda_id_externo);
+        return json({ integracion_activa: integracionActiva, tienda_online: tiendaOnline, offline_reason: tienda.motivo, detalle, tienda });
       }
       default:
         return json({ error: "ACCION_DESCONOCIDA" }, 400);
