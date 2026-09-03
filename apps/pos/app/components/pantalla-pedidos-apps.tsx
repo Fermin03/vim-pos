@@ -6,8 +6,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { DatosCaja } from "../lib/turno";
 import { fmtMxn } from "../lib/turno";
 import {
-  accionPedidoApp, cambiarPrepUber, etiquetaApp, etiquetaEstado, etiquetaTienda, leerPedidosApps, leerTiendaUber,
-  marcarExpiradosVistos, mensajeErrorTienda, OPCIONES_PAUSA, ordenarPedidos, pausarTiendaUber, reanudarTiendaUber,
+  accionPedidoApp, cambiarPrepUber, etiquetaAlergia, etiquetaApp, etiquetaEstado, etiquetaTienda, leerPedidosApps, leerTiendaUber,
+  marcarExpiradosVistos, mensajeErrorTienda, OPCIONES_PAUSA, ordenarPedidos, pausarTiendaUber, pedidoConAlergia, reanudarTiendaUber,
   segundosRestantes, type DuracionPausa, type EstadoTiendaApp, type PedidoApp,
 } from "../lib/pedidos-apps";
 import { BotonVolver } from "./boton-volver";
@@ -178,11 +178,15 @@ export function PantallaPedidosApps({ token, caja, onSalir }: { token: string; c
             const seg = p.estado === "RECIBIDO" ? segundosRestantes(p.venceAceptacion, ahora) : null;
             const urgente = seg !== null && seg < 120;
             const pendiente = p.estado === "RECIBIDO" || p.estado === "ERROR";
+            const alergia = pedidoConAlergia(p);
             return (
               <li
                 key={p.id}
-                className={`flex flex-col gap-2 rounded border-2 bg-surface p-3 ${pendiente ? (urgente ? "border-danger" : "border-accent") : "border-line"}`}
+                className={`flex flex-col gap-2 rounded border-2 bg-surface p-3 ${pendiente ? (urgente || alergia ? "border-danger" : "border-accent") : "border-line"}`}
               >
+                {alergia && (
+                  <p className="rounded bg-danger px-2 py-1 text-[13px] font-bold uppercase tracking-wide text-white">⚠ Pedido con alergia: revisa cada ítem</p>
+                )}
                 <div className="flex items-center justify-between">
                   <span className="text-[12.5px] font-semibold uppercase tracking-wide text-ink-2">{etiquetaApp(p.app)}</span>
                   <span className="text-[26px] font-bold leading-none text-ink">{p.folioCorto ?? p.idExterno.slice(-6)}</span>
@@ -209,6 +213,9 @@ export function PantallaPedidosApps({ token, caja, onSalir }: { token: string; c
                         <span className="text-ink-3"> · {it.modificadores.map((m) => `${m.cantidad > 1 ? m.cantidad + "× " : ""}${m.nombreApp}`).join(", ")}</span>
                       )}
                       {it.nota && <span className="text-ink-3"> · “{it.nota}”</span>}
+                      {etiquetaAlergia(it) && (
+                        <span className="mt-0.5 block rounded border border-danger bg-danger-soft px-1.5 py-0.5 text-[12.5px] font-semibold text-danger">{etiquetaAlergia(it)}</span>
+                      )}
                     </li>
                   ))}
                 </ul>

@@ -30,6 +30,35 @@ const grossE5 = (money: unknown): number | null => {
 };
 const dec = (money: unknown): string | null => { const e5 = grossE5(money); return e5 === null ? null : e5ADecimal(e5); };
 
+/** Alérgenos de Uber → español. OTHER se resuelve con el texto libre; lo desconocido se deja tal cual en minúsculas. */
+const ALERGENOS: Record<string, string> = {
+  DAIRY: "lácteos", EGG: "huevo", EGGS: "huevo", FISH: "pescado", SHELLFISH: "mariscos", TREENUTS: "frutos secos",
+  TREE_NUTS: "frutos secos", PEANUTS: "cacahuate", GLUTEN: "gluten", SOY: "soya", SESAME: "ajonjolí", WHEAT: "trigo",
+};
+export function traducirAlergeno(codigo: string): string {
+  const k = codigo.trim().toUpperCase();
+  return ALERGENOS[k] ?? codigo.trim().toLowerCase();
+}
+
+/** customer_request.allergy de Uber (v1/delivery) → alérgenos en español + texto libre. */
+export function alergiaDeItem(customerRequest: unknown): { alergenos: string[]; alergia_nota: string | null } {
+  const a = obj(obj(customerRequest).allergy);
+  const alergenos: string[] = [];
+  for (const x of arr(a.allergens)) {
+    if (typeof x === "string" && x.trim() !== "") {
+      if (x.trim().toUpperCase() !== "OTHER") alergenos.push(traducirAlergeno(x));
+      continue;
+    }
+    const o = obj(x);                                       // forma v2: { type, freeform_text }
+    const tipo = str(o.type);
+    const libre = str(o.freeform_text);
+    if (tipo && tipo.toUpperCase() !== "OTHER") alergenos.push(traducirAlergeno(tipo));
+    else if (libre) alergenos.push(libre.trim().toLowerCase());
+  }
+  const nota = str(a.instructions) ?? str(a.allergy_instructions);
+  return { alergenos: [...new Set(alergenos)], alergia_nota: nota };
+}
+
 function tipoEntrega(f: unknown): TipoEntrega | null {
   switch (f) {
     case "DELIVERY_BY_UBER": return "APP_REPARTE";
@@ -79,6 +108,7 @@ export function normalizarPedidoUber(orden: unknown, esUuidConocido: (id: string
         cantidad: Math.max(1, num(obj(it.quantity).amount) || 1),
         precio_unitario_mxn: unitario(cartItemId, "ITEM"),
         nota: str(obj(it.customer_request).special_instructions),
+        ...alergiaDeItem(it.customer_request),
         modificadores,
       });
     }

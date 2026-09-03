@@ -76,7 +76,7 @@ pendientes. La columna "dónde" dice qué parte del sistema o del negocio la cub
 | A4 | Soportar webhooks `orders.notification` **y** `orders.failure` | estándares | ✅ | El webhook procesa notification, scheduled.notification, failure y cancel |
 | A5 | Soportar *Activate / Retrieve config / Remove integration* | estándares | ✅ | Edge Function `delivery-uber-conexion`: activar (POST pos_data), verificar (GET pos_data), pausar/reanudar (PATCH) y desconectar (DELETE); pantalla Apps de delivery en el admin (F1b) |
 | A6 | Soportar *Get/Set Store Status* y *Update Prep Time* | estándares | ✅ | `delivery-accion` (POS): `tienda_estado`, `tienda_pausar`, `tienda_reanudar`, `tienda_prep`; `delivery-uber-conexion` (admin): `prep` y `verificar` con estado; expirados por `delivery_marcar_expirados()` + pg_cron (mig. 0093). Spec `docs/superpowers/specs/2026-09-02-delivery-a6-tienda-uber-y-expirados-design.md` |
-| A7 | **Retransmitir alergias e instrucciones especiales**; si no se pueden retransmitir, **rechazar el pedido** | tabla Order API; estándares | ⚠️ | Instrucciones de carrito → `tickets.nota_general`; de ítem → nota del `ticket_item`. Falta verificar el campo de alérgenos del `GetOrder` y mostrarlo en caja/KDS |
+| A7 | **Retransmitir alergias e instrucciones especiales**; si no se pueden retransmitir, **rechazar el pedido** | tabla Order API; estándares | ✅ | `customer_request.allergy` → `items[].alergenos` (en español) + `alergia_nota`; el ticket lleva `⚠ ALERGIA: …` al frente de `nota_cocina` del ítem y `⚠ PEDIDO CON ALERGIA` en `nota_general` (mig. 0094): se ve en caja, KDS y comanda. Instrucciones de carrito e ítem ya viajaban. Un ítem con alergia que no esté en el catálogo y sin producto genérico queda pendiente del cajero, nunca se acepta a ciegas. **Pedir a Uber que active "allergy requests" para la tienda** (viene apagado para integradores) |
 | A8 | Uber puede compartir nuestras métricas de rendimiento con merchants | 4.2 | — | Informativo: nuestra tasa de aceptación es pública para clientes potenciales |
 | A9 | No saltarse límites de llamadas ni usar bots/scraping contra las APIs | TOU III.C, III.G | ✅ | Token client_credentials cacheado en `delivery_credenciales_app` (máx. 100/h); sin polling a Uber, todo por webhook |
 | A10 | Versiones: tolerar campos nuevos y cambios de orden en las respuestas | estándares | ✅ | Los normalizadores ignoran campos desconocidos |
@@ -152,7 +152,7 @@ Fuente: `../guias/quality-and-performance.md` (captura del 2 sep 2026). Lo que e
 - Flujo de pedido con POST explícitos Accept/Deny/Cancel y motivos soportados. → A3 ✅
 - Endpoints de tienda: Get Store Status, Set Store Status, Update Prep Time. → A6 ✅
 - **Rechazar el pedido si trae alérgenos o instrucciones especiales que no se puedan retransmitir
-  al POS.** → A7
+  al POS.** → A7 ✅ (siempre se retransmiten por la nota de cocina; si el ítem no se puede crear, el pedido no se auto-acepta)
 
 **Recomendado**: disposable items, alérgenos, instrucciones por ítem y por carrito, todos los
 endpoints de Store y Order.
@@ -177,6 +177,6 @@ mapeo. Los pedidos que vencen sin respuesta pasan a EXPIRADO cada minuto y avisa
 4. Escribir el **plan de respuesta a incidentes** con el aviso a Uber en 24 h (C12, D5) y el
    procedimiento para solicitudes de titulares (C6, C7). Va en `docs/operacion/`.
 5. Definir la **retención** de datos personales de pedidos de apps (C4) y programar el job.
-6. ~~A5 (F1b) y A6 (estado de tienda, prep, expirados) hechos~~. Falta verificar alérgenos (A7).
+6. ~~A5 (F1b), A6 (estado de tienda, prep, expirados) y A7 (alergias en el ticket) hechos~~. Pendiente: que Uber active "allergy requests" en la tienda tras la validación.
 7. Documentar subencargados, accesos a producción y el programa de seguridad (C5, C9–C11) para
    poder firmar el certificado anual (C13) sin sustos.

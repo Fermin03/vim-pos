@@ -33,6 +33,7 @@ BEGIN
     jsonb_build_array(
       jsonb_build_object('producto_id', v_prod, 'nombre_app', 'Hamburguesa Clásica', 'cantidad', 2,
         'precio_unitario_mxn', 150.00, 'nota', 'bien cocida',
+        'alergenos', jsonb_build_array('cacahuate', 'lácteos'), 'alergia_nota', 'alergia fuerte',
         'modificadores', CASE WHEN v_opcion IS NULL THEN '[]'::jsonb ELSE jsonb_build_array(
           jsonb_build_object('opcion_modificador_id', v_opcion, 'nombre_app', 'extra', 'cantidad', 1, 'precio_extra_mxn', 20.00)) END)),
     340.00, now() + interval '11 minutes')
@@ -60,6 +61,14 @@ BEGIN
   IF v_cocina <> 'EN_COCINA' THEN RAISE EXCEPTION 'no entró a cocina (%)', v_cocina; END IF;
   SELECT precio_unitario_snapshot INTO v_precio FROM ticket_items WHERE ticket_id = v_ticket LIMIT 1;
   IF v_precio <> 150.00 THEN RAISE EXCEPTION 'el ítem no lleva el precio de la app (%)', v_precio; END IF;
+  -- A7: la alergia va primero en la nota de cocina del ítem y el ticket avisa en la nota general.
+  SELECT nota_cocina INTO v_metodo FROM ticket_items WHERE ticket_id = v_ticket LIMIT 1;
+  IF v_metodo NOT LIKE '⚠ ALERGIA: cacahuate, lácteos — "alergia fuerte" · bien cocida%' THEN
+    RAISE EXCEPTION 'nota de cocina sin la alergia al frente: %', v_metodo;
+  END IF;
+  SELECT nota_general INTO v_metodo FROM tickets WHERE id = v_ticket;
+  IF v_metodo NOT LIKE '⚠ PEDIDO CON ALERGIA%' THEN RAISE EXCEPTION 'nota general sin aviso de alergia: %', v_metodo; END IF;
+  RAISE NOTICE 'alergia relayada: %', v_metodo;
   SELECT metodo_pago::text INTO v_metodo FROM pagos WHERE ticket_id = v_ticket LIMIT 1;
   IF v_metodo <> 'APP_UBEREATS' THEN RAISE EXCEPTION 'pago con método %', v_metodo; END IF;
   SELECT estado, ticket_id INTO v_estado, v_ticket2 FROM delivery_pedidos WHERE id = v_pedido;

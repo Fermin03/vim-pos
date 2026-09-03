@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { e5ADecimal, normalizarPedidoUber, motivoRechazoUber, crearClienteUber, segundosAReadyTime } from "./uber.ts";
+import { e5ADecimal, normalizarPedidoUber, motivoRechazoUber, crearClienteUber, segundosAReadyTime, alergiaDeItem, traducirAlergeno } from "./uber.ts";
 
 const PROD = "11111111-1111-4111-8111-111111111111";
 const OPCION = "22222222-2222-4222-8222-222222222222";
@@ -193,4 +193,30 @@ test("posData: crear va con token del dueño; leer/actualizar/borrar con token d
   assert.equal(llamadas[4].init.method, "DELETE");
   await c.estadoTienda("st-1");
   assert.equal(llamadas[5].url, "https://test-api.uber.com/v1/delivery/store/st-1/status");
+});
+
+// --- A7: alérgenos --------------------------------------------------------------------------
+test("alergiaDeItem: lista de Uber en español, OTHER con texto libre, sin duplicados", () => {
+  assert.deepEqual(alergiaDeItem({ allergy: { allergens: ["PEANUTS", "DAIRY", "peanuts"], instructions: "Soy alérgico al cacahuate" } }),
+    { alergenos: ["cacahuate", "lácteos"], alergia_nota: "Soy alérgico al cacahuate" });
+  assert.deepEqual(alergiaDeItem({ allergy: { allergens: [{ type: "GLUTEN" }, { type: "OTHER", freeform_text: "Kiwi" }], allergy_instructions: "x" } }),
+    { alergenos: ["gluten", "kiwi"], alergia_nota: "x" });
+  assert.deepEqual(alergiaDeItem({ special_instructions: "sin cebolla" }), { alergenos: [], alergia_nota: null });
+  assert.deepEqual(alergiaDeItem(undefined), { alergenos: [], alergia_nota: null });
+  assert.equal(traducirAlergeno("SHELLFISH"), "mariscos");
+  assert.equal(traducirAlergeno("LUPIN"), "lupin");
+});
+
+test("normalizarPedidoUber: la alergia del ítem viaja en el pedido normalizado", () => {
+  const conAlergia = JSON.parse(JSON.stringify(ORDEN));
+  conAlergia.order.carts[0].items[0].customer_request = {
+    special_instructions: "sin cebolla",
+    allergy: { allergens: ["PEANUTS"], instructions: "alergia fuerte" },
+  };
+  const p = normalizarPedidoUber(conAlergia, (id) => id === PROD || id === OPCION);
+  assert.deepEqual(p.items[0].alergenos, ["cacahuate"]);
+  assert.equal(p.items[0].alergia_nota, "alergia fuerte");
+  assert.equal(p.items[0].nota, "sin cebolla");
+  assert.deepEqual(p.items[1].alergenos, []);
+  assert.equal(p.items[1].alergia_nota, null);
 });
