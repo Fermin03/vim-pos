@@ -1,13 +1,14 @@
 # Activar facturación real — checklist
 
-Hoy (3 sep 2026) no hay contrato de producción con Facturama; Fermín está en espera de contratarlo.
-Nada de esto se puede hacer antes. El orden importa: un paso saltado deja un comprobante inválido
+Contratado el 3 sep 2026 a las 16:04: «API - anualidad», $1,650 MXN, en la cuenta de producción
+`app.facturama.mx` con RFC VIMF0308282D7 (cuenta preexistente de Fermín). El orden importa: un paso saltado deja un comprobante inválido
 en manos de un cliente (ADR `docs/decisiones/0009`).
 
 ## 1. Contratar (Fermín, con Facturama)
 
-- [ ] Cuenta de **producción** en `https://app.facturama.mx` (la de sandbox no sirve; son cuentas
-      distintas). RFC de la cuenta: el de VIM (Fermín, persona física).
+- [x] Cuenta de **producción** en `https://app.facturama.mx` (la de sandbox no sirve; son cuentas
+      distintas). RFC de la cuenta: el de VIM (Fermín, persona física). Hecho 3 sep 2026.
+- [ ] Correo de la cuenta cambiado a `integraciones@vimpos.com.mx` (Cuentas → datos de la cuenta).
 - [ ] Confirmar por escrito que la modalidad **Multiemisor** está activa en la cuenta (Fermín ya
       confirmó que viene incluida en el plan; pedir que lo dejen por correo).
 - [ ] Precio por folio: publicado $0.50 (1–10,000). Comprar el primer paquete de folios desde la web
