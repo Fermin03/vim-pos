@@ -88,6 +88,16 @@ app de Uber: `https://admin.vimpos.com.mx/configuracion/integraciones/uber/callb
 `SIN_PERMISO` 403, `SIN_AUTORIZACION` 409, `SUCURSAL_YA_CONECTADA` / `TIENDA_YA_CONECTADA` 409,
 `TERMINOS_NO_ACEPTADOS` 400, `CONEXION_NO_EXISTE` 404, `UBER_ERROR` 502. Spec:
 `docs/superpowers/specs/2026-09-02-delivery-f1b-conectar-uber-design.md`.
+Además (spec A6): `prep` (`conexion_id`, `minutos`) sincroniza el tiempo de preparación a Uber y
+luego a `tiempo_prep_min`; `verificar` devuelve también `tienda` (estado normalizado, cacheado 60 s
+en `config.tienda`).
+
+Acciones de tienda en `delivery-accion` (POS, spec A6), por `sucursal_id`: `tienda_estado`
+(`forzar?`), `tienda_pausar` (`duracion`: `30m` | `1h` | `dia`), `tienda_reanudar`, `tienda_prep`
+(`minutos` 1..180). Errores: `SIN_CONEXION_UBER` 404, `TIENDA_ESTRATEGIA_UBER` 409 (la tienda no
+tiene estrategia de estado "external": solo se pausa desde Uber Eats Manager),
+`PREP_FUERA_DE_RANGO` 400, `UBER_ERROR` 502. Los expirados los marca `delivery_marcar_expirados()`
+por pg_cron cada minuto (migración 0093).
 
 Prueba local (stack arriba, `supabase db reset`, una `delivery_conexion` ACTIVA con
 `tienda_id_externo = 'store-1'` para la sucursal de Knock-Out y un turno abierto):
