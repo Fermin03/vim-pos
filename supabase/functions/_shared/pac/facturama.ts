@@ -27,6 +27,33 @@ type RespuestaFacturama = {
   [k: string]: unknown;
 };
 
+/**
+ * Estado de una cancelación según Facturama (`CancelationStatusLite.Status`), ya interpretado.
+ * `canceled`, `acepted` y `expired` son cancelado; `pending` espera al receptor (72 h);
+ * `rejected` lo rechazó el receptor y el CFDI sigue vigente; `desconocido` = cuerpo vacío o sin
+ * `Status`, que es lo que devolvía la ruta equivocada.
+ */
+export type EstadoCancelacionPac = "cancelado" | "pendiente" | "rechazado" | "desconocido";
+
+export type ResultadoCancelacionPac =
+  | { ok: true; estado: EstadoCancelacionPac; statusPac: string; mensaje: string; acuseBase64: string | null; cuerpo: string }
+  | { ok: false; codigo: string; mensaje: string };
+
+/** Interpreta el cuerpo del DELETE. Exportado para probarlo sin red. */
+export function interpretarCancelacion(cuerpo: string): { estado: EstadoCancelacionPac; statusPac: string; mensaje: string; acuseBase64: string | null } {
+  let d: Record<string, unknown> = {};
+  try { d = (JSON.parse(cuerpo || "null") ?? {}) as Record<string, unknown>; } catch { d = {}; }
+  const statusPac = String(d.Status ?? "").trim().toLowerCase();
+  const acuse = typeof d.AcuseXmlBase64 === "string" && d.AcuseXmlBase64.trim() !== "" ? d.AcuseXmlBase64.trim() : null;
+  const mensaje = String(d.Message ?? "").trim();
+  const estado: EstadoCancelacionPac =
+    statusPac === "canceled" || statusPac === "acepted" || statusPac === "accepted" || statusPac === "expired" ? "cancelado"
+    : statusPac === "pending" || statusPac === "requested" ? "pendiente"
+    : statusPac === "rejected" ? "rechazado"
+    : "desconocido";
+  return { estado, statusPac, mensaje, acuseBase64: acuse };
+}
+
 /** Lo que devuelve `verificarCuenta()`: nunca incluye la credencial ni nada de un sello. */
 export type EstadoCuentaPac = {
   entorno: "produccion" | "sandbox" | "otro";
@@ -152,7 +179,7 @@ export class FacturamaPac implements PacAdapter {
     id: string,
     motivo: "01" | "02" | "03" | "04",
     uuidSustituto?: string,
-  ): Promise<{ ok: true; cuerpo: string } | { ok: false; codigo: string; mensaje: string }> {
+  ): Promise<ResultadoCancelacionPac> {
     // El motivo 01 significa "con errores CON relación": el SAT exige decir cuál es el comprobante
     // que sustituye al cancelado. Se valida AQUÍ porque **la API no lo valida**: comprobado contra
     // el sandbox, un DELETE con motivo 01 y sin sustituto responde 200 tan tranquilo. Dejarlo pasar
@@ -165,12 +192,16 @@ export class FacturamaPac implements PacAdapter {
       };
     }
 
-    const params = new URLSearchParams({ type: "issuedLite", motive: motivo });
+    // Ruta DOCUMENTADA de Multiemisor: `DELETE /api-lite/cfdis/{id}?motive=` (plural, sin `type`),
+    // que responde `CancelationStatusLite` con `Status` y el acuse en base64. La forma anterior,
+    // `/api-lite/cfdi/{id}?type=issuedLite`, respondía 200 con el cuerpo VACÍO en producción
+    // (3 sep 2026) y el comprobante seguía vigente: un 200 sin cuerpo no cancela nada.
+    const params = new URLSearchParams({ motive: motivo });
     if (uuidSustituto) params.set("uuidReplacement", uuidSustituto);
 
     let res: Response;
     try {
-      res = await fetch(`${this.baseUrl}/api-lite/cfdi/${id}?${params}`, {
+      res = await fetch(`${this.baseUrl}/api-lite/cfdis/${encodeURIComponent(id)}?${params}`, {
         method: "DELETE",
         headers: { Authorization: this.autorizacion, Accept: "application/json" },
       });
@@ -179,7 +210,7 @@ export class FacturamaPac implements PacAdapter {
     }
 
     const cuerpo = await res.text();
-    if (res.ok) return { ok: true, cuerpo };
+    if (res.ok) return { ok: true, ...interpretarCancelacion(cuerpo), cuerpo };
 
     let datos: Record<string, unknown>;
     try {

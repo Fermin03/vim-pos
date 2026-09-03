@@ -311,7 +311,7 @@ export const MOTIVOS_CANCELACION = [
 ] as const;
 
 export type ResultadoCancelacion =
-  | { ok: true; estado: "CANCELADO" | "EN_PROCESO_CANCELACION"; mensaje: string }
+  | { ok: true; estado: "CANCELADO" | "EN_PROCESO_CANCELACION" | "CANCELACION_RECHAZADA"; mensaje: string }
   | { ok: false; error: string };
 
 export async function cancelarCfdi(

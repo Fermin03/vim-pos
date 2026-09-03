@@ -21,6 +21,8 @@ const ESTADO_CFDI_BADGE: Record<string, { label: string; cls: string }> = {
   EN_PROCESO_TIMBRADO: { label: "En proceso", cls: "bg-sel text-ink-2" },
   ERROR_TIMBRADO: { label: "Error", cls: "bg-[#FBECEA] text-danger" },
   CANCELADO: { label: "Cancelado", cls: "bg-sel text-ink-3" },
+  EN_PROCESO_CANCELACION: { label: "Cancelación en proceso", cls: "bg-[#FCF3E6] text-warning" },
+  CANCELACION_RECHAZADA: { label: "Cancelación rechazada", cls: "bg-[#FBECEA] text-danger" },
 };
 
 /** Facturación — punto de entrada del flujo CFDI: ticket PAGADO → receptor → timbrar. */
@@ -200,14 +202,27 @@ export default function FacturacionPage() {
                               </button>
                             </span>
                           )
-                          : (
-                            <span className="flex items-center justify-end gap-3">
-                              {t.cfdiId && (t.cfdiEstado === "CANCELADO" || t.cfdiEstado === "EN_PROCESO_CANCELACION") && (
-                                <DescargasCfdi cfdiId={t.cfdiId} estado={t.cfdiEstado} />
-                              )}
-                              <Button size="md" onClick={() => setSel(t)}>Facturar</Button>
-                            </span>
-                          )}
+                          : t.cfdiEstado === "EN_PROCESO_CANCELACION"
+                            ? (
+                              <span className="flex items-center justify-end gap-3">
+                                {t.cfdiId && <DescargasCfdi cfdiId={t.cfdiId} estado={t.cfdiEstado} />}
+                                <button
+                                  onClick={() => setCancelando(t)}
+                                  className="text-[12.5px] font-medium text-warning underline underline-offset-2"
+                                  title="Vuelve a preguntar al SAT si la cancelación ya procedió"
+                                >
+                                  Revisar cancelación
+                                </button>
+                              </span>
+                            )
+                            : (
+                              <span className="flex items-center justify-end gap-3">
+                                {t.cfdiId && t.cfdiEstado === "CANCELADO" && (
+                                  <DescargasCfdi cfdiId={t.cfdiId} estado={t.cfdiEstado} />
+                                )}
+                                <Button size="md" onClick={() => setSel(t)}>Facturar</Button>
+                              </span>
+                            )}
                       </td>
                     </tr>
                   );
