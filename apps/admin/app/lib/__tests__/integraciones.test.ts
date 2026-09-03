@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, beforeAll } from "vitest";
-import { urlConexionUber, generarState, iniciarConexionUber, validarState, mensajeErrorIntegracion, etiquetaEstado, RUTA_CALLBACK_UBER } from "../integraciones";
+import { urlConexionUber, generarState, iniciarConexionUber, validarState, mensajeErrorIntegracion, etiquetaEstado, etiquetaTienda, RUTA_CALLBACK_UBER } from "../integraciones";
 
 // vitest corre en entorno node: se simula lo mínimo del navegador que usa el flujo OAuth.
 beforeAll(() => {
@@ -65,5 +65,16 @@ describe("mensajeErrorIntegracion", () => {
 describe("etiquetaEstado", () => {
   it("tiene texto para cada estado", () => {
     for (const e of ["SIN_CONECTAR", "PENDIENTE", "ACTIVA", "PAUSADA", "ERROR", "DESCONECTADA"] as const) expect(etiquetaEstado(e).length).toBeGreaterThan(0);
+  });
+});
+
+describe("etiquetaTienda (spec A6)", () => {
+  const base = { hasta: null, motivo: null, consultado_at: "2026-09-02T18:10:00Z" };
+  it("en línea, pausada hasta HH:mm (hora de León), sin datos", () => {
+    expect(etiquetaTienda({ ...base, estado: "EN_LINEA" })).toBe("En línea");
+    expect(etiquetaTienda({ ...base, estado: "PAUSADA", hasta: "2026-09-02T18:40:00Z" })).toBe("Pausada hasta 12:40");
+    expect(etiquetaTienda({ ...base, estado: "DESCONOCIDO" })).toBe("Sin datos");
+    expect(etiquetaTienda(null)).toBe("Sin datos");
+    expect(mensajeErrorIntegracion(new Error("PREP_FUERA_DE_RANGO"))).toMatch(/1 y 180/);
   });
 });

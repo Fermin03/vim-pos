@@ -41,7 +41,7 @@ import { PantallaReservaciones } from "./pantalla-reservaciones";
 import { PantallaConsultaCuentas } from "./pantalla-consulta-cuentas";
 import { PantallaDevoluciones } from "./pantalla-devoluciones";
 import { PantallaPedidosApps } from "./pantalla-pedidos-apps";
-import { leerPedidosApps } from "../lib/pedidos-apps";
+import { hayExpiradosSinVer, leerExpiradosHoy, leerPedidosApps } from "../lib/pedidos-apps";
 import { ModalCancelarItem } from "./modal-cancelar-item";
 import { ModalDescuentoItem } from "./modal-descuento-item";
 import { ModalCancelarTicket } from "./modal-cancelar-ticket";
@@ -135,6 +135,7 @@ export function HomePos({
   // ADR 0011 — pedidos de apps de delivery: pantalla, badge del inicio y sonido al llegar uno nuevo.
   const [enPedidosApps, setEnPedidosApps] = useState(false);
   const [nPedidosApps, setNPedidosApps] = useState(0);
+  const [expiradosApps, setExpiradosApps] = useState(0);   // spec A6: vencidos sin aceptar, no vistos aún
   const idsAppsVistos = useRef<Set<string> | null>(null);
   // F16 — estado de conexión (avisa al cajero si se cae la red).
   const { online } = useConexion(SUPABASE_URL ? `${SUPABASE_URL}/auth/v1/health` : undefined);
@@ -862,6 +863,9 @@ export function HomePos({
           }
         })
         .catch(() => { /* informativo: sin red la caja sigue vendiendo */ });
+      leerExpiradosHoy(token, caja.sucursal_id)
+        .then(({ n, ultimo }) => { if (vivo) setExpiradosApps(hayExpiradosSinVer(ultimo) ? n : 0); })
+        .catch(() => { /* informativo */ });
     };
     cargar();
     const id = setInterval(cargar, 10000);
@@ -1225,6 +1229,7 @@ export function HomePos({
           nCuentasDomicilio={cuentasAbiertas.domicilio}
           nEnEspera={nEnEspera}
           nPedidosApps={nPedidosApps}
+          expiradosApps={expiradosApps}
           onPedidosApps={() => { setEnInicio(false); setEnPedidosApps(true); }}
           onComedor={() => { setEnInicio(false); setEnMesas(true); }}
           onPickup={() => { setEnInicio(false); setEnPickup(true); }}

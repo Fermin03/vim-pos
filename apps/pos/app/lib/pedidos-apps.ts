@@ -123,3 +123,98 @@ export function idsNuevos(antes: PedidoApp[], ahora: PedidoApp[]): string[] {
   const vistos = new Set(antes.map((p) => p.id));
   return ahora.filter((p) => !vistos.has(p.id)).map((p) => p.id);
 }
+
+// ── Tienda de Uber (spec A6): estado, pausa, reanudar y tiempo de preparación, vía delivery-accion ──
+
+export type EstadoTiendaApp = { estado: "EN_LINEA" | "PAUSADA" | "DESCONOCIDO"; hasta: string | null; motivo: string | null; consultado_at: string };
+export type DuracionPausa = "30m" | "1h" | "dia";
+type RespTienda = { ok?: boolean; tienda?: EstadoTiendaApp; tiempo_prep_min?: number; error?: string; detalle?: string };
+
+async function llamarAccion(token: string, cuerpo: Record<string, unknown>): Promise<RespTienda & { status: number }> {
+  try {
+    const r = await fetch(`${URL}/functions/v1/delivery-accion`, {
+      method: "POST",
+      headers: { apikey: ANON, Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+      body: JSON.stringify(cuerpo),
+    });
+    const j = (await r.json().catch(() => ({}))) as RespTienda;
+    return { ...j, status: r.status, error: r.ok ? undefined : (j.error ?? `HTTP_${r.status}`) };
+  } catch (e) {
+    return { status: 0, error: "SIN_RED", detalle: e instanceof Error ? e.message : String(e) };
+  }
+}
+
+export type ResultadoTienda =
+  | { ok: true; tienda: EstadoTiendaApp; tiempoPrepMin?: number }
+  | { ok: false; error: string; detalle?: string; tiempoPrepMin?: number };
+
+function comoResultado(r: RespTienda & { status: number }): ResultadoTienda {
+  return r.error || !r.tienda
+    ? { ok: false, error: r.error ?? "SIN_DATOS", detalle: r.detalle, tiempoPrepMin: r.tiempo_prep_min }
+    : { ok: true, tienda: r.tienda, tiempoPrepMin: r.tiempo_prep_min };
+}
+
+export async function leerTiendaUber(token: string, sucursalId: string, forzar = false): Promise<ResultadoTienda> {
+  return comoResultado(await llamarAccion(token, { accion: "tienda_estado", sucursal_id: sucursalId, forzar }));
+}
+export async function pausarTiendaUber(token: string, sucursalId: string, duracion: DuracionPausa): Promise<ResultadoTienda> {
+  return comoResultado(await llamarAccion(token, { accion: "tienda_pausar", sucursal_id: sucursalId, duracion }));
+}
+export async function reanudarTiendaUber(token: string, sucursalId: string): Promise<ResultadoTienda> {
+  return comoResultado(await llamarAccion(token, { accion: "tienda_reanudar", sucursal_id: sucursalId }));
+}
+export async function cambiarPrepUber(
+  token: string, sucursalId: string, minutos: number,
+): Promise<{ ok: true; tiempoPrepMin: number } | { ok: false; error: string; detalle?: string }> {
+  const r = await llamarAccion(token, { accion: "tienda_prep", sucursal_id: sucursalId, minutos });
+  return r.error || r.tiempo_prep_min === undefined
+    ? { ok: false, error: r.error ?? "SIN_DATOS", detalle: r.detalle }
+    : { ok: true, tiempoPrepMin: r.tiempo_prep_min };
+}
+
+/** Expirados de hoy en la sucursal (vista con RLS heredado, migración 0093). */
+export async function leerExpiradosHoy(token: string, sucursalId: string): Promise<{ n: number; ultimo: string | null }> {
+  const { data, error } = await employeeClient(token)
+    .from("vw_delivery_expirados_hoy").select("n_expirados, ultimo_expirado_at").eq("sucursal_id", sucursalId).maybeSingle();
+  if (error) throw new Error(error.message);
+  const f = data as { n_expirados: number; ultimo_expirado_at: string | null } | null;
+  return { n: f?.n_expirados ?? 0, ultimo: f?.ultimo_expirado_at ?? null };
+}
+
+const CLAVE_VISTO = "vimpos.apps.vistoExpirados";
+/** Al entrar a Pedidos de apps se da por visto todo lo expirado hasta ahora (por dispositivo). */
+export function marcarExpiradosVistos(hasta: string | null): void {
+  try { localStorage.setItem(CLAVE_VISTO, hasta ?? new Date().toISOString()); } catch { /* sin storage: el aviso se repite, no pasa nada */ }
+}
+export function hayExpiradosSinVer(ultimo: string | null): boolean {
+  if (!ultimo) return false;
+  try { const visto = localStorage.getItem(CLAVE_VISTO); return !visto || visto < ultimo; } catch { return true; }
+}
+
+export function horaCorta(iso: string | null, zona = "America/Mexico_City"): string | null {
+  if (!iso) return null;
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return null;
+  return new Intl.DateTimeFormat("es-MX", { timeZone: zona, hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).format(d);
+}
+export function etiquetaTienda(t: EstadoTiendaApp | null): string {
+  if (!t || t.estado === "DESCONOCIDO") return "Uber: sin datos";
+  if (t.estado === "EN_LINEA") return "Uber: en línea";
+  const h = horaCorta(t.hasta);
+  return h ? `Uber: pausada hasta ${h}` : "Uber: pausada";
+}
+export const OPCIONES_PAUSA: { codigo: DuracionPausa; label: string }[] = [
+  { codigo: "30m", label: "30 minutos" },
+  { codigo: "1h", label: "1 hora" },
+  { codigo: "dia", label: "Resto del día" },
+];
+export function mensajeErrorTienda(codigo: string, detalle?: string): string {
+  switch (codigo) {
+    case "SIN_CONEXION_UBER": return "Esta sucursal no tiene conectada su tienda de Uber Eats.";
+    case "TIENDA_ESTRATEGIA_UBER": return "Esta tienda solo se pausa desde Uber Eats Manager (Uber no permite hacerlo desde el POS).";
+    case "PREP_FUERA_DE_RANGO": return "El tiempo de preparación debe estar entre 1 y 180 minutos.";
+    case "SIN_RED": return "Sin conexión con la nube. Reintenta en unos segundos.";
+    case "UBER_ERROR": return `Uber Eats no respondió${detalle ? ` (${detalle})` : ""}. Reintenta en un momento.`;
+    default: return detalle ? `${codigo}: ${detalle}` : codigo;
+  }
+}
