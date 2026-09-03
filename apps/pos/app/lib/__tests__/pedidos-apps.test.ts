@@ -1,10 +1,13 @@
 import { describe, it, expect } from "vitest";
-import { segundosRestantes, etiquetaApp, etiquetaEstado, ordenarPedidos, idsNuevos, type PedidoApp } from "../pedidos-apps";
+import { segundosRestantes, etiquetaApp, etiquetaEstado, ordenarPedidos, idsNuevos, etiquetaAlergia, pedidoConAlergia, type PedidoApp, type PedidoAppItem } from "../pedidos-apps";
 
 const base = (extra: Partial<PedidoApp>): PedidoApp => ({
   id: "x", app: "APP_UBEREATS", idExterno: "e", folioCorto: null, estado: "RECIBIDO", tipoEntrega: null, clienteNombre: null,
   notaCliente: null, items: [], totalCliente: null, venceAceptacion: null, recibidoAt: "2026-09-02T10:00:00Z", ticketId: null,
   ticketFolio: null, ultimoError: null, ...extra,
+});
+const item = (extra: Partial<PedidoAppItem>): PedidoAppItem => ({
+  nombreApp: "Hamburguesa", cantidad: 1, precioUnitario: 100, nota: null, mapeado: true, alergenos: [], alergiaNota: null, modificadores: [], ...extra,
 });
 
 describe("pedidos de apps · helpers", () => {
@@ -79,5 +82,18 @@ describe("tienda de Uber · helpers", () => {
     expect(mensajeErrorTienda("SIN_CONEXION_UBER")).toMatch(/no tiene conectada/);
     expect(mensajeErrorTienda("PREP_FUERA_DE_RANGO")).toMatch(/1 y 180/);
     expect(OPCIONES_PAUSA.map((o) => o.codigo)).toEqual(["30m", "1h", "dia"]);
+  });
+});
+
+describe("alergias (A7)", () => {
+  it("etiquetaAlergia arma la lista y el texto; null sin alergia", () => {
+    expect(etiquetaAlergia(item({ alergenos: ["cacahuate", "lácteos"], alergiaNota: "alergia fuerte" }))).toBe("ALERGIA: cacahuate, lácteos — “alergia fuerte”");
+    expect(etiquetaAlergia(item({ alergenos: ["gluten"] }))).toBe("ALERGIA: gluten");
+    expect(etiquetaAlergia(item({ alergiaNota: "sin kiwi" }))).toBe("ALERGIA: ver nota — “sin kiwi”");
+    expect(etiquetaAlergia(item({}))).toBeNull();
+  });
+  it("pedidoConAlergia mira todos los ítems", () => {
+    expect(pedidoConAlergia(base({ items: [item({}), item({ alergenos: ["soya"] })] }))).toBe(true);
+    expect(pedidoConAlergia(base({ items: [item({}), item({})] }))).toBe(false);
   });
 });
