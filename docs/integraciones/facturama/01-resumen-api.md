@@ -15,7 +15,7 @@ el sandbox; esto es lo que Facturama documenta.
 | Prefijo de rutas | `/api/…` o raíz | `/api-lite/…` para timbrar, cancelar y CSD; raíz para consultar y descargar |
 | Activación en producción | Con la cuenta | Hay que pedirla por separado (guía `multiemisor--proceso`); Fermín confirmó que **está incluida en el plan contratado** |
 
-Guías: `guias/multiemisor--proceso.md`, `guias/api-web--proceso.md`, `otros/Docs-multi.md`.
+Guías: `guias/api-multi--proceso-facturacion.md`, `guias/primeros-pasos.md`, `otros/Docs-multi.md`.
 
 ## 2. Cuentas, entornos y autenticación
 
@@ -24,14 +24,14 @@ Guías: `guias/multiemisor--proceso.md`, `guias/api-web--proceso.md`, `otros/Doc
   Un RFC solo puede registrarse una vez por entorno (`guias/crear-cuenta.md`).
 - Base URL: `https://apisandbox.facturama.mx` en pruebas; `https://api.facturama.mx` en producción.
 - **HTTP Basic** con usuario y contraseña de la cuenta, en todas las peticiones
-  (`guias/autenticacion.md`). En Multiemisor no hay tokens ni OAuth.
+  (`guias/primeros-pasos.md`). En Multiemisor no hay tokens ni OAuth.
 - Sandbox no timbra ante el SAT: usa certificados de prueba. El **sello de prueba** se descarga de
   `https://cdnfacturama.azureedge.net/content/csd-pruebas.zip`; contraseña de todas las llaves
-  `12345678a`. La guía `guias/sellos-de-prueba.md` trae la tabla de RFC de prueba con su razón social
+  `12345678a`. La guía `guias/conocimientos--sellos-digitales-pruebas.md` trae la tabla de RFC de prueba con su razón social
   y régimen (por ejemplo `EKU9003173C9` Escuela Kemper Urgate, régimen 601).
 - **Folios**: cada timbrado consume uno; también lo consumen la validación de RFC en producción
   (`GET /customers/status?rfc=`) y la consulta de estatus ante el SAT (`GET /cfdi/status`).
-  Precios publicados en `guias/recarga-folios.md`: $0.50 por folio de 1 a 10,000, $0.45 de 10,001 a
+  Precios publicados en `guias/api-web--cfdi--recarga-folios.md`: $0.50 por folio de 1 a 10,000, $0.45 de 10,001 a
   50,000, y baja en escalones. La recarga se hace desde la web de Facturama, no por API
   (los endpoints `Subscription` no están documentados; dieron error al capturarlos).
 
@@ -39,7 +39,7 @@ Guías: `guias/multiemisor--proceso.md`, `guias/api-web--proceso.md`, `otros/Doc
 
 `POST /api-lite/3/cfdis` — referencia completa en
 `referencia-api-multi/POST-api-lite-3-cfdis.md` (todos los atributos del modelo `CfdiMulti`),
-ejemplo comentado en `guias/multiemisor--factura.md`.
+ejemplo comentado en `guias/api-multi--cfdi--factura.md`.
 
 Esqueleto mínimo de una factura de ingreso:
 
@@ -70,10 +70,10 @@ Puntos que la documentación deja claros:
 - `ExpeditionPlace` es el CP del lugar de expedición (la sucursal). En factura global,
   `Receiver.TaxZipCode` debe ser **igual** a `ExpeditionPlace`.
 - `Receiver.FiscalRegime` y `TaxZipCode` son obligatorios en CFDI 4.0, y deben coincidir con la
-  Constancia del receptor (`guias/cfdi-4-0.md`).
+  Constancia del receptor (`guias/cfdi40--migrar-cfdi40.md`).
 - Cada `Item` declara `TaxObject` (`01` no objeto, `02` objeto, `03` objeto no obligado a
   desglose) y sus `Taxes` con `Base`, `Rate`, `Total`.
-- Campos opcionales útiles (`guias/multiemisor--campos-adicionales.md`): `Observations`,
+- Campos opcionales útiles (`guias/api-multi--cfdi--campos-adicionales.md`): `Observations`,
   `PaymentBankName`, `PaymentAccountNumber`, `OrderNumber`, `PaymentConditions`, `LogoUrl` (jpg o
   png; **no SVG**).
 - La respuesta trae `Id` (23 caracteres, la clave para descargar y cancelar), `Complement.TaxStamp`
@@ -82,7 +82,7 @@ Puntos que la documentación deja claros:
 
 ## 4. Factura global (público en general)
 
-Guía `guias/factura-global.md` y `guias/cfdi-4-0--publico-en-general.md`.
+Guía `guias/cfdi40--publico-general.md`.
 
 - Receptor fijo: `Rfc` `XAXX010101000`, `Name` `PUBLICO EN GENERAL`, `CfdiUse` `S01`,
   `FiscalRegime` `616`, `TaxZipCode` = `ExpeditionPlace`.
@@ -94,7 +94,7 @@ Guía `guias/factura-global.md` y `guias/cfdi-4-0--publico-en-general.md`.
 
 ## 5. Cancelación
 
-Guías `guias/multiemisor--cancelacion.md` y `guias/cancelacion-cfdi.md`; referencia
+Guías `guias/api-multi--cfdi--cancelacion.md` y `guias/api-web--cfdi--cancelacion.md`; referencia
 `referencia-api-multi/DELETE-api-lite-cfdis-id_motive_uuidReplacement.md`.
 
 `DELETE /api-lite/cfdis/{id}?motive=02` (la skill documenta también la forma
@@ -111,23 +111,23 @@ La respuesta trae `Status`: `canceled` (cancelado), `active` (sigue vigente), `p
 aceptación del receptor), `acepted` (así, con una c: aceptado), `rejected` (el receptor rechazó),
 `expired` (venció el plazo de respuesta). Desde 2022 el SAT puede exigir aceptación del receptor;
 un 200 no significa cancelado, hay que leer `Status` y después el acuse
-(`GET /cfdi/acuse/issuedLite/{id}?format=xml`; `referencia-api-web/GET-cfdi-acuse_type_id_format.md`).
+(`GET /cfdi/acuse/issuedLite/{id}?format=xml`; `referencia-api-web/GET-Acuse-format-type-id.md`).
 
 Consulta de estatus ante el SAT sin nuestra base:
-`GET /cfdi/status?uuid=&issuerRfc=&receiverRfc=&total=` (`guias/cfdi-status.md`; consume folio).
+`GET /cfdi/status?uuid=&issuerRfc=&receiverRfc=&total=` (`guias/validaciones--cfdi-status.md`; consume folio).
 
-Hay también una guía de **cancelación sin CSD cargado** (`guias/multiemisor--cancelacion-sin-csd.md`):
+Hay también una guía de **cancelación sin CSD cargado** (`guias/api-multi--cfdi--cancelacion-sin-csd.md`):
 Facturama devuelve un XML a firmar y se le regresa firmado. No la usamos: nuestros emisores tienen
 el sello cargado.
 
 ## 6. Consultar y descargar
 
-- Listado (`guias/multiemisor--consultar.md`): `GET /cfdi?type=issuedLite&folioStart&folioEnd&dateStart&dateEnd&rfcIssuer&rfc&taxEntityName&status&page`,
+- Listado (`guias/api-multi--cfdi--consultar.md`): `GET /cfdi?type=issuedLite&folioStart&folioEnd&dateStart&dateEnd&rfcIssuer&rfc&taxEntityName&status&page`,
   100 por página, `status` = `active` o `canceled`.
 - Detalle: `GET /api-lite/cfdis/{id}` (`referencia-api-multi/GET-api-lite-cfdis-id.md`).
 - Descargas: `GET /cfdi/{xml|pdf|html}/issuedLite/{id}` → JSON con `Content` en base64,
   `ContentType`, `ContentLength`, `ContentEncoding`
-  (`referencia-api-multi/GET-api-lite-cfdi_format_type_id.md`).
+  (`referencia-api-multi/GET-Cfdi-format-type-id.md`).
 - Envío por correo: `POST /Cfdi?cfdiType=issuedLite&cfdiId=&email=&subject=&comments=&issuerEmail=&includePayBtn=`
   (`referencia-api-web/POST-cfdi_cfdiType_cfdiId_email_…md`). Responde
   `{ msj, success }` **siempre con HTTP 200**: el resultado está en `success`.
@@ -135,7 +135,7 @@ el sello cargado.
 
 ## 7. Sellos (CSD)
 
-`guias/multiemisor--csds.md` y `referencia-api-multi/{POST,GET,PUT,DELETE}-api-lite-csds*.md`.
+`guias/api-multi--csds.md` y `referencia-api-multi/{POST,GET,PUT,DELETE}-api-lite-csds*.md`.
 
 - `POST /api-lite/csds` con `Rfc`, `Certificate` (.cer en base64), `PrivateKey` (.key en base64) y
   `PrivateKeyPassword`. Si el RFC ya tiene sello responde 400: renovar es `PUT /api-lite/csds/{rfc}`.
@@ -157,16 +157,16 @@ Todos en `referencia-api-web/GET-catalogs-*.md`. Los que importan al POS y al po
 | `GET /catalogs/PaymentForms`, `PaymentMethods`, `Currencies`, `CfdiTypes`, `RelationTypes` | Listas cerradas |
 | `GET /customers/status?rfc=` | Valida formato, existencia y estatus activo del RFC en el SAT. **En producción consume folio** |
 
-Los catálogos cambian con el SAT (el historial `guias/historial-cambios.md` registra cuándo), así
+Los catálogos cambian con el SAT (el historial `guias/historial-actualizaciones.md` registra cuándo), así
 que conviene tenerlos copiados en la base y refrescarlos, no consultarlos en cada venta.
 
 ## 9. Otros tipos de comprobante que Facturama documenta
 
-- **Nota de crédito** (`guias/nota-de-credito.md`): `CfdiType` `E`, `NameId` `2`, relación tipo
+- **Nota de crédito** (`guias/cfdi40--nota-credito.md`): `CfdiType` `E`, `NameId` `2`, relación tipo
   `01` (nota de crédito de los documentos relacionados) con el UUID de la factura, `CfdiUse` `G02`.
-- **CFDI relacionados** (`guias/cfdi-relacionados.md`): nodo `Relations` con `Type` `01`…`07` y
+- **CFDI relacionados** (`guias/conocimientos--cfdi-relacionados.md`): nodo `Relations` con `Type` `01`…`07` y
   la lista de `Uuid`. El `04` (sustitución) acompaña a la cancelación con motivo `01`.
-- **Complemento de pago** (`guias/complemento-pago.md`): `CfdiType` `P` para PPD. Un restaurante
+- **Complemento de pago** (`guias/cfdi40--complementos--complemento-pago-20.md`): `CfdiType` `P` para PPD. Un restaurante
   cobra al momento (PUE), así que casi no aplica.
 - Complementos de nómina, carta porte, comercio exterior, retenciones, INE, IEDU, donativos,
   etc.: documentados en `guias/`, fuera del alcance de un POS de restaurante.

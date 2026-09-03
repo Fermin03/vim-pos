@@ -52,7 +52,7 @@ Mapa entre la documentación capturada y el código. Estado: 3 de septiembre de 
 - **Recarga de folios**: Facturama la hace desde su web, no por API. Nuestro modelo de folios
   (paquetes que vende VIM) es independiente del saldo de folios de la cuenta Facturama: hay que
   vigilar ese saldo aparte (ver `03-activacion-produccion.md`).
-- **Historial de cambios** (`guias/historial-cambios.md`): Facturama anuncia ahí los cambios de
+- **Historial de cambios** (`guias/historial-actualizaciones.md`): Facturama anuncia ahí los cambios de
   catálogos del SAT y de la API. Conviene revisarlo cada mes.
 
 ## Trabajo sugerido cuando se active producción (en orden de valor)

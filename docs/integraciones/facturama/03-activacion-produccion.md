@@ -59,7 +59,7 @@ Estado actual en producción: `tenant_cfdi_emisor` tiene el RFC de Fermín como 
 - **Saldo de folios de la cuenta Facturama**: se compra en su web y no lo vemos por API. Regla:
   cuando el saldo baje del consumo de un mes, recargar. Anotar en el calendario una revisión mensual
   hasta que haya un aviso automático.
-- **Historial de cambios** de Facturama (`guias/historial-cambios.md`): revisión mensual; los
+- **Historial de cambios** de Facturama (`guias/historial-actualizaciones.md`): revisión mensual; los
   catálogos del SAT cambian.
 - **Caducidad de CSD**: aviso al dueño 60 días antes (pendiente de construir; hoy manual).
 - **Datos e incidentes**: el XML y el PDF son datos fiscales del cliente y de su receptor; el
