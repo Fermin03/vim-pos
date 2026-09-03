@@ -6,7 +6,7 @@
 
 Qué datos te pedimos, para qué los usamos y cómo pedirnos que los borremos. En corto: te pedimos lo mínimo para poder contestarte, y no los vendemos ni los compartimos con nadie que quiera venderte algo.
 
-Última actualización: 25 de agosto de 2026.
+Última actualización: 3 de septiembre de 2026.
 
 ## Quién es responsable de tus datos
 
@@ -44,6 +44,8 @@ Para una sola cosa: contactarte y atender lo que pediste. En concreto:
 - El servicio con el que nos llega el aviso de que escribiste.
 
 Fuera de eso, solo los compartiríamos si nos lo exigiera una autoridad competente.
+
+**Si eres cliente de VIM POS y conectas una app de reparto** (Uber Eats, DiDi Food, Rappi), los datos de los comensales que la app manda con cada pedido los tratamos por cuenta tuya y de la app: solo para preparar y cobrar el pedido y para mostrarte tus ventas, y a los **30 días** se borran el teléfono, la dirección y el resto de datos personales. El detalle está en los [Términos del servicio](https://vimpos.com.mx/terminos), sección «Apps de reparto». Si un comensal quiere ejercer sus derechos sobre esos datos, lo canalizamos a la app, que es quien responde por ellos.
 
 ## Cuánto tiempo los guardamos
 
