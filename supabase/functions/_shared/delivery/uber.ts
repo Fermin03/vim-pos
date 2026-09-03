@@ -144,6 +144,10 @@ export type ClienteUber = {
   listarTiendas(tokenDueno: string): Promise<unknown[]>;
   posData(tiendaId: string): PosDataUber;
   estadoTienda(tiendaId: string): Promise<unknown>;
+  /** POST …/update-store-status (pausar/reanudar). Requiere estrategia de estado "external" en Uber. */
+  actualizarEstadoTienda(tiendaId: string, cuerpo: unknown): Promise<unknown>;
+  /** POST …/update-store-prep-time (default_prep_time en segundos). */
+  actualizarPrepTienda(tiendaId: string, cuerpo: unknown): Promise<unknown>;
 };
 
 export function crearClienteUber(cfg: {
@@ -232,6 +236,8 @@ export function crearClienteUber(cfg: {
     listarTiendas,
     posData,
     estadoTienda: async (tiendaId) => (await llamar("GET", `/v1/delivery/store/${encodeURIComponent(tiendaId)}/status`)).json(),
+    actualizarEstadoTienda: async (tiendaId, cuerpo) => (await llamar("POST", `/v1/delivery/store/${encodeURIComponent(tiendaId)}/update-store-status`, cuerpo)).json(),
+    actualizarPrepTienda: async (tiendaId, cuerpo) => (await llamar("POST", `/v1/delivery/store/${encodeURIComponent(tiendaId)}/update-store-prep-time`, cuerpo)).json(),
     obtenerOrden: async (id) => (await llamar("GET", `/v1/delivery/order/${encodeURIComponent(id)}?expand=carts,deliveries,payment`)).json(),
     aceptar: async (id, readyTime, folio) => {
       await llamar("POST", `/v1/delivery/order/${encodeURIComponent(id)}/accept`, { ready_for_pickup_time: readyTime, external_reference_id: folio });

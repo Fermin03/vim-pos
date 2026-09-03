@@ -75,7 +75,7 @@ pendientes. La columna "dónde" dice qué parte del sistema o del negocio la cub
 | A3 | Aceptar/rechazar/cancelar con **POST explícitos y motivos de los tipos soportados** | 4.1 + estándares | ✅ | `motivoRechazoUber` mapea AGOTADO/CERRADO/SATURADO/POS_OFFLINE/OTRO a los `deny_reason` de Uber |
 | A4 | Soportar webhooks `orders.notification` **y** `orders.failure` | estándares | ✅ | El webhook procesa notification, scheduled.notification, failure y cancel |
 | A5 | Soportar *Activate / Retrieve config / Remove integration* | estándares | ✅ | Edge Function `delivery-uber-conexion`: activar (POST pos_data), verificar (GET pos_data), pausar/reanudar (PATCH) y desconectar (DELETE); pantalla Apps de delivery en el admin (F1b) |
-| A6 | Soportar *Get/Set Store Status* y *Update Prep Time* | estándares | ⬜ | F1b/F4: pausar tienda desde el POS, tiempo de preparación |
+| A6 | Soportar *Get/Set Store Status* y *Update Prep Time* | estándares | ✅ | `delivery-accion` (POS): `tienda_estado`, `tienda_pausar`, `tienda_reanudar`, `tienda_prep`; `delivery-uber-conexion` (admin): `prep` y `verificar` con estado; expirados por `delivery_marcar_expirados()` + pg_cron (mig. 0093). Spec `docs/superpowers/specs/2026-09-02-delivery-a6-tienda-uber-y-expirados-design.md` |
 | A7 | **Retransmitir alergias e instrucciones especiales**; si no se pueden retransmitir, **rechazar el pedido** | tabla Order API; estándares | ⚠️ | Instrucciones de carrito → `tickets.nota_general`; de ítem → nota del `ticket_item`. Falta verificar el campo de alérgenos del `GetOrder` y mostrarlo en caja/KDS |
 | A8 | Uber puede compartir nuestras métricas de rendimiento con merchants | 4.2 | — | Informativo: nuestra tasa de aceptación es pública para clientes potenciales |
 | A9 | No saltarse límites de llamadas ni usar bots/scraping contra las APIs | TOU III.C, III.G | ✅ | Token client_credentials cacheado en `delivery_credenciales_app` (máx. 100/h); sin polling a Uber, todo por webhook |
@@ -150,7 +150,7 @@ Fuente: `../guias/quality-and-performance.md` (captura del 2 sep 2026). Lo que e
 - Endpoints de gestión de integración: Activate, Retrieve Config, Remove. → A5
 - Webhooks de notificación y de fallo de pedidos. → A4 ✅
 - Flujo de pedido con POST explícitos Accept/Deny/Cancel y motivos soportados. → A3 ✅
-- Endpoints de tienda: Get Store Status, Set Store Status, Update Prep Time. → A6
+- Endpoints de tienda: Get Store Status, Set Store Status, Update Prep Time. → A6 ✅
 - **Rechazar el pedido si trae alérgenos o instrucciones especiales que no se puedan retransmitir
   al POS.** → A7
 
@@ -164,7 +164,7 @@ especiales por ítem/pedido y categorías de impuesto donde aplique.
 diario. Por debajo de 99 % Uber puede revocar el acceso o apagar tiendas. Implicaciones de
 diseño ya tomadas: auto-aceptar por defecto, crear el ticket aunque la caja esté en otra pantalla,
 y tener un producto genérico para ítems sin mapear para que **nunca** se pierda un pedido por un
-mapeo. Pendiente: alerta cuando una sucursal rechaza o deja expirar pedidos (F1b, salud de tienda).
+mapeo. Los pedidos que vencen sin respuesta pasan a EXPIRADO cada minuto y avisan en el POS (banner en el inicio) y en el admin (columna "Expirados hoy"); así la tasa se puede medir con `delivery_pedidos`.
 
 ## Lo que hay que hacer a partir de este contrato (orden sugerido)
 
@@ -177,6 +177,6 @@ mapeo. Pendiente: alerta cuando una sucursal rechaza o deja expirar pedidos (F1b
 4. Escribir el **plan de respuesta a incidentes** con el aviso a Uber en 24 h (C12, D5) y el
    procedimiento para solicitudes de titulares (C6, C7). Va en `docs/operacion/`.
 5. Definir la **retención** de datos personales de pedidos de apps (C4) y programar el job.
-6. ~~A5 (hecho en F1b)~~. Completar los endpoints de estado de tienda y tiempo de preparación (A6) y verificar alérgenos (A7).
+6. ~~A5 (F1b) y A6 (estado de tienda, prep, expirados) hechos~~. Falta verificar alérgenos (A7).
 7. Documentar subencargados, accesos a producción y el programa de seguridad (C5, C9–C11) para
    poder firmar el certificado anual (C13) sin sustos.

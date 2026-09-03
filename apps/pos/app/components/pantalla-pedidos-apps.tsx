@@ -6,12 +6,14 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { DatosCaja } from "../lib/turno";
 import { fmtMxn } from "../lib/turno";
 import {
-  accionPedidoApp, etiquetaApp, etiquetaEstado, leerPedidosApps, ordenarPedidos, segundosRestantes,
-  type PedidoApp,
+  accionPedidoApp, cambiarPrepUber, etiquetaApp, etiquetaEstado, etiquetaTienda, leerPedidosApps, leerTiendaUber,
+  marcarExpiradosVistos, mensajeErrorTienda, OPCIONES_PAUSA, ordenarPedidos, pausarTiendaUber, reanudarTiendaUber,
+  segundosRestantes, type DuracionPausa, type EstadoTiendaApp, type PedidoApp,
 } from "../lib/pedidos-apps";
 import { BotonVolver } from "./boton-volver";
 
 const REFRESCO_MS = 10_000;
+const REFRESCO_TIENDA_MS = 60_000;
 type MotivoRechazo = "AGOTADO" | "CERRADO" | "SATURADO" | "OTRO";
 const MOTIVOS: { codigo: MotivoRechazo; label: string }[] = [
   { codigo: "AGOTADO", label: "Producto agotado" },
@@ -41,7 +43,54 @@ export function PantallaPedidosApps({ token, caja, onSalir }: { token: string; c
   const [ocupado, setOcupado] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [rechazando, setRechazando] = useState<PedidoApp | null>(null);
+  // Tienda de Uber (spec A6): estado cacheado en el servidor; sin conexión → la barra no se pinta.
+  const [tienda, setTienda] = useState<EstadoTiendaApp | null>(null);
+  const [prep, setPrep] = useState<number | null>(null);
+  const [sinConexion, setSinConexion] = useState(false);
+  const [ocupadoTienda, setOcupadoTienda] = useState(false);
+  const [menuPausa, setMenuPausa] = useState(false);
   const montado = useRef(true);
+
+  const recargarTienda = useCallback(async (forzar = false) => {
+    const r = await leerTiendaUber(token, caja.sucursal_id, forzar);
+    if (!montado.current) return;
+    if (r.ok) { setSinConexion(false); setTienda(r.tienda); if (r.tiempoPrepMin !== undefined) setPrep(r.tiempoPrepMin); }
+    else if (r.error === "SIN_CONEXION_UBER") setSinConexion(true);
+    else { /* la barra queda en "sin datos" y se reintenta al minuto; los minutos de VIM sí se muestran */
+      if (r.tiempoPrepMin !== undefined) setPrep(r.tiempoPrepMin);
+    }
+  }, [token, caja.sucursal_id]);
+
+  useEffect(() => {
+    marcarExpiradosVistos(null);
+    recargarTienda();
+    const id = setInterval(() => { recargarTienda(); }, REFRESCO_TIENDA_MS);
+    return () => clearInterval(id);
+  }, [recargarTienda]);
+
+  const accionTienda = async (fn: () => Promise<{ ok: boolean; error?: string; detalle?: string }>) => {
+    setOcupadoTienda(true); setError(null); setMenuPausa(false);
+    const r = await fn();
+    if (!montado.current) return;
+    setOcupadoTienda(false);
+    if (!r.ok) setError(mensajeErrorTienda(r.error ?? "SIN_DATOS", r.detalle));
+  };
+  const pausar = (d: DuracionPausa) => accionTienda(async () => {
+    const r = await pausarTiendaUber(token, caja.sucursal_id, d);
+    if (r.ok && montado.current) setTienda(r.tienda);
+    return r;
+  });
+  const reanudar = () => accionTienda(async () => {
+    const r = await reanudarTiendaUber(token, caja.sucursal_id);
+    if (r.ok && montado.current) setTienda(r.tienda);
+    return r;
+  });
+  const cambiarPrep = (n: number) => accionTienda(async () => {
+    const minutos = Math.min(180, Math.max(1, n));
+    const r = await cambiarPrepUber(token, caja.sucursal_id, minutos);
+    if (r.ok && montado.current) setPrep(r.tiempoPrepMin);
+    return r;
+  });
 
   const recargar = useCallback(async () => {
     try {
@@ -84,6 +133,34 @@ export function PantallaPedidosApps({ token, caja, onSalir }: { token: string; c
         )}
         <span className="ml-auto text-[13px] text-ink-3">{caja.sucursalNombre}</span>
       </header>
+
+      {!sinConexion && (
+        <div className="flex flex-shrink-0 flex-wrap items-center gap-2 border-b border-line bg-surface px-3 py-2">
+          <span className={`inline-flex items-center gap-1.5 text-[13.5px] font-semibold ${tienda?.estado === "EN_LINEA" ? "text-success" : tienda?.estado === "PAUSADA" ? "text-warning" : "text-ink-3"}`}>
+            <span className={`h-2 w-2 rounded-full ${tienda?.estado === "EN_LINEA" ? "bg-success" : tienda?.estado === "PAUSADA" ? "bg-warning" : "bg-ink-3"}`} />
+            {etiquetaTienda(tienda)}
+          </span>
+          {prep !== null && (
+            <span className="ml-3 inline-flex items-center gap-1 text-[13.5px] text-ink-2">
+              Prep:
+              <button type="button" aria-label="Menos 5 minutos" disabled={ocupadoTienda} onClick={() => cambiarPrep(prep - 5)}
+                className="h-11 w-11 rounded border border-line-strong text-[16px] font-semibold text-ink transition hover:bg-hover disabled:opacity-50">−5</button>
+              <span className="w-[64px] text-center font-semibold text-ink">{prep} min</span>
+              <button type="button" aria-label="Más 5 minutos" disabled={ocupadoTienda} onClick={() => cambiarPrep(prep + 5)}
+                className="h-11 w-11 rounded border border-line-strong text-[16px] font-semibold text-ink transition hover:bg-hover disabled:opacity-50">+5</button>
+            </span>
+          )}
+          <span className="ml-auto flex gap-2">
+            {tienda?.estado === "PAUSADA" ? (
+              <button type="button" disabled={ocupadoTienda} onClick={reanudar}
+                className="h-11 rounded bg-accent px-4 text-[14px] font-semibold text-white transition hover:bg-accent-hover disabled:opacity-50">Reanudar</button>
+            ) : (
+              <button type="button" disabled={ocupadoTienda} onClick={() => setMenuPausa(true)}
+                className="h-11 rounded border border-line-strong px-4 text-[14px] font-semibold text-ink transition hover:border-ink hover:bg-hover disabled:opacity-50">Pausar…</button>
+            )}
+          </span>
+        </div>
+      )}
 
       {error && (
         <p role="alert" className="mx-4 mt-3 rounded border border-danger bg-danger-soft px-3 py-2 text-[13.5px] text-danger">{error}</p>
@@ -162,6 +239,24 @@ export function PantallaPedidosApps({ token, caja, onSalir }: { token: string; c
             );
           })}
         </ul>
+      )}
+
+      {menuPausa && (
+        <div role="dialog" aria-modal="true" aria-label="Pausar la tienda en Uber" className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="w-full max-w-sm rounded border border-line bg-surface p-4">
+            <h2 className="mb-1 text-[15px] font-semibold text-ink">¿Cuánto tiempo pausamos Uber Eats?</h2>
+            <p className="mb-3 text-[13px] text-ink-2">Uber dejará de mandar pedidos a esta sucursal durante ese tiempo.</p>
+            <div className="flex flex-col gap-2">
+              {OPCIONES_PAUSA.map((o) => (
+                <button key={o.codigo} type="button" disabled={ocupadoTienda} onClick={() => pausar(o.codigo)}
+                  className="h-11 rounded border border-line-strong px-3 text-left text-[14px] font-semibold text-ink transition hover:border-ink hover:bg-hover disabled:opacity-50">
+                  {o.label}
+                </button>
+              ))}
+              <button type="button" onClick={() => setMenuPausa(false)} className="mt-1 h-10 text-[13.5px] text-ink-3">Cancelar</button>
+            </div>
+          </div>
+        </div>
       )}
 
       {rechazando && (

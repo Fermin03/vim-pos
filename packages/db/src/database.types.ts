@@ -8620,6 +8620,30 @@ export type Database = {
           },
         ]
       }
+      vw_delivery_expirados_hoy: {
+        Row: {
+          n_expirados: number | null
+          sucursal_id: string | null
+          tenant_id: string | null
+          ultimo_expirado_at: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "delivery_pedidos_sucursal_id_fkey"
+            columns: ["sucursal_id"]
+            isOneToOne: false
+            referencedRelation: "sucursales"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "delivery_pedidos_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       vw_descuentos_por_usuario: {
         Row: {
           ajuste_count: number | null
@@ -9781,6 +9805,7 @@ export type Database = {
       current_sucursal_id: { Args: never; Returns: string }
       current_tenant_id: { Args: never; Returns: string }
       custom_access_token_hook: { Args: { event: Json }; Returns: Json }
+      delivery_marcar_expirados: { Args: never; Returns: number }
       delivery_pedido_transicion: {
         Args: { p_detalle?: string; p_estado: string; p_pedido_id: string }
         Returns: undefined

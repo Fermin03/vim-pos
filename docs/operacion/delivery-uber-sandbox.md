@@ -35,7 +35,7 @@ supabase secrets set UBER_ENTORNO=sandbox UBER_CLIENT_ID=<client_id> UBER_CLIENT
 supabase functions deploy delivery-webhook-uber --no-verify-jwt
 supabase functions deploy delivery-accion
 supabase functions deploy delivery-uber-conexion
-supabase db push
+supabase db push   # 0093 programa el cron de expirados en la nube
 ```
 
 Variables públicas del **admin** (Vercel, proyecto admin, y `apps/admin/.env.local` en desarrollo):
@@ -81,6 +81,21 @@ VALUES ('<tenant>', '<sucursal>', 'APP_UBEREATS', 'ACTIVA', '<STORE_ID>', 'Tiend
 Subir un menú mínimo a la tienda de prueba con **ids = uuids de productos de VIM**
 (`PUT https://test-api.uber.com/v2/eats/stores/<STORE_ID>/menus`, ejemplo en
 `docs/integraciones/delivery/uber-eats/referencia-api/v2-example-menu-payloads.md`).
+
+## 3b. Tienda y expirados (spec A6)
+
+- **POS → Pedidos de apps**: la barra de arriba muestra "Uber: en línea / pausada hasta HH:MM /
+  sin datos" (cache de 60 s), **Prep −5/+5** (sincroniza a Uber y a `tiempo_prep_min`) y
+  **Pausar…** (30 min, 1 h, resto del día) / **Reanudar**. Si Uber contesta 403
+  `resource_update_not_allowed` la tienda no tiene estrategia de estado "external": se pausa
+  desde Uber Eats Manager (pedir a soporte que la cambie para la tienda de prueba).
+- **Admin → Apps de delivery**: chip "Tienda: …", columna "Expirados hoy" y Prep (min) que también
+  va a Uber.
+- **Expirados**: `delivery_marcar_expirados()` corre cada minuto por pg_cron en la nube (mig.
+  0093). Comprobar en el SQL editor: `select jobname, schedule, active from cron.job;`. Para
+  probar sin esperar: insertar un `delivery_pedidos` RECIBIDO con `vence_aceptacion` en el pasado
+  y ejecutar la función; el POS muestra el banner rojo en el inicio hasta que alguien entra a
+  Pedidos de apps.
 
 ## 4. Prueba de punta a punta
 

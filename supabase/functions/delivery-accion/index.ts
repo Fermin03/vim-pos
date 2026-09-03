@@ -3,6 +3,8 @@
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import { corsHeaders } from "../_shared/cors.ts";
 import { crearClienteUber, motivoRechazoUber, segundosAReadyTime, type MotivoRechazo } from "../_shared/delivery/uber.ts";
+import { cambiarPrepTienda, consultarEstadoTienda, pausarTienda, reanudarTienda, type ConexionTienda } from "../_shared/delivery/tienda-uber-acciones.ts";
+import type { DbMinima } from "../_shared/delivery/procesar-uber.ts";
 
 const admin = createClient(
   Deno.env.get("SUPABASE_URL")!,
@@ -30,7 +32,13 @@ const uber = crearClienteUber({
   },
 });
 
-type Cuerpo = { pedido_id?: string; accion?: string; motivo?: string; detalle?: string; tiempo_prep_min?: number };
+type Cuerpo = {
+  pedido_id?: string; accion?: string; motivo?: string; detalle?: string; tiempo_prep_min?: number;
+  // Acciones de tienda (spec A6): por sucursal, no por pedido.
+  sucursal_id?: string; duracion?: string; minutos?: number; forzar?: boolean;
+};
+const ACCIONES_TIENDA = ["tienda_estado", "tienda_pausar", "tienda_reanudar", "tienda_prep"];
+const ESTADOS_CONECTADA = ["ACTIVA", "PAUSADA", "ERROR"];
 type Pedido = { id: string; tenant_id: string; app: string; id_externo: string; estado: string; folio_corto: string | null; conexion_id: string };
 const MOTIVOS: MotivoRechazo[] = ["AGOTADO", "CERRADO", "SATURADO", "POS_OFFLINE", "OTRO"];
 const msg = (e: unknown) => (e instanceof Error ? e.message : String(e));
@@ -55,7 +63,43 @@ Deno.serve(async (req) => {
   // 2) Cuerpo y pedido (del tenant del cajero, nunca de otro).
   let body: Cuerpo;
   try { body = await req.json(); } catch { return json({ error: "BAD_JSON" }, 400); }
-  if (!body.pedido_id || !body.accion) return json({ error: "FALTAN_CAMPOS" }, 400);
+  if (!body.accion) return json({ error: "FALTAN_CAMPOS" }, 400);
+
+  // Acciones de tienda (spec A6): estado, pausar, reanudar y tiempo de preparación de la tienda de
+  // Uber de una sucursal. Cualquier empleado con sesión en la caja puede: es operación.
+  if (ACCIONES_TIENDA.includes(body.accion)) {
+    if (!body.sucursal_id) return json({ error: "FALTAN_CAMPOS" }, 400);
+    const { data: cxData } = await admin.from("delivery_conexiones")
+      .select("id, tenant_id, sucursal_id, tienda_id_externo, tiempo_prep_min, config, estado")
+      .eq("sucursal_id", body.sucursal_id).eq("app", "APP_UBEREATS").maybeSingle();
+    const cx = cxData as (ConexionTienda & { estado: string }) | null;
+    if (!cx || cx.tenant_id !== tenantId || !cx.tienda_id_externo || !ESTADOS_CONECTADA.includes(cx.estado)) {
+      return json({ error: "SIN_CONEXION_UBER" }, 404);
+    }
+    const deps = { db: admin as unknown as DbMinima, uber, ahora: () => new Date() };
+    try {
+      switch (body.accion) {
+        case "tienda_estado":
+          return json({ ok: true, tienda: await consultarEstadoTienda(deps, cx, body.forzar === true), tiempo_prep_min: cx.tiempo_prep_min });
+        case "tienda_pausar": {
+          const d = body.duracion === "1h" || body.duracion === "dia" ? body.duracion : "30m";
+          return json({ ok: true, tienda: await pausarTienda(deps, cx, d) });
+        }
+        case "tienda_reanudar":
+          return json({ ok: true, tienda: await reanudarTienda(deps, cx) });
+        case "tienda_prep":
+          return json({ ok: true, ...(await cambiarPrepTienda(deps, cx, Number(body.minutos))) });
+      }
+    } catch (e) {
+      const m = msg(e);
+      if (m === "TIENDA_ESTRATEGIA_UBER") return json({ error: "TIENDA_ESTRATEGIA_UBER" }, 409);
+      if (m === "PREP_FUERA_DE_RANGO") return json({ error: "PREP_FUERA_DE_RANGO" }, 400);
+      // Aunque Uber no responda, el POS puede mostrar los minutos que tenemos en VIM.
+      return json({ error: "UBER_ERROR", detalle: m, tiempo_prep_min: cx.tiempo_prep_min }, 502);
+    }
+  }
+
+  if (!body.pedido_id) return json({ error: "FALTAN_CAMPOS" }, 400);
 
   const { data: pData } = await admin.from("delivery_pedidos")
     .select("id, tenant_id, app, id_externo, estado, folio_corto, conexion_id").eq("id", body.pedido_id).maybeSingle();
