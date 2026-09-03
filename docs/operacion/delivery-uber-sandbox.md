@@ -124,6 +124,19 @@ sus botones funcionan igual que en la web (el gateway reenvía `delivery-accion`
 - Sin internet: el agente se salta el ciclo y la pantalla sigue con lo último espejado; al volver
   la red, el siguiente ciclo se pone al día.
 
+## 3e. Aviso push al dueño cuando vencen pedidos (0097)
+
+Una sola vez, Fermín:
+1. Dashboard → **Vault** → *New secret*: `vim_interno` = cadena aleatoria de 32+ caracteres (del
+   gestor de contraseñas) y `vim_functions_url` = `https://pbiaxzvmssjsxdwqrumb.supabase.co/functions/v1`.
+2. Edge Functions → **Secrets**: `VIM_INTERNO_SECRET` = la misma cadena que `vim_interno`.
+3. Los dispositivos que deben recibir el aviso activan notificaciones en el admin
+   (Configuración → Notificaciones).
+
+Prueba: `select delivery_avisar_expirados('<tenant>', '<sucursal>', 1);` en el SQL editor debe
+devolver `true` y llegar la notificación; `select * from net._http_response order by id desc limit 3`
+muestra la respuesta de `enviar-push` (200 con `enviadas`).
+
 ## 4. Prueba de punta a punta
 
 1. Abrir turno en el POS (nube) de la sucursal vinculada.

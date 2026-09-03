@@ -99,6 +99,14 @@ tiene estrategia de estado "external": solo se pausa desde Uber Eats Manager),
 `PREP_FUERA_DE_RANGO` 400, `UBER_ERROR` 502. Los expirados los marca `delivery_marcar_expirados()`
 por pg_cron cada minuto (migración 0093).
 
+### Push de expirados al dueño (0097)
+
+`enviar-push` acepta, además del JWT de usuario, el camino interno: cabecera `x-vim-interno`
+igual al secret `VIM_INTERNO_SECRET` y `tenant_id` en el cuerpo. Lo usa la base de datos:
+`delivery_marcar_expirados()` (cron cada minuto) llama a `delivery_avisar_expirados()` que hace
+`net.http_post` a `enviar-push` con el secreto leído de Vault (`vim_interno`) y la URL base de
+funciones (`vim_functions_url`). Sin pg_net o sin secretos, el marcado sigue y el aviso se omite.
+
 ### Espejo en la caja de escritorio (spec 2026-09-03)
 
 - `delivery-espejo` (solo dispositivos): sella `cajas.espejo_apps_at` y devuelve conexiones y
