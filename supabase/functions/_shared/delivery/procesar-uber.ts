@@ -28,7 +28,7 @@ export type DbMinima = {
 export type DepsProceso = { db: DbMinima; uber: ClienteUber; ahora: () => Date };
 export type ResultadoProceso = {
   pedido_id: string | null;
-  accion: "ACEPTADO_AUTO" | "PENDIENTE_CAJERO" | "DUPLICADO" | "SIN_CONEXION" | "ERROR";
+  accion: "ACEPTADO_AUTO" | "PENDIENTE_CAJERO" | "PENDIENTE_ESCRITORIO" | "DUPLICADO" | "SIN_CONEXION" | "ERROR";
   detalle?: string;
 };
 
@@ -104,6 +104,14 @@ export async function procesarNotificacionUber(deps: DepsProceso, evento: unknow
   const { data: insertado, error: errIns } = await deps.db.from("delivery_pedidos").insert(filaPedido(pedido, cx, ahora, orden)).select("id").single();
   if (errIns || !obj(insertado).id) return { pedido_id: null, accion: "ERROR", detalle: `insert pedido: ${errMsg(errIns)}` };
   const pedidoId = String(obj(insertado).id);
+
+  // 4b) ¿Hay una caja instalada viva en la sucursal? Entonces el ticket se crea allá (espejo,
+  // spec 2026-09-03): la nube no auto-acepta ni crea ticket; el agente de la caja lo hace.
+  const { data: espejo } = await deps.db.rpc("sucursal_con_espejo", { p_sucursal: cx.sucursal_id });
+  if (espejo === true) {
+    await deps.db.from("delivery_pedidos").update({ gestion: "ESCRITORIO" }).eq("id", pedidoId);
+    return { pedido_id: pedidoId, accion: "PENDIENTE_ESCRITORIO" };
+  }
 
   // 5) ¿Auto-aceptar? Solo con turno abierto en la sucursal; si no, que decida el cajero.
   const { data: turnos } = await deps.db.from("turnos").select("id").eq("sucursal_id", cx.sucursal_id).eq("estado", "ABIERTO").limit(1);
