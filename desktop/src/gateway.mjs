@@ -146,6 +146,27 @@ export function crearGateway(backend) {
         const out = await autorizarPin(pool, secret, bearer(req), body);
         return send(out.error ?? 200, out.body);
       }
+      if (p === "/functions/v1/delivery-accion") {
+        // Espejo de apps (spec 2026-09-03): la pantalla del POS actúa igual que en la web; el
+        // gateway valida la sesión LOCAL y reenvía a la nube con el token de DISPOSITIVO, que
+        // nunca sale al navegador. Sin nube → 503 (la pantalla ya lo explica).
+        const u = await getUser(pool, secret, bearer(req));
+        if (u.error) return send(u.error, u.body);
+        const nube = typeof backend.nube === "function" ? await backend.nube().catch(() => null) : null;
+        if (!nube) return send(503, { error: "FUNCION_REQUIERE_NUBE", funcion: "delivery-accion" });
+        const cuerpo = (await readBody(req)).toString() || "{}";
+        let up;
+        try {
+          up = await fetch(`${nube.cloudUrl}/functions/v1/delivery-accion`, {
+            method: "POST", body: cuerpo,
+            headers: { apikey: nube.anonKey, Authorization: `Bearer ${nube.deviceToken}`, "Content-Type": "application/json" },
+            signal: AbortSignal.timeout(15000),
+          });
+        } catch (e) {
+          return send(503, { error: "SIN_RED", detalle: String(e?.message ?? e) });
+        }
+        return send(up.status, await up.text());
+      }
       if (p.startsWith("/functions/v1/")) {
         // Otras Edge Functions (timbrar-cfdi, enviar-push…) requieren nube: fallan claro offline.
         return send(503, { error: "FUNCION_REQUIERE_NUBE", funcion: p.replace("/functions/v1/", "") });
