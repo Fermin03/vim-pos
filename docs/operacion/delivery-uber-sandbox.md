@@ -107,6 +107,23 @@ active "allergy requests" para la tienda** (viene apagado en integraciones POS);
 cliente puede escribirla en las instrucciones, que también llegan. Prueba local:
 `supabase/scripts/smoke_delivery_app.sql` (ítem con alergia → nota de cocina y nota general).
 
+## 3d. Caja de escritorio (espejo)
+
+Si la sucursal opera con el programa instalado, no hay que hacer nada especial: al arrancar, la
+caja vinculada a la nube inicia el agente de espejo (`· [espejo]` en el log). Cada 10 s lee
+`delivery-espejo` con su token de dispositivo, copia conexiones y pedidos a su base local, y para
+los pedidos que le tocan crea el ticket local y acepta en Uber. La pantalla "Pedidos de apps" y
+sus botones funcionan igual que en la web (el gateway reenvía `delivery-accion` a la nube).
+
+- Ver que la caja está viva para la nube: `select nombre, espejo_apps_at from cajas` en el SQL
+  editor (debe tener menos de un minuto).
+- Si el ticket no aparece en la caja: buscar en el log `· [espejo]` el motivo (`SIN_TURNO_ABIERTO`,
+  `ITEM_SIN_MAPEAR`, reclamo de otra caja) y en la tarjeta del POS (`ultimo_error`).
+- Si la app cancela un pedido que ya tenía ticket local, la tarjeta lo avisa en rojo y el cajero
+  cancela el ticket con el flujo normal.
+- Sin internet: el agente se salta el ciclo y la pantalla sigue con lo último espejado; al volver
+  la red, el siguiente ciclo se pone al día.
+
 ## 4. Prueba de punta a punta
 
 1. Abrir turno en el POS (nube) de la sucursal vinculada.

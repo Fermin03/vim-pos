@@ -21,7 +21,8 @@
     "sitio:indexnow": "node sitio-web/_agentes/indexnow.mjs",
     "test:sitio": "node --test sitio-web/_agentes/pruebas.test.mjs",
     "db:reset": "supabase db reset",
-    "db:types": "supabase gen types typescript --local > packages/db/src/database.types.ts"
+    "db:types": "supabase gen types typescript --local > packages/db/src/database.types.ts",
+    "test:escritorio": "node --test desktop/src/*.test.mjs"
   },
   "devDependencies": {
     "turbo": "^2.1.0",

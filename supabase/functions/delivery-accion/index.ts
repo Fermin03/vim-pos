@@ -39,7 +39,18 @@ type Cuerpo = {
 };
 const ACCIONES_TIENDA = ["tienda_estado", "tienda_pausar", "tienda_reanudar", "tienda_prep"];
 const ESTADOS_CONECTADA = ["ACTIVA", "PAUSADA", "ERROR"];
-type Pedido = { id: string; tenant_id: string; app: string; id_externo: string; estado: string; folio_corto: string | null; conexion_id: string };
+type Pedido = {
+  id: string; tenant_id: string; sucursal_id: string; app: string; id_externo: string; estado: string; folio_corto: string | null;
+  conexion_id: string; gestion: "NUBE" | "ESCRITORIO"; gestion_caja_id: string | null;
+};
+/** El id de caja de un dispositivo viene en su correo: caja-<uuid>@dispositivos.<dominio>. */
+function cajaDesdeCorreo(email: string | undefined): string | null {
+  const m = /^caja-([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})@/i.exec(email ?? "");
+  return m ? m[1].toLowerCase() : null;
+}
+function claimsDe(token: string): Record<string, unknown> {
+  try { const p = token.split(".")[1] ?? ""; return JSON.parse(atob(p.replace(/-/g, "+").replace(/_/g, "/"))); } catch { return {}; }
+}
 const MOTIVOS: MotivoRechazo[] = ["AGOTADO", "CERRADO", "SATURADO", "POS_OFFLINE", "OTRO"];
 const msg = (e: unknown) => (e instanceof Error ? e.message : String(e));
 
@@ -59,6 +70,16 @@ Deno.serve(async (req) => {
     .eq("usuario_id", userResp.user.id).eq("activo", true).limit(1).maybeSingle();
   if (!acceso) return json({ error: "SIN_TENANT" }, 403);
   const tenantId = (acceso as { tenant_id: string }).tenant_id;
+  // Dispositivo (caja instalada, espejo): su caja sale del correo y se verifica contra el tenant.
+  const esDispositivo = claimsDe(token).tipo_identidad === "DISPOSITIVO";
+  let cajaDispositivo: { id: string; sucursal_id: string } | null = null;
+  if (esDispositivo) {
+    const cid = cajaDesdeCorreo(userResp.user.email);
+    if (cid) {
+      const { data: c } = await admin.from("cajas").select("id, sucursal_id").eq("id", cid).eq("tenant_id", tenantId).maybeSingle();
+      cajaDispositivo = (c as { id: string; sucursal_id: string } | null) ?? null;
+    }
+  }
 
   // 2) Cuerpo y pedido (del tenant del cajero, nunca de otro).
   let body: Cuerpo;
@@ -102,7 +123,7 @@ Deno.serve(async (req) => {
   if (!body.pedido_id) return json({ error: "FALTAN_CAMPOS" }, 400);
 
   const { data: pData } = await admin.from("delivery_pedidos")
-    .select("id, tenant_id, app, id_externo, estado, folio_corto, conexion_id").eq("id", body.pedido_id).maybeSingle();
+    .select("id, tenant_id, sucursal_id, app, id_externo, estado, folio_corto, conexion_id, gestion, gestion_caja_id").eq("id", body.pedido_id).maybeSingle();
   const pedido = pData as Pedido | null;
   if (!pedido || pedido.tenant_id !== tenantId) return json({ error: "PEDIDO_NO_EXISTE" }, 404);
   if (pedido.app !== "APP_UBEREATS") return json({ error: "APP_NO_SOPORTADA" }, 400);
@@ -115,12 +136,40 @@ Deno.serve(async (req) => {
     });
   };
 
+  // Espejo (spec 2026-09-03): reclamar y aceptar sin crear ticket en la nube.
+  const reclamarParaCaja = async (): Promise<Response | null> => {
+    if (!cajaDispositivo) return null;
+    if (pedido.sucursal_id !== cajaDispositivo.sucursal_id) return json({ error: "PEDIDO_NO_EXISTE" }, 404);
+    const { data: ok } = await admin.rpc("delivery_reclamar_pedido", { p_pedido: pedido.id, p_caja: cajaDispositivo.id });
+    if (ok !== true) return json({ error: "RECLAMADO_POR_OTRA_CAJA", caja: pedido.gestion_caja_id }, 409);
+    return null;
+  };
+
   try {
     switch (body.accion) {
+      case "reclamar": {
+        if (!esDispositivo || !cajaDispositivo) return json({ error: "SOLO_DISPOSITIVO" }, 403);
+        if (pedido.gestion !== "ESCRITORIO") return json({ error: "GESTION_NUBE" }, 409);
+        const r = await reclamarParaCaja();
+        return r ?? json({ ok: true });
+      }
       case "aceptar": {
         if (!["RECIBIDO", "ERROR"].includes(pedido.estado)) return json({ error: "ACCION_INVALIDA", estado: pedido.estado }, 409);
         const { data: cx } = await admin.from("delivery_conexiones").select("tiempo_prep_min").eq("id", pedido.conexion_id).maybeSingle();
         const minutos = Number(body.tiempo_prep_min) || Number((cx as { tiempo_prep_min?: number } | null)?.tiempo_prep_min) || 15;
+        if (pedido.gestion === "ESCRITORIO") {
+          // El ticket lo crea (o ya creó) la caja instalada; aquí solo se acepta en Uber.
+          if (esDispositivo) { const r = await reclamarParaCaja(); if (r) return r; }
+          try {
+            await uber.aceptar(pedido.id_externo, segundosAReadyTime(new Date(), minutos), pedido.folio_corto ?? pedido.id);
+            await registrarSalida("accept", true, { minutos, gestion: "ESCRITORIO" });
+          } catch (e) {
+            await registrarSalida("accept", false, msg(e));
+            if (!msg(e).startsWith("YA_PROCESADA")) return json({ error: "UBER_ERROR", detalle: msg(e) }, 502);
+          }
+          await admin.rpc("delivery_pedido_transicion", { p_pedido_id: pedido.id, p_estado: "ACEPTADO", p_detalle: null });
+          return json({ ok: true, gestion: "ESCRITORIO" });
+        }
         const { data: ticketId, error: errRpc } = await admin.rpc("crear_ticket_desde_app", { p_pedido_id: pedido.id });
         if (errRpc) {
           const m = errRpc.message ?? String(errRpc);
