@@ -38,7 +38,7 @@ cruzan con la lista de clientes del restaurante ni con marketing.
 
 | Proveedor | Para qué | Dónde | Contrato de datos |
 |---|---|---|---|
-| Supabase (sobre AWS) | Base de datos, Edge Functions, Storage | Región del proyecto `pbiaxzvmssjsxdwqrumb` (ver dashboard → Settings) | DPA de Supabase (supabase.com/legal/dpa) |
+| Supabase (sobre AWS) | Base de datos, Edge Functions, Storage, Vault (secreto interno de avisos) | Región del proyecto `pbiaxzvmssjsxdwqrumb` (ver dashboard → Settings) | DPA de Supabase (supabase.com/legal/dpa) |
 | Vercel | Servir POS web, admin y sitio | Edge global; build en EE. UU. | DPA de Vercel (vercel.com/legal/dpa) |
 | GitHub | Código e instaladores del escritorio (no datos de clientes) | EE. UU. | Términos de GitHub |
 
