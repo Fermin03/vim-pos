@@ -222,6 +222,16 @@ en D: (`ELECTRON_CACHE`/`ELECTRON_BUILDER_CACHE`) por el junction del perfil.
 esta PC (perfil con junction) eso rompe `initdb` → lanzar con **`VIM_DATA_DIR=D:\ruta`** (o setear esa
 env de sistema). En una **PC normal del piloto** `userData` funciona sin tocar nada.
 
+## Arranque que "no abre a la primera" (0.4.56)
+
+Causa: `postgres.exe` muere antes de decir "ready" (puerto 54329 aún ocupado por el Postgres de la
+sesión anterior, candado `postmaster.pid`, memoria compartida, antivirus) y embedded-postgres
+rechaza sin motivo → el log decía `Boot falló: undefined`. Desde 0.4.56 el arranque captura lo que
+escribe Postgres, reintenta hasta 3 veces con 3 s y limpieza entre intentos
+(`src/arranque-reintentos.mjs`), y si aun así falla el diálogo y el log dicen la causa
+(`arranque: Postgres no arrancó (intento 1/3): el puerto de Postgres sigue ocupado…`). Si a un
+cliente le vuelve a pasar, pedir `%APPDATA%im-pos-desktopim-pos.log` y buscar `arranque:`.
+
 ## Espejo de pedidos de apps (Uber Eats) — spec 2026-09-03
 
 La caja vinculada a la nube corre un agente (`src/delivery-espejo.mjs`, log `· [espejo]`) cada
