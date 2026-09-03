@@ -13,29 +13,48 @@ const CLAVE_STATE = "vimpos.uber.state";
 export type EstadoConexion = "SIN_CONECTAR" | "PENDIENTE" | "ACTIVA" | "PAUSADA" | "ERROR" | "DESCONECTADA";
 export type AppDelivery = "APP_UBEREATS" | "APP_DIDI" | "APP_RAPPI";
 
+/** Estado de la tienda en la app, cacheado por las Edge Functions en `config.tienda` (spec A6). */
+export type TiendaApp = { estado: "EN_LINEA" | "PAUSADA" | "DESCONOCIDO"; hasta: string | null; motivo: string | null; consultado_at: string };
+
 export type ConexionApp = {
   id: string; sucursal_id: string; sucursal_nombre: string; app: AppDelivery; estado: EstadoConexion;
   tienda_nombre_app: string | null; auto_aceptar: boolean; tiempo_prep_min: number;
-  ultimo_error: string | null; conectada_at: string | null;
+  ultimo_error: string | null; conectada_at: string | null; tienda: TiendaApp | null;
 };
 
-type Fila = Omit<ConexionApp, "sucursal_nombre"> & { sucursal: { nombre: string } | { nombre: string }[] | null };
+type Fila = Omit<ConexionApp, "sucursal_nombre" | "tienda"> & { config: unknown; sucursal: { nombre: string } | { nombre: string }[] | null };
+
+function tiendaDesdeConfig(config: unknown): TiendaApp | null {
+  const t = (config && typeof config === "object" ? (config as { tienda?: unknown }).tienda : null) as Partial<TiendaApp> | null | undefined;
+  if (!t || typeof t !== "object" || typeof t.consultado_at !== "string") return null;
+  if (t.estado !== "EN_LINEA" && t.estado !== "PAUSADA" && t.estado !== "DESCONOCIDO") return null;
+  return { estado: t.estado, hasta: typeof t.hasta === "string" ? t.hasta : null, motivo: typeof t.motivo === "string" ? t.motivo : null, consultado_at: t.consultado_at };
+}
 
 /** Conexiones del tenant (RLS). Una fila por sucursal × app, en cualquier estado. */
 export async function listarConexiones(): Promise<ConexionApp[]> {
   const { data, error } = await supabase.from("delivery_conexiones")
-    .select("id, sucursal_id, app, estado, tienda_nombre_app, auto_aceptar, tiempo_prep_min, ultimo_error, conectada_at, sucursal:sucursales(nombre)")
+    .select("id, sucursal_id, app, estado, tienda_nombre_app, auto_aceptar, tiempo_prep_min, ultimo_error, conectada_at, config, sucursal:sucursales(nombre)")
     .order("created_at", { ascending: true });
   if (error) throw new Error(error.message);
   return ((data ?? []) as unknown as Fila[]).map((f) => {
-    const { sucursal, ...resto } = f;
+    const { sucursal, config, ...resto } = f;
     const s = Array.isArray(sucursal) ? sucursal[0] : sucursal;
-    return { ...resto, sucursal_nombre: s?.nombre ?? "" };
+    return { ...resto, sucursal_nombre: s?.nombre ?? "", tienda: tiendaDesdeConfig(config) };
   });
 }
 
-/** Auto-aceptar y minutos de preparación se editan directo bajo RLS (la tabla da UPDATE a authenticated). */
-export async function actualizarConexion(id: string, cambios: { auto_aceptar?: boolean; tiempo_prep_min?: number }): Promise<void> {
+/** Expirados de hoy por sucursal (vista con RLS heredado, migración 0093). */
+export async function listarExpiradosHoy(): Promise<Record<string, number>> {
+  const { data, error } = await supabase.from("vw_delivery_expirados_hoy").select("sucursal_id, n_expirados");
+  if (error) throw new Error(error.message);
+  const out: Record<string, number> = {};
+  for (const f of (data ?? []) as { sucursal_id: string; n_expirados: number }[]) out[f.sucursal_id] = f.n_expirados;
+  return out;
+}
+
+/** Auto-aceptar se edita directo bajo RLS. Los minutos de preparación van por `accionConexion("prep")` (se sincronizan a Uber). */
+export async function actualizarConexion(id: string, cambios: { auto_aceptar?: boolean }): Promise<void> {
   const { error } = await supabase.from("delivery_conexiones").update(cambios).eq("id", id);
   if (error) throw new Error(error.message);
 }
@@ -79,13 +98,14 @@ export type TiendaUber = {
   id: string; nombre: string; direccion: string; ciudad: string;
   conectada_a: { sucursal_id: string; sucursal_nombre: string } | null;
 };
-export type Verificacion = { integracion_activa: boolean; tienda_online: boolean; offline_reason: string | null; detalle: string | null };
+export type Verificacion = { integracion_activa: boolean; tienda_online: boolean; offline_reason: string | null; detalle: string | null; tienda?: TiendaApp };
 
 export async function accionConexion(accion: "intercambiar", campos: { code: string }): Promise<{ tiendas: TiendaUber[] }>;
 export async function accionConexion(accion: "tiendas"): Promise<{ tiendas: TiendaUber[] }>;
 export async function accionConexion(accion: "activar", campos: { tienda_id: string; sucursal_id: string; auto_aceptar: boolean; tiempo_prep_min: number; terminos_aceptados: boolean }): Promise<{ conexion_id: string }>;
 export async function accionConexion(accion: "pausar" | "reanudar" | "desconectar", campos: { conexion_id: string }): Promise<{ estado: EstadoConexion }>;
 export async function accionConexion(accion: "verificar", campos: { conexion_id: string }): Promise<Verificacion>;
+export async function accionConexion(accion: "prep", campos: { conexion_id: string; minutos: number }): Promise<{ tiempo_prep_min: number }>;
 export async function accionConexion(accion: string, campos: Record<string, unknown> = {}): Promise<unknown> {
   const { data } = await supabase.auth.getSession();
   const token = data.session?.access_token;
@@ -123,6 +143,7 @@ const MENSAJES: Record<string, string> = {
   CONEXION_NO_EXISTE: "Esa conexión ya no existe.",
   ACCION_INVALIDA: "Esa acción no aplica en el estado actual de la conexión.",
   UBER_ERROR: "Uber no respondió como se esperaba. Inténtalo de nuevo en unos minutos.",
+  PREP_FUERA_DE_RANGO: "El tiempo de preparación debe estar entre 1 y 180 minutos.",
 };
 
 export function mensajeErrorIntegracion(e: unknown): string {
@@ -136,4 +157,18 @@ export function etiquetaEstado(estado: EstadoConexion): string {
 
 export function etiquetaApp(app: AppDelivery): string {
   return { APP_UBEREATS: "Uber Eats", APP_DIDI: "DiDi Food", APP_RAPPI: "Rappi" }[app];
+}
+
+export function horaCorta(iso: string | null, zona = "America/Mexico_City"): string | null {
+  if (!iso) return null;
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return null;
+  return new Intl.DateTimeFormat("es-MX", { timeZone: zona, hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).format(d);
+}
+
+export function etiquetaTienda(t: TiendaApp | null): string {
+  if (!t || t.estado === "DESCONOCIDO") return "Sin datos";
+  if (t.estado === "EN_LINEA") return "En línea";
+  const h = horaCorta(t.hasta);
+  return h ? `Pausada hasta ${h}` : "Pausada";
 }
