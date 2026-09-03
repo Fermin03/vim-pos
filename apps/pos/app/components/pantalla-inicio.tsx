@@ -28,6 +28,7 @@ export function PantallaInicio({
   nCuentasDomicilio,
   nEnEspera,
   nPedidosApps = 0,
+  expiradosApps = 0,
   online = true,
   onComedor,
   onParaLlevar,
@@ -52,6 +53,8 @@ export function PantallaInicio({
   nEnEspera: number;
   /** Pedidos de apps de delivery (Uber/DiDi/Rappi) esperando que el cajero los acepte. ADR 0011. */
   nPedidosApps?: number;
+  /** Pedidos de apps que vencieron sin aceptar y nadie ha visto en este dispositivo (spec A6). */
+  expiradosApps?: number;
   /** Estado de red, para la barra de estado inferior (la caja opera igual sin internet). */
   online?: boolean;
   onComedor: () => void;
@@ -141,6 +144,18 @@ export function PantallaInicio({
           </button>
         </div>
       </header>
+
+      {expiradosApps > 0 && onPedidosApps && (
+        <button
+          type="button"
+          onClick={onPedidosApps}
+          role="alert"
+          className="mx-4 mt-3 flex flex-shrink-0 items-center gap-2 rounded border border-danger bg-danger-soft px-3 py-2.5 text-left text-[14px] font-semibold text-danger"
+        >
+          <span className="h-2.5 w-2.5 flex-shrink-0 rounded-full bg-danger" />
+          {expiradosApps === 1 ? "Se venció 1 pedido de app sin aceptar." : `Se vencieron ${expiradosApps} pedidos de apps sin aceptar.`} Toca para ver Pedidos de apps.
+        </button>
+      )}
 
       {/* ── Barra de accesos ────────────────────────────────────────────────── */}
       <nav
