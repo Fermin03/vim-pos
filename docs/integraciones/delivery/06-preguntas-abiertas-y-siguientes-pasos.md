@@ -27,6 +27,9 @@
    (formulario del portal) y pedir el kickoff / grupo de WhatsApp.
 
 ### Rappi
+> **2 sep 2026:** en espera de un cliente que use Rappi. Knock-Out Burger no está en Rappi, así que
+> no hay ejecutivo de cuenta que abra la puerta; forzarlo (alta ficticia) no. Cuando un cliente o
+> prospecto esté en Rappi, se manda el texto B1 del doc 07 por su ejecutivo. Plan B: LinkedIn.
 1. No hay formulario público: hay que conseguir el contacto (TAM / equipo de integraciones). Vías:
    el ejecutivo de cuenta de Knock-Out Burger en Rappi (el restaurante puede pedir que su POS se
    integre), o el canal de aliados en Portal Partners.
