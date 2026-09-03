@@ -17,6 +17,7 @@ portales.
 | [`04-comparativa.md`](04-comparativa.md) | Las tres lado a lado: qué se parece, qué no, tiempos límite, dinero, firmas |
 | [`05-diseno-integracion-vimpos.md`](05-diseno-integracion-vimpos.md) | **Cómo va a funcionar dentro de VIM POS**: arquitectura, tablas, flujo de conexión del cliente, pedidos, menú, offline, conciliación |
 | [`06-preguntas-abiertas-y-siguientes-pasos.md`](06-preguntas-abiertas-y-siguientes-pasos.md) | Lo que Fermín tiene que decidir o gestionar (trámites con cada app) y el orden propuesto |
+| [`07-solicitudes-didi-rappi.md`](07-solicitudes-didi-rappi.md) | Pasos y textos listos para pedir acceso a DiDi Food (Qualification + correo) y a Rappi (TAM vía ejecutivo del piloto y Portal de Aliados) |
 
 ## Documentación cruda (fuente de verdad)
 
