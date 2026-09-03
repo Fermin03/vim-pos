@@ -23,7 +23,7 @@ Mapa entre la documentación capturada y el código. Estado: 3 de septiembre de 
 |---|---|---|
 | `POST /api-lite/3/cfdis` | ✅ `timbrar()` | Ingreso individual y global (`GlobalInformation`) |
 | `DELETE /api-lite/cfdi/{id}?type=issuedLite&motive=` | ✅ `cancelar()` | Valida nosotros que `01` lleve `uuidReplacement`; estado final por acuse, no por HTTP 200 |
-| `GET /cfdi/{xml\|pdf\|html}/issuedLite/{id}` | ✅ `descargar()` | Decodifica el base64 del JSON; guardamos XML y PDF en Storage: Facturama no los conserva para nosotros |
+| `GET /cfdi/{xml\|pdf\|html}/issuedLite/{id}` | ✅ `descargar()` | Decodifica el base64 del JSON. Desde 0098 los archivos se guardan en el bucket privado `cfdi` al timbrar y `descargar-cfdi` los sirve al admin (o los repone del PAC) |
 | `GET /cfdi/acuse/issuedLite/{id}?format=xml` | ✅ `descargarAcuse()` | Distingue acuse real de «te devuelvo el CFDI» |
 | `POST /Cfdi?cfdiType=issuedLite&cfdiId=&email=` | ✅ `enviarPorCorreo()` | Lee `success`, no el HTTP |
 | `POST /api-lite/csds`, `PUT /api-lite/csds/{rfc}` | ✅ `cargarSello()` | POST y cae a PUT si «Ya existe un CSD» |
@@ -39,6 +39,14 @@ Mapa entre la documentación capturada y el código. Estado: 3 de septiembre de 
 | Cancelación sin CSD (XML firmado) | ➖ no aplica | Nuestros emisores tienen sello cargado |
 | Complemento de pago (`P`), nómina, carta porte, etc. | ➖ no aplica | Restaurante cobra PUE |
 | API Web: clientes, productos, sucursales, series | ➖ no aplica | Solo existen en modalidad Web |
+
+## Lo que enseñó el primer CFDI real (3 sep 2026)
+
+- **Los archivos no se guardaban.** `tickets_cfdi` tenía rutas `cfdi/<id>.xml` pero no existía el
+  bucket ni nadie subía nada; el admin no tenía botón de descarga. Corregido en 0098 + `descargar-cfdi`.
+- **La hora del PAC viene sin zona** (`2026-09-03T16:34:41`, hora de México) y se guardaba como UTC:
+  seis horas de error. Corregido en `_shared/pac/fechas.ts`; 0098 repara las filas ya guardadas.
+- Emisor y receptor con el mismo RFC: Facturama lo timbró sin objeción.
 
 ## Lo que la documentación cambió de opinión respecto a lo que creíamos
 

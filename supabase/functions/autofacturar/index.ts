@@ -23,6 +23,7 @@ import { createClient } from "jsr:@supabase/supabase-js@2";
 import { corsHeaders } from "../_shared/cors.ts";
 import { timbrarConFailover, obtenerFacturama, PAC_NO_CONFIGURADO } from "../_shared/pac/index.ts";
 import { armarConceptos, ConceptosIncoherentes, type LineaTicket } from "../_shared/pac/conceptos.ts";
+import { archivarCfdi, subidorSupabase } from "../_shared/pac/archivo.ts";
 
 /**
  * Ritmo máximo por IP. Generoso para una persona —quien factura su comida lo intenta tres o cuatro
@@ -333,6 +334,11 @@ Deno.serve(async (req) => {
   const [xml, pdf] = pac
     ? await Promise.all([pac.descargar(res.pacReferencia, "xml"), pac.descargar(res.pacReferencia, "pdf")])
     : [null, null];
+  // …y se archivan en el bucket privado `cfdi` (`sb` aquí es service_role). Best-effort.
+  {
+    const archivo = await archivarCfdi(cfdiId, { xml, pdf }, subidorSupabase(sb));
+    if (archivo.errores.length) console.error(`[autofactura] ${cfdiId} archivo incompleto: ${archivo.errores.join("; ")}`);
+  }
 
   // El correo lo manda Facturama con los adjuntos. Si falla, NO se rompe nada: la factura está
   // timbrada y el comensal la tiene ahí para descargar. Se avisa en la respuesta y se deja rastro

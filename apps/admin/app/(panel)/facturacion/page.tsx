@@ -9,7 +9,7 @@ import {
   facturarTicket, FORMAS_PAGO_SAT, listarTicketsFacturables, RECEPTOR_PUBLICO_GENERAL,
   receptorSchema, USOS_CFDI, type ReceptorInput, type ResultadoTimbrado, type TicketFacturable,
   listarPeriodosGlobales, periodoPorCerrar, timbrarFacturaGlobal,
-  cancelarCfdi, MOTIVOS_CANCELACION,
+  cancelarCfdi, MOTIVOS_CANCELACION, descargarCfdi, type FormatoCfdi,
   type PeriodoGlobal,
 } from "../../lib/facturacion";
 import { leerCfdiEmisor } from "../../lib/configuracion";
@@ -191,6 +191,7 @@ export default function FacturacionPage() {
                           ? (
                             <span className="flex items-center justify-end gap-3">
                               <span className="text-[12px] text-ink-3" title={t.cfdiUuid ?? ""}>UUID {t.cfdiUuid ? `${t.cfdiUuid.slice(0, 8)}…` : ""}</span>
+                              {t.cfdiId && <DescargasCfdi cfdiId={t.cfdiId} estado={t.cfdiEstado} />}
                               <button
                                 onClick={() => setCancelando(t)}
                                 className="text-[12.5px] font-medium text-danger underline underline-offset-2"
@@ -199,7 +200,14 @@ export default function FacturacionPage() {
                               </button>
                             </span>
                           )
-                          : <Button size="md" onClick={() => setSel(t)}>Facturar</Button>}
+                          : (
+                            <span className="flex items-center justify-end gap-3">
+                              {t.cfdiId && (t.cfdiEstado === "CANCELADO" || t.cfdiEstado === "EN_PROCESO_CANCELACION") && (
+                                <DescargasCfdi cfdiId={t.cfdiId} estado={t.cfdiEstado} />
+                              )}
+                              <Button size="md" onClick={() => setSel(t)}>Facturar</Button>
+                            </span>
+                          )}
                       </td>
                     </tr>
                   );
@@ -429,5 +437,35 @@ function PanelCancelar({ ticket, onCerrar }: { ticket: TicketFacturable; onCerra
         )}
       </div>
     </div>
+  );
+}
+
+/** XML / PDF (y acuse cuando está cancelado) de un comprobante. Los sirve `descargar-cfdi`. */
+function DescargasCfdi({ cfdiId, estado }: { cfdiId: string; estado: string }) {
+  const [ocupado, setOcupado] = useState<FormatoCfdi | null>(null);
+  const [fallo, setFallo] = useState<string | null>(null);
+  const formatos: FormatoCfdi[] = estado === "CANCELADO" ? ["xml", "pdf", "acuse"] : ["xml", "pdf"];
+  async function bajar(f: FormatoCfdi) {
+    setOcupado(f); setFallo(null);
+    const r = await descargarCfdi(cfdiId, f);
+    if (!r.ok) setFallo(r.error);
+    setOcupado(null);
+  }
+  return (
+    <span className="flex items-center gap-2">
+      {formatos.map((f) => (
+        <button
+          key={f}
+          type="button"
+          onClick={() => bajar(f)}
+          disabled={ocupado !== null}
+          className="text-[12.5px] font-medium text-ink-2 underline underline-offset-2 disabled:opacity-50"
+          title={f === "acuse" ? "Acuse de cancelación del SAT" : `Descargar ${f.toUpperCase()}`}
+        >
+          {ocupado === f ? "…" : f === "acuse" ? "Acuse" : f.toUpperCase()}
+        </button>
+      ))}
+      {fallo && <span className="text-[11.5px] text-danger" role="alert">{fallo}</span>}
+    </span>
   );
 }

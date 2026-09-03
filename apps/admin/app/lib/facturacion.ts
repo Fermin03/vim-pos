@@ -335,3 +335,37 @@ export async function cancelarCfdi(
     mensaje: String(d.mensaje ?? ""),
   };
 }
+
+// ── Descarga de archivos del comprobante ────────────────────────────────────
+// El bucket es privado: `descargar-cfdi` comprueba que el CFDI es del negocio y devuelve el
+// archivo en base64; aquí se convierte en descarga del navegador.
+
+export type FormatoCfdi = "xml" | "pdf" | "acuse";
+
+export async function descargarCfdi(cfdiId: string, formato: FormatoCfdi): Promise<{ ok: true } | { ok: false; error: string }> {
+  const { data: sess } = await supabase.auth.getSession();
+  const token = sess.session?.access_token;
+  if (!token) return { ok: false, error: "Sesión expirada, vuelve a entrar" };
+
+  const res = await fetch(`${SB_URL}/functions/v1/descargar-cfdi`, {
+    method: "POST",
+    headers: { apikey: SB_ANON, Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ cfdi_id: cfdiId, formato }),
+  });
+  const d = (await res.json().catch(() => ({}))) as Record<string, unknown>;
+  if (!res.ok || !d.ok || typeof d.base64 !== "string") {
+    return { ok: false, error: String(d.mensaje ?? d.detalle ?? d.error ?? `HTTP ${res.status}`) };
+  }
+  const bin = atob(d.base64);
+  const bytes = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+  const url = URL.createObjectURL(new Blob([bytes], { type: String(d.content_type ?? "application/octet-stream") }));
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = String(d.nombre ?? `cfdi.${formato === "pdf" ? "pdf" : "xml"}`);
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+  return { ok: true };
+}

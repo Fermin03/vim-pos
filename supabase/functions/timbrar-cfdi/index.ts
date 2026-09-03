@@ -11,6 +11,7 @@ import { createClient } from "jsr:@supabase/supabase-js@2";
 import { corsHeaders } from "../_shared/cors.ts";
 import { timbrarConFailover, obtenerFacturama } from "../_shared/pac/index.ts";
 import { armarConceptos, ConceptosIncoherentes, type LineaTicket } from "../_shared/pac/conceptos.ts";
+import { archivarCfdi, subidorSupabase } from "../_shared/pac/archivo.ts";
 
 const ROLES_FACTURA = ["DUENO", "ADMIN"];
 
@@ -224,8 +225,8 @@ Deno.serve(async (req) => {
     return json({ ok: false, estado: "ERROR_TIMBRADO", error: res.codigoError, mensaje: res.mensajeError }, 502);
   }
 
-  // Guardar XML en Storage sería el siguiente paso (bucket privado cfdi/); por ahora se
-  // registran las rutas lógicas y el XML viaja en el response_payload para auditoría.
+  // Rutas en el bucket privado `cfdi` (0098). Los archivos se suben más abajo, ya con el
+  // comprobante marcado como timbrado: el registro manda y el archivo se repone si hace falta.
   const xmlPath = `cfdi/${cfdiId}.xml`;
   const pdfPath = `cfdi/${cfdiId}.pdf`;
 
@@ -245,15 +246,24 @@ Deno.serve(async (req) => {
   });
   if (tErr) return json({ error: "MARCAR_TIMBRADO_ERROR", detalle: tErr.message }, 500);
 
+  const pac = obtenerFacturama();
+
+  // Archivo: el PAC no es nuestro archivo. XML y PDF se bajan ahora y se guardan en el bucket
+  // privado `cfdi` con service_role (el bucket no tiene políticas para usuarios). Si algo falla,
+  // el CFDI sigue timbrado y `descargar-cfdi` los repone del PAC cuando alguien los pida.
+  if (pac && res.pacReferencia) {
+    const admin = createClient(url, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!, { auth: { persistSession: false } });
+    const [xml, pdf] = await Promise.all([pac.descargar(res.pacReferencia, "xml"), pac.descargar(res.pacReferencia, "pdf")]);
+    const archivo = await archivarCfdi(cfdiId, { xml, pdf }, subidorSupabase(admin));
+    if (archivo.errores.length) console.error(`[cfdi] ${cfdiId} archivo incompleto: ${archivo.errores.join("; ")}`);
+  }
+
   // Si el receptor dejó correo, Facturama le manda la factura con sus adjuntos. Un fallo aquí no
   // toca el timbrado: el comprobante existe y se puede reenviar.
   const correoReceptor = (c.receptor_email as string | null) ?? null;
-  if (correoReceptor) {
-    const pac = obtenerFacturama();
-    if (pac) {
-      const envio = await pac.enviarPorCorreo(res.pacReferencia, correoReceptor);
-      if (!envio.ok) console.error(`[cfdi] ${cfdiId} timbrado pero sin enviar a ${correoReceptor}: ${envio.mensaje}`);
-    }
+  if (correoReceptor && pac) {
+    const envio = await pac.enviarPorCorreo(res.pacReferencia, correoReceptor);
+    if (!envio.ok) console.error(`[cfdi] ${cfdiId} timbrado pero sin enviar a ${correoReceptor}: ${envio.mensaje}`);
   }
 
   // Dejar constancia del PAC que REALMENTE timbró. Importa cuando entra el failover: el borrador

@@ -18,6 +18,7 @@
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import { corsHeaders } from "../_shared/cors.ts";
 import { obtenerFacturama } from "../_shared/pac/index.ts";
+import { archivarCfdi, subidorSupabase } from "../_shared/pac/archivo.ts";
 
 const ROLES_CANCELA = ["DUENO", "ADMIN"];
 
@@ -115,6 +116,11 @@ Deno.serve(async (req) => {
   const confirmada = acuse !== null && contieneCancelacion(acuse);
 
   const rutaAcuse = acuse ? `cfdi/${cfdiId}-acuse.xml` : null;
+  if (acuse) {
+    const admin = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!, { auth: { persistSession: false } });
+    const archivo = await archivarCfdi(cfdiId, { acuse }, subidorSupabase(admin));
+    if (archivo.errores.length) console.error(`[cancelar] ${cfdiId} acuse sin archivar: ${archivo.errores.join("; ")}`);
+  }
   const { error: rErr } = await sb.rpc("cfdi_registrar_cancelacion", {
     p_cfdi_id: cfdiId,
     p_estado: confirmada ? "CANCELADO" : "EN_PROCESO_CANCELACION",
