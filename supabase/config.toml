@@ -40,3 +40,8 @@ verify_jwt = false
 # Webhook de Uber Eats (ADR 0011): sin JWT, la autenticidad la da X-Uber-Signature.
 [functions.delivery-webhook-uber]
 verify_jwt = false
+
+# enviar-push valida por sí misma (JWT de usuario o secreto interno x-vim-interno para el camino
+# base de datos → pg_net, mig. 0097); la verificación del gateway rechazaría la llamada interna.
+[functions.enviar-push]
+verify_jwt = false
