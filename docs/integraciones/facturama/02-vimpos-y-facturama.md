@@ -22,7 +22,7 @@ Mapa entre la documentación capturada y el código. Estado: 3 de septiembre de 
 | Documentado por Facturama | En VIM POS | Notas |
 |---|---|---|
 | `POST /api-lite/3/cfdis` | ✅ `timbrar()` | Ingreso individual y global (`GlobalInformation`) |
-| `DELETE /api-lite/cfdi/{id}?type=issuedLite&motive=` | ✅ `cancelar()` | Valida nosotros que `01` lleve `uuidReplacement`; estado final por acuse, no por HTTP 200 |
+| `DELETE /api-lite/cfdis/{id}?motive=` | ✅ `cancelar()` | Ruta documentada (plural, sin `type`). Responde `Status` + `AcuseXmlBase64`; `canceled/acepted/expired` = cancelado, `pending` = en proceso, `rejected` = sigue vigente. Validamos que `01` lleve `uuidReplacement` |
 | `GET /cfdi/{xml\|pdf\|html}/issuedLite/{id}` | ✅ `descargar()` | Decodifica el base64 del JSON. Desde 0098 los archivos se guardan en el bucket privado `cfdi` al timbrar y `descargar-cfdi` los sirve al admin (o los repone del PAC) |
 | `GET /cfdi/acuse/issuedLite/{id}?format=xml` | ✅ `descargarAcuse()` | Distingue acuse real de «te devuelvo el CFDI» |
 | `POST /Cfdi?cfdiType=issuedLite&cfdiId=&email=` | ✅ `enviarPorCorreo()` | Lee `success`, no el HTTP |
@@ -47,13 +47,15 @@ Mapa entre la documentación capturada y el código. Estado: 3 de septiembre de 
 - **La hora del PAC viene sin zona** (`2026-09-03T16:34:41`, hora de México) y se guardaba como UTC:
   seis horas de error. Corregido en `_shared/pac/fechas.ts`; 0098 repara las filas ya guardadas.
 - Emisor y receptor con el mismo RFC: Facturama lo timbró sin objeción.
+- **La ruta de cancelación de la skill no cancelaba.** `DELETE /api-lite/cfdi/{id}?type=issuedLite&motive=02`
+  respondió 200 con cuerpo vacío y el CFDI siguió vigente; el «acuse» que devolvió la API era el
+  propio comprobante. Se cambió a la ruta documentada `/api-lite/cfdis/{id}?motive=`, que responde
+  `Status` y el acuse en base64, y el estado se decide por ese `Status`.
 
 ## Lo que la documentación cambió de opinión respecto a lo que creíamos
 
-- **Cancelación**: la referencia Multiemisor documenta `DELETE /api-lite/cfdis/{id}?motive=&uuidReplacement=`
-  (plural, sin `type`), mientras la skill verificó `DELETE /api-lite/cfdi/{id}?type=issuedLite&motive=`.
-  Las dos responden 200 en sandbox. Al activar producción hay que confirmar cuál cancela de
-  verdad (sandbox no cancela) y dejar solo una.
+- **Cancelación**: resuelto el 3 sep 2026 en producción: manda la ruta documentada
+  `DELETE /api-lite/cfdis/{id}?motive=`. La otra respondía 200 vacío sin cancelar.
 - **Estados de cancelación**: la guía enumera `canceled / active / pending / acepted / rejected /
   expired`. Nuestro `EN_PROCESO_CANCELACION` cubre `pending`; falta mapear `rejected` y `expired`
   (el receptor no aceptó o venció el plazo: el CFDI sigue vigente y hay que avisarlo al dueño).
@@ -65,7 +67,7 @@ Mapa entre la documentación capturada y el código. Estado: 3 de septiembre de 
 
 ## Trabajo sugerido cuando se active producción (en orden de valor)
 
-1. Confirmar la ruta de cancelación real y mapear `rejected`/`expired` (1 migración + adaptador).
+1. ~~Confirmar la ruta de cancelación real y mapear `rejected`/`expired`~~ hecho el 3 sep 2026.
 2. Sembrar catálogos del SAT desde `/catalogs` en una tabla global y usarlos en el portal y en el
    admin (usos por régimen, unidades, claves de producto).
 3. `GET /customers/status` como segunda opinión cuando el SAT rechaza RFC o CP del receptor.

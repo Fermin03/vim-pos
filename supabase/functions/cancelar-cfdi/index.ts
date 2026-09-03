@@ -83,7 +83,9 @@ Deno.serve(async (req) => {
     return json({ error: "SIN_PERMISO", detalle: "Solo DUEÑO/ADMIN pueden cancelar" }, 403);
   }
 
-  if (cfdi.estado_sat !== "TIMBRADO") {
+  // TIMBRADO: se solicita. EN_PROCESO_CANCELACION: se vuelve a preguntar al PAC, que es como se
+  // consulta si el receptor ya contestó o venció el plazo (la petición repetida no duplica nada).
+  if (cfdi.estado_sat !== "TIMBRADO" && cfdi.estado_sat !== "EN_PROCESO_CANCELACION") {
     return json({
       error: "NO_CANCELABLE",
       mensaje: cfdi.estado_sat === "CANCELADO"
@@ -110,34 +112,56 @@ Deno.serve(async (req) => {
     return json({ ok: false, error: res.codigo, mensaje: res.mensaje }, 400);
   }
 
-  // El acuse decide el estado final. Un 200 del PAC solo dice que la SOLICITUD entró; mientras no
-  // haya acuse, esto queda EN PROCESO — que es la verdad y no una suposición optimista.
-  const acuse = await pac.descargarAcuse(cfdi.pac_referencia);
-  const confirmada = acuse !== null && contieneCancelacion(acuse);
+  // El `Status` del PAC decide. Un 200 solo dice que la petición entró: `canceled`/`acepted`/
+  // `expired` es cancelado, `pending` espera al receptor, `rejected` lo rechazó y el CFDI sigue
+  // vigente. Si el cuerpo no trae Status (la ruta vieja respondía vacío), se recurre al acuse y se
+  // exige que sea un acuse de verdad y no el propio comprobante.
+  let acuse: string | null = res.acuseBase64;
+  let estadoPac = res.estado;
+  if (estadoPac === "desconocido") {
+    const bajado = await pac.descargarAcuse(cfdi.pac_referencia);
+    if (bajado !== null && contieneCancelacion(bajado)) { acuse = bajado; estadoPac = "cancelado"; }
+    else estadoPac = "pendiente";
+  } else if (estadoPac === "cancelado" && !acuse) {
+    const bajado = await pac.descargarAcuse(cfdi.pac_referencia);
+    if (bajado !== null && contieneCancelacion(bajado)) acuse = bajado;
+  }
+  const confirmada = estadoPac === "cancelado";
+  const rechazada = estadoPac === "rechazado";
 
-  const rutaAcuse = acuse ? `cfdi/${cfdiId}-acuse.xml` : null;
-  if (acuse) {
+  // El acuse se archiva SOLO cuando hay cancelación: guardar como acuse otra cosa es mentir.
+  const rutaAcuse = confirmada && acuse ? `cfdi/${cfdiId}-acuse.xml` : null;
+  if (rutaAcuse && acuse) {
     const admin = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!, { auth: { persistSession: false } });
     const archivo = await archivarCfdi(cfdiId, { acuse }, subidorSupabase(admin));
     if (archivo.errores.length) console.error(`[cancelar] ${cfdiId} acuse sin archivar: ${archivo.errores.join("; ")}`);
   }
+
+  const estadoFinal = confirmada ? "CANCELADO" : rechazada ? "CANCELACION_RECHAZADA" : "EN_PROCESO_CANCELACION";
+  const mensajePac = confirmada
+    ? `Cancelación confirmada por el SAT${res.mensaje ? ` · ${res.mensaje}` : ""}`
+    : rechazada
+      ? `El receptor rechazó la cancelación${res.mensaje ? ` · ${res.mensaje}` : ""}`
+      : `Solicitud enviada, en espera del receptor${res.mensaje ? ` · ${res.mensaje}` : ""}`;
   const { error: rErr } = await sb.rpc("cfdi_registrar_cancelacion", {
     p_cfdi_id: cfdiId,
-    p_estado: confirmada ? "CANCELADO" : "EN_PROCESO_CANCELACION",
+    p_estado: estadoFinal,
     p_motivo: motivo,
     p_acuse_storage_path: rutaAcuse,
-    p_pac_mensaje: confirmada ? "Cancelación confirmada por el SAT" : "Solicitud enviada, en espera del acuse",
-    p_response_payload: { respuesta: res.cuerpo.slice(0, 2000) },
+    p_pac_mensaje: mensajePac,
+    p_response_payload: { status: res.statusPac, mensaje: res.mensaje, respuesta: res.cuerpo.slice(0, 2000) },
   });
   if (rErr) return json({ error: "NO_SE_REGISTRO", detalle: rErr.message }, 500);
 
   return json({
     ok: true,
-    estado: confirmada ? "CANCELADO" : "EN_PROCESO_CANCELACION",
-    acuse,   // base64 del XML, cuando lo hay
+    estado: estadoFinal,
+    acuse: confirmada ? acuse : null,   // base64 del XML, cuando lo hay
     mensaje: confirmada
       ? "El comprobante quedó cancelado."
-      : "Se envió la solicitud. Si tu cliente debe aceptarla, la cancelación queda en proceso hasta que responda.",
+      : rechazada
+        ? "Tu cliente rechazó la cancelación: la factura sigue vigente."
+        : "Se envió la solicitud. Si tu cliente debe aceptarla, la cancelación queda en proceso hasta que responda (72 horas); vuelve a pulsar «Revisar cancelación» para consultar.",
   });
 });
 
