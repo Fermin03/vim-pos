@@ -99,6 +99,19 @@ tiene estrategia de estado "external": solo se pausa desde Uber Eats Manager),
 `PREP_FUERA_DE_RANGO` 400, `UBER_ERROR` 502. Los expirados los marca `delivery_marcar_expirados()`
 por pg_cron cada minuto (migración 0093).
 
+### Espejo en la caja de escritorio (spec 2026-09-03)
+
+- `delivery-espejo` (solo dispositivos): sella `cajas.espejo_apps_at` y devuelve conexiones y
+  pedidos de la sucursal de la caja (sin credenciales ni `payload_raw`). La llama el agente del
+  escritorio cada 10 s.
+- `delivery-accion`: acepta también el JWT de **dispositivo**. `reclamar` (`pedido_id`) reclama
+  un pedido ESCRITORIO para la caja; `aceptar` en un pedido ESCRITORIO **no** crea ticket en la
+  nube: acepta en Uber y pasa a ACEPTADO (el ticket lo crea la caja y sube con el push).
+- `sync-push`: tras aplicar el snapshot llama `delivery_enlazar_tickets` (enlace por
+  `folio_externo_app`) y devuelve `enlazados`.
+- El webhook deja el pedido en `gestion = ESCRITORIO` cuando `sucursal_con_espejo()` es true
+  (una caja instalada con latido de menos de 90 s).
+
 Prueba local (stack arriba, `supabase db reset`, una `delivery_conexion` ACTIVA con
 `tienda_id_externo = 'store-1'` para la sucursal de Knock-Out y un turno abierto):
 

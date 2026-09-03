@@ -55,5 +55,13 @@ Deno.serve(async (req) => {
   const { data, error } = await admin.rpc("sync_push_snapshot", { p_tenant: tenant, p_snapshot: body.snapshot });
   if (error) return json({ error: "RPC_ERROR", detalle: error.message }, 500);
 
-  return json({ resultado: data });
+  // Espejo de apps (spec 2026-09-03): los tickets creados en la caja para pedidos de apps suben
+  // aquí; se enlazan al pedido por folio_externo_app. Best-effort: no puede tirar el push.
+  let enlazados = 0;
+  try {
+    const { data: n } = await admin.rpc("delivery_enlazar_tickets", { p_tenant: tenant });
+    enlazados = Number(n ?? 0);
+  } catch { /* la siguiente subida lo reintenta */ }
+
+  return json({ resultado: data, enlazados });
 });
