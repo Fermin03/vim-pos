@@ -6,7 +6,7 @@
 
 Qué contratas, qué incluye, cómo se cobra y cómo cancelar. Escritos para que se entiendan de una lectura.
 
-Última actualización: 25 de agosto de 2026.
+Última actualización: 3 de septiembre de 2026.
 
 ## Quién presta el servicio
 
@@ -47,6 +47,18 @@ Podemos suspender el servicio si hay un pago pendiente pasado el plazo de arriba
 Si cancelas, puedes pedirnos una copia dentro de los **90 días** siguientes y te la damos en un formato que puedas abrir. Pasado ese plazo, se borra todo salvo lo que la ley fiscal nos obligue a conservar.
 
 Además, tu información también vive en tu propia caja: el día que dejes de ser cliente no te quedas sin nada mientras esa computadora exista.
+
+## Apps de reparto (Uber Eats, DiDi Food, Rappi)
+
+Si conectas la tienda que tienes en una app de reparto, los pedidos de esa app entran solos a tu caja y a tu cocina. Es opcional: lo activas tú desde el panel, tienda por tienda, y lo desconectas cuando quieras.
+
+**Al conectarla nos autorizas** a recibir en tu nombre los pedidos y los datos que la app manda con ellos (nombre corto y teléfono del cliente, dirección, ítems, instrucciones y alergias), y a usarlos **solo** para preparar y cobrar esos pedidos y para mostrarte tus ventas. No los usamos para nada más ni los cruzamos con tu lista de clientes. Esos datos son de la app y de su cliente; a los **30 días** de cerrado el pedido borramos el teléfono, la dirección y el resto de datos personales y solo dejamos importes e ítems para tus reportes.
+
+**Lo que necesitas de tu lado.** Tener contrato vigente con la app y cumplir sus reglas: nosotros somos el sistema que recibe el pedido, no la app. En particular, **la tableta que te da la app se queda en tu local y encendida**: la app lo exige y es tu respaldo si algo falla. Cada pedido que aceptas en VIM POS te compromete con la app igual que si lo aceptaras en su tableta.
+
+**El dinero no pasa por nosotros.** Lo que la app te cobra o te liquida es asunto entre ella y tú; nosotros solo lo registramos para que tu caja cuadre. No cobramos comisión por pedido.
+
+**No somos socios ni representantes de ninguna app.** Usamos sus interfaces con su licencia, y cada app puede cambiarlas o suspender el acceso; si eso pasa, te avisamos y el resto del sistema sigue funcionando. El soporte de la conexión te lo damos nosotros, no la app.
 
 ## Disponibilidad y soporte
 

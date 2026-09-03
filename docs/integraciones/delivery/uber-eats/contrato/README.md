@@ -85,16 +85,16 @@ pendientes. La columna "dónde" dice qué parte del sistema o del negocio la cub
 
 | # | Obligación | Cláusula | Estado | Dónde |
 |---|---|---|---|---|
-| B1 | **Soportar que el merchant siga aceptando pedidos en la tablet de Uber** (Device), que debe quedarse en el local, accesible al personal de mostrador. **No promover reemplazar la tablet** ni desplegar una alternativa sin aprobación escrita de Uber | 4.3.2 | ⚠️ | Producto: el POS es *complemento*, no sustituto. **Marketing/sitio web: prohibido decir "olvídate de la tablet de Uber"** o similar. Revisar copy de `sitio-web/` antes de anunciar la integración |
-| B2 | Confirmar, de forma continua, que **cada merchant tiene un Uber Eats Agreement vigente** con Uber | 3.2.1 | ⬜ | La conexión OAuth solo funciona con cuenta de merchant activa; documentarlo como control y guardar `conectada_at`/`tienda_id_externo` como evidencia |
-| B3 | Que **cada merchant autorice expresamente** a VIM a acceder a sus datos de Uber y **acepte términos al menos tan restrictivos** que este contrato sobre el uso de esos datos | 3.2.1, 4.3.1(a) | ⚠️ | Registro: casilla obligatoria en el asistente de conexión, con fecha y usuario en `delivery_conexiones.config.terminos_aceptados_*` (F1b). Falta la cláusula en los **términos de servicio de VIM POS** |
+| B1 | **Soportar que el merchant siga aceptando pedidos en la tablet de Uber** (Device), que debe quedarse en el local, accesible al personal de mostrador. **No promover reemplazar la tablet** ni desplegar una alternativa sin aprobación escrita de Uber | 4.3.2 | ✅ | Términos del servicio, sección «Apps de reparto»: la tableta se queda en el local y encendida. `sitio-web/agents.md` prohíbe el copy "reemplaza la tablet" y "socio/aliado de Uber". Copy actual del sitio revisado el 3 sep 2026: limpio |
+| B2 | Confirmar, de forma continua, que **cada merchant tiene un Uber Eats Agreement vigente** con Uber | 3.2.1 | ✅ | Términos: el restaurante se obliga a tener contrato vigente con la app; la conexión OAuth solo funciona con cuenta activa; `conectada_at`/`tienda_id_externo` como evidencia; revisión al conectar (`docs/operacion/datos-e-incidentes-delivery.md` §8) |
+| B3 | Que **cada merchant autorice expresamente** a VIM a acceder a sus datos de Uber y **acepte términos al menos tan restrictivos** que este contrato sobre el uso de esos datos | 3.2.1, 4.3.1(a) | ✅ | Términos del servicio, sección «Apps de reparto» (autorización expresa y uso limitado) + casilla en el asistente con fecha y usuario en `delivery_conexiones.config.terminos_aceptados_*` |
 | B4 | No firmar contratos que impidan cumplir este acuerdo o limiten derechos de Uber | 4.3.1(b)(c) | ✅ | Revisar al firmar exclusividades con otras apps (DiDi/Rappi) |
 | B5 | Ofrecer de buena fe la integración a **todos** los clientes de VIM que usen Uber Eats y ayudar a Uber a identificarlos | 4.3.3 | ✅ | La integración va incluida en el producto, no es un add-on por cliente |
-| B6 | **VIM da todo el soporte** de la integración al merchant (implementación y técnico, continuo). Uber solo ayuda por correo, a su criterio | 5.2 | ⬜ | Runbook de soporte + FAQ para clientes; registrar `ultimo_error` visible en admin |
+| B6 | **VIM da todo el soporte** de la integración al merchant (implementación y técnico, continuo). Uber solo ayuda por correo, a su criterio | 5.2 | ✅ | Términos: «el soporte de la conexión te lo damos nosotros»; runbook `delivery-uber-sandbox.md` §5; `ultimo_error` visible en Apps de delivery |
 | B7 | VIM **nunca cobra ni paga** nada entre Uber y el merchant | 5.1 | ✅ | La conciliación (`apps_liquidaciones`) es solo lectura/informativa |
 | B8 | Uber puede usar las **marcas de VIM** para marketing (en el formato que VIM apruebe) | 4.4 | — | Informativo |
 | B9 | No usar marcas/logos de Uber sin permiso escrito; solo referirse a Uber como fuente y seguir sus *design guidelines* | TOU IV.A, IV.B, VI.B | ⚠️ | En el POS usamos el texto "Uber Eats" (permitido). **No** dibujar logos propios de Uber; si se usa un ícono, tomarlo de sus guidelines sin modificar |
-| B10 | No declarar "alianza", "socio oficial" ni patrocinio de Uber sin aprobación escrita | TOU IX | ⬜ | Marketing: decir "integración con Uber Eats", no "partner de Uber" |
+| B10 | No declarar "alianza", "socio oficial" ni patrocinio de Uber sin aprobación escrita | TOU IX | ✅ | Términos: «No somos socios ni representantes de ninguna app»; regla en `sitio-web/agents.md` |
 
 ### C. Datos (Uber Data / datos personales) — esto es lo delicado
 
@@ -105,18 +105,18 @@ Uber Data = nombre e inicial del apellido del cliente, su teléfono, e informaci
 | # | Obligación | Cláusula | Estado | Dónde |
 |---|---|---|---|---|
 | C1 | Usar Uber Data **solo** para (a) tramitar el pedido y (b) mostrárselo al merchant en su panel, solo o **agregado con sus demás ventas**. Para nada más | 3.2.2, DPA 1.2 | ✅ | El dato vive en `delivery_pedidos` bajo RLS del tenant; el panel del admin puede sumar Uber+DiDi+Rappi+mostrador (permitido explícitamente) |
-| C2 | No combinar datos personales de Uber con otras fuentes salvo que sea necesario para el servicio | DPA 1.2 | ⚠️ | **No** cruzar `cliente_telefono` de Uber con la tabla de clientes/lealtad del merchant. Hoy no se hace; dejarlo escrito como regla en el ADR |
+| C2 | No combinar datos personales de Uber con otras fuentes salvo que sea necesario para el servicio | DPA 1.2 | ✅ | Términos: «no los cruzamos con tu lista de clientes»; regla escrita en `docs/operacion/datos-e-incidentes-delivery.md` §1 |
 | C3 | No exponer datos personales a otros usuarios ni a terceros | TOU VII.A | ✅ | RLS por tenant; el KDS muestra solo nombre corto; el teléfono solo en caja |
-| C4 | **Retención mínima**: conservar los datos solo lo necesario; destruir/devolver al terminar o cuando Uber lo pida | DPA 1.5 | ⬜ | Definir política: anonimizar `cliente_nombre`, `cliente_telefono`, `direccion_texto` y `payload_raw` a los N días (propuesta: 30) con un job; conservar montos e ítems para conciliación |
-| C5 | **Subencargados** (Supabase/AWS, Vercel, etc.) solo con contrato igual de restrictivo; VIM sigue siendo responsable | DPA 1.4 | ⬜ | Lista de subencargados en el aviso de privacidad de VIM; conservar los DPA de Supabase y Vercel (ambos los publican) |
-| C6 | Solicitudes de titulares (ARCO/GDPR) → **reenviar de inmediato a Uber** y cooperar | DPA 1.6 | ⬜ | Procedimiento en el runbook: no responder al cliente final, reenviar a Uber |
-| C7 | Requerimientos de autoridad sobre datos de Uber → informar a Uber cuanto antes | DPA 1.7 | ⬜ | Mismo procedimiento |
+| C4 | **Retención mínima**: conservar los datos solo lo necesario; destruir/devolver al terminar o cuando Uber lo pida | DPA 1.5 | ✅ | Migración 0095: `delivery_anonimizar_pedidos_viejos(30)` con cron diario `delivery-retencion`; prometido en términos y aviso («a los 30 días»); procedimiento de borrado anticipado en `datos-e-incidentes-delivery.md` §2 |
+| C5 | **Subencargados** (Supabase/AWS, Vercel, etc.) solo con contrato igual de restrictivo; VIM sigue siendo responsable | DPA 1.4 | ✅ | Lista de subencargados con sus DPA en `datos-e-incidentes-delivery.md` §3 (Supabase/AWS, Vercel, GitHub) |
+| C6 | Solicitudes de titulares (ARCO/GDPR) → **reenviar de inmediato a Uber** y cooperar | DPA 1.6 | ✅ | Procedimiento en `datos-e-incidentes-delivery.md` §7; el aviso de privacidad lo dice al comensal |
+| C7 | Requerimientos de autoridad sobre datos de Uber → informar a Uber cuanto antes | DPA 1.7 | ✅ | `datos-e-incidentes-delivery.md` §7 |
 | C8 | Transferencias internacionales: cláusulas contractuales tipo si la ley lo exige | DPA 1.9 | — | Datos en Supabase (región definida en el proyecto); anotar la región en el aviso |
-| C9 | **Programa de seguridad escrito** + políticas para detectar y prevenir brechas | DPA 2.1 | ⚠️ | Existe la auditoría cyber-neo (ago 2026) y `docs/seguridad/`; falta redactarlo como "programa" con dueño y revisión periódica |
-| C10 | Acceso a los datos solo a quien lo necesite; revisar accesos periódicamente | DPA 2.2 | ⚠️ | RLS + roles del POS lo aplican para merchants; falta la lista de quién en VIM tiene acceso a producción (Supabase dashboard, service_role) y revisarla cada trimestre |
-| C11 | Escaneo de vulnerabilidades, parches al día, antimalware en todos los sistemas que procesen datos de Uber | DPA 2.3 | ⚠️ | Dependabot/`pnpm audit` en CI; equipos de VIM con Windows Update + antivirus. Documentarlo |
-| C12 | **Notificar a Uber en 24 horas** cualquier acceso no autorizado real o sospechado a datos de Uber | DPA 2.4 | ⬜ | Plan de respuesta a incidentes con el contacto de Uber (formulario de soporte de integraciones) y plantilla de aviso |
-| C13 | Certificado anual de cumplimiento a petición de Uber (firmado por un directivo); negarlo es incumplimiento material | 3.2.2, TOU III.B | ⬜ | Tener listos los documentos C4–C12 para poder firmarlo |
+| C9 | **Programa de seguridad escrito** + políticas para detectar y prevenir brechas | DPA 2.1 | ✅ | `datos-e-incidentes-delivery.md` §5–6 (medidas + respuesta a incidentes), con dueño y revisión trimestral |
+| C10 | Acceso a los datos solo a quien lo necesite; revisar accesos periódicamente | DPA 2.2 | ✅ | Lista de accesos a producción y revisión trimestral en `datos-e-incidentes-delivery.md` §4 |
+| C11 | Escaneo de vulnerabilidades, parches al día, antimalware en todos los sistemas que procesen datos de Uber | DPA 2.3 | ✅ | `datos-e-incidentes-delivery.md` §5 |
+| C12 | **Notificar a Uber en 24 horas** cualquier acceso no autorizado real o sospechado a datos de Uber | DPA 2.4 | ✅ | Plan de incidentes con plantilla de aviso a Uber en 24 h: `datos-e-incidentes-delivery.md` §6 |
+| C13 | Certificado anual de cumplimiento a petición de Uber (firmado por un directivo); negarlo es incumplimiento material | 3.2.2, TOU III.B | ✅ | Respaldo documental listo: `datos-e-incidentes-delivery.md` completo; Fermín firma cuando Uber lo pida |
 | C14 | Auditoría de Uber máximo una vez al año, con aviso; si revela incumplimiento material, VIM paga la auditoría y corrige | 3.2.3, TOU III.E | — | Informativo; depende de C9–C12 |
 | C15 | Indemnizar a Uber por pérdida, alteración o mal uso de datos personales de Uber | DPA 1.8 | — | Riesgo real. Es la única obligación **sin tope** de responsabilidad junto con las de 3.2.1 |
 
@@ -128,7 +128,7 @@ Uber Data = nombre e inicial del apellido del cliente, su teléfono, e informaci
 | D2 | No incrustar credenciales en código abierto; no enmascarar identidad al llamar a la API | TOU II.C | ✅ | Repo privado; `.env.*` ignorados; el `client_id` es público por diseño |
 | D3 | Tratar como confidencial la documentación, credenciales y comunicaciones de Uber | TOU VII.C | ⚠️ | El contrato y las capturas viven en este repo privado. **No publicar** el contrato ni los PDFs fuera del equipo |
 | D4 | Tener **términos de uso y aviso de privacidad** visibles para los usuarios del producto | TOU III.A | ✅ | Sitio web de VIM POS tiene aviso de privacidad; los términos de servicio deben incluir B3 |
-| D5 | Avisar a Uber por escrito si una brecha de nuestros términos/privacidad afecta a usuarios de Uber | TOU III.A | ⬜ | Mismo plan de incidentes que C12 |
+| D5 | Avisar a Uber por escrito si una brecha de nuestros términos/privacidad afecta a usuarios de Uber | TOU III.A | ✅ | Mismo plan de incidentes (§6) |
 
 ### E. Límites de responsabilidad (para saber a qué nos exponemos)
 
@@ -167,6 +167,10 @@ y tener un producto genérico para ítems sin mapear para que **nunca** se pierd
 mapeo. Los pedidos que vencen sin respuesta pasan a EXPIRADO cada minuto y avisan en el POS (banner en el inicio) y en el admin (columna "Expirados hoy"); así la tasa se puede medir con `delivery_pedidos`.
 
 ## Lo que hay que hacer a partir de este contrato (orden sugerido)
+
+> **3 sep 2026:** todo lo de abajo está hecho salvo lo que depende de Uber (tiendas de prueba,
+> activar "allergy requests") y la cesión del contrato si VIM se constituye como sociedad.
+
 
 1. Guardar la copia **firmada** del contrato aquí y confirmar las casillas de APIs (Fermín).
 2. Añadir a los **términos de servicio de VIM POS** la cláusula de apps de delivery (B3): el
