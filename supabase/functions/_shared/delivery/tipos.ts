@@ -16,6 +16,10 @@ export type ItemNormalizado = {
   cantidad: number;
   precio_unitario_mxn: string;
   nota: string | null;
+  /** Alérgenos que el cliente marcó en la app, ya en español ("cacahuate", "lácteos"…). Obligación A7 del contrato. */
+  alergenos: string[];
+  /** Texto libre del cliente sobre su alergia. */
+  alergia_nota: string | null;
   modificadores: ModificadorNormalizado[];
 };
 

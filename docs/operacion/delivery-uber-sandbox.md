@@ -97,6 +97,16 @@ Subir un menú mínimo a la tienda de prueba con **ids = uuids de productos de V
   y ejecutar la función; el POS muestra el banner rojo en el inicio hasta que alguien entra a
   Pedidos de apps.
 
+## 3c. Alergias (A7)
+
+Uber manda la alergia por ítem (`customer_request.allergy`: lista de alérgenos + texto libre). El
+normalizador la traduce (`cacahuate`, `lácteos`…) y `crear_ticket_desde_app` la pone **al frente**
+de la nota de cocina del ítem (`⚠ ALERGIA: …`) y avisa en la nota general del ticket; la tarjeta de
+Pedidos de apps la muestra en rojo. Para que Uber mande el campo hay que **pedir a soporte que
+active "allergy requests" para la tienda** (viene apagado en integraciones POS); mientras tanto el
+cliente puede escribirla en las instrucciones, que también llegan. Prueba local:
+`supabase/scripts/smoke_delivery_app.sql` (ítem con alergia → nota de cocina y nota general).
+
 ## 4. Prueba de punta a punta
 
 1. Abrir turno en el POS (nube) de la sucursal vinculada.

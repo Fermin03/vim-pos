@@ -12,6 +12,9 @@ export type AppPedido = "APP_UBEREATS" | "APP_DIDI" | "APP_RAPPI";
 
 export type PedidoAppItem = {
   nombreApp: string; cantidad: number; precioUnitario: number; nota: string | null; mapeado: boolean;
+  /** Alérgenos marcados por el cliente en la app, en español (A7 del contrato). */
+  alergenos: string[];
+  alergiaNota: string | null;
   modificadores: { nombreApp: string; cantidad: number }[];
 };
 export type PedidoApp = {
@@ -63,6 +66,8 @@ function itemsDesdeJson(v: unknown): PedidoAppItem[] {
       cantidad: Number(it.cantidad ?? 1),
       precioUnitario: Number(it.precio_unitario_mxn ?? 0),
       nota: (it.nota as string | null) ?? null,
+      alergenos: Array.isArray(it.alergenos) ? (it.alergenos as unknown[]).filter((a): a is string => typeof a === "string" && a.length > 0) : [],
+      alergiaNota: typeof it.alergia_nota === "string" && it.alergia_nota.length > 0 ? it.alergia_nota : null,
       mapeado: typeof it.producto_id === "string" && it.producto_id.length > 0,
       modificadores: mods.map((m) => ({ nombreApp: String(m.nombre_app ?? ""), cantidad: Number(m.cantidad ?? 1) })),
     };
@@ -87,6 +92,16 @@ export async function accionPedidoApp(
   } catch (e) {
     return { ok: false, error: "SIN_RED", detalle: e instanceof Error ? e.message : String(e) };
   }
+}
+
+/** "ALERGIA: cacahuate, lácteos — "texto"" o null si el ítem no trae alergia. */
+export function etiquetaAlergia(it: Pick<PedidoAppItem, "alergenos" | "alergiaNota">): string | null {
+  if (it.alergenos.length === 0 && !it.alergiaNota) return null;
+  const lista = it.alergenos.length > 0 ? it.alergenos.join(", ") : "ver nota";
+  return `ALERGIA: ${lista}${it.alergiaNota ? ` — “${it.alergiaNota}”` : ""}`;
+}
+export function pedidoConAlergia(p: Pick<PedidoApp, "items">): boolean {
+  return p.items.some((it) => it.alergenos.length > 0 || it.alergiaNota !== null);
 }
 
 export function segundosRestantes(venceAceptacion: string | null, ahora: Date): number | null {
