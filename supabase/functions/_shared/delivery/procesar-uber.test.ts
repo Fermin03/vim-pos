@@ -12,7 +12,7 @@ const ORDEN = { order: { id: "ord-1", display_id: "2A003", state: "OFFERED", sta
 type Fila = Record<string, unknown>;
 
 /** BD de mentira: tablas en memoria y RPCs contadas. Imita solo las cadenas de supabase-js que usa el proceso. */
-function dbFalsa(opts: { conexion: Fila | null; turnoAbierto: boolean; productos: string[] }) {
+function dbFalsa(opts: { conexion: Fila | null; turnoAbierto: boolean; productos: string[]; espejo?: boolean }) {
   const pedidos: Fila[] = [];
   const rpcs: { fn: string; args: unknown }[] = [];
   const consulta = (tabla: string, filtros: Fila) => {
@@ -38,7 +38,7 @@ function dbFalsa(opts: { conexion: Fila | null; turnoAbierto: boolean; productos
       insert: (fila: Fila) => ({ select: () => ({ single: async () => { const f = { id: `ped-${pedidos.length + 1}`, ...fila }; pedidos.push(f); return { data: f, error: null }; } }) }),
       update: (cambios: Fila) => ({ eq: async (_c: string, id: unknown) => { const p = pedidos.find((x) => x.id === id); if (p) Object.assign(p, cambios); return { error: null }; } }),
     }),
-    rpc: async (fn: string, args: unknown) => { rpcs.push({ fn, args }); return { data: "ticket-1", error: null }; },
+    rpc: async (fn: string, args: unknown) => { rpcs.push({ fn, args }); return { data: fn === "sucursal_con_espejo" ? opts.espejo === true : "ticket-1", error: null }; },
   };
   return { db: db as unknown as DepsProceso["db"], pedidos, rpcs };
 }
@@ -61,7 +61,7 @@ test("con conexión activa, auto_aceptar y turno abierto: crea el pedido, el tic
   const r = await procesarNotificacionUber({ db: falsa.db, uber: uberFalso({ aceptar: (id) => aceptadas.push(id) }), ahora: () => new Date("2026-09-02T10:00:00Z") }, evento);
   assert.equal(r.accion, "ACEPTADO_AUTO");
   assert.deepEqual(aceptadas, ["ord-1"]);
-  assert.equal(falsa.rpcs[0].fn, "crear_ticket_desde_app");
+  assert.equal(falsa.rpcs.filter((x) => x.fn !== "sucursal_con_espejo")[0]?.fn, "crear_ticket_desde_app");
   assert.equal(falsa.pedidos[0].estado, "RECIBIDO");
   assert.equal(falsa.pedidos[0].vence_aceptacion, "2026-09-02T10:11:00.000Z");
   assert.equal((falsa.pedidos[0].items as { producto_id: string }[])[0].producto_id, PROD);
@@ -73,7 +73,7 @@ test("sin turno abierto: el pedido queda RECIBIDO para el cajero y NO se acepta 
   const r = await procesarNotificacionUber({ db: falsa.db, uber: uberFalso({ aceptar: () => { acepto = true; } }), ahora: () => new Date() }, evento);
   assert.equal(r.accion, "PENDIENTE_CAJERO");
   assert.equal(acepto, false);
-  assert.equal(falsa.rpcs.length, 0);
+  assert.equal(falsa.rpcs.filter((x) => x.fn !== "sucursal_con_espejo").length, 0);
   assert.equal(falsa.pedidos.length, 1);
 });
 
@@ -99,4 +99,18 @@ test("el mismo pedido dos veces: DUPLICADO sin volver a insertar", async () => {
   const r = await procesarNotificacionUber(deps, evento);
   assert.equal(r.accion, "DUPLICADO");
   assert.equal(falsa.pedidos.length, 1);
+});
+
+// --- Espejo en escritorio (spec 2026-09-03) ---------------------------------------------------
+test("con caja instalada viva: PENDIENTE_ESCRITORIO, gestion ESCRITORIO, sin ticket ni accept en la nube", async () => {
+  const falsa = dbFalsa({ conexion: conexionActiva, turnoAbierto: true, productos: [PROD], espejo: true });
+  const aceptadas: string[] = [];
+  const r = await procesarNotificacionUber({ db: falsa.db, uber: uberFalso({ aceptar: (id) => aceptadas.push(id) }), ahora: () => new Date("2026-09-03T10:00:00Z") }, evento);
+  assert.equal(r.accion, "PENDIENTE_ESCRITORIO");
+  assert.equal(falsa.pedidos.length, 1);
+  assert.equal(falsa.pedidos[0].estado, "RECIBIDO");
+  assert.equal(falsa.pedidos[0].gestion, "ESCRITORIO");
+  assert.ok(falsa.rpcs.some((x) => x.fn === "sucursal_con_espejo"));
+  assert.ok(!falsa.rpcs.some((x) => x.fn === "crear_ticket_desde_app"), "no crea ticket en la nube");
+  assert.deepEqual(aceptadas, [], "no acepta en Uber");
 });
