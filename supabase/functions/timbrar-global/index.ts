@@ -19,7 +19,8 @@
 // Local: supabase functions serve timbrar-global --env-file supabase/functions/.env
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import { corsHeaders } from "../_shared/cors.ts";
-import { timbrarConFailover } from "../_shared/pac/index.ts";
+import { timbrarConFailover, obtenerFacturama } from "../_shared/pac/index.ts";
+import { archivarCfdi, subidorSupabase } from "../_shared/pac/archivo.ts";
 import { armarConceptosGlobal, ConceptosIncoherentes, type LineaTicket, type TicketDelPeriodo } from "../_shared/pac/conceptos.ts";
 
 const ROLES_FACTURA = ["DUENO", "ADMIN"];
@@ -288,6 +289,17 @@ Deno.serve(async (req) => {
       p_request_payload: { pac: res.pacUsado, periodo: { desde, hasta }, tickets: delPeriodo.length },
       p_response_payload: res.responsePayload,
     });
+
+    // Archivo del XML y el PDF en el bucket privado `cfdi` (ver timbrar-cfdi). Best-effort.
+    {
+      const pacF = obtenerFacturama();
+      if (pacF && res.pacReferencia) {
+        const admin = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!, { auth: { persistSession: false } });
+        const [xml, pdf] = await Promise.all([pacF.descargar(res.pacReferencia, "xml"), pacF.descargar(res.pacReferencia, "pdf")]);
+        const archivo = await archivarCfdi(cfdiId, { xml, pdf }, subidorSupabase(admin));
+        if (archivo.errores.length) console.error(`[global] ${cfdiId} archivo incompleto: ${archivo.errores.join("; ")}`);
+      }
+    }
 
     // El vínculo ticket ↔ global. Va DESPUÉS del timbrado: si se escribiera antes y el timbrado
     // fallara, los tickets quedarían marcados como amparados por un comprobante que no existe, y

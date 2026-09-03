@@ -99,6 +99,14 @@ tiene estrategia de estado "external": solo se pausa desde Uber Eats Manager),
 `PREP_FUERA_DE_RANGO` 400, `UBER_ERROR` 502. Los expirados los marca `delivery_marcar_expirados()`
 por pg_cron cada minuto (migración 0093).
 
+### Archivo de comprobantes y `descargar-cfdi` (0098)
+
+Al timbrar (`timbrar-cfdi`, `timbrar-global`, `autofacturar`) se bajan del PAC el XML y el PDF y se
+suben con service_role al bucket privado `cfdi` (`_shared/pac/archivo.ts`); `cancelar-cfdi` archiva el
+acuse. El bucket no tiene políticas: `descargar-cfdi` (JWT, RLS sobre `tickets_cfdi`) sirve los
+archivos en base64 y, si uno falta, lo repone del PAC por su referencia. Las fechas del PAC se
+normalizan a la zona de México (`_shared/pac/fechas.ts`): Facturama las manda sin zona.
+
 ### Verificar la cuenta del PAC (cargar-csd, acción `verificar`)
 
 `cargar-csd` con `{"accion":"verificar"}` comprueba credencial y modalidad Multiemisor de Facturama

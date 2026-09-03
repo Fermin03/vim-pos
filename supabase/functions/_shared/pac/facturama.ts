@@ -12,6 +12,7 @@
 //
 // El detalle de rutas, payloads y trampas está en la habilidad `facturama-cfdi` del proyecto.
 import type { PacAdapter, PacTimbradoRequest, PacTimbradoResult } from "./tipos.ts";
+import { normalizarFechaPac } from "./fechas.ts";
 
 /** Sandbox por defecto: si alguien despliega sin configurar la URL, que timbre en pruebas y no en
  *  producción. Equivocarse hacia el lado inofensivo. */
@@ -106,16 +107,18 @@ export class FacturamaPac implements PacAdapter {
       };
     }
 
-    const fechaTimbrado = d.Complement?.TaxStamp?.Date ?? new Date().toISOString();
+    // Facturama manda la hora local de México sin zona; `normalizarFechaPac` se la pone. Sin eso el
+    // timbrado se guardaba seis horas antes de lo real (visto en el primer CFDI de producción).
+    const fechaTimbrado = normalizarFechaPac(d.Complement?.TaxStamp?.Date);
     return {
       ok: true,
       uuidFiscal: uuid,
       serie: String(cuerpo.Serie ?? ""),
       folioFiscal: String(d.Folio ?? req.folio),
       fechaTimbrado,
-      fechaEmision: d.Date ?? fechaTimbrado,
-      // El XML se descarga aparte: en Multiemisor Facturama NO guarda nada, así que si no lo
-      // bajamos y lo archivamos nosotros, se pierde. Lo hace `timbrar-cfdi` con `descargar()`.
+      fechaEmision: d.Date ? normalizarFechaPac(d.Date) : fechaTimbrado,
+      // El XML se descarga aparte con `descargar()` y lo archiva quien timbra (`_shared/pac/archivo.ts`):
+      // el PAC no es nuestro archivo.
       xml: "",
       pacReferencia: String(d.Id ?? ""),
       costoCentavos: 50, // $0.50 por folio, supuesto del modelo. Confirmar con el comercial.
