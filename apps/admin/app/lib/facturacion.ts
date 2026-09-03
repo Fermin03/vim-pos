@@ -70,7 +70,10 @@ export async function listarTicketsFacturables(desde: string, hasta: string, fol
         // Ver la nota de arriba: sin `!tickets_cfdi_ticket_id_fkey` esto es ambiguo.
         "tickets_cfdi!tickets_cfdi_ticket_id_fkey(id, estado_sat, uuid_fiscal, created_at)",
     )
-    .eq("estado_fiscal", "PAGADO")
+    // PAGADO = facturable; FACTURADO = ya tiene CFDI y debe seguir a la vista para descargar el
+    // XML/PDF o cancelarlo. Al facturar, el ticket pasa a FACTURADO: sin esto desaparecía de la
+    // lista justo cuando más falta hace (visto con el primer CFDI real, 3 sep 2026).
+    .in("estado_fiscal", ["PAGADO", "FACTURADO"])
     .gte("dia_contable", desde)
     .lte("dia_contable", hasta)
     .order("created_at", { ascending: false })
