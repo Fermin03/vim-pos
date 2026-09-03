@@ -68,7 +68,10 @@ Estado actual en producción: `tenant_cfdi_emisor` tiene el RFC de Fermín como 
    este es el primer lugar donde se prueba la cancelación de verdad. Confirmar también cuál de las
    dos rutas documentadas cancela (ver `02-vimpos-y-facturama.md`).
 5. Factura global del día con el ticket restante (si lo hay) y verificarla en el SAT.
-6. Autofactura desde `factura.vimpos.com.mx` con el QR de un ticket.
+6. Autofactura desde `factura.vimpos.com.mx` con el QR de un ticket. Requisitos que faltaban el
+   3 sep 2026: el proyecto de Vercel del portal necesita `NEXT_PUBLIC_SUPABASE_URL` y
+   `NEXT_PUBLIC_SUPABASE_ANON_KEY`, y el secret `VIM_CORS_ORIGINS` de las Edge Functions debe
+   incluir `https://factura.vimpos.com.mx` (si no, el navegador dice «No pudimos conectar»).
 
 ## 5. Operación continua
 

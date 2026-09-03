@@ -1,6 +1,8 @@
 // SEC CN-004 (Cyber Neo) — CORS por-request con allowlist.
 // Configuración de prod:
-//   supabase secrets set VIM_CORS_ORIGINS="https://pos.vimpos.com.mx,https://admin.vimpos.com.mx,https://platform.vimpos.com.mx"
+//   supabase secrets set VIM_CORS_ORIGINS="https://vimpos.com.mx,https://pos.vimpos.com.mx,https://admin.vimpos.com.mx,https://platform.vimpos.com.mx,https://factura.vimpos.com.mx"
+// OJO: cada app nueva con dominio propio hay que añadirla aquí; si falta, el navegador reporta
+// "No pudimos conectar" aunque la función responda 200 (pasó con el portal de autofactura, 3 sep 2026).
 // Solo esos orígenes reciben su propio Origin reflejado; el resto recibe el primero (no su
 // Origin) → el navegador bloquea la lectura.
 //
