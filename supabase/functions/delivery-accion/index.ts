@@ -94,7 +94,8 @@ Deno.serve(async (req) => {
       const m = msg(e);
       if (m === "TIENDA_ESTRATEGIA_UBER") return json({ error: "TIENDA_ESTRATEGIA_UBER" }, 409);
       if (m === "PREP_FUERA_DE_RANGO") return json({ error: "PREP_FUERA_DE_RANGO" }, 400);
-      return json({ error: "UBER_ERROR", detalle: m }, 502);
+      // Aunque Uber no responda, el POS puede mostrar los minutos que tenemos en VIM.
+      return json({ error: "UBER_ERROR", detalle: m, tiempo_prep_min: cx.tiempo_prep_min }, 502);
     }
   }
 

@@ -146,11 +146,11 @@ async function llamarAccion(token: string, cuerpo: Record<string, unknown>): Pro
 
 export type ResultadoTienda =
   | { ok: true; tienda: EstadoTiendaApp; tiempoPrepMin?: number }
-  | { ok: false; error: string; detalle?: string };
+  | { ok: false; error: string; detalle?: string; tiempoPrepMin?: number };
 
 function comoResultado(r: RespTienda & { status: number }): ResultadoTienda {
   return r.error || !r.tienda
-    ? { ok: false, error: r.error ?? "SIN_DATOS", detalle: r.detalle }
+    ? { ok: false, error: r.error ?? "SIN_DATOS", detalle: r.detalle, tiempoPrepMin: r.tiempo_prep_min }
     : { ok: true, tienda: r.tienda, tiempoPrepMin: r.tiempo_prep_min };
 }
 

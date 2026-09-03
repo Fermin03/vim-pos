@@ -56,7 +56,9 @@ export function PantallaPedidosApps({ token, caja, onSalir }: { token: string; c
     if (!montado.current) return;
     if (r.ok) { setSinConexion(false); setTienda(r.tienda); if (r.tiempoPrepMin !== undefined) setPrep(r.tiempoPrepMin); }
     else if (r.error === "SIN_CONEXION_UBER") setSinConexion(true);
-    else if (r.error === "UBER_ERROR" || r.error === "SIN_RED") { /* la barra queda en "sin datos"; se reintenta al minuto */ }
+    else { /* la barra queda en "sin datos" y se reintenta al minuto; los minutos de VIM sí se muestran */
+      if (r.tiempoPrepMin !== undefined) setPrep(r.tiempoPrepMin);
+    }
   }, [token, caja.sucursal_id]);
 
   useEffect(() => {
