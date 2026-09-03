@@ -3,6 +3,7 @@
 // + PostgREST como sidecar. Es el mismo stack validado en la Fase 0, ahora como módulo
 // reusable que arranca el proceso main de Electron (o el verify headless).
 import EmbeddedPostgres from "embedded-postgres";
+import { arrancarConReintentos, crearCapturaDeLog } from "./arranque-reintentos.mjs";
 import pg from "pg";
 import { spawn, execFileSync } from "node:child_process";
 import { randomBytes } from "node:crypto";
@@ -203,8 +204,13 @@ export async function startLocalBackend(opts = {}) {
   // ('postgres' si nunca se rotó) y se rota más abajo, una sola vez.
   let password = clusterNuevo ? nuevaClave() : (passGuardada ?? "postgres");
 
+  // Lo que escribe postgres.exe se guarda para explicar un fallo de arranque (antes llegaba como
+  // "Boot falló: undefined": embedded-postgres rechaza sin motivo si el proceso muere temprano).
+  const capturaPg = crearCapturaDeLog();
   const database = new EmbeddedPostgres({
     databaseDir: dataDir, user: "postgres", password, port: pgPort, persistent: true,
+    onLog: (m) => capturaPg.onLog(m),
+    onError: (e) => capturaPg.onLog(String(e?.message ?? e)),
     // scram-sha-256 en vez del 'password' (contraseña EN CLARO por el socket) que trae por
     // defecto embedded-postgres. Solo aplica al initdb: los clústeres ya creados conservan su
     // pg_hba, y reescribirlo en caliente arriesga dejar la caja sin poder conectarse a su BD.
@@ -215,7 +221,20 @@ export async function startLocalBackend(opts = {}) {
     await database.initialise();
     guardarPass(password); // ya es la del clúster: persistir antes de seguir
   }
-  await database.start();
+  // Reintentos con limpieza entre intentos: un postgres anterior que aún no suelta el puerto o el
+  // candado se quita solo en segundos; antes eso obligaba al cajero a abrir la app dos o tres veces.
+  await arrancarConReintentos({
+    arrancar: () => database.start(),
+    captura: capturaPg,
+    intentos: 3,
+    esperaMs: 3000,
+    log: (m) => log(`arranque: ${m}`),
+    limpiar: () => {
+      matarHuerfanos(dataDir, (m) => log(`limpieza: ${m}`), pidfile);
+      matarPostgresDeEstaInstalacion(pgBin, (m) => log(`limpieza: ${m}`));
+      matarQuienOcupaElPuerto(pgPort, (m) => log(`limpieza: ${m}`));
+    },
+  });
   let pgPid = 0;
   try { pgPid = parseInt(readFileSync(path.join(dataDir, "postmaster.pid"), "utf8").split("\n")[0], 10) || 0; } catch { /* */ }
   log(`Postgres embebido en localhost:${pgPort}`);
