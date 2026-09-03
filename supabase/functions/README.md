@@ -99,6 +99,14 @@ tiene estrategia de estado "external": solo se pausa desde Uber Eats Manager),
 `PREP_FUERA_DE_RANGO` 400, `UBER_ERROR` 502. Los expirados los marca `delivery_marcar_expirados()`
 por pg_cron cada minuto (migración 0093).
 
+### Verificar la cuenta del PAC (cargar-csd, acción `verificar`)
+
+`cargar-csd` con `{"accion":"verificar"}` comprueba credencial y modalidad Multiemisor de Facturama
+sin gastar folios ni tocar sellos (`FacturamaPac.verificarCuenta()`: `GET /catalogs/PaymentForms` y
+`GET /cfdi?type=issuedLite`). Entra con JWT de dueño/admin del tenant o por el camino interno
+`x-vim-interno` (mismo secreto que enviar-push). Por eso `verify_jwt = false` en config.toml: la
+función valida el JWT por sí misma. Receta en `docs/integraciones/facturama/03-activacion-produccion.md`.
+
 ### Push de expirados al dueño (0097)
 
 `enviar-push` acepta, además del JWT de usuario, el camino interno: cabecera `x-vim-interno`

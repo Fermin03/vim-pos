@@ -19,6 +19,12 @@ import { createClient } from "jsr:@supabase/supabase-js@2";
 import { corsHeaders } from "../_shared/cors.ts";
 import { obtenerFacturama } from "../_shared/pac/index.ts";
 import { CertificadoIlegible, esDelRfc, estaVigente, leerCertificado } from "../_shared/pac/certificado.ts";
+import { igualesEnTiempoConstante } from "../_shared/delivery/firma.ts";
+
+// Camino interno: la base de datos (o quien tenga el secreto compartido) puede pedir SOLO la
+// verificación de la cuenta del PAC —credencial y Multiemisor— sin gastar folios ni tocar sellos.
+// Mismo esquema que enviar-push: cabecera `x-vim-interno` = secret VIM_INTERNO_SECRET.
+const INTERNO = Deno.env.get("VIM_INTERNO_SECRET") ?? "";
 
 const ROLES_CSD = ["DUENO", "ADMIN"];
 
@@ -32,6 +38,17 @@ Deno.serve(async (req) => {
 
   if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
   if (req.method !== "POST") return json({ error: "METHOD_NOT_ALLOWED" }, 405);
+
+  const internoRecibido = (req.headers.get("x-vim-interno") ?? "").trim();
+  if (internoRecibido !== "") {
+    if (INTERNO === "" || !igualesEnTiempoConstante(internoRecibido, INTERNO)) return json({ error: "INTERNO_INVALIDO" }, 401);
+    let interno: { accion?: string };
+    try { interno = await req.json(); } catch { return json({ error: "BAD_JSON" }, 400); }
+    if (interno.accion !== "verificar") return json({ error: "ACCION_NO_PERMITIDA" }, 403);
+    const pacInterno = obtenerFacturama();
+    if (!pacInterno) return json({ ok: false, error: "PAC_NO_CONFIGURADO" }, 503);
+    return json({ ok: true, ...(await pacInterno.verificarCuenta()) });
+  }
 
   const token = (req.headers.get("authorization") ?? "").replace(/^Bearer\s+/i, "");
   if (!token) return json({ error: "NO_AUTH" }, 401);
@@ -68,6 +85,13 @@ Deno.serve(async (req) => {
     .filter(Boolean) as string[];
   if (!roles.some((r) => ROLES_CSD.includes(r))) {
     return json({ error: "SIN_PERMISO", detalle: "Solo DUEÑO/ADMIN pueden administrar el sello" }, 403);
+  }
+
+  // ── Verificación de la cuenta del PAC (dueño/admin, sin folio, sin sello) ───────────────────
+  if (body.accion === "verificar") {
+    const pacV = obtenerFacturama();
+    if (!pacV) return json({ ok: false, error: "PAC_NO_CONFIGURADO" }, 503);
+    return json({ ok: true, ...(await pacV.verificarCuenta()) });
   }
 
   const { data: emisor, error: eErr } = await sb
