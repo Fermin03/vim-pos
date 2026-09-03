@@ -15,6 +15,7 @@ import { pushToCloud } from "./sync-push.mjs";
 import { respaldar } from "./backup.mjs";
 import { crearWatchdog } from "./watchdog.mjs";
 import { crearCicloSync } from "./sync-ciclo.mjs";
+import { crearEspejo } from "./delivery-espejo.mjs";
 import { registrarErrorLocal, subirErrores } from "./sync-errores.mjs";
 import { buscarActualizacion, descargarInstalador } from "./updater.mjs";
 
@@ -577,13 +578,41 @@ const ciclo = crearCicloSync({
   log: (m) => console.log("· [sync]", m),
 });
 
-/** Arranca el ciclo: una sincronización completa ya, y de ahí en adelante cada 10 minutos. */
+// ── Espejo de pedidos de apps (spec 2026-09-03) ────────────────────────────
+// Token de dispositivo con caché corta para el gateway (puente de delivery-accion) y el agente.
+let nubeCache = null;
+async function tokenDeNubeCacheado() {
+  if (nubeCache && Date.now() - nubeCache.at < 20 * 60_000) return nubeCache.opts;
+  const opts = await tokenDeNube();
+  if (opts) nubeCache = { opts, at: Date.now() };
+  return opts;
+}
+/** La caja de este dispositivo viene en su correo: caja-<uuid>@dispositivos.<dominio>. */
+function cajaDeEstaCaja() {
+  const email = leerNube()?.email ?? "";
+  const m = /^caja-([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})@/i.exec(email);
+  return m ? m[1].toLowerCase() : null;
+}
+let espejo = null;
+
+/** Arranca el ciclo: una sincronización completa ya, y de ahí en adelante cada 10 minutos.
+ *  Y el espejo de pedidos de apps cada 10 s (solo si la caja está vinculada a la nube). */
 function iniciarSync() {
   ciclo.iniciar();
+  if (backend) backend.nube = tokenDeNubeCacheado;
+  const cajaId = cajaDeEstaCaja();
+  if (backend?.pool && cajaId && !espejo) {
+    espejo = crearEspejo({ pool: backend.pool, nube: tokenDeNubeCacheado, cajaId, log: (m) => console.log("· [espejo]", m) });
+    espejo.iniciar();
+  } else if (!cajaId) {
+    console.log("· [espejo] omitido (la caja no está vinculada a la nube)");
+  }
 }
 
 function detenerSync() {
   ciclo.detener();
+  try { espejo?.detener(); } catch { /* */ }
+  espejo = null;
 }
 
 let cerrando = false;

@@ -221,7 +221,9 @@ export function PantallaPedidosApps({ token, caja, onSalir }: { token: string; c
                 </ul>
                 {p.notaCliente && <p className="text-[13px] italic text-ink-2">“{p.notaCliente}”</p>}
                 {p.totalCliente !== null && <p className="text-[13px] text-ink-3">Total en la app: {fmtMxn(p.totalCliente)}</p>}
-                {p.ultimoError && p.estado === "ERROR" && <p className="text-[12px] text-danger">{p.ultimoError}</p>}
+                {p.ultimoError && (p.estado === "ERROR" || p.estado === "CANCELADO" || p.estado === "EXPIRADO") && (
+                  <p className="text-[12px] font-semibold text-danger">{p.ultimoError}</p>
+                )}
                 <div className="mt-auto flex gap-2 pt-1">
                   {pendiente && (
                     <>
