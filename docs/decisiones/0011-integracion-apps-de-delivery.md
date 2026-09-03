@@ -27,6 +27,13 @@ credenciales. 1C.2 §8: conciliación por CSV con `ingesta_metodo 'API'` reserva
 5. El identificador que se manda a las apps es el `uuid` de VIM (`productos.id`,
    `opciones_modificador.id`): no hay tabla de mapeo.
 6. Orden: Uber (sandbox autoservicio) → DiDi → Rappi. La primera fase solo cubre Uber.
+7. **El ticket se crea donde está la cocina** (3 sep 2026, spec
+   `docs/superpowers/specs/2026-09-03-delivery-espejo-escritorio-design.md`). Si una caja
+   instalada de la sucursal está viva (latido `cajas.espejo_apps_at` < 90 s), el pedido se gestiona
+   en ESCRITORIO: la nube no crea ticket; el agente de la caja espeja el pedido en su base local,
+   crea el ticket ahí (folio local, KDS, comanda) y acepta en Uber vía `delivery-accion`. Si no hay
+   caja instalada viva, se gestiona en NUBE como el POS web. La fuente de verdad del pedido sigue
+   siendo la nube; el ticket sube con el push y se enlaza por `folio_externo_app`.
 
 ## Por qué
 

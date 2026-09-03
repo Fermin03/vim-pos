@@ -222,6 +222,16 @@ en D: (`ELECTRON_CACHE`/`ELECTRON_BUILDER_CACHE`) por el junction del perfil.
 esta PC (perfil con junction) eso rompe `initdb` → lanzar con **`VIM_DATA_DIR=D:\ruta`** (o setear esa
 env de sistema). En una **PC normal del piloto** `userData` funciona sin tocar nada.
 
+## Espejo de pedidos de apps (Uber Eats) — spec 2026-09-03
+
+La caja vinculada a la nube corre un agente (`src/delivery-espejo.mjs`, log `· [espejo]`) cada
+10 s: llama `delivery-espejo` con el token de dispositivo, espeja `delivery_conexiones` y
+`delivery_pedidos` de su sucursal en la base local, reclama los pedidos que le tocan
+(`delivery-accion` → `reclamar`), crea el ticket local con `crear_ticket_desde_app` y acepta en
+Uber (`delivery-accion` → `aceptar`). El gateway reenvía `POST /functions/v1/delivery-accion` a la
+nube con el token de dispositivo (`backend.nube`), así la pantalla del POS no cambia. Pruebas:
+`pnpm test:escritorio` (planificador + agente con nube y base falsas).
+
 ## Hub del local — KDS en tiempo real por LAN (Fase 2)
 
 La caja hace de **servidor en la LAN**: el gateway escucha en `0.0.0.0` y al arrancar loguea
