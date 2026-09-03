@@ -15,6 +15,9 @@
    pedir un *partner manager*. Para producción hará falta **otra cuenta Uber** (la de producción).
 
 ### DiDi Food
+> **2 sep 2026, 22:40:** Qualification enviada desde el portal (cuenta `integraciones@vimpos.com.mx`,
+> RFC como Tax ID, perfil en inglés del doc 07). Pendiente: correo A3 a `globalsupportapi@didiglobal.com`
+> y esperar NDA / aprobación.
 1. Registrarse en <https://developer.didi-food.com/en-US/openapi> y completar
    **Qualifications Management** con los datos de VIM (RFC, acta constitutiva, poder notarial e
    identificación del representante a la mano por si piden el *Technology Integration Agreement*).
