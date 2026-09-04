@@ -82,9 +82,9 @@ _Si algo falla_
 
 Un sistema que vive en tu local también puede fallar. La diferencia está en si se arregla solo o si tienes que cerrar la caja hasta que llegue alguien.
 
-![Monitor del turno: venta, efectivo esperado, IVA y el desglose por forma de pago.](https://vimpos.com.mx/assets/img/capturas/pos-arqueo.webp)
+![Arqueo del cierre de turno: efectivo esperado, efectivo contado y la diferencia, con cada forma de pago en su renglón.](https://vimpos.com.mx/assets/img/capturas/pos-arqueo.webp)
 
-_El monitor del turno: la venta, el efectivo que debería haber con su fondo, el IVA y el desglose por forma de pago. Sale igual haya habido internet o no._
+_El arqueo al cerrar el turno: lo que dice el sistema, lo que hay en el cajón y la diferencia. Sale igual haya habido internet o no._
 
 ### Se revisa a sí mismo
 

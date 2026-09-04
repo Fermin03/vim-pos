@@ -68,19 +68,35 @@ const PAPEL = { width: 640, height: 1400 };
    extremos se pueden cruzar con un grep y saber si falta alguna o si sobra
    una toma que ya nadie usa. */
 const TOMAS = [
-  { id: "pos-home",            app: "pos",   ruta: "/",             titulo: "Home del POS",               espera: /para llevar/i },                                   // index, demo
+  /* El hero del sitio. Antes era el concentrador vacío con el logotipo en
+     medio; ahora es la caja en plena venta: catálogo abierto y un ticket con
+     tres productos. Es la primera imagen que ve un prospecto, y tiene que
+     enseñar el producto haciendo lo suyo. */
+  { id: "pos-home",            app: "pos",   ruta: "/",             titulo: "Caja con un ticket en curso",  accion: "armarTicket", limpiar: "descartarTicket", espera: /^Cobrar/i },  // index, demo
   { id: "pos-catalogo",        app: "pos",   ruta: "/",             titulo: "Catálogo con modificadores", accion: "abrirModificadores", espera: "Término de la carne" }, // index
   { id: "pos-pago",            app: "pos",   ruta: "/",             titulo: "Método de pago",             accion: "abrirCobro", limpiar: "descartarTicket", espera: /efectivo/i },          // index
   { id: "pos-mesas",           app: "pos",   ruta: "/",             titulo: "Mapa de mesas",              accion: "abrirMesas",         espera: /mesa/i },              // index
   { id: "pos-sin-conexion",    app: "pos",   ruta: "/",             titulo: "Banner de sin conexión",     accion: "cortarRed",          espera: /sin conexión|sin internet/i }, // sin-internet
-  { id: "pos-arqueo",          app: "pos",   ruta: "/",             titulo: "Arqueo y corte",             accion: "abrirCorteX", espera: /efectivo esperado/i },                            // sin-internet
-  { id: "kds",                 app: "kds",   ruta: "/",             titulo: "Pantalla de cocina",         espera: /cocina|comanda|pedido|sin pedidos/i },              // index
+  /* El monitor del turno. Se conserva con su nombre de siempre porque tres
+     páginas lo enlazan; el arqueo de verdad es la toma "pos-cierre". */
+  { id: "pos-monitor",         app: "pos",   ruta: "/",             titulo: "Monitor del turno",          accion: "abrirCorteX", espera: /efectivo esperado/i },
+  /* La espera es un producto del menú, no la palabra "cocina": la pantalla
+     de vinculación también dice "cocina", y así fue como la primera versión
+     publicó un formulario de credenciales como si fuera la pantalla de
+     comandas. */
+  { id: "kds",                 app: "kds",   ruta: "/",             titulo: "Pantalla de cocina",         espera: /Crazy Clásica|Doble Queso/ },                       // index, funciones
   { id: "admin-dashboard",     app: "admin", ruta: "/dashboard",            titulo: "Dashboard del panel",           espera: /ventas|hoy|resumen/i },      // precios, index
   { id: "admin-resultados",    app: "admin", ruta: "/reportes/consolidado", titulo: "Estado de resultados del día",  espera: /resultados|consolidado/i },  // index
   { id: "admin-inventario",    app: "admin", ruta: "/inventario",           titulo: "Inventario",                    espera: /inventario|insumo/i },       // precios
-  { id: "admin-conciliacion",  app: "admin", ruta: "/conciliacion",         titulo: "Conciliación de apps",          espera: /conciliaci/i },              // — segunda ola
-  { id: "admin-importador",    app: "admin", ruta: "/catalogo/importar",    titulo: "Importador de menú",            espera: /importar|pegar/i },          // index
-  { id: "ticket-venta",        app: "pos",   ruta: "/", papel: true, titulo: "Ticket de venta",  accion: "vistaPreviaTicket", espera: /Crazy Burgers/i },  // precios
+  { id: "admin-conciliacion",  app: "admin", ruta: "/conciliacion",         titulo: "Conciliación de apps",          accion: "abrirLiquidacion", espera: /RP-884/ },  // funciones
+  { id: "admin-importador",    app: "admin", ruta: "/catalogo/importar",    titulo: "Importador de menú",            accion: "revisarEjemplo", espera: /Hamburguesas/ },  // index, funciones
+  { id: "ticket-venta",        app: "pos",   ruta: "/", papel: true, titulo: "Ticket de venta",  accion: "vistaPreviaTicket", espera: /Crazy Burgers/i },  // precios, facturacion
+  /* El arqueo: la pantalla de cierre con el efectivo contado y la diferencia
+     a la vista. Va casi al final porque entra al flujo de cerrar el turno;
+     no lo cierra (no pulsa "Generar corte"), pero deja la caja en esa
+     pantalla. Las cuentas abiertas de la semilla cuelgan de Caja 02 a
+     propósito: si fueran de este turno, el cierre se bloquearía. */
+  { id: "pos-arqueo",          app: "pos",   ruta: "/",   titulo: "Arqueo del cierre de turno", accion: "abrirArqueo", espera: /Arqueo/ },  // index, funciones, sin-internet
   /* corte-z ES LA ÚNICA QUE NO SALE, y se deja documentado en vez de borrarla.
   
      Cierra el turno de verdad, así que va de última — pero además exige que no
@@ -109,6 +125,62 @@ const ACCIONES = {
   async entrarAlCatalogo(page) {
     await page.getByText(/para llevar/i).first().click();
     await page.getByText("Crazy Clásica").first().waitFor({ timeout: 8000 });
+  },
+
+  /* El hero: un ticket con tres productos a la vista. La hamburguesa pasa por
+     el modal del término; las papas y el refresco no tienen modificadores y
+     entran al ticket con un clic. */
+  async armarTicket(page) {
+    await ACCIONES.ponerUnProducto(page);
+    /* Cada producto vive en la pestaña de su categoría. */
+    await page.getByRole("button", { name: /para acompañar/i }).first().click();
+    await page.getByText("Papas gajo").first().click();
+    await page.waitForTimeout(500);
+    await page.getByRole("button", { name: /^Bebidas$/i }).first().click();
+    await page.getByText("Refresco 600 ml").first().click();
+    await page.waitForTimeout(500);
+    /* De vuelta a las hamburguesas, que es la pestaña que se ve en la captura. */
+    await page.getByRole("button", { name: /^Hamburguesas$/i }).first().click();
+    await page.waitForTimeout(700);
+  },
+
+  /* Cerrar turno → confirmar → teclear el efectivo contado. Se lee lo esperado
+     de la propia pantalla y se declara 40 pesos menos: un arqueo que cuadra
+     exacto no enseña para qué sirve el arqueo. */
+  async abrirArqueo(page) {
+    await page.getByRole("button", { name: /cerrar turno/i }).first().click();
+    await page.getByRole("button", { name: /^S[ií], cerrar turno/i }).first().waitFor({ timeout: 8000 });
+    await page.getByRole("button", { name: /^S[ií], cerrar turno/i }).first().click();
+    await page.getByText(/Arqueo/).first().waitFor({ timeout: 10000 });
+    await page.waitForTimeout(600);
+    const esperado = await page.evaluate(() => {
+      const fila = [...document.querySelectorAll("tr")].find((tr) => /Efectivo/.test(tr.textContent || ""));
+      const m = (fila?.textContent || "").match(/\$\s?([\d,]+\.\d{2})/);
+      return m ? Number(m[1].replace(/,/g, "")) : null;
+    });
+    const contado = esperado != null ? Math.max(0, Math.round(esperado - 40)) : 3260;
+    const efectivo = page.locator("input").first();
+    await efectivo.click();
+    await page.keyboard.type(String(contado), { delay: 40 });
+    await page.keyboard.press("Tab");
+    await page.waitForTimeout(500);
+  },
+
+  /* La conciliación se ve por liquidación: la lista solo tiene totales, el
+     cruce renglón por renglón está en el detalle. */
+  async abrirLiquidacion(page) {
+    await page.locator("tr", { hasText: /Rappi/i }).first().click();
+    await page.getByText(/RP-884/).first().waitFor({ timeout: 8000 });
+    await page.waitForTimeout(400);
+  },
+
+  /* El importador con la vista previa puesta: pega el ejemplo y pulsa Revisar.
+     Vacío, la captura enseñaba un cuadro de texto y nada más. */
+  async revisarEjemplo(page) {
+    await page.getByRole("button", { name: /usar ejemplo/i }).click();
+    await page.getByRole("button", { name: /^Revisar$/i }).click();
+    await page.getByText(/Hamburguesas/).first().waitFor({ timeout: 8000 });
+    await page.waitForTimeout(400);
   },
 
   async abrirModificadores(page) {
@@ -194,6 +266,10 @@ const ACCIONES = {
 
   async abrirMesas(page) {
     await page.getByText(/comedor/i).first().click();
+    /* Con una cuenta elegida, el panel derecho enseña lo que la mesa lleva
+       consumido; vacío, la mitad de la captura es un letrero. */
+    await page.getByText(/^Mesa 4$/).first().click().catch(() => {});
+    await page.waitForTimeout(800);
   },
 
   async cortarRed(page) {
@@ -270,6 +346,22 @@ async function entrarAlPos(page) {
   await page.waitForTimeout(800);
 }
 
+/* La pantalla de cocina se vincula como dispositivo, con las credenciales de
+   la caja de la semilla. En desarrollo el formulario viene prellenado con la
+   caja del fixture de Knock-Out; se sobreescribe, que si no la cocina enseña
+   las comandas del negocio equivocado — o ninguna. */
+async function entrarAlKds(page) {
+  await page.goto(KDS, { waitUntil: "networkidle" });
+  const id = page.getByLabel(/identificador del dispositivo/i);
+  if (await id.isVisible().catch(() => false)) {
+    await id.fill(CAJA.email);
+    await page.getByLabel(/clave del dispositivo/i).fill(CAJA.password);
+    await page.getByRole("button", { name: /vincular pantalla/i }).click();
+    await page.waitForLoadState("networkidle");
+    await page.waitForTimeout(1500);
+  }
+}
+
 /* El panel es una sesión aparte: correo y contraseña de la dueña. Sin esto las
    cinco tomas de /admin salen siendo la pantalla de inicio de sesión. */
 async function entrarAlPanel(page) {
@@ -300,6 +392,7 @@ async function capturar(page, toma) {
      Conclusión práctica: cada `goto` al POS devuelve al selector de empleados,
      así que hay que volver a entrar. `entrarAlPos` comprueba antes de actuar,
      de modo que llamarla de más no cuesta nada. */
+  if (toma.app === "kds") await entrarAlKds(page);
   if (toma.app === "pos") {
     await entrarAlPos(page);
     /* `entrarAlPos` empieza yendo a "/", así que si la toma pedía otra ruta hay
@@ -412,6 +505,18 @@ async function aWebp() {
 
 const navegador = await chromium.launch();
 const contexto = await navegador.newContext({ deviceScaleFactor: 2, locale: "es-MX" });
+
+/* La pantalla de cocina es un cliente del hub: en producción el escritorio le
+   inyecta la dirección del gateway de la caja por `window.__VIM_SUPABASE_URL`.
+   Aquí no hay escritorio, así que se inyecta la del Supabase local, que es
+   donde vive el negocio de la semilla. El POS lee la misma variable y ya
+   apunta ahí por su .env.local, así que no le cambia nada. */
+const ANON_LOCAL = process.env.VIM_ANON_LOCAL
+  ?? (await readFile(path.resolve(import.meta.dirname, "../../apps/pos/.env.local"), "utf8")).match(/NEXT_PUBLIC_SUPABASE_ANON_KEY=(\S+)/)?.[1];
+await contexto.addInitScript(({ url, anon }) => {
+  window.__VIM_SUPABASE_URL = url;
+  window.__VIM_SUPABASE_ANON = anon;
+}, { url: process.env.VIM_SUPABASE_LOCAL ?? "http://127.0.0.1:54321", anon: ANON_LOCAL });
 const page = await contexto.newPage();
 
 await mkdir(SALIDA, { recursive: true });
@@ -425,7 +530,11 @@ await entrarAlPos(page);
 await entrarAlPanel(paginaPanel);
 
 let hechas = 0;
-for (const toma of TOMAS) {
+/* `node render.mjs pos-arqueo kds` captura solo esas tomas. Sirve para repetir
+   una sin rehacer las quince, o para tomar el arqueo después de limpiar la
+   caja. */
+const SOLO = process.argv.slice(2);
+for (const toma of TOMAS.filter((t) => !SOLO.length || SOLO.includes(t.id))) {
   const hoja = toma.app === "admin" ? paginaPanel : page;
   if (await capturar(hoja, toma)) hechas++;
   if (toma.accion === "cortarRed") await hoja.context().setOffline(false);

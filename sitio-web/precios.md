@@ -129,9 +129,9 @@ Todas, siempre. Llegan solas a tu caja y no hay que agendar a nadie ni pagar la 
 
 Copia diaria en tu local y copia fuera de él. Sin que tengas que acordarte.
 
-![Listado de insumos con existencias y mermas.](https://vimpos.com.mx/assets/img/capturas/admin-inventario.webp)
+![Inventario con cada insumo, su existencia, su mínimo y el aviso cuando anda bajo.](https://vimpos.com.mx/assets/img/capturas/admin-inventario.webp)
 
-_Desde el plan Negocio: cuánto insumo entró, cuánto salió con las ventas y cuánto se fue en mermas. Es donde se ve el dinero que se pierde sin que nadie lo apunte._
+_Desde el plan Negocio: cada insumo con su existencia, su mínimo y el aviso cuando anda bajo. Lo que se descuenta sale de la receta de cada platillo, no de un conteo a mano._
 
 _Si necesitas más_
 

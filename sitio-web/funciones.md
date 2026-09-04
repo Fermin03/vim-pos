@@ -54,9 +54,9 @@ _La cocina_
 
 Cada producto sabe de qué estación sale. Las bebidas se imprimen en la barra y la comida en cocina, en lugar de un papel largo que hay que leer entero para encontrar lo tuyo.
 
-![Pantalla de cocina al vincularse con la caja: se enlaza una vez por la red del local y después recibe ahí cada comanda.](https://vimpos.com.mx/assets/img/capturas/kds.webp)
+![Pantalla de cocina con siete comandas activas, cada una con su tiempo, el término de la carne, los extras y las notas.](https://vimpos.com.mx/assets/img/capturas/kds.webp)
 
-_La pantalla de cocina al vincularse con la caja: se enlaza una sola vez por la red del local y después recibe ahí cada comanda. Si tu cocina prefiere papel, la misma comanda sale por la impresora de cada área; las dos cosas conviven._
+_La pantalla de cocina: cada comanda con su tiempo, el término, los extras y la nota del cajero, y la más vieja en rojo. Si tu cocina prefiere papel, la misma comanda sale por la impresora de cada área; las dos cosas conviven._
 
 ### Pantalla o papel
 
@@ -76,9 +76,9 @@ _Comedor_
 
 Para el restaurante con meseros: el mapa del comedor, la cuenta que crece mientras la mesa sigue ahí, y el pedido que sale a cocina cuando se toma y no cuando se paga.
 
-![Mapa de mesas del comedor con el estado de cada una.](https://vimpos.com.mx/assets/img/capturas/pos-mesas.webp)
+![Las mesas abiertas del comedor con su consumo y su tiempo, y la cuenta de la mesa elegida con todo lo que pidió.](https://vimpos.com.mx/assets/img/capturas/pos-mesas.webp)
 
-_El mapa del comedor por secciones: qué mesa está ocupada, cuál lleva más tiempo y cuánto va consumido._
+_Las mesas abiertas del comedor: cuánto lleva cada una, cuánto va consumido, y la cuenta de la mesa elegida con todo lo que pidió, lista para cobrar o para seguir agregando._
 
 ### A cocina antes de cobrar
 
@@ -120,9 +120,9 @@ _Reportes y corte_
 
 El corte Z está calcado del formato que tu equipo ya lee cada noche, a propósito: quien lo revisa no tiene que reaprender dónde mirar. Y el panel suma catorce reportes para cuando quieras entender algo concreto.
 
-![Corte del turno con el desglose por forma de pago y por tipo de servicio.](https://vimpos.com.mx/assets/img/capturas/pos-arqueo.webp)
+![Arqueo del cierre de turno: efectivo esperado, efectivo contado y la diferencia, con cada forma de pago en su renglón.](https://vimpos.com.mx/assets/img/capturas/pos-arqueo.webp)
 
-_El corte del turno: venta, ticket promedio, efectivo esperado con su fondo, IVA, descuentos y devoluciones. Abajo, el desglose por forma de pago y por tipo de servicio._
+_El arqueo al cerrar el turno: lo que el sistema espera por cada forma de pago, lo que el cajero contó, y la diferencia a la vista. Los 40 pesos que faltan en efectivo no se esconden en el total._
 
 ![Panel del dueño con las ventas del día, el ticket promedio y el top de productos.](https://vimpos.com.mx/assets/img/capturas/admin-dashboard.webp)
 

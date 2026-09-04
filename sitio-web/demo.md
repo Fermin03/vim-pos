@@ -21,7 +21,7 @@ Media hora, sin compromiso y sin presentación. Vemos tu carta, montamos un par 
 
    Con el precio de la página, sin cotización inflada. Si no te sirve, te lo decimos y no insistimos.
 
-![Pantalla principal de la caja con los modos de servicio: comedor, para llevar, pick-up y domicilio.](https://vimpos.com.mx/assets/img/capturas/pos-home.webp)
+![La caja en plena venta: el catálogo por categorías y un ticket en curso con una hamburguesa, papas y refresco.](https://vimpos.com.mx/assets/img/capturas/pos-home.webp)
 
 _Esto es lo que vas a ver en la demostración, con tus productos y tus precios cargados._
 
