@@ -71,13 +71,15 @@ export const config = {
   ],
 };
 
-// Las cuatro de siempre. Van a mano porque una respuesta creada aquí se salta
+// Las cinco de siempre. Van a mano porque una respuesta creada aquí se salta
 // la fase `headers` de vercel.json: el middleware corre antes que todo.
 const SEGURIDAD = {
   'X-Content-Type-Options': 'nosniff',
   'X-Frame-Options': 'SAMEORIGIN',
   'Referrer-Policy': 'strict-origin-when-cross-origin',
   'Permissions-Policy': 'camera=(), microphone=(), geolocation=(), interest-cohort=()',
+  'Content-Security-Policy':
+    "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self' https://pbiaxzvmssjsxdwqrumb.supabase.co; object-src 'none'; base-uri 'self'; frame-ancestors 'self'; form-action 'self'",
   // La misma dirección devuelve HTML o Markdown según lo que pidan. Sin esto,
   // una caché compartida guarda la primera de las dos y se la da a todos.
   Vary: 'Accept, Accept-Encoding',

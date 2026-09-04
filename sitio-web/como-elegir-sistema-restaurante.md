@@ -76,9 +76,7 @@ No hay terminal bancaria integrada. La tarjeta se cobra en tu terminal de siempr
 
 El sistema te ayuda a revisar lo que la app te depositó, pero la liquidación se pega a mano. Si tienes cientos de pedidos diarios por app, eso es trabajo real.
 
-### Si necesitas facturar mañana
-
-El módulo de facturación está en producción. Lo que tarda es lo tuyo: tener a la mano tu Constancia y tu Certificado de Sello Digital. Con eso, se enciende el mismo día. Está explicado en [la página de facturación](https://vimpos.com.mx/facturacion-cfdi).
+Y una que ya salió de esta lista: **facturar**. El módulo está en producción y se enciende el día que traes tu Constancia y tu Certificado de Sello Digital. Está explicado en [la página de facturación](https://vimpos.com.mx/facturacion-cfdi).
 
 ## Y si después de las nueve preguntas te sigue cuadrando
 

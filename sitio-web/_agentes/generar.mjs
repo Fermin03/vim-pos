@@ -479,6 +479,18 @@ function vercelJson() {
       headers: [
         { key: 'X-Content-Type-Options', value: 'nosniff' },
         { key: 'X-Frame-Options', value: 'SAMEORIGIN' },
+        // El sitio no carga nada de fuera: ni scripts, ni tipografías, ni
+        // imágenes. Lo único que sale es la solicitud de demo a la función de
+        // Supabase. `unsafe-inline` en estilos porque las páginas llevan
+        // atributos `style=""`; en scripts no hace falta (el JSON-LD no se
+        // ejecuta). `data:` en imágenes por el SVG en línea del CSS.
+        {
+          key: 'Content-Security-Policy',
+          value:
+            "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; " +
+            "img-src 'self' data:; font-src 'self'; connect-src 'self' https://pbiaxzvmssjsxdwqrumb.supabase.co; " +
+            "object-src 'none'; base-uri 'self'; frame-ancestors 'self'; form-action 'self'",
+        },
         { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
         { key: 'Permissions-Policy', value: 'camera=(), microphone=(), geolocation=(), interest-cohort=()' },
       ],

@@ -116,6 +116,8 @@ export function resolver(ruta, cabeceras = {}) {
         'X-Frame-Options': 'SAMEORIGIN',
         'Referrer-Policy': 'strict-origin-when-cross-origin',
         'Permissions-Policy': 'camera=(), microphone=(), geolocation=(), interest-cohort=()',
+        'Content-Security-Policy':
+          "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self' https://pbiaxzvmssjsxdwqrumb.supabase.co; object-src 'none'; base-uri 'self'; frame-ancestors 'self'; form-action 'self'",
         Vary: 'Accept, Accept-Encoding',
         Link: '<https://vimpos.com.mx/404.md>; rel="alternate"; type="text/markdown"',
         'Cache-Control': 'public, max-age=0, must-revalidate',

@@ -12,7 +12,7 @@ Qué datos te pedimos, para qué los usamos y cómo pedirnos que los borremos. E
 
 **VIM POS**, persona física con actividad empresarial, con RFC **XAXX010101000** y domicilio en Guanajuato, México. Opera bajo la marca **VIM POS**.
 
-Para cualquier cosa de este aviso: [hola@vimpos.com.mx](mailto:hola@vimpos.com.mx) o [WhatsApp hola@vimpos.com.mx](https://wa.me/hola@vimpos.com.mx).
+Para cualquier cosa de este aviso: [hola@vimpos.com.mx](mailto:hola@vimpos.com.mx) o [WhatsApp hola@vimpos.com.mx](https://wa.me/hola@vimpos.com.mx?text=Hola%2C%20tengo%20una%20pregunta%20sobre%20el%20aviso%20de%20privacidad%20de%20VIM%20POS.).
 
 ## Qué datos recabamos
 

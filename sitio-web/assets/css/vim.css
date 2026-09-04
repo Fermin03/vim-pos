@@ -476,7 +476,7 @@ body[data-menu-abierto="true"] { overflow: hidden; }
   gap: var(--sp-8);
   grid-template-columns: 1fr;
 }
-@media (min-width: 700px) { .pie-rejilla { grid-template-columns: 1.4fr 1fr 1fr; } }
+@media (min-width: 700px) { .pie-rejilla { grid-template-columns: 1.6fr 1fr 1fr 1fr; } }
 
 .pie .pie-titulo {
   /* Es un h2 —el nivel que le toca en el esquema del documento— pero se ve
