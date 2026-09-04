@@ -1,6 +1,6 @@
 -- RLS cross-tenant de proveedores, compras, compra_lineas y proveedor_insumo_alias (ADR 0012).
 begin;
-select plan(5);
+select plan(6);
 
 insert into tenants (id, codigo, nombre_comercial, vertical_principal)
 values ('aaaaaaaa-0000-0000-0000-0000000000c0', 'rls-compras-a', 'Tenant A', 'QUICK_SERVICE'),
@@ -37,7 +37,8 @@ select throws_ok(
 select throws_ok(
   $$ insert into compras (tenant_id, sucursal_id, proveedor_id, fecha, subtotal_mxn, iva_mxn, total_mxn, usuario_id, dia_contable)
      values ('bbbbbbbb-0000-0000-0000-0000000000c0', 'bbbbbbbb-0000-0000-0000-0000000000c1', 'bbbbbbbb-0000-0000-0000-0000000000c2', '2026-09-03', 1, 0, 1, '99999999-0000-0000-0000-0000000000c9', '2026-09-03') $$,
-  'P0001', NULL, 'Tenant A no inserta compras del tenant B');
+  'P0001', 'Sucursal bbbbbbbb-0000-0000-0000-0000000000c1 no existe o está eliminada', 'Tenant A no inserta compras del tenant B');
+select is((select count(*)::int from compras), 1, 'La compra del tenant B no se insertó; tenant A sigue viendo solo la suya');
 select is((select count(*)::int from proveedor_insumo_alias), 0, 'Alias vacío y legible por el tenant');
 
 select * from finish();
