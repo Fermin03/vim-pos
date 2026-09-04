@@ -35,7 +35,7 @@ _Por qué funciona_
 
 Un punto de venta en internet es una ventana: lo que ves en pantalla vive en otro lado y cada cobro tiene que viajar hasta allá y volver. Si el camino se corta, la ventana se queda en blanco. Aquí el sistema completo está instalado en la computadora de tu caja, así que el cobro no viaja a ningún lado: se hace ahí mismo.
 
-![La caja con el aviso de que no hay conexión, con el ticket y el catálogo funcionando igual.](https://vimpos.com.mx/assets/img/capturas/pos-sin-conexion.webp)
+![La caja con el aviso de que no hay conexión, con el ticket y el catálogo funcionando igual.](https://vimpos.com.mx/assets/img/capturas/pos-sin-conexion.webp?v=2)
 
 _La caja avisa que no hay internet y sigue cobrando. No hay pantalla de error ni «reintentando»: el aviso es informativo y el turno no se detiene._
 
@@ -82,7 +82,7 @@ _Si algo falla_
 
 Un sistema que vive en tu local también puede fallar. La diferencia está en si se arregla solo o si tienes que cerrar la caja hasta que llegue alguien.
 
-![Arqueo del cierre de turno: efectivo esperado, efectivo contado y la diferencia, con cada forma de pago en su renglón.](https://vimpos.com.mx/assets/img/capturas/pos-arqueo.webp)
+![Arqueo del cierre de turno: efectivo esperado, efectivo contado y la diferencia, con cada forma de pago en su renglón.](https://vimpos.com.mx/assets/img/capturas/pos-arqueo.webp?v=2)
 
 _El arqueo al cerrar el turno: lo que dice el sistema, lo que hay en el cajón y la diferencia. Sale igual haya habido internet o no._
 
