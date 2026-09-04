@@ -16,6 +16,7 @@ Cada archivo dice **qué decía el plan, qué hacemos hoy y por qué**. Manda lo
 | [0010](0010-el-demo-estatico-se-retira.md) | El demo estático se retira; la demo es el producto real | 02/09/2026 |
 | [0011](0011-integracion-apps-de-delivery.md) | Apps de delivery: VIM es el integrador, el comercio solo autoriza su tienda | 02/09/2026 |
 | [0012](0012-compras-y-proveedores.md) | Compras con proveedores y recetas con pantalla; supera D26 y D31 | 03/09/2026 |
+| [0013](0013-el-inventario-viaja-por-movimientos.md) | El inventario viaja por movimientos: la caja los sube, la nube recalcula | 04/09/2026 |
 
 ## Pendientes de escribir
 
