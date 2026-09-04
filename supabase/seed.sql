@@ -453,3 +453,5 @@ BEGIN
 
   RAISE NOTICE 'FIXTURE DEV: María % (PIN 1234); dispositivo %; dueño dueno@knockout.dev / devadmin', v_maria, v_disp_email;
 END $$;
+
+SELECT sembrar_unidades_base('99999999-0000-0000-0000-0000000000aa');
