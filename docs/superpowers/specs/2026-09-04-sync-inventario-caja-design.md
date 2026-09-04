@@ -155,9 +155,9 @@ y para la función nueva.
   Un lote puede contener solo movimientos si no hay ventas pendientes.
 - Tras la respuesta: `marcarMovimientosPushed(ids − rechazados)` con
   `INSERT INTO _vim_mov_ok … ON CONFLICT DO NOTHING`. Los rechazados son los ids que vengan en
-  `_errores` con `tabla = 'movimientos_inventario'`; se reintentan en el siguiente ciclo y, si
-  vuelven a fallar, quedan reportados por `sync-errores.mjs` como hoy (una vez por id, no en cada
-  ciclo: se guarda el id en memoria del proceso para no repetir el reporte).
+  `_errores` con `tabla = 'movimientos_inventario'`; se reintentan en el siguiente ciclo y quedan
+  en el log de la caja como las demás filas rechazadas (el reporte a `sync-errores.mjs` de
+  rechazos persistentes queda para después).
 - `_vim_push_ok` no cambia: un ticket se marca subido con la lógica actual, independientemente
   de sus movimientos.
 
