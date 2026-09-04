@@ -6,14 +6,6 @@
 
 Media hora, sin compromiso y sin presentación. Vemos tu carta, montamos un par de productos tuyos y te dejamos cobrar una venta de prueba en el sistema de verdad. Después preguntas lo que quieras y te decimos qué plan te toca.
 
-## Listo, ya nos llegó
-
-Te escribimos por WhatsApp el mismo día hábil. Si tienes prisa, escríbenos tú y contestamos antes.
-
-[Escríbenos por WhatsApp](https://wa.me/524761273020)
-
-[Ver precios mientras](https://vimpos.com.mx/precios)
-
 ## Qué pasa después de enviar
 
 1. ### Te escribimos por WhatsApp

@@ -548,6 +548,20 @@ test('cada gemelo en Markdown lleva título, resumen y el contenido de su págin
   assert.ok(leer('precios.md').includes('| Sucursales | 1 | 1 | 3 |'), 'la tabla comparativa no sobrevivió');
 });
 
+test('los acordeones conservan su título y lo oculto no viaja al Markdown', () => {
+  // Las preguntas del FAQ y los nombres de giro viven en un <button>, y los
+  // botones se descartan. Sin esta excepción, el gemelo eran ocho respuestas
+  // seguidas que empezaban con «Sí.» sin decir a qué contestaban.
+  const portada = leer('index.md');
+  for (const titulo of ['### ¿De verdad funciona sin internet?', '### ¿Emite facturas?', '### Foodtruck', '### Cadenas']) {
+    assert.ok(portada.includes(titulo), `index.md perdió el título de acordeón «${titulo}»`);
+  }
+  // Cuelgan un nivel por debajo del encabezado de su sección, sea h2 o h3.
+  assert.ok(leer('facturacion-cfdi.md').includes('#### ¿Necesito internet para facturar?'), 'la pregunta no cuelga de su h3');
+  // El acuse del formulario está `hidden` hasta que se envía: no es contenido.
+  assert.ok(!leer('demo.md').includes('Listo, ya nos llegó'), 'demo.md trae el acuse oculto del formulario');
+});
+
 test('llms.txt sigue el formato de llmstxt.org y dice cuándo usar el producto', () => {
   const txt = leer('llms.txt');
   const lineas = txt.split('\n');

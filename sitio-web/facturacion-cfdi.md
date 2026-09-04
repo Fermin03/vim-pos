@@ -86,9 +86,15 @@ _Preguntas_
 
 ### Lo que nos preguntan de la facturación
 
+#### ¿Puedo usar VIM POS sin la facturación?
+
 Sí. La caja, la cocina, las mesas y el inventario no dependen de ella, y hoy es lo que están usando quienes ya tienen el sistema. La facturación se enciende desde el panel el día que la necesites, sin que tengas que cambiar nada.
 
+#### ¿Necesito internet para facturar?
+
 Para timbrar sí: el sello viaja al proveedor autorizado y éste responde. Para _cobrar_ no — eso sigue funcionando sin conexión, y el ticket sale con su código igual. Cuando vuelve la señal, lo pendiente se timbra solo. Está explicado en [qué pasa sin internet](https://vimpos.com.mx/sin-internet).
+
+#### ¿Y si mi sello está por vencer?
 
 Te avisamos antes. De tu sello guardamos cuál es y cuándo vence precisamente para eso: enterarte el día que deja de timbrar es enterarte tarde.
 
