@@ -40,7 +40,7 @@ al mes, más IVA
 - 1 sucursal · 3 cajas
 - Todo lo de Esencial
 - Inventario y control de mermas
-- **Facturación incluida** Muy pronto
+- **Facturación incluida**
 - **Nosotros cargamos tu menú**
 - Te acompañamos el día del arranque
 
@@ -147,15 +147,11 @@ Al mes, más IVA. Comparte turno y comandas con la principal.
 
 ### Facturación
 
-Muy pronto
-
 $349
 
-Al mes, más IVA, y **solo si estás en Esencial**: en Negocio y en Cadena ya va incluida. Está construido y probado; estamos cerrando la activación con el proveedor autorizado. En la demo te damos la fecha real.
+Al mes, más IVA, y **solo si estás en Esencial**: en Negocio y en Cadena ya va incluida. Se enciende desde el panel con tu Constancia y tu sello digital, y ese mismo día tus tickets salen con su código para facturar.
 
 _Facturación_
-
-Muy pronto
 
 ## Tus clientes se facturan solos, desde el ticket
 

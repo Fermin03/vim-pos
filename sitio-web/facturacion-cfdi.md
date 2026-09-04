@@ -1,18 +1,12 @@
-# Facturación CFDI
+# Facturación CFDI 4.0, sin parar la fila
 
 > Autofactura por QR desde el ticket, factura global automática y el periodo lo eliges tú. Qué necesitas dar, qué cuestan los folios y cómo se enciende en tu negocio.
 
 **VIM POS** · punto de venta para restaurantes en México · versión en HTML: https://vimpos.com.mx/facturacion-cfdi
 
-_Facturación_
-
-Muy pronto
-
-# Facturación CFDI 4.0, sin parar la fila
-
 Tu comensal escanea el código del ticket, pone su RFC y recibe su factura por correo. Lo que nadie facturó se junta solo en la factura global del periodo. Tu cajero no vuelve a capturar datos fiscales y tú no vuelves a recibir el mensaje de «¿me pueden facturar lo del sábado?».
 
-Está en producción: timbra con un PAC autorizado por el SAT y el comprobante que recibe tu cliente es un CFDI 4.0 válido. Abajo dice exactamente qué necesitas dar para encenderlo en tu negocio.
+Ya está disponible: timbra con un proveedor autorizado por el SAT y el comprobante que recibe tu cliente es un CFDI 4.0 válido. Abajo dice exactamente qué necesitas dar para encenderlo en tu negocio.
 
 [Pide una demo](https://vimpos.com.mx/demo)
 
@@ -84,7 +78,7 @@ _Dónde está hoy_
 
 ## Qué necesitas para encenderlo
 
-El módulo está en producción: timbrado, factura global y el portal de autofacturación emiten comprobantes reales ante el SAT a través de un PAC autorizado.
+El módulo ya está disponible: timbrado, factura global y el portal de autofacturación emiten comprobantes reales ante el SAT a través de un proveedor autorizado.
 
 Para encenderlo en tu negocio hacen falta tres cosas: tu Constancia de Situación Fiscal, tu Certificado de Sello Digital (el archivo.cer, el.key y su contraseña) y un paquete de folios. El sello se carga una sola vez desde el panel y a partir de ahí cada ticket que lo pida sale timbrado.
 
@@ -92,9 +86,9 @@ _Preguntas_
 
 ### Lo que nos preguntan de la facturación
 
-Sí. La caja, la cocina, las mesas y el inventario no dependen de ella, y hoy es lo que están usando quienes ya tienen el sistema. La facturación se enciende cuando cierre la activación, sin que tengas que cambiar nada.
+Sí. La caja, la cocina, las mesas y el inventario no dependen de ella, y hoy es lo que están usando quienes ya tienen el sistema. La facturación se enciende desde el panel el día que la necesites, sin que tengas que cambiar nada.
 
-Para timbrar sí: el sello viaja al PAC y el PAC responde. Para _cobrar_ no — eso sigue funcionando sin conexión, y el ticket sale con su código igual. Cuando vuelve la señal, lo pendiente se timbra solo. Está explicado en [qué pasa sin internet](https://vimpos.com.mx/sin-internet).
+Para timbrar sí: el sello viaja al proveedor autorizado y éste responde. Para _cobrar_ no — eso sigue funcionando sin conexión, y el ticket sale con su código igual. Cuando vuelve la señal, lo pendiente se timbra solo. Está explicado en [qué pasa sin internet](https://vimpos.com.mx/sin-internet).
 
 Te avisamos antes. De tu sello guardamos cuál es y cuándo vence precisamente para eso: enterarte el día que deja de timbrar es enterarte tarde.
 
