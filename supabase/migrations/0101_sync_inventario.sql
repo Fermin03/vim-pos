@@ -20,6 +20,8 @@ RETURNS integer LANGUAGE sql IMMUTABLE AS $$
     WHEN 'AJUSTE_POSITIVO' THEN 1 WHEN 'TRANSFERENCIA_ENTRADA' THEN 1
     ELSE -1 END;
 $$;
+REVOKE EXECUTE ON FUNCTION _vim_signo_movimiento(movimiento_inventario_tipo) FROM public, anon, authenticated;
+GRANT EXECUTE ON FUNCTION _vim_signo_movimiento(movimiento_inventario_tipo) TO service_role;
 
 -- ---------------------------------------------------------------------------
 -- 2. Aplicar movimientos de la caja: insertar los nuevos y mover existencias
