@@ -91,10 +91,20 @@ function desescapar(s) {
 // `solo-lectores` NO se salta: es contenido escrito para quien no ve la
 // pantalla —títulos de sección, pies de tabla— y un agente está exactamente en
 // esa situación. Saltarlo dejaba la tabla comparativa de precios sin encabezado.
+// El atributo `hidden` también se salta: es lo que la página guarda para
+// después (el acuse del formulario, un error vacío). En la página no se ve, y
+// en el Markdown salía como si fuera contenido.
 const saltar = (nodo) =>
   IGNORADOS.has(nodo.nombre) ||
   nodo.atributos?.['aria-hidden'] === 'true' ||
+  nodo.atributos?.hidden !== undefined ||
   /\b(trampa|monitor-barra)\b/.test(nodo.atributos?.class || '');
+
+// El botón de un acordeón es la excepción a «los botones no dicen nada»: es la
+// pregunta del FAQ o el nombre del giro. Sin él, el Markdown eran ocho
+// respuestas seguidas que empezaban con «Sí.» sin decir a qué.
+const esTituloDeAcordeon = (nodo) =>
+  nodo.nombre === 'button' && /\bacordeon-boton\b/.test(nodo.atributos?.class || '');
 
 export function convertir(html, { base = 'https://vimpos.com.mx' } = {}) {
   const arbol = analizar(html);
@@ -181,18 +191,27 @@ export function convertir(html, { base = 'https://vimpos.com.mx' } = {}) {
   }
 
   // ── Bloques ───────────────────────────────────────────────────────────────
+  // Nivel del último encabezado visto. El título de un acordeón se cuelga un
+  // nivel por debajo del encabezado de su sección, sea h2 o h3.
+  let ultimoNivel = 1;
+
   function bloques(nodo) {
     if (nodo.nombre === '#texto') {
       const t = limpiar(desescapar(nodo.texto));
       return t ? [t] : [];
+    }
+    if (esTituloDeAcordeon(nodo)) {
+      const t = limpiar(nodo.hijos.map(enLinea).join(''));
+      return t ? ['#'.repeat(Math.min(ultimoNivel + 1, 6)) + ' ' + t] : [];
     }
     if (saltar(nodo)) return [];
 
     const n = nodo.nombre;
 
     if (/^h[1-6]$/.test(n)) {
+      ultimoNivel = Number(n[1]);
       const t = limpiar(enLinea(nodo));
-      return t ? ['#'.repeat(Number(n[1])) + ' ' + t] : [];
+      return t ? ['#'.repeat(ultimoNivel) + ' ' + t] : [];
     }
 
     if (n === 'p' || n === 'figcaption' || n === 'caption' || n === 'dd' || n === 'dt') {

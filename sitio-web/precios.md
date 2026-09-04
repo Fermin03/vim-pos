@@ -40,7 +40,7 @@ al mes, más IVA
 - 1 sucursal · 3 cajas
 - Todo lo de Esencial
 - Inventario y control de mermas
-- **Facturación incluida**
+- **Facturación incluida · 20 folios al mes**
 - **Nosotros cargamos tu menú**
 - Te acompañamos el día del arranque
 
@@ -57,7 +57,7 @@ al mes, más IVA
 - 3 sucursales · cajas ilimitadas
 - Todo lo de Negocio
 - Un reporte que suma todas
-- Facturación incluida, con más folios
+- Facturación incluida · 40 folios al mes
 - Menú compartido o propio por sucursal
 - Visita presencial el día del arranque
 
@@ -211,13 +211,23 @@ _Preguntas_
 
 ## Lo que nos preguntan del precio
 
+### ¿Hay contrato forzoso?
+
 No. Es mes a mes y lo cancelas cuando quieras. Si pagas el año por adelantado para aprovechar el descuento, ése sí es un año.
+
+### ¿Puedo cambiar de plan después?
 
 Sí, para arriba o para abajo, y sin volver a configurar nada. Lo normal es abrir una segunda caja o una segunda sucursal y subir por eso.
 
+### ¿Me cobran comisión por cada venta?
+
 No. Pagas tu plan y ya. Vendas lo que vendas, el precio es el mismo — que es justamente lo que no pasa cuando el punto de venta también te procesa la tarjeta.
 
+### ¿Y si soy un negocio de una sola caja?
+
 Ése es Esencial. Llevas el mismo sistema completo, incluido cobrar sin internet; la diferencia es que la carga del menú la haces tú siguiendo una guía, en vez de que la hagamos nosotros contigo.
+
+### ¿Cuánto tarda en estar funcionando?
 
 Alrededor de un día: cargar el menú, dejar configurado lo fiscal y las tres horas de capacitación con tu equipo. Se agenda para que caiga en tu día flojo, no en viernes.
 

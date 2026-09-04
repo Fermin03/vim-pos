@@ -4,7 +4,7 @@
 
 **VIM POS** · punto de venta para restaurantes en México · versión en HTML: https://vimpos.com.mx/
 
-Caja, cocina, mesas, inventario y facturación en un solo sistema. La implementación, la carga de tu menú y la capacitación van incluidas, y el precio está publicado en esta página. Del otro lado no hay un distribuidor: está quien lo construyó.
+Caja, cocina, mesas, inventario y facturación en un solo sistema. La implementación va incluida en los tres planes; desde Negocio, cargamos tu menú y capacitamos a tu equipo. El precio está publicado en esta página. Del otro lado no hay un distribuidor: está quien lo construyó.
 
 [Pide una demo](https://vimpos.com.mx/demo)
 
@@ -88,19 +88,31 @@ _Para tu giro_
 
 El sistema se configura según tu giro: cambian los modos de servicio, las pantallas y lo que se imprime. Donde hay un límite, está escrito.
 
+### Quick Service
+
 Mostrador y pickup. Cola rápida, comanda directa a cocina y modos de servicio para separar lo que se come aquí de lo que se lleva — que además cambia el IVA.
+
+### Foodtruck
 
 Turno por evento y operación sin señal en la calle, que es donde el argumento del producto deja de ser teórico. Una sola caja, un solo turno, cierre al terminar.
 
+### Café & Bar
+
 Cuentas abiertas en barra, modificadores con precio y cierres por turno. La cuenta se queda abierta hasta que el cliente pide, no hasta que se cierra el sistema.
+
+### Full Service
 
 Mapa de mesas, meseros y propinas.
 
 **El límite:** no hay app de mesero en tableta. Se opera desde la caja.
 
+### Dark Kitchen
+
 Varias marcas virtuales desde una cocina, y conciliación de lo que te liquidan Rappi, Uber y DiDi contra lo que registró tu caja.
 
 **El límite:** la liquidación se pega a mano; todavía no se sube el archivo.
+
+### Cadenas
 
 Varias sucursales con catálogo propio o compartido, franquicias, y un consolidado que suma todo sin tener que abrir cada una.
 
@@ -145,7 +157,7 @@ _El que recomendamos_
 $999
 
 - 1 sucursal · 3 cajas
-- Facturación incluida
+- Facturación incluida · 20 folios al mes
 - Carga de tu menú y capacitación
 
 ### Cadena
@@ -162,23 +174,39 @@ _Preguntas frecuentes_
 
 ## Lo que nos preguntan antes de la demo
 
+### ¿De verdad funciona sin internet?
+
 Sí. El programa se instala en la computadora de tu caja y trabaja ahí, así que cobrar, imprimir y mandar a cocina no pasan por internet en ningún momento. La señal solo hace falta para respaldar tus ventas y para que puedas ver tus números desde fuera del local.
+
+### ¿Qué necesito comprar?
 
 Una computadora con Windows, una impresora de tickets, un cajón de dinero y el módem que ya tienes. VIM no vende equipo: te decimos qué modelos funcionan y lo compras donde te salga mejor.
 
+### ¿Puedo traer mi menú de otro sistema?
+
 Sí. Descargas tu menú del sistema que usas hoy y lo pegas tal cual. Si el formato no cuadra, tráete el archivo a la demo y lo vemos juntos.
+
+### ¿Emite facturas?
 
 Sí. Factura global del periodo, timbrado individual de cualquier ticket y portal de autofacturación por QR, con CFDI 4.0 timbrado por un proveedor autorizado por el SAT. Los folios se pagan aparte; el precio está en la página de precios.
 
+### ¿Cuánto tarda la implementación?
+
 Alrededor de un día: carga del menú, configuración y tres horas de capacitación. En el plan Esencial lo haces tú con una guía; desde Negocio lo hacemos nosotros y te acompañamos el día del arranque.
+
+### ¿Y si se va la luz o alguien cierra el programa?
 
 El programa se queda junto al reloj de Windows y se vuelve a abrir solo si alguien lo cierra. Guarda copias de tus ventas por su cuenta, y las que no alcanzaron a subir suben en cuanto vuelve la señal.
 
+### ¿Funciona con varias sucursales?
+
 Sí. Cada sucursal opera con su propia caja y su propio turno, y el panel suma todo en un reporte consolidado. El catálogo puede ser común o propio de cada una.
+
+### ¿Puedo cobrar con tarjeta desde el sistema?
 
 No. La tarjeta se registra como forma de pago para que el corte cuadre, pero el cobro lo haces con tu terminal bancaria de siempre. No hay terminal integrada y preferimos decirlo antes de que lo descubras instalando.
 
-## Te lo enseñamos en 20 minutos, con tu menú.
+## Te lo enseñamos en media hora, con tu menú.
 
 Sin presentación ni compromiso. Traes tu carta, la cargamos y ves cómo se ve tu propio negocio en pantalla.
 
