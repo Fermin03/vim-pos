@@ -78,7 +78,7 @@ El sistema te ayuda a revisar lo que la app te depositó, pero la liquidación s
 
 ### Si necesitas facturar mañana
 
-El módulo de facturación está construido y probado, pero estamos cerrando la activación con el PAC y todavía no lo encendemos. Está explicado en [la página de facturación](https://vimpos.com.mx/facturacion-cfdi). Si facturar es tu urgencia de esta semana, hoy no llegamos.
+El módulo de facturación está en producción. Lo que tarda es lo tuyo: tener a la mano tu Constancia y tu Certificado de Sello Digital. Con eso, se enciende el mismo día. Está explicado en [la página de facturación](https://vimpos.com.mx/facturacion-cfdi).
 
 ## Y si después de las nueve preguntas te sigue cuadrando
 

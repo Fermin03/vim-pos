@@ -1,7 +1,16 @@
 # 0009 — El CFDI está construido y NO está activado
 
-**Fecha:** 31 de agosto de 2026 · **Estado:** vigente · **Revisar antes de:** vender a un cliente
-que facture
+**Fecha:** 31 de agosto de 2026 · **Estado:** SUPERADO el 3 de septiembre de 2026 · se conserva como
+historia de por qué el módulo estuvo apagado y qué se comprobó al encenderlo
+
+> **Superado (3 sep 2026).** Facturama de producción contratado (Multiemisor activo), secrets
+> puestos y verificados, sello de Knock-Out (RFC de Fermín) cargado, y probado con comprobantes
+> reales: timbrado desde el admin (KO1C-2026-000109) y desde el portal público
+> (KO1C-2026-000130), correo con XML y PDF, descarga y archivo en Storage, y **cancelación
+> confirmada por el SAT** con acuse (`Cancelado sin aceptación`). Lo que se corrigió ese día:
+> archivo de XML/PDF/acuse (0098 + `descargar-cfdi`), hora del PAC sin zona, ruta de cancelación
+> (`/api-lite/cfdis/{id}?motive=`), CORS del portal. Detalle en
+> `docs/integraciones/facturama/02-vimpos-y-facturama.md` y `03-activacion-produccion.md`.
 
 ## Por qué existe este documento
 

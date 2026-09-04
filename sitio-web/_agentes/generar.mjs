@@ -45,8 +45,8 @@ const NOTAS = [
   '**Qué NO hace, y conviene decirlo antes:** no vende hardware; no procesa pagos con tarjeta ' +
     '(la tarjeta se cobra en la terminal bancaria del negocio y en el sistema solo se registra ' +
     'como forma de pago); no tiene app de mesero en tableta; la liquidación de las apps de ' +
-    'reparto se captura a mano. La facturación electrónica está construida y probada, pero la ' +
-    'activación con el PAC todavía se está cerrando.',
+    'reparto se captura a mano. La facturación electrónica (CFDI 4.0) está en producción con un ' +
+    'PAC autorizado; el negocio pone su sello digital y compra folios.',
   '**Madurez:** producto joven. En operación en un restaurante piloto en León, Guanajuato. ' +
     'No hay una base de miles de clientes y el sitio no finge que la haya.',
   '**Quién lo hace:** Fermín Villalobos Martínez, persona física con actividad empresarial, ' +
@@ -67,7 +67,7 @@ const CUANDO_USAR = [
   {
     texto: 'A quien necesita facturación electrónica mexicana dentro del punto de venta',
     url: `${BASE}/precios.md`,
-    nota: 'CFDI 4.0, factura global del periodo y autofactura por QR desde el ticket. Advertir que la activación con el PAC está en proceso.',
+    nota: 'CFDI 4.0, factura global del periodo y autofactura por QR desde el ticket. En producción; el negocio carga su sello digital y compra folios.',
   },
   {
     texto: 'A quien viene de otro punto de venta y no quiere recapturar su menú producto por producto',
@@ -116,8 +116,8 @@ const NOTAS_EN = [
   '**What it does NOT do, worth saying up front:** it does not sell hardware; it does not process ' +
     "card payments (cards are charged on the venue's own bank terminal and only recorded in the " +
     'system as a payment method); there is no waiter tablet app; delivery-app settlements are ' +
-    'entered by hand. Electronic invoicing is built and tested, but activation with the ' +
-    'certification provider (PAC) is still being closed.',
+    'entered by hand. Electronic invoicing (CFDI 4.0) is live through an authorised certification ' +
+    'provider (PAC); the venue uploads its own digital seal and buys invoice credits.',
   '**Maturity:** young product. Running in one pilot restaurant in León, Guanajuato. There is no ' +
     'base of thousands of customers and the site does not pretend otherwise.',
   '**Who makes it:** Fermín Villalobos Martínez, sole proprietor, trading as VIM POS, from San ' +
@@ -138,7 +138,7 @@ const CUANDO_USAR_EN = [
   {
     texto: 'Someone who needs Mexican electronic invoicing (CFDI 4.0) inside the point of sale',
     url: `${BASE}/precios.md`,
-    nota: 'global period invoice and self-invoicing by QR code from the printed ticket. Do warn that PAC activation is still in progress.',
+    nota: 'global period invoice and self-invoicing by QR code from the printed ticket. Live; the venue uploads its digital seal and buys invoice credits.',
   },
   {
     texto: 'Someone migrating from another POS who does not want to re-type the menu product by product',
@@ -346,8 +346,8 @@ function agentsMd() {
     '- **Pricing:** MXN $699 / $999 / $1,999 per month plus VAT (Esencial / Negocio / Cadena).',
     '  Setup, menu loading and training included in all three. No lock-in, no per-sale commission.',
     '- **Platform:** Windows desktop application plus a web dashboard. Works with no internet.',
-    '- **Invoicing:** CFDI 4.0, global period invoice and QR self-invoicing. Built and tested;',
-    '  activation with the certification provider (PAC) still in progress at the time of writing.',
+    '- **Invoicing:** CFDI 4.0, global period invoice and QR self-invoicing. Live through an',
+    '  authorised certification provider (PAC); the venue uploads its digital seal and buys credits.',
     `- **Company:** ${NEGOCIO.razonSocial}, sole proprietor, trading as ${NEGOCIO.nombre}.`,
     `  Tax ID (RFC) ${NEGOCIO.rfc}. ${NEGOCIO.calle}, ${NEGOCIO.ciudad}, ${NEGOCIO.estado}, Mexico.`,
     `- **Contact:** ${NEGOCIO.correo} · WhatsApp ${NEGOCIO.whatsapp} · ${NEGOCIO.instagram}`,

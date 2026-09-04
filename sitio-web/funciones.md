@@ -180,7 +180,7 @@ Muy pronto
 
 El comensal escanea el código del ticket, pone sus datos y recibe su **CFDI 4.0** por correo. Nadie en el mostrador captura un RFC ni abre otro programa. Va incluida desde el plan Negocio.
 
-El módulo cubre las tres cosas que un restaurante necesita ante el SAT: el **timbrado** de cada ticket que pida factura, la **factura global** con el resto de las ventas del día, y el portal de **autofacturación** por QR donde el cliente hace el trámite solo. Está construido y probado; estamos cerrando la activación con el PAC —el proveedor autorizado de certificación—, así que todavía no lo encendemos.
+El módulo cubre las tres cosas que un restaurante necesita ante el SAT: el **timbrado** de cada ticket que pida factura, la **factura global** con el resto de las ventas del día, y el portal de **autofacturación** por QR donde el cliente hace el trámite solo. Está en producción: los comprobantes se timbran con un PAC autorizado por el SAT y se archivan con su XML y su PDF.
 
 [Cómo funciona la facturación](https://vimpos.com.mx/facturacion-cfdi)
 

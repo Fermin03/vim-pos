@@ -1,6 +1,6 @@
 # Facturación CFDI
 
-> Autofactura por QR desde el ticket, factura global automática y el periodo lo eliges tú. Qué necesitas dar, qué cuestan los folios y qué falta para encenderlo.
+> Autofactura por QR desde el ticket, factura global automática y el periodo lo eliges tú. Qué necesitas dar, qué cuestan los folios y cómo se enciende en tu negocio.
 
 **VIM POS** · punto de venta para restaurantes en México · versión en HTML: https://vimpos.com.mx/facturacion-cfdi
 
@@ -12,7 +12,7 @@ Muy pronto
 
 Tu comensal escanea el código del ticket, pone su RFC y recibe su factura por correo. Lo que nadie facturó se junta solo en la factura global del periodo. Tu cajero no vuelve a capturar datos fiscales y tú no vuelves a recibir el mensaje de «¿me pueden facturar lo del sábado?».
 
-El módulo está construido y probado. Estamos cerrando la activación con el PAC —el proveedor autorizado de certificación—, así que todavía no lo encendemos. Abajo dice exactamente qué falta.
+Está en producción: timbra con un PAC autorizado por el SAT y el comprobante que recibe tu cliente es un CFDI 4.0 válido. Abajo dice exactamente qué necesitas dar para encenderlo en tu negocio.
 
 [Pide una demo](https://vimpos.com.mx/demo)
 
@@ -82,11 +82,11 @@ Precios más IVA. La tabla completa de los tres planes está en la [página de p
 
 _Dónde está hoy_
 
-## Qué falta para encenderlo
+## Qué necesitas para encenderlo
 
-El módulo está construido y probado de punta a punta: timbrado, factura global y el portal de autofacturación. Lo que se emite hoy son comprobantes de prueba, y por eso no lo anunciamos como disponible.
+El módulo está en producción: timbrado, factura global y el portal de autofacturación emiten comprobantes reales ante el SAT a través de un PAC autorizado.
 
-Lo que falta es cerrar la activación con el PAC. En una demo te decimos la fecha real; no la publicamos aquí hasta que sea firme, porque una fecha que se mueve es peor que no dar ninguna.
+Para encenderlo en tu negocio hacen falta tres cosas: tu Constancia de Situación Fiscal, tu Certificado de Sello Digital (el archivo.cer, el.key y su contraseña) y un paquete de folios. El sello se carga una sola vez desde el panel y a partir de ahí cada ticket que lo pida sale timbrado.
 
 _Preguntas_
 
