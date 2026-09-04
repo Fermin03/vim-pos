@@ -9784,6 +9784,10 @@ export type Database = {
         }
         Returns: string
       }
+      anular_compra: {
+        Args: { p_compra_id: string; p_motivo: string }
+        Returns: undefined
+      }
       aplicar_descuento_manual: {
         Args: {
           p_autorizacion_pin_id: string
@@ -10341,6 +10345,7 @@ export type Database = {
         }
         Returns: Json
       }
+      registrar_compra: { Args: { p_compra: Json }; Returns: string }
       registrar_no_entrega_delivery: {
         Args: {
           p_asignacion_id: string
