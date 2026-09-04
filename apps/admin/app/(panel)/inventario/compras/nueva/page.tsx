@@ -44,7 +44,6 @@ export default function NuevaCompraPage() {
   const [cfdi, setCfdi] = useState<CfdiRecibido | null>(null);
   const [proveedorSugerido, setProveedorSugerido] = useState<{ rfc: string; nombre: string } | null>(null);
   const [duplicada, setDuplicada] = useState<{ id: string; folio: string } | null>(null);
-  const [aliases, setAliases] = useState<Alias[]>([]);
   const [filas, setFilas] = useState<Fila[]>([filaVacia()]);
   const [avisoArchivo, setAvisoArchivo] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -56,21 +55,6 @@ export default function NuevaCompraPage() {
       .catch((e) => setError(mensajeError(e, "No se pudieron cargar los catálogos")));
     supabase.from("tenants").select("rfc").maybeSingle().then(({ data }) => setRfcNegocio(((data as { rfc?: string | null } | null)?.rfc) ?? null));
   }, []);
-
-  useEffect(() => {
-    if (!proveedorId) { setAliases([]); return; }
-    listarAliases(proveedorId).then(setAliases).catch(() => setAliases([]));
-  }, [proveedorId]);
-
-  // Cuando llegan los alias del proveedor, empareja las filas del XML que aún no tienen insumo.
-  useEffect(() => {
-    if (!cfdi || aliases.length === 0) return;
-    setFilas((prev) => prev.map((f) => {
-      if (f.insumoId || !f.claveOrigen) return f;
-      const a = aliases.find((x) => x.claveOrigen === f.claveOrigen);
-      return a ? { ...f, insumoId: a.insumoId, unidadId: a.unidadId, factorTexto: String(a.factor), emparejado: true } : f;
-    }));
-  }, [aliases, cfdi]);
 
   const insumoDe = (id: string) => insumos.find((i) => i.id === id);
   const unidadDe = (id: string) => unidades.find((u) => u.id === id);
@@ -95,11 +79,17 @@ export default function NuevaCompraPage() {
     if (prov) setProveedorId(prov.id);
     else { setProveedorId(""); setProveedorSugerido({ rfc: c.emisor.rfc, nombre: c.emisor.nombre }); }
 
+    // Se piden los alias del proveedor recién resuelto (no del estado, que puede ir retrasado)
+    // para emparejar las filas del XML desde el primer render, aunque sea la misma factura
+    // que ya se leyó antes sin recargar la página.
+    const alias = prov ? await listarAliases(prov.id).catch(() => [] as Alias[]) : [];
     setFilas(c.conceptos.map((con) => {
+      const a = alias.find((x) => x.claveOrigen === con.claveOrigen);
       const unidadProv = unidadPorCodigo(CLAVE_SAT_A_CODIGO[con.claveUnidad] ?? "");
       return {
-        descripcionOrigen: con.descripcion, claveOrigen: con.claveOrigen, emparejado: false,
-        insumoId: "", cantidadTexto: String(con.cantidad), unidadId: unidadProv?.id ?? "", factorTexto: "1",
+        descripcionOrigen: con.descripcion, claveOrigen: con.claveOrigen, emparejado: !!a,
+        insumoId: a?.insumoId ?? "", cantidadTexto: String(con.cantidad),
+        unidadId: a?.unidadId ?? unidadProv?.id ?? "", factorTexto: a ? String(a.factor) : "1",
         importeTexto: String(con.importeSinIva), omitir: false,
       };
     }));
@@ -127,7 +117,7 @@ export default function NuevaCompraPage() {
     const f = filas[i]!;
     const insumo = insumoDe(f.insumoId);
     const sugerido = factorSugerido(unidadDe(unidadId), insumo ? unidadDe(insumo.unidadId) : undefined, conversiones);
-    set(i, { unidadId, factorTexto: sugerido == null ? f.factorTexto : String(sugerido) });
+    set(i, { unidadId, factorTexto: sugerido == null ? f.factorTexto : String(sugerido), emparejado: false });
   }
 
   const capturas: (LineaCaptura | null)[] = filas.map((f) => {
