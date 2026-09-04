@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { Button } from "@vim/ui/styles";
 import { PageBody, PageHeader } from "../../components/page-header";
 import {
@@ -176,9 +177,13 @@ export default function InventarioPage() {
            siembra sus unidades), pero el aviso se queda: si el dato vuelve a
            faltar por lo que sea, la pantalla lo dice en vez de callarse. */
         right={
-          <Button onClick={nuevo} disabled={unidades.length === 0} title={unidades.length === 0 ? "Faltan las unidades de medida de tu negocio" : undefined}>
-            Nuevo insumo
-          </Button>
+          <div className="flex gap-2">
+            <Link href="/inventario/compras" className="inline-flex h-11 items-center rounded border border-line-strong px-4 text-sm font-semibold text-ink-2 hover:bg-hover">Compras</Link>
+            <Link href="/inventario/proveedores" className="inline-flex h-11 items-center rounded border border-line-strong px-4 text-sm font-semibold text-ink-2 hover:bg-hover">Proveedores</Link>
+            <Button onClick={nuevo} disabled={unidades.length === 0} title={unidades.length === 0 ? "Faltan las unidades de medida de tu negocio" : undefined}>
+              Nuevo insumo
+            </Button>
+          </div>
         }
       />
       <PageBody>
@@ -377,7 +382,7 @@ function ModalMovimiento({
   onHecho: () => void;
   onCerrar: () => void;
 }) {
-  const [tipo, setTipo] = useState<TipoMovimientoUI>("ENTRADA_COMPRA");
+  const [tipo, setTipo] = useState<TipoMovimientoUI>("MERMA");
   const [sucursalId, setSucursalId] = useState(sucursales[0]?.id ?? "");
   const [cantidad, setCantidad] = useState("");
   const [costo, setCosto] = useState(String(insumo.costoUnitario || ""));
@@ -403,7 +408,7 @@ function ModalMovimiento({
         insumoId: insumo.id,
         tipo,
         cantidad: cant,
-        costoUnitario: tipo === "ENTRADA_COMPRA" ? Number(costo || 0) || null : null,
+        costoUnitario: tipo === "AJUSTE_POSITIVO" ? Number(costo || 0) || null : null,
         motivo: motivo.trim() || undefined,
       });
       onHecho();
@@ -429,6 +434,7 @@ function ModalMovimiento({
             </button>
           ))}
         </div>
+        <p className="mb-3 text-[12px] text-ink-3">Las entradas por compra se registran en Compras.</p>
 
         {sucursales.length > 1 && (
           <div className="mb-3">
@@ -444,9 +450,9 @@ function ModalMovimiento({
             <label className={label} htmlFor="m-cant">Cantidad ({insumo.unidadSimbolo})</label>
             <input id="m-cant" className={input} value={cantidad} inputMode="decimal" autoFocus onChange={(e) => setCantidad(e.target.value.replace(/[^0-9.]/g, ""))} placeholder="0" />
           </div>
-          {tipo === "ENTRADA_COMPRA" && (
+          {tipo === "AJUSTE_POSITIVO" && (
             <div>
-              <label className={label} htmlFor="m-costo">Costo unitario</label>
+              <label className={label} htmlFor="m-costo">Costo unitario · opcional</label>
               <input id="m-costo" className={input} value={costo} inputMode="decimal" onChange={(e) => setCosto(e.target.value.replace(/[^0-9.]/g, ""))} placeholder="0.00" />
             </div>
           )}
