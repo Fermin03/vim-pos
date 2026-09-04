@@ -211,9 +211,25 @@ Debajo, los tres límites con el valor del plan en gris y el override editable.
 ### 5.5 Migración `0102_platform_modulos_limites.sql`
 
 - `CREATE TABLE tenant_limites (...)` con RLS negada a todos (solo service_role).
-- `planes.features_incluidos` se rellena para los tres planes vigentes con el catálogo de
-  módulos (los valores exactos por plan los fija Fermín al implementar; el default propuesto es
-  todo `true` salvo `recetas` y `reservaciones` en el plan de entrada).
+- `planes.features_incluidos` **no se toca**: ya trae las claves que el sitio publica
+  (`cfdi_incluido`, `inventario`, `consolidado_sucursales`, 0086). Se agrega la clave `modulos`
+  a los tres planes con `UPDATE ... SET features_incluidos = features_incluidos || '{"modulos": {...}}'`:
+
+  | Módulo | Esencial | Negocio | Cadena |
+  |---|---|---|---|
+  | `cfdi` | *(no va en `modulos`: lo resuelve el add-on CFDI, que el alta de 0086 ya materializa en `tenant_addons` cuando el plan lo incluye)* | | |
+  | `delivery_apps` | sí | sí | sí |
+  | `kds` | sí | sí | sí |
+  | `recetas` | no | sí | sí |
+  | `reservaciones` | sí | sí | sí |
+  | `promociones` | sí | sí | sí |
+
+  Sale de la descripción de cada plan en 0086: Esencial es "una sola caja" sin inventario ni
+  facturación; Negocio suma inventario y CFDI. Lo que 0086 no menciona (delivery, cocina,
+  reservaciones, promociones) va incluido en todos porque hoy ningún cliente paga aparte por
+  ello; si un día se cobra, se apaga aquí y se vende como add-on.
+- Los planes heredados por vertical (`FT`, `QS`, `CB`, `FS`, `DK`, `ENT`, retirados en 0086)
+  reciben el mismo `modulos` que Negocio: quien siga en uno de ellos no pierde nada.
 - Función `modulos_efectivos(p_tenant uuid) RETURNS jsonb`: permitido (plan + flags vigentes por
   fecha) AND encendido (`configuracion_tenant`). Para `cfdi`, permitido = `tenant_addon_activo`.
 - Función `limites_efectivos(p_tenant uuid) RETURNS jsonb`.
