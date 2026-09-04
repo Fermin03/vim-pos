@@ -638,6 +638,7 @@ export type Database = {
           created_by: string | null
           deleted_at: string | null
           descripcion: string | null
+          espejo_apps_at: string | null
           id: string
           identificador_dispositivo: string | null
           impresora_config: Json | null
@@ -658,6 +659,7 @@ export type Database = {
           created_by?: string | null
           deleted_at?: string | null
           descripcion?: string | null
+          espejo_apps_at?: string | null
           id?: string
           identificador_dispositivo?: string | null
           impresora_config?: Json | null
@@ -678,6 +680,7 @@ export type Database = {
           created_by?: string | null
           deleted_at?: string | null
           descripcion?: string | null
+          espejo_apps_at?: string | null
           id?: string
           identificador_dispositivo?: string | null
           impresora_config?: Json | null
@@ -1477,6 +1480,197 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "vw_ventas_apps_externas"
             referencedColumns: ["ticket_id"]
+          },
+        ]
+      }
+      compra_lineas: {
+        Row: {
+          cantidad: number
+          cantidad_capturada: number
+          compra_id: string
+          costo_unitario_mxn: number
+          created_at: string
+          descripcion_origen: string | null
+          id: string
+          importe_mxn: number
+          insumo_id: string
+          movimiento_id: string | null
+          movimiento_reversa_id: string | null
+          orden: number
+          tenant_id: string
+          unidad_capturada_id: string
+        }
+        Insert: {
+          cantidad: number
+          cantidad_capturada: number
+          compra_id: string
+          costo_unitario_mxn: number
+          created_at?: string
+          descripcion_origen?: string | null
+          id?: string
+          importe_mxn: number
+          insumo_id: string
+          movimiento_id?: string | null
+          movimiento_reversa_id?: string | null
+          orden?: number
+          tenant_id: string
+          unidad_capturada_id: string
+        }
+        Update: {
+          cantidad?: number
+          cantidad_capturada?: number
+          compra_id?: string
+          costo_unitario_mxn?: number
+          created_at?: string
+          descripcion_origen?: string | null
+          id?: string
+          importe_mxn?: number
+          insumo_id?: string
+          movimiento_id?: string | null
+          movimiento_reversa_id?: string | null
+          orden?: number
+          tenant_id?: string
+          unidad_capturada_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "compra_lineas_compra_id_fkey"
+            columns: ["compra_id"]
+            isOneToOne: false
+            referencedRelation: "compras"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "compra_lineas_insumo_id_fkey"
+            columns: ["insumo_id"]
+            isOneToOne: false
+            referencedRelation: "insumos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "compra_lineas_movimiento_id_fkey"
+            columns: ["movimiento_id"]
+            isOneToOne: false
+            referencedRelation: "movimientos_inventario"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "compra_lineas_movimiento_reversa_id_fkey"
+            columns: ["movimiento_reversa_id"]
+            isOneToOne: false
+            referencedRelation: "movimientos_inventario"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "compra_lineas_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "compra_lineas_unidad_capturada_id_fkey"
+            columns: ["unidad_capturada_id"]
+            isOneToOne: false
+            referencedRelation: "unidades_medida"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      compras: {
+        Row: {
+          anulada_at: string | null
+          anulada_por: string | null
+          cfdi_uuid: string | null
+          created_at: string
+          dia_contable: string
+          estado: Database["public"]["Enums"]["compra_estado"]
+          fecha: string
+          folio_completo: string | null
+          folio_consecutivo: number | null
+          id: string
+          iva_mxn: number
+          motivo_anulacion: string | null
+          notas: string | null
+          origen: Database["public"]["Enums"]["compra_origen"]
+          proveedor_id: string
+          referencia_documento: string | null
+          subtotal_mxn: number
+          sucursal_id: string
+          tenant_id: string
+          total_mxn: number
+          updated_at: string
+          usuario_id: string
+        }
+        Insert: {
+          anulada_at?: string | null
+          anulada_por?: string | null
+          cfdi_uuid?: string | null
+          created_at?: string
+          dia_contable: string
+          estado?: Database["public"]["Enums"]["compra_estado"]
+          fecha: string
+          folio_completo?: string | null
+          folio_consecutivo?: number | null
+          id?: string
+          iva_mxn: number
+          motivo_anulacion?: string | null
+          notas?: string | null
+          origen?: Database["public"]["Enums"]["compra_origen"]
+          proveedor_id: string
+          referencia_documento?: string | null
+          subtotal_mxn: number
+          sucursal_id: string
+          tenant_id: string
+          total_mxn: number
+          updated_at?: string
+          usuario_id: string
+        }
+        Update: {
+          anulada_at?: string | null
+          anulada_por?: string | null
+          cfdi_uuid?: string | null
+          created_at?: string
+          dia_contable?: string
+          estado?: Database["public"]["Enums"]["compra_estado"]
+          fecha?: string
+          folio_completo?: string | null
+          folio_consecutivo?: number | null
+          id?: string
+          iva_mxn?: number
+          motivo_anulacion?: string | null
+          notas?: string | null
+          origen?: Database["public"]["Enums"]["compra_origen"]
+          proveedor_id?: string
+          referencia_documento?: string | null
+          subtotal_mxn?: number
+          sucursal_id?: string
+          tenant_id?: string
+          total_mxn?: number
+          updated_at?: string
+          usuario_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "compras_proveedor_id_fkey"
+            columns: ["proveedor_id"]
+            isOneToOne: false
+            referencedRelation: "proveedores"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "compras_sucursal_id_fkey"
+            columns: ["sucursal_id"]
+            isOneToOne: false
+            referencedRelation: "sucursales"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "compras_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -2583,6 +2777,8 @@ export type Database = {
           estado: string
           estado_app: string | null
           folio_corto: string | null
+          gestion: string
+          gestion_caja_id: string | null
           id: string
           id_externo: string
           items: Json
@@ -2627,6 +2823,8 @@ export type Database = {
           estado?: string
           estado_app?: string | null
           folio_corto?: string | null
+          gestion?: string
+          gestion_caja_id?: string | null
           id?: string
           id_externo: string
           items?: Json
@@ -2671,6 +2869,8 @@ export type Database = {
           estado?: string
           estado_app?: string | null
           folio_corto?: string | null
+          gestion?: string
+          gestion_caja_id?: string | null
           id?: string
           id_externo?: string
           items?: Json
@@ -2702,6 +2902,13 @@ export type Database = {
             columns: ["conexion_id"]
             isOneToOne: false
             referencedRelation: "delivery_conexiones"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "delivery_pedidos_gestion_caja_id_fkey"
+            columns: ["gestion_caja_id"]
+            isOneToOne: false
+            referencedRelation: "cajas"
             referencedColumns: ["id"]
           },
           {
@@ -4153,6 +4360,7 @@ export type Database = {
         Row: {
           autorizacion_pin_id: string | null
           cantidad: number
+          compra_id: string | null
           costo_total_mxn: number | null
           costo_unitario_mxn: number
           created_at: string
@@ -4180,6 +4388,7 @@ export type Database = {
         Insert: {
           autorizacion_pin_id?: string | null
           cantidad: number
+          compra_id?: string | null
           costo_total_mxn?: number | null
           costo_unitario_mxn?: number
           created_at?: string
@@ -4207,6 +4416,7 @@ export type Database = {
         Update: {
           autorizacion_pin_id?: string | null
           cantidad?: number
+          compra_id?: string | null
           costo_total_mxn?: number | null
           costo_unitario_mxn?: number
           created_at?: string
@@ -4237,6 +4447,13 @@ export type Database = {
             columns: ["autorizacion_pin_id"]
             isOneToOne: false
             referencedRelation: "autorizaciones_pin"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "movimientos_inventario_compra_id_fkey"
+            columns: ["compra_id"]
+            isOneToOne: false
+            referencedRelation: "compras"
             referencedColumns: ["id"]
           },
           {
@@ -5311,6 +5528,127 @@ export type Database = {
         }
         Relationships: []
       }
+      proveedor_insumo_alias: {
+        Row: {
+          clave_origen: string
+          created_at: string
+          descripcion_origen: string | null
+          factor: number
+          id: string
+          insumo_id: string
+          proveedor_id: string
+          tenant_id: string
+          unidad_id: string
+          updated_at: string
+        }
+        Insert: {
+          clave_origen: string
+          created_at?: string
+          descripcion_origen?: string | null
+          factor: number
+          id?: string
+          insumo_id: string
+          proveedor_id: string
+          tenant_id: string
+          unidad_id: string
+          updated_at?: string
+        }
+        Update: {
+          clave_origen?: string
+          created_at?: string
+          descripcion_origen?: string | null
+          factor?: number
+          id?: string
+          insumo_id?: string
+          proveedor_id?: string
+          tenant_id?: string
+          unidad_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "proveedor_insumo_alias_insumo_id_fkey"
+            columns: ["insumo_id"]
+            isOneToOne: false
+            referencedRelation: "insumos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "proveedor_insumo_alias_proveedor_id_fkey"
+            columns: ["proveedor_id"]
+            isOneToOne: false
+            referencedRelation: "proveedores"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "proveedor_insumo_alias_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "proveedor_insumo_alias_unidad_id_fkey"
+            columns: ["unidad_id"]
+            isOneToOne: false
+            referencedRelation: "unidades_medida"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      proveedores: {
+        Row: {
+          activo: boolean
+          created_at: string
+          deleted_at: string | null
+          deleted_by: string | null
+          email: string | null
+          id: string
+          nombre: string
+          notas: string | null
+          rfc: string | null
+          telefono: string | null
+          tenant_id: string
+          updated_at: string
+        }
+        Insert: {
+          activo?: boolean
+          created_at?: string
+          deleted_at?: string | null
+          deleted_by?: string | null
+          email?: string | null
+          id?: string
+          nombre: string
+          notas?: string | null
+          rfc?: string | null
+          telefono?: string | null
+          tenant_id: string
+          updated_at?: string
+        }
+        Update: {
+          activo?: boolean
+          created_at?: string
+          deleted_at?: string | null
+          deleted_by?: string | null
+          email?: string | null
+          id?: string
+          nombre?: string
+          notas?: string | null
+          rfc?: string | null
+          telefono?: string | null
+          tenant_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "proveedores_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       push_suscripciones: {
         Row: {
           auth: string
@@ -5355,6 +5693,7 @@ export type Database = {
       receta_componentes: {
         Row: {
           cantidad: number
+          cantidad_capturada: number | null
           created_at: string
           es_critico: boolean
           id: string
@@ -5363,10 +5702,12 @@ export type Database = {
           orden_visualizacion: number
           receta_id: string
           tenant_id: string
+          unidad_capturada_id: string | null
           updated_at: string
         }
         Insert: {
           cantidad: number
+          cantidad_capturada?: number | null
           created_at?: string
           es_critico?: boolean
           id?: string
@@ -5375,10 +5716,12 @@ export type Database = {
           orden_visualizacion?: number
           receta_id: string
           tenant_id: string
+          unidad_capturada_id?: string | null
           updated_at?: string
         }
         Update: {
           cantidad?: number
+          cantidad_capturada?: number | null
           created_at?: string
           es_critico?: boolean
           id?: string
@@ -5387,6 +5730,7 @@ export type Database = {
           orden_visualizacion?: number
           receta_id?: string
           tenant_id?: string
+          unidad_capturada_id?: string | null
           updated_at?: string
         }
         Relationships: [
@@ -5409,6 +5753,13 @@ export type Database = {
             columns: ["tenant_id"]
             isOneToOne: false
             referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "receta_componentes_unidad_capturada_id_fkey"
+            columns: ["unidad_capturada_id"]
+            isOneToOne: false
+            referencedRelation: "unidades_medida"
             referencedColumns: ["id"]
           },
         ]
@@ -9386,6 +9737,7 @@ export type Database = {
         Args: { p_rows: Json; p_tabla: string; p_tenant: string }
         Returns: Json
       }
+      _vim_secreto: { Args: { p_nombre: string }; Returns: string }
       abrir_cuenta: {
         Args: {
           p_caja_id: string
@@ -9805,10 +10157,23 @@ export type Database = {
       current_sucursal_id: { Args: never; Returns: string }
       current_tenant_id: { Args: never; Returns: string }
       custom_access_token_hook: { Args: { event: Json }; Returns: Json }
+      delivery_anonimizar_pedidos_viejos: {
+        Args: { p_dias?: number }
+        Returns: number
+      }
+      delivery_avisar_expirados: {
+        Args: { p_n: number; p_sucursal: string; p_tenant: string }
+        Returns: boolean
+      }
+      delivery_enlazar_tickets: { Args: { p_tenant: string }; Returns: number }
       delivery_marcar_expirados: { Args: never; Returns: number }
       delivery_pedido_transicion: {
         Args: { p_detalle?: string; p_estado: string; p_pedido_id: string }
         Returns: undefined
+      }
+      delivery_reclamar_pedido: {
+        Args: { p_caja: string; p_pedido: string }
+        Returns: boolean
       }
       descontar_inventario_por_venta: {
         Args: { p_ticket_id: string }
@@ -9868,6 +10233,15 @@ export type Database = {
           consecutivo: number
           folio_completo: string
         }[]
+      }
+      guardar_receta: {
+        Args: {
+          p_activa: boolean
+          p_componentes: Json
+          p_notas: string
+          p_producto_id: string
+        }
+        Returns: string
       }
       imprimir_comanda: {
         Args: {
@@ -10022,6 +10396,10 @@ export type Database = {
           p_usuario_solicitante_id: string
         }
         Returns: Json
+      }
+      sucursal_con_espejo: {
+        Args: { p_segundos?: number; p_sucursal: string }
+        Returns: boolean
       }
       sync_aplicar_operacion: {
         Args: {
@@ -10189,6 +10567,8 @@ export type Database = {
         | "IMPRESORA_SIN_PAPEL"
         | "ERROR_DESCONOCIDO"
         | "CANCELADO_POR_USUARIO"
+      compra_estado: "CONFIRMADA" | "ANULADA"
+      compra_origen: "MANUAL" | "XML"
       cuenta_abierta_estado: "ABIERTA" | "CERRADA" | "CANCELADA"
       delivery_estado:
         | "ASIGNADO"
@@ -10611,6 +10991,8 @@ export const Constants = {
         "ERROR_DESCONOCIDO",
         "CANCELADO_POR_USUARIO",
       ],
+      compra_estado: ["CONFIRMADA", "ANULADA"],
+      compra_origen: ["MANUAL", "XML"],
       cuenta_abierta_estado: ["ABIERTA", "CERRADA", "CANCELADA"],
       delivery_estado: [
         "ASIGNADO",
