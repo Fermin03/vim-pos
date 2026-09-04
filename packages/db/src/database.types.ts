@@ -9729,6 +9729,10 @@ export type Database = {
       }
     }
     Functions: {
+      _vim_aplicar_movimientos: {
+        Args: { p_rows: Json; p_tenant: string }
+        Returns: Json
+      }
       _vim_apply_rows: {
         Args: { p_rows: Json; p_tabla: string; p_tenant: string }
         Returns: number
@@ -9738,6 +9742,12 @@ export type Database = {
         Returns: Json
       }
       _vim_secreto: { Args: { p_nombre: string }; Returns: string }
+      _vim_signo_movimiento: {
+        Args: {
+          p_tipo: Database["public"]["Enums"]["movimiento_inventario_tipo"]
+        }
+        Returns: number
+      }
       abrir_cuenta: {
         Args: {
           p_caja_id: string
