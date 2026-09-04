@@ -22,6 +22,14 @@ export const PULL_ORDER = [
   { t: "productos_grupos_modificadores" },
   { t: "subtipos_personal" },
   { t: "configuracion_tenant" },
+  // Inventario (ADR 0013): unidades antes que insumos; existencias, recetas y componentes después.
+  // La caja lo necesita para descontar al vender; los movimientos que genera suben por el push.
+  { t: "unidades_medida" },
+  { t: "insumos" },
+  { t: "insumo_stock_sucursal" },
+  { t: "recetas" },
+  { t: "receta_componentes" },
+  { t: "modificador_componentes" },
   { t: "repartidores" },
   { t: "permisos" },
   { t: "roles" },
@@ -95,6 +103,10 @@ const CLAVES_NATURALES = {
   roles: { claves: ["codigo", "tenant_id"], dependientes: [{ tabla: "rol_permisos", col: "rol_id" }] },
   permisos: { claves: ["codigo"], dependientes: [{ tabla: "rol_permisos", col: "permiso_id" }] },
   rol_permisos: { claves: ["rol_id", "permiso_id"], dependientes: [] },
+  // Una venta local puede crear la fila de existencias (aplicar_movimiento_inventario la inserta si
+  // no existe) con un id distinto al de la nube. Los movimientos no apuntan a esta fila, así que
+  // borrar la local y dejar entrar la de la nube es seguro.
+  insumo_stock_sucursal: { claves: ["insumo_id", "sucursal_id"], dependientes: [] },
 };
 
 /**
@@ -126,6 +138,54 @@ async function reconciliarCatalogo(client, tabla, filas, log = () => {}) {
   if (borradas) log(`  ${tabla}: ${borradas} realineada(s) con la nube`);
 }
 
+/** Signo de cada tipo de movimiento (misma tabla que aplicar_movimiento_inventario, 0007 §9.3). */
+export const SIGNO_MOVIMIENTO = {
+  ENTRADA_COMPRA: 1, REVERSA_CANCELACION: 1, AJUSTE_POSITIVO: 1, TRANSFERENCIA_ENTRADA: 1,
+  SALIDA_VENTA: -1, SALIDA_MODIFICADOR_EXTRA: -1, MERMA: -1, AJUSTE_NEGATIVO: -1,
+  TRANSFERENCIA_SALIDA: -1, DEVOLUCION_PROVEEDOR: -1,
+};
+
+/**
+ * Lo que la nube todavía NO sabe: suma con signo de los movimientos locales pendientes de subir,
+ * por (insumo, sucursal). Una salida pendiente de 3 da -3: la existencia bajada de la nube debe
+ * quedar en nube + (-3). Puro, sin base de datos, para poder probarlo.
+ */
+export function deltaPendiente(movimientos) {
+  const acumulado = new Map();
+  for (const m of movimientos ?? []) {
+    const signo = SIGNO_MOVIMIENTO[m.tipo] ?? 0;
+    const clave = `${m.insumo_id}|${m.sucursal_id}`;
+    acumulado.set(clave, (acumulado.get(clave) ?? 0) + signo * Number(m.cantidad));
+  }
+  return acumulado;
+}
+
+/**
+ * Después de bajar `insumo_stock_sucursal` (la nube manda), resta lo que la caja vendió y aún no
+ * subió. Sin esto, un pull entre dos pushes "devolvería" existencias ya vendidas.
+ */
+export async function corregirExistenciasPorPendientes(client, log = () => {}) {
+  await client.query("CREATE TABLE IF NOT EXISTS _vim_mov_ok (movimiento_id uuid PRIMARY KEY, subido_at timestamptz DEFAULT now())");
+  const { rows } = await client.query(`
+    SELECT m.insumo_id, m.sucursal_id, m.tipo, m.cantidad
+      FROM movimientos_inventario m
+      LEFT JOIN _vim_mov_ok ok ON ok.movimiento_id = m.id
+     WHERE ok.movimiento_id IS NULL`);
+  const deltas = deltaPendiente(rows);
+  let n = 0;
+  for (const [clave, delta] of deltas) {
+    if (!delta) continue;
+    const [insumoId, sucursalId] = clave.split("|");
+    const r = await client.query(
+      `UPDATE insumo_stock_sucursal
+          SET stock_actual = stock_actual + $3, stock_negativo_flag = (stock_actual + $3) < 0
+        WHERE insumo_id = $1 AND sucursal_id = $2`, [insumoId, sucursalId, delta]);
+    n += r.rowCount;
+  }
+  if (n) log(`  insumo_stock_sucursal: ${n} existencia(s) corregida(s) por movimientos pendientes`);
+  return n;
+}
+
 export async function pullSnapshot(pool, snapshot, log = () => {}) {
   const client = await pool.connect();
   const resumen = {};
@@ -139,6 +199,7 @@ export async function pullSnapshot(pool, snapshot, log = () => {}) {
       const n = await upsertTabla(client, schema, t, filas);
       resumen[t] = n;
       if (n) log(`  ${schema}.${t}: ${n}`);
+      if (t === "insumo_stock_sucursal") await corregirExistenciasPorPendientes(client, log);
     }
     await client.query(
       `CREATE TABLE IF NOT EXISTS _vim_sync (clave text PRIMARY KEY, valor text, at timestamptz DEFAULT now())`);
