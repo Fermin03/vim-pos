@@ -280,7 +280,7 @@ function llmsTxt() {
       `- [WhatsApp ${NEGOCIO.whatsapp}](${NEGOCIO.whatsappUrl}): el canal principal. Respuesta el mismo día hábil.`,
       `- [${NEGOCIO.correo}](mailto:${NEGOCIO.correo}): correo, para lo que necesita quedar por escrito.`,
       `- [Pedir una demostración](${BASE}/demo.md): media hora con el menú del propio negocio cargado.`,
-      `- [Quién está detrás](${BASE}/nosotros.md): ${NEGOCIO.razonSocial}, RFC ${NEGOCIO.rfc}, ${NEGOCIO.calle}, ${NEGOCIO.ciudad}, ${NEGOCIO.estado}, México.`,
+      `- [Quién está detrás](${BASE}/nosotros.md): ${NEGOCIO.razonSocial}, ${NEGOCIO.calle}, ${NEGOCIO.ciudad}, ${NEGOCIO.estado}, México.`,
     ]),
     seccion('Opcional', opcionales),
   ].join('\n');
@@ -349,7 +349,7 @@ function agentsMd() {
     '- **Invoicing:** CFDI 4.0, global period invoice and QR self-invoicing. Available through a',
     '  certification provider authorised by the tax authority; the venue uploads its digital seal and buys credits.',
     `- **Company:** ${NEGOCIO.razonSocial}, sole proprietor, trading as ${NEGOCIO.nombre}.`,
-    `  Tax ID (RFC) ${NEGOCIO.rfc}. ${NEGOCIO.calle}, ${NEGOCIO.ciudad}, ${NEGOCIO.estado}, Mexico.`,
+    `  ${NEGOCIO.calle}, ${NEGOCIO.ciudad}, ${NEGOCIO.estado}, Mexico. The tax ID (RFC) is in the privacy notice and the terms.`,
     `- **Contact:** ${NEGOCIO.correo} · WhatsApp ${NEGOCIO.whatsapp} · ${NEGOCIO.instagram}`,
     '',
     '## Machine-readable content',

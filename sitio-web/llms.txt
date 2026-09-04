@@ -65,7 +65,7 @@ extension, and the normal address answers with `text/markdown` when asked with a
 - [WhatsApp hola@vimpos.com.mx](https://wa.me/hola@vimpos.com.mx): el canal principal. Respuesta el mismo día hábil.
 - [hola@vimpos.com.mx](mailto:hola@vimpos.com.mx): correo, para lo que necesita quedar por escrito.
 - [Pedir una demostración](https://vimpos.com.mx/demo.md): media hora con el menú del propio negocio cargado.
-- [Quién está detrás](https://vimpos.com.mx/nosotros.md): VIM POS, RFC XAXX010101000, Guanajuato, México.
+- [Quién está detrás](https://vimpos.com.mx/nosotros.md): VIM POS, Guanajuato, México.
 
 ## Opcional
 

@@ -25,7 +25,7 @@ Media hora, sin compromiso y sin presentación. Vemos tu carta, montamos un par 
 
 _Esto es lo que vas a ver en la demostración, con tus productos y tus precios cargados._
 
-**No te va a llamar un vendedor.** Somos un equipo chico de León: te contesta quien construyó el sistema.
+**No te va a llamar un vendedor.** Somos un equipo chico de León: te contesta quien construyó el sistema. Y si prefieres hablar ahora, [llámanos al hola@vimpos.com.mx](tel:+hola@vimpos.com.mx) en horario hábil.
 
 Tus datos son solo para contactarte por esto. No los vendemos, no los compartimos y no te vamos a meter a una lista de correos.
 

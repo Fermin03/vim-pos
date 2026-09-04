@@ -54,7 +54,7 @@ is already published. What to do instead:
 - **Invoicing:** CFDI 4.0, global period invoice and QR self-invoicing. Available through a
   certification provider authorised by the tax authority; the venue uploads its digital seal and buys credits.
 - **Company:** VIM POS, sole proprietor, trading as VIM POS.
-  Tax ID (RFC) XAXX010101000. Guanajuato, México.
+  Guanajuato, México. The tax ID (RFC) is in the privacy notice and the terms.
 - **Contact:** hola@vimpos.com.mx · WhatsApp hola@vimpos.com.mx · https://www.instagram.com/vimpos_mx/
 
 ## Machine-readable content

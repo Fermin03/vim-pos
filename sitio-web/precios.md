@@ -141,7 +141,7 @@ Se agregan y se quitan cuando quieras, y se cobran junto con tu plan.
 
 ### Sucursal adicional
 
-$799
+$599
 
 Al mes, más IVA. Entra al reporte que suma todas.
 
