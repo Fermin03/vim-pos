@@ -485,6 +485,9 @@ test('ningún enlace interno del sitio lleva a un 404', () => {
     for (const m of html.matchAll(/(?:href|src)="([^"]+)"/g)) {
       const destino = m[1];
       if (/^(https?:|mailto:|tel:|data:|#)/.test(destino)) continue;
+      // `/_vercel/…` lo sirve la plataforma, no esta carpeta: es el script de
+      // la analítica. En local y con la analítica apagada da 404 a propósito.
+      if (destino.startsWith('/_vercel/')) continue;
       const ruta = destino.startsWith('/') ? destino : '/' + destino;
       const limpia = ruta.split(/[?#]/)[0];
       const res = resolver(limpia);
