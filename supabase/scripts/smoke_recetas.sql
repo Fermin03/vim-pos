@@ -8,7 +8,16 @@ DECLARE
   v_dueno  uuid := '99999999-0000-0000-0000-0000000000e1';
   v_pza uuid; v_g uuid; v_carne uuid; v_pan uuid; v_prod uuid; v_receta uuid;
   v_costo numeric; v_n int; v_version int;
+  v_ajeno uuid; v_pza_ajena uuid;
 BEGIN
+  -- Fixture de otro negocio, insertada como postgres (superusuario, bypasea RLS) ANTES de fijar
+  -- los claims del JWT de abajo: set_config solo afecta a current_tenant_id(), no al bypass.
+  INSERT INTO tenants(id, codigo, nombre_comercial, vertical_principal)
+  VALUES ('99999999-0000-0000-0000-0000000000ff', 'smoke-ajeno', 'Ajeno', 'QUICK_SERVICE') ON CONFLICT (id) DO NOTHING;
+  SELECT id INTO v_pza_ajena FROM unidades_medida WHERE tenant_id=v_tenant AND codigo='PZA' LIMIT 1; -- reuse seed unit only to satisfy NOT NULL
+  INSERT INTO insumos(tenant_id, nombre, unidad_medida_id, categoria, costo_unitario_mxn)
+  VALUES ('99999999-0000-0000-0000-0000000000ff', 'Insumo ajeno', v_pza_ajena, 'OTROS', 1) RETURNING id INTO v_ajeno;
+
   PERFORM set_config('request.jwt.claims', json_build_object('sub', v_dueno::text, 'tenant_id', v_tenant::text)::text, true);
   SELECT id INTO v_pza FROM unidades_medida WHERE tenant_id=v_tenant AND codigo='PZA' LIMIT 1;
   SELECT id INTO v_g   FROM unidades_medida WHERE tenant_id=v_tenant AND codigo='G' LIMIT 1;
@@ -57,6 +66,15 @@ BEGIN
   -- 5) Pausada sin componentes → permitido
   PERFORM guardar_receta(v_prod, false, NULL, '[]'::jsonb);
   IF (SELECT activa FROM recetas WHERE id=v_receta) THEN RAISE EXCEPTION 'debió quedar pausada'; END IF;
+
+  -- 6) Insumo de otro negocio → error (la FK sola no lo impediría)
+  BEGIN
+    PERFORM guardar_receta(v_prod, true, NULL, jsonb_build_array(
+      jsonb_build_object('insumo_id', v_ajeno, 'cantidad', 1, 'cantidad_capturada', 1, 'unidad_capturada_id', v_pza, 'es_critico', true, 'notas', NULL, 'orden', 0)));
+    RAISE EXCEPTION 'debió fallar: insumo de otro negocio';
+  EXCEPTION WHEN OTHERS THEN
+    IF SQLERRM NOT LIKE '%no es de tu negocio%' THEN RAISE; END IF;
+  END;
 
   RAISE NOTICE 'SMOKE RECETAS OK';
 END $$;

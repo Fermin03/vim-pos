@@ -200,6 +200,27 @@ BEGIN
   SELECT count(DISTINCT c->>'insumo_id') INTO v_distintos FROM jsonb_array_elements(p_componentes) c;
   IF v_distintos <> v_n THEN RAISE EXCEPTION 'Hay insumos repetidos en la receta'; END IF;
 
+  -- Todo insumo debe ser del negocio y estar vivo (la FK no pasa por RLS).
+  IF EXISTS (
+    SELECT 1 FROM jsonb_array_elements(p_componentes) c
+    WHERE NOT EXISTS (
+      SELECT 1 FROM insumos i
+      WHERE i.id = (c->>'insumo_id')::uuid AND i.tenant_id = v_tenant AND i.deleted_at IS NULL)
+  ) THEN
+    RAISE EXCEPTION 'Uno de los insumos no existe o no es de tu negocio';
+  END IF;
+  -- La unidad capturada, si viene, debe ser del sistema o del negocio.
+  IF EXISTS (
+    SELECT 1 FROM jsonb_array_elements(p_componentes) c
+    WHERE NULLIF(c->>'unidad_capturada_id','') IS NOT NULL
+      AND NOT EXISTS (
+        SELECT 1 FROM unidades_medida u
+        WHERE u.id = (c->>'unidad_capturada_id')::uuid
+          AND (u.tenant_id = v_tenant OR u.tenant_id IS NULL))
+  ) THEN
+    RAISE EXCEPTION 'Una de las unidades no es válida para tu negocio';
+  END IF;
+
   SELECT id INTO v_receta FROM recetas WHERE producto_id = p_producto_id AND tenant_id = v_tenant;
   IF v_receta IS NULL THEN
     INSERT INTO recetas (tenant_id, producto_id, activa, notas_preparacion, created_by, updated_by)
@@ -220,9 +241,6 @@ BEGIN
          COALESCE((c->>'es_critico')::boolean, true), NULLIF(c->>'notas',''),
          COALESCE((c->>'orden')::int, 0)
   FROM jsonb_array_elements(p_componentes) c;
-
-  -- Si quedó sin componentes el trigger no dispara: dejar el costo en 0.
-  IF v_n = 0 THEN UPDATE recetas SET costo_total_mxn = 0 WHERE id = v_receta; END IF;
 
   RETURN v_receta;
 END $$;
