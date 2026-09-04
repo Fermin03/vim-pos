@@ -166,7 +166,7 @@ _Si ya usas otro_
 
 ## Tu menú se pega y ya
 
-Descargas el menú del sistema que usas hoy y lo pegas aquí tal cual. No hay que recapturar trescientos productos a mano ni pagar por la mudanza.
+Descargas el menú del sistema que usas hoy (Square, Toast, Loyverse, Clip o una hoja de cálculo) y lo pegas aquí tal cual. No hay que recapturar trescientos productos a mano ni pagar por la mudanza.
 
 ![Importador de menú mostrando lo que se va a dar de alta antes de confirmar.](https://vimpos.com.mx/assets/img/capturas/admin-importador.webp?v=2)
 

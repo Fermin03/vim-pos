@@ -18,6 +18,10 @@ El mismo día hábil, por el canal que prefieras. No hay centro de llamadas, no 
 
 Contestamos **el mismo día hábil**, en horario hábil y en español. No hay número 800 ni menú de opciones.
 
+![Panel del dueño con las ventas del día, el ticket promedio y el top de productos.](https://vimpos.com.mx/assets/img/capturas/admin-dashboard.webp?v=2)
+
+_El panel que te enseñamos en la demostración: cómo va el día, la venta por hora y qué se vende más, desde el celular o la computadora._
+
 ## Quién responde
 
 **Fermín Villalobos Martínez**, persona física con actividad empresarial, RFC **VIMF0308282D7**, que opera bajo la marca **VIM POS**. Es el mismo responsable que aparece en el [aviso de privacidad](https://vimpos.com.mx/aviso-privacidad) y en los [términos del servicio](https://vimpos.com.mx/terminos).

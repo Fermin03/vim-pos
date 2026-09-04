@@ -30,9 +30,9 @@ Todo tu sistema vive en tu caja, no en internet
 
 Funciona con las impresoras de tickets de siempre
 
-Corte Z sellado, con arqueo, sobrante y faltante
+El corte de caja cuadra contra lo que hay en el cajón
 
-14 reportes en el panel del dueño
+Ves la venta del día desde tu celular
 
 _Por qué existe_
 
@@ -56,7 +56,7 @@ _Cómo funciona_
 
 Casi todos los puntos de venta de hoy viven en internet: si se cae la señal, se cae tu negocio. Aquí es al revés — el sistema entero está en la computadora de tu mostrador, y lo que está fuera cuelga de un hilo que se puede cortar sin que pase nada.
 
-Pruébalo: se apaga la nube y el local sigue entero.
+**Pruébalo:** se apaga la nube y el local sigue entero.
 
 _Lo que hace_
 
@@ -138,7 +138,7 @@ _Pegas el menú del sistema que usas hoy y lo ves antes de aceptarlo: qué produ
 
 ### Tu menú se pega y ya
 
-Descargas tu menú del sistema que usas hoy y lo pegas aquí tal cual. No hay que recapturar trescientos productos a mano ni pagar por la mudanza.
+Descargas tu menú del sistema que usas hoy (Square, Toast, Loyverse, Clip o una hoja de cálculo) y lo pegas aquí tal cual. No hay que recapturar trescientos productos a mano ni pagar por la mudanza.
 
 ### Tu corte se ve igual
 
@@ -398,7 +398,7 @@ _Si ya usas otro_
 
 ## Tu menú se pega y ya
 
-Descargas el menú del sistema que usas hoy y lo pegas aquí tal cual. No hay que recapturar trescientos productos a mano ni pagar por la mudanza.
+Descargas el menú del sistema que usas hoy (Square, Toast, Loyverse, Clip o una hoja de cálculo) y lo pegas aquí tal cual. No hay que recapturar trescientos productos a mano ni pagar por la mudanza.
 
 ![Importador de menú mostrando lo que se va a dar de alta antes de confirmar.](https://vimpos.com.mx/assets/img/capturas/admin-importador.webp?v=2)
 
@@ -867,7 +867,7 @@ No. Es mes a mes y lo cancelas cuando quieras. Si pagas el año por adelantado p
 
 ### ¿Puedo cambiar de plan después?
 
-Sí, para arriba o para abajo, y sin volver a configurar nada. Lo normal es abrir una segunda caja o una segunda sucursal y subir por eso.
+Sí, para arriba o para abajo, y sin volver a configurar nada. Lo típico sería abrir una segunda caja o una segunda sucursal y subir por eso.
 
 ### ¿Me cobran comisión por cada venta?
 
@@ -966,6 +966,10 @@ Aquí el programa sale gratis o casi, porque el proveedor también te procesa la
 
 Eso _no_ es malo por sí solo: comisión de tarjeta vas a pagar igual, la cobre quien la cobre. La pregunta correcta no es «¿cuánto cobran?», es **«¿cuánto más que lo que ya me cobra mi banco?»**. Esa diferencia es el precio real del software — y es el único que crece justo cuando te va bien.
 
+![Pantalla de cobro con las formas de pago: efectivo, débito, crédito, transferencia, app externa y pago dividido.](https://vimpos.com.mx/assets/img/capturas/pos-pago.webp?v=2)
+
+_Las formas de pago en la caja de VIM POS. La tarjeta se registra para que el corte cuadre, pero el cobro va por tu terminal bancaria: por eso el precio del sistema no crece con tu venta._
+
 ### La aritmética, con tus números
 
 Toma lo que cobras con tarjeta en un mes bueno y multiplícalo por la diferencia de tarifa. Un solo punto porcentual pesa más de lo que parece:
@@ -1028,6 +1032,10 @@ _Las nueve preguntas_
 La respuesta importante no es «sí», es _qué_ sigue funcionando. Muchos sistemas tienen un «modo offline» que cobra pero no manda a cocina, o que guarda la venta y la pierde si el navegador se cierra. Pregunta si imprime comanda, si el corte cuadra y qué pasa con lo cobrado cuando vuelve la señal.
 
 Cómo comprobarlo: en la demo, pide que le quiten el internet a la computadora y sigue vendiendo. Es la prueba que ningún folleto sustituye.
+
+![La caja con el aviso de que no hay conexión, con el ticket y el catálogo funcionando igual.](https://vimpos.com.mx/assets/img/capturas/pos-sin-conexion.webp?v=2)
+
+_Así se ve la pregunta 1 respondida en la caja de VIM POS: el aviso de que no hay internet, y el ticket y el catálogo funcionando igual. Pide esta misma pantalla en cualquier demo._
 
 ### 2 · ¿El precio está publicado?
 
@@ -1109,17 +1117,17 @@ El sistema se desarrolla y se soporta desde la zona de León y San Francisco del
 
 ## Por qué existe
 
-Porque un restaurante mexicano hoy escoge entre tres cosas, y ninguna de las tres está pensada para él:
-
-- **Los sistemas de fuera.** Caros, en dólares y con el SAT como una idea vaga. Pagas por funciones diseñadas para otro país y la factura la resuelves aparte.
-- **Los de siempre.** Llevan quince años funcionando y lo hacen bien, pero viven en una sola computadora: sin respaldo, sin ver tus números desde el celular y sin nada que hacer si se moja el disco duro.
-- **El cuaderno.** Funciona hasta que hay dos cajas, o un socio, o alguien pregunta cuánto se vendió el martes pasado.
+Porque un restaurante mexicano hoy escoge entre un sistema de fuera, caro y en dólares; uno de los de siempre, que vive en una sola computadora sin respaldo; o el cuaderno, que aguanta hasta que hay dos cajas o un socio. Ninguno está pensado para él.
 
 VIM POS es el intento de que no haya que escoger: el sistema completo vive en la computadora de tu caja —así que cobra aunque se caiga el internet— y la nube es el respaldo y el panel, no el motor.
 
+![La caja en plena venta: el catálogo por categorías y un ticket en curso con una hamburguesa, papas y refresco.](https://vimpos.com.mx/assets/img/capturas/pos-home.webp?v=2)
+
+_La caja, tal como la ve quien cobra. Todo lo que hay en este sitio son capturas del sistema funcionando, no dibujos._
+
 ## Cómo trabajamos
 
-Somos una marca desconocida compitiendo contra otras de veinticinco años. Parecer grandes no es una opción, y fingirlo se descubre en la primera llamada. Lo que sí podemos ser es concretos donde los demás son vagos:
+Somos nuevos y competimos contra marcas de veinticinco años. Parecer grandes no es una opción, y fingirlo se descubre en la primera llamada. Lo que sí podemos ser es concretos donde los demás son vagos:
 
 - **El precio está publicado.** Los tres planes, los extras y los paquetes de folios están en la [página de precios](https://vimpos.com.mx/precios). No hay «contáctanos para conocer el precio».
 - **La implementación va incluida.** En los tres planes: instalación, carga de tu menú, datos fiscales y capacitación. No es un pago inicial que aparece en la primera factura.
@@ -1163,6 +1171,10 @@ El mismo día hábil, por el canal que prefieras. No hay centro de llamadas, no 
 - **El [formulario de demostración](https://vimpos.com.mx/demo).** Si prefieres que te busquemos nosotros. Pide cuántas cajas y cuántas sucursales tienes, que es lo que decide qué plan te toca y qué te enseñamos.
 
 Contestamos **el mismo día hábil**, en horario hábil y en español. No hay número 800 ni menú de opciones.
+
+![Panel del dueño con las ventas del día, el ticket promedio y el top de productos.](https://vimpos.com.mx/assets/img/capturas/admin-dashboard.webp?v=2)
+
+_El panel que te enseñamos en la demostración: cómo va el día, la venta por hora y qué se vende más, desde el celular o la computadora._
 
 ## Quién responde
 

@@ -205,7 +205,7 @@ No. Es mes a mes y lo cancelas cuando quieras. Si pagas el año por adelantado p
 
 ### ¿Puedo cambiar de plan después?
 
-Sí, para arriba o para abajo, y sin volver a configurar nada. Lo normal es abrir una segunda caja o una segunda sucursal y subir por eso.
+Sí, para arriba o para abajo, y sin volver a configurar nada. Lo típico sería abrir una segunda caja o una segunda sucursal y subir por eso.
 
 ### ¿Me cobran comisión por cada venta?
 

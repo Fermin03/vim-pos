@@ -14,17 +14,17 @@ El sistema se desarrolla y se soporta desde la zona de León y San Francisco del
 
 ## Por qué existe
 
-Porque un restaurante mexicano hoy escoge entre tres cosas, y ninguna de las tres está pensada para él:
-
-- **Los sistemas de fuera.** Caros, en dólares y con el SAT como una idea vaga. Pagas por funciones diseñadas para otro país y la factura la resuelves aparte.
-- **Los de siempre.** Llevan quince años funcionando y lo hacen bien, pero viven en una sola computadora: sin respaldo, sin ver tus números desde el celular y sin nada que hacer si se moja el disco duro.
-- **El cuaderno.** Funciona hasta que hay dos cajas, o un socio, o alguien pregunta cuánto se vendió el martes pasado.
+Porque un restaurante mexicano hoy escoge entre un sistema de fuera, caro y en dólares; uno de los de siempre, que vive en una sola computadora sin respaldo; o el cuaderno, que aguanta hasta que hay dos cajas o un socio. Ninguno está pensado para él.
 
 VIM POS es el intento de que no haya que escoger: el sistema completo vive en la computadora de tu caja —así que cobra aunque se caiga el internet— y la nube es el respaldo y el panel, no el motor.
 
+![La caja en plena venta: el catálogo por categorías y un ticket en curso con una hamburguesa, papas y refresco.](https://vimpos.com.mx/assets/img/capturas/pos-home.webp?v=2)
+
+_La caja, tal como la ve quien cobra. Todo lo que hay en este sitio son capturas del sistema funcionando, no dibujos._
+
 ## Cómo trabajamos
 
-Somos una marca desconocida compitiendo contra otras de veinticinco años. Parecer grandes no es una opción, y fingirlo se descubre en la primera llamada. Lo que sí podemos ser es concretos donde los demás son vagos:
+Somos nuevos y competimos contra marcas de veinticinco años. Parecer grandes no es una opción, y fingirlo se descubre en la primera llamada. Lo que sí podemos ser es concretos donde los demás son vagos:
 
 - **El precio está publicado.** Los tres planes, los extras y los paquetes de folios están en la [página de precios](https://vimpos.com.mx/precios). No hay «contáctanos para conocer el precio».
 - **La implementación va incluida.** En los tres planes: instalación, carga de tu menú, datos fiscales y capacitación. No es un pago inicial que aparece en la primera factura.
