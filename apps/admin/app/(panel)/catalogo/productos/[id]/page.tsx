@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
+import Link from "next/link";
 import { PageHeader, PageBody } from "../../../../components/page-header";
 import { CatalogoTabs } from "../../../../components/catalogo-tabs";
 import { ProductoForm } from "../../../../components/producto-form";
@@ -26,6 +27,7 @@ export default function EditarProductoPage() {
           { label: "Productos", href: "/catalogo/productos" },
           { label: prod ? prod.nombre : "Editar" },
         ]}
+        right={prod ? <Link className="text-sm font-medium text-accent underline-offset-2 hover:underline" href={`/catalogo/recetas/${prod.id}`}>Receta y costo</Link> : undefined}
       />
       <CatalogoTabs />
       <PageBody>

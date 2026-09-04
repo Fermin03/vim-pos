@@ -125,9 +125,8 @@ export async function eliminarInsumo(id: string): Promise<void> {
   if (error) throw new Error(error.message);
 }
 
-export type TipoMovimientoUI = "ENTRADA_COMPRA" | "MERMA" | "AJUSTE_POSITIVO" | "AJUSTE_NEGATIVO";
+export type TipoMovimientoUI = "MERMA" | "AJUSTE_POSITIVO" | "AJUSTE_NEGATIVO";
 export const TIPOS_MOV: { v: TipoMovimientoUI; l: string }[] = [
-  { v: "ENTRADA_COMPRA", l: "Entrada (compra)" },
   { v: "MERMA", l: "Merma" },
   { v: "AJUSTE_POSITIVO", l: "Ajuste +" },
   { v: "AJUSTE_NEGATIVO", l: "Ajuste −" },
