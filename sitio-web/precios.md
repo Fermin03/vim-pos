@@ -95,7 +95,7 @@ _Comparación de los tres planes de VIM POS._
 | Capacitación | Videos y guía escrita | 3 horas con tu equipo | 3 horas con tu equipo |
 | El día del arranque | Soporte por chat | Te acompañamos en línea | Vamos a tu local |
 
-![Panel del dueño con las ventas del día y el estado de las cajas.](https://vimpos.com.mx/assets/img/capturas/admin-dashboard.webp)
+![Panel del dueño con las ventas del día y el estado de las cajas.](https://vimpos.com.mx/assets/img/capturas/admin-dashboard.webp?v=2)
 
 _El panel, incluido en los tres planes: cómo va el día, cuánto lleva cada caja y qué se está vendiendo, desde el celular o desde la computadora._
 
@@ -129,7 +129,7 @@ Todas, siempre. Llegan solas a tu caja y no hay que agendar a nadie ni pagar la 
 
 Copia diaria en tu local y copia fuera de él. Sin que tengas que acordarte.
 
-![Inventario con cada insumo, su existencia, su mínimo y el aviso cuando anda bajo.](https://vimpos.com.mx/assets/img/capturas/admin-inventario.webp)
+![Inventario con cada insumo, su existencia, su mínimo y el aviso cuando anda bajo.](https://vimpos.com.mx/assets/img/capturas/admin-inventario.webp?v=2)
 
 _Desde el plan Negocio: cada insumo con su existencia, su mínimo y el aviso cuando anda bajo. Lo que se descuenta sale de la receta de cada platillo, no de un conteo a mano._
 

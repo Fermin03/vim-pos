@@ -12,7 +12,7 @@ Caja, cocina, mesas, inventario y facturación en un solo sistema. La implementa
 
 En operación en Knock-Out Burger, León, Gto.
 
-![La caja en plena venta: el catálogo por categorías y un ticket en curso con una hamburguesa, papas y refresco.](https://vimpos.com.mx/assets/img/capturas/pos-home.webp)
+![La caja en plena venta: el catálogo por categorías y un ticket en curso con una hamburguesa, papas y refresco.](https://vimpos.com.mx/assets/img/capturas/pos-home.webp?v=2)
 
 Todo tu sistema vive en tu caja, no en internet
 
@@ -54,25 +54,25 @@ _Lo que hace_
 
 Catálogo por categorías, modificadores con precio —queso extra, sin cebolla, término de la carne— y cobro en efectivo, tarjeta o transferencia. Con propina y con cambio calculado.
 
-![Un producto abierto con sus opciones: término de la carne y extras con su precio.](https://vimpos.com.mx/assets/img/capturas/pos-catalogo.webp)
+![Un producto abierto con sus opciones: término de la carne y extras con su precio.](https://vimpos.com.mx/assets/img/capturas/pos-catalogo.webp?v=2)
 
 ### Mandar a cocina
 
 La comanda sale impresa donde tiene que salir: las bebidas en la barra y la comida en cocina, cada papel con el rótulo de su estación. O en una pantalla, si prefieres no imprimir.
 
-![Pantalla de cocina con siete comandas activas, cada una con su tiempo, el término de la carne, los extras y las notas.](https://vimpos.com.mx/assets/img/capturas/kds.webp)
+![Pantalla de cocina con siete comandas activas, cada una con su tiempo, el término de la carne, los extras y las notas.](https://vimpos.com.mx/assets/img/capturas/kds.webp?v=2)
 
 ### Cerrar el turno
 
 Arqueo contra lo que dice el sistema, con sobrante y faltante a la vista, y corte Z sellado. Con el mismo formato de siempre, para que nadie tenga que reaprender a leerlo.
 
-![Arqueo del cierre de turno: efectivo esperado, efectivo contado y la diferencia, con cada forma de pago en su renglón.](https://vimpos.com.mx/assets/img/capturas/pos-arqueo.webp)
+![Arqueo del cierre de turno: efectivo esperado, efectivo contado y la diferencia, con cada forma de pago en su renglón.](https://vimpos.com.mx/assets/img/capturas/pos-arqueo.webp?v=2)
 
 ### Ver tu negocio
 
 Desde el celular: cuánto llevas hoy contra ayer, qué se vende y qué no, inventario con costo, y catorce reportes. Con aviso si tu caja lleva días sin subir las ventas.
 
-![Panel del dueño con las ventas del día y el estado de las cajas.](https://vimpos.com.mx/assets/img/capturas/admin-dashboard.webp)
+![Panel del dueño con las ventas del día y el estado de las cajas.](https://vimpos.com.mx/assets/img/capturas/admin-dashboard.webp?v=2)
 
 _El diferenciador_
 
@@ -120,7 +120,7 @@ _Si ya usas otro_
 
 ## Cambiar de punto de venta sin volver a capturar tu menú
 
-![Importador de menú mostrando lo que se va a dar de alta antes de confirmar.](https://vimpos.com.mx/assets/img/capturas/admin-importador.webp)
+![Importador de menú mostrando lo que se va a dar de alta antes de confirmar.](https://vimpos.com.mx/assets/img/capturas/admin-importador.webp?v=2)
 
 _Pegas el menú del sistema que usas hoy y lo ves antes de aceptarlo: qué producto entra, con qué precio y en qué categoría. Nada se guarda hasta que tú lo confirmas._
 
