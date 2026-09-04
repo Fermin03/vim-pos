@@ -6,6 +6,7 @@ const TABS = [
   { label: "Categorías", href: "/catalogo/categorias" },
   { label: "Productos", href: "/catalogo/productos" },
   { label: "Modificadores", href: "/catalogo/modificadores" },
+  { label: "Recetas", href: "/catalogo/recetas" },
 ];
 
 /** Sub-navegación del módulo Catálogo. */
