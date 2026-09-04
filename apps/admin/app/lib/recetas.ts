@@ -55,8 +55,9 @@ export function margen(precioSinIvaMxn: number, costo: number): { pesos: number;
   return { pesos, porcentaje: precioSinIvaMxn > 0 ? redondear(pesos / precioSinIvaMxn, 4) : null };
 }
 
-export function precioSinIva(precioConIva: number, tasaIva: number, ivaIncluido: boolean): number {
-  return ivaIncluido ? redondear(precioConIva / (1 + tasaIva), 2) : precioConIva;
+/** `tasaIvaPorcentaje` es la tasa tal como se guarda en `productos.tasa_iva` (16 = 16 %, no 0.16). */
+export function precioSinIva(precioConIva: number, tasaIvaPorcentaje: number, ivaIncluido: boolean): number {
+  return ivaIncluido ? redondear(precioConIva / (1 + tasaIvaPorcentaje / 100), 2) : precioConIva;
 }
 
 // ---------------------------------------------------------------- datos
@@ -115,7 +116,7 @@ export async function listarRecetasResumen(): Promise<RecetaResumen[]> {
       productoId: S(p.id),
       nombre: S(p.nombre),
       categoriaNombre: ((p.categoria as { nombre?: string } | null)?.nombre) ?? "",
-      precioSinIva: precioSinIva(num(p.precio_base_mxn), num(p.tasa_iva ?? 0.16), p.iva_incluido_en_precio !== false),
+      precioSinIva: precioSinIva(num(p.precio_base_mxn), num(p.tasa_iva ?? 16), p.iva_incluido_en_precio !== false),
       costo: receta ? num(receta.costo_total_mxn) : null,
       activa: receta ? Boolean(receta.activa) : null,
     };
