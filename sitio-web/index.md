@@ -18,9 +18,9 @@ Todo tu sistema vive en tu caja, no en internet
 
 Funciona con las impresoras de tickets de siempre
 
-Corte Z sellado, con arqueo, sobrante y faltante
+El corte de caja cuadra contra lo que hay en el cajón
 
-14 reportes en el panel del dueño
+Ves la venta del día desde tu celular
 
 _Por qué existe_
 
@@ -44,7 +44,7 @@ _Cómo funciona_
 
 Casi todos los puntos de venta de hoy viven en internet: si se cae la señal, se cae tu negocio. Aquí es al revés — el sistema entero está en la computadora de tu mostrador, y lo que está fuera cuelga de un hilo que se puede cortar sin que pase nada.
 
-Pruébalo: se apaga la nube y el local sigue entero.
+**Pruébalo:** se apaga la nube y el local sigue entero.
 
 _Lo que hace_
 
@@ -126,7 +126,7 @@ _Pegas el menú del sistema que usas hoy y lo ves antes de aceptarlo: qué produ
 
 ### Tu menú se pega y ya
 
-Descargas tu menú del sistema que usas hoy y lo pegas aquí tal cual. No hay que recapturar trescientos productos a mano ni pagar por la mudanza.
+Descargas tu menú del sistema que usas hoy (Square, Toast, Loyverse, Clip o una hoja de cálculo) y lo pegas aquí tal cual. No hay que recapturar trescientos productos a mano ni pagar por la mudanza.
 
 ### Tu corte se ve igual
 

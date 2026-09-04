@@ -36,6 +36,10 @@ Aquí el programa sale gratis o casi, porque el proveedor también te procesa la
 
 Eso _no_ es malo por sí solo: comisión de tarjeta vas a pagar igual, la cobre quien la cobre. La pregunta correcta no es «¿cuánto cobran?», es **«¿cuánto más que lo que ya me cobra mi banco?»**. Esa diferencia es el precio real del software — y es el único que crece justo cuando te va bien.
 
+![Pantalla de cobro con las formas de pago: efectivo, débito, crédito, transferencia, app externa y pago dividido.](https://vimpos.com.mx/assets/img/capturas/pos-pago.webp?v=2)
+
+_Las formas de pago en la caja de VIM POS. La tarjeta se registra para que el corte cuadre, pero el cobro va por tu terminal bancaria: por eso el precio del sistema no crece con tu venta._
+
 ### La aritmética, con tus números
 
 Toma lo que cobras con tarjeta en un mes bueno y multiplícalo por la diferencia de tarifa. Un solo punto porcentual pesa más de lo que parece:
