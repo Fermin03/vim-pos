@@ -168,7 +168,7 @@ Una computadora con Windows, una impresora de tickets, un cajón de dinero y el 
 
 Sí. Descargas tu menú del sistema que usas hoy y lo pegas tal cual. Si el formato no cuadra, tráete el archivo a la demo y lo vemos juntos.
 
-Sí. Factura global del periodo, timbrado individual de cualquier ticket y portal de autofacturación por QR, con CFDI 4.0 timbrado por un PAC autorizado. Los folios se pagan aparte; el precio está en la página de precios.
+Sí. Factura global del periodo, timbrado individual de cualquier ticket y portal de autofacturación por QR, con CFDI 4.0 timbrado por un proveedor autorizado por el SAT. Los folios se pagan aparte; el precio está en la página de precios.
 
 Alrededor de un día: carga del menú, configuración y tres horas de capacitación. En el plan Esencial lo haces tú con una guía; desde Negocio lo hacemos nosotros y te acompañamos el día del arranque.
 

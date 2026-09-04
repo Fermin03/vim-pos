@@ -11,6 +11,9 @@ historia de por qué el módulo estuvo apagado y qué se comprobó al encenderlo
 > archivo de XML/PDF/acuse (0098 + `descargar-cfdi`), hora del PAC sin zona, ruta de cancelación
 > (`/api-lite/cfdis/{id}?motive=`), CORS del portal. Detalle en
 > `docs/integraciones/facturama/02-vimpos-y-facturama.md` y `03-activacion-produccion.md`.
+> El paso 5 (quitar los «Muy pronto» del sitio) se hizo el mismo 3 de septiembre de 2026: ya no
+> queda ninguno en `sitio-web/`, la prosa habla en presente sin nombrar al PAC, y los `.md` y
+> `llms.txt` para agentes están regenerados.
 
 ## Por qué existe este documento
 
@@ -60,6 +63,9 @@ porque nadie lo ha intentado, no porque algo lo impida.
 
 ## Lo que el sitio le dice al cliente
 
+*(Vigente hasta el 3 de septiembre de 2026; desde ese día el sitio anuncia la facturación como
+disponible.)*
+
 Aquí no hay problema: el sitio **lo dice**. `precios.html`, `funciones.html` y la página dedicada
 `facturacion-cfdi.html` marcan la facturación como «Muy pronto», y el home lo explica en voz alta:
 *«facturación dice "muy pronto" en vez de fingir que ya está»*.
@@ -88,6 +94,7 @@ Se anuncia como incluida en el precio, sin fecha inventada. Esa es la decisión 
 5. Quitar los «Muy pronto» del sitio. Están en `sitio-web/precios.html` (tres),
    `funciones.html`, `facturacion-cfdi.html`, y la prosa de `index.html` y `nosotros.html` que
    presume de decirlo. Regenerar después los `.md` y `llms.txt` con `pnpm sitio:generar`.
+   **Hecho el 3 de septiembre de 2026.**
 
 ## La guarda del mock — **hecha el 31/08/2026**
 

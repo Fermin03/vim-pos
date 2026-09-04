@@ -41,7 +41,7 @@ export const PAGINAS = [
     markdown: 'facturacion-cfdi.md',
     nombre: 'Facturación CFDI',
     resumen:
-      'Cómo factura un restaurante con VIM POS: autofactura por QR desde el ticket, factura global automática al cerrar el periodo, y el plazo para facturar lo decide el negocio. En producción con un PAC autorizado; el negocio carga su sello digital y compra folios.',
+      'Cómo factura un restaurante con VIM POS: autofactura por QR desde el ticket, factura global automática al cerrar el periodo, y el plazo para facturar lo decide el negocio. Disponible a través de un proveedor autorizado por el SAT; el negocio carga su sello digital y compra folios.',
     enSitemap: true,
   },
   {

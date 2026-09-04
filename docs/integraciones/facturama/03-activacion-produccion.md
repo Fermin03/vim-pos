@@ -86,8 +86,15 @@ Estado actual en producción: `tenant_cfdi_emisor` tiene el RFC de Fermín como 
   reintenta; el failover a Facturapi solo aplica a fallos de transporte, y Facturapi no es
   multi-tenant, así que en la práctica el respaldo es esperar.
 
-## 6. Qué decir en el sitio mientras tanto
+## 6. Qué dice el sitio
 
-`vimpos.com.mx` y `agents.md` dicen «activación del PAC en curso». Es correcto hasta que se
-complete la sección 4. Al terminar, actualizar sitio, `agents.md`, el ADR 0009 (estado
-«superado») y la memoria `project_cfdi_activacion`.
+**Hecho el 3 de septiembre de 2026.** Mientras la sección 4 no estaba completa, `vimpos.com.mx` y
+`agents.md` decían «activación del PAC en curso» y la facturación llevaba la pastilla «Muy pronto».
+Al cerrar la activación se actualizó todo en el mismo día: no queda ningún «Muy pronto» de
+facturación en `sitio-web/`, la prosa la anuncia como disponible sin nombrar a Facturama ni al PAC
+(regla de copy del sitio: «proveedor autorizado por el SAT»), los `.md`, `llms.txt` y `agents.md`
+se regeneraron con `pnpm sitio:generar`, el ADR 0009 quedó en estado «superado» con el paso 5
+marcado como hecho, y la memoria `project_cfdi_activacion` lo refleja.
+
+Si algún día el PAC deja de operar o se cambia de proveedor, este es el punto de partida: volver a
+poner la pastilla y la prosa en futuro es la misma lista de archivos que enumera el paso 5 del ADR.

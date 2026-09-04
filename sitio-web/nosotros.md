@@ -37,7 +37,7 @@ Somos una marca desconocida compitiendo contra otras de veinticinco años. Parec
 
 **En operación en Knock-Out Burger, en León, Guanajuato.** Es el piloto, y lo decimos así: un restaurante real cobrando con el sistema todos los días, no una lista de logotipos de clientes que no existen.
 
-La facturación electrónica —factura global, timbrado individual y portal de autofacturación por QR— está construida y probada, y estamos cerrando la activación con el proveedor autorizado de certificación. Mientras eso no sea firme, en la página de precios dice «muy pronto» y no una fecha inventada. En la demostración te damos la fecha real.
+La facturación electrónica —factura global, timbrado individual y portal de autofacturación por QR— está disponible desde septiembre de 2026. Mientras no estuvo encendida, en la página de precios decía «muy pronto» y no una fecha inventada; esa misma regla aplica a todo lo que anunciemos de aquí en adelante.
 
 ## Cómo hablar con nosotros
 
