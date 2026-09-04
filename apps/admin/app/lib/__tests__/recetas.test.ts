@@ -46,7 +46,10 @@ describe("costoReceta y margen", () => {
     expect(margen(0, 5)).toEqual({ pesos: -5, porcentaje: null });
   });
   it("precioSinIva quita el IVA incluido y respeta el precio neto", () => {
-    expect(precioSinIva(116, 0.16, true)).toBe(100);
-    expect(precioSinIva(100, 0.16, false)).toBe(100);
+    expect(precioSinIva(116, 16, true)).toBe(100);
+    expect(precioSinIva(100, 16, false)).toBe(100);
+  });
+  it("precioSinIva con tasa cero (producto exento) no cambia el precio", () => {
+    expect(precioSinIva(100, 0, true)).toBe(100);
   });
 });
