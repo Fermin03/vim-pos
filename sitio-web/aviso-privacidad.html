@@ -36,7 +36,7 @@
 <link rel="manifest" href="site.webmanifest">
 <meta name="theme-color" content="#0078C9">
 
-<link rel="stylesheet" href="assets/css/vim.css?v=12">
+<link rel="stylesheet" href="assets/css/vim.css?v=13">
 </head>
 <body>
 
@@ -224,8 +224,12 @@
             para verse está en este mismo sitio, así que tu visita no se le anuncia a nadie más.
           </p>
           <p>
-            Si más adelante medimos las visitas, será con una herramienta sin cookies y que no
-            identifica a nadie. Si eso cambiara, se actualizaría este aviso antes.
+            <strong>Sí medimos las visitas</strong>, con la herramienta del proveedor que aloja el
+            sitio (Vercel Web Analytics). No usa cookies, no guarda tu dirección IP y no identifica
+            a nadie: cuenta cuántas personas ven cada página, desde qué país y en qué tipo de
+            dispositivo, y si se hizo clic en WhatsApp, se envió el formulario de demostración, se
+            consultó el precio anual o se abrió una pregunta frecuente. No hay forma de saber quién
+            hizo cada cosa. Si esto cambiara, se actualizaría este aviso antes.
           </p>
         </div>
 
@@ -301,7 +305,11 @@
   </div>
 </footer>
 
-<script src="assets/js/vim.js?v=12" defer></script>
+<script src="assets/js/vim.js?v=13" defer></script>
+<!-- Medición sin cookies (Vercel Web Analytics). Se sirve desde este dominio y
+     solo existe si está encendida en el proyecto de Vercel; si no, es un 404
+     inofensivo. Los eventos se mandan desde vim.js. -->
+<script defer src="/_vercel/insights/script.js"></script>
 <script type="application/ld+json">
 {
   "@context": "https://schema.org",

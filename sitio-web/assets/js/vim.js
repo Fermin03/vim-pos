@@ -23,6 +23,26 @@
   var ANON = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBiaWF4enZtc3Nqc3hkd3FydW1iIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODAyNTMyMzIsImV4cCI6MjA5NTgyOTIzMn0.OsfFcqw-jrj-qZtFkUPQCrLgYtnDmsOxC93iLJShpKs";
   var WHATSAPP = "524761273020";
 
+  /* ---- Medición sin cookies ----------------------------------------------
+     Vercel Web Analytics: el script se sirve desde este mismo dominio, no pone
+     cookies y no identifica a nadie (el aviso de privacidad lo dice así).
+     Esta cola guarda los eventos que ocurran antes de que cargue el script;
+     él la vacía al arrancar. Si el script no está (analítica apagada en
+     Vercel, o el servidor local), nada se rompe: la cola crece y ya.
+
+     Cuatro eventos, los que dicen si el sitio vende: clic en WhatsApp, demo
+     enviada, cambio a precio anual y qué pregunta se abre. */
+  window.va = window.va || function () { (window.vaq = window.vaq || []).push(arguments); };
+  function medir(nombre, datos) {
+    try { window.va("event", { name: nombre, data: datos || {} }); } catch (e) { /* nunca estorba */ }
+  }
+
+  document.querySelectorAll('a[href*="wa.me/"]').forEach(function (a) {
+    a.addEventListener("click", function () {
+      medir("whatsapp", { pagina: location.pathname });
+    });
+  });
+
   /* ---- Menú móvil: cajón lateral ------------------------------------------
      La animación es CSS puro (`translateX`), así que aquí no se mide ni se
      escribe ningún alto — eso era la versión anterior, que se desplegaba hacia
@@ -154,6 +174,7 @@
       panel.style.height = abierto ? "0px" : panel.scrollHeight + "px";
       item.setAttribute("data-abierto", String(!abierto));
       boton.setAttribute("aria-expanded", String(!abierto));
+      if (!abierto) medir("acordeon", { titulo: boton.textContent.trim().slice(0, 80), pagina: location.pathname });
     });
   });
 
@@ -199,6 +220,8 @@
         document.querySelectorAll("[data-nota-periodo]").forEach(function (n) {
           n.textContent = anual ? "al mes, pagando el año, más IVA" : "al mes, más IVA";
         });
+
+        if (anual) medir("precio_anual");
       });
     });
   }
@@ -328,6 +351,7 @@
           form.hidden = true;
           listo.hidden = false;
           listo.querySelector("h2").focus();
+          medir("demo_enviada");
         })
         .catch(function (err) {
           /* El error no deja al visitante sin salida: se le ofrece WhatsApp,
