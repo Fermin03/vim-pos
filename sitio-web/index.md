@@ -12,7 +12,7 @@ Caja, cocina, mesas, inventario y facturación en un solo sistema. La implementa
 
 En operación en Knock-Out Burger, León, Gto.
 
-![Pantalla principal de la caja con los modos de servicio: comedor, para llevar, pick-up y domicilio.](https://vimpos.com.mx/assets/img/capturas/pos-home.webp)
+![La caja en plena venta: el catálogo por categorías y un ticket en curso con una hamburguesa, papas y refresco.](https://vimpos.com.mx/assets/img/capturas/pos-home.webp)
 
 Todo tu sistema vive en tu caja, no en internet
 
@@ -60,13 +60,13 @@ Catálogo por categorías, modificadores con precio —queso extra, sin cebolla,
 
 La comanda sale impresa donde tiene que salir: las bebidas en la barra y la comida en cocina, cada papel con el rótulo de su estación. O en una pantalla, si prefieres no imprimir.
 
-![Pantalla de cocina al vincularse con la caja: se enlaza una vez por la red del local y después recibe ahí cada comanda.](https://vimpos.com.mx/assets/img/capturas/kds.webp)
+![Pantalla de cocina con siete comandas activas, cada una con su tiempo, el término de la carne, los extras y las notas.](https://vimpos.com.mx/assets/img/capturas/kds.webp)
 
 ### Cerrar el turno
 
 Arqueo contra lo que dice el sistema, con sobrante y faltante a la vista, y corte Z sellado. Con el mismo formato de siempre, para que nadie tenga que reaprender a leerlo.
 
-![Monitor del turno: venta, efectivo esperado, IVA y el desglose por forma de pago.](https://vimpos.com.mx/assets/img/capturas/pos-arqueo.webp)
+![Arqueo del cierre de turno: efectivo esperado, efectivo contado y la diferencia, con cada forma de pago en su renglón.](https://vimpos.com.mx/assets/img/capturas/pos-arqueo.webp)
 
 ### Ver tu negocio
 

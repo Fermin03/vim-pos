@@ -24,7 +24,7 @@ Caja, cocina, mesas, inventario y facturación en un solo sistema. La implementa
 
 En operación en Knock-Out Burger, León, Gto.
 
-![Pantalla principal de la caja con los modos de servicio: comedor, para llevar, pick-up y domicilio.](https://vimpos.com.mx/assets/img/capturas/pos-home.webp)
+![La caja en plena venta: el catálogo por categorías y un ticket en curso con una hamburguesa, papas y refresco.](https://vimpos.com.mx/assets/img/capturas/pos-home.webp)
 
 Todo tu sistema vive en tu caja, no en internet
 
@@ -72,13 +72,13 @@ Catálogo por categorías, modificadores con precio —queso extra, sin cebolla,
 
 La comanda sale impresa donde tiene que salir: las bebidas en la barra y la comida en cocina, cada papel con el rótulo de su estación. O en una pantalla, si prefieres no imprimir.
 
-![Pantalla de cocina al vincularse con la caja: se enlaza una vez por la red del local y después recibe ahí cada comanda.](https://vimpos.com.mx/assets/img/capturas/kds.webp)
+![Pantalla de cocina con siete comandas activas, cada una con su tiempo, el término de la carne, los extras y las notas.](https://vimpos.com.mx/assets/img/capturas/kds.webp)
 
 ### Cerrar el turno
 
 Arqueo contra lo que dice el sistema, con sobrante y faltante a la vista, y corte Z sellado. Con el mismo formato de siempre, para que nadie tenga que reaprender a leerlo.
 
-![Monitor del turno: venta, efectivo esperado, IVA y el desglose por forma de pago.](https://vimpos.com.mx/assets/img/capturas/pos-arqueo.webp)
+![Arqueo del cierre de turno: efectivo esperado, efectivo contado y la diferencia, con cada forma de pago en su renglón.](https://vimpos.com.mx/assets/img/capturas/pos-arqueo.webp)
 
 ### Ver tu negocio
 
@@ -286,9 +286,9 @@ _La cocina_
 
 Cada producto sabe de qué estación sale. Las bebidas se imprimen en la barra y la comida en cocina, en lugar de un papel largo que hay que leer entero para encontrar lo tuyo.
 
-![Pantalla de cocina al vincularse con la caja: se enlaza una vez por la red del local y después recibe ahí cada comanda.](https://vimpos.com.mx/assets/img/capturas/kds.webp)
+![Pantalla de cocina con siete comandas activas, cada una con su tiempo, el término de la carne, los extras y las notas.](https://vimpos.com.mx/assets/img/capturas/kds.webp)
 
-_La pantalla de cocina al vincularse con la caja: se enlaza una sola vez por la red del local y después recibe ahí cada comanda. Si tu cocina prefiere papel, la misma comanda sale por la impresora de cada área; las dos cosas conviven._
+_La pantalla de cocina: cada comanda con su tiempo, el término, los extras y la nota del cajero, y la más vieja en rojo. Si tu cocina prefiere papel, la misma comanda sale por la impresora de cada área; las dos cosas conviven._
 
 ### Pantalla o papel
 
@@ -308,9 +308,9 @@ _Comedor_
 
 Para el restaurante con meseros: el mapa del comedor, la cuenta que crece mientras la mesa sigue ahí, y el pedido que sale a cocina cuando se toma y no cuando se paga.
 
-![Mapa de mesas del comedor con el estado de cada una.](https://vimpos.com.mx/assets/img/capturas/pos-mesas.webp)
+![Las mesas abiertas del comedor con su consumo y su tiempo, y la cuenta de la mesa elegida con todo lo que pidió.](https://vimpos.com.mx/assets/img/capturas/pos-mesas.webp)
 
-_El mapa del comedor por secciones: qué mesa está ocupada, cuál lleva más tiempo y cuánto va consumido._
+_Las mesas abiertas del comedor: cuánto lleva cada una, cuánto va consumido, y la cuenta de la mesa elegida con todo lo que pidió, lista para cobrar o para seguir agregando._
 
 ### A cocina antes de cobrar
 
@@ -352,9 +352,9 @@ _Reportes y corte_
 
 El corte Z está calcado del formato que tu equipo ya lee cada noche, a propósito: quien lo revisa no tiene que reaprender dónde mirar. Y el panel suma catorce reportes para cuando quieras entender algo concreto.
 
-![Corte del turno con el desglose por forma de pago y por tipo de servicio.](https://vimpos.com.mx/assets/img/capturas/pos-arqueo.webp)
+![Arqueo del cierre de turno: efectivo esperado, efectivo contado y la diferencia, con cada forma de pago en su renglón.](https://vimpos.com.mx/assets/img/capturas/pos-arqueo.webp)
 
-_El corte del turno: venta, ticket promedio, efectivo esperado con su fondo, IVA, descuentos y devoluciones. Abajo, el desglose por forma de pago y por tipo de servicio._
+_El arqueo al cerrar el turno: lo que el sistema espera por cada forma de pago, lo que el cajero contó, y la diferencia a la vista. Los 40 pesos que faltan en efectivo no se esconden en el total._
 
 ![Panel del dueño con las ventas del día, el ticket promedio y el top de productos.](https://vimpos.com.mx/assets/img/capturas/admin-dashboard.webp)
 
@@ -512,9 +512,9 @@ _Si algo falla_
 
 Un sistema que vive en tu local también puede fallar. La diferencia está en si se arregla solo o si tienes que cerrar la caja hasta que llegue alguien.
 
-![Monitor del turno: venta, efectivo esperado, IVA y el desglose por forma de pago.](https://vimpos.com.mx/assets/img/capturas/pos-arqueo.webp)
+![Arqueo del cierre de turno: efectivo esperado, efectivo contado y la diferencia, con cada forma de pago en su renglón.](https://vimpos.com.mx/assets/img/capturas/pos-arqueo.webp)
 
-_El monitor del turno: la venta, el efectivo que debería haber con su fondo, el IVA y el desglose por forma de pago. Sale igual haya habido internet o no._
+_El arqueo al cerrar el turno: lo que dice el sistema, lo que hay en el cajón y la diferencia. Sale igual haya habido internet o no._
 
 ### Se revisa a sí mismo
 
@@ -568,7 +568,7 @@ _Cómo funciona_
 
 No hay que mandar a nadie a un portal aparte ni dictar un folio por teléfono. El ticket que sale de tu impresora lleva impreso el código: se escanea con la cámara del teléfono, se capturan los datos fiscales una vez, y la factura llega al correo del cliente.
 
-![Ticket impreso de una venta: negocio, folio, cajero, el producto con su modificador, subtotal, IVA, total y el cambio.](https://vimpos.com.mx/assets/img/capturas/ticket-venta.webp)
+![Ticket impreso de una venta con el código QR para facturar al pie: negocio, folio, cajero, el producto con su modificador, subtotal, IVA, total y cambio.](https://vimpos.com.mx/assets/img/capturas/ticket-venta.webp)
 
 _El comensal escanea el código del ticket, pone su RFC y le llega la factura. Tu cajero no vuelve a parar la fila para eso._
 
@@ -791,9 +791,9 @@ Todas, siempre. Llegan solas a tu caja y no hay que agendar a nadie ni pagar la 
 
 Copia diaria en tu local y copia fuera de él. Sin que tengas que acordarte.
 
-![Listado de insumos con existencias y mermas.](https://vimpos.com.mx/assets/img/capturas/admin-inventario.webp)
+![Inventario con cada insumo, su existencia, su mínimo y el aviso cuando anda bajo.](https://vimpos.com.mx/assets/img/capturas/admin-inventario.webp)
 
-_Desde el plan Negocio: cuánto insumo entró, cuánto salió con las ventas y cuánto se fue en mermas. Es donde se ve el dinero que se pierde sin que nadie lo apunte._
+_Desde el plan Negocio: cada insumo con su existencia, su mínimo y el aviso cuando anda bajo. Lo que se descuenta sale de la receta de cada platillo, no de un conteo a mano._
 
 _Si necesitas más_
 
@@ -916,7 +916,7 @@ Media hora, sin compromiso y sin presentación. Vemos tu carta, montamos un par 
 
    Con el precio de la página, sin cotización inflada. Si no te sirve, te lo decimos y no insistimos.
 
-![Pantalla principal de la caja con los modos de servicio: comedor, para llevar, pick-up y domicilio.](https://vimpos.com.mx/assets/img/capturas/pos-home.webp)
+![La caja en plena venta: el catálogo por categorías y un ticket en curso con una hamburguesa, papas y refresco.](https://vimpos.com.mx/assets/img/capturas/pos-home.webp)
 
 _Esto es lo que vas a ver en la demostración, con tus productos y tus precios cargados._
 

@@ -18,7 +18,7 @@ _Cómo funciona_
 
 No hay que mandar a nadie a un portal aparte ni dictar un folio por teléfono. El ticket que sale de tu impresora lleva impreso el código: se escanea con la cámara del teléfono, se capturan los datos fiscales una vez, y la factura llega al correo del cliente.
 
-![Ticket impreso de una venta: negocio, folio, cajero, el producto con su modificador, subtotal, IVA, total y el cambio.](https://vimpos.com.mx/assets/img/capturas/ticket-venta.webp)
+![Ticket impreso de una venta con el código QR para facturar al pie: negocio, folio, cajero, el producto con su modificador, subtotal, IVA, total y cambio.](https://vimpos.com.mx/assets/img/capturas/ticket-venta.webp)
 
 _El comensal escanea el código del ticket, pone su RFC y le llega la factura. Tu cajero no vuelve a parar la fila para eso._
 
