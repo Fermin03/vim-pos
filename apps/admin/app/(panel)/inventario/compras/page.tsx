@@ -8,16 +8,15 @@ import { listarCompras, type CompraResumen } from "../../../lib/compras";
 import { listarProveedores, type Proveedor } from "../../../lib/proveedores";
 import { listarSucursalesOpciones, type SucursalOpcion } from "../../../lib/inventario";
 import { mensajeError } from "../../../lib/errores";
+import { haceDiasISO, hoyISO } from "../../../lib/fechas";
 
 const fmt = (n: number) => new Intl.NumberFormat("es-MX", { style: "currency", currency: "MXN" }).format(n);
 const input = "h-10 rounded border border-line-strong px-2 text-sm outline-none focus:border-ink";
-const hoy = () => new Date().toISOString().slice(0, 10);
-const hace = (dias: number) => new Date(Date.now() - dias * 86400000).toISOString().slice(0, 10);
 
 export default function ComprasPage() {
   const router = useRouter();
-  const [desde, setDesde] = useState(hace(30));
-  const [hasta, setHasta] = useState(hoy());
+  const [desde, setDesde] = useState(haceDiasISO(30));
+  const [hasta, setHasta] = useState(hoyISO());
   const [proveedorId, setProveedorId] = useState("");
   const [sucursalId, setSucursalId] = useState("");
   const [proveedores, setProveedores] = useState<Proveedor[]>([]);
@@ -25,7 +24,7 @@ export default function ComprasPage() {
   const [filas, setFilas] = useState<CompraResumen[] | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const rangoInvalido = desde > hasta ? "La fecha inicial no puede ser mayor que la final" : hasta > hoy() ? "No puedes elegir fechas futuras" : null;
+  const rangoInvalido = desde > hasta ? "La fecha inicial no puede ser mayor que la final" : hasta > hoyISO() ? "No puedes elegir fechas futuras" : null;
 
   async function cargar() {
     if (rangoInvalido) return;
@@ -45,8 +44,8 @@ export default function ComprasPage() {
       />
       <PageBody>
         <div className="mb-4 flex flex-wrap items-end gap-3">
-          <label className="grid gap-1 text-[12px] text-ink-2">Desde<input type="date" className={input} value={desde} max={hoy()} onChange={(e) => setDesde(e.target.value)} /></label>
-          <label className="grid gap-1 text-[12px] text-ink-2">Hasta<input type="date" className={input} value={hasta} max={hoy()} onChange={(e) => setHasta(e.target.value)} /></label>
+          <label className="grid gap-1 text-[12px] text-ink-2">Desde<input type="date" className={input} value={desde} max={hoyISO()} onChange={(e) => setDesde(e.target.value)} /></label>
+          <label className="grid gap-1 text-[12px] text-ink-2">Hasta<input type="date" className={input} value={hasta} max={hoyISO()} onChange={(e) => setHasta(e.target.value)} /></label>
           <label className="grid gap-1 text-[12px] text-ink-2">Proveedor
             <select className={input} value={proveedorId} onChange={(e) => setProveedorId(e.target.value)}><option value="">Todos</option>{proveedores.map((p) => <option key={p.id} value={p.id}>{p.nombre}</option>)}</select>
           </label>
