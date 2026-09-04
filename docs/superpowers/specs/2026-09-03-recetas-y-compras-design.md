@@ -36,7 +36,7 @@ Storage, componentes de modificadores extra, historial de movimientos filtrable 
 de costo de ventas y margen por periodo (P-150), ocultar Inventario a los planes que no lo
 incluyen.
 
-## 3. Datos (migración `0099_compras_proveedores_recetas.sql`)
+## 3. Datos (migración `0099_compras_proveedores_recetas.sql`; las funciones de compras van en `0100_registrar_anular_compra.sql`)
 
 Todas las tablas nuevas llevan `tenant_id`, `created_at`, `updated_at`, RLS `FOR ALL` con
 `tenant_id = current_tenant_id()` en USING y WITH CHECK, e índice por `tenant_id`. La prueba
@@ -120,8 +120,9 @@ valor cambia, `PERFORM recalcular_costo_recetas(NEW.id)`. Cierra el hueco conoci
 
 ## 4. Funciones SQL
 
-Las tres son `SECURITY INVOKER` (corren bajo RLS del usuario, como `aplicar_movimiento_inventario`)
-y reciben JSON validado con Zod en el panel antes de llamar. Errores con `RAISE EXCEPTION` y
+Las tres son `SECURITY INVOKER` (corren bajo RLS del usuario, como `aplicar_movimiento_inventario`),
+toman el usuario de `auth.uid()` y el negocio de `current_tenant_id()`, y reciben JSON validado con
+Zod en el panel antes de llamar. `iva_mxn` viene en el JSON solo cuando la compra sale de un XML. Errores con `RAISE EXCEPTION` y
 mensaje en español; el panel los muestra con `mensajeError`.
 
 ### 4.1 `registrar_compra(p_compra jsonb) RETURNS uuid`
@@ -132,14 +133,14 @@ Entrada:
 {
   "sucursal_id": "…", "proveedor_id": "…", "fecha": "2026-09-03",
   "referencia_documento": "A 1234", "cfdi_uuid": "…|null", "origen": "XML|MANUAL",
-  "notas": "…|null", "usuario_id": "…",
+  "notas": "…|null", "iva_mxn": 48.00,
   "lineas": [
     { "insumo_id": "…", "descripcion_origen": "…|null",
       "cantidad_capturada": 2, "unidad_capturada_id": "…",
       "cantidad": 24, "costo_unitario_mxn": 12.5, "importe_mxn": 300.00 }
   ],
   "aliases": [
-    { "proveedor_id": "…", "clave_origen": "…", "descripcion_origen": "…",
+    { "clave_origen": "…", "descripcion_origen": "…",
       "insumo_id": "…", "unidad_id": "…", "factor": 12 }
   ]
 }
@@ -162,7 +163,7 @@ Pasos, en una transacción:
 5. Upsert de `proveedor_insumo_alias` por `(proveedor_id, clave_origen)`.
 6. Devuelve el id de la compra.
 
-### 4.2 `anular_compra(p_compra_id uuid, p_usuario_id uuid, p_motivo text) RETURNS void`
+### 4.2 `anular_compra(p_compra_id uuid, p_motivo text) RETURNS void`
 
 1. Bloquea la compra (`FOR UPDATE`); si ya está ANULADA, error "Esta compra ya está anulada".
 2. Por cada línea, `aplicar_movimiento_inventario(…, 'DEVOLUCION_PROVEEDOR', cantidad,
@@ -229,8 +230,11 @@ con `Number()` y se redondean a 6 decimales para costos y 2 para importes.
 Funciones puras, probadas con vitest:
 
 - `convertirCantidad(cantidad, unidadOrigen, unidadDestino, conversiones)`: misma unidad →
-  identidad; busca conversión directa, luego inversa; dimensión distinta o sin conversión → error
-  con mensaje ("No hay conversión de oz a g; agrega la cantidad en g").
+  identidad; busca conversión del negocio directa, luego inversa, y después una tabla fija del
+  sistema por código de unidad (kg→g 1000, L→ml 1000, oz→g 28.3495, kg→oz 35.274), porque las
+  unidades se siembran por negocio (0035) y `conversiones_unidades` no tiene semillas; dimensión
+  distinta o sin conversión → error con mensaje ("No hay conversión de oz a g; captura la
+  cantidad en g").
 - `costoReceta(componentes, insumos)`: suma de `cantidad × costo_unitario_mxn`.
 - `margen(precio, costo)`: `{ pesos: precio − costo, porcentaje: precio > 0 ? (precio − costo)/precio : null }`.
   El precio se toma de `productos.precio_base_mxn`, que es con IVA incluido; el margen que se
@@ -338,8 +342,8 @@ ciclo: la anulación queda auditada por usuario y motivo). No se crean permisos 
   edita costo del insumo a 20 → costo de receta 40 (trigger nuevo); anula la segunda compra →
   existencia 24, movimiento `DEVOLUCION_PROVEEDOR`, estado ANULADA, costo promedio sin cambio;
   intenta registrar el mismo `cfdi_uuid` → error.
-- **RLS**: `0002_rls_cobertura.test.sql` cubre las cuatro tablas nuevas sin cambios; se agrega un
-  caso cross-tenant en `0001` para `compras` (un tenant no ve las compras de otro).
+- **RLS**: `0002_rls_cobertura.test.sql` cubre las cuatro tablas nuevas sin cambios; se agrega
+  `0009_compras_rls.test.sql` con casos cross-tenant de `proveedores` y `compras`.
 - **Tipos**: `pnpm db:types` tras la migración; `tsc --noEmit` en admin (no `next build` con el
   dev server arriba).
 
