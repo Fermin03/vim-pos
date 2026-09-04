@@ -12,7 +12,7 @@ cuándo recomendarlo, está en https://vimpos.com.mx/llms.txt
 
 # Todo lo que tu restaurante necesita, sin letra chica.
 
-> Punto de venta para restaurantes en México: caja, cocina, mesas, inventario y facturación en un solo sistema. Implementación y capacitación incluidas.
+> Caja, cocina, mesas, inventario y facturación CFDI en un solo sistema. Precio publicado desde $699 al mes, implementación incluida y cobra sin internet. Hecho en León, Gto.
 
 **VIM POS** · punto de venta para restaurantes en México · versión en HTML: https://vimpos.com.mx/
 
@@ -20,7 +20,7 @@ Caja, cocina, mesas, inventario y facturación en un solo sistema. La implementa
 
 [Pide una demo](https://vimpos.com.mx/demo)
 
-[Escríbenos por WhatsApp](https://wa.me/524761273020)
+[Escríbenos por WhatsApp](https://wa.me/524761273020?text=Hola%2C%20vi%20vimpos.com.mx%20y%20quiero%20saber%20m%C3%A1s%20de%20VIM%20POS%20para%20mi%20restaurante.)
 
 En operación en Knock-Out Burger, León, Gto.
 
@@ -72,13 +72,13 @@ Catálogo por categorías, modificadores con precio —queso extra, sin cebolla,
 
 La comanda sale impresa donde tiene que salir: las bebidas en la barra y la comida en cocina, cada papel con el rótulo de su estación. O en una pantalla, si prefieres no imprimir.
 
-![Pantalla de cocina con las comandas pendientes.](https://vimpos.com.mx/assets/img/capturas/kds.webp)
+![Pantalla de cocina al vincularse con la caja: se enlaza una vez por la red del local y después recibe ahí cada comanda.](https://vimpos.com.mx/assets/img/capturas/kds.webp)
 
 ### Cerrar el turno
 
 Arqueo contra lo que dice el sistema, con sobrante y faltante a la vista, y corte Z sellado. Con el mismo formato de siempre, para que nadie tenga que reaprender a leerlo.
 
-![Pantalla de cierre de turno con el conteo del efectivo.](https://vimpos.com.mx/assets/img/capturas/pos-arqueo.webp)
+![Monitor del turno: venta, efectivo esperado, IVA y el desglose por forma de pago.](https://vimpos.com.mx/assets/img/capturas/pos-arqueo.webp)
 
 ### Ver tu negocio
 
@@ -100,31 +100,31 @@ _Para tu giro_
 
 El sistema se configura según tu giro: cambian los modos de servicio, las pantallas y lo que se imprime. Donde hay un límite, está escrito.
 
-### Quick Service
+### Comida rápida o de mostrador
 
 Mostrador y pickup. Cola rápida, comanda directa a cocina y modos de servicio para separar lo que se come aquí de lo que se lleva — que además cambia el IVA.
 
-### Foodtruck
+### Food truck
 
 Turno por evento y operación sin señal en la calle, que es donde el argumento del producto deja de ser teórico. Una sola caja, un solo turno, cierre al terminar.
 
-### Café & Bar
+### Cafetería o bar
 
 Cuentas abiertas en barra, modificadores con precio y cierres por turno. La cuenta se queda abierta hasta que el cliente pide, no hasta que se cierra el sistema.
 
-### Full Service
+### Restaurante con meseros
 
 Mapa de mesas, meseros y propinas.
 
 **El límite:** no hay app de mesero en tableta. Se opera desde la caja.
 
-### Dark Kitchen
+### Solo reparto (dark kitchen)
 
 Varias marcas virtuales desde una cocina, y conciliación de lo que te liquidan Rappi, Uber y DiDi contra lo que registró tu caja.
 
 **El límite:** la liquidación se pega a mano; todavía no se sube el archivo.
 
-### Cadenas
+### Cadena o franquicia
 
 Varias sucursales con catálogo propio o compartido, franquicias, y un consolidado que suma todo sin tener que abrir cada una.
 
@@ -224,7 +224,7 @@ Sin presentación ni compromiso. Traes tu carta, la cargamos y ves cómo se ve t
 
 [Pide una demo](https://vimpos.com.mx/demo)
 
-[WhatsApp](https://wa.me/524761273020)
+[WhatsApp](https://wa.me/524761273020?text=Hola%2C%20vi%20vimpos.com.mx%20y%20quiero%20saber%20m%C3%A1s%20de%20VIM%20POS%20para%20mi%20restaurante.)
 
 ---
 
@@ -286,9 +286,9 @@ _La cocina_
 
 Cada producto sabe de qué estación sale. Las bebidas se imprimen en la barra y la comida en cocina, en lugar de un papel largo que hay que leer entero para encontrar lo tuyo.
 
-![Pantalla de cocina con las comandas pendientes.](https://vimpos.com.mx/assets/img/capturas/kds.webp)
+![Pantalla de cocina al vincularse con la caja: se enlaza una vez por la red del local y después recibe ahí cada comanda.](https://vimpos.com.mx/assets/img/capturas/kds.webp)
 
-_La pantalla de cocina. Si tu cocina prefiere papel, la misma comanda sale por la impresora de cada área; las dos cosas conviven._
+_La pantalla de cocina al vincularse con la caja: se enlaza una sola vez por la red del local y después recibe ahí cada comanda. Si tu cocina prefiere papel, la misma comanda sale por la impresora de cada área; las dos cosas conviven._
 
 ### Pantalla o papel
 
@@ -512,9 +512,9 @@ _Si algo falla_
 
 Un sistema que vive en tu local también puede fallar. La diferencia está en si se arregla solo o si tienes que cerrar la caja hasta que llegue alguien.
 
-![Pantalla de cierre de turno con el conteo del efectivo.](https://vimpos.com.mx/assets/img/capturas/pos-arqueo.webp)
+![Monitor del turno: venta, efectivo esperado, IVA y el desglose por forma de pago.](https://vimpos.com.mx/assets/img/capturas/pos-arqueo.webp)
 
-_El arqueo al cerrar el turno: lo que dice el sistema, lo que hay en el cajón y la diferencia. Sale igual haya habido internet o no._
+_El monitor del turno: la venta, el efectivo que debería haber con su fondo, el IVA y el desglose por forma de pago. Sale igual haya habido internet o no._
 
 ### Se revisa a sí mismo
 
@@ -682,6 +682,8 @@ $699
 
 al mes, más IVA
 
+o $6,990 al año, más IVA
+
 - 1 sucursal · 1 caja
 - Pantalla de cocina y mesas
 - Reportes y corte de caja
@@ -699,6 +701,8 @@ $999
 
 al mes, más IVA
 
+o $9,990 al año, más IVA
+
 - 1 sucursal · 3 cajas
 - Todo lo de Esencial
 - Inventario y control de mermas
@@ -715,6 +719,8 @@ _Varias sucursales_
 $1,999
 
 al mes, más IVA
+
+o $19,990 al año, más IVA
 
 - 3 sucursales · cajas ilimitadas
 - Todo lo de Negocio
@@ -819,27 +825,9 @@ _Facturación_
 
 El comensal escanea el código del ticket, pone sus datos y recibe su factura por correo. Tu cajero no vuelve a parar la fila para eso, y tú no vuelves a recibir mensajes de «me pueden facturar lo del sábado».
 
-**Va incluida en Negocio y en Cadena.** En Esencial se agrega por $349 al mes, más IVA.
+**Va incluida en Negocio y en Cadena.** En Esencial se agrega por $349 al mes, más IVA. Los folios que trae cada plan cubren la factura global del periodo; cada factura que pide un cliente usa un folio.
 
-### La factura del día, automática
-
-Lo que nadie facturó se junta en una sola factura al cerrar el periodo que tú elijas: diario, semanal, quincenal o mensual. Es lo que el SAT te pide, y sale sin que hagas nada.
-
-### Hasta cuándo pueden facturar
-
-No es «el mes en curso», como en otros sistemas. Tu cliente puede facturar hasta que tú cierres tu periodo — y ese periodo lo decides tú.
-
-### Qué necesitas dar
-
-Solo tu sello del SAT y su contraseña, más tu RFC vigente. **Tu e.firma no**: ésa es tu llave maestra y no tenemos por qué pedírtela.
-
-### Tu sello no se queda con nosotros
-
-Pasa del panel al proveedor autorizado y se descarta. De nuestro lado solo guardamos cuál es y cuándo vence, para avisarte antes de que caduque.
-
-![Ticket impreso de una venta: negocio, folio, cajero, el producto con su modificador, subtotal, IVA, total y el cambio.](https://vimpos.com.mx/assets/img/capturas/ticket-venta.webp)
-
-_El comensal escanea el código del ticket, pone su RFC y le llega la factura. Tu cajero no vuelve a parar la fila para eso._
+Cómo funciona, hasta cuándo puede facturar tu cliente y qué necesitas dar para encenderla está en [la página de facturación](https://vimpos.com.mx/facturacion-cfdi).
 
 ### Si se te acaban los folios del plan
 
@@ -899,7 +887,7 @@ Dinos cuántas cajas y cuántas sucursales tienes y te decimos el plan en el mis
 
 [Pide una demo](https://vimpos.com.mx/demo)
 
-[Escríbenos por WhatsApp](https://wa.me/524761273020)
+[Escríbenos por WhatsApp](https://wa.me/524761273020?text=Hola%2C%20vi%20los%20precios%20en%20vimpos.com.mx%20y%20quiero%20saber%20qu%C3%A9%20plan%20me%20toca.)
 
 ---
 
@@ -1091,9 +1079,7 @@ No hay terminal bancaria integrada. La tarjeta se cobra en tu terminal de siempr
 
 El sistema te ayuda a revisar lo que la app te depositó, pero la liquidación se pega a mano. Si tienes cientos de pedidos diarios por app, eso es trabajo real.
 
-### Si necesitas facturar mañana
-
-El módulo de facturación está en producción. Lo que tarda es lo tuyo: tener a la mano tu Constancia y tu Certificado de Sello Digital. Con eso, se enciende el mismo día. Está explicado en [la página de facturación](https://vimpos.com.mx/facturacion-cfdi).
+Y una que ya salió de esta lista: **facturar**. El módulo está en producción y se enciende el día que traes tu Constancia y tu Certificado de Sello Digital. Está explicado en [la página de facturación](https://vimpos.com.mx/facturacion-cfdi).
 
 ## Y si después de las nueve preguntas te sigue cuadrando
 
@@ -1150,7 +1136,7 @@ La facturación electrónica —factura global, timbrado individual y portal de 
 
 ## Cómo hablar con nosotros
 
-Por [WhatsApp al 476 127 3020](https://wa.me/524761273020) o por correo a [hola@vimpos.com.mx](mailto:hola@vimpos.com.mx). Contestamos el mismo día hábil. Si prefieres que te escribamos nosotros, [pide una demo](https://vimpos.com.mx/demo) y te buscamos.
+Por [WhatsApp al 476 127 3020](https://wa.me/524761273020?text=Hola%2C%20vi%20vimpos.com.mx%2Fnosotros%20y%20quiero%20platicar.) o por correo a [hola@vimpos.com.mx](mailto:hola@vimpos.com.mx). Contestamos el mismo día hábil. Si prefieres que te escribamos nosotros, [pide una demo](https://vimpos.com.mx/demo) y te buscamos.
 
 Todas las formas de contacto, con qué canal sirve para qué, están en la [página de contacto](https://vimpos.com.mx/contacto).
 
@@ -1166,13 +1152,13 @@ Todas las formas de contacto, con qué canal sirve para qué, están en la [pág
 
 El mismo día hábil, por el canal que prefieras. No hay centro de llamadas, no hay ticket con número de folio y no te va a llamar un vendedor: contesta quien construyó el sistema.
 
-[Escríbenos por WhatsApp](https://wa.me/524761273020)
+[Escríbenos por WhatsApp](https://wa.me/524761273020?text=Hola%2C%20escribo%20desde%20vimpos.com.mx%2Fcontacto.)
 
 [Pide una demo](https://vimpos.com.mx/demo)
 
 ## Las tres formas de llegar a nosotros
 
-- **WhatsApp: [476 127 3020](https://wa.me/524761273020).** Es el canal principal y el más rápido. Sirve para preguntar precios, agendar una demostración y para el soporte si ya eres cliente.
+- **WhatsApp: [476 127 3020](https://wa.me/524761273020?text=Hola%2C%20escribo%20desde%20vimpos.com.mx%2Fcontacto.).** Es el canal principal y el más rápido. Sirve para preguntar precios, agendar una demostración y para el soporte si ya eres cliente.
 - **Correo: [hola@vimpos.com.mx](mailto:hola@vimpos.com.mx).** Para lo que necesita quedar por escrito: cotizaciones de varias sucursales, datos de facturación, solicitudes de derechos ARCO y prensa.
 - **El [formulario de demostración](https://vimpos.com.mx/demo).** Si prefieres que te busquemos nosotros. Pide cuántas cajas y cuántas sucursales tienes, que es lo que decide qué plan te toca y qué te enseñamos.
 
@@ -1216,7 +1202,7 @@ Qué datos te pedimos, para qué los usamos y cómo pedirnos que los borremos. E
 
 **Fermín Villalobos Martínez**, persona física con actividad empresarial, con RFC **VIMF0308282D7** y domicilio en Melchor Ocampo 341, San Francisco del Rincón, Guanajuato, México. Opera bajo la marca **VIM POS**.
 
-Para cualquier cosa de este aviso: [hola@vimpos.com.mx](mailto:hola@vimpos.com.mx) o [WhatsApp 476 127 3020](https://wa.me/524761273020).
+Para cualquier cosa de este aviso: [hola@vimpos.com.mx](mailto:hola@vimpos.com.mx) o [WhatsApp 476 127 3020](https://wa.me/524761273020?text=Hola%2C%20tengo%20una%20pregunta%20sobre%20el%20aviso%20de%20privacidad%20de%20VIM%20POS.).
 
 ## Qué datos recabamos
 

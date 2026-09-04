@@ -6,13 +6,13 @@
 
 El mismo día hábil, por el canal que prefieras. No hay centro de llamadas, no hay ticket con número de folio y no te va a llamar un vendedor: contesta quien construyó el sistema.
 
-[Escríbenos por WhatsApp](https://wa.me/524761273020)
+[Escríbenos por WhatsApp](https://wa.me/524761273020?text=Hola%2C%20escribo%20desde%20vimpos.com.mx%2Fcontacto.)
 
 [Pide una demo](https://vimpos.com.mx/demo)
 
 ## Las tres formas de llegar a nosotros
 
-- **WhatsApp: [476 127 3020](https://wa.me/524761273020).** Es el canal principal y el más rápido. Sirve para preguntar precios, agendar una demostración y para el soporte si ya eres cliente.
+- **WhatsApp: [476 127 3020](https://wa.me/524761273020?text=Hola%2C%20escribo%20desde%20vimpos.com.mx%2Fcontacto.).** Es el canal principal y el más rápido. Sirve para preguntar precios, agendar una demostración y para el soporte si ya eres cliente.
 - **Correo: [hola@vimpos.com.mx](mailto:hola@vimpos.com.mx).** Para lo que necesita quedar por escrito: cotizaciones de varias sucursales, datos de facturación, solicitudes de derechos ARCO y prensa.
 - **El [formulario de demostración](https://vimpos.com.mx/demo).** Si prefieres que te busquemos nosotros. Pide cuántas cajas y cuántas sucursales tienes, que es lo que decide qué plan te toca y qué te enseñamos.
 

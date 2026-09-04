@@ -344,6 +344,10 @@
           "value": "SAMEORIGIN"
         },
         {
+          "key": "Content-Security-Policy",
+          "value": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self' https://pbiaxzvmssjsxdwqrumb.supabase.co; object-src 'none'; base-uri 'self'; frame-ancestors 'self'; form-action 'self'"
+        },
+        {
           "key": "Referrer-Policy",
           "value": "strict-origin-when-cross-origin"
         },

@@ -54,9 +54,9 @@ _La cocina_
 
 Cada producto sabe de qué estación sale. Las bebidas se imprimen en la barra y la comida en cocina, en lugar de un papel largo que hay que leer entero para encontrar lo tuyo.
 
-![Pantalla de cocina con las comandas pendientes.](https://vimpos.com.mx/assets/img/capturas/kds.webp)
+![Pantalla de cocina al vincularse con la caja: se enlaza una vez por la red del local y después recibe ahí cada comanda.](https://vimpos.com.mx/assets/img/capturas/kds.webp)
 
-_La pantalla de cocina. Si tu cocina prefiere papel, la misma comanda sale por la impresora de cada área; las dos cosas conviven._
+_La pantalla de cocina al vincularse con la caja: se enlaza una sola vez por la red del local y después recibe ahí cada comanda. Si tu cocina prefiere papel, la misma comanda sale por la impresora de cada área; las dos cosas conviven._
 
 ### Pantalla o papel
 

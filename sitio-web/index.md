@@ -1,6 +1,6 @@
 # Todo lo que tu restaurante necesita, sin letra chica.
 
-> Punto de venta para restaurantes en México: caja, cocina, mesas, inventario y facturación en un solo sistema. Implementación y capacitación incluidas.
+> Caja, cocina, mesas, inventario y facturación CFDI en un solo sistema. Precio publicado desde $699 al mes, implementación incluida y cobra sin internet. Hecho en León, Gto.
 
 **VIM POS** · punto de venta para restaurantes en México · versión en HTML: https://vimpos.com.mx/
 
@@ -8,7 +8,7 @@ Caja, cocina, mesas, inventario y facturación en un solo sistema. La implementa
 
 [Pide una demo](https://vimpos.com.mx/demo)
 
-[Escríbenos por WhatsApp](https://wa.me/524761273020)
+[Escríbenos por WhatsApp](https://wa.me/524761273020?text=Hola%2C%20vi%20vimpos.com.mx%20y%20quiero%20saber%20m%C3%A1s%20de%20VIM%20POS%20para%20mi%20restaurante.)
 
 En operación en Knock-Out Burger, León, Gto.
 
@@ -60,13 +60,13 @@ Catálogo por categorías, modificadores con precio —queso extra, sin cebolla,
 
 La comanda sale impresa donde tiene que salir: las bebidas en la barra y la comida en cocina, cada papel con el rótulo de su estación. O en una pantalla, si prefieres no imprimir.
 
-![Pantalla de cocina con las comandas pendientes.](https://vimpos.com.mx/assets/img/capturas/kds.webp)
+![Pantalla de cocina al vincularse con la caja: se enlaza una vez por la red del local y después recibe ahí cada comanda.](https://vimpos.com.mx/assets/img/capturas/kds.webp)
 
 ### Cerrar el turno
 
 Arqueo contra lo que dice el sistema, con sobrante y faltante a la vista, y corte Z sellado. Con el mismo formato de siempre, para que nadie tenga que reaprender a leerlo.
 
-![Pantalla de cierre de turno con el conteo del efectivo.](https://vimpos.com.mx/assets/img/capturas/pos-arqueo.webp)
+![Monitor del turno: venta, efectivo esperado, IVA y el desglose por forma de pago.](https://vimpos.com.mx/assets/img/capturas/pos-arqueo.webp)
 
 ### Ver tu negocio
 
@@ -88,31 +88,31 @@ _Para tu giro_
 
 El sistema se configura según tu giro: cambian los modos de servicio, las pantallas y lo que se imprime. Donde hay un límite, está escrito.
 
-### Quick Service
+### Comida rápida o de mostrador
 
 Mostrador y pickup. Cola rápida, comanda directa a cocina y modos de servicio para separar lo que se come aquí de lo que se lleva — que además cambia el IVA.
 
-### Foodtruck
+### Food truck
 
 Turno por evento y operación sin señal en la calle, que es donde el argumento del producto deja de ser teórico. Una sola caja, un solo turno, cierre al terminar.
 
-### Café & Bar
+### Cafetería o bar
 
 Cuentas abiertas en barra, modificadores con precio y cierres por turno. La cuenta se queda abierta hasta que el cliente pide, no hasta que se cierra el sistema.
 
-### Full Service
+### Restaurante con meseros
 
 Mapa de mesas, meseros y propinas.
 
 **El límite:** no hay app de mesero en tableta. Se opera desde la caja.
 
-### Dark Kitchen
+### Solo reparto (dark kitchen)
 
 Varias marcas virtuales desde una cocina, y conciliación de lo que te liquidan Rappi, Uber y DiDi contra lo que registró tu caja.
 
 **El límite:** la liquidación se pega a mano; todavía no se sube el archivo.
 
-### Cadenas
+### Cadena o franquicia
 
 Varias sucursales con catálogo propio o compartido, franquicias, y un consolidado que suma todo sin tener que abrir cada una.
 
@@ -212,7 +212,7 @@ Sin presentación ni compromiso. Traes tu carta, la cargamos y ves cómo se ve t
 
 [Pide una demo](https://vimpos.com.mx/demo)
 
-[WhatsApp](https://wa.me/524761273020)
+[WhatsApp](https://wa.me/524761273020?text=Hola%2C%20vi%20vimpos.com.mx%20y%20quiero%20saber%20m%C3%A1s%20de%20VIM%20POS%20para%20mi%20restaurante.)
 
 ---
 

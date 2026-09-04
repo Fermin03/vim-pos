@@ -41,7 +41,7 @@ La facturación electrónica —factura global, timbrado individual y portal de 
 
 ## Cómo hablar con nosotros
 
-Por [WhatsApp al 476 127 3020](https://wa.me/524761273020) o por correo a [hola@vimpos.com.mx](mailto:hola@vimpos.com.mx). Contestamos el mismo día hábil. Si prefieres que te escribamos nosotros, [pide una demo](https://vimpos.com.mx/demo) y te buscamos.
+Por [WhatsApp al 476 127 3020](https://wa.me/524761273020?text=Hola%2C%20vi%20vimpos.com.mx%2Fnosotros%20y%20quiero%20platicar.) o por correo a [hola@vimpos.com.mx](mailto:hola@vimpos.com.mx). Contestamos el mismo día hábil. Si prefieres que te escribamos nosotros, [pide una demo](https://vimpos.com.mx/demo) y te buscamos.
 
 Todas las formas de contacto, con qué canal sirve para qué, están en la [página de contacto](https://vimpos.com.mx/contacto).
 

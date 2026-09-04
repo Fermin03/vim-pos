@@ -12,7 +12,7 @@ Qué datos te pedimos, para qué los usamos y cómo pedirnos que los borremos. E
 
 **Fermín Villalobos Martínez**, persona física con actividad empresarial, con RFC **VIMF0308282D7** y domicilio en Melchor Ocampo 341, San Francisco del Rincón, Guanajuato, México. Opera bajo la marca **VIM POS**.
 
-Para cualquier cosa de este aviso: [hola@vimpos.com.mx](mailto:hola@vimpos.com.mx) o [WhatsApp 476 127 3020](https://wa.me/524761273020).
+Para cualquier cosa de este aviso: [hola@vimpos.com.mx](mailto:hola@vimpos.com.mx) o [WhatsApp 476 127 3020](https://wa.me/524761273020?text=Hola%2C%20tengo%20una%20pregunta%20sobre%20el%20aviso%20de%20privacidad%20de%20VIM%20POS.).
 
 ## Qué datos recabamos
 

@@ -20,6 +20,8 @@ $699
 
 al mes, más IVA
 
+o $6,990 al año, más IVA
+
 - 1 sucursal · 1 caja
 - Pantalla de cocina y mesas
 - Reportes y corte de caja
@@ -37,6 +39,8 @@ $999
 
 al mes, más IVA
 
+o $9,990 al año, más IVA
+
 - 1 sucursal · 3 cajas
 - Todo lo de Esencial
 - Inventario y control de mermas
@@ -53,6 +57,8 @@ _Varias sucursales_
 $1,999
 
 al mes, más IVA
+
+o $19,990 al año, más IVA
 
 - 3 sucursales · cajas ilimitadas
 - Todo lo de Negocio
@@ -157,27 +163,9 @@ _Facturación_
 
 El comensal escanea el código del ticket, pone sus datos y recibe su factura por correo. Tu cajero no vuelve a parar la fila para eso, y tú no vuelves a recibir mensajes de «me pueden facturar lo del sábado».
 
-**Va incluida en Negocio y en Cadena.** En Esencial se agrega por $349 al mes, más IVA.
+**Va incluida en Negocio y en Cadena.** En Esencial se agrega por $349 al mes, más IVA. Los folios que trae cada plan cubren la factura global del periodo; cada factura que pide un cliente usa un folio.
 
-### La factura del día, automática
-
-Lo que nadie facturó se junta en una sola factura al cerrar el periodo que tú elijas: diario, semanal, quincenal o mensual. Es lo que el SAT te pide, y sale sin que hagas nada.
-
-### Hasta cuándo pueden facturar
-
-No es «el mes en curso», como en otros sistemas. Tu cliente puede facturar hasta que tú cierres tu periodo — y ese periodo lo decides tú.
-
-### Qué necesitas dar
-
-Solo tu sello del SAT y su contraseña, más tu RFC vigente. **Tu e.firma no**: ésa es tu llave maestra y no tenemos por qué pedírtela.
-
-### Tu sello no se queda con nosotros
-
-Pasa del panel al proveedor autorizado y se descarta. De nuestro lado solo guardamos cuál es y cuándo vence, para avisarte antes de que caduque.
-
-![Ticket impreso de una venta: negocio, folio, cajero, el producto con su modificador, subtotal, IVA, total y el cambio.](https://vimpos.com.mx/assets/img/capturas/ticket-venta.webp)
-
-_El comensal escanea el código del ticket, pone su RFC y le llega la factura. Tu cajero no vuelve a parar la fila para eso._
+Cómo funciona, hasta cuándo puede facturar tu cliente y qué necesitas dar para encenderla está en [la página de facturación](https://vimpos.com.mx/facturacion-cfdi).
 
 ### Si se te acaban los folios del plan
 
@@ -237,7 +225,7 @@ Dinos cuántas cajas y cuántas sucursales tienes y te decimos el plan en el mis
 
 [Pide una demo](https://vimpos.com.mx/demo)
 
-[Escríbenos por WhatsApp](https://wa.me/524761273020)
+[Escríbenos por WhatsApp](https://wa.me/524761273020?text=Hola%2C%20vi%20los%20precios%20en%20vimpos.com.mx%20y%20quiero%20saber%20qu%C3%A9%20plan%20me%20toca.)
 
 ---
 

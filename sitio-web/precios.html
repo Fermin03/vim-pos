@@ -36,7 +36,7 @@
 <link rel="manifest" href="site.webmanifest">
 <meta name="theme-color" content="#0078C9">
 
-<link rel="stylesheet" href="assets/css/vim.css?v=11">
+<link rel="stylesheet" href="assets/css/vim.css?v=12">
 </head>
 <body>
 
@@ -51,7 +51,7 @@
       </a>
       <nav class="nav-enlaces" aria-label="Principal">
         <a class="nav-enlace" href="/funciones">Funciones</a>
-        <a class="nav-enlace" href="/sin-internet">Sin internet</a>
+        <a class="nav-enlace" href="/facturacion-cfdi">Facturación</a>
         <a class="nav-enlace" href="/precios" aria-current="page">Precios</a>
       </nav>
       <div class="nav-acciones">
@@ -78,7 +78,7 @@
     <nav aria-label="Menú">
       <div class="nav-movil-lista">
           <a href="/funciones">Funciones</a>
-          <a href="/sin-internet">Sin internet</a>
+          <a href="/facturacion-cfdi">Facturación</a>
           <a href="/precios">Precios</a>
           <a href="/demo">Pide una demo</a>
       </div>
@@ -130,8 +130,9 @@
           <div class="pila pila-2">
             <p class="eyebrow" style="color:var(--ink-2)">Una sola caja</p>
             <h3>Esencial</h3>
-            <div class="plan-precio" data-precio data-mensual="$699" data-anual="$580">$699</div>
+            <div class="plan-precio" data-precio data-mensual="$699" data-anual="$583">$699</div>
             <span class="plan-periodo" data-nota-periodo>al mes, más IVA</span>
+            <span class="plan-periodo">o $6,990 al año, más IVA</span>
           </div>
           <ul class="plan-lista">
             <li>1 sucursal · 1 caja</li>
@@ -148,8 +149,9 @@
           <div class="pila pila-2">
             <p class="eyebrow" style="color:var(--accent-hover)">El que recomendamos</p>
             <h3>Negocio</h3>
-            <div class="plan-precio" data-precio data-mensual="$999" data-anual="$829">$999</div>
+            <div class="plan-precio" data-precio data-mensual="$999" data-anual="$833">$999</div>
             <span class="plan-periodo" data-nota-periodo>al mes, más IVA</span>
+            <span class="plan-periodo">o $9,990 al año, más IVA</span>
           </div>
           <ul class="plan-lista">
             <li>1 sucursal · 3 cajas</li>
@@ -166,8 +168,9 @@
           <div class="pila pila-2">
             <p class="eyebrow" style="color:var(--ink-2)">Varias sucursales</p>
             <h3>Cadena</h3>
-            <div class="plan-precio" data-precio data-mensual="$1,999" data-anual="$1,659">$1,999</div>
+            <div class="plan-precio" data-precio data-mensual="$1,999" data-anual="$1,666">$1,999</div>
             <span class="plan-periodo" data-nota-periodo>al mes, más IVA</span>
+            <span class="plan-periodo">o $19,990 al año, más IVA</span>
           </div>
           <ul class="plan-lista">
             <li>3 sucursales · cajas ilimitadas</li>
@@ -441,53 +444,14 @@
         </p>
         <p>
           <strong>Va incluida en Negocio y en Cadena.</strong> En Esencial se agrega por $349 al
-          mes, más IVA.
+          mes, más IVA. Los folios que trae cada plan cubren la factura global del periodo; cada
+          factura que pide un cliente usa un folio.
+        </p>
+        <p>
+          Cómo funciona, hasta cuándo puede facturar tu cliente y qué necesitas dar para
+          encenderla está en <a href="/facturacion-cfdi">la página de facturación</a>.
         </p>
       </div>
-
-      <div class="dos">
-        <div class="tarjeta pila pila-3">
-          <h3>La factura del día, automática</h3>
-          <p>
-            Lo que nadie facturó se junta en una sola factura al cerrar el periodo que tú elijas:
-            diario, semanal, quincenal o mensual. Es lo que el SAT te pide, y sale sin que hagas
-            nada.
-          </p>
-        </div>
-        <div class="tarjeta pila pila-3">
-          <h3>Hasta cuándo pueden facturar</h3>
-          <p>
-            No es «el mes en curso», como en otros sistemas. Tu cliente puede facturar hasta que
-            tú cierres tu periodo — y ese periodo lo decides tú.
-          </p>
-        </div>
-        <div class="tarjeta pila pila-3">
-          <h3>Qué necesitas dar</h3>
-          <p>
-            Solo tu sello del SAT y su contraseña, más tu RFC vigente. <strong>Tu e.firma
-            no</strong>: ésa es tu llave maestra y no tenemos por qué pedírtela.
-          </p>
-        </div>
-        <div class="tarjeta pila pila-3">
-          <h3>Tu sello no se queda con nosotros</h3>
-          <p>
-            Pasa del panel al proveedor autorizado y se descarta. De nuestro lado solo guardamos
-            cuál es y cuándo vence, para avisarte antes de que caduque.
-          </p>
-        </div>
-      </div>
-
-      <figure class="figura figura-papel" data-captura="ticket-venta">
-          <div class="monitor">
-            <div class="monitor-barra" aria-hidden="true">
-              <span class="monitor-punto"></span><span class="monitor-punto"></span><span class="monitor-punto"></span>
-            </div>
-            <img src="assets/img/capturas/ticket-venta.webp"
-                 alt="Ticket impreso de una venta: negocio, folio, cajero, el producto con su modificador, subtotal, IVA, total y el cambio."
-                 width="604" height="1238" loading="lazy" decoding="async">
-          </div>
-          <figcaption>El comensal escanea el código del ticket, pone su RFC y le llega la factura. Tu cajero no vuelve a parar la fila para eso.</figcaption>
-        </figure>
 
       <div class="pila pila-5">
         <div class="pila pila-3">
@@ -659,7 +623,7 @@
         </p>
         <div class="fila" style="justify-content:center">
           <a class="btn btn-primario btn-hero" href="/demo">Pide una demo</a>
-          <a class="btn btn-fantasma btn-hero" href="https://wa.me/524761273020">Escríbenos por WhatsApp</a>
+          <a class="btn btn-fantasma btn-hero" href="https://wa.me/524761273020?text=Hola%2C%20vi%20los%20precios%20en%20vimpos.com.mx%20y%20quiero%20saber%20qu%C3%A9%20plan%20me%20toca.">Escríbenos por WhatsApp</a>
         </div>
       </div>
     </div>
@@ -691,14 +655,19 @@
         </ul>
       </div>
       <div>
-        <h2 class="pie-titulo">Contacto</h2>
+        <h2 class="pie-titulo">Guías</h2>
         <ul class="pie-lista">
           <li><a href="/como-elegir-sistema-restaurante">Cómo elegir sistema</a></li>
           <li><a href="/cuanto-cuesta-un-sistema-para-restaurante">Cuánto cuesta</a></li>
           <li><a href="/nosotros">Nosotros</a></li>
+        </ul>
+      </div>
+      <div>
+        <h2 class="pie-titulo">Contacto</h2>
+        <ul class="pie-lista">
           <li><a href="/contacto">Contacto</a></li>
           <li><a href="mailto:hola@vimpos.com.mx">hola@vimpos.com.mx</a></li>
-          <li><a href="https://wa.me/524761273020">WhatsApp 476 127 3020</a></li>
+          <li><a href="https://wa.me/524761273020?text=Hola%2C%20vi%20los%20precios%20en%20vimpos.com.mx%20y%20quiero%20saber%20qu%C3%A9%20plan%20me%20toca.">WhatsApp 476 127 3020</a></li>
         </ul>
       </div>
     </div>
