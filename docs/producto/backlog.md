@@ -128,6 +128,18 @@ Cobrarle a los **tenants** (no a sus clientes). Stripe Checkout + webhooks + est
 ## 6. 🟢 Módulo de inventario (insumos, recetas, mermas)
 
 Existe el esquema (`insumos`, `aplicar_movimiento_inventario`, `descontar_inventario_por_venta`,
-recetas producto→insumos) pero no está cableado en UI ni verificado end-to-end. Es prerequisito de
-#29 (reversa de inventario en devoluciones). Ciclo propio: cargar insumos, recetas, ver existencias,
-mermas, y conectar el descuento/reversa automático.
+recetas producto→insumos) y ya está cableado en UI y verificado end-to-end. Es prerequisito de
+#29 (reversa de inventario en devoluciones), resuelto arriba.
+
+**Recetas, proveedores y compras: construidos (ADR 0012, plan `docs/superpowers/plans/2026-09-03-recetas-y-compras.md`).**
+El editor de receta y costo por producto (`/catalogo/recetas`), el catálogo de proveedores
+(`/inventario/proveedores`) y el flujo de compras con alias y costo promedio (`/inventario/compras`,
+`/inventario/compras/nueva`) quedaron construidos y verificados (pgTAP + smokes de recetas, compras
+e inventario). La entrada de inventario por compra directa ya no se ofrece en el modal de movimiento
+de Inventario: se registra desde Compras.
+
+Pendiente, sin resolver en este ciclo:
+
+- Sincronización de inventario con la caja instalada (migraciones 0055/0056).
+- Historial de movimientos filtrable (P-149).
+- Reporte de costo de ventas y margen por periodo (P-150).
