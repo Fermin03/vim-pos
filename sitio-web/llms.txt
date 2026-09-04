@@ -65,7 +65,7 @@ extension, and the normal address answers with `text/markdown` when asked with a
 - [WhatsApp +52 476 127 3020](https://wa.me/524761273020): el canal principal. Respuesta el mismo día hábil.
 - [hola@vimpos.com.mx](mailto:hola@vimpos.com.mx): correo, para lo que necesita quedar por escrito.
 - [Pedir una demostración](https://vimpos.com.mx/demo.md): media hora con el menú del propio negocio cargado.
-- [Quién está detrás](https://vimpos.com.mx/nosotros.md): Fermín Villalobos Martínez, RFC VIMF0308282D7, Melchor Ocampo 341, San Francisco del Rincón, Guanajuato, México.
+- [Quién está detrás](https://vimpos.com.mx/nosotros.md): Fermín Villalobos Martínez, Melchor Ocampo 341, San Francisco del Rincón, Guanajuato, México.
 
 ## Opcional
 

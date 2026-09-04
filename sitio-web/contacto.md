@@ -12,11 +12,11 @@ El mismo día hábil, por el canal que prefieras. No hay centro de llamadas, no 
 
 ## Las tres formas de llegar a nosotros
 
-- **WhatsApp: [476 127 3020](https://wa.me/524761273020?text=Hola%2C%20escribo%20desde%20vimpos.com.mx%2Fcontacto.).** Es el canal principal y el más rápido. Sirve para preguntar precios, agendar una demostración y para el soporte si ya eres cliente.
+- **WhatsApp: [476 127 3020](https://wa.me/524761273020?text=Hola%2C%20escribo%20desde%20vimpos.com.mx%2Fcontacto.).** Es el canal principal y el más rápido. Sirve para preguntar precios, agendar una demostración y para el soporte si ya eres cliente. Si prefieres hablar, [llama al mismo número](tel:+524761273020) en horario hábil.
 - **Correo: [hola@vimpos.com.mx](mailto:hola@vimpos.com.mx).** Para lo que necesita quedar por escrito: cotizaciones de varias sucursales, datos de facturación, solicitudes de derechos ARCO y prensa.
 - **El [formulario de demostración](https://vimpos.com.mx/demo).** Si prefieres que te busquemos nosotros. Pide cuántas cajas y cuántas sucursales tienes, que es lo que decide qué plan te toca y qué te enseñamos.
 
-Contestamos **el mismo día hábil**, en horario hábil y en español. No hay número 800 ni menú de opciones.
+Contestamos **el mismo día hábil**, en horario hábil y en español. No hay número 800 ni menú de opciones: llamas y contesta una persona.
 
 ![Panel del dueño con las ventas del día, el ticket promedio y el top de productos.](https://vimpos.com.mx/assets/img/capturas/admin-dashboard.webp?v=2)
 
@@ -24,7 +24,7 @@ _El panel que te enseñamos en la demostración: cómo va el día, la venta por 
 
 ## Quién responde
 
-**Fermín Villalobos Martínez**, persona física con actividad empresarial, RFC **VIMF0308282D7**, que opera bajo la marca **VIM POS**. Es el mismo responsable que aparece en el [aviso de privacidad](https://vimpos.com.mx/aviso-privacidad) y en los [términos del servicio](https://vimpos.com.mx/terminos).
+**Fermín Villalobos Martínez**, persona física con actividad empresarial, que opera bajo la marca **VIM POS**. Es el mismo responsable que aparece en el [aviso de privacidad](https://vimpos.com.mx/aviso-privacidad) y en los [términos del servicio](https://vimpos.com.mx/terminos).
 
 **Domicilio:** Melchor Ocampo 341, San Francisco del Rincón, Guanajuato, México. Es domicilio fiscal y de trabajo, no una tienda: si quieres que nos veamos en persona, se agenda antes por WhatsApp.
 

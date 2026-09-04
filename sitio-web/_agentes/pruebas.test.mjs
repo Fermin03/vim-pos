@@ -524,9 +524,16 @@ test('los datos de contacto son los mismos en todas partes', () => {
   const texto = (ruta) => soloTexto(cuerpo(resolver(ruta)));
 
   for (const ruta of ['/nosotros', '/contacto', '/aviso-privacidad', '/terminos']) {
-    const t = texto(ruta);
-    assert.ok(t.includes(NEGOCIO.razonSocial), `${ruta} sin la razón social`);
-    assert.ok(t.includes(NEGOCIO.rfc), `${ruta} sin el RFC`);
+    assert.ok(texto(ruta).includes(NEGOCIO.razonSocial), `${ruta} sin la razón social`);
+  }
+  // El RFC va SOLO donde la ley lo pide. En Nosotros y Contacto sobraba: un RFC
+  // de persona física lleva la fecha de nacimiento, y no hace falta repetirlo
+  // en cuatro páginas para identificar a quien responde (decisión del 4-sep-2026).
+  for (const ruta of ['/aviso-privacidad', '/terminos']) {
+    assert.ok(texto(ruta).includes(NEGOCIO.rfc), `${ruta} sin el RFC`);
+  }
+  for (const ruta of ['/nosotros', '/contacto']) {
+    assert.ok(!texto(ruta).includes(NEGOCIO.rfc), `${ruta} repite el RFC`);
   }
   for (const ruta of ['/nosotros', '/contacto']) {
     const t = texto(ruta);
@@ -619,7 +626,7 @@ test('agents.md le dice a un agente cuándo usar el producto y qué hacer despu�
   // Y que diga la verdad incómoda: no hay API, el contacto es humano.
   assert.ok(md.includes('no public API'), 'no dice que no hay API');
   assert.ok(md.includes(NEGOCIO.whatsappUrl), 'no da el enlace de contacto');
-  assert.ok(md.includes(NEGOCIO.rfc), 'no identifica a la empresa');
+  assert.ok(md.includes(NEGOCIO.razonSocial), 'no identifica a la empresa');
 
   assert.ok(md.length > 2500, `agents.md solo tiene ${md.length} caracteres`);
 });

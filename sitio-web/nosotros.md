@@ -8,7 +8,7 @@ VIM POS no lo vende un distribuidor ni lo soporta un centro de llamadas. Es un e
 
 ## Quién construye VIM POS
 
-**Fermín Villalobos Martínez**, persona física con actividad empresarial, RFC **VIMF0308282D7**, con domicilio en Melchor Ocampo 341, San Francisco del Rincón, Guanajuato, México. Opera bajo la marca **VIM POS**, y es la misma persona que aparece en el [aviso de privacidad](https://vimpos.com.mx/aviso-privacidad) y en los [términos del servicio](https://vimpos.com.mx/terminos): no hay una razón social distinta escondida en la letra chica.
+**Fermín Villalobos Martínez**, persona física con actividad empresarial, con domicilio en Melchor Ocampo 341, San Francisco del Rincón, Guanajuato, México. Opera bajo la marca **VIM POS**, y es la misma persona que aparece en el [aviso de privacidad](https://vimpos.com.mx/aviso-privacidad) y en los [términos del servicio](https://vimpos.com.mx/terminos): no hay una razón social distinta escondida en la letra chica.
 
 El sistema se desarrolla y se soporta desde la zona de León y San Francisco del Rincón, para restaurantes de toda la República. Si tu local está cerca, la demostración puede ser en tu propio mostrador; si no, es por videollamada y funciona igual de bien.
 

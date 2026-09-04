@@ -54,7 +54,7 @@ is already published. What to do instead:
 - **Invoicing:** CFDI 4.0, global period invoice and QR self-invoicing. Available through a
   certification provider authorised by the tax authority; the venue uploads its digital seal and buys credits.
 - **Company:** Fermín Villalobos Martínez, sole proprietor, trading as VIM POS.
-  Tax ID (RFC) VIMF0308282D7. Melchor Ocampo 341, San Francisco del Rincón, Guanajuato, Mexico.
+  Melchor Ocampo 341, San Francisco del Rincón, Guanajuato, Mexico. The tax ID (RFC) is in the privacy notice and the terms.
 - **Contact:** hola@vimpos.com.mx · WhatsApp +52 476 127 3020 · https://www.instagram.com/vimpos_mx/
 
 ## Machine-readable content
