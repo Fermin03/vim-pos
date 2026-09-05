@@ -1,6 +1,6 @@
 /**
  * Catálogo de módulos que VIM permite por cliente (ADR 0014). Los códigos son los mismos que
- * escribe la migración 0102 en `planes.features_incluidos->'modulos'` y los que lee
+ * escribe la migración 0103 en `planes.features_incluidos->'modulos'` y los que lee
  * `modulos_efectivos()`. Agregar uno aquí sin migración no lo enciende en ningún lado.
  */
 export type CodigoModulo = "cfdi" | "delivery_apps" | "kds" | "recetas" | "reservaciones" | "promociones";
