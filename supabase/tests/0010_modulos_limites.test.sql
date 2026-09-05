@@ -1,5 +1,5 @@
 -- ============================================================================
--- Módulos y límites por cliente (spec 2026-09-04 §5.4–5.5, ADR 0014, migración 0102).
+-- Módulos y límites por cliente (spec 2026-09-04 §5.4–5.5, ADR 0014, migración 0103).
 --
 -- Lo que se protege: que el panel de plataforma pueda decir qué módulos y qué límites tiene
 -- cada cliente, que una excepción por flag mande sobre el plan (y venza), que el efectivo sea

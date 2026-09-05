@@ -4,7 +4,7 @@
 
 **Goal:** Convertir `apps/platform` de pestañas con cajón lateral en páginas con barra lateral y ficha de cliente por secciones, con confirmaciones escritas para lo destructivo, refresco automático, y la pantalla de módulos y límites por cliente escribiendo en las tablas que ya existen.
 
-**Architecture:** Una migración (0102) crea `tenant_limites`, las columnas de bloqueo en `tenants`, la clave `modulos` en `planes.features_incluidos`, las funciones `modulos_efectivos` / `limites_efectivos` y el trigger que limita cajas por sucursal. El panel pasa al App Router: `lib/sesion.tsx` guarda la clave en `sessionStorage` y provee `api`; `components/barra-lateral.tsx` es la navegación; cada pestaña vieja es una página; el cajón `DetalleDrawer` se descompone en `clientes/[id]/page.tsx` con componentes de sección; `dialogo-confirmar.tsx` reemplaza `prompt`/`confirm`. Nada de esto toca la caja instalada.
+**Architecture:** Una migración (0103) crea `tenant_limites`, las columnas de bloqueo en `tenants`, la clave `modulos` en `planes.features_incluidos`, las funciones `modulos_efectivos` / `limites_efectivos` y el trigger que limita cajas por sucursal. El panel pasa al App Router: `lib/sesion.tsx` guarda la clave en `sessionStorage` y provee `api`; `components/barra-lateral.tsx` es la navegación; cada pestaña vieja es una página; el cajón `DetalleDrawer` se descompone en `clientes/[id]/page.tsx` con componentes de sección; `dialogo-confirmar.tsx` reemplaza `prompt`/`confirm`. Nada de esto toca la caja instalada.
 
 **Tech Stack:** Next 15 App Router (client components), React 19, Tailwind con `@vim/config/tailwind-preset` + `@vim/ui/tokens.css`, `@vim/ui/styles` (`Modal`, `Button`, `LogoVim`), supabase-js con `service_role` solo en `app/api/*`, vitest (node) para lógica pura, pgTAP (`supabase test db`) para SQL.
 
@@ -20,7 +20,7 @@
 - **Toda escritura del panel llama `auditar()`** de `app/lib/server.ts` con `tenantId` y `motivo`.
 - **Tokens de diseño**: solo clases del preset (`ink`, `ink-2`, `ink-3`, `line`, `line-strong`, `surface`, `bg`, `hover`, `sel`, `accent`, `success`, `warning`, `danger`). Un solo botón `accent` por pantalla. Lo destructivo en `danger`. Antes de escribir CSS nuevo, cargar la skill `emil-design-eng` (`feedback_skills_emil`).
 - **`prompt()` y `confirm()` del navegador quedan prohibidos** en el panel al terminar.
-- **Migraciones aplicadas en remoto no se editan**: 0102 es nueva y aditiva. Tras aplicarla: `pnpm db:types`.
+- **Migraciones aplicadas en remoto no se editan**: 0103 es nueva y aditiva. Tras aplicarla: `pnpm db:types`.
 - Commits pequeños, mensajes en español con prefijo (`db:`, `feat(platform):`, `test:`, `docs:`), y al final de cada mensaje:
   `Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>`
 
@@ -30,7 +30,7 @@
 
 | Archivo | Responsabilidad |
 |---|---|
-| `supabase/migrations/0102_platform_modulos_limites.sql` | tabla `tenant_limites`, columnas de bloqueo, `planes.modulos`, `modulos_efectivos`, `limites_efectivos`, trigger de cajas |
+| `supabase/migrations/0103_platform_modulos_limites.sql` | tabla `tenant_limites`, columnas de bloqueo, `planes.modulos`, `modulos_efectivos`, `limites_efectivos`, trigger de cajas |
 | `supabase/tests/0010_modulos_limites.test.sql` | pgTAP: funciones, trigger, grants |
 | `packages/db/src/modulos.ts` | catálogo de módulos compartido (`MODULOS`, `CodigoModulo`) |
 | `apps/platform/app/lib/sesion.tsx` | contexto de sesión: clave en `sessionStorage`, `api()`, `salir()` |
@@ -102,10 +102,10 @@ A partir de aquí **todas las rutas son relativas a `vim-pos-platform/`**.
 
 ---
 
-### Task 1: Migración 0102 — límites, bloqueo, módulos por plan, funciones y trigger
+### Task 1: Migración 0103 — límites, bloqueo, módulos por plan, funciones y trigger
 
 **Files:**
-- Create: `supabase/migrations/0102_platform_modulos_limites.sql`
+- Create: `supabase/migrations/0103_platform_modulos_limites.sql`
 - Create: `supabase/tests/0010_modulos_limites.test.sql`
 - Modify: `supabase/tests/0003_grants_secdef.test.sql` (no: las funciones nuevas son `authenticated`; ver Step 5)
 
@@ -188,11 +188,11 @@ Expected: `0010_modulos_limites.test.sql` falla en #1 (`modulos` no existe) y la
 
 - [ ] **Step 3: Escribir la migración**
 
-`supabase/migrations/0102_platform_modulos_limites.sql`:
+`supabase/migrations/0103_platform_modulos_limites.sql`:
 
 ```sql
 -- ============================================================================
--- 0102 — El panel de plataforma controla módulos y límites por cliente (ADR 0014, entrega 1).
+-- 0103 — El panel de plataforma controla módulos y límites por cliente (ADR 0014, entrega 1).
 --
 -- `tenant_feature_flags` (0002) y `planes.max_*` existían desde el primer día y nadie los
 -- leía. Aquí se les da una lectura única (`modulos_efectivos`, `limites_efectivos`), una tabla
@@ -361,8 +361,8 @@ Expected: `0010_modulos_limites.test.sql` 12/12 OK y los demás siguen verdes. S
 
 ```bash
 pnpm db:types
-git add supabase/migrations/0102_platform_modulos_limites.sql supabase/tests/0010_modulos_limites.test.sql packages/db/src/database.types.ts
-git commit -m "db: módulos y límites por cliente, bloqueo programado y candado de cajas (0102, ADR 0014)
+git add supabase/migrations/0103_platform_modulos_limites.sql supabase/tests/0010_modulos_limites.test.sql packages/db/src/database.types.ts
+git commit -m "db: módulos y límites por cliente, bloqueo programado y candado de cajas (0103, ADR 0014)
 
 Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
 ```
@@ -392,7 +392,7 @@ Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
 ```ts
 /**
  * Catálogo de módulos que VIM permite por cliente (ADR 0014). Los códigos son los mismos que
- * escribe la migración 0102 en `planes.features_incluidos->'modulos'` y los que lee
+ * escribe la migración 0103 en `planes.features_incluidos->'modulos'` y los que lee
  * `modulos_efectivos()`. Agregar uno aquí sin migración no lo enciende en ningún lado.
  */
 export type CodigoModulo = "cfdi" | "delivery_apps" | "kds" | "recetas" | "reservaciones" | "promociones";

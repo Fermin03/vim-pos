@@ -1,11 +1,11 @@
 -- ============================================================================
--- 0102 — El panel de plataforma controla módulos y límites por cliente (ADR 0014, entrega 1).
+-- 0103 — El panel de plataforma controla módulos y límites por cliente (ADR 0014, entrega 1).
 --
 -- `tenant_feature_flags` (0002) y `planes.max_*` existían desde el primer día y nadie los
 -- leía. Aquí se les da una lectura única (`modulos_efectivos`, `limites_efectivos`), una tabla
 -- de excepciones de límites por cliente, la primera regla que los aplica (cajas por sucursal)
 -- y las dos columnas con las que "suspender con gracia" programa el bloqueo que la caja
--- empezará a obedecer en la entrega 2 (latido, migración 0103).
+-- empezará a obedecer en la entrega 2 (latido, migración 0104).
 --
 -- Diseño: docs/superpowers/specs/2026-09-04-platform-centro-de-control-design.md §5.4–5.5.
 -- ============================================================================

@@ -63,7 +63,7 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }
 
   const { count: nSucursales } = await sb.from("sucursales").select("id", { count: "exact", head: true }).eq("tenant_id", id).is("deleted_at", null);
 
-  // Módulos y límites (0102, ADR 0014): la lectura la hacen las funciones de la base, aquí solo
+  // Módulos y límites (0103, ADR 0014): la lectura la hacen las funciones de la base, aquí solo
   // se le suman las excepciones vigentes para que la ficha diga POR QUÉ un módulo está como está.
   const [{ data: modRaw }, { data: limRaw }, { data: flagsRaw }] = await Promise.all([
     sb.rpc("modulos_efectivos", { p_tenant: id }),
