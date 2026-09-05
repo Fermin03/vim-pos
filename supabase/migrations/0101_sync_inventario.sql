@@ -60,6 +60,13 @@ BEGIN
   -- Fila por fila y en orden de fecha: son pocos por lote, y así cada error se aísla solo.
   FOR v_fila IN SELECT value FROM jsonb_array_elements(p_rows) ORDER BY value->>'fecha' LOOP
     BEGIN
+      -- m1: sin este chequeo, un movimiento de OTRO tenant lo filtra en silencio la propia WHERE
+      -- del INSERT (tenant_id = $2) y EXECUTE...INTO v_id devuelve NULL. Eso caía en el `CONTINUE`
+      -- de "ya existía: nada que mover" — la caja lo veía como aplicado y lo marcaba confirmado sin
+      -- que la nube hubiera insertado ni movido nada. Ahora es un error explícito, aislado por fila.
+      IF (v_fila->>'tenant_id')::uuid IS DISTINCT FROM p_tenant THEN
+        RAISE EXCEPTION 'movimiento de otro negocio';
+      END IF;
       IF NOT EXISTS (SELECT 1 FROM insumos WHERE id = (v_fila->>'insumo_id')::uuid AND tenant_id = p_tenant) THEN
         RAISE EXCEPTION 'insumo % no es del negocio', v_fila->>'insumo_id';
       END IF;
@@ -82,8 +89,10 @@ BEGIN
       VALUES (p_tenant, (v_fila->>'insumo_id')::uuid, (v_fila->>'sucursal_id')::uuid, v_delta, v_delta < 0,
               COALESCE((v_fila->>'fecha')::timestamptz, now()))
       ON CONFLICT (insumo_id, sucursal_id) DO UPDATE
+        -- m2: stock_negativo_flag es pegajoso (0007 §8.5): una vez true, sigue true hasta un
+        -- ajuste por conteo físico. OR con el flag actual, no solo con el resultado de esta suma.
         SET stock_actual = insumo_stock_sucursal.stock_actual + EXCLUDED.stock_actual,
-            stock_negativo_flag = (insumo_stock_sucursal.stock_actual + EXCLUDED.stock_actual) < 0,
+            stock_negativo_flag = insumo_stock_sucursal.stock_negativo_flag OR (insumo_stock_sucursal.stock_actual + EXCLUDED.stock_actual) < 0,
             fecha_ultimo_movimiento = GREATEST(COALESCE(insumo_stock_sucursal.fecha_ultimo_movimiento, EXCLUDED.fecha_ultimo_movimiento), EXCLUDED.fecha_ultimo_movimiento);
     EXCEPTION WHEN OTHERS THEN
       v_errores := v_errores || jsonb_build_object('tabla', 'movimientos_inventario', 'id', v_fila->>'id', 'error', SQLERRM);

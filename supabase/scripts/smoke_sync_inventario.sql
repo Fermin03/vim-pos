@@ -12,6 +12,7 @@ DECLARE
   v_ajeno uuid := '99999999-0000-0000-0000-0000000000ff';
   v_pza uuid; v_insumo uuid; v_insumo_ajeno uuid; v_prod uuid;
   v_m1 uuid := gen_random_uuid(); v_m2 uuid := gen_random_uuid(); v_m3 uuid := gen_random_uuid(); v_m4 uuid := gen_random_uuid();
+  v_m5 uuid := gen_random_uuid(); -- m1: movimiento con tenant_id ajeno en la propia fila
   v_snap jsonb; v_res jsonb; v_stock numeric; v_alerta text; v_estado text; v_n int; v_eventos_antes int; v_eventos_despues int;
   v_conexion timestamptz;
   v_turno uuid; v_ticket uuid; v_ticket2 uuid; v_total numeric; v_fiscal text; v_stock_antes numeric; v_stock_despues numeric;
@@ -69,6 +70,22 @@ BEGIN
   SELECT count(*) INTO v_n FROM jsonb_array_elements(COALESCE(v_res->'_errores', '[]'::jsonb)) e WHERE e->>'tabla' = 'pagos';
   IF v_n <> 1 THEN RAISE EXCEPTION 'el pago mal formado debía estar en _errores (aislamiento 0074)'; END IF;
   IF EXISTS (SELECT 1 FROM movimientos_inventario WHERE id = v_m4) THEN RAISE EXCEPTION 'el movimiento ajeno no debía insertarse'; END IF;
+
+  -- 1.bis) m1: movimiento cuya PROPIA fila trae un tenant_id ajeno (insumo/sucursal sí son de v_t).
+  -- Antes esto lo filtraba en silencio la WHERE del INSERT (tenant_id = p_tenant): EXECUTE...INTO
+  -- v_id devolvía NULL, caía en el CONTINUE de "ya existía: nada que mover" y la caja lo marcaba
+  -- confirmado sin que la nube hubiera insertado ni movido nada. Ahora debe RAISE y aislarse en
+  -- _errores como cualquier otra fila mala (el resto del push sigue).
+  v_res := sync_push_snapshot(v_t, jsonb_build_object('movimientos_inventario', jsonb_build_array(
+    jsonb_build_object('id', v_m5, 'tenant_id', v_ajeno, 'sucursal_id', v_s, 'insumo_id', v_insumo, 'tipo', 'SALIDA_VENTA',
+      'cantidad', 1, 'costo_unitario_mxn', 4, 'stock_antes', 6, 'stock_despues', 5, 'fecha', now(), 'dia_contable', CURRENT_DATE, 'usuario_id', v_m, 'created_at', now()))));
+  RAISE NOTICE 'push con tenant_id ajeno en la fila: %', v_res;
+  IF (v_res->>'movimientos_inventario')::int <> 0 THEN RAISE EXCEPTION 'un movimiento con tenant_id ajeno en la fila no debía aplicarse, aplicó %', v_res->>'movimientos_inventario'; END IF;
+  SELECT count(*) INTO v_n FROM jsonb_array_elements(COALESCE(v_res->'_errores', '[]'::jsonb)) e WHERE e->>'id' = v_m5::text;
+  IF v_n <> 1 THEN RAISE EXCEPTION 'el movimiento con tenant_id ajeno en la fila debía estar en _errores (m1)'; END IF;
+  IF EXISTS (SELECT 1 FROM movimientos_inventario WHERE id = v_m5) THEN RAISE EXCEPTION 'el movimiento con tenant_id ajeno en la fila no debía insertarse (m1)'; END IF;
+  SELECT stock_actual INTO v_stock FROM insumo_stock_sucursal WHERE insumo_id = v_insumo AND sucursal_id = v_s;
+  IF v_stock <> 6 THEN RAISE EXCEPTION 'el movimiento con tenant_id ajeno no debía mover existencias, quedó en %', v_stock; END IF;
 
   -- 2) Segundo push idéntico: nada cambia (idempotencia por id)
   v_res := sync_push_snapshot(v_t, v_snap);
