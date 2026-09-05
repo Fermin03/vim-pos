@@ -40,5 +40,11 @@ export const NOMBRE_ESTADO: Record<string, string> = {
   ACTIVO: "Activo", TRIAL: "En prueba", SUSPENDIDO: "Suspendido", CANCELADO: "Cancelado", INTERNO: "Interno",
 };
 
+/** Fases de onboarding (0012) en palabras. */
+export const NOMBRE_FASE: Record<string, string> = {
+  INVITADO: "Invitado", EN_CONFIGURACION: "En configuración", GO_LIVE: "En producción", ABANDONADO: "Abandonado",
+};
+export const nombreFase = (f: string | null | undefined) => (f ? NOMBRE_FASE[f] ?? f : "—");
+
 export const input = "h-11 w-full rounded border border-line-strong px-3 text-sm outline-none focus:border-ink focus:shadow-[0_0_0_3px_rgba(22,22,26,.06)]";
 export const label = "mb-1.5 block text-[13px] font-medium text-ink-2";

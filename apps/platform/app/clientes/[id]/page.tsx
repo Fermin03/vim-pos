@@ -3,7 +3,7 @@ import { useParams, useRouter } from "next/navigation";
 import { useCallback, useState } from "react";
 import { useSesion } from "../../lib/sesion";
 import { textoActualizado, useRefresco } from "../../lib/refresco";
-import { fechaHoraMx, fmtMxn } from "../../lib/formato";
+import { fechaHoraMx, fmtMxn, nombreFase } from "../../lib/formato";
 import type { Detalle, Plan } from "../../lib/tipos";
 import { Seccion } from "../../components/seccion";
 import { TarjetaCifra } from "../../components/tarjeta-cifra";
@@ -119,10 +119,10 @@ export default function FichaCliente() {
       <div className="flex flex-col gap-6">
         <Seccion id="operacion" titulo="Operación" descripcion="Lo que hace este cliente hoy: cajas, sincronización y ventas.">
           <div className="mb-4 grid grid-cols-2 gap-3 lg:grid-cols-4">
-            <TarjetaCifra titulo="Plan" valor={plan?.codigo ?? "—"} sub={fmtMxn(Number(plan?.precio_mensual_mxn ?? 0)) + "/mes"} />
+            <TarjetaCifra titulo="Plan" valor={plan?.codigo ?? "—"} sub={fmtMxn(Number(plan?.precio_mensual_mxn ?? 0)) + "/mes"} texto />
             <TarjetaCifra titulo="Sucursales" valor={String(d.nSucursales)} />
             <TarjetaCifra titulo="Folios" valor={String(d.foliosSaldo)} sub={d.foliosBase ? `+${Math.max(d.foliosBase.mensuales - d.foliosBase.consumidos, 0)} de base este mes` : undefined} />
-            <TarjetaCifra titulo="Fase" valor={String((t.onboarding as { fase?: string } | null)?.fase ?? "—")} />
+            <TarjetaCifra titulo="Fase" valor={nombreFase((t.onboarding as { fase?: string } | null)?.fase)} texto />
           </div>
           <SaludTenant api={api} id={id} />
         </Seccion>

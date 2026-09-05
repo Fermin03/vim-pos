@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import type { Detalle, Plan } from "../lib/tipos";
-import { fmtMxn, input, label } from "../lib/formato";
+import { fmtMxn, input, label, nombreFase } from "../lib/formato";
 import { DialogoConfirmar } from "./dialogo-confirmar";
 
 type Accion = (b: Record<string, unknown>) => Promise<void>;
@@ -91,7 +91,7 @@ export function FichaContrato({ d, planes, accion, busy }: { d: Detalle; planes:
         <div className={bloque}>
           <div className={sub}>
             <span className={subTitulo}>Onboarding</span>
-            <span className="rounded-full bg-sel px-2 py-0.5 text-[11px] font-semibold text-ink-2">{fase}</span>
+            <span className="rounded-full bg-sel px-2 py-0.5 text-[11px] font-semibold text-ink-2">{nombreFase(fase)}</span>
           </div>
           <div className="flex flex-wrap gap-2">
             {fase !== "ABANDONADO" && (
