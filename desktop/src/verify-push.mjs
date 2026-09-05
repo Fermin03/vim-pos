@@ -6,13 +6,18 @@
 import { startBackend } from "./backend.mjs";
 import { construirSnapshotPush, marcarPushed, listarPendientes, marcarMovimientosPushed } from "./sync-push.mjs";
 
+const CAJA = "99999999-0000-0000-0000-0000000000cc";
+
 let backend;
 try {
   backend = await startBackend({ log: () => {} });
   const pool = backend.pool;
   const q = async (sql, p) => (await pool.query(sql, p)).rows;
 
-  const tenant = (await q("SELECT id FROM tenants LIMIT 1"))[0].id;
+  // Ancla en la CAJA del fixture (fija): "LIMIT 1" sobre tenants es ambiguo en una base de dev que
+  // ya tenga más de un tenant (p.ej. uso real de la app además del fixture sembrado) — ver el
+  // mismo arreglo en verify-sync.mjs.
+  const tenant = (await q("SELECT tenant_id FROM cajas WHERE id=$1", [CAJA]))[0].tenant_id;
   // Estado limpio de tracking para que las ventas terminales cuenten como pendientes.
   await pool.query("CREATE TABLE IF NOT EXISTS _vim_push_ok (ticket_id uuid PRIMARY KEY, pushed_at timestamptz DEFAULT now())");
   await pool.query("TRUNCATE _vim_push_ok");
@@ -38,10 +43,15 @@ try {
   if (movimientoIds.length) {
     if (!snapshot.movimientos_inventario?.length) throw new Error("el snapshot no incluye movimientos_inventario");
     if ((res.movimientos_inventario ?? 0) !== 0) throw new Error("la RPC aplicó sobre la propia caja movimientos que ya existían: debía ser 0 (idempotencia por id)");
-    await marcarMovimientosPushed(pool, movimientoIds);
+    // Espejo de producción (movimientosRechazados en sync-push.mjs): solo se marcan los que la
+    // nube NO reportó en _errores. Marcar un id rechazado como subido lo perdería para siempre.
+    const rechazados = new Set((res._errores ?? []).filter((e) => e?.tabla === "movimientos_inventario" && e.id).map((e) => e.id));
+    await marcarMovimientosPushed(pool, movimientoIds.filter((id) => !rechazados.has(id)));
     const otra = await listarPendientes(pool);
-    if (otra.movimientoIds.length !== 0) throw new Error("_vim_mov_ok no evitó re-subir movimientos");
-    console.log("· _vim_mov_ok evita re-subir movimientos (OK)");
+    if (otra.movimientoIds.length !== rechazados.size) {
+      throw new Error(`_vim_mov_ok no evitó re-subir movimientos: quedaron ${otra.movimientoIds.length} pendientes, esperaba ${rechazados.size} (los rechazados)`);
+    }
+    console.log(`· _vim_mov_ok evita re-subir movimientos (OK)${rechazados.size ? ` — ${rechazados.size} rechazado(s) quedaron pendientes para reintentar` : ""}`);
   }
 
   // 3) Folios/estados no cambiaron (verbatim, sin regenerar)
