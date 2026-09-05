@@ -12,6 +12,7 @@ import { SaludTenant } from "../../components/salud-tenant";
 import { FichaContrato } from "../../components/ficha-contrato";
 import { FichaFacturacion } from "../../components/ficha-facturacion";
 import { ModulosLimites } from "../../components/modulos-limites";
+import { ZonaPeligrosa } from "../../components/zona-peligrosa";
 import { DialogoConfirmar } from "../../components/dialogo-confirmar";
 
 const ANCLAS = [
@@ -108,7 +109,7 @@ export default function FichaCliente() {
         </div>
         {bloqueoDesde && (
           <p className="mt-2 text-[12.5px] font-semibold text-warning">
-            Bloqueo programado: la caja dejará de vender el {fechaHoraMx(bloqueoDesde)}.
+            Bloqueo programado: la caja dejará de vender el {fechaHoraMx(bloqueoDesde)} (hora de México).
           </p>
         )}
       </div>
@@ -135,7 +136,7 @@ export default function FichaCliente() {
           <FichaFacturacion d={d} accion={accion} busy={busy} />
         </Seccion>
 
-        {/* ZONA_PELIGROSA */}
+        <ZonaPeligrosa estado={estado} nombre={nombre} bloqueoDesde={bloqueoDesde} accion={accion} busy={busy} />
       </div>
       <p className="mt-4 text-[11.5px] text-ink-3">{textoActualizado(hace)}</p>
 
