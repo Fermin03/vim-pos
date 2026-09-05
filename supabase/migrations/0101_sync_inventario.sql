@@ -271,3 +271,95 @@ AS $$
 $$;
 REVOKE EXECUTE ON FUNCTION sync_pull_snapshot(uuid) FROM public, anon, authenticated;
 GRANT EXECUTE ON FUNCTION sync_pull_snapshot(uuid) TO service_role;
+
+-- ---------------------------------------------------------------------------
+-- 5. descontar_inventario_por_venta: sin fila en configuracion_tenant, no descuenta (y no revienta)
+-- ---------------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION descontar_inventario_por_venta(
+  p_ticket_id uuid
+) RETURNS void
+LANGUAGE plpgsql
+AS $$
+DECLARE
+  v_tenant_id uuid;
+  v_sucursal_id uuid;
+  v_item record;
+  v_componente record;
+  v_modulo_activo boolean;
+BEGIN
+  -- Tenant y sucursal del ticket; la configuración puede no existir (LEFT JOIN): en ese caso el
+  -- módulo cuenta como apagado. Antes un JOIN interno dejaba v_tenant_id NULL y, si había recetas,
+  -- la venta reventaba al pagar (violaba D32: la venta nunca se bloquea por inventario).
+  SELECT tk.tenant_id, tk.sucursal_id, ct.modulo_inventario_activo
+    INTO v_tenant_id, v_sucursal_id, v_modulo_activo
+    FROM tickets tk
+    LEFT JOIN configuracion_tenant ct ON ct.tenant_id = tk.tenant_id
+   WHERE tk.id = p_ticket_id;
+
+  IF v_tenant_id IS NULL OR COALESCE(v_modulo_activo, false) = false THEN
+    RETURN;
+  END IF;
+
+  -- Iterar items del ticket y aplicar receta
+  -- (Las tablas tickets y ticket_items se definen en Parte 1C)
+  FOR v_item IN
+    SELECT ti.id, ti.producto_id, ti.cantidad
+    FROM ticket_items ti
+    WHERE ti.ticket_id = p_ticket_id
+      AND ti.cancelado = false
+  LOOP
+    -- Insumos de la receta base
+    FOR v_componente IN
+      SELECT rc.insumo_id, rc.cantidad AS cantidad_unitaria
+      FROM receta_componentes rc
+      JOIN recetas r ON r.id = rc.receta_id
+      WHERE r.producto_id = v_item.producto_id
+        AND r.activa = true
+    LOOP
+      PERFORM aplicar_movimiento_inventario(
+        v_tenant_id,
+        v_sucursal_id,
+        v_componente.insumo_id,
+        'SALIDA_VENTA',
+        v_componente.cantidad_unitaria * v_item.cantidad,
+        NULL,
+        NULL,
+        NULL,
+        'Venta ticket',
+        p_ticket_id,
+        NULL,
+        NULL
+      );
+    END LOOP;
+
+    -- Insumos de modificadores EXTRA aplicados al item
+    -- (La tabla ticket_item_modificadores se definirá en Parte 1C)
+    FOR v_componente IN
+      SELECT mc.insumo_id, mc.cantidad AS cantidad_unitaria
+      FROM ticket_item_modificadores tim
+      JOIN opciones_modificador om ON om.id = tim.opcion_modificador_id
+      JOIN grupos_modificadores gm ON gm.id = om.grupo_id
+      JOIN modificador_componentes mc ON mc.opcion_modificador_id = om.id
+      WHERE tim.ticket_item_id = v_item.id
+        AND gm.naturaleza = 'EXTRA'
+    LOOP
+      PERFORM aplicar_movimiento_inventario(
+        v_tenant_id,
+        v_sucursal_id,
+        v_componente.insumo_id,
+        'SALIDA_MODIFICADOR_EXTRA',
+        v_componente.cantidad_unitaria * v_item.cantidad,
+        NULL,
+        NULL,
+        NULL,
+        'Modificador extra',
+        p_ticket_id,
+        NULL,
+        NULL
+      );
+    END LOOP;
+  END LOOP;
+END;
+$$;
+
+COMMENT ON FUNCTION descontar_inventario_por_venta IS 'Descuenta insumos al pagar ticket. §34.3 del /core. Se llama desde trigger de tickets en Parte 1C. Sin fila en configuracion_tenant, el módulo cuenta como apagado (no descuenta, no bloquea la venta).';

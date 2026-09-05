@@ -14,6 +14,7 @@ DECLARE
   v_m1 uuid := gen_random_uuid(); v_m2 uuid := gen_random_uuid(); v_m3 uuid := gen_random_uuid(); v_m4 uuid := gen_random_uuid();
   v_snap jsonb; v_res jsonb; v_stock numeric; v_alerta text; v_estado text; v_n int; v_eventos_antes int; v_eventos_despues int;
   v_conexion timestamptz;
+  v_turno uuid; v_ticket uuid; v_ticket2 uuid; v_total numeric; v_fiscal text; v_stock_antes numeric; v_stock_despues numeric;
 BEGIN
   PERFORM set_config('request.jwt.claims', json_build_object('sub', v_m::text, 'tenant_id', v_t::text)::text, true);
   SELECT id INTO v_pza FROM unidades_medida WHERE tenant_id = v_t AND codigo = 'PZA' LIMIT 1;
@@ -89,6 +90,43 @@ BEGIN
   IF v_eventos_despues < v_eventos_antes + 3 THEN RAISE EXCEPTION 'sync_eventos no registró los 3 pushes (% → %)', v_eventos_antes, v_eventos_despues; END IF;
   SELECT ultima_conexion INTO v_conexion FROM cajas WHERE id = v_c;
   IF v_conexion IS NULL OR v_conexion < now() - interval '1 minute' THEN RAISE EXCEPTION 'cajas.ultima_conexion no se selló'; END IF;
+
+  -- 5) descontar_inventario_por_venta: el tenant seed NO tiene fila en configuracion_tenant.
+  --    Antes (0007, JOIN interno) esto dejaba v_tenant_id NULL y, al haber receta, la venta
+  --    reventaba al pagar. Ahora (0101 §5, LEFT JOIN) el módulo cuenta como apagado: la venta
+  --    se cobra normal y no se descuenta inventario.
+  UPDATE turnos SET estado = 'CERRADO', fecha_cierre = now() WHERE caja_id = v_c AND estado = 'ABIERTO';
+  INSERT INTO turnos (tenant_id, sucursal_id, caja_id, codigo_turno, dia_contable, usuario_apertura_id, fondo_inicial_mxn, fondo_modo)
+  VALUES (v_t, v_s, v_c, 'SM-INV', CURRENT_DATE, v_m, 500, 'TOTAL') RETURNING id INTO v_turno;
+
+  v_ticket := abrir_ticket(v_s, v_c, v_turno, 'PARA_LLEVAR'::modo_servicio, NULL, NULL, 'inv-smoke-1', v_m);
+  PERFORM agregar_item_a_ticket(v_ticket, v_prod, 1, NULL, '[]'::jsonb, 'inv-smoke-item-1');
+  SELECT total_mxn INTO v_total FROM tickets WHERE id = v_ticket;
+  PERFORM aplicar_pago(v_ticket, 'EFECTIVO'::metodo_pago, v_total, v_total, NULL, NULL, NULL, false, NULL, 'inv-smoke-pago-1');
+
+  SELECT estado_fiscal::text INTO v_fiscal FROM tickets WHERE id = v_ticket;
+  RAISE NOTICE 'ticket sin configuracion_tenant: estado_fiscal=%', v_fiscal;
+  IF v_fiscal <> 'PAGADO' THEN RAISE EXCEPTION 'la venta no debe bloquearse por inventario; estado_fiscal=%', v_fiscal; END IF;
+  SELECT count(*) INTO v_n FROM movimientos_inventario WHERE ticket_id = v_ticket AND tipo = 'SALIDA_VENTA';
+  IF v_n <> 0 THEN RAISE EXCEPTION 'sin configuracion_tenant no debía descontar inventario, hubo % movimiento(s)', v_n; END IF;
+
+  -- Ahora se activa el módulo para el tenant (única fila; el resto de columnas trae DEFAULT).
+  INSERT INTO configuracion_tenant (tenant_id, modulo_inventario_activo) VALUES (v_t, true);
+
+  SELECT stock_actual INTO v_stock_antes FROM insumo_stock_sucursal WHERE insumo_id = v_insumo AND sucursal_id = v_s;
+
+  v_ticket2 := abrir_ticket(v_s, v_c, v_turno, 'PARA_LLEVAR'::modo_servicio, NULL, NULL, 'inv-smoke-2', v_m);
+  PERFORM agregar_item_a_ticket(v_ticket2, v_prod, 1, NULL, '[]'::jsonb, 'inv-smoke-item-2');
+  SELECT total_mxn INTO v_total FROM tickets WHERE id = v_ticket2;
+  PERFORM aplicar_pago(v_ticket2, 'EFECTIVO'::metodo_pago, v_total, v_total, NULL, NULL, NULL, false, NULL, 'inv-smoke-pago-2');
+
+  SELECT estado_fiscal::text INTO v_fiscal FROM tickets WHERE id = v_ticket2;
+  IF v_fiscal <> 'PAGADO' THEN RAISE EXCEPTION 'venta con módulo activo debía cobrarse igual, estado_fiscal=%', v_fiscal; END IF;
+  SELECT count(*) INTO v_n FROM movimientos_inventario WHERE ticket_id = v_ticket2 AND tipo = 'SALIDA_VENTA';
+  RAISE NOTICE 'ticket con configuracion_tenant activa: movimientos SALIDA_VENTA=%', v_n;
+  IF v_n <> 1 THEN RAISE EXCEPTION 'con módulo activo esperaba 1 movimiento SALIDA_VENTA, hubo %', v_n; END IF;
+  SELECT stock_actual INTO v_stock_despues FROM insumo_stock_sucursal WHERE insumo_id = v_insumo AND sucursal_id = v_s;
+  IF v_stock_antes - v_stock_despues <> 1 THEN RAISE EXCEPTION 'esperaba que el stock bajara 1 (receta), bajó %', v_stock_antes - v_stock_despues; END IF;
 
   RAISE NOTICE 'SMOKE SYNC INVENTARIO OK';
 END $$;
