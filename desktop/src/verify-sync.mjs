@@ -138,6 +138,61 @@ try {
   if (stock6 !== 6 || movs !== 1) throw new Error(`la venta local no descontó: existencia ${stock6}, movimientos ${movs}`);
   console.log(`· venta local con receta → existencia ${stock6}, 1 movimiento SALIDA_VENTA ligado al ticket (descuento local OK)`);
 
+  // ── C1: reconciliar receta_componentes por padre (no por clave compuesta fila a fila) ──────
+  // `guardar_receta` (0099) borra y reinserta los componentes con ids NUEVOS en cada edición del
+  // dueño. El siguiente pull trae la MISMA pareja (receta_id, insumo_id) con otro id: antes esto
+  // chocaba contra el índice único `receta_insumo_unico` y hacía ROLLBACK de TODO el pull, para
+  // siempre. Ahora reconciliarCatalogo borra por padre (receta_id) antes de insertar.
+  const compNuevoId = "11111111-2222-3333-4444-555555555555";
+  await pullSnapshot(pool, {
+    __watermark: "sim-inv-2",
+    receta_componentes: [{ id: compNuevoId, tenant_id: tenant, receta_id: REC, insumo_id: INS, cantidad: 2, es_critico: true, orden_visualizacion: 0, created_at: new Date(), updated_at: new Date() }],
+  }, (m) => console.log(m));
+  const componentesReceta = await q("SELECT id, cantidad FROM receta_componentes WHERE receta_id=$1", [REC]);
+  if (componentesReceta.length !== 1) throw new Error(`C1: esperaba 1 componente para la receta tras reconciliar por padre, hay ${componentesReceta.length}`);
+  if (componentesReceta[0].id !== compNuevoId) throw new Error(`C1: el componente no quedó con el id nuevo de la nube (${componentesReceta[0].id})`);
+  if (Number(componentesReceta[0].cantidad) !== 2) throw new Error(`C1: cantidad esperada 2, es ${componentesReceta[0].cantidad}`);
+  console.log(`· receta_componentes reconciliado por padre (receta_id): 1 componente con id nuevo de la nube, cantidad 2 (C1 OK)`);
+
+  // ── C2: unidades_medida con id de nube distinto al local (misma clave natural codigo+tenant) ──
+  // Simula una caja de campo que sembró sus unidades (0035/0085) con gen_random_uuid() antes de
+  // que existiera el pull: el código coincide con la nube pero el id no. Se usa KG (no PZA, que ya
+  // está en uso por el insumo de esta misma prueba) para no dejar nada colgando de un id borrado.
+  const kgLocal = (await q("SELECT id FROM unidades_medida WHERE tenant_id=$1 AND codigo='KG'", [tenant]))[0];
+  if (!kgLocal) throw new Error("C2: la base local no tiene la unidad KG (¿seed sin sembrar_unidades_base?)");
+  const kgNube = "33333333-0000-0000-0000-000000000099";
+  await pullSnapshot(pool, {
+    __watermark: "sim-inv-3",
+    unidades_medida: [{ id: kgNube, tenant_id: tenant, codigo: "KG", nombre: "Kilogramo", simbolo: "kg", dimension: "MASA", es_unidad_base: true, es_sistema: true, activa: true, orden_visualizacion: 6, created_at: new Date(), updated_at: new Date() }],
+  }, (m) => console.log(m));
+  const kgTrasPull = (await q("SELECT id FROM unidades_medida WHERE tenant_id=$1 AND codigo='KG'", [tenant]))[0];
+  if (kgTrasPull.id !== kgNube) throw new Error(`C2: unidades_medida no se realineó con la nube: local sigue en ${kgTrasPull.id}, esperaba ${kgNube}`);
+  console.log(`· unidades_medida reconciliado por clave natural (codigo,tenant_id): id local ahora = id de la nube (C2 OK)`);
+
+  // ── I1: la corrección por pendientes solo toca lo que la nube mandó EN ESTE pull ───────────
+  // Antes, corregirExistenciasPorPendientes tomaba TODO movimiento local sin confirmar y corregía
+  // su (insumo, sucursal) aunque la nube no lo hubiera mandado en el snapshot — p.ej. un insumo sin
+  // fila de existencia todavía en la nube. Eso resta de una fila que la nube nunca tocó: drift de
+  // una unidad por pull. Aquí INS2 tiene un movimiento pendiente pero NO viaja en el pull.
+  const INS2 = "cccccccc-2222-3333-4444-555555555555";
+  await q("DELETE FROM movimientos_inventario WHERE insumo_id=$1", [INS2]);
+  await q(`INSERT INTO insumos (id, tenant_id, nombre, unidad_medida_id, categoria, costo_unitario_mxn, metodo_valuacion, estado, stock_minimo_global, stock_critico_global)
+           VALUES ($1,$2,'Sal verify',$3,'OTROS',2,'PROMEDIO_PONDERADO','ACTIVO',1,0)
+           ON CONFLICT (id) DO UPDATE SET nombre = EXCLUDED.nombre`, [INS2, tenant, pza]);
+  await q(`INSERT INTO insumo_stock_sucursal (tenant_id, insumo_id, sucursal_id, stock_actual)
+           VALUES ($1,$2,$3,20) ON CONFLICT (insumo_id, sucursal_id) DO UPDATE SET stock_actual = 20`, [tenant, INS2, suc]);
+  await q(`INSERT INTO movimientos_inventario (tenant_id, sucursal_id, insumo_id, tipo, cantidad, costo_unitario_mxn, stock_antes, stock_despues, fecha, dia_contable)
+           VALUES ($1,$2,$3,'SALIDA_VENTA',5,2,20,15,now(),CURRENT_DATE)`, [tenant, suc, INS2]);
+  const stockActualINS = (await q("SELECT stock_actual FROM insumo_stock_sucursal WHERE insumo_id=$1 AND sucursal_id=$2", [INS, suc]))[0].stock_actual;
+  // El pull manda existencia SOLO de INS (re-envía su valor actual tal cual); INS2 no viaja.
+  await pullSnapshot(pool, {
+    __watermark: "sim-inv-4",
+    insumo_stock_sucursal: [{ id: STOCK, tenant_id: tenant, insumo_id: INS, sucursal_id: suc, stock_actual: stockActualINS, stock_negativo_flag: false, created_at: new Date(), updated_at: new Date() }],
+  }, (m) => console.log(m));
+  const stockINS2 = Number((await q("SELECT stock_actual FROM insumo_stock_sucursal WHERE insumo_id=$1 AND sucursal_id=$2", [INS2, suc]))[0].stock_actual);
+  if (stockINS2 !== 20) throw new Error(`I1: la corrección tocó un insumo que la nube no mandó en este pull; esperaba 20, es ${stockINS2}`);
+  console.log(`· corrección por pendientes acotada a lo que trajo el pull: INS2 sin tocar (${stockINS2}) pese a tener un movimiento local pendiente (I1 OK)`);
+
   console.log("\n✅ SYNC PULL OK — precio + producto + empleado(PIN) + inventario bajaron al device y funcionan;");
   console.log(`   upsert idempotente en orden de FKs + snapshot real de la RPC round-tripea + corrección por pendientes + descuento local. Tablas: ${Object.keys(resumen).join(", ")}.`);
 } catch (e) {
