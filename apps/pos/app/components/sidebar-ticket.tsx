@@ -171,13 +171,20 @@ export function SidebarTicket({
           <span className="truncate font-display text-[18px] font-semibold leading-tight tracking-[-0.02em]">
             {titulo ?? (folioCuenta ? `Cuenta ${folioCuenta}` : "Ticket nuevo")}
           </span>
+          {/* Dos botones en uno: con la cuenta ya guardada en BD esto CANCELA la cuenta; con un
+              carrito suelto solo lo vacía. Se dice cuál de los dos es, porque no se deshacen igual.
+
+              El `vacio` solo aplica al carrito suelto. Antes deshabilitaba también el otro caso, y
+              eso dejaba sin salida justo a la mesa que más la necesita: la que se abrió por error y
+              no tiene ni un producto. Su ticket ya existe (BORRADOR) y tiene la mesa ocupada; si el
+              único botón que la cancela está gris, la mesa se queda ocupada para siempre. */}
           <button
             type="button"
-            disabled={vacio || procesando || (bloqueado && !onCancelarTicket) || (!bloqueado && !onLimpiar)}
+            disabled={procesando || (bloqueado ? !onCancelarTicket : vacio || !onLimpiar)}
             onClick={() => (bloqueado && onCancelarTicket ? onCancelarTicket() : onLimpiar?.())}
             className="rounded px-2 py-[5px] text-[13.5px] font-semibold text-ink-3 transition-colors hover:bg-hover hover:text-danger disabled:cursor-default disabled:opacity-40"
           >
-            Limpiar
+            {bloqueado && onCancelarTicket ? "Cancelar cuenta" : "Limpiar"}
           </button>
         </div>
         {/* Modo de servicio — SOLO LECTURA. El modo se elige en la pantalla de inicio (una venta
