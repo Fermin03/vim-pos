@@ -8,7 +8,12 @@ Nosotros. VIM, por dentro. Se dan de alta tenants, se activan complementos, se c
 revisa el CFDI de los clientes. Es la única app que usa `service_role` y la única desde la que se
 puede romper el negocio de alguien más.
 
-Poca superficie (7 pantallas) y mucho poder por pantalla.
+Poca superficie y mucho poder por pantalla. Desde la entrega 1 del ADR 0014 (04/09/2026) el
+panel es una barra lateral con cinco pantallas globales (Atención, Clientes, Facturación,
+Errores, Bitácora) y una **ficha de cliente** con cuatro secciones en este orden: Operación,
+Contrato, Facturación y Zona peligrosa. El orden es el del trabajo diario: primero si está
+operando, luego qué paga, luego lo que factura, y al final, aparte, lo que puede romperle el
+negocio. Las pantallas se refrescan solas cada minuto mientras la pestaña está visible.
 
 ## Se ve distinto a propósito
 
@@ -23,6 +28,12 @@ Al revés que en el POS, aquí **la lentitud es una función**. Lo que toca a un
 - Confirmación que obliga a **escribir el nombre del tenant**, no a pulsar "sí".
 - La pantalla dice a quién afecta y desde cuándo, con nombre comercial, no solo con UUID.
 - Nada destructivo comparte fila con algo cotidiano.
+
+Esto lo implementa `app/components/dialogo-confirmar.tsx`: motivo de al menos 10 caracteres,
+nombre comercial escrito, días de gracia cuando aplica y una casilla "entiendo" en cancelar.
+`prompt()` y `confirm()` del navegador no se usan en este panel. Suspender siempre programa un
+bloqueo con gracia (`tenants.bloqueo_desde`, a las 06:00 de México); la caja lo obedece desde la
+entrega 2.
 
 ## Los datos son de otro
 

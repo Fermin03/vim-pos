@@ -1,9 +1,10 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
+import { Shell } from "./components/shell";
 
 export const metadata: Metadata = {
   title: "VIM POS · Plataforma",
-  description: "Panel interno de VIM — provisioning de clientes",
+  description: "Panel interno de VIM: clientes, facturación y control de cajas",
 };
 
 export const viewport: Viewport = { width: "device-width", initialScale: 1 };
@@ -19,7 +20,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           rel="stylesheet"
         />
       </head>
-      <body>{children}</body>
+      <body>
+        <Shell>{children}</Shell>
+      </body>
     </html>
   );
 }

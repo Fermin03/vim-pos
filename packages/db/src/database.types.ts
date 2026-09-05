@@ -7180,6 +7180,41 @@ export type Database = {
           },
         ]
       }
+      tenant_limites: {
+        Row: {
+          max_cajas_por_sucursal: number | null
+          max_sucursales: number | null
+          max_usuarios: number | null
+          motivo: string | null
+          tenant_id: string
+          updated_at: string
+        }
+        Insert: {
+          max_cajas_por_sucursal?: number | null
+          max_sucursales?: number | null
+          max_usuarios?: number | null
+          motivo?: string | null
+          tenant_id: string
+          updated_at?: string
+        }
+        Update: {
+          max_cajas_por_sucursal?: number | null
+          max_sucursales?: number | null
+          max_usuarios?: number | null
+          motivo?: string | null
+          tenant_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tenant_limites_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: true
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       tenant_onboarding_estado: {
         Row: {
           fase: Database["public"]["Enums"]["onboarding_fase"]
@@ -7229,6 +7264,8 @@ export type Database = {
       }
       tenants: {
         Row: {
+          bloqueo_desde: string | null
+          bloqueo_mensaje: string | null
           codigo: string
           codigo_postal_fiscal: string | null
           created_at: string
@@ -7255,6 +7292,8 @@ export type Database = {
           vertical_principal: Database["public"]["Enums"]["vertical_tipo"]
         }
         Insert: {
+          bloqueo_desde?: string | null
+          bloqueo_mensaje?: string | null
           codigo: string
           codigo_postal_fiscal?: string | null
           created_at?: string
@@ -7281,6 +7320,8 @@ export type Database = {
           vertical_principal: Database["public"]["Enums"]["vertical_tipo"]
         }
         Update: {
+          bloqueo_desde?: string | null
+          bloqueo_mensaje?: string | null
           codigo?: string
           codigo_postal_fiscal?: string | null
           created_at?: string
@@ -10275,6 +10316,7 @@ export type Database = {
         Args: { p_fecha: string; p_sucursal_id: string }
         Returns: Json
       }
+      limites_efectivos: { Args: { p_tenant: string }; Returns: Json }
       liquidar_delivery: {
         Args: {
           p_asignacion_id: string
@@ -10305,6 +10347,7 @@ export type Database = {
         }
         Returns: undefined
       }
+      modulos_efectivos: { Args: { p_tenant: string }; Returns: Json }
       obtener_reporte_z: { Args: { p_turno_id: string }; Returns: Json }
       onboarding_actualizar_fase: {
         Args: {

@@ -209,11 +209,11 @@ Interfaz en la ficha: una lista de módulos con interruptor y tres estados por f
 el plan", "Permitido por excepción" (con motivo visible) y "No incluido". Cambiarlo pide motivo.
 Debajo, los tres límites con el valor del plan en gris y el override editable.
 
-### 5.5 Migración `0102_platform_modulos_limites.sql`
+### 5.5 Migración `0103_platform_modulos_limites.sql`
 
 - `CREATE TABLE tenant_limites (...)` con RLS negada a todos (solo service_role).
 - `tenants.bloqueo_desde timestamptz NULL` y `tenants.bloqueo_mensaje text NULL` nacen aquí y no
-  en 0103, porque "suspender con gracia" (§5.3) ya los escribe desde esta entrega; la caja los
+  en 0104, porque "suspender con gracia" (§5.3) ya los escribe desde esta entrega; la caja los
   empieza a obedecer en la 2.
 - Trigger `trg_cajas_limite` (`BEFORE INSERT ON cajas`): si el conteo de cajas activas no
   borradas de esa sucursal ya alcanzó `limites_efectivos->>'max_cajas_por_sucursal'`, `RAISE
@@ -276,13 +276,13 @@ Hereda `nucleo.md` y `platform.md`. Se carga la skill de diseño antes de escrib
 
 ## 6. Entrega 2 — Latido y bloqueo real
 
-### 6.1 Migración `0103_caja_latido_y_bloqueo.sql`
+### 6.1 Migración `0104_caja_latido_y_bloqueo.sql`
 
 Columnas nuevas:
 
 | Tabla | Columna | Para |
 |---|---|---|
-| `tenants` | `bloqueo_desde`, `bloqueo_mensaje` | ya existen desde 0102 (§5.5); aquí solo se leen |
+| `tenants` | `bloqueo_desde`, `bloqueo_mensaje` | ya existen desde 0103 (§5.5); aquí solo se leen |
 | `cajas` | `version_app text NULL` | última versión reportada |
 | `cajas` | `ultimo_latido timestamptz NULL` | distinto de `ultima_conexion`: esta prueba que la caja está encendida aunque no venda |
 | `cajas` | `so text NULL` | "Windows 11 10.0.26200", para soporte |
@@ -366,7 +366,7 @@ actualizar.
 
 ## 8. Entrega 3 — Avisos a las cajas
 
-### 8.1 Migración `0104_avisos_plataforma.sql`
+### 8.1 Migración `0105_avisos_plataforma.sql`
 
 ```
 avisos_plataforma (
@@ -406,7 +406,7 @@ registran vía RPC `marcar_aviso_visto(p_aviso uuid)` ejecutable por `authentica
 
 ## 9. Entrega 4 — Versiones de la caja
 
-### 9.1 Migración `0105_versiones_caja.sql`
+### 9.1 Migración `0106_versiones_caja.sql`
 
 ```
 versiones_caja (
@@ -491,15 +491,15 @@ SQL con `set role authenticated` y claims falsos, como las existentes).
 
 ## 12. Publicación
 
-1. Entrega 1: migración 0102 con `supabase db push`, deploy de `apps/platform` en Vercel. Sin
+1. Entrega 1: migración 0103 con `supabase db push`, deploy de `apps/platform` en Vercel. Sin
    versión nueva de escritorio.
-2. Entrega 2: migración 0103, `supabase functions deploy caja-latido` (funciona desde Windows,
+2. Entrega 2: migración 0104, `supabase functions deploy caja-latido` (funciona desde Windows,
    ver `reference_supabase_cli_token_windows`), deploy de `apps/pos` y `apps/admin`, escritorio
    **0.4.58** (`npm run dist` tarda más de 10 minutos, lanzar en segundo plano). Avisar a
    Knock-Out antes de que su caja se actualice.
-3. Entrega 3: migración 0104 y redeploy de `caja-latido`. Si coincide en tiempo con la 2, va en
+3. Entrega 3: migración 0105 y redeploy de `caja-latido`. Si coincide en tiempo con la 2, va en
    la misma versión de escritorio.
-4. Entrega 4: migración 0105, variable `PLATFORM_RELEASES_HOST` en Vercel, y a partir de ahí las
+4. Entrega 4: migración 0106, variable `PLATFORM_RELEASES_HOST` en Vercel, y a partir de ahí las
    versiones se publican desde el panel.
 
 ## 13. Riesgos y decisiones tomadas
