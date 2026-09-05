@@ -33,8 +33,12 @@ BEGIN
   RAISE NOTICE 'cuenta abierta: items=% total=% estado=% (esperado 2 / 240 / ABIERTO)', v_items, v_total, v_estado_fiscal;
   IF v_items <> 2 OR v_total <> 240 THEN RAISE EXCEPTION 'el agregado incremental no acumuló (items=% total=%)', v_items, v_total; END IF;
 
-  -- Cobrar
-  PERFORM aplicar_pago(v_ticket, 'EFECTIVO'::metodo_pago, 240, 240, NULL, NULL, NULL, false, NULL, 'cm-pago');
+  -- Cobrar CON PROPINA. Es el camino por defecto del comedor (el modal pregunta la propina
+  -- antes del método), y es justo el que se rompió con la 0060: la propina no entra en
+  -- total_mxn, así que un guard de sobrepago que no la contemple rechaza el pago, el ticket se
+  -- queda ABIERTO y la mesa nunca se libera. Ver 0102.
+  PERFORM establecer_propina_ticket(v_ticket, 30);
+  PERFORM aplicar_pago(v_ticket, 'EFECTIVO'::metodo_pago, v_total + 30, v_total + 30, NULL, NULL, NULL, false, NULL, 'cm-pago');
   SELECT estado_fiscal INTO v_estado_fiscal FROM tickets WHERE id=v_ticket;
   SELECT estado INTO v_estado_mesa FROM mesas WHERE id=v_mesa;
   RAISE NOTICE 'tras cobrar: ticket=% / mesa=% (esperado PAGADO / liberada)', v_estado_fiscal, v_estado_mesa;
