@@ -7,7 +7,8 @@
     "./client": "./src/client.browser.ts",
     "./server": "./src/client.server.ts",
     "./service": "./src/client.service.ts",
-    "./types": "./src/database.types.ts"
+    "./types": "./src/database.types.ts",
+    "./modulos": "./src/modulos.ts"
   },
   "scripts": {
     "gen-types": "supabase gen types typescript --local > src/database.types.ts"
