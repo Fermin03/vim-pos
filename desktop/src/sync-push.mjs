@@ -45,6 +45,19 @@ export const MAX_VENTAS_POR_LOTE = 100;
 /** Techo duro por petición. Un lote que lo cruce se parte en dos, sin importar cuántas ventas trae. */
 export const MAX_BYTES_POR_LOTE = 2 * 1024 * 1024;
 
+/**
+ * I2: techo de movimientos de inventario por CORRIDA de push, no por lote.
+ *
+ * `pushToCloud` pegaba TODOS los movimientos pendientes al primer lote, y `partir` solo dividía
+ * `ticketIds` — `movimientoIds` viajaba entero con cada mitad. Con un backlog grande (una caja
+ * mucho tiempo sin conexión, o un ajuste masivo) ese primer lote podía pesar más de
+ * `MAX_BYTES_POR_LOTE` aunque no llevara ni una venta, y como antes de este fix un lote sin
+ * tickets no podía partirse (`ticketIds.length > 1` era la única condición de corte), el 413 se
+ * repetía para siempre: la misma caja atorada del comentario de arriba, ahora por inventario y
+ * no por ventas. El resto de lo pendiente se pospone al siguiente ciclo (unos minutos después).
+ */
+export const MAX_MOVIMIENTOS_POR_PUSH = 500;
+
 async function asegurarTabla(pool) {
   await pool.query("CREATE TABLE IF NOT EXISTS _vim_push_ok (ticket_id uuid PRIMARY KEY, pushed_at timestamptz DEFAULT now())");
   // Los turnos se rastrean por HUELLA, no por "ya lo mandé": un ticket terminal nunca cambia,
@@ -318,17 +331,24 @@ async function enviarLote(pool, { cloudUrl, anonKey, deviceToken }, { ticketIds,
   const cuerpo = JSON.stringify({ snapshot });
   const bytes = Buffer.byteLength(cuerpo);
 
+  // I2: un lote puede pesar de más por sus ventas, por sus movimientos, o por ambos — así que se
+  // puede partir mientras CUALQUIERA de los dos traiga más de uno, no solo por ticketIds. Un lote
+  // de puros movimientos (ticketIds vacío o con 1 sola venta) también debe poder encogerse.
+  const partible = () => ticketIds.length > 1 || movimientoIds.length > 1;
+
   const partir = async (motivo) => {
-    const mitad = Math.ceil(ticketIds.length / 2);
-    log(`${motivo}: se parte en ${mitad} + ${ticketIds.length - mitad} ventas`);
-    // Los turnos y movimientos forzados van con la primera mitad; la segunda ya solo carga los
-    // suyos por FK (turnos) o los pendientes propios (movimientos, si no se acotó la lista).
-    const a = await enviarLote(pool, { cloudUrl, anonKey, deviceToken }, { ticketIds: ticketIds.slice(0, mitad), turnoIds, movimientoIds, maxBytes }, log);
-    const b = await enviarLote(pool, { cloudUrl, anonKey, deviceToken }, { ticketIds: ticketIds.slice(mitad), turnoIds: [], movimientoIds: [], maxBytes }, log);
+    const mitadT = Math.ceil(ticketIds.length / 2);
+    const mitadM = Math.ceil(movimientoIds.length / 2);
+    log(`${motivo}: se parte en ${mitadT} + ${ticketIds.length - mitadT} ventas`
+      + (movimientoIds.length > 1 ? ` y ${mitadM} + ${movimientoIds.length - mitadM} movimientos` : ""));
+    // Los turnos forzados van con la primera mitad; la segunda ya solo carga los suyos por FK.
+    // Los movimientos se parten a la mitad en ambas: no tienen FK que los arrastre solos.
+    const a = await enviarLote(pool, { cloudUrl, anonKey, deviceToken }, { ticketIds: ticketIds.slice(0, mitadT), turnoIds, movimientoIds: movimientoIds.slice(0, mitadM), maxBytes }, log);
+    const b = await enviarLote(pool, { cloudUrl, anonKey, deviceToken }, { ticketIds: ticketIds.slice(mitadT), turnoIds: [], movimientoIds: movimientoIds.slice(mitadM), maxBytes }, log);
     return { subidos: a.subidos + b.subidos, turnos: a.turnos + b.turnos, movimientos: a.movimientos + b.movimientos, rechazados: a.rechazados + b.rechazados };
   };
 
-  if (bytes > maxBytes && ticketIds.length > 1) {
+  if (bytes > maxBytes && partible()) {
     return partir(`lote de ${(bytes / 1048576).toFixed(1)} MB`);
   }
 
@@ -337,7 +357,7 @@ async function enviarLote(pool, { cloudUrl, anonKey, deviceToken }, { ticketIds,
     headers: { apikey: anonKey, Authorization: `Bearer ${deviceToken}`, "Content-Type": "application/json" },
     body: cuerpo,
   });
-  if (res.status === 413 && ticketIds.length > 1) {
+  if (res.status === 413 && partible()) {
     return partir("la nube rechazó el lote por tamaño");
   }
   if (!res.ok) throw new Error(`sync-push HTTP ${res.status}: ${await res.text().catch(() => "")}`);
@@ -370,8 +390,16 @@ async function enviarLote(pool, { cloudUrl, anonKey, deviceToken }, { ticketIds,
 export async function pushToCloud(pool, opts, log = () => {}, cfg = {}) {
   const maxVentas = cfg.maxVentasPorLote ?? MAX_VENTAS_POR_LOTE;
   const maxBytes = cfg.maxBytesPorLote ?? MAX_BYTES_POR_LOTE;
+  const maxMovimientos = cfg.maxMovimientosPorPush ?? MAX_MOVIMIENTOS_POR_PUSH;
 
-  const { ids, turnosCambiados, movimientoIds } = await listarPendientes(pool);
+  const { ids, turnosCambiados, movimientoIds: movimientoIdsTodos } = await listarPendientes(pool);
+  // I2: techo por corrida (ver el comentario de MAX_MOVIMIENTOS_POR_PUSH). El resto se queda
+  // pendiente y lo recoge listarPendientes() en el siguiente ciclo — en orden de fecha, así que no
+  // se salta ninguno, solo se pospone.
+  const movimientoIds = movimientoIdsTodos.slice(0, maxMovimientos);
+  if (movimientoIdsTodos.length > movimientoIds.length) {
+    log(`${movimientoIdsTodos.length - movimientoIds.length} movimiento(s) de inventario se posponen al siguiente ciclo (techo ${maxMovimientos} por corrida)`);
+  }
   // Un cierre de turno SIN ventas nuevas también es algo que subir. Cuando esta condición solo
   // miraba los tickets, el cierre se quedaba en la caja y la nube nunca se enteraba. Lo mismo pasa
   // con un movimiento de inventario suelto (ADR 0013): también cuenta como pendiente por sí solo.
