@@ -71,8 +71,15 @@ DECLARE
   v_flag       boolean;
 BEGIN
   IF p_tenant IS NULL THEN RETURN NULL; END IF;
-  -- Un usuario autenticado solo puede preguntar por su propio tenant.
-  IF current_tenant_id() IS NOT NULL AND current_tenant_id() <> p_tenant THEN RETURN NULL; END IF;
+  -- Un usuario autenticado solo puede preguntar por su propio tenant. Se decide por el ROL del
+  -- JWT y no por la ausencia del claim: el hook de acceso (0006) emite tokens SIN tenant_id a
+  -- empleados dados de baja, y un token así seguiría siendo `authenticated`. Sin JWT (sesión
+  -- directa a la base: pruebas, semillas) o con service_role, pasa.
+  IF auth.jwt() IS NOT NULL
+     AND (auth.jwt() ->> 'role') IS DISTINCT FROM 'service_role'
+     AND current_tenant_id() IS DISTINCT FROM p_tenant THEN
+    RETURN NULL;
+  END IF;
 
   SELECT COALESCE(p.features_incluidos->'modulos', '{}'::jsonb)
     INTO v_plan
@@ -117,7 +124,10 @@ SET search_path = public, pg_temp
 AS $$
   SELECT CASE
     WHEN p_tenant IS NULL THEN NULL
-    WHEN current_tenant_id() IS NOT NULL AND current_tenant_id() <> p_tenant THEN NULL
+    -- Mismo criterio que modulos_efectivos: por rol, no por ausencia del claim.
+    WHEN auth.jwt() IS NOT NULL
+         AND (auth.jwt() ->> 'role') IS DISTINCT FROM 'service_role'
+         AND current_tenant_id() IS DISTINCT FROM p_tenant THEN NULL
     ELSE (
       SELECT jsonb_build_object(
         'max_sucursales',         COALESCE(l.max_sucursales, p.max_sucursales),
@@ -146,6 +156,11 @@ GRANT EXECUTE ON FUNCTION limites_efectivos(uuid) TO authenticated, service_role
 -- ── Primera regla que aplica un límite: cajas por sucursal ──────────────────
 -- El admin del dueño inserta cajas directo bajo RLS, así que el candado va en la tabla. El pull
 -- de la caja instalada corre en modo réplica y no dispara este trigger (ADR 0004).
+--
+-- Cubre INSERT y también UPDATE de `activa`, `sucursal_id` y `deleted_at`: la política de cajas
+-- es FOR ALL, así que sin eso el dueño podía crear una caja, desactivarla, crear otra y volver a
+-- activar la primera (o mover una caja a la sucursal llena) y quedarse con dos donde el plan da
+-- una. Solo cuenta la fila resultante si queda activa y no borrada, y se excluye a sí misma.
 CREATE OR REPLACE FUNCTION cajas_verificar_limite()
 RETURNS trigger
 LANGUAGE plpgsql
@@ -155,10 +170,11 @@ DECLARE
   v_max integer;
   v_n   integer;
 BEGIN
+  IF NOT (NEW.activa AND NEW.deleted_at IS NULL) THEN RETURN NEW; END IF;
   SELECT (limites_efectivos(NEW.tenant_id)->>'max_cajas_por_sucursal')::integer INTO v_max;
   IF v_max IS NULL THEN RETURN NEW; END IF;
   SELECT count(*) INTO v_n FROM cajas
-   WHERE sucursal_id = NEW.sucursal_id AND deleted_at IS NULL AND activa = true;
+   WHERE sucursal_id = NEW.sucursal_id AND deleted_at IS NULL AND activa = true AND id <> NEW.id;
   IF v_n >= v_max THEN
     RAISE EXCEPTION 'Tu plan permite % caja(s) por sucursal. Pide a VIM ampliar el límite.', v_max
       USING ERRCODE = 'P0001';
@@ -168,5 +184,5 @@ END;
 $$;
 REVOKE EXECUTE ON FUNCTION cajas_verificar_limite() FROM public;
 CREATE TRIGGER trg_cajas_limite
-  BEFORE INSERT ON cajas
+  BEFORE INSERT OR UPDATE OF activa, sucursal_id, deleted_at ON cajas
   FOR EACH ROW EXECUTE FUNCTION cajas_verificar_limite();

@@ -9,7 +9,7 @@
 -- Se corre con:  supabase test db
 -- ============================================================================
 begin;
-select plan(12);
+select plan(15);
 
 -- Tenant de prueba en plan ESENCIAL (1 caja por sucursal, sin recetas).
 insert into tenants (id, codigo, nombre_comercial, vertical_principal, plan_actual_id)
@@ -64,8 +64,25 @@ select throws_ok(
      values ('aaaaaaaa-0000-0000-0000-0000000000d0', 'aaaaaaaa-0000-0000-0000-0000000000d1', 3, 'Caja 3') $$,
   'P0001', 'Tu plan permite 2 caja(s) por sucursal. Pide a VIM ampliar el límite.', 'la tercera caja se rechaza');
 
--- #12 otro tenant autenticado no lee los módulos del primero (guard por claim)
+-- #12 el UPDATE tampoco se salta el candado: desactivar, crear otra y reactivar la primera
+update cajas set activa = false where tenant_id = 'aaaaaaaa-0000-0000-0000-0000000000d0' and numero = 1;
+insert into cajas (tenant_id, sucursal_id, numero, nombre)
+values ('aaaaaaaa-0000-0000-0000-0000000000d0', 'aaaaaaaa-0000-0000-0000-0000000000d1', 3, 'Caja 3');
+select throws_ok(
+  $$ update cajas set activa = true where tenant_id = 'aaaaaaaa-0000-0000-0000-0000000000d0' and numero = 1 $$,
+  'P0001', 'Tu plan permite 2 caja(s) por sucursal. Pide a VIM ampliar el límite.', 'reactivar la caja de más se rechaza');
+-- #13 un UPDATE que no toca activa/sucursal/deleted_at pasa aunque la sucursal esté llena
+select lives_ok(
+  $$ update cajas set nombre = 'Caja 3 barra' where tenant_id = 'aaaaaaaa-0000-0000-0000-0000000000d0' and numero = 3 $$,
+  'renombrar una caja no dispara el candado');
+
+-- #14 un JWT authenticated SIN claim de tenant (empleado dado de baja, hook 0006) no lee nada
 set local role authenticated;
+select set_config('request.jwt.claims',
+  json_build_object('sub', '99999999-0000-0000-0000-0000000000d8', 'role', 'authenticated')::text, true);
+select is(limites_efectivos('aaaaaaaa-0000-0000-0000-0000000000d0'), null, 'sin claim de tenant recibe NULL');
+
+-- #15 otro tenant autenticado no lee los módulos del primero (guard por claim)
 select set_config('request.jwt.claims',
   json_build_object('sub', '99999999-0000-0000-0000-0000000000d9',
                     'tenant_id', 'bbbbbbbb-0000-0000-0000-0000000000d0',
