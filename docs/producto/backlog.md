@@ -138,8 +138,15 @@ El editor de receta y costo por producto (`/catalogo/recetas`), el catálogo de 
 e inventario). La entrada de inventario por compra directa ya no se ofrece en el modal de movimiento
 de Inventario: se registra desde Compras.
 
+**Sincronización de inventario con la caja instalada: construida (ADR 0013, plan
+`docs/superpowers/plans/2026-09-04-sync-inventario-caja.md`).** El pull baja insumos, existencias y
+recetas a la base embebida del escritorio; la venta local descuenta por receta y genera el movimiento;
+el push sube esos movimientos y la nube los aplica una sola vez por id (descuenta existencia, evalúa
+alertas y AGOTADO automático), con el aislamiento de fila restaurado y
+`descontar_inventario_por_venta` a prueba de tenants sin `configuracion_tenant`. El panel enciende el
+módulo desde Inventario.
+
 Pendiente, sin resolver en este ciclo:
 
-- Sincronización de inventario con la caja instalada (migraciones 0055/0056).
 - Historial de movimientos filtrable (P-149).
 - Reporte de costo de ventas y margen por periodo (P-150).
