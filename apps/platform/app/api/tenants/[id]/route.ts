@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { autorizar, auditar } from "../../../lib/server";
 import { hoyMx, sumarMeses } from "@vim/fecha";
+import { MODULOS } from "@vim/db/modulos";
+import { fechaBloqueo, mensajeBloqueoPorDefecto } from "../../../lib/bloqueo";
 
 // Detalle y acciones sobre un tenant (suspender/reactivar/cancelar, notas, plan).
 // Todo auditado en super_admin_accesos. service_role, gated por X-Platform-Key.
@@ -17,7 +19,7 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }
     .from("tenants")
     .select(
       "id, codigo, nombre_comercial, estado, vertical_principal, razon_social, rfc, regimen_fiscal, " +
-        "codigo_postal_fiscal, email_fiscal, fecha_alta, fecha_baja, motivo_baja, created_at, " +
+        "codigo_postal_fiscal, email_fiscal, fecha_alta, fecha_baja, motivo_baja, bloqueo_desde, bloqueo_mensaje, created_at, " +
         "plan:planes(id, codigo, nombre, precio_mensual_mxn), " +
         "onboarding:tenant_onboarding_estado(fase, fase_wizard, fecha_invitacion, fecha_activacion, fecha_go_live, notas_internas), " +
         "suscripcion:suscripciones(estado, precio_mensual_mxn, proxima_fecha_cobro, ciclo_facturacion)",
@@ -61,8 +63,27 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }
 
   const { count: nSucursales } = await sb.from("sucursales").select("id", { count: "exact", head: true }).eq("tenant_id", id).is("deleted_at", null);
 
+  // Módulos y límites (0103, ADR 0014): la lectura la hacen las funciones de la base, aquí solo
+  // se le suman las excepciones vigentes para que la ficha diga POR QUÉ un módulo está como está.
+  const [{ data: modRaw }, { data: limRaw }, { data: flagsRaw }] = await Promise.all([
+    sb.rpc("modulos_efectivos", { p_tenant: id }),
+    sb.rpc("limites_efectivos", { p_tenant: id }),
+    sb.from("tenant_feature_flags").select("flag_codigo, activado, motivo, fecha_fin, fecha_inicio").eq("tenant_id", id),
+  ]);
+  const ahora = Date.now();
+  const excepciones = ((flagsRaw ?? []) as { flag_codigo: string; activado: boolean; motivo: string | null; fecha_fin: string | null; fecha_inicio: string }[])
+    .filter((f) => !f.fecha_fin || new Date(f.fecha_fin).getTime() > ahora)
+    .map((f) => ({ codigo: f.flag_codigo, activado: f.activado, motivo: f.motivo, fecha_fin: f.fecha_fin }));
+  const modulos = {
+    ...((modRaw ?? { permitidos: {}, efectivos: {} }) as { permitidos: Record<string, boolean>; efectivos: Record<string, boolean> }),
+    excepciones,
+  };
+  const limites = (limRaw ?? null) as Record<string, unknown> | null;
+
   return NextResponse.json({
     tenant,
+    modulos,
+    limites,
     foliosSaldo: saldo?.saldo_paquetes ?? 0,
     foliosBase: saldo
       ? { mensuales: saldo.folios_base_mensuales, consumidos: saldo.folios_base_consumidos, periodo: saldo.periodo_actual }
@@ -93,13 +114,26 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
     if (!ESTADOS_VALIDOS.includes(nuevo)) return NextResponse.json({ error: "ESTADO_INVALIDO" }, { status: 400 });
     const motivo = (body.motivo as string | undefined)?.trim() || null;
     const esBaja = nuevo === "SUSPENDIDO" || nuevo === "CANCELADO";
+    if (esBaja && (!motivo || motivo.length < 10)) return NextResponse.json({ error: "MOTIVO_REQUERIDO" }, { status: 400 });
+
     const patch: Record<string, unknown> = { estado: nuevo };
-    if (esBaja) { patch.fecha_baja = new Date().toISOString(); patch.motivo_baja = motivo; }
-    else { patch.fecha_baja = null; patch.motivo_baja = null; }
+    if (esBaja) {
+      patch.fecha_baja = new Date().toISOString();
+      patch.motivo_baja = motivo;
+      // Suspender siempre lleva gracia (>= 1 día): entre decidirlo y que la caja deje de vender
+      // hay días de aviso. Cancelar bloquea ya, salvo que se capture gracia.
+      const graciaRaw = body.gracia_dias == null ? null : Math.trunc(Number(body.gracia_dias));
+      if (nuevo === "SUSPENDIDO" && (graciaRaw === null || !(graciaRaw >= 1))) return NextResponse.json({ error: "GRACIA_REQUERIDA" }, { status: 400 });
+      const bloqueoDesde = graciaRaw !== null && graciaRaw >= 1 ? fechaBloqueo(hoyMx(), graciaRaw) : new Date().toISOString();
+      patch.bloqueo_desde = bloqueoDesde;
+      patch.bloqueo_mensaje = (body.mensaje as string | undefined)?.trim() || mensajeBloqueoPorDefecto(bloqueoDesde);
+    } else {
+      patch.fecha_baja = null; patch.motivo_baja = null; patch.bloqueo_desde = null; patch.bloqueo_mensaje = null;
+    }
     const { error } = await sb.from("tenants").update(patch).eq("id", id);
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-    await auditar(sb, { accion: `tenant.${nuevo.toLowerCase()}`, tenantId: id, motivo, payload: { estado: nuevo } });
-    return NextResponse.json({ ok: true });
+    await auditar(sb, { accion: `tenant.${nuevo.toLowerCase()}`, tenantId: id, motivo, payload: { estado: nuevo, bloqueo_desde: patch.bloqueo_desde ?? null } });
+    return NextResponse.json({ ok: true, bloqueo_desde: patch.bloqueo_desde ?? null });
   }
 
   if (accion === "marcar_fase") {
@@ -266,7 +300,52 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
     if (nuevo === "CANCELADA" || nuevo === "EXPIRADA") patch.fecha_fin = new Date().toISOString();
     const { error } = await sb.from("suscripciones").update(patch).eq("tenant_id", id).in("estado", ["ACTIVA", "PAUSADA"]);
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-    await auditar(sb, { accion: `tenant.suscripcion_${nuevo.toLowerCase()}`, tenantId: id });
+    await auditar(sb, { accion: `tenant.suscripcion_${nuevo.toLowerCase()}`, tenantId: id, motivo: (body.motivo as string | undefined)?.trim() || null });
+    return NextResponse.json({ ok: true });
+  }
+
+  // ── Módulos por excepción (tenant_feature_flags) ──────────────────────────────────────────
+  // Permitir escribe/actualiza el flag en true; quitar lo pone en false (así puede negar lo que
+  // el plan incluye). "Según plan" = borrar el flag. cfdi no entra: lo decide el add-on.
+  if (accion === "modulo_permitir" || accion === "modulo_quitar" || accion === "modulo_segun_plan") {
+    const codigo = String(body.codigo ?? "");
+    const motivo = (body.motivo as string | undefined)?.trim() || "";
+    if (!MODULOS.some((m) => m.codigo === codigo && !m.porAddon)) return NextResponse.json({ error: "MODULO_INVALIDO" }, { status: 400 });
+    if (accion !== "modulo_segun_plan" && motivo.length < 10) return NextResponse.json({ error: "MOTIVO_REQUERIDO" }, { status: 400 });
+    if (accion === "modulo_segun_plan") {
+      const { error } = await sb.from("tenant_feature_flags").delete().eq("tenant_id", id).eq("flag_codigo", codigo);
+      if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    } else {
+      const { error } = await sb.from("tenant_feature_flags").upsert(
+        { tenant_id: id, flag_codigo: codigo, activado: accion === "modulo_permitir", motivo, fecha_inicio: new Date().toISOString(), fecha_fin: null },
+        { onConflict: "tenant_id,flag_codigo" },
+      );
+      if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    }
+    await auditar(sb, { accion: `tenant.${accion}`, tenantId: id, motivo: motivo || "Vuelve a lo que dice el plan", payload: { codigo } });
+    return NextResponse.json({ ok: true });
+  }
+
+  // ── Límites por excepción (tenant_limites) ─────────────────────────────────────────────────
+  if (accion === "limites") {
+    const motivo = (body.motivo as string | undefined)?.trim() || "";
+    if (motivo.length < 10) return NextResponse.json({ error: "MOTIVO_REQUERIDO" }, { status: 400 });
+    const lee = (k: string): number | null => {
+      const v = body[k];
+      if (v === null || v === undefined || v === "") return null;
+      const n = Math.trunc(Number(v));
+      if (!Number.isFinite(n) || n < 1) throw new Error(`LIMITE_INVALIDO:${k}`);
+      return n;
+    };
+    let fila: Record<string, unknown>;
+    try {
+      fila = { tenant_id: id, max_sucursales: lee("max_sucursales"), max_cajas_por_sucursal: lee("max_cajas_por_sucursal"), max_usuarios: lee("max_usuarios"), motivo };
+    } catch (e) {
+      return NextResponse.json({ error: e instanceof Error ? e.message : "LIMITE_INVALIDO" }, { status: 400 });
+    }
+    const { error } = await sb.from("tenant_limites").upsert(fila, { onConflict: "tenant_id" });
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    await auditar(sb, { accion: "tenant.limites", tenantId: id, motivo, payload: fila });
     return NextResponse.json({ ok: true });
   }
 
