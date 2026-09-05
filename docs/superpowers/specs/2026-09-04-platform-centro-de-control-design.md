@@ -181,9 +181,9 @@ Dos capas, porque ya existen dos tablas con papeles distintos:
 | **Encendido** | El dueño, desde su admin | `configuracion_tenant.modulo_*_activo` | El cliente *lo está usando* |
 
 Un módulo no permitido no aparece encendible en el admin: la pantalla del dueño lo enseña
-apagado con "No incluido en tu plan. Pídelo a VIM". La caja y el POS web reciben en
-`directivas.modulos` el resultado de las dos capas (permitido AND encendido), y es lo único
-que consultan.
+apagado con "No incluido en tu plan. Pídelo a VIM" (eso se conecta en la entrega 2, cuando el
+admin empieza a llamar `mi_acceso()`). La caja y el POS web reciben en `directivas.modulos` el
+resultado de las dos capas (permitido AND encendido), y es lo único que consultan.
 
 Catálogo de módulos, fijo en código (`packages/db/modulos.ts`, un solo archivo compartido):
 
@@ -200,9 +200,10 @@ Límites: la fila del plan trae `max_sucursales`, `max_cajas_por_sucursal` y `ma
 agrega la tabla `tenant_limites` (tenant_id PK, las tres columnas en NULL, `motivo`,
 `updated_at`) para excepciones por cliente; el límite efectivo es `coalesce(override, plan)`. En
 esta entrega los límites **se muestran y se editan**; la primera regla que los aplica es
-"no se puede dar de alta una caja por encima del límite" en `provisionar-dispositivo`, y se hace
-en esta misma entrega porque es una línea. Sucursales y usuarios se aplican en la entrega 2 vía
-`mi_acceso()`.
+"no se puede dar de alta una caja por encima del límite", y va en un trigger `BEFORE INSERT` en
+`cajas` (el admin del dueño inserta cajas directo bajo RLS, no por Edge Function), con un
+mensaje legible que el admin ya muestra tal cual. Sucursales y usuarios se aplican en la
+entrega 2 vía `mi_acceso()`.
 
 Interfaz en la ficha: una lista de módulos con interruptor y tres estados por fila: "Incluido en
 el plan", "Permitido por excepción" (con motivo visible) y "No incluido". Cambiarlo pide motivo.
@@ -211,6 +212,13 @@ Debajo, los tres límites con el valor del plan en gris y el override editable.
 ### 5.5 Migración `0102_platform_modulos_limites.sql`
 
 - `CREATE TABLE tenant_limites (...)` con RLS negada a todos (solo service_role).
+- `tenants.bloqueo_desde timestamptz NULL` y `tenants.bloqueo_mensaje text NULL` nacen aquí y no
+  en 0103, porque "suspender con gracia" (§5.3) ya los escribe desde esta entrega; la caja los
+  empieza a obedecer en la 2.
+- Trigger `trg_cajas_limite` (`BEFORE INSERT ON cajas`): si el conteo de cajas activas no
+  borradas de esa sucursal ya alcanzó `limites_efectivos->>'max_cajas_por_sucursal'`, `RAISE
+  EXCEPTION` con `ERRCODE = 'P0001'` y mensaje "Tu plan permite N cajas por sucursal. Pide a VIM
+  ampliar el límite." NULL = sin límite.
 - `planes.features_incluidos` **no se toca**: ya trae las claves que el sitio publica
   (`cfdi_incluido`, `inventario`, `consolidado_sucursales`, 0086). Se agrega la clave `modulos`
   a los tres planes con `UPDATE ... SET features_incluidos = features_incluidos || '{"modulos": {...}}'`:
@@ -274,8 +282,7 @@ Columnas nuevas:
 
 | Tabla | Columna | Para |
 |---|---|---|
-| `tenants` | `bloqueo_desde timestamptz NULL` | fecha a partir de la cual las directivas dicen `bloqueado: true`. NULL = sin bloqueo programado |
-| `tenants` | `bloqueo_mensaje text NULL` | lo que verá el cajero; lo escribe el panel al suspender |
+| `tenants` | `bloqueo_desde`, `bloqueo_mensaje` | ya existen desde 0102 (§5.5); aquí solo se leen |
 | `cajas` | `version_app text NULL` | última versión reportada |
 | `cajas` | `ultimo_latido timestamptz NULL` | distinto de `ultima_conexion`: esta prueba que la caja está encendida aunque no venda |
 | `cajas` | `so text NULL` | "Windows 11 10.0.26200", para soporte |
