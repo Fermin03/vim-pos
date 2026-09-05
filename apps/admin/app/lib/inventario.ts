@@ -162,3 +162,24 @@ export async function listarSucursalesOpciones(): Promise<SucursalOpcion[]> {
   if (error) throw new Error(error.message);
   return ((data ?? []) as Record<string, unknown>[]).map((s) => ({ id: String(s.id), nombre: S(s.nombre) }));
 }
+
+/** ¿Las ventas descuentan inventario? (configuracion_tenant.modulo_inventario_activo, ADR 0013). */
+export async function leerModuloInventario(): Promise<boolean> {
+  const tid = await tenantId();
+  const { data, error } = await supabase.from("configuracion_tenant").select("modulo_inventario_activo").eq("tenant_id", tid).maybeSingle();
+  if (error) throw new Error(error.message);
+  return Boolean((data as { modulo_inventario_activo?: boolean } | null)?.modulo_inventario_activo);
+}
+
+/**
+ * Enciende o apaga el descuento automático. Apagarlo no revierte nada: solo deja de descontar.
+ * La mayoría de los tenants no tiene fila en configuracion_tenant todavía (se crea al primer ajuste
+ * en el panel), así que esto es un upsert por tenant_id, no un UPDATE que podría afectar 0 filas.
+ */
+export async function activarModuloInventario(activo: boolean): Promise<void> {
+  const tid = await tenantId();
+  const { error } = await supabase
+    .from("configuracion_tenant")
+    .upsert({ tenant_id: tid, modulo_inventario_activo: activo }, { onConflict: "tenant_id" });
+  if (error) throw new Error(error.message);
+}
