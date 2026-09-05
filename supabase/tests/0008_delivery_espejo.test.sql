@@ -18,6 +18,15 @@ update cajas set espejo_apps_at = now() where id = '99999999-0000-0000-0000-0000
 select is(sucursal_con_espejo('99999999-0000-0000-0000-0000000000bb'), true, 'con latido reciente hay espejo');
 
 -- Reclamo: la primera caja gana; una segunda caja no puede.
+--
+-- El fixture de desarrollo está en el plan Esencial, que desde la migración 0102 (ADR 0014)
+-- permite UNA caja por sucursal y lo hace cumplir con el trigger `trg_cajas_limite`. Esta prueba
+-- necesita dos para comprobar que la segunda no puede reclamar el pedido, así que se le concede
+-- la excepción explícita — que es exactamente el mecanismo que 0102 introduce para eso.
+insert into tenant_limites (tenant_id, max_cajas_por_sucursal, motivo)
+values ('99999999-0000-0000-0000-0000000000aa', 2, 'La prueba del espejo necesita dos cajas')
+on conflict (tenant_id) do update set max_cajas_por_sucursal = 2;
+
 insert into cajas (id, tenant_id, sucursal_id, numero, nombre)
 values ('99999999-0000-0000-0000-0000000000c2', '99999999-0000-0000-0000-0000000000aa', '99999999-0000-0000-0000-0000000000bb', 2, 'Caja 02')
 on conflict (id) do nothing;
