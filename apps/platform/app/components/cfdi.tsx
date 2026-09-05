@@ -120,7 +120,7 @@ export function Cfdi({ api, onAbrirEmpresa }: { api: Api; onAbrirEmpresa: (id: s
         <div className="rounded-lg border border-line bg-surface p-10 text-center">
           <div className="font-display text-[17px] font-semibold">Todavía nadie tiene CFDI contratado</div>
           <p className="mt-1 text-[13px] text-ink-3">
-            El add-on se da de alta desde el detalle de cada empresa, en Empresas.
+            El add-on se da de alta desde la ficha de cada cliente, en Clientes.
           </p>
         </div>
       ) : (

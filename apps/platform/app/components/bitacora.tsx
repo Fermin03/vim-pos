@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import { hace, type Acceso, type Api } from "../lib/tipos";
+import { input } from "../lib/formato";
 
 /**
  * Bitácora de accesos de super admin.
@@ -13,6 +14,10 @@ import { hace, type Acceso, type Api } from "../lib/tipos";
 export function Bitacora({ api }: { api: Api }) {
   const [accesos, setAccesos] = useState<Acceso[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // Filtros: con cientos de filas, "qué se le hizo a X" o "quién impersonó" tiene que ser un
+  // clic, no una lectura de arriba abajo.
+  const [accion, setAccion] = useState("");
+  const [q, setQ] = useState("");
 
   useEffect(() => {
     (async () => {
@@ -27,6 +32,11 @@ export function Bitacora({ api }: { api: Api }) {
   if (error) return <p className="text-[13px] text-danger">{error}</p>;
   if (!accesos) return <p className="text-[13px] text-ink-3">Cargando…</p>;
 
+  const acciones = Array.from(new Set(accesos.map((a) => a.accion))).sort();
+  const lista = accesos.filter(
+    (a) => (!accion || a.accion === accion) && (!q.trim() || a.tenant.toLowerCase().includes(q.trim().toLowerCase())),
+  );
+
   return (
     <div>
       <h2 className="mb-1 font-display text-[18px] font-semibold tracking-tight">Bitácora de accesos</h2>
@@ -34,6 +44,16 @@ export function Bitacora({ api }: { api: Api }) {
         Toda acción sobre los datos de un cliente queda aquí. Es lo que te permite responder con hechos si alguna vez
         preguntan quién tocó su información.
       </p>
+      {accesos.length > 0 && (
+        <div className="mb-3 flex flex-wrap gap-2">
+          <select className={`${input} w-[260px]`} value={accion} onChange={(e) => setAccion(e.target.value)} aria-label="Filtrar por acción">
+            <option value="">Todas las acciones</option>
+            {acciones.map((a) => <option key={a} value={a}>{a}</option>)}
+          </select>
+          <input className={`${input} w-[260px]`} placeholder="Filtrar por empresa…" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Filtrar por empresa" />
+          <span className="self-center text-[12px] text-ink-3">{lista.length} de {accesos.length}</span>
+        </div>
+      )}
       {accesos.length === 0 ? (
         <p className="text-[13px] text-ink-3">Sin accesos registrados.</p>
       ) : (
@@ -49,7 +69,10 @@ export function Bitacora({ api }: { api: Api }) {
               </tr>
             </thead>
             <tbody>
-              {accesos.map((a) => (
+              {lista.length === 0 && (
+                <tr><td colSpan={5} className="p-4 text-center text-ink-3">Nada con ese filtro.</td></tr>
+              )}
+              {lista.map((a) => (
                 <tr key={a.id} className="border-t border-line">
                   <td className="whitespace-nowrap p-2.5 text-ink-2">{hace(a.fecha)}</td>
                   <td className="p-2.5 font-semibold">{a.accion}</td>
