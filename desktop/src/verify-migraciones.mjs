@@ -1,8 +1,8 @@
 // Un instalador nuevo debe arrancar (a) desde cero y (b) desde una caja que se quedó en una
 // migración vieja, aplicando solas las que faltan. Aquí se prueba (a) con un dataRoot temporal
-// (pgdata + bin/conf/log/pidfile/secretos, TODO aislado del entorno de dev): si una migración no
-// entra en el Postgres embebido (por ejemplo, 0098 usa storage.buckets y depende del shim), esto
-// lo dice antes de publicar.
+// (pgdata + bin/conf/log/pidfile/secretos, todo el entorno aislado del de dev): si una migración
+// no entra en el Postgres embebido (por ejemplo, 0098 usa storage.buckets y depende del shim),
+// esto lo dice antes de publicar.
 import { mkdtempSync, rmSync, readdirSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
