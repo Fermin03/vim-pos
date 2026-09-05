@@ -35,7 +35,8 @@
     "iconos": "node scripts/generar-iconos.mjs",
     "carga:plantilla": "node scripts/capturar-plantilla.mjs",
     "carga": "node scripts/carga-nube.mjs",
-    "resincronizar-cortes": "node scripts/resincronizar-cortes.mjs"
+    "resincronizar-cortes": "node scripts/resincronizar-cortes.mjs",
+    "smokes": "node scripts/smokes.mjs"
   },
   "dependencies": {
     "embedded-postgres": "17.10.0-beta.17",
