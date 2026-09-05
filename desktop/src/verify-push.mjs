@@ -4,7 +4,7 @@
 // cambian y que el tracking _vim_push_ok evita re-subir. (El insert-fresco-conserva-folio ya
 // quedó probado en smoke_sync_push contra el esquema canónico.)
 import { startBackend } from "./backend.mjs";
-import { construirSnapshotPush, marcarPushed } from "./sync-push.mjs";
+import { construirSnapshotPush, marcarPushed, listarPendientes, marcarMovimientosPushed } from "./sync-push.mjs";
 
 let backend;
 try {
@@ -16,6 +16,8 @@ try {
   // Estado limpio de tracking para que las ventas terminales cuenten como pendientes.
   await pool.query("CREATE TABLE IF NOT EXISTS _vim_push_ok (ticket_id uuid PRIMARY KEY, pushed_at timestamptz DEFAULT now())");
   await pool.query("TRUNCATE _vim_push_ok");
+  await pool.query("CREATE TABLE IF NOT EXISTS _vim_mov_ok (movimiento_id uuid PRIMARY KEY, subido_at timestamptz DEFAULT now())");
+  await pool.query("TRUNCATE _vim_mov_ok");
 
   // 1) Armar el snapshot pendiente (ventas terminales de la caja)
   const { snapshot, ids } = await construirSnapshotPush(pool);
@@ -29,6 +31,18 @@ try {
   // 2) Aplicar el snapshot por la MISMA RPC de la nube (idempotente sobre el propio device)
   const res = (await q("SELECT sync_push_snapshot($1::uuid, $2::jsonb) AS r", [tenant, JSON.stringify(snapshot)]))[0].r;
   console.log(`· sync_push_snapshot aplicó: ${JSON.stringify(res)}`);
+
+  // Inventario (ADR 0013): los movimientos locales pendientes viajan y se marcan.
+  const { movimientoIds } = await listarPendientes(pool);
+  console.log(`· movimientos de inventario pendientes: ${movimientoIds.length}`);
+  if (movimientoIds.length) {
+    if (!snapshot.movimientos_inventario?.length) throw new Error("el snapshot no incluye movimientos_inventario");
+    if ((res.movimientos_inventario ?? 0) !== 0) throw new Error("la RPC aplicó sobre la propia caja movimientos que ya existían: debía ser 0 (idempotencia por id)");
+    await marcarMovimientosPushed(pool, movimientoIds);
+    const otra = await listarPendientes(pool);
+    if (otra.movimientoIds.length !== 0) throw new Error("_vim_mov_ok no evitó re-subir movimientos");
+    console.log("· _vim_mov_ok evita re-subir movimientos (OK)");
+  }
 
   // 3) Folios/estados no cambiaron (verbatim, sin regenerar)
   const despues = await q("SELECT folio_completo,estado_fiscal FROM tickets WHERE id = ANY($1) ORDER BY folio_completo", [ids]);
