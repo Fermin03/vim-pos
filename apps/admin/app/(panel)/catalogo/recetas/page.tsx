@@ -1,6 +1,7 @@
 "use client";
-import { useEffect, useMemo, useState } from "react";
+import { Suspense, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { PageBody, PageHeader, TablaScroll } from "../../../components/page-header";
 import { CatalogoTabs } from "../../../components/catalogo-tabs";
 import { listarRecetasResumen, margen, type RecetaResumen } from "../../../lib/recetas";
@@ -22,10 +23,19 @@ const BADGE: Record<Estado, { texto: string; clase: string }> = {
 };
 
 export default function RecetasPage() {
+  return (
+    <Suspense fallback={<PageBody><p className="text-sm text-ink-3">Cargando…</p></PageBody>}>
+      <Recetas />
+    </Suspense>
+  );
+}
+
+function Recetas() {
+  const params = useSearchParams();
   const [filas, setFilas] = useState<RecetaResumen[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busqueda, setBusqueda] = useState("");
-  const [soloSin, setSoloSin] = useState(false);
+  const [soloSin, setSoloSin] = useState(params.get("sin") === "1");
 
   useEffect(() => {
     listarRecetasResumen().then(setFilas).catch((e) => { setError(mensajeError(e, "No se pudieron cargar las recetas")); setFilas([]); });

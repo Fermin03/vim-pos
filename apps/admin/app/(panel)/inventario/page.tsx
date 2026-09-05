@@ -4,12 +4,14 @@ import Link from "next/link";
 import { Button } from "@vim/ui/styles";
 import { PageBody, PageHeader } from "../../components/page-header";
 import {
+  activarModuloInventario,
   actualizarInsumo,
   CATEGORIAS_INSUMO,
   crearInsumo,
   eliminarInsumo,
   insumoSchema,
   LABEL_CATEGORIA,
+  leerModuloInventario,
   listarInsumos,
   listarSucursalesOpciones,
   listarUnidades,
@@ -20,6 +22,7 @@ import {
   type TipoMovimientoUI,
   type Unidad,
 } from "../../lib/inventario";
+import { listarRecetasResumen } from "../../lib/recetas";
 import { mensajeError } from "../../lib/errores";
 
 const input = "h-11 w-full rounded border border-line-strong px-3 text-sm outline-none focus:border-ink focus:shadow-[0_0_0_3px_rgba(22,22,26,.06)]";
@@ -67,6 +70,9 @@ export default function InventarioPage() {
   const [busqueda, setBusqueda] = useState("");
   const [filtro, setFiltro] = useState<"TODOS" | EstadoStock>("TODOS");
   const [pagina, setPagina] = useState(1);
+  const [descuenta, setDescuenta] = useState<boolean | null>(null);
+  const [sinReceta, setSinReceta] = useState(0);
+  const [cambiando, setCambiando] = useState(false);
 
   async function recargar() {
     try {
@@ -80,7 +86,26 @@ export default function InventarioPage() {
     recargar();
     listarUnidades().then(setUnidades).catch(() => {});
     listarSucursalesOpciones().then(setSucursales).catch(() => {});
+    leerModuloInventario().then(setDescuenta).catch(() => setDescuenta(false));
+    listarRecetasResumen().then((r) => setSinReceta(r.filter((x) => x.activa === null).length)).catch(() => {});
   }, []);
+
+  /** Enciende o apaga el descuento automático de inventario al vender (ADR 0013). */
+  async function cambiarDescuento(activo: boolean) {
+    if (!activo && !confirm("Las ventas dejarán de descontar inventario. Las existencias no cambian. ¿Apagar?")) return;
+    setCambiando(true);
+    setError(null);
+    try {
+      await activarModuloInventario(activo);
+      setDescuenta(activo);
+      setOkMsg(activo ? "Descuento automático encendido." : "Descuento automático apagado.");
+      setTimeout(() => setOkMsg(null), 2500);
+    } catch (e) {
+      setError(mensajeError(e, "No se pudo cambiar el descuento automático"));
+    } finally {
+      setCambiando(false);
+    }
+  }
 
   function nuevo() {
     setError(null);
@@ -204,6 +229,27 @@ export default function InventarioPage() {
 
         {okMsg && <p className="mb-3 text-sm font-medium text-success">{okMsg}</p>}
         {error && !editando && !moviendo && <p className="mb-3 text-sm font-medium text-danger">{error}</p>}
+
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-line bg-surface p-4">
+          <div className="grid gap-1">
+            <div className="flex items-center gap-3">
+              <button
+                type="button" role="switch" aria-checked={!!descuenta} disabled={descuenta === null || cambiando}
+                onClick={() => cambiarDescuento(!descuenta)}
+                className={`relative h-6 w-11 rounded-full transition-colors ${descuenta ? "bg-accent" : "bg-line-strong"} disabled:opacity-50`}
+              >
+                <span className={`absolute top-0.5 h-5 w-5 rounded-full bg-white transition-transform ${descuenta ? "left-[22px]" : "left-0.5"}`} />
+              </button>
+              <span className="text-sm font-semibold">Descontar inventario al vender {descuenta === null ? "" : descuenta ? "· Encendido" : "· Apagado"}</span>
+            </div>
+            <p className="text-[12.5px] text-ink-2">Cuando está encendido, cada venta descuenta los insumos de la receta del producto. Los productos sin receta se venden sin descontar.</p>
+          </div>
+          {sinReceta > 0 && (
+            <Link href="/catalogo/recetas?sin=1" className="text-sm font-medium text-warning underline-offset-2 hover:underline">
+              {sinReceta} producto{sinReceta === 1 ? "" : "s"} sin receta
+            </Link>
+          )}
+        </div>
 
         {insumos === null && <p className="text-sm text-ink-3">Cargando…</p>}
 
