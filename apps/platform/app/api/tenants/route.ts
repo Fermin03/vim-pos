@@ -12,7 +12,7 @@ export async function GET(req: Request) {
   const { data, error } = await sb
     .from("tenants")
     .select(
-      "id, codigo, nombre_comercial, estado, vertical_principal, fecha_alta, created_at, " +
+      "id, codigo, nombre_comercial, estado, vertical_principal, fecha_alta, bloqueo_desde, created_at, " +
         "plan:planes(codigo, nombre, precio_mensual_mxn), " +
         "onboarding:tenant_onboarding_estado(fase, fecha_go_live)",
     )
