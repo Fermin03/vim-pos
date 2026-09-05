@@ -1,5 +1,19 @@
--- Smoke F10 provisioning: crea un owner (auth.users) + crear_tenant_con_owner (plan QS) y
--- verifica que quedó el tenant + perfil + acceso DUENO + saldo de folios + onboarding. ROLLBACK.
+-- Smoke F10 provisioning: crea un owner (auth.users) + crear_tenant_con_owner y verifica que
+-- quedó el tenant + perfil + acceso DUENO + saldo de folios + onboarding. ROLLBACK.
+--
+-- EL PLAN SE ELIGE DE LA BASE, NO SE ESCRIBE A MANO.
+--
+-- Estaba fijo en 'QS' hasta el 5/09/2026. Cuando el precio pasó a fijarlo el tamaño del paquete y
+-- no la vertical (migración 0086), los planes por vertical —QS, FS, CB, DK, FT, ENT— quedaron con
+-- activo=false y entraron los tres escalones: ESENCIAL, NEGOCIO y CADENA. `crear_tenant_con_owner`
+-- rechaza un plan inactivo, así que el smoke se rompía contra la nube: probaba un alta que ya no
+-- es posible. No se había notado porque nadie corría los smokes.
+--
+-- Y no basta con cambiarlo a 'ESENCIAL': el Postgres del escritorio y el stack de Supabase tienen
+-- catálogos de `planes` DISTINTOS (en el del escritorio el activo es 'QS' y ESENCIAL ni existe),
+-- así que cualquier código fijo deja rojo uno de los dos entornos. El sujeto de este smoke es el
+-- ALTA, no un plan concreto: toma el primer plan activo que haya y, si no hay ninguno, lo dice.
+-- La vertical sí sigue siendo QUICK_SERVICE: lo que dejó de depender de ella es el precio.
 \set ON_ERROR_STOP on
 BEGIN;
 DO $$
@@ -7,8 +21,11 @@ DECLARE
   v_owner uuid := gen_random_uuid();
   v_tenant uuid;
   v_codigo text := 'smoke-prov-' || substr(v_owner::text, 1, 8);
-  v_acceso int; v_folios int; v_fase text; v_dueno_ok boolean;
+  v_acceso int; v_folios int; v_fase text; v_dueno_ok boolean; v_plan text;
 BEGIN
+  SELECT codigo INTO v_plan FROM planes WHERE activo ORDER BY orden_visualizacion, codigo LIMIT 1;
+  IF v_plan IS NULL THEN RAISE EXCEPTION 'no hay ningún plan activo: el alta de un tenant es imposible'; END IF;
+
   -- Owner como lo crearía la Edge Function vía admin.auth.admin.createUser (aquí, directo).
   INSERT INTO auth.users (id, instance_id, aud, role, email, encrypted_password,
                           email_confirmed_at, created_at, updated_at,
@@ -26,7 +43,7 @@ BEGIN
     p_nombre_owner     := 'Owner Smoke',
     p_telefono_owner   := '4770000000',
     p_vertical         := 'QUICK_SERVICE'::vertical_tipo,
-    p_plan_codigo      := 'QS',
+    p_plan_codigo      := v_plan,
     p_estado           := 'TRIAL'::tenant_estado,
     p_notas_internas   := 'Alta de prueba (smoke)'
   );
@@ -54,6 +71,6 @@ BEGIN
     RAISE EXCEPTION 'tenant no quedó bien';
   END IF;
 
-  RAISE NOTICE 'SMOKE PROVISIONING OK: tenant % (% / QS / TRIAL) con dueño, folios y onboarding.', v_codigo, v_tenant;
+  RAISE NOTICE 'SMOKE PROVISIONING OK: tenant % (% / plan % / TRIAL) con dueño, folios y onboarding.', v_codigo, v_tenant, v_plan;
 END $$;
 ROLLBACK;
