@@ -1,6 +1,7 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useCallback, useState } from "react";
 import type { Alerta, Api, Severidad } from "../lib/tipos";
+import { textoActualizado, useRefresco } from "../lib/refresco";
 
 const SEV: Record<Severidad, { punto: string; caja: string; texto: string }> = {
   critica: { punto: "bg-danger", caja: "border-danger/30 bg-[#FBECEA]", texto: "text-danger" },
@@ -20,15 +21,15 @@ export function Atencion({ api, onAbrirEmpresa }: { api: Api; onAbrirEmpresa: (i
   const [error, setError] = useState<string | null>(null);
   const [filtro, setFiltro] = useState<Severidad | "todas">("todas");
 
-  useEffect(() => {
-    (async () => {
-      try {
-        setAlertas(((await api("/api/alertas")).alertas ?? []) as Alerta[]);
-      } catch (e) {
-        setError(e instanceof Error ? e.message : "Error");
-      }
-    })();
+  const cargar = useCallback(async () => {
+    try {
+      setAlertas(((await api("/api/alertas")).alertas ?? []) as Alerta[]);
+      setError(null);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Error");
+    }
   }, [api]);
+  const { hace } = useRefresco(cargar);
 
   if (error) return <p className="text-[13px] text-danger">{error}</p>;
   if (!alertas) return <p className="text-[13px] text-ink-3">Revisando…</p>;
@@ -92,7 +93,7 @@ export function Atencion({ api, onAbrirEmpresa }: { api: Api; onAbrirEmpresa: (i
                 <button
                   type="button"
                   onClick={() => onAbrirEmpresa(a.tenantId as string)}
-                  className="flex-shrink-0 rounded border border-line-strong bg-surface px-3 py-1.5 text-[12.5px] font-semibold text-ink-2 transition hover:border-ink hover:text-ink"
+                  className="btn flex-shrink-0 rounded border border-line-strong bg-surface px-3 py-1.5 text-[12.5px] font-semibold text-ink-2 hover:border-ink hover:text-ink"
                 >
                   Abrir
                 </button>
@@ -101,6 +102,7 @@ export function Atencion({ api, onAbrirEmpresa }: { api: Api; onAbrirEmpresa: (i
           ))}
         </div>
       )}
+      <p className="mt-4 text-[11.5px] text-ink-3">{textoActualizado(hace)}</p>
     </div>
   );
 }

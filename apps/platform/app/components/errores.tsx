@@ -1,6 +1,7 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useCallback, useState } from "react";
 import { hace, type Api } from "../lib/tipos";
+import { textoActualizado, useRefresco } from "../lib/refresco";
 
 type ErrorAgrupado = {
   clave: string;
@@ -33,17 +34,17 @@ export function Errores({ api }: { api: Api }) {
   const [error, setError] = useState<string | null>(null);
   const [abierto, setAbierto] = useState<string | null>(null);
 
-  useEffect(() => {
-    (async () => {
-      try {
-        const r = await api("/api/errores");
-        setErrores((r.errores ?? []) as ErrorAgrupado[]);
-        setTotal(Number(r.total ?? 0));
-      } catch (e) {
-        setError(e instanceof Error ? e.message : "Error");
-      }
-    })();
+  const cargar = useCallback(async () => {
+    try {
+      const r = await api("/api/errores");
+      setErrores((r.errores ?? []) as ErrorAgrupado[]);
+      setTotal(Number(r.total ?? 0));
+      setError(null);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Error");
+    }
   }, [api]);
+  const { hace: haceCarga } = useRefresco(cargar);
 
   if (error) return <p className="text-[13px] text-danger">{error}</p>;
   if (!errores) return <p className="text-[13px] text-ink-3">Cargando…</p>;
@@ -97,6 +98,7 @@ export function Errores({ api }: { api: Api }) {
           ))}
         </div>
       )}
+      <p className="mt-4 text-[11.5px] text-ink-3">{textoActualizado(haceCarga)}</p>
     </div>
   );
 }
