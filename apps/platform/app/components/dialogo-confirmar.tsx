@@ -52,7 +52,7 @@ export function DialogoConfirmar(p: DialogoConfirmarProps) {
   const fechaBloq = p.conGracia && Number.isInteger(gracia) && gracia >= 1 ? fechaBloqueo(hoyMx(), gracia) : null;
 
   return (
-    <Modal open={p.abierto} onClose={p.onCerrar} title={p.titulo} className="w-full max-w-lg rounded-lg bg-surface p-6 shadow-xl">
+    <Modal open={p.abierto} onClose={p.onCerrar} title={p.titulo} hideTitle className="w-full max-w-lg rounded-lg bg-surface p-6 shadow-xl">
       <h2 className={["font-display text-[18px] font-semibold tracking-tight", p.peligroso ? "text-danger" : ""].join(" ")}>{p.titulo}</h2>
       <div className="mt-2 text-[13px] leading-snug text-ink-2">{p.descripcion}</div>
 

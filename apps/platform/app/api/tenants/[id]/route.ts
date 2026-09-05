@@ -300,7 +300,7 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
     if (nuevo === "CANCELADA" || nuevo === "EXPIRADA") patch.fecha_fin = new Date().toISOString();
     const { error } = await sb.from("suscripciones").update(patch).eq("tenant_id", id).in("estado", ["ACTIVA", "PAUSADA"]);
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-    await auditar(sb, { accion: `tenant.suscripcion_${nuevo.toLowerCase()}`, tenantId: id });
+    await auditar(sb, { accion: `tenant.suscripcion_${nuevo.toLowerCase()}`, tenantId: id, motivo: (body.motivo as string | undefined)?.trim() || null });
     return NextResponse.json({ ok: true });
   }
 
