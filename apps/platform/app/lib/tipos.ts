@@ -74,3 +74,47 @@ export function hace(iso: string | null): string {
   const d = Math.floor(h / 24);
   return `hace ${d} ${d === 1 ? "día" : "días"}`;
 }
+
+// ── Clientes (lista y ficha) ─────────────────────────────────────────────────────────────────
+
+export type Tenant = {
+  id: string; codigo: string; nombre_comercial: string; estado: string; vertical_principal: string;
+  fecha_alta: string | null;
+  bloqueo_desde?: string | null;
+  plan?: { codigo: string; nombre: string; precio_mensual_mxn: number } | null;
+  onboarding?: { fase: string; fecha_go_live: string | null } | null;
+};
+
+export type Metricas = {
+  totalTenants: number; activos: number; trial: number; suspendidos: number; cancelados: number;
+  porVertical: Record<string, number>; mrr: number; foliosVendidos30d: number;
+};
+
+export type AddonCatalogo = { id: string; codigo: string; nombre: string; descripcion: string | null; precio_mensual_mxn: number };
+export type AddonContratado = {
+  id: string; activo: boolean; fecha_inicio: string; fecha_fin: string | null; precio_mensual_mxn: number;
+  addon: { id: string; codigo: string; nombre: string; precio_mensual_mxn: number } | null;
+};
+export type Paquete = { id: string; codigo: string; nombre: string; cantidad_folios: number; precio_mxn: number };
+/** `vertical` es null en los planes por tamaño (0086) y solo trae valor en los heredados. */
+export type Plan = { id: string; codigo: string; nombre: string; vertical: string | null; precio_mensual_mxn: number };
+
+export type Modulos = {
+  permitidos: Record<string, boolean>;
+  efectivos: Record<string, boolean>;
+  excepciones: { codigo: string; activado: boolean; motivo: string | null; fecha_fin: string | null }[];
+};
+export type LimitesTrio = { max_sucursales: number | null; max_cajas_por_sucursal: number | null; max_usuarios: number | null };
+export type Limites = LimitesTrio & { del_plan: LimitesTrio; excepcion: LimitesTrio & { motivo: string | null } };
+
+export type Detalle = {
+  tenant: Record<string, unknown>;
+  foliosSaldo: number;
+  foliosBase: { mensuales: number; consumidos: number; periodo: string } | null;
+  addons: AddonContratado[];
+  catalogoAddons: AddonCatalogo[];
+  paquetes: Paquete[];
+  nSucursales: number;
+  modulos: Modulos;
+  limites: Limites | null;
+};
