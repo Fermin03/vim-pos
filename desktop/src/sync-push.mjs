@@ -45,12 +45,30 @@ export const MAX_VENTAS_POR_LOTE = 100;
 /** Techo duro por petición. Un lote que lo cruce se parte en dos, sin importar cuántas ventas trae. */
 export const MAX_BYTES_POR_LOTE = 2 * 1024 * 1024;
 
+/**
+ * I2: techo de movimientos de inventario por CORRIDA de push, no por lote.
+ *
+ * `pushToCloud` pegaba TODOS los movimientos pendientes al primer lote, y `partir` solo dividía
+ * `ticketIds` — `movimientoIds` viajaba entero con cada mitad. Con un backlog grande (una caja
+ * mucho tiempo sin conexión, o un ajuste masivo) ese primer lote podía pesar más de
+ * `MAX_BYTES_POR_LOTE` aunque no llevara ni una venta, y como antes de este fix un lote sin
+ * tickets no podía partirse (`ticketIds.length > 1` era la única condición de corte), el 413 se
+ * repetía para siempre: la misma caja atorada del comentario de arriba, ahora por inventario y
+ * no por ventas. El resto de lo pendiente se pospone al siguiente ciclo (unos minutos después).
+ */
+export const MAX_MOVIMIENTOS_POR_PUSH = 500;
+
 async function asegurarTabla(pool) {
   await pool.query("CREATE TABLE IF NOT EXISTS _vim_push_ok (ticket_id uuid PRIMARY KEY, pushed_at timestamptz DEFAULT now())");
   // Los turnos se rastrean por HUELLA, no por "ya lo mandé": un ticket terminal nunca cambia,
   // pero un turno sí —se abre, se cierra, se le cuenta el efectivo— y cada cambio tiene que
   // volver a viajar. Ver el porqué en el comentario de `construirSnapshotPush`.
   await pool.query("CREATE TABLE IF NOT EXISTS _vim_turnos_ok (turno_id uuid PRIMARY KEY, huella text NOT NULL, pushed_at timestamptz DEFAULT now())");
+
+  // Movimientos de inventario: la caja los genera al vender (y al cancelar/devolver) y NUNCA los
+  // baja del pull, así que todo lo que hay en la tabla local es de origen local. Se marcan por id
+  // en cuanto la nube confirma; la nube es idempotente por id, así que reenviar no descuenta doble.
+  await pool.query("CREATE TABLE IF NOT EXISTS _vim_mov_ok (movimiento_id uuid PRIMARY KEY, subido_at timestamptz DEFAULT now())");
 
   await rescatarCortesUnaVez(pool);
 }
@@ -133,9 +151,14 @@ export async function listarPendientes(pool) {
          FROM turnos x
          LEFT JOIN _vim_turnos_ok o ON o.turno_id = x.id
         WHERE o.turno_id IS NULL
-           OR o.huella IS DISTINCT FROM md5(to_jsonb(x)::text)) AS turnos
+           OR o.huella IS DISTINCT FROM md5(to_jsonb(x)::text)) AS turnos,
+      -- Movimientos de inventario aún no confirmados por la nube, en orden de fecha.
+      (SELECT array_agg(m.id ORDER BY m.fecha)
+         FROM movimientos_inventario m
+         LEFT JOIN _vim_mov_ok ok ON ok.movimiento_id = m.id
+        WHERE ok.movimiento_id IS NULL) AS movimientos
   `, [TERMINALES]);
-  return { ids: rows[0].ids ?? [], turnosCambiados: rows[0].turnos ?? [] };
+  return { ids: rows[0].ids ?? [], turnosCambiados: rows[0].turnos ?? [], movimientoIds: rows[0].movimientos ?? [] };
 }
 
 /**
@@ -167,7 +190,7 @@ export async function listarPendientes(pool) {
  * `movimientos_caja` sigue a los mismos turnos y no solo a los de las ventas: un turno con puras
  * entradas y salidas de efectivo, sin vender nada, tampoco subía jamás.
  */
-export async function construirSnapshotPush(pool, { ticketIds = null, turnoIds = null } = {}) {
+export async function construirSnapshotPush(pool, { ticketIds = null, turnoIds = null, movimientoIds = null } = {}) {
   await asegurarTabla(pool);
   const { rows } = await pool.query(`
     WITH tk AS (
@@ -190,6 +213,7 @@ export async function construirSnapshotPush(pool, { ticketIds = null, turnoIds =
     SELECT
       (SELECT array_agg(id) FROM tk) AS ids,
       (SELECT jsonb_agg(jsonb_build_object('id', id, 'huella', huella)) FROM tn) AS turnos,
+      (SELECT array_agg(id) FROM movimientos_inventario x WHERE ($4::uuid[] IS NOT NULL AND x.id = ANY($4::uuid[])) OR ($4::uuid[] IS NULL AND $2::uuid[] IS NULL AND x.id NOT IN (SELECT movimiento_id FROM _vim_mov_ok))) AS movimientos,
       jsonb_strip_nulls(jsonb_build_object(
         'turnos',                    (SELECT jsonb_agg(to_jsonb(x)) FROM turnos x WHERE x.id IN (SELECT id FROM tn)),
         'tickets',                   (SELECT jsonb_agg(to_jsonb(x)) FROM tickets x WHERE x.id IN (SELECT id FROM tk)),
@@ -214,10 +238,17 @@ export async function construirSnapshotPush(pool, { ticketIds = null, turnoIds =
         'cortes_parciales',          (SELECT jsonb_agg(to_jsonb(x)) FROM cortes_parciales x WHERE x.turno_id IN (SELECT id FROM tn)),
         'cortes_caja',               (SELECT jsonb_agg(to_jsonb(x)) FROM cortes_caja x WHERE x.turno_id IN (SELECT id FROM tn)),
         'cortes_caja_detalle',       (SELECT jsonb_agg(to_jsonb(x)) FROM cortes_caja_detalle x WHERE x.corte_caja_id IN (SELECT id FROM cortes_caja WHERE turno_id IN (SELECT id FROM tn))),
-        'reportes_z_historico',      (SELECT jsonb_agg(to_jsonb(x)) FROM reportes_z_historico x WHERE x.turno_id IN (SELECT id FROM tn))
+        'reportes_z_historico',      (SELECT jsonb_agg(to_jsonb(x)) FROM reportes_z_historico x WHERE x.turno_id IN (SELECT id FROM tn)),
+
+        -- Inventario (ADR 0013): con lista, exactamente esos; sin lista (modo completo), todos los
+        -- pendientes. Solo columnas reales: costo_total_mxn es generada y la nube la ignora igual.
+        'movimientos_inventario',    (SELECT jsonb_agg(to_jsonb(x) - 'costo_total_mxn' ORDER BY x.fecha) FROM movimientos_inventario x
+                                        WHERE ($4::uuid[] IS NOT NULL AND x.id = ANY($4::uuid[]))
+                                           OR ($4::uuid[] IS NULL AND $2::uuid[] IS NULL
+                                               AND x.id NOT IN (SELECT movimiento_id FROM _vim_mov_ok)))
       )) AS snapshot
-  `, [TERMINALES, ticketIds, turnoIds]);
-  return { snapshot: rows[0].snapshot ?? {}, ids: rows[0].ids ?? [], turnos: rows[0].turnos ?? [] };
+  `, [TERMINALES, ticketIds, turnoIds, movimientoIds]);
+  return { snapshot: rows[0].snapshot ?? {}, ids: rows[0].ids ?? [], turnos: rows[0].turnos ?? [], movimientos: rows[0].movimientos ?? [] };
 }
 
 /** Marca tickets como subidos (para no re-enviarlos). */
@@ -225,6 +256,13 @@ export async function marcarPushed(pool, ids) {
   if (!ids?.length) return;
   await pool.query(
     "INSERT INTO _vim_push_ok(ticket_id) SELECT unnest($1::uuid[]) ON CONFLICT (ticket_id) DO NOTHING", [ids]);
+}
+
+/** Marca movimientos de inventario confirmados por la nube. */
+export async function marcarMovimientosPushed(pool, ids) {
+  if (!ids?.length) return;
+  await pool.query(
+    "INSERT INTO _vim_mov_ok(movimiento_id) SELECT unnest($1::uuid[]) ON CONFLICT (movimiento_id) DO NOTHING", [ids]);
 }
 
 /**
@@ -265,11 +303,19 @@ function rechazadosPorTicket(errores, snapshot) {
     } else if (e.tabla === "ticket_items" || e.tabla === "pagos") {
       const fila = (snapshot[e.tabla] ?? []).find((x) => x.id === e.id);
       if (fila?.ticket_id) fuera.add(fila.ticket_id);
+    } else if (e.tabla === "movimientos_inventario") {
+      // Un movimiento rechazado se reintenta solo (ver movimientosRechazados); no invalida la venta.
+      continue;
     } else {
       fuera.add(e.id); // tickets, turnos y movimientos_caja: el id ya es el que importa
     }
   }
   return fuera;
+}
+
+/** Ids de movimientos de inventario que la nube rechazó: no se marcan y se reintentan. */
+function movimientosRechazados(errores) {
+  return new Set((errores ?? []).filter((e) => e?.tabla === "movimientos_inventario" && e.id).map((e) => e.id));
 }
 
 /**
@@ -280,21 +326,29 @@ function rechazadosPorTicket(errores, snapshot) {
  * reintentando lo mismo). Partir a la mitad en vez de recalcular un tamaño "correcto" converge
  * en pocas vueltas y no necesita saber cuál es el límite del otro lado.
  */
-async function enviarLote(pool, { cloudUrl, anonKey, deviceToken }, { ticketIds, turnoIds, maxBytes }, log) {
-  const { snapshot, ids, turnos } = await construirSnapshotPush(pool, { ticketIds, turnoIds });
+async function enviarLote(pool, { cloudUrl, anonKey, deviceToken }, { ticketIds, turnoIds, movimientoIds = [], maxBytes }, log) {
+  const { snapshot, ids, turnos, movimientos } = await construirSnapshotPush(pool, { ticketIds, turnoIds, movimientoIds });
   const cuerpo = JSON.stringify({ snapshot });
   const bytes = Buffer.byteLength(cuerpo);
 
+  // I2: un lote puede pesar de más por sus ventas, por sus movimientos, o por ambos — así que se
+  // puede partir mientras CUALQUIERA de los dos traiga más de uno, no solo por ticketIds. Un lote
+  // de puros movimientos (ticketIds vacío o con 1 sola venta) también debe poder encogerse.
+  const partible = () => ticketIds.length > 1 || movimientoIds.length > 1;
+
   const partir = async (motivo) => {
-    const mitad = Math.ceil(ticketIds.length / 2);
-    log(`${motivo}: se parte en ${mitad} + ${ticketIds.length - mitad} ventas`);
+    const mitadT = Math.ceil(ticketIds.length / 2);
+    const mitadM = Math.ceil(movimientoIds.length / 2);
+    log(`${motivo}: se parte en ${mitadT} + ${ticketIds.length - mitadT} ventas`
+      + (movimientoIds.length > 1 ? ` y ${mitadM} + ${movimientoIds.length - mitadM} movimientos` : ""));
     // Los turnos forzados van con la primera mitad; la segunda ya solo carga los suyos por FK.
-    const a = await enviarLote(pool, { cloudUrl, anonKey, deviceToken }, { ticketIds: ticketIds.slice(0, mitad), turnoIds, maxBytes }, log);
-    const b = await enviarLote(pool, { cloudUrl, anonKey, deviceToken }, { ticketIds: ticketIds.slice(mitad), turnoIds: [], maxBytes }, log);
-    return { subidos: a.subidos + b.subidos, turnos: a.turnos + b.turnos, rechazados: a.rechazados + b.rechazados };
+    // Los movimientos se parten a la mitad en ambas: no tienen FK que los arrastre solos.
+    const a = await enviarLote(pool, { cloudUrl, anonKey, deviceToken }, { ticketIds: ticketIds.slice(0, mitadT), turnoIds, movimientoIds: movimientoIds.slice(0, mitadM), maxBytes }, log);
+    const b = await enviarLote(pool, { cloudUrl, anonKey, deviceToken }, { ticketIds: ticketIds.slice(mitadT), turnoIds: [], movimientoIds: movimientoIds.slice(mitadM), maxBytes }, log);
+    return { subidos: a.subidos + b.subidos, turnos: a.turnos + b.turnos, movimientos: a.movimientos + b.movimientos, rechazados: a.rechazados + b.rechazados };
   };
 
-  if (bytes > maxBytes && ticketIds.length > 1) {
+  if (bytes > maxBytes && partible()) {
     return partir(`lote de ${(bytes / 1048576).toFixed(1)} MB`);
   }
 
@@ -303,7 +357,7 @@ async function enviarLote(pool, { cloudUrl, anonKey, deviceToken }, { ticketIds,
     headers: { apikey: anonKey, Authorization: `Bearer ${deviceToken}`, "Content-Type": "application/json" },
     body: cuerpo,
   });
-  if (res.status === 413 && ticketIds.length > 1) {
+  if (res.status === 413 && partible()) {
     return partir("la nube rechazó el lote por tamaño");
   }
   if (!res.ok) throw new Error(`sync-push HTTP ${res.status}: ${await res.text().catch(() => "")}`);
@@ -316,11 +370,13 @@ async function enviarLote(pool, { cloudUrl, anonKey, deviceToken }, { ticketIds,
   const fuera = rechazadosPorTicket(errores, snapshot);
   await marcarPushed(pool, ids.filter((id) => !fuera.has(id)));
   await marcarTurnosPushed(pool, turnos.filter((t) => !fuera.has(t.id)));
+  const movFuera = movimientosRechazados(errores);
+  await marcarMovimientosPushed(pool, movimientos.filter((id) => !movFuera.has(id)));
   if (errores.length) {
     const muestra = errores.slice(0, 3).map((e) => `${e.tabla}/${String(e.id).slice(0, 8)}: ${e.error}`).join(" · ");
     log(`la nube rechazó ${errores.length} fila(s), se reintentarán: ${muestra}`);
   }
-  return { subidos: ids.length - fuera.size, turnos: turnos.length, rechazados: errores.length };
+  return { subidos: ids.length - fuera.size, turnos: turnos.length, movimientos: movimientos.length - movFuera.size, rechazados: errores.length };
 }
 
 /**
@@ -334,35 +390,48 @@ async function enviarLote(pool, { cloudUrl, anonKey, deviceToken }, { ticketIds,
 export async function pushToCloud(pool, opts, log = () => {}, cfg = {}) {
   const maxVentas = cfg.maxVentasPorLote ?? MAX_VENTAS_POR_LOTE;
   const maxBytes = cfg.maxBytesPorLote ?? MAX_BYTES_POR_LOTE;
+  const maxMovimientos = cfg.maxMovimientosPorPush ?? MAX_MOVIMIENTOS_POR_PUSH;
 
-  const { ids, turnosCambiados } = await listarPendientes(pool);
+  const { ids, turnosCambiados, movimientoIds: movimientoIdsTodos } = await listarPendientes(pool);
+  // I2: techo por corrida (ver el comentario de MAX_MOVIMIENTOS_POR_PUSH). El resto se queda
+  // pendiente y lo recoge listarPendientes() en el siguiente ciclo — en orden de fecha, así que no
+  // se salta ninguno, solo se pospone.
+  const movimientoIds = movimientoIdsTodos.slice(0, maxMovimientos);
+  if (movimientoIdsTodos.length > movimientoIds.length) {
+    log(`${movimientoIdsTodos.length - movimientoIds.length} movimiento(s) de inventario se posponen al siguiente ciclo (techo ${maxMovimientos} por corrida)`);
+  }
   // Un cierre de turno SIN ventas nuevas también es algo que subir. Cuando esta condición solo
-  // miraba los tickets, el cierre se quedaba en la caja y la nube nunca se enteraba.
-  if (!ids.length && !turnosCambiados.length) { log("nada pendiente por subir"); return { subidos: 0, turnos: 0, rechazados: 0, lotes: 0 }; }
+  // miraba los tickets, el cierre se quedaba en la caja y la nube nunca se enteraba. Lo mismo pasa
+  // con un movimiento de inventario suelto (ADR 0013): también cuenta como pendiente por sí solo.
+  if (!ids.length && !turnosCambiados.length && !movimientoIds.length) { log("nada pendiente por subir"); return { subidos: 0, turnos: 0, movimientos: 0, rechazados: 0, lotes: 0 }; }
 
   const parte = [
     ids.length ? `${ids.length} venta${ids.length === 1 ? "" : "s"}` : null,
     turnosCambiados.length ? `${turnosCambiados.length} turno${turnosCambiados.length === 1 ? "" : "s"}` : null,
+    movimientoIds.length ? `${movimientoIds.length} movimiento(s) de inventario` : null,
   ].filter(Boolean).join(" y ");
 
-  // Sin ventas queda un solo lote vacío: el que lleva los turnos que cambiaron.
+  // Sin ventas queda un solo lote vacío: el que lleva los turnos que cambiaron (y los movimientos).
   const lotes = ids.length ? trocear(ids, maxVentas) : [[]];
   log(`subiendo ${parte}${lotes.length > 1 ? ` en ${lotes.length} lotes` : ""}…`);
 
   let subidos = 0;
   let turnos = 0;
+  let movimientos = 0;
   let rechazados = 0;
   let n = 0;
 
   for (const lote of lotes) {
-    // Los turnos que cambiaron sin arrastrar ventas viajan pegados al primer lote; los demás
-    // lotes ya cargan por FK los turnos de sus propios tickets.
+    // Los turnos que cambiaron sin arrastrar ventas, y los movimientos pendientes, viajan pegados
+    // al primer lote; los demás lotes ya cargan por FK los turnos de sus propios tickets.
     const turnoIds = n === 0 ? turnosCambiados : [];
+    const movIds = n === 0 ? movimientoIds : [];
     n++;
     try {
-      const r = await enviarLote(pool, opts, { ticketIds: lote, turnoIds, maxBytes }, log);
+      const r = await enviarLote(pool, opts, { ticketIds: lote, turnoIds, movimientoIds: movIds, maxBytes }, log);
       subidos += r.subidos;
       turnos += r.turnos;
+      movimientos += r.movimientos;
       rechazados += r.rechazados;
     } catch (e) {
       // El mensaje dice cuánto SÍ quedó arriba: sin eso, el log de la caja (que es el único
@@ -372,5 +441,5 @@ export async function pushToCloud(pool, opts, log = () => {}, cfg = {}) {
     if (lotes.length > 1) log(`lote ${n}/${lotes.length} · ${subidos}/${ids.length} ventas arriba`);
   }
 
-  return { subidos, turnos, rechazados, lotes: n };
+  return { subidos, turnos, movimientos, rechazados, lotes: n };
 }

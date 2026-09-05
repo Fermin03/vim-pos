@@ -524,23 +524,17 @@ async function syncBestEffort({ conPull = true } = {}) {
     if (!s.access_token) { console.log("· [sync] omitido (login de dispositivo en la nube falló)"); return false; }
     const deviceToken = s.access_token;
     const opts = { cloudUrl, anonKey: anon, deviceToken };
-    if (conPull) {
-      try {
-        console.log("· [sync] PULL: bajando rebanada del tenant…");
-        const rp = await pullFromCloud(backend.pool, opts, (m) => console.log("· [sync]", m));
-        console.log(`· [sync] PULL OK: ${Object.keys(rp).length} tablas`);
-      } catch (e) { console.log("· [sync] PULL omitido:", e.message); }
-    }
+    let pushOk = false;
     try {
       console.log("· [sync] PUSH: subiendo ventas offline…");
       const rs = await pushToCloud(backend.pool, opts, (m) => console.log("· [sync]", m));
-      console.log(`· [sync] PUSH OK: ${rs.subidos} ventas subidas`);
+      console.log(`· [sync] PUSH OK: ${rs.subidos} ventas, ${rs.movimientos ?? 0} movimientos de inventario`);
       // La bitácora va DESPUÉS y en su propio try: si falla, las ventas ya se subieron y el
       // ciclo debe contarse como exitoso. Perder un reporte de error no justifica un reintento.
       try {
         await subirErrores(backend.pool, opts, (m) => console.log("· [sync]", m));
       } catch (e) { console.log("· [sync] bitácora de errores omitida:", e.message); }
-      return true;
+      pushOk = true;
     } catch (e) {
       console.log("· [sync] PUSH omitido:", e.message);
       // Un push que falla NO deja rastro en la nube: la RPC rechaza y no llega a registrar nada,
@@ -559,8 +553,18 @@ async function syncBestEffort({ conPull = true } = {}) {
         });
         await subirErrores(backend.pool, opts, (m) => console.log("· [sync]", m));
       } catch (e2) { console.log("· [sync] no se pudo reportar el fallo:", e2.message); }
-      return false;
     }
+    // PULL después del PUSH (ADR 0013): el agotado automático lo decide la nube al recibir los
+    // movimientos; si el catálogo bajara antes, traería el estado viejo y lo pisaría hasta el
+    // siguiente ciclo. La corrección por pendientes del pull protege las existencias si el push falló.
+    if (conPull) {
+      try {
+        console.log("· [sync] PULL: bajando rebanada del tenant…");
+        const rp = await pullFromCloud(backend.pool, opts, (m) => console.log("· [sync]", m));
+        console.log(`· [sync] PULL OK: ${Object.keys(rp).length} tablas`);
+      } catch (e) { console.log("· [sync] PULL omitido:", e.message); }
+    }
+    return pushOk;
   } catch (e) {
     console.log("· [sync] best-effort omitido:", e.message);
     return false;
