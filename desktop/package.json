@@ -9,6 +9,7 @@
   "scripts": {
     "verify": "node src/verify-e2e.mjs",
     "verify:sync": "node src/verify-sync.mjs",
+    "verify:migraciones": "node src/verify-migraciones.mjs",
     "verify:sync-ciclo": "node src/verify-sync-ciclo.mjs",
     "verify:push": "node src/verify-push.mjs",
     "verify:dia": "node src/verify-dia.mjs",
