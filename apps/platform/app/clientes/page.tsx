@@ -3,7 +3,7 @@ import { useRouter } from "next/navigation";
 import { useCallback, useState } from "react";
 import { useSesion } from "../lib/sesion";
 import { textoActualizado, useRefresco } from "../lib/refresco";
-import { fechaCorta, fmtMxn, input } from "../lib/formato";
+import { fechaCorta, fmtMxn, input, nombreFase } from "../lib/formato";
 import type { Metricas, Tenant } from "../lib/tipos";
 import { TarjetaCifra } from "../components/tarjeta-cifra";
 import { PastillaEstado } from "../components/pastilla-estado";
@@ -106,7 +106,7 @@ export default function ClientesPage() {
                     <td className="px-4 py-2.5 font-medium">{t.nombre_comercial}</td>
                     <td className="px-4 py-2.5 text-ink-2">{t.vertical_principal}</td>
                     <td className="px-4 py-2.5 text-ink-2">{t.plan?.codigo ?? "—"}</td>
-                    <td className="px-4 py-2.5 text-[12px] text-ink-3">{t.onboarding?.fase ?? "—"}</td>
+                    <td className="px-4 py-2.5 text-[12px] text-ink-3">{nombreFase(t.onboarding?.fase)}</td>
                     <td className="px-4 py-2.5">
                       <PastillaEstado estado={t.estado} />
                       {bloqueo && <div className="mt-0.5 text-[11px] font-semibold text-warning">bloquea el {fechaCorta(bloqueo)}</div>}
