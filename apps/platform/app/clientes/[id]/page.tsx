@@ -11,6 +11,7 @@ import { PastillaEstado } from "../../components/pastilla-estado";
 import { SaludTenant } from "../../components/salud-tenant";
 import { FichaContrato } from "../../components/ficha-contrato";
 import { FichaFacturacion } from "../../components/ficha-facturacion";
+import { ModulosLimites } from "../../components/modulos-limites";
 import { DialogoConfirmar } from "../../components/dialogo-confirmar";
 
 const ANCLAS = [
@@ -127,7 +128,7 @@ export default function FichaCliente() {
 
         <Seccion id="contrato" titulo="Contrato" descripcion="Qué paga, qué tiene contratado y qué puede usar.">
           <FichaContrato d={d} planes={planes} accion={accion} busy={busy} />
-          {/* MODULOS_LIMITES */}
+          <ModulosLimites d={d} nombre={nombre} accion={accion} busy={busy} />
         </Seccion>
 
         <Seccion id="facturacion" titulo="Facturación" descripcion="Datos fiscales y folios CFDI.">
