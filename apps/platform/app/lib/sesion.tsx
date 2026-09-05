@@ -71,7 +71,13 @@ function Entrada({ onEntrar }: { onEntrar: (clave: string) => void }) {
       const r = await fetch("/api/tenants", { headers: { "X-Platform-Key": k } });
       if (r.status === 401) throw new Error("Clave incorrecta");
       if (r.status === 429) throw new Error("Demasiados intentos. Espera 15 minutos.");
-      if (!r.ok) throw new Error("No se pudo entrar");
+      if (!r.ok) {
+        // El motivo real, no un "no se pudo entrar" genérico: un 500 por una migración que
+        // falta o un 503 por falta de PLATFORM_PROVISION_KEY se ven idénticos a una clave
+        // equivocada, y se pierde el rato buscando el problema donde no está.
+        const cuerpo = (await r.json().catch(() => ({}))) as { error?: string; detalle?: string };
+        throw new Error(cuerpo.error ?? cuerpo.detalle ?? `El servidor respondió ${r.status}`);
+      }
       onEntrar(k);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Error al entrar");
