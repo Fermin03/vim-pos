@@ -64,3 +64,40 @@ test("normalizar nunca inventa un bloqueo con basura", () => {
   assert.equal(normalizar({ acceso: { bloqueado: 1 } }).acceso.bloqueado, false);
   assert.deepEqual(normalizar(undefined), DIRECTIVAS_VACIAS);
 });
+
+// ── Cola de acuses de avisos (ADR 0014, entrega 3) ──────────────────────────
+
+test("guarda los acuses pendientes junto a las directivas", () => {
+  const a = crearAlmacenDirectivas({ archivo: "d.json", fs: fsFalso() });
+  a.marcarVisto("11111111-0000-0000-0000-0000000000f0");
+  a.marcarVisto("11111111-0000-0000-0000-0000000000f0"); // repetido: no duplica
+  assert.deepEqual(a.vistosPendientes(), ["11111111-0000-0000-0000-0000000000f0"]);
+});
+
+test("los acuses sobreviven a una directiva nueva", () => {
+  const a = crearAlmacenDirectivas({ archivo: "d.json", fs: fsFalso() });
+  a.marcarVisto("11111111-0000-0000-0000-0000000000f0");
+  a.guardar({ acceso: { bloqueado: false }, avisos: [] });
+  assert.deepEqual(a.vistosPendientes(), ["11111111-0000-0000-0000-0000000000f0"]);
+  assert.equal(a.leer().directivas.acceso.bloqueado, false);
+});
+
+test("limpiarVistos borra solo lo ya reportado", () => {
+  const a = crearAlmacenDirectivas({ archivo: "d.json", fs: fsFalso() });
+  a.marcarVisto("aaaa1111-0000-0000-0000-0000000000f0");
+  a.marcarVisto("bbbb2222-0000-0000-0000-0000000000f0");
+  a.limpiarVistos(["aaaa1111-0000-0000-0000-0000000000f0"]);
+  assert.deepEqual(a.vistosPendientes(), ["bbbb2222-0000-0000-0000-0000000000f0"]);
+});
+
+test("un id que no es uuid se descarta", () => {
+  const a = crearAlmacenDirectivas({ archivo: "d.json", fs: fsFalso() });
+  a.marcarVisto("no-es-uuid");
+  a.marcarVisto(null);
+  assert.deepEqual(a.vistosPendientes(), []);
+});
+
+test("sin archivo no hay acuses pendientes y no revienta", () => {
+  const a = crearAlmacenDirectivas({ archivo: "d.json", fs: fsFalso() });
+  assert.deepEqual(a.vistosPendientes(), []);
+});

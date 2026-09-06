@@ -248,6 +248,7 @@ async function bootCaja() {
       onVincularNube: (p) => vincularConNube(p),
       estadoSync: () => ({ disponible: true, vinculada: leerNube() !== null, ...ciclo.estado() }),
       onFolios: () => consultarFolios(),
+      avisoVisto: (id) => directivas.marcarVisto(id),
       directivas: () => {
         const { directivas: d, recibidoIso } = directivas.leer();
         return { disponible: true, recibido: recibidoIso, directivas: d };
@@ -501,6 +502,8 @@ async function tokenDeNube() {
 async function latir() {
   const opts = await tokenDeNube();
   if (!opts) return;   // sin vincular: no hay a quién latir
+  // Acuses de avisos que el cajero cerró desde el último latido (ADR 0014, entrega 3).
+  const vistos = directivas.vistosPendientes();
   const r = await fetch(`${opts.cloudUrl}/functions/v1/caja-latido`, {
     method: "POST",
     headers: {
@@ -508,12 +511,18 @@ async function latir() {
       Authorization: `Bearer ${opts.deviceToken}`,
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({ version: app.getVersion(), so: `${os.type()} ${os.release()}` }),
+    body: JSON.stringify({
+      version: app.getVersion(),
+      so: `${os.type()} ${os.release()}`,
+      avisos_vistos: vistos,
+    }),
     signal: AbortSignal.timeout(10000),
   });
   if (!r.ok) throw new Error(`caja-latido HTTP ${r.status}`);
   const j = await r.json();
   if (j?.directivas) directivas.guardar(j.directivas);
+  // Se limpian DESPUÉS de que la nube confirmó: si el latido falla, se reintentan en el siguiente.
+  if (vistos.length > 0) directivas.limpiarVistos(vistos);
 }
 
 /**
