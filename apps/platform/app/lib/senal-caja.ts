@@ -6,7 +6,10 @@
  * semanas subiendo ventas sin fallar. Una alarma que siempre suena deja de mirarse, y el día que
  * una caja se calle de verdad nadie lo va a notar.
  *
- * Las tres señales, de más a menos directa:
+ * Las señales, de más a menos directa:
+ *   · `latido`   — la caja llamó a `caja_latido` (migración 0104). La más honesta: prueba que
+ *                  está encendida aunque no haya vendido ni tenido nada que subir. Solo la
+ *                  mandan las cajas desde 0.4.58; las anteriores caen al criterio de abajo.
  *   · `conexion` — la caja selló su paso al sincronizar (migración 0073). Prueba que habló.
  *   · `sync`     — subió datos. Igual de bueno, pero solo ocurre cuando había algo que subir.
  *   · `venta`    — vendió. Prueba que operó, no que se conectó: puede haber vendido sin subir.
@@ -15,15 +18,16 @@
  * de hace tres horas puede convivir con una caja que lleva días sin subir nada — que es
  * justamente el caso grave, el que deja al cliente sin respaldo en la nube.
  */
-export type OrigenSenal = "conexion" | "sync" | "venta";
+export type OrigenSenal = "latido" | "conexion" | "sync" | "venta";
 export type EstadoCaja = "ok" | "tibia" | "caida" | "nunca" | "bloqueada" | "inactiva";
 
 export function señalDeCaja(
-  fuentes: { ultimaConexion?: string | null; ultimoSync?: string | null; ultimaVenta?: string | null },
+  fuentes: { ultimoLatido?: string | null; ultimaConexion?: string | null; ultimoSync?: string | null; ultimaVenta?: string | null },
   ahora: number = Date.now(),
 ): { señal: string | null; origen: OrigenSenal | null; horas: number | null } {
-  const señal = fuentes.ultimaConexion ?? fuentes.ultimoSync ?? fuentes.ultimaVenta ?? null;
-  const origen: OrigenSenal | null = fuentes.ultimaConexion ? "conexion"
+  const señal = fuentes.ultimoLatido ?? fuentes.ultimaConexion ?? fuentes.ultimoSync ?? fuentes.ultimaVenta ?? null;
+  const origen: OrigenSenal | null = fuentes.ultimoLatido ? "latido"
+    : fuentes.ultimaConexion ? "conexion"
     : fuentes.ultimoSync ? "sync"
     : fuentes.ultimaVenta ? "venta"
     : null;
