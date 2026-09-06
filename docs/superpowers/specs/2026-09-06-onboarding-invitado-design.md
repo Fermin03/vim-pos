@@ -57,11 +57,11 @@ VIM                          El dueño                        La caja (su PC)
                                1 Datos del negocio
                                2 Tu menú           (importador CSV)
                                3 Tu equipo         (cajeros con PIN)
-                               4 Descarga la caja  ──────────► instala
-                               5 Vincúlala          código ──► [4 8 2 1 9 3]
+                               4 Instala y conecta ─────────► descarga e instala
+                                 tu caja             código ──► [4 8 2 1 9 3]
                                     ▲                              │
                                     └──── late ────────────────────┘
-                               6 Tu primera venta ◄──────────── cobra
+                               5 Tu primera venta ◄──────────── cobra
                                      │
                                      ▼
                                   GO_LIVE
@@ -109,12 +109,15 @@ siendo cierto. Se conserva ese principio en los pasos nuevos.
 | 1 | Datos del negocio | `tenants.nombre_comercial` tiene contenido | sí |
 | 2 | Tu menú | `count(productos) > 0` | sí |
 | 3 | Tu equipo | `count(usuarios_perfil) > 1` | sí |
-| 4 | **Descarga la caja** | la caja late alguna vez (ver #5) — el paso se cierra solo | sí |
-| 5 | **Vincula la caja** | **`cajas.ultimo_latido IS NOT NULL`** | sí |
-| 6 | **Tu primera venta** | `count(tickets) > 0` | sí |
+| 4 | **Instala y conecta tu caja** | **`cajas.ultimo_latido IS NOT NULL`** | sí |
+| 5 | **Tu primera venta** | `count(tickets) > 0` | sí |
 | — | Datos fiscales (CFDI) | `tenants.razon_social` tiene contenido | no |
 
-**El cambio importante es el paso 5.** Hoy el checklist marca la caja como lista con
+Descargar e instalar **no es un paso aparte**: no hay forma honesta de detectar que alguien
+descargó un archivo, y un paso que solo se puede marcar a mano es justo el que la gente marca sin
+hacer. Descarga, instalación y vinculación son un solo paso con una sola señal: la caja late.
+
+**El cambio importante es ese paso 4.** Hoy el checklist marca la caja como lista con
 `count(cajas) > 0` — una **fila en una tabla**. Se puede llegar al 100% sin nada con qué cobrar.
 Pasa a usar `cajas.ultimo_latido`, que la entrega 2 del ADR 0014 puso ahí precisamente para
 significar "esta caja está viva y habla con nosotros". Una caja que late es una caja que existe.
@@ -263,7 +266,7 @@ anotado para que sea una decisión y no un descuido.
 | `supabase/tests/00XX_vinculacion.test.sql` | pgTAP de lo anterior |
 | `supabase/functions/canjear-vinculacion/index.ts` | canje público con límite por IP |
 | `apps/admin/app/lib/onboarding.ts` | pasos nuevos; la caja se mide por latido |
-| `apps/admin/app/(panel)/bienvenida/page.tsx` | pasos de descarga, vinculación y primera venta |
+| `apps/admin/app/(panel)/bienvenida/page.tsx` | paso de instalar y conectar la caja, y el de la primera venta |
 | `apps/admin/app/(panel)/layout.tsx` | aterrizar en `/bienvenida` mientras no haya `GO_LIVE` |
 | `apps/admin/app/(panel)/configuracion/cajas/…` | botón "Vincular esta caja" que emite el código |
 | `apps/platform/app/clientes/nuevo/page.tsx` | mostrar el enlace copiable y si el correo salió |
