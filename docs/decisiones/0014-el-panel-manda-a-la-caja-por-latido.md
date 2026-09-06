@@ -48,7 +48,7 @@
 ## Consecuencias
 
 - Hay hasta diez minutos entre decidir en el panel y que la caja obedezca. Aceptado.
-- Cajas anteriores a 0.4.58 no laten ni bloquean; el panel las enseña como "versión anterior" y
+- Cajas anteriores a 0.4.60 no laten ni bloquean; el panel las enseña como "versión anterior" y
   la entrega de versiones sirve para empujarlas a actualizar.
 - `cajas.ultimo_latido` pasa a ser la primera señal del semáforo del panel; `ultima_conexion`,
   el sync y la última venta quedan como respaldo para cajas viejas.

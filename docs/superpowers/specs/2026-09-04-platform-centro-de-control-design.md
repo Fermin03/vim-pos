@@ -33,7 +33,7 @@ Cuatro entregas, en este orden. Cada una se publica sola.
 | # | Entrega | Toca la caja instalada |
 |---|---|---|
 | 1 | Rediseño del panel + módulos y límites por cliente (§5) | No |
-| 2 | Latido de la caja + bloqueo real por estado (§6, §7) | Sí (escritorio 0.4.58) |
+| 2 | Latido de la caja + bloqueo real por estado (§6, §7) | Sí (escritorio 0.4.60) |
 | 3 | Avisos a las cajas (§8) | Sí (misma versión que 2 si coinciden) |
 | 4 | Versiones de la caja desde el panel (§9) | Sí |
 
@@ -98,7 +98,7 @@ Formato de las directivas (lo devuelven las dos rutas, idéntico):
   "avisos": [
     { "id": "…", "nivel": "info", "titulo": "Mantenimiento", "cuerpo": "…", "requiere_confirmacion": false, "vigente_hasta": null }
   ],
-  "version": { "minima": "0.4.58", "recomendada": "0.4.60", "url": "…", "sha512": "…", "notas": "…", "bloquea_bajo_minima": false }
+  "version": { "minima": "0.4.60", "recomendada": "0.4.60", "url": "…", "sha512": "…", "notas": "…", "bloquea_bajo_minima": false }
 }
 ```
 
@@ -213,7 +213,7 @@ Debajo, los tres límites con el valor del plan en gris y el override editable.
 
 - `CREATE TABLE tenant_limites (...)` con RLS negada a todos (solo service_role).
 - `tenants.bloqueo_desde timestamptz NULL` y `tenants.bloqueo_mensaje text NULL` nacen aquí y no
-  en 0104, porque "suspender con gracia" (§5.3) ya los escribe desde esta entrega; la caja los
+  en 0105, porque "suspender con gracia" (§5.3) ya los escribe desde esta entrega; la caja los
   empieza a obedecer en la 2.
 - Trigger `trg_cajas_limite` (`BEFORE INSERT ON cajas`): si el conteo de cajas activas no
   borradas de esa sucursal ya alcanzó `limites_efectivos->>'max_cajas_por_sucursal'`, `RAISE
@@ -276,7 +276,7 @@ Hereda `nucleo.md` y `platform.md`. Se carga la skill de diseño antes de escrib
 
 ## 6. Entrega 2 — Latido y bloqueo real
 
-### 6.1 Migración `0104_caja_latido_y_bloqueo.sql`
+### 6.1 Migración `0105_caja_latido_y_bloqueo.sql`
 
 Columnas nuevas:
 
@@ -323,7 +323,7 @@ del correo sintético del dispositivo (`caja-<uuid>@dispositivos.vimpos.mx`, reg
 se toma de `x-forwarded-for`. Responde `{ directivas }`. Cualquier error del RPC responde 500 y
 la caja conserva sus directivas anteriores.
 
-### 6.4 Escritorio (0.4.58)
+### 6.4 Escritorio (0.4.60)
 
 - En `sync-ciclo.mjs` el ciclo llama `latir()` **al principio de cada ciclo, siempre**, antes del
   push. Un fallo del latido no cuenta como fallo del ciclo ni dispara backoff: se registra y se
@@ -359,14 +359,14 @@ pantallas de alta correspondientes con el mismo `mi_acceso()`.
 
 ## 7. Compatibilidad hacia atrás
 
-Cajas con versión anterior a 0.4.58 no llaman al latido, no reciben directivas y no bloquean. El
+Cajas con versión anterior a 0.4.60 no llaman al latido, no reciben directivas y no bloquean. El
 panel las distingue: una caja con `version_app = NULL` se muestra como "sin latido · versión
-anterior a 0.4.58" en gris, no en rojo. La entrega 4 sirve justamente para empujarlas a
+anterior a 0.4.60" en gris, no en rojo. La entrega 4 sirve justamente para empujarlas a
 actualizar.
 
 ## 8. Entrega 3 — Avisos a las cajas
 
-### 8.1 Migración `0105_avisos_plataforma.sql`
+### 8.1 Migración `0106_avisos_plataforma.sql`
 
 ```
 avisos_plataforma (
@@ -406,7 +406,7 @@ registran vía RPC `marcar_aviso_visto(p_aviso uuid)` ejecutable por `authentica
 
 ## 9. Entrega 4 — Versiones de la caja
 
-### 9.1 Migración `0106_versiones_caja.sql`
+### 9.1 Migración `0107_versiones_caja.sql`
 
 ```
 versiones_caja (
@@ -493,13 +493,13 @@ SQL con `set role authenticated` y claims falsos, como las existentes).
 
 1. Entrega 1: migración 0103 con `supabase db push`, deploy de `apps/platform` en Vercel. Sin
    versión nueva de escritorio.
-2. Entrega 2: migración 0104, `supabase functions deploy caja-latido` (funciona desde Windows,
+2. Entrega 2: migración 0105, `supabase functions deploy caja-latido` (funciona desde Windows,
    ver `reference_supabase_cli_token_windows`), deploy de `apps/pos` y `apps/admin`, escritorio
-   **0.4.58** (`npm run dist` tarda más de 10 minutos, lanzar en segundo plano). Avisar a
+   **0.4.60** (`npm run dist` tarda más de 10 minutos, lanzar en segundo plano). Avisar a
    Knock-Out antes de que su caja se actualice.
-3. Entrega 3: migración 0105 y redeploy de `caja-latido`. Si coincide en tiempo con la 2, va en
+3. Entrega 3: migración 0106 y redeploy de `caja-latido`. Si coincide en tiempo con la 2, va en
    la misma versión de escritorio.
-4. Entrega 4: migración 0106, variable `PLATFORM_RELEASES_HOST` en Vercel, y a partir de ahí las
+4. Entrega 4: migración 0107, variable `PLATFORM_RELEASES_HOST` en Vercel, y a partir de ahí las
    versiones se publican desde el panel.
 
 ## 13. Riesgos y decisiones tomadas

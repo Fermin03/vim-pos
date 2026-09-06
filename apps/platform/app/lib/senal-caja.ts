@@ -7,9 +7,9 @@
  * una caja se calle de verdad nadie lo va a notar.
  *
  * Las señales, de más a menos directa:
- *   · `latido`   — la caja llamó a `caja_latido` (migración 0104). La más honesta: prueba que
+ *   · `latido`   — la caja llamó a `caja_latido` (migración 0105). La más honesta: prueba que
  *                  está encendida aunque no haya vendido ni tenido nada que subir. Solo la
- *                  mandan las cajas desde 0.4.58; las anteriores caen al criterio de abajo.
+ *                  mandan las cajas desde 0.4.60; las anteriores caen al criterio de abajo.
  *   · `conexion` — la caja selló su paso al sincronizar (migración 0073). Prueba que habló.
  *   · `sync`     — subió datos. Igual de bueno, pero solo ocurre cuando había algo que subir.
  *   · `venta`    — vendió. Prueba que operó, no que se conectó: puede haber vendido sin subir.

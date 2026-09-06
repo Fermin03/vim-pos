@@ -1,5 +1,5 @@
 -- ============================================================================
--- Latido de la caja y directivas (spec 2026-09-04 §6, ADR 0014, migración 0104).
+-- Latido de la caja y directivas (spec 2026-09-04 §6, ADR 0014, migración 0105).
 --
 -- Lo que se protege: que las directivas digan bloqueado SOLO a partir de la fecha, que el
 -- latido selle versión y hora, que un tenant no lea las directivas de otro, y que el límite de

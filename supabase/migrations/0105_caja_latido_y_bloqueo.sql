@@ -1,5 +1,5 @@
 -- ============================================================================
--- 0104 — Latido de la caja y directivas (ADR 0014, entrega 2).
+-- 0105 — Latido de la caja y directivas (ADR 0014, entrega 2).
 --
 -- La 0103 dejó al panel decidiendo cosas que nadie obedecía: suspender escribía una fecha y la
 -- caja seguía vendiendo igual. Aquí nace el canal: la caja llama cada 10 minutos, sella que está
@@ -19,7 +19,7 @@ ALTER TABLE cajas
   ADD COLUMN so            text NULL;
 COMMENT ON COLUMN cajas.ultimo_latido IS
   'Última vez que la caja llamó a caja_latido(). Prueba que está encendida aunque no venda (a diferencia de ultima_conexion).';
-COMMENT ON COLUMN cajas.version_app IS 'Versión del escritorio que reportó la caja. NULL = anterior a 0.4.58.';
+COMMENT ON COLUMN cajas.version_app IS 'Versión del escritorio que reportó la caja. NULL = anterior a 0.4.60.';
 COMMENT ON COLUMN cajas.so IS 'Sistema operativo reportado, para soporte.';
 
 -- ── Directivas: todo lo que la caja debe obedecer, resuelto aquí ────────────
