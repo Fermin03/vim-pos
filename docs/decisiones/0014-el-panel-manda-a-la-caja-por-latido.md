@@ -58,4 +58,16 @@
   puede hacer desde el panel crece, así que Cloudflare Access delante del panel sube de
   prioridad.
 
+- **El bloqueo es un control comercial, no una barrera de seguridad.** La caja falla abierto a
+  propósito (sin directivas, vende), y su archivo de directivas es borrable por quien tenga la
+  computadora. Se asume: sirve para cobrarle a quien deja de pagar, no para detener a alguien
+  decidido a saltárselo. Lo que sí cuesta dinero a VIM —timbrar CFDI, que consume folios que le
+  pagamos al PAC— se cierra **también en el servidor** (`timbrar-cfdi` y `timbrar-global`
+  comprueban `mi_acceso()`). `sync-push` se deja abierto a propósito: un cliente bloqueado no
+  puede perder sus ventas.
+- **Las directivas no llevan nada interno de VIM.** `resolver_directivas` devuelve los límites
+  efectivos sin el desglose ni el `motivo` de las excepciones: ese texto lo escribe VIM en una
+  tabla sin políticas de RLS y acabaría en el disco del cliente y en `/__directivas`, que el
+  servidor local sirve sin autenticar a toda la red del restaurante.
+
 Diseño completo: `docs/superpowers/specs/2026-09-04-platform-centro-de-control-design.md`.
