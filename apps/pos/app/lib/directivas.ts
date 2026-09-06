@@ -18,6 +18,68 @@ export type Directivas = {
 
 export type NivelAcceso = "ok" | "gracia" | "bloqueado";
 
+export type NivelAviso = "info" | "warning" | "danger";
+export type Aviso = {
+  id: string;
+  nivel: NivelAviso;
+  titulo: string;
+  cuerpo: string;
+  requiere_confirmacion: boolean;
+  vigente_hasta: string | null;
+};
+
+const NIVELES_AVISO: NivelAviso[] = ["info", "warning", "danger"];
+
+/**
+ * Los avisos que hay que enseñarle al cajero. FUNCIÓN PURA.
+ *
+ * Descarta lo que no tenga forma de aviso en vez de confiar en la nube: un JSON raro no puede
+ * tumbar la pantalla desde la que se cobra. El orden se respeta tal cual viene — la nube ya los
+ * ordenó por urgencia (danger primero) y aquí no se re-decide.
+ */
+export function avisosDe(d: Directivas | null): Aviso[] {
+  const xs = Array.isArray(d?.avisos) ? d.avisos : [];
+  return xs.flatMap((x) => {
+    if (!x || typeof x !== "object") return [];
+    const o = x as Record<string, unknown>;
+    if (typeof o.id !== "string" || typeof o.titulo !== "string" || typeof o.cuerpo !== "string") return [];
+    const nivel = NIVELES_AVISO.includes(o.nivel as NivelAviso) ? (o.nivel as NivelAviso) : "info";
+    return [{
+      id: o.id,
+      nivel,
+      titulo: o.titulo,
+      cuerpo: o.cuerpo,
+      requiere_confirmacion: o.requiere_confirmacion === true,
+      vigente_hasta: typeof o.vigente_hasta === "string" ? o.vigente_hasta : null,
+    }];
+  });
+}
+
+/**
+ * Acusa la lectura de un aviso.
+ *
+ * En la caja lo anota el escritorio y viaja en el siguiente latido; en el POS web va directo por
+ * RPC. NUNCA lanza: un acuse perdido hace que el aviso vuelva a salir, que es molesto; dejar al
+ * cajero con el diálogo atrapado sería peor.
+ */
+export async function marcarAvisoVisto(id: string): Promise<void> {
+  try {
+    const r = await fetch("/__aviso-visto", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id }),
+    });
+    if (r.ok) return;
+  } catch {
+    // POS web: esa ruta no existe. Se acusa contra la nube.
+  }
+  try {
+    await deviceClient.rpc("marcar_aviso_visto", { p_aviso: id });
+  } catch {
+    // Se reintentará la próxima vez que el aviso aparezca.
+  }
+}
+
 const MENSAJE_POR_DEFECTO =
   "Tu servicio de VIM POS está suspendido. Ponte en contacto con VIM para reactivarlo.";
 

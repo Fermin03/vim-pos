@@ -29,6 +29,14 @@ Al revés que en el POS, aquí **la lentitud es una función**. Lo que toca a un
 - La pantalla dice a quién afecta y desde cuándo, con nombre comercial, no solo con UUID.
 - Nada destructivo comparte fila con algo cotidiano.
 
+**Avisos (entrega 3).** `/avisos` escribe mensajes a las cajas, a un cliente o a todos. Lo que
+hace útil la pantalla es el conteo **"visto por N de M cajas"**: mandar un aviso sin saber si
+llegó es gritar al vacío. Ese número cuenta solo acuses hechos desde una caja; los del POS web
+van aparte, porque si se sumaran podría superar al denominador. Un aviso **importante a todos
+los clientes** se confirma escribiendo `TODOS`, con la misma fricción que lo destructivo. Retirar
+es borrado lógico: los acuses de quien ya lo leyó sobreviven. La ficha de cada cliente muestra
+los avisos que le aplican y enlaza al formulario con el destinatario ya puesto.
+
 Desde la entrega 2 (05/09/2026) la ficha muestra además la **versión del escritorio de cada
 caja**. Una caja sin versión es anterior a 0.4.60 y no late: se muestra **en gris**, nunca en
 rojo — no está caída, solo sin actualizar.
