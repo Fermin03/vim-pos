@@ -136,9 +136,18 @@ function mismaProcedencia(req, port, { exigirJson = true } = {}) {
   return true;
 }
 
+// Freno del botón "Actualizar menú". Diez segundos: suficiente para que un doble clic o un
+// cliente impaciente no encadenen descargas del catálogo entero, y corto de más para que nadie
+// note que existe cuando de verdad acaba de cambiar algo.
+export const ESPERA_CATALOGO_MANUAL_MS = 10_000;
+
 export async function startUiServer(dir, port, gatewayPort = 54350, host = "0.0.0.0", opts = {}) {
   const kds = !!opts.kds;
   let hub = opts.hub || null; // COCINA: gateway remoto (mutable; lo fija el setup)
+  // Por servidor y no global: la caja y la cocina corren cada una el suyo y no tienen por qué
+  // compartir freno. `ahora` se inyecta para poder probar el freno sin esperar diez segundos.
+  const ahoraMs = opts.ahora ?? (() => Date.now());
+  let ultimoCatalogoManual = 0;
 
   const server = http.createServer(async (req, res) => {
     try {
@@ -203,6 +212,39 @@ export async function startUiServer(dir, port, gatewayPort = 54350, host = "0.0.
           return res.end(JSON.stringify(r ?? { ok: false, aplica: false }));
         } catch (e) {
           return res.end(JSON.stringify({ ok: false, error: e?.message ?? "No se pudo consultar" }));
+        }
+      }
+
+      // CAJA: "Actualizar menú" — baja el catálogo YA, sin esperar al sondeo del minuto.
+      //
+      // El sondeo automático ya cubre el caso normal; esto es para cuando el dueño acaba de dar de
+      // alta un producto y lo quiere en pantalla AHORA, con el cliente delante. Baja el catálogo y
+      // avisa por SSE, así que también refresca la segunda caja y la cocina.
+      //
+      // Sí se permite desde la LAN (a diferencia de /__actualizar, que instala software): esto solo
+      // vuelve a leer el menú del propio negocio, y restringirlo dejaría el botón muerto en la
+      // segunda caja. Lo que sí lleva es la guarda de origen y un freno: sin él, mantener pulsado
+      // el botón —o un script en el WiFi del local— pondría a la caja a bajar el catálogo entero en
+      // bucle contra la nube.
+      if (!kds && req.method === "POST" && req.url.startsWith("/__sincronizar-catalogo")) {
+        if (!mismaProcedencia(req, port, { exigirJson: false })) {
+          res.writeHead(403, { "Content-Type": "application/json" });
+          return res.end(JSON.stringify({ ok: false, error: "Origen no permitido." }));
+        }
+        const ahora = ahoraMs();
+        if (ahora - ultimoCatalogoManual < ESPERA_CATALOGO_MANUAL_MS) {
+          res.writeHead(429, { "Content-Type": "application/json", "Cache-Control": "no-store" });
+          return res.end(JSON.stringify({ ok: false, error: "El menú se acaba de actualizar." }));
+        }
+        ultimoCatalogoManual = ahora;
+        res.writeHead(200, { "Content-Type": "application/json", "Cache-Control": "no-store" });
+        try {
+          const ok = (await opts.onSincronizarCatalogo?.()) === true;
+          return res.end(JSON.stringify(ok
+            ? { ok: true }
+            : { ok: false, error: "No se pudo contactar a la nube." }));
+        } catch (e) {
+          return res.end(JSON.stringify({ ok: false, error: e?.message ?? "No se pudo actualizar" }));
         }
       }
 

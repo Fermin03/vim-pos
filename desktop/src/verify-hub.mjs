@@ -1,7 +1,8 @@
 // Fase 2 · Hub del local — verifica el tiempo real del KDS por LAN (LISTEN/NOTIFY → SSE).
 // Un cliente SSE (simula la pantalla de cocina) se conecta al gateway; se manda un ticket a
 // cocina en la "caja"; el KDS debe recibir el evento AL INSTANTE (sin polling). Además prueba
-// que el gateway es accesible por la IP de la LAN (para que un KDS en otra máquina se conecte).
+// que el gateway es accesible por la IP de la LAN (para que un KDS en otra máquina se conecte),
+// y que el mismo puente lleva el aviso de 'menú nuevo' que refresca el catálogo del POS.
 import { startBackend } from "./backend.mjs";
 
 const GW_PORT = 54350;
@@ -83,6 +84,17 @@ try {
   const listo = eventos.find((e) => e.evento === "cocina" && e.data.includes(ticket) && e.data.includes("LISTO"));
   if (!listo) throw new Error("el KDS NO recibió el evento LISTO");
   console.log(`· ⚡ KDS recibió LISTO en tiempo real (${Date.now() - t1}ms después)`);
+
+  // El menú, al instante. El mismo puente lleva 'vim_catalogo': cuando el escritorio termina de
+  // bajar el catálogo, la pantalla del POS (y la 2ª caja, y la cocina) lo recargan sin reiniciar.
+  // Antes de esto el catálogo se cargaba UNA vez por sesión y un producto nuevo no salía hasta
+  // reiniciar la aplicación. Se prueba aquí porque es el único sitio donde el puente está vivo.
+  console.log("· avisando de un menú nuevo…");
+  await c.query("SELECT pg_notify('vim_catalogo', $1)", [JSON.stringify({ motivo: "verify" })]);
+  await wait(1500);
+  const catalogo = eventos.find((e) => e.evento === "catalogo" && e.data.includes("verify"));
+  if (!catalogo) throw new Error(`la pantalla NO recibió el evento de catálogo. Eventos: ${JSON.stringify(eventos)}`);
+  console.log("· ⚡ la pantalla recibió el aviso de menú nuevo en tiempo real ✓");
   c.release();
 
   // Modo KDS: un token de DISPOSITIVO lee las comandas por el gateway (sin PIN de empleado) —

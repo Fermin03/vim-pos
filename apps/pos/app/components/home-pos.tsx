@@ -7,6 +7,7 @@ import {
   type Categoria,
   type Producto,
 } from "../lib/catalogo";
+import { alCambiarCatalogo } from "../lib/catalogo-eventos";
 import { fmtMxn, contarCuentasAbiertasPorModo, type CuentasAbiertasPorModo, type DatosCaja, type Turno } from "../lib/turno";
 import { useReloj } from "./topbar-pos";
 import { type Empleado } from "../lib/supabase";
@@ -231,31 +232,49 @@ export function HomePos({
   const [esperaError, setEsperaError] = useState<string | null>(null);
   const [nEnEspera, setNEnEspera] = useState(0);
 
+  /**
+   * Lee el menú y lo pinta. Sacado del efecto de arranque para poder VOLVER a llamarlo: antes se
+   * cargaba una sola vez por sesión, así que un producto dado de alta en /admin no salía en la
+   * caja hasta reiniciar la aplicación — aunque el escritorio ya lo tuviera bajado.
+   *
+   * Solo toca `categorias` y `productos`. El carrito guarda su propia copia de cada producto al
+   * agregarlo (ver LineaCarrito), así que un cambio de precio a media cuenta NO reescribe el
+   * ticket abierto bajo los pies del cajero: lo que se está cobrando se cobra como se pidió.
+   */
+  const recargarCatalogo = useCallback(async (): Promise<void> => {
+    try {
+      const [cs, ps] = await Promise.all([listarCategoriasPos(token), listarProductosPos(token)]);
+      setCategorias(cs);
+      setProductos(ps);
+      // Fase 3 — cache de lectura: el menú sobrevive sin red (recargas offline).
+      cachePut("catalogo", { categorias: cs, productos: ps });
+    } catch (e) {
+      // Sin red: servir el catálogo desde el cache local (Dexie).
+      const cacheado = await cacheGet<{ categorias: Categoria[]; productos: Producto[] }>("catalogo");
+      if (cacheado) {
+        setCategorias(cacheado.categorias);
+        setProductos(cacheado.productos);
+        return;
+      }
+      throw e;
+    }
+  }, [token]);
+
   useEffect(() => {
     let activo = true;
-    Promise.all([listarCategoriasPos(token), listarProductosPos(token)])
-      .then(([cs, ps]) => {
-        if (!activo) return;
-        setCategorias(cs);
-        setProductos(ps);
-        // Fase 3 — cache de lectura: el menú sobrevive sin red (recargas offline).
-        cachePut("catalogo", { categorias: cs, productos: ps });
-      })
-      .catch(async (e) => {
-        if (!activo) return;
-        // Sin red: servir el catálogo desde el cache local (Dexie).
-        const cacheado = await cacheGet<{ categorias: Categoria[]; productos: Producto[] }>("catalogo");
-        if (cacheado && activo) {
-          setCategorias(cacheado.categorias);
-          setProductos(cacheado.productos);
-          return;
-        }
-        setError(e instanceof Error ? e.message : "Error");
-      });
+    recargarCatalogo().catch((e) => {
+      if (activo) setError(e instanceof Error ? e.message : "Error");
+    });
     return () => {
       activo = false;
     };
-  }, [token]);
+  }, [recargarCatalogo]);
+
+  // El escritorio avisa cuando termina de bajar un menú nuevo (sondeo del minuto o botón
+  // "Actualizar menú"). Se relee en el sitio, sin recargar la página: el carrito, la cuenta de
+  // mesa abierta y el turno siguen donde estaban. Un fallo aquí se traga a propósito — que no se
+  // pueda refrescar el menú no puede sacar un error en la cara de quien está cobrando.
+  useEffect(() => alCambiarCatalogo(() => { recargarCatalogo().catch(() => {}); }), [recargarCatalogo]);
 
 
   // T2 — re-lee el ticket de mesa y reconstruye el carrito tras un agregado incremental.

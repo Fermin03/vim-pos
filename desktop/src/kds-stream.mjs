@@ -2,7 +2,19 @@
 // Una conexión pg dedicada hace LISTEN 'vim_kds'; cada NOTIFY (cambio de estado de cocina) se
 // reenvía a los clientes SSE conectados (la pantalla de cocina / 2ª caja en la LAN). SSE porque es
 // HTTP simple (atraviesa la LAN sin WebSocket), reconecta solo, y el navegador trae EventSource.
+//
+// El mismo puente lleva 'vim_catalogo': cuando el escritorio termina de bajar el menú, avisa a las
+// pantallas para que lo recarguen sin reiniciar. Va por AQUÍ y no por un stream propio porque una
+// segunda conexión SSE (más una tercera conexión pg dedicada, que LISTEN retiene entera) sería
+// duplicar toda esta plomería para mandar un evento cada varias horas. Los clientes viejos no se
+// rompen: el KDS escucha `event: cocina` y un tipo de evento que no conoce lo ignora.
 import pg from "pg";
+
+/** Canal de NOTIFY → nombre del evento SSE que ven las pantallas. */
+const CANALES = {
+  vim_kds: "cocina",
+  vim_catalogo: "catalogo",
+};
 
 /** Crea el puente LISTEN→SSE. Devuelve { handleSse(req,res,url), stop() }. */
 export async function crearKdsStream({ pgPort, pgPassword = "postgres", log = () => {} }) {
@@ -11,17 +23,21 @@ export async function crearKdsStream({ pgPort, pgPassword = "postgres", log = ()
   // llamadas antiguas que no la pasen.
   const client = new pg.Client({ host: "127.0.0.1", port: pgPort, user: "postgres", password: pgPassword, database: "vimpos" });
   await client.connect();
-  await client.query("LISTEN vim_kds");
+  for (const canal of Object.keys(CANALES)) await client.query(`LISTEN ${canal}`);
 
   const clientes = new Set(); // { res, sucursal }
 
   client.on("notification", (msg) => {
+    const evento = CANALES[msg.channel];
+    if (!evento) return;
     let payload = msg.payload;
     let sucursal = null;
     try { sucursal = JSON.parse(msg.payload).sucursal_id; } catch { /* */ }
     for (const c of clientes) {
-      if (c.sucursal && sucursal && c.sucursal !== sucursal) continue; // filtro por sucursal
-      try { c.res.write(`event: cocina\ndata: ${payload}\n\n`); } catch { /* cliente cayó */ }
+      // El filtro por sucursal es de la cocina: un cambio de menú es del negocio entero y le
+      // toca a todas las pantallas, incluida la segunda caja de otra sucursal en la LAN.
+      if (evento === "cocina" && c.sucursal && sucursal && c.sucursal !== sucursal) continue;
+      try { c.res.write(`event: ${evento}\ndata: ${payload}\n\n`); } catch { /* cliente cayó */ }
     }
   });
 

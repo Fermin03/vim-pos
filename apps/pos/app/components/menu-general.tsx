@@ -2,6 +2,7 @@
 import { LogoVim } from "@vim/ui/styles";
 import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { buscarActualizacion, esEscritorio } from "../lib/actualizacion";
+import { pedirActualizacionCatalogo } from "../lib/catalogo-eventos";
 
 /**
  * Menú de pantalla completa del POS.
@@ -42,7 +43,22 @@ export function MenuGeneral({
   const [enEscritorio, setEnEscritorio] = useState(false);
   const [buscandoUpd, setBuscandoUpd] = useState(false);
   const [avisoUpd, setAvisoUpd] = useState<string | null>(null);
+  const [bajandoMenu, setBajandoMenu] = useState(false);
   useEffect(() => { setEnEscritorio(esEscritorio()); }, []);
+
+  /**
+   * Trae el menú de la nube en el momento. El escritorio ya lo sondea solo cada minuto; esto es
+   * para el dueño que acaba de dar de alta un producto y lo quiere en pantalla con el cliente
+   * delante. La pantalla NO se recarga aquí: el escritorio avisa por SSE cuando terminó de bajar,
+   * y así la segunda caja y la cocina se enteran por el mismo camino.
+   */
+  const actualizarMenu = useCallback(async () => {
+    setBajandoMenu(true);
+    setAvisoUpd(null);
+    const r = await pedirActualizacionCatalogo();
+    setBajandoMenu(false);
+    setAvisoUpd(r.ok ? "Menú actualizado." : (r.error ?? "No se pudo actualizar el menú."));
+  }, []);
 
   const revisarActualizacion = useCallback(async () => {
     setBuscandoUpd(true);
@@ -101,11 +117,18 @@ export function MenuGeneral({
           <SeccionMenu titulo="Ajustes">
             <TileMenu label="Configurar impresora" onClick={con(onImpresora)} icon={<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" className="h-8 w-8"><path d="M6 9V2h12v7M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2M6 14h12v8H6z" /></svg>} />
             {enEscritorio && (
+              <>
+            <TileMenu
+              label={bajandoMenu ? "Actualizando…" : "Actualizar menú"}
+              onClick={() => { if (!bajandoMenu) actualizarMenu(); }}
+              icon={<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" className="h-8 w-8"><path d="M4 6h13a3 3 0 0 1 0 6H7a3 3 0 0 0 0 6h13" /><path d="m17 3 3 3-3 3" /><path d="m7 15-3 3 3 3" /></svg>}
+            />
               <TileMenu
                 label={buscandoUpd ? "Buscando…" : "Buscar actualizaciones"}
                 onClick={() => { if (!buscandoUpd) revisarActualizacion(); }}
                 icon={<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" className="h-8 w-8"><path d="M21 12a9 9 0 1 1-2.6-6.4" /><path d="M21 3v5h-5" /><path d="M12 8v5" /><path d="m9.5 11 2.5 2.5 2.5-2.5" /></svg>}
               />
+              </>
             )}
             <TileMenu label="Cerrar turno" onClick={con(onCerrarTurno)} peligro icon={<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" className="h-8 w-8"><path d="M9 11l3 3L22 4" /><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" /></svg>} />
           </SeccionMenu>
