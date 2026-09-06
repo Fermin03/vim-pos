@@ -9,7 +9,8 @@
 
 ## Contexto — qué encontró la revisión (reencuadre de alcance)
 
-El [ANALISIS-BRECHAS.md](2026-08-analisis-brechas.md) (7-jun) está **desactualizado**. Verificado el 31-jul,
+El [ANALISIS-BRECHAS.md](2026-08-analisis-brechas.md) (7-jun) estaba **desactualizado** cuando se escribió
+esto; ya lleva encima una sección de estado al 6-sep-2026. Verificado el 31-jul,
 las tres "brechas del piloto" ya **están construidas y funcionales**, no son stubs:
 
 | Brecha (según doc viejo) | Estado real (31-jul) | Evidencia |
@@ -278,7 +279,7 @@ código existe), y actualizar el doc de brechas al estado real.
    cancelación/devolución (#29, mig. 0057).
 3. **Round-trip:** abrir cuenta en mesa → agregar ítems → cerrar pantalla → **retomar** la cuenta y ver el
    carrito reconstruido (con modificadores; cancelados omitidos; producto fuera de catálogo omitido).
-4. Actualizar [ANALISIS-BRECHAS.md](2026-08-analisis-brechas.md) al estado 31-jul (marcar estas 3 como hechas).
+4. ~~Actualizar [ANALISIS-BRECHAS.md](2026-08-analisis-brechas.md) al estado 31-jul (marcar estas 3 como hechas).~~ Hecho el 6-sep-2026, con el estado de esa fecha.
 
 **Verificación:** las 3 rutas pasan un smoke manual documentado; cualquier bug encontrado se corrige aquí.
 

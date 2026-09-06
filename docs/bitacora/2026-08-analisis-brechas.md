@@ -1,5 +1,73 @@
 # 🔍 Análisis de brechas — VIM POS (7 Jun 2026)
 
+> ## ⚠️ Actualizado el 6 sep 2026 — lee esto antes que las tablas de abajo
+>
+> Lo que sigue es la **foto del 7 de junio**, y buena parte ya no es cierta. Se conserva porque
+> explica de dónde venía el producto; el estado real de cada brecha está en la sección
+> [¿Qué sigue abierto?](#qué-sigue-abierto-al-6-sep-2026), justo debajo. Las tablas de Tiers
+> llevan marcada cada fila que ya se cerró.
+>
+> Es la segunda vez que este documento se queda atrás sin avisar: en julio ya había tres brechas
+> marcadas como pendientes que estaban construidas, y alguien planeó trabajo sobre eso. Un
+> documento de estado que miente cuesta más que no tenerlo.
+
+---
+
+## ✅ Lo que se cerró entre junio y septiembre de 2026
+
+Verificado en el repositorio el 6 sep 2026 (rutas y tamaños reales, no memoria).
+
+| Brecha de junio | Estado hoy | Evidencia |
+|---|---|---|
+| Dashboard real del admin (*stub de 45 líneas*) | ✅ Hecho | `apps/admin/app/(panel)/dashboard/page.tsx` — 383 líneas |
+| Inventario UI (*placeholder de 6 líneas*) | ✅ Hecho | `…/inventario/page.tsx` — 521 líneas; ADR 0013 (el inventario viaja por movimientos) |
+| Clientes / CRM (*placeholder de 6 líneas*) | ✅ Hecho | `…/clientes/page.tsx` — 338 líneas |
+| Importador de menú (*0%*) | ✅ Hecho | `…/catalogo/importar/page.tsx` — 177 líneas |
+| Round-trip cargar-ticket→carrito (*keystone de Full Service*) | ✅ Hecho | `apps/pos/app/lib/cuenta-mesa.ts` → `reconstruirCarrito`; ADRs 0005 y 0006 |
+| Reportes (*17 de 23 faltaban*) | ✅ Casi cerrado | 14 reportes en `…/reportes/`: mesero, área, marca, categoría, producto, modo de servicio, tiempos de cocina, no-shows, descuentos, reimpresiones, eventos, apps externas, consolidado, Z histórico |
+| Recibos faltantes (devolución, corte) | ✅ Hecho | `apps/pos/app/lib/print/devolucion-builder.ts`, `reporte-z-builder.ts` |
+| Promociones (*sin UI ni motor*) | ✅ Hecho | `…/promociones/page.tsx` — 247 líneas; `apps/pos/app/lib/promociones.ts` con pruebas |
+| Reservaciones UI (*backend sí, UI 0%*) | ✅ Hecho | `…/reservaciones/page.tsx` — 204 líneas; `apps/pos/app/lib/reservaciones.ts` |
+| Dark Kitchen: conciliación con apps (*0%*) | ✅ Hecho | `…/conciliacion/page.tsx` — 257 líneas; ADR 0011, Uber en producción (3 sep) |
+| Café & Bar: alertas de cuentas prolongadas | ✅ Hecho | `apps/pos/app/lib/__tests__/alertas-mesa.test.ts` |
+| Foodtruck: eventos como contexto del turno | ✅ Hecho | `apps/pos/app/lib/turno.ts` (`evento_nombre`) + reporte por evento |
+| Offline-first completo (*F16, Dexie + batch*) | ✅ Resuelto **de otra forma** | ADR 0004: lo da el escritorio (Postgres local + sync por snapshot). Dexie queda como caché de lectura |
+| Movimientos de caja P-097-100 (*4 pantallas*) | ✅ Superado por decisión | ADR 0007: dos movimientos, no cuatro |
+| CFDI con PAC real (*mock en junio*) | ✅ En producción | ADR 0009 superado; timbrado y cancelación con acuse desde el 3 sep |
+
+**Y cosas que en junio ni figuraban** porque no existían como idea:
+
+- **Compras y proveedores** (ADR 0012) y **recetas** — `…/compras`, `…/proveedores`, `…/recetas`.
+- **Integración con apps de delivery** (ADR 0011) — Uber en producción; DiDi solicitado.
+- **Panel `/platform` como centro de control** (ADR 0014, cuatro entregas) — bloqueo por estado,
+  avisos a las cajas, módulos y límites por cliente, y versiones de la caja.
+- **Sitio web público** (`sitio-web/`), con su capa para agentes.
+
+---
+
+## ¿Qué sigue abierto? (al 6 sep 2026)
+
+| Sigue abierto | Nota |
+|---|---|
+| **Onboarding / wizard de alta** (P-001-057) | Lo más grande que queda del Tier 1. Hay pantalla de `bienvenida` en admin y fases de onboarding en `/platform`, pero no el asistente self-serve completo. Cada alta sigue siendo acompañada. |
+| **App separada de mesero** | El flujo de mesero vive **dentro** del POS (`apps/pos/app/lib/mesero.ts`): atribución, envío a cocina pre-pago y propinas. La app aparte sigue sin empezar — y habría que decidir si se quiere. |
+| **App de repartidor** | Sin empezar. La cola de delivery sí está en el POS. |
+| **Billing / Stripe (F22)** | Sin empezar: no hay una sola referencia a Stripe en el repo. Hoy se cobra fuera del producto. |
+| **Enterprise (F24), SSO + multi-PAC (F23), Loyalty (F13+)** | Sin empezar. Crecimiento, no piloto. |
+| **A8 — login individual de super-admin** | El panel sigue con clave compartida. Subió de prioridad con la entrega 4 del ADR 0014: esa clave ahora también publica el instalador de todas las cajas. |
+| **Hardening final + pentest + LFPDPPP (F25)** | Sin empezar. La auditoría cyber-neo de agosto sí está cerrada salvo hallazgos de baja prioridad. |
+| **Pantallas POS discretas del mockup** (Tier 3) | Sigue igual que en junio, y sigue siendo deliberado: los mockups dejaron de mandar (ADR 0001). |
+
+**Veredicto al 6 sep 2026.** El producto ya no está limitado por las brechas de junio. Lo que
+falta para **vender solo** es el onboarding self-serve y el cobro de la suscripción; lo que falta
+para **dormir tranquilo** es A8 y el pentest. El piloto de Knock-Out no está bloqueado por código:
+hoy la caja se usa a ratos, no a diario.
+
+---
+
+## 📅 La foto del 7 de junio (histórico)
+
+
 Comparación entre la **especificación** (`docs/especificacion/`, entonces fuera del repo: plan maestro, playbook F0-F25, 6 docs de flujos, 16 docs de arquitectura, 231 mockups) y **lo construido** (monorepo `vim-pos`).
 
 > **Lectura clave:** la métrica "23% de mockups implementados" **subestima** la realidad funcional. Una pantalla como `home-pos` cubre varios mockups (P-059..P-077) y los modales cubren los métodos de pago (P-070..P-074). La **ruta crítica de Quick Service** (login→venta→cobro→cocina→cierre→CFDI) está **~80% funcional**. Lo que está bajo es la **amplitud**: las otras 5 verticales, el onboarding y varios módulos de admin.
@@ -27,10 +95,10 @@ Comparación entre la **especificación** (`docs/especificacion/`, entonces fuer
 | Brecha | Mockups | Estado | Por qué importa |
 |---|---|---|---|
 | **Onboarding / wizard de alta** | P-001-057 (~27 pantallas) | 11% | No hay setup guiado. Un dueño nuevo no puede configurar su negocio+menú solo; hoy se hace manual por admin. Bloquea el self-serve a escala. |
-| **Setup inicial de catálogo (CSV/asistido)** | P-030-053 | 0% | Cargar el menú es lo más laborioso del alta; sin importador es fricción alta por cliente. |
-| **Dashboard real del admin** | P-177 | Stub (45 líneas, sin queries) | Es la primera pantalla que ve el dueño; hoy está vacía. |
-| **Clientes / CRM** | P-151-154 | Placeholder (6 líneas) | Ruta existe, sin funcionalidad. Necesario para factura a cliente frecuente. |
-| **Inventario (UI)** | P-144-150 | Placeholder (6 líneas) | Backend existe (insumos/recetas/movimientos). Bloquea: café/bar (recetas ml/oz), dark kitchen, y la **reversa de inventario en devoluciones (#29)**. |
+| ~~**Setup inicial de catálogo (CSV/asistido)**~~ ✅ | P-030-053 | ~~0%~~ → importador hecho | Cargar el menú es lo más laborioso del alta; sin importador es fricción alta por cliente. |
+| ~~**Dashboard real del admin**~~ ✅ | P-177 | ~~Stub (45 líneas, sin queries)~~ → hecho | Es la primera pantalla que ve el dueño; hoy está vacía. |
+| ~~**Clientes / CRM**~~ ✅ | P-151-154 | ~~Placeholder (6 líneas)~~ → hecho | Ruta existe, sin funcionalidad. Necesario para factura a cliente frecuente. |
+| ~~**Inventario (UI)**~~ ✅ | P-144-150 | ~~Placeholder (6 líneas)~~ → hecho | Backend existe (insumos/recetas/movimientos). Bloquea: café/bar (recetas ml/oz), dark kitchen, y la **reversa de inventario en devoluciones (#29)**. |
 
 ---
 
@@ -62,7 +130,7 @@ Comparación entre la **especificación** (`docs/especificacion/`, entonces fuer
 
 | Módulo | Fase playbook | Estado |
 |---|---|---|
-| **Offline-first completo** (Dexie + sync por batch + Capacitor) | F16 | Solo detección de conexión + banner |
+| ~~**Offline-first completo**~~ ✅ (por el escritorio, ADR 0004) | F16 | ~~Solo detección de conexión + banner~~ → resuelto de otra forma |
 | **Push notifications + KDS interactivo** | F15 | No iniciado |
 | **Billing / Stripe** (suscripción del SaaS) | F22 | No iniciado |
 | **Enterprise** (multi-sucursal consolidado, franquicias, permisos finos) | F24 | Estructura BD, UI 0% |
