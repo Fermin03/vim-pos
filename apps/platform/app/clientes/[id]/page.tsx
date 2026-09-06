@@ -9,6 +9,7 @@ import { Seccion } from "../../components/seccion";
 import { TarjetaCifra } from "../../components/tarjeta-cifra";
 import { PastillaEstado } from "../../components/pastilla-estado";
 import { SaludTenant } from "../../components/salud-tenant";
+import { AvisosCliente } from "../../components/avisos-cliente";
 import { FichaContrato } from "../../components/ficha-contrato";
 import { FichaFacturacion } from "../../components/ficha-facturacion";
 import { ModulosLimites } from "../../components/modulos-limites";
@@ -125,6 +126,7 @@ export default function FichaCliente() {
             <TarjetaCifra titulo="Fase" valor={nombreFase((t.onboarding as { fase?: string } | null)?.fase)} texto />
           </div>
           <SaludTenant api={api} id={id} />
+          <AvisosCliente api={api} tenantId={id} nombre={nombre} />
         </Seccion>
 
         <Seccion id="contrato" titulo="Contrato" descripcion="Qué paga, qué tiene contratado y qué puede usar.">
