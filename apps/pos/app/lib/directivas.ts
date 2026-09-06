@@ -9,7 +9,18 @@ import { deviceClient } from "./supabase";
  */
 export type Directivas = {
   servidor_hora: string | null;
-  acceso: { estado: string | null; bloqueado: boolean; bloquea_desde: string | null; mensaje: string | null };
+  acceso: {
+    estado: string | null;
+    bloqueado: boolean;
+    bloquea_desde: string | null;
+    mensaje: string | null;
+    /**
+     * Por qué está bloqueada. Lo pone el ESCRITORIO, no la nube: el bloqueo por versión se
+     * resuelve en la caja comparando con la versión instalada (ADR 0014, entrega 4). En el POS
+     * web nunca viene, y ahí siempre es por suscripción.
+     */
+    motivo?: string;
+  };
   modulos: Record<string, boolean>;
   limites: Record<string, unknown>;
   avisos: unknown[];
@@ -17,6 +28,8 @@ export type Directivas = {
 };
 
 export type NivelAcceso = "ok" | "gracia" | "bloqueado";
+/** Qué hay que hacer para salir del bloqueo: pagar, o actualizar la caja. */
+export type MotivoBloqueo = "suscripcion" | "version";
 
 export type NivelAviso = "info" | "warning" | "danger";
 export type Aviso = {
@@ -82,6 +95,8 @@ export async function marcarAvisoVisto(id: string): Promise<void> {
 
 const MENSAJE_POR_DEFECTO =
   "Tu servicio de VIM POS está suspendido. Ponte en contacto con VIM para reactivarlo.";
+const MENSAJE_VERSION =
+  "Actualiza VIM POS para poder seguir vendiendo.";
 
 /**
  * Qué debe hacer el POS. FUNCIÓN PURA.
@@ -94,21 +109,24 @@ const MENSAJE_POR_DEFECTO =
 export function evaluarAcceso(
   d: Directivas | null,
   ahora: Date = new Date(),
-): { nivel: NivelAcceso; mensaje: string; desde: string | null } {
+): { nivel: NivelAcceso; mensaje: string; desde: string | null; motivo: MotivoBloqueo } {
   const a = d?.acceso;
-  if (!a) return { nivel: "ok", mensaje: "", desde: null };
-  const mensaje = a.mensaje?.trim() || MENSAJE_POR_DEFECTO;
+  if (!a) return { nivel: "ok", mensaje: "", desde: null, motivo: "suscripcion" };
+  // Cualquier cosa que no sea exactamente "version" es una suspensión: un motivo desconocido
+  // debe caer en la pantalla que pide llamar a VIM, no en una a medio pintar.
+  const motivo: MotivoBloqueo = a.motivo === "version" ? "version" : "suscripcion";
+  const mensaje = a.mensaje?.trim() || (motivo === "version" ? MENSAJE_VERSION : MENSAJE_POR_DEFECTO);
 
-  if (a.bloqueado === true) return { nivel: "bloqueado", mensaje, desde: a.bloquea_desde };
+  if (a.bloqueado === true) return { nivel: "bloqueado", mensaje, desde: a.bloquea_desde, motivo };
 
   // La gracia solo aplica a quien de verdad está de baja: un TRIAL o un tenant INTERNO nunca
   // debe ver la banda (§6.2).
   if (a.estado === "SUSPENDIDO" || a.estado === "CANCELADO") {
-    return { nivel: "gracia", mensaje, desde: a.bloquea_desde };
+    return { nivel: "gracia", mensaje, desde: a.bloquea_desde, motivo };
   }
 
   void ahora;
-  return { nivel: "ok", mensaje: "", desde: null };
+  return { nivel: "ok", mensaje: "", desde: null, motivo };
 }
 
 /** `/__directivas` si hay escritorio; si no, `mi_acceso()`. `null` = no se pudo saber. */
