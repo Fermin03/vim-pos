@@ -121,3 +121,24 @@ export type Detalle = {
   modulos: Modulos;
   limites: Limites | null;
 };
+
+/** Un aviso tal como lo devuelve `/api/avisos`, con su alcance y sus lecturas (ADR 0014). */
+export type AvisoPanel = {
+  id: string;
+  tenantId: string | null;
+  /** null = va a todos los clientes. */
+  tenantNombre: string | null;
+  nivel: string;
+  titulo: string;
+  cuerpo: string;
+  requiereConfirmacion: boolean;
+  vigenteDesde: string;
+  vigenteHasta: string | null;
+  createdAt: string;
+  borrado: boolean;
+  /** Acuses hechos DESDE UNA CAJA. Es el número que cuenta para "N de M cajas". */
+  vistos: number;
+  /** Acuses desde el POS web, que no tiene caja. Van aparte para no inflar el anterior. */
+  vistosWeb: number;
+  cajasAlcance: number;
+};

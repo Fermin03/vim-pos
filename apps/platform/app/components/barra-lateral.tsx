@@ -8,6 +8,7 @@ import { useSesion } from "../lib/sesion";
 const NAV: { href: string; label: string }[] = [
   { href: "/atencion", label: "Atención" },
   { href: "/clientes", label: "Clientes" },
+  { href: "/avisos", label: "Avisos" },
   { href: "/cfdi", label: "Facturación" },
   { href: "/errores", label: "Errores" },
   { href: "/bitacora", label: "Bitácora" },
