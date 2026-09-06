@@ -8919,6 +8919,45 @@ export type Database = {
         }
         Relationships: []
       }
+      versiones_caja: {
+        Row: {
+          bloquea_bajo_minima: boolean
+          bloquea_desde: string | null
+          created_at: string
+          es_minima: boolean
+          fecha: string | null
+          notas: string | null
+          publicada: boolean
+          sha512: string
+          url: string
+          version: string
+        }
+        Insert: {
+          bloquea_bajo_minima?: boolean
+          bloquea_desde?: string | null
+          created_at?: string
+          es_minima?: boolean
+          fecha?: string | null
+          notas?: string | null
+          publicada?: boolean
+          sha512: string
+          url: string
+          version: string
+        }
+        Update: {
+          bloquea_bajo_minima?: boolean
+          bloquea_desde?: string | null
+          created_at?: string
+          es_minima?: boolean
+          fecha?: string | null
+          notas?: string | null
+          publicada?: boolean
+          sha512?: string
+          url?: string
+          version?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       vw_clientes_resumen: {
