@@ -142,3 +142,32 @@ export type AvisoPanel = {
   vistosWeb: number;
   cajasAlcance: number;
 };
+
+/** Una versión del escritorio en el catálogo (`/api/versiones`, ADR 0014). */
+export type VersionCaja = {
+  version: string;
+  url: string;
+  sha512: string;
+  notas: string | null;
+  fecha: string | null;
+  publicada: boolean;
+  es_minima: boolean;
+  bloquea_bajo_minima: boolean;
+  bloquea_desde: string | null;
+  created_at: string;
+};
+
+/** Una caja del parque, con la versión que reportó en su último latido. */
+export type CajaParque = {
+  id: string;
+  nombre: string;
+  cliente: string;
+  tenantId: string;
+  sucursal: string;
+  versionApp: string | null;
+  so: string | null;
+  ultimoLatido: string | null;
+  /** No ha latido nunca: es anterior a 0.4.60. No es lo mismo que estar desactualizada. */
+  sinLatido: boolean;
+  desactualizada: boolean;
+};
