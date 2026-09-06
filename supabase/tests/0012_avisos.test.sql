@@ -8,7 +8,7 @@
 -- Se corre con:  supabase test db
 -- ============================================================================
 begin;
-select plan(12);
+select plan(14);
 
 insert into tenants (id, codigo, nombre_comercial, vertical_principal, estado, plan_actual_id)
 values ('eeeeeeee-0000-0000-0000-0000000000f0', 'avi-uno', 'Avisos Uno', 'QUICK_SERVICE', 'ACTIVO',
@@ -77,7 +77,18 @@ select is((select count(*)::int from avisos_lecturas where aviso_id = '11111111-
 select is(jsonb_array_length(resolver_directivas('eeeeeeee-0000-0000-0000-0000000000f0', 'eeeeeeee-0000-0000-0000-0000000000f2')->'avisos'),
           1, 'un aviso visto no vuelve a esa caja');
 
--- #12 un id inventado en los acuses no revienta el latido
+-- #12 el acuse SIN caja (POS web) también entra: caja_id es NULL y la clave lo permite
+set local role authenticated;
+select set_config('request.jwt.claims',
+  json_build_object('sub', '99999999-0000-0000-0000-0000000000e9',
+                    'tenant_id', 'ffffffff-0000-0000-0000-0000000000f0',
+                    'role', 'authenticated')::text, true);
+select ok(marcar_aviso_visto('22222222-0000-0000-0000-0000000000f0'), 'el POS web puede acusar un aviso global');
+-- #13 y no puede acusar uno que no le toca
+select ok(NOT marcar_aviso_visto('11111111-0000-0000-0000-0000000000f0'), 'no puede acusar el aviso de otro negocio');
+reset role;
+
+-- #14 un id inventado en los acuses no revienta el latido
 select lives_ok(
   $$ select caja_latido('eeeeeeee-0000-0000-0000-0000000000f2', '0.4.61', null, null,
                         array['99999999-9999-9999-9999-999999999999']::uuid[]) $$,

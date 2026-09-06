@@ -4,6 +4,8 @@ import { type ReactNode, useCallback, useEffect, useState } from "react";
 import { useReloj } from "./topbar-pos";
 import { evaluarSync, leerEstadoSync, type NivelSync } from "../lib/estado-sync";
 import { BandaAcceso, useAcceso } from "./banda-acceso";
+import { DialogoAvisos } from "./dialogo-avisos";
+import { avisosDe, leerDirectivas, type Aviso } from "../lib/directivas";
 import { evaluarFolios, leerFolios, type NivelFolios } from "../lib/folios";
 import type { DatosCaja, Turno } from "../lib/turno";
 import type { Empleado } from "../lib/supabase";
@@ -107,12 +109,21 @@ export function PantallaInicio({
   // toma el lugar de "Cerrar turno".
   const sinTurno = turno === null;
   const acceso = useAcceso();
+  // Avisos de VIM. Esta es la pantalla que el cajero ve tras el PIN y al abrir turno, así que
+  // es donde se le enseñan (ADR 0014, entrega 3).
+  const [avisos, setAvisos] = useState<Aviso[] | null>(null);
+  useEffect(() => {
+    let vivo = true;
+    leerDirectivas().then((d) => { if (vivo) setAvisos(avisosDe(d)); }).catch(() => {});
+    return () => { vivo = false; };
+  }, []);
 
   return (
     <main className="flex h-screen flex-col bg-bg">
       {/* Aviso de suspensión con gracia: el cajero puede seguir cobrando, pero el negocio tiene
           que enterarse antes de la fecha en que la caja deje de vender (ADR 0014). */}
       {acceso.nivel === "gracia" && <BandaAcceso mensaje={acceso.mensaje} desde={acceso.desde} />}
+      {avisos && avisos.length > 0 && <DialogoAvisos avisos={avisos} onCerrar={() => setAvisos([])} />}
       {/* ── Barra superior: quién opera y dónde ─────────────────────────────── */}
       <header className="flex h-[clamp(2.75rem,6.5vh,3.5rem)] flex-shrink-0 items-center justify-between gap-3 border-b border-line px-[clamp(0.75rem,2vw,1.25rem)]">
         <div className="flex min-w-0 items-center gap-3">

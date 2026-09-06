@@ -632,20 +632,26 @@ export type Database = {
       avisos_lecturas: {
         Row: {
           aviso_id: string
-          caja_id: string
+          caja_id: string | null
           fecha: string
+          id: string
+          tenant_id: string
           usuario_id: string | null
         }
         Insert: {
           aviso_id: string
-          caja_id: string
+          caja_id?: string | null
           fecha?: string
+          id?: string
+          tenant_id: string
           usuario_id?: string | null
         }
         Update: {
           aviso_id?: string
-          caja_id?: string
+          caja_id?: string | null
           fecha?: string
+          id?: string
+          tenant_id?: string
           usuario_id?: string | null
         }
         Relationships: [
@@ -661,6 +667,13 @@ export type Database = {
             columns: ["caja_id"]
             isOneToOne: false
             referencedRelation: "cajas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "avisos_lecturas_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
             referencedColumns: ["id"]
           },
         ]

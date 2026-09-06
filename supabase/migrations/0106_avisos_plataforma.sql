@@ -33,16 +33,27 @@ CREATE INDEX idx_avisos_vigentes ON avisos_plataforma (tenant_id, vigente_desde)
 ALTER TABLE avisos_plataforma ENABLE ROW LEVEL SECURITY;   -- sin políticas: solo service_role
 
 CREATE TABLE avisos_lecturas (
+  id         uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   aviso_id   uuid NOT NULL REFERENCES avisos_plataforma(id) ON DELETE CASCADE,
-  -- NULL = leído en el POS web, donde no hay caja. Ahí el acuse es por negocio, no por persona:
-  -- la clave primaria incluye caja_id, así que un segundo empleado no genera una fila propia.
-  -- Se guarda `usuario_id` para saber quién lo cerró, aunque no distinga acuses.
+  -- De quién es el acuse. Va explícito porque un aviso global lo leen varios negocios y hay que
+  -- poder contar "visto por N de M cajas" de cada uno.
+  tenant_id  uuid NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+  -- NULL = leído en el POS web, donde no hay caja.
   caja_id    uuid NULL REFERENCES cajas(id) ON DELETE CASCADE,
   usuario_id uuid NULL,
-  fecha      timestamptz NOT NULL DEFAULT now(),
-  PRIMARY KEY (aviso_id, caja_id)
+  fecha      timestamptz NOT NULL DEFAULT now()
 );
 COMMENT ON TABLE avisos_lecturas IS 'Acuse de lectura de un aviso, por caja (ADR 0014).';
+
+-- La clave NO puede ser (aviso_id, caja_id): en Postgres las columnas de una clave primaria son
+-- implícitamente NOT NULL, así que el acuse del POS web —que va sin caja— nunca habría podido
+-- insertarse. Se separa en dos índices parciales.
+CREATE UNIQUE INDEX uq_avisos_lecturas_caja ON avisos_lecturas (aviso_id, caja_id)
+  WHERE caja_id IS NOT NULL;
+-- En el POS web el acuse es por NEGOCIO, no por persona: un segundo empleado del mismo tenant no
+-- genera una fila propia. Se guarda `usuario_id` para saber quién lo cerró primero.
+CREATE UNIQUE INDEX uq_avisos_lecturas_web ON avisos_lecturas (aviso_id, tenant_id)
+  WHERE caja_id IS NULL;
 ALTER TABLE avisos_lecturas ENABLE ROW LEVEL SECURITY;     -- sin políticas: solo service_role
 
 -- ── Las directivas llevan los avisos que esta caja no ha visto ──────────────
@@ -146,8 +157,8 @@ BEGIN
   -- la caja, así que un id inventado —o de otro negocio— simplemente no inserta nada: un acuse
   -- inválido no puede tumbar el latido, que es lo que mantiene viva la señal de la caja.
   IF p_avisos_vistos IS NOT NULL AND array_length(p_avisos_vistos, 1) > 0 THEN
-    INSERT INTO avisos_lecturas (aviso_id, caja_id)
-    SELECT a.id, p_caja
+    INSERT INTO avisos_lecturas (aviso_id, tenant_id, caja_id)
+    SELECT a.id, v_tenant, p_caja
       FROM avisos_plataforma a
      WHERE a.id = ANY (p_avisos_vistos)
        AND (a.tenant_id = v_tenant OR a.tenant_id IS NULL)
@@ -175,8 +186,8 @@ DECLARE
   v_filas  integer;
 BEGIN
   IF v_tenant IS NULL OR p_aviso IS NULL THEN RETURN false; END IF;
-  INSERT INTO avisos_lecturas (aviso_id, caja_id, usuario_id)
-  SELECT a.id, NULL, auth.uid()
+  INSERT INTO avisos_lecturas (aviso_id, tenant_id, caja_id, usuario_id)
+  SELECT a.id, v_tenant, NULL, auth.uid()
     FROM avisos_plataforma a
    WHERE a.id = p_aviso AND (a.tenant_id = v_tenant OR a.tenant_id IS NULL)
   ON CONFLICT DO NOTHING;
