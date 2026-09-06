@@ -22,7 +22,7 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }
   const [sucRes, cajasRes, syncRes, ventaRes, turnoRes] = await Promise.all([
     sb.from("sucursales").select("id, nombre, activa").eq("tenant_id", id).is("deleted_at", null).limit(200),
     sb.from("cajas")
-      .select("id, nombre, sucursal_id, activa, bloqueada, bloqueo_motivo, ultima_conexion, ultima_ip")
+      .select("id, nombre, sucursal_id, activa, bloqueada, bloqueo_motivo, ultima_conexion, ultima_ip, ultimo_latido, version_app, so")
       .eq("tenant_id", id).is("deleted_at", null).limit(500),
     // Últimas sincronizaciones: sirven para ver si además de conectarse, los datos SUBEN.
     sb.from("sync_eventos")
@@ -63,8 +63,10 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }
   const cajas = ((cajasRes.data ?? []) as {
     id: string; nombre: string; sucursal_id: string; activa: boolean;
     bloqueada: boolean; bloqueo_motivo: string | null; ultima_conexion: string | null; ultima_ip: string | null;
+    ultimo_latido: string | null; version_app: string | null; so: string | null;
   }[]).map((c) => {
     const { señal, origen: origenSenal, horas } = señalDeCaja({
+      ultimoLatido: c.ultimo_latido,
       ultimaConexion: c.ultima_conexion,
       ultimoSync: ultimoSyncPorCaja.get(c.id) ?? null,
       ultimaVenta: ultimaVentaPorCaja.get(c.id) ?? null,
@@ -81,6 +83,10 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }
       // hace tres horas, que no es lo mismo — y en soporte esa diferencia importa.
       origenSenal,
       ultimaIp: c.ultima_ip,
+      // NULL = caja anterior a 0.4.58, que no late. Se muestra en gris, nunca en rojo: no está
+      // caída, solo sin actualizar (spec §7).
+      versionApp: c.version_app,
+      so: c.so,
       horasSinConexion: horas,
       // Semáforo: el mismo criterio que usa la bandeja de alertas, para que no se contradigan.
       estado: estadoDeCaja(c, horas),

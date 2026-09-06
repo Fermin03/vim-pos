@@ -22,8 +22,11 @@ export type CajaSalud = {
   sucursal: string;
   estado: string;
   ultimaConexion: string | null;
-  /** Qué prueba esa fecha: "conexion" (la caja reportó), "sync" (subió datos), "venta" (vendió). */
-  origenSenal: "conexion" | "sync" | "venta" | null;
+  /** Qué prueba esa fecha: "latido" (la caja reportó estar viva), "conexion", "sync" o "venta". */
+  origenSenal: "latido" | "conexion" | "sync" | "venta" | null;
+  /** Versión del escritorio. NULL = anterior a 0.4.58, que no late. */
+  versionApp: string | null;
+  so: string | null;
   ultimaIp: string | null;
   horasSinConexion: number | null;
   bloqueoMotivo: string | null;
