@@ -41,6 +41,7 @@ mandan**: se archivaron el 30/08/2026 en `respaldos/`, ver `decisiones/0001`.
 3. **Español en el dominio** (igual que el SQL `snake_case`). Archivos `kebab-case`, componentes `PascalCase`.
 4. **Sin `any`.** `unknown` + Zod.
 5. **El POS escribe directo por RPC bajo RLS** (no hay capa Dexie de escritura en operación). El offline-first lo da el **escritorio**: Postgres local + gateway compatible con supabase-js, y sync por **snapshot** (migraciones 0055 pull / 0056 push), no un op-log. *(Corregido en la remediación Fase 3: la versión anterior —"pasa por Dexie y sincroniza por batch"— describía el outbox web, hoy congelado. Justificación: el doc manda, así que se versiona el cambio; ver `apps/pos/app/lib/outbox.ts` @deprecated. El único Dexie que queda es el **cache de lectura** del catálogo.)*
+6. **Instaladores solo desde un checkout completo.** Antes de `npm run dist` o de publicar una versión del escritorio, lee y pasa la lista **"Antes de empaquetar"** de `desktop/RUNBOOK.md`. `desktop/bin/postgrest.exe` está gitignoreado y ningún script lo regenera: un worktree o un clon nuevo **no lo trae**, y electron-builder empaqueta igual, sin avisar. Nunca se publica un instalador sin `dist/win-unpacked/resources/bin/postgrest.exe` o que pese menos de ~155 MB. *(Las 0.4.60–0.4.62 salieron sin él y dejaron a Knock-Out sin caja el 6 sep 2026; una caja rota no se auto-actualiza, así que el error no se corrige solo publicando.)*
 
 ## Convenciones de migraciones
 

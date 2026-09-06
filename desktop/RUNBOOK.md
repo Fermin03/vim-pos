@@ -25,7 +25,7 @@ destinos: navegador→nube, Electron→local.
 
 ```bash
 cd desktop
-npm install                 # baja Postgres embebido + Electron; postgrest.exe/libpq ya vienen
+npm install                 # baja Postgres embebido + Electron. postgrest.exe NO viene: es bin/postgrest.exe, gitignoreado (ver "Antes de empaquetar")
 npm run verify              # E2E headless: device→empleados(RLS)→pin-login→venta(RPC)→PAGADO
 npm run build:ui            # exporta el POS estático → desktop/pos-ui/ (UI 100% offline)
 npm run build:kds-ui        # exporta la COCINA (apps/kds) → desktop/kds-ui/
@@ -59,6 +59,37 @@ Fixtures de dev (seed): dispositivo `caja-99999999-…cc@dispositivos.vimpos.mx`
 cajera **María G. PIN 1234**; dueño `dueno@knockout.dev` / `devadmin`.
 
 ## Empaquetar (probado)
+
+### Antes de empaquetar — lista obligatoria (léela SIEMPRE antes de `npm run dist`)
+
+> **Por qué existe:** el 6 sep 2026 las versiones 0.4.60, 0.4.61 y 0.4.62 salieron **sin
+> `postgrest.exe`**. Se construyeron desde un worktree que no tenía el binario, y electron-builder
+> empaqueta igual, sin avisar. Las cajas arrancaban Postgres, hacían `spawn` de un archivo
+> inexistente, esperaban 60 s y morían con *"PostgREST no respondió"* — un mensaje que señalaba al
+> sitio equivocado. Knock-Out se quedó sin caja, y una caja rota **no se auto-actualiza** (el updater
+> corre después del backend, que nunca arranca). Hotfix: 0.4.63.
+
+1. **Estás en un checkout que tiene `desktop/bin/postgrest.exe`.** Debe medir **69,366,272 bytes**
+   (sha256 `5a1f928c8aaa3519567a093fce8ae34fb81423e14980785d6968669b3789bbd1`). Está en
+   `.gitignore` y **ningún script lo regenera**: un worktree o un clon nuevo NO lo trae. Cópialo
+   desde `vim-pos/desktop/bin/` antes de seguir. Es el único `extraResources` en esa situación:
+   `pos-ui/` y `kds-ui/` los rehace `npm run dist`, `pg-bin` viene de `npm install`, el resto está en git.
+2. **`desktop/node_modules` existe.** `desktop/` NO está en el workspace de pnpm (`apps/*`,
+   `packages/*`), así que `pnpm install` en la raíz no lo instala: `npm install` dentro de
+   `desktop/` (o un junction al `node_modules` del checkout principal, que tiene las mismas versiones).
+3. **Construye desde `vim-pos/`.** Desde otro worktree (`vim-pos-platform/`, uno temporal) solo si
+   pasaste 1 y 2 a mano. Y nunca en una ruta bajo `AppData`: EFS rompe electron-builder.
+4. **`npm run dist` tiene que terminar con `✔ extraResources completos`.** `scripts/dist.mjs`
+   comprueba los recursos antes de empaquetar y otra vez sobre `dist/win-unpacked/resources`; si
+   aborta con *"faltan recursos"*, arregla el origen. No se fuerza ni se comenta el chequeo.
+5. **Antes de publicar, tres comprobaciones sobre el resultado:**
+   - `dist/win-unpacked/resources/bin/postgrest.exe` existe (69,366,272 bytes);
+   - `dist/VIM POS Setup <ver>.exe` pesa **~156 MB** (los rotos pesaban 147 MB: esos 9 MB de
+     menos son exactamente el binario comprimido) y tiene la **fecha de hoy**;
+   - tras subirlo, el `content-length` del asset en GitHub es idéntico al del archivo local.
+
+Si cualquiera falla, **no se publica**. Un instalador incompleto deja al cliente sin caja y sin
+forma de recibir el arreglo por el actualizador.
 
 ```bash
 npm run build:ui                                   # exporta el POS a pos-ui/
@@ -119,7 +150,8 @@ notificación + (en la caja) ítem en la bandeja "⬇ Actualización vX — inst
 1. Sube la versión en `desktop/package.json` (p. ej. `0.4.49` → `0.4.50`).
 2. `npm run dist` → `dist/VIM POS Setup 0.4.50.exe`.
    **Tarda más de diez minutos.** Antes de seguir, comprueba la FECHA del `.exe`: es fácil publicar
-   el binario anterior creyendo que el nuevo ya salió.
+   el binario anterior creyendo que el nuevo ya salió. Y pasa la lista **"Antes de empaquetar"** de
+   arriba: `dist/win-unpacked/resources/bin/postgrest.exe` presente y el `.exe` de ~156 MB.
 3. **Sube el `.exe` PRIMERO**, y solo después genera el manifiesto:
 
    ```bash
