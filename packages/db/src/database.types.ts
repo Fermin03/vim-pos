@@ -629,6 +629,92 @@ export type Database = {
           },
         ]
       }
+      avisos_lecturas: {
+        Row: {
+          aviso_id: string
+          caja_id: string
+          fecha: string
+          usuario_id: string | null
+        }
+        Insert: {
+          aviso_id: string
+          caja_id: string
+          fecha?: string
+          usuario_id?: string | null
+        }
+        Update: {
+          aviso_id?: string
+          caja_id?: string
+          fecha?: string
+          usuario_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "avisos_lecturas_aviso_id_fkey"
+            columns: ["aviso_id"]
+            isOneToOne: false
+            referencedRelation: "avisos_plataforma"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "avisos_lecturas_caja_id_fkey"
+            columns: ["caja_id"]
+            isOneToOne: false
+            referencedRelation: "cajas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      avisos_plataforma: {
+        Row: {
+          creado_por: string | null
+          created_at: string
+          cuerpo: string
+          deleted_at: string | null
+          id: string
+          nivel: string
+          requiere_confirmacion: boolean
+          tenant_id: string | null
+          titulo: string
+          vigente_desde: string
+          vigente_hasta: string | null
+        }
+        Insert: {
+          creado_por?: string | null
+          created_at?: string
+          cuerpo: string
+          deleted_at?: string | null
+          id?: string
+          nivel: string
+          requiere_confirmacion?: boolean
+          tenant_id?: string | null
+          titulo: string
+          vigente_desde?: string
+          vigente_hasta?: string | null
+        }
+        Update: {
+          creado_por?: string | null
+          created_at?: string
+          cuerpo?: string
+          deleted_at?: string | null
+          id?: string
+          nivel?: string
+          requiere_confirmacion?: boolean
+          tenant_id?: string | null
+          titulo?: string
+          vigente_desde?: string
+          vigente_hasta?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "avisos_plataforma_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       cajas: {
         Row: {
           activa: boolean
@@ -9967,6 +10053,7 @@ export type Database = {
       }
       caja_latido: {
         Args: {
+          p_avisos_vistos?: string[]
           p_caja: string
           p_ip?: unknown
           p_so?: string
@@ -10345,6 +10432,7 @@ export type Database = {
         }
         Returns: Json
       }
+      marcar_aviso_visto: { Args: { p_aviso: string }; Returns: boolean }
       marcar_no_show_reservacion: {
         Args: { p_reservacion_id: string }
         Returns: undefined

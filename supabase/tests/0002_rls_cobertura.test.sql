@@ -27,7 +27,8 @@ create temporary table _rls_exentas (tabla text) on commit drop;
 insert into _rls_exentas (tabla) values
   ('super_admin_accesos'),      -- SEC CN-002: bitácora de plataforma, solo service_role (mig. 0024).
   ('delivery_autorizaciones'),  -- Token OAuth del dueño para activar tiendas; solo la Edge Function (mig. 0092, spec F1b).
-  ('tenant_limites');           -- Excepciones de límites que VIM pone al cliente; solo el panel de plataforma (mig. 0103, ADR 0014).
+  ('tenant_limites'),           -- Excepciones de límites que VIM pone al cliente; solo el panel de plataforma (mig. 0103, ADR 0014).
+  ('avisos_plataforma');        -- Avisos que VIM manda a las cajas; llegan por las directivas del latido, no por RLS (mig. 0106, ADR 0014).
 
 -- #2 — CRÍTICA: ninguna tabla con tenant_id tiene RLS deshabilitado.
 select is_empty($$
