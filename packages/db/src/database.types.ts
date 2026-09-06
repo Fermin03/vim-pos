@@ -644,12 +644,15 @@ export type Database = {
           impresora_config: Json | null
           nombre: string
           numero: number
+          so: string | null
           sucursal_id: string
           tenant_id: string
           ultima_conexion: string | null
           ultima_ip: unknown
+          ultimo_latido: string | null
           updated_at: string
           updated_by: string | null
+          version_app: string | null
         }
         Insert: {
           activa?: boolean
@@ -665,12 +668,15 @@ export type Database = {
           impresora_config?: Json | null
           nombre: string
           numero: number
+          so?: string | null
           sucursal_id: string
           tenant_id: string
           ultima_conexion?: string | null
           ultima_ip?: unknown
+          ultimo_latido?: string | null
           updated_at?: string
           updated_by?: string | null
+          version_app?: string | null
         }
         Update: {
           activa?: boolean
@@ -686,12 +692,15 @@ export type Database = {
           impresora_config?: Json | null
           nombre?: string
           numero?: number
+          so?: string | null
           sucursal_id?: string
           tenant_id?: string
           ultima_conexion?: string | null
           ultima_ip?: unknown
+          ultimo_latido?: string | null
           updated_at?: string
           updated_by?: string | null
+          version_app?: string | null
         }
         Relationships: [
           {
@@ -735,7 +744,7 @@ export type Database = {
           ticket_dia_contable_snapshot: string
           ticket_estado_cocina_previo: Database["public"]["Enums"]["ticket_estado_cocina"]
           ticket_estado_fiscal_previo: Database["public"]["Enums"]["ticket_estado_fiscal"]
-          ticket_folio_snapshot: string
+          ticket_folio_snapshot: string | null
           ticket_id: string
           ticket_total_snapshot: number
           turno_id: string
@@ -768,7 +777,7 @@ export type Database = {
           ticket_dia_contable_snapshot: string
           ticket_estado_cocina_previo: Database["public"]["Enums"]["ticket_estado_cocina"]
           ticket_estado_fiscal_previo: Database["public"]["Enums"]["ticket_estado_fiscal"]
-          ticket_folio_snapshot: string
+          ticket_folio_snapshot?: string | null
           ticket_id: string
           ticket_total_snapshot: number
           turno_id: string
@@ -801,7 +810,7 @@ export type Database = {
           ticket_dia_contable_snapshot?: string
           ticket_estado_cocina_previo?: Database["public"]["Enums"]["ticket_estado_cocina"]
           ticket_estado_fiscal_previo?: Database["public"]["Enums"]["ticket_estado_fiscal"]
-          ticket_folio_snapshot?: string
+          ticket_folio_snapshot?: string | null
           ticket_id?: string
           ticket_total_snapshot?: number
           turno_id?: string
@@ -9956,6 +9965,15 @@ export type Database = {
           telefono: string
         }[]
       }
+      caja_latido: {
+        Args: {
+          p_caja: string
+          p_ip?: unknown
+          p_so?: string
+          p_version?: string
+        }
+        Returns: Json
+      }
       calcular_dia_contable: {
         Args: { p_tenant_id: string; p_ts?: string }
         Returns: string
@@ -10336,6 +10354,7 @@ export type Database = {
         Returns: undefined
       }
       marcar_pedido_listo: { Args: { p_ticket_id: string }; Returns: undefined }
+      mi_acceso: { Args: never; Returns: Json }
       modificar_reservacion: {
         Args: {
           p_cliente_nombre?: string
@@ -10429,6 +10448,10 @@ export type Database = {
       resetear_pin_empleado: {
         Args: { p_pin_nuevo: string; p_usuario_id: string }
         Returns: undefined
+      }
+      resolver_directivas: {
+        Args: { p_caja?: string; p_tenant: string }
+        Returns: Json
       }
       retomar_ticket: { Args: { p_ticket_id: string }; Returns: undefined }
       reversar_inventario_por_cancelacion: {
