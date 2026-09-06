@@ -32,6 +32,12 @@ export function tocaPull(nCiclo, cada = SYNC_PULL_CADA) {
  */
 export function crearCicloSync({
   ejecutar,
+  /**
+   * Se ejecuta al principio de cada ciclo, pase lo que pase. Aquí va el LATIDO (ADR 0014): es lo
+   * que prueba que la caja está encendida —aunque no haya vendido ni tenga nada que subir— y lo
+   * que trae las directivas que debe obedecer.
+   */
+  antesDeCadaCiclo = async () => {},
   cadaMs = SYNC_CADA_MS,
   reintentoMs = SYNC_REINTENTO_MS,
   pullCada = SYNC_PULL_CADA,
@@ -63,6 +69,14 @@ export function crearCicloSync({
     // vez competirían por marcar los mismos tickets como subidos.
     if (enCurso) { programar(cadaMs); return; }
     enCurso = true;
+    // El latido va PRIMERO y siempre. Su fallo se registra y NO toca al ciclo: si un latido
+    // caído contara como fallo, una nube intermitente dispararía el backoff y retrasaría la
+    // subida de ventas, que es justo lo contrario de lo que queremos.
+    try {
+      await antesDeCadaCiclo();
+    } catch (e) {
+      log(`latido omitido: ${e?.message ?? e}`);
+    }
     let ok = false;
     try {
       ok = (await ejecutar({ conPull: tocaPull(ciclos, pullCada) })) === true;

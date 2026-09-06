@@ -151,6 +151,15 @@ export async function startUiServer(dir, port, gatewayPort = 54350, host = "0.0.
         return res.end(JSON.stringify(opts.estadoSync ? opts.estadoSync() : { disponible: false }));
       }
 
+      // CAJA: lo que la nube dice que este negocio puede hacer (ADR 0014). Va por HTTP y no por
+      // IPC de Electron por lo mismo que el estado de sync: la 2ª caja y la cocina cargan la
+      // interfaz desde este servidor y no tienen preload. Solo lo que el cajero ya vería en
+      // pantalla; nada del negocio.
+      if (!kds && req.method === "GET" && req.url.startsWith("/__directivas")) {
+        res.writeHead(200, { "Content-Type": "application/json", "Cache-Control": "no-store" });
+        return res.end(JSON.stringify(opts.directivas ? opts.directivas() : { disponible: false }));
+      }
+
       // CAJA: folios de facturación que le quedan al negocio.
       //
       // Se pregunta a la NUBE en el momento, no al Postgres local. El saldo lo mueve el panel de
