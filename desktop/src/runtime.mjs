@@ -297,9 +297,28 @@ export async function startLocalBackend(opts = {}) {
   await db.query(readFileSync(kdsNotifyFile, "utf8"));
 
   // 5) Seed de fixtures solo si la BD está vacía (en producción llega por sync/provisioning).
+  //
+  // SIN TRUNCATE. Aquí había un
+  //   TRUNCATE planes, folios_paquetes, roles, permisos, rol_permisos RESTART IDENTITY CASCADE
+  // antes del seed, y hacía daño de dos formas:
+  //
+  //   • Los catálogos globales los siembran las MIGRACIONES (0046, con ids fijos; 0086 para los
+  //     planes por paquete). El TRUNCATE los borraba y dejaba que el seed los repusiera desde su
+  //     propia copia, que es anterior a la 0086: en la caja de desarrollo quedaba 'QS' ACTIVO y
+  //     los tres escalones —ESENCIAL, NEGOCIO, CADENA— ni existían. O sea, dev decía una cosa y
+  //     la nube otra sobre qué planes se pueden contratar. Se destapó el 5/09/2026 al enganchar
+  //     los smokes al CI: `smoke_provisioning.sql` pasaba en dev y fallaba contra el stack real.
+  //   • `seed.sql` inserta los roles con gen_random_uuid(). Tras el TRUNCATE nacían con ids
+  //     DISTINTOS de los de la nube, y al bajar la rebanada de un tenant los empleados llegaban
+  //     con un rol_id que aquí no existía: el POS no los listaba. Con los ids fijos de la 0046
+  //     intactos, eso deja de pasar.
+  //
+  // El TRUNCATE tampoco hacía falta: TODOS los bloques de seed.sql terminan en
+  // `ON CONFLICT DO NOTHING`, así que sobre una base ya migrada el seed es inocuo — que es
+  // exactamente cómo se comporta en la nube, donde nadie trunca nada antes de `supabase db reset`.
+  // El `CASCADE`, además, podía llevarse por delante filas dependientes sin que nadie lo pidiera.
   const vacia = (await db.query("SELECT count(*)::int n FROM tenants")).rows[0].n === 0;
   if (vacia && seedIfEmpty) {
-    await db.query("TRUNCATE planes, folios_paquetes, roles, permisos, rol_permisos RESTART IDENTITY CASCADE");
     await db.query(readFileSync(seedFile, "utf8"));
     log("seed de fixtures aplicado (BD estaba vacía)");
   }

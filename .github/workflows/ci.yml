@@ -1,7 +1,14 @@
 # F14 CN-013 (Cyber Neo) — gates de seguridad en CI.
-# Cada PR a main corre: lint + typecheck + build + vitest + supabase db push/test (RLS) +
-# pnpm audit. Si algo falla, el merge queda bloqueado. Previene que una regresión de
-# seguridad (key filtrada, dep vulnerable, RLS roto) llegue a main sin que un humano la vea.
+# Cada PR a main corre: lint + typecheck + build + vitest + smokes de negocio + supabase
+# db push/test (RLS) + pnpm audit. Si algo falla, el merge queda bloqueado. Previene que una
+# regresión de seguridad (key filtrada, dep vulnerable, RLS roto) llegue a main sin que un
+# humano la vea.
+#
+# 5/09/2026 — se sumaron los smokes de supabase/scripts/ al job `rls-tests`. Cubrían la
+# operación completa en SQL desde hacía meses, pero no los corría nadie: `smoke_propina.sql`
+# llevaba cinco semanas en rojo con el cobro con propina roto en producción. El detalle, en el
+# propio paso. El job conserva el nombre `rls-tests` a propósito, porque puede estar marcado
+# como check requerido en la protección de rama y renombrarlo lo desactivaría en silencio.
 #
 # SEC CN-015 — tres arreglos sobre la versión anterior:
 #   1) El gate de dependencias terminaba en `|| true`, así que NUNCA bloqueaba nada. Se justificaba
@@ -127,6 +134,56 @@ jobs:
 
       - name: Start Supabase local stack
         run: supabase start
+
+      - name: Smokes de negocio (supabase/scripts/smoke_*.sql) — BLOQUEANTE
+        # POR QUÉ EXISTE ESTE PASO.
+        #
+        # Los smokes de supabase/scripts/ cubren la operación de punta a punta en SQL —venta,
+        # cobro, propina, mesas, cancelación, devolución, corte, sync— y hasta el 5/09/2026 NO LOS
+        # CORRÍA NADA. `smoke_propina.sql` estuvo CINCO SEMANAS en rojo sin que nadie se enterara:
+        # la migración 0060 había perdido el `+ propina_mxn` del guard de sobrepago, así que todo
+        # cobro con propina se rechazaba, el ticket se quedaba ABIERTO y la mesa nunca se liberaba.
+        # El smoke que lo cazaba existía desde antes del bug. El agujero no fue de cobertura: fue
+        # que la cobertura no se ejecutaba. Ver la migración 0102.
+        #
+        # Van aquí y no en un job propio porque este ya tiene el stack levantado con las
+        # migraciones y el seed aplicados, que es exactamente lo que necesitan. Un job aparte
+        # volvería a levantar Docker para nada.
+        #
+        # Se corren con psql y no con `desktop/scripts/smokes.mjs`: los .sql ya traen su
+        # `\set ON_ERROR_STOP on` y su `BEGIN;/ROLLBACK;`, que psql entiende de forma nativa. El
+        # runner de Node existe para correrlos en local sin Docker (`npm run smokes` en desktop/).
+        run: |
+          DB_URL="$(supabase status -o env | sed -n 's/^DB_URL="\{0,1\}\([^"]*\)"\{0,1\}$/\1/p')"
+          if [ -z "$DB_URL" ]; then
+            echo "❌ no pude sacar DB_URL de 'supabase status -o env'"; exit 1
+          fi
+
+          # Sin el fixture no hay nada que probar y los 34 fallarían con errores que no orientan
+          # a nada. Mejor una línea que diga la verdad: el seed no entró.
+          if ! psql "$DB_URL" -tAc "SELECT 1 FROM tenants WHERE id='99999999-0000-0000-0000-0000000000aa'" | grep -q 1; then
+            echo "❌ el fixture de supabase/seed.sql no está en la BD; los smokes lo necesitan"; exit 1
+          fi
+
+          # Se corren TODOS y se acumulan los fallos: un PR rojo debe decir cuáles smokes se
+          # rompieron, no solo el primero.
+          fallos=0
+          for f in supabase/scripts/smoke_*.sql; do
+            if psql "$DB_URL" -v ON_ERROR_STOP=1 -q -f "$f" >/tmp/smoke.out 2>&1; then
+              echo "✅ $(basename "$f")"
+            else
+              fallos=$((fallos + 1))
+              echo "❌ $(basename "$f")"
+              # Los RAISE NOTICE del smoke dicen en qué paso murió; salen por stderr.
+              sed 's/^/      /' /tmp/smoke.out
+            fi
+          done
+
+          echo
+          if [ "$fallos" -ne 0 ]; then
+            echo "❌ $fallos smoke(s) en rojo"; exit 1
+          fi
+          echo "✅ todos los smokes en verde"
 
       - name: Apply migrations + run RLS tests
         # `supabase test db` corre supabase/tests/*.sql como pg_prove:
