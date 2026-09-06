@@ -5,6 +5,19 @@ const AHORA = new Date("2026-08-19T12:00:00Z").getTime();
 const haceHoras = (h: number) => new Date(AHORA - h * 3_600_000).toISOString();
 
 describe("señalDeCaja", () => {
+  it("el latido manda sobre todas las demás señales", () => {
+    const r = señalDeCaja(
+      { ultimoLatido: haceHoras(1), ultimaConexion: haceHoras(5), ultimoSync: haceHoras(6), ultimaVenta: haceHoras(2) },
+      AHORA,
+    );
+    expect(r.origen).toBe("latido");
+    expect(r.horas).toBe(1);
+  });
+
+  it("sin latido se cae al criterio anterior (cajas sin actualizar)", () => {
+    expect(señalDeCaja({ ultimaConexion: haceHoras(3) }, AHORA).origen).toBe("conexion");
+  });
+
   it("prefiere el sello de conexión sobre todo lo demás", () => {
     const r = señalDeCaja({ ultimaConexion: haceHoras(1), ultimoSync: haceHoras(5), ultimaVenta: haceHoras(2) }, AHORA);
     expect(r.origen).toBe("conexion");

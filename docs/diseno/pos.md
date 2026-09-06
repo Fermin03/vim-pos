@@ -56,6 +56,25 @@ de la tanda y no de la cuenta, tiene que decirlo.
 Sin conexión, sincronizando, turno abierto, folios restantes. El cajero no debe descubrir que
 lleva media hora offline al intentar cobrar.
 
+## Servicio suspendido: avisar sin estorbar, bloquear sin dejar tirado
+
+Desde la entrega 2 del ADR 0014 la caja obedece las **directivas** que le manda la nube en cada
+latido. Dos estados nuevos, y ninguno improvisa: la caja no calcula nada, solo aplica lo que
+recibió.
+
+- **Gracia** — banda amarilla arriba con el mensaje que escribió VIM y la fecha en que la caja
+  dejará de vender. El cajero **sigue cobrando**. El aviso es para que el dueño lo resuelva, no
+  para frenar el mostrador.
+- **Bloqueado** — pantalla completa antes del PIN, con el teléfono de soporte. Dice que las
+  ventas anteriores están a salvo y se siguen respaldando, porque esa es la primera pregunta de
+  un dueño bloqueado. La sincronización **no se detiene**: quien se ponga al corriente no perdió
+  nada.
+
+**La falta de datos nunca bloquea.** Sin archivo de directivas, con el archivo corrupto o con la
+nube caída, la caja vende. Perder ventas por un corte de red nuestro sería peor que el impago que
+esto persigue. Por eso el bloqueo es un control **comercial**, no una barrera de seguridad: lo que
+de verdad cuesta dinero —timbrar un CFDI— se cierra además en el servidor.
+
 ## Lo que NO se hereda de otras apps
 
 - **La densidad del admin.** Aquí el scroll es tiempo frente a un cliente, pero apretar de más

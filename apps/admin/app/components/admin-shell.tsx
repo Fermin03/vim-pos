@@ -8,9 +8,15 @@ import { cargarPerfil, iniciales, type Perfil } from "../lib/perfil";
 import { salir } from "../lib/supabase";
 import { listarSucursales } from "../lib/configuracion";
 import { JERARQUIA_MINIMA_PANEL, puedeVer } from "../lib/acceso";
+import { leerAcceso, ACCESO_OK, type Acceso } from "../lib/acceso-tenant";
 
 const PerfilCtx = createContext<Perfil | null>(null);
 export const usePerfil = () => useContext(PerfilCtx);
+
+/** Estado de la suscripción del negocio (ADR 0014). Las pantallas de alta lo consultan para
+ *  apagar sus botones cuando el servicio está bloqueado. */
+const AccesoCtx = createContext<Acceso>(ACCESO_OK);
+export const useAccesoTenant = () => useContext(AccesoCtx);
 
 type Item = { label: string; href: string; icon: ReactNode };
 type Seccion = { titulo: string; items: Item[] };
@@ -79,6 +85,7 @@ export function AdminShell({ children }: { children: ReactNode }) {
   const [listo, setListo] = useState(false);
   const [sinAcceso, setSinAcceso] = useState<string | null>(null);
   const [sucursales, setSucursales] = useState<{ nombre: string; total: number } | null>(null);
+  const [acceso, setAcceso] = useState<Acceso>(ACCESO_OK);
   // Cajón lateral: solo existe por debajo de `lg`. En escritorio el <aside> es estático.
   const [menuAbierto, setMenuAbierto] = useState(false);
 
@@ -86,6 +93,16 @@ export function AdminShell({ children }: { children: ReactNode }) {
   useEffect(() => {
     setMenuAbierto(false);
   }, [pathname]);
+
+  // Estado de la suscripción, cada 10 minutos: el mismo ritmo con el que la caja late, porque
+  // es la misma decisión y no tiene sentido que el dueño y su cajero vean cosas distintas.
+  useEffect(() => {
+    let vivo = true;
+    const cargar = () => { leerAcceso().then((a) => { if (vivo) setAcceso(a); }).catch(() => {}); };
+    cargar();
+    const id = setInterval(cargar, 10 * 60_000);
+    return () => { vivo = false; clearInterval(id); };
+  }, []);
 
   // Bloquea el scroll del documento y permite cerrar con Esc mientras el cajón está abierto.
   useEffect(() => {
@@ -195,6 +212,7 @@ export function AdminShell({ children }: { children: ReactNode }) {
 
   return (
     <PerfilCtx.Provider value={perfil}>
+     <AccesoCtx.Provider value={acceso}>
       <div className="flex h-[100dvh] lg:h-screen">
         {/* Velo del cajón (solo móvil/tablet). */}
         <div
@@ -325,9 +343,27 @@ export function AdminShell({ children }: { children: ReactNode }) {
 
               Mientras el perfil carga no se bloquea nada: hacerlo mostraría un "sin acceso" de un
               parpadeo a todo el mundo, y enseñar a ignorar ese aviso es peor que no tenerlo. */}
+          {/* Estado de la suscripción (ADR 0014). Bloqueado no cierra el panel: lo deja en solo
+              lectura, porque el dueño necesita sus reportes y sus datos fiscales justo para
+              poder pagar y cerrar su contabilidad. */}
+          {acceso.nivel !== "ok" && (
+            <div
+              role="status"
+              className={[
+                "flex-shrink-0 px-5 py-2.5 text-center text-[13px] font-semibold",
+                acceso.nivel === "bloqueado" ? "bg-[#FBECEA] text-danger" : "bg-[#F6EEDD] text-warning",
+              ].join(" ")}
+            >
+              {acceso.mensaje}
+              {acceso.nivel === "bloqueado" && (
+                <span className="ml-2 font-normal text-ink-2">Tu panel quedó en solo lectura hasta que se reactive.</span>
+              )}
+            </div>
+          )}
           {perfil && !puedeVer(jer, pathname) ? <SinAcceso rol={perfil.rolNombre} /> : children}
         </div>
       </div>
+     </AccesoCtx.Provider>
     </PerfilCtx.Provider>
   );
 }

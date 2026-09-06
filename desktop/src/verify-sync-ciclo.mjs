@@ -6,6 +6,9 @@ import assert from "node:assert/strict";
 import { crearCicloSync, esperaSiguiente, tocaPull } from "./sync-ciclo.mjs";
 
 const MIN = 60 * 1000;
+/** Espera a que el tick termine del todo. Un `Promise.resolve()` suelto solo alcanzaba mientras
+ *  `tick()` tuviera un único `await`; al sumarse el latido, el tick quedaba a medias. */
+const asentar = () => new Promise((r) => setImmediate(r));
 let fallidas = 0;
 
 function prueba(nombre, fn) {
@@ -30,7 +33,11 @@ function relojFalso() {
         pend.delete(id);
         ahora = at;
         await fn();
-        await Promise.resolve();
+        // Drena la cola de microtareas del tick completo. Antes era un solo `Promise.resolve()`,
+        // que alcanzaba solo mientras `tick()` tuviera un único `await`; al sumarse el latido
+        // (ADR 0014) el tick quedaba a medias y las pruebas de ritmo fallaban por el arnés, no
+        // por el ciclo. `setImmediate` espera a que no quede nada pendiente.
+        await new Promise((r) => setImmediate(r));
       }
       ahora = fin;
     },
@@ -59,7 +66,7 @@ await (async () => {
     setTimeoutFn: reloj.setTimeoutFn, clearTimeoutFn: reloj.clearTimeoutFn,
   });
   c.iniciar();
-  await Promise.resolve();
+  await asentar();
   await reloj.avanzar(31 * MIN); // 3 intervalos más
 
   prueba("sincroniza al arrancar y luego cada 10 min", () => {
@@ -80,7 +87,7 @@ await (async () => {
     setTimeoutFn: reloj.setTimeoutFn, clearTimeoutFn: reloj.clearTimeoutFn,
   });
   c.iniciar();
-  await Promise.resolve();
+  await asentar();
 
   await reloj.avanzar(1 * MIN);
   prueba("tras fallar reintenta al minuto, no a los 10", () => assert.equal(intentos, 2));
@@ -113,12 +120,12 @@ await (async () => {
     setTimeoutFn: reloj.setTimeoutFn, clearTimeoutFn: reloj.clearTimeoutFn,
   });
   c.iniciar();
-  await Promise.resolve();
+  await asentar();
   c.iniciar();                 // segundo disparo con el primero todavía en vuelo
-  await Promise.resolve();
+  await asentar();
   prueba("nunca se solapan dos sincronizaciones", () => assert.equal(solapes, 0));
   liberar?.();
-  await Promise.resolve();
+  await asentar();
   c.detener();
 })();
 
@@ -130,7 +137,7 @@ await (async () => {
     setTimeoutFn: reloj.setTimeoutFn, clearTimeoutFn: reloj.clearTimeoutFn,
   });
   c.iniciar();
-  await Promise.resolve();
+  await asentar();
   const tras = veces;
   c.detener();
   await reloj.avanzar(60 * MIN);
@@ -149,7 +156,7 @@ await (async () => {
     setTimeoutFn: reloj.setTimeoutFn, clearTimeoutFn: reloj.clearTimeoutFn,
   });
   c.iniciar();
-  await Promise.resolve();
+  await asentar();
   await reloj.avanzar(1 * MIN);
   prueba("una excepción no mata el ciclo: reintenta", () => assert.equal(veces, 2));
   c.detener();
