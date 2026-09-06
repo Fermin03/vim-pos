@@ -35,10 +35,14 @@ export default function IntegracionesPage() {
   const uberDe = (sucursalId: string) => conexiones?.find((c) => c.sucursal_id === sucursalId && c.app === "APP_UBEREATS") ?? null;
   const conectar = () => { window.location.href = iniciarConexionUber(); };
 
-  async function correr(cx: ConexionApp, accion: "pausar" | "reanudar" | "desconectar" | "verificar") {
+  async function correr(cx: ConexionApp, accion: "pausar" | "reanudar" | "desconectar" | "verificar" | "menu") {
     setOcupada(cx.id); setError(null); setAviso(null);
     try {
-      if (accion === "verificar") {
+      if (accion === "menu") {
+        const m = await accionConexion("menu", { conexion_id: cx.id });
+        const fuera = m.excluidos.length ? ` Quedaron fuera ${m.excluidos.length}: ${m.excluidos.slice(0, 5).map((x) => `${x.nombre} (${x.motivo})`).join(", ")}${m.excluidos.length > 5 ? "…" : ""}.` : "";
+        setAviso(`Carta enviada a Uber: ${m.items} productos en ${m.categorias} categorías.${fuera}`);
+      } else if (accion === "verificar") {
         const v: Verificacion = await accionConexion("verificar", { conexion_id: cx.id });
         setAviso(v.integracion_activa
           ? `Conexión correcta. Tienda en Uber: ${etiquetaTienda(v.tienda ?? null).toLowerCase()}${v.offline_reason ? ` (${v.offline_reason})` : ""}.`
@@ -147,6 +151,7 @@ export default function IntegracionesPage() {
                         {conectada && cx && (
                           <span className="inline-flex flex-wrap justify-end gap-1.5">
                             <Button variant="ghost" disabled={trabajando} onClick={() => correr(cx, "verificar")}>Comprobar</Button>
+                            <Button variant="ghost" disabled={trabajando} onClick={() => correr(cx, "menu")} title="Reemplaza la carta de la tienda en Uber con los productos activos del catálogo">Enviar carta</Button>
                             {cx.estado === "ACTIVA" && <Button variant="ghost" disabled={trabajando} onClick={() => correr(cx, "pausar")}>Pausar</Button>}
                             {cx.estado === "PAUSADA" && <Button variant="ghost" disabled={trabajando} onClick={() => correr(cx, "reanudar")}>Reanudar</Button>}
                             <Button variant="ghost" disabled={trabajando} onClick={() => setDesconectar(cx)}>Desconectar</Button>
