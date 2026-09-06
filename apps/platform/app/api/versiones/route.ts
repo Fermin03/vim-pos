@@ -110,8 +110,9 @@ export async function POST(req: Request) {
   // sirviendo la anterior, y nada lo delataría. Al revés no hay daño: la caja se actualiza como
   // siempre y basta con repetir el POST (es idempotente) para que quede el registro.
   //
-  // El manifiesto se RE-SERIALIZA aquí en vez de reenviar el texto pegado: el script
-  // `release-manifest` escribe las notas con los acentos rotos y esto lo arregla de paso.
+  // El manifiesto se RE-SERIALIZA aquí en vez de reenviar el texto pegado: así lo que llega al
+  // bucket son exactamente los campos que el panel validó, en UTF-8 y sin nada de más que se
+  // hubiera colado al copiar y pegar.
   //
   // La caché corta es obligatoria: sin ella el CDN sirve el manifiesto anterior hasta un minuto y
   // parece que la publicación no surtió efecto. Pasó en las entregas 2 y 3.
