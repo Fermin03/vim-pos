@@ -7,6 +7,7 @@ import { app, BrowserWindow, Tray, Menu, nativeImage, clipboard, Notification, d
 import { existsSync, readFileSync, writeFileSync, mkdirSync, openSync, writeSync } from "node:fs";
 import { inspect } from "node:util";
 import path from "node:path";
+import os from "node:os";
 import { fileURLToPath } from "node:url";
 import { startBackend } from "./backend.mjs";
 import { startUiServer } from "./ui-server.mjs";
@@ -15,6 +16,7 @@ import { pushToCloud } from "./sync-push.mjs";
 import { respaldar } from "./backup.mjs";
 import { crearWatchdog } from "./watchdog.mjs";
 import { crearCicloSync } from "./sync-ciclo.mjs";
+import { crearAlmacenDirectivas } from "./directivas.mjs";
 import { crearEspejo } from "./delivery-espejo.mjs";
 import { registrarErrorLocal, subirErrores } from "./sync-errores.mjs";
 import { buscarActualizacion, descargarInstalador } from "./updater.mjs";
@@ -42,6 +44,12 @@ const HUB_CFG = path.join(CONFIG_DIR, "kds-hub.json");
 // interfaz (un restaurantero no define env vars). Ahora la pantalla de vinculación las persiste.
 const NUBE_CFG = path.join(CONFIG_DIR, "nube.json");
 const LOG_PATH = path.join(CONFIG_DIR, "vim-pos.log");
+// Lo que la nube dice que este negocio puede hacer (ADR 0014). En archivo y no en el Postgres
+// local a propósito: tiene que estar disponible aunque el backend tarde en arrancar.
+const directivas = crearAlmacenDirectivas({
+  archivo: path.join(CONFIG_DIR, "directivas.json"),
+  log: (m) => console.log("· [directivas]", m),
+});
 
 /**
  * Espeja console.log/error a un archivo. La app empaquetada no tiene consola: sin esto, un fallo
@@ -240,6 +248,10 @@ async function bootCaja() {
       onVincularNube: (p) => vincularConNube(p),
       estadoSync: () => ({ disponible: true, vinculada: leerNube() !== null, ...ciclo.estado() }),
       onFolios: () => consultarFolios(),
+      directivas: () => {
+        const { directivas: d, recibidoIso } = directivas.leer();
+        return { disponible: true, recibido: recibidoIso, directivas: d };
+      },
     });
     posUrl = `http://localhost:${UI_PORT}`;
     console.log(`· [ui] POS servido offline desde ${posUrl} · KDS/2ª caja en la LAN: http://${backend.lanIp}:${UI_PORT}`);
@@ -477,6 +489,34 @@ async function tokenDeNube() {
 }
 
 /**
+ * Latido: le dice a la nube que esta caja está viva y recoge lo que debe obedecer.
+ *
+ * Se llama en CADA ciclo, aunque no haya nada que subir. Ese era el hueco que la migración 0073
+ * dejó escrito: `ultima_conexion` solo se sellaba al subir ventas, así que una caja encendida en
+ * un día flojo envejecía en el panel hasta parecer caída.
+ *
+ * Si falla, NO se toca lo guardado: la caja sigue con la última directiva conocida y sigue
+ * vendiendo. Perder ventas por un corte de red sería peor que el problema que esto resuelve.
+ */
+async function latir() {
+  const opts = await tokenDeNube();
+  if (!opts) return;   // sin vincular: no hay a quién latir
+  const r = await fetch(`${opts.cloudUrl}/functions/v1/caja-latido`, {
+    method: "POST",
+    headers: {
+      apikey: opts.anonKey,
+      Authorization: `Bearer ${opts.deviceToken}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ version: app.getVersion(), so: `${os.type()} ${os.release()}` }),
+    signal: AbortSignal.timeout(10000),
+  });
+  if (!r.ok) throw new Error(`caja-latido HTTP ${r.status}`);
+  const j = await r.json();
+  if (j?.directivas) directivas.guardar(j.directivas);
+}
+
+/**
  * Folios que le quedan al negocio, preguntados a la nube en el momento.
  *
  * `aplica:false` cuando la caja no está vinculada o el tenant no tiene fila de saldo: en ese caso
@@ -578,6 +618,7 @@ async function syncBestEffort({ conPull = true } = {}) {
 // La política (ritmo, backoff, no solaparse, cada cuánto toca PULL) vive en sync-ciclo.mjs,
 // que se puede probar sin Electron.
 const ciclo = crearCicloSync({
+  antesDeCadaCiclo: () => latir(),
   ejecutar: ({ conPull }) => syncBestEffort({ conPull }),
   log: (m) => console.log("· [sync]", m),
 });
