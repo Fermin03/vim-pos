@@ -23,6 +23,32 @@ const PIDFILE = path.join(root, "bin", ".pids.json");
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 
 /**
+ * El instalador PUEDE salir sin PostgREST: `bin/postgrest.exe` está en .gitignore y electron-builder
+ * no protesta por un extraResources ausente. Pasó en las 0.4.60–0.4.62 (6 sep 2026): `spawn` de un
+ * archivo inexistente devuelve pid undefined, el readiness esperaba sus 60 s y el error decía
+ * "PostgREST no respondió" — señalando al proceso, no al paquete. Costó horas. Aquí se dice qué
+ * falta, dónde y qué hacer, ANTES de lanzar nada. Exportada para probarla.
+ */
+export function comprobarBinarioPostgrest(ruta) {
+  if (existsSync(ruta)) return;
+  throw new Error(`Falta el binario de PostgREST en ${ruta}: el instalador quedó incompleto. Reinstala VIM POS.`);
+}
+
+/**
+ * Traduce el 'error' de un spawn fallido a algo que el log y el diálogo puedan decir. Sin esto, un
+ * ENOENT/EACCES del hijo llega como excepción asíncrona sin oyente: no deja rastro y nadie sabe por
+ * qué la caja no abrió. Exportada para probarla.
+ */
+export function explicarFalloDeSpawn(e, ruta) {
+  const code = e?.code ?? "";
+  if (code === "ENOENT") return `no se pudo lanzar PostgREST: ${ruta} no existe`;
+  if (code === "EACCES" || code === "EPERM") {
+    return `no se pudo lanzar PostgREST (${code}): sin permisos para ejecutar ${ruta}, o el antivirus lo bloqueó`;
+  }
+  return `no se pudo lanzar PostgREST (${code || "sin código"}): ${e?.message ?? e}`;
+}
+
+/**
  * Mata procesos huérfanos (Postgres/PostgREST) que quedaron de un arranque anterior que no cerró
  * limpio (crash / kill forzado). Lee el pidfile del run previo + el postmaster.pid del data dir.
  * Con la instancia única de Electron, aquí no hay riesgo de matar la instancia viva. Exportada
@@ -341,11 +367,18 @@ export async function startLocalBackend(opts = {}) {
     `server-host = "127.0.0.1"`,
     ``,
   ].join("\n"), { mode: 0o600 }); // el .conf lleva el jwt-secret y las credenciales de la BD
+  // Antes de abrir el log (que quedaría en 0 bytes) y de lanzar nada: si el paquete no trae el
+  // binario, que el error lo diga ya, no tras 60 s de readiness a un proceso que nunca nació.
+  comprobarBinarioPostgrest(postgrestExe);
   const logFd = openSync(logPath, "w");
   const rest = spawn(postgrestExe, [confPath], {
     stdio: ["ignore", logFd, logFd],
     env: { ...process.env, PATH: `${pgBin}${path.delimiter}${process.env.PATH}` },
   });
+  // Un spawn fallido (EACCES por antivirus, DLL bloqueada…) emite 'error' de forma asíncrona; sin
+  // oyente tumba el proceso sin dejar rastro. Se registra y se corta el readiness abajo.
+  let falloSpawn = null;
+  rest.on("error", (e) => { falloSpawn = explicarFalloDeSpawn(e, postgrestExe); log(falloSpawn); });
 
   // Registrar los PIDs YA, ANTES del readiness. Si el arranque falla aquí (readiness expira),
   // el postgrest recién lanzado queda rastreado en el pidfile → el próximo arranque lo mata en
@@ -355,6 +388,7 @@ export async function startLocalBackend(opts = {}) {
 
   let ready = false;
   for (let i = 0; i < 120; i++) { // hasta ~60s: bajo carga, el schema cache tarda en cargar
+    if (falloSpawn) break; // el proceso no existe: no hay nada que esperar
     // 127.0.0.1 (no 'localhost'): PostgREST escucha 0.0.0.0 (IPv4); en el Electron empaquetado
     // 'localhost' resuelve a ::1 (IPv6) primero → nunca conectaría.
     try { if ((await fetch(`http://127.0.0.1:${restPort}/`)).ok) { ready = true; break; } } catch { /* aún no */ }
@@ -362,6 +396,7 @@ export async function startLocalBackend(opts = {}) {
   }
   if (!ready) {
     try { rest.kill(); } catch { /* */ } // no dejarlo colgado como huérfano ocupando restPort
+    if (falloSpawn) throw new Error(`${falloSpawn}. Reinstala VIM POS.`);
     let tail = "";
     try { tail = readFileSync(logPath, "utf8").split("\n").slice(-6).join("\n"); } catch { /* */ }
     throw new Error(`PostgREST no respondió.\n${tail}`);
