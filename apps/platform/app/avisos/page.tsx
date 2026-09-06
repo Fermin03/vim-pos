@@ -144,6 +144,7 @@ export default function AvisosPage() {
                   <div className="flex flex-shrink-0 items-center gap-3">
                     <span className="text-[12.5px] tabular-nums text-ink-2">
                       visto por <b>{a.vistos}</b> de {a.cajasAlcance} {a.cajasAlcance === 1 ? "caja" : "cajas"}
+                      {a.vistosWeb > 0 && <span className="text-ink-3"> · {a.vistosWeb} desde el POS web</span>}
                     </span>
                     <button onClick={() => setBorrando(a)} disabled={busy} className="btn h-8 rounded border border-line-strong px-3 text-[12.5px] font-semibold text-ink-3 hover:text-danger disabled:opacity-50">
                       Retirar…

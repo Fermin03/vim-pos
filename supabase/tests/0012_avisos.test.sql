@@ -10,6 +10,11 @@
 begin;
 select plan(14);
 
+-- Aislamiento: la base de desarrollo puede tener avisos GLOBALES creados a mano, y un aviso
+-- global le llega a todos los tenants —incluidos los de esta prueba—, así que los conteos
+-- fallarían por datos ajenos. Se retiran dentro de la transacción; el rollback los devuelve.
+update avisos_plataforma set deleted_at = now() where deleted_at is null;
+
 insert into tenants (id, codigo, nombre_comercial, vertical_principal, estado, plan_actual_id)
 values ('eeeeeeee-0000-0000-0000-0000000000f0', 'avi-uno', 'Avisos Uno', 'QUICK_SERVICE', 'ACTIVO',
         (select id from planes where codigo = 'NEGOCIO')),
