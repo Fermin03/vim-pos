@@ -83,7 +83,7 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }
       // hace tres horas, que no es lo mismo — y en soporte esa diferencia importa.
       origenSenal,
       ultimaIp: c.ultima_ip,
-      // NULL = caja anterior a 0.4.58, que no late. Se muestra en gris, nunca en rojo: no está
+      // NULL = caja anterior a 0.4.60, que no late. Se muestra en gris, nunca en rojo: no está
       // caída, solo sin actualizar (spec §7).
       versionApp: c.version_app,
       so: c.so,

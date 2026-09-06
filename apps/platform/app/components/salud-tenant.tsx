@@ -83,14 +83,14 @@ export function SaludTenant({ api, id }: { api: Api; id: string }) {
                     {c.bloqueoMotivo && <span className="ml-1 text-[11px] text-ink-3">{c.bloqueoMotivo}</span>}
                   </td>
                   <td className="p-2 text-ink-2">
-                    {c.versionApp ?? <span className="text-ink-3">anterior a 0.4.58</span>}
+                    {c.versionApp ?? <span className="text-ink-3">anterior a 0.4.60</span>}
                   </td>
                   <td className="p-2 text-right tabular-nums text-ink-2">
                     {hace(c.ultimaConexion)}
                     {/* De dónde sale el dato. "Conectada" apoyado en una venta de hace tres horas
                         no es lo mismo que la caja reportando ahora, y en soporte esa diferencia
                         decide si hay que llamar al cliente. */}
-                    {/* El latido es el caso normal desde 0.4.58 y no lleva aclaración. Las demás
+                    {/* El latido es el caso normal desde 0.4.60 y no lleva aclaración. Las demás
                         señales sí: "Conectada" apoyado en una venta de hace tres horas no es lo
                         mismo, y en soporte esa diferencia decide si hay que llamar al cliente. */}
                     {c.origenSenal && c.origenSenal !== "latido" && c.origenSenal !== "conexion" && (

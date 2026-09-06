@@ -4,7 +4,7 @@
 
 **Goal:** Que lo que se decide en el panel llegue a la caja: un latido cada 10 minutos trae directivas resueltas en la nube (acceso con gracia, módulos, límites) y la caja, el POS web y el admin las obedecen.
 
-**Architecture:** Una migración (0104) agrega tres columnas a `cajas` y tres funciones: `resolver_directivas(tenant, caja)` compone el paquete completo; `caja_latido(...)` sella el latido y lo devuelve (solo `service_role`); `mi_acceso()` lo entrega bajo RLS a un usuario autenticado. La Edge Function `caja-latido` es el único camino de la caja, autenticada con el JWT del dispositivo igual que `sync-push`. El escritorio (0.4.58) llama al latido al principio de cada ciclo, guarda el JSON en `userData/directivas.json` y lo sirve en `/__directivas`. El POS decide con una función pura `evaluarAcceso`; el admin usa `mi_acceso()`. Los límites dejan de ser informativos: `sucursales` gana su trigger y `crear-empleado` valida usuarios.
+**Architecture:** Una migración (0105) agrega tres columnas a `cajas` y tres funciones: `resolver_directivas(tenant, caja)` compone el paquete completo; `caja_latido(...)` sella el latido y lo devuelve (solo `service_role`); `mi_acceso()` lo entrega bajo RLS a un usuario autenticado. La Edge Function `caja-latido` es el único camino de la caja, autenticada con el JWT del dispositivo igual que `sync-push`. El escritorio (0.4.60) llama al latido al principio de cada ciclo, guarda el JSON en `userData/directivas.json` y lo sirve en `/__directivas`. El POS decide con una función pura `evaluarAcceso`; el admin usa `mi_acceso()`. Los límites dejan de ser informativos: `sucursales` gana su trigger y `crear-empleado` valida usuarios.
 
 **Tech Stack:** Postgres/plpgsql (SECURITY DEFINER con `search_path` fijo), Deno + Zod en la Edge Function, Node ESM sin dependencias en el escritorio (probado con `node --test` y relojes falsos), Next 15 + React 19 en POS/admin/panel, vitest para lógica pura, pgTAP para SQL.
 
@@ -13,14 +13,14 @@
 ## Global Constraints
 
 - **Carpeta:** worktree `PROYECTOS/VIM POS/vim-pos-platform/`, rama nueva `platform-latido` creada desde `main` (ya contiene la entrega 1). **No tocar `vim-pos/`**, que otra sesión usa.
-- **Numeración de migraciones:** la siguiente libre es **0104**. Antes de fijarla, correr `supabase migration list --linked` y confirmar que 0104 no está tomada en producción. Si lo está, subir el número aquí y en la spec. Una migración cuyo número ya figura en el historial remoto **se salta en silencio**.
+- **Numeración de migraciones:** la siguiente libre es **0105**. Antes de fijarla, correr `supabase migration list --linked` y confirmar que 0105 no está tomada en producción. Si lo está, subir el número aquí y en la spec. Una migración cuyo número ya figura en el historial remoto **se salta en silencio**.
 - **La venta nunca se bloquea por falta de red** (§3). Solo bloquea una directiva que diga `bloqueado: true`. Una directiva vieja o ausente **no** bloquea, aunque su `bloquea_desde` ya haya pasado.
 - **El latido no puede frenar el push.** Su fallo se registra y el ciclo sigue; no cuenta como fallo ni dispara backoff.
 - **Identidad por token, nunca por cuerpo.** El `caja_id` sale del correo sintético del dispositivo (`caja-<uuid>@dispositivos.vimpos.mx`), como en `desktop/src/auth.mjs`.
 - **`service_role` solo en Edge Functions y `apps/platform`** (regla dura 1). `mi_acceso()` es la única pieza nueva ejecutable por `authenticated`, solo lee y solo del tenant de la sesión.
 - **Sin `any`**: `unknown` + Zod o tipos declarados. `pnpm turbo run typecheck` en cero tras cada tarea.
 - **Español en dominio**, archivos `kebab-case`, componentes `PascalCase`.
-- **Compatibilidad (§7):** una caja anterior a 0.4.58 no late, no recibe directivas y no bloquea. El panel la muestra en gris como "versión anterior", nunca en rojo.
+- **Compatibilidad (§7):** una caja anterior a 0.4.60 no late, no recibe directivas y no bloquea. El panel la muestra en gris como "versión anterior", nunca en rojo.
 - Commits pequeños, en español, con prefijo (`db:`, `feat(pos):`, `escritorio:`, `test:`, `docs:`) y al final:
   `Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>`
 
@@ -30,7 +30,7 @@
 
 | Archivo | Responsabilidad |
 |---|---|
-| `supabase/migrations/0104_caja_latido_y_bloqueo.sql` | columnas de `cajas`, `resolver_directivas`, `caja_latido`, `mi_acceso`, trigger de sucursales |
+| `supabase/migrations/0105_caja_latido_y_bloqueo.sql` | columnas de `cajas`, `resolver_directivas`, `caja_latido`, `mi_acceso`, trigger de sucursales |
 | `supabase/tests/0011_latido_y_directivas.test.sql` | pgTAP: directivas, gracia, aislamiento, trigger |
 | `supabase/functions/caja-latido/index.ts` | Edge Function del latido |
 | `supabase/functions/_shared/latido.ts` | validación pura del cuerpo (probada con `node --test`) |
@@ -42,7 +42,7 @@
 | `desktop/src/sync-ciclo.mjs` | gancho `antesDeCadaCiclo` |
 | `desktop/src/sync-ciclo.test.mjs` | el latido corre siempre y su fallo no cuenta |
 | `desktop/src/ui-server.mjs` | ruta `GET /__directivas` |
-| `desktop/package.json` | versión 0.4.58 |
+| `desktop/package.json` | versión 0.4.60 |
 | `apps/pos/app/lib/directivas.ts` | lectura + `evaluarAcceso` (pura) |
 | `apps/pos/app/lib/__tests__/directivas.test.ts` | su prueba |
 | `apps/pos/app/components/banda-acceso.tsx` | banda de gracia |
@@ -71,12 +71,12 @@ git checkout -b platform-latido
 pnpm install --frozen-lockfile
 ```
 
-- [ ] **Step 2: Confirmar que 0104 está libre en producción**
+- [ ] **Step 2: Confirmar que 0105 está libre en producción**
 
 ```bash
 supabase migration list --linked
 ```
-Expected: la última versión es `0103`. Si aparece `0104`, renumerar todo este plan a `0105` antes de seguir.
+Expected: la última versión es `0103`. Si aparece `0105`, renumerar todo este plan a `0105` antes de seguir.
 
 - [ ] **Step 3: Subir a Knock-Out al plan Cadena (decisión de Fermín, 5 sep 2026)**
 
@@ -98,10 +98,10 @@ Expected: todo en verde antes de tocar nada.
 
 ---
 
-### Task 1: Migración 0104 — columnas, directivas, latido y límite de sucursales
+### Task 1: Migración 0105 — columnas, directivas, latido y límite de sucursales
 
 **Files:**
-- Create: `supabase/migrations/0104_caja_latido_y_bloqueo.sql`
+- Create: `supabase/migrations/0105_caja_latido_y_bloqueo.sql`
 - Create: `supabase/tests/0011_latido_y_directivas.test.sql`
 
 **Interfaces:**
@@ -114,7 +114,7 @@ Expected: todo en verde antes de tocar nada.
 
 ```sql
 -- ============================================================================
--- Latido de la caja y directivas (spec 2026-09-04 §6, ADR 0014, migración 0104).
+-- Latido de la caja y directivas (spec 2026-09-04 §6, ADR 0014, migración 0105).
 --
 -- Lo que se protege: que las directivas digan bloqueado SOLO a partir de la fecha, que el
 -- latido selle versión y hora, que un tenant no lea las directivas de otro, y que el límite de
@@ -166,11 +166,11 @@ select is((resolver_directivas('cccccccc-0000-0000-0000-0000000000e0', null)->'m
 select is((resolver_directivas('cccccccc-0000-0000-0000-0000000000e0', null)->'limites'->>'max_cajas_por_sucursal'), '1', 'las directivas traen los límites');
 
 -- #10 el latido sella hora y versión, y devuelve las directivas
-select ok((caja_latido('cccccccc-0000-0000-0000-0000000000e2', '0.4.58', 'Windows 11', '10.0.0.5'::inet)) ? 'acceso', 'el latido devuelve directivas');
+select ok((caja_latido('cccccccc-0000-0000-0000-0000000000e2', '0.4.60', 'Windows 11', '10.0.0.5'::inet)) ? 'acceso', 'el latido devuelve directivas');
 -- #11
 select results_eq(
   $$ select version_app::text, (ultimo_latido is not null) from cajas where id = 'cccccccc-0000-0000-0000-0000000000e2' $$,
-  $$ values ('0.4.58', true) $$,
+  $$ values ('0.4.60', true) $$,
   'el latido sella versión y hora');
 
 -- #12 el límite de sucursales se aplica (Esencial da 1 y ya tiene una)
@@ -200,11 +200,11 @@ Expected: falla en #1 (`ultimo_latido` no existe).
 
 - [ ] **Step 3: Escribir la migración**
 
-`supabase/migrations/0104_caja_latido_y_bloqueo.sql`:
+`supabase/migrations/0105_caja_latido_y_bloqueo.sql`:
 
 ```sql
 -- ============================================================================
--- 0104 — Latido de la caja y directivas (ADR 0014, entrega 2).
+-- 0105 — Latido de la caja y directivas (ADR 0014, entrega 2).
 --
 -- La 0103 dejó al panel decidiendo cosas que nadie obedecía: suspender escribía una fecha y la
 -- caja seguía vendiendo. Aquí nace el canal: la caja llama cada 10 minutos, sella que está viva
@@ -221,7 +221,7 @@ ALTER TABLE cajas
   ADD COLUMN so            text NULL;
 COMMENT ON COLUMN cajas.ultimo_latido IS
   'Última vez que la caja llamó a caja_latido(). Prueba que está encendida aunque no venda (a diferencia de ultima_conexion).';
-COMMENT ON COLUMN cajas.version_app IS 'Versión del escritorio que reportó la caja. NULL = anterior a 0.4.58.';
+COMMENT ON COLUMN cajas.version_app IS 'Versión del escritorio que reportó la caja. NULL = anterior a 0.4.60.';
 COMMENT ON COLUMN cajas.so IS 'Sistema operativo reportado, para soporte.';
 
 -- ── Directivas: todo lo que la caja debe obedecer, resuelto aquí ────────────
@@ -343,8 +343,8 @@ CREATE TRIGGER trg_sucursales_limite
 - [ ] **Step 4: Aplicar en local y correr la prueba**
 
 ```bash
-docker exec -i supabase_db_vim-pos psql -U postgres -d postgres -v ON_ERROR_STOP=1 -1 < supabase/migrations/0104_caja_latido_y_bloqueo.sql
-docker exec supabase_db_vim-pos psql -U postgres -d postgres -Atc "insert into supabase_migrations.schema_migrations (version, name) values ('0104','caja_latido_y_bloqueo') on conflict do nothing"
+docker exec -i supabase_db_vim-pos psql -U postgres -d postgres -v ON_ERROR_STOP=1 -1 < supabase/migrations/0105_caja_latido_y_bloqueo.sql
+docker exec supabase_db_vim-pos psql -U postgres -d postgres -Atc "insert into supabase_migrations.schema_migrations (version, name) values ('0105','caja_latido_y_bloqueo') on conflict do nothing"
 supabase test db
 ```
 Expected: `0011_latido_y_directivas.test.sql` 13/13 y el resto en verde. **Si `0002_rls_cobertura` o alguna prueba de delivery falla por el trigger de sucursales, es el mismo caso que la 0103 con las cajas:** darle a esa prueba su excepción explícita en `tenant_limites`, no debilitar el trigger.
@@ -353,8 +353,8 @@ Expected: `0011_latido_y_directivas.test.sql` 13/13 y el resto en verde. **Si `0
 
 ```bash
 pnpm db:types
-git add supabase/migrations/0104_caja_latido_y_bloqueo.sql supabase/tests/0011_latido_y_directivas.test.sql packages/db/src/database.types.ts
-git commit -m "db: latido de la caja, directivas y límite de sucursales (0104, ADR 0014)
+git add supabase/migrations/0105_caja_latido_y_bloqueo.sql supabase/tests/0011_latido_y_directivas.test.sql packages/db/src/database.types.ts
+git commit -m "db: latido de la caja, directivas y límite de sucursales (0105, ADR 0014)
 
 Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
 ```
@@ -395,8 +395,8 @@ test("rechaza un correo que no es de dispositivo", () => {
 });
 
 test("acepta un cuerpo válido", () => {
-  const r = validarCuerpo({ version: "0.4.58", so: "Windows 11", avisos_vistos: [] });
-  assert.equal(r.version, "0.4.58");
+  const r = validarCuerpo({ version: "0.4.60", so: "Windows 11", avisos_vistos: [] });
+  assert.equal(r.version, "0.4.60");
   assert.equal(r.so, "Windows 11");
 });
 
@@ -743,7 +743,7 @@ Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
 - Modify: `desktop/src/sync-ciclo.test.mjs`
 - Modify: `desktop/src/main.mjs`
 - Modify: `desktop/src/ui-server.mjs`
-- Modify: `desktop/package.json` (versión 0.4.58)
+- Modify: `desktop/package.json` (versión 0.4.60)
 
 **Interfaces:**
 - Consumes: `crearAlmacenDirectivas` (Task 3), `tokenDeNube()` de `main.mjs`, la Edge Function (Task 2).
@@ -886,7 +886,7 @@ En `desktop/src/ui-server.mjs`, junto a la ruta de `/__estado-sync`:
 
 - [ ] **Step 7: Subir la versión**
 
-En `desktop/package.json`, `"version": "0.4.58"`.
+En `desktop/package.json`, `"version": "0.4.60"`.
 
 - [ ] **Step 8: Verificar contra la nube local y confirmar**
 
@@ -895,12 +895,12 @@ Levantar el escritorio en modo desarrollo contra la Supabase local, vincular la 
 ```bash
 curl -s http://localhost:5173/__directivas | python -m json.tool | head -20
 ```
-Expected: `disponible: true`, `recibido` con fecha reciente y `acceso.bloqueado: false`. En la base, `select version_app, ultimo_latido from cajas` muestra `0.4.58` y una hora de hace segundos.
+Expected: `disponible: true`, `recibido` con fecha reciente y `acceso.bloqueado: false`. En la base, `select version_app, ultimo_latido from cajas` muestra `0.4.60` y una hora de hace segundos.
 
 ```bash
 node --test desktop/src/*.test.mjs
 git add desktop/
-git commit -m "escritorio: latido en cada ciclo, /__directivas y versión 0.4.58
+git commit -m "escritorio: latido en cada ciclo, /__directivas y versión 0.4.60
 
 Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
 ```
@@ -1354,8 +1354,8 @@ Expected: FAIL — `origen` es `"conexion"`, no `"latido"`.
 En `apps/platform/app/lib/senal-caja.ts`, añadir `"latido"` a `OrigenSenal`, aceptar `ultimoLatido` en `fuentes` y ponerlo **primero** en las dos cadenas de `??`, con este comentario:
 
 ```ts
- *   · `latido`   — la caja llamó a `caja_latido` (0104). La señal más honesta: prueba que está
- *                  encendida aunque no haya vendido ni tenido nada que subir. Desde 0.4.58.
+ *   · `latido`   — la caja llamó a `caja_latido` (0105). La señal más honesta: prueba que está
+ *                  encendida aunque no haya vendido ni tenido nada que subir. Desde 0.4.60.
 ```
 
 En `salud-tenant.tsx`, traducir el origen nuevo: `c.origenSenal === "latido" ? "" : …` (el latido es el caso normal, así que **no** lleva aclaración; las demás sí la conservan).
@@ -1368,7 +1368,7 @@ En la tabla de `salud-tenant.tsx`, una columna "Versión":
 
 ```tsx
                   <td className="p-2 text-ink-2">
-                    {c.versionApp ?? <span className="text-ink-3">anterior a 0.4.58</span>}
+                    {c.versionApp ?? <span className="text-ink-3">anterior a 0.4.60</span>}
                   </td>
 ```
 
@@ -1379,7 +1379,7 @@ Con cabecera `<th className="p-2 text-left font-semibold">Versión</th>`. Una ca
 ```bash
 pnpm --filter @vim/platform test && pnpm --filter @vim/platform typecheck
 ```
-En el navegador, la ficha del cliente de pruebas muestra la caja con versión `0.4.58` y "Conectada" apoyada en el latido.
+En el navegador, la ficha del cliente de pruebas muestra la caja con versión `0.4.60` y "Conectada" apoyada en el latido.
 
 ```bash
 git add apps/platform
@@ -1423,7 +1423,7 @@ Invocar `security-review` sobre la rama. Debe quedar limpio: el `caja_id` sale d
 
 - [ ] **Step 4: Documentación**
 
-En `docs/diseno/platform.md`, en la sección de la ficha, añadir que la columna Versión distingue las cajas anteriores a 0.4.58 en gris. En `docs/diseno/pos.md`, documentar los dos estados nuevos (banda de gracia y pantalla de bloqueo) y la regla de que la falta de datos nunca bloquea.
+En `docs/diseno/platform.md`, en la sección de la ficha, añadir que la columna Versión distingue las cajas anteriores a 0.4.60 en gris. En `docs/diseno/pos.md`, documentar los dos estados nuevos (banda de gracia y pantalla de bloqueo) y la regla de que la falta de datos nunca bloquea.
 
 ```bash
 git add docs/
@@ -1437,21 +1437,21 @@ Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
 Con el visto bueno de Fermín y **avisando antes a Knock-Out**, que es el piloto:
 
 ```bash
-supabase db push                                    # 0104, desde ESTE worktree
+supabase db push                                    # 0105, desde ESTE worktree
 supabase functions deploy caja-latido
 git push -u origin platform-latido
 gh pr create --base main --title "Panel: latido de la caja y bloqueo real (ADR 0014, entrega 2)" --body-file <cuerpo>
 ```
 
-Tras el merge, publicar el escritorio **0.4.58** (`npm run dist` tarda más de 10 minutos: lanzarlo en segundo plano y verificar la fecha del `.exe` antes de publicar), subir `latest.json` con el `curl` de `reference_publicar_latest_json` y crear el release.
+Tras el merge, publicar el escritorio **0.4.60** (`npm run dist` tarda más de 10 minutos: lanzarlo en segundo plano y verificar la fecha del `.exe` antes de publicar), subir `latest.json` con el `curl` de `reference_publicar_latest_json` y crear el release.
 
 - [ ] **Step 6: Vigilar el primer ciclo**
 
-A la mañana siguiente, en el panel: las cajas actualizadas deben mostrar versión `0.4.58` y "Conectada" por latido. Las que sigan en gris son las que no se han actualizado — es lo que la entrega 4 viene a resolver.
+A la mañana siguiente, en el panel: las cajas actualizadas deben mostrar versión `0.4.60` y "Conectada" por latido. Las que sigan en gris son las que no se han actualizado — es lo que la entrega 4 viene a resolver.
 
 - [ ] **Step 7: Memoria**
 
-Actualizar `../MEMORY.md` y la memoria del proyecto (`project_platform_centro_control.md`) con la entrega 2 en producción, la versión 0.4.58 y qué queda de las entregas 3 y 4.
+Actualizar `../MEMORY.md` y la memoria del proyecto (`project_platform_centro_control.md`) con la entrega 2 en producción, la versión 0.4.60 y qué queda de las entregas 3 y 4.
 
 ---
 

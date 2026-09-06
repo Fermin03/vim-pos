@@ -30,7 +30,7 @@ Al revés que en el POS, aquí **la lentitud es una función**. Lo que toca a un
 - Nada destructivo comparte fila con algo cotidiano.
 
 Desde la entrega 2 (05/09/2026) la ficha muestra además la **versión del escritorio de cada
-caja**. Una caja sin versión es anterior a 0.4.58 y no late: se muestra **en gris**, nunca en
+caja**. Una caja sin versión es anterior a 0.4.60 y no late: se muestra **en gris**, nunca en
 rojo — no está caída, solo sin actualizar.
 
 Esto lo implementa `app/components/dialogo-confirmar.tsx`: motivo de al menos 10 caracteres,
