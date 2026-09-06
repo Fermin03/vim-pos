@@ -400,8 +400,11 @@ Y ampliar el comentario de cabecera del archivo: el cuerpo ya documenta `avisos_
 ```bash
 supabase functions serve caja-latido --no-verify-jwt --env-file supabase/functions/.env &
 ANON=$(grep -m1 '^NEXT_PUBLIC_SUPABASE_ANON_KEY=' apps/platform/.env.local | cut -d= -f2- | tr -d '"\r')
+# La clave del dispositivo de DEV vive en `supabase/seed.sql`; no se copia aquí para que
+# este documento no cargue credenciales.
+PASS=$(grep -m1 -oP "crypt[(]'[\\K][^']+" supabase/seed.sql)
 T=$(curl -s -X POST "http://127.0.0.1:54321/auth/v1/token?grant_type=password" -H "apikey: $ANON" -H "Content-Type: application/json" \
-  -d '{"email":"caja-99999999-0000-0000-0000-0000000000cc@dispositivos.vimpos.mx","password":"vim-device-dev"}' \
+  -d "{\"email\":\"caja-99999999-0000-0000-0000-0000000000cc@dispositivos.vimpos.mx\",\"password\":\"$PASS\"}" \
   | python -c "import sys,json;print(json.load(sys.stdin)['access_token'])")
 # Crear un aviso global y ver que llega
 docker exec supabase_db_vim-pos psql -U postgres -d postgres -Atc "insert into avisos_plataforma (id,tenant_id,nivel,titulo,cuerpo) values ('33333333-0000-0000-0000-0000000000f0',null,'info','Prueba','Cuerpo de prueba') on conflict (id) do nothing"
