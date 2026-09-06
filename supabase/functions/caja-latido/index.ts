@@ -3,7 +3,7 @@
 // recibe las DIRECTIVAS que debe obedecer (acceso con gracia, módulos efectivos, límites).
 //
 // Llamada: POST /functions/v1/caja-latido  (Authorization: Bearer <JWT del dispositivo>)
-//   body: { version?, so?, avisos_vistos?: uuid[] }
+//   body: { version?, so?, avisos_vistos?: uuid[] }   ← avisos_vistos: acuses de lectura (0106)
 // Respuesta: { directivas }
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import { corsHeaders } from "../_shared/cors.ts";
@@ -59,6 +59,10 @@ Deno.serve(async (req) => {
     p_version: cuerpo.version,
     p_so: cuerpo.so,
     p_ip: ipDe(req),
+    // Acuses de los avisos que el cajero cerró (ADR 0014, entrega 3). Van en el latido y no en
+    // una llamada propia para que un aviso leído sin internet no se pierda: la caja los guarda
+    // y los reporta cuando puede.
+    p_avisos_vistos: cuerpo.avisos_vistos.length > 0 ? cuerpo.avisos_vistos : null,
   });
   if (error) return json({ error: "RPC_ERROR", detalle: error.message }, 500);
   // La caja fue borrada o desactivada mientras seguía encendida: que lo sepa con un código
