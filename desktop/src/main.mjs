@@ -635,8 +635,9 @@ const ciclo = crearCicloSync({
 // ── Espejo de pedidos de apps (spec 2026-09-03) ────────────────────────────
 // Token de dispositivo con caché corta para el gateway (puente de delivery-accion) y el agente.
 let nubeCache = null;
-async function tokenDeNubeCacheado() {
-  if (nubeCache && Date.now() - nubeCache.at < 20 * 60_000) return nubeCache.opts;
+async function tokenDeNubeCacheado({ forzar = false } = {}) {
+  // `forzar`: quien recibió un 401 con el token cacheado pide uno nuevo (agente de espejo).
+  if (!forzar && nubeCache && Date.now() - nubeCache.at < 20 * 60_000) return nubeCache.opts;
   const opts = await tokenDeNube();
   if (opts) nubeCache = { opts, at: Date.now() };
   return opts;

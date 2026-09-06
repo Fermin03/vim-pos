@@ -159,6 +159,18 @@ muestra la respuesta de `enviar-push` (200 con `enviadas`).
 5. Con `auto_aceptar = false` en la conexión: el pedido aparece **Por aceptar** con contador; Aceptar
    y Rechazar (con motivo) deben reflejarse en Uber.
 
+### Resultado del 6 sep 2026 (nube, sucursal Pruebas de VIM Pruebas)
+
+Hecho de punta a punta con la tienda de prueba 1: OAuth con `uber-test@` (en ventana de incógnito:
+la sesión de Uber se comparte entre dashboards y el primer intento autorizó con otra cuenta y devolvió
+0 tiendas) → Activar → Comprobar (integración activa, tienda en línea) → Enviar carta (38 productos,
+7 categorías) → pedido desde ubereats.com → webhook con firma válida → ítems reconocidos por uuid →
+con turno abierto en el POS web, **aceptado en automático**, ticket VP1-2026-000005 → Marcar listo →
+`ready` enviado a Uber. Lo que se rompió y se arregló ese día: el contador de folios de la nube no
+existía para sucursales cuyos folios emitió el escritorio (mig. 0107); el primer pedido expiró sin
+turno abierto. Pendiente: la caja de escritorio (espejo) recibía `401 AUTH_INVALIDA` y se quedaba con
+el token muerto 20 min; el agente ya fuerza login nuevo tras un 401 y el log dice vigencia y sesión.
+
 ## 5. Cuando algo falla
 
 - `delivery_eventos.error` dice qué pasó al procesar (`UBER_TOKEN_401` = credenciales o entorno

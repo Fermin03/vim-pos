@@ -91,3 +91,34 @@ test("tick: la app canceló un pedido con ticket local → aviso; sin nube → o
   const sin = await crearEspejo({ pool: poolFalso(), nube: async () => null, cajaId: CAJA, fetchFn: nube.fetchFn }).tick();
   assert.deepEqual(sin, { omitido: "sin nube" });
 });
+
+test("tras un 401 pide token nuevo con forzar y reintenta; el log dice vigencia y sesión, no el token", async () => {
+  const { resumenToken } = await import("./delivery-espejo.mjs");
+  const carga = Buffer.from(JSON.stringify({ exp: 1_000_000_000 + 3600, iat: 1_000_000_000, session_id: "abcdef12-0000", sub: "secreto" })).toString("base64url");
+  const jwt = `h.${carga}.f`;
+  const r = resumenToken(jwt, 1_000_000_000 * 1000 + 60_000);
+  assert.match(r, /emitido hace 60s, vence en 3540s, sesión abcdef12/);
+  assert.doesNotMatch(r, /secreto/);
+
+  const pool = poolFalso();
+  const pedidos = [];
+  let llamadasNube = 0;
+  const forzados = [];
+  const nube = async ({ forzar } = {}) => { llamadasNube++; forzados.push(forzar === true); return { ...NUBE, deviceToken: jwt }; };
+  let respuestas = 0;
+  const fetchFn = async () => {
+    respuestas++;
+    return respuestas === 1
+      ? new Response(JSON.stringify({ error: "AUTH_INVALIDA", detalle: "session not found" }), { status: 401 })
+      : new Response(JSON.stringify({ ahora: "x", caja_id: CAJA, sucursal_id: "s", conexiones: [], pedidos }), { status: 200 });
+  };
+  const logs = [];
+  const agente = crearEspejo({ pool, nube, cajaId: CAJA, fetchFn, log: (m) => logs.push(m) });
+  const r1 = await agente.tick();
+  assert.equal(r1.error, 401);
+  assert.ok(logs.some((m) => /token rechazado \(session not found\)/.test(m) && /sesión abcdef12/.test(m) && !m.includes(jwt)));
+  const r2 = await agente.tick();
+  assert.equal(r2.error, undefined);
+  assert.equal(llamadasNube, 2, "el segundo tick volvió a pedir token");
+  assert.deepEqual(forzados, [false, true], "el segundo login fue forzado");
+});
