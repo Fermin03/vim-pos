@@ -106,6 +106,7 @@ export async function accionConexion(accion: "activar", campos: { tienda_id: str
 export async function accionConexion(accion: "pausar" | "reanudar" | "desconectar", campos: { conexion_id: string }): Promise<{ estado: EstadoConexion }>;
 export async function accionConexion(accion: "verificar", campos: { conexion_id: string }): Promise<Verificacion>;
 export async function accionConexion(accion: "prep", campos: { conexion_id: string; minutos: number }): Promise<{ tiempo_prep_min: number }>;
+export async function accionConexion(accion: "menu", campos: { conexion_id: string }): Promise<{ items: number; categorias: number; excluidos: { id: string; nombre: string; motivo: string }[] }>;
 export async function accionConexion(accion: string, campos: Record<string, unknown> = {}): Promise<unknown> {
   const { data } = await supabase.auth.getSession();
   const token = data.session?.access_token;
@@ -136,6 +137,7 @@ const MENSAJES: Record<string, string> = {
   AUTH_INVALIDA: "Tu sesión expiró. Vuelve a iniciar sesión.",
   SIN_PERMISO: "Solo un administrador o el dueño puede conectar apps de delivery.",
   SIN_AUTORIZACION: "La autorización de Uber venció o no existe. Vuelve a conectar con Uber Eats.",
+  CARTA_VACIA: "No hay productos activos con precio que mandar a Uber. Revisa el catálogo.",
   SUCURSAL_NO_EXISTE: "Esa sucursal ya no existe.",
   SUCURSAL_YA_CONECTADA: "Esa sucursal ya tiene una tienda de Uber Eats conectada. Desconéctala primero.",
   TIENDA_YA_CONECTADA: "Esa tienda de Uber ya está conectada a otra sucursal.",

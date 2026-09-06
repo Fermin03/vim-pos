@@ -78,9 +78,11 @@ INSERT INTO delivery_conexiones (tenant_id, sucursal_id, app, estado, tienda_id_
 VALUES ('<tenant>', '<sucursal>', 'APP_UBEREATS', 'ACTIVA', '<STORE_ID>', 'Tienda de prueba Uber', true, 12, now());
 ```
 
-Subir un menú mínimo a la tienda de prueba con **ids = uuids de productos de VIM**
-(`PUT https://test-api.uber.com/v2/eats/stores/<STORE_ID>/menus`, ejemplo en
-`docs/integraciones/delivery/uber-eats/referencia-api/v2-example-menu-payloads.md`).
+La carta se manda desde el admin: en la fila de la sucursal, **Enviar carta** (acción `menu` de
+`delivery-uber-conexion`, `_shared/delivery/menu-uber.ts`). Reemplaza la carta entera de la tienda
+con los productos activos con precio (**id del ítem en Uber = uuid del producto en VIM**), agrupados
+por categoría, sin modificadores, disponible todo el día. Los agotados, ocultos y sin precio quedan
+fuera y el aviso dice cuáles. Hay que repetirlo cuando cambie el catálogo (no es automático todavía).
 
 ## 3b. Tienda y expirados (spec A6)
 
@@ -139,7 +141,15 @@ muestra la respuesta de `enviar-push` (200 con `enviadas`).
 
 ## 4. Prueba de punta a punta
 
-1. Abrir turno en el POS (nube) de la sucursal vinculada.
+0. Tiendas de prueba recibidas el 3 sep 2026 (caso 59818999): «VIM POS Test Store 1» (dueño
+   `uber-test@vimpos.com.mx`, id `e597a6b1-9ea2-45d0-a0cd-5843ac6908b8`) y «VIM POS Test Store 2»
+   (`uber-test2@vimpos.com.mx`, id `55435171-1ab7-4a42-8b38-b55d5672ef25`), Delivery by Uber. Uber
+   NO las integró: hay que conectarlas con el flujo de §3 (OAuth con la cuenta del dueño de prueba).
+   Las contraseñas están en el correo de Uber; van al gestor de contraseñas, no aquí. Uber avisó que
+   el client ID no tenía webhook URL: comprobar en el dashboard de desarrollador que el Primary
+   Webhook sea `https://pbiaxzvmssjsxdwqrumb.supabase.co/functions/v1/delivery-webhook-uber`.
+1. Abrir turno en el POS (nube o caja de escritorio) de la sucursal vinculada; mandar la carta
+   (**Enviar carta** en el admin).
 2. En ubereats.com con la cuenta de prueba, dirección de la tienda de prueba, pedir un producto.
 3. Verificar en orden: `delivery_eventos` (fila `orders.notification`, `firma_valida = true`,
    `respuesta->>'accion' = 'ACEPTADO_AUTO'`), `delivery_pedidos` (estado `ACEPTADO`, `ticket_id`),

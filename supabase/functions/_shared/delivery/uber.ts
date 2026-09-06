@@ -178,6 +178,8 @@ export type ClienteUber = {
   actualizarEstadoTienda(tiendaId: string, cuerpo: unknown): Promise<unknown>;
   /** POST …/update-store-prep-time (default_prep_time en segundos). */
   actualizarPrepTienda(tiendaId: string, cuerpo: unknown): Promise<unknown>;
+  /** PUT /v2/eats/stores/{id}/menus: reemplaza la carta completa de la tienda (token de la app, scope eats.store). */
+  reemplazarMenu(tiendaId: string, menu: unknown): Promise<void>;
 };
 
 export function crearClienteUber(cfg: {
@@ -211,7 +213,7 @@ export function crearClienteUber(cfg: {
     return token;
   };
 
-  type Metodo = "GET" | "POST" | "PATCH" | "DELETE";
+  type Metodo = "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
   const llamar = async (metodo: Metodo, ruta: string, cuerpo?: unknown, tokenExplicito?: string): Promise<Response> => {
     const token = tokenExplicito ?? await obtenerToken();
     const r = await f(`${dom.api}${ruta}`, {
@@ -274,5 +276,6 @@ export function crearClienteUber(cfg: {
     },
     rechazar: async (id, cuerpo) => { await llamar("POST", `/v1/delivery/order/${encodeURIComponent(id)}/deny`, cuerpo); },
     marcarLista: async (id) => { await llamar("POST", `/v1/delivery/order/${encodeURIComponent(id)}/ready`, {}); },
+    reemplazarMenu: async (tiendaId, menu) => { await llamar("PUT", `/v2/eats/stores/${encodeURIComponent(tiendaId)}/menus`, menu); },
   };
 }
