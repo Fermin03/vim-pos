@@ -4,7 +4,7 @@
 
 **Goal:** Ver desde el panel qué versión corre cada caja de cada cliente, publicar una versión nueva sin tocar la terminal, y poder exigir una versión mínima.
 
-**Architecture:** Una migración (0107) crea `versiones_caja` y hace que `resolver_directivas` llene el hueco `version: {}` que la 0105 dejó, con la recomendada y la mínima. El panel gana `/versiones`: arriba el parque de cajas con su versión, abajo el historial; publicar es pegar el `latest.json` que genera `release-manifest`, y el servidor del panel lo valida, lo guarda y lo sube al bucket (con la caché corta que ya sabemos que hace falta). En el escritorio, `directivas.mjs` compara la versión local con la recomendada y con la mínima; por debajo de la mínima, y solo si VIM lo encendió, el POS usa la misma pantalla de bloqueo con un botón para instalar.
+**Architecture:** Una migración (0108) crea `versiones_caja` y hace que `resolver_directivas` llene el hueco `version: {}` que la 0105 dejó, con la recomendada y la mínima. El panel gana `/versiones`: arriba el parque de cajas con su versión, abajo el historial; publicar es pegar el `latest.json` que genera `release-manifest`, y el servidor del panel lo valida, lo guarda y lo sube al bucket (con la caché corta que ya sabemos que hace falta). En el escritorio, `directivas.mjs` compara la versión local con la recomendada y con la mínima; por debajo de la mínima, y solo si VIM lo encendió, el POS usa la misma pantalla de bloqueo con un botón para instalar.
 
 **Tech Stack:** Postgres/plpgsql (SECURITY DEFINER con `search_path` fijo), Next 15 + React 19 en el panel, Node ESM sin dependencias en el escritorio (`node --test`), vitest para lógica pura, pgTAP para SQL, Supabase Storage por API REST.
 
@@ -13,7 +13,7 @@
 ## Global Constraints
 
 - **Carpeta y rama:** worktree `vim-pos-platform/`, rama nueva `platform-versiones` creada **desde `origin/main`** (`main` está checkouteado en `vim-pos/`, aquí no se puede `git checkout main`).
-- **Numeración de migraciones — ya chocó dos veces.** La spec dice 0107; comprobar con `supabase migration list --linked` **antes de fijarlo y otra vez antes de publicar**. Un número ya presente en el historial remoto hace que `db push` **salte la migración en silencio**. Igual con la versión del escritorio: mirar `desktop/package.json` en `main`, no asumir.
+- **Numeración de migraciones — ya chocó TRES veces.** La spec dice 0107, pero ya lo tomó `0107_generar_folio_no_repite` de otra sesión: esta va como **0108**. Comprobar igualmente con `supabase migration list --linked` **antes de fijarlo y otra vez antes de publicar**. Un número ya presente en el historial remoto hace que `db push` **salte la migración en silencio**. Igual con la versión del escritorio: mirar `desktop/package.json` en `main`, no asumir.
 - **Nada de esto puede dejar una caja sin vender por accidente.** El bloqueo por versión es la única parte de todo el ADR que la caja decide **localmente**, comparando su versión con la mínima; a diferencia de la suspensión, una directiva vieja **sí** puede bloquear estando sin internet. Por eso: viene apagado, se enciende con confirmación escrita, y la pantalla de bloqueo **siempre** ofrece el botón de instalar y el teléfono de soporte.
 - **El actualizador de la caja no cambia.** Sigue leyendo el mismo `latest.json` de siempre; lo que cambia es quién lo escribe. Una caja vieja que no entienda `directivas.version` sigue actualizándose como hoy.
 - **La caché del CDN miente.** Tras subir `latest.json`, la URL pública sirve la copia anterior hasta un minuto. Subir con `-H "cache-control: max-age=60"` y **verificar la propagación** antes de dar la publicación por buena.
@@ -29,7 +29,7 @@
 
 | Archivo | Responsabilidad |
 |---|---|
-| `supabase/migrations/0107_versiones_caja.sql` | tabla `versiones_caja`, índice único de la mínima, `resolver_directivas` con `version` |
+| `supabase/migrations/0108_versiones_caja.sql` | tabla `versiones_caja`, índice único de la mínima, `resolver_directivas` con `version` |
 | `supabase/tests/0013_versiones.test.sql` | pgTAP: recomendada, mínima, bloqueo por fecha, una sola mínima |
 | `apps/platform/app/api/versiones/route.ts` | GET (parque de cajas + historial), POST (publicar), PATCH (mínima / retirar) |
 | `apps/platform/app/lib/manifiesto.ts` | `validarManifiesto()` pura + su prueba |
@@ -62,26 +62,26 @@ pnpm install --frozen-lockfile
 supabase migration list --linked | tail -3
 git show origin/main:desktop/package.json | grep -m1 '"version"'
 ```
-Expected: la última remota es `0106` (si no, subir el número en todo este plan y en la spec §9) y el escritorio está en `0.4.61` (la versión de esta entrega será la siguiente libre).
+Expected: la última remota es `0107` (si no, subir el número en todo este plan y en la spec §9) y el escritorio está en `0.4.61` (la versión de esta entrega será la siguiente libre).
 
 - [ ] **Step 3: Línea base verde**
 
 ```bash
 pnpm turbo run typecheck && pnpm turbo run test && pnpm test:functions && node --test desktop/src/*.test.mjs && supabase test db
 ```
-Expected: todo en verde. Si la base local no tiene la 0106, aplicarla desde su archivo y registrarla antes de seguir.
+Expected: todo en verde. Si la base local no tiene la 0107, aplicarla desde su archivo y registrarla antes de seguir.
 
 ---
 
-### Task 1: Migración 0107 — catálogo de versiones y directivas
+### Task 1: Migración 0108 — catálogo de versiones y directivas
 
 **Files:**
-- Create: `supabase/migrations/0107_versiones_caja.sql`
+- Create: `supabase/migrations/0108_versiones_caja.sql`
 - Create: `supabase/tests/0013_versiones.test.sql`
 
 **Interfaces:**
 - Produces: tabla `versiones_caja`; `resolver_directivas` devuelve `version` con `{ recomendada, minima, url, sha512, notas, bloquea_bajo_minima, bloquea_desde }`.
-- Consumes: `resolver_directivas` de la 0106 (se redefine con `CREATE OR REPLACE`; **no cambia de firma**, así que no hay que redesplegar `caja-latido`).
+- Consumes: `resolver_directivas` de la 0106/0107 (se redefine con `CREATE OR REPLACE`; **no cambia de firma**, así que no hay que redesplegar `caja-latido`).
 
 - [ ] **Step 1: Escribir la prueba pgTAP (falla porque no hay tabla)**
 
@@ -89,7 +89,7 @@ Expected: todo en verde. Si la base local no tiene la 0106, aplicarla desde su a
 
 ```sql
 -- ============================================================================
--- Versiones de la caja (spec 2026-09-04 §9, ADR 0014, migración 0107).
+-- Versiones de la caja (spec 2026-09-04 §9, ADR 0014, migración 0108).
 --
 -- Lo que se protege: que la recomendada sea la más alta PUBLICADA, que solo pueda haber una
 -- mínima, y que el bloqueo por versión solo se anuncie cuando VIM lo encendió y llegó su fecha.
@@ -170,11 +170,11 @@ Expected: falla en #1, `versiones_caja` no existe.
 
 - [ ] **Step 3: Escribir la migración**
 
-`supabase/migrations/0107_versiones_caja.sql`:
+`supabase/migrations/0108_versiones_caja.sql`:
 
 ```sql
 -- ============================================================================
--- 0107 — Catálogo de versiones del escritorio (ADR 0014, entrega 4).
+-- 0108 — Catálogo de versiones del escritorio (ADR 0014, entrega 4).
 --
 -- Publicar una actualización era: compilar, generar latest.json, subirlo con curl y crear el
 -- release a mano. Tres de esos pasos pasan al panel, y de paso queda registro de qué se publicó
@@ -298,8 +298,8 @@ GRANT EXECUTE ON FUNCTION resolver_directivas(uuid, uuid) TO service_role;
 - [ ] **Step 4: Aplicar y correr las pruebas**
 
 ```bash
-docker exec -i supabase_db_vim-pos psql -U postgres -d postgres -v ON_ERROR_STOP=1 -1 < supabase/migrations/0107_versiones_caja.sql
-docker exec supabase_db_vim-pos psql -U postgres -d postgres -Atc "insert into supabase_migrations.schema_migrations (version, name) values ('0107','versiones_caja') on conflict do nothing"
+docker exec -i supabase_db_vim-pos psql -U postgres -d postgres -v ON_ERROR_STOP=1 -1 < supabase/migrations/0108_versiones_caja.sql
+docker exec supabase_db_vim-pos psql -U postgres -d postgres -Atc "insert into supabase_migrations.schema_migrations (version, name) values ('0108','versiones_caja') on conflict do nothing"
 supabase test db
 ```
 Expected: `0013_versiones.test.sql` 11/11 y el resto en verde. `versiones_caja` no tiene `tenant_id`, así que `0002_rls_cobertura` no debería reclamarla; si lo hace, añadirla a `_rls_exentas` con su justificación.
@@ -309,7 +309,7 @@ Expected: `0013_versiones.test.sql` 11/11 y el resto en verde. `versiones_caja` 
 ```bash
 pnpm db:types
 git add supabase/ packages/db/src/database.types.ts
-git commit -m "db: catálogo de versiones del escritorio y directivas de versión (0107, ADR 0014)
+git commit -m "db: catálogo de versiones del escritorio y directivas de versión (0108, ADR 0014)
 
 Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
 ```
@@ -697,7 +697,7 @@ Y actualizar `reference_publicar_latest_json` en la memoria: publicar ya no es `
 **Comprobar otra vez el número de migración y la versión del escritorio en `main`.** Después:
 
 ```bash
-supabase db push          # 0107; NO hace falta redesplegar caja-latido (la firma no cambia)
+supabase db push          # 0108; NO hace falta redesplegar caja-latido (la firma no cambia)
 git push -u origin platform-versiones
 gh pr create --base main --title "Panel: versiones de la caja (ADR 0014, entrega 4)" --body-file <cuerpo>
 ```
