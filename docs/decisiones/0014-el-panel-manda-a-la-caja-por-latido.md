@@ -65,6 +65,19 @@
   pagamos al PAC— se cierra **también en el servidor** (`timbrar-cfdi` y `timbrar-global`
   comprueban `mi_acceso()`). `sync-push` se deja abierto a propósito: un cliente bloqueado no
   puede perder sus ventas.
+- **El bloqueo por versión es la única directiva que decide la caja.** Todo lo demás lo resuelve
+  la nube y la caja solo obedece; la mínima se compara contra la versión instalada, que la nube
+  no conoce hasta el siguiente latido. Consecuencia práctica: a diferencia de la suspensión, una
+  directiva vieja **sí** puede bloquear a una caja sin internet. Por eso viene apagado, se
+  enciende con fecha futura y confirmación escrita, y la pantalla **siempre** ofrece el botón de
+  instalar. La nube manda ya resuelto el `bloquea_bajo_minima` (encendido *y* fecha cumplida):
+  la caja no recalcula la fecha, porque su reloj puede estar mal.
+- **Publicar una versión pasa a depender de la clave del panel.** El manifiesto que decide qué
+  binario instalan todas las cajas se sube desde `/versiones`, así que quien tenga esa clave
+  puede publicar. El panel valida el manifiesto (la url tiene que empezar por el prefijo exacto
+  de nuestros releases —con el repo dentro, porque en `github.com` publica cualquiera—, contener
+  la versión y traer sha512), pero el hash sigue viajando en el mismo archivo que la url —ver
+  SEC CN-008—: la firma del manifiesto y Cloudflare Access delante del panel suben de prioridad.
 - **Las directivas no llevan nada interno de VIM.** `resolver_directivas` devuelve los límites
   efectivos sin el desglose ni el `motivo` de las excepciones: ese texto lo escribe VIM en una
   tabla sin políticas de RLS y acabaría en el disco del cliente y en `/__directivas`, que el

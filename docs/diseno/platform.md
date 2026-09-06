@@ -41,6 +41,22 @@ Desde la entrega 2 (05/09/2026) la ficha muestra además la **versión del escri
 caja**. Una caja sin versión es anterior a 0.4.60 y no late: se muestra **en gris**, nunca en
 rojo — no está caída, solo sin actualizar.
 
+**Versiones (entrega 4).** `/versiones` abre con el **parque**, no con el historial: la pregunta
+que se hace al entrar es "¿quién está atrás?", no "¿qué publiqué?". Tres cifras arriba —al día,
+por debajo de la mínima, sin reportar versión— y la tabla de todas las cajas de todos los
+clientes, con filtro de "solo desactualizadas". Publicar es **pegar el `latest.json`** que generó
+`release-manifest` y confirmar escribiendo `TODOS`; el panel lo valida, lo sube al bucket y lo
+guarda. Después avisa de que el CDN puede seguir sirviendo la versión anterior **hasta un
+minuto**: sin ese texto, comprobar el enlace enseguida parece un fallo de la publicación.
+
+Exigir una **versión mínima** es lo único del panel que puede dejar una caja sin vender aunque el
+negocio esté al corriente, así que se separa en dos pasos. Marcarla como mínima solo la pinta
+como desactualizada. **Exigirla** pide además la fecha, una casilla de "entiendo que una caja sin
+internet no podrá salir del bloqueo sola" y escribir `BLOQUEAR` — no el nombre de un cliente,
+porque afecta a todos. La fecha usa el mismo cálculo que la suspensión: 06:00 de México, cuando
+el corte del día anterior ya está cerrado en cualquier restaurante. Una versión que es la mínima
+**no se puede retirar**: dejaría a las cajas viejas sin una versión a la que subir.
+
 Esto lo implementa `app/components/dialogo-confirmar.tsx`: motivo de al menos 10 caracteres,
 nombre comercial escrito, días de gracia cuando aplica y una casilla "entiendo" en cancelar.
 `prompt()` y `confirm()` del navegador no se usan en este panel. Suspender siempre programa un

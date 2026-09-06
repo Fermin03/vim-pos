@@ -16,7 +16,7 @@ import { pushToCloud } from "./sync-push.mjs";
 import { respaldar } from "./backup.mjs";
 import { crearWatchdog } from "./watchdog.mjs";
 import { crearCicloSync } from "./sync-ciclo.mjs";
-import { crearAlmacenDirectivas } from "./directivas.mjs";
+import { crearAlmacenDirectivas, estadoDeVersion } from "./directivas.mjs";
 import { crearEspejo } from "./delivery-espejo.mjs";
 import { registrarErrorLocal, subirErrores } from "./sync-errores.mjs";
 import { buscarActualizacion, descargarInstalador } from "./updater.mjs";
@@ -251,7 +251,15 @@ async function bootCaja() {
       avisoVisto: (id) => directivas.marcarVisto(id),
       directivas: () => {
         const { directivas: d, recibidoIso } = directivas.leer();
-        return { disponible: true, recibido: recibidoIso, directivas: d };
+        const ver = estadoDeVersion(d, app.getVersion());
+        // El bloqueo por versión se resuelve AQUÍ, comparando con la versión instalada, y se
+        // presenta en el mismo campo que la suspensión para que el POS no necesite dos caminos.
+        // El `motivo` es lo único que los distingue: cambia el texto y añade el botón de instalar.
+        const acceso = ver.bloqueaPorVersion
+          ? { ...d.acceso, bloqueado: true, motivo: "version",
+              mensaje: "Actualiza VIM POS para poder seguir vendiendo." }
+          : d.acceso;
+        return { disponible: true, recibido: recibidoIso, directivas: { ...d, acceso } };
       },
     });
     posUrl = `http://localhost:${UI_PORT}`;
@@ -523,6 +531,13 @@ async function latir() {
   if (j?.directivas) directivas.guardar(j.directivas);
   // Se limpian DESPUÉS de que la nube confirmó: si el latido falla, se reintentan en el siguiente.
   if (vistos.length > 0) directivas.limpiarVistos(vistos);
+
+  // Si la nube recomienda una versión más nueva se revisa el feed YA, en vez de esperar al
+  // chequeo horario: publicar desde el panel y que la caja tarde una hora en enterarse haría
+  // que el panel pareciera roto. El flujo posterior es el de siempre (notificación + bandeja),
+  // y el manifiesto se sigue leyendo del feed, que es quien trae el sha512 que se verifica.
+  const ver = estadoDeVersion(directivas.leer().directivas, app.getVersion());
+  if (ver.hayNueva && !updateInfo) revisarActualizacion().catch(() => {});
 }
 
 /**

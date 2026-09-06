@@ -89,3 +89,30 @@ describe("avisosDe", () => {
     expect(r.map((x) => x.id)).toEqual(["a1", "a2"]);
   });
 });
+
+// ── Motivo del bloqueo (ADR 0014, entrega 4) ─────────────────────────────────
+// El escritorio manda `motivo: "version"` cuando la caja está por debajo de la mínima exigida.
+// Cambia el texto y añade el botón de instalar; todo lo demás es idéntico a una suspensión.
+describe("evaluarAcceso · motivo", () => {
+  it("una suspensión bloquea por suscripción", () => {
+    const r = evaluarAcceso(con({ estado: "SUSPENDIDO", bloqueado: true }), AHORA);
+    expect(r.motivo).toBe("suscripcion");
+  });
+
+  it("el escritorio puede decir que el bloqueo es por versión", () => {
+    const r = evaluarAcceso(con({ estado: "ACTIVO", bloqueado: true, motivo: "version" }), AHORA);
+    expect(r.nivel).toBe("bloqueado");
+    expect(r.motivo).toBe("version");
+  });
+
+  it("un motivo desconocido cae en suscripción, no rompe la pantalla", () => {
+    const d = con({ estado: "SUSPENDIDO", bloqueado: true });
+    (d.acceso as Record<string, unknown>).motivo = "loquesea";
+    expect(evaluarAcceso(d, AHORA).motivo).toBe("suscripcion");
+  });
+
+  it("sin bloqueo el motivo no importa y se sigue vendiendo", () => {
+    const r = evaluarAcceso(con({ estado: "ACTIVO", motivo: "version" }), AHORA);
+    expect(r.nivel).toBe("ok");
+  });
+});
