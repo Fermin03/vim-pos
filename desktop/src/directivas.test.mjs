@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { crearAlmacenDirectivas, normalizar, DIRECTIVAS_VACIAS } from "./directivas.mjs";
+import { crearAlmacenDirectivas, estadoDeVersion, normalizar, DIRECTIVAS_VACIAS } from "./directivas.mjs";
 
 /** fs falso en memoria: la prueba no toca disco. */
 function fsFalso(inicial = null) {
@@ -117,4 +117,64 @@ test("un id que no es uuid se descarta", () => {
 test("sin archivo no hay acuses pendientes y no revienta", () => {
   const a = crearAlmacenDirectivas({ archivo: "d.json", fs: fsFalso() });
   assert.deepEqual(a.vistosPendientes(), []);
+});
+
+// ── Versión (ADR 0014, entrega 4) ─────────────────────────────────────────────
+// Es la única directiva que la caja resuelve SOLA, comparando con la versión instalada. Por eso
+// se prueba a conciencia: aquí un fallo no muestra un aviso de más, deja a un negocio sin cobrar.
+
+const conVersion = (v) => ({ acceso: { bloqueado: false }, version: v });
+
+test("sin bloque de versión no hay nada que hacer", () => {
+  const r = estadoDeVersion(normalizar(conVersion({})), "0.4.61");
+  assert.equal(r.hayNueva, false);
+  assert.equal(r.bloqueaPorVersion, false);
+});
+
+test("una recomendada más nueva se anuncia con su url y su hash", () => {
+  const r = estadoDeVersion(normalizar(conVersion({ recomendada: "0.4.62", url: "u", sha512: "s" })), "0.4.61");
+  assert.equal(r.hayNueva, true);
+  assert.equal(r.recomendada, "0.4.62");
+  assert.equal(r.url, "u");
+  assert.equal(r.sha512, "s");
+});
+
+test("una recomendada igual o vieja no se anuncia", () => {
+  assert.equal(estadoDeVersion(normalizar(conVersion({ recomendada: "0.4.61" })), "0.4.61").hayNueva, false);
+  assert.equal(estadoDeVersion(normalizar(conVersion({ recomendada: "0.4.60" })), "0.4.61").hayNueva, false);
+});
+
+test("compara por número, no por texto: 0.4.9 es MENOR que 0.4.61", () => {
+  assert.equal(estadoDeVersion(normalizar(conVersion({ recomendada: "0.4.9" })), "0.4.61").hayNueva, false);
+  assert.equal(estadoDeVersion(normalizar(conVersion({ recomendada: "0.4.61" })), "0.4.9").hayNueva, true);
+});
+
+test("por debajo de la mínima bloquea SOLO si la nube lo encendió", () => {
+  const bajo = { minima: "0.4.62", bloquea_bajo_minima: true };
+  assert.equal(estadoDeVersion(normalizar(conVersion(bajo)), "0.4.61").bloqueaPorVersion, true);
+  const apagado = { minima: "0.4.62", bloquea_bajo_minima: false };
+  assert.equal(estadoDeVersion(normalizar(conVersion(apagado)), "0.4.61").bloqueaPorVersion, false);
+});
+
+test("estando al día o por encima de la mínima nunca bloquea", () => {
+  const v = { minima: "0.4.60", bloquea_bajo_minima: true };
+  assert.equal(estadoDeVersion(normalizar(conVersion(v)), "0.4.61").bloqueaPorVersion, false);
+  assert.equal(estadoDeVersion(normalizar(conVersion({ minima: "0.4.61", bloquea_bajo_minima: true })), "0.4.61").bloqueaPorVersion, false);
+});
+
+test("sin directivas no bloquea: la falta de datos nunca deja a una caja sin vender", () => {
+  assert.equal(estadoDeVersion(DIRECTIVAS_VACIAS, "0.4.61").bloqueaPorVersion, false);
+  assert.equal(estadoDeVersion(undefined, "0.4.61").bloqueaPorVersion, false);
+  assert.equal(estadoDeVersion(null, null).bloqueaPorVersion, false);
+});
+
+test("un `bloquea_bajo_minima` que no es booleano no bloquea", () => {
+  // Mismo criterio que `acceso.bloqueado`: solo `true` de verdad manda.
+  const raro = { minima: "0.4.62", bloquea_bajo_minima: "true" };
+  assert.equal(estadoDeVersion(normalizar(conVersion(raro)), "0.4.61").bloqueaPorVersion, false);
+});
+
+test("una mínima con basura por versión no bloquea", () => {
+  const raro = { minima: "no-es-una-version", bloquea_bajo_minima: true };
+  assert.equal(estadoDeVersion(normalizar(conVersion(raro)), "0.4.61").bloqueaPorVersion, false);
 });
