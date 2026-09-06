@@ -406,7 +406,7 @@ registran vía RPC `marcar_aviso_visto(p_aviso uuid)` ejecutable por `authentica
 
 ## 9. Entrega 4 — Versiones de la caja
 
-### 9.1 Migración `0107_versiones_caja.sql`
+### 9.1 Migración `0108_versiones_caja.sql`
 
 ```
 versiones_caja (
@@ -499,7 +499,7 @@ SQL con `set role authenticated` y claims falsos, como las existentes).
    Knock-Out antes de que su caja se actualice.
 3. Entrega 3: migración 0106 y redeploy de `caja-latido`. Si coincide en tiempo con la 2, va en
    la misma versión de escritorio.
-4. Entrega 4: migración 0107, variable `PLATFORM_RELEASES_HOST` en Vercel, y a partir de ahí las
+4. Entrega 4: migración 0108, variable `PLATFORM_RELEASES_HOST` en Vercel, y a partir de ahí las
    versiones se publican desde el panel.
 
 ## 13. Riesgos y decisiones tomadas
