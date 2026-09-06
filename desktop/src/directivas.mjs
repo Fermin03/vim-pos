@@ -95,6 +95,11 @@ export function crearAlmacenDirectivas({
     marcarVisto(id) {
       if (typeof id !== "string" || !UUID.test(id)) return;
       const actual = leerCrudo();
+      // Solo se acusa un aviso que esta caja recibió de verdad. Sin esto se podían "pre-acusar"
+      // avisos futuros —conociendo o adivinando su id— y suprimirlos antes de que nadie los
+      // viera, que es justo lo que el aviso viene a evitar.
+      const recibidos = Array.isArray(actual.directivas?.avisos) ? actual.directivas.avisos : [];
+      if (!recibidos.some((a) => a && typeof a === "object" && a.id === id)) return;
       const vistos = Array.isArray(actual.vistos) ? actual.vistos : [];
       if (vistos.includes(id)) return;
       // Tope por si una caja pasa semanas sin poder reportar: lo viejo ya no le importa a nadie.

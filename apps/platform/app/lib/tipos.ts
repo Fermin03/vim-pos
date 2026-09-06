@@ -136,6 +136,9 @@ export type AvisoPanel = {
   vigenteHasta: string | null;
   createdAt: string;
   borrado: boolean;
+  /** Acuses hechos DESDE UNA CAJA. Es el número que cuenta para "N de M cajas". */
   vistos: number;
+  /** Acuses desde el POS web, que no tiene caja. Van aparte para no inflar el anterior. */
+  vistosWeb: number;
   cajasAlcance: number;
 };

@@ -31,7 +31,7 @@ export async function GET(req: Request) {
     sb.from("avisos_plataforma")
       .select("id, tenant_id, nivel, titulo, cuerpo, requiere_confirmacion, vigente_desde, vigente_hasta, created_at, deleted_at")
       .order("created_at", { ascending: false }).limit(200),
-    sb.from("avisos_lecturas").select("aviso_id, tenant_id").limit(5000),
+    sb.from("avisos_lecturas").select("aviso_id, caja_id").limit(5000),
     // Solo cajas activas: el alcance es "a cuántas cajas que operan le puede llegar".
     sb.from("cajas").select("id, tenant_id").is("deleted_at", null).eq("activa", true).limit(2000),
     sb.from("tenants").select("id, nombre_comercial, estado").is("deleted_at", null).limit(1000),
@@ -50,9 +50,14 @@ export async function GET(req: Request) {
     cajasTotales += 1;
   }
 
+  // El "visto por N de M cajas" cuenta SOLO acuses de caja. Los del POS web van sin caja y se
+  // reportan aparte: si se sumaran al mismo número, el numerador podría superar al denominador
+  // y, peor, un empleado podría inflarlo llamando a la RPC sin que ninguna caja lo mostrara.
   const vistosPorAviso = new Map<string, number>();
-  for (const l of (lecturasRes.data ?? []) as { aviso_id: string }[]) {
-    vistosPorAviso.set(l.aviso_id, (vistosPorAviso.get(l.aviso_id) ?? 0) + 1);
+  const vistosWebPorAviso = new Map<string, number>();
+  for (const l of (lecturasRes.data ?? []) as { aviso_id: string; caja_id: string | null }[]) {
+    const m = l.caja_id ? vistosPorAviso : vistosWebPorAviso;
+    m.set(l.aviso_id, (m.get(l.aviso_id) ?? 0) + 1);
   }
 
   const avisos = ((avisosRes.data ?? []) as Aviso[]).map((a) => ({
@@ -68,6 +73,7 @@ export async function GET(req: Request) {
     createdAt: a.created_at,
     borrado: a.deleted_at !== null,
     vistos: vistosPorAviso.get(a.id) ?? 0,
+    vistosWeb: vistosWebPorAviso.get(a.id) ?? 0,
     // Un aviso global alcanza a las cajas de todos los clientes que siguen vivos.
     cajasAlcance: a.tenant_id ? (cajasPorTenant.get(a.tenant_id) ?? 0) : cajasTotales,
   }));

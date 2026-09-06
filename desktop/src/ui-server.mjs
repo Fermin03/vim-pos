@@ -163,6 +163,16 @@ export async function startUiServer(dir, port, gatewayPort = 54350, host = "0.0.
       // CAJA: el cajero cerró un aviso de VIM. Se anota localmente y viaja en el siguiente
       // latido (ADR 0014). POST con guarda de origen, como el resto de las rutas que escriben.
       if (!kds && req.method === "POST" && req.url.startsWith("/__aviso-visto")) {
+        // SOLO desde la propia caja, igual que /__actualizar. `mismaProcedencia` es una guarda
+        // contra CSRF, no autenticación: cualquier cliente que no sea un navegador cumple sus
+        // condiciones con dos líneas de curl. Como este servidor escucha en la LAN para la 2ª
+        // caja y la cocina, sin esto cualquiera en el WiFi del restaurante podía leer los ids en
+        // /__directivas y marcarlos como vistos, dejando al cajero sin ver un aviso de
+        // suspensión y mintiéndole al panel sobre quién lo leyó.
+        if (!LOCALES.has(req.socket.remoteAddress ?? "")) {
+          res.writeHead(403, { "Content-Type": "application/json" });
+          return res.end(JSON.stringify({ ok: false, error: "Solo desde la caja." }));
+        }
         if (!mismaProcedencia(req, port)) {
           res.writeHead(403, { "Content-Type": "application/json" });
           return res.end(JSON.stringify({ ok: false, error: "Origen no permitido." }));
