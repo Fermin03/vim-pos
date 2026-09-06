@@ -75,6 +75,19 @@ nube caída, la caja vende. Perder ventas por un corte de red nuestro sería peo
 esto persigue. Por eso el bloqueo es un control **comercial**, no una barrera de seguridad: lo que
 de verdad cuesta dinero —timbrar un CFDI— se cierra además en el servidor.
 
+### Avisos de VIM
+
+Desde la entrega 3 del ADR 0014, VIM puede mandarle un mensaje al cajero: llega por el mismo
+latido y se muestra **al abrir turno**, en un diálogo.
+
+**De uno en uno, nunca en lista.** Un cajero con prisa cierra una lista sin leer nada, y el
+acuse diría que la leyó. Así cada aviso cuesta un toque y el acuse significa algo. El botón dice
+**Entendido** cuando VIM pidió confirmación y **Cerrar** cuando no.
+
+**Un aviso nunca impide vender.** El diálogo se cierra siempre, incluso si el acuse no se pudo
+registrar; lo peor que pasa entonces es que vuelva a salir en el siguiente turno. El cuerpo se
+renderiza como texto plano, nunca como HTML.
+
 ## Lo que NO se hereda de otras apps
 
 - **La densidad del admin.** Aquí el scroll es tiempo frente a un cliente, pero apretar de más
