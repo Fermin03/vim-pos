@@ -1,8 +1,8 @@
 "use client";
 import { useEffect, useState } from "react";
-import { evaluarAcceso, leerDirectivas, type NivelAcceso } from "../lib/directivas";
+import { evaluarAcceso, leerDirectivas, type MotivoBloqueo, type NivelAcceso } from "../lib/directivas";
 
-export type Acceso = { nivel: NivelAcceso; mensaje: string; desde: string | null };
+export type Acceso = { nivel: NivelAcceso; mensaje: string; desde: string | null; motivo: MotivoBloqueo };
 
 /**
  * Nivel de acceso de esta caja (ADR 0014).
@@ -12,7 +12,7 @@ export type Acceso = { nivel: NivelAcceso; mensaje: string; desde: string | null
  * cliente se note en menos de un minuto desde que llega la directiva nueva.
  */
 export function useAcceso(): Acceso {
-  const [r, setR] = useState<Acceso>({ nivel: "ok", mensaje: "", desde: null });
+  const [r, setR] = useState<Acceso>({ nivel: "ok", mensaje: "", desde: null, motivo: "suscripcion" });
   useEffect(() => {
     let vivo = true;
     const cargar = () => {

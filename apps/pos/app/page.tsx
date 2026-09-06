@@ -135,7 +135,7 @@ export default function Page() {
   // dejan pasar `boot` y `vincular` a propósito: una caja sin vincular todavía no tiene
   // directivas, y atraparla aquí impediría vincularla para siempre.
   if (acceso.nivel === "bloqueado" && estado.paso !== "boot" && estado.paso !== "vincular") {
-    return <PantallaBloqueada mensaje={acceso.mensaje} />;
+    return <PantallaBloqueada mensaje={acceso.mensaje} motivo={acceso.motivo} />;
   }
 
   switch (estado.paso) {
