@@ -37,7 +37,9 @@ Deno.serve(async (req) => {
   const token = (req.headers.get("authorization") ?? "").replace(/^Bearer\s+/i, "");
   if (!token) return json({ error: "NO_AUTH" }, 401);
   const { data: userResp, error: userErr } = await admin.auth.getUser(token);
-  if (userErr || !userResp?.user) return json({ error: "AUTH_INVALIDA" }, 401);
+  // El detalle (mensaje de GoTrue: expirado, sesión inexistente…) va al log de la caja; sin él
+  // el 6 sep 2026 no se pudo saber por qué la caja de escritorio se quedaba sin espejo.
+  if (userErr || !userResp?.user) return json({ error: "AUTH_INVALIDA", detalle: userErr?.message ?? "sin usuario" }, 401);
   const claims = claimsDe(token);
   if (claims.tipo_identidad !== "DISPOSITIVO") return json({ error: "SOLO_DISPOSITIVO" }, 403);
   const tenantId = typeof claims.tenant_id === "string" ? claims.tenant_id : null;

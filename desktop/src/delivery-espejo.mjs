@@ -23,20 +23,37 @@ const COLS_PEDIDO_LOCAL = [...COLUMNAS_PEDIDO, "payload_raw", "ticket_id"];
 const SQL_PEDIDO = upsertSql("delivery_pedidos", COLS_PEDIDO_LOCAL, ["ticket_id"]);
 const json = (v) => (v === null || v === undefined ? null : typeof v === "object" ? JSON.stringify(v) : v);
 
+/** Vigencia y sesión de un JWT, para el log. Nunca devuelve el token ni sus claims sensibles. */
+export function resumenToken(jwt, ahora = Date.now()) {
+  try {
+    const carga = JSON.parse(Buffer.from(String(jwt).split(".")[1].replace(/-/g, "+").replace(/_/g, "/"), "base64").toString("utf8"));
+    const exp = Number(carga.exp) * 1000;
+    const iat = Number(carga.iat) * 1000;
+    const restante = Number.isFinite(exp) ? Math.round((exp - ahora) / 1000) : null;
+    const edad = Number.isFinite(iat) ? Math.round((ahora - iat) / 1000) : null;
+    return `emitido hace ${edad ?? "?"}s, ${restante === null ? "sin exp" : restante >= 0 ? `vence en ${restante}s` : `venció hace ${-restante}s`}, sesión ${String(carga.session_id ?? "?").slice(0, 8)}`;
+  } catch {
+    return "token ilegible";
+  }
+}
+
 /**
  * crearEspejo({ pool, nube, cajaId, log, cadaMs, fetchFn }) → { iniciar, detener, tick }
  *  - pool: pg.Pool de la base local.
- *  - nube: () => Promise<{ cloudUrl, anonKey, deviceToken } | null>  (token de dispositivo).
+ *  - nube: ({ forzar }) => Promise<{ cloudUrl, anonKey, deviceToken } | null>  (token de dispositivo;
+ *          con `forzar: true` debe hacer login nuevo, sin caché: se pide tras un 401).
  *  - cajaId: uuid de esta caja (del correo del dispositivo).
  */
 export function crearEspejo({ pool, nube, cajaId, log = () => {}, cadaMs = ESPEJO_CADA_MS, fetchFn = fetch }) {
   let timer = null;
   let corriendo = false;
   let tokenCache = null; // { opts, at }
+  let forzarLogin = false; // tras un 401: el siguiente token se pide sin caché, también arriba (main.mjs)
 
   async function opcionesNube() {
-    if (tokenCache && Date.now() - tokenCache.at < TOKEN_TTL_MS) return tokenCache.opts;
-    const opts = await nube();
+    if (!forzarLogin && tokenCache && Date.now() - tokenCache.at < TOKEN_TTL_MS) return tokenCache.opts;
+    const opts = await nube({ forzar: forzarLogin });
+    forzarLogin = false;
     if (!opts) return null;
     tokenCache = { opts, at: Date.now() };
     return opts;
@@ -52,7 +69,14 @@ export function crearEspejo({ pool, nube, cajaId, log = () => {}, cadaMs = ESPEJ
     const texto = await r.text();
     let body = {};
     try { body = texto ? JSON.parse(texto) : {}; } catch { body = { error: "RESPUESTA_NO_JSON", detalle: texto.slice(0, 200) }; }
-    if (r.status === 401) tokenCache = null; // token vencido: el siguiente tick vuelve a pedirlo
+    if (r.status === 401) {
+      // Token rechazado. Se tira la caché de aquí Y se pide arriba un login nuevo: el 6 sep 2026 la
+      // caché de main.mjs devolvía el mismo token muerto durante 20 minutos y la caja se quedaba en
+      // «Uber: sin datos». Se deja rastro de qué token era (vigencia y sesión, nunca el token).
+      tokenCache = null;
+      forzarLogin = true;
+      log(`token rechazado (${body?.detalle ?? "sin detalle"}) · ${resumenToken(opts.deviceToken)}`);
+    }
     return { status: r.status, ok: r.ok, body };
   }
 
