@@ -13,6 +13,7 @@
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const SEMVER = /^\d+\.\d+\.\d+$/;
 
 export const DIRECTIVAS_VACIAS = Object.freeze({
   servidor_hora: null,
@@ -43,6 +44,49 @@ export function normalizar(x) {
     avisos: Array.isArray(x.avisos) ? x.avisos : [],
     version: obj(x.version),
   };
+}
+
+/**
+ * Qué hacer con la versión que anuncian las directivas (ADR 0014, entrega 4).
+ *
+ * PURA, y llamada también desde el POS por `/__directivas`. Por eso la comparación de versiones
+ * se COPIA de `updater.mjs` en vez de importarla: ese módulo arrastra el descargador (crypto,
+ * streams al disco, el instalador NSIS) y nada de eso pinta en una respuesta HTTP. Son cuatro
+ * líneas; la duplicación cuesta menos que el acoplamiento.
+ *
+ * `bloqueaPorVersion` es la única decisión de todo el ADR que la caja toma sola, comparando con
+ * la versión instalada. A diferencia de la suspensión, una directiva vieja SÍ puede bloquear sin
+ * internet, así que aquí todo lo que no sea exactamente lo esperado deja vender: `true` de verdad
+ * en `bloquea_bajo_minima`, y dos versiones que parezcan versiones. La nube ya comprobó que
+ * llegó la fecha; la caja no la recalcula (su reloj puede estar mal).
+ */
+export function estadoDeVersion(directivas, versionActual) {
+  const d = directivas && typeof directivas === "object" ? directivas : DIRECTIVAS_VACIAS;
+  const v = d.version && typeof d.version === "object" ? d.version : {};
+  const sem = (x) => (typeof x === "string" && SEMVER.test(x) ? x : null);
+  const actual = sem(typeof versionActual === "string" ? versionActual : "");
+  const recomendada = sem(v.recomendada);
+  const minima = sem(v.minima);
+  return {
+    hayNueva: Boolean(actual && recomendada && esMasNueva(recomendada, actual)),
+    recomendada,
+    url: typeof v.url === "string" ? v.url : null,
+    sha512: typeof v.sha512 === "string" ? v.sha512 : null,
+    minima,
+    bloqueaPorVersion:
+      v.bloquea_bajo_minima === true && Boolean(actual && minima && esMasNueva(minima, actual)),
+  };
+}
+
+/** Copia deliberada de `updater.esMasNueva`: comparación numérica x.y.z, no alfabética. */
+function esMasNueva(remota, actual) {
+  const pr = remota.split(".").map((n) => parseInt(n, 10) || 0);
+  const pa = actual.split(".").map((n) => parseInt(n, 10) || 0);
+  for (let i = 0; i < 3; i++) {
+    if ((pr[i] || 0) > (pa[i] || 0)) return true;
+    if ((pr[i] || 0) < (pa[i] || 0)) return false;
+  }
+  return false;
 }
 
 export function crearAlmacenDirectivas({
