@@ -13,8 +13,12 @@ import { validarManifiesto } from "../../lib/manifiesto";
 type SbPlataforma = Parameters<typeof auditar>[0];
 
 const MOTIVO_MINIMO = 10;
-/** Dónde deben vivir los instaladores. Se puede mover con una variable, no tocando código. */
-const HOST_RELEASES = process.env.PLATFORM_RELEASES_HOST ?? "github.com";
+/**
+ * Prefijo EXACTO donde deben vivir los instaladores. Con el repo dentro, no solo el dominio: en
+ * `github.com` publica cualquiera. Se puede mover con una variable, sin tocar código.
+ */
+const PREFIJO_RELEASES =
+  process.env.PLATFORM_RELEASES_PREFIX ?? "https://github.com/Fermin03/vim-pos/releases/download/";
 
 /** Compara "0.4.61" con "0.4.9" por número. Como texto, la segunda ganaría. */
 function menorQue(a: string | null, b: string | null): boolean {
@@ -96,7 +100,7 @@ export async function POST(req: Request) {
   const motivo = String(body.motivo ?? "").trim();
   if (motivo.length < MOTIVO_MINIMO) return NextResponse.json({ error: "MOTIVO_REQUERIDO" }, { status: 400 });
 
-  const val = validarManifiesto(String(body.manifiesto ?? ""), HOST_RELEASES);
+  const val = validarManifiesto(String(body.manifiesto ?? ""), PREFIJO_RELEASES);
   if (!val.ok) return NextResponse.json({ error: "MANIFIESTO_INVALIDO", detalle: val.error }, { status: 400 });
   const m = val.manifiesto;
 

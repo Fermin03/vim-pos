@@ -7,8 +7,10 @@
  *   · la url tiene que contener la versión — pegar el `latest.json` de otra compilación es el
  *     error fácil de cometer a las once de la noche, y publicaría un instalador viejo como si
  *     fuera nuevo, a todos los clientes a la vez;
- *   · el host tiene que ser el de releases — sin eso, un despiste apunta las cajas de todos los
- *     clientes a un binario que no controlamos.
+ *   · la url tiene que empezar por el prefijo EXACTO de nuestros releases. Comprobar solo el
+ *     host no sirve: en `github.com` publica cualquiera, así que "está en GitHub" no es "es
+ *     nuestro". Se compara contra `origin + pathname`, ya normalizado por `URL`, para que ni un
+ *     `https://github.com@otro-sitio/…` ni un `..` en la ruta cuelen.
  *
  * El sha512 no es negociable (SEC CN-008): sin él la caja instalaría cualquier cosa sin poder
  * verificarla. Función PURA, para probarla sin red ni base.
@@ -30,7 +32,7 @@ const SEMVER = /^\d+\.\d+\.\d+$/;
 const SHA512 = /^[0-9a-f]{128}$/i;
 const FECHA = /^\d{4}-\d{2}-\d{2}$/;
 
-export function validarManifiesto(texto: string, hostPermitido: string): ResultadoManifiesto {
+export function validarManifiesto(texto: string, prefijoPermitido: string): ResultadoManifiesto {
   let j: unknown;
   try {
     j = JSON.parse(texto);
@@ -57,8 +59,8 @@ export function validarManifiesto(texto: string, hostPermitido: string): Resulta
   if (u.protocol !== "https:") {
     return { ok: false, error: "La url del instalador debe ser https." };
   }
-  if (u.hostname !== hostPermitido) {
-    return { ok: false, error: `La url debe estar en el dominio de releases (${hostPermitido}), no en ${u.hostname}.` };
+  if (!(u.origin + u.pathname).startsWith(prefijoPermitido)) {
+    return { ok: false, error: `La url del instalador tiene que empezar por ${prefijoPermitido}` };
   }
   if (!url.includes(version)) {
     return {
