@@ -17,6 +17,8 @@ import { ModalPin } from "./components/modal-pin";
 import { PantallaBloqueo } from "./components/pantalla-bloqueo";
 import { ModalSesionExpirada } from "./components/modal-sesion-expirada";
 import { PantallaTurno } from "./components/pantalla-turno";
+import { useAcceso } from "./components/banda-acceso";
+import { PantallaBloqueada } from "./components/pantalla-bloqueada";
 import { PantallaKds } from "@vim/kds-core";
 
 // Etiquetas de la sucursal/caja para vistas previas a la sesión real (selector,
@@ -40,6 +42,8 @@ const MODO_KDS = typeof window !== "undefined" && new URLSearchParams(window.loc
 export default function Page() {
   const [estado, setEstado] = useState<Estado>({ paso: "boot" });
   const [cajaId, setCajaId] = useState<string | null>(null);
+  // Lo que la nube dice que este negocio puede hacer (ADR 0014).
+  const acceso = useAcceso();
 
   // ── Arranque del dispositivo (Parte 1F §2.1) ────────────────────────────────
   useEffect(() => {
@@ -126,6 +130,13 @@ export default function Page() {
       <p className="text-sm text-danger">Dispositivo sin caja asociada. Re-vincula.</p>
     </main>
   );
+
+  // Puerta de acceso: va ANTES del switch para que ninguna pantalla del POS quede detrás. Se
+  // dejan pasar `boot` y `vincular` a propósito: una caja sin vincular todavía no tiene
+  // directivas, y atraparla aquí impediría vincularla para siempre.
+  if (acceso.nivel === "bloqueado" && estado.paso !== "boot" && estado.paso !== "vincular") {
+    return <PantallaBloqueada mensaje={acceso.mensaje} />;
+  }
 
   switch (estado.paso) {
     case "boot":
