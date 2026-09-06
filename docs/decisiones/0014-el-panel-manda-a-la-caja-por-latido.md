@@ -74,8 +74,9 @@
   la caja no recalcula la fecha, porque su reloj puede estar mal.
 - **Publicar una versión pasa a depender de la clave del panel.** El manifiesto que decide qué
   binario instalan todas las cajas se sube desde `/versiones`, así que quien tenga esa clave
-  puede publicar. El panel valida el manifiesto (host de releases, la url tiene que contener la
-  versión, sha512 obligatorio), pero el hash sigue viajando en el mismo archivo que la url —ver
+  puede publicar. El panel valida el manifiesto (la url tiene que empezar por el prefijo exacto
+  de nuestros releases —con el repo dentro, porque en `github.com` publica cualquiera—, contener
+  la versión y traer sha512), pero el hash sigue viajando en el mismo archivo que la url —ver
   SEC CN-008—: la firma del manifiesto y Cloudflare Access delante del panel suben de prioridad.
 - **Las directivas no llevan nada interno de VIM.** `resolver_directivas` devuelve los límites
   efectivos sin el desglose ni el `motivo` de las excepciones: ese texto lo escribe VIM en una
