@@ -160,6 +160,24 @@ export async function startUiServer(dir, port, gatewayPort = 54350, host = "0.0.
         return res.end(JSON.stringify(opts.directivas ? opts.directivas() : { disponible: false }));
       }
 
+      // CAJA: el cajero cerró un aviso de VIM. Se anota localmente y viaja en el siguiente
+      // latido (ADR 0014). POST con guarda de origen, como el resto de las rutas que escriben.
+      if (!kds && req.method === "POST" && req.url.startsWith("/__aviso-visto")) {
+        if (!mismaProcedencia(req, port)) {
+          res.writeHead(403, { "Content-Type": "application/json" });
+          return res.end(JSON.stringify({ ok: false, error: "Origen no permitido." }));
+        }
+        let body = "";
+        for await (const chunk of req) body += chunk;
+        let id = null;
+        try { id = JSON.parse(body || "{}").id ?? null; } catch { /* cuerpo inválido: se ignora */ }
+        opts.avisoVisto?.(id);
+        // Siempre 200: que no se pueda anotar el acuse no debe dejar al cajero con el aviso
+        // abierto. Lo peor que pasa es que lo vuelva a ver en el siguiente turno.
+        res.writeHead(200, { "Content-Type": "application/json" });
+        return res.end(JSON.stringify({ ok: true }));
+      }
+
       // CAJA: folios de facturación que le quedan al negocio.
       //
       // Se pregunta a la NUBE en el momento, no al Postgres local. El saldo lo mueve el panel de
