@@ -1,5 +1,5 @@
 -- ============================================================================
--- 0106 — generar_folio() nunca repite un folio que ya exista en tickets.
+-- 0107 — generar_folio() nunca repite un folio que ya exista en tickets.
 --
 -- Lo que pasó (6 sep 2026, primer pedido real de Uber Eats): la caja de escritorio de la sucursal
 -- Pruebas había emitido VP1-2026-000001…000004 con SU contador local y los subió por sync-push;
@@ -68,7 +68,7 @@ END;
 $$;
 
 COMMENT ON FUNCTION generar_folio IS
-  'Folio atómico por sucursal/año/tipo, formato [codigo]-[anio]-[NNNNNN]. Para TICKET nunca repite un folio ya emitido (0106): el consecutivo es el mayor entre contador+1 y máximo emitido+1.';
+  'Folio atómico por sucursal/año/tipo, formato [codigo]-[anio]-[NNNNNN]. Para TICKET nunca repite un folio ya emitido (0107): el consecutivo es el mayor entre contador+1 y máximo emitido+1.';
 
 -- Reparación única: contadores TICKET al día con lo que ya existe en tickets.
 INSERT INTO contadores_folio (tenant_id, sucursal_id, anio, tipo_documento, ultimo_consecutivo)
