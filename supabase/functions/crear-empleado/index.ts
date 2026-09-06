@@ -74,6 +74,30 @@ Deno.serve(async (req) => {
       return json({ error: "SUCURSAL_FORANEA" }, 400);
   }
 
+  // 4.bis) Límite de usuarios del plan (ADR 0014, entrega 2).
+  //
+  // Se comprueba aquí y no en el navegador porque esta función es la ÚNICA puerta por la que se
+  // crean empleados: apagar un botón en el admin no impide llamar a la función directamente.
+  // Va antes de crear el auth.users para no dejar huérfanos si el límite rechaza.
+  const { data: limRaw } = await admin.rpc("limites_efectivos", { p_tenant: tenant_id });
+  const maxUsuarios = (limRaw as { max_usuarios?: number | null } | null)?.max_usuarios ?? null;
+  if (maxUsuarios !== null) {
+    // Cuenta USUARIOS distintos con acceso vigente, no filas de acceso: un empleado con acceso a
+    // dos sucursales tiene dos filas y sería absurdo que consumiera dos lugares del plan.
+    const { data: accesos } = await admin
+      .from("usuarios_acceso")
+      .select("usuario_id")
+      .eq("tenant_id", tenant_id)
+      .eq("activo", true);
+    const count = new Set(((accesos ?? []) as { usuario_id: string }[]).map((a) => a.usuario_id)).size;
+    if (count >= maxUsuarios) {
+      return json(
+        { error: "LIMITE_USUARIOS", detalle: `Tu plan permite ${maxUsuarios} usuarios. Pide a VIM ampliar el límite.` },
+        409,
+      );
+    }
+  }
+
   // 5) Crear auth.users con email confirmado (sin envío real en dev)
   const { data: created, error: createErr } = await admin.auth.admin.createUser({
     email: email.trim(),
