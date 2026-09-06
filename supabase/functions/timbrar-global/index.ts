@@ -72,6 +72,18 @@ Deno.serve(async (req) => {
     return json({ error: "SIN_PERMISO", detalle: "Solo DUEÑO/ADMIN pueden emitir la factura global" }, 403);
   }
 
+  // Servicio suspendido: no se timbra (ADR 0014). Mismo motivo que en `timbrar-cfdi`: cada folio
+  // sale de la cuenta que VIM le paga al PAC, así que este control vive en el servidor y no en
+  // las directivas que obedece el cliente.
+  const { data: accesoRaw } = await sb.rpc("mi_acceso");
+  const acceso = (accesoRaw as { acceso?: { bloqueado?: boolean; mensaje?: string | null } } | null)?.acceso;
+  if (acceso?.bloqueado === true) {
+    return json(
+      { error: "SERVICIO_SUSPENDIDO", detalle: acceso.mensaje ?? "El servicio está suspendido. Contacta a VIM." },
+      403,
+    );
+  }
+
   // ── Datos del emisor ────────────────────────────────────────────────────────────────────────
   const { data: emisorRaw } = await sb
     .from("tenant_cfdi_emisor")

@@ -57,7 +57,12 @@ BEGIN
       'mensaje',       v_mensaje),
     -- Solo los EFECTIVOS: a la caja no le sirve saber qué está permitido pero apagado.
     'modulos', COALESCE(modulos_efectivos(p_tenant) -> 'efectivos', '{}'::jsonb),
-    'limites', COALESCE(limites_efectivos(p_tenant), '{}'::jsonb),
+    -- Solo los números efectivos. Se quitan `del_plan` y `excepcion` porque esta última lleva
+    -- `motivo`: texto que escribe VIM en `tenant_limites` —una tabla con RLS y sin políticas,
+    -- deliberadamente interna— y que acabaría en un archivo del disco del cliente y en
+    -- `/__directivas`, accesible sin autenticar desde la red del restaurante. El panel sigue
+    -- viendo el desglose porque llama a `limites_efectivos` por su cuenta.
+    'limites', COALESCE(limites_efectivos(p_tenant) - 'del_plan' - 'excepcion', '{}'::jsonb),
     'avisos',  '[]'::jsonb,   -- entrega 3
     'version', '{}'::jsonb    -- entrega 4
   );

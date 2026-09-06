@@ -79,6 +79,21 @@ Deno.serve(async (req) => {
   if (!roles.some((r) => ROLES_FACTURA.includes(r))) {
     return json({ error: "SIN_PERMISO", detalle: "Solo DUEÑO/ADMIN pueden facturar" }, 403);
   }
+  // Servicio suspendido: no se timbra (ADR 0014, entrega 2).
+  //
+  // El bloqueo de la caja lo aplica el cliente con sus directivas, y eso basta para la operación
+  // diaria. Timbrar es distinto: cada folio sale de la cuenta que VIM le paga al PAC, así que un
+  // negocio bloqueado que llame a esta función directamente nos costaría dinero. Aquí sí hay un
+  // control del lado del servidor, y `mi_acceso()` lo resuelve con el JWT del propio llamante.
+  const { data: accesoRaw } = await sb.rpc("mi_acceso");
+  const bloqueado = (accesoRaw as { acceso?: { bloqueado?: boolean; mensaje?: string | null } } | null)?.acceso;
+  if (bloqueado?.bloqueado === true) {
+    return json(
+      { error: "SERVICIO_SUSPENDIDO", detalle: bloqueado.mensaje ?? "El servicio está suspendido. Contacta a VIM." },
+      403,
+    );
+  }
+
   if (cfdi.estado_sat === "TIMBRADO") return json({ error: "YA_TIMBRADO" }, 409);
   if (cfdi.estado_sat !== "BORRADOR" && cfdi.estado_sat !== "ERROR_TIMBRADO") {
     return json({ error: "ESTADO_NO_TIMBRABLE", estado: cfdi.estado_sat }, 409);

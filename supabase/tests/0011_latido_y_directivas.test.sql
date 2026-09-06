@@ -8,7 +8,7 @@
 -- Se corre con:  supabase test db
 -- ============================================================================
 begin;
-select plan(13);
+select plan(14);
 
 insert into tenants (id, codigo, nombre_comercial, vertical_principal, estado, plan_actual_id)
 values ('cccccccc-0000-0000-0000-0000000000e0', 'lat-uno', 'Latido Uno', 'QUICK_SERVICE', 'ACTIVO',
@@ -67,14 +67,23 @@ select results_eq(
   $$ values ('0.4.58', true) $$,
   'el latido sella versión y hora');
 
--- #12 el límite de sucursales se aplica (Esencial da 1 y ya tiene una)
+-- #12 las directivas NO llevan el motivo interno de las excepciones a la caja del cliente
+insert into tenant_limites (tenant_id, max_cajas_por_sucursal, motivo)
+values ('cccccccc-0000-0000-0000-0000000000e0', 2, 'cortesía interna que el cliente no debe leer')
+on conflict (tenant_id) do update set motivo = excluded.motivo;
+select ok(
+  (resolver_directivas('cccccccc-0000-0000-0000-0000000000e0', null)->'limites') ?& array['max_sucursales','max_cajas_por_sucursal']
+  and not ((resolver_directivas('cccccccc-0000-0000-0000-0000000000e0', null)->'limites') ? 'excepcion'),
+  'las directivas llevan los límites efectivos pero no el motivo interno');
+
+-- #13 el límite de sucursales se aplica (Esencial da 1 y ya tiene una)
 select throws_ok(
   $$ insert into sucursales (tenant_id, codigo, nombre)
      values ('cccccccc-0000-0000-0000-0000000000e0', 'L2', 'Suc L2') $$,
   'P0001', 'Tu plan permite 1 sucursal(es). Pide a VIM ampliar el límite.',
   'la segunda sucursal se rechaza');
 
--- #13 un tenant autenticado no lee las directivas de otro
+-- #14 un tenant autenticado no lee las directivas de otro
 set local role authenticated;
 select set_config('request.jwt.claims',
   json_build_object('sub', '99999999-0000-0000-0000-0000000000e9',
