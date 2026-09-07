@@ -2,7 +2,7 @@
 
 **Fecha:** 2026-06-02
 **Fase:** F5.2 (POS operativo) — primera venta que persiste en BD
-**Autor:** el dueño + Claude Code
+**Autor:** El dueño + Claude Code
 **Estado:** aprobado para plan de implementación
 
 ---

@@ -2,7 +2,7 @@
 
 > Plan de trabajo para cerrar los riesgos detectados en la revisión (31-jul-2026) y dejar el
 > piloto de Knock-Out **endurecido y verificable**. Método acordado: **guía primero, ejecutar por
-> fases** con visto bueno del dueño en cada bloque. Decisiones base:
+> fases** con visto bueno de el dueño en cada bloque. Decisiones base:
 > - **Sync:** el escritorio (Postgres local) es el **único** camino de operación → se congela el outbox web.
 > - **Alcance:** los 6 riesgos + verificar las brechas del piloto (ya construidas, ver §Contexto).
 > - **Infra:** hay acceso al dashboard de Supabase y a la PC de la caja en esta sesión.

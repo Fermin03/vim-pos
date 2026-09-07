@@ -1,7 +1,7 @@
 # Activar facturación real — checklist
 
 Contratado el 3 sep 2026 a las 16:04: «API - anualidad», $1,650 MXN, en la cuenta de producción
-`app.facturama.mx` con RFC XAXX010101000 (cuenta preexistente del dueño). El orden importa: un paso saltado deja un comprobante inválido
+`app.facturama.mx` con RFC XAXX010101000 (cuenta preexistente de el dueño). El orden importa: un paso saltado deja un comprobante inválido
 en manos de un cliente (ADR `docs/decisiones/0009`).
 
 ## 1. Contratar (el dueño, con Facturama)
@@ -44,7 +44,7 @@ credencial ni datos de sellos.
 
 ## 3. Emisor de Knock-Out (el dueño con el dueño; admin → Configuración → CFDI)
 
-Estado actual en producción: `tenant_cfdi_emisor` tiene el RFC del dueño como marcador,
+Estado actual en producción: `tenant_cfdi_emisor` tiene el RFC de el dueño como marcador,
 `proveedor_pac = FACTURAPI` y sin sello. Hay que:
 
 - [ ] Capturar RFC, razón social **como aparece en la Constancia, en mayúsculas y sin régimen
@@ -59,7 +59,7 @@ Estado actual en producción: `tenant_cfdi_emisor` tiene el RFC del dueño como 
 
 ## 4. Primera prueba real (nosotros, con el dueño mirando)
 
-1. Ticket de $1.00 en la caja, factura individual a un RFC real que controlemos (el del dueño),
+1. Ticket de $1.00 en la caja, factura individual a un RFC real que controlemos (el de el dueño),
    con CP de su Constancia. Comprobar UUID en el XML y que el PDF y el XML quedaron en Storage.
 2. Verificar el CFDI en el portal del SAT (`verificacfdi.facturaelectronica.sat.gob.mx`) con UUID,
    RFC emisor, RFC receptor y total.

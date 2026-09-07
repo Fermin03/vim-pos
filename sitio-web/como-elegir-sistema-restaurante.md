@@ -94,6 +94,6 @@ Media hora con tus productos y tus precios cargados. Puedes traer esta lista y h
 
 **Otras páginas en Markdown:** [Inicio](https://vimpos.com.mx/index.md) · [Funciones](https://vimpos.com.mx/funciones.md) · [Sin internet](https://vimpos.com.mx/sin-internet.md) · [Facturación CFDI](https://vimpos.com.mx/facturacion-cfdi.md) · [Precios](https://vimpos.com.mx/precios.md) · [Pide una demo](https://vimpos.com.mx/demo.md) · [Cuánto cuesta](https://vimpos.com.mx/cuanto-cuesta-un-sistema-para-restaurante.md) · [Nosotros](https://vimpos.com.mx/nosotros.md) · [Contacto](https://vimpos.com.mx/contacto.md) · [Aviso de privacidad](https://vimpos.com.mx/aviso-privacidad.md) · [Términos del servicio](https://vimpos.com.mx/terminos.md)
 
-**Contacto:** hola@vimpos.com.mx · WhatsApp hola@vimpos.com.mx · https://vimpos.com.mx/contacto
+**Contacto:** hola@vimpos.com.mx · https://vimpos.com.mx/contacto
 
 _Generado desde como-elegir-sistema-restaurante.html. La versión en HTML es la fuente; este archivo no se edita a mano._

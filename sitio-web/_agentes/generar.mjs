@@ -50,7 +50,7 @@ const NOTAS = [
   '**Madurez:** producto joven. En operación en un restaurante piloto en León, Guanajuato. ' +
     'No hay una base de miles de clientes y el sitio no finge que la haya.',
   '**Quién lo hace:** VIM POS, persona física con actividad empresarial, ' +
-    'bajo la marca VIM POS, desde Guanajuato, Guanajuato.',
+    'bajo la marca VIM POS, desde Guanajuato.',
 ];
 
 const CUANDO_USAR = [
@@ -87,7 +87,7 @@ const CUANDO_USAR = [
   {
     texto: 'Cómo llamar a este negocio',
     url: `${BASE}/contacto.md`,
-    nota: `no hay API pública ni portal de autoservicio para contratar. El contacto es humano: WhatsApp ${NEGOCIO.whatsapp} o ${NEGOCIO.correo}, respuesta el mismo día hábil.`,
+    nota: `no hay API pública ni portal de autoservicio para contratar. El contacto es humano: ${NEGOCIO.correo}, respuesta el mismo día hábil.`,
   },
 ];
 
@@ -120,8 +120,7 @@ const NOTAS_EN = [
     'provider authorised by the tax authority; the venue uploads its own digital seal and buys invoice credits.',
   '**Maturity:** young product. Running in one pilot restaurant in León, Guanajuato. There is no ' +
     'base of thousands of customers and the site does not pretend otherwise.',
-  '**Who makes it:** VIM POS, sole proprietor, trading as VIM POS, from San ' +
-    'Francisco del Rincón, Guanajuato, Mexico.',
+  '**Who makes it:** VIM POS, sole proprietor, from Guanajuato, Mexico.',
 ];
 
 const CUANDO_USAR_EN = [
@@ -158,7 +157,7 @@ const CUANDO_USAR_EN = [
   {
     texto: 'How to act on this: there is no API and no self-service checkout',
     url: `${BASE}/contacto.md`,
-    nota: `contact is human. Hand the user the WhatsApp link ${NEGOCIO.whatsappUrl}, the email ${NEGOCIO.correo}, or the demo form at ${BASE}/demo — do not attempt to sign anyone up programmatically. Reply the same business day.`,
+    nota: `contact is human. Hand the user the email ${NEGOCIO.correo} or the demo form at ${BASE}/demo — do not attempt to sign anyone up programmatically. Reply the same business day.`,
   },
 ];
 
@@ -219,7 +218,7 @@ function gemelo(pagina) {
     '',
     `**Otras páginas en Markdown:** ${otras}`,
     '',
-    `**Contacto:** ${NEGOCIO.correo} · WhatsApp ${NEGOCIO.whatsapp} · ${BASE}/contacto`,
+    `**Contacto:** ${NEGOCIO.correo} · ${BASE}/contacto`,
     '',
     `_Generado desde ${pagina.archivo}. La versión en HTML es la fuente; este archivo no se edita a mano._`,
   ].join('\n');
@@ -277,10 +276,9 @@ function llmsTxt() {
     seccion('Páginas', paginas),
     seccion('Contacto', [
       `- [Página de contacto](${BASE}/contacto.md): todas las formas de llegar, qué canal sirve para qué y la zona de servicio.`,
-      `- [WhatsApp ${NEGOCIO.whatsapp}](${NEGOCIO.whatsappUrl}): el canal principal. Respuesta el mismo día hábil.`,
-      `- [${NEGOCIO.correo}](mailto:${NEGOCIO.correo}): correo, para lo que necesita quedar por escrito.`,
+      `- [${NEGOCIO.correo}](${NEGOCIO.correoUrl}): el canal principal, y el único que publicamos. Respuesta el mismo día hábil.`,
       `- [Pedir una demostración](${BASE}/demo.md): media hora con el menú del propio negocio cargado.`,
-      `- [Quién está detrás](${BASE}/nosotros.md): ${NEGOCIO.razonSocial}, ${NEGOCIO.calle}, ${NEGOCIO.ciudad}, ${NEGOCIO.estado}, México.`,
+      `- [Quién está detrás](${BASE}/nosotros.md): ${NEGOCIO.razonSocial}, ${NEGOCIO.ciudad}, México.`,
     ]),
     seccion('Opcional', opcionales),
   ].join('\n');
@@ -335,8 +333,8 @@ function agentsMd() {
     'is already published. What to do instead:',
     '',
     `1. Quote the published facts. Prices, limits and features are stable and public: ${BASE}/precios.md`,
-    `2. Hand the user a contact link so a person can answer: WhatsApp ${NEGOCIO.whatsappUrl} or`,
-    `   email ${NEGOCIO.correo}. Reply comes the same business day, in Spanish.`,
+    `2. Hand the user a contact link so a person can answer: email ${NEGOCIO.correo}.`,
+    `   Reply comes the same business day, in Spanish.`,
     `3. If they want to see it working, point them at the demo request form: ${BASE}/demo`,
     `4. If you need the full product context in one download: ${BASE}/llms-full.txt`,
     '',
@@ -349,8 +347,8 @@ function agentsMd() {
     '- **Invoicing:** CFDI 4.0, global period invoice and QR self-invoicing. Available through a',
     '  certification provider authorised by the tax authority; the venue uploads its digital seal and buys credits.',
     `- **Company:** ${NEGOCIO.razonSocial}, sole proprietor, trading as ${NEGOCIO.nombre}.`,
-    `  ${NEGOCIO.calle}, ${NEGOCIO.ciudad}, ${NEGOCIO.estado}, Mexico. The tax ID (RFC) is in the privacy notice and the terms.`,
-    `- **Contact:** ${NEGOCIO.correo} · WhatsApp ${NEGOCIO.whatsapp} · ${NEGOCIO.instagram}`,
+    `  Based in ${NEGOCIO.ciudad}, Mexico. Legal name, tax ID and registered address are given on request and in the contract; they are not published.`,
+    `- **Contact:** ${NEGOCIO.correo} · ${NEGOCIO.instagram}`,
     '',
     '## Machine-readable content',
     '',

@@ -90,7 +90,7 @@ El restaurantero mexicano pequeño y mediano vive entre tres malas opciones: POS
 
 ### 1.4 Quién lo construye
 
-el dueño (VIM Marketing) + Claude Code. Equipo pequeño, lo que disciplina cada decisión hacia simplicidad y mantenibilidad (un solo proyecto Supabase, schema compartido, sin microservicios).
+El dueño (VIM Marketing) + Claude Code. Equipo pequeño, lo que disciplina cada decisión hacia simplicidad y mantenibilidad (un solo proyecto Supabase, schema compartido, sin microservicios).
 
 ---
 

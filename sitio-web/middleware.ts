@@ -200,7 +200,7 @@ export const CUERPO_MARKDOWN = [
   '- [Nosotros](https://vimpos.com.mx/nosotros.md)',
   '- [Contacto](https://vimpos.com.mx/contacto.md)',
   '',
-  'Contacto: hola@vimpos.com.mx · WhatsApp hola@vimpos.com.mx',
+  'Contacto: hola@vimpos.com.mx · hola@vimpos.com.mx',
   '',
 ].join('\n');
 

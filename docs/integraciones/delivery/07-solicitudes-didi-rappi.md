@@ -4,7 +4,7 @@ Uber ya está: cuenta, contrato, sandbox y producción (ver `uber-eats/contrato/
 Rappi no tienen autoservicio: hay que pedir acceso y esperar semanas. Conviene arrancar los dos en
 paralelo. Todo lo de aquí lo manda **el dueño** con su correo de VIM; los textos van listos para
 copiar. Datos que se repiten: VIM POS, VIM POS (persona física con actividad
-empresarial, RFC XAXX010101000), León / Guanajuato, Guanajuato, correo
+empresarial, RFC XAXX010101000), León, Guanajuato, correo
 `integraciones@vimpos.com.mx`, sitio `https://vimpos.com.mx`, piloto Knock-Out Burger (León).
 
 Regla de oro en los dos: **nunca prometer que VIM POS sustituye la tablet de la app ni llamarnos
@@ -92,7 +92,7 @@ Account Manager) del equipo de integraciones, que crea la `Integration` y el `cl
 puertas, usar las dos a la vez:
 
 1. **El ejecutivo de cuenta de Knock-Out Burger en Rappi.** Es la vía más rápida: el restaurante
-   pide que su POS se integre y Rappi lo canaliza. el dueño le pide al dueño de Knock-Out que mande
+   pide que su POS se integre y Rappi lo canaliza. El dueño le pide al dueño de Knock-Out que mande
    el texto B1 a su ejecutivo (o que lo presente por WhatsApp).
 2. **Portal de Aliados / dev-portal.** En <https://dev-portal.rappi.com/es/> y en el Portal de
    Aliados (soporte → integraciones) mandar el texto B2 pidiendo contacto con el equipo de
@@ -126,7 +126,7 @@ Lo que necesitamos de ustedes:
 4. Lista de IPs desde las que llegan los webhooks (si la manejan) y confirmación de si los montos en México vienen en pesos o en centavos.
 5. Acceso a una tienda de prueba para validar el flujo completo antes de vincular la del piloto.
 
-Datos: VIM POS · VIM POS (persona física con actividad empresarial, RFC XAXX010101000) · León / Guanajuato, Guanajuato · integraciones@vimpos.com.mx · hola@vimpos.com.mx.
+Datos: VIM POS · VIM POS (persona física con actividad empresarial, RFC XAXX010101000) · León, Guanajuato · integraciones@vimpos.com.mx · hola@vimpos.com.mx.
 
 Quedo atento. Gracias.
 VIM POS

@@ -225,12 +225,12 @@ Dinos cuántas cajas y cuántas sucursales tienes y te decimos el plan en el mis
 
 [Pide una demo](https://vimpos.com.mx/demo)
 
-[Escríbenos por WhatsApp](https://wa.me/hola@vimpos.com.mx?text=Hola%2C%20vi%20los%20precios%20en%20vimpos.com.mx%20y%20quiero%20saber%20qu%C3%A9%20plan%20me%20toca.)
+[Escríbenos por correo](mailto:hola@vimpos.com.mx)
 
 ---
 
 **Otras páginas en Markdown:** [Inicio](https://vimpos.com.mx/index.md) · [Funciones](https://vimpos.com.mx/funciones.md) · [Sin internet](https://vimpos.com.mx/sin-internet.md) · [Facturación CFDI](https://vimpos.com.mx/facturacion-cfdi.md) · [Pide una demo](https://vimpos.com.mx/demo.md) · [Cuánto cuesta](https://vimpos.com.mx/cuanto-cuesta-un-sistema-para-restaurante.md) · [Cómo elegir sistema](https://vimpos.com.mx/como-elegir-sistema-restaurante.md) · [Nosotros](https://vimpos.com.mx/nosotros.md) · [Contacto](https://vimpos.com.mx/contacto.md) · [Aviso de privacidad](https://vimpos.com.mx/aviso-privacidad.md) · [Términos del servicio](https://vimpos.com.mx/terminos.md)
 
-**Contacto:** hola@vimpos.com.mx · WhatsApp hola@vimpos.com.mx · https://vimpos.com.mx/contacto
+**Contacto:** hola@vimpos.com.mx · https://vimpos.com.mx/contacto
 
 _Generado desde precios.html. La versión en HTML es la fuente; este archivo no se edita a mano._

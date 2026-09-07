@@ -706,7 +706,7 @@ Menú de pausa: mismo patrón que el diálogo de rechazo (`role="dialog"`), con 
 - [ ] **Step 2: Admin en navegador**: fila con chip "Sin datos", columna Expirados hoy = 1, cambiar Prep → error de Uber y valor restaurado.
 - [ ] **Step 3: docs** — contrato README A6 → ✅ (`delivery-accion` tienda_* y `delivery-uber-conexion` prep/verificar; expirados por cron); runbook: sección "Pausar / prep / expirados"; `supabase/functions/README.md` ya en Task 4.
 - [ ] **Step 4: `pnpm test && pnpm test:functions && supabase test db`** en verde. Commit docs. Luego `superpowers:finishing-a-development-branch`.
-- [ ] **Step 5: Despliegue tras fusión (con confirmación del dueño)**: `supabase db push` (0093 crea el cron en la nube), `supabase functions deploy delivery-accion` y `delivery-uber-conexion`, `git push origin main` (Vercel POS y admin). Verificar en la nube: `select jobname, schedule from cron.job` desde el SQL editor del dashboard.
+- [ ] **Step 5: Despliegue tras fusión (con confirmación de el dueño)**: `supabase db push` (0093 crea el cron en la nube), `supabase functions deploy delivery-accion` y `delivery-uber-conexion`, `git push origin main` (Vercel POS y admin). Verificar en la nube: `select jobname, schedule from cron.job` desde el SQL editor del dashboard.
 
 ---
 

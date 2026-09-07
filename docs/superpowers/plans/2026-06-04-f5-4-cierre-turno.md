@@ -8,7 +8,7 @@
 
 **Tech Stack:** Next 15 + React 19 + TS, Supabase JS (RLS), reusa `lib/autorizacion.ts` (F5.2b) y `lib/print/*` (F5.3), `vitest`.
 
-**Spec/diseño:** este plan (compactado, con OK del dueño). Mockups: P-101 arqueo, P-102 resultado-corte, P-103/104 cerrar+Z, P-106/P-226 reporte Z.
+**Spec/diseño:** este plan (compactado, con OK de el dueño). Mockups: P-101 arqueo, P-102 resultado-corte, P-103/104 cerrar+Z, P-106/P-226 reporte Z.
 
 **Rama:** `f5.4-cierre-turno`. Merge `--no-ff` a `main` al cerrar.
 

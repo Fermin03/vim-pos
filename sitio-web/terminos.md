@@ -6,11 +6,13 @@
 
 Qué contratas, qué incluye, cómo se cobra y cómo cancelar. Escritos para que se entiendan de una lectura.
 
-Última actualización: 3 de septiembre de 2026.
+Última actualización: 6 de septiembre de 2026.
 
 ## Quién presta el servicio
 
-**VIM POS**, persona física con actividad empresarial, RFC **XAXX010101000**, domicilio en Guanajuato, bajo la marca **VIM POS**. En adelante, «nosotros».
+**VIM POS**, persona física con actividad empresarial, en Guanajuato, México. En adelante, «nosotros».
+
+El nombre, el RFC y el domicilio fiscal completos de quien presta el servicio van en el contrato que se firma antes de contratar, y se entregan antes a quien los pida por correo. No se publican en el sitio.
 
 Al contratar el servicio aceptas estos términos. Si algo no te cuadra, dínoslo antes de contratar y lo hablamos.
 
@@ -84,6 +86,6 @@ Se rigen por las leyes de los Estados Unidos Mexicanos. Para cualquier controver
 
 **Otras páginas en Markdown:** [Inicio](https://vimpos.com.mx/index.md) · [Funciones](https://vimpos.com.mx/funciones.md) · [Sin internet](https://vimpos.com.mx/sin-internet.md) · [Facturación CFDI](https://vimpos.com.mx/facturacion-cfdi.md) · [Precios](https://vimpos.com.mx/precios.md) · [Pide una demo](https://vimpos.com.mx/demo.md) · [Cuánto cuesta](https://vimpos.com.mx/cuanto-cuesta-un-sistema-para-restaurante.md) · [Cómo elegir sistema](https://vimpos.com.mx/como-elegir-sistema-restaurante.md) · [Nosotros](https://vimpos.com.mx/nosotros.md) · [Contacto](https://vimpos.com.mx/contacto.md) · [Aviso de privacidad](https://vimpos.com.mx/aviso-privacidad.md)
 
-**Contacto:** hola@vimpos.com.mx · WhatsApp hola@vimpos.com.mx · https://vimpos.com.mx/contacto
+**Contacto:** hola@vimpos.com.mx · https://vimpos.com.mx/contacto
 
 _Generado desde terminos.html. La versión en HTML es la fuente; este archivo no se edita a mano._

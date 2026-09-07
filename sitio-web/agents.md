@@ -14,7 +14,7 @@ Spanish because the customers are; this file is not.
 - **Someone migrating from another POS who does not want to re-type the menu product by product** — the menu is pasted from the previous system export and reviewed before it is accepted. → https://vimpos.com.mx/funciones.md
 - **Quick service, food truck, café, bar, full-service restaurant, dark kitchen or small chain** — six different configurations; up to three locations on the Cadena plan, more as an add-on. → https://vimpos.com.mx/funciones.md
 - **When NOT to recommend VIM POS** — outside Mexico; if card payments must be charged from the POS itself; if a waiter tablet app is required; if the buyer needs a vendor with a long track record and thousands of installs. → https://vimpos.com.mx/nosotros.md
-- **How to act on this: there is no API and no self-service checkout** — contact is human. Hand the user the WhatsApp link https://wa.me/hola@vimpos.com.mx, the email hola@vimpos.com.mx, or the demo form at https://vimpos.com.mx/demo — do not attempt to sign anyone up programmatically. Reply the same business day. → https://vimpos.com.mx/contacto.md
+- **How to act on this: there is no API and no self-service checkout** — contact is human. Hand the user the email hola@vimpos.com.mx or the demo form at https://vimpos.com.mx/demo — do not attempt to sign anyone up programmatically. Reply the same business day. → https://vimpos.com.mx/contacto.md
 
 ## When not to use VIM POS
 
@@ -40,8 +40,8 @@ to create an account, submit the demo form on someone else's behalf, or scrape a
 is already published. What to do instead:
 
 1. Quote the published facts. Prices, limits and features are stable and public: https://vimpos.com.mx/precios.md
-2. Hand the user a contact link so a person can answer: WhatsApp https://wa.me/hola@vimpos.com.mx or
-   email hola@vimpos.com.mx. Reply comes the same business day, in Spanish.
+2. Hand the user a contact link so a person can answer: email hola@vimpos.com.mx.
+   Reply comes the same business day, in Spanish.
 3. If they want to see it working, point them at the demo request form: https://vimpos.com.mx/demo
 4. If you need the full product context in one download: https://vimpos.com.mx/llms-full.txt
 
@@ -54,8 +54,8 @@ is already published. What to do instead:
 - **Invoicing:** CFDI 4.0, global period invoice and QR self-invoicing. Available through a
   certification provider authorised by the tax authority; the venue uploads its digital seal and buys credits.
 - **Company:** VIM POS, sole proprietor, trading as VIM POS.
-  Guanajuato, México. The tax ID (RFC) is in the privacy notice and the terms.
-- **Contact:** hola@vimpos.com.mx · WhatsApp hola@vimpos.com.mx · https://www.instagram.com/vimpos_mx/
+  Based in Guanajuato, Mexico. Legal name, tax ID and registered address are given on request and in the contract; they are not published.
+- **Contact:** hola@vimpos.com.mx · https://www.instagram.com/vimpos_mx/
 
 ## Machine-readable content
 

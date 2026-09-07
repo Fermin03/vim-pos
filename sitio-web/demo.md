@@ -25,7 +25,7 @@ Media hora, sin compromiso y sin presentación. Vemos tu carta, montamos un par 
 
 _Esto es lo que vas a ver en la demostración, con tus productos y tus precios cargados._
 
-**No te va a llamar un vendedor.** Somos un equipo chico de León: te contesta quien construyó el sistema. Y si prefieres hablar ahora, [llámanos al hola@vimpos.com.mx](tel:+hola@vimpos.com.mx) en horario hábil.
+**No te va a llamar un vendedor.** Somos un equipo chico de León: te contesta quien construyó el sistema. Y si prefieres hablar ahora, [escríbenos](mailto:hola@vimpos.com.mx) y te contestamos el mismo día hábil.
 
 Tus datos son solo para contactarte por esto. No los vendemos, no los compartimos y no te vamos a meter a una lista de correos.
 
@@ -33,6 +33,6 @@ Tus datos son solo para contactarte por esto. No los vendemos, no los compartimo
 
 **Otras páginas en Markdown:** [Inicio](https://vimpos.com.mx/index.md) · [Funciones](https://vimpos.com.mx/funciones.md) · [Sin internet](https://vimpos.com.mx/sin-internet.md) · [Facturación CFDI](https://vimpos.com.mx/facturacion-cfdi.md) · [Precios](https://vimpos.com.mx/precios.md) · [Cuánto cuesta](https://vimpos.com.mx/cuanto-cuesta-un-sistema-para-restaurante.md) · [Cómo elegir sistema](https://vimpos.com.mx/como-elegir-sistema-restaurante.md) · [Nosotros](https://vimpos.com.mx/nosotros.md) · [Contacto](https://vimpos.com.mx/contacto.md) · [Aviso de privacidad](https://vimpos.com.mx/aviso-privacidad.md) · [Términos del servicio](https://vimpos.com.mx/terminos.md)
 
-**Contacto:** hola@vimpos.com.mx · WhatsApp hola@vimpos.com.mx · https://vimpos.com.mx/contacto
+**Contacto:** hola@vimpos.com.mx · https://vimpos.com.mx/contacto
 
 _Generado desde demo.html. La versión en HTML es la fuente; este archivo no se edita a mano._

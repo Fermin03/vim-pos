@@ -571,26 +571,79 @@ test('las páginas de confianza tienen contenido de verdad', () => {
 
 test('los datos de contacto son los mismos en todas partes', () => {
   // Se compara sobre el texto con los espacios normalizados: el HTML parte
-  // «Guanajuato» en dos líneas y eso no es una inconsistencia de datos.
+  // «» en dos líneas y eso no es una inconsistencia de datos.
   const texto = (ruta) => soloTexto(cuerpo(resolver(ruta)));
 
   for (const ruta of ['/nosotros', '/contacto', '/aviso-privacidad', '/terminos']) {
     assert.ok(texto(ruta).includes(NEGOCIO.razonSocial), `${ruta} sin la razón social`);
   }
-  // El RFC va SOLO donde la ley lo pide. En Nosotros y Contacto sobraba: un RFC
-  // de persona física lleva la fecha de nacimiento, y no hace falta repetirlo
-  // en cuatro páginas para identificar a quien responde (decisión del 4-sep-2026).
-  for (const ruta of ['/aviso-privacidad', '/terminos']) {
-    assert.ok(texto(ruta).includes(NEGOCIO.rfc), `${ruta} sin el RFC`);
-  }
-  for (const ruta of ['/nosotros', '/contacto']) {
-    assert.ok(!texto(ruta).includes(NEGOCIO.rfc), `${ruta} repite el RFC`);
-  }
   for (const ruta of ['/nosotros', '/contacto']) {
     const t = texto(ruta);
-    assert.ok(t.includes(NEGOCIO.calle), `${ruta} sin la calle`);
     assert.ok(t.includes(NEGOCIO.ciudad), `${ruta} sin la ciudad`);
     assert.ok(t.includes(NEGOCIO.correo), `${ruta} sin el correo`);
+  }
+});
+
+// ── Los datos personales no vuelven (6/09/2026) ─────────────────────────────
+//
+// El sitio publicaba el nombre legal, el RFC, el domicilio particular y el
+// móvil de una persona física. Salieron el 6 de septiembre de 2026, y esta
+// prueba existe para que no vuelvan por descuido: basta con que alguien copie
+// un párrafo de una versión vieja, o que el generador vuelva a leer un campo
+// que ya no debería existir.
+//
+// Se comprueba sobre TODOS los archivos que se publican, no solo sobre las
+// páginas: los gemelos en Markdown, el llms.txt y el agents.md se generan
+// solos, y un dato que se cuele ahí es igual de público.
+//
+// Las formas van escritas a mano y no como una sola expresión: cada una es un
+// dato distinto y el mensaje del fallo tiene que decir CUÁL volvió.
+//
+// ⚠️ Y van por FORMA, nunca por valor. La primera versión de esta prueba
+// listaba el apellido y el número tal cual, para buscarlos: es decir, para
+// impedir que los datos se publicaran… los publicaba, aquí mismo, en el
+// repositorio que es público. Una prueba que guarda el secreto que protege no
+// protege nada. Si alguna vez hace falta afinar esto, que sea añadiendo formas,
+// no ejemplos.
+test('ningún dato personal vuelve al sitio', () => {
+  const PROHIBIDO = [
+    // Un RFC: cuatro letras, la fecha de nacimiento y la homoclave. El de una
+    // persona física lleva su fecha de nacimiento dentro, así que publicarlo
+    // no es publicar un identificador fiscal y ya.
+    [/\b[A-ZÑ&]{4}\d{6}[A-Z0-9]{3}\b/, 'algo con forma de RFC'],
+    // Diez dígitos con o sin separadores: un móvil mexicano.
+    [/(?<!\d)\d{3}[\s.-]?\d{3}[\s.-]?\d{4}(?!\d)/, 'algo con forma de teléfono'],
+    // Un enlace de WhatsApp lleva el número dentro de la propia dirección.
+    [/wa\.me\//, 'un enlace de WhatsApp'],
+    [/tel:\+?\d/, 'un enlace de teléfono'],
+    // «domicilio en Tal 341»: una calle con número. La ciudad sola no es
+    // identificable; la calle con número es la puerta de la casa.
+    [/domicilio[^.<]{0,40}\d{1,5}\b/i, 'un domicilio con número de puerta'],
+    // Y el hueco por donde se coló la primera vez: un JSON-LD con calle.
+    [/"streetAddress"\s*:\s*"[^"]/, 'una calle en los datos estructurados'],
+  ];
+
+  // Todo lo que se sube: las páginas, sus gemelos, y los archivos para agentes.
+  const publicados = [
+    ...TODAS.map((p) => p.archivo),
+    ...TODAS.map((p) => p.markdown),
+    'llms.txt',
+    'llms-full.txt',
+    'agents.md',
+    '404.html',
+    '404.md',
+    'sitemap.xml',
+    'assets/js/vim.js',
+  ];
+
+  for (const archivo of publicados) {
+    const contenido = leer(archivo);
+    for (const [forma, queEs] of PROHIBIDO) {
+      assert.ok(
+        !forma.test(contenido),
+        `${archivo} volvió a publicar ${queEs} (${forma}). Ver el bloque NEGOCIO en _agentes/paginas.mjs.`,
+      );
+    }
   }
 });
 
@@ -676,7 +729,7 @@ test('agents.md le dice a un agente cuándo usar el producto y qué hacer despu�
 
   // Y que diga la verdad incómoda: no hay API, el contacto es humano.
   assert.ok(md.includes('no public API'), 'no dice que no hay API');
-  assert.ok(md.includes(NEGOCIO.whatsappUrl), 'no da el enlace de contacto');
+  assert.ok(md.includes(NEGOCIO.correo), "no da el correo de contacto");
   assert.ok(md.includes(NEGOCIO.razonSocial), 'no identifica a la empresa');
 
   assert.ok(md.length > 2500, `agents.md solo tiene ${md.length} caracteres`);
@@ -761,10 +814,13 @@ test('el JSON-LD de la portada parsea y está completo', () => {
   assert.ok(org.contactPoint.some((c) => c.contactType === 'customer support'));
 
   assert.equal(org.address['@type'], 'PostalAddress');
-  for (const campo of ['streetAddress', 'addressLocality', 'addressRegion', 'addressCountry']) {
+  // Sin `streetAddress` a propósito: era el domicilio particular del dueño.
+  // Ver el bloque NEGOCIO en paginas.mjs y la prueba «ningún dato personal
+  // vuelve al sitio».
+  for (const campo of ["addressLocality", "addressRegion", "addressCountry"]) {
     assert.ok(org.address[campo], `la dirección no trae ${campo}`);
   }
-  assert.equal(org.address.streetAddress, NEGOCIO.calle);
+  assert.ok(!org.address.streetAddress, "el JSON-LD volvió a publicar la calle");
   assert.equal(org.address.addressLocality, NEGOCIO.ciudad);
 
   const app = de('SoftwareApplication');

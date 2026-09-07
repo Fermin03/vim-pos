@@ -5,7 +5,7 @@
 > **Propietario:** el dueño — VIM Marketing
 > **Documento:** noveno en la serie de arquitectura de VIM POS — primero **no técnico** (no es SQL)
 > **Alcance:** qué roles existen, qué puede hacer cada uno, qué requiere autorización superior, cómo se configura por tenant
-> **Audiencia:** el dueño + onboarding de cada nuevo cliente piloto (Knock-Out Burger, Chick'n Go, Camtaritos)
+> **Audiencia:** El dueño + onboarding de cada nuevo cliente piloto (Knock-Out Burger, Chick'n Go, Camtaritos)
 > **Depende de:** Partes 1A-1E de la arquitectura técnica (todas)
 > **Continúa en:** 10-SETUP-INICIAL (wizard de onboarding del primer tenant)
 
@@ -196,7 +196,7 @@ Todo cambio de rol, toda asignación, toda revocación, toda autorización de PI
 
 #### SUPER_ADMIN (Nivel 9)
 
-**Quién:** el dueño y el equipo de VIM Marketing/soporte técnico.
+**Quién:** El dueño y el equipo de VIM Marketing/soporte técnico.
 
 **Scope:** Plataforma — TODOS los tenants. Ignora RLS (D73).
 

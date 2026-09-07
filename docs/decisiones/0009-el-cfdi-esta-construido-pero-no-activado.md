@@ -4,7 +4,7 @@
 historia de por qué el módulo estuvo apagado y qué se comprobó al encenderlo
 
 > **Superado (3 sep 2026).** Facturama de producción contratado (Multiemisor activo), secrets
-> puestos y verificados, sello de Knock-Out (RFC del dueño) cargado, y probado con comprobantes
+> puestos y verificados, sello de Knock-Out (RFC de el dueño) cargado, y probado con comprobantes
 > reales: timbrado desde el admin (KO1C-2026-000109) y desde el portal público
 > (KO1C-2026-000130), correo con XML y PDF, descarga y archivo en Storage, y **cancelación
 > confirmada por el SAT** con acuse (`Cancelado sin aceptación`). Lo que se corrigió ese día:
@@ -17,7 +17,7 @@ historia de por qué el módulo estuvo apagado y qué se comprobó al encenderlo
 
 ## Por qué existe este documento
 
-Porque hoy esto solo vive en la cabeza del dueño, y es de las cosas que, mal entendidas, pueden
+Porque hoy esto solo vive en la cabeza de el dueño, y es de las cosas que, mal entendidas, pueden
 terminar en un comprobante fiscal inválido en manos de un cliente.
 
 Que la especificación describa el timbrado con detalle (`13-ORQUESTACION-TIMBRADO-CFDI.md`) y que

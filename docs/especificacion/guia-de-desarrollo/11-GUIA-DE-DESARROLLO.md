@@ -4,7 +4,7 @@
 > **Fecha:** Mayo 2026
 > **Propietario:** el dueño — VIM Marketing
 > **Documento:** convenciones de código, estructura del repositorio y flujo de trabajo. Es el manual para construir el MVP sin improvisar.
-> **Audiencia:** el dueño + Claude Code + futuro equipo
+> **Audiencia:** El dueño + Claude Code + futuro equipo
 > **Depende de:** todos los docs de arquitectura (07-1A…1F), 10 (setup), 12 (plataforma)
 > **Stack base (fijado en Plan Maestro §4):** Next.js 15 + TypeScript + Tailwind + Supabase + Dexie + Capacitor (Fase 3) + Edge Functions (Deno) + Vercel
 

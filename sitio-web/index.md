@@ -8,7 +8,7 @@ Caja, cocina, mesas, inventario y facturación en un solo sistema. La implementa
 
 [Pide una demo](https://vimpos.com.mx/demo)
 
-[Escríbenos por WhatsApp](https://wa.me/hola@vimpos.com.mx?text=Hola%2C%20vi%20vimpos.com.mx%20y%20quiero%20saber%20m%C3%A1s%20de%20VIM%20POS%20para%20mi%20restaurante.)
+[Escríbenos por correo](mailto:hola@vimpos.com.mx)
 
 En operación en Knock-Out Burger, León, Gto.
 
@@ -212,12 +212,12 @@ Sin presentación ni compromiso. Traes tu carta, la cargamos y ves cómo se ve t
 
 [Pide una demo](https://vimpos.com.mx/demo)
 
-[WhatsApp](https://wa.me/hola@vimpos.com.mx?text=Hola%2C%20vi%20vimpos.com.mx%20y%20quiero%20saber%20m%C3%A1s%20de%20VIM%20POS%20para%20mi%20restaurante.)
+[Escríbenos](mailto:hola@vimpos.com.mx)
 
 ---
 
 **Otras páginas en Markdown:** [Funciones](https://vimpos.com.mx/funciones.md) · [Sin internet](https://vimpos.com.mx/sin-internet.md) · [Facturación CFDI](https://vimpos.com.mx/facturacion-cfdi.md) · [Precios](https://vimpos.com.mx/precios.md) · [Pide una demo](https://vimpos.com.mx/demo.md) · [Cuánto cuesta](https://vimpos.com.mx/cuanto-cuesta-un-sistema-para-restaurante.md) · [Cómo elegir sistema](https://vimpos.com.mx/como-elegir-sistema-restaurante.md) · [Nosotros](https://vimpos.com.mx/nosotros.md) · [Contacto](https://vimpos.com.mx/contacto.md) · [Aviso de privacidad](https://vimpos.com.mx/aviso-privacidad.md) · [Términos del servicio](https://vimpos.com.mx/terminos.md)
 
-**Contacto:** hola@vimpos.com.mx · WhatsApp hola@vimpos.com.mx · https://vimpos.com.mx/contacto
+**Contacto:** hola@vimpos.com.mx · https://vimpos.com.mx/contacto
 
 _Generado desde index.html. La versión en HTML es la fuente; este archivo no se edita a mano._

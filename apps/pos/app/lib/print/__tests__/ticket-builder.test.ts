@@ -75,7 +75,7 @@ describe("construirTicketJob — datos de entrega (domicilio)", () => {
     ...DATOS,
     meta: { ...DATOS.meta, modoServicio: "Domicilio" },
     entrega: {
-      cliente: "VIM POS",
+      cliente: "Ana Pérez Rangel",
       telefono: "477 100 2030",
       direccion: "Blvd. Adolfo López Mateos 1500 int. 4, Jardines del Moral, León, Gto., CP 37160",
       referencias: "Portón negro frente al parque",
@@ -88,7 +88,7 @@ describe("construirTicketJob — datos de entrega (domicilio)", () => {
       .bloques.filter((b) => b.t === "texto")
       .map((b) => (b as { valor: string }).valor);
     expect(texto).toContain("DATOS DE ENTREGA");
-    expect(texto).toContain("VIM POS");
+    expect(texto).toContain("Ana Pérez Rangel");
     expect(texto).toContain("Tel. 477 100 2030");
     expect(texto.some((v) => v.includes("Jardines del Moral"))).toBe(true);
     expect(texto).toContain("Ref: Portón negro frente al parque");
