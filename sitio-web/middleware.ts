@@ -66,10 +66,39 @@ export const config = {
   // La primera versión de esta regla los destapaba, y lo cazó la prueba «el
   // matcher del middleware no toca NINGUNA ruta real» antes de llegar a
   // producción. Habría reabierto justo el agujero que se cerró el 30 de agosto.
-  matcher: [
-    '/((?!assets|_|404|about|agents|AGENTS|apple-touch|aviso-privacidad|como-elegir-sistema-restaurante|cuanto-cuesta-un-sistema-para-restaurante|contact|demo|facturacion-cfdi|favicon|funciones|index|llms|nosotros|precios|privacy|robots|sin-internet|site|terminos|terms)(?!(?!vercel[.]json$|middleware[.]ts$)[^/]*[.](?!md$)[A-Za-z0-9]+$).+)',
-  ],
+  // ⚠️ MANTENIMIENTO — este matcher NO es el de siempre.
+  //
+  // `/(.*)` es todo: la portada, las páginas, los .md, /assets, el sitemap y el
+  // favicon. Nada llega al contenido estático mientras esto esté aquí. Es lo
+  // que apaga el sitio desde el código, y lo que hay que deshacer para
+  // encenderlo (ver MANTENIMIENTO, más abajo).
+  matcher: ['/(.*)'],
 };
+
+// ── El apagado temporal ─────────────────────────────────────────────────────
+//
+// Puesto el 6 de septiembre de 2026, a petición del dueño, por seguridad. El
+// sitio contesta 503 a todo mientras esto valga `true`.
+//
+// POR QUÉ 503 Y NO 404 NI 200:
+// un 503 con `Retry-After` es la única respuesta que le dice a un buscador
+// «esto vuelve»; ante un 404 desindexa las páginas y ante un 200 se guarda
+// como contenido la propia página de apagado. Si el sitio vuelve, vuelve con
+// su posicionamiento intacto.
+//
+// PARA ENCENDER EL SITIO, dos cambios y ninguno más:
+//   1. `MANTENIMIENTO = false`
+//   2. `matcher: MATCHER_404` (la constante de aquí abajo, tal cual)
+// Las pruebas de `_agentes/pruebas.test.mjs` siguen comprobando MATCHER_404 en
+// los dos estados, así que el matcher del 404 no se pudre mientras espera.
+export const MANTENIMIENTO = true;
+
+// El matcher del 404, el de siempre, intacto. No se usa mientras el sitio esté
+// apagado; existe para poder devolverlo a `config.matcher` sin reconstruirlo de
+// memoria, y para que las pruebas lo sigan vigilando.
+export const MATCHER_404 = [
+  '/((?!assets|_|404|about|agents|AGENTS|apple-touch|aviso-privacidad|como-elegir-sistema-restaurante|cuanto-cuesta-un-sistema-para-restaurante|contact|demo|facturacion-cfdi|favicon|funciones|index|llms|nosotros|precios|privacy|robots|sin-internet|site|terminos|terms)(?!(?!vercel[.]json$|middleware[.]ts$)[^/]*[.](?!md$)[A-Za-z0-9]+$).+)',
+];
 
 // Las cinco de siempre. Van a mano porque una respuesta creada aquí se salta
 // la fase `headers` de vercel.json: el middleware corre antes que todo.
@@ -184,7 +213,87 @@ const CUERPO_HTML_MINIMO = `<!doctype html>
 <li><a href="/contacto">Contacto</a></li><li><a href="/sitemap.xml">Mapa del sitio</a></li></ul></body></html>
 `;
 
+// La página del apagado, en HTML y en Markdown. Va escrita aquí, como el 404 en
+// Markdown y por el mismo motivo: una respuesta que depende de que el servidor
+// pueda leer un archivo del propio sitio es una respuesta frágil, y con el
+// matcher en `/(.*)` ese archivo tampoco se podría servir.
+const MANTENIMIENTO_MD = [
+  '# VIM POS — el sitio está apagado temporalmente',
+  '',
+  '> El sitio de VIM POS no está disponible en este momento. No es una avería:',
+  '> se apagó a propósito y volverá.',
+  '',
+  'El producto sigue funcionando con normalidad: esto afecta solo a la página',
+  'pública, no a las cajas ni al panel de los clientes.',
+  '',
+  'Para cualquier cosa: hola@vimpos.com.mx',
+  '',
+].join('\n');
+
+const MANTENIMIENTO_HTML = `<!doctype html>
+<html lang="es-MX"><head><meta charset="utf-8">
+<title>Volvemos pronto — VIM POS</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<style>
+  :root { color-scheme: light dark; }
+  body { margin: 0; min-height: 100vh; display: grid; place-items: center;
+         font: 16px/1.6 system-ui, -apple-system, "Segoe UI", sans-serif;
+         background: #0f1115; color: #e7e9ee; padding: 24px; }
+  main { max-width: 34rem; }
+  h1 { font-size: 1.6rem; line-height: 1.25; margin: 0 0 .75rem; letter-spacing: -.01em; }
+  p { margin: 0 0 .75rem; color: #b6bcc9; }
+  a { color: #e7e9ee; }
+  .marca { font-weight: 700; letter-spacing: .04em; font-size: .8rem;
+           text-transform: uppercase; color: #8b93a5; margin: 0 0 1.5rem; }
+</style></head>
+<body><main>
+  <p class="marca">VIM POS</p>
+  <h1>Volvemos pronto</h1>
+  <p>El sitio está apagado temporalmente. No es una avería: lo apagamos a propósito y volverá.</p>
+  <p>El producto sigue funcionando con normalidad. Esto afecta solo a esta página pública,
+     no a las cajas ni al panel de los clientes.</p>
+  <p>Para cualquier cosa: <a href="mailto:hola@vimpos.com.mx">hola@vimpos.com.mx</a></p>
+</main></body></html>
+`;
+
+function respuestaMantenimiento(peticion: Request): Response {
+  // Se reutiliza la misma negociación que el 404: quien no pida HTML por su
+  // nombre —curl, un agente, un script— recibe Markdown, que puede leer.
+  const html = prefiereHtml(peticion.headers.get('accept'));
+  return new Response(html ? MANTENIMIENTO_HTML : MANTENIMIENTO_MD, {
+    status: 503,
+    headers: {
+      ...SEGURIDAD,
+      'Content-Type': html
+        ? 'text/html; charset=utf-8'
+        : 'text/markdown; charset=utf-8',
+      // Una hora. No promete la vuelta: le dice al buscador que reintente y que
+      // no dé las páginas por muertas.
+      'Retry-After': '3600',
+      // Que nadie —ni caché intermedia ni navegador— se guarde el apagado y lo
+      // siga enseñando cuando el sitio vuelva.
+      'Cache-Control': 'no-store',
+      'X-Robots-Tag': 'noindex, nofollow',
+    },
+  });
+}
+
 export default async function middleware(peticion: Request): Promise<Response> {
+  // Lo primero de todo, antes que la negociación del 404: mientras el sitio esté
+  // apagado no hay ninguna otra respuesta posible.
+  if (MANTENIMIENTO) return respuestaMantenimiento(peticion);
+
+  return respuesta404(peticion);
+}
+
+// El 404 de siempre, tal cual estaba, movido a su propia función exportada.
+//
+// El motivo es la prueba, no el código: mientras `MANTENIMIENTO` valga `true`,
+// llamar al middleware devuelve 503 y las dos pruebas del 404 no podrían
+// comprobar nada. Sacándolo aquí siguen cubriéndolo, y así el 404 no se pudre
+// mientras el sitio está apagado — que es exactamente cuando nadie lo miraría.
+export async function respuesta404(peticion: Request): Promise<Response> {
   if (!prefiereHtml(peticion.headers.get('accept'))) {
     return new Response(CUERPO_MARKDOWN, {
       status: 404,

@@ -20,7 +20,7 @@ import { execFileSync } from 'node:child_process';
 
 import { RAIZ, config, resolver, ACEPTA_MD, MATCHER_MIDDLEWARE } from './rutas.mjs';
 import { BASE, PAGINAS, TODAS, PAGINA_404, NEGOCIO } from './paginas.mjs';
-import middleware, { prefiereHtml } from '../middleware.ts';
+import middleware, { prefiereHtml, respuesta404, MANTENIMIENTO, config as configMiddleware } from '../middleware.ts';
 
 const leer = (rel) => fs.readFileSync(path.join(RAIZ, rel), 'utf8');
 const cuerpo = (res) => (res.cuerpo != null ? res.cuerpo : fs.readFileSync(res.archivo, 'utf8'));
@@ -338,6 +338,57 @@ test('las páginas de verdad NO cambian de criterio: con */* sirven HTML', () =>
   }
 });
 
+// ── El apagado temporal (6/09/2026) ─────────────────────────────────────────
+//
+// Mientras `MANTENIMIENTO` valga `true` el sitio no sirve NADA: ni páginas, ni
+// Markdown, ni /assets, ni el sitemap. Esta prueba comprueba las dos mitades
+// que hacen que un apagado sea temporal de verdad y no una desaparición:
+// el estatus 503 —que le dice al buscador «vuelve a intentarlo» en vez de
+// «esto ya no existe»— y que la respuesta no se pueda cachear en el camino.
+//
+// Cuando el sitio se encienda, esta prueba pasa sola por el otro lado: con
+// MANTENIMIENTO en `false` comprueba que el 503 ya no sale por ningún lado.
+test('con el sitio apagado, todo contesta 503 y nada se cachea', async () => {
+  const rutas = ['/', '/precios', '/precios.md', '/assets/js/vim.js', '/sitemap.xml'];
+
+  for (const ruta of rutas) {
+    for (const accept of ['text/html,*/*;q=0.8', '*/*', 'text/markdown']) {
+      const res = await middleware(
+        new Request('https://vimpos.com.mx' + ruta, { headers: { accept } }),
+      );
+
+      if (!MANTENIMIENTO) {
+        assert.notEqual(res.status, 503, `${ruta} sigue apagada con MANTENIMIENTO en false`);
+        continue;
+      }
+
+      assert.equal(res.status, 503, `${ruta} (${accept}) tendría que contestar 503`);
+      // 503 y no 404: un 404 haría que el buscador desindexe las páginas, y
+      // este apagado es temporal. El `Retry-After` es la otra mitad del mensaje.
+      assert.ok(Number(res.headers.get('retry-after')) > 0, `${ruta} sin Retry-After`);
+      assert.equal(res.headers.get('cache-control'), 'no-store', `${ruta} se puede cachear`);
+      assert.match(res.headers.get('x-robots-tag') ?? '', /noindex/);
+      // Y sigue negociando como el resto del sitio: HTML solo a quien lo pida.
+      const esperado = accept.startsWith('text/html') ? 'text/html' : 'text/markdown';
+      assert.ok(
+        res.headers.get('content-type').startsWith(esperado),
+        `${ruta} (${accept}) devolvió ${res.headers.get('content-type')}`,
+      );
+      // Lo que nunca puede pasar: que el apagado filtre contenido del sitio.
+      const cuerpo = await res.text();
+      assert.ok(!cuerpo.includes('id="contenido"'), `${ruta} sirvió una página de verdad`);
+    }
+  }
+});
+
+// Comprobación aparte, y a propósito: el matcher del apagado tiene que ser el
+// que lo abarca todo. Si alguien lo estrecha «para dejar pasar los assets», el
+// sitio deja de estar apagado y nadie se entera hasta mirarlo.
+test('con el sitio apagado, el matcher no deja pasar nada', () => {
+  if (!MANTENIMIENTO) return;
+  assert.deepEqual(configMiddleware.matcher, ['/(.*)']);
+});
+
 test('el middleware responde 404 con el cuerpo que toca', async () => {
   // `fetch` se sustituye por el sistema de archivos: lo que en Vercel es una
   // petición interna al origen, aquí es leer el archivo de al lado. Se cuenta
@@ -352,7 +403,7 @@ test('el middleware responde 404 con el cuerpo que toca', async () => {
 
   try {
     const pedir = (accept) =>
-      middleware(new Request('https://vimpos.com.mx/ruta-muerta', { headers: { accept } }));
+      respuesta404(new Request('https://vimpos.com.mx/ruta-muerta', { headers: { accept } }));
 
     const md = await pedir('text/markdown');
     assert.equal(md.status, 404, 'el estatus tiene que seguir siendo 404');
@@ -383,7 +434,7 @@ test('si la página de error no se puede leer, el middleware contesta igual', as
     globalThis.fetch = async () => {
       throw new Error('el origen no contesta');
     };
-    const roto = await middleware(
+    const roto = await respuesta404(
       new Request('https://vimpos.com.mx/ruta-muerta', { headers: { accept: 'text/html' } }),
     );
     assert.equal(roto.status, 404);
@@ -401,14 +452,14 @@ test('si la página de error no se puede leer, el middleware contesta igual', as
         '<!doctype html>\n<html><head><title>Login</title></head><body>Inicia sesión en Vercel</body></html>',
         { status: 200 },
       );
-    const ajeno = await middleware(
+    const ajeno = await respuesta404(
       new Request('https://vimpos.com.mx/ruta-muerta', { headers: { accept: 'text/html' } }),
     );
     assert.equal(ajeno.status, 404);
     assert.ok(!(await ajeno.text()).includes('Inicia sesión'), 'sirvió una página ajena');
 
     // El Markdown no depende de nada de esto y sigue saliendo bien.
-    const md = await middleware(
+    const md = await respuesta404(
       new Request('https://vimpos.com.mx/ruta-muerta', { headers: { accept: 'text/markdown' } }),
     );
     assert.equal(md.status, 404);
