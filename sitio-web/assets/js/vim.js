@@ -23,18 +23,36 @@
   var ANON = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBiaWF4enZtc3Nqc3hkd3FydW1iIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODAyNTMyMzIsImV4cCI6MjA5NTgyOTIzMn0.OsfFcqw-jrj-qZtFkUPQCrLgYtnDmsOxC93iLJShpKs";
   var WHATSAPP = "hola@vimpos.com.mx";
 
-  /* ---- Medición sin cookies ----------------------------------------------
-     Vercel Web Analytics: el script se sirve desde este mismo dominio, no pone
-     cookies y no identifica a nadie (el aviso de privacidad lo dice así).
-     Esta cola guarda los eventos que ocurran antes de que cargue el script;
-     él la vacía al arrancar. Si el script no está (analítica apagada en
-     Vercel, o el servidor local), nada se rompe: la cola crece y ya.
+  /* ---- Medición -----------------------------------------------------------
+     Cada evento se manda a DOS sitios, y no es duplicar por duplicar:
 
-     Cuatro eventos, los que dicen si el sitio vende: clic en WhatsApp, demo
-     enviada, cambio a precio anual y qué pregunta se abre. */
+       · Vercel Web Analytics, que se sirve desde este mismo dominio y no pone
+         cookies. Es el que responde «cuánta gente entró y qué hizo» sin
+         depender de nadie más. Su cola guarda lo que ocurra antes de que
+         cargue el script; él la vacía al arrancar.
+       · Google Tag Manager, que a su vez alimenta Google Analytics y, el día
+         que se anuncie, la etiqueta de Google Ads. Es el que hace falta para
+         que una campaña sepa qué clic acabó en demostración. Su cola es
+         `dataLayer` y funciona igual: si GTM no ha cargado, o no cargó nunca,
+         los eventos se quedan en el array y no se rompe nada.
+
+     Los mismos cuatro eventos que dicen si el sitio vende: clic en WhatsApp,
+     demo enviada, cambio a precio anual y qué pregunta se abre. El nombre del
+     evento viaja idéntico a los dos lados para que los informes se puedan
+     comparar sin traducir nada.
+
+     Un aviso para quien configure GTM: lo que llega a `dataLayer` es un evento
+     con `event: <nombre>` y las propiedades sueltas al lado, NO anidadas. El
+     activador correcto es «Evento personalizado» con ese nombre exacto. */
   window.va = window.va || function () { (window.vaq = window.vaq || []).push(arguments); };
+  window.dataLayer = window.dataLayer || [];
   function medir(nombre, datos) {
     try { window.va("event", { name: nombre, data: datos || {} }); } catch (e) { /* nunca estorba */ }
+    try {
+      var carga = { event: nombre };
+      for (var k in datos || {}) if (Object.prototype.hasOwnProperty.call(datos, k)) carga[k] = datos[k];
+      window.dataLayer.push(carga);
+    } catch (e) { /* nunca estorba */ }
   }
 
   document.querySelectorAll('a[href*="wa.me/"]').forEach(function (a) {
