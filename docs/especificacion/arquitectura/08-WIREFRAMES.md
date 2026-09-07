@@ -5,7 +5,7 @@
 > **Propietario:** el dueño — VIM Marketing
 > **Documento:** octavo en la serie de arquitectura de VIM POS
 > **Alcance:** catálogo exhaustivo de TODAS las pantallas que se necesitan diseñar en Adobe Illustrator antes de empezar a programar el MVP
-> **Audiencia:** el dueño (diseñador), futuro equipo de desarrollo
+> **Audiencia:** El dueño (diseñador), futuro equipo de desarrollo
 > **Depende de:** Partes 1A-1E, 09-MATRIZ-ROLES-PERMISOS, 10-SETUP-INICIAL
 > **Continúa en:** desarrollo del MVP
 
@@ -43,7 +43,7 @@
 
 ### 0.1 Por qué este documento
 
-el dueño diseñará todos los mockups visuales en Adobe Illustrator antes de empezar a programar. Este documento es el **checklist exhaustivo** de qué pantallas necesita dibujar, con suficientes especificaciones para que cada una sea diseñable sin tener que volver a leer las Partes 1A-1E.
+El dueño diseñará todos los mockups visuales en Adobe Illustrator antes de empezar a programar. Este documento es el **checklist exhaustivo** de qué pantallas necesita dibujar, con suficientes especificaciones para que cada una sea diseñable sin tener que volver a leer las Partes 1A-1E.
 
 Cada entrada tiene:
 - **ID único** (formato: P-XXX para identificación cruzada en desarrollo)

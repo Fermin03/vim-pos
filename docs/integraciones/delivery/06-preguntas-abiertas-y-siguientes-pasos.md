@@ -91,7 +91,7 @@
 
 ## D. Siguiente sesión (propuesta)
 
-1. el dueño decide B.1–B.4 y arranca los trámites de A (al menos crear la cuenta de Uber Developer y
+1. El dueño decide B.1–B.4 y arranca los trámites de A (al menos crear la cuenta de Uber Developer y
    registrar el perfil en DiDi).
 2. Con eso, la siguiente sesión de código: ADR `00NN-integracion-apps-de-delivery.md`, migración con
    las cuatro tablas y RLS, `delivery-webhook-uber` + adaptador Uber + panel "Pedidos de apps" contra

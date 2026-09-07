@@ -78,7 +78,7 @@ supabase migration list --linked
 ```
 Expected: la última versión es `0103`. Si aparece `0105`, renumerar todo este plan a `0105` antes de seguir.
 
-- [ ] **Step 3: Subir a Knock-Out al plan Cadena (decisión del dueño, 5 sep 2026)**
+- [ ] **Step 3: Subir a Knock-Out al plan Cadena (decisión de el dueño, 5 sep 2026)**
 
 Prerrequisito de esta entrega: Knock-Out paga **Negocio** (1 sucursal) y usa 2, así que el trigger de sucursales de la Task 1 lo dejaría bloqueado para dar de alta más. Desde `platform.vimpos.com.mx` → Clientes → Knock-Out Burger → Contrato → Plan → **Cadena**. Verificar:
 
@@ -1434,7 +1434,7 @@ Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
 
 - [ ] **Step 5: Publicar**
 
-Con el visto bueno del dueño y **avisando antes a Knock-Out**, que es el piloto:
+Con el visto bueno de el dueño y **avisando antes a Knock-Out**, que es el piloto:
 
 ```bash
 supabase db push                                    # 0105, desde ESTE worktree

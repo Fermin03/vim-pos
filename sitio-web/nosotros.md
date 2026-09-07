@@ -4,13 +4,13 @@
 
 **VIM POS** · punto de venta para restaurantes en México · versión en HTML: https://vimpos.com.mx/nosotros
 
-VIM POS no lo vende un distribuidor ni lo soporta un centro de llamadas. Es un equipo chico en Guanajuato, y quien te contesta el WhatsApp es quien escribió el programa que va a estar en tu caja.
+VIM POS no lo vende un distribuidor ni lo soporta un centro de llamadas. Es un equipo chico en Guanajuato, y quien te contesta el correo es quien escribió el programa que va a estar en tu caja.
 
 ## Quién construye VIM POS
 
-**VIM POS**, persona física con actividad empresarial, con domicilio en Guanajuato, México. Opera bajo la marca **VIM POS**, y es la misma persona que aparece en el [aviso de privacidad](https://vimpos.com.mx/aviso-privacidad) y en los [términos del servicio](https://vimpos.com.mx/terminos): no hay una razón social distinta escondida en la letra chica.
+**VIM POS**, persona física con actividad empresarial, en Guanajuato, México. Es la misma que aparece en el [aviso de privacidad](https://vimpos.com.mx/aviso-privacidad) y en los [términos del servicio](https://vimpos.com.mx/terminos): no hay una razón social distinta escondida en la letra chica. Los datos fiscales completos van en el contrato.
 
-El sistema se desarrolla y se soporta desde la zona de León y Guanajuato, para restaurantes de toda la República. Si tu local está cerca, la demostración puede ser en tu propio mostrador; si no, es por videollamada y funciona igual de bien.
+El sistema se desarrolla y se soporta desde la zona de León, para restaurantes de toda la República. Si tu local está cerca, la demostración puede ser en tu propio mostrador; si no, es por videollamada y funciona igual de bien.
 
 ## Por qué existe
 
@@ -41,7 +41,7 @@ La facturación electrónica —factura global, timbrado individual y portal de 
 
 ## Cómo hablar con nosotros
 
-Por [WhatsApp al hola@vimpos.com.mx](https://wa.me/hola@vimpos.com.mx?text=Hola%2C%20vi%20vimpos.com.mx%2Fnosotros%20y%20quiero%20platicar.) o por correo a [hola@vimpos.com.mx](mailto:hola@vimpos.com.mx). Contestamos el mismo día hábil. Si prefieres que te escribamos nosotros, [pide una demo](https://vimpos.com.mx/demo) y te buscamos.
+Por [hola@vimpos.com.mx](mailto:hola@vimpos.com.mx) o por correo a [hola@vimpos.com.mx](mailto:hola@vimpos.com.mx). Contestamos el mismo día hábil. Si prefieres que te escribamos nosotros, [pide una demo](https://vimpos.com.mx/demo) y te buscamos.
 
 Todas las formas de contacto, con qué canal sirve para qué, están en la [página de contacto](https://vimpos.com.mx/contacto).
 
@@ -49,6 +49,6 @@ Todas las formas de contacto, con qué canal sirve para qué, están en la [pág
 
 **Otras páginas en Markdown:** [Inicio](https://vimpos.com.mx/index.md) · [Funciones](https://vimpos.com.mx/funciones.md) · [Sin internet](https://vimpos.com.mx/sin-internet.md) · [Facturación CFDI](https://vimpos.com.mx/facturacion-cfdi.md) · [Precios](https://vimpos.com.mx/precios.md) · [Pide una demo](https://vimpos.com.mx/demo.md) · [Cuánto cuesta](https://vimpos.com.mx/cuanto-cuesta-un-sistema-para-restaurante.md) · [Cómo elegir sistema](https://vimpos.com.mx/como-elegir-sistema-restaurante.md) · [Contacto](https://vimpos.com.mx/contacto.md) · [Aviso de privacidad](https://vimpos.com.mx/aviso-privacidad.md) · [Términos del servicio](https://vimpos.com.mx/terminos.md)
 
-**Contacto:** hola@vimpos.com.mx · WhatsApp hola@vimpos.com.mx · https://vimpos.com.mx/contacto
+**Contacto:** hola@vimpos.com.mx · https://vimpos.com.mx/contacto
 
 _Generado desde nosotros.html. La versión en HTML es la fuente; este archivo no se edita a mano._

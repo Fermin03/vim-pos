@@ -24,7 +24,7 @@ un 11%. Al mirarlo de cerca, la cifra engaña: **casi todo está construido**.
 Lo que falta no es el asistente. Es **el último tramo**: el dueño llega hasta "tengo el menú
 cargado" y ahí se detiene, porque nadie le dice de dónde baja la caja ni cómo la conecta.
 
-**Alcance elegido** (decisiones del dueño, 6 sep 2026):
+**Alcance elegido** (decisiones de el dueño, 6 sep 2026):
 
 - **Sigue siendo por invitación.** No se abre ninguna puerta pública. `signup-tenant` se queda
   como está, sin enlazar desde el sitio.
@@ -101,7 +101,7 @@ defecto, y que se vuelve a `/bienvenida` hasta que el negocio vende.
 ### 3.1 Los pasos, y qué los marca completos
 
 La virtud de `leerEstadoOnboarding()` es que no se cree nada: consulta los datos reales, así que
-el dueño puede irse, volver, o configurar por su cuenta fuera del checklist, y el estado sigue
+El dueño puede irse, volver, o configurar por su cuenta fuera del checklist, y el estado sigue
 siendo cierto. Se conserva ese principio en los pasos nuevos.
 
 | # | Paso | Se marca completo cuando | Obligatorio |

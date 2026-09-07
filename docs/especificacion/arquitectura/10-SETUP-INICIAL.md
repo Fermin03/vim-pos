@@ -5,7 +5,7 @@
 > **Propietario:** el dueño — VIM Marketing
 > **Documento:** décimo en la serie de arquitectura de VIM POS
 > **Alcance:** flujo paso a paso desde "el dueño crea un tenant" hasta "el restaurante cobra su primera venta"
-> **Audiencia:** el dueño (operador), nuevo cliente piloto (Knock-Out Burger, Chick'n Go, Camtaritos), futuro equipo de onboarding/soporte de VIM Marketing
+> **Audiencia:** El dueño (operador), nuevo cliente piloto (Knock-Out Burger, Chick'n Go, Camtaritos), futuro equipo de onboarding/soporte de VIM Marketing
 > **Depende de:** Partes 1A-1E (arquitectura técnica), 09 (matriz de roles y permisos), **12 (provisioning — nomenclatura canónica)**
 > **Continúa en:** desarrollo del MVP
 
@@ -91,7 +91,7 @@ El onboarding se considera exitoso si el cliente:
 1. **Completa Fase 0 a 4** (datos básicos, sucursal, caja, 1 usuario cajero, 1 producto) en menos de **30 minutos**
 2. **Logra cobrar primera venta real** (no de prueba) en menos de **90 minutos** desde el inicio
 3. **Configura su catálogo completo** (todos sus productos reales) en menos de **4 horas acumuladas**
-4. **NO requiere intervención técnica del dueño** después de Fase 1 (lo demás es autoservicio guiado)
+4. **NO requiere intervención técnica de el dueño** después de Fase 1 (lo demás es autoservicio guiado)
 5. **NO abandona** el proceso entre fases (medido por días sin avanzar)
 
 **Anti-métrica:** si el cliente llama a el dueño por dudas de configuración 3+ veces, el wizard falló en su trabajo. Esa llamada es una bandera para mejorar el documento.
@@ -134,7 +134,7 @@ El dueño del restaurante:
 
 ### 1.2 Self-service guiado (D84)
 
-**Lo que NO queremos:** el dueño conectándose por TeamViewer a cada cliente, llenando formularios por él. Eso no escala más allá de los 3 pilotos.
+**Lo que NO queremos:** El dueño conectándose por TeamViewer a cada cliente, llenando formularios por él. Eso no escala más allá de los 3 pilotos.
 
 **Lo que SÍ queremos:** el cliente sigue los pasos solo, con un wizard inteligente que:
 - Le pregunta lo necesario en orden lógico
@@ -144,7 +144,7 @@ El dueño del restaurante:
 - Le ofrece defaults inteligentes por vertical (D78)
 - Le permite volver atrás sin perder lo avanzado (D81)
 
-el dueño entra solo en **dos momentos**:
+El dueño entra solo en **dos momentos**:
 - **Fase 0:** él crea el tenant cuando cierra la venta (1-2 minutos)
 - **Soporte reactivo:** si el cliente reporta problema específico
 
@@ -322,7 +322,7 @@ Para tu sesión de onboarding con VIM POS, ten lista esta información:
 
 ### 4.1 Paso 0.1: Captura de información del nuevo cliente
 
-el dueño entra al panel de administración de VIM Marketing (Fase 2; en MVP es Supabase Studio o un script).
+El dueño entra al panel de administración de VIM Marketing (Fase 2; en MVP es Supabase Studio o un script).
 
 **Información que captura:**
 
@@ -2008,7 +2008,7 @@ async function bootstrap(tenantId: string) {
 Si un tenant no completa onboarding en:
 
 - **7 días:** email automático de "Hola Mario, ¿necesitas ayuda con tu configuración?"
-- **15 días:** email del dueño ofreciendo sesión 1:1
+- **15 días:** email de el dueño ofreciendo sesión 1:1
 - **30 días:** alerta interna a el dueño para llamar
 - **90 días:** considerar suspender el tenant (con aviso previo)
 
@@ -2028,7 +2028,7 @@ Cuando una validación bloqueante falla, el mensaje debe ser **específico y acc
 
 Si un tenant queda "atorado" sin posibilidad de recuperación (raro, pero posible si hubo bug serio):
 
-1. el dueño revisa estado en `tenant_onboarding_estado` y `auditoria_eventos`
+1. El dueño revisa estado en `tenant_onboarding_estado` y `auditoria_eventos`
 2. Decide: reparar manualmente o resetear el onboarding
 3. Si resetear: función `resetear_onboarding_tenant(tenant_id)` borra datos creados durante onboarding y vuelve a fase 1 (solo aplicable si NO hubo ventas reales)
 
@@ -2114,7 +2114,7 @@ Raro pero posible: "Empecé como foodtruck, ahora abrí restaurante full service
 
 ### 16.1 Validaciones operativas (probar con cliente piloto)
 
-- [ ] **VOnB-01** el dueño crea tenant para "Knock-Out Burger" desde panel admin. El dueño Mario recibe email en 30 segundos.
+- [ ] **VOnB-01** El dueño crea tenant para "Knock-Out Burger" desde panel admin. El dueño Mario recibe email en 30 segundos.
 - [ ] **VOnB-02** Mario hace clic en link de activación. Define contraseña y PIN. Entra al wizard.
 - [ ] **VOnB-03** Mario completa Fase 1 (datos fiscales) en < 15 min, incluyendo RFC, razón social, régimen 601.
 - [ ] **VOnB-04** Mario configura 1 sucursal, 1 caja, 1 área de cocina (default QSR) en < 5 min.

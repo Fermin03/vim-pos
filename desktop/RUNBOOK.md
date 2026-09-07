@@ -250,7 +250,7 @@ los binarios nativos ejecuten), recursos en `resources/` (migraciones, seed, sql
 false`** — no firmamos el ejecutable, así electron-builder no baja winCodeSign. Correr con los caches
 en D: (`ELECTRON_CACHE`/`ELECTRON_BUILDER_CACHE`) por el junction del perfil.
 
-**Datos en la máquina del dueño:** la app *instalada* usa `userData` (`%APPDATA%`) por defecto; en
+**Datos en la máquina de el dueño:** la app *instalada* usa `userData` (`%APPDATA%`) por defecto; en
 esta PC (perfil con junction) eso rompe `initdb` → lanzar con **`VIM_DATA_DIR=D:\ruta`** (o setear esa
 env de sistema). En una **PC normal del piloto** `userData` funciona sin tocar nada.
 

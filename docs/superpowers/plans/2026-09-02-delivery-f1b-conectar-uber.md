@@ -1447,14 +1447,14 @@ git commit -m "docs(delivery): F1b — runbook desde el admin, contrato A5/B3 cu
 
 Luego `superpowers:finishing-a-development-branch` (fusionar a `main` si el dueño lo aprueba).
 
-- [ ] **Step 5: Despliegue (tras la fusión, con confirmación del dueño)**
+- [ ] **Step 5: Despliegue (tras la fusión, con confirmación de el dueño)**
 
 ```bash
 supabase db push
 supabase functions deploy delivery-uber-conexion
 ```
 
-el dueño añade en el dashboard de Supabase el secret `UBER_REDIRECT_URI`, en Vercel (proyecto admin) `NEXT_PUBLIC_UBER_CLIENT_ID` y `NEXT_PUBLIC_UBER_ENTORNO=sandbox`, y en la app de Uber las Redirect URIs. Verificar: `curl -X POST …/functions/v1/delivery-uber-conexion` sin JWT → 401.
+El dueño añade en el dashboard de Supabase el secret `UBER_REDIRECT_URI`, en Vercel (proyecto admin) `NEXT_PUBLIC_UBER_CLIENT_ID` y `NEXT_PUBLIC_UBER_ENTORNO=sandbox`, y en la app de Uber las Redirect URIs. Verificar: `curl -X POST …/functions/v1/delivery-uber-conexion` sin JWT → 401.
 
 ---
 

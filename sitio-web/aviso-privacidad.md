@@ -6,13 +6,15 @@
 
 Qué datos te pedimos, para qué los usamos y cómo pedirnos que los borremos. En corto: te pedimos lo mínimo para poder contestarte, y no los vendemos ni los compartimos con nadie que quiera venderte algo.
 
-Última actualización: 3 de septiembre de 2026.
+Última actualización: 6 de septiembre de 2026.
 
 ## Quién es responsable de tus datos
 
-**VIM POS**, persona física con actividad empresarial, con RFC **XAXX010101000** y domicilio en Guanajuato, México. Opera bajo la marca **VIM POS**.
+**VIM POS**, persona física con actividad empresarial, en Guanajuato, México.
 
-Para cualquier cosa de este aviso: [hola@vimpos.com.mx](mailto:hola@vimpos.com.mx) o [WhatsApp hola@vimpos.com.mx](https://wa.me/hola@vimpos.com.mx?text=Hola%2C%20tengo%20una%20pregunta%20sobre%20el%20aviso%20de%20privacidad%20de%20VIM%20POS.).
+El nombre, el RFC y el domicilio fiscal completos del responsable se entregan a quien los pida por el correo de abajo, y van en el contrato de cualquier cliente. No se publican aquí.
+
+Para cualquier cosa de este aviso: [hola@vimpos.com.mx](mailto:hola@vimpos.com.mx).
 
 ## Qué datos recabamos
 
@@ -79,6 +81,6 @@ Si cambia, se publica aquí con la fecha nueva arriba. Si el cambio afecta a par
 
 **Otras páginas en Markdown:** [Inicio](https://vimpos.com.mx/index.md) · [Funciones](https://vimpos.com.mx/funciones.md) · [Sin internet](https://vimpos.com.mx/sin-internet.md) · [Facturación CFDI](https://vimpos.com.mx/facturacion-cfdi.md) · [Precios](https://vimpos.com.mx/precios.md) · [Pide una demo](https://vimpos.com.mx/demo.md) · [Cuánto cuesta](https://vimpos.com.mx/cuanto-cuesta-un-sistema-para-restaurante.md) · [Cómo elegir sistema](https://vimpos.com.mx/como-elegir-sistema-restaurante.md) · [Nosotros](https://vimpos.com.mx/nosotros.md) · [Contacto](https://vimpos.com.mx/contacto.md) · [Términos del servicio](https://vimpos.com.mx/terminos.md)
 
-**Contacto:** hola@vimpos.com.mx · WhatsApp hola@vimpos.com.mx · https://vimpos.com.mx/contacto
+**Contacto:** hola@vimpos.com.mx · https://vimpos.com.mx/contacto
 
 _Generado desde aviso-privacidad.html. La versión en HTML es la fuente; este archivo no se edita a mano._

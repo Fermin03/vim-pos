@@ -16,12 +16,15 @@
      Se saca de: Supabase → Project Settings → API → anon public.
      Es la misma que ya está en Vercel como NEXT_PUBLIC_SUPABASE_ANON_KEY.
 
-     Si se queda vacía el formulario NO se rompe: cae a WhatsApp con los datos
+     Si se queda vacía el formulario NO se rompe: cae al correo con los datos
      ya escritos. Un formulario que falla en silencio pierde el lead; uno que
-     abre WhatsApp lo entrega igual, solo que por otro camino. */
+     abre el correo lo entrega igual, solo que por otro camino.
+
+     6/09/2026 — la salida de emergencia era WhatsApp y ahora es el correo. El
+     número era personal y salió del sitio entero; el mecanismo es el mismo. */
   var API = "https://pbiaxzvmssjsxdwqrumb.supabase.co";
   var ANON = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBiaWF4enZtc3Nqc3hkd3FydW1iIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODAyNTMyMzIsImV4cCI6MjA5NTgyOTIzMn0.OsfFcqw-jrj-qZtFkUPQCrLgYtnDmsOxC93iLJShpKs";
-  var WHATSAPP = "hola@vimpos.com.mx";
+  var CORREO = "hola@vimpos.com.mx";
 
   /* ---- Medición sin cookies ----------------------------------------------
      Vercel Web Analytics: el script se sirve desde este mismo dominio, no pone
@@ -30,14 +33,18 @@
      él la vacía al arrancar. Si el script no está (analítica apagada en
      Vercel, o el servidor local), nada se rompe: la cola crece y ya.
 
-     Cuatro eventos, los que dicen si el sitio vende: clic en WhatsApp, demo
+     Cuatro eventos, los que dicen si el sitio vende: clic en el correo, demo
      enviada, cambio a precio anual y qué pregunta se abre. */
   window.va = window.va || function () { (window.vaq = window.vaq || []).push(arguments); };
   function medir(nombre, datos) {
     try { window.va("event", { name: nombre, data: datos || {} }); } catch (e) { /* nunca estorba */ }
   }
 
-  document.querySelectorAll('a[href*="wa.me/"]').forEach(function (a) {
+  /* El evento conserva el nombre `whatsapp` a propósito aunque el canal ya sea
+     el correo: renombrarlo partiría la serie histórica en Vercel en dos, y una
+     métrica que se corta cada vez que cambia el canal no sirve para comparar
+     nada. Mide lo mismo que medía: cuánta gente pide hablar con alguien. */
+  document.querySelectorAll('a[href^="mailto:"]').forEach(function (a) {
     a.addEventListener("click", function () {
       medir("whatsapp", { pagina: location.pathname });
     });
@@ -297,20 +304,28 @@
       });
     });
 
-    /* Si no hay a dónde mandar el formulario, se entrega por WhatsApp con todo
-       escrito. La persona solo le da a enviar. */
-    function porWhatsapp(d) {
+    /* Si no hay a dónde mandar el formulario, se entrega por correo con todo
+       escrito. La persona solo le da a enviar.
+
+       El WhatsApp del visitante viaja en el cuerpo y no en el asunto: es el
+       dato con el que se le contesta, y un asunto largo se corta en casi todos
+       los clientes de correo. */
+    function porCorreo(d) {
       var lineas = [
         "Hola, quiero una demo de VIM POS.",
         "",
         "Nombre: " + d.nombre,
+        "WhatsApp: " + d.whatsapp,
         "Negocio: " + d.negocio,
         "Cajas: " + d.cajas,
         "Sucursales: " + d.sucursales,
       ];
       if (d.usa_hoy) lineas.push("Uso hoy: " + d.usa_hoy);
       var texto = lineas.join("\n");
-      window.location.href = "https://wa.me/" + WHATSAPP + "?text=" + encodeURIComponent(texto);
+      window.location.href =
+        "mailto:" + CORREO +
+        "?subject=" + encodeURIComponent("Demo de VIM POS") +
+        "&body=" + encodeURIComponent(texto);
     }
 
     form.addEventListener("submit", function (e) {
@@ -329,7 +344,7 @@
         return;
       }
 
-      if (!ANON) { porWhatsapp(datos); return; }
+      if (!ANON) { porCorreo(datos); return; }
 
       botonEnviar.setAttribute("aria-busy", "true");
       botonEnviar.textContent = "Enviando…";
@@ -354,14 +369,14 @@
           medir("demo_enviada");
         })
         .catch(function (err) {
-          /* El error no deja al visitante sin salida: se le ofrece WhatsApp,
+          /* El error no deja al visitante sin salida: se le ofrece el correo,
              que es a donde iba a acabar de todos modos. */
           botonEnviar.removeAttribute("aria-busy");
           botonEnviar.textContent = "Pide una demo";
           cajaError.hidden = false;
           cajaError.textContent =
             (err.message || "No se pudo enviar.") +
-            " Escríbenos por WhatsApp al hola@vimpos.com.mx y lo resolvemos ahí.";
+            " Escríbenos a hola@vimpos.com.mx y lo resolvemos ahí.";
         });
     });
   }

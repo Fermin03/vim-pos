@@ -1,22 +1,22 @@
 # Escríbenos y contesta una persona
 
-> WhatsApp hola@vimpos.com.mx, hola@vimpos.com.mx y domicilio en Guanajuato, Guanajuato. Contestamos el mismo día hábil y no te contesta un vendedor.
+> Escríbenos a hola@vimpos.com.mx. Contestamos el mismo día hábil y no te contesta un vendedor, sino quien construyó el sistema.
 
 **VIM POS** · punto de venta para restaurantes en México · versión en HTML: https://vimpos.com.mx/contacto
 
 El mismo día hábil, por el canal que prefieras. No hay centro de llamadas, no hay ticket con número de folio y no te va a llamar un vendedor: contesta quien construyó el sistema.
 
-[Escríbenos por WhatsApp](https://wa.me/hola@vimpos.com.mx?text=Hola%2C%20escribo%20desde%20vimpos.com.mx%2Fcontacto.)
+[Escríbenos por correo](mailto:hola@vimpos.com.mx)
 
 [Pide una demo](https://vimpos.com.mx/demo)
 
 ## Las tres formas de llegar a nosotros
 
-- **WhatsApp: [hola@vimpos.com.mx](https://wa.me/hola@vimpos.com.mx?text=Hola%2C%20escribo%20desde%20vimpos.com.mx%2Fcontacto.).** Es el canal principal y el más rápido. Sirve para preguntar precios, agendar una demostración y para el soporte si ya eres cliente. Si prefieres hablar, [llama al mismo número](tel:+hola@vimpos.com.mx) en horario hábil.
-- **Correo: [hola@vimpos.com.mx](mailto:hola@vimpos.com.mx).** Para lo que necesita quedar por escrito: cotizaciones de varias sucursales, datos de facturación, solicitudes de derechos ARCO y prensa.
+- **Correo: [hola@vimpos.com.mx](mailto:hola@vimpos.com.mx).** Es el canal principal. Sirve para preguntar precios, agendar una demostración, el soporte si ya eres cliente, y para lo que necesita quedar por escrito: cotizaciones de varias sucursales, datos de facturación, solicitudes de derechos ARCO y prensa. Contestamos el mismo día hábil.
+- **WhatsApp, en cuanto nos escribas.** Si prefieres seguir la conversación por ahí, dilo en el correo y te pasamos el número. Ya no lo publicamos en el sitio.
 - **El [formulario de demostración](https://vimpos.com.mx/demo).** Si prefieres que te busquemos nosotros. Pide cuántas cajas y cuántas sucursales tienes, que es lo que decide qué plan te toca y qué te enseñamos.
 
-Contestamos **el mismo día hábil**, en horario hábil y en español. No hay número 800 ni menú de opciones: llamas y contesta una persona.
+Contestamos **el mismo día hábil**, en horario hábil y en español. No hay número 800 ni menú de opciones: escribes y contesta una persona.
 
 ![Panel del dueño con las ventas del día, el ticket promedio y el top de productos.](https://vimpos.com.mx/assets/img/capturas/admin-dashboard.webp?v=2)
 
@@ -24,18 +24,18 @@ _El panel que te enseñamos en la demostración: cómo va el día, la venta por 
 
 ## Quién responde
 
-**VIM POS**, persona física con actividad empresarial, que opera bajo la marca **VIM POS**. Es el mismo responsable que aparece en el [aviso de privacidad](https://vimpos.com.mx/aviso-privacidad) y en los [términos del servicio](https://vimpos.com.mx/terminos).
+**VIM POS**, persona física con actividad empresarial. Es el mismo responsable que aparece en el [aviso de privacidad](https://vimpos.com.mx/aviso-privacidad) y en los [términos del servicio](https://vimpos.com.mx/terminos).
 
-**Domicilio:** Guanajuato, México. Es domicilio fiscal y de trabajo, no una tienda: si quieres que nos veamos en persona, se agenda antes por WhatsApp.
+**Dónde estamos:** Guanajuato, México. No hay tienda ni mostrador al público, así que no publicamos la dirección: si quieres que nos veamos en persona, se agenda antes por correo. El domicilio fiscal completo va en el contrato y se entrega a quien lo pida.
 
-**Zona de servicio:** toda la República Mexicana. La visita presencial el día del arranque va incluida en el plan Cadena; en la zona de León y Guanajuato también podemos ir a la demostración.
+**Zona de servicio:** toda la República Mexicana. La visita presencial el día del arranque va incluida en el plan Cadena; en la zona de León también podemos ir a la demostración.
 
 ## Qué te sirve más según lo que busques
 
 - **Saber cuánto cuesta.** No hace falta escribirnos: los tres planes, los extras y los paquetes de folios están publicados en la [página de precios](https://vimpos.com.mx/precios).
 - **Saber si hace lo que necesitas.** Lo que hace el sistema y lo que no, módulo por módulo, está en [funciones](https://vimpos.com.mx/funciones).
 - **Verlo funcionando.** [Pide una demo](https://vimpos.com.mx/demo): media hora, con tus productos y tus precios cargados, sin presentación y sin compromiso.
-- **Soporte, si ya eres cliente.** WhatsApp al mismo número, en horario hábil, y también el día del arranque en los planes con acompañamiento.
+- **Soporte, si ya eres cliente.** Al mismo correo, en horario hábil, y también el día del arranque en los planes con acompañamiento.
 - **Derechos ARCO o privacidad.** Por correo, con lo que pide el [aviso de privacidad](https://vimpos.com.mx/aviso-privacidad). Se contesta en un máximo de 20 días hábiles y no cuesta nada.
 
 ## Para agentes y herramientas automáticas
@@ -46,6 +46,6 @@ Este sitio publica su contenido también en Markdown y describe qué es VIM POS 
 
 **Otras páginas en Markdown:** [Inicio](https://vimpos.com.mx/index.md) · [Funciones](https://vimpos.com.mx/funciones.md) · [Sin internet](https://vimpos.com.mx/sin-internet.md) · [Facturación CFDI](https://vimpos.com.mx/facturacion-cfdi.md) · [Precios](https://vimpos.com.mx/precios.md) · [Pide una demo](https://vimpos.com.mx/demo.md) · [Cuánto cuesta](https://vimpos.com.mx/cuanto-cuesta-un-sistema-para-restaurante.md) · [Cómo elegir sistema](https://vimpos.com.mx/como-elegir-sistema-restaurante.md) · [Nosotros](https://vimpos.com.mx/nosotros.md) · [Aviso de privacidad](https://vimpos.com.mx/aviso-privacidad.md) · [Términos del servicio](https://vimpos.com.mx/terminos.md)
 
-**Contacto:** hola@vimpos.com.mx · WhatsApp hola@vimpos.com.mx · https://vimpos.com.mx/contacto
+**Contacto:** hola@vimpos.com.mx · https://vimpos.com.mx/contacto
 
 _Generado desde contacto.html. La versión en HTML es la fuente; este archivo no se edita a mano._

@@ -8,7 +8,7 @@ Uber**: si algo del ADR 0011 o del código lo contradice, se corrige el código.
 
 | Archivo | Qué es |
 |---|---|
-| `2026-09-02-uber-api-licensing-agreement-firmado.pdf` | El contrato completo (14 páginas), **versión completada de DocuSign** con los datos del Provider, las casillas de APIs y la firma del dueño (2 sep 2026). Contiene datos personales (RFC, dirección, teléfono): no sale de este repo privado. |
+| `2026-09-02-uber-api-licensing-agreement-firmado.pdf` | El contrato completo (14 páginas), **versión completada de DocuSign** con los datos del Provider, las casillas de APIs y la firma de el dueño (2 sep 2026). Contiene datos personales (RFC, dirección, teléfono): no sale de este repo privado. |
 | `2026-09-02-docusign-certificado-de-firma.pdf` | Certificado de DocuSign del sobre `BE49223E-42E1-8187-816B-696076163E3A`. Estado al descargarlo: *Entregado* (enviado y visto el 2 sep 2026 a las 17:18–17:19, hora del centro). |
 | `uber-eats-api-terms-of-use-row.md` | Los *API Terms of Use* (versión ROW/EU, feb 2021) que el contrato incorpora por referencia. Texto íntegro. |
 

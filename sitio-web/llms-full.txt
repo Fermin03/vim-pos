@@ -20,7 +20,7 @@ Caja, cocina, mesas, inventario y facturación en un solo sistema. La implementa
 
 [Pide una demo](https://vimpos.com.mx/demo)
 
-[Escríbenos por WhatsApp](https://wa.me/hola@vimpos.com.mx?text=Hola%2C%20vi%20vimpos.com.mx%20y%20quiero%20saber%20m%C3%A1s%20de%20VIM%20POS%20para%20mi%20restaurante.)
+[Escríbenos por correo](mailto:hola@vimpos.com.mx)
 
 En operación en Knock-Out Burger, León, Gto.
 
@@ -224,7 +224,7 @@ Sin presentación ni compromiso. Traes tu carta, la cargamos y ves cómo se ve t
 
 [Pide una demo](https://vimpos.com.mx/demo)
 
-[WhatsApp](https://wa.me/hola@vimpos.com.mx?text=Hola%2C%20vi%20vimpos.com.mx%20y%20quiero%20saber%20m%C3%A1s%20de%20VIM%20POS%20para%20mi%20restaurante.)
+[Escríbenos](mailto:hola@vimpos.com.mx)
 
 ---
 
@@ -887,7 +887,7 @@ Dinos cuántas cajas y cuántas sucursales tienes y te decimos el plan en el mis
 
 [Pide una demo](https://vimpos.com.mx/demo)
 
-[Escríbenos por WhatsApp](https://wa.me/hola@vimpos.com.mx?text=Hola%2C%20vi%20los%20precios%20en%20vimpos.com.mx%20y%20quiero%20saber%20qu%C3%A9%20plan%20me%20toca.)
+[Escríbenos por correo](mailto:hola@vimpos.com.mx)
 
 ---
 
@@ -920,7 +920,7 @@ Media hora, sin compromiso y sin presentación. Vemos tu carta, montamos un par 
 
 _Esto es lo que vas a ver en la demostración, con tus productos y tus precios cargados._
 
-**No te va a llamar un vendedor.** Somos un equipo chico de León: te contesta quien construyó el sistema. Y si prefieres hablar ahora, [llámanos al hola@vimpos.com.mx](tel:+hola@vimpos.com.mx) en horario hábil.
+**No te va a llamar un vendedor.** Somos un equipo chico de León: te contesta quien construyó el sistema. Y si prefieres hablar ahora, [escríbenos](mailto:hola@vimpos.com.mx) y te contestamos el mismo día hábil.
 
 Tus datos son solo para contactarte por esto. No los vendemos, no los compartimos y no te vamos a meter a una lista de correos.
 
@@ -1107,13 +1107,13 @@ Media hora con tus productos y tus precios cargados. Puedes traer esta lista y h
 
 **VIM POS** · punto de venta para restaurantes en México · versión en HTML: https://vimpos.com.mx/nosotros
 
-VIM POS no lo vende un distribuidor ni lo soporta un centro de llamadas. Es un equipo chico en Guanajuato, y quien te contesta el WhatsApp es quien escribió el programa que va a estar en tu caja.
+VIM POS no lo vende un distribuidor ni lo soporta un centro de llamadas. Es un equipo chico en Guanajuato, y quien te contesta el correo es quien escribió el programa que va a estar en tu caja.
 
 ## Quién construye VIM POS
 
-**VIM POS**, persona física con actividad empresarial, con domicilio en Guanajuato, México. Opera bajo la marca **VIM POS**, y es la misma persona que aparece en el [aviso de privacidad](https://vimpos.com.mx/aviso-privacidad) y en los [términos del servicio](https://vimpos.com.mx/terminos): no hay una razón social distinta escondida en la letra chica.
+**VIM POS**, persona física con actividad empresarial, en Guanajuato, México. Es la misma que aparece en el [aviso de privacidad](https://vimpos.com.mx/aviso-privacidad) y en los [términos del servicio](https://vimpos.com.mx/terminos): no hay una razón social distinta escondida en la letra chica. Los datos fiscales completos van en el contrato.
 
-El sistema se desarrolla y se soporta desde la zona de León y Guanajuato, para restaurantes de toda la República. Si tu local está cerca, la demostración puede ser en tu propio mostrador; si no, es por videollamada y funciona igual de bien.
+El sistema se desarrolla y se soporta desde la zona de León, para restaurantes de toda la República. Si tu local está cerca, la demostración puede ser en tu propio mostrador; si no, es por videollamada y funciona igual de bien.
 
 ## Por qué existe
 
@@ -1144,7 +1144,7 @@ La facturación electrónica —factura global, timbrado individual y portal de 
 
 ## Cómo hablar con nosotros
 
-Por [WhatsApp al hola@vimpos.com.mx](https://wa.me/hola@vimpos.com.mx?text=Hola%2C%20vi%20vimpos.com.mx%2Fnosotros%20y%20quiero%20platicar.) o por correo a [hola@vimpos.com.mx](mailto:hola@vimpos.com.mx). Contestamos el mismo día hábil. Si prefieres que te escribamos nosotros, [pide una demo](https://vimpos.com.mx/demo) y te buscamos.
+Por [hola@vimpos.com.mx](mailto:hola@vimpos.com.mx) o por correo a [hola@vimpos.com.mx](mailto:hola@vimpos.com.mx). Contestamos el mismo día hábil. Si prefieres que te escribamos nosotros, [pide una demo](https://vimpos.com.mx/demo) y te buscamos.
 
 Todas las formas de contacto, con qué canal sirve para qué, están en la [página de contacto](https://vimpos.com.mx/contacto).
 
@@ -1154,23 +1154,23 @@ Todas las formas de contacto, con qué canal sirve para qué, están en la [pág
 
 # Escríbenos y contesta una persona
 
-> WhatsApp hola@vimpos.com.mx, hola@vimpos.com.mx y domicilio en Guanajuato, Guanajuato. Contestamos el mismo día hábil y no te contesta un vendedor.
+> Escríbenos a hola@vimpos.com.mx. Contestamos el mismo día hábil y no te contesta un vendedor, sino quien construyó el sistema.
 
 **VIM POS** · punto de venta para restaurantes en México · versión en HTML: https://vimpos.com.mx/contacto
 
 El mismo día hábil, por el canal que prefieras. No hay centro de llamadas, no hay ticket con número de folio y no te va a llamar un vendedor: contesta quien construyó el sistema.
 
-[Escríbenos por WhatsApp](https://wa.me/hola@vimpos.com.mx?text=Hola%2C%20escribo%20desde%20vimpos.com.mx%2Fcontacto.)
+[Escríbenos por correo](mailto:hola@vimpos.com.mx)
 
 [Pide una demo](https://vimpos.com.mx/demo)
 
 ## Las tres formas de llegar a nosotros
 
-- **WhatsApp: [hola@vimpos.com.mx](https://wa.me/hola@vimpos.com.mx?text=Hola%2C%20escribo%20desde%20vimpos.com.mx%2Fcontacto.).** Es el canal principal y el más rápido. Sirve para preguntar precios, agendar una demostración y para el soporte si ya eres cliente. Si prefieres hablar, [llama al mismo número](tel:+hola@vimpos.com.mx) en horario hábil.
-- **Correo: [hola@vimpos.com.mx](mailto:hola@vimpos.com.mx).** Para lo que necesita quedar por escrito: cotizaciones de varias sucursales, datos de facturación, solicitudes de derechos ARCO y prensa.
+- **Correo: [hola@vimpos.com.mx](mailto:hola@vimpos.com.mx).** Es el canal principal. Sirve para preguntar precios, agendar una demostración, el soporte si ya eres cliente, y para lo que necesita quedar por escrito: cotizaciones de varias sucursales, datos de facturación, solicitudes de derechos ARCO y prensa. Contestamos el mismo día hábil.
+- **WhatsApp, en cuanto nos escribas.** Si prefieres seguir la conversación por ahí, dilo en el correo y te pasamos el número. Ya no lo publicamos en el sitio.
 - **El [formulario de demostración](https://vimpos.com.mx/demo).** Si prefieres que te busquemos nosotros. Pide cuántas cajas y cuántas sucursales tienes, que es lo que decide qué plan te toca y qué te enseñamos.
 
-Contestamos **el mismo día hábil**, en horario hábil y en español. No hay número 800 ni menú de opciones: llamas y contesta una persona.
+Contestamos **el mismo día hábil**, en horario hábil y en español. No hay número 800 ni menú de opciones: escribes y contesta una persona.
 
 ![Panel del dueño con las ventas del día, el ticket promedio y el top de productos.](https://vimpos.com.mx/assets/img/capturas/admin-dashboard.webp?v=2)
 
@@ -1178,18 +1178,18 @@ _El panel que te enseñamos en la demostración: cómo va el día, la venta por 
 
 ## Quién responde
 
-**VIM POS**, persona física con actividad empresarial, que opera bajo la marca **VIM POS**. Es el mismo responsable que aparece en el [aviso de privacidad](https://vimpos.com.mx/aviso-privacidad) y en los [términos del servicio](https://vimpos.com.mx/terminos).
+**VIM POS**, persona física con actividad empresarial. Es el mismo responsable que aparece en el [aviso de privacidad](https://vimpos.com.mx/aviso-privacidad) y en los [términos del servicio](https://vimpos.com.mx/terminos).
 
-**Domicilio:** Guanajuato, México. Es domicilio fiscal y de trabajo, no una tienda: si quieres que nos veamos en persona, se agenda antes por WhatsApp.
+**Dónde estamos:** Guanajuato, México. No hay tienda ni mostrador al público, así que no publicamos la dirección: si quieres que nos veamos en persona, se agenda antes por correo. El domicilio fiscal completo va en el contrato y se entrega a quien lo pida.
 
-**Zona de servicio:** toda la República Mexicana. La visita presencial el día del arranque va incluida en el plan Cadena; en la zona de León y Guanajuato también podemos ir a la demostración.
+**Zona de servicio:** toda la República Mexicana. La visita presencial el día del arranque va incluida en el plan Cadena; en la zona de León también podemos ir a la demostración.
 
 ## Qué te sirve más según lo que busques
 
 - **Saber cuánto cuesta.** No hace falta escribirnos: los tres planes, los extras y los paquetes de folios están publicados en la [página de precios](https://vimpos.com.mx/precios).
 - **Saber si hace lo que necesitas.** Lo que hace el sistema y lo que no, módulo por módulo, está en [funciones](https://vimpos.com.mx/funciones).
 - **Verlo funcionando.** [Pide una demo](https://vimpos.com.mx/demo): media hora, con tus productos y tus precios cargados, sin presentación y sin compromiso.
-- **Soporte, si ya eres cliente.** WhatsApp al mismo número, en horario hábil, y también el día del arranque en los planes con acompañamiento.
+- **Soporte, si ya eres cliente.** Al mismo correo, en horario hábil, y también el día del arranque en los planes con acompañamiento.
 - **Derechos ARCO o privacidad.** Por correo, con lo que pide el [aviso de privacidad](https://vimpos.com.mx/aviso-privacidad). Se contesta en un máximo de 20 días hábiles y no cuesta nada.
 
 ## Para agentes y herramientas automáticas
@@ -1208,13 +1208,15 @@ Este sitio publica su contenido también en Markdown y describe qué es VIM POS 
 
 Qué datos te pedimos, para qué los usamos y cómo pedirnos que los borremos. En corto: te pedimos lo mínimo para poder contestarte, y no los vendemos ni los compartimos con nadie que quiera venderte algo.
 
-Última actualización: 3 de septiembre de 2026.
+Última actualización: 6 de septiembre de 2026.
 
 ## Quién es responsable de tus datos
 
-**VIM POS**, persona física con actividad empresarial, con RFC **XAXX010101000** y domicilio en Guanajuato, México. Opera bajo la marca **VIM POS**.
+**VIM POS**, persona física con actividad empresarial, en Guanajuato, México.
 
-Para cualquier cosa de este aviso: [hola@vimpos.com.mx](mailto:hola@vimpos.com.mx) o [WhatsApp hola@vimpos.com.mx](https://wa.me/hola@vimpos.com.mx?text=Hola%2C%20tengo%20una%20pregunta%20sobre%20el%20aviso%20de%20privacidad%20de%20VIM%20POS.).
+El nombre, el RFC y el domicilio fiscal completos del responsable se entregan a quien los pida por el correo de abajo, y van en el contrato de cualquier cliente. No se publican aquí.
+
+Para cualquier cosa de este aviso: [hola@vimpos.com.mx](mailto:hola@vimpos.com.mx).
 
 ## Qué datos recabamos
 
@@ -1289,11 +1291,13 @@ Si cambia, se publica aquí con la fecha nueva arriba. Si el cambio afecta a par
 
 Qué contratas, qué incluye, cómo se cobra y cómo cancelar. Escritos para que se entiendan de una lectura.
 
-Última actualización: 3 de septiembre de 2026.
+Última actualización: 6 de septiembre de 2026.
 
 ## Quién presta el servicio
 
-**VIM POS**, persona física con actividad empresarial, RFC **XAXX010101000**, domicilio en Guanajuato, bajo la marca **VIM POS**. En adelante, «nosotros».
+**VIM POS**, persona física con actividad empresarial, en Guanajuato, México. En adelante, «nosotros».
+
+El nombre, el RFC y el domicilio fiscal completos de quien presta el servicio van en el contrato que se firma antes de contratar, y se entregan antes a quien los pida por correo. No se publican en el sitio.
 
 Al contratar el servicio aceptas estos términos. Si algo no te cuadra, dínoslo antes de contratar y lo hablamos.
 

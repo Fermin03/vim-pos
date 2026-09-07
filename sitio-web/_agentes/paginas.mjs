@@ -137,15 +137,24 @@ export const porRuta = (ruta) => TODAS.find((p) => p.ruta === ruta);
 // Los datos de contacto viven aquí y no repartidos por nueve archivos, porque
 // la coherencia del NAP (nombre, dirección, teléfono) es literalmente uno de
 // los puntos que se auditan.
+//
+// 6/09/2026 — de aquí salieron el nombre legal, el RFC, el domicilio y el
+// número de WhatsApp. Eran datos personales de una persona física: el RFC de
+// una lleva su fecha de nacimiento, el domicilio fiscal era su casa y el
+// número era su móvil. Publicados en el sitio, quedaban además en el
+// repositorio, que es público. El canal es ahora el correo, que sí es de la
+// empresa.
+//
+// Los campos NO se dejaron vacíos: se borraron. Un campo vacío se cuela en un
+// JSON-LD como `"streetAddress": ""` y en una frase como «domicilio en ,
+// Guanajuato» —las dos cosas pasaron en este mismo cambio antes de repasarlo a
+// mano—. Si algún día vuelve a hacer falta un domicilio publicable, que sea el
+// fiscal de un despacho o un buzón, nunca el de casa.
 export const NEGOCIO = {
   nombre: 'VIM POS',
   razonSocial: 'VIM POS',
-  rfc: 'XAXX010101000',
   correo: 'hola@vimpos.com.mx',
-  whatsapp: 'hola@vimpos.com.mx',
-  whatsappUrl: 'https://wa.me/hola@vimpos.com.mx',
-  telefonoE164: '+hola@vimpos.com.mx',
-  calle: 'Guanajuato',
+  correoUrl: 'mailto:hola@vimpos.com.mx',
   ciudad: 'Guanajuato',
   estado: 'Guanajuato',
   pais: 'MX',

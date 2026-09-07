@@ -21,7 +21,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { config as configMiddleware, prefiereHtml, CUERPO_MARKDOWN } from '../middleware.ts';
+import { MATCHER_404, prefiereHtml, CUERPO_MARKDOWN } from '../middleware.ts';
 
 export const RAIZ = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -30,7 +30,15 @@ export const config = JSON.parse(fs.readFileSync(path.join(RAIZ, 'vercel.json'),
 // El middleware corre ANTES que todo lo demás, incluidas las redirecciones. Su
 // `matcher` sale del propio archivo, sin copiarlo, para que no puedan
 // separarse: si allí se añade una exclusión, aquí se entera sola.
-export const MATCHER_MIDDLEWARE = new RegExp('^' + configMiddleware.matcher[0] + '$');
+//
+// 6/09/2026 — sale de `MATCHER_404` y ya no de `config.matcher`. Con el sitio
+// en mantenimiento `config.matcher` es `/(.*)`, y leerlo de ahí volvería
+// trivialmente verdes las pruebas del enrutador: «todo lo tapa el middleware»
+// pasa cualquier comprobación de que no se sirve nada que no deba. Lo que
+// interesa vigilar es el matcher del 404, que es el que vuelve cuando el sitio
+// se encienda; si se pudre mientras espera, nos enteramos al encender y no
+// antes. Ver el bloque MANTENIMIENTO en ../middleware.ts.
+export const MATCHER_MIDDLEWARE = new RegExp('^' + MATCHER_404[0] + '$');
 
 // Un `source` de Vercel es una ruta literal donde los paréntesis se dejan pasar
 // como expresión regular. Se escapa todo lo de fuera y se respeta lo de dentro.

@@ -50,7 +50,7 @@ conectarlo, con su DPA.
 | Persona | Acceso | Revisión |
 |---|---|---|
 | VIM POS (dueño) | Dashboard de Supabase (service_role, secrets), Vercel, GitHub, cuenta de desarrollador de Uber | Trimestral: quitar lo que no se use |
-| Claude Code (asistente, sesión local del dueño) | CLI de Supabase con el token del dueño; nunca credenciales de Uber en claro | Cada sesión termina sin token persistente |
+| Claude Code (asistente, sesión local de el dueño) | CLI de Supabase con el token de el dueño; nunca credenciales de Uber en claro | Cada sesión termina sin token persistente |
 
 Los restaurantes solo ven su tenant (RLS). El POS y el admin nunca usan `service_role`.
 
