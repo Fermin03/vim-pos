@@ -282,6 +282,8 @@ La caja hace de **servidor en la LAN**: el gateway escucha en `0.0.0.0` y al arr
 - **Tiempo real:** trigger `pg_notify('vim_kds', …)` al cambiar el estado de cocina de un ticket →
   el backend hace `LISTEN` y reenvía por **SSE** (`GET /kds/stream?sucursal=<id>`). El KDS del POS
   se suscribe (EventSource) y recarga al instante; el polling de 5s queda como respaldo.
+  El mismo puente lleva `vim_catalogo` como `event: catalogo` (ver "El menú, al minuto"): un
+  cliente que no lo conozca lo ignora, así que el KDS viejo no se rompe.
 - Verificado: `npm run verify:hub` (KDS recibe EN_COCINA/LISTO en vivo + acceso por IP de LAN).
 - **UI servido por la LAN (auto-configurable):** el hub sirve el POS en `http://<ip-caja>:54360`;
   el `ui-server` inyecta el endpoint del gateway desde `location` → cualquier navegador de la LAN
@@ -292,6 +294,31 @@ La caja hace de **servidor en la LAN**: el gateway escucha en `0.0.0.0` y al arr
 - **Pendiente Fase 2 (comodidad, no riesgo):** descubrimiento mDNS del hub (hoy IP a mano); refresco
   del token del device para KDS 24/7 (hoy TTL 12h cubre un turno, reinicio diario lo renueva);
   probar 2ª caja en la LAN.
+
+## El menú, al minuto (sondeo de catálogo)
+
+El catálogo bajaba **1 de cada 6 ciclos** (`SYNC_PULL_CADA`, ≈1 h). Un producto dado de alta en
+/admin no salía en la caja hasta esa hora o hasta reiniciar la app —el arranque siempre hace PULL—
+y así lo reportó el piloto. Bajarlo cada 10 min tampoco servía: es reescribir productos, precios y
+permisos sobre la base de una caja que está cobrando.
+
+La caja no puede recibir avisos (vive detrás del NAT del local), así que **pregunta**:
+
+- **Cada 60 s** llama `catalogo_version()` (migración `0109`) por PostgREST. Devuelve UN timestamp:
+  el `max(updated_at)` del menú del tenant, bajo RLS. Va por PostgREST y no por Edge Function a
+  propósito — ahí no cuesta invocación ni arranque en frío. Si no cambió, no pasa nada.
+- Si cambió, **PULL en el acto** (`sondeo-catalogo.mjs`). El PULL del sondeo NO sube ventas: un
+  cambio de menú no tiene por qué arrastrar un push, que es la parte lenta.
+- Al terminar, `pg_notify('vim_catalogo', …)` → viaja por el **mismo puente SSE del KDS** →
+  el POS relee el menú sin recargar. La 2ª caja y la cocina se enteran por el mismo camino.
+- **Botón manual:** `POST /__sincronizar-catalogo` (menú del POS → Ajustes → "Actualizar menú").
+  Guarda de origen como el resto de rutas que escriben, y freno de 10 s.
+- Con la nube caída el sondeo hace backoff 1→2→4→8→10 min, y ahí se queda: una caja sin internet
+  preguntando cada minuto solo llena el log.
+- Verificado: `npm run verify:hub` (el aviso de catálogo llega por SSE) y `node --test src/`.
+
+Una caja que arranca **sin red** deja el sondeo sin versión conocida, así que el primer sondeo que
+alcance la nube baja el catálogo. Es a propósito: su copia local es de la sesión anterior.
 
 ## Conectar a la nube (deploy del sync real) — #3
 

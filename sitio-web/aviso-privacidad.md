@@ -63,11 +63,15 @@ Si consideras que no atendimos bien tu solicitud, puedes acudir al **INAI** ([ho
 
 ## Cookies y medición
 
-**Este sitio no usa cookies de publicidad ni de rastreo**, ni de terceros que te sigan a otras páginas. Por eso no verás un banner de consentimiento: no hay nada que consentir.
+**Este sitio mide sus visitas con Google Analytics**, que se carga a través de Google Tag Manager. Para no contarte dos veces, Google Analytics guarda en tu navegador una cookie de este mismo dominio con un identificador aleatorio. Ese identificador no lleva tu nombre, tu teléfono ni nada de lo que hayas escrito aquí, y no lo cruzamos con las solicitudes de demostración.
 
-Tampoco carga tipografías ni scripts desde servidores de terceros. Todo lo que necesita para verse está en este mismo sitio, así que tu visita no se le anuncia a nadie más.
+**Qué se mide:** qué páginas ves, desde qué país entras, en qué tipo de dispositivo, y las cuatro acciones que nos dicen si el sitio sirve para algo — si se hizo clic en WhatsApp, si se envió el formulario de demostración, si se consultó el precio anual y qué pregunta frecuente se abrió. Nada de eso identifica a una persona.
 
-**Sí medimos las visitas**, con la herramienta del proveedor que aloja el sitio (Vercel Web Analytics). No usa cookies, no guarda tu dirección IP y no identifica a nadie: cuenta cuántas personas ven cada página, desde qué país y en qué tipo de dispositivo, y si se hizo clic en WhatsApp, se envió el formulario de demostración, se consultó el precio anual o se abrió una pregunta frecuente. No hay forma de saber quién hizo cada cosa. Si esto cambiara, se actualizaría este aviso antes.
+**Qué NO hacemos:** no ponemos cookies de publicidad ni de remarketing, no te seguimos a otras páginas y no vendemos ni cedemos tu visita a nadie. Tampoco cargamos tipografías de terceros: todas viven en este mismo sitio.
+
+Google trata estos datos por cuenta nuestra y puede procesarlos fuera de México. Si prefieres quedarte fuera de la medición, puedes instalar el [complemento de inhabilitación de Google Analytics](https://tools.google.com/dlpage/gaoptout) o bloquear las cookies de este sitio desde tu navegador. El sitio funciona exactamente igual sin ellas: no hay nada aquí que dependa de que te midamos.
+
+Además, el proveedor que aloja el sitio (Vercel) cuenta las visitas de forma agregada y sin cookies. Si algo de esto cambiara, se actualizaría este aviso antes.
 
 ## Seguridad
 

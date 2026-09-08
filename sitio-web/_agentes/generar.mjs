@@ -477,17 +477,38 @@ function vercelJson() {
       headers: [
         { key: 'X-Content-Type-Options', value: 'nosniff' },
         { key: 'X-Frame-Options', value: 'SAMEORIGIN' },
-        // El sitio no carga nada de fuera: ni scripts, ni tipografías, ni
-        // imágenes. Lo único que sale es la solicitud de demo a la función de
-        // Supabase. `unsafe-inline` en estilos porque las páginas llevan
-        // atributos `style=""`; en scripts no hace falta (el JSON-LD no se
-        // ejecuta). `data:` en imágenes por el SVG en línea del CSS.
+        // De fuera solo entra Google Tag Manager, y de ahí Google Analytics.
+        // Todo lo demás —tipografías, imágenes, estilos— sigue viviendo en este
+        // dominio. Lo que sale son dos cosas: la solicitud de demo a la función
+        // de Supabase y los eventos de medición a Google.
+        //
+        // `unsafe-inline` en estilos porque las páginas llevan atributos
+        // `style=""`; en SCRIPTS sigue sin estar, y es a propósito — por eso el
+        // fragmento de GTM no se pega en línea como manda Google sino que vive
+        // en `assets/js/gtm.js`, servido desde aquí. Abrir 'unsafe-inline' por
+        // una etiqueta habría tirado la mitad de la protección.
+        //
+        // `data:` en imágenes por el SVG en línea del CSS. `tagassistant` en
+        // `frame-ancestors` para que el modo de vista previa de GTM pueda
+        // mostrar el sitio dentro de su depurador; sin eso, «Vista previa» sale
+        // en blanco y parece que la instalación falló.
+        //
+        // ⚠️ Esta es la copia BUENA de la política: `vercel.json` se genera
+        // desde aquí y cualquier cambio hecho allí se pierde en el siguiente
+        // `node _agentes/generar.mjs`. Las otras dos copias, que sí van a mano,
+        // están en `middleware.ts` y en `_agentes/rutas.mjs`; las tres tienen
+        // que decir lo mismo.
         {
           key: 'Content-Security-Policy',
           value:
-            "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; " +
-            "img-src 'self' data:; font-src 'self'; connect-src 'self' https://pbiaxzvmssjsxdwqrumb.supabase.co; " +
-            "object-src 'none'; base-uri 'self'; frame-ancestors 'self'; form-action 'self'",
+            "default-src 'self'; script-src 'self' https://www.googletagmanager.com; " +
+            "style-src 'self' 'unsafe-inline'; " +
+            "img-src 'self' data: https://*.google-analytics.com https://*.googletagmanager.com; " +
+            "font-src 'self'; " +
+            "connect-src 'self' https://pbiaxzvmssjsxdwqrumb.supabase.co " +
+            "https://*.google-analytics.com https://*.analytics.google.com https://*.googletagmanager.com; " +
+            "object-src 'none'; base-uri 'self'; " +
+            "frame-ancestors 'self' https://tagassistant.google.com; form-action 'self'",
         },
         { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
         { key: 'Permissions-Policy', value: 'camera=(), microphone=(), geolocation=(), interest-cohort=()' },

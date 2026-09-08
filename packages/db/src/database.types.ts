@@ -10141,6 +10141,7 @@ export type Database = {
         Args: { p_pin_actual: string; p_pin_nuevo: string }
         Returns: undefined
       }
+      catalogo_version: { Args: never; Returns: string }
       cancelar_item_ticket: {
         Args: {
           p_autorizacion_pin_id?: string

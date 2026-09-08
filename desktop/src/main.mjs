@@ -16,6 +16,7 @@ import { pushToCloud } from "./sync-push.mjs";
 import { respaldar } from "./backup.mjs";
 import { crearWatchdog } from "./watchdog.mjs";
 import { crearCicloSync } from "./sync-ciclo.mjs";
+import { crearSondeoCatalogo } from "./sondeo-catalogo.mjs";
 import { crearAlmacenDirectivas, estadoDeVersion } from "./directivas.mjs";
 import { crearEspejo } from "./delivery-espejo.mjs";
 import { registrarErrorLocal, subirErrores } from "./sync-errores.mjs";
@@ -248,6 +249,7 @@ async function bootCaja() {
       onVincularNube: (p) => vincularConNube(p),
       estadoSync: () => ({ disponible: true, vinculada: leerNube() !== null, ...ciclo.estado() }),
       onFolios: () => consultarFolios(),
+      onSincronizarCatalogo: () => bajarCatalogoAhora("botón"),
       avisoVisto: (id) => directivas.marcarVisto(id),
       directivas: () => {
         const { directivas: d, recibidoIso } = directivas.leer();
@@ -623,9 +625,15 @@ async function syncBestEffort({ conPull = true } = {}) {
     // siguiente ciclo. La corrección por pendientes del pull protege las existencias si el push falló.
     if (conPull) {
       try {
+        // La versión se lee ANTES de bajar: si el dueño guarda un producto mientras el snapshot
+        // viaja, esa versión queda por delante de la que damos por vista y el sondeo vuelve a
+        // bajar en un minuto. El error cae del lado de bajar de más, nunca de quedarse corto.
+        const version = await leerVersionCatalogo(opts);
         console.log("· [sync] PULL: bajando rebanada del tenant…");
         const rp = await pullFromCloud(backend.pool, opts, (m) => console.log("· [sync]", m));
         console.log(`· [sync] PULL OK: ${Object.keys(rp).length} tablas`);
+        sondeo.marcarVista(version);
+        await avisarCatalogoNuevo("sync");
       } catch (e) { console.log("· [sync] PULL omitido:", e.message); }
     }
     return pushOk;
@@ -634,6 +642,106 @@ async function syncBestEffort({ conPull = true } = {}) {
     return false;
   }
 }
+
+// ── El menú, al minuto ───────────────────────────────────────────────────────
+// El catálogo bajaba 1 de cada 6 ciclos (≈1 h): un producto dado de alta en /admin no salía en la
+// caja hasta esa hora, o hasta reiniciar la aplicación. Ahora se PREGUNTA cada minuto —una sola
+// fecha, ver la migración 0109— y solo se baja cuando de verdad cambió algo. La política del
+// sondeo (ritmo, backoff, no solaparse) vive en sondeo-catalogo.mjs, que se prueba sin Electron.
+
+/**
+ * Última fecha de cambio del menú del tenant, según la nube.
+ *
+ * `null` cuando la caja no está vinculada o la nube no contesta: el sondeo lo lee como "no hay
+ * novedad" y se queda quieto, que es lo correcto — una caja sin nube no tiene menú nuevo que
+ * bajar, y tratarlo como error la pondría a reintentar contra nada.
+ *
+ * Va por PostgREST y no por una Edge Function a propósito: es una lectura por caja por minuto, y
+ * por ahí no cuesta ni invocación ni arranque en frío.
+ */
+async function leerVersionCatalogo(opts = null) {
+  const o = opts ?? (await tokenDeNubeCacheado());
+  if (!o) return null;
+  try {
+    const r = await fetch(`${o.cloudUrl}/rest/v1/rpc/catalogo_version`, {
+      method: "POST",
+      headers: {
+        apikey: o.anonKey,
+        Authorization: `Bearer ${o.deviceToken}`,
+        "Content-Type": "application/json",
+      },
+      body: "{}",
+      signal: AbortSignal.timeout(10000),
+    });
+    if (!r.ok) return null;
+    const v = await r.json();
+    return typeof v === "string" ? v : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Le dice a las pantallas que el menú de esta caja cambió, para que lo recarguen sin reiniciar.
+ *
+ * El NOTIFY viaja por el mismo puente LISTEN→SSE del KDS (kds-stream.mjs), así que también llega
+ * a la segunda caja y a la cocina en la LAN. Best-effort: que no se pueda avisar no puede tumbar
+ * un PULL que ya se hizo bien — lo peor que pasa es que la pantalla se entere en su próxima carga.
+ */
+async function avisarCatalogoNuevo(motivo) {
+  try {
+    await backend?.pool?.query("SELECT pg_notify('vim_catalogo', $1)",
+      [JSON.stringify({ motivo, at: Date.now() })]);
+  } catch (e) {
+    console.log("· [catálogo] no se pudo avisar a las pantallas:", e?.message ?? e);
+  }
+}
+
+/**
+ * Baja el catálogo YA, sin esperar al ciclo. Lo usan el sondeo y el botón "Actualizar menú".
+ *
+ * NO sube ventas: un cambio de menú no tiene por qué arrastrar un push, que es la parte lenta y
+ * la que puede fallar. Si el push está atorado, el menú se actualiza igual.
+ */
+let pullCatalogoEnCurso = null;
+async function bajarCatalogoAhora(motivo = "sondeo", version = undefined) {
+  // El sondeo no se solapa consigo mismo, pero el BOTÓN puede caer justo encima de él. Dos PULL a
+  // la vez escriben las mismas filas y se quedan esperándose por los candados de Postgres, así
+  // que quien llega tarde se cuelga del que ya va en camino en vez de abrir otro.
+  if (pullCatalogoEnCurso) return pullCatalogoEnCurso;
+  pullCatalogoEnCurso = (async () => bajarCatalogo(motivo, version))();
+  try {
+    return await pullCatalogoEnCurso;
+  } finally {
+    pullCatalogoEnCurso = null;
+  }
+}
+
+async function bajarCatalogo(motivo, version) {
+  const opts = await tokenDeNubeCacheado();
+  if (!opts) { console.log("· [catálogo] omitido (caja sin vincular)"); return false; }
+  if (!backend?.pool) { console.log("· [catálogo] omitido (el backend local aún no está listo)"); return false; }
+  try {
+    // El sondeo ya leyó la versión para decidir que había que bajar: la pasa y no se vuelve a
+    // preguntar. El botón no la tiene, así que la lee aquí —siempre ANTES del PULL— para que el
+    // sondeo no repita en un minuto lo que este PULL acaba de traer.
+    const v = version === undefined ? await leerVersionCatalogo(opts) : version;
+    const rp = await pullFromCloud(backend.pool, opts, (m) => console.log("· [catálogo]", m));
+    console.log(`· [catálogo] actualizado desde la nube (${Object.keys(rp).length} tablas, por ${motivo})`);
+    sondeo.marcarVista(v);
+    await avisarCatalogoNuevo(motivo);
+    return true;
+  } catch (e) {
+    console.log("· [catálogo] no se pudo bajar:", e?.message ?? e);
+    return false;
+  }
+}
+
+const sondeo = crearSondeoCatalogo({
+  leerVersion: () => leerVersionCatalogo(),
+  bajarCatalogo: (version) => bajarCatalogoAhora("sondeo", version),
+  log: (m) => console.log("· [catálogo]", m),
+});
 
 // ── Ciclo de sincronización ──────────────────────────────────────────────────
 // Antes solo se sincronizaba al arrancar la app. Un restaurante que no apaga la computadora
@@ -664,11 +772,21 @@ function cajaDeEstaCaja() {
   return m ? m[1].toLowerCase() : null;
 }
 let espejo = null;
+let arranqueSondeo = null;  // temporizador del arranque diferido del sondeo del menú
 
 /** Arranca el ciclo: una sincronización completa ya, y de ahí en adelante cada 10 minutos.
- *  Y el espejo de pedidos de apps cada 10 s (solo si la caja está vinculada a la nube). */
+ *  Y el espejo de pedidos de apps cada 10 s (solo si la caja está vinculada a la nube).
+ *  Y el sondeo del menú cada minuto, para que un producto nuevo no espere a la hora. */
 function iniciarSync() {
   ciclo.iniciar();
+  // El sondeo arranca DESPUÉS del primer ciclo a propósito: ese ciclo ya baja el catálogo y deja
+  // marcada la versión, así que el primer sondeo no repite el PULL. Un minuto de retraso en
+  // arrancarlo no le cuesta nada a nadie y ahorra bajar el menú entero en cada arranque.
+  // El handle se guarda para poder cancelarlo: sin eso, cerrar la caja en su primer minuto dejaba
+  // este temporizador vivo y el sondeo arrancaba con la app ya apagándose.
+  if (arranqueSondeo) clearTimeout(arranqueSondeo);
+  arranqueSondeo = setTimeout(() => { arranqueSondeo = null; sondeo.iniciar(); }, 60_000);
+  arranqueSondeo?.unref?.();
   if (backend) backend.nube = tokenDeNubeCacheado;
   const cajaId = cajaDeEstaCaja();
   if (backend?.pool && cajaId && !espejo) {
@@ -681,6 +799,8 @@ function iniciarSync() {
 
 function detenerSync() {
   ciclo.detener();
+  if (arranqueSondeo) { clearTimeout(arranqueSondeo); arranqueSondeo = null; }
+  sondeo.detener();
   try { espejo?.detener(); } catch { /* */ }
   espejo = null;
 }

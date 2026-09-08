@@ -105,6 +105,28 @@ con esas palabras y le manda a actualizar la caja principal.
 Cualquier motivo de bloqueo que la caja no reconozca se trata como suspensión, no como versión:
 un valor raro no puede dejar la pantalla a medio pintar ni ofrecer un botón que no lleva a nada.
 
+### El menú se actualiza solo
+
+Un producto dado de alta en /admin aparece en la caja **en menos de un minuto**, sin reiniciar
+nada. Antes el catálogo se cargaba una sola vez al abrir la caja y solo se volvía a bajar de la
+nube una vez por hora: el dueño daba de alta un producto, se paraba frente a la caja y no estaba.
+
+**El cambio entra sin interrumpir a nadie.** La pantalla relee el menú en el sitio; el carrito, la
+cuenta de mesa abierta y el turno siguen donde estaban. Y lo que ya está en el ticket **no se
+reescribe**: cada línea guarda el nombre y el precio con los que se pidió, así que un cambio de
+precio a media cuenta no le mueve el total al cajero delante del cliente.
+
+También llega la vuelta contraria: si el dueño marca un producto como agotado o lo quita del
+menú, desaparece de la caja por el mismo camino.
+
+**Y hay un botón, en Ajustes → "Actualizar menú".** El minuto automático cubre el día normal;
+el botón es para el dueño que acaba de guardar un producto y lo quiere en pantalla ahora, con el
+cliente delante. Dice "Menú actualizado" cuando llegó y explica el motivo cuando no —sin nube, la
+caja sigue cobrando con el menú que tiene, que es lo único que no se puede interrumpir.
+
+En la **segunda caja de la LAN y en la cocina** el menú se refresca igual: el aviso viaja por el
+mismo canal que las comandas.
+
 ## Lo que NO se hereda de otras apps
 
 - **La densidad del admin.** Aquí el scroll es tiempo frente a un cliente, pero apretar de más
