@@ -12,8 +12,8 @@
 //     simples, cada uno con su índice (migración 0110).
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import { corsHeaders } from "../_shared/cors.ts";
+import { cajaIdDeEmail } from "../_shared/latido.ts";
 import { cadenciaEspejo, cursorPedido, TOPE_PEDIDOS, unirPedidos } from "../_shared/delivery/espejo.ts";
-import { crearVerificadorDispositivo } from "../_shared/auth-dispositivo.ts";
 
 const admin = createClient(
   Deno.env.get("SUPABASE_URL")!,
@@ -21,13 +21,13 @@ const admin = createClient(
   { auth: { persistSession: false } },
 );
 
-// La firma del token se verifica aquí en vez de preguntarle a GoTrue en cada llamada: es la
-// función que más veces se llama de todo el proyecto. OJO: las Edge Functions no permiten
-// secretos con prefijo SUPABASE_ (reservado), por eso el JWT secret se inyecta como
-// VIM_JWT_SECRET — el mismo que usa pin-login para acuñar los tokens.
-const JWT_SECRET = Deno.env.get("VIM_JWT_SECRET");
-if (!JWT_SECRET) throw new Error("Falta VIM_JWT_SECRET en el entorno de la función.");
-const verificarDispositivo = crearVerificadorDispositivo(JWT_SECRET);
+// POR QUÉ SIGUE AQUÍ getUser. El 9 sep 2026 se intentó verificar la firma del token en local para
+// ahorrarse este viaje a GoTrue. No se puede: este proyecto está migrado a CLAVES DE FIRMA
+// ASIMÉTRICAS —su JWKS publica una ES256— así que los tokens que emite GoTrue NO van firmados con
+// el JWT secret HS256. Que `pin-login` acuñe tokens HS256 y el RLS los acepte no significa que los
+// emitidos sean HS256: aceptar no es emitir. Una verificación local solo de HS256 rechazaría todos
+// los tokens de dispositivo reales. Si algún día se quiere el ahorro, hay que verificar ES256
+// contra el JWKS (cacheando las claves) y dejar HS256 solo para lo de pin-login.
 
 /** Los cuatro estados del índice parcial `idx_delivery_pedidos_sucursal_activos` (0090). */
 const ESTADOS_ACTIVOS = ["RECIBIDO", "ACEPTADO", "EN_PREPARACION", "LISTO"];
@@ -36,6 +36,14 @@ const COLS_CONEXION = "id, tenant_id, sucursal_id, marca_virtual_id, app, estado
 // set_updated_at lo pisaría con el reloj local si se guardara).
 const COLS_PEDIDO = "id, tenant_id, sucursal_id, conexion_id, app, id_externo, folio_corto, estado, estado_app, tipo_entrega, programado_para, vence_aceptacion, cliente_nombre, cliente_telefono, cliente_telefono_pin, direccion_texto, nota_cliente, items, items_sin_mapear, subtotal_mxn, descuento_app_mxn, descuento_tienda_mxn, envio_mxn, propina_mxn, total_cliente_mxn, total_restaurante_mxn, efectivo_a_cobrar_mxn, ticket_id, repartidor_nombre, repartidor_telefono, repartidor_estado, recibido_at, aceptado_at, listo_at, entregado_at, cancelado_at, motivo_cancelacion, cancelado_por, ultimo_error, created_at, gestion, gestion_caja_id, updated_at";
 
+/** Lee los claims de un JWT cuya firma YA validó getUser (no re-verifica). */
+function claimsDe(token: string): Record<string, unknown> {
+  try {
+    const p = token.split(".")[1] ?? "";
+    return JSON.parse(atob(p.replace(/-/g, "+").replace(/_/g, "/")));
+  } catch { return {}; }
+}
+
 Deno.serve(async (req) => {
   const cors = corsHeaders(req);
   const json = (body: unknown, status = 200) =>
@@ -43,11 +51,17 @@ Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
   if (req.method !== "POST") return json({ error: "METHOD_NOT_ALLOWED" }, 405);
 
-  // El detalle (vencido, firma mala) va al log de la caja; sin él el 6 sep 2026 no se pudo saber
-  // por qué la caja de escritorio se quedaba sin espejo.
-  const auth = await verificarDispositivo(req.headers.get("authorization"));
-  if (!auth.ok) return json({ error: auth.error, ...(auth.detalle ? { detalle: auth.detalle } : {}) }, auth.status);
-  const { tenantId, cajaId } = auth;
+  const token = (req.headers.get("authorization") ?? "").replace(/^Bearer\s+/i, "");
+  if (!token) return json({ error: "NO_AUTH" }, 401);
+  const { data: userResp, error: userErr } = await admin.auth.getUser(token);
+  // El detalle (mensaje de GoTrue: expirado, sesión inexistente…) va al log de la caja; sin él
+  // el 6 sep 2026 no se pudo saber por qué la caja de escritorio se quedaba sin espejo.
+  if (userErr || !userResp?.user) return json({ error: "AUTH_INVALIDA", detalle: userErr?.message ?? "sin usuario" }, 401);
+  const claims = claimsDe(token);
+  if (claims.tipo_identidad !== "DISPOSITIVO") return json({ error: "SOLO_DISPOSITIVO" }, 403);
+  const tenantId = typeof claims.tenant_id === "string" ? claims.tenant_id : null;
+  const cajaId = cajaIdDeEmail(userResp.user.email);
+  if (!tenantId || !cajaId) return json({ error: "DISPOSITIVO_SIN_CAJA" }, 403);
 
   const cuerpo = await req.json().catch(() => ({})) as { desde?: unknown };
   const desde = cursorPedido(cuerpo?.desde);
