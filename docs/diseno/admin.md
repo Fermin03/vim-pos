@@ -42,6 +42,24 @@ es la acción", y una barra no es una acción. Una serie, un color, estable entr
 Cancelar un ticket, borrar un producto, cerrar un turno ajeno. Piden confirmación que **nombra la
 consecuencia** y, cuando toca dinero, PIN. Nada destructivo vive junto a un filtro.
 
+## Combos
+
+En Catálogo, **Combos** vive como pestaña propia entre Modificadores y Recetas (ADR 0015). Un
+combo se crea con los mismos datos que cualquier producto —nombre, categoría, clave SAT sugerida
+`90101503` (editable, no obligatoria)— y de ahí se pasa a la misma pantalla a agregarle **slots**:
+uno por paso que va a ver la caja. Un slot puede tomar sus opciones de **una categoría entera** en
+vez de listarlas una por una — es la forma normal de decir "cualquier hamburguesa" sin mantener la
+lista a mano cada vez que se da de alta una.
+
+Una opción agotada no se oculta del slot: se marca. El combo se sigue vendiendo aunque falte un
+insumo puntual, y ocultar la opción escondería el motivo por el que el cliente ya no la ve en caja.
+
+La **vista previa de precio** recalcula en vivo, con cada slot que se agrega o edita, lo que de
+verdad va a pagar el cliente ("Con Clásica $140 · Con Doble $175") — porque el precio final del
+combo no está escrito en ningún campo del formulario, sale de sumar slots, y el dueño necesita
+verlo tal como lo calcula la caja antes de publicar, no confiar en que la suma le salió bien en la
+cabeza.
+
 ## Lo que NO se hereda del POS
 
 - Los objetivos de 44–56px. Con mouse, 36–40px es lo correcto; 44 se ve infantil.
