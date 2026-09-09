@@ -63,7 +63,6 @@ function ModalSlot({
   const editar = !!slot;
   const [nombre, setNombre] = useState(slot?.nombre ?? "");
   const [minimo, setMinimo] = useState(slot ? String(slot.minimo_selecciones) : "1");
-  const [maximo, setMaximo] = useState(slot ? String(slot.maximo_selecciones) : "1");
   const [modoPrecio, setModoPrecio] = useState<ModoPrecio>(slot?.modo_precio ?? "DELTA");
   const [fuente, setFuente] = useState<"categoria" | "lista">(slot?.categoria_id ? "categoria" : "lista");
   const [categoriaId, setCategoriaId] = useState(slot?.categoria_id ?? "");
@@ -80,7 +79,8 @@ function ModalSlot({
     const parsed = slotSchema.safeParse({
       nombre,
       minimo_selecciones: Number(minimo),
-      maximo_selecciones: Number(maximo),
+      // Fijo en 1 mientras la caja no sepa atender un slot múltiple (ver slotSchema en lib/combos).
+      maximo_selecciones: 1,
       modo_precio: modoPrecio,
       categoria_id: fuente === "categoria" ? categoriaId : null,
       activo,
@@ -123,12 +123,15 @@ function ModalSlot({
             <input id="slot-min" className={input} value={minimo} inputMode="numeric" onChange={(e) => setMinimo(e.target.value.replace(/[^0-9]/g, ""))} />
           </div>
           <div>
-            <label className={label} htmlFor="slot-max">
-              Máximo a elegir
-            </label>
-            <input id="slot-max" className={input} value={maximo} inputMode="numeric" onChange={(e) => setMaximo(e.target.value.replace(/[^0-9]/g, ""))} />
+            <span className={label}>Máximo a elegir</span>
+            <p className="flex h-11 items-center text-sm text-ink-2">1 opción</p>
           </div>
         </div>
+        <p className="-mt-2 text-[12.5px] text-ink-3">
+          Por ahora cada slot deja elegir una sola opción. Los slots de varias opciones (por
+          ejemplo “elige 2 acompañamientos”) llegan más adelante: la caja todavía no sabe pedir el
+          término de dos hamburguesas dentro del mismo slot.
+        </p>
         <div>
           <label className={label} htmlFor="slot-modo">
             Modo de precio

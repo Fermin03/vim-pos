@@ -25,8 +25,6 @@ export const comboSchema = z.object({
   clave_sat: z.string().trim().regex(/^\d{8}$/, "La clave del SAT son 8 dígitos").optional().or(z.literal("")),
   tasa_iva: z.number().min(0).max(100),
   iva_incluido_en_precio: z.boolean(),
-  visible_en_pos: z.boolean(),
-  estado: z.enum(["ACTIVO", "PAUSADO"]),
 });
 export type ComboInput = z.infer<typeof comboSchema>;
 /** Clave sugerida al crear: comida rápida (spec §5). */
@@ -78,6 +76,17 @@ export async function activarComboUpsell(activo: boolean): Promise<void> {
   if (error) throw new Error(error.message);
 }
 
+/**
+ * Un combo NACE PAUSADO, sin excepción: en el momento de crearlo todavía no tiene ni un slot.
+ *
+ * En una caja al día vender un combo sin slots es inofensivo (el POS avisa "Este combo no tiene
+ * slots configurados"). En una caja que aún no tomó la 0.4.65 **no hay migración 0110**: no existe
+ * `es_combo`, ni la RPC, ni la guarda dentro de su `agregar_item_a_ticket` local, así que pinta el
+ * padre como un producto normal y lo vende al precio base —los $45 de "hacerlo combo"— sin cocinar
+ * nada. Nacer pausado cierra esa ventana y además es mejor experiencia por sí solo.
+ *
+ * El dueño lo publica desde la ficha del combo (`ProductoForm`) cuando ya tiene sus slots.
+ */
 export async function crearCombo(input: ComboInput): Promise<string> {
   const d = comboSchema.parse(input);
   const tid = await tenantId();
@@ -85,7 +94,7 @@ export async function crearCombo(input: ComboInput): Promise<string> {
   const { data, error } = await supabase.from("productos").insert({
     tenant_id: tid, es_combo: true, nombre: d.nombre, categoria_id: d.categoria_id, precio_base_mxn: d.precio_base_mxn,
     descripcion: d.descripcion || null, clave_sat: d.clave_sat || null, tasa_iva: d.tasa_iva, iva_incluido_en_precio: d.iva_incluido_en_precio,
-    visible_en_pos: d.visible_en_pos, estado: d.estado, orden_visualizacion: (maxRow?.orden_visualizacion ?? 0) + 1,
+    estado: "PAUSADO", orden_visualizacion: (maxRow?.orden_visualizacion ?? 0) + 1,
   }).select("id").single();
   if (error) throw new Error(error.message);
   return (data as { id: string }).id;
@@ -94,8 +103,15 @@ export async function crearCombo(input: ComboInput): Promise<string> {
 // ── Slots ────────────────────────────────────────────────────────────────────
 export const slotSchema = z.object({
   nombre: z.string().trim().min(1, "El nombre es obligatorio").max(80),
-  minimo_selecciones: z.number().int().min(0),
-  maximo_selecciones: z.number().int().min(1),
+  // Con el máximo fijo en 1, el mínimo solo puede ser 0 (slot opcional) o 1 (obligatorio). Sin este
+  // tope, escribir "2" caía en el refine de abajo con un mensaje que culpa a un campo que el dueño
+  // ya no puede tocar.
+  minimo_selecciones: z.number().int().min(0).max(1, "Con un máximo de 1, el mínimo solo puede ser 0 (opcional) o 1 (obligatorio)"),
+  // Un slot de varias opciones (max > 1) todavía no se puede atender en la caja: el modal no abre
+  // el grupo de modificadores obligatorio de cada opción elegida, así que una hamburguesa dentro de
+  // un slot múltiple se iría a cocina sin término. `maximo_selecciones` es un campo expuesto —el
+  // dueño podría crear uno mañana— así que se limita aquí hasta que la caja sepa atenderlo.
+  maximo_selecciones: z.number().int().min(1).max(1, "Por ahora cada slot deja elegir una sola opción"),
   modo_precio: z.enum(["DELTA", "SUMA_PRECIO_PRODUCTO"]),
   categoria_id: z.string().uuid().nullable(),
   activo: z.boolean(),

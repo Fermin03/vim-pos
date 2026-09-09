@@ -162,9 +162,18 @@ export default function CombosPage() {
         )}
 
         {combos !== null && combos.length > 0 && (
-          <p className="mt-4 text-[13px] text-ink-3">
-            <b className="text-ink-2">{combos.length}</b> combo(s)
-          </p>
+          <>
+            <p className="mt-4 text-[13px] text-ink-3">
+              <b className="text-ink-2">{combos.length}</b> combo(s)
+            </p>
+            {/* Un combo nuevo nace PAUSADO (lib/combos.ts: crearCombo). Sin este aviso, el dueño
+                ve "Pausado" en la tabla y no sabe que le toca a él publicarlo. */}
+            <p className="mt-1 text-[13px] text-ink-3">
+              Un combo nuevo nace <b className="text-ink-2">Pausado</b> porque todavía no tiene
+              slots. Ábrelo, agrégale sus slots y cambia su estado a Activo para que la caja lo
+              venda.
+            </p>
+          </>
         )}
       </PageBody>
     </>

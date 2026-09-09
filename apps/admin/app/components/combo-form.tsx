@@ -26,8 +26,6 @@ export function ComboForm() {
   const [claveSat, setClaveSat] = useState(CLAVE_SAT_COMBO);
   const [tasaIva, setTasaIva] = useState("16");
   const [ivaIncluido, setIvaIncluido] = useState(true);
-  const [visible, setVisible] = useState(true);
-  const [estado, setEstado] = useState<"ACTIVO" | "PAUSADO">("ACTIVO");
   const [error, setError] = useState<string | null>(null);
   const [guardando, setGuardando] = useState(false);
 
@@ -47,8 +45,6 @@ export function ComboForm() {
       clave_sat: claveSat,
       tasa_iva: Number(tasaIva),
       iva_incluido_en_precio: ivaIncluido,
-      visible_en_pos: visible,
-      estado,
     });
     if (!parsed.success) {
       setError(parsed.error.issues[0]?.message ?? "Datos inválidos");
@@ -172,22 +168,18 @@ export function ComboForm() {
           </label>
         </div>
 
-        <div>
-          <label className={label} htmlFor="estado">
-            Estado
-          </label>
-          <select id="estado" className={input} value={estado} onChange={(e) => setEstado(e.target.value as "ACTIVO" | "PAUSADO")}>
-            <option value="ACTIVO">Activo · visible y vendible</option>
-            <option value="PAUSADO">Pausado · oculto del POS</option>
-          </select>
+        {/* No hay selector de estado a propósito: el combo nace PAUSADO. Al crearlo todavía no
+            tiene ni un slot, y una caja que no haya tomado la 0.4.65 (sin migración 0110) lo
+            pintaría como un producto normal y lo vendería al precio base, sin cocinar nada. Se
+            publica desde la ficha del combo cuando ya tiene sus slots. */}
+        <div className="rounded-lg border border-line bg-surface p-4">
+          <p className="text-sm font-medium">El combo se crea pausado</p>
+          <p className="mt-1 text-[12.5px] text-ink-2">
+            Todavía no tiene slots, así que la caja no debe venderlo. En la siguiente pantalla le
+            agregas sus slots (qué hamburguesa, qué acompañamiento, qué bebida) y ahí mismo lo
+            publicas cambiando su estado a <b className="text-ink">Activo</b>.
+          </p>
         </div>
-
-        <label className="flex items-center gap-2.5 rounded-lg border border-line bg-surface p-4">
-          <input type="checkbox" className="h-4 w-4 accent-[#16161A]" checked={visible} onChange={(e) => setVisible(e.target.checked)} />
-          <span className="text-sm">
-            <span className="font-medium">Visible en el POS</span> <span className="text-ink-3">(desmarca para armarlo antes de publicarlo)</span>
-          </span>
-        </label>
 
         {error && (
           <p className="text-sm font-medium text-danger" role="alert">
