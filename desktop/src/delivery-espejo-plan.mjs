@@ -71,3 +71,23 @@ export function planificarEspejo({ conexiones = [], pedidos = [], localPedidos =
   candidatos.sort((a, b) => String(a.vence_aceptacion ?? "").localeCompare(String(b.vence_aceptacion ?? "")));
   return { upserts, aCrear: candidatos.map((p) => p.id), avisos };
 }
+
+/**
+ * El cursor para el siguiente delta: el instante más nuevo entre lo que acaba de llegar y lo que
+ * ya se tenía. Nunca retrocede, y una fila con fecha ilegible se ignora en vez de tirarlo.
+ *
+ * Se compara por instante y no por texto porque las fechas llegan con precisiones y husos
+ * distintos según quién escribió la fila; "…04:00:00-06:00" es más viejo que "…10:05:00+00:00"
+ * aunque ordenado como cadena parezca lo contrario.
+ */
+export function cursorDe(filas = [], previo = null) {
+  let mejor = previo;
+  let mejorT = typeof previo === "string" ? Date.parse(previo) : NaN;
+  for (const f of filas) {
+    const v = f?.updated_at;
+    const t = typeof v === "string" ? Date.parse(v) : NaN;
+    if (!Number.isFinite(t)) continue;
+    if (!Number.isFinite(mejorT) || t > mejorT) { mejor = v; mejorT = t; }
+  }
+  return mejor;
+}

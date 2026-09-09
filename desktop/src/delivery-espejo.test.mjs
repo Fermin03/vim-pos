@@ -6,10 +6,11 @@ const CAJA = "cccccccc-0000-0000-0000-0000000000cc";
 const NUBE = { cloudUrl: "https://nube.test", anonKey: "anon", deviceToken: "DEV" };
 
 /** Base local de mentira: registra SQL y responde lo mínimo que usa el agente. */
-function poolFalso({ turnoAbierto = true, locales = [], fallaTicket = null } = {}) {
+function poolFalso({ turnoAbierto = true, locales = [], fallaTicket = null, fallaEspejoLocal = false } = {}) {
   const sql = [];
   const query = async (texto, params) => {
     sql.push({ texto, params });
+    if (fallaEspejoLocal && texto.startsWith("INSERT INTO delivery_pedidos")) throw new Error("disco lleno");
     if (texto.startsWith("SELECT id, ticket_id, estado FROM delivery_pedidos")) return { rows: locales };
     if (texto.startsWith("SELECT 1 FROM turnos")) return { rows: turnoAbierto ? [{}] : [] };
     if (texto.startsWith("SELECT crear_ticket_desde_app")) { if (fallaTicket) throw new Error(fallaTicket); return { rows: [{ crear_ticket_desde_app: "tk-local" }] }; }
@@ -19,13 +20,13 @@ function poolFalso({ turnoAbierto = true, locales = [], fallaTicket = null } = {
 }
 
 /** Nube de mentira: responde delivery-espejo y delivery-accion y registra las llamadas. */
-function nubeFalsa({ pedidos, conexiones = [{ id: "cx1", auto_aceptar: true, tiempo_prep_min: 12, config: {} }], reclamoOk = true, aceptarStatus = 200 }) {
+function nubeFalsa({ pedidos, conexiones = [{ id: "cx1", auto_aceptar: true, tiempo_prep_min: 12, config: {} }], reclamoOk = true, aceptarStatus = 200, siguienteEnMs = 10_000 }) {
   const llamadas = [];
   const fetchFn = async (url, init) => {
     const body = JSON.parse(init.body);
     llamadas.push({ url: String(url), auth: init.headers.Authorization, body });
     const resp = (status, obj) => new Response(JSON.stringify(obj), { status });
-    if (String(url).endsWith("/delivery-espejo")) return resp(200, { ahora: "2026-09-03T10:00:00Z", caja_id: CAJA, sucursal_id: "s", conexiones, pedidos });
+    if (String(url).endsWith("/delivery-espejo")) return resp(200, { ahora: "2026-09-03T10:00:00Z", caja_id: CAJA, sucursal_id: "s", conexiones, pedidos, siguiente_en_ms: siguienteEnMs });
     if (body.accion === "reclamar") return reclamoOk ? resp(200, { ok: true }) : resp(409, { error: "RECLAMADO_POR_OTRA_CAJA" });
     if (body.accion === "aceptar") return aceptarStatus === 200 ? resp(200, { ok: true, gestion: "ESCRITORIO" }) : resp(aceptarStatus, { error: "UBER_ERROR" });
     return resp(400, { error: "ACCION_DESCONOCIDA" });
@@ -121,4 +122,109 @@ test("tras un 401 pide token nuevo con forzar y reintenta; el log dice vigencia 
   assert.equal(r2.error, undefined);
   assert.equal(llamadasNube, 2, "el segundo tick volvió a pedir token");
   assert.deepEqual(forzados, [false, true], "el segundo login fue forzado");
+});
+
+// ── Delta y ritmo (optimización 2026-09-09) ──────────────────────────────────
+// El agente sondeaba cada 10 s y se traía TODOS los pedidos de las últimas 24 h en cada vuelta,
+// tuviera el cliente delivery o no. Ahora pide solo lo que cambió y el servidor le dice cuándo
+// volver.
+
+/** Captura las esperas que programa el agente, sin relojes de verdad. */
+function relojFalso() {
+  const esperas = [];
+  return {
+    esperas,
+    setTimeoutFn: (fn, ms) => { esperas.push(ms); return { unref() {} }; },
+    clearTimeoutFn: () => {},
+  };
+}
+const centro = () => 0.5; // jitter neutro
+
+test("el primer sondeo va sin cursor; el siguiente pide solo lo que cambió", async () => {
+  const pool = poolFalso();
+  const nube = nubeFalsa({ pedidos: [pedido({ updated_at: "2026-09-03T10:00:05Z" })] });
+  const agente = crearEspejo({ pool, nube: async () => NUBE, cajaId: CAJA, fetchFn: nube.fetchFn });
+  await agente.tick();
+  await agente.tick();
+  const sondeos = nube.llamadas.filter((l) => l.url.endsWith("/delivery-espejo"));
+  assert.equal(sondeos[0].body.desde, undefined, "el primero va en frío");
+  assert.equal(sondeos[1].body.desde, "2026-09-03T10:00:05Z", "el segundo lleva el cursor");
+});
+
+test("sin pedidos que espejar no se toca la tabla local de pedidos, pero las conexiones sí", async () => {
+  const pool = poolFalso();
+  const nube = nubeFalsa({ pedidos: [] });
+  const agente = crearEspejo({ pool, nube: async () => NUBE, cajaId: CAJA, fetchFn: nube.fetchFn });
+  const r = await agente.tick();
+  assert.equal(r.espejados, 0);
+  assert.ok(!pool.sql.some((q) => q.texto.startsWith("SELECT id, ticket_id, estado FROM delivery_pedidos")));
+  assert.ok(!pool.sql.some((q) => q.texto.startsWith("SELECT 1 FROM turnos")), "ni siquiera pregunta por el turno");
+  assert.ok(!pool.sql.some((q) => q.texto.startsWith("INSERT INTO delivery_pedidos")));
+  assert.ok(pool.sql.some((q) => q.texto.startsWith("INSERT INTO delivery_conexiones")), "las conexiones sí se espejan");
+});
+
+test("la caja obedece la cadencia que manda el servidor", async () => {
+  const pool = poolFalso();
+  const nube = nubeFalsa({ pedidos: [], siguienteEnMs: 300_000 });
+  const reloj = relojFalso();
+  const agente = crearEspejo({ pool, nube: async () => NUBE, cajaId: CAJA, fetchFn: nube.fetchFn, aleatorio: centro, ...reloj });
+  await agente.vuelta();
+  assert.equal(reloj.esperas.at(-1), 300_000);
+});
+
+test("un servidor que no manda cadencia deja el ritmo de siempre: no rompe con nubes viejas", async () => {
+  const pool = poolFalso();
+  const nube = nubeFalsa({ pedidos: [], siguienteEnMs: null });
+  const reloj = relojFalso();
+  const agente = crearEspejo({ pool, nube: async () => NUBE, cajaId: CAJA, fetchFn: nube.fetchFn, aleatorio: centro, ...reloj });
+  await agente.vuelta();
+  assert.equal(reloj.esperas.at(-1), 10_000);
+});
+
+test("tras un sondeo fallido la caja espera más, en vez de martillear cada 10 s", async () => {
+  const pool = poolFalso();
+  const reloj = relojFalso();
+  const agente = crearEspejo({
+    pool, nube: async () => NUBE, cajaId: CAJA, aleatorio: centro, ...reloj,
+    fetchFn: async () => { throw new Error("sin red"); },
+  });
+  await agente.vuelta();
+  assert.equal(reloj.esperas.at(-1), 20_000, "primer fallo: el doble");
+  await agente.vuelta();
+  assert.equal(reloj.esperas.at(-1), 40_000, "segundo fallo: el doble otra vez");
+});
+
+test("un sondeo bueno después de fallar borra el backoff", async () => {
+  const pool = poolFalso();
+  const nube = nubeFalsa({ pedidos: [], siguienteEnMs: 30_000 });
+  const reloj = relojFalso();
+  let rompe = true;
+  const agente = crearEspejo({
+    pool, nube: async () => NUBE, cajaId: CAJA, aleatorio: centro, ...reloj,
+    fetchFn: async (...a) => { if (rompe) throw new Error("sin red"); return nube.fetchFn(...a); },
+  });
+  await agente.vuelta();
+  rompe = false;
+  await agente.vuelta();
+  assert.equal(reloj.esperas.at(-1), 30_000);
+});
+
+test("con un ticket local pendiente la caja no se duerme aunque el servidor mande reposo", async () => {
+  const pool = poolFalso({ fallaTicket: "SIN_TURNO_ABIERTO" }); // el ticket no se pudo crear: queda pendiente
+  const nube = nubeFalsa({ pedidos: [pedido({ estado: "ACEPTADO" })], siguienteEnMs: 300_000 });
+  const reloj = relojFalso();
+  const agente = crearEspejo({ pool, nube: async () => NUBE, cajaId: CAJA, fetchFn: nube.fetchFn, aleatorio: centro, ...reloj });
+  await agente.vuelta();
+  assert.equal(reloj.esperas.at(-1), 10_000);
+});
+
+test("si el espejo local falla, el cursor no avanza: la vuelta siguiente vuelve a pedir lo mismo", async () => {
+  const pool = poolFalso({ fallaEspejoLocal: true });
+  const nube = nubeFalsa({ pedidos: [pedido({ updated_at: "2026-09-03T10:00:05Z" })] });
+  const agente = crearEspejo({ pool, nube: async () => NUBE, cajaId: CAJA, fetchFn: nube.fetchFn });
+  const r = await agente.tick();
+  assert.ok(r.error, "la vuelta falló");
+  await agente.tick();
+  const sondeos = nube.llamadas.filter((l) => l.url.endsWith("/delivery-espejo"));
+  assert.equal(sondeos[1].body.desde, undefined, "sigue en frío hasta que el espejo local cuaje");
 });
