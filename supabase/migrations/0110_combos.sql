@@ -125,7 +125,7 @@ COMMENT ON COLUMN ticket_items.precio_asignado_mxn IS 'Solo hijos: parte del pre
 -- (0008) exigía que ese campo solo se llenara junto con un override manual autorizado por PIN
 -- (precio_override=true + autorizacion_pin_override_id); un hijo de combo no es eso, así que se
 -- amplía el CHECK con un tercer caso en vez de reusar la semántica de override.
-ALTER TABLE ticket_items DROP CONSTRAINT precio_override_coherente;
+ALTER TABLE ticket_items DROP CONSTRAINT IF EXISTS precio_override_coherente;
 ALTER TABLE ticket_items ADD CONSTRAINT precio_override_coherente CHECK (
   (precio_override = false AND precio_unitario_original_snapshot IS NULL AND autorizacion_pin_override_id IS NULL)
   OR (precio_override = true AND precio_unitario_original_snapshot IS NOT NULL AND autorizacion_pin_override_id IS NOT NULL)
@@ -262,7 +262,6 @@ DECLARE
   v_prod        record;
   v_opcion      record;
   v_comp        jsonb;
-  v_modif       jsonb;
   v_n           numeric;
   v_delta       numeric(12,2);
   v_precio      numeric(12,2);
@@ -374,21 +373,19 @@ BEGIN
     p_nota_cocina, p_client_id_local, auth.uid(), 'PADRE'
   ) RETURNING id INTO v_padre_id;
 
+  -- Un modificador PAGADO en la línea del padre se cobraría sin aparecer en ningún reporte: las
+  -- tres vistas de ventas excluyen combo_rol = 'PADRE', mientras que recalcular_totales_ticket sí
+  -- mete monto_modificadores_mxn en el total del ticket y el CFDI lo conserva. Hoy está latente
+  -- —el modal de la caja arma la línea del padre con modificadores: []— pero el parámetro existe y
+  -- dos capas del cliente ya lo pasan, así que la primera función que lo use (la importación de
+  -- Uber de la entrega 2 es candidata) subestimaría los ingresos en silencio.
+  --
+  -- Falla ruidosamente en vez de cobrar mal. Quien quiera levantar la restricción tiene que
+  -- arreglar antes las vistas: el modificador del padre necesita llegar a algún renglón del
+  -- reporte. Los modificadores del COMPONENTE (v_comp->'modificadores') sí funcionan y sí se
+  -- reportan, porque cuelgan de un hijo, que las vistas sí cuentan.
   IF p_modificadores IS NOT NULL AND jsonb_array_length(p_modificadores) > 0 THEN
-    FOR v_modif IN SELECT * FROM jsonb_array_elements(p_modificadores) LOOP
-      SELECT om.id, om.nombre, om.precio_extra_mxn AS precio_extra, gm.id AS grupo_id, gm.nombre AS grupo_nombre, gm.naturaleza
-        INTO v_opcion FROM opciones_modificador om JOIN grupos_modificadores gm ON gm.id = om.grupo_id
-       WHERE om.id = (v_modif->>'opcion_modificador_id')::uuid AND om.deleted_at IS NULL;
-      IF NOT FOUND THEN RAISE EXCEPTION 'Opción de modificador % no existe', v_modif->>'opcion_modificador_id'; END IF;
-      INSERT INTO ticket_item_modificadores (
-        tenant_id, ticket_item_id, opcion_modificador_id, grupo_id, grupo_nombre_snapshot, opcion_nombre_snapshot,
-        precio_extra_snapshot, naturaleza_snapshot, cantidad, monto_total_mxn, created_by
-      ) VALUES (
-        v_tenant_id, v_padre_id, v_opcion.id, v_opcion.grupo_id, v_opcion.grupo_nombre, v_opcion.nombre,
-        v_opcion.precio_extra, v_opcion.naturaleza, COALESCE((v_modif->>'cantidad')::integer, 1),
-        v_opcion.precio_extra * COALESCE((v_modif->>'cantidad')::integer, 1) * p_cantidad, auth.uid()
-      );
-    END LOOP;
+    RAISE EXCEPTION 'Los modificadores en la línea del combo no se soportan todavía: se cobrarían sin llegar a los reportes de ventas. Ponlos en el componente que corresponda.';
   END IF;
 
   -- 4) Los hijos: por la RPC de siempre (snapshot + modificadores) y luego a precio 0 con prorrateo
@@ -407,13 +404,16 @@ BEGIN
       INTO v_carta_hijo, v_hijo_parent_id, v_hijo_combo_rol
       FROM ticket_items WHERE id = v_hijo_id;
     -- 0110 hallazgo 1: agregar_item_a_ticket puede devolver una fila EXISTENTE (idempotencia por
-    -- client_id_local) en vez de insertar. Si esa fila ya es hijo de OTRO padre (o de este mismo
-    -- padre en un reintento legítimo), no la re-apadrinamos a ciegas: se la robaríamos a su combo
-    -- original y corromperíamos sus totales.
-    IF NOT (
-      (v_hijo_combo_rol IS NULL AND v_hijo_parent_id IS NULL)
-      OR v_hijo_parent_id = v_padre_id
-    ) THEN
+    -- client_id_local) en vez de insertar. Si esa fila ya forma parte de un combo, no la
+    -- re-apadrinamos a ciegas: se la robaríamos a su combo original y corromperíamos sus totales.
+    --
+    -- Se rechaza también cuando ya es hijo de ESTE mismo padre (revisión final, hallazgo 7). No
+    -- hay reintento legítimo que llegue aquí —un reintento del combo entero sale antes por la
+    -- idempotencia del padre, y la RPC es una sola transacción—, pero sí hay un payload malformado
+    -- que llega: dos componentes de la MISMA llamada con el mismo client_id_local. Con la guarda
+    -- anterior, el segundo recibía la fila del primero —ya puesta a 0—, el prorrateo se calculaba
+    -- sobre un precio de carta de 0 y el UPDATE pisaba precio_unitario_original_snapshot con 0.
+    IF v_hijo_combo_rol IS NOT NULL OR v_hijo_parent_id IS NOT NULL THEN
       RAISE EXCEPTION 'El componente ya pertenece a otro renglón del ticket (client_id_local reusado)';
     END IF;
     IF v_carta > 0 THEN
@@ -436,7 +436,7 @@ BEGIN
   RETURN v_padre_id;
 END;
 $$;
-COMMENT ON FUNCTION agregar_combo_a_ticket IS 'Inserta un combo: padre (cobra el precio calculado aquí) + hijos a precio 0 con prorrateo informativo. Valida slots, pertenencia y agotados. Idempotente por client_id_local. ADR 0015.';
+COMMENT ON FUNCTION agregar_combo_a_ticket IS 'Inserta un combo: padre (cobra el precio calculado aquí) + hijos a precio 0 con prorrateo informativo. Valida slots, pertenencia y agotados. Idempotente por client_id_local. Rechaza p_modificadores en la línea del padre (no llegarían a las vistas de ventas). ADR 0015.';
 
 -- ── §2.4 cancelar_item_ticket: el padre arrastra a los hijos; un hijo no se cancela solo ──
 CREATE OR REPLACE FUNCTION cancelar_item_ticket(
@@ -501,25 +501,35 @@ SELECT
   SUM(CASE WHEN ti.combo_rol = 'HIJO' THEN ti.precio_asignado_mxn + ti.subtotal_bruto_mxn ELSE ti.subtotal_bruto_mxn END) AS subtotal_mxn,
   -- IVA del HIJO: su parte prorrateada del precio del padre nunca pasó por recalcular_totales_ticket
   -- (ese cálculo solo corre sobre precio_unitario_snapshot, que en el HIJO es 0), así que aquí se
-  -- ramifica igual que 0008_operacion_venta.sql (recalcular_totales_ticket): con IVA incluido,
-  -- iva = neto - neto/(1+tasa/100) (== neto*tasa/(100+tasa)); con IVA por afuera, iva = neto*tasa/100.
-  SUM(CASE WHEN ti.combo_rol = 'HIJO'
-           THEN (CASE WHEN ti.iva_incluido_en_precio_snapshot
-                      THEN ROUND(ti.precio_asignado_mxn * ti.tasa_iva_snapshot / (100 + ti.tasa_iva_snapshot), 2)
-                      ELSE ROUND(ti.precio_asignado_mxn * ti.tasa_iva_snapshot / 100, 2)
-                 END) + ti.iva_item_mxn
+  -- deriva a mano. Los atributos fiscales son los DEL PADRE (join `padre` + lateral `rebanada`), no los
+  -- del hijo: precio_asignado_mxn es una rebanada del precio del padre y lleva su carácter fiscal.
+  -- Leer el snapshot del hijo daba números que no corresponden a ningún cobro (una ensalada al 16 %
+  -- por afuera dentro de un combo con IVA dentro reportaba 7.40 donde se cobraron 6.38).
+  SUM(CASE WHEN ti.combo_rol = 'HIJO' THEN rebanada.iva_mxn + ti.iva_item_mxn
            ELSE ti.iva_item_mxn END) AS iva_mxn,
-  SUM(CASE WHEN ti.combo_rol = 'HIJO' THEN ti.precio_asignado_mxn + ti.total_item_mxn ELSE ti.total_item_mxn END) AS total_mxn,
+  -- Con IVA por AFUERA la rebanada es un importe NETO y el cobro real fue neto × (1 + tasa): sin
+  -- sumarle el IVA derivado, todo reporte de ventas queda corto por el impuesto y la fila se
+  -- contradice a sí misma (total_mxn < subtotal_mxn + iva_mxn). Con IVA dentro no se suma nada
+  -- porque la rebanada ya lo trae, igual que subtotal_bruto_mxn en un renglón normal.
+  SUM(CASE WHEN ti.combo_rol = 'HIJO'
+           THEN ti.precio_asignado_mxn + (CASE WHEN rebanada.iva_dentro THEN 0 ELSE rebanada.iva_mxn END) + ti.total_item_mxn
+           ELSE ti.total_item_mxn END) AS total_mxn,
   AVG(CASE WHEN ti.combo_rol = 'HIJO' THEN ti.precio_unitario_original_snapshot ELSE ti.precio_unitario_snapshot END) AS precio_unitario_promedio_mxn
 FROM tickets t
 JOIN ticket_items ti ON ti.ticket_id = t.id
+LEFT JOIN ticket_items padre ON padre.id = ti.parent_item_id
+LEFT JOIN LATERAL (
+  SELECT ROUND(ti.precio_asignado_mxn * padre.tasa_iva_snapshot
+               / (CASE WHEN padre.iva_incluido_en_precio_snapshot THEN 100 + padre.tasa_iva_snapshot ELSE 100 END), 2) AS iva_mxn,
+         padre.iva_incluido_en_precio_snapshot AS iva_dentro
+) rebanada ON ti.combo_rol = 'HIJO'
 WHERE t.deleted_at IS NULL
   AND t.estado_fiscal IN ('PAGADO', 'FACTURADO')
   AND ti.cancelado = false
   AND ti.categoria_nombre_snapshot IS NOT NULL
   AND ti.combo_rol IS DISTINCT FROM 'PADRE'
 GROUP BY t.tenant_id, t.sucursal_id, t.dia_contable, ti.categoria_nombre_snapshot;
-COMMENT ON VIEW vw_ventas_por_categoria IS 'Ventas por categoría/día. Los PADRES de combo no cuentan; los HIJOS valen su precio asignado más sus extras (ADR 0015).';
+COMMENT ON VIEW vw_ventas_por_categoria IS 'Ventas por categoría/día. Los PADRES de combo no cuentan; los HIJOS valen su precio asignado más sus extras, con el IVA derivado de los atributos fiscales DEL PADRE (y sumado al total cuando el padre cobra con IVA por afuera). ADR 0015.';
 
 CREATE OR REPLACE VIEW vw_ventas_por_producto
 WITH (security_invoker = true) AS
@@ -533,25 +543,29 @@ SELECT
   COUNT(DISTINCT t.id)         AS tickets_con_producto,
   SUM(ti.cantidad)             AS unidades_vendidas,
   SUM(CASE WHEN ti.combo_rol = 'HIJO' THEN ti.precio_asignado_mxn + ti.subtotal_bruto_mxn ELSE ti.subtotal_bruto_mxn END) AS subtotal_mxn,
-  -- IVA del HIJO: misma ramificación que arriba y que recalcular_totales_ticket (0008), según
-  -- iva_incluido_en_precio_snapshot.
-  SUM(CASE WHEN ti.combo_rol = 'HIJO'
-           THEN (CASE WHEN ti.iva_incluido_en_precio_snapshot
-                      THEN ROUND(ti.precio_asignado_mxn * ti.tasa_iva_snapshot / (100 + ti.tasa_iva_snapshot), 2)
-                      ELSE ROUND(ti.precio_asignado_mxn * ti.tasa_iva_snapshot / 100, 2)
-                 END) + ti.iva_item_mxn
+  -- IVA y total del HIJO: misma regla que en vw_ventas_por_categoria — atributos fiscales DEL
+  -- PADRE (join `padre`) y, con IVA por afuera, el impuesto derivado se suma a total_mxn.
+  SUM(CASE WHEN ti.combo_rol = 'HIJO' THEN rebanada.iva_mxn + ti.iva_item_mxn
            ELSE ti.iva_item_mxn END) AS iva_mxn,
-  SUM(CASE WHEN ti.combo_rol = 'HIJO' THEN ti.precio_asignado_mxn + ti.total_item_mxn ELSE ti.total_item_mxn END) AS total_mxn,
+  SUM(CASE WHEN ti.combo_rol = 'HIJO'
+           THEN ti.precio_asignado_mxn + (CASE WHEN rebanada.iva_dentro THEN 0 ELSE rebanada.iva_mxn END) + ti.total_item_mxn
+           ELSE ti.total_item_mxn END) AS total_mxn,
   AVG(CASE WHEN ti.combo_rol = 'HIJO' THEN ti.precio_unitario_original_snapshot ELSE ti.precio_unitario_snapshot END) AS precio_unitario_promedio_mxn
 FROM tickets t
 JOIN ticket_items ti ON ti.ticket_id = t.id
+LEFT JOIN ticket_items padre ON padre.id = ti.parent_item_id
+LEFT JOIN LATERAL (
+  SELECT ROUND(ti.precio_asignado_mxn * padre.tasa_iva_snapshot
+               / (CASE WHEN padre.iva_incluido_en_precio_snapshot THEN 100 + padre.tasa_iva_snapshot ELSE 100 END), 2) AS iva_mxn,
+         padre.iva_incluido_en_precio_snapshot AS iva_dentro
+) rebanada ON ti.combo_rol = 'HIJO'
 WHERE t.deleted_at IS NULL
   AND t.estado_fiscal IN ('PAGADO', 'FACTURADO')
   AND ti.cancelado = false
   AND ti.combo_rol IS DISTINCT FROM 'PADRE'
 GROUP BY t.tenant_id, t.sucursal_id, t.dia_contable,
          ti.producto_id, ti.producto_nombre_snapshot, ti.producto_sku_snapshot;
-COMMENT ON VIEW vw_ventas_por_producto IS 'Ventas por producto/día. Los PADRES de combo no cuentan; los HIJOS valen su precio asignado más sus extras (ADR 0015).';
+COMMENT ON VIEW vw_ventas_por_producto IS 'Ventas por producto/día. Los PADRES de combo no cuentan; los HIJOS valen su precio asignado más sus extras, con el IVA derivado de los atributos fiscales DEL PADRE (y sumado al total cuando el padre cobra con IVA por afuera). ADR 0015.';
 
 CREATE OR REPLACE VIEW vw_ventas_por_area_cocina
 WITH (security_invoker = true) AS
@@ -562,16 +576,26 @@ SELECT
   ti.area_cocina_nombre_snapshot AS area_cocina,
   COUNT(DISTINCT t.id)           AS tickets_con_area,
   SUM(ti.cantidad)               AS unidades_preparadas,
-  SUM(CASE WHEN ti.combo_rol = 'HIJO' THEN ti.precio_asignado_mxn + ti.total_item_mxn ELSE ti.total_item_mxn END) AS total_vendido_mxn
+  -- Mismo criterio que las otras dos vistas: con IVA por afuera en el PADRE, la rebanada es neta
+  -- y hay que sumarle el impuesto derivado para reportar lo que de verdad se cobró.
+  SUM(CASE WHEN ti.combo_rol = 'HIJO'
+           THEN ti.precio_asignado_mxn + (CASE WHEN rebanada.iva_dentro THEN 0 ELSE rebanada.iva_mxn END) + ti.total_item_mxn
+           ELSE ti.total_item_mxn END) AS total_vendido_mxn
 FROM tickets t
 JOIN ticket_items ti ON ti.ticket_id = t.id
+LEFT JOIN ticket_items padre ON padre.id = ti.parent_item_id
+LEFT JOIN LATERAL (
+  SELECT ROUND(ti.precio_asignado_mxn * padre.tasa_iva_snapshot
+               / (CASE WHEN padre.iva_incluido_en_precio_snapshot THEN 100 + padre.tasa_iva_snapshot ELSE 100 END), 2) AS iva_mxn,
+         padre.iva_incluido_en_precio_snapshot AS iva_dentro
+) rebanada ON ti.combo_rol = 'HIJO'
 WHERE t.deleted_at IS NULL
   AND t.estado_fiscal IN ('PAGADO', 'FACTURADO')
   AND ti.cancelado = false
   AND ti.area_cocina_nombre_snapshot IS NOT NULL
   AND ti.combo_rol IS DISTINCT FROM 'PADRE'
 GROUP BY t.tenant_id, t.sucursal_id, t.dia_contable, ti.area_cocina_nombre_snapshot;
-COMMENT ON VIEW vw_ventas_por_area_cocina IS 'Ventas por área de cocina/día. Los PADRES de combo no cuentan; los HIJOS valen su precio asignado más sus extras (ADR 0015).';
+COMMENT ON VIEW vw_ventas_por_area_cocina IS 'Ventas por área de cocina/día. Los PADRES de combo no cuentan; los HIJOS valen su precio asignado más sus extras, con el IVA derivado de los atributos fiscales DEL PADRE (y sumado al total cuando el padre cobra con IVA por afuera). ADR 0015.';
 
 -- ── §3.2 Pull: las dos tablas bajan a la caja (ADR 0004: lista explícita) ───────────────
 -- Cuerpo idéntico al vigente (0101) más dos claves después de productos_grupos_modificadores.
