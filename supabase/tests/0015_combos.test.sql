@@ -1,7 +1,7 @@
 -- Combos (ADR 0015, migración 0110): las tablas de slots están aisladas por tenant, un combo no
 -- puede ser opción de otro combo, y la RPC que cobra no se salta la RLS.
 begin;
-select plan(8);
+select plan(9);
 
 insert into tenants (id, codigo, nombre_comercial, vertical_principal) values
   ('cccccccc-0000-0000-0000-0000000000a0', 'combos-a', 'Combos A', 'QUICK_SERVICE'),
@@ -71,6 +71,23 @@ select throws_ok(
   $$ insert into combo_opciones (tenant_id, grupo_id, producto_id, precio_delta_mxn, es_default)
      values ('cccccccc-0000-0000-0000-0000000000a0', 'cccccccc-0000-0000-0000-0000000000a5', 'cccccccc-0000-0000-0000-0000000000a6', 0, true) $$,
   '23505', null, 'combo_opciones permite un solo es_default por slot');
+
+-- #9 catalogo_version() (0109) también mide combo_grupos/combo_opciones: un slot nuevo es
+-- "el menú cambió" tanto como un producto nuevo (0110 §3.3). Se compara contra un valor fijo
+-- sembrado, no contra "no es null" — una fila en productos ya bastaría para eso y no probaría
+-- que la función de verdad lee las tablas de combos.
+reset role;
+alter table combo_grupos disable trigger trg_combo_grupos_updated_at;
+update combo_grupos set updated_at = '2099-01-01 00:00:00+00'
+ where id = 'cccccccc-0000-0000-0000-0000000000a5';
+alter table combo_grupos enable trigger trg_combo_grupos_updated_at;
+set local role authenticated;
+select set_config('request.jwt.claims',
+  json_build_object('sub', 'cccccccc-0000-0000-0000-0000000000c9',
+                    'tenant_id', 'cccccccc-0000-0000-0000-0000000000a0',
+                    'role', 'authenticated')::text, true);
+select is(catalogo_version(), '2099-01-01 00:00:00+00'::timestamptz,
+          'un slot de combo (combo_grupos) mueve catalogo_version()');
 
 select * from finish();
 rollback;

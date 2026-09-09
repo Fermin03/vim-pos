@@ -481,3 +481,150 @@ BEGIN
 END;
 $$;
 COMMENT ON FUNCTION cancelar_item_ticket IS 'Cancela un ítem individual sin cancelar el ticket. Si la comanda ya está en cocina, requiere PIN (§16.3). Un PADRE de combo arrastra a sus HIJOS; un HIJO no se cancela solo (0110).';
+
+-- ── §3.1 Vistas de ventas: sin padres; hijos valen su parte prorrateada + sus extras ────────
+-- CREATE OR REPLACE VIEW exige las mismas columnas en el mismo orden: solo cambian expresiones.
+-- WITH (security_invoker = true) se repite a propósito: la 0044 lo puso con un ALTER VIEW
+-- dinámico sobre TODAS las vistas de public, pero CREATE OR REPLACE VIEW no conserva reloptions
+-- —lo resetea a security_definer (el dueño de la vista, no el que consulta)—, así que si no se
+-- repite aquí la vista deja de respetar la RLS de tickets/ticket_items (0002_rls_cobertura lo
+-- comprueba: "toda vista vw_* declara security_invoker").
+CREATE OR REPLACE VIEW vw_ventas_por_categoria
+WITH (security_invoker = true) AS
+SELECT
+  t.tenant_id,
+  t.sucursal_id,
+  t.dia_contable,
+  ti.categoria_nombre_snapshot AS categoria,
+  COUNT(DISTINCT t.id)         AS tickets_con_categoria,
+  SUM(ti.cantidad)             AS unidades_vendidas,
+  SUM(CASE WHEN ti.combo_rol = 'HIJO' THEN ti.precio_asignado_mxn + ti.subtotal_bruto_mxn ELSE ti.subtotal_bruto_mxn END) AS subtotal_mxn,
+  SUM(CASE WHEN ti.combo_rol = 'HIJO'
+           THEN ROUND(ti.precio_asignado_mxn * ti.tasa_iva_snapshot / (100 + ti.tasa_iva_snapshot), 2) + ti.iva_item_mxn
+           ELSE ti.iva_item_mxn END) AS iva_mxn,
+  SUM(CASE WHEN ti.combo_rol = 'HIJO' THEN ti.precio_asignado_mxn + ti.total_item_mxn ELSE ti.total_item_mxn END) AS total_mxn,
+  AVG(CASE WHEN ti.combo_rol = 'HIJO' THEN ti.precio_unitario_original_snapshot ELSE ti.precio_unitario_snapshot END) AS precio_unitario_promedio_mxn
+FROM tickets t
+JOIN ticket_items ti ON ti.ticket_id = t.id
+WHERE t.deleted_at IS NULL
+  AND t.estado_fiscal IN ('PAGADO', 'FACTURADO')
+  AND ti.cancelado = false
+  AND ti.categoria_nombre_snapshot IS NOT NULL
+  AND ti.combo_rol IS DISTINCT FROM 'PADRE'
+GROUP BY t.tenant_id, t.sucursal_id, t.dia_contable, ti.categoria_nombre_snapshot;
+
+CREATE OR REPLACE VIEW vw_ventas_por_producto
+WITH (security_invoker = true) AS
+SELECT
+  t.tenant_id,
+  t.sucursal_id,
+  t.dia_contable,
+  ti.producto_id,
+  ti.producto_nombre_snapshot  AS producto_nombre,
+  ti.producto_sku_snapshot     AS producto_sku,
+  COUNT(DISTINCT t.id)         AS tickets_con_producto,
+  SUM(ti.cantidad)             AS unidades_vendidas,
+  SUM(CASE WHEN ti.combo_rol = 'HIJO' THEN ti.precio_asignado_mxn + ti.subtotal_bruto_mxn ELSE ti.subtotal_bruto_mxn END) AS subtotal_mxn,
+  SUM(CASE WHEN ti.combo_rol = 'HIJO'
+           THEN ROUND(ti.precio_asignado_mxn * ti.tasa_iva_snapshot / (100 + ti.tasa_iva_snapshot), 2) + ti.iva_item_mxn
+           ELSE ti.iva_item_mxn END) AS iva_mxn,
+  SUM(CASE WHEN ti.combo_rol = 'HIJO' THEN ti.precio_asignado_mxn + ti.total_item_mxn ELSE ti.total_item_mxn END) AS total_mxn,
+  AVG(CASE WHEN ti.combo_rol = 'HIJO' THEN ti.precio_unitario_original_snapshot ELSE ti.precio_unitario_snapshot END) AS precio_unitario_promedio_mxn
+FROM tickets t
+JOIN ticket_items ti ON ti.ticket_id = t.id
+WHERE t.deleted_at IS NULL
+  AND t.estado_fiscal IN ('PAGADO', 'FACTURADO')
+  AND ti.cancelado = false
+  AND ti.combo_rol IS DISTINCT FROM 'PADRE'
+GROUP BY t.tenant_id, t.sucursal_id, t.dia_contable,
+         ti.producto_id, ti.producto_nombre_snapshot, ti.producto_sku_snapshot;
+COMMENT ON VIEW vw_ventas_por_producto IS 'Ventas por producto/día. Los PADRES de combo no cuentan; los HIJOS valen su precio asignado más sus extras (ADR 0015).';
+
+CREATE OR REPLACE VIEW vw_ventas_por_area_cocina
+WITH (security_invoker = true) AS
+SELECT
+  t.tenant_id,
+  t.sucursal_id,
+  t.dia_contable,
+  ti.area_cocina_nombre_snapshot AS area_cocina,
+  COUNT(DISTINCT t.id)           AS tickets_con_area,
+  SUM(ti.cantidad)               AS unidades_preparadas,
+  SUM(CASE WHEN ti.combo_rol = 'HIJO' THEN ti.precio_asignado_mxn + ti.total_item_mxn ELSE ti.total_item_mxn END) AS total_vendido_mxn
+FROM tickets t
+JOIN ticket_items ti ON ti.ticket_id = t.id
+WHERE t.deleted_at IS NULL
+  AND t.estado_fiscal IN ('PAGADO', 'FACTURADO')
+  AND ti.cancelado = false
+  AND ti.area_cocina_nombre_snapshot IS NOT NULL
+  AND ti.combo_rol IS DISTINCT FROM 'PADRE'
+GROUP BY t.tenant_id, t.sucursal_id, t.dia_contable, ti.area_cocina_nombre_snapshot;
+
+-- ── §3.2 Pull: las dos tablas bajan a la caja (ADR 0004: lista explícita) ───────────────
+-- Cuerpo idéntico al vigente (0101) más dos claves después de productos_grupos_modificadores.
+CREATE OR REPLACE FUNCTION sync_pull_snapshot(p_tenant uuid)
+RETURNS jsonb
+LANGUAGE sql
+SECURITY DEFINER
+SET search_path = public, auth, pg_temp
+AS $$
+  SELECT jsonb_build_object(
+    'tenants',                        coalesce((SELECT jsonb_agg(to_jsonb(x)) FROM tenants x WHERE x.id = p_tenant), '[]'::jsonb),
+    'sucursales',                     coalesce((SELECT jsonb_agg(to_jsonb(x)) FROM sucursales x WHERE x.tenant_id = p_tenant), '[]'::jsonb),
+    'cajas',                          coalesce((SELECT jsonb_agg(to_jsonb(x)) FROM cajas x WHERE x.tenant_id = p_tenant), '[]'::jsonb),
+    'secciones',                      coalesce((SELECT jsonb_agg(to_jsonb(x)) FROM secciones x WHERE x.tenant_id = p_tenant), '[]'::jsonb),
+    'mesas',                          coalesce((SELECT jsonb_agg(to_jsonb(x)) FROM mesas x WHERE x.tenant_id = p_tenant), '[]'::jsonb),
+    'areas_cocina',                   coalesce((SELECT jsonb_agg(to_jsonb(x)) FROM areas_cocina x WHERE x.tenant_id = p_tenant), '[]'::jsonb),
+    'marcas_virtuales',               coalesce((SELECT jsonb_agg(to_jsonb(x)) FROM marcas_virtuales x WHERE x.tenant_id = p_tenant), '[]'::jsonb),
+    'categorias',                     coalesce((SELECT jsonb_agg(to_jsonb(x)) FROM categorias x WHERE x.tenant_id = p_tenant), '[]'::jsonb),
+    'grupos_modificadores',           coalesce((SELECT jsonb_agg(to_jsonb(x)) FROM grupos_modificadores x WHERE x.tenant_id = p_tenant), '[]'::jsonb),
+    'productos',                      coalesce((SELECT jsonb_agg(to_jsonb(x)) FROM productos x WHERE x.tenant_id = p_tenant), '[]'::jsonb),
+    'opciones_modificador',           coalesce((SELECT jsonb_agg(to_jsonb(x)) FROM opciones_modificador x WHERE x.tenant_id = p_tenant), '[]'::jsonb),
+    'productos_grupos_modificadores', coalesce((SELECT jsonb_agg(to_jsonb(x)) FROM productos_grupos_modificadores x WHERE x.tenant_id = p_tenant), '[]'::jsonb),
+    -- Combos (ADR 0015): slots y opciones; el combo mismo ya baja con productos.
+    'combo_grupos',                   coalesce((SELECT jsonb_agg(to_jsonb(x)) FROM combo_grupos x WHERE x.tenant_id = p_tenant), '[]'::jsonb),
+    'combo_opciones',                 coalesce((SELECT jsonb_agg(to_jsonb(x)) FROM combo_opciones x WHERE x.tenant_id = p_tenant), '[]'::jsonb),
+    'subtipos_personal',              coalesce((SELECT jsonb_agg(to_jsonb(x)) FROM subtipos_personal x WHERE x.tenant_id = p_tenant), '[]'::jsonb),
+    'configuracion_tenant',           coalesce((SELECT jsonb_agg(to_jsonb(x)) FROM configuracion_tenant x WHERE x.tenant_id = p_tenant), '[]'::jsonb),
+    'repartidores',                   coalesce((SELECT jsonb_agg(to_jsonb(x)) FROM repartidores x WHERE x.tenant_id = p_tenant), '[]'::jsonb),
+    'unidades_medida',                coalesce((SELECT jsonb_agg(to_jsonb(x)) FROM unidades_medida x WHERE x.tenant_id = p_tenant OR x.tenant_id IS NULL), '[]'::jsonb),
+    'insumos',                        coalesce((SELECT jsonb_agg(to_jsonb(x)) FROM insumos x WHERE x.tenant_id = p_tenant), '[]'::jsonb),
+    'insumo_stock_sucursal',          coalesce((SELECT jsonb_agg(to_jsonb(x)) FROM insumo_stock_sucursal x WHERE x.tenant_id = p_tenant), '[]'::jsonb),
+    'recetas',                        coalesce((SELECT jsonb_agg(to_jsonb(x)) FROM recetas x WHERE x.tenant_id = p_tenant), '[]'::jsonb),
+    'receta_componentes',             coalesce((SELECT jsonb_agg(to_jsonb(x)) FROM receta_componentes x WHERE x.tenant_id = p_tenant), '[]'::jsonb),
+    'modificador_componentes',        coalesce((SELECT jsonb_agg(to_jsonb(x)) FROM modificador_componentes x WHERE x.tenant_id = p_tenant), '[]'::jsonb),
+    'roles',                          coalesce((SELECT jsonb_agg(to_jsonb(x)) FROM roles x WHERE x.tenant_id = p_tenant OR x.tenant_id IS NULL), '[]'::jsonb),
+    'rol_permisos',                   coalesce((SELECT jsonb_agg(to_jsonb(x)) FROM rol_permisos x WHERE x.rol_id IN (SELECT id FROM roles WHERE tenant_id = p_tenant OR tenant_id IS NULL)), '[]'::jsonb),
+    'permisos',                       coalesce((SELECT jsonb_agg(to_jsonb(x)) FROM permisos x), '[]'::jsonb),
+    'usuarios_acceso',                coalesce((SELECT jsonb_agg(to_jsonb(x)) FROM usuarios_acceso x WHERE x.tenant_id = p_tenant), '[]'::jsonb),
+    'usuarios_perfil',                coalesce((SELECT jsonb_agg(to_jsonb(x)) FROM usuarios_perfil x WHERE x.id IN (SELECT usuario_id FROM usuarios_acceso WHERE tenant_id = p_tenant)), '[]'::jsonb),
+    'users',                          coalesce((SELECT jsonb_agg(jsonb_build_object(
+                                          'id', u.id, 'email', u.email, 'encrypted_password', u.encrypted_password,
+                                          'email_confirmed_at', u.email_confirmed_at, 'created_at', u.created_at,
+                                          'raw_app_meta_data', u.raw_app_meta_data, 'raw_user_meta_data', u.raw_user_meta_data))
+                                        FROM auth.users u
+                                        WHERE u.id IN (SELECT usuario_id FROM usuarios_acceso WHERE tenant_id = p_tenant)), '[]'::jsonb),
+    '__watermark', to_char(now() AT TIME ZONE 'utc', 'YYYY-MM-DD"T"HH24:MI:SS"Z"')
+  );
+$$;
+REVOKE EXECUTE ON FUNCTION sync_pull_snapshot(uuid) FROM public, anon, authenticated;
+GRANT EXECUTE ON FUNCTION sync_pull_snapshot(uuid) TO service_role;
+
+-- ── §3.3 catalogo_version(): un slot nuevo también es "el menú cambió" ──────────────────
+CREATE OR REPLACE FUNCTION catalogo_version()
+RETURNS timestamptz
+LANGUAGE sql
+STABLE
+SET search_path = public, pg_temp
+AS $$
+  SELECT GREATEST(
+    (SELECT max(updated_at) FROM categorias),
+    (SELECT max(updated_at) FROM productos),
+    (SELECT max(updated_at) FROM grupos_modificadores),
+    (SELECT max(updated_at) FROM opciones_modificador),
+    (SELECT max(created_at) FROM productos_grupos_modificadores),
+    (SELECT max(updated_at) FROM combo_grupos),
+    (SELECT max(updated_at) FROM combo_opciones)
+  );
+$$;
+REVOKE EXECUTE ON FUNCTION catalogo_version() FROM public, anon;
+GRANT EXECUTE ON FUNCTION catalogo_version() TO authenticated, service_role;
