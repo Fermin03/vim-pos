@@ -173,3 +173,13 @@ test("cuando la identidad no cuadra, el fallo dice QUÉ claim faltó", async () 
   const empleado = await verificar(await firmar(cargaValida({ tipo_identidad: "EMPLEADO" })));
   assert.match(!empleado.ok ? empleado.detalle ?? "" : "", /tipo_identidad/i);
 });
+
+test("el correo tiene que ser del dominio de dispositivos, como en el resto del repo", () => {
+  // latido.ts, pin-login y desktop/src/auth.mjs anclan los tres al dominio. Sin el anclaje, un
+  // correo con la forma `caja-<uuid>@lo-que-sea` daría caja: hoy nadie puede provocarlo
+  // (provisionar-dispositivo genera el correo server-side), pero es una capa que el repo ya
+  // tenía y no hay motivo para perderla aquí.
+  assert.equal(identidadDeDispositivo(cargaValida({ email: `caja-${CAJA}@otro-dominio.com` })), null);
+  assert.equal(identidadDeDispositivo(cargaValida({ email: `caja-${CAJA}@dispositivos.vimpos.mx.malo.com` })), null);
+  assert.equal(identidadDeDispositivo(cargaValida())?.cajaId, CAJA, "el dominio bueno sigue pasando");
+});

@@ -22,7 +22,7 @@ por vertical, la matriz de permisos, CFDI, impresión. Lo que envejeció está l
 |---|---|---|
 | `decisiones/` | Un archivo por decisión que superó al plan. Corto: qué decía el plan, qué hacemos, por qué. | Se añade; rara vez se edita |
 | `diseno/` | El núcleo de marca y un documento por app | Sí, en el mismo commit que el código |
-| `operacion/` | Runbooks: publicar, desplegar, go-live, sitio, SSO | Sí, cuando cambia el procedimiento |
+| `operacion/` | Runbooks: publicar, desplegar, go-live, sitio, SSO, revocar una caja | Sí, cuando cambia el procedimiento |
 | `producto/` | Roadmap y backlog | Sí |
 | `bitacora/` | Auditorías, remediaciones, cosas que pasaron. Fechadas. | **No.** Son un registro, no un documento vivo |
 

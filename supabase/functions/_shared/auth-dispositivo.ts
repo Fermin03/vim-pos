@@ -21,8 +21,16 @@
 // Se usa Web Crypto y no djwt para que el módulo corra tal cual bajo `node --test`: la seguridad
 // de esto tiene que estar cubierta por pruebas, incluida la trampa de alg:none.
 
-/** El correo sintético del dispositivo lleva dentro su caja (1F §1.1). El dispositivo ES una caja. */
-const EMAIL_DISPOSITIVO = /^caja-([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})@/i;
+/**
+ * El correo sintético del dispositivo lleva dentro su caja (1F §1.1). El dispositivo ES una caja.
+ *
+ * Anclado al dominio, igual que `_shared/latido.ts`, `pin-login` y `desktop/src/auth.mjs`. Hoy
+ * nadie puede provocar un correo con otro dominio y rol DISPOSITIVO —`provisionar-dispositivo` lo
+ * genera server-side—, pero es una capa que el repo ya tenía en los otros tres sitios y que sale
+ * gratis conservar. Si algún día se migra el dominio de dispositivos, hay que tocar los cuatro.
+ */
+const EMAIL_DISPOSITIVO =
+  /^caja-([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})@dispositivos\.vimpos\.mx$/i;
 
 export type Carga = Record<string, unknown>;
 export type Dispositivo = { sub: string; tenantId: string; cajaId: string; email: string };
@@ -146,7 +154,7 @@ export function identidadOFalta(carga: Carga | null): Dispositivo | { falta: str
   const email = typeof carga.email === "string" ? carga.email : "";
   if (!email) return { falta: "el token no trae el claim email (de ahí sale la caja)" };
   const cajaId = EMAIL_DISPOSITIVO.exec(email)?.[1]?.toLowerCase() ?? null;
-  if (!cajaId) return { falta: "el claim email no tiene forma de correo de dispositivo" };
+  if (!cajaId) return { falta: "el claim email no es un correo de dispositivo (caja-<uuid>@dispositivos.vimpos.mx)" };
   return { sub, tenantId, cajaId, email };
 }
 
