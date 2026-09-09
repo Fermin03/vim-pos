@@ -15,6 +15,7 @@ DECLARE
   v_combo uuid; v_g_hamb uuid; v_g_acom uuid; v_cat_beb uuid; v_refresco uuid;
   v_queso uuid; v_turno uuid; v_ticket uuid; v_padre uuid;
   v_g uuid; v_carne uuid; v_pza uuid;
+  v_ensalada uuid; v_ticket2 uuid; v_padre2 uuid;
   r record; v_total numeric; v_n int; v_suma numeric;
 BEGIN
   PERFORM set_config('request.jwt.claims',
@@ -141,6 +142,42 @@ BEGIN
   SELECT coalesce(sum(total_mxn),0) INTO v_suma FROM vw_ventas_por_producto
    WHERE tenant_id = v_tenant AND producto_id = v_papas AND dia_contable = CURRENT_DATE;
   IF v_suma < 110 THEN RAISE EXCEPTION 'las papas en combo deben contar 2×55 = 110 en la vista (hay %)', v_suma; END IF;
+  RAISE NOTICE 'vista de ventas OK';
+
+  -- 7) IVA de un HIJO con iva_incluido_en_precio = false (hallazgo Important, revisión ronda 1):
+  -- vw_ventas_por_producto/categoria deben ramificar el IVA del hijo igual que
+  -- recalcular_totales_ticket (0008), no asumir siempre "precio ya trae IVA dentro".
+  INSERT INTO productos(tenant_id, categoria_id, nombre, precio_base_mxn, tasa_iva, iva_incluido_en_precio)
+  VALUES (v_tenant, v_cat_beb, 'Ensalada IVA aparte smoke', 40, 16, false) RETURNING id INTO v_ensalada;
+  INSERT INTO combo_opciones(tenant_id, grupo_id, producto_id, precio_delta_mxn, es_default)
+  VALUES (v_tenant, v_g_acom, v_ensalada, 20, false);
+  -- La sección 5 dejó el insumo "Carne combo smoke" en 0 (sin fila en insumo_stock_sucursal) y el
+  -- trigger de alertas ya auto-agotó la Clásica por insumo crítico agotado; para esta sección solo
+  -- interesa el IVA, no el inventario, así que se reactiva igual que la sección 3 hace con las papas.
+  UPDATE productos SET agotado_automatico = false, estado = 'ACTIVO', motivo_agotado = NULL WHERE id = v_clas;
+
+  v_ticket2 := abrir_ticket(v_suc, v_caja, v_turno, 'PARA_LLEVAR'::modo_servicio, NULL, NULL, 'smoke-combo-iva-1', v_maria);
+  v_padre2 := agregar_combo_a_ticket(v_ticket2, v_combo, 1, jsonb_build_array(
+    jsonb_build_object('grupo_id', v_g_hamb, 'producto_id', v_clas, 'cantidad', 1, 'client_id_local', 'smoke-combo-iva-h1'),
+    jsonb_build_object('grupo_id', v_g_acom, 'producto_id', v_ensalada, 'cantidad', 1, 'client_id_local', 'smoke-combo-iva-h2')),
+    '[]'::jsonb, NULL, 'smoke-combo-iva-p');
+
+  -- Padre = 45 (combo) + 120 (Clásica, SUMA_PRECIO_PRODUCTO) + 20 (delta ensalada) = 185.
+  -- Prorrateo de la ensalada (última del bucle, se lleva el residuo): 185 − round(185×120/160,2) = 46.25.
+  SELECT precio_asignado_mxn INTO v_total FROM ticket_items WHERE parent_item_id = v_padre2 AND producto_id = v_ensalada;
+  IF v_total <> 46.25 THEN RAISE EXCEPTION 'prorrateo de la ensalada debe ser 46.25, es %', v_total; END IF;
+
+  PERFORM aplicar_pago(v_ticket2, 'EFECTIVO'::metodo_pago, 185, 200, NULL, NULL, NULL, false, NULL, 'smoke-combo-iva-pago');
+
+  -- IVA correcto (por afuera): round(46.25 × 16/100, 2) = 7.40. La fórmula vieja (que asumía IVA
+  -- incluido para todo hijo) daría round(46.25 × 16/116, 2) = 6.38 — distinguible del valor correcto.
+  SELECT iva_mxn INTO v_total FROM vw_ventas_por_producto
+   WHERE tenant_id = v_tenant AND producto_id = v_ensalada AND dia_contable = CURRENT_DATE;
+  IF v_total <> 7.40 THEN
+    RAISE EXCEPTION 'IVA de un hijo con IVA por afuera debe ser 7.40 (46.25 × 16%%), es %', v_total;
+  END IF;
+  RAISE NOTICE 'IVA por afuera en hijo OK: 7.40';
+
   RAISE NOTICE 'SMOKE COMBOS OK';
 END $$;
 ROLLBACK;

@@ -499,8 +499,15 @@ SELECT
   COUNT(DISTINCT t.id)         AS tickets_con_categoria,
   SUM(ti.cantidad)             AS unidades_vendidas,
   SUM(CASE WHEN ti.combo_rol = 'HIJO' THEN ti.precio_asignado_mxn + ti.subtotal_bruto_mxn ELSE ti.subtotal_bruto_mxn END) AS subtotal_mxn,
+  -- IVA del HIJO: su parte prorrateada del precio del padre nunca pasó por recalcular_totales_ticket
+  -- (ese cálculo solo corre sobre precio_unitario_snapshot, que en el HIJO es 0), así que aquí se
+  -- ramifica igual que 0008_operacion_venta.sql (recalcular_totales_ticket): con IVA incluido,
+  -- iva = neto - neto/(1+tasa/100) (== neto*tasa/(100+tasa)); con IVA por afuera, iva = neto*tasa/100.
   SUM(CASE WHEN ti.combo_rol = 'HIJO'
-           THEN ROUND(ti.precio_asignado_mxn * ti.tasa_iva_snapshot / (100 + ti.tasa_iva_snapshot), 2) + ti.iva_item_mxn
+           THEN (CASE WHEN ti.iva_incluido_en_precio_snapshot
+                      THEN ROUND(ti.precio_asignado_mxn * ti.tasa_iva_snapshot / (100 + ti.tasa_iva_snapshot), 2)
+                      ELSE ROUND(ti.precio_asignado_mxn * ti.tasa_iva_snapshot / 100, 2)
+                 END) + ti.iva_item_mxn
            ELSE ti.iva_item_mxn END) AS iva_mxn,
   SUM(CASE WHEN ti.combo_rol = 'HIJO' THEN ti.precio_asignado_mxn + ti.total_item_mxn ELSE ti.total_item_mxn END) AS total_mxn,
   AVG(CASE WHEN ti.combo_rol = 'HIJO' THEN ti.precio_unitario_original_snapshot ELSE ti.precio_unitario_snapshot END) AS precio_unitario_promedio_mxn
@@ -512,6 +519,7 @@ WHERE t.deleted_at IS NULL
   AND ti.categoria_nombre_snapshot IS NOT NULL
   AND ti.combo_rol IS DISTINCT FROM 'PADRE'
 GROUP BY t.tenant_id, t.sucursal_id, t.dia_contable, ti.categoria_nombre_snapshot;
+COMMENT ON VIEW vw_ventas_por_categoria IS 'Ventas por categoría/día. Los PADRES de combo no cuentan; los HIJOS valen su precio asignado más sus extras (ADR 0015).';
 
 CREATE OR REPLACE VIEW vw_ventas_por_producto
 WITH (security_invoker = true) AS
@@ -525,8 +533,13 @@ SELECT
   COUNT(DISTINCT t.id)         AS tickets_con_producto,
   SUM(ti.cantidad)             AS unidades_vendidas,
   SUM(CASE WHEN ti.combo_rol = 'HIJO' THEN ti.precio_asignado_mxn + ti.subtotal_bruto_mxn ELSE ti.subtotal_bruto_mxn END) AS subtotal_mxn,
+  -- IVA del HIJO: misma ramificación que arriba y que recalcular_totales_ticket (0008), según
+  -- iva_incluido_en_precio_snapshot.
   SUM(CASE WHEN ti.combo_rol = 'HIJO'
-           THEN ROUND(ti.precio_asignado_mxn * ti.tasa_iva_snapshot / (100 + ti.tasa_iva_snapshot), 2) + ti.iva_item_mxn
+           THEN (CASE WHEN ti.iva_incluido_en_precio_snapshot
+                      THEN ROUND(ti.precio_asignado_mxn * ti.tasa_iva_snapshot / (100 + ti.tasa_iva_snapshot), 2)
+                      ELSE ROUND(ti.precio_asignado_mxn * ti.tasa_iva_snapshot / 100, 2)
+                 END) + ti.iva_item_mxn
            ELSE ti.iva_item_mxn END) AS iva_mxn,
   SUM(CASE WHEN ti.combo_rol = 'HIJO' THEN ti.precio_asignado_mxn + ti.total_item_mxn ELSE ti.total_item_mxn END) AS total_mxn,
   AVG(CASE WHEN ti.combo_rol = 'HIJO' THEN ti.precio_unitario_original_snapshot ELSE ti.precio_unitario_snapshot END) AS precio_unitario_promedio_mxn
@@ -558,6 +571,7 @@ WHERE t.deleted_at IS NULL
   AND ti.area_cocina_nombre_snapshot IS NOT NULL
   AND ti.combo_rol IS DISTINCT FROM 'PADRE'
 GROUP BY t.tenant_id, t.sucursal_id, t.dia_contable, ti.area_cocina_nombre_snapshot;
+COMMENT ON VIEW vw_ventas_por_area_cocina IS 'Ventas por área de cocina/día. Los PADRES de combo no cuentan; los HIJOS valen su precio asignado más sus extras (ADR 0015).';
 
 -- ── §3.2 Pull: las dos tablas bajan a la caja (ADR 0004: lista explícita) ───────────────
 -- Cuerpo idéntico al vigente (0101) más dos claves después de productos_grupos_modificadores.
@@ -586,6 +600,7 @@ AS $$
     'subtipos_personal',              coalesce((SELECT jsonb_agg(to_jsonb(x)) FROM subtipos_personal x WHERE x.tenant_id = p_tenant), '[]'::jsonb),
     'configuracion_tenant',           coalesce((SELECT jsonb_agg(to_jsonb(x)) FROM configuracion_tenant x WHERE x.tenant_id = p_tenant), '[]'::jsonb),
     'repartidores',                   coalesce((SELECT jsonb_agg(to_jsonb(x)) FROM repartidores x WHERE x.tenant_id = p_tenant), '[]'::jsonb),
+    -- Inventario (ADR 0013): lo que la caja necesita para descontar al vender. Nunca sube de vuelta.
     'unidades_medida',                coalesce((SELECT jsonb_agg(to_jsonb(x)) FROM unidades_medida x WHERE x.tenant_id = p_tenant OR x.tenant_id IS NULL), '[]'::jsonb),
     'insumos',                        coalesce((SELECT jsonb_agg(to_jsonb(x)) FROM insumos x WHERE x.tenant_id = p_tenant), '[]'::jsonb),
     'insumo_stock_sucursal',          coalesce((SELECT jsonb_agg(to_jsonb(x)) FROM insumo_stock_sucursal x WHERE x.tenant_id = p_tenant), '[]'::jsonb),
