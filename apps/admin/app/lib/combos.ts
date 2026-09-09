@@ -187,10 +187,21 @@ export function vistaPrevia(base: number, slots: SlotConOpciones[]): { principal
   };
 }
 
-/** Resuelve las opciones de un slot como las verá la caja: por categoría o explícitas. */
+/**
+ * Resuelve las opciones de un slot para el editor de combos del admin (no para la caja: esta
+ * función vive en `apps/admin`, la caja tiene su propia versión con paridad de precio, ver
+ * `precioCombo` arriba).
+ *
+ * A propósito NO se excluyen los productos agotados (`estado = 'AGOTADO'`): esta es una
+ * pantalla de configuración, no de venta. Que una hamburguesa se agote hoy no la saca del combo
+ * — mañana vuelve a haber — y si la quitáramos de la lista, la pantalla de "opciones del slot"
+ * parpadearía cada vez que cambia el inventario del día. Sí se excluyen los PAUSADOS: pausar un
+ * producto es una decisión del dueño de ocultarlo, no un hecho del inventario. La caja, que
+ * necesita ocultar lo agotado al vender, lo resuelve por su cuenta.
+ */
 export async function slotsConOpciones(comboId: string): Promise<SlotConOpciones[]> {
   const slots = await listarSlots(comboId);
-  const { data: prods, error } = await supabase.from("productos").select("id, nombre, precio_base_mxn, categoria_id, es_combo, visible_en_pos").is("deleted_at", null).eq("estado", "ACTIVO");
+  const { data: prods, error } = await supabase.from("productos").select("id, nombre, precio_base_mxn, categoria_id, es_combo, visible_en_pos").is("deleted_at", null).neq("estado", "PAUSADO");
   if (error) throw new Error(error.message);
   const productos = (prods ?? []) as unknown as { id: string; nombre: string; precio_base_mxn: number; categoria_id: string; es_combo: boolean; visible_en_pos: boolean }[];
   const out: SlotConOpciones[] = [];

@@ -204,7 +204,9 @@ export function ProductoForm({ producto }: { producto: Producto | null }) {
           </div>
         )}
 
-        {areas.length > 0 && (
+        {/* Un combo no tiene estación propia: la comanda la generan los productos que el
+            cliente elige dentro de cada slot, cada uno con la suya. */}
+        {areas.length > 0 && !producto?.es_combo && (
           <div>
             <label className={label} htmlFor="area">
               Estación de preparación <span className="text-ink-3">· opcional</span>

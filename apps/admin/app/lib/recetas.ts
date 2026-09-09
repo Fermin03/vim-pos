@@ -107,6 +107,10 @@ export async function listarRecetasResumen(): Promise<RecetaResumen[]> {
     .from("productos")
     .select("id, nombre, precio_base_mxn, tasa_iva, iva_incluido_en_precio, categoria:categorias!categoria_id(nombre), receta:recetas(costo_total_mxn, activa)")
     .is("deleted_at", null)
+    // Un combo no tiene receta propia (ADR 0015): su costo sale de sumar las recetas de lo que
+    // elige el cliente, no de un insumo fijo. Ofrecerle aquí "agregar receta" sería un callejón
+    // sin salida.
+    .eq("es_combo", false)
     .order("nombre");
   if (error) throw new Error(error.message);
   return ((data ?? []) as unknown as Record<string, unknown>[]).map((p) => {
