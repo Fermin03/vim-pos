@@ -43,3 +43,34 @@ cada `git push` a `main` redespliega automáticamente.
 ## PENDIENTE de backend (sin esto las apps cargan pero no funcionan)
 - `supabase link` + `supabase db push` (las 43 migraciones) al proyecto cloud `pbiaxzvmssjsxdwqrumb`.
 - `supabase functions deploy` (las 7 edge functions) + `supabase secrets set`.
+
+## Borrar despliegues viejos
+
+**Cada despliegue sigue vivo en su propia URL, sirviendo el sitio tal como estaba ese día.** Sacar
+algo de `main` no toca ninguno de los anteriores, y el panel de Vercel no borra en lote: es de uno
+en uno. Para eso está `scripts/borrar-despliegues-vercel.mjs`.
+
+```bash
+npx vercel@latest login                                              # deja la sesión en disco
+node scripts/borrar-despliegues-vercel.mjs --proyecto=sitio-web      # solo LISTA
+node scripts/borrar-despliegues-vercel.mjs --proyecto=sitio-web --borrar
+```
+
+Sin `--borrar` no borra nada. Nunca toca el despliegue que sirve producción —se lo pregunta a la
+API en vez de deducirlo por fecha— ni nada posterior al corte, para que queden destinos de *Instant
+Rollback*. El corte por defecto es el merge que sacó los datos personales del sitio (6 sep 2026);
+se cambia con `--antes-de=2026-08-01`.
+
+Se usó el 8 de septiembre de 2026 para borrar los **107 despliegues de `sitio-web`** anteriores a
+esa purga. Los de `platform`, `admin`, `pos` y `vim-factura` se dejaron a propósito: nunca
+publicaron esos datos —bajo `apps/` solo estaban en dos archivos de test y en un comentario de
+código— y borrarlos se llevaría por delante el historial de rollback del producto.
+
+**Ojo al comprobar si una URL de despliegue está expuesta.** Con Deployment Protection en modo
+estándar, `vimpos.com.mx` es público pero las URLs `.vercel.app` redirigen (302) al login de
+Vercel. `curl -L` sigue la redirección y devuelve **200** — que es la página de login, no el sitio.
+Hay que mirar sin seguir redirecciones:
+
+```bash
+curl -s -D - -o /dev/null https://<despliegue>.vercel.app/
+```
