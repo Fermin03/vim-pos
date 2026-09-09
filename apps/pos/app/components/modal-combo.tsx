@@ -1,5 +1,5 @@
 "use client";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { Producto } from "../lib/catalogo";
 import type { ComboDef, ComponenteSel, SlotCombo } from "../lib/combos";
 import { componentesPorDefecto, deltaDe, nuevoClientIdComponente, precioCombo, slotValido } from "../lib/combos";
@@ -95,6 +95,42 @@ export function ModalCombo({ combo, token, linea, preset, onConfirmar, onCancela
       if (avanzarAlTerminar) avanzar();
     }
   }
+
+  /**
+   * Cierra el modal de modificadores anidado con el mismo criterio que su botón Cancelar (ver
+   * comentario en `onCancelar` más abajo): si el grupo era obligatorio, deshace la selección para
+   * que el slot quede inválido en vez de dejarlo a medias. Se extrae como función propia porque la
+   * llaman tanto el botón como el manejador de Escape de abajo.
+   */
+  function cerrarPersonalizando() {
+    setPersonalizando((p) => {
+      if (!p) return null;
+      if (p.avanzar) setComponentes((prev) => prev.filter((c) => c.clientId !== p.comp.clientId));
+      return null;
+    });
+  }
+
+  /**
+   * Escape para el modal de modificadores anidado (spec §6.2, "Escape cierra lo que esté
+   * encima"). El dispatcher central de home-pos.tsx (`alEscapar`) no sabe de `personalizando`
+   * porque es estado local de este componente — su listener sigue registrado desde que se abrió
+   * el drawer del combo y por orden de registro DOM se dispararía antes que cualquier listener
+   * nuevo que agreguemos aquí en fase de burbuja, cerrando el drawer entero por error. Por eso
+   * este listener se registra en fase de CAPTURA: se ejecuta antes que el de home-pos sin
+   * importar cuándo se registró cada uno, y `stopPropagation` evita que ese dispatcher externo
+   * llegue a ver la tecla.
+   */
+  useEffect(() => {
+    if (!personalizando) return;
+    const alTeclear = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      e.preventDefault();
+      e.stopPropagation();
+      cerrarPersonalizando();
+    };
+    window.addEventListener("keydown", alTeclear, true);
+    return () => window.removeEventListener("keydown", alTeclear, true);
+  }, [personalizando]);
 
   function confirmar() {
     const base: LineaCarrito = linea
@@ -273,16 +309,13 @@ export function ModalCombo({ combo, token, linea, preset, onConfirmar, onCancela
             setPersonalizando(null);
             if (avanzarDespues) avanzar();
           }}
-          onCancelar={() => {
-            const p = personalizando;
-            setPersonalizando(null);
-            // Este modal solo se abre con avanzar=true cuando el grupo era obligatorio (flujo de
-            // selección inicial en elegir()). Cancelarlo ahí NO debe avanzar el paso: hay que
-            // deshacer la selección del componente para que el slot quede inválido y el cajero
-            // tenga que volver a tocar la tarjeta. Cuando avanzar=false (reabierto desde
-            // "Personalizar" sobre un componente ya elegido) el cancelar sigue sin tocar nada.
-            if (p.avanzar) setComponentes((prev) => prev.filter((c) => c.clientId !== p.comp.clientId));
-          }}
+          // Este modal solo se abre con avanzar=true cuando el grupo era obligatorio (flujo de
+          // selección inicial en elegir()). Cancelarlo ahí NO debe avanzar el paso: hay que
+          // deshacer la selección del componente para que el slot quede inválido y el cajero
+          // tenga que volver a tocar la tarjeta. Cuando avanzar=false (reabierto desde
+          // "Personalizar" sobre un componente ya elegido) el cancelar sigue sin tocar nada.
+          // Mismo criterio en `cerrarPersonalizando`, que también dispara Escape (arriba).
+          onCancelar={cerrarPersonalizando}
         />
       )}
     </div>
