@@ -35,6 +35,26 @@ function cuadra(r: ReturnType<typeof armarConceptos>): void {
   );
   const suma = r.conceptos.reduce((a, c) => a + Math.round(c.total * 100), 0);
   assert.equal(suma, Math.round(r.total * 100), "los conceptos deben sumar el total");
+  // La OTRA invariante que el SAT valida y que ningun caso puede romper: la tasa que el concepto
+  // DECLARA tiene que explicar el impuesto que TRASLADA. Un comprobante que declara 0.00 % sobre
+  // una base de $185 y traslada $1.60 cuadra en pesos y es fiscalmente invalido: cuadrar al
+  // centavo no basta. (Revision final, hallazgo 1: asi se timbraba un combo con hijos de tasa
+  // mixta, en silencio, porque la red de seguridad solo miraba el total.)
+  for (const c of r.conceptos) {
+    const base = Math.round((c.importe - c.descuento) * 100);
+    const iva = Math.round(c.iva * 100);
+    if (c.tasaIva === 0) {
+      assert.equal(iva, 0, `el concepto "${c.descripcion}" declara tasa 0 y traslada ${c.iva}`);
+      continue;
+    }
+    // Hasta 2 centavos de holgura: el reparto del descuento de ticket redondea base e IVA aparte.
+    const esperado = Math.round((base * c.tasaIva) / 100);
+    assert.ok(
+      Math.abs(iva - esperado) <= 2,
+      `el concepto "${c.descripcion}" declara tasa ${c.tasaIva} sobre base ${base / 100} ` +
+        `pero traslada ${c.iva} (esperado ~${esperado / 100})`,
+    );
+  }
 }
 
 test("un renglón con IVA incluido separa base e impuesto", () => {
@@ -331,8 +351,82 @@ test("dos combos y un producto suelto dan tres conceptos y cuadran", () => {
 });
 
 test("un hijo sin padre en la lista se factura como renglón normal (no se pierde dinero)", () => {
+  // El PADRE de OTRO combo va en la lista a propósito: sin él, esta prueba pasaba igual con el
+  // plegado anulado (una lista sin padres no se colapsa nunca) y por tanto no discriminaba nada.
+  const padre = linea({ descripcion: "Combo", totalItemMxn: 175, ivaItemMxn: 24.14, id: "p1", parentId: null, comboRol: "PADRE" });
+  const propio = linea({ descripcion: "Clásica", subtotalBrutoMxn: 0, totalItemMxn: 0, ivaItemMxn: 0, id: "h0", parentId: "p1", comboRol: "HIJO" });
   const h1 = linea({ descripcion: "Doble", subtotalBrutoMxn: 0, montoModificadoresMxn: 15, totalItemMxn: 15, ivaItemMxn: 2.07, id: "h1", parentId: "zz", comboRol: "HIJO" });
-  const r = armarConceptos([h1], 15);
-  assert.equal(r.conceptos.length, 1);
+  const r = armarConceptos([padre, propio, h1], 190);
+  assert.deepEqual(r.conceptos.map((c) => c.descripcion), ["Combo (Clásica)", "Doble"]);
+  assert.equal(r.conceptos[1].total, 15);
+  cuadra(r);
+});
+
+// -- Tasas mixtas dentro de un combo (revisión final, hallazgo 1) ---------------------------
+//
+// El spec 8 decía "hijos con tasa distinta al padre: se asume la del padre". No se puede: el
+// impuesto del hijo se calculó A SU TASA, y meterlo dentro de un concepto que declara la tasa del
+// padre rompe la correspondencia entre tasa declarada e impuesto trasladado. Un hijo a precio 0 y
+// sin extras no aporta nada y da igual; uno con extra pagado sí. Por eso solo se absorbe al hijo
+// que comparte tasa Y régimen (IVA dentro/fuera) con su padre.
+//
+// TODAS las fixtures de arriba usan una sola tasa uniforme: por eso esto pasó desapercibido.
+
+test("hijo a tasa 0 con extra pagado bajo un padre al 16 %: se factura aparte, no revienta", () => {
+  const padre = linea({ descripcion: "Combo", totalItemMxn: 175, ivaItemMxn: 24.14, id: "p1", parentId: null, comboRol: "PADRE" });
+  const h1 = linea({
+    descripcion: "Pan para llevar", tasaIva: 0, subtotalBrutoMxn: 0, montoModificadoresMxn: 10,
+    totalItemMxn: 10, ivaItemMxn: 0, id: "h1", parentId: "p1", comboRol: "HIJO",
+  });
+  // Antes: el plegado sumaba $10 al bruto del padre sin sumar IVA, el descuento salía negativo y
+  // armarConceptos lanzaba ConceptosIncoherentes. El cliente no podía facturar su consumo.
+  const r = armarConceptos([padre, h1], 185);
+  assert.deepEqual(r.conceptos.map((c) => c.descripcion), ["Combo", "Pan para llevar"]);
+  assert.equal(r.conceptos[0].tasaIva, 16);
+  assert.equal(r.conceptos[1].tasaIva, 0);
+  assert.equal(r.conceptos[1].iva, 0);
+  assert.equal(r.total, 185);
+  cuadra(r);
+});
+
+test("hijo al 16 % con extra pagado bajo un padre a tasa 0: no se timbra tasa 0 con IVA", () => {
+  const padre = linea({ descripcion: "Combo", tasaIva: 0, totalItemMxn: 175, ivaItemMxn: 0, id: "p1", parentId: null, comboRol: "PADRE" });
+  const h1 = linea({
+    descripcion: "Cerveza", tasaIva: 16, subtotalBrutoMxn: 0, montoModificadoresMxn: 11.6,
+    totalItemMxn: 11.6, ivaItemMxn: 1.6, id: "h1", parentId: "p1", comboRol: "HIJO",
+  });
+  // Este es el que fallaba EN SILENCIO: la aritmética cerraba, la red de seguridad no saltaba y
+  // salía un concepto único que declaraba tasa 0.00 sobre $185 de base con $1.60 de traslado.
+  const r = armarConceptos([padre, h1], 186.6);
+  assert.deepEqual(r.conceptos.map((c) => c.descripcion), ["Combo", "Cerveza"]);
+  assert.equal(r.conceptos[0].tasaIva, 0);
+  assert.equal(r.conceptos[0].iva, 0);
+  assert.equal(r.conceptos[1].tasaIva, 16);
+  assert.equal(r.conceptos[1].iva, 1.6);
+  cuadra(r);
+});
+
+test("mismo porcentaje pero distinto régimen (IVA dentro vs. fuera) tampoco se absorbe", () => {
+  const padre = linea({ descripcion: "Combo", totalItemMxn: 116, ivaItemMxn: 16, id: "p1", parentId: null, comboRol: "PADRE" });
+  const h1 = linea({
+    descripcion: "Ensalada", ivaIncluidoEnPrecio: false, subtotalBrutoMxn: 0, montoModificadoresMxn: 20,
+    totalItemMxn: 23.2, ivaItemMxn: 3.2, id: "h1", parentId: "p1", comboRol: "HIJO",
+  });
+  const r = armarConceptos([padre, h1], 139.2);
+  assert.equal(r.conceptos.length, 2);
+  assert.equal(r.conceptos[0].importe, 100);
+  assert.equal(r.conceptos[1].importe, 20);
+  cuadra(r);
+});
+
+test("un hijo a precio cero y tasa distinta no cambia el dinero, solo deja de ir en el nombre", () => {
+  const padre = linea({ descripcion: "Combo", totalItemMxn: 175, ivaItemMxn: 24.14, id: "p1", parentId: null, comboRol: "PADRE" });
+  const h1 = linea({ descripcion: "Doble", subtotalBrutoMxn: 0, totalItemMxn: 0, ivaItemMxn: 0, id: "h1", parentId: "p1", comboRol: "HIJO" });
+  const h2 = linea({ descripcion: "Refresco", tasaIva: 0, subtotalBrutoMxn: 0, totalItemMxn: 0, ivaItemMxn: 0, id: "h2", parentId: "p1", comboRol: "HIJO" });
+  const r = armarConceptos([padre, h1, h2], 175);
+  // El de tasa 0 sale como concepto propio de $0.00: no se pierde ni se inventa dinero y el
+  // comprobante sigue cuadrando. Lo que NO puede pasar es que su tasa se declare como la del padre.
+  assert.equal(r.total, 175);
+  assert.equal(r.conceptos[0].descripcion, "Combo (Doble)");
   cuadra(r);
 });

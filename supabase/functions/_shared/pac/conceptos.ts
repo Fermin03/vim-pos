@@ -96,6 +96,15 @@ const DESCRIPCION_MAX = 1000;
  * Un combo es UN concepto (ADR 0015): el padre absorbe lo que sus hijos cobraron (solo extras: los
  * hijos van a precio 0) y toma el nombre "Combo (Doble, Papas, Refresco)". Un hijo cuyo padre no
  * venga en la lista se deja como renglón normal: perder su importe descuadraría el comprobante.
+ *
+ * SOLO se absorbe al hijo que comparte tasa Y régimen (IVA dentro o fuera del precio) con su padre.
+ * El spec §8 decía "hijos con tasa distinta al padre: se asume la del padre", y no se puede: el
+ * `ivaItemMxn` del hijo está calculado A SU TASA, así que meterlo dentro de un concepto que declara
+ * la tasa del padre rompe la correspondencia entre la tasa declarada y el impuesto trasladado. En
+ * un sentido revienta al armar (descuento negativo: el cliente no puede facturar) y en el otro
+ * cierra la aritmética y se timbra un comprobante fiscalmente inválido sin que nadie se entere.
+ * Dejar al hijo como concepto propio conserva el dinero al centavo y declara cada tasa donde va;
+ * es el mismo camino que ya seguía el hijo huérfano.
  */
 export function colapsarCombos(lineas: LineaTicket[]): LineaTicket[] {
   const padres = new Map<string, LineaTicket>();
@@ -103,13 +112,18 @@ export function colapsarCombos(lineas: LineaTicket[]): LineaTicket[] {
   const nombres = new Map<string, string[]>();
   const salida: LineaTicket[] = [];
   for (const l of lineas) {
-    if (l.comboRol === "HIJO" && l.parentId && padres.has(l.parentId)) {
-      const p = padres.get(l.parentId)!;
-      p.subtotalBrutoMxn = aPesos(aCentavos(p.subtotalBrutoMxn) + aCentavos(l.subtotalBrutoMxn) + aCentavos(l.montoModificadoresMxn));
-      p.descuentoItemMxn = aPesos(aCentavos(p.descuentoItemMxn) + aCentavos(l.descuentoItemMxn));
-      p.promocionItemMxn = aPesos(aCentavos(p.promocionItemMxn) + aCentavos(l.promocionItemMxn));
-      p.ivaItemMxn = aPesos(aCentavos(p.ivaItemMxn) + aCentavos(l.ivaItemMxn));
-      p.totalItemMxn = aPesos(aCentavos(p.totalItemMxn) + aCentavos(l.totalItemMxn));
+    const padre = l.comboRol === "HIJO" && l.parentId ? padres.get(l.parentId) : undefined;
+    if (
+      padre &&
+      l.parentId &&
+      padre.tasaIva === l.tasaIva &&
+      padre.ivaIncluidoEnPrecio === l.ivaIncluidoEnPrecio
+    ) {
+      padre.subtotalBrutoMxn = aPesos(aCentavos(padre.subtotalBrutoMxn) + aCentavos(l.subtotalBrutoMxn) + aCentavos(l.montoModificadoresMxn));
+      padre.descuentoItemMxn = aPesos(aCentavos(padre.descuentoItemMxn) + aCentavos(l.descuentoItemMxn));
+      padre.promocionItemMxn = aPesos(aCentavos(padre.promocionItemMxn) + aCentavos(l.promocionItemMxn));
+      padre.ivaItemMxn = aPesos(aCentavos(padre.ivaItemMxn) + aCentavos(l.ivaItemMxn));
+      padre.totalItemMxn = aPesos(aCentavos(padre.totalItemMxn) + aCentavos(l.totalItemMxn));
       nombres.set(l.parentId, [...(nombres.get(l.parentId) ?? []), l.descripcion]);
       continue;
     }
