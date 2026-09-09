@@ -74,6 +74,13 @@ export async function listarProductosPos(token: string): Promise<Producto[]> {
   });
 }
 
+/** "¿Lo hacemos combo?" por negocio. Sin fila o sin red se asume encendido: es el default de la columna. */
+export async function leerComboUpsellActivo(token: string): Promise<boolean> {
+  const { data, error } = await employeeClient(token).from("configuracion_tenant").select("combo_upsell_activo").maybeSingle();
+  if (error || !data) return true;
+  return (data as { combo_upsell_activo: boolean | null }).combo_upsell_activo !== false;
+}
+
 // Paleta de fallback si la categoría no tiene color asignado
 const PALETA_FALLBACK: Record<string, { bg: string; ink: string }> = {
   blue: { bg: "#E6ECF5", ink: "#2C5AA0" },

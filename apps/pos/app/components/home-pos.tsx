@@ -4,6 +4,7 @@ import { Button } from "@vim/ui/styles";
 import {
   listarCategoriasPos,
   listarProductosPos,
+  leerComboUpsellActivo,
   type Categoria,
   type Producto,
 } from "../lib/catalogo";
@@ -18,12 +19,13 @@ import {
   type LineaCarrito,
   type ModificadorSel,
 } from "../lib/carrito";
-import { listarCombos, type ComboDef } from "../lib/combos";
+import { listarCombos, combosQueAdmiten, diferencialCombo, type ComboDef } from "../lib/combos";
 import { obtenerGruposDeProducto, type GrupoModificadores } from "../lib/modificadores";
 import { persistirTicket, leerTotales, type TotalesTicket } from "../lib/cobro";
 import { SidebarTicket } from "./sidebar-ticket";
 import { ModalModificadores } from "./modal-modificadores";
 import { ModalCombo } from "./modal-combo";
+import { HojaCombo } from "./hoja-combo";
 import { ModalCobro } from "./modal-cobro";
 import { ModalDescuento } from "./modal-descuento";
 import { obtenerImpresora, obtenerImpresoraDeEstacion } from "../lib/print/adapter";
@@ -184,6 +186,9 @@ export function HomePos({
   // ADR 0015 — combos: catálogo de defs con slots resueltos, y el drawer de armado abierto (si hay).
   const [combos, setCombos] = useState<ComboDef[]>([]);
   const [comboAbierto, setComboAbierto] = useState<{ combo: ComboDef; linea?: LineaCarrito | null; preset?: { producto: Producto; modificadores: ModificadorSel[] } | null } | null>(null);
+  // §6.5 — interruptor del tenant y la hoja "¿Lo hacemos combo?" cuando aplica.
+  const [upsellActivo, setUpsellActivo] = useState(true);
+  const [hojaCombo, setHojaCombo] = useState<{ producto: Producto; mods: ModificadorSel[]; nota: string | null; combo: ComboDef } | null>(null);
   const [totalesCobro, setTotalesCobro] = useState<TotalesTicket | null>(null);
   // Al cobrar desde la lista ya no se navega, así que la lista no se remonta sola y seguiría
   // mostrando la cuenta recién pagada. Este contador la fuerza a releerse.
@@ -255,6 +260,7 @@ export function HomePos({
       // Su propio .catch: si solo falla la consulta de combos, no debe tirar el catch exterior
       // (que revertiría a la caché un catálogo de productos que YA se bajó bien).
       setCombos(await listarCombos(token, ps).catch(() => []));
+      setUpsellActivo(await leerComboUpsellActivo(token));
       // Fase 3 — cache de lectura: el menú sobrevive sin red (recargas offline).
       cachePut("catalogo", { categorias: cs, productos: ps });
     } catch (e) {
@@ -421,6 +427,30 @@ export function HomePos({
     }
   }, [ticketBd, token, productos, combos]);
 
+  /** Agrega el producto suelto, sin ofrecer combo: mesa (llama al servidor) o venta rápida (reducer). */
+  const agregarSuelto = useCallback(
+    async (p: Producto, mods: ModificadorSel[], nota: string | null) => {
+      if (ticketBd) {
+        await agregarItemAlTicket(token, { ticketId: ticketBd.ticketId, productoId: p.id, cantidad: 1, modificadores: mods, nota });
+        await recargarCuenta();
+        return;
+      }
+      dispatch({ tipo: "agregar", linea: { clientId: nuevoClientId(), producto: p, cantidad: 1, modificadores: mods, notaCocina: nota } });
+    },
+    [ticketBd, token, recargarCuenta],
+  );
+
+  /** Decide entre ofrecer "¿Lo hacemos combo?" o agregar el producto suelto de una vez (spec §6.5). */
+  const ofrecerCombo = useCallback(
+    async (p: Producto, mods: ModificadorSel[], nota: string | null) => {
+      const elegibles = upsellActivo && !(ticketBd && cocinaEnviada) ? combosQueAdmiten(p, combos) : [];
+      if (elegibles.length === 0) { await agregarSuelto(p, mods, nota); return; }
+      const mejor = [...elegibles].sort((a, b) => diferencialCombo(a, p).extra - diferencialCombo(b, p).extra)[0]!;
+      setHojaCombo({ producto: p, mods, nota, combo: mejor });
+    },
+    [upsellActivo, ticketBd, cocinaEnviada, combos, agregarSuelto],
+  );
+
   const onTapProducto = useCallback(
     async (p: Producto) => {
       if (p.agotado) return;
@@ -433,13 +463,7 @@ export function HomePos({
       try {
         const grupos = await obtenerGruposDeProducto(token, p.id);
         if (grupos.length === 0) {
-          if (ticketBd) {
-            // Modo cuenta de mesa: agrega al ticket abierto y re-sincroniza.
-            await agregarItemAlTicket(token, { ticketId: ticketBd.ticketId, productoId: p.id, cantidad: 1, modificadores: [], nota: null });
-            await recargarCuenta();
-          } else {
-            dispatch({ tipo: "agregar", linea: { clientId: nuevoClientId(), producto: p, cantidad: 1, modificadores: [], notaCocina: null } });
-          }
+          await ofrecerCombo(p, [], null);
         } else {
           setModGrupos({ producto: p, grupos });
         }
@@ -447,7 +471,7 @@ export function HomePos({
         setError(e instanceof Error ? e.message : "Error al cargar modificadores");
       }
     },
-    [token, ticketBd, recargarCuenta, combos],
+    [token, combos, ofrecerCombo],
   );
 
   const confirmarModificadores = useCallback(
@@ -455,18 +479,13 @@ export function HomePos({
       if (!modGrupos) return;
       const prod = modGrupos.producto;
       setModGrupos(null);
-      if (ticketBd) {
-        try {
-          await agregarItemAlTicket(token, { ticketId: ticketBd.ticketId, productoId: prod.id, cantidad: 1, modificadores: mods, nota });
-          await recargarCuenta();
-        } catch (e) {
-          setError(e instanceof Error ? e.message : "No se pudo agregar el ítem");
-        }
-        return;
+      try {
+        await ofrecerCombo(prod, mods, nota);
+      } catch (e) {
+        setError(e instanceof Error ? e.message : "No se pudo agregar el ítem");
       }
-      dispatch({ tipo: "agregar", linea: { clientId: nuevoClientId(), producto: prod, cantidad: 1, modificadores: mods, notaCocina: nota } });
     },
-    [modGrupos, ticketBd, token, recargarCuenta],
+    [modGrupos, ofrecerCombo],
   );
 
   /** Confirmación del drawer de combo: agrega (o reemplaza, si venía de "Editar") la línea. */
@@ -962,6 +981,12 @@ export function HomePos({
       // El de modificadores va primero porque se pinta encima del de combo cuando ambos aplican.
       [modGrupos != null, () => setModGrupos(null)],
       [comboAbierto != null, () => setComboAbierto(null)],
+      // La hoja "¿Lo hacemos combo?": Escape es "No, solo" — el producto se agrega igual, nunca se pierde.
+      [hojaCombo != null, () => {
+        const h = hojaCombo!;
+        setHojaCombo(null);
+        void agregarSuelto(h.producto, h.mods, h.nota).catch((e) => setError(e instanceof Error ? e.message : "Error"));
+      }],
       [cancelandoItem != null, () => setCancelandoItem(null)],
       [descuentoItem != null, () => setDescuentoItem(null)],
       [cancelandoTicket, () => setCancelandoTicket(false)],
@@ -989,7 +1014,7 @@ export function HomePos({
         && !enDelivery && !enPickup && !enMesas, () => intentarSalirDeCaptura("atras")],
     ];
     return capas.find(([visible]) => visible)?.[1] ?? null;
-  }, [modGrupos, comboAbierto, cancelandoItem, descuentoItem, cancelandoTicket, mostrarRecibo, confirmacion, totalesCobro,
+  }, [modGrupos, comboAbierto, hojaCombo, agregarSuelto, cancelandoItem, descuentoItem, cancelandoTicket, mostrarRecibo, confirmacion, totalesCobro,
       procesandoCobro, agregandoA, viendoMapaMesas, pidiendoMesa, nombreCuentaAbierto,
       clienteDomAbierto, esperaPidiendoEtiqueta, esperaListaAbierta, movimientoAbierto,
       abrirCajaAbierto, cambiarPinAbierto, misPropinasAbierto, configImpresoraAbierto,
@@ -1640,6 +1665,22 @@ export function HomePos({
           preset={comboAbierto.preset ?? null}
           onConfirmar={confirmarCombo}
           onCancelar={() => setComboAbierto(null)}
+        />
+      )}
+      {hojaCombo && (
+        <HojaCombo
+          producto={hojaCombo.producto}
+          combo={hojaCombo.combo}
+          onNo={() => {
+            const h = hojaCombo;
+            setHojaCombo(null);
+            void agregarSuelto(h.producto, h.mods, h.nota).catch((e) => setError(e instanceof Error ? e.message : "Error"));
+          }}
+          onSi={() => {
+            const h = hojaCombo;
+            setHojaCombo(null);
+            setComboAbierto({ combo: h.combo, preset: { producto: h.producto, modificadores: h.mods } });
+          }}
         />
       )}
       {descuentoAbierto && ticketBd && (
