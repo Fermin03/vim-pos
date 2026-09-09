@@ -185,7 +185,7 @@ export function HomePos({
   const [modGrupos, setModGrupos] = useState<{ producto: Producto; grupos: GrupoModificadores[] } | null>(null);
   // ADR 0015 — combos: catálogo de defs con slots resueltos, y el drawer de armado abierto (si hay).
   const [combos, setCombos] = useState<ComboDef[]>([]);
-  const [comboAbierto, setComboAbierto] = useState<{ combo: ComboDef; linea?: LineaCarrito | null; preset?: { producto: Producto; modificadores: ModificadorSel[] } | null } | null>(null);
+  const [comboAbierto, setComboAbierto] = useState<{ combo: ComboDef; linea?: LineaCarrito | null; preset?: { producto: Producto; modificadores: ModificadorSel[]; notaCocina?: string | null } | null } | null>(null);
   // §6.5 — interruptor del tenant y la hoja "¿Lo hacemos combo?" cuando aplica.
   const [upsellActivo, setUpsellActivo] = useState(true);
   const [hojaCombo, setHojaCombo] = useState<{ producto: Producto; mods: ModificadorSel[]; nota: string | null; combo: ComboDef } | null>(null);
@@ -260,7 +260,9 @@ export function HomePos({
       // Su propio .catch: si solo falla la consulta de combos, no debe tirar el catch exterior
       // (que revertiría a la caché un catálogo de productos que YA se bajó bien).
       setCombos(await listarCombos(token, ps).catch(() => []));
-      setUpsellActivo(await leerComboUpsellActivo(token));
+      // Mismo motivo que la línea de arriba. `true` porque encendido es el default de la
+      // columna (ver catalogo.ts) y es lo menos sorprendente si la consulta falla.
+      setUpsellActivo(await leerComboUpsellActivo(token).catch(() => true));
       // Fase 3 — cache de lectura: el menú sobrevive sin red (recargas offline).
       cachePut("catalogo", { categorias: cs, productos: ps });
     } catch (e) {
@@ -1679,7 +1681,7 @@ export function HomePos({
           onSi={() => {
             const h = hojaCombo;
             setHojaCombo(null);
-            setComboAbierto({ combo: h.combo, preset: { producto: h.producto, modificadores: h.mods } });
+            setComboAbierto({ combo: h.combo, preset: { producto: h.producto, modificadores: h.mods, notaCocina: h.nota } });
           }}
         />
       )}

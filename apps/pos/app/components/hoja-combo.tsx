@@ -16,7 +16,7 @@ export function HojaCombo({ producto, combo, onSi, onNo }: { producto: Producto;
         </span>
         <div className="min-w-0 flex-1">
           <b className="block font-display text-[17px] font-semibold tracking-[-0.01em]">¿Lo hacemos combo?</b>
-          <span className="mt-0.5 block text-[13px] text-ink-2"><span className="font-display font-bold text-ink">+{fmtMxn(extra)}</span> · {resto.join(" y ")} · cambia lo que quieras después</span>
+          <span className="mt-0.5 block text-[13px] text-ink-2"><span className="font-display font-bold tabular-nums text-ink">+{fmtMxn(extra)}</span> · {resto.join(" y ")} · cambia lo que quieras después</span>
         </div>
         <div className="flex flex-shrink-0 gap-2">
           <button type="button" onClick={onNo} className="h-[52px] rounded border border-line-strong bg-surface px-4 text-[14.5px] font-semibold text-ink-2 transition hover:bg-hover">No, solo</button>

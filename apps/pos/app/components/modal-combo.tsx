@@ -22,8 +22,13 @@ type Props = {
   token: string;
   /** Línea existente que se edita (reabre en el resumen). */
   linea?: LineaCarrito | null;
-  /** Producto ya elegido para el primer slot (viene del aviso "¿Lo hacemos combo?"). */
-  preset?: { producto: Producto; modificadores: ModificadorSel[] } | null;
+  /**
+   * Producto ya elegido para el primer slot (viene del aviso "¿Lo hacemos combo?").
+   * `notaCocina` es opcional: la única llamadora que hoy lo pasa es `home-pos.tsx`, con la nota
+   * que el cajero ya había escrito para el producto suelto — no perderla al aceptar el combo.
+   * `modal-agregar-productos.tsx` no pasa `preset`, así que el campo opcional no la afecta.
+   */
+  preset?: { producto: Producto; modificadores: ModificadorSel[]; notaCocina?: string | null } | null;
   onConfirmar: (linea: LineaCarrito) => void;
   onCancelar: () => void;
 };
@@ -49,7 +54,7 @@ export function ModalCombo({ combo, token, linea, preset, onConfirmar, onCancela
     if (preset && slots[0]) {
       const primero = slots[0];
       return [
-        { grupoId: primero.id, grupoNombre: primero.nombre, producto: preset.producto, cantidad: 1, modificadores: preset.modificadores, notaCocina: null, clientId: nuevoClientIdComponente() },
+        { grupoId: primero.id, grupoNombre: primero.nombre, producto: preset.producto, cantidad: 1, modificadores: preset.modificadores, notaCocina: preset.notaCocina ?? null, clientId: nuevoClientIdComponente() },
         ...base.filter((c) => c.grupoId !== primero.id),
       ];
     }
