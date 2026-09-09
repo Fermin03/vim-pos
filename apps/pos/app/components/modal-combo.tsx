@@ -147,30 +147,34 @@ export function ModalCombo({ combo, token, linea, preset, onConfirmar, onCancela
                   const importe = importeDe(slot, o);
                   const disabled = o.producto.agotado;
                   return (
-                    <button key={o.producto.id} type="button" disabled={disabled} aria-pressed={!!c} onClick={() => elegir(slot, o.producto)}
-                      className={["relative flex min-h-[96px] flex-col items-start justify-between gap-2.5 rounded-lg border px-[13px] py-3 text-left transition active:scale-[.98]",
-                        disabled ? "cursor-not-allowed border-line opacity-45" : c ? "border-ink bg-sel shadow-[inset_0_0_0_1px_rgb(var(--ink))]" : "border-line"].join(" ")}>
-                      {disabled
-                        ? <span className="absolute right-2.5 top-2.5 rounded-full bg-danger/10 px-2 py-0.5 text-[10.5px] font-bold uppercase tracking-wide text-danger">Agotado</span>
-                        : <span className={["absolute right-2.5 top-2.5 flex h-5 w-5 items-center justify-center rounded-full border-[1.5px]", c ? "border-ink bg-ink" : "border-line-strong"].join(" ")}><IconCheck className={["h-3 w-3 text-white", c ? "opacity-100" : "opacity-0"].join(" ")} /></span>}
-                      <span>
-                        <span className="block text-[15px] font-semibold leading-tight text-ink">{o.producto.nombre}</span>
-                        {c && c.modificadores.length > 0 && <span className="mt-0.5 block text-[12px] text-ink-3">{c.modificadores.map((m) => m.opcionNombre).join(" · ")}</span>}
-                      </span>
-                      <span className="flex w-full items-baseline justify-between">
-                        {importe > 0
-                          ? <span className="font-display text-[14px] font-semibold tabular-nums text-ink-2">{slot.modo === "SUMA_PRECIO_PRODUCTO" ? "" : "+"}{fmtMxn(importe)}</span>
-                          : <span className="text-[12.5px] font-medium text-ink-3">Incluido</span>}
-                        {o.esDefault && !c && <span className="text-[10.5px] font-bold uppercase tracking-[0.04em] text-success">Default</span>}
-                        {c && (
-                          <span role="button" tabIndex={0} className="text-[12.5px] font-semibold text-accent"
-                            onClick={(e) => { e.stopPropagation(); void personalizar(c, false, false); }}
-                            onKeyDown={(e) => { if (e.key === "Enter") { e.stopPropagation(); void personalizar(c, false, false); } }}>
-                            Personalizar
-                          </span>
-                        )}
-                      </span>
-                    </button>
+                    // Contenedor relativo: la tarjeta y "Personalizar" son botones HERMANOS (un
+                    // <button> no puede anidar otro control interactivo), "Personalizar" flota en
+                    // la esquina inferior con 44px de área táctil.
+                    <div key={o.producto.id} className="relative">
+                      <button type="button" disabled={disabled} aria-pressed={!!c} onClick={() => elegir(slot, o.producto)}
+                        className={["relative flex min-h-[96px] w-full flex-col items-start justify-between gap-2.5 rounded-lg border px-[13px] py-3 text-left transition active:scale-[.98]",
+                          disabled ? "cursor-not-allowed border-line opacity-45" : c ? "border-ink bg-sel shadow-[inset_0_0_0_1px_rgb(var(--ink))]" : "border-line"].join(" ")}>
+                        {disabled
+                          ? <span className="absolute right-2.5 top-2.5 rounded-full bg-danger/10 px-2 py-0.5 text-[10.5px] font-bold uppercase tracking-wide text-danger">Agotado</span>
+                          : <span className={["absolute right-2.5 top-2.5 flex h-5 w-5 items-center justify-center rounded-full border-[1.5px]", c ? "border-ink bg-ink" : "border-line-strong"].join(" ")}><IconCheck className={["h-3 w-3 text-white", c ? "opacity-100" : "opacity-0"].join(" ")} /></span>}
+                        <span>
+                          <span className="block text-[15px] font-semibold leading-tight text-ink">{o.producto.nombre}</span>
+                          {c && c.modificadores.length > 0 && <span className="mt-0.5 block text-[12px] text-ink-3">{c.modificadores.map((m) => m.opcionNombre).join(" · ")}</span>}
+                        </span>
+                        <span className="flex w-full items-baseline justify-between">
+                          {importe > 0
+                            ? <span className="font-display text-[14px] font-semibold tabular-nums text-ink-2">{slot.modo === "SUMA_PRECIO_PRODUCTO" ? "" : "+"}{fmtMxn(importe)}</span>
+                            : <span className="text-[12.5px] font-medium text-ink-3">Incluido</span>}
+                          {o.esDefault && !c && <span className="text-[10.5px] font-bold uppercase tracking-[0.04em] text-success">Default</span>}
+                        </span>
+                      </button>
+                      {c && (
+                        <button type="button" onClick={(e) => { e.stopPropagation(); void personalizar(c, false, false); }}
+                          className="absolute bottom-1 right-1 z-10 flex h-11 min-w-[44px] items-center justify-center rounded px-2.5 text-[12.5px] font-semibold text-accent transition hover:bg-hover">
+                          Personalizar
+                        </button>
+                      )}
+                    </div>
                   );
                 })}
               </div>
@@ -245,12 +249,12 @@ export function ModalCombo({ combo, token, linea, preset, onConfirmar, onCancela
             </button>
             {enResumen ? (
               <button type="button" disabled={!todoValido} onClick={confirmar}
-                className="flex h-[52px] flex-1 items-center justify-between rounded-lg bg-accent px-4 text-[16px] font-bold text-white shadow-[0_1px_3px_rgba(0,120,201,.3)] transition hover:bg-accent-hover disabled:cursor-not-allowed disabled:bg-line-strong disabled:shadow-none">
+                className="flex h-[52px] flex-1 items-center justify-between rounded-lg bg-accent px-4 text-[16px] font-bold text-white shadow-[0_1px_3px_rgb(var(--accent)/0.3)] transition hover:bg-accent-hover disabled:cursor-not-allowed disabled:bg-line-strong disabled:shadow-none">
                 <span>{linea ? "Guardar cambios" : "Agregar al ticket"}</span><span className="font-display tabular-nums">{fmtMxn(precio * cantidad)}</span>
               </button>
             ) : (
               <button type="button" disabled={!slotValido(slot!, componentes)} onClick={avanzar}
-                className="flex h-[52px] flex-1 items-center justify-between rounded-lg bg-accent px-4 text-[16px] font-bold text-white shadow-[0_1px_3px_rgba(0,120,201,.3)] transition hover:bg-accent-hover disabled:cursor-not-allowed disabled:bg-line-strong disabled:shadow-none">
+                className="flex h-[52px] flex-1 items-center justify-between rounded-lg bg-accent px-4 text-[16px] font-bold text-white shadow-[0_1px_3px_rgb(var(--accent)/0.3)] transition hover:bg-accent-hover disabled:cursor-not-allowed disabled:bg-line-strong disabled:shadow-none">
                 <span>{paso === slots.length - 1 ? "Revisar" : "Siguiente"}</span><span className="font-display tabular-nums">{fmtMxn(precio)}</span>
               </button>
             )}
@@ -269,7 +273,16 @@ export function ModalCombo({ combo, token, linea, preset, onConfirmar, onCancela
             setPersonalizando(null);
             if (avanzarDespues) avanzar();
           }}
-          onCancelar={() => { const av = personalizando.avanzar; setPersonalizando(null); if (av) avanzar(); }}
+          onCancelar={() => {
+            const p = personalizando;
+            setPersonalizando(null);
+            // Este modal solo se abre con avanzar=true cuando el grupo era obligatorio (flujo de
+            // selección inicial en elegir()). Cancelarlo ahí NO debe avanzar el paso: hay que
+            // deshacer la selección del componente para que el slot quede inválido y el cajero
+            // tenga que volver a tocar la tarjeta. Cuando avanzar=false (reabierto desde
+            // "Personalizar" sobre un componente ya elegido) el cancelar sigue sin tocar nada.
+            if (p.avanzar) setComponentes((prev) => prev.filter((c) => c.clientId !== p.comp.clientId));
+          }}
         />
       )}
     </div>

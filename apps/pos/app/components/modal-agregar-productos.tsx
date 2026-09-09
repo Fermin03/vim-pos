@@ -1,9 +1,11 @@
 "use client";
 import { useCallback, useState } from "react";
 import { CatalogoProductos } from "./catalogo-productos";
+import { ModalCombo } from "./modal-combo";
 import { ModalModificadores } from "./modal-modificadores";
 import { SidebarTicket } from "./sidebar-ticket";
-import { agregarItemAlTicket } from "../lib/cuenta-mesa";
+import { agregarComboAlTicket, agregarItemAlTicket } from "../lib/cuenta-mesa";
+import type { ComboDef } from "../lib/combos";
 import { obtenerGruposDeProducto } from "../lib/modificadores";
 import { nuevoClientId, type LineaCarrito, type ModificadorSel, type ModoServicio } from "../lib/carrito";
 import type { Categoria, Producto } from "../lib/catalogo";
@@ -40,6 +42,7 @@ export function ModalAgregarProductos({
   modo,
   categorias,
   productos,
+  combos,
   onCerrar,
   onEnviarCocina,
 }: {
@@ -49,6 +52,8 @@ export function ModalAgregarProductos({
   modo: ModoServicio;
   categorias: Categoria[] | null;
   productos: Producto[] | null;
+  /** ADR 0015 — combos: catálogo de defs con slots resueltos, igual que en la pantalla de venta. */
+  combos: ComboDef[];
   /** Cierra. `huboCambios` = se guardó algo en la cuenta (la lista tiene que releerse). */
   onCerrar: (huboCambios: boolean) => void;
   /** Manda a cocina lo pendiente de la cuenta e imprime su comanda. */
@@ -56,6 +61,7 @@ export function ModalAgregarProductos({
 }) {
   const [lineas, setLineas] = useState<LineaCarrito[]>([]);
   const [modGrupos, setModGrupos] = useState<{ producto: Producto; grupos: GrupoModificadores[] } | null>(null);
+  const [comboAbierto, setComboAbierto] = useState<ComboDef | null>(null);
   const [ocupado, setOcupado] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -70,6 +76,12 @@ export function ModalAgregarProductos({
   const onTap = useCallback(
     async (p: Producto) => {
       setError(null);
+      if (p.esCombo) {
+        const def = combos.find((c) => c.producto.id === p.id);
+        if (!def) { setError("Este combo no tiene slots configurados. Revísalo en el admin."); return; }
+        setComboAbierto(def);
+        return;
+      }
       try {
         const grupos = await obtenerGruposDeProducto(token, p.id);
         if (grupos.length === 0) agregar(p, [], null);
@@ -78,8 +90,14 @@ export function ModalAgregarProductos({
         setError(e instanceof Error ? e.message : "Error al cargar modificadores");
       }
     },
-    [token, agregar],
+    [token, agregar, combos],
   );
+
+  /** Confirmación del drawer de combo: agrega la línea a la tanda, igual que `agregar` para un producto simple. */
+  const agregarCombo = useCallback((linea: LineaCarrito) => {
+    setComboAbierto(null);
+    setLineas((prev) => [...prev, linea]);
+  }, []);
 
   /**
    * Guarda la tanda completa en la cuenta.
@@ -91,14 +109,18 @@ export function ModalAgregarProductos({
    */
   const guardar = useCallback(async () => {
     for (const l of lineas) {
-      await agregarItemAlTicket(token, {
-        ticketId,
-        productoId: l.producto.id,
-        cantidad: l.cantidad,
-        modificadores: l.modificadores,
-        nota: l.notaCocina,
-        clientId: l.clientId,
-      });
+      if (l.combo) {
+        await agregarComboAlTicket(token, { ticketId, linea: l });
+      } else {
+        await agregarItemAlTicket(token, {
+          ticketId,
+          productoId: l.producto.id,
+          cantidad: l.cantidad,
+          modificadores: l.modificadores,
+          nota: l.notaCocina,
+          clientId: l.clientId,
+        });
+      }
     }
   }, [lineas, token, ticketId]);
 
@@ -191,6 +213,15 @@ export function ModalAgregarProductos({
             agregar(p, mods, nota);
           }}
           onCancelar={() => setModGrupos(null)}
+        />
+      )}
+
+      {comboAbierto && (
+        <ModalCombo
+          combo={comboAbierto}
+          token={token}
+          onConfirmar={agregarCombo}
+          onCancelar={() => setComboAbierto(null)}
         />
       )}
     </div>

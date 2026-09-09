@@ -252,7 +252,9 @@ export function HomePos({
       const [cs, ps] = await Promise.all([listarCategoriasPos(token), listarProductosPos(token)]);
       setCategorias(cs);
       setProductos(ps);
-      setCombos(await listarCombos(token, ps));
+      // Su propio .catch: si solo falla la consulta de combos, no debe tirar el catch exterior
+      // (que revertiría a la caché un catálogo de productos que YA se bajó bien).
+      setCombos(await listarCombos(token, ps).catch(() => []));
       // Fase 3 — cache de lectura: el menú sobrevive sin red (recargas offline).
       cachePut("catalogo", { categorias: cs, productos: ps });
     } catch (e) {
@@ -956,6 +958,10 @@ export function HomePos({
    */
   const alEscapar = useMemo(() => {
     const capas: [boolean, () => void][] = [
+      // Modificadores y combo: overlays sobre la rejilla de captura, por encima de todo lo demás.
+      // El de modificadores va primero porque se pinta encima del de combo cuando ambos aplican.
+      [modGrupos != null, () => setModGrupos(null)],
+      [comboAbierto != null, () => setComboAbierto(null)],
       [cancelandoItem != null, () => setCancelandoItem(null)],
       [descuentoItem != null, () => setDescuentoItem(null)],
       [cancelandoTicket, () => setCancelandoTicket(false)],
@@ -983,7 +989,7 @@ export function HomePos({
         && !enDelivery && !enPickup && !enMesas, () => intentarSalirDeCaptura("atras")],
     ];
     return capas.find(([visible]) => visible)?.[1] ?? null;
-  }, [cancelandoItem, descuentoItem, cancelandoTicket, mostrarRecibo, confirmacion, totalesCobro,
+  }, [modGrupos, comboAbierto, cancelandoItem, descuentoItem, cancelandoTicket, mostrarRecibo, confirmacion, totalesCobro,
       procesandoCobro, agregandoA, viendoMapaMesas, pidiendoMesa, nombreCuentaAbierto,
       clienteDomAbierto, esperaPidiendoEtiqueta, esperaListaAbierta, movimientoAbierto,
       abrirCajaAbierto, cambiarPinAbierto, misPropinasAbierto, configImpresoraAbierto,
@@ -1460,6 +1466,7 @@ export function HomePos({
             modo={modo}
             categorias={categorias}
             productos={productos}
+            combos={combos}
             onCerrar={(huboCambios) => {
               setAgregandoA(null);
               if (huboCambios) setCuentasVersion((v) => v + 1); // totales y conteos cambiaron
