@@ -155,18 +155,26 @@ function limpiar(l: LineaConArea): LineaComanda {
 /**
  * De los renglones del ticket a los de la comanda (ADR 0015): el PADRE no se imprime —la cocina
  * prepara tres cosas separadas, no "un combo"—, cada HIJO lleva "Combo #n" (n = el lugar del padre
- * entre los renglones que NO son hijos, así un ticket con producto suelto + combo + producto suelto
- * numera el combo bien) y los modificadores del padre como contexto, para que la plancha y la barra
- * sepan que van juntos aunque salgan en papeles distintos.
+ * entre los renglones PADRE: el primer combo del ticket es el #1, el segundo el #2) y los
+ * modificadores del padre como contexto, para que la plancha y la barra sepan que van juntos aunque
+ * salgan en papeles distintos.
+ *
+ * Se numera SOLO entre padres porque el papel se imprime una vez y el KDS recalcula en vivo: con la
+ * numeración anterior —el lugar del padre entre todos los renglones no-hijo NO CANCELADOS— bastaba
+ * cancelar un producto suelto que estuviera encima del combo para que la pantalla renumerara y el
+ * papel no, y la plancha y la barra acabaran mirando números distintos. Entre padres el número
+ * aguanta cualquier cancelación de algo que no sea un combo. Misma regla en
+ * `packages/kds-core/src/comandas.ts`.
  */
 export function lineasParaComanda(lineas: LineaImpresion[]): LineaConArea[] {
   const numero = new Map<string, number>();
   const ctxPadre = new Map<string, string[]>();
   let n = 0;
   for (const l of lineas) {
-    if (l.comboRol === "HIJO") continue;
+    if (l.comboRol !== "PADRE") continue;
     n += 1;
-    if (l.comboRol === "PADRE") { numero.set(l.id, n); ctxPadre.set(l.id, l.modificadores); }
+    numero.set(l.id, n);
+    ctxPadre.set(l.id, l.modificadores);
   }
   const out: LineaConArea[] = [];
   for (const l of lineas) {

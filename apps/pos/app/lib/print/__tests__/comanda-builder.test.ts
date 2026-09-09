@@ -207,9 +207,35 @@ describe("lineasParaComanda", () => {
       L({ id: "H2", nombre: "Refresco", comboRol: "HIJO", parentId: "P", areaId: "barra", areaNombre: "Barra" }),
     ]);
     expect(out.map((l) => l.nombre)).toEqual(["Brownie", "Doble", "Refresco"]);
-    expect(out[1].contexto).toBe("Combo #2 · Para llevar");
-    expect(out[2].contexto).toBe("Combo #2 · Para llevar");
+    expect(out[1].contexto).toBe("Combo #1 · Para llevar");
+    expect(out[2].contexto).toBe("Combo #1 · Para llevar");
     expect(out[1].modificadores).toEqual(["Tres cuartos"]);
+  });
+  it("el número del combo no se mueve si se cancela un producto suelto de arriba", () => {
+    // El papel se imprime UNA vez y el KDS recalcula en vivo. Si el número dependiera del lugar
+    // entre todos los renglones no-hijo vivos, cancelar el Brownie renumeraría la pantalla a
+    // "Combo #1" mientras el papel de la plancha seguiría diciendo "Combo #2": dos números para el
+    // mismo combo, cada estación mirando el suyo. Numerando entre PADRES, no se mueve.
+    const combo = [
+      L({ id: "P", nombre: "Combo", comboRol: "PADRE", modificadores: [] }),
+      L({ id: "H1", nombre: "Doble", comboRol: "HIJO", parentId: "P", areaId: "plancha", areaNombre: "Plancha" }),
+    ];
+    const conSuelto = lineasParaComanda([L({ id: "S", nombre: "Brownie", areaId: "fria", areaNombre: "Fría" }), ...combo]);
+    const sinSuelto = lineasParaComanda(combo);
+    expect(conSuelto.find((l) => l.nombre === "Doble")?.contexto).toBe("Combo #1");
+    expect(sinSuelto.find((l) => l.nombre === "Doble")?.contexto).toBe("Combo #1");
+  });
+  it("el segundo combo del ticket es el #2 aunque haya sueltos de por medio", () => {
+    const out = lineasParaComanda([
+      L({ id: "P1", nombre: "Combo", comboRol: "PADRE" }),
+      L({ id: "H1", nombre: "Doble", comboRol: "HIJO", parentId: "P1" }),
+      L({ id: "S", nombre: "Brownie" }),
+      L({ id: "P2", nombre: "Combo", comboRol: "PADRE" }),
+      L({ id: "H2", nombre: "Clásica", comboRol: "HIJO", parentId: "P2" }),
+    ]);
+    expect(out.map((l) => l.nombre)).toEqual(["Doble", "Brownie", "Clásica"]);
+    expect(out[0].contexto).toBe("Combo #1");
+    expect(out[2].contexto).toBe("Combo #2");
   });
   it("el contexto se imprime debajo del nombre", () => {
     const job = construirComandaJob({ ...D, lineas: [{ cantidad: 1, nombre: "Doble", modificadores: [], notaCocina: null, contexto: "Combo #1" }] });

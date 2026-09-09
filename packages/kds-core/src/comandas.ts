@@ -75,16 +75,21 @@ export async function leerComandas(token: string, sucursalId: string): Promise<C
   return rows.map((t) => {
     const folio = t.folio_completo ?? t.id;
     // Combos (ADR 0015): el PADRE no va a cocina —se prepara la comida, no "un combo"— y cada
-    // HIJO lleva "Combo #n", n = el lugar del padre entre los renglones que NO son hijos. Misma
-    // regla que lineasParaComanda (comanda-builder.ts) para que el papel y la pantalla coincidan.
+    // HIJO lleva "Combo #n", n = el lugar del padre entre los renglones PADRE. Misma regla que
+    // lineasParaComanda (comanda-builder.ts) para que el papel y la pantalla coincidan.
+    //
+    // Entre PADRES y no entre "todos los renglones no-hijo vivos": esta pantalla recalcula en vivo
+    // y el papel ya se imprimió. Cancelar un producto suelto que estuviera encima del combo
+    // renumeraba aquí y no allá, y la plancha y la barra acababan mirando números distintos.
     const vivos = (t.ticket_items ?? []).filter((i) => !i.cancelado).sort((a, b) => a.orden_visualizacion - b.orden_visualizacion);
     const numero = new Map<string, number>();
     const ctxPadre = new Map<string, string[]>();
     let n = 0;
     for (const i of vivos) {
-      if (i.combo_rol === "HIJO") continue;
+      if (i.combo_rol !== "PADRE") continue;
       n += 1;
-      if (i.combo_rol === "PADRE") { numero.set(i.id, n); ctxPadre.set(i.id, (i.ticket_item_modificadores ?? []).map((m) => m.opcion_nombre_snapshot)); }
+      numero.set(i.id, n);
+      ctxPadre.set(i.id, (i.ticket_item_modificadores ?? []).map((m) => m.opcion_nombre_snapshot));
     }
     const items = vivos
       .filter((i) => i.combo_rol !== "PADRE")
