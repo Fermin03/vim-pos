@@ -303,6 +303,9 @@ export function PantallaKds({
                         <span className="font-display min-w-[44px] text-[30px] font-extrabold leading-none text-[#F0F0EC]">{it.cantidad}</span>
                         <div className="min-w-0 flex-1">
                           <div className="text-[22px] font-bold leading-snug">{it.nombre}</div>
+                          {it.comboEtiqueta && (
+                            <div className="mt-0.5 text-[15px] font-bold leading-snug text-[#B8B8C0]">↳ {it.comboEtiqueta}</div>
+                          )}
                           {it.modificadores.length > 0 && (
                             <div className="mt-1 text-[16px] font-medium leading-snug text-[#B8B8C0]">{it.modificadores.join(" · ")}</div>
                           )}
