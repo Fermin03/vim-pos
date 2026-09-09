@@ -54,6 +54,9 @@ CREATE TABLE combo_opciones (
   created_at           timestamptz NOT NULL DEFAULT now(),
   updated_at           timestamptz NOT NULL DEFAULT now(),
   deleted_at           timestamptz NULL,
+  -- La unicidad es dura a propósito: un índice parcial (que excluyera deleted_at) no puede ser
+  -- árbitro de ON CONFLICT en PostgREST. Re-agregar una opción borrada pasa por el upsert del
+  -- admin (onConflict: "grupo_id,producto_id"), que limpia deleted_at en el mismo payload.
   CONSTRAINT combo_opcion_unica UNIQUE (grupo_id, producto_id)
 );
 CREATE UNIQUE INDEX idx_combo_opciones_default ON combo_opciones(grupo_id) WHERE es_default = true AND deleted_at IS NULL;
@@ -83,6 +86,25 @@ $$;
 CREATE TRIGGER trg_combo_opciones_no_combo
   BEFORE INSERT OR UPDATE OF producto_id ON combo_opciones
   FOR EACH ROW EXECUTE FUNCTION combo_opciones_no_combo();
+
+-- El otro camino al anidamiento: marcar como combo un producto que YA es opción de un slot.
+-- Sin esto la prohibición de arriba solo cubre la mitad, y el catálogo puede quedar en un estado
+-- que la caja rechazaría al vender.
+CREATE OR REPLACE FUNCTION productos_no_combo_si_es_opcion() RETURNS trigger
+LANGUAGE plpgsql AS $$
+BEGIN
+  IF NEW.es_combo AND EXISTS (
+    SELECT 1 FROM combo_opciones WHERE producto_id = NEW.id AND deleted_at IS NULL
+  ) THEN
+    RAISE EXCEPTION 'El producto "%" es opción de un combo: no puede convertirse en combo', NEW.nombre;
+  END IF;
+  RETURN NEW;
+END;
+$$;
+CREATE TRIGGER trg_productos_no_combo_si_es_opcion
+  BEFORE UPDATE OF es_combo ON productos
+  FOR EACH ROW WHEN (NEW.es_combo AND NOT OLD.es_combo)
+  EXECUTE FUNCTION productos_no_combo_si_es_opcion();
 
 -- ── §1.4 Interruptor del aviso "¿Lo hacemos combo?" ──────────────────────────
 ALTER TABLE configuracion_tenant ADD COLUMN IF NOT EXISTS combo_upsell_activo boolean NOT NULL DEFAULT true;
