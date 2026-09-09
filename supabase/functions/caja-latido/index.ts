@@ -7,7 +7,8 @@
 // Respuesta: { directivas }
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import { corsHeaders } from "../_shared/cors.ts";
-import { cajaIdDeEmail, validarCuerpo } from "../_shared/latido.ts";
+import { validarCuerpo } from "../_shared/latido.ts";
+import { crearVerificadorDispositivo } from "../_shared/auth-dispositivo.ts";
 
 const admin = createClient(
   Deno.env.get("SUPABASE_URL")!,
@@ -15,14 +16,12 @@ const admin = createClient(
   { auth: { persistSession: false } },
 );
 
-function leerClaims(token: string): Record<string, unknown> {
-  try {
-    const p = token.split(".")[1];
-    return p ? JSON.parse(atob(p.replace(/-/g, "+").replace(/_/g, "/"))) : {};
-  } catch {
-    return {};
-  }
-}
+// La firma del token se verifica aqui mismo en vez de preguntarle a GoTrue en cada llamada: esta
+// funcion corre en bucle en cada caja. OJO: las Edge Functions no permiten secretos con prefijo
+// SUPABASE_ (reservado), por eso el JWT secret se inyecta como VIM_JWT_SECRET.
+const JWT_SECRET = Deno.env.get("VIM_JWT_SECRET");
+if (!JWT_SECRET) throw new Error("Falta VIM_JWT_SECRET en el entorno de la funcion.");
+const verificarDispositivo = crearVerificadorDispositivo(JWT_SECRET);
 
 /** Primera IP de x-forwarded-for. Solo se guarda para soporte. */
 function ipDe(req: Request): string | null {
@@ -39,18 +38,11 @@ Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
   if (req.method !== "POST") return json({ error: "METHOD_NOT_ALLOWED" }, 405);
 
-  const token = (req.headers.get("authorization") ?? "").replace(/^Bearer\s+/i, "");
-  if (!token) return json({ error: "NO_AUTH" }, 401);
-  const { data: u, error: uErr } = await admin.auth.getUser(token);
-  if (uErr || !u?.user) return json({ error: "AUTH_INVALIDA" }, 401);
-
-  const claims = leerClaims(token);
-  if (claims.tipo_identidad !== "DISPOSITIVO") return json({ error: "NO_ES_DISPOSITIVO" }, 403);
-
-  // El caja_id sale del correo del dispositivo, NUNCA del cuerpo: si viniera de fuera, una caja
-  // podría sellar el latido de otra y, peor, leer sus directivas.
-  const cajaId = cajaIdDeEmail(u.user.email);
-  if (!cajaId) return json({ error: "DISPOSITIVO_SIN_CAJA" }, 403);
+  // El caja_id sale del correo del dispositivo (dentro del token FIRMADO), NUNCA del cuerpo: si
+  // viniera de fuera, una caja podría sellar el latido de otra y, peor, leer sus directivas.
+  const auth = await verificarDispositivo(req.headers.get("authorization"));
+  if (!auth.ok) return json({ error: auth.error, ...(auth.detalle ? { detalle: auth.detalle } : {}) }, auth.status);
+  const { cajaId } = auth;
 
   const cuerpo = validarCuerpo(await req.json().catch(() => ({})));
 

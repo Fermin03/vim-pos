@@ -13,12 +13,21 @@
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import { corsHeaders } from "../_shared/cors.ts";
 import { cadenciaEspejo, cursorPedido, TOPE_PEDIDOS, unirPedidos } from "../_shared/delivery/espejo.ts";
+import { crearVerificadorDispositivo } from "../_shared/auth-dispositivo.ts";
 
 const admin = createClient(
   Deno.env.get("SUPABASE_URL")!,
   Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
   { auth: { persistSession: false } },
 );
+
+// La firma del token se verifica aquí en vez de preguntarle a GoTrue en cada llamada: es la
+// función que más veces se llama de todo el proyecto. OJO: las Edge Functions no permiten
+// secretos con prefijo SUPABASE_ (reservado), por eso el JWT secret se inyecta como
+// VIM_JWT_SECRET — el mismo que usa pin-login para acuñar los tokens.
+const JWT_SECRET = Deno.env.get("VIM_JWT_SECRET");
+if (!JWT_SECRET) throw new Error("Falta VIM_JWT_SECRET en el entorno de la función.");
+const verificarDispositivo = crearVerificadorDispositivo(JWT_SECRET);
 
 /** Los cuatro estados del índice parcial `idx_delivery_pedidos_sucursal_activos` (0090). */
 const ESTADOS_ACTIVOS = ["RECIBIDO", "ACEPTADO", "EN_PREPARACION", "LISTO"];
@@ -27,19 +36,6 @@ const COLS_CONEXION = "id, tenant_id, sucursal_id, marca_virtual_id, app, estado
 // set_updated_at lo pisaría con el reloj local si se guardara).
 const COLS_PEDIDO = "id, tenant_id, sucursal_id, conexion_id, app, id_externo, folio_corto, estado, estado_app, tipo_entrega, programado_para, vence_aceptacion, cliente_nombre, cliente_telefono, cliente_telefono_pin, direccion_texto, nota_cliente, items, items_sin_mapear, subtotal_mxn, descuento_app_mxn, descuento_tienda_mxn, envio_mxn, propina_mxn, total_cliente_mxn, total_restaurante_mxn, efectivo_a_cobrar_mxn, ticket_id, repartidor_nombre, repartidor_telefono, repartidor_estado, recibido_at, aceptado_at, listo_at, entregado_at, cancelado_at, motivo_cancelacion, cancelado_por, ultimo_error, created_at, gestion, gestion_caja_id, updated_at";
 
-/** El id de caja viene en el correo del dispositivo: caja-<uuid>@dispositivos.<dominio>. */
-export function cajaDesdeCorreo(email: string | undefined): string | null {
-  const m = /^caja-([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})@/i.exec(email ?? "");
-  return m ? m[1].toLowerCase() : null;
-}
-
-function claimsDe(token: string): Record<string, unknown> {
-  try {
-    const p = token.split(".")[1] ?? "";
-    return JSON.parse(atob(p.replace(/-/g, "+").replace(/_/g, "/")));
-  } catch { return {}; }
-}
-
 Deno.serve(async (req) => {
   const cors = corsHeaders(req);
   const json = (body: unknown, status = 200) =>
@@ -47,17 +43,11 @@ Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
   if (req.method !== "POST") return json({ error: "METHOD_NOT_ALLOWED" }, 405);
 
-  const token = (req.headers.get("authorization") ?? "").replace(/^Bearer\s+/i, "");
-  if (!token) return json({ error: "NO_AUTH" }, 401);
-  const { data: userResp, error: userErr } = await admin.auth.getUser(token);
-  // El detalle (mensaje de GoTrue: expirado, sesión inexistente…) va al log de la caja; sin él
-  // el 6 sep 2026 no se pudo saber por qué la caja de escritorio se quedaba sin espejo.
-  if (userErr || !userResp?.user) return json({ error: "AUTH_INVALIDA", detalle: userErr?.message ?? "sin usuario" }, 401);
-  const claims = claimsDe(token);
-  if (claims.tipo_identidad !== "DISPOSITIVO") return json({ error: "SOLO_DISPOSITIVO" }, 403);
-  const tenantId = typeof claims.tenant_id === "string" ? claims.tenant_id : null;
-  const cajaId = cajaDesdeCorreo(userResp.user.email);
-  if (!tenantId || !cajaId) return json({ error: "DISPOSITIVO_SIN_CAJA" }, 403);
+  // El detalle (vencido, firma mala) va al log de la caja; sin él el 6 sep 2026 no se pudo saber
+  // por qué la caja de escritorio se quedaba sin espejo.
+  const auth = await verificarDispositivo(req.headers.get("authorization"));
+  if (!auth.ok) return json({ error: auth.error, ...(auth.detalle ? { detalle: auth.detalle } : {}) }, auth.status);
+  const { tenantId, cajaId } = auth;
 
   const cuerpo = await req.json().catch(() => ({})) as { desde?: unknown };
   const desde = cursorPedido(cuerpo?.desde);
@@ -66,7 +56,7 @@ Deno.serve(async (req) => {
   // de este tenant o está desactivada. Con esto el webhook sabe que hay una caja instalada viva.
   const { data: cajaData } = await admin.from("cajas")
     .update({ espejo_apps_at: new Date().toISOString() })
-    .eq("id", cajaId).eq("tenant_id", tenantId).eq("activa", true)
+    .eq("id", cajaId).eq("tenant_id", tenantId).eq("activa", true).is("deleted_at", null)
     .select("id, sucursal_id").maybeSingle();
   const caja = cajaData as { id: string; sucursal_id: string } | null;
   if (!caja) return json({ error: "CAJA_NO_EXISTE" }, 403);

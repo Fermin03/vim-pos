@@ -8,6 +8,7 @@
 // Respuesta: { resultado: { <tabla>: n } }
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import { corsHeaders } from "../_shared/cors.ts";
+import { crearVerificadorDispositivo } from "../_shared/auth-dispositivo.ts";
 
 const admin = createClient(
   Deno.env.get("SUPABASE_URL")!,
@@ -15,13 +16,27 @@ const admin = createClient(
   { auth: { persistSession: false } },
 );
 
-function leerClaims(token: string): Record<string, unknown> {
-  try {
-    const p = token.split(".")[1];
-    return p ? JSON.parse(atob(p.replace(/-/g, "+").replace(/_/g, "/"))) : {};
-  } catch {
-    return {};
-  }
+// La firma del token se verifica aquí mismo en vez de preguntarle a GoTrue en cada llamada: esta
+// función corre en bucle en cada caja. OJO: las Edge Functions no permiten secretos con prefijo
+// SUPABASE_ (reservado), por eso el JWT secret se inyecta como VIM_JWT_SECRET.
+const JWT_SECRET = Deno.env.get("VIM_JWT_SECRET");
+if (!JWT_SECRET) throw new Error("Falta VIM_JWT_SECRET en el entorno de la función.");
+const verificarDispositivo = crearVerificadorDispositivo(JWT_SECRET);
+
+/**
+ * La caja tiene que existir, ser de este tenant y estar activa.
+ *
+ * Esto ANTES NO SE COMPROBABA: con getUser bastaba que el usuario del dispositivo siguiera vivo
+ * en auth, así que una caja desactivada seguía subiendo ventas y bajando el catálogo, y la única
+ * forma de pararla era borrarle el usuario a mano. Ahora `activa = false` corta en el acto — que
+ * además es lo correcto para el límite del plan: desactivar una caja libera su lugar (0103), y
+ * sin este candado se podían operar dos con un plan de una.
+ */
+async function cajaEnRegla(cajaId: string, tenantId: string): Promise<boolean> {
+  const { data } = await admin.from("cajas").select("id")
+    .eq("id", cajaId).eq("tenant_id", tenantId).eq("activa", true).is("deleted_at", null)
+    .maybeSingle();
+  return Boolean(data);
 }
 
 Deno.serve(async (req) => {
@@ -32,16 +47,10 @@ Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
   if (req.method !== "POST") return json({ error: "METHOD_NOT_ALLOWED" }, 405);
 
-  const token = (req.headers.get("authorization") ?? "").replace(/^Bearer\s+/i, "");
-  if (!token) return json({ error: "NO_AUTH" }, 401);
-  const { data: u, error: uErr } = await admin.auth.getUser(token);
-  if (uErr || !u?.user) return json({ error: "AUTH_INVALIDA" }, 401);
-
-  const claims = leerClaims(token);
-  const tenant = claims.tenant_id as string | undefined;
-  if (claims.tipo_identidad !== "DISPOSITIVO" || !tenant) {
-    return json({ error: "NO_ES_DISPOSITIVO" }, 403);
-  }
+  const auth = await verificarDispositivo(req.headers.get("authorization"));
+  if (!auth.ok) return json({ error: auth.error, ...(auth.detalle ? { detalle: auth.detalle } : {}) }, auth.status);
+  const tenant = auth.tenantId;
+  if (!await cajaEnRegla(auth.cajaId, tenant)) return json({ error: "CAJA_NO_EXISTE" }, 403);
 
   let body: { snapshot?: Record<string, unknown> };
   try {
