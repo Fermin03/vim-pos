@@ -233,7 +233,7 @@ function TablaOpciones({
               {f.nombre}
               {f.agotado && <BadgeAgotado />}
             </td>
-            <td className="px-3 py-2.5 text-right text-[13px] tabular-nums text-ink-2">{precioMxn(f.precio)}</td>
+            <td className="px-3 py-2.5 text-right font-display text-[13px] tabular-nums text-ink-2">{precioMxn(f.precio)}</td>
             <td className="px-3 py-2.5 text-right">
               {/* No controlado a propósito: si `value` viniera de `filas` cada tecla se
                   pisaría con el estado viejo (que solo cambia tras guardar). Se guarda al
@@ -326,7 +326,7 @@ function PanelOpciones({ slot, productos, onCambio }: { slot: Slot; productos: P
       productoId: o.producto_id,
       nombre: o.nombre,
       precio: o.precio,
-      agotado: false,
+      agotado: o.estado === "AGOTADO",
       delta: String(o.precio_delta_mxn),
       esDefault: o.es_default,
       activa: o.activa,

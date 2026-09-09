@@ -37,7 +37,10 @@ export default function EditarComboPage() {
         {combo && !combo.es_combo && <p className="text-sm text-danger">Este producto no es un combo.</p>}
         {combo && combo.es_combo && (
           <>
-            <ProductoForm producto={combo} />
+            {/* alGuardar: se queda en esta pantalla (es la de slots) en vez de navegar a
+                /catalogo/productos, y recarga el producto para que el nombre en la cabecera y el
+                precio base que alimenta la vista previa reflejen el cambio sin recargar a mano. */}
+            <ProductoForm producto={combo} alGuardar={cargar} />
             <ComboSlotsEditor comboId={combo.id} onCambio={() => setRefreshToken((v) => v + 1)} />
             <ComboPreview comboId={combo.id} base={combo.precio_base_mxn} refreshToken={refreshToken} />
           </>

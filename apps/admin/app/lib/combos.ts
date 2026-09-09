@@ -1,6 +1,7 @@
 "use client";
 import { z } from "zod";
 import { supabase, leerSesion } from "./supabase";
+import type { EstadoProducto } from "./catalogo";
 
 export const MODO_PRECIO = {
   DELTA: "Solo el delta de la opción",
@@ -123,12 +124,12 @@ export const opcionSchema = z.object({
   activa: z.boolean(),
 });
 export type OpcionInput = z.infer<typeof opcionSchema>;
-export type Opcion = OpcionInput & { id: string; producto_id: string; nombre: string; precio: number; orden_visualizacion: number };
+export type Opcion = OpcionInput & { id: string; producto_id: string; nombre: string; precio: number; estado: EstadoProducto; orden_visualizacion: number };
 
 export async function listarOpciones(slotId: string): Promise<Opcion[]> {
   const { data, error } = await supabase
     .from("combo_opciones")
-    .select("id, producto_id, precio_delta_mxn, es_default, activa, orden_visualizacion, producto:productos(nombre, precio_base_mxn)")
+    .select("id, producto_id, precio_delta_mxn, es_default, activa, orden_visualizacion, producto:productos(nombre, precio_base_mxn, estado)")
     .eq("grupo_id", slotId)
     .is("deleted_at", null)
     .order("orden_visualizacion", { ascending: true });
@@ -137,6 +138,9 @@ export async function listarOpciones(slotId: string): Promise<Opcion[]> {
     id: String(f.id), producto_id: String(f.producto_id), precio_delta_mxn: Number(f.precio_delta_mxn), es_default: Boolean(f.es_default),
     activa: Boolean(f.activa), orden_visualizacion: Number(f.orden_visualizacion),
     nombre: ((f.producto as { nombre?: string } | null)?.nombre) ?? "—", precio: Number((f.producto as { precio_base_mxn?: number } | null)?.precio_base_mxn ?? 0),
+    // Un producto agotado sigue siendo parte del combo (pantalla de configuración, no de venta):
+    // se necesita el estado para mostrar el mismo aviso "Agotado" que ya usa la rama por categoría.
+    estado: ((f.producto as { estado?: EstadoProducto } | null)?.estado) ?? "ACTIVO",
   }));
 }
 

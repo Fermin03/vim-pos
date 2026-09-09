@@ -68,7 +68,7 @@ export function ComboPreview({ comboId, base, refreshToken }: { comboId: string;
       )}
 
       {deltas.length > 0 && (
-        <p className="mt-1.5 tabular-nums text-[13.5px] text-ink-2">
+        <p className="mt-1.5 font-display tabular-nums text-[13.5px] text-ink-2">
           {deltas.map((d, i) => (
             <span key={d.slot + d.nombre}>
               {i > 0 && " · "}
