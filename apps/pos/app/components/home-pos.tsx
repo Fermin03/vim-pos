@@ -38,7 +38,7 @@ import { ModalMisPropinas } from "./modal-mis-propinas";
 import { leerAreasDeItems, leerTicketParaImpresion } from "../lib/print/ticket-datos";
 import { construirTicketJob, debeImprimirTicketAlCobrar } from "../lib/print/ticket-builder";
 import { rasterizarImagen } from "../lib/print/rasterizar";
-import { agruparComandaPorArea, construirComandaJob, debeImprimirComandaAlCobrar, type DatosComanda, type LineaConArea } from "../lib/print/comanda-builder";
+import { agruparComandaPorArea, construirComandaJob, debeImprimirComandaAlCobrar, lineasParaComanda, type DatosComanda, type LineaConArea } from "../lib/print/comanda-builder";
 import { ReciboPreview } from "./recibo-preview";
 import { PantallaCierre } from "./pantalla-cierre";
 import { PantallaKds } from "@vim/kds-core";
@@ -587,6 +587,12 @@ export function HomePos({
       const datos = await leerTicketParaImpresion(ticketId, {
         token, cajeroNombre: empleado.nombre, cajaNombre: caja.nombre,
       });
+      // Combos (ADR 0015): `soloItems` trae los ids recién enviados a cocina, pero un combo se
+      // envía completo. Si solo llegó el id del padre (o el de un hijo suelto), se completa con
+      // `parentId` para que `lineasParaComanda` vea al padre Y a todos sus hijos juntos —si falta
+      // alguno, ese renglón se queda sin "Combo #n" y sin el contexto del padre.
+      const seleccion = datos.lineas.filter((l) => soloItems.includes(l.id) || (l.parentId != null && soloItems.includes(l.parentId)));
+      const lineas = lineasParaComanda(seleccion);
       const dc: DatosComanda = {
         folio: datos.meta.folio,
         modoServicio: datos.meta.modoServicio,
@@ -595,14 +601,10 @@ export function HomePos({
         fechaIso: datos.meta.fechaIso,
         cliente: datos.entrega?.cliente ?? datos.meta.nombreCliente ?? null,
         esAgregado,
-        lineas: datos.lineas
-          .filter((l) => soloItems.includes(l.id))
-          .map((l) => ({
-            cantidad: l.cantidad, nombre: l.nombre, modificadores: l.modificadores, notaCocina: l.notaCocina,
-          })),
+        lineas,
         ancho: 80,
       };
-      const fallidas = await imprimirComandaPorAreas(dc, datos.lineas.filter((l) => soloItems.includes(l.id)));
+      const fallidas = await imprimirComandaPorAreas(dc, lineas);
       // El pedido YA está en cocina (KDS): un fallo de papel no debe deshacer nada ni bloquear.
       // Pero tampoco se calla: si nadie avisa, la cocina se queda sin comanda y nadie se entera.
       if (fallidas.length > 0) {
@@ -1077,13 +1079,16 @@ export function HomePos({
                 cajeroNombre: empleado.nombre,
                 cajaNombre: caja.nombre,
               });
+              // Combos (ADR 0015): igual que en `imprimirComandaCocina` — el padre no se imprime,
+              // cada hijo se manda a su estación con "Combo #n" como contexto.
+              const lineasCom = lineasParaComanda(datos.lineas);
               const datosCom: DatosComanda = {
                 folio: datos.meta.folio,
                 modoServicio: datos.meta.modoServicio,
                 cajero: datos.meta.cajero,
                 caja: datos.meta.caja,
                 fechaIso: datos.meta.fechaIso,
-                lineas: datos.lineas.map((l) => ({ cantidad: l.cantidad, nombre: l.nombre, modificadores: l.modificadores, notaCocina: l.notaCocina })),
+                lineas: lineasCom,
                 ancho: 80,
               };
               setDatosTicket(datos);
@@ -1116,7 +1121,7 @@ export function HomePos({
               // sola impresora, el ticket que acaba de salir ya es el papel.
               if (debeImprimirComandaAlCobrar(datos.meta.modo, hayEstacionDeCocinaDedicada())) {
                 // También repartida: en Para llevar la bebida va a la barra igual que en el resto.
-                imprimirComandaPorAreas(datosCom, datos.lineas).catch(() => {});
+                imprimirComandaPorAreas(datosCom, lineasCom).catch(() => {});
               }
               // Reparto a domicilio: se cierra con lo que de verdad entró. Best-effort — la venta
               // ya quedó cobrada y un fallo aquí no debe deshacerla.

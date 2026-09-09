@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { agruparComandaPorArea, construirComandaJob, debeImprimirComandaAlCobrar, type DatosComanda } from "../comanda-builder";
+import { agruparComandaPorArea, construirComandaJob, debeImprimirComandaAlCobrar, lineasParaComanda, type DatosComanda } from "../comanda-builder";
+import type { LineaImpresion } from "../tipos";
 
 const D: DatosComanda = {
   folio: "KC-2026-000001",
@@ -192,5 +193,26 @@ describe("agruparComandaPorArea — la comanda se parte por estación", () => {
     });
     const texto = job.bloques.filter((b) => b.t === "texto").map((b) => (b as { valor: string }).valor);
     expect(texto).toContain("BARRA");
+  });
+});
+
+describe("lineasParaComanda", () => {
+  const L = (x: Partial<LineaImpresion> & { id: string; nombre: string }): LineaImpresion =>
+    ({ cantidad: 1, totalMxn: 0, modificadores: [], notaCocina: null, comboRol: null, parentId: null, grupoNombre: null, extras: [], ...x });
+  it("quita el padre, numera el combo y pone el contexto en cada hijo", () => {
+    const out = lineasParaComanda([
+      L({ id: "S", nombre: "Brownie", areaId: "fria", areaNombre: "Fría" }),
+      L({ id: "P", nombre: "Combo", comboRol: "PADRE", modificadores: ["Para llevar"] }),
+      L({ id: "H1", nombre: "Doble", comboRol: "HIJO", parentId: "P", modificadores: ["Tres cuartos"], areaId: "plancha", areaNombre: "Plancha" }),
+      L({ id: "H2", nombre: "Refresco", comboRol: "HIJO", parentId: "P", areaId: "barra", areaNombre: "Barra" }),
+    ]);
+    expect(out.map((l) => l.nombre)).toEqual(["Brownie", "Doble", "Refresco"]);
+    expect(out[1].contexto).toBe("Combo #2 · Para llevar");
+    expect(out[2].contexto).toBe("Combo #2 · Para llevar");
+    expect(out[1].modificadores).toEqual(["Tres cuartos"]);
+  });
+  it("el contexto se imprime debajo del nombre", () => {
+    const job = construirComandaJob({ ...D, lineas: [{ cantidad: 1, nombre: "Doble", modificadores: [], notaCocina: null, contexto: "Combo #1" }] });
+    expect(job.bloques).toContainEqual({ t: "texto", valor: "  ↳ Combo #1", size: 1, bold: true });
   });
 });

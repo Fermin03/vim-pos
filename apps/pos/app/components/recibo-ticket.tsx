@@ -75,22 +75,41 @@ export function ReciboTicket({ datos }: { datos: DatosTicketImpresion }) {
 
       {/* Items */}
       <div className="text-[11px]">
-        {datos.lineas.map((l, i) => (
-          <div key={i} className="mb-[9px]">
-            <div className="flex items-start justify-between gap-2">
-              <div className="flex-1">
-                <span className="font-bold">{l.cantidad}×</span> {l.nombre}
+        {datos.lineas.map((l, i) =>
+          // Combos (ADR 0015, spec §7): el HIJO va indentado bajo el PADRE, con su slot y SIN
+          // importe —el cliente ya pagó el combo entero en el renglón del padre—. Un extra con
+          // costo dentro del hijo (p. ej. "Extra queso") sí se imprime, con su importe.
+          l.comboRol === "HIJO" ? (
+            <div key={i} className="mb-[9px]">
+              <div className="pl-[18px] text-[10px] leading-[1.45] text-[#555]">
+                {l.grupoNombre ? `${l.grupoNombre}: ` : ""}
+                {l.nombre}
+                {l.modificadores.length ? ` · ${l.modificadores.join(", ")}` : ""}
               </div>
-              <span className="whitespace-nowrap font-bold">{fmt(l.totalMxn)}</span>
+              {(l.extras ?? []).map((e, j) => (
+                <div key={j} className="flex items-start justify-between gap-2 pl-[18px] text-[10px] leading-[1.45] text-[#555]">
+                  <span>+ {e.nombre}</span>
+                  <span className="whitespace-nowrap font-bold">{fmt(e.importeMxn)}</span>
+                </div>
+              ))}
             </div>
-            {l.modificadores.map((m, j) => (
-              <div key={j} className="pl-[18px] text-[10px] leading-[1.45] text-[#555]">+ {m}</div>
-            ))}
-            {l.notaCocina && l.notaCocina.trim().length > 0 && (
-              <div className="pl-[18px] text-[10px] leading-[1.45] italic text-[#555]">» {l.notaCocina.trim()}</div>
-            )}
-          </div>
-        ))}
+          ) : (
+            <div key={i} className="mb-[9px]">
+              <div className="flex items-start justify-between gap-2">
+                <div className="flex-1">
+                  <span className="font-bold">{l.cantidad}×</span> {l.nombre}
+                </div>
+                <span className="whitespace-nowrap font-bold">{fmt(l.totalMxn)}</span>
+              </div>
+              {l.modificadores.map((m, j) => (
+                <div key={j} className="pl-[18px] text-[10px] leading-[1.45] text-[#555]">+ {m}</div>
+              ))}
+              {l.notaCocina && l.notaCocina.trim().length > 0 && (
+                <div className="pl-[18px] text-[10px] leading-[1.45] italic text-[#555]">» {l.notaCocina.trim()}</div>
+              )}
+            </div>
+          ),
+        )}
       </div>
 
       <DividerDashed />

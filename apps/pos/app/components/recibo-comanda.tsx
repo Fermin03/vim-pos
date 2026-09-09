@@ -54,6 +54,9 @@ export function ReciboComanda({ datos }: { datos: DatosComanda }) {
               <span className="min-w-[42px] font-sans text-[26px] font-extrabold leading-none">{l.cantidad}×</span>
               <span className="font-sans text-[20px] font-bold leading-[1.15]">{l.nombre}</span>
             </div>
+            {/* Combos (ADR 0015): este renglón es un HIJO — dice de cuál combo es y hereda los
+                modificadores del padre, para que la estación sepa que va junto con los otros. */}
+            {l.contexto && <div className="pl-[52px] font-sans text-[13px] font-bold text-[#444]">↳ {l.contexto}</div>}
             {(l.modificadores.length > 0 || l.notaCocina) && (
               <div className="mt-[7px] flex flex-col gap-1 pl-[52px]">
                 {l.modificadores.map((m, j) => (

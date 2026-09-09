@@ -56,7 +56,19 @@ export function construirTicketJob(d: DatosTicketImpresion, logo?: Bloque | null
   b.push({ t: "separador", estilo: "punteado" });
 
   // 3. Líneas
+  //
+  // Combos (ADR 0015, spec §7): el PADRE es un renglón normal —cobra, con su precio, hijos
+  // incluidos (ver `ticket-datos.ts`)—. El HIJO va indentado debajo, con su slot ("Hamburguesa:
+  // Doble") y SIN importe: el cliente ya pagó el combo entero en el renglón del padre. Un extra
+  // con costo dentro del hijo (p. ej. "Extra queso") sí se imprime, con su importe, porque eso lo
+  // pagó de más.
   for (const l of d.lineas) {
+    if (l.comboRol === "HIJO") {
+      b.push({ t: "texto", valor: `  ${l.grupoNombre ? `${l.grupoNombre}: ` : ""}${l.nombre}`, size: 1 });
+      if (l.modificadores.length > 0) b.push({ t: "texto", valor: `    ${l.modificadores.join(", ")}`, size: 1 });
+      for (const e of l.extras ?? []) b.push({ t: "fila", izq: `    + ${e.nombre}`, der: pesos(e.importeMxn) });
+      continue;
+    }
     b.push({ t: "fila", izq: `${l.cantidad}x ${l.nombre}`, der: pesos(l.totalMxn) });
     for (const m of l.modificadores) b.push({ t: "texto", valor: `  + ${m}`, size: 1 });
     if (l.notaCocina && l.notaCocina.trim().length > 0) {

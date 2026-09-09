@@ -38,6 +38,12 @@ export type LineaImpresion = {
    */
   areaId?: string | null;
   areaNombre?: string | null;
+  /** Combos (ADR 0015): el PADRE cobra e imprime su precio; el HIJO va indentado bajo él. */
+  comboRol?: "PADRE" | "HIJO" | null;
+  parentId?: string | null;
+  grupoNombre?: string | null;
+  /** Modificadores con costo del renglón: el ticket los imprime con importe. */
+  extras?: { nombre: string; importeMxn: number }[];
 };
 
 export type PagoImpresion = {

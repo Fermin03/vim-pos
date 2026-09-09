@@ -68,6 +68,21 @@ describe("construirTicketJob", () => {
     const job = construirTicketJob(conNota);
     expect(job.bloques).toContainEqual({ t: "texto", valor: "  > Sin cebolla", size: 1 });
   });
+
+  it("imprime el combo como un renglón con precio y sus hijos indentados sin importe", () => {
+    const d = { ...DATOS, lineas: [
+      { id: "P", cantidad: 1, nombre: "Combo", totalMxn: 190, modificadores: [], notaCocina: null, comboRol: "PADRE" as const, parentId: null, grupoNombre: null, extras: [] },
+      { id: "H1", cantidad: 1, nombre: "Doble", totalMxn: 15, modificadores: ["Tres cuartos", "Extra queso"], notaCocina: null, comboRol: "HIJO" as const, parentId: "P", grupoNombre: "Hamburguesa", extras: [{ nombre: "Extra queso", importeMxn: 15 }] },
+      { id: "H2", cantidad: 1, nombre: "Refresco", totalMxn: 0, modificadores: ["Sin hielo"], notaCocina: null, comboRol: "HIJO" as const, parentId: "P", grupoNombre: "Bebida", extras: [] },
+    ] };
+    const job = construirTicketJob(d);
+    expect(job.bloques).toContainEqual({ t: "fila", izq: "1x Combo", der: "$190.00" });
+    expect(job.bloques).toContainEqual({ t: "texto", valor: "  Hamburguesa: Doble", size: 1 });
+    expect(job.bloques).toContainEqual({ t: "texto", valor: "    Tres cuartos, Extra queso", size: 1 });
+    expect(job.bloques).toContainEqual({ t: "fila", izq: "    + Extra queso", der: "$15.00" });
+    expect(job.bloques).toContainEqual({ t: "texto", valor: "  Bebida: Refresco", size: 1 });
+    expect(job.bloques.find((b) => b.t === "fila" && b.izq === "1x Doble")).toBeUndefined();
+  });
 });
 
 describe("construirTicketJob — datos de entrega (domicilio)", () => {
