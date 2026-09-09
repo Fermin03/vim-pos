@@ -142,10 +142,16 @@ export default function ProductosPage() {
               <tbody>
                 {visibles.map((p) => {
                   const b = BADGE[p.estado];
+                  // Un combo se edita en su propia pantalla (slots, vista previa de precio):
+                  // no tiene receta ni estación, así que el editor de producto no le sirve.
+                  const editarHref = p.es_combo ? `/catalogo/combos/${p.id}` : `/catalogo/productos/${p.id}`;
                   return (
-                    <tr key={p.id} className="group cursor-pointer border-b border-line last:border-none hover:bg-hover" onClick={() => router.push(`/catalogo/productos/${p.id}`)}>
+                    <tr key={p.id} className="group cursor-pointer border-b border-line last:border-none hover:bg-hover" onClick={() => router.push(editarHref)}>
                       <td className="px-4 py-3.5">
-                        <div className="text-[15px] font-semibold">{p.nombre}</div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-[15px] font-semibold">{p.nombre}</span>
+                          {p.es_combo && <span className="rounded-full bg-accent-soft px-2 py-0.5 text-[11px] font-semibold text-accent">Combo</span>}
+                        </div>
                         {p.codigo_interno && <div className="mt-px text-[12.5px] text-ink-3">{p.codigo_interno}</div>}
                       </td>
                       <td className="px-4 py-3.5 text-[14px] text-ink-2">{p.categoriaNombre}</td>
@@ -161,7 +167,7 @@ export default function ProductosPage() {
                           <button
                             type="button"
                             title="Editar"
-                            onClick={() => router.push(`/catalogo/productos/${p.id}`)}
+                            onClick={() => router.push(editarHref)}
                             className="flex h-10 w-10 items-center justify-center rounded border border-transparent lg:h-8 lg:w-8 text-ink-3 transition hover:border-line-strong hover:bg-surface hover:text-ink"
                           >
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-4 w-4"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" /><path d="M18.5 2.5a2.1 2.1 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" /></svg>

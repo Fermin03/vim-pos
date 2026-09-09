@@ -89,6 +89,8 @@ export type Dashboard = {
   /** Resumen del día contable ANTERIOR a hoy (no "el previo con ventas"), para los deltas %. */
   ayer: ResumenDia | null;
   topProductos: TopProducto[];
+  /** Combos vendidos (renglones PADRE) en tickets pagados del día que se mira. Cantidad, no filas. */
+  combosVendidos: number;
   /** Serie de total_neto por día (para la mini-tendencia), del más antiguo al más reciente. */
   tendencia: { dia: string; total: number }[];
   /** Ventas por hora del día más reciente (solo horas con venta, ordenadas). */
@@ -202,6 +204,22 @@ export async function leerDashboard(diaElegido?: string): Promise<Dashboard> {
     total: num(r.total_mxn),
   }));
 
+  /* Combos vendidos (ADR 0015): un combo escribe un renglón PADRE (cobra) más sus HIJOS
+     (precio 0). Contar combos es contar PADRES de tickets pagados del día que se mira —
+     mismo día contable y mismo filtro de "pagado" que el resto del panel (ver
+     vw_estado_resultados_dia), para que la cifra no contradiga a las de al lado.
+     Cantidad, no filas: un combo vendido x3 en un mismo renglón son tres combos. */
+  const { data: cv, error: e4 } = await supabase
+    .from("ticket_items")
+    .select("cantidad, ticket:tickets!inner(dia_contable, estado_fiscal, deleted_at)")
+    .eq("combo_rol", "PADRE")
+    .eq("cancelado", false)
+    .eq("ticket.dia_contable", diaVista)
+    .in("ticket.estado_fiscal", ["PAGADO", "FACTURADO"])
+    .is("ticket.deleted_at", null);
+  if (e4) throw new Error(e4.message);
+  const combosVendidos = ((cv ?? []) as Record<string, unknown>[]).reduce((a, r) => a + num(r.cantidad), 0);
+
   // Ventas por hora del día más reciente (P-177). No hay vista SQL agregada por hora, así que se
   // agrupa en el cliente desde los tickets pagados del día: son decenas, no miles, por día/sucursal.
   const { data: th, error: e3 } = await supabase
@@ -225,7 +243,7 @@ export async function leerDashboard(diaElegido?: string): Promise<Dashboard> {
     .map(([hora, total]) => ({ hora, total: Math.round(total * 100) / 100 }))
     .sort((a, b) => a.hora - b.hora);
 
-  return { dia: diaVista, hoyContable, esHoy: diaVista === hoyContable, ultimoDiaConVentas, hoy, ayer, topProductos, tendencia, ventasPorHora };
+  return { dia: diaVista, hoyContable, esHoy: diaVista === hoyContable, ultimoDiaConVentas, hoy, ayer, topProductos, combosVendidos, tendencia, ventasPorHora };
 }
 
 // ── Reporte Z histórico (P-181) ─────────────────────────────────────────────

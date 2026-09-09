@@ -12,6 +12,11 @@ export type ItemComanda = {
   notaCocina: string | null;
   /** Área de cocina del ítem (para el filtro multi-área). null = sin área. */
   area: string | null;
+  /** "Combo #2 · Para llevar": el hijo de un combo (ADR 0015) dice de cuál es y hereda los
+   *  modificadores del padre, para que la estación sepa que este renglón va junto con los otros
+   *  del mismo combo aunque salgan en tarjetas separadas. null en un ítem suelto o en un hijo
+   *  huérfano (envío parcial donde el padre no llegó en esta lectura). */
+  comboEtiqueta: string | null;
 };
 
 export type ComandaKds = {
@@ -36,7 +41,8 @@ export async function leerComandas(token: string, sucursalId: string): Promise<C
     .from("tickets")
     .select(
       "id, folio_completo, modo_servicio, estado_cocina, fecha_envio_cocina, nota_general, " +
-        "ticket_items(id, cantidad, producto_nombre_snapshot, nota_cocina, cancelado, area_cocina_nombre_snapshot, ticket_item_modificadores(opcion_nombre_snapshot))",
+        "ticket_items(id, cantidad, producto_nombre_snapshot, nota_cocina, cancelado, area_cocina_nombre_snapshot, " +
+        "parent_item_id, combo_rol, orden_visualizacion, ticket_item_modificadores(opcion_nombre_snapshot))",
     )
     .eq("sucursal_id", sucursalId)
     .in("estado_cocina", ["EN_COCINA", "LISTO"])
@@ -58,6 +64,9 @@ export async function leerComandas(token: string, sucursalId: string): Promise<C
           nota_cocina: string | null;
           cancelado: boolean;
           area_cocina_nombre_snapshot: string | null;
+          parent_item_id: string | null;
+          combo_rol: "PADRE" | "HIJO" | null;
+          orden_visualizacion: number;
           ticket_item_modificadores: { opcion_nombre_snapshot: string }[] | null;
         }[]
       | null;
@@ -65,8 +74,25 @@ export async function leerComandas(token: string, sucursalId: string): Promise<C
 
   return rows.map((t) => {
     const folio = t.folio_completo ?? t.id;
-    const items = (t.ticket_items ?? [])
-      .filter((i) => !i.cancelado)
+    // Combos (ADR 0015): el PADRE no va a cocina —se prepara la comida, no "un combo"— y cada
+    // HIJO lleva "Combo #n", n = el lugar del padre entre los renglones PADRE. Misma regla que
+    // lineasParaComanda (comanda-builder.ts) para que el papel y la pantalla coincidan.
+    //
+    // Entre PADRES y no entre "todos los renglones no-hijo vivos": esta pantalla recalcula en vivo
+    // y el papel ya se imprimió. Cancelar un producto suelto que estuviera encima del combo
+    // renumeraba aquí y no allá, y la plancha y la barra acababan mirando números distintos.
+    const vivos = (t.ticket_items ?? []).filter((i) => !i.cancelado).sort((a, b) => a.orden_visualizacion - b.orden_visualizacion);
+    const numero = new Map<string, number>();
+    const ctxPadre = new Map<string, string[]>();
+    let n = 0;
+    for (const i of vivos) {
+      if (i.combo_rol !== "PADRE") continue;
+      n += 1;
+      numero.set(i.id, n);
+      ctxPadre.set(i.id, (i.ticket_item_modificadores ?? []).map((m) => m.opcion_nombre_snapshot));
+    }
+    const items = vivos
+      .filter((i) => i.combo_rol !== "PADRE")
       .map((i) => ({
         id: i.id,
         cantidad: Number(i.cantidad),
@@ -74,6 +100,9 @@ export async function leerComandas(token: string, sucursalId: string): Promise<C
         modificadores: (i.ticket_item_modificadores ?? []).map((m) => m.opcion_nombre_snapshot),
         notaCocina: i.nota_cocina,
         area: i.area_cocina_nombre_snapshot,
+        comboEtiqueta: i.combo_rol === "HIJO" && i.parent_item_id && numero.has(i.parent_item_id)
+          ? [`Combo #${numero.get(i.parent_item_id)}`, ...(ctxPadre.get(i.parent_item_id) ?? [])].join(" · ")
+          : null,
       }));
     return {
       ticketId: t.id,

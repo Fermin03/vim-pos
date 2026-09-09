@@ -8,7 +8,8 @@
     "./server": "./src/client.server.ts",
     "./service": "./src/client.service.ts",
     "./types": "./src/database.types.ts",
-    "./modulos": "./src/modulos.ts"
+    "./modulos": "./src/modulos.ts",
+    "./fixtures-combos": "./src/fixtures-combos.ts"
   },
   "scripts": {
     "gen-types": "supabase gen types typescript --local > src/database.types.ts"

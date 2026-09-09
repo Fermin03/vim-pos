@@ -1,10 +1,13 @@
-import type { Bloque, PrintJob } from "./tipos";
+import type { Bloque, LineaImpresion, PrintJob } from "./tipos";
 
 export type LineaComanda = {
   cantidad: number;
   nombre: string;
   modificadores: string[];
   notaCocina: string | null;
+  /** "Combo #2 · Para llevar": el hijo de un combo dice de cuál es y hereda los modificadores del
+   *  padre, para que la estación sepa que este renglón va junto con los otros del mismo combo. */
+  contexto?: string | null;
 };
 
 export type DatosComanda = {
@@ -77,6 +80,9 @@ export function construirComandaJob(d: DatosComanda): PrintJob {
     // cocina tome la lista por un pedido nuevo.
     const marca = d.esCancelacion ? "CANCELA " : "";
     b.push({ t: "texto", valor: `${marca}${l.cantidad}x ${l.nombre}`, size: 2, bold: true });
+    // Combos (ADR 0015): este renglón es un HIJO — dice de cuál combo es y con qué se pidió el
+    // combo entero (p. ej. "Para llevar"), para que la estación sepa que va junto con los otros.
+    if (l.contexto) b.push({ t: "texto", valor: `  ↳ ${l.contexto}`, size: 1, bold: true });
     for (const m of l.modificadores) {
       b.push({ t: "texto", valor: esQuita(m) ? `  ${m.trim().toUpperCase()}` : `  + ${m}`, size: 1, bold: esQuita(m) });
     }
@@ -143,5 +149,42 @@ export function agruparComandaPorArea(lineas: LineaConArea[]): GrupoComanda[] {
 }
 
 function limpiar(l: LineaConArea): LineaComanda {
-  return { cantidad: l.cantidad, nombre: l.nombre, modificadores: l.modificadores, notaCocina: l.notaCocina };
+  return { cantidad: l.cantidad, nombre: l.nombre, modificadores: l.modificadores, notaCocina: l.notaCocina, contexto: l.contexto ?? null };
+}
+
+/**
+ * De los renglones del ticket a los de la comanda (ADR 0015): el PADRE no se imprime —la cocina
+ * prepara tres cosas separadas, no "un combo"—, cada HIJO lleva "Combo #n" (n = el lugar del padre
+ * entre los renglones PADRE: el primer combo del ticket es el #1, el segundo el #2) y los
+ * modificadores del padre como contexto, para que la plancha y la barra sepan que van juntos aunque
+ * salgan en papeles distintos.
+ *
+ * Se numera SOLO entre padres porque el papel se imprime una vez y el KDS recalcula en vivo: con la
+ * numeración anterior —el lugar del padre entre todos los renglones no-hijo NO CANCELADOS— bastaba
+ * cancelar un producto suelto que estuviera encima del combo para que la pantalla renumerara y el
+ * papel no, y la plancha y la barra acabaran mirando números distintos. Entre padres el número
+ * aguanta cualquier cancelación de algo que no sea un combo. Misma regla en
+ * `packages/kds-core/src/comandas.ts`.
+ */
+export function lineasParaComanda(lineas: LineaImpresion[]): LineaConArea[] {
+  const numero = new Map<string, number>();
+  const ctxPadre = new Map<string, string[]>();
+  let n = 0;
+  for (const l of lineas) {
+    if (l.comboRol !== "PADRE") continue;
+    n += 1;
+    numero.set(l.id, n);
+    ctxPadre.set(l.id, l.modificadores);
+  }
+  const out: LineaConArea[] = [];
+  for (const l of lineas) {
+    if (l.comboRol === "PADRE") continue;
+    const base: LineaConArea = { cantidad: l.cantidad, nombre: l.nombre, modificadores: l.modificadores, notaCocina: l.notaCocina, areaId: l.areaId, areaNombre: l.areaNombre };
+    if (l.comboRol === "HIJO" && l.parentId && numero.has(l.parentId)) {
+      const extra = ctxPadre.get(l.parentId) ?? [];
+      base.contexto = [`Combo #${numero.get(l.parentId)}`, ...extra].join(" · ");
+    }
+    out.push(base);
+  }
+  return out;
 }

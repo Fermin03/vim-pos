@@ -15,6 +15,34 @@ const MODO_LABEL: Record<string, string> = {
 
 type Ctx = { token: string; cajeroNombre: string; cajaNombre: string };
 
+/**
+ * Suma a cada PADRE el total de sus HIJOS —que van a precio 0 y solo cargan lo que el cliente
+ * pagó de más en extras (migración 0111: `agregar_combo_a_ticket`)— para que el ticket muestre el
+ * precio completo del combo en un solo renglón ("1x Combo $190").
+ *
+ * Función PURA con pruebas propias (`__tests__/ticket-datos.test.ts`): antes vivía inline aquí,
+ * sin archivo de pruebas, y el fixture del builder ya traía el total calculado — una regresión en
+ * el plegado (perder el `?? 0`, sumar dos veces, cruzar el `parentId`) habría pasado las 158
+ * pruebas sin que nadie se enterara. Es dinero que ve el cliente.
+ *
+ * No muta `lineas` ni los objetos que contiene: el llamador arma este arreglo fresco en cada
+ * lectura, pero una función que muta su entrada es una trampa para quien la reuse más adelante.
+ */
+export function foldearHijosEnPadre(lineas: LineaImpresion[]): LineaImpresion[] {
+  const hijosTotal = new Map<string, number>();
+  for (const l of lineas) {
+    if (l.comboRol === "HIJO" && l.parentId) {
+      hijosTotal.set(l.parentId, (hijosTotal.get(l.parentId) ?? 0) + l.totalMxn);
+    }
+  }
+  return lineas.map((l) => {
+    if (l.comboRol !== "PADRE") return l;
+    const extra = hijosTotal.get(l.id) ?? 0;
+    if (extra === 0) return l; // sin hijos con costo: nada que sumar, ni copia que hacer
+    return { ...l, totalMxn: Math.round((l.totalMxn + extra) * 100) / 100 };
+  });
+}
+
 /** Lee el ticket persistido y arma los datos planos para impresión (bajo RLS del empleado). */
 export async function leerTicketParaImpresion(ticketId: string, ctx: Ctx): Promise<DatosTicketImpresion> {
   const sb = employeeClient(ctx.token);
@@ -31,7 +59,8 @@ export async function leerTicketParaImpresion(ticketId: string, ctx: Ctx): Promi
     .from("ticket_items")
     .select(
       "id, producto_nombre_snapshot, cantidad, total_item_mxn, nota_cocina, " +
-        "ticket_item_modificadores(opcion_nombre_snapshot), " +
+        "parent_item_id, combo_rol, combo_grupo_nombre_snapshot, " +
+        "ticket_item_modificadores(opcion_nombre_snapshot, precio_extra_snapshot, cantidad), " +
         // El área se resuelve aquí, con el ticket: producto primero, categoría si el producto no
         // tiene. Traerla en la misma consulta evita una segunda vuelta por renglón en hora pico.
         "producto:productos(area_cocina_id, area:areas_cocina(nombre), " +
@@ -39,14 +68,21 @@ export async function leerTicketParaImpresion(ticketId: string, ctx: Ctx): Promi
     )
     .eq("ticket_id", ticketId)
     .eq("cancelado", false)
-    .order("created_at", { ascending: true });
+    // El padre debe quedar antes que sus hijos: el ticket y la comanda dependen de ese orden
+    // (numerar el combo, indentar los hijos debajo) y `orden_visualizacion` es lo que lo garantiza.
+    .order("orden_visualizacion", { ascending: true });
   if (e2) throw new Error(e2.message);
   const lineas: LineaImpresion[] = (items ?? []).map((it) => {
     type Area = { nombre: string } | null;
     type Prod = { area_cocina_id: string | null; area: Area; categoria: { area_cocina_id: string | null; area: Area } | null } | null;
+    type Mod = { opcion_nombre_snapshot: string; precio_extra_snapshot: string | number | null; cantidad: number | null };
     // `as unknown as`: con el select anidado supabase-js no infiere la forma y devuelve su tipo
     // de error genérico. La forma real es la de abajo.
-    const r = it as unknown as { id: string; producto_nombre_snapshot: string; cantidad: number; total_item_mxn: string | number; nota_cocina: string | null; ticket_item_modificadores: { opcion_nombre_snapshot: string }[] | null; producto: Prod };
+    const r = it as unknown as {
+      id: string; producto_nombre_snapshot: string; cantidad: number; total_item_mxn: string | number; nota_cocina: string | null;
+      parent_item_id: string | null; combo_rol: "PADRE" | "HIJO" | null; combo_grupo_nombre_snapshot: string | null;
+      ticket_item_modificadores: Mod[] | null; producto: Prod;
+    };
     const prod = r.producto;
     // El producto manda sobre la categoría: la categoría es el valor por defecto y el producto la
     // excepción (una limonada preparada en cocina dentro de la categoría Bebidas, por ejemplo).
@@ -61,8 +97,20 @@ export async function leerTicketParaImpresion(ticketId: string, ctx: Ctx): Promi
       notaCocina: r.nota_cocina ?? null,
       areaId,
       areaNombre,
+      comboRol: (r.combo_rol as "PADRE" | "HIJO" | null) ?? null,
+      parentId: (r.parent_item_id as string) ?? null,
+      grupoNombre: (r.combo_grupo_nombre_snapshot as string) ?? null,
+      extras: (r.ticket_item_modificadores ?? [])
+        .filter((m) => Number(m.precio_extra_snapshot ?? 0) > 0)
+        .map((m) => ({ nombre: m.opcion_nombre_snapshot, importeMxn: Number(m.precio_extra_snapshot) * Number(m.cantidad ?? 1) * Number(r.cantidad) })),
     };
   });
+
+  // El importe del PADRE que llega en `total_item_mxn` es el precio del combo tal cual se fijó al
+  // agregarlo (migración 0111: `agregar_combo_a_ticket`); los hijos van a precio 0 y solo cargan lo
+  // que el cliente pagó de más en extras. Para que el ticket muestre "1x Combo $190" con esos extras
+  // adentro, se suman aquí al padre, UNA sola vez — ver `foldearHijosEnPadre` y sus pruebas.
+  const lineasConCombo = foldearHijosEnPadre(lineas);
 
   const { data: pagos, error: e3 } = await sb
     .from("pagos")
@@ -130,7 +178,7 @@ export async function leerTicketParaImpresion(ticketId: string, ctx: Ctx): Promi
       nombreCliente: (tk.nombre_cliente as string) ?? null,
     },
     entrega,
-    lineas,
+    lineas: lineasConCombo,
     totales: {
       subtotal: Number(tk.subtotal_mxn), descuentos: Number(tk.descuentos_manuales_mxn),
       iva: Number(tk.iva_mxn), total: Number(tk.total_mxn), propina: Number(tk.propina_mxn),

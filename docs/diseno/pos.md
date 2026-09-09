@@ -127,6 +127,54 @@ caja sigue cobrando con el menú que tiene, que es lo único que no se puede int
 En la **segunda caja de la LAN y en la cocina** el menú se refresca igual: el aviso viaja por el
 mismo canal que las comandas.
 
+### Combos: un slot por paso, y el avance lo da el toque
+
+Desde el ADR 0015 un combo se captura en un drawer de **un slot por pantalla** (Hamburguesa →
+Acompañamiento → Bebida → Resumen). En un slot de una sola elección, **tocar la tarjeta selecciona
+y avanza**: no hay botón "Siguiente" que buscar. Se probó en el prototipo del 8 sep 2026 y el dueño
+lo aprobó tal cual. Los defaults vienen preseleccionados, así que el caso común son tres toques —
+salvo que el default esté agotado: ese slot arranca sin elegir y hay que tocar.
+
+Una opción agotada no desaparece de la tarjeta: se ve, deshabilitada, con la insignia "Agotado". El
+combo entero no deja de venderse porque falte una papa chica; solo esa opción queda fuera hasta que
+vuelva el inventario — mismo criterio en el editor de combos del admin.
+
+Si el producto elegido tiene un modificador obligatorio (el término), su modal se abre **encima**
+del paso y al confirmar se avanza; no se vuelve a la lista. "Personalizar" en una tarjeta ya elegida
+abre los opcionales. Ese modal anidado tiene su propio Escape, que cierra solo los modificadores —
+no todo el drawer del combo—, y si el grupo era obligatorio, cerrar deshace la selección: mejor un
+slot sin elegir que uno elegido a medias.
+
+El precio va en vivo en la cabecera y en el botón. Las tarjetas dicen "+$15" cuando cambian el
+precio e "Incluido" cuando no: el cajero lo lee sin sumar.
+
+**"¿Lo hacemos combo?"** aparece como hoja inferior al agregar suelto un producto que es principal
+de algún combo, con el diferencial ("+$45 · papas y refresco"). Es la pregunta que el cajero le
+hace al cliente de todos modos; el sistema solo la calcula. **Sí** abre el combo ya en el paso 2 y
+conserva la nota de cocina que el cajero ya le había puesto al producto suelto: queda pegada a ese
+componente, no al combo entero, y llega así a su propio renglón en cocina. **No, solo** agrega el
+producto tal cual estaba — Escape hace lo mismo, el producto nunca se pierde. No aparece al agregar
+a una cuenta de mesa ya enviada a cocina (reabriría la comanda).
+
+El dueño apaga "¿Lo hacemos combo?" por negocio desde **Catálogo → Combos** en el admin, con el
+switch "Ofrecer el combo en la caja" (`configuracion_tenant.combo_upsell_activo`, migración 0111).
+Vive ahí y no en Configuración porque solo afecta a los combos: es del mismo módulo que los crea,
+no una preferencia general del negocio.
+
+En el carrito el combo es **un renglón con precio** y sus hijos indentados bajo una línea vertical,
+cada uno con su slot en versalitas. Un extra con costo dentro de un hijo muestra su importe; lo
+incluido no muestra nada. **Editar reabre el drawer en el resumen — solo mientras el ticket no se
+ha guardado.** En una cuenta de mesa ya persistida no hay botón Editar en un combo: se cancela el
+renglón completo (motivo y autorización, como cualquier ítem) y se vuelve a capturar. Es el mismo
+criterio que ya regía para los modificadores; un combo no es una excepción.
+
+En la comanda y el KDS **el combo no existe**: salen sus hijos, cada uno en su estación, con
+"↳ Combo #n" para que plancha y barra sepan que van juntos. En el ticket del cliente es al revés:
+"1x Combo $170" cobra por todos a la vez y los hijos van sin el precio del combo — pero un extra con
+costo dentro de un hijo (p. ej. "Extra queso") sí se imprime con su importe, porque eso lo pagó de
+más, y la nota de cocina de ESE hijo también sale ahí, un nivel más adentro que la del renglón
+normal, para que quien lo recibe sepa qué llevaba ese componente y no solo la cocina.
+
 ## Lo que NO se hereda de otras apps
 
 - **La densidad del admin.** Aquí el scroll es tiempo frente a un cliente, pero apretar de más

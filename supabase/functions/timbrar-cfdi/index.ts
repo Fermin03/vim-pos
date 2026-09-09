@@ -125,7 +125,8 @@ Deno.serve(async (req) => {
   const { data: filas, error: iErr } = await sb
     .from("ticket_items")
     .select(
-      "producto_nombre_snapshot, cantidad, clave_sat_snapshot, unidad_sat_snapshot, " +
+      "id, parent_item_id, combo_rol, " +
+        "producto_nombre_snapshot, cantidad, clave_sat_snapshot, unidad_sat_snapshot, " +
         "tasa_iva_snapshot, iva_incluido_en_precio_snapshot, subtotal_bruto_mxn, " +
         "monto_modificadores_mxn, descuento_item_mxn, promocion_item_mxn, iva_item_mxn, total_item_mxn",
     )
@@ -135,6 +136,9 @@ Deno.serve(async (req) => {
   if (iErr) return json({ error: "ITEMS_ERROR", detalle: iErr.message }, 500);
 
   const lineas: LineaTicket[] = ((filas ?? []) as Record<string, unknown>[]).map((f) => ({
+    id: String(f.id),
+    parentId: (f.parent_item_id as string) ?? null,
+    comboRol: (f.combo_rol as "PADRE" | "HIJO" | null) ?? null,
     descripcion: String(f.producto_nombre_snapshot),
     cantidad: num(f.cantidad),
     claveSat: (f.clave_sat_snapshot as string) ?? null,

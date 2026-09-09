@@ -19,7 +19,18 @@ const input =
   "h-11 w-full rounded border border-line-strong px-3 text-sm outline-none focus:border-ink focus:shadow-[0_0_0_3px_rgba(22,22,26,.06)]";
 const label = "mb-1.5 block text-[13px] font-medium text-ink-2";
 
-export function ProductoForm({ producto }: { producto: Producto | null }) {
+export function ProductoForm({
+  producto,
+  alGuardar,
+}: {
+  producto: Producto | null;
+  /**
+   * Qué hacer al guardar, en vez de salir a la lista de productos. Por defecto (sin este prop)
+   * el comportamiento es el de siempre — el editor de producto normal no cambia. El editor de
+   * combos lo usa para quedarse en la pantalla de slots y recargar el producto en vez de navegar.
+   */
+  alGuardar?: () => void;
+}) {
   const router = useRouter();
   const editar = !!producto;
 
@@ -80,7 +91,14 @@ export function ProductoForm({ producto }: { producto: Producto | null }) {
     try {
       if (editar) await actualizarProducto(producto!.id, parsed.data);
       else await crearProducto(parsed.data);
-      router.push("/catalogo/productos");
+      if (alGuardar) {
+        // A diferencia del comportamiento por defecto, aquí no se navega: el componente sigue
+        // montado, así que el botón debe volver a habilitarse.
+        setGuardando(false);
+        alGuardar();
+      } else {
+        router.push("/catalogo/productos");
+      }
     } catch (e) {
       setError(mensajeError(e, "No se pudo guardar"));
       setGuardando(false);
@@ -204,7 +222,9 @@ export function ProductoForm({ producto }: { producto: Producto | null }) {
           </div>
         )}
 
-        {areas.length > 0 && (
+        {/* Un combo no tiene estación propia: la comanda la generan los productos que el
+            cliente elige dentro de cada slot, cada uno con la suya. */}
+        {areas.length > 0 && !producto?.es_combo && (
           <div>
             <label className={label} htmlFor="area">
               Estación de preparación <span className="text-ink-3">· opcional</span>

@@ -1591,6 +1591,140 @@ export type Database = {
           },
         ]
       }
+      combo_grupos: {
+        Row: {
+          activo: boolean
+          categoria_id: string | null
+          combo_producto_id: string
+          created_at: string
+          deleted_at: string | null
+          id: string
+          maximo_selecciones: number
+          minimo_selecciones: number
+          modo_precio: Database["public"]["Enums"]["combo_modo_precio"]
+          nombre: string
+          orden_visualizacion: number
+          tenant_id: string
+          updated_at: string
+        }
+        Insert: {
+          activo?: boolean
+          categoria_id?: string | null
+          combo_producto_id: string
+          created_at?: string
+          deleted_at?: string | null
+          id?: string
+          maximo_selecciones?: number
+          minimo_selecciones?: number
+          modo_precio?: Database["public"]["Enums"]["combo_modo_precio"]
+          nombre: string
+          orden_visualizacion?: number
+          tenant_id: string
+          updated_at?: string
+        }
+        Update: {
+          activo?: boolean
+          categoria_id?: string | null
+          combo_producto_id?: string
+          created_at?: string
+          deleted_at?: string | null
+          id?: string
+          maximo_selecciones?: number
+          minimo_selecciones?: number
+          modo_precio?: Database["public"]["Enums"]["combo_modo_precio"]
+          nombre?: string
+          orden_visualizacion?: number
+          tenant_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "combo_grupos_categoria_id_fkey"
+            columns: ["categoria_id"]
+            isOneToOne: false
+            referencedRelation: "categorias"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "combo_grupos_combo_producto_id_fkey"
+            columns: ["combo_producto_id"]
+            isOneToOne: false
+            referencedRelation: "productos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "combo_grupos_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      combo_opciones: {
+        Row: {
+          activa: boolean
+          created_at: string
+          deleted_at: string | null
+          es_default: boolean
+          grupo_id: string
+          id: string
+          orden_visualizacion: number
+          precio_delta_mxn: number
+          producto_id: string
+          tenant_id: string
+          updated_at: string
+        }
+        Insert: {
+          activa?: boolean
+          created_at?: string
+          deleted_at?: string | null
+          es_default?: boolean
+          grupo_id: string
+          id?: string
+          orden_visualizacion?: number
+          precio_delta_mxn?: number
+          producto_id: string
+          tenant_id: string
+          updated_at?: string
+        }
+        Update: {
+          activa?: boolean
+          created_at?: string
+          deleted_at?: string | null
+          es_default?: boolean
+          grupo_id?: string
+          id?: string
+          orden_visualizacion?: number
+          precio_delta_mxn?: number
+          producto_id?: string
+          tenant_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "combo_opciones_grupo_id_fkey"
+            columns: ["grupo_id"]
+            isOneToOne: false
+            referencedRelation: "combo_grupos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "combo_opciones_producto_id_fkey"
+            columns: ["producto_id"]
+            isOneToOne: false
+            referencedRelation: "productos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "combo_opciones_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       compra_lineas: {
         Row: {
           cantidad: number
@@ -1852,6 +1986,7 @@ export type Database = {
           alerta_reincidencia_dias: number
           cfdi_folio_inicial: number | null
           cfdi_serie_default: string | null
+          combo_upsell_activo: boolean
           created_at: string
           csd_archivo_encrypted: string | null
           csd_password_encrypted: string | null
@@ -1890,6 +2025,7 @@ export type Database = {
           alerta_reincidencia_dias?: number
           cfdi_folio_inicial?: number | null
           cfdi_serie_default?: string | null
+          combo_upsell_activo?: boolean
           created_at?: string
           csd_archivo_encrypted?: string | null
           csd_password_encrypted?: string | null
@@ -1928,6 +2064,7 @@ export type Database = {
           alerta_reincidencia_dias?: number
           cfdi_folio_inicial?: number | null
           cfdi_serie_default?: string | null
+          combo_upsell_activo?: boolean
           created_at?: string
           csd_archivo_encrypted?: string | null
           csd_password_encrypted?: string | null
@@ -5084,6 +5221,7 @@ export type Database = {
           deleted_at: string | null
           deleted_by: string | null
           descripcion: string | null
+          es_combo: boolean
           estado: Database["public"]["Enums"]["producto_estado"]
           id: string
           imagen_url: string | null
@@ -5118,6 +5256,7 @@ export type Database = {
           deleted_at?: string | null
           deleted_by?: string | null
           descripcion?: string | null
+          es_combo?: boolean
           estado?: Database["public"]["Enums"]["producto_estado"]
           id?: string
           imagen_url?: string | null
@@ -5152,6 +5291,7 @@ export type Database = {
           deleted_at?: string | null
           deleted_by?: string | null
           descripcion?: string | null
+          es_combo?: boolean
           estado?: Database["public"]["Enums"]["producto_estado"]
           id?: string
           imagen_url?: string | null
@@ -7680,6 +7820,8 @@ export type Database = {
           categoria_nombre_snapshot: string | null
           clave_sat_snapshot: string | null
           client_id_local: string | null
+          combo_grupo_nombre_snapshot: string | null
+          combo_rol: string | null
           created_at: string
           created_by: string | null
           descuento_item_mxn: number
@@ -7692,6 +7834,8 @@ export type Database = {
           motivo_cancelacion: string | null
           nota_cocina: string | null
           orden_visualizacion: number
+          parent_item_id: string | null
+          precio_asignado_mxn: number | null
           precio_override: boolean
           precio_unitario_original_snapshot: number | null
           precio_unitario_snapshot: number
@@ -7719,6 +7863,8 @@ export type Database = {
           categoria_nombre_snapshot?: string | null
           clave_sat_snapshot?: string | null
           client_id_local?: string | null
+          combo_grupo_nombre_snapshot?: string | null
+          combo_rol?: string | null
           created_at?: string
           created_by?: string | null
           descuento_item_mxn?: number
@@ -7731,6 +7877,8 @@ export type Database = {
           motivo_cancelacion?: string | null
           nota_cocina?: string | null
           orden_visualizacion?: number
+          parent_item_id?: string | null
+          precio_asignado_mxn?: number | null
           precio_override?: boolean
           precio_unitario_original_snapshot?: number | null
           precio_unitario_snapshot: number
@@ -7758,6 +7906,8 @@ export type Database = {
           categoria_nombre_snapshot?: string | null
           clave_sat_snapshot?: string | null
           client_id_local?: string | null
+          combo_grupo_nombre_snapshot?: string | null
+          combo_rol?: string | null
           created_at?: string
           created_by?: string | null
           descuento_item_mxn?: number
@@ -7770,6 +7920,8 @@ export type Database = {
           motivo_cancelacion?: string | null
           nota_cocina?: string | null
           orden_visualizacion?: number
+          parent_item_id?: string | null
+          precio_asignado_mxn?: number | null
           precio_override?: boolean
           precio_unitario_original_snapshot?: number | null
           precio_unitario_snapshot?: number
@@ -7800,6 +7952,13 @@ export type Database = {
             columns: ["autorizacion_pin_override_id"]
             isOneToOne: false
             referencedRelation: "autorizaciones_pin"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ticket_items_parent_item_id_fkey"
+            columns: ["parent_item_id"]
+            isOneToOne: false
+            referencedRelation: "ticket_items"
             referencedColumns: ["id"]
           },
           {
@@ -9971,6 +10130,18 @@ export type Database = {
         }
         Returns: Json
       }
+      agregar_combo_a_ticket: {
+        Args: {
+          p_cantidad?: number
+          p_client_id_local?: string
+          p_combo_producto_id: string
+          p_componentes?: Json
+          p_modificadores?: Json
+          p_nota_cocina?: string
+          p_ticket_id: string
+        }
+        Returns: string
+      }
       agregar_item_a_ticket: {
         Args: {
           p_cantidad: number
@@ -10141,7 +10312,6 @@ export type Database = {
         Args: { p_pin_actual: string; p_pin_nuevo: string }
         Returns: undefined
       }
-      catalogo_version: { Args: never; Returns: string }
       cancelar_item_ticket: {
         Args: {
           p_autorizacion_pin_id?: string
@@ -10181,6 +10351,7 @@ export type Database = {
         }
         Returns: string
       }
+      catalogo_version: { Args: never; Returns: string }
       cerrar_ticket_si_pagado: {
         Args: { p_ticket_id: string }
         Returns: boolean
@@ -10789,6 +10960,7 @@ export type Database = {
         | "IMPRESORA_SIN_PAPEL"
         | "ERROR_DESCONOCIDO"
         | "CANCELADO_POR_USUARIO"
+      combo_modo_precio: "DELTA" | "SUMA_PRECIO_PRODUCTO"
       compra_estado: "CONFIRMADA" | "ANULADA"
       compra_origen: "MANUAL" | "XML"
       cuenta_abierta_estado: "ABIERTA" | "CERRADA" | "CANCELADA"
@@ -11213,6 +11385,7 @@ export const Constants = {
         "ERROR_DESCONOCIDO",
         "CANCELADO_POR_USUARIO",
       ],
+      combo_modo_precio: ["DELTA", "SUMA_PRECIO_PRODUCTO"],
       compra_estado: ["CONFIRMADA", "ANULADA"],
       compra_origen: ["MANUAL", "XML"],
       cuenta_abierta_estado: ["ABIERTA", "CERRADA", "CANCELADA"],

@@ -31,3 +31,12 @@ test("SIGNO_MOVIMIENTO cubre los diez tipos del enum", () => {
     "REVERSA_CANCELACION", "SALIDA_MODIFICADOR_EXTRA", "SALIDA_VENTA", "TRANSFERENCIA_ENTRADA", "TRANSFERENCIA_SALIDA",
   ]);
 });
+
+import { PULL_ORDER } from "./sync-pull.mjs";
+
+test("PULL_ORDER baja los slots de combos después de productos y sus opciones después de los slots", () => {
+  const t = PULL_ORDER.map((x) => x.t);
+  assert.ok(t.indexOf("combo_grupos") > t.indexOf("productos"), "combo_grupos va después de productos (FK a productos)");
+  assert.ok(t.indexOf("combo_opciones") > t.indexOf("combo_grupos"), "combo_opciones va después de combo_grupos (FK)");
+  assert.ok(t.indexOf("combo_opciones") < t.indexOf("configuracion_tenant"));
+});

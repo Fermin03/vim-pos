@@ -18,6 +18,7 @@ Cada archivo dice **qué decía el plan, qué hacemos hoy y por qué**. Manda lo
 | [0012](0012-compras-y-proveedores.md) | Compras con proveedores y recetas con pantalla; supera D26 y D31 | 03/09/2026 |
 | [0013](0013-el-inventario-viaja-por-movimientos.md) | El inventario viaja por movimientos: la caja los sube, la nube recalcula | 04/09/2026 |
 | [0014](0014-el-panel-manda-a-la-caja-por-latido.md) | El panel manda a la caja por latido: bloqueo con gracia, módulos, avisos y versiones | 04/09/2026 |
+| [0015](0015-los-combos-son-un-producto-con-slots.md) | Los combos son un producto con slots: el padre cobra, los hijos cocinan y descuentan | 08/09/2026 |
 
 ## Pendientes de escribir
 

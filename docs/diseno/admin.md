@@ -42,6 +42,30 @@ es la acción", y una barra no es una acción. Una serie, un color, estable entr
 Cancelar un ticket, borrar un producto, cerrar un turno ajeno. Piden confirmación que **nombra la
 consecuencia** y, cuando toca dinero, PIN. Nada destructivo vive junto a un filtro.
 
+## Combos
+
+En Catálogo, **Combos** vive como pestaña propia entre Modificadores y Recetas (ADR 0015). Un
+combo se crea con los mismos datos que cualquier producto —nombre, categoría, clave SAT sugerida
+`90101503` (editable, no obligatoria)— y de ahí se navega a la pantalla del combo a agregarle
+**slots**: uno por paso que va a ver la caja. Un slot puede tomar sus opciones de **una categoría
+entera** en vez de listarlas una por una — es la forma normal de decir "cualquier hamburguesa" sin
+mantener la lista a mano cada vez que se da de alta una.
+
+Una opción agotada no se oculta del slot: se marca. El combo se sigue vendiendo aunque falte un
+insumo puntual, y ocultar la opción escondería el motivo por el que el cliente ya no la ve en caja.
+
+La **vista previa de precio** recalcula en vivo, con cada slot que se agrega o edita, lo que de
+verdad va a pagar el cliente ("Con Clásica $140 · Con Doble $175") — porque el precio final del
+combo no está escrito en ningún campo del formulario, sale de sumar slots, y el dueño necesita
+verlo tal como lo calcula la caja antes de publicar, no confiar en que la suma le salió bien en la
+cabeza.
+
+La lista de Combos también trae el switch **"Ofrecer el combo en la caja"**
+(`configuracion_tenant.combo_upsell_activo`, migración 0111): apaga la pregunta "¿Lo hacemos
+combo?" que la caja le hace al cliente cuando el cajero agrega suelto un producto que es principal
+de un combo. Vive aquí, no en Configuración, porque solo afecta a los combos — mismo criterio que
+el switch de descuento de inventario, que vive en Inventario y no en Configuración.
+
 ## Lo que NO se hereda del POS
 
 - Los objetivos de 44–56px. Con mouse, 36–40px es lo correcto; 44 se ve infantil.

@@ -108,7 +108,7 @@ export type RenglonCuenta = {
 export async function leerRenglonesCuenta(token: string, ticketId: string): Promise<RenglonCuenta[]> {
   const { data, error } = await employeeClient(token)
     .from("ticket_items")
-    .select("id, producto_nombre_snapshot, cantidad, total_item_mxn, nota_cocina, ticket_item_modificadores(opcion_nombre_snapshot)")
+    .select("id, producto_nombre_snapshot, cantidad, total_item_mxn, nota_cocina, parent_item_id, combo_rol, combo_grupo_nombre_snapshot, ticket_item_modificadores(opcion_nombre_snapshot)")
     .eq("ticket_id", ticketId)
     .eq("cancelado", false)
     .order("created_at", { ascending: true });
@@ -116,15 +116,23 @@ export async function leerRenglonesCuenta(token: string, ticketId: string): Prom
   type Fila = {
     id: string; producto_nombre_snapshot: string; cantidad: number | string;
     total_item_mxn: number | string; nota_cocina: string | null;
+    parent_item_id: string | null; combo_rol: "PADRE" | "HIJO" | null; combo_grupo_nombre_snapshot: string | null;
     ticket_item_modificadores: { opcion_nombre_snapshot: string }[] | null;
   };
-  return ((data ?? []) as unknown as Fila[]).map((r) => ({
+  const filas = (data ?? []) as unknown as Fila[];
+  // Los hijos no son renglones propios de la cuenta: se pliegan como texto bajo su padre, para
+  // que el cajero pueda verificar el pedido ("¿trae Doble y Papas?") sin abrir el carrito.
+  const hijosDe = (id: string) => filas.filter((h) => h.parent_item_id === id).map((h) =>
+    `${h.combo_grupo_nombre_snapshot ?? "Incluye"}: ${h.producto_nombre_snapshot}${(h.ticket_item_modificadores ?? []).length ? " · " + (h.ticket_item_modificadores ?? []).map((m) => m.opcion_nombre_snapshot).join(" · ") : ""}`);
+  return filas.filter((r) => r.combo_rol !== "HIJO").map((r) => ({
     id: r.id,
     productoNombre: r.producto_nombre_snapshot,
     cantidad: Number(r.cantidad),
-    totalItemMxn: Number(r.total_item_mxn),
+    // El padre cobra su precio de combo; sus hijos cargan lo que sumaron sus PROPIOS extras
+    // (modificadores). Si no se incluyen aquí, el cajero verifica un total menor al que se cobró.
+    totalItemMxn: Number(r.total_item_mxn) + filas.filter((h) => h.parent_item_id === r.id).reduce((s, h) => s + Number(h.total_item_mxn), 0),
     estadoCocina: null, // vive en el ticket, no en el renglón; lo aporta quien llama
-    modificadores: (r.ticket_item_modificadores ?? []).map((m) => m.opcion_nombre_snapshot),
+    modificadores: [...(r.ticket_item_modificadores ?? []).map((m) => m.opcion_nombre_snapshot), ...hijosDe(r.id)],
     notaCocina: r.nota_cocina,
   }));
 }

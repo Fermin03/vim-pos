@@ -14,6 +14,10 @@
 
 /** Un renglón de `ticket_items`, ya calculado por `recalcular_totales_ticket`. */
 export type LineaTicket = {
+  /** id de ticket_items; solo hace falta para reconocer a los hijos de un combo. */
+  id?: string;
+  parentId?: string | null;
+  comboRol?: "PADRE" | "HIJO" | null;
   descripcion: string;
   cantidad: number;
   claveSat: string | null;
@@ -85,6 +89,72 @@ type LineaEnCentavos = {
   total: number;
 };
 
+/** Límite del Anexo 20 para `Descripcion` de un concepto. */
+const DESCRIPCION_MAX = 1000;
+
+/**
+ * Un combo es UN concepto (ADR 0015): el padre absorbe lo que sus hijos cobraron (solo extras: los
+ * hijos van a precio 0) y toma el nombre "Combo (Doble, Papas, Refresco)". Un hijo cuyo padre no
+ * venga en la lista se deja como renglón normal: perder su importe descuadraría el comprobante.
+ *
+ * Un hijo que SÍ cobra dinero solo se absorbe si comparte tasa Y régimen (IVA dentro o fuera del
+ * precio) con su padre. El spec §8 decía "hijos con tasa distinta al padre: se asume la del padre",
+ * y no se puede: el `ivaItemMxn` del hijo está calculado A SU TASA, así que meterlo dentro de un
+ * concepto que declara la tasa del padre rompe la correspondencia entre la tasa declarada y el
+ * impuesto trasladado. En un sentido revienta al armar (descuento negativo: el cliente no puede
+ * facturar) y en el otro cierra la aritmética y se timbra un comprobante fiscalmente inválido sin
+ * que nadie se entere. Dejar a ese hijo como concepto propio conserva el dinero al centavo y
+ * declara cada tasa donde va; es el mismo camino que ya seguía el hijo huérfano.
+ *
+ * El hijo SIN dinero se pliega siempre, tenga la tasa que tenga. Los hijos van a precio 0 por
+ * construcción, así que este es el caso normal, no el raro: separar por tasa a quien no aporta un
+ * centavo no protege ninguna tasa —no hay impuesto que declarar mal— y sí produce un concepto con
+ * valor unitario, importe y base en cero. El Anexo 20 exige que la base de un traslado sea mayor
+ * que cero, o sea que ese renglón vacío arriesga volver a bloquear el timbrado; y donde el PAC lo
+ * tolere, deja una factura con una línea sin sentido y sin el nombre de ese componente.
+ */
+/**
+ * Un renglón que no mueve un centavo en ninguno de los cuatro campos que `desglosarLinea` mira.
+ *
+ * Se compara en centavos enteros y no contra 0 en pesos porque el renglón llega de la base como
+ * `numeric` y puede traer polvo de flotante; un `0.0000001` no es dinero y no debe partir un combo.
+ */
+function sinDinero(l: LineaTicket): boolean {
+  return (
+    aCentavos(l.subtotalBrutoMxn) === 0 &&
+    aCentavos(l.montoModificadoresMxn) === 0 &&
+    aCentavos(l.ivaItemMxn) === 0 &&
+    aCentavos(l.totalItemMxn) === 0
+  );
+}
+
+export function colapsarCombos(lineas: LineaTicket[]): LineaTicket[] {
+  const padres = new Map<string, LineaTicket>();
+  for (const l of lineas) if (l.comboRol === "PADRE" && l.id) padres.set(l.id, { ...l });
+  const nombres = new Map<string, string[]>();
+  const salida: LineaTicket[] = [];
+  for (const l of lineas) {
+    const padre = l.comboRol === "HIJO" && l.parentId ? padres.get(l.parentId) : undefined;
+    const mismaTasa =
+      !!padre && padre.tasaIva === l.tasaIva && padre.ivaIncluidoEnPrecio === l.ivaIncluidoEnPrecio;
+    if (padre && l.parentId && (mismaTasa || sinDinero(l))) {
+      padre.subtotalBrutoMxn = aPesos(aCentavos(padre.subtotalBrutoMxn) + aCentavos(l.subtotalBrutoMxn) + aCentavos(l.montoModificadoresMxn));
+      padre.descuentoItemMxn = aPesos(aCentavos(padre.descuentoItemMxn) + aCentavos(l.descuentoItemMxn));
+      padre.promocionItemMxn = aPesos(aCentavos(padre.promocionItemMxn) + aCentavos(l.promocionItemMxn));
+      padre.ivaItemMxn = aPesos(aCentavos(padre.ivaItemMxn) + aCentavos(l.ivaItemMxn));
+      padre.totalItemMxn = aPesos(aCentavos(padre.totalItemMxn) + aCentavos(l.totalItemMxn));
+      nombres.set(l.parentId, [...(nombres.get(l.parentId) ?? []), l.descripcion]);
+      continue;
+    }
+    salida.push(l.comboRol === "PADRE" && l.id ? padres.get(l.id)! : l);
+  }
+  for (const [id, hijos] of nombres) {
+    const p = padres.get(id)!;
+    p.descripcion = `${p.descripcion} (${hijos.join(", ")})`.slice(0, DESCRIPCION_MAX);
+  }
+  return salida;
+}
+
 /**
  * Arma los conceptos del CFDI a partir de los renglones del ticket.
  *
@@ -102,7 +172,7 @@ export function armarConceptos(lineas: LineaTicket[], totalTicketMxn: number): C
   }
 
   const totalTicket = aCentavos(totalTicketMxn);
-  const enCentavos = lineas.map(desglosarLinea);
+  const enCentavos = colapsarCombos(lineas).map(desglosarLinea);
 
   // El descuento a nivel TICKET (el que no cuelga de ningún renglón) no viene en los renglones:
   // se deduce de la diferencia. Deducirlo en vez de leerlo de otra tabla hace que este cálculo

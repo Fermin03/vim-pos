@@ -91,6 +91,7 @@ export function SidebarTicket({
   promocionMxn = 0,
   bloqueado = false,
   procesando,
+  onEditar,
 }: {
   estado: EstadoCarrito;
   onCantidad: (clientId: string, cantidad: number) => void;
@@ -99,6 +100,9 @@ export function SidebarTicket({
   onCancelarItemPersistido?: (clientId: string) => void;
   /** Cuando el ticket está persistido, "%" abre el descuento/override por ítem (F6.5). */
   onDescuentoItem?: (clientId: string) => void;
+  /** Reabre el modal de combo en el resumen para una línea de combo ya elegida. Ausente en modo
+   *  cuenta de mesa: una línea persistida se cambia cancelando el combo y capturándolo de nuevo. */
+  onEditar?: (clientId: string) => void;
   /** Limpia el carrito local (sin BD). Habilitado cuando no hay ticket persistido y hay líneas. */
   onLimpiar?: () => void;
   /** Cuando el ticket está persistido, "Limpiar" llama a este handler para cancelar todo el ticket. */
@@ -274,6 +278,12 @@ export function SidebarTicket({
                   modificadores={l.modificadores.map((m) => m.opcionNombre)}
                   notaCocina={l.notaCocina}
                   totalMxn={totalLinea(l)}
+                  hijos={l.combo?.componentes.map((c) => ({
+                    slot: c.grupoNombre,
+                    nombre: c.producto.nombre,
+                    detalle: c.modificadores.length ? c.modificadores.map((m) => m.opcionNombre).join(" · ") : null,
+                    extraMxn: c.modificadores.reduce((s, m) => s + m.precioExtra * m.cantidad, 0) * c.cantidad,
+                  }))}
                 />
 
                 {/* Controles: stepper + Quitar */}
@@ -318,6 +328,16 @@ export function SidebarTicket({
                       className={["rounded px-2 py-[5px] text-[13px] font-semibold transition-all hover:bg-hover", l.notaCocina ? "text-[#9A6B12]" : "text-ink-3 hover:text-ink"].join(" ")}
                     >
                       Nota
+                    </button>
+                  )}
+                  {l.combo && onEditar && (
+                    <button
+                      type="button"
+                      disabled={bloqueado}
+                      onClick={() => onEditar(l.clientId)}
+                      className="rounded px-2 py-[5px] text-[13px] font-semibold text-ink-3 transition-all hover:bg-hover hover:text-ink disabled:opacity-40"
+                    >
+                      Editar
                     </button>
                   )}
                   <button

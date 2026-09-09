@@ -20,6 +20,9 @@ export const PULL_ORDER = [
   { t: "productos" },
   { t: "opciones_modificador" },
   { t: "productos_grupos_modificadores" },
+  // Combos (ADR 0015): slots y opciones. El combo mismo ya bajó con productos.
+  { t: "combo_grupos" },
+  { t: "combo_opciones" },
   { t: "subtipos_personal" },
   { t: "configuracion_tenant" },
   // Inventario (ADR 0013): unidades antes que insumos; existencias, recetas y componentes después.

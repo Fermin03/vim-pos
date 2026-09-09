@@ -4,6 +4,7 @@ import { Button } from "@vim/ui/styles";
 import {
   listarCategoriasPos,
   listarProductosPos,
+  leerComboUpsellActivo,
   type Categoria,
   type Producto,
 } from "../lib/catalogo";
@@ -15,12 +16,16 @@ import {
   reducerCarrito,
   estadoInicial,
   nuevoClientId,
+  type LineaCarrito,
   type ModificadorSel,
 } from "../lib/carrito";
+import { listarCombos, combosQueAdmiten, diferencialCombo, type ComboDef } from "../lib/combos";
 import { obtenerGruposDeProducto, type GrupoModificadores } from "../lib/modificadores";
 import { persistirTicket, leerTotales, type TotalesTicket } from "../lib/cobro";
 import { SidebarTicket } from "./sidebar-ticket";
 import { ModalModificadores } from "./modal-modificadores";
+import { ModalCombo } from "./modal-combo";
+import { HojaCombo } from "./hoja-combo";
 import { ModalCobro } from "./modal-cobro";
 import { ModalDescuento } from "./modal-descuento";
 import { obtenerImpresora, obtenerImpresoraDeEstacion } from "../lib/print/adapter";
@@ -33,7 +38,7 @@ import { ModalMisPropinas } from "./modal-mis-propinas";
 import { leerAreasDeItems, leerTicketParaImpresion } from "../lib/print/ticket-datos";
 import { construirTicketJob, debeImprimirTicketAlCobrar } from "../lib/print/ticket-builder";
 import { rasterizarImagen } from "../lib/print/rasterizar";
-import { agruparComandaPorArea, construirComandaJob, debeImprimirComandaAlCobrar, type DatosComanda, type LineaConArea } from "../lib/print/comanda-builder";
+import { agruparComandaPorArea, construirComandaJob, debeImprimirComandaAlCobrar, lineasParaComanda, type DatosComanda, type LineaConArea } from "../lib/print/comanda-builder";
 import { ReciboPreview } from "./recibo-preview";
 import { PantallaCierre } from "./pantalla-cierre";
 import { PantallaKds } from "@vim/kds-core";
@@ -60,7 +65,7 @@ import { PantallaMonitorVentas } from "./pantalla-monitor-ventas";
 import { listarTicketsEnEspera, ponerTicketEnEspera, retomarTicketEnEspera } from "../lib/espera";
 import { ModalEtiquetaEspera, ModalListaEspera } from "./modal-espera";
 import { leerItemsPersistidos, type ItemTicket } from "../lib/cancelacion";
-import { abrirCuentaEnMesa, agregarItemAlTicket, reconstruirCarrito } from "../lib/cuenta-mesa";
+import { abrirCuentaEnMesa, agregarComboAlTicket, agregarItemAlTicket, reconstruirCarrito } from "../lib/cuenta-mesa";
 import { atribuirMesero, contarPendientesCocina, enviarACocina, yaEnviadoACocina } from "../lib/mesero";
 import { useConexion } from "../lib/conexion";
 import { cacheGet, cachePut, contarPendientes } from "../lib/outbox";
@@ -178,6 +183,12 @@ export function HomePos({
   const [error, setError] = useState<string | null>(null);
   const [carrito, dispatch] = useReducer(reducerCarrito, estadoInicial);
   const [modGrupos, setModGrupos] = useState<{ producto: Producto; grupos: GrupoModificadores[] } | null>(null);
+  // ADR 0015 — combos: catálogo de defs con slots resueltos, y el drawer de armado abierto (si hay).
+  const [combos, setCombos] = useState<ComboDef[]>([]);
+  const [comboAbierto, setComboAbierto] = useState<{ combo: ComboDef; linea?: LineaCarrito | null; preset?: { producto: Producto; modificadores: ModificadorSel[]; notaCocina?: string | null } | null } | null>(null);
+  // §6.5 — interruptor del tenant y la hoja "¿Lo hacemos combo?" cuando aplica.
+  const [upsellActivo, setUpsellActivo] = useState(true);
+  const [hojaCombo, setHojaCombo] = useState<{ producto: Producto; mods: ModificadorSel[]; nota: string | null; combo: ComboDef } | null>(null);
   const [totalesCobro, setTotalesCobro] = useState<TotalesTicket | null>(null);
   // Al cobrar desde la lista ya no se navega, así que la lista no se remonta sola y seguiría
   // mostrando la cuenta recién pagada. Este contador la fuerza a releerse.
@@ -246,6 +257,12 @@ export function HomePos({
       const [cs, ps] = await Promise.all([listarCategoriasPos(token), listarProductosPos(token)]);
       setCategorias(cs);
       setProductos(ps);
+      // Su propio .catch: si solo falla la consulta de combos, no debe tirar el catch exterior
+      // (que revertiría a la caché un catálogo de productos que YA se bajó bien).
+      setCombos(await listarCombos(token, ps).catch(() => []));
+      // Mismo motivo que la línea de arriba. `true` porque encendido es el default de la
+      // columna (ver catalogo.ts) y es lo menos sorprendente si la consulta falla.
+      setUpsellActivo(await leerComboUpsellActivo(token).catch(() => true));
       // Fase 3 — cache de lectura: el menú sobrevive sin red (recargas offline).
       cachePut("catalogo", { categorias: cs, productos: ps });
     } catch (e) {
@@ -254,6 +271,7 @@ export function HomePos({
       if (cacheado) {
         setCategorias(cacheado.categorias);
         setProductos(cacheado.productos);
+        setCombos(await listarCombos(token, cacheado.productos).catch(() => []));
         return;
       }
       throw e;
@@ -390,7 +408,7 @@ export function HomePos({
     try {
       const [bd, recon, items] = await Promise.all([
         leerTotales(token, tId),
-        reconstruirCarrito(token, tId, productos ?? []),
+        reconstruirCarrito(token, tId, productos ?? [], combos),
         leerItemsPersistidos(token, tId).catch(() => [] as ItemTicket[]),
       ]);
       dispatch({ tipo: "cargar", estado: { modoServicio: recon.modoServicio, lineas: recon.lineas } });
@@ -409,21 +427,45 @@ export function HomePos({
       // El ítem ya pudo insertarse en BD; avisamos para que el cajero recargue, sin romper la UI.
       setError(e instanceof Error ? `Cuenta desincronizada: ${e.message}. Reabre la mesa para ver el estado real.` : "Error al sincronizar la cuenta");
     }
-  }, [ticketBd, token, productos]);
+  }, [ticketBd, token, productos, combos]);
+
+  /** Agrega el producto suelto, sin ofrecer combo: mesa (llama al servidor) o venta rápida (reducer). */
+  const agregarSuelto = useCallback(
+    async (p: Producto, mods: ModificadorSel[], nota: string | null) => {
+      if (ticketBd) {
+        await agregarItemAlTicket(token, { ticketId: ticketBd.ticketId, productoId: p.id, cantidad: 1, modificadores: mods, nota });
+        await recargarCuenta();
+        return;
+      }
+      dispatch({ tipo: "agregar", linea: { clientId: nuevoClientId(), producto: p, cantidad: 1, modificadores: mods, notaCocina: nota } });
+    },
+    [ticketBd, token, recargarCuenta],
+  );
+
+  /** Decide entre ofrecer "¿Lo hacemos combo?" o agregar el producto suelto de una vez (spec §6.5). */
+  const ofrecerCombo = useCallback(
+    async (p: Producto, mods: ModificadorSel[], nota: string | null) => {
+      const elegibles = upsellActivo && !(ticketBd && cocinaEnviada) ? combosQueAdmiten(p, combos) : [];
+      if (elegibles.length === 0) { await agregarSuelto(p, mods, nota); return; }
+      const mejor = [...elegibles].sort((a, b) => diferencialCombo(a, p).extra - diferencialCombo(b, p).extra)[0]!;
+      setHojaCombo({ producto: p, mods, nota, combo: mejor });
+    },
+    [upsellActivo, ticketBd, cocinaEnviada, combos, agregarSuelto],
+  );
 
   const onTapProducto = useCallback(
     async (p: Producto) => {
       if (p.agotado) return;
+      if (p.esCombo) {
+        const def = combos.find((c) => c.producto.id === p.id);
+        if (!def) { setError("Este combo no tiene slots configurados. Revísalo en el admin."); return; }
+        setComboAbierto({ combo: def });
+        return;
+      }
       try {
         const grupos = await obtenerGruposDeProducto(token, p.id);
         if (grupos.length === 0) {
-          if (ticketBd) {
-            // Modo cuenta de mesa: agrega al ticket abierto y re-sincroniza.
-            await agregarItemAlTicket(token, { ticketId: ticketBd.ticketId, productoId: p.id, cantidad: 1, modificadores: [], nota: null });
-            await recargarCuenta();
-          } else {
-            dispatch({ tipo: "agregar", linea: { clientId: nuevoClientId(), producto: p, cantidad: 1, modificadores: [], notaCocina: null } });
-          }
+          await ofrecerCombo(p, [], null);
         } else {
           setModGrupos({ producto: p, grupos });
         }
@@ -431,7 +473,7 @@ export function HomePos({
         setError(e instanceof Error ? e.message : "Error al cargar modificadores");
       }
     },
-    [token, ticketBd, recargarCuenta],
+    [token, combos, ofrecerCombo],
   );
 
   const confirmarModificadores = useCallback(
@@ -439,19 +481,26 @@ export function HomePos({
       if (!modGrupos) return;
       const prod = modGrupos.producto;
       setModGrupos(null);
-      if (ticketBd) {
-        try {
-          await agregarItemAlTicket(token, { ticketId: ticketBd.ticketId, productoId: prod.id, cantidad: 1, modificadores: mods, nota });
-          await recargarCuenta();
-        } catch (e) {
-          setError(e instanceof Error ? e.message : "No se pudo agregar el ítem");
-        }
-        return;
+      try {
+        await ofrecerCombo(prod, mods, nota);
+      } catch (e) {
+        setError(e instanceof Error ? e.message : "No se pudo agregar el ítem");
       }
-      dispatch({ tipo: "agregar", linea: { clientId: nuevoClientId(), producto: prod, cantidad: 1, modificadores: mods, notaCocina: nota } });
     },
-    [modGrupos, ticketBd, token, recargarCuenta],
+    [modGrupos, ofrecerCombo],
   );
+
+  /** Confirmación del drawer de combo: agrega (o reemplaza, si venía de "Editar") la línea. */
+  const confirmarCombo = useCallback(async (linea: LineaCarrito) => {
+    const editando = !!comboAbierto?.linea;
+    setComboAbierto(null);
+    if (ticketBd) {
+      try { await agregarComboAlTicket(token, { ticketId: ticketBd.ticketId, linea }); await recargarCuenta(); }
+      catch (e) { setError(e instanceof Error ? e.message : "No se pudo agregar el combo"); }
+      return;
+    }
+    dispatch({ tipo: editando ? "reemplazar" : "agregar", linea });
+  }, [comboAbierto, ticketBd, token, recargarCuenta]);
 
   /** Entra en modo cuenta de mesa: carga el ticket persistido al carrito para seguir editando. */
   const entrarCuenta = useCallback(async (ticketId: string, origen: Origen = "inicio") => {
@@ -461,7 +510,7 @@ export function HomePos({
     try {
       const [bd, recon, items] = await Promise.all([
         leerTotales(token, ticketId),
-        reconstruirCarrito(token, ticketId, productos ?? []),
+        reconstruirCarrito(token, ticketId, productos ?? [], combos),
         leerItemsPersistidos(token, ticketId).catch(() => [] as ItemTicket[]),
       ]);
       dispatch({ tipo: "cargar", estado: { modoServicio: recon.modoServicio, lineas: recon.lineas } });
@@ -477,7 +526,7 @@ export function HomePos({
     } catch (e) {
       setError(e instanceof Error ? e.message : "No se pudo cargar la cuenta");
     }
-  }, [token, productos]);
+  }, [token, productos, combos]);
 
   const onAbrirCuentaMesa = useCallback(async (mesaId: string) => {
     try {
@@ -538,6 +587,12 @@ export function HomePos({
       const datos = await leerTicketParaImpresion(ticketId, {
         token, cajeroNombre: empleado.nombre, cajaNombre: caja.nombre,
       });
+      // Combos (ADR 0015): `soloItems` trae los ids recién enviados a cocina, pero un combo se
+      // envía completo. Si solo llegó el id del padre (o el de un hijo suelto), se completa con
+      // `parentId` para que `lineasParaComanda` vea al padre Y a todos sus hijos juntos —si falta
+      // alguno, ese renglón se queda sin "Combo #n" y sin el contexto del padre.
+      const seleccion = datos.lineas.filter((l) => soloItems.includes(l.id) || (l.parentId != null && soloItems.includes(l.parentId)));
+      const lineas = lineasParaComanda(seleccion);
       const dc: DatosComanda = {
         folio: datos.meta.folio,
         modoServicio: datos.meta.modoServicio,
@@ -546,14 +601,10 @@ export function HomePos({
         fechaIso: datos.meta.fechaIso,
         cliente: datos.entrega?.cliente ?? datos.meta.nombreCliente ?? null,
         esAgregado,
-        lineas: datos.lineas
-          .filter((l) => soloItems.includes(l.id))
-          .map((l) => ({
-            cantidad: l.cantidad, nombre: l.nombre, modificadores: l.modificadores, notaCocina: l.notaCocina,
-          })),
+        lineas,
         ancho: 80,
       };
-      const fallidas = await imprimirComandaPorAreas(dc, datos.lineas.filter((l) => soloItems.includes(l.id)));
+      const fallidas = await imprimirComandaPorAreas(dc, lineas);
       // El pedido YA está en cocina (KDS): un fallo de papel no debe deshacer nada ni bloquear.
       // Pero tampoco se calla: si nadie avisa, la cocina se queda sin comanda y nadie se entera.
       if (fallidas.length > 0) {
@@ -930,6 +981,16 @@ export function HomePos({
    */
   const alEscapar = useMemo(() => {
     const capas: [boolean, () => void][] = [
+      // Modificadores y combo: overlays sobre la rejilla de captura, por encima de todo lo demás.
+      // El de modificadores va primero porque se pinta encima del de combo cuando ambos aplican.
+      [modGrupos != null, () => setModGrupos(null)],
+      [comboAbierto != null, () => setComboAbierto(null)],
+      // La hoja "¿Lo hacemos combo?": Escape es "No, solo" — el producto se agrega igual, nunca se pierde.
+      [hojaCombo != null, () => {
+        const h = hojaCombo!;
+        setHojaCombo(null);
+        void agregarSuelto(h.producto, h.mods, h.nota).catch((e) => setError(e instanceof Error ? e.message : "Error"));
+      }],
       [cancelandoItem != null, () => setCancelandoItem(null)],
       [descuentoItem != null, () => setDescuentoItem(null)],
       [cancelandoTicket, () => setCancelandoTicket(false)],
@@ -957,7 +1018,7 @@ export function HomePos({
         && !enDelivery && !enPickup && !enMesas, () => intentarSalirDeCaptura("atras")],
     ];
     return capas.find(([visible]) => visible)?.[1] ?? null;
-  }, [cancelandoItem, descuentoItem, cancelandoTicket, mostrarRecibo, confirmacion, totalesCobro,
+  }, [modGrupos, comboAbierto, hojaCombo, agregarSuelto, cancelandoItem, descuentoItem, cancelandoTicket, mostrarRecibo, confirmacion, totalesCobro,
       procesandoCobro, agregandoA, viendoMapaMesas, pidiendoMesa, nombreCuentaAbierto,
       clienteDomAbierto, esperaPidiendoEtiqueta, esperaListaAbierta, movimientoAbierto,
       abrirCajaAbierto, cambiarPinAbierto, misPropinasAbierto, configImpresoraAbierto,
@@ -1018,13 +1079,16 @@ export function HomePos({
                 cajeroNombre: empleado.nombre,
                 cajaNombre: caja.nombre,
               });
+              // Combos (ADR 0015): igual que en `imprimirComandaCocina` — el padre no se imprime,
+              // cada hijo se manda a su estación con "Combo #n" como contexto.
+              const lineasCom = lineasParaComanda(datos.lineas);
               const datosCom: DatosComanda = {
                 folio: datos.meta.folio,
                 modoServicio: datos.meta.modoServicio,
                 cajero: datos.meta.cajero,
                 caja: datos.meta.caja,
                 fechaIso: datos.meta.fechaIso,
-                lineas: datos.lineas.map((l) => ({ cantidad: l.cantidad, nombre: l.nombre, modificadores: l.modificadores, notaCocina: l.notaCocina })),
+                lineas: lineasCom,
                 ancho: 80,
               };
               setDatosTicket(datos);
@@ -1057,7 +1121,7 @@ export function HomePos({
               // sola impresora, el ticket que acaba de salir ya es el papel.
               if (debeImprimirComandaAlCobrar(datos.meta.modo, hayEstacionDeCocinaDedicada())) {
                 // También repartida: en Para llevar la bebida va a la barra igual que en el resto.
-                imprimirComandaPorAreas(datosCom, datos.lineas).catch(() => {});
+                imprimirComandaPorAreas(datosCom, lineasCom).catch(() => {});
               }
               // Reparto a domicilio: se cierra con lo que de verdad entró. Best-effort — la venta
               // ya quedó cobrada y un fallo aquí no debe deshacerla.
@@ -1434,6 +1498,7 @@ export function HomePos({
             modo={modo}
             categorias={categorias}
             productos={productos}
+            combos={combos}
             onCerrar={(huboCambios) => {
               setAgregandoA(null);
               if (huboCambios) setCuentasVersion((v) => v + 1); // totales y conteos cambiaron
@@ -1550,6 +1615,12 @@ export function HomePos({
           onNotaLinea={(id, nota) => dispatch({ tipo: "nota_linea", clientId: id, nota })}
           onNotaOrden={(nota) => dispatch({ tipo: "nota_orden", nota })}
           onCobrar={iniciarCobro}
+          // En cuenta de mesa no se ofrece Editar: una línea persistida se cambia cancelando
+          // el combo y capturándolo de nuevo (igual que hoy con los modificadores).
+          onEditar={ticketBd ? undefined : (id) => {
+            const l = carrito.lineas.find((x) => x.clientId === id);
+            if (l?.combo) setComboAbierto({ combo: l.combo.def, linea: l });
+          }}
           onPonerEnEspera={online ? () => { setEsperaError(null); setEsperaPidiendoEtiqueta(true); } : undefined}
           // Comedor va por la MISMA rama que Pick-up y domicilio: su cuenta también queda
           // abierta y se cobra después desde la lista. Antes entraba por la otra, que pinta
@@ -1591,6 +1662,32 @@ export function HomePos({
           grupos={modGrupos.grupos}
           onConfirmar={confirmarModificadores}
           onCancelar={() => setModGrupos(null)}
+        />
+      )}
+      {comboAbierto && (
+        <ModalCombo
+          combo={comboAbierto.combo}
+          token={token}
+          linea={comboAbierto.linea ?? null}
+          preset={comboAbierto.preset ?? null}
+          onConfirmar={confirmarCombo}
+          onCancelar={() => setComboAbierto(null)}
+        />
+      )}
+      {hojaCombo && (
+        <HojaCombo
+          producto={hojaCombo.producto}
+          combo={hojaCombo.combo}
+          onNo={() => {
+            const h = hojaCombo;
+            setHojaCombo(null);
+            void agregarSuelto(h.producto, h.mods, h.nota).catch((e) => setError(e instanceof Error ? e.message : "Error"));
+          }}
+          onSi={() => {
+            const h = hojaCombo;
+            setHojaCombo(null);
+            setComboAbierto({ combo: h.combo, preset: { producto: h.producto, modificadores: h.mods, notaCocina: h.nota } });
+          }}
         />
       )}
       {descuentoAbierto && ticketBd && (

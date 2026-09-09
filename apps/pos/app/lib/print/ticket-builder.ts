@@ -56,7 +56,29 @@ export function construirTicketJob(d: DatosTicketImpresion, logo?: Bloque | null
   b.push({ t: "separador", estilo: "punteado" });
 
   // 3. Líneas
+  //
+  // Combos (ADR 0015, spec §7): el PADRE es un renglón normal —cobra, con su precio, hijos
+  // incluidos (ver `ticket-datos.ts`)—. El HIJO va indentado debajo, con su slot ("Hamburguesa:
+  // Doble") y SIN importe: el cliente ya pagó el combo entero en el renglón del padre. Un extra
+  // con costo dentro del hijo (p. ej. "Extra queso") sí se imprime, con su importe, porque eso lo
+  // pagó de más — pero solo ahí: la línea de modificadores del hijo lista solo los que NO cuestan,
+  // para no repetir el mismo dato dos veces en el mismo ticket.
   for (const l of d.lineas) {
+    if (l.comboRol === "HIJO") {
+      const nombresExtras = new Set((l.extras ?? []).map((e) => e.nombre));
+      const modificadoresLibres = l.modificadores.filter((m) => !nombresExtras.has(m));
+      b.push({ t: "texto", valor: `  ${l.grupoNombre ? `${l.grupoNombre}: ` : ""}${l.nombre}`, size: 1 });
+      if (modificadoresLibres.length > 0) b.push({ t: "texto", valor: `    ${modificadoresLibres.join(", ")}`, size: 1 });
+      for (const e of l.extras ?? []) b.push({ t: "fila", izq: `    + ${e.nombre}`, der: pesos(e.importeMxn) });
+      // La nota de cocina del HIJO es una instrucción propia de ESE componente ("bien cocida"),
+      // no del combo entero: si no se imprime aquí, el cliente se queda sin verla en su ticket
+      // aunque sí llegue a la comanda de cocina. Un nivel más adentro que la del renglón normal,
+      // para que se lea colgando de su producto.
+      if (l.notaCocina && l.notaCocina.trim().length > 0) {
+        b.push({ t: "texto", valor: `    > ${l.notaCocina.trim()}`, size: 1 });
+      }
+      continue;
+    }
     b.push({ t: "fila", izq: `${l.cantidad}x ${l.nombre}`, der: pesos(l.totalMxn) });
     for (const m of l.modificadores) b.push({ t: "texto", valor: `  + ${m}`, size: 1 });
     if (l.notaCocina && l.notaCocina.trim().length > 0) {

@@ -68,6 +68,44 @@ describe("construirTicketJob", () => {
     const job = construirTicketJob(conNota);
     expect(job.bloques).toContainEqual({ t: "texto", valor: "  > Sin cebolla", size: 1 });
   });
+
+  it("imprime el combo como un renglón con precio y sus hijos indentados sin importe", () => {
+    const d = { ...DATOS, lineas: [
+      { id: "P", cantidad: 1, nombre: "Combo", totalMxn: 190, modificadores: [], notaCocina: null, comboRol: "PADRE" as const, parentId: null, grupoNombre: null, extras: [] },
+      { id: "H1", cantidad: 1, nombre: "Doble", totalMxn: 15, modificadores: ["Tres cuartos", "Extra queso"], notaCocina: null, comboRol: "HIJO" as const, parentId: "P", grupoNombre: "Hamburguesa", extras: [{ nombre: "Extra queso", importeMxn: 15 }] },
+      { id: "H2", cantidad: 1, nombre: "Refresco", totalMxn: 0, modificadores: ["Sin hielo"], notaCocina: null, comboRol: "HIJO" as const, parentId: "P", grupoNombre: "Bebida", extras: [] },
+    ] };
+    const job = construirTicketJob(d);
+    expect(job.bloques).toContainEqual({ t: "fila", izq: "1x Combo", der: "$190.00" });
+    expect(job.bloques).toContainEqual({ t: "texto", valor: "  Hamburguesa: Doble", size: 1 });
+    // Solo el modificador libre va en la línea plana; "Extra queso" (con costo) sale abajo,
+    // una sola vez, con su importe — no en las dos partes (hallazgo 4).
+    expect(job.bloques).toContainEqual({ t: "texto", valor: "    Tres cuartos", size: 1 });
+    expect(job.bloques).toContainEqual({ t: "fila", izq: "    + Extra queso", der: "$15.00" });
+    expect(job.bloques).toContainEqual({ t: "texto", valor: "  Bebida: Refresco", size: 1 });
+    expect(job.bloques.find((b) => b.t === "fila" && b.izq === "1x Doble")).toBeUndefined();
+  });
+
+  it("no repite un extra pagado en la línea de modificadores del hijo (hallazgo 4)", () => {
+    const d = { ...DATOS, lineas: [
+      { id: "P", cantidad: 1, nombre: "Combo", totalMxn: 190, modificadores: [], notaCocina: null, comboRol: "PADRE" as const, parentId: null, grupoNombre: null, extras: [] },
+      { id: "H1", cantidad: 1, nombre: "Doble", totalMxn: 15, modificadores: ["Extra queso"], notaCocina: null, comboRol: "HIJO" as const, parentId: "P", grupoNombre: "Hamburguesa", extras: [{ nombre: "Extra queso", importeMxn: 15 }] },
+    ] };
+    const job = construirTicketJob(d);
+    // "Extra queso" solo aparece como fila con importe; nunca como texto plano de modificadores.
+    expect(job.bloques.find((b) => b.t === "texto" && b.valor.includes("Extra queso"))).toBeUndefined();
+    expect(job.bloques).toContainEqual({ t: "fila", izq: "    + Extra queso", der: "$15.00" });
+  });
+
+  it("imprime la nota de cocina de un HIJO, colgada de su producto (hallazgo 1)", () => {
+    const d = { ...DATOS, lineas: [
+      { id: "P", cantidad: 1, nombre: "Combo", totalMxn: 190, modificadores: [], notaCocina: null, comboRol: "PADRE" as const, parentId: null, grupoNombre: null, extras: [] },
+      { id: "H1", cantidad: 1, nombre: "Doble", totalMxn: 15, modificadores: ["Tres cuartos", "Extra queso"], notaCocina: "Bien cocida", comboRol: "HIJO" as const, parentId: "P", grupoNombre: "Hamburguesa", extras: [{ nombre: "Extra queso", importeMxn: 15 }] },
+    ] };
+    const job = construirTicketJob(d);
+    // Un nivel más adentro (4 espacios) que la nota de un renglón normal (2 espacios).
+    expect(job.bloques).toContainEqual({ t: "texto", valor: "    > Bien cocida", size: 1 });
+  });
 });
 
 describe("construirTicketJob — datos de entrega (domicilio)", () => {
