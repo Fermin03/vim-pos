@@ -16,6 +16,7 @@ export type Producto = {
   precio_base_mxn: number;
   categoria_id: string;
   agotado: boolean;
+  esCombo: boolean;
   /** Snapshots fiscales/cocina (Fase 3): el cobro offline los necesita para reconstruir el ítem al sincronizar. */
   sku: string | null;
   tasaIva: number;
@@ -47,7 +48,7 @@ export async function listarCategoriasPos(token: string): Promise<Categoria[]> {
 export async function listarProductosPos(token: string): Promise<Producto[]> {
   const { data, error } = await employeeClient(token)
     .from("productos")
-    .select("id, nombre, descripcion, precio_base_mxn, categoria_id, estado, agotado_manual, agotado_automatico, visible_en_pos, codigo_interno, tasa_iva, iva_incluido_en_precio, clave_sat, unidad_sat, categoria:categorias(nombre)")
+    .select("id, nombre, descripcion, precio_base_mxn, categoria_id, estado, agotado_manual, agotado_automatico, visible_en_pos, codigo_interno, tasa_iva, iva_incluido_en_precio, clave_sat, unidad_sat, es_combo, categoria:categorias(nombre)")
     .is("deleted_at", null)
     .eq("visible_en_pos", true)
     .in("estado", ["ACTIVO", "AGOTADO"])
@@ -62,6 +63,7 @@ export async function listarProductosPos(token: string): Promise<Producto[]> {
       precio_base_mxn: Number(p.precio_base_mxn),
       categoria_id: String(p.categoria_id),
       agotado: p.estado === "AGOTADO" || Boolean(p.agotado_manual) || Boolean(p.agotado_automatico),
+      esCombo: Boolean(p.es_combo),
       sku: (p.codigo_interno as string) ?? null,
       tasaIva: Number(p.tasa_iva ?? 16),
       ivaIncluido: Boolean(p.iva_incluido_en_precio),
