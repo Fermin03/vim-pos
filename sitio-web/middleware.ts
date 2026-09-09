@@ -66,39 +66,44 @@ export const config = {
   // La primera versión de esta regla los destapaba, y lo cazó la prueba «el
   // matcher del middleware no toca NINGUNA ruta real» antes de llegar a
   // producción. Habría reabierto justo el agujero que se cerró el 30 de agosto.
-  // ⚠️ MANTENIMIENTO — este matcher NO es el de siempre.
-  //
-  // `/(.*)` es todo: la portada, las páginas, los .md, /assets, el sitemap y el
-  // favicon. Nada llega al contenido estático mientras esto esté aquí. Es lo
-  // que apaga el sitio desde el código, y lo que hay que deshacer para
-  // encenderlo (ver MANTENIMIENTO, más abajo).
-  matcher: ['/(.*)'],
+  // El matcher va escrito aquí como literal, y no como una constante de fuera,
+  // a propósito: Vercel lee este `config` en tiempo de construcción y no hay
+  // garantía de que sepa seguir una referencia. Durante el apagado del 6 al 8
+  // de septiembre esto llegó a decir `matcher: MATCHER_404`, y era un riesgo
+  // tonto de correr con la única pieza que decide si el sitio se sirve o no.
+  matcher: [
+    '/((?!assets|_|404|about|agents|AGENTS|apple-touch|aviso-privacidad|como-elegir-sistema-restaurante|cuanto-cuesta-un-sistema-para-restaurante|contact|demo|facturacion-cfdi|favicon|funciones|index|llms|nosotros|precios|privacy|robots|sin-internet|site|terminos|terms)(?!(?!vercel[.]json$|middleware[.]ts$)[^/]*[.](?!md$)[A-Za-z0-9]+$).+)',
+  ],
 };
 
-// ── El apagado temporal ─────────────────────────────────────────────────────
+// ── El apagado temporal, ya deshecho ────────────────────────────────────────
 //
-// Puesto el 6 de septiembre de 2026, a petición del dueño, por seguridad. El
-// sitio contesta 503 a todo mientras esto valga `true`.
+// El sitio estuvo apagado del 6 al 8 de septiembre de 2026, por seguridad,
+// mientras salían del código el nombre legal, el RFC, el domicilio particular
+// y el móvil personal. Contestaba 503 a todo.
 //
-// POR QUÉ 503 Y NO 404 NI 200:
-// un 503 con `Retry-After` es la única respuesta que le dice a un buscador
-// «esto vuelve»; ante un 404 desindexa las páginas y ante un 200 se guarda
-// como contenido la propia página de apagado. Si el sitio vuelve, vuelve con
-// su posicionamiento intacto.
+// El mecanismo se queda montado a propósito. Apagarlo otra vez son dos líneas:
+//   1. `MANTENIMIENTO = true`
+//   2. el `matcher` de arriba a `['/(.*)']` — que es todo: la portada, las
+//      páginas, los .md, /assets, el sitemap y el favicon
 //
-// PARA ENCENDER EL SITIO, dos cambios y ninguno más:
-//   1. `MANTENIMIENTO = false`
-//   2. `matcher: MATCHER_404` (la constante de aquí abajo, tal cual)
-// Las pruebas de `_agentes/pruebas.test.mjs` siguen comprobando MATCHER_404 en
-// los dos estados, así que el matcher del 404 no se pudre mientras espera.
-export const MANTENIMIENTO = true;
+// POR QUÉ 503 Y NO 404 NI 200, que es lo que hay que recordar si se vuelve a
+// usar: un 503 con `Retry-After` es la única respuesta que le dice a un
+// buscador «esto vuelve»; ante un 404 desindexa las páginas y ante un 200 se
+// guarda como contenido la propia página de apagado. El sitio volvió con su
+// posicionamiento intacto porque estuvo apagado así.
+export const MANTENIMIENTO = false;
 
-// El matcher del 404, el de siempre, intacto. No se usa mientras el sitio esté
-// apagado; existe para poder devolverlo a `config.matcher` sin reconstruirlo de
-// memoria, y para que las pruebas lo sigan vigilando.
-export const MATCHER_404 = [
-  '/((?!assets|_|404|about|agents|AGENTS|apple-touch|aviso-privacidad|como-elegir-sistema-restaurante|cuanto-cuesta-un-sistema-para-restaurante|contact|demo|facturacion-cfdi|favicon|funciones|index|llms|nosotros|precios|privacy|robots|sin-internet|site|terminos|terms)(?!(?!vercel[.]json$|middleware[.]ts$)[^/]*[.](?!md$)[A-Za-z0-9]+$).+)',
-];
+// El matcher del 404 con nombre propio, para `_agentes/rutas.mjs` y para las
+// pruebas. Sale de `config`, no de una copia: si allí se añade una exclusión,
+// aquí se entera sola, que era el punto de la nota original.
+//
+// ⚠️ Si se vuelve a apagar el sitio hay que escribir aquí el matcher del 404 a
+// mano, porque `config.matcher` pasará a ser `/(.*)`. Si no, las pruebas del
+// enrutador se vuelven trivialmente verdes —«todo lo tapa el middleware» pasa
+// cualquier comprobación de que no se sirve lo que no debe— y el matcher del
+// 404 se pudre sin que nadie se entere hasta encender el sitio.
+export const MATCHER_404 = config.matcher;
 
 // Las cinco de siempre. Van a mano porque una respuesta creada aquí se salta
 // la fase `headers` de vercel.json: el middleware corre antes que todo.

@@ -348,7 +348,7 @@ test('las páginas de verdad NO cambian de criterio: con */* sirven HTML', () =>
 //
 // Cuando el sitio se encienda, esta prueba pasa sola por el otro lado: con
 // MANTENIMIENTO en `false` comprueba que el 503 ya no sale por ningún lado.
-test('con el sitio apagado, todo contesta 503 y nada se cachea', async () => {
+test('el interruptor de apagado: 503 en todo si está puesto, en nada si no', async () => {
   const rutas = ['/', '/precios', '/precios.md', '/assets/js/vim.js', '/sitemap.xml'];
 
   for (const ruta of rutas) {
@@ -384,7 +384,7 @@ test('con el sitio apagado, todo contesta 503 y nada se cachea', async () => {
 // Comprobación aparte, y a propósito: el matcher del apagado tiene que ser el
 // que lo abarca todo. Si alguien lo estrecha «para dejar pasar los assets», el
 // sitio deja de estar apagado y nadie se entera hasta mirarlo.
-test('con el sitio apagado, el matcher no deja pasar nada', () => {
+test('con el sitio apagado, el matcher no dejaría pasar nada', () => {
   if (!MANTENIMIENTO) return;
   assert.deepEqual(configMiddleware.matcher, ['/(.*)']);
 });

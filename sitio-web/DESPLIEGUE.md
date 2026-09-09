@@ -1,24 +1,29 @@
 # Cómo se publica este sitio
 
-> ## 🔴 EL SITIO ESTÁ APAGADO (6 de septiembre de 2026)
+> ## 🟢 El sitio está encendido
 >
-> Apagado a propósito, por seguridad, a petición del dueño. Todo lo que hay debajo de este
-> aviso describe el sitio **encendido**; sigue siendo cierto y sigue siendo a donde volver.
+> Estuvo apagado del **6 al 8 de septiembre de 2026**, por seguridad, mientras salían del código
+> el nombre legal, el RFC, el domicilio particular y el móvil personal. Contestaba **503** a todo.
 >
-> **Está apagado por dos sitios a la vez, y hacen falta los dos para encenderlo:**
+> **Cómo se vuelve a apagar**, si hiciera falta — dos líneas en `middleware.ts`:
 >
-> | Dónde | Qué hace | Cómo se revierte |
-> |---|---|---|
-> | `middleware.ts` | Contesta **503** a todo, con `Retry-After` y `no-store` | `MANTENIMIENTO = false` y `matcher: MATCHER_404` |
-> | Vercel → Settings → Deployment Protection | No deja llegar ni al despliegue | Se apaga desde el panel |
+> | Qué | A qué |
+> |---|---|
+> | `MANTENIMIENTO` | `true` |
+> | `config.matcher` | `['/(.*)']` |
+>
+> Y en el panel, **Vercel → Settings → Deployment Protection**, que es lo único que tapa además
+> los **despliegues anteriores**: cada uno sigue accesible por su URL única y sirve el sitio tal
+> como estaba ese día. El middleware no los toca.
 >
 > **Por qué 503 y no 404 ni 200:** un 503 con `Retry-After` es la única respuesta que le dice a
 > un buscador «esto vuelve». Con un 404 desindexa las páginas y hay que reconstruir el
 > posicionamiento desde cero; con un 200 se guarda la página de apagado como si fuera el sitio.
+> El sitio volvió con su posicionamiento intacto porque estuvo apagado así.
 >
-> **El matcher del 404 no se borró.** Vive en `MATCHER_404`, en el mismo archivo, y las pruebas
-> de `_agentes/pruebas.test.mjs` lo siguen vigilando mientras espera — para que el día que se
-> encienda el sitio no salga a la luz que se pudrió mientras nadie lo miraba.
+> **Los datos personales no vuelven por descuido:** la prueba «ningún dato personal vuelve al
+> sitio», en `_agentes/pruebas.test.mjs`, recorre todo lo que se publica buscando por *forma* —
+> algo con forma de RFC, de teléfono de diez dígitos, de enlace de WhatsApp, de calle con número.
 
 El sitio se sirve desde **Vercel**, como proyecto aparte de las tres apps, desde el mismo
 repositorio y con auto-deploy en cada commit a `main`.
