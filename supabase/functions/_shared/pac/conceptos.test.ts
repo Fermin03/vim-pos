@@ -294,3 +294,45 @@ test("la global cuadra al centavo con 500 tickets al azar", () => {
 test("se niega a amparar un periodo sin ventas", () => {
   assert.throws(() => armarConceptosGlobal([]), ConceptosIncoherentes);
 });
+
+test("un combo timbra como un solo concepto con el nombre de sus hijos", () => {
+  const padre = linea({ descripcion: "Combo", totalItemMxn: 175, ivaItemMxn: 24.14, claveSat: "90101503", id: "p1", parentId: null, comboRol: "PADRE" });
+  const h1 = linea({ descripcion: "Doble", totalItemMxn: 0, ivaItemMxn: 0, subtotalBrutoMxn: 0, id: "h1", parentId: "p1", comboRol: "HIJO" });
+  const h2 = linea({ descripcion: "Papas", totalItemMxn: 0, ivaItemMxn: 0, subtotalBrutoMxn: 0, id: "h2", parentId: "p1", comboRol: "HIJO" });
+  const r = armarConceptos([padre, h1, h2], 175);
+  assert.equal(r.conceptos.length, 1);
+  assert.equal(r.conceptos[0].descripcion, "Combo (Doble, Papas)");
+  assert.equal(r.conceptos[0].claveProdServ, "90101503");
+  assert.equal(r.conceptos[0].total, 175);
+  cuadra(r);
+});
+
+test("el extra con costo de un hijo entra al importe del combo", () => {
+  const padre = linea({ descripcion: "Combo", totalItemMxn: 175, ivaItemMxn: 24.14, id: "p1", parentId: null, comboRol: "PADRE" });
+  const h1 = linea({ descripcion: "Doble", subtotalBrutoMxn: 0, montoModificadoresMxn: 15, totalItemMxn: 15, ivaItemMxn: 2.07, id: "h1", parentId: "p1", comboRol: "HIJO" });
+  const r = armarConceptos([padre, h1], 190);
+  assert.equal(r.conceptos.length, 1);
+  assert.equal(r.conceptos[0].descripcion, "Combo (Doble)");
+  assert.equal(r.conceptos[0].total, 190);
+  cuadra(r);
+});
+
+test("dos combos y un producto suelto dan tres conceptos y cuadran", () => {
+  const lineas = [
+    linea({ descripcion: "Combo", totalItemMxn: 175, ivaItemMxn: 24.14, id: "p1", parentId: null, comboRol: "PADRE" }),
+    linea({ descripcion: "Doble", subtotalBrutoMxn: 0, totalItemMxn: 0, ivaItemMxn: 0, id: "h1", parentId: "p1", comboRol: "HIJO" }),
+    linea({ descripcion: "Brownie", totalItemMxn: 45, ivaItemMxn: 6.21, id: "s1", parentId: null, comboRol: null }),
+    linea({ descripcion: "Combo", totalItemMxn: 140, ivaItemMxn: 19.31, id: "p2", parentId: null, comboRol: "PADRE" }),
+    linea({ descripcion: "Clásica", subtotalBrutoMxn: 0, totalItemMxn: 0, ivaItemMxn: 0, id: "h2", parentId: "p2", comboRol: "HIJO" }),
+  ];
+  const r = armarConceptos(lineas, 360);
+  assert.deepEqual(r.conceptos.map((c) => c.descripcion), ["Combo (Doble)", "Brownie", "Combo (Clásica)"]);
+  cuadra(r);
+});
+
+test("un hijo sin padre en la lista se factura como renglón normal (no se pierde dinero)", () => {
+  const h1 = linea({ descripcion: "Doble", subtotalBrutoMxn: 0, montoModificadoresMxn: 15, totalItemMxn: 15, ivaItemMxn: 2.07, id: "h1", parentId: "zz", comboRol: "HIJO" });
+  const r = armarConceptos([h1], 15);
+  assert.equal(r.conceptos.length, 1);
+  cuadra(r);
+});

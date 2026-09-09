@@ -14,6 +14,10 @@
 
 /** Un renglón de `ticket_items`, ya calculado por `recalcular_totales_ticket`. */
 export type LineaTicket = {
+  /** id de ticket_items; solo hace falta para reconocer a los hijos de un combo. */
+  id?: string;
+  parentId?: string | null;
+  comboRol?: "PADRE" | "HIJO" | null;
   descripcion: string;
   cantidad: number;
   claveSat: string | null;
@@ -85,6 +89,39 @@ type LineaEnCentavos = {
   total: number;
 };
 
+/** Límite del Anexo 20 para `Descripcion` de un concepto. */
+const DESCRIPCION_MAX = 1000;
+
+/**
+ * Un combo es UN concepto (ADR 0015): el padre absorbe lo que sus hijos cobraron (solo extras: los
+ * hijos van a precio 0) y toma el nombre "Combo (Doble, Papas, Refresco)". Un hijo cuyo padre no
+ * venga en la lista se deja como renglón normal: perder su importe descuadraría el comprobante.
+ */
+export function colapsarCombos(lineas: LineaTicket[]): LineaTicket[] {
+  const padres = new Map<string, LineaTicket>();
+  for (const l of lineas) if (l.comboRol === "PADRE" && l.id) padres.set(l.id, { ...l });
+  const nombres = new Map<string, string[]>();
+  const salida: LineaTicket[] = [];
+  for (const l of lineas) {
+    if (l.comboRol === "HIJO" && l.parentId && padres.has(l.parentId)) {
+      const p = padres.get(l.parentId)!;
+      p.subtotalBrutoMxn = aPesos(aCentavos(p.subtotalBrutoMxn) + aCentavos(l.subtotalBrutoMxn) + aCentavos(l.montoModificadoresMxn));
+      p.descuentoItemMxn = aPesos(aCentavos(p.descuentoItemMxn) + aCentavos(l.descuentoItemMxn));
+      p.promocionItemMxn = aPesos(aCentavos(p.promocionItemMxn) + aCentavos(l.promocionItemMxn));
+      p.ivaItemMxn = aPesos(aCentavos(p.ivaItemMxn) + aCentavos(l.ivaItemMxn));
+      p.totalItemMxn = aPesos(aCentavos(p.totalItemMxn) + aCentavos(l.totalItemMxn));
+      nombres.set(l.parentId, [...(nombres.get(l.parentId) ?? []), l.descripcion]);
+      continue;
+    }
+    salida.push(l.comboRol === "PADRE" && l.id ? padres.get(l.id)! : l);
+  }
+  for (const [id, hijos] of nombres) {
+    const p = padres.get(id)!;
+    p.descripcion = `${p.descripcion} (${hijos.join(", ")})`.slice(0, DESCRIPCION_MAX);
+  }
+  return salida;
+}
+
 /**
  * Arma los conceptos del CFDI a partir de los renglones del ticket.
  *
@@ -102,7 +139,7 @@ export function armarConceptos(lineas: LineaTicket[], totalTicketMxn: number): C
   }
 
   const totalTicket = aCentavos(totalTicketMxn);
-  const enCentavos = lineas.map(desglosarLinea);
+  const enCentavos = colapsarCombos(lineas).map(desglosarLinea);
 
   // El descuento a nivel TICKET (el que no cuelga de ningún renglón) no viene en los renglones:
   // se deduce de la diferencia. Deducirlo en vez de leerlo de otra tabla hace que este cálculo
