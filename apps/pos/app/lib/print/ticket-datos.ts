@@ -15,6 +15,34 @@ const MODO_LABEL: Record<string, string> = {
 
 type Ctx = { token: string; cajeroNombre: string; cajaNombre: string };
 
+/**
+ * Suma a cada PADRE el total de sus HIJOS —que van a precio 0 y solo cargan lo que el cliente
+ * pagó de más en extras (migración 0110: `agregar_combo_a_ticket`)— para que el ticket muestre el
+ * precio completo del combo en un solo renglón ("1x Combo $190").
+ *
+ * Función PURA con pruebas propias (`__tests__/ticket-datos.test.ts`): antes vivía inline aquí,
+ * sin archivo de pruebas, y el fixture del builder ya traía el total calculado — una regresión en
+ * el plegado (perder el `?? 0`, sumar dos veces, cruzar el `parentId`) habría pasado las 158
+ * pruebas sin que nadie se enterara. Es dinero que ve el cliente.
+ *
+ * No muta `lineas` ni los objetos que contiene: el llamador arma este arreglo fresco en cada
+ * lectura, pero una función que muta su entrada es una trampa para quien la reuse más adelante.
+ */
+export function foldearHijosEnPadre(lineas: LineaImpresion[]): LineaImpresion[] {
+  const hijosTotal = new Map<string, number>();
+  for (const l of lineas) {
+    if (l.comboRol === "HIJO" && l.parentId) {
+      hijosTotal.set(l.parentId, (hijosTotal.get(l.parentId) ?? 0) + l.totalMxn);
+    }
+  }
+  return lineas.map((l) => {
+    if (l.comboRol !== "PADRE") return l;
+    const extra = hijosTotal.get(l.id) ?? 0;
+    if (extra === 0) return l; // sin hijos con costo: nada que sumar, ni copia que hacer
+    return { ...l, totalMxn: Math.round((l.totalMxn + extra) * 100) / 100 };
+  });
+}
+
 /** Lee el ticket persistido y arma los datos planos para impresión (bajo RLS del empleado). */
 export async function leerTicketParaImpresion(ticketId: string, ctx: Ctx): Promise<DatosTicketImpresion> {
   const sb = employeeClient(ctx.token);
@@ -81,10 +109,8 @@ export async function leerTicketParaImpresion(ticketId: string, ctx: Ctx): Promi
   // El importe del PADRE que llega en `total_item_mxn` es el precio del combo tal cual se fijó al
   // agregarlo (migración 0110: `agregar_combo_a_ticket`); los hijos van a precio 0 y solo cargan lo
   // que el cliente pagó de más en extras. Para que el ticket muestre "1x Combo $190" con esos extras
-  // adentro, se suman aquí al padre, UNA sola vez.
-  const hijosTotal = new Map<string, number>();
-  for (const l of lineas) if (l.comboRol === "HIJO" && l.parentId) hijosTotal.set(l.parentId, (hijosTotal.get(l.parentId) ?? 0) + l.totalMxn);
-  for (const l of lineas) if (l.comboRol === "PADRE") l.totalMxn = Math.round((l.totalMxn + (hijosTotal.get(l.id) ?? 0)) * 100) / 100;
+  // adentro, se suman aquí al padre, UNA sola vez — ver `foldearHijosEnPadre` y sus pruebas.
+  const lineasConCombo = foldearHijosEnPadre(lineas);
 
   const { data: pagos, error: e3 } = await sb
     .from("pagos")
@@ -152,7 +178,7 @@ export async function leerTicketParaImpresion(ticketId: string, ctx: Ctx): Promi
       nombreCliente: (tk.nombre_cliente as string) ?? null,
     },
     entrega,
-    lineas,
+    lineas: lineasConCombo,
     totales: {
       subtotal: Number(tk.subtotal_mxn), descuentos: Number(tk.descuentos_manuales_mxn),
       iva: Number(tk.iva_mxn), total: Number(tk.total_mxn), propina: Number(tk.propina_mxn),

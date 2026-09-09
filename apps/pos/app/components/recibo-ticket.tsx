@@ -75,25 +75,40 @@ export function ReciboTicket({ datos }: { datos: DatosTicketImpresion }) {
 
       {/* Items */}
       <div className="text-[11px]">
-        {datos.lineas.map((l, i) =>
+        {datos.lineas.map((l, i) => {
           // Combos (ADR 0015, spec §7): el HIJO va indentado bajo el PADRE, con su slot y SIN
           // importe —el cliente ya pagó el combo entero en el renglón del padre—. Un extra con
-          // costo dentro del hijo (p. ej. "Extra queso") sí se imprime, con su importe.
-          l.comboRol === "HIJO" ? (
-            <div key={i} className="mb-[9px]">
-              <div className="pl-[18px] text-[10px] leading-[1.45] text-[#555]">
-                {l.grupoNombre ? `${l.grupoNombre}: ` : ""}
-                {l.nombre}
-                {l.modificadores.length ? ` · ${l.modificadores.join(", ")}` : ""}
-              </div>
-              {(l.extras ?? []).map((e, j) => (
-                <div key={j} className="flex items-start justify-between gap-2 pl-[18px] text-[10px] leading-[1.45] text-[#555]">
-                  <span>+ {e.nombre}</span>
-                  <span className="whitespace-nowrap font-bold">{fmt(e.importeMxn)}</span>
+          // costo dentro del hijo (p. ej. "Extra queso") sí se imprime, con su importe, pero solo
+          // ahí: la línea de modificadores lista solo los que no cuestan, para no repetirlo. Este
+          // bloque debe quedar idéntico —contenido y orden— a construirTicketJob (ticket-builder.ts):
+          // es el papel lo que existe de verdad, esto es su previsualización.
+          if (l.comboRol === "HIJO") {
+            const nombresExtras = new Set((l.extras ?? []).map((e) => e.nombre));
+            const modificadoresLibres = l.modificadores.filter((m) => !nombresExtras.has(m));
+            return (
+              <div key={i} className="mb-[9px]">
+                <div className="pl-[18px] text-[10px] leading-[1.45] text-[#555]">
+                  {l.grupoNombre ? `${l.grupoNombre}: ` : ""}
+                  {l.nombre}
                 </div>
-              ))}
-            </div>
-          ) : (
+                {modificadoresLibres.length > 0 && (
+                  <div className="pl-[27px] text-[10px] leading-[1.45] text-[#555]">
+                    {modificadoresLibres.join(", ")}
+                  </div>
+                )}
+                {(l.extras ?? []).map((e, j) => (
+                  <div key={j} className="flex items-start justify-between gap-2 pl-[27px] text-[10px] leading-[1.45] text-[#555]">
+                    <span>+ {e.nombre}</span>
+                    <span className="whitespace-nowrap font-bold">{fmt(e.importeMxn)}</span>
+                  </div>
+                ))}
+                {l.notaCocina && l.notaCocina.trim().length > 0 && (
+                  <div className="pl-[27px] text-[10px] leading-[1.45] italic text-[#555]">» {l.notaCocina.trim()}</div>
+                )}
+              </div>
+            );
+          }
+          return (
             <div key={i} className="mb-[9px]">
               <div className="flex items-start justify-between gap-2">
                 <div className="flex-1">
@@ -108,8 +123,8 @@ export function ReciboTicket({ datos }: { datos: DatosTicketImpresion }) {
                 <div className="pl-[18px] text-[10px] leading-[1.45] italic text-[#555]">» {l.notaCocina.trim()}</div>
               )}
             </div>
-          ),
-        )}
+          );
+        })}
       </div>
 
       <DividerDashed />
