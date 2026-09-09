@@ -61,13 +61,13 @@
 
 ## Consecuencias
 
-- Migración 0110: dos tablas, cuatro columnas en `ticket_items`, RPC `agregar_combo_a_ticket`,
+- Migración 0111: dos tablas, cuatro columnas en `ticket_items`, RPC `agregar_combo_a_ticket`,
   cascada en `cancelar_item_ticket`, pull y `catalogo_version()` con las dos tablas.
 - Toda consulta de "ventas por producto" debe **excluir padres y usar `precio_asignado_mxn` en
   hijos**; si no, el combo cuenta doble o el refresco no cuenta.
 - La comanda, el KDS y el ticket impreso distinguen padre e hijos; una caja vieja que reciba un
   ticket con combos (por espejo de delivery o cuenta abierta) los verá como renglones planos
-  hasta actualizarse. Se publica instalador 0.4.65.
+  hasta actualizarse. Se publica instalador 0.4.66.
 - Los tres armadores de conceptos CFDI (timbrar, autofacturar, global) comparten
   `conceptos.ts`; el colapso vive ahí y en ningún otro lado.
 - Diseño completo: `docs/superpowers/specs/2026-09-08-combos-design.md`.

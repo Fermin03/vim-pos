@@ -52,7 +52,7 @@ export async function listarCombos(): Promise<ComboResumen[]> {
 
 /**
  * ¿La caja ofrece "¿Lo hacemos combo?" al agregar suelto un producto que es principal de algún
- * combo? (`configuracion_tenant.combo_upsell_activo`, migración 0110; ver `docs/diseno/pos.md`).
+ * combo? (`configuracion_tenant.combo_upsell_activo`, migración 0111; ver `docs/diseno/pos.md`).
  * Sin fila en `configuracion_tenant` el valor por default de la columna es `true`, así que solo
  * `false` explícito la apaga — igual que `leerComboUpsellActivo` en `apps/pos/app/lib/catalogo.ts`.
  */
@@ -80,7 +80,7 @@ export async function activarComboUpsell(activo: boolean): Promise<void> {
  * Un combo NACE PAUSADO, sin excepción: en el momento de crearlo todavía no tiene ni un slot.
  *
  * En una caja al día vender un combo sin slots es inofensivo (el POS avisa "Este combo no tiene
- * slots configurados"). En una caja que aún no tomó la 0.4.65 **no hay migración 0110**: no existe
+ * slots configurados"). En una caja que aún no tomó la 0.4.66 **no hay migración 0111**: no existe
  * `es_combo`, ni la RPC, ni la guarda dentro de su `agregar_item_a_ticket` local, así que pinta el
  * padre como un producto normal y lo vende al precio base —los $45 de "hacerlo combo"— sin cocinar
  * nada. Nacer pausado cierra esa ventana y además es mejor experiencia por sí solo.

@@ -24,7 +24,7 @@ ninguna tabla ni columna de combos; el enum de promoción `COMBO_PAQUETE` (0007)
 
 **Entra (entrega 1):**
 
-1. Migración `0110_combos.sql`: bandera en productos, `combo_grupos`, `combo_opciones`,
+1. Migración `0111_combos.sql`: bandera en productos, `combo_grupos`, `combo_opciones`,
    columnas de agrupación en `ticket_items`, RPC `agregar_combo_a_ticket`, cascada en
    `cancelar_item_ticket`, pull y `catalogo_version()` (§4).
 2. Admin: pestaña Combos con editor de slots y vista previa de precios (§5).
@@ -33,7 +33,7 @@ ninguna tabla ni columna de combos; el enum de promoción `COMBO_PAQUETE` (0007)
 4. Comanda, KDS y ticket impreso con padre e hijos (§7).
 5. CFDI: un concepto por combo (§8).
 6. Reportes de ventas por producto corregidos (§9).
-7. Escritorio: pull de las dos tablas, instalador 0.4.65 (§10).
+7. Escritorio: pull de las dos tablas, instalador 0.4.66 (§10).
 8. Pruebas (§11).
 
 **No entra:** combos en la carta de Uber (entrega 2, §12); auto-combo / promoción
@@ -58,7 +58,7 @@ modificadores de una línea ya en el carrito (limitación previa, no la resolvem
 - **Lista explícita de tablas en el sync** (ADR 0004): las dos tablas nuevas se agregan a mano
   al pull y a `catalogo_version()`.
 
-## 4. Modelo de datos — migración `0110_combos.sql`
+## 4. Modelo de datos — migración `0111_combos.sql`
 
 ### 4.1 `productos.es_combo`
 
@@ -227,7 +227,7 @@ Recetas). Rutas:
 | Ruta | Qué hace |
 |---|---|
 | `/catalogo/combos` | lista: nombre, categoría, precio base, nº de slots, estado; crear, pausar, borrar (soft) |
-| `/catalogo/combos/nuevo` | paso 1: datos del producto (nombre, categoría, precio base, clave SAT sugerida `90101503`, IVA). Crea el producto con `es_combo` **en estado `PAUSADO`** —al crearlo no tiene ni un slot, y una caja sin la 0.4.65 lo vendería al precio base sin cocinar nada— y redirige al editor. No hay selector de estado ni de visibilidad: el dueño lo publica desde el editor cuando ya tiene slots |
+| `/catalogo/combos/nuevo` | paso 1: datos del producto (nombre, categoría, precio base, clave SAT sugerida `90101503`, IVA). Crea el producto con `es_combo` **en estado `PAUSADO`** —al crearlo no tiene ni un slot, y una caja sin la 0.4.66 lo vendería al precio base sin cocinar nada— y redirige al editor. No hay selector de estado ni de visibilidad: el dueño lo publica desde el editor cuando ya tiene slots |
 | `/catalogo/combos/[id]` | editor de slots + vista previa |
 
 Componentes nuevos: `combo-form.tsx` (datos del producto, reutiliza campos de `producto-form.tsx`
@@ -364,7 +364,7 @@ por la cantidad duplicaría el importe justo cuando se venden dos combos: exacta
 conteo que el ADR quiere evitar. (La redacción anterior decía "× cantidad"; se corrige aquí porque
 un spec que contradice al código correcto acaba "arreglando" el código.)
 
-En vez de crear una vista nueva `v_ventas_por_producto`, 0110 **reescribe las tres vistas `vw_*`
+En vez de crear una vista nueva `v_ventas_por_producto`, 0111 **reescribe las tres vistas `vw_*`
 que ya existían** (`vw_ventas_por_categoria`, `vw_ventas_por_producto`, `vw_ventas_por_area_cocina`)
 para que apliquen la regla. Es mejor decisión: todos los consumidores actuales la heredan sin
 tocarlos y no queda una vista vieja al lado, lista para que alguien la consulte por error.
@@ -381,8 +381,8 @@ combo no compite ahí con sus propios componentes; el mosaico ocupa ese lugar.
 
 ## 10. Escritorio
 
-- Migración 0110 se aplica sola al arrancar (como 0101). `sync-pull.mjs` con las dos tablas.
-- Versión 0.4.65. Lista "Antes de empaquetar" del RUNBOOK completa (postgrest.exe, tamaño del
+- Migración 0111 se aplica sola al arrancar (como 0101). `sync-pull.mjs` con las dos tablas.
+- Versión 0.4.66. Lista "Antes de empaquetar" del RUNBOOK completa (postgrest.exe, tamaño del
   .exe, checkout con `desktop/bin`).
 - Espejo de delivery (`crear_ticket_desde_app`): sin cambio; un pedido de app no trae combos
   hasta la entrega 2.
@@ -428,8 +428,8 @@ niveles de anidamiento; sin tamaños. DiDi solo admite combos fijos con precio.
   en `apps/admin` y `apps/pos` al implementar y se lista en el plan.
 - **Caja vieja con ticket nuevo**: un 0.4.64 que reciba por pull un ticket con combos (cuenta
   abierta creada en la web) lo verá plano y podría cancelar un hijo suelto. La mitigación que decía
-  este spec —"la BD local ya tendrá 0110 al arrancar"— **es falsa** para una caja que todavía no se
-  actualizó: sin la 0.4.65 no hay migración 0110 en su Postgres local, así que no existe `es_combo`,
+  este spec —"la BD local ya tendrá 0111 al arrancar"— **es falsa** para una caja que todavía no se
+  actualizó: sin la 0.4.66 no hay migración 0111 en su Postgres local, así que no existe `es_combo`,
   ni `agregar_combo_a_ticket`, ni la guarda dentro de su `agregar_item_a_ticket`. Esa caja pinta al
   padre como un producto normal y lo vende al precio base (los $45 de "hacerlo combo") sin cocinar
   nada. Mitigación real: **un combo nuevo nace `PAUSADO`** (`crearCombo` en

@@ -37,7 +37,7 @@ export default function CombosPage() {
     leerComboUpsellActivo().then(setOfrecer).catch(() => setOfrecer(true));
   }, []);
 
-  /** Enciende o apaga "¿Lo hacemos combo?" en caja (migración 0110, docs/diseno/pos.md). */
+  /** Enciende o apaga "¿Lo hacemos combo?" en caja (migración 0111, docs/diseno/pos.md). */
   async function cambiarOfrecer(activo: boolean) {
     setCambiando(true);
     setError(null);

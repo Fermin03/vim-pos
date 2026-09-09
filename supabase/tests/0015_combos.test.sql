@@ -1,4 +1,4 @@
--- Combos (ADR 0015, migración 0110): las tablas de slots están aisladas por tenant, un combo no
+-- Combos (ADR 0015, migración 0111): las tablas de slots están aisladas por tenant, un combo no
 -- puede ser opción de otro combo, y la RPC que cobra no se salta la RLS.
 begin;
 select plan(11);
@@ -73,7 +73,7 @@ select throws_ok(
   '23505', null, 'combo_opciones permite un solo es_default por slot');
 
 -- #9 catalogo_version() (0109) también mide combo_grupos/combo_opciones: un slot nuevo es
--- "el menú cambió" tanto como un producto nuevo (0110 §3.3). Se compara contra un valor fijo
+-- "el menú cambió" tanto como un producto nuevo (0111 §3.3). Se compara contra un valor fijo
 -- sembrado, no contra "no es null" — una fila en productos ya bastaría para eso y no probaría
 -- que la función de verdad lee las tablas de combos.
 reset role;

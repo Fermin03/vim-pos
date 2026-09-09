@@ -1,4 +1,4 @@
--- 0110 — Combos (ADR 0015, spec 2026-09-08-combos-design.md).
+-- 0111 — Combos (ADR 0015, spec 2026-09-08-combos-design.md).
 --
 -- §1 Catálogo: el combo es un producto (es_combo) con slots (combo_grupos) y opciones
 --    (combo_opciones). Un slot puede apuntar a una categoría entera.
@@ -183,7 +183,7 @@ BEGIN
   IF NOT FOUND THEN
     RAISE EXCEPTION 'Producto % no existe o está eliminado', p_producto_id;
   END IF;
-  -- 0110: un combo sin hijos sería un renglón que cobra y no cocina. Tiene su propia RPC.
+  -- 0111: un combo sin hijos sería un renglón que cobra y no cocina. Tiene su propia RPC.
   IF v_producto.es_combo THEN
     RAISE EXCEPTION 'El producto "%" es un combo: usa agregar_combo_a_ticket', v_producto.nombre;
   END IF;
@@ -403,7 +403,7 @@ BEGIN
     SELECT precio_unitario_snapshot * cantidad, parent_item_id, combo_rol
       INTO v_carta_hijo, v_hijo_parent_id, v_hijo_combo_rol
       FROM ticket_items WHERE id = v_hijo_id;
-    -- 0110 hallazgo 1: agregar_item_a_ticket puede devolver una fila EXISTENTE (idempotencia por
+    -- 0111 hallazgo 1: agregar_item_a_ticket puede devolver una fila EXISTENTE (idempotencia por
     -- client_id_local) en vez de insertar. Si esa fila ya forma parte de un combo, no la
     -- re-apadrinamos a ciegas: se la robaríamos a su combo original y corromperíamos sus totales.
     --
@@ -480,7 +480,7 @@ BEGIN
   -- recalcular_totales_ticket() invocada por trigger (UPDATE OF cancelado)
 END;
 $$;
-COMMENT ON FUNCTION cancelar_item_ticket IS 'Cancela un ítem individual sin cancelar el ticket. Si la comanda ya está en cocina, requiere PIN (§16.3). Un PADRE de combo arrastra a sus HIJOS; un HIJO no se cancela solo (0110).';
+COMMENT ON FUNCTION cancelar_item_ticket IS 'Cancela un ítem individual sin cancelar el ticket. Si la comanda ya está en cocina, requiere PIN (§16.3). Un PADRE de combo arrastra a sus HIJOS; un HIJO no se cancela solo (0111).';
 
 -- ── §3.1 Vistas de ventas: sin padres; hijos valen su parte prorrateada + sus extras ────────
 -- CREATE OR REPLACE VIEW exige las mismas columnas en el mismo orden: solo cambian expresiones.

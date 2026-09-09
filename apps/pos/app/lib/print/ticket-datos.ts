@@ -17,7 +17,7 @@ type Ctx = { token: string; cajeroNombre: string; cajaNombre: string };
 
 /**
  * Suma a cada PADRE el total de sus HIJOS —que van a precio 0 y solo cargan lo que el cliente
- * pagó de más en extras (migración 0110: `agregar_combo_a_ticket`)— para que el ticket muestre el
+ * pagó de más en extras (migración 0111: `agregar_combo_a_ticket`)— para que el ticket muestre el
  * precio completo del combo en un solo renglón ("1x Combo $190").
  *
  * Función PURA con pruebas propias (`__tests__/ticket-datos.test.ts`): antes vivía inline aquí,
@@ -107,7 +107,7 @@ export async function leerTicketParaImpresion(ticketId: string, ctx: Ctx): Promi
   });
 
   // El importe del PADRE que llega en `total_item_mxn` es el precio del combo tal cual se fijó al
-  // agregarlo (migración 0110: `agregar_combo_a_ticket`); los hijos van a precio 0 y solo cargan lo
+  // agregarlo (migración 0111: `agregar_combo_a_ticket`); los hijos van a precio 0 y solo cargan lo
   // que el cliente pagó de más en extras. Para que el ticket muestre "1x Combo $190" con esos extras
   // adentro, se suman aquí al padre, UNA sola vez — ver `foldearHijosEnPadre` y sus pruebas.
   const lineasConCombo = foldearHijosEnPadre(lineas);

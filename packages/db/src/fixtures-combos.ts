@@ -1,7 +1,7 @@
 // Fixture compartida del PRECIO DE UN COMBO (ADR 0015).
 //
 // El precio de un combo está implementado TRES veces: la RPC `agregar_combo_a_ticket` (migración
-// 0110), `precioCombo` en la caja (`apps/pos/app/lib/combos.ts`) y `precioCombo` en el admin
+// 0111), `precioCombo` en la caja (`apps/pos/app/lib/combos.ts`) y `precioCombo` en el admin
 // (`apps/admin/app/lib/combos.ts`, que dibuja la vista previa que el dueño usa para poner el
 // precio). Las tres coinciden hoy, y hasta la revisión final de la rama lo único que las sostenía
 // era que dos archivos de prueba distintos codificaban a mano los mismos 190 y 140: si una de las

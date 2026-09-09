@@ -61,7 +61,7 @@ verlo tal como lo calcula la caja antes de publicar, no confiar en que la suma l
 cabeza.
 
 La lista de Combos también trae el switch **"Ofrecer el combo en la caja"**
-(`configuracion_tenant.combo_upsell_activo`, migración 0110): apaga la pregunta "¿Lo hacemos
+(`configuracion_tenant.combo_upsell_activo`, migración 0111): apaga la pregunta "¿Lo hacemos
 combo?" que la caja le hace al cliente cuando el cajero agrega suelto un producto que es principal
 de un combo. Vive aquí, no en Configuración, porque solo afecta a los combos — mismo criterio que
 el switch de descuento de inventario, que vive en Inventario y no en Configuración.

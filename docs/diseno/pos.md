@@ -157,7 +157,7 @@ producto tal cual estaba — Escape hace lo mismo, el producto nunca se pierde. 
 a una cuenta de mesa ya enviada a cocina (reabriría la comanda).
 
 El dueño apaga "¿Lo hacemos combo?" por negocio desde **Catálogo → Combos** en el admin, con el
-switch "Ofrecer el combo en la caja" (`configuracion_tenant.combo_upsell_activo`, migración 0110).
+switch "Ofrecer el combo en la caja" (`configuracion_tenant.combo_upsell_activo`, migración 0111).
 Vive ahí y no en Configuración porque solo afecta a los combos: es del mismo módulo que los crea,
 no una preferencia general del negocio.
 

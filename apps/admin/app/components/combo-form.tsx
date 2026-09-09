@@ -169,7 +169,7 @@ export function ComboForm() {
         </div>
 
         {/* No hay selector de estado a propósito: el combo nace PAUSADO. Al crearlo todavía no
-            tiene ni un slot, y una caja que no haya tomado la 0.4.65 (sin migración 0110) lo
+            tiene ni un slot, y una caja que no haya tomado la 0.4.66 (sin migración 0111) lo
             pintaría como un producto normal y lo vendería al precio base, sin cocinar nada. Se
             publica desde la ficha del combo cuando ya tiene sus slots. */}
         <div className="rounded-lg border border-line bg-surface p-4">
