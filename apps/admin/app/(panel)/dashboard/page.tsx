@@ -322,7 +322,12 @@ export default function DashboardPage() {
                 <div className="border-b border-line px-5 py-4">
                   <div className="flex items-center justify-between gap-3">
                     <div className="font-display text-[15px] font-semibold">Top productos{data?.esHoy ? " hoy" : ""}</div>
-                    <Link href="/reportes/ventas-producto" className="text-[12px] font-semibold text-ink-3 transition-colors hover:text-ink">Ver todos</Link>
+                    <div className="flex items-center gap-2">
+                      <Link href="/reportes/ventas-producto" className="text-[12px] font-semibold text-ink-3 transition-colors hover:text-ink">Ver todos</Link>
+                      <span className="rounded-full bg-accent-soft px-2.5 py-0.5 text-[12px] font-semibold text-accent" title="Combos cobrados en el día">
+                        {data?.combosVendidos ?? 0} combos
+                      </span>
+                    </div>
                   </div>
                 </div>
                 <div className="px-5 py-2">
