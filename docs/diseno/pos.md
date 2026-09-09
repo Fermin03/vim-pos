@@ -156,10 +156,10 @@ componente, no al combo entero, y llega así a su propio renglón en cocina. **N
 producto tal cual estaba — Escape hace lo mismo, el producto nunca se pierde. No aparece al agregar
 a una cuenta de mesa ya enviada a cocina (reabriría la comanda).
 
-> **Deuda:** el dueño debería poder apagar "¿Lo hacemos combo?" por negocio —
-> `configuracion_tenant.combo_upsell_activo` existe para eso (migración 0110) y la caja ya lo
-> respeta— pero el admin todavía no tiene una pantalla que lo cambie. Hoy solo se apaga a mano en
-> la base de datos.
+El dueño apaga "¿Lo hacemos combo?" por negocio desde **Catálogo → Combos** en el admin, con el
+switch "Ofrecer el combo en la caja" (`configuracion_tenant.combo_upsell_activo`, migración 0110).
+Vive ahí y no en Configuración porque solo afecta a los combos: es del mismo módulo que los crea,
+no una preferencia general del negocio.
 
 En el carrito el combo es **un renglón con precio** y sus hijos indentados bajo una línea vertical,
 cada uno con su slot en versalitas. Un extra con costo dentro de un hijo muestra su importe; lo

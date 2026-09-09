@@ -52,6 +52,32 @@ export async function listarCombos(): Promise<ComboResumen[]> {
   }));
 }
 
+/**
+ * ¿La caja ofrece "¿Lo hacemos combo?" al agregar suelto un producto que es principal de algún
+ * combo? (`configuracion_tenant.combo_upsell_activo`, migración 0110; ver `docs/diseno/pos.md`).
+ * Sin fila en `configuracion_tenant` el valor por default de la columna es `true`, así que solo
+ * `false` explícito la apaga — igual que `leerComboUpsellActivo` en `apps/pos/app/lib/catalogo.ts`.
+ */
+export async function leerComboUpsellActivo(): Promise<boolean> {
+  const tid = await tenantId();
+  const { data, error } = await supabase.from("configuracion_tenant").select("combo_upsell_activo").eq("tenant_id", tid).maybeSingle();
+  if (error) throw new Error(error.message);
+  return (data as { combo_upsell_activo?: boolean } | null)?.combo_upsell_activo !== false;
+}
+
+/**
+ * Enciende o apaga la pregunta "¿Lo hacemos combo?" en caja. Apagarla no toca los combos ni sus
+ * precios, solo deja de ofrecerse la conversión automática cuando el cajero agrega el principal
+ * suelto. Igual que en inventario (`activarModuloInventario`), la mayoría de tenants no tiene fila
+ * en `configuracion_tenant` todavía, así que esto es un upsert por tenant_id, no un UPDATE que
+ * podría afectar 0 filas.
+ */
+export async function activarComboUpsell(activo: boolean): Promise<void> {
+  const tid = await tenantId();
+  const { error } = await supabase.from("configuracion_tenant").upsert({ tenant_id: tid, combo_upsell_activo: activo }, { onConflict: "tenant_id" });
+  if (error) throw new Error(error.message);
+}
+
 export async function crearCombo(input: ComboInput): Promise<string> {
   const d = comboSchema.parse(input);
   const tid = await tenantId();

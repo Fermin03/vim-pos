@@ -60,6 +60,12 @@ combo no está escrito en ningún campo del formulario, sale de sumar slots, y e
 verlo tal como lo calcula la caja antes de publicar, no confiar en que la suma le salió bien en la
 cabeza.
 
+La lista de Combos también trae el switch **"Ofrecer el combo en la caja"**
+(`configuracion_tenant.combo_upsell_activo`, migración 0110): apaga la pregunta "¿Lo hacemos
+combo?" que la caja le hace al cliente cuando el cajero agrega suelto un producto que es principal
+de un combo. Vive aquí, no en Configuración, porque solo afecta a los combos — mismo criterio que
+el switch de descuento de inventario, que vive en Inventario y no en Configuración.
+
 ## Lo que NO se hereda del POS
 
 - Los objetivos de 44–56px. Con mouse, 36–40px es lo correcto; 44 se ve infantil.

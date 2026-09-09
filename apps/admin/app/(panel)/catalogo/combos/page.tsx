@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 import { Button } from "@vim/ui/styles";
 import { PageHeader, PageBody } from "../../../components/page-header";
 import { CatalogoTabs } from "../../../components/catalogo-tabs";
-import { listarCombos, type ComboResumen } from "../../../lib/combos";
+import { activarComboUpsell, leerComboUpsellActivo, listarCombos, type ComboResumen } from "../../../lib/combos";
 import { precioMxn } from "../../../lib/catalogo";
 import { mensajeError } from "../../../lib/errores";
 
@@ -20,6 +20,9 @@ export default function CombosPage() {
   const router = useRouter();
   const [combos, setCombos] = useState<ComboResumen[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [okMsg, setOkMsg] = useState<string | null>(null);
+  const [ofrecer, setOfrecer] = useState<boolean | null>(null);
+  const [cambiando, setCambiando] = useState(false);
 
   async function recargar() {
     setError(null);
@@ -31,7 +34,24 @@ export default function CombosPage() {
   }
   useEffect(() => {
     recargar();
+    leerComboUpsellActivo().then(setOfrecer).catch(() => setOfrecer(true));
   }, []);
+
+  /** Enciende o apaga "¿Lo hacemos combo?" en caja (migración 0110, docs/diseno/pos.md). */
+  async function cambiarOfrecer(activo: boolean) {
+    setCambiando(true);
+    setError(null);
+    try {
+      await activarComboUpsell(activo);
+      setOfrecer(activo);
+      setOkMsg(activo ? "La caja va a ofrecer el combo." : "La caja dejó de ofrecer el combo.");
+      setTimeout(() => setOkMsg(null), 2500);
+    } catch (e) {
+      setError(mensajeError(e, "No se pudo cambiar"));
+    } finally {
+      setCambiando(false);
+    }
+  }
 
   const sinNada = combos !== null && combos.length === 0;
 
@@ -52,11 +72,33 @@ export default function CombosPage() {
       />
       <CatalogoTabs />
       <PageBody>
+        {okMsg && <p className="mb-3 text-sm font-medium text-success">{okMsg}</p>}
         {error && (
           <p className="mb-4 text-sm font-medium text-danger" role="alert">
             {error}
           </p>
         )}
+
+        <div className="mb-4 flex flex-wrap items-center gap-3 rounded-lg border border-line bg-surface p-4">
+          <div className="grid gap-1">
+            <div className="flex items-center gap-3">
+              <button
+                type="button" role="switch" aria-checked={!!ofrecer} disabled={ofrecer === null || cambiando}
+                onClick={() => cambiarOfrecer(!ofrecer)}
+                className={`relative h-6 w-11 rounded-full transition-colors ${ofrecer ? "bg-accent" : "bg-line-strong"} disabled:opacity-50`}
+              >
+                <span className={`absolute top-0.5 h-5 w-5 rounded-full bg-white transition-transform ${ofrecer ? "left-[22px]" : "left-0.5"}`} />
+              </button>
+              <span className="text-sm font-semibold">Ofrecer el combo en la caja {ofrecer === null ? "" : ofrecer ? "· Encendido" : "· Apagado"}</span>
+            </div>
+            <p className="text-[12.5px] text-ink-2">
+              Cuando el cajero agrega suelto un producto que es principal de un combo (por
+              ejemplo, una hamburguesa), la caja le pregunta si lo hace combo y le muestra cuánto
+              cuesta de más. Apagado, el combo se sigue armando a mano desde su propia pantalla.
+            </p>
+          </div>
+        </div>
+
         {combos === null && <p className="text-sm text-ink-3">Cargando…</p>}
 
         {combos !== null && (
