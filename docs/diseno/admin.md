@@ -46,10 +46,10 @@ consecuencia** y, cuando toca dinero, PIN. Nada destructivo vive junto a un filt
 
 En Catálogo, **Combos** vive como pestaña propia entre Modificadores y Recetas (ADR 0015). Un
 combo se crea con los mismos datos que cualquier producto —nombre, categoría, clave SAT sugerida
-`90101503` (editable, no obligatoria)— y de ahí se pasa a la misma pantalla a agregarle **slots**:
-uno por paso que va a ver la caja. Un slot puede tomar sus opciones de **una categoría entera** en
-vez de listarlas una por una — es la forma normal de decir "cualquier hamburguesa" sin mantener la
-lista a mano cada vez que se da de alta una.
+`90101503` (editable, no obligatoria)— y de ahí se navega a la pantalla del combo a agregarle
+**slots**: uno por paso que va a ver la caja. Un slot puede tomar sus opciones de **una categoría
+entera** en vez de listarlas una por una — es la forma normal de decir "cualquier hamburguesa" sin
+mantener la lista a mano cada vez que se da de alta una.
 
 Una opción agotada no se oculta del slot: se marca. El combo se sigue vendiendo aunque falte un
 insumo puntual, y ocultar la opción escondería el motivo por el que el cliente ya no la ve en caja.

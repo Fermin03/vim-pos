@@ -44,10 +44,14 @@ export default function CombosPage() {
     try {
       await activarComboUpsell(activo);
       setOfrecer(activo);
-      setOkMsg(activo ? "La caja va a ofrecer el combo." : "La caja dejó de ofrecer el combo.");
+      setOkMsg(
+        activo
+          ? "La caja va a ofrecer el combo en unos minutos, o al momento si el cajero toca “Actualizar menú”."
+          : "La caja va a dejar de ofrecer el combo en unos minutos, o al momento si el cajero toca “Actualizar menú”.",
+      );
       setTimeout(() => setOkMsg(null), 2500);
     } catch (e) {
-      setError(mensajeError(e, "No se pudo cambiar"));
+      setError(mensajeError(e, "No se pudo cambiar si la caja ofrece el combo"));
     } finally {
       setCambiando(false);
     }
