@@ -90,6 +90,16 @@ BEGIN
     PERFORM agregar_item_a_ticket(v_ticket, v_combo, 1, NULL, '[]'::jsonb, 'smoke-combo-x4');
     RAISE EXCEPTION 'debió fallar: un combo no entra por agregar_item_a_ticket';
   EXCEPTION WHEN OTHERS THEN IF SQLERRM NOT LIKE '%agregar_combo_a_ticket%' THEN RAISE; END IF; END;
+  -- Hallazgo 1 (revisión ronda 1): un client_id_local de componente que ya es hijo de OTRO combo
+  -- no se puede robar (agregar_item_a_ticket lo devolvería existente y este lo re-apadrinaría).
+  -- 'smoke-combo-h2' ya es hijo del v_padre de la sección 1 (todavía sin cancelar).
+  BEGIN
+    PERFORM agregar_combo_a_ticket(v_ticket, v_combo, 1, jsonb_build_array(
+      jsonb_build_object('grupo_id', v_g_hamb, 'producto_id', v_clas, 'cantidad', 1),
+      jsonb_build_object('grupo_id', v_g_acom, 'producto_id', v_papas, 'cantidad', 1, 'client_id_local', 'smoke-combo-h2')),
+      '[]'::jsonb, NULL, 'smoke-combo-x5');
+    RAISE EXCEPTION 'debió fallar: el componente ya pertenece a otro combo';
+  EXCEPTION WHEN OTHERS THEN IF SQLERRM NOT LIKE '%ya pertenece a otro renglón%' THEN RAISE; END IF; END;
   RAISE NOTICE 'validaciones OK';
 
   -- 4) Cancelar un hijo falla; cancelar el padre arrastra a los hijos

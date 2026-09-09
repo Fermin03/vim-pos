@@ -277,6 +277,8 @@ DECLARE
   v_n_comp      integer;
   v_next_orden  integer;
   v_cat_nombre  text;
+  v_hijo_parent_id uuid;
+  v_hijo_combo_rol text;
 BEGIN
   SELECT tenant_id, estado_fiscal INTO v_tenant_id, v_estado FROM tickets WHERE id = p_ticket_id;
   IF NOT FOUND THEN RAISE EXCEPTION 'Ticket % no existe', p_ticket_id; END IF;
@@ -401,7 +403,19 @@ BEGIN
       COALESCE(v_comp->'modificadores', '[]'::jsonb),
       NULLIF(v_comp->>'client_id_local', ''));
 
-    SELECT precio_unitario_snapshot * cantidad INTO v_carta_hijo FROM ticket_items WHERE id = v_hijo_id;
+    SELECT precio_unitario_snapshot * cantidad, parent_item_id, combo_rol
+      INTO v_carta_hijo, v_hijo_parent_id, v_hijo_combo_rol
+      FROM ticket_items WHERE id = v_hijo_id;
+    -- 0110 hallazgo 1: agregar_item_a_ticket puede devolver una fila EXISTENTE (idempotencia por
+    -- client_id_local) en vez de insertar. Si esa fila ya es hijo de OTRO padre (o de este mismo
+    -- padre en un reintento legítimo), no la re-apadrinamos a ciegas: se la robaríamos a su combo
+    -- original y corromperíamos sus totales.
+    IF NOT (
+      (v_hijo_combo_rol IS NULL AND v_hijo_parent_id IS NULL)
+      OR v_hijo_parent_id = v_padre_id
+    ) THEN
+      RAISE EXCEPTION 'El componente ya pertenece a otro renglón del ticket (client_id_local reusado)';
+    END IF;
     IF v_carta > 0 THEN
       v_asignado := ROUND(v_total_padre * v_carta_hijo / v_carta, 2);
     ELSE
@@ -445,11 +459,11 @@ BEGIN
   IF v_item.cancelado THEN
     RAISE EXCEPTION 'Item ya está cancelado';
   END IF;
-  IF v_item.combo_rol = 'HIJO' THEN
-    RAISE EXCEPTION 'Cancela el combo completo';
-  END IF;
   IF v_item.estado_fiscal = 'PAGADO' THEN
     RAISE EXCEPTION 'No se puede cancelar items de ticket PAGADO. Usar flujo de devolución (1C.2)';
+  END IF;
+  IF v_item.combo_rol = 'HIJO' THEN
+    RAISE EXCEPTION 'Cancela el combo completo';
   END IF;
   IF v_item.estado_cocina IN ('EN_COCINA', 'LISTO') AND p_autorizacion_pin_id IS NULL THEN
     RAISE EXCEPTION 'Cancelar item con comanda en cocina requiere autorización_pin_id';
