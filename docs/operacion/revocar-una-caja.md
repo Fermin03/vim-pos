@@ -1,23 +1,20 @@
 # Cómo cortarle el acceso a una caja
 
-**La palanca es `cajas.activa = false`. Regenerar la clave del dispositivo YA NO corta al instante.**
-
-Esto cambió el 9 sep 2026, cuando las funciones que la caja llama en bucle dejaron de preguntarle
-a GoTrue en cada llamada y pasaron a verificar la firma del token ellas mismas
-(`supabase/functions/_shared/auth-dispositivo.ts`). Importa saberlo porque en el incidente de
-Knock-Out del 8 sep se usó justo la palanca que ahora es la lenta.
+**La palanca de siempre es `cajas.activa = false`.** Desde el 9 sep 2026 corta en las tres
+funciones que importan; antes solo cortaba en el espejo de delivery.
 
 ## Qué corta y en cuánto tiempo
 
 | Acción | Efecto |
 |---|---|
 | **`cajas.activa = false`** (o `deleted_at`) | **Inmediato**, en la siguiente llamada de la caja |
-| Regenerar la clave del dispositivo | Solo impide **nuevos** logins. El token que ya tenga sigue sirviendo hasta que expire |
-| Borrar o banear el usuario en `auth.users` | Igual: hasta que expire el token que ya tenga |
+| Borrar o banear el usuario en `auth.users` | **Inmediato**: las funciones validan el token contra GoTrue en cada llamada |
+| Regenerar la clave del dispositivo | **NO corta al instante.** Solo impide *nuevos* logins; el token que la caja ya tenga sigue sirviendo hasta que expire (≤1 h) |
 
-La ventana de esos dos últimos es el `exp` del token: **una hora como mucho** con el TTL por
-defecto del proyecto. No hay lista de revocación ni forma de acortarla salvo bajar el JWT expiry
-en Supabase, cosa que afecta a todas las sesiones.
+Esa tercera fila es la que engaña, y no es nueva: `getUser` comprueba que el usuario siga vivo,
+no que su contraseña siga siendo la misma. En el incidente de Knock-Out del 8 sep se regeneró la
+clave del dispositivo; lo que resolvió aquello fue que la caja volviera a entrar con la clave
+nueva, no que a la vieja se le cortara el paso.
 
 ## El procedimiento
 
@@ -28,13 +25,15 @@ en Supabase, cosa que afecta a todas las sesiones.
    Con eso, `delivery-espejo`, `sync-push` y `sync-pull` le contestan 403 en la siguiente vuelta:
    deja de subir ventas, de bajar el catálogo y de ver pedidos de apps.
 
-2. **Solo si además sospechas de la credencial**, regenera la clave del dispositivo. Eso impide
-   que vuelva a entrar; no expulsa al que ya está dentro.
+   Hasta el 9 sep 2026 **`sync-push` y `sync-pull` no comprobaban esto**: una caja desactivada
+   seguía subiendo ventas y bajando el catálogo completo del tenant. Si operas una versión
+   anterior de esas funciones, desactivar no basta.
 
-3. Si de verdad hay que expulsar YA a alguien con un token robado y no basta con el paso 1,
-   la única salida es rotar el JWT secret del proyecto — que invalida **todas** las sesiones de
-   todos los clientes. Es la opción nuclear y tiene su propia nota:
-   el secreto no se rotó en agosto justamente por eso.
+2. **Si además sospechas de la credencial**, regenera la clave del dispositivo. Impide que vuelva
+   a entrar; no expulsa al que ya está dentro.
+
+3. **Si hay que expulsar YA a alguien con un token robado**, borra o banea el usuario del
+   dispositivo en `auth.users`. Eso sí surte efecto en la siguiente llamada.
 
 ## Al revés: reactivar
 
