@@ -419,14 +419,34 @@ test("mismo porcentaje pero distinto régimen (IVA dentro vs. fuera) tampoco se 
   cuadra(r);
 });
 
-test("un hijo a precio cero y tasa distinta no cambia el dinero, solo deja de ir en el nombre", () => {
+test("un hijo a precio cero y tasa distinta va en el nombre igual que sus hermanos", () => {
   const padre = linea({ descripcion: "Combo", totalItemMxn: 175, ivaItemMxn: 24.14, id: "p1", parentId: null, comboRol: "PADRE" });
   const h1 = linea({ descripcion: "Doble", subtotalBrutoMxn: 0, totalItemMxn: 0, ivaItemMxn: 0, id: "h1", parentId: "p1", comboRol: "HIJO" });
   const h2 = linea({ descripcion: "Refresco", tasaIva: 0, subtotalBrutoMxn: 0, totalItemMxn: 0, ivaItemMxn: 0, id: "h2", parentId: "p1", comboRol: "HIJO" });
   const r = armarConceptos([padre, h1, h2], 175);
-  // El de tasa 0 sale como concepto propio de $0.00: no se pierde ni se inventa dinero y el
-  // comprobante sigue cuadrando. Lo que NO puede pasar es que su tasa se declare como la del padre.
+  // La tasa del hijo solo importa cuando hay impuesto que declarar. Aquí no cobra nada, así que se
+  // pliega igual que el hermano al 16 % y el combo sigue siendo UN concepto, como manda el ADR 0015.
   assert.equal(r.total, 175);
-  assert.equal(r.conceptos[0].descripcion, "Combo (Doble)");
+  assert.deepEqual(r.conceptos.map((c) => c.descripcion), ["Combo (Doble, Refresco)"]);
+  cuadra(r);
+});
+
+test("el hijo sin dinero y con tasa distinta se pliega en el nombre del padre", () => {
+  // El caso que el diseño tenía en mente: combo al 16 % con IVA dentro cuyo bolillo va a tasa 0.
+  // El bolillo no cobra un peso —los hijos van a precio 0 por construcción— así que separarlo en
+  // su propio concepto no protege ninguna tasa: solo agrega un renglón con base 0, y el Anexo 20
+  // exige que la base de un traslado sea mayor que cero. Sin dinero de por medio, el hijo aporta
+  // únicamente su nombre, y ahí es donde tiene que ir.
+  const padre = linea({ descripcion: "Combo", totalItemMxn: 175, ivaItemMxn: 24.14, id: "p1", parentId: null, comboRol: "PADRE" });
+  const bolillo = linea({
+    descripcion: "Bolillo", tasaIva: 0, subtotalBrutoMxn: 0, montoModificadoresMxn: 0,
+    totalItemMxn: 0, ivaItemMxn: 0, id: "h1", parentId: "p1", comboRol: "HIJO",
+  });
+  const r = armarConceptos([padre, bolillo], 175);
+  assert.deepEqual(r.conceptos.map((c) => c.descripcion), ["Combo (Bolillo)"]);
+  assert.equal(r.conceptos[0].tasaIva, 16);
+  assert.equal(r.conceptos[0].importe, 150.86);
+  assert.equal(r.conceptos[0].iva, 24.14);
+  assert.equal(r.total, 175);
   cuadra(r);
 });

@@ -344,11 +344,15 @@ ya enviada a cocina** (evita reabrir comandas); sí en venta directa y en cuenta
   facturar); en la otra la aritmética cierra, la red de seguridad `total !== totalTicket` no salta
   y se timbra un comprobante que declara 0.00 % sobre una base de $185 con $1.60 de traslado: una
   factura fiscalmente inválida, en silencio.
-  `colapsarCombos` absorbe en el padre **solo** a los hijos cuya `tasaIva` Y `ivaIncluidoEnPrecio`
-  coincidan con las del padre; los demás salen como concepto propio, igual que el hijo huérfano.
-  Un hijo a precio 0 y sin extras (el caso normal) no aporta importe, así que esto solo cambia el
-  comprobante cuando alguien paga un extra en un componente de tasa distinta. Sigue sin prorratearse
-  impuesto entre hijos.
+  `colapsarCombos` deja como concepto propio —igual que al hijo huérfano— **solo al hijo que
+  además cobra dinero**: el que tiene algo distinto de 0 en `subtotalBrutoMxn`,
+  `montoModificadoresMxn`, `ivaItemMxn` o `totalItemMxn`. El hijo sin dinero se pliega siempre,
+  tenga la tasa que tenga, porque no hay impuesto que declarar mal y sí habría un concepto con base
+  0: el Anexo 20 pide que la base de un traslado sea mayor que cero, así que separarlo arriesga
+  volver a bloquear el timbrado en el caso normal (los hijos van a precio 0 por construcción) y de
+  paso le quita al cliente el nombre de ese componente. O sea que esto solo cambia el comprobante
+  cuando alguien paga un extra en un componente de tasa distinta. Sigue sin prorratearse impuesto
+  entre hijos.
 
 ## 9. Reportes
 
