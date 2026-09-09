@@ -207,6 +207,8 @@ export type Producto = {
   clave_sat: string | null;
   tasa_iva: number;
   iva_incluido_en_precio: boolean;
+  /** true = producto padre de un combo (ADR 0015); se administra desde combos.ts, no desde este formulario. */
+  es_combo: boolean;
 };
 
 type FilaProd = Omit<Producto, "categoriaNombre"> & { categoria: { nombre: string } | null };
@@ -215,7 +217,7 @@ export async function listarProductos(): Promise<Producto[]> {
   const { data, error } = await supabase
     .from("productos")
     .select(
-      "id, nombre, descripcion, codigo_interno, precio_base_mxn, categoria_id, estado, agotado_manual, visible_en_pos, marca_virtual_id, area_cocina_id, clave_sat, tasa_iva, iva_incluido_en_precio, categoria:categorias(nombre)",
+      "id, nombre, descripcion, codigo_interno, precio_base_mxn, categoria_id, estado, agotado_manual, visible_en_pos, marca_virtual_id, area_cocina_id, clave_sat, tasa_iva, iva_incluido_en_precio, es_combo, categoria:categorias(nombre)",
     )
     .is("deleted_at", null)
     .order("orden_visualizacion", { ascending: true });
@@ -236,6 +238,7 @@ export async function listarProductos(): Promise<Producto[]> {
     clave_sat: f.clave_sat ?? null,
     tasa_iva: Number(f.tasa_iva),
     iva_incluido_en_precio: f.iva_incluido_en_precio,
+    es_combo: Boolean(f.es_combo),
   }));
 }
 
@@ -243,7 +246,7 @@ export async function obtenerProducto(id: string): Promise<Producto | null> {
   const { data, error } = await supabase
     .from("productos")
     .select(
-      "id, nombre, descripcion, codigo_interno, precio_base_mxn, categoria_id, estado, agotado_manual, visible_en_pos, marca_virtual_id, area_cocina_id, clave_sat, tasa_iva, iva_incluido_en_precio, categoria:categorias(nombre)",
+      "id, nombre, descripcion, codigo_interno, precio_base_mxn, categoria_id, estado, agotado_manual, visible_en_pos, marca_virtual_id, area_cocina_id, clave_sat, tasa_iva, iva_incluido_en_precio, es_combo, categoria:categorias(nombre)",
     )
     .eq("id", id)
     .is("deleted_at", null)
@@ -267,6 +270,7 @@ export async function obtenerProducto(id: string): Promise<Producto | null> {
     clave_sat: f.clave_sat ?? null,
     tasa_iva: Number(f.tasa_iva),
     iva_incluido_en_precio: f.iva_incluido_en_precio,
+    es_combo: Boolean(f.es_combo),
   };
 }
 
