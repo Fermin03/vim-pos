@@ -1,6 +1,7 @@
 "use client";
 import { employeeClient } from "./supabase";
 import type { LineaCarrito, ModoServicio } from "./carrito";
+import { componentesJsonb } from "./cuenta-mesa";
 
 export type MetodoPago =
   | "EFECTIVO"
@@ -84,14 +85,24 @@ export async function persistirTicket(
   }
 
   for (const l of lineas) {
-    const { error } = await sb.rpc("agregar_item_a_ticket", {
-      p_ticket_id: tid,
-      p_producto_id: l.producto.id,
-      p_cantidad: l.cantidad,
-      p_nota_cocina: l.notaCocina,
-      p_modificadores: modifsJsonb(l),
-      p_client_id_local: l.clientId,
-    });
+    const { error } = l.combo
+      ? await sb.rpc("agregar_combo_a_ticket", {
+          p_ticket_id: tid,
+          p_combo_producto_id: l.producto.id,
+          p_cantidad: l.cantidad,
+          p_componentes: componentesJsonb(l.combo.componentes),
+          p_modificadores: modifsJsonb(l),
+          p_nota_cocina: l.notaCocina,
+          p_client_id_local: l.clientId,
+        })
+      : await sb.rpc("agregar_item_a_ticket", {
+          p_ticket_id: tid,
+          p_producto_id: l.producto.id,
+          p_cantidad: l.cantidad,
+          p_nota_cocina: l.notaCocina,
+          p_modificadores: modifsJsonb(l),
+          p_client_id_local: l.clientId,
+        });
     if (error) throw new Error(error.message);
   }
 
