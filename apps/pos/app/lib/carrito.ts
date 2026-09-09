@@ -2,6 +2,7 @@
 import type { Producto } from "./catalogo";
 import type { GrupoModificadores, OpcionModificador } from "./modificadores";
 import type { ClienteDomicilio } from "./clientes-domicilio";
+import type { ComboDef, ComponenteSel } from "./combos";
 
 export type ModoServicio = "COMER_AQUI" | "PARA_LLEVAR" | "DRIVE_THRU" | "DELIVERY_PROPIO";
 
@@ -19,6 +20,9 @@ export type LineaCarrito = {
   cantidad: number;
   modificadores: ModificadorSel[];
   notaCocina: string | null;
+  /** Solo líneas de combo: el padre es `producto`, los hijos son `componentes`. `precioUnitario` se
+   *  congela al confirmar (precioCombo) para que la línea no dependa del catálogo después. */
+  combo?: { def: ComboDef; componentes: ComponenteSel[]; precioUnitario: number };
 };
 
 export type EstadoCarrito = {
@@ -35,6 +39,7 @@ export const estadoInicial: EstadoCarrito = { modoServicio: "COMER_AQUI", lineas
 
 export type AccionCarrito =
   | { tipo: "agregar"; linea: LineaCarrito }
+  | { tipo: "reemplazar"; linea: LineaCarrito }
   | { tipo: "cantidad"; clientId: string; cantidad: number }
   | { tipo: "quitar"; clientId: string }
   | { tipo: "modo"; modo: ModoServicio }
@@ -49,6 +54,9 @@ export function reducerCarrito(estado: EstadoCarrito, accion: AccionCarrito): Es
   switch (accion.tipo) {
     case "agregar":
       return { ...estado, lineas: [...estado.lineas, accion.linea] };
+    case "reemplazar":
+      // Sustituye la línea EN SU LUGAR (edición de combo desde el ticket): no se debe reordenar.
+      return { ...estado, lineas: estado.lineas.map((l) => (l.clientId === accion.linea.clientId ? accion.linea : l)) };
     case "cargar":
       // T2 — reemplaza el carrito completo (reconstrucción desde un ticket persistido de mesa).
       return accion.estado;
@@ -85,10 +93,19 @@ export function reducerCarrito(estado: EstadoCarrito, accion: AccionCarrito): Es
 
 const r2 = (n: number): number => Math.round(n * 100) / 100;
 
-/** Precio unitario de una línea: base + suma de modificadores (precio_extra * cantidad de cada modif). */
+const extrasDe = (mods: ModificadorSel[]): number => mods.reduce((acc, m) => acc + m.precioExtra * m.cantidad, 0);
+
+/**
+ * Precio unitario de una línea. Línea normal: base + extras de sus propios modificadores.
+ * Línea de combo: precio del combo YA CONGELADO (no se recalcula del catálogo) + extras del
+ * propio padre + extras de cada componente (cada uno multiplicado por su propia cantidad).
+ */
 export function precioUnitarioLinea(l: LineaCarrito): number {
-  const modif = l.modificadores.reduce((acc, m) => acc + m.precioExtra * m.cantidad, 0);
-  return r2(l.producto.precio_base_mxn + modif);
+  if (l.combo) {
+    const extrasHijos = l.combo.componentes.reduce((acc, c) => acc + extrasDe(c.modificadores) * c.cantidad, 0);
+    return r2(l.combo.precioUnitario + extrasDe(l.modificadores) + extrasHijos);
+  }
+  return r2(l.producto.precio_base_mxn + extrasDe(l.modificadores));
 }
 
 /** Total bruto de una línea (precio unitario * cantidad). */
