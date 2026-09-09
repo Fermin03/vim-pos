@@ -76,6 +76,17 @@ jobs:
         # configurado, `next lint` es interactivo).
         run: pnpm -r test
 
+      - name: Pruebas de las Edge Functions
+        # supabase/functions es código Deno y no está en el workspace de pnpm, así que sus
+        # módulos puros se prueban con el runner de Node (--experimental-strip-types, 22.6+).
+        # No dependen de node_modules: solo de `node:` y de sus propios archivos.
+        #
+        # 9/09/2026 — se sumaron aquí y en el job `desktop`. Existían desde hacía meses y el CI
+        # no las corría: el gate del escritorio era `node --check`, que comprueba que el archivo
+        # PARSEA y nada más. Una regresión en el ciclo de sync, en el espejo de pedidos o en el
+        # cálculo de un delta pasaba el CI entera sin que nadie la viera.
+        run: pnpm test:functions
+
       - name: Auditoría de dependencias — BLOQUEANTE (lo que se despliega)
         # Sin `|| true`: si una dependencia de producción tiene una CVE alta, el merge se detiene.
         run: pnpm audit --prod --audit-level=high
@@ -111,6 +122,21 @@ jobs:
       - name: Las fuentes parsean
         working-directory: desktop
         run: node --check src/main.mjs && for f in src/*.mjs scripts/*.mjs; do node --check "$f"; done
+
+      - name: Dependencias mínimas para las pruebas
+        # Solo las tres de producción (pg, embedded-postgres, jsonwebtoken) y sin postinstall.
+        # electron y electron-builder son devDependencies: pesan cientos de megas y `node --test`
+        # no los toca. Comprobado: con esto las 85 pruebas corren enteras.
+        working-directory: desktop
+        run: npm ci --omit=dev --ignore-scripts
+
+      - name: Pruebas del escritorio
+        # Corren sobre el mismo Node 20 del paso anterior a propósito: es el que empaqueta
+        # Electron, así que se prueban contra la versión que de verdad las va a ejecutar en la
+        # caja del cliente. Los verify:* de extremo a extremo siguen fuera: necesitan el Postgres
+        # embebido de Windows.
+        working-directory: desktop
+        run: node --test src/*.test.mjs
 
   rls-tests:
     runs-on: ubuntu-latest
