@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { planificarEspejo, filaLocal, puedeCrear, COLUMNAS_PEDIDO } from "./delivery-espejo-plan.mjs";
+import { planificarEspejo, filaLocal, puedeCrear, cursorDe, COLUMNAS_PEDIDO } from "./delivery-espejo-plan.mjs";
 
 const CAJA = "cccccccc-0000-0000-0000-0000000000cc";
 const OTRA = "cccccccc-0000-0000-0000-0000000000c2";
@@ -63,4 +63,34 @@ test("planificarEspejo: avisa cuando la app canceló un pedido con ticket local;
   });
   assert.deepEqual(r.aCrear, ["pronto", "tarde"]);
   assert.deepEqual(r.avisos, [{ pedidoId: "canc", motivo: "La app canceló este pedido: cancela el ticket en caja" }]);
+});
+
+// ── Cursor del delta ─────────────────────────────────────────────────────────
+// El cursor vive en memoria del agente y NO se espeja: el trigger set_updated_at pisa updated_at
+// con el reloj local en cada UPDATE, así que la copia local no sirve para preguntarle a la nube
+// "¿qué cambió desde…?". Un reinicio de la caja hace arranque en frío y ya.
+
+test("el cursor avanza al updated_at más nuevo de lo que llegó", () => {
+  const filas = [{ updated_at: "2026-09-09T10:00:00Z" }, { updated_at: "2026-09-09T10:05:00Z" }];
+  assert.equal(cursorDe(filas, null), "2026-09-09T10:05:00Z");
+});
+
+test("sin filas, el cursor se queda donde estaba", () => {
+  assert.equal(cursorDe([], "2026-09-09T10:05:00Z"), "2026-09-09T10:05:00Z");
+});
+
+test("el cursor nunca retrocede", () => {
+  const filas = [{ updated_at: "2026-09-09T09:00:00Z" }];
+  assert.equal(cursorDe(filas, "2026-09-09T10:05:00Z"), "2026-09-09T10:05:00Z");
+});
+
+test("una fila sin updated_at usable no mueve el cursor ni lo rompe", () => {
+  const filas = [{ updated_at: null }, { updated_at: "no es fecha" }, {}];
+  assert.equal(cursorDe(filas, "2026-09-09T10:05:00Z"), "2026-09-09T10:05:00Z");
+  assert.equal(cursorDe(filas, null), null);
+});
+
+test("compara por instante, no por texto: distinta precisión y huso siguen ordenándose bien", () => {
+  const filas = [{ updated_at: "2026-09-09T10:05:00.123456+00:00" }];
+  assert.equal(cursorDe(filas, "2026-09-09T04:00:00-06:00"), "2026-09-09T10:05:00.123456+00:00");
 });

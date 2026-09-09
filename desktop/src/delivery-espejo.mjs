@@ -1,12 +1,17 @@
-// Agente de espejo de pedidos de apps (spec 2026-09-03). Cada 10 s, con el token de dispositivo:
+// Agente de espejo de pedidos de apps (spec 2026-09-03; delta y ritmo 2026-09-09). Con el token
+// de dispositivo, al ritmo que le diga la nube:
 //   1) delivery-espejo → conexiones y pedidos de la sucursal (y sella el latido de la caja);
 //   2) los espeja en la base local (mismas tablas);
 //   3) para los pedidos que le tocan a esta caja, crea el ticket LOCAL (folio local, KDS, comanda)
 //      y acepta en Uber vía delivery-accion;
 //   4) deja aviso si la app canceló un pedido que ya tiene ticket local.
 // Sin nube, el ciclo se salta y la pantalla sigue mostrando lo último espejado.
-import { planificarEspejo, COLUMNAS_PEDIDO, COLUMNAS_CONEXION } from "./delivery-espejo-plan.mjs";
+import { planificarEspejo, cursorDe, COLUMNAS_PEDIDO, COLUMNAS_CONEXION } from "./delivery-espejo-plan.mjs";
+import { cadenciaAceptada, esperaEspejo } from "./delivery-espejo-ritmo.mjs";
 
+// Ritmo de arranque y de respaldo: lo que se usa hasta que la nube diga otra cosa (y para
+// siempre si la nube es más vieja que la caja). El ritmo real lo decide el servidor, que es el
+// único que sabe si este cliente tiene delivery conectado y si hay pedidos vivos.
 export const ESPEJO_CADA_MS = 10_000;
 const TOKEN_TTL_MS = 20 * 60_000;
 
@@ -44,11 +49,23 @@ export function resumenToken(jwt, ahora = Date.now()) {
  *          con `forzar: true` debe hacer login nuevo, sin caché: se pide tras un 401).
  *  - cajaId: uuid de esta caja (del correo del dispositivo).
  */
-export function crearEspejo({ pool, nube, cajaId, log = () => {}, cadaMs = ESPEJO_CADA_MS, fetchFn = fetch }) {
+export function crearEspejo({
+  pool, nube, cajaId, log = () => {}, cadaMs = ESPEJO_CADA_MS, fetchFn = fetch,
+  setTimeoutFn = setTimeout, clearTimeoutFn = clearTimeout, aleatorio = Math.random,
+}) {
   let timer = null;
   let corriendo = false;
+  let detenido = false;
   let tokenCache = null; // { opts, at }
   let forzarLogin = false; // tras un 401: el siguiente token se pide sin caché, también arriba (main.mjs)
+  // Hasta dónde llegó el último delta. Vive SOLO en memoria a propósito: el trigger
+  // set_updated_at pisa updated_at con el reloj local en cada UPDATE, así que la copia espejada
+  // no sirve para preguntarle a la nube "¿qué cambió desde…?". Un reinicio hace arranque en frío
+  // (la nube manda entonces la ventana de 24 h completa), que es una consulta cara UNA vez.
+  let cursor = null;
+  let cadencia = cadenciaAceptada(cadaMs, cadaMs);
+  let fallos = 0;
+  let pendiente = false; // quedó trabajo local a medias: no dormirse aunque la nube diga reposo
 
   async function opcionesNube() {
     if (!forzarLogin && tokenCache && Date.now() - tokenCache.at < TOKEN_TTL_MS) return tokenCache.opts;
@@ -85,18 +102,25 @@ export function crearEspejo({ pool, nube, cajaId, log = () => {}, cadaMs = ESPEJ
     corriendo = true;
     try {
       const opts = await opcionesNube();
-      if (!opts) return { omitido: "sin nube" };
-      const r = await llamar(opts, "delivery-espejo", {});
-      if (!r.ok) { log(`espejo HTTP ${r.status} ${r.body?.error ?? ""}`); return { error: r.status }; }
-      const { conexiones = [], pedidos = [], sucursal_id: sucursalId } = r.body;
+      if (!opts) { fallos++; return { omitido: "sin nube" }; }
+      // `desde` es el cursor del delta: la nube manda solo lo que cambió después de ese instante.
+      // Sin cursor (arranque) pide la ventana completa, como siempre.
+      const r = await llamar(opts, "delivery-espejo", { desde: cursor ?? undefined });
+      if (!r.ok) { fallos++; log(`espejo HTTP ${r.status} ${r.body?.error ?? ""}`); return { error: r.status }; }
+      fallos = 0;
+      const { conexiones = [], pedidos = [], sucursal_id: sucursalId, siguiente_en_ms: siguiente } = r.body;
+      cadencia = cadenciaAceptada(siguiente, cadaMs);
 
-      const ids = pedidos.map((p) => p.id);
-      const { rows: localPedidos } = ids.length
-        ? await pool.query(`SELECT id, ticket_id, estado FROM delivery_pedidos WHERE id = ANY($1::uuid[])`, [ids])
-        : { rows: [] };
-      const { rows: turnos } = await pool.query(
-        `SELECT 1 FROM turnos WHERE sucursal_id = $1 AND estado = 'ABIERTO' LIMIT 1`, [sucursalId]);
-      const plan = planificarEspejo({ conexiones, pedidos, localPedidos, turnoAbierto: turnos.length > 0, cajaId });
+      // Con el delta vacío no hay nada que planear: ni consultar la copia local ni preguntar por
+      // el turno. Esa es la vuelta normal de un cliente sin delivery, y tiene que salir casi gratis.
+      let plan = { upserts: [], aCrear: [], avisos: [] };
+      if (pedidos.length) {
+        const { rows: localPedidos } = await pool.query(
+          `SELECT id, ticket_id, estado FROM delivery_pedidos WHERE id = ANY($1::uuid[])`, [pedidos.map((p) => p.id)]);
+        const { rows: turnos } = await pool.query(
+          `SELECT 1 FROM turnos WHERE sucursal_id = $1 AND estado = 'ABIERTO' LIMIT 1`, [sucursalId]);
+        plan = planificarEspejo({ conexiones, pedidos, localPedidos, turnoAbierto: turnos.length > 0, cajaId });
+      }
 
       // Espejo en una transacción.
       const client = await pool.connect();
@@ -111,8 +135,13 @@ export function crearEspejo({ pool, nube, cajaId, log = () => {}, cadaMs = ESPEJ
         throw e;
       } finally { client.release(); }
 
+      // El cursor avanza SOLO cuando la copia local ya cuajó. Si se adelantara y la transacción
+      // fallara, el siguiente delta empezaría después de esas filas y el pedido no volvería a
+      // llegar nunca: los vivos sí se remandan siempre, pero uno recién cancelado no.
+      cursor = cursorDe(pedidos, cursor);
+
       // Tickets que le tocan a esta caja.
-      let creados = 0, aceptados = 0;
+      let creados = 0, aceptados = 0, reintentables = 0;
       for (const id of plan.aCrear) {
         const pedido = pedidos.find((p) => p.id === id);
         const conexion = conexiones.find((c) => c.id === pedido?.conexion_id);
@@ -126,17 +155,22 @@ export function crearEspejo({ pool, nube, cajaId, log = () => {}, cadaMs = ESPEJ
           const codigo = m.includes("SIN_TURNO_ABIERTO") ? "SIN_TURNO_ABIERTO" : m.includes("ITEM_SIN_MAPEAR") ? "ITEM_SIN_MAPEAR" : m;
           await pool.query(`UPDATE delivery_pedidos SET ultimo_error = $2 WHERE id = $1`, [id, codigo]).catch(() => {});
           log(`pedido ${pedido?.folio_corto ?? id}: no se pudo crear el ticket local (${codigo})`);
+          reintentables++;
           continue;
         }
         if (pedido?.estado === "RECIBIDO") {
           const ac = await llamar(opts, "delivery-accion", { accion: "aceptar", pedido_id: id, tiempo_prep_min: conexion?.tiempo_prep_min ?? 15 });
           if (ac.ok || ac.body?.error === "ACCION_INVALIDA") aceptados++;
-          else log(`pedido ${pedido?.folio_corto ?? id}: accept en Uber falló (${ac.body?.error ?? ac.status}); se reintenta`);
+          else { reintentables++; log(`pedido ${pedido?.folio_corto ?? id}: accept en Uber falló (${ac.body?.error ?? ac.status}); se reintenta`); }
         }
       }
+      // Un reclamo que otra caja ganó NO cuenta: ese pedido ya no es de aquí y volver pronto no
+      // lo arregla. Solo cuenta lo que este equipo puede reintentar con provecho.
+      pendiente = reintentables > 0;
       if (creados || aceptados || plan.avisos.length) log(`${pedidos.length} pedidos espejados · ${creados} tickets creados · ${aceptados} aceptados · ${plan.avisos.length} avisos`);
       return { espejados: pedidos.length, creados, aceptados, avisos: plan.avisos.length };
     } catch (e) {
+      fallos++;
       log(`tick falló: ${e?.message ?? e}`);
       return { error: String(e?.message ?? e) };
     } finally {
@@ -144,9 +178,29 @@ export function crearEspejo({ pool, nube, cajaId, log = () => {}, cadaMs = ESPEJ
     }
   }
 
+  function programar(ms) {
+    if (timer) clearTimeoutFn(timer);
+    timer = null;
+    if (detenido) return;
+    timer = setTimeoutFn(() => { vuelta().catch(() => {}); }, ms);
+    timer?.unref?.(); // un temporizador pendiente no debe impedir que la app cierre
+  }
+
+  /** Una vuelta completa: sondear y dejar programada la siguiente. */
+  async function vuelta() {
+    try {
+      await tick();
+    } finally {
+      programar(esperaEspejo({ cadencia, fallos, pendiente, aleatorio }));
+    }
+  }
+
   return {
     tick,
-    iniciar() { if (timer) return; timer = setInterval(() => { tick(); }, cadaMs); tick(); log("agente iniciado"); },
-    detener() { if (timer) clearInterval(timer); timer = null; },
+    vuelta,
+    /** Para diagnóstico: a qué ritmo va y por qué. */
+    estado() { return { cadencia, fallos, pendiente, cursor, armado: timer !== null }; },
+    iniciar() { if (timer) return; detenido = false; vuelta().catch(() => {}); log("agente iniciado"); },
+    detener() { detenido = true; if (timer) clearTimeoutFn(timer); timer = null; },
   };
 }
