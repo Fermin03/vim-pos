@@ -227,13 +227,15 @@ Recetas). Rutas:
 | Ruta | Qué hace |
 |---|---|
 | `/catalogo/combos` | lista: nombre, categoría, precio base, nº de slots, estado; crear, pausar, borrar (soft) |
-| `/catalogo/combos/nuevo` | paso 1: datos del producto (nombre, categoría, precio base, clave SAT sugerida `90101503`, IVA, visible en caja). Crea el producto con `es_combo` y redirige al editor |
+| `/catalogo/combos/nuevo` | paso 1: datos del producto (nombre, categoría, precio base, clave SAT sugerida `90101503`, IVA). Crea el producto con `es_combo` **en estado `PAUSADO`** —al crearlo no tiene ni un slot, y una caja sin la 0.4.65 lo vendería al precio base sin cocinar nada— y redirige al editor. No hay selector de estado ni de visibilidad: el dueño lo publica desde el editor cuando ya tiene slots |
 | `/catalogo/combos/[id]` | editor de slots + vista previa |
 
 Componentes nuevos: `combo-form.tsx` (datos del producto, reutiliza campos de `producto-form.tsx`
 sin receta, sin área de cocina, sin código de barras), `combo-slots-editor.tsx` (lista ordenable
-de slots; por slot: nombre, mínimo, máximo, modo de precio, fuente = categoría o lista; tabla de
-opciones con producto, delta, default, activa), `combo-preview.tsx` (calcula "Con Clásica $150 ·
+de slots; por slot: nombre, mínimo, modo de precio, fuente = categoría o lista; tabla de
+opciones con producto, delta, default, activa; el máximo queda fijo en 1 hasta que la caja sepa
+atender un slot múltiple —hoy no abriría el grupo de modificadores obligatorio de cada opción, así
+que una hamburguesa se iría a cocina sin término), `combo-preview.tsx` (calcula "Con Clásica $150 ·
 Con Doble $155 · Aros +$15" con la misma función de precio que la caja, extraída a
 `packages/` o duplicada en `apps/admin/app/lib/combos.ts` con prueba de paridad).
 
@@ -334,17 +336,44 @@ ya enviada a cocina** (evita reabrir comandas); sí en venta directa y en cuenta
   en el padre.
 - Los tres consumidores (`timbrar-cfdi`, `autofacturar`, `timbrar-global`) agregan las tres
   columnas al `select`; `timbrar-global` no cambia de lógica (un concepto por ticket y tasa).
-- Hijos con tasa distinta al padre: se asume la del padre (alimentos preparados para consumo,
-  16 %). Se documenta en el ADR; no se prorratea impuesto entre hijos.
+- Hijos con tasa distinta al padre: **NO se asume la del padre** (corregido en la revisión final
+  de la rama; la redacción anterior decía lo contrario y era un bug con nombre de decisión). El
+  `iva_item_mxn` del hijo se calculó A SU TASA: meterlo dentro de un concepto que declara la tasa
+  del padre rompe la correspondencia entre la tasa declarada y el impuesto trasladado. En una
+  dirección revienta al armar (descuento negativo → `ConceptosIncoherentes` → el cliente no puede
+  facturar); en la otra la aritmética cierra, la red de seguridad `total !== totalTicket` no salta
+  y se timbra un comprobante que declara 0.00 % sobre una base de $185 con $1.60 de traslado: una
+  factura fiscalmente inválida, en silencio.
+  `colapsarCombos` absorbe en el padre **solo** a los hijos cuya `tasaIva` Y `ivaIncluidoEnPrecio`
+  coincidan con las del padre; los demás salen como concepto propio, igual que el hijo huérfano.
+  Un hijo a precio 0 y sin extras (el caso normal) no aporta importe, así que esto solo cambia el
+  comprobante cuando alguien paga un extra en un componente de tasa distinta. Sigue sin prorratearse
+  impuesto entre hijos.
 
 ## 9. Reportes
 
-Regla para toda consulta de ventas por producto (dashboard del admin, ventas por categoría,
-top 10 "Populares" del POS): **excluir `combo_rol = 'PADRE'` y, en hijos, usar
-`precio_asignado_mxn × cantidad` en lugar de `total_item_mxn`**. Se crea la vista
-`v_ventas_por_producto` en 0110 que ya aplica la regla y las consultas existentes se apuntan a
-ella. El dashboard agrega la tarjeta "Combos vendidos" (conteo de padres) y el combo aparece en
-"Populares" como producto propio (los padres cuentan para popularidad, no para mezcla).
+Regla para toda consulta de ventas por producto (dashboard del admin, ventas por categoría, ventas
+por área de cocina): **excluir `combo_rol = 'PADRE'` y, en hijos, sumar `precio_asignado_mxn` tal
+cual, sin multiplicar por la cantidad.** `precio_asignado_mxn` YA es un importe de línea completo
+—la RPC lo calcula sobre `v_total_padre`, que incluye `p_cantidad`—, así que multiplicarlo otra vez
+por la cantidad duplicaría el importe justo cuando se venden dos combos: exactamente el doble
+conteo que el ADR quiere evitar. (La redacción anterior decía "× cantidad"; se corrige aquí porque
+un spec que contradice al código correcto acaba "arreglando" el código.)
+
+En vez de crear una vista nueva `v_ventas_por_producto`, 0110 **reescribe las tres vistas `vw_*`
+que ya existían** (`vw_ventas_por_categoria`, `vw_ventas_por_producto`, `vw_ventas_por_area_cocina`)
+para que apliquen la regla. Es mejor decisión: todos los consumidores actuales la heredan sin
+tocarlos y no queda una vista vieja al lado, lista para que alguien la consulte por error.
+
+El IVA de la rebanada del hijo se deriva con los atributos fiscales **DEL PADRE** (`tasa_iva_snapshot`
+e `iva_incluido_en_precio_snapshot` de la fila `parent_item_id`), no con los del hijo: el dinero al
+que se aplica viene del precio del padre y lleva su carácter fiscal. Y cuando el padre cobra con
+**IVA por afuera**, la rebanada es un importe NETO: hay que sumarle el IVA derivado a `total_mxn`,
+o el reporte queda corto por el impuesto y la fila se contradice a sí misma.
+
+El dashboard agrega el mosaico "Combos vendidos" (conteo de padres). Los combos **no** aparecen en
+el top "Populares": esa lista sale de las vistas, que excluyen al padre a propósito, así que un
+combo no compite ahí con sus propios componentes; el mosaico ocupa ese lugar.
 
 ## 10. Escritorio
 
@@ -362,13 +391,20 @@ ella. El dashboard agrega la tarjeta "Combos vendidos" (conteo de padres) y el c
   mínimo no cubierto, rechazo por producto fuera del slot, rechazo por agotado, extra en hijo
   sube el total, cancelar padre cancela hijos, cancelar hijo falla, `agregar_item_a_ticket` con
   un combo falla, pago descuenta receta de los hijos y nada del padre, idempotencia por
-  `client_id_local`.
+  `client_id_local`, dos componentes con el mismo `client_id_local` rechazados, modificadores en
+  la línea del padre rechazados, y las tres columnas de la vista de ventas (subtotal/IVA/total y
+  su relación) con el padre cobrando con IVA dentro y con IVA por afuera.
 - `supabase/tests/0015_combos.test.sql`: RLS de las dos tablas y del pull.
 - `conceptos.test.ts`: colapso con extra en hijo, con descuento en padre, con dos combos y un
-  producto suelto; cuadre al centavo.
+  producto suelto; cuadre al centavo; y **tasas mixtas** en las dos direcciones (hijo a tasa 0 bajo
+  padre al 16 % y al revés), que es donde el §8 estaba mal. El helper `cuadra()` comprueba además
+  que la tasa que declara cada concepto explique el impuesto que traslada: cuadrar en pesos no
+  basta para que una factura sea válida.
 - `apps/pos`: pruebas de `precioCombo`, del reducer con `reemplazar`, de `reconstruirCarrito`
   con padre e hijos, y de la elegibilidad del aviso.
-- `apps/admin`: paridad `precioCombo` admin vs caja sobre los mismos fixtures.
+- `apps/admin`: paridad `precioCombo` admin vs caja sobre los mismos fixtures — literalmente los
+  mismos: ambas pruebas leen `@vim/db/fixtures-combos` (`packages/db/src/fixtures-combos.ts`), así
+  que una divergencia entre las dos implementaciones rompe algo en vez de pasar desapercibida.
 - `desktop/src/sync-pull.test.mjs`: las dos tablas están en la lista y en orden.
 - Manual en localhost con la semilla Crazy Burgers: crear combo, venderlo, comanda por área,
   ticket, timbrar en sandbox, cancelar, reporte.
@@ -387,8 +423,15 @@ niveles de anidamiento; sin tamaños. DiDi solo admite combos fijos con precio.
 - **Doble conteo en reportes** si alguna consulta no pasa por la vista. Se busca `total_item_mxn`
   en `apps/admin` y `apps/pos` al implementar y se lista en el plan.
 - **Caja vieja con ticket nuevo**: un 0.4.64 que reciba por pull un ticket con combos (cuenta
-  abierta creada en la web) lo verá plano y podría cancelar un hijo suelto. Mitigación: la RPC de
-  cancelación vive en la BD local, que ya tendrá 0110 al arrancar; y las cajas se actualizan solas.
+  abierta creada en la web) lo verá plano y podría cancelar un hijo suelto. La mitigación que decía
+  este spec —"la BD local ya tendrá 0110 al arrancar"— **es falsa** para una caja que todavía no se
+  actualizó: sin la 0.4.65 no hay migración 0110 en su Postgres local, así que no existe `es_combo`,
+  ni `agregar_combo_a_ticket`, ni la guarda dentro de su `agregar_item_a_ticket`. Esa caja pinta al
+  padre como un producto normal y lo vende al precio base (los $45 de "hacerlo combo") sin cocinar
+  nada. Mitigación real: **un combo nuevo nace `PAUSADO`** (`crearCombo` en
+  `apps/admin/app/lib/combos.ts`) y el dueño lo publica cuando ya tiene sus slots; una caja vieja
+  filtra por `estado IN ('ACTIVO','AGOTADO')`, así que nunca lo ve. Y las cajas se actualizan solas,
+  salvo si quedaron rotas (ver el incidente de las 0.4.60–0.4.62).
 - **Categoría fuente con productos que son opciones de otro slot**: permitido; el precio lo
   fija el slot donde se eligió.
 - **Modificadores del padre vs. del hijo**: "Para llevar" en el padre, "término" en el hijo. La
