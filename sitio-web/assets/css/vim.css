@@ -990,11 +990,14 @@ body[data-menu-abierto="true"] { overflow: hidden; }
 .tira .hueco { min-height: 200px; }
 
 /* El ticket y el corte Z son rollo de papel, no pantalla: se capturan a
-   640×1400 y meterlos en un marco de monitor de 1100 px de ancho los deja
-   nadando en el centro. Van estrechos y sin barra de ventana. */
-.figura-papel { align-items: flex-start; }
-.figura-papel .monitor { max-width: 340px; background: var(--bg); }
+   640×1400 y dentro de un marco de monitor de 1100 px de ancho el papel se
+   queda pegado a un lado, con media ventana vacía al otro. El marco se ajusta
+   al ancho del rollo, se centra en la columna y pierde la barra de ventana:
+   un ticket no sale de un navegador. */
+.figura-papel { align-items: center; }
+.figura-papel .monitor { max-width: min(480px, 100%); background: var(--bg); }
 .figura-papel .monitor-barra { display: none; }
+.figura-papel figcaption { text-align: center; }
 .figura-papel .hueco { min-height: 380px; }
 
 /* ==========================================================================
