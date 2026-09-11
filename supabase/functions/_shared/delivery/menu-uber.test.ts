@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { centavos, construirMenuUber, idValidoUber } from "./menu-uber.ts";
+import { armarCombosCarta, armarGruposModificadorCarta, centavos, construirMenuUber, idValidoUber, type ProductoCarta } from "./menu-uber.ts";
 
 const cats = [
   { id: "c-bebidas", nombre: "Bebidas", orden: 2 },
@@ -305,4 +305,133 @@ test("lo mismo por el otro camino: n_slots=0 excluye al padre por «combo sin sl
   assert.deepEqual(r.excluidos.map((e) => [e.id, e.motivo]), [["c1", "combo sin slots"]]);
   assert.deepEqual(r.menu.modifier_groups, []);
   assert.equal(r.combos, 0);
+});
+
+// --- Task 5: armarCombosCarta / armarGruposModificadorCarta ----------------
+//
+// `armarCombosCarta` es el contrato entre la carta que se publica en Uber y la RPC
+// `agregar_combo_a_ticket` (0111_combos.sql:338-350): el mismo producto tiene que ser opción
+// válida de un slot en los dos lados, o un pedido entra por Uber y revienta al crear el ticket,
+// con el cliente ya cobrado. Cada prueba reproduce una regla de esas líneas, una por caso.
+
+const PRODUCTOS_SLOT: ProductoCarta[] = [
+  { id: "p-normal", nombre: "Normal", precio_base_mxn: 100, categoria_id: "cat-a" },
+  { id: "p-delta", nombre: "Con delta", precio_base_mxn: 80, categoria_id: "cat-a" },
+  { id: "p-excluido", nombre: "Excluido", precio_base_mxn: 90, categoria_id: "cat-a" },
+  { id: "p-agotado", nombre: "Agotado", precio_base_mxn: 70, categoria_id: "cat-a", agotado: true },
+  { id: "p-oculto", nombre: "Oculto", precio_base_mxn: 60, categoria_id: "cat-a", visible: false },
+  { id: "p-combo-anidado", nombre: "Combo anidado", precio_base_mxn: 200, categoria_id: "cat-a", es_combo: true },
+  { id: "p-otra-cat", nombre: "De otra categoría", precio_base_mxn: 50, categoria_id: "cat-b" },
+];
+
+test("slot por categoría: producto de la categoría sin fila explícita se publica con delta 0 (0111_combos.sql:344-346, rama ELSIF)", () => {
+  const slots = [{ id: "s-cat", combo_producto_id: "c1", nombre: "Slot", orden_visualizacion: 1,
+                   minimo_selecciones: 1, maximo_selecciones: 1, modo_precio: "DELTA", categoria_id: "cat-a" }];
+  const r = armarCombosCarta(PRODUCTOS_SLOT, slots, []);
+  const opciones = r[0]!.slots[0]!.opciones;
+  assert.deepEqual(opciones.find((o) => o.producto_id === "p-normal"), { producto_id: "p-normal", importe_mxn: 0 });
+});
+
+test("slot por categoría: fila explícita activa aporta su delta (0111_combos.sql:340-343, IF FOUND + activa)", () => {
+  const slots = [{ id: "s-cat", combo_producto_id: "c1", nombre: "Slot", orden_visualizacion: 1,
+                   minimo_selecciones: 1, maximo_selecciones: 1, modo_precio: "DELTA", categoria_id: "cat-a" }];
+  const comboOpciones = [{ grupo_id: "s-cat", producto_id: "p-delta", precio_delta_mxn: 15, activa: true }];
+  const r = armarCombosCarta(PRODUCTOS_SLOT, slots, comboOpciones);
+  const opciones = r[0]!.slots[0]!.opciones;
+  assert.deepEqual(opciones.find((o) => o.producto_id === "p-delta"), { producto_id: "p-delta", importe_mxn: 15 });
+});
+
+test("slot por categoría: fila explícita inactiva excluye al producto (0111_combos.sql:341-342)", () => {
+  const slots = [{ id: "s-cat", combo_producto_id: "c1", nombre: "Slot", orden_visualizacion: 1,
+                   minimo_selecciones: 1, maximo_selecciones: 1, modo_precio: "DELTA", categoria_id: "cat-a" }];
+  const comboOpciones = [{ grupo_id: "s-cat", producto_id: "p-excluido", precio_delta_mxn: 0, activa: false }];
+  const r = armarCombosCarta(PRODUCTOS_SLOT, slots, comboOpciones);
+  const opciones = r[0]!.slots[0]!.opciones;
+  assert.equal(opciones.some((o) => o.producto_id === "p-excluido"), false);
+  // el resto de la categoría (sin fila) sigue publicándose: la exclusión es puntual, no vacía el slot.
+  assert.ok(opciones.some((o) => o.producto_id === "p-normal"));
+});
+
+test("slot por categoría: agotado, oculto o combo anidado nunca son opción, tengan o no fila explícita", () => {
+  const slots = [{ id: "s-cat", combo_producto_id: "c1", nombre: "Slot", orden_visualizacion: 1,
+                   minimo_selecciones: 1, maximo_selecciones: 1, modo_precio: "DELTA", categoria_id: "cat-a" }];
+  // Con fila explícita activa (que en la categoría solo debería aportar delta): igual quedan fuera.
+  const comboOpciones = [
+    { grupo_id: "s-cat", producto_id: "p-agotado", precio_delta_mxn: 0, activa: true },
+    { grupo_id: "s-cat", producto_id: "p-oculto", precio_delta_mxn: 0, activa: true },
+    { grupo_id: "s-cat", producto_id: "p-combo-anidado", precio_delta_mxn: 0, activa: true },
+  ];
+  const r = armarCombosCarta(PRODUCTOS_SLOT, slots, comboOpciones);
+  const ids = r[0]!.slots[0]!.opciones.map((o) => o.producto_id);
+  assert.equal(ids.includes("p-agotado"), false);
+  assert.equal(ids.includes("p-oculto"), false);
+  assert.equal(ids.includes("p-combo-anidado"), false);
+  // y un producto de otra categoría tampoco, aunque esté vendible.
+  assert.equal(ids.includes("p-otra-cat"), false);
+});
+
+test("slot sin categoria_id: solo las filas explícitas activas, nada más (0111_combos.sql:344-349, sin rama ELSIF)", () => {
+  const slots = [{ id: "s-libre", combo_producto_id: "c1", nombre: "Slot libre", orden_visualizacion: 1,
+                   minimo_selecciones: 1, maximo_selecciones: 1, modo_precio: "DELTA", categoria_id: null }];
+  const comboOpciones = [
+    { grupo_id: "s-libre", producto_id: "p-normal", precio_delta_mxn: 5, activa: true },
+    { grupo_id: "s-libre", producto_id: "p-otra-cat", precio_delta_mxn: 0, activa: true },
+    { grupo_id: "s-libre", producto_id: "p-excluido", precio_delta_mxn: 0, activa: false }, // inactiva: no cuenta
+    { grupo_id: "s-libre", producto_id: "p-agotado", precio_delta_mxn: 0, activa: true },    // activa pero no vendible
+  ];
+  const r = armarCombosCarta(PRODUCTOS_SLOT, slots, comboOpciones);
+  const ids = r[0]!.slots[0]!.opciones.map((o) => o.producto_id).sort();
+  // p-delta NUNCA aparece: no hay fila explícita para él y el slot no tiene categoría.
+  assert.deepEqual(ids, ["p-normal", "p-otra-cat"]);
+});
+
+test("importe: SUMA_PRECIO_PRODUCTO suma el precio del producto más el delta; DELTA solo el delta", () => {
+  const slots = [
+    { id: "s-suma", combo_producto_id: "c1", nombre: "Suma", orden_visualizacion: 1,
+      minimo_selecciones: 1, maximo_selecciones: 1, modo_precio: "SUMA_PRECIO_PRODUCTO", categoria_id: null },
+    { id: "s-delta", combo_producto_id: "c1", nombre: "Delta", orden_visualizacion: 2,
+      minimo_selecciones: 1, maximo_selecciones: 1, modo_precio: "DELTA", categoria_id: null },
+  ];
+  const comboOpciones = [
+    { grupo_id: "s-suma", producto_id: "p-normal", precio_delta_mxn: 5, activa: true },
+    { grupo_id: "s-delta", producto_id: "p-normal", precio_delta_mxn: 5, activa: true },
+  ];
+  const r = armarCombosCarta(PRODUCTOS_SLOT, slots, comboOpciones);
+  const slotSuma = r[0]!.slots.find((s) => s.id === "s-suma")!;
+  const slotDelta = r[0]!.slots.find((s) => s.id === "s-delta")!;
+  // p-normal cuesta 100: SUMA_PRECIO_PRODUCTO = 100 + 5 = 105; DELTA = solo el delta = 5.
+  assert.equal(slotSuma.opciones.find((o) => o.producto_id === "p-normal")!.importe_mxn, 105);
+  assert.equal(slotDelta.opciones.find((o) => o.producto_id === "p-normal")!.importe_mxn, 5);
+});
+
+test("varios combos: cada slot se agrupa bajo su propio combo_producto_id", () => {
+  const slots = [
+    { id: "s1", combo_producto_id: "c1", nombre: "S1", orden_visualizacion: 1,
+      minimo_selecciones: 1, maximo_selecciones: 1, modo_precio: "DELTA", categoria_id: "cat-a" },
+    { id: "s2", combo_producto_id: "c2", nombre: "S2", orden_visualizacion: 1,
+      minimo_selecciones: 1, maximo_selecciones: 1, modo_precio: "DELTA", categoria_id: "cat-b" },
+  ];
+  const r = armarCombosCarta(PRODUCTOS_SLOT, slots, []);
+  assert.deepEqual(r.map((c) => c.producto_id).sort(), ["c1", "c2"]);
+  assert.deepEqual(r.find((c) => c.producto_id === "c1")!.slots.map((s) => s.id), ["s1"]);
+  assert.deepEqual(r.find((c) => c.producto_id === "c2")!.slots.map((s) => s.id), ["s2"]);
+});
+
+test("armarGruposModificadorCarta: agrupa opciones y productos por grupo_id, respetando el orden de visualización", () => {
+  const grupos = [{ id: "g1", nombre: "Término", tipo_seleccion: "UNICA_OBLIGATORIA", minimo_selecciones: null, maximo_selecciones: null }];
+  const opciones = [
+    { id: "o1", grupo_id: "g1", nombre: "Tres cuartos", precio_extra_mxn: 0, agotada: false },
+    { id: "o2", grupo_id: "g1", nombre: "Bien cocida", precio_extra_mxn: 0, agotada: true },
+  ];
+  const vinculos = [
+    { producto_id: "p2", grupo_id: "g1", orden_visualizacion: 2 },
+    { producto_id: "p1", grupo_id: "g1", orden_visualizacion: 1 },
+  ];
+  const r = armarGruposModificadorCarta(grupos, opciones, vinculos);
+  assert.equal(r.length, 1);
+  assert.deepEqual(r[0]!.opciones, [
+    { id: "o1", nombre: "Tres cuartos", precio_extra_mxn: 0, agotada: false },
+    { id: "o2", nombre: "Bien cocida", precio_extra_mxn: 0, agotada: true },
+  ]);
+  assert.deepEqual(r[0]!.producto_ids, ["p1", "p2"]); // ordenados por orden_visualizacion, no por llegada
 });

@@ -107,6 +107,95 @@ export function cantidadesDeGrupo(
   }
 }
 
+/**
+ * Arma los grupos de modificadores de la carta a partir de las filas ya consultadas (PostgREST):
+ * opciones por grupo y productos a los que se aplica, en el orden en que los pide la caja. Función
+ * pura — solo transforma filas ya leídas, no toca la base; vive aquí (y no en la Edge Function que
+ * la llama) para poder probarla igual que el resto del módulo.
+ */
+export function armarGruposModificadorCarta(
+  grupos: Record<string, unknown>[],
+  opciones: Record<string, unknown>[],
+  vinculos: Record<string, unknown>[],
+): GrupoModificadorCarta[] {
+  const opcionesPorGrupo = new Map<string, GrupoModificadorCarta["opciones"]>();
+  for (const o of opciones) {
+    const k = String(o.grupo_id);
+    opcionesPorGrupo.set(k, [...(opcionesPorGrupo.get(k) ?? []),
+      { id: String(o.id), nombre: String(o.nombre ?? ""), precio_extra_mxn: o.precio_extra_mxn as number, agotada: o.agotada === true }]);
+  }
+  const productosPorGrupo = new Map<string, { pid: string; orden: number }[]>();
+  for (const r of vinculos) {
+    const k = String(r.grupo_id);
+    productosPorGrupo.set(k, [...(productosPorGrupo.get(k) ?? []),
+      { pid: String(r.producto_id), orden: Number(r.orden_visualizacion ?? 0) }]);
+  }
+  return grupos.map((g) => ({
+    id: String(g.id), nombre: String(g.nombre ?? ""),
+    tipo_seleccion: g.tipo_seleccion as GrupoModificadorCarta["tipo_seleccion"],
+    minimo_selecciones: (g.minimo_selecciones as number | null) ?? null,
+    maximo_selecciones: (g.maximo_selecciones as number | null) ?? null,
+    opciones: opcionesPorGrupo.get(String(g.id)) ?? [],
+    producto_ids: (productosPorGrupo.get(String(g.id)) ?? []).sort((a, b) => a.orden - b.orden).map((x) => x.pid),
+  }));
+}
+
+/**
+ * Resuelve las opciones de cada slot de combo con el mismo criterio que la RPC
+ * `agregar_combo_a_ticket` (0111_combos.sql:338-350) — y que ya usan la caja (`apps/pos/app/lib/
+ * combos.ts: armarCombos`) y la vista previa del admin (`apps/admin/app/lib/combos.ts`): con
+ * `categoria_id`, todos los productos vendibles de esa categoría salvo los excluidos explícitamente
+ * (`combo_opciones.activa = false`); sin `categoria_id`, exactamente las filas explícitas activas.
+ * "Vendible" = producto activo (ya filtrado en la consulta), visible en el POS, no agotado y no
+ * combo (un combo no puede ser componente de otro combo). El importe que cada opción aporta es
+ * `precio_base_mxn` (solo si el slot es `SUMA_PRECIO_PRODUCTO`) más su `precio_delta_mxn`.
+ *
+ * Nota: la RPC, leída al pie de la letra, es un poco más permisiva en dos casos de borde — una
+ * fila explícita activa para un producto fuera de la categoría del slot, o sobre un producto
+ * oculto del POS — porque su rama `IF FOUND` no repite las comprobaciones de categoría ni de
+ * `visible_en_pos`. No se replica esa permisividad a propósito: el editor de combos del admin no
+ * deja crear ese primer caso (sin buscador para productos ajenos a la categoría en un slot por
+ * categoría), el segundo caso no cambia el menú publicado de todos modos (`construirMenuUber`
+ * excluye un producto oculto vía `motivoBase` aunque llegara como opción), y esta simplificación es
+ * la misma que ya usan la caja y el admin — replicar la RPC al pie de la letra habría desalineado
+ * *esta* función del resto del sistema. Publicar un conjunto más amplio que el que acepta la RPC sí
+ * sería grave (el pedido entra y revienta al crear el ticket, con el cliente ya cobrado); publicar
+ * de menos, en estos dos casos de borde, no lo es.
+ */
+export function armarCombosCarta(
+  productos: ProductoCarta[],
+  comboGrupos: Record<string, unknown>[],
+  comboOpciones: Record<string, unknown>[],
+): ComboCarta[] {
+  const opcionesPorSlot = new Map<string, Record<string, unknown>[]>();
+  for (const o of comboOpciones) {
+    const k = String(o.grupo_id);
+    opcionesPorSlot.set(k, [...(opcionesPorSlot.get(k) ?? []), o]);
+  }
+  const vendibles = new Map(productos.filter((p) => !p.es_combo && p.visible !== false && !p.agotado).map((p) => [p.id, p]));
+  const slotsPorCombo = new Map<string, ComboCarta["slots"]>();
+  for (const s of comboGrupos) {
+    const explicitas = opcionesPorSlot.get(String(s.id)) ?? [];
+    const excluidos = new Set(explicitas.filter((o) => o.activa === false).map((o) => String(o.producto_id)));
+    const delta = new Map(explicitas.filter((o) => o.activa !== false).map((o) => [String(o.producto_id), Number(o.precio_delta_mxn ?? 0)]));
+    const sumaPrecioProducto = s.modo_precio === "SUMA_PRECIO_PRODUCTO";
+    const candidatos = s.categoria_id
+      ? [...vendibles.values()].filter((p) => p.categoria_id === String(s.categoria_id) && !excluidos.has(p.id))
+      : [...delta.keys()].flatMap((pid) => { const p = vendibles.get(pid); return p ? [p] : []; });
+    const opcionesSlot = candidatos.map((p) => ({
+      producto_id: p.id,
+      importe_mxn: (sumaPrecioProducto ? Number(p.precio_base_mxn) : 0) + (delta.get(p.id) ?? 0),
+    }));
+    const comboProductoId = String(s.combo_producto_id);
+    slotsPorCombo.set(comboProductoId, [...(slotsPorCombo.get(comboProductoId) ?? []), {
+      id: String(s.id), nombre: String(s.nombre ?? ""), orden: Number(s.orden_visualizacion ?? 0),
+      minimo_selecciones: Number(s.minimo_selecciones ?? 1), maximo_selecciones: Number(s.maximo_selecciones ?? 1),
+      opciones: opcionesSlot,
+    }]);
+  }
+  return [...slotsPorCombo.entries()].map(([producto_id, slots]) => ({ producto_id, slots }));
+}
+
 type AjustePrecio = { context_type: "MODIFIER_GROUP"; context_value: string; price: number; core_price: number };
 type AjusteCantidad = { context_type: "MODIFIER_GROUP"; context_value: string; quantity: { min_permitted: number; max_permitted: number } };
 
