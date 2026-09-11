@@ -83,6 +83,19 @@ test("sin productos válidos: menú vacío pero bien formado", () => {
   assert.deepEqual((r.menu.menus[0] as { category_ids: string[] }).category_ids, []);
 });
 
+// Formas mínimas de lo que Uber espera en `items`/`modifier_groups`, solo con los campos que
+// estas pruebas leen — evita `any` al indexar el `unknown[]` que devuelve `construirMenuUber`.
+type ItemMenu = {
+  id: string;
+  price_info: { price: number; core_price: number };
+  external_data: string;
+  modifier_group_ids: { ids: string[] };
+};
+type GrupoMenu = {
+  id: string;
+  quantity_info: { quantity: { min_permitted: number; max_permitted: number } };
+};
+
 const GRUPOS = [
   { id: "g-term", nombre: "Término", tipo_seleccion: "UNICA_OBLIGATORIA" as const,
     minimo_selecciones: null, maximo_selecciones: null,
@@ -100,7 +113,7 @@ test("publica los grupos y sus opciones como ítems sin categoría", () => {
   const r = construirMenuUber([{ id: "p1", nombre: "Hamburguesa", precio_base_mxn: 100, categoria_id: "cat" }],
                               [{ id: "cat", nombre: "Hamburguesas", orden: 1 }],
                               { grupos: GRUPOS });
-  const items = r.menu.items as Record<string, any>[];
+  const items = r.menu.items as ItemMenu[];
   // el producto lleva sus dos grupos, en orden
   assert.deepEqual(items.find((i) => i.id === "p1")!.modifier_group_ids.ids, ["g-term", "g-extra"]);
   // cada opción es un ítem con su precio y su external_data
@@ -126,7 +139,7 @@ test("las cantidades salen del tipo de selección", () => {
     { ...base, id: "g3", nombre: "Múltiple opcional", tipo_seleccion: "MULTIPLE_OPCIONAL" },
     { ...base, id: "g4", nombre: "Rango", tipo_seleccion: "MULTIPLE_OBLIGATORIA_RANGO", minimo_selecciones: 1, maximo_selecciones: 2 },
   ] });
-  const q = (id: string) => (r.menu.modifier_groups as Record<string, any>[]).find((g) => g.id === id)!.quantity_info.quantity;
+  const q = (id: string) => (r.menu.modifier_groups as GrupoMenu[]).find((g) => g.id === id)!.quantity_info.quantity;
   assert.deepEqual(q("g1"), { min_permitted: 1, max_permitted: 1 });
   assert.deepEqual(q("g2"), { min_permitted: 0, max_permitted: 1 });
   assert.deepEqual(q("g3"), { min_permitted: 0, max_permitted: 2 });
@@ -146,7 +159,7 @@ test("un grupo sin opciones se cae; si era obligatorio, su producto tampoco se p
     ] });
   assert.deepEqual(r.excluidos.map((e) => [e.id, e.motivo]), [["p1", "grupo obligatorio sin opciones"]]);
   assert.deepEqual(r.menu.modifier_groups, []);
-  const p2 = (r.menu.items as Record<string, any>[]).find((i) => i.id === "p2")!;
+  const p2 = (r.menu.items as ItemMenu[]).find((i) => i.id === "p2")!;
   assert.deepEqual(p2.modifier_group_ids.ids, []);
 });
 
