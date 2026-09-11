@@ -30,6 +30,10 @@ const grossE5 = (money: unknown): number | null => {
 };
 const dec = (money: unknown): string | null => { const e5 = grossE5(money); return e5 === null ? null : e5ADecimal(e5); };
 
+// Duplicada de procesar-uber.ts:UUID_RE — ese módulo importa de este (uber.ts), no al revés, así
+// que exportarla desde allá invertiría la relación entre los dos módulos. Mantener ambas en sincronía.
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 /** Alérgenos de Uber → español. OTHER se resuelve con el texto libre; lo desconocido se deja tal cual en minúsculas. */
 const ALERGENOS: Record<string, string> = {
   DAIRY: "lácteos", EGG: "huevo", EGGS: "huevo", FISH: "pescado", SHELLFISH: "mariscos", TREENUTS: "frutos secos",
@@ -103,10 +107,16 @@ export function normalizarPedidoUber(
   /**
    * Los grupos elegidos de un ítem. `nivel` acota el anidamiento a dos (spec §3): un combo trae
    * componentes (slots) y cada componente puede a su vez traer sus propios modificadores (p. ej.
-   * el término de cocción), pero ahí se detiene. El id del grupo se pasa tal cual: VIM es quien lo
-   * asignó al construir la carta (grupo de modificadores o slot de combo), y Uber solo lo devuelve
-   * — no hay catálogo de grupos de modificadores para validarlo contra algo (a diferencia de los
-   * slots, que sí se consultan en `combo_grupos` vía `esSlot`).
+   * el término de cocción), pero ahí se detiene.
+   *
+   * `grupo_id` se sanea contra la forma de uuid (no hay catálogo de grupos de modificadores que
+   * consultar en lote, a diferencia de los slots vía `esSlot`/`combo_grupos`). No es un filtro
+   * cosmético: tanto `grupos_modificadores.id` como `combo_grupos.id` son `uuid PRIMARY KEY
+   * DEFAULT gen_random_uuid()` (0007, 0111) y `menu-uber.ts` los publica sin transformarlos, así
+   * que Uber siempre debería devolvernos un uuid nuestro. El SQL de la Task 7 hace
+   * `(m->>'grupo_id')::uuid` dentro de un `EXISTS`, y plpgsql no tiene cast seguro: un valor
+   * no-uuid ahí tumba la creación del ticket de un pedido ya cobrado. Aquí, en el normalizador, es
+   * donde ya se sanea `producto_id`/`opcion_modificador_id` — lo mismo toca para `grupo_id`.
    */
   const modificadoresDe = (it: Dict, nivel: number): ModificadorNormalizado[] => {
     const out: ModificadorNormalizado[] = [];
@@ -117,7 +127,7 @@ export function normalizarPedidoUber(
         const anidados = nivel < 1 ? modificadoresDe(sel, nivel + 1) : [];
         out.push({
           opcion_modificador_id: oid !== "" && (esOpcion(oid) || esProducto(oid)) ? oid : null,
-          grupo_id: gid,
+          grupo_id: gid !== null && UUID_RE.test(gid) ? gid : null,
           nombre_app: str(sel.title) ?? oid,
           cantidad: Math.max(1, num(obj(sel.quantity).amount) || 1),
           precio_extra_mxn: precioOpcion(sel),

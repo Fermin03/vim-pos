@@ -228,12 +228,21 @@ test("normalizarPedidoUber: la alergia del ítem viaja en el pedido normalizado"
 /** Objeto money de Uber (amount_e5 = pesos × 100 000). */
 const money = (pesos: number) => ({ gross: { amount_e5: Math.round(pesos * 100_000) } });
 
+// grupo_id se sanea contra la forma de uuid (grupos_modificadores.id / combo_grupos.id son uuid en
+// la BD, y Uber solo hace eco de lo que nosotros publicamos): las fixtures usan uuids reales, cada
+// uno terminado en un sufijo que recuerda qué representa, para que las pruebas se sigan leyendo bien.
+const GRUPO_EXTRAS = "11110000-0000-4000-8000-000000000001"; // grupo "Extras" (dos opciones)
+const SLOT_BURGER = "51075107-0000-4000-8000-00000000beef"; // slot "Hamburguesa" (combo)
+const SLOT_PAPAS = "51075107-0000-4000-8000-000000000003"; // slot "Papas" (combo)
+const GRUPO_TERMINO = "70000000-0000-4000-8000-000000000004"; // grupo "Término" (anidado en el componente)
+const GRUPO_INCLUYE = "80000000-0000-4000-8000-000000000005"; // grupo "Incluye" (solo removed_items)
+
 /** Una orden mínima con dos opciones de precios distintos en el mismo ítem. */
 const ordenDosExtras = {
   order: {
     carts: [{ items: [{
       id: "p1", cart_item_id: "ci-1", title: "Hamburguesa", quantity: { amount: 1 },
-      selected_modifier_groups: [{ id: "g-extra", title: "Extras", selected_items: [
+      selected_modifier_groups: [{ id: GRUPO_EXTRAS, title: "Extras", selected_items: [
         { id: "o-queso", cart_item_id: "ci-1-a", title: "Extra queso", quantity: { amount: 1 } },
         { id: "o-tocino", cart_item_id: "ci-1-b", title: "Tocino", quantity: { amount: 1 } },
       ] }],
@@ -251,13 +260,26 @@ test("cada opción cobra su propio precio, no el de la primera", () => {
   const mods = p.items[0]!.modificadores;
   assert.deepEqual(mods.map((m) => [m.opcion_modificador_id, m.precio_extra_mxn]),
     [["o-queso", "15.00"], ["o-tocino", "20.00"]]);
-  assert.equal(mods[0]!.grupo_id, "g-extra");
+  assert.equal(mods[0]!.grupo_id, GRUPO_EXTRAS);
+});
+
+test("si el grupo no tiene forma de uuid, grupo_id sale null (Task 7 hace un cast a ::uuid)", () => {
+  const orden = { order: { carts: [{ items: [{
+    id: "p1", cart_item_id: "ci-1", title: "Hamburguesa", quantity: { amount: 1 },
+    selected_modifier_groups: [{ id: "no-es-un-uuid", title: "Extras", selected_items: [
+      { id: "o-queso", cart_item_id: "ci-1-a", title: "Extra queso", quantity: { amount: 1 } },
+    ] }],
+  }] }], payment: { payment_detail: { item_charges: { price_breakdown: [
+    { cart_item_id: "ci-1-a", price_type: "OPTION", unit: money(15) },
+  ] } } } } };
+  const p = normalizarPedidoUber(orden, () => true, () => true, () => false);
+  assert.equal(p.items[0]!.modificadores[0]!.grupo_id, null);
 });
 
 test("si el desglose no trae la opción, se usa el precio que trae la propia opción", () => {
   const orden = { order: { carts: [{ items: [{
     id: "p1", cart_item_id: "ci-1", title: "Hamburguesa", quantity: { amount: 1 },
-    selected_modifier_groups: [{ id: "g", title: "Extras", selected_items: [
+    selected_modifier_groups: [{ id: GRUPO_EXTRAS, title: "Extras", selected_items: [
       { id: "o-queso", cart_item_id: "ci-1-a", title: "Extra queso", quantity: { amount: 1 }, price: money(15) },
     ] }],
   }] }], payment: { payment_detail: { item_charges: { price_breakdown: [] } } } } };
@@ -269,13 +291,13 @@ test("un combo trae sus slots y el término anidado", () => {
   const orden = { order: { carts: [{ items: [{
     id: "c1", cart_item_id: "ci-c", title: "Combo", quantity: { amount: 1 },
     selected_modifier_groups: [
-      { id: "s-burger", title: "Hamburguesa", selected_items: [{
+      { id: SLOT_BURGER, title: "Hamburguesa", selected_items: [{
         id: "p2", cart_item_id: "ci-c-1", title: "Doble", quantity: { amount: 1 },
-        selected_modifier_groups: [{ id: "g-term", title: "Término", selected_items: [
+        selected_modifier_groups: [{ id: GRUPO_TERMINO, title: "Término", selected_items: [
           { id: "o-34", cart_item_id: "ci-c-1-a", title: "Tres cuartos", quantity: { amount: 1 } },
         ] }],
       }] },
-      { id: "s-papas", title: "Papas", selected_items: [{
+      { id: SLOT_PAPAS, title: "Papas", selected_items: [{
         id: "p3", cart_item_id: "ci-c-2", title: "Papas", quantity: { amount: 1 } }] },
     ],
   }] }], payment: { payment_detail: { item_charges: { price_breakdown: [
@@ -286,21 +308,21 @@ test("un combo trae sus slots y el término anidado", () => {
     { cart_item_id: "ci-c-1-a", price_type: "OPTION", unit: money(0) },
     { cart_item_id: "ci-c-2", price_type: "OPTION", unit: money(15) },
   ] } } } } };
-  const p = normalizarPedidoUber(orden, () => true, () => true, (id) => id.startsWith("s-"));
+  const p = normalizarPedidoUber(orden, () => true, () => true, (id) => id === SLOT_BURGER || id === SLOT_PAPAS);
   const it = p.items[0]!;
   assert.equal(it.producto_id, "c1");
   assert.equal(it.precio_unitario_mxn, "45.00");
   assert.deepEqual(it.modificadores.map((m) => [m.grupo_id, m.opcion_modificador_id, m.precio_extra_mxn]),
-    [["s-burger", "p2", "130.00"], ["s-papas", "p3", "15.00"]]);
+    [[SLOT_BURGER, "p2", "130.00"], [SLOT_PAPAS, "p3", "15.00"]]);
   // el término viaja colgando de su componente
   assert.deepEqual(it.modificadores[0]!.modificadores!.map((m) => [m.grupo_id, m.opcion_modificador_id]),
-    [["g-term", "o-34"]]);
+    [[GRUPO_TERMINO, "o-34"]]);
 });
 
 test("las opciones que el cliente quitó acaban en la nota, no en cocina", () => {
   const orden = { order: { carts: [{ items: [{
     id: "p1", cart_item_id: "ci-1", title: "Hamburguesa", quantity: { amount: 1 },
-    selected_modifier_groups: [{ id: "g", title: "Incluye", selected_items: [],
+    selected_modifier_groups: [{ id: GRUPO_INCLUYE, title: "Incluye", selected_items: [],
       removed_items: [{ id: "o-cebolla", title: "Cebolla", quantity: { amount: 0 } }] }],
   }] }], payment: { payment_detail: { item_charges: { price_breakdown: [] } } } } };
   const p = normalizarPedidoUber(orden, () => true, () => true, () => false);
