@@ -4,13 +4,13 @@
 
 **VIM POS** · punto de venta para restaurantes en México · versión en HTML: https://vimpos.com.mx/nosotros
 
-VIM POS no lo vende un distribuidor ni lo soporta un centro de llamadas: el sistema, la instalación y el soporte salen de la misma casa, en Guanajuato. Aquí está quién lo construye, por qué existe y en qué punto está el producto hoy.
+VIM POS no se vende por distribuidores ni se atiende desde un centro de llamadas. Nosotros instalamos el sistema, capacitamos a tu equipo y respondemos por él: cuando algo falla no hay a quién pasarle la bolita.
 
 ## Quién construye VIM POS
 
 **VIM POS**, persona física con actividad empresarial, en Guanajuato, México. Es la misma que aparece en el [aviso de privacidad](https://vimpos.com.mx/aviso-privacidad) y en los [términos del servicio](https://vimpos.com.mx/terminos): no hay una razón social distinta escondida en la letra chica. Los datos fiscales completos van en el contrato.
 
-El sistema se desarrolla y se soporta desde la zona de León, para restaurantes de toda la República. Si tu local está cerca, la demostración puede ser en tu propio mostrador; si no, es por videollamada y funciona igual de bien.
+Atendemos restaurantes de toda la República. La demostración es por videollamada; si tu local queda cerca, la hacemos en tu propio mostrador.
 
 ## Por qué existe
 
@@ -24,7 +24,7 @@ _La caja, tal como la ve quien cobra. Todo lo que hay en este sitio son capturas
 
 ## Cómo trabajamos
 
-Competimos contra marcas de veinticinco años, y no lo hacemos con promesas: lo hacemos siendo concretos donde los demás son vagos.
+Competimos contra marcas con veinticinco años encima, y ahí no se gana con promesas. Somos concretos donde el resto es vago:
 
 - **El precio está publicado.** Los tres planes, los extras y los paquetes de folios están en la [página de precios](https://vimpos.com.mx/precios). No hay «contáctanos para conocer el precio».
 - **La implementación va incluida.** En los tres planes: instalación, carga de tu menú, datos fiscales y capacitación. No es un pago inicial que aparece en la primera factura.
