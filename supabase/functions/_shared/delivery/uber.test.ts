@@ -56,7 +56,7 @@ test("e5ADecimal: 750000 → 7.50, redondeo a centavos, sin flotantes raros", ()
 });
 
 test("normalizarPedidoUber: ítems por uuid, precio unitario de la app, sin mapear aparte", () => {
-  const p = normalizarPedidoUber(ORDEN, (id) => id === PROD, (id) => id === OPCION, () => false);
+  const p = normalizarPedidoUber(ORDEN, (id) => id === PROD, (id) => id === OPCION);
   assert.equal(p.app, "APP_UBEREATS");
   assert.equal(p.id_externo, "bd1ed236-ee79-11ed-a05b-0242ac12A003");
   assert.equal(p.folio_corto, "2A003");
@@ -84,9 +84,9 @@ test("normalizarPedidoUber: ítems por uuid, precio unitario de la app, sin mape
 
 test("normalizarPedidoUber: pickup y BYOC se clasifican", () => {
   const pickup = structuredClone(ORDEN); pickup.order.fulfillment_type = "PICKUP";
-  assert.equal(normalizarPedidoUber(pickup, () => true, () => true, () => false).tipo_entrega, "RECOGE_CLIENTE");
+  assert.equal(normalizarPedidoUber(pickup, () => true, () => true).tipo_entrega, "RECOGE_CLIENTE");
   const byoc = structuredClone(ORDEN); byoc.order.fulfillment_type = "DELIVERY_BY_MERCHANT";
-  assert.equal(normalizarPedidoUber(byoc, () => true, () => true, () => false).tipo_entrega, "RESTAURANTE_REPARTE");
+  assert.equal(normalizarPedidoUber(byoc, () => true, () => true).tipo_entrega, "RESTAURANTE_REPARTE");
 });
 
 test("motivoRechazoUber mapea al catálogo de deny_reason.type", () => {
@@ -215,7 +215,7 @@ test("normalizarPedidoUber: la alergia del ítem viaja en el pedido normalizado"
     special_instructions: "sin cebolla",
     allergy: { allergens: ["PEANUTS"], instructions: "alergia fuerte" },
   };
-  const p = normalizarPedidoUber(conAlergia, (id) => id === PROD, (id) => id === OPCION, () => false);
+  const p = normalizarPedidoUber(conAlergia, (id) => id === PROD, (id) => id === OPCION);
   assert.deepEqual(p.items[0].alergenos, ["cacahuate"]);
   assert.equal(p.items[0].alergia_nota, "alergia fuerte");
   assert.equal(p.items[0].nota, "sin cebolla");
@@ -256,7 +256,7 @@ const ordenDosExtras = {
 };
 
 test("cada opción cobra su propio precio, no el de la primera", () => {
-  const p = normalizarPedidoUber(ordenDosExtras, () => true, () => true, () => false);
+  const p = normalizarPedidoUber(ordenDosExtras, () => true, () => true);
   const mods = p.items[0]!.modificadores;
   assert.deepEqual(mods.map((m) => [m.opcion_modificador_id, m.precio_extra_mxn]),
     [["o-queso", "15.00"], ["o-tocino", "20.00"]]);
@@ -272,7 +272,7 @@ test("si el grupo no tiene forma de uuid, grupo_id sale null (Task 7 hace un cas
   }] }], payment: { payment_detail: { item_charges: { price_breakdown: [
     { cart_item_id: "ci-1-a", price_type: "OPTION", unit: money(15) },
   ] } } } } };
-  const p = normalizarPedidoUber(orden, () => true, () => true, () => false);
+  const p = normalizarPedidoUber(orden, () => true, () => true);
   assert.equal(p.items[0]!.modificadores[0]!.grupo_id, null);
 });
 
@@ -283,7 +283,7 @@ test("si el desglose no trae la opción, se usa el precio que trae la propia opc
       { id: "o-queso", cart_item_id: "ci-1-a", title: "Extra queso", quantity: { amount: 1 }, price: money(15) },
     ] }],
   }] }], payment: { payment_detail: { item_charges: { price_breakdown: [] } } } } };
-  const p = normalizarPedidoUber(orden, () => true, () => true, () => false);
+  const p = normalizarPedidoUber(orden, () => true, () => true);
   assert.equal(p.items[0]!.modificadores[0]!.precio_extra_mxn, "15.00");
 });
 
@@ -308,7 +308,7 @@ test("un combo trae sus slots y el término anidado", () => {
     { cart_item_id: "ci-c-1-a", price_type: "OPTION", unit: money(0) },
     { cart_item_id: "ci-c-2", price_type: "OPTION", unit: money(15) },
   ] } } } } };
-  const p = normalizarPedidoUber(orden, () => true, () => true, (id) => id === SLOT_BURGER || id === SLOT_PAPAS);
+  const p = normalizarPedidoUber(orden, () => true, () => true);
   const it = p.items[0]!;
   assert.equal(it.producto_id, "c1");
   assert.equal(it.precio_unitario_mxn, "45.00");
@@ -325,7 +325,7 @@ test("las opciones que el cliente quitó acaban en la nota, no en cocina", () =>
     selected_modifier_groups: [{ id: GRUPO_INCLUYE, title: "Incluye", selected_items: [],
       removed_items: [{ id: "o-cebolla", title: "Cebolla", quantity: { amount: 0 } }] }],
   }] }], payment: { payment_detail: { item_charges: { price_breakdown: [] } } } } };
-  const p = normalizarPedidoUber(orden, () => true, () => true, () => false);
+  const p = normalizarPedidoUber(orden, () => true, () => true);
   assert.equal(p.items[0]!.modificadores.length, 0);
   assert.equal(p.items[0]!.nota, "sin Cebolla");
 });

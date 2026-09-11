@@ -75,15 +75,13 @@ function tipoEntrega(f: unknown): TipoEntrega | null {
 /**
  * Convierte la respuesta de GET /v1/delivery/order/{id}?expand=carts,deliveries,payment al pedido
  * normalizado. `esProducto`/`esOpcion` dicen si un id de ítem/opción existe en el catálogo del
- * tenant; `esSlot` dice si un id de grupo es un slot de combo (`combo_grupos`). Precio unitario:
- * `payment.payment_detail.item_charges.price_breakdown` (gross, con IVA), que es lo que pagó el
- * cliente; si no viene, 0.00 y el cajero lo ve.
+ * tenant. Precio unitario: `payment.payment_detail.item_charges.price_breakdown` (gross, con IVA),
+ * que es lo que pagó el cliente; si no viene, 0.00 y el cajero lo ve.
  */
 export function normalizarPedidoUber(
   orden: unknown,
   esProducto: (id: string) => boolean,
   esOpcion: (id: string) => boolean,
-  esSlot: (id: string) => boolean,
 ): PedidoNormalizado {
   const o = obj(obj(orden).order);
   const detalle = obj(obj(o.payment).payment_detail);
@@ -109,9 +107,10 @@ export function normalizarPedidoUber(
    * componentes (slots) y cada componente puede a su vez traer sus propios modificadores (p. ej.
    * el término de cocción), pero ahí se detiene.
    *
-   * `grupo_id` se sanea contra la forma de uuid (no hay catálogo de grupos de modificadores que
-   * consultar en lote, a diferencia de los slots vía `esSlot`/`combo_grupos`). No es un filtro
-   * cosmético: tanto `grupos_modificadores.id` como `combo_grupos.id` son `uuid PRIMARY KEY
+   * `grupo_id` se sanea contra la forma de uuid: a diferencia de `producto_id`/
+   * `opcion_modificador_id`, no se resuelve contra ningún catálogo del tenant, así que aquí no hay
+   * más filtro posible que la forma. No es cosmético: tanto `grupos_modificadores.id` como
+   * `combo_grupos.id` son `uuid PRIMARY KEY
    * DEFAULT gen_random_uuid()` (0007, 0111) y `menu-uber.ts` los publica sin transformarlos, así
    * que Uber siempre debería devolvernos un uuid nuestro. El SQL de la Task 7 hace
    * `(m->>'grupo_id')::uuid` dentro de un `EXISTS`, y plpgsql no tiene cast seguro: un valor
