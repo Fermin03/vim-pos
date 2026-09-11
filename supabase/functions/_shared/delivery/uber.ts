@@ -30,6 +30,10 @@ const grossE5 = (money: unknown): number | null => {
 };
 const dec = (money: unknown): string | null => { const e5 = grossE5(money); return e5 === null ? null : e5ADecimal(e5); };
 
+// Duplicada de procesar-uber.ts:UUID_RE — ese módulo importa de este (uber.ts), no al revés, así
+// que exportarla desde allá invertiría la relación entre los dos módulos. Mantener ambas en sincronía.
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 /** Alérgenos de Uber → español. OTHER se resuelve con el texto libre; lo desconocido se deja tal cual en minúsculas. */
 const ALERGENOS: Record<string, string> = {
   DAIRY: "lácteos", EGG: "huevo", EGGS: "huevo", FISH: "pescado", SHELLFISH: "mariscos", TREENUTS: "frutos secos",
@@ -70,16 +74,76 @@ function tipoEntrega(f: unknown): TipoEntrega | null {
 
 /**
  * Convierte la respuesta de GET /v1/delivery/order/{id}?expand=carts,deliveries,payment al pedido
- * normalizado. `esUuidConocido` dice si un id de ítem/opción existe en el catálogo del tenant.
- * Precio unitario: `payment.payment_detail.item_charges.price_breakdown` (gross, con IVA), que es
- * lo que pagó el cliente; si no viene, 0.00 y el cajero lo ve.
+ * normalizado. `esProducto`/`esOpcion` dicen si un id de ítem/opción existe en el catálogo del
+ * tenant. Precio unitario: `payment.payment_detail.item_charges.price_breakdown` (gross, con IVA),
+ * que es lo que pagó el cliente; si no viene, 0.00 y el cajero lo ve.
  */
-export function normalizarPedidoUber(orden: unknown, esUuidConocido: (id: string) => boolean): PedidoNormalizado {
+export function normalizarPedidoUber(
+  orden: unknown,
+  esProducto: (id: string) => boolean,
+  esOpcion: (id: string) => boolean,
+): PedidoNormalizado {
   const o = obj(obj(orden).order);
   const detalle = obj(obj(o.payment).payment_detail);
   const breakdown = arr(obj(detalle.item_charges).price_breakdown).map(obj);
   const unitario = (cartItemId: string, tipo: "ITEM" | "OPTION"): string =>
     dec(breakdown.find((b) => b.cart_item_id === cartItemId && b.price_type === tipo)?.unit) ?? "0.00";
+
+  /**
+   * Antes se buscaba en el desglose por el `cart_item_id` DEL PADRE y `find` devolvía la primera
+   * fila OPTION, así que con dos opciones las dos cobraban lo mismo. Cada opción tiene su propio
+   * `cart_item_id`: se busca por ese. Si el desglose no la trae, se usa el `price` de la propia
+   * opción (`selected_items[{id, title, quantity, price…}]`, doc 03 §6), que es un objeto money
+   * con `gross.amount_e5` como todo el dinero de esta API.
+   */
+  const precioOpcion = (sel: Dict): string => {
+    const cid = str(sel.cart_item_id);
+    return (cid ? dec(breakdown.find((b) => b.cart_item_id === cid && b.price_type === "OPTION")?.unit) : null)
+      ?? dec(sel.price) ?? "0.00";
+  };
+
+  /**
+   * Los grupos elegidos de un ítem. `nivel` acota el anidamiento a dos (spec §3): un combo trae
+   * componentes (slots) y cada componente puede a su vez traer sus propios modificadores (p. ej.
+   * el término de cocción), pero ahí se detiene.
+   *
+   * `grupo_id` se sanea contra la forma de uuid: a diferencia de `producto_id`/
+   * `opcion_modificador_id`, no se resuelve contra ningún catálogo del tenant, así que aquí no hay
+   * más filtro posible que la forma. No es cosmético: tanto `grupos_modificadores.id` como
+   * `combo_grupos.id` son `uuid PRIMARY KEY
+   * DEFAULT gen_random_uuid()` (0007, 0111) y `menu-uber.ts` los publica sin transformarlos, así
+   * que Uber siempre debería devolvernos un uuid nuestro. El SQL de la Task 7 hace
+   * `(m->>'grupo_id')::uuid` dentro de un `EXISTS`, y plpgsql no tiene cast seguro: un valor
+   * no-uuid ahí tumba la creación del ticket de un pedido ya cobrado. Aquí, en el normalizador, es
+   * donde ya se sanea `producto_id`/`opcion_modificador_id` — lo mismo toca para `grupo_id`.
+   */
+  const modificadoresDe = (it: Dict, nivel: number): ModificadorNormalizado[] => {
+    const out: ModificadorNormalizado[] = [];
+    for (const g of arr(it.selected_modifier_groups).map(obj)) {
+      const gid = str(g.id);
+      for (const sel of arr(g.selected_items).map(obj)) {
+        const oid = str(sel.id) ?? "";
+        const anidados = nivel < 1 ? modificadoresDe(sel, nivel + 1) : [];
+        out.push({
+          opcion_modificador_id: oid !== "" && (esOpcion(oid) || esProducto(oid)) ? oid : null,
+          grupo_id: gid !== null && UUID_RE.test(gid) ? gid : null,
+          nombre_app: str(sel.title) ?? oid,
+          cantidad: Math.max(1, num(obj(sel.quantity).amount) || 1),
+          precio_extra_mxn: precioOpcion(sel),
+          ...(anidados.length ? { modificadores: anidados } : {}),
+        });
+      }
+    }
+    return out;
+  };
+
+  /** Las opciones por defecto que el cliente quitó: no van a cocina, pero la cocina debe saberlo. */
+  const quitadosDe = (it: Dict): string[] =>
+    arr(it.selected_modifier_groups).map(obj)
+      .flatMap((g) => arr(g.removed_items).map(obj))
+      .map((r) => str(r.title) ?? "")
+      .filter((t) => t !== "")
+      .map((t) => `sin ${t}`);
 
   const items: ItemNormalizado[] = [];
   const sinMapear: { nombre_app: string; id_app: string }[] = [];
@@ -88,28 +152,18 @@ export function normalizarPedidoUber(orden: unknown, esUuidConocido: (id: string
       const id = str(it.id) ?? "";
       const cartItemId = str(it.cart_item_id) ?? "";
       const nombre = str(it.title) ?? id;
-      const conocido = id !== "" && esUuidConocido(id);
+      const conocido = id !== "" && esProducto(id);
       if (!conocido) sinMapear.push({ nombre_app: nombre, id_app: id });
-      const modificadores: ModificadorNormalizado[] = [];
-      for (const g of arr(it.selected_modifier_groups).map(obj)) {
-        for (const sel of arr(g.selected_items).map(obj)) {
-          const oid = str(sel.id) ?? "";
-          modificadores.push({
-            opcion_modificador_id: oid !== "" && esUuidConocido(oid) ? oid : null,
-            nombre_app: str(sel.title) ?? oid,
-            cantidad: Math.max(1, num(obj(sel.quantity).amount) || 1),
-            precio_extra_mxn: unitario(cartItemId, "OPTION"),
-          });
-        }
-      }
+      const quitados = quitadosDe(it);
+      const notaBase = str(obj(it.customer_request).special_instructions);
       items.push({
         producto_id: conocido ? id : null,
         nombre_app: nombre,
         cantidad: Math.max(1, num(obj(it.quantity).amount) || 1),
         precio_unitario_mxn: unitario(cartItemId, "ITEM"),
-        nota: str(obj(it.customer_request).special_instructions),
+        nota: [notaBase, ...quitados].filter(Boolean).join(" · ") || null,
         ...alergiaDeItem(it.customer_request),
-        modificadores,
+        modificadores: modificadoresDe(it, 0),
       });
     }
   }

@@ -41,7 +41,7 @@ export default function IntegracionesPage() {
       if (accion === "menu") {
         const m = await accionConexion("menu", { conexion_id: cx.id });
         const fuera = m.excluidos.length ? ` Quedaron fuera ${m.excluidos.length}: ${m.excluidos.slice(0, 5).map((x) => `${x.nombre} (${x.motivo})`).join(", ")}${m.excluidos.length > 5 ? "…" : ""}.` : "";
-        setAviso(`Carta enviada a Uber: ${m.items} productos en ${m.categorias} categorías.${fuera}`);
+        setAviso(`Carta enviada a Uber: ${m.items} productos, ${m.grupos} grupos de opciones y ${m.categorias} categorías.${fuera}`);
       } else if (accion === "verificar") {
         const v: Verificacion = await accionConexion("verificar", { conexion_id: cx.id });
         setAviso(v.integracion_activa

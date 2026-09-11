@@ -6,9 +6,9 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { DatosCaja } from "../lib/turno";
 import { fmtMxn } from "../lib/turno";
 import {
-  accionPedidoApp, cambiarPrepUber, etiquetaAlergia, etiquetaApp, etiquetaEstado, etiquetaTienda, leerPedidosApps, leerTiendaUber,
-  marcarExpiradosVistos, mensajeErrorTienda, OPCIONES_PAUSA, ordenarPedidos, pausarTiendaUber, pedidoConAlergia, reanudarTiendaUber,
-  segundosRestantes, type DuracionPausa, type EstadoTiendaApp, type PedidoApp,
+  accionPedidoApp, cambiarPrepUber, etiquetaAlergia, etiquetaApp, etiquetaEstado, etiquetaModificadores, etiquetaTienda, leerPedidosApps,
+  leerTiendaUber, marcarExpiradosVistos, mensajeErrorTienda, OPCIONES_PAUSA, ordenarPedidos, pausarTiendaUber, pedidoConAlergia,
+  reanudarTiendaUber, segundosRestantes, type DuracionPausa, type EstadoTiendaApp, type PedidoApp,
 } from "../lib/pedidos-apps";
 import { BotonVolver } from "./boton-volver";
 
@@ -210,7 +210,7 @@ export function PantallaPedidosApps({ token, caja, onSalir }: { token: string; c
                     <li key={i} className={it.mapeado ? "" : "text-danger"}>
                       {it.cantidad} × {it.nombreApp}{it.mapeado ? "" : " (no está en el catálogo)"}
                       {it.modificadores.length > 0 && (
-                        <span className="text-ink-3"> · {it.modificadores.map((m) => `${m.cantidad > 1 ? m.cantidad + "× " : ""}${m.nombreApp}`).join(", ")}</span>
+                        <span className="text-ink-3"> · {etiquetaModificadores(it.modificadores)}</span>
                       )}
                       {it.nota && <span className="text-ink-3"> · “{it.nota}”</span>}
                       {etiquetaAlergia(it) && (

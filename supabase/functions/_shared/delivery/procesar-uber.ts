@@ -55,17 +55,23 @@ function filaPedido(p: PedidoNormalizado, cx: Dict, recibidoAt: Date, payloadRaw
   };
 }
 
-/** Ids de ítem y de opción que trae la orden, para preguntar al catálogo de una sola vez. */
+/**
+ * Ids de ítem y de opción que trae la orden, para preguntar al catálogo de una sola vez (los ids
+ * de grupo quedan en la misma bolsa sin costo — ninguna tabla los tiene como pk, así que nunca
+ * hacen match; `grupo_id` se sanea por forma de uuid, no contra un catálogo, en el normalizador).
+ * Baja un nivel más que antes para recoger también los ids del término anidado dentro de un
+ * componente de combo (spec §3: el anidamiento se acota a dos niveles).
+ */
 function idsDeLaOrden(orden: unknown): string[] {
   const ids = new Set<string>();
-  for (const cart of arr(obj(obj(orden).order).carts).map(obj)) {
-    for (const it of arr(cart.items).map(obj)) {
-      if (typeof it.id === "string") ids.add(it.id);
-      for (const g of arr(it.selected_modifier_groups).map(obj)) {
-        for (const s of arr(g.selected_items).map(obj)) if (typeof s.id === "string") ids.add(s.id);
-      }
+  const deItem = (it: Dict, nivel: number) => {
+    if (typeof it.id === "string") ids.add(it.id);
+    for (const g of arr(it.selected_modifier_groups).map(obj)) {
+      if (typeof g.id === "string") ids.add(g.id);
+      for (const s of arr(g.selected_items).map(obj)) { if (nivel < 1) deItem(s, nivel + 1); else if (typeof s.id === "string") ids.add(s.id); }
     }
-  }
+  };
+  for (const cart of arr(obj(obj(orden).order).carts).map(obj)) for (const it of arr(cart.items).map(obj)) deItem(it, 0);
   return [...ids].filter((id) => UUID_RE.test(id));
 }
 
@@ -89,15 +95,21 @@ export async function procesarNotificacionUber(deps: DepsProceso, evento: unknow
   let orden: unknown;
   try { orden = await deps.uber.obtenerOrden(orderId); }
   catch (e) { return { pedido_id: null, accion: "ERROR", detalle: `obtenerOrden: ${errMsg(e)}` }; }
+  // Dos conjuntos, no uno: con uno solo mezclando productos y opciones, un id de producto podría
+  // colarse como opción reconocida (y viceversa) por cualquier coincidencia en el conjunto
+  // mezclado. El endurecido real está a nivel de ÍTEM, en `normalizarPedidoUber` (uber.ts): un
+  // `it.id` solo cuenta como producto conocido si `esProducto(id)`, nunca por `esOpcion(id)`. A
+  // nivel de OPCIÓN los dos conjuntos sí se unen a propósito ahí mismo — una elección de slot de
+  // combo es un producto real y tiene que poder aterrizar en `opcion_modificador_id`.
   const uuids = idsDeLaOrden(orden);
-  const conocidos = new Set<string>();
+  const prods = new Set<string>(); const opcs = new Set<string>();
   if (uuids.length) {
     const r1 = await deps.db.from("productos").select("id").eq("tenant_id", cx.tenant_id).in("id", uuids);
-    for (const f of arr(obj(r1).data).map(obj)) if (typeof f.id === "string") conocidos.add(f.id);
+    for (const f of arr(obj(r1).data).map(obj)) if (typeof f.id === "string") prods.add(f.id);
     const r2 = await deps.db.from("opciones_modificador").select("id").eq("tenant_id", cx.tenant_id).in("id", uuids);
-    for (const f of arr(obj(r2).data).map(obj)) if (typeof f.id === "string") conocidos.add(f.id);
+    for (const f of arr(obj(r2).data).map(obj)) if (typeof f.id === "string") opcs.add(f.id);
   }
-  const pedido = normalizarPedidoUber(orden, (id) => conocidos.has(id));
+  const pedido = normalizarPedidoUber(orden, (id) => prods.has(id), (id) => opcs.has(id));
 
   // 4) Persistir el pedido (RECIBIDO) antes de cualquier decisión.
   const ahora = deps.ahora();

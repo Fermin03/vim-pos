@@ -10,12 +10,18 @@ export type PedidoAppEstado =
   | "RECIBIDO" | "ACEPTADO" | "RECHAZADO" | "EN_PREPARACION" | "LISTO" | "ENTREGADO" | "CANCELADO" | "EXPIRADO" | "ERROR";
 export type AppPedido = "APP_UBEREATS" | "APP_DIDI" | "APP_RAPPI";
 
+export type PedidoAppModificador = {
+  nombreApp: string;
+  cantidad: number;
+  /** Solo para la elección de un slot de combo: sus propios extras (el término, un extra queso). */
+  modificadores?: PedidoAppModificador[];
+};
 export type PedidoAppItem = {
   nombreApp: string; cantidad: number; precioUnitario: number; nota: string | null; mapeado: boolean;
   /** Alérgenos marcados por el cliente en la app, en español (A7 del contrato). */
   alergenos: string[];
   alergiaNota: string | null;
-  modificadores: { nombreApp: string; cantidad: number }[];
+  modificadores: PedidoAppModificador[];
 };
 export type PedidoApp = {
   id: string; app: AppPedido; idExterno: string; folioCorto: string | null; estado: PedidoAppEstado;
@@ -56,7 +62,18 @@ export async function leerPedidosApps(token: string, sucursalId: string): Promis
   }));
 }
 
-function itemsDesdeJson(v: unknown): PedidoAppItem[] {
+/** Recursivo: una elección de combo trae a su vez sus propios extras (el término, un extra queso). */
+function modificadorDesdeJson(m: unknown): PedidoAppModificador {
+  const r = (m ?? {}) as Record<string, unknown>;
+  const anidados = Array.isArray(r.modificadores) ? (r.modificadores as Record<string, unknown>[]).map(modificadorDesdeJson) : [];
+  return {
+    nombreApp: String(r.nombre_app ?? ""),
+    cantidad: Number(r.cantidad ?? 1),
+    ...(anidados.length > 0 ? { modificadores: anidados } : {}),
+  };
+}
+
+export function itemsDesdeJson(v: unknown): PedidoAppItem[] {
   if (!Array.isArray(v)) return [];
   return v.map((x) => {
     const it = (x ?? {}) as Record<string, unknown>;
@@ -69,7 +86,7 @@ function itemsDesdeJson(v: unknown): PedidoAppItem[] {
       alergenos: Array.isArray(it.alergenos) ? (it.alergenos as unknown[]).filter((a): a is string => typeof a === "string" && a.length > 0) : [],
       alergiaNota: typeof it.alergia_nota === "string" && it.alergia_nota.length > 0 ? it.alergia_nota : null,
       mapeado: typeof it.producto_id === "string" && it.producto_id.length > 0,
-      modificadores: mods.map((m) => ({ nombreApp: String(m.nombre_app ?? ""), cantidad: Number(m.cantidad ?? 1) })),
+      modificadores: mods.map(modificadorDesdeJson),
     };
   });
 }
@@ -92,6 +109,25 @@ export async function accionPedidoApp(
   } catch (e) {
     return { ok: false, error: "SIN_RED", detalle: e instanceof Error ? e.message : String(e) };
   }
+}
+
+function etiquetaUnModificador(m: PedidoAppModificador): string {
+  const cantidad = m.cantidad > 1 ? `${m.cantidad}× ` : "";
+  // Un anidado sin nombre (título vacío en el normalizador) no aporta nada entre paréntesis;
+  // si se le hace caso se vería "Cheese Burger ()", que confunde más de lo que dice.
+  const conNombre = (m.modificadores ?? []).filter((n) => n.nombreApp.trim().length > 0);
+  const anidados = conNombre.length > 0
+    ? ` (${conNombre.map((n) => `${n.cantidad > 1 ? `${n.cantidad}× ` : ""}${n.nombreApp}`).join(", ")})`
+    : "";
+  return `${cantidad}${m.nombreApp}${anidados}`;
+}
+/**
+ * Los extras de un componente de combo (el término, un extra queso) van entre paréntesis pegados
+ * a ese componente: pintarlos sueltos al final del renglón no dice a cuál pertenece cada uno, que
+ * es justo lo que el cajero necesita ver.
+ */
+export function etiquetaModificadores(mods: PedidoAppModificador[]): string {
+  return mods.map(etiquetaUnModificador).join(", ");
 }
 
 /** "ALERGIA: cacahuate, lácteos — "texto"" o null si el ítem no trae alergia. */

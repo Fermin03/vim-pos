@@ -4,7 +4,9 @@
 // Solo Dueño/Administrador (jerarquía >= 4); todo filtra por el tenant del JWT.
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import { corsHeaders } from "../_shared/cors.ts";
-import { construirMenuUber, type CategoriaCarta, type ProductoCarta } from "../_shared/delivery/menu-uber.ts";
+import {
+  armarCombosCarta, armarGruposModificadorCarta, construirMenuUber, type CategoriaCarta, type ProductoCarta,
+} from "../_shared/delivery/menu-uber.ts";
 import { crearClienteUber } from "../_shared/delivery/uber.ts";
 import { cuerpoPosData, normalizarTiendasUber, transicionConexion, type EstadoConexion } from "../_shared/delivery/uber-activacion.ts";
 import { cambiarPrepTienda, consultarEstadoTienda, type ConexionTienda } from "../_shared/delivery/tienda-uber-acciones.ts";
@@ -263,22 +265,57 @@ Deno.serve(async (req) => {
         // que es lo que permite reconocer los pedidos sin tabla de mapeo. Reemplaza la carta entera.
         const cx = await conexionDelTenant(body.conexion_id);
         if (!cx || !cx.tienda_id_externo) return json({ error: "CONEXION_NO_EXISTE" }, 404);
-        const [{ data: prods }, { data: cats }] = await Promise.all([
+        const [
+          { data: prods }, { data: cats }, { data: gruposModificador }, { data: opcionesModificador },
+          { data: vinculosProductoGrupo }, { data: comboGrupos }, { data: comboOpciones },
+        ] = await Promise.all([
           admin.from("productos")
-            .select("id, nombre, descripcion, precio_base_mxn, tasa_iva, categoria_id, agotado_manual, agotado_automatico, visible_en_pos")
+            .select("id, nombre, descripcion, precio_base_mxn, tasa_iva, categoria_id, agotado_manual, agotado_automatico, visible_en_pos, es_combo")
             .eq("tenant_id", tenantId).eq("estado", "ACTIVO").is("deleted_at", null),
           admin.from("categorias").select("id, nombre, orden_visualizacion").eq("tenant_id", tenantId).eq("activa", true).is("deleted_at", null),
+          admin.from("grupos_modificadores").select("id, nombre, tipo_seleccion, minimo_selecciones, maximo_selecciones")
+            .eq("tenant_id", tenantId).eq("activo", true).is("deleted_at", null),
+          admin.from("opciones_modificador").select("id, grupo_id, nombre, precio_extra_mxn, agotada")
+            .eq("tenant_id", tenantId).eq("activa", true).is("deleted_at", null),
+          admin.from("productos_grupos_modificadores").select("producto_id, grupo_id, orden_visualizacion")
+            .eq("tenant_id", tenantId),
+          admin.from("combo_grupos").select("id, combo_producto_id, nombre, orden_visualizacion, minimo_selecciones, maximo_selecciones, modo_precio, categoria_id")
+            .eq("tenant_id", tenantId).eq("activo", true).is("deleted_at", null),
+          admin.from("combo_opciones").select("grupo_id, producto_id, precio_delta_mxn, activa")
+            .eq("tenant_id", tenantId).is("deleted_at", null),
         ]);
+        // Un combo sin slots configurados no se puede vender: cuenta cuántos grupos tiene cada
+        // combo para que construirMenuUber lo excluya (ver "combo sin slots").
+        const slotsPorCombo = new Map<string, number>();
+        for (const g of ((comboGrupos ?? []) as Record<string, unknown>[])) {
+          const k = String(g.combo_producto_id);
+          slotsPorCombo.set(k, (slotsPorCombo.get(k) ?? 0) + 1);
+        }
         const productos: ProductoCarta[] = ((prods ?? []) as Record<string, unknown>[]).map((p) => ({
           id: String(p.id), nombre: String(p.nombre ?? ""), descripcion: (p.descripcion as string | null) ?? null,
           precio_base_mxn: p.precio_base_mxn as number | string, tasa_iva: p.tasa_iva as number | null,
           categoria_id: (p.categoria_id as string | null) ?? null,
           agotado: p.agotado_manual === true || p.agotado_automatico === true, visible: p.visible_en_pos !== false,
+          es_combo: p.es_combo === true,
+          n_slots: slotsPorCombo.get(String(p.id)) ?? 0,
         }));
         const categorias: CategoriaCarta[] = ((cats ?? []) as Record<string, unknown>[]).map((c) => ({
           id: String(c.id), nombre: String(c.nombre ?? ""), orden: (c.orden_visualizacion as number | null) ?? 0,
         }));
-        const carta = construirMenuUber(productos, categorias, { titulo: cx.tienda_nombre_app ? `Carta · ${cx.tienda_nombre_app}` : "Carta" });
+        const gruposCarta = armarGruposModificadorCarta(
+          (gruposModificador ?? []) as Record<string, unknown>[],
+          (opcionesModificador ?? []) as Record<string, unknown>[],
+          (vinculosProductoGrupo ?? []) as Record<string, unknown>[],
+        );
+        const combosCarta = armarCombosCarta(
+          productos,
+          (comboGrupos ?? []) as Record<string, unknown>[],
+          (comboOpciones ?? []) as Record<string, unknown>[],
+        );
+        const carta = construirMenuUber(productos, categorias, {
+          titulo: cx.tienda_nombre_app ? `Carta · ${cx.tienda_nombre_app}` : "Carta",
+          grupos: gruposCarta, combos: combosCarta,
+        });
         if (carta.items === 0) return json({ error: "CARTA_VACIA", excluidos: carta.excluidos }, 409);
         try { await uber.reemplazarMenu(cx.tienda_id_externo, carta.menu); }
         catch (e) {
@@ -288,10 +325,19 @@ Deno.serve(async (req) => {
         const ahora = new Date().toISOString();
         await admin.from("delivery_conexiones").update({
           ultimo_evento_at: ahora,
-          config: { ...(cx.config ?? {}), carta_enviada_at: ahora, carta_items: carta.items, carta_categorias: carta.categorias },
+          config: {
+            ...(cx.config ?? {}), carta_enviada_at: ahora, carta_items: carta.items, carta_categorias: carta.categorias,
+            carta_grupos: carta.grupos, carta_opciones: carta.opcionesModificador,
+          },
         }).eq("id", cx.id);
-        await registrar("menu", true, { items: carta.items, categorias: carta.categorias, excluidos: carta.excluidos.length }, cx.id, cx.tienda_id_externo);
-        return json({ items: carta.items, categorias: carta.categorias, excluidos: carta.excluidos });
+        await registrar("menu", true, {
+          items: carta.items, categorias: carta.categorias, grupos: carta.grupos, opciones: carta.opcionesModificador,
+          combos: carta.combos, excluidos: carta.excluidos.length,
+        }, cx.id, cx.tienda_id_externo);
+        return json({
+          items: carta.items, categorias: carta.categorias, grupos: carta.grupos, opciones: carta.opcionesModificador,
+          excluidos: carta.excluidos,
+        });
       }
       default:
         return json({ error: "ACCION_DESCONOCIDA" }, 400);

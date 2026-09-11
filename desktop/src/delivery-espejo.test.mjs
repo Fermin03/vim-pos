@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { crearEspejo } from "./delivery-espejo.mjs";
+import { crearEspejo, codigoDeError } from "./delivery-espejo.mjs";
 
 const CAJA = "cccccccc-0000-0000-0000-0000000000cc";
 const NUBE = { cloudUrl: "https://nube.test", anonKey: "anon", deviceToken: "DEV" };
@@ -227,4 +227,41 @@ test("si el espejo local falla, el cursor no avanza: la vuelta siguiente vuelve 
   await agente.tick();
   const sondeos = nube.llamadas.filter((l) => l.url.endsWith("/delivery-espejo"));
   assert.equal(sondeos[1].body.desde, undefined, "sigue en frío hasta que el espejo local cuaje");
+});
+
+test("codigoDeError traduce los errores de combo (Task 7) y los que ya existían; lo demás se deja tal cual", () => {
+  // Texto libre de agregar_combo_a_ticket (0111_combos.sql) — se reconoce por una frase estable.
+  assert.equal(codigoDeError('El slot "Bebida" requiere entre 1 y 1 selecciones (recibió 0)'), "COMBO_INCOMPLETO");
+  assert.equal(codigoDeError('El producto "Doble" está agotado o pausado'), "PRODUCTO_AGOTADO");
+  assert.equal(codigoDeError('El producto "Papas chicas" no es opción del slot "Guarnición"'), "COMBO_OPCION_INVALIDA");
+  // Revisión final, punto 6: sexto mensaje sin traducir. Aparece cuando alguien desactiva una
+  // opción de un slot en el admin mientras Uber sigue vendiendo la carta vieja.
+  assert.equal(codigoDeError('El producto "Papas chicas" está excluido del slot "Guarnición"'), "COMBO_OPCION_EXCLUIDA");
+
+  // Con prefijo de crear_ticket_desde_app (0112_combos_uber.sql) — el código ya viene en el mensaje.
+  assert.equal(
+    codigoDeError(
+      'COMBO_ELECCION_SIN_MAPEAR: el combo "Promo doble" trae una elección que no es un slot activo de este combo o cuyo producto no está mapeado en el catálogo',
+    ),
+    "COMBO_ELECCION_SIN_MAPEAR",
+  );
+  assert.equal(
+    codigoDeError(
+      'COMBO_ELECCION_AMBIGUA: el combo "Promo doble" repite la misma elección de slot con modificadores de segundo nivel en alguna de las repeticiones; no se puede saber a qué unidad va cada extra',
+    ),
+    "COMBO_ELECCION_AMBIGUA",
+  );
+
+  // Los dos códigos que ya se traducían siguen igual, con el formato real que manda la RPC ("CODIGO: resto").
+  assert.equal(codigoDeError("SIN_TURNO_ABIERTO: sucursal s1"), "SIN_TURNO_ABIERTO");
+  assert.equal(codigoDeError("ITEM_SIN_MAPEAR: Malteada (sin producto genérico configurado)"), "ITEM_SIN_MAPEAR");
+
+  // Anclado: el nombre de un producto que por casualidad contenga el texto de un código con
+  // prefijo no debe disparar ese código — solo cuenta si el mensaje EMPIEZA con "CODIGO:".
+  assert.equal(codigoDeError('El producto "Combo ITEM_SIN_MAPEAR especial" está agotado o pausado'), "PRODUCTO_AGOTADO");
+
+  // Lo no reconocido se devuelve tal cual (prueba original del brief): mejor un mensaje feo que
+  // esconder un fallo que nadie previó.
+  assert.equal(codigoDeError("algo raro de postgres"), "algo raro de postgres");
+  assert.equal(codigoDeError("SIN_TURNO_ABIERTO"), "SIN_TURNO_ABIERTO");
 });

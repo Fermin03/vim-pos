@@ -5,9 +5,13 @@ export type TipoEntrega = "APP_REPARTE" | "RESTAURANTE_REPARTE" | "RECOGE_CLIENT
 
 export type ModificadorNormalizado = {
   opcion_modificador_id: string | null;   // null = no existe en el catálogo de VIM
+  /** Grupo en el que se eligió. Para un combo es el uuid del slot; null si no se reconoce. */
+  grupo_id: string | null;
   nombre_app: string;
   cantidad: number;
   precio_extra_mxn: string;
+  /** Solo para el componente de un combo: sus propios modificadores (el término). */
+  modificadores?: ModificadorNormalizado[];
 };
 
 export type ItemNormalizado = {
