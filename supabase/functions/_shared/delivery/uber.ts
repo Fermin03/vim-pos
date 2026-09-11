@@ -70,16 +70,71 @@ function tipoEntrega(f: unknown): TipoEntrega | null {
 
 /**
  * Convierte la respuesta de GET /v1/delivery/order/{id}?expand=carts,deliveries,payment al pedido
- * normalizado. `esUuidConocido` dice si un id de ítem/opción existe en el catálogo del tenant.
- * Precio unitario: `payment.payment_detail.item_charges.price_breakdown` (gross, con IVA), que es
- * lo que pagó el cliente; si no viene, 0.00 y el cajero lo ve.
+ * normalizado. `esProducto`/`esOpcion` dicen si un id de ítem/opción existe en el catálogo del
+ * tenant; `esSlot` dice si un id de grupo es un slot de combo (`combo_grupos`). Precio unitario:
+ * `payment.payment_detail.item_charges.price_breakdown` (gross, con IVA), que es lo que pagó el
+ * cliente; si no viene, 0.00 y el cajero lo ve.
  */
-export function normalizarPedidoUber(orden: unknown, esUuidConocido: (id: string) => boolean): PedidoNormalizado {
+export function normalizarPedidoUber(
+  orden: unknown,
+  esProducto: (id: string) => boolean,
+  esOpcion: (id: string) => boolean,
+  esSlot: (id: string) => boolean,
+): PedidoNormalizado {
   const o = obj(obj(orden).order);
   const detalle = obj(obj(o.payment).payment_detail);
   const breakdown = arr(obj(detalle.item_charges).price_breakdown).map(obj);
   const unitario = (cartItemId: string, tipo: "ITEM" | "OPTION"): string =>
     dec(breakdown.find((b) => b.cart_item_id === cartItemId && b.price_type === tipo)?.unit) ?? "0.00";
+
+  /**
+   * Antes se buscaba en el desglose por el `cart_item_id` DEL PADRE y `find` devolvía la primera
+   * fila OPTION, así que con dos opciones las dos cobraban lo mismo. Cada opción tiene su propio
+   * `cart_item_id`: se busca por ese. Si el desglose no la trae, se usa el `price` de la propia
+   * opción (`selected_items[{id, title, quantity, price…}]`, doc 03 §6), que es un objeto money
+   * con `gross.amount_e5` como todo el dinero de esta API.
+   */
+  const precioOpcion = (sel: Dict): string => {
+    const cid = str(sel.cart_item_id);
+    return (cid ? dec(breakdown.find((b) => b.cart_item_id === cid && b.price_type === "OPTION")?.unit) : null)
+      ?? dec(sel.price) ?? "0.00";
+  };
+
+  /**
+   * Los grupos elegidos de un ítem. `nivel` acota el anidamiento a dos (spec §3): un combo trae
+   * componentes (slots) y cada componente puede a su vez traer sus propios modificadores (p. ej.
+   * el término de cocción), pero ahí se detiene. El id del grupo se pasa tal cual: VIM es quien lo
+   * asignó al construir la carta (grupo de modificadores o slot de combo), y Uber solo lo devuelve
+   * — no hay catálogo de grupos de modificadores para validarlo contra algo (a diferencia de los
+   * slots, que sí se consultan en `combo_grupos` vía `esSlot`).
+   */
+  const modificadoresDe = (it: Dict, nivel: number): ModificadorNormalizado[] => {
+    const out: ModificadorNormalizado[] = [];
+    for (const g of arr(it.selected_modifier_groups).map(obj)) {
+      const gid = str(g.id);
+      for (const sel of arr(g.selected_items).map(obj)) {
+        const oid = str(sel.id) ?? "";
+        const anidados = nivel < 1 ? modificadoresDe(sel, nivel + 1) : [];
+        out.push({
+          opcion_modificador_id: oid !== "" && (esOpcion(oid) || esProducto(oid)) ? oid : null,
+          grupo_id: gid,
+          nombre_app: str(sel.title) ?? oid,
+          cantidad: Math.max(1, num(obj(sel.quantity).amount) || 1),
+          precio_extra_mxn: precioOpcion(sel),
+          ...(anidados.length ? { modificadores: anidados } : {}),
+        });
+      }
+    }
+    return out;
+  };
+
+  /** Las opciones por defecto que el cliente quitó: no van a cocina, pero la cocina debe saberlo. */
+  const quitadosDe = (it: Dict): string[] =>
+    arr(it.selected_modifier_groups).map(obj)
+      .flatMap((g) => arr(g.removed_items).map(obj))
+      .map((r) => str(r.title) ?? "")
+      .filter((t) => t !== "")
+      .map((t) => `sin ${t}`);
 
   const items: ItemNormalizado[] = [];
   const sinMapear: { nombre_app: string; id_app: string }[] = [];
@@ -88,28 +143,18 @@ export function normalizarPedidoUber(orden: unknown, esUuidConocido: (id: string
       const id = str(it.id) ?? "";
       const cartItemId = str(it.cart_item_id) ?? "";
       const nombre = str(it.title) ?? id;
-      const conocido = id !== "" && esUuidConocido(id);
+      const conocido = id !== "" && esProducto(id);
       if (!conocido) sinMapear.push({ nombre_app: nombre, id_app: id });
-      const modificadores: ModificadorNormalizado[] = [];
-      for (const g of arr(it.selected_modifier_groups).map(obj)) {
-        for (const sel of arr(g.selected_items).map(obj)) {
-          const oid = str(sel.id) ?? "";
-          modificadores.push({
-            opcion_modificador_id: oid !== "" && esUuidConocido(oid) ? oid : null,
-            nombre_app: str(sel.title) ?? oid,
-            cantidad: Math.max(1, num(obj(sel.quantity).amount) || 1),
-            precio_extra_mxn: unitario(cartItemId, "OPTION"),
-          });
-        }
-      }
+      const quitados = quitadosDe(it);
+      const notaBase = str(obj(it.customer_request).special_instructions);
       items.push({
         producto_id: conocido ? id : null,
         nombre_app: nombre,
         cantidad: Math.max(1, num(obj(it.quantity).amount) || 1),
         precio_unitario_mxn: unitario(cartItemId, "ITEM"),
-        nota: str(obj(it.customer_request).special_instructions),
+        nota: [notaBase, ...quitados].filter(Boolean).join(" · ") || null,
         ...alergiaDeItem(it.customer_request),
-        modificadores,
+        modificadores: modificadoresDe(it, 0),
       });
     }
   }

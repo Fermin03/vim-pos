@@ -12,15 +12,16 @@ const ORDEN = { order: { id: "ord-1", display_id: "2A003", state: "OFFERED", sta
 type Fila = Record<string, unknown>;
 
 /** BD de mentira: tablas en memoria y RPCs contadas. Imita solo las cadenas de supabase-js que usa el proceso. */
-function dbFalsa(opts: { conexion: Fila | null; turnoAbierto: boolean; productos: string[]; espejo?: boolean }) {
+function dbFalsa(opts: { conexion: Fila | null; turnoAbierto: boolean; productos: string[]; opciones?: string[]; slots?: string[]; espejo?: boolean }) {
   const pedidos: Fila[] = [];
   const rpcs: { fn: string; args: unknown }[] = [];
+  const catalogos: Record<string, string[]> = { productos: opts.productos, opciones_modificador: opts.opciones ?? [], combo_grupos: opts.slots ?? [] };
   const consulta = (tabla: string, filtros: Fila) => {
     const resolver = () => {
       if (tabla === "delivery_conexiones") return opts.conexion && opts.conexion.tienda_id_externo === filtros.tienda_id_externo ? [opts.conexion] : [];
       if (tabla === "delivery_pedidos") return pedidos.filter((p) => p.id_externo === filtros.id_externo);
       if (tabla === "turnos") return opts.turnoAbierto ? [{ id: "t1" }] : [];
-      if (tabla === "productos") return opts.productos.filter((id) => (filtros.__in as unknown[]).includes(id)).map((id) => ({ id }));
+      if (tabla in catalogos) return catalogos[tabla]!.filter((id) => (filtros.__in as unknown[]).includes(id)).map((id) => ({ id }));
       return [];
     };
     const cadena = {
