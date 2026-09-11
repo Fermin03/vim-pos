@@ -65,7 +65,7 @@ export async function leerPedidosApps(token: string, sucursalId: string): Promis
 /** Recursivo: una elección de combo trae a su vez sus propios extras (el término, un extra queso). */
 function modificadorDesdeJson(m: unknown): PedidoAppModificador {
   const r = (m ?? {}) as Record<string, unknown>;
-  const anidados = Array.isArray(r.modificadores) ? r.modificadores.map(modificadorDesdeJson) : [];
+  const anidados = Array.isArray(r.modificadores) ? (r.modificadores as Record<string, unknown>[]).map(modificadorDesdeJson) : [];
   return {
     nombreApp: String(r.nombre_app ?? ""),
     cantidad: Number(r.cantidad ?? 1),
@@ -77,7 +77,7 @@ export function itemsDesdeJson(v: unknown): PedidoAppItem[] {
   if (!Array.isArray(v)) return [];
   return v.map((x) => {
     const it = (x ?? {}) as Record<string, unknown>;
-    const mods = Array.isArray(it.modificadores) ? it.modificadores : [];
+    const mods = Array.isArray(it.modificadores) ? (it.modificadores as Record<string, unknown>[]) : [];
     return {
       nombreApp: String(it.nombre_app ?? ""),
       cantidad: Number(it.cantidad ?? 1),
@@ -113,8 +113,11 @@ export async function accionPedidoApp(
 
 function etiquetaUnModificador(m: PedidoAppModificador): string {
   const cantidad = m.cantidad > 1 ? `${m.cantidad}× ` : "";
-  const anidados = m.modificadores && m.modificadores.length > 0
-    ? ` (${m.modificadores.map((n) => `${n.cantidad > 1 ? `${n.cantidad}× ` : ""}${n.nombreApp}`).join(", ")})`
+  // Un anidado sin nombre (título vacío en el normalizador) no aporta nada entre paréntesis;
+  // si se le hace caso se vería "Cheese Burger ()", que confunde más de lo que dice.
+  const conNombre = (m.modificadores ?? []).filter((n) => n.nombreApp.trim().length > 0);
+  const anidados = conNombre.length > 0
+    ? ` (${conNombre.map((n) => `${n.cantidad > 1 ? `${n.cantidad}× ` : ""}${n.nombreApp}`).join(", ")})`
     : "";
   return `${cantidad}${m.nombreApp}${anidados}`;
 }

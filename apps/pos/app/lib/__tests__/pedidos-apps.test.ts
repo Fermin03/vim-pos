@@ -134,6 +134,13 @@ describe("etiquetaModificadores: los extras van pegados a su componente", () => 
   it("modificadores anidado presente pero vacío se trata igual que ausente", () => {
     expect(etiquetaModificadores([{ nombreApp: "Papas Sencillas", cantidad: 1, modificadores: [] }])).toBe("Papas Sencillas");
   });
+
+  it("un anidado sin nombre no genera paréntesis vacíos", () => {
+    expect(etiquetaModificadores([{ nombreApp: "Cheese Burger", cantidad: 1, modificadores: [{ nombreApp: "", cantidad: 1 }] }]))
+      .toBe("Cheese Burger");
+    expect(etiquetaModificadores([{ nombreApp: "Cheese Burger", cantidad: 1, modificadores: [{ nombreApp: "  ", cantidad: 1 }, { nombreApp: "extra queso", cantidad: 1 }] }]))
+      .toBe("Cheese Burger (extra queso)");
+  });
 });
 
 describe("itemsDesdeJson: conserva el segundo nivel al leer el pedido", () => {
@@ -162,5 +169,16 @@ describe("itemsDesdeJson: conserva el segundo nivel al leer el pedido", () => {
   it("modificadores de un solo nivel (el caso de hoy, sin combo): no gana un array vacío colgando", () => {
     const crudo = [{ nombre_app: "Hamburguesa", cantidad: 1, precio_unitario_mxn: "90.00", producto_id: "p3", modificadores: [{ nombre_app: "Sin cebolla", cantidad: 1 }] }];
     expect(itemsDesdeJson(crudo)[0].modificadores).toEqual([{ nombreApp: "Sin cebolla", cantidad: 1 }]);
+  });
+
+  it("un anidado con modificadores: [] explícito en el JSON crudo: el parseo ya lo omite, no solo el render", () => {
+    const crudo = [{
+      nombre_app: "Combo Knock-Out", cantidad: 1, precio_unitario_mxn: "180.00", producto_id: "p1",
+      modificadores: [{ nombre_app: "Cheese Burger", cantidad: 1, modificadores: [] }],
+    }];
+    const [it0] = itemsDesdeJson(crudo);
+    expect(it0.modificadores[0]).toEqual({ nombreApp: "Cheese Burger", cantidad: 1 });
+    expect(it0.modificadores[0].modificadores).toBeUndefined();
+    expect("modificadores" in it0.modificadores[0]).toBe(false);
   });
 });
