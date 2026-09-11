@@ -38,7 +38,7 @@ test("el ítem lleva el uuid de VIM como id y el precio en centavos; los excluid
   assert.deepEqual(ids, ["p-cheese", "p-agua", "p-sin-cat"]);
   const cheese = (r.menu.items as Record<string, unknown>[])[0];
   assert.deepEqual(cheese.price_info, { price: 10000 });
-  assert.deepEqual(cheese.tax_info, { tax_rate: 16 });
+  assert.deepEqual(cheese.tax_info, { vat_rate_percentage: 16 });
   assert.deepEqual(cheese.title, { translations: { es_mx: "Cheese burger" } });
   assert.deepEqual(cheese.description, { translations: { es_mx: "Con queso" } });
   assert.deepEqual(r.excluidos.map((e) => e.motivo), ["agotado", "sin precio", "oculto en el POS", "id inválido para Uber"]);
@@ -83,6 +83,22 @@ test("sin productos válidos: menú vacío pero bien formado", () => {
   assert.deepEqual((r.menu.menus[0] as { category_ids: string[] }).category_ids, []);
 });
 
+test("el IVA viaja como vat_rate_percentage (México, precio con IVA incluido)", () => {
+  const r = construirMenuUber(
+    [{ id: "p1", nombre: "Hamburguesa", precio_base_mxn: 100, tasa_iva: 16 },
+     { id: "p2", nombre: "Pan para llevar", precio_base_mxn: 30, tasa_iva: 0 }],
+    [],
+    { grupos: [{ id: "g", nombre: "Extras", tipo_seleccion: "MULTIPLE_OPCIONAL",
+                 minimo_selecciones: null, maximo_selecciones: null,
+                 opciones: [{ id: "o", nombre: "Queso", precio_extra_mxn: 15 }], producto_ids: ["p1"] }] },
+  );
+  const items = r.menu.items as ItemMenu[];
+  assert.deepEqual(items.find((i) => i.id === "p1")!.tax_info, { vat_rate_percentage: 16 });
+  assert.deepEqual(items.find((i) => i.id === "p2")!.tax_info, { vat_rate_percentage: 0 });
+  assert.deepEqual(items.find((i) => i.id === "o")!.tax_info, { vat_rate_percentage: 16 });
+  assert.equal("tax_rate" in items[0]!.tax_info, false);
+});
+
 // Formas mínimas de lo que Uber espera en `items`/`modifier_groups`, solo con los campos que
 // estas pruebas leen — evita `any` al indexar el `unknown[]` que devuelve `construirMenuUber`.
 type Ajuste = { context_type: "MODIFIER_GROUP"; context_value: string; price: number; core_price: number };
@@ -91,6 +107,7 @@ type ItemMenu = {
   id: string;
   price_info: { price: number; core_price: number; overrides: Ajuste[] };
   quantity_info: { overrides: AjusteCantidad[] };
+  tax_info: { vat_rate_percentage: number };
   external_data: string;
   modifier_group_ids: { ids: string[] };
 };

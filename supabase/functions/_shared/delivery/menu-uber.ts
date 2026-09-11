@@ -7,7 +7,7 @@
 //
 // Módulo puro: recibe productos, categorías, grupos de modificadores y combos ya leídos, devuelve
 // el cuerpo exacto que espera Uber. Precios en centavos (Uber no acepta decimales); IVA como
-// `tax_rate`. Un combo se publica como el producto padre más un `modifier_group` por slot, cuyas
+// `vat_rate_percentage`. Un combo se publica como el producto padre más un `modifier_group` por slot, cuyas
 // opciones son los productos reales de la carta — el mismo cálculo aditivo que hace el servidor
 // en `agregar_combo_a_ticket`.
 
@@ -215,7 +215,7 @@ export function construirMenuUber(
       id: p.id,
       title: texto(p.nombre || "Producto"),
       price_info: { price: precio },
-      tax_info: { tax_rate: Math.max(0, Number(p.tasa_iva ?? 16) || 0) },
+      tax_info: { vat_rate_percentage: Math.max(0, Number(p.tasa_iva ?? 16) || 0) },
       quantity_info: {},
       // Los grupos de modificadores propios van primero; los slots de combo que traen a este
       // producto como opción, después — un combo no tiene grupos propios publicados (invariante
@@ -258,7 +258,7 @@ export function construirMenuUber(
         // Uber SUMA el precio de la opción al del padre, así que aquí va el extra tal cual.
         // `core_price` es lo que Uber usa para calcular un reembolso parcial.
         price_info: { price: precio, core_price: precio },
-        tax_info: { tax_rate: 16 },
+        tax_info: { vat_rate_percentage: 16 },
         quantity_info: {},
         modifier_group_ids: { ids: [] },
         external_data: o.id,
