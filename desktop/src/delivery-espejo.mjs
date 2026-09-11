@@ -62,6 +62,9 @@ export function codigoDeError(m) {
   if (m.includes("requiere entre") && m.includes("selecciones")) return "COMBO_INCOMPLETO";
   if (m.includes("está agotado o pausado")) return "PRODUCTO_AGOTADO";
   if (m.includes("no es opción del slot")) return "COMBO_OPCION_INVALIDA";
+  // Se dispara cuando alguien desactiva una opción de un slot en el admin (combo_opciones.activa =
+  // false) mientras Uber sigue vendiendo la carta vieja que la ofrecía.
+  if (m.includes("está excluido del slot")) return "COMBO_OPCION_EXCLUIDA";
   return m;
 }
 

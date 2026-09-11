@@ -16,11 +16,15 @@
 -- hijo, porque las vistas de ventas sí cuentan a los hijos.
 
 -- ── reprorratear_combo ───────────────────────────────────────────────────────
--- El prorrateo de los hijos vive en dos sitios: lo calcula agregar_combo_a_ticket al vender en
--- caja, y hay que recalcularlo cuando un pedido de app impone el precio que cobró la plataforma
--- (distinto del que sale de sumar catálogo + deltas). Para no tener la misma aritmética escrita
--- dos veces, se extrae aquí. Mismos atributos de función que agregar_combo_a_ticket (0111): sin
--- SECURITY DEFINER (invoker), plpgsql plano — corre bajo el mismo contexto RLS que la RPC de caja.
+-- El prorrateo de los hijos vive en DOS sitios, no uno: lo calcula agregar_combo_a_ticket al
+-- vender en caja (0111_combos.sql:419-424, la misma aritmética — carta proporcional, el último
+-- absorbe la diferencia), y hay que recalcularlo aparte cuando un pedido de app impone el precio
+-- que cobró la plataforma (distinto del que sale de sumar catálogo + deltas). No se pudo extraer
+-- una sola función para los dos casos: 0111 ya está aplicada en producción y no se edita, así que
+-- su copia se queda donde está. Esta función es solo para el camino nuevo (crear_ticket_desde_app,
+-- más abajo); quien toque el prorrateo en un lado tiene que revisar el otro. Mismos atributos de
+-- función que agregar_combo_a_ticket (0111): sin SECURITY DEFINER (invoker), plpgsql plano — corre
+-- bajo el mismo contexto RLS que la RPC de caja.
 CREATE OR REPLACE FUNCTION reprorratear_combo(p_padre_id uuid, p_precio_padre numeric)
 RETURNS void
 LANGUAGE plpgsql
@@ -53,6 +57,12 @@ BEGIN
 END;
 $$;
 COMMENT ON FUNCTION reprorratear_combo IS 'Recalcula precio_asignado_mxn de los hijos de un combo para un precio de padre dado. Lo usa crear_ticket_desde_app cuando la app impone su precio.';
+
+-- Sin este REVOKE (hallazgo de la revisión final) queda con EXECUTE a PUBLIC por default: cualquier
+-- usuario autenticado podría reescribir precio_asignado_mxn de cualquier combo del tenant con un
+-- número arbitrario. Su único llamador es crear_ticket_desde_app, más abajo en este archivo; nada
+-- fuera de SQL la necesita.
+REVOKE ALL ON FUNCTION reprorratear_combo(uuid, numeric) FROM PUBLIC, anon, authenticated;
 
 -- ── crear_ticket_desde_app con la rama de combo ──────────────────────────────
 -- Redefinida COMPLETA tomando como base 0096_delivery_espejo_escritorio.sql: mismos atributos

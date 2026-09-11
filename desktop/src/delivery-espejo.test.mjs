@@ -234,6 +234,9 @@ test("codigoDeError traduce los errores de combo (Task 7) y los que ya existían
   assert.equal(codigoDeError('El slot "Bebida" requiere entre 1 y 1 selecciones (recibió 0)'), "COMBO_INCOMPLETO");
   assert.equal(codigoDeError('El producto "Doble" está agotado o pausado'), "PRODUCTO_AGOTADO");
   assert.equal(codigoDeError('El producto "Papas chicas" no es opción del slot "Guarnición"'), "COMBO_OPCION_INVALIDA");
+  // Revisión final, punto 6: sexto mensaje sin traducir. Aparece cuando alguien desactiva una
+  // opción de un slot en el admin mientras Uber sigue vendiendo la carta vieja.
+  assert.equal(codigoDeError('El producto "Papas chicas" está excluido del slot "Guarnición"'), "COMBO_OPCION_EXCLUIDA");
 
   // Con prefijo de crear_ticket_desde_app (0112_combos_uber.sql) — el código ya viene en el mensaje.
   assert.equal(
