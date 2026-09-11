@@ -82,3 +82,79 @@ test("sin productos válidos: menú vacío pero bien formado", () => {
   assert.equal(r.categorias, 0);
   assert.deepEqual((r.menu.menus[0] as { category_ids: string[] }).category_ids, []);
 });
+
+const GRUPOS = [
+  { id: "g-term", nombre: "Término", tipo_seleccion: "UNICA_OBLIGATORIA" as const,
+    minimo_selecciones: null, maximo_selecciones: null,
+    opciones: [{ id: "o-34", nombre: "Tres cuartos", precio_extra_mxn: 0 },
+               { id: "o-bien", nombre: "Bien cocida", precio_extra_mxn: 0 }],
+    producto_ids: ["p1"] },
+  { id: "g-extra", nombre: "Extras", tipo_seleccion: "MULTIPLE_OPCIONAL" as const,
+    minimo_selecciones: null, maximo_selecciones: null,
+    opciones: [{ id: "o-queso", nombre: "Extra queso", precio_extra_mxn: 15 },
+               { id: "o-tocino", nombre: "Tocino", precio_extra_mxn: 20, agotada: true }],
+    producto_ids: ["p1"] },
+];
+
+test("publica los grupos y sus opciones como ítems sin categoría", () => {
+  const r = construirMenuUber([{ id: "p1", nombre: "Hamburguesa", precio_base_mxn: 100, categoria_id: "cat" }],
+                              [{ id: "cat", nombre: "Hamburguesas", orden: 1 }],
+                              { grupos: GRUPOS });
+  const items = r.menu.items as Record<string, any>[];
+  // el producto lleva sus dos grupos, en orden
+  assert.deepEqual(items.find((i) => i.id === "p1")!.modifier_group_ids.ids, ["g-term", "g-extra"]);
+  // cada opción es un ítem con su precio y su external_data
+  const queso = items.find((i) => i.id === "o-queso")!;
+  assert.equal(queso.price_info.price, 1500);
+  assert.equal(queso.price_info.core_price, 1500);
+  assert.equal(queso.external_data, "o-queso");
+  // la opción agotada no se publica
+  assert.equal(items.find((i) => i.id === "o-tocino"), undefined);
+  // las opciones NO están en ninguna categoría
+  const enCategorias = r.menu.categories.flatMap((c) => c.entities.map((e) => e.id));
+  assert.deepEqual(enCategorias, ["p1"]);
+  assert.equal(r.grupos, 2);
+  assert.equal(r.opcionesModificador, 3);
+});
+
+test("las cantidades salen del tipo de selección", () => {
+  const base = { minimo_selecciones: null, maximo_selecciones: null, producto_ids: ["p1"],
+                 opciones: [{ id: "a", nombre: "A", precio_extra_mxn: 0 }, { id: "b", nombre: "B", precio_extra_mxn: 0 }] };
+  const r = construirMenuUber([{ id: "p1", nombre: "P", precio_base_mxn: 100 }], [], { grupos: [
+    { ...base, id: "g1", nombre: "Única obligatoria", tipo_seleccion: "UNICA_OBLIGATORIA" },
+    { ...base, id: "g2", nombre: "Única opcional", tipo_seleccion: "UNICA_OPCIONAL" },
+    { ...base, id: "g3", nombre: "Múltiple opcional", tipo_seleccion: "MULTIPLE_OPCIONAL" },
+    { ...base, id: "g4", nombre: "Rango", tipo_seleccion: "MULTIPLE_OBLIGATORIA_RANGO", minimo_selecciones: 1, maximo_selecciones: 2 },
+  ] });
+  const q = (id: string) => (r.menu.modifier_groups as Record<string, any>[]).find((g) => g.id === id)!.quantity_info.quantity;
+  assert.deepEqual(q("g1"), { min_permitted: 1, max_permitted: 1 });
+  assert.deepEqual(q("g2"), { min_permitted: 0, max_permitted: 1 });
+  assert.deepEqual(q("g3"), { min_permitted: 0, max_permitted: 2 });
+  assert.deepEqual(q("g4"), { min_permitted: 1, max_permitted: 2 });
+});
+
+test("un grupo sin opciones se cae; si era obligatorio, su producto tampoco se publica", () => {
+  const r = construirMenuUber(
+    [{ id: "p1", nombre: "Con obligatorio vacío", precio_base_mxn: 100 },
+     { id: "p2", nombre: "Con opcional vacío", precio_base_mxn: 100 }],
+    [],
+    { grupos: [
+      { id: "gv1", nombre: "Término", tipo_seleccion: "UNICA_OBLIGATORIA", minimo_selecciones: null, maximo_selecciones: null,
+        opciones: [{ id: "x", nombre: "X", precio_extra_mxn: 0, agotada: true }], producto_ids: ["p1"] },
+      { id: "gv2", nombre: "Extras", tipo_seleccion: "MULTIPLE_OPCIONAL", minimo_selecciones: null, maximo_selecciones: null,
+        opciones: [{ id: "y", nombre: "Y", precio_extra_mxn: 0, agotada: true }], producto_ids: ["p2"] },
+    ] });
+  assert.deepEqual(r.excluidos.map((e) => [e.id, e.motivo]), [["p1", "grupo obligatorio sin opciones"]]);
+  assert.deepEqual(r.menu.modifier_groups, []);
+  const p2 = (r.menu.items as Record<string, any>[]).find((i) => i.id === "p2")!;
+  assert.deepEqual(p2.modifier_group_ids.ids, []);
+});
+
+test("sin grupos ni combos, la carta es exactamente la de hoy", () => {
+  const productos = [{ id: "p1", nombre: "Hamburguesa", precio_base_mxn: 100, categoria_id: "cat" }];
+  const categorias = [{ id: "cat", nombre: "Hamburguesas", orden: 1 }];
+  const conParam = construirMenuUber(productos, categorias, { titulo: "Carta", grupos: [], combos: [] });
+  const sinParam = construirMenuUber(productos, categorias, { titulo: "Carta" });
+  assert.deepEqual(conParam.menu, sinParam.menu);
+  assert.deepEqual(sinParam.menu.modifier_groups, []);
+});

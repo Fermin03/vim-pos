@@ -5,9 +5,9 @@
 // tabla de mapeo y `crear_ticket_desde_app` los convierte en renglones del ticket. Sin este menú
 // la tienda de Uber no tiene nada que vender, o vende ids que el POS no conoce (`items_sin_mapear`).
 //
-// Módulo puro: recibe productos y categorías ya leídos, devuelve el cuerpo exacto que espera Uber.
-// Precios en centavos (Uber no acepta decimales); IVA como `tax_rate`; sin modificadores todavía
-// (los combos y extras del POS no se exponen en esta primera carta).
+// Módulo puro: recibe productos, categorías y grupos de modificadores ya leídos, devuelve el
+// cuerpo exacto que espera Uber. Precios en centavos (Uber no acepta decimales); IVA como
+// `tax_rate`. Los combos todavía no se exponen (van en una entrega aparte).
 
 export type ProductoCarta = {
   id: string;
@@ -25,6 +25,17 @@ export type ProductoCarta = {
 };
 
 export type CategoriaCarta = { id: string; nombre: string; orden?: number | null };
+
+export type GrupoModificadorCarta = {
+  id: string;
+  nombre: string;
+  tipo_seleccion: "UNICA_OBLIGATORIA" | "UNICA_OPCIONAL" | "MULTIPLE_OPCIONAL" | "MULTIPLE_OBLIGATORIA_RANGO";
+  minimo_selecciones: number | null;
+  maximo_selecciones: number | null;
+  opciones: { id: string; nombre: string; precio_extra_mxn: number | string; agotada?: boolean }[];
+  /** Productos a los que se aplica, en el orden en que los pide la caja. */
+  producto_ids: string[];
+};
 
 export type MenuUber = {
   items: unknown[];
@@ -50,6 +61,23 @@ export function centavos(precio: number | string): number {
 }
 
 /**
+ * Cantidades del grupo según su tipo (enum `modificador_tipo_seleccion`, 0007). Uber necesita
+ * min/max explícitos; el POS los deduce del tipo salvo en el rango, que sí los guarda.
+ */
+export function cantidadesDeGrupo(
+  g: Pick<GrupoModificadorCarta, "tipo_seleccion" | "minimo_selecciones" | "maximo_selecciones">,
+  nOpciones: number,
+): { min_permitted: number; max_permitted: number } {
+  switch (g.tipo_seleccion) {
+    case "UNICA_OBLIGATORIA": return { min_permitted: 1, max_permitted: 1 };
+    case "UNICA_OPCIONAL": return { min_permitted: 0, max_permitted: 1 };
+    case "MULTIPLE_OPCIONAL": return { min_permitted: 0, max_permitted: Math.max(1, nOpciones) };
+    case "MULTIPLE_OBLIGATORIA_RANGO":
+      return { min_permitted: g.minimo_selecciones ?? 1, max_permitted: g.maximo_selecciones ?? Math.max(1, nOpciones) };
+  }
+}
+
+/**
  * Arma el menú. Excluye productos sin precio, agotados, ocultos o con id inválido; las categorías
  * sin productos no van; los productos sin categoría caen en «Otros». Devuelve también los conteos
  * y los productos excluidos con su motivo, para que el admin diga qué quedó fuera.
@@ -57,11 +85,34 @@ export function centavos(precio: number | string): number {
 export function construirMenuUber(
   productos: ProductoCarta[],
   categorias: CategoriaCarta[],
-  opciones: { titulo?: string } = {},
-): { menu: MenuUber; items: number; categorias: number; excluidos: { id: string; nombre: string; motivo: string }[] } {
+  opciones: { titulo?: string; grupos?: GrupoModificadorCarta[]; combos?: unknown[] } = {},
+): {
+  menu: MenuUber;
+  items: number;
+  categorias: number;
+  grupos: number;
+  opcionesModificador: number;
+  excluidos: { id: string; nombre: string; motivo: string }[];
+} {
   const excluidos: { id: string; nombre: string; motivo: string }[] = [];
   const items: unknown[] = [];
   const porCategoria = new Map<string, string[]>();
+
+  // Un grupo sin opciones rompe la sincronización de la carta entera (documentado por Toast), así
+  // que no se publica. Si era obligatorio, su producto queda inordenable: se excluye también.
+  const gruposVivos = (opciones.grupos ?? [])
+    .map((g) => ({ ...g, opciones: g.opciones.filter((o) => !o.agotada && idValidoUber(o.id)) }))
+    .filter((g) => g.opciones.length > 0);
+  const gruposPorProducto = new Map<string, string[]>();
+  for (const g of gruposVivos) for (const pid of g.producto_ids) {
+    gruposPorProducto.set(pid, [...(gruposPorProducto.get(pid) ?? []), g.id]);
+  }
+  const obligatorioVacio = new Set<string>();
+  for (const g of opciones.grupos ?? []) {
+    const vivo = gruposVivos.some((v) => v.id === g.id);
+    const obligatorio = g.tipo_seleccion === "UNICA_OBLIGATORIA" || g.tipo_seleccion === "MULTIPLE_OBLIGATORIA_RANGO";
+    if (!vivo && obligatorio) for (const pid of g.producto_ids) obligatorioVacio.add(pid);
+  }
 
   for (const p of productos) {
     const precio = centavos(p.precio_base_mxn);
@@ -70,6 +121,7 @@ export function construirMenuUber(
       : p.agotado ? "agotado"
       : precio <= 0 ? "sin precio"
       : p.es_combo && !(p.n_slots && p.n_slots > 0) ? "combo sin slots"
+      : obligatorioVacio.has(p.id) ? "grupo obligatorio sin opciones"
       : null;
     if (motivo) { excluidos.push({ id: p.id, nombre: p.nombre, motivo }); continue; }
     const item: Record<string, unknown> = {
@@ -78,7 +130,7 @@ export function construirMenuUber(
       price_info: { price: precio },
       tax_info: { tax_rate: Math.max(0, Number(p.tasa_iva ?? 16) || 0) },
       quantity_info: {},
-      modifier_group_ids: { ids: [] },
+      modifier_group_ids: { ids: gruposPorProducto.get(p.id) ?? [] },
       external_data: p.id,
     };
     if (p.descripcion && p.descripcion.trim()) item.description = texto(p.descripcion);
@@ -99,9 +151,39 @@ export function construirMenuUber(
     categories.push({ id: SIN_CATEGORIA, title: texto("Otros"), entities: sueltos.map((id) => ({ id, type: "ITEM" as const })) });
   }
 
+  // Las opciones se empujan a `items` aquí, después de cerrar `porCategoria`, para que no puedan
+  // colarse en ninguna categoría: no se venden sueltas, solo como parte de un grupo.
+  const modifierGroups: unknown[] = [];
+  let nOpciones = 0;
+  for (const g of gruposVivos) {
+    for (const o of g.opciones) {
+      const precio = Math.max(0, Math.round(Number(o.precio_extra_mxn) * 100) || 0);
+      items.push({
+        id: o.id,
+        title: texto(o.nombre || "Opción"),
+        // Uber SUMA el precio de la opción al del padre, así que aquí va el extra tal cual.
+        // `core_price` es lo que Uber usa para calcular un reembolso parcial.
+        price_info: { price: precio, core_price: precio },
+        tax_info: { tax_rate: 16 },
+        quantity_info: {},
+        modifier_group_ids: { ids: [] },
+        external_data: o.id,
+      });
+      nOpciones += 1;
+    }
+    modifierGroups.push({
+      id: g.id,
+      external_data: g.id,
+      title: texto(g.nombre || "Opciones"),
+      quantity_info: { quantity: cantidadesDeGrupo(g, g.opciones.length) },
+      modifier_options: g.opciones.map((o) => ({ type: "ITEM" as const, id: o.id })),
+      display_type: "expanded",
+    });
+  }
+
   const menu: MenuUber = {
     items,
-    modifier_groups: [],
+    modifier_groups: modifierGroups,
     categories,
     menus: [{
       id: "carta",
@@ -110,5 +192,12 @@ export function construirMenuUber(
       category_ids: categories.map((c) => c.id),
     }],
   };
-  return { menu, items: items.length, categorias: categories.length, excluidos };
+  return {
+    menu,
+    items: items.length,
+    categorias: categories.length,
+    grupos: modifierGroups.length,
+    opcionesModificador: nOpciones,
+    excluidos,
+  };
 }
