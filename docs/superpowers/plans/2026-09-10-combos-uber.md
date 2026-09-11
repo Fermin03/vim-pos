@@ -25,6 +25,12 @@
 - **Dinero:** `numeric(12,2)` en la base; en la carta, centavos enteros vía `centavos()`. Nunca flotantes.
 - **RLS sagrado:** ninguna ruta de `apps/*` usa `service_role`; las Edge Functions sí, server-side.
 - **Sin `any`**; español en el dominio; archivos `kebab-case`; los comentarios explican el porqué.
+  Esto **también obliga a las pruebas**. La Task 2 dejó establecido el patrón en
+  `menu-uber.test.ts`: dos tipos mínimos locales, `ItemMenu` y `GrupoMenu`, con solo los campos que
+  las pruebas leen. Las tareas siguientes castean a esos tipos y **les añaden los campos que sus
+  propias aserciones necesiten** (la Task 3 lee `price_info.overrides`, `quantity_info.overrides` y
+  `modifier_options`, que todavía no están en ellos). Es la regla dura 4 del `CLAUDE.md` y no tiene
+  excepción por ser código de prueba.
 - Commits en español, terminados exactamente con:
   `Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>`
 
@@ -211,7 +217,7 @@ test("publica los grupos y sus opciones como ítems sin categoría", () => {
   const r = construirMenuUber([{ id: "p1", nombre: "Hamburguesa", precio_base_mxn: 100, categoria_id: "cat" }],
                               [{ id: "cat", nombre: "Hamburguesas", orden: 1 }],
                               { grupos: GRUPOS });
-  const items = r.menu.items as Record<string, any>[];
+  const items = r.menu.items as ItemMenu[];
   // el producto lleva sus dos grupos, en orden
   assert.deepEqual(items.find((i) => i.id === "p1")!.modifier_group_ids.ids, ["g-term", "g-extra"]);
   // cada opción es un ítem con su precio y su external_data
@@ -237,7 +243,7 @@ test("las cantidades salen del tipo de selección", () => {
     { ...base, id: "g3", nombre: "Múltiple opcional", tipo_seleccion: "MULTIPLE_OPCIONAL" },
     { ...base, id: "g4", nombre: "Rango", tipo_seleccion: "MULTIPLE_OBLIGATORIA_RANGO", minimo_selecciones: 1, maximo_selecciones: 2 },
   ] });
-  const q = (id: string) => (r.menu.modifier_groups as Record<string, any>[]).find((g) => g.id === id)!.quantity_info.quantity;
+  const q = (id: string) => (r.menu.modifier_groups as GrupoMenu[]).find((g) => g.id === id)!.quantity_info.quantity;
   assert.deepEqual(q("g1"), { min_permitted: 1, max_permitted: 1 });
   assert.deepEqual(q("g2"), { min_permitted: 0, max_permitted: 1 });
   assert.deepEqual(q("g3"), { min_permitted: 0, max_permitted: 2 });
@@ -257,7 +263,7 @@ test("un grupo sin opciones se cae; si era obligatorio, su producto tampoco se p
     ] });
   assert.deepEqual(r.excluidos.map((e) => [e.id, e.motivo]), [["p1", "grupo obligatorio sin opciones"]]);
   assert.deepEqual(r.menu.modifier_groups, []);
-  const p2 = (r.menu.items as Record<string, any>[]).find((i) => i.id === "p2")!;
+  const p2 = (r.menu.items as ItemMenu[]).find((i) => i.id === "p2")!;
   assert.deepEqual(p2.modifier_group_ids.ids, []);
 });
 
@@ -445,7 +451,7 @@ const PRODS = [
 
 test("el combo publica sus slots y las opciones llevan el ajuste de precio por grupo", () => {
   const r = construirMenuUber(PRODS, [{ id: "cat", nombre: "Todo", orden: 1 }], { combos: [COMBO] });
-  const items = r.menu.items as Record<string, any>[];
+  const items = r.menu.items as ItemMenu[];
   // el padre: precio base y sus slots en orden
   const padre = items.find((i) => i.id === "c1")!;
   assert.equal(padre.price_info.price, 4500);
@@ -464,7 +470,7 @@ test("el combo publica sus slots y las opciones llevan el ajuste de precio por g
   assert.equal(papas.price_info.overrides[0].price, 0);
   assert.equal(papas.price_info.overrides[0].core_price, 5000);
   // los slots son grupos con sus cantidades
-  const slot = (r.menu.modifier_groups as Record<string, any>[]).find((g) => g.id === "s-burger")!;
+  const slot = (r.menu.modifier_groups as GrupoMenu[]).find((g) => g.id === "s-burger")!;
   assert.deepEqual(slot.quantity_info.quantity, { min_permitted: 1, max_permitted: 1 });
   assert.deepEqual(slot.modifier_options, [{ type: "ITEM", id: "p1" }, { type: "ITEM", id: "p2" }]);
   assert.equal(r.combos, 1);
@@ -478,7 +484,7 @@ test("el segundo nivel se conserva: el hijo mantiene sus propios grupos", () => 
                opciones: [{ id: "o-34", nombre: "Tres cuartos", precio_extra_mxn: 0 }],
                producto_ids: ["p2"] }],
   });
-  const doble = (r.menu.items as Record<string, any>[]).find((i) => i.id === "p2")!;
+  const doble = (r.menu.items as ItemMenu[]).find((i) => i.id === "p2")!;
   assert.deepEqual(doble.modifier_group_ids.ids, ["g-term"]);
 });
 
@@ -487,7 +493,7 @@ test("un slot sin opciones publicables tumba el combo entero", () => {
     combos: [{ ...COMBO, slots: [COMBO.slots[0]!, { ...COMBO.slots[1]!, opciones: [] }] }],
   });
   assert.deepEqual(r.excluidos.map((e) => [e.id, e.motivo]), [["c1", "slot sin opciones"]]);
-  assert.equal((r.menu.items as Record<string, any>[]).find((i) => i.id === "c1"), undefined);
+  assert.equal((r.menu.items as ItemMenu[]).find((i) => i.id === "c1"), undefined);
   // sus slots tampoco se publican
   assert.deepEqual(r.menu.modifier_groups, []);
 });
@@ -498,7 +504,7 @@ test("una opción de slot que no está en la carta no cuenta", () => {
     [],
     { combos: [COMBO] },
   );
-  const slot = (r.menu.modifier_groups as Record<string, any>[]).find((g) => g.id === "s-burger")!;
+  const slot = (r.menu.modifier_groups as GrupoMenu[]).find((g) => g.id === "s-burger")!;
   assert.deepEqual(slot.modifier_options, [{ type: "ITEM", id: "p2" }]);
 });
 ```
@@ -640,7 +646,7 @@ test("el IVA viaja como vat_rate_percentage (México, precio con IVA incluido)",
                  minimo_selecciones: null, maximo_selecciones: null,
                  opciones: [{ id: "o", nombre: "Queso", precio_extra_mxn: 15 }], producto_ids: ["p1"] }] },
   );
-  const items = r.menu.items as Record<string, any>[];
+  const items = r.menu.items as ItemMenu[];
   assert.deepEqual(items.find((i) => i.id === "p1")!.tax_info, { vat_rate_percentage: 16 });
   assert.deepEqual(items.find((i) => i.id === "p2")!.tax_info, { vat_rate_percentage: 0 });
   assert.deepEqual(items.find((i) => i.id === "o")!.tax_info, { vat_rate_percentage: 16 });
