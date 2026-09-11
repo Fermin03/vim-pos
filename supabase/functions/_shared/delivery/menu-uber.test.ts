@@ -207,9 +207,11 @@ test("el combo publica sus slots y las opciones llevan el ajuste de precio por g
   assert.deepEqual(doble.price_info.overrides, [
     { context_type: "MODIFIER_GROUP", context_value: "s-burger", price: 13000, core_price: 13000 },
   ]);
-  assert.deepEqual(doble.quantity_info.overrides, [
-    { context_type: "MODIFIER_GROUP", context_value: "s-burger", quantity: { min_permitted: 0, max_permitted: 1 } },
-  ]);
+  // sin la clave `quantity` vacía: una clave opcional ausente es más segura que una presente y
+  // vacía frente a un validador de schema, y así publica hoy `quantity_info: {}` para los demás.
+  assert.deepEqual(doble.quantity_info, {
+    overrides: [{ context_type: "MODIFIER_GROUP", context_value: "s-burger", quantity: { min_permitted: 0, max_permitted: 1 } }],
+  });
   // las papas aportan 0 dentro del combo pero valen 50 sueltas
   const papas = items.find((i) => i.id === "p3")!;
   assert.equal(papas.price_info.overrides[0].price, 0);
@@ -263,4 +265,27 @@ test("una opción de slot agotada no cuenta; si era la única, el combo se cae",
   });
   assert.deepEqual(r.excluidos.map((e) => [e.id, e.motivo]), [["c1", "slot sin opciones"], ["p1", "agotado"]]);
   assert.deepEqual(r.menu.modifier_groups, []);
+});
+
+test("un combo agotado (o de otro modo excluido) no publica sus slots como grupos huérfanos", () => {
+  // c1 está agotado: su ítem se excluye por su propio motivo ("agotado"), no por "slot sin
+  // opciones". Antes de este arreglo, `combosVivos` solo miraba si las OPCIONES de los slots
+  // estaban en la carta, nunca si el propio padre lo estaba — así que sus modifier_groups se
+  // publicaban igual, sin ningún ítem (el padre no existe) que los referenciara.
+  const prods = PRODS.map((p) => (p.id === "c1" ? { ...p, agotado: true } : p));
+  const r = construirMenuUber(prods, [], { combos: [COMBO] });
+  assert.deepEqual(r.excluidos.map((e) => [e.id, e.motivo]), [["c1", "agotado"]]);
+  assert.equal((r.menu.items as ItemMenu[]).find((i) => i.id === "c1"), undefined);
+  assert.deepEqual(r.menu.modifier_groups, []);
+  assert.equal(r.combos, 0);
+});
+
+test("lo mismo por el otro camino: n_slots=0 excluye al padre por «combo sin slots», y sus slots tampoco se publican", () => {
+  // El motivo "combo sin slots" no sale de `motivoBase` — sale de `n_slots`, un campo aparte que
+  // ya trae el producto. `padreVivo` tiene que cubrir los dos caminos, no solo `motivoBase`.
+  const prods = PRODS.map((p) => (p.id === "c1" ? { ...p, n_slots: 0 } : p));
+  const r = construirMenuUber(prods, [], { combos: [COMBO] });
+  assert.deepEqual(r.excluidos.map((e) => [e.id, e.motivo]), [["c1", "combo sin slots"]]);
+  assert.deepEqual(r.menu.modifier_groups, []);
+  assert.equal(r.combos, 0);
 });

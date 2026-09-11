@@ -77,6 +77,20 @@ export function centavos(precio: number | string): number {
 }
 
 /**
+ * Motivo de exclusión que no depende de combos ni de grupos: id inválido, oculto, agotado o sin
+ * precio. Es el único criterio para decidir si un producto entra a `items[]`, y el mismo que usa
+ * `combosPublicables` para saber qué productos están realmente "en la carta" — para que un slot
+ * de combo nunca apunte a una opción (o a un padre) que Uber no va a encontrar.
+ */
+function motivoBase(p: ProductoCarta): string | null {
+  return !idValidoUber(p.id) ? "id inválido para Uber"
+    : p.visible === false ? "oculto en el POS"
+    : p.agotado ? "agotado"
+    : centavos(p.precio_base_mxn) <= 0 ? "sin precio"
+    : null;
+}
+
+/**
  * Cantidades del grupo según su tipo (enum `modificador_tipo_seleccion`, 0007). Uber necesita
  * min/max explícitos; el POS los deduce del tipo salvo en el rango, que sí los guarda.
  */
@@ -91,6 +105,61 @@ export function cantidadesDeGrupo(
     case "MULTIPLE_OBLIGATORIA_RANGO":
       return { min_permitted: g.minimo_selecciones ?? 1, max_permitted: g.maximo_selecciones ?? Math.max(1, nOpciones) };
   }
+}
+
+type AjustePrecio = { context_type: "MODIFIER_GROUP"; context_value: string; price: number; core_price: number };
+type AjusteCantidad = { context_type: "MODIFIER_GROUP"; context_value: string; quantity: { min_permitted: number; max_permitted: number } };
+
+/**
+ * Decide qué combos son publicables y qué ajuste de precio/cantidad le toca, por slot, a cada
+ * producto que es opción de uno.
+ *
+ * Un combo se publica solo si su propio producto (el padre) también se publica: si el padre está
+ * agotado, oculto, sin precio, con id inválido (`motivoBase`), o si su conteo de slots en la base
+ * dice que no tiene ninguno ("combo sin slots"), sus grupos-slot quedarían huérfanos —publicados
+ * sin que ningún ítem los referencie— y sus opciones cargarían un ajuste de precio que nadie usa.
+ * Luego, un combo al que le falta un slot es inordenable en Uber (rechazo MISSING_ITEM): tampoco
+ * se publica. Las opciones que ya no están en la carta (agotadas, ocultas, sin precio) simplemente
+ * no cuentan.
+ */
+function combosPublicables(
+  productos: ProductoCarta[],
+  combos: ComboCarta[],
+): {
+  combosVivos: ComboCarta[];
+  comboSinSlot: Set<string>;
+  slotsPorCombo: Map<string, string[]>;
+  ajustesPrecio: Map<string, AjustePrecio[]>;
+  ajustesCantidad: Map<string, AjusteCantidad[]>;
+} {
+  const enCarta = new Set(productos.filter((p) => motivoBase(p) === null).map((p) => p.id));
+  const padreVivo = (id: string): boolean => {
+    const p = productos.find((pp) => pp.id === id);
+    return !!p && motivoBase(p) === null && !(p.es_combo && !(p.n_slots && p.n_slots > 0));
+  };
+  const combosVivos: ComboCarta[] = [];
+  const comboSinSlot = new Set<string>();
+  for (const c of combos) {
+    if (!padreVivo(c.producto_id)) continue; // el padre ya se excluye por su propio motivo
+    const slots = [...c.slots].sort((a, b) => a.orden - b.orden)
+      .map((s) => ({ ...s, opciones: s.opciones.filter((o) => enCarta.has(o.producto_id)) }));
+    if (slots.length === 0 || slots.some((s) => s.opciones.length === 0)) { comboSinSlot.add(c.producto_id); continue; }
+    combosVivos.push({ ...c, slots });
+  }
+  const slotsPorCombo = new Map<string, string[]>();
+  const ajustesPrecio = new Map<string, AjustePrecio[]>();
+  const ajustesCantidad = new Map<string, AjusteCantidad[]>();
+  for (const c of combosVivos) {
+    slotsPorCombo.set(c.producto_id, c.slots.map((s) => s.id));
+    for (const s of c.slots) for (const o of s.opciones) {
+      const suelto = centavos(productos.find((p) => p.id === o.producto_id)?.precio_base_mxn ?? 0);
+      ajustesPrecio.set(o.producto_id, [...(ajustesPrecio.get(o.producto_id) ?? []),
+        { context_type: "MODIFIER_GROUP", context_value: s.id, price: centavos(o.importe_mxn), core_price: suelto }]);
+      ajustesCantidad.set(o.producto_id, [...(ajustesCantidad.get(o.producto_id) ?? []),
+        { context_type: "MODIFIER_GROUP", context_value: s.id, quantity: { min_permitted: 0, max_permitted: 1 } }]);
+    }
+  }
+  return { combosVivos, comboSinSlot, slotsPorCombo, ajustesPrecio, ajustesCantidad };
 }
 
 /**
@@ -115,17 +184,6 @@ export function construirMenuUber(
   const items: unknown[] = [];
   const porCategoria = new Map<string, string[]>();
 
-  // Motivo de exclusión que no depende de combos ni de grupos: id inválido, oculto, agotado o sin
-  // precio. Se usa tanto para la cadena de exclusión del producto (abajo) como para decidir qué
-  // productos están realmente en la carta que se publica (`enCarta`, abajo) — el mismo criterio en
-  // un solo sitio, para que un producto excluido nunca aparezca como opción de un slot.
-  const motivoBase = (p: ProductoCarta): string | null =>
-    !idValidoUber(p.id) ? "id inválido para Uber"
-    : p.visible === false ? "oculto en el POS"
-    : p.agotado ? "agotado"
-    : centavos(p.precio_base_mxn) <= 0 ? "sin precio"
-    : null;
-
   // Un grupo sin opciones rompe la sincronización de la carta entera (documentado por Toast), así
   // que no se publica. Si era obligatorio, su producto queda inordenable: se excluye también.
   const gruposVivos = (opciones.grupos ?? [])
@@ -142,35 +200,8 @@ export function construirMenuUber(
     if (!vivo && obligatorio) for (const pid of g.producto_ids) obligatorioVacio.add(pid);
   }
 
-  // Un combo al que le falta un slot es inordenable en Uber (rechazo MISSING_ITEM): no se publica.
-  // Las opciones que ya no están en la carta (agotadas, ocultas, sin precio) simplemente no cuentan;
-  // `enCarta` usa el mismo `motivoBase` que la cadena de exclusión de abajo, para que un slot
-  // nunca apunte a un `modifier_option` que Uber no va a encontrar en `items[]`.
-  const enCarta = new Set(productos.filter((p) => motivoBase(p) === null).map((p) => p.id));
-  const combosVivos: ComboCarta[] = [];
-  const comboSinSlot = new Set<string>();
-  for (const c of opciones.combos ?? []) {
-    const slots = [...c.slots].sort((a, b) => a.orden - b.orden)
-      .map((s) => ({ ...s, opciones: s.opciones.filter((o) => enCarta.has(o.producto_id) && idValidoUber(o.producto_id)) }));
-    if (slots.length === 0 || slots.some((s) => s.opciones.length === 0)) { comboSinSlot.add(c.producto_id); continue; }
-    combosVivos.push({ ...c, slots });
-  }
-  const slotsPorCombo = new Map<string, string[]>();
-  /** producto → ajustes que le tocan por estar en un slot. */
-  const ajustesPrecio = new Map<string, { context_type: "MODIFIER_GROUP"; context_value: string; price: number; core_price: number }[]>();
-  const ajustesCantidad = new Map<string, { context_type: "MODIFIER_GROUP"; context_value: string; quantity: { min_permitted: number; max_permitted: number } }[]>();
-  for (const c of combosVivos) {
-    slotsPorCombo.set(c.producto_id, c.slots.map((s) => s.id));
-    for (const s of c.slots) for (const o of s.opciones) {
-      const suelto = centavos(productos.find((p) => p.id === o.producto_id)?.precio_base_mxn ?? 0);
-      ajustesPrecio.set(o.producto_id, [...(ajustesPrecio.get(o.producto_id) ?? []),
-        { context_type: "MODIFIER_GROUP", context_value: s.id,
-          price: Math.max(0, Math.round(Number(o.importe_mxn) * 100) || 0), core_price: suelto }]);
-      ajustesCantidad.set(o.producto_id, [...(ajustesCantidad.get(o.producto_id) ?? []),
-        { context_type: "MODIFIER_GROUP", context_value: s.id,
-          quantity: { min_permitted: 0, max_permitted: 1 } }]);
-    }
-  }
+  const { combosVivos, comboSinSlot, slotsPorCombo, ajustesPrecio, ajustesCantidad } =
+    combosPublicables(productos, opciones.combos ?? []);
 
   for (const p of productos) {
     const precio = centavos(p.precio_base_mxn);
@@ -196,7 +227,7 @@ export function construirMenuUber(
     const ajP = ajustesPrecio.get(p.id);
     if (ajP?.length) item.price_info = { price: precio, overrides: ajP };
     const ajC = ajustesCantidad.get(p.id);
-    if (ajC?.length) item.quantity_info = { quantity: {}, overrides: ajC };
+    if (ajC?.length) item.quantity_info = { overrides: ajC };
     items.push(item);
     const cat = p.categoria_id && categorias.some((c) => c.id === p.categoria_id) ? p.categoria_id : SIN_CATEGORIA;
     porCategoria.set(cat, [...(porCategoria.get(cat) ?? []), p.id]);
@@ -220,7 +251,7 @@ export function construirMenuUber(
   let nOpciones = 0;
   for (const g of gruposVivos) {
     for (const o of g.opciones) {
-      const precio = Math.max(0, Math.round(Number(o.precio_extra_mxn) * 100) || 0);
+      const precio = centavos(o.precio_extra_mxn);
       items.push({
         id: o.id,
         title: texto(o.nombre || "Opción"),
