@@ -172,18 +172,21 @@ BEGIN
         RAISE EXCEPTION 'COMBO_ELECCION_SIN_MAPEAR: el combo "%" trae una elección que no es un slot activo de este combo o cuyo producto no está mapeado en el catálogo', v_item->>'nombre_app';
       END IF;
 
-      -- Guardarraíl 2 (ronda de revisión 1, "importante", patrón del plan): el UPDATE de más abajo
-      -- que cobra los modificadores del segundo nivel empareja por producto (hijo.producto_id), no
-      -- por elección individual. Si un slot con maximo_selecciones > 1 trae el MISMO producto
-      -- elegido dos veces y alguna de esas dos apariciones trae modificadores anidados (p. ej. dos
-      -- refrescos, uno con un extra distinto del otro), no hay forma de saber a cuál hijo va cada
-      -- extra: se niega a adivinar en vez de atribuir el dinero a la fila equivocada. Dos elecciones
-      -- iguales SIN modificadores anidados (el caso normal de "2 refrescos") no entra aquí.
+      -- Guardarraíl 2 (ronda de revisión 1, ampliado en la ronda 2): el UPDATE de más abajo que
+      -- cobra los modificadores del segundo nivel empareja por producto (hijo.producto_id), sin
+      -- distinguir de qué elección —ni de qué SLOT— vino cada hijo. El principio es "negarse a
+      -- adivinar cuando no se puede saber a qué hijo va el dinero"; la clave tiene que ser solo
+      -- opcion_modificador_id, no (grupo_id, opcion_modificador_id): un combo "elige dos bebidas"
+      -- se configura tan naturalmente como dos SLOTS de la misma categoría como con un slot de
+      -- maximo_selecciones=2, y si el mismo producto se elige en dos slots distintos con extras de
+      -- segundo nivel distintos, el UPDATE tampoco puede distinguirlos aunque el grupo_id difiera.
+      -- Dos elecciones del mismo producto SIN modificadores anidados en ninguna (vengan del mismo
+      -- slot o de dos distintos) no entran aquí y siguen produciendo ticket con su dinero correcto.
       IF EXISTS (
         SELECT 1
           FROM jsonb_array_elements(COALESCE(v_item->'modificadores', '[]'::jsonb)) m
          WHERE NULLIF(m->>'grupo_id', '') IS NOT NULL AND NULLIF(m->>'opcion_modificador_id', '') IS NOT NULL
-         GROUP BY m->>'grupo_id', m->>'opcion_modificador_id'
+         GROUP BY m->>'opcion_modificador_id'
         HAVING count(*) > 1 AND bool_or(jsonb_array_length(COALESCE(m->'modificadores', '[]'::jsonb)) > 0)
       ) THEN
         RAISE EXCEPTION 'COMBO_ELECCION_AMBIGUA: el combo "%" repite la misma elección de slot con modificadores de segundo nivel en alguna de las repeticiones; no se puede saber a qué unidad va cada extra', v_item->>'nombre_app';

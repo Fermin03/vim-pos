@@ -16,9 +16,9 @@ DECLARE
   v_caja   uuid := '99999999-0000-0000-0000-0000000000cc';
   v_maria  uuid := '99999999-0000-0000-0000-000000000001';
   v_cat_h  uuid; v_combo uuid; v_slot_hamb uuid; v_slot_beb uuid; v_slot_papas uuid;
-  v_prod_hamb uuid; v_prod_beb uuid; v_prod_papas uuid; v_grupo_termino uuid; v_opcion_termino uuid;
+  v_prod_hamb uuid; v_prod_beb uuid; v_prod_papas uuid; v_prod_multi uuid; v_grupo_termino uuid; v_opcion_termino uuid;
   v_conexion uuid; v_turno uuid;
-  v_pedido1 uuid; v_pedido2 uuid; v_pedido3 uuid; v_pedido4 uuid; v_pedido5 uuid; v_pedido6 uuid; v_pedido7 uuid;
+  v_pedido1 uuid; v_pedido2 uuid; v_pedido3 uuid; v_pedido4 uuid; v_pedido5 uuid; v_pedido6 uuid; v_pedido7 uuid; v_pedido8 uuid;
   v_ticket1 uuid; v_ticket2 uuid; v_ticket7 uuid;
   v_padre1 uuid; v_padre2 uuid; v_padre7 uuid;
   v_precio_padre numeric; v_suma_asignado numeric;
@@ -51,6 +51,12 @@ BEGIN
   VALUES (v_tenant, v_combo, 'Papas', 3, 0, 2, 'DELTA') RETURNING id INTO v_slot_papas;
   INSERT INTO productos(tenant_id, categoria_id, nombre, precio_base_mxn) VALUES (v_tenant, v_cat_h, 'Papas combo Uber smoke', 20) RETURNING id INTO v_prod_papas;
   INSERT INTO combo_opciones(tenant_id, grupo_id, producto_id, precio_delta_mxn, es_default) VALUES (v_tenant, v_slot_papas, v_prod_papas, 0, false);
+
+  -- Un producto válido como opción en DOS slots distintos (Bebida y Papas): solo lo usa el pedido
+  -- 8 (guardarraíl 2 ampliado en la ronda 2 — la ambigüedad "entre slots", no solo dentro del mismo).
+  INSERT INTO productos(tenant_id, categoria_id, nombre, precio_base_mxn) VALUES (v_tenant, v_cat_h, 'Multi-slot Uber smoke', 25) RETURNING id INTO v_prod_multi;
+  INSERT INTO combo_opciones(tenant_id, grupo_id, producto_id, precio_delta_mxn, es_default) VALUES (v_tenant, v_slot_beb, v_prod_multi, 0, false);
+  INSERT INTO combo_opciones(tenant_id, grupo_id, producto_id, precio_delta_mxn, es_default) VALUES (v_tenant, v_slot_papas, v_prod_multi, 0, false);
 
   INSERT INTO grupos_modificadores(tenant_id, nombre, tipo_seleccion) VALUES (v_tenant, 'Término de cocción Uber smoke', 'UNICA_OBLIGATORIA') RETURNING id INTO v_grupo_termino;
   INSERT INTO opciones_modificador(tenant_id, grupo_id, nombre, precio_extra_mxn) VALUES (v_tenant, v_grupo_termino, 'Tres cuartos Uber smoke', 0) RETURNING id INTO v_opcion_termino;
@@ -316,6 +322,45 @@ BEGIN
   SELECT total_mxn INTO v_total_ticket FROM tickets WHERE id = v_ticket7;
   IF v_total_ticket <> 206 THEN RAISE EXCEPTION 'pedido 7: el ticket debe cobrar 206, es %', v_total_ticket; END IF;
   RAISE NOTICE 'pedido 7 OK: dos elecciones iguales sin modificadores anidados no las bloquea el guardarraíl (padre 206)';
+
+  -- 10) Ronda de revisión 2: el mismo producto elegido en DOS SLOTS DISTINTOS (Bebida y Papas),
+  -- cada elección con un modificador de segundo nivel distinto. El UPDATE empareja por
+  -- hijo.producto_id sin mirar de qué slot vino cada hijo, así que esto es tan ambiguo como
+  -- repetir el producto dentro del mismo slot — la clave del guardarraíl 2 ahora es solo
+  -- opcion_modificador_id (ronda 2), no (grupo_id, opcion_modificador_id), precisamente para
+  -- atrapar este caso. Debe reventar con COMBO_ELECCION_AMBIGUA y dejar el pedido sin ticket.
+  INSERT INTO delivery_pedidos (tenant_id, sucursal_id, conexion_id, app, id_externo, folio_corto, estado,
+    cliente_nombre, items, total_cliente_mxn, vence_aceptacion)
+  VALUES (v_tenant, v_suc, v_conexion, 'APP_UBEREATS', 'uber-combo-smoke-8', '9C008', 'RECIBIDO',
+    'Cliente Uber Combo multi-slot ambiguo',
+    jsonb_build_array(jsonb_build_object(
+      'producto_id', v_combo, 'nombre_app', 'Combo Uber smoke', 'cantidad', 1,
+      'precio_unitario_mxn', 45.00, 'nota', NULL,
+      'modificadores', jsonb_build_array(
+        jsonb_build_object('grupo_id', v_slot_hamb, 'opcion_modificador_id', v_prod_hamb,
+          'nombre_app', 'Hamburguesa combo Uber smoke', 'cantidad', 1, 'precio_extra_mxn', 130.00),
+        jsonb_build_object('grupo_id', v_slot_beb, 'opcion_modificador_id', v_prod_multi,
+          'nombre_app', 'Multi-slot Uber smoke (como bebida)', 'cantidad', 1, 'precio_extra_mxn', 9.00,
+          'modificadores', jsonb_build_array(
+            jsonb_build_object('grupo_id', v_grupo_termino, 'opcion_modificador_id', v_opcion_termino,
+              'nombre_app', 'Extra multi-slot bebida', 'cantidad', 1, 'precio_extra_mxn', 12.00))),
+        jsonb_build_object('grupo_id', v_slot_papas, 'opcion_modificador_id', v_prod_multi,
+          'nombre_app', 'Multi-slot Uber smoke (como papas)', 'cantidad', 1, 'precio_extra_mxn', 9.00,
+          'modificadores', jsonb_build_array(
+            jsonb_build_object('grupo_id', v_grupo_termino, 'opcion_modificador_id', v_opcion_termino,
+              'nombre_app', 'Extra multi-slot papas', 'cantidad', 1, 'precio_extra_mxn', 6.00)))))),
+    211.00, now() + interval '11 minutes')
+  RETURNING id INTO v_pedido8;
+
+  BEGIN
+    PERFORM crear_ticket_desde_app(v_pedido8);
+    RAISE EXCEPTION 'debió fallar: mismo producto elegido en dos slots distintos, ambos con modificador anidado';
+  EXCEPTION WHEN OTHERS THEN
+    IF SQLERRM NOT LIKE 'COMBO_ELECCION_AMBIGUA%' THEN RAISE; END IF;
+    RAISE NOTICE 'elección ambigua entre slots distintos rechazada: %', SQLERRM;
+  END;
+  SELECT ticket_id INTO v_ticket1 FROM delivery_pedidos WHERE id = v_pedido8;
+  IF v_ticket1 IS NOT NULL THEN RAISE EXCEPTION 'el pedido con producto repetido entre slots no debió quedar con ticket'; END IF;
 
   RAISE NOTICE 'SMOKE COMBOS UBER OK';
 END $$;
