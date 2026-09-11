@@ -22,8 +22,6 @@ Caja, cocina, mesas, inventario y facturación en un solo sistema. La implementa
 
 [Escríbenos por correo](mailto:hola@vimpos.com.mx)
 
-En operación en Knock-Out Burger, León, Gto.
-
 ![La caja en plena venta: el catálogo por categorías y un ticket en curso con una hamburguesa, papas y refresco.](https://vimpos.com.mx/assets/img/capturas/pos-home.webp?v=2)
 
 Todo tu sistema vive en tu caja, no en internet
