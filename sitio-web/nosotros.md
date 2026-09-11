@@ -4,7 +4,7 @@
 
 **VIM POS** · punto de venta para restaurantes en México · versión en HTML: https://vimpos.com.mx/nosotros
 
-VIM POS no se vende por distribuidores ni se atiende desde un centro de llamadas. Nosotros instalamos el sistema, capacitamos a tu equipo y respondemos por él: cuando algo falla no hay a quién pasarle la bolita.
+VIM POS no se vende por distribuidores ni se atiende desde un centro de llamadas. Nosotros instalamos el sistema, capacitamos a tu equipo y respondemos por él.
 
 ## Quién construye VIM POS
 
