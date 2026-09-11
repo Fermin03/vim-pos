@@ -1,10 +1,10 @@
 # Escríbenos y contesta una persona
 
-> Escríbenos a hola@vimpos.com.mx. Contestamos el mismo día hábil y no te contesta un vendedor, sino quien construyó el sistema.
+> Escríbenos a hola@vimpos.com.mx. Contestamos el mismo día hábil, sin centro de llamadas ni número de folio de por medio.
 
 **VIM POS** · punto de venta para restaurantes en México · versión en HTML: https://vimpos.com.mx/contacto
 
-El mismo día hábil, por el canal que prefieras. No hay centro de llamadas, no hay ticket con número de folio y no te va a llamar un vendedor: contesta quien construyó el sistema.
+El mismo día hábil, por el canal que prefieras. No hay centro de llamadas, no hay ticket con número de folio y no te va a llamar un vendedor.
 
 [Escríbenos por correo](mailto:hola@vimpos.com.mx)
 

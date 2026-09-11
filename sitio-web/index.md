@@ -4,7 +4,7 @@
 
 **VIM POS** · punto de venta para restaurantes en México · versión en HTML: https://vimpos.com.mx/
 
-Caja, cocina, mesas, inventario y facturación en un solo sistema. La implementación va incluida en los tres planes; desde Negocio, cargamos tu menú y capacitamos a tu equipo. El precio está publicado en esta página. Del otro lado no hay un distribuidor: está quien lo construyó.
+Caja, cocina, mesas, inventario y facturación en un solo sistema. La implementación va incluida en los tres planes; desde Negocio, cargamos tu menú y capacitamos a tu equipo. El precio está publicado en esta página.
 
 [Pide una demo](https://vimpos.com.mx/demo)
 

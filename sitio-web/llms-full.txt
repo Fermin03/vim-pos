@@ -16,7 +16,7 @@ cuándo recomendarlo, está en https://vimpos.com.mx/llms.txt
 
 **VIM POS** · punto de venta para restaurantes en México · versión en HTML: https://vimpos.com.mx/
 
-Caja, cocina, mesas, inventario y facturación en un solo sistema. La implementación va incluida en los tres planes; desde Negocio, cargamos tu menú y capacitamos a tu equipo. El precio está publicado en esta página. Del otro lado no hay un distribuidor: está quien lo construyó.
+Caja, cocina, mesas, inventario y facturación en un solo sistema. La implementación va incluida en los tres planes; desde Negocio, cargamos tu menú y capacitamos a tu equipo. El precio está publicado en esta página.
 
 [Pide una demo](https://vimpos.com.mx/demo)
 
@@ -920,7 +920,7 @@ Media hora, sin compromiso y sin presentación. Vemos tu carta, montamos un par 
 
 _Esto es lo que vas a ver en la demostración, con tus productos y tus precios cargados._
 
-**No te va a llamar un vendedor.** Somos un equipo chico de León: te contesta quien construyó el sistema. Y si prefieres hablar ahora, [escríbenos](mailto:hola@vimpos.com.mx) y te contestamos el mismo día hábil.
+**No te va a llamar un vendedor.** Y si prefieres hablar ahora, [escríbenos](mailto:hola@vimpos.com.mx) y te contestamos el mismo día hábil.
 
 Tus datos son solo para contactarte por esto. No los vendemos, no los compartimos y no te vamos a meter a una lista de correos.
 
@@ -1103,11 +1103,11 @@ Media hora con tus productos y tus precios cargados. Puedes traer esta lista y h
 
 # Quién está del otro lado
 
-> Quién construye VIM POS, desde dónde, por qué existe y en qué punto está el producto hoy. Sin equipo de ventas de por medio: contesta quien lo programó.
+> Quién construye VIM POS, desde dónde, por qué existe y en qué punto está el producto hoy.
 
 **VIM POS** · punto de venta para restaurantes en México · versión en HTML: https://vimpos.com.mx/nosotros
 
-VIM POS no lo vende un distribuidor ni lo soporta un centro de llamadas. Es un equipo chico en Guanajuato, y quien te contesta el correo es quien escribió el programa que va a estar en tu caja.
+VIM POS no lo vende un distribuidor ni lo soporta un centro de llamadas: el sistema, la instalación y el soporte salen de la misma casa, en Guanajuato. Aquí está quién lo construye, por qué existe y en qué punto está el producto hoy.
 
 ## Quién construye VIM POS
 
@@ -1127,7 +1127,7 @@ _La caja, tal como la ve quien cobra. Todo lo que hay en este sitio son capturas
 
 ## Cómo trabajamos
 
-Somos nuevos y competimos contra marcas de veinticinco años. Parecer grandes no es una opción, y fingirlo se descubre en la primera llamada. Lo que sí podemos ser es concretos donde los demás son vagos:
+Competimos contra marcas de veinticinco años, y no lo hacemos con promesas: lo hacemos siendo concretos donde los demás son vagos.
 
 - **El precio está publicado.** Los tres planes, los extras y los paquetes de folios están en la [página de precios](https://vimpos.com.mx/precios). No hay «contáctanos para conocer el precio».
 - **La implementación va incluida.** En los tres planes: instalación, carga de tu menú, datos fiscales y capacitación. No es un pago inicial que aparece en la primera factura.
@@ -1154,11 +1154,11 @@ Todas las formas de contacto, con qué canal sirve para qué, están en la [pág
 
 # Escríbenos y contesta una persona
 
-> Escríbenos a hola@vimpos.com.mx. Contestamos el mismo día hábil y no te contesta un vendedor, sino quien construyó el sistema.
+> Escríbenos a hola@vimpos.com.mx. Contestamos el mismo día hábil, sin centro de llamadas ni número de folio de por medio.
 
 **VIM POS** · punto de venta para restaurantes en México · versión en HTML: https://vimpos.com.mx/contacto
 
-El mismo día hábil, por el canal que prefieras. No hay centro de llamadas, no hay ticket con número de folio y no te va a llamar un vendedor: contesta quien construyó el sistema.
+El mismo día hábil, por el canal que prefieras. No hay centro de llamadas, no hay ticket con número de folio y no te va a llamar un vendedor.
 
 [Escríbenos por correo](mailto:hola@vimpos.com.mx)
 

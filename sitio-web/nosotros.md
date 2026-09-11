@@ -1,10 +1,10 @@
 # Quién está del otro lado
 
-> Quién construye VIM POS, desde dónde, por qué existe y en qué punto está el producto hoy. Sin equipo de ventas de por medio: contesta quien lo programó.
+> Quién construye VIM POS, desde dónde, por qué existe y en qué punto está el producto hoy.
 
 **VIM POS** · punto de venta para restaurantes en México · versión en HTML: https://vimpos.com.mx/nosotros
 
-VIM POS no lo vende un distribuidor ni lo soporta un centro de llamadas. Es un equipo chico en Guanajuato, y quien te contesta el correo es quien escribió el programa que va a estar en tu caja.
+VIM POS no lo vende un distribuidor ni lo soporta un centro de llamadas: el sistema, la instalación y el soporte salen de la misma casa, en Guanajuato. Aquí está quién lo construye, por qué existe y en qué punto está el producto hoy.
 
 ## Quién construye VIM POS
 
@@ -24,7 +24,7 @@ _La caja, tal como la ve quien cobra. Todo lo que hay en este sitio son capturas
 
 ## Cómo trabajamos
 
-Somos nuevos y competimos contra marcas de veinticinco años. Parecer grandes no es una opción, y fingirlo se descubre en la primera llamada. Lo que sí podemos ser es concretos donde los demás son vagos:
+Competimos contra marcas de veinticinco años, y no lo hacemos con promesas: lo hacemos siendo concretos donde los demás son vagos.
 
 - **El precio está publicado.** Los tres planes, los extras y los paquetes de folios están en la [página de precios](https://vimpos.com.mx/precios). No hay «contáctanos para conocer el precio».
 - **La implementación va incluida.** En los tres planes: instalación, carga de tu menú, datos fiscales y capacitación. No es un pago inicial que aparece en la primera factura.
