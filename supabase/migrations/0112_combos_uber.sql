@@ -145,8 +145,50 @@ BEGIN
     IF COALESCE(v_es_combo, false) THEN
       -- Un combo entra por su propia RPC: el padre cobra y los hijos cocinan (ADR 0015). Los
       -- modificadores del ítem son las elecciones de slot; los suyos propios cuelgan de cada uno.
-      -- Un modificador cuyo grupo_id no sea un slot de ESTE combo se descarta por el EXISTS: evita
-      -- que un grupo de modificadores propio del combo (que no publicamos) entre como si fuera slot.
+      --
+      -- Guardarraíl 1 (ronda de revisión 1, "importante"): toda elección con grupo_id tiene que
+      -- ser un slot ACTIVO de ESTE combo Y traer su producto mapeado. Dos rutas la rompen sin
+      -- ningún error de catálogo: (a) un slot con maximo_selecciones > 1 donde una elección está
+      -- mapeada y otra no —el normalizador (uber.ts) deja grupo_id puesto y opcion_modificador_id
+      -- en null cuando el producto elegido no está en catálogo todavía; el mínimo/máximo del slot
+      -- lo satisface la elección mapeada, así que agregar_combo_a_ticket no se entera— y (b) un
+      -- grupo de modificadores propio del combo (nada lo prohíbe: productos_grupos_modificadores
+      -- no excluye es_combo) que Uber nos devuelva con la forma de una elección. En ambos casos, si
+      -- no se frena aquí, esa elección suma su precio_extra_mxn al padre (más abajo, v_extras) sin
+      -- generar un hijo: el cliente paga por algo que cocina nunca ve. Se fija el filtro que compara
+      -- 0111 (activo = true AND deleted_at IS NULL, agregar_combo_a_ticket líneas 308-309 y 322-323)
+      -- para que "es un slot de este combo" signifique lo mismo en las dos funciones.
+      IF EXISTS (
+        SELECT 1 FROM jsonb_array_elements(COALESCE(v_item->'modificadores', '[]'::jsonb)) m
+         WHERE NULLIF(m->>'grupo_id', '') IS NOT NULL
+           AND (
+             NULLIF(m->>'opcion_modificador_id', '') IS NULL
+             OR NOT EXISTS (
+                  SELECT 1 FROM combo_grupos g
+                   WHERE g.id = (m->>'grupo_id')::uuid AND g.combo_producto_id = v_producto_id
+                     AND g.activo = true AND g.deleted_at IS NULL)
+           )
+      ) THEN
+        RAISE EXCEPTION 'COMBO_ELECCION_SIN_MAPEAR: el combo "%" trae una elección que no es un slot activo de este combo o cuyo producto no está mapeado en el catálogo', v_item->>'nombre_app';
+      END IF;
+
+      -- Guardarraíl 2 (ronda de revisión 1, "importante", patrón del plan): el UPDATE de más abajo
+      -- que cobra los modificadores del segundo nivel empareja por producto (hijo.producto_id), no
+      -- por elección individual. Si un slot con maximo_selecciones > 1 trae el MISMO producto
+      -- elegido dos veces y alguna de esas dos apariciones trae modificadores anidados (p. ej. dos
+      -- refrescos, uno con un extra distinto del otro), no hay forma de saber a cuál hijo va cada
+      -- extra: se niega a adivinar en vez de atribuir el dinero a la fila equivocada. Dos elecciones
+      -- iguales SIN modificadores anidados (el caso normal de "2 refrescos") no entra aquí.
+      IF EXISTS (
+        SELECT 1
+          FROM jsonb_array_elements(COALESCE(v_item->'modificadores', '[]'::jsonb)) m
+         WHERE NULLIF(m->>'grupo_id', '') IS NOT NULL AND NULLIF(m->>'opcion_modificador_id', '') IS NOT NULL
+         GROUP BY m->>'grupo_id', m->>'opcion_modificador_id'
+        HAVING count(*) > 1 AND bool_or(jsonb_array_length(COALESCE(m->'modificadores', '[]'::jsonb)) > 0)
+      ) THEN
+        RAISE EXCEPTION 'COMBO_ELECCION_AMBIGUA: el combo "%" repite la misma elección de slot con modificadores de segundo nivel en alguna de las repeticiones; no se puede saber a qué unidad va cada extra', v_item->>'nombre_app';
+      END IF;
+
       SELECT jsonb_agg(jsonb_build_object(
                'grupo_id', m->>'grupo_id',
                'producto_id', m->>'opcion_modificador_id',
@@ -162,7 +204,8 @@ BEGIN
        WHERE NULLIF(m->>'grupo_id', '') IS NOT NULL
          AND NULLIF(m->>'opcion_modificador_id', '') IS NOT NULL
          AND EXISTS (SELECT 1 FROM combo_grupos g
-                      WHERE g.id = (m->>'grupo_id')::uuid AND g.combo_producto_id = v_producto_id);
+                      WHERE g.id = (m->>'grupo_id')::uuid AND g.combo_producto_id = v_producto_id
+                        AND g.activo = true AND g.deleted_at IS NULL);
 
       v_item_id := agregar_combo_a_ticket(
         v_ticket_id, v_producto_id, (v_item->>'cantidad')::numeric,

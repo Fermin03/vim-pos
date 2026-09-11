@@ -3,7 +3,10 @@
 -- cada elección de slot (Uber las manda como modificadores del ítem, no como precio del ítem);
 -- los hijos van a 0 con prorrateo; un extra pagado del segundo nivel (el término de la
 -- hamburguesa) se cobra en el modificador del hijo correcto, multiplicado por SU cantidad (no la
--- del combo suelta) cuando el combo se pide más de una vez. Fixtures propias. ROLLBACK.
+-- del combo suelta) cuando el combo se pide más de una vez. Ronda de revisión 1: dos guardarraíles
+-- que se niegan a adivinar de dónde sale el dinero (una elección que no es un slot activo o sin
+-- producto mapeado; dos elecciones iguales con modificadores de segundo nivel distintos) en vez de
+-- cobrar de más/menos en silencio. Fixtures propias. ROLLBACK.
 \set ON_ERROR_STOP on
 BEGIN;
 DO $$
@@ -12,12 +15,12 @@ DECLARE
   v_suc    uuid := '99999999-0000-0000-0000-0000000000bb';
   v_caja   uuid := '99999999-0000-0000-0000-0000000000cc';
   v_maria  uuid := '99999999-0000-0000-0000-000000000001';
-  v_cat_h  uuid; v_combo uuid; v_slot_hamb uuid; v_slot_beb uuid;
-  v_prod_hamb uuid; v_prod_beb uuid; v_grupo_termino uuid; v_opcion_termino uuid;
+  v_cat_h  uuid; v_combo uuid; v_slot_hamb uuid; v_slot_beb uuid; v_slot_papas uuid;
+  v_prod_hamb uuid; v_prod_beb uuid; v_prod_papas uuid; v_grupo_termino uuid; v_opcion_termino uuid;
   v_conexion uuid; v_turno uuid;
-  v_pedido1 uuid; v_pedido2 uuid; v_pedido3 uuid;
-  v_ticket1 uuid; v_ticket2 uuid;
-  v_padre1 uuid; v_padre2 uuid;
+  v_pedido1 uuid; v_pedido2 uuid; v_pedido3 uuid; v_pedido4 uuid; v_pedido5 uuid; v_pedido6 uuid; v_pedido7 uuid;
+  v_ticket1 uuid; v_ticket2 uuid; v_ticket7 uuid;
+  v_padre1 uuid; v_padre2 uuid; v_padre7 uuid;
   v_precio_padre numeric; v_suma_asignado numeric;
   v_mods_hijo int; v_extra_pagado_hijo numeric; v_hijo_prod uuid;
   v_total_ticket numeric; v_total_pedido numeric;
@@ -41,6 +44,13 @@ BEGIN
   INSERT INTO productos(tenant_id, categoria_id, nombre, precio_base_mxn) VALUES (v_tenant, v_cat_h, 'Bebida combo Uber smoke', 30) RETURNING id INTO v_prod_beb;
   INSERT INTO combo_opciones(tenant_id, grupo_id, producto_id, precio_delta_mxn, es_default) VALUES (v_tenant, v_slot_hamb, v_prod_hamb, 0, true);
   INSERT INTO combo_opciones(tenant_id, grupo_id, producto_id, precio_delta_mxn, es_default) VALUES (v_tenant, v_slot_beb, v_prod_beb, 0, true);
+
+  -- Un tercer slot OPCIONAL (min 0, max 2) que admite repetir la misma opción: solo lo usan los
+  -- pedidos 6 y 7 (guardarraíl 2, la ambigüedad de "dos elecciones iguales").
+  INSERT INTO combo_grupos(tenant_id, combo_producto_id, nombre, orden_visualizacion, minimo_selecciones, maximo_selecciones, modo_precio)
+  VALUES (v_tenant, v_combo, 'Papas', 3, 0, 2, 'DELTA') RETURNING id INTO v_slot_papas;
+  INSERT INTO productos(tenant_id, categoria_id, nombre, precio_base_mxn) VALUES (v_tenant, v_cat_h, 'Papas combo Uber smoke', 20) RETURNING id INTO v_prod_papas;
+  INSERT INTO combo_opciones(tenant_id, grupo_id, producto_id, precio_delta_mxn, es_default) VALUES (v_tenant, v_slot_papas, v_prod_papas, 0, false);
 
   INSERT INTO grupos_modificadores(tenant_id, nombre, tipo_seleccion) VALUES (v_tenant, 'Término de cocción Uber smoke', 'UNICA_OBLIGATORIA') RETURNING id INTO v_grupo_termino;
   INSERT INTO opciones_modificador(tenant_id, grupo_id, nombre, precio_extra_mxn) VALUES (v_tenant, v_grupo_termino, 'Tres cuartos Uber smoke', 0) RETURNING id INTO v_opcion_termino;
@@ -175,6 +185,137 @@ BEGIN
   END;
   SELECT ticket_id INTO v_ticket1 FROM delivery_pedidos WHERE id = v_pedido3;
   IF v_ticket1 IS NOT NULL THEN RAISE EXCEPTION 'el pedido incompleto no debió quedar con ticket'; END IF;
+
+  -- 6) Guardarraíl 1 / Ruta B (ronda de revisión 1): una elección trae un grupo_id que NO es un
+  -- slot de este combo (aquí, el grupo de modificadores del término, que es real pero no es un
+  -- slot). Nada de catálogo mal montado: los dos slots obligatorios vienen completos y válidos: el
+  -- problema es solo esta tercera "elección" sobrante. Debe reventar con COMBO_ELECCION_SIN_MAPEAR
+  -- y el pedido debe quedar sin ticket — si no, esos $999 se sumarían al padre sin generar un hijo.
+  INSERT INTO delivery_pedidos (tenant_id, sucursal_id, conexion_id, app, id_externo, folio_corto, estado,
+    cliente_nombre, items, total_cliente_mxn, vence_aceptacion)
+  VALUES (v_tenant, v_suc, v_conexion, 'APP_UBEREATS', 'uber-combo-smoke-4', '9C004', 'RECIBIDO',
+    'Cliente Uber Combo grupo ajeno',
+    jsonb_build_array(jsonb_build_object(
+      'producto_id', v_combo, 'nombre_app', 'Combo Uber smoke', 'cantidad', 1,
+      'precio_unitario_mxn', 45.00, 'nota', NULL,
+      'modificadores', jsonb_build_array(
+        jsonb_build_object('grupo_id', v_slot_hamb, 'opcion_modificador_id', v_prod_hamb,
+          'nombre_app', 'Hamburguesa combo Uber smoke', 'cantidad', 1, 'precio_extra_mxn', 130.00),
+        jsonb_build_object('grupo_id', v_slot_beb, 'opcion_modificador_id', v_prod_beb,
+          'nombre_app', 'Bebida combo Uber smoke', 'cantidad', 1, 'precio_extra_mxn', 15.00),
+        jsonb_build_object('grupo_id', v_grupo_termino, 'opcion_modificador_id', v_opcion_termino,
+          'nombre_app', 'Elección ajena al combo', 'cantidad', 1, 'precio_extra_mxn', 999.00)))),
+    1189.00, now() + interval '11 minutes')
+  RETURNING id INTO v_pedido4;
+
+  BEGIN
+    PERFORM crear_ticket_desde_app(v_pedido4);
+    RAISE EXCEPTION 'debió fallar: grupo_id que no es slot de este combo';
+  EXCEPTION WHEN OTHERS THEN
+    IF SQLERRM NOT LIKE 'COMBO_ELECCION_SIN_MAPEAR%' THEN RAISE; END IF;
+    RAISE NOTICE 'grupo ajeno rechazado: %', SQLERRM;
+  END;
+  SELECT ticket_id INTO v_ticket1 FROM delivery_pedidos WHERE id = v_pedido4;
+  IF v_ticket1 IS NOT NULL THEN RAISE EXCEPTION 'el pedido con grupo ajeno no debió quedar con ticket'; END IF;
+
+  -- 7) Guardarraíl 1 / Ruta A (la más silenciosa: no requiere ningún grupo ajeno, un catálogo a
+  -- medio sincronizar basta). La elección de Hamburguesa trae un grupo_id que SÍ es un slot válido
+  -- de este combo, pero opcion_modificador_id llega NULL — el normalizador lo deja así cuando el
+  -- producto que el cliente eligió en Uber todavía no está mapeado en nuestro catálogo. El slot
+  -- Bebida sigue completo, así que el mínimo/máximo no la atrapa: sin este guardarraíl, el precio
+  -- de esa elección ($130) se sumaría al padre sin generar ningún hijo.
+  INSERT INTO delivery_pedidos (tenant_id, sucursal_id, conexion_id, app, id_externo, folio_corto, estado,
+    cliente_nombre, items, total_cliente_mxn, vence_aceptacion)
+  VALUES (v_tenant, v_suc, v_conexion, 'APP_UBEREATS', 'uber-combo-smoke-5', '9C005', 'RECIBIDO',
+    'Cliente Uber Combo producto sin mapear',
+    jsonb_build_array(jsonb_build_object(
+      'producto_id', v_combo, 'nombre_app', 'Combo Uber smoke', 'cantidad', 1,
+      'precio_unitario_mxn', 45.00, 'nota', NULL,
+      'modificadores', jsonb_build_array(
+        jsonb_build_object('grupo_id', v_slot_hamb, 'opcion_modificador_id', NULL,
+          'nombre_app', 'Hamburguesa sin mapear en Uber smoke', 'cantidad', 1, 'precio_extra_mxn', 130.00),
+        jsonb_build_object('grupo_id', v_slot_beb, 'opcion_modificador_id', v_prod_beb,
+          'nombre_app', 'Bebida combo Uber smoke', 'cantidad', 1, 'precio_extra_mxn', 15.00)))),
+    190.00, now() + interval '11 minutes')
+  RETURNING id INTO v_pedido5;
+
+  BEGIN
+    PERFORM crear_ticket_desde_app(v_pedido5);
+    RAISE EXCEPTION 'debió fallar: producto de la elección sin mapear en catálogo';
+  EXCEPTION WHEN OTHERS THEN
+    IF SQLERRM NOT LIKE 'COMBO_ELECCION_SIN_MAPEAR%' THEN RAISE; END IF;
+    RAISE NOTICE 'elección sin mapear rechazada: %', SQLERRM;
+  END;
+  SELECT ticket_id INTO v_ticket1 FROM delivery_pedidos WHERE id = v_pedido5;
+  IF v_ticket1 IS NOT NULL THEN RAISE EXCEPTION 'el pedido con producto sin mapear no debió quedar con ticket'; END IF;
+
+  -- 8) Guardarraíl 2 (ronda de revisión 1): el slot Papas (max 2) trae la MISMA opción (Papas)
+  -- dos veces, y una de las dos repeticiones trae un modificador de segundo nivel. El UPDATE que
+  -- cobra ese extra empareja por producto, no por elección individual, así que no hay forma de
+  -- saber a cuál de los dos hijos "Papas" le toca el extra: debe reventar con COMBO_ELECCION_AMBIGUA.
+  INSERT INTO delivery_pedidos (tenant_id, sucursal_id, conexion_id, app, id_externo, folio_corto, estado,
+    cliente_nombre, items, total_cliente_mxn, vence_aceptacion)
+  VALUES (v_tenant, v_suc, v_conexion, 'APP_UBEREATS', 'uber-combo-smoke-6', '9C006', 'RECIBIDO',
+    'Cliente Uber Combo papas ambiguas',
+    jsonb_build_array(jsonb_build_object(
+      'producto_id', v_combo, 'nombre_app', 'Combo Uber smoke', 'cantidad', 1,
+      'precio_unitario_mxn', 45.00, 'nota', NULL,
+      'modificadores', jsonb_build_array(
+        jsonb_build_object('grupo_id', v_slot_hamb, 'opcion_modificador_id', v_prod_hamb,
+          'nombre_app', 'Hamburguesa combo Uber smoke', 'cantidad', 1, 'precio_extra_mxn', 130.00),
+        jsonb_build_object('grupo_id', v_slot_beb, 'opcion_modificador_id', v_prod_beb,
+          'nombre_app', 'Bebida combo Uber smoke', 'cantidad', 1, 'precio_extra_mxn', 15.00),
+        jsonb_build_object('grupo_id', v_slot_papas, 'opcion_modificador_id', v_prod_papas,
+          'nombre_app', 'Papas combo Uber smoke', 'cantidad', 1, 'precio_extra_mxn', 8.00,
+          'modificadores', jsonb_build_array(
+            jsonb_build_object('grupo_id', v_grupo_termino, 'opcion_modificador_id', v_opcion_termino,
+              'nombre_app', 'Extra papas 1', 'cantidad', 1, 'precio_extra_mxn', 12.00))),
+        jsonb_build_object('grupo_id', v_slot_papas, 'opcion_modificador_id', v_prod_papas,
+          'nombre_app', 'Papas combo Uber smoke', 'cantidad', 1, 'precio_extra_mxn', 8.00)))),
+    398.00, now() + interval '11 minutes')
+  RETURNING id INTO v_pedido6;
+
+  BEGIN
+    PERFORM crear_ticket_desde_app(v_pedido6);
+    RAISE EXCEPTION 'debió fallar: dos elecciones iguales con modificador anidado en alguna';
+  EXCEPTION WHEN OTHERS THEN
+    IF SQLERRM NOT LIKE 'COMBO_ELECCION_AMBIGUA%' THEN RAISE; END IF;
+    RAISE NOTICE 'elección ambigua rechazada: %', SQLERRM;
+  END;
+  SELECT ticket_id INTO v_ticket1 FROM delivery_pedidos WHERE id = v_pedido6;
+  IF v_ticket1 IS NOT NULL THEN RAISE EXCEPTION 'el pedido con elección ambigua no debió quedar con ticket'; END IF;
+
+  -- 9) Contraprueba del guardarraíl 2: dos elecciones iguales SIN modificadores anidados en
+  -- NINGUNA (el caso normal de "2 papas") siguen funcionando — el guardarraíl no debe romper un
+  -- pedido bueno solo porque una opción se repite.
+  INSERT INTO delivery_pedidos (tenant_id, sucursal_id, conexion_id, app, id_externo, folio_corto, estado,
+    cliente_nombre, items, total_cliente_mxn, vence_aceptacion)
+  VALUES (v_tenant, v_suc, v_conexion, 'APP_UBEREATS', 'uber-combo-smoke-7', '9C007', 'RECIBIDO',
+    'Cliente Uber Combo papas x2 sin ambigüedad',
+    jsonb_build_array(jsonb_build_object(
+      'producto_id', v_combo, 'nombre_app', 'Combo Uber smoke', 'cantidad', 1,
+      'precio_unitario_mxn', 45.00, 'nota', NULL,
+      'modificadores', jsonb_build_array(
+        jsonb_build_object('grupo_id', v_slot_hamb, 'opcion_modificador_id', v_prod_hamb,
+          'nombre_app', 'Hamburguesa combo Uber smoke', 'cantidad', 1, 'precio_extra_mxn', 130.00),
+        jsonb_build_object('grupo_id', v_slot_beb, 'opcion_modificador_id', v_prod_beb,
+          'nombre_app', 'Bebida combo Uber smoke', 'cantidad', 1, 'precio_extra_mxn', 15.00),
+        jsonb_build_object('grupo_id', v_slot_papas, 'opcion_modificador_id', v_prod_papas,
+          'nombre_app', 'Papas combo Uber smoke', 'cantidad', 1, 'precio_extra_mxn', 8.00),
+        jsonb_build_object('grupo_id', v_slot_papas, 'opcion_modificador_id', v_prod_papas,
+          'nombre_app', 'Papas combo Uber smoke', 'cantidad', 1, 'precio_extra_mxn', 8.00)))),
+    206.00, now() + interval '11 minutes')
+  RETURNING id INTO v_pedido7;
+
+  v_ticket7 := crear_ticket_desde_app(v_pedido7);
+  SELECT id INTO v_padre7 FROM ticket_items WHERE ticket_id = v_ticket7 AND combo_rol = 'PADRE';
+  IF v_padre7 IS NULL THEN RAISE EXCEPTION 'pedido 7 (papas x2 sin ambigüedad) no creó el padre'; END IF;
+  -- Padre = 45 + 130 (hamburguesa) + 15 (bebida) + 8 + 8 (dos papas) = 206.
+  SELECT precio_unitario_snapshot INTO v_precio_padre FROM ticket_items WHERE id = v_padre7;
+  IF v_precio_padre <> 206 THEN RAISE EXCEPTION 'pedido 7: el padre debe cobrar 206, es %', v_precio_padre; END IF;
+  SELECT total_mxn INTO v_total_ticket FROM tickets WHERE id = v_ticket7;
+  IF v_total_ticket <> 206 THEN RAISE EXCEPTION 'pedido 7: el ticket debe cobrar 206, es %', v_total_ticket; END IF;
+  RAISE NOTICE 'pedido 7 OK: dos elecciones iguales sin modificadores anidados no las bloquea el guardarraíl (padre 206)';
 
   RAISE NOTICE 'SMOKE COMBOS UBER OK';
 END $$;
