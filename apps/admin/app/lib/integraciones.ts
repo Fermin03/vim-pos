@@ -106,7 +106,7 @@ export async function accionConexion(accion: "activar", campos: { tienda_id: str
 export async function accionConexion(accion: "pausar" | "reanudar" | "desconectar", campos: { conexion_id: string }): Promise<{ estado: EstadoConexion }>;
 export async function accionConexion(accion: "verificar", campos: { conexion_id: string }): Promise<Verificacion>;
 export async function accionConexion(accion: "prep", campos: { conexion_id: string; minutos: number }): Promise<{ tiempo_prep_min: number }>;
-export async function accionConexion(accion: "menu", campos: { conexion_id: string }): Promise<{ items: number; categorias: number; excluidos: { id: string; nombre: string; motivo: string }[] }>;
+export async function accionConexion(accion: "menu", campos: { conexion_id: string }): Promise<{ items: number; categorias: number; grupos: number; opciones: number; excluidos: { id: string; nombre: string; motivo: string }[] }>;
 export async function accionConexion(accion: string, campos: Record<string, unknown> = {}): Promise<unknown> {
   const { data } = await supabase.auth.getSession();
   const token = data.session?.access_token;
