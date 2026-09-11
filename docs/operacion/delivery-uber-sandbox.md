@@ -171,6 +171,96 @@ existía para sucursales cuyos folios emitió el escritorio (mig. 0107); el prim
 turno abierto. Pendiente: la caja de escritorio (espejo) recibía `401 AUTH_INVALIDA` y se quedaba con
 el token muerto 20 min; el agente ya fuerza login nuevo tras un 401 y el log dice vigencia y sesión.
 
+### Resultado del 11 sep 2026 — combos y modificadores (entrega 2)
+
+Primera prueba con la carta que lleva **grupos de modificadores y combos**. Se hizo **por fases**,
+para separar el riesgo de publicar del riesgo de cobrar. Hay un solo proyecto de Supabase
+(`pbiaxzvmssjsxdwqrumb`), así que "sandbox" es la tienda de prueba de Uber, no un backend aparte:
+probar obliga a desplegar a producción.
+
+**Fase A — solo la carta.** Se desplegó únicamente `delivery-uber-conexion`. Antes se comprobó que
+esa función **no tiene ninguna acción que procese pedidos** y que sus dos referencias a
+`procesar-uber.ts` son `import type`, que desaparece al compilar: el radio real del despliegue era
+el botón "Enviar carta" del admin. Si hubiera fallado, se revertía redesplegando la versión de
+`main`.
+
+Resultado: **la carta se publicó y Uber la aceptó.** Eso cierra la duda de mayor riesgo de toda la
+entrega, porque `tax_info` pasó de `tax_rate` a `vat_rate_percentage` (lo que corresponde a México
+con precio con IVA incluido) y ese era el único cambio que alcanzaba a **todos** los restaurantes
+que ya publican. Como `PUT /menus` reemplaza la carta entera, un rechazo habría dejado sin poder
+republicar a quien lo intentara. También quedaron aceptados los `modifier_group` de los grupos de
+modificadores y los de los slots de combo, con sus opciones como ítems sin categoría.
+
+**Fase B — el pedido.** Se aplicó la migración `0112_combos_uber.sql` y se redesplegaron
+`delivery-webhook-uber` y `delivery-accion`. Las dos hacían falta: cada función empaqueta su propia
+copia de `_shared/`, así que sin redesplegarlas el pedido habría llegado con el normalizador viejo,
+sin `grupo_id`, y la migración nueva lo habría rechazado.
+
+Pedido **9E434** desde ubereats.com → ticket **VP1-2026-000009**, aceptado en automático, con dos
+combos:
+
+```
+1 × Combo Knock-Out · Cheese Burger, Papas Sencillas, Coca Cola
+1 × Combo Knock-Out · Cheese Burger, Aros de Cebolla, Coca Cola
+Total en la app: $300.00
+```
+
+**El ticket cuadra con lo que cobró Uber.**
+
+### Qué quedó probado, y qué no
+
+**Probado:**
+
+- La carta se publica con grupos de modificadores y combos, y Uber la acepta.
+- Un pedido con combos se convierte en ticket: padre con su precio, hijos desglosados.
+- **El segundo nivel de anidamiento.** No se probó con el término —esos grupos se habían quitado del
+  catálogo de pruebas— pero sí con **extras sobre los componentes del combo**, que recorren
+  exactamente el mismo camino. El término habría pasado por el mismo código.
+- **El defecto de los `$0.00` está cerrado con datos reales.** El precio de cada opción se buscaba en
+  el desglose con el `cart_item_id` del ítem **padre**, cuando Uber indexa esas filas por el de la
+  **opción**; con datos reales no coincidía ninguna y todo modificador entraba a cero. Que el total
+  del ticket cuadre con los $300 de la app lo demuestra: si los extras hubieran entrado a cero, no
+  cuadraría.
+
+**No probado en vivo, y por qué se asume:**
+
+- **Un extra sobre un producto suelto**, fuera de combo. Es el caso de Knock-Out, que no usa combos
+  todavía. Recorre la misma ruta de código que los extras dentro del combo, que sí quedó probada.
+  Riesgo bajo, asumido a propósito.
+- **`core_price` vs `corePrice`.** La referencia de Uber y su propio ejemplo se contradicen. No
+  rompe el `PUT`; rompe los reembolsos parciales, en silencio. Sigue sin confirmar.
+- **El tope de precio por ítem en pesos**, si existe para México.
+- **Que `min_permitted`/`max_permitted` se respeten de verdad en la app del cliente.** El modelo de
+  combo lo da por hecho: si Uber no los aplicara, podría llegar un pedido con un slot incompleto y
+  el POS lo rechazaría con el cliente ya cobrado.
+- **El `max_permitted` de un slot no se recorta a sus opciones vivas** (a diferencia del de un grupo
+  de modificadores, que sí). Un slot "elige hasta 2" con una sola opción disponible publica
+  `max_permitted: 2` con un solo `modifier_option`. No lo vuelve inordenable —el máximo es un tope,
+  no una exigencia— pero está por ver si Uber acepta ese payload sin protestar.
+
+### Lo que la prueba real encontró y se arregló
+
+Los extras del segundo nivel **no se veían en la pantalla "Pedidos de apps"**. El dinero estaba bien
+y la cocina los recibía, porque cuelgan del renglón hijo, pero `apps/pos/app/lib/pedidos-apps.ts`
+se quedaba con el nombre y la cantidad de cada modificador y descartaba el array anidado. El cajero
+veía "Cheese Burger" sin enterarse de que llevaba algo encima.
+
+Arreglado: la tarjeta pinta ahora el extra pegado a su componente,
+`1 × Combo Knock-Out · Cheese Burger (extra queso), Papas Sencillas, Coca Cola`. **Ese arreglo vive
+en el POS web, que se despliega desde `main`: no se ve hasta mezclar.**
+
+### El orden del despliegue, que importa
+
+1. `supabase db push` (la `0112`).
+2. Mezclar el PR.
+3. Instalador **0.4.68** en todas las cajas.
+4. **Solo al final**, enviar la carta con combos a la tienda de producción.
+
+Una caja en 0.4.67 no tiene la `0112`, así que `agregar_item_a_ticket` rechazaría el combo con
+`'El producto "%" es un combo: usa agregar_combo_a_ticket'` — un mensaje que el espejo tampoco
+traduce. Publicar la carta antes de actualizar el parque es invitar pedidos que la caja no sabe
+cobrar.
+
 ## 5. Cuando algo falla
 
 - `delivery_eventos.error` dice qué pasó al procesar (`UBER_TOKEN_401` = credenciales o entorno
