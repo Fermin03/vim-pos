@@ -184,7 +184,7 @@ test("un grupo sin opciones se cae; si era obligatorio, su producto tampoco se p
   assert.deepEqual(p2.modifier_group_ids.ids, []);
 });
 
-test("sin grupos ni combos, la carta es exactamente la de hoy", () => {
+test("grupos y combos vacíos, sin pasar el parámetro: los dos dan la misma carta (no rompen nada nuevo)", () => {
   const productos = [{ id: "p1", nombre: "Hamburguesa", precio_base_mxn: 100, categoria_id: "cat" }];
   const categorias = [{ id: "cat", nombre: "Hamburguesas", orden: 1 }];
   const conParam = construirMenuUber(productos, categorias, { titulo: "Carta", grupos: [], combos: [] });
@@ -305,6 +305,99 @@ test("lo mismo por el otro camino: n_slots=0 excluye al padre por «combo sin sl
   assert.deepEqual(r.excluidos.map((e) => [e.id, e.motivo]), [["c1", "combo sin slots"]]);
   assert.deepEqual(r.menu.modifier_groups, []);
   assert.equal(r.combos, 0);
+});
+
+// --- Revisión final: invariante 5 del spec (un combo publica solo sus slots) --------------------
+//
+// Los cuatro casos siguientes comparten origen: la carta no aplicaba el invariante 5 con el mismo
+// rigor que la base de datos. Un combo con un grupo de modificadores propio (asignado por error o
+// en masa) no debe publicar ese grupo, ni caer de la carta por él; un slot con menos opciones vivas
+// que su mínimo, o un grupo MULTIPLE_OBLIGATORIA_RANGO cuyo rango ya no cabe en las opciones vivas,
+// no debe publicarse inordenable.
+
+test("Importante 1: un combo no publica sus propios grupos de modificadores (invariante 5)", () => {
+  const r = construirMenuUber(
+    PRODS,
+    [{ id: "cat", nombre: "Todo", orden: 1 }],
+    {
+      combos: [COMBO],
+      grupos: [{ id: "g-extras", nombre: "Extras", tipo_seleccion: "MULTIPLE_OPCIONAL",
+                 minimo_selecciones: null, maximo_selecciones: null,
+                 opciones: [{ id: "o-queso", nombre: "Extra queso", precio_extra_mxn: 15 }],
+                 producto_ids: ["c1"] }], // el grupo se le asignó al combo por error (asignación masiva)
+    },
+  );
+  const padre = (r.menu.items as ItemMenu[]).find((i) => i.id === "c1")!;
+  // solo sus slots — nunca "g-extras", que Uber devolvería con el uuid del grupo de modificadores
+  // y que la guardia 1 de crear_ticket_desde_app (0112) rechazaría como COMBO_ELECCION_SIN_MAPEAR
+  assert.deepEqual(padre.modifier_group_ids.ids, ["s-burger", "s-papas"]);
+});
+
+test("Importante 2: un combo vendible no se cae de la carta por un grupo obligatorio propio sin opciones", () => {
+  const r = construirMenuUber(
+    PRODS,
+    [{ id: "cat", nombre: "Todo", orden: 1 }],
+    {
+      combos: [COMBO],
+      grupos: [{ id: "g-termino", nombre: "Término", tipo_seleccion: "UNICA_OBLIGATORIA",
+                 minimo_selecciones: null, maximo_selecciones: null,
+                 opciones: [{ id: "o-34", nombre: "Tres cuartos", precio_extra_mxn: 0, agotada: true }],
+                 producto_ids: ["c1"] }], // grupo obligatorio del combo, agotado por completo
+    },
+  );
+  assert.deepEqual(r.excluidos, []);
+  assert.ok((r.menu.items as ItemMenu[]).some((i) => i.id === "c1"), "el combo sigue vendible");
+});
+
+test("Importante 3: un slot con menos opciones vivas que su mínimo tumba el combo, no solo el slot vacío", () => {
+  const combo = {
+    producto_id: "c1",
+    slots: [
+      { id: "s-burger", nombre: "Hamburguesa", orden: 1, minimo_selecciones: 1, maximo_selecciones: 1,
+        opciones: [{ producto_id: "p1", importe_mxn: 100 }] },
+      // "elige 2 bebidas": mínimo 2, pero solo queda 1 opción viva — inordenable, no vacío
+      { id: "s-bebidas", nombre: "Bebidas", orden: 2, minimo_selecciones: 2, maximo_selecciones: 2,
+        opciones: [{ producto_id: "p3", importe_mxn: 0 }] },
+    ],
+  };
+  const r = construirMenuUber(PRODS, [], { combos: [combo] });
+  assert.deepEqual(r.excluidos.map((e) => [e.id, e.motivo]), [["c1", "slot sin opciones"]]);
+  assert.deepEqual(r.menu.modifier_groups, []);
+});
+
+test("Importante 4a: MULTIPLE_OBLIGATORIA_RANGO recorta el máximo a las opciones vivas", () => {
+  const r = construirMenuUber(
+    [{ id: "p1", nombre: "P", precio_base_mxn: 100 }],
+    [],
+    { grupos: [{ id: "g-salsas", nombre: "Salsas", tipo_seleccion: "MULTIPLE_OBLIGATORIA_RANGO",
+                 minimo_selecciones: 1, maximo_selecciones: 3,
+                 opciones: [
+                   { id: "o1", nombre: "BBQ", precio_extra_mxn: 0 },
+                   { id: "o2", nombre: "Picante", precio_extra_mxn: 0, agotada: true },
+                   { id: "o3", nombre: "Ajo", precio_extra_mxn: 0 },
+                 ],
+                 producto_ids: ["p1"] }] },
+  );
+  const g = (r.menu.modifier_groups as GrupoMenu[]).find((x) => x.id === "g-salsas")!;
+  assert.deepEqual(g.quantity_info.quantity, { min_permitted: 1, max_permitted: 2 });
+  assert.equal(g.modifier_options.length, 2);
+});
+
+test("Importante 4b: si el mínimo supera las opciones vivas, el grupo se trata como obligatorio vacío", () => {
+  const r = construirMenuUber(
+    [{ id: "p1", nombre: "P", precio_base_mxn: 100 }],
+    [],
+    { grupos: [{ id: "g-salsas", nombre: "Salsas", tipo_seleccion: "MULTIPLE_OBLIGATORIA_RANGO",
+                 minimo_selecciones: 2, maximo_selecciones: 3,
+                 opciones: [
+                   { id: "o1", nombre: "BBQ", precio_extra_mxn: 0 },
+                   { id: "o2", nombre: "Picante", precio_extra_mxn: 0, agotada: true },
+                   { id: "o3", nombre: "Ajo", precio_extra_mxn: 0, agotada: true },
+                 ],
+                 producto_ids: ["p1"] }] },
+  );
+  assert.deepEqual(r.excluidos.map((e) => [e.id, e.motivo]), [["p1", "grupo obligatorio sin opciones"]]);
+  assert.deepEqual(r.menu.modifier_groups, []);
 });
 
 // --- Task 5: armarCombosCarta / armarGruposModificadorCarta ----------------

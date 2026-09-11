@@ -103,7 +103,12 @@ export function cantidadesDeGrupo(
     case "UNICA_OPCIONAL": return { min_permitted: 0, max_permitted: 1 };
     case "MULTIPLE_OPCIONAL": return { min_permitted: 0, max_permitted: Math.max(1, nOpciones) };
     case "MULTIPLE_OBLIGATORIA_RANGO":
-      return { min_permitted: g.minimo_selecciones ?? 1, max_permitted: g.maximo_selecciones ?? Math.max(1, nOpciones) };
+      // El máximo nunca puede pedir más de las opciones que de verdad se publican: si una
+      // agotada se llevó parte del rango, Uber no puede ofrecer un `max_permitted` que no
+      // alcanza. El mínimo insuficiente no se corrige aquí — ese caso hace que el grupo entero
+      // se trate como obligatorio vacío antes de llegar a esta función (Importante 4, revisión
+      // final: ver `gruposVivos` en `construirMenuUber`).
+      return { min_permitted: g.minimo_selecciones ?? 1, max_permitted: Math.min(g.maximo_selecciones ?? nOpciones, nOpciones) };
   }
 }
 
@@ -232,7 +237,11 @@ function combosPublicables(
     if (!padreVivo(c.producto_id)) continue; // el padre ya se excluye por su propio motivo
     const slots = [...c.slots].sort((a, b) => a.orden - b.orden)
       .map((s) => ({ ...s, opciones: s.opciones.filter((o) => enCarta.has(o.producto_id)) }));
-    if (slots.length === 0 || slots.some((s) => s.opciones.length === 0)) { comboSinSlot.add(c.producto_id); continue; }
+    // No basta con "vacío": un slot con menos opciones vivas que su propio mínimo (p. ej. "elige 2
+    // bebidas" con una sola bebida viva) es igual de inordenable — el cliente no puede repetir una
+    // opción para llegar al mínimo, porque cada opción lleva max_permitted: 1 por contexto (más
+    // abajo). Importante 3, revisión final.
+    if (slots.length === 0 || slots.some((s) => s.opciones.length < s.minimo_selecciones)) { comboSinSlot.add(c.producto_id); continue; }
     combosVivos.push({ ...c, slots });
   }
   const slotsPorCombo = new Map<string, string[]>();
@@ -273,20 +282,37 @@ export function construirMenuUber(
   const items: unknown[] = [];
   const porCategoria = new Map<string, string[]>();
 
+  // Un combo no publica sus propios grupos de modificadores (invariante 5 del spec §3: la línea
+  // del padre no admite modificadores — 0111_combos.sql:387-389 — y publicarlos obligaría a
+  // distinguir en el pedido entrante un grupo-slot de un grupo-modificador sobre el mismo
+  // producto). Se filtra aquí, en el origen de `gruposPorProducto` y `obligatorioVacio`, para que
+  // un grupo asignado a un combo por error (p. ej. una asignación masiva que no excluye combos)
+  // nunca llegue a publicarse en su `modifier_group_ids` (Importante 1, revisión final) ni pueda
+  // tumbar al combo de la carta por "grupo obligatorio sin opciones" (Importante 2).
+  const combosIds = new Set(productos.filter((p) => p.es_combo).map((p) => p.id));
+
   // Un grupo sin opciones rompe la sincronización de la carta entera (documentado por Toast), así
-  // que no se publica. Si era obligatorio, su producto queda inordenable: se excluye también.
+  // que no se publica. Si era obligatorio, su producto queda inordenable: se excluye también. Un
+  // MULTIPLE_OBLIGATORIA_RANGO cuyo mínimo ya no cabe en las opciones vivas (una o más se agotaron)
+  // es igual de inordenable aunque no esté vacío del todo: se trata como si lo estuviera
+  // (Importante 4, revisión final) en vez de publicar un rango que Uber no puede cumplir.
   const gruposVivos = (opciones.grupos ?? [])
     .map((g) => ({ ...g, opciones: g.opciones.filter((o) => !o.agotada && idValidoUber(o.id)) }))
-    .filter((g) => g.opciones.length > 0);
+    .filter((g) => g.opciones.length > 0
+      && !(g.tipo_seleccion === "MULTIPLE_OBLIGATORIA_RANGO" && g.opciones.length < (g.minimo_selecciones ?? 1)));
   const gruposPorProducto = new Map<string, string[]>();
   for (const g of gruposVivos) for (const pid of g.producto_ids) {
+    if (combosIds.has(pid)) continue;
     gruposPorProducto.set(pid, [...(gruposPorProducto.get(pid) ?? []), g.id]);
   }
   const obligatorioVacio = new Set<string>();
   for (const g of opciones.grupos ?? []) {
     const vivo = gruposVivos.some((v) => v.id === g.id);
     const obligatorio = g.tipo_seleccion === "UNICA_OBLIGATORIA" || g.tipo_seleccion === "MULTIPLE_OBLIGATORIA_RANGO";
-    if (!vivo && obligatorio) for (const pid of g.producto_ids) obligatorioVacio.add(pid);
+    if (!vivo && obligatorio) for (const pid of g.producto_ids) {
+      if (combosIds.has(pid)) continue;
+      obligatorioVacio.add(pid);
+    }
   }
 
   const { combosVivos, comboSinSlot, slotsPorCombo, ajustesPrecio, ajustesCantidad } =
@@ -306,9 +332,10 @@ export function construirMenuUber(
       price_info: { price: precio },
       tax_info: { vat_rate_percentage: Math.max(0, Number(p.tasa_iva ?? 16) || 0) },
       quantity_info: {},
-      // Los grupos de modificadores propios van primero; los slots de combo que traen a este
-      // producto como opción, después — un combo no tiene grupos propios publicados (invariante
-      // del spec), y un producto que es opción de un slot sí puede tener los suyos.
+      // Los grupos de modificadores propios van primero (ya sin los de un combo: ver
+      // `combosIds` arriba); después, si ESTE producto ES el padre de un combo, sus propios
+      // slots — `slotsPorCombo` está indexado por el producto padre, no por sus opciones (spec
+      // §4.3: "el combo padre... y sus slots en modifier_group_ids.ids").
       modifier_group_ids: { ids: [...(gruposPorProducto.get(p.id) ?? []), ...(slotsPorCombo.get(p.id) ?? [])] },
       external_data: p.id,
     };
