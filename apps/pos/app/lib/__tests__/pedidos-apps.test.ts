@@ -1,5 +1,8 @@
 import { describe, it, expect } from "vitest";
-import { segundosRestantes, etiquetaApp, etiquetaEstado, ordenarPedidos, idsNuevos, etiquetaAlergia, pedidoConAlergia, type PedidoApp, type PedidoAppItem } from "../pedidos-apps";
+import {
+  segundosRestantes, etiquetaApp, etiquetaEstado, ordenarPedidos, idsNuevos, etiquetaAlergia, pedidoConAlergia,
+  etiquetaModificadores, itemsDesdeJson, type PedidoApp, type PedidoAppItem,
+} from "../pedidos-apps";
 
 const base = (extra: Partial<PedidoApp>): PedidoApp => ({
   id: "x", app: "APP_UBEREATS", idExterno: "e", folioCorto: null, estado: "RECIBIDO", tipoEntrega: null, clienteNombre: null,
@@ -95,5 +98,69 @@ describe("alergias (A7)", () => {
   it("pedidoConAlergia mira todos los ítems", () => {
     expect(pedidoConAlergia(base({ items: [item({}), item({ alergenos: ["soya"] })] }))).toBe(true);
     expect(pedidoConAlergia(base({ items: [item({}), item({})] }))).toBe(false);
+  });
+});
+
+// ── Combos: el segundo nivel de modificadores (los extras sobre un componente) ──────────────
+describe("etiquetaModificadores: los extras van pegados a su componente", () => {
+  it("sin modificadores → cadena vacía", () => {
+    expect(etiquetaModificadores([])).toBe("");
+  });
+
+  it("un modificador de primer nivel sin anidados, igual que antes", () => {
+    expect(etiquetaModificadores([{ nombreApp: "Papas Sencillas", cantidad: 1 }])).toBe("Papas Sencillas");
+  });
+
+  it("respeta la cantidad > 1 en primer nivel, igual que antes", () => {
+    expect(etiquetaModificadores([{ nombreApp: "Extra queso", cantidad: 2 }, { nombreApp: "Sin cebolla", cantidad: 1 }]))
+      .toBe("2× Extra queso, Sin cebolla");
+  });
+
+  it("un componente de combo con un extra anidado: el extra va entre paréntesis, pegado al componente", () => {
+    expect(etiquetaModificadores([
+      { nombreApp: "Cheese Burger", cantidad: 1, modificadores: [{ nombreApp: "extra queso", cantidad: 1 }] },
+      { nombreApp: "Papas Sencillas", cantidad: 1 },
+      { nombreApp: "Coca Cola", cantidad: 1 },
+    ])).toBe("Cheese Burger (extra queso), Papas Sencillas, Coca Cola");
+  });
+
+  it("varios extras sobre varios componentes, con cantidades en ambos niveles", () => {
+    expect(etiquetaModificadores([
+      { nombreApp: "Cheese Burger", cantidad: 1, modificadores: [{ nombreApp: "Término medio", cantidad: 1 }, { nombreApp: "Extra queso", cantidad: 2 }] },
+      { nombreApp: "Papas Grandes", cantidad: 2, modificadores: [{ nombreApp: "Extra salsa", cantidad: 1 }] },
+    ])).toBe("Cheese Burger (Término medio, 2× Extra queso), 2× Papas Grandes (Extra salsa)");
+  });
+
+  it("modificadores anidado presente pero vacío se trata igual que ausente", () => {
+    expect(etiquetaModificadores([{ nombreApp: "Papas Sencillas", cantidad: 1, modificadores: [] }])).toBe("Papas Sencillas");
+  });
+});
+
+describe("itemsDesdeJson: conserva el segundo nivel al leer el pedido", () => {
+  it("un combo con extras sobre dos de sus componentes (pedido real con dos combos)", () => {
+    const crudo = [
+      {
+        nombre_app: "Combo Knock-Out", cantidad: 1, precio_unitario_mxn: "180.00", nota: null, alergenos: [], alergia_nota: null, producto_id: "p1",
+        modificadores: [
+          { nombre_app: "Cheese Burger", cantidad: 1, modificadores: [{ nombre_app: "extra queso", cantidad: 1 }] },
+          { nombre_app: "Papas Sencillas", cantidad: 1 },
+          { nombre_app: "Coca Cola", cantidad: 1 },
+        ],
+      },
+    ];
+    const [it0] = itemsDesdeJson(crudo);
+    expect(it0.modificadores[0]).toEqual({ nombreApp: "Cheese Burger", cantidad: 1, modificadores: [{ nombreApp: "extra queso", cantidad: 1 }] });
+    expect(it0.modificadores[1]).toEqual({ nombreApp: "Papas Sencillas", cantidad: 1 });
+    expect(it0.modificadores[1].modificadores).toBeUndefined();
+  });
+
+  it("sin modificadores en absoluto: se ve igual que hoy (array vacío)", () => {
+    const crudo = [{ nombre_app: "Refresco", cantidad: 1, precio_unitario_mxn: "30.00", producto_id: "p2" }];
+    expect(itemsDesdeJson(crudo)[0].modificadores).toEqual([]);
+  });
+
+  it("modificadores de un solo nivel (el caso de hoy, sin combo): no gana un array vacío colgando", () => {
+    const crudo = [{ nombre_app: "Hamburguesa", cantidad: 1, precio_unitario_mxn: "90.00", producto_id: "p3", modificadores: [{ nombre_app: "Sin cebolla", cantidad: 1 }] }];
+    expect(itemsDesdeJson(crudo)[0].modificadores).toEqual([{ nombreApp: "Sin cebolla", cantidad: 1 }]);
   });
 });
