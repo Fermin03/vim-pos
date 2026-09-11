@@ -42,6 +42,29 @@ export function resumenToken(jwt, ahora = Date.now()) {
   }
 }
 
+// Errores de crear_ticket_desde_app (0112_combos_uber.sql) que ya vienen con su código como
+// prefijo ("CODIGO: resto del mensaje"), la misma convención que ya usaba PEDIDO_NO_EXISTE (fuera
+// del alcance de esta traducción). Se comprueban anclados al INICIO del mensaje (no con un
+// `includes` suelto): un `includes` dispararía el código equivocado si el nombre de un producto
+// contuviera esa cadena por casualidad (p. ej. un combo llamado "ITEM_SIN_MAPEAR especial" que sí
+// se pudo mapear, pero está agotado).
+const PREFIJOS_DE_ERROR = ["SIN_TURNO_ABIERTO", "ITEM_SIN_MAPEAR", "COMBO_ELECCION_SIN_MAPEAR", "COMBO_ELECCION_AMBIGUA"];
+
+/**
+ * Traduce el error de la RPC crear_ticket_desde_app a un código corto que la caja le muestra al
+ * cajero. Lo que no se reconoce se deja TAL CUAL: es preferible un mensaje feo de Postgres que
+ * esconder un fallo que nadie previó.
+ */
+export function codigoDeError(m) {
+  for (const codigo of PREFIJOS_DE_ERROR) if (m.startsWith(`${codigo}:`)) return codigo;
+  // Texto libre de agregar_combo_a_ticket (0111_combos.sql): no trae prefijo, se reconoce por
+  // una frase estable de cada RAISE EXCEPTION.
+  if (m.includes("requiere entre") && m.includes("selecciones")) return "COMBO_INCOMPLETO";
+  if (m.includes("está agotado o pausado")) return "PRODUCTO_AGOTADO";
+  if (m.includes("no es opción del slot")) return "COMBO_OPCION_INVALIDA";
+  return m;
+}
+
 /**
  * crearEspejo({ pool, nube, cajaId, log, cadaMs, fetchFn }) → { iniciar, detener, tick }
  *  - pool: pg.Pool de la base local.
@@ -152,7 +175,7 @@ export function crearEspejo({
           creados++;
         } catch (e) {
           const m = String(e?.message ?? e);
-          const codigo = m.includes("SIN_TURNO_ABIERTO") ? "SIN_TURNO_ABIERTO" : m.includes("ITEM_SIN_MAPEAR") ? "ITEM_SIN_MAPEAR" : m;
+          const codigo = codigoDeError(m);
           await pool.query(`UPDATE delivery_pedidos SET ultimo_error = $2 WHERE id = $1`, [id, codigo]).catch(() => {});
           log(`pedido ${pedido?.folio_corto ?? id}: no se pudo crear el ticket local (${codigo})`);
           reintentables++;
