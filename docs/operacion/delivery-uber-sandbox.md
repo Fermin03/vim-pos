@@ -224,9 +224,10 @@ Total en la app: $300.00
 
 **No probado en vivo, y por qué se asume:**
 
-- **Un extra sobre un producto suelto**, fuera de combo. Es el caso de Knock-Out, que no usa combos
-  todavía. Recorre la misma ruta de código que los extras dentro del combo, que sí quedó probada.
-  Riesgo bajo, asumido a propósito.
+- **Un extra sobre un producto suelto**, fuera de combo. Recorre la misma ruta de código que los
+  extras dentro del combo, que sí quedó probada. Riesgo bajo, asumido a propósito. Además, hoy
+  **ningún restaurante real usa apps de delivery**: la integración está en producción pero solo la
+  ejercita el tenant de pruebas, así que un fallo aquí no alcanza a un cliente.
 - **`core_price` vs `corePrice`.** La referencia de Uber y su propio ejemplo se contradicen. No
   rompe el `PUT`; rompe los reembolsos parciales, en silencio. Sigue sin confirmar.
 - **El tope de precio por ítem en pesos**, si existe para México.
@@ -260,6 +261,10 @@ Una caja en 0.4.67 no tiene la `0112`, así que `agregar_item_a_ticket` rechazar
 `'El producto "%" es un combo: usa agregar_combo_a_ticket'` — un mensaje que el espejo tampoco
 traduce. Publicar la carta antes de actualizar el parque es invitar pedidos que la caja no sabe
 cobrar.
+
+**Hoy esto no bloquea a nadie**: ningún restaurante real usa apps de delivery todavía. La regla
+aplica al primero que las active — y entonces hay que comprobar que su caja está de verdad en
+0.4.68, porque el actualizador avisa y ofrece, no instala solo.
 
 ## 5. Cuando algo falla
 
