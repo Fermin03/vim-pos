@@ -44,6 +44,19 @@ test("el ítem lleva el uuid de VIM como id y el precio en centavos; los excluid
   assert.deepEqual(r.excluidos.map((e) => e.motivo), ["agotado", "sin precio", "oculto en el POS", "id inválido para Uber"]);
 });
 
+test("un combo sin slots no se publica", () => {
+  const r = construirMenuUber(
+    [
+      { id: "c1", nombre: "Combo sin armar", precio_base_mxn: 45, es_combo: true, n_slots: 0 },
+      { id: "c2", nombre: "Combo armado", precio_base_mxn: 45, es_combo: true, n_slots: 3 },
+      { id: "p1", nombre: "Hamburguesa", precio_base_mxn: 100 },
+    ],
+    [],
+  );
+  assert.deepEqual(r.excluidos.map((e) => [e.id, e.motivo]), [["c1", "combo sin slots"]]);
+  assert.equal(r.items, 2);
+});
+
 test("categorías en su orden, sin las vacías, y «Otros» al final para los sueltos", () => {
   const r = construirMenuUber(prods, cats);
   assert.equal(r.categorias, 3);

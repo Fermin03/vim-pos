@@ -18,6 +18,10 @@ export type ProductoCarta = {
   categoria_id?: string | null;
   agotado?: boolean;
   visible?: boolean;
+  /** true si es un combo (productos.es_combo). Un combo sin slots no se puede vender. */
+  es_combo?: boolean;
+  /** Nº de slots activos del combo. Solo se mira cuando `es_combo`. */
+  n_slots?: number;
 };
 
 export type CategoriaCarta = { id: string; nombre: string; orden?: number | null };
@@ -65,6 +69,7 @@ export function construirMenuUber(
       : p.visible === false ? "oculto en el POS"
       : p.agotado ? "agotado"
       : precio <= 0 ? "sin precio"
+      : p.es_combo && !(p.n_slots && p.n_slots > 0) ? "combo sin slots"
       : null;
     if (motivo) { excluidos.push({ id: p.id, nombre: p.nombre, motivo }); continue; }
     const item: Record<string, unknown> = {

@@ -263,17 +263,27 @@ Deno.serve(async (req) => {
         // que es lo que permite reconocer los pedidos sin tabla de mapeo. Reemplaza la carta entera.
         const cx = await conexionDelTenant(body.conexion_id);
         if (!cx || !cx.tienda_id_externo) return json({ error: "CONEXION_NO_EXISTE" }, 404);
-        const [{ data: prods }, { data: cats }] = await Promise.all([
+        const [{ data: prods }, { data: cats }, { data: grupos }] = await Promise.all([
           admin.from("productos")
-            .select("id, nombre, descripcion, precio_base_mxn, tasa_iva, categoria_id, agotado_manual, agotado_automatico, visible_en_pos")
+            .select("id, nombre, descripcion, precio_base_mxn, tasa_iva, categoria_id, agotado_manual, agotado_automatico, visible_en_pos, es_combo")
             .eq("tenant_id", tenantId).eq("estado", "ACTIVO").is("deleted_at", null),
           admin.from("categorias").select("id, nombre, orden_visualizacion").eq("tenant_id", tenantId).eq("activa", true).is("deleted_at", null),
+          admin.from("combo_grupos").select("combo_producto_id").eq("tenant_id", tenantId).eq("activo", true).is("deleted_at", null),
         ]);
+        // Un combo sin slots configurados no se puede vender: cuenta cuántos grupos tiene cada
+        // combo para que construirMenuUber lo excluya (ver "combo sin slots").
+        const slotsPorCombo = new Map<string, number>();
+        for (const g of ((grupos ?? []) as Record<string, unknown>[])) {
+          const k = String(g.combo_producto_id);
+          slotsPorCombo.set(k, (slotsPorCombo.get(k) ?? 0) + 1);
+        }
         const productos: ProductoCarta[] = ((prods ?? []) as Record<string, unknown>[]).map((p) => ({
           id: String(p.id), nombre: String(p.nombre ?? ""), descripcion: (p.descripcion as string | null) ?? null,
           precio_base_mxn: p.precio_base_mxn as number | string, tasa_iva: p.tasa_iva as number | null,
           categoria_id: (p.categoria_id as string | null) ?? null,
           agotado: p.agotado_manual === true || p.agotado_automatico === true, visible: p.visible_en_pos !== false,
+          es_combo: p.es_combo === true,
+          n_slots: slotsPorCombo.get(String(p.id)) ?? 0,
         }));
         const categorias: CategoriaCarta[] = ((cats ?? []) as Record<string, unknown>[]).map((c) => ({
           id: String(c.id), nombre: String(c.nombre ?? ""), orden: (c.orden_visualizacion as number | null) ?? 0,
