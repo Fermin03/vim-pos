@@ -5,9 +5,11 @@
 // tabla de mapeo y `crear_ticket_desde_app` los convierte en renglones del ticket. Sin este menú
 // la tienda de Uber no tiene nada que vender, o vende ids que el POS no conoce (`items_sin_mapear`).
 //
-// Módulo puro: recibe productos, categorías y grupos de modificadores ya leídos, devuelve el
-// cuerpo exacto que espera Uber. Precios en centavos (Uber no acepta decimales); IVA como
-// `tax_rate`. Los combos todavía no se exponen (van en una entrega aparte).
+// Módulo puro: recibe productos, categorías, grupos de modificadores y combos ya leídos, devuelve
+// el cuerpo exacto que espera Uber. Precios en centavos (Uber no acepta decimales); IVA como
+// `tax_rate`. Un combo se publica como el producto padre más un `modifier_group` por slot, cuyas
+// opciones son los productos reales de la carta — el mismo cálculo aditivo que hace el servidor
+// en `agregar_combo_a_ticket`.
 
 export type ProductoCarta = {
   id: string;
@@ -35,6 +37,20 @@ export type GrupoModificadorCarta = {
   opciones: { id: string; nombre: string; precio_extra_mxn: number | string; agotada?: boolean }[];
   /** Productos a los que se aplica, en el orden en que los pide la caja. */
   producto_ids: string[];
+};
+
+export type ComboCarta = {
+  producto_id: string;
+  slots: {
+    id: string;
+    nombre: string;
+    orden: number;
+    minimo_selecciones: number;
+    maximo_selecciones: number;
+    /** Ya resueltas por quien consulta: categoría o lista, exclusiones aplicadas, agotados fuera.
+     *  `importe_mxn` es lo que la opción aporta al precio del combo, con la fórmula del servidor. */
+    opciones: { producto_id: string; importe_mxn: number | string }[];
+  }[];
 };
 
 export type MenuUber = {
@@ -85,18 +101,30 @@ export function cantidadesDeGrupo(
 export function construirMenuUber(
   productos: ProductoCarta[],
   categorias: CategoriaCarta[],
-  opciones: { titulo?: string; grupos?: GrupoModificadorCarta[]; combos?: unknown[] } = {},
+  opciones: { titulo?: string; grupos?: GrupoModificadorCarta[]; combos?: ComboCarta[] } = {},
 ): {
   menu: MenuUber;
   items: number;
   categorias: number;
   grupos: number;
   opcionesModificador: number;
+  combos: number;
   excluidos: { id: string; nombre: string; motivo: string }[];
 } {
   const excluidos: { id: string; nombre: string; motivo: string }[] = [];
   const items: unknown[] = [];
   const porCategoria = new Map<string, string[]>();
+
+  // Motivo de exclusión que no depende de combos ni de grupos: id inválido, oculto, agotado o sin
+  // precio. Se usa tanto para la cadena de exclusión del producto (abajo) como para decidir qué
+  // productos están realmente en la carta que se publica (`enCarta`, abajo) — el mismo criterio en
+  // un solo sitio, para que un producto excluido nunca aparezca como opción de un slot.
+  const motivoBase = (p: ProductoCarta): string | null =>
+    !idValidoUber(p.id) ? "id inválido para Uber"
+    : p.visible === false ? "oculto en el POS"
+    : p.agotado ? "agotado"
+    : centavos(p.precio_base_mxn) <= 0 ? "sin precio"
+    : null;
 
   // Un grupo sin opciones rompe la sincronización de la carta entera (documentado por Toast), así
   // que no se publica. Si era obligatorio, su producto queda inordenable: se excluye también.
@@ -114,15 +142,43 @@ export function construirMenuUber(
     if (!vivo && obligatorio) for (const pid of g.producto_ids) obligatorioVacio.add(pid);
   }
 
+  // Un combo al que le falta un slot es inordenable en Uber (rechazo MISSING_ITEM): no se publica.
+  // Las opciones que ya no están en la carta (agotadas, ocultas, sin precio) simplemente no cuentan;
+  // `enCarta` usa el mismo `motivoBase` que la cadena de exclusión de abajo, para que un slot
+  // nunca apunte a un `modifier_option` que Uber no va a encontrar en `items[]`.
+  const enCarta = new Set(productos.filter((p) => motivoBase(p) === null).map((p) => p.id));
+  const combosVivos: ComboCarta[] = [];
+  const comboSinSlot = new Set<string>();
+  for (const c of opciones.combos ?? []) {
+    const slots = [...c.slots].sort((a, b) => a.orden - b.orden)
+      .map((s) => ({ ...s, opciones: s.opciones.filter((o) => enCarta.has(o.producto_id) && idValidoUber(o.producto_id)) }));
+    if (slots.length === 0 || slots.some((s) => s.opciones.length === 0)) { comboSinSlot.add(c.producto_id); continue; }
+    combosVivos.push({ ...c, slots });
+  }
+  const slotsPorCombo = new Map<string, string[]>();
+  /** producto → ajustes que le tocan por estar en un slot. */
+  const ajustesPrecio = new Map<string, { context_type: "MODIFIER_GROUP"; context_value: string; price: number; core_price: number }[]>();
+  const ajustesCantidad = new Map<string, { context_type: "MODIFIER_GROUP"; context_value: string; quantity: { min_permitted: number; max_permitted: number } }[]>();
+  for (const c of combosVivos) {
+    slotsPorCombo.set(c.producto_id, c.slots.map((s) => s.id));
+    for (const s of c.slots) for (const o of s.opciones) {
+      const suelto = centavos(productos.find((p) => p.id === o.producto_id)?.precio_base_mxn ?? 0);
+      ajustesPrecio.set(o.producto_id, [...(ajustesPrecio.get(o.producto_id) ?? []),
+        { context_type: "MODIFIER_GROUP", context_value: s.id,
+          price: Math.max(0, Math.round(Number(o.importe_mxn) * 100) || 0), core_price: suelto }]);
+      ajustesCantidad.set(o.producto_id, [...(ajustesCantidad.get(o.producto_id) ?? []),
+        { context_type: "MODIFIER_GROUP", context_value: s.id,
+          quantity: { min_permitted: 0, max_permitted: 1 } }]);
+    }
+  }
+
   for (const p of productos) {
     const precio = centavos(p.precio_base_mxn);
-    const motivo = !idValidoUber(p.id) ? "id inválido para Uber"
-      : p.visible === false ? "oculto en el POS"
-      : p.agotado ? "agotado"
-      : precio <= 0 ? "sin precio"
-      : p.es_combo && !(p.n_slots && p.n_slots > 0) ? "combo sin slots"
+    const motivo = motivoBase(p)
+      ?? (p.es_combo && !(p.n_slots && p.n_slots > 0) ? "combo sin slots"
       : obligatorioVacio.has(p.id) ? "grupo obligatorio sin opciones"
-      : null;
+      : comboSinSlot.has(p.id) ? "slot sin opciones"
+      : null);
     if (motivo) { excluidos.push({ id: p.id, nombre: p.nombre, motivo }); continue; }
     const item: Record<string, unknown> = {
       id: p.id,
@@ -130,10 +186,17 @@ export function construirMenuUber(
       price_info: { price: precio },
       tax_info: { tax_rate: Math.max(0, Number(p.tasa_iva ?? 16) || 0) },
       quantity_info: {},
-      modifier_group_ids: { ids: gruposPorProducto.get(p.id) ?? [] },
+      // Los grupos de modificadores propios van primero; los slots de combo que traen a este
+      // producto como opción, después — un combo no tiene grupos propios publicados (invariante
+      // del spec), y un producto que es opción de un slot sí puede tener los suyos.
+      modifier_group_ids: { ids: [...(gruposPorProducto.get(p.id) ?? []), ...(slotsPorCombo.get(p.id) ?? [])] },
       external_data: p.id,
     };
     if (p.descripcion && p.descripcion.trim()) item.description = texto(p.descripcion);
+    const ajP = ajustesPrecio.get(p.id);
+    if (ajP?.length) item.price_info = { price: precio, overrides: ajP };
+    const ajC = ajustesCantidad.get(p.id);
+    if (ajC?.length) item.quantity_info = { quantity: {}, overrides: ajC };
     items.push(item);
     const cat = p.categoria_id && categorias.some((c) => c.id === p.categoria_id) ? p.categoria_id : SIN_CATEGORIA;
     porCategoria.set(cat, [...(porCategoria.get(cat) ?? []), p.id]);
@@ -181,6 +244,21 @@ export function construirMenuUber(
     });
   }
 
+  // Cada slot de combo se publica como un modifier_group más, con las mismas opciones de la carta;
+  // el precio aditivo de Uber ya está resuelto en `ajustesPrecio` sobre el ítem de cada opción.
+  for (const c of combosVivos) {
+    for (const s of c.slots) {
+      modifierGroups.push({
+        id: s.id,
+        external_data: s.id,
+        title: texto(s.nombre || "Elige"),
+        quantity_info: { quantity: { min_permitted: s.minimo_selecciones, max_permitted: s.maximo_selecciones } },
+        modifier_options: s.opciones.map((o) => ({ type: "ITEM" as const, id: o.producto_id })),
+        display_type: "expanded",
+      });
+    }
+  }
+
   const menu: MenuUber = {
     items,
     modifier_groups: modifierGroups,
@@ -198,6 +276,7 @@ export function construirMenuUber(
     categorias: categories.length,
     grupos: modifierGroups.length,
     opcionesModificador: nOpciones,
+    combos: combosVivos.length,
     excluidos,
   };
 }

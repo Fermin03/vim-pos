@@ -85,15 +85,19 @@ test("sin productos válidos: menú vacío pero bien formado", () => {
 
 // Formas mínimas de lo que Uber espera en `items`/`modifier_groups`, solo con los campos que
 // estas pruebas leen — evita `any` al indexar el `unknown[]` que devuelve `construirMenuUber`.
+type Ajuste = { context_type: "MODIFIER_GROUP"; context_value: string; price: number; core_price: number };
+type AjusteCantidad = { context_type: "MODIFIER_GROUP"; context_value: string; quantity: { min_permitted: number; max_permitted: number } };
 type ItemMenu = {
   id: string;
-  price_info: { price: number; core_price: number };
+  price_info: { price: number; core_price: number; overrides: Ajuste[] };
+  quantity_info: { overrides: AjusteCantidad[] };
   external_data: string;
   modifier_group_ids: { ids: string[] };
 };
 type GrupoMenu = {
   id: string;
   quantity_info: { quantity: { min_permitted: number; max_permitted: number } };
+  modifier_options: { type: "ITEM"; id: string }[];
 };
 
 const GRUPOS = [
@@ -170,4 +174,93 @@ test("sin grupos ni combos, la carta es exactamente la de hoy", () => {
   const sinParam = construirMenuUber(productos, categorias, { titulo: "Carta" });
   assert.deepEqual(conParam.menu, sinParam.menu);
   assert.deepEqual(sinParam.menu.modifier_groups, []);
+});
+
+// --- Task 3: combos ---------------------------------------------------------
+
+const COMBO = {
+  producto_id: "c1",
+  slots: [
+    { id: "s-burger", nombre: "Hamburguesa", orden: 1, minimo_selecciones: 1, maximo_selecciones: 1,
+      opciones: [{ producto_id: "p1", importe_mxn: 100 }, { producto_id: "p2", importe_mxn: 130 }] },
+    { id: "s-papas", nombre: "Papas", orden: 2, minimo_selecciones: 1, maximo_selecciones: 1,
+      opciones: [{ producto_id: "p3", importe_mxn: 0 }] },
+  ],
+};
+const PRODS = [
+  { id: "c1", nombre: "Combo", precio_base_mxn: 45, categoria_id: "cat", es_combo: true, n_slots: 2 },
+  { id: "p1", nombre: "Sencilla", precio_base_mxn: 100, categoria_id: "cat" },
+  { id: "p2", nombre: "Doble", precio_base_mxn: 130, categoria_id: "cat" },
+  { id: "p3", nombre: "Papas", precio_base_mxn: 50, categoria_id: "cat" },
+];
+
+test("el combo publica sus slots y las opciones llevan el ajuste de precio por grupo", () => {
+  const r = construirMenuUber(PRODS, [{ id: "cat", nombre: "Todo", orden: 1 }], { combos: [COMBO] });
+  const items = r.menu.items as ItemMenu[];
+  // el padre: precio base y sus slots en orden
+  const padre = items.find((i) => i.id === "c1")!;
+  assert.equal(padre.price_info.price, 4500);
+  assert.deepEqual(padre.modifier_group_ids.ids, ["s-burger", "s-papas"]);
+  // la Doble: $130 suelta, y dentro del slot aporta 130 con core_price 130
+  const doble = items.find((i) => i.id === "p2")!;
+  assert.equal(doble.price_info.price, 13000);
+  assert.deepEqual(doble.price_info.overrides, [
+    { context_type: "MODIFIER_GROUP", context_value: "s-burger", price: 13000, core_price: 13000 },
+  ]);
+  assert.deepEqual(doble.quantity_info.overrides, [
+    { context_type: "MODIFIER_GROUP", context_value: "s-burger", quantity: { min_permitted: 0, max_permitted: 1 } },
+  ]);
+  // las papas aportan 0 dentro del combo pero valen 50 sueltas
+  const papas = items.find((i) => i.id === "p3")!;
+  assert.equal(papas.price_info.overrides[0].price, 0);
+  assert.equal(papas.price_info.overrides[0].core_price, 5000);
+  // los slots son grupos con sus cantidades
+  const slot = (r.menu.modifier_groups as GrupoMenu[]).find((g) => g.id === "s-burger")!;
+  assert.deepEqual(slot.quantity_info.quantity, { min_permitted: 1, max_permitted: 1 });
+  assert.deepEqual(slot.modifier_options, [{ type: "ITEM", id: "p1" }, { type: "ITEM", id: "p2" }]);
+  assert.equal(r.combos, 1);
+});
+
+test("el segundo nivel se conserva: el hijo mantiene sus propios grupos", () => {
+  const r = construirMenuUber(PRODS, [], {
+    combos: [COMBO],
+    grupos: [{ id: "g-term", nombre: "Término", tipo_seleccion: "UNICA_OBLIGATORIA",
+               minimo_selecciones: null, maximo_selecciones: null,
+               opciones: [{ id: "o-34", nombre: "Tres cuartos", precio_extra_mxn: 0 }],
+               producto_ids: ["p2"] }],
+  });
+  const doble = (r.menu.items as ItemMenu[]).find((i) => i.id === "p2")!;
+  assert.deepEqual(doble.modifier_group_ids.ids, ["g-term"]);
+});
+
+test("un slot sin opciones publicables tumba el combo entero", () => {
+  const r = construirMenuUber(PRODS, [], {
+    combos: [{ ...COMBO, slots: [COMBO.slots[0]!, { ...COMBO.slots[1]!, opciones: [] }] }],
+  });
+  assert.deepEqual(r.excluidos.map((e) => [e.id, e.motivo]), [["c1", "slot sin opciones"]]);
+  assert.equal((r.menu.items as ItemMenu[]).find((i) => i.id === "c1"), undefined);
+  // sus slots tampoco se publican
+  assert.deepEqual(r.menu.modifier_groups, []);
+});
+
+test("una opción de slot que no está en la carta no cuenta", () => {
+  const r = construirMenuUber(
+    [PRODS[0]!, PRODS[2]!, PRODS[3]!],  // sin p1
+    [],
+    { combos: [COMBO] },
+  );
+  const slot = (r.menu.modifier_groups as GrupoMenu[]).find((g) => g.id === "s-burger")!;
+  assert.deepEqual(slot.modifier_options, [{ type: "ITEM", id: "p2" }]);
+});
+
+test("una opción de slot agotada no cuenta; si era la única, el combo se cae", () => {
+  // p1 está presente (no ausente de `productos`, a diferencia de la prueba anterior) pero agotado:
+  // `enCarta` debe usar el mismo criterio de exclusión que el resto de la función, no solo
+  // "está en el array", o Uber recibiría un modifier_option que apunta a un ítem inexistente.
+  const prods = PRODS.map((p) => (p.id === "p1" ? { ...p, agotado: true } : p));
+  const r = construirMenuUber(prods, [], {
+    combos: [{ ...COMBO, slots: [{ ...COMBO.slots[0]!, opciones: [{ producto_id: "p1", importe_mxn: 100 }] }, COMBO.slots[1]!] }],
+  });
+  assert.deepEqual(r.excluidos.map((e) => [e.id, e.motivo]), [["c1", "slot sin opciones"], ["p1", "agotado"]]);
+  assert.deepEqual(r.menu.modifier_groups, []);
 });
