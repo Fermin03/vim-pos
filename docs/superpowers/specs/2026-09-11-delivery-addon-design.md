@@ -34,43 +34,64 @@ que manda en este diseño es el comercial**; la carga es una consecuencia agrada
 
 ## 2. Alcance
 
-**Entra:** que `delivery_apps` se resuelva como add-on de pago; que apagarlo le diga a Uber que
-deje de mandar pedidos; que la caja deje de sondear; que las superficies del admin y del POS
-desaparezcan; y un lector de módulos para el admin, que hoy no tiene.
+**Entra:** que `delivery_apps` se resuelva como add-on de pago que concede VIM; un interruptor del
+dueño para encenderlo; que retirar el add-on le diga a Uber que deje de mandar pedidos; que la caja
+deje de sondear cuando no está encendido; que las superficies del admin y del POS desaparezcan sin
+permiso; y un lector de módulos para el admin, que hoy no tiene.
 
-**No entra:** el precio del add-on (es un dato, lo decide Fermín al darlo de alta); DiDi y Rappi
+**No entra:** DiDi y Rappi
 (no existen todavía, pero el módulo es uno solo para "apps de delivery", no uno por app); cambiar
 la cadencia del espejo, que ya está bien; y cualquier cambio al flujo de pedidos en sí.
 
 ## 3. Decisiones tomadas
 
-1. **De pago, como el CFDI.** Lo permite VIM por cliente, no el plan.
+1. **Lo enciende VIM por cliente, desde `/platform`.** Nunca el plan y nunca el dueño. El plan solo
+   decide **cuánto cuesta**: incluido (sin cargo) desde Negocio ($999) y Cadena ($1,999), y **$100
+   al mes** para Esencial ($699), que así paga $799 — por debajo de los $999 de subir de plan.
 2. **Al apagarse, se le avisa a Uber.** `integration_enabled = false`, para que Uber deje de
    mandar pedidos y los maneje por su tablero. Es la única opción en la que ningún cliente final
    paga por comida que nadie va a preparar.
-3. **Sin el add-on, desaparece por completo.** Ni sección en el admin ni pantalla en el POS.
+3. **Dos capas: VIM permite, el dueño enciende.** Es la forma que ya usa `recetas` (ADR 0013).
+   Fermín concede el add-on desde `/platform`; el dueño lo activa en "Apps de delivery" cuando lo
+   vaya a usar. Sin el add-on, la sección **desaparece por completo** del admin y del POS.
 
 ## 4. El add-on
 
-Una fila en `addons` con código `DELIVERY`, hermana de la de `CFDI` (0081:26). La tabla es de
-`0002_nucleo_comercial.sql:105` y trae `precio_mensual_mxn`, `visible_publico` y `activo`.
+Una fila en `addons` con código `DELIVERY`, hermana de la de `CFDI` (0081:26), con
+`precio_mensual_mxn = 100.00` — el precio de lista, que es el que paga un Esencial.
 
-El precio lo fija Fermín, así que la migración inserta la fila con `precio_mensual_mxn = 0.00` y
-**`visible_publico = false`**: el add-on existe y se puede asignar a mano, pero no aparece como
-contratable hasta que alguien le ponga precio. Darlo de alta a un cliente es insertar en
-`tenant_addons`, igual que el CFDI.
+Encenderlo a un cliente es insertar en `tenant_addons`, igual que el CFDI. Lo que hace que un solo
+mecanismo cubra los dos casos es que **`tenant_addons.precio_mensual_mxn` es por fila**
+(`0002_nucleo_comercial.sql:234`):
+
+| Plan | La fila lleva | El cliente paga |
+|---|---|---|
+| Esencial $699 | `100.00` | $799 |
+| Negocio $999 | `0.00`, `notas = 'incluido en el plan'` | $999 |
+| Cadena $1,999 | `0.00`, `notas = 'incluido en el plan'` | $1,999 |
+
+El panel **pre-llena ese precio según el plan del cliente** al dar de alta el add-on: $100 si es
+Esencial, $0 si es Negocio o Cadena. Fermín puede cambiarlo (una cortesía, una promoción), pero el
+valor por defecto es el correcto. Así la política de precios vive en un sitio y no en la memoria de
+quien rellena el formulario.
+
+**"Incluido desde $999" es política de cobro, no un permiso automático.** El plan NO concede el
+módulo: si lo concediera, la caja de todo cliente de Negocio en adelante sondearía pedidos aunque
+nunca conecte una tienda, y se perdería el ahorro que motiva esta entrega. Mecánicamente es idéntico
+en los tres planes —Fermín lo enciende— y lo único que cambia es el número en la fila.
 
 En `modulos_efectivos` (0103), `delivery_apps` **sale del bucle** de `tenant_feature_flags`/plan y
 pasa a resolverse como el CFDI:
 
 ```sql
 v_perm := tenant_addon_activo(p_tenant, 'DELIVERY');
+v_enc  := COALESCE(v_del, false);   -- configuracion_tenant.modulo_delivery_activo
 v_permitidos := v_permitidos || jsonb_build_object('delivery_apps', v_perm);
-v_efectivos  := v_efectivos  || jsonb_build_object('delivery_apps', v_perm);
+v_efectivos  := v_efectivos  || jsonb_build_object('delivery_apps', (v_perm AND v_enc));
 ```
 
-`permitidos` y `efectivos` coinciden porque el dueño no tiene interruptor propio: o lo contrató o
-no. Es la misma forma que el CFDI.
+Aquí `permitidos` y `efectivos` **no** coinciden, a diferencia del CFDI: el add-on da el permiso y
+el dueño da el encendido. Ver §4b.
 
 La migración **quita `delivery_apps` de `planes.features_incluidos->'modulos'`** en los nueve
 planes donde 0103 lo puso. Si no se quita, queda una llave muerta que confundirá al siguiente que
@@ -80,6 +101,31 @@ lea la tabla.
 por Fermín el 11 sep 2026); la integración solo la ejercita el tenant de pruebas. El tenant
 `vim-pruebas` recibe su fila en `tenant_addons` dentro de la misma migración, para no quedarse sin
 su propio banco de pruebas.
+
+## 4b. Los tres estados
+
+El interruptor del dueño vive en `configuracion_tenant.modulo_delivery_activo` (boolean, por
+defecto **false**), hermano de `modulo_inventario_activo`, que es como ya se enciende `recetas`
+(ADR 0013, `apps/admin/app/lib/inventario.ts:166-183`).
+
+| Estado | Cuándo | Admin | POS | ¿La caja sondea? |
+|---|---|---|---|---|
+| **No permitido** | Fermín no dio el add-on | la sección no existe | nada | no |
+| **Permitido, apagado** | lo dio; el dueño no lo activó | sección con interruptor y una línea de qué hace | nada | **no** |
+| **Permitido, encendido** | el dueño lo activó | sección completa | pantalla de pedidos | sí |
+
+El estado de en medio es el que hace que el interruptor valga la pena. **No es burocracia: es lo
+que conserva el ahorro.** Sin él, a todo cliente con el add-on concedido le sondearía la caja
+aunque nunca conecte una tienda, y volveríamos a las 288 llamadas diarias por caja.
+
+De ahí sale una asimetría que el plan debe respetar: **el admin se guía por `permitidos`** (para
+poder mostrar el interruptor apagado) y **el POS y la caja por `efectivos`** (la pantalla y el
+sondeo solo existen cuando está encendido de verdad). `modulos_efectivos` devuelve los dos;
+`resolver_directivas` manda solo `efectivos`, que es justo lo que la caja necesita.
+
+Apagar el interruptor **no** avisa a Uber: es una decisión del dueño, no un corte comercial, y el
+dueño puede volver a encenderlo. Lo que sí avisa a Uber es retirar el add-on (§5). Pero mientras
+esté apagado, los guards de §6 rechazan igual, así que un pedido que llegue no se cuela.
 
 ## 5. Apagar de verdad
 
@@ -116,8 +162,10 @@ sin publicar un instalador. Es la propiedad que hace que este diseño funcione e
 **`delivery-uber-conexion`.** Sin módulo, todas sus acciones responden 403. Si no, el dueño podría
 reconectar su tienda por OAuth y recuperar el servicio sin pagarlo.
 
-**El admin y el POS** esconden sus superficies. Es cortesía, no seguridad: quien se salte la
-interfaz choca con los tres guards de arriba.
+Los tres miran **`efectivos`**: sin add-on o con el interruptor del dueño apagado, rechazan igual.
+
+**El admin y el POS** esconden sus superficies —el admin por `permitidos`, el POS por `efectivos`
+(§4b)—. Es cortesía, no seguridad: quien se salte la interfaz choca con los tres guards de arriba.
 
 ## 7. La caja deja de preguntar
 
@@ -138,19 +186,28 @@ Dos detalles que el plan no puede saltarse:
 ## 8. Las superficies
 
 **Admin.** `apps/admin/app/components/config-sidenav.tsx:18` deja de pintar "Apps de delivery"
-cuando el módulo está apagado, y la ruta `/configuracion/integraciones` redirige. Hace falta un
-lector de módulos que **hoy no existe**: el admin lee el de inventario a pelo desde
-`configuracion_tenant` (`apps/admin/app/lib/inventario.ts:166-171`) y no tiene nada genérico. Se
-añade `apps/admin/app/lib/modulos.ts` que llama al RPC `modulos_efectivos`, que ya tiene
-`GRANT EXECUTE ... TO authenticated` (0103:115).
+cuando el módulo **no está permitido**, y la ruta `/configuracion/integraciones` redirige.
+
+Cuando está permitido pero apagado, la sección se ve con el interruptor de activar y una línea de
+qué hace; el asistente de conexión de Uber aparece solo al encenderlo. El interruptor escribe
+`configuracion_tenant.modulo_delivery_activo` con el mismo patrón de upsert que ya usa el de
+inventario (`apps/admin/app/lib/inventario.ts:183`).
+
+Hace falta además un lector de módulos que **hoy no existe**: el admin lee el de inventario a pelo
+desde `configuracion_tenant` y no tiene nada genérico. Se añade `apps/admin/app/lib/modulos.ts` que
+llama al RPC `modulos_efectivos` —que ya tiene `GRANT EXECUTE ... TO authenticated` (0103:115)— y
+devuelve **las dos capas**, porque el admin necesita `permitidos` para distinguir el estado de en
+medio.
 
 **POS.** `apps/pos/app/lib/directivas.ts` ya expone `modulos: Record<string, boolean>`. `home-pos.tsx`
 deja de montar `PantallaPedidosApps` y su badge cuando `modulos.delivery_apps` es falso.
 
 ## 9. Pruebas
 
-- `modulos_efectivos` devuelve `delivery_apps: false` sin `tenant_addons`, `true` con uno vigente, y
-  `false` de nuevo cuando la vigencia caduca. Es la prueba que fija el cambio de fuente.
+- `modulos_efectivos` y las dos capas: sin `tenant_addons`, `permitido` y `efectivo` en `false`; con
+  add-on vigente y el interruptor apagado, `permitido` **true** y `efectivo` **false** (el estado de
+  en medio, el que más fácil se implementa mal); con los dos, ambos en `true`; y `false` otra vez
+  cuando la vigencia caduca, aunque el interruptor siga encendido.
 - Los tres guards de Edge Function: con módulo pasan, sin módulo rechazan **y no escriben nada**.
   Que no escriban es la parte que importa: un guard que rechaza pero deja el pedido creado no sirve.
 - La cadencia de reposo para un tenant sin módulo, en `_shared/delivery/espejo.ts`, con `node --test`.
@@ -167,6 +224,13 @@ cuanto haya un cliente. Retirar el add-on a media comida corta pedidos en curso.
 impide a propósito: Fermín pidió poder cortar a quien no paga. La mitigación es de operación, no de
 código: retirar add-ons fuera de horario de servicio, y que el panel avise de cuántos pedidos vivos
 hay antes de confirmar.
+
+**El dueño apaga su interruptor sin querer y deja de recibir pedidos.** Uber sigue ofreciendo la
+tienda porque el add-on sigue vigente, así que los pedidos entran a Uber y el POS los rechaza. Es
+el mismo modo de fallo que ya tiene `recetas` con su interruptor, pero ahí solo deja de descontar
+inventario y aquí se pierden ventas. Mitigación: el interruptor pide confirmación cuando hay
+conexiones activas, y decirlo en la confirmación — "Uber seguirá mandando pedidos y no los verás
+aquí". No se resuelve avisando a Uber, porque apagar es reversible y el dueño lo reactivará.
 
 **Una caja vieja que nunca se actualiza.** Sigue arrancando su espejo. La cubre el guard del
 espejo: contesta vacío y en reposo. Pesa 288 llamadas al día en vez de 0 — el mismo número que hoy,
