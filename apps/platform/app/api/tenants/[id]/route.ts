@@ -244,9 +244,13 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
       if (planCodigo === "NEGOCIO" || planCodigo === "CADENA") precioLista = 0;
     }
     const precio = body.precio_mensual_mxn != null ? Number(body.precio_mensual_mxn) : precioLista;
+    // Una fila en $0.00 sin explicación invita a preguntar, dentro de seis meses, si el cero es un
+    // error. El spec (§4) fija esta nota para Negocio/Cadena; solo se usa cuando el precio salió
+    // en cero y nadie mandó un motivo propio — un motivo explícito (cortesía, promoción) manda.
+    const motivo = (body.motivo as string | undefined)?.trim() || (precio === 0 ? "incluido en el plan" : null);
     const { error } = await sb.from("tenant_addons").insert({
       tenant_id: id, addon_id: addon.id, fecha_inicio: hoyMx(), activo: true,
-      precio_mensual_mxn: precio, notas: (body.motivo as string | undefined)?.trim() || null,
+      precio_mensual_mxn: precio, notas: motivo,
     });
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
     await auditar(sb, { accion: "tenant.addon_activar", tenantId: id, motivo: `Alta del add-on ${addon.nombre}`, payload: { codigo, precio } });
@@ -290,8 +294,11 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
     let pausadas = 0;
     const fallos: string[] = [];
     if (codigo === "DELIVERY") {
+      // Solo "ACTIVA": `transicionConexion` (uber-activacion.ts) solo admite "pausar" desde ahí.
+      // Una PENDIENTE incluida aquí volvería con 409 de Uber, entraría en `fallos` y el operador
+      // vería un aviso de "Uber no confirmó la pausa" para una tienda que nunca estuvo activa.
       const { data: cxs } = await sb.from("delivery_conexiones")
-        .select("id, estado").eq("tenant_id", id).eq("app", "APP_UBEREATS").in("estado", ["ACTIVA", "PENDIENTE"]);
+        .select("id, estado").eq("tenant_id", id).eq("app", "APP_UBEREATS").eq("estado", "ACTIVA");
       const supabaseUrl = process.env.SUPABASE_URL;
       const claveServicio = process.env.SUPABASE_SERVICE_ROLE_KEY;
       const secretoInterno = process.env.VIM_DELIVERY_INTERNO_SECRET;
