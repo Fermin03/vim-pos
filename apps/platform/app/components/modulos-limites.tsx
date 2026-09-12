@@ -68,7 +68,7 @@ export function ModulosLimites({ d, nombre, accion, busy }: { d: Detalle; nombre
                   <div className="min-w-0">
                     <div className="text-[13px] font-semibold">{m.nombre}</div>
                     <div className={["text-[11.5px]", m.porAddon ? (permitido ? "text-success" : "text-ink-3") : o.clase].join(" ")}>
-                      {m.porAddon ? (permitido ? "Por el add-on CFDI" : "Sin add-on CFDI · se activa arriba, en Add-ons") : o.texto}
+                      {m.porAddon ? (permitido ? `Por el add-on ${m.nombre}` : `Sin add-on ${m.nombre} · se activa arriba, en Add-ons`) : o.texto}
                     </div>
                     {permitido && !efectivo && m.interruptorDueno && (
                       <div className="text-[11.5px] text-ink-3">Permitido, pero el dueño no lo ha encendido en su admin.</div>
