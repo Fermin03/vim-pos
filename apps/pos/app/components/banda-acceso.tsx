@@ -2,7 +2,17 @@
 import { useEffect, useState } from "react";
 import { evaluarAcceso, leerDirectivas, type MotivoBloqueo, type NivelAcceso } from "../lib/directivas";
 
-export type Acceso = { nivel: NivelAcceso; mensaje: string; desde: string | null; motivo: MotivoBloqueo };
+export type Acceso = {
+  nivel: NivelAcceso;
+  mensaje: string;
+  desde: string | null;
+  motivo: MotivoBloqueo;
+  /** Módulos de pago que la nube tiene encendidos para este negocio (add-on de delivery). Se
+   *  expone aquí para que quien ya lee directivas para la banda de gracia y el bloqueo (p. ej.
+   *  `home-pos.tsx`) no tenga que abrir una consulta nueva solo para saber si un módulo está
+   *  prendido. */
+  modulos: Record<string, boolean>;
+};
 
 /**
  * Nivel de acceso de esta caja (ADR 0014).
@@ -12,12 +22,12 @@ export type Acceso = { nivel: NivelAcceso; mensaje: string; desde: string | null
  * cliente se note en menos de un minuto desde que llega la directiva nueva.
  */
 export function useAcceso(): Acceso {
-  const [r, setR] = useState<Acceso>({ nivel: "ok", mensaje: "", desde: null, motivo: "suscripcion" });
+  const [r, setR] = useState<Acceso>({ nivel: "ok", mensaje: "", desde: null, motivo: "suscripcion", modulos: {} });
   useEffect(() => {
     let vivo = true;
     const cargar = () => {
       leerDirectivas()
-        .then((d) => { if (vivo) setR(evaluarAcceso(d)); })
+        .then((d) => { if (vivo) setR({ ...evaluarAcceso(d), modulos: d?.modulos ?? {} }); })
         .catch(() => {});
     };
     cargar();

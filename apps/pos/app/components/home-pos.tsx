@@ -48,6 +48,7 @@ import { PantallaConsultaCuentas } from "./pantalla-consulta-cuentas";
 import { PantallaDevoluciones } from "./pantalla-devoluciones";
 import { PantallaPedidosApps } from "./pantalla-pedidos-apps";
 import { hayExpiradosSinVer, leerExpiradosHoy, leerPedidosApps } from "../lib/pedidos-apps";
+import { useAcceso } from "./banda-acceso";
 import { ModalCancelarItem } from "./modal-cancelar-item";
 import { ModalDescuentoItem } from "./modal-descuento-item";
 import { ModalCancelarTicket } from "./modal-cancelar-ticket";
@@ -143,6 +144,11 @@ export function HomePos({
   const [nPedidosApps, setNPedidosApps] = useState(0);
   const [expiradosApps, setExpiradosApps] = useState(0);   // spec A6: vencidos sin aceptar, no vistos aún
   const idsAppsVistos = useRef<Set<string> | null>(null);
+  // Add-on de delivery: el módulo manda sobre la pantalla y sobre el badge. `useAcceso` ya lee
+  // las directivas para la banda de gracia y el bloqueo (ADR 0014); se reutiliza esa lectura en
+  // vez de abrir una consulta nueva solo para saber si el módulo está prendido.
+  const { modulos } = useAcceso();
+  const hayDelivery = modulos?.delivery_apps === true;
   // F16 — estado de conexión (avisa al cajero si se cae la red).
   const { online } = useConexion(SUPABASE_URL ? `${SUPABASE_URL}/auth/v1/health` : undefined);
   // Fase 3 — outbox offline: pendientes por sincronizar + auto-sync al reconectar.
@@ -912,7 +918,10 @@ export function HomePos({
   // ADR 0011 — pedidos de apps: se consultan SIEMPRE (no solo en el inicio) porque un pedido de
   // Uber tiene minutos para aceptarse y el cajero puede estar en medio de una venta. Una consulta
   // ligera cada 10 s; el sonido suena una vez por pedido nuevo pendiente.
+  // Add-on de delivery: sin el módulo encendido, ni se sondea. Es la misma carga que la caja de
+  // escritorio deja de meterle a la nube con su espejo cuando el módulo está apagado.
   useEffect(() => {
+    if (!hayDelivery) return;
     let vivo = true;
     const cargar = () => {
       leerPedidosApps(token, caja.sucursal_id)
@@ -940,7 +949,7 @@ export function HomePos({
     cargar();
     const id = setInterval(cargar, 10000);
     return () => { vivo = false; clearInterval(id); };
-  }, [token, caja.sucursal_id]);
+  }, [hayDelivery, token, caja.sucursal_id]);
 
   /** Cierra la confirmación/recibo y deja la caja lista para la siguiente venta. */
   const nuevoTicket = useCallback(() => {
@@ -1313,7 +1322,9 @@ export function HomePos({
           nEnEspera={nEnEspera}
           nPedidosApps={nPedidosApps}
           expiradosApps={expiradosApps}
-          onPedidosApps={() => { setEnInicio(false); setEnPedidosApps(true); }}
+          // Sin el módulo, `onPedidosApps` queda undefined: PantallaInicio no pinta ni el atajo
+          // ni el aviso de vencidos (ambos son condicionales a que venga la función).
+          onPedidosApps={hayDelivery ? () => { setEnInicio(false); setEnPedidosApps(true); } : undefined}
           onComedor={() => { setEnInicio(false); setEnMesas(true); }}
           onPickup={() => { setEnInicio(false); setEnPickup(true); }}
           onDomicilio={() => { setEnInicio(false); setEnDelivery(true); }}
@@ -1524,7 +1535,10 @@ export function HomePos({
     return <PantallaDevoluciones token={token} caja={caja} turno={turno} empleado={empleado} onSalir={volverAlInicio} />;
   }
 
-  if (enPedidosApps) {
+  // `hayDelivery` manda incluso sobre el estado de navegación: si el módulo se apagó mientras el
+  // cajero estaba parado en esta pantalla (el latido llega cada 10 min, `useAcceso` relee cada
+  // minuto), no se vuelve a montar y cae al POS normal.
+  if (enPedidosApps && hayDelivery) {
     return <PantallaPedidosApps token={token} caja={caja} onSalir={volverAlInicio} />;
   }
 
