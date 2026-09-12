@@ -232,7 +232,18 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
       .maybeSingle();
     if (yaRaw) return NextResponse.json({ ok: true, yaEstaba: true });
 
-    const precio = body.precio_mensual_mxn != null ? Number(body.precio_mensual_mxn) : Number(addon.precio_mensual_mxn);
+    // El plan no concede el módulo —si lo concediera, la caja de todo cliente de Negocio sondearía
+    // sin usarlo— pero sí decide el precio: incluido desde Negocio, $100 al mes en Esencial.
+    // Pre-llenarlo aquí evita que la política viva en la memoria de quien rellena el formulario;
+    // un precio explícito en el cuerpo (cortesía, promoción) sigue ganando, por eso se comprueba
+    // primero. Misma forma de leer el plan que usa `plan:planes(...)` en el GET de esta ruta.
+    let precioLista = Number(addon.precio_mensual_mxn);
+    if (codigo === "DELIVERY") {
+      const { data: tRaw } = await sb.from("tenants").select("plan:planes(codigo)").eq("id", id).maybeSingle();
+      const planCodigo = (tRaw as { plan?: { codigo?: string } } | null)?.plan?.codigo ?? "";
+      if (planCodigo === "NEGOCIO" || planCodigo === "CADENA") precioLista = 0;
+    }
+    const precio = body.precio_mensual_mxn != null ? Number(body.precio_mensual_mxn) : precioLista;
     const { error } = await sb.from("tenant_addons").insert({
       tenant_id: id, addon_id: addon.id, fecha_inicio: hoyMx(), activo: true,
       precio_mensual_mxn: precio, notas: (body.motivo as string | undefined)?.trim() || null,
@@ -255,8 +266,50 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
       .eq("addon_id", addon.id)
       .eq("activo", true);
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-    await auditar(sb, { accion: "tenant.addon_desactivar", tenantId: id, motivo: `Baja del add-on ${addon.nombre}`, payload: { codigo } });
-    return NextResponse.json({ ok: true });
+
+    // Uber no lee nuestra base: si no se le avisa, sigue ofreciendo la tienda y cobrándole al
+    // cliente final por comida que nadie va a preparar. Se le avisa por cada conexión viva.
+    //
+    // El add-on ya quedó retirado arriba —el cliente dejó de pagar— así que un fallo de red aquí
+    // NO deshace eso: un fallo de red no puede dejarle el servicio encendido. Queda registrado en
+    // `fallos` (y en `delivery_eventos`, del lado de la Edge Function) para que alguien reintente.
+    //
+    // `delivery-uber-conexion` valida por JWT de dueño y exige el módulo `delivery_apps` para
+    // "pausar"; ninguna de las dos cosas aplica aquí (no hay dueño con sesión, y el módulo se
+    // acaba de apagar arriba). Por eso esa función abre una puerta explícita y acotada para
+    // `service_role` SOLO en "pausar", con el tenant resuelto desde la conexión — no del JWT que
+    // esta llamada no trae. Ver el comentario en supabase/functions/delivery-uber-conexion/index.ts.
+    let pausadas = 0;
+    const fallos: string[] = [];
+    if (codigo === "DELIVERY") {
+      const { data: cxs } = await sb.from("delivery_conexiones")
+        .select("id, estado").eq("tenant_id", id).in("estado", ["ACTIVA", "PENDIENTE"]);
+      const supabaseUrl = process.env.SUPABASE_URL;
+      const claveServicio = process.env.SUPABASE_SERVICE_ROLE_KEY;
+      for (const cx of (cxs ?? []) as { id: string; estado: string }[]) {
+        try {
+          if (!supabaseUrl || !claveServicio) throw new Error("SERVIDOR_SIN_CONFIG");
+          const r = await fetch(`${supabaseUrl}/functions/v1/delivery-uber-conexion`, {
+            method: "POST",
+            // `apikey` además de `Authorization`: sin él, la clave de servicio se rechaza en la
+            // puerta del gateway antes de llegar al código de la función (mismo gotcha que en
+            // /api/versiones al publicar a Storage).
+            headers: { "content-type": "application/json", apikey: claveServicio, authorization: `Bearer ${claveServicio}` },
+            body: JSON.stringify({ accion: "pausar", conexion_id: cx.id, habilitar: false }),
+          });
+          if (!r.ok) throw new Error(`HTTP ${r.status}`);
+          pausadas += 1;
+        } catch (e) {
+          fallos.push(`${cx.id}: ${e instanceof Error ? e.message : String(e)}`);
+        }
+      }
+    }
+
+    await auditar(sb, {
+      accion: "tenant.addon_desactivar", tenantId: id, motivo: `Baja del add-on ${addon.nombre}`,
+      payload: { codigo, pausadas, fallos },
+    });
+    return NextResponse.json({ ok: true, pausadas, fallos });
   }
 
   if (accion === "cambiar_plan") {

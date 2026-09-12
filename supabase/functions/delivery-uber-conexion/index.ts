@@ -61,23 +61,47 @@ Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
   if (req.method !== "POST") return json({ error: "METHOD_NOT_ALLOWED" }, 405);
 
-  // 1) JWT del admin → tenant y jerarquía del rol.
   const token = (req.headers.get("authorization") ?? "").replace(/^Bearer\s+/i, "");
   if (!token) return json({ error: "NO_AUTH" }, 401);
-  const { data: userResp, error: userErr } = await admin.auth.getUser(token);
-  if (userErr || !userResp?.user) return json({ error: "AUTH_INVALIDA" }, 401);
-  const usuarioId = userResp.user.id;
-  const { data: accesoData } = await admin.from("usuarios_acceso").select("tenant_id, rol:roles(jerarquia)")
-    .eq("usuario_id", usuarioId).eq("activo", true).limit(1).maybeSingle();
-  const acceso = accesoData as unknown as Acceso | null;
-  if (!acceso) return json({ error: "SIN_TENANT" }, 403);
-  const tenantId = acceso.tenant_id;
-  const rol = Array.isArray(acceso.rol) ? acceso.rol[0] : acceso.rol;
-  if ((rol?.jerarquia ?? 0) < JERARQUIA_MINIMA) return json({ error: "SIN_PERMISO" }, 403);
 
   let body: Cuerpo;
   try { body = await req.json(); } catch { return json({ error: "BAD_JSON" }, 400); }
   if (!body.accion) return json({ error: "FALTAN_CAMPOS" }, 400);
+
+  // Puerta explícita y acotada para service_role (Task 6): SOLO la acción "pausar", y SOLO si el
+  // token es exactamente la clave de servicio del proyecto. Existe para que `apps/platform` pueda
+  // avisarle a Uber cuando VIM retira el add-on de un tenant — ahí no hay dueño con sesión abierta,
+  // así que exigir un JWT de usuario (como hace el resto de esta función) dejaría a Uber sin
+  // enterarse y cobrándole al cliente final por comida que nadie va a preparar.
+  // admin.auth.getUser(token) rechaza el service_role de por sí (el JWT no trae "sub" de un usuario
+  // real en auth.users), así que sin esta rama la llamada del panel moriría en AUTH_INVALIDA.
+  // El tenant sale de la CONEXIÓN, no de un JWT que aquí no existe — eso es lo que acota el alcance:
+  // esta puerta no da acceso a otro tenant que el dueño de la fila que se le pasa por id.
+  const claveServicio = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
+  const esPausarDeServicio = body.accion === "pausar" && claveServicio !== "" && token === claveServicio;
+
+  let tenantId: string;
+  let usuarioId: string | null;
+  if (esPausarDeServicio) {
+    if (!body.conexion_id) return json({ error: "FALTAN_CAMPOS" }, 400);
+    const { data: cxRaw } = await admin.from("delivery_conexiones").select("tenant_id").eq("id", body.conexion_id).maybeSingle();
+    const cxTenantId = (cxRaw as { tenant_id: string } | null)?.tenant_id;
+    if (!cxTenantId) return json({ error: "CONEXION_NO_EXISTE" }, 404);
+    tenantId = cxTenantId;
+    usuarioId = null; // actor de sistema, no una persona con fila en auth.users.
+  } else {
+    // 1) JWT del admin → tenant y jerarquía del rol.
+    const { data: userResp, error: userErr } = await admin.auth.getUser(token);
+    if (userErr || !userResp?.user) return json({ error: "AUTH_INVALIDA" }, 401);
+    usuarioId = userResp.user.id;
+    const { data: accesoData } = await admin.from("usuarios_acceso").select("tenant_id, rol:roles(jerarquia)")
+      .eq("usuario_id", usuarioId).eq("activo", true).limit(1).maybeSingle();
+    const acceso = accesoData as unknown as Acceso | null;
+    if (!acceso) return json({ error: "SIN_TENANT" }, 403);
+    tenantId = acceso.tenant_id;
+    const rol = Array.isArray(acceso.rol) ? acceso.rol[0] : acceso.rol;
+    if ((rol?.jerarquia ?? 0) < JERARQUIA_MINIMA) return json({ error: "SIN_PERMISO" }, 403);
+  }
 
   const registrar = async (tipo: string, ok: boolean, detalle: unknown, conexionId: string | null, tiendaId: string | null) => {
     await admin.from("delivery_eventos").insert({
@@ -132,7 +156,10 @@ Deno.serve(async (req) => {
   // que dejarla pasar sin módulo es seguro. Y hace falta: un dueño al que se le retiró el add-on
   // tiene que poder soltar su tienda de Uber, y la Task 6 usa este mismo camino para cortar el
   // servicio cuando VIM retira el add-on.
-  if (body.accion !== "desconectar") {
+  // El "pausar" de service_role queda AFUERA por la misma razón que "desconectar": el panel lo
+  // invoca JUSTO cuando (o después de) quitar el módulo, así que exigirlo aquí volvería a la
+  // llamada imposible de cumplir y Uber nunca se enteraría de la baja.
+  if (body.accion !== "desconectar" && !esPausarDeServicio) {
     const { data: mod } = await admin.rpc("modulos_efectivos", { p_tenant: tenantId });
     const efectivos = (mod as { efectivos?: Record<string, boolean> } | null)?.efectivos ?? {};
     if (efectivos.delivery_apps !== true) return json({ error: "SIN_MODULO_DELIVERY" }, 403);
