@@ -300,10 +300,16 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
           if (!supabaseUrl || !claveServicio || !secretoInterno) throw new Error("SERVIDOR_SIN_CONFIG");
           const r = await fetch(`${supabaseUrl}/functions/v1/delivery-uber-conexion`, {
             method: "POST",
-            // `apikey` + `Authorization`: sin ellos, la puerta del gateway rechaza la llamada antes
-            // de llegar al código de la función (mismo gotcha que en /api/versiones al publicar a
-            // Storage). `x-vim-interno` es la valla de la función, no la del gateway: identifica
-            // esta llamada como el camino interno para que no necesite JWT de dueño.
+            // `Authorization`: sin ella, `verify_jwt` normal del gateway rechaza la llamada antes
+            // de llegar al código de la función — necesaria, no una suposición: es justo lo que
+            // hace que esta función funcione hoy para admin/lib/integraciones.ts, aunque con un
+            // JWT de usuario en vez de la `service_role key` (ver "Comprobar antes de desplegar"
+            // en el informe de la Task 6: que ESTA clave en particular la pase no está probado).
+            // `apikey`: se deja por el precedente de /api/versiones (Storage, con la misma clave
+            // rotada) — no confirmado que el gateway de Functions también lo exija, pero no hace
+            // daño tenerlo de más.
+            // `x-vim-interno` es la valla de la función, no la del gateway: identifica esta
+            // llamada como el camino interno para que no necesite JWT de dueño.
             headers: {
               "content-type": "application/json",
               apikey: claveServicio,

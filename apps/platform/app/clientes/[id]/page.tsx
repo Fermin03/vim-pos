@@ -64,8 +64,15 @@ export default function FichaCliente() {
       // (fallo de red, no se aborta la baja). Va en `avisoUber`, no en `error`: `error` se limpia
       // solo en cada refresco automático, y el operador podría no estar mirando la pantalla en ese
       // momento exacto.
-      const fallos = r.fallos;
-      if (Array.isArray(fallos)) setAvisoUber(fallos.length > 0 ? (fallos as string[]) : null);
+      //
+      // `route.ts` devuelve `{ fallos: [] }` en CUALQUIER `addon_desactivar`, no solo el de
+      // DELIVERY (p.ej. dar de baja el add-on de CFDI, ficha-contrato.tsx). Sin el filtro por
+      // `addon_codigo`, esa baja de otro add-on pisaba el aviso de Uber con un `[]` silencioso —
+      // el mismo fallo silencioso que este aviso existe para evitar, solo que por otra puerta.
+      if (body.accion === "addon_desactivar" && body.addon_codigo === "DELIVERY") {
+        const fallos = r.fallos;
+        if (Array.isArray(fallos)) setAvisoUber(fallos.length > 0 ? (fallos as string[]) : null);
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : "Error");
       throw e;
