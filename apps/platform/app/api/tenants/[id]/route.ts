@@ -279,11 +279,14 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
     // `delivery-uber-conexion` valida por JWT de dueño y exige el módulo `delivery_apps` para
     // "pausar"; ninguna de las dos cosas aplica aquí (no hay dueño con sesión, y el módulo se
     // acaba de apagar arriba). Por eso esa función acepta, SOLO para "pausar", el camino interno
-    // `x-vim-interno` (mismo esquema que cargar-csd/enviar-push), con el tenant resuelto desde la
-    // conexión — no del JWT que esta llamada no trae. La `service_role key` NO sirve para esto: se
-    // rotó a formato `sb_secret_…` (no es un JWT) y de todas formas la inyecta Supabase con un
-    // nombre que este proyecto no puede fijar. Ver el comentario en
-    // supabase/functions/delivery-uber-conexion/index.ts.
+    // `x-vim-interno` (mismo ESQUEMA que cargar-csd/enviar-push, pero con secreto PROPIO —
+    // `VIM_DELIVERY_INTERNO_SECRET`, no el que comparten esas dos: compartirlo habría dejado tres
+    // funciones con poderes muy distintos colgando de una sola credencial), con el tenant resuelto
+    // desde la conexión, no del JWT que esta llamada no trae. `x-vim-interno` es la valla de la
+    // FUNCIÓN, no la del gateway: `verify_jwt` normal sigue activo ahí (spec
+    // 2026-09-02-delivery-f1b-conectar-uber-design.md:81 lo pide explícito), así que igual hace
+    // falta un `Authorization` que la pase — se manda la `service_role key`, la misma que ya viaja
+    // como `apikey`. Ver el comentario en supabase/functions/delivery-uber-conexion/index.ts.
     let pausadas = 0;
     const fallos: string[] = [];
     if (codigo === "DELIVERY") {
@@ -291,17 +294,22 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
         .select("id, estado").eq("tenant_id", id).eq("app", "APP_UBEREATS").in("estado", ["ACTIVA", "PENDIENTE"]);
       const supabaseUrl = process.env.SUPABASE_URL;
       const claveServicio = process.env.SUPABASE_SERVICE_ROLE_KEY;
-      const secretoInterno = process.env.VIM_INTERNO_SECRET;
+      const secretoInterno = process.env.VIM_DELIVERY_INTERNO_SECRET;
       for (const cx of (cxs ?? []) as { id: string; estado: string }[]) {
         try {
           if (!supabaseUrl || !claveServicio || !secretoInterno) throw new Error("SERVIDOR_SIN_CONFIG");
           const r = await fetch(`${supabaseUrl}/functions/v1/delivery-uber-conexion`, {
             method: "POST",
-            // `apikey`: sin él, la puerta del gateway rechaza la llamada antes de llegar al código
-            // de la función (mismo gotcha que en /api/versiones al publicar a Storage).
-            // `x-vim-interno`: identifica esta llamada ante la función (ver arriba); no es un JWT,
-            // así que no va en `Authorization`.
-            headers: { "content-type": "application/json", apikey: claveServicio, "x-vim-interno": secretoInterno },
+            // `apikey` + `Authorization`: sin ellos, la puerta del gateway rechaza la llamada antes
+            // de llegar al código de la función (mismo gotcha que en /api/versiones al publicar a
+            // Storage). `x-vim-interno` es la valla de la función, no la del gateway: identifica
+            // esta llamada como el camino interno para que no necesite JWT de dueño.
+            headers: {
+              "content-type": "application/json",
+              apikey: claveServicio,
+              authorization: `Bearer ${claveServicio}`,
+              "x-vim-interno": secretoInterno,
+            },
             body: JSON.stringify({ accion: "pausar", conexion_id: cx.id, habilitar: false }),
           });
           if (!r.ok) throw new Error(`HTTP ${r.status}`);

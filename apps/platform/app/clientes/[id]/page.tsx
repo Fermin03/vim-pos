@@ -37,6 +37,11 @@ export default function FichaCliente() {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [impersonando, setImpersonando] = useState(false);
+  // Aparte de `error`: `cargar()` lo limpia en cada refresco automático (cada 60 s, useRefresco), y
+  // un aviso de "Uber no confirmó la pausa" que dure menos que el tiempo de leerlo no sirve de
+  // nada. Este solo lo toca `accion()`, así que sobrevive al refresco hasta la siguiente vez que
+  // se dé de baja el add-on (con éxito total, que lo limpia, o con fallos nuevos, que lo reemplazan).
+  const [avisoUber, setAvisoUber] = useState<string[] | null>(null);
 
   const cargar = useCallback(async () => {
     try {
@@ -56,12 +61,11 @@ export default function FichaCliente() {
       const r = await api(`/api/tenants/${id}`, { method: "PATCH", body: JSON.stringify(body) });
       await recargar();
       // addon_desactivar puede devolver "listo" con conexiones que no se pudieron avisar a Uber
-      // (fallo de red, no se aborta la baja). Sin esto el operador ve la pantalla en verde y nadie
-      // se entera de que hace falta reintentar.
+      // (fallo de red, no se aborta la baja). Va en `avisoUber`, no en `error`: `error` se limpia
+      // solo en cada refresco automático, y el operador podría no estar mirando la pantalla en ese
+      // momento exacto.
       const fallos = r.fallos;
-      if (Array.isArray(fallos) && fallos.length > 0) {
-        setError(`El add-on se dio de baja, pero Uber no confirmó la pausa de ${fallos.length} conexión(es). Repórtalo para pausarlas a mano.`);
-      }
+      if (Array.isArray(fallos)) setAvisoUber(fallos.length > 0 ? (fallos as string[]) : null);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Error");
       throw e;
@@ -123,6 +127,17 @@ export default function FichaCliente() {
       </div>
 
       {error && <p className="mb-3 text-sm text-danger" role="alert">{error}</p>}
+      {avisoUber && (
+        <div className="mb-3 rounded-lg border border-warning/40 bg-surface p-3 text-[13px] text-warning" role="alert">
+          <p className="font-semibold">
+            El add-on de delivery se dio de baja, pero Uber no confirmó la pausa de {avisoUber.length} conexión(es).
+            Repórtalo para pausarlas a mano.
+          </p>
+          <ul className="mt-1 list-disc pl-4 text-[12px]">
+            {avisoUber.map((f) => <li key={f}>{f}</li>)}
+          </ul>
+        </div>
+      )}
 
       <div className="flex flex-col gap-6">
         <Seccion id="operacion" titulo="Operación" descripcion="Lo que hace este cliente hoy: cajas, sincronización y ventas.">
