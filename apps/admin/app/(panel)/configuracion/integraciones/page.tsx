@@ -30,6 +30,12 @@ export default function IntegracionesPage() {
 
   const [sucursales, setSucursales] = useState<Sucursal[] | null>(null);
   const [conexiones, setConexiones] = useState<ConexionApp[] | null>(null);
+  // Sin esto, un `recargar()` que falla deja `conexiones` en `null` para siempre (nunca hay un
+  // segundo disparador: el único efecto que llama `recargar` depende de `encendido`, que ya no
+  // vuelve a cambiar) y el switch de abajo quedaría deshabilitado sin salida. Se distingue
+  // "todavía no sé" (`conexiones === null && !conexionesFallo`, temporal) de "no pude saber"
+  // (`conexionesFallo`, permanente hasta el próximo intento) para que el switch se re-habilite.
+  const [conexionesFallo, setConexionesFallo] = useState(false);
   const [expirados, setExpirados] = useState<Record<string, number>>({});
   const [error, setError] = useState<string | null>(null);
   const [aviso, setAviso] = useState<string | null>(null);
@@ -52,6 +58,7 @@ export default function IntegracionesPage() {
 
   async function recargar() {
     setError(null);
+    setConexionesFallo(false);
     try {
       const [s, c, x] = await Promise.all([listarSucursales(), listarConexiones(), listarExpiradosHoy().catch(() => ({}))]);
       setSucursales(s);
@@ -59,6 +66,8 @@ export default function IntegracionesPage() {
       setExpirados(x);
     } catch (e) {
       setError(mensajeError(e, "No se pudo cargar"));
+      // No se sabe si hay conexiones activas — ver el porqué en `hayConexionesActivas`.
+      setConexionesFallo(true);
     }
   }
   // El asistente de Uber solo trae sus datos cuando el módulo está de verdad encendido.
@@ -72,16 +81,24 @@ export default function IntegracionesPage() {
   // ¿Alguna tienda con vínculo vivo en Uber? Apagar el módulo no le avisa a Uber —eso solo pasa
   // al retirar el add-on, spec §5— así que la tienda le sigue apareciendo abierta al cliente
   // final mientras el POS rechaza el pedido. Es el riesgo que nombra el spec §10.
-  const hayConexionesActivas = (conexiones ?? []).some((c) => c.estado === "ACTIVA" || c.estado === "PAUSADA" || c.estado === "ERROR");
+  //
+  // Si `recargar()` falló (`conexionesFallo`), NO se sabe si hay conexiones activas — y aquí la
+  // decisión es a propósito conservadora: se asume que SÍ las hay. Preguntar de más no cuesta
+  // nada (el dueño confirma un apagado que de verdad quería); no preguntar sí cuesta: es el mismo
+  // modo de fallo que el spec §10 nombra como el que más duele. No "simplificar" esto a
+  // `(conexiones ?? [])` sin más: eso es exactamente el hueco que la ronda 2 de revisión encontró.
+  const hayConexionesActivas = conexionesFallo || (conexiones ?? []).some((c) => c.estado === "ACTIVA" || c.estado === "PAUSADA" || c.estado === "ERROR");
 
   // Ventana de carrera (hallazgo de revisión): `recargar()` solo arranca cuando `encendido` pasa
   // a `true` y tarda un viaje a Supabase; mientras tanto `conexiones` sigue en `null` y
-  // `hayConexionesActivas` lee eso como "no hay ninguna". Si el switch fuera pulsable en esa
-  // ventana, apagar saltaría la confirmación justo en el caso que el spec §10 quiere cubierto.
-  // Se cierra deshabilitando el switch mientras está encendido y las conexiones no han llegado
-  // todavía — no al revés: en el estado "permitido, apagado" `conexiones` está en `null` para
-  // siempre (no hay nada que cargar sin encender primero), y ahí SÍ tiene que poder encenderse.
-  const cargandoConexiones = encendido && conexiones === null;
+  // `hayConexionesActivas` leería eso como "no hay ninguna" si no fuera por lo de arriba. Se
+  // cierra deshabilitando el switch mientras está encendido y las conexiones TODAVÍA no han
+  // resuelto (ni con éxito ni con error) — no al revés: en el estado "permitido, apagado"
+  // `conexiones` está en `null` para siempre (no hay nada que cargar sin encender primero), y ahí
+  // SÍ tiene que poder encenderse. Y si `recargar()` ya falló, tampoco hay que seguir esperando:
+  // el switch se re-habilita y usa el valor conservador de `hayConexionesActivas` de arriba, para
+  // no dejarlo gris para siempre por una carga que nunca va a resolver sola (segundo hallazgo).
+  const cargandoConexiones = encendido && conexiones === null && !conexionesFallo;
 
   /** Enciende o apaga las apps de delivery (ADR 0014). Apagar con conexiones activas exige
    *  confirmación explícita, nombrando la consecuencia (docs/diseno/admin.md "Acciones peligrosas"). */
