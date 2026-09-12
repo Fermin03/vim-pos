@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { cadenciaEspejo, cursorPedido, unirPedidos, REPOSO_MS, NORMAL_MS, RAPIDA_MS } from "./espejo.ts";
+import { cadenciaEspejo, cursorPedido, respuestaSinModulo, unirPedidos, REPOSO_MS, NORMAL_MS, RAPIDA_MS } from "./espejo.ts";
 
 test("sin conexiones, la caja sondea en reposo: este cliente no vende por apps", () => {
   assert.equal(cadenciaEspejo({ conexiones: [], pedidosVivos: [] }), REPOSO_MS);
@@ -82,4 +82,17 @@ test("un cursor que no es fecha se ignora: se responde en frío en vez de revent
   for (const basura of [undefined, null, "", "ayer", 123, {}, "DROP TABLE"]) {
     assert.equal(cursorPedido(basura), null, `con ${String(basura)}`);
   }
+});
+
+// ── Guard del módulo (Task 3) ────────────────────────────────────────────────
+// Un tenant cuyo dueño no encendió el módulo se contesta en frío, con la misma forma que la
+// respuesta normal, para que la caja duerma sin necesitar código nuevo del lado del escritorio.
+
+test("sin módulo: respuesta vacía y a reposo", () => {
+  const r = respuestaSinModulo("caja-1", "suc-1");
+  assert.deepEqual(r.conexiones, []);
+  assert.deepEqual(r.pedidos, []);
+  assert.equal(r.siguiente_en_ms, REPOSO_MS);
+  assert.equal(r.caja_id, "caja-1");
+  assert.equal(r.sucursal_id, "suc-1");
 });

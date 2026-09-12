@@ -13,7 +13,7 @@
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import { corsHeaders } from "../_shared/cors.ts";
 import { cajaIdDeEmail } from "../_shared/latido.ts";
-import { cadenciaEspejo, cursorPedido, TOPE_PEDIDOS, unirPedidos } from "../_shared/delivery/espejo.ts";
+import { cadenciaEspejo, cursorPedido, respuestaSinModulo, TOPE_PEDIDOS, unirPedidos } from "../_shared/delivery/espejo.ts";
 
 const admin = createClient(
   Deno.env.get("SUPABASE_URL")!,
@@ -74,6 +74,17 @@ Deno.serve(async (req) => {
     .select("id, sucursal_id").maybeSingle();
   const caja = cajaData as { id: string; sucursal_id: string } | null;
   if (!caja) return json({ error: "CAJA_NO_EXISTE" }, 403);
+
+  // Guard del módulo: el dueño tiene que haberlo encendido, no solo que VIM se lo haya concedido
+  // (por eso se lee `efectivos`, no `permitidos`). Va aquí, ANTES de las tres consultas de abajo,
+  // para que una caja que todavía no se enteró de que perdió el módulo —o que nunca se
+  // actualice— deje de costarle a la base ni una lectura en cuanto se apague el módulo, sin
+  // publicar un instalador (una caja rota no se auto-actualiza y el parque no se mueve en bloque).
+  const { data: mod } = await admin.rpc("modulos_efectivos", { p_tenant: tenantId });
+  const efectivos = (mod as { efectivos?: Record<string, boolean> } | null)?.efectivos ?? {};
+  if (efectivos.delivery_apps !== true) {
+    return json(respuestaSinModulo(caja.id, caja.sucursal_id));
+  }
 
   const pedidosDe = () => admin.from("delivery_pedidos").select(COLS_PEDIDO)
     .eq("tenant_id", tenantId).eq("sucursal_id", caja.sucursal_id)
