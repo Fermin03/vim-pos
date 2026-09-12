@@ -1,7 +1,8 @@
 // Conectar / pausar / desconectar tiendas de Uber Eats desde el admin (spec F1b, ADR 0011).
 // El dueño autoriza en Uber; aquí se canjea el code (el client secret nunca sale de Supabase),
 // se listan sus tiendas y se activa la integración con integrator_store_id = uuid de la sucursal.
-// Solo Dueño/Administrador (jerarquía >= 4); todo filtra por el tenant del JWT.
+// Solo Dueño/Administrador (jerarquía >= 4); todo filtra por el tenant del JWT — salvo el camino
+// interno de "pausar" (Task 6, ver `INTERNO` más abajo), que usa `x-vim-interno` en vez de JWT.
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import { corsHeaders } from "../_shared/cors.ts";
 import {
@@ -11,6 +12,7 @@ import { crearClienteUber } from "../_shared/delivery/uber.ts";
 import { cuerpoPosData, normalizarTiendasUber, transicionConexion, type EstadoConexion } from "../_shared/delivery/uber-activacion.ts";
 import { cambiarPrepTienda, consultarEstadoTienda, type ConexionTienda } from "../_shared/delivery/tienda-uber-acciones.ts";
 import type { DbMinima } from "../_shared/delivery/procesar-uber.ts";
+import { igualesEnTiempoConstante } from "../_shared/delivery/firma.ts";
 
 const admin = createClient(
   Deno.env.get("SUPABASE_URL")!,
@@ -54,6 +56,13 @@ const msg = (e: unknown) => (e instanceof Error ? e.message : String(e));
 const JERARQUIA_MINIMA = 4;
 const ESTADOS_CONECTADA = ["ACTIVA", "PAUSADA", "ERROR"];
 
+// Camino interno (Task 6): apps/platform lo usa para avisarle a Uber cuando VIM retira el add-on
+// de un tenant — ahí no hay dueño con sesión abierta, así que el JWT de usuario que exige el resto
+// de esta función no aplica. Mismo esquema que cargar-csd/enviar-push: cabecera `x-vim-interno`
+// contra el secreto `VIM_INTERNO_SECRET`, en tiempo constante (nunca con `===`, que filtra el
+// prefijo por temporización — el mismo defecto que server.ts de platform documenta y corrige).
+const INTERNO = Deno.env.get("VIM_INTERNO_SECRET") ?? "";
+
 Deno.serve(async (req) => {
   const cors = corsHeaders(req);
   const json = (body: unknown, status = 200) =>
@@ -61,28 +70,24 @@ Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
   if (req.method !== "POST") return json({ error: "METHOD_NOT_ALLOWED" }, 405);
 
-  const token = (req.headers.get("authorization") ?? "").replace(/^Bearer\s+/i, "");
-  if (!token) return json({ error: "NO_AUTH" }, 401);
+  // Puerta interna (Task 6): si trae `x-vim-interno` válido, no se exige JWT de usuario. Se
+  // comprueba ANTES de leer `Authorization` porque `apps/platform` no manda ese header — no hay
+  // sesión de dueño de la que sacarlo.
+  const internoRecibido = (req.headers.get("x-vim-interno") ?? "").trim();
+  const esInterno = internoRecibido !== "" && INTERNO !== "" && igualesEnTiempoConstante(internoRecibido, INTERNO);
 
   let body: Cuerpo;
   try { body = await req.json(); } catch { return json({ error: "BAD_JSON" }, 400); }
   if (!body.accion) return json({ error: "FALTAN_CAMPOS" }, 400);
 
-  // Puerta explícita y acotada para service_role (Task 6): SOLO la acción "pausar", y SOLO si el
-  // token es exactamente la clave de servicio del proyecto. Existe para que `apps/platform` pueda
-  // avisarle a Uber cuando VIM retira el add-on de un tenant — ahí no hay dueño con sesión abierta,
-  // así que exigir un JWT de usuario (como hace el resto de esta función) dejaría a Uber sin
-  // enterarse y cobrándole al cliente final por comida que nadie va a preparar.
-  // admin.auth.getUser(token) rechaza el service_role de por sí (el JWT no trae "sub" de un usuario
-  // real en auth.users), así que sin esta rama la llamada del panel moriría en AUTH_INVALIDA.
-  // El tenant sale de la CONEXIÓN, no de un JWT que aquí no existe — eso es lo que acota el alcance:
-  // esta puerta no da acceso a otro tenant que el dueño de la fila que se le pasa por id.
-  const claveServicio = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
-  const esPausarDeServicio = body.accion === "pausar" && claveServicio !== "" && token === claveServicio;
-
   let tenantId: string;
   let usuarioId: string | null;
-  if (esPausarDeServicio) {
+  if (esInterno) {
+    // Acotado a "pausar": es la única acción que el panel necesita para avisarle a Uber cuando VIM
+    // retira el add-on de un tenant. El tenant sale de la CONEXIÓN, no de un JWT que aquí no
+    // existe — eso es lo que acota el alcance: esta puerta no da acceso a otro tenant que el dueño
+    // de la fila que se le pasa por id, y ninguna otra acción entra por ella.
+    if (body.accion !== "pausar") return json({ error: "ACCION_NO_PERMITIDA" }, 403);
     if (!body.conexion_id) return json({ error: "FALTAN_CAMPOS" }, 400);
     const { data: cxRaw } = await admin.from("delivery_conexiones").select("tenant_id").eq("id", body.conexion_id).maybeSingle();
     const cxTenantId = (cxRaw as { tenant_id: string } | null)?.tenant_id;
@@ -91,6 +96,8 @@ Deno.serve(async (req) => {
     usuarioId = null; // actor de sistema, no una persona con fila en auth.users.
   } else {
     // 1) JWT del admin → tenant y jerarquía del rol.
+    const token = (req.headers.get("authorization") ?? "").replace(/^Bearer\s+/i, "");
+    if (!token) return json({ error: "NO_AUTH" }, 401);
     const { data: userResp, error: userErr } = await admin.auth.getUser(token);
     if (userErr || !userResp?.user) return json({ error: "AUTH_INVALIDA" }, 401);
     usuarioId = userResp.user.id;
@@ -156,10 +163,10 @@ Deno.serve(async (req) => {
   // que dejarla pasar sin módulo es seguro. Y hace falta: un dueño al que se le retiró el add-on
   // tiene que poder soltar su tienda de Uber, y la Task 6 usa este mismo camino para cortar el
   // servicio cuando VIM retira el add-on.
-  // El "pausar" de service_role queda AFUERA por la misma razón que "desconectar": el panel lo
+  // El "pausar" del camino interno queda AFUERA por la misma razón que "desconectar": el panel lo
   // invoca JUSTO cuando (o después de) quitar el módulo, así que exigirlo aquí volvería a la
   // llamada imposible de cumplir y Uber nunca se enteraría de la baja.
-  if (body.accion !== "desconectar" && !esPausarDeServicio) {
+  if (body.accion !== "desconectar" && !esInterno) {
     const { data: mod } = await admin.rpc("modulos_efectivos", { p_tenant: tenantId });
     const efectivos = (mod as { efectivos?: Record<string, boolean> } | null)?.efectivos ?? {};
     if (efectivos.delivery_apps !== true) return json({ error: "SIN_MODULO_DELIVERY" }, 403);

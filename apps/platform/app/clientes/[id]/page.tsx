@@ -53,8 +53,15 @@ export default function FichaCliente() {
   const accion = useCallback(async (body: Record<string, unknown>) => {
     setBusy(true); setError(null);
     try {
-      await api(`/api/tenants/${id}`, { method: "PATCH", body: JSON.stringify(body) });
+      const r = await api(`/api/tenants/${id}`, { method: "PATCH", body: JSON.stringify(body) });
       await recargar();
+      // addon_desactivar puede devolver "listo" con conexiones que no se pudieron avisar a Uber
+      // (fallo de red, no se aborta la baja). Sin esto el operador ve la pantalla en verde y nadie
+      // se entera de que hace falta reintentar.
+      const fallos = r.fallos;
+      if (Array.isArray(fallos) && fallos.length > 0) {
+        setError(`El add-on se dio de baja, pero Uber no confirmó la pausa de ${fallos.length} conexión(es). Repórtalo para pausarlas a mano.`);
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : "Error");
       throw e;

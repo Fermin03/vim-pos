@@ -268,7 +268,9 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
     // Uber no lee nuestra base: si no se le avisa, sigue ofreciendo la tienda y cobrándole al
-    // cliente final por comida que nadie va a preparar. Se le avisa por cada conexión viva.
+    // cliente final por comida que nadie va a preparar. Se le avisa por cada conexión viva de Uber
+    // (`.eq("app", "APP_UBEREATS")`: cuando exista DiDi, sus conexiones no deben mandarse a este
+    // endpoint, que solo sabe hablar con Uber).
     //
     // El add-on ya quedó retirado arriba —el cliente dejó de pagar— así que un fallo de red aquí
     // NO deshace eso: un fallo de red no puede dejarle el servicio encendido. Queda registrado en
@@ -276,25 +278,30 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
     //
     // `delivery-uber-conexion` valida por JWT de dueño y exige el módulo `delivery_apps` para
     // "pausar"; ninguna de las dos cosas aplica aquí (no hay dueño con sesión, y el módulo se
-    // acaba de apagar arriba). Por eso esa función abre una puerta explícita y acotada para
-    // `service_role` SOLO en "pausar", con el tenant resuelto desde la conexión — no del JWT que
-    // esta llamada no trae. Ver el comentario en supabase/functions/delivery-uber-conexion/index.ts.
+    // acaba de apagar arriba). Por eso esa función acepta, SOLO para "pausar", el camino interno
+    // `x-vim-interno` (mismo esquema que cargar-csd/enviar-push), con el tenant resuelto desde la
+    // conexión — no del JWT que esta llamada no trae. La `service_role key` NO sirve para esto: se
+    // rotó a formato `sb_secret_…` (no es un JWT) y de todas formas la inyecta Supabase con un
+    // nombre que este proyecto no puede fijar. Ver el comentario en
+    // supabase/functions/delivery-uber-conexion/index.ts.
     let pausadas = 0;
     const fallos: string[] = [];
     if (codigo === "DELIVERY") {
       const { data: cxs } = await sb.from("delivery_conexiones")
-        .select("id, estado").eq("tenant_id", id).in("estado", ["ACTIVA", "PENDIENTE"]);
+        .select("id, estado").eq("tenant_id", id).eq("app", "APP_UBEREATS").in("estado", ["ACTIVA", "PENDIENTE"]);
       const supabaseUrl = process.env.SUPABASE_URL;
       const claveServicio = process.env.SUPABASE_SERVICE_ROLE_KEY;
+      const secretoInterno = process.env.VIM_INTERNO_SECRET;
       for (const cx of (cxs ?? []) as { id: string; estado: string }[]) {
         try {
-          if (!supabaseUrl || !claveServicio) throw new Error("SERVIDOR_SIN_CONFIG");
+          if (!supabaseUrl || !claveServicio || !secretoInterno) throw new Error("SERVIDOR_SIN_CONFIG");
           const r = await fetch(`${supabaseUrl}/functions/v1/delivery-uber-conexion`, {
             method: "POST",
-            // `apikey` además de `Authorization`: sin él, la clave de servicio se rechaza en la
-            // puerta del gateway antes de llegar al código de la función (mismo gotcha que en
-            // /api/versiones al publicar a Storage).
-            headers: { "content-type": "application/json", apikey: claveServicio, authorization: `Bearer ${claveServicio}` },
+            // `apikey`: sin él, la puerta del gateway rechaza la llamada antes de llegar al código
+            // de la función (mismo gotcha que en /api/versiones al publicar a Storage).
+            // `x-vim-interno`: identifica esta llamada ante la función (ver arriba); no es un JWT,
+            // así que no va en `Authorization`.
+            headers: { "content-type": "application/json", apikey: claveServicio, "x-vim-interno": secretoInterno },
             body: JSON.stringify({ accion: "pausar", conexion_id: cx.id, habilitar: false }),
           });
           if (!r.ok) throw new Error(`HTTP ${r.status}`);

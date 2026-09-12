@@ -50,3 +50,10 @@ verify_jwt = false
 
 [functions.enviar-push]
 verify_jwt = false
+
+# delivery-uber-conexion valida el JWT de dueño/admin por sí misma (getUser) para casi todo, y
+# acepta además el camino interno `x-vim-interno` SOLO para "pausar" (Task 6, apps/platform avisa
+# a Uber al retirar el add-on de un tenant) — esa llamada no trae JWT, y la verificación del
+# gateway la rechazaría igual que rechazaría la de enviar-push/cargar-csd.
+[functions.delivery-uber-conexion]
+verify_jwt = false
