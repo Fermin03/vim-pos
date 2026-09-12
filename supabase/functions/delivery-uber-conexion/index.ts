@@ -125,6 +125,19 @@ Deno.serve(async (req) => {
     return c && c.tenant_id === tenantId ? c : null;
   };
 
+  // Guard del módulo: conectar, pausar, reanudar y mandar la carta quedan cerrados sin el add-on
+  // (se lee `efectivos`, no `permitidos` — el dueño también tuvo que encenderlo). Fail-closed: si
+  // el RPC falla o no devuelve fila, `efectivos` queda `{}` y `!== true` bloquea igual.
+  // "desconectar" queda AFUERA a propósito: esa acción solo quita capacidad, nunca la concede, así
+  // que dejarla pasar sin módulo es seguro. Y hace falta: un dueño al que se le retiró el add-on
+  // tiene que poder soltar su tienda de Uber, y la Task 6 usa este mismo camino para cortar el
+  // servicio cuando VIM retira el add-on.
+  if (body.accion !== "desconectar") {
+    const { data: mod } = await admin.rpc("modulos_efectivos", { p_tenant: tenantId });
+    const efectivos = (mod as { efectivos?: Record<string, boolean> } | null)?.efectivos ?? {};
+    if (efectivos.delivery_apps !== true) return json({ error: "SIN_MODULO_DELIVERY" }, 403);
+  }
+
   try {
     switch (body.accion) {
       case "intercambiar": {
