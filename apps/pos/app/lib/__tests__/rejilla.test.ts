@@ -175,14 +175,14 @@ describe("calcularRejilla con medidas de opción", () => {
     expect(r.paginas).toBe(1);
     expect(r.columnas).toBeGreaterThanOrEqual(2);
     expect(r.anchoFicha).toBeGreaterThanOrEqual(96);
-    expect(r.altoFicha).toBeGreaterThanOrEqual(56);
+    expect(r.altoFicha).toBeGreaterThanOrEqual(60);
   });
 
   it("un slot con 40 opciones pagina en vez de encoger sin fin", () => {
     const r = calcularRejilla({ ancho: 440, alto: 520, total: 40, medidas: CELDA_OPCION });
     // Con las medidas del catálogo darían 5 páginas; con las de opción, 2.
     expect(r.paginas).toBe(2);
-    expect(r.altoFicha).toBeGreaterThanOrEqual(56);
+    expect(r.altoFicha).toBeGreaterThanOrEqual(60);
   });
 });
 
@@ -202,7 +202,7 @@ describe("repartirGrupos", () => {
   it("todos los grupos comparten columnas y alto de celda: la cuadrícula se ve pareja", () => {
     const r = repartirGrupos({ ancho: 440, alto: 620, opcionesPorGrupo: [2, 9, 4], altoCabecera: cabecera, altoExtra: 84 });
     expect(r.columnas).toBeGreaterThanOrEqual(2);
-    expect(r.altoCelda).toBeGreaterThanOrEqual(44);
+    expect(r.altoCelda).toBeGreaterThanOrEqual(60);
     expect(r.anchoCelda).toBeGreaterThanOrEqual(96);
   });
 
@@ -241,7 +241,7 @@ describe("repartirGrupos", () => {
   it("antes de la primera medición no pierde opciones", () => {
     const r = repartirGrupos({ ancho: 0, alto: 0, opcionesPorGrupo: [3, 3], altoCabecera: cabecera, altoExtra: 84 });
     expect(r.columnas).toBeGreaterThanOrEqual(1);
-    expect(r.altoCelda).toBeGreaterThanOrEqual(44);
+    expect(r.altoCelda).toBeGreaterThanOrEqual(60);
     expect([0, 1].map((g) => colocadas(r, g))).toEqual([3, 3]);
   });
 });

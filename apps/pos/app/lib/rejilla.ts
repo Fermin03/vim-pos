@@ -46,7 +46,7 @@ const CELDA_CATALOGO: Medidas = {
  * pantalla completa, y su contenido es más corto —"Bien cocido", "Queso cheddar +$15"—, así que
  * aguanta ser más baja que la del catálogo sin dejar de ser cómoda con el dedo.
  */
-export const CELDA_OPCION: Medidas = { minAncho: 96, minAlto: 56, idealAncho: 200, idealAlto: 90 };
+export const CELDA_OPCION: Medidas = { minAncho: 96, minAlto: 60, idealAncho: 200, idealAlto: 90 };
 
 export type Rejilla = {
   /** Columnas de la rejilla (capacidad, no cuántos productos hay). */
@@ -119,8 +119,15 @@ const COLUMNAS_GRUPO = [2, 3, 4, 5];
  * con 8 reservaba de más y dejaba la celda en su mínimo con 59px libres debajo.
  */
 const GAP_OPCION = 8;
-const ALTO_OPCION_IDEAL = 72;
-const ALTO_OPCION_MIN = 44;
+/**
+ * Alto de la celda de opción. El mínimo es 60 y no 44 porque el que manda aquí es el TEXTO: una
+ * opción se lee a un escalón por debajo del nombre de un producto del catálogo (`tamanoOpcion`),
+ * y en 44px esa talla no cabía con su precio debajo. Celdas más altas entran menos por página —
+ * se pagina antes— y es el intercambio que se eligió: mejor pasar de página que entrecerrar los
+ * ojos en hora pico.
+ */
+const ALTO_OPCION_IDEAL = 88;
+const ALTO_OPCION_MIN = 60;
 
 /** Un trozo de un grupo colocado en una página: `cantidad` opciones a partir de `desde`. */
 export type TrozoGrupo = { grupo: number; desde: number; cantidad: number };
@@ -264,6 +271,17 @@ export function calcularBarraCategorias({ ancho, total }: { ancho: number; total
  */
 export function tamanoNombre(anchoCelda: number, altoCelda: number): number {
   return acotar(11, Math.floor(Math.min(anchoCelda / 11.5, altoCelda / 8)), 16);
+}
+
+/**
+ * Talla del nombre de una OPCIÓN (slot de combo, modificador), en px.
+ *
+ * Va un escalón por debajo del nombre de un producto del catálogo —que llega a 16— porque es
+ * texto de apoyo dentro de un drawer, no el objetivo principal de la pantalla. El piso de 13 es
+ * lo que obliga a que la celda no baje de 60px de alto.
+ */
+export function tamanoOpcion(anchoCelda: number, altoCelda: number): number {
+  return acotar(13, Math.floor(Math.min(anchoCelda / 9, altoCelda / 4.2)), 15);
 }
 
 /** Talla de la etiqueta de categoría, en px. Misma idea que `tamanoNombre`. */

@@ -4,7 +4,7 @@ import type { Producto } from "../lib/catalogo";
 import type { GrupoModificadores } from "../lib/modificadores";
 import type { ModificadorSel } from "../lib/carrito";
 import { seleccionInicialGrupo } from "../lib/carrito";
-import { clampPagina, repartirGrupos, tamanoNombre } from "../lib/rejilla";
+import { clampPagina, repartirGrupos, tamanoOpcion } from "../lib/rejilla";
 import { fmtMxn } from "../lib/turno";
 import { useHueco } from "../lib/usar-hueco";
 import { Paginador } from "./paginador";
@@ -187,7 +187,7 @@ export function ModalModificadores({
   );
   const paginaActual = clampPagina(pagina, reparto.paginas.length);
   const trozos = reparto.paginas[paginaActual - 1] ?? [];
-  const pxOpcion = tamanoNombre(reparto.anchoCelda, reparto.altoCelda);
+  const pxOpcion = tamanoOpcion(reparto.anchoCelda, reparto.altoCelda);
 
   // Si el producto cambia (el drawer se reutiliza), volver a la primera página.
   useEffect(() => setPagina(1), [producto.id]);
@@ -320,7 +320,7 @@ export function ModalModificadores({
                             {o.agotada ? <span className="text-ink-3"> (agotado)</span> : null}
                           </span>
                           {o.precioExtra > 0 && (
-                            <span className="font-display font-semibold tabular-nums text-ink-2" style={{ fontSize: pxOpcion - 1 }}>
+                            <span className="font-display font-semibold tabular-nums text-ink-2" style={{ fontSize: pxOpcion - 2 }}>
                               +{fmtMxn(o.precioExtra)}
                             </span>
                           )}

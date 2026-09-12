@@ -6,7 +6,7 @@ import { componentesPorDefecto, deltaDe, nuevoClientIdComponente, precioCombo, s
 import type { LineaCarrito, ModificadorSel } from "../lib/carrito";
 import { nuevoClientId } from "../lib/carrito";
 import { obtenerGruposDeProducto, type GrupoModificadores } from "../lib/modificadores";
-import { CELDA_OPCION, calcularRejilla, clampPagina, tamanoNombre } from "../lib/rejilla";
+import { CELDA_OPCION, calcularRejilla, clampPagina, tamanoOpcion } from "../lib/rejilla";
 import { fmtMxn } from "../lib/turno";
 import { useHueco } from "../lib/usar-hueco";
 import { ModalModificadores } from "./modal-modificadores";
@@ -94,7 +94,7 @@ export function ModalCombo({ combo, token, linea, preset, onConfirmar, onCancela
     () => (slot?.opciones ?? []).slice((pagOpcActual - 1) * rejillaOpc.porPagina, pagOpcActual * rejillaOpc.porPagina),
     [slot, pagOpcActual, rejillaOpc.porPagina],
   );
-  const pxOpcion = tamanoNombre(rejillaOpc.anchoFicha, rejillaOpc.altoFicha);
+  const pxOpcion = tamanoOpcion(rejillaOpc.anchoFicha, rejillaOpc.altoFicha);
   // Cada paso empieza en su primera página.
   useEffect(() => setPagOpc(1), [paso]);
 
