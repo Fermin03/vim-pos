@@ -921,7 +921,15 @@ export function HomePos({
   // Add-on de delivery: sin el módulo encendido, ni se sondea. Es la misma carga que la caja de
   // escritorio deja de meterle a la nube con su espejo cuando el módulo está apagado.
   useEffect(() => {
-    if (!hayDelivery) return;
+    if (!hayDelivery) {
+      // No basta con no pintar la pantalla: si el cajero estaba parado en Pedidos de apps cuando
+      // VIM apagó el módulo, `enPedidosApps` se queda en `true` (solo `volverAlInicio` lo baja, y
+      // eso exige un toque del cajero). Si el módulo se reenciende después, sin que el cajero
+      // navegue, el render seguiría evaluando `enPedidosApps && hayDelivery` como cierto y la app
+      // saltaría sola de vuelta a esa pantalla, quizás encima de una venta en curso.
+      setEnPedidosApps(false);
+      return;
+    }
     let vivo = true;
     const cargar = () => {
       leerPedidosApps(token, caja.sucursal_id)
