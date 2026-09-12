@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { Button, Modal } from "@vim/ui/styles";
 import { PageHeader, PageBody } from "../../../components/page-header";
 import { listarSucursales, type Sucursal } from "../../../lib/configuracion";
@@ -7,10 +8,26 @@ import {
   accionConexion, actualizarConexion, etiquetaEstado, etiquetaTienda, iniciarConexionUber, listarConexiones,
   listarExpiradosHoy, mensajeErrorIntegracion, type ConexionApp, type EstadoConexion, type Verificacion,
 } from "../../../lib/integraciones";
+import { activarModuloDelivery, leerModulos } from "../../../lib/modulos";
 import { mensajeError } from "../../../lib/errores";
 
-/** Spec F1b: conexiones de apps de delivery por sucursal. Solo Uber Eats por ahora. */
+type Modulos = { permitidos: Record<string, boolean>; efectivos: Record<string, boolean> };
+
+/**
+ * Spec F1b: conexiones de apps de delivery por sucursal. Solo Uber Eats por ahora.
+ *
+ * Delivery es el único módulo con dos capas (ADR 0014, migración 0113): antes de pintar nada se
+ * resuelve `permitidos` — sin él, VIM no le dio el add-on a este cliente y la sección no existe,
+ * así que se redirige. Con permiso pero sin `efectivos.delivery_apps` (el dueño no lo encendió),
+ * se ve solo el encabezado, la explicación y el interruptor: nada del asistente de conexión de
+ * Uber, que solo aparece cuando de verdad está encendido.
+ */
 export default function IntegracionesPage() {
+  const router = useRouter();
+  const [modulos, setModulos] = useState<Modulos | null>(null);
+  const [cambiando, setCambiando] = useState(false);
+  const [errorModulo, setErrorModulo] = useState<string | null>(null);
+
   const [sucursales, setSucursales] = useState<Sucursal[] | null>(null);
   const [conexiones, setConexiones] = useState<ConexionApp[] | null>(null);
   const [expirados, setExpirados] = useState<Record<string, number>>({});
@@ -18,6 +35,20 @@ export default function IntegracionesPage() {
   const [aviso, setAviso] = useState<string | null>(null);
   const [ocupada, setOcupada] = useState<string | null>(null); // id de la conexión con acción en curso
   const [desconectar, setDesconectar] = useState<ConexionApp | null>(null);
+
+  // Sin respuesta del RPC se asume "nada permitido": esconder de más es recuperable —el dueño
+  // llama—, mostrar de más deja tocar un módulo que no se pagó.
+  useEffect(() => {
+    leerModulos().then(setModulos).catch(() => setModulos({ permitidos: {}, efectivos: {} }));
+  }, []);
+
+  // No existe para este cliente: VIM no concedió el add-on. No hay nada que explicar aquí, solo
+  // sacar al dueño de una ruta que para él no debería estar.
+  useEffect(() => {
+    if (modulos && modulos.permitidos.delivery_apps !== true) router.replace("/configuracion");
+  }, [modulos, router]);
+
+  const encendido = modulos?.efectivos.delivery_apps === true;
 
   async function recargar() {
     setError(null);
@@ -30,10 +61,34 @@ export default function IntegracionesPage() {
       setError(mensajeError(e, "No se pudo cargar"));
     }
   }
-  useEffect(() => { recargar(); }, []);
+  // El asistente de Uber solo trae sus datos cuando el módulo está de verdad encendido.
+  useEffect(() => {
+    if (encendido) recargar();
+  }, [encendido]);
 
   const uberDe = (sucursalId: string) => conexiones?.find((c) => c.sucursal_id === sucursalId && c.app === "APP_UBEREATS") ?? null;
   const conectar = () => { window.location.href = iniciarConexionUber(); };
+
+  // ¿Alguna tienda con vínculo vivo en Uber? Apagar el módulo no le avisa a Uber —eso solo pasa
+  // al retirar el add-on, spec §5— así que la tienda le sigue apareciendo abierta al cliente
+  // final mientras el POS rechaza el pedido. Es el riesgo que nombra el spec §10.
+  const hayConexionesActivas = (conexiones ?? []).some((c) => c.estado === "ACTIVA" || c.estado === "PAUSADA" || c.estado === "ERROR");
+
+  /** Enciende o apaga las apps de delivery (ADR 0014). Apagar con conexiones activas exige
+   *  confirmación explícita, nombrando la consecuencia (docs/diseno/admin.md "Acciones peligrosas"). */
+  async function cambiarActivo(activo: boolean) {
+    if (!activo && hayConexionesActivas && !confirm("Uber seguirá mandando pedidos a tu tienda y no los verás aquí. ¿Apagar de todas formas?")) return;
+    setCambiando(true);
+    setErrorModulo(null);
+    try {
+      await activarModuloDelivery(activo);
+      setModulos((m) => (m ? { ...m, efectivos: { ...m.efectivos, delivery_apps: activo } } : m));
+    } catch (e) {
+      setErrorModulo(mensajeError(e, "No se pudo cambiar"));
+    } finally {
+      setCambiando(false);
+    }
+  }
 
   async function correr(cx: ConexionApp, accion: "pausar" | "reanudar" | "desconectar" | "verificar" | "menu") {
     setOcupada(cx.id); setError(null); setAviso(null);
@@ -79,106 +134,145 @@ export default function IntegracionesPage() {
 
   const th = "border-b border-line bg-sel px-4 py-[13px] text-left text-[11.5px] font-bold uppercase tracking-wide text-ink-3";
 
+  // Cargando el módulo: no se sabe todavía si la sección existe para este cliente.
+  if (!modulos) {
+    return (
+      <>
+        <PageHeader titulo="Apps de delivery" migas={[{ label: "Configuración" }, { label: "Apps de delivery" }]} />
+        <PageBody><p className="text-sm text-ink-3">Cargando…</p></PageBody>
+      </>
+    );
+  }
+
+  // No permitido: se está redirigiendo (efecto de arriba). No hay nada que mostrar aquí.
+  if (modulos.permitidos.delivery_apps !== true) return null;
+
   return (
     <>
       <PageHeader
         titulo="Apps de delivery"
-        subtitulo="Conecta tus tiendas de las apps de reparto para que los pedidos entren solos al POS."
+        subtitulo={encendido ? "Conecta tus tiendas de las apps de reparto para que los pedidos entren solos al POS." : undefined}
         migas={[{ label: "Configuración" }, { label: "Apps de delivery" }]}
-        right={<Button onClick={conectar}>Conectar con Uber Eats</Button>}
+        right={encendido ? <Button onClick={conectar}>Conectar con Uber Eats</Button> : undefined}
       />
       <PageBody>
-        {error && <p className="mb-4 text-sm font-medium text-danger" role="alert">{error}</p>}
-        {aviso && <p className="mb-4 text-sm font-medium text-success">{aviso}</p>}
-        {(sucursales === null || conexiones === null) && !error && <p className="text-sm text-ink-3">Cargando…</p>}
+        {errorModulo && <p className="mb-4 text-sm font-medium text-danger" role="alert">{errorModulo}</p>}
 
-        {sucursales !== null && conexiones !== null && (
-          <div className="tabla-caja overflow-hidden rounded-lg border border-line bg-surface">
-            <table className="w-full border-collapse">
-              <thead>
-                <tr>
-                  <th className={th}>Sucursal</th>
-                  <th className={th}>Uber Eats</th>
-                  <th className={`${th} w-[120px]`}>Auto-aceptar</th>
-                  <th className={`${th} w-[110px]`}>Prep (min)</th>
-                  <th className={`${th} w-[110px]`}>Expirados hoy</th>
-                  <th className={`${th} w-[320px]`}></th>
-                </tr>
-              </thead>
-              <tbody>
-                {sucursales.map((s) => {
-                  const cx = uberDe(s.id);
-                  const conectada = cx !== null && (cx.estado === "ACTIVA" || cx.estado === "PAUSADA" || cx.estado === "ERROR");
-                  const trabajando = cx !== null && ocupada === cx.id;
-                  return (
-                    <tr key={s.id} className="border-b border-line last:border-none">
-                      <td className="px-4 py-3.5"><div className="text-[15px] font-semibold">{s.nombre}</div></td>
-                      <td className="px-4 py-3.5">
-                        <Estado estado={cx?.estado ?? "SIN_CONECTAR"} />
-                        {conectada && cx?.tienda_nombre_app && <div className="mt-1 text-[13px] text-ink-2">{cx.tienda_nombre_app}</div>}
-                        {conectada && cx && (
-                          <div className={`mt-1 inline-flex items-center gap-1.5 text-[12.5px] font-semibold ${cx.tienda?.estado === "EN_LINEA" ? "text-success" : cx.tienda?.estado === "PAUSADA" ? "text-warning" : "text-ink-3"}`}>
-                            <span className={`h-1.5 w-1.5 rounded-full ${cx.tienda?.estado === "EN_LINEA" ? "bg-success" : cx.tienda?.estado === "PAUSADA" ? "bg-warning" : "bg-ink-3"}`} />
-                            Tienda: {etiquetaTienda(cx.tienda)}
-                          </div>
-                        )}
-                        {cx?.estado === "ERROR" && cx.ultimo_error && <div className="mt-1 text-[12.5px] text-danger">{cx.ultimo_error}</div>}
-                      </td>
-                      <td className="px-4 py-3.5">
-                        {conectada && cx && (
-                          <label className="inline-flex items-center gap-2 text-[13px]">
-                            <input type="checkbox" checked={cx.auto_aceptar} onChange={(e) => cambiar(cx, { auto_aceptar: e.target.checked })} className="h-4 w-4 accent-accent" />
-                            {cx.auto_aceptar ? "Sí" : "No"}
-                          </label>
-                        )}
-                      </td>
-                      <td className="px-4 py-3.5">
-                        {conectada && cx && (
-                          <input
-                            type="number" min={1} max={180} defaultValue={cx.tiempo_prep_min} aria-label="Minutos de preparación" disabled={trabajando}
-                            onBlur={(e) => cambiarPrep(cx, e.target)}
-                            className="h-9 w-[76px] rounded border border-line bg-surface px-2 text-right text-[13.5px] tabular-nums disabled:opacity-50"
-                          />
-                        )}
-                      </td>
-                      <td className="px-4 py-3.5 text-right">
-                        {(expirados[s.id] ?? 0) > 0
-                          ? <span className="font-display text-[15px] font-semibold tabular-nums text-danger">{expirados[s.id]}</span>
-                          : <span className="text-ink-3">—</span>}
-                      </td>
-                      <td className="px-4 py-3.5 text-right">
-                        {!conectada && <Button variant="ghost" onClick={conectar}>Conectar</Button>}
-                        {conectada && cx && (
-                          <span className="inline-flex flex-wrap justify-end gap-1.5">
-                            <Button variant="ghost" disabled={trabajando} onClick={() => correr(cx, "verificar")}>Comprobar</Button>
-                            <Button variant="ghost" disabled={trabajando} onClick={() => correr(cx, "menu")} title="Reemplaza la carta de la tienda en Uber con los productos activos del catálogo">Enviar carta</Button>
-                            {cx.estado === "ACTIVA" && <Button variant="ghost" disabled={trabajando} onClick={() => correr(cx, "pausar")}>Pausar</Button>}
-                            {cx.estado === "PAUSADA" && <Button variant="ghost" disabled={trabajando} onClick={() => correr(cx, "reanudar")}>Reanudar</Button>}
-                            <Button variant="ghost" disabled={trabajando} onClick={() => setDesconectar(cx)}>Desconectar</Button>
-                          </span>
-                        )}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-            {sucursales.length === 0 && (
-              <div className="px-6 py-12 text-center text-sm text-ink-2">Primero crea una sucursal en Configuración › Sucursales.</div>
-            )}
+        <div className="mb-6 flex flex-wrap items-start gap-3 rounded-lg border border-line bg-surface p-4">
+          <button
+            type="button" role="switch" aria-checked={encendido} disabled={cambiando}
+            onClick={() => cambiarActivo(!encendido)}
+            className={`relative mt-0.5 h-6 w-11 flex-shrink-0 rounded-full transition-colors ${encendido ? "bg-accent" : "bg-line-strong"} disabled:opacity-50`}
+          >
+            <span className={`absolute top-0.5 h-5 w-5 rounded-full bg-white transition-transform ${encendido ? "left-[22px]" : "left-0.5"}`} />
+          </button>
+          <div className="min-w-0">
+            <div className="text-sm font-semibold">Apps de delivery {encendido ? "· Encendido" : "· Apagado"}</div>
+            <p className="mt-0.5 text-[12.5px] text-ink-2">
+              Cuando está encendido, los pedidos de Uber Eats entran a la caja como un ticket, con su comanda a cocina.
+            </p>
           </div>
+        </div>
+
+        {!encendido && (
+          <p className="text-sm text-ink-3">Enciéndelo para conectar tus tiendas de Uber Eats.</p>
         )}
 
-        <div className="mt-6 grid gap-3 sm:grid-cols-2 lg:max-w-[720px]">
-          {["DiDi Food", "Rappi"].map((n) => (
-            <div key={n} className="rounded-lg border border-dashed border-line bg-surface px-4 py-3 text-[13px] text-ink-3">
-              <span className="font-semibold text-ink-2">{n}</span> · Próximamente
+        {encendido && (
+          <>
+            {error && <p className="mb-4 text-sm font-medium text-danger" role="alert">{error}</p>}
+            {aviso && <p className="mb-4 text-sm font-medium text-success">{aviso}</p>}
+            {(sucursales === null || conexiones === null) && !error && <p className="text-sm text-ink-3">Cargando…</p>}
+
+            {sucursales !== null && conexiones !== null && (
+              <div className="tabla-caja overflow-hidden rounded-lg border border-line bg-surface">
+                <table className="w-full border-collapse">
+                  <thead>
+                    <tr>
+                      <th className={th}>Sucursal</th>
+                      <th className={th}>Uber Eats</th>
+                      <th className={`${th} w-[120px]`}>Auto-aceptar</th>
+                      <th className={`${th} w-[110px]`}>Prep (min)</th>
+                      <th className={`${th} w-[110px]`}>Expirados hoy</th>
+                      <th className={`${th} w-[320px]`}></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {sucursales.map((s) => {
+                      const cx = uberDe(s.id);
+                      const conectada = cx !== null && (cx.estado === "ACTIVA" || cx.estado === "PAUSADA" || cx.estado === "ERROR");
+                      const trabajando = cx !== null && ocupada === cx.id;
+                      return (
+                        <tr key={s.id} className="border-b border-line last:border-none">
+                          <td className="px-4 py-3.5"><div className="text-[15px] font-semibold">{s.nombre}</div></td>
+                          <td className="px-4 py-3.5">
+                            <Estado estado={cx?.estado ?? "SIN_CONECTAR"} />
+                            {conectada && cx?.tienda_nombre_app && <div className="mt-1 text-[13px] text-ink-2">{cx.tienda_nombre_app}</div>}
+                            {conectada && cx && (
+                              <div className={`mt-1 inline-flex items-center gap-1.5 text-[12.5px] font-semibold ${cx.tienda?.estado === "EN_LINEA" ? "text-success" : cx.tienda?.estado === "PAUSADA" ? "text-warning" : "text-ink-3"}`}>
+                                <span className={`h-1.5 w-1.5 rounded-full ${cx.tienda?.estado === "EN_LINEA" ? "bg-success" : cx.tienda?.estado === "PAUSADA" ? "bg-warning" : "bg-ink-3"}`} />
+                                Tienda: {etiquetaTienda(cx.tienda)}
+                              </div>
+                            )}
+                            {cx?.estado === "ERROR" && cx.ultimo_error && <div className="mt-1 text-[12.5px] text-danger">{cx.ultimo_error}</div>}
+                          </td>
+                          <td className="px-4 py-3.5">
+                            {conectada && cx && (
+                              <label className="inline-flex items-center gap-2 text-[13px]">
+                                <input type="checkbox" checked={cx.auto_aceptar} onChange={(e) => cambiar(cx, { auto_aceptar: e.target.checked })} className="h-4 w-4 accent-accent" />
+                                {cx.auto_aceptar ? "Sí" : "No"}
+                              </label>
+                            )}
+                          </td>
+                          <td className="px-4 py-3.5">
+                            {conectada && cx && (
+                              <input
+                                type="number" min={1} max={180} defaultValue={cx.tiempo_prep_min} aria-label="Minutos de preparación" disabled={trabajando}
+                                onBlur={(e) => cambiarPrep(cx, e.target)}
+                                className="h-9 w-[76px] rounded border border-line bg-surface px-2 text-right text-[13.5px] tabular-nums disabled:opacity-50"
+                              />
+                            )}
+                          </td>
+                          <td className="px-4 py-3.5 text-right">
+                            {(expirados[s.id] ?? 0) > 0
+                              ? <span className="font-display text-[15px] font-semibold tabular-nums text-danger">{expirados[s.id]}</span>
+                              : <span className="text-ink-3">—</span>}
+                          </td>
+                          <td className="px-4 py-3.5 text-right">
+                            {!conectada && <Button variant="ghost" onClick={conectar}>Conectar</Button>}
+                            {conectada && cx && (
+                              <span className="inline-flex flex-wrap justify-end gap-1.5">
+                                <Button variant="ghost" disabled={trabajando} onClick={() => correr(cx, "verificar")}>Comprobar</Button>
+                                <Button variant="ghost" disabled={trabajando} onClick={() => correr(cx, "menu")} title="Reemplaza la carta de la tienda en Uber con los productos activos del catálogo">Enviar carta</Button>
+                                {cx.estado === "ACTIVA" && <Button variant="ghost" disabled={trabajando} onClick={() => correr(cx, "pausar")}>Pausar</Button>}
+                                {cx.estado === "PAUSADA" && <Button variant="ghost" disabled={trabajando} onClick={() => correr(cx, "reanudar")}>Reanudar</Button>}
+                                <Button variant="ghost" disabled={trabajando} onClick={() => setDesconectar(cx)}>Desconectar</Button>
+                              </span>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+                {sucursales.length === 0 && (
+                  <div className="px-6 py-12 text-center text-sm text-ink-2">Primero crea una sucursal en Configuración › Sucursales.</div>
+                )}
+              </div>
+            )}
+
+            <div className="mt-6 grid gap-3 sm:grid-cols-2 lg:max-w-[720px]">
+              {["DiDi Food", "Rappi"].map((n) => (
+                <div key={n} className="rounded-lg border border-dashed border-line bg-surface px-4 py-3 text-[13px] text-ink-3">
+                  <span className="font-semibold text-ink-2">{n}</span> · Próximamente
+                </div>
+              ))}
             </div>
-          ))}
-        </div>
+          </>
+        )}
       </PageBody>
 
-      {desconectar && (
+      {encendido && desconectar && (
         <Modal open onClose={() => setDesconectar(null)} title="Desconectar Uber Eats" className="w-full max-w-[420px] rounded-lg border border-line bg-surface p-6 shadow-xl">
           <p className="text-sm text-ink-2">
             Los pedidos de Uber Eats de <b className="text-ink">{desconectar.sucursal_nombre}</b> dejarán de llegar al POS.
