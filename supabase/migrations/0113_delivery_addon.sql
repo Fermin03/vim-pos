@@ -111,6 +111,14 @@ COMMENT ON FUNCTION modulos_efectivos(uuid) IS
 REVOKE EXECUTE ON FUNCTION modulos_efectivos(uuid) FROM public, anon;
 GRANT EXECUTE ON FUNCTION modulos_efectivos(uuid) TO authenticated, service_role;
 
+-- ── Barrer las excepciones manuales que quedarían huérfanas ──────────────────
+-- Entre el 4 y el 11 de sep el panel permitía crear excepciones (`tenant_feature_flags`) para
+-- `delivery_apps`, porque todavía no era `porAddon`. Con el cambio de arriba, el panel ya no
+-- pinta el botón para tocarlas y `modulos_efectivos` ya no las lee (delivery_apps se resuelve
+-- aparte, con el add-on + el interruptor) — si quedó alguna fila, sería basura invisible e
+-- irremovible desde la interfaz para siempre. Es el único momento barato para limpiarla.
+DELETE FROM tenant_feature_flags WHERE flag_codigo = 'delivery_apps';
+
 -- ── Quitar delivery de los planes ────────────────────────────────────────────
 -- 0103 lo puso en los nueve planes. Si se queda, es una llave muerta que hará dudar al siguiente
 -- que lea la tabla sobre quién concede el módulo.
