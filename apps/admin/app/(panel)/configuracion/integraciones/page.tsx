@@ -74,6 +74,15 @@ export default function IntegracionesPage() {
   // final mientras el POS rechaza el pedido. Es el riesgo que nombra el spec §10.
   const hayConexionesActivas = (conexiones ?? []).some((c) => c.estado === "ACTIVA" || c.estado === "PAUSADA" || c.estado === "ERROR");
 
+  // Ventana de carrera (hallazgo de revisión): `recargar()` solo arranca cuando `encendido` pasa
+  // a `true` y tarda un viaje a Supabase; mientras tanto `conexiones` sigue en `null` y
+  // `hayConexionesActivas` lee eso como "no hay ninguna". Si el switch fuera pulsable en esa
+  // ventana, apagar saltaría la confirmación justo en el caso que el spec §10 quiere cubierto.
+  // Se cierra deshabilitando el switch mientras está encendido y las conexiones no han llegado
+  // todavía — no al revés: en el estado "permitido, apagado" `conexiones` está en `null` para
+  // siempre (no hay nada que cargar sin encender primero), y ahí SÍ tiene que poder encenderse.
+  const cargandoConexiones = encendido && conexiones === null;
+
   /** Enciende o apaga las apps de delivery (ADR 0014). Apagar con conexiones activas exige
    *  confirmación explícita, nombrando la consecuencia (docs/diseno/admin.md "Acciones peligrosas"). */
   async function cambiarActivo(activo: boolean) {
@@ -160,7 +169,7 @@ export default function IntegracionesPage() {
 
         <div className="mb-6 flex flex-wrap items-start gap-3 rounded-lg border border-line bg-surface p-4">
           <button
-            type="button" role="switch" aria-checked={encendido} disabled={cambiando}
+            type="button" role="switch" aria-checked={encendido} disabled={cambiando || cargandoConexiones}
             onClick={() => cambiarActivo(!encendido)}
             className={`relative mt-0.5 h-6 w-11 flex-shrink-0 rounded-full transition-colors ${encendido ? "bg-accent" : "bg-line-strong"} disabled:opacity-50`}
           >
@@ -170,6 +179,7 @@ export default function IntegracionesPage() {
             <div className="text-sm font-semibold">Apps de delivery {encendido ? "· Encendido" : "· Apagado"}</div>
             <p className="mt-0.5 text-[12.5px] text-ink-2">
               Cuando está encendido, los pedidos de Uber Eats entran a la caja como un ticket, con su comanda a cocina.
+              {cargandoConexiones && " Comprobando tus conexiones antes de dejarte apagarlo…"}
             </p>
           </div>
         </div>

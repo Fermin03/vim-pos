@@ -8,12 +8,13 @@ import { describe, it, expect, vi } from "vitest";
  */
 const doble = vi.hoisted(() => ({
   rpc: {} as Record<string, unknown>,
+  rpcError: null as { message: string } | null,
   upsert: null as { tabla: string; valores: Record<string, unknown> } | null,
 }));
 
 vi.mock("../supabase", () => ({
   supabase: {
-    rpc: vi.fn(async (fn: string) => ({ data: doble.rpc[fn] ?? null, error: null })),
+    rpc: vi.fn(async (fn: string) => (doble.rpcError ? { data: null, error: doble.rpcError } : { data: doble.rpc[fn] ?? null, error: null })),
     from: vi.fn((tabla: string) => ({
       upsert: vi.fn(async (valores: Record<string, unknown>) => {
         doble.upsert = { tabla, valores };
@@ -26,9 +27,15 @@ vi.mock("../supabase", () => ({
 
 import { activarModuloDelivery, leerModulos } from "../modulos";
 
-/** Doble de supabase: fija lo que el RPC `modulos_efectivos` devuelve en la siguiente llamada. */
-function supabaseFalso(cfg: { rpc: Record<string, unknown> }) {
-  doble.rpc = cfg.rpc;
+/**
+ * Doble de supabase: fija lo que el RPC `modulos_efectivos` devuelve en la siguiente llamada, o
+ * el error que PostgREST regresaría si el RPC falla (`{ error: "..." }` en vez de `{ rpc }`) —
+ * esa rama de `leerModulos` (`if (error) throw`) no queda cubierta si el doble solo sabe
+ * responder con éxito.
+ */
+function supabaseFalso(cfg: { rpc: Record<string, unknown> } | { error: string }) {
+  doble.rpc = "rpc" in cfg ? cfg.rpc : {};
+  doble.rpcError = "error" in cfg ? { message: cfg.error } : null;
   return doble;
 }
 
@@ -44,6 +51,11 @@ describe("leerModulos", () => {
     supabaseFalso({ rpc: { modulos_efectivos: null } });
     const m = await leerModulos();
     expect(m).toEqual({ permitidos: {}, efectivos: {} });
+  });
+
+  it("si el RPC falla, se propaga el error (no se esconde como 'nada permitido')", async () => {
+    supabaseFalso({ error: "conexión perdida" });
+    await expect(leerModulos()).rejects.toThrow("conexión perdida");
   });
 });
 
