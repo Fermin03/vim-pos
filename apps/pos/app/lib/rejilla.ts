@@ -31,6 +31,23 @@ const IDEAL_ALTO = 112;
 const MIN_ANCHO = 110;
 const MIN_ALTO = 92;
 
+export type Medidas = { minAncho: number; minAlto: number; idealAncho: number; idealAlto: number };
+
+/** Celda del catálogo: la de un producto, que es el objetivo táctil más repetido del turno. */
+const CELDA_CATALOGO: Medidas = {
+  minAncho: MIN_ANCHO,
+  minAlto: MIN_ALTO,
+  idealAncho: IDEAL_ANCHO,
+  idealAlto: IDEAL_ALTO,
+};
+
+/**
+ * Celda de una OPCIÓN (un slot de combo, un modificador). Vive en un drawer de 480px, no en la
+ * pantalla completa, y su contenido es más corto —"Bien cocido", "Queso cheddar +$15"—, así que
+ * aguanta ser más baja que la del catálogo sin dejar de ser cómoda con el dedo.
+ */
+export const CELDA_OPCION: Medidas = { minAncho: 96, minAlto: 56, idealAncho: 200, idealAlto: 90 };
+
 export type Rejilla = {
   /** Columnas de la rejilla (capacidad, no cuántos productos hay). */
   columnas: number;
@@ -57,16 +74,19 @@ export function calcularRejilla({
   ancho,
   alto,
   total,
+  medidas = CELDA_CATALOGO,
 }: {
   ancho: number;
   alto: number;
   total: number;
+  /** Con qué celda se mide. Por omisión, la del catálogo. */
+  medidas?: Medidas;
 }): Rejilla {
-  const columnasMax = cuantasCaben(ancho, MIN_ANCHO);
-  const filasMax = cuantasCaben(alto, MIN_ALTO);
+  const columnasMax = cuantasCaben(ancho, medidas.minAncho);
+  const filasMax = cuantasCaben(alto, medidas.minAlto);
 
-  let columnas = cuantasCaben(ancho, IDEAL_ANCHO);
-  let filas = cuantasCaben(alto, IDEAL_ALTO);
+  let columnas = cuantasCaben(ancho, medidas.idealAncho);
+  let filas = cuantasCaben(alto, medidas.idealAlto);
 
   // Densifica de a un paso —una columna y una fila— hasta que quepa la categoría o hasta tocar el
   // piso táctil. Termina siempre: cada vuelta sube al menos uno de los dos y ambos tienen tope.
@@ -86,9 +106,118 @@ export function calcularRejilla({
     // cuadrícula mide siempre lo mismo dentro de una pantalla, tenga la categoría 3 productos o
     // 20 — lo único que cambia es cuántas celdas van llenas. Es lo que pidió Fermín, y de paso le
     // da al cajero una posición fija por producto.
-    anchoFicha: Math.max(MIN_ANCHO, Math.floor((ancho - GAP * (columnas - 1)) / columnas)),
-    altoFicha: Math.max(MIN_ALTO, Math.floor((alto - GAP * (filas - 1)) / filas)),
+    anchoFicha: Math.max(medidas.minAncho, Math.floor((ancho - GAP * (columnas - 1)) / columnas)),
+    altoFicha: Math.max(medidas.minAlto, Math.floor((alto - GAP * (filas - 1)) / filas)),
   };
+}
+
+/** Columnas que se prueban al repartir grupos de opciones, de la más cómoda a la más apretada. */
+const COLUMNAS_GRUPO = [2, 3, 4, 5];
+/**
+ * Separación entre celdas de opción (`gap-2`), más apretada que la del catálogo porque vive en
+ * un drawer. Tiene que ser EL MISMO número que pinta el componente: calcular con 12 y dibujar
+ * con 8 reservaba de más y dejaba la celda en su mínimo con 59px libres debajo.
+ */
+const GAP_OPCION = 8;
+const ALTO_OPCION_IDEAL = 72;
+const ALTO_OPCION_MIN = 44;
+
+/** Un trozo de un grupo colocado en una página: `cantidad` opciones a partir de `desde`. */
+export type TrozoGrupo = { grupo: number; desde: number; cantidad: number };
+
+export type RepartoGrupos = {
+  /** Iguales para TODOS los grupos: es lo que hace que la cuadrícula se vea pareja. */
+  columnas: number;
+  altoCelda: number;
+  anchoCelda: number;
+  paginas: TrozoGrupo[][];
+};
+
+/**
+ * Reparte varios grupos de opciones —los modificadores de un producto— en páginas que caben.
+ *
+ * El catálogo tiene una sola tanda de celdas; aquí hay N grupos, cada uno con su cabecera y su
+ * propio número de opciones, apilados en el mismo hueco. La regla es la misma de siempre: la
+ * cuadrícula manda, el texto se achica, y lo que no cabe se pagina en vez de scrollear.
+ *
+ * Primero busca la combinación MÁS CÓMODA (menos columnas, celda más alta) con la que TODOS los
+ * grupos entren de una sola vez, que es el caso normal: tres grupos de cinco opciones en un drawer
+ * de 440×620 caben holgados. Solo cuando ninguna combinación alcanza, reparte en páginas.
+ *
+ * Al repartir **puede partir un grupo**. Es a propósito: un grupo con 30 opciones es más alto que
+ * la página entera, y preferir "no partir grupos" lo dejaría directamente inalcanzable. Partido, el
+ * cajero lo ve continuado en la siguiente página; entero y recortado, no lo ve nunca.
+ */
+export function repartirGrupos({
+  ancho,
+  alto,
+  opcionesPorGrupo,
+  altoCabecera,
+  altoExtra,
+}: {
+  ancho: number;
+  alto: number;
+  opcionesPorGrupo: number[];
+  /** Alto del encabezado de cada grupo (nombre + insignia de regla). */
+  altoCabecera: number;
+  /** Alto de lo que comparte la página con los grupos (la nota de cocina, el paginador). */
+  altoExtra: number;
+}): RepartoGrupos {
+  // El piso garantiza que en una página SIEMPRE quepa una cabecera y una fila. Sin eso, un hueco
+  // diminuto —o la medición de 0 del primer render— dejaba el reparto cerrando páginas vacías para
+  // siempre: bucle infinito y el proceso muerto por memoria.
+  const altoUtil = Math.max(altoCabecera + ALTO_OPCION_MIN + GAP_OPCION, alto - altoExtra);
+  const anchoDe = (columnas: number) => Math.floor((ancho - GAP_OPCION * (columnas - 1)) / columnas);
+  const usables = COLUMNAS_GRUPO.filter((c) => anchoDe(c) >= CELDA_OPCION.minAncho);
+  const columnasPosibles = usables.length > 0 ? usables : [1];
+
+  const altoDe = (opciones: number, columnas: number, altoCelda: number) =>
+    altoCabecera + Math.max(1, Math.ceil(opciones / columnas)) * (altoCelda + GAP_OPCION);
+
+  // ¿Hay una combinación con la que TODO quepa de una vez? Es el caso normal.
+  for (const columnas of columnasPosibles) {
+    for (let altoCelda = ALTO_OPCION_IDEAL; altoCelda >= ALTO_OPCION_MIN; altoCelda -= 4) {
+      const total = opcionesPorGrupo.reduce((s, n) => s + altoDe(n, columnas, altoCelda), 0);
+      if (total <= altoUtil) {
+        return {
+          columnas,
+          altoCelda,
+          anchoCelda: Math.max(CELDA_OPCION.minAncho, anchoDe(columnas)),
+          paginas: [opcionesPorGrupo.map((n, grupo) => ({ grupo, desde: 0, cantidad: n }))],
+        };
+      }
+    }
+  }
+
+  // No cabe: máxima densidad y reparto por páginas, llenando cada una hasta donde da.
+  const columnas = columnasPosibles[columnasPosibles.length - 1]!;
+  const altoCelda = ALTO_OPCION_MIN;
+  const paginas: TrozoGrupo[][] = [];
+  let pagina: TrozoGrupo[] = [];
+  let usado = 0;
+
+  for (const [grupo, opciones] of opcionesPorGrupo.entries()) {
+    let desde = 0;
+    do {
+      const filasQueCaben = Math.floor((altoUtil - usado - altoCabecera) / (altoCelda + GAP_OPCION));
+      if (filasQueCaben < 1) {
+        if (pagina.length === 0) break; // no debería pasar: el piso de `altoUtil` lo impide
+        // Ya no cabe ni la cabecera con una fila: se cierra la página y se sigue en la siguiente.
+        paginas.push(pagina);
+        pagina = [];
+        usado = 0;
+        continue;
+      }
+      const filas = Math.min(filasQueCaben, Math.ceil((opciones - desde) / columnas));
+      const cantidad = Math.min(opciones - desde, filas * columnas);
+      pagina.push({ grupo, desde, cantidad });
+      usado += altoCabecera + filas * (altoCelda + GAP_OPCION);
+      desde += cantidad;
+    } while (desde < opciones);
+  }
+  paginas.push(pagina);
+
+  return { columnas, altoCelda, anchoCelda: Math.max(CELDA_OPCION.minAncho, anchoDe(columnas)), paginas };
 }
 
 /** Pastilla de categoría: mínimo legible y separación, en px. */

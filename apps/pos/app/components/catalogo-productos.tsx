@@ -1,5 +1,5 @@
 "use client";
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { colorCategoria, ICONOS_POS, type Categoria, type Producto } from "../lib/catalogo";
 import { usePreciosVisibles } from "../lib/precios-visibles";
 import {
@@ -10,6 +10,8 @@ import {
   tamanoNombre,
 } from "../lib/rejilla";
 import { fmtMxn } from "../lib/turno";
+import { useHueco } from "../lib/usar-hueco";
+import { Paginador } from "./paginador";
 
 /**
  * Catálogo: cuadrícula de categorías + cuadrícula de productos.
@@ -45,25 +47,6 @@ const ALTO_PASTILLA = 44;
 /** Por debajo de este ancho de pastilla, el icono le quita al nombre más de lo que aporta. */
 const ANCHO_CON_ICONO = 130;
 
-/**
- * Vigila el tamaño de un elemento y devuelve la limpieza.
- *
- * Mide **en firme al montar** y no solo con `ResizeObserver`, porque el observer entrega sus avisos
- * como parte del ciclo de pintado: si la ventana está oculta o minimizada cuando el catálogo se
- * monta, no llega ninguno y la cuadrícula se quedaría creyendo que mide 0×0 —una celda por página—
- * hasta el siguiente cambio de tamaño. `getBoundingClientRect` sí responde sin pintar.
- */
-function observarTamano(el: HTMLElement, medir: () => void): () => void {
-  medir();
-  const ro = new ResizeObserver(medir);
-  ro.observe(el);
-  window.addEventListener("resize", medir);
-  return () => {
-    ro.disconnect();
-    window.removeEventListener("resize", medir);
-  };
-}
-
 export function CatalogoProductos({
   categorias,
   productos,
@@ -86,39 +69,15 @@ export function CatalogoProductos({
   const mostrarPrecios = usePreciosVisibles();
 
   // ── Categorías: cuadrícula pareja, sin scroll ───────────────────────────────────────────────
-  const barraRef = useRef<HTMLDivElement>(null);
-  const [anchoBarra, setAnchoBarra] = useState(0);
-
-  useLayoutEffect(() => {
-    const el = barraRef.current;
-    if (!el) return;
-    return observarTamano(el, () => setAnchoBarra(el.getBoundingClientRect().width));
-  }, []);
-
+  const [barraRef, huecoBarra] = useHueco<HTMLDivElement>();
   const barra = useMemo(
-    () => calcularBarraCategorias({ ancho: anchoBarra, total: categorias?.length ?? 0 }),
-    [anchoBarra, categorias?.length],
+    () => calcularBarraCategorias({ ancho: huecoBarra.ancho, total: categorias?.length ?? 0 }),
+    [huecoBarra.ancho, categorias?.length],
   );
 
   // ── Rejilla: columnas, filas y páginas del hueco real ───────────────────────────────────────
-  const zonaRef = useRef<HTMLDivElement>(null);
-  const [hueco, setHueco] = useState({ ancho: 0, alto: 0 });
+  const [zonaRef, hueco] = useHueco<HTMLDivElement>();
   const [pagina, setPagina] = useState(1);
-
-  useLayoutEffect(() => {
-    const el = zonaRef.current;
-    if (!el) return;
-    const medir = () => {
-      const r = el.getBoundingClientRect();
-      // Sin el guardia de igualdad, cada medición idéntica dispararía un render de más.
-      setHueco((prev) =>
-        Math.abs(prev.ancho - r.width) < 0.5 && Math.abs(prev.alto - r.height) < 0.5
-          ? prev
-          : { ancho: r.width, alto: r.height },
-      );
-    };
-    return observarTamano(el, medir);
-  }, []);
 
   const rejilla = useMemo(
     () => calcularRejilla({ ancho: hueco.ancho, alto: hueco.alto, total: visibles.length }),
@@ -291,45 +250,7 @@ export function CatalogoProductos({
       {/* La barra de páginas vive FUERA de la zona medida: al aparecer le quita alto a la rejilla,
           el observer recalcula y —como quitar alto nunca reduce el número de páginas— converge en
           una pasada, sin parpadeo. */}
-      {rejilla.paginas > 1 && (
-        <div className="flex flex-shrink-0 items-center justify-end gap-2 border-t border-line bg-surface px-5 py-2">
-          <span className="mr-1 text-[13px] font-semibold tabular-nums text-ink-3">
-            {paginaActual} / {rejilla.paginas}
-          </span>
-          <BotonPagina etiqueta="Página anterior" onClick={() => irA(paginaActual - 1)} disabled={paginaActual === 1}>
-            <path d="M15 18l-6-6 6-6" />
-          </BotonPagina>
-          <BotonPagina etiqueta="Página siguiente" onClick={() => irA(paginaActual + 1)} disabled={paginaActual === rejilla.paginas}>
-            <path d="M9 18l6-6-6-6" />
-          </BotonPagina>
-        </div>
-      )}
+      <Paginador pagina={paginaActual} paginas={rejilla.paginas} onIr={irA} />
     </div>
-  );
-}
-
-function BotonPagina({
-  etiqueta,
-  onClick,
-  disabled,
-  children,
-}: {
-  etiqueta: string;
-  onClick: () => void;
-  disabled: boolean;
-  children: React.ReactNode;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      disabled={disabled}
-      aria-label={etiqueta}
-      className="flex h-[46px] w-[58px] items-center justify-center rounded-lg border border-line-strong text-ink transition hover:border-ink hover:bg-hover active:scale-[.97] disabled:cursor-not-allowed disabled:border-line disabled:text-ink-3"
-    >
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.25" strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5" aria-hidden="true">
-        {children}
-      </svg>
-    </button>
   );
 }

@@ -1,5 +1,13 @@
 import { describe, expect, it } from "vitest";
-import { calcularBarraCategorias, calcularRejilla, clampPagina, tamanoEtiqueta, tamanoNombre } from "../rejilla";
+import {
+  CELDA_OPCION,
+  calcularBarraCategorias,
+  calcularRejilla,
+  clampPagina,
+  repartirGrupos,
+  tamanoEtiqueta,
+  tamanoNombre,
+} from "../rejilla";
 
 /**
  * Aritmética del catálogo. Los anchos/altos de estas pruebas son el HUECO ÚTIL del catálogo
@@ -158,5 +166,82 @@ describe("tamaño del texto", () => {
   it("la etiqueta de categoría se achica con la pastilla pero no desaparece", () => {
     expect(tamanoEtiqueta(155)).toBe(14);
     expect(tamanoEtiqueta(92)).toBe(11);
+  });
+});
+
+describe("calcularRejilla con medidas de opción", () => {
+  it("en el drawer de combo (440×520) caben 8 opciones sin paginar", () => {
+    const r = calcularRejilla({ ancho: 440, alto: 520, total: 8, medidas: CELDA_OPCION });
+    expect(r.paginas).toBe(1);
+    expect(r.columnas).toBeGreaterThanOrEqual(2);
+    expect(r.anchoFicha).toBeGreaterThanOrEqual(96);
+    expect(r.altoFicha).toBeGreaterThanOrEqual(56);
+  });
+
+  it("un slot con 40 opciones pagina en vez de encoger sin fin", () => {
+    const r = calcularRejilla({ ancho: 440, alto: 520, total: 40, medidas: CELDA_OPCION });
+    // Con las medidas del catálogo darían 5 páginas; con las de opción, 2.
+    expect(r.paginas).toBe(2);
+    expect(r.altoFicha).toBeGreaterThanOrEqual(56);
+  });
+});
+
+describe("repartirGrupos", () => {
+  const cabecera = 26;
+  /** Cuántas opciones del grupo `g` quedaron colocadas en total. */
+  const colocadas = (r: { paginas: { grupo: number; cantidad: number }[][] }, g: number) =>
+    r.paginas.flat().filter((t) => t.grupo === g).reduce((s, t) => s + t.cantidad, 0);
+
+  it("el caso normal —3 grupos de 5 opciones— entra completo en una página", () => {
+    const r = repartirGrupos({ ancho: 440, alto: 620, opcionesPorGrupo: [5, 5, 5], altoCabecera: cabecera, altoExtra: 84 });
+    expect(r.paginas).toHaveLength(1);
+    expect(r.paginas[0]).toHaveLength(3);
+    expect([0, 1, 2].map((g) => colocadas(r, g))).toEqual([5, 5, 5]);
+  });
+
+  it("todos los grupos comparten columnas y alto de celda: la cuadrícula se ve pareja", () => {
+    const r = repartirGrupos({ ancho: 440, alto: 620, opcionesPorGrupo: [2, 9, 4], altoCabecera: cabecera, altoExtra: 84 });
+    expect(r.columnas).toBeGreaterThanOrEqual(2);
+    expect(r.altoCelda).toBeGreaterThanOrEqual(44);
+    expect(r.anchoCelda).toBeGreaterThanOrEqual(96);
+  });
+
+  it("cuando no cabe ni apretado usa varias páginas y no pierde ni una opción", () => {
+    const r = repartirGrupos({ ancho: 440, alto: 300, opcionesPorGrupo: [8, 8, 8, 8], altoCabecera: cabecera, altoExtra: 84 });
+    expect(r.paginas.length).toBeGreaterThan(1);
+    expect([0, 1, 2, 3].map((g) => colocadas(r, g))).toEqual([8, 8, 8, 8]);
+  });
+
+  it("un grupo más grande que la página se parte en trozos en vez de quedar inalcanzable", () => {
+    const r = repartirGrupos({ ancho: 440, alto: 240, opcionesPorGrupo: [30, 3], altoCabecera: cabecera, altoExtra: 84 });
+    expect(r.paginas.flat().filter((t) => t.grupo === 0).length).toBeGreaterThan(1);
+    expect(colocadas(r, 0)).toBe(30);
+    expect(colocadas(r, 1)).toBe(3);
+  });
+
+  it("ningún trozo se sale de la página que lo contiene", () => {
+    const alto = 300;
+    const extra = 84;
+    const r = repartirGrupos({ ancho: 440, alto, opcionesPorGrupo: [8, 8, 8, 8], altoCabecera: cabecera, altoExtra: extra });
+    for (const pagina of r.paginas) {
+      const usado = pagina.reduce(
+        (s, t) => s + cabecera + Math.ceil(t.cantidad / r.columnas) * (r.altoCelda + 8),
+        0,
+      );
+      expect(usado).toBeLessThanOrEqual(alto - extra);
+    }
+  });
+
+  it("sin grupos devuelve una página vacía y no truena", () => {
+    const r = repartirGrupos({ ancho: 440, alto: 620, opcionesPorGrupo: [], altoCabecera: cabecera, altoExtra: 84 });
+    expect(r.paginas).toHaveLength(1);
+    expect(r.columnas).toBeGreaterThanOrEqual(1);
+  });
+
+  it("antes de la primera medición no pierde opciones", () => {
+    const r = repartirGrupos({ ancho: 0, alto: 0, opcionesPorGrupo: [3, 3], altoCabecera: cabecera, altoExtra: 84 });
+    expect(r.columnas).toBeGreaterThanOrEqual(1);
+    expect(r.altoCelda).toBeGreaterThanOrEqual(44);
+    expect([0, 1].map((g) => colocadas(r, g))).toEqual([3, 3]);
   });
 });

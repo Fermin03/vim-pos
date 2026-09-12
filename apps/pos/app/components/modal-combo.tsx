@@ -6,8 +6,11 @@ import { componentesPorDefecto, deltaDe, nuevoClientIdComponente, precioCombo, s
 import type { LineaCarrito, ModificadorSel } from "../lib/carrito";
 import { nuevoClientId } from "../lib/carrito";
 import { obtenerGruposDeProducto, type GrupoModificadores } from "../lib/modificadores";
+import { CELDA_OPCION, calcularRejilla, clampPagina, tamanoNombre } from "../lib/rejilla";
 import { fmtMxn } from "../lib/turno";
+import { useHueco } from "../lib/usar-hueco";
 import { ModalModificadores } from "./modal-modificadores";
+import { Paginador } from "./paginador";
 
 /**
  * Drawer de armado de combo: un slot por paso (spec §6.2, validado en el prototipo). En un slot
@@ -16,6 +19,13 @@ import { ModalModificadores } from "./modal-modificadores";
  * abre encima del paso y al confirmar avanza una sola vez. El último paso es el resumen, con
  * cantidad y nota para cocina. El precio se recalcula en cada cambio y se ve en vivo en la
  * cabecera y en el botón del pie.
+ *
+ * Las opciones del paso **no scrollean**: la cuadrícula se mide contra el hueco del drawer y las
+ * tarjetas lo llenan, todas del mismo tamaño, con el texto achicándose para caber. Un slot con
+ * más opciones de las que caben **pagina** — misma regla y mismo paginador que el catálogo.
+ *
+ * El resumen conserva un scroll de respaldo: es una lista de revisión, y recortarla escondería
+ * justo lo que el cajero va a confirmar. Con un combo normal —tres o cuatro slots— no aparece.
  */
 type Props = {
   combo: ComboDef;
@@ -71,6 +81,22 @@ export function ModalCombo({ combo, token, linea, preset, onConfirmar, onCancela
   const precioBase = useMemo(() => precioCombo(combo, componentes), [combo, componentes]);
   const precio = useMemo(() => Math.round((precioBase + componentes.reduce((s, c) => s + extrasDe(c.modificadores) * c.cantidad, 0)) * 100) / 100, [precioBase, componentes]);
   const todoValido = slots.every((s) => slotValido(s, componentes));
+
+  // Cuadrícula de opciones del paso: manda el hueco del drawer, igual que en el catálogo.
+  const [zonaRef, hueco] = useHueco<HTMLDivElement>();
+  const [pagOpc, setPagOpc] = useState(1);
+  const rejillaOpc = useMemo(
+    () => calcularRejilla({ ancho: hueco.ancho, alto: hueco.alto, total: slot?.opciones.length ?? 0, medidas: CELDA_OPCION }),
+    [hueco.ancho, hueco.alto, slot?.opciones.length],
+  );
+  const pagOpcActual = clampPagina(pagOpc, rejillaOpc.paginas);
+  const opcionesEnPantalla = useMemo(
+    () => (slot?.opciones ?? []).slice((pagOpcActual - 1) * rejillaOpc.porPagina, pagOpcActual * rejillaOpc.porPagina),
+    [slot, pagOpcActual, rejillaOpc.porPagina],
+  );
+  const pxOpcion = tamanoNombre(rejillaOpc.anchoFicha, rejillaOpc.altoFicha);
+  // Cada paso empieza en su primera página.
+  useEffect(() => setPagOpc(1), [paso]);
 
   const avanzar = () => setPaso((p) => Math.min(p + 1, slots.length));
 
@@ -148,7 +174,7 @@ export function ModalCombo({ combo, token, linea, preset, onConfirmar, onCancela
 
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-end bg-ink/[0.34]" role="dialog" aria-modal="true" onClick={(e) => { if (e.target === e.currentTarget) onCancelar(); }}>
-      <aside className="flex h-full w-full max-w-[480px] flex-col border-l border-line-strong bg-surface shadow-[-14px_0_40px_rgba(22,22,26,.12)]" onClick={(e) => e.stopPropagation()}>
+      <aside className="flex h-full w-full max-w-[576px] flex-col border-l border-line-strong bg-surface shadow-[-14px_0_40px_rgba(22,22,26,.12)]" onClick={(e) => e.stopPropagation()}>
         {/* Cabecera: nombre, paso, precio en vivo, barra de pasos */}
         <div className="flex-shrink-0 border-b border-line px-5 pb-3 pt-4">
           <div className="flex items-start justify-between gap-4">
@@ -169,11 +195,10 @@ export function ModalCombo({ combo, token, linea, preset, onConfirmar, onCancela
         </div>
 
         {/* Cuerpo */}
-        <div className="flex-1 overflow-y-auto px-5 py-5">
-          {error && <div className="mb-3 rounded border border-line bg-accent-soft px-3 py-2 text-[12.5px] font-medium text-danger">{error}</div>}
-          {slot && (
-            <>
-              <div className="mb-3 flex items-center gap-2">
+        {error && <div className="mx-5 mt-3 flex-shrink-0 rounded border border-line bg-accent-soft px-3 py-2 text-[12.5px] font-medium text-danger">{error}</div>}
+        {slot && (
+          <>
+              <div className="flex flex-shrink-0 items-center gap-2 px-5 pb-3 pt-5">
                 <span className="text-[14.5px] font-bold text-ink">{slot.nombre}</span>
                 {slot.min > 0 ? (
                   slotValido(slot, componentes)
@@ -182,8 +207,18 @@ export function ModalCombo({ combo, token, linea, preset, onConfirmar, onCancela
                 ) : <span className="text-[12px] font-medium text-ink-3">Opcional</span>}
                 <span className="ml-auto text-[11.5px] font-medium text-ink-3">{slot.max === 1 ? "Elige 1" : `Elige ${slot.min}–${slot.max}`}{slot.modo === "SUMA_PRECIO_PRODUCTO" ? " · se suma su precio" : ""}</span>
               </div>
-              <div className="grid grid-cols-2 gap-2.5">
-                {slot.opciones.map((o) => {
+              {/* El hueco se mide en un elemento sin padding: así el número que entra al
+                  cálculo es el ancho real de la cuadrícula. */}
+              <div className="min-h-0 flex-1 overflow-hidden px-5">
+                <div ref={zonaRef} className="h-full w-full">
+                  <div
+                    className="grid h-full w-full gap-2.5"
+                    style={{
+                      gridTemplateColumns: `repeat(${rejillaOpc.columnas}, minmax(0, 1fr))`,
+                      gridTemplateRows: `repeat(${rejillaOpc.filas}, minmax(0, 1fr))`,
+                    }}
+                  >
+                {opcionesEnPantalla.map((o) => {
                   const c = componentes.find((x) => x.grupoId === slot.id && x.producto.id === o.producto.id);
                   const importe = importeDe(slot, o);
                   const disabled = o.producto.agotado;
@@ -191,15 +226,15 @@ export function ModalCombo({ combo, token, linea, preset, onConfirmar, onCancela
                     // Contenedor relativo: la tarjeta y "Personalizar" son botones HERMANOS (un
                     // <button> no puede anidar otro control interactivo), "Personalizar" flota en
                     // la esquina inferior con 44px de área táctil.
-                    <div key={o.producto.id} className="relative">
-                      <button type="button" disabled={disabled} aria-pressed={!!c} onClick={() => elegir(slot, o.producto)}
-                        className={["relative flex min-h-[96px] w-full flex-col items-start justify-between gap-2.5 rounded-lg border px-[13px] py-3 text-left transition active:scale-[.98]",
+                    <div key={o.producto.id} className="relative h-full">
+                      <button type="button" disabled={disabled} aria-pressed={!!c} onClick={() => elegir(slot, o.producto)} style={{ fontSize: pxOpcion }}
+                        className={["relative flex h-full w-full flex-col items-center justify-center gap-2 rounded-lg border px-2.5 py-2 text-center transition active:scale-[.98]",
                           disabled ? "cursor-not-allowed border-line opacity-45" : c ? "border-ink bg-sel shadow-[inset_0_0_0_1px_rgb(var(--ink))]" : "border-line"].join(" ")}>
                         {disabled
                           ? <span className="absolute right-2.5 top-2.5 rounded-full bg-danger/10 px-2 py-0.5 text-[10.5px] font-bold uppercase tracking-wide text-danger">Agotado</span>
                           : <span className={["absolute right-2.5 top-2.5 flex h-5 w-5 items-center justify-center rounded-full border-[1.5px]", c ? "border-ink bg-ink" : "border-line-strong"].join(" ")}><IconCheck className={["h-3 w-3 text-white", c ? "opacity-100" : "opacity-0"].join(" ")} /></span>}
                         <span>
-                          <span className="block text-[15px] font-semibold leading-tight text-ink">{o.producto.nombre}</span>
+                          <span className="line-clamp-3 block break-words font-semibold leading-tight text-ink">{o.producto.nombre}</span>
                           {c && c.modificadores.length > 0 && <span className="mt-0.5 block text-[12px] text-ink-3">{c.modificadores.map((m) => m.opcionNombre).join(" · ")}</span>}
                         </span>
                         <span className="flex w-full items-baseline justify-between">
@@ -218,18 +253,23 @@ export function ModalCombo({ combo, token, linea, preset, onConfirmar, onCancela
                     </div>
                   );
                 })}
+                  </div>
+                </div>
               </div>
               {slot.min === 0 && (
-                <button type="button" onClick={() => { setComponentes((prev) => prev.filter((c) => c.grupoId !== slot.id)); avanzar(); }}
-                  className="mt-3 flex h-[52px] w-full items-center justify-center rounded border border-line-strong text-[15px] font-semibold text-ink-2 transition hover:bg-hover">
-                  Sin {slot.nombre.toLowerCase()}
-                </button>
+                <div className="flex-shrink-0 px-5 pt-3">
+                  <button type="button" onClick={() => { setComponentes((prev) => prev.filter((c) => c.grupoId !== slot.id)); avanzar(); }}
+                    className="flex h-[52px] w-full items-center justify-center rounded border border-line-strong text-[15px] font-semibold text-ink-2 transition hover:bg-hover">
+                    Sin {slot.nombre.toLowerCase()}
+                  </button>
+                </div>
               )}
-            </>
-          )}
+              <Paginador compacto pagina={pagOpcActual} paginas={rejillaOpc.paginas} onIr={setPagOpc} />
+          </>
+        )}
 
-          {enResumen && (
-            <>
+        {enResumen && (
+          <div className="flex-1 overflow-y-auto px-5 py-5">
               <div className="flex flex-col">
                 {slots.map((s, i) => {
                   const del = componentes.filter((c) => c.grupoId === s.id);
@@ -277,9 +317,8 @@ export function ModalCombo({ combo, token, linea, preset, onConfirmar, onCancela
                 <textarea value={nota} onChange={(e) => setNota(e.target.value)} rows={2} placeholder="Ej. todo para llevar, sin servilletas"
                   className="w-full resize-y rounded border border-line-strong px-[13px] py-[11px] font-sans text-[15px] text-ink outline-none placeholder:text-ink-3 focus:border-ink focus:shadow-[inset_0_0_0_1px_rgb(var(--ink))]" />
               </div>
-            </>
-          )}
-        </div>
+          </div>
+        )}
 
         {/* Pie */}
         <div className="flex-shrink-0 border-t border-line px-5 py-4">

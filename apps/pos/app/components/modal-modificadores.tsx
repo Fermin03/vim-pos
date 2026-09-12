@@ -1,12 +1,44 @@
 "use client";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { Producto } from "../lib/catalogo";
 import type { GrupoModificadores } from "../lib/modificadores";
 import type { ModificadorSel } from "../lib/carrito";
 import { seleccionInicialGrupo } from "../lib/carrito";
+import { clampPagina, repartirGrupos, tamanoNombre } from "../lib/rejilla";
 import { fmtMxn } from "../lib/turno";
+import { useHueco } from "../lib/usar-hueco";
+import { Paginador } from "./paginador";
+
+/**
+ * Drawer de modificadores: los grupos de un producto (término, extras, sin qué) y la nota.
+ *
+ * NO SCROLLEA
+ *
+ * Antes los grupos se apilaban en un cuerpo con scroll vertical y cada opción era un renglón de
+ * ancho completo: un producto con tres grupos de cinco opciones ya obligaba a deslizar para ver el
+ * último, y a deslizar de vuelta para corregir el primero.
+ *
+ * Ahora rige la misma regla que el catálogo: **manda la cuadrícula, no el contenido.** Las opciones
+ * son celdas iguales en cuadrícula, `repartirGrupos` decide de una sola vez las columnas y el alto
+ * de celda que hacen que TODOS los grupos quepan en el hueco medido, y el texto se achica para
+ * caber. Cuando ni apretando alcanza, se **pagina** — y un grupo más alto que la página se parte en
+ * trozos, porque entero y recortado no se vería nunca.
+ *
+ * El drawer mide 576px y no 480: un 20% más de ancho es una columna más de opciones, o la misma
+ * columna con el nombre entero en vez de cortado.
+ *
+ * Dos cosas que se fueron para que esto quepa:
+ *
+ * - **El hero de 150px** (un degradado con un icono genérico de hamburguesa, el mismo para todos
+ *   los productos). Se llevaba una quinta parte del drawer sin decir nada del producto.
+ * - **El banner rojo por grupo** ("Debes elegir una opción"). Lo que informa ya está en el nombre
+ *   del grupo en rojo, en la insignia "Obligatorio" y en el aviso del pie, que además dice cuál.
+ */
 
 type SelPorGrupo = Record<string, Set<string>>; // grupoId -> set de opcionId
+
+/** Alto reservado al encabezado de cada grupo dentro de la cuadrícula. */
+const ALTO_CABECERA = 26;
 
 function initSel(grupos: GrupoModificadores[]): SelPorGrupo {
   const s: SelPorGrupo = {};
@@ -45,22 +77,15 @@ function esUnica(g: GrupoModificadores): boolean {
   return g.tipoSeleccion === "UNICA_OBLIGATORIA" || g.tipoSeleccion === "UNICA_OPCIONAL";
 }
 
+function esObligatorio(g: GrupoModificadores): boolean {
+  return g.tipoSeleccion === "UNICA_OBLIGATORIA" || g.tipoSeleccion === "MULTIPLE_OBLIGATORIA_RANGO";
+}
+
 // Icono check SVG
 function IconCheck({ className }: { className?: string }) {
   return (
     <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={3} strokeLinecap="round" strokeLinejoin="round">
       <polyline points="20 6 9 17 4 12" />
-    </svg>
-  );
-}
-
-// Icono de advertencia
-function IconWarning({ className }: { className?: string }) {
-  return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
-      <circle cx="12" cy="12" r="10" />
-      <line x1="12" y1="8" x2="12" y2="12" />
-      <line x1="12" y1="16" x2="12.01" y2="16" />
     </svg>
   );
 }
@@ -86,17 +111,6 @@ function IconAlert({ className }: { className?: string }) {
   );
 }
 
-// Icono hamburguesa (placeholder producto)
-function IconBurger({ className }: { className?: string }) {
-  return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round">
-      <path d="M3 11a9 9 0 0 1 18 0Z" />
-      <path d="M3 15h18" />
-      <path d="M5 19h14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2Z" />
-    </svg>
-  );
-}
-
 export function ModalModificadores({
   producto,
   grupos,
@@ -110,11 +124,12 @@ export function ModalModificadores({
 }) {
   const [sel, setSel] = useState<SelPorGrupo>(() => initSel(grupos));
   const [nota, setNota] = useState("");
+  const [pagina, setPagina] = useState(1);
 
   function toggle(g: GrupoModificadores, opcionId: string) {
     setSel((prev) => {
       const actual = new Set(prev[g.id]);
-      const unica = g.tipoSeleccion === "UNICA_OBLIGATORIA" || g.tipoSeleccion === "UNICA_OPCIONAL";
+      const unica = esUnica(g);
       if (actual.has(opcionId)) {
         if (g.tipoSeleccion === "UNICA_OBLIGATORIA") return prev; // no permitir vaciar
         actual.delete(opcionId);
@@ -155,6 +170,28 @@ export function ModalModificadores({
   // Primer grupo inválido para el hint del footer
   const primerGrupoInvalido = grupos.find((g) => !grupoValido(g, sel[g.id] ?? new Set()));
 
+  // ── Reparto: columnas y alto de celda iguales para todos los grupos ─────────────────────────
+  // `altoExtra` es 0 porque la nota y el paginador son hermanos del elemento medido: el alto que
+  // devuelve `useHueco` ya viene con ellos descontados.
+  const [zonaRef, hueco] = useHueco<HTMLDivElement>();
+  const reparto = useMemo(
+    () =>
+      repartirGrupos({
+        ancho: hueco.ancho,
+        alto: hueco.alto,
+        opcionesPorGrupo: grupos.map((g) => g.opciones.length),
+        altoCabecera: ALTO_CABECERA,
+        altoExtra: 0,
+      }),
+    [hueco.ancho, hueco.alto, grupos],
+  );
+  const paginaActual = clampPagina(pagina, reparto.paginas.length);
+  const trozos = reparto.paginas[paginaActual - 1] ?? [];
+  const pxOpcion = tamanoNombre(reparto.anchoCelda, reparto.altoCelda);
+
+  // Si el producto cambia (el drawer se reutiliza), volver a la primera página.
+  useEffect(() => setPagina(1), [producto.id]);
+
   return (
     /* Scrim */
     <div
@@ -165,169 +202,153 @@ export function ModalModificadores({
     >
       {/* Drawer panel — right side, full height below any top bar */}
       <aside
-        className="flex h-full w-full max-w-[480px] flex-col bg-surface shadow-[−14px_0_40px_rgba(22,22,26,.12)] border-l border-line-strong"
+        className="flex h-full w-full max-w-[576px] flex-col border-l border-line-strong bg-surface shadow-[−14px_0_40px_rgba(22,22,26,.12)]"
         onClick={(e) => e.stopPropagation()}
       >
-
-        {/* Hero: imagen placeholder */}
-        <div className="relative flex-shrink-0">
-          <div className="flex h-[150px] items-center justify-center bg-gradient-to-br from-[#F6E7EC] to-[#F1D9D1] text-[#9B2D4E]">
-            <IconBurger className="h-[70px] w-[70px] opacity-55" />
-          </div>
-          {/* Botón cerrar flotante */}
+        {/* Cabecera: nombre + precio base. (Aquí vivía un hero de 150px con un icono genérico de
+            hamburguesa, igual para todos los productos: se llevaba una quinta parte del drawer.) */}
+        <div className="flex flex-shrink-0 items-start gap-3 border-b border-line px-5 py-4">
+          <span className="min-w-0 flex-1 font-display text-[21px] font-semibold leading-tight tracking-[-0.02em] text-ink">
+            {producto.nombre}
+          </span>
+          <span className="flex-shrink-0 text-right">
+            <small className="mb-[-2px] block font-sans text-[11px] font-semibold uppercase tracking-[0.04em] text-ink-3">
+              Precio base
+            </small>
+            <span className="font-display text-[21px] font-bold tabular-nums text-ink">
+              {fmtMxn(producto.precio_base_mxn)}
+            </span>
+          </span>
           <button
             type="button"
             onClick={onCancelar}
             aria-label="Cerrar"
-            className="absolute right-3 top-3 flex h-9 w-9 items-center justify-center rounded-full border-none bg-white/90 shadow-sm backdrop-blur-sm transition hover:bg-white"
+            className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full border border-line-strong bg-surface transition hover:bg-hover"
           >
             <IconX className="h-[18px] w-[18px] text-ink" />
           </button>
         </div>
 
-        {/* Nombre + precio base */}
-        <div className="flex-shrink-0 border-b border-line px-5 py-4">
-          <div className="flex items-start justify-between gap-4">
-            <span className="font-display text-[21px] font-semibold leading-tight tracking-[-0.02em] text-ink">
-              {producto.nombre}
-            </span>
-            <span className="flex-shrink-0 text-right">
-              <small className="mb-[-2px] block font-sans text-[11px] font-semibold uppercase tracking-[0.04em] text-ink-3">
-                Precio base
-              </small>
-              <span className="font-display text-[21px] font-bold tabular-nums text-ink">
-                {fmtMxn(producto.precio_base_mxn)}
-              </span>
-            </span>
-          </div>
-        </div>
+        {/* Cuerpo: cuadrícula medida, sin scroll */}
+        <div className="min-h-0 flex-1 overflow-hidden px-5 py-4">
+          {/* El hueco se mide en un elemento sin padding: así el número que entra al cálculo es el
+              ancho real de la cuadrícula. */}
+          <div ref={zonaRef} className="flex h-full w-full flex-col gap-2">
+            {trozos.map((t) => {
+              const g = grupos[t.grupo]!;
+              const selGrupo = sel[g.id] ?? new Set<string>();
+              const valido = grupoValido(g, selGrupo);
+              const obligatorio = esObligatorio(g);
+              const isUnica = esUnica(g);
+              const opciones = g.opciones.slice(t.desde, t.desde + t.cantidad);
+              const continuacion = t.desde > 0;
 
-        {/* Cuerpo scrollable: grupos + nota */}
-        <div className="flex-1 overflow-y-auto px-5 py-5">
-          {grupos.map((g) => {
-            const selGrupo = sel[g.id] ?? new Set<string>();
-            const valido = grupoValido(g, selGrupo);
-            const esObligatoria = g.tipoSeleccion === "UNICA_OBLIGATORIA" || g.tipoSeleccion === "MULTIPLE_OBLIGATORIA_RANGO";
-            const esOpcional = !esObligatoria;
-            const isUnica = esUnica(g);
-
-            return (
-              <div key={g.id} className="mb-5 last:mb-0">
-                {/* Cabecera del grupo */}
-                <div className="mb-3 flex items-center gap-2">
-                  <span className={["text-[14.5px] font-bold", !valido && esObligatoria ? "text-danger" : "text-ink"].join(" ")}>
-                    {g.nombre}
-                  </span>
-                  {/* Badge de estado */}
-                  {esObligatoria ? (
-                    valido ? (
-                      <span className="inline-flex items-center gap-1 rounded-full bg-[#E7F2EC] px-2 py-0.5 text-[10.5px] font-bold uppercase tracking-[0.04em] text-success">
-                        <IconCheck className="h-[11px] w-[11px]" />
-                        Listo
-                      </span>
+              return (
+                <div key={`${g.id}-${t.desde}`} className="flex flex-col">
+                  {/* Cabecera del grupo */}
+                  <div className="flex flex-shrink-0 items-center gap-2" style={{ height: ALTO_CABECERA }}>
+                    <span className={["truncate text-[14px] font-bold", !valido && obligatorio ? "text-danger" : "text-ink"].join(" ")}>
+                      {g.nombre}
+                      {/* Un grupo partido entre páginas lo dice, para que nadie crea que ya las vio todas. */}
+                      {continuacion && <span className="font-medium text-ink-3"> (sigue)</span>}
+                    </span>
+                    {obligatorio ? (
+                      valido ? (
+                        <span className="inline-flex flex-shrink-0 items-center gap-1 rounded-full bg-[#E7F2EC] px-2 py-0.5 text-[10.5px] font-bold uppercase tracking-[0.04em] text-success">
+                          <IconCheck className="h-[11px] w-[11px]" />
+                          Listo
+                        </span>
+                      ) : (
+                        <span className="flex-shrink-0 rounded-full bg-accent-soft px-2 py-0.5 text-[10.5px] font-bold uppercase tracking-[0.04em] text-accent">
+                          Obligatorio
+                        </span>
+                      )
                     ) : (
-                      <span className="rounded-full bg-accent-soft px-2 py-0.5 text-[10.5px] font-bold uppercase tracking-[0.04em] text-accent">
-                        Obligatorio
-                      </span>
-                    )
-                  ) : (
-                    <span className="text-[12px] font-medium text-ink-3">Opcional</span>
-                  )}
-                  {/* Regla (eje derecho) */}
-                  <span className="ml-auto text-[11.5px] font-medium text-ink-3">
-                    {reglaTipoLabel(g)}
-                  </span>
-                </div>
+                      <span className="flex-shrink-0 text-[12px] font-medium text-ink-3">Opcional</span>
+                    )}
+                    <span className="ml-auto flex-shrink-0 text-[11.5px] font-medium text-ink-3">{reglaTipoLabel(g)}</span>
+                  </div>
 
-                {/* Opciones */}
-                <div className="flex flex-col">
-                  {g.opciones.map((o) => {
-                    const checked = selGrupo.has(o.id);
-                    const atMax =
-                      g.tipoSeleccion === "MULTIPLE_OBLIGATORIA_RANGO" &&
-                      g.max != null &&
-                      selGrupo.size >= g.max &&
-                      !checked;
-                    const disabled = o.agotada || atMax;
+                  {/* Opciones: celdas iguales, todas las del trozo caben */}
+                  <div
+                    className="grid gap-2"
+                    style={{
+                      gridTemplateColumns: `repeat(${reparto.columnas}, minmax(0, 1fr))`,
+                      gridAutoRows: `${reparto.altoCelda}px`,
+                    }}
+                  >
+                    {opciones.map((o) => {
+                      const checked = selGrupo.has(o.id);
+                      const atMax =
+                        g.tipoSeleccion === "MULTIPLE_OBLIGATORIA_RANGO" &&
+                        g.max != null &&
+                        selGrupo.size >= g.max &&
+                        !checked;
+                      const disabled = o.agotada || atMax;
 
-                    return (
-                      <div
-                        key={o.id}
-                        role="button"
-                        tabIndex={disabled ? -1 : 0}
-                        aria-pressed={checked}
-                        aria-disabled={disabled}
-                        onClick={() => { if (!disabled) toggle(g, o.id); }}
-                        onKeyDown={(e) => { if (!disabled && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); toggle(g, o.id); } }}
-                        className={[
-                          "mb-[7px] flex cursor-pointer items-center gap-3 rounded border px-[13px] py-3 transition-all duration-[120ms] last:mb-0",
-                          o.agotada
-                            ? "cursor-not-allowed border-line opacity-45"
-                            : atMax
-                            ? "cursor-not-allowed border-line opacity-45"
-                            : checked
-                            ? "border-ink bg-sel shadow-[inset_0_0_0_1px_rgb(var(--ink))]"
-                            : "border-line hover:border-line-strong",
-                        ].join(" ")}
-                      >
-                        {/* Indicador radio/checkbox */}
-                        <span
+                      return (
+                        <button
+                          key={o.id}
+                          type="button"
+                          aria-pressed={checked}
+                          disabled={disabled}
+                          onClick={() => toggle(g, o.id)}
+                          style={{ fontSize: pxOpcion }}
                           className={[
-                            "flex h-5 w-5 flex-shrink-0 items-center justify-center border-[1.5px] transition-all duration-[120ms]",
-                            isUnica ? "rounded-full" : "rounded-[5px]",
-                            checked
-                              ? "border-ink bg-ink"
-                              : "border-line-strong bg-transparent",
+                            "relative flex h-full w-full flex-col items-center justify-center gap-0.5 overflow-hidden rounded border px-2 py-1 text-center transition-colors",
+                            disabled
+                              ? "cursor-not-allowed border-line opacity-45"
+                              : checked
+                                ? "border-ink bg-sel shadow-[inset_0_0_0_1px_rgb(var(--ink))]"
+                                : "border-line hover:border-line-strong",
                           ].join(" ")}
                         >
-                          <IconCheck className={["h-3 w-3 text-white transition-opacity", checked ? "opacity-100" : "opacity-0"].join(" ")} />
-                        </span>
-
-                        {/* Nombre de opción */}
-                        <span className="flex-1 text-[15px] font-medium text-ink">
-                          {o.nombre}
-                          {o.agotada ? <span className="ml-1 text-ink-3">(agotado)</span> : null}
-                        </span>
-
-                        {/* Precio extra */}
-                        {o.precioExtra > 0 ? (
-                          <span className="tabular-nums text-[14px] font-semibold text-ink-2">
-                            +{fmtMxn(o.precioExtra)}
+                          {/* Indicador radio/checkbox, en la esquina para no robarle ancho al nombre */}
+                          <span
+                            className={[
+                              "absolute right-1.5 top-1.5 flex h-4 w-4 items-center justify-center border-[1.5px] transition-colors",
+                              isUnica ? "rounded-full" : "rounded-[4px]",
+                              checked ? "border-ink bg-ink" : "border-line-strong bg-transparent",
+                            ].join(" ")}
+                            aria-hidden="true"
+                          >
+                            <IconCheck className={["h-2.5 w-2.5 text-white", checked ? "opacity-100" : "opacity-0"].join(" ")} />
                           </span>
-                        ) : (
-                          <span className="text-[12.5px] font-medium text-ink-3">Sin costo</span>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
 
-                {/* Banner de error inline cuando grupo es inválido */}
-                {!valido && esObligatoria && (
-                  <div className="mt-1 flex items-center gap-[7px] rounded border border-[#F3CFC4] bg-accent-soft px-3 py-[9px] text-[12.5px] font-medium text-danger">
-                    <IconWarning className="h-[15px] w-[15px] flex-shrink-0" />
-                    Debes elegir una opción.
+                          <span className="line-clamp-2 break-words font-medium leading-tight text-ink">
+                            {o.nombre}
+                            {o.agotada ? <span className="text-ink-3"> (agotado)</span> : null}
+                          </span>
+                          {o.precioExtra > 0 && (
+                            <span className="font-display font-semibold tabular-nums text-ink-2" style={{ fontSize: pxOpcion - 1 }}>
+                              +{fmtMxn(o.precioExtra)}
+                            </span>
+                          )}
+                        </button>
+                      );
+                    })}
                   </div>
-                )}
-              </div>
-            );
-          })}
-
-          {/* Nota de cocina */}
-          <div className="mt-2">
-            <label className="mb-3 block text-[14.5px] font-bold text-ink">
-              Nota para cocina{" "}
-              <span className="text-[12px] font-medium text-ink-3">(opcional)</span>
-            </label>
-            <textarea
-              value={nota}
-              onChange={(e) => setNota(e.target.value)}
-              placeholder="Ej. bien dorada, partir a la mitad, poca sal"
-              rows={2}
-              className="w-full resize-y rounded border border-line-strong px-[13px] py-[11px] font-sans text-[15px] text-ink outline-none placeholder:text-ink-3 focus:border-ink focus:shadow-[inset_0_0_0_1px_rgb(var(--ink))]"
-            />
+                </div>
+              );
+            })}
           </div>
         </div>
+
+        {/* Nota de cocina: fuera del área medida, siempre a la vista */}
+        <div className="flex-shrink-0 px-5 pb-3">
+          <label className="mb-1.5 block text-[13px] font-bold text-ink">
+            Nota para cocina <span className="text-[12px] font-medium text-ink-3">(opcional)</span>
+          </label>
+          <textarea
+            value={nota}
+            onChange={(e) => setNota(e.target.value)}
+            placeholder="Ej. bien dorada, partir a la mitad, poca sal"
+            rows={2}
+            className="w-full resize-none rounded border border-line-strong px-[13px] py-[9px] font-sans text-[14px] text-ink outline-none placeholder:text-ink-3 focus:border-ink focus:shadow-[inset_0_0_0_1px_rgb(var(--ink))]"
+          />
+        </div>
+
+        <Paginador compacto pagina={paginaActual} paginas={reparto.paginas.length} onIr={setPagina} />
 
         {/* Footer fijo */}
         <div className="flex-shrink-0 border-t border-line px-5 py-4">
