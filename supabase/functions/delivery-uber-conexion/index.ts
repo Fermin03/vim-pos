@@ -12,7 +12,7 @@ import { crearClienteUber } from "../_shared/delivery/uber.ts";
 import { cuerpoPosData, normalizarTiendasUber, transicionConexion, type EstadoConexion } from "../_shared/delivery/uber-activacion.ts";
 import { cambiarPrepTienda, consultarEstadoTienda, type ConexionTienda } from "../_shared/delivery/tienda-uber-acciones.ts";
 import type { DbMinima } from "../_shared/delivery/procesar-uber.ts";
-import { igualesEnTiempoConstante } from "../_shared/delivery/firma.ts";
+import { accionInternaPermitida, secretoInternoValido } from "../_shared/delivery/interno.ts";
 
 const admin = createClient(
   Deno.env.get("SUPABASE_URL")!,
@@ -85,7 +85,7 @@ Deno.serve(async (req) => {
   // identificar quién llama es lo primero, no un paso más dentro del cuerpo ya parseado.
   const internoRecibido = (req.headers.get("x-vim-interno") ?? "").trim();
   const esInterno = internoRecibido !== "";
-  if (esInterno && (INTERNO === "" || !igualesEnTiempoConstante(internoRecibido, INTERNO))) {
+  if (esInterno && !secretoInternoValido(internoRecibido, INTERNO)) {
     return json({ error: "INTERNO_INVALIDO" }, 401);
   }
 
@@ -119,7 +119,7 @@ Deno.serve(async (req) => {
     // retira el add-on de un tenant. El tenant sale de la CONEXIÓN, no de un JWT que aquí no
     // existe — eso es lo que acota el alcance: esta puerta no da acceso a otro tenant que el dueño
     // de la fila que se le pasa por id, y ninguna otra acción entra por ella.
-    if (body.accion !== "pausar") return json({ error: "ACCION_NO_PERMITIDA" }, 403);
+    if (!accionInternaPermitida(body.accion)) return json({ error: "ACCION_NO_PERMITIDA" }, 403);
     if (!body.conexion_id) return json({ error: "FALTAN_CAMPOS" }, 400);
     const { data: cxRaw } = await admin.from("delivery_conexiones").select("tenant_id").eq("id", body.conexion_id).maybeSingle();
     const cxTenantId = (cxRaw as { tenant_id: string } | null)?.tenant_id;
@@ -173,7 +173,7 @@ Deno.serve(async (req) => {
     return c && c.tenant_id === tenantId ? c : null;
   };
 
-  // Guard del módulo: conectar, pausar, reanudar y mandar la carta quedan cerrados sin el add-on
+  // Guard del módulo: todas las acciones salvo "desconectar" quedan cerradas sin el add-on
   // (se lee `efectivos`, no `permitidos` — el dueño también tuvo que encenderlo). Fail-closed: si
   // el RPC falla o no devuelve fila, `efectivos` queda `{}` y `!== true` bloquea igual.
   // "desconectar" queda AFUERA a propósito: esa acción solo quita capacidad, nunca la concede, así
