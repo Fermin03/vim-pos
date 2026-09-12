@@ -794,12 +794,54 @@ gh pr create --title "Las apps de delivery son un add-on" --body "…"
 ```
 Esperar `rls-tests` en verde antes de mezclar.
 
-- [ ] **Step 3: Producción, en este orden**
+- [ ] **Step 3: Antes de tocar nada — cuatro comprobaciones**
+
+La revisión final las echó en falta. Las tres primeras son de lectura y no cambian nada.
+
+**a) Dar de alta el secreto en los dos lados**, con el mismo valor:
+
+```bash
+supabase secrets set VIM_DELIVERY_INTERNO_SECRET=<valor>
+```
+y la misma variable en el entorno de servidor de `apps/platform` en Vercel. **Sin esto, retirar el
+add-on no avisa a Uber** y el panel lo reporta en `fallos`.
+
+**b) Confirmar que el gateway acepta la llamada del panel.** Es lo único de la rama que no se pudo
+verificar sin desplegar. Con la clave de servicio real y un `x-vim-interno` **deliberadamente
+incorrecto** (no toca Uber ni ninguna fila):
+
+```bash
+curl -i -X POST "$SUPABASE_URL/functions/v1/delivery-uber-conexion"   -H "apikey: $SR" -H "Authorization: Bearer $SR" -H "content-type: application/json"   -H "x-vim-interno: no-es-el-secreto"   -d '{"accion":"pausar","conexion_id":"00000000-0000-0000-0000-000000000000"}'
+```
+
+`401 {"error":"INTERNO_INVALIDO"}` = el gateway dejó pasar y corrió la función: **bien**.
+Un 401 con el vocabulario de Supabase (`{"code":401,"message":"Invalid JWT"}`, sin campo `error`)
+= lo frenó el gateway: **parar**, y decidir otro mecanismo. Repetirlo sin la cabecera `apikey`
+cierra la duda de si el gateway la exige. Luego, con el secreto bueno y un `conexion_id`
+inexistente → `404 CONEXION_NO_EXISTE` prueba el camino entero sin llamar a Uber.
+
+**c) Comprobar en producción que de verdad nadie usa delivery.** Todo el diseño se apoya en eso, y
+el spec §10 nombra "confundir *está en producción* con *está en uso*" como la trampa que ya mordió:
+
+```sql
+SELECT tenant_id, estado FROM delivery_conexiones WHERE estado IN ('ACTIVA','PAUSADA','ERROR');
+```
+
+Si sale alguien que no sea `vim-pruebas`, **parar**: la migración le quitaría el módulo y hay que
+darle el add-on antes.
+
+**d) Regenerar los tipos.** `pnpm db:types` no se pudo correr en el worktree (la base local tiene
+drift real). Hacerlo desde un entorno limpio; hoy no rompe nada porque el cliente del admin no usa
+el genérico, pero el archivo generado está desincronizado.
+
+- [ ] **Step 4: Producción, en este orden**
 
 1. `supabase migration list --linked` y `supabase db push`. **Ojo:** la migración retira delivery de todos los planes, así que en cuanto se aplique, **todo cliente queda sin el módulo hasta que se le dé el add-on**. Como hoy nadie usa delivery, no rompe a nadie; el de pruebas se autoconcede en la propia migración.
 2. Desplegar las tres Edge Functions: `delivery-webhook-uber`, `delivery-espejo`, `delivery-uber-conexion`.
 3. Mezclar el PR (despliega admin, POS y panel en Vercel).
 4. Instalador **0.4.69**, con la lista "Antes de empaquetar" del RUNBOOK.
+5. Después del `db push`, verificar contra un tenant real que `modulos_efectivos` sigue devolviendo
+   los otros cinco módulos como estaban: el smoke corre sobre la semilla de dev, no sobre producción.
 
 El orden no es el de la entrega de combos: aquí la migración puede ir primero porque **quita** permisos, no añade capacidades que la caja necesite entender. Una caja en 0.4.68 seguirá sondeando aunque el cliente no tenga el módulo, y el guard del espejo la manda a reposo: pesa lo mismo que hoy, no peor.
 
