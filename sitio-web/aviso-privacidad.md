@@ -75,7 +75,7 @@ Si consideras que no atendimos bien tu solicitud, puedes acudir al **INAI** ([ho
 
 Te lo decimos en claro porque la ley mexicana nos obliga a informarte y a dejarte oponerte, no a pedirte permiso antes: mientras no digas nada, la medición está encendida. Si prefieres no depender de este sitio, también puedes instalar el [complemento de inhabilitación de Google Analytics](https://tools.google.com/dlpage/gaoptout) o bloquear las cookies desde tu navegador. El sitio funciona exactamente igual sin ellas: no hay nada aquí que dependa de que te midamos.
 
-Google trata estos datos por cuenta nuestra y puede procesarlos fuera de México, donde los conserva como máximo **14 meses**. Además, el proveedor que aloja el sitio (Vercel) cuenta las visitas de forma agregada y sin cookies. Si algo de esto cambiara, se actualizaría este aviso antes.
+Google trata estos datos por cuenta nuestra y puede procesarlos fuera de México, donde los conserva **14 meses desde tu última visita** — si vuelves, la cuenta se reinicia. Además, el proveedor que aloja el sitio (Vercel) cuenta las visitas de forma agregada y sin cookies. Si algo de esto cambiara, se actualizaría este aviso antes.
 
 ## Seguridad
 
