@@ -146,6 +146,9 @@ const MENSAJES: Record<string, string> = {
   ACCION_INVALIDA: "Esa acción no aplica en el estado actual de la conexión.",
   UBER_ERROR: "Uber no respondió como se esperaba. Inténtalo de nuevo en unos minutos.",
   PREP_FUERA_DE_RANGO: "El tiempo de preparación debe estar entre 1 y 180 minutos.",
+  // Normalmente no se ve: sin el módulo, la sección entera desaparece del admin. Se ve con una
+  // pestaña abierta desde antes de que se apagara — y ahí el código en crudo no dice nada.
+  SIN_MODULO_DELIVERY: "Las apps de delivery están apagadas. Enciéndelas en Configuración → Apps de delivery.",
 };
 
 export function mensajeErrorIntegracion(e: unknown): string {

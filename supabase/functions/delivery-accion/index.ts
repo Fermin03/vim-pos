@@ -4,6 +4,7 @@ import { createClient } from "jsr:@supabase/supabase-js@2";
 import { corsHeaders } from "../_shared/cors.ts";
 import { crearClienteUber, motivoRechazoUber, segundosAReadyTime, type MotivoRechazo } from "../_shared/delivery/uber.ts";
 import { cambiarPrepTienda, consultarEstadoTienda, pausarTienda, reanudarTienda, type ConexionTienda } from "../_shared/delivery/tienda-uber-acciones.ts";
+import { ACCIONES_TIENDA, accionExigeModulo, moduloDeliveryActivo } from "../_shared/delivery/modulo.ts";
 import type { DbMinima } from "../_shared/delivery/procesar-uber.ts";
 
 const admin = createClient(
@@ -37,7 +38,6 @@ type Cuerpo = {
   // Acciones de tienda (spec A6): por sucursal, no por pedido.
   sucursal_id?: string; duracion?: string; minutos?: number; forzar?: boolean;
 };
-const ACCIONES_TIENDA = ["tienda_estado", "tienda_pausar", "tienda_reanudar", "tienda_prep"];
 const ESTADOS_CONECTADA = ["ACTIVA", "PAUSADA", "ERROR"];
 type Pedido = {
   id: string; tenant_id: string; sucursal_id: string; app: string; id_externo: string; estado: string; folio_corto: string | null;
@@ -85,6 +85,15 @@ Deno.serve(async (req) => {
   let body: Cuerpo;
   try { body = await req.json(); } catch { return json({ error: "BAD_JSON" }, 400); }
   if (!body.accion) return json({ error: "FALTAN_CAMPOS" }, 400);
+
+  // Guard del módulo (add-on de delivery): las acciones de TIENDA quedan cerradas sin el add-on
+  // encendido. Va aquí, antes de resolver la conexión, para que un POS que sigue sondeando —una
+  // pestaña vieja, una caja sin actualizar— no cueste ni una lectura de más ni una llamada a Uber.
+  // El porqué de que solo alcance a las de tienda está en `modulo.ts`.
+  if (accionExigeModulo(body.accion)) {
+    const { data: mod } = await admin.rpc("modulos_efectivos", { p_tenant: tenantId });
+    if (!moduloDeliveryActivo(mod)) return json({ error: "SIN_MODULO_DELIVERY" }, 403);
+  }
 
   // Acciones de tienda (spec A6): estado, pausar, reanudar y tiempo de preparación de la tienda de
   // Uber de una sucursal. Cualquier empleado con sesión en la caja puede: es operación.

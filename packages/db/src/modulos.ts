@@ -10,14 +10,14 @@ export type Modulo = {
   nombre: string;
   descripcion: string;
   /** Columna de configuracion_tenant que el dueño enciende, o null si no hay interruptor. */
-  interruptorDueno: "modulo_inventario_activo" | null;
-  /** true = el permiso lo decide el add-on CFDI, no un flag. */
+  interruptorDueno: "modulo_inventario_activo" | "modulo_delivery_activo" | null;
+  /** true = el permiso lo decide un add-on de pago, no un flag ni el plan. */
   porAddon: boolean;
 };
 
 export const MODULOS: readonly Modulo[] = [
   { codigo: "cfdi", nombre: "Facturación electrónica", descripcion: "Timbrado CFDI desde el admin y el portal de autofactura.", interruptorDueno: null, porAddon: true },
-  { codigo: "delivery_apps", nombre: "Apps de delivery", descripcion: "Uber Eats, DiDi y Rappi entrando a la caja.", interruptorDueno: null, porAddon: false },
+  { codigo: "delivery_apps", nombre: "Apps de delivery", descripcion: "Uber Eats, DiDi y Rappi entrando a la caja.", interruptorDueno: "modulo_delivery_activo", porAddon: true },
   { codigo: "kds", nombre: "Pantalla de cocina", descripcion: "Comandas en pantalla por área de preparación.", interruptorDueno: null, porAddon: false },
   { codigo: "recetas", nombre: "Recetas e inventario", descripcion: "Insumos, compras y descuento de inventario al vender.", interruptorDueno: "modulo_inventario_activo", porAddon: false },
   { codigo: "reservaciones", nombre: "Reservaciones", descripcion: "Mesas reservadas visibles desde la caja.", interruptorDueno: null, porAddon: false },

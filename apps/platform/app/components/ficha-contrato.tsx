@@ -119,7 +119,9 @@ export function FichaContrato({ d, planes, accion, busy }: { d: Detalle; planes:
                   <div className="min-w-0">
                     <div className="text-[13px] font-semibold">{a.nombre}</div>
                     <div className="text-[11.5px] text-ink-3">
-                      {fmtMxn(Number(a.precio_mensual_mxn))}/mes{contratado ? ` · activo desde ${contratado.fecha_inicio}` : ""}
+                      {/* Con fila contratada, el precio real es el que se grabó al contratar (puede ser
+                          $0.00 si el plan lo incluye) — no el de catálogo, que es solo el de lista. */}
+                      {fmtMxn(Number(contratado ? contratado.precio_mensual_mxn : a.precio_mensual_mxn))}/mes{contratado ? ` · activo desde ${contratado.fecha_inicio}` : ""}
                     </div>
                   </div>
                   <button

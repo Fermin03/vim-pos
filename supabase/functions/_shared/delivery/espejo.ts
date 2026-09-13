@@ -64,6 +64,25 @@ export function unirPedidos<T extends { id: string; recibido_at?: string | null 
 }
 
 /**
+ * Lo que se le contesta a una caja cuyo tenant no tiene el módulo encendido.
+ *
+ * Vacía y en reposo. Importa que exista como función y no como un objeto suelto en el handler
+ * porque es la única parte del corte que se puede probar: el handler no se prueba (toca la base).
+ * Y va ANTES de las tres consultas del handler, así que un tenant sin delivery no le cuesta a la
+ * base ni una lectura.
+ */
+export function respuestaSinModulo(cajaId: string, sucursalId: string) {
+  return {
+    ahora: new Date().toISOString(),
+    caja_id: cajaId,
+    sucursal_id: sucursalId,
+    conexiones: [] as unknown[],
+    pedidos: [] as unknown[],
+    siguiente_en_ms: REPOSO_MS,
+  };
+}
+
+/**
  * El cursor que mandó la caja, normalizado, o null si no es una fecha usable — y entonces se le
  * responde en frío. Nada del cuerpo llega a una consulta sin pasar por aquí: se valida en vez de
  * confiar, aunque el cliente sea nuestro y la consulta vaya parametrizada.

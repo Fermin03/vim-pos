@@ -28,7 +28,7 @@ export type DbMinima = {
 export type DepsProceso = { db: DbMinima; uber: ClienteUber; ahora: () => Date };
 export type ResultadoProceso = {
   pedido_id: string | null;
-  accion: "ACEPTADO_AUTO" | "PENDIENTE_CAJERO" | "PENDIENTE_ESCRITORIO" | "DUPLICADO" | "SIN_CONEXION" | "ERROR";
+  accion: "ACEPTADO_AUTO" | "PENDIENTE_CAJERO" | "PENDIENTE_ESCRITORIO" | "DUPLICADO" | "SIN_CONEXION" | "SIN_MODULO" | "ERROR";
   detalle?: string;
 };
 
@@ -86,6 +86,14 @@ export async function procesarNotificacionUber(deps: DepsProceso, evento: unknow
   const { data: cxData } = await deps.db.from("delivery_conexiones").select("*").eq("app", "APP_UBEREATS").eq("tienda_id_externo", storeId).maybeSingle();
   const cx = obj(cxData);
   if (!cx.id) return { pedido_id: null, accion: "SIN_CONEXION", detalle: `store ${storeId}` };
+
+  // El add-on manda: sin él no entra trabajo de este cliente. Va aquí, antes del duplicado y antes
+  // de pedirle la orden a Uber, para no hacer ni una llamada de red por un pedido que se descarta.
+  // Se lee `efectivos` (permitido por el plan Y encendido por el dueño), no `permitidos`.
+  const { data: mod } = await deps.db.rpc("modulos_efectivos", { p_tenant: String(cx.tenant_id) });
+  if (obj(obj(mod).efectivos).delivery_apps !== true) {
+    return { pedido_id: null, accion: "SIN_MODULO", detalle: `tenant ${cx.tenant_id} sin el módulo de delivery` };
+  }
 
   // 2) ¿Ya lo teníamos? (reintentos de Uber, eventos fuera de orden)
   const { data: existente } = await deps.db.from("delivery_pedidos").select("id, estado").eq("app", "APP_UBEREATS").eq("id_externo", orderId).maybeSingle();

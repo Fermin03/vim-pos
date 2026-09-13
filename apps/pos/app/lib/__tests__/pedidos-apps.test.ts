@@ -83,6 +83,7 @@ describe("tienda de Uber · helpers", () => {
   it("mensajes y opciones de pausa", () => {
     expect(mensajeErrorTienda("TIENDA_ESTRATEGIA_UBER")).toMatch(/Uber Eats Manager/);
     expect(mensajeErrorTienda("SIN_CONEXION_UBER")).toMatch(/no tiene conectada/);
+    expect(mensajeErrorTienda("SIN_MODULO_DELIVERY")).toMatch(/apagadas/);
     expect(mensajeErrorTienda("PREP_FUERA_DE_RANGO")).toMatch(/1 y 180/);
     expect(OPCIONES_PAUSA.map((o) => o.codigo)).toEqual(["30m", "1h", "dia"]);
   });

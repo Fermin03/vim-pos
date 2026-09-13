@@ -33,7 +33,10 @@ vercel deploy --prod --yes
 ## Env vars por app
 - **pos** y **admin**: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`.
 - **platform**: además `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` (server, secreta),
-  `PLATFORM_PROVISION_KEY`, `VIM_JWT_SECRET`, `ADMIN_APP_URL` (para impersonación).
+  `PLATFORM_PROVISION_KEY`, `VIM_JWT_SECRET`, `ADMIN_APP_URL` (para impersonación),
+  `VIM_DELIVERY_INTERNO_SECRET` (autentica el aviso a `delivery-uber-conexion` cuando platform
+  pausa Uber al retirarle el add-on de delivery a un tenant; tiene que coincidir con el secreto del
+  mismo nombre puesto en Supabase).
 - **Edge Functions** (Supabase, no Vercel): `VIM_CORS_ORIGINS`, `FACTURAPI_API_KEY`, etc.
 
 ## Auto-deploy en cada commit

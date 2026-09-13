@@ -12,9 +12,12 @@ const ORDEN = { order: { id: "ord-1", display_id: "2A003", state: "OFFERED", sta
 type Fila = Record<string, unknown>;
 
 /** BD de mentira: tablas en memoria y RPCs contadas. Imita solo las cadenas de supabase-js que usa el proceso. */
-function dbFalsa(opts: { conexion: Fila | null; turnoAbierto: boolean; productos: string[]; opciones?: string[]; espejo?: boolean }) {
+function dbFalsa(opts: { conexion: Fila | null; turnoAbierto: boolean; productos: string[]; opciones?: string[]; espejo?: boolean; moduloDelivery?: boolean }) {
   const pedidos: Fila[] = [];
   const rpcs: { fn: string; args: unknown }[] = [];
+  // Por defecto encendido: si cambiara a false, todas las pruebas de este archivo que no hablan
+  // de módulos quedarían en rojo por una razón que no vinieron a probar.
+  const moduloDelivery = opts.moduloDelivery ?? true;
   const catalogos: Record<string, string[]> = { productos: opts.productos, opciones_modificador: opts.opciones ?? [] };
   const consulta = (tabla: string, filtros: Fila) => {
     const resolver = () => {
@@ -39,7 +42,12 @@ function dbFalsa(opts: { conexion: Fila | null; turnoAbierto: boolean; productos
       insert: (fila: Fila) => ({ select: () => ({ single: async () => { const f = { id: `ped-${pedidos.length + 1}`, ...fila }; pedidos.push(f); return { data: f, error: null }; } }) }),
       update: (cambios: Fila) => ({ eq: async (_c: string, id: unknown) => { const p = pedidos.find((x) => x.id === id); if (p) Object.assign(p, cambios); return { error: null }; } }),
     }),
-    rpc: async (fn: string, args: unknown) => { rpcs.push({ fn, args }); return { data: fn === "sucursal_con_espejo" ? opts.espejo === true : "ticket-1", error: null }; },
+    rpc: async (fn: string, args: unknown) => {
+      rpcs.push({ fn, args });
+      if (fn === "sucursal_con_espejo") return { data: opts.espejo === true, error: null };
+      if (fn === "modulos_efectivos") return { data: { efectivos: { delivery_apps: moduloDelivery } }, error: null };
+      return { data: "ticket-1", error: null };
+    },
   };
   return { db: db as unknown as DepsProceso["db"], pedidos, rpcs };
 }
@@ -62,7 +70,9 @@ test("con conexión activa, auto_aceptar y turno abierto: crea el pedido, el tic
   const r = await procesarNotificacionUber({ db: falsa.db, uber: uberFalso({ aceptar: (id) => aceptadas.push(id) }), ahora: () => new Date("2026-09-02T10:00:00Z") }, evento);
   assert.equal(r.accion, "ACEPTADO_AUTO");
   assert.deepEqual(aceptadas, ["ord-1"]);
-  assert.equal(falsa.rpcs.filter((x) => x.fn !== "sucursal_con_espejo")[0]?.fn, "crear_ticket_desde_app");
+  // "modulos_efectivos" y "sucursal_con_espejo" son chequeos previos que corren siempre (Task 2 /
+  // spec 2026-09-03); lo que importa aquí es cuál es el primer RPC de negocio.
+  assert.equal(falsa.rpcs.filter((x) => x.fn !== "sucursal_con_espejo" && x.fn !== "modulos_efectivos")[0]?.fn, "crear_ticket_desde_app");
   assert.equal(falsa.pedidos[0].estado, "RECIBIDO");
   assert.equal(falsa.pedidos[0].vence_aceptacion, "2026-09-02T10:11:00.000Z");
   assert.equal((falsa.pedidos[0].items as { producto_id: string }[])[0].producto_id, PROD);
@@ -74,7 +84,9 @@ test("sin turno abierto: el pedido queda RECIBIDO para el cajero y NO se acepta 
   const r = await procesarNotificacionUber({ db: falsa.db, uber: uberFalso({ aceptar: () => { acepto = true; } }), ahora: () => new Date() }, evento);
   assert.equal(r.accion, "PENDIENTE_CAJERO");
   assert.equal(acepto, false);
-  assert.equal(falsa.rpcs.filter((x) => x.fn !== "sucursal_con_espejo").length, 0);
+  // Igual que arriba: sin turno no debe llamarse ningún RPC de negocio (crear ticket, transición),
+  // solo los chequeos previos incondicionales.
+  assert.equal(falsa.rpcs.filter((x) => x.fn !== "sucursal_con_espejo" && x.fn !== "modulos_efectivos").length, 0);
   assert.equal(falsa.pedidos.length, 1);
 });
 
@@ -99,6 +111,22 @@ test("el mismo pedido dos veces: DUPLICADO sin volver a insertar", async () => {
   await procesarNotificacionUber(deps, evento);
   const r = await procesarNotificacionUber(deps, evento);
   assert.equal(r.accion, "DUPLICADO");
+  assert.equal(falsa.pedidos.length, 1);
+});
+
+// --- Add-on de delivery (ADR 0014 / Task 1: modulos_efectivos) --------------------------------
+test("un pedido de un tenant sin el módulo no se procesa ni se guarda", async () => {
+  const falsa = dbFalsa({ conexion: conexionActiva, turnoAbierto: true, productos: [PROD], moduloDelivery: false });
+  const r = await procesarNotificacionUber({ db: falsa.db, uber: uberFalso(), ahora: () => new Date() }, evento);
+  assert.equal(r.accion, "SIN_MODULO");
+  assert.equal(r.pedido_id, null);
+  assert.equal(falsa.pedidos.length, 0); // lo que más importa: no se escribió nada
+});
+
+test("con el módulo, el mismo pedido entra como siempre", async () => {
+  const falsa = dbFalsa({ conexion: conexionActiva, turnoAbierto: true, productos: [PROD], moduloDelivery: true });
+  const r = await procesarNotificacionUber({ db: falsa.db, uber: uberFalso(), ahora: () => new Date() }, evento);
+  assert.notEqual(r.accion, "SIN_MODULO");
   assert.equal(falsa.pedidos.length, 1);
 });
 

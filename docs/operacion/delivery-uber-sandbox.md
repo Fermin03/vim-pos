@@ -266,6 +266,318 @@ cobrar.
 aplica al primero que las active — y entonces hay que comprobar que su caja está de verdad en
 0.4.68, porque el actualizador avisa y ofrece, no instala solo.
 
+## 4b. Guion — los tres estados del add-on de delivery
+
+Prueba de la entrega "delivery como add-on" (PR #12, migración 0113). Se corre con el tenant de
+pruebas **`d3462bb3-198b-4cc3-8105-7060d6998478`** (`vim-pruebas`) y la tienda sandbox ya
+conectada. **Requisito de partida: la conexión tiene que estar en `ACTIVA`** — si está en
+`PENDIENTE` o `ERROR` no hay nada que pausar y el estado 1 no prueba lo que dice probar.
+
+### Por qué va en tres olas, y no de corrido
+
+La interfaz (admin, POS, panel) se despliega desde `main`: hasta que el PR no se mezcle, en
+producción sigue la versión anterior. El backend, en cambio, se despliega a mano y puede ir antes.
+Así que la prueba se parte por donde se parte el despliegue:
+
+| Ola | Cuándo | Qué se prueba |
+|---|---|---|
+| **A** | tras aplicar 0113 y desplegar las 3 functions, **antes** de mezclar | los guards: webhook, espejo y cadencia. Los estados se cambian por SQL |
+| **B** | tras mezclar el PR | el interruptor del dueño, la sección que desaparece, el POS, y el aviso a Uber desde el panel |
+| **C** | con la caja en **0.4.69** | que el espejo se **detenga** de verdad, no que baje el ritmo |
+
+Sin la ola C, una caja en 0.4.68 sigue sondeando: obedece el `siguiente_en_ms` que le manda la nube
+y se va a 5 minutos, pero no para. Eso **también es un resultado válido** y hay que verlo: es lo que
+le va a pasar a todo el parque hasta que se actualice.
+
+### Paso 0 — la línea base, antes de tocar nada
+
+```sql
+SELECT modulos_efectivos('d3462bb3-198b-4cc3-8105-7060d6998478');
+```
+
+Tiene que traer `delivery_apps: true` en **las dos** llaves (`permitidos` y `efectivos`): así lo
+deja la migración. Si `permitidos` sale en `false`, el `INSERT` de `tenant_addons` de la 0113 no
+corrió —¿la migración se saltó en silencio?— y no tiene sentido seguir.
+
+---
+
+### Estado 3 — encendido: **nada cambia** (ola A)
+
+La no-regresión que más importa. Esta entrega no debe cambiarle nada a quien sí paga.
+
+- [ ] Hacer un pedido en la tienda sandbox, como en la prueba del 11 sep.
+- [ ] El ticket entra en la caja, con su comanda. Cuadra el total.
+- [ ] En el log de la caja (`%APPDATA%\vim-pos-desktop\vim-pos.log`) el espejo sigue a su ritmo
+      normal: 30 s con conexión viva y nada corriendo, 10 s mientras hay una ventana de aceptación.
+
+---
+
+### Estado 2 — el dueño lo apaga (olas A, B y C)
+
+**Apagarlo.** En la ola A por SQL, que es exactamente lo que escribe el interruptor del admin:
+
+```sql
+UPDATE configuracion_tenant SET modulo_delivery_activo = false
+ WHERE tenant_id = 'd3462bb3-198b-4cc3-8105-7060d6998478';
+SELECT modulos_efectivos('d3462bb3-198b-4cc3-8105-7060d6998478');
+-- permitidos.delivery_apps = true   ·   efectivos.delivery_apps = false
+```
+
+En la ola B se hace desde el admin: **Configuración → Apps de delivery → el interruptor**. Pide
+confirmación al apagar. El encabezado pasa a "Apps de delivery · Apagado" y el asistente de Uber
+desaparece de la pantalla; la **sección sigue en el menú**, que es la diferencia con el estado 1.
+
+- [ ] **La caja deja de sondear.** Hasta 10 minutos de espera: el módulo viaja en el latido, y el
+      latido va cada 10 min. En 0.4.69 el log lo dice literal:
+      `· [espejo] detenido (el cliente apagó el módulo de apps de delivery)`.
+      En 0.4.68 no aparece nada: el espejo sigue, pero la nube le contesta `siguiente_en_ms:
+      300000` y pasa a preguntar cada 5 minutos. También sirve mirar `directivas.json` en la misma
+      carpeta: `modulos.delivery_apps` tiene que estar en `false`.
+- [ ] **El POS esconde la pantalla de pedidos de apps** (ola B). Si el cajero estaba parado en ella,
+      se le saca; no basta con no pintar el botón.
+- [ ] **Un pedido que llegue se descarta antes de pedírselo a Uber.** Hacer otro pedido sandbox y:
+
+```sql
+SELECT created_at, tipo, respuesta->>'accion' AS accion, respuesta->>'detalle' AS detalle
+  FROM delivery_eventos
+ WHERE direccion = 'ENTRADA' AND app = 'APP_UBEREATS'
+ ORDER BY created_at DESC LIMIT 5;
+```
+
+Se espera `accion = SIN_MODULO`. **Ojo:** esa fila lleva `tenant_id` nulo —no hay pedido al que
+enrutarla— así que solo se ve desde el editor SQL, nunca desde el admin del cliente.
+
+- [ ] Y que **no** haya fila de pedido:
+
+```sql
+SELECT count(*) FROM delivery_pedidos WHERE app = 'APP_UBEREATS' AND id_externo = '<order id>';
+-- 0
+```
+
+---
+
+### Estado 1 — VIM retira el add-on (olas A y B)
+
+**En la ola B se hace desde `/platform` → el cliente → Add-ons → dar de baja "Apps de delivery"**,
+que es el camino de verdad: es el único que le avisa a Uber. En la ola A, por SQL, se prueba todo
+menos ese aviso:
+
+```sql
+UPDATE tenant_addons SET activo = false, fecha_fin = CURRENT_DATE
+ WHERE tenant_id = 'd3462bb3-198b-4cc3-8105-7060d6998478'
+   AND addon_id = (SELECT id FROM addons WHERE codigo = 'DELIVERY') AND activo;
+SELECT modulos_efectivos('d3462bb3-198b-4cc3-8105-7060d6998478');
+-- las DOS llaves en false
+```
+
+- [ ] **La sección desaparece del admin**, del menú incluido (ola B). No queda interruptor: el
+      dueño no puede devolverse lo que no le concedieron.
+- [ ] **Las acciones de `delivery-uber-conexion` devuelven 403 `SIN_MODULO_DELIVERY`.** Con la
+      sección escondida no hay botón que pulsar, así que la prueba directa es a mano: sacar el
+      token de la sesión del dueño (devtools del admin → Application → Local Storage) y
+
+```bash
+curl -i -X POST "$SUPABASE_URL/functions/v1/delivery-uber-conexion" \
+  -H "apikey: $ANON" -H "Authorization: Bearer $TOKEN_DUENO" -H "content-type: application/json" \
+  -d '{"accion":"comprobar_tienda","conexion_id":"<uuid>"}'
+```
+
+`desconectar` es la excepción a propósito: sigue funcionando sin módulo, porque solo quita.
+
+- [ ] **Uber recibió el aviso** (ola B, y solo si el secreto está dado de alta en los dos lados).
+      La respuesta del panel trae `{pausadas: 1, fallos: []}`; un `fallos` con algo dentro es el
+      síntoma de que falta `VIM_DELIVERY_INTERNO_SECRET` en Vercel o en Supabase. Del lado de la
+      base:
+
+```sql
+SELECT estado FROM delivery_conexiones WHERE tenant_id = 'd3462bb3-198b-4cc3-8105-7060d6998478';
+-- PAUSADA
+
+SELECT created_at, tipo, procesado, respuesta
+  FROM delivery_eventos
+ WHERE direccion = 'SALIDA' AND tipo = 'pos_data_actualizar'
+ ORDER BY created_at DESC LIMIT 3;
+-- respuesta: {"integration_enabled": false}
+```
+
+Y en el dashboard de Uber, la tienda deja de aceptar pedidos.
+
+---
+
+### Estado 3 otra vez — devolverlo (olas A y B)
+
+Es lo que va a pasar con un cliente que se atrasa un mes y luego paga. **Son dos gestos, no uno**:
+dar de alta el add-on **y** encender el interruptor. Y la conexión se quedó en `PAUSADA` — hay que
+reanudarla desde el admin para que Uber vuelva a mandar pedidos.
+
+- [ ] Add-on de alta desde `/platform`. El precio pre-llenado depende del plan del tenant:
+      **0.00 si es Negocio o Cadena**, 100.00 si es Esencial. Comprobar de paso que la ficha de
+      contrato enseña el precio pactado, no el de lista.
+- [ ] Interruptor encendido desde el admin.
+- [ ] Reanudar la conexión y hacer un último pedido: el ticket entra como en el estado 3 inicial.
+
+### Qué anotar
+
+Fecha, versión de la caja en cada ola, y para cada estado qué se vio y qué no. Lo que **no** se
+pudo comprobar importa tanto como lo que sí: el defecto de los modificadores a $0.00 de la entrega
+anterior sobrevivió porque una prueba dijo "pasa" sobre una fixture irreal.
+
+### Resultado de la ola A — 13 sep 2026
+
+Migración **0113 aplicada** (`supabase db push --linked`, una sola migración, dry-run antes) y las
+tres Edge Functions desplegadas: `delivery-webhook-uber`, `delivery-espejo`,
+`delivery-uber-conexion`.
+
+**La comprobación previa salió limpia.** En toda la base hay **una sola** fila en
+`delivery_conexiones` —la tienda sandbox del tenant de pruebas, `ACTIVA`— y cuatro
+`delivery_pedidos` históricos, todos del mismo tenant y todos `CANCELADO`. Ningún cliente real
+usa delivery, así que retirarle el módulo a todo el mundo no rompió a nadie.
+
+**Después de la migración:** los nueve planes se quedaron con `kds, recetas, promociones,
+reservaciones` y ninguno concede ya `delivery_apps`; cero filas en `tenant_feature_flags` con ese
+código; y `modulos_efectivos` de los cuatro tenants devuelve los otros cinco módulos igual que
+antes. `vim-pruebas` quedó con las dos capas en `true`, como manda la migración.
+
+> Observación que no es de esta entrega: `recetas` sale `permitidos: true` pero `efectivos: false`
+> en **todos** los tenants, Knock-Out incluido, porque su interruptor es
+> `modulo_inventario_activo` (ADR 0013) y nadie lo tiene encendido. Es el comportamiento de 0103,
+> no una regresión de la 0113 — pero conviene saberlo antes de que alguien pregunte por qué el POS
+> no enseña recetas.
+
+#### El gateway sí deja pasar la llamada del panel
+
+Era lo único de la rama que no se podía verificar sin desplegar. Con un `x-vim-interno`
+deliberadamente incorrecto y un `conexion_id` inexistente —sin tocar Uber ni ninguna fila— las tres
+variantes contestaron **`401 {"error":"INTERNO_INVALIDO"}`**: vocabulario nuestro, o sea que el
+gateway dejó pasar y corrió el código de la función.
+
+De paso se cerró la duda que quedaba anotada en el código: el gateway acepta **`apikey` sola**, sin
+`Authorization`. El panel manda las dos, así que no hay nada que cambiar; pero la suposición de que
+`Authorization` era obligatoria era falsa.
+
+Funciona igual con el secreto sin dar de alta: sin `VIM_DELIVERY_INTERNO_SECRET` configurado,
+cualquier cabecera es inválida por diseño (`secretoInternoValido` exige que el configurado no sea
+vacío).
+
+#### El espejo: de 30 s a 5 minutos, con una caja 0.4.68
+
+La prueba de verdad de esta entrega, medida sobre `cajas.espejo_apps_at` de la caja de pruebas
+(versión **0.4.68**, sin desplegar nada en el escritorio):
+
+| Momento | Intervalos observados |
+|---|---|
+| Estado 3 (encendido) | 31, 29, 28, 32 s → **NORMAL** |
+| Estado 2 (el dueño lo apaga) | **323 s** → **REPOSO** |
+| Estado 3 otra vez | 33, 34, 30, 30, 32, 30, 31, 33 s → **NORMAL** |
+
+El cambio es **inmediato**, no espera al latido: el guard vive en la Edge Function y se evalúa en
+cada llamada; la caja solo obedece el `siguiente_en_ms` que recibe. Diez veces menos carga sin
+tocar el parque. El cero llega con 0.4.69, que además detiene el espejo.
+
+Y el estado 1 (sin add-on) deja las **dos** llaves en `false`, como debe.
+
+#### El pedido con el módulo apagado (13 sep 2026, 17:23 UTC)
+
+Pedido real en la tienda sandbox con `efectivos.delivery_apps = false` (add-on concedido,
+interruptor del dueño apagado). Orden `1546d6e0-e81a-44cd-820a-ad9d82f5b592`.
+
+```
+delivery_eventos #174   orders.notification
+  firma_valida = true    procesado = true
+  respuesta.accion  = SIN_MODULO
+  respuesta.detalle = tenant d3462bb3-… sin el módulo de delivery
+  tenant_id = NULL   conexion_id = NULL   http_status = NULL
+```
+
+Las tres cosas que se querían ver:
+
+1. **El webhook sigue recibiendo y verificando la firma.** El módulo no le quita a Uber su acuse:
+   se contesta 200 y el evento queda registrado. Un webhook que fallara haría que Uber reintentara
+   y acabara marcando la integración como caída.
+2. **`accion = SIN_MODULO`**, con el tenant nombrado en el detalle.
+3. **Ninguna fila nueva en `delivery_pedidos`**: siguen siendo las cuatro de siempre.
+
+Y una cuarta, que es la que justifica dónde está puesto el guard: **ese pedido tiene un solo evento
+en toda la tabla, el de entrada**. Ni una llamada de salida a Uber — el guard corre antes de
+`obtenerOrden()`, así que un tenant sin módulo no cuesta ni un viaje de red.
+
+La conexión se quedó en `ACTIVA`: apagar el interruptor **no** pausa la tienda en Uber. Es a
+propósito — pausar es cosa del panel cuando VIM retira el add-on, no del dueño que apaga su propio
+módulo un rato. El efecto visible para el cliente final es que el pedido se queda sin aceptar y
+expira por la ventana de ~11 min de Uber.
+
+El `tenant_id` nulo del evento confirma lo que advierte el guion: esa fila **solo se ve desde el
+editor SQL**, nunca desde el admin del cliente, porque no hay pedido al que enrutarla.
+
+#### El 403, y la cuarta función que faltaba (13 sep 2026)
+
+**El 403 de `delivery-uber-conexion`, probado con la sesión de un dueño.** Con el módulo apagado,
+"Comprobar" en el admin devolvió el error genérico *"Algo salió mal con la conexión"* — el admin
+desplegado no tiene traducción para `SIN_MODULO_DELIVERY` y cae al mensaje por defecto. Del lado de
+la base, **ningún evento**: ni el `verificar` que esa acción escribe siempre, ni la llamada a Uber
+que lo precede. El guard cortó antes de hablar con Uber. (En la rama ya hay mensaje para ese código,
+en el admin y en el POS: sin él, una pestaña abierta desde antes solo vería el código en crudo.)
+
+**Y buscando eso apareció un agujero.** Doce segundos después de apagar el módulo entró un evento
+`tienda_estado`, y otro al minuto siguiente, y otro. No era el "Comprobar": es la pantalla "Pedidos
+de apps" del POS, que pregunta el estado de la tienda **cada 60 s** (`REFRESCO_TIENDA_MS`) contra
+`delivery-accion` — **una cuarta función que el spec no guardaba**. 56 de los últimos 60 eventos de
+salida eran ese sondeo, y siguieron entrando con el módulo apagado.
+
+Arreglado en la misma rama: `delivery-accion` exige el módulo para sus cuatro acciones de TIENDA
+(`tienda_estado`, `tienda_pausar`, `tienda_reanudar`, `tienda_prep`) y deja pasar las de PEDIDO —
+un cliente al que se le retira el módulo con pedidos vivos tiene que poder despachar comida ya
+pagada, y nuevos no entran porque el webhook los descarta antes.
+
+**Verificado en producción con la función redesplegada**, y con control para descartar que la
+pantalla simplemente se hubiera cerrado:
+
+| Ventana | `tienda_estado` |
+|---|---|
+| Antes (módulo encendido) | 17:28:15, 17:29:16, 17:31:16, 17:33:16, 17:35:57 |
+| Módulo apagado 17:37:38 → 17:41:54 | **ninguno en 4 minutos** |
+| Encendido otra vez a las 17:41:54 | 17:42:33 (a los 39 s), 17:44:33 |
+
+El sondeo nunca paró: el POS siguió preguntando y se llevó 403 sin que la llamada saliera a Uber.
+
+#### El secreto interno, dado de alta y comprobado (13 sep 2026)
+
+`VIM_DELIVERY_INTERNO_SECRET`: 32 bytes aleatorios en hex, el mismo valor en Supabase (Edge
+Functions → Secrets) y en Vercel (proyecto `platform`, los tres entornos). Queda además en
+`supabase/functions/.env`, que está en `.gitignore`, para desarrollo local.
+
+**Los dos caminos automáticos estaban cerrados**, y conviene saberlo para la próxima:
+`supabase secrets set` —y también `secrets list`— responde *"Access token not provided"* aunque
+`db push` y `functions deploy` funcionen en la misma máquina y el mismo minuto; y el token que el
+CLI de Vercel dejó en `auth.json` estaba **caducado** (`invalidToken` de la API). Los dos altas se
+hacen desde el dashboard.
+
+Comprobado contra la función desplegada, **sin llamar a Uber ni tocar ninguna fila** (el
+`conexion_id` es todo ceros):
+
+| Llamada | Respuesta |
+|---|---|
+| secreto incorrecto (control) | `401 INTERNO_INVALIDO` |
+| secreto bueno, conexión inexistente | **`404 CONEXION_NO_EXISTE`** |
+| secreto bueno, acción `desconectar` | `403 ACCION_NO_PERMITIDA` |
+
+La segunda es la que importa: llegar hasta "esa conexión no existe" significa que la llamada pasó
+el gateway, pasó la puerta interna y llegó a resolver el tenant desde la fila. La tercera confirma
+el alcance: el secreto autentica al llamador, no le autoriza cualquier acción — por el camino
+interno solo entra `pausar`.
+
+**Lo que todavía no está probado es el lado de Vercel.** El único código que lee esa variable es el
+de retirar el add-on, así que se comprueba en la ola B: la respuesta del panel tiene que traer
+`{pausadas: 1, fallos: []}`. Y una variable nueva en Vercel no aplica hasta el siguiente
+despliegue.
+
+#### Lo que la ola A no puede probar
+
+- ~~El webhook descartando con `SIN_MODULO`~~: **probado**, ver arriba.
+- ~~El 403 `SIN_MODULO_DELIVERY`~~: **probado** con la sesión de un dueño, ver arriba.
+- **Toda la interfaz** (el interruptor, la sección que desaparece, el POS) y **el aviso a Uber**:
+  son la ola B, y el aviso necesita además el secreto dado de alta en Supabase y en Vercel.
+
 ## 5. Cuando algo falla
 
 - `delivery_eventos.error` dice qué pasó al procesar (`UBER_TOKEN_401` = credenciales o entorno

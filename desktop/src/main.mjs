@@ -19,6 +19,7 @@ import { crearCicloSync } from "./sync-ciclo.mjs";
 import { crearSondeoCatalogo } from "./sondeo-catalogo.mjs";
 import { crearAlmacenDirectivas, estadoDeVersion } from "./directivas.mjs";
 import { crearEspejo } from "./delivery-espejo.mjs";
+import { debeSondearApps } from "./delivery-espejo-modulo.mjs";
 import { registrarErrorLocal, subirErrores } from "./sync-errores.mjs";
 import { buscarActualizacion, descargarInstalador } from "./updater.mjs";
 
@@ -530,7 +531,12 @@ async function latir() {
   });
   if (!r.ok) throw new Error(`caja-latido HTTP ${r.status}`);
   const j = await r.json();
-  if (j?.directivas) directivas.guardar(j.directivas);
+  if (j?.directivas) {
+    directivas.guardar(j.directivas);
+    // El módulo de apps de delivery puede haberse encendido o apagado desde el último latido:
+    // reacciona en caliente, sin esperar a un reinicio de la caja.
+    sincronizarEspejoConModulo(directivas.leer().directivas);
+  }
   // Se limpian DESPUÉS de que la nube confirmó: si el latido falla, se reintentan en el siguiente.
   if (vistos.length > 0) directivas.limpiarVistos(vistos);
 
@@ -789,11 +795,42 @@ function iniciarSync() {
   arranqueSondeo?.unref?.();
   if (backend) backend.nube = tokenDeNubeCacheado;
   const cajaId = cajaDeEstaCaja();
-  if (backend?.pool && cajaId && !espejo) {
+  // `efectivos` es lo que manda el latido (resolver_directivas no manda `permitidos`, eso es
+  // cosa del admin). Sin latido guardado todavía, `directivas.leer()` devuelve DIRECTIVAS_VACIAS
+  // (`modulos: {}`) y `debeSondearApps` responde `false`: el espejo NO arranca "por si acaso" al
+  // primer arranque de la caja, que es justo el sondeo que esta entrega vino a quitar. El primer
+  // latido decide, y de ahí en adelante manda `sincronizarEspejoConModulo`.
+  const { directivas: d } = directivas.leer();
+  if (backend?.pool && cajaId && debeSondearApps(d) && !espejo) {
     espejo = crearEspejo({ pool: backend.pool, nube: tokenDeNubeCacheado, cajaId, log: (m) => console.log("· [espejo]", m) });
     espejo.iniciar();
   } else if (!cajaId) {
     console.log("· [espejo] omitido (la caja no está vinculada a la nube)");
+  } else if (!debeSondearApps(d)) {
+    console.log("· [espejo] omitido (el cliente no tiene el módulo de apps de delivery)");
+  }
+}
+
+/**
+ * Reacciona a un cambio del módulo de apps de delivery tras un latido (ADR 0014, add-on de
+ * delivery): si se apagó y hay espejo vivo, lo detiene; si se encendió y no lo hay, lo arranca.
+ * Sin esto, apagar el módulo desde el panel no tendría efecto hasta que alguien reiniciara la
+ * caja, y encenderlo tendría que esperar lo mismo — cuando lo que promete la entrega es que el
+ * latido, cada 10 minutos, basta.
+ */
+function sincronizarEspejoConModulo(d) {
+  const activo = debeSondearApps(d);
+  if (!activo && espejo) {
+    try { espejo.detener(); } catch { /* */ }
+    espejo = null;
+    console.log("· [espejo] detenido (el cliente apagó el módulo de apps de delivery)");
+  } else if (activo && !espejo) {
+    const cajaId = cajaDeEstaCaja();
+    if (backend?.pool && cajaId) {
+      espejo = crearEspejo({ pool: backend.pool, nube: tokenDeNubeCacheado, cajaId, log: (m) => console.log("· [espejo]", m) });
+      espejo.iniciar();
+      console.log("· [espejo] iniciado (el cliente encendió el módulo de apps de delivery)");
+    }
   }
 }
 
