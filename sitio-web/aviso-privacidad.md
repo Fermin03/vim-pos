@@ -6,7 +6,7 @@
 
 Qué datos te pedimos, para qué los usamos y cómo pedirnos que los borremos. En corto: te pedimos lo mínimo para poder contestarte, y no los vendemos ni los compartimos con nadie que quiera venderte algo.
 
-Última actualización: 6 de septiembre de 2026.
+Última actualización: 13 de septiembre de 2026.
 
 ## Quién es responsable de tus datos
 
@@ -67,11 +67,15 @@ Si consideras que no atendimos bien tu solicitud, puedes acudir al **INAI** ([ho
 
 **Qué se mide:** qué páginas ves, desde qué país entras, en qué tipo de dispositivo, y las cuatro acciones que nos dicen si el sitio sirve para algo — si se hizo clic en WhatsApp, si se envió el formulario de demostración, si se consultó el precio anual y qué pregunta frecuente se abrió. Nada de eso identifica a una persona.
 
-**Qué NO hacemos:** no ponemos cookies de publicidad ni de remarketing, no te seguimos a otras páginas y no vendemos ni cedemos tu visita a nadie. Tampoco cargamos tipografías de terceros: todas viven en este mismo sitio.
+**Qué NO hacemos:** no ponemos cookies de publicidad ni de remarketing, no te seguimos a otras páginas y no vendemos ni cedemos tu visita a nadie. Tampoco cargamos tipografías de terceros: todas viven en este mismo sitio. En la configuración de Google que usa este sitio, el consentimiento para publicidad está **denegado** desde que carga la página y ahí se queda; si algún día anunciamos en Google Ads, te lo preguntaremos aparte y este aviso lo dirá antes.
 
-Google trata estos datos por cuenta nuestra y puede procesarlos fuera de México. Si prefieres quedarte fuera de la medición, puedes instalar el [complemento de inhabilitación de Google Analytics](https://tools.google.com/dlpage/gaoptout) o bloquear las cookies de este sitio desde tu navegador. El sitio funciona exactamente igual sin ellas: no hay nada aquí que dependa de que te midamos.
+**Cómo decides tú.** La primera vez que entras aparece abajo un aviso con dos botones. Si pulsas **«No me midas»**, Google Analytics deja de medirte en ese mismo instante, se borran las cookies que hubiera puesto y no se vuelve a intentar. Si pulsas **«Entendido»**, sigue midiendo como se describe arriba.
 
-Además, el proveedor que aloja el sitio (Vercel) cuenta las visitas de forma agregada y sin cookies. Si algo de esto cambiara, se actualizaría este aviso antes.
+**Puedes cambiar de opinión cuando quieras:** el enlace **«Cookies»** del pie de cualquier página vuelve a abrir ese aviso. Tu decisión se guarda en tu propio navegador (en el almacenamiento local, bajo la clave **vim-cookies**), no en un servidor nuestro — por eso vale para el navegador y el dispositivo donde la tomaste, y no para los demás.
+
+Te lo decimos en claro porque la ley mexicana nos obliga a informarte y a dejarte oponerte, no a pedirte permiso antes: mientras no digas nada, la medición está encendida. Si prefieres no depender de este sitio, también puedes instalar el [complemento de inhabilitación de Google Analytics](https://tools.google.com/dlpage/gaoptout) o bloquear las cookies desde tu navegador. El sitio funciona exactamente igual sin ellas: no hay nada aquí que dependa de que te midamos.
+
+Google trata estos datos por cuenta nuestra y puede procesarlos fuera de México, donde los conserva **14 meses desde tu última visita** — si vuelves, la cuenta se reinicia. Además, el proveedor que aloja el sitio (Vercel) cuenta las visitas de forma agregada y sin cookies. Si algo de esto cambiara, se actualizaría este aviso antes.
 
 ## Seguridad
 

@@ -39,7 +39,13 @@
 <link rel="manifest" href="site.webmanifest">
 <meta name="theme-color" content="#0078C9">
 
-<link rel="stylesheet" href="assets/css/vim.css?v=14">
+<link rel="stylesheet" href="assets/css/vim.css?v=16">
+<!-- Consentimiento de cookies. Va ANTES que gtm.js y el orden NO es
+     cosmético: los dos llevan `defer`, que respeta el orden del documento, y
+     Consent Mode descarta un estado por defecto que llegue después de que el
+     contenedor haya cargado. Invertir estas dos líneas hace que Google
+     Analytics mida la primera visita con los ajustes de fábrica. -->
+<script src="assets/js/consentimiento.js?v=1" defer></script>
 <!-- Google Tag Manager (contenedor GTM-PRTJDNQ2). El fragmento en línea que da
      Google no cabe aquí: la política de seguridad del sitio prohíbe los scripts
      en línea, y uno bloqueado no avisa — la analítica parecería instalada y no
@@ -203,6 +209,7 @@
       <span class="fila" style="gap:var(--sp-5)">
         <a href="/aviso-privacidad" style="color:inherit">Aviso de privacidad</a>
         <a href="/terminos" style="color:inherit">Términos</a>
+        <button type="button" class="pie-cookies" data-cookies-abrir hidden>Cookies</button>
       </span>
     </div>
   </div>

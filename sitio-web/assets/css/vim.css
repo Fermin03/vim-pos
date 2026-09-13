@@ -1223,3 +1223,106 @@ body[data-menu-abierto="true"] { overflow: hidden; }
 @media (prefers-reduced-motion: reduce) {
   .punto::before { transition: none; }
 }
+
+/* Un enlace con almohadilla (#cookies en el aviso de privacidad, por ejemplo)
+   deja su destino pegado al borde de arriba, que es justo donde está el
+   encabezado fijo de 64 px: la persona aterriza en el párrafo equivocado. Esto
+   le reserva el hueco del encabezado y un respiro. */
+:target { scroll-margin-top: calc(64px + var(--sp-5)); }
+
+/* ═══ Aviso de cookies ══════════════════════════════════════════════════════
+   Tarjeta abajo a la izquierda, no una franja que cruce la pantalla. Una
+   franja tapa el pie en móvil y obliga a resolverla para seguir leyendo; la
+   tarjeta se queda a un lado y se puede ignorar mientras se lee la página,
+   que es lo que casi todo el mundo va a hacer.
+
+   El marcado lo construye assets/js/consentimiento.js, no el HTML. El motivo
+   está explicado en ese archivo: si el script no carga, Google Analytics
+   tampoco arranca, así que un banner que sobreviviera sin él estaría avisando
+   de una medición que no ocurre. */
+
+.cookies {
+  position: fixed;
+  left: var(--sp-5);
+  bottom: var(--sp-5);
+  z-index: 60;                          /* encima del pie, debajo del menú */
+  width: min(420px, calc(100vw - var(--sp-5) * 2));
+  padding: var(--sp-5);
+  background: var(--bg);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r-lg);
+  box-shadow: 0 1px 2px rgba(22,22,26,.04), 0 12px 32px -12px rgba(22,22,26,.18);
+
+  /* Estado de partida y de salida. Nunca desde `scale(0)` ni desde la nada:
+     el desplazamiento es su propia altura más el hueco al borde, así que sale
+     limpio por abajo sin que haya que saber cuánto mide. */
+  opacity: 0;
+  transform: translateY(calc(100% + var(--sp-5)));
+  transition:
+    opacity var(--v-corta) var(--sal),
+    transform var(--v-corta) var(--sal);
+}
+
+/* Entra un poco más lento de lo que sale: al aparecer hay que notar de dónde
+   viene, al irse ya se decidió y estorbaría. */
+.cookies[data-visible="si"] {
+  opacity: 1;
+  transform: translateY(0);
+  transition-duration: var(--v-media);
+}
+
+.cookies-texto {
+  margin: 0 0 var(--sp-4);
+  font-size: var(--t-13);
+  line-height: 1.55;
+  color: var(--ink-2);
+  text-wrap: pretty;
+}
+.cookies-texto strong { color: var(--ink); }
+.cookies-texto a { color: var(--ink); text-underline-offset: 2px; }
+
+/* Los dos botones pesan lo mismo y miden lo mismo. Esconder el «no» detrás de
+   un enlace gris es el truco de siempre, y este sitio vende no tener letra
+   chica: el botón de rechazar tiene que verse tan bien como el otro. */
+.cookies-acciones {
+  display: flex;
+  gap: var(--sp-2);
+}
+.cookies-acciones .btn {
+  flex: 1;
+  height: 36px;
+  padding-inline: var(--sp-3);
+  font-size: var(--t-13);
+}
+
+/* En móvil ocupa el ancho con su margen y se sube por encima del área del
+   gesto de inicio del iPhone. */
+@media (max-width: 559px) {
+  .cookies {
+    left: var(--sp-3);
+    right: var(--sp-3);
+    bottom: calc(var(--sp-3) + env(safe-area-inset-bottom, 0px));
+    width: auto;
+    padding: var(--sp-4);
+  }
+}
+
+/* Con movimiento reducido se queda el fundido, que es el que explica que algo
+   apareció; se va el desplazamiento, que es el que marea. */
+@media (prefers-reduced-motion: reduce) {
+  .cookies { transform: none; }
+  .cookies[data-visible="si"] { transform: none; }
+}
+
+/* El botón del pie que reabre el aviso. Llega con `hidden` en el HTML y lo
+   destapa consentimiento.js: sin JavaScript no hay nada que abrir. */
+.pie-cookies {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}

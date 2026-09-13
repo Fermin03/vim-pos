@@ -6,7 +6,7 @@
 
 Qué contratas, qué incluye, cómo se cobra y cómo cancelar. Escritos para que se entiendan de una lectura.
 
-Última actualización: 6 de septiembre de 2026.
+Última actualización: 13 de septiembre de 2026.
 
 ## Quién presta el servicio
 
@@ -49,6 +49,12 @@ Podemos suspender el servicio si hay un pago pendiente pasado el plazo de arriba
 Si cancelas, puedes pedirnos una copia dentro de los **90 días** siguientes y te la damos en un formato que puedas abrir. Pasado ese plazo, se borra todo salvo lo que la ley fiscal nos obligue a conservar.
 
 Además, tu información también vive en tu propia caja: el día que dejes de ser cliente no te quedas sin nada mientras esa computadora exista.
+
+## Cookies y medición de este sitio
+
+**Este sitio web mide sus visitas con Google Analytics**, que guarda una cookie en tu navegador con un identificador aleatorio. La primera vez que entras te sale un aviso con la opción de rechazarlo, y el enlace «Cookies» del pie te deja cambiar de opinión después. Qué se mide exactamente, qué no hacemos y cuánto dura está en el [Aviso de privacidad](https://vimpos.com.mx/aviso-privacidad#cookies).
+
+**El sistema que contratas es otra cosa.** Ni la caja ni el panel de administración llevan Google Analytics, ni cookies de publicidad, ni ninguna medición de terceros: ahí solo se guarda lo necesario para mantener tu sesión abierta y para que el punto de venta funcione. Lo que se mide en esta página web no toca en ningún momento las ventas, el menú ni los clientes de tu negocio.
 
 ## Apps de reparto (Uber Eats, DiDi Food, Rappi)
 
