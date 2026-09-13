@@ -731,7 +731,7 @@ donde ya se leen para la banda de gracia y el bloqueo, no con una consulta nueva
 
 - [ ] **Step 5: Versión**
 
-`desktop/package.json` sube a la siguiente libre (comprobar `main`: hoy está en 0.4.68, así que **0.4.69**).
+`desktop/package.json` sube a la siguiente libre (comprobar `main`: hoy está en 0.4.68, así que **0.4.70**).
 
 - [ ] **Step 6: Verde y commit**
 
@@ -839,7 +839,7 @@ el genérico, pero el archivo generado está desincronizado.
 1. `supabase migration list --linked` y `supabase db push`. **Ojo:** la migración retira delivery de todos los planes, así que en cuanto se aplique, **todo cliente queda sin el módulo hasta que se le dé el add-on**. Como hoy nadie usa delivery, no rompe a nadie; el de pruebas se autoconcede en la propia migración.
 2. Desplegar las tres Edge Functions: `delivery-webhook-uber`, `delivery-espejo`, `delivery-uber-conexion`.
 3. Mezclar el PR (despliega admin, POS y panel en Vercel).
-4. Instalador **0.4.69**, con la lista "Antes de empaquetar" del RUNBOOK.
+4. Instalador **0.4.70**, con la lista "Antes de empaquetar" del RUNBOOK.
 5. Después del `db push`, verificar contra un tenant real que `modulos_efectivos` sigue devolviendo
    los otros cinco módulos como estaban: el smoke corre sobre la semilla de dev, no sobre producción.
 
