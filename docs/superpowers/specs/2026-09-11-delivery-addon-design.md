@@ -148,7 +148,7 @@ restaurante los ve en el tablero de Uber. El panel muestra el fallo para que alg
 
 ## 6. Dónde se hace cumplir
 
-Cuatro sitios, y el orden importa: los **tres primeros son la barrera**; el último es cortesía.
+Cinco sitios, y el orden importa: los **cuatro primeros son la barrera**; el último es cortesía.
 
 **El webhook (`delivery-webhook-uber`).** Antes de procesar, comprueba el módulo del tenant de la
 conexión. Sin módulo: registra el evento con un motivo claro y **no crea pedido**. Es la barrera
@@ -162,10 +162,23 @@ sin publicar un instalador. Es la propiedad que hace que este diseño funcione e
 **`delivery-uber-conexion`.** Sin módulo, todas sus acciones responden 403. Si no, el dueño podría
 reconectar su tienda por OAuth y recuperar el servicio sin pagarlo.
 
-Los tres miran **`efectivos`**: sin add-on o con el interruptor del dueño apagado, rechazan igual.
+**`delivery-accion`** (añadido el 13 sep 2026, después de probar en producción). Sin módulo, sus
+acciones de **tienda** —`tienda_estado`, `tienda_pausar`, `tienda_reanudar`, `tienda_prep`—
+responden 403. Sus acciones de **pedido** (aceptar, rechazar, listo, reclamar…) pasan igual, por la
+misma razón por la que §5 exime `desconectar`: a un cliente al que se le retira el módulo con
+pedidos vivos hay que dejarlo despachar comida que el cliente final ya pagó. Pedidos nuevos no
+entran, porque el webhook los descarta antes.
+
+> **Esta función faltaba en la primera versión de este spec, y era la peor de olvidar.** La
+> pantalla "Pedidos de apps" del POS le pregunta el estado de la tienda **cada 60 s**
+> (`REFRESCO_TIENDA_MS`), y eso sale a Uber. Con el módulo apagado seguía saliendo: 56 de los
+> últimos 60 eventos de salida en producción eran ese sondeo. Esconder la pantalla no basta —
+> depende de que el cliente esté actualizado y de que nadie tenga una pestaña abierta desde antes.
+
+Los cuatro miran **`efectivos`**: sin add-on o con el interruptor del dueño apagado, rechazan igual.
 
 **El admin y el POS** esconden sus superficies —el admin por `permitidos`, el POS por `efectivos`
-(§4b)—. Es cortesía, no seguridad: quien se salte la interfaz choca con los tres guards de arriba.
+(§4b)—. Es cortesía, no seguridad: quien se salte la interfaz choca con los cuatro guards de arriba.
 
 ## 7. La caja deja de preguntar
 

@@ -265,6 +265,9 @@ export function mensajeErrorTienda(codigo: string, detalle?: string): string {
     case "TIENDA_ESTRATEGIA_UBER": return "Esta tienda solo se pausa desde Uber Eats Manager (Uber no permite hacerlo desde el POS).";
     case "PREP_FUERA_DE_RANGO": return "El tiempo de preparación debe estar entre 1 y 180 minutos.";
     case "SIN_RED": return "Sin conexión con la nube. Reintenta en unos segundos.";
+    // Con el módulo apagado esta pantalla no se pinta; el caso real es una caja que la tenía
+    // abierta cuando se apagó. Sin esto vería el código en crudo cada 60 s.
+    case "SIN_MODULO_DELIVERY": return "Las apps de delivery están apagadas para este negocio.";
     case "UBER_ERROR": return `Uber Eats no respondió${detalle ? ` (${detalle})` : ""}. Reintenta en un momento.`;
     default: return detalle ? `${codigo}: ${detalle}` : codigo;
   }
