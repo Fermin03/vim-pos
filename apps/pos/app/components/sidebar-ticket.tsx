@@ -2,6 +2,7 @@
 import { useState } from "react";
 import type { EstadoCarrito, LineaCarrito, ModoServicio } from "../lib/carrito";
 import { calcularTotalesDisplay, totalLinea } from "../lib/carrito";
+import { setPreciosVisibles, usePreciosVisibles } from "../lib/precios-visibles";
 import { fmtMxn } from "../lib/turno";
 import { RenglonItem } from "./renglon-item";
 
@@ -27,22 +28,6 @@ function IconoTicket() {
     >
       <path d="M4 4h16v12a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2Z" />
       <path d="M8 4v14M16 4v14" />
-    </svg>
-  );
-}
-function IconoNota() {
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      className="h-4 w-4"
-    >
-      <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
-      <path d="M18.5 2.5a2.12 2.12 0 0 1 3 3L12 15l-4 1 1-4Z" />
     </svg>
   );
 }
@@ -153,17 +138,21 @@ export function SidebarTicket({
   /**
    * Cuenta que NO se cobra aquí: Pick-up y Domicilio mandan a cocina y se cobran después,
    * desde su pantalla de cuentas. En ese flujo la caja solo captura, así que se ocultan
-   * Cobrar, Descuento y Nota — el descuento y la nota se aplican al cobrar, y tenerlos aquí
-   * invita a "cobrar ahora" una orden que todavía no sale de cocina. De paso, quitar esa fila
-   * le devuelve alto a la lista de productos, que es lo que el cajero necesita ver.
+   * Cobrar y Descuento — el descuento se aplica al cobrar, y tenerlo aquí invita a "cobrar ahora"
+   * una orden que todavía no sale de cocina. El interruptor de precios sí se queda: un cliente
+   * pregunta cuánto cuesta algo en cualquiera de los cuatro modos.
    */
   const seCobraDespues = onEnviarCocinaAbierto != null;
 
   // Ancho del carrito: era fijo en 404px, y en una caja de 1024px se comía el 40% de la pantalla
-  // dejando el catálogo apretado. Ahora escala (32vw) con topes: nunca menos de 320px —por debajo
-  // no cabe una línea con cantidad, nombre y precio— ni más de 420px.
+  // dejando el catálogo apretado. Ahora escala con topes: nunca menos de 288px —por debajo no cabe
+  // una línea con cantidad, nombre y precio— ni más de 420px.
+  //
+  // Bajó de 32vw a 26vw: cada punto porcentual de aquí es ancho que le falta al catálogo, y el
+  // catálogo es el que tiene que caber sin scroll. En 1366 le devuelve ~90px —una columna más de
+  // productos—; en 1024 es la diferencia entre 3 y 4 columnas.
   return (
-    <aside className="flex w-[clamp(20rem,32vw,26.25rem)] flex-shrink-0 flex-col border-l border-line bg-surface">
+    <aside className="flex w-[clamp(18rem,26vw,26.25rem)] flex-shrink-0 flex-col border-l border-line bg-surface">
 
       {/* ── Cabecera ─────────────────────────────────────────── */}
       <div className="flex-shrink-0 border-b border-line px-5 pb-3 pt-4">
@@ -406,17 +395,12 @@ export function SidebarTicket({
       </div>
 
       {/* ── Acciones secundarias ──────────────────────────────── */}
-      {!seCobraDespues && (
+      {/* Donde estaba "Nota": ese botón nació `disabled` con un "F5.2b — diferido" y nunca se
+          implementó, mientras la nota de la orden SÍ funciona desde el encabezado del ticket
+          ("+ Nota de la orden"). Ocupaba la mitad del renglón para no hacer nada. */}
       <div className="flex flex-shrink-0 gap-2 px-5 pt-2">
-        {/* F5.2b — diferido */}
-        <button
-          type="button"
-          disabled
-          className="inline-flex flex-1 cursor-pointer items-center justify-center gap-[7px] rounded border border-line-strong bg-surface px-[11px] py-2 text-[13.5px] font-semibold text-ink-2 transition-all hover:border-ink hover:text-ink disabled:cursor-default disabled:opacity-[.45] disabled:hover:border-line-strong disabled:hover:text-ink-2"
-        >
-          <IconoNota />
-          Nota
-        </button>
+        <InterruptorPrecios />
+        {!seCobraDespues && (
         <button
           type="button"
           disabled={vacio || hayDescuento || procesando || !onAplicarDescuento}
@@ -426,8 +410,8 @@ export function SidebarTicket({
           <IconoDescuento />
           {hayDescuento ? "Descuento aplicado" : "Descuento"}
         </button>
+        )}
       </div>
-      )}
 
       {/* ── Pie: Cobrar + En espera ───────────────────────────── */}
       {/* Pie compactado (mockup: pt-4 pb-5, Cobrar py-18px). "Cobrar" conserva un alto cómodo para
@@ -509,5 +493,45 @@ export function SidebarTicket({
         )}
       </div>
     </aside>
+  );
+}
+
+/**
+ * Interruptor de "Mostrar precios".
+ *
+ * La cuadrícula del catálogo enseña solo el nombre del producto: así el nombre cabe más grande en
+ * la misma celda, y el precio no le dice nada al cajero que ya se sabe el menú. Este interruptor
+ * los enciende en todas las celdas para cuando un cliente pregunta cuánto cuesta algo.
+ *
+ * Se queda como lo dejes, también al reabrir la caja.
+ */
+function InterruptorPrecios() {
+  const visibles = usePreciosVisibles();
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={visibles}
+      // "Precios" y no "Mostrar precios": con el sidebar en su ancho mínimo (288px) la etiqueta
+      // larga se cortaba a "Mostrar…", que es peor que corta. El interruptor ya dice que enciende
+      // algo; el texto completo queda para lectores de pantalla.
+      aria-label="Mostrar precios en el catálogo"
+      onClick={() => setPreciosVisibles(!visibles)}
+      className={[
+        "inline-flex min-w-0 flex-1 items-center justify-center gap-[7px] rounded border px-[11px] py-2 text-[13px] font-semibold transition-colors",
+        visibles ? "border-ink bg-sel text-ink" : "border-line-strong bg-surface text-ink-2 hover:border-ink hover:text-ink",
+      ].join(" ")}
+    >
+      <span
+        className={["relative h-[18px] w-[32px] flex-shrink-0 rounded-full transition-colors", visibles ? "bg-ink" : "bg-line-strong"].join(" ")}
+        aria-hidden="true"
+      >
+        <span
+          className="absolute left-[2px] top-[2px] h-[14px] w-[14px] rounded-full bg-white transition-transform duration-150 ease-out"
+          style={{ transform: visibles ? "translateX(14px)" : "translateX(0)" }}
+        />
+      </span>
+      <span className="truncate">Precios</span>
+    </button>
   );
 }
