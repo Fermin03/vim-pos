@@ -585,6 +585,53 @@ despliegue.
 - **Toda la interfaz** (el interruptor, la sección que desaparece, el POS) y **el aviso a Uber**:
   son la ola B, y el aviso necesita además el secreto dado de alta en Supabase y en Vercel.
 
+### Resultado de la ola B — 13 sep 2026
+
+Con el PR #12 mezclado (`1af7f8c`) y los cinco proyectos de Vercel desplegados.
+
+**Estado 2, el dueño lo apaga desde el admin.** El interruptor escribió
+`modulo_delivery_activo = false` y `modulos_efectivos` quedó en `permitidos: true` /
+`efectivos: false`. En pantalla: la sección **se queda** con su interruptor pero sin el asistente de
+Uber —esa es la diferencia visible con el estado 1— y el POS esconde "Pedidos de apps", que
+reaparece al volver a encender.
+
+**Estado 1, VIM retira el add-on desde el panel.** Lo único de toda la entrega que no se podía
+ejercitar de otra forma, porque es lo que estrena la variable de Vercel:
+
+```
+delivery_eventos #193   18:43:43   pos_data_actualizar
+  procesado = true   respuesta = {"integration_enabled": false}
+delivery_conexiones     estado = PAUSADA
+modulos_efectivos       permitidos = false   efectivos = false
+```
+
+El camino entero: el panel leyó `VIM_DELIVERY_INTERNO_SECRET`, llamó a la Edge Function, pasó el
+gateway y la puerta interna, resolvió el tenant desde la fila de la conexión y le dijo a Uber que
+cerrara. El interruptor del dueño seguía en `true` y aun así las dos llaves cayeron: sin add-on, lo
+que el dueño quiera da igual.
+
+**Un contraste que quedó grabado sin buscarlo:** el mismo botón "Comprobar", con el módulo
+encendido, escribió su evento `verificar` a las 18:37 (#192); con el módulo apagado, un rato antes,
+no dejó rastro ninguno. Misma acción, mismo usuario, distinto módulo.
+
+**Devolverlo.** Salió un bug, y no de esta entrega: dar de alta el add-on el mismo día de la baja
+reventaba con `duplicate key value violates unique constraint "addon_unico_activo"`, porque esa
+restricción de la 0002 es `UNIQUE (tenant_id, addon_id, fecha_inicio)` y no lo que su nombre dice.
+Arreglado en el PR #14 —un alta el mismo día se trata como deshacer la baja— y **probado en el
+escenario exacto que falló**: tras desplegar, el alta entró limpia y la fila quedó reactivada con
+`fecha_fin: null`, precio **0.00** y la nota "incluido en el plan" (el tenant está en NEGOCIO).
+
+La conexión volvió a `ACTIVA` reusando la misma fila (`7a5b0309…`, creada el 6 sep), con la carta
+republicada: 49 ítems, 1 combo, 5 grupos, 10 opciones.
+
+#### Lo que la ola B deja pendiente
+
+Solo la **ola C**: publicar la **0.4.70**. Mientras no exista ese instalador, ninguna caja tiene el
+guard del escritorio y el espejo de un cliente sin módulo **baja a 5 minutos pero no para**. Medido
+el 13 sep con el módulo apagado y tres latidos de por medio: sellos a 18:19:06, 18:24:22 y 18:29:18.
+El `directivas.json` de la caja sí traía `delivery_apps: false` — el dato llega, falta el código que
+reacciona.
+
 ## 5. Cuando algo falla
 
 - `delivery_eventos.error` dice qué pasó al procesar (`UBER_TOKEN_401` = credenciales o entorno
