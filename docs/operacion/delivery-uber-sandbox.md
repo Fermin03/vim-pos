@@ -476,9 +476,42 @@ tocar el parque. El cero llega con 0.4.69, que además detiene el espejo.
 
 Y el estado 1 (sin add-on) deja las **dos** llaves en `false`, como debe.
 
+#### El pedido con el módulo apagado (13 sep 2026, 17:23 UTC)
+
+Pedido real en la tienda sandbox con `efectivos.delivery_apps = false` (add-on concedido,
+interruptor del dueño apagado). Orden `1546d6e0-e81a-44cd-820a-ad9d82f5b592`.
+
+```
+delivery_eventos #174   orders.notification
+  firma_valida = true    procesado = true
+  respuesta.accion  = SIN_MODULO
+  respuesta.detalle = tenant d3462bb3-… sin el módulo de delivery
+  tenant_id = NULL   conexion_id = NULL   http_status = NULL
+```
+
+Las tres cosas que se querían ver:
+
+1. **El webhook sigue recibiendo y verificando la firma.** El módulo no le quita a Uber su acuse:
+   se contesta 200 y el evento queda registrado. Un webhook que fallara haría que Uber reintentara
+   y acabara marcando la integración como caída.
+2. **`accion = SIN_MODULO`**, con el tenant nombrado en el detalle.
+3. **Ninguna fila nueva en `delivery_pedidos`**: siguen siendo las cuatro de siempre.
+
+Y una cuarta, que es la que justifica dónde está puesto el guard: **ese pedido tiene un solo evento
+en toda la tabla, el de entrada**. Ni una llamada de salida a Uber — el guard corre antes de
+`obtenerOrden()`, así que un tenant sin módulo no cuesta ni un viaje de red.
+
+La conexión se quedó en `ACTIVA`: apagar el interruptor **no** pausa la tienda en Uber. Es a
+propósito — pausar es cosa del panel cuando VIM retira el add-on, no del dueño que apaga su propio
+módulo un rato. El efecto visible para el cliente final es que el pedido se queda sin aceptar y
+expira por la ventana de ~11 min de Uber.
+
+El `tenant_id` nulo del evento confirma lo que advierte el guion: esa fila **solo se ve desde el
+editor SQL**, nunca desde el admin del cliente, porque no hay pedido al que enrutarla.
+
 #### Lo que la ola A no puede probar
 
-- **El webhook descartando con `SIN_MODULO`**: hace falta un pedido real en la tienda sandbox.
+- ~~El webhook descartando con `SIN_MODULO`~~: **probado**, ver arriba.
 - **El 403 `SIN_MODULO_DELIVERY`** de `delivery-uber-conexion`: hace falta el JWT de un dueño.
 - **Toda la interfaz** (el interruptor, la sección que desaparece, el POS) y **el aviso a Uber**:
   son la ola B, y el aviso necesita además el secreto dado de alta en Supabase y en Vercel.
