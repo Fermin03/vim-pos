@@ -422,6 +422,67 @@ Fecha, versión de la caja en cada ola, y para cada estado qué se vio y qué no
 pudo comprobar importa tanto como lo que sí: el defecto de los modificadores a $0.00 de la entrega
 anterior sobrevivió porque una prueba dijo "pasa" sobre una fixture irreal.
 
+### Resultado de la ola A — 13 sep 2026
+
+Migración **0113 aplicada** (`supabase db push --linked`, una sola migración, dry-run antes) y las
+tres Edge Functions desplegadas: `delivery-webhook-uber`, `delivery-espejo`,
+`delivery-uber-conexion`.
+
+**La comprobación previa salió limpia.** En toda la base hay **una sola** fila en
+`delivery_conexiones` —la tienda sandbox del tenant de pruebas, `ACTIVA`— y cuatro
+`delivery_pedidos` históricos, todos del mismo tenant y todos `CANCELADO`. Ningún cliente real
+usa delivery, así que retirarle el módulo a todo el mundo no rompió a nadie.
+
+**Después de la migración:** los nueve planes se quedaron con `kds, recetas, promociones,
+reservaciones` y ninguno concede ya `delivery_apps`; cero filas en `tenant_feature_flags` con ese
+código; y `modulos_efectivos` de los cuatro tenants devuelve los otros cinco módulos igual que
+antes. `vim-pruebas` quedó con las dos capas en `true`, como manda la migración.
+
+> Observación que no es de esta entrega: `recetas` sale `permitidos: true` pero `efectivos: false`
+> en **todos** los tenants, Knock-Out incluido, porque su interruptor es
+> `modulo_inventario_activo` (ADR 0013) y nadie lo tiene encendido. Es el comportamiento de 0103,
+> no una regresión de la 0113 — pero conviene saberlo antes de que alguien pregunte por qué el POS
+> no enseña recetas.
+
+#### El gateway sí deja pasar la llamada del panel
+
+Era lo único de la rama que no se podía verificar sin desplegar. Con un `x-vim-interno`
+deliberadamente incorrecto y un `conexion_id` inexistente —sin tocar Uber ni ninguna fila— las tres
+variantes contestaron **`401 {"error":"INTERNO_INVALIDO"}`**: vocabulario nuestro, o sea que el
+gateway dejó pasar y corrió el código de la función.
+
+De paso se cerró la duda que quedaba anotada en el código: el gateway acepta **`apikey` sola**, sin
+`Authorization`. El panel manda las dos, así que no hay nada que cambiar; pero la suposición de que
+`Authorization` era obligatoria era falsa.
+
+Funciona igual con el secreto sin dar de alta: sin `VIM_DELIVERY_INTERNO_SECRET` configurado,
+cualquier cabecera es inválida por diseño (`secretoInternoValido` exige que el configurado no sea
+vacío).
+
+#### El espejo: de 30 s a 5 minutos, con una caja 0.4.68
+
+La prueba de verdad de esta entrega, medida sobre `cajas.espejo_apps_at` de la caja de pruebas
+(versión **0.4.68**, sin desplegar nada en el escritorio):
+
+| Momento | Intervalos observados |
+|---|---|
+| Estado 3 (encendido) | 31, 29, 28, 32 s → **NORMAL** |
+| Estado 2 (el dueño lo apaga) | **323 s** → **REPOSO** |
+| Estado 3 otra vez | 33, 34, 30, 30, 32, 30, 31, 33 s → **NORMAL** |
+
+El cambio es **inmediato**, no espera al latido: el guard vive en la Edge Function y se evalúa en
+cada llamada; la caja solo obedece el `siguiente_en_ms` que recibe. Diez veces menos carga sin
+tocar el parque. El cero llega con 0.4.69, que además detiene el espejo.
+
+Y el estado 1 (sin add-on) deja las **dos** llaves en `false`, como debe.
+
+#### Lo que la ola A no puede probar
+
+- **El webhook descartando con `SIN_MODULO`**: hace falta un pedido real en la tienda sandbox.
+- **El 403 `SIN_MODULO_DELIVERY`** de `delivery-uber-conexion`: hace falta el JWT de un dueño.
+- **Toda la interfaz** (el interruptor, la sección que desaparece, el POS) y **el aviso a Uber**:
+  son la ola B, y el aviso necesita además el secreto dado de alta en Supabase y en Vercel.
+
 ## 5. Cuando algo falla
 
 - `delivery_eventos.error` dice qué pasó al procesar (`UBER_TOKEN_401` = credenciales o entorno
