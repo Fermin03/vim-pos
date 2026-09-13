@@ -509,10 +509,41 @@ expira por la ventana de ~11 min de Uber.
 El `tenant_id` nulo del evento confirma lo que advierte el guion: esa fila **solo se ve desde el
 editor SQL**, nunca desde el admin del cliente, porque no hay pedido al que enrutarla.
 
+#### El 403, y la cuarta función que faltaba (13 sep 2026)
+
+**El 403 de `delivery-uber-conexion`, probado con la sesión de un dueño.** Con el módulo apagado,
+"Comprobar" en el admin devolvió el error genérico *"Algo salió mal con la conexión"* — el admin
+desplegado no tiene traducción para `SIN_MODULO_DELIVERY` y cae al mensaje por defecto. Del lado de
+la base, **ningún evento**: ni el `verificar` que esa acción escribe siempre, ni la llamada a Uber
+que lo precede. El guard cortó antes de hablar con Uber. (En la rama ya hay mensaje para ese código,
+en el admin y en el POS: sin él, una pestaña abierta desde antes solo vería el código en crudo.)
+
+**Y buscando eso apareció un agujero.** Doce segundos después de apagar el módulo entró un evento
+`tienda_estado`, y otro al minuto siguiente, y otro. No era el "Comprobar": es la pantalla "Pedidos
+de apps" del POS, que pregunta el estado de la tienda **cada 60 s** (`REFRESCO_TIENDA_MS`) contra
+`delivery-accion` — **una cuarta función que el spec no guardaba**. 56 de los últimos 60 eventos de
+salida eran ese sondeo, y siguieron entrando con el módulo apagado.
+
+Arreglado en la misma rama: `delivery-accion` exige el módulo para sus cuatro acciones de TIENDA
+(`tienda_estado`, `tienda_pausar`, `tienda_reanudar`, `tienda_prep`) y deja pasar las de PEDIDO —
+un cliente al que se le retira el módulo con pedidos vivos tiene que poder despachar comida ya
+pagada, y nuevos no entran porque el webhook los descarta antes.
+
+**Verificado en producción con la función redesplegada**, y con control para descartar que la
+pantalla simplemente se hubiera cerrado:
+
+| Ventana | `tienda_estado` |
+|---|---|
+| Antes (módulo encendido) | 17:28:15, 17:29:16, 17:31:16, 17:33:16, 17:35:57 |
+| Módulo apagado 17:37:38 → 17:41:54 | **ninguno en 4 minutos** |
+| Encendido otra vez a las 17:41:54 | 17:42:33 (a los 39 s), 17:44:33 |
+
+El sondeo nunca paró: el POS siguió preguntando y se llevó 403 sin que la llamada saliera a Uber.
+
 #### Lo que la ola A no puede probar
 
 - ~~El webhook descartando con `SIN_MODULO`~~: **probado**, ver arriba.
-- **El 403 `SIN_MODULO_DELIVERY`** de `delivery-uber-conexion`: hace falta el JWT de un dueño.
+- ~~El 403 `SIN_MODULO_DELIVERY`~~: **probado** con la sesión de un dueño, ver arriba.
 - **Toda la interfaz** (el interruptor, la sección que desaparece, el POS) y **el aviso a Uber**:
   son la ola B, y el aviso necesita además el secreto dado de alta en Supabase y en Vercel.
 
