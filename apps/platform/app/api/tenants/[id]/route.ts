@@ -3,6 +3,7 @@ import { autorizar, auditar } from "../../../lib/server";
 import { hoyMx, sumarMeses } from "@vim/fecha";
 import { MODULOS } from "@vim/db/modulos";
 import { fechaBloqueo, mensajeBloqueoPorDefecto } from "../../../lib/bloqueo";
+import { decidirAltaAddon, type FilaAddon } from "../../../lib/addons";
 
 // Detalle y acciones sobre un tenant (suspender/reactivar/cancelar, notas, plan).
 // Todo auditado en super_admin_accesos. service_role, gated por X-Platform-Key.
@@ -223,14 +224,16 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
     // Un add-on ya vigente no se vuelve a dar de alta: la restricción de la base solo impide
     // repetir la MISMA fecha de inicio, así que sin esto un doble clic al día siguiente dejaría
     // dos filas activas y el cliente aparecería pagándolo dos veces.
-    const { data: yaRaw } = await sb
+    // Se leen TODAS sus filas de este add-on, no solo la activa: `addon_unico_activo` es
+    // `UNIQUE (tenant_id, addon_id, fecha_inicio)`, así que una baja de HOY bloquea el INSERT de
+    // hoy. `decidirAltaAddon` distingue los tres casos; el porqué está en `lib/addons.ts`.
+    const { data: filasRaw } = await sb
       .from("tenant_addons")
-      .select("id")
+      .select("id, activo, fecha_inicio")
       .eq("tenant_id", id)
-      .eq("addon_id", addon.id)
-      .eq("activo", true)
-      .maybeSingle();
-    if (yaRaw) return NextResponse.json({ ok: true, yaEstaba: true });
+      .eq("addon_id", addon.id);
+    const decision = decidirAltaAddon((filasRaw ?? []) as FilaAddon[], hoyMx());
+    if (decision.accion === "ya_estaba") return NextResponse.json({ ok: true, yaEstaba: true });
 
     // El plan no concede el módulo —si lo concediera, la caja de todo cliente de Negocio sondearía
     // sin usarlo— pero sí decide el precio: incluido desde Negocio, $100 al mes en Esencial.
@@ -248,12 +251,21 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
     // error. El spec (§4) fija esta nota para Negocio/Cadena; solo se usa cuando el precio salió
     // en cero y nadie mandó un motivo propio — un motivo explícito (cortesía, promoción) manda.
     const motivo = (body.motivo as string | undefined)?.trim() || (precio === 0 ? "incluido en el plan" : null);
-    const { error } = await sb.from("tenant_addons").insert({
-      tenant_id: id, addon_id: addon.id, fecha_inicio: hoyMx(), activo: true,
-      precio_mensual_mxn: precio, notas: motivo,
-    });
+    // Reactivar es deshacer la baja de hoy: se le pone el precio y el motivo del formulario, que
+    // son los que el operador acaba de decidir, y se borra la fecha de fin.
+    const { error } = decision.accion === "reactivar"
+      ? await sb.from("tenant_addons")
+        .update({ activo: true, fecha_fin: null, precio_mensual_mxn: precio, notas: motivo })
+        .eq("id", decision.id)
+      : await sb.from("tenant_addons").insert({
+        tenant_id: id, addon_id: addon.id, fecha_inicio: hoyMx(), activo: true,
+        precio_mensual_mxn: precio, notas: motivo,
+      });
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-    await auditar(sb, { accion: "tenant.addon_activar", tenantId: id, motivo: `Alta del add-on ${addon.nombre}`, payload: { codigo, precio } });
+    await auditar(sb, {
+      accion: "tenant.addon_activar", tenantId: id, motivo: `Alta del add-on ${addon.nombre}`,
+      payload: { codigo, precio, reactivada: decision.accion === "reactivar" },
+    });
     return NextResponse.json({ ok: true });
   }
 
