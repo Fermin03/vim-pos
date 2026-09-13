@@ -283,7 +283,14 @@ Así que la prueba se parte por donde se parte el despliegue:
 |---|---|---|
 | **A** | tras aplicar 0113 y desplegar las 3 functions, **antes** de mezclar | los guards: webhook, espejo y cadencia. Los estados se cambian por SQL |
 | **B** | tras mezclar el PR | el interruptor del dueño, la sección que desaparece, el POS, y el aviso a Uber desde el panel |
-| **C** | con la caja en **0.4.69** | que el espejo se **detenga** de verdad, no que baje el ritmo |
+| **C** | con la caja en **0.4.70** | que el espejo se **detenga** de verdad, no que baje el ritmo |
+
+> **Por qué 0.4.70 y no 0.4.69.** La rama del add-on reservó la 0.4.69 cuando `main` estaba en
+> 0.4.68, pero otra sesión se llevó ese número el mismo día: el PR #11 la subió a 0.4.69 y
+> **publicó `VIM.POS.Setup.0.4.69.exe` a las 16:25**, con el catálogo en cuadrícula y **sin** el
+> guard del espejo. Como las dos ramas escribieron el mismo string, git no dio conflicto y la mezcla
+> pasó limpia: quedaron dos contenidos distintos bajo un mismo número. El instalador del add-on va
+> en **0.4.70**. Es la misma trampa que el plan ya advertía para las migraciones, en otra ventanilla.
 
 Sin la ola C, una caja en 0.4.68 sigue sondeando: obedece el `siguiente_en_ms` que le manda la nube
 y se va a 5 minutos, pero no para. Eso **también es un resultado válido** y hay que verlo: es lo que
@@ -328,7 +335,7 @@ confirmación al apagar. El encabezado pasa a "Apps de delivery · Apagado" y el
 desaparece de la pantalla; la **sección sigue en el menú**, que es la diferencia con el estado 1.
 
 - [ ] **La caja deja de sondear.** Hasta 10 minutos de espera: el módulo viaja en el latido, y el
-      latido va cada 10 min. En 0.4.69 el log lo dice literal:
+      latido va cada 10 min. En 0.4.70 el log lo dice literal:
       `· [espejo] detenido (el cliente apagó el módulo de apps de delivery)`.
       En 0.4.68 no aparece nada: el espejo sigue, pero la nube le contesta `siguiente_en_ms:
       300000` y pasa a preguntar cada 5 minutos. También sirve mirar `directivas.json` en la misma
@@ -472,7 +479,7 @@ La prueba de verdad de esta entrega, medida sobre `cajas.espejo_apps_at` de la c
 
 El cambio es **inmediato**, no espera al latido: el guard vive en la Edge Function y se evalúa en
 cada llamada; la caja solo obedece el `siguiente_en_ms` que recibe. Diez veces menos carga sin
-tocar el parque. El cero llega con 0.4.69, que además detiene el espejo.
+tocar el parque. El cero llega con 0.4.70, que además detiene el espejo.
 
 Y el estado 1 (sin add-on) deja las **dos** llaves en `false`, como debe.
 
