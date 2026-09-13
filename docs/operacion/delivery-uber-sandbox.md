@@ -540,6 +540,37 @@ pantalla simplemente se hubiera cerrado:
 
 El sondeo nunca paró: el POS siguió preguntando y se llevó 403 sin que la llamada saliera a Uber.
 
+#### El secreto interno, dado de alta y comprobado (13 sep 2026)
+
+`VIM_DELIVERY_INTERNO_SECRET`: 32 bytes aleatorios en hex, el mismo valor en Supabase (Edge
+Functions → Secrets) y en Vercel (proyecto `platform`, los tres entornos). Queda además en
+`supabase/functions/.env`, que está en `.gitignore`, para desarrollo local.
+
+**Los dos caminos automáticos estaban cerrados**, y conviene saberlo para la próxima:
+`supabase secrets set` —y también `secrets list`— responde *"Access token not provided"* aunque
+`db push` y `functions deploy` funcionen en la misma máquina y el mismo minuto; y el token que el
+CLI de Vercel dejó en `auth.json` estaba **caducado** (`invalidToken` de la API). Los dos altas se
+hacen desde el dashboard.
+
+Comprobado contra la función desplegada, **sin llamar a Uber ni tocar ninguna fila** (el
+`conexion_id` es todo ceros):
+
+| Llamada | Respuesta |
+|---|---|
+| secreto incorrecto (control) | `401 INTERNO_INVALIDO` |
+| secreto bueno, conexión inexistente | **`404 CONEXION_NO_EXISTE`** |
+| secreto bueno, acción `desconectar` | `403 ACCION_NO_PERMITIDA` |
+
+La segunda es la que importa: llegar hasta "esa conexión no existe" significa que la llamada pasó
+el gateway, pasó la puerta interna y llegó a resolver el tenant desde la fila. La tercera confirma
+el alcance: el secreto autentica al llamador, no le autoriza cualquier acción — por el camino
+interno solo entra `pausar`.
+
+**Lo que todavía no está probado es el lado de Vercel.** El único código que lee esa variable es el
+de retirar el add-on, así que se comprueba en la ola B: la respuesta del panel tiene que traer
+`{pausadas: 1, fallos: []}`. Y una variable nueva en Vercel no aplica hasta el siguiente
+despliegue.
+
 #### Lo que la ola A no puede probar
 
 - ~~El webhook descartando con `SIN_MODULO`~~: **probado**, ver arriba.
