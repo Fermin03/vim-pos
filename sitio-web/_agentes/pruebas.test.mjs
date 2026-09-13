@@ -634,6 +634,7 @@ test('ningún dato personal vuelve al sitio', () => {
     '404.md',
     'sitemap.xml',
     'assets/js/vim.js',
+    'assets/js/consentimiento.js',
   ];
 
   for (const archivo of publicados) {

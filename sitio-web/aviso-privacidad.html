@@ -36,7 +36,13 @@
 <link rel="manifest" href="site.webmanifest">
 <meta name="theme-color" content="#0078C9">
 
-<link rel="stylesheet" href="assets/css/vim.css?v=14">
+<link rel="stylesheet" href="assets/css/vim.css?v=16">
+<!-- Consentimiento de cookies. Va ANTES que gtm.js y el orden NO es
+     cosmético: los dos llevan `defer`, que respeta el orden del documento, y
+     Consent Mode descarta un estado por defecto que llegue después de que el
+     contenedor haya cargado. Invertir estas dos líneas hace que Google
+     Analytics mida la primera visita con los ajustes de fábrica. -->
+<script src="assets/js/consentimiento.js?v=1" defer></script>
 <!-- Google Tag Manager (contenedor GTM-PRTJDNQ2). El fragmento en línea que da
      Google no cabe aquí: la política de seguridad del sitio prohíbe los scripts
      en línea, y uno bloqueado no avisa — la analítica parecería instalada y no
@@ -111,7 +117,7 @@
         borremos. En corto: te pedimos lo mínimo para poder contestarte, y no
         los vendemos ni los compartimos con nadie que quiera venderte algo.
       </p>
-      <p style="font-size:var(--t-13);color:var(--ink-2)">Última actualización: 6 de septiembre de 2026.</p>
+      <p style="font-size:var(--t-13);color:var(--ink-2)">Última actualización: 13 de septiembre de 2026.</p>
     </div>
   </section>
 
@@ -221,7 +227,7 @@
           </p>
         </div>
 
-        <div class="pila pila-4">
+        <div class="pila pila-4" id="cookies">
           <h2>Cookies y medición</h2>
           <p>
             <strong>Este sitio mide sus visitas con Google Analytics</strong>, que se carga a través
@@ -239,19 +245,39 @@
           <p>
             <strong>Qué NO hacemos:</strong> no ponemos cookies de publicidad ni de remarketing, no
             te seguimos a otras páginas y no vendemos ni cedemos tu visita a nadie. Tampoco cargamos
-            tipografías de terceros: todas viven en este mismo sitio.
+            tipografías de terceros: todas viven en este mismo sitio. En la configuración de Google
+            que usa este sitio, el consentimiento para publicidad está <strong>denegado</strong>
+            desde que carga la página y ahí se queda; si algún día anunciamos en Google Ads, te lo
+            preguntaremos aparte y este aviso lo dirá antes.
+          </p>
+
+          <p>
+            <strong>Cómo decides tú.</strong> La primera vez que entras aparece abajo un aviso con dos botones. Si pulsas
+            <strong>«No me midas»</strong>, Google Analytics deja de medirte en ese mismo
+            instante, se borran las cookies que hubiera puesto y no se vuelve a intentar. Si
+            pulsas <strong>«Entendido»</strong>, sigue midiendo como se describe arriba.
           </p>
           <p>
-            Google trata estos datos por cuenta nuestra y puede procesarlos fuera de México. Si
-            prefieres quedarte fuera de la medición, puedes instalar el
+            <strong>Puedes cambiar de opinión cuando quieras:</strong> el enlace
+            <strong>«Cookies»</strong> del pie de cualquier página vuelve a abrir ese aviso. Tu
+            decisión se guarda en tu propio navegador (en el almacenamiento local, bajo la clave
+            <strong>vim-cookies</strong>), no en un servidor nuestro — por eso vale para el navegador y
+            el dispositivo donde la tomaste, y no para los demás.
+          </p>
+          <p>
+            Te lo decimos en claro porque la ley mexicana nos obliga a informarte y a dejarte
+            oponerte, no a pedirte permiso antes: mientras no digas nada, la medición está
+            encendida. Si prefieres no depender de este sitio, también puedes instalar el
             <a href="https://tools.google.com/dlpage/gaoptout" rel="noopener">complemento de
-            inhabilitación de Google Analytics</a> o bloquear las cookies de este sitio desde tu
-            navegador. El sitio funciona exactamente igual sin ellas: no hay nada aquí que dependa
-            de que te midamos.
+            inhabilitación de Google Analytics</a> o bloquear las cookies desde tu navegador. El
+            sitio funciona exactamente igual sin ellas: no hay nada aquí que dependa de que te
+            midamos.
           </p>
           <p>
-            Además, el proveedor que aloja el sitio (Vercel) cuenta las visitas de forma agregada y
-            sin cookies. Si algo de esto cambiara, se actualizaría este aviso antes.
+            Google trata estos datos por cuenta nuestra y puede procesarlos fuera de México, donde
+            los conserva como máximo <strong>14 meses</strong>. Además, el proveedor que aloja el
+            sitio (Vercel) cuenta las visitas de forma agregada y sin cookies. Si algo de esto
+            cambiara, se actualizaría este aviso antes.
           </p>
         </div>
 
@@ -321,6 +347,7 @@
       <span class="fila" style="gap:var(--sp-5)">
         <a href="/aviso-privacidad" style="color:inherit">Aviso de privacidad</a>
         <a href="/terminos" style="color:inherit">Términos</a>
+        <button type="button" class="pie-cookies" data-cookies-abrir hidden>Cookies</button>
       </span>
     </div>
   </div>

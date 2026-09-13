@@ -36,7 +36,13 @@
 <link rel="manifest" href="site.webmanifest">
 <meta name="theme-color" content="#0078C9">
 
-<link rel="stylesheet" href="assets/css/vim.css?v=14">
+<link rel="stylesheet" href="assets/css/vim.css?v=16">
+<!-- Consentimiento de cookies. Va ANTES que gtm.js y el orden NO es
+     cosmético: los dos llevan `defer`, que respeta el orden del documento, y
+     Consent Mode descarta un estado por defecto que llegue después de que el
+     contenedor haya cargado. Invertir estas dos líneas hace que Google
+     Analytics mida la primera visita con los ajustes de fábrica. -->
+<script src="assets/js/consentimiento.js?v=1" defer></script>
 <!-- Google Tag Manager (contenedor GTM-PRTJDNQ2). El fragmento en línea que da
      Google no cabe aquí: la política de seguridad del sitio prohíbe los scripts
      en línea, y uno bloqueado no avisa — la analítica parecería instalada y no
@@ -109,7 +115,7 @@
         Qué contratas, qué incluye, cómo se cobra y cómo cancelar. Escritos para
         que se entiendan de una lectura.
       </p>
-      <p style="font-size:var(--t-13);color:var(--ink-2)">Última actualización: 6 de septiembre de 2026.</p>
+      <p style="font-size:var(--t-13);color:var(--ink-2)">Última actualización: 13 de septiembre de 2026.</p>
     </div>
   </section>
 
@@ -217,6 +223,24 @@
           <p>
             Además, tu información también vive en tu propia caja: el día que dejes de ser cliente
             no te quedas sin nada mientras esa computadora exista.
+          </p>
+        </div>
+
+        <div class="pila pila-4">
+          <h2>Cookies y medición de este sitio</h2>
+          <p>
+            <strong>Este sitio web mide sus visitas con Google Analytics</strong>, que guarda una
+            cookie en tu navegador con un identificador aleatorio. La primera vez que entras te
+            sale un aviso con la opción de rechazarlo, y el enlace «Cookies» del pie te deja
+            cambiar de opinión después. Qué se mide exactamente, qué no hacemos y cuánto dura está
+            en el <a href="/aviso-privacidad#cookies">Aviso de privacidad</a>.
+          </p>
+          <p>
+            <strong>El sistema que contratas es otra cosa.</strong> Ni la caja ni el panel de
+            administración llevan Google Analytics, ni cookies de publicidad, ni ninguna medición
+            de terceros: ahí solo se guarda lo necesario para mantener tu sesión abierta y para que
+            el punto de venta funcione. Lo que se mide en esta página web no toca en ningún momento
+            las ventas, el menú ni los clientes de tu negocio.
           </p>
         </div>
 
@@ -347,6 +371,7 @@
       <span class="fila" style="gap:var(--sp-5)">
         <a href="/aviso-privacidad" style="color:inherit">Aviso de privacidad</a>
         <a href="/terminos" style="color:inherit">Términos</a>
+        <button type="button" class="pie-cookies" data-cookies-abrir hidden>Cookies</button>
       </span>
     </div>
   </div>

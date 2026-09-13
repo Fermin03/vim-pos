@@ -1204,7 +1204,7 @@ Este sitio publica su contenido también en Markdown y describe qué es VIM POS 
 
 Qué datos te pedimos, para qué los usamos y cómo pedirnos que los borremos. En corto: te pedimos lo mínimo para poder contestarte, y no los vendemos ni los compartimos con nadie que quiera venderte algo.
 
-Última actualización: 6 de septiembre de 2026.
+Última actualización: 13 de septiembre de 2026.
 
 ## Quién es responsable de tus datos
 
@@ -1265,11 +1265,15 @@ Si consideras que no atendimos bien tu solicitud, puedes acudir al **INAI** ([ho
 
 **Qué se mide:** qué páginas ves, desde qué país entras, en qué tipo de dispositivo, y las cuatro acciones que nos dicen si el sitio sirve para algo — si se hizo clic en WhatsApp, si se envió el formulario de demostración, si se consultó el precio anual y qué pregunta frecuente se abrió. Nada de eso identifica a una persona.
 
-**Qué NO hacemos:** no ponemos cookies de publicidad ni de remarketing, no te seguimos a otras páginas y no vendemos ni cedemos tu visita a nadie. Tampoco cargamos tipografías de terceros: todas viven en este mismo sitio.
+**Qué NO hacemos:** no ponemos cookies de publicidad ni de remarketing, no te seguimos a otras páginas y no vendemos ni cedemos tu visita a nadie. Tampoco cargamos tipografías de terceros: todas viven en este mismo sitio. En la configuración de Google que usa este sitio, el consentimiento para publicidad está **denegado** desde que carga la página y ahí se queda; si algún día anunciamos en Google Ads, te lo preguntaremos aparte y este aviso lo dirá antes.
 
-Google trata estos datos por cuenta nuestra y puede procesarlos fuera de México. Si prefieres quedarte fuera de la medición, puedes instalar el [complemento de inhabilitación de Google Analytics](https://tools.google.com/dlpage/gaoptout) o bloquear las cookies de este sitio desde tu navegador. El sitio funciona exactamente igual sin ellas: no hay nada aquí que dependa de que te midamos.
+**Cómo decides tú.** La primera vez que entras aparece abajo un aviso con dos botones. Si pulsas **«No me midas»**, Google Analytics deja de medirte en ese mismo instante, se borran las cookies que hubiera puesto y no se vuelve a intentar. Si pulsas **«Entendido»**, sigue midiendo como se describe arriba.
 
-Además, el proveedor que aloja el sitio (Vercel) cuenta las visitas de forma agregada y sin cookies. Si algo de esto cambiara, se actualizaría este aviso antes.
+**Puedes cambiar de opinión cuando quieras:** el enlace **«Cookies»** del pie de cualquier página vuelve a abrir ese aviso. Tu decisión se guarda en tu propio navegador (en el almacenamiento local, bajo la clave **vim-cookies**), no en un servidor nuestro — por eso vale para el navegador y el dispositivo donde la tomaste, y no para los demás.
+
+Te lo decimos en claro porque la ley mexicana nos obliga a informarte y a dejarte oponerte, no a pedirte permiso antes: mientras no digas nada, la medición está encendida. Si prefieres no depender de este sitio, también puedes instalar el [complemento de inhabilitación de Google Analytics](https://tools.google.com/dlpage/gaoptout) o bloquear las cookies desde tu navegador. El sitio funciona exactamente igual sin ellas: no hay nada aquí que dependa de que te midamos.
+
+Google trata estos datos por cuenta nuestra y puede procesarlos fuera de México, donde los conserva como máximo **14 meses**. Además, el proveedor que aloja el sitio (Vercel) cuenta las visitas de forma agregada y sin cookies. Si algo de esto cambiara, se actualizaría este aviso antes.
 
 ## Seguridad
 
@@ -1291,7 +1295,7 @@ Si cambia, se publica aquí con la fecha nueva arriba. Si el cambio afecta a par
 
 Qué contratas, qué incluye, cómo se cobra y cómo cancelar. Escritos para que se entiendan de una lectura.
 
-Última actualización: 6 de septiembre de 2026.
+Última actualización: 13 de septiembre de 2026.
 
 ## Quién presta el servicio
 
@@ -1334,6 +1338,12 @@ Podemos suspender el servicio si hay un pago pendiente pasado el plazo de arriba
 Si cancelas, puedes pedirnos una copia dentro de los **90 días** siguientes y te la damos en un formato que puedas abrir. Pasado ese plazo, se borra todo salvo lo que la ley fiscal nos obligue a conservar.
 
 Además, tu información también vive en tu propia caja: el día que dejes de ser cliente no te quedas sin nada mientras esa computadora exista.
+
+## Cookies y medición de este sitio
+
+**Este sitio web mide sus visitas con Google Analytics**, que guarda una cookie en tu navegador con un identificador aleatorio. La primera vez que entras te sale un aviso con la opción de rechazarlo, y el enlace «Cookies» del pie te deja cambiar de opinión después. Qué se mide exactamente, qué no hacemos y cuánto dura está en el [Aviso de privacidad](https://vimpos.com.mx/aviso-privacidad#cookies).
+
+**El sistema que contratas es otra cosa.** Ni la caja ni el panel de administración llevan Google Analytics, ni cookies de publicidad, ni ninguna medición de terceros: ahí solo se guarda lo necesario para mantener tu sesión abierta y para que el punto de venta funcione. Lo que se mide en esta página web no toca en ningún momento las ventas, el menú ni los clientes de tu negocio.
 
 ## Apps de reparto (Uber Eats, DiDi Food, Rappi)
 
