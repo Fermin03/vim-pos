@@ -624,13 +624,55 @@ escenario exacto que falló**: tras desplegar, el alta entró limpia y la fila q
 La conexión volvió a `ACTIVA` reusando la misma fila (`7a5b0309…`, creada el 6 sep), con la carta
 republicada: 49 ítems, 1 combo, 5 grupos, 10 opciones.
 
-#### Lo que la ola B deja pendiente
+#### Lo que la ola B dejó pendiente, y ya no
 
-Solo la **ola C**: publicar la **0.4.70**. Mientras no exista ese instalador, ninguna caja tiene el
-guard del escritorio y el espejo de un cliente sin módulo **baja a 5 minutos pero no para**. Medido
-el 13 sep con el módulo apagado y tres latidos de por medio: sellos a 18:19:06, 18:24:22 y 18:29:18.
-El `directivas.json` de la caja sí traía `delivery_apps: false` — el dato llega, falta el código que
-reacciona.
+Faltaba la **ola C**: publicar la 0.4.70. Mientras no existió ese instalador, ninguna caja tenía el
+guard del escritorio y el espejo de un cliente sin módulo **bajaba a 5 minutos pero no paraba**
+(medido el 13 sep: sellos a 18:19:06, 18:24:22 y 18:29:18, con tres latidos de por medio; el
+`directivas.json` sí traía `delivery_apps: false` — el dato llegaba, faltaba el código que
+reacciona). Resuelto abajo.
+
+### Resultado de la ola C — 13 sep 2026
+
+Instalador **0.4.70** publicado (release `v0.4.70`, 156,357,497 bytes; el `sha512` del manifiesto se
+calculó sobre el asset **descargado**, no sobre el local) y instalado en la caja de pruebas.
+
+#### El espejo se detiene, y vuelve
+
+| Hora (UTC) | Qué |
+|---|---|
+| 19:35:59 | sondeo normal, cada ~30 s |
+| **19:36:03** | **el dueño apaga el módulo** |
+| 19:36:32 | último sondeo: este ya recibe la respuesta de reposo |
+| 19:41:50 | sondeo de reposo, a 5 min |
+| **19:43:56** | **latido** → la caja se entera |
+| — | **nada más**: el sello siguiente tocaba hacia las 19:46:50 y no llegó |
+| **19:50:44** | **se vuelve a encender** |
+| **19:53:57** | **latido** → la caja se entera |
+| 19:53:58 | el espejo arranca solo, y sigue a ~30 s (19:54:27, 19:55:00, 19:55:31…) |
+
+En el log de la caja (`%APPDATA%/vim-pos-desktop/vim-pos.log`), las dos líneas, cada una a
+milisegundos de su latido:
+
+```
+[19:43:57.386] · [espejo] detenido (el cliente apagó el módulo de apps de delivery)
+[19:53:59.007] · [espejo] iniciado (el cliente encendió el módulo de apps de delivery)
+```
+
+**De 288 llamadas al día a cero**, sin reiniciar la caja y sin que el cajero note nada.
+
+#### Lo que hay que saber para operar
+
+**El cambio tarda hasta 10 minutos en los dos sentidos**, porque viaja en el latido. Apagar no
+duele: la carga cae a reposo en el acto (eso lo decide la Edge Function en cada llamada) y la
+parada total llega con el latido. **Encender sí se nota**: a un cliente que acaba de pagar puede
+tardarle hasta 10 minutos en volverle el espejo. No es un fallo; es el precio de que la caja no
+consulte nada más que su latido.
+
+**Cómo distinguir reposo de parada, que es donde ya me equivoqué una vez:** son indistinguibles
+durante los primeros cinco minutos. Un espejo en reposo sella `cajas.espejo_apps_at` cada ~300 s; uno
+detenido no sella nunca. Hay que esperar **más de un ciclo de reposo** después del latido antes de
+concluir nada — y confirmar con el control: encender otra vez y ver que vuelve.
 
 ## 5. Cuando algo falla
 
