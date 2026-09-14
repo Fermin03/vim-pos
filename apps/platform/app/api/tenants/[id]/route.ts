@@ -3,7 +3,7 @@ import { autorizar, auditar } from "../../../lib/server";
 import { hoyMx, sumarMeses } from "@vim/fecha";
 import { MODULOS } from "@vim/db/modulos";
 import { fechaBloqueo, mensajeBloqueoPorDefecto } from "../../../lib/bloqueo";
-import { decidirAltaAddon, type FilaAddon } from "../../../lib/addons";
+import { decidirAltaAddon, precioAltaDelivery, type FilaAddon } from "../../../lib/addons";
 
 // Detalle y acciones sobre un tenant (suspender/reactivar/cancelar, notas, plan).
 // Todo auditado en super_admin_accesos. service_role, gated por X-Platform-Key.
@@ -244,7 +244,7 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
     if (codigo === "DELIVERY") {
       const { data: tRaw } = await sb.from("tenants").select("plan:planes(codigo)").eq("id", id).maybeSingle();
       const planCodigo = (tRaw as { plan?: { codigo?: string } } | null)?.plan?.codigo ?? "";
-      if (planCodigo === "NEGOCIO" || planCodigo === "CADENA") precioLista = 0;
+      precioLista = precioAltaDelivery(planCodigo, precioLista);
     }
     const precio = body.precio_mensual_mxn != null ? Number(body.precio_mensual_mxn) : precioLista;
     // Una fila en $0.00 sin explicación invita a preguntar, dentro de seis meses, si el cero es un
@@ -306,11 +306,15 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
     let pausadas = 0;
     const fallos: string[] = [];
     if (codigo === "DELIVERY") {
-      // Solo "ACTIVA": `transicionConexion` (uber-activacion.ts) solo admite "pausar" desde ahí.
-      // Una PENDIENTE incluida aquí volvería con 409 de Uber, entraría en `fallos` y el operador
-      // vería un aviso de "Uber no confirmó la pausa" para una tienda que nunca estuvo activa.
+      // "ACTIVA" y "ERROR". La segunda se sumó el 14 sep 2026 por decisión de negocio: una conexión
+      // rota que no se cierra le sigue apareciendo abierta al cliente final, que pide comida que el
+      // POS va a rechazar. El camino interno de `delivery-uber-conexion` usa para eso la regla
+      // `pausar_vim`, que sí admite ERROR (el dueño conserva la estrecha).
+      // PENDIENTE sigue fuera: nunca estuvo abierta en Uber, así que su pausa vuelve con 409, se
+      // apuntaría en `fallos` y el operador vería "Uber no confirmó la pausa" de una tienda que
+      // jamás estuvo activa.
       const { data: cxs } = await sb.from("delivery_conexiones")
-        .select("id, estado").eq("tenant_id", id).eq("app", "APP_UBEREATS").eq("estado", "ACTIVA");
+        .select("id, estado").eq("tenant_id", id).eq("app", "APP_UBEREATS").in("estado", ["ACTIVA", "ERROR"]);
       const supabaseUrl = process.env.SUPABASE_URL;
       const claveServicio = process.env.SUPABASE_SERVICE_ROLE_KEY;
       const secretoInterno = process.env.VIM_DELIVERY_INTERNO_SECRET;

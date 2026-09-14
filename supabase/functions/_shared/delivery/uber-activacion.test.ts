@@ -60,3 +60,17 @@ test("transicionConexion: tabla de estados", () => {
   assert.throws(() => transicionConexion("DESCONECTADA", "desconectar"), /TRANSICION_INVALIDA/);
   assert.throws(() => transicionConexion(null, "desconectar"), /TRANSICION_INVALIDA:null:desconectar/);
 });
+
+test("pausar_vim: VIM cierra tambien una tienda en ERROR; el dueno no", () => {
+  // Decision de negocio del 14 sep 2026: al retirar el add-on hay que cerrar la tienda AUNQUE la
+  // conexion este rota, porque si no le sigue apareciendo abierta al cliente final mientras el POS
+  // rechaza cada pedido. Va en una accion propia y no en "pausar" a secas para no abrirle al dueno
+  // el atajo ERROR -> PAUSADA -> ACTIVA, que se saltaria el reaprovisionamiento.
+  assert.equal(transicionConexion("ERROR", "pausar_vim"), "PAUSADA");
+  assert.equal(transicionConexion("ACTIVA", "pausar_vim"), "PAUSADA");
+  assert.throws(() => transicionConexion("ERROR", "pausar"), /TRANSICION_INVALIDA:ERROR:pausar/);
+  // PENDIENTE sigue fuera: nunca estuvo abierta en Uber, y pedir su pausa devuelve 409.
+  assert.throws(() => transicionConexion("PENDIENTE", "pausar_vim"), /TRANSICION_INVALIDA/);
+  assert.throws(() => transicionConexion("PAUSADA", "pausar_vim"), /TRANSICION_INVALIDA/);
+  assert.throws(() => transicionConexion("DESCONECTADA", "pausar_vim"), /TRANSICION_INVALIDA/);
+});

@@ -54,11 +54,18 @@ export function cuerpoPosData(cfg: { sucursalId: string; autoAceptar: boolean })
 }
 
 export type EstadoConexion = "SIN_CONECTAR" | "PENDIENTE" | "ACTIVA" | "PAUSADA" | "ERROR" | "DESCONECTADA";
-export type AccionConexion = "activar" | "pausar" | "reanudar" | "desconectar";
+export type AccionConexion = "activar" | "pausar" | "pausar_vim" | "reanudar" | "desconectar";
 
 const REGLAS: Record<AccionConexion, { desde: (EstadoConexion | null)[]; a: EstadoConexion }> = {
   activar: { desde: [null, "SIN_CONECTAR", "DESCONECTADA", "ERROR"], a: "ACTIVA" },
   pausar: { desde: ["ACTIVA"], a: "PAUSADA" },
+  // La pausa que hace VIM al retirar el add-on, que alcanza también a una conexión rota: si no se
+  // cierra, la tienda le sigue apareciendo abierta al cliente final mientras el POS rechaza cada
+  // pedido que entra (decisión de negocio del 14 sep 2026). Es una acción aparte y no un estado más
+  // en `pausar` para no abrirle al dueño el atajo ERROR → PAUSADA → ACTIVA, que devolvería al aire
+  // una tienda rota sin volver a aprovisionarla. PENDIENTE queda fuera: nunca estuvo abierta en
+  // Uber y pedir su pausa devuelve 409.
+  pausar_vim: { desde: ["ACTIVA", "ERROR"], a: "PAUSADA" },
   reanudar: { desde: ["PAUSADA"], a: "ACTIVA" },
   desconectar: { desde: ["ACTIVA", "PAUSADA", "ERROR"], a: "DESCONECTADA" },
 };

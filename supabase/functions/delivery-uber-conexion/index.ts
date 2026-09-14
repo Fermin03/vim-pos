@@ -261,7 +261,14 @@ Deno.serve(async (req) => {
         const cx = await conexionDelTenant(body.conexion_id);
         if (!cx || !cx.tienda_id_externo) return json({ error: "CONEXION_NO_EXISTE" }, 404);
         let nuevo: EstadoConexion;
-        try { nuevo = transicionConexion(cx.estado, body.accion); } catch { return json({ error: "ACCION_INVALIDA", estado: cx.estado }, 409); }
+        // El camino interno usa `pausar_vim`, que alcanza también a una conexión en ERROR: cuando
+        // VIM retira el add-on hay que cerrar la tienda esté como esté, o al cliente final le sigue
+        // apareciendo abierta mientras el POS rechaza cada pedido. El dueño conserva `pausar` a
+        // secas (solo desde ACTIVA): darle la versión ancha le abriría el atajo
+        // ERROR → PAUSADA → ACTIVA, que devuelve al aire una tienda rota sin reaprovisionarla.
+        const regla = body.accion === "pausar" && esInterno ? "pausar_vim" : body.accion;
+        try { nuevo = transicionConexion(cx.estado, regla as "pausar" | "pausar_vim" | "reanudar"); }
+        catch { return json({ error: "ACCION_INVALIDA", estado: cx.estado }, 409); }
         const habilitar = body.accion === "reanudar";
         try { await uber.posData(cx.tienda_id_externo).actualizar({ integration_enabled: habilitar }); }
         catch (e) {

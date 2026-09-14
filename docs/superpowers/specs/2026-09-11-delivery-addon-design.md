@@ -70,8 +70,15 @@ mecanismo cubra los dos casos es que **`tenant_addons.precio_mensual_mxn` es por
 | Negocio $999 | `0.00`, `notas = 'incluido en el plan'` | $999 |
 | Cadena $1,999 | `0.00`, `notas = 'incluido en el plan'` | $1,999 |
 
-El panel **pre-llena ese precio según el plan del cliente** al dar de alta el add-on: $100 si es
-Esencial, $0 si es Negocio o Cadena. Fermín puede cambiarlo (una cortesía, una promoción), pero el
+El panel **pre-llena ese precio según el plan del cliente** al dar de alta el add-on: **$100 solo
+si es Esencial; cualquier otro plan lo lleva incluido**.
+
+> **Corregido el 14 sep 2026.** La regla original nombraba a Negocio y Cadena, y los planes viejos
+> por vertical —`FT`, `QS`, `CB`, `FS`, `DK`, `ENT`— caían al precio de lista por omisión: un `ENT`
+> de $2,499 acababa pagando aparte lo que un `CADENA` de $1,999 lleva incluido. Se le dio la vuelta
+> a la regla, para nombrar a quien paga en vez de a quien no. Un plan **desconocido** sigue pagando:
+> cobrar de más se ve en la factura y alguien reclama; regalarlo no lo nota nadie. La lista vive en
+> `precioAltaDelivery` (`apps/platform/app/lib/addons.ts`), con pruebas. Fermín puede cambiarlo (una cortesía, una promoción), pero el
 valor por defecto es el correcto. Así la política de precios vive en un sitio y no en la memoria de
 quien rellena el formulario.
 
@@ -136,6 +143,14 @@ La acción ya existe. `delivery-uber-conexion` tiene `case "pausar"` (`index.ts:
 `uber.posData(tienda).actualizar({ integration_enabled: false })` y registra el evento. **Se
 reutiliza tal cual**: al retirar el add-on, cada conexión del tenant en estado vivo pasa por ese
 mismo camino.
+
+> **Ampliado el 14 sep 2026: también se cierran las conexiones en `ERROR`.** Antes solo se pausaban
+> las `ACTIVA`, porque la tabla de transiciones no admite `pausar` desde `ERROR`. El efecto era que
+> una conexión rota se quedaba abierta en Uber: al cliente final le seguía apareciendo la tienda y
+> pedía comida que el POS iba a rechazar. Ahora el camino interno usa una acción propia,
+> `pausar_vim`, que admite `ACTIVA` y `ERROR`. **El dueño conserva la estrecha**: darle la ancha le
+> abriría el atajo `ERROR → PAUSADA → ACTIVA`, que devuelve al aire una tienda rota sin volver a
+> aprovisionarla. `PENDIENTE` sigue fuera — nunca estuvo abierta, y pedir su pausa devuelve 409.
 
 Quién lo dispara: el panel `/platform`, en la ficha del cliente, al retirar el add-on. No un
 trigger de base de datos — la llamada a Uber es I/O de red y no tiene nada que hacer dentro de una
