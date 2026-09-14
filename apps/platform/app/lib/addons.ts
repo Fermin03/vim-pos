@@ -13,6 +13,33 @@
 // arreglar esto sería mover el suelo. Lo que se arregla es la lectura del caso — un alta el mismo
 // día de la baja no es una fila nueva, es **deshacer** la de hoy.
 
+/**
+ * Precio con el que el panel pre-llena el alta del add-on de delivery, según el plan del cliente.
+ *
+ * **Solo Esencial lo paga.** Cualquier otro plan lo lleva incluido sin cargo. Al principio (spec
+ * §4) la regla nombraba Negocio y Cadena, y los planes viejos por vertical —`FT`, `QS`, `CB`, `FS`,
+ * `DK`, `ENT`— caían al precio de lista por omisión: un `ENT` de $2,499 pagaba aparte lo que un
+ * `CADENA` de $1,999 llevaba incluido. Corregido el 14 sep 2026 dándole la vuelta a la regla: se
+ * nombra a quien paga, no a quien no.
+ *
+ * **Un plan desconocido paga.** Si mañana aparece un plan nuevo, cobrarlo de más se ve en la
+ * factura y alguien reclama; regalarlo no lo nota nadie. Y el operador ve el precio en el
+ * formulario y puede cambiarlo antes de guardar.
+ *
+ * @param planCodigo  Código del plan del tenant, o vacío si no tiene.
+ * @param precioLista `addons.precio_mensual_mxn` de la fila del add-on.
+ */
+export function precioAltaDelivery(planCodigo: string | undefined, precioLista: number): number {
+  return PLANES_QUE_LO_INCLUYEN.has(planCodigo ?? "") ? 0 : precioLista;
+}
+
+/**
+ * Los planes que traen delivery sin cargo. Es una lista explícita y no un "todos menos Esencial"
+ * para que un plan nuevo no se regale solo: darlo de alta aquí es un gesto deliberado de dos
+ * segundos, y mientras tanto el panel cobra, que es el lado recuperable del error.
+ */
+const PLANES_QUE_LO_INCLUYEN = new Set(["NEGOCIO", "CADENA", "FT", "QS", "CB", "FS", "DK", "ENT"]);
+
 /** Lo mínimo que hace falta de cada fila de `tenant_addons` para decidir. */
 export type FilaAddon = { id: string; activo: boolean; fecha_inicio: string };
 
