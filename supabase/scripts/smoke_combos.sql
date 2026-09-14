@@ -24,7 +24,11 @@ BEGIN
     json_build_object('sub', v_maria::text, 'tenant_id', v_tenant::text)::text, true);
   UPDATE turnos SET estado='CERRADO', fecha_cierre=now() WHERE caja_id=v_caja AND estado='ABIERTO';
   INSERT INTO turnos(tenant_id, sucursal_id, caja_id, codigo_turno, dia_contable, usuario_apertura_id, fondo_inicial_mxn, fondo_modo)
-  VALUES (v_tenant, v_suc, v_caja, 'SMOKE-COMBO', CURRENT_DATE, v_maria, 500, 'TOTAL') RETURNING id INTO v_turno;
+  -- La fecha del turno y la que se consulta en las vistas tienen que salir de la MISMA regla que
+  -- usa el sistema (`calcular_dia_contable`: zona del negocio y corte a las 03:00). Con CURRENT_DATE
+  -- —UTC en CI— este smoke se ponia rojo entre las 18:00 y la medianoche de Mexico: los tickets
+  -- quedaban en el dia contable de ayer y la consulta preguntaba por el de hoy.
+  VALUES (v_tenant, v_suc, v_caja, 'SMOKE-COMBO', calcular_dia_contable(v_tenant), v_maria, 500, 'TOTAL') RETURNING id INTO v_turno;
 
   -- Catálogo: un refresco en otra categoría (para probar "fuera del slot") y el combo
   INSERT INTO categorias(tenant_id, nombre, orden_visualizacion) VALUES (v_tenant, 'Bebidas smoke', 9) RETURNING id INTO v_cat_beb;
@@ -162,7 +166,7 @@ BEGIN
   IF EXISTS (SELECT 1 FROM vw_ventas_por_producto WHERE tenant_id = v_tenant AND producto_nombre = 'Combo smoke') THEN
     RAISE EXCEPTION 'vw_ventas_por_producto no debe listar el padre'; END IF;
   SELECT coalesce(sum(total_mxn),0) INTO v_suma FROM vw_ventas_por_producto
-   WHERE tenant_id = v_tenant AND producto_id = v_papas AND dia_contable = CURRENT_DATE;
+   WHERE tenant_id = v_tenant AND producto_id = v_papas AND dia_contable = calcular_dia_contable(v_tenant);
   IF v_suma < 110 THEN RAISE EXCEPTION 'las papas en combo deben contar 2×55 = 110 en la vista (hay %)', v_suma; END IF;
   RAISE NOTICE 'vista de ventas OK';
 
@@ -201,7 +205,7 @@ BEGIN
   -- dentro del subtotal (total = subtotal); con IVA por afuera se suma encima (total = subtotal +
   -- iva, sección 8). Es esa relación la que caza los dos defectos; un número suelto no.
   SELECT subtotal_mxn, iva_mxn, total_mxn INTO v_sub, v_iva, v_total FROM vw_ventas_por_producto
-   WHERE tenant_id = v_tenant AND producto_id = v_ensalada AND dia_contable = CURRENT_DATE;
+   WHERE tenant_id = v_tenant AND producto_id = v_ensalada AND dia_contable = calcular_dia_contable(v_tenant);
   IF v_sub <> 46.25 OR v_iva <> 6.38 OR v_total <> 46.25 THEN
     RAISE EXCEPTION 'hijo bajo padre con IVA dentro: esperaba 46.25 / 6.38 / 46.25, hay % / % / %', v_sub, v_iva, v_total;
   END IF;
@@ -245,7 +249,7 @@ BEGIN
   -- tiene que reportar lo que se cobró: 185 + 29.60 = 214.60, y cada fila con total = subtotal + iva.
   SELECT coalesce(sum(subtotal_mxn),0), coalesce(sum(iva_mxn),0), coalesce(sum(total_mxn),0)
     INTO v_sub, v_iva, v_total FROM vw_ventas_por_producto
-   WHERE tenant_id = v_tenant AND dia_contable = CURRENT_DATE AND producto_id IN (v_hamb_f, v_papas_f);
+   WHERE tenant_id = v_tenant AND dia_contable = calcular_dia_contable(v_tenant) AND producto_id IN (v_hamb_f, v_papas_f);
   IF v_total <> v_sub + v_iva THEN
     RAISE EXCEPTION 'con IVA por fuera la fila debe cumplir total = subtotal + iva (% <> % + %)', v_total, v_sub, v_iva;
   END IF;
@@ -254,7 +258,7 @@ BEGIN
   END IF;
   -- Y la misma cifra por categoría: las tres vistas comparten la regla, no solo la de producto.
   SELECT coalesce(sum(total_mxn),0) INTO v_total FROM vw_ventas_por_categoria
-   WHERE tenant_id = v_tenant AND dia_contable = CURRENT_DATE AND categoria = 'Acompanamientos fuera smoke';
+   WHERE tenant_id = v_tenant AND dia_contable = calcular_dia_contable(v_tenant) AND categoria = 'Acompanamientos fuera smoke';
   IF v_total <> 53.65 THEN
     RAISE EXCEPTION 'vw_ventas_por_categoria: las papas del combo con IVA por fuera valen 53.65, hay %', v_total;
   END IF;

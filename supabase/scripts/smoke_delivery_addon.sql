@@ -21,8 +21,13 @@ BEGIN
   RAISE NOTICE 'estado 1 (sin add-on) OK: ni permitido ni efectivo';
 
   -- Estado 2: con add-on vigente y el interruptor apagado (default de la columna) → permitido, NO efectivo.
+  -- OJO con la fecha: `tenant_addon_activo` compara contra la fecha de MEXICO, no la del servidor.
+  -- Con CURRENT_DATE (UTC en CI) este smoke se ponia rojo entre las 18:00 y la medianoche de
+  -- Mexico —seis horas al dia— porque el alta quedaba fechada "manana" y no salia vigente. Aqui se
+  -- usa la MISMA expresion que la funcion, para que la prueba no dependa de la hora a la que corra.
   INSERT INTO tenant_addons(tenant_id, addon_id, fecha_inicio, activo, precio_mensual_mxn)
-  VALUES (v_tenant, (SELECT id FROM addons WHERE codigo = 'DELIVERY'), CURRENT_DATE, true, 100.00);
+  VALUES (v_tenant, (SELECT id FROM addons WHERE codigo = 'DELIVERY'),
+          (now() AT TIME ZONE 'America/Mexico_City')::date, true, 100.00);
   SELECT modulos_efectivos(v_tenant) INTO v_m;
   IF NOT (v_m->'permitidos'->>'delivery_apps')::boolean THEN RAISE EXCEPTION 'con add-on vigente debe estar permitido'; END IF;
   IF (v_m->'efectivos'->>'delivery_apps')::boolean THEN RAISE EXCEPTION 'permitido pero sin encender NO debe ser efectivo'; END IF;
@@ -37,7 +42,7 @@ BEGIN
   RAISE NOTICE 'estado 3 (add-on vigente + encendido) OK: permitido y efectivo';
 
   -- La vigencia manda sobre el interruptor: caducar el add-on lo apaga aunque el dueño lo deje encendido.
-  UPDATE tenant_addons SET fecha_fin = CURRENT_DATE - 1
+  UPDATE tenant_addons SET fecha_fin = (now() AT TIME ZONE 'America/Mexico_City')::date - 1
    WHERE tenant_id = v_tenant AND addon_id = (SELECT id FROM addons WHERE codigo = 'DELIVERY');
   SELECT modulos_efectivos(v_tenant) INTO v_m;
   IF (v_m->'permitidos'->>'delivery_apps')::boolean THEN RAISE EXCEPTION 'caducado no debe seguir permitido'; END IF;
