@@ -3,8 +3,9 @@
 // por la RPC sync_push_snapshot (idempotente, verbatim) y comprueba que folios/estados no
 // cambian y que el tracking _vim_push_ok evita re-subir. (El insert-fresco-conserva-folio ya
 // quedó probado en smoke_sync_push contra el esquema canónico.)
+import assert from "node:assert";
 import { startBackend } from "./backend.mjs";
-import { construirSnapshotPush, marcarPushed, listarPendientes, marcarMovimientosPushed } from "./sync-push.mjs";
+import { construirSnapshotPush, marcarPushed, listarPendientes, marcarMovimientosPushed, marcarRepartidoresSubidos } from "./sync-push.mjs";
 
 const CAJA = "99999999-0000-0000-0000-0000000000cc";
 
@@ -23,6 +24,8 @@ try {
   await pool.query("TRUNCATE _vim_push_ok");
   await pool.query("CREATE TABLE IF NOT EXISTS _vim_mov_ok (movimiento_id uuid PRIMARY KEY, subido_at timestamptz DEFAULT now())");
   await pool.query("TRUNCATE _vim_mov_ok");
+  await pool.query("CREATE TABLE IF NOT EXISTS _vim_repartidores_ok (repartidor_id uuid PRIMARY KEY, subido_at timestamptz DEFAULT now())");
+  await pool.query("TRUNCATE _vim_repartidores_ok");
 
   // 1) Armar el snapshot pendiente (ventas terminales de la caja)
   const { snapshot, ids } = await construirSnapshotPush(pool);
@@ -111,6 +114,26 @@ try {
   const otra = await construirSnapshotPush(pool);
   if (otra.ids.length !== 0) throw new Error(`tras marcar subidos, aún quedan ${otra.ids.length} pendientes`);
   console.log("· tras marcar subidos → 0 pendientes (no re-sube)");
+
+  // 5) Repartidores (0114/Task 2): un alta en la caja sube UNA vez y no vuelve a viajar.
+  // Si se reenviara en cada ciclo, el push pisaría con la copia local vieja cualquier edición hecha
+  // en el panel — y el catálogo también baja por el pull, así que eso pasaría de verdad.
+  {
+    const { rows: [r] } = await pool.query(
+      `INSERT INTO repartidores(tenant_id, nombre) VALUES ($1, 'Alta En Caja') RETURNING id`,
+      [tenant],
+    );
+    const primero = await construirSnapshotPush(pool);
+    const enviados = (primero.snapshot?.repartidores ?? []).map((x) => x.id);
+    assert.ok(enviados.includes(r.id), "el repartidor nuevo debía ir en el primer snapshot");
+
+    await marcarRepartidoresSubidos(pool, [r.id]);
+
+    const segundo = await construirSnapshotPush(pool);
+    const reenviados = (segundo.snapshot?.repartidores ?? []).map((x) => x.id);
+    assert.ok(!reenviados.includes(r.id), "un repartidor ya confirmado NO debe volver a subir");
+    console.log("✅ repartidores: sube una vez y no pisa al panel");
+  }
 
   console.log(`\n✅ SYNC PUSH OK — ${ids.length} ventas de la caja armadas en snapshot y aplicadas por sync_push_snapshot`);
   console.log("   sin alterar folios/estados; tracking evita re-subir. Cierra el ciclo: pull baja referencia, push sube ventas.");

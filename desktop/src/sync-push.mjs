@@ -70,6 +70,14 @@ async function asegurarTabla(pool) {
   // en cuanto la nube confirma; la nube es idempotente por id, así que reenviar no descuenta doble.
   await pool.query("CREATE TABLE IF NOT EXISTS _vim_mov_ok (movimiento_id uuid PRIMARY KEY, subido_at timestamptz DEFAULT now())");
 
+  // Repartidores: la caja puede darlos de alta (0114) porque un domicilio no puede quedarse sin
+  // salir porque nadie entró al panel. Suben UNA sola vez, por id.
+  //
+  // OJO, no es como _vim_mov_ok aunque se parezca: los movimientos de inventario nunca bajan del
+  // pull, así que allí la libreta solo evita re-trabajo. Los repartidores SÍ bajan, y aquí la
+  // libreta es lo que impide que la caja reenvíe su copia vieja y pise lo que se editó en el panel.
+  await pool.query("CREATE TABLE IF NOT EXISTS _vim_repartidores_ok (repartidor_id uuid PRIMARY KEY, subido_at timestamptz DEFAULT now())");
+
   await rescatarCortesUnaVez(pool);
 }
 
@@ -214,6 +222,7 @@ export async function construirSnapshotPush(pool, { ticketIds = null, turnoIds =
       (SELECT array_agg(id) FROM tk) AS ids,
       (SELECT jsonb_agg(jsonb_build_object('id', id, 'huella', huella)) FROM tn) AS turnos,
       (SELECT array_agg(id) FROM movimientos_inventario x WHERE ($4::uuid[] IS NOT NULL AND x.id = ANY($4::uuid[])) OR ($4::uuid[] IS NULL AND $2::uuid[] IS NULL AND x.id NOT IN (SELECT movimiento_id FROM _vim_mov_ok))) AS movimientos,
+      (SELECT array_agg(id) FROM repartidores x WHERE x.id NOT IN (SELECT repartidor_id FROM _vim_repartidores_ok)) AS repartidores,
       jsonb_strip_nulls(jsonb_build_object(
         'turnos',                    (SELECT jsonb_agg(to_jsonb(x)) FROM turnos x WHERE x.id IN (SELECT id FROM tn)),
         'tickets',                   (SELECT jsonb_agg(to_jsonb(x)) FROM tickets x WHERE x.id IN (SELECT id FROM tk)),
@@ -225,6 +234,10 @@ export async function construirSnapshotPush(pool, { ticketIds = null, turnoIds =
         -- salida, antes de cobrar, así que para cuando el ticket entra en esta rebanada ya está
         -- liquidada y sube completa.
         'delivery_asignaciones',     (SELECT jsonb_agg(to_jsonb(x)) FROM delivery_asignaciones x WHERE x.ticket_id IN (SELECT id FROM tk)),
+
+        -- El catálogo de repartidores, solo los que la nube aún no confirmó. Ver _vim_repartidores_ok.
+        'repartidores',              (SELECT jsonb_agg(to_jsonb(x)) FROM repartidores x
+                                        WHERE x.id NOT IN (SELECT repartidor_id FROM _vim_repartidores_ok)),
 
         -- EL CIERRE DEL TURNO. Se quedaba en la caja.
         --
@@ -248,7 +261,10 @@ export async function construirSnapshotPush(pool, { ticketIds = null, turnoIds =
                                                AND x.id NOT IN (SELECT movimiento_id FROM _vim_mov_ok)))
       )) AS snapshot
   `, [TERMINALES, ticketIds, turnoIds, movimientoIds]);
-  return { snapshot: rows[0].snapshot ?? {}, ids: rows[0].ids ?? [], turnos: rows[0].turnos ?? [], movimientos: rows[0].movimientos ?? [] };
+  return {
+    snapshot: rows[0].snapshot ?? {}, ids: rows[0].ids ?? [], turnos: rows[0].turnos ?? [],
+    movimientos: rows[0].movimientos ?? [], repartidores: rows[0].repartidores ?? [],
+  };
 }
 
 /** Marca tickets como subidos (para no re-enviarlos). */
@@ -263,6 +279,15 @@ export async function marcarMovimientosPushed(pool, ids) {
   if (!ids?.length) return;
   await pool.query(
     "INSERT INTO _vim_mov_ok(movimiento_id) SELECT unnest($1::uuid[]) ON CONFLICT (movimiento_id) DO NOTHING", [ids]);
+}
+
+/** Marca los repartidores que la nube ya aplicó: no vuelven a subir nunca. */
+export async function marcarRepartidoresSubidos(pool, ids) {
+  if (!ids?.length) return;
+  await pool.query(
+    "INSERT INTO _vim_repartidores_ok (repartidor_id) SELECT unnest($1::uuid[]) ON CONFLICT DO NOTHING",
+    [ids],
+  );
 }
 
 /**
@@ -300,6 +325,10 @@ function rechazadosPorTicket(errores, snapshot) {
       // Que no suba quién repartió no invalida la venta. Retener el ticket por esto lo dejaría
       // reintentándose para siempre si la asignación nunca puede aplicarse.
       continue;
+    } else if (e.tabla === "repartidores") {
+      // Un repartidor rechazado se reintenta solo (ver repartidoresRechazados); no cuelga de
+      // ningún ticket, igual que delivery_asignaciones: que no suba el catálogo no invalida ventas.
+      continue;
     } else if (e.tabla === "ticket_items" || e.tabla === "pagos") {
       const fila = (snapshot[e.tabla] ?? []).find((x) => x.id === e.id);
       if (fila?.ticket_id) fuera.add(fila.ticket_id);
@@ -319,6 +348,16 @@ function movimientosRechazados(errores) {
 }
 
 /**
+ * Ids de repartidores que la nube rechazó: no se marcan en _vim_repartidores_ok.
+ *
+ * Marcar un rechazado lo perdería para siempre — por diseño un repartidor confirmado nunca vuelve
+ * a viajar, así que si se marca sin haber llegado de verdad, esa alta no existirá jamás en la nube.
+ */
+function repartidoresRechazados(errores) {
+  return new Set((errores ?? []).filter((e) => e?.tabla === "repartidores" && e.id).map((e) => e.id));
+}
+
+/**
  * Envía UN lote y marca lo que la nube aceptó.
  *
  * Se parte solo si hace falta: primero por tamaño medido antes de salir, y también si la nube
@@ -327,7 +366,7 @@ function movimientosRechazados(errores) {
  * en pocas vueltas y no necesita saber cuál es el límite del otro lado.
  */
 async function enviarLote(pool, { cloudUrl, anonKey, deviceToken }, { ticketIds, turnoIds, movimientoIds = [], maxBytes }, log) {
-  const { snapshot, ids, turnos, movimientos } = await construirSnapshotPush(pool, { ticketIds, turnoIds, movimientoIds });
+  const { snapshot, ids, turnos, movimientos, repartidores } = await construirSnapshotPush(pool, { ticketIds, turnoIds, movimientoIds });
   const cuerpo = JSON.stringify({ snapshot });
   const bytes = Buffer.byteLength(cuerpo);
 
@@ -372,6 +411,8 @@ async function enviarLote(pool, { cloudUrl, anonKey, deviceToken }, { ticketIds,
   await marcarTurnosPushed(pool, turnos.filter((t) => !fuera.has(t.id)));
   const movFuera = movimientosRechazados(errores);
   await marcarMovimientosPushed(pool, movimientos.filter((id) => !movFuera.has(id)));
+  const repFuera = repartidoresRechazados(errores);
+  await marcarRepartidoresSubidos(pool, repartidores.filter((id) => !repFuera.has(id)));
   if (errores.length) {
     const muestra = errores.slice(0, 3).map((e) => `${e.tabla}/${String(e.id).slice(0, 8)}: ${e.error}`).join(" · ");
     log(`la nube rechazó ${errores.length} fila(s), se reintentarán: ${muestra}`);
