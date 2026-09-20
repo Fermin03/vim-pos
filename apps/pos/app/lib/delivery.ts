@@ -201,6 +201,9 @@ export async function liquidarDelivery(
   if (error) throw new Error(error.message);
 }
 
+// "En reparto", no "En ruta": es como lo dice el negocio. El valor del enum en la base sigue siendo
+// EN_RUTA — renombrarlo arrastraría migración, la vista vw_cumplimiento_tiempos_delivery y el
+// espejo de escritorio por una palabra que solo se lee en pantalla.
 const ESTADO_LABEL: Record<DeliveryEstado, string> = {
   ASIGNADO: "Asignado", EN_RUTA: "En reparto", EN_DESTINO: "En destino", ENTREGADO: "Entregado",
   NO_ENTREGADO: "No entregado", EN_REGRESO: "En regreso", LIQUIDADO: "Liquidado", CANCELADO: "Cancelado",
