@@ -184,15 +184,37 @@ Hacen falta **dos escrituras más**, y las dos están implementadas:
 
 - **El pull anota lo que baja** (`marcarRepartidoresDelPull`, en `desktop/src/sync-pull.mjs`), dentro
   de la misma transacción del pull: si el pull hace ROLLBACK, las marcas se van con él.
-- **`asegurarTabla()` siembra la libreta con el catálogo local**, y **solo en el momento de crear la
-  tabla** (`to_regclass(...) IS NOT NULL` antes del `CREATE TABLE IF NOT EXISTS`). Esa condición no
-  es un detalle: si la siembra corriera en cada arranque, un repartidor dado de alta en la caja y
-  todavía sin subir quedaría marcado como enviado, y **por diseño una fila marcada no vuelve a
-  viajar nunca** — esa alta no existiría jamás en la nube y nadie se enteraría. Al crear la tabla la
-  siembra sí es segura: hasta esta versión la caja no podía crear repartidores, así que todo el
-  catálogo local bajó del pull y la nube ya lo tiene.
+- **La libreta nace sembrada con el catálogo local**, en `sembrarRepartidoresUnaVez()`
+  (`desktop/src/sync-push.mjs`), llamada **desde el arranque** —`startLocalBackend()` en
+  `desktop/src/runtime.mjs`, justo después de aplicar las migraciones— y **una sola vez por caja**,
+  con un marcador en `_vim_migraciones_sync` igual al del rescate de cortes. Sembrar más de una vez
+  marcaría como enviado un repartidor dado de alta en la caja y todavía sin subir, y **por diseño
+  una fila marcada no vuelve a viajar nunca**: esa alta no existiría jamás en la nube y nadie se
+  enteraría. En el primer arranque la siembra sí es segura, porque hasta esta versión la caja no
+  podía crear repartidores — todo el catálogo local bajó del pull y la nube ya lo tiene.
 
 Con las dos, el catálogo viaja hacia arriba **solo** cuando nació en la caja.
+
+#### Corrección — la siembra es del ARRANQUE, no del primer push
+
+> Esta sección decía que sembraba `asegurarTabla()` al crear la tabla. Se implementó así y **era
+> una pérdida de datos esperando su turno**. Se corrige el diseño con el código.
+
+A `asegurarTabla()` solo se llega desde `pushToCloud()`, y el push ni se intenta cuando el login del
+dispositivo contra la nube falla (`desktop/src/main.mjs`). La libreta no nacía al instalar: nacía en
+el **primer sync exitoso**. Una caja que se actualiza sin internet —o con una credencial de
+dispositivo que no entra, como le pasó al piloto el 8/09/2026— se queda sin libreta; el cajero da de
+alta a un repartidor, que es justo para lo que se hizo el alta desde la caja; y cuando vuelve la
+conexión la siembra lo encuentra en el catálogo y lo marca como subido. No viaja nunca, nadie se
+entera, y sus `delivery_asignaciones` se estrellan contra la FK en la nube —donde
+`rechazadosPorTicket()` las deja pasar a propósito—, así que cada reparto que hizo pierde también su
+atribución. Era además no determinista: el sondeo del menú corre un `pullFromCloud` cada minuto y el
+ciclo de sync cada diez, así que a veces el pull creaba la tabla primero y el repartidor se salvaba.
+
+El arranque es el momento que **no depende de la nube**: las migraciones se aplican con internet o
+sin él, y ocurre antes de que la caja pueda escribir nada. `asegurarTabla()` conserva su
+`CREATE TABLE IF NOT EXISTS` —el push tiene que funcionar en las pruebas y en cualquier caja cuyo
+arranque no haya pasado por ahí— pero ya no siembra.
 
 ### 4.4 Estado mostrado
 
@@ -341,27 +363,34 @@ ya existía tampoco se veía nunca.
 
 `supabase/scripts/smoke_delivery_viaje.sql`:
 
+Numerados **igual que en el archivo**, para que «el caso N» signifique lo mismo aquí y allá:
+
 1. Asignar 3 pedidos a un repartidor devuelve **un** `viaje_id` y las 3 filas lo comparten.
-2. Las 3 quedan en `EN_RUTA` con `fecha_salida` y `monto_a_liquidar_mxn` igual a `total_mxn`.
-3. **Atomicidad**: un lote de 3 donde el tercero es de Pick-up falla entero y **no deja ninguna
+2. Asignar **es** salir: las 3 quedan en `EN_RUTA` con `fecha_salida`.
+3. El `monto_a_liquidar_mxn` lo calcula el servidor desde `tickets.total_mxn`, no el cliente.
+4. **Atomicidad**: un lote de 3 donde el tercero es de Pick-up falla entero y **no deja ninguna
    asignación**, ni siquiera de los dos primeros.
-4. Un ticket inexistente en el lote → excepción, y tampoco deja nada.
-5. **Idempotencia**: reasignar un ticket que ya tiene asignación viva la actualiza, no duplica.
-6. Repartidor inactivo o con `deleted_at` → excepción.
-7. `sync_push_snapshot` con un `repartidores` en el snapshot lo aplica y lo cuenta en el
+5. Un ticket inexistente en el lote → excepción, y tampoco deja nada.
+6. **Idempotencia**: reasignar un ticket que ya tiene asignación viva la actualiza, no duplica.
+7. Repartidor inactivo o con `deleted_at` → excepción.
+8. `sync_push_snapshot` con un `repartidores` en el snapshot lo aplica y lo cuenta en el
    resultado — que es lo que prueba que el alta desde la caja llega a la nube (§4.3).
-8. **Aislamiento por tenant**: un pedido de otro negocio, con los claims del primero, lanza y no
+9. **Aislamiento por tenant**: un pedido de otro negocio, con los claims del primero, lanza y no
    deja ninguna fila. Lleva control (con sus propios claims ese mismo pedido sí se asigna) para
    que no pueda ponerse verde por un fixture mal armado.
 
-**Lo que prueba el caso 8 es el predicado, no el RLS.** Los smokes corren como `postgres`, que se
+**Lo que prueba el caso 9 es el predicado, no el RLS.** Los smokes corren como `postgres`, que se
 salta las políticas (cabecera de `desktop/scripts/smokes.mjs`), así que lo único que puede rechazar
 al pedido ajeno es el `tenant_id = current_tenant_id()` explícito de la RPC. El camino real bajo
 RLS se ejercita con el patrón de `desktop/src/verify-e2e.mjs`.
 
 > Esta sección decía antes que "el aislamiento por tenant no se prueba aquí" y a la vez que sí se
-> probaba el predicado. Ningún caso lo tocaba: todos los anteriores corrían bajo un solo tenant. El caso 8 es
+> probaba el predicado. Ningún caso lo tocaba: todos los anteriores corrían bajo un solo tenant. El caso 9 es
 > el que faltaba, y `CLAUDE.md` no lo deja opcional.
+>
+> Y numeraba con ocho entradas —juntaba el `EN_RUTA` y el monto en una— mientras el `.sql` levanta
+> nueve, así que «el caso 8» de aquí era el del push de allá y quien siguiera la referencia acababa
+> en el caso equivocado. Se parten en 2 y 3 para que las dos listas casen una a una.
 
 Nunca comparar `CURRENT_DATE` contra fechas de negocio: el servidor es UTC y el sistema calcula en
 hora de México; eso pone los smokes rojos seis horas al día.
@@ -384,8 +413,11 @@ Y en `node --test` (corre en CI, a diferencia de los `verify:*`), la libreta por
 - `desktop/src/sync-push.test.mjs` — el camino de RECHAZO: una respuesta de la nube con un
   `_errores` de tabla `repartidores` **no** marca esa fila y la deja pendiente para el siguiente
   ciclo. Hoy el código lo hace bien; una regresión ahí sería permanente y silenciosa, porque una
-  fila marcada por error no vuelve a viajar nunca. En el mismo archivo, las dos caras de la
-  siembra de `asegurarTabla()` (§4.3): siembra al crear la tabla, y **no** siembra si ya existía.
+  fila marcada por error no vuelve a viajar nunca. En el mismo archivo, el **orden** de la siembra
+  (§4.3): que el arranque siembre con el catálogo, que no vuelva a sembrar en el arranque
+  siguiente, que el push no siembre nunca —un alta hecha sin conexión, antes de que la libreta
+  existiera, tiene que llegar a la nube igual— y que una siembra fallida deje el marcador puesto en
+  vez de quedar armada para más tarde.
 - `desktop/src/sync-pull.test.mjs` — que `pullSnapshot()` anota lo que baja, y dentro de la
   transacción (antes del `COMMIT`).
 

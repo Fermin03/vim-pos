@@ -4,6 +4,7 @@
 // reusable que arranca el proceso main de Electron (o el verify headless).
 import EmbeddedPostgres from "embedded-postgres";
 import { arrancarConReintentos, crearCapturaDeLog } from "./arranque-reintentos.mjs";
+import { sembrarRepartidoresUnaVez } from "./sync-push.mjs";
 import pg from "pg";
 import { spawn, execFileSync } from "node:child_process";
 import { randomBytes } from "node:crypto";
@@ -310,6 +311,21 @@ export async function startLocalBackend(opts = {}) {
     }
   }
   if (nuevas) log(`${nuevas} migraciones nuevas aplicadas`);
+
+  // 3b) Libreta del sync de repartidores (0114), sembrada AQUÍ y no en el primer push.
+  //
+  // Va en el arranque porque el arranque es el único momento que NO depende de la nube: las
+  // migraciones de arriba se aplican con internet o sin él, mientras que el push ni se intenta si
+  // el dispositivo no logra autenticarse contra Supabase (main.mjs). Sembrando desde el push, una
+  // caja que se actualizara sin conexión se quedaba sin libreta, el cajero daba de alta a un
+  // repartidor —el caso para el que se hizo la función— y la siembra del primer sync lo marcaba
+  // como ya subido: no llegaba nunca a la nube y nadie se enteraba. El porqué completo, y por qué
+  // sembrar en este instante es seguro, están en `sembrarRepartidoresUnaVez` (sync-push.mjs).
+  //
+  // Antes del seed de fixtures a propósito: lo que siembre `seed.sql` debe quedar FUERA de la
+  // libreta. Equivocarse hacia "no marcado" cuesta un envío de más; hacia "marcado", un alta que
+  // no existe en la nube y que nadie puede recuperar.
+  await sembrarRepartidoresUnaVez(db, log);
 
   // 4) Grants a los roles API (lo que Supabase da fuera de las migraciones).
   await db.query(`

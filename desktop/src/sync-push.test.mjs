@@ -8,50 +8,65 @@
 //   · marcar de menos → la caja reenvía su copia y pisa lo que se editó en el panel, porque la
 //     nube aplica `ON CONFLICT (id) DO UPDATE` de todas las columnas.
 //
-// Los dos casos de aquí son justamente los bordes: qué pasa cuando la nube RECHAZA una fila, y
-// cuándo se puede sembrar la libreta con el catálogo que ya está en la caja.
+// Lo que se cubre aquí son los bordes: qué pasa cuando la nube RECHAZA una fila, y —sobre todo— EN
+// QUÉ MOMENTO se siembra la libreta. Lo segundo ya falló una vez: la siembra vivía en el push, al
+// que solo se llega con la nube respondiendo, así que una caja actualizada sin conexión se quedaba
+// sin libreta, el cajero daba de alta a un repartidor y la siembra del primer sync lo marcaba como
+// subido. Por eso las pruebas de orden imitan ese calendario: arranque → alta local → push.
 //
 // Vive sin base de datos a propósito (igual que verify-push-lotes): lo que se prueba es la
 // política, y provocar un rechazo de la nube a voluntad con el Postgres embebido es lento y
 // difícil de montar. El SQL real lo cubre `npm run verify:push`.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { listarPendientes, pushToCloud } from "./sync-push.mjs";
+import { listarPendientes, pushToCloud, sembrarRepartidoresUnaVez } from "./sync-push.mjs";
 
 /**
- * Un pool que sabe lo justo para este archivo: sin ventas, sin turnos, sin movimientos, y los
- * repartidores pendientes que se le pasen. Apunta lo que se escribe en la libreta.
+ * Un pool que sabe lo justo para este archivo: sin ventas, sin turnos, sin movimientos, y el
+ * catálogo de repartidores que se le pase. Modela tres cosas y apunta lo que se escribe en ellas:
+ * la tabla `repartidores` (`catalogo`, mutable: las pruebas le añaden altas hechas en la caja), la
+ * libreta `_vim_repartidores_ok` (`marcados`) y los marcadores de una-sola-vez
+ * (`marcadores`, `_vim_migraciones_sync`).
  */
-function crearPoolFalso({ repartidores = [], tablaYaExistia = true, catalogo = [] } = {}) {
-  const marcados = new Set();
+function crearPoolFalso({ catalogo = [], yaMarcados = [], fallaLaSiembra = false } = {}) {
+  const marcados = new Set(yaMarcados);
+  // El rescate de cortes (0.4.50) se da por corrido: aquí no se prueba y no debe tocar nada.
+  const marcadores = new Set(["rescate_cortes_0089"]);
   const sembrados = [];
   const pool = {
+    catalogo: [...catalogo],
     marcados,
+    marcadores,
     sembrados,
+    fallaLaSiembra,
     async query(sql, params = []) {
-      if (sql.includes("to_regclass('public._vim_repartidores_ok')")) {
-        return { rows: [{ existia: tablaYaExistia }] };
-      }
-      if (sql.startsWith("CREATE TABLE")) return { rows: [] };
+      if (sql.startsWith("CREATE TABLE")) return { rows: [], rowCount: 0 };
 
-      // La siembra del arranque: `SELECT id FROM repartidores`, sin parámetros.
+      // `_vim_migraciones_sync`: el marcador de "esto ya corrió una vez en esta caja".
+      if (sql.includes("_vim_migraciones_sync")) {
+        const clave = sql.match(/'([a-z0-9_]+)'/)?.[1];
+        if (sql.trimStart().toUpperCase().startsWith("SELECT")) {
+          return { rows: [], rowCount: marcadores.has(clave) ? 1 : 0 };
+        }
+        marcadores.add(clave);
+        return { rows: [], rowCount: 1 };
+      }
+
+      // La siembra del ARRANQUE: `SELECT id FROM repartidores`, sin parámetros.
       if (sql.includes("_vim_repartidores_ok") && sql.includes("SELECT id FROM repartidores")) {
-        sembrados.push(...catalogo);
-        for (const id of catalogo) marcados.add(id);
-        return { rows: [] };
+        if (pool.fallaLaSiembra) throw new Error("siembra rota a propósito");
+        const nuevos = pool.catalogo.filter((id) => !marcados.has(id));
+        sembrados.push(...nuevos);
+        for (const id of nuevos) marcados.add(id);
+        return { rows: [], rowCount: nuevos.length };
       }
       // El marcado tras confirmar la nube: `SELECT unnest($1::uuid[])`.
       if (sql.includes("_vim_repartidores_ok") && sql.includes("unnest")) {
         for (const id of params[0]) marcados.add(id);
-        return { rows: [] };
+        return { rows: [], rowCount: params[0].length };
       }
 
-      // Rescate de cortes (0.4.50): se contesta "ya corrió" para que no intente nada.
-      if (sql.includes("_vim_migraciones_sync")) {
-        return sql.trim().toUpperCase().startsWith("SELECT") ? { rows: [{}], rowCount: 1 } : { rows: [], rowCount: 0 };
-      }
-
-      const pendientes = repartidores.filter((id) => !marcados.has(id));
+      const pendientes = pool.catalogo.filter((id) => !marcados.has(id));
 
       if (sql.includes("array_agg(id ORDER BY fecha_apertura)")) {
         return { rows: [{ ids: null, turnos: null, movimientos: null, repartidores: pendientes.length ? pendientes : null }] };
@@ -86,8 +101,11 @@ const OPTS = { cloudUrl: "http://nube.falsa", anonKey: "x", deviceToken: "y" };
 const A = "aaaaaaaa-0000-0000-0000-000000000001";
 const B = "bbbbbbbb-0000-0000-0000-000000000002";
 
+/** Ids de repartidores que viajaron en la petición número `i` del push. */
+const enviadosEn = (nube, i = 0) => (nube.peticiones[i]?.snapshot?.repartidores ?? []).map((r) => r.id);
+
 test("un repartidor que la nube RECHAZA no se marca y vuelve a intentarse", async () => {
-  const pool = crearPoolFalso({ repartidores: [A, B] });
+  const pool = crearPoolFalso({ catalogo: [A, B] });
   // La nube aísla la fila conflictiva (migración 0074) y dice cuál se quedó fuera.
   const nube = nubeFalsa({ resultado: { repartidores: 1, _errores: [{ tabla: "repartidores", id: B, error: "repartidor_nombre_uq" }] } });
   try {
@@ -103,7 +121,7 @@ test("un repartidor que la nube RECHAZA no se marca y vuelve a intentarse", asyn
 });
 
 test("sin rechazos se marcan todos los que viajaron", async () => {
-  const pool = crearPoolFalso({ repartidores: [A, B] });
+  const pool = crearPoolFalso({ catalogo: [A, B] });
   const nube = nubeFalsa({ resultado: { repartidores: 2 } });
   try {
     await pushToCloud(pool, OPTS, () => {});
@@ -114,7 +132,7 @@ test("sin rechazos se marcan todos los que viajaron", async () => {
 });
 
 test("un error de OTRA tabla no arrastra al repartidor que sí entró", async () => {
-  const pool = crearPoolFalso({ repartidores: [A] });
+  const pool = crearPoolFalso({ catalogo: [A] });
   const nube = nubeFalsa({ resultado: { _errores: [{ tabla: "delivery_asignaciones", id: "otra-cosa", error: "boom" }] } });
   try {
     await pushToCloud(pool, OPTS, () => {});
@@ -122,20 +140,70 @@ test("un error de OTRA tabla no arrastra al repartidor que sí entró", async ()
   } finally { nube.restaurar(); }
 });
 
-test("la libreta se siembra con el catálogo SOLO cuando la tabla no existía", async () => {
-  // Primera vez: la tabla se crea ahora, así que todo lo local bajó del pull y la nube ya lo tiene.
-  const nueva = crearPoolFalso({ tablaYaExistia: false, catalogo: [A, B], repartidores: [A, B] });
-  const pend = await listarPendientes(nueva);
-  assert.deepEqual(nueva.sembrados.sort(), [A, B].sort());
+test("el ARRANQUE siembra la libreta con el catálogo que ya estaba en la caja", async () => {
+  // Primer arranque tras actualizar: todo lo que hay en `repartidores` bajó del pull —ninguna
+  // versión anterior sabía darlos de alta aquí— así que la nube ya lo tiene y marcarlo es seguro.
+  const pool = crearPoolFalso({ catalogo: [A, B] });
+  assert.equal(await sembrarRepartidoresUnaVez(pool), 2);
+  assert.deepEqual(pool.sembrados.sort(), [A, B].sort());
+  const pend = await listarPendientes(pool);
   assert.deepEqual(pend.repartidorIds, [], "tras sembrar no queda nada pendiente de subir");
 });
 
-test("la siembra NO se repite en cada arranque (si se repitiera, un alta local se perdería)", async () => {
-  // La tabla ya existe y hay un alta hecha en la caja que todavía no ha viajado. Sembrar aquí la
-  // marcaría como subida y, por diseño, no volvería a viajar nunca: el repartidor no existiría en
-  // la nube y nadie se enteraría.
-  const pool = crearPoolFalso({ tablaYaExistia: true, catalogo: [A], repartidores: [A] });
+test("la siembra NO se repite en el siguiente arranque (si se repitiera, un alta local se perdería)", async () => {
+  const pool = crearPoolFalso({ catalogo: [B] });
+  await sembrarRepartidoresUnaVez(pool);
+
+  // La caja se usa: el cajero da de alta a A, que todavía no ha viajado. Mañana se vuelve a abrir.
+  pool.catalogo.push(A);
+  assert.equal(await sembrarRepartidoresUnaVez(pool), 0, "la siembra corre una sola vez por caja");
+  assert.deepEqual(pool.sembrados, [B], "no debe sembrarse nada en el segundo arranque");
+
   const pend = await listarPendientes(pool);
-  assert.deepEqual(pool.sembrados, [], "no debe sembrarse nada cuando la tabla ya existía");
-  assert.deepEqual(pend.repartidorIds, [A], "el alta local sigue pendiente de subir");
+  assert.deepEqual(pend.repartidorIds, [A], "el alta local sigue pendiente después de reiniciar");
+});
+
+test("un alta hecha SIN CONEXIÓN, antes de que la libreta existiera, sí llega a la nube", async () => {
+  // Esta es la prueba del ORDEN, y el calendario es el del incidente que la motivó.
+  //
+  // La caja se actualiza a esta versión sin internet (o con una credencial de dispositivo que no
+  // entra, como le pasó al piloto el 8/09/2026). Arranca igual: las migraciones y la siembra no
+  // dependen de la nube. En el catálogo solo está B, que bajó del pull antes de actualizar.
+  const pool = crearPoolFalso({ catalogo: [B] });
+  await sembrarRepartidoresUnaVez(pool);
+  assert.deepEqual(pool.sembrados, [B]);
+
+  // Sigue sin conexión, y el cajero da de alta a A para poder sacar un domicilio: es EL caso para
+  // el que existe el alta desde la caja, no un borde.
+  pool.catalogo.push(A);
+
+  // Vuelve la conexión y corre el primer push de esta versión. Cuando la siembra vivía aquí, este
+  // push marcaba a A sin haberlo mandado: no llegaba nunca a la nube, y de paso sus
+  // `delivery_asignaciones` se quedaban sin atribución porque la FK las rechaza allá arriba.
+  const nube = nubeFalsa({ resultado: { repartidores: 1 } });
+  try {
+    await pushToCloud(pool, OPTS, () => {});
+    assert.deepEqual(pool.sembrados, [B], "el push no debe sembrar la libreta: eso es del arranque");
+    assert.deepEqual(enviadosEn(nube), [A], "el alta hecha en la caja tenía que viajar en el push");
+    assert.ok(pool.marcados.has(A), "y quedar marcada una vez que la nube la confirmó");
+  } finally { nube.restaurar(); }
+});
+
+test("una siembra que falla deja el marcador puesto y no queda armada para un arranque posterior", async () => {
+  // Se marca ANTES de sembrar a propósito. Los dos fallos posibles no cuestan lo mismo: sin libreta
+  // el catálogo sube una vez (acotado, y se acaba solo), mientras que una siembra pendiente para
+  // MÁS TARDE marcaría como subida un alta local y esa sí se pierde para siempre y en silencio.
+  const pool = crearPoolFalso({ catalogo: [B], fallaLaSiembra: true });
+  await assert.rejects(() => sembrarRepartidoresUnaVez(pool), /siembra rota/);
+  assert.ok(pool.marcadores.has("siembra_repartidores_0114"), "el marcador se escribe antes de sembrar");
+
+  // Arranque siguiente, ya con un alta hecha en la caja: no se siembra nada, así que A conserva su
+  // viaje. El precio de la siembra perdida es que B vuelva a subir una vez, no perder a A.
+  pool.fallaLaSiembra = false;
+  pool.catalogo.push(A);
+  assert.equal(await sembrarRepartidoresUnaVez(pool), 0);
+  assert.deepEqual(pool.sembrados, []);
+
+  const pend = await listarPendientes(pool);
+  assert.ok(pend.repartidorIds.includes(A), "el alta local no puede perderse por una siembra fallida");
 });

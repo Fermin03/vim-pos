@@ -50,13 +50,8 @@ function crearPoolFalso({ nTickets = 450, nTurnos = 5, turnosCambiados = [], rep
 
       if (sql.startsWith("CREATE TABLE")) return { rows: [] };
 
-      // La libreta de repartidores se siembra SOLO cuando la tabla no existía (ver asegurarTabla).
-      // Aquí se contesta "ya existía" para que no intente sembrar: este pool no tiene catálogo, y
-      // la siembra se prueba contra el esquema real en verify:push.
-      if (sql.includes("to_regclass('public._vim_repartidores_ok')")) {
-        return { rows: [{ existia: true }] };
-      }
-
+      // La libreta de repartidores ya no se siembra desde el push (la siembra vive en el arranque,
+      // `sembrarRepartidoresUnaVez`), así que aquí solo llega el marcado de lo que la nube confirmó.
       if (sql.includes("_vim_repartidores_ok (repartidor_id)")) {
         for (const id of params[0]) repartidoresMarcados.add(id);
         return { rows: [] };

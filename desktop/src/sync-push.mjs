@@ -89,23 +89,25 @@ async function asegurarTabla(pool) {
   // refresca antes de pisar: la ventana es un ciclo entero, no unos segundos. Un repartidor dado
   // de baja en el panel entre el último pull y el siguiente push RESUCITABA.
   //
-  // Se cierra por los dos lados: el pull anota lo que baja (sync-pull.mjs), y aquí se siembra la
-  // libreta con el catálogo que ya está en la caja.
-  const { rows: [{ existia }] } = await pool.query(
-    "SELECT to_regclass('public._vim_repartidores_ok') IS NOT NULL AS existia",
-  );
+  // Se cierra por los dos lados: el pull anota lo que baja (sync-pull.mjs), y la libreta nace
+  // SEMBRADA con el catálogo que ya estaba en la caja.
+  //
+  // AQUÍ SOLO SE CREA LA TABLA. LA SIEMBRA VIVE EN EL ARRANQUE, NO EN EL PUSH.
+  //
+  // La siembra estuvo aquí y era una pérdida de datos esperando su turno: a este archivo solo se
+  // llega desde pushToCloud, y el push ni se intenta si el login del dispositivo contra la nube
+  // falla (main.mjs). O sea, la libreta no nacía al instalar sino en el primer sync EXITOSO. Una
+  // caja que se actualiza sin internet (o con una credencial que no entra, como le pasó al piloto
+  // el 8/09/2026) se queda sin libreta; el cajero da de alta a un repartidor —que es justo para lo
+  // que se hizo esto—, y cuando vuelve la conexión la siembra lo encuentra en el catálogo y lo
+  // marca como ya subido. Por diseño no vuelve a viajar nunca: no llega a la nube, nadie se entera,
+  // y sus `delivery_asignaciones` se estrellan contra la FK allá arriba —donde `rechazadosPorTicket`
+  // las deja pasar a propósito—, así que cada reparto que hizo pierde también su atribución.
+  // Ver `sembrarRepartidoresUnaVez`, que corre al arrancar el backend local (runtime.mjs).
+  //
+  // El CREATE se queda porque el push tiene que funcionar igual en las pruebas y en cualquier caja
+  // cuyo arranque no haya pasado por ahí: sin la tabla, todas las consultas de abajo reventarían.
   await pool.query("CREATE TABLE IF NOT EXISTS _vim_repartidores_ok (repartidor_id uuid PRIMARY KEY, subido_at timestamptz DEFAULT now())");
-  if (!existia) {
-    // SOLO al CREAR la tabla, nunca en cada arranque. Sembrar en cada arranque marcaría como
-    // "ya subido" a un repartidor dado de alta en la caja que todavía no ha viajado, y por diseño
-    // un repartidor marcado NO vuelve a subir jamás: esa alta no existiría nunca en la nube y
-    // nadie se enteraría. En el momento de crear la tabla la siembra sí es segura, porque hasta
-    // esta versión la caja no podía crear repartidores — todo lo que hay en el catálogo local
-    // bajó del pull y la nube ya lo tiene.
-    await pool.query(
-      "INSERT INTO _vim_repartidores_ok (repartidor_id) SELECT id FROM repartidores ON CONFLICT DO NOTHING",
-    );
-  }
 
   await rescatarCortesUnaVez(pool);
 }
@@ -157,6 +159,58 @@ async function rescatarCortesUnaVez(pool) {
   if (n > 0) {
     console.log(`[sync] rescate de cortes: ${n} turno(s) volverán a subir con su cierre.`);
   }
+}
+
+/**
+ * Siembra `_vim_repartidores_ok` con el catálogo que ya está en la caja. UNA sola vez por caja, EN
+ * EL ARRANQUE — la llama `startLocalBackend` (runtime.mjs) justo después de aplicar migraciones.
+ *
+ * QUÉ SIEMBRA Y POR QUÉ ES SEGURO
+ *
+ * La libreta dice qué repartidores NO hay que mandar a la nube. Al instalar esta versión, el
+ * catálogo local solo puede traer filas que BAJARON del pull: ninguna versión anterior sabía dar de
+ * alta un repartidor desde la caja. La nube ya los tiene, así que marcarlos no pierde nada — y sin
+ * marcarlos, el primer push subiría el catálogo entero y pisaría con la copia local el nombre, el
+ * teléfono, el `activo` y el `deleted_at` que se hayan editado en el panel.
+ *
+ * POR QUÉ EN EL ARRANQUE Y NO EN EL PRIMER PUSH
+ *
+ * Porque el arranque no depende de la nube y el push sí. Aplicar las migraciones es lo primero que
+ * hace la caja al abrir, pase lo que pase con el internet; el push ni se intenta si el dispositivo
+ * no logra autenticarse contra Supabase. Sembrar desde el push dejaba sin libreta a la caja que se
+ * actualiza sin conexión, y la siembra acababa corriendo DESPUÉS de que el cajero diera de alta a un
+ * repartidor: lo marcaba como subido y esa alta no existía jamás en la nube. Ver `asegurarTabla`.
+ *
+ * Aquí eso no puede pasar: el primer arranque tras la actualización ocurre antes de que la caja
+ * pueda escribir nada, y todo lo que se cree después ya nace fuera de la libreta.
+ *
+ * POR QUÉ SE MARCA ANTES DE SEMBRAR (igual que `rescatarCortesUnaVez`)
+ *
+ * Porque los dos fallos posibles no cuestan lo mismo. Si la siembra falla con el marcador ya
+ * puesto, la libreta se queda vacía y el catálogo sube una vez: se pisa lo que el panel haya
+ * editado en el último ciclo, es acotado y se acaba solo. Si en cambio el marcador se escribiera al
+ * final, una siembra fallida quedaría armada para un arranque POSTERIOR — y para entonces el
+ * catálogo ya puede tener un alta hecha en la caja, que la siembra marcaría como subida y se
+ * perdería para siempre y en silencio. Es exactamente el fallo que esta función existe para cerrar.
+ */
+export async function sembrarRepartidoresUnaVez(db, log = () => {}) {
+  await db.query("CREATE TABLE IF NOT EXISTS _vim_repartidores_ok (repartidor_id uuid PRIMARY KEY, subido_at timestamptz DEFAULT now())");
+  await db.query(
+    "CREATE TABLE IF NOT EXISTS _vim_migraciones_sync (clave text PRIMARY KEY, aplicada_at timestamptz DEFAULT now())",
+  );
+  const { rowCount: yaCorrio } = await db.query(
+    "SELECT 1 FROM _vim_migraciones_sync WHERE clave = 'siembra_repartidores_0114'",
+  );
+  if (yaCorrio) return 0;
+
+  await db.query(
+    "INSERT INTO _vim_migraciones_sync(clave) VALUES ('siembra_repartidores_0114') ON CONFLICT DO NOTHING",
+  );
+  const { rowCount: n } = await db.query(
+    "INSERT INTO _vim_repartidores_ok (repartidor_id) SELECT id FROM repartidores ON CONFLICT DO NOTHING",
+  );
+  if (n > 0) log(`libreta de repartidores sembrada con ${n} del catálogo (bajaron de la nube: no vuelven a subir)`);
+  return n;
 }
 
 /** Parte una lista en trozos de a lo más `tamano`. */
