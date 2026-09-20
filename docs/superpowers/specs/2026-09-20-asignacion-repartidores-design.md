@@ -129,13 +129,37 @@ siguen diciendo quién los llevó).
 
 ### 4.3 `repartidores` sube al push
 
-En la misma 0114, `repartidores` se añade al array de tablas de `sync_push_snapshot`, **antes** de
-`delivery_asignaciones` porque estas lo referencian por `repartidor_catalogo_id`. Sin esto, un
-repartidor dado de alta desde la caja (§6.1) se quedaría en el Postgres local para siempre. Ver
-§12.1.
+Sin esto, un repartidor dado de alta desde la caja (§6.1) se quedaría en el Postgres local para
+siempre. Son **dos sitios**, y los dos hacen falta: el servidor tiene que aceptar la tabla y el
+escritorio tiene que mandarla.
 
-`CREATE OR REPLACE FUNCTION` exige la función entera, así que se copia el cuerpo vigente (el de la
-0078) y el único cambio es esa tabla en el `FOREACH`.
+**Servidor — en la 0114.** `repartidores` se añade al array `v_tablas` de `sync_push_snapshot`,
+**primero**, porque `delivery_asignaciones` lo referencia por `repartidor_catalogo_id` y el array
+está ordenado por dependencia.
+
+`CREATE OR REPLACE FUNCTION` exige la función entera, así que hay que copiar el cuerpo **vigente**.
+La definición vigente es la de **`0101_sync_inventario.sql`**, no la de la 0078: desde entonces la
+0089 añadió los cortes y la 0101 sacó `movimientos_inventario` del modo réplica y añadió el aviso
+de `_ignoradas`. Copiar el cuerpo de la 0078 dejaría fuera los cortes Z y el inventario —
+exactamente el incidente de los trece turnos cerrados sin corte en la nube.
+
+**Escritorio — `desktop/src/sync-push.mjs`.** `construirSnapshotPush()` arma el snapshot con su
+propia lista de tablas; añadir la tabla solo en el servidor no manda nada.
+
+Y **no se mandan todos los repartidores en cada push**: el catálogo también baja por el pull, así
+que reenviar la copia local en cada ciclo sobrescribiría con datos viejos cualquier edición hecha
+en el panel. Se sube **cada repartidor una sola vez**, con una libreta igual a las que ya existen:
+
+```sql
+CREATE TABLE IF NOT EXISTS _vim_repartidores_ok (repartidor_id uuid PRIMARY KEY, subido_at timestamptz DEFAULT now())
+```
+
+en `asegurarTabla()`, y el snapshot incluye solo los que no estén en ella. Se marcan cuando la nube
+confirma, igual que `_vim_mov_ok`.
+
+Es distinto de `_vim_mov_ok` en un punto que conviene no confundir: los movimientos de inventario
+**nunca** bajan del pull, así que todo lo local es de origen local. Los repartidores sí bajan. Por
+eso la libreta aquí no es solo para no re-trabajar — es lo que impide que la caja pise al panel.
 
 ### 4.4 Estado mostrado
 
@@ -241,7 +265,9 @@ Es un rename mecánico de dos usos.
 
 - **Push:** `delivery_asignaciones` ya está en el array de `sync_push_snapshot` (0078) y
   `viaje_id` viaja sola por el `information_schema` del destino (0074) — la columna no obliga a
-  tocar nada. Lo que sí lo obliga es añadir `repartidores` al array (§4.3).
+  tocar nada. Lo que sí lo obliga es subir `repartidores`, en los dos sitios del §4.3: `v_tablas`
+  de `sync_push_snapshot` (copiando el cuerpo de la **0101**) y `construirSnapshotPush()` del
+  escritorio con su libreta `_vim_repartidores_ok`.
 - **Pull:** `repartidores` ya está en `sync_pull_snapshot` (0078). No se toca.
 - **Escritorio:** la migración 0114 se aplica sola al arrancar (lee `resources/migrations`).
   Instalador **0.4.71**, siguiendo la lista "Antes de empaquetar" del RUNBOOK y desde un checkout
@@ -255,13 +281,18 @@ Es un rename mecánico de dos usos.
 
 1. Asignar 3 pedidos a un repartidor devuelve **un** `viaje_id` y las 3 filas lo comparten.
 2. Las 3 quedan en `EN_RUTA` con `fecha_salida` y `monto_a_liquidar_mxn` igual a `total_mxn`.
-3. **Atomicidad**: un lote con un ticket de otro tenant falla entero y no deja ninguna fila.
-4. **Idempotencia**: reasignar un ticket que ya tiene asignación viva la actualiza, no duplica.
-5. Repartidor inactivo o con `deleted_at` → excepción.
-6. Un ticket que no es `DELIVERY_PROPIO` → excepción.
-7. **RLS**: el tenant B no ve los viajes del tenant A.
-8. `sync_push_snapshot` con un `repartidores` en el snapshot lo aplica y lo cuenta en el
+3. **Atomicidad**: un lote de 3 donde el tercero es de Pick-up falla entero y **no deja ninguna
+   asignación**, ni siquiera de los dos primeros.
+4. Un ticket inexistente en el lote → excepción, y tampoco deja nada.
+5. **Idempotencia**: reasignar un ticket que ya tiene asignación viva la actualiza, no duplica.
+6. Repartidor inactivo o con `deleted_at` → excepción.
+7. `sync_push_snapshot` con un `repartidores` en el snapshot lo aplica y lo cuenta en el
    resultado — que es lo que prueba que el alta desde la caja llega a la nube (§4.3).
+
+**El aislamiento por tenant no se prueba aquí.** Los smokes corren como `postgres`, que se salta
+RLS (cabecera de `desktop/scripts/smokes.mjs`). Lo que sí se prueba —y es lo que de verdad protege
+a esta RPC— es su predicado explícito `tenant_id = current_tenant_id()`, que no depende del RLS.
+El camino real bajo RLS se ejercita con el patrón de `desktop/src/verify-e2e.mjs`.
 
 Nunca comparar `CURRENT_DATE` contra fechas de negocio: el servidor es UTC y el sistema calcula en
 hora de México; eso pone los smokes rojos seis horas al día.
@@ -272,7 +303,13 @@ Lo puro, en `apps/pos/app/lib/__tests__/`: agrupar asignaciones por `viaje_id` (
 `NULL`), minutos fuera desde la más vieja, suma de efectivo, y que un viaje sin pedidos vivos no
 se muestre.
 
-### 10.3 A mano
+### 10.3 Escritorio
+
+`npm run verify:push` desde `desktop/`, comprobando que `construirSnapshotPush()` incluye un
+repartidor nuevo la primera vez y **no** lo vuelve a incluir después de marcarlo en
+`_vim_repartidores_ok`. Es la prueba de que el catálogo sube sin pisar al panel.
+
+### 10.4 A mano
 
 En el POS empaquetado en el navegador, sin Electron: asignar uno, asignar tres de un jalón,
 comprobar que imprimir ya no marca salida, que el naranja sale de la asignación, y que cobrar un
@@ -288,9 +325,11 @@ pestaña *En reparto* solo muestra `delivery_asignaciones`, que solo se crean pa
 
 1. **El catálogo pasa a viajar en los dos sentidos.** Hasta hoy `repartidores` solo bajaba (pull);
    con el alta desde la caja (§6.1) también sube (§4.3). Es el primer catálogo que la caja puede
-   crear, y por tanto el primero que puede divergir: si el panel edita a "Luis" mientras la caja
-   lo crea, gana el último push. Aceptable para un nombre y un teléfono, pero hay que mirarlo en
-   el primer ciclo real, igual que se hizo con el sync de inventario (ADR 0013).
+   crear, y por tanto el primero que puede divergir. La libreta `_vim_repartidores_ok` cierra el
+   caso que importa —que la caja pise ediciones del panel— porque cada fila sube una sola vez.
+   Queda una ventana estrecha: si el panel edita a "Luis" en los segundos entre que la caja lo
+   crea y lo sube, gana la caja. Aceptable para un nombre y un teléfono; se mira en el primer
+   ciclo real, igual que se hizo con el sync de inventario (ADR 0013).
 2. **Pedidos viejos sin `viaje_id`.** Los que ya existan se muestran como viajes de un pedido. Es
    correcto y no requiere backfill.
 3. **Obligatorio cambia la costumbre del cajero.** Hoy imprime y se acabó. Hay que avisarle a
