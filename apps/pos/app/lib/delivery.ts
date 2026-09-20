@@ -98,6 +98,61 @@ export async function asignarRepartidor(
 }
 
 /**
+ * Asigna uno o varios pedidos al mismo repartidor y los deja en reparto.
+ *
+ * Asignar ES salir: no hay un segundo paso que confirmar. Antes eran dos llamadas
+ * (`asignar_delivery_repartidor` + `confirmar_salida_delivery`) y existía un tercer camino que se
+ * las saltaba —imprimir el ticket marcaba la salida sin repartidor—, así que había pedidos
+ * "salidos" que nadie llevaba.
+ *
+ * El monto NO se manda: lo calcula la RPC desde `tickets.total_mxn`. Es el dinero que el repartidor
+ * tiene que traer de vuelta y lo decide quien manda, no esta pantalla.
+ */
+export async function asignarLote(
+  token: string,
+  args: { ticketIds: string[]; repartidorId: string; tiempoPromesa?: number | null },
+): Promise<string> {
+  const { data, error } = await employeeClient(token).rpc("asignar_delivery_lote", {
+    p_ticket_ids: args.ticketIds,
+    p_repartidor_id: args.repartidorId,
+    p_tiempo_promesa_minutos: args.tiempoPromesa ?? null,
+  });
+  if (error) throw new Error(error.message);
+  return String(data);
+}
+
+/**
+ * Da de alta un repartidor desde la caja.
+ *
+ * El catálogo se administra en el panel, pero desde que asignar es obligatorio la caja necesita una
+ * salida: si nadie dio de alta a nadie, sin esto ningún domicilio podría salir hasta que alguien
+ * entre al panel web — y eso es trabar la caja en hora pico por un trámite.
+ */
+export async function crearRepartidor(
+  token: string,
+  tenantId: string,
+  args: { nombre: string; telefono?: string | null },
+): Promise<Repartidor> {
+  const nombre = args.nombre.trim();
+  const telefono = args.telefono?.trim() ? args.telefono.trim() : null;
+  const { data, error } = await employeeClient(token)
+    .from("repartidores")
+    .insert({ tenant_id: tenantId, nombre, telefono })
+    .select("id, nombre, telefono")
+    .single();
+  // El choque del índice único llega como jerga de Postgres; aquí se dice lo que pasó.
+  if (error) {
+    throw new Error(
+      error.message.includes("repartidor_nombre_uq")
+        ? "Ya hay un repartidor con ese nombre."
+        : error.message,
+    );
+  }
+  const r = data as Record<string, unknown>;
+  return { id: String(r.id), nombre: String(r.nombre), telefono: (r.telefono as string) ?? null };
+}
+
+/**
  * Asignación contra una CUENTA de usuario. No se usa hoy —los repartidores no entran al sistema—
  * y se conserva para cuando exista la app del repartidor, que sí tendrá cuentas propias.
  */
@@ -147,7 +202,7 @@ export async function liquidarDelivery(
 }
 
 const ESTADO_LABEL: Record<DeliveryEstado, string> = {
-  ASIGNADO: "Asignado", EN_RUTA: "En ruta", EN_DESTINO: "En destino", ENTREGADO: "Entregado",
+  ASIGNADO: "Asignado", EN_RUTA: "En reparto", EN_DESTINO: "En destino", ENTREGADO: "Entregado",
   NO_ENTREGADO: "No entregado", EN_REGRESO: "En regreso", LIQUIDADO: "Liquidado", CANCELADO: "Cancelado",
 };
 export function labelDeliveryEstado(e: DeliveryEstado): string {
