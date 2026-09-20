@@ -11,6 +11,7 @@ import { ModalCancelarItems, type LineaCancelada } from "./modal-cancelar-items"
 import { ModalCancelarTicket } from "./modal-cancelar-ticket";
 import { ModalDescuento } from "./modal-descuento";
 import { ModalAutorizacionPin } from "./modal-autorizacion-pin";
+import { PanelEnReparto } from "./panel-en-reparto";
 import type { Empleado } from "../lib/supabase";
 import type { ModoServicio } from "../lib/carrito";
 import { capaVisible } from "../lib/escape";
@@ -77,6 +78,7 @@ export function PantallaCuentasModo({
   onImprimirTicket,
   onComandaCancelacion,
   extraPorCuenta,
+  mostrarEnReparto,
 }: {
   token: string;
   caja: DatosCaja;
@@ -99,9 +101,14 @@ export function PantallaCuentasModo({
   onComandaCancelacion: (ticketId: string, lineas: LineaCancelada[]) => Promise<void>;
   /** Acciones propias del modo (p. ej. "Marcar salida" en domicilio). */
   extraPorCuenta?: (c: CuentaAbierta, recargar: () => void) => React.ReactNode;
+  /** Domicilio: muestra la pestaña de los pedidos que ya van con un repartidor. */
+  mostrarEnReparto?: boolean;
 }) {
   const copia = COPIA[modo];
   const esComedor = modo === "COMER_AQUI";
+  // Solo domicilio tiene dos pestañas; Pick-up y Comedor nunca reciben mostrarEnReparto y se
+  // quedan siempre en "local", que es exactamente el maestro-detalle de siempre.
+  const [pestana, setPestana] = useState<"local" | "reparto">("local");
   const [items, setItems] = useState<CuentaAbierta[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [selId, setSelId] = useState<string | null>(null);
@@ -240,6 +247,20 @@ export function PantallaCuentasModo({
 
       {error && <p className="flex-shrink-0 bg-[#FBF1EF] px-4 py-2 text-[13px] font-medium text-danger" role="alert">{error}</p>}
 
+      {/* Domicilio: "Pedidos" es el maestro-detalle de siempre; "En reparto" es la vista nueva de
+          quién anda repartiendo. Pick-up y Comedor nunca reciben mostrarEnReparto, así que ni
+          ven la franja ni pueden caer en pestana === "reparto" por accidente (el botón que lo
+          cambiaría no existe). */}
+      {mostrarEnReparto && (
+        <div role="tablist" className="flex flex-shrink-0 items-center gap-2 border-b border-line px-3 py-2">
+          <BotonPestana label="Pedidos" activa={pestana === "local"} onClick={() => setPestana("local")} />
+          <BotonPestana label="En reparto" activa={pestana === "reparto"} onClick={() => setPestana("reparto")} />
+        </div>
+      )}
+
+      {pestana === "reparto" && mostrarEnReparto ? (
+        <PanelEnReparto token={token} sucursalId={caja.sucursal_id} onCobrar={onCobrar} />
+      ) : (
       <div className="flex min-h-0 flex-1">
         {/* ── Lista de cuentas ─────────────────────────────────────────── */}
         <div className="flex w-[clamp(18rem,30vw,24rem)] flex-shrink-0 flex-col border-r border-line">
@@ -407,6 +428,7 @@ export function PantallaCuentasModo({
           )}
         </div>
       </div>
+      )}
 
       {cancelando && sel && (
         <ModalCancelarItem
@@ -574,6 +596,25 @@ function Accion({
       ].join(" ")}
     >
       {ocupado ? "Imprimiendo…" : label}
+    </button>
+  );
+}
+
+/** Misma pinta que los botones de la cabecera (borde + fondo claro); la activa se marca como
+ *  la tarjeta seleccionada de la lista, para no inventar un tercer estilo de "seleccionado". */
+function BotonPestana({ label, activa, onClick }: { label: string; activa: boolean; onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      role="tab"
+      aria-selected={activa}
+      onClick={onClick}
+      className={[
+        "flex h-10 items-center rounded border px-3.5 text-[13.5px] font-semibold transition",
+        activa ? "border-ink bg-sel text-ink" : "border-line-strong bg-surface text-ink-2 hover:border-ink hover:text-ink",
+      ].join(" ")}
+    >
+      {label}
     </button>
   );
 }

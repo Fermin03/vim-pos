@@ -1477,6 +1477,7 @@ export function HomePos({
               )
             : undefined
         }
+        mostrarEnReparto={modo === "DELIVERY_PROPIO"}
         />
         {asignandoRepartidor && (
           <ModalAsignarRepartidor
