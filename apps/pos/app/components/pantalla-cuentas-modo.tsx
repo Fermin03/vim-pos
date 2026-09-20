@@ -309,9 +309,13 @@ export function PantallaCuentasModo({
             <div className="flex flex-col gap-2">
               {itemsLocal?.map((c) => {
                 const activa = c.ticketId === selId;
-                // Ticket ya impreso = la orden salió. Se pinta en naranja para distinguir de un
-                // vistazo lo que ya va en camino de lo que sigue pendiente de imprimir.
-                const salio = yaImpresas.has(c.ticketId) || c.impresaAt != null;
+                // Ticket ya impreso = la orden salió, EXCEPTO en domicilio: ahí "En el local" ya
+                // solo contiene pedidos sin repartidor (se filtran en cuanto se asignan), así que
+                // nada en esta lista puede haber salido. Pintarlo de naranja por venir impreso
+                // sería la misma mentira que esta tarea vino a quitar, solo que reaparecida en la
+                // otra pestaña. En Pick-up/Comedor "impreso" sigue siendo la única señal de salida
+                // y no cambia.
+                const salio = modo === "DELIVERY_PROPIO" ? false : (yaImpresas.has(c.ticketId) || c.impresaAt != null);
                 return (
                   <button
                     key={c.ticketId}
