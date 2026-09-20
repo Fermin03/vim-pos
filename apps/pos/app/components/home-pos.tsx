@@ -1198,7 +1198,7 @@ export function HomePos({
                     r.motivo === "sin asignación"
                       ? {
                           titulo: "Pedido sin repartidor",
-                          texto: "Este pedido se cobró sin repartidor asignado y ya no se le puede asignar uno. Anota por fuera quién lo va a llevar: no va a aparecer en el corte de ningún repartidor.",
+                          texto: "Este pedido se cobró sin repartidor asignado, y ya cerrado no se le puede asignar uno. Anota por fuera quién lo lleva: el sistema ya no va a poder decir de quién fue.",
                         }
                       : {
                           titulo: "El reparto quedó sin cerrar",
@@ -1276,11 +1276,12 @@ export function HomePos({
           onNuevoTicket={nuevoTicket}
         />
       )}
-      {/* Domicilio cobrado sin repartidor anotado. Va por encima de la confirmación de cobro y del
-          recibo (z-[60]) porque es lo único de esta pantalla que el cajero no puede pasar por alto:
-          ese pedido ya no va a poder cuadrarse contra nadie. No detiene nada — el cobro ya quedó. */}
+      {/* Domicilio cobrado sin repartidor anotado. z-[70] para quedar por encima de la confirmación
+          de cobro (z-50) y del recibo (z-[60]): es lo único de esta pantalla que el cajero no puede
+          pasar por alto, porque ese pedido ya no va a poder cuadrarse contra nadie. No detiene nada
+          — el cobro ya quedó registrado. */}
       {avisoReparto && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-ink/50 p-4" role="alertdialog" aria-modal="true">
+        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-ink/50 p-4" role="alertdialog" aria-modal="true">
           <div className="w-full max-w-md rounded-xl bg-surface p-6 text-center shadow-xl">
             <div className="mx-auto mb-3 flex h-16 w-16 items-center justify-center rounded-full bg-danger/10 text-danger">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="h-8 w-8"><path d="M12 9v4" /><path d="M12 17h.01" /><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z" /></svg>
