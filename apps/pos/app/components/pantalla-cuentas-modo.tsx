@@ -247,13 +247,13 @@ export function PantallaCuentasModo({
 
       {error && <p className="flex-shrink-0 bg-[#FBF1EF] px-4 py-2 text-[13px] font-medium text-danger" role="alert">{error}</p>}
 
-      {/* Domicilio: "Pedidos" es el maestro-detalle de siempre; "En reparto" es la vista nueva de
+      {/* Domicilio: "En el local" es el maestro-detalle de siempre; "En reparto" es la vista nueva de
           quién anda repartiendo. Pick-up y Comedor nunca reciben mostrarEnReparto, así que ni
           ven la franja ni pueden caer en pestana === "reparto" por accidente (el botón que lo
           cambiaría no existe). */}
       {mostrarEnReparto && (
         <div role="tablist" className="flex flex-shrink-0 items-center gap-2 border-b border-line px-3 py-2">
-          <BotonPestana label="Pedidos" activa={pestana === "local"} onClick={() => setPestana("local")} />
+          <BotonPestana label="En el local" activa={pestana === "local"} onClick={() => setPestana("local")} />
           <BotonPestana label="En reparto" activa={pestana === "reparto"} onClick={() => setPestana("reparto")} />
         </div>
       )}
