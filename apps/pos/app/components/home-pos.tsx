@@ -73,6 +73,7 @@ import { cacheGet, cachePut, contarPendientes } from "../lib/outbox";
 import { sincronizar } from "../lib/sync";
 import { notificarEventoCritico } from "../lib/push-eventos";
 import type { DatosTicketImpresion } from "../lib/print/tipos";
+import { capaVisible } from "../lib/escape";
 import { useEscape } from "../lib/use-escape";
 import { ModalSalidaDomicilio } from "./modal-salida-domicilio";
 import type { LineaCancelada } from "./modal-cancelar-items";
@@ -372,6 +373,21 @@ export function HomePos({
     setEnMonitor(false);
     setEnInicio(true);
   }, [salirNavegacion]);
+
+  /**
+   * El mapa de mesas y las reservaciones viven SOLO dentro de la rama de listas (Comedor, Para
+   * llevar, Domicilio): se pintan encima de ella. Al salir de esa rama dejan de verse, pero su
+   * bandera seguía en `true` — y volvían a aparecer solas al entrar a cualquiera de las tres,
+   * incluso a Para llevar, donde reservaciones ni siquiera tiene botón.
+   *
+   * Se bajan aquí y no en cada salida porque las salidas son muchas (volver, volver al inicio,
+   * entrar a una cuenta) y una sola que se olvide reproduce el bug.
+   */
+  useEffect(() => {
+    if (enMesas || enPickup || enDelivery) return;
+    setViendoMapaMesas(false);
+    setViendoReservaciones(false);
+  }, [enMesas, enPickup, enDelivery]);
 
   /** Ejecuta la salida que quedó en pausa mientras se decidía qué hacer con la cuenta. */
   const consumirSalidaPendiente = useCallback(() => {
@@ -1034,7 +1050,7 @@ export function HomePos({
       [!enInicio && !enKds && !enMonitor && !enConsultaCuentas && !enDevoluciones && !enPedidosApps
         && !enDelivery && !enPickup && !enMesas, () => intentarSalirDeCaptura("atras")],
     ];
-    return capas.find(([visible]) => visible)?.[1] ?? null;
+    return capaVisible(capas);
   }, [modGrupos, comboAbierto, hojaCombo, agregarSuelto, cancelandoItem, descuentoItem, cancelandoTicket, mostrarRecibo, confirmacion, totalesCobro,
       procesandoCobro, agregandoA, viendoMapaMesas, pidiendoMesa, nombreCuentaAbierto,
       clienteDomAbierto, esperaPidiendoEtiqueta, esperaListaAbierta, movimientoAbierto,

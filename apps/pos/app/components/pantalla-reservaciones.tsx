@@ -1,7 +1,9 @@
 "use client";
 import { LogoVim } from "@vim/ui/styles";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { BotonVolver } from "./boton-volver";
+import { capaVisible } from "../lib/escape";
+import { useEscape } from "../lib/use-escape";
 import { type DatosCaja } from "../lib/turno";
 import { leerMesas, type MesaVista } from "../lib/mesas";
 import {
@@ -93,6 +95,16 @@ export function PantallaReservaciones({
   useEffect(() => {
     void recargar();
   }, [recargar]);
+
+  /* Escape: cierra el diálogo que esté abierto y deja la lista; solo desde la lista sale a
+     Comedor. Sin esto la tecla se la quedaba la lista de cuentas que sigue montada detrás, y su
+     última capa es volver al inicio: desde «Nueva reservación» Escape mandaba al cajero al menú
+     principal en vez de cerrar el diálogo. */
+  const alEscapar = useMemo(
+    () => capaVisible([[modo.t !== "lista", () => setModo({ t: "lista" })], [true, onSalir]]),
+    [modo.t, onSalir],
+  );
+  useEscape(alEscapar);
 
   async function ejecutar(fn: () => Promise<void>) {
     setOcupado(true);

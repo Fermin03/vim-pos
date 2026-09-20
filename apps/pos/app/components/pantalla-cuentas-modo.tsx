@@ -13,6 +13,7 @@ import { ModalDescuento } from "./modal-descuento";
 import { ModalAutorizacionPin } from "./modal-autorizacion-pin";
 import type { Empleado } from "../lib/supabase";
 import type { ModoServicio } from "../lib/carrito";
+import { capaVisible } from "../lib/escape";
 import { useEscape } from "../lib/use-escape";
 
 const PERMISO_REIMPRIMIR = "venta.reimprimir_ticket";
@@ -174,8 +175,8 @@ export function PantallaCuentasModo({
       [selId != null, () => setSelId(null)],
       [true, onSalir],
     ];
-    return capas.find(([visible]) => visible)?.[1] ?? null;
-  }, [borrandoCuenta, cancelandoCuenta, descontando, pidiendoPinReimpresion, selId, onSalir]);
+    return capaVisible(capas);
+  }, [cancelandoItems, borrandoCuenta, cancelandoCuenta, descontando, pidiendoPinReimpresion, selId, onSalir]);
   useEscape(alEscapar);
 
   const vacia = detalle === null ? null : detalle.length === 0;
