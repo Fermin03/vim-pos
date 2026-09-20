@@ -4,8 +4,10 @@ import { BotonVolver } from "./boton-volver";
 import { RenglonItem } from "./renglon-item";
 import { Button, LogoVim } from "@vim/ui/styles";
 import { fmtMxn, type DatosCaja, type Turno } from "../lib/turno";
-import { borrarCuentaVacia, leerEntregaCuenta, listarCuentasAbiertas, leerRenglonesCuenta, marcarSalidaDomicilio, minutosAbierta, type CuentaAbierta, type RenglonCuenta } from "../lib/cuentas-abiertas";
+import { borrarCuentaVacia, leerEntregaCuenta, listarCuentasAbiertas, leerRenglonesCuenta, minutosAbierta, type CuentaAbierta, type RenglonCuenta } from "../lib/cuentas-abiertas";
 import { leerTotales, type TotalesTicket } from "../lib/cobro";
+import { leerDeliveries } from "../lib/delivery";
+import { agruparViajes } from "../lib/viajes";
 import { ModalCancelarItem } from "./modal-cancelar-item";
 import { ModalCancelarItems, type LineaCancelada } from "./modal-cancelar-items";
 import { ModalCancelarTicket } from "./modal-cancelar-ticket";
@@ -127,6 +129,10 @@ export function PantallaCuentasModo({
   /** A quién y dónde se entrega. Solo en domicilio; en los demás modos el cliente está enfrente. */
   const [entrega, setEntrega] = useState<Awaited<ReturnType<typeof leerEntregaCuenta>>>(null);
   const [borrando, setBorrando] = useState(false);
+  // Domicilio: asignaciones vivas (con repartidor, todavía sin cobrar). Un ticket con asignación
+  // viva ya no es "del local": vive en la pestaña "En reparto" y de ahí se cobra. Se guarda aparte
+  // de `items` porque también alimenta el contador de esa pestaña, sin otra consulta.
+  const [asignacionesVivas, setAsignacionesVivas] = useState<Awaited<ReturnType<typeof leerDeliveries>>>([]);
 
   const recargar = useCallback(async () => {
     setError(null);
@@ -135,6 +141,16 @@ export function PantallaCuentasModo({
     } catch (e) {
       setError(e instanceof Error ? e.message : "No se pudieron cargar las cuentas");
       setItems([]);
+    }
+    // Solo domicilio tiene repartidores que asignar. Aparte de las cuentas y con su propio
+    // catch: si esto falla, la lista de "En el local" se sigue viendo (aunque sin poder sacar
+    // de ahí lo ya asignado ni actualizar el contador de "En reparto").
+    if (modo === "DELIVERY_PROPIO") {
+      try {
+        setAsignacionesVivas(await leerDeliveries(token, caja.sucursal_id));
+      } catch {
+        /* se queda con lo que ya tenía; no rompe la lista de cuentas */
+      }
     }
   }, [token, caja.sucursal_id, modo, esComedor]);
 
@@ -167,7 +183,17 @@ export function PantallaCuentasModo({
     return () => { vivo = false; };
   }, [selId, recargarDetalle]);
 
-  const sel = (items ?? []).find((c) => c.ticketId === selId) ?? null;
+  // Domicilio: un ticket con repartidor asignado ya no es "del local" (invariante del diseño: o
+  // tiene repartidor y está en reparto, o sigue en el local, nunca las dos). En Pick-up y Comedor
+  // `asignacionesVivas` nunca se llena, así que este filtro no les toca ni una cuenta.
+  const idsAsignados = useMemo(() => new Set(asignacionesVivas.map((a) => a.ticketId)), [asignacionesVivas]);
+  const itemsLocal = useMemo(
+    () => (items === null ? null : items.filter((c) => !idsAsignados.has(c.ticketId))),
+    [items, idsAsignados],
+  );
+  const viajesEnReparto = useMemo(() => agruparViajes(asignacionesVivas), [asignacionesVivas]);
+
+  const sel = (itemsLocal ?? []).find((c) => c.ticketId === selId) ?? null;
   // "Ya se imprimió" = lo hicimos en esta sesión, o el ticket trae marca de impresión previa.
   const yaSeImprimio = sel != null && (yaImpresas.has(sel.ticketId) || sel.impresaAt != null);
   // null = todavía no se sabe. Solo `true` habilita el borrado.
@@ -194,24 +220,16 @@ export function PantallaCuentasModo({
     try {
       await onImprimirTicket(ticketId);
       setYaImpresas((s) => new Set(s).add(ticketId));
-      // En domicilio, imprimir el ticket ES el momento en que la orden sale con el repartidor.
-      // Se persiste (comanda_impresa_at) para que el naranja siga ahí tras recargar y lo vea
-      // cualquier caja de la sucursal, no solo la que imprimió. Si el UPDATE falla, la orden
-      // ya se imprimió: se deja la marca local y no se molesta al cajero con un error.
-      if (modo === "DELIVERY_PROPIO") {
-        try {
-          await marcarSalidaDomicilio(token, ticketId);
-          await recargar();
-        } catch {
-          /* la marca local ya pintó la cuenta */
-        }
-      }
+      // Imprimir ya NO marca la salida. Lo hacía —sellaba comanda_impresa_at y la tarjeta se
+      // pintaba naranja— y ese era el camino por el que los pedidos "salían" sin repartidor: el
+      // cajero que imprimía nunca pasaba por el modal. Desde la 0114 lo que saca un pedido a la
+      // calle es asignarle repartidor, y nada más.
     } catch (e) {
       setError(e instanceof Error ? e.message : "No se pudo imprimir");
     } finally {
       setImprimiendo(false);
     }
-  }, [onImprimirTicket, modo, token, recargar]);
+  }, [onImprimirTicket]);
 
   return (
     <main className="flex h-screen flex-col bg-bg">
@@ -253,8 +271,8 @@ export function PantallaCuentasModo({
           cambiaría no existe). */}
       {mostrarEnReparto && (
         <div role="tablist" className="flex flex-shrink-0 items-center gap-2 border-b border-line px-3 py-2">
-          <BotonPestana label="En el local" activa={pestana === "local"} onClick={() => setPestana("local")} />
-          <BotonPestana label="En reparto" activa={pestana === "reparto"} onClick={() => setPestana("reparto")} />
+          <BotonPestana label={`En el local · ${(itemsLocal ?? []).length}`} activa={pestana === "local"} onClick={() => setPestana("local")} />
+          <BotonPestana label={`En reparto · ${viajesEnReparto.length}`} activa={pestana === "reparto"} onClick={() => setPestana("reparto")} />
         </div>
       )}
 
@@ -265,15 +283,15 @@ export function PantallaCuentasModo({
         {/* ── Lista de cuentas ─────────────────────────────────────────── */}
         <div className="flex w-[clamp(18rem,30vw,24rem)] flex-shrink-0 flex-col border-r border-line">
           <div className="min-h-0 flex-1 overflow-y-auto p-3">
-            {items === null && <p className="p-3 text-sm text-ink-3">Cargando…</p>}
-            {items?.length === 0 && (
+            {itemsLocal === null && <p className="p-3 text-sm text-ink-3">Cargando…</p>}
+            {itemsLocal?.length === 0 && (
               <div className="flex h-full flex-col items-center justify-center gap-2 px-4 text-center">
                 <p className="text-[14px] font-semibold text-ink-2">{copia.vacioTitulo}</p>
                 <p className="text-[12.5px] text-ink-3">{copia.vacioTexto}</p>
               </div>
             )}
             <div className="flex flex-col gap-2">
-              {items?.map((c) => {
+              {itemsLocal?.map((c) => {
                 const activa = c.ticketId === selId;
                 // Ticket ya impreso = la orden salió. Se pinta en naranja para distinguir de un
                 // vistazo lo que ya va en camino de lo que sigue pendiente de imprimir.
