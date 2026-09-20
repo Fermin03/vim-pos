@@ -16,6 +16,8 @@ export type DeliveryAsignacion = {
   propinaRepartidor: number;
   tiempoPromesa: number | null;
   fechaAsignacion: string;
+  /** Los pedidos que salieron juntos comparten este id. NULL en los anteriores a la 0114. */
+  viajeId: string | null;
 };
 
 /** Lee las asignaciones de delivery del turno (cola de domicilios). */
@@ -29,7 +31,7 @@ export async function leerDeliveries(token: string, sucursalId: string): Promise
     // `repartidor_catalogo_id` (0078) es el camino nuevo y ese sí tiene FK al catálogo, así que
     // para los repartidores dados de alta ahí el nombre llega directo.
     .select(
-      "id, ticket_id, repartidor_id, repartidor_nombre, estado, monto_a_liquidar_mxn, propina_repartidor_mxn, tiempo_promesa_minutos, fecha_asignacion, " +
+      "id, ticket_id, repartidor_id, repartidor_nombre, estado, monto_a_liquidar_mxn, propina_repartidor_mxn, tiempo_promesa_minutos, fecha_asignacion, viaje_id, " +
         "ticket:tickets(folio_completo), catalogo:repartidores(nombre)",
     )
     .eq("sucursal_id", sucursalId)
@@ -52,6 +54,7 @@ export async function leerDeliveries(token: string, sucursalId: string): Promise
     propinaRepartidor: Number(r.propina_repartidor_mxn ?? 0),
     tiempoPromesa: r.tiempo_promesa_minutos != null ? Number(r.tiempo_promesa_minutos) : null,
     fechaAsignacion: String(r.fecha_asignacion),
+    viajeId: (r.viaje_id as string) ?? null,
   }));
 }
 
