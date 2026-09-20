@@ -209,6 +209,14 @@ export function HomePos({
   const [viendoMapaMesas, setViendoMapaMesas] = useState(false);
   const [procesandoCobro, setProcesandoCobro] = useState(false);
   const [confirmacion, setConfirmacion] = useState<{ folio: string | null; cambio: number } | null>(null);
+  /**
+   * Aviso de un domicilio que se cobró sin repartidor anotado (o cuyo reparto no se pudo liquidar).
+   *
+   * Tiene pantalla propia y no `setError` porque `error` no se pinta en ninguna parte de esta
+   * pantalla: un aviso invisible es lo mismo que no avisar. Aparece DESPUÉS del cobro y nunca lo
+   * detiene — el dinero ya entró y la caja no se puede quedar trabada por esto.
+   */
+  const [avisoReparto, setAvisoReparto] = useState<{ titulo: string; texto: string } | null>(null);
   // Ticket ya persistido en BD por el flujo de descuento. Mientras exista, el carrito
   // queda comprometido (bloqueado) y el cobro reusa este mismo ticket (no re-persiste).
   const [ticketBd, setTicketBd] = useState<TotalesTicket | null>(null);
@@ -1027,6 +1035,9 @@ export function HomePos({
       [cancelandoItem != null, () => setCancelandoItem(null)],
       [descuentoItem != null, () => setDescuentoItem(null)],
       [cancelandoTicket, () => setCancelandoTicket(false)],
+      // El aviso del reparto se pinta encima del recibo y de la confirmación de cobro, así que
+      // Escape tiene que cerrarlo a él primero.
+      [avisoReparto != null, () => setAvisoReparto(null)],
       [mostrarRecibo, () => setMostrarRecibo(false)],
       [confirmacion != null, nuevoTicket],
       [totalesCobro != null && !procesandoCobro, () => setTotalesCobro(null)],
@@ -1051,7 +1062,7 @@ export function HomePos({
         && !enDelivery && !enPickup && !enMesas, () => intentarSalirDeCaptura("atras")],
     ];
     return capaVisible(capas);
-  }, [modGrupos, comboAbierto, hojaCombo, agregarSuelto, cancelandoItem, descuentoItem, cancelandoTicket, mostrarRecibo, confirmacion, totalesCobro,
+  }, [modGrupos, comboAbierto, hojaCombo, agregarSuelto, cancelandoItem, descuentoItem, cancelandoTicket, avisoReparto, mostrarRecibo, confirmacion, totalesCobro,
       procesandoCobro, agregandoA, viendoMapaMesas, pidiendoMesa, nombreCuentaAbierto,
       clienteDomAbierto, esperaPidiendoEtiqueta, esperaListaAbierta, movimientoAbierto,
       abrirCajaAbierto, cambiarPinAbierto, misPropinasAbierto, configImpresoraAbierto,
@@ -1164,8 +1175,36 @@ export function HomePos({
                 const r = await cerrarRepartoAlCobrar(token, {
                   ticketId, efectivo, tarjeta: otros, liquidadoPorId: empleado.id,
                 });
-                if (!r.liquidada && r.motivo && r.motivo !== "sin asignación") {
-                  setError(`La venta se cobró, pero no se pudo liquidar al repartidor: ${r.motivo}`);
+                // "Sin asignación" YA NO SE CALLA.
+                //
+                // Se silenciaba porque asignar repartidor era opcional: un domicilio podía salir
+                // sin nadie anotado y no había nada que reportar. Desde la 0114 asignar es
+                // obligatorio, así que este caso dejó de ser normal — y callarlo borraba la única
+                // señal de que la regla se rompió.
+                //
+                // Y no es hipotético: `listarCuentasAbiertas` solo trae BORRADOR/ABIERTO, así que
+                // un ticket cobrado se sale de "En el local" y ya no aparece en ninguna de las dos
+                // pestañas; `asignar_delivery_lote` lo rechaza con "ya está cerrado". En un pedido
+                // PREPAGADO —tarjeta o transferencia al tomar la orden, cuando todavía no hay
+                // repartidor a quién asignárselo— cobrar antes de asignar es la ÚNICA secuencia
+                // posible, o sea el camino normal, no un descuido raro.
+                //
+                // Se avisa DESPUÉS del cobro y nunca antes: el dinero ya entró, y una confirmación
+                // previa saldría en cada prepago para hacer una pregunta que el cajero no puede
+                // contestar de otra manera. Lo que sí necesita es enterarse, porque ese pedido no
+                // va a poder cuadrarse contra ningún repartidor.
+                if (!r.liquidada) {
+                  setAvisoReparto(
+                    r.motivo === "sin asignación"
+                      ? {
+                          titulo: "Pedido sin repartidor",
+                          texto: "Este pedido se cobró sin repartidor asignado y ya no se le puede asignar uno. Anota por fuera quién lo va a llevar: no va a aparecer en el corte de ningún repartidor.",
+                        }
+                      : {
+                          titulo: "El reparto quedó sin cerrar",
+                          texto: `El cobro sí se registró, pero no se pudo cerrar el reparto: ${r.motivo ?? "error"}. Revisa a mano la liquidación del repartidor.`,
+                        },
+                  );
                 }
               }
               // El cajón NO se abre aquí. Ya se abrió al presionar "Cobrar" (`abrirCajonParaCobrar`),
@@ -1236,6 +1275,21 @@ export function HomePos({
           onCerrar={() => setMostrarRecibo(false)}
           onNuevoTicket={nuevoTicket}
         />
+      )}
+      {/* Domicilio cobrado sin repartidor anotado. Va por encima de la confirmación de cobro y del
+          recibo (z-[60]) porque es lo único de esta pantalla que el cajero no puede pasar por alto:
+          ese pedido ya no va a poder cuadrarse contra nadie. No detiene nada — el cobro ya quedó. */}
+      {avisoReparto && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-ink/50 p-4" role="alertdialog" aria-modal="true">
+          <div className="w-full max-w-md rounded-xl bg-surface p-6 text-center shadow-xl">
+            <div className="mx-auto mb-3 flex h-16 w-16 items-center justify-center rounded-full bg-danger/10 text-danger">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="h-8 w-8"><path d="M12 9v4" /><path d="M12 17h.01" /><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z" /></svg>
+            </div>
+            <div className="font-display text-[22px] font-semibold">{avisoReparto.titulo}</div>
+            <p className="mt-2 text-[14px] leading-relaxed text-ink-2">{avisoReparto.texto}</p>
+            <Button className="mt-5 w-full" onClick={() => setAvisoReparto(null)}>Entendido</Button>
+          </div>
+        </div>
       )}
     </>
   );
