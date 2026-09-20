@@ -75,7 +75,7 @@ import { notificarEventoCritico } from "../lib/push-eventos";
 import type { DatosTicketImpresion } from "../lib/print/tipos";
 import { capaVisible } from "../lib/escape";
 import { useEscape } from "../lib/use-escape";
-import { ModalSalidaDomicilio } from "./modal-salida-domicilio";
+import { ModalAsignarRepartidor } from "./modal-asignar-repartidor";
 import type { LineaCancelada } from "./modal-cancelar-items";
 import { cerrarRepartoAlCobrar } from "../lib/delivery";
 
@@ -122,8 +122,8 @@ export function HomePos({
    * decidir en un segundo. Después ya nadie se acuerda.
    */
   const [salidaPendiente, setSalidaPendiente] = useState<null | "atras" | "inicio">(null);
-  /** Pedido de domicilio que está por salir: se pregunta quién se lo lleva antes de marcarlo. */
-  const [saliendoDomicilio, setSaliendoDomicilio] = useState<
+  /** Pedido de domicilio que está por salir: se pregunta quién se lo lleva antes de asignarlo. */
+  const [asignandoRepartidor, setAsignandoRepartidor] = useState<
     null | { ticketId: string; folio: string | null; total: number; recargar: () => void }
   >(null);
   const [enKds, setEnKds] = useState(false);
@@ -1466,27 +1466,28 @@ export function HomePos({
         onComandaCancelacion={imprimirComandaCancelacion}
         extraPorCuenta={
           enDelivery
-            ? (c, recargar) =>
-                c.estadoCocina === "LISTO" ? (
-                  <button
-                    type="button"
-                    onClick={() => setSaliendoDomicilio({ ticketId: c.ticketId, folio: c.folio, total: c.total, recargar })}
-                    className="flex h-9 flex-shrink-0 items-center rounded border border-line-strong px-3 text-[13px] font-semibold text-ink-2 transition hover:border-ink hover:text-ink"
-                  >
-                    Marcar salida
-                  </button>
-                ) : null
+            ? (c, recargar) => (
+                <button
+                  type="button"
+                  onClick={() => setAsignandoRepartidor({ ticketId: c.ticketId, folio: c.folio, total: c.total, recargar })}
+                  className="flex h-9 flex-shrink-0 items-center rounded border border-line-strong px-3 text-[13px] font-semibold text-ink-2 transition hover:border-ink hover:text-ink"
+                >
+                  Asignar repartidor
+                </button>
+              )
             : undefined
         }
         />
-        {saliendoDomicilio && (
-          <ModalSalidaDomicilio
+        {asignandoRepartidor && (
+          <ModalAsignarRepartidor
             token={token}
-            ticketId={saliendoDomicilio.ticketId}
-            folio={saliendoDomicilio.folio}
-            total={saliendoDomicilio.total}
-            onListo={() => { const r = saliendoDomicilio.recargar; setSaliendoDomicilio(null); r(); }}
-            onCerrar={() => setSaliendoDomicilio(null)}
+            tenantId={caja.tenant_id}
+            sucursalId={caja.sucursal_id}
+            ticketId={asignandoRepartidor.ticketId}
+            folio={asignandoRepartidor.folio}
+            total={asignandoRepartidor.total}
+            onListo={() => { const r = asignandoRepartidor.recargar; setAsignandoRepartidor(null); r(); }}
+            onCerrar={() => setAsignandoRepartidor(null)}
           />
         )}
         {/* El cobro va aquí también: sin esto, abrirlo desde la lista no mostraría nada, porque
