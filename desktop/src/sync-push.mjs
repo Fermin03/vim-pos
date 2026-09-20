@@ -164,9 +164,17 @@ export async function listarPendientes(pool) {
       (SELECT array_agg(m.id ORDER BY m.fecha)
          FROM movimientos_inventario m
          LEFT JOIN _vim_mov_ok ok ON ok.movimiento_id = m.id
-        WHERE ok.movimiento_id IS NULL) AS movimientos
+        WHERE ok.movimiento_id IS NULL) AS movimientos,
+      -- Repartidores dados de alta en la caja aún no confirmados por la nube (ver _vim_repartidores_ok
+      -- en asegurarTabla). Sin esto, un alta a media jornada sin ventas ni turnos ni movimientos de
+      -- por medio no hace pasar la guarda de pushToCloud y se queda atorada en silencio.
+      (SELECT array_agg(x.id) FROM repartidores x
+        WHERE x.id NOT IN (SELECT repartidor_id FROM _vim_repartidores_ok)) AS repartidores
   `, [TERMINALES]);
-  return { ids: rows[0].ids ?? [], turnosCambiados: rows[0].turnos ?? [], movimientoIds: rows[0].movimientos ?? [] };
+  return {
+    ids: rows[0].ids ?? [], turnosCambiados: rows[0].turnos ?? [],
+    movimientoIds: rows[0].movimientos ?? [], repartidorIds: rows[0].repartidores ?? [],
+  };
 }
 
 /**
@@ -433,7 +441,7 @@ export async function pushToCloud(pool, opts, log = () => {}, cfg = {}) {
   const maxBytes = cfg.maxBytesPorLote ?? MAX_BYTES_POR_LOTE;
   const maxMovimientos = cfg.maxMovimientosPorPush ?? MAX_MOVIMIENTOS_POR_PUSH;
 
-  const { ids, turnosCambiados, movimientoIds: movimientoIdsTodos } = await listarPendientes(pool);
+  const { ids, turnosCambiados, movimientoIds: movimientoIdsTodos, repartidorIds } = await listarPendientes(pool);
   // I2: techo por corrida (ver el comentario de MAX_MOVIMIENTOS_POR_PUSH). El resto se queda
   // pendiente y lo recoge listarPendientes() en el siguiente ciclo — en orden de fecha, así que no
   // se salta ninguno, solo se pospone.
@@ -443,13 +451,18 @@ export async function pushToCloud(pool, opts, log = () => {}, cfg = {}) {
   }
   // Un cierre de turno SIN ventas nuevas también es algo que subir. Cuando esta condición solo
   // miraba los tickets, el cierre se quedaba en la caja y la nube nunca se enteraba. Lo mismo pasa
-  // con un movimiento de inventario suelto (ADR 0013): también cuenta como pendiente por sí solo.
-  if (!ids.length && !turnosCambiados.length && !movimientoIds.length) { log("nada pendiente por subir"); return { subidos: 0, turnos: 0, movimientos: 0, rechazados: 0, lotes: 0 }; }
+  // con un movimiento de inventario suelto (ADR 0013), y con un repartidor dado de alta a media
+  // jornada (0114/Task 2): sin este último `!repartidorIds.length`, un alta que cae justo cuando no
+  // hay ventas, turnos cambiados NI movimientos pendientes hacía volver esta guarda antes de llegar
+  // a construirSnapshotPush, y el repartidor se quedaba atorado en la caja hasta que ALGO ajeno
+  // volviera a hacerla pasar — en silencio, sin error, contra el motivo de tener el catálogo aquí.
+  if (!ids.length && !turnosCambiados.length && !movimientoIds.length && !repartidorIds.length) { log("nada pendiente por subir"); return { subidos: 0, turnos: 0, movimientos: 0, rechazados: 0, lotes: 0 }; }
 
   const parte = [
     ids.length ? `${ids.length} venta${ids.length === 1 ? "" : "s"}` : null,
     turnosCambiados.length ? `${turnosCambiados.length} turno${turnosCambiados.length === 1 ? "" : "s"}` : null,
     movimientoIds.length ? `${movimientoIds.length} movimiento(s) de inventario` : null,
+    repartidorIds.length ? `${repartidorIds.length} repartidor(es)` : null,
   ].filter(Boolean).join(" y ");
 
   // Sin ventas queda un solo lote vacío: el que lleva los turnos que cambiaron (y los movimientos).

@@ -118,21 +118,67 @@ try {
   // 5) Repartidores (0114/Task 2): un alta en la caja sube UNA vez y no vuelve a viajar.
   // Si se reenviara en cada ciclo, el push pisaría con la copia local vieja cualquier edición hecha
   // en el panel — y el catálogo también baja por el pull, así que eso pasaría de verdad.
+  //
+  // repartidores es la tabla real del catálogo (no una libreta de sync): a diferencia de
+  // _vim_push_ok/_vim_mov_ok, que se truncan al arrancar este archivo, aquí no se limpia nada al
+  // inicio, y el nombre tiene un índice único por tenant (repartidor_nombre_uq). Sin este borrado
+  // previo, la segunda corrida contra la misma caja de dev choca con el "Alta En Caja" que dejó la
+  // corrida anterior. Se borra por nombre ANTES y por id DESPUÉS para que el caso quede repetible.
   {
+    await pool.query(
+      `DELETE FROM repartidores WHERE tenant_id=$1 AND lower(btrim(nombre))=lower(btrim('Alta En Caja'))`,
+      [tenant],
+    );
     const { rows: [r] } = await pool.query(
       `INSERT INTO repartidores(tenant_id, nombre) VALUES ($1, 'Alta En Caja') RETURNING id`,
       [tenant],
     );
-    const primero = await construirSnapshotPush(pool);
-    const enviados = (primero.snapshot?.repartidores ?? []).map((x) => x.id);
-    assert.ok(enviados.includes(r.id), "el repartidor nuevo debía ir en el primer snapshot");
+    try {
+      const primero = await construirSnapshotPush(pool);
+      const enviados = (primero.snapshot?.repartidores ?? []).map((x) => x.id);
+      assert.ok(enviados.includes(r.id), "el repartidor nuevo debía ir en el primer snapshot");
 
-    await marcarRepartidoresSubidos(pool, [r.id]);
+      await marcarRepartidoresSubidos(pool, [r.id]);
 
-    const segundo = await construirSnapshotPush(pool);
-    const reenviados = (segundo.snapshot?.repartidores ?? []).map((x) => x.id);
-    assert.ok(!reenviados.includes(r.id), "un repartidor ya confirmado NO debe volver a subir");
-    console.log("✅ repartidores: sube una vez y no pisa al panel");
+      const segundo = await construirSnapshotPush(pool);
+      const reenviados = (segundo.snapshot?.repartidores ?? []).map((x) => x.id);
+      assert.ok(!reenviados.includes(r.id), "un repartidor ya confirmado NO debe volver a subir");
+      console.log("✅ repartidores: sube una vez y no pisa al panel");
+    } finally {
+      // No deja rastro en el catálogo real de la caja de dev, ni bloquea la siguiente corrida.
+      await pool.query("DELETE FROM repartidores WHERE id=$1", [r.id]);
+    }
+  }
+
+  // 6) La guarda de pushToCloud también sabe de repartidores (fix round 1): sin ventas, sin turno
+  // cambiado y sin movimiento pendiente, un alta suelta NO debe leerse como "nada pendiente".
+  // listarPendientes es el dato que esa guarda consulta; probarlo aquí, contra el esquema real,
+  // complementa a verify-push-lotes (que prueba la guarda en sí con un pool falso).
+  {
+    const antesPend = await listarPendientes(pool);
+    await pool.query(
+      `DELETE FROM repartidores WHERE tenant_id=$1 AND lower(btrim(nombre))=lower(btrim('Alta Suelta'))`,
+      [tenant],
+    );
+    const { rows: [r] } = await pool.query(
+      `INSERT INTO repartidores(tenant_id, nombre) VALUES ($1, 'Alta Suelta') RETURNING id`,
+      [tenant],
+    );
+    try {
+      const pend = await listarPendientes(pool);
+      assert.ok(
+        pend.repartidorIds?.includes(r.id),
+        "listarPendientes debía reportar el repartidor recién dado de alta",
+      );
+      assert.strictEqual(
+        pend.ids.length + pend.turnosCambiados.length + pend.movimientoIds.length,
+        antesPend.ids.length + antesPend.turnosCambiados.length + antesPend.movimientoIds.length,
+        "este caso asume que el alta del repartidor no cambió lo demás pendiente",
+      );
+      console.log("✅ listarPendientes: un repartidor solo también cuenta como pendiente (guarda de pushToCloud)");
+    } finally {
+      await pool.query("DELETE FROM repartidores WHERE id=$1", [r.id]);
+    }
   }
 
   console.log(`\n✅ SYNC PUSH OK — ${ids.length} ventas de la caja armadas en snapshot y aplicadas por sync_push_snapshot`);
