@@ -44,7 +44,8 @@ nadie porque no hay a quién cuadrárselo.
 7. Pruebas (§10).
 
 **No entra:** pedidos de apps de delivery (Uber/DiDi traen su propio repartidor, §11); cambios en
-el cobro o en la liquidación automática al cobrar; cuadre acumulado por repartidor al cierre de
+la liquidación automática al cobrar —salvo el aviso de §7.1, que no cambia el cobro sino que deja
+de callar cuando el pedido salió sin nadie anotado—; cuadre acumulado por repartidor al cierre de
 turno; reasignar un pedido ya en reparto; app del repartidor; geolocalización o rutas; reportes
 nuevos en el admin.
 
@@ -161,6 +162,38 @@ Es distinto de `_vim_mov_ok` en un punto que conviene no confundir: los movimien
 **nunca** bajan del pull, así que todo lo local es de origen local. Los repartidores sí bajan. Por
 eso la libreta aquí no es solo para no re-trabajar — es lo que impide que la caja pise al panel.
 
+#### Corrección — la libreta tiene que escribirse también en el PULL
+
+> Esta sección decía que con marcar al subir bastaba. **Era falso**, y el código hizo lo que el
+> diseño pedía. Se corrige el diseño, no al revés.
+
+Marcar solo al SUBIR no cierra nada, porque `sync_pull_snapshot` manda **todas** las filas de
+`repartidores` del tenant y el pull las escribía sin anotar ninguna. El
+`id NOT IN (SELECT repartidor_id FROM _vim_repartidores_ok)` del snapshot no seleccionaba "lo
+creado aquí": seleccionaba **casi todo el catálogo local**. Lo que pasaba, en orden:
+
+1. En el primer ciclo tras instalar esta versión, el catálogo entero sube.
+2. Después, cada repartidor creado en el panel hace el viaje de vuelta en cuanto la caja lo baja.
+3. La nube lo aplica con `ON CONFLICT (id) DO UPDATE SET <cada columna> = EXCLUDED.<columna>`:
+   `nombre`, `telefono`, `activo`, `deleted_at` y `updated_at`, todos pisados.
+4. Y el **push corre antes que el pull** (`desktop/src/main.mjs`, deliberado, ADR 0013), así que la
+   caja nunca se refresca antes de pisar. La ventana no es de segundos: es **un ciclo entero**.
+5. Un repartidor dado de baja en el panel entre el último pull y el siguiente push **resucita**.
+
+Hacen falta **dos escrituras más**, y las dos están implementadas:
+
+- **El pull anota lo que baja** (`marcarRepartidoresDelPull`, en `desktop/src/sync-pull.mjs`), dentro
+  de la misma transacción del pull: si el pull hace ROLLBACK, las marcas se van con él.
+- **`asegurarTabla()` siembra la libreta con el catálogo local**, y **solo en el momento de crear la
+  tabla** (`to_regclass(...) IS NOT NULL` antes del `CREATE TABLE IF NOT EXISTS`). Esa condición no
+  es un detalle: si la siembra corriera en cada arranque, un repartidor dado de alta en la caja y
+  todavía sin subir quedaría marcado como enviado, y **por diseño una fila marcada no vuelve a
+  viajar nunca** — esa alta no existiría jamás en la nube y nadie se enteraría. Al crear la tabla la
+  siembra sí es segura: hasta esta versión la caja no podía crear repartidores, así que todo el
+  catálogo local bajó del pull y la nube ya lo tiene.
+
+Con las dos, el catálogo viaja hacia arriba **solo** cuando nació en la caja.
+
 ### 4.4 Estado mostrado
 
 El enum sigue siendo `EN_RUTA`. La etiqueta visible en `ESTADO_LABEL`
@@ -186,7 +219,14 @@ viaje de una):
 
 - **Nombre del repartidor** (de `catalogo.nombre`, con `repartidor_nombre` de respaldo).
 - **N pedidos** del viaje.
-- **Minutos fuera**, contados desde la `fecha_asignacion` **más vieja** del viaje.
+- **Minutos fuera**, contados desde la **salida más vieja** del viaje: `fecha_salida`, y solo si
+  falta, `fecha_asignacion`.
+
+  > Este punto decía `fecha_asignacion` a secas. Era un desliz del documento: al REASIGNAR, la RPC
+  > pone `fecha_salida = now()` y deja `fecha_asignacion` como estaba, así que un pedido reasignado
+  > dos horas después de su primera asignación marcaba "120 min fuera" en un viaje recién salido —
+  > y lo pintaba tarde sin serlo. El respaldo hace falta: una asignación anterior a la 0114 podía
+  > quedarse en ASIGNADO sin salida confirmada.
 - **Efectivo que carga**: suma de `monto_a_liquidar_mxn` del viaje.
 - Si hay promesa de tiempo y se pasó, la tarjeta lo marca.
 
@@ -252,6 +292,28 @@ Tres cambios en `pantalla-cuentas-modo.tsx` y `home-pos.tsx`:
 `marcarSalidaDomicilio()` se renombra a `marcarComandaImpresa()`, que es lo que de verdad hace.
 Es un rename mecánico de dos usos.
 
+### 7.1 Cobrar un domicilio sin repartidor sí avisa
+
+§2 dejaba fuera "cambios en el cobro", y eso dejó un agujero: `cerrarRepartoAlCobrar` devuelve
+`motivo: "sin asignación"` cuando el ticket no tiene a nadie anotado, y el llamador silenciaba
+**exactamente ese caso**. Era correcto mientras asignar era opcional; con la regla de §3 es la
+única señal de que la regla se rompió, y estaba apagada.
+
+No es un descuido raro: `listarCuentasAbiertas` filtra `estado_fiscal IN ('BORRADOR','ABIERTO')`,
+así que un ticket ya cobrado se sale de *En el local* y no vuelve a aparecer en ninguna de las dos
+pestañas, y `asignar_delivery_lote` lo rechaza con "ya está cerrado". En un pedido **prepagado**
+—tarjeta o transferencia al tomar la orden, cuando todavía no hay repartidor a quién
+asignárselo— cobrar antes de asignar es la única secuencia posible.
+
+Se avisa **después** del cobro y nunca antes. El dinero ya entró y la caja no se puede trabar (§3);
+una confirmación previa saldría en cada prepago para hacer una pregunta que el cajero no puede
+contestar de otra manera. Lo que sí necesita es enterarse de que ese pedido no va a poder cuadrarse
+contra ningún repartidor.
+
+El aviso es un diálogo propio, no `setError`: ese estado se escribe en media docena de sitios de
+`home-pos.tsx` y **no se pinta en ninguna parte**, así que el mensaje de "no se pudo liquidar" que
+ya existía tampoco se veía nunca.
+
 ## 8. Limpieza
 
 - **Borrar `apps/pos/app/components/modal-liquidar-delivery.tsx`.** Código muerto: nadie lo
@@ -288,11 +350,18 @@ Es un rename mecánico de dos usos.
 6. Repartidor inactivo o con `deleted_at` → excepción.
 7. `sync_push_snapshot` con un `repartidores` en el snapshot lo aplica y lo cuenta en el
    resultado — que es lo que prueba que el alta desde la caja llega a la nube (§4.3).
+8. **Aislamiento por tenant**: un pedido de otro negocio, con los claims del primero, lanza y no
+   deja ninguna fila. Lleva control (con sus propios claims ese mismo pedido sí se asigna) para
+   que no pueda ponerse verde por un fixture mal armado.
 
-**El aislamiento por tenant no se prueba aquí.** Los smokes corren como `postgres`, que se salta
-RLS (cabecera de `desktop/scripts/smokes.mjs`). Lo que sí se prueba —y es lo que de verdad protege
-a esta RPC— es su predicado explícito `tenant_id = current_tenant_id()`, que no depende del RLS.
-El camino real bajo RLS se ejercita con el patrón de `desktop/src/verify-e2e.mjs`.
+**Lo que prueba el caso 8 es el predicado, no el RLS.** Los smokes corren como `postgres`, que se
+salta las políticas (cabecera de `desktop/scripts/smokes.mjs`), así que lo único que puede rechazar
+al pedido ajeno es el `tenant_id = current_tenant_id()` explícito de la RPC. El camino real bajo
+RLS se ejercita con el patrón de `desktop/src/verify-e2e.mjs`.
+
+> Esta sección decía antes que "el aislamiento por tenant no se prueba aquí" y a la vez que sí se
+> probaba el predicado. Ningún caso lo tocaba: todos los anteriores corrían bajo un solo tenant. El caso 8 es
+> el que faltaba, y `CLAUDE.md` no lo deja opcional.
 
 Nunca comparar `CURRENT_DATE` contra fechas de negocio: el servidor es UTC y el sistema calcula en
 hora de México; eso pone los smokes rojos seis horas al día.
@@ -300,14 +369,25 @@ hora de México; eso pone los smokes rojos seis horas al día.
 ### 10.2 Unitarias
 
 Lo puro, en `apps/pos/app/lib/__tests__/`: agrupar asignaciones por `viaje_id` (incluidas las
-`NULL`), minutos fuera desde la más vieja, suma de efectivo, y que un viaje sin pedidos vivos no
-se muestre.
+`NULL`), minutos fuera desde la salida más vieja —incluido el pedido reasignado, que no debe
+contar lo que esperó en el local, y el respaldo a `fecha_asignacion` cuando no hay salida—, suma
+de efectivo, y que un viaje sin pedidos vivos no se muestre.
 
 ### 10.3 Escritorio
 
 `npm run verify:push` desde `desktop/`, comprobando que `construirSnapshotPush()` incluye un
 repartidor nuevo la primera vez y **no** lo vuelve a incluir después de marcarlo en
 `_vim_repartidores_ok`. Es la prueba de que el catálogo sube sin pisar al panel.
+
+Y en `node --test` (corre en CI, a diferencia de los `verify:*`), la libreta por los dos bordes:
+
+- `desktop/src/sync-push.test.mjs` — el camino de RECHAZO: una respuesta de la nube con un
+  `_errores` de tabla `repartidores` **no** marca esa fila y la deja pendiente para el siguiente
+  ciclo. Hoy el código lo hace bien; una regresión ahí sería permanente y silenciosa, porque una
+  fila marcada por error no vuelve a viajar nunca. En el mismo archivo, las dos caras de la
+  siembra de `asegurarTabla()` (§4.3): siembra al crear la tabla, y **no** siembra si ya existía.
+- `desktop/src/sync-pull.test.mjs` — que `pullSnapshot()` anota lo que baja, y dentro de la
+  transacción (antes del `COMMIT`).
 
 ### 10.4 A mano
 
@@ -326,10 +406,21 @@ pestaña *En reparto* solo muestra `delivery_asignaciones`, que solo se crean pa
 1. **El catálogo pasa a viajar en los dos sentidos.** Hasta hoy `repartidores` solo bajaba (pull);
    con el alta desde la caja (§6.1) también sube (§4.3). Es el primer catálogo que la caja puede
    crear, y por tanto el primero que puede divergir. La libreta `_vim_repartidores_ok` cierra el
-   caso que importa —que la caja pise ediciones del panel— porque cada fila sube una sola vez.
-   Queda una ventana estrecha: si el panel edita a "Luis" en los segundos entre que la caja lo
-   crea y lo sube, gana la caja. Aceptable para un nombre y un teléfono; se mira en el primer
-   ciclo real, igual que se hizo con el sync de inventario (ADR 0013).
+   caso que importa —que la caja pise ediciones del panel— **siempre que se escriba también en el
+   pull y se siembre al crearse**; ver la corrección de §4.3. Sin esas dos escrituras la libreta no
+   protegía nada: subía el catálogo entero y cada alta del panel volvía a subir pisada.
+
+   > Este punto decía que la libreta ya cerraba el caso y que el riesgo residual era "una ventana
+   > estrecha, de segundos, entre que la caja crea a Luis y lo sube". **Las dos cosas eran falsas**
+   > con el mecanismo tal y como estaba escrito: la ventana era de un ciclo entero —el push corre
+   > antes que el pull, ADR 0013— y no aplicaba solo a los repartidores creados en la caja, sino a
+   > todo el catálogo.
+
+   Lo que **sí** queda abierto, ya con las dos escrituras puestas: un repartidor creado en la caja
+   y editado en el panel antes de que la caja lo suba se sube con los datos de la caja y pisa la
+   edición. Es una fila que la caja acaba de crear y una ventana de un ciclo; aceptable para un
+   nombre y un teléfono, y se mira en el primer ciclo real, igual que se hizo con el sync de
+   inventario (ADR 0013).
 2. **Pedidos viejos sin `viaje_id`.** Los que ya existan se muestran como viajes de un pedido. Es
    correcto y no requiere backfill.
 3. **Obligatorio cambia la costumbre del cajero.** Hoy imprime y se acabó. Hay que avisarle a
