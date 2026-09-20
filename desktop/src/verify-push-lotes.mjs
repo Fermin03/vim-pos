@@ -38,23 +38,39 @@ function crearPoolFalso({ nTickets = 450, nTurnos = 5, turnosCambiados = [], rep
 
   const subidos = new Set();
   const turnosMarcados = new Map();
+  const repartidoresMarcados = new Set();
 
   const pool = {
     consultas: 0,
     subidos,
     turnosMarcados,
+    repartidoresMarcados,
     async query(sql, params = []) {
       pool.consultas++;
 
       if (sql.startsWith("CREATE TABLE")) return { rows: [] };
 
+      // La libreta de repartidores se siembra SOLO cuando la tabla no existía (ver asegurarTabla).
+      // Aquí se contesta "ya existía" para que no intente sembrar: este pool no tiene catálogo, y
+      // la siembra se prueba contra el esquema real en verify:push.
+      if (sql.includes("to_regclass('public._vim_repartidores_ok')")) {
+        return { rows: [{ existia: true }] };
+      }
+
+      if (sql.includes("_vim_repartidores_ok (repartidor_id)")) {
+        for (const id of params[0]) repartidoresMarcados.add(id);
+        return { rows: [] };
+      }
+
       if (sql.includes("array_agg(id ORDER BY fecha_apertura)")) {
         const pendientes = tickets.filter((t) => !subidos.has(t.id)).map((t) => t.id);
         const cambiados = turnosCambiados.filter((id) => !turnosMarcados.has(id));
-        // repartidores: fijo por parámetro de la prueba (aquí no hay tabla real que consultar);
-        // sirve para probar que un alta suelta, sin ventas ni turnos ni movimientos de por medio,
-        // igual hace pasar la guarda de pushToCloud.
-        return { rows: [{ ids: pendientes.length ? pendientes : null, turnos: cambiados.length ? cambiados : null, repartidores: repartidorIds.length ? repartidorIds : null }] };
+        // repartidores: los del parámetro de la prueba que aún no están en la libreta (aquí no hay
+        // tabla real que consultar). Sirve para probar que un alta suelta, sin ventas ni turnos ni
+        // movimientos de por medio, igual hace pasar la guarda de pushToCloud — y que un rechazo de
+        // la nube deja al repartidor pendiente en vez de darlo por subido.
+        const repPend = repartidorIds.filter((id) => !repartidoresMarcados.has(id));
+        return { rows: [{ ids: pendientes.length ? pendientes : null, turnos: cambiados.length ? cambiados : null, repartidores: repPend.length ? repPend : null }] };
       }
 
       if (sql.includes("WITH tk AS")) {
@@ -68,15 +84,20 @@ function crearPoolFalso({ nTickets = 450, nTurnos = 5, turnosCambiados = [], rep
         if (ticketIds === null && turnoIds === null) for (const id of turnosCambiados) refs.add(id);
         const delLoteTurnos = turnos.filter((t) => refs.has(t.id));
         const idsLote = delLote.map((t) => t.id);
+        // Los repartidores pendientes viajan en TODOS los lotes, igual que en el SQL real: el
+        // snapshot los selecciona por "no están en la libreta", sin mirar el lote.
+        const repPend = repartidorIds.filter((id) => !repartidoresMarcados.has(id));
         return {
           rows: [{
             ids: idsLote.length ? idsLote : null,
             turnos: delLoteTurnos.length ? delLoteTurnos.map((t) => ({ id: t.id, huella: `h-${t.id}` })) : null,
+            repartidores: repPend.length ? repPend : null,
             snapshot: {
               turnos: delLoteTurnos,
               tickets: delLote,
               ticket_items: items.filter((i) => idsLote.includes(i.ticket_id)),
               pagos: pagos.filter((p) => idsLote.includes(p.ticket_id)),
+              repartidores: repPend.map((id) => ({ id, nombre: `Repartidor ${id}` })),
             },
           }],
         };

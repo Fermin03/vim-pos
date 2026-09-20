@@ -76,7 +76,36 @@ async function asegurarTabla(pool) {
   // OJO, no es como _vim_mov_ok aunque se parezca: los movimientos de inventario nunca bajan del
   // pull, así que allí la libreta solo evita re-trabajo. Los repartidores SÍ bajan, y aquí la
   // libreta es lo que impide que la caja reenvíe su copia vieja y pise lo que se editó en el panel.
+  //
+  // PARA QUE ESO SEA CIERTO, LA LIBRETA TIENE QUE SABER DE LOS QUE BAJARON.
+  //
+  // Solo se escribía al SUBIR (marcarRepartidoresSubidos). Las filas que llegaban por el pull no
+  // se anotaban en ningún lado, y `sync_pull_snapshot` manda el catálogo COMPLETO del tenant: el
+  // "solo los que no están en la libreta" del snapshot de push acababa siendo "casi todos". El
+  // resultado era justo lo contrario de lo que la libreta promete — cada repartidor creado en el
+  // panel hacía un viaje de ida y vuelta y volvía a subir tal como la caja lo tenía, y la nube lo
+  // aplica con ON CONFLICT (id) DO UPDATE de TODAS las columnas: nombre, teléfono, activo,
+  // deleted_at. Y como el push corre ANTES que el pull (main.mjs, ADR 0013), la caja nunca se
+  // refresca antes de pisar: la ventana es un ciclo entero, no unos segundos. Un repartidor dado
+  // de baja en el panel entre el último pull y el siguiente push RESUCITABA.
+  //
+  // Se cierra por los dos lados: el pull anota lo que baja (sync-pull.mjs), y aquí se siembra la
+  // libreta con el catálogo que ya está en la caja.
+  const { rows: [{ existia }] } = await pool.query(
+    "SELECT to_regclass('public._vim_repartidores_ok') IS NOT NULL AS existia",
+  );
   await pool.query("CREATE TABLE IF NOT EXISTS _vim_repartidores_ok (repartidor_id uuid PRIMARY KEY, subido_at timestamptz DEFAULT now())");
+  if (!existia) {
+    // SOLO al CREAR la tabla, nunca en cada arranque. Sembrar en cada arranque marcaría como
+    // "ya subido" a un repartidor dado de alta en la caja que todavía no ha viajado, y por diseño
+    // un repartidor marcado NO vuelve a subir jamás: esa alta no existiría nunca en la nube y
+    // nadie se enteraría. En el momento de crear la tabla la siembra sí es segura, porque hasta
+    // esta versión la caja no podía crear repartidores — todo lo que hay en el catálogo local
+    // bajó del pull y la nube ya lo tiene.
+    await pool.query(
+      "INSERT INTO _vim_repartidores_ok (repartidor_id) SELECT id FROM repartidores ON CONFLICT DO NOTHING",
+    );
+  }
 
   await rescatarCortesUnaVez(pool);
 }
