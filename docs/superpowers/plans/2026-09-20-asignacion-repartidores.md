@@ -1231,7 +1231,7 @@ git rm apps/pos/app/components/modal-salida-domicilio.tsx
 cd apps/pos && npm run typecheck
 ```
 
-Esperado: sin errores. Si aparece algo sobre `marcarSalidaDomicilio` en `pantalla-cuentas-modo.tsx`, déjalo: se resuelve en el Task 7.
+Esperado: sin errores, sin excepciones. Esta tarea no toca `marcarSalidaDomicilio` ni `pantalla-cuentas-modo.tsx`, así que cualquier error que salga ahí es real — escálalo, no lo ignores.
 
 - [ ] **Step 5: Commit**
 
