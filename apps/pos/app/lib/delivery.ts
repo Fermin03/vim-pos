@@ -16,6 +16,15 @@ export type DeliveryAsignacion = {
   propinaRepartidor: number;
   tiempoPromesa: number | null;
   fechaAsignacion: string;
+  /**
+   * Cuándo salió de verdad. NULL mientras el pedido siga en el local.
+   *
+   * No es lo mismo que `fechaAsignacion` y por eso viajan las dos: al REASIGNAR, la RPC
+   * (0114) pone `fecha_salida = now()` y deja `fecha_asignacion` como estaba. Contar los minutos
+   * fuera desde la asignación hacía que un pedido reasignado dos horas después marcara "120 min
+   * fuera" en un viaje que acababa de arrancar, y lo pintaba tarde sin serlo.
+   */
+  fechaSalida: string | null;
   /** Los pedidos que salieron juntos comparten este id. NULL en los anteriores a la 0114. */
   viajeId: string | null;
 };
@@ -31,7 +40,7 @@ export async function leerDeliveries(token: string, sucursalId: string): Promise
     // `repartidor_catalogo_id` (0078) es el camino nuevo y ese sí tiene FK al catálogo, así que
     // para los repartidores dados de alta ahí el nombre llega directo.
     .select(
-      "id, ticket_id, repartidor_id, repartidor_nombre, estado, monto_a_liquidar_mxn, propina_repartidor_mxn, tiempo_promesa_minutos, fecha_asignacion, viaje_id, " +
+      "id, ticket_id, repartidor_id, repartidor_nombre, estado, monto_a_liquidar_mxn, propina_repartidor_mxn, tiempo_promesa_minutos, fecha_asignacion, fecha_salida, viaje_id, " +
         "ticket:tickets(folio_completo), catalogo:repartidores(nombre)",
     )
     .eq("sucursal_id", sucursalId)
@@ -54,6 +63,7 @@ export async function leerDeliveries(token: string, sucursalId: string): Promise
     propinaRepartidor: Number(r.propina_repartidor_mxn ?? 0),
     tiempoPromesa: r.tiempo_promesa_minutos != null ? Number(r.tiempo_promesa_minutos) : null,
     fechaAsignacion: String(r.fecha_asignacion),
+    fechaSalida: r.fecha_salida != null ? String(r.fecha_salida) : null,
     viajeId: (r.viaje_id as string) ?? null,
   }));
 }

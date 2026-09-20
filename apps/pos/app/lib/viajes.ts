@@ -19,10 +19,25 @@ export type Viaje = {
   pedidos: DeliveryAsignacion[];
   /** Lo que el repartidor debe traer de vuelta por todo el viaje. */
   efectivo: number;
-  /** Cuándo salió: la asignación más vieja del viaje. */
+  /** Cuándo salió: la salida más vieja del viaje (ver `salidaDe`). */
   desdeIso: string;
   promesaMin: number | null;
 };
+
+/**
+ * Cuándo salió este pedido: `fecha_salida` y, si no la tiene, la asignación.
+ *
+ * Manda la salida porque es la que se mueve. Al REASIGNAR, `asignar_delivery_lote` (0114) pone
+ * `fecha_salida = now()` y NO toca `fecha_asignacion`: contando desde la asignación, un pedido que
+ * cambió de repartidor dos horas después salía con "120 min fuera" en un viaje recién arrancado —
+ * y marcado como tarde sin serlo.
+ *
+ * El respaldo hace falta de verdad: las asignaciones anteriores a la 0114 podían quedarse en
+ * ASIGNADO sin salida confirmada, y ahí `fecha_asignacion` es lo único que hay.
+ */
+function salidaDe(a: DeliveryAsignacion): string {
+  return a.fechaSalida ?? a.fechaAsignacion;
+}
 
 export function agruparViajes(asignaciones: DeliveryAsignacion[]): Viaje[] {
   const porViaje = new Map<string, DeliveryAsignacion[]>();
@@ -35,14 +50,14 @@ export function agruparViajes(asignaciones: DeliveryAsignacion[]): Viaje[] {
 
   const viajes: Viaje[] = [];
   for (const [id, pedidos] of porViaje) {
-    const ordenados = [...pedidos].sort((x, y) => x.fechaAsignacion.localeCompare(y.fechaAsignacion));
+    const ordenados = [...pedidos].sort((x, y) => salidaDe(x).localeCompare(salidaDe(y)));
     const primero = ordenados[0]!;
     viajes.push({
       id,
       repartidorNombre: primero.repartidorNombre,
       pedidos: ordenados,
       efectivo: ordenados.reduce((s, p) => s + p.montoALiquidar, 0),
-      desdeIso: primero.fechaAsignacion,
+      desdeIso: salidaDe(primero),
       // La promesa es del viaje: si los pedidos traen distintas, manda la más corta, que es la que
       // se incumple primero.
       promesaMin: ordenados.reduce<number | null>(

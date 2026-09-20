@@ -5,7 +5,7 @@ import type { DeliveryAsignacion } from "../delivery";
 const asig = (over: Partial<DeliveryAsignacion> & { id: string }): DeliveryAsignacion => ({
   ticketId: `t-${over.id}`, ticketFolio: null, repartidorId: null, repartidorNombre: "Luis",
   estado: "EN_RUTA", montoALiquidar: 100, propinaRepartidor: 0, tiempoPromesa: 30,
-  fechaAsignacion: "2026-09-20T18:00:00Z", viajeId: null, ...over,
+  fechaAsignacion: "2026-09-20T18:00:00Z", fechaSalida: null, viajeId: null, ...over,
 });
 
 describe("agruparViajes", () => {
@@ -65,6 +65,23 @@ describe("minutosFuera", () => {
     ]);
     expect(minutosFuera(v!, new Date("2026-09-20T18:25:00Z"))).toBe(25);
   });
+
+  it("cuenta desde la SALIDA, no desde la asignación, cuando el pedido se reasignó", () => {
+    // `asignar_delivery_lote` pone fecha_salida = now() al reasignar y deja fecha_asignacion como
+    // estaba. Contando desde la asignación, este viaje recién salido marcaba "120 min fuera".
+    const [v] = agruparViajes([
+      asig({ id: "a", viajeId: "V2", fechaAsignacion: "2026-09-20T16:00:00Z", fechaSalida: "2026-09-20T18:00:00Z" }),
+    ]);
+    expect(minutosFuera(v!, new Date("2026-09-20T18:10:00Z"))).toBe(10);
+  });
+
+  it("sin fecha de salida cae de vuelta a la asignación", () => {
+    // Asignaciones anteriores a la 0114: podían quedarse en ASIGNADO sin salida confirmada.
+    const [v] = agruparViajes([
+      asig({ id: "a", viajeId: null, fechaAsignacion: "2026-09-20T18:00:00Z", fechaSalida: null }),
+    ]);
+    expect(minutosFuera(v!, new Date("2026-09-20T18:15:00Z"))).toBe(15);
+  });
 });
 
 describe("viajeTarde", () => {
@@ -72,6 +89,14 @@ describe("viajeTarde", () => {
     const [v] = agruparViajes([asig({ id: "a", viajeId: "V1", tiempoPromesa: 30 })]);
     expect(viajeTarde(v!, new Date("2026-09-20T18:31:00Z"))).toBe(true);
     expect(viajeTarde(v!, new Date("2026-09-20T18:20:00Z"))).toBe(false);
+  });
+
+  it("un pedido reasignado no sale marcado tarde por lo que esperó en el local", () => {
+    const [v] = agruparViajes([
+      asig({ id: "a", viajeId: "V2", tiempoPromesa: 30, fechaAsignacion: "2026-09-20T16:00:00Z", fechaSalida: "2026-09-20T18:00:00Z" }),
+    ]);
+    expect(viajeTarde(v!, new Date("2026-09-20T18:20:00Z"))).toBe(false);
+    expect(viajeTarde(v!, new Date("2026-09-20T18:35:00Z"))).toBe(true);
   });
 
   it("sin promesa nunca es tarde", () => {
