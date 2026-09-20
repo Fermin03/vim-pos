@@ -192,6 +192,20 @@ async function rescatarCortesUnaVez(pool) {
  * final, una siembra fallida quedaría armada para un arranque POSTERIOR — y para entonces el
  * catálogo ya puede tener un alta hecha en la caja, que la siembra marcaría como subida y se
  * perdería para siempre y en silencio. Es exactamente el fallo que esta función existe para cerrar.
+ *
+ * Y POR ESO UN FALLO AL SEMBRAR NO TUMBA EL ARRANQUE
+ *
+ * Es consecuencia de lo anterior, no una excepción: cuando el `INSERT` de la siembra lanza, el
+ * marcador YA está confirmado, así que el arranque siguiente sale por el `return 0` de arriba y no
+ * vuelve a intentarlo nunca. La siembra no puede quedar armada para más tarde, que era lo único
+ * que justificaría morirse aquí. Lo que queda es el coste ya aceptado —una subida del catálogo
+ * entero, que pisa como mucho un ciclo de ediciones del panel— contra dejar la caja sin abrir.
+ *
+ * Y no sería solo "sin abrir al actualizar": `startLocalBackend` se vuelve a recorrer a media
+ * jornada, en el reinicio del perro guardián y en el del respaldo bajo demanda (`main.mjs`), donde
+ * un throw aquí dejaría `backend` en null con una línea de consola. La caja nunca deja de cobrar
+ * por una libreta de sincronización. Solo se protege el `INSERT` de la siembra: si fallara la
+ * escritura del marcador, que aborte — de todos modos abortaría en los GRANT de doce líneas abajo.
  */
 export async function sembrarRepartidoresUnaVez(db, log = () => {}) {
   await db.query("CREATE TABLE IF NOT EXISTS _vim_repartidores_ok (repartidor_id uuid PRIMARY KEY, subido_at timestamptz DEFAULT now())");
@@ -203,14 +217,39 @@ export async function sembrarRepartidoresUnaVez(db, log = () => {}) {
   );
   if (yaCorrio) return 0;
 
+  // Libreta con filas y sin marcador: la escribió algo que no fue esta función — el pull anotando
+  // lo que bajó, o la siembra vieja que vivía en el push. Entonces el catálogo local YA puede
+  // contener un alta hecha en la caja y todavía sin subir, y sembrar ahora la marcaría como
+  // enviada: la misma pérdida que esta función existe para impedir, ejecutada por el propio
+  // arreglo. Pasa en las máquinas de desarrollo que corrieron la build anterior de esta rama (a
+  // ninguna caja de cliente le llegó), y el plan de pruebas a mano hace justo ese recorrido.
+  // No sembrar es seguro: lo único que se pierde es la protección contra una subida del catálogo.
+  const { rowCount: yaTieneFilas } = await db.query("SELECT 1 FROM _vim_repartidores_ok LIMIT 1");
+
   await db.query(
     "INSERT INTO _vim_migraciones_sync(clave) VALUES ('siembra_repartidores_0114') ON CONFLICT DO NOTHING",
   );
-  const { rowCount: n } = await db.query(
-    "INSERT INTO _vim_repartidores_ok (repartidor_id) SELECT id FROM repartidores ON CONFLICT DO NOTHING",
-  );
-  if (n > 0) log(`libreta de repartidores sembrada con ${n} del catálogo (bajaron de la nube: no vuelven a subir)`);
-  return n;
+
+  // Se marca igual, para no volver a mirarlo en cada arranque.
+  if (yaTieneFilas) {
+    log("libreta de repartidores ya tenía anotaciones: no se siembra (marcaría un alta local sin subir)");
+    return 0;
+  }
+
+  try {
+    const { rowCount: n } = await db.query(
+      "INSERT INTO _vim_repartidores_ok (repartidor_id) SELECT id FROM repartidores ON CONFLICT DO NOTHING",
+    );
+    if (n > 0) log(`libreta de repartidores sembrada con ${n} del catálogo (bajaron de la nube: no vuelven a subir)`);
+    return n;
+  } catch (e) {
+    // Ruidoso pero no fatal: la caja abre. El siguiente push subirá el catálogo entero una vez.
+    const aviso = `no se pudo sembrar la libreta de repartidores (${e.message}). La caja abre igual;`
+      + " el próximo push subirá el catálogo completo una vez y puede pisar ediciones recientes del panel.";
+    log(`⚠ ${aviso}`);
+    console.error("· [sync]", aviso);
+    return 0;
+  }
 }
 
 /** Parte una lista en trozos de a lo más `tamano`. */

@@ -52,6 +52,11 @@ function crearPoolFalso({ catalogo = [], yaMarcados = [], fallaLaSiembra = false
         return { rows: [], rowCount: 1 };
       }
 
+      // La guarda del arranque: ¿la libreta ya tiene anotaciones de alguien más?
+      if (sql.includes("SELECT 1 FROM _vim_repartidores_ok")) {
+        return { rows: [], rowCount: marcados.size ? 1 : 0 };
+      }
+
       // La siembra del ARRANQUE: `SELECT id FROM repartidores`, sin parámetros.
       if (sql.includes("_vim_repartidores_ok") && sql.includes("SELECT id FROM repartidores")) {
         if (pool.fallaLaSiembra) throw new Error("siembra rota a propósito");
@@ -189,15 +194,29 @@ test("un alta hecha SIN CONEXIÓN, antes de que la libreta existiera, sí llega 
   } finally { nube.restaurar(); }
 });
 
-test("una siembra que falla deja el marcador puesto y no queda armada para un arranque posterior", async () => {
-  // Se marca ANTES de sembrar a propósito. Los dos fallos posibles no cuestan lo mismo: sin libreta
-  // el catálogo sube una vez (acotado, y se acaba solo), mientras que una siembra pendiente para
-  // MÁS TARDE marcaría como subida un alta local y esa sí se pierde para siempre y en silencio.
+test("una siembra que falla NO tumba el arranque, y no queda armada para uno posterior", async () => {
+  // La caja no puede dejar de cobrar por una libreta de sincronización, y este camino se recorre
+  // también a media jornada (reinicio del perro guardián, respaldo bajo demanda). Que se trague el
+  // fallo es seguro precisamente por el orden: el marcador ya está puesto cuando la siembra lanza,
+  // así que el arranque siguiente no la reintenta — y no puede marcar un alta local de mañana.
   const pool = crearPoolFalso({ catalogo: [B], fallaLaSiembra: true });
-  await assert.rejects(() => sembrarRepartidoresUnaVez(pool), /siembra rota/);
-  assert.ok(pool.marcadores.has("siembra_repartidores_0114"), "el marcador se escribe antes de sembrar");
+  const dicho = [];
+  const grito = [];
+  const errorOriginal = console.error;
+  console.error = (...partes) => grito.push(partes.join(" "));
+  try {
+    assert.equal(
+      await sembrarRepartidoresUnaVez(pool, (m) => dicho.push(m)), 0,
+      "un fallo al sembrar no puede propagarse: la caja tiene que abrir",
+    );
+  } finally { console.error = errorOriginal; }
 
-  // Arranque siguiente, ya con un alta hecha en la caja: no se siembra nada, así que A conserva su
+  assert.deepEqual(pool.sembrados, [], "no llegó a sembrar nada");
+  assert.ok(pool.marcadores.has("siembra_repartidores_0114"), "el marcador se escribe antes de sembrar");
+  assert.ok(dicho.some((m) => /no se pudo sembrar/.test(m)), "el fallo tiene que quedar en el log de la caja");
+  assert.ok(grito.length > 0, "y también en consola: en silencio no se diagnostica nada");
+
+  // Arranque siguiente, ya con un alta hecha en la caja: no se reintenta, así que A conserva su
   // viaje. El precio de la siembra perdida es que B vuelva a subir una vez, no perder a A.
   pool.fallaLaSiembra = false;
   pool.catalogo.push(A);
@@ -206,4 +225,19 @@ test("una siembra que falla deja el marcador puesto y no queda armada para un ar
 
   const pend = await listarPendientes(pool);
   assert.ok(pend.repartidorIds.includes(A), "el alta local no puede perderse por una siembra fallida");
+});
+
+test("no siembra si la libreta YA tenía anotaciones, aunque no haya marcador", async () => {
+  // Máquina que corrió la build anterior de esta rama: la libreta ya existe —la escribió el pull, o
+  // la siembra vieja que vivía en el push— pero el marcador no, porque entonces no se usaba. Si se
+  // sembrara ahora, el catálogo actual ya puede traer un alta hecha en la caja y sin subir, y
+  // quedaría marcada como enviada: la misma pérdida que este arreglo existe para impedir, cometida
+  // por el propio arreglo. A ninguna caja de cliente le llegó esa build, pero a las de desarrollo sí.
+  const pool = crearPoolFalso({ catalogo: [A, B], yaMarcados: [B] });
+  assert.equal(await sembrarRepartidoresUnaVez(pool), 0);
+  assert.deepEqual(pool.sembrados, [], "no debe sembrar sobre una libreta que ya escribió alguien más");
+  assert.ok(pool.marcadores.has("siembra_repartidores_0114"), "pero marca igual: no se repasa en cada arranque");
+
+  const pend = await listarPendientes(pool);
+  assert.deepEqual(pend.repartidorIds, [A], "el alta local conserva su viaje a la nube");
 });

@@ -325,6 +325,12 @@ export async function startLocalBackend(opts = {}) {
   // Antes del seed de fixtures a propósito: lo que siembre `seed.sql` debe quedar FUERA de la
   // libreta. Equivocarse hacia "no marcado" cuesta un envío de más; hacia "marcado", un alta que
   // no existe en la nube y que nadie puede recuperar.
+  //
+  // NO PUEDE TUMBAR EL ARRANQUE, y se encarga ella de eso. Esta línea se recorre también a media
+  // jornada —el perro guardián reinicia el backend, y el respaldo bajo demanda lo para y lo vuelve
+  // a levantar (`main.mjs`)—, así que un throw aquí no sería "la caja no actualiza": sería la caja
+  // sin cobrar en plena comida. La siembra se traga su propio fallo y lo deja en el log; como el
+  // marcador se escribe ANTES, un fallo tampoco queda armado para el arranque siguiente.
   await sembrarRepartidoresUnaVez(db, log);
 
   // 4) Grants a los roles API (lo que Supabase da fuera de las migraciones).
