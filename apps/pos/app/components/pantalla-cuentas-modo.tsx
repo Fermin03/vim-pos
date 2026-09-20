@@ -4,7 +4,7 @@ import { BotonVolver } from "./boton-volver";
 import { RenglonItem } from "./renglon-item";
 import { Button, LogoVim } from "@vim/ui/styles";
 import { fmtMxn, type DatosCaja, type Turno } from "../lib/turno";
-import { borrarCuentaVacia, leerEntregaCuenta, listarCuentasAbiertas, leerRenglonesCuenta, minutosAbierta, type CuentaAbierta, type RenglonCuenta } from "../lib/cuentas-abiertas";
+import { borrarCuentaVacia, leerEntregaCuenta, listarCuentasAbiertas, leerRenglonesCuenta, marcarComandaImpresa, minutosAbierta, type CuentaAbierta, type RenglonCuenta } from "../lib/cuentas-abiertas";
 import { leerTotales, type TotalesTicket } from "../lib/cobro";
 import { leerDeliveries } from "../lib/delivery";
 import { agruparViajes } from "../lib/viajes";
@@ -224,12 +224,25 @@ export function PantallaCuentasModo({
       // pintaba naranja— y ese era el camino por el que los pedidos "salían" sin repartidor: el
       // cajero que imprimía nunca pasaba por el modal. Desde la 0114 lo que saca un pedido a la
       // calle es asignarle repartidor, y nada más.
+      //
+      // Pero el sello SÍ hay que dejarlo: sin persistirlo, `impresaAt` nunca se actualiza y el
+      // respaldo cross-sesión/cross-caja de "ya se imprimió" (lo que exige PIN en la siguiente
+      // impresión) se pierde al recargar. Solo domicilio, como antes — en Pick-up/Comedor este
+      // sellado nunca existió y esta entrega no les toca el comportamiento. Best-effort: el
+      // ticket ya salió de la impresora, así que un fallo aquí no debe molestar al cajero.
+      if (modo === "DELIVERY_PROPIO") {
+        try {
+          await marcarComandaImpresa(token, ticketId);
+        } catch {
+          /* la marca local (yaImpresas) ya cubre esta sesión */
+        }
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : "No se pudo imprimir");
     } finally {
       setImprimiendo(false);
     }
-  }, [onImprimirTicket]);
+  }, [onImprimirTicket, modo, token]);
 
   return (
     <main className="flex h-screen flex-col bg-bg">
@@ -239,7 +252,10 @@ export function PantallaCuentasModo({
           <LogoVim className="h-8 w-8 flex-shrink-0" />
           <div className="min-w-0">
             <div className="truncate font-display text-[15px] font-semibold tracking-tight">{copia.titulo} · {caja.nombre}</div>
-            <div className="truncate text-[12px] text-ink-3">{copia.subtitulo((items ?? []).length)}</div>
+            {/* Cuenta lo mismo que se ve debajo: en domicilio, `items` sin filtrar incluiría lo
+                que ya está en reparto y el número de aquí arriba contradiría a las dos pestañas
+                de abajo (el motivo real por el que se separaron en 3+2, no una cifra suelta). */}
+            <div className="truncate text-[12px] text-ink-3">{copia.subtitulo((itemsLocal ?? []).length)}</div>
           </div>
         </div>
         <div className="flex flex-shrink-0 items-center gap-2">
