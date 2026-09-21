@@ -222,6 +222,19 @@ export function PantallaInicio({
           <Acceso label="Cerrar turno" onClick={onCerrarTurno} peligro
             icon={<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M9 11l3 3L22 4" /><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" /></svg>} />
         )}
+
+        {/* Salir de la caja. Al final de todo y detrás de su propio separador: es la única acción
+            de esta barra que no es parte de vender, y la que peor se perdona por accidente.
+            Solo en la VENTANA de la caja: la cocina y una segunda caja cargan este mismo POS por
+            HTTP y no tienen preload, así que allí `puedeSalir` es false y el botón no existe —
+            apagar el hub desde una pantalla remota no es algo que deba poder hacerse por error. */}
+        {puedeSalir && (
+          <>
+            <span className="w-px flex-shrink-0 bg-line-strong" aria-hidden="true" />
+            <Acceso label="Salir" onClick={() => setConfirmandoSalir(true)} peligro
+              icon={<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" /><path d="m16 17 5-5-5-5" /><path d="M21 12H9" /></svg>} />
+          </>
+        )}
       </nav>
 
       {/* ── Área del negocio ────────────────────────────────────────────────── */}
@@ -336,21 +349,6 @@ export function PantallaInicio({
           {" · "}
           {ahora ? ahora.toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit", hour12: false }) : "—"}
         </span>
-        {/* Salir de la caja. Hasta ahora la única salida real estaba en el menú de la bandeja,
-            que un cajero no conoce: la X solo esconde la ventana y deja todo corriendo por
-            detrás. Va al final de la barra, lejos de los accesos de venta. */}
-        {puedeSalir && (
-          <button
-            type="button"
-            onClick={() => setConfirmandoSalir(true)}
-            className="flex flex-shrink-0 items-center gap-1 rounded px-1.5 py-0.5 font-semibold text-ink-3 transition hover:bg-[#FBF1EF] hover:text-danger"
-          >
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-3 w-3" aria-hidden="true">
-              <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" /><path d="m16 17 5-5-5-5" /><path d="M21 12H9" />
-            </svg>
-            Salir
-          </button>
-        )}
       </footer>
 
       {confirmandoSalir && (
