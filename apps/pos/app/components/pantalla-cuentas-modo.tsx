@@ -4,13 +4,16 @@ import { BotonVolver } from "./boton-volver";
 import { RenglonItem } from "./renglon-item";
 import { Button, LogoVim } from "@vim/ui/styles";
 import { fmtMxn, type DatosCaja, type Turno } from "../lib/turno";
-import { borrarCuentaVacia, leerEntregaCuenta, listarCuentasAbiertas, leerRenglonesCuenta, marcarSalidaDomicilio, minutosAbierta, type CuentaAbierta, type RenglonCuenta } from "../lib/cuentas-abiertas";
+import { borrarCuentaVacia, leerEntregaCuenta, listarCuentasAbiertas, leerRenglonesCuenta, marcarComandaImpresa, minutosAbierta, type CuentaAbierta, type RenglonCuenta } from "../lib/cuentas-abiertas";
 import { leerTotales, type TotalesTicket } from "../lib/cobro";
+import { leerDeliveries } from "../lib/delivery";
+import { agruparViajes } from "../lib/viajes";
 import { ModalCancelarItem } from "./modal-cancelar-item";
 import { ModalCancelarItems, type LineaCancelada } from "./modal-cancelar-items";
 import { ModalCancelarTicket } from "./modal-cancelar-ticket";
 import { ModalDescuento } from "./modal-descuento";
 import { ModalAutorizacionPin } from "./modal-autorizacion-pin";
+import { PanelEnReparto } from "./panel-en-reparto";
 import type { Empleado } from "../lib/supabase";
 import type { ModoServicio } from "../lib/carrito";
 import { capaVisible } from "../lib/escape";
@@ -77,6 +80,7 @@ export function PantallaCuentasModo({
   onImprimirTicket,
   onComandaCancelacion,
   extraPorCuenta,
+  mostrarEnReparto,
 }: {
   token: string;
   caja: DatosCaja;
@@ -99,9 +103,14 @@ export function PantallaCuentasModo({
   onComandaCancelacion: (ticketId: string, lineas: LineaCancelada[]) => Promise<void>;
   /** Acciones propias del modo (p. ej. "Marcar salida" en domicilio). */
   extraPorCuenta?: (c: CuentaAbierta, recargar: () => void) => React.ReactNode;
+  /** Domicilio: muestra la pestaña de los pedidos que ya van con un repartidor. */
+  mostrarEnReparto?: boolean;
 }) {
   const copia = COPIA[modo];
   const esComedor = modo === "COMER_AQUI";
+  // Solo domicilio tiene dos pestañas; Pick-up y Comedor nunca reciben mostrarEnReparto y se
+  // quedan siempre en "local", que es exactamente el maestro-detalle de siempre.
+  const [pestana, setPestana] = useState<"local" | "reparto">("local");
   const [items, setItems] = useState<CuentaAbierta[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [selId, setSelId] = useState<string | null>(null);
@@ -120,6 +129,10 @@ export function PantallaCuentasModo({
   /** A quién y dónde se entrega. Solo en domicilio; en los demás modos el cliente está enfrente. */
   const [entrega, setEntrega] = useState<Awaited<ReturnType<typeof leerEntregaCuenta>>>(null);
   const [borrando, setBorrando] = useState(false);
+  // Domicilio: asignaciones vivas (con repartidor, todavía sin cobrar). Un ticket con asignación
+  // viva ya no es "del local": vive en la pestaña "En reparto" y de ahí se cobra. Se guarda aparte
+  // de `items` porque también alimenta el contador de esa pestaña, sin otra consulta.
+  const [asignacionesVivas, setAsignacionesVivas] = useState<Awaited<ReturnType<typeof leerDeliveries>>>([]);
 
   const recargar = useCallback(async () => {
     setError(null);
@@ -128,6 +141,16 @@ export function PantallaCuentasModo({
     } catch (e) {
       setError(e instanceof Error ? e.message : "No se pudieron cargar las cuentas");
       setItems([]);
+    }
+    // Solo domicilio tiene repartidores que asignar. Aparte de las cuentas y con su propio
+    // catch: si esto falla, la lista de "En el local" se sigue viendo (aunque sin poder sacar
+    // de ahí lo ya asignado ni actualizar el contador de "En reparto").
+    if (modo === "DELIVERY_PROPIO") {
+      try {
+        setAsignacionesVivas(await leerDeliveries(token, caja.sucursal_id));
+      } catch {
+        /* se queda con lo que ya tenía; no rompe la lista de cuentas */
+      }
     }
   }, [token, caja.sucursal_id, modo, esComedor]);
 
@@ -160,7 +183,17 @@ export function PantallaCuentasModo({
     return () => { vivo = false; };
   }, [selId, recargarDetalle]);
 
-  const sel = (items ?? []).find((c) => c.ticketId === selId) ?? null;
+  // Domicilio: un ticket con repartidor asignado ya no es "del local" (invariante del diseño: o
+  // tiene repartidor y está en reparto, o sigue en el local, nunca las dos). En Pick-up y Comedor
+  // `asignacionesVivas` nunca se llena, así que este filtro no les toca ni una cuenta.
+  const idsAsignados = useMemo(() => new Set(asignacionesVivas.map((a) => a.ticketId)), [asignacionesVivas]);
+  const itemsLocal = useMemo(
+    () => (items === null ? null : items.filter((c) => !idsAsignados.has(c.ticketId))),
+    [items, idsAsignados],
+  );
+  const viajesEnReparto = useMemo(() => agruparViajes(asignacionesVivas), [asignacionesVivas]);
+
+  const sel = (itemsLocal ?? []).find((c) => c.ticketId === selId) ?? null;
   // "Ya se imprimió" = lo hicimos en esta sesión, o el ticket trae marca de impresión previa.
   const yaSeImprimio = sel != null && (yaImpresas.has(sel.ticketId) || sel.impresaAt != null);
   // null = todavía no se sabe. Solo `true` habilita el borrado.
@@ -187,16 +220,21 @@ export function PantallaCuentasModo({
     try {
       await onImprimirTicket(ticketId);
       setYaImpresas((s) => new Set(s).add(ticketId));
-      // En domicilio, imprimir el ticket ES el momento en que la orden sale con el repartidor.
-      // Se persiste (comanda_impresa_at) para que el naranja siga ahí tras recargar y lo vea
-      // cualquier caja de la sucursal, no solo la que imprimió. Si el UPDATE falla, la orden
-      // ya se imprimió: se deja la marca local y no se molesta al cajero con un error.
+      // Imprimir ya NO marca la salida. Lo hacía —sellaba comanda_impresa_at y la tarjeta se
+      // pintaba naranja— y ese era el camino por el que los pedidos "salían" sin repartidor: el
+      // cajero que imprimía nunca pasaba por el modal. Desde la 0114 lo que saca un pedido a la
+      // calle es asignarle repartidor, y nada más.
+      //
+      // Pero el sello SÍ hay que dejarlo: sin persistirlo, `impresaAt` nunca se actualiza y el
+      // respaldo cross-sesión/cross-caja de "ya se imprimió" (lo que exige PIN en la siguiente
+      // impresión) se pierde al recargar. Solo domicilio, como antes — en Pick-up/Comedor este
+      // sellado nunca existió y esta entrega no les toca el comportamiento. Best-effort: el
+      // ticket ya salió de la impresora, así que un fallo aquí no debe molestar al cajero.
       if (modo === "DELIVERY_PROPIO") {
         try {
-          await marcarSalidaDomicilio(token, ticketId);
-          await recargar();
+          await marcarComandaImpresa(token, ticketId);
         } catch {
-          /* la marca local ya pintó la cuenta */
+          /* la marca local (yaImpresas) ya cubre esta sesión */
         }
       }
     } catch (e) {
@@ -204,7 +242,7 @@ export function PantallaCuentasModo({
     } finally {
       setImprimiendo(false);
     }
-  }, [onImprimirTicket, modo, token, recargar]);
+  }, [onImprimirTicket, modo, token]);
 
   return (
     <main className="flex h-screen flex-col bg-bg">
@@ -214,7 +252,10 @@ export function PantallaCuentasModo({
           <LogoVim className="h-8 w-8 flex-shrink-0" />
           <div className="min-w-0">
             <div className="truncate font-display text-[15px] font-semibold tracking-tight">{copia.titulo} · {caja.nombre}</div>
-            <div className="truncate text-[12px] text-ink-3">{copia.subtitulo((items ?? []).length)}</div>
+            {/* Cuenta lo mismo que se ve debajo: en domicilio, `items` sin filtrar incluiría lo
+                que ya está en reparto y el número de aquí arriba contradiría a las dos pestañas
+                de abajo (el motivo real por el que se separaron en 3+2, no una cifra suelta). */}
+            <div className="truncate text-[12px] text-ink-3">{copia.subtitulo((itemsLocal ?? []).length)}</div>
           </div>
         </div>
         <div className="flex flex-shrink-0 items-center gap-2">
@@ -240,23 +281,41 @@ export function PantallaCuentasModo({
 
       {error && <p className="flex-shrink-0 bg-[#FBF1EF] px-4 py-2 text-[13px] font-medium text-danger" role="alert">{error}</p>}
 
+      {/* Domicilio: "En el local" es el maestro-detalle de siempre; "En reparto" es la vista nueva de
+          quién anda repartiendo. Pick-up y Comedor nunca reciben mostrarEnReparto, así que ni
+          ven la franja ni pueden caer en pestana === "reparto" por accidente (el botón que lo
+          cambiaría no existe). */}
+      {mostrarEnReparto && (
+        <div role="tablist" className="flex flex-shrink-0 items-center gap-2 border-b border-line px-3 py-2">
+          <BotonPestana label={`En el local · ${(itemsLocal ?? []).length}`} activa={pestana === "local"} onClick={() => setPestana("local")} />
+          <BotonPestana label={`En reparto · ${viajesEnReparto.length}`} activa={pestana === "reparto"} onClick={() => setPestana("reparto")} />
+        </div>
+      )}
+
+      {pestana === "reparto" && mostrarEnReparto ? (
+        <PanelEnReparto token={token} sucursalId={caja.sucursal_id} onCobrar={onCobrar} />
+      ) : (
       <div className="flex min-h-0 flex-1">
         {/* ── Lista de cuentas ─────────────────────────────────────────── */}
         <div className="flex w-[clamp(18rem,30vw,24rem)] flex-shrink-0 flex-col border-r border-line">
           <div className="min-h-0 flex-1 overflow-y-auto p-3">
-            {items === null && <p className="p-3 text-sm text-ink-3">Cargando…</p>}
-            {items?.length === 0 && (
+            {itemsLocal === null && <p className="p-3 text-sm text-ink-3">Cargando…</p>}
+            {itemsLocal?.length === 0 && (
               <div className="flex h-full flex-col items-center justify-center gap-2 px-4 text-center">
                 <p className="text-[14px] font-semibold text-ink-2">{copia.vacioTitulo}</p>
                 <p className="text-[12.5px] text-ink-3">{copia.vacioTexto}</p>
               </div>
             )}
             <div className="flex flex-col gap-2">
-              {items?.map((c) => {
+              {itemsLocal?.map((c) => {
                 const activa = c.ticketId === selId;
-                // Ticket ya impreso = la orden salió. Se pinta en naranja para distinguir de un
-                // vistazo lo que ya va en camino de lo que sigue pendiente de imprimir.
-                const salio = yaImpresas.has(c.ticketId) || c.impresaAt != null;
+                // Ticket ya impreso = la orden salió, EXCEPTO en domicilio: ahí "En el local" ya
+                // solo contiene pedidos sin repartidor (se filtran en cuanto se asignan), así que
+                // nada en esta lista puede haber salido. Pintarlo de naranja por venir impreso
+                // sería la misma mentira que esta tarea vino a quitar, solo que reaparecida en la
+                // otra pestaña. En Pick-up/Comedor "impreso" sigue siendo la única señal de salida
+                // y no cambia.
+                const salio = modo === "DELIVERY_PROPIO" ? false : (yaImpresas.has(c.ticketId) || c.impresaAt != null);
                 return (
                   <button
                     key={c.ticketId}
@@ -407,6 +466,7 @@ export function PantallaCuentasModo({
           )}
         </div>
       </div>
+      )}
 
       {cancelando && sel && (
         <ModalCancelarItem
@@ -574,6 +634,25 @@ function Accion({
       ].join(" ")}
     >
       {ocupado ? "Imprimiendo…" : label}
+    </button>
+  );
+}
+
+/** Misma pinta que los botones de la cabecera (borde + fondo claro); la activa se marca como
+ *  la tarjeta seleccionada de la lista, para no inventar un tercer estilo de "seleccionado". */
+function BotonPestana({ label, activa, onClick }: { label: string; activa: boolean; onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      role="tab"
+      aria-selected={activa}
+      onClick={onClick}
+      className={[
+        "flex h-10 items-center rounded border px-3.5 text-[13.5px] font-semibold transition",
+        activa ? "border-ink bg-sel text-ink" : "border-line-strong bg-surface text-ink-2 hover:border-ink hover:text-ink",
+      ].join(" ")}
+    >
+      {label}
     </button>
   );
 }

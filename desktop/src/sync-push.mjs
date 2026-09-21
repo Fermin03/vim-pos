@@ -70,6 +70,45 @@ async function asegurarTabla(pool) {
   // en cuanto la nube confirma; la nube es idempotente por id, así que reenviar no descuenta doble.
   await pool.query("CREATE TABLE IF NOT EXISTS _vim_mov_ok (movimiento_id uuid PRIMARY KEY, subido_at timestamptz DEFAULT now())");
 
+  // Repartidores: la caja puede darlos de alta (0114) porque un domicilio no puede quedarse sin
+  // salir porque nadie entró al panel. Suben UNA sola vez, por id.
+  //
+  // OJO, no es como _vim_mov_ok aunque se parezca: los movimientos de inventario nunca bajan del
+  // pull, así que allí la libreta solo evita re-trabajo. Los repartidores SÍ bajan, y aquí la
+  // libreta es lo que impide que la caja reenvíe su copia vieja y pise lo que se editó en el panel.
+  //
+  // PARA QUE ESO SEA CIERTO, LA LIBRETA TIENE QUE SABER DE LOS QUE BAJARON.
+  //
+  // Solo se escribía al SUBIR (marcarRepartidoresSubidos). Las filas que llegaban por el pull no
+  // se anotaban en ningún lado, y `sync_pull_snapshot` manda el catálogo COMPLETO del tenant: el
+  // "solo los que no están en la libreta" del snapshot de push acababa siendo "casi todos". El
+  // resultado era justo lo contrario de lo que la libreta promete — cada repartidor creado en el
+  // panel hacía un viaje de ida y vuelta y volvía a subir tal como la caja lo tenía, y la nube lo
+  // aplica con ON CONFLICT (id) DO UPDATE de TODAS las columnas: nombre, teléfono, activo,
+  // deleted_at. Y como el push corre ANTES que el pull (main.mjs, ADR 0013), la caja nunca se
+  // refresca antes de pisar: la ventana es un ciclo entero, no unos segundos. Un repartidor dado
+  // de baja en el panel entre el último pull y el siguiente push RESUCITABA.
+  //
+  // Se cierra por los dos lados: el pull anota lo que baja (sync-pull.mjs), y la libreta nace
+  // SEMBRADA con el catálogo que ya estaba en la caja.
+  //
+  // AQUÍ SOLO SE CREA LA TABLA. LA SIEMBRA VIVE EN EL ARRANQUE, NO EN EL PUSH.
+  //
+  // La siembra estuvo aquí y era una pérdida de datos esperando su turno: a este archivo solo se
+  // llega desde pushToCloud, y el push ni se intenta si el login del dispositivo contra la nube
+  // falla (main.mjs). O sea, la libreta no nacía al instalar sino en el primer sync EXITOSO. Una
+  // caja que se actualiza sin internet (o con una credencial que no entra, como le pasó al piloto
+  // el 8/09/2026) se queda sin libreta; el cajero da de alta a un repartidor —que es justo para lo
+  // que se hizo esto—, y cuando vuelve la conexión la siembra lo encuentra en el catálogo y lo
+  // marca como ya subido. Por diseño no vuelve a viajar nunca: no llega a la nube, nadie se entera,
+  // y sus `delivery_asignaciones` se estrellan contra la FK allá arriba —donde `rechazadosPorTicket`
+  // las deja pasar a propósito—, así que cada reparto que hizo pierde también su atribución.
+  // Ver `sembrarRepartidoresUnaVez`, que corre al arrancar el backend local (runtime.mjs).
+  //
+  // El CREATE se queda porque el push tiene que funcionar igual en las pruebas y en cualquier caja
+  // cuyo arranque no haya pasado por ahí: sin la tabla, todas las consultas de abajo reventarían.
+  await pool.query("CREATE TABLE IF NOT EXISTS _vim_repartidores_ok (repartidor_id uuid PRIMARY KEY, subido_at timestamptz DEFAULT now())");
+
   await rescatarCortesUnaVez(pool);
 }
 
@@ -122,6 +161,97 @@ async function rescatarCortesUnaVez(pool) {
   }
 }
 
+/**
+ * Siembra `_vim_repartidores_ok` con el catálogo que ya está en la caja. UNA sola vez por caja, EN
+ * EL ARRANQUE — la llama `startLocalBackend` (runtime.mjs) justo después de aplicar migraciones.
+ *
+ * QUÉ SIEMBRA Y POR QUÉ ES SEGURO
+ *
+ * La libreta dice qué repartidores NO hay que mandar a la nube. Al instalar esta versión, el
+ * catálogo local solo puede traer filas que BAJARON del pull: ninguna versión anterior sabía dar de
+ * alta un repartidor desde la caja. La nube ya los tiene, así que marcarlos no pierde nada — y sin
+ * marcarlos, el primer push subiría el catálogo entero y pisaría con la copia local el nombre, el
+ * teléfono, el `activo` y el `deleted_at` que se hayan editado en el panel.
+ *
+ * POR QUÉ EN EL ARRANQUE Y NO EN EL PRIMER PUSH
+ *
+ * Porque el arranque no depende de la nube y el push sí. Aplicar las migraciones es lo primero que
+ * hace la caja al abrir, pase lo que pase con el internet; el push ni se intenta si el dispositivo
+ * no logra autenticarse contra Supabase. Sembrar desde el push dejaba sin libreta a la caja que se
+ * actualiza sin conexión, y la siembra acababa corriendo DESPUÉS de que el cajero diera de alta a un
+ * repartidor: lo marcaba como subido y esa alta no existía jamás en la nube. Ver `asegurarTabla`.
+ *
+ * Aquí eso no puede pasar: el primer arranque tras la actualización ocurre antes de que la caja
+ * pueda escribir nada, y todo lo que se cree después ya nace fuera de la libreta.
+ *
+ * POR QUÉ SE MARCA ANTES DE SEMBRAR (igual que `rescatarCortesUnaVez`)
+ *
+ * Porque los dos fallos posibles no cuestan lo mismo. Si la siembra falla con el marcador ya
+ * puesto, la libreta se queda vacía y el catálogo sube una vez: se pisa lo que el panel haya
+ * editado en el último ciclo, es acotado y se acaba solo. Si en cambio el marcador se escribiera al
+ * final, una siembra fallida quedaría armada para un arranque POSTERIOR — y para entonces el
+ * catálogo ya puede tener un alta hecha en la caja, que la siembra marcaría como subida y se
+ * perdería para siempre y en silencio. Es exactamente el fallo que esta función existe para cerrar.
+ *
+ * Y POR ESO UN FALLO AL SEMBRAR NO TUMBA EL ARRANQUE
+ *
+ * Es consecuencia de lo anterior, no una excepción: cuando el `INSERT` de la siembra lanza, el
+ * marcador YA está confirmado, así que el arranque siguiente sale por el `return 0` de arriba y no
+ * vuelve a intentarlo nunca. La siembra no puede quedar armada para más tarde, que era lo único
+ * que justificaría morirse aquí. Lo que queda es el coste ya aceptado —una subida del catálogo
+ * entero, que pisa como mucho un ciclo de ediciones del panel— contra dejar la caja sin abrir.
+ *
+ * Y no sería solo "sin abrir al actualizar": `startLocalBackend` se vuelve a recorrer a media
+ * jornada, en el reinicio del perro guardián y en el del respaldo bajo demanda (`main.mjs`), donde
+ * un throw aquí dejaría `backend` en null con una línea de consola. La caja nunca deja de cobrar
+ * por una libreta de sincronización. Solo se protege el `INSERT` de la siembra: si fallara la
+ * escritura del marcador, que aborte — de todos modos abortaría en los GRANT de doce líneas abajo.
+ */
+export async function sembrarRepartidoresUnaVez(db, log = () => {}) {
+  await db.query("CREATE TABLE IF NOT EXISTS _vim_repartidores_ok (repartidor_id uuid PRIMARY KEY, subido_at timestamptz DEFAULT now())");
+  await db.query(
+    "CREATE TABLE IF NOT EXISTS _vim_migraciones_sync (clave text PRIMARY KEY, aplicada_at timestamptz DEFAULT now())",
+  );
+  const { rowCount: yaCorrio } = await db.query(
+    "SELECT 1 FROM _vim_migraciones_sync WHERE clave = 'siembra_repartidores_0114'",
+  );
+  if (yaCorrio) return 0;
+
+  // Libreta con filas y sin marcador: la escribió algo que no fue esta función — el pull anotando
+  // lo que bajó, o la siembra vieja que vivía en el push. Entonces el catálogo local YA puede
+  // contener un alta hecha en la caja y todavía sin subir, y sembrar ahora la marcaría como
+  // enviada: la misma pérdida que esta función existe para impedir, ejecutada por el propio
+  // arreglo. Pasa en las máquinas de desarrollo que corrieron la build anterior de esta rama (a
+  // ninguna caja de cliente le llegó), y el plan de pruebas a mano hace justo ese recorrido.
+  // No sembrar es seguro: lo único que se pierde es la protección contra una subida del catálogo.
+  const { rowCount: yaTieneFilas } = await db.query("SELECT 1 FROM _vim_repartidores_ok LIMIT 1");
+
+  await db.query(
+    "INSERT INTO _vim_migraciones_sync(clave) VALUES ('siembra_repartidores_0114') ON CONFLICT DO NOTHING",
+  );
+
+  // Se marca igual, para no volver a mirarlo en cada arranque.
+  if (yaTieneFilas) {
+    log("libreta de repartidores ya tenía anotaciones: no se siembra (marcaría un alta local sin subir)");
+    return 0;
+  }
+
+  try {
+    const { rowCount: n } = await db.query(
+      "INSERT INTO _vim_repartidores_ok (repartidor_id) SELECT id FROM repartidores ON CONFLICT DO NOTHING",
+    );
+    if (n > 0) log(`libreta de repartidores sembrada con ${n} del catálogo (bajaron de la nube: no vuelven a subir)`);
+    return n;
+  } catch (e) {
+    // Ruidoso pero no fatal: la caja abre. El siguiente push subirá el catálogo entero una vez.
+    const aviso = `no se pudo sembrar la libreta de repartidores (${e.message}). La caja abre igual;`
+      + " el próximo push subirá el catálogo completo una vez y puede pisar ediciones recientes del panel.";
+    log(`⚠ ${aviso}`);
+    console.error("· [sync]", aviso);
+    return 0;
+  }
+}
+
 /** Parte una lista en trozos de a lo más `tamano`. */
 export function trocear(lista, tamano) {
   const trozos = [];
@@ -156,9 +286,17 @@ export async function listarPendientes(pool) {
       (SELECT array_agg(m.id ORDER BY m.fecha)
          FROM movimientos_inventario m
          LEFT JOIN _vim_mov_ok ok ON ok.movimiento_id = m.id
-        WHERE ok.movimiento_id IS NULL) AS movimientos
+        WHERE ok.movimiento_id IS NULL) AS movimientos,
+      -- Repartidores dados de alta en la caja aún no confirmados por la nube (ver _vim_repartidores_ok
+      -- en asegurarTabla). Sin esto, un alta a media jornada sin ventas ni turnos ni movimientos de
+      -- por medio no hace pasar la guarda de pushToCloud y se queda atorada en silencio.
+      (SELECT array_agg(x.id) FROM repartidores x
+        WHERE x.id NOT IN (SELECT repartidor_id FROM _vim_repartidores_ok)) AS repartidores
   `, [TERMINALES]);
-  return { ids: rows[0].ids ?? [], turnosCambiados: rows[0].turnos ?? [], movimientoIds: rows[0].movimientos ?? [] };
+  return {
+    ids: rows[0].ids ?? [], turnosCambiados: rows[0].turnos ?? [],
+    movimientoIds: rows[0].movimientos ?? [], repartidorIds: rows[0].repartidores ?? [],
+  };
 }
 
 /**
@@ -214,6 +352,7 @@ export async function construirSnapshotPush(pool, { ticketIds = null, turnoIds =
       (SELECT array_agg(id) FROM tk) AS ids,
       (SELECT jsonb_agg(jsonb_build_object('id', id, 'huella', huella)) FROM tn) AS turnos,
       (SELECT array_agg(id) FROM movimientos_inventario x WHERE ($4::uuid[] IS NOT NULL AND x.id = ANY($4::uuid[])) OR ($4::uuid[] IS NULL AND $2::uuid[] IS NULL AND x.id NOT IN (SELECT movimiento_id FROM _vim_mov_ok))) AS movimientos,
+      (SELECT array_agg(id) FROM repartidores x WHERE x.id NOT IN (SELECT repartidor_id FROM _vim_repartidores_ok)) AS repartidores,
       jsonb_strip_nulls(jsonb_build_object(
         'turnos',                    (SELECT jsonb_agg(to_jsonb(x)) FROM turnos x WHERE x.id IN (SELECT id FROM tn)),
         'tickets',                   (SELECT jsonb_agg(to_jsonb(x)) FROM tickets x WHERE x.id IN (SELECT id FROM tk)),
@@ -225,6 +364,10 @@ export async function construirSnapshotPush(pool, { ticketIds = null, turnoIds =
         -- salida, antes de cobrar, así que para cuando el ticket entra en esta rebanada ya está
         -- liquidada y sube completa.
         'delivery_asignaciones',     (SELECT jsonb_agg(to_jsonb(x)) FROM delivery_asignaciones x WHERE x.ticket_id IN (SELECT id FROM tk)),
+
+        -- El catálogo de repartidores, solo los que la nube aún no confirmó. Ver _vim_repartidores_ok.
+        'repartidores',              (SELECT jsonb_agg(to_jsonb(x)) FROM repartidores x
+                                        WHERE x.id NOT IN (SELECT repartidor_id FROM _vim_repartidores_ok)),
 
         -- EL CIERRE DEL TURNO. Se quedaba en la caja.
         --
@@ -248,7 +391,10 @@ export async function construirSnapshotPush(pool, { ticketIds = null, turnoIds =
                                                AND x.id NOT IN (SELECT movimiento_id FROM _vim_mov_ok)))
       )) AS snapshot
   `, [TERMINALES, ticketIds, turnoIds, movimientoIds]);
-  return { snapshot: rows[0].snapshot ?? {}, ids: rows[0].ids ?? [], turnos: rows[0].turnos ?? [], movimientos: rows[0].movimientos ?? [] };
+  return {
+    snapshot: rows[0].snapshot ?? {}, ids: rows[0].ids ?? [], turnos: rows[0].turnos ?? [],
+    movimientos: rows[0].movimientos ?? [], repartidores: rows[0].repartidores ?? [],
+  };
 }
 
 /** Marca tickets como subidos (para no re-enviarlos). */
@@ -263,6 +409,15 @@ export async function marcarMovimientosPushed(pool, ids) {
   if (!ids?.length) return;
   await pool.query(
     "INSERT INTO _vim_mov_ok(movimiento_id) SELECT unnest($1::uuid[]) ON CONFLICT (movimiento_id) DO NOTHING", [ids]);
+}
+
+/** Marca los repartidores que la nube ya aplicó: no vuelven a subir nunca. */
+export async function marcarRepartidoresSubidos(pool, ids) {
+  if (!ids?.length) return;
+  await pool.query(
+    "INSERT INTO _vim_repartidores_ok (repartidor_id) SELECT unnest($1::uuid[]) ON CONFLICT DO NOTHING",
+    [ids],
+  );
 }
 
 /**
@@ -300,6 +455,10 @@ function rechazadosPorTicket(errores, snapshot) {
       // Que no suba quién repartió no invalida la venta. Retener el ticket por esto lo dejaría
       // reintentándose para siempre si la asignación nunca puede aplicarse.
       continue;
+    } else if (e.tabla === "repartidores") {
+      // Un repartidor rechazado se reintenta solo (ver repartidoresRechazados); no cuelga de
+      // ningún ticket, igual que delivery_asignaciones: que no suba el catálogo no invalida ventas.
+      continue;
     } else if (e.tabla === "ticket_items" || e.tabla === "pagos") {
       const fila = (snapshot[e.tabla] ?? []).find((x) => x.id === e.id);
       if (fila?.ticket_id) fuera.add(fila.ticket_id);
@@ -319,6 +478,16 @@ function movimientosRechazados(errores) {
 }
 
 /**
+ * Ids de repartidores que la nube rechazó: no se marcan en _vim_repartidores_ok.
+ *
+ * Marcar un rechazado lo perdería para siempre — por diseño un repartidor confirmado nunca vuelve
+ * a viajar, así que si se marca sin haber llegado de verdad, esa alta no existirá jamás en la nube.
+ */
+function repartidoresRechazados(errores) {
+  return new Set((errores ?? []).filter((e) => e?.tabla === "repartidores" && e.id).map((e) => e.id));
+}
+
+/**
  * Envía UN lote y marca lo que la nube aceptó.
  *
  * Se parte solo si hace falta: primero por tamaño medido antes de salir, y también si la nube
@@ -327,7 +496,7 @@ function movimientosRechazados(errores) {
  * en pocas vueltas y no necesita saber cuál es el límite del otro lado.
  */
 async function enviarLote(pool, { cloudUrl, anonKey, deviceToken }, { ticketIds, turnoIds, movimientoIds = [], maxBytes }, log) {
-  const { snapshot, ids, turnos, movimientos } = await construirSnapshotPush(pool, { ticketIds, turnoIds, movimientoIds });
+  const { snapshot, ids, turnos, movimientos, repartidores } = await construirSnapshotPush(pool, { ticketIds, turnoIds, movimientoIds });
   const cuerpo = JSON.stringify({ snapshot });
   const bytes = Buffer.byteLength(cuerpo);
 
@@ -372,6 +541,8 @@ async function enviarLote(pool, { cloudUrl, anonKey, deviceToken }, { ticketIds,
   await marcarTurnosPushed(pool, turnos.filter((t) => !fuera.has(t.id)));
   const movFuera = movimientosRechazados(errores);
   await marcarMovimientosPushed(pool, movimientos.filter((id) => !movFuera.has(id)));
+  const repFuera = repartidoresRechazados(errores);
+  await marcarRepartidoresSubidos(pool, repartidores.filter((id) => !repFuera.has(id)));
   if (errores.length) {
     const muestra = errores.slice(0, 3).map((e) => `${e.tabla}/${String(e.id).slice(0, 8)}: ${e.error}`).join(" · ");
     log(`la nube rechazó ${errores.length} fila(s), se reintentarán: ${muestra}`);
@@ -392,7 +563,7 @@ export async function pushToCloud(pool, opts, log = () => {}, cfg = {}) {
   const maxBytes = cfg.maxBytesPorLote ?? MAX_BYTES_POR_LOTE;
   const maxMovimientos = cfg.maxMovimientosPorPush ?? MAX_MOVIMIENTOS_POR_PUSH;
 
-  const { ids, turnosCambiados, movimientoIds: movimientoIdsTodos } = await listarPendientes(pool);
+  const { ids, turnosCambiados, movimientoIds: movimientoIdsTodos, repartidorIds } = await listarPendientes(pool);
   // I2: techo por corrida (ver el comentario de MAX_MOVIMIENTOS_POR_PUSH). El resto se queda
   // pendiente y lo recoge listarPendientes() en el siguiente ciclo — en orden de fecha, así que no
   // se salta ninguno, solo se pospone.
@@ -402,13 +573,18 @@ export async function pushToCloud(pool, opts, log = () => {}, cfg = {}) {
   }
   // Un cierre de turno SIN ventas nuevas también es algo que subir. Cuando esta condición solo
   // miraba los tickets, el cierre se quedaba en la caja y la nube nunca se enteraba. Lo mismo pasa
-  // con un movimiento de inventario suelto (ADR 0013): también cuenta como pendiente por sí solo.
-  if (!ids.length && !turnosCambiados.length && !movimientoIds.length) { log("nada pendiente por subir"); return { subidos: 0, turnos: 0, movimientos: 0, rechazados: 0, lotes: 0 }; }
+  // con un movimiento de inventario suelto (ADR 0013), y con un repartidor dado de alta a media
+  // jornada (0114/Task 2): sin este último `!repartidorIds.length`, un alta que cae justo cuando no
+  // hay ventas, turnos cambiados NI movimientos pendientes hacía volver esta guarda antes de llegar
+  // a construirSnapshotPush, y el repartidor se quedaba atorado en la caja hasta que ALGO ajeno
+  // volviera a hacerla pasar — en silencio, sin error, contra el motivo de tener el catálogo aquí.
+  if (!ids.length && !turnosCambiados.length && !movimientoIds.length && !repartidorIds.length) { log("nada pendiente por subir"); return { subidos: 0, turnos: 0, movimientos: 0, rechazados: 0, lotes: 0 }; }
 
   const parte = [
     ids.length ? `${ids.length} venta${ids.length === 1 ? "" : "s"}` : null,
     turnosCambiados.length ? `${turnosCambiados.length} turno${turnosCambiados.length === 1 ? "" : "s"}` : null,
     movimientoIds.length ? `${movimientoIds.length} movimiento(s) de inventario` : null,
+    repartidorIds.length ? `${repartidorIds.length} repartidor(es)` : null,
   ].filter(Boolean).join(" y ");
 
   // Sin ventas queda un solo lote vacío: el que lleva los turnos que cambiaron (y los movimientos).

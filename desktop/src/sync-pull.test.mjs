@@ -40,3 +40,58 @@ test("PULL_ORDER baja los slots de combos después de productos y sus opciones d
   assert.ok(t.indexOf("combo_opciones") > t.indexOf("combo_grupos"), "combo_opciones va después de combo_grupos (FK)");
   assert.ok(t.indexOf("combo_opciones") < t.indexOf("configuracion_tenant"));
 });
+
+import { pullSnapshot } from "./sync-pull.mjs";
+
+/**
+ * Un cliente de mentiras que responde lo mínimo para que `pullSnapshot` corra: la metadata de la
+ * tabla y un OK para todo lo demás. Apunta cada consulta para poder mirarlas después.
+ */
+function clienteFalso() {
+  const consultas = [];
+  const client = {
+    consultas,
+    async query(sql, params = []) {
+      consultas.push({ sql, params });
+      if (sql.includes("information_schema.columns")) {
+        return { rows: [
+          { column_name: "id", udt_name: "uuid", is_generated: "NEVER", is_identity: "NO" },
+          { column_name: "nombre", udt_name: "varchar", is_generated: "NEVER", is_identity: "NO" },
+          { column_name: "activo", udt_name: "bool", is_generated: "NEVER", is_identity: "NO" },
+        ] };
+      }
+      if (sql.includes("indisprimary")) return { rows: [{ attname: "id" }] };
+      return { rows: [], rowCount: 0 };
+    },
+    release() {},
+  };
+  return { client, pool: { async connect() { return client; } } };
+}
+
+const R1 = "aaaaaaaa-0000-0000-0000-000000000001";
+const R2 = "bbbbbbbb-0000-0000-0000-000000000002";
+
+test("el pull anota en _vim_repartidores_ok lo que acaba de bajar", async () => {
+  // Sin esto, el push volvía a mandar a la nube su propia copia del catálogo y pisaba lo editado
+  // en el panel — incluido un `deleted_at`, que resucitaba a un repartidor dado de baja.
+  const { client, pool } = clienteFalso();
+  await pullSnapshot(pool, {
+    repartidores: [
+      { id: R1, nombre: "Luis", activo: true },
+      { id: R2, nombre: "Ana", activo: false },
+    ],
+  });
+  const marca = client.consultas.find((c) => c.sql.includes("_vim_repartidores_ok") && c.sql.includes("unnest"));
+  assert.ok(marca, "el pull debía anotar los repartidores que bajó");
+  assert.deepEqual(marca.params[0].sort(), [R1, R2].sort());
+  // Y dentro de la misma transacción: si el pull revienta, las marcas se van con el ROLLBACK.
+  const iMarca = client.consultas.indexOf(marca);
+  const iCommit = client.consultas.findIndex((c) => c.sql === "COMMIT");
+  assert.ok(iMarca < iCommit, "la marca va antes del COMMIT, dentro de la transacción del pull");
+});
+
+test("un pull sin repartidores no toca la libreta", async () => {
+  const { client, pool } = clienteFalso();
+  await pullSnapshot(pool, { repartidores: [] });
+  assert.ok(!client.consultas.some((c) => c.sql.includes("_vim_repartidores_ok")));
+});

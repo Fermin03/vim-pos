@@ -24,7 +24,7 @@ const RELLENO = "x".repeat(2000); // para que cada ticket pese como uno real (~2
  * Universo de prueba: `nTickets` ventas terminales repartidas en `nTurnos` turnos, cada una con
  * 4 renglones y un pago. Responde las mismas consultas que sync-push.mjs le hace al pool real.
  */
-function crearPoolFalso({ nTickets = 450, nTurnos = 5, turnosCambiados = [] } = {}) {
+function crearPoolFalso({ nTickets = 450, nTurnos = 5, turnosCambiados = [], repartidorIds = [] } = {}) {
   const turnos = Array.from({ length: nTurnos }, (_, i) => ({ id: `turno-${i}`, estado: "CERRADO" }));
   const tickets = Array.from({ length: nTickets }, (_, i) => ({
     id: `ticket-${String(i).padStart(4, "0")}`,
@@ -38,20 +38,34 @@ function crearPoolFalso({ nTickets = 450, nTurnos = 5, turnosCambiados = [] } = 
 
   const subidos = new Set();
   const turnosMarcados = new Map();
+  const repartidoresMarcados = new Set();
 
   const pool = {
     consultas: 0,
     subidos,
     turnosMarcados,
+    repartidoresMarcados,
     async query(sql, params = []) {
       pool.consultas++;
 
       if (sql.startsWith("CREATE TABLE")) return { rows: [] };
 
+      // La libreta de repartidores ya no se siembra desde el push (la siembra vive en el arranque,
+      // `sembrarRepartidoresUnaVez`), así que aquí solo llega el marcado de lo que la nube confirmó.
+      if (sql.includes("_vim_repartidores_ok (repartidor_id)")) {
+        for (const id of params[0]) repartidoresMarcados.add(id);
+        return { rows: [] };
+      }
+
       if (sql.includes("array_agg(id ORDER BY fecha_apertura)")) {
         const pendientes = tickets.filter((t) => !subidos.has(t.id)).map((t) => t.id);
         const cambiados = turnosCambiados.filter((id) => !turnosMarcados.has(id));
-        return { rows: [{ ids: pendientes.length ? pendientes : null, turnos: cambiados.length ? cambiados : null }] };
+        // repartidores: los del parámetro de la prueba que aún no están en la libreta (aquí no hay
+        // tabla real que consultar). Sirve para probar que un alta suelta, sin ventas ni turnos ni
+        // movimientos de por medio, igual hace pasar la guarda de pushToCloud — y que un rechazo de
+        // la nube deja al repartidor pendiente en vez de darlo por subido.
+        const repPend = repartidorIds.filter((id) => !repartidoresMarcados.has(id));
+        return { rows: [{ ids: pendientes.length ? pendientes : null, turnos: cambiados.length ? cambiados : null, repartidores: repPend.length ? repPend : null }] };
       }
 
       if (sql.includes("WITH tk AS")) {
@@ -65,15 +79,20 @@ function crearPoolFalso({ nTickets = 450, nTurnos = 5, turnosCambiados = [] } = 
         if (ticketIds === null && turnoIds === null) for (const id of turnosCambiados) refs.add(id);
         const delLoteTurnos = turnos.filter((t) => refs.has(t.id));
         const idsLote = delLote.map((t) => t.id);
+        // Los repartidores pendientes viajan en TODOS los lotes, igual que en el SQL real: el
+        // snapshot los selecciona por "no están en la libreta", sin mirar el lote.
+        const repPend = repartidorIds.filter((id) => !repartidoresMarcados.has(id));
         return {
           rows: [{
             ids: idsLote.length ? idsLote : null,
             turnos: delLoteTurnos.length ? delLoteTurnos.map((t) => ({ id: t.id, huella: `h-${t.id}` })) : null,
+            repartidores: repPend.length ? repPend : null,
             snapshot: {
               turnos: delLoteTurnos,
               tickets: delLote,
               ticket_items: items.filter((i) => idsLote.includes(i.ticket_id)),
               pagos: pagos.filter((p) => idsLote.includes(p.ticket_id)),
+              repartidores: repPend.map((id) => ({ id, nombre: `Repartidor ${id}` })),
             },
           }],
         };
@@ -253,6 +272,22 @@ prueba("un cierre de turno sin ventas nuevas sigue viajando solo", async () => {
     afirmar(r.turnos === 1, `se esperaba 1 turno subido, fueron ${r.turnos}`);
     const ids = (recibidas[0].snapshot.turnos ?? []).map((t) => t.id);
     afirmar(ids.includes("turno-1"), `el turno cambiado no viajó: ${JSON.stringify(ids)}`);
+  } finally { await cerrar(servidor); }
+});
+
+prueba("un repartidor pendiente por sí solo sí dispara un ciclo de push", async () => {
+  // Fix round 1 (revisión de Task 2): listarPendientes no consultaba repartidores, así que la
+  // guarda de pushToCloud (!ids.length && !turnosCambiados.length && !movimientoIds.length)
+  // volvía temprano y un alta hecha en la caja se quedaba atorada hasta que ALGO ajeno (una venta,
+  // un cierre de turno) hiciera pasar la guarda. Sin ventas, sin turno cambiado y sin movimiento de
+  // inventario de por medio, esto tiene que seguir mandando una petición.
+  const pool = crearPoolFalso({ nTickets: 0, nTurnos: 1, repartidorIds: ["repartidor-1"] });
+  const { servidor, recibidas } = crearNubeFalsa();
+  const puerto = await escuchar(servidor);
+  try {
+    const r = await pushToCloud(pool, { cloudUrl: `http://127.0.0.1:${puerto}`, anonKey: "x", deviceToken: "y" }, () => {});
+    afirmar(recibidas.length === 1, `un repartidor pendiente por sí solo debía disparar 1 petición, salieron ${recibidas.length}`);
+    afirmar(r.lotes === 1, `se esperaba 1 lote, fueron ${r.lotes}`);
   } finally { await cerrar(servidor); }
 });
 

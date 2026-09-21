@@ -6,7 +6,8 @@ import { leerEntrega } from "./print/ticket-datos";
 // Cuentas ABIERTAS por modo de servicio: tickets comprometidos (BORRADOR/ABIERTO) que NO están en
 // espera ni pagados. Se usan en "Ver cuentas" de cada pestaña: Pick-up (por recolectar) y Domicilio
 // (pedidos activos). El modelo ya trae todo lo necesario — sin migración:
-//   comanda_impresa_at → marca de "salió/impreso" (etapa de entrega en domicilio).
+//   comanda_impresa_at → marca de "se imprimió" nada más. Desde la 0114 NO es etapa de entrega:
+//   lo que saca un domicilio a la calle es asignarle repartidor, no imprimir su ticket.
 export type CuentaAbierta = {
   ticketId: string;
   folio: string | null;
@@ -15,7 +16,7 @@ export type CuentaAbierta = {
   nItems: number;
   desdeIso: string | null;        // fecha_apertura
   estadoCocina: string;           // SIN_ENVIAR | EN_COCINA | LISTO | ENTREGADO…
-  impresaAt: string | null;       // comanda_impresa_at → ya salió/se imprimió
+  impresaAt: string | null;       // comanda_impresa_at → ya se imprimió
   cliente: string | null;         // nombre del cliente (domicilio) o nombre suelto (Pick-up)
   mesa: string | null;            // número de mesa (comedor), desde tickets_mesas
 };
@@ -68,9 +69,9 @@ export async function listarCuentasAbiertas(
   }));
 }
 
-/** Domicilio: marca que la orden SALIÓ (imprime la comanda). Pasa de "En preparación" a "En
- *  entrega". Usa comanda_impresa_at; el UPDATE a tickets lo permite el RLS del tenant. */
-export async function marcarSalidaDomicilio(token: string, ticketId: string): Promise<void> {
+/** Sella que la comanda del ticket se imprimió. NO significa que el pedido haya salido: lo que lo
+ *  saca a la calle es asignarle repartidor (0114). Se usa para ofrecer "Reimprimir" con PIN. */
+export async function marcarComandaImpresa(token: string, ticketId: string): Promise<void> {
   const { error } = await employeeClient(token)
     .from("tickets")
     .update({ comanda_impresa_at: new Date().toISOString() })

@@ -16,6 +16,17 @@ export type DeliveryAsignacion = {
   propinaRepartidor: number;
   tiempoPromesa: number | null;
   fechaAsignacion: string;
+  /**
+   * Cuándo salió de verdad. NULL mientras el pedido siga en el local.
+   *
+   * No es lo mismo que `fechaAsignacion` y por eso viajan las dos: al REASIGNAR, la RPC
+   * (0114) pone `fecha_salida = now()` y deja `fecha_asignacion` como estaba. Contar los minutos
+   * fuera desde la asignación hacía que un pedido reasignado dos horas después marcara "120 min
+   * fuera" en un viaje que acababa de arrancar, y lo pintaba tarde sin serlo.
+   */
+  fechaSalida: string | null;
+  /** Los pedidos que salieron juntos comparten este id. NULL en los anteriores a la 0114. */
+  viajeId: string | null;
 };
 
 /** Lee las asignaciones de delivery del turno (cola de domicilios). */
@@ -29,7 +40,7 @@ export async function leerDeliveries(token: string, sucursalId: string): Promise
     // `repartidor_catalogo_id` (0078) es el camino nuevo y ese sí tiene FK al catálogo, así que
     // para los repartidores dados de alta ahí el nombre llega directo.
     .select(
-      "id, ticket_id, repartidor_id, repartidor_nombre, estado, monto_a_liquidar_mxn, propina_repartidor_mxn, tiempo_promesa_minutos, fecha_asignacion, " +
+      "id, ticket_id, repartidor_id, repartidor_nombre, estado, monto_a_liquidar_mxn, propina_repartidor_mxn, tiempo_promesa_minutos, fecha_asignacion, fecha_salida, viaje_id, " +
         "ticket:tickets(folio_completo), catalogo:repartidores(nombre)",
     )
     .eq("sucursal_id", sucursalId)
@@ -52,6 +63,8 @@ export async function leerDeliveries(token: string, sucursalId: string): Promise
     propinaRepartidor: Number(r.propina_repartidor_mxn ?? 0),
     tiempoPromesa: r.tiempo_promesa_minutos != null ? Number(r.tiempo_promesa_minutos) : null,
     fechaAsignacion: String(r.fecha_asignacion),
+    fechaSalida: r.fecha_salida != null ? String(r.fecha_salida) : null,
+    viajeId: (r.viaje_id as string) ?? null,
   }));
 }
 
@@ -92,6 +105,61 @@ export async function asignarRepartidor(
   });
   if (error) throw new Error(error.message);
   return String(data);
+}
+
+/**
+ * Asigna uno o varios pedidos al mismo repartidor y los deja en reparto.
+ *
+ * Asignar ES salir: no hay un segundo paso que confirmar. Antes eran dos llamadas
+ * (`asignar_delivery_repartidor` + `confirmar_salida_delivery`) y existía un tercer camino que se
+ * las saltaba —imprimir el ticket marcaba la salida sin repartidor—, así que había pedidos
+ * "salidos" que nadie llevaba.
+ *
+ * El monto NO se manda: lo calcula la RPC desde `tickets.total_mxn`. Es el dinero que el repartidor
+ * tiene que traer de vuelta y lo decide quien manda, no esta pantalla.
+ */
+export async function asignarLote(
+  token: string,
+  args: { ticketIds: string[]; repartidorId: string; tiempoPromesa?: number | null },
+): Promise<string> {
+  const { data, error } = await employeeClient(token).rpc("asignar_delivery_lote", {
+    p_ticket_ids: args.ticketIds,
+    p_repartidor_id: args.repartidorId,
+    p_tiempo_promesa_minutos: args.tiempoPromesa ?? null,
+  });
+  if (error) throw new Error(error.message);
+  return String(data);
+}
+
+/**
+ * Da de alta un repartidor desde la caja.
+ *
+ * El catálogo se administra en el panel, pero desde que asignar es obligatorio la caja necesita una
+ * salida: si nadie dio de alta a nadie, sin esto ningún domicilio podría salir hasta que alguien
+ * entre al panel web — y eso es trabar la caja en hora pico por un trámite.
+ */
+export async function crearRepartidor(
+  token: string,
+  tenantId: string,
+  args: { nombre: string; telefono?: string | null },
+): Promise<Repartidor> {
+  const nombre = args.nombre.trim();
+  const telefono = args.telefono?.trim() ? args.telefono.trim() : null;
+  const { data, error } = await employeeClient(token)
+    .from("repartidores")
+    .insert({ tenant_id: tenantId, nombre, telefono })
+    .select("id, nombre, telefono")
+    .single();
+  // El choque del índice único llega como jerga de Postgres; aquí se dice lo que pasó.
+  if (error) {
+    throw new Error(
+      error.message.includes("repartidor_nombre_uq")
+        ? "Ya hay un repartidor con ese nombre."
+        : error.message,
+    );
+  }
+  const r = data as Record<string, unknown>;
+  return { id: String(r.id), nombre: String(r.nombre), telefono: (r.telefono as string) ?? null };
 }
 
 /**
@@ -143,8 +211,11 @@ export async function liquidarDelivery(
   if (error) throw new Error(error.message);
 }
 
+// "En reparto", no "En ruta": es como lo dice el negocio. El valor del enum en la base sigue siendo
+// EN_RUTA — renombrarlo arrastraría migración, la vista vw_cumplimiento_tiempos_delivery y el
+// espejo de escritorio por una palabra que solo se lee en pantalla.
 const ESTADO_LABEL: Record<DeliveryEstado, string> = {
-  ASIGNADO: "Asignado", EN_RUTA: "En ruta", EN_DESTINO: "En destino", ENTREGADO: "Entregado",
+  ASIGNADO: "Asignado", EN_RUTA: "En reparto", EN_DESTINO: "En destino", ENTREGADO: "Entregado",
   NO_ENTREGADO: "No entregado", EN_REGRESO: "En regreso", LIQUIDADO: "Liquidado", CANCELADO: "Cancelado",
 };
 export function labelDeliveryEstado(e: DeliveryEstado): string {

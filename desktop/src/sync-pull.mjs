@@ -230,6 +230,33 @@ export async function corregirExistenciasPorPendientes(client, log = () => {}, f
   return n;
 }
 
+/**
+ * Anota en la libreta del PUSH los repartidores que acaban de bajar del pull.
+ *
+ * `_vim_repartidores_ok` (ver `asegurarTabla` en sync-push.mjs) dice qué repartidores NO hay que
+ * mandar a la nube. Si solo se escribiera al subir, todo lo que baja del pull quedaría fuera de la
+ * libreta y el push lo volvería a mandar: la caja pisaría con su copia vieja el nombre, el
+ * teléfono, el `activo` y hasta el `deleted_at` que se editaron en el panel — y como el push corre
+ * ANTES que el pull, sin refrescarse primero. Un repartidor dado de baja en el panel resucitaba.
+ *
+ * Va DENTRO de la transacción del pull a propósito: si el pull revienta y hace ROLLBACK, estas
+ * marcas se van con él y la caja no da por sabido lo que nunca llegó a guardar.
+ *
+ * `CREATE TABLE IF NOT EXISTS` porque el pull puede correr antes que el primer push de una caja
+ * recién instalada. Crearla vacía aquí es correcto: la siembra del push solo aplica cuando la tabla
+ * no existía, y este INSERT deja anotado exactamente lo que la nube acaba de confirmar que es suyo.
+ */
+export async function marcarRepartidoresDelPull(client, filas, log = () => {}) {
+  const ids = [...new Set((filas ?? []).map((f) => f?.id).filter((id) => id != null))];
+  if (!ids.length) return 0;
+  await client.query(
+    "CREATE TABLE IF NOT EXISTS _vim_repartidores_ok (repartidor_id uuid PRIMARY KEY, subido_at timestamptz DEFAULT now())");
+  await client.query(
+    "INSERT INTO _vim_repartidores_ok (repartidor_id) SELECT unnest($1::uuid[]) ON CONFLICT DO NOTHING", [ids]);
+  log(`  repartidores: ${ids.length} anotado(s) como de la nube (no vuelven a subir)`);
+  return ids.length;
+}
+
 export async function pullSnapshot(pool, snapshot, log = () => {}) {
   const client = await pool.connect();
   const resumen = {};
@@ -244,6 +271,7 @@ export async function pullSnapshot(pool, snapshot, log = () => {}) {
       resumen[t] = n;
       if (n) log(`  ${schema}.${t}: ${n}`);
       if (t === "insumo_stock_sucursal") await corregirExistenciasPorPendientes(client, log, filas);
+      if (t === "repartidores") await marcarRepartidoresDelPull(client, filas, log);
     }
     await client.query(
       `CREATE TABLE IF NOT EXISTS _vim_sync (clave text PRIMARY KEY, valor text, at timestamptz DEFAULT now())`);
