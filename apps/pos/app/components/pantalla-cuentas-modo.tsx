@@ -134,9 +134,10 @@ export function PantallaCuentasModo({
       setError(e instanceof Error ? e.message : "No se pudieron cargar las cuentas");
       setItems([]);
     }
-    // Solo domicilio tiene repartidores que asignar. Aparte de las cuentas y con su propio
-    // catch: si esto falla, la lista de "En el local" se sigue viendo (aunque sin poder sacar
-    // de ahí lo ya asignado ni actualizar el contador de "En reparto").
+    // Solo domicilio tiene repartidores que asignar: en Pick-up y Comedor esto no se consulta
+    // nunca, así que el mapa queda vacío y sus tarjetas no pueden rotular a nadie. Va aparte de
+    // las cuentas y con su propio catch: si falla, la lista se sigue viendo, solo que sin decir
+    // quién lleva cada pedido.
     if (modo === "DELIVERY_PROPIO") {
       try {
         setAsignacionesVivas(await leerDeliveries(token, caja.sucursal_id));

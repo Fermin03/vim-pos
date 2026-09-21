@@ -146,6 +146,18 @@ describe("construirTicketJob — datos de entrega (domicilio)", () => {
     expect(filas[iCajero + 1]).toMatchObject({ izq: "Repartidor", der: "Luis Hernández" });
   });
 
+  it("no imprime repartidor en un ticket que no es de domicilio", () => {
+    // Exclusivo de domicilio. Lo sostienen tres cosas: la RPC rechaza asignar repartidor a un
+    // ticket que no sea DELIVERY_PROPIO, `ticket-datos` deja `entrega` en null fuera de ese modo,
+    // y la lista de cuentas ni consulta las asignaciones. Lo que fija ESTA prueba es el último
+    // eslabón —un ticket sin datos de entrega no imprime el renglón— que es el que se rompería si
+    // alguien quitara el `?.` del guard y lo imprimiera siempre.
+    const filas = construirTicketJob(DATOS).bloques.filter((b) => b.t === "fila") as { izq: string }[];
+    expect(filas.some((f) => f.izq === "Repartidor")).toBe(false);
+    // Y el resto de la cabecera intacta, para que la prueba no pase por estar vacía.
+    expect(filas.some((f) => f.izq === "Cajero")).toBe(true);
+  });
+
   it("no imprime el renglón del repartidor si el ticket salió antes de asignarlo", () => {
     // Imprimir y asignar son acciones sueltas: un ticket impreso antes de asignar es un caso
     // normal, no un error. Lo que no puede hacer es imprimir la etiqueta vacía.
