@@ -118,6 +118,7 @@ describe("construirTicketJob — datos de entrega (domicilio)", () => {
       direccion: "Blvd. Adolfo López Mateos 1500 int. 4, Jardines del Moral, León, Gto., CP 37160",
       referencias: "Portón negro frente al parque",
       notasRepartidor: "El timbre no sirve, hablar por teléfono",
+      repartidor: "Luis Hernández",
     },
   };
 
@@ -131,6 +132,25 @@ describe("construirTicketJob — datos de entrega (domicilio)", () => {
     expect(texto.some((v) => v.includes("Jardines del Moral"))).toBe(true);
     expect(texto).toContain("Ref: Portón negro frente al parque");
     expect(texto).toContain("Nota: El timbre no sirve, hablar por teléfono");
+  });
+
+  it("imprime quién se lo lleva", () => {
+    const texto = construirTicketJob(CON_ENTREGA)
+      .bloques.filter((b) => b.t === "texto")
+      .map((b) => (b as { valor: string }).valor);
+    expect(texto).toContain("Repartidor: Luis Hernández");
+  });
+
+  it("no imprime el renglón del repartidor si el ticket salió antes de asignarlo", () => {
+    // Imprimir y asignar son acciones sueltas: un ticket impreso antes de asignar es un caso
+    // normal, no un error. Lo que no puede hacer es imprimir la etiqueta vacía.
+    const sinRepartidor = { ...CON_ENTREGA, entrega: { ...CON_ENTREGA.entrega!, repartidor: null } };
+    const texto = construirTicketJob(sinRepartidor)
+      .bloques.filter((b) => b.t === "texto")
+      .map((b) => (b as { valor: string }).valor);
+    expect(texto.some((v) => v.startsWith("Repartidor:"))).toBe(false);
+    // El resto del bloque sigue imprimiéndose igual.
+    expect(texto).toContain("Ana Pérez Rangel");
   });
 
   it("imprime la dirección en el mismo tamaño que el nombre y el teléfono", () => {
@@ -165,7 +185,7 @@ describe("construirTicketJob — datos de entrega (domicilio)", () => {
   it("omite los renglones que vengan vacíos sin romper el ticket", () => {
     const texto = construirTicketJob({
       ...CON_ENTREGA,
-      entrega: { cliente: "Ana", telefono: null, direccion: null, referencias: null, notasRepartidor: null },
+      entrega: { cliente: "Ana", telefono: null, direccion: null, referencias: null, notasRepartidor: null, repartidor: null },
     }).bloques.filter((b) => b.t === "texto").map((b) => (b as { valor: string }).valor);
     expect(texto).toContain("Ana");
     expect(texto.some((v) => v.startsWith("Tel. 477 100"))).toBe(false);

@@ -53,13 +53,16 @@ export type PagoImpresion = {
   cambioMxn: number;
 };
 
-/** Lo que el repartidor necesita para llegar y para que le abran la puerta. */
+/** Lo que el repartidor necesita para llegar y para que le abran la puerta, y quién lo lleva. */
 export type DatosEntrega = {
   cliente: string | null;
   telefono: string | null;
   direccion: string | null;
   referencias: string | null;
   notasRepartidor: string | null;
+  /** Quién se lo llevó. null si el ticket se imprimió antes de asignarle repartidor, que es un
+   *  orden válido: imprimir y asignar son acciones sueltas. */
+  repartidor: string | null;
 };
 
 export type DatosTicketImpresion = {

@@ -51,6 +51,10 @@ export function construirTicketJob(d: DatosTicketImpresion, logo?: Bloque | null
     if (d.entrega.direccion) b.push({ t: "texto", valor: d.entrega.direccion, size: 2, bold: true });
     if (d.entrega.referencias) b.push({ t: "texto", valor: `Ref: ${d.entrega.referencias}`, size: 1 });
     if (d.entrega.notasRepartidor) b.push({ t: "texto", valor: `Nota: ${d.entrega.notasRepartidor}`, size: 1 });
+    // Quién se lo lleva, al final del bloque y en tamaño normal. No compite con la dirección, que
+    // es lo único que hay que poder leer en la calle y de noche; esto se lee en el mostrador, al
+    // entregar la bolsa, y en el papel que vuelve. Falta si se imprimió antes de asignar.
+    if (d.entrega.repartidor) b.push({ t: "texto", valor: `Repartidor: ${d.entrega.repartidor}`, size: 1, bold: true });
   }
 
   b.push({ t: "separador", estilo: "punteado" });
