@@ -32,6 +32,11 @@ export function construirTicketJob(d: DatosTicketImpresion, logo?: Bloque | null
   b.push({ t: "fila", izq: "Fecha", der: formatoFecha(d.meta.fechaIso) });
   b.push({ t: "fila", izq: "Ticket", der: `#${folioCorto(d.meta.folio)}` });
   b.push({ t: "fila", izq: "Cajero", der: d.meta.cajero });
+  // Quién se lo lleva, junto a quién lo cobró: las dos personas de las que hay que responder por
+  // este papel. Se lee de `entrega` —donde vive lo del domicilio— pero se imprime aquí arriba,
+  // porque es dato de la cuenta y no una indicación para llegar. Falta si el ticket se imprimió
+  // antes de asignar: imprimir y asignar son acciones sueltas y ese orden es válido.
+  if (d.entrega?.repartidor) b.push({ t: "fila", izq: "Repartidor", der: d.entrega.repartidor, bold: true });
   b.push({ t: "fila", izq: "Caja", der: d.meta.caja });
   if (d.meta.modoServicio) b.push({ t: "fila", izq: "Servicio", der: d.meta.modoServicio });
   // Nombre suelto de la cuenta (Pick-up): es como se identifica el pedido al entregarlo.
@@ -51,10 +56,6 @@ export function construirTicketJob(d: DatosTicketImpresion, logo?: Bloque | null
     if (d.entrega.direccion) b.push({ t: "texto", valor: d.entrega.direccion, size: 2, bold: true });
     if (d.entrega.referencias) b.push({ t: "texto", valor: `Ref: ${d.entrega.referencias}`, size: 1 });
     if (d.entrega.notasRepartidor) b.push({ t: "texto", valor: `Nota: ${d.entrega.notasRepartidor}`, size: 1 });
-    // Quién se lo lleva, al final del bloque y en tamaño normal. No compite con la dirección, que
-    // es lo único que hay que poder leer en la calle y de noche; esto se lee en el mostrador, al
-    // entregar la bolsa, y en el papel que vuelve. Falta si se imprimió antes de asignar.
-    if (d.entrega.repartidor) b.push({ t: "texto", valor: `Repartidor: ${d.entrega.repartidor}`, size: 1, bold: true });
   }
 
   b.push({ t: "separador", estilo: "punteado" });

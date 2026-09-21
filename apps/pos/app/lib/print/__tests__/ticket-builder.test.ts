@@ -134,22 +134,27 @@ describe("construirTicketJob — datos de entrega (domicilio)", () => {
     expect(texto).toContain("Nota: El timbre no sirve, hablar por teléfono");
   });
 
-  it("imprime quién se lo lleva", () => {
-    const texto = construirTicketJob(CON_ENTREGA)
-      .bloques.filter((b) => b.t === "texto")
-      .map((b) => (b as { valor: string }).valor);
-    expect(texto).toContain("Repartidor: Luis Hernández");
+  it("imprime quién se lo lleva, justo debajo del cajero", () => {
+    // La posición importa y por eso se afirma: va arriba, con los datos de la cuenta, no abajo
+    // entre las indicaciones para llegar. Se comprueba contra el renglón de Cajero y no contra un
+    // índice fijo, que se rompería al añadir cualquier otra fila a la cabecera.
+    const filas = construirTicketJob(CON_ENTREGA).bloques.filter((b) => b.t === "fila") as {
+      izq: string; der: string;
+    }[];
+    const iCajero = filas.findIndex((f) => f.izq === "Cajero");
+    expect(iCajero).toBeGreaterThanOrEqual(0);
+    expect(filas[iCajero + 1]).toMatchObject({ izq: "Repartidor", der: "Luis Hernández" });
   });
 
   it("no imprime el renglón del repartidor si el ticket salió antes de asignarlo", () => {
     // Imprimir y asignar son acciones sueltas: un ticket impreso antes de asignar es un caso
     // normal, no un error. Lo que no puede hacer es imprimir la etiqueta vacía.
     const sinRepartidor = { ...CON_ENTREGA, entrega: { ...CON_ENTREGA.entrega!, repartidor: null } };
-    const texto = construirTicketJob(sinRepartidor)
-      .bloques.filter((b) => b.t === "texto")
-      .map((b) => (b as { valor: string }).valor);
-    expect(texto.some((v) => v.startsWith("Repartidor:"))).toBe(false);
-    // El resto del bloque sigue imprimiéndose igual.
+    const job = construirTicketJob(sinRepartidor);
+    const filas = job.bloques.filter((b) => b.t === "fila") as { izq: string }[];
+    expect(filas.some((f) => f.izq === "Repartidor")).toBe(false);
+    // El resto del ticket sigue imprimiéndose igual.
+    const texto = job.bloques.filter((b) => b.t === "texto").map((b) => (b as { valor: string }).valor);
     expect(texto).toContain("Ana Pérez Rangel");
   });
 
