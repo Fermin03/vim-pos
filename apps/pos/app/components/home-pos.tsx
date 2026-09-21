@@ -1417,7 +1417,6 @@ export function HomePos({
           onMonitorVentas={() => { setEnInicio(false); setEnMonitor(true); }}
           onConsultarCuentas={() => { setEnInicio(false); setEnConsultaCuentas(true); }}
           onMovimientoCaja={() => setMovimientoAbierto(true)}
-          onCorteX={() => { setEnInicio(false); setEnMonitor(true); }}
           onAbrirTurno={() => { /* aquí siempre hay turno abierto: el botón no se muestra */ }}
           onCerrarTurno={() => setConfirmandoCierre(true)}
           onMenu={() => setMenuGeneralAbierto(true)}
@@ -1439,6 +1438,7 @@ export function HomePos({
         )}
         {menuGeneralAbierto && (
           <MenuGeneral
+            onCorteX={() => { setEnInicio(false); setEnMonitor(true); }}
             onCerrar={() => setMenuGeneralAbierto(false)}
             onKds={() => { setMenuGeneralAbierto(false); setEnInicio(false); setEnKds(true); }}
             onDevoluciones={() => { setMenuGeneralAbierto(false); setEnInicio(false); setEnDevoluciones(true); }}

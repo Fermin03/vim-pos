@@ -1,5 +1,5 @@
 "use client";
-import { LogoVim } from "@vim/ui/styles";
+import { Button, LogoVim, Modal } from "@vim/ui/styles";
 import { type ReactNode, useCallback, useEffect, useState } from "react";
 import { useReloj } from "./topbar-pos";
 import { evaluarSync, leerEstadoSync, type NivelSync } from "../lib/estado-sync";
@@ -9,6 +9,15 @@ import { avisosDe, leerDirectivas, type Aviso } from "../lib/directivas";
 import { evaluarFolios, leerFolios, type NivelFolios } from "../lib/folios";
 import type { DatosCaja, Turno } from "../lib/turno";
 import type { Empleado } from "../lib/supabase";
+
+declare global {
+  interface Window {
+    /** La pone el preload de Electron (desktop/src/preload.cjs). Solo existe en la VENTANA de la
+     *  caja: los clientes de la LAN (segunda caja, cocina) cargan el mismo POS por HTTP y no tienen
+     *  preload, así que allí es `undefined` y el botón de salir ni se pinta. */
+    __VIM_SALIR?: () => Promise<void>;
+  }
+}
 
 /**
  * Pantalla principal del POS: barra de accesos arriba y el negocio al centro.
@@ -41,7 +50,6 @@ export function PantallaInicio({
   onMonitorVentas,
   onConsultarCuentas,
   onMovimientoCaja,
-  onCorteX,
   onAbrirTurno,
   onCerrarTurno,
   onMenu,
@@ -68,7 +76,6 @@ export function PantallaInicio({
   onMonitorVentas: () => void;
   onConsultarCuentas: () => void;
   onMovimientoCaja: () => void;
-  onCorteX: () => void;
   onAbrirTurno: () => void;
   onCerrarTurno: () => void;
   onMenu: () => void;
@@ -108,6 +115,12 @@ export function PantallaInicio({
   // vender queda bloqueado hasta abrirlo: los accesos de venta salen apagados y "Abrir turno"
   // toma el lugar de "Cerrar turno".
   const sinTurno = turno === null;
+  // Salir de la aplicación. Se detecta por la FUNCIÓN del preload y no por `__VIM_DESKTOP`, que el
+  // ui-server también inyecta a los clientes de la LAN: allí el botón saldría y no podría apagar
+  // nada. Se resuelve tras montar porque en el render del servidor no existe `window`.
+  const [puedeSalir, setPuedeSalir] = useState(false);
+  const [confirmandoSalir, setConfirmandoSalir] = useState(false);
+  useEffect(() => { setPuedeSalir(typeof window.__VIM_SALIR === "function"); }, []);
   const acceso = useAcceso();
   // Avisos de VIM. Esta es la pantalla que el cajero ve tras el PIN y al abrir turno, así que
   // es donde se le enseñan (ADR 0014, entrega 3).
@@ -199,8 +212,6 @@ export function PantallaInicio({
           icon={<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M6 2h9l3 3v15a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V3a1 1 0 0 1 1-1z" /><path d="M9 8h6M9 12h6M9 16h4" /></svg>} />
         <Acceso label="Monitor ventas" onClick={onMonitorVentas} requiereTurno={sinTurno}
           icon={<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M3 3v18h18" /><path d="M7 15l4-5 3 3 5-7" /></svg>} />
-        <Acceso label="Corte caja X" onClick={onCorteX} requiereTurno={sinTurno}
-          icon={<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M6 2h12v20l-3-2-3 2-3-2-3 2V2z" /><path d="M9 7h6M9 11h6M9 15h3" /></svg>} />
 
         <span className="w-px flex-shrink-0 bg-line-strong" aria-hidden="true" />
 
@@ -325,7 +336,61 @@ export function PantallaInicio({
           {" · "}
           {ahora ? ahora.toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit", hour12: false }) : "—"}
         </span>
+        {/* Salir de la caja. Hasta ahora la única salida real estaba en el menú de la bandeja,
+            que un cajero no conoce: la X solo esconde la ventana y deja todo corriendo por
+            detrás. Va al final de la barra, lejos de los accesos de venta. */}
+        {puedeSalir && (
+          <button
+            type="button"
+            onClick={() => setConfirmandoSalir(true)}
+            className="flex flex-shrink-0 items-center gap-1 rounded px-1.5 py-0.5 font-semibold text-ink-3 transition hover:bg-[#FBF1EF] hover:text-danger"
+          >
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-3 w-3" aria-hidden="true">
+              <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" /><path d="m16 17 5-5-5-5" /><path d="M21 12H9" />
+            </svg>
+            Salir
+          </button>
+        )}
       </footer>
+
+      {confirmandoSalir && (
+        <Modal
+          open
+          onClose={() => setConfirmandoSalir(false)}
+          title="Cerrar la caja"
+          hideTitle
+          className="w-[420px] rounded-lg border border-line bg-surface p-6 shadow-[0_18px_44px_rgba(22,22,26,.18)]"
+        >
+          <h2 className="font-display text-xl font-semibold tracking-tight">¿Cerrar la caja?</h2>
+          {/* Esta computadora es el hub de la LAN: al apagarla, la cocina y cualquier segunda caja
+              se quedan sin backend. Decirlo es la diferencia entre cerrar a propósito y descubrir
+              a media comida que la cocina dejó de recibir comandas. */}
+          <p className="mt-2 text-[13.5px] leading-snug text-ink-2">
+            La cocina y las demás pantallas conectadas a esta computadora dejarán de funcionar
+            hasta que la vuelvas a abrir.
+          </p>
+          {!sinTurno && (
+            <p className="mt-2 text-[13.5px] font-semibold leading-snug text-ink-2">
+              Además, la caja tiene un turno abierto. Se queda abierto y podrás retomarlo al volver.
+            </p>
+          )}
+          <p className="mt-2 text-[12.5px] leading-snug text-ink-3">
+            Antes de cerrar se guarda un respaldo. No se pierde ninguna venta.
+          </p>
+          <div className="mt-5 flex gap-2">
+            <button
+              type="button"
+              onClick={() => setConfirmandoSalir(false)}
+              className="h-11 flex-1 rounded border border-line-strong text-[14px] font-semibold text-ink-2 transition hover:border-ink hover:text-ink"
+            >
+              Cancelar
+            </button>
+            <Button className="flex-1" onClick={() => { void window.__VIM_SALIR?.(); }}>
+              Cerrar la caja
+            </Button>
+          </div>
+        </Modal>
+      )}
     </main>
   );
 }

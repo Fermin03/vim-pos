@@ -104,7 +104,6 @@ export function PantallaTurno({
           onMonitorVentas={abrir}
           onConsultarCuentas={abrir}
           onMovimientoCaja={abrir}
-          onCorteX={abrir}
           onAbrirTurno={abrir}
           onCerrarTurno={abrir}
           onMenu={onCambiarCajero}
