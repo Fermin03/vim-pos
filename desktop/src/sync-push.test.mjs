@@ -147,6 +147,9 @@ const B = "bbbbbbbb-0000-0000-0000-000000000002";
 /** Ids de repartidores que viajaron en la petición número `i` del push. */
 const enviadosEn = (nube, i = 0) => (nube.peticiones[i]?.snapshot?.repartidores ?? []).map((r) => r.id);
 
+/** Ids de zonas de envío que viajaron en la petición número `i` del push. */
+const zonasEnviadasEn = (nube, i = 0) => (nube.peticiones[i]?.snapshot?.zonas_envio ?? []).map((z) => z.id);
+
 test("un repartidor que la nube RECHAZA no se marca y vuelve a intentarse", async () => {
   const pool = crearPoolFalso({ catalogo: [A, B] });
   // La nube aísla la fila conflictiva (migración 0074) y dice cuál se quedó fuera.
@@ -303,4 +306,46 @@ test("las zonas pendientes son las que la nube aún no confirmó", async () => {
   const pool = crearPoolFalso({ catalogoZonas: [{ id: "z1" }, { id: "z2" }], yaMarcadasZonas: ["z1"] });
   const p = await listarPendientes(pool);
   assert.deepEqual(p.zonaIds, ["z2"]);
+});
+
+// Ronda de arreglos 1/5: las tres pruebas de arriba solo llaman a `sembrarZonasUnaVez` o a
+// `listarPendientes`, así que nunca ejercitan el camino de PUSH real: el destructuring de `zonas`
+// en `enviarLote`, `marcarZonasSubidas`, `zonasRechazadas` ni la rama `zonas_envio` de
+// `rechazadosPorTicket` tenían ninguna prueba que los pasara. Gemelas exactas de las pruebas de
+// repartidores de arriba ("un repartidor que la nube RECHAZA…" y "un alta hecha SIN CONEXIÓN…"),
+// que sí pasan por `pushToCloud`.
+
+test("una zona que la nube RECHAZA no se marca y vuelve a intentarse", async () => {
+  const pool = crearPoolFalso({ catalogoZonas: [{ id: "z1" }, { id: "z2" }] });
+  // La nube aísla la fila conflictiva (migración 0074) y dice cuál se quedó fuera.
+  const nube = nubeFalsa({ resultado: { zonas_envio: 1, _errores: [{ tabla: "zonas_envio", id: "z2", error: "zona_envio_nombre_uq" }] } });
+  try {
+    await pushToCloud(pool, OPTS, () => {});
+
+    assert.ok(pool.marcadasZonas.has("z1"), "la zona que SÍ entró debía quedar marcada");
+    assert.ok(!pool.marcadasZonas.has("z2"), "marcar una rechazada la perdería para siempre: no debe marcarse");
+
+    // Y por eso sigue pendiente: el siguiente ciclo la vuelve a mandar.
+    const pend = await listarPendientes(pool);
+    assert.deepEqual(pend.zonaIds, ["z2"]);
+  } finally { nube.restaurar(); }
+});
+
+test("una zona dada de alta SIN CONEXIÓN, antes de que la libreta existiera, sí llega a la nube", async () => {
+  // Mismo calendario que con los repartidores: la caja arranca sin internet —la siembra no
+  // depende de la nube—, y solo después el cajero da de alta una zona nueva para poder cobrar un
+  // domicilio. Cuando vuelve la conexión, el push tiene que mandarla y marcarla, no perderla.
+  const pool = crearPoolFalso({ catalogoZonas: [{ id: "z1" }] });
+  await sembrarZonasUnaVez(pool);
+  assert.deepEqual(pool.sembradosZonas, ["z1"]);
+
+  pool.catalogoZonas.push({ id: "z2" });
+
+  const nube = nubeFalsa({ resultado: { zonas_envio: 1 } });
+  try {
+    await pushToCloud(pool, OPTS, () => {});
+    assert.deepEqual(pool.sembradosZonas, ["z1"], "el push no debe sembrar la libreta: eso es del arranque");
+    assert.deepEqual(zonasEnviadasEn(nube), ["z2"], "el alta hecha en la caja tenía que viajar en el push");
+    assert.ok(pool.marcadasZonas.has("z2"), "y quedar marcada una vez que la nube la confirmó");
+  } finally { nube.restaurar(); }
 });

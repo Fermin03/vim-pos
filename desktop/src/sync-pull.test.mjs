@@ -41,7 +41,7 @@ test("PULL_ORDER baja los slots de combos después de productos y sus opciones d
   assert.ok(t.indexOf("combo_opciones") < t.indexOf("configuracion_tenant"));
 });
 
-import { pullSnapshot, marcarZonasDelPull } from "./sync-pull.mjs";
+import { pullSnapshot } from "./sync-pull.mjs";
 
 /**
  * Un cliente de mentiras que responde lo mínimo para que `pullSnapshot` corra: la metadata de la
@@ -97,19 +97,37 @@ test("un pull sin repartidores no toca la libreta", async () => {
 });
 
 // Zonas de envío (0115/Task 4): misma gemela que los repartidores, mirando _vim_zonas_ok.
-// Nota de terreno: el brief nombra el doble como `clienteFalsoDelPull`; el nombre real en este
-// archivo es `clienteFalso()` (definido arriba) — se usa ese.
+//
+// Ronda de arreglos 1/5: la primera versión de estas dos pruebas llamaba a `marcarZonasDelPull`
+// directamente, sin pasar por `pullSnapshot`. Eso no verificaba que el bucle de `pullSnapshot`
+// invoque la función cuando `t === "zonas_envio"`, ni que la marca ocurra ANTES del `COMMIT` —la
+// garantía de rollback que la propia tarea exige explícitamente—. Se reescriben para pasar por
+// `pullSnapshot` real, exactamente como las de repartidores de arriba (líneas 74-97).
+
+const Z1 = "cccccccc-0000-0000-0000-000000000001";
+const Z2 = "dddddddd-0000-0000-0000-000000000002";
 
 test("el pull anota en _vim_zonas_ok lo que acaba de bajar", async () => {
-  const { client } = clienteFalso();
-  await marcarZonasDelPull(client, [{ id: "z1" }, { id: "z2" }], () => {});
+  // Sin esto, el push volvía a mandar a la nube su propia copia del catálogo y pisaba el nombre,
+  // el costo o el `activa` que se acaban de editar en el panel.
+  const { client, pool } = clienteFalso();
+  await pullSnapshot(pool, {
+    zonas_envio: [
+      { id: Z1, nombre: "Centro", costo_mxn: 30 },
+      { id: Z2, nombre: "Norte", costo_mxn: 45 },
+    ],
+  });
   const marca = client.consultas.find((c) => c.sql.includes("_vim_zonas_ok") && c.sql.includes("unnest"));
-  assert.ok(marca, "el pull no anotó las zonas que bajaron");
-  assert.deepEqual(marca.params[0], ["z1", "z2"]);
+  assert.ok(marca, "el pull debía anotar las zonas que bajó");
+  assert.deepEqual(marca.params[0].sort(), [Z1, Z2].sort());
+  // Y dentro de la misma transacción: si el pull revienta, las marcas se van con el ROLLBACK.
+  const iMarca = client.consultas.indexOf(marca);
+  const iCommit = client.consultas.findIndex((c) => c.sql === "COMMIT");
+  assert.ok(iMarca < iCommit, "la marca va antes del COMMIT, dentro de la transacción del pull");
 });
 
-test("sin zonas en el snapshot, el pull no toca la libreta", async () => {
-  const { client } = clienteFalso();
-  assert.equal(await marcarZonasDelPull(client, [], () => {}), 0);
+test("un pull sin zonas no toca la libreta", async () => {
+  const { client, pool } = clienteFalso();
+  await pullSnapshot(pool, { zonas_envio: [] });
   assert.ok(!client.consultas.some((c) => c.sql.includes("_vim_zonas_ok")));
 });
