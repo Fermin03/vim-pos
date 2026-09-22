@@ -145,6 +145,60 @@ BEGIN
                                    ORDER BY orden_visualizacion LIMIT 1)
     THEN RAISE EXCEPTION 'el envío no heredó la política de IVA del ticket'; END IF;
 
+  -- 6b) RESPALDO SIN RENGLONES: ticket recién abierto, SIN pasar por agregar_item_a_ticket (el
+  --     cajero puede elegir la zona antes de capturar la comida — abrir_ticket deja el ticket en
+  --     BORRADOR sin renglones). No hay ningún renglón de producto del que heredar, así que la RPC
+  --     debe caer en el respaldo 16.00/incluido.
+  DECLARE
+    v_vacio         uuid;
+    v_renglon_vacio uuid;
+    v_tasa_vacio    numeric(5,2);
+    v_incl_vacio    boolean;
+  BEGIN
+    v_vacio := abrir_ticket(v_suc, v_caja, v_turno, 'DELIVERY_PROPIO', NULL, NULL, NULL, v_maria);
+    IF EXISTS (SELECT 1 FROM ticket_items WHERE ticket_id = v_vacio) THEN
+      RAISE EXCEPTION 'el ticket "vacío" del caso 6b ya traía renglones';
+    END IF;
+
+    v_renglon_vacio := fijar_envio_ticket(v_vacio, v_z_norte);
+    SELECT tasa_iva_snapshot, iva_incluido_en_precio_snapshot
+      INTO v_tasa_vacio, v_incl_vacio
+      FROM ticket_items WHERE id = v_renglon_vacio;
+
+    IF v_tasa_vacio <> 16.00 OR v_incl_vacio IS DISTINCT FROM true THEN
+      RAISE EXCEPTION 'respaldo sin renglones: esperaba 16.00/true, got %/%', v_tasa_vacio, v_incl_vacio;
+    END IF;
+  END;
+
+  -- 6c) HERENCIA FALSABLE: producto cuyo primer renglón NO es 16%/incluido, para que este caso
+  --     reviente si alguien quema la constante del respaldo en vez de heredar de verdad. Fixture
+  --     de prueba, NO es catálogo real: IVA por afuera al 8% (útil para probar sin depender de
+  --     ninguna franja fronteriza real).
+  DECLARE
+    v_cat_h       uuid := 'a0000000-0000-0000-0000-0000000000c1';  -- categoría Hamburguesas (seed)
+    v_prod_raro   uuid;
+    v_raro        uuid;
+    v_renglon_raro uuid;
+    v_tasa_raro   numeric(5,2);
+    v_incl_raro   boolean;
+  BEGIN
+    INSERT INTO productos (tenant_id, categoria_id, nombre, precio_base_mxn, tasa_iva, iva_incluido_en_precio)
+    VALUES (v_tenant, v_cat_h, 'SMOKE fixture — IVA raro (no es catálogo real)', 100.00, 8.00, false)
+    RETURNING id INTO v_prod_raro;
+
+    v_raro := abrir_ticket(v_suc, v_caja, v_turno, 'DELIVERY_PROPIO', NULL, NULL, NULL, v_maria);
+    PERFORM agregar_item_a_ticket(v_raro, v_prod_raro, 1, NULL, '[]'::jsonb, NULL);
+
+    v_renglon_raro := fijar_envio_ticket(v_raro, v_z_norte);
+    SELECT tasa_iva_snapshot, iva_incluido_en_precio_snapshot
+      INTO v_tasa_raro, v_incl_raro
+      FROM ticket_items WHERE id = v_renglon_raro;
+
+    IF v_tasa_raro <> 8.00 OR v_incl_raro IS DISTINCT FROM false THEN
+      RAISE EXCEPTION 'herencia falsable: esperaba 8.00/false (política real del primer renglón), got %/% -- ¿se quemó la constante del respaldo?', v_tasa_raro, v_incl_raro;
+    END IF;
+  END;
+
   -- 7) Otro modo de servicio: rechazado
   v_aqui := abrir_ticket(v_suc, v_caja, v_turno, 'COMER_AQUI', NULL, NULL, NULL, v_maria);
   PERFORM agregar_item_a_ticket(v_aqui, v_prod, 1, NULL, '[]'::jsonb, NULL);
