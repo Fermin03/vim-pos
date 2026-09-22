@@ -84,3 +84,113 @@ COMMENT ON COLUMN ticket_items.cargo_tipo IS 'NULL = renglón de producto. ENVIO
 -- La garantía va en la base, no en que el código se acuerde.
 CREATE UNIQUE INDEX IF NOT EXISTS ticket_envio_unico
   ON ticket_items (ticket_id) WHERE cargo_tipo = 'ENVIO' AND cancelado = false;
+
+-- ============================================================================
+-- fijar_envio_ticket(ticket, zona) — punto único por el que entra y sale el cargo.
+--
+-- Idempotente: llamarla dos veces con la misma zona deja el mismo renglón. Con otra zona, lo
+-- reprecia. Con NULL, lo borra.
+--
+-- BORRA en lugar de cancelar a propósito: un cargo retirado antes de cobrar no es una venta
+-- cancelada y no tiene por qué aparecer en los reportes de cancelaciones. El trigger
+-- AFTER INSERT OR UPDATE OR DELETE de ticket_items (0008:696) recalcula los totales solo.
+-- ============================================================================
+CREATE OR REPLACE FUNCTION fijar_envio_ticket(p_ticket_id uuid, p_zona_id uuid)
+RETURNS uuid
+LANGUAGE plpgsql
+AS $$
+DECLARE
+  v_tenant     uuid;
+  v_sucursal   uuid;
+  v_modo       modo_servicio;
+  v_estado     ticket_estado_fiscal;
+  v_zona       record;
+  v_item       uuid;
+  v_tasa       numeric(5,2);
+  v_incluido   boolean;
+  v_orden      integer;
+BEGIN
+  SELECT tenant_id, sucursal_id, modo_servicio, estado_fiscal
+    INTO v_tenant, v_sucursal, v_modo, v_estado
+  FROM tickets WHERE id = p_ticket_id;
+
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'Ticket % no existe', p_ticket_id;
+  END IF;
+  IF v_estado NOT IN ('BORRADOR', 'ABIERTO') THEN
+    RAISE EXCEPTION 'El envío solo se puede fijar en tickets BORRADOR o ABIERTO (estado actual: %)', v_estado;
+  END IF;
+  IF v_modo <> 'DELIVERY_PROPIO' THEN
+    RAISE EXCEPTION 'El cargo de envío solo aplica a domicilio propio (modo actual: %)', v_modo;
+  END IF;
+
+  SELECT id INTO v_item
+  FROM ticket_items
+  WHERE ticket_id = p_ticket_id AND cargo_tipo = 'ENVIO' AND cancelado = false;
+
+  -- Quitar el envío
+  IF p_zona_id IS NULL THEN
+    IF v_item IS NOT NULL THEN DELETE FROM ticket_items WHERE id = v_item; END IF;
+    UPDATE tickets SET zona_envio_id = NULL, updated_at = now() WHERE id = p_ticket_id;
+    RETURN NULL;
+  END IF;
+
+  SELECT z.id, z.nombre, z.costo_mxn INTO v_zona
+  FROM zonas_envio z
+  WHERE z.id = p_zona_id
+    AND z.tenant_id = v_tenant
+    AND z.sucursal_id = v_sucursal
+    AND z.activa = true
+    AND z.deleted_at IS NULL;
+
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'Zona de envío % no existe, está inactiva o no es de esta sucursal', p_zona_id;
+  END IF;
+
+  -- La política fiscal del envío es la del ticket, no una constante: un negocio que factura con
+  -- IVA por afuera tendría si no un envío incoherente con su propia comida.
+  SELECT tasa_iva_snapshot, iva_incluido_en_precio_snapshot
+    INTO v_tasa, v_incluido
+  FROM ticket_items
+  WHERE ticket_id = p_ticket_id AND cargo_tipo IS NULL AND cancelado = false
+  ORDER BY orden_visualizacion
+  LIMIT 1;
+
+  IF NOT FOUND THEN
+    v_tasa := 16.00;
+    v_incluido := true;
+  END IF;
+
+  IF v_item IS NOT NULL THEN
+    UPDATE ticket_items
+       SET producto_nombre_snapshot = 'Envío · ' || v_zona.nombre,
+           precio_unitario_snapshot = v_zona.costo_mxn,
+           tasa_iva_snapshot = v_tasa,
+           iva_incluido_en_precio_snapshot = v_incluido,
+           updated_at = now()
+     WHERE id = v_item;
+  ELSE
+    SELECT COALESCE(MAX(orden_visualizacion), 0) + 1 INTO v_orden
+    FROM ticket_items WHERE ticket_id = p_ticket_id;
+
+    INSERT INTO ticket_items (
+      tenant_id, ticket_id, producto_id, cargo_tipo, cantidad, orden_visualizacion,
+      producto_nombre_snapshot, precio_unitario_snapshot,
+      tasa_iva_snapshot, iva_incluido_en_precio_snapshot,
+      clave_sat_snapshot, unidad_sat_snapshot, created_by
+    ) VALUES (
+      v_tenant, p_ticket_id, NULL, 'ENVIO', 1, v_orden,
+      'Envío · ' || v_zona.nombre, v_zona.costo_mxn,
+      v_tasa, v_incluido,
+      NULL, NULL, auth.uid()
+    ) RETURNING id INTO v_item;
+  END IF;
+
+  UPDATE tickets SET zona_envio_id = v_zona.id, updated_at = now() WHERE id = p_ticket_id;
+  RETURN v_item;
+END;
+$$;
+
+COMMENT ON FUNCTION fijar_envio_ticket IS 'Fija (o quita, con zona NULL) el renglón de envío de un ticket de domicilio. Idempotente. Los totales los recalcula el trigger de ticket_items.';
+
+GRANT EXECUTE ON FUNCTION fijar_envio_ticket(uuid, uuid) TO authenticated, service_role;
