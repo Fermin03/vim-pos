@@ -111,10 +111,47 @@ async function asegurarTabla(pool) {
 
   // Zonas de envío (0116): mismo mecanismo que los repartidores de arriba, mismo motivo — la caja
   // puede darlas de alta (el cajero necesita cobrar un domicilio a una colonia nueva sin esperar al
-  // panel) y suben UNA sola vez, por id. Ver `sembrarZonasUnaVez` para la siembra en el arranque.
-  await pool.query("CREATE TABLE IF NOT EXISTS _vim_zonas_ok (zona_id uuid PRIMARY KEY, subido_at timestamptz DEFAULT now())");
+  // panel). Pero van por HUELLA, no "una sola vez por id": ver `asegurarLibretaZonas`.
+  await asegurarLibretaZonas(pool);
 
   await rescatarCortesUnaVez(pool);
+}
+
+/** Huella de una zona: la fila completa, igual que la de los turnos (ver `construirSnapshotPush`). */
+const HUELLA_ZONA = "md5(to_jsonb(x)::text)";
+
+/**
+ * Zonas de envío que hay que mandar: las que la nube nunca confirmó, y las que CAMBIARON desde la
+ * última vez que la nube y la caja coincidieron. `x` es `zonas_envio`; `o`, la libreta.
+ *
+ * Una fila con huella NULL (la dejó una libreta anterior a la huella) no se da por cambiada: no se
+ * sabe, y `asegurarLibretaZonas` la rellena antes de que se consulte.
+ */
+const ZONA_PENDIENTE = `(o.zona_id IS NULL OR (o.huella IS NOT NULL AND o.huella IS DISTINCT FROM ${HUELLA_ZONA}))`;
+
+/**
+ * Crea (o migra) la libreta `_vim_zonas_ok` y rellena las huellas que falten.
+ *
+ * POR QUÉ HUELLA Y NO "UNA VEZ POR ID", COMO LOS REPARTIDORES.
+ *
+ * La caja no solo da de alta zonas: también las REPRECIA (`cambiarCostoZona`, con PIN de
+ * supervisor). Esa zona ya estaba en la libreta, así que con "sube una vez por id" nunca volvía a
+ * subir, y el siguiente pull la pisaba con el precio de la nube: lo que autorizó el supervisor
+ * duraba minutos. Es el mismo problema que ya resolvieron los turnos (`_vim_turnos_ok`): la libreta
+ * guarda la huella de la fila tal como la nube la tiene —al subir y al bajar del pull— y la zona
+ * vuelve a viajar si no está anotada O si su huella cambió.
+ *
+ * La migración no pierde filas: la columna nace NULL y aquí mismo se rellena con la huella actual.
+ * Eso da por sabida la versión local de cada zona ya anotada, que es lo que la libreta vieja ya
+ * afirmaba ("ya subió"); con la versión anterior un repreciado local tampoco habría subido nunca.
+ *
+ * Idempotente y barata: la llaman el arranque, cada push y cada pull.
+ */
+export async function asegurarLibretaZonas(db) {
+  await db.query("CREATE TABLE IF NOT EXISTS _vim_zonas_ok (zona_id uuid PRIMARY KEY, huella text NULL, subido_at timestamptz DEFAULT now())");
+  await db.query("ALTER TABLE _vim_zonas_ok ADD COLUMN IF NOT EXISTS huella text NULL");
+  await db.query(`UPDATE _vim_zonas_ok o SET huella = ${HUELLA_ZONA}
+                    FROM zonas_envio x WHERE x.id = o.zona_id AND o.huella IS NULL`);
 }
 
 /**
@@ -269,7 +306,9 @@ export async function sembrarRepartidoresUnaVez(db, log = () => {}) {
  * comentario por comentario, está en `sembrarRepartidoresUnaVez` — no se repite aquí.
  */
 export async function sembrarZonasUnaVez(db, log = () => {}) {
-  await db.query("CREATE TABLE IF NOT EXISTS _vim_zonas_ok (zona_id uuid PRIMARY KEY, subido_at timestamptz DEFAULT now())");
+  // Fuera del try de abajo a propósito, igual que antes el CREATE: sin la libreta nada del push de
+  // zonas funciona. Migra y rellena huellas en cada arranque; la siembra, en cambio, una sola vez.
+  await asegurarLibretaZonas(db);
   await db.query(
     "CREATE TABLE IF NOT EXISTS _vim_migraciones_sync (clave text PRIMARY KEY, aplicada_at timestamptz DEFAULT now())",
   );
@@ -296,7 +335,7 @@ export async function sembrarZonasUnaVez(db, log = () => {}) {
 
   try {
     const { rowCount: n } = await db.query(
-      "INSERT INTO _vim_zonas_ok (zona_id) SELECT id FROM zonas_envio ON CONFLICT DO NOTHING",
+      `INSERT INTO _vim_zonas_ok (zona_id, huella) SELECT x.id, ${HUELLA_ZONA} FROM zonas_envio x ON CONFLICT DO NOTHING`,
     );
     if (n > 0) log(`libreta de zonas sembrada con ${n} del catálogo (bajaron de la nube: no vuelven a subir)`);
     return n;
@@ -350,11 +389,12 @@ export async function listarPendientes(pool) {
       -- por medio no hace pasar la guarda de pushToCloud y se queda atorada en silencio.
       (SELECT array_agg(x.id) FROM repartidores x
         WHERE x.id NOT IN (SELECT repartidor_id FROM _vim_repartidores_ok)) AS repartidores,
-      -- Zonas de envío dadas de alta en la caja aún no confirmadas por la nube (ver _vim_zonas_ok
-      -- en asegurarTabla). Mismo motivo que los repartidores: sin esto, un alta suelta se queda
-      -- atorada en silencio.
+      -- Zonas de envío dadas de alta o repreciadas en la caja que la nube aún no tiene así (ver
+      -- asegurarLibretaZonas). Mismo motivo que los repartidores: sin esto, un alta suelta se
+      -- queda atorada en silencio.
       (SELECT array_agg(x.id) FROM zonas_envio x
-        WHERE x.id NOT IN (SELECT zona_id FROM _vim_zonas_ok)) AS zonas
+         LEFT JOIN _vim_zonas_ok o ON o.zona_id = x.id
+        WHERE ${ZONA_PENDIENTE}) AS zonas
   `, [TERMINALES]);
   return {
     ids: rows[0].ids ?? [], turnosCambiados: rows[0].turnos ?? [],
@@ -417,7 +457,10 @@ export async function construirSnapshotPush(pool, { ticketIds = null, turnoIds =
       (SELECT jsonb_agg(jsonb_build_object('id', id, 'huella', huella)) FROM tn) AS turnos,
       (SELECT array_agg(id) FROM movimientos_inventario x WHERE ($4::uuid[] IS NOT NULL AND x.id = ANY($4::uuid[])) OR ($4::uuid[] IS NULL AND $2::uuid[] IS NULL AND x.id NOT IN (SELECT movimiento_id FROM _vim_mov_ok))) AS movimientos,
       (SELECT array_agg(id) FROM repartidores x WHERE x.id NOT IN (SELECT repartidor_id FROM _vim_repartidores_ok)) AS repartidores,
-      (SELECT array_agg(id) FROM zonas_envio x WHERE x.id NOT IN (SELECT zona_id FROM _vim_zonas_ok)) AS zonas,
+      -- Con la huella que se manda: si la zona cambia mientras viaja, la anotada no coincide y
+      -- vuelve a subir en el siguiente ciclo.
+      (SELECT jsonb_agg(jsonb_build_object('id', x.id, 'huella', ${HUELLA_ZONA})) FROM zonas_envio x
+         LEFT JOIN _vim_zonas_ok o ON o.zona_id = x.id WHERE ${ZONA_PENDIENTE}) AS zonas,
       jsonb_strip_nulls(jsonb_build_object(
         'turnos',                    (SELECT jsonb_agg(to_jsonb(x)) FROM turnos x WHERE x.id IN (SELECT id FROM tn)),
         'tickets',                   (SELECT jsonb_agg(to_jsonb(x)) FROM tickets x WHERE x.id IN (SELECT id FROM tk)),
@@ -434,9 +477,10 @@ export async function construirSnapshotPush(pool, { ticketIds = null, turnoIds =
         'repartidores',              (SELECT jsonb_agg(to_jsonb(x)) FROM repartidores x
                                         WHERE x.id NOT IN (SELECT repartidor_id FROM _vim_repartidores_ok)),
 
-        -- El catálogo de zonas de envío, solo las que la nube aún no confirmó. Ver _vim_zonas_ok.
+        -- El catálogo de zonas de envío: las nuevas y las cambiadas. Ver asegurarLibretaZonas.
         'zonas_envio',                (SELECT jsonb_agg(to_jsonb(x)) FROM zonas_envio x
-                                        WHERE x.id NOT IN (SELECT zona_id FROM _vim_zonas_ok)),
+                                         LEFT JOIN _vim_zonas_ok o ON o.zona_id = x.id
+                                        WHERE ${ZONA_PENDIENTE}),
 
         -- EL CIERRE DEL TURNO. Se quedaba en la caja.
         --
@@ -490,12 +534,18 @@ export async function marcarRepartidoresSubidos(pool, ids) {
   );
 }
 
-/** Marca las zonas de envío que la nube ya aplicó: no vuelven a subir nunca. */
-export async function marcarZonasSubidas(pool, ids) {
-  if (!ids?.length) return;
+/**
+ * Anota las zonas de envío que la nube ya aplicó, con la huella que viajó. Se ACTUALIZA en
+ * conflicto, como los turnos: una zona repreciada vuelve a subir y lo que importa es la última
+ * versión que la nube recibió. `zonas` es `[{ id, huella }]`.
+ */
+export async function marcarZonasSubidas(pool, zonas) {
+  if (!zonas?.length) return;
   await pool.query(
-    "INSERT INTO _vim_zonas_ok (zona_id) SELECT unnest($1::uuid[]) ON CONFLICT DO NOTHING",
-    [ids],
+    `INSERT INTO _vim_zonas_ok (zona_id, huella)
+     SELECT (x->>'id')::uuid, x->>'huella' FROM jsonb_array_elements($1::jsonb) AS x
+     ON CONFLICT (zona_id) DO UPDATE SET huella = EXCLUDED.huella, subido_at = now()`,
+    [JSON.stringify(zonas)],
   );
 }
 
@@ -573,8 +623,8 @@ function repartidoresRechazados(errores) {
 /**
  * Ids de zonas de envío que la nube rechazó: no se marcan en _vim_zonas_ok.
  *
- * Marcar una rechazada la perdería para siempre — por diseño una zona confirmada nunca vuelve a
- * viajar, así que si se marca sin haber llegado de verdad, esa alta no existirá jamás en la nube.
+ * Marcar una rechazada la perdería: con su huella anotada deja de estar pendiente y, si nadie la
+ * vuelve a tocar, esa alta (o ese precio) no existirá jamás en la nube.
  */
 function zonasRechazadas(errores) {
   return new Set((errores ?? []).filter((e) => e?.tabla === "zonas_envio" && e.id).map((e) => e.id));
@@ -637,7 +687,7 @@ async function enviarLote(pool, { cloudUrl, anonKey, deviceToken }, { ticketIds,
   const repFuera = repartidoresRechazados(errores);
   await marcarRepartidoresSubidos(pool, repartidores.filter((id) => !repFuera.has(id)));
   const zonaFuera = zonasRechazadas(errores);
-  await marcarZonasSubidas(pool, zonas.filter((id) => !zonaFuera.has(id)));
+  await marcarZonasSubidas(pool, zonas.filter((z) => !zonaFuera.has(z.id)));
   if (errores.length) {
     const muestra = errores.slice(0, 3).map((e) => `${e.tabla}/${String(e.id).slice(0, 8)}: ${e.error}`).join(" · ");
     log(`la nube rechazó ${errores.length} fila(s), se reintentarán: ${muestra}`);

@@ -53,6 +53,10 @@ function crearPoolFalso({
     fallaLaSiembra,
     async query(sql, params = []) {
       if (sql.startsWith("CREATE TABLE")) return { rows: [], rowCount: 0 };
+      // Migración de la libreta de zonas a huella (C3): columna y relleno. Aquí no hay huellas que
+      // rellenar; lo que hacen de verdad lo prueba el bloque con Postgres real al final del archivo.
+      if (sql.startsWith("ALTER TABLE _vim_zonas_ok")) return { rows: [], rowCount: 0 };
+      if (sql.startsWith("UPDATE _vim_zonas_ok")) return { rows: [], rowCount: 0 };
 
       // `_vim_migraciones_sync`: el marcador de "esto ya corrió una vez en esta caja".
       if (sql.includes("_vim_migraciones_sync")) {
@@ -80,7 +84,7 @@ function crearPoolFalso({
         for (const id of nuevos) marcados.add(id);
         return { rows: [], rowCount: nuevos.length };
       }
-      if (sql.includes("_vim_zonas_ok") && sql.includes("SELECT id FROM zonas_envio")) {
+      if (sql.includes("_vim_zonas_ok") && sql.includes("FROM zonas_envio x ON CONFLICT")) {
         if (pool.fallaLaSiembra) throw new Error("siembra rota a propósito");
         const idsZonas = pool.catalogoZonas.map((z) => z.id);
         const nuevas = idsZonas.filter((id) => !marcadasZonas.has(id));
@@ -93,9 +97,11 @@ function crearPoolFalso({
         for (const id of params[0]) marcados.add(id);
         return { rows: [], rowCount: params[0].length };
       }
-      if (sql.includes("_vim_zonas_ok") && sql.includes("unnest")) {
-        for (const id of params[0]) marcadasZonas.add(id);
-        return { rows: [], rowCount: params[0].length };
+      // Las zonas se marcan con su huella: `[{ id, huella }]` en JSON.
+      if (sql.includes("_vim_zonas_ok") && sql.includes("jsonb_array_elements")) {
+        const zonas = JSON.parse(params[0]);
+        for (const z of zonas) marcadasZonas.add(z.id);
+        return { rows: [], rowCount: zonas.length };
       }
 
       const pendientes = pool.catalogo.filter((id) => !marcados.has(id));
@@ -115,7 +121,7 @@ function crearPoolFalso({
           rows: [{
             ids: null, turnos: null, movimientos: null,
             repartidores: pendientes.length ? pendientes : null,
-            zonas: pendientesZonas.length ? pendientesZonas : null,
+            zonas: pendientesZonas.length ? pendientesZonas.map((id) => ({ id, huella: `h-${id}` })) : null,
             snapshot: {
               repartidores: pendientes.map((id) => ({ id, nombre: `Repartidor ${id}` })),
               zonas_envio: pendientesZonas.map((id) => ({ id, nombre: `Zona ${id}` })),
@@ -348,4 +354,87 @@ test("una zona dada de alta SIN CONEXIÓN, antes de que la libreta existiera, s�
     assert.deepEqual(zonasEnviadasEn(nube), ["z2"], "el alta hecha en la caja tenía que viajar en el push");
     assert.ok(pool.marcadasZonas.has("z2"), "y quedar marcada una vez que la nube la confirmó");
   } finally { nube.restaurar(); }
+});
+
+// ── C3 (revisión final): la libreta de zonas va por HUELLA, contra un Postgres de verdad ──────
+//
+// Una zona que la caja reprecia con PIN (`cambiarCostoZona`) ya está en la libreta, así que con
+// "sube UNA vez por id" nunca volvía a subir, y el siguiente pull la pisaba con el precio de la
+// nube: lo que autorizó el supervisor duraba minutos. Aquí va con Postgres real y no con el pool
+// falso porque lo que decide es SQL (`md5(to_jsonb(x)::text)` contra la huella anotada): un pool
+// falso solo probaría su propia imitación.
+import { describe, before, after } from "node:test";
+import { mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import path from "node:path";
+import { startLocalBackend } from "./runtime.mjs";
+import { pullSnapshot } from "./sync-pull.mjs";
+
+describe("libreta de zonas por huella (Postgres real)", () => {
+  const TENANT = "99999999-0000-0000-0000-0000000000aa";
+  const SUC = "99999999-0000-0000-0000-0000000000bb";
+  let dir, backend, db;
+
+  /** La fila tal como la mandaría la nube (to_jsonb de la local, que es lo que subió). */
+  const filaDe = async (id) => (await db.query("SELECT to_jsonb(z) AS f FROM zonas_envio z WHERE id = $1", [id])).rows[0].f;
+  const pendientes = async () => (await listarPendientes(db)).zonaIds;
+
+  before(async () => {
+    dir = mkdtempSync(path.join(tmpdir(), "vim-zonas-huella-"));
+    backend = await startLocalBackend({ dataRoot: dir, pgPort: 54393, restPort: 54394, log: () => {} });
+    db = backend.pool;
+    // Que ninguna venta del fixture de dev viaje en los push de abajo: aquí solo importan las zonas.
+    await listarPendientes(db);
+    await db.query("INSERT INTO _vim_push_ok (ticket_id) SELECT id FROM tickets ON CONFLICT DO NOTHING");
+  }, { timeout: 120_000 });
+
+  after(async () => {
+    if (backend) await backend.stop();
+    if (dir) rmSync(dir, { recursive: true, force: true });
+  });
+
+  test("bajar del pull NO vuelve a subir; repreciar en la caja SÍ; y subido, ya no", async () => {
+    const { rows: [{ id }] } = await db.query(
+      "INSERT INTO zonas_envio (tenant_id, sucursal_id, nombre, costo_mxn) VALUES ($1, $2, 'Huella Norte', 35) RETURNING id",
+      [TENANT, SUC]);
+
+    // Llega por el pull: la libreta la anota con su huella y no está pendiente.
+    await pullSnapshot(db, { zonas_envio: [await filaDe(id)] });
+    assert.ok(!(await pendientes()).includes(id), "una zona recién bajada del pull no debe volver a subir");
+
+    // El supervisor autoriza otro precio en la caja.
+    await db.query("UPDATE zonas_envio SET costo_mxn = 50 WHERE id = $1", [id]);
+    assert.ok((await pendientes()).includes(id), "una zona repreciada en la caja tiene que volver a subir");
+
+    const nube = nubeFalsa({ resultado: { zonas_envio: 1 } });
+    try {
+      await pushToCloud(db, OPTS, () => {});
+      const subida = (nube.peticiones[0]?.snapshot?.zonas_envio ?? []).find((z) => z.id === id);
+      assert.equal(Number(subida?.costo_mxn), 50, "el push debía llevar el precio nuevo");
+    } finally { nube.restaurar(); }
+    assert.ok(!(await pendientes()).includes(id), "confirmada por la nube, no vuelve a subir");
+
+    // El siguiente pull trae de vuelta lo mismo que subió: sigue sin estar pendiente y el precio queda.
+    await pullSnapshot(db, { zonas_envio: [await filaDe(id)] });
+    assert.ok(!(await pendientes()).includes(id));
+    const { rows: [{ costo_mxn }] } = await db.query("SELECT costo_mxn FROM zonas_envio WHERE id = $1", [id]);
+    assert.equal(Number(costo_mxn), 50);
+  });
+
+  test("una libreta vieja (sin huella) se migra sin perder filas ni subir de más", async () => {
+    const { rows: [{ id }] } = await db.query(
+      "INSERT INTO zonas_envio (tenant_id, sucursal_id, nombre, costo_mxn) VALUES ($1, $2, 'Huella Vieja', 20) RETURNING id",
+      [TENANT, SUC]);
+    // La libreta tal como la dejaba la versión anterior: sin columna huella, con la zona anotada.
+    await db.query("DROP TABLE _vim_zonas_ok");
+    await db.query("CREATE TABLE _vim_zonas_ok (zona_id uuid PRIMARY KEY, subido_at timestamptz DEFAULT now())");
+    await db.query("INSERT INTO _vim_zonas_ok (zona_id) SELECT id FROM zonas_envio");
+
+    assert.ok(!(await pendientes()).includes(id), "una fila sin huella no se da por cambiada");
+    const { rows } = await db.query("SELECT count(*)::int AS n, count(huella)::int AS con FROM _vim_zonas_ok");
+    assert.equal(rows[0].n, rows[0].con, "toda fila migrada debía quedar con su huella recalculada");
+
+    await db.query("UPDATE zonas_envio SET costo_mxn = 25 WHERE id = $1", [id]);
+    assert.ok((await pendientes()).includes(id), "tras la migración, repreciar vuelve a subir");
+  });
 });

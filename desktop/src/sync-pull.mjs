@@ -6,6 +6,8 @@
 // generadas, y hace INSERT ... ON CONFLICT (pk) DO UPDATE. Corre en modo réplica para no
 // disparar triggers (misma semántica que la replicación lógica). Reusable con cualquier fuente.
 
+import { asegurarLibretaZonas } from "./sync-push.mjs";
+
 // Orden de FKs: padres antes que hijos. Solo se procesan las tablas presentes en el snapshot.
 export const PULL_ORDER = [
   { t: "tenants" },
@@ -273,10 +275,14 @@ export async function marcarRepartidoresDelPull(client, filas, log = () => {}) {
 export async function marcarZonasDelPull(client, filas, log = () => {}) {
   const ids = [...new Set((filas ?? []).map((f) => f?.id).filter((id) => id != null))];
   if (!ids.length) return 0;
+  await asegurarLibretaZonas(client);
+  // La huella se calcula sobre la fila LOCAL recién escrita, no sobre el JSON de la nube: es con la
+  // local con la que el push la va a comparar. DO UPDATE porque lo que la nube acaba de mandar es
+  // ahora lo "ya sabido" (ver asegurarLibretaZonas en sync-push.mjs).
   await client.query(
-    "CREATE TABLE IF NOT EXISTS _vim_zonas_ok (zona_id uuid PRIMARY KEY, subido_at timestamptz DEFAULT now())");
-  await client.query(
-    "INSERT INTO _vim_zonas_ok (zona_id) SELECT unnest($1::uuid[]) ON CONFLICT DO NOTHING", [ids]);
+    `INSERT INTO _vim_zonas_ok (zona_id, huella)
+     SELECT x.id, md5(to_jsonb(x)::text) FROM zonas_envio x WHERE x.id = ANY($1::uuid[])
+     ON CONFLICT (zona_id) DO UPDATE SET huella = EXCLUDED.huella`, [ids]);
   log(`  zonas de envío: ${ids.length} anotada(s) como de la nube (no vuelven a subir)`);
   return ids.length;
 }

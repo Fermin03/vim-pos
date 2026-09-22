@@ -117,9 +117,13 @@ test("el pull anota en _vim_zonas_ok lo que acaba de bajar", async () => {
       { id: Z2, nombre: "Norte", costo_mxn: 45 },
     ],
   });
-  const marca = client.consultas.find((c) => c.sql.includes("_vim_zonas_ok") && c.sql.includes("unnest"));
+  const marca = client.consultas.find((c) => c.sql.includes("INSERT INTO _vim_zonas_ok"));
   assert.ok(marca, "el pull debía anotar las zonas que bajó");
   assert.deepEqual(marca.params[0].sort(), [Z1, Z2].sort());
+  // C3: con la huella de la fila LOCAL recién escrita (la misma expresión que compara el push) y
+  // pisando la que hubiera: lo que acaba de bajar es lo "ya sabido" y no debe volver a subir.
+  assert.match(marca.sql, /md5\(to_jsonb\(x\)::text\)/);
+  assert.match(marca.sql, /DO UPDATE SET huella = EXCLUDED\.huella/);
   // Y dentro de la misma transacción: si el pull revienta, las marcas se van con el ROLLBACK.
   const iMarca = client.consultas.indexOf(marca);
   const iCommit = client.consultas.findIndex((c) => c.sql === "COMMIT");
