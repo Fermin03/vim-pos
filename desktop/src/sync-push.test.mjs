@@ -421,6 +421,38 @@ describe("libreta de zonas por huella (Postgres real)", () => {
     assert.equal(Number(costo_mxn), 50);
   });
 
+  test("I6: una zona creada en la caja que choca por nombre con la de la nube no traba el pull", async () => {
+    // La caja dio de alta "Centro" sin conexión y cobró un domicilio con ella; el panel creó su
+    // propio "centro". El pull chocaba contra zona_envio_nombre_uq y hacía ROLLBACK de todo.
+    const { rows: [{ id: local }] } = await db.query(
+      "INSERT INTO zonas_envio (tenant_id, sucursal_id, nombre, costo_mxn) VALUES ($1, $2, 'Centro I6', 0) RETURNING id",
+      [TENANT, SUC]);
+    // Un domicilio cobrado con esa zona (el fixture de dev no trae ventas: se abre una).
+    const c = await db.connect();
+    let ticket;
+    try {
+      await c.query("SELECT set_config('request.jwt.claims', $1, false)",
+        [JSON.stringify({ sub: "99999999-0000-0000-0000-000000000001", tenant_id: TENANT })]);
+      const { rows: [{ id: turno }] } = await c.query(
+        `INSERT INTO turnos (tenant_id, sucursal_id, caja_id, codigo_turno, dia_contable, usuario_apertura_id, fondo_inicial_mxn)
+         VALUES ($1, $2, '99999999-0000-0000-0000-0000000000cc', 'I6', current_date, '99999999-0000-0000-0000-000000000001', 0)
+         RETURNING id`, [TENANT, SUC]);
+      ({ rows: [{ id: ticket }] } = await c.query(
+        `SELECT abrir_ticket($1, '99999999-0000-0000-0000-0000000000cc', $2, 'DELIVERY_PROPIO', NULL, NULL, NULL,
+                             '99999999-0000-0000-0000-000000000001') AS id`, [SUC, turno]));
+      await c.query("SELECT fijar_envio_ticket($1, $2)", [ticket, local]);
+    } finally { c.release(); }
+    assert.equal((await db.query("SELECT zona_envio_id FROM tickets WHERE id = $1", [ticket])).rows[0].zona_envio_id, local);
+
+    const nube = { ...(await filaDe(local)), id: "12345678-0000-4000-8000-00000000c1a6", nombre: "  centro i6 ", costo_mxn: 15 };
+    await pullSnapshot(db, { zonas_envio: [nube] });
+
+    const { rows: zonas } = await db.query("SELECT id, costo_mxn FROM zonas_envio WHERE lower(btrim(nombre)) = 'centro i6'");
+    assert.deepEqual(zonas.map((z) => z.id), [nube.id], "debe quedar solo la zona de la nube");
+    const { rows: [t] } = await db.query("SELECT zona_envio_id FROM tickets WHERE id = $1", [ticket]);
+    assert.equal(t.zona_envio_id, nube.id, "el ticket que usaba la zona local debe apuntar a la de la nube");
+  });
+
   test("una libreta vieja (sin huella) se migra sin perder filas ni subir de más", async () => {
     const { rows: [{ id }] } = await db.query(
       "INSERT INTO zonas_envio (tenant_id, sucursal_id, nombre, costo_mxn) VALUES ($1, $2, 'Huella Vieja', 20) RETURNING id",

@@ -130,6 +130,24 @@ const CLAVES_NATURALES = {
   // C1: reconciliación por padre, no por clave compuesta fila-a-fila (ver comentario arriba).
   receta_componentes: { porPadre: "receta_id" },
   modificador_componentes: { porPadre: "opcion_modificador_id" },
+  // I6: la caja da de alta "Centro" sin conexión y el panel da de alta otro "Centro". Mismo nombre,
+  // otro id: el upsert choca con zona_envio_nombre_uq —(sucursal_id, lower(btrim(nombre))) WHERE
+  // deleted_at IS NULL, 0116— y el ROLLBACK se lleva TODO el pull, en cada ciclo, para siempre.
+  // La clave natural es una EXPRESIÓN, no columnas sueltas, y solo cuenta entre filas vivas (una
+  // zona de la nube ya borrada no choca con nada). La zona local sí tiene datos que no se pueden
+  // tirar: ventas y direcciones que la usan. Por eso `reapuntar` en vez de `dependientes`: se les
+  // cambia el id al de la nube (que el upsert de abajo inserta enseguida; en modo réplica la FK no
+  // se revisa en el ínterin) y después se borra la zona local. Un alta que la caja no llegó a
+  // subir se pierde a favor de la del panel, con su precio: la nube manda.
+  zonas_envio: {
+    claveSql: {
+      where: "sucursal_id = $1 AND lower(btrim(nombre)) = lower(btrim($2)) AND deleted_at IS NULL",
+      params: (f) => [f.sucursal_id ?? null, f.nombre ?? null],
+      aplica: (f) => f.deleted_at == null,
+    },
+    dependientes: [],
+    reapuntar: [{ tabla: "tickets", col: "zona_envio_id" }, { tabla: "direcciones_cliente", col: "zona_envio_id" }],
+  },
 };
 
 /**
@@ -155,14 +173,26 @@ async function reconciliarCatalogo(client, tabla, filas, log = () => {}) {
   let borradas = 0;
   for (const f of filas) {
     if (!f?.id) continue;
-    // IS NOT DISTINCT FROM: trata NULL = NULL (los catálogos globales llevan tenant_id NULL).
-    const cond = cfg.claves.map((c, i) => `"${c}" IS NOT DISTINCT FROM $${i + 1}`).join(" AND ");
-    const params = cfg.claves.map((c) => f[c] ?? null);
+    let cond, params;
+    if (cfg.claveSql) {
+      // Clave natural por expresión (I6, zonas_envio): el índice único no es de columnas sueltas.
+      if (!cfg.claveSql.aplica(f)) continue;
+      cond = cfg.claveSql.where;
+      params = cfg.claveSql.params(f);
+    } else {
+      // IS NOT DISTINCT FROM: trata NULL = NULL (los catálogos globales llevan tenant_id NULL).
+      cond = cfg.claves.map((c, i) => `"${c}" IS NOT DISTINCT FROM $${i + 1}`).join(" AND ");
+      params = cfg.claves.map((c) => f[c] ?? null);
+    }
     const { rows } = await client.query(
-      `SELECT id FROM ${tabla} WHERE ${cond} AND id <> $${cfg.claves.length + 1}`,
+      `SELECT id FROM ${tabla} WHERE ${cond} AND id <> $${params.length + 1}`,
       [...params, f.id],
     );
     for (const vieja of rows) {
+      // Primero se mudan los que tienen datos propios al id de la nube; luego se borra lo demás.
+      for (const r of cfg.reapuntar ?? []) {
+        await client.query(`UPDATE ${r.tabla} SET "${r.col}" = $1 WHERE "${r.col}" = $2`, [f.id, vieja.id]);
+      }
       for (const d of cfg.dependientes) {
         await client.query(`DELETE FROM ${d.tabla} WHERE "${d.col}" = $1`, [vieja.id]);
       }

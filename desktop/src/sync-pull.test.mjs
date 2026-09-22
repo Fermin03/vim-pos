@@ -135,3 +135,49 @@ test("un pull sin zonas no toca la libreta", async () => {
   await pullSnapshot(pool, { zonas_envio: [] });
   assert.ok(!client.consultas.some((c) => c.sql.includes("_vim_zonas_ok")));
 });
+
+// I6 (revisión final): la caja crea "Centro" sin conexión y el panel crea otro "Centro". El pull
+// chocaba contra zona_envio_nombre_uq y hacía ROLLBACK de TODO (catálogo, empleados), para
+// siempre. Se reconcilia por clave natural (sucursal, nombre sin mayúsculas ni espacios de sobra):
+// la zona local se borra para que entre la de la nube, y ANTES los tickets y las direcciones que la
+// usaban se reapuntan al id de la nube — borrarlos, como hacen los `dependientes` de roles, sería
+// perder ventas.
+test("una zona local que choca por nombre con una de la nube se reapunta y se borra antes del upsert", async () => {
+  const LOCAL = "eeeeeeee-0000-0000-0000-000000000001";
+  const NUBE = "ffffffff-0000-0000-0000-000000000002";
+  const SUC = "99999999-0000-0000-0000-0000000000bb";
+  const { client, pool } = clienteFalso();
+  const query = client.query.bind(client);
+  client.query = async (sql, params = []) => {
+    // La fila local en conflicto: mismo nombre (otra capitalización), otro id.
+    if (sql.includes("FROM zonas_envio") && sql.includes("lower(btrim(nombre))") && sql.trimStart().startsWith("SELECT")) {
+      await query(sql, params);
+      return { rows: [{ id: LOCAL }], rowCount: 1 };
+    }
+    return query(sql, params);
+  };
+
+  await pullSnapshot(pool, { zonas_envio: [{ id: NUBE, sucursal_id: SUC, nombre: "Centro ", deleted_at: null }] });
+
+  const busca = client.consultas.find((c) => c.sql.includes("lower(btrim(nombre))"));
+  assert.ok(busca, "debía buscar la zona local por clave natural");
+  assert.deepEqual(busca.params.slice(0, 2), [SUC, "Centro "]);
+
+  const i = (pred) => client.consultas.findIndex(pred);
+  const iTickets = i((c) => /UPDATE tickets SET "zona_envio_id"/.test(c.sql));
+  const iDirs = i((c) => /UPDATE direcciones_cliente SET "zona_envio_id"/.test(c.sql));
+  const iBorra = i((c) => c.sql.startsWith("DELETE FROM zonas_envio"));
+  const iUpsert = i((c) => c.sql.includes('INSERT INTO public."zonas_envio"'));
+  assert.ok(iTickets >= 0 && iDirs >= 0, "los tickets y las direcciones debían reapuntarse");
+  assert.deepEqual(client.consultas[iTickets].params, [NUBE, LOCAL]);
+  assert.deepEqual(client.consultas[iDirs].params, [NUBE, LOCAL]);
+  assert.ok(iTickets < iBorra && iDirs < iBorra, "se reapunta ANTES de borrar la zona local");
+  assert.ok(iBorra < iUpsert, "y se borra ANTES de que entre la de la nube");
+  assert.ok(!client.consultas.some((c) => c.sql.startsWith("DELETE FROM tickets")), "nunca se borran ventas");
+});
+
+test("una zona de la nube ya borrada no reconcilia nada (no choca con el índice parcial)", async () => {
+  const { client, pool } = clienteFalso();
+  await pullSnapshot(pool, { zonas_envio: [{ id: "ffffffff-0000-0000-0000-000000000003", sucursal_id: "s", nombre: "Vieja", deleted_at: "2026-09-01T00:00:00Z" }] });
+  assert.ok(!client.consultas.some((c) => c.sql.includes("lower(btrim(nombre))")));
+});
