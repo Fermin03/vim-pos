@@ -21,7 +21,7 @@ vi.mock("../supabase", () => ({
   }),
 }));
 
-import { persistirTicket } from "../cobro";
+import { persistirTicket, cambiarZonaDePedido } from "../cobro";
 
 const TOTALES_ROW = {
   id: "ticket-1",
@@ -84,5 +84,38 @@ describe("persistirTicket — el cargo de envío (Task 7)", () => {
     const totales = await persistir("zona-9");
     expect(totales.total).toBe(116);
     expect(totales.ticketId).toBe("ticket-1");
+  });
+});
+
+describe("cambiarZonaDePedido — cambiar la zona de un pedido en curso (Task 7, ronda 1/5)", () => {
+  beforeEach(() => {
+    rpcMock.mockReset();
+    rpcMock.mockImplementation(async () => ({ data: null, error: null }));
+    singleMock.mockReset();
+    singleMock.mockImplementation(async () => ({ data: TOTALES_ROW, error: null }));
+  });
+
+  it("sin ticket (pedido todavía no persistido) no toca la red y devuelve null", async () => {
+    const resultado = await cambiarZonaDePedido("t", null, "zona-9");
+    expect(resultado).toBeNull();
+    expect(rpcMock).not.toHaveBeenCalled();
+    expect(singleMock).not.toHaveBeenCalled();
+  });
+
+  it("con ticket, llama a fijar_envio_ticket y devuelve los totales frescos de leerTotales", async () => {
+    const resultado = await cambiarZonaDePedido("t", "ticket-1", "zona-9");
+    expect(rpcMock).toHaveBeenCalledWith("fijar_envio_ticket", { p_ticket_id: "ticket-1", p_zona_id: "zona-9" });
+    expect(resultado?.total).toBe(116);
+  });
+
+  it("quitar la zona (zonaId null) también llama a la RPC, con p_zona_id null", async () => {
+    await cambiarZonaDePedido("t", "ticket-1", null);
+    expect(rpcMock).toHaveBeenCalledWith("fijar_envio_ticket", { p_ticket_id: "ticket-1", p_zona_id: null });
+  });
+
+  it("si la escritura falla, propaga el error y NUNCA llega a leer los totales", async () => {
+    rpcMock.mockImplementation(async () => ({ data: null, error: { message: "El envío solo se puede fijar en tickets BORRADOR o ABIERTO (estado actual: PAGADO)" } }));
+    await expect(cambiarZonaDePedido("t", "ticket-1", "zona-9")).rejects.toThrow(/BORRADOR o ABIERTO/);
+    expect(singleMock).not.toHaveBeenCalled();
   });
 });

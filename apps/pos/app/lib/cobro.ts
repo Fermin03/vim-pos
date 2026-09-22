@@ -2,6 +2,7 @@
 import { employeeClient } from "./supabase";
 import type { LineaCarrito, ModoServicio } from "./carrito";
 import { componentesJsonb } from "./cuenta-mesa";
+import { fijarEnvioTicket } from "./zonas-envio";
 
 export type MetodoPago =
   | "EFECTIVO"
@@ -147,6 +148,30 @@ export async function leerTotales(token: string, ticketId: string): Promise<Tota
     estadoFiscal: t.estado_fiscal,
     folio: t.folio_completo,
   };
+}
+
+/**
+ * Cambia (o quita, con `zonaId` null) la zona de reparto de un pedido que YA tiene ticket, y
+ * relee los totales autoritativos — para que el renglón de envío del ticket lateral y el total
+ * del pie se muevan juntos (Task 7, ronda de arreglos 1/5).
+ *
+ * `ticketId: null` significa "el pedido todavía no se persistió": no hay nada que reescribir en
+ * BD, así que no toca la red y devuelve `null` — el caller decide qué hacer con el carrito local
+ * en ese caso (para un ticket sin persistir, cambiar de zona es solo un `dispatch`).
+ *
+ * Si `fijarEnvioTicket` truena (zona inactiva, de otra sucursal, o el ticket ya no está en
+ * BORRADOR/ABIERTO — ver `fijar_envio_ticket` en `0115_zonas_envio.sql`), el error se propaga tal
+ * cual y `leerTotales` nunca se llama: el caller no debe actualizar el carrito con una zona que la
+ * base rechazó.
+ */
+export async function cambiarZonaDePedido(
+  token: string,
+  ticketId: string | null,
+  zonaId: string | null,
+): Promise<TotalesTicket | null> {
+  if (!ticketId) return null;
+  await fijarEnvioTicket(token, ticketId, zonaId);
+  return leerTotales(token, ticketId);
 }
 
 /** F5.2b — fija la propina del ticket (RPC establecer_propina_ticket, bajo RLS). */

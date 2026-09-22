@@ -18,10 +18,11 @@ import {
   nuevoClientId,
   type LineaCarrito,
   type ModificadorSel,
+  type EnvioCarrito,
 } from "../lib/carrito";
 import { listarCombos, combosQueAdmiten, diferencialCombo, type ComboDef } from "../lib/combos";
 import { obtenerGruposDeProducto, type GrupoModificadores } from "../lib/modificadores";
-import { persistirTicket, leerTotales, type TotalesTicket } from "../lib/cobro";
+import { persistirTicket, leerTotales, cambiarZonaDePedido, type TotalesTicket } from "../lib/cobro";
 import { SidebarTicket } from "./sidebar-ticket";
 import { ModalModificadores } from "./modal-modificadores";
 import { ModalCombo } from "./modal-combo";
@@ -797,6 +798,25 @@ export function HomePos({
       setProcesandoCobro(false);
     }
   }, [carrito, ticketBd, token, caja.sucursal_id, turno.caja_id, turno.id, online]);
+
+  /**
+   * Ronda de arreglos 1/5 (Task 7) — cambiar la zona de ESTE pedido desde el renglón de envío.
+   *
+   * Sin ticket persistido: solo carrito, como antes (`cambiarZonaDePedido` no toca la red). Con
+   * ticket persistido —el caso real, porque un domicilio se manda a cocina (y por tanto se
+   * persiste) ANTES de cobrarse—, además reescribe el renglón en BD y trae los totales
+   * autoritativos, para que el número grande del pie y el renglón de envío se muevan juntos.
+   *
+   * Deliberadamente NO hace `dispatch` antes de que `cambiarZonaDePedido` resuelva: si la
+   * escritura en BD truena (zona inactiva, de otra sucursal, o el ticket ya no está en
+   * BORRADOR/ABIERTO), el error se propaga tal cual al modal (que lo muestra y NO se cierra) y el
+   * carrito se queda exactamente como estaba: nunca diciendo una zona que la base no tiene.
+   */
+  const cambiarZonaPedido = useCallback(async (envio: EnvioCarrito | null) => {
+    const totales = await cambiarZonaDePedido(token, ticketBd?.ticketId ?? null, envio?.zonaId ?? null);
+    if (totales) setTicketBd(totales);
+    dispatch({ tipo: "zona", envio });
+  }, [ticketBd, token]);
 
   const bloqueado = ticketBd !== null;
   // En modo cuenta de mesa el ticket está persistido (ticketBd) PERO el menú debe seguir activo
@@ -1705,7 +1725,7 @@ export function HomePos({
           turnoId={turno.id}
           empleadoNombre={empleado.nombre}
           valor={carrito.envio?.zonaId ?? null}
-          onElegir={(envio) => { dispatch({ tipo: "zona", envio }); setZonaPedidoAbierto(false); }}
+          onElegir={cambiarZonaPedido}
           onCerrar={() => setZonaPedidoAbierto(false)}
         />
       )}

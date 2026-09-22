@@ -96,9 +96,11 @@ export function SidebarTicket({
   /** Abre el modal de cliente para domicilio (solo aplica en modo Domicilio). */
   onEditarCliente?: () => void;
   /** Abre el modal de zona de reparto para cambiar el envío de ESTE pedido (sin tocar la
-   *  dirección guardada del cliente). Solo tiene efecto con el ticket sin persistir: una vez
-   *  bloqueado, el total mostrado es el autoritativo de la BD (`totalConDescuento`) y cambiar
-   *  la zona aquí no lo movería — ver renglón deshabilitado más abajo. */
+   *  dirección guardada del cliente). Con el ticket ya persistido, el caller también reescribe
+   *  el renglón en BD (`fijarEnvioTicket`) y refresca el total autoritativo — el número grande
+   *  y el renglón se mueven juntos. Se ofrece siempre: un domicilio se manda a cocina (y por
+   *  tanto se persiste) ANTES de cobrarse, así que "solo mientras no hay ticket" dejaría la
+   *  función muerta justo cuando el cajero de verdad necesita corregir la zona. */
   onCambiarZona?: () => void;
   /** Edita la nota de cocina de una línea (carrito local, pre-cobro). */
   onNotaLinea?: (clientId: string, nota: string | null) => void;
@@ -370,15 +372,15 @@ export function SidebarTicket({
           cajero necesita ver. Subtotal/IVA son informativos → tipografía menor y filas apretadas;
           el TOTAL sigue siendo el número dominante. */}
       <div className="flex-shrink-0 border-t border-line bg-sel px-5 py-3">
-        {/* Renglón de envío: solo domicilio, y solo mientras el ticket no está persistido. Una
-            vez bloqueado el total de abajo es el autoritativo de la BD (totalConDescuento) y
-            tocar la zona aquí no lo movería, así que se deshabilita en vez de mentir. */}
+        {/* Renglón de envío: tocable SIEMPRE, también con el ticket ya persistido — un domicilio
+            se manda a cocina (y por tanto se persiste) antes de cobrarse, así que apagar esto al
+            bloquear dejaría la función muerta justo cuando más se necesita. El caller reescribe
+            la BD (fijarEnvioTicket) y refresca el total autoritativo cuando corresponde. */}
         {estado.envio && (
           <button
             type="button"
-            disabled={bloqueado}
             onClick={onCambiarZona}
-            className="mb-1 flex w-full items-center justify-between text-[13px] text-ink-2 hover:text-ink disabled:cursor-default disabled:hover:text-ink-2"
+            className="mb-1 flex w-full items-center justify-between text-[13px] text-ink-2 hover:text-ink"
           >
             <span>{estado.envio.nombre}</span>
             <span className="tabular-nums font-medium text-ink">{fmtMxn(estado.envio.costoMxn)}</span>
