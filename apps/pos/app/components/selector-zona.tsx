@@ -1,6 +1,6 @@
 "use client";
 import { useState } from "react";
-import { crearZona, cambiarCostoZona, type ZonaEnvio } from "../lib/zonas-envio";
+import { crearZona, cambiarCostoZona, validarCostoZona, type ZonaEnvio } from "../lib/zonas-envio";
 import { fmtMxn } from "../lib/turno";
 import type { Autorizacion } from "../lib/autorizacion";
 import { ModalAutorizacionPin } from "./modal-autorizacion-pin";
@@ -50,7 +50,8 @@ export function SelectorZona({
     if (!alta) return;
     const costo = Number(alta.costo || 0);
     if (!alta.nombre.trim()) { setError("Escribe el nombre de la zona."); return; }
-    if (!Number.isFinite(costo) || costo < 0) { setError("El costo no puede ser negativo."); return; }
+    const invalido = validarCostoZona(costo);
+    if (invalido) { setError(invalido); return; }
     try {
       const z = await crearZona(token, { tenantId, sucursalId, nombre: alta.nombre, costoMxn: costo });
       onZonaSincronizada(z);
@@ -72,7 +73,8 @@ export function SelectorZona({
   function pedirAutorizacionCosto() {
     if (!repreciando) return;
     const costo = Number(repreciando.costo || 0);
-    if (!Number.isFinite(costo) || costo < 0) { setError("El costo no puede ser negativo."); return; }
+    const invalido = validarCostoZona(costo);
+    if (invalido) { setError(invalido); return; }
     setError(null);
     setPinAbierto(true);
   }

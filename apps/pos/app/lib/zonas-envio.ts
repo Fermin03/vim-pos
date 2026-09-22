@@ -37,11 +37,30 @@ export async function listarZonas(token: string, sucursalId: string): Promise<Zo
   return ((data ?? []) as Record<string, unknown>[]).map(mapZona);
 }
 
+/** Tope del costo de una zona: el mismo del panel (`zonaSchema` en apps/admin). */
+export const COSTO_ZONA_MAX = 9999;
+
+/** Valida el costo capturado en la caja (alta o repreciado). null = válido. */
+export function validarCostoZona(costo: number): string | null {
+  if (!Number.isFinite(costo)) return "Escribe un costo válido.";
+  if (costo < 0) return "El costo no puede ser negativo.";
+  if (costo > COSTO_ZONA_MAX) return "El costo no puede pasar de $9,999.";
+  return null;
+}
+
+/** El choque del índice único llega como jerga de Postgres; aquí se dice lo que pasó (como el panel). */
+export function traducirErrorZona(mensaje: string): string {
+  if (mensaje.includes("zona_envio_nombre_uq")) return "Ya existe una zona con ese nombre en esta sucursal.";
+  return mensaje;
+}
+
 /** Alta desde la caja: llega un pedido de una colonia que nadie había capturado. Sin PIN. */
 export async function crearZona(
   token: string,
   args: { tenantId: string; sucursalId: string; nombre: string; costoMxn: number },
 ): Promise<ZonaEnvio> {
+  const invalido = validarCostoZona(args.costoMxn);
+  if (invalido) throw new Error(invalido);
   const { data, error } = await employeeClient(token)
     .from("zonas_envio")
     .insert({
@@ -52,12 +71,14 @@ export async function crearZona(
     })
     .select("id, nombre, costo_mxn")
     .single();
-  if (error) throw new Error(error.message);
+  if (error) throw new Error(traducirErrorZona(error.message));
   return mapZona(data as Record<string, unknown>);
 }
 
 /** Repreciar una zona existente. El PIN lo pide la pantalla ANTES de llamar aquí. */
 export async function cambiarCostoZona(token: string, zonaId: string, costoMxn: number): Promise<void> {
+  const invalido = validarCostoZona(costoMxn);
+  if (invalido) throw new Error(invalido);
   const { error } = await employeeClient(token)
     .from("zonas_envio")
     .update({ costo_mxn: costoMxn })
