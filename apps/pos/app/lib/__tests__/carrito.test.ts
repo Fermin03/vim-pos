@@ -1,3 +1,4 @@
+import type { ClienteDomicilio } from "../clientes-domicilio";
 import { describe, it, expect } from "vitest";
 import { reducerCarrito, estadoInicial, precioUnitarioLinea, totalLinea, calcularTotalesDisplay, type LineaCarrito } from "../carrito";
 import type { Producto } from "../catalogo";
@@ -75,11 +76,17 @@ describe("envío por zona", () => {
     expect(reducerCarrito(con, { tipo: "modo", modo: "COMER_AQUI" }).envio).toBeNull();
   });
 
-  it("limpiar el carrito deja el envío en el pedido anterior", () => {
+  it("limpiar el carrito conserva el envío junto con el cliente: son del mismo domicilio", () => {
+    // Antes `limpiar` conservaba el cliente y tiraba el envío: el siguiente pedido del mismo
+    // cliente salía sin cargo aunque el domicilio (y su zona) fueran los mismos.
+    const cliente: ClienteDomicilio = { clienteId: "c1", nombre: "Ana", telefono: "477", direccionId: "d1", direccionPreview: "Madero 10", zona: null };
     const con = reducerCarrito(
-      { ...estadoInicial, modoServicio: "DELIVERY_PROPIO" },
+      { ...estadoInicial, modoServicio: "DELIVERY_PROPIO", clienteDomicilio: cliente },
       { tipo: "zona", envio: { zonaId: "z1", nombre: "Zona Norte", costoMxn: 35 } },
     );
-    expect(reducerCarrito(con, { tipo: "limpiar" }).envio).toBeNull();
+    const limpio = reducerCarrito(con, { tipo: "limpiar" });
+    expect(limpio.envio).toEqual({ zonaId: "z1", nombre: "Zona Norte", costoMxn: 35 });
+    expect(limpio.clienteDomicilio).toBe(cliente);
+    expect(limpio.lineas).toEqual([]);
   });
 });

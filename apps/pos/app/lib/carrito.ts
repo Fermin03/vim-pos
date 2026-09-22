@@ -92,8 +92,10 @@ export function reducerCarrito(estado: EstadoCarrito, accion: AccionCarrito): Es
     case "zona":
       return { ...estado, envio: accion.envio };
     case "limpiar":
-      // La nota de orden es de ESTE pedido: se limpia con él. El envío va con el pedido anterior.
-      return { modoServicio: estado.modoServicio, lineas: [], clienteDomicilio: estado.clienteDomicilio ?? null, notaOrden: null, nombreCuenta: null, envio: null };
+      // La nota de orden es de ESTE pedido: se limpia con él. El envío se queda con el cliente:
+      // los dos salen del mismo domicilio, y conservar uno sin el otro mandaba el siguiente pedido
+      // del mismo cliente sin cargo de envío.
+      return { modoServicio: estado.modoServicio, lineas: [], clienteDomicilio: estado.clienteDomicilio ?? null, notaOrden: null, nombreCuenta: null, envio: estado.envio ?? null };
     default:
       return estado;
   }
