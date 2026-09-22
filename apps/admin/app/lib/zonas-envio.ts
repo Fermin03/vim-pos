@@ -7,8 +7,9 @@ import { supabase, leerSesion } from "./supabase";
  * cobra por cada una. Las crea el cajero desde la caja o el dueño aquí con calma.
  *
  * Nombre único por sucursal sin distinguir mayúsculas ni espacios (índice `zona_envio_nombre_uq`,
- * filtrado a filas vivas). Sin política DELETE en la tabla: tickets y direcciones de cliente
- * apuntan a la zona, así que la baja es lógica (`deleted_at`).
+ * filtrado a filas vivas). La tabla SÍ tiene política DELETE (`zonas_envio_delete`, 0116), pero
+ * aquí no se usa: tickets y direcciones de cliente apuntan a la zona, así que la baja es lógica
+ * (`deleted_at`) para no romper esas referencias ni el historial.
  */
 
 async function tenantId(): Promise<string> {
