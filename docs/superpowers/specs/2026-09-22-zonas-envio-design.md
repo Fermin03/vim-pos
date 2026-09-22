@@ -30,9 +30,10 @@ cobra.
 
 **Entra:**
 
-1. Migración `0115_zonas_envio.sql`: tabla `zonas_envio`, `zona_envio_id` en
+1. Migración `0116_zonas_envio.sql`: tabla `zonas_envio`, `zona_envio_id` en
    `direcciones_cliente` y `tickets`, `cargo_tipo` en `ticket_items`, RPC `fijar_envio_ticket`,
-   y el catálogo añadido a los dos sentidos del sync (§4).
+   y el catálogo añadido a los dos sentidos del sync (§4). *(Se numeró 0116 y no 0115: la rama
+   `fix/mesas-huerfanas` reclamó el 0115 primero con su propia migración.)*
 2. Caja: selector de zona y alta de zona en el modal de domicilio (§5).
 3. Caja: el envío en el carrito, en el ticket lateral y en la persistencia del ticket (§6).
 4. Cocina: el cargo no viaja al KDS ni a la comanda (§8).
@@ -65,9 +66,9 @@ por monto mínimo de compra.
 - **El envío sigue la política fiscal del ticket.** Hereda `iva_incluido_en_precio` y la tasa del
   primer renglón, no una constante.
 
-## 4. Datos — migración `0115_zonas_envio.sql`
+## 4. Datos — migración `0116_zonas_envio.sql`
 
-> Confirmar que `0115` sigue libre al crear el archivo: hay ramas abiertas que pueden haber
+> Confirmar que `0116` sigue libre al crear el archivo: hay ramas abiertas que pueden haber
 > tomado el número (trampa conocida, ADR 0014). Y aplicarla a producción **antes** de mezclar.
 
 ### 4.1 `zonas_envio`
@@ -301,7 +302,7 @@ Desactivar una zona la saca de los chips de la caja; las direcciones que la ten�
   (su FK) y antes de lo demás.
 - `desktop/src/sync-push.mjs` → `construirSnapshotPush`: `'zonas_envio'` con el patrón
   `_vim_zonas_ok` — tabla local de control, se mandan las que la nube aún no confirmó, y una
-  siembra única (`siembra_zonas_0115`, espejo de `siembra_repartidores_0114`) que marca como ya
+  siembra única (`siembra_zonas_0116`, espejo de `siembra_repartidores_0114`) que marca como ya
   subidas las que bajaron del pull, para que una caja recién actualizada no reenvíe el catálogo
   entero.
 - Las columnas nuevas de `tickets` y `ticket_items` viajan solas: el push serializa con
@@ -360,7 +361,7 @@ cargo de zona sería cobrarlo dos veces. La RPC ni siquiera los alcanza: sus tic
   vive en la caja; si se reinstala sin respaldo, se pierde y se vuelve a llenar pidiendo la zona.
   El reporte por zona no depende de esto: usa `tickets.zona_envio_id`.
 - **Orden de despliegue.** Migración a producción primero, instalador después. Una caja con el POS
-  nuevo contra una base sin `0115` falla al fijar el envío; al revés (base migrada, caja vieja) es
+  nuevo contra una base sin `0116` falla al fijar el envío; al revés (base migrada, caja vieja) es
   inocuo: baja el catálogo de zonas y no lo usa.
 - **Cambiar el precio de una zona no reprecia nada.** Es lo correcto —el renglón es un snapshot—
   pero conviene decirlo en el admin con una nota, porque la expectativa natural del dueño es que

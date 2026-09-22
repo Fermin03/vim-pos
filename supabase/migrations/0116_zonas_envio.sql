@@ -1,5 +1,5 @@
 -- ============================================================================
--- 0115 — Zonas de envío: el domicilio se cobra según dónde vive el cliente.
+-- 0116 — Zonas de envío: el domicilio se cobra según dónde vive el cliente.
 --
 -- POR QUÉ UN RENGLÓN DEL TICKET Y NO UNA COLUMNA DE tickets
 --

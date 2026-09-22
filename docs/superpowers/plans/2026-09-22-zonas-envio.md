@@ -23,7 +23,7 @@ TypeScript (POS y admin), Electron + Postgres embebido (escritorio), vitest (POS
 ## Global Constraints
 
 - Rama de trabajo: `delivery/zonas-envio` (ya creada, con la especificación commiteada).
-- Migración `0115_zonas_envio.sql`. **Antes de crear el archivo, confirmar que el número sigue
+- Migración `0116_zonas_envio.sql`. **Antes de crear el archivo, confirmar que el número sigue
   libre** (`ls supabase/migrations | tail -3` y revisar ramas/PRs abiertos).
 - **La migración se aplica a producción a mano y ANTES de mezclar el PR.** El `db push` del CI
   corre contra una base efímera y no sirve de despliegue.
@@ -53,7 +53,7 @@ TypeScript (POS y admin), Electron + Postgres embebido (escritorio), vitest (POS
 
 | Archivo | Responsabilidad |
 |---|---|
-| `supabase/migrations/0115_zonas_envio.sql` | Tabla, columnas, índices, RLS, RPC y las dos funciones de sync |
+| `supabase/migrations/0116_zonas_envio.sql` | Tabla, columnas, índices, RLS, RPC y las dos funciones de sync |
 | `supabase/scripts/smoke_envio.sql` | Todo el contrato de BD del envío (bloquea el merge) |
 | `apps/pos/app/lib/zonas-envio.ts` | Leer, crear y repreciar zonas desde la caja |
 | `apps/pos/app/components/selector-zona.tsx` | Los chips de zona + el `＋` + el lápiz con PIN |
@@ -85,7 +85,7 @@ TypeScript (POS y admin), Electron + Postgres embebido (escritorio), vitest (POS
 ## Task 1: Esquema — `zonas_envio`, columnas y marca de cargo
 
 **Files:**
-- Create: `supabase/migrations/0115_zonas_envio.sql`
+- Create: `supabase/migrations/0116_zonas_envio.sql`
 - Create: `supabase/scripts/smoke_envio.sql`
 
 **Interfaces:**
@@ -101,7 +101,7 @@ ls supabase/migrations | tail -3
 git branch -a --sort=-committerdate | head -8
 ```
 
-Esperado: la última es `0114_delivery_viaje.sql`. Si alguien tomó `0115`, usar el siguiente libre
+Esperado: la última es `0114_delivery_viaje.sql`. Si alguien tomó `0116`, usar el siguiente libre
 y renombrar todas las referencias de este plan.
 
 - [ ] **Step 2: Escribir el smoke del esquema (falla)**
@@ -172,11 +172,11 @@ Esperado: `❌ smoke_envio.sql` con `relation "zonas_envio" does not exist`.
 
 - [ ] **Step 4: Escribir la migración**
 
-Crear `supabase/migrations/0115_zonas_envio.sql`:
+Crear `supabase/migrations/0116_zonas_envio.sql`:
 
 ```sql
 -- ============================================================================
--- 0115 — Zonas de envío: el domicilio se cobra según dónde vive el cliente.
+-- 0116 — Zonas de envío: el domicilio se cobra según dónde vive el cliente.
 --
 -- POR QUÉ UN RENGLÓN DEL TICKET Y NO UNA COLUMNA DE tickets
 --
@@ -291,7 +291,7 @@ smokes que hacen `to_jsonb` de renglones.
 - [ ] **Step 7: Commit**
 
 ```bash
-git add supabase/migrations/0115_zonas_envio.sql supabase/scripts/smoke_envio.sql
+git add supabase/migrations/0116_zonas_envio.sql supabase/scripts/smoke_envio.sql
 git commit -m "feat(envio): tabla zonas_envio y la marca de cargo en los renglones
 
 Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
@@ -302,7 +302,7 @@ Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
 ## Task 2: La RPC `fijar_envio_ticket`
 
 **Files:**
-- Modify: `supabase/migrations/0115_zonas_envio.sql` (se le añade la función al final)
+- Modify: `supabase/migrations/0116_zonas_envio.sql` (se le añade la función al final)
 - Modify: `supabase/scripts/smoke_envio.sql` (se le añade el segundo bloque)
 
 **Interfaces:**
@@ -441,7 +441,7 @@ Esperado: `❌` con `function fijar_envio_ticket(uuid, uuid) does not exist`.
 
 - [ ] **Step 3: Escribir la RPC**
 
-Añadir al final de `supabase/migrations/0115_zonas_envio.sql`:
+Añadir al final de `supabase/migrations/0116_zonas_envio.sql`:
 
 ```sql
 -- ============================================================================
@@ -574,7 +574,7 @@ Esperado: todos en verde.
 - [ ] **Step 6: Commit**
 
 ```bash
-git add supabase/migrations/0115_zonas_envio.sql supabase/scripts/smoke_envio.sql
+git add supabase/migrations/0116_zonas_envio.sql supabase/scripts/smoke_envio.sql
 git commit -m "feat(envio): fijar_envio_ticket pone el cargo como renglón del ticket
 
 Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
@@ -585,7 +585,7 @@ Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
 ## Task 3: El catálogo entra y sale del sync en la nube
 
 **Files:**
-- Modify: `supabase/migrations/0115_zonas_envio.sql` (se le añaden las dos funciones de sync)
+- Modify: `supabase/migrations/0116_zonas_envio.sql` (se le añaden las dos funciones de sync)
 - Modify: `supabase/scripts/smoke_envio.sql` (tercer bloque)
 
 **Interfaces:**
@@ -640,7 +640,7 @@ cd desktop && npm run smokes -- smoke_envio.sql
 
 Esperado: `❌` con `sync_pull_snapshot no incluye zonas_envio`.
 
-- [ ] **Step 3: Copiar las dos funciones a la 0115 con la línea nueva**
+- [ ] **Step 3: Copiar las dos funciones a la 0116 con la línea nueva**
 
 Las funciones se redefinen **completas** (es la convención del repo: cada migración que las toca
 las vuelve a declarar entera).
@@ -650,7 +650,7 @@ sed -n '602,649p' supabase/migrations/0111_combos.sql   # sync_pull_snapshot vig
 sed -n '128,256p' supabase/migrations/0114_delivery_viaje.sql   # sync_push_snapshot vigente
 ```
 
-Pegar ambas al final de la `0115` con estos dos cambios y nada más:
+Pegar ambas al final de la `0116` con estos dos cambios y nada más:
 
 1. En `sync_pull_snapshot`, junto a la línea de `'repartidores'`:
 
@@ -693,7 +693,7 @@ funciones.
 - [ ] **Step 6: Commit**
 
 ```bash
-git add supabase/migrations/0115_zonas_envio.sql supabase/scripts/smoke_envio.sql
+git add supabase/migrations/0116_zonas_envio.sql supabase/scripts/smoke_envio.sql
 git commit -m "feat(envio): las zonas bajan en el pull y suben en el push
 
 Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
@@ -868,21 +868,21 @@ repartidor en el bloque de la línea 458 (se reintenta sola, no cuelga del ticke
 - [ ] **Step 5: La siembra, una vez por caja**
 
 En `desktop/src/sync-push.mjs`, copiando `sembrarRepartidoresUnaVez` (línea 165) con la clave
-`siembra_zonas_0115`:
+`siembra_zonas_0116`:
 
 ```js
 export async function sembrarZonasUnaVez(db, log = () => {}) {
   await db.query("CREATE TABLE IF NOT EXISTS _vim_zonas_ok (zona_id uuid PRIMARY KEY, subido_at timestamptz DEFAULT now())");
   await db.query("CREATE TABLE IF NOT EXISTS _vim_migraciones_sync (clave text PRIMARY KEY, aplicada_at timestamptz DEFAULT now())");
   const { rowCount: yaCorrio } = await db.query(
-    "SELECT 1 FROM _vim_migraciones_sync WHERE clave = 'siembra_zonas_0115'");
+    "SELECT 1 FROM _vim_migraciones_sync WHERE clave = 'siembra_zonas_0116'");
   if (yaCorrio) return 0;
 
   // Libreta con filas y sin marcador: la escribió el pull, así que el catálogo local ya puede
   // tener un alta hecha en la caja y sin subir. Sembrar ahora la marcaría como enviada — la misma
   // pérdida que esta función existe para impedir.
   const { rowCount: yaTieneFilas } = await db.query("SELECT 1 FROM _vim_zonas_ok LIMIT 1");
-  await db.query("INSERT INTO _vim_migraciones_sync(clave) VALUES ('siembra_zonas_0115') ON CONFLICT DO NOTHING");
+  await db.query("INSERT INTO _vim_migraciones_sync(clave) VALUES ('siembra_zonas_0116') ON CONFLICT DO NOTHING");
   if (yaTieneFilas) {
     log("libreta de zonas ya tenía anotaciones: no se siembra (marcaría un alta local sin subir)");
     return 0;
@@ -1828,7 +1828,7 @@ PR con el cuerpo terminado en
 
 ## Notas de riesgo para quien ejecute
 
-- **El número de migración.** Si otra rama tomó `0115`, renombrar antes de empezar: dos
+- **El número de migración.** Si otra rama tomó `0116`, renombrar antes de empezar: dos
   migraciones con el mismo número se pisan en el despliegue.
 - **Los smokes son el contrato.** Si `smoke_envio.sql` se pone rojo tras un cambio en otra parte,
   lo más probable es que alguien haya metido dinero al ticket sin renglón. Eso rompe el timbrado.

@@ -283,7 +283,7 @@ test("no siembra si la libreta YA tenía anotaciones, aunque no haya marcador", 
   assert.deepEqual(pend.repartidorIds, [A], "el alta local conserva su viaje a la nube");
 });
 
-// Zonas de envío (0115/Task 4): mismo mecanismo que los repartidores (0114), mismo riesgo en los
+// Zonas de envío (0116/Task 4): mismo mecanismo que los repartidores (0114), mismo riesgo en los
 // dos sentidos — marcar de más pierde un alta local para siempre, marcar de menos pisa lo que el
 // panel acaba de editar. Ver `sembrarZonasUnaVez` en sync-push.mjs para el razonamiento completo.
 

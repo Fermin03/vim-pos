@@ -111,7 +111,7 @@ export async function persistirTicket(
   }
 
   // El envío entra DESPUÉS del bucle de renglones: fijar_envio_ticket hereda la tasa de IVA y el
-  // "incluido en precio" del primer renglón de producto (0115_zonas_envio.sql), así que ese
+  // "incluido en precio" del primer renglón de producto (0116_zonas_envio.sql), así que ese
   // renglón tiene que existir ya cuando se llama.
   if (envioZonaId) {
     const { error } = await sb.rpc("fijar_envio_ticket", { p_ticket_id: tid, p_zona_id: envioZonaId });
@@ -160,7 +160,7 @@ export async function leerTotales(token: string, ticketId: string): Promise<Tota
  * en ese caso (para un ticket sin persistir, cambiar de zona es solo un `dispatch`).
  *
  * Si `fijarEnvioTicket` truena (zona inactiva, de otra sucursal, o el ticket ya no está en
- * BORRADOR/ABIERTO — ver `fijar_envio_ticket` en `0115_zonas_envio.sql`), el error se propaga tal
+ * BORRADOR/ABIERTO — ver `fijar_envio_ticket` en `0116_zonas_envio.sql`), el error se propaga tal
  * cual y `leerTotales` nunca se llama: el caller no debe actualizar el carrito con una zona que la
  * base rechazó.
  */

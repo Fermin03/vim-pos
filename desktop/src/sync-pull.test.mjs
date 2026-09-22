@@ -96,7 +96,7 @@ test("un pull sin repartidores no toca la libreta", async () => {
   assert.ok(!client.consultas.some((c) => c.sql.includes("_vim_repartidores_ok")));
 });
 
-// Zonas de envío (0115/Task 4): misma gemela que los repartidores, mirando _vim_zonas_ok.
+// Zonas de envío (0116/Task 4): misma gemela que los repartidores, mirando _vim_zonas_ok.
 //
 // Ronda de arreglos 1/5: la primera versión de estas dos pruebas llamaba a `marcarZonasDelPull`
 // directamente, sin pasar por `pullSnapshot`. Eso no verificaba que el bucle de `pullSnapshot`

@@ -109,7 +109,7 @@ async function asegurarTabla(pool) {
   // cuyo arranque no haya pasado por ahí: sin la tabla, todas las consultas de abajo reventarían.
   await pool.query("CREATE TABLE IF NOT EXISTS _vim_repartidores_ok (repartidor_id uuid PRIMARY KEY, subido_at timestamptz DEFAULT now())");
 
-  // Zonas de envío (0115): mismo mecanismo que los repartidores de arriba, mismo motivo — la caja
+  // Zonas de envío (0116): mismo mecanismo que los repartidores de arriba, mismo motivo — la caja
   // puede darlas de alta (el cajero necesita cobrar un domicilio a una colonia nueva sin esperar al
   // panel) y suben UNA sola vez, por id. Ver `sembrarZonasUnaVez` para la siembra en el arranque.
   await pool.query("CREATE TABLE IF NOT EXISTS _vim_zonas_ok (zona_id uuid PRIMARY KEY, subido_at timestamptz DEFAULT now())");
@@ -274,7 +274,7 @@ export async function sembrarZonasUnaVez(db, log = () => {}) {
     "CREATE TABLE IF NOT EXISTS _vim_migraciones_sync (clave text PRIMARY KEY, aplicada_at timestamptz DEFAULT now())",
   );
   const { rowCount: yaCorrio } = await db.query(
-    "SELECT 1 FROM _vim_migraciones_sync WHERE clave = 'siembra_zonas_0115'",
+    "SELECT 1 FROM _vim_migraciones_sync WHERE clave = 'siembra_zonas_0116'",
   );
   if (yaCorrio) return 0;
 
@@ -285,7 +285,7 @@ export async function sembrarZonasUnaVez(db, log = () => {}) {
   const { rowCount: yaTieneFilas } = await db.query("SELECT 1 FROM _vim_zonas_ok LIMIT 1");
 
   await db.query(
-    "INSERT INTO _vim_migraciones_sync(clave) VALUES ('siembra_zonas_0115') ON CONFLICT DO NOTHING",
+    "INSERT INTO _vim_migraciones_sync(clave) VALUES ('siembra_zonas_0116') ON CONFLICT DO NOTHING",
   );
 
   // Se marca igual, para no volver a mirarlo en cada arranque.
@@ -669,7 +669,7 @@ export async function pushToCloud(pool, opts, log = () => {}, cfg = {}) {
   // Un cierre de turno SIN ventas nuevas también es algo que subir. Cuando esta condición solo
   // miraba los tickets, el cierre se quedaba en la caja y la nube nunca se enteraba. Lo mismo pasa
   // con un movimiento de inventario suelto (ADR 0013), con un repartidor dado de alta a media
-  // jornada (0114/Task 2) y con una zona de envío dada de alta igual (0115/Task 4): sin
+  // jornada (0114/Task 2) y con una zona de envío dada de alta igual (0116/Task 4): sin
   // `!repartidorIds.length` ni `!zonaIds.length`, una alta que cae justo cuando no hay ventas,
   // turnos cambiados NI movimientos pendientes hacía volver esta guarda antes de llegar a
   // construirSnapshotPush, y se quedaba atorada en la caja hasta que ALGO ajeno volviera a hacerla

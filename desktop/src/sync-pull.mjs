@@ -10,7 +10,7 @@
 export const PULL_ORDER = [
   { t: "tenants" },
   { t: "sucursales" },
-  // Zonas de envío (0115): FK a sucursales, así que van justo después de su padre.
+  // Zonas de envío (0116): FK a sucursales, así que van justo después de su padre.
   { t: "zonas_envio" },
   { t: "cajas" },
   { t: "areas_cocina" },
