@@ -44,6 +44,8 @@ export type LineaImpresion = {
   grupoNombre?: string | null;
   /** Modificadores con costo del renglón: el ticket los imprime con importe. */
   extras?: { nombre: string; importeMxn: number }[];
+  /** 'ENVIO' = cargo, no comida: se imprime en el ticket del cliente pero nunca en la comanda. */
+  cargoTipo?: string | null;
 };
 
 export type PagoImpresion = {

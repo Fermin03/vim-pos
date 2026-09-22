@@ -242,3 +242,20 @@ describe("lineasParaComanda", () => {
     expect(job.bloques).toContainEqual({ t: "texto", valor: "  ↳ Combo #1", size: 1, bold: true });
   });
 });
+
+describe("cargos", () => {
+  it("el envío no llega a la comanda: la plancha no prepara un reparto", () => {
+    const lineas: LineaImpresion[] = [
+      { id: "1", cantidad: 1, nombre: "Hamburguesa Clásica", totalMxn: 120, modificadores: [], notaCocina: null },
+      { id: "2", cantidad: 1, nombre: "Envío · Zona Norte", totalMxn: 35, modificadores: [], notaCocina: null, cargoTipo: "ENVIO" },
+    ];
+    expect(lineasParaComanda(lineas).map((l) => l.nombre)).toEqual(["Hamburguesa Clásica"]);
+  });
+
+  it("un pedido que es SOLO envío no produce comanda con renglones", () => {
+    const lineas: LineaImpresion[] = [
+      { id: "1", cantidad: 1, nombre: "Envío · Centro", totalMxn: 0, modificadores: [], notaCocina: null, cargoTipo: "ENVIO" },
+    ];
+    expect(lineasParaComanda(lineas)).toEqual([]);
+  });
+});

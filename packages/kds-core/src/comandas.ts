@@ -42,7 +42,7 @@ export async function leerComandas(token: string, sucursalId: string): Promise<C
     .select(
       "id, folio_completo, modo_servicio, estado_cocina, fecha_envio_cocina, nota_general, " +
         "ticket_items(id, cantidad, producto_nombre_snapshot, nota_cocina, cancelado, area_cocina_nombre_snapshot, " +
-        "parent_item_id, combo_rol, orden_visualizacion, ticket_item_modificadores(opcion_nombre_snapshot))",
+        "parent_item_id, combo_rol, orden_visualizacion, cargo_tipo, ticket_item_modificadores(opcion_nombre_snapshot))",
     )
     .eq("sucursal_id", sucursalId)
     .in("estado_cocina", ["EN_COCINA", "LISTO"])
@@ -67,6 +67,7 @@ export async function leerComandas(token: string, sucursalId: string): Promise<C
           parent_item_id: string | null;
           combo_rol: "PADRE" | "HIJO" | null;
           orden_visualizacion: number;
+          cargo_tipo: string | null;
           ticket_item_modificadores: { opcion_nombre_snapshot: string }[] | null;
         }[]
       | null;
@@ -81,7 +82,14 @@ export async function leerComandas(token: string, sucursalId: string): Promise<C
     // Entre PADRES y no entre "todos los renglones no-hijo vivos": esta pantalla recalcula en vivo
     // y el papel ya se imprimió. Cancelar un producto suelto que estuviera encima del combo
     // renumeraba aquí y no allá, y la plancha y la barra acababan mirando números distintos.
-    const vivos = (t.ticket_items ?? []).filter((i) => !i.cancelado).sort((a, b) => a.orden_visualizacion - b.orden_visualizacion);
+    //
+    // `!i.cargo_tipo` fuera de "vivos" también: un cargo (envío) no es comida, nunca es PADRE/HIJO,
+    // así que quitarlo aquí no mueve la numeración de combos. Filtra por `cargo_tipo`, no por
+    // `producto_id` — un producto borrado del catálogo también deja ese campo en null, y "sin
+    // producto" no es lo mismo que "es un cargo". Misma regla en `comanda-builder.ts`.
+    const vivos = (t.ticket_items ?? [])
+      .filter((i) => !i.cancelado && !i.cargo_tipo)
+      .sort((a, b) => a.orden_visualizacion - b.orden_visualizacion);
     const numero = new Map<string, number>();
     const ctxPadre = new Map<string, string[]>();
     let n = 0;

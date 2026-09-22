@@ -250,6 +250,22 @@ describe("construirTicketJob — QR de autofacturación opcional", () => {
   });
 });
 
+describe("construirTicketJob — cargos (envío)", () => {
+  it("el cargo de envío sí se imprime en el ticket del cliente", () => {
+    const conEnvio: DatosTicketImpresion = {
+      ...DATOS,
+      lineas: [
+        ...DATOS.lineas,
+        { cantidad: 1, nombre: "Envío · Zona Norte", totalMxn: 35, modificadores: [], notaCocina: null, cargoTipo: "ENVIO" },
+      ],
+      totales: { ...DATOS.totales, total: 143 },
+    };
+    const job = construirTicketJob(conEnvio);
+    expect(job.bloques).toContainEqual({ t: "fila", izq: "1x Envío · Zona Norte", der: "$35.00" });
+    expect(job.bloques).toContainEqual({ t: "fila", izq: "TOTAL", der: "$143.00", bold: true });
+  });
+});
+
 describe("debeImprimirTicketAlCobrar — qué modo saca papel al cobrar", () => {
   it("Para llevar SÍ: va del carrito al cobro y no hay otro momento para imprimirlo", () => {
     expect(debeImprimirTicketAlCobrar("PARA_LLEVAR")).toBe(true);

@@ -58,7 +58,7 @@ export async function leerTicketParaImpresion(ticketId: string, ctx: Ctx): Promi
   const { data: items, error: e2 } = await sb
     .from("ticket_items")
     .select(
-      "id, producto_nombre_snapshot, cantidad, total_item_mxn, nota_cocina, " +
+      "id, producto_nombre_snapshot, cantidad, total_item_mxn, nota_cocina, cargo_tipo, " +
         "parent_item_id, combo_rol, combo_grupo_nombre_snapshot, " +
         "ticket_item_modificadores(opcion_nombre_snapshot, precio_extra_snapshot, cantidad), " +
         // El área se resuelve aquí, con el ticket: producto primero, categoría si el producto no
@@ -80,6 +80,7 @@ export async function leerTicketParaImpresion(ticketId: string, ctx: Ctx): Promi
     // de error genérico. La forma real es la de abajo.
     const r = it as unknown as {
       id: string; producto_nombre_snapshot: string; cantidad: number; total_item_mxn: string | number; nota_cocina: string | null;
+      cargo_tipo: string | null;
       parent_item_id: string | null; combo_rol: "PADRE" | "HIJO" | null; combo_grupo_nombre_snapshot: string | null;
       ticket_item_modificadores: Mod[] | null; producto: Prod;
     };
@@ -100,6 +101,7 @@ export async function leerTicketParaImpresion(ticketId: string, ctx: Ctx): Promi
       comboRol: (r.combo_rol as "PADRE" | "HIJO" | null) ?? null,
       parentId: (r.parent_item_id as string) ?? null,
       grupoNombre: (r.combo_grupo_nombre_snapshot as string) ?? null,
+      cargoTipo: (r.cargo_tipo as string) ?? null,
       extras: (r.ticket_item_modificadores ?? [])
         .filter((m) => Number(m.precio_extra_snapshot ?? 0) > 0)
         .map((m) => ({ nombre: m.opcion_nombre_snapshot, importeMxn: Number(m.precio_extra_snapshot) * Number(m.cantidad ?? 1) * Number(r.cantidad) })),
