@@ -19,6 +19,8 @@ Cada archivo dice **qué decía el plan, qué hacemos hoy y por qué**. Manda lo
 | [0013](0013-el-inventario-viaja-por-movimientos.md) | El inventario viaja por movimientos: la caja los sube, la nube recalcula | 04/09/2026 |
 | [0014](0014-el-panel-manda-a-la-caja-por-latido.md) | El panel manda a la caja por latido: bloqueo con gracia, módulos, avisos y versiones | 04/09/2026 |
 | [0015](0015-los-combos-son-un-producto-con-slots.md) | Los combos son un producto con slots: el padre cobra, los hijos cocinan y descuentan | 08/09/2026 |
+| [0016](0016-un-viaje-es-una-columna-no-una-tabla.md) | Un viaje es una columna, no una tabla: y asignar ES salir | 20/09/2026 |
+| [0017](0017-el-envio-es-un-renglon.md) | El envío es un renglón, no una columna | 22/09/2026 |
 
 ## Pendientes de escribir
 
