@@ -16,14 +16,14 @@ const DIR_VACIA: DireccionInput = { etiqueta: "Casa", calle: "", numero: "", col
 
 /** Campos de una dirección (compartidos entre "cliente nuevo" y "agregar dirección"). */
 function CamposDireccion({
-  dir, onCambio, token, tenantId, sucursalId, cajaId, turnoId, empleadoNombre, zonas, onZonaCreada,
+  dir, onCambio, token, tenantId, sucursalId, cajaId, turnoId, empleadoNombre, zonas, onZonaSincronizada,
 }: {
   dir: DireccionInput;
   onCambio: (d: DireccionInput) => void;
   token: string; tenantId: string; sucursalId: string; cajaId: string; turnoId: string;
   empleadoNombre: string;
   zonas: ZonaEnvio[];
-  onZonaCreada: (z: ZonaEnvio) => void;
+  onZonaSincronizada: (z: ZonaEnvio) => void;
 }) {
   return (
     <>
@@ -52,7 +52,7 @@ function CamposDireccion({
           zonas={zonas}
           valor={dir.zona?.id ?? null}
           onCambio={(z) => onCambio({ ...dir, zona: z })}
-          onZonaCreada={onZonaCreada}
+          onZonaSincronizada={onZonaSincronizada}
         />
       </div>
     </>
@@ -106,18 +106,24 @@ export function ModalClienteDomicilio({
   // `validarDir` necesita saber si el negocio tiene zonas, y este modal monta el selector dos
   // veces (cliente nuevo y dirección alterna) — cargarlo adentro lo duplicaría.
   const [zonas, setZonas] = useState<ZonaEnvio[]>([]);
+  // Si `listarZonas` falla, fallamos abierto (no bloquear el CRM de domicilio por un problema de
+  // red) pero NO en silencio: sin este aviso, `zonas` se queda en [] y `validarDir` concluye que
+  // el negocio no tiene zonas, así que el pedido saldría sin cargo de envío sin que nadie se entere.
+  const [avisoZonas, setAvisoZonas] = useState<string | null>(null);
   useEffect(() => {
-    // Un error aquí no debe bloquear el CRM de domicilio: se trata igual que "sin zonas" (fail
-    // open). Es justo lo que ya hacía la caja antes de esta entrega.
-    listarZonas(token, sucursalId).then(setZonas).catch(() => {});
+    setAvisoZonas(null);
+    listarZonas(token, sucursalId)
+      .then(setZonas)
+      .catch(() => setAvisoZonas("No se pudieron cargar las zonas de reparto. Si el negocio ya tiene zonas, revisa la conexión antes de continuar."));
   }, [token, sucursalId]);
 
-  /** Alta o repreciado de zona: upsert por id en el catálogo local del modal. */
-  function onZonaCreada(z: ZonaEnvio) {
+  /** Alta o repreciado de zona: upsert por id en el catálogo local del modal. Sin reordenar: la
+   *  carga inicial ya viene en el orden que configuró el dueño (orden, luego nombre); resortear
+   *  aquí lo perdería en la primera alta o repreciado de la sesión. */
+  function onZonaSincronizada(z: ZonaEnvio) {
     setZonas((zs) => {
       const existe = zs.some((x) => x.id === z.id);
-      const siguiente = existe ? zs.map((x) => (x.id === z.id ? z : x)) : [...zs, z];
-      return siguiente.slice().sort((a, b) => a.nombre.localeCompare(b.nombre));
+      return existe ? zs.map((x) => (x.id === z.id ? z : x)) : [...zs, z];
     });
   }
 
@@ -213,6 +219,12 @@ export function ModalClienteDomicilio({
         )}
       </div>
 
+      {avisoZonas && (
+        <div className="mb-3 rounded border border-[#E8DCC0] bg-[#F6EEDD] px-3 py-2 text-[12.5px] font-medium text-warning" role="alert">
+          {avisoZonas}
+        </div>
+      )}
+
       {zonaPendiente ? (
         /* ── Esta dirección es de antes de las zonas: se le asigna una antes de continuar ── */
         <div className="flex flex-col gap-2.5">
@@ -227,7 +239,7 @@ export function ModalClienteDomicilio({
             zonas={zonas}
             valor={null}
             onCambio={(z) => { if (z) void confirmarZonaPendiente(z); }}
-            onZonaCreada={onZonaCreada}
+            onZonaSincronizada={onZonaSincronizada}
           />
         </div>
       ) : agregandoA ? (
@@ -236,7 +248,7 @@ export function ModalClienteDomicilio({
           <CamposDireccion
             dir={dirNueva} onCambio={setDirNueva}
             token={token} tenantId={tenantId} sucursalId={sucursalId} cajaId={cajaId} turnoId={turnoId}
-            empleadoNombre={empleadoNombre} zonas={zonas} onZonaCreada={onZonaCreada}
+            empleadoNombre={empleadoNombre} zonas={zonas} onZonaSincronizada={onZonaSincronizada}
           />
           <p className="text-[11.5px] text-ink-3">CP, ciudad y estado se toman de la sucursal (editable luego en el admin).</p>
         </div>
@@ -289,7 +301,7 @@ export function ModalClienteDomicilio({
           <CamposDireccion
             dir={dir} onCambio={setDir}
             token={token} tenantId={tenantId} sucursalId={sucursalId} cajaId={cajaId} turnoId={turnoId}
-            empleadoNombre={empleadoNombre} zonas={zonas} onZonaCreada={onZonaCreada}
+            empleadoNombre={empleadoNombre} zonas={zonas} onZonaSincronizada={onZonaSincronizada}
           />
           <p className="text-[11.5px] text-ink-3">CP, ciudad y estado se toman de la sucursal. Podrás agregarle más direcciones después (Casa, Oficina…).</p>
         </div>
