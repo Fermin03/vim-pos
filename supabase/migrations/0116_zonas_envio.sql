@@ -89,7 +89,8 @@ CREATE UNIQUE INDEX IF NOT EXISTS ticket_envio_unico
 -- fijar_envio_ticket(ticket, zona) — punto único por el que entra y sale el cargo.
 --
 -- Idempotente: llamarla dos veces con la misma zona deja el mismo renglón. Con otra zona, lo
--- reprecia. Con NULL, lo borra.
+-- reprecia. Con NULL, lo borra. Con una zona de $0, fija la zona en el ticket SIN renglón (y borra
+-- el que hubiera): devuelve el id del renglón, o NULL cuando no queda ninguno.
 --
 -- BORRA en lugar de cancelar a propósito: un cargo retirado antes de cobrar no es una venta
 -- cancelada y no tiene por qué aparecer en los reportes de cancelaciones. El trigger
@@ -169,6 +170,26 @@ BEGIN
     RAISE EXCEPTION 'Zona de envío % no existe, está inactiva o no es de esta sucursal', p_zona_id;
   END IF;
 
+  -- Zona gratis: la zona se registra en el ticket (reportes por zona) pero NO hay renglón. Un
+  -- concepto de $0 no timbra —el Anexo 20 exige base > 0 y armarConceptos solo pliega renglones
+  -- sin dinero cuando son hijos de combo—, así que un renglón de "Envío · Centro $0.00" dejaría el
+  -- ticket sin poder facturarse. Si la zona anterior sí cobraba, su renglón se borra.
+  IF v_zona.costo_mxn = 0 THEN
+    IF v_item IS NOT NULL THEN
+      DELETE FROM ticket_items WHERE id = v_item;
+      GET DIAGNOSTICS v_filas = ROW_COUNT;
+      IF v_filas <> 1 THEN
+        RAISE EXCEPTION 'No se pudo quitar el renglón de envío % (filas afectadas: %)', v_item, v_filas;
+      END IF;
+    END IF;
+    UPDATE tickets SET zona_envio_id = v_zona.id, updated_at = now() WHERE id = p_ticket_id;
+    GET DIAGNOSTICS v_filas = ROW_COUNT;
+    IF v_filas <> 1 THEN
+      RAISE EXCEPTION 'No se pudo fijar la zona del ticket % (filas afectadas: %)', p_ticket_id, v_filas;
+    END IF;
+    RETURN NULL;
+  END IF;
+
   -- La política fiscal del envío es la del ticket, no una constante: un negocio que factura con
   -- IVA por afuera tendría si no un envío incoherente con su propia comida.
   SELECT tasa_iva_snapshot, iva_incluido_en_precio_snapshot
@@ -221,7 +242,7 @@ BEGIN
 END;
 $$;
 
-COMMENT ON FUNCTION fijar_envio_ticket IS 'Fija (o quita, con zona NULL) el renglón de envío de un ticket de domicilio. Idempotente. Los totales los recalcula el trigger de ticket_items.';
+COMMENT ON FUNCTION fijar_envio_ticket IS 'Fija (o quita, con zona NULL) el renglón de envío de un ticket de domicilio. Una zona de $0 se registra en el ticket sin renglón (un concepto de base 0 no timbra). Idempotente. Los totales los recalcula el trigger de ticket_items.';
 
 -- Definer: fuera `public`/`anon` (el EXECUTE por omisión es de PUBLIC). La guarda de tenant ya los
 -- rechazaría, pero una RPC que se salta RLS no se deja abierta a quien no tiene sesión.

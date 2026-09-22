@@ -132,15 +132,30 @@ BEGIN
   IF (SELECT zona_envio_id FROM tickets WHERE id = v_ticket) IS NOT NULL
     THEN RAISE EXCEPTION 'el ticket conservó la zona tras quitar el envío'; END IF;
 
-  -- 5) Zona de $0: hay renglón y el total no cambia
-  PERFORM fijar_envio_ticket(v_ticket, v_z_centro);
+  -- 5) Zona de $0: NO hay renglón (un concepto de base 0 no timbra: Anexo 20 exige base > 0, y
+  --    armarConceptos solo pliega los renglones sin dinero que son hijos de combo), el total no
+  --    cambia y la zona SÍ queda en el ticket, para los reportes por zona.
+  IF fijar_envio_ticket(v_ticket, v_z_centro) IS NOT NULL
+    THEN RAISE EXCEPTION 'zona gratis: sin renglón no hay id que devolver'; END IF;
   SELECT total_mxn INTO v_total FROM tickets WHERE id = v_ticket;
   IF v_total <> 240.00 THEN RAISE EXCEPTION 'zona gratis: esperaba 240.00, got %', v_total; END IF;
-  SELECT count(*) INTO v_n FROM ticket_items
-   WHERE ticket_id = v_ticket AND cargo_tipo = 'ENVIO' AND cancelado = false;
-  IF v_n <> 1 THEN RAISE EXCEPTION 'la zona gratis también deja renglón (el cliente ve que no pagó envío)'; END IF;
+  SELECT count(*) INTO v_n FROM ticket_items WHERE ticket_id = v_ticket AND cargo_tipo = 'ENVIO';
+  IF v_n <> 0 THEN RAISE EXCEPTION 'la zona gratis dejó % renglón(es) de $0: ese ticket no se podría facturar', v_n; END IF;
+  IF (SELECT zona_envio_id FROM tickets WHERE id = v_ticket) IS DISTINCT FROM v_z_centro
+    THEN RAISE EXCEPTION 'zona gratis: el ticket no guardó la zona'; END IF;
 
-  -- 6) El IVA se hereda del ticket, no es una constante
+  -- 5b) De $35 a $0: el renglón que ya existía desaparece
+  PERFORM fijar_envio_ticket(v_ticket, v_z_norte);
+  PERFORM fijar_envio_ticket(v_ticket, v_z_centro);
+  SELECT total_mxn INTO v_total FROM tickets WHERE id = v_ticket;
+  IF v_total <> 240.00 THEN RAISE EXCEPTION 'de $35 a $0: esperaba 240.00, got %', v_total; END IF;
+  SELECT count(*) INTO v_n FROM ticket_items WHERE ticket_id = v_ticket AND cargo_tipo = 'ENVIO';
+  IF v_n <> 0 THEN RAISE EXCEPTION 'de $35 a $0: el renglón de envío debía desaparecer, quedan %', v_n; END IF;
+  IF (SELECT zona_envio_id FROM tickets WHERE id = v_ticket) IS DISTINCT FROM v_z_centro
+    THEN RAISE EXCEPTION 'de $35 a $0: el ticket no guardó la zona gratis'; END IF;
+
+  -- 6) El IVA se hereda del ticket, no es una constante (con una zona que sí cobra)
+  PERFORM fijar_envio_ticket(v_ticket, v_z_norte);
   SELECT iva_incluido_en_precio_snapshot INTO v_iva_incl
     FROM ticket_items WHERE ticket_id = v_ticket AND cargo_tipo = 'ENVIO';
   IF v_iva_incl IS DISTINCT FROM (SELECT iva_incluido_en_precio_snapshot FROM ticket_items
@@ -335,6 +350,15 @@ BEGIN
   SELECT count(*) INTO v_n FROM ticket_items
    WHERE ticket_id = v_ticket AND cargo_tipo = 'ENVIO' AND cancelado = false;
   IF v_n <> 1 THEN RAISE EXCEPTION 'RLS b) esperaba 1 renglón de envío, hay %', v_n; END IF;
+
+  -- b2) Zona gratis bajo RLS: el renglón que había desaparece y la zona queda
+  PERFORM fijar_envio_ticket(v_ticket, current_setting('smoke_envio.z_gratis')::uuid);
+  SELECT count(*) INTO v_n FROM ticket_items WHERE ticket_id = v_ticket AND cargo_tipo = 'ENVIO';
+  SELECT total_mxn INTO v_total FROM tickets WHERE id = v_ticket;
+  IF v_n <> 0 OR v_total <> 240.00 THEN
+    RAISE EXCEPTION 'RLS b2) zona gratis dejó % renglón(es) ENVIO y total % (esperaba 0 y 240.00)', v_n, v_total;
+  END IF;
+  PERFORM fijar_envio_ticket(v_ticket, v_lejos);
 
   -- c) Quitarla: el total vuelve y NO queda renglón
   PERFORM fijar_envio_ticket(v_ticket, NULL);

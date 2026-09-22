@@ -162,8 +162,18 @@ Reglas:
 6. Escribe `tickets.zona_envio_id`.
 7. La zona debe ser del mismo tenant, estar viva y activa, y pertenecer a la sucursal del ticket.
 
-Un cargo con `costo_mxn = 0` **sí** inserta renglón: el ticket dice "Envío · Centro $0.00", que es
-información, no ruido — el cliente ve que no le cobraron el envío.
+Una zona con `costo_mxn = 0` **no** inserta renglón: fija `tickets.zona_envio_id` (la zona queda
+registrada para reportes) y, si existía un renglón de una zona anterior que sí cobraba, lo borra.
+Devuelve `NULL`. *(Corregido en la revisión final de la rama: la versión anterior insertaba
+"Envío · Centro $0.00". Un renglón suelto sin dinero sale al CFDI como concepto de base 0 —
+`armarConceptos` solo pliega los renglones sin dinero que son hijos de combo— y el Anexo 20 exige
+base > 0: ese ticket no se podría facturar. No insertar el renglón evita tocar el CFDI y las Edge
+Functions en producción.)* Al reabrir la cuenta, el POS reconstruye la zona gratis desde
+`tickets.zona_envio_id` (`envioReconstruido` en `cuenta-mesa.ts`), para que siga visible a $0.
+
+La función es `SECURITY DEFINER` con `search_path` fijo y guarda de tenant explícita: como invoker,
+la política `ticket_items_delete` (solo tickets en `BORRADOR`) hacía que quitar el envío de un
+ticket `ABIERTO` afectara cero filas sin error. Cada escritura comprueba sus filas afectadas.
 
 ### 4.5 El catálogo viaja en los dos sentidos
 

@@ -106,6 +106,24 @@ export function envioDeFilas(filas: FilaItemPersistido[]): EnvioCarrito | null {
   return { zonaId: "", nombre: f.producto_nombre_snapshot, costoMxn: Number(f.precio_unitario_snapshot) };
 }
 
+/** Lo que `reconstruirCarrito` lee del ticket para recuperar su envío. */
+export type TicketEnvioPersistido = { zona_envio_id: string | null; zonas_envio: { nombre: string } | null } | null;
+
+/**
+ * El envío de un ticket persistido, con renglón o sin él.
+ *
+ * Una zona de $0 NO deja renglón (un concepto de base 0 no timbra; ver `fijar_envio_ticket` en la
+ * 0116), pero sí queda en `tickets.zona_envio_id`. Sin este respaldo, al reabrir la cuenta la zona
+ * desaparecería de pantalla y el cajero no sabría que ya la eligió.
+ */
+export function envioReconstruido(filas: FilaItemPersistido[], ticket: TicketEnvioPersistido): EnvioCarrito | null {
+  const zonaId = ticket?.zona_envio_id ?? null;
+  const renglon = envioDeFilas(filas);
+  if (renglon) return { ...renglon, zonaId: String(zonaId ?? "") };
+  if (zonaId && ticket?.zonas_envio) return { zonaId, nombre: ticket.zonas_envio.nombre, costoMxn: 0 };
+  return null;
+}
+
 /**
  * Reconstruye las líneas del carrito desde un ticket persistido, casando producto_id con el
  * catálogo cargado. Items cancelados se omiten. Devuelve también el modo de servicio y, si el
@@ -118,7 +136,7 @@ export async function reconstruirCarrito(
   combos: ComboDef[] = [],
 ): Promise<{ lineas: LineaCarrito[]; modoServicio: ModoServicio; envio: EnvioCarrito | null }> {
   const sb = employeeClient(token);
-  const { data: ticket } = await sb.from("tickets").select("modo_servicio, zona_envio_id").eq("id", ticketId).maybeSingle();
+  const { data: ticket } = await sb.from("tickets").select("modo_servicio, zona_envio_id, zonas_envio(nombre)").eq("id", ticketId).maybeSingle();
   const modo = mapearModo((ticket?.modo_servicio as string) ?? "MESA");
 
   const { data, error } = await sb
@@ -130,11 +148,10 @@ export async function reconstruirCarrito(
 
   const filas = (data ?? []) as unknown as FilaItemPersistido[];
   const porId = new Map(productos.map((p) => [p.id, p]));
-  const envio = envioDeFilas(filas);
   return {
     lineas: agruparPadresHijos(filas.filter((r) => !r.cargo_tipo), porId, combos),
     modoServicio: modo,
-    envio: envio ? { ...envio, zonaId: String(ticket?.zona_envio_id ?? "") } : null,
+    envio: envioReconstruido(filas, (ticket ?? null) as unknown as TicketEnvioPersistido),
   };
 }
 

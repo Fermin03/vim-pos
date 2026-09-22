@@ -64,6 +64,13 @@ cualquier otro concepto: cuadra por construcción, sin tocar el armador.
   `apps/pos/app/lib/print/comanda-builder.ts` descartan los renglones con `cargo_tipo = 'ENVIO'`
   al armar lo que va a cocina: el envío no es comida, no se prepara y no debe llegarle al cocinero
   como si fuera un platillo.
+- **Una zona de $0 no deja renglón.** `fijar_envio_ticket` registra la zona en
+  `tickets.zona_envio_id` y no inserta nada (y borra el renglón de la zona anterior, si cobraba).
+  Un renglón suelto de $0 llegaría al CFDI como concepto de base 0 —`armarConceptos` solo pliega
+  renglones sin dinero cuando son hijos de combo— y el Anexo 20 exige base > 0: el ticket no se
+  podría facturar. Así el armador y las Edge Functions en producción no cambian. El precio de esa
+  decisión es que el ticket impreso no dice "envío $0.00"; la zona se sigue viendo en el POS
+  (se reconstruye desde `tickets.zona_envio_id`) y en los reportes por zona.
 - **El IVA del envío se hereda del primer renglón vivo del ticket**, no de una constante. Un
   cargo con tasa o política de IVA fija rompería a cualquier tenant que facture con IVA por
   afuera; heredar del ticket lo mantiene consistente con el resto de la venta.

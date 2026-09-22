@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { agruparPadresHijos, envioDeFilas, type FilaItemPersistido } from "../cuenta-mesa";
+import { agruparPadresHijos, envioDeFilas, envioReconstruido, type FilaItemPersistido } from "../cuenta-mesa";
 import type { Producto } from "../catalogo";
 import type { ComboDef } from "../combos";
 
@@ -58,5 +58,27 @@ describe("agruparPadresHijos", () => {
     ];
     expect(envioDeFilas(filas)).toEqual({ zonaId: "", nombre: "Envío · Zona Norte", costoMxn: 35 });
     expect(agruparPadresHijos(filas.filter((f) => !f.cargo_tipo), porId, [def]).length).toBe(1);
+  });
+});
+
+describe("envioReconstruido", () => {
+  const renglonEnvio = fila({ id: "e", producto_id: null, cargo_tipo: "ENVIO", precio_unitario_snapshot: 35, producto_nombre_snapshot: "Envío · Zona Norte" });
+
+  it("con renglón de envío, toma el importe congelado y la zona del ticket", () => {
+    const e = envioReconstruido([renglonEnvio], { zona_envio_id: "z1", zonas_envio: { nombre: "Zona Norte" } });
+    expect(e?.zonaId).toBe("z1");
+    expect(e?.costoMxn).toBe(35);
+  });
+
+  it("zona gratis: sin renglón pero con zona en el ticket, la zona sigue visible a $0", () => {
+    // La RPC no inserta renglón de $0 (no timbraría); sin esto, al reabrir la cuenta la zona
+    // desaparecería de la pantalla aunque siga registrada en el ticket.
+    expect(envioReconstruido([], { zona_envio_id: "z0", zonas_envio: { nombre: "Centro" } }))
+      .toEqual({ zonaId: "z0", nombre: "Centro", costoMxn: 0 });
+  });
+
+  it("sin renglón y sin zona no hay envío", () => {
+    expect(envioReconstruido([], { zona_envio_id: null, zonas_envio: null })).toBeNull();
+    expect(envioReconstruido([], null)).toBeNull();
   });
 });
