@@ -1673,6 +1673,9 @@ export function HomePos({
           token={token}
           tenantId={caja.tenant_id}
           sucursalId={caja.sucursal_id}
+          cajaId={turno.caja_id}
+          turnoId={turno.id}
+          empleadoNombre={empleado.nombre}
           onSeleccionar={(c) => { dispatch({ tipo: "cliente", cliente: c }); setClienteDomAbierto(false); }}
           onCerrar={() => setClienteDomAbierto(false)}
         />
