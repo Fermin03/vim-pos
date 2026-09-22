@@ -3,7 +3,7 @@
 //    gateway) + UI del POS. Hace de HUB en la LAN. Fase 3: bandeja (no se apaga por accidente) +
 //    watchdog (se auto-recupera) + respaldo del pgdata al cerrar y bajo demanda.
 //  • COCINA (--role=cocina): pantalla de cocina como CLIENTE DELGADO del hub. SIN backend local.
-import { app, BrowserWindow, Tray, Menu, nativeImage, clipboard, Notification, dialog, shell, safeStorage } from "electron";
+import { app, BrowserWindow, Tray, Menu, nativeImage, clipboard, Notification, dialog, shell, safeStorage, ipcMain } from "electron";
 import { existsSync, readFileSync, writeFileSync, mkdirSync, openSync, writeSync } from "node:fs";
 import { inspect } from "node:util";
 import path from "node:path";
@@ -97,6 +97,16 @@ let watchdog;
 let opcionesBackend = {};   // para poder re-arrancar el backend igual (watchdog / respaldo)
 let backupsDir = null;
 let saliendoDeVerdad = false; // distinguir "cerrar ventana" (→ bandeja) de "salir de verdad"
+
+// Salir desde el POS (botón de la barra inferior). Mismo camino que "Salir (apaga la caja)" de la
+// bandeja: marcar la intención —si no, `close` solo esconde la ventana— y dejar que `before-quit`
+// haga `cerrarTodo()`, que detiene sync, watchdog y ui-server, apaga Postgres y respalda en frío.
+// Existía solo en la bandeja, que un cajero no conoce; la única salida que tenía a mano era la X,
+// y esa no cierra nada.
+ipcMain.handle("vim:salir", () => {
+  saliendoDeVerdad = true;
+  app.quit();
+});
 let arrancado = false;        // ya terminó el boot: después, un rechazo suelto no debe matar la caja
 let respaldando = false;
 let updateInfo = null;        // manifiesto de la actualización disponible (o null)

@@ -69,6 +69,16 @@ app.whenReady().then(async () => {
     return "contextBridge OK";
   });
 
+  await prueba("el preload expone la salida de la caja", async () => {
+    // El POS pinta el botón "Salir" SOLO si existe esta función, porque es lo único que distingue
+    // esta ventana de un cliente de la LAN (`__VIM_DESKTOP` también se le inyecta a la cocina).
+    // Si el preload deja de publicarla, el botón desaparece sin que falle nada más: la única
+    // salida vuelve a ser el menú de la bandeja, que es justo lo que se quiso dejar de necesitar.
+    const v = await win.webContents.executeJavaScript("typeof window.__VIM_SALIR === 'function'");
+    if (v !== true) throw new Error("el preload no publicó __VIM_SALIR: el POS no podrá cerrar la caja");
+    return "__VIM_SALIR OK";
+  });
+
   await prueba("nativeImage + Tray + Menu (systray de la caja)", () => {
     const icono = path.join(__dirname, "..", "build", "tray.png");
     if (!existsSync(icono)) throw new Error("falta build/tray.png");

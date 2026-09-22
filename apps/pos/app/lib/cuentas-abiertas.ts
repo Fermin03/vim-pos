@@ -253,7 +253,7 @@ export async function listarCuentasQueBloqueanCorte(
 export async function leerEntregaCuenta(
   token: string,
   ticketId: string,
-): Promise<{ cliente: string | null; telefono: string | null; direccion: string | null; referencias: string | null; notasRepartidor: string | null } | null> {
+): Promise<{ cliente: string | null; telefono: string | null; direccion: string | null; referencias: string | null; notasRepartidor: string | null; repartidor: string | null } | null> {
   const sb = employeeClient(token);
   const { data, error } = await sb
     .from("tickets")
@@ -263,5 +263,5 @@ export async function leerEntregaCuenta(
   if (error) throw new Error(error.message);
   const t = (data ?? null) as { cliente_id: string | null; direccion_entrega_id: string | null; modo_servicio: string } | null;
   if (!t || t.modo_servicio !== "DELIVERY_PROPIO") return null;
-  return leerEntrega(sb, t.cliente_id, t.direccion_entrega_id);
+  return leerEntrega(sb, ticketId, t.cliente_id, t.direccion_entrega_id);
 }

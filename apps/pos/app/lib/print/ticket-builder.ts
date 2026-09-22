@@ -32,6 +32,11 @@ export function construirTicketJob(d: DatosTicketImpresion, logo?: Bloque | null
   b.push({ t: "fila", izq: "Fecha", der: formatoFecha(d.meta.fechaIso) });
   b.push({ t: "fila", izq: "Ticket", der: `#${folioCorto(d.meta.folio)}` });
   b.push({ t: "fila", izq: "Cajero", der: d.meta.cajero });
+  // Quién se lo lleva, junto a quién lo cobró: las dos personas de las que hay que responder por
+  // este papel. Se lee de `entrega` —donde vive lo del domicilio— pero se imprime aquí arriba,
+  // porque es dato de la cuenta y no una indicación para llegar. Falta si el ticket se imprimió
+  // antes de asignar: imprimir y asignar son acciones sueltas y ese orden es válido.
+  if (d.entrega?.repartidor) b.push({ t: "fila", izq: "Repartidor", der: d.entrega.repartidor, bold: true });
   b.push({ t: "fila", izq: "Caja", der: d.meta.caja });
   if (d.meta.modoServicio) b.push({ t: "fila", izq: "Servicio", der: d.meta.modoServicio });
   // Nombre suelto de la cuenta (Pick-up): es como se identifica el pedido al entregarlo.

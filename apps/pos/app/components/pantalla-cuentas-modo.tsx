@@ -7,13 +7,11 @@ import { fmtMxn, type DatosCaja, type Turno } from "../lib/turno";
 import { borrarCuentaVacia, leerEntregaCuenta, listarCuentasAbiertas, leerRenglonesCuenta, marcarComandaImpresa, minutosAbierta, type CuentaAbierta, type RenglonCuenta } from "../lib/cuentas-abiertas";
 import { leerTotales, type TotalesTicket } from "../lib/cobro";
 import { leerDeliveries } from "../lib/delivery";
-import { agruparViajes } from "../lib/viajes";
 import { ModalCancelarItem } from "./modal-cancelar-item";
 import { ModalCancelarItems, type LineaCancelada } from "./modal-cancelar-items";
 import { ModalCancelarTicket } from "./modal-cancelar-ticket";
 import { ModalDescuento } from "./modal-descuento";
 import { ModalAutorizacionPin } from "./modal-autorizacion-pin";
-import { PanelEnReparto } from "./panel-en-reparto";
 import type { Empleado } from "../lib/supabase";
 import type { ModoServicio } from "../lib/carrito";
 import { capaVisible } from "../lib/escape";
@@ -80,7 +78,6 @@ export function PantallaCuentasModo({
   onImprimirTicket,
   onComandaCancelacion,
   extraPorCuenta,
-  mostrarEnReparto,
 }: {
   token: string;
   caja: DatosCaja;
@@ -103,14 +100,9 @@ export function PantallaCuentasModo({
   onComandaCancelacion: (ticketId: string, lineas: LineaCancelada[]) => Promise<void>;
   /** Acciones propias del modo (p. ej. "Marcar salida" en domicilio). */
   extraPorCuenta?: (c: CuentaAbierta, recargar: () => void) => React.ReactNode;
-  /** Domicilio: muestra la pestaña de los pedidos que ya van con un repartidor. */
-  mostrarEnReparto?: boolean;
 }) {
   const copia = COPIA[modo];
   const esComedor = modo === "COMER_AQUI";
-  // Solo domicilio tiene dos pestañas; Pick-up y Comedor nunca reciben mostrarEnReparto y se
-  // quedan siempre en "local", que es exactamente el maestro-detalle de siempre.
-  const [pestana, setPestana] = useState<"local" | "reparto">("local");
   const [items, setItems] = useState<CuentaAbierta[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [selId, setSelId] = useState<string | null>(null);
@@ -129,9 +121,9 @@ export function PantallaCuentasModo({
   /** A quién y dónde se entrega. Solo en domicilio; en los demás modos el cliente está enfrente. */
   const [entrega, setEntrega] = useState<Awaited<ReturnType<typeof leerEntregaCuenta>>>(null);
   const [borrando, setBorrando] = useState(false);
-  // Domicilio: asignaciones vivas (con repartidor, todavía sin cobrar). Un ticket con asignación
-  // viva ya no es "del local": vive en la pestaña "En reparto" y de ahí se cobra. Se guarda aparte
-  // de `items` porque también alimenta el contador de esa pestaña, sin otra consulta.
+  // Domicilio: asignaciones vivas (con repartidor, todavía sin cobrar). Sirven para rotular cada
+  // tarjeta con quién se lo lleva. El pedido NO se mueve de sitio al asignarlo: se probó sacándolo
+  // a una pestaña aparte y el cajero acababa buscándolo en dos listas para cobrarlo.
   const [asignacionesVivas, setAsignacionesVivas] = useState<Awaited<ReturnType<typeof leerDeliveries>>>([]);
 
   const recargar = useCallback(async () => {
@@ -142,9 +134,10 @@ export function PantallaCuentasModo({
       setError(e instanceof Error ? e.message : "No se pudieron cargar las cuentas");
       setItems([]);
     }
-    // Solo domicilio tiene repartidores que asignar. Aparte de las cuentas y con su propio
-    // catch: si esto falla, la lista de "En el local" se sigue viendo (aunque sin poder sacar
-    // de ahí lo ya asignado ni actualizar el contador de "En reparto").
+    // Solo domicilio tiene repartidores que asignar: en Pick-up y Comedor esto no se consulta
+    // nunca, así que el mapa queda vacío y sus tarjetas no pueden rotular a nadie. Va aparte de
+    // las cuentas y con su propio catch: si falla, la lista se sigue viendo, solo que sin decir
+    // quién lleva cada pedido.
     if (modo === "DELIVERY_PROPIO") {
       try {
         setAsignacionesVivas(await leerDeliveries(token, caja.sucursal_id));
@@ -183,17 +176,14 @@ export function PantallaCuentasModo({
     return () => { vivo = false; };
   }, [selId, recargarDetalle]);
 
-  // Domicilio: un ticket con repartidor asignado ya no es "del local" (invariante del diseño: o
-  // tiene repartidor y está en reparto, o sigue en el local, nunca las dos). En Pick-up y Comedor
-  // `asignacionesVivas` nunca se llena, así que este filtro no les toca ni una cuenta.
-  const idsAsignados = useMemo(() => new Set(asignacionesVivas.map((a) => a.ticketId)), [asignacionesVivas]);
-  const itemsLocal = useMemo(
-    () => (items === null ? null : items.filter((c) => !idsAsignados.has(c.ticketId))),
-    [items, idsAsignados],
+  // Quién lleva cada pedido, para rotular su tarjeta. En Pick-up y Comedor `asignacionesVivas`
+  // nunca se llena, así que el mapa queda vacío y esas listas no cambian en nada.
+  const repartidorPorTicket = useMemo(
+    () => new Map(asignacionesVivas.map((a) => [a.ticketId, a.repartidorNombre])),
+    [asignacionesVivas],
   );
-  const viajesEnReparto = useMemo(() => agruparViajes(asignacionesVivas), [asignacionesVivas]);
 
-  const sel = (itemsLocal ?? []).find((c) => c.ticketId === selId) ?? null;
+  const sel = (items ?? []).find((c) => c.ticketId === selId) ?? null;
   // "Ya se imprimió" = lo hicimos en esta sesión, o el ticket trae marca de impresión previa.
   const yaSeImprimio = sel != null && (yaImpresas.has(sel.ticketId) || sel.impresaAt != null);
   // null = todavía no se sabe. Solo `true` habilita el borrado.
@@ -255,7 +245,7 @@ export function PantallaCuentasModo({
             {/* Cuenta lo mismo que se ve debajo: en domicilio, `items` sin filtrar incluiría lo
                 que ya está en reparto y el número de aquí arriba contradiría a las dos pestañas
                 de abajo (el motivo real por el que se separaron en 3+2, no una cifra suelta). */}
-            <div className="truncate text-[12px] text-ink-3">{copia.subtitulo((itemsLocal ?? []).length)}</div>
+            <div className="truncate text-[12px] text-ink-3">{copia.subtitulo((items ?? []).length)}</div>
           </div>
         </div>
         <div className="flex flex-shrink-0 items-center gap-2">
@@ -281,40 +271,24 @@ export function PantallaCuentasModo({
 
       {error && <p className="flex-shrink-0 bg-[#FBF1EF] px-4 py-2 text-[13px] font-medium text-danger" role="alert">{error}</p>}
 
-      {/* Domicilio: "En el local" es el maestro-detalle de siempre; "En reparto" es la vista nueva de
-          quién anda repartiendo. Pick-up y Comedor nunca reciben mostrarEnReparto, así que ni
-          ven la franja ni pueden caer en pestana === "reparto" por accidente (el botón que lo
-          cambiaría no existe). */}
-      {mostrarEnReparto && (
-        <div role="tablist" className="flex flex-shrink-0 items-center gap-2 border-b border-line px-3 py-2">
-          <BotonPestana label={`En el local · ${(itemsLocal ?? []).length}`} activa={pestana === "local"} onClick={() => setPestana("local")} />
-          <BotonPestana label={`En reparto · ${viajesEnReparto.length}`} activa={pestana === "reparto"} onClick={() => setPestana("reparto")} />
-        </div>
-      )}
-
-      {pestana === "reparto" && mostrarEnReparto ? (
-        <PanelEnReparto token={token} sucursalId={caja.sucursal_id} onCobrar={onCobrar} />
-      ) : (
       <div className="flex min-h-0 flex-1">
         {/* ── Lista de cuentas ─────────────────────────────────────────── */}
         <div className="flex w-[clamp(18rem,30vw,24rem)] flex-shrink-0 flex-col border-r border-line">
           <div className="min-h-0 flex-1 overflow-y-auto p-3">
-            {itemsLocal === null && <p className="p-3 text-sm text-ink-3">Cargando…</p>}
-            {itemsLocal?.length === 0 && (
+            {items === null && <p className="p-3 text-sm text-ink-3">Cargando…</p>}
+            {items?.length === 0 && (
               <div className="flex h-full flex-col items-center justify-center gap-2 px-4 text-center">
                 <p className="text-[14px] font-semibold text-ink-2">{copia.vacioTitulo}</p>
                 <p className="text-[12.5px] text-ink-3">{copia.vacioTexto}</p>
               </div>
             )}
             <div className="flex flex-col gap-2">
-              {itemsLocal?.map((c) => {
+              {items?.map((c) => {
                 const activa = c.ticketId === selId;
-                // Ticket ya impreso = la orden salió, EXCEPTO en domicilio: ahí "En el local" ya
-                // solo contiene pedidos sin repartidor (se filtran en cuanto se asignan), así que
-                // nada en esta lista puede haber salido. Pintarlo de naranja por venir impreso
-                // sería la misma mentira que esta tarea vino a quitar, solo que reaparecida en la
-                // otra pestaña. En Pick-up/Comedor "impreso" sigue siendo la única señal de salida
-                // y no cambia.
+                // Ticket ya impreso = la orden salió, EXCEPTO en domicilio: ahí lo que saca un
+                // pedido a la calle es asignarle repartidor, y eso se ve en su propio renglón.
+                // Pintar de naranja por venir impreso sería decir "salió" de algo que sigue en el
+                // mostrador. En Pick-up/Comedor "impreso" sigue siendo la única señal y no cambia.
                 const salio = modo === "DELIVERY_PROPIO" ? false : (yaImpresas.has(c.ticketId) || c.impresaAt != null);
                 return (
                   <button
@@ -334,6 +308,14 @@ export function PantallaCuentasModo({
                       <span className="truncate font-display text-[15px] font-semibold">{(esComedor && c.mesa ? `Mesa ${c.mesa}` : null) ?? c.cliente ?? c.folio ?? "Cuenta"}</span>
                       <span className="flex-shrink-0 font-display text-[15px] font-bold tabular-nums">{fmtMxn(c.total)}</span>
                     </div>
+                    {/* Quién lo lleva, debajo del nombre. Va rotulado y no suelto: el renglón de
+                        arriba ya es un nombre —el del cliente— y dos nombres seguidos sin etiqueta
+                        se confunden. Solo aparece si hay repartidor asignado. */}
+                    {repartidorPorTicket.has(c.ticketId) && (
+                      <div className={["mt-0.5 truncate text-[12px] font-semibold", salio ? "text-white/85" : "text-ink-2"].join(" ")}>
+                        Repartidor: {repartidorPorTicket.get(c.ticketId)}
+                      </div>
+                    )}
                     <div className={["mt-0.5 flex items-center justify-between gap-2 text-[12px]", salio ? "text-white/75" : "text-ink-3"].join(" ")}>
                       <span className="truncate">{c.nItems} {c.nItems === 1 ? "producto" : "productos"}</span>
                       <span className="flex-shrink-0">{minutosAbierta(c.desdeIso, ahora)} min</span>
@@ -466,7 +448,6 @@ export function PantallaCuentasModo({
           )}
         </div>
       </div>
-      )}
 
       {cancelando && sel && (
         <ModalCancelarItem
@@ -640,19 +621,3 @@ function Accion({
 
 /** Misma pinta que los botones de la cabecera (borde + fondo claro); la activa se marca como
  *  la tarjeta seleccionada de la lista, para no inventar un tercer estilo de "seleccionado". */
-function BotonPestana({ label, activa, onClick }: { label: string; activa: boolean; onClick: () => void }) {
-  return (
-    <button
-      type="button"
-      role="tab"
-      aria-selected={activa}
-      onClick={onClick}
-      className={[
-        "flex h-10 items-center rounded border px-3.5 text-[13.5px] font-semibold transition",
-        activa ? "border-ink bg-sel text-ink" : "border-line-strong bg-surface text-ink-2 hover:border-ink hover:text-ink",
-      ].join(" ")}
-    >
-      {label}
-    </button>
-  );
-}

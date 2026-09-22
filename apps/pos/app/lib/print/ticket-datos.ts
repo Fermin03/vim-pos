@@ -146,7 +146,7 @@ export async function leerTicketParaImpresion(ticketId: string, ctx: Ctx): Promi
   // qué referencias; sin esto el ticket no le sirve para entregar. En los demás modos no se
   // imprime —el cliente está enfrente y sus datos no tienen por qué salir en papel.
   const entrega = tk.modo_servicio === "DELIVERY_PROPIO"
-    ? await leerEntrega(sb, tk.cliente_id as string | null, tk.direccion_entrega_id as string | null)
+    ? await leerEntrega(sb, ticketId, tk.cliente_id as string | null, tk.direccion_entrega_id as string | null)
     : null;
 
   // El QR de autofacturación es opcional por tenant. Sin fila de configuración se trata como
@@ -196,6 +196,7 @@ export async function leerTicketParaImpresion(ticketId: string, ctx: Ctx): Promi
  *  referencias es peor que no imprimirlas, pero no imprimir NADA es peor todavía. */
 export async function leerEntrega(
   sb: ReturnType<typeof employeeClient>,
+  ticketId: string,
   clienteId: string | null,
   direccionId: string | null,
 ): Promise<DatosEntrega | null> {
@@ -234,8 +235,29 @@ export async function leerEntrega(
     notasRepartidor = d.notas_repartidor ?? null;
   }
 
-  if (!cliente && !telefono && !direccion) return null;
-  return { cliente, telefono, direccion, referencias, notasRepartidor };
+  // Quién se lo lleva. Se toma `repartidor_nombre` —la foto del momento en que se asignó— antes
+  // que el nombre vigente del catálogo: el ticket es un documento, y debe decir quién lo llevó
+  // aunque mañana se corrija la ortografía de esa persona o se dé de baja.
+  let repartidor: string | null = null;
+  {
+    const { data } = await sb
+      .from("delivery_asignaciones")
+      .select("repartidor_nombre, catalogo:repartidores(nombre)")
+      .eq("ticket_id", ticketId)
+      .not("estado", "in", "(LIQUIDADO,CANCELADO)")
+      .order("fecha_asignacion", { ascending: false })
+      .limit(1);
+    const a = ((data ?? []) as Record<string, unknown>[])[0];
+    if (a) {
+      repartidor = (a.repartidor_nombre as string | null)
+        ?? ((a.catalogo as { nombre?: string } | null)?.nombre ?? null);
+    }
+  }
+
+  // `repartidor` cuenta para decidir si hay bloque: un domicilio con repartidor anotado pero sin
+  // dirección capturada tiene poco que imprimir, pero quién lo llevó sí debe salir.
+  if (!cliente && !telefono && !direccion && !repartidor) return null;
+  return { cliente, telefono, direccion, referencias, notasRepartidor, repartidor };
 }
 
 /**

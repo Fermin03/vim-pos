@@ -15,6 +15,7 @@ export function MenuGeneral({
   onCerrar,
   onKds,
   onDevoluciones,
+  onCorteX,
   onEnEspera,
   onAbrirCajon,
   nEnEspera,
@@ -28,6 +29,7 @@ export function MenuGeneral({
   onCerrar: () => void;
   onKds: () => void;
   onDevoluciones: () => void;
+  onCorteX: () => void;
   onEnEspera: () => void;
   onAbrirCajon: () => void;
   nEnEspera: number;
@@ -105,6 +107,7 @@ export function MenuGeneral({
             <TileMenu label="Devoluciones" onClick={con(onDevoluciones)} icon={<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" className="h-8 w-8"><path d="M9 14l-4-4 4-4M5 10h11a4 4 0 0 1 0 8h-1" /></svg>} />
             {/* Estas dos vivían en el topbar de la pantalla de venta. Al quitarlo se quedaron sin
                 puerta: se podía dejar un pedido en espera pero ya no recuperarlo. */}
+            <TileMenu label="Corte caja X" onClick={con(onCorteX)} icon={<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" className="h-8 w-8"><path d="M6 2h12v20l-3-2-3 2-3-2-3 2V2z" /><path d="M9 7h6M9 11h6M9 15h3" /></svg>} />
             <TileMenu label="Pedidos en espera" badge={nEnEspera} onClick={con(onEnEspera)} icon={<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" className="h-8 w-8"><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></svg>} />
             <TileMenu label="Abrir cajón" onClick={con(onAbrirCajon)} icon={<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" className="h-8 w-8"><rect x="3" y="8" width="18" height="11" rx="1.5" /><path d="M3 12h18M10 15.5h4" /><path d="M7 8V6a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v2" /></svg>} />
           </SeccionMenu>

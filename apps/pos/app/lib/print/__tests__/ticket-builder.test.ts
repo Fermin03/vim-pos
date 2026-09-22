@@ -118,6 +118,7 @@ describe("construirTicketJob — datos de entrega (domicilio)", () => {
       direccion: "Blvd. Adolfo López Mateos 1500 int. 4, Jardines del Moral, León, Gto., CP 37160",
       referencias: "Portón negro frente al parque",
       notasRepartidor: "El timbre no sirve, hablar por teléfono",
+      repartidor: "Luis Hernández",
     },
   };
 
@@ -131,6 +132,42 @@ describe("construirTicketJob — datos de entrega (domicilio)", () => {
     expect(texto.some((v) => v.includes("Jardines del Moral"))).toBe(true);
     expect(texto).toContain("Ref: Portón negro frente al parque");
     expect(texto).toContain("Nota: El timbre no sirve, hablar por teléfono");
+  });
+
+  it("imprime quién se lo lleva, justo debajo del cajero", () => {
+    // La posición importa y por eso se afirma: va arriba, con los datos de la cuenta, no abajo
+    // entre las indicaciones para llegar. Se comprueba contra el renglón de Cajero y no contra un
+    // índice fijo, que se rompería al añadir cualquier otra fila a la cabecera.
+    const filas = construirTicketJob(CON_ENTREGA).bloques.filter((b) => b.t === "fila") as {
+      izq: string; der: string;
+    }[];
+    const iCajero = filas.findIndex((f) => f.izq === "Cajero");
+    expect(iCajero).toBeGreaterThanOrEqual(0);
+    expect(filas[iCajero + 1]).toMatchObject({ izq: "Repartidor", der: "Luis Hernández" });
+  });
+
+  it("no imprime repartidor en un ticket que no es de domicilio", () => {
+    // Exclusivo de domicilio. Lo sostienen tres cosas: la RPC rechaza asignar repartidor a un
+    // ticket que no sea DELIVERY_PROPIO, `ticket-datos` deja `entrega` en null fuera de ese modo,
+    // y la lista de cuentas ni consulta las asignaciones. Lo que fija ESTA prueba es el último
+    // eslabón —un ticket sin datos de entrega no imprime el renglón— que es el que se rompería si
+    // alguien quitara el `?.` del guard y lo imprimiera siempre.
+    const filas = construirTicketJob(DATOS).bloques.filter((b) => b.t === "fila") as { izq: string }[];
+    expect(filas.some((f) => f.izq === "Repartidor")).toBe(false);
+    // Y el resto de la cabecera intacta, para que la prueba no pase por estar vacía.
+    expect(filas.some((f) => f.izq === "Cajero")).toBe(true);
+  });
+
+  it("no imprime el renglón del repartidor si el ticket salió antes de asignarlo", () => {
+    // Imprimir y asignar son acciones sueltas: un ticket impreso antes de asignar es un caso
+    // normal, no un error. Lo que no puede hacer es imprimir la etiqueta vacía.
+    const sinRepartidor = { ...CON_ENTREGA, entrega: { ...CON_ENTREGA.entrega!, repartidor: null } };
+    const job = construirTicketJob(sinRepartidor);
+    const filas = job.bloques.filter((b) => b.t === "fila") as { izq: string }[];
+    expect(filas.some((f) => f.izq === "Repartidor")).toBe(false);
+    // El resto del ticket sigue imprimiéndose igual.
+    const texto = job.bloques.filter((b) => b.t === "texto").map((b) => (b as { valor: string }).valor);
+    expect(texto).toContain("Ana Pérez Rangel");
   });
 
   it("imprime la dirección en el mismo tamaño que el nombre y el teléfono", () => {
@@ -165,7 +202,7 @@ describe("construirTicketJob — datos de entrega (domicilio)", () => {
   it("omite los renglones que vengan vacíos sin romper el ticket", () => {
     const texto = construirTicketJob({
       ...CON_ENTREGA,
-      entrega: { cliente: "Ana", telefono: null, direccion: null, referencias: null, notasRepartidor: null },
+      entrega: { cliente: "Ana", telefono: null, direccion: null, referencias: null, notasRepartidor: null, repartidor: null },
     }).bloques.filter((b) => b.t === "texto").map((b) => (b as { valor: string }).valor);
     expect(texto).toContain("Ana");
     expect(texto.some((v) => v.startsWith("Tel. 477 100"))).toBe(false);
