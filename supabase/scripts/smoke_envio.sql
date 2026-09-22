@@ -72,7 +72,10 @@ DECLARE
   v_n      integer;
   v_iva_incl boolean;
 BEGIN
-  PERFORM set_config('request.jwt.claims', json_build_object('sub', v_maria::text)::text, true);
+  -- Con tenant_id: fijar_envio_ticket es SECURITY DEFINER y compara el tenant del ticket con el
+  -- del JWT, igual que en producción.
+  PERFORM set_config('request.jwt.claims',
+    json_build_object('sub', v_maria::text, 'tenant_id', v_tenant::text)::text, true);
 
   INSERT INTO turnos (tenant_id, sucursal_id, caja_id, codigo_turno, dia_contable,
                       usuario_apertura_id, fondo_inicial_mxn)
@@ -242,6 +245,41 @@ BEGIN
   VALUES (v_zona_ajena, v_ajeno, v_suc_ajena, 'Zona Ajena', 20.00) ON CONFLICT (id) DO NOTHING;
 END $$;
 
+-- Fixture del bloque de la RPC bajo RLS (abajo). Se arma como postgres porque abrir el turno y el
+-- ticket no es lo que se prueba; lo que se prueba es fijar_envio_ticket llamada como la llama el
+-- POS. Los ids viajan en GUCs locales porque las variables de un DO no cruzan al siguiente.
+DO $$
+DECLARE
+  v_tenant uuid := '99999999-0000-0000-0000-0000000000aa';
+  v_suc    uuid := '99999999-0000-0000-0000-0000000000bb';
+  v_caja   uuid := '99999999-0000-0000-0000-0000000000cc';
+  v_maria  uuid := '99999999-0000-0000-0000-000000000001';
+  v_prod   uuid := 'b0000000-0000-0000-0000-0000000000f1';  -- Hamburguesa Clásica, $120, IVA incl.
+  v_turno  uuid;
+  v_ticket uuid;
+  v_z      uuid;
+BEGIN
+  PERFORM set_config('request.jwt.claims', json_build_object('sub', v_maria::text)::text, true);
+  SELECT id INTO v_turno FROM turnos WHERE codigo_turno = 'SMOKE-ENV' AND tenant_id = v_tenant;
+
+  -- Dos hamburguesas = 240.00. Tras agregar_item_a_ticket el ticket ya está ABIERTO
+  -- (trg_ticket_item_promover_borrador): justo el estado en que la política ticket_items_delete
+  -- NO deja borrar renglones a `authenticated`.
+  v_ticket := abrir_ticket(v_suc, v_caja, v_turno, 'DELIVERY_PROPIO', NULL, NULL, NULL, v_maria);
+  PERFORM agregar_item_a_ticket(v_ticket, v_prod, 2, NULL, '[]'::jsonb, NULL);
+  PERFORM set_config('smoke_envio.ticket', v_ticket::text, true);
+
+  INSERT INTO zonas_envio (tenant_id, sucursal_id, nombre, costo_mxn)
+  VALUES (v_tenant, v_suc, 'RLS Norte', 35.00) RETURNING id INTO v_z;
+  PERFORM set_config('smoke_envio.z_norte', v_z::text, true);
+  INSERT INTO zonas_envio (tenant_id, sucursal_id, nombre, costo_mxn)
+  VALUES (v_tenant, v_suc, 'RLS Lejos', 50.00) RETURNING id INTO v_z;
+  PERFORM set_config('smoke_envio.z_lejos', v_z::text, true);
+  INSERT INTO zonas_envio (tenant_id, sucursal_id, nombre, costo_mxn)
+  VALUES (v_tenant, v_suc, 'RLS Gratis', 0.00) RETURNING id INTO v_z;
+  PERFORM set_config('smoke_envio.z_gratis', v_z::text, true);
+END $$;
+
 SET LOCAL ROLE authenticated;
 SELECT set_config('request.jwt.claims',
   '{"sub":"99999999-0000-0000-0000-000000000001","tenant_id":"99999999-0000-0000-0000-0000000000aa","role":"authenticated"}',
@@ -271,6 +309,88 @@ BEGIN
   END IF;
 
   RAISE NOTICE 'RLS OK -- zonas_envio: alta+lectura propia bajo authenticated, zona ajena invisible';
+END $$;
+
+-- 4b) LA RPC BAJO RLS, como la llama el POS. Los casos de arriba corren como postgres, que se salta
+--     la política ticket_items_delete (0008:2126: solo borra renglones de tickets en BORRADOR); por
+--     eso nadie vio que, como `authenticated`, quitar el envío devolvía NULL sin error, borraba la
+--     zona del ticket y dejaba VIVO el renglón con el total inflado (hallazgo C1).
+DO $$
+DECLARE
+  v_ticket  uuid := current_setting('smoke_envio.ticket')::uuid;
+  v_norte   uuid := current_setting('smoke_envio.z_norte')::uuid;
+  v_lejos   uuid := current_setting('smoke_envio.z_lejos')::uuid;
+  v_total   numeric(12,2);
+  v_n       integer;
+BEGIN
+  -- a) Poner la zona
+  PERFORM fijar_envio_ticket(v_ticket, v_norte);
+  SELECT total_mxn INTO v_total FROM tickets WHERE id = v_ticket;
+  IF v_total <> 275.00 THEN RAISE EXCEPTION 'RLS a) con envío: esperaba 275.00, got %', v_total; END IF;
+
+  -- b) Cambiarla: reprecia sin duplicar
+  PERFORM fijar_envio_ticket(v_ticket, v_lejos);
+  SELECT total_mxn INTO v_total FROM tickets WHERE id = v_ticket;
+  IF v_total <> 290.00 THEN RAISE EXCEPTION 'RLS b) tras cambiar de zona: esperaba 290.00, got %', v_total; END IF;
+  SELECT count(*) INTO v_n FROM ticket_items
+   WHERE ticket_id = v_ticket AND cargo_tipo = 'ENVIO' AND cancelado = false;
+  IF v_n <> 1 THEN RAISE EXCEPTION 'RLS b) esperaba 1 renglón de envío, hay %', v_n; END IF;
+
+  -- c) Quitarla: el total vuelve y NO queda renglón
+  PERFORM fijar_envio_ticket(v_ticket, NULL);
+  SELECT count(*) INTO v_n FROM ticket_items WHERE ticket_id = v_ticket AND cargo_tipo = 'ENVIO';
+  SELECT total_mxn INTO v_total FROM tickets WHERE id = v_ticket;
+  IF v_n <> 0 OR v_total <> 240.00 THEN
+    RAISE EXCEPTION 'RLS c) quitar el envío como authenticated dejó % renglón(es) ENVIO y total % (esperaba 0 y 240.00)', v_n, v_total;
+  END IF;
+  IF (SELECT zona_envio_id FROM tickets WHERE id = v_ticket) IS NOT NULL THEN
+    RAISE EXCEPTION 'RLS c) el ticket conservó la zona tras quitar el envío';
+  END IF;
+
+  -- Se deja puesto para el caso d)
+  PERFORM fijar_envio_ticket(v_ticket, v_norte);
+  RAISE NOTICE 'RLS OK -- fijar_envio_ticket: poner, cambiar y quitar bajo authenticated';
+END $$;
+
+-- d) Un empleado de OTRO negocio no puede tocar ese ticket (ni quitar ni poner envío).
+SELECT set_config('request.jwt.claims',
+  '{"sub":"99999999-0000-0000-0000-0000000000f1","tenant_id":"99999999-0000-0000-0000-0000000000ff","role":"authenticated"}',
+  true);
+
+DO $$
+DECLARE
+  v_ticket uuid := current_setting('smoke_envio.ticket')::uuid;
+  v_lejos  uuid := current_setting('smoke_envio.z_lejos')::uuid;
+BEGIN
+  BEGIN
+    PERFORM fijar_envio_ticket(v_ticket, NULL);
+    RAISE EXCEPTION 'FALLO: un empleado de otro tenant pudo quitar el envío de un ticket ajeno';
+  EXCEPTION WHEN raise_exception THEN
+    IF SQLERRM LIKE 'FALLO:%' THEN RAISE; END IF;
+  END;
+  BEGIN
+    PERFORM fijar_envio_ticket(v_ticket, v_lejos);
+    RAISE EXCEPTION 'FALLO: un empleado de otro tenant pudo cambiar el envío de un ticket ajeno';
+  EXCEPTION WHEN raise_exception THEN
+    IF SQLERRM LIKE 'FALLO:%' THEN RAISE; END IF;
+  END;
+END $$;
+
+SELECT set_config('request.jwt.claims',
+  '{"sub":"99999999-0000-0000-0000-000000000001","tenant_id":"99999999-0000-0000-0000-0000000000aa","role":"authenticated"}',
+  true);
+
+DO $$
+DECLARE
+  v_ticket uuid := current_setting('smoke_envio.ticket')::uuid;
+  v_norte  uuid := current_setting('smoke_envio.z_norte')::uuid;
+BEGIN
+  IF (SELECT total_mxn FROM tickets WHERE id = v_ticket) <> 275.00
+     OR (SELECT zona_envio_id FROM tickets WHERE id = v_ticket) IS DISTINCT FROM v_norte
+     OR (SELECT count(*) FROM ticket_items WHERE ticket_id = v_ticket AND cargo_tipo = 'ENVIO') <> 1 THEN
+    RAISE EXCEPTION 'RLS d) el intento del otro tenant alteró el ticket';
+  END IF;
+  RAISE NOTICE 'RLS OK -- fijar_envio_ticket: otro tenant rechazado sin tocar nada';
 END $$;
 
 RESET ROLE;

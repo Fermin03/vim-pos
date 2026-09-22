@@ -94,10 +94,20 @@ CREATE UNIQUE INDEX IF NOT EXISTS ticket_envio_unico
 -- BORRA en lugar de cancelar a propósito: un cargo retirado antes de cobrar no es una venta
 -- cancelada y no tiene por qué aparecer en los reportes de cancelaciones. El trigger
 -- AFTER INSERT OR UPDATE OR DELETE de ticket_items (0008:696) recalcula los totales solo.
+--
+-- SECURITY DEFINER a propósito. Como invoker, el DELETE del renglón pasaba por la política
+-- ticket_items_delete (0008:2126), que solo deja borrar renglones de tickets en BORRADOR — y todo
+-- ticket con renglones ya está ABIERTO (trg_ticket_item_promover_borrador). El DELETE afectaba
+-- CERO filas sin error: la RPC quitaba la zona del ticket y dejaba vivo el cargo, con el total
+-- inflado. Como definer se salta RLS, así que la frontera del tenant la pone la guarda explícita
+-- de abajo, ANTES de tocar nada; y cada escritura comprueba cuántas filas afectó, para que un
+-- "no hizo nada" nunca vuelva a pasar por éxito.
 -- ============================================================================
 CREATE OR REPLACE FUNCTION fijar_envio_ticket(p_ticket_id uuid, p_zona_id uuid)
 RETURNS uuid
 LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, pg_temp
 AS $$
 DECLARE
   v_tenant     uuid;
@@ -109,12 +119,14 @@ DECLARE
   v_tasa       numeric(5,2);
   v_incluido   boolean;
   v_orden      integer;
+  v_filas      integer;
 BEGIN
   SELECT tenant_id, sucursal_id, modo_servicio, estado_fiscal
     INTO v_tenant, v_sucursal, v_modo, v_estado
   FROM tickets WHERE id = p_ticket_id;
 
-  IF NOT FOUND THEN
+  -- Misma respuesta para "no existe" y "es de otro negocio": no se confirma que el id exista.
+  IF NOT FOUND OR v_tenant IS DISTINCT FROM current_tenant_id() THEN
     RAISE EXCEPTION 'Ticket % no existe', p_ticket_id;
   END IF;
   IF v_estado NOT IN ('BORRADOR', 'ABIERTO') THEN
@@ -130,8 +142,18 @@ BEGIN
 
   -- Quitar el envío
   IF p_zona_id IS NULL THEN
-    IF v_item IS NOT NULL THEN DELETE FROM ticket_items WHERE id = v_item; END IF;
+    IF v_item IS NOT NULL THEN
+      DELETE FROM ticket_items WHERE id = v_item;
+      GET DIAGNOSTICS v_filas = ROW_COUNT;
+      IF v_filas <> 1 THEN
+        RAISE EXCEPTION 'No se pudo quitar el renglón de envío % (filas afectadas: %)', v_item, v_filas;
+      END IF;
+    END IF;
     UPDATE tickets SET zona_envio_id = NULL, updated_at = now() WHERE id = p_ticket_id;
+    GET DIAGNOSTICS v_filas = ROW_COUNT;
+    IF v_filas <> 1 THEN
+      RAISE EXCEPTION 'No se pudo quitar la zona del ticket % (filas afectadas: %)', p_ticket_id, v_filas;
+    END IF;
     RETURN NULL;
   END IF;
 
@@ -169,6 +191,10 @@ BEGIN
            iva_incluido_en_precio_snapshot = v_incluido,
            updated_at = now()
      WHERE id = v_item;
+    GET DIAGNOSTICS v_filas = ROW_COUNT;
+    IF v_filas <> 1 THEN
+      RAISE EXCEPTION 'No se pudo repreciar el renglón de envío % (filas afectadas: %)', v_item, v_filas;
+    END IF;
   ELSE
     SELECT COALESCE(MAX(orden_visualizacion), 0) + 1 INTO v_orden
     FROM ticket_items WHERE ticket_id = p_ticket_id;
@@ -187,12 +213,19 @@ BEGIN
   END IF;
 
   UPDATE tickets SET zona_envio_id = v_zona.id, updated_at = now() WHERE id = p_ticket_id;
+  GET DIAGNOSTICS v_filas = ROW_COUNT;
+  IF v_filas <> 1 THEN
+    RAISE EXCEPTION 'No se pudo fijar la zona del ticket % (filas afectadas: %)', p_ticket_id, v_filas;
+  END IF;
   RETURN v_item;
 END;
 $$;
 
 COMMENT ON FUNCTION fijar_envio_ticket IS 'Fija (o quita, con zona NULL) el renglón de envío de un ticket de domicilio. Idempotente. Los totales los recalcula el trigger de ticket_items.';
 
+-- Definer: fuera `public`/`anon` (el EXECUTE por omisión es de PUBLIC). La guarda de tenant ya los
+-- rechazaría, pero una RPC que se salta RLS no se deja abierta a quien no tiene sesión.
+REVOKE EXECUTE ON FUNCTION fijar_envio_ticket(uuid, uuid) FROM public, anon;
 GRANT EXECUTE ON FUNCTION fijar_envio_ticket(uuid, uuid) TO authenticated, service_role;
 
 -- ============================================================================
