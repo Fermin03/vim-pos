@@ -28,6 +28,9 @@ export async function enviarACocina(token: string, ticketId: string): Promise<st
     .eq("ticket_id", ticketId)
     .eq("cancelado", false)
     .is("enviado_cocina_at", null)
+    // Los cargos (envío) no van a cocina. Sin esto, cambiar la zona de un pedido ya mandado
+    // dejaba un renglón "pendiente" que se enviaba solo e imprimía una comanda vacía.
+    .is("cargo_tipo", null)
     .select("id");
   if (error) throw new Error(error.message);
   const ids = ((data ?? []) as { id: string }[]).map((r) => r.id);
@@ -61,7 +64,8 @@ export async function contarPendientesCocina(token: string, ticketId: string): P
     .select("id", { count: "exact", head: true })
     .eq("ticket_id", ticketId)
     .eq("cancelado", false)
-    .is("enviado_cocina_at", null);
+    .is("enviado_cocina_at", null)
+    .is("cargo_tipo", null); // el envío no es cocina: no habilita "Enviar a cocina"
   if (error) throw new Error(error.message);
   return count ?? 0;
 }

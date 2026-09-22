@@ -628,6 +628,9 @@ export function HomePos({
       // alguno, ese renglón se queda sin "Combo #n" y sin el contexto del padre.
       const seleccion = datos.lineas.filter((l) => soloItems.includes(l.id) || (l.parentId != null && soloItems.includes(l.parentId)));
       const lineas = lineasParaComanda(seleccion);
+      // Si lo recién enviado no tiene nada para cocina (p. ej. solo cargos), no hay comanda: un
+      // papel vacío rotulado AGREGADO hace que la cocina busque un pedido que no existe.
+      if (lineas.length === 0) return;
       const dc: DatosComanda = {
         folio: datos.meta.folio,
         modoServicio: datos.meta.modoServicio,
