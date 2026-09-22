@@ -10,6 +10,19 @@ function mapZona(r: Record<string, unknown>): ZonaEnvio {
   return { id: String(r.id), nombre: String(r.nombre), costoMxn: Number(r.costo_mxn) };
 }
 
+/**
+ * La zona de una dirección guardada, tal como está HOY en el catálogo vigente.
+ *
+ * La dirección embebe su zona sin filtrar `activa` ni `deleted_at` (y con el precio de cuando se
+ * leyó). Usarla tal cual mandaba a `fijar_envio_ticket` una zona desactivada, que truena al
+ * persistir. Una zona que no esté en la lista vigente cuenta como "sin zona" (se vuelve a pedir),
+ * y el precio sale siempre de la lista.
+ */
+export function zonaVigente(zona: ZonaEnvio | null, vigentes: ZonaEnvio[]): ZonaEnvio | null {
+  if (!zona) return null;
+  return vigentes.find((z) => z.id === zona.id) ?? null;
+}
+
 /** Zonas activas de la sucursal, en el orden en que se muestran los chips. */
 export async function listarZonas(token: string, sucursalId: string): Promise<ZonaEnvio[]> {
   const { data, error } = await employeeClient(token)

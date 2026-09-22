@@ -21,7 +21,7 @@ vi.mock("../supabase", () => ({
   }),
 }));
 
-import { persistirTicket, cambiarZonaDePedido } from "../cobro";
+import { persistirTicket, cambiarZonaDePedido, ErrorEnvioNoFijado } from "../cobro";
 
 const TOTALES_ROW = {
   id: "ticket-1",
@@ -78,6 +78,28 @@ describe("persistirTicket — el cargo de envío (Task 7)", () => {
         : { data: "ticket-1", error: null },
     );
     await expect(persistir("zona-mala")).rejects.toThrow(/no existe, está inactiva/);
+  });
+
+  it("si el envío falla, el error lleva el ticket YA creado (y sus totales) para no abrir otro al reintentar", async () => {
+    // abrir_ticket y los renglones ya pasaron: hay un ticket ABIERTO real. Si el llamador no se
+    // entera de su id, el reintento abre otro y el primero queda huérfano trabando el corte.
+    rpcMock.mockImplementation(async (nombre: string) =>
+      nombre === "fijar_envio_ticket"
+        ? { data: null, error: { message: "Zona de envío zona-mala no existe, está inactiva o no es de esta sucursal" } }
+        : { data: "ticket-1", error: null },
+    );
+    const error = await persistir("zona-mala").catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(ErrorEnvioNoFijado);
+    const e = error as ErrorEnvioNoFijado;
+    expect(e.ticketId).toBe("ticket-1");
+    expect(e.totales?.ticketId).toBe("ticket-1");
+    expect(e.message).toMatch(/no existe, está inactiva/);
+  });
+
+  it("un fallo ANTES de abrir el ticket no es ErrorEnvioNoFijado (no hay ticket que adoptar)", async () => {
+    rpcMock.mockImplementation(async () => ({ data: null, error: { message: "turno cerrado" } }));
+    const error = await persistir("zona-9").catch((e: unknown) => e);
+    expect(error).not.toBeInstanceOf(ErrorEnvioNoFijado);
   });
 
   it("lee los totales autoritativos de la BD después de fijar el envío", async () => {

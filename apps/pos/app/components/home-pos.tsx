@@ -22,7 +22,7 @@ import {
 } from "../lib/carrito";
 import { listarCombos, combosQueAdmiten, diferencialCombo, type ComboDef } from "../lib/combos";
 import { obtenerGruposDeProducto, type GrupoModificadores } from "../lib/modificadores";
-import { persistirTicket, leerTotales, cambiarZonaDePedido, type TotalesTicket } from "../lib/cobro";
+import { persistirTicket, leerTotales, cambiarZonaDePedido, ErrorEnvioNoFijado, type TotalesTicket } from "../lib/cobro";
 import { SidebarTicket } from "./sidebar-ticket";
 import { ModalModificadores } from "./modal-modificadores";
 import { ModalCombo } from "./modal-combo";
@@ -711,6 +711,20 @@ export function HomePos({
     }
   }, [token, ticketBd, cocinaEnviada, imprimirComandaCocina, volverAtras]);
 
+  /**
+   * Si `persistirTicket` falló DESPUÉS de abrir el ticket (el envío no se pudo fijar), ese ticket
+   * ya existe ABIERTO: la pantalla lo adopta como `ticketBd` ANTES de mostrar el error, para que el
+   * reintento lo reuse en vez de abrir otro y dejar el primero huérfano trabando el corte. El
+   * carrito conserva su envío a propósito: tocar ese renglón fija la zona sobre el ticket ya
+   * persistido (`cambiarZonaPedido`). Devuelve el mensaje que hay que mostrar.
+   */
+  const adoptarTicketSiQuedoAbierto = useCallback(async (e: unknown, porDefecto: string): Promise<string> => {
+    if (!(e instanceof ErrorEnvioNoFijado)) return e instanceof Error ? e.message : porDefecto;
+    const bd = e.totales ?? await leerTotales(token, e.ticketId).catch(() => null);
+    if (bd) setTicketBd(bd);
+    return `El pedido se guardó, pero sin envío: ${e.message}. Toca el renglón de envío para elegir otra zona.`;
+  }, [token]);
+
   /** Persiste el ticket si aún no existe; abre el modal de descuento sobre ese ticket. */
   const onAplicarDescuento = useCallback(async () => {
     if (carrito.lineas.length === 0) return;
@@ -736,11 +750,11 @@ export function HomePos({
       try { setItemsPersistidos(await leerItemsPersistidos(token, bd.ticketId)); } catch { /* no bloquear */ }
       setDescuentoAbierto(true);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Error al preparar el descuento");
+      setError(await adoptarTicketSiQuedoAbierto(e, "Error al preparar el descuento"));
     } finally {
       setProcesandoCobro(false);
     }
-  }, [carrito, ticketBd, token, caja.sucursal_id, turno.caja_id, turno.id, imprimirComandaCocina]);
+  }, [carrito, ticketBd, token, caja.sucursal_id, turno.caja_id, turno.id, imprimirComandaCocina, adoptarTicketSiQuedoAbierto]);
 
   /**
    * Abre el cajón al empezar el cobro.
@@ -793,11 +807,11 @@ export function HomePos({
       setTicketBd(totales);
       setTotalesCobro(totales);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Error al abrir el ticket");
+      setError(await adoptarTicketSiQuedoAbierto(e, "Error al abrir el ticket"));
     } finally {
       setProcesandoCobro(false);
     }
-  }, [carrito, ticketBd, token, caja.sucursal_id, turno.caja_id, turno.id, online]);
+  }, [carrito, ticketBd, token, caja.sucursal_id, turno.caja_id, turno.id, online, adoptarTicketSiQuedoAbierto]);
 
   /**
    * Ronda de arreglos 1/5 (Task 7) — cambiar la zona de ESTE pedido desde el renglón de envío.
@@ -857,11 +871,11 @@ export function HomePos({
       refrescarEspera();
       consumirSalidaPendiente();
     } catch (e) {
-      setEsperaError(e instanceof Error ? e.message : "No se pudo poner en espera");
+      setEsperaError(await adoptarTicketSiQuedoAbierto(e, "No se pudo poner en espera"));
     } finally {
       setEsperaProcesando(false);
     }
-  }, [carrito, ticketBd, token, caja.sucursal_id, turno.caja_id, turno.id, refrescarEspera]);
+  }, [carrito, ticketBd, token, caja.sucursal_id, turno.caja_id, turno.id, refrescarEspera, adoptarTicketSiQuedoAbierto]);
 
   /** Pick-up / Domicilio — persiste la orden, la envía a cocina y la deja ABIERTA (sin cobrar).
    *  Queda en "Ver cuentas" del modo; se cobra al recoger / al regresar el repartidor. */
@@ -896,11 +910,11 @@ export function HomePos({
       // Vuelve a la lista de cuentas del modo, que es donde el cajero sigue trabajando.
       volverAtras();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "No se pudo enviar a cocina");
+      setError(await adoptarTicketSiQuedoAbierto(e, "No se pudo enviar a cocina"));
     } finally {
       setProcesandoCobro(false);
     }
-  }, [carrito, ticketBd, token, caja.sucursal_id, turno.caja_id, turno.id, cocinaEnviada, imprimirComandaCocina, volverAtras]);
+  }, [carrito, ticketBd, token, caja.sucursal_id, turno.caja_id, turno.id, cocinaEnviada, imprimirComandaCocina, volverAtras, adoptarTicketSiQuedoAbierto]);
 
   /** Logo del negocio listo para la térmica. Se rasteriza al vuelo (es rápido y evita
    *  guardar estado que se desincronice si cambian el logo desde el panel). Si no hay logo

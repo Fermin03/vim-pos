@@ -41,6 +41,23 @@ type CtxCobro = {
   turnoId: string;
 };
 
+/**
+ * El ticket se abrió y sus renglones entraron, pero el envío no se pudo fijar (zona desactivada,
+ * de otra sucursal…). Lleva el `ticketId` —y los totales, si se pudieron leer— porque ese ticket
+ * YA EXISTE ABIERTO: si el llamador no lo adopta, el reintento abre otro y el primero se queda
+ * huérfano trabando el corte (el fantasma del comentario de `iniciarCobro` en home-pos.tsx).
+ */
+export class ErrorEnvioNoFijado extends Error {
+  constructor(
+    mensaje: string,
+    readonly ticketId: string,
+    readonly totales: TotalesTicket | null,
+  ) {
+    super(mensaje);
+    this.name = "ErrorEnvioNoFijado";
+  }
+}
+
 function modifsJsonb(linea: LineaCarrito): { opcion_modificador_id: string; cantidad: number }[] {
   return linea.modificadores.map((m) => ({ opcion_modificador_id: m.opcionId, cantidad: m.cantidad }));
 }
@@ -115,7 +132,10 @@ export async function persistirTicket(
   // renglón tiene que existir ya cuando se llama.
   if (envioZonaId) {
     const { error } = await sb.rpc("fijar_envio_ticket", { p_ticket_id: tid, p_zona_id: envioZonaId });
-    if (error) throw new Error(error.message);
+    if (error) {
+      const totales = await leerTotales(ctx.token, tid).catch(() => null);
+      throw new ErrorEnvioNoFijado(error.message, tid, totales);
+    }
   }
 
   return leerTotales(ctx.token, tid);

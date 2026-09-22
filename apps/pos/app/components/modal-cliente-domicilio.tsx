@@ -6,7 +6,7 @@ import {
   fijarZonaDireccion, ETIQUETAS_DIRECCION,
   type ClienteDomicilio, type DireccionCliente, type DireccionInput,
 } from "../lib/clientes-domicilio";
-import { listarZonas, type ZonaEnvio } from "../lib/zonas-envio";
+import { listarZonas, zonaVigente, type ZonaEnvio } from "../lib/zonas-envio";
 import { SelectorZona } from "./selector-zona";
 
 const input = "h-11 w-full rounded border border-line-strong px-3 text-sm outline-none focus:border-ink focus:shadow-[0_0_0_3px_rgba(22,22,26,.06)]";
@@ -179,12 +179,15 @@ export function ModalClienteDomicilio({
   /** Elegir una dirección guardada: si el negocio tiene zonas y ella no trae ninguna, primero se
    *  la pedimos (y la dejamos guardada para la próxima vez) antes de seleccionarla. */
   function elegirDireccion(c: ClienteDomicilio, d: DireccionCliente) {
-    if (zonas.length > 0 && !d.zona) {
+    // La zona guardada solo vale si sigue en el catálogo vigente (activa y sin borrar), y con SU
+    // precio de hoy: una zona desactivada cuenta como "sin zona" y se vuelve a pedir.
+    const vigente = zonaVigente(d.zona, zonas);
+    if (zonas.length > 0 && !vigente) {
       setError(null);
-      setZonaPendiente({ cliente: c, direccion: d });
+      setZonaPendiente({ cliente: c, direccion: { ...d, zona: null } });
       return;
     }
-    onSeleccionar(conDireccion(c, d));
+    onSeleccionar(conDireccion(c, { ...d, zona: vigente }));
   }
 
   async function confirmarZonaPendiente(z: ZonaEnvio) {
