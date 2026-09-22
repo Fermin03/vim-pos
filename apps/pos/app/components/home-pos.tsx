@@ -446,7 +446,7 @@ export function HomePos({
         reconstruirCarrito(token, tId, productos ?? [], combos),
         leerItemsPersistidos(token, tId).catch(() => [] as ItemTicket[]),
       ]);
-      dispatch({ tipo: "cargar", estado: { modoServicio: recon.modoServicio, lineas: recon.lineas } });
+      dispatch({ tipo: "cargar", estado: { modoServicio: recon.modoServicio, lineas: recon.lineas, envio: recon.envio } });
       setTicketBd(bd);
       // Un renglón agregado después del primer envío deja el botón habilitado otra vez: si no,
       // lo nuevo se queda sin mandar y la cocina nunca se entera.
@@ -548,7 +548,7 @@ export function HomePos({
         reconstruirCarrito(token, ticketId, productos ?? [], combos),
         leerItemsPersistidos(token, ticketId).catch(() => [] as ItemTicket[]),
       ]);
-      dispatch({ tipo: "cargar", estado: { modoServicio: recon.modoServicio, lineas: recon.lineas } });
+      dispatch({ tipo: "cargar", estado: { modoServicio: recon.modoServicio, lineas: recon.lineas, envio: recon.envio } });
       setVolverA(origen);
       setTicketBd(bd);
       setItemsPersistidos(items);

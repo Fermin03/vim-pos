@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { agruparPadresHijos, type FilaItemPersistido } from "../cuenta-mesa";
+import { agruparPadresHijos, envioDeFilas, type FilaItemPersistido } from "../cuenta-mesa";
 import type { Producto } from "../catalogo";
 import type { ComboDef } from "../combos";
 
@@ -13,9 +13,10 @@ const def: ComboDef = { producto: combo, slots: [
   { id: "g1", nombre: "Hamburguesa", orden: 1, min: 1, max: 1, modo: "SUMA_PRECIO_PRODUCTO", opciones: [] },
   { id: "g2", nombre: "Acompañamiento", orden: 2, min: 1, max: 1, modo: "DELTA", opciones: [] },
 ] };
-const fila = (f: Partial<FilaItemPersistido> & { id: string; producto_id: string }): FilaItemPersistido => ({
+const fila = (f: Partial<FilaItemPersistido> & { id: string; producto_id: string | null }): FilaItemPersistido => ({
   client_id_local: null, cantidad: 1, nota_cocina: null, cancelado: false, parent_item_id: null, combo_rol: null,
-  combo_grupo_nombre_snapshot: null, precio_unitario_snapshot: 0, ticket_item_modificadores: [], ...f,
+  combo_grupo_nombre_snapshot: null, precio_unitario_snapshot: 0, cargo_tipo: null, producto_nombre_snapshot: "",
+  ticket_item_modificadores: [], ...f,
 });
 
 describe("agruparPadresHijos", () => {
@@ -49,5 +50,13 @@ describe("agruparPadresHijos", () => {
     const [l] = agruparPadresHijos(filas, porId, [def]);
     expect(l.cantidad).toBe(2);
     expect(l.combo?.componentes[0].cantidad).toBe(1);
+  });
+  it("el renglón de envío no se cuela como línea del carrito", () => {
+    const filas = [
+      fila({ id: "i1", producto_id: "p1", precio_unitario_snapshot: 120, producto_nombre_snapshot: "Brownie" }),
+      fila({ id: "i2", producto_id: null, cargo_tipo: "ENVIO", precio_unitario_snapshot: 35, producto_nombre_snapshot: "Envío · Zona Norte" }),
+    ];
+    expect(envioDeFilas(filas)).toEqual({ zonaId: "", nombre: "Envío · Zona Norte", costoMxn: 35 });
+    expect(agruparPadresHijos(filas.filter((f) => !f.cargo_tipo), porId, [def]).length).toBe(1);
   });
 });

@@ -1,7 +1,7 @@
 "use client";
 import { employeeClient } from "./supabase";
 import type { Producto } from "./catalogo";
-import type { LineaCarrito, ModificadorSel, ModoServicio } from "./carrito";
+import type { EnvioCarrito, LineaCarrito, ModificadorSel, ModoServicio } from "./carrito";
 import type { ComboDef, ComponenteSel } from "./combos";
 
 // T2 keystone — Cuenta por mesa (Full Service). El POS de QS construye el carrito local y persiste
@@ -18,7 +18,7 @@ function clientIdLocal(): string {
 export type FilaItemPersistido = {
   id: string;
   client_id_local: string | null;
-  producto_id: string;
+  producto_id: string | null;
   cantidad: number | string;
   nota_cocina: string | null;
   cancelado: boolean;
@@ -26,6 +26,10 @@ export type FilaItemPersistido = {
   combo_rol: "PADRE" | "HIJO" | null;
   combo_grupo_nombre_snapshot: string | null;
   precio_unitario_snapshot: number | string;
+  /** Distingue un cargo (p.ej. envío) de un producto normal. Nunca uses `producto_id === null` para
+   *  esto: un producto borrado del catálogo también deja ese campo en null. */
+  cargo_tipo: string | null;
+  producto_nombre_snapshot: string;
   ticket_item_modificadores: { opcion_modificador_id: string; grupo_nombre_snapshot: string | null; opcion_nombre_snapshot: string | null; precio_extra_snapshot: number | string | null; cantidad: number | null }[] | null;
 };
 
@@ -87,28 +91,51 @@ export function agruparPadresHijos(filas: FilaItemPersistido[], porId: Map<strin
 }
 
 /**
+ * Saca el cargo de envío de los renglones persistidos.
+ *
+ * Sin esto el renglón se perdería en silencio: `agruparPadresHijos` descarta lo que no encuentra
+ * en el catálogo, y el envío no está en el catálogo a propósito. El cajero vería un total con
+ * envío sin nada en pantalla que lo explique.
+ *
+ * `zonaId` se rellena luego desde `tickets.zona_envio_id`; para pintar el renglón basta el nombre
+ * y el importe congelados (lo que REALMENTE se cobró, no el precio actual de la zona).
+ */
+export function envioDeFilas(filas: FilaItemPersistido[]): EnvioCarrito | null {
+  const f = filas.find((r) => r.cargo_tipo === "ENVIO" && !r.cancelado);
+  if (!f) return null;
+  return { zonaId: "", nombre: f.producto_nombre_snapshot, costoMxn: Number(f.precio_unitario_snapshot) };
+}
+
+/**
  * Reconstruye las líneas del carrito desde un ticket persistido, casando producto_id con el
- * catálogo cargado. Items cancelados se omiten. Devuelve también el modo de servicio.
+ * catálogo cargado. Items cancelados se omiten. Devuelve también el modo de servicio y, si el
+ * ticket trae un cargo de envío persistido, el `envio` para que el cajero lo vuelva a ver.
  */
 export async function reconstruirCarrito(
   token: string,
   ticketId: string,
   productos: Producto[],
   combos: ComboDef[] = [],
-): Promise<{ lineas: LineaCarrito[]; modoServicio: ModoServicio }> {
+): Promise<{ lineas: LineaCarrito[]; modoServicio: ModoServicio; envio: EnvioCarrito | null }> {
   const sb = employeeClient(token);
-  const { data: ticket } = await sb.from("tickets").select("modo_servicio").eq("id", ticketId).maybeSingle();
+  const { data: ticket } = await sb.from("tickets").select("modo_servicio, zona_envio_id").eq("id", ticketId).maybeSingle();
   const modo = mapearModo((ticket?.modo_servicio as string) ?? "MESA");
 
   const { data, error } = await sb
     .from("ticket_items")
-    .select("id, client_id_local, producto_id, cantidad, nota_cocina, cancelado, parent_item_id, combo_rol, combo_grupo_nombre_snapshot, precio_unitario_snapshot, ticket_item_modificadores(opcion_modificador_id, grupo_nombre_snapshot, opcion_nombre_snapshot, precio_extra_snapshot, cantidad)")
+    .select("id, client_id_local, producto_id, cantidad, nota_cocina, cancelado, parent_item_id, combo_rol, combo_grupo_nombre_snapshot, precio_unitario_snapshot, cargo_tipo, producto_nombre_snapshot, ticket_item_modificadores(opcion_modificador_id, grupo_nombre_snapshot, opcion_nombre_snapshot, precio_extra_snapshot, cantidad)")
     .eq("ticket_id", ticketId)
     .order("orden_visualizacion", { ascending: true });
   if (error) throw new Error(error.message);
 
+  const filas = (data ?? []) as unknown as FilaItemPersistido[];
   const porId = new Map(productos.map((p) => [p.id, p]));
-  return { lineas: agruparPadresHijos((data ?? []) as unknown as FilaItemPersistido[], porId, combos), modoServicio: modo };
+  const envio = envioDeFilas(filas);
+  return {
+    lineas: agruparPadresHijos(filas.filter((r) => !r.cargo_tipo), porId, combos),
+    modoServicio: modo,
+    envio: envio ? { ...envio, zonaId: String(ticket?.zona_envio_id ?? "") } : null,
+  };
 }
 
 /** Agrega un combo a un ticket abierto (cuenta de mesa). Idempotente por los client ids de la línea. */
