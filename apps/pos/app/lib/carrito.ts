@@ -6,6 +6,9 @@ import type { ComboDef, ComponenteSel } from "./combos";
 
 export type ModoServicio = "COMER_AQUI" | "PARA_LLEVAR" | "DRIVE_THRU" | "DELIVERY_PROPIO";
 
+/** Cargo de envío del pedido. Antes de cobrar vive aquí; al persistir se vuelve renglón del ticket. */
+export type EnvioCarrito = { zonaId: string; nombre: string; costoMxn: number };
+
 export type ModificadorSel = {
   opcionId: string;
   grupoNombre: string;
@@ -33,9 +36,11 @@ export type EstadoCarrito = {
   notaOrden?: string | null;
   /** Pick-up: nombre suelto para identificar la cuenta. NO es un cliente registrado. */
   nombreCuenta?: string | null;
+  /** Zona de reparto y su cargo. Solo DELIVERY_PROPIO. */
+  envio?: EnvioCarrito | null;
 };
 
-export const estadoInicial: EstadoCarrito = { modoServicio: "COMER_AQUI", lineas: [], clienteDomicilio: null, notaOrden: null, nombreCuenta: null };
+export const estadoInicial: EstadoCarrito = { modoServicio: "COMER_AQUI", lineas: [], clienteDomicilio: null, notaOrden: null, nombreCuenta: null, envio: null };
 
 export type AccionCarrito =
   | { tipo: "agregar"; linea: LineaCarrito }
@@ -47,6 +52,7 @@ export type AccionCarrito =
   | { tipo: "nota_linea"; clientId: string; nota: string | null }
   | { tipo: "nota_orden"; nota: string | null }
   | { tipo: "nombre_cuenta"; nombre: string | null }
+  | { tipo: "zona"; envio: EnvioCarrito | null }
   | { tipo: "cargar"; estado: EstadoCarrito }
   | { tipo: "limpiar" };
 
@@ -70,8 +76,8 @@ export function reducerCarrito(estado: EstadoCarrito, accion: AccionCarrito): Es
     case "quitar":
       return { ...estado, lineas: estado.lineas.filter((l) => l.clientId !== accion.clientId) };
     case "modo":
-      // Al salir de Domicilio se limpia el cliente asociado.
-      return { ...estado, modoServicio: accion.modo, clienteDomicilio: accion.modo === "DELIVERY_PROPIO" ? estado.clienteDomicilio ?? null : null, nombreCuenta: accion.modo === "DRIVE_THRU" ? estado.nombreCuenta ?? null : null };
+      // Al salir de Domicilio se limpia el cliente asociado y el envío.
+      return { ...estado, modoServicio: accion.modo, clienteDomicilio: accion.modo === "DELIVERY_PROPIO" ? estado.clienteDomicilio ?? null : null, nombreCuenta: accion.modo === "DRIVE_THRU" ? estado.nombreCuenta ?? null : null, envio: accion.modo === "DELIVERY_PROPIO" ? estado.envio ?? null : null };
     case "cliente":
       return { ...estado, clienteDomicilio: accion.cliente };
     case "nombre_cuenta":
@@ -83,9 +89,11 @@ export function reducerCarrito(estado: EstadoCarrito, accion: AccionCarrito): Es
       };
     case "nota_orden":
       return { ...estado, notaOrden: accion.nota };
+    case "zona":
+      return { ...estado, envio: accion.envio };
     case "limpiar":
-      // La nota de orden es de ESTE pedido: se limpia con él.
-      return { modoServicio: estado.modoServicio, lineas: [], clienteDomicilio: estado.clienteDomicilio ?? null, notaOrden: null, nombreCuenta: null };
+      // La nota de orden es de ESTE pedido: se limpia con él. El envío va con el pedido anterior.
+      return { modoServicio: estado.modoServicio, lineas: [], clienteDomicilio: estado.clienteDomicilio ?? null, notaOrden: null, nombreCuenta: null, envio: null };
     default:
       return estado;
   }
@@ -118,9 +126,12 @@ export type TotalesDisplay = { subtotal: number; iva: number; total: number };
 /**
  * Totales de DISPLAY. Asume IVA incluido en precio (caso Knock-Out: productos.iva_incluido_en_precio=true).
  * Tasa fija 16% para display; la BD recalcula con la tasa real por producto al cobrar.
+ *
+ * `envioMxn` es el cargo de zona del pedido. Antes de cobrar no es una línea del carrito —vive en
+ * `estado.envio`— pero sí forma parte del total que el cajero le dice al cliente.
  */
-export function calcularTotalesDisplay(lineas: LineaCarrito[], tasaIva = 16): TotalesDisplay {
-  const total = r2(lineas.reduce((acc, l) => acc + totalLinea(l), 0));
+export function calcularTotalesDisplay(lineas: LineaCarrito[], tasaIva = 16, envioMxn = 0): TotalesDisplay {
+  const total = r2(lineas.reduce((acc, l) => acc + totalLinea(l), 0) + envioMxn);
   const subtotal = r2(total / (1 + tasaIva / 100));
   const iva = r2(total - subtotal);
   return { subtotal, iva, total };
