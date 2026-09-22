@@ -17,6 +17,13 @@ BEGIN
   INSERT INTO zonas_envio (tenant_id, sucursal_id, nombre, costo_mxn)
   VALUES (v_tenant, v_suc, 'Zona Norte', 35.00) RETURNING id INTO v_z_norte;
 
+  -- 1b) Una zona nueva es "el catálogo cambió": catalogo_version() la ve. Sin esto la caja no
+  --     se entera hasta el pull de respaldo (hasta una hora). Nada más en esta transacción ha
+  --     tocado el catálogo todavía, así que el máximo solo puede ser now() si incluye zonas_envio.
+  IF catalogo_version() IS DISTINCT FROM now() THEN
+    RAISE EXCEPTION 'catalogo_version() no incluye zonas_envio (devolvió %, esperaba %)', catalogo_version(), now();
+  END IF;
+
   -- 2) Nombre repetido en la misma sucursal: rechazado aunque cambien mayúsculas y espacios
   BEGIN
     INSERT INTO zonas_envio (tenant_id, sucursal_id, nombre, costo_mxn)
@@ -235,6 +242,17 @@ BEGIN
   EXCEPTION WHEN raise_exception THEN
     IF SQLERRM LIKE 'FALLO:%' THEN RAISE; END IF;
   END;
+
+  -- 9) El envío no es un producto vendido: el ticket PAGADO de arriba lleva envío y aun así no
+  --    aparece "Envío · …" en la vista de ventas por producto.
+  IF EXISTS (SELECT 1 FROM vw_ventas_por_producto
+              WHERE tenant_id = v_tenant AND producto_nombre LIKE 'Envío%') THEN
+    RAISE EXCEPTION 'vw_ventas_por_producto cuenta el envío como producto vendido';
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM vw_ventas_por_producto
+                  WHERE tenant_id = v_tenant AND producto_id = v_prod) THEN
+    RAISE EXCEPTION 'vw_ventas_por_producto perdió la comida del ticket con envío';
+  END IF;
 
   RAISE NOTICE 'OK fijar_envio_ticket';
 END $$;

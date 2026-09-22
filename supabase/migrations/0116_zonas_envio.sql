@@ -431,3 +431,75 @@ COMMENT ON FUNCTION sync_push_snapshot(uuid, jsonb) IS
   'Replica la rebanada operativa de la caja (modo réplica, aislando filas conflictivas en _errores) y aplica sus movimientos de inventario en modo origin (existencias + alertas). Registra sync_eventos y sella cajas.ultima_conexion. Solo service_role. ADR 0013.';
 REVOKE EXECUTE ON FUNCTION sync_push_snapshot(uuid, jsonb) FROM public, anon, authenticated;
 GRANT EXECUTE ON FUNCTION sync_push_snapshot(uuid, jsonb) TO service_role;
+
+-- ============================================================================
+-- catalogo_version(): una zona nueva o repreciada también es "el catálogo cambió".
+--
+-- Sin esto la caja solo se enteraba de un cambio de zona hecho en el panel con el pull de respaldo
+-- (hasta una hora). Copia íntegra de la vigente (0111_combos.sql §3.3) con una línea más:
+-- zonas_envio.
+-- ============================================================================
+CREATE OR REPLACE FUNCTION catalogo_version()
+RETURNS timestamptz
+LANGUAGE sql
+STABLE
+SET search_path = public, pg_temp
+AS $$
+  SELECT GREATEST(
+    (SELECT max(updated_at) FROM categorias),
+    (SELECT max(updated_at) FROM productos),
+    (SELECT max(updated_at) FROM grupos_modificadores),
+    (SELECT max(updated_at) FROM opciones_modificador),
+    (SELECT max(created_at) FROM productos_grupos_modificadores),
+    (SELECT max(updated_at) FROM combo_grupos),
+    (SELECT max(updated_at) FROM combo_opciones),
+    (SELECT max(updated_at) FROM zonas_envio)
+  );
+$$;
+REVOKE EXECUTE ON FUNCTION catalogo_version() FROM public, anon;
+GRANT EXECUTE ON FUNCTION catalogo_version() TO authenticated, service_role;
+
+-- ============================================================================
+-- vw_ventas_por_producto: el envío no es un producto vendido.
+--
+-- Copia íntegra de la vigente (0111_combos.sql §3.1) con una condición más en el WHERE:
+-- `ti.cargo_tipo IS NULL`. Sin ella, "Envío · Zona Norte" salía en el ranking de productos. Las
+-- vistas por categoría y por área de cocina no la necesitan: ya exigen categoria/area no nulas, y
+-- el renglón de envío no tiene ninguna de las dos.
+-- ============================================================================
+CREATE OR REPLACE VIEW vw_ventas_por_producto
+WITH (security_invoker = true) AS
+SELECT
+  t.tenant_id,
+  t.sucursal_id,
+  t.dia_contable,
+  ti.producto_id,
+  ti.producto_nombre_snapshot  AS producto_nombre,
+  ti.producto_sku_snapshot     AS producto_sku,
+  COUNT(DISTINCT t.id)         AS tickets_con_producto,
+  SUM(ti.cantidad)             AS unidades_vendidas,
+  SUM(CASE WHEN ti.combo_rol = 'HIJO' THEN ti.precio_asignado_mxn + ti.subtotal_bruto_mxn ELSE ti.subtotal_bruto_mxn END) AS subtotal_mxn,
+  -- IVA y total del HIJO: misma regla que en vw_ventas_por_categoria — atributos fiscales DEL
+  -- PADRE (join `padre`) y, con IVA por afuera, el impuesto derivado se suma a total_mxn.
+  SUM(CASE WHEN ti.combo_rol = 'HIJO' THEN rebanada.iva_mxn + ti.iva_item_mxn
+           ELSE ti.iva_item_mxn END) AS iva_mxn,
+  SUM(CASE WHEN ti.combo_rol = 'HIJO'
+           THEN ti.precio_asignado_mxn + (CASE WHEN rebanada.iva_dentro THEN 0 ELSE rebanada.iva_mxn END) + ti.total_item_mxn
+           ELSE ti.total_item_mxn END) AS total_mxn,
+  AVG(CASE WHEN ti.combo_rol = 'HIJO' THEN ti.precio_unitario_original_snapshot ELSE ti.precio_unitario_snapshot END) AS precio_unitario_promedio_mxn
+FROM tickets t
+JOIN ticket_items ti ON ti.ticket_id = t.id
+LEFT JOIN ticket_items padre ON padre.id = ti.parent_item_id
+LEFT JOIN LATERAL (
+  SELECT ROUND(ti.precio_asignado_mxn * padre.tasa_iva_snapshot
+               / (CASE WHEN padre.iva_incluido_en_precio_snapshot THEN 100 + padre.tasa_iva_snapshot ELSE 100 END), 2) AS iva_mxn,
+         padre.iva_incluido_en_precio_snapshot AS iva_dentro
+) rebanada ON ti.combo_rol = 'HIJO'
+WHERE t.deleted_at IS NULL
+  AND t.estado_fiscal IN ('PAGADO', 'FACTURADO')
+  AND ti.cancelado = false
+  AND ti.combo_rol IS DISTINCT FROM 'PADRE'
+  AND ti.cargo_tipo IS NULL
+GROUP BY t.tenant_id, t.sucursal_id, t.dia_contable,
+         ti.producto_id, ti.producto_nombre_snapshot, ti.producto_sku_snapshot;
+COMMENT ON VIEW vw_ventas_por_producto IS 'Ventas por producto/día. Los PADRES de combo no cuentan; los HIJOS valen su precio asignado más sus extras, con el IVA derivado de los atributos fiscales DEL PADRE (y sumado al total cuando el padre cobra con IVA por afuera). ADR 0015. Los cargos (cargo_tipo, p.ej. ENVIO) no son productos y no cuentan. ADR 0017.';
