@@ -16,6 +16,8 @@ export { leerCreds, guardarCreds, olvidarCreds, CREDS_DEV_FIXTURE, type DeviceCr
 export { leerCaja, type CajaKds } from "./caja";
 export {
   leerComandas,
+  comandasDesdeFilas,
+  SELECCION_TICKET_ITEMS_KDS,
   avanzarCocina,
   cerrarComanda,
   labelModo,
@@ -24,5 +26,7 @@ export {
   type ComandaKds,
   type ItemComanda,
   type EstadoCocina,
+  type FilaTicketKds,
+  type FilaItemKds,
 } from "./comandas";
 export { areasDeComandas, comandasNuevas, SIN_AREA } from "./estado";

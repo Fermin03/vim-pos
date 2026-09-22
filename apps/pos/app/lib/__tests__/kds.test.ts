@@ -1,5 +1,16 @@
 import { describe, it, expect } from "vitest";
-import { siguienteEstado, minutosEnCocina, labelModo, areasDeComandas, comandasNuevas, SIN_AREA } from "@vim/kds-core";
+import {
+  siguienteEstado,
+  minutosEnCocina,
+  labelModo,
+  areasDeComandas,
+  comandasNuevas,
+  SIN_AREA,
+  comandasDesdeFilas,
+  SELECCION_TICKET_ITEMS_KDS,
+  type FilaTicketKds,
+  type FilaItemKds,
+} from "@vim/kds-core";
 
 describe("kds — máquina de estados de cocina", () => {
   it("avanza EN_COCINA → LISTO → ENTREGADO y luego null", () => {
@@ -52,5 +63,52 @@ describe("kds — F15 multi-área + nuevos pedidos", () => {
     expect(comandasNuevas(previos, ["a", "b", "c"])).toBe(1);
     expect(comandasNuevas(previos, ["c", "d"])).toBe(2);
     expect(comandasNuevas(new Set(), ["a"])).toBe(1);
+  });
+});
+
+describe("comandasDesdeFilas — la comanda del KDS ignora los cargos", () => {
+  const item = (x: Partial<FilaItemKds> & { id: string; producto_nombre_snapshot: string }): FilaItemKds => ({
+    cantidad: 1,
+    nota_cocina: null,
+    cancelado: false,
+    area_cocina_nombre_snapshot: null,
+    parent_item_id: null,
+    combo_rol: null,
+    orden_visualizacion: 1,
+    cargo_tipo: null,
+    ticket_item_modificadores: [],
+    ...x,
+  });
+  const fila = (items: FilaItemKds[]): FilaTicketKds => ({
+    id: "T1",
+    folio_completo: "KC-2026-000009",
+    modo_servicio: "PARA_LLEVAR",
+    estado_cocina: "EN_COCINA",
+    fecha_envio_cocina: "2026-06-06T12:00:00Z",
+    nota_general: null,
+    ticket_items: items,
+  });
+
+  it("el envío no llega a la pantalla de cocina: la plancha no prepara un reparto", () => {
+    const [c] = comandasDesdeFilas([
+      fila([
+        item({ id: "1", producto_nombre_snapshot: "Hamburguesa Clásica", orden_visualizacion: 1 }),
+        item({ id: "2", producto_nombre_snapshot: "Envío · Zona Norte", orden_visualizacion: 2, cargo_tipo: "ENVIO" }),
+      ]),
+    ]);
+    expect(c!.items.map((i) => i.nombre)).toEqual(["Hamburguesa Clásica"]);
+  });
+
+  it("un ticket que es SOLO envío llega a la pantalla sin renglones", () => {
+    const [c] = comandasDesdeFilas([
+      fila([item({ id: "1", producto_nombre_snapshot: "Envío · Centro", cargo_tipo: "ENVIO" })]),
+    ]);
+    expect(c!.items).toEqual([]);
+  });
+});
+
+describe("SELECCION_TICKET_ITEMS_KDS — la proyección que pide leerComandas", () => {
+  it("incluye cargo_tipo: sin este campo el filtro de cargos deja de filtrar en silencio", () => {
+    expect(SELECCION_TICKET_ITEMS_KDS).toContain("cargo_tipo");
   });
 });
