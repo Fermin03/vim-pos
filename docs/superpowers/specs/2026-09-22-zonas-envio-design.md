@@ -314,7 +314,15 @@ Desactivar una zona la saca de los chips de la caja; las direcciones que la ten�
   `_vim_zonas_ok` — tabla local de control, se mandan las que la nube aún no confirmó, y una
   siembra única (`siembra_zonas_0116`, espejo de `siembra_repartidores_0114`) que marca como ya
   subidas las que bajaron del pull, para que una caja recién actualizada no reenvíe el catálogo
-  entero.
+  entero. *(Revisión final de la rama: la libreta va por **huella**, como `_vim_turnos_ok` —
+  `md5(to_jsonb(x))` anotada al subir y al bajar del pull—; una zona sube si no está anotada o si
+  su huella cambió. Con "una vez por id" un repreciado autorizado con PIN en la caja nunca subía y
+  el siguiente pull lo revertía.)*
+- `sync-pull.mjs` → `CLAVES_NATURALES`: `zonas_envio` con clave natural
+  `(sucursal_id, lower(btrim(nombre)))` entre filas vivas. Si la caja creó "Centro" sin conexión y
+  el panel otro "Centro", la zona local se borra para que entre la de la nube, **reapuntando antes**
+  `tickets.zona_envio_id` y `direcciones_cliente.zona_envio_id` al id de la nube. Sin esto el pull
+  chocaba con `zona_envio_nombre_uq` y hacía ROLLBACK de todo, en cada ciclo.
 - Las columnas nuevas de `tickets` y `ticket_items` viajan solas: el push serializa con
   `to_jsonb(x)` y el pull descubre columnas por `information_schema`.
 
