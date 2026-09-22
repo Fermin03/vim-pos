@@ -59,6 +59,7 @@ export function SidebarTicket({
   onLimpiar,
   onCancelarTicket,
   onEditarCliente,
+  onCambiarZona,
   onNotaLinea,
   onNotaOrden,
   onCobrar,
@@ -94,6 +95,11 @@ export function SidebarTicket({
   onCancelarTicket?: () => void;
   /** Abre el modal de cliente para domicilio (solo aplica en modo Domicilio). */
   onEditarCliente?: () => void;
+  /** Abre el modal de zona de reparto para cambiar el envío de ESTE pedido (sin tocar la
+   *  dirección guardada del cliente). Solo tiene efecto con el ticket sin persistir: una vez
+   *  bloqueado, el total mostrado es el autoritativo de la BD (`totalConDescuento`) y cambiar
+   *  la zona aquí no lo movería — ver renglón deshabilitado más abajo. */
+  onCambiarZona?: () => void;
   /** Edita la nota de cocina de una línea (carrito local, pre-cobro). */
   onNotaLinea?: (clientId: string, nota: string | null) => void;
   /** Edita la nota de cocina de TODA la orden. */
@@ -126,7 +132,7 @@ export function SidebarTicket({
   bloqueado?: boolean;
   procesando: boolean;
 }) {
-  const totales = calcularTotalesDisplay(estado.lineas);
+  const totales = calcularTotalesDisplay(estado.lineas, 16, estado.envio?.costoMxn ?? 0);
   const vacio = estado.lineas.length === 0;
   const totalProductos = estado.lineas.reduce((s, l) => s + l.cantidad, 0);
   // Notas de cocina: qué línea se está editando + si el input de nota de orden está abierto.
@@ -364,6 +370,20 @@ export function SidebarTicket({
           cajero necesita ver. Subtotal/IVA son informativos → tipografía menor y filas apretadas;
           el TOTAL sigue siendo el número dominante. */}
       <div className="flex-shrink-0 border-t border-line bg-sel px-5 py-3">
+        {/* Renglón de envío: solo domicilio, y solo mientras el ticket no está persistido. Una
+            vez bloqueado el total de abajo es el autoritativo de la BD (totalConDescuento) y
+            tocar la zona aquí no lo movería, así que se deshabilita en vez de mentir. */}
+        {estado.envio && (
+          <button
+            type="button"
+            disabled={bloqueado}
+            onClick={onCambiarZona}
+            className="mb-1 flex w-full items-center justify-between text-[13px] text-ink-2 hover:text-ink disabled:cursor-default disabled:hover:text-ink-2"
+          >
+            <span>{estado.envio.nombre}</span>
+            <span className="tabular-nums font-medium text-ink">{fmtMxn(estado.envio.costoMxn)}</span>
+          </button>
+        )}
         <div className="mb-1 flex justify-between text-[13px] text-ink-2">
           <span>Subtotal</span>
           <span className="tabular-nums font-medium text-ink">{fmtMxn(totales.subtotal)}</span>

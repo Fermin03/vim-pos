@@ -54,6 +54,9 @@ export async function persistirTicket(
   direccionEntregaId?: string | null,
   notaOrden?: string | null,
   nombreCliente?: string | null,
+  /** Zona de reparto del pedido. El cargo entra como renglón, después de los productos: la RPC
+   *  hereda la política de IVA del primer renglón, así que los productos tienen que existir ya. */
+  envioZonaId?: string | null,
 ): Promise<TotalesTicket> {
   const sb = employeeClient(ctx.token);
 
@@ -103,6 +106,14 @@ export async function persistirTicket(
           p_modificadores: modifsJsonb(l),
           p_client_id_local: l.clientId,
         });
+    if (error) throw new Error(error.message);
+  }
+
+  // El envío entra DESPUÉS del bucle de renglones: fijar_envio_ticket hereda la tasa de IVA y el
+  // "incluido en precio" del primer renglón de producto (0115_zonas_envio.sql), así que ese
+  // renglón tiene que existir ya cuando se llama.
+  if (envioZonaId) {
+    const { error } = await sb.rpc("fijar_envio_ticket", { p_ticket_id: tid, p_zona_id: envioZonaId });
     if (error) throw new Error(error.message);
   }
 

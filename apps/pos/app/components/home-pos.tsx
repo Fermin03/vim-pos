@@ -32,6 +32,7 @@ import { obtenerImpresora, obtenerImpresoraDeEstacion } from "../lib/print/adapt
 import { estacionParaArea, hayEstacionDeCocinaDedicada } from "../lib/print/config";
 import { ModalConfigImpresora } from "./modal-config-impresora";
 import { ModalClienteDomicilio } from "./modal-cliente-domicilio";
+import { ModalZonaPedido } from "./modal-zona-pedido";
 import { ModalNombreCuenta } from "./modal-nombre-cuenta";
 import { ModalCambiarPin } from "./modal-cambiar-pin";
 import { ModalMisPropinas } from "./modal-mis-propinas";
@@ -225,6 +226,9 @@ export function HomePos({
   const [enModoMesa, setEnModoMesa] = useState(false);
   const [configImpresoraAbierto, setConfigImpresoraAbierto] = useState(false);
   const [clienteDomAbierto, setClienteDomAbierto] = useState(false);
+  // Task 7 — cambiar la zona de reparto de ESTE pedido desde el renglón de envío del ticket
+  // lateral (no reabre la búsqueda de cliente ni toca `direcciones_cliente`).
+  const [zonaPedidoAbierto, setZonaPedidoAbierto] = useState(false);
   const [nombreCuentaAbierto, setNombreCuentaAbierto] = useState(false);
   const [cambiarPinAbierto, setCambiarPinAbierto] = useState(false);
   const [cocinaEnviada, setCocinaEnviada] = useState(false);
@@ -723,6 +727,7 @@ export function HomePos({
           carrito.clienteDomicilio?.direccionId ?? null,
           carrito.notaOrden ?? null,
           carrito.nombreCuenta ?? null,
+          carrito.envio?.zonaId ?? null,
         );
         setTicketBd(bd);
       }
@@ -774,6 +779,7 @@ export function HomePos({
         carrito.clienteDomicilio?.direccionId ?? null,
         carrito.notaOrden ?? null,
         carrito.nombreCuenta ?? null,
+        carrito.envio?.zonaId ?? null,
       );
       /* EL TICKET YA EXISTE, CON FOLIO. La pantalla tiene que saberlo desde este instante.
 
@@ -819,6 +825,7 @@ export function HomePos({
           carrito.clienteDomicilio?.direccionId ?? null,
           carrito.notaOrden ?? null,
           carrito.nombreCuenta ?? null,
+          carrito.envio?.zonaId ?? null,
         );
       }
       await ponerTicketEnEspera(token, bd.ticketId, etiqueta);
@@ -853,6 +860,7 @@ export function HomePos({
           carrito.clienteDomicilio?.direccionId ?? null,
           carrito.notaOrden ?? null,
           carrito.nombreCuenta ?? null,
+          carrito.envio?.zonaId ?? null,
         );
         // Desde aquí el ticket es real. Si lo de abajo falla —la impresora, la red— el error se
         // muestra y el cajero sigue en la pantalla; sin esto la pantalla no sabía que el ticket
@@ -1046,6 +1054,7 @@ export function HomePos({
       [pidiendoMesa, () => setPidiendoMesa(false)],
       [nombreCuentaAbierto, () => setNombreCuentaAbierto(false)],
       [clienteDomAbierto, () => setClienteDomAbierto(false)],
+      [zonaPedidoAbierto, () => setZonaPedidoAbierto(false)],
       [esperaPidiendoEtiqueta, () => setEsperaPidiendoEtiqueta(false)],
       [esperaListaAbierta, () => setEsperaListaAbierta(false)],
       [movimientoAbierto, () => setMovimientoAbierto(false)],
@@ -1064,7 +1073,7 @@ export function HomePos({
     return capaVisible(capas);
   }, [modGrupos, comboAbierto, hojaCombo, agregarSuelto, cancelandoItem, descuentoItem, cancelandoTicket, avisoReparto, mostrarRecibo, confirmacion, totalesCobro,
       procesandoCobro, agregandoA, viendoMapaMesas, pidiendoMesa, nombreCuentaAbierto,
-      clienteDomAbierto, esperaPidiendoEtiqueta, esperaListaAbierta, movimientoAbierto,
+      clienteDomAbierto, zonaPedidoAbierto, esperaPidiendoEtiqueta, esperaListaAbierta, movimientoAbierto,
       abrirCajaAbierto, cambiarPinAbierto, misPropinasAbierto, configImpresoraAbierto,
       salidaPendiente, confirmandoCierre, menuGeneralAbierto, cerrando, enInicio, enKds, enMonitor,
       enConsultaCuentas, enDevoluciones, enPedidosApps, enDelivery, enPickup, enMesas, nuevoTicket,
@@ -1676,8 +1685,28 @@ export function HomePos({
           cajaId={turno.caja_id}
           turnoId={turno.id}
           empleadoNombre={empleado.nombre}
-          onSeleccionar={(c) => { dispatch({ tipo: "cliente", cliente: c }); setClienteDomAbierto(false); }}
+          onSeleccionar={(c) => {
+            dispatch({ tipo: "cliente", cliente: c });
+            // Ruling 1 — el envío se pone solo con la zona de la dirección elegida. Sin esto, un
+            // cliente guardado con zona no pondría ningún cargo hasta cobrar: el hueco que cierra
+            // Task 7 (ver también el renglón de envío del ticket lateral).
+            dispatch({ tipo: "zona", envio: c.zona ? { zonaId: c.zona.id, nombre: c.zona.nombre, costoMxn: c.zona.costoMxn } : null });
+            setClienteDomAbierto(false);
+          }}
           onCerrar={() => setClienteDomAbierto(false)}
+        />
+      )}
+      {zonaPedidoAbierto && (
+        <ModalZonaPedido
+          token={token}
+          tenantId={caja.tenant_id}
+          sucursalId={caja.sucursal_id}
+          cajaId={turno.caja_id}
+          turnoId={turno.id}
+          empleadoNombre={empleado.nombre}
+          valor={carrito.envio?.zonaId ?? null}
+          onElegir={(envio) => { dispatch({ tipo: "zona", envio }); setZonaPedidoAbierto(false); }}
+          onCerrar={() => setZonaPedidoAbierto(false)}
         />
       )}
       {nombreCuentaAbierto && (
@@ -1709,6 +1738,7 @@ export function HomePos({
           onLimpiar={!ticketBd ? () => dispatch({ tipo: "limpiar" }) : undefined}
           onCancelarTicket={ticketBd ? () => setCancelandoTicket(true) : undefined}
           onEditarCliente={() => setClienteDomAbierto(true)}
+          onCambiarZona={() => setZonaPedidoAbierto(true)}
           onNotaLinea={(id, nota) => dispatch({ tipo: "nota_linea", clientId: id, nota })}
           onNotaOrden={(nota) => dispatch({ tipo: "nota_orden", nota })}
           onCobrar={iniciarCobro}
