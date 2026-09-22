@@ -275,4 +275,40 @@ END $$;
 
 RESET ROLE;
 
+-- 5) Sync con la nube: la zona BAJA en el pull y una zona nueva creada en la caja SUBE en el push.
+--    Corre como postgres (RESET ROLE ya hecho arriba): sync_push_snapshot hace
+--    SET LOCAL session_replication_role = replica, que exige superusuario.
+DO $$
+DECLARE
+  v_tenant uuid := '99999999-0000-0000-0000-0000000000aa';
+  v_suc    uuid := '99999999-0000-0000-0000-0000000000bb';
+  v_snap   jsonb;
+  v_zona   uuid := gen_random_uuid();
+BEGIN
+  INSERT INTO zonas_envio (tenant_id, sucursal_id, nombre, costo_mxn)
+  VALUES (v_tenant, v_suc, 'Bajada', 25.00);
+
+  -- BAJA: la rebanada del tenant trae las zonas
+  v_snap := sync_pull_snapshot(v_tenant);
+  IF NOT (v_snap ? 'zonas_envio') THEN
+    RAISE EXCEPTION 'sync_pull_snapshot no incluye zonas_envio: la caja nunca vería el catálogo';
+  END IF;
+  IF jsonb_array_length(v_snap->'zonas_envio') < 1 THEN
+    RAISE EXCEPTION 'sync_pull_snapshot devolvió zonas_envio vacío';
+  END IF;
+
+  -- SUBE: una zona dada de alta en la caja se replica verbatim
+  PERFORM sync_push_snapshot(v_tenant, jsonb_build_object(
+    'zonas_envio', jsonb_build_array(jsonb_build_object(
+      'id', v_zona, 'tenant_id', v_tenant, 'sucursal_id', v_suc,
+      'nombre', 'Desde la caja', 'costo_mxn', 40.00, 'orden', 0, 'activa', true,
+      'created_at', now(), 'updated_at', now(), 'deleted_at', NULL))));
+
+  IF NOT EXISTS (SELECT 1 FROM zonas_envio WHERE id = v_zona AND costo_mxn = 40.00) THEN
+    RAISE EXCEPTION 'sync_push_snapshot no aplicó la zona creada en la caja';
+  END IF;
+
+  RAISE NOTICE 'OK sync de zonas_envio';
+END $$;
+
 ROLLBACK;
