@@ -41,7 +41,7 @@ test("PULL_ORDER baja los slots de combos después de productos y sus opciones d
   assert.ok(t.indexOf("combo_opciones") < t.indexOf("configuracion_tenant"));
 });
 
-import { pullSnapshot } from "./sync-pull.mjs";
+import { pullSnapshot, marcarZonasDelPull } from "./sync-pull.mjs";
 
 /**
  * Un cliente de mentiras que responde lo mínimo para que `pullSnapshot` corra: la metadata de la
@@ -94,4 +94,22 @@ test("un pull sin repartidores no toca la libreta", async () => {
   const { client, pool } = clienteFalso();
   await pullSnapshot(pool, { repartidores: [] });
   assert.ok(!client.consultas.some((c) => c.sql.includes("_vim_repartidores_ok")));
+});
+
+// Zonas de envío (0115/Task 4): misma gemela que los repartidores, mirando _vim_zonas_ok.
+// Nota de terreno: el brief nombra el doble como `clienteFalsoDelPull`; el nombre real en este
+// archivo es `clienteFalso()` (definido arriba) — se usa ese.
+
+test("el pull anota en _vim_zonas_ok lo que acaba de bajar", async () => {
+  const { client } = clienteFalso();
+  await marcarZonasDelPull(client, [{ id: "z1" }, { id: "z2" }], () => {});
+  const marca = client.consultas.find((c) => c.sql.includes("_vim_zonas_ok") && c.sql.includes("unnest"));
+  assert.ok(marca, "el pull no anotó las zonas que bajaron");
+  assert.deepEqual(marca.params[0], ["z1", "z2"]);
+});
+
+test("sin zonas en el snapshot, el pull no toca la libreta", async () => {
+  const { client } = clienteFalso();
+  assert.equal(await marcarZonasDelPull(client, [], () => {}), 0);
+  assert.ok(!client.consultas.some((c) => c.sql.includes("_vim_zonas_ok")));
 });

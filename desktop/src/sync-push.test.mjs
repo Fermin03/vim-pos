@@ -19,25 +19,37 @@
 // difícil de montar. El SQL real lo cubre `npm run verify:push`.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { listarPendientes, pushToCloud, sembrarRepartidoresUnaVez } from "./sync-push.mjs";
+import { listarPendientes, pushToCloud, sembrarRepartidoresUnaVez, sembrarZonasUnaVez } from "./sync-push.mjs";
 
 /**
- * Un pool que sabe lo justo para este archivo: sin ventas, sin turnos, sin movimientos, y el
- * catálogo de repartidores que se le pase. Modela tres cosas y apunta lo que se escribe en ellas:
- * la tabla `repartidores` (`catalogo`, mutable: las pruebas le añaden altas hechas en la caja), la
- * libreta `_vim_repartidores_ok` (`marcados`) y los marcadores de una-sola-vez
- * (`marcadores`, `_vim_migraciones_sync`).
+ * Un pool que sabe lo justo para este archivo: sin ventas, sin turnos, sin movimientos, y los
+ * catálogos de repartidores y de zonas de envío que se le pasen. Modela lo que se escribe en:
+ * las tablas `repartidores` / `zonas_envio` (`catalogo` / `catalogoZonas`, mutables: las pruebas
+ * les añaden altas hechas en la caja), las libretas `_vim_repartidores_ok` / `_vim_zonas_ok`
+ * (`marcados` / `marcadasZonas`) y los marcadores de una-sola-vez (`marcadores`,
+ * `_vim_migraciones_sync`).
+ *
+ * `catalogoZonas` guarda objetos `{ id }` (no ids sueltos como `catalogo`) porque así las trae la
+ * prueba del brief de la Tarea 4 y es lo que espera `sembrarZonasUnaVez` al construir el snapshot.
  */
-function crearPoolFalso({ catalogo = [], yaMarcados = [], fallaLaSiembra = false } = {}) {
+function crearPoolFalso({
+  catalogo = [], yaMarcados = [], fallaLaSiembra = false,
+  catalogoZonas = [], yaMarcadasZonas = [],
+} = {}) {
   const marcados = new Set(yaMarcados);
+  const marcadasZonas = new Set(yaMarcadasZonas);
   // El rescate de cortes (0.4.50) se da por corrido: aquí no se prueba y no debe tocar nada.
   const marcadores = new Set(["rescate_cortes_0089"]);
   const sembrados = [];
+  const sembradosZonas = [];
   const pool = {
     catalogo: [...catalogo],
+    catalogoZonas: [...catalogoZonas],
     marcados,
+    marcadasZonas,
     marcadores,
     sembrados,
+    sembradosZonas,
     fallaLaSiembra,
     async query(sql, params = []) {
       if (sql.startsWith("CREATE TABLE")) return { rows: [], rowCount: 0 };
@@ -56,8 +68,11 @@ function crearPoolFalso({ catalogo = [], yaMarcados = [], fallaLaSiembra = false
       if (sql.includes("SELECT 1 FROM _vim_repartidores_ok")) {
         return { rows: [], rowCount: marcados.size ? 1 : 0 };
       }
+      if (sql.includes("SELECT 1 FROM _vim_zonas_ok")) {
+        return { rows: [], rowCount: marcadasZonas.size ? 1 : 0 };
+      }
 
-      // La siembra del ARRANQUE: `SELECT id FROM repartidores`, sin parámetros.
+      // La siembra del ARRANQUE: `SELECT id FROM repartidores` / `SELECT id FROM zonas_envio`, sin parámetros.
       if (sql.includes("_vim_repartidores_ok") && sql.includes("SELECT id FROM repartidores")) {
         if (pool.fallaLaSiembra) throw new Error("siembra rota a propósito");
         const nuevos = pool.catalogo.filter((id) => !marcados.has(id));
@@ -65,23 +80,46 @@ function crearPoolFalso({ catalogo = [], yaMarcados = [], fallaLaSiembra = false
         for (const id of nuevos) marcados.add(id);
         return { rows: [], rowCount: nuevos.length };
       }
+      if (sql.includes("_vim_zonas_ok") && sql.includes("SELECT id FROM zonas_envio")) {
+        if (pool.fallaLaSiembra) throw new Error("siembra rota a propósito");
+        const idsZonas = pool.catalogoZonas.map((z) => z.id);
+        const nuevas = idsZonas.filter((id) => !marcadasZonas.has(id));
+        sembradosZonas.push(...nuevas);
+        for (const id of nuevas) marcadasZonas.add(id);
+        return { rows: [], rowCount: nuevas.length };
+      }
       // El marcado tras confirmar la nube: `SELECT unnest($1::uuid[])`.
       if (sql.includes("_vim_repartidores_ok") && sql.includes("unnest")) {
         for (const id of params[0]) marcados.add(id);
         return { rows: [], rowCount: params[0].length };
       }
+      if (sql.includes("_vim_zonas_ok") && sql.includes("unnest")) {
+        for (const id of params[0]) marcadasZonas.add(id);
+        return { rows: [], rowCount: params[0].length };
+      }
 
       const pendientes = pool.catalogo.filter((id) => !marcados.has(id));
+      const pendientesZonas = pool.catalogoZonas.map((z) => z.id).filter((id) => !marcadasZonas.has(id));
 
       if (sql.includes("array_agg(id ORDER BY fecha_apertura)")) {
-        return { rows: [{ ids: null, turnos: null, movimientos: null, repartidores: pendientes.length ? pendientes : null }] };
+        return {
+          rows: [{
+            ids: null, turnos: null, movimientos: null,
+            repartidores: pendientes.length ? pendientes : null,
+            zonas: pendientesZonas.length ? pendientesZonas : null,
+          }],
+        };
       }
       if (sql.includes("WITH tk AS")) {
         return {
           rows: [{
             ids: null, turnos: null, movimientos: null,
             repartidores: pendientes.length ? pendientes : null,
-            snapshot: { repartidores: pendientes.map((id) => ({ id, nombre: `Repartidor ${id}` })) },
+            zonas: pendientesZonas.length ? pendientesZonas : null,
+            snapshot: {
+              repartidores: pendientes.map((id) => ({ id, nombre: `Repartidor ${id}` })),
+              zonas_envio: pendientesZonas.map((id) => ({ id, nombre: `Zona ${id}` })),
+            },
           }],
         };
       }
@@ -240,4 +278,29 @@ test("no siembra si la libreta YA tenía anotaciones, aunque no haya marcador", 
 
   const pend = await listarPendientes(pool);
   assert.deepEqual(pend.repartidorIds, [A], "el alta local conserva su viaje a la nube");
+});
+
+// Zonas de envío (0115/Task 4): mismo mecanismo que los repartidores (0114), mismo riesgo en los
+// dos sentidos — marcar de más pierde un alta local para siempre, marcar de menos pisa lo que el
+// panel acaba de editar. Ver `sembrarZonasUnaVez` en sync-push.mjs para el razonamiento completo.
+
+test("la siembra de zonas no corre dos veces en la misma caja", async () => {
+  const pool = crearPoolFalso({ catalogoZonas: [{ id: "z1" }] });
+  assert.equal(await sembrarZonasUnaVez(pool, () => {}), 1);
+  assert.equal(await sembrarZonasUnaVez(pool, () => {}), 0);
+});
+
+test("la siembra de zonas NO marca un alta local que todavía no sube", async () => {
+  // Calendario del fallo real de la 0114: arranque sin libreta → alta en la caja → primer sync.
+  // Si la libreta ya tiene anotaciones (las puso el pull), sembrar marcaría el alta local como
+  // subida y esa zona no viajaría NUNCA.
+  const pool = crearPoolFalso({ catalogoZonas: [{ id: "z1" }, { id: "z2" }], yaMarcadasZonas: ["z1"] });
+  assert.equal(await sembrarZonasUnaVez(pool, () => {}), 0);
+  assert.ok(!pool.marcadasZonas.has("z2"), "la siembra marcó un alta local sin subir");
+});
+
+test("las zonas pendientes son las que la nube aún no confirmó", async () => {
+  const pool = crearPoolFalso({ catalogoZonas: [{ id: "z1" }, { id: "z2" }], yaMarcadasZonas: ["z1"] });
+  const p = await listarPendientes(pool);
+  assert.deepEqual(p.zonaIds, ["z2"]);
 });

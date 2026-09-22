@@ -10,6 +10,8 @@
 export const PULL_ORDER = [
   { t: "tenants" },
   { t: "sucursales" },
+  // Zonas de envío (0115): FK a sucursales, así que van justo después de su padre.
+  { t: "zonas_envio" },
   { t: "cajas" },
   { t: "areas_cocina" },
   { t: "secciones" },
@@ -257,6 +259,28 @@ export async function marcarRepartidoresDelPull(client, filas, log = () => {}) {
   return ids.length;
 }
 
+/**
+ * Anota en la libreta del PUSH las zonas de envío que acaban de bajar del pull.
+ *
+ * Misma razón que con los repartidores (ver `marcarRepartidoresDelPull` arriba): si solo se
+ * escribiera al subir, lo que baja del panel quedaría fuera de la libreta y el push lo volvería a
+ * mandar, pisando con la copia vieja de la caja el nombre, el costo y el `activa` que se acaban de
+ * editar arriba. Y el push corre ANTES que el pull, sin refrescarse primero.
+ *
+ * Va DENTRO de la transacción del pull a propósito: si el pull revienta y hace ROLLBACK, estas
+ * marcas se van con él.
+ */
+export async function marcarZonasDelPull(client, filas, log = () => {}) {
+  const ids = [...new Set((filas ?? []).map((f) => f?.id).filter((id) => id != null))];
+  if (!ids.length) return 0;
+  await client.query(
+    "CREATE TABLE IF NOT EXISTS _vim_zonas_ok (zona_id uuid PRIMARY KEY, subido_at timestamptz DEFAULT now())");
+  await client.query(
+    "INSERT INTO _vim_zonas_ok (zona_id) SELECT unnest($1::uuid[]) ON CONFLICT DO NOTHING", [ids]);
+  log(`  zonas de envío: ${ids.length} anotada(s) como de la nube (no vuelven a subir)`);
+  return ids.length;
+}
+
 export async function pullSnapshot(pool, snapshot, log = () => {}) {
   const client = await pool.connect();
   const resumen = {};
@@ -272,6 +296,7 @@ export async function pullSnapshot(pool, snapshot, log = () => {}) {
       if (n) log(`  ${schema}.${t}: ${n}`);
       if (t === "insumo_stock_sucursal") await corregirExistenciasPorPendientes(client, log, filas);
       if (t === "repartidores") await marcarRepartidoresDelPull(client, filas, log);
+      if (t === "zonas_envio") await marcarZonasDelPull(client, filas, log);
     }
     await client.query(
       `CREATE TABLE IF NOT EXISTS _vim_sync (clave text PRIMARY KEY, valor text, at timestamptz DEFAULT now())`);
