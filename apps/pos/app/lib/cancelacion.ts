@@ -111,6 +111,10 @@ export async function leerItemsPersistidos(token: string, ticketId: string): Pro
       .select("id, client_id_local, producto_nombre_snapshot, cantidad, total_item_mxn")
       .eq("ticket_id", ticketId)
       .eq("cancelado", false)
+      // Los cargos (envío) no son productos: no se cancelan desde aquí —se quitan cambiando la
+      // zona— y, si salieran, home-pos los compararía contra el catálogo y avisaría "fuera de
+      // catálogo" en cada domicilio con envío.
+      .is("cargo_tipo", null)
       // Un HIJO de combo no se cancela suelto (la RPC exige cancelar el PADRE, que arrastra a los
       // hijos): se excluye de la lista cancelable. `.neq` a secas también tumbaría los renglones
       // normales (combo_rol NULL), porque en SQL NULL <> 'HIJO' no es verdadero.
