@@ -90,6 +90,9 @@ export function agruparPadresHijos(filas: FilaItemPersistido[], porId: Map<strin
   return lineas;
 }
 
+/** Prefijo con que `fijar_envio_ticket` nombra el renglón de envío. */
+const PREFIJO_RENGLON_ENVIO = "Envío · ";
+
 /**
  * Saca el cargo de envío de los renglones persistidos.
  *
@@ -103,7 +106,13 @@ export function agruparPadresHijos(filas: FilaItemPersistido[], porId: Map<strin
 export function envioDeFilas(filas: FilaItemPersistido[]): EnvioCarrito | null {
   const f = filas.find((r) => r.cargo_tipo === "ENVIO" && !r.cancelado);
   if (!f) return null;
-  return { zonaId: "", nombre: f.producto_nombre_snapshot, costoMxn: Number(f.precio_unitario_snapshot) };
+  // El renglón se llama "Envío · <zona>" (fijar_envio_ticket, 0116) porque así sale en el ticket
+  // impreso y en el CFDI. En pantalla va solo el nombre de la zona, como en un carrito nuevo: si
+  // no, la misma zona se leía distinto según se hubiera capturado o reabierto la cuenta.
+  const nombre = f.producto_nombre_snapshot.startsWith(PREFIJO_RENGLON_ENVIO)
+    ? f.producto_nombre_snapshot.slice(PREFIJO_RENGLON_ENVIO.length)
+    : f.producto_nombre_snapshot;
+  return { zonaId: "", nombre, costoMxn: Number(f.precio_unitario_snapshot) };
 }
 
 /** Lo que `reconstruirCarrito` lee del ticket para recuperar su envío. */

@@ -56,7 +56,9 @@ describe("agruparPadresHijos", () => {
       fila({ id: "i1", producto_id: "p1", precio_unitario_snapshot: 120, producto_nombre_snapshot: "Brownie" }),
       fila({ id: "i2", producto_id: null, cargo_tipo: "ENVIO", precio_unitario_snapshot: 35, producto_nombre_snapshot: "Envío · Zona Norte" }),
     ];
-    expect(envioDeFilas(filas)).toEqual({ zonaId: "", nombre: "Envío · Zona Norte", costoMxn: 35 });
+    // M4: el ticket lateral muestra el nombre de la zona SIN el prefijo del renglón, igual que en
+    // un carrito nuevo (antes: "Envío · Zona Norte" al reabrir y "Zona Norte" al capturar).
+    expect(envioDeFilas(filas)).toEqual({ zonaId: "", nombre: "Zona Norte", costoMxn: 35 });
     expect(agruparPadresHijos(filas.filter((f) => !f.cargo_tipo), porId, [def]).length).toBe(1);
   });
 });
@@ -66,8 +68,7 @@ describe("envioReconstruido", () => {
 
   it("con renglón de envío, toma el importe congelado y la zona del ticket", () => {
     const e = envioReconstruido([renglonEnvio], { zona_envio_id: "z1", zonas_envio: { nombre: "Zona Norte" } });
-    expect(e?.zonaId).toBe("z1");
-    expect(e?.costoMxn).toBe(35);
+    expect(e).toEqual({ zonaId: "z1", nombre: "Zona Norte", costoMxn: 35 });
   });
 
   it("zona gratis: sin renglón pero con zona en el ticket, la zona sigue visible a $0", () => {
