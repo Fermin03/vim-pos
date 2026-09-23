@@ -500,3 +500,44 @@ test("un descuento de ticket sin comida sobre la cual repartirse no se timbra", 
 test("un descuento de ticket mayor que la comida no se come el envío: se rechaza", () => {
   assert.throws(() => armarConceptos(ticketConEnvio(), 20), ConceptosIncoherentes);
 });
+
+// ── El excedente de un descuento congelado no se come el envío (recalcular_totales_ticket, 0116) ──
+// Un descuento de ticket se congela como monto. Si después se cancela comida, la base topa el total
+// en los renglones de cargo vivos (el envío) y reporta solo lo aplicado. El CFDI deduce el descuento
+// como sumaLineas − total, así que ese ticket llega aquí coherente y debe timbrar.
+
+test("cortesía congelada y se cancela un platillo: timbra con el envío completo", () => {
+  // 240 de comida + 35 de envío, cortesía de 240, se cancela una hamburguesa. La base deja el total
+  // en 35: renglones vivos 155 − descuento efectivo 120. Nada del descuento cae en el envío.
+  const vivos = [ticketConEnvio()[0], ticketConEnvio()[2]];
+  const r = armarConceptos(vivos, 35);
+  const envio = r.conceptos.find((c) => c.descripcion.startsWith("Envío"));
+  assert.ok(envio);
+  assert.equal(envio.descuento, 0);
+  assert.equal(envio.total, 35);
+  assert.equal(r.total, 35);
+  cuadra(r);
+});
+
+test("descuento congelado y se cancela toda la comida: solo el envío, sin nada que repartir", () => {
+  // El tope deja el descuento efectivo en 0 (sumaLineas − total = 0): no hay reparto que intentar.
+  const soloEnvio = [linea({ descripcion: "Envío · Zona Norte", totalItemMxn: 35, ivaItemMxn: 4.83, cargoTipo: "ENVIO" })];
+  const r = armarConceptos(soloEnvio, 35);
+  assert.equal(r.descuento, 0);
+  assert.equal(r.total, 35);
+  cuadra(r);
+});
+
+test("la global que no cuadra dice qué folio la bloquea", () => {
+  // Un solo ticket incoherente tumba la global de todo el periodo: el error tiene que decir cuál.
+  const sano = { folio: "A-0001", totalMxn: 120, lineas: [linea({ totalItemMxn: 120, ivaItemMxn: 16.55 })] };
+  const roto = {
+    folio: "A-0002",
+    totalMxn: 11,
+    lineas: [linea({ descripcion: "Envío · Zona Norte", totalItemMxn: 35, ivaItemMxn: 4.83, cargoTipo: "ENVIO" })],
+  };
+  assert.throws(
+    () => armarConceptosGlobal([sano, roto]),
+    (e: unknown) => e instanceof ConceptosIncoherentes && e.message.includes("A-0002"),
+  );
+});
