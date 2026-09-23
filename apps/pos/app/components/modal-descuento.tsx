@@ -6,6 +6,7 @@ import {
   MOTIVOS,
   aplicarDescuento,
   descuentoSchema,
+  leerEnvioDelTicket,
   permisoDescuento,
   previewDescuento,
   type MotivoDescuento,
@@ -78,6 +79,15 @@ export function ModalDescuento({
 
   useEffect(() => { void cargarPromos(); }, [cargarPromos]);
 
+  // El envío no admite descuentos (ADR 0017): la base lo excluye, y la vista previa también. Si la
+  // lectura falla se queda en 0 —la vista previa es informativa; el monto real lo fija la base.
+  const [envio, setEnvio] = useState(0);
+  useEffect(() => {
+    let vivo = true;
+    leerEnvioDelTicket(token, ticketId).then((e) => { if (vivo) setEnvio(e); }).catch(() => {});
+    return () => { vivo = false; };
+  }, [token, ticketId]);
+
   async function onPonerPromo(p: PromoAplicable) {
     setPromoOcupada(p.id);
     setError(null);
@@ -114,7 +124,7 @@ export function ModalDescuento({
     ? ROLES_CORTESIA.includes(empleado.rol)
     : ROLES_DESCUENTO.includes(empleado.rol);
   const valorNum = Number(valor || 0);
-  const descuento = previewDescuento(tipo, valorNum, totalActual);
+  const descuento = previewDescuento(tipo, valorNum, totalActual, envio);
   const nuevoTotal = Math.max(0, Math.round((totalActual - descuento) * 100) / 100);
 
   function labelMotivo(): string {
@@ -343,6 +353,11 @@ export function ModalDescuento({
         <div className="mt-1 flex justify-between text-ink-2">
           <span>Descuento</span><span className="tabular-nums text-danger">−{fmtMxn(descuento)}</span>
         </div>
+        {envio > 0 && (
+          <div className="mt-1 text-[12px] text-ink-3">
+            El envío ({fmtMxn(envio)}) no se descuenta: se cobra completo.
+          </div>
+        )}
         <div className="mt-2 flex justify-between border-t border-line pt-2 font-display text-[16px] font-bold">
           <span>Nuevo total</span><span className="tabular-nums">{fmtMxn(nuevoTotal)}</span>
         </div>

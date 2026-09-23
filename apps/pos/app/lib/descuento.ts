@@ -81,11 +81,30 @@ export async function aplicarDescuento(
 }
 
 /** Calcula el monto de descuento para PREVIEW en cliente (la BD es la autoridad).
- *  Para OVERRIDE_PRECIO, `valor` es el nuevo precio: el "descuento" es base - valor. */
-export function previewDescuento(tipo: TipoDescuento, valor: number, totalActual: number): number {
-  if (tipo === "CORTESIA_TOTAL") return totalActual; // 100% off
-  if (tipo === "OVERRIDE_PRECIO") return Math.max(0, Math.round((totalActual - Math.max(0, valor)) * 100) / 100);
+ *  Para OVERRIDE_PRECIO, `valor` es el nuevo precio: el "descuento" es base - valor.
+ *
+ *  `envioMxn` es el cargo de envío del ticket. El envío no admite descuentos (spec zonas de envío
+ *  §3, ADR 0017): la base lo excluye en `aplicar_descuento_manual`, así que la vista previa también
+ *  —si no, el cajero anunciaría un descuento distinto del que se aplica. */
+export function previewDescuento(tipo: TipoDescuento, valor: number, totalActual: number, envioMxn = 0): number {
+  const base = Math.max(0, Math.round((totalActual - Math.max(0, envioMxn)) * 100) / 100);
+  if (tipo === "CORTESIA_TOTAL") return base; // 100% off de la comida
+  if (tipo === "OVERRIDE_PRECIO") return Math.max(0, Math.round((base - Math.max(0, valor)) * 100) / 100);
   if (!valor || valor <= 0) return 0;
-  const m = tipo === "PORCENTAJE" ? (totalActual * Math.min(valor, 100)) / 100 : Math.min(valor, totalActual);
+  const m = tipo === "PORCENTAJE" ? (base * Math.min(valor, 100)) / 100 : Math.min(valor, base);
   return Math.round(m * 100) / 100;
+}
+
+/** Lo que el ticket cobra de envío (renglones de cargo vivos). 0 si no hay. Alimenta la vista
+ *  previa del descuento de ticket, que no debe calcular sobre el envío. */
+export async function leerEnvioDelTicket(token: string, ticketId: string): Promise<number> {
+  const { data, error } = await employeeClient(token)
+    .from("ticket_items")
+    .select("total_item_mxn")
+    .eq("ticket_id", ticketId)
+    .eq("cancelado", false)
+    .not("cargo_tipo", "is", null);
+  if (error) throw new Error(error.message);
+  const filas = z.array(z.object({ total_item_mxn: z.union([z.number(), z.string()]) })).parse(data ?? []);
+  return Math.round(filas.reduce((acc, f) => acc + Number(f.total_item_mxn) * 100, 0)) / 100;
 }
