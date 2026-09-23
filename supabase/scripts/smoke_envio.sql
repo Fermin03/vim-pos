@@ -673,4 +673,150 @@ BEGIN
   RAISE NOTICE 'OK el envío no admite descuentos ni promociones';
 END $$;
 
+-- 7) EL EXCEDENTE DE UN DESCUENTO CONGELADO NO SE COME EL ENVÍO (recalcular_totales_ticket, 0116).
+--    El descuento o la promoción de ticket se congela como MONTO al aplicarse. Si después se cancela
+--    comida (cancelar_item_ticket lo permite en ABIERTO), el monto congelado supera la comida que
+--    queda; antes, recalcular_totales_ticket restaba el excedente del envío (solo topaba en 0). Ahora
+--    el total no baja de los renglones de cargo vivos, el descuento reportado en el ticket es el que
+--    se aplicó de verdad, y la invariante del timbrado se sostiene:
+--      renglones vivos − (descuentos_manuales_mxn + promociones_mxn) = total_mxn
+--    Control sin envío: el tope en 0 de siempre, con el descuento reportado sin tocar.
+DO $$
+DECLARE
+  v_tenant uuid := '99999999-0000-0000-0000-0000000000aa';
+  v_suc    uuid := '99999999-0000-0000-0000-0000000000bb';
+  v_caja   uuid := '99999999-0000-0000-0000-0000000000cc';
+  v_maria  uuid := '99999999-0000-0000-0000-000000000001';
+  v_prod   uuid := 'b0000000-0000-0000-0000-0000000000f1';  -- Hamburguesa Clásica, $120, IVA incl.
+  v_turno  uuid;
+  v_zona   uuid;
+  v_auth   jsonb;
+  v_pin    uuid;
+  v_autorizo uuid;
+  v_promo  uuid;
+  v_t      uuid;
+  v_h1     uuid;
+  v_h2     uuid;
+  v_tk     record;
+  v_suma   numeric(12,2);
+  v_fallos text[] := '{}';
+BEGIN
+  PERFORM set_config('request.jwt.claims',
+    json_build_object('sub', v_maria::text, 'tenant_id', v_tenant::text)::text, true);
+  SELECT id INTO v_turno FROM turnos WHERE codigo_turno = 'SMOKE-ENV' AND tenant_id = v_tenant;
+
+  -- Nombre nuevo: el archivo entero es UNA transacción.
+  INSERT INTO zonas_envio (tenant_id, sucursal_id, nombre, costo_mxn)
+  VALUES (v_tenant, v_suc, 'Tope Norte', 35.00) RETURNING id INTO v_zona;
+
+  v_t := abrir_ticket(v_suc, v_caja, v_turno, 'DELIVERY_PROPIO', NULL, NULL, NULL, v_maria);
+  v_auth := verificar_autorizacion_pin('4321', 'descuento_manual', 'descuento.manual_aplicar',
+              'ticket', v_t, 240, 'CORTESIA_INVITADO', v_caja, v_turno, v_maria);
+  IF (v_auth->>'ok')::boolean IS NOT TRUE THEN RAISE EXCEPTION 'autorización falló: %', v_auth; END IF;
+  v_pin := (v_auth->>'autorizacion_pin_id')::uuid;
+  v_autorizo := (v_auth->>'autorizo_id')::uuid;
+
+  -- a) El caso de la revisión: $240 de comida (dos renglones de $120) + $35 de envío, cortesía
+  --    total (congela 240), se cancela un platillo. Total 35.00, no 0.00.
+  v_h1 := agregar_item_a_ticket(v_t, v_prod, 1, NULL, '[]'::jsonb, NULL);
+  v_h2 := agregar_item_a_ticket(v_t, v_prod, 1, NULL, '[]'::jsonb, NULL);
+  PERFORM fijar_envio_ticket(v_t, v_zona);
+  PERFORM aplicar_descuento_manual(v_t, NULL, 'CORTESIA_TOTAL', 0, 'CORTESIA_INVITADO', NULL,
+            v_pin, v_maria, v_autorizo, NULL);
+  PERFORM cancelar_item_ticket(v_h2, 'smoke tope', NULL);
+  SELECT * INTO v_tk FROM tickets WHERE id = v_t;
+  SELECT COALESCE(SUM(total_item_mxn), 0) INTO v_suma
+    FROM ticket_items WHERE ticket_id = v_t AND cancelado = false;
+  IF v_tk.total_mxn <> 35.00 THEN
+    v_fallos := v_fallos || format('a) cortesía + cancelar un platillo: total %s (esperaba 35.00, el envío)', v_tk.total_mxn);
+  END IF;
+  IF v_tk.descuentos_manuales_mxn <> 120.00 THEN
+    v_fallos := v_fallos || format('a) descuento reportado %s (esperaba 120.00, lo que de verdad se aplicó)', v_tk.descuentos_manuales_mxn);
+  END IF;
+  IF v_suma - v_tk.descuentos_manuales_mxn - v_tk.promociones_mxn <> v_tk.total_mxn THEN
+    v_fallos := v_fallos || format('a) invariante: renglones %s − descuento %s − promociones %s ≠ total %s',
+                  v_suma, v_tk.descuentos_manuales_mxn, v_tk.promociones_mxn, v_tk.total_mxn);
+  END IF;
+
+  -- a2) Y si se cancela TODA la comida: queda el envío solo, sin descuento efectivo.
+  PERFORM cancelar_item_ticket(v_h1, 'smoke tope', NULL);
+  SELECT * INTO v_tk FROM tickets WHERE id = v_t;
+  IF v_tk.total_mxn <> 35.00 OR v_tk.descuentos_manuales_mxn <> 0.00 THEN
+    v_fallos := v_fallos || format('a2) sin comida: total %s y descuento %s (esperaba 35.00 y 0.00)',
+                  v_tk.total_mxn, v_tk.descuentos_manuales_mxn);
+  END IF;
+
+  -- b) 50% de descuento sobre $360 de comida (congela 180) y se cancelan dos de tres platillos
+  --    (más de la mitad): la comida que queda (120) se descuenta entera y el envío se cobra.
+  v_t := abrir_ticket(v_suc, v_caja, v_turno, 'DELIVERY_PROPIO', NULL, NULL, NULL, v_maria);
+  v_h1 := agregar_item_a_ticket(v_t, v_prod, 1, NULL, '[]'::jsonb, NULL);
+  v_h2 := agregar_item_a_ticket(v_t, v_prod, 1, NULL, '[]'::jsonb, NULL);
+  PERFORM agregar_item_a_ticket(v_t, v_prod, 1, NULL, '[]'::jsonb, NULL);
+  PERFORM fijar_envio_ticket(v_t, v_zona);
+  PERFORM aplicar_descuento_manual(v_t, NULL, 'PORCENTAJE', 50, 'CLIENTE_FRECUENTE', NULL,
+            v_pin, v_maria, v_autorizo, NULL);
+  PERFORM cancelar_item_ticket(v_h1, 'smoke tope', NULL);
+  PERFORM cancelar_item_ticket(v_h2, 'smoke tope', NULL);
+  SELECT * INTO v_tk FROM tickets WHERE id = v_t;
+  SELECT COALESCE(SUM(total_item_mxn), 0) INTO v_suma
+    FROM ticket_items WHERE ticket_id = v_t AND cancelado = false;
+  IF v_tk.total_mxn <> 35.00 OR v_tk.descuentos_manuales_mxn <> 120.00 THEN
+    v_fallos := v_fallos || format('b) 50%% + cancelar 2 de 3: total %s y descuento %s (esperaba 35.00 y 120.00)',
+                  v_tk.total_mxn, v_tk.descuentos_manuales_mxn);
+  END IF;
+  IF v_suma - v_tk.descuentos_manuales_mxn - v_tk.promociones_mxn <> v_tk.total_mxn THEN
+    v_fallos := v_fallos || format('b) invariante: renglones %s − descuento %s − promociones %s ≠ total %s',
+                  v_suma, v_tk.descuentos_manuales_mxn, v_tk.promociones_mxn, v_tk.total_mxn);
+  END IF;
+
+  -- c) Lo mismo por el carril de las promociones: cortesía de ticket y se cancela un platillo.
+  INSERT INTO promociones (tenant_id, nombre, tipo, alcance)
+  VALUES (v_tenant, 'SMOKE tope — cortesía', 'CORTESIA_TOTAL', 'TICKET_COMPLETO')
+  RETURNING id INTO v_promo;
+  v_t := abrir_ticket(v_suc, v_caja, v_turno, 'DELIVERY_PROPIO', NULL, NULL, NULL, v_maria);
+  v_h1 := agregar_item_a_ticket(v_t, v_prod, 1, NULL, '[]'::jsonb, NULL);
+  PERFORM agregar_item_a_ticket(v_t, v_prod, 1, NULL, '[]'::jsonb, NULL);
+  PERFORM fijar_envio_ticket(v_t, v_zona);
+  PERFORM aplicar_promocion(v_t, v_promo, NULL);
+  PERFORM cancelar_item_ticket(v_h1, 'smoke tope', NULL);
+  SELECT * INTO v_tk FROM tickets WHERE id = v_t;
+  SELECT COALESCE(SUM(total_item_mxn), 0) INTO v_suma
+    FROM ticket_items WHERE ticket_id = v_t AND cancelado = false;
+  IF v_tk.total_mxn <> 35.00 OR v_tk.promociones_mxn <> 120.00 THEN
+    v_fallos := v_fallos || format('c) promo cortesía + cancelar un platillo: total %s y promociones %s (esperaba 35.00 y 120.00)',
+                  v_tk.total_mxn, v_tk.promociones_mxn);
+  END IF;
+  IF v_suma - v_tk.descuentos_manuales_mxn - v_tk.promociones_mxn <> v_tk.total_mxn THEN
+    v_fallos := v_fallos || format('c) invariante: renglones %s − descuento %s − promociones %s ≠ total %s',
+                  v_suma, v_tk.descuentos_manuales_mxn, v_tk.promociones_mxn, v_tk.total_mxn);
+  END IF;
+
+  -- d) CONTROL sin envío: el comportamiento de siempre. Cortesía total sobre 240, se cancela un
+  --    platillo: el total se topa en 0 y el descuento reportado sigue siendo el congelado (240).
+  v_t := abrir_ticket(v_suc, v_caja, v_turno, 'PARA_LLEVAR', NULL, NULL, NULL, v_maria);
+  v_h1 := agregar_item_a_ticket(v_t, v_prod, 1, NULL, '[]'::jsonb, NULL);
+  PERFORM agregar_item_a_ticket(v_t, v_prod, 1, NULL, '[]'::jsonb, NULL);
+  PERFORM aplicar_descuento_manual(v_t, NULL, 'CORTESIA_TOTAL', 0, 'CORTESIA_INVITADO', NULL,
+            v_pin, v_maria, v_autorizo, NULL);
+  PERFORM cancelar_item_ticket(v_h1, 'smoke tope', NULL);
+  SELECT * INTO v_tk FROM tickets WHERE id = v_t;
+  IF v_tk.total_mxn <> 0.00 OR v_tk.descuentos_manuales_mxn <> 240.00 THEN
+    v_fallos := v_fallos || format('d) control sin envío: total %s y descuento %s (esperaba 0.00 y 240.00, como siempre)',
+                  v_tk.total_mxn, v_tk.descuentos_manuales_mxn);
+  END IF;
+
+  -- e) La redefinición conserva el search_path fijo que la 0044 le puso por ALTER FUNCTION.
+  IF NOT EXISTS (SELECT 1 FROM pg_proc
+                  WHERE proname = 'recalcular_totales_ticket'
+                    AND pronamespace = 'public'::regnamespace
+                    AND COALESCE(proconfig, '{}') @> ARRAY['search_path=public, extensions, pg_temp']) THEN
+    v_fallos := v_fallos || 'e) recalcular_totales_ticket perdió su search_path fijo'::text;
+  END IF;
+
+  IF cardinality(v_fallos) > 0 THEN
+    RAISE EXCEPTION 'El descuento congelado se come el envío: %', array_to_string(v_fallos, ' | ');
+  END IF;
+  RAISE NOTICE 'OK el excedente de un descuento congelado no se come el envío';
+END $$;
+
 ROLLBACK;
