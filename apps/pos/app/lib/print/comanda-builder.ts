@@ -167,6 +167,11 @@ function limpiar(l: LineaConArea): LineaComanda {
  * `packages/kds-core/src/comandas.ts`.
  */
 export function lineasParaComanda(lineas: LineaImpresion[]): LineaConArea[] {
+  // Los cargos (envío) no son comida: a la plancha no le sirve saber que el pedido paga $35 de
+  // reparto, y un renglón así en la comanda se lee como un platillo que nadie sabe preparar. Va
+  // ANTES de numerar combos: un cargo nunca es PADRE/HIJO, así que quitarlo aquí no mueve la
+  // numeración (misma regla en `packages/kds-core/src/comandas.ts`).
+  lineas = lineas.filter((l) => !l.cargoTipo);
   const numero = new Map<string, number>();
   const ctxPadre = new Map<string, string[]>();
   let n = 0;

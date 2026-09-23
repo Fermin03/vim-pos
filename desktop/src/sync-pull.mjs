@@ -6,10 +6,14 @@
 // generadas, y hace INSERT ... ON CONFLICT (pk) DO UPDATE. Corre en modo réplica para no
 // disparar triggers (misma semántica que la replicación lógica). Reusable con cualquier fuente.
 
+import { asegurarLibretaZonas, ZONA_EDITADA_LOCAL } from "./sync-push.mjs";
+
 // Orden de FKs: padres antes que hijos. Solo se procesan las tablas presentes en el snapshot.
 export const PULL_ORDER = [
   { t: "tenants" },
   { t: "sucursales" },
+  // Zonas de envío (0116): FK a sucursales, así que van justo después de su padre.
+  { t: "zonas_envio" },
   { t: "cajas" },
   { t: "areas_cocina" },
   { t: "secciones" },
@@ -126,6 +130,24 @@ const CLAVES_NATURALES = {
   // C1: reconciliación por padre, no por clave compuesta fila-a-fila (ver comentario arriba).
   receta_componentes: { porPadre: "receta_id" },
   modificador_componentes: { porPadre: "opcion_modificador_id" },
+  // I6: la caja da de alta "Centro" sin conexión y el panel da de alta otro "Centro". Mismo nombre,
+  // otro id: el upsert choca con zona_envio_nombre_uq —(sucursal_id, lower(btrim(nombre))) WHERE
+  // deleted_at IS NULL, 0116— y el ROLLBACK se lleva TODO el pull, en cada ciclo, para siempre.
+  // La clave natural es una EXPRESIÓN, no columnas sueltas, y solo cuenta entre filas vivas (una
+  // zona de la nube ya borrada no choca con nada). La zona local sí tiene datos que no se pueden
+  // tirar: ventas y direcciones que la usan. Por eso `reapuntar` en vez de `dependientes`: se les
+  // cambia el id al de la nube (que el upsert de abajo inserta enseguida; en modo réplica la FK no
+  // se revisa en el ínterin) y después se borra la zona local. Un alta que la caja no llegó a
+  // subir se pierde a favor de la del panel, con su precio: la nube manda.
+  zonas_envio: {
+    claveSql: {
+      where: "sucursal_id = $1 AND lower(btrim(nombre)) = lower(btrim($2)) AND deleted_at IS NULL",
+      params: (f) => [f.sucursal_id ?? null, f.nombre ?? null],
+      aplica: (f) => f.deleted_at == null,
+    },
+    dependientes: [],
+    reapuntar: [{ tabla: "tickets", col: "zona_envio_id" }, { tabla: "direcciones_cliente", col: "zona_envio_id" }],
+  },
 };
 
 /**
@@ -151,14 +173,26 @@ async function reconciliarCatalogo(client, tabla, filas, log = () => {}) {
   let borradas = 0;
   for (const f of filas) {
     if (!f?.id) continue;
-    // IS NOT DISTINCT FROM: trata NULL = NULL (los catálogos globales llevan tenant_id NULL).
-    const cond = cfg.claves.map((c, i) => `"${c}" IS NOT DISTINCT FROM $${i + 1}`).join(" AND ");
-    const params = cfg.claves.map((c) => f[c] ?? null);
+    let cond, params;
+    if (cfg.claveSql) {
+      // Clave natural por expresión (I6, zonas_envio): el índice único no es de columnas sueltas.
+      if (!cfg.claveSql.aplica(f)) continue;
+      cond = cfg.claveSql.where;
+      params = cfg.claveSql.params(f);
+    } else {
+      // IS NOT DISTINCT FROM: trata NULL = NULL (los catálogos globales llevan tenant_id NULL).
+      cond = cfg.claves.map((c, i) => `"${c}" IS NOT DISTINCT FROM $${i + 1}`).join(" AND ");
+      params = cfg.claves.map((c) => f[c] ?? null);
+    }
     const { rows } = await client.query(
-      `SELECT id FROM ${tabla} WHERE ${cond} AND id <> $${cfg.claves.length + 1}`,
+      `SELECT id FROM ${tabla} WHERE ${cond} AND id <> $${params.length + 1}`,
       [...params, f.id],
     );
     for (const vieja of rows) {
+      // Primero se mudan los que tienen datos propios al id de la nube; luego se borra lo demás.
+      for (const r of cfg.reapuntar ?? []) {
+        await client.query(`UPDATE ${r.tabla} SET "${r.col}" = $1 WHERE "${r.col}" = $2`, [f.id, vieja.id]);
+      }
       for (const d of cfg.dependientes) {
         await client.query(`DELETE FROM ${d.tabla} WHERE "${d.col}" = $1`, [vieja.id]);
       }
@@ -257,6 +291,83 @@ export async function marcarRepartidoresDelPull(client, filas, log = () => {}) {
   return ids.length;
 }
 
+/**
+ * Anota en la libreta del PUSH las zonas de envío que acaban de bajar del pull.
+ *
+ * Misma razón que con los repartidores (ver `marcarRepartidoresDelPull` arriba): si solo se
+ * escribiera al subir, lo que baja del panel quedaría fuera de la libreta y el push lo volvería a
+ * mandar, pisando con la copia vieja de la caja el nombre, el costo y el `activa` que se acaban de
+ * editar arriba. Y el push corre ANTES que el pull, sin refrescarse primero.
+ *
+ * Va DENTRO de la transacción del pull a propósito: si el pull revienta y hace ROLLBACK, estas
+ * marcas se van con él.
+ */
+export async function marcarZonasDelPull(client, filas, log = () => {}) {
+  const ids = [...new Set((filas ?? []).map((f) => f?.id).filter((id) => id != null))];
+  if (!ids.length) return 0;
+  await asegurarLibretaZonas(client);
+  // La huella se calcula sobre la fila LOCAL recién escrita, no sobre el JSON de la nube: es con la
+  // local con la que el push la va a comparar. DO UPDATE porque lo que la nube acaba de mandar es
+  // ahora lo "ya sabido" (ver asegurarLibretaZonas en sync-push.mjs).
+  await client.query(
+    `INSERT INTO _vim_zonas_ok (zona_id, huella)
+     SELECT x.id, md5(to_jsonb(x)::text) FROM zonas_envio x WHERE x.id = ANY($1::uuid[])
+     ON CONFLICT (zona_id) DO UPDATE SET huella = EXCLUDED.huella`, [ids]);
+  log(`  zonas de envío: ${ids.length} anotada(s) como de la nube (no vuelven a subir)`);
+  return ids.length;
+}
+
+/**
+ * Reparte las zonas entrantes del pull en las que se pueden aplicar y las que hay que descartar
+ * porque su copia LOCAL tiene un repreciado pendiente de subir (ver `ZONA_EDITADA_LOCAL` en
+ * sync-push.mjs: misma huella que usa el push para decidir qué sube).
+ *
+ * Es el arreglo al residual de la re-revisión final (22 sep): antes, `pullSnapshot` upseteaba TODAS
+ * las zonas de la nube sin mirar la libreta, y luego `marcarZonasDelPull` las anotaba con la huella
+ * de la versión que ACABABA de escribir. Un repreciado con PIN de supervisor ("Zona 2" de $35 a
+ * $50) sobrevivía solo hasta el siguiente pull —arranque, sondeo de catálogo, o el pull tras un
+ * push fallido (main.mjs ~212, 641, 745)— y volvía a $35 en silencio; peor aún, como la huella ya
+ * coincidía con la de la nube, el cambio no se volvía a subir NUNCA.
+ *
+ * Una zona descartada aquí no se toca en absoluto en este pull: ni upsert, ni `reconciliarCatalogo`,
+ * ni `marcarZonasDelPull`. Sigue con su precio local y pendiente de subir; el siguiente push la sube
+ * y, con la nube ya al día, el próximo pull de esa zona es inocuo.
+ *
+ * Por qué NO se descarta por "no está en la libreta" (a diferencia de `ZONA_PENDIENTE`, que sí
+ * incluye ese caso para decidir qué subir): una fila que llega de la nube y no está en la libreta es
+ * o bien una zona nueva del panel (nunca vista aquí, no hay nada local que proteger) o bien una zona
+ * nueva de la CAJA que aún no subió (no puede venir de la nube con ese id, así que no aparece en el
+ * snapshot). Solo una zona YA conocida (con huella) y cuya copia local cambió es una edición
+ * pendiente que hay que proteger.
+ */
+async function separarZonasPendientes(client, filas) {
+  const ids = [...new Set((filas ?? []).map((f) => f?.id).filter((id) => id != null))];
+  if (!ids.length) return { aplicar: filas ?? [], descartadas: [] };
+  await asegurarLibretaZonas(client);
+  // Candado ANTES de mirar la huella, y en su propia sentencia: un `cambiarCostoZona` en vuelo (su
+  // UPDATE hecho, sin COMMIT) haría que esta consulta viera la versión vieja, la diera por no
+  // pendiente, y el upsert de abajo —que sí espera el candado— pisara el repreciado al soltarse.
+  // Con el candado, el pull espera a ese COMMIT y la consulta siguiente (READ COMMITTED: foto nueva
+  // por sentencia) ya lo ve como pendiente. Al revés, un repreciado que llega después espera a que
+  // el pull confirme y se aplica encima: queda pendiente contra la huella recién anotada. Dura lo
+  // que la transacción del pull.
+  // FOR NO KEY UPDATE: evita choque con FOR KEY SHARE de las llaves foráneas (tickets.zona_envio_id,
+  // direcciones_cliente.zona_envio_id). FOR UPDATE causaba deadlock en el fijar de envíos durante el
+  // pull. FOR NO KEY UPDATE bloquea UPDATE concurrente de cambiarCostoZona sin estorbar las FK.
+  await client.query("SELECT 1 FROM zonas_envio WHERE id = ANY($1::uuid[]) FOR NO KEY UPDATE", [ids]);
+  const { rows } = await client.query(
+    `SELECT o.zona_id FROM _vim_zonas_ok o
+       JOIN zonas_envio x ON x.id = o.zona_id
+      WHERE o.zona_id = ANY($1::uuid[]) AND ${ZONA_EDITADA_LOCAL}`,
+    [ids]);
+  const pendientes = new Set(rows.map((r) => r.zona_id));
+  if (!pendientes.size) return { aplicar: filas, descartadas: [] };
+  return {
+    aplicar: filas.filter((f) => !pendientes.has(f.id)),
+    descartadas: filas.filter((f) => pendientes.has(f.id)),
+  };
+}
+
 export async function pullSnapshot(pool, snapshot, log = () => {}) {
   const client = await pool.connect();
   const resumen = {};
@@ -264,14 +375,23 @@ export async function pullSnapshot(pool, snapshot, log = () => {}) {
     await client.query("BEGIN");
     await client.query("SET LOCAL session_replication_role = replica"); // no disparar triggers/audit
     for (const { t, schema = "public" } of PULL_ORDER) {
-      const filas = snapshot[t] ?? snapshot[`${schema}.${t}`];
+      let filas = snapshot[t] ?? snapshot[`${schema}.${t}`];
       if (!filas?.length) continue;
+      if (t === "zonas_envio") {
+        const { aplicar, descartadas } = await separarZonasPendientes(client, filas);
+        if (descartadas.length) {
+          log(`  zonas de envío: ${descartadas.length} con repreciado local pendiente, no se pisan`);
+        }
+        filas = aplicar;
+        if (!filas.length) continue;
+      }
       await reconciliarCatalogo(client, t, filas, log);
       const n = await upsertTabla(client, schema, t, filas);
       resumen[t] = n;
       if (n) log(`  ${schema}.${t}: ${n}`);
       if (t === "insumo_stock_sucursal") await corregirExistenciasPorPendientes(client, log, filas);
       if (t === "repartidores") await marcarRepartidoresDelPull(client, filas, log);
+      if (t === "zonas_envio") await marcarZonasDelPull(client, filas, log);
     }
     await client.query(
       `CREATE TABLE IF NOT EXISTS _vim_sync (clave text PRIMARY KEY, valor text, at timestamptz DEFAULT now())`);

@@ -59,6 +59,7 @@ export function SidebarTicket({
   onLimpiar,
   onCancelarTicket,
   onEditarCliente,
+  onCambiarZona,
   onNotaLinea,
   onNotaOrden,
   onCobrar,
@@ -94,6 +95,13 @@ export function SidebarTicket({
   onCancelarTicket?: () => void;
   /** Abre el modal de cliente para domicilio (solo aplica en modo Domicilio). */
   onEditarCliente?: () => void;
+  /** Abre el modal de zona de reparto para cambiar el envío de ESTE pedido (sin tocar la
+   *  dirección guardada del cliente). Con el ticket ya persistido, el caller también reescribe
+   *  el renglón en BD (`fijarEnvioTicket`) y refresca el total autoritativo — el número grande
+   *  y el renglón se mueven juntos. Se ofrece siempre: un domicilio se manda a cocina (y por
+   *  tanto se persiste) ANTES de cobrarse, así que "solo mientras no hay ticket" dejaría la
+   *  función muerta justo cuando el cajero de verdad necesita corregir la zona. */
+  onCambiarZona?: () => void;
   /** Edita la nota de cocina de una línea (carrito local, pre-cobro). */
   onNotaLinea?: (clientId: string, nota: string | null) => void;
   /** Edita la nota de cocina de TODA la orden. */
@@ -126,7 +134,7 @@ export function SidebarTicket({
   bloqueado?: boolean;
   procesando: boolean;
 }) {
-  const totales = calcularTotalesDisplay(estado.lineas);
+  const totales = calcularTotalesDisplay(estado.lineas, 16, estado.envio?.costoMxn ?? 0);
   const vacio = estado.lineas.length === 0;
   const totalProductos = estado.lineas.reduce((s, l) => s + l.cantidad, 0);
   // Notas de cocina: qué línea se está editando + si el input de nota de orden está abierto.
@@ -364,6 +372,20 @@ export function SidebarTicket({
           cajero necesita ver. Subtotal/IVA son informativos → tipografía menor y filas apretadas;
           el TOTAL sigue siendo el número dominante. */}
       <div className="flex-shrink-0 border-t border-line bg-sel px-5 py-3">
+        {/* Renglón de envío: tocable SIEMPRE, también con el ticket ya persistido — un domicilio
+            se manda a cocina (y por tanto se persiste) antes de cobrarse, así que apagar esto al
+            bloquear dejaría la función muerta justo cuando más se necesita. El caller reescribe
+            la BD (fijarEnvioTicket) y refresca el total autoritativo cuando corresponde. */}
+        {estado.envio && (
+          <button
+            type="button"
+            onClick={onCambiarZona}
+            className="mb-1 flex w-full items-center justify-between text-[13px] text-ink-2 hover:text-ink"
+          >
+            <span>{estado.envio.nombre}</span>
+            <span className="tabular-nums font-medium text-ink">{fmtMxn(estado.envio.costoMxn)}</span>
+          </button>
+        )}
         <div className="mb-1 flex justify-between text-[13px] text-ink-2">
           <span>Subtotal</span>
           <span className="tabular-nums font-medium text-ink">{fmtMxn(totales.subtotal)}</span>

@@ -18,10 +18,11 @@ import {
   nuevoClientId,
   type LineaCarrito,
   type ModificadorSel,
+  type EnvioCarrito,
 } from "../lib/carrito";
 import { listarCombos, combosQueAdmiten, diferencialCombo, type ComboDef } from "../lib/combos";
 import { obtenerGruposDeProducto, type GrupoModificadores } from "../lib/modificadores";
-import { persistirTicket, leerTotales, type TotalesTicket } from "../lib/cobro";
+import { persistirTicket, leerTotales, cambiarZonaDePedido, ErrorEnvioNoFijado, type TotalesTicket } from "../lib/cobro";
 import { SidebarTicket } from "./sidebar-ticket";
 import { ModalModificadores } from "./modal-modificadores";
 import { ModalCombo } from "./modal-combo";
@@ -32,6 +33,7 @@ import { obtenerImpresora, obtenerImpresoraDeEstacion } from "../lib/print/adapt
 import { estacionParaArea, hayEstacionDeCocinaDedicada } from "../lib/print/config";
 import { ModalConfigImpresora } from "./modal-config-impresora";
 import { ModalClienteDomicilio } from "./modal-cliente-domicilio";
+import { ModalZonaPedido } from "./modal-zona-pedido";
 import { ModalNombreCuenta } from "./modal-nombre-cuenta";
 import { ModalCambiarPin } from "./modal-cambiar-pin";
 import { ModalMisPropinas } from "./modal-mis-propinas";
@@ -225,6 +227,9 @@ export function HomePos({
   const [enModoMesa, setEnModoMesa] = useState(false);
   const [configImpresoraAbierto, setConfigImpresoraAbierto] = useState(false);
   const [clienteDomAbierto, setClienteDomAbierto] = useState(false);
+  // Task 7 — cambiar la zona de reparto de ESTE pedido desde el renglón de envío del ticket
+  // lateral (no reabre la búsqueda de cliente ni toca `direcciones_cliente`).
+  const [zonaPedidoAbierto, setZonaPedidoAbierto] = useState(false);
   const [nombreCuentaAbierto, setNombreCuentaAbierto] = useState(false);
   const [cambiarPinAbierto, setCambiarPinAbierto] = useState(false);
   const [cocinaEnviada, setCocinaEnviada] = useState(false);
@@ -441,7 +446,7 @@ export function HomePos({
         reconstruirCarrito(token, tId, productos ?? [], combos),
         leerItemsPersistidos(token, tId).catch(() => [] as ItemTicket[]),
       ]);
-      dispatch({ tipo: "cargar", estado: { modoServicio: recon.modoServicio, lineas: recon.lineas } });
+      dispatch({ tipo: "cargar", estado: { modoServicio: recon.modoServicio, lineas: recon.lineas, envio: recon.envio } });
       setTicketBd(bd);
       // Un renglón agregado después del primer envío deja el botón habilitado otra vez: si no,
       // lo nuevo se queda sin mandar y la cocina nunca se entera.
@@ -543,7 +548,7 @@ export function HomePos({
         reconstruirCarrito(token, ticketId, productos ?? [], combos),
         leerItemsPersistidos(token, ticketId).catch(() => [] as ItemTicket[]),
       ]);
-      dispatch({ tipo: "cargar", estado: { modoServicio: recon.modoServicio, lineas: recon.lineas } });
+      dispatch({ tipo: "cargar", estado: { modoServicio: recon.modoServicio, lineas: recon.lineas, envio: recon.envio } });
       setVolverA(origen);
       setTicketBd(bd);
       setItemsPersistidos(items);
@@ -623,6 +628,9 @@ export function HomePos({
       // alguno, ese renglón se queda sin "Combo #n" y sin el contexto del padre.
       const seleccion = datos.lineas.filter((l) => soloItems.includes(l.id) || (l.parentId != null && soloItems.includes(l.parentId)));
       const lineas = lineasParaComanda(seleccion);
+      // Si lo recién enviado no tiene nada para cocina (p. ej. solo cargos), no hay comanda: un
+      // papel vacío rotulado AGREGADO hace que la cocina busque un pedido que no existe.
+      if (lineas.length === 0) return;
       const dc: DatosComanda = {
         folio: datos.meta.folio,
         modoServicio: datos.meta.modoServicio,
@@ -706,6 +714,20 @@ export function HomePos({
     }
   }, [token, ticketBd, cocinaEnviada, imprimirComandaCocina, volverAtras]);
 
+  /**
+   * Si `persistirTicket` falló DESPUÉS de abrir el ticket (el envío no se pudo fijar), ese ticket
+   * ya existe ABIERTO: la pantalla lo adopta como `ticketBd` ANTES de mostrar el error, para que el
+   * reintento lo reuse en vez de abrir otro y dejar el primero huérfano trabando el corte. El
+   * carrito conserva su envío a propósito: tocar ese renglón fija la zona sobre el ticket ya
+   * persistido (`cambiarZonaPedido`). Devuelve el mensaje que hay que mostrar.
+   */
+  const adoptarTicketSiQuedoAbierto = useCallback(async (e: unknown, porDefecto: string): Promise<string> => {
+    if (!(e instanceof ErrorEnvioNoFijado)) return e instanceof Error ? e.message : porDefecto;
+    const bd = e.totales ?? await leerTotales(token, e.ticketId).catch(() => null);
+    if (bd) setTicketBd(bd);
+    return `El pedido se guardó, pero sin envío: ${e.message}. Toca el renglón de envío para elegir otra zona.`;
+  }, [token]);
+
   /** Persiste el ticket si aún no existe; abre el modal de descuento sobre ese ticket. */
   const onAplicarDescuento = useCallback(async () => {
     if (carrito.lineas.length === 0) return;
@@ -723,6 +745,7 @@ export function HomePos({
           carrito.clienteDomicilio?.direccionId ?? null,
           carrito.notaOrden ?? null,
           carrito.nombreCuenta ?? null,
+          carrito.envio?.zonaId ?? null,
         );
         setTicketBd(bd);
       }
@@ -730,11 +753,11 @@ export function HomePos({
       try { setItemsPersistidos(await leerItemsPersistidos(token, bd.ticketId)); } catch { /* no bloquear */ }
       setDescuentoAbierto(true);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Error al preparar el descuento");
+      setError(await adoptarTicketSiQuedoAbierto(e, "Error al preparar el descuento"));
     } finally {
       setProcesandoCobro(false);
     }
-  }, [carrito, ticketBd, token, caja.sucursal_id, turno.caja_id, turno.id, imprimirComandaCocina]);
+  }, [carrito, ticketBd, token, caja.sucursal_id, turno.caja_id, turno.id, imprimirComandaCocina, adoptarTicketSiQuedoAbierto]);
 
   /**
    * Abre el cajón al empezar el cobro.
@@ -774,6 +797,7 @@ export function HomePos({
         carrito.clienteDomicilio?.direccionId ?? null,
         carrito.notaOrden ?? null,
         carrito.nombreCuenta ?? null,
+        carrito.envio?.zonaId ?? null,
       );
       /* EL TICKET YA EXISTE, CON FOLIO. La pantalla tiene que saberlo desde este instante.
 
@@ -786,11 +810,30 @@ export function HomePos({
       setTicketBd(totales);
       setTotalesCobro(totales);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Error al abrir el ticket");
+      setError(await adoptarTicketSiQuedoAbierto(e, "Error al abrir el ticket"));
     } finally {
       setProcesandoCobro(false);
     }
-  }, [carrito, ticketBd, token, caja.sucursal_id, turno.caja_id, turno.id, online]);
+  }, [carrito, ticketBd, token, caja.sucursal_id, turno.caja_id, turno.id, online, adoptarTicketSiQuedoAbierto]);
+
+  /**
+   * Ronda de arreglos 1/5 (Task 7) — cambiar la zona de ESTE pedido desde el renglón de envío.
+   *
+   * Sin ticket persistido: solo carrito, como antes (`cambiarZonaDePedido` no toca la red). Con
+   * ticket persistido —el caso real, porque un domicilio se manda a cocina (y por tanto se
+   * persiste) ANTES de cobrarse—, además reescribe el renglón en BD y trae los totales
+   * autoritativos, para que el número grande del pie y el renglón de envío se muevan juntos.
+   *
+   * Deliberadamente NO hace `dispatch` antes de que `cambiarZonaDePedido` resuelva: si la
+   * escritura en BD truena (zona inactiva, de otra sucursal, o el ticket ya no está en
+   * BORRADOR/ABIERTO), el error se propaga tal cual al modal (que lo muestra y NO se cierra) y el
+   * carrito se queda exactamente como estaba: nunca diciendo una zona que la base no tiene.
+   */
+  const cambiarZonaPedido = useCallback(async (envio: EnvioCarrito | null) => {
+    const totales = await cambiarZonaDePedido(token, ticketBd?.ticketId ?? null, envio?.zonaId ?? null);
+    if (totales) setTicketBd(totales);
+    dispatch({ tipo: "zona", envio });
+  }, [ticketBd, token]);
 
   const bloqueado = ticketBd !== null;
   // En modo cuenta de mesa el ticket está persistido (ticketBd) PERO el menú debe seguir activo
@@ -819,6 +862,7 @@ export function HomePos({
           carrito.clienteDomicilio?.direccionId ?? null,
           carrito.notaOrden ?? null,
           carrito.nombreCuenta ?? null,
+          carrito.envio?.zonaId ?? null,
         );
       }
       await ponerTicketEnEspera(token, bd.ticketId, etiqueta);
@@ -830,11 +874,11 @@ export function HomePos({
       refrescarEspera();
       consumirSalidaPendiente();
     } catch (e) {
-      setEsperaError(e instanceof Error ? e.message : "No se pudo poner en espera");
+      setEsperaError(await adoptarTicketSiQuedoAbierto(e, "No se pudo poner en espera"));
     } finally {
       setEsperaProcesando(false);
     }
-  }, [carrito, ticketBd, token, caja.sucursal_id, turno.caja_id, turno.id, refrescarEspera]);
+  }, [carrito, ticketBd, token, caja.sucursal_id, turno.caja_id, turno.id, refrescarEspera, adoptarTicketSiQuedoAbierto]);
 
   /** Pick-up / Domicilio — persiste la orden, la envía a cocina y la deja ABIERTA (sin cobrar).
    *  Queda en "Ver cuentas" del modo; se cobra al recoger / al regresar el repartidor. */
@@ -853,6 +897,7 @@ export function HomePos({
           carrito.clienteDomicilio?.direccionId ?? null,
           carrito.notaOrden ?? null,
           carrito.nombreCuenta ?? null,
+          carrito.envio?.zonaId ?? null,
         );
         // Desde aquí el ticket es real. Si lo de abajo falla —la impresora, la red— el error se
         // muestra y el cajero sigue en la pantalla; sin esto la pantalla no sabía que el ticket
@@ -868,11 +913,11 @@ export function HomePos({
       // Vuelve a la lista de cuentas del modo, que es donde el cajero sigue trabajando.
       volverAtras();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "No se pudo enviar a cocina");
+      setError(await adoptarTicketSiQuedoAbierto(e, "No se pudo enviar a cocina"));
     } finally {
       setProcesandoCobro(false);
     }
-  }, [carrito, ticketBd, token, caja.sucursal_id, turno.caja_id, turno.id, cocinaEnviada, imprimirComandaCocina, volverAtras]);
+  }, [carrito, ticketBd, token, caja.sucursal_id, turno.caja_id, turno.id, cocinaEnviada, imprimirComandaCocina, volverAtras, adoptarTicketSiQuedoAbierto]);
 
   /** Logo del negocio listo para la térmica. Se rasteriza al vuelo (es rápido y evita
    *  guardar estado que se desincronice si cambian el logo desde el panel). Si no hay logo
@@ -1046,6 +1091,7 @@ export function HomePos({
       [pidiendoMesa, () => setPidiendoMesa(false)],
       [nombreCuentaAbierto, () => setNombreCuentaAbierto(false)],
       [clienteDomAbierto, () => setClienteDomAbierto(false)],
+      [zonaPedidoAbierto, () => setZonaPedidoAbierto(false)],
       [esperaPidiendoEtiqueta, () => setEsperaPidiendoEtiqueta(false)],
       [esperaListaAbierta, () => setEsperaListaAbierta(false)],
       [movimientoAbierto, () => setMovimientoAbierto(false)],
@@ -1064,7 +1110,7 @@ export function HomePos({
     return capaVisible(capas);
   }, [modGrupos, comboAbierto, hojaCombo, agregarSuelto, cancelandoItem, descuentoItem, cancelandoTicket, avisoReparto, mostrarRecibo, confirmacion, totalesCobro,
       procesandoCobro, agregandoA, viendoMapaMesas, pidiendoMesa, nombreCuentaAbierto,
-      clienteDomAbierto, esperaPidiendoEtiqueta, esperaListaAbierta, movimientoAbierto,
+      clienteDomAbierto, zonaPedidoAbierto, esperaPidiendoEtiqueta, esperaListaAbierta, movimientoAbierto,
       abrirCajaAbierto, cambiarPinAbierto, misPropinasAbierto, configImpresoraAbierto,
       salidaPendiente, confirmandoCierre, menuGeneralAbierto, cerrando, enInicio, enKds, enMonitor,
       enConsultaCuentas, enDevoluciones, enPedidosApps, enDelivery, enPickup, enMesas, nuevoTicket,
@@ -1673,8 +1719,31 @@ export function HomePos({
           token={token}
           tenantId={caja.tenant_id}
           sucursalId={caja.sucursal_id}
-          onSeleccionar={(c) => { dispatch({ tipo: "cliente", cliente: c }); setClienteDomAbierto(false); }}
+          cajaId={turno.caja_id}
+          turnoId={turno.id}
+          empleadoNombre={empleado.nombre}
+          onSeleccionar={(c) => {
+            dispatch({ tipo: "cliente", cliente: c });
+            // Ruling 1 — el envío se pone solo con la zona de la dirección elegida. Sin esto, un
+            // cliente guardado con zona no pondría ningún cargo hasta cobrar: el hueco que cierra
+            // Task 7 (ver también el renglón de envío del ticket lateral).
+            dispatch({ tipo: "zona", envio: c.zona ? { zonaId: c.zona.id, nombre: c.zona.nombre, costoMxn: c.zona.costoMxn } : null });
+            setClienteDomAbierto(false);
+          }}
           onCerrar={() => setClienteDomAbierto(false)}
+        />
+      )}
+      {zonaPedidoAbierto && (
+        <ModalZonaPedido
+          token={token}
+          tenantId={caja.tenant_id}
+          sucursalId={caja.sucursal_id}
+          cajaId={turno.caja_id}
+          turnoId={turno.id}
+          empleadoNombre={empleado.nombre}
+          valor={carrito.envio?.zonaId ?? null}
+          onElegir={cambiarZonaPedido}
+          onCerrar={() => setZonaPedidoAbierto(false)}
         />
       )}
       {nombreCuentaAbierto && (
@@ -1706,6 +1775,7 @@ export function HomePos({
           onLimpiar={!ticketBd ? () => dispatch({ tipo: "limpiar" }) : undefined}
           onCancelarTicket={ticketBd ? () => setCancelandoTicket(true) : undefined}
           onEditarCliente={() => setClienteDomAbierto(true)}
+          onCambiarZona={() => setZonaPedidoAbierto(true)}
           onNotaLinea={(id, nota) => dispatch({ tipo: "nota_linea", clientId: id, nota })}
           onNotaOrden={(nota) => dispatch({ tipo: "nota_orden", nota })}
           onCobrar={iniciarCobro}

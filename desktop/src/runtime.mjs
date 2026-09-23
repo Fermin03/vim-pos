@@ -4,7 +4,7 @@
 // reusable que arranca el proceso main de Electron (o el verify headless).
 import EmbeddedPostgres from "embedded-postgres";
 import { arrancarConReintentos, crearCapturaDeLog } from "./arranque-reintentos.mjs";
-import { sembrarRepartidoresUnaVez } from "./sync-push.mjs";
+import { sembrarRepartidoresUnaVez, sembrarZonasUnaVez } from "./sync-push.mjs";
 import pg from "pg";
 import { spawn, execFileSync } from "node:child_process";
 import { randomBytes } from "node:crypto";
@@ -332,6 +332,10 @@ export async function startLocalBackend(opts = {}) {
   // sin cobrar en plena comida. La siembra se traga su propio fallo y lo deja en el log; como el
   // marcador se escribe ANTES, un fallo tampoco queda armado para el arranque siguiente.
   await sembrarRepartidoresUnaVez(db, log);
+
+  // 3c) Misma libreta, mismo motivo, para zonas de envío (0116/Task 4): ver `sembrarZonasUnaVez`
+  // en sync-push.mjs, que reusa el razonamiento completo de `sembrarRepartidoresUnaVez` de arriba.
+  await sembrarZonasUnaVez(db, log);
 
   // 4) Grants a los roles API (lo que Supabase da fuera de las migraciones).
   await db.query(`

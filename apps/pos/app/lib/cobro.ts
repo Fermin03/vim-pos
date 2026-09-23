@@ -2,6 +2,7 @@
 import { employeeClient } from "./supabase";
 import type { LineaCarrito, ModoServicio } from "./carrito";
 import { componentesJsonb } from "./cuenta-mesa";
+import { fijarEnvioTicket } from "./zonas-envio";
 
 export type MetodoPago =
   | "EFECTIVO"
@@ -40,6 +41,23 @@ type CtxCobro = {
   turnoId: string;
 };
 
+/**
+ * El ticket se abrió y sus renglones entraron, pero el envío no se pudo fijar (zona desactivada,
+ * de otra sucursal…). Lleva el `ticketId` —y los totales, si se pudieron leer— porque ese ticket
+ * YA EXISTE ABIERTO: si el llamador no lo adopta, el reintento abre otro y el primero se queda
+ * huérfano trabando el corte (el fantasma del comentario de `iniciarCobro` en home-pos.tsx).
+ */
+export class ErrorEnvioNoFijado extends Error {
+  constructor(
+    mensaje: string,
+    readonly ticketId: string,
+    readonly totales: TotalesTicket | null,
+  ) {
+    super(mensaje);
+    this.name = "ErrorEnvioNoFijado";
+  }
+}
+
 function modifsJsonb(linea: LineaCarrito): { opcion_modificador_id: string; cantidad: number }[] {
   return linea.modificadores.map((m) => ({ opcion_modificador_id: m.opcionId, cantidad: m.cantidad }));
 }
@@ -54,6 +72,9 @@ export async function persistirTicket(
   direccionEntregaId?: string | null,
   notaOrden?: string | null,
   nombreCliente?: string | null,
+  /** Zona de reparto del pedido. El cargo entra como renglón, después de los productos: la RPC
+   *  hereda la política de IVA del primer renglón, así que los productos tienen que existir ya. */
+  envioZonaId?: string | null,
 ): Promise<TotalesTicket> {
   const sb = employeeClient(ctx.token);
 
@@ -106,6 +127,17 @@ export async function persistirTicket(
     if (error) throw new Error(error.message);
   }
 
+  // El envío entra DESPUÉS del bucle de renglones: fijar_envio_ticket hereda la tasa de IVA y el
+  // "incluido en precio" del primer renglón de producto (0116_zonas_envio.sql), así que ese
+  // renglón tiene que existir ya cuando se llama.
+  if (envioZonaId) {
+    const { error } = await sb.rpc("fijar_envio_ticket", { p_ticket_id: tid, p_zona_id: envioZonaId });
+    if (error) {
+      const totales = await leerTotales(ctx.token, tid).catch(() => null);
+      throw new ErrorEnvioNoFijado(error.message, tid, totales);
+    }
+  }
+
   return leerTotales(ctx.token, tid);
 }
 
@@ -136,6 +168,30 @@ export async function leerTotales(token: string, ticketId: string): Promise<Tota
     estadoFiscal: t.estado_fiscal,
     folio: t.folio_completo,
   };
+}
+
+/**
+ * Cambia (o quita, con `zonaId` null) la zona de reparto de un pedido que YA tiene ticket, y
+ * relee los totales autoritativos — para que el renglón de envío del ticket lateral y el total
+ * del pie se muevan juntos (Task 7, ronda de arreglos 1/5).
+ *
+ * `ticketId: null` significa "el pedido todavía no se persistió": no hay nada que reescribir en
+ * BD, así que no toca la red y devuelve `null` — el caller decide qué hacer con el carrito local
+ * en ese caso (para un ticket sin persistir, cambiar de zona es solo un `dispatch`).
+ *
+ * Si `fijarEnvioTicket` truena (zona inactiva, de otra sucursal, o el ticket ya no está en
+ * BORRADOR/ABIERTO — ver `fijar_envio_ticket` en `0116_zonas_envio.sql`), el error se propaga tal
+ * cual y `leerTotales` nunca se llama: el caller no debe actualizar el carrito con una zona que la
+ * base rechazó.
+ */
+export async function cambiarZonaDePedido(
+  token: string,
+  ticketId: string | null,
+  zonaId: string | null,
+): Promise<TotalesTicket | null> {
+  if (!ticketId) return null;
+  await fijarEnvioTicket(token, ticketId, zonaId);
+  return leerTotales(token, ticketId);
 }
 
 /** F5.2b — fija la propina del ticket (RPC establecer_propina_ticket, bajo RLS). */

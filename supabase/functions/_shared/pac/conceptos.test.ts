@@ -450,3 +450,94 @@ test("el hijo sin dinero y con tasa distinta se pliega en el nombre del padre", 
   assert.equal(r.total, 175);
   cuadra(r);
 });
+
+// ── El envío no admite descuentos (spec zonas de envío §3, ADR 0017) ─────────────────────────────
+// La base ya calcula el descuento de ticket sobre la comida; si el reparto del CFDI lo repartiera
+// también sobre el renglón de envío, la factura diría otra cosa que el ticket.
+
+/** Dos hamburguesas de $120 (IVA dentro) y un envío de $35 que hereda la misma política. */
+function ticketConEnvio(): LineaTicket[] {
+  return [
+    linea({ descripcion: "Hamburguesa", totalItemMxn: 120, ivaItemMxn: 16.55 }),
+    linea({ descripcion: "Hamburguesa", totalItemMxn: 120, ivaItemMxn: 16.55 }),
+    linea({ descripcion: "Envío · Zona Norte", totalItemMxn: 35, ivaItemMxn: 4.83, cargoTipo: "ENVIO" }),
+  ];
+}
+
+test("el descuento del ticket se reparte solo en la comida: el envío sale completo", () => {
+  // 10 % de la comida = 24.00; el ticket cobra 275 − 24 = 251.
+  const r = armarConceptos(ticketConEnvio(), 251);
+  const envio = r.conceptos.find((c) => c.descripcion.startsWith("Envío"));
+  assert.ok(envio, "falta el concepto de envío");
+  assert.equal(envio.descuento, 0);
+  assert.equal(envio.total, 35);
+  assert.equal(envio.importe, 30.17);
+  assert.equal(envio.iva, 4.83);
+  const comida = r.conceptos.filter((c) => !c.descripcion.startsWith("Envío"));
+  assert.equal(Math.round(comida.reduce((a, c) => a + c.total, 0) * 100), 21600);
+  assert.equal(r.total, 251);
+  cuadra(r);
+});
+
+test("cortesía de la comida: el envío es lo único que se cobra y no lleva descuento", () => {
+  const r = armarConceptos(ticketConEnvio(), 35);
+  const envio = r.conceptos.find((c) => c.descripcion.startsWith("Envío"));
+  assert.ok(envio);
+  assert.equal(envio.descuento, 0);
+  assert.equal(envio.total, 35);
+  assert.equal(r.total, 35);
+  cuadra(r);
+});
+
+test("un descuento de ticket sin comida sobre la cual repartirse no se timbra", () => {
+  // Tras las guardas de la base no debería existir (el descuento se calcula sobre la comida). Si
+  // aparece —p. ej. un descuento congelado cuya comida se canceló después— no se reparte sobre el
+  // envío ni se divide entre cero: se rechaza y se investiga.
+  const soloEnvio = [linea({ descripcion: "Envío · Zona Norte", totalItemMxn: 35, ivaItemMxn: 4.83, cargoTipo: "ENVIO" })];
+  assert.throws(() => armarConceptos(soloEnvio, 11), ConceptosIncoherentes);
+});
+
+test("un descuento de ticket mayor que la comida no se come el envío: se rechaza", () => {
+  assert.throws(() => armarConceptos(ticketConEnvio(), 20), ConceptosIncoherentes);
+});
+
+// ── El excedente de un descuento congelado no se come el envío (recalcular_totales_ticket, 0116) ──
+// Un descuento de ticket se congela como monto. Si después se cancela comida, la base topa el total
+// en los renglones de cargo vivos (el envío) y reporta solo lo aplicado. El CFDI deduce el descuento
+// como sumaLineas − total, así que ese ticket llega aquí coherente y debe timbrar.
+
+test("cortesía congelada y se cancela un platillo: timbra con el envío completo", () => {
+  // 240 de comida + 35 de envío, cortesía de 240, se cancela una hamburguesa. La base deja el total
+  // en 35: renglones vivos 155 − descuento efectivo 120. Nada del descuento cae en el envío.
+  const vivos = [ticketConEnvio()[0], ticketConEnvio()[2]];
+  const r = armarConceptos(vivos, 35);
+  const envio = r.conceptos.find((c) => c.descripcion.startsWith("Envío"));
+  assert.ok(envio);
+  assert.equal(envio.descuento, 0);
+  assert.equal(envio.total, 35);
+  assert.equal(r.total, 35);
+  cuadra(r);
+});
+
+test("descuento congelado y se cancela toda la comida: solo el envío, sin nada que repartir", () => {
+  // El tope deja el descuento efectivo en 0 (sumaLineas − total = 0): no hay reparto que intentar.
+  const soloEnvio = [linea({ descripcion: "Envío · Zona Norte", totalItemMxn: 35, ivaItemMxn: 4.83, cargoTipo: "ENVIO" })];
+  const r = armarConceptos(soloEnvio, 35);
+  assert.equal(r.descuento, 0);
+  assert.equal(r.total, 35);
+  cuadra(r);
+});
+
+test("la global que no cuadra dice qué folio la bloquea", () => {
+  // Un solo ticket incoherente tumba la global de todo el periodo: el error tiene que decir cuál.
+  const sano = { folio: "A-0001", totalMxn: 120, lineas: [linea({ totalItemMxn: 120, ivaItemMxn: 16.55 })] };
+  const roto = {
+    folio: "A-0002",
+    totalMxn: 11,
+    lineas: [linea({ descripcion: "Envío · Zona Norte", totalItemMxn: 35, ivaItemMxn: 4.83, cargoTipo: "ENVIO" })],
+  };
+  assert.throws(
+    () => armarConceptosGlobal([sano, roto]),
+    (e: unknown) => e instanceof ConceptosIncoherentes && e.message.includes("A-0002"),
+  );
+});

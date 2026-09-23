@@ -1,5 +1,6 @@
 "use client";
 import { employeeClient } from "./supabase";
+import type { ZonaEnvio } from "./zonas-envio";
 
 // CRM ligero para domicilios desde el POS. Busca por teléfono/nombre y registra
 // cliente + direcciones (un cliente puede tener varias: Casa, Oficina, etc.).
@@ -10,6 +11,12 @@ export type DireccionCliente = {
   etiqueta: string;
   preview: string;
   referencias: string | null;
+  /**
+   * Zona de reparto de esta dirección, completa (no solo el id): el ticket lateral necesita
+   * nombre y costo para pintar el renglón de envío antes de cobrar. null = todavía no se le
+   * asignó (direcciones de antes de esta entrega, o el negocio no tiene zonas).
+   */
+  zona: ZonaEnvio | null;
 };
 
 export type ClienteDomicilio = {
@@ -19,13 +26,19 @@ export type ClienteDomicilio = {
   /** Dirección elegida para ESTE pedido. */
   direccionId: string | null;
   direccionPreview: string | null;
+  /** Zona de la dirección elegida para ESTE pedido (ver `DireccionCliente.zona`). */
+  zona: ZonaEnvio | null;
   /** Todas las direcciones del cliente (Casa, Oficina, …). */
   direcciones: DireccionCliente[];
 };
 
 export const ETIQUETAS_DIRECCION = ["Casa", "Oficina", "Otra"] as const;
 
-type FilaDir = { id: string; etiqueta: string | null; calle: string; numero_exterior: string; colonia: string; referencias: string | null };
+type FilaZonaEmbed = { id: string; nombre: string; costo_mxn: number } | null;
+type FilaDir = {
+  id: string; etiqueta: string | null; calle: string; numero_exterior: string; colonia: string; referencias: string | null;
+  zona: FilaZonaEmbed;
+};
 type FilaCliente = {
   id: string;
   nombre: string;
@@ -34,12 +47,17 @@ type FilaCliente = {
   direcciones: FilaDir[] | null;
 };
 
+function mapZonaEmbed(z: FilaZonaEmbed): ZonaEnvio | null {
+  return z ? { id: z.id, nombre: z.nombre, costoMxn: Number(z.costo_mxn) } : null;
+}
+
 function mapDir(d: FilaDir): DireccionCliente {
   return {
     id: d.id,
     etiqueta: d.etiqueta || "Principal",
     preview: `${d.calle} ${d.numero_exterior}, ${d.colonia}`,
     referencias: d.referencias ?? null,
+    zona: mapZonaEmbed(d.zona),
   };
 }
 
@@ -52,13 +70,14 @@ function armar(c: FilaCliente): ClienteDomicilio {
     telefono: c.telefono,
     direccionId: d0?.id ?? null,
     direccionPreview: d0 ? `${d0.etiqueta} · ${d0.preview}` : null,
+    zona: d0?.zona ?? null,
     direcciones: dirs,
   };
 }
 
 /** Marca una dirección concreta como la elegida para el pedido. */
 export function conDireccion(c: ClienteDomicilio, dir: DireccionCliente): ClienteDomicilio {
-  return { ...c, direccionId: dir.id, direccionPreview: `${dir.etiqueta} · ${dir.preview}` };
+  return { ...c, direccionId: dir.id, direccionPreview: `${dir.etiqueta} · ${dir.preview}`, zona: dir.zona };
 }
 
 /** Busca clientes del tenant por teléfono o nombre (mínimo 2 caracteres), con TODAS sus direcciones. */
@@ -69,7 +88,7 @@ export async function buscarClientesDomicilio(token: string, q: string): Promise
   const esc = term.replace(/[%,()]/g, " ");
   const { data, error } = await sb
     .from("clientes")
-    .select("id, nombre, apellido_paterno, telefono, direcciones:direcciones_cliente(id, etiqueta, calle, numero_exterior, colonia, referencias)")
+    .select("id, nombre, apellido_paterno, telefono, direcciones:direcciones_cliente(id, etiqueta, calle, numero_exterior, colonia, referencias, zona:zonas_envio(id, nombre, costo_mxn))")
     .or(`telefono.ilike.%${esc}%,nombre.ilike.%${esc}%`)
     .is("deleted_at", null)
     .limit(8);
@@ -83,6 +102,8 @@ export type DireccionInput = {
   numero: string;
   colonia: string;
   referencias: string;
+  /** Zona elegida en el formulario (objeto completo: se guarda tal cual en la dirección nueva). */
+  zona: ZonaEnvio | null;
 };
 
 /** Inserta una dirección para un cliente (defaults CP/ciudad/estado de la sucursal). */
@@ -109,6 +130,7 @@ export async function agregarDireccionCliente(
       ciudad: s.ciudad || "—",
       estado_geo: s.estado_geo || "—",
       referencias: args.dir.referencias.trim() || null,
+      zona_envio_id: args.dir.zona?.id ?? null,
     })
     .select("id")
     .single();
@@ -118,7 +140,21 @@ export async function agregarDireccionCliente(
     etiqueta,
     preview: `${args.dir.calle.trim()} ${numero}, ${args.dir.colonia.trim()}`,
     referencias: args.dir.referencias.trim() || null,
+    zona: args.dir.zona ?? null,
   };
+}
+
+/**
+ * Asigna la zona a una dirección ya guardada. Caso: se elige un cliente para un pedido y su
+ * dirección no traía zona (de antes de esta entrega) pero el negocio sí tiene zonas activas —
+ * el modal pide la zona antes de continuar y la deja registrada para la próxima vez.
+ */
+export async function fijarZonaDireccion(token: string, direccionId: string, zonaId: string): Promise<void> {
+  const { error } = await employeeClient(token)
+    .from("direcciones_cliente")
+    .update({ zona_envio_id: zonaId })
+    .eq("id", direccionId);
+  if (error) throw new Error(error.message);
 }
 
 /** Registra un cliente nuevo + su primera dirección. Devuelve el cliente listo para asociar. */
@@ -143,6 +179,7 @@ export async function registrarClienteDomicilio(
     telefono: input.telefono.trim() || null,
     direccionId: dir.id,
     direccionPreview: `${dir.etiqueta} · ${dir.preview}`,
+    zona: dir.zona,
     direcciones: [dir],
   };
 }

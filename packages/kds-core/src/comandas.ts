@@ -32,46 +32,56 @@ export type ComandaKds = {
   items: ItemComanda[];
 };
 
+/** Una fila de `ticket_items` tal cual la devuelve PostgREST con {@link SELECCION_TICKET_ITEMS_KDS}. */
+export type FilaItemKds = {
+  id: string;
+  cantidad: number | string;
+  producto_nombre_snapshot: string;
+  nota_cocina: string | null;
+  cancelado: boolean;
+  area_cocina_nombre_snapshot: string | null;
+  parent_item_id: string | null;
+  combo_rol: "PADRE" | "HIJO" | null;
+  orden_visualizacion: number;
+  cargo_tipo: string | null;
+  ticket_item_modificadores: { opcion_nombre_snapshot: string }[] | null;
+};
+
+/** Una fila de `tickets` con sus `ticket_items` anidados, tal cual la devuelve `leerComandas`. */
+export type FilaTicketKds = {
+  id: string;
+  folio_completo: string | null;
+  modo_servicio: string;
+  estado_cocina: EstadoCocina;
+  fecha_envio_cocina: string | null;
+  nota_general: string | null;
+  ticket_items: FilaItemKds[] | null;
+};
+
 /**
- * Lee las comandas activas de la sucursal para el KDS: tickets EN_COCINA o LISTO,
- * con sus ítems no cancelados y modificadores. Orden: más antiguo primero (FIFO de cocina).
+ * Proyección de `ticket_items` que pide `leerComandas`, como constante y no como texto suelto
+ * dentro del `.select()`: así una prueba puede afirmar que `cargo_tipo` sigue en la lista.
+ *
+ * Sin `cargo_tipo` aquí, PostgREST devuelve esa columna como `undefined` en TODAS las filas,
+ * `!i.cargo_tipo` se vuelve `true` para TODAS —incluidas las de envío— y `comandasDesdeFilas` deja
+ * de filtrar los cargos EN SILENCIO: sin excepción, sin prueba en rojo (las pruebas de
+ * `comandasDesdeFilas` usan fixtures que ya traen el campo) y sin error de tipos, porque el cast
+ * `as unknown as FilaTicketKds[]` de más abajo no verifica que el dato real tenga la forma que dice
+ * tener.
  */
-export async function leerComandas(token: string, sucursalId: string): Promise<ComandaKds[]> {
-  const { data, error } = await clienteConToken(token)
-    .from("tickets")
-    .select(
-      "id, folio_completo, modo_servicio, estado_cocina, fecha_envio_cocina, nota_general, " +
-        "ticket_items(id, cantidad, producto_nombre_snapshot, nota_cocina, cancelado, area_cocina_nombre_snapshot, " +
-        "parent_item_id, combo_rol, orden_visualizacion, ticket_item_modificadores(opcion_nombre_snapshot))",
-    )
-    .eq("sucursal_id", sucursalId)
-    .in("estado_cocina", ["EN_COCINA", "LISTO"])
-    .order("fecha_envio_cocina", { ascending: true });
-  if (error) throw new Error(error.message);
+export const SELECCION_TICKET_ITEMS_KDS =
+  "id, cantidad, producto_nombre_snapshot, nota_cocina, cancelado, area_cocina_nombre_snapshot, " +
+  "parent_item_id, combo_rol, orden_visualizacion, cargo_tipo, ticket_item_modificadores(opcion_nombre_snapshot)";
 
-  const rows = (data ?? []) as unknown as {
-    id: string;
-    folio_completo: string | null;
-    modo_servicio: string;
-    estado_cocina: EstadoCocina;
-    fecha_envio_cocina: string | null;
-    nota_general: string | null;
-    ticket_items:
-      | {
-          id: string;
-          cantidad: number | string;
-          producto_nombre_snapshot: string;
-          nota_cocina: string | null;
-          cancelado: boolean;
-          area_cocina_nombre_snapshot: string | null;
-          parent_item_id: string | null;
-          combo_rol: "PADRE" | "HIJO" | null;
-          orden_visualizacion: number;
-          ticket_item_modificadores: { opcion_nombre_snapshot: string }[] | null;
-        }[]
-      | null;
-  }[];
-
+/**
+ * De las filas crudas de `tickets`+`ticket_items` a las comandas que pinta el KDS: descarta
+ * cancelados y cargos, numera los combos entre PADRES y arma cada `ItemComanda`.
+ *
+ * Función PURA, sin red — separada de `leerComandas` para poder probarla con un fixture plano, sin
+ * mockear `@supabase/supabase-js` (mismo motivo por el que `lineasParaComanda` vive aparte de
+ * `leerTicketParaImpresion` en `comanda-builder.ts`).
+ */
+export function comandasDesdeFilas(rows: FilaTicketKds[]): ComandaKds[] {
   return rows.map((t) => {
     const folio = t.folio_completo ?? t.id;
     // Combos (ADR 0015): el PADRE no va a cocina —se prepara la comida, no "un combo"— y cada
@@ -81,7 +91,14 @@ export async function leerComandas(token: string, sucursalId: string): Promise<C
     // Entre PADRES y no entre "todos los renglones no-hijo vivos": esta pantalla recalcula en vivo
     // y el papel ya se imprimió. Cancelar un producto suelto que estuviera encima del combo
     // renumeraba aquí y no allá, y la plancha y la barra acababan mirando números distintos.
-    const vivos = (t.ticket_items ?? []).filter((i) => !i.cancelado).sort((a, b) => a.orden_visualizacion - b.orden_visualizacion);
+    //
+    // `!i.cargo_tipo` fuera de "vivos" también: un cargo (envío) no es comida, nunca es PADRE/HIJO,
+    // así que quitarlo aquí no mueve la numeración de combos. Filtra por `cargo_tipo`, no por
+    // `producto_id` — un producto borrado del catálogo también deja ese campo en null, y "sin
+    // producto" no es lo mismo que "es un cargo". Misma regla en `comanda-builder.ts`.
+    const vivos = (t.ticket_items ?? [])
+      .filter((i) => !i.cancelado && !i.cargo_tipo)
+      .sort((a, b) => a.orden_visualizacion - b.orden_visualizacion);
     const numero = new Map<string, number>();
     const ctxPadre = new Map<string, string[]>();
     let n = 0;
@@ -115,6 +132,26 @@ export async function leerComandas(token: string, sucursalId: string): Promise<C
       items,
     };
   });
+}
+
+/**
+ * Lee las comandas activas de la sucursal para el KDS: tickets EN_COCINA o LISTO,
+ * con sus ítems no cancelados y modificadores. Orden: más antiguo primero (FIFO de cocina).
+ */
+export async function leerComandas(token: string, sucursalId: string): Promise<ComandaKds[]> {
+  const { data, error } = await clienteConToken(token)
+    .from("tickets")
+    .select(
+      "id, folio_completo, modo_servicio, estado_cocina, fecha_envio_cocina, nota_general, " +
+        `ticket_items(${SELECCION_TICKET_ITEMS_KDS})`,
+    )
+    .eq("sucursal_id", sucursalId)
+    .in("estado_cocina", ["EN_COCINA", "LISTO"])
+    .order("fecha_envio_cocina", { ascending: true });
+  if (error) throw new Error(error.message);
+
+  const rows = (data ?? []) as unknown as FilaTicketKds[];
+  return comandasDesdeFilas(rows);
 }
 
 /**

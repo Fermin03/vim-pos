@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { agruparPadresHijos, type FilaItemPersistido } from "../cuenta-mesa";
+import { agruparPadresHijos, envioDeFilas, envioReconstruido, type FilaItemPersistido } from "../cuenta-mesa";
 import type { Producto } from "../catalogo";
 import type { ComboDef } from "../combos";
 
@@ -13,9 +13,10 @@ const def: ComboDef = { producto: combo, slots: [
   { id: "g1", nombre: "Hamburguesa", orden: 1, min: 1, max: 1, modo: "SUMA_PRECIO_PRODUCTO", opciones: [] },
   { id: "g2", nombre: "Acompañamiento", orden: 2, min: 1, max: 1, modo: "DELTA", opciones: [] },
 ] };
-const fila = (f: Partial<FilaItemPersistido> & { id: string; producto_id: string }): FilaItemPersistido => ({
+const fila = (f: Partial<FilaItemPersistido> & { id: string; producto_id: string | null }): FilaItemPersistido => ({
   client_id_local: null, cantidad: 1, nota_cocina: null, cancelado: false, parent_item_id: null, combo_rol: null,
-  combo_grupo_nombre_snapshot: null, precio_unitario_snapshot: 0, ticket_item_modificadores: [], ...f,
+  combo_grupo_nombre_snapshot: null, precio_unitario_snapshot: 0, cargo_tipo: null, producto_nombre_snapshot: "",
+  ticket_item_modificadores: [], ...f,
 });
 
 describe("agruparPadresHijos", () => {
@@ -49,5 +50,36 @@ describe("agruparPadresHijos", () => {
     const [l] = agruparPadresHijos(filas, porId, [def]);
     expect(l.cantidad).toBe(2);
     expect(l.combo?.componentes[0].cantidad).toBe(1);
+  });
+  it("el renglón de envío no se cuela como línea del carrito", () => {
+    const filas = [
+      fila({ id: "i1", producto_id: "p1", precio_unitario_snapshot: 120, producto_nombre_snapshot: "Brownie" }),
+      fila({ id: "i2", producto_id: null, cargo_tipo: "ENVIO", precio_unitario_snapshot: 35, producto_nombre_snapshot: "Envío · Zona Norte" }),
+    ];
+    // M4: el ticket lateral muestra el nombre de la zona SIN el prefijo del renglón, igual que en
+    // un carrito nuevo (antes: "Envío · Zona Norte" al reabrir y "Zona Norte" al capturar).
+    expect(envioDeFilas(filas)).toEqual({ zonaId: "", nombre: "Zona Norte", costoMxn: 35 });
+    expect(agruparPadresHijos(filas.filter((f) => !f.cargo_tipo), porId, [def]).length).toBe(1);
+  });
+});
+
+describe("envioReconstruido", () => {
+  const renglonEnvio = fila({ id: "e", producto_id: null, cargo_tipo: "ENVIO", precio_unitario_snapshot: 35, producto_nombre_snapshot: "Envío · Zona Norte" });
+
+  it("con renglón de envío, toma el importe congelado y la zona del ticket", () => {
+    const e = envioReconstruido([renglonEnvio], { zona_envio_id: "z1", zonas_envio: { nombre: "Zona Norte" } });
+    expect(e).toEqual({ zonaId: "z1", nombre: "Zona Norte", costoMxn: 35 });
+  });
+
+  it("zona gratis: sin renglón pero con zona en el ticket, la zona sigue visible a $0", () => {
+    // La RPC no inserta renglón de $0 (no timbraría); sin esto, al reabrir la cuenta la zona
+    // desaparecería de la pantalla aunque siga registrada en el ticket.
+    expect(envioReconstruido([], { zona_envio_id: "z0", zonas_envio: { nombre: "Centro" } }))
+      .toEqual({ zonaId: "z0", nombre: "Centro", costoMxn: 0 });
+  });
+
+  it("sin renglón y sin zona no hay envío", () => {
+    expect(envioReconstruido([], { zona_envio_id: null, zonas_envio: null })).toBeNull();
+    expect(envioReconstruido([], null)).toBeNull();
   });
 });

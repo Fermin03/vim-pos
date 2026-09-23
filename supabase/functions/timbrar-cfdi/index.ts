@@ -125,7 +125,7 @@ Deno.serve(async (req) => {
   const { data: filas, error: iErr } = await sb
     .from("ticket_items")
     .select(
-      "id, parent_item_id, combo_rol, " +
+      "id, parent_item_id, combo_rol, cargo_tipo, " +
         "producto_nombre_snapshot, cantidad, clave_sat_snapshot, unidad_sat_snapshot, " +
         "tasa_iva_snapshot, iva_incluido_en_precio_snapshot, subtotal_bruto_mxn, " +
         "monto_modificadores_mxn, descuento_item_mxn, promocion_item_mxn, iva_item_mxn, total_item_mxn",
@@ -139,6 +139,7 @@ Deno.serve(async (req) => {
     id: String(f.id),
     parentId: (f.parent_item_id as string) ?? null,
     comboRol: (f.combo_rol as "PADRE" | "HIJO" | null) ?? null,
+    cargoTipo: (f.cargo_tipo as string | null) ?? null,
     descripcion: String(f.producto_nombre_snapshot),
     cantidad: num(f.cantidad),
     claveSat: (f.clave_sat_snapshot as string) ?? null,

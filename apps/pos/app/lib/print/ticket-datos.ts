@@ -16,6 +16,25 @@ const MODO_LABEL: Record<string, string> = {
 type Ctx = { token: string; cajeroNombre: string; cajaNombre: string };
 
 /**
+ * Proyección de `ticket_items` que pide `leerTicketParaImpresion`, como constante y no como texto
+ * suelto dentro del `.select()`: así una prueba puede afirmar que `cargo_tipo` sigue en la lista.
+ *
+ * Sin `cargo_tipo` aquí, el `map` de abajo lee `cargoTipo: undefined` para TODOS los renglones y
+ * el ticket seguiría imprimiendo el envío igual (no hay filtro que romper en el ticket del
+ * cliente) — pero `lineasParaComanda` (comanda-builder.ts) SÍ filtra por este campo, y una comanda
+ * armada con datos de un ticket leído por una función que perdiera `cargo_tipo` volvería a
+ * mostrarle el envío a la cocina, en silencio.
+ */
+export const SELECCION_TICKET_ITEMS_IMPRESION =
+  "id, producto_nombre_snapshot, cantidad, total_item_mxn, nota_cocina, cargo_tipo, " +
+  "parent_item_id, combo_rol, combo_grupo_nombre_snapshot, " +
+  "ticket_item_modificadores(opcion_nombre_snapshot, precio_extra_snapshot, cantidad), " +
+  // El área se resuelve aquí, con el ticket: producto primero, categoría si el producto no
+  // tiene. Traerla en la misma consulta evita una segunda vuelta por renglón en hora pico.
+  "producto:productos(area_cocina_id, area:areas_cocina(nombre), " +
+  "categoria:categorias(area_cocina_id, area:areas_cocina(nombre)))";
+
+/**
  * Suma a cada PADRE el total de sus HIJOS —que van a precio 0 y solo cargan lo que el cliente
  * pagó de más en extras (migración 0111: `agregar_combo_a_ticket`)— para que el ticket muestre el
  * precio completo del combo en un solo renglón ("1x Combo $190").
@@ -57,15 +76,7 @@ export async function leerTicketParaImpresion(ticketId: string, ctx: Ctx): Promi
 
   const { data: items, error: e2 } = await sb
     .from("ticket_items")
-    .select(
-      "id, producto_nombre_snapshot, cantidad, total_item_mxn, nota_cocina, " +
-        "parent_item_id, combo_rol, combo_grupo_nombre_snapshot, " +
-        "ticket_item_modificadores(opcion_nombre_snapshot, precio_extra_snapshot, cantidad), " +
-        // El área se resuelve aquí, con el ticket: producto primero, categoría si el producto no
-        // tiene. Traerla en la misma consulta evita una segunda vuelta por renglón en hora pico.
-        "producto:productos(area_cocina_id, area:areas_cocina(nombre), " +
-        "categoria:categorias(area_cocina_id, area:areas_cocina(nombre)))",
-    )
+    .select(SELECCION_TICKET_ITEMS_IMPRESION)
     .eq("ticket_id", ticketId)
     .eq("cancelado", false)
     // El padre debe quedar antes que sus hijos: el ticket y la comanda dependen de ese orden
@@ -80,6 +91,7 @@ export async function leerTicketParaImpresion(ticketId: string, ctx: Ctx): Promi
     // de error genérico. La forma real es la de abajo.
     const r = it as unknown as {
       id: string; producto_nombre_snapshot: string; cantidad: number; total_item_mxn: string | number; nota_cocina: string | null;
+      cargo_tipo: string | null;
       parent_item_id: string | null; combo_rol: "PADRE" | "HIJO" | null; combo_grupo_nombre_snapshot: string | null;
       ticket_item_modificadores: Mod[] | null; producto: Prod;
     };
@@ -100,6 +112,7 @@ export async function leerTicketParaImpresion(ticketId: string, ctx: Ctx): Promi
       comboRol: (r.combo_rol as "PADRE" | "HIJO" | null) ?? null,
       parentId: (r.parent_item_id as string) ?? null,
       grupoNombre: (r.combo_grupo_nombre_snapshot as string) ?? null,
+      cargoTipo: (r.cargo_tipo as string) ?? null,
       extras: (r.ticket_item_modificadores ?? [])
         .filter((m) => Number(m.precio_extra_snapshot ?? 0) > 0)
         .map((m) => ({ nombre: m.opcion_nombre_snapshot, importeMxn: Number(m.precio_extra_snapshot) * Number(m.cantidad ?? 1) * Number(r.cantidad) })),

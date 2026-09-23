@@ -1,7 +1,7 @@
 "use client";
 import { employeeClient } from "./supabase";
 import type { Producto } from "./catalogo";
-import type { LineaCarrito, ModificadorSel, ModoServicio } from "./carrito";
+import type { EnvioCarrito, LineaCarrito, ModificadorSel, ModoServicio } from "./carrito";
 import type { ComboDef, ComponenteSel } from "./combos";
 
 // T2 keystone — Cuenta por mesa (Full Service). El POS de QS construye el carrito local y persiste
@@ -18,7 +18,7 @@ function clientIdLocal(): string {
 export type FilaItemPersistido = {
   id: string;
   client_id_local: string | null;
-  producto_id: string;
+  producto_id: string | null;
   cantidad: number | string;
   nota_cocina: string | null;
   cancelado: boolean;
@@ -26,6 +26,10 @@ export type FilaItemPersistido = {
   combo_rol: "PADRE" | "HIJO" | null;
   combo_grupo_nombre_snapshot: string | null;
   precio_unitario_snapshot: number | string;
+  /** Distingue un cargo (p.ej. envío) de un producto normal. Nunca uses `producto_id === null` para
+   *  esto: un producto borrado del catálogo también deja ese campo en null. */
+  cargo_tipo: string | null;
+  producto_nombre_snapshot: string;
   ticket_item_modificadores: { opcion_modificador_id: string; grupo_nombre_snapshot: string | null; opcion_nombre_snapshot: string | null; precio_extra_snapshot: number | string | null; cantidad: number | null }[] | null;
 };
 
@@ -86,29 +90,78 @@ export function agruparPadresHijos(filas: FilaItemPersistido[], porId: Map<strin
   return lineas;
 }
 
+/** Prefijo con que `fijar_envio_ticket` nombra el renglón de envío. */
+const PREFIJO_RENGLON_ENVIO = "Envío · ";
+
+/**
+ * Saca el cargo de envío de los renglones persistidos.
+ *
+ * Sin esto el renglón se perdería en silencio: `agruparPadresHijos` descarta lo que no encuentra
+ * en el catálogo, y el envío no está en el catálogo a propósito. El cajero vería un total con
+ * envío sin nada en pantalla que lo explique.
+ *
+ * `zonaId` se rellena luego desde `tickets.zona_envio_id`; para pintar el renglón basta el nombre
+ * y el importe congelados (lo que REALMENTE se cobró, no el precio actual de la zona).
+ */
+export function envioDeFilas(filas: FilaItemPersistido[]): EnvioCarrito | null {
+  const f = filas.find((r) => r.cargo_tipo === "ENVIO" && !r.cancelado);
+  if (!f) return null;
+  // El renglón se llama "Envío · <zona>" (fijar_envio_ticket, 0116) porque así sale en el ticket
+  // impreso y en el CFDI. En pantalla va solo el nombre de la zona, como en un carrito nuevo: si
+  // no, la misma zona se leía distinto según se hubiera capturado o reabierto la cuenta.
+  const nombre = f.producto_nombre_snapshot.startsWith(PREFIJO_RENGLON_ENVIO)
+    ? f.producto_nombre_snapshot.slice(PREFIJO_RENGLON_ENVIO.length)
+    : f.producto_nombre_snapshot;
+  return { zonaId: "", nombre, costoMxn: Number(f.precio_unitario_snapshot) };
+}
+
+/** Lo que `reconstruirCarrito` lee del ticket para recuperar su envío. */
+export type TicketEnvioPersistido = { zona_envio_id: string | null; zonas_envio: { nombre: string } | null } | null;
+
+/**
+ * El envío de un ticket persistido, con renglón o sin él.
+ *
+ * Una zona de $0 NO deja renglón (un concepto de base 0 no timbra; ver `fijar_envio_ticket` en la
+ * 0116), pero sí queda en `tickets.zona_envio_id`. Sin este respaldo, al reabrir la cuenta la zona
+ * desaparecería de pantalla y el cajero no sabría que ya la eligió.
+ */
+export function envioReconstruido(filas: FilaItemPersistido[], ticket: TicketEnvioPersistido): EnvioCarrito | null {
+  const zonaId = ticket?.zona_envio_id ?? null;
+  const renglon = envioDeFilas(filas);
+  if (renglon) return { ...renglon, zonaId: String(zonaId ?? "") };
+  if (zonaId && ticket?.zonas_envio) return { zonaId, nombre: ticket.zonas_envio.nombre, costoMxn: 0 };
+  return null;
+}
+
 /**
  * Reconstruye las líneas del carrito desde un ticket persistido, casando producto_id con el
- * catálogo cargado. Items cancelados se omiten. Devuelve también el modo de servicio.
+ * catálogo cargado. Items cancelados se omiten. Devuelve también el modo de servicio y, si el
+ * ticket trae un cargo de envío persistido, el `envio` para que el cajero lo vuelva a ver.
  */
 export async function reconstruirCarrito(
   token: string,
   ticketId: string,
   productos: Producto[],
   combos: ComboDef[] = [],
-): Promise<{ lineas: LineaCarrito[]; modoServicio: ModoServicio }> {
+): Promise<{ lineas: LineaCarrito[]; modoServicio: ModoServicio; envio: EnvioCarrito | null }> {
   const sb = employeeClient(token);
-  const { data: ticket } = await sb.from("tickets").select("modo_servicio").eq("id", ticketId).maybeSingle();
+  const { data: ticket } = await sb.from("tickets").select("modo_servicio, zona_envio_id, zonas_envio(nombre)").eq("id", ticketId).maybeSingle();
   const modo = mapearModo((ticket?.modo_servicio as string) ?? "MESA");
 
   const { data, error } = await sb
     .from("ticket_items")
-    .select("id, client_id_local, producto_id, cantidad, nota_cocina, cancelado, parent_item_id, combo_rol, combo_grupo_nombre_snapshot, precio_unitario_snapshot, ticket_item_modificadores(opcion_modificador_id, grupo_nombre_snapshot, opcion_nombre_snapshot, precio_extra_snapshot, cantidad)")
+    .select("id, client_id_local, producto_id, cantidad, nota_cocina, cancelado, parent_item_id, combo_rol, combo_grupo_nombre_snapshot, precio_unitario_snapshot, cargo_tipo, producto_nombre_snapshot, ticket_item_modificadores(opcion_modificador_id, grupo_nombre_snapshot, opcion_nombre_snapshot, precio_extra_snapshot, cantidad)")
     .eq("ticket_id", ticketId)
     .order("orden_visualizacion", { ascending: true });
   if (error) throw new Error(error.message);
 
+  const filas = (data ?? []) as unknown as FilaItemPersistido[];
   const porId = new Map(productos.map((p) => [p.id, p]));
-  return { lineas: agruparPadresHijos((data ?? []) as unknown as FilaItemPersistido[], porId, combos), modoServicio: modo };
+  return {
+    lineas: agruparPadresHijos(filas.filter((r) => !r.cargo_tipo), porId, combos),
+    modoServicio: modo,
+    envio: envioReconstruido(filas, (ticket ?? null) as unknown as TicketEnvioPersistido),
+  };
 }
 
 /** Agrega un combo a un ticket abierto (cuenta de mesa). Idempotente por los client ids de la línea. */

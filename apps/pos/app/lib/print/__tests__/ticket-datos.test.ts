@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { foldearHijosEnPadre } from "../ticket-datos";
+import { foldearHijosEnPadre, SELECCION_TICKET_ITEMS_IMPRESION } from "../ticket-datos";
 import type { LineaImpresion } from "../tipos";
 
 /** Fixture mínima: solo llena lo que cada caso necesita, el resto son valores neutros. */
@@ -88,5 +88,11 @@ describe("foldearHijosEnPadre", () => {
       L({ id: "H1", nombre: "Extra", totalMxn: 0.2, comboRol: "HIJO", parentId: "P" }),
     ]);
     expect(out.find((l) => l.id === "P")!.totalMxn).toBe(100.3);
+  });
+});
+
+describe("SELECCION_TICKET_ITEMS_IMPRESION — la proyección que pide leerTicketParaImpresion", () => {
+  it("incluye cargo_tipo: sin este campo el ticket pierde de dónde sale cargoTipo", () => {
+    expect(SELECCION_TICKET_ITEMS_IMPRESION).toContain("cargo_tipo");
   });
 });
