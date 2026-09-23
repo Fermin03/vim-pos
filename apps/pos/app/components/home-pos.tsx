@@ -1376,7 +1376,8 @@ export function HomePos({
       {/* Cuenta guardada que se está abandonando. Sin esto quedaba viva en la base y sin ninguna
           pantalla que la mostrara: "Para llevar" no tiene lista de cuentas, así que reaparecía
           días después trabando el corte. Se pregunta aquí, que es cuando el cajero sabe qué pasó. */}
-      {salidaPendiente && (
+      {/* Se oculta mientras se pide la etiqueta: ese modal va debajo y quedaba tapado por éste. */}
+      {salidaPendiente && !esperaPidiendoEtiqueta && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/40 p-4" role="dialog" aria-modal="true">
           <div className="w-full max-w-md rounded-xl bg-surface p-6 shadow-xl">
             <div className="font-display text-[19px] font-semibold">Esta cuenta ya tiene folio</div>
@@ -1392,7 +1393,12 @@ export function HomePos({
                   demás modos la cuenta en espera desaparece de su lista (filtran en_espera=false)
                   y sería otra forma de perderla. */}
               {carrito.modoServicio === "PARA_LLEVAR" && (
-                <Button onClick={() => { setEsperaError(null); setEsperaPidiendoEtiqueta(true); }}>
+                <Button onClick={() => {
+                  setEsperaError(null);
+                  // Un pedido retomado ya tiene etiqueta: se regresa con la misma, sin preguntar.
+                  if (retomadoEspera) void confirmarEspera(retomadoEspera.etiqueta);
+                  else setEsperaPidiendoEtiqueta(true);
+                }}>
                   Dejarla en espera
                 </Button>
               )}
