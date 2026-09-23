@@ -370,7 +370,16 @@ import path from "node:path";
 import { startLocalBackend } from "./runtime.mjs";
 import { pullSnapshot } from "./sync-pull.mjs";
 
-describe("libreta de zonas por huella (Postgres real)", () => {
+// El job `desktop` de ci.yml corre en ubuntu-latest y dice explícitamente que "los verify:* de
+// extremo a extremo necesitan el Postgres embebido de Windows y quedan fuera de este job a
+// propósito" (comentario del step "Pruebas del escritorio"). El runner de Linux no trae las
+// librerías del binario `initdb` embebido (falta libicuuc.so.60) y arrancar Postgres real ahí
+// falla en el hook, tumbando todas las pruebas de este bloque. Se salta fuera de Windows.
+const SOLO_WINDOWS_MOTIVO =
+  "Postgres embebido solo en Windows; en CI la política se cubre con los dobles";
+const SOLO_WINDOWS = process.platform !== "win32" ? SOLO_WINDOWS_MOTIVO : false;
+
+describe("libreta de zonas por huella (Postgres real)", { skip: SOLO_WINDOWS }, () => {
   const TENANT = "99999999-0000-0000-0000-0000000000aa";
   const SUC = "99999999-0000-0000-0000-0000000000bb";
   let dir, backend, db;
