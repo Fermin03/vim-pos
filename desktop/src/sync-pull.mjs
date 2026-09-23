@@ -351,7 +351,10 @@ async function separarZonasPendientes(client, filas) {
   // por sentencia) ya lo ve como pendiente. Al revés, un repreciado que llega después espera a que
   // el pull confirme y se aplica encima: queda pendiente contra la huella recién anotada. Dura lo
   // que la transacción del pull.
-  await client.query("SELECT 1 FROM zonas_envio WHERE id = ANY($1::uuid[]) FOR UPDATE", [ids]);
+  // FOR NO KEY UPDATE: evita choque con FOR KEY SHARE de las llaves foráneas (tickets.zona_envio_id,
+  // direcciones_cliente.zona_envio_id). FOR UPDATE causaba deadlock en el fijar de envíos durante el
+  // pull. FOR NO KEY UPDATE bloquea UPDATE concurrente de cambiarCostoZona sin estorbar las FK.
+  await client.query("SELECT 1 FROM zonas_envio WHERE id = ANY($1::uuid[]) FOR NO KEY UPDATE", [ids]);
   const { rows } = await client.query(
     `SELECT o.zona_id FROM _vim_zonas_ok o
        JOIN zonas_envio x ON x.id = o.zona_id
