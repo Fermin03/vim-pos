@@ -410,7 +410,24 @@ cargo de zona sería cobrarlo dos veces. La RPC ni siquiera los alcanza: sus tic
   pero conviene decirlo en el admin con una nota, porque la expectativa natural del dueño es que
   "el precio de la zona" sea un dato vivo.
 - **Promoción de ticket completo sobre el envío.** Resuelto (§3, §8): sí lo rebajaba, y ya no.
-  Queda un hueco menor: un descuento de ticket se congela al aplicarse, así que si después se
-  cancela la comida, el monto congelado puede comerse el envío en `recalcular_totales_ticket`.
-  El CFDI no lo timbra (`armarConceptos` rechaza un descuento de ticket sin comida sobre la cual
-  repartirse) y el caso se investiga.
+  El hueco que quedaba —un descuento de ticket se congela como monto al aplicarse, y si después
+  se cancelaba comida el excedente se comía el envío (total $0 en vez de $35) y el ticket no
+  timbraba, bloqueando además la factura global del periodo— también está resuelto en la `0116`:
+  `recalcular_totales_ticket` topa el total en los renglones de cargo vivos en vez de en 0, y el
+  ticket reporta solo el descuento que de verdad se aplicó (renglones − descuentos = total). Los
+  registros de `ticket_descuentos_manuales` / `ticket_promociones_aplicadas` conservan el monto
+  autorizado. Sin envío, el comportamiento de siempre no cambia. La factura global, si algún día
+  choca con un ticket incoherente, dice qué folio es.
+- **Residual decidido — un repreciado en la caja gana a una baja en la nube.** Si una zona se
+  reprecia en la caja (PIN de supervisor) y, antes de que el push lo suba, en la nube la desactivan
+  o la borran, el pull no la pisa (está pendiente) y el push sube la fila local completa: la zona
+  vuelve a quedar activa en la nube. Ya pasaba antes de proteger los repreciados pendientes; se
+  acepta porque el caso pide dos personas editando la misma zona en minutos, y el dueño la vuelve a
+  desactivar en el panel.
+- **Residual decidido — `CLAVES_NATURALES` con un nombre reciclado en la nube.** Previo a este
+  trabajo. Si en la nube renombran una zona ("Centro" → "Centro Histórico") y crean otra con el
+  nombre viejo ("Centro"), el pull reconcilia por nombre (`reconciliarCatalogo`,
+  `desktop/src/sync-pull.mjs`): toma la zona local "Centro" —que es la renombrada— por un choque,
+  le muda los tickets y las direcciones a la zona NUEVA y la borra. El dinero no se mueve (el
+  renglón de envío es un snapshot), pero los reportes por zona de esos tickets quedan con la zona
+  equivocada. Se acepta: renombrar y reciclar el nombre en el mismo intervalo de sync es raro.
