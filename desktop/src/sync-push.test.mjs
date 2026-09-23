@@ -565,3 +565,71 @@ describe("libreta de zonas por huella (Postgres real)", { skip: SOLO_WINDOWS }, 
     assert.ok((await pendientes()).includes(id), "y seguir pendiente de subir");
   });
 });
+
+// ── Clientes registrados en la caja (23 sep 2026) ─────────────────────────────────────────────
+//
+// El POS da de alta clientes (y sus direcciones) al tomar un domicilio, contra el Postgres LOCAL.
+// El push nunca los incluyó: en producción, Knockout Burger tenía 217 clientes en la caja y CERO en
+// la nube, con 250 tickets arriba apuntando a clientes que allá no existían (el modo réplica apaga
+// las FK, así que la venta entraba igual y nadie se enteraba). /admin/clientes salía vacío.
+//
+// Van por HUELLA, como las zonas, y no "una vez por id": la caja también modifica lo que ya subió
+// (`fijarZonaDireccion` le pone zona a una dirección vieja), y ese cambio tiene que viajar.
+describe("clientes de la caja suben a la nube (Postgres real)", { skip: SOLO_WINDOWS }, () => {
+  const TENANT = "99999999-0000-0000-0000-0000000000aa";
+  let dir, backend, db;
+
+  const pend = () => listarPendientes(db);
+
+  before(async () => {
+    dir = mkdtempSync(path.join(tmpdir(), "vim-clientes-push-"));
+    backend = await startLocalBackend({ dataRoot: dir, pgPort: 54391, restPort: 54392, log: () => {} });
+    db = backend.pool;
+    await listarPendientes(db);
+    await db.query("INSERT INTO _vim_push_ok (ticket_id) SELECT id FROM tickets ON CONFLICT DO NOTHING");
+  }, { timeout: 120_000 });
+
+  after(async () => {
+    if (backend) await backend.stop();
+    if (dir) rmSync(dir, { recursive: true, force: true });
+  });
+
+  test("un cliente nuevo con su dirección sube; confirmado, ya no; cambiar la dirección la vuelve a subir", async () => {
+    const { rows: [{ id: cliente }] } = await db.query(
+      "INSERT INTO clientes (tenant_id, nombre, telefono) VALUES ($1, 'Cliente Push', '4770000001') RETURNING id", [TENANT]);
+    const { rows: [{ id: direccion }] } = await db.query(
+      `INSERT INTO direcciones_cliente (tenant_id, cliente_id, calle, numero_exterior, colonia, codigo_postal, ciudad, estado_geo)
+       VALUES ($1, $2, 'Madero', '12', 'Centro', '37000', 'León', 'Guanajuato') RETURNING id`, [TENANT, cliente]);
+
+    const p = await pend();
+    assert.ok(p.clienteIds.includes(cliente), "un cliente recién registrado en la caja tiene que estar pendiente de subir");
+    assert.ok(p.direccionIds.includes(direccion), "y su dirección también");
+
+    // Sin ventas ni turnos de por medio: el alta sola tiene que hacer pasar la guarda de pushToCloud.
+    const nube = nubeFalsa({ resultado: { clientes: 1, direcciones_cliente: 1 } });
+    try {
+      await pushToCloud(db, OPTS, () => {});
+      const snap = nube.peticiones[0]?.snapshot ?? {};
+      assert.ok((snap.clientes ?? []).some((c) => c.id === cliente), "el push debía llevar al cliente");
+      assert.ok((snap.direcciones_cliente ?? []).some((d) => d.id === direccion), "y su dirección");
+    } finally { nube.restaurar(); }
+
+    const p2 = await pend();
+    assert.ok(!p2.clienteIds.includes(cliente), "confirmado por la nube, no vuelve a subir");
+    assert.ok(!p2.direccionIds.includes(direccion));
+
+    // La caja le cambia algo a la dirección ya subida (p. ej. le asigna zona): tiene que volver a viajar.
+    await db.query("UPDATE direcciones_cliente SET referencias = 'Portón negro' WHERE id = $1", [direccion]);
+    assert.ok((await pend()).direccionIds.includes(direccion), "una dirección modificada en la caja vuelve a subir");
+  });
+
+  test("un cliente que la nube RECHAZA no se marca y se reintenta", async () => {
+    const { rows: [{ id: cliente }] } = await db.query(
+      "INSERT INTO clientes (tenant_id, nombre, telefono) VALUES ($1, 'Cliente Rechazado', '4770000002') RETURNING id", [TENANT]);
+    const nube = nubeFalsa({ resultado: { clientes: 0, _errores: [{ tabla: "clientes", id: cliente, error: "idx_clientes_telefono_unico" }] } });
+    try {
+      await pushToCloud(db, OPTS, () => {});
+    } finally { nube.restaurar(); }
+    assert.ok((await pend()).clienteIds.includes(cliente), "marcar un rechazado lo perdería para siempre");
+  });
+});
