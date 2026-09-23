@@ -473,4 +473,195 @@ BEGIN
   RAISE NOTICE 'OK sync de zonas_envio';
 END $$;
 
+-- 6) EL ENVÍO NO ADMITE DESCUENTOS NI PROMOCIONES (spec §3, ADR 0017). Un 10% rebaja la comida;
+--    el envío se cobra completo. Cuatro caminos por donde el envío se colaba a la base del
+--    descuento: el descuento manual de ticket, la promoción de ticket, la evaluación de promociones
+--    (monto previsto y mínimo de compra) y el descuento de renglón sobre el propio envío. El quinto
+--    —el reparto en el CFDI— lo cubren las unitarias de conceptos.ts.
+--
+--    Cada caso usa SU ticket (240 de comida + 35 de envío = 275) para que un descuento no contamine
+--    al siguiente. Los fallos se juntan y se reportan todos al final: en rojo se ve de un vistazo
+--    cuántos caminos dejan pasar el envío, no solo el primero.
+DO $$
+DECLARE
+  v_tenant uuid := '99999999-0000-0000-0000-0000000000aa';
+  v_suc    uuid := '99999999-0000-0000-0000-0000000000bb';
+  v_caja   uuid := '99999999-0000-0000-0000-0000000000cc';
+  v_maria  uuid := '99999999-0000-0000-0000-000000000001';
+  v_prod   uuid := 'b0000000-0000-0000-0000-0000000000f1';  -- Hamburguesa Clásica, $120, IVA incl.
+  v_turno  uuid;
+  v_zona   uuid;
+  v_auth   jsonb;
+  v_pin    uuid;
+  v_autorizo uuid;
+  v_t      uuid;
+  v_envio  uuid;
+  v_promo  uuid;
+  v_monto  numeric(12,2);
+  v_total  numeric(12,2);
+  v_suma   numeric(12,2);
+  v_desc   numeric(12,2);
+  v_fallos text[] := '{}';
+BEGIN
+  PERFORM set_config('request.jwt.claims',
+    json_build_object('sub', v_maria::text, 'tenant_id', v_tenant::text)::text, true);
+  SELECT id INTO v_turno FROM turnos WHERE codigo_turno = 'SMOKE-ENV' AND tenant_id = v_tenant;
+
+  -- Nombre nuevo: el archivo entero es UNA transacción y 'Zona Norte'/'RLS Norte' ya existen.
+  INSERT INTO zonas_envio (tenant_id, sucursal_id, nombre, costo_mxn)
+  VALUES (v_tenant, v_suc, 'Descuentos Norte', 35.00) RETURNING id INTO v_zona;
+
+  -- Una autorización de supervisor (Diego, PIN 4321), reutilizada: aplicar_descuento_manual solo
+  -- exige que exista, y lo que se prueba aquí es el monto, no el flujo de PIN.
+  v_t := abrir_ticket(v_suc, v_caja, v_turno, 'DELIVERY_PROPIO', NULL, NULL, NULL, v_maria);
+  v_auth := verificar_autorizacion_pin('4321', 'descuento_manual', 'descuento.manual_aplicar',
+              'ticket', v_t, 24, 'CLIENTE_FRECUENTE', v_caja, v_turno, v_maria);
+  IF (v_auth->>'ok')::boolean IS NOT TRUE THEN RAISE EXCEPTION 'autorización falló: %', v_auth; END IF;
+  v_pin := (v_auth->>'autorizacion_pin_id')::uuid;
+  v_autorizo := (v_auth->>'autorizo_id')::uuid;
+
+  -- a) Descuento manual de ticket, 10%: 24.00 (el 10% de 240), no 27.50 (el de 275).
+  PERFORM agregar_item_a_ticket(v_t, v_prod, 2, NULL, '[]'::jsonb, NULL);
+  PERFORM fijar_envio_ticket(v_t, v_zona);
+  PERFORM aplicar_descuento_manual(v_t, NULL, 'PORCENTAJE', 10, 'CLIENTE_FRECUENTE', NULL,
+            v_pin, v_maria, v_autorizo, NULL);
+  SELECT monto_descontado_mxn INTO v_monto FROM ticket_descuentos_manuales
+   WHERE ticket_id = v_t AND ticket_item_id IS NULL;
+  SELECT total_mxn INTO v_total FROM tickets WHERE id = v_t;
+  IF v_monto <> 24.00 OR v_total <> 251.00 THEN
+    v_fallos := v_fallos || format('a) descuento manual 10%%: monto %s y total %s (esperaba 24.00 y 251.00)', v_monto, v_total);
+  END IF;
+
+  -- a2) La invariante del timbrado con descuento de ticket: renglones − descuentos de ticket = total.
+  SELECT COALESCE(SUM(total_item_mxn), 0) INTO v_suma
+    FROM ticket_items WHERE ticket_id = v_t AND cancelado = false;
+  SELECT COALESCE(SUM(monto_descontado_mxn), 0) INTO v_desc FROM ticket_descuentos_manuales
+   WHERE ticket_id = v_t AND ticket_item_id IS NULL AND reversado = false;
+  IF v_suma - v_desc <> v_total THEN
+    v_fallos := v_fallos || format('a2) renglones %s − descuento de ticket %s ≠ total %s', v_suma, v_desc, v_total);
+  END IF;
+
+  -- b) Monto fijo mayor que la comida: se topa en la comida y el envío queda completo.
+  v_t := abrir_ticket(v_suc, v_caja, v_turno, 'DELIVERY_PROPIO', NULL, NULL, NULL, v_maria);
+  PERFORM agregar_item_a_ticket(v_t, v_prod, 2, NULL, '[]'::jsonb, NULL);
+  PERFORM fijar_envio_ticket(v_t, v_zona);
+  PERFORM aplicar_descuento_manual(v_t, NULL, 'MONTO_FIJO', 300, 'CLIENTE_FRECUENTE', NULL,
+            v_pin, v_maria, v_autorizo, NULL);
+  SELECT monto_descontado_mxn INTO v_monto FROM ticket_descuentos_manuales
+   WHERE ticket_id = v_t AND ticket_item_id IS NULL;
+  SELECT total_mxn INTO v_total FROM tickets WHERE id = v_t;
+  IF v_monto <> 240.00 OR v_total <> 35.00 THEN
+    v_fallos := v_fallos || format('b) monto fijo de 300: monto %s y total %s (esperaba 240.00 y 35.00)', v_monto, v_total);
+  END IF;
+
+  -- c) Cortesía total: regala la comida, no el envío. El total queda en 35.00.
+  v_t := abrir_ticket(v_suc, v_caja, v_turno, 'DELIVERY_PROPIO', NULL, NULL, NULL, v_maria);
+  PERFORM agregar_item_a_ticket(v_t, v_prod, 2, NULL, '[]'::jsonb, NULL);
+  PERFORM fijar_envio_ticket(v_t, v_zona);
+  PERFORM aplicar_descuento_manual(v_t, NULL, 'CORTESIA_TOTAL', 0, 'CORTESIA_INVITADO', NULL,
+            v_pin, v_maria, v_autorizo, NULL);
+  SELECT total_mxn INTO v_total FROM tickets WHERE id = v_t;
+  IF v_total <> 35.00 THEN
+    v_fallos := v_fallos || format('c) cortesía total: total %s (esperaba 35.00, el envío)', v_total);
+  END IF;
+
+  -- d) Promoción de ticket del 10%: 24.00. Y la evaluación previa estima lo mismo.
+  INSERT INTO promociones (tenant_id, nombre, tipo, alcance, valor_porcentaje)
+  VALUES (v_tenant, 'SMOKE envío — 10% al ticket', 'PORCENTAJE', 'TICKET_COMPLETO', 10)
+  RETURNING id INTO v_promo;
+  v_t := abrir_ticket(v_suc, v_caja, v_turno, 'DELIVERY_PROPIO', NULL, NULL, NULL, v_maria);
+  PERFORM agregar_item_a_ticket(v_t, v_prod, 2, NULL, '[]'::jsonb, NULL);
+  PERFORM fijar_envio_ticket(v_t, v_zona);
+  SELECT monto_descuento_estimado_mxn INTO v_monto
+    FROM evaluar_promociones_aplicables(v_t) WHERE promocion_id = v_promo;
+  IF v_monto IS DISTINCT FROM 24.00 THEN
+    v_fallos := v_fallos || format('d) evaluar_promociones_aplicables estima %s para el 10%% (esperaba 24.00)', v_monto);
+  END IF;
+  PERFORM aplicar_promocion(v_t, v_promo, NULL);
+  SELECT monto_descontado_mxn INTO v_monto FROM ticket_promociones_aplicadas
+   WHERE ticket_id = v_t AND promocion_id = v_promo;
+  SELECT total_mxn INTO v_total FROM tickets WHERE id = v_t;
+  IF v_monto <> 24.00 OR v_total <> 251.00 THEN
+    v_fallos := v_fallos || format('d) promoción 10%%: monto %s y total %s (esperaba 24.00 y 251.00)', v_monto, v_total);
+  END IF;
+  -- d2) Invariante del timbrado, ahora con promoción de ticket.
+  SELECT COALESCE(SUM(total_item_mxn), 0) INTO v_suma
+    FROM ticket_items WHERE ticket_id = v_t AND cancelado = false;
+  SELECT COALESCE(SUM(monto_descontado_mxn), 0) INTO v_desc FROM ticket_promociones_aplicadas
+   WHERE ticket_id = v_t AND cancelada_por_cajero = false AND promocion_alcance_snapshot = 'TICKET_COMPLETO';
+  IF v_suma - v_desc <> v_total THEN
+    v_fallos := v_fallos || format('d2) renglones %s − promoción de ticket %s ≠ total %s', v_suma, v_desc, v_total);
+  END IF;
+
+  -- e) Promoción cortesía de ticket: el total queda en el envío.
+  INSERT INTO promociones (tenant_id, nombre, tipo, alcance)
+  VALUES (v_tenant, 'SMOKE envío — cortesía', 'CORTESIA_TOTAL', 'TICKET_COMPLETO')
+  RETURNING id INTO v_promo;
+  v_t := abrir_ticket(v_suc, v_caja, v_turno, 'DELIVERY_PROPIO', NULL, NULL, NULL, v_maria);
+  PERFORM agregar_item_a_ticket(v_t, v_prod, 2, NULL, '[]'::jsonb, NULL);
+  PERFORM fijar_envio_ticket(v_t, v_zona);
+  PERFORM aplicar_promocion(v_t, v_promo, NULL);
+  SELECT total_mxn INTO v_total FROM tickets WHERE id = v_t;
+  IF v_total <> 35.00 THEN
+    v_fallos := v_fallos || format('e) promoción cortesía: total %s (esperaba 35.00)', v_total);
+  END IF;
+
+  -- f) Precio especial de 200 por la comida: descuenta 40 (240 → 200) y el envío va aparte.
+  INSERT INTO promociones (tenant_id, nombre, tipo, alcance, precio_especial_mxn)
+  VALUES (v_tenant, 'SMOKE envío — precio especial', 'PRECIO_ESPECIAL', 'TICKET_COMPLETO', 200)
+  RETURNING id INTO v_promo;
+  v_t := abrir_ticket(v_suc, v_caja, v_turno, 'DELIVERY_PROPIO', NULL, NULL, NULL, v_maria);
+  PERFORM agregar_item_a_ticket(v_t, v_prod, 2, NULL, '[]'::jsonb, NULL);
+  PERFORM fijar_envio_ticket(v_t, v_zona);
+  PERFORM aplicar_promocion(v_t, v_promo, NULL);
+  SELECT total_mxn INTO v_total FROM tickets WHERE id = v_t;
+  IF v_total <> 235.00 THEN
+    v_fallos := v_fallos || format('f) precio especial 200: total %s (esperaba 235.00 = 200 + 35)', v_total);
+  END IF;
+
+  -- g) Mínimo de compra de 250: 240 de comida + 35 de envío NO lo alcanzan.
+  INSERT INTO promociones (tenant_id, nombre, tipo, alcance, valor_porcentaje, condiciones)
+  VALUES (v_tenant, 'SMOKE envío — 5% desde 250', 'PORCENTAJE', 'TICKET_COMPLETO', 5,
+          '{"monto_ticket": {"minimo_mxn": 250}}'::jsonb)
+  RETURNING id INTO v_promo;
+  v_t := abrir_ticket(v_suc, v_caja, v_turno, 'DELIVERY_PROPIO', NULL, NULL, NULL, v_maria);
+  PERFORM agregar_item_a_ticket(v_t, v_prod, 2, NULL, '[]'::jsonb, NULL);
+  PERFORM fijar_envio_ticket(v_t, v_zona);
+  IF EXISTS (SELECT 1 FROM evaluar_promociones_aplicables(v_t) WHERE promocion_id = v_promo) THEN
+    v_fallos := v_fallos || 'g) una promo con mínimo de 250 se ofreció a 240 de comida + 35 de envío'::text;
+  END IF;
+  -- g2) Control: con 360 de comida sí aparece (el filtro no está simplemente roto).
+  PERFORM agregar_item_a_ticket(v_t, v_prod, 1, NULL, '[]'::jsonb, NULL);
+  IF NOT EXISTS (SELECT 1 FROM evaluar_promociones_aplicables(v_t) WHERE promocion_id = v_promo) THEN
+    v_fallos := v_fallos || 'g2) con 360 de comida la promo de mínimo 250 no apareció'::text;
+  END IF;
+
+  -- h) Descuento de RENGLÓN sobre el propio envío: rechazado (si no, la regla se salta
+  --    descontando el renglón directamente). Porcentaje y cambio de precio, los dos.
+  v_t := abrir_ticket(v_suc, v_caja, v_turno, 'DELIVERY_PROPIO', NULL, NULL, NULL, v_maria);
+  PERFORM agregar_item_a_ticket(v_t, v_prod, 2, NULL, '[]'::jsonb, NULL);
+  v_envio := fijar_envio_ticket(v_t, v_zona);
+  BEGIN
+    PERFORM aplicar_descuento_manual(v_t, v_envio, 'PORCENTAJE', 50, 'CLIENTE_FRECUENTE', NULL,
+              v_pin, v_maria, v_autorizo, NULL);
+    v_fallos := v_fallos || 'h) se permitió un descuento de renglón sobre el envío'::text;
+  EXCEPTION WHEN check_violation THEN NULL;
+  END;
+  BEGIN
+    PERFORM aplicar_descuento_manual(v_t, v_envio, 'OVERRIDE_PRECIO', 0, 'CLIENTE_FRECUENTE', NULL,
+              v_pin, v_maria, v_autorizo, NULL);
+    v_fallos := v_fallos || 'h) se permitió cambiarle el precio al renglón de envío'::text;
+  EXCEPTION WHEN check_violation THEN NULL;
+  END;
+  SELECT total_mxn INTO v_total FROM tickets WHERE id = v_t;
+  IF v_total <> 275.00 THEN
+    v_fallos := v_fallos || format('h) el ticket quedó en %s tras los intentos (esperaba 275.00)', v_total);
+  END IF;
+
+  IF cardinality(v_fallos) > 0 THEN
+    RAISE EXCEPTION 'El envío entra al descuento por % camino(s): %', cardinality(v_fallos), array_to_string(v_fallos, ' | ');
+  END IF;
+  RAISE NOTICE 'OK el envío no admite descuentos ni promociones';
+END $$;
+
 ROLLBACK;
