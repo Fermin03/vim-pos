@@ -527,4 +527,32 @@ describe("libreta de zonas por huella (Postgres real)", () => {
     assert.equal(Number(costo_mxn), 28, "sin cambio local pendiente, el valor de la nube sí se aplica");
     assert.ok(!(await pendientes()).includes(id));
   });
+
+  // Carrera (revisión del 22 sep): `separarZonasPendientes` consultaba sin FOR UPDATE. Un
+  // `cambiarCostoZona` en vuelo (su UPDATE hecho, sin COMMIT) no se veía como pendiente; el upsert
+  // del pull esperaba el candado de la fila y, al soltarse, pisaba el repreciado y lo anotaba como
+  // "ya sabido": el precio del supervisor se perdía y no volvía a subir.
+  test("un repreciado en vuelo mientras corre el pull no se pisa", async () => {
+    const { rows: [{ id }] } = await db.query(
+      "INSERT INTO zonas_envio (tenant_id, sucursal_id, nombre, costo_mxn) VALUES ($1, $2, 'Huella Carrera', 35) RETURNING id",
+      [TENANT, SUC]);
+    await pullSnapshot(db, { zonas_envio: [await filaDe(id)] });
+    const filaVieja = await filaDe(id);
+
+    // El repreciado de la caja, a medio camino: UPDATE hecho, COMMIT todavía no.
+    const caja = await db.connect();
+    let pull;
+    try {
+      await caja.query("BEGIN");
+      await caja.query("UPDATE zonas_envio SET costo_mxn = 50 WHERE id = $1", [id]);
+      pull = pullSnapshot(db, { zonas_envio: [filaVieja] });
+      await new Promise((r) => setTimeout(r, 400)); // el pull llega a la zona y espera el candado
+      await caja.query("COMMIT");
+    } finally { caja.release(); }
+    await pull;
+
+    const { rows: [{ costo_mxn }] } = await db.query("SELECT costo_mxn FROM zonas_envio WHERE id = $1", [id]);
+    assert.equal(Number(costo_mxn), 50, "el repreciado que terminó durante el pull debe sobrevivir");
+    assert.ok((await pendientes()).includes(id), "y seguir pendiente de subir");
+  });
 });
