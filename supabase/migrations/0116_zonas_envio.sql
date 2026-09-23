@@ -596,8 +596,9 @@ BEGIN
   ELSIF p_tipo = 'MONTO_FIJO' THEN
     v_monto := p_valor;
     v_monto_descontado := v_monto;
-    -- 0116: a nivel ticket, topado en la comida. Sin tope, un monto mayor que la comida se comía
-    -- el envío (recalcular_totales_ticket solo evita que el total baje de cero).
+    -- 0116: a nivel ticket, topado en la comida. Sin tope, un monto mayor que la comida quedaba
+    -- registrado por encima de lo aplicable (recalcular_totales_ticket, redefinida al final de
+    -- esta migración, ya no deja que se coma el envío, pero el registro debe decir la verdad).
     IF p_ticket_item_id IS NULL THEN
       SELECT LEAST(v_monto, GREATEST(total_mxn - v_cargos, 0)) INTO v_monto_descontado
         FROM tickets WHERE id = p_ticket_id;
@@ -879,5 +880,201 @@ BEGIN
   RETURNING id INTO v_id;
 
   RETURN v_id;
+END;
+$$;
+
+-- ============================================================================
+-- EL EXCEDENTE DE UN DESCUENTO CONGELADO NO SE COME EL ENVÍO (recalcular_totales_ticket)
+--
+-- Un descuento o una promoción de ticket se CONGELA como monto al aplicarse (arriba ya se calcula
+-- sobre la comida). Si después se cancela comida —cancelar_item_ticket lo permite en ABIERTO con el
+-- descuento puesto, y el POS no puede revertir un descuento manual— el monto congelado supera la
+-- comida que queda y esta función restaba el excedente del envío: solo topaba el total en 0.
+-- Ejemplo: 240 de comida + 35 de envío, cortesía total (240), se cancela un platillo de 120 →
+-- total 0 en vez de 35. El negocio no cobraba el envío y el ticket no timbraba: el armador de
+-- conceptos no tiene comida sobre la que repartir el descuento (ConceptosIncoherentes), y como la
+-- factura global mete todos los tickets PAGADO, un ticket así bloqueaba la global del periodo.
+--
+-- Copia íntegra de la vigente (0008 §8.1; ninguna migración posterior la redefinió) con SOLO este
+-- cambio: tras restar descuentos y promociones de nivel ticket, el total no baja de la suma de los
+-- renglones de cargo vivos (v_piso) en vez de 0. Y lleva `SET search_path = public, extensions,
+-- pg_temp`: se lo puso la 0044 con ALTER FUNCTION y un CREATE OR REPLACE sin la cláusula lo quita.
+--
+-- EL DESCUENTO REPORTADO. Cuando el tope actúa, descuentos_manuales_mxn / promociones_mxn del ticket
+-- guardan lo que DE VERDAD se aplicó, no el monto congelado: el excedente que no pudo aplicarse se
+-- descarta del reportado. Así el ticket cuadra por construcción:
+--     renglones vivos − (descuentos_manuales_mxn + promociones_mxn) = total_mxn
+-- que es exactamente lo que el CFDI deduce (sumaLineas − total, _shared/pac/conceptos.ts) y lo que
+-- guarda la fila de tickets_cfdi (subtotal + iva − descuento = total, 0009). Los registros de
+-- ticket_descuentos_manuales / ticket_promociones_aplicadas NO se tocan: conservan el monto que se
+-- autorizó, para la auditoría. Los manuales se aplican primero (mismo orden de siempre), así que si
+-- el tope actúa ahí, la promoción queda con 0 efectivo.
+--
+-- Sin renglones de cargo (v_piso = 0) todo queda EXACTAMENTE como antes, incluido el reportado:
+-- el tope en 0 de siempre sigue reportando el monto congelado. Cambiar eso sería tocar el
+-- comportamiento de todos los tickets sin envío, fuera del alcance de esta migración.
+-- ============================================================================
+CREATE OR REPLACE FUNCTION recalcular_totales_ticket(p_ticket_id uuid)
+RETURNS void
+LANGUAGE plpgsql
+SET search_path = public, extensions, pg_temp
+AS $$
+DECLARE
+  v_subtotal_bruto          numeric(12,2) := 0;
+  v_modificadores           numeric(12,2) := 0;
+  v_descuentos_manuales     numeric(12,2) := 0;
+  v_promociones             numeric(12,2) := 0;
+  v_iva                     numeric(12,2) := 0;
+  v_subtotal_final          numeric(12,2) := 0;
+  v_total                   numeric(12,2) := 0;
+  v_monto_pagado            numeric(12,2) := 0;
+  v_cambio                  numeric(12,2) := 0;
+  v_item                    record;
+  v_item_bruto              numeric(12,2);
+  v_item_modif              numeric(12,2);
+  v_item_desc               numeric(12,2);
+  v_item_promo              numeric(12,2);
+  v_item_neto               numeric(12,2);
+  v_item_iva                numeric(12,2);
+  v_item_total              numeric(12,2);
+  v_piso                    numeric(12,2) := 0;  -- 0116: renglones de cargo vivos (el envío)
+BEGIN
+  -- Iterar items no cancelados y calcular su subtotal e IVA
+  FOR v_item IN
+    SELECT
+      ti.id,
+      ti.cantidad,
+      ti.precio_unitario_snapshot,
+      ti.tasa_iva_snapshot,
+      ti.iva_incluido_en_precio_snapshot,
+      COALESCE(SUM(tim.monto_total_mxn), 0) AS monto_modif
+    FROM ticket_items ti
+    LEFT JOIN ticket_item_modificadores tim ON tim.ticket_item_id = ti.id
+    WHERE ti.ticket_id = p_ticket_id
+      AND ti.cancelado = false
+    GROUP BY ti.id, ti.cantidad, ti.precio_unitario_snapshot,
+             ti.tasa_iva_snapshot, ti.iva_incluido_en_precio_snapshot
+  LOOP
+    -- Bruto del ítem: precio * cantidad + modificadores
+    v_item_bruto := (v_item.cantidad * v_item.precio_unitario_snapshot);
+    v_item_modif := v_item.monto_modif;
+
+    -- Descuentos manuales aplicables a este item (los del ticket completo se distribuyen abajo)
+    SELECT COALESCE(SUM(monto_descontado_mxn), 0)
+    INTO v_item_desc
+    FROM ticket_descuentos_manuales
+    WHERE ticket_item_id = v_item.id
+      AND reversado = false;
+
+    -- Promociones aplicables a este item (las del ticket completo se distribuyen abajo)
+    SELECT COALESCE(SUM(monto_descontado_mxn), 0)
+    INTO v_item_promo
+    FROM ticket_promociones_aplicadas
+    WHERE ticket_id = p_ticket_id
+      AND cancelada_por_cajero = false
+      AND v_item.id = ANY(items_afectados);
+
+    -- Neto del ítem (después de descuentos a nivel item, no a nivel ticket)
+    v_item_neto := (v_item_bruto + v_item_modif) - v_item_desc - v_item_promo;
+    IF v_item_neto < 0 THEN v_item_neto := 0; END IF;
+
+    -- IVA del ítem según política iva_incluido
+    IF v_item.iva_incluido_en_precio_snapshot THEN
+      -- El precio ya trae IVA: subtotal_sin_iva = neto / (1 + tasa/100), iva = neto - subtotal
+      v_item_iva := ROUND(v_item_neto - (v_item_neto / (1 + v_item.tasa_iva_snapshot/100)), 2);
+      v_item_total := v_item_neto;
+    ELSE
+      -- IVA por afuera: subtotal_sin_iva = neto, iva = neto * tasa/100, total = neto + iva
+      v_item_iva := ROUND(v_item_neto * v_item.tasa_iva_snapshot/100, 2);
+      v_item_total := v_item_neto + v_item_iva;
+    END IF;
+
+    -- Persistir el cálculo en ticket_items
+    UPDATE ticket_items
+    SET subtotal_bruto_mxn      = v_item_bruto,
+        monto_modificadores_mxn = v_item_modif,
+        descuento_item_mxn      = v_item_desc,
+        promocion_item_mxn      = v_item_promo,
+        iva_item_mxn            = v_item_iva,
+        total_item_mxn          = v_item_total
+    WHERE id = v_item.id;
+
+    -- Acumular al ticket
+    v_subtotal_bruto      := v_subtotal_bruto + v_item_bruto;
+    v_modificadores       := v_modificadores  + v_item_modif;
+    v_descuentos_manuales := v_descuentos_manuales + v_item_desc;
+    v_promociones         := v_promociones    + v_item_promo;
+    v_iva                 := v_iva            + v_item_iva;
+    v_total               := v_total          + v_item_total;
+  END LOOP;
+
+  -- 0116: el piso del total. Los descuentos de ticket no pueden comerse los renglones de cargo
+  -- (el envío no admite descuentos, spec zonas de envío §3, ADR 0017). Se lee DESPUÉS del bucle,
+  -- que acaba de persistir total_item_mxn. Acotado a v_total por defensa: el piso nunca puede
+  -- subir el total por encima de la suma de sus renglones (eso descuadraría el CFDI).
+  SELECT COALESCE(SUM(total_item_mxn), 0)
+  INTO v_piso
+  FROM ticket_items
+  WHERE ticket_id = p_ticket_id
+    AND cancelado = false
+    AND cargo_tipo IS NOT NULL;
+  v_piso := LEAST(v_piso, GREATEST(v_total, 0));
+
+  -- Descuentos manuales a nivel ticket (sin ticket_item_id) — se restan del total
+  SELECT COALESCE(SUM(monto_descontado_mxn), 0)
+  INTO v_item_desc
+  FROM ticket_descuentos_manuales
+  WHERE ticket_id = p_ticket_id
+    AND ticket_item_id IS NULL
+    AND reversado = false;
+  v_total := v_total - v_item_desc;
+  -- 0116: el excedente no se come el cargo; se reporta solo lo que se aplicó.
+  IF v_piso > 0 AND v_total < v_piso THEN
+    v_item_desc := v_item_desc - (v_piso - v_total);
+    v_total := v_piso;
+  END IF;
+  v_descuentos_manuales := v_descuentos_manuales + v_item_desc;
+  IF v_total < 0 THEN v_total := 0; END IF;
+
+  -- Promociones a nivel ticket (items_afectados vacío y alcance TICKET_COMPLETO)
+  SELECT COALESCE(SUM(monto_descontado_mxn), 0)
+  INTO v_item_promo
+  FROM ticket_promociones_aplicadas
+  WHERE ticket_id = p_ticket_id
+    AND cancelada_por_cajero = false
+    AND promocion_alcance_snapshot = 'TICKET_COMPLETO';
+  v_total := v_total - v_item_promo;
+  -- 0116: ídem para las promociones.
+  IF v_piso > 0 AND v_total < v_piso THEN
+    v_item_promo := v_item_promo - (v_piso - v_total);
+    v_total := v_piso;
+  END IF;
+  v_promociones := v_promociones + v_item_promo;
+  IF v_total < 0 THEN v_total := 0; END IF;
+
+  -- Subtotal final (sin IVA) — útil para reportes
+  v_subtotal_final := v_total - v_iva;
+  IF v_subtotal_final < 0 THEN v_subtotal_final := 0; END IF;
+
+  -- Pagos
+  SELECT
+    COALESCE(SUM(monto_mxn) FILTER (WHERE estado IN ('APLICADO', 'CONCILIADO')), 0),
+    COALESCE(SUM(cambio_mxn) FILTER (WHERE estado IN ('APLICADO', 'CONCILIADO')), 0)
+  INTO v_monto_pagado, v_cambio
+  FROM pagos
+  WHERE ticket_id = p_ticket_id
+    AND deleted_at IS NULL;
+
+  -- Persistir totales en el ticket
+  UPDATE tickets
+  SET subtotal_mxn            = v_subtotal_final,
+      descuentos_manuales_mxn = v_descuentos_manuales,
+      promociones_mxn         = v_promociones,
+      iva_mxn                 = v_iva,
+      total_mxn               = v_total,
+      monto_pagado_mxn        = v_monto_pagado,
+      cambio_mxn              = v_cambio,
+      updated_at              = now()
+  WHERE id = p_ticket_id;
 END;
 $$;
