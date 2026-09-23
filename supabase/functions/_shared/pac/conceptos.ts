@@ -279,10 +279,11 @@ function desglosarLinea(linea: LineaTicket): LineaEnCentavos {
  *
  * Si no hay comida con dinero sobre la cual repartir —un descuento de ticket en un ticket cuyo
  * único renglón con dinero es el envío— se RECHAZA en vez de repartirlo sobre el envío o dividir
- * entre cero. Las guardas de la base impiden que nazca así; que llegue aquí es un dato incoherente
- * (p. ej. un descuento congelado cuya comida se canceló después), y un CFDI que le pone descuento
- * al envío contradice la regla y el ticket. Mismo criterio que el resto del módulo: mejor un
- * timbrado que no sale y se investiga que uno que sale mal.
+ * entre cero. Las guardas de la base impiden que nazca así (incluido el descuento congelado cuya
+ * comida se canceló después: desde la 0116 recalcular_totales_ticket topa el total en los cargos
+ * vivos y el descuento efectivo queda en 0); que llegue aquí es un dato incoherente, y un CFDI
+ * que le pone descuento al envío contradice la regla y el ticket. Mismo criterio que el resto del
+ * módulo: mejor un timbrado que no sale y se investiga que uno que sale mal.
  */
 function repartirDescuentoDeTicket(lineas: LineaEnCentavos[], descuentoTicket: number): void {
   const elegibles = lineas.map((_, i) => i).filter((i) => !lineas[i].origen.cargoTipo);
@@ -393,7 +394,17 @@ export function armarConceptosGlobal(tickets: TicketDelPeriodo[]): ConceptosArma
 
   const conceptos: ConceptoCfdi[] = [];
   for (const t of tickets) {
-    const armado = armarConceptos(t.lineas, t.totalMxn);
+    // Un solo ticket incoherente tumba la global de TODO el periodo; sin el folio, el error no
+    // dice cuál investigar. Se envuelve solo el error de datos: cualquier otro sube tal cual.
+    let armado: ConceptosArmados;
+    try {
+      armado = armarConceptos(t.lineas, t.totalMxn);
+    } catch (e) {
+      if (e instanceof ConceptosIncoherentes) {
+        throw new ConceptosIncoherentes(`Venta folio ${t.folio}: ${e.message}`);
+      }
+      throw e;
+    }
 
     // Agrupar por tasa dentro del ticket. Se suma en centavos para que la agrupación no reintroduzca
     // el error de redondeo que `armarConceptos` acaba de eliminar.
