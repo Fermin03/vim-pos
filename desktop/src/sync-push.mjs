@@ -126,7 +126,7 @@ export const HUELLA_ZONA = "md5(to_jsonb(x)::text)";
  *
  * Se exporta aparte de `ZONA_PENDIENTE` porque `pullSnapshot` (sync-pull.mjs) la reusa con un
  * propósito distinto: no decidir qué subir, sino qué fila entrante de la nube HAY que descartar
- * para no pisar ese cambio local antes de que el push lo suba (ver `filtrarZonasSinPendiente`).
+ * para no pisar ese cambio local antes de que el push lo suba (ver `separarZonasPendientes`).
  * Ahí SÍ importa distinguir "cambiada" de "nunca confirmada" (`o.zona_id IS NULL`): una fila que
  * nunca pasó por la libreta y coincide de id con la nube es una zona genuinamente nueva de allá,
  * no una edición local que proteger.

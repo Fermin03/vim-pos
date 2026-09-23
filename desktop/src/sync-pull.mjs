@@ -344,6 +344,14 @@ async function separarZonasPendientes(client, filas) {
   const ids = [...new Set((filas ?? []).map((f) => f?.id).filter((id) => id != null))];
   if (!ids.length) return { aplicar: filas ?? [], descartadas: [] };
   await asegurarLibretaZonas(client);
+  // Candado ANTES de mirar la huella, y en su propia sentencia: un `cambiarCostoZona` en vuelo (su
+  // UPDATE hecho, sin COMMIT) haría que esta consulta viera la versión vieja, la diera por no
+  // pendiente, y el upsert de abajo —que sí espera el candado— pisara el repreciado al soltarse.
+  // Con el candado, el pull espera a ese COMMIT y la consulta siguiente (READ COMMITTED: foto nueva
+  // por sentencia) ya lo ve como pendiente. Al revés, un repreciado que llega después espera a que
+  // el pull confirme y se aplica encima: queda pendiente contra la huella recién anotada. Dura lo
+  // que la transacción del pull.
+  await client.query("SELECT 1 FROM zonas_envio WHERE id = ANY($1::uuid[]) FOR UPDATE", [ids]);
   const { rows } = await client.query(
     `SELECT o.zona_id FROM _vim_zonas_ok o
        JOIN zonas_envio x ON x.id = o.zona_id
