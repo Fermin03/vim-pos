@@ -67,6 +67,7 @@ import { PantallaCuentasModo } from "./pantalla-cuentas-modo";
 import { PantallaMonitorVentas } from "./pantalla-monitor-ventas";
 import { listarTicketsEnEspera, ponerTicketEnEspera, retomarTicketEnEspera } from "../lib/espera";
 import { ModalEtiquetaEspera, ModalListaEspera } from "./modal-espera";
+import { ModalCuentasParaLlevar, listarCuentasParaLlevar } from "./modal-cuentas-para-llevar";
 import { leerItemsPersistidos, type ItemTicket } from "../lib/cancelacion";
 import { abrirCuentaEnMesa, agregarComboAlTicket, agregarItemAlTicket, reconstruirCarrito } from "../lib/cuenta-mesa";
 import { atribuirMesero, contarPendientesCocina, enviarACocina, yaEnviadoACocina } from "../lib/mesero";
@@ -266,6 +267,10 @@ export function HomePos({
   const [esperaProcesando, setEsperaProcesando] = useState(false);
   const [esperaError, setEsperaError] = useState<string | null>(null);
   const [nEnEspera, setNEnEspera] = useState(0);
+  // Cuentas abiertas de "Para llevar": su propio botón en la barra de captura, junto al de espera.
+  const [llevarListaAbierta, setLlevarListaAbierta] = useState(false);
+  const [llevarError, setLlevarError] = useState<string | null>(null);
+  const [nAbiertasLlevar, setNAbiertasLlevar] = useState(0);
 
   /**
    * Lee el menú y lo pinta. Sacado del efecto de arranque para poder VOLVER a llamarlo: antes se
@@ -997,6 +1002,35 @@ export function HomePos({
     }
   }, [carrito.lineas.length, token, entrarCuenta, refrescarEspera]);
 
+  // Contadores de los dos botones de Para llevar (cuentas abiertas y en espera). Se recalculan al
+  // entrar a la captura, cada vez que cambia el ticket en pantalla (se guardó, se cobró, se canceló
+  // o se salió de él) y cada 20 s: la lista es de toda la sucursal y otra caja puede moverla.
+  useEffect(() => {
+    if (enInicio || carrito.modoServicio !== "PARA_LLEVAR") return;
+    let vivo = true;
+    const refrescar = () => {
+      listarCuentasParaLlevar(token, caja.sucursal_id)
+        .then((c) => { if (vivo) setNAbiertasLlevar(c.length); })
+        .catch(() => {});
+      refrescarEspera();
+    };
+    refrescar();
+    const id = setInterval(refrescar, 20_000);
+    return () => { vivo = false; clearInterval(id); };
+  }, [enInicio, carrito.modoServicio, ticketBd?.ticketId, token, caja.sucursal_id, refrescarEspera]);
+
+  /** Abre una cuenta de Para llevar desde su lista, para cobrarla (o cancelarla) aquí mismo. */
+  const abrirCuentaLlevar = useCallback(async (ticketId: string) => {
+    // Igual que retomar: abrirla sustituye el carrito, y lo que está a medias no se tira sin aviso.
+    if (carrito.lineas.length > 0) {
+      setLlevarError("Tienes un pedido a medias. Cóbralo o déjalo en espera antes de abrir otra cuenta.");
+      return;
+    }
+    setLlevarError(null);
+    if (await entrarCuenta(ticketId)) setLlevarListaAbierta(false);
+    else setLlevarError("No se pudo abrir la cuenta. Intenta de nuevo.");
+  }, [carrito.lineas.length, entrarCuenta]);
+
   /** Descarta el overlay de confirmación/recibo (sin tocar el carrito en curso).
    *  Se llama al navegar por el topbar para que un recibo viejo no reaparezca apilado. */
   // Badges del inicio: sólo se refrescan mientras el inicio está a la vista, para no consultar
@@ -1385,7 +1419,7 @@ export function HomePos({
               {ticketBd?.folio ? <><span className="font-semibold">{ticketBd.folio}</span> · </> : null}
               {fmtMxn(ticketBd?.total ?? 0)}.{" "}
               {carrito.modoServicio === "PARA_LLEVAR"
-                ? "Si sales sin resolverla, queda abierta y no vas a poder verla en ninguna pantalla — solo aparecería al cerrar el turno, trabándolo."
+                ? "Si sales sin resolverla, queda abierta en «Cuentas abiertas» de Para llevar, sin cobrar, y no te deja cerrar el turno hasta que la resuelvas."
                 : "Si sales sin resolverla, queda abierta en la lista como si fuera un pedido real, y aparece en el corte como cuenta sin cobrar."}
             </p>
             <div className="mt-5 flex flex-col gap-2">
@@ -1442,6 +1476,16 @@ export function HomePos({
             </div>
           </div>
         </div>
+      )}
+      {llevarListaAbierta && (
+        <ModalCuentasParaLlevar
+          token={token}
+          sucursalId={caja.sucursal_id}
+          onAbrir={abrirCuentaLlevar}
+          onCerrar={() => setLlevarListaAbierta(false)}
+          procesando={false}
+          error={llevarError}
+        />
       )}
       {esperaListaAbierta && (
         <ModalListaEspera
@@ -1732,10 +1776,29 @@ export function HomePos({
       <div className="flex flex-shrink-0 items-center gap-3 border-b border-line bg-surface px-3 py-2">
         <BotonVolver onClick={() => intentarSalirDeCaptura("atras")} />
         {carrito.modoServicio === "PARA_LLEVAR" && (
+          /* Cuentas abiertas de Para llevar: las que quedaron sin cobrar y FUERA de espera. Sin
+             este botón no se veían en ninguna pantalla y solo aparecían trabando el corte. */
+          <button
+            type="button"
+            onClick={() => { setLlevarError(null); setLlevarListaAbierta(true); }}
+            className="ml-auto flex h-10 flex-shrink-0 items-center gap-2 rounded border border-line-strong px-3 text-[13.5px] font-semibold text-ink transition hover:border-ink hover:bg-hover"
+          >
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4" aria-hidden="true">
+              <path d="M6 3h12v18l-3-2-3 2-3-2-3 2z" /><path d="M9 8h6M9 12h6" />
+            </svg>
+            Cuentas abiertas
+            {nAbiertasLlevar > 0 && (
+              <span className="flex h-[22px] min-w-[22px] items-center justify-center rounded-full bg-ink px-1.5 text-[12px] font-bold tabular-nums text-white">
+                {nAbiertasLlevar}
+              </span>
+            )}
+          </button>
+        )}
+        {carrito.modoServicio === "PARA_LLEVAR" && (
           <button
             type="button"
             onClick={() => { setEsperaError(null); setEsperaListaAbierta(true); }}
-            className="ml-auto flex h-10 flex-shrink-0 items-center gap-2 rounded border border-line-strong px-3 text-[13.5px] font-semibold text-ink transition hover:border-ink hover:bg-hover"
+            className="flex h-10 flex-shrink-0 items-center gap-2 rounded border border-line-strong px-3 text-[13.5px] font-semibold text-ink transition hover:border-ink hover:bg-hover"
           >
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4" aria-hidden="true">
               <circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" />
@@ -1829,7 +1892,8 @@ export function HomePos({
           onEnviarCocina={undefined}
           onEnviarCocinaAbierto={
             // Un pedido retomado de espera es de mostrador: su acción es Cobrar, no Enviar.
-            enModoMesa && ticketBd && !retomadoEspera
+            // Para llevar tampoco: su cuenta abierta se cobra en mostrador, no se manda a cocina.
+            enModoMesa && ticketBd && !retomadoEspera && carrito.modoServicio !== "PARA_LLEVAR"
               ? onEnviarCocina
               : !enModoMesa && (carrito.modoServicio === "DRIVE_THRU" || carrito.modoServicio === "DELIVERY_PROPIO")
                 ? enviarACocinaAbierto
