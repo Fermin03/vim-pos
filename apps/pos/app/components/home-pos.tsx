@@ -225,6 +225,10 @@ export function HomePos({
   // T2 — modo "cuenta por mesa": el carrito refleja un ticket persistido y los taps agregan
   // incrementalmente. Sólo se activa al abrir/retomar una mesa; QS no cambia.
   const [enModoMesa, setEnModoMesa] = useState(false);
+  // Pedido retomado de "en espera". Viaja por la misma maquinaria que una mesa (ticket persistido,
+  // taps incrementales), pero es una venta de mostrador: se COBRA aquí, no se manda a cocina.
+  // Guarda la etiqueta para devolverlo a espera si el cajero sale sin cobrar.
+  const [retomadoEspera, setRetomadoEspera] = useState<{ ticketId: string; etiqueta: string } | null>(null);
   const [configImpresoraAbierto, setConfigImpresoraAbierto] = useState(false);
   const [clienteDomAbierto, setClienteDomAbierto] = useState(false);
   // Task 7 — cambiar la zona de reparto de ESTE pedido desde el renglón de envío del ticket
@@ -356,6 +360,17 @@ export function HomePos({
    *  Sin esto, ticketBd quedaba colgado y el POS no volvía a un ticket QS limpio. */
   const salirNavegacion = useCallback(() => {
     cerrarRecibo();
+    // Un pedido retomado de espera que se abandona sin cobrar VUELVE a espera. Retomar le quita la
+    // marca en la base antes de cargarlo, y "Para llevar" no tiene lista de cuentas: si se quedara
+    // así, sería una cuenta ABIERTA invisible en todo el POS que solo reaparece trabando el corte
+    // (pasó en Knock-Out el 22 sep). Si ya se cobró o canceló, el RPC lo rechaza y no pasa nada.
+    if (retomadoEspera) {
+      ponerTicketEnEspera(token, retomadoEspera.ticketId, retomadoEspera.etiqueta)
+        .then(() => listarTicketsEnEspera(token, turno.caja_id))
+        .then((ts) => setNEnEspera(ts.length))
+        .catch(() => {});
+      setRetomadoEspera(null);
+    }
     if (enModoMesa) {
       setEnModoMesa(false);
       setTicketBd(null);
@@ -363,7 +378,13 @@ export function HomePos({
       setCocinaEnviada(false);
       dispatch({ tipo: "limpiar" });
     }
-  }, [cerrarRecibo, enModoMesa]);
+  }, [cerrarRecibo, enModoMesa, retomadoEspera, token, turno.caja_id]);
+
+  // Se cobró, se canceló o se volvió a poner en espera a mano: el ticket ya no está en pantalla y
+  // no hay nada que devolver a espera.
+  useEffect(() => {
+    if (retomadoEspera && ticketBd?.ticketId !== retomadoEspera.ticketId) setRetomadoEspera(null);
+  }, [ticketBd, retomadoEspera]);
 
   /** Sale de la captura y regresa a la pantalla de la que se vino (no al inicio). */
   const volverAtras = useCallback(() => {
@@ -558,8 +579,10 @@ export function HomePos({
       setEnDelivery(false);
       // B1 — saber si la mesa ya fue enviada a cocina (para el botón).
       contarPendientesCocina(token, ticketId).then((n) => setCocinaEnviada(n === 0)).catch(() => {});
+      return true;
     } catch (e) {
       setError(e instanceof Error ? e.message : "No se pudo cargar la cuenta");
+      return false;
     }
   }, [token, productos, combos]);
 
@@ -869,6 +892,8 @@ export function HomePos({
       // La caja queda libre para la siguiente venta; el pedido vive en BD.
       dispatch({ tipo: "limpiar" });
       setTicketBd(null);
+      setEnModoMesa(false); // un pedido retomado entra en modo cuenta; al guardarlo se sale
+      setCocinaEnviada(false);
       setItemsPersistidos([]);
       setEsperaPidiendoEtiqueta(false);
       refrescarEspera();
@@ -944,7 +969,7 @@ export function HomePos({
   }, [token, empleado.nombre, caja.nombre]);
 
   /** Retoma un pedido en espera: lo carga al carrito como cuenta editable (misma maquinaria de mesas). */
-  const retomarEspera = useCallback(async (ticketId: string) => {
+  const retomarEspera = useCallback(async (ticketId: string, etiqueta: string) => {
     // Retomar SUSTITUYE el carrito. Mientras la lista solo se abría desde el inicio esto daba
     // igual, porque ahí el carrito siempre está vacío; con el botón en la barra de captura, un
     // cajero a media comanda podía perder lo capturado sin un solo aviso. Se avisa en vez de
@@ -957,7 +982,12 @@ export function HomePos({
     setEsperaError(null);
     try {
       await retomarTicketEnEspera(token, ticketId);
-      await entrarCuenta(ticketId);
+      if (!(await entrarCuenta(ticketId))) {
+        // No se pudo cargar: sin esto quedaría fuera de espera y sin pantalla que lo muestre.
+        await ponerTicketEnEspera(token, ticketId, etiqueta).catch(() => {});
+        throw new Error("No se pudo cargar el pedido. Sigue en espera; intenta de nuevo.");
+      }
+      setRetomadoEspera({ ticketId, etiqueta });
       setEsperaListaAbierta(false);
       refrescarEspera();
     } catch (e) {
@@ -1792,7 +1822,8 @@ export function HomePos({
           // mesa que apenas está ordenando, que es justo lo que no se quiere en comedor.
           onEnviarCocina={undefined}
           onEnviarCocinaAbierto={
-            enModoMesa && ticketBd
+            // Un pedido retomado de espera es de mostrador: su acción es Cobrar, no Enviar.
+            enModoMesa && ticketBd && !retomadoEspera
               ? onEnviarCocina
               : !enModoMesa && (carrito.modoServicio === "DRIVE_THRU" || carrito.modoServicio === "DELIVERY_PROPIO")
                 ? enviarACocinaAbierto
