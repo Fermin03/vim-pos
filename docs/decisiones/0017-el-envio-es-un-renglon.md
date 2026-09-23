@@ -68,12 +68,26 @@ cualquier otro concepto: cuadra por construcción, sin tocar el armador.
   `tickets.zona_envio_id` y no inserta nada (y borra el renglón de la zona anterior, si cobraba).
   Un renglón suelto de $0 llegaría al CFDI como concepto de base 0 —`armarConceptos` solo pliega
   renglones sin dinero cuando son hijos de combo— y el Anexo 20 exige base > 0: el ticket no se
-  podría facturar. Así el armador y las Edge Functions en producción no cambian. El precio de esa
+  podría facturar. Así el armador no necesita un caso especial para el renglón de $0. El precio de esa
   decisión es que el ticket impreso no dice "envío $0.00"; la zona se sigue viendo en el POS
   (se reconstruye desde `tickets.zona_envio_id`) y en los reportes por zona.
 - **El IVA del envío se hereda del primer renglón vivo del ticket**, no de una constante. Un
   cargo con tasa o política de IVA fija rompería a cualquier tenant que facture con IVA por
   afuera; heredar del ticket lo mantiene consistente con el resto de la venta.
+
+- **El envío no admite descuentos ni promociones de ticket** (decisión de Fermín, spec §3). Ser un
+  renglón más lo metía solo en la base de todo descuento de ticket: un 10% rebajaba también el
+  envío. La 0116 redefine `aplicar_descuento_manual`, `aplicar_promocion` y
+  `evaluar_promociones_aplicables` para calcular sobre la comida (total menos renglones con
+  `cargo_tipo`), incluido el mínimo de compra de una promoción; rechaza el descuento de renglón
+  sobre el propio envío (quitarlo sí se puede, quitando la zona); y `armarConceptos` reparte el
+  descuento de ticket solo entre los renglones de producto, así que el concepto de envío va al
+  CFDI sin descuento. La vista previa del POS calcula sobre la misma base.
+- **Despliegue:** las Edge Functions **`timbrar-cfdi`, `timbrar-global` y `autofacturar` deben
+  redesplegarse junto con la migración 0116** (leen `cargo_tipo` para excluir el envío del
+  reparto). Con la migración aplicada y las funciones viejas, un ticket con envío y descuento de
+  ticket se facturaría con descuento repartido también sobre el envío: cuadra al centavo, pero
+  contradice la regla y el ticket impreso.
 
 ## Pendiente abierto
 

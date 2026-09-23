@@ -62,6 +62,19 @@ por monto mínimo de compra.
   no por disciplina del que llama.
 - **El envío no es comida.** No va a cocina, no consume inventario, no admite modificadores ni
   promociones, y no cuenta como producto vendido.
+- **El envío queda fuera de todo descuento o promoción de ticket** (decisión de Fermín). Un 10% de
+  descuento rebaja la comida; el envío se cobra completo. En concreto:
+  - La base de `aplicar_descuento_manual` a nivel ticket (porcentaje, monto fijo —topado en la
+    comida— y cortesía) y la de `aplicar_promocion` (porcentaje, monto fijo, cortesía y precio
+    especial) es el total **menos** los renglones con `cargo_tipo`.
+  - `evaluar_promociones_aplicables` no cuenta el envío ni para el monto previsto ni para alcanzar
+    `condiciones.monto_ticket.minimo_mxn`: $240 de comida + $35 de envío no alcanzan un mínimo de
+    $250.
+  - Descontar **el propio renglón** de envío (descuento de ítem o cambio de precio) se rechaza;
+    quitar el envío sí se puede, quitando la zona.
+  - En el CFDI, `armarConceptos` reparte el descuento de ticket solo entre los renglones de
+    producto: el concepto de envío sale con descuento 0.
+  - La vista previa del POS (`previewDescuento`) calcula sobre la misma base que la BD.
 - **Solo `DELIVERY_PROPIO`.** Cualquier otro modo de servicio rechaza el cargo.
 - **El envío sigue la política fiscal del ticket.** Hereda `iva_incluido_en_precio` y la tasa del
   primer renglón, no una constante.
@@ -271,6 +284,9 @@ Nada que hacer, y ese es justo el punto del diseño:
   que el envío se imprime solo, al final de la lista.
 - **CFDI:** `timbrar-cfdi` arma conceptos desde `ticket_items` y valida contra `total_mxn`.
   Cuadra por construcción. El envío aparece como una línea más con la clave genérica del giro.
+  Única excepción al "nada que hacer": el reparto del descuento de ticket excluye los renglones
+  con `cargo_tipo` (§3), así que `timbrar-cfdi`, `timbrar-global` y `autofacturar` leen
+  `cargo_tipo` y **se redespliegan junto con la migración**.
 - **Factura global y cancelación:** se apoyan en los mismos totales. Sin cambios.
 
 ## 8. Cocina: el envío no va
@@ -281,9 +297,11 @@ Nada que hacer, y ese es justo el punto del diseño:
 - `apps/pos/app/lib/print/comanda-builder.ts`: mismo filtro para la comanda impresa.
 - **Inventario:** no hay nada que hacer. El descuento de insumos (`0101_sync_inventario.sql`:316)
   une contra `recetas.producto_id`, y un renglón con `producto_id NULL` no une con nada.
-- **Promociones:** `aplicar_promocion` opera sobre items del catálogo. Verificar en la
-  implementación que una promo de alcance `TICKET_COMPLETO` no descuente sobre el envío; si lo
-  hace, excluir `cargo_tipo IS NOT NULL` de su base.
+- **Promociones y descuentos:** comprobado en la implementación: sí descontaban sobre el envío
+  (la base era `total_mxn`, con envío, en los tres caminos). La 0116 redefine
+  `aplicar_descuento_manual`, `aplicar_promocion` y `evaluar_promociones_aplicables` para
+  excluir `cargo_tipo IS NOT NULL` de su base; ver §3. Cubierto por el bloque 6 de
+  `smoke_envio.sql`.
 
 ## 9. Cuentas reabiertas
 
@@ -384,6 +402,8 @@ cargo de zona sería cobrarlo dos veces. La RPC ni siquiera los alcanza: sus tic
 - **Cambiar el precio de una zona no reprecia nada.** Es lo correcto —el renglón es un snapshot—
   pero conviene decirlo en el admin con una nota, porque la expectativa natural del dueño es que
   "el precio de la zona" sea un dato vivo.
-- **Promoción de ticket completo sobre el envío.** Hay que comprobarlo en la implementación (§8):
-  si `aplicar_promocion` reparte sobre todos los renglones, un 10% de descuento estaría rebajando
-  también el envío.
+- **Promoción de ticket completo sobre el envío.** Resuelto (§3, §8): sí lo rebajaba, y ya no.
+  Queda un hueco menor: un descuento de ticket se congela al aplicarse, así que si después se
+  cancela la comida, el monto congelado puede comerse el envío en `recalcular_totales_ticket`.
+  El CFDI no lo timbra (`armarConceptos` rechaza un descuento de ticket sin comida sobre la cual
+  repartirse) y el caso se investiga.
