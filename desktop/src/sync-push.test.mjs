@@ -469,4 +469,62 @@ describe("libreta de zonas por huella (Postgres real)", () => {
     await db.query("UPDATE zonas_envio SET costo_mxn = 25 WHERE id = $1", [id]);
     assert.ok((await pendientes()).includes(id), "tras la migración, repreciar vuelve a subir");
   });
+
+  // ── Residual (re-revisión final, 22 sep): el pull pisaba un repreciado local pendiente ──────
+  //
+  // `pullSnapshot` hacía upsert de TODAS las zonas de la nube sin saltar las que tenían un cambio
+  // local pendiente de subir, y luego las marcaba con la huella de la versión de la NUBE. Un
+  // repreciado con PIN de supervisor sobrevivía solo hasta el siguiente pull (arranque, sondeo de
+  // catálogo, o el pull tras un push fallido — main.mjs ~212, 641, 745): el precio volvía al de la
+  // nube en silencio, y como la huella ya coincidía, el cambio no volvía a subir nunca.
+  test("un pull con el precio viejo de la nube NO revierte un repreciado local pendiente de subir", async () => {
+    const { rows: [{ id }] } = await db.query(
+      "INSERT INTO zonas_envio (tenant_id, sucursal_id, nombre, costo_mxn) VALUES ($1, $2, 'Huella Sur', 35) RETURNING id",
+      [TENANT, SUC]);
+
+    // La zona ya bajó del pull una vez: está en la libreta con la huella de $35.
+    await pullSnapshot(db, { zonas_envio: [await filaDe(id)] });
+    const filaVieja = await filaDe(id); // la nube todavía tiene el precio viejo
+
+    // El supervisor autoriza el repreciado en la caja, ANTES de que el push lo suba.
+    await db.query("UPDATE zonas_envio SET costo_mxn = 50 WHERE id = $1", [id]);
+    assert.ok((await pendientes()).includes(id), "queda pendiente de subir");
+
+    // Llega un pull (sondeo/arranque) con el snapshot viejo: la nube todavía no sabe del repreciado.
+    await pullSnapshot(db, { zonas_envio: [filaVieja] });
+
+    const { rows: [{ costo_mxn }] } = await db.query("SELECT costo_mxn FROM zonas_envio WHERE id = $1", [id]);
+    assert.equal(Number(costo_mxn), 50, "el precio local repreciado debe sobrevivir al pull");
+    assert.ok((await pendientes()).includes(id), "y seguir pendiente de subir: el pull no la marcó como de la nube");
+
+    // Convergencia: el siguiente push sube el precio nuevo; después de eso, un pull ya es inocuo.
+    const nube = nubeFalsa({ resultado: { zonas_envio: 1 } });
+    try {
+      await pushToCloud(db, OPTS, () => {});
+      const subida = (nube.peticiones[0]?.snapshot?.zonas_envio ?? []).find((z) => z.id === id);
+      assert.equal(Number(subida?.costo_mxn), 50, "el push debía llevar el precio nuevo, no el viejo silenciado");
+    } finally { nube.restaurar(); }
+    assert.ok(!(await pendientes()).includes(id), "confirmada por la nube, ya no está pendiente");
+
+    await pullSnapshot(db, { zonas_envio: [await filaDe(id)] });
+    const { rows: [{ costo_mxn: final }] } = await db.query("SELECT costo_mxn FROM zonas_envio WHERE id = $1", [id]);
+    assert.equal(Number(final), 50, "converge: el pull posterior al push ya no revierte nada");
+    assert.ok(!(await pendientes()).includes(id));
+  });
+
+  test("control: una zona SIN cambios locales sí se actualiza con el valor de la nube", async () => {
+    const { rows: [{ id }] } = await db.query(
+      "INSERT INTO zonas_envio (tenant_id, sucursal_id, nombre, costo_mxn) VALUES ($1, $2, 'Huella Poniente', 20) RETURNING id",
+      [TENANT, SUC]);
+    await pullSnapshot(db, { zonas_envio: [await filaDe(id)] });
+    assert.ok(!(await pendientes()).includes(id), "sin ediciones locales, no está pendiente");
+
+    // La nube manda una versión con otro precio: como la copia local NO cambió, sí debe aplicarse.
+    const filaConCambioDeLaNube = { ...(await filaDe(id)), costo_mxn: 28 };
+    await pullSnapshot(db, { zonas_envio: [filaConCambioDeLaNube] });
+
+    const { rows: [{ costo_mxn }] } = await db.query("SELECT costo_mxn FROM zonas_envio WHERE id = $1", [id]);
+    assert.equal(Number(costo_mxn), 28, "sin cambio local pendiente, el valor de la nube sí se aplica");
+    assert.ok(!(await pendientes()).includes(id));
+  });
 });

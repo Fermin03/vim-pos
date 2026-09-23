@@ -118,16 +118,29 @@ async function asegurarTabla(pool) {
 }
 
 /** Huella de una zona: la fila completa, igual que la de los turnos (ver `construirSnapshotPush`). */
-const HUELLA_ZONA = "md5(to_jsonb(x)::text)";
+export const HUELLA_ZONA = "md5(to_jsonb(x)::text)";
 
 /**
- * Zonas de envío que hay que mandar: las que la nube nunca confirmó, y las que CAMBIARON desde la
- * última vez que la nube y la caja coincidieron. `x` es `zonas_envio`; `o`, la libreta.
+ * Una zona ya conocida (está en la libreta con huella) cuya copia LOCAL cambió desde la última vez
+ * que coincidió con la nube: un repreciado (`cambiarCostoZona`, PIN de supervisor) todavía no subido.
+ *
+ * Se exporta aparte de `ZONA_PENDIENTE` porque `pullSnapshot` (sync-pull.mjs) la reusa con un
+ * propósito distinto: no decidir qué subir, sino qué fila entrante de la nube HAY que descartar
+ * para no pisar ese cambio local antes de que el push lo suba (ver `filtrarZonasSinPendiente`).
+ * Ahí SÍ importa distinguir "cambiada" de "nunca confirmada" (`o.zona_id IS NULL`): una fila que
+ * nunca pasó por la libreta y coincide de id con la nube es una zona genuinamente nueva de allá,
+ * no una edición local que proteger.
  *
  * Una fila con huella NULL (la dejó una libreta anterior a la huella) no se da por cambiada: no se
  * sabe, y `asegurarLibretaZonas` la rellena antes de que se consulte.
  */
-const ZONA_PENDIENTE = `(o.zona_id IS NULL OR (o.huella IS NOT NULL AND o.huella IS DISTINCT FROM ${HUELLA_ZONA}))`;
+export const ZONA_EDITADA_LOCAL = `(o.huella IS NOT NULL AND o.huella IS DISTINCT FROM ${HUELLA_ZONA})`;
+
+/**
+ * Zonas de envío que hay que mandar: las que la nube nunca confirmó, y las que CAMBIARON desde la
+ * última vez que la nube y la caja coincidieron. `x` es `zonas_envio`; `o`, la libreta.
+ */
+const ZONA_PENDIENTE = `(o.zona_id IS NULL OR ${ZONA_EDITADA_LOCAL})`;
 
 /**
  * Crea (o migra) la libreta `_vim_zonas_ok` y rellena las huellas que falten.

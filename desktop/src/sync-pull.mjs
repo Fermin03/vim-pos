@@ -6,7 +6,7 @@
 // generadas, y hace INSERT ... ON CONFLICT (pk) DO UPDATE. Corre en modo réplica para no
 // disparar triggers (misma semántica que la replicación lógica). Reusable con cualquier fuente.
 
-import { asegurarLibretaZonas } from "./sync-push.mjs";
+import { asegurarLibretaZonas, ZONA_EDITADA_LOCAL } from "./sync-push.mjs";
 
 // Orden de FKs: padres antes que hijos. Solo se procesan las tablas presentes en el snapshot.
 export const PULL_ORDER = [
@@ -317,6 +317,46 @@ export async function marcarZonasDelPull(client, filas, log = () => {}) {
   return ids.length;
 }
 
+/**
+ * Reparte las zonas entrantes del pull en las que se pueden aplicar y las que hay que descartar
+ * porque su copia LOCAL tiene un repreciado pendiente de subir (ver `ZONA_EDITADA_LOCAL` en
+ * sync-push.mjs: misma huella que usa el push para decidir qué sube).
+ *
+ * Es el arreglo al residual de la re-revisión final (22 sep): antes, `pullSnapshot` upseteaba TODAS
+ * las zonas de la nube sin mirar la libreta, y luego `marcarZonasDelPull` las anotaba con la huella
+ * de la versión que ACABABA de escribir. Un repreciado con PIN de supervisor ("Zona 2" de $35 a
+ * $50) sobrevivía solo hasta el siguiente pull —arranque, sondeo de catálogo, o el pull tras un
+ * push fallido (main.mjs ~212, 641, 745)— y volvía a $35 en silencio; peor aún, como la huella ya
+ * coincidía con la de la nube, el cambio no se volvía a subir NUNCA.
+ *
+ * Una zona descartada aquí no se toca en absoluto en este pull: ni upsert, ni `reconciliarCatalogo`,
+ * ni `marcarZonasDelPull`. Sigue con su precio local y pendiente de subir; el siguiente push la sube
+ * y, con la nube ya al día, el próximo pull de esa zona es inocuo.
+ *
+ * Por qué NO se descarta por "no está en la libreta" (a diferencia de `ZONA_PENDIENTE`, que sí
+ * incluye ese caso para decidir qué subir): una fila que llega de la nube y no está en la libreta es
+ * o bien una zona nueva del panel (nunca vista aquí, no hay nada local que proteger) o bien una zona
+ * nueva de la CAJA que aún no subió (no puede venir de la nube con ese id, así que no aparece en el
+ * snapshot). Solo una zona YA conocida (con huella) y cuya copia local cambió es una edición
+ * pendiente que hay que proteger.
+ */
+async function separarZonasPendientes(client, filas) {
+  const ids = [...new Set((filas ?? []).map((f) => f?.id).filter((id) => id != null))];
+  if (!ids.length) return { aplicar: filas ?? [], descartadas: [] };
+  await asegurarLibretaZonas(client);
+  const { rows } = await client.query(
+    `SELECT o.zona_id FROM _vim_zonas_ok o
+       JOIN zonas_envio x ON x.id = o.zona_id
+      WHERE o.zona_id = ANY($1::uuid[]) AND ${ZONA_EDITADA_LOCAL}`,
+    [ids]);
+  const pendientes = new Set(rows.map((r) => r.zona_id));
+  if (!pendientes.size) return { aplicar: filas, descartadas: [] };
+  return {
+    aplicar: filas.filter((f) => !pendientes.has(f.id)),
+    descartadas: filas.filter((f) => pendientes.has(f.id)),
+  };
+}
+
 export async function pullSnapshot(pool, snapshot, log = () => {}) {
   const client = await pool.connect();
   const resumen = {};
@@ -324,8 +364,16 @@ export async function pullSnapshot(pool, snapshot, log = () => {}) {
     await client.query("BEGIN");
     await client.query("SET LOCAL session_replication_role = replica"); // no disparar triggers/audit
     for (const { t, schema = "public" } of PULL_ORDER) {
-      const filas = snapshot[t] ?? snapshot[`${schema}.${t}`];
+      let filas = snapshot[t] ?? snapshot[`${schema}.${t}`];
       if (!filas?.length) continue;
+      if (t === "zonas_envio") {
+        const { aplicar, descartadas } = await separarZonasPendientes(client, filas);
+        if (descartadas.length) {
+          log(`  zonas de envío: ${descartadas.length} con repreciado local pendiente, no se pisan`);
+        }
+        filas = aplicar;
+        if (!filas.length) continue;
+      }
       await reconciliarCatalogo(client, t, filas, log);
       const n = await upsertTabla(client, schema, t, filas);
       resumen[t] = n;

@@ -335,7 +335,14 @@ Desactivar una zona la saca de los chips de la caja; las direcciones que la ten�
   entero. *(Revisión final de la rama: la libreta va por **huella**, como `_vim_turnos_ok` —
   `md5(to_jsonb(x))` anotada al subir y al bajar del pull—; una zona sube si no está anotada o si
   su huella cambió. Con "una vez por id" un repreciado autorizado con PIN en la caja nunca subía y
-  el siguiente pull lo revertía.)*
+  el siguiente pull lo revertía. **ARREGLADO (22 sep):** ese primer arreglo por huella dejaba un
+  residual — `pullSnapshot` upseteaba TODAS las zonas de la nube sin mirar la libreta, así que un
+  repreciado local pendiente sobrevivía solo hasta el SIGUIENTE pull, que lo pisaba con el precio
+  viejo en silencio y, al anotar la huella de la nube, lo dejaba sin volver a subir jamás. Ahora
+  `pullSnapshot` (`sync-pull.mjs` → `separarZonasPendientes`) descarta antes del upsert las filas
+  entrantes cuya copia local tiene la huella cambiada y no las marca en `_vim_zonas_ok`: el cambio
+  sobrevive hasta que el push lo suba. Reusa `ZONA_EDITADA_LOCAL`, exportada desde
+  `sync-push.mjs`.)*
 - `sync-pull.mjs` → `CLAVES_NATURALES`: `zonas_envio` con clave natural
   `(sucursal_id, lower(btrim(nombre)))` entre filas vivas. Si la caja creó "Centro" sin conexión y
   el panel otro "Centro", la zona local se borra para que entre la de la nube, **reapuntando antes**
