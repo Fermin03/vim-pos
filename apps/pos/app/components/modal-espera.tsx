@@ -59,7 +59,7 @@ export function ModalListaEspera({
 }: {
   token: string;
   cajaId: string;
-  onRetomar: (ticketId: string) => void;
+  onRetomar: (ticketId: string, etiqueta: string) => void;
   onCerrar: () => void;
   procesando: boolean;
   error: string | null;
@@ -89,7 +89,7 @@ export function ModalListaEspera({
                 key={t.ticketId}
                 type="button"
                 disabled={procesando}
-                onClick={() => onRetomar(t.ticketId)}
+                onClick={() => onRetomar(t.ticketId, t.etiqueta)}
                 className="flex w-full items-center justify-between gap-3 border-b border-line px-4 py-3 text-left transition last:border-b-0 hover:bg-hover disabled:opacity-60"
               >
                 <div className="min-w-0">
