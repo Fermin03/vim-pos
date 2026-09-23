@@ -450,3 +450,53 @@ test("el hijo sin dinero y con tasa distinta se pliega en el nombre del padre", 
   assert.equal(r.total, 175);
   cuadra(r);
 });
+
+// ── El envío no admite descuentos (spec zonas de envío §3, ADR 0017) ─────────────────────────────
+// La base ya calcula el descuento de ticket sobre la comida; si el reparto del CFDI lo repartiera
+// también sobre el renglón de envío, la factura diría otra cosa que el ticket.
+
+/** Dos hamburguesas de $120 (IVA dentro) y un envío de $35 que hereda la misma política. */
+function ticketConEnvio(): LineaTicket[] {
+  return [
+    linea({ descripcion: "Hamburguesa", totalItemMxn: 120, ivaItemMxn: 16.55 }),
+    linea({ descripcion: "Hamburguesa", totalItemMxn: 120, ivaItemMxn: 16.55 }),
+    linea({ descripcion: "Envío · Zona Norte", totalItemMxn: 35, ivaItemMxn: 4.83, cargoTipo: "ENVIO" }),
+  ];
+}
+
+test("el descuento del ticket se reparte solo en la comida: el envío sale completo", () => {
+  // 10 % de la comida = 24.00; el ticket cobra 275 − 24 = 251.
+  const r = armarConceptos(ticketConEnvio(), 251);
+  const envio = r.conceptos.find((c) => c.descripcion.startsWith("Envío"));
+  assert.ok(envio, "falta el concepto de envío");
+  assert.equal(envio.descuento, 0);
+  assert.equal(envio.total, 35);
+  assert.equal(envio.importe, 30.17);
+  assert.equal(envio.iva, 4.83);
+  const comida = r.conceptos.filter((c) => !c.descripcion.startsWith("Envío"));
+  assert.equal(Math.round(comida.reduce((a, c) => a + c.total, 0) * 100), 21600);
+  assert.equal(r.total, 251);
+  cuadra(r);
+});
+
+test("cortesía de la comida: el envío es lo único que se cobra y no lleva descuento", () => {
+  const r = armarConceptos(ticketConEnvio(), 35);
+  const envio = r.conceptos.find((c) => c.descripcion.startsWith("Envío"));
+  assert.ok(envio);
+  assert.equal(envio.descuento, 0);
+  assert.equal(envio.total, 35);
+  assert.equal(r.total, 35);
+  cuadra(r);
+});
+
+test("un descuento de ticket sin comida sobre la cual repartirse no se timbra", () => {
+  // Tras las guardas de la base no debería existir (el descuento se calcula sobre la comida). Si
+  // aparece —p. ej. un descuento congelado cuya comida se canceló después— no se reparte sobre el
+  // envío ni se divide entre cero: se rechaza y se investiga.
+  const soloEnvio = [linea({ descripcion: "Envío · Zona Norte", totalItemMxn: 35, ivaItemMxn: 4.83, cargoTipo: "ENVIO" })];
+  assert.throws(() => armarConceptos(soloEnvio, 11), ConceptosIncoherentes);
+});
+
+test("un descuento de ticket mayor que la comida no se come el envío: se rechaza", () => {
+  assert.throws(() => armarConceptos(ticketConEnvio(), 20), ConceptosIncoherentes);
+});
