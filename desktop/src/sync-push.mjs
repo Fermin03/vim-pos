@@ -58,6 +58,17 @@ export const MAX_BYTES_POR_LOTE = 2 * 1024 * 1024;
  */
 export const MAX_MOVIMIENTOS_POR_PUSH = 500;
 
+/**
+ * Techo de clientes (y, aparte, de direcciones) por CORRIDA de push. Mismo motivo que el de los
+ * movimientos: el primer push tras actualizar sube TODO el padrón que la caja fue juntando sin que
+ * nunca viajara (Knockout Burger: 217 clientes el 23 sep 2026), y una caja con miles no debe
+ * convertirse en un lote imposible. Lo que no quepa se va en el siguiente ciclo.
+ */
+export const MAX_CLIENTES_POR_PUSH = 500;
+
+/** Huella de un cliente o una dirección: la fila completa, igual que la de los turnos y las zonas. */
+const HUELLA_FILA = "md5(to_jsonb(x)::text)";
+
 async function asegurarTabla(pool) {
   await pool.query("CREATE TABLE IF NOT EXISTS _vim_push_ok (ticket_id uuid PRIMARY KEY, pushed_at timestamptz DEFAULT now())");
   // Los turnos se rastrean por HUELLA, no por "ya lo mandé": un ticket terminal nunca cambia,
@@ -113,6 +124,20 @@ async function asegurarTabla(pool) {
   // puede darlas de alta (el cajero necesita cobrar un domicilio a una colonia nueva sin esperar al
   // panel). Pero van por HUELLA, no "una sola vez por id": ver `asegurarLibretaZonas`.
   await asegurarLibretaZonas(pool);
+
+  // Clientes y sus direcciones: el POS los da de alta al tomar un domicilio y NUNCA subían. El
+  // padrón se quedaba en la caja: /admin/clientes vacío y los tickets de la nube apuntando a
+  // clientes que allá no existían (el modo réplica apaga las FK, así que nadie se enteraba).
+  //
+  // Por huella y no "una vez por id": la caja también modifica lo que ya subió (`fijarZonaDireccion`
+  // le asigna zona a una dirección vieja) y ese cambio tiene que viajar. No bajan del pull, así que
+  // la huella solo cambia cuando la caja edita: un cambio hecho en el panel no se pisa con la copia
+  // de la caja mientras la caja no toque esa fila.
+  //
+  // Sin siembra: ninguna fila de estas tablas llegó nunca por el pull, así que TODO lo que hay en la
+  // caja es de origen local y el primer push tiene que subirlo. Esa es la recuperación del padrón.
+  await pool.query("CREATE TABLE IF NOT EXISTS _vim_clientes_ok (cliente_id uuid PRIMARY KEY, huella text NOT NULL, subido_at timestamptz DEFAULT now())");
+  await pool.query("CREATE TABLE IF NOT EXISTS _vim_direcciones_ok (direccion_id uuid PRIMARY KEY, huella text NOT NULL, subido_at timestamptz DEFAULT now())");
 
   await rescatarCortesUnaVez(pool);
 }
@@ -407,12 +432,21 @@ export async function listarPendientes(pool) {
       -- queda atorada en silencio.
       (SELECT array_agg(x.id) FROM zonas_envio x
          LEFT JOIN _vim_zonas_ok o ON o.zona_id = x.id
-        WHERE ${ZONA_PENDIENTE}) AS zonas
+        WHERE ${ZONA_PENDIENTE}) AS zonas,
+      -- Clientes y direcciones nuevos o modificados en la caja (ver _vim_clientes_ok en
+      -- asegurarTabla). En orden de alta: si hay más que el techo, suben primero los más viejos.
+      (SELECT array_agg(x.id ORDER BY x.created_at) FROM clientes x
+         LEFT JOIN _vim_clientes_ok o ON o.cliente_id = x.id
+        WHERE o.cliente_id IS NULL OR o.huella IS DISTINCT FROM ${HUELLA_FILA}) AS clientes,
+      (SELECT array_agg(x.id ORDER BY x.created_at) FROM direcciones_cliente x
+         LEFT JOIN _vim_direcciones_ok o ON o.direccion_id = x.id
+        WHERE o.direccion_id IS NULL OR o.huella IS DISTINCT FROM ${HUELLA_FILA}) AS direcciones
   `, [TERMINALES]);
   return {
     ids: rows[0].ids ?? [], turnosCambiados: rows[0].turnos ?? [],
     movimientoIds: rows[0].movimientos ?? [], repartidorIds: rows[0].repartidores ?? [],
     zonaIds: rows[0].zonas ?? [],
+    clienteIds: rows[0].clientes ?? [], direccionIds: rows[0].direcciones ?? [],
   };
 }
 
@@ -445,7 +479,7 @@ export async function listarPendientes(pool) {
  * `movimientos_caja` sigue a los mismos turnos y no solo a los de las ventas: un turno con puras
  * entradas y salidas de efectivo, sin vender nada, tampoco subía jamás.
  */
-export async function construirSnapshotPush(pool, { ticketIds = null, turnoIds = null, movimientoIds = null } = {}) {
+export async function construirSnapshotPush(pool, { ticketIds = null, turnoIds = null, movimientoIds = null, clienteIds = null, direccionIds = null } = {}) {
   await asegurarTabla(pool);
   const { rows } = await pool.query(`
     WITH tk AS (
@@ -455,6 +489,22 @@ export async function construirSnapshotPush(pool, { ticketIds = null, turnoIds =
           OR ($2::uuid[] IS NULL
               AND estado_fiscal = ANY($1)
               AND id NOT IN (SELECT ticket_id FROM _vim_push_ok))
+    ),
+    cl AS (
+      -- Clientes: igual que los movimientos — con lista, exactamente esos; sin lista (modo
+      -- completo), todos los nuevos o modificados. La huella se calcula aquí, con la fila que viaja.
+      SELECT x.id, ${HUELLA_FILA} AS huella FROM clientes x
+        LEFT JOIN _vim_clientes_ok o ON o.cliente_id = x.id
+       WHERE ($5::uuid[] IS NOT NULL AND x.id = ANY($5::uuid[]))
+          OR ($5::uuid[] IS NULL AND $2::uuid[] IS NULL
+              AND (o.cliente_id IS NULL OR o.huella IS DISTINCT FROM ${HUELLA_FILA}))
+    ),
+    dr AS (
+      SELECT x.id, ${HUELLA_FILA} AS huella FROM direcciones_cliente x
+        LEFT JOIN _vim_direcciones_ok o ON o.direccion_id = x.id
+       WHERE ($6::uuid[] IS NOT NULL AND x.id = ANY($6::uuid[]))
+          OR ($6::uuid[] IS NULL AND $2::uuid[] IS NULL
+              AND (o.direccion_id IS NULL OR o.huella IS DISTINCT FROM ${HUELLA_FILA}))
     ),
     tn AS (
       SELECT x.id, md5(to_jsonb(x)::text) AS huella
@@ -474,7 +524,13 @@ export async function construirSnapshotPush(pool, { ticketIds = null, turnoIds =
       -- vuelve a subir en el siguiente ciclo.
       (SELECT jsonb_agg(jsonb_build_object('id', x.id, 'huella', ${HUELLA_ZONA})) FROM zonas_envio x
          LEFT JOIN _vim_zonas_ok o ON o.zona_id = x.id WHERE ${ZONA_PENDIENTE}) AS zonas,
+      (SELECT jsonb_agg(jsonb_build_object('id', id, 'huella', huella)) FROM cl) AS clientes,
+      (SELECT jsonb_agg(jsonb_build_object('id', id, 'huella', huella)) FROM dr) AS direcciones,
       jsonb_strip_nulls(jsonb_build_object(
+        -- El padrón de clientes que la caja registró al tomar domicilios. Ver _vim_clientes_ok.
+        'clientes',                  (SELECT jsonb_agg(to_jsonb(x)) FROM clientes x WHERE x.id IN (SELECT id FROM cl)),
+        'direcciones_cliente',       (SELECT jsonb_agg(to_jsonb(x)) FROM direcciones_cliente x WHERE x.id IN (SELECT id FROM dr)),
+
         'turnos',                    (SELECT jsonb_agg(to_jsonb(x)) FROM turnos x WHERE x.id IN (SELECT id FROM tn)),
         'tickets',                   (SELECT jsonb_agg(to_jsonb(x)) FROM tickets x WHERE x.id IN (SELECT id FROM tk)),
         'ticket_items',              (SELECT jsonb_agg(to_jsonb(x)) FROM ticket_items x WHERE x.ticket_id IN (SELECT id FROM tk)),
@@ -516,11 +572,12 @@ export async function construirSnapshotPush(pool, { ticketIds = null, turnoIds =
                                            OR ($4::uuid[] IS NULL AND $2::uuid[] IS NULL
                                                AND x.id NOT IN (SELECT movimiento_id FROM _vim_mov_ok)))
       )) AS snapshot
-  `, [TERMINALES, ticketIds, turnoIds, movimientoIds]);
+  `, [TERMINALES, ticketIds, turnoIds, movimientoIds, clienteIds, direccionIds]);
   return {
     snapshot: rows[0].snapshot ?? {}, ids: rows[0].ids ?? [], turnos: rows[0].turnos ?? [],
     movimientos: rows[0].movimientos ?? [], repartidores: rows[0].repartidores ?? [],
     zonas: rows[0].zonas ?? [],
+    clientes: rows[0].clientes ?? [], direcciones: rows[0].direcciones ?? [],
   };
 }
 
@@ -560,6 +617,24 @@ export async function marcarZonasSubidas(pool, zonas) {
      ON CONFLICT (zona_id) DO UPDATE SET huella = EXCLUDED.huella, subido_at = now()`,
     [JSON.stringify(zonas)],
   );
+}
+
+/**
+ * Anota los clientes y las direcciones que la nube ya aplicó, con la huella que viajó. Se ACTUALIZA
+ * en conflicto, como las zonas: lo que importa es la última versión que la nube recibió.
+ */
+export async function marcarClientesSubidos(pool, clientes, direcciones) {
+  const anotar = async (tabla, col, filas) => {
+    if (!filas?.length) return;
+    await pool.query(
+      `INSERT INTO ${tabla} (${col}, huella)
+       SELECT (x->>'id')::uuid, x->>'huella' FROM jsonb_array_elements($1::jsonb) AS x
+       ON CONFLICT (${col}) DO UPDATE SET huella = EXCLUDED.huella, subido_at = now()`,
+      [JSON.stringify(filas)],
+    );
+  };
+  await anotar("_vim_clientes_ok", "cliente_id", clientes);
+  await anotar("_vim_direcciones_ok", "direccion_id", direcciones);
 }
 
 /**
@@ -605,6 +680,10 @@ function rechazadosPorTicket(errores, snapshot) {
       // Igual que un repartidor rechazado: la zona se reintenta sola (ver zonasRechazadas), no
       // cuelga de ningún ticket.
       continue;
+    } else if (e.tabla === "clientes" || e.tabla === "direcciones_cliente") {
+      // Tampoco cuelgan de ningún ticket: se reintentan solos (ver filasRechazadas). Que no suba un
+      // cliente no invalida la venta que lo menciona.
+      continue;
     } else if (e.tabla === "ticket_items" || e.tabla === "pagos") {
       const fila = (snapshot[e.tabla] ?? []).find((x) => x.id === e.id);
       if (fila?.ticket_id) fuera.add(fila.ticket_id);
@@ -643,6 +722,11 @@ function zonasRechazadas(errores) {
   return new Set((errores ?? []).filter((e) => e?.tabla === "zonas_envio" && e.id).map((e) => e.id));
 }
 
+/** Ids de filas de `tabla` que la nube rechazó: no se anotan en su libreta y se reintentan. */
+function filasRechazadas(errores, tabla) {
+  return new Set((errores ?? []).filter((e) => e?.tabla === tabla && e.id).map((e) => e.id));
+}
+
 /**
  * Envía UN lote y marca lo que la nube aceptó.
  *
@@ -651,8 +735,9 @@ function zonasRechazadas(errores) {
  * reintentando lo mismo). Partir a la mitad en vez de recalcular un tamaño "correcto" converge
  * en pocas vueltas y no necesita saber cuál es el límite del otro lado.
  */
-async function enviarLote(pool, { cloudUrl, anonKey, deviceToken }, { ticketIds, turnoIds, movimientoIds = [], maxBytes }, log) {
-  const { snapshot, ids, turnos, movimientos, repartidores, zonas } = await construirSnapshotPush(pool, { ticketIds, turnoIds, movimientoIds });
+async function enviarLote(pool, { cloudUrl, anonKey, deviceToken }, { ticketIds, turnoIds, movimientoIds = [], clienteIds = [], direccionIds = [], maxBytes }, log) {
+  const { snapshot, ids, turnos, movimientos, repartidores, zonas, clientes, direcciones } =
+    await construirSnapshotPush(pool, { ticketIds, turnoIds, movimientoIds, clienteIds, direccionIds });
   const cuerpo = JSON.stringify({ snapshot });
   const bytes = Buffer.byteLength(cuerpo);
 
@@ -668,7 +753,9 @@ async function enviarLote(pool, { cloudUrl, anonKey, deviceToken }, { ticketIds,
       + (movimientoIds.length > 1 ? ` y ${mitadM} + ${movimientoIds.length - mitadM} movimientos` : ""));
     // Los turnos forzados van con la primera mitad; la segunda ya solo carga los suyos por FK.
     // Los movimientos se parten a la mitad en ambas: no tienen FK que los arrastre solos.
-    const a = await enviarLote(pool, { cloudUrl, anonKey, deviceToken }, { ticketIds: ticketIds.slice(0, mitadT), turnoIds, movimientoIds: movimientoIds.slice(0, mitadM), maxBytes }, log);
+    // Los clientes, igual que los turnos forzados, con la primera mitad (su techo por corrida ya
+    // los mantiene muy por debajo del límite de bytes).
+    const a = await enviarLote(pool, { cloudUrl, anonKey, deviceToken }, { ticketIds: ticketIds.slice(0, mitadT), turnoIds, movimientoIds: movimientoIds.slice(0, mitadM), clienteIds, direccionIds, maxBytes }, log);
     const b = await enviarLote(pool, { cloudUrl, anonKey, deviceToken }, { ticketIds: ticketIds.slice(mitadT), turnoIds: [], movimientoIds: movimientoIds.slice(mitadM), maxBytes }, log);
     return { subidos: a.subidos + b.subidos, turnos: a.turnos + b.turnos, movimientos: a.movimientos + b.movimientos, rechazados: a.rechazados + b.rechazados };
   };
@@ -701,6 +788,9 @@ async function enviarLote(pool, { cloudUrl, anonKey, deviceToken }, { ticketIds,
   await marcarRepartidoresSubidos(pool, repartidores.filter((id) => !repFuera.has(id)));
   const zonaFuera = zonasRechazadas(errores);
   await marcarZonasSubidas(pool, zonas.filter((z) => !zonaFuera.has(z.id)));
+  const cliFuera = filasRechazadas(errores, "clientes");
+  const dirFuera = filasRechazadas(errores, "direcciones_cliente");
+  await marcarClientesSubidos(pool, clientes.filter((c) => !cliFuera.has(c.id)), direcciones.filter((d) => !dirFuera.has(d.id)));
   if (errores.length) {
     const muestra = errores.slice(0, 3).map((e) => `${e.tabla}/${String(e.id).slice(0, 8)}: ${e.error}`).join(" · ");
     log(`la nube rechazó ${errores.length} fila(s), se reintentarán: ${muestra}`);
@@ -721,7 +811,15 @@ export async function pushToCloud(pool, opts, log = () => {}, cfg = {}) {
   const maxBytes = cfg.maxBytesPorLote ?? MAX_BYTES_POR_LOTE;
   const maxMovimientos = cfg.maxMovimientosPorPush ?? MAX_MOVIMIENTOS_POR_PUSH;
 
-  const { ids, turnosCambiados, movimientoIds: movimientoIdsTodos, repartidorIds, zonaIds } = await listarPendientes(pool);
+  const maxClientes = cfg.maxClientesPorPush ?? MAX_CLIENTES_POR_PUSH;
+
+  const pendientes = await listarPendientes(pool);
+  const { ids, turnosCambiados, movimientoIds: movimientoIdsTodos, repartidorIds, zonaIds } = pendientes;
+  const clienteIds = pendientes.clienteIds.slice(0, maxClientes);
+  const direccionIds = pendientes.direccionIds.slice(0, maxClientes);
+  if (pendientes.clienteIds.length > clienteIds.length || pendientes.direccionIds.length > direccionIds.length) {
+    log(`clientes/direcciones de más se posponen al siguiente ciclo (techo ${maxClientes} por corrida)`);
+  }
   // I2: techo por corrida (ver el comentario de MAX_MOVIMIENTOS_POR_PUSH). El resto se queda
   // pendiente y lo recoge listarPendientes() en el siguiente ciclo — en orden de fecha, así que no
   // se salta ninguno, solo se pospone.
@@ -737,7 +835,9 @@ export async function pushToCloud(pool, opts, log = () => {}, cfg = {}) {
   // turnos cambiados NI movimientos pendientes hacía volver esta guarda antes de llegar a
   // construirSnapshotPush, y se quedaba atorada en la caja hasta que ALGO ajeno volviera a hacerla
   // pasar — en silencio, sin error, contra el motivo de tener el catálogo aquí.
-  if (!ids.length && !turnosCambiados.length && !movimientoIds.length && !repartidorIds.length && !zonaIds.length) { log("nada pendiente por subir"); return { subidos: 0, turnos: 0, movimientos: 0, rechazados: 0, lotes: 0 }; }
+  // Lo mismo con un cliente registrado sin que la venta se haya cobrado todavía.
+  if (!ids.length && !turnosCambiados.length && !movimientoIds.length && !repartidorIds.length && !zonaIds.length
+      && !clienteIds.length && !direccionIds.length) { log("nada pendiente por subir"); return { subidos: 0, turnos: 0, movimientos: 0, rechazados: 0, lotes: 0 }; }
 
   const parte = [
     ids.length ? `${ids.length} venta${ids.length === 1 ? "" : "s"}` : null,
@@ -745,6 +845,8 @@ export async function pushToCloud(pool, opts, log = () => {}, cfg = {}) {
     movimientoIds.length ? `${movimientoIds.length} movimiento(s) de inventario` : null,
     repartidorIds.length ? `${repartidorIds.length} repartidor(es)` : null,
     zonaIds.length ? `${zonaIds.length} zona(s) de envío` : null,
+    clienteIds.length ? `${clienteIds.length} cliente(s)` : null,
+    direccionIds.length ? `${direccionIds.length} dirección(es) de cliente` : null,
   ].filter(Boolean).join(" y ");
 
   // Sin ventas queda un solo lote vacío: el que lleva los turnos que cambiaron (y los movimientos).
@@ -762,9 +864,11 @@ export async function pushToCloud(pool, opts, log = () => {}, cfg = {}) {
     // al primer lote; los demás lotes ya cargan por FK los turnos de sus propios tickets.
     const turnoIds = n === 0 ? turnosCambiados : [];
     const movIds = n === 0 ? movimientoIds : [];
+    const cliIds = n === 0 ? clienteIds : [];
+    const dirIds = n === 0 ? direccionIds : [];
     n++;
     try {
-      const r = await enviarLote(pool, opts, { ticketIds: lote, turnoIds, movimientoIds: movIds, maxBytes }, log);
+      const r = await enviarLote(pool, opts, { ticketIds: lote, turnoIds, movimientoIds: movIds, clienteIds: cliIds, direccionIds: dirIds, maxBytes }, log);
       subidos += r.subidos;
       turnos += r.turnos;
       movimientos += r.movimientos;
