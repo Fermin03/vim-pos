@@ -18,6 +18,12 @@ export type LineaTicket = {
   id?: string;
   parentId?: string | null;
   comboRol?: "PADRE" | "HIJO" | null;
+  /**
+   * `ticket_items.cargo_tipo` (p. ej. "ENVIO"): el renglón es un cargo, no un producto. Un cargo no
+   * admite descuentos de ticket (spec zonas de envío §3, ADR 0017), así que queda fuera del reparto.
+   * Ausente o null = producto normal.
+   */
+  cargoTipo?: string | null;
   descripcion: string;
   cantidad: number;
   claveSat: string | null;
@@ -186,7 +192,7 @@ export function armarConceptos(lineas: LineaTicket[], totalTicketMxn: number): C
         `(${aPesos(sumaLineas)}). Falta un renglón o el ticket quedó a medio recalcular.`,
     );
   }
-  if (descuentoTicket > 0) repartirDescuentoDeTicket(enCentavos, descuentoTicket, sumaLineas);
+  if (descuentoTicket > 0) repartirDescuentoDeTicket(enCentavos, descuentoTicket);
 
   enCentavos.forEach(absorberDescuentoSinIva);
 
@@ -266,21 +272,35 @@ function desglosarLinea(linea: LineaTicket): LineaEnCentavos {
  * OJO — aquí el CFDI se separa a propósito de `tickets.iva_mxn`: un descuento a nivel ticket baja
  * el total pero el POS **no** le baja el IVA, así que su `iva_mxn` queda inflado. Fiscalmente el
  * descuento sí reduce la base gravable. El comprobante lleva el IVA correcto, no el del ticket.
+ *
+ * LOS CARGOS (envío) NO ENTRAN AL REPARTO. El envío no admite descuentos (spec zonas de envío §3,
+ * ADR 0017): la base ya calcula el descuento de ticket sobre la comida, así que aquí se reparte
+ * solo entre los renglones de producto y el concepto de envío sale con descuento 0.
+ *
+ * Si no hay comida con dinero sobre la cual repartir —un descuento de ticket en un ticket cuyo
+ * único renglón con dinero es el envío— se RECHAZA en vez de repartirlo sobre el envío o dividir
+ * entre cero. Las guardas de la base impiden que nazca así; que llegue aquí es un dato incoherente
+ * (p. ej. un descuento congelado cuya comida se canceló después), y un CFDI que le pone descuento
+ * al envío contradice la regla y el ticket. Mismo criterio que el resto del módulo: mejor un
+ * timbrado que no sale y se investiga que uno que sale mal.
  */
-function repartirDescuentoDeTicket(
-  lineas: LineaEnCentavos[],
-  descuentoTicket: number,
-  sumaLineas: number,
-): void {
-  if (sumaLineas <= 0) {
-    throw new ConceptosIncoherentes("Hay un descuento de ticket pero los renglones no suman nada");
+function repartirDescuentoDeTicket(lineas: LineaEnCentavos[], descuentoTicket: number): void {
+  const elegibles = lineas.map((_, i) => i).filter((i) => !lineas[i].origen.cargoTipo);
+  const sumaElegibles = elegibles.reduce((acc, i) => acc + lineas[i].total, 0);
+  if (sumaElegibles <= 0) {
+    throw new ConceptosIncoherentes(
+      "Hay un descuento de ticket pero ningún renglón de producto sobre el cual repartirlo " +
+        "(el envío no admite descuentos)",
+    );
   }
 
-  const partes = lineas.map((l) => Math.round((descuentoTicket * l.total) / sumaLineas));
+  const partes = lineas.map((l, i) =>
+    elegibles.includes(i) ? Math.round((descuentoTicket * l.total) / sumaElegibles) : 0,
+  );
   const repartido = partes.reduce((a, b) => a + b, 0);
 
-  let mayor = 0;
-  for (let i = 1; i < lineas.length; i++) if (lineas[i].total > lineas[mayor].total) mayor = i;
+  let mayor = elegibles[0];
+  for (const i of elegibles) if (lineas[i].total > lineas[mayor].total) mayor = i;
   partes[mayor] += descuentoTicket - repartido;
 
   lineas.forEach((l, i) => {
