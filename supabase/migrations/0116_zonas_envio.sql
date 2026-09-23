@@ -503,3 +503,381 @@ WHERE t.deleted_at IS NULL
 GROUP BY t.tenant_id, t.sucursal_id, t.dia_contable,
          ti.producto_id, ti.producto_nombre_snapshot, ti.producto_sku_snapshot;
 COMMENT ON VIEW vw_ventas_por_producto IS 'Ventas por producto/día. Los PADRES de combo no cuentan; los HIJOS valen su precio asignado más sus extras, con el IVA derivado de los atributos fiscales DEL PADRE (y sumado al total cuando el padre cobra con IVA por afuera). ADR 0015. Los cargos (cargo_tipo, p.ej. ENVIO) no son productos y no cuentan. ADR 0017.';
+
+-- ============================================================================
+-- EL ENVÍO NO ADMITE DESCUENTOS NI PROMOCIONES (spec 2026-09-22-zonas-envio §3, ADR 0017)
+--
+-- Regla del dueño: un 10% de descuento rebaja la comida; el envío se cobra completo. La spec lo
+-- decía y nadie lo había implementado. Como el envío es un renglón más (ADR 0017), entraba solo a
+-- la base de todo descuento de ticket. Se redefinen las tres funciones por donde se colaba:
+--
+--   · aplicar_descuento_manual (vigente: 0008) — a nivel ticket, PORCENTAJE, MONTO_FIJO (ahora con
+--     tope, que no tenía) y CORTESIA_TOTAL calculan sobre la comida. A nivel renglón, descontar el
+--     propio renglón de envío se rechaza: sería la puerta trasera de la regla. Quitar el envío sí se
+--     puede, quitando la zona (fijar_envio_ticket con NULL).
+--   · aplicar_promocion (vigente: 0087) — la base `v_total` excluye el envío (los cuatro tipos).
+--   · evaluar_promociones_aplicables (vigente: 0008) — el envío no cuenta para el monto previsto
+--     ni para alcanzar `condiciones.monto_ticket.minimo_mxn`.
+--
+-- Cada una es copia de su versión vigente con SOLO estos cambios. Las dos de la 0008 llevan además
+-- `SET search_path = public, extensions, pg_temp`: se lo puso la 0044 con ALTER FUNCTION, y un
+-- CREATE OR REPLACE sin la cláusula se lo quitaría. aplicar_promocion no lo tenía y no lo gana.
+-- Permisos y comentarios sobreviven al CREATE OR REPLACE.
+--
+-- El quinto camino, el reparto del descuento en el CFDI, vive en
+-- supabase/functions/_shared/pac/conceptos.ts: DESPLEGAR timbrar-cfdi, timbrar-global y
+-- autofacturar JUNTO con esta migración.
+-- ============================================================================
+
+CREATE OR REPLACE FUNCTION aplicar_descuento_manual(
+  p_ticket_id        uuid,
+  p_ticket_item_id   uuid,                       -- NULL = aplica al ticket completo
+  p_tipo             descuento_manual_tipo,
+  p_valor            numeric(12,2),              -- porcentaje, monto fijo, o precio override
+  p_motivo_categoria descuento_manual_motivo,
+  p_motivo_texto     text,                       -- obligatorio si motivo=OTRO
+  p_autorizacion_pin_id uuid,                    -- pre-obtenida del flujo de PIN
+  p_usuario_solicitante_id uuid,
+  p_usuario_autorizo_id uuid,
+  p_client_id_local  varchar DEFAULT NULL
+) RETURNS uuid
+LANGUAGE plpgsql
+SET search_path = public, extensions, pg_temp
+AS $$
+DECLARE
+  v_tenant_id        uuid;
+  v_descuento_id     uuid;
+  v_monto_descontado numeric(12,2);
+  v_base             numeric(12,2);
+  v_porc             numeric(5,2);
+  v_monto            numeric(12,2);
+  v_precio_over      numeric(12,2);
+  v_item             record;
+  v_cargos           numeric(12,2) := 0;         -- 0116: el envío, que no se descuenta
+BEGIN
+  SELECT tenant_id INTO v_tenant_id FROM tickets WHERE id = p_ticket_id;
+  IF NOT FOUND THEN RAISE EXCEPTION 'Ticket % no existe', p_ticket_id; END IF;
+
+  -- Idempotencia
+  IF p_client_id_local IS NOT NULL THEN
+    SELECT id INTO v_descuento_id FROM ticket_descuentos_manuales
+    WHERE tenant_id = v_tenant_id AND client_id_local = p_client_id_local;
+    IF FOUND THEN RETURN v_descuento_id; END IF;
+  END IF;
+
+  -- 0116: el envío no admite descuentos (spec zonas de envío §3, ADR 0017). Descontar el renglón
+  -- de envío directamente sería la puerta trasera de la regla. Quitarlo sí se puede: es quitar la
+  -- zona del pedido (fijar_envio_ticket con zona NULL).
+  IF p_ticket_item_id IS NOT NULL AND EXISTS (
+    SELECT 1 FROM ticket_items WHERE id = p_ticket_item_id AND cargo_tipo IS NOT NULL
+  ) THEN
+    RAISE EXCEPTION 'El envío no admite descuentos: se cobra completo. Si no se va a cobrar, quita la zona del pedido.'
+      USING ERRCODE = 'check_violation';
+  END IF;
+
+  -- 0116: a nivel ticket, la base del descuento es la comida. El envío se resta de la base.
+  IF p_ticket_item_id IS NULL THEN
+    SELECT COALESCE(SUM(total_item_mxn), 0) INTO v_cargos
+      FROM ticket_items
+     WHERE ticket_id = p_ticket_id AND cancelado = false AND cargo_tipo IS NOT NULL;
+  END IF;
+
+  -- Calcular monto descontado según tipo
+  IF p_tipo = 'PORCENTAJE' THEN
+    v_porc := p_valor;
+    -- Base de cálculo depende del alcance
+    IF p_ticket_item_id IS NULL THEN
+      SELECT GREATEST(subtotal_mxn + iva_mxn - promociones_mxn - v_cargos, 0) INTO v_base FROM tickets WHERE id = p_ticket_id;
+    ELSE
+      SELECT total_item_mxn INTO v_base FROM ticket_items WHERE id = p_ticket_item_id;
+    END IF;
+    v_monto_descontado := ROUND(v_base * v_porc / 100, 2);
+
+  ELSIF p_tipo = 'MONTO_FIJO' THEN
+    v_monto := p_valor;
+    v_monto_descontado := v_monto;
+    -- 0116: a nivel ticket, topado en la comida. Sin tope, un monto mayor que la comida se comía
+    -- el envío (recalcular_totales_ticket solo evita que el total baje de cero).
+    IF p_ticket_item_id IS NULL THEN
+      SELECT LEAST(v_monto, GREATEST(total_mxn - v_cargos, 0)) INTO v_monto_descontado
+        FROM tickets WHERE id = p_ticket_id;
+    END IF;
+
+  ELSIF p_tipo = 'CORTESIA_TOTAL' THEN
+    IF p_ticket_item_id IS NULL THEN
+      SELECT GREATEST(total_mxn - v_cargos, 0) INTO v_monto_descontado FROM tickets WHERE id = p_ticket_id;
+    ELSE
+      SELECT total_item_mxn INTO v_monto_descontado FROM ticket_items WHERE id = p_ticket_item_id;
+    END IF;
+
+  ELSIF p_tipo = 'OVERRIDE_PRECIO' THEN
+    -- Para OVERRIDE_PRECIO: marcamos el ítem con precio_override y calculamos el delta
+    v_precio_over := p_valor;
+    SELECT * INTO v_item FROM ticket_items WHERE id = p_ticket_item_id;
+    IF NOT FOUND THEN RAISE EXCEPTION 'ticket_item % no existe', p_ticket_item_id; END IF;
+    v_monto_descontado := GREATEST(0, (v_item.precio_unitario_snapshot - v_precio_over) * v_item.cantidad);
+
+    -- Actualizar el ítem con override
+    UPDATE ticket_items
+    SET precio_override = true,
+        precio_unitario_original_snapshot = precio_unitario_snapshot,
+        autorizacion_pin_override_id = p_autorizacion_pin_id,
+        precio_unitario_snapshot = v_precio_over
+    WHERE id = p_ticket_item_id;
+  END IF;
+
+  -- Insertar registro del descuento
+  INSERT INTO ticket_descuentos_manuales (
+    tenant_id, ticket_id, ticket_item_id,
+    tipo, valor_porcentaje, valor_monto_mxn, precio_override_mxn,
+    monto_descontado_mxn,
+    motivo_categoria, motivo_texto,
+    autorizacion_pin_id,
+    usuario_solicitante_id, usuario_autorizo_id,
+    client_id_local, created_by
+  ) VALUES (
+    v_tenant_id, p_ticket_id, p_ticket_item_id,
+    p_tipo,
+    CASE WHEN p_tipo = 'PORCENTAJE'      THEN p_valor ELSE NULL END,
+    CASE WHEN p_tipo = 'MONTO_FIJO'      THEN p_valor ELSE NULL END,
+    CASE WHEN p_tipo = 'OVERRIDE_PRECIO' THEN p_valor ELSE NULL END,
+    v_monto_descontado,
+    p_motivo_categoria, p_motivo_texto,
+    p_autorizacion_pin_id,
+    p_usuario_solicitante_id, p_usuario_autorizo_id,
+    p_client_id_local, p_usuario_solicitante_id
+  ) RETURNING id INTO v_descuento_id;
+
+  RETURN v_descuento_id;
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION evaluar_promociones_aplicables(p_ticket_id uuid)
+RETURNS TABLE (
+  promocion_id          uuid,
+  nombre                varchar(150),
+  tipo                  promocion_tipo,
+  alcance               promocion_alcance,
+  monto_descuento_estimado_mxn numeric(12,2),
+  condiciones           jsonb,
+  prioridad             integer
+)
+LANGUAGE plpgsql STABLE
+SET search_path = public, extensions, pg_temp
+AS $$
+DECLARE
+  v_tenant_id   uuid;
+  v_sucursal_id uuid;
+  v_modo        modo_servicio;
+  v_cliente_id  uuid;
+  v_subtotal    numeric(12,2);
+  v_ahora       timestamptz := now();
+BEGIN
+  -- 0116: el envío no cuenta ni para el monto previsto ni para alcanzar el mínimo de compra
+  -- (spec zonas de envío §3, ADR 0017). v_subtotal es la comida.
+  SELECT t.tenant_id, t.sucursal_id, t.modo_servicio, t.cliente_id,
+         GREATEST(t.subtotal_mxn + t.iva_mxn - COALESCE((
+           SELECT SUM(ti.total_item_mxn) FROM ticket_items ti
+            WHERE ti.ticket_id = t.id AND ti.cancelado = false AND ti.cargo_tipo IS NOT NULL
+         ), 0), 0)
+  INTO v_tenant_id, v_sucursal_id, v_modo, v_cliente_id, v_subtotal
+  FROM tickets t
+  WHERE t.id = p_ticket_id;
+
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'Ticket % no existe', p_ticket_id;
+  END IF;
+
+  -- Retornar promociones que cumplen FILTROS BÁSICOS evaluables en SQL.
+  -- La evaluación detallada de condiciones jsonb se hace en la capa de servicios.
+  RETURN QUERY
+  SELECT
+    p.id,
+    p.nombre,
+    p.tipo,
+    p.alcance,
+    -- Estimación rápida del descuento (la app recalcula exactamente al aplicar)
+    CASE
+      WHEN p.tipo = 'PORCENTAJE'     THEN ROUND(v_subtotal * p.valor_porcentaje / 100, 2)
+      WHEN p.tipo = 'MONTO_FIJO'     THEN p.valor_monto_mxn
+      WHEN p.tipo = 'CORTESIA_TOTAL' THEN v_subtotal
+      ELSE 0
+    END AS monto_descuento_estimado_mxn,
+    p.condiciones,
+    p.prioridad
+  FROM promociones p
+  WHERE p.tenant_id = v_tenant_id
+    AND p.estado = 'ACTIVA'
+    AND p.deleted_at IS NULL
+    AND p.fecha_inicio <= v_ahora
+    AND (p.fecha_fin IS NULL OR p.fecha_fin >= v_ahora)
+    AND (p.max_usos_total IS NULL OR p.usos_actuales < p.max_usos_total)
+    AND (
+      -- Filtro de sucursal si la condición existe en jsonb
+      NOT (p.condiciones ? 'sucursales_aplicables')
+      OR v_sucursal_id::text = ANY(
+        SELECT jsonb_array_elements_text(p.condiciones->'sucursales_aplicables')
+      )
+    )
+    AND (
+      -- Filtro de modo de servicio
+      NOT (p.condiciones ? 'modos_servicio_permitidos')
+      OR v_modo::text = ANY(
+        SELECT jsonb_array_elements_text(p.condiciones->'modos_servicio_permitidos')
+      )
+    )
+    AND (
+      -- Filtro de monto mínimo
+      NOT (p.condiciones ? 'monto_ticket')
+      OR (p.condiciones->'monto_ticket'->>'minimo_mxn') IS NULL
+      OR v_subtotal >= (p.condiciones->'monto_ticket'->>'minimo_mxn')::numeric
+    )
+    AND (
+      -- Filtro requiere_cliente_identificado
+      p.requiere_cliente_identificado = false
+      OR v_cliente_id IS NOT NULL
+    )
+  ORDER BY p.prioridad DESC, p.valor_porcentaje DESC NULLS LAST;
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION aplicar_promocion(
+  p_ticket_id       uuid,
+  p_promocion_id    uuid,
+  p_client_id_local varchar DEFAULT NULL
+) RETURNS uuid
+LANGUAGE plpgsql
+AS $$
+DECLARE
+  v_tenant_id   uuid;
+  v_estado      ticket_estado_fiscal;
+  v_cliente_id  uuid;
+  v_total       numeric(12,2);
+  v_promo       record;
+  v_monto       numeric(12,2);
+  v_id          uuid;
+BEGIN
+  SELECT tenant_id, estado_fiscal, cliente_id, total_mxn
+    INTO v_tenant_id, v_estado, v_cliente_id, v_total
+    FROM tickets WHERE id = p_ticket_id;
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'Ticket % no existe', p_ticket_id;
+  END IF;
+
+  -- Idempotencia por client_id_local, igual que el resto de operaciones de caja:
+  -- si el envío se repite (reintento de red, sync), devuelve la misma fila en vez
+  -- de descontar dos veces.
+  IF p_client_id_local IS NOT NULL THEN
+    SELECT id INTO v_id FROM ticket_promociones_aplicadas
+     WHERE tenant_id = v_tenant_id AND client_id_local = p_client_id_local;
+    IF FOUND THEN RETURN v_id; END IF;
+  END IF;
+
+  /* Un ticket cobrado ya no se toca. Sin esta guarda se le podría aplicar una
+     promoción a una venta cerrada: el total cambiaría por debajo de un ticket ya
+     impreso y ya cuadrado en el corte. */
+  IF v_estado NOT IN ('BORRADOR', 'ABIERTO') THEN
+    RAISE EXCEPTION 'El ticket ya está %; no se le pueden aplicar promociones', v_estado
+      USING ERRCODE = 'check_violation';
+  END IF;
+
+  SELECT * INTO v_promo FROM promociones
+   WHERE id = p_promocion_id AND tenant_id = v_tenant_id AND deleted_at IS NULL;
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'La promoción no existe o no es de este negocio'
+      USING ERRCODE = 'check_violation';
+  END IF;
+
+  -- Se revalida en la base lo que la app ya filtró. No es desconfianza del
+  -- cliente: entre que la caja pinta la lista y el cajero toca el botón pueden
+  -- pasar minutos, y una promoción que venció o se pausó en ese hueco no debe
+  -- entrar.
+  IF v_promo.estado <> 'ACTIVA' THEN
+    RAISE EXCEPTION 'La promoción "%" no está activa', v_promo.nombre
+      USING ERRCODE = 'check_violation';
+  END IF;
+  IF v_promo.fecha_inicio > now() OR (v_promo.fecha_fin IS NOT NULL AND v_promo.fecha_fin < now()) THEN
+    RAISE EXCEPTION 'La promoción "%" no está vigente', v_promo.nombre
+      USING ERRCODE = 'check_violation';
+  END IF;
+  IF v_promo.max_usos_total IS NOT NULL AND v_promo.usos_actuales >= v_promo.max_usos_total THEN
+    RAISE EXCEPTION 'La promoción "%" agotó sus usos', v_promo.nombre
+      USING ERRCODE = 'check_violation';
+  END IF;
+  IF v_promo.requiere_cliente_identificado AND v_cliente_id IS NULL THEN
+    RAISE EXCEPTION 'La promoción "%" pide identificar al cliente', v_promo.nombre
+      USING ERRCODE = 'check_violation';
+  END IF;
+
+  IF v_promo.alcance <> 'TICKET_COMPLETO' THEN
+    RAISE EXCEPTION 'Todavía no se aplican promociones de alcance % desde la caja', v_promo.alcance
+      USING ERRCODE = 'feature_not_supported';
+  END IF;
+
+  /* La misma promoción, dos veces en un ticket, es siempre un doble clic o un
+     reintento — nunca una intención. Se corta antes de descontar. */
+  IF EXISTS (
+    SELECT 1 FROM ticket_promociones_aplicadas
+     WHERE ticket_id = p_ticket_id AND promocion_id = p_promocion_id
+       AND cancelada_por_cajero = false
+  ) THEN
+    RAISE EXCEPTION 'La promoción "%" ya está aplicada a este ticket', v_promo.nombre
+      USING ERRCODE = 'unique_violation';
+  END IF;
+
+  -- 0116: el envío no admite promociones (spec zonas de envío §3, ADR 0017). La base es la
+  -- comida: el total vigente menos los renglones de cargo. Un 10% rebaja la comida; el envío se
+  -- cobra completo, también en cortesía y en precio especial.
+  v_total := GREATEST(v_total - COALESCE((
+    SELECT SUM(total_item_mxn) FROM ticket_items
+     WHERE ticket_id = p_ticket_id AND cancelado = false AND cargo_tipo IS NOT NULL
+  ), 0), 0);
+
+  -- Monto, siempre sobre el total vigente y siempre acotado a él.
+  v_monto := CASE v_promo.tipo
+    WHEN 'PORCENTAJE'      THEN ROUND(v_total * LEAST(v_promo.valor_porcentaje, 100) / 100, 2)
+    WHEN 'MONTO_FIJO'      THEN LEAST(v_promo.valor_monto_mxn, v_total)
+    WHEN 'CORTESIA_TOTAL'  THEN v_total
+    WHEN 'PRECIO_ESPECIAL' THEN GREATEST(v_total - v_promo.precio_especial_mxn, 0)
+    ELSE NULL
+  END;
+
+  IF v_monto IS NULL THEN
+    RAISE EXCEPTION 'El tipo de promoción % todavía no se aplica desde la caja', v_promo.tipo
+      USING ERRCODE = 'feature_not_supported';
+  END IF;
+
+  -- Un ticket sin nada cobrable (o una promo que no descuenta) no se registra:
+  -- dejaría un renglón de $0 en el ticket del cliente y en los reportes.
+  IF v_monto <= 0 THEN
+    RAISE EXCEPTION 'La promoción "%" no descuenta nada sobre este ticket', v_promo.nombre
+      USING ERRCODE = 'check_violation';
+  END IF;
+
+  /* El insert dispara los dos triggers de la 0008: `trg_promo_apl_recalc`
+     recalcula los totales del ticket y `trg_promo_apl_uso` incrementa
+     `usos_actuales`. Por eso aquí no se toca `tickets` ni `promociones` a mano:
+     hacerlo duplicaría el efecto. */
+  INSERT INTO ticket_promociones_aplicadas (
+    tenant_id, ticket_id, promocion_id,
+    promocion_nombre_snapshot, promocion_tipo_snapshot, promocion_alcance_snapshot,
+    valor_porcentaje_snapshot, valor_monto_snapshot, precio_especial_snapshot,
+    monto_descontado_mxn, items_afectados,
+    cumple_condiciones_snapshot, cliente_id, client_id_local
+  ) VALUES (
+    v_tenant_id, p_ticket_id, p_promocion_id,
+    v_promo.nombre, v_promo.tipo, v_promo.alcance,
+    v_promo.valor_porcentaje, v_promo.valor_monto_mxn, v_promo.precio_especial_mxn,
+    v_monto, '{}',
+    jsonb_build_object(
+      'total_base_mxn', v_total,
+      'aplicada_desde', 'caja',
+      'evaluada_at', now()
+    ),
+    v_cliente_id, p_client_id_local
+  )
+  RETURNING id INTO v_id;
+
+  RETURN v_id;
+END;
+$$;

@@ -658,6 +658,15 @@ BEGIN
     v_fallos := v_fallos || format('h) el ticket quedó en %s tras los intentos (esperaba 275.00)', v_total);
   END IF;
 
+  -- i) La redefinición en la 0116 conserva el search_path fijo que la 0044 les puso por ALTER
+  --    FUNCTION (un CREATE OR REPLACE sin la cláusula se lo habría quitado en silencio).
+  IF EXISTS (SELECT 1 FROM pg_proc
+              WHERE proname IN ('aplicar_descuento_manual', 'evaluar_promociones_aplicables')
+                AND pronamespace = 'public'::regnamespace
+                AND NOT (COALESCE(proconfig, '{}') @> ARRAY['search_path=public, extensions, pg_temp'])) THEN
+    v_fallos := v_fallos || 'i) aplicar_descuento_manual/evaluar_promociones_aplicables perdieron su search_path fijo'::text;
+  END IF;
+
   IF cardinality(v_fallos) > 0 THEN
     RAISE EXCEPTION 'El envío entra al descuento por % camino(s): %', cardinality(v_fallos), array_to_string(v_fallos, ' | ');
   END IF;
