@@ -2,7 +2,7 @@
 import { useEffect, useMemo, useState } from "react";
 import type { Producto } from "../lib/catalogo";
 import type { GrupoModificadores } from "../lib/modificadores";
-import type { ModificadorSel } from "../lib/carrito";
+import type { AlcanceEdicion, ModificadorSel } from "../lib/carrito";
 import { seleccionInicialGrupo } from "../lib/carrito";
 import { clampPagina, repartirGrupos, tamanoOpcion } from "../lib/rejilla";
 import { fmtMxn } from "../lib/turno";
@@ -10,7 +10,21 @@ import { useHueco } from "../lib/usar-hueco";
 import { Paginador } from "./paginador";
 
 /**
- * Drawer de modificadores: los grupos de un producto (término, extras, sin qué) y la nota.
+ * Modal de modificadores: los grupos de un producto (término, extras, sin qué) y la nota.
+ *
+ * CENTRADO, AL 80% DE LA PANTALLA
+ *
+ * Fue un drawer de 576px pegado a la derecha. Ahora es un modal centrado que ocupa el 80% del
+ * ancho y del alto: las mismas opciones, con botones más grandes (ver `ANCHO_OPCION_MAX` y
+ * `ALTO_OPCION_MAX` en `rejilla.ts`). Como el modal es más ancho que alto, la nota de cocina bajó
+ * al pie, en una sola línea junto a los botones, para dejarle el alto a la cuadrícula.
+ *
+ * TAMBIÉN EDITA
+ *
+ * Con `inicial` se abre sobre un renglón ya capturado (el cajero tocó el renglón en el ticket):
+ * arranca con lo que el renglón tenía marcado y confirma con "Guardar cambios". Si el renglón
+ * trae más de una unidad (`cantidadLinea`), el pie deja elegir si el cambio es para una sola
+ * —se separa en su propio renglón— o para todas.
  *
  * NO SCROLLEA
  *
@@ -23,9 +37,6 @@ import { Paginador } from "./paginador";
  * de celda que hacen que TODOS los grupos quepan en el hueco medido, y el texto se achica para
  * caber. Cuando ni apretando alcanza, se **pagina** — y un grupo más alto que la página se parte en
  * trozos, porque entero y recortado no se vería nunca.
- *
- * El drawer mide 576px y no 480: un 20% más de ancho es una columna más de opciones, o la misma
- * columna con el nombre entero en vez de cortado.
  *
  * Dos cosas que se fueron para que esto quepa:
  *
@@ -40,9 +51,18 @@ type SelPorGrupo = Record<string, Set<string>>; // grupoId -> set de opcionId
 /** Alto reservado al encabezado de cada grupo dentro de la cuadrícula. */
 const ALTO_CABECERA = 26;
 
-function initSel(grupos: GrupoModificadores[]): SelPorGrupo {
+/**
+ * Selección de arranque. Sin `inicial`, los defaults de cada grupo. Con `inicial` (edición), lo que
+ * el renglón ya tenía: se respeta aunque hoy una opción esté agotada, porque ya está en el pedido.
+ */
+function initSel(grupos: GrupoModificadores[], inicial?: ModificadorSel[] | null): SelPorGrupo {
   const s: SelPorGrupo = {};
-  for (const g of grupos) s[g.id] = new Set(seleccionInicialGrupo(g).map((o) => o.id));
+  const elegidas = inicial ? new Set(inicial.map((m) => m.opcionId)) : null;
+  for (const g of grupos) {
+    s[g.id] = elegidas
+      ? new Set(g.opciones.filter((o) => elegidas.has(o.id)).map((o) => o.id))
+      : new Set(seleccionInicialGrupo(g).map((o) => o.id));
+  }
   return s;
 }
 
@@ -114,17 +134,31 @@ function IconAlert({ className }: { className?: string }) {
 export function ModalModificadores({
   producto,
   grupos,
+  inicial,
+  cantidadLinea = 1,
+  sinNota = false,
   onConfirmar,
   onCancelar,
 }: {
   producto: Producto;
   grupos: GrupoModificadores[];
-  onConfirmar: (mods: ModificadorSel[], nota: string | null) => void;
+  /** Edición de un renglón ya capturado: su selección y su nota. Ausente = producto nuevo. */
+  inicial?: { modificadores: ModificadorSel[]; nota: string | null } | null;
+  /** Unidades del renglón que se edita. Con más de una, el pie pregunta a cuántas aplicar. */
+  cantidadLinea?: number;
+  /** Oculta la nota: el componente de un combo no la usa (la nota va en el combo entero). */
+  sinNota?: boolean;
+  onConfirmar: (mods: ModificadorSel[], nota: string | null, alcance: AlcanceEdicion) => void;
   onCancelar: () => void;
 }) {
-  const [sel, setSel] = useState<SelPorGrupo>(() => initSel(grupos));
-  const [nota, setNota] = useState("");
+  const editando = inicial != null;
+  const [sel, setSel] = useState<SelPorGrupo>(() => initSel(grupos, inicial?.modificadores));
+  const [nota, setNota] = useState(inicial?.nota ?? "");
   const [pagina, setPagina] = useState(1);
+  // Por omisión se separa UNA unidad: es lo que pidió Fermín y lo que menos sorprende —tocar un
+  // "3× Hamburguesa" para quitarle la cebolla a una no debe cambiar las tres—.
+  const [alcance, setAlcance] = useState<AlcanceEdicion>("una");
+  const preguntaAlcance = editando && cantidadLinea > 1;
 
   function toggle(g: GrupoModificadores, opcionId: string) {
     setSel((prev) => {
@@ -164,7 +198,7 @@ export function ModalModificadores({
         if (o) mods.push({ opcionId: o.id, grupoNombre: g.nombre, opcionNombre: o.nombre, precioExtra: o.precioExtra, cantidad: 1 });
       }
     }
-    onConfirmar(mods, nota.trim() || null);
+    onConfirmar(mods, nota.trim() || null, preguntaAlcance ? alcance : "todas");
   }
 
   // Primer grupo inválido para el hint del footer
@@ -195,14 +229,15 @@ export function ModalModificadores({
   return (
     /* Scrim */
     <div
-      className="fixed inset-0 z-50 flex items-end justify-end bg-ink/[0.34]"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-ink/[0.34]"
       role="dialog"
       aria-modal="true"
+      aria-label={producto.nombre}
       onClick={(e) => { if (e.target === e.currentTarget) onCancelar(); }}
     >
-      {/* Drawer panel — right side, full height below any top bar */}
+      {/* Panel centrado al 80% de la pantalla en los dos ejes */}
       <aside
-        className="flex h-full w-full max-w-[576px] flex-col border-l border-line-strong bg-surface shadow-[−14px_0_40px_rgba(22,22,26,.12)]"
+        className="flex h-[80vh] w-[80vw] flex-col overflow-hidden rounded-lg border border-line-strong bg-surface shadow-[0_24px_60px_rgba(22,22,26,.18)]"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Cabecera: nombre + precio base. (Aquí vivía un hero de 150px con un icono genérico de
@@ -334,56 +369,88 @@ export function ModalModificadores({
           </div>
         </div>
 
-        {/* Nota de cocina: fuera del área medida, siempre a la vista */}
-        <div className="flex-shrink-0 px-5 pb-3">
-          <label className="mb-1.5 block text-[13px] font-bold text-ink">
-            Nota para cocina <span className="text-[12px] font-medium text-ink-3">(opcional)</span>
-          </label>
-          <textarea
-            value={nota}
-            onChange={(e) => setNota(e.target.value)}
-            placeholder="Ej. bien dorada, partir a la mitad, poca sal"
-            rows={2}
-            className="w-full resize-none rounded border border-line-strong px-[13px] py-[9px] font-sans text-[14px] text-ink outline-none placeholder:text-ink-3 focus:border-ink focus:shadow-[inset_0_0_0_1px_rgb(var(--ink))]"
-          />
-        </div>
-
         <Paginador compacto pagina={paginaActual} paginas={reparto.paginas.length} onIr={setPagina} />
 
-        {/* Footer fijo */}
+        {/* Pie fijo: aviso y alcance arriba; nota y botones en una sola fila */}
         <div className="flex-shrink-0 border-t border-line px-5 py-4">
-          {/* Hint de validación si hay grupo inválido */}
-          {!todoValido && primerGrupoInvalido && (
-            <div className="mb-3 flex items-center gap-[7px] text-[12.5px] font-semibold text-warning">
-              <IconAlert className="h-[15px] w-[15px] flex-shrink-0" />
-              <span>
-                {primerGrupoInvalido.tipoSeleccion === "UNICA_OBLIGATORIA"
-                  ? `Elige el término en "${primerGrupoInvalido.nombre}" para continuar`
-                  : `Completa "${primerGrupoInvalido.nombre}" para continuar`}
-              </span>
+          {(preguntaAlcance || (!todoValido && primerGrupoInvalido)) && (
+            <div className="mb-3 flex items-center gap-4">
+              {preguntaAlcance && (
+                <div className="inline-flex flex-shrink-0 items-center gap-2">
+                  <span className="text-[13px] font-bold text-ink">Cambiar</span>
+                  <span role="radiogroup" aria-label="A cuántas unidades aplicar el cambio" className="inline-flex overflow-hidden rounded border border-line-strong">
+                    {([
+                      ["una", "Solo 1"],
+                      ["todas", `Las ${cantidadLinea}`],
+                    ] as const).map(([valor, etiqueta]) => (
+                      <button
+                        key={valor}
+                        type="button"
+                        role="radio"
+                        aria-checked={alcance === valor}
+                        onClick={() => setAlcance(valor)}
+                        className={[
+                          "h-11 px-4 text-[14px] font-semibold transition-colors",
+                          alcance === valor ? "bg-ink text-white" : "bg-surface text-ink-2 hover:bg-hover",
+                        ].join(" ")}
+                      >
+                        {etiqueta}
+                      </button>
+                    ))}
+                  </span>
+                  <span className="text-[12.5px] font-medium text-ink-3">
+                    {alcance === "una" ? "se separa en su propio renglón" : "cambia el renglón entero"}
+                  </span>
+                </div>
+              )}
+              {!todoValido && primerGrupoInvalido && (
+                <div className="ml-auto flex items-center gap-[7px] text-[12.5px] font-semibold text-warning">
+                  <IconAlert className="h-[15px] w-[15px] flex-shrink-0" />
+                  <span>
+                    {primerGrupoInvalido.tipoSeleccion === "UNICA_OBLIGATORIA"
+                      ? `Elige el término en "${primerGrupoInvalido.nombre}" para continuar`
+                      : `Completa "${primerGrupoInvalido.nombre}" para continuar`}
+                  </span>
+                </div>
+              )}
             </div>
           )}
 
-          <div className="flex items-center gap-4">
-            {/* Botón cancelar (ghost) */}
+          <div className="flex items-center gap-3">
+            {/* Nota de cocina: una línea, al lado de los botones. En el modal ancho sobra ancho y
+                falta alto, así que la nota le cede el alto a la cuadrícula. */}
+            {!sinNota && (
+              <input
+                value={nota}
+                onChange={(e) => setNota(e.target.value)}
+                maxLength={200}
+                aria-label="Nota para cocina (opcional)"
+                placeholder="Nota para cocina (opcional): bien dorada, poca sal…"
+                className="h-[52px] min-w-0 flex-1 rounded border border-line-strong px-[13px] font-sans text-[14px] text-ink outline-none placeholder:text-ink-3 focus:border-ink focus:shadow-[inset_0_0_0_1px_rgb(var(--ink))]"
+              />
+            )}
+
             <button
               type="button"
               onClick={onCancelar}
-              className="flex h-[52px] items-center justify-center rounded border border-line-strong bg-surface px-5 text-[15px] font-semibold text-ink-2 transition hover:bg-hover active:bg-sel"
+              className={[
+                "flex h-[52px] flex-shrink-0 items-center justify-center rounded border border-line-strong bg-surface px-5 text-[15px] font-semibold text-ink-2 transition hover:bg-hover active:bg-sel",
+                sinNota ? "mr-auto" : "",
+              ].join(" ")}
             >
               Cancelar
             </button>
 
-            {/* Botón agregar — accent, muestra precio total */}
+            {/* Confirmar — accent, con el precio de lo que cambia */}
             <button
               type="button"
               disabled={!todoValido}
               onClick={confirmar}
-              className="flex flex-1 items-center justify-between gap-2 rounded-lg border-none bg-accent px-4 py-[16px] text-[16px] font-bold text-white shadow-[0_1px_3px_rgba(232,80,46,.3)] transition hover:bg-accent-hover disabled:cursor-not-allowed disabled:bg-line-strong disabled:shadow-none"
+              className="flex h-[52px] w-[min(340px,40%)] flex-shrink-0 items-center justify-between gap-2 rounded-lg border-none bg-accent px-4 text-[16px] font-bold text-white shadow-[0_1px_3px_rgba(232,80,46,.3)] transition hover:bg-accent-hover active:scale-[.98] disabled:cursor-not-allowed disabled:bg-line-strong disabled:shadow-none"
             >
-              <span>Agregar al ticket</span>
+              <span className="truncate">{editando ? "Guardar cambios" : "Agregar al ticket"}</span>
               <span className="font-display tabular-nums">
-                {fmtMxn(precioTotal)}
+                {fmtMxn(preguntaAlcance && alcance === "todas" ? precioTotal * cantidadLinea : precioTotal)}
               </span>
             </button>
           </div>

@@ -7,7 +7,7 @@ import { SidebarTicket } from "./sidebar-ticket";
 import { agregarComboAlTicket, agregarItemAlTicket } from "../lib/cuenta-mesa";
 import type { ComboDef } from "../lib/combos";
 import { obtenerGruposDeProducto } from "../lib/modificadores";
-import { nuevoClientId, type LineaCarrito, type ModificadorSel, type ModoServicio } from "../lib/carrito";
+import { aplicarEdicion, nuevoClientId, type AlcanceEdicion, type LineaCarrito, type ModificadorSel, type ModoServicio } from "../lib/carrito";
 import type { Categoria, Producto } from "../lib/catalogo";
 import type { GrupoModificadores } from "../lib/modificadores";
 
@@ -60,8 +60,9 @@ export function ModalAgregarProductos({
   onEnviarCocina: (ticketId: string) => Promise<void>;
 }) {
   const [lineas, setLineas] = useState<LineaCarrito[]>([]);
-  const [modGrupos, setModGrupos] = useState<{ producto: Producto; grupos: GrupoModificadores[] } | null>(null);
-  const [comboAbierto, setComboAbierto] = useState<ComboDef | null>(null);
+  // `edicion`: el renglón de la tanda que se reabrió tocándolo en la lista.
+  const [modGrupos, setModGrupos] = useState<{ producto: Producto; grupos: GrupoModificadores[]; edicion?: LineaCarrito } | null>(null);
+  const [comboAbierto, setComboAbierto] = useState<{ combo: ComboDef; linea?: LineaCarrito } | null>(null);
   const [ocupado, setOcupado] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -79,7 +80,7 @@ export function ModalAgregarProductos({
       if (p.esCombo) {
         const def = combos.find((c) => c.producto.id === p.id);
         if (!def) { setError("Este combo no tiene slots configurados. Revísalo en el admin."); return; }
-        setComboAbierto(def);
+        setComboAbierto({ combo: def });
         return;
       }
       try {
@@ -94,10 +95,32 @@ export function ModalAgregarProductos({
   );
 
   /** Confirmación del drawer de combo: agrega la línea a la tanda, igual que `agregar` para un producto simple. */
-  const agregarCombo = useCallback((linea: LineaCarrito) => {
+  const agregarCombo = useCallback((linea: LineaCarrito, alcance: AlcanceEdicion) => {
+    const original = comboAbierto?.linea;
     setComboAbierto(null);
-    setLineas((prev) => [...prev, linea]);
-  }, []);
+    if (original) setLineas((prev) => aplicarEdicion(prev, original.clientId, linea, alcance));
+    else setLineas((prev) => [...prev, linea]);
+  }, [comboAbierto]);
+
+  /**
+   * Tocar un renglón de la tanda lo reabre, igual que en la pantalla de venta: el combo en su
+   * resumen, un producto en sus modificadores. Sin modificadores no abre nada. Aquí todo es
+   * editable: nada de la tanda se ha guardado ni mandado a cocina todavía.
+   */
+  const editarLinea = useCallback(
+    async (clientId: string) => {
+      const l = lineas.find((x) => x.clientId === clientId);
+      if (!l) return;
+      if (l.combo) { setComboAbierto({ combo: l.combo.def, linea: l }); return; }
+      try {
+        const grupos = await obtenerGruposDeProducto(token, l.producto.id);
+        if (grupos.length > 0) setModGrupos({ producto: l.producto, grupos, edicion: l });
+      } catch (e) {
+        setError(e instanceof Error ? e.message : "Error al cargar modificadores");
+      }
+    },
+    [lineas, token],
+  );
 
   /**
    * Guarda la tanda completa en la cuenta.
@@ -192,6 +215,7 @@ export function ModalAgregarProductos({
             setLineas((prev) => prev.map((l) => (l.clientId === clientId ? { ...l, notaCocina: nota } : l)))
           }
           onLimpiar={() => setLineas([])}
+          onEditar={(clientId) => void editarLinea(clientId)}
           // Mandar a cocina es la acción principal, igual que en pick-up y domicilio: deja la
           // cuenta abierta y se cobra después desde la lista.
           onEnviarCocinaAbierto={enviarACocina}
@@ -207,9 +231,15 @@ export function ModalAgregarProductos({
         <ModalModificadores
           producto={modGrupos.producto}
           grupos={modGrupos.grupos}
-          onConfirmar={(mods, nota) => {
-            const p = modGrupos.producto;
+          inicial={modGrupos.edicion ? { modificadores: modGrupos.edicion.modificadores, nota: modGrupos.edicion.notaCocina } : null}
+          cantidadLinea={modGrupos.edicion?.cantidad ?? 1}
+          onConfirmar={(mods, nota, alcance) => {
+            const { producto: p, edicion } = modGrupos;
             setModGrupos(null);
+            if (edicion) {
+              setLineas((prev) => aplicarEdicion(prev, edicion.clientId, { ...edicion, modificadores: mods, notaCocina: nota }, alcance));
+              return;
+            }
             agregar(p, mods, nota);
           }}
           onCancelar={() => setModGrupos(null)}
@@ -218,8 +248,9 @@ export function ModalAgregarProductos({
 
       {comboAbierto && (
         <ModalCombo
-          combo={comboAbierto}
+          combo={comboAbierto.combo}
           token={token}
+          linea={comboAbierto.linea ?? null}
           onConfirmar={agregarCombo}
           onCancelar={() => setComboAbierto(null)}
         />

@@ -244,4 +244,18 @@ describe("repartirGrupos", () => {
     expect(r.altoCelda).toBeGreaterThanOrEqual(60);
     expect([0, 1].map((g) => colocadas(r, g))).toEqual([3, 3]);
   });
+
+  it("en el modal al 80% (1060×330) los botones no se vuelven barras: tope de ancho y celda más alta", () => {
+    const r = repartirGrupos({ ancho: 1060, alto: 330, opcionesPorGrupo: [5, 5, 5], altoCabecera: cabecera, altoExtra: 0 });
+    expect(r.paginas).toHaveLength(1);
+    expect(r.anchoCelda).toBeLessThanOrEqual(260);
+    expect(r.altoCelda).toBeGreaterThanOrEqual(60);
+  });
+
+  it("con pocas opciones y alto de sobra la celda crece, con tope", () => {
+    const r = repartirGrupos({ ancho: 1060, alto: 400, opcionesPorGrupo: [4], altoCabecera: cabecera, altoExtra: 0 });
+    expect(r.altoCelda).toBeGreaterThan(88);
+    expect(r.altoCelda).toBeLessThanOrEqual(128);
+    expect(r.anchoCelda).toBeLessThanOrEqual(260);
+  });
 });

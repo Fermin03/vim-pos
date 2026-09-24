@@ -42,11 +42,14 @@ const CELDA_CATALOGO: Medidas = {
 };
 
 /**
- * Celda de una OPCIÓN (un slot de combo, un modificador). Vive en un drawer de 480px, no en la
- * pantalla completa, y su contenido es más corto —"Bien cocido", "Queso cheddar +$15"—, así que
- * aguanta ser más baja que la del catálogo sin dejar de ser cómoda con el dedo.
+ * Celda de una OPCIÓN (un slot de combo, un modificador). Vive en un modal centrado al 80% de la
+ * pantalla, y su contenido es más corto —"Bien cocido", "Queso cheddar +$15"—.
+ *
+ * La ideal subió de 200×90 a 240×130 cuando el modal dejó de ser un drawer de 576px: con el
+ * espacio nuevo Fermín pidió las MISMAS opciones con botones más grandes, no más opciones por
+ * página. Una ideal mayor es justo eso: caben menos celdas cómodas, así que cada una crece.
  */
-export const CELDA_OPCION: Medidas = { minAncho: 96, minAlto: 60, idealAncho: 200, idealAlto: 90 };
+export const CELDA_OPCION: Medidas = { minAncho: 96, minAlto: 60, idealAncho: 240, idealAlto: 130 };
 
 export type Rejilla = {
   /** Columnas de la rejilla (capacidad, no cuántos productos hay). */
@@ -112,7 +115,13 @@ export function calcularRejilla({
 }
 
 /** Columnas que se prueban al repartir grupos de opciones, de la más cómoda a la más apretada. */
-const COLUMNAS_GRUPO = [2, 3, 4, 5];
+const COLUMNAS_GRUPO = [2, 3, 4, 5, 6, 7, 8];
+/**
+ * Ancho máximo de una celda de opción. En el drawer de 576px nunca se alcanzaba; en el modal al
+ * 80% de la pantalla, dos columnas darían botones de 500px —barras, no botones— con el alto sin
+ * usar. Con el tope, el ancho se reparte en más columnas y el alto sobrante hace crecer la celda.
+ */
+const ANCHO_OPCION_MAX = 260;
 /**
  * Separación entre celdas de opción (`gap-2`), más apretada que la del catálogo porque vive en
  * un drawer. Tiene que ser EL MISMO número que pinta el componente: calcular con 12 y dibujar
@@ -128,6 +137,8 @@ const GAP_OPCION = 8;
  */
 const ALTO_OPCION_IDEAL = 88;
 const ALTO_OPCION_MIN = 60;
+/** Hasta dónde crece la celda cuando sobra alto (modal grande, pocas opciones). */
+const ALTO_OPCION_MAX = 128;
 
 /** Un trozo de un grupo colocado en una página: `cantidad` opciones a partir de `desde`. */
 export type TrozoGrupo = { grupo: number; desde: number; cantidad: number };
@@ -176,7 +187,11 @@ export function repartirGrupos({
   const altoUtil = Math.max(altoCabecera + ALTO_OPCION_MIN + GAP_OPCION, alto - altoExtra);
   const anchoDe = (columnas: number) => Math.floor((ancho - GAP_OPCION * (columnas - 1)) / columnas);
   const usables = COLUMNAS_GRUPO.filter((c) => anchoDe(c) >= CELDA_OPCION.minAncho);
-  const columnasPosibles = usables.length > 0 ? usables : [1];
+  // Las que respetan el tope de ancho van primero; si ninguna lo respeta (un hueco enorme), se
+  // queda la más densa de las usables.
+  const acotadas = usables.filter((c) => anchoDe(c) <= ANCHO_OPCION_MAX);
+  const columnasPosibles =
+    acotadas.length > 0 ? acotadas : usables.length > 0 ? [usables[usables.length - 1]!] : [1];
 
   const altoDe = (opciones: number, columnas: number, altoCelda: number) =>
     altoCabecera + Math.max(1, Math.ceil(opciones / columnas)) * (altoCelda + GAP_OPCION);
@@ -184,11 +199,17 @@ export function repartirGrupos({
   // ¿Hay una combinación con la que TODO quepa de una vez? Es el caso normal.
   for (const columnas of columnasPosibles) {
     for (let altoCelda = ALTO_OPCION_IDEAL; altoCelda >= ALTO_OPCION_MIN; altoCelda -= 4) {
-      const total = opcionesPorGrupo.reduce((s, n) => s + altoDe(n, columnas, altoCelda), 0);
-      if (total <= altoUtil) {
+      const totalCon = (h: number) => opcionesPorGrupo.reduce((s, n) => s + altoDe(n, columnas, h), 0);
+      if (totalCon(altoCelda) <= altoUtil) {
+        // Cabe con la celda cómoda y todavía sobra alto: la celda crece hasta llenarlo, con tope.
+        // Es lo que agranda los botones en el modal ancho sin meter más opciones por página.
+        let alto = altoCelda;
+        if (alto === ALTO_OPCION_IDEAL) {
+          while (alto + 4 <= ALTO_OPCION_MAX && totalCon(alto + 4) <= altoUtil) alto += 4;
+        }
         return {
           columnas,
-          altoCelda,
+          altoCelda: alto,
           anchoCelda: Math.max(CELDA_OPCION.minAncho, anchoDe(columnas)),
           paginas: [opcionesPorGrupo.map((n, grupo) => ({ grupo, desde: 0, cantidad: n }))],
         };
