@@ -264,7 +264,7 @@ export function ModalCombo({ combo, token, linea, preset, onConfirmar, onCancela
               {slot.min === 0 && (
                 <div className="flex-shrink-0 px-5 pt-3">
                   <button type="button" onClick={() => { setComponentes((prev) => prev.filter((c) => c.grupoId !== slot.id)); avanzar(); }}
-                    className="flex h-[52px] w-full items-center justify-center rounded border border-line-strong text-[15px] font-semibold text-ink-2 transition hover:bg-hover">
+                    className="flex h-[52px] items-center justify-center rounded border border-line-strong px-6 text-[15px] font-semibold text-ink-2 transition hover:bg-hover">
                     Sin {slot.nombre.toLowerCase()}
                   </button>
                 </div>
@@ -352,12 +352,12 @@ export function ModalCombo({ combo, token, linea, preset, onConfirmar, onCancela
             </button>
             {enResumen ? (
               <button type="button" disabled={!todoValido} onClick={confirmar}
-                className="flex h-[52px] flex-1 items-center justify-between rounded-lg bg-accent px-4 text-[16px] font-bold text-white shadow-[0_1px_3px_rgb(var(--accent)/0.3)] transition hover:bg-accent-hover disabled:cursor-not-allowed disabled:bg-line-strong disabled:shadow-none">
+                className="ml-auto flex h-[52px] w-[min(340px,40%)] flex-shrink-0 items-center justify-between gap-2 rounded-lg bg-accent px-4 text-[16px] font-bold text-white shadow-[0_1px_3px_rgb(var(--accent)/0.3)] transition hover:bg-accent-hover active:scale-[.98] disabled:cursor-not-allowed disabled:bg-line-strong disabled:shadow-none">
                 <span>{linea ? "Guardar cambios" : "Agregar al ticket"}</span><span className="font-display tabular-nums">{fmtMxn(precio * cantidadEfectiva)}</span>
               </button>
             ) : (
               <button type="button" disabled={!slotValido(slot!, componentes)} onClick={avanzar}
-                className="flex h-[52px] flex-1 items-center justify-between rounded-lg bg-accent px-4 text-[16px] font-bold text-white shadow-[0_1px_3px_rgb(var(--accent)/0.3)] transition hover:bg-accent-hover disabled:cursor-not-allowed disabled:bg-line-strong disabled:shadow-none">
+                className="ml-auto flex h-[52px] w-[min(340px,40%)] flex-shrink-0 items-center justify-between gap-2 rounded-lg bg-accent px-4 text-[16px] font-bold text-white shadow-[0_1px_3px_rgb(var(--accent)/0.3)] transition hover:bg-accent-hover active:scale-[.98] disabled:cursor-not-allowed disabled:bg-line-strong disabled:shadow-none">
                 <span>{paso === slots.length - 1 ? "Revisar" : "Siguiente"}</span><span className="font-display tabular-nums">{fmtMxn(precio)}</span>
               </button>
             )}
