@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Button } from "@vim/ui/styles";
 import { PageBody, PageHeader } from "../../components/page-header";
 import {
@@ -8,10 +8,14 @@ import {
   clienteSchema,
   crearCliente,
   eliminarCliente,
-  listarClientesConResumen,
+  kpisClientes,
+  listarClientesPagina,
   type Cliente,
   type ClienteConResumen,
+  type FiltroCliente,
+  type KpisClientes,
 } from "../../lib/clientes";
+import { CLIENTES_POR_PAGINA, paginasTotales, textoRango } from "../../lib/clientes-paginacion";
 import { mensajeError } from "../../lib/errores";
 
 const input =
@@ -42,28 +46,56 @@ function fmtVisita(iso: string | null): string {
   return new Intl.DateTimeFormat("es-MX", { day: "2-digit", month: "short", year: "2-digit" }).format(new Date(iso));
 }
 
-type FiltroCliente = "TODOS" | "CON_RFC" | "RECURRENTES";
-
 export default function ClientesPage() {
   const [clientes, setClientes] = useState<ClienteConResumen[] | null>(null);
+  const [total, setTotal] = useState(0);
+  const [kpis, setKpis] = useState<KpisClientes | null>(null);
+  const [pagina, setPagina] = useState(1);
   const [busqueda, setBusqueda] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [okMsg, setOkMsg] = useState<string | null>(null);
   const [editando, setEditando] = useState<{ id: string | null; datos: typeof VACIO } | null>(null);
   const [guardando, setGuardando] = useState(false);
   const [filtro, setFiltro] = useState<FiltroCliente>("TODOS");
+  const [version, setVersion] = useState(0);
+  // Solo la respuesta de la ÚLTIMA consulta pinta la tabla: al teclear rápido, una búsqueda vieja
+  // que tarda más podía llegar después y dejar en pantalla resultados que ya no corresponden.
+  const ultimaConsulta = useRef(0);
 
-  async function recargar(b = busqueda) {
-    try {
-      setClientes(await listarClientesConResumen(b));
-    } catch (e) {
-      setError(mensajeError(e, "No se pudo cargar"));
-      setClientes([]);
-    }
-  }
+  // Cualquier cambio de búsqueda o filtro vuelve a la página 1: quedarse en la 4 de un filtro que
+  // ahora solo tiene una página enseñaría una tabla vacía.
   useEffect(() => {
-    recargar("");
-  }, []);
+    setPagina(1);
+  }, [busqueda, filtro]);
+
+  useEffect(() => {
+    const n = ++ultimaConsulta.current;
+    // La búsqueda espera a que se deje de teclear; la paginación y los filtros van directo.
+    const t = setTimeout(async () => {
+      try {
+        const { filas, total: t } = await listarClientesPagina({ busqueda, filtro, pagina });
+        if (n !== ultimaConsulta.current) return;
+        // Se borró el último cliente de la última página: retroceder en vez de enseñarla vacía.
+        if (filas.length === 0 && pagina > 1) { setPagina(paginasTotales(t, CLIENTES_POR_PAGINA)); return; }
+        setClientes(filas);
+        setTotal(t);
+      } catch (e) {
+        if (n !== ultimaConsulta.current) return;
+        setError(mensajeError(e, "No se pudo cargar"));
+        setClientes([]);
+        setTotal(0);
+      }
+    }, busqueda ? 250 : 0);
+    return () => clearTimeout(t);
+  }, [busqueda, filtro, pagina, version]);
+
+  useEffect(() => {
+    kpisClientes().then(setKpis).catch((e) => setError(mensajeError(e, "No se pudieron cargar los indicadores")));
+  }, [version]);
+
+  /** Vuelve a pedir la página actual y los indicadores (tras guardar, bloquear o eliminar). */
+  const recargar = () => setVersion((v) => v + 1);
+
 
   function nuevo() {
     setError(null);
@@ -127,21 +159,6 @@ export default function ClientesPage() {
     if (editando) setEditando({ ...editando, datos: { ...editando.datos, [k]: v } });
   }
 
-  const todos = clientes ?? [];
-  const conRfc = todos.filter((c) => (c.rfc ?? "").trim() !== "").length;
-  const recurrentes = todos.filter((c) => c.compras >= 3).length;
-  // Ticket promedio del negocio: gasto total entre compras totales. Solo cuenta a quien ya
-  // compró — promediar los ceros de clientes recién dados de alta lo hundiría sin razón.
-  const comprasTotales = todos.reduce((a, c) => a + c.compras, 0);
-  const gastoTotal = todos.reduce((a, c) => a + c.gastoTotal, 0);
-  const ticketPromedio = comprasTotales > 0 ? gastoTotal / comprasTotales : 0;
-
-  const visibles = todos.filter((c) => {
-    if (filtro === "CON_RFC") return (c.rfc ?? "").trim() !== "";
-    if (filtro === "RECURRENTES") return c.compras >= 3;
-    return true;
-  });
-
   return (
     <>
       <PageHeader
@@ -153,26 +170,26 @@ export default function ClientesPage() {
         {okMsg && <p className="mb-3 text-sm font-medium text-success">{okMsg}</p>}
         {error && !editando && <p className="mb-3 text-sm font-medium text-danger">{error}</p>}
 
-        {clientes !== null && clientes.length > 0 && (
+        {kpis !== null && kpis.total > 0 && (
           <div className="mb-5 grid grid-cols-2 gap-4 lg:grid-cols-4">
             <div className="rounded-lg border border-line bg-surface p-4">
               <div className="text-[11.5px] font-bold uppercase tracking-wide text-ink-3">Total clientes</div>
-              <div className="mt-1 font-display text-2xl font-bold tabular-nums">{clientes.length}</div>
+              <div className="mt-1 font-display text-2xl font-bold tabular-nums">{kpis.total}</div>
               <div className="text-[11.5px] text-ink-3">registrados</div>
             </div>
             <div className="rounded-lg border border-line bg-surface p-4">
               <div className="text-[11.5px] font-bold uppercase tracking-wide text-ink-3">Con factura</div>
-              <div className="mt-1 font-display text-2xl font-bold tabular-nums">{conRfc}</div>
+              <div className="mt-1 font-display text-2xl font-bold tabular-nums">{kpis.conRfc}</div>
               <div className="text-[11.5px] text-ink-3">tienen RFC capturado</div>
             </div>
             <div className="rounded-lg border border-line bg-surface p-4">
               <div className="text-[11.5px] font-bold uppercase tracking-wide text-ink-3">Recurrentes</div>
-              <div className="mt-1 font-display text-2xl font-bold tabular-nums">{recurrentes}</div>
+              <div className="mt-1 font-display text-2xl font-bold tabular-nums">{kpis.recurrentes}</div>
               <div className="text-[11.5px] text-ink-3">3+ compras</div>
             </div>
             <div className="rounded-lg border border-line bg-surface p-4">
               <div className="text-[11.5px] font-bold uppercase tracking-wide text-ink-3">Ticket promedio</div>
-              <div className="mt-1 font-display text-2xl font-bold tabular-nums">{fmt(ticketPromedio)}</div>
+              <div className="mt-1 font-display text-2xl font-bold tabular-nums">{fmt(kpis.ticketPromedio)}</div>
               <div className="text-[11.5px] text-ink-3">por visita</div>
             </div>
           </div>
@@ -199,21 +216,18 @@ export default function ClientesPage() {
             className="h-9 max-w-sm flex-1 rounded border border-line-strong px-3 text-[13px] outline-none focus:border-ink"
             value={busqueda}
             placeholder="Buscar por nombre, teléfono, RFC o correo…"
-            onChange={(e) => {
-              setBusqueda(e.target.value);
-              recargar(e.target.value);
-            }}
+            onChange={(e) => setBusqueda(e.target.value)}
           />
         </div>
 
         {clientes === null && <p className="text-sm text-ink-3">Cargando…</p>}
-        {clientes && clientes.length === 0 && !editando && (
+        {clientes && kpis?.total === 0 && !editando && (
           <div className="rounded-lg border border-line bg-surface p-8 text-center text-ink-3">
             <p className="text-[15px] font-semibold text-ink-2">{busqueda ? "Sin coincidencias" : "Sin clientes todavía"}</p>
             <p className="mt-1 text-[13px]">Agrega clientes para facturarles más rápido y llevar su historial.</p>
           </div>
         )}
-        {clientes && clientes.length > 0 && (
+        {clientes && kpis !== null && kpis.total > 0 && (
           <div className="tabla-caja overflow-hidden rounded-lg border border-line bg-surface">
             <table className="w-full text-[13.5px]">
               <thead>
@@ -227,7 +241,7 @@ export default function ClientesPage() {
                 </tr>
               </thead>
               <tbody>
-                {visibles.map((c) => (
+                {clientes.map((c) => (
                   <tr key={c.id} className="border-b border-line last:border-b-0">
                     <td className="px-4 py-2.5">
                       <div className="font-medium">
@@ -253,7 +267,7 @@ export default function ClientesPage() {
                     </td>
                   </tr>
                 ))}
-                {visibles.length === 0 && (
+                {clientes.length === 0 && (
                   <tr>
                     <td colSpan={6} className="px-4 py-10 text-center">
                       <p className="text-[14px] font-semibold text-ink-2">Sin resultados</p>
@@ -263,8 +277,27 @@ export default function ClientesPage() {
                 )}
               </tbody>
             </table>
-            <div className="border-t border-line px-4 py-3 text-[12.5px] text-ink-3">
-              Mostrando <b className="text-ink-2">{visibles.length}</b> de <b className="text-ink-2">{todos.length}</b> clientes
+            <div className="flex flex-wrap items-center justify-between gap-3 border-t border-line px-4 py-3 text-[12.5px] text-ink-3">
+              <span>
+                Mostrando <b className="tabular-nums text-ink-2">{textoRango(pagina, CLIENTES_POR_PAGINA, total)}</b> clientes
+              </span>
+              {paginasTotales(total, CLIENTES_POR_PAGINA) > 1 && (
+                <div className="flex items-center gap-2">
+                  <Button variant="ghost" onClick={() => setPagina((p) => p - 1)} disabled={pagina <= 1}>
+                    Anterior
+                  </Button>
+                  <span className="tabular-nums">
+                    Página {pagina} de {paginasTotales(total, CLIENTES_POR_PAGINA)}
+                  </span>
+                  <Button
+                    variant="ghost"
+                    onClick={() => setPagina((p) => p + 1)}
+                    disabled={pagina >= paginasTotales(total, CLIENTES_POR_PAGINA)}
+                  >
+                    Siguiente
+                  </Button>
+                </div>
+              )}
             </div>
           </div>
         )}
