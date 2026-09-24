@@ -86,8 +86,9 @@ export function SidebarTicket({
   onCancelarItemPersistido?: (clientId: string) => void;
   /** Cuando el ticket está persistido, "%" abre el descuento/override por ítem (F6.5). */
   onDescuentoItem?: (clientId: string) => void;
-  /** Reabre el modal de combo en el resumen para una línea de combo ya elegida. Ausente en modo
-   *  cuenta de mesa: una línea persistida se cambia cancelando el combo y capturándolo de nuevo. */
+  /** Tocar un renglón lo reabre en su modal: el de combo (en el resumen) o el de modificadores.
+   *  Ausente en modo cuenta de mesa: ahí las líneas ya están guardadas en la cuenta, y una línea
+   *  enviada a cocina ya no se modifica. */
   onEditar?: (clientId: string) => void;
   /** Limpia el carrito local (sin BD). Habilitado cuando no hay ticket persistido y hay líneas. */
   onLimpiar?: () => void;
@@ -151,6 +152,7 @@ export function SidebarTicket({
    * pregunta cuánto cuesta algo en cualquiera de los cuatro modos.
    */
   const seCobraDespues = onEnviarCocinaAbierto != null;
+  const editable = onEditar != null && !bloqueado && !procesando;
 
   // Ancho del carrito: era fijo en 404px, y en una caja de 1024px se comía el 40% de la pantalla
   // dejando el catálogo apretado. Ahora escala con topes: nunca menos de 288px —por debajo no cabe
@@ -269,19 +271,36 @@ export function SidebarTicket({
                 key={l.clientId}
                 className="-ml-1 cursor-pointer border-b border-line border-l-4 border-l-transparent py-3 pl-3 transition-colors hover:bg-sel"
               >
-                <RenglonItem
-                  cantidad={l.cantidad}
-                  nombre={l.producto.nombre}
-                  modificadores={l.modificadores.map((m) => m.opcionNombre)}
-                  notaCocina={l.notaCocina}
-                  totalMxn={totalLinea(l)}
-                  hijos={l.combo?.componentes.map((c) => ({
-                    slot: c.grupoNombre,
-                    nombre: c.producto.nombre,
-                    detalle: c.modificadores.length ? c.modificadores.map((m) => m.opcionNombre).join(" · ") : null,
-                    extraMxn: c.modificadores.reduce((s, m) => s + m.precioExtra * m.cantidad, 0) * c.cantidad,
-                  }))}
-                />
+                {/* Tocar el renglón lo reabre en su modal de modificadores o de combo. Quien llama
+                    decide si hay algo que editar: un producto sin modificadores no abre nada. */}
+                <div
+                  role={editable ? "button" : undefined}
+                  tabIndex={editable ? 0 : undefined}
+                  aria-label={editable ? `Editar ${l.producto.nombre}` : undefined}
+                  onClick={editable ? () => onEditar!(l.clientId) : undefined}
+                  onKeyDown={
+                    editable
+                      ? (e) => {
+                          if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onEditar!(l.clientId); }
+                        }
+                      : undefined
+                  }
+                  className={editable ? "rounded outline-none transition-transform focus-visible:ring-2 focus-visible:ring-ink active:scale-[.99]" : undefined}
+                >
+                  <RenglonItem
+                    cantidad={l.cantidad}
+                    nombre={l.producto.nombre}
+                    modificadores={l.modificadores.map((m) => m.opcionNombre)}
+                    notaCocina={l.notaCocina}
+                    totalMxn={totalLinea(l)}
+                    hijos={l.combo?.componentes.map((c) => ({
+                      slot: c.grupoNombre,
+                      nombre: c.producto.nombre,
+                      detalle: c.modificadores.length ? c.modificadores.map((m) => m.opcionNombre).join(" · ") : null,
+                      extraMxn: c.modificadores.reduce((s, m) => s + m.precioExtra * m.cantidad, 0) * c.cantidad,
+                    }))}
+                  />
+                </div>
 
                 {/* Controles: stepper + Quitar */}
                 <div className="mt-2 flex items-center gap-3 pl-10">
@@ -325,16 +344,6 @@ export function SidebarTicket({
                       className={["rounded px-2 py-[5px] text-[13px] font-semibold transition-all hover:bg-hover", l.notaCocina ? "text-[#9A6B12]" : "text-ink-3 hover:text-ink"].join(" ")}
                     >
                       Nota
-                    </button>
-                  )}
-                  {l.combo && onEditar && (
-                    <button
-                      type="button"
-                      disabled={bloqueado}
-                      onClick={() => onEditar(l.clientId)}
-                      className="rounded px-2 py-[5px] text-[13px] font-semibold text-ink-3 transition-all hover:bg-hover hover:text-ink disabled:opacity-40"
-                    >
-                      Editar
                     </button>
                   )}
                   <button

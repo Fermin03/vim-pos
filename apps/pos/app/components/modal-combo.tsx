@@ -3,7 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 import type { Producto } from "../lib/catalogo";
 import type { ComboDef, ComponenteSel, SlotCombo } from "../lib/combos";
 import { componentesPorDefecto, deltaDe, nuevoClientIdComponente, precioCombo, slotValido } from "../lib/combos";
-import type { LineaCarrito, ModificadorSel } from "../lib/carrito";
+import type { AlcanceEdicion, LineaCarrito, ModificadorSel } from "../lib/carrito";
 import { nuevoClientId } from "../lib/carrito";
 import { obtenerGruposDeProducto, type GrupoModificadores } from "../lib/modificadores";
 import { CELDA_OPCION, calcularRejilla, clampPagina, tamanoOpcion } from "../lib/rejilla";
@@ -13,7 +13,7 @@ import { ModalModificadores } from "./modal-modificadores";
 import { Paginador } from "./paginador";
 
 /**
- * Drawer de armado de combo: un slot por paso (spec §6.2, validado en el prototipo). En un slot
+ * Modal de armado de combo (centrado, al 80% de la pantalla, igual que el de modificadores): un slot por paso (spec §6.2, validado en el prototipo). En un slot
  * `max = 1` tocar una tarjeta selecciona Y avanza — no hay "Siguiente" que buscar. Si el producto
  * elegido trae un grupo obligatorio (p. ej. término de la hamburguesa), `ModalModificadores` se
  * abre encima del paso y al confirmar avanza una sola vez. El último paso es el resumen, con
@@ -39,7 +39,8 @@ type Props = {
    * `modal-agregar-productos.tsx` no pasa `preset`, así que el campo opcional no la afecta.
    */
   preset?: { producto: Producto; modificadores: ModificadorSel[]; notaCocina?: string | null } | null;
-  onConfirmar: (linea: LineaCarrito) => void;
+  /** `alcance` solo importa al editar un renglón de más de una unidad (ver `aplicarEdicion`). */
+  onConfirmar: (linea: LineaCarrito, alcance: AlcanceEdicion) => void;
   onCancelar: () => void;
 };
 
@@ -75,6 +76,10 @@ export function ModalCombo({ combo, token, linea, preset, onConfirmar, onCancela
   const [nota, setNota] = useState<string>(linea?.notaCocina ?? "");
   const [personalizando, setPersonalizando] = useState<{ comp: ComponenteSel; grupos: GrupoModificadores[]; avanzar: boolean } | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // Editar un renglón de varias unidades: por omisión el cambio se lleva UNA, separada.
+  const preguntaAlcance = (linea?.cantidad ?? 1) > 1;
+  const [alcance, setAlcance] = useState<AlcanceEdicion>("una");
+  const cantidadEfectiva = preguntaAlcance && alcance === "una" ? 1 : cantidad;
 
   const enResumen = paso >= slots.length;
   const slot: SlotCombo | null = enResumen ? null : (slots[paso] ?? null);
@@ -165,16 +170,16 @@ export function ModalCombo({ combo, token, linea, preset, onConfirmar, onCancela
 
   function confirmar() {
     const base: LineaCarrito = linea
-      ? { ...linea, cantidad, notaCocina: nota.trim() || null, combo: { def: combo, componentes, precioUnitario: precioBase } }
+      ? { ...linea, cantidad: cantidadEfectiva, notaCocina: nota.trim() || null, combo: { def: combo, componentes, precioUnitario: precioBase } }
       : { clientId: nuevoClientId(), producto: combo.producto, cantidad, modificadores: [], notaCocina: nota.trim() || null, combo: { def: combo, componentes, precioUnitario: precioBase } };
-    onConfirmar(base);
+    onConfirmar(base, preguntaAlcance ? alcance : "todas");
   }
 
   const importeDe = (s: SlotCombo, o: { producto: Producto; delta: number }) => (s.modo === "SUMA_PRECIO_PRODUCTO" ? o.producto.precio_base_mxn : 0) + o.delta;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-end bg-ink/[0.34]" role="dialog" aria-modal="true" onClick={(e) => { if (e.target === e.currentTarget) onCancelar(); }}>
-      <aside className="flex h-full w-full max-w-[576px] flex-col border-l border-line-strong bg-surface shadow-[-14px_0_40px_rgba(22,22,26,.12)]" onClick={(e) => e.stopPropagation()}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/[0.34]" role="dialog" aria-modal="true" aria-label={combo.producto.nombre} onClick={(e) => { if (e.target === e.currentTarget) onCancelar(); }}>
+      <aside className="flex h-[80vh] w-[80vw] flex-col overflow-hidden rounded-lg border border-line-strong bg-surface shadow-[0_24px_60px_rgba(22,22,26,.18)]" onClick={(e) => e.stopPropagation()}>
         {/* Cabecera: nombre, paso, precio en vivo, barra de pasos */}
         <div className="flex-shrink-0 border-b border-line px-5 pb-3 pt-4">
           <div className="flex items-start justify-between gap-4">
@@ -184,7 +189,7 @@ export function ModalCombo({ combo, token, linea, preset, onConfirmar, onCancela
             </div>
             <div className="flex-shrink-0 text-right">
               <small className="mb-[-2px] block text-[11px] font-semibold uppercase tracking-[0.04em] text-ink-3">{enResumen ? "Total" : "Precio"}</small>
-              <span className="font-display text-[21px] font-bold tabular-nums text-ink">{fmtMxn(enResumen ? precio * cantidad : precio)}</span>
+              <span className="font-display text-[21px] font-bold tabular-nums text-ink">{fmtMxn(enResumen ? precio * cantidadEfectiva : precio)}</span>
             </div>
           </div>
           <div className="mt-3 flex gap-1.5">
@@ -259,7 +264,7 @@ export function ModalCombo({ combo, token, linea, preset, onConfirmar, onCancela
               {slot.min === 0 && (
                 <div className="flex-shrink-0 px-5 pt-3">
                   <button type="button" onClick={() => { setComponentes((prev) => prev.filter((c) => c.grupoId !== slot.id)); avanzar(); }}
-                    className="flex h-[52px] w-full items-center justify-center rounded border border-line-strong text-[15px] font-semibold text-ink-2 transition hover:bg-hover">
+                    className="flex h-[52px] items-center justify-center rounded border border-line-strong px-6 text-[15px] font-semibold text-ink-2 transition hover:bg-hover">
                     Sin {slot.nombre.toLowerCase()}
                   </button>
                 </div>
@@ -304,6 +309,23 @@ export function ModalCombo({ combo, token, linea, preset, onConfirmar, onCancela
                   <span className="font-display text-[14px] font-semibold tabular-nums text-ink-2">{fmtMxn(combo.producto.precio_base_mxn)}</span>
                 </div>
               </div>
+              {preguntaAlcance && (
+                <div className="mt-5 flex items-center justify-between gap-3">
+                  <b className="text-[14.5px] font-bold">Cambiar</b>
+                  <span className="flex items-center gap-2">
+                    <span className="text-[12.5px] font-medium text-ink-3">{alcance === "una" ? "se separa en su propio renglón" : "cambia el renglón entero"}</span>
+                    <span role="radiogroup" aria-label="A cuántos combos aplicar el cambio" className="inline-flex overflow-hidden rounded border border-line-strong">
+                      {([["una", "Solo 1"], ["todas", `Los ${linea!.cantidad}`]] as const).map(([valor, etiqueta]) => (
+                        <button key={valor} type="button" role="radio" aria-checked={alcance === valor} onClick={() => setAlcance(valor)}
+                          className={["h-11 px-4 text-[14px] font-semibold transition-colors", alcance === valor ? "bg-ink text-white" : "bg-surface text-ink-2 hover:bg-hover"].join(" ")}>
+                          {etiqueta}
+                        </button>
+                      ))}
+                    </span>
+                  </span>
+                </div>
+              )}
+              {!(preguntaAlcance && alcance === "una") && (
               <div className="mt-5 flex items-center justify-between">
                 <b className="text-[14.5px] font-bold">Cantidad</b>
                 <span className="inline-flex items-center overflow-hidden rounded border border-line-strong">
@@ -312,6 +334,7 @@ export function ModalCombo({ combo, token, linea, preset, onConfirmar, onCancela
                   <button type="button" aria-label="Más" onClick={() => setCantidad((n) => n + 1)} className="flex h-11 w-11 items-center justify-center text-[19px] text-ink-2 hover:bg-hover">+</button>
                 </span>
               </div>
+              )}
               <div className="mt-5">
                 <label className="mb-2.5 block text-[14.5px] font-bold text-ink">Nota para cocina <span className="text-[12px] font-medium text-ink-3">(opcional, para todo el combo)</span></label>
                 <textarea value={nota} onChange={(e) => setNota(e.target.value)} rows={2} placeholder="Ej. todo para llevar, sin servilletas"
@@ -329,12 +352,12 @@ export function ModalCombo({ combo, token, linea, preset, onConfirmar, onCancela
             </button>
             {enResumen ? (
               <button type="button" disabled={!todoValido} onClick={confirmar}
-                className="flex h-[52px] flex-1 items-center justify-between rounded-lg bg-accent px-4 text-[16px] font-bold text-white shadow-[0_1px_3px_rgb(var(--accent)/0.3)] transition hover:bg-accent-hover disabled:cursor-not-allowed disabled:bg-line-strong disabled:shadow-none">
-                <span>{linea ? "Guardar cambios" : "Agregar al ticket"}</span><span className="font-display tabular-nums">{fmtMxn(precio * cantidad)}</span>
+                className="ml-auto flex h-[52px] w-[min(340px,40%)] flex-shrink-0 items-center justify-between gap-2 rounded-lg bg-accent px-4 text-[16px] font-bold text-white shadow-[0_1px_3px_rgb(var(--accent)/0.3)] transition hover:bg-accent-hover active:scale-[.98] disabled:cursor-not-allowed disabled:bg-line-strong disabled:shadow-none">
+                <span>{linea ? "Guardar cambios" : "Agregar al ticket"}</span><span className="font-display tabular-nums">{fmtMxn(precio * cantidadEfectiva)}</span>
               </button>
             ) : (
               <button type="button" disabled={!slotValido(slot!, componentes)} onClick={avanzar}
-                className="flex h-[52px] flex-1 items-center justify-between rounded-lg bg-accent px-4 text-[16px] font-bold text-white shadow-[0_1px_3px_rgb(var(--accent)/0.3)] transition hover:bg-accent-hover disabled:cursor-not-allowed disabled:bg-line-strong disabled:shadow-none">
+                className="ml-auto flex h-[52px] w-[min(340px,40%)] flex-shrink-0 items-center justify-between gap-2 rounded-lg bg-accent px-4 text-[16px] font-bold text-white shadow-[0_1px_3px_rgb(var(--accent)/0.3)] transition hover:bg-accent-hover active:scale-[.98] disabled:cursor-not-allowed disabled:bg-line-strong disabled:shadow-none">
                 <span>{paso === slots.length - 1 ? "Revisar" : "Siguiente"}</span><span className="font-display tabular-nums">{fmtMxn(precio)}</span>
               </button>
             )}
@@ -346,6 +369,11 @@ export function ModalCombo({ combo, token, linea, preset, onConfirmar, onCancela
         <ModalModificadores
           producto={personalizando.comp.producto}
           grupos={personalizando.grupos}
+          // Reabierto desde "Personalizar": arranca con lo que el componente ya tenía. Antes
+          // arrancaba de cero y al confirmar se perdían los modificadores ya elegidos.
+          inicial={personalizando.avanzar ? null : { modificadores: personalizando.comp.modificadores, nota: null }}
+          // La nota del componente no viaja: la nota va en el combo entero (resumen).
+          sinNota
           onConfirmar={(mods) => {
             const comp = personalizando.comp;
             setComponentes((prev) => prev.map((c) => (c.clientId === comp.clientId ? { ...c, modificadores: mods } : c)));

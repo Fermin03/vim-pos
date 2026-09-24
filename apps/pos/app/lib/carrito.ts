@@ -63,6 +63,7 @@ export const estadoInicial: EstadoCarrito = { modoServicio: "COMER_AQUI", lineas
 export type AccionCarrito =
   | { tipo: "agregar"; linea: LineaCarrito }
   | { tipo: "reemplazar"; linea: LineaCarrito }
+  | { tipo: "editar"; clientId: string; editada: LineaCarrito; alcance: AlcanceEdicion }
   | { tipo: "cantidad"; clientId: string; cantidad: number }
   | { tipo: "quitar"; clientId: string }
   | { tipo: "modo"; modo: ModoServicio }
@@ -82,6 +83,8 @@ export function reducerCarrito(estado: EstadoCarrito, accion: AccionCarrito): Es
     case "reemplazar":
       // Sustituye la línea EN SU LUGAR (edición de combo desde el ticket): no se debe reordenar.
       return { ...estado, lineas: estado.lineas.map((l) => (l.clientId === accion.linea.clientId ? accion.linea : l)) };
+    case "editar":
+      return { ...estado, lineas: aplicarEdicion(estado.lineas, accion.clientId, accion.editada, accion.alcance) };
     case "cargar":
       // T2 — reemplaza el carrito completo (reconstrucción desde un ticket persistido de mesa).
       return accion.estado;
@@ -121,6 +124,56 @@ export function reducerCarrito(estado: EstadoCarrito, accion: AccionCarrito): Es
     default:
       return estado;
   }
+}
+
+/**
+ * A qué unidades de un renglón se aplica una edición. Solo importa si el renglón trae más de una:
+ * con "3× Hamburguesa", `una` separa una unidad con el cambio y deja las otras dos como estaban;
+ * `todas` cambia el renglón entero.
+ */
+export type AlcanceEdicion = "una" | "todas";
+
+/** ¿La edición deja la línea igual? Entonces no hay nada que separar ni que reemplazar. */
+function mismaLinea(a: LineaCarrito, b: LineaCarrito): boolean {
+  const mods = (l: LineaCarrito) => l.modificadores.map((m) => `${m.opcionId}:${m.cantidad}`).sort().join("|");
+  const combo = (l: LineaCarrito) =>
+    l.combo
+      ? l.combo.componentes
+          .map((c) => `${c.grupoId}:${c.producto.id}:${c.cantidad}:${c.modificadores.map((m) => m.opcionId).sort().join(",")}:${c.notaCocina ?? ""}`)
+          .sort()
+          .join("|")
+      : "";
+  return mods(a) === mods(b) && (a.notaCocina ?? "") === (b.notaCocina ?? "") && combo(a) === combo(b);
+}
+
+/**
+ * Aplica la edición de un renglón ya capturado (se reabrió su modal de modificadores o de combo).
+ *
+ * - `todas` (o un renglón de una sola unidad): la línea se sustituye EN SU LUGAR, conservando su
+ *   `clientId`. La cantidad es la que traiga `editada` —el modal de combo deja cambiarla—.
+ * - `una` con cantidad > 1: la original baja una unidad y la editada entra justo debajo como
+ *   renglón nuevo de una unidad, para que el cajero la vea junto a la que salió.
+ *
+ * Si la edición no cambió nada, las líneas se devuelven tal cual: separar "3×" en "2× + 1×"
+ * idénticos solo ensucia el ticket.
+ */
+export function aplicarEdicion(
+  lineas: LineaCarrito[],
+  clientId: string,
+  editada: LineaCarrito,
+  alcance: AlcanceEdicion,
+): LineaCarrito[] {
+  const i = lineas.findIndex((l) => l.clientId === clientId);
+  if (i < 0) return lineas;
+  const original = lineas[i]!;
+  const separa = alcance === "una" && original.cantidad > 1;
+  if (separa) {
+    if (mismaLinea(original, editada)) return lineas;
+    const nueva: LineaCarrito = { ...editada, clientId: nuevoClientId(), cantidad: 1 };
+    return [...lineas.slice(0, i), { ...original, cantidad: original.cantidad - 1 }, nueva, ...lineas.slice(i + 1)];
+  }
+  if (mismaLinea(original, editada) && original.cantidad === editada.cantidad) return lineas;
+  return lineas.map((l, j) => (j === i ? { ...editada, clientId: original.clientId } : l));
 }
 
 const r2 = (n: number): number => Math.round(n * 100) / 100;

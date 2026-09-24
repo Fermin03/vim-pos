@@ -1,6 +1,6 @@
 import type { ClienteDomicilio } from "../clientes-domicilio";
 import { describe, it, expect } from "vitest";
-import { reducerCarrito, estadoInicial, precioUnitarioLinea, totalLinea, calcularTotalesDisplay, clienteIdParaTicket, admiteClienteCuenta, type LineaCarrito } from "../carrito";
+import { reducerCarrito, estadoInicial, precioUnitarioLinea, totalLinea, calcularTotalesDisplay, clienteIdParaTicket, admiteClienteCuenta, aplicarEdicion, type LineaCarrito } from "../carrito";
 import type { Producto } from "../catalogo";
 import type { ComboDef } from "../combos";
 
@@ -117,5 +117,64 @@ describe("cliente asignado a la cuenta (comedor, para llevar, pick-up)", () => {
     expect(clienteIdParaTicket({ ...estadoInicial, modoServicio: "COMER_AQUI", clienteCuenta: ana })).toBe("c-ana");
     const dom = { clienteId: "c-dom" } as ClienteDomicilio;
     expect(clienteIdParaTicket({ ...estadoInicial, modoServicio: "DELIVERY_PROPIO", clienteDomicilio: dom, clienteCuenta: ana })).toBe("c-dom");
+  });
+});
+
+describe("editar un renglón ya capturado", () => {
+  const queso = { opcionId: "q", grupoNombre: "Extras", opcionNombre: "Queso", precioExtra: 15, cantidad: 1 };
+  const cebolla = { opcionId: "c", grupoNombre: "Sin", opcionNombre: "Sin cebolla", precioExtra: 0, cantidad: 1 };
+  const burger = (cantidad: number): LineaCarrito => ({ clientId: "b", producto: prod("p1", "Hamburguesa", 100), cantidad, modificadores: [queso], notaCocina: null });
+  const otra: LineaCarrito = { clientId: "z", producto: prod("p2", "Refresco", 30), cantidad: 1, modificadores: [], notaCocina: null };
+
+  it("de una sola unidad: sustituye en su lugar y conserva el clientId", () => {
+    const r = aplicarEdicion([burger(1), otra], "b", { ...burger(1), modificadores: [cebolla] }, "una");
+    expect(r).toHaveLength(2);
+    expect(r[0]!.clientId).toBe("b");
+    expect(r[0]!.modificadores).toEqual([cebolla]);
+    expect(r[1]).toBe(otra);
+  });
+
+  it("'una' con 3 unidades: separa una debajo y deja 2 como estaban", () => {
+    const r = aplicarEdicion([burger(3), otra], "b", { ...burger(3), modificadores: [queso, cebolla] }, "una");
+    expect(r.map((l) => l.cantidad)).toEqual([2, 1, 1]);
+    expect(r[0]!.modificadores).toEqual([queso]);
+    expect(r[1]!.modificadores).toEqual([queso, cebolla]);
+    expect(r[1]!.clientId).not.toBe("b");
+    expect(r[2]).toBe(otra);
+  });
+
+  it("'todas' con 3 unidades: cambia el renglón entero sin separar", () => {
+    const r = aplicarEdicion([burger(3)], "b", { ...burger(3), modificadores: [] }, "todas");
+    expect(r).toHaveLength(1);
+    expect(r[0]!.cantidad).toBe(3);
+    expect(r[0]!.modificadores).toEqual([]);
+  });
+
+  it("sin cambios no separa: 3× no se vuelve 2× + 1× idénticos", () => {
+    const lineas = [burger(3)];
+    expect(aplicarEdicion(lineas, "b", { ...burger(3), modificadores: [queso] }, "una")).toBe(lineas);
+  });
+
+  it("la nota también cuenta como cambio", () => {
+    const r = aplicarEdicion([burger(2)], "b", { ...burger(2), notaCocina: "bien dorada" }, "una");
+    expect(r.map((l) => [l.cantidad, l.notaCocina])).toEqual([[1, null], [1, "bien dorada"]]);
+  });
+
+  it("un combo de 2 separado conserva el precio congelado en ambos renglones", () => {
+    const editada: LineaCarrito = { ...lineaCombo, combo: { ...lineaCombo.combo!, componentes: [lineaCombo.combo!.componentes[0]!] } };
+    const r = aplicarEdicion([lineaCombo], "l1", editada, "una");
+    expect(r.map((l) => l.cantidad)).toEqual([1, 1]);
+    expect(r[1]!.combo!.componentes).toHaveLength(1);
+    expect(r[1]!.combo!.precioUnitario).toBe(175);
+  });
+
+  it("por el reducer: la acción 'editar' aplica la misma regla", () => {
+    const e = reducerCarrito({ ...estadoInicial, lineas: [burger(2)] }, { tipo: "editar", clientId: "b", editada: { ...burger(2), modificadores: [] }, alcance: "una" });
+    expect(e.lineas.map((l) => l.cantidad)).toEqual([1, 1]);
+  });
+
+  it("un clientId que ya no existe no toca nada", () => {
+    const lineas = [otra];
+    expect(aplicarEdicion(lineas, "nada", burger(1), "todas")).toBe(lineas);
   });
 });

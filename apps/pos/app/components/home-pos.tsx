@@ -21,6 +21,7 @@ import {
   type LineaCarrito,
   type ModificadorSel,
   type EnvioCarrito,
+  type AlcanceEdicion,
 } from "../lib/carrito";
 import { listarCombos, combosQueAdmiten, diferencialCombo, type ComboDef } from "../lib/combos";
 import { obtenerGruposDeProducto, type GrupoModificadores } from "../lib/modificadores";
@@ -196,7 +197,8 @@ export function HomePos({
   const [productos, setProductos] = useState<Producto[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [carrito, dispatch] = useReducer(reducerCarrito, estadoInicial);
-  const [modGrupos, setModGrupos] = useState<{ producto: Producto; grupos: GrupoModificadores[] } | null>(null);
+  // `edicion`: el renglón del ticket que se reabrió para cambiarle los modificadores.
+  const [modGrupos, setModGrupos] = useState<{ producto: Producto; grupos: GrupoModificadores[]; edicion?: LineaCarrito } | null>(null);
   // ADR 0015 — combos: catálogo de defs con slots resueltos, y el drawer de armado abierto (si hay).
   const [combos, setCombos] = useState<ComboDef[]>([]);
   const [comboAbierto, setComboAbierto] = useState<{ combo: ComboDef; linea?: LineaCarrito | null; preset?: { producto: Producto; modificadores: ModificadorSel[]; notaCocina?: string | null } | null } | null>(null);
@@ -544,10 +546,16 @@ export function HomePos({
   );
 
   const confirmarModificadores = useCallback(
-    async (mods: ModificadorSel[], nota: string | null) => {
+    async (mods: ModificadorSel[], nota: string | null, alcance: AlcanceEdicion) => {
       if (!modGrupos) return;
       const prod = modGrupos.producto;
+      const edicion = modGrupos.edicion;
       setModGrupos(null);
+      if (edicion) {
+        // Edición de un renglón ya capturado: no se ofrece combo, solo se cambia (o se separa).
+        dispatch({ tipo: "editar", clientId: edicion.clientId, editada: { ...edicion, modificadores: mods, notaCocina: nota }, alcance });
+        return;
+      }
       try {
         await ofrecerCombo(prod, mods, nota);
       } catch (e) {
@@ -558,16 +566,34 @@ export function HomePos({
   );
 
   /** Confirmación del drawer de combo: agrega (o reemplaza, si venía de "Editar") la línea. */
-  const confirmarCombo = useCallback(async (linea: LineaCarrito) => {
-    const editando = !!comboAbierto?.linea;
+  const confirmarCombo = useCallback(async (linea: LineaCarrito, alcance: AlcanceEdicion) => {
+    const original = comboAbierto?.linea ?? null;
     setComboAbierto(null);
     if (ticketBd) {
       try { await agregarComboAlTicket(token, { ticketId: ticketBd.ticketId, linea }); await recargarCuenta(); }
       catch (e) { setError(e instanceof Error ? e.message : "No se pudo agregar el combo"); }
       return;
     }
-    dispatch({ tipo: editando ? "reemplazar" : "agregar", linea });
+    if (original) dispatch({ tipo: "editar", clientId: original.clientId, editada: linea, alcance });
+    else dispatch({ tipo: "agregar", linea });
   }, [comboAbierto, ticketBd, token, recargarCuenta]);
+
+  /**
+   * Tocar un renglón del ticket lo reabre: el combo en su resumen, un producto en su modal de
+   * modificadores con lo que ya tenía marcado. Un producto sin modificadores no abre nada (no hay
+   * qué cambiarle). Solo aplica al carrito suelto: en cuenta de mesa las líneas ya están guardadas.
+   */
+  const editarLinea = useCallback(async (clientId: string) => {
+    const l = carrito.lineas.find((x) => x.clientId === clientId);
+    if (!l) return;
+    if (l.combo) { setComboAbierto({ combo: l.combo.def, linea: l }); return; }
+    try {
+      const grupos = await obtenerGruposDeProducto(token, l.producto.id);
+      if (grupos.length > 0) setModGrupos({ producto: l.producto, grupos, edicion: l });
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Error al cargar modificadores");
+    }
+  }, [carrito.lineas, token]);
 
   /** Entra en modo cuenta de mesa: carga el ticket persistido al carrito para seguir editando. */
   const entrarCuenta = useCallback(async (ticketId: string, origen: Origen = "inicio") => {
@@ -1927,12 +1953,9 @@ export function HomePos({
           onNotaLinea={(id, nota) => dispatch({ tipo: "nota_linea", clientId: id, nota })}
           onNotaOrden={(nota) => dispatch({ tipo: "nota_orden", nota })}
           onCobrar={iniciarCobro}
-          // En cuenta de mesa no se ofrece Editar: una línea persistida se cambia cancelando
-          // el combo y capturándolo de nuevo (igual que hoy con los modificadores).
-          onEditar={ticketBd ? undefined : (id) => {
-            const l = carrito.lineas.find((x) => x.clientId === id);
-            if (l?.combo) setComboAbierto({ combo: l.combo.def, linea: l });
-          }}
+          // En cuenta de mesa no se edita tocando el renglón: la línea ya está guardada en la
+          // cuenta y se cambia cancelándola y capturándola de nuevo.
+          onEditar={ticketBd ? undefined : (id) => void editarLinea(id)}
           onPonerEnEspera={online ? () => { setEsperaError(null); setEsperaPidiendoEtiqueta(true); } : undefined}
           // Comedor va por la MISMA rama que Pick-up y domicilio: su cuenta también queda
           // abierta y se cobra después desde la lista. Antes entraba por la otra, que pinta
@@ -1974,6 +1997,8 @@ export function HomePos({
         <ModalModificadores
           producto={modGrupos.producto}
           grupos={modGrupos.grupos}
+          inicial={modGrupos.edicion ? { modificadores: modGrupos.edicion.modificadores, nota: modGrupos.edicion.notaCocina } : null}
+          cantidadLinea={modGrupos.edicion?.cantidad ?? 1}
           onConfirmar={confirmarModificadores}
           onCancelar={() => setModGrupos(null)}
         />
