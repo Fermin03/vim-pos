@@ -2,6 +2,7 @@
 import type { Producto } from "./catalogo";
 import type { GrupoModificadores, OpcionModificador } from "./modificadores";
 import type { ClienteDomicilio } from "./clientes-domicilio";
+import type { ClienteCuenta } from "./clientes-cuenta";
 import type { ComboDef, ComponenteSel } from "./combos";
 
 export type ModoServicio = "COMER_AQUI" | "PARA_LLEVAR" | "DRIVE_THRU" | "DELIVERY_PROPIO";
@@ -38,9 +39,26 @@ export type EstadoCarrito = {
   nombreCuenta?: string | null;
   /** Zona de reparto y su cargo. Solo DELIVERY_PROPIO. */
   envio?: EnvioCarrito | null;
+  /**
+   * Cliente registrado de la cuenta en Comedor, Para llevar o Pick-up. Opcional: sin él la venta
+   * queda igual que siempre. Domicilio NO lo usa: tiene su propio cliente con dirección
+   * (`clienteDomicilio`). No confundir con `nombreCuenta`, que es un nombre suelto sin registro.
+   */
+  clienteCuenta?: ClienteCuenta | null;
 };
 
-export const estadoInicial: EstadoCarrito = { modoServicio: "COMER_AQUI", lineas: [], clienteDomicilio: null, notaOrden: null, nombreCuenta: null, envio: null };
+/** Los modos donde se puede asignar un cliente a la cuenta (domicilio va aparte). */
+export function admiteClienteCuenta(modo: ModoServicio): boolean {
+  return modo === "COMER_AQUI" || modo === "PARA_LLEVAR" || modo === "DRIVE_THRU";
+}
+
+/** El `cliente_id` que lleva la venta: el de domicilio en domicilio, el de la cuenta en los demás. */
+export function clienteIdParaTicket(e: EstadoCarrito): string | null {
+  if (e.modoServicio === "DELIVERY_PROPIO") return e.clienteDomicilio?.clienteId ?? null;
+  return e.clienteCuenta?.clienteId ?? null;
+}
+
+export const estadoInicial: EstadoCarrito = { modoServicio: "COMER_AQUI", lineas: [], clienteDomicilio: null, notaOrden: null, nombreCuenta: null, envio: null, clienteCuenta: null };
 
 export type AccionCarrito =
   | { tipo: "agregar"; linea: LineaCarrito }
@@ -49,6 +67,7 @@ export type AccionCarrito =
   | { tipo: "quitar"; clientId: string }
   | { tipo: "modo"; modo: ModoServicio }
   | { tipo: "cliente"; cliente: ClienteDomicilio | null }
+  | { tipo: "cliente_cuenta"; cliente: ClienteCuenta | null }
   | { tipo: "nota_linea"; clientId: string; nota: string | null }
   | { tipo: "nota_orden"; nota: string | null }
   | { tipo: "nombre_cuenta"; nombre: string | null }
@@ -77,9 +96,11 @@ export function reducerCarrito(estado: EstadoCarrito, accion: AccionCarrito): Es
       return { ...estado, lineas: estado.lineas.filter((l) => l.clientId !== accion.clientId) };
     case "modo":
       // Al salir de Domicilio se limpia el cliente asociado y el envío.
-      return { ...estado, modoServicio: accion.modo, clienteDomicilio: accion.modo === "DELIVERY_PROPIO" ? estado.clienteDomicilio ?? null : null, nombreCuenta: accion.modo === "DRIVE_THRU" ? estado.nombreCuenta ?? null : null, envio: accion.modo === "DELIVERY_PROPIO" ? estado.envio ?? null : null };
+      return { ...estado, modoServicio: accion.modo, clienteDomicilio: accion.modo === "DELIVERY_PROPIO" ? estado.clienteDomicilio ?? null : null, nombreCuenta: accion.modo === "DRIVE_THRU" ? estado.nombreCuenta ?? null : null, envio: accion.modo === "DELIVERY_PROPIO" ? estado.envio ?? null : null, clienteCuenta: admiteClienteCuenta(accion.modo) ? estado.clienteCuenta ?? null : null };
     case "cliente":
       return { ...estado, clienteDomicilio: accion.cliente };
+    case "cliente_cuenta":
+      return { ...estado, clienteCuenta: accion.cliente };
     case "nombre_cuenta":
       return { ...estado, nombreCuenta: accion.nombre };
     case "nota_linea":
@@ -94,8 +115,9 @@ export function reducerCarrito(estado: EstadoCarrito, accion: AccionCarrito): Es
     case "limpiar":
       // La nota de orden es de ESTE pedido: se limpia con él. El envío se queda con el cliente:
       // los dos salen del mismo domicilio, y conservar uno sin el otro mandaba el siguiente pedido
-      // del mismo cliente sin cargo de envío.
-      return { modoServicio: estado.modoServicio, lineas: [], clienteDomicilio: estado.clienteDomicilio ?? null, notaOrden: null, nombreCuenta: null, envio: estado.envio ?? null };
+      // del mismo cliente sin cargo de envío. El cliente de la cuenta, en cambio, se suelta: en
+      // mostrador el siguiente pedido es de otra persona.
+      return { modoServicio: estado.modoServicio, lineas: [], clienteDomicilio: estado.clienteDomicilio ?? null, notaOrden: null, nombreCuenta: null, envio: estado.envio ?? null, clienteCuenta: null };
     default:
       return estado;
   }

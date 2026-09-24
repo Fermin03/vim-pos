@@ -17,9 +17,17 @@ export type CuentaAbierta = {
   desdeIso: string | null;        // fecha_apertura
   estadoCocina: string;           // SIN_ENVIAR | EN_COCINA | LISTO | ENTREGADO…
   impresaAt: string | null;       // comanda_impresa_at → ya se imprimió
-  cliente: string | null;         // nombre del cliente (domicilio) o nombre suelto (Pick-up)
+  cliente: string | null;         // nombre del cliente registrado o, si no hay, el nombre suelto (Pick-up)
+  clienteId: string | null;       // cliente registrado de la cuenta (null = sin cliente)
   mesa: string | null;            // número de mesa (comedor), desde tickets_mesas
 };
+
+/** Nombre completo del cliente embebido (`cliente:clientes(nombre, apellido_paterno)`), o null. */
+function nombreClienteFila(c: unknown): string | null {
+  const f = c as { nombre?: string; apellido_paterno?: string | null } | null;
+  if (!f?.nombre) return null;
+  return [f.nombre, f.apellido_paterno].filter(Boolean).join(" ").trim();
+}
 
 /** Cuentas abiertas de un modo en la SUCURSAL (Pick-up: DRIVE_THRU, Domicilio: DELIVERY_PROPIO).
  *  Sucursal-wide para que cualquier caja pueda completarlas. */
@@ -42,7 +50,7 @@ export async function listarCuentasAbiertas(
     // (`mesa_id` y `mesa_anterior_id`, esta última para transferencias). Sin la pista,
     // PostgREST no sabe cuál seguir y rechaza la consulta entera con "more than one
     // relationship was found" — dejando sin lista a los TRES modos, no solo a comedor.
-    .select("id, folio_completo, total_mxn, monto_pendiente_mxn, fecha_apertura, estado_cocina, comanda_impresa_at, nombre_cliente, cliente:clientes(nombre), tickets_mesas(fecha_liberacion, mesas!mesa_id(numero)), ticket_items(cantidad, cancelado)")
+    .select("id, folio_completo, total_mxn, monto_pendiente_mxn, fecha_apertura, estado_cocina, comanda_impresa_at, nombre_cliente, cliente_id, cliente:clientes(nombre, apellido_paterno), tickets_mesas(fecha_liberacion, mesas!mesa_id(numero)), ticket_items(cantidad, cancelado)")
     .eq("sucursal_id", sucursalId)
     .in("modo_servicio", modos)
     .is("deleted_at", null)
@@ -62,7 +70,8 @@ export async function listarCuentasAbiertas(
     estadoCocina: String(t.estado_cocina ?? "SIN_ENVIAR"),
     impresaAt: (t.comanda_impresa_at as string) ?? null,
     // Cliente registrado (domicilio) manda; si no, el nombre suelto de Pick-up.
-    cliente: ((t.cliente as { nombre?: string } | null)?.nombre) ?? ((t.nombre_cliente as string) ?? null),
+    cliente: nombreClienteFila(t.cliente) ?? ((t.nombre_cliente as string) ?? null),
+    clienteId: (t.cliente_id as string) ?? null,
     // Solo la asignación viva: una mesa liberada (cuenta transferida) no debe seguir rotulando.
     mesa: (((t.tickets_mesas as { fecha_liberacion: string | null; mesas: { numero: string } | null }[] | null) ?? [])
       .find((m) => m.fecha_liberacion === null)?.mesas?.numero) ?? null,

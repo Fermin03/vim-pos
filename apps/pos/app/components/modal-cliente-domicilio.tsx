@@ -12,10 +12,10 @@ import { SelectorZona } from "./selector-zona";
 const input = "h-11 w-full rounded border border-line-strong px-3 text-sm outline-none focus:border-ink focus:shadow-[0_0_0_3px_rgba(22,22,26,.06)]";
 const label = "mb-1 block text-[12.5px] font-medium text-ink-2";
 
-const DIR_VACIA: DireccionInput = { etiqueta: "Casa", calle: "", numero: "", colonia: "", referencias: "", zona: null };
+export const DIR_VACIA: DireccionInput = { etiqueta: "Casa", calle: "", numero: "", colonia: "", referencias: "", zona: null };
 
 /** Campos de una dirección (compartidos entre "cliente nuevo" y "agregar dirección"). */
-function CamposDireccion({
+export function CamposDireccion({
   dir, onCambio, token, tenantId, sucursalId, cajaId, turnoId, empleadoNombre, zonas, onZonaSincronizada,
 }: {
   dir: DireccionInput;

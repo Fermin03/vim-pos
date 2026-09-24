@@ -1,7 +1,8 @@
 "use client";
 import { employeeClient } from "./supabase";
 import type { Producto } from "./catalogo";
-import type { EnvioCarrito, LineaCarrito, ModificadorSel, ModoServicio } from "./carrito";
+import { admiteClienteCuenta, type EnvioCarrito, type LineaCarrito, type ModificadorSel, type ModoServicio } from "./carrito";
+import type { ClienteCuenta } from "./clientes-cuenta";
 import type { ComboDef, ComponenteSel } from "./combos";
 
 // T2 keystone — Cuenta por mesa (Full Service). El POS de QS construye el carrito local y persiste
@@ -143,9 +144,9 @@ export async function reconstruirCarrito(
   ticketId: string,
   productos: Producto[],
   combos: ComboDef[] = [],
-): Promise<{ lineas: LineaCarrito[]; modoServicio: ModoServicio; envio: EnvioCarrito | null }> {
+): Promise<{ lineas: LineaCarrito[]; modoServicio: ModoServicio; envio: EnvioCarrito | null; clienteCuenta: ClienteCuenta | null }> {
   const sb = employeeClient(token);
-  const { data: ticket } = await sb.from("tickets").select("modo_servicio, zona_envio_id, zonas_envio(nombre)").eq("id", ticketId).maybeSingle();
+  const { data: ticket } = await sb.from("tickets").select("modo_servicio, zona_envio_id, zonas_envio(nombre), cliente:clientes(id, nombre, apellido_paterno, telefono)").eq("id", ticketId).maybeSingle();
   const modo = mapearModo((ticket?.modo_servicio as string) ?? "MESA");
 
   const { data, error } = await sb
@@ -161,6 +162,9 @@ export async function reconstruirCarrito(
     lineas: agruparPadresHijos(filas.filter((r) => !r.cargo_tipo), porId, combos),
     modoServicio: modo,
     envio: envioReconstruido(filas, (ticket ?? null) as unknown as TicketEnvioPersistido),
+    // El cliente de la cuenta, para que al retomarla siga viéndose a quién está asignada.
+    // Domicilio no: su cliente con dirección se lee aparte (leerEntregaCuenta).
+    clienteCuenta: admiteClienteCuenta(modo) ? clienteDeTicket(ticket?.cliente) : null,
   };
 }
 
@@ -190,6 +194,13 @@ export function componentesJsonb(componentes: ComponenteSel[]) {
     nota_cocina: c.notaCocina,
     client_id_local: c.clientId,
   }));
+}
+
+/** El cliente embebido en el ticket (`cliente:clientes(...)`), como `ClienteCuenta`. */
+export function clienteDeTicket(c: unknown): ClienteCuenta | null {
+  const f = (Array.isArray(c) ? c[0] : c) as { id?: string; nombre?: string; apellido_paterno?: string | null; telefono?: string | null } | null | undefined;
+  if (!f?.id) return null;
+  return { clienteId: f.id, nombre: [f.nombre, f.apellido_paterno].filter(Boolean).join(" ").trim(), telefono: f.telefono ?? null };
 }
 
 function mapearModo(m: string): ModoServicio {
