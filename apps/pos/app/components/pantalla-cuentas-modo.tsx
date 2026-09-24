@@ -15,6 +15,8 @@ import { ModalAutorizacionPin } from "./modal-autorizacion-pin";
 import type { Empleado } from "../lib/supabase";
 import type { ModoServicio } from "../lib/carrito";
 import { capaVisible } from "../lib/escape";
+import { asignarClienteTicket } from "../lib/clientes-cuenta";
+import { IconoAsignarCliente, IconoClienteAsignado, ModalClienteCuenta } from "./modal-cliente-cuenta";
 import { useEscape } from "../lib/use-escape";
 
 const PERMISO_REIMPRIMIR = "venta.reimprimir_ticket";
@@ -121,6 +123,9 @@ export function PantallaCuentasModo({
   /** A quién y dónde se entrega. Solo en domicilio; en los demás modos el cliente está enfrente. */
   const [entrega, setEntrega] = useState<Awaited<ReturnType<typeof leerEntregaCuenta>>>(null);
   const [borrando, setBorrando] = useState(false);
+  // Cuenta a la que se le está asignando cliente. Solo Comedor y Pick-up: domicilio ya tiene el suyo.
+  const [clienteDe, setClienteDe] = useState<CuentaAbierta | null>(null);
+  const admiteCliente = modo !== "DELIVERY_PROPIO";
   // Domicilio: asignaciones vivas (con repartidor, todavía sin cobrar). Sirven para rotular cada
   // tarjeta con quién se lo lleva. El pedido NO se mueve de sitio al asignarlo: se probó sacándolo
   // a una pestaña aparte y el cajero acababa buscándolo en dos listas para cobrarlo.
@@ -190,6 +195,7 @@ export function PantallaCuentasModo({
   // Escape: cierra lo que esté encima; si no hay nada, vuelve al inicio (mismo orden que el POS).
   const alEscapar = useMemo(() => {
     const capas: [boolean, () => void][] = [
+      [clienteDe != null, () => setClienteDe(null)],
       [cancelandoItems, () => setCancelandoItems(false)],
       [borrandoCuenta, () => setBorrandoCuenta(false)],
       [cancelandoCuenta, () => setCancelandoCuenta(false)],
@@ -199,7 +205,7 @@ export function PantallaCuentasModo({
       [true, onSalir],
     ];
     return capaVisible(capas);
-  }, [cancelandoItems, borrandoCuenta, cancelandoCuenta, descontando, pidiendoPinReimpresion, selId, onSalir]);
+  }, [clienteDe, cancelandoItems, borrandoCuenta, cancelandoCuenta, descontando, pidiendoPinReimpresion, selId, onSalir]);
   useEscape(alEscapar);
 
   const vacia = detalle === null ? null : detalle.length === 0;
@@ -291,12 +297,13 @@ export function PantallaCuentasModo({
                 // mostrador. En Pick-up/Comedor "impreso" sigue siendo la única señal y no cambia.
                 const salio = modo === "DELIVERY_PROPIO" ? false : (yaImpresas.has(c.ticketId) || c.impresaAt != null);
                 return (
-                  <button
+                  /* Dos botones en una tarjeta: elegir la cuenta, y (Comedor/Pick-up) su cliente.
+                     Van hermanos y no anidados: un botón dentro de otro no es HTML válido y el
+                     toque en el ícono también seleccionaría la cuenta. */
+                  <div
                     key={c.ticketId}
-                    type="button"
-                    onClick={() => setSelId(c.ticketId)}
                     className={[
-                      "w-full rounded-lg border p-3 text-left transition",
+                      "flex w-full items-stretch rounded-lg border transition",
                       salio
                         ? `bg-accent text-white ${activa ? "border-ink" : "border-accent hover:brightness-105"}`
                         : activa
@@ -304,6 +311,7 @@ export function PantallaCuentasModo({
                           : "border-line-strong bg-surface hover:border-ink",
                     ].join(" ")}
                   >
+                    <button type="button" onClick={() => setSelId(c.ticketId)} className="min-w-0 flex-1 p-3 text-left">
                     <div className="flex items-baseline justify-between gap-2">
                       <span className="truncate font-display text-[15px] font-semibold">{(esComedor && c.mesa ? `Mesa ${c.mesa}` : null) ?? c.cliente ?? c.folio ?? "Cuenta"}</span>
                       <span className="flex-shrink-0 font-display text-[15px] font-bold tabular-nums">{fmtMxn(c.total)}</span>
@@ -316,11 +324,34 @@ export function PantallaCuentasModo({
                         Repartidor: {repartidorPorTicket.get(c.ticketId)}
                       </div>
                     )}
+                    {/* En comedor el título es la mesa: el cliente va debajo, rotulado. En Pick-up
+                        el título ya es su nombre y repetirlo sobraría. */}
+                    {esComedor && c.mesa && c.clienteId && c.cliente && (
+                      <div className={["mt-0.5 truncate text-[12px] font-semibold", salio ? "text-white/85" : "text-ink-2"].join(" ")}>
+                        Cliente: {c.cliente}
+                      </div>
+                    )}
                     <div className={["mt-0.5 flex items-center justify-between gap-2 text-[12px]", salio ? "text-white/75" : "text-ink-3"].join(" ")}>
                       <span className="truncate">{c.nItems} {c.nItems === 1 ? "producto" : "productos"}</span>
                       <span className="flex-shrink-0">{minutosAbierta(c.desdeIso, ahora)} min</span>
                     </div>
-                  </button>
+                    </button>
+                    {admiteCliente && (
+                      <button
+                        type="button"
+                        onClick={() => setClienteDe(c)}
+                        aria-label={c.clienteId ? `Cliente: ${c.cliente ?? ""}. Cambiar` : "Asignar cliente"}
+                        title={c.clienteId ? "Cambiar cliente" : "Asignar cliente"}
+                        className={[
+                          "flex w-12 flex-shrink-0 items-center justify-center rounded-r-lg border-l transition",
+                          salio ? "border-white/25 text-white hover:bg-white/10" : "border-line hover:bg-hover",
+                          !salio && c.clienteId ? "text-accent" : !salio ? "text-ink-3 hover:text-ink" : "",
+                        ].join(" ")}
+                      >
+                        {c.clienteId ? <IconoClienteAsignado className="h-5 w-5" /> : <IconoAsignarCliente className="h-5 w-5" />}
+                      </button>
+                    )}
+                  </div>
                 );
               })}
             </div>
@@ -340,8 +371,11 @@ export function PantallaCuentasModo({
               {/* Barra de acciones sobre la cuenta seleccionada */}
               <div className="flex flex-shrink-0 flex-wrap items-center gap-2 border-b border-line px-4 py-3">
                 <div className="mr-auto min-w-0">
-                  <div className="truncate font-display text-[16px] font-semibold">{sel.cliente ?? sel.folio ?? "Cuenta"}</div>
-                  <div className="text-[12px] text-ink-3">{sel.folio ? `${sel.folio} · ` : ""}{fmtMxn(sel.total)}</div>
+                  {/* En comedor manda la mesa (igual que en la tarjeta); el cliente, si hay, va abajo. */}
+                  <div className="truncate font-display text-[16px] font-semibold">{(esComedor && sel.mesa ? `Mesa ${sel.mesa}` : null) ?? sel.cliente ?? sel.folio ?? "Cuenta"}</div>
+                  <div className="truncate text-[12px] text-ink-3">
+                    {esComedor && sel.mesa && sel.clienteId && sel.cliente ? `${sel.cliente} · ` : ""}{sel.folio ? `${sel.folio} · ` : ""}{fmtMxn(sel.total)}
+                  </div>
                 </div>
                 <Accion label="Agregar producto" onClick={() => onAgregarProductos(sel.ticketId)} />
                 <Accion label={hayDescuento ? "Descuento aplicado" : "Descuento"} onClick={() => setDescontando(true)} inactivo={hayDescuento} />
@@ -591,6 +625,23 @@ export function PantallaCuentasModo({
           motivo="Reimpresión de ticket"
           onAutorizado={() => { setPidiendoPinReimpresion(false); imprimir(sel.ticketId); }}
           onCancelar={() => setPidiendoPinReimpresion(false)}
+        />
+      )}
+      {clienteDe && (
+        <ModalClienteCuenta
+          token={token}
+          tenantId={caja.tenant_id}
+          sucursalId={caja.sucursal_id}
+          cajaId={turno.caja_id}
+          turnoId={turno.id}
+          empleadoNombre={empleado.nombre}
+          actual={clienteDe.clienteId ? { clienteId: clienteDe.clienteId, nombre: clienteDe.cliente ?? "", telefono: null } : null}
+          onAsignar={async (cli) => {
+            await asignarClienteTicket(token, clienteDe.ticketId, cli?.clienteId ?? null);
+            setClienteDe(null);
+            void recargar();
+          }}
+          onCerrar={() => setClienteDe(null)}
         />
       )}
     </main>

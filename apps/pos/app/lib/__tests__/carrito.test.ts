@@ -1,6 +1,6 @@
 import type { ClienteDomicilio } from "../clientes-domicilio";
 import { describe, it, expect } from "vitest";
-import { reducerCarrito, estadoInicial, precioUnitarioLinea, totalLinea, calcularTotalesDisplay, type LineaCarrito } from "../carrito";
+import { reducerCarrito, estadoInicial, precioUnitarioLinea, totalLinea, calcularTotalesDisplay, clienteIdParaTicket, admiteClienteCuenta, type LineaCarrito } from "../carrito";
 import type { Producto } from "../catalogo";
 import type { ComboDef } from "../combos";
 
@@ -88,5 +88,34 @@ describe("envío por zona", () => {
     expect(limpio.envio).toEqual({ zonaId: "z1", nombre: "Zona Norte", costoMxn: 35 });
     expect(limpio.clienteDomicilio).toBe(cliente);
     expect(limpio.lineas).toEqual([]);
+  });
+});
+
+describe("cliente asignado a la cuenta (comedor, para llevar, pick-up)", () => {
+  const ana = { clienteId: "c-ana", nombre: "Ana Gómez", telefono: "4771234567" };
+
+  it("solo esos tres modos lo admiten; domicilio tiene su propio cliente", () => {
+    expect(["COMER_AQUI", "PARA_LLEVAR", "DRIVE_THRU"].every((m) => admiteClienteCuenta(m as never))).toBe(true);
+    expect(admiteClienteCuenta("DELIVERY_PROPIO")).toBe(false);
+  });
+
+  it("se conserva al cambiar entre esos modos y se suelta al pasar a domicilio", () => {
+    let e = reducerCarrito({ ...estadoInicial, modoServicio: "PARA_LLEVAR" }, { tipo: "cliente_cuenta", cliente: ana });
+    e = reducerCarrito(e, { tipo: "modo", modo: "DRIVE_THRU" });
+    expect(e.clienteCuenta).toEqual(ana);
+    e = reducerCarrito(e, { tipo: "modo", modo: "DELIVERY_PROPIO" });
+    expect(e.clienteCuenta ?? null).toBeNull();
+  });
+
+  it("una cuenta nueva empieza sin cliente: el siguiente pedido es de otra persona", () => {
+    const e = reducerCarrito({ ...estadoInicial, clienteCuenta: ana }, { tipo: "limpiar" });
+    expect(e.clienteCuenta ?? null).toBeNull();
+  });
+
+  it("clienteIdParaTicket manda el de domicilio en domicilio y el de la cuenta en los demás", () => {
+    expect(clienteIdParaTicket({ ...estadoInicial })).toBeNull();
+    expect(clienteIdParaTicket({ ...estadoInicial, modoServicio: "COMER_AQUI", clienteCuenta: ana })).toBe("c-ana");
+    const dom = { clienteId: "c-dom" } as ClienteDomicilio;
+    expect(clienteIdParaTicket({ ...estadoInicial, modoServicio: "DELIVERY_PROPIO", clienteDomicilio: dom, clienteCuenta: ana })).toBe("c-dom");
   });
 });

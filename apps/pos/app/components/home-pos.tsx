@@ -16,6 +16,8 @@ import {
   reducerCarrito,
   estadoInicial,
   nuevoClientId,
+  admiteClienteCuenta,
+  clienteIdParaTicket,
   type LineaCarrito,
   type ModificadorSel,
   type EnvioCarrito,
@@ -33,6 +35,8 @@ import { obtenerImpresora, obtenerImpresoraDeEstacion } from "../lib/print/adapt
 import { estacionParaArea, hayEstacionDeCocinaDedicada } from "../lib/print/config";
 import { ModalConfigImpresora } from "./modal-config-impresora";
 import { ModalClienteDomicilio } from "./modal-cliente-domicilio";
+import { IconoAsignarCliente, IconoClienteAsignado, ModalClienteCuenta } from "./modal-cliente-cuenta";
+import { asignarClienteTicket, type ClienteCuenta } from "../lib/clientes-cuenta";
 import { ModalZonaPedido } from "./modal-zona-pedido";
 import { ModalNombreCuenta } from "./modal-nombre-cuenta";
 import { ModalCambiarPin } from "./modal-cambiar-pin";
@@ -232,6 +236,8 @@ export function HomePos({
   const [retomadoEspera, setRetomadoEspera] = useState<{ ticketId: string; etiqueta: string } | null>(null);
   const [configImpresoraAbierto, setConfigImpresoraAbierto] = useState(false);
   const [clienteDomAbierto, setClienteDomAbierto] = useState(false);
+  // Cliente (opcional) de la cuenta en Comedor, Para llevar y Pick-up. Ver ModalClienteCuenta.
+  const [clienteCuentaAbierto, setClienteCuentaAbierto] = useState(false);
   // Task 7 — cambiar la zona de reparto de ESTE pedido desde el renglón de envío del ticket
   // lateral (no reabre la búsqueda de cliente ni toca `direcciones_cliente`).
   const [zonaPedidoAbierto, setZonaPedidoAbierto] = useState(false);
@@ -472,7 +478,7 @@ export function HomePos({
         reconstruirCarrito(token, tId, productos ?? [], combos),
         leerItemsPersistidos(token, tId).catch(() => [] as ItemTicket[]),
       ]);
-      dispatch({ tipo: "cargar", estado: { modoServicio: recon.modoServicio, lineas: recon.lineas, envio: recon.envio } });
+      dispatch({ tipo: "cargar", estado: { modoServicio: recon.modoServicio, lineas: recon.lineas, envio: recon.envio, clienteCuenta: recon.clienteCuenta } });
       setTicketBd(bd);
       // Un renglón agregado después del primer envío deja el botón habilitado otra vez: si no,
       // lo nuevo se queda sin mandar y la cocina nunca se entera.
@@ -574,7 +580,7 @@ export function HomePos({
         reconstruirCarrito(token, ticketId, productos ?? [], combos),
         leerItemsPersistidos(token, ticketId).catch(() => [] as ItemTicket[]),
       ]);
-      dispatch({ tipo: "cargar", estado: { modoServicio: recon.modoServicio, lineas: recon.lineas, envio: recon.envio } });
+      dispatch({ tipo: "cargar", estado: { modoServicio: recon.modoServicio, lineas: recon.lineas, envio: recon.envio, clienteCuenta: recon.clienteCuenta } });
       setVolverA(origen);
       setTicketBd(bd);
       setItemsPersistidos(items);
@@ -756,6 +762,18 @@ export function HomePos({
     return `El pedido se guardó, pero sin envío: ${e.message}. Toca el renglón de envío para elegir otra zona.`;
   }, [token]);
 
+  /**
+   * Asigna (o quita) el cliente de la cuenta. Si la cuenta ya existe en la base —comedor y pick-up
+   * la abren desde el principio, y una retomada también— se guarda en ese momento; si no (Para
+   * llevar antes de cobrar), viaja en el carrito y entra al crear el ticket (clienteIdParaTicket).
+   * Si falla, lanza: el modal muestra el error y no se cierra.
+   */
+  const onAsignarClienteCuenta = useCallback(async (c: ClienteCuenta | null) => {
+    if (ticketBd) await asignarClienteTicket(token, ticketBd.ticketId, c?.clienteId ?? null);
+    dispatch({ tipo: "cliente_cuenta", cliente: c });
+    setClienteCuentaAbierto(false);
+  }, [ticketBd, token]);
+
   /** Persiste el ticket si aún no existe; abre el modal de descuento sobre ese ticket. */
   const onAplicarDescuento = useCallback(async () => {
     if (carrito.lineas.length === 0) return;
@@ -769,7 +787,7 @@ export function HomePos({
           carrito.modoServicio,
           carrito.lineas,
           nuevoClientId(),
-          carrito.clienteDomicilio?.clienteId ?? null,
+          clienteIdParaTicket(carrito),
           carrito.clienteDomicilio?.direccionId ?? null,
           carrito.notaOrden ?? null,
           carrito.nombreCuenta ?? null,
@@ -821,7 +839,7 @@ export function HomePos({
         carrito.modoServicio,
         carrito.lineas,
         nuevoClientId(),
-        carrito.clienteDomicilio?.clienteId ?? null,
+        clienteIdParaTicket(carrito),
         carrito.clienteDomicilio?.direccionId ?? null,
         carrito.notaOrden ?? null,
         carrito.nombreCuenta ?? null,
@@ -886,7 +904,7 @@ export function HomePos({
           carrito.modoServicio,
           carrito.lineas,
           nuevoClientId(),
-          carrito.clienteDomicilio?.clienteId ?? null,
+          clienteIdParaTicket(carrito),
           carrito.clienteDomicilio?.direccionId ?? null,
           carrito.notaOrden ?? null,
           carrito.nombreCuenta ?? null,
@@ -923,7 +941,7 @@ export function HomePos({
           carrito.modoServicio,
           carrito.lineas,
           nuevoClientId(),
-          carrito.clienteDomicilio?.clienteId ?? null,
+          clienteIdParaTicket(carrito),
           carrito.clienteDomicilio?.direccionId ?? null,
           carrito.notaOrden ?? null,
           carrito.nombreCuenta ?? null,
@@ -1155,6 +1173,7 @@ export function HomePos({
       [pidiendoMesa, () => setPidiendoMesa(false)],
       [nombreCuentaAbierto, () => setNombreCuentaAbierto(false)],
       [clienteDomAbierto, () => setClienteDomAbierto(false)],
+      [clienteCuentaAbierto, () => setClienteCuentaAbierto(false)],
       [zonaPedidoAbierto, () => setZonaPedidoAbierto(false)],
       [esperaPidiendoEtiqueta, () => setEsperaPidiendoEtiqueta(false)],
       [esperaListaAbierta, () => setEsperaListaAbierta(false)],
@@ -1174,7 +1193,7 @@ export function HomePos({
     return capaVisible(capas);
   }, [modGrupos, comboAbierto, hojaCombo, agregarSuelto, cancelandoItem, descuentoItem, cancelandoTicket, avisoReparto, mostrarRecibo, confirmacion, totalesCobro,
       procesandoCobro, agregandoA, viendoMapaMesas, pidiendoMesa, nombreCuentaAbierto,
-      clienteDomAbierto, zonaPedidoAbierto, esperaPidiendoEtiqueta, esperaListaAbierta, movimientoAbierto,
+      clienteDomAbierto, clienteCuentaAbierto, zonaPedidoAbierto, esperaPidiendoEtiqueta, esperaListaAbierta, movimientoAbierto,
       abrirCajaAbierto, cambiarPinAbierto, misPropinasAbierto, configImpresoraAbierto,
       salidaPendiente, confirmandoCierre, menuGeneralAbierto, cerrando, enInicio, enKds, enMonitor,
       enConsultaCuentas, enDevoluciones, enPedidosApps, enDelivery, enPickup, enMesas, nuevoTicket,
@@ -1775,13 +1794,30 @@ export function HomePos({
           pulsar la equivocada con prisa. */}
       <div className="flex flex-shrink-0 items-center gap-3 border-b border-line bg-surface px-3 py-2">
         <BotonVolver onClick={() => intentarSalirDeCaptura("atras")} />
+        {admiteClienteCuenta(carrito.modoServicio) && (
+          /* Cliente de la cuenta (opcional). Con cliente asignado muestra su nombre: así se ve de un
+             vistazo a quién le cuenta esta venta. Sin él, la venta sigue igual que siempre. */
+          <button
+            type="button"
+            onClick={() => setClienteCuentaAbierto(true)}
+            className={[
+              "ml-auto flex h-10 max-w-[240px] flex-shrink-0 items-center gap-2 rounded border px-3 text-[13.5px] font-semibold transition hover:border-ink hover:bg-hover",
+              carrito.clienteCuenta ? "border-accent text-ink" : "border-line-strong text-ink",
+            ].join(" ")}
+          >
+            {carrito.clienteCuenta
+              ? <IconoClienteAsignado className="h-4 w-4 flex-shrink-0 text-accent" />
+              : <IconoAsignarCliente className="h-4 w-4 flex-shrink-0" />}
+            <span className="truncate">{carrito.clienteCuenta?.nombre ?? "Asignar cliente"}</span>
+          </button>
+        )}
         {carrito.modoServicio === "PARA_LLEVAR" && (
           /* Cuentas abiertas de Para llevar: las que quedaron sin cobrar y FUERA de espera. Sin
              este botón no se veían en ninguna pantalla y solo aparecían trabando el corte. */
           <button
             type="button"
             onClick={() => { setLlevarError(null); setLlevarListaAbierta(true); }}
-            className="ml-auto flex h-10 flex-shrink-0 items-center gap-2 rounded border border-line-strong px-3 text-[13.5px] font-semibold text-ink transition hover:border-ink hover:bg-hover"
+            className="flex h-10 flex-shrink-0 items-center gap-2 rounded border border-line-strong px-3 text-[13.5px] font-semibold text-ink transition hover:border-ink hover:bg-hover"
           >
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4" aria-hidden="true">
               <path d="M6 3h12v18l-3-2-3 2-3-2-3 2z" /><path d="M9 8h6M9 12h6" />
@@ -1813,6 +1849,19 @@ export function HomePos({
         )}
       </div>
       {configImpresoraAbierto && <ModalConfigImpresora token={token} sucursalId={caja.sucursal_id} onCerrar={() => setConfigImpresoraAbierto(false)} />}
+      {clienteCuentaAbierto && (
+        <ModalClienteCuenta
+          token={token}
+          tenantId={caja.tenant_id}
+          sucursalId={caja.sucursal_id}
+          cajaId={turno.caja_id}
+          turnoId={turno.id}
+          empleadoNombre={empleado.nombre}
+          actual={carrito.clienteCuenta ?? null}
+          onAsignar={onAsignarClienteCuenta}
+          onCerrar={() => setClienteCuentaAbierto(false)}
+        />
+      )}
       {clienteDomAbierto && (
         <ModalClienteDomicilio
           token={token}

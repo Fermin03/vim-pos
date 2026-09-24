@@ -75,7 +75,15 @@ export function Modal({
     (campo ?? els[0])?.focus();
 
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") cerrar.current();
+      if (e.key === "Escape") {
+        /* Marcar la tecla como atendida NO es opcional. El POS tiene su propia pila de Escape
+           en `window` (apps/pos/app/lib/use-escape.ts) que ignora las teclas ya atendidas. Sin
+           esto, React aplica el cierre antes de que la tecla llegue a `window`; la pila ya no ve
+           este modal abierto y ejecuta la capa de abajo. Cerrar el cliente de domicilio sacaba
+           además al cajero de la pantalla de captura: una tecla, dos acciones. */
+        e.preventDefault();
+        cerrar.current();
+      }
       if (e.key === "Tab") {
         const actuales = Array.from(focusables());
         if (actuales.length === 0) return;
