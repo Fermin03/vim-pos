@@ -165,15 +165,25 @@ export function aplicarEdicion(
 ): LineaCarrito[] {
   const i = lineas.findIndex((l) => l.clientId === clientId);
   if (i < 0) return lineas;
-  const original = lineas[i]!;
-  const separa = alcance === "una" && original.cantidad > 1;
-  if (separa) {
-    if (mismaLinea(original, editada)) return lineas;
-    const nueva: LineaCarrito = { ...editada, clientId: nuevoClientId(), cantidad: 1 };
-    return [...lineas.slice(0, i), { ...original, cantidad: original.cantidad - 1 }, nueva, ...lineas.slice(i + 1)];
+  const reemplazo = lineasDeEdicion(lineas[i]!, editada, alcance);
+  if (!reemplazo) return lineas;
+  return [...lineas.slice(0, i), ...reemplazo, ...lineas.slice(i + 1)];
+}
+
+/**
+ * Las líneas que ocupan el lugar de `original` tras editarla, o `null` si la edición no cambió
+ * nada. Es la regla de `aplicarEdicion` sin la lista alrededor, para que la cuenta de mesa mande
+ * a la base EXACTAMENTE lo mismo que el carrito local pondría en pantalla (`reemplazar_item_ticket`).
+ *
+ * La primera línea conserva el `clientId` de la original; la separada lleva uno nuevo.
+ */
+export function lineasDeEdicion(original: LineaCarrito, editada: LineaCarrito, alcance: AlcanceEdicion): LineaCarrito[] | null {
+  if (alcance === "una" && original.cantidad > 1) {
+    if (mismaLinea(original, editada)) return null;
+    return [{ ...original, cantidad: original.cantidad - 1 }, { ...editada, clientId: nuevoClientId(), cantidad: 1 }];
   }
-  if (mismaLinea(original, editada) && original.cantidad === editada.cantidad) return lineas;
-  return lineas.map((l, j) => (j === i ? { ...editada, clientId: original.clientId } : l));
+  if (mismaLinea(original, editada) && original.cantidad === editada.cantidad) return null;
+  return [{ ...editada, clientId: original.clientId }];
 }
 
 const r2 = (n: number): number => Math.round(n * 100) / 100;

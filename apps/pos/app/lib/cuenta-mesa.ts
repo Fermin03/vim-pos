@@ -184,6 +184,40 @@ export async function agregarComboAlTicket(token: string, args: { ticketId: stri
   if (error) throw new Error(error.message);
 }
 
+/**
+ * Edita un renglón ya guardado en la cuenta que todavía no sale a cocina (0119): la base cancela el
+ * renglón con motivo EDITADO y pone `lineas` en su lugar, en una sola transacción.
+ *
+ * Todas las líneas viajan con client ids NUEVOS, también sus componentes: el renglón viejo queda
+ * cancelado pero sigue en la tabla con los suyos, y el índice único por `client_id_local` no deja
+ * repetirlos. Si la llamada falla, la transacción no dejó nada a medias: el cajero vuelve a tocar
+ * el renglón y la cuenta se relee.
+ */
+export async function reemplazarItemTicket(token: string, args: { ticketItemId: string; lineas: LineaCarrito[] }): Promise<void> {
+  const payload = args.lineas.map((l) =>
+    l.combo
+      ? {
+          combo_producto_id: l.producto.id,
+          cantidad: l.cantidad,
+          componentes: componentesJsonb(l.combo.componentes.map((c) => ({ ...c, clientId: clientIdLocal() }))),
+          nota_cocina: l.notaCocina,
+          client_id_local: clientIdLocal(),
+        }
+      : {
+          producto_id: l.producto.id,
+          cantidad: l.cantidad,
+          modificadores: l.modificadores.map((m) => ({ opcion_modificador_id: m.opcionId, cantidad: m.cantidad })),
+          nota_cocina: l.notaCocina,
+          client_id_local: clientIdLocal(),
+        },
+  );
+  const { error } = await employeeClient(token).rpc("reemplazar_item_ticket", {
+    p_ticket_item_id: args.ticketItemId,
+    p_lineas: payload,
+  });
+  if (error) throw new Error(error.message);
+}
+
 /** Traduce los componentes seleccionados de un combo al JSON que espera `agregar_combo_a_ticket`. */
 export function componentesJsonb(componentes: ComponenteSel[]) {
   return componentes.map((c) => ({
