@@ -94,6 +94,8 @@ export type ItemTicket = {
   cantidad: number;
   totalItemMxn: number;
   estadoCocina: string | null;
+  /** El renglón ya salió en una comanda (0069). Ya no se edita (0119); se cancela con motivo. */
+  enviadoCocina: boolean;
 };
 
 /**
@@ -108,7 +110,7 @@ export async function leerItemsPersistidos(token: string, ticketId: string): Pro
   const sb = employeeClient(token);
   const [itemsRes, ticketRes] = await Promise.all([
     sb.from("ticket_items")
-      .select("id, client_id_local, producto_nombre_snapshot, cantidad, total_item_mxn")
+      .select("id, client_id_local, producto_nombre_snapshot, cantidad, total_item_mxn, enviado_cocina_at")
       .eq("ticket_id", ticketId)
       .eq("cancelado", false)
       // Los cargos (envío) no son productos: no se cancelan desde aquí —se quitan cambiando la
@@ -130,6 +132,7 @@ export async function leerItemsPersistidos(token: string, ticketId: string): Pro
     producto_nombre_snapshot: string;
     cantidad: number;
     total_item_mxn: string | number;
+    enviado_cocina_at: string | null;
   }[];
   return rows.map((r) => ({
     id: r.id,
@@ -138,5 +141,6 @@ export async function leerItemsPersistidos(token: string, ticketId: string): Pro
     cantidad: Number(r.cantidad),
     totalItemMxn: Number(r.total_item_mxn),
     estadoCocina,
+    enviadoCocina: r.enviado_cocina_at != null,
   }));
 }

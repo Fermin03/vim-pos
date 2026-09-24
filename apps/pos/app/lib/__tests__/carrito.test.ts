@@ -1,6 +1,6 @@
 import type { ClienteDomicilio } from "../clientes-domicilio";
 import { describe, it, expect } from "vitest";
-import { reducerCarrito, estadoInicial, precioUnitarioLinea, totalLinea, calcularTotalesDisplay, clienteIdParaTicket, admiteClienteCuenta, aplicarEdicion, type LineaCarrito } from "../carrito";
+import { reducerCarrito, estadoInicial, precioUnitarioLinea, totalLinea, calcularTotalesDisplay, clienteIdParaTicket, admiteClienteCuenta, aplicarEdicion, lineasDeEdicion, type LineaCarrito } from "../carrito";
 import type { Producto } from "../catalogo";
 import type { ComboDef } from "../combos";
 
@@ -176,5 +176,28 @@ describe("editar un renglón ya capturado", () => {
   it("un clientId que ya no existe no toca nada", () => {
     const lineas = [otra];
     expect(aplicarEdicion(lineas, "nada", burger(1), "todas")).toBe(lineas);
+  });
+});
+
+describe("lineasDeEdicion: lo que la cuenta de mesa manda a la base", () => {
+  const queso = { opcionId: "q", grupoNombre: "Extras", opcionNombre: "Queso", precioExtra: 15, cantidad: 1 };
+  const burger = (cantidad: number, mods = [queso]): LineaCarrito => ({ clientId: "b", producto: prod("p1", "Hamburguesa", 100), cantidad, modificadores: mods, notaCocina: null });
+
+  it("'una' de 3: la original con 2 y la editada con 1, en ese orden", () => {
+    const r = lineasDeEdicion(burger(3), burger(3, []), "una")!;
+    expect(r.map((l) => [l.cantidad, l.modificadores.length])).toEqual([[2, 1], [1, 0]]);
+    expect(r[0]!.clientId).toBe("b");
+  });
+  it("'todas': una sola línea con la cantidad de la editada", () => {
+    expect(lineasDeEdicion(burger(3), burger(3, []), "todas")!.map((l) => l.cantidad)).toEqual([3]);
+  });
+  it("sin cambios devuelve null: no se llama a la base", () => {
+    expect(lineasDeEdicion(burger(3), burger(3), "una")).toBeNull();
+    expect(lineasDeEdicion(burger(1), burger(1), "todas")).toBeNull();
+  });
+  it("coincide con lo que aplicarEdicion pone en pantalla", () => {
+    const lista = aplicarEdicion([burger(3)], "b", burger(3, []), "una");
+    const r = lineasDeEdicion(burger(3), burger(3, []), "una")!;
+    expect(lista.map((l) => [l.cantidad, l.modificadores.length])).toEqual(r.map((l) => [l.cantidad, l.modificadores.length]));
   });
 });

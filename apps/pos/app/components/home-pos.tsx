@@ -16,6 +16,7 @@ import {
   reducerCarrito,
   estadoInicial,
   nuevoClientId,
+  lineasDeEdicion,
   admiteClienteCuenta,
   clienteIdParaTicket,
   type LineaCarrito,
@@ -74,7 +75,7 @@ import { listarTicketsEnEspera, ponerTicketEnEspera, retomarTicketEnEspera } fro
 import { ModalEtiquetaEspera, ModalListaEspera } from "./modal-espera";
 import { ModalCuentasParaLlevar, listarCuentasParaLlevar } from "./modal-cuentas-para-llevar";
 import { leerItemsPersistidos, type ItemTicket } from "../lib/cancelacion";
-import { abrirCuentaEnMesa, agregarComboAlTicket, agregarItemAlTicket, reconstruirCarrito } from "../lib/cuenta-mesa";
+import { abrirCuentaEnMesa, agregarComboAlTicket, agregarItemAlTicket, reconstruirCarrito, reemplazarItemTicket } from "../lib/cuenta-mesa";
 import { atribuirMesero, contarPendientesCocina, enviarACocina, yaEnviadoACocina } from "../lib/mesero";
 import { useConexion } from "../lib/conexion";
 import { cacheGet, cachePut, contarPendientes } from "../lib/outbox";
@@ -545,6 +546,27 @@ export function HomePos({
     [token, combos, ofrecerCombo],
   );
 
+  /**
+   * Guarda la edición de un renglón de la cuenta de mesa: la base cancela el renglón (motivo
+   * EDITADO) y pone en su lugar las mismas líneas que el carrito local pondría en pantalla.
+   */
+  const guardarEdicionEnCuenta = useCallback(
+    async (original: LineaCarrito, editada: LineaCarrito, alcance: AlcanceEdicion) => {
+      const it = itemsPersistidos.find((x) => x.clientId === original.clientId);
+      const lineas = lineasDeEdicion(original, editada, alcance);
+      if (!it || !lineas) return;
+      try {
+        await reemplazarItemTicket(token, { ticketItemId: it.id, lineas });
+        await recargarCuenta();
+      } catch (e) {
+        // Se relee primero: recargarCuenta limpia el aviso, y la cuenta tiene que verse como quedó.
+        await recargarCuenta();
+        setError(e instanceof Error ? e.message : "No se pudo guardar el cambio");
+      }
+    },
+    [itemsPersistidos, token, recargarCuenta],
+  );
+
   const confirmarModificadores = useCallback(
     async (mods: ModificadorSel[], nota: string | null, alcance: AlcanceEdicion) => {
       if (!modGrupos) return;
@@ -553,7 +575,9 @@ export function HomePos({
       setModGrupos(null);
       if (edicion) {
         // Edición de un renglón ya capturado: no se ofrece combo, solo se cambia (o se separa).
-        dispatch({ tipo: "editar", clientId: edicion.clientId, editada: { ...edicion, modificadores: mods, notaCocina: nota }, alcance });
+        const editada = { ...edicion, modificadores: mods, notaCocina: nota };
+        if (ticketBd) { await guardarEdicionEnCuenta(edicion, editada, alcance); return; }
+        dispatch({ tipo: "editar", clientId: edicion.clientId, editada, alcance });
         return;
       }
       try {
@@ -562,13 +586,14 @@ export function HomePos({
         setError(e instanceof Error ? e.message : "No se pudo agregar el ítem");
       }
     },
-    [modGrupos, ofrecerCombo],
+    [modGrupos, ofrecerCombo, ticketBd, guardarEdicionEnCuenta],
   );
 
   /** Confirmación del drawer de combo: agrega (o reemplaza, si venía de "Editar") la línea. */
   const confirmarCombo = useCallback(async (linea: LineaCarrito, alcance: AlcanceEdicion) => {
     const original = comboAbierto?.linea ?? null;
     setComboAbierto(null);
+    if (ticketBd && original) { await guardarEdicionEnCuenta(original, linea, alcance); return; }
     if (ticketBd) {
       try { await agregarComboAlTicket(token, { ticketId: ticketBd.ticketId, linea }); await recargarCuenta(); }
       catch (e) { setError(e instanceof Error ? e.message : "No se pudo agregar el combo"); }
@@ -576,16 +601,22 @@ export function HomePos({
     }
     if (original) dispatch({ tipo: "editar", clientId: original.clientId, editada: linea, alcance });
     else dispatch({ tipo: "agregar", linea });
-  }, [comboAbierto, ticketBd, token, recargarCuenta]);
+  }, [comboAbierto, ticketBd, token, recargarCuenta, guardarEdicionEnCuenta]);
 
   /**
    * Tocar un renglón del ticket lo reabre: el combo en su resumen, un producto en su modal de
    * modificadores con lo que ya tenía marcado. Un producto sin modificadores no abre nada (no hay
-   * qué cambiarle). Solo aplica al carrito suelto: en cuenta de mesa las líneas ya están guardadas.
+   * qué cambiarle). En cuenta de mesa, solo lo que todavía no sale a cocina: lo enviado ya no se
+   * modifica (se cancela, con motivo), y se dice en vez de no hacer nada.
    */
   const editarLinea = useCallback(async (clientId: string) => {
     const l = carrito.lineas.find((x) => x.clientId === clientId);
     if (!l) return;
+    if (ticketBd) {
+      const it = itemsPersistidos.find((x) => x.clientId === clientId);
+      if (!it) return;
+      if (it.enviadoCocina) { setError(`${l.producto.nombre} ya se mandó a cocina: ya no se puede modificar.`); return; }
+    }
     if (l.combo) { setComboAbierto({ combo: l.combo.def, linea: l }); return; }
     try {
       const grupos = await obtenerGruposDeProducto(token, l.producto.id);
@@ -593,7 +624,7 @@ export function HomePos({
     } catch (e) {
       setError(e instanceof Error ? e.message : "Error al cargar modificadores");
     }
-  }, [carrito.lineas, token]);
+  }, [carrito.lineas, token, ticketBd, itemsPersistidos]);
 
   /** Entra en modo cuenta de mesa: carga el ticket persistido al carrito para seguir editando. */
   const entrarCuenta = useCallback(async (ticketId: string, origen: Origen = "inicio") => {
@@ -1933,6 +1964,26 @@ export function HomePos({
         <ModalMisPropinas token={token} meseroId={empleado.id} meseroNombre={empleado.nombre} onCerrar={() => setMisPropinasAbierto(false)} />
       )}
 
+      {/* Avisos de la captura (setError). Este renglón se perdió el 17 ago 2026 al sacar el
+          catálogo a su propio componente, y desde entonces todo setError de esta pantalla era
+          invisible: "Este combo no tiene slots", "Cuenta desincronizada", y el de un producto
+          que ya salió a cocina y no se puede editar. */}
+      {error && (
+        <div className="flex flex-shrink-0 items-center gap-3 bg-[#FBECEA] px-4 py-2" role="alert">
+          <p className="min-w-0 flex-1 text-[13px] font-medium text-danger">{error}</p>
+          <button
+            type="button"
+            onClick={() => setError(null)}
+            aria-label="Cerrar aviso"
+            className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded text-danger transition hover:bg-danger/10"
+          >
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" className="h-4 w-4" aria-hidden="true">
+              <path d="M18 6 6 18M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+      )}
+
       <div className="flex min-h-0 flex-1">
           <CatalogoProductos
             categorias={categorias}
@@ -1953,9 +2004,8 @@ export function HomePos({
           onNotaLinea={(id, nota) => dispatch({ tipo: "nota_linea", clientId: id, nota })}
           onNotaOrden={(nota) => dispatch({ tipo: "nota_orden", nota })}
           onCobrar={iniciarCobro}
-          // En cuenta de mesa no se edita tocando el renglón: la línea ya está guardada en la
-          // cuenta y se cambia cancelándola y capturándola de nuevo.
-          onEditar={ticketBd ? undefined : (id) => void editarLinea(id)}
+          // También en cuenta de mesa: lo que no ha salido a cocina se edita en la base (0119).
+          onEditar={(id) => void editarLinea(id)}
           onPonerEnEspera={online ? () => { setEsperaError(null); setEsperaPidiendoEtiqueta(true); } : undefined}
           // Comedor va por la MISMA rama que Pick-up y domicilio: su cuenta también queda
           // abierta y se cobra después desde la lista. Antes entraba por la otra, que pinta

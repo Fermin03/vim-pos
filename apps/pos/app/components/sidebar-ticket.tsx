@@ -87,8 +87,7 @@ export function SidebarTicket({
   /** Cuando el ticket está persistido, "%" abre el descuento/override por ítem (F6.5). */
   onDescuentoItem?: (clientId: string) => void;
   /** Tocar un renglón lo reabre en su modal: el de combo (en el resumen) o el de modificadores.
-   *  Ausente en modo cuenta de mesa: ahí las líneas ya están guardadas en la cuenta, y una línea
-   *  enviada a cocina ya no se modifica. */
+   *  En cuenta de mesa también se pasa: quien llama rechaza (y avisa) lo que ya salió a cocina. */
   onEditar?: (clientId: string) => void;
   /** Limpia el carrito local (sin BD). Habilitado cuando no hay ticket persistido y hay líneas. */
   onLimpiar?: () => void;
@@ -152,7 +151,9 @@ export function SidebarTicket({
    * pregunta cuánto cuesta algo en cualquiera de los cuatro modos.
    */
   const seCobraDespues = onEnviarCocinaAbierto != null;
-  const editable = onEditar != null && !bloqueado && !procesando;
+  // No depende de `bloqueado`: en cuenta de mesa los renglones que no han salido a cocina sí se
+  // editan (0119). Quien pasa `onEditar` decide qué renglón se abre y avisa del que no.
+  const editable = onEditar != null && !procesando;
 
   // Ancho del carrito: era fijo en 404px, y en una caja de 1024px se comía el 40% de la pantalla
   // dejando el catálogo apretado. Ahora escala con topes: nunca menos de 288px —por debajo no cabe
