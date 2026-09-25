@@ -42,10 +42,17 @@ import { Paginador } from "./paginador";
  * es el del catálogo, no el de la ventana — el sidebar del ticket se lleva un cuarto.
  */
 
-/** Alto de la pastilla de categoría (44px = objetivo táctil mínimo del doc de diseño). */
-const ALTO_PASTILLA = 44;
-/** Por debajo de este ancho de pastilla, el icono le quita al nombre más de lo que aporta. */
-const ANCHO_CON_ICONO = 130;
+/**
+ * Alto de la pastilla de categoría. Era 44 (el mínimo táctil del doc de diseño); subió a 56 con el
+ * rediseño de la venta: cambiar de categoría es de lo que más se toca en el turno, y 56 deja dos
+ * renglones de nombre sin apretar.
+ */
+const ALTO_PASTILLA = 56;
+/**
+ * Por debajo de este ancho de pastilla, el icono le quita al nombre más de lo que aporta. Era 130;
+ * con la letra más grande, a 134px el icono dejaba 82px y "Hamburguesas" se partía a la mitad.
+ */
+const ANCHO_CON_ICONO = 170;
 
 export function CatalogoProductos({
   categorias,
@@ -67,6 +74,12 @@ export function CatalogoProductos({
     [productos, catSel],
   );
   const mostrarPrecios = usePreciosVisibles();
+  // Color de cada categoría, para la franja de sus productos. Es el mismo índice que usa la
+  // pastilla: una categoría sin color propio toma el de la paleta según su posición.
+  const colorDe = useMemo(
+    () => new Map((categorias ?? []).map((c, i) => [c.id, colorCategoria(c, i).ink])),
+    [categorias],
+  );
 
   // ── Categorías: cuadrícula pareja, sin scroll ───────────────────────────────────────────────
   const [barraRef, huecoBarra] = useHueco<HTMLDivElement>();
@@ -132,7 +145,7 @@ export function CatalogoProductos({
           reparto es parejo (11 categorías salen 6 y 5, no 10 y 1). Nunca scrollea. */}
       <div
         ref={barraRef}
-        className="grid flex-shrink-0 gap-2 border-b border-line bg-surface px-5 py-3"
+        className="grid flex-shrink-0 gap-2 border-b border-line bg-surface px-4 py-3"
         style={{ gridTemplateColumns: `repeat(${barra.columnas}, minmax(0, 1fr))` }}
       >
         {categorias === null && <p className="text-sm text-ink-3">Cargando…</p>}
@@ -146,14 +159,19 @@ export function CatalogoProductos({
               onClick={() => setElegida(c.id)}
               aria-current={active ? "true" : undefined}
               style={{ height: ALTO_PASTILLA, fontSize: pxEtiqueta }}
+              // Borde line-strong y tinta plena en reposo: con `line` y ink-2 las pastillas
+              // inactivas se perdían contra el fondo y parecían deshabilitadas.
               className={[
-                "inline-flex items-center justify-center gap-2 overflow-hidden rounded-lg border px-2 text-center font-semibold leading-tight transition-colors",
+                "inline-flex items-center justify-center gap-2 overflow-hidden rounded-lg border px-2.5 text-center font-semibold leading-tight transition-[transform,background-color,border-color,color] duration-150 ease-vim active:scale-[.97]",
                 active
                   ? "border-ink bg-ink font-bold text-white"
-                  : "border-line text-ink-2 hover:border-line-strong hover:text-ink",
+                  : "border-line-strong bg-surface text-ink hover:border-ink",
               ].join(" ")}
             >
-              {conIcono && (
+              {/* El color de la categoría va también en la pastilla: es el que lleva la franja de
+                  sus productos, y así se asocian sin leer. Con espacio, el icono ya coloreado; sin
+                  él, un cuadrito que no le quita ancho al nombre. */}
+              {conIcono ? (
                 <span
                   className="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded"
                   style={active ? { background: "rgba(255,255,255,0.15)", color: "#fff" } : { background: col.bg, color: col.ink }}
@@ -162,6 +180,8 @@ export function CatalogoProductos({
                     <path d={ICONOS_POS[c.icono ?? "tag"] ?? ICONOS_POS.tag} />
                   </svg>
                 </span>
+              ) : (
+                <span aria-hidden="true" className="h-2.5 w-2.5 flex-shrink-0 rounded-[3px]" style={{ background: col.ink }} />
               )}
               <span className="line-clamp-2 break-words">{c.nombre}</span>
             </button>
@@ -171,7 +191,7 @@ export function CatalogoProductos({
       </div>
 
       <div
-        className="min-h-0 flex-1 overflow-hidden bg-bg p-5 outline-none"
+        className="min-h-0 flex-1 overflow-hidden bg-bg p-4 outline-none"
         onPointerDown={onPointerDown}
         onPointerUp={onPointerUp}
         onClickCapture={(e) => {
@@ -216,30 +236,42 @@ export function CatalogoProductos({
                   disabled={p.agotado || bloqueado}
                   onClick={() => onTapProducto(p)}
                   style={{ fontSize: pxNombre }}
+                  // Solo transform y borde: es el botón que más se toca del turno, así que el
+                  // apachurrón es la única animación y dura lo que un toque.
                   className={[
-                    "flex h-full w-full flex-col items-center justify-center gap-1 overflow-hidden rounded-lg border bg-surface px-2 py-1.5 text-center transition",
-                    p.agotado || bloqueado
-                      ? "cursor-not-allowed border-line opacity-50"
-                      : "border-line hover:border-ink hover:shadow-sm active:scale-[.97]",
+                    "flex h-full w-full flex-col overflow-hidden rounded-lg border text-left transition-[transform,border-color] duration-150 ease-vim",
+                    p.agotado
+                      ? "cursor-not-allowed border-line-strong bg-sel text-ink-3"
+                      : bloqueado
+                        ? "cursor-not-allowed border-line-strong bg-surface opacity-50"
+                        : "border-line-strong bg-surface hover:border-ink active:scale-[.97]",
                   ].join(" ")}
                 >
-                  {/* Solo el nombre. El precio ocupa un renglón que el cajero no necesita, y sin él
-                      cabe más grande en la misma celda; se enciende con "Mostrar precios" cuando un
-                      cliente pregunta. break-words: un nombre largo sin espacios se saldría. */}
-                  <span className={[mostrarPrecios ? "line-clamp-2" : "line-clamp-3", "break-words font-semibold leading-snug"].join(" ")}>
-                    {p.nombre}
-                  </span>
-                  {p.agotado ? (
-                    <span className="font-bold uppercase tracking-wide text-danger" style={{ fontSize: pxNombre - 2 }}>
-                      Agotado
+                  {/* Franja del color de la categoría: el producto se reconoce antes de leerlo. */}
+                  <span
+                    aria-hidden="true"
+                    className="h-1.5 flex-shrink-0"
+                    style={{ background: colorDe.get(p.categoria_id) ?? "rgb(var(--line-strong))", opacity: p.agotado ? 0.3 : 1 }}
+                  />
+                  <span className={["flex min-h-0 flex-1 flex-col justify-center gap-1.5 py-2", rejilla.anchoFicha < 140 ? "px-2.5" : "px-3.5"].join(" ")}>
+                    {/* Solo el nombre. El precio ocupa un renglón que el cajero no necesita, y sin
+                        él cabe más grande en la misma celda; se enciende con "Precios" cuando un
+                        cliente pregunta. break-words: un nombre largo sin espacios se saldría. */}
+                    <span className={[mostrarPrecios || p.agotado ? "line-clamp-2" : "line-clamp-3", "break-words font-semibold leading-tight"].join(" ")}>
+                      {p.nombre}
                     </span>
-                  ) : (
-                    mostrarPrecios && (
-                      <span className="font-display font-bold tabular-nums" style={{ fontSize: pxNombre }}>
-                        {fmtMxn(p.precio_base_mxn)}
+                    {p.agotado ? (
+                      <span className="self-start rounded bg-hover px-1.5 py-0.5 text-[12px] font-bold uppercase tracking-[0.04em] text-ink-2">
+                        Agotado
                       </span>
-                    )
-                  )}
+                    ) : (
+                      mostrarPrecios && (
+                        <span className="font-display font-bold tabular-nums text-ink-2" style={{ fontSize: pxNombre - 1 }}>
+                          {fmtMxn(p.precio_base_mxn)}
+                        </span>
+                      )
+                    )}
+                  </span>
                 </button>
               ))}
             </div>

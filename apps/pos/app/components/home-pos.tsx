@@ -32,6 +32,7 @@ import { ModalModificadores } from "./modal-modificadores";
 import { ModalCombo } from "./modal-combo";
 import { HojaCombo } from "./hoja-combo";
 import { ModalCobro } from "./modal-cobro";
+import { CobroCompletado } from "./cobro-completado";
 import { ModalDescuento } from "./modal-descuento";
 import { obtenerImpresora, obtenerImpresoraDeEstacion } from "../lib/print/adapter";
 import { estacionParaArea, hayEstacionDeCocinaDedicada } from "../lib/print/config";
@@ -218,7 +219,20 @@ export function HomePos({
   const [pidiendoMesa, setPidiendoMesa] = useState(false);
   const [viendoMapaMesas, setViendoMapaMesas] = useState(false);
   const [procesandoCobro, setProcesandoCobro] = useState(false);
-  const [confirmacion, setConfirmacion] = useState<{ folio: string | null; cambio: number } | null>(null);
+  const [confirmacion, setConfirmacion] = useState<{ folio: string | null; cambio: number; total: number | null } | null>(null);
+  /**
+   * El cambio de la venta anterior, para el encabezado del ticket nuevo. "Cobro completado" se
+   * cierra solo a los 5 s, y a veces la cajera todavía está contando el dinero: así no lo pierde.
+   * Se borra con el primer producto del ticket nuevo.
+   */
+  const [cambioAnterior, setCambioAnterior] = useState<number | null>(null);
+  /** "Efectivo exacto" desde el ticket: el modal de cobro se abre ya cobrando. */
+  const [atajoCobro, setAtajoCobro] = useState<"EFECTIVO_EXACTO" | null>(null);
+  /** "Imprimir copia" abre el recibo y lo imprime de una vez. */
+  const [imprimirCopia, setImprimirCopia] = useState(false);
+  useEffect(() => {
+    if (carrito.lineas.length > 0) setCambioAnterior(null);
+  }, [carrito.lineas.length]);
   /**
    * Aviso de un domicilio que se cobró sin repartidor anotado (o cuyo reparto no se pudo liquidar).
    *
@@ -877,9 +891,10 @@ export function HomePos({
     obtenerImpresora("CAJA", { onMostrar: () => {} }).abrirCajon().catch(() => {});
   }, []);
 
-  const iniciarCobro = useCallback(async () => {
+  const iniciarCobro = useCallback(async (atajo: "EFECTIVO_EXACTO" | null = null) => {
     if (carrito.lineas.length === 0) return;
     abrirCajonParaCobrar();
+    setAtajoCobro(atajo);
     // Si el ticket ya se persistió (flujo de descuento), reusarlo: nada de re-abrir.
     if (ticketBd) {
       setTotalesCobro(ticketBd);
@@ -1173,6 +1188,7 @@ export function HomePos({
     setDatosTicket(null);
     setDatosComanda(null);
     setMostrarRecibo(false);
+    setImprimirCopia(false);
     setEstadoTicket("idle");
     setItemsPersistidos([]);
     setCancelandoItem(null);
@@ -1292,15 +1308,18 @@ export function HomePos({
           token={token}
           sucursalId={caja.sucursal_id}
           totalesIniciales={totalesCobro}
-          onPagado={async (folio, cambio) => {
+          atajo={atajoCobro}
+          onPagado={async (folio, cambio, total) => {
             const ticketId = totalesCobro.ticketId;
             setTotalesCobro(null);
+            setAtajoCobro(null);
+            setCambioAnterior(cambio > 0 ? cambio : null);
             setTicketBd(null);
             setEnModoMesa(false);
             setCocinaEnviada(false);
             dispatch({ tipo: "limpiar" });
             setCuentasVersion((v) => v + 1); // la cuenta pagada ya no va en la lista
-            setConfirmacion({ folio, cambio });
+            setConfirmacion({ folio, cambio, total });
             // Armar el ticket e IMPRIMIR automáticamente. Con PreviewAdapter abre el recibo
             // en pantalla; al activar EpsonEposAdapter, ese mismo llamado imprime en papel.
             try {
@@ -1406,43 +1425,20 @@ export function HomePos({
               setEstadoTicket("error");
             }
           }}
-          onCerrar={() => setTotalesCobro(null)}
+          onCerrar={() => { setTotalesCobro(null); setAtajoCobro(null); }}
         />
       )}
       {confirmacion && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/40 p-4" role="dialog" aria-modal="true">
-          <div className="w-full max-w-md rounded-xl bg-surface p-6 text-center shadow-xl">
-            <div className="mx-auto mb-3 flex h-16 w-16 items-center justify-center rounded-full bg-success/10 text-success">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" className="h-8 w-8"><path d="M20 6 9 17l-5-5" /></svg>
-            </div>
-            <div className="font-display text-[22px] font-semibold">Cobro completado</div>
-            {confirmacion.folio && <div className="mt-1 text-[13px] text-ink-3">Ticket {confirmacion.folio}</div>}
-            {confirmacion.cambio > 0 && (
-              <div className="mt-3 rounded-lg border border-line">
-                <div className="flex items-center justify-between px-4 py-3 text-success">
-                  <span className="text-[14px] font-semibold">Cambio a entregar</span>
-                  <span className="font-display text-[20px] font-bold tabular-nums">{fmtMxn(confirmacion.cambio)}</span>
-                </div>
-              </div>
-            )}
-            {/* Panel de impresión (1 fila: ticket del cliente) */}
-            <div className="mt-4 flex items-center gap-3 rounded-lg border border-line px-4 py-3 text-left">
-              <span className={["flex h-8 w-8 items-center justify-center rounded", estadoTicket === "lista" ? "bg-success/10 text-success" : estadoTicket === "error" ? "bg-danger/10 text-danger" : "bg-hover text-ink-3"].join(" ")}>
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-4 w-4"><polyline points="6 9 6 2 18 2 18 9" /><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2" /><rect x="6" y="14" width="12" height="8" /></svg>
-              </span>
-              <div className="flex-1">
-                <div className="text-[14px] font-semibold">Ticket del cliente</div>
-                <div className="text-[12px] text-ink-3">{estadoTicket === "lista" ? "Vista previa lista · 80mm" : estadoTicket === "error" ? "No se pudo armar" : "Preparando…"}</div>
-              </div>
-              {datosTicket && (
-                <button type="button" onClick={() => setMostrarRecibo(true)} className="rounded border border-line-strong px-3 py-1.5 text-[13px] font-semibold text-ink-2 hover:border-ink hover:text-ink">
-                  Ver / Imprimir
-                </button>
-              )}
-            </div>
-            <Button className="mt-4 w-full" onClick={nuevoTicket}>Nuevo ticket</Button>
-          </div>
-        </div>
+        <CobroCompletado
+          folio={confirmacion.folio}
+          cambio={confirmacion.cambio}
+          total={confirmacion.total}
+          estadoTicket={estadoTicket}
+          puedeImprimir={datosTicket != null}
+          pausa={mostrarRecibo || avisoReparto != null}
+          onImprimirCopia={() => { setImprimirCopia(true); setMostrarRecibo(true); }}
+          onNuevoTicket={nuevoTicket}
+        />
       )}
       {mostrarRecibo && datosTicket && (
         <ReciboPreview
@@ -1458,8 +1454,9 @@ export function HomePos({
               );
             }
           }}
-          onCerrar={() => setMostrarRecibo(false)}
+          onCerrar={() => { setMostrarRecibo(false); setImprimirCopia(false); }}
           onNuevoTicket={nuevoTicket}
+          autoImprimir={imprimirCopia}
         />
       )}
       {/* Domicilio cobrado sin repartidor anotado. z-[70] para quedar por encima de la confirmación
@@ -1714,6 +1711,7 @@ export function HomePos({
           // El cobro se abre ENCIMA de la lista, sin cargar la cuenta ni saltar al catálogo:
           // el cajero pidió cobrar, no capturar productos. El modal solo necesita los totales.
           try {
+            setAtajoCobro(null);
             setTotalesCobro(await leerTotales(token, ticketId));
           } catch (e) {
             setError(e instanceof Error ? e.message : "No se pudo abrir el cobro");
@@ -2003,7 +2001,9 @@ export function HomePos({
           onCambiarZona={() => setZonaPedidoAbierto(true)}
           onNotaLinea={(id, nota) => dispatch({ tipo: "nota_linea", clientId: id, nota })}
           onNotaOrden={(nota) => dispatch({ tipo: "nota_orden", nota })}
-          onCobrar={iniciarCobro}
+          onCobrar={() => void iniciarCobro()}
+          onEfectivoExacto={() => void iniciarCobro("EFECTIVO_EXACTO")}
+          cambioAnterior={cambioAnterior}
           // También en cuenta de mesa: lo que no ha salido a cocina se edita en la base (0119).
           onEditar={(id) => void editarLinea(id)}
           onPonerEnEspera={online ? () => { setEsperaError(null); setEsperaPidiendoEtiqueta(true); } : undefined}

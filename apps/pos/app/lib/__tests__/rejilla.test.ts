@@ -154,18 +154,25 @@ describe("calcularBarraCategorias", () => {
 
 describe("tamaño del texto", () => {
   it("la celda grande usa el texto máximo y la mínima el mínimo", () => {
-    expect(tamanoNombre(184, 128)).toBe(16);
-    expect(tamanoNombre(110, 92)).toBe(11);
+    expect(tamanoNombre(184, 128)).toBe(17);
+    expect(tamanoNombre(110, 92)).toBe(14);
   });
 
-  it("el nombre nunca baja de 11px ni sube de 16px", () => {
-    expect(tamanoNombre(40, 30)).toBe(11);
-    expect(tamanoNombre(900, 900)).toBe(16);
+  it("el nombre nunca baja de 14px ni sube de 17px", () => {
+    expect(tamanoNombre(40, 30)).toBe(14);
+    expect(tamanoNombre(900, 900)).toBe(17);
+  });
+
+  it("mide lo mismo en 1024×768 que en 1920×1080", () => {
+    // Celdas reales de las dos pantallas (3×4 contra 8×7): la grande no agranda la letra.
+    expect(tamanoNombre(222, 130)).toBe(17);
+    expect(tamanoNombre(170, 118)).toBe(17);
   });
 
   it("la etiqueta de categoría se achica con la pastilla pero no desaparece", () => {
-    expect(tamanoEtiqueta(155)).toBe(14);
-    expect(tamanoEtiqueta(92)).toBe(11);
+    expect(tamanoEtiqueta(155)).toBe(16);
+    expect(tamanoEtiqueta(134)).toBe(14);
+    expect(tamanoEtiqueta(92)).toBe(13);
   });
 });
 

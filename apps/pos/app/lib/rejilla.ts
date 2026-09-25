@@ -289,9 +289,13 @@ export function calcularBarraCategorias({ ancho, total }: { ancho: number; total
  * El texto se achica para caber en la celda en vez de que la celda crezca para el texto: es la
  * regla que pidió Fermín y la que mantiene la cuadrícula pareja. El ancho manda (los nombres
  * envuelven) y el alto pone el otro tope para que quepan nombre y precio.
+ *
+ * Subió de 11–16 a 14–17 con el rediseño de la venta (sep 2026): a 11px el nombre no se leía a
+ * brazo de distancia. El tope de 17 es el de la maqueta aprobada y es el mismo en 1024×768 que en
+ * 1920×1080: la pantalla grande enseña MÁS productos, no letra más grande.
  */
 export function tamanoNombre(anchoCelda: number, altoCelda: number): number {
-  return acotar(11, Math.floor(Math.min(anchoCelda / 11.5, altoCelda / 8)), 16);
+  return acotar(14, Math.floor(Math.min(anchoCelda / 10, altoCelda / 6.5)), 17);
 }
 
 /**
@@ -305,9 +309,16 @@ export function tamanoOpcion(anchoCelda: number, altoCelda: number): number {
   return acotar(13, Math.floor(Math.min(anchoCelda / 9, altoCelda / 4.2)), 15);
 }
 
-/** Talla de la etiqueta de categoría, en px. Misma idea que `tamanoNombre`. */
+/**
+ * Talla de la etiqueta de categoría, en px. Misma idea que `tamanoNombre`.
+ *
+ * La cuenta es la de "Hamburguesas", el nombre de una sola palabra más largo que suele haber: una
+ * palabra que no cabe en su renglón se parte a la mitad ("Hamburgu-esas"), y eso se lee peor que
+ * una letra un punto más chica. En 1024×768, con cinco categorías, la pastilla mide ~134px y sale
+ * a 14. El piso es 13 por la pastilla mínima (88px), que solo sale con muchas categorías.
+ */
 export function tamanoEtiqueta(anchoPastilla: number): number {
-  return acotar(11, Math.floor(anchoPastilla / 11), 14);
+  return acotar(13, Math.floor(anchoPastilla / 9.5), 16);
 }
 
 /**

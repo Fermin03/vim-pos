@@ -185,7 +185,7 @@ function metodoCfg(v: MetodoPago): MetodoConfig {
 
 // ─── Sub-vistas ──────────────────────────────────────────────────────────────
 
-type Vista = "propina" | "selector" | "efectivo" | "otro" | "dividido";
+type Vista = "propina" | "selector" | "efectivo" | "otro" | "dividido" | "atajo";
 
 // ─── Tipos locales ───────────────────────────────────────────────────────────
 
@@ -206,18 +206,23 @@ function Numpad({
   buffer,
   onChange,
   compact = false,
+  grande = false,
   onEnter,
   capturarTeclado = true,
 }: {
   buffer: string;
   onChange: (b: string) => void;
   compact?: boolean;
+  /** Teclas de 64px: las del cobro en efectivo, el teclado que más se usa del turno. */
+  grande?: boolean;
   /** Enter confirma (p. ej. cobrar). */
   onEnter?: () => void;
   /** Si es false, no escucha el teclado (por si convivieran dos numpads). */
   capturarTeclado?: boolean;
 }) {
-  const nkBase = compact
+  const nkBase = grande
+    ? "border border-line-strong rounded-lg bg-surface font-display text-2xl font-semibold cursor-pointer h-16 flex items-center justify-center text-ink transition-[transform,background-color] duration-150 ease-vim hover:bg-hover active:scale-[.97] active:bg-line"
+    : compact
     ? "border border-line-strong rounded bg-surface font-display text-xl font-semibold cursor-pointer min-h-[48px] flex items-center justify-center text-ink transition-colors hover:bg-hover active:bg-line"
     : "border border-line-strong rounded bg-surface font-display text-2xl font-semibold cursor-pointer min-h-[56px] flex items-center justify-center text-ink transition-colors hover:bg-hover active:bg-line";
 
@@ -254,7 +259,7 @@ function Numpad({
   return (
     <div className="grid grid-cols-3 gap-2">
       {keys.map((k) => (
-        <button key={k} type="button" className={nkBase} onClick={() => press(k)}>
+        <button key={k} type="button" className={nkBase} onClick={() => press(k)} aria-label={k === "back" ? "Borrar" : undefined}>
           {k === "back" ? <IcoBackspace cls="w-6 h-6 text-ink-2" /> : k}
         </button>
       ))}
@@ -370,8 +375,9 @@ function VistaEfectivo({
   const [buffer, setBuffer] = useState<string>(aBuffer(pendiente));
   const [recibBuffer, setRecibBuffer] = useState<string>("");
 
-  // Atajos de denominación (billetes en pesos → centavos)
-  const denominaciones = [50, 100, 200, 500, 1000];
+  // Billetes en pesos. Se SUMAN: $200 + $100 = $300, que es como llega el dinero en la mano. El de
+  // $20 faltaba, y es el más común en una cuenta chica.
+  const billetes = [20, 50, 100, 200, 500, 1000];
   function addDenom(d: number) {
     const cur = recibBuffer ? parseInt(recibBuffer, 10) : 0;
     setRecibBuffer(String(cur + d * 100));
@@ -387,136 +393,100 @@ function VistaEfectivo({
     onAplicar(monto, recibido);
   }
 
-  let changeState: "idle" | "ready" | "short" = "idle";
-  if (recibido > 0 && cambio >= 0) changeState = "ready";
-  else if (recibido > 0 && cambio < 0) changeState = "short";
+  const falta = recibido > 0 && cambio < 0;
+
+  // El botón dice lo que va a pasar, con el número que la cajera tiene que contar: "Cobrar y dar
+  // $125.00 de cambio". Antes decía "Cobrar $375.00" pasara lo que pasara.
+  const etiquetaCobrar = procesando
+    ? "Aplicando…"
+    : !puedeCobrar
+      ? `Cobrar ${fmtMxn(pendiente)}`
+      : cambio > 0
+        ? `Cobrar y dar ${fmtMxn(cambio)} de cambio`
+        : `Cobrar ${fmtMxn(pendiente)} exacto`;
 
   return (
-    <div className="flex h-full min-h-0">
-      {/* Columna izquierda */}
-      <div className="flex-1 min-w-0 flex flex-col border-r border-line px-8 py-6">
-        {/* Cabecera */}
-        <div className="flex items-center gap-3 mb-5">
-          <span className="w-10 h-10 rounded-[11px] flex items-center justify-center flex-shrink-0" style={{ background: "#E7F2EC", color: "#2E7D52" }}>
-            <IcoEfectivo cls="w-[22px] h-[22px]" />
-          </span>
-          <div>
-            <h1 className="font-display text-xl font-semibold tracking-tight">Pago en efectivo</h1>
-            <p className="text-[12.5px] text-ink-3">Ticket #{totales.ticketId.slice(-6)}</p>
-          </div>
+    <div className="flex flex-col gap-4 p-6">
+      <div className="flex items-baseline justify-between gap-4">
+        <h1 className="font-display text-[22px] font-semibold tracking-[-0.02em]">Cobro en efectivo</h1>
+        <div className="text-[16px] font-semibold text-ink-2">
+          Total{" "}
+          <span className="font-display text-[22px] font-bold tabular-nums text-ink">{fmtMxn(pendiente)}</span>
         </div>
-
-        {/* Filas totales */}
-        <div className="flex flex-col gap-3">
-          <div className="flex items-baseline justify-between py-3 border-b border-line">
-            <span className="text-[15px] text-ink-2 font-medium">Total a cobrar</span>
-            <span className="font-display text-[22px] font-semibold text-ink tabular-nums">{fmtMxn(pendiente)}</span>
-          </div>
-          <div className={["flex items-baseline justify-between py-3", recibido <= 0 ? "opacity-50" : ""].join(" ")}>
-            <span className="text-[15px] text-ink-2 font-medium">Efectivo recibido</span>
-            <span className="font-display text-[22px] font-semibold text-ink tabular-nums">
-              {recibido > 0 ? fmtMxn(recibido) : "$0.00"}
-            </span>
-          </div>
-        </div>
-
-        {/* Cambio prominente */}
-        <div
-          className={[
-            "mt-auto border rounded-lg p-6 text-center transition-all",
-            changeState === "ready"
-              ? "bg-[#E7F2EC] border-[#BFE0CC]"
-              : changeState === "short"
-                ? "bg-[#FCF6E8] border-[#EEDFB8]"
-                : "border-line",
-          ].join(" ")}
-        >
-          <div
-            className={[
-              "text-[13px] font-bold uppercase tracking-widest",
-              changeState === "ready" ? "text-success" : changeState === "short" ? "text-warning" : "text-ink-3",
-            ].join(" ")}
-          >
-            {changeState === "short" ? "Falta" : "Cambio"}
-          </div>
-          <div
-            className={[
-              "font-display font-bold tabular-nums leading-none mt-[6px]",
-              changeState === "ready"
-                ? "text-[60px] text-success"
-                : changeState === "short"
-                  ? "text-[30px] text-warning"
-                  : "text-[60px] text-ink-3",
-            ].join(" ")}
-          >
-            {changeState === "short"
-              ? fmtMxn(Math.abs(cambio))
-              : fmtMxn(Math.max(0, cambio))}
-          </div>
-          <div
-            className={[
-              "text-[13px] mt-2 tabular-nums",
-              changeState === "ready" ? "text-success" : changeState === "short" ? "text-warning font-semibold" : "text-ink-3",
-            ].join(" ")}
-          >
-            {changeState === "short"
-              ? "El efectivo recibido es menor al total"
-              : changeState === "ready" && cambio === 0
-                ? "Pago exacto, sin cambio"
-                : changeState === "ready"
-                  ? "Entrega este cambio al cliente"
-                  : "Captura el efectivo que entrega el cliente"}
-          </div>
-        </div>
-
-        {error && <p className="mt-3 text-sm font-medium text-danger" role="alert">{error}</p>}
       </div>
 
-      {/* Columna derecha: atajos + numpad + cobrar */}
-      <div className="w-[440px] flex-shrink-0 flex flex-col px-6 py-6">
-        {/* Atajos de denominación */}
-        <div className="grid grid-cols-3 gap-2 mb-3">
-          {denominaciones.map((d) => (
-            <button
-              key={d}
-              type="button"
-              onClick={() => addDenom(d)}
-              className="py-[13px] border border-line-strong bg-surface rounded font-sans text-[15px] font-semibold text-ink cursor-pointer transition-all hover:border-ink hover:bg-hover active:scale-[.97] tabular-nums"
+      <div className="flex gap-5">
+        <div className="flex min-w-0 flex-1 flex-col gap-3">
+          {/* Recibido y cambio ARRIBA y en grande: son los dos números que se miran mientras se
+              cuenta el dinero. El cambio iba abajo, lejos de los billetes. */}
+          <div className="flex items-center justify-between gap-3 rounded-lg border-2 border-ink px-4 py-3.5">
+            <span className="text-[16px] font-semibold text-ink-2">Recibido</span>
+            <span className={["font-display text-[40px] font-bold leading-none tracking-[-0.02em] tabular-nums", recibido > 0 ? "text-ink" : "text-ink-3"].join(" ")}>
+              {fmtMxn(recibido)}
+            </span>
+          </div>
+          <div
+            className={[
+              "flex items-center justify-between gap-3 rounded-lg px-4 py-3.5",
+              falta ? "bg-warning-soft" : recibido > 0 ? "bg-success-soft" : "bg-hover",
+            ].join(" ")}
+          >
+            <span className={["text-[16px] font-semibold", falta ? "text-warning" : recibido > 0 ? "text-success" : "text-ink-3"].join(" ")}>
+              {falta ? "Falta" : "Entrega de cambio"}
+            </span>
+            <span
+              className={[
+                "font-display text-[48px] font-bold leading-none tracking-[-0.02em] tabular-nums",
+                falta ? "text-warning" : recibido > 0 ? "text-success" : "text-ink-3",
+              ].join(" ")}
             >
-              ${d >= 1000 ? "1,000" : d}
-            </button>
-          ))}
+              {fmtMxn(Math.abs(cambio))}
+            </span>
+          </div>
+
+          <div className="grid grid-cols-3 gap-2">
+            {billetes.map((d) => (
+              <button
+                key={d}
+                type="button"
+                onClick={() => addDenom(d)}
+                className="h-14 rounded-lg border border-line-strong bg-surface font-display text-[18px] font-bold tabular-nums text-ink transition-[transform,background-color,border-color] duration-150 ease-vim hover:border-ink active:scale-[.97] active:bg-hover"
+              >
+                ${d >= 1000 ? "1,000" : d}
+              </button>
+            ))}
+          </div>
           <button
             type="button"
-            onClick={() => { setRecibBuffer(aBuffer(pendiente)); }}
-            className="col-span-3 py-[13px] border border-dashed border-line-strong bg-surface rounded font-sans text-[15px] font-semibold text-ink-2 cursor-pointer transition-all hover:text-ink hover:bg-hover tabular-nums"
+            onClick={() => setRecibBuffer(aBuffer(pendiente))}
+            className="h-12 rounded-lg border border-line-strong bg-surface text-[16px] font-bold tabular-nums text-ink transition-[transform,border-color] duration-150 ease-vim hover:border-ink active:scale-[.98]"
           >
             Pago exacto · {fmtMxn(pendiente)}
           </button>
+          {error && <p className="text-sm font-medium text-danger" role="alert">{error}</p>}
         </div>
 
-        {/* Numpad recibido */}
-        <div className="flex-1">
-          <Numpad buffer={recibBuffer} onChange={setRecibBuffer} onEnter={handleCobrar} />
+        <div className="w-64 flex-shrink-0">
+          <Numpad buffer={recibBuffer} onChange={setRecibBuffer} onEnter={handleCobrar} grande />
         </div>
+      </div>
 
-        {/* Botón cobrar */}
-        <button
-          type="button"
-          onClick={handleCobrar}
-          disabled={!puedeCobrar || procesando}
-          className="mt-3 w-full font-sans text-[18px] font-bold text-white bg-accent border-none py-[18px] rounded-lg cursor-pointer transition-colors hover:bg-accent-hover disabled:bg-line-strong disabled:cursor-not-allowed flex items-center justify-center gap-[10px] shadow-sm"
-        >
-          {procesando ? "Aplicando…" : <>Cobrar <span className="font-display tabular-nums opacity-90">{fmtMxn(pendiente)}</span></>}
-        </button>
+      <div className="flex gap-2.5">
         <button
           type="button"
           onClick={onVolver}
           disabled={procesando}
-          className="mt-2 flex items-center justify-center gap-[7px] font-sans text-[13.5px] font-semibold text-ink-3 bg-transparent border-none cursor-pointer py-2 px-3 rounded transition-colors hover:text-ink"
+          className="h-14 w-40 flex-shrink-0 rounded-lg border border-line-strong bg-surface text-[16px] font-semibold text-ink transition-[transform,border-color] duration-150 ease-vim hover:border-ink active:scale-[.98] disabled:opacity-50"
         >
-          <IcoBack cls="w-[15px] h-[15px]" />
-          Cambiar método de pago
+          Volver
+        </button>
+        <button
+          type="button"
+          onClick={handleCobrar}
+          disabled={!puedeCobrar || procesando}
+          className="h-14 min-w-0 flex-1 rounded-lg bg-accent px-4 font-display text-[18px] font-bold tabular-nums text-white shadow-sm transition-[transform,background-color] duration-150 ease-vim hover:bg-accent-hover active:scale-[.98] disabled:cursor-not-allowed disabled:bg-line-strong disabled:shadow-none disabled:active:scale-100"
+        >
+          <span className="block truncate">{etiquetaCobrar}</span>
         </button>
       </div>
     </div>
@@ -1025,13 +995,20 @@ export function ModalCobro({
   token,
   sucursalId,
   totalesIniciales,
+  atajo = null,
   onPagado,
   onCerrar,
 }: {
   token: string;
   sucursalId: string;
   totalesIniciales: TotalesTicket;
-  onPagado: (folio: string | null, cambio: number) => void;
+  /**
+   * "Efectivo exacto" desde el ticket: cobra el pendiente en efectivo sin pasar por el selector ni
+   * el teclado. Si la sucursal pide propina, la pregunta primero; si el cobro falla, cae en la
+   * vista de efectivo normal con el error a la vista.
+   */
+  atajo?: "EFECTIVO_EXACTO" | null;
+  onPagado: (folio: string | null, cambio: number, total: number) => void;
   onCerrar: () => void;
 }) {
   const [totales, setTotales] = useState<TotalesTicket>(totalesIniciales);
@@ -1049,14 +1026,16 @@ export function ModalCobro({
       .then((s) => {
         if (!activo) return;
         setSug(s);
-        if (!s.capturar) setVista("selector"); // sucursal sin propina → salta el paso
+        if (!s.capturar) setVista(atajo ? "atajo" : "selector"); // sucursal sin propina → salta el paso
       })
       .catch(() => {
         if (!activo) return;
         setSug({ porcentajes: [10, 15, 20], capturar: false, libre: true, sin: true });
-        setVista("selector");
+        setVista(atajo ? "atajo" : "selector");
       });
     return () => { activo = false; };
+    // El atajo se fija al abrir el modal y no cambia mientras está abierto.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token, sucursalId]);
 
   // Total autoritativo (BD) + propina capturada en cliente; la propina ya quedó persistida.
@@ -1072,7 +1051,7 @@ export function ModalCobro({
     try {
       await establecerPropina(token, totales.ticketId, monto);
       setPropina(monto);
-      setVista("selector");
+      setVista(atajo ? "atajo" : "selector");
     } catch (e) {
       setError(e instanceof Error ? e.message : "No se pudo fijar la propina");
     } finally {
@@ -1093,17 +1072,29 @@ export function ModalCobro({
       );
       setTotales(t);
       if (t.estadoFiscal === "PAGADO") {
-        onPagado(t.folio, t.cambio);
+        onPagado(t.folio, t.cambio, t.total);
       } else {
         // queda pendiente: resetea a selector para siguiente pago
         setVista("selector");
       }
     } catch (e) {
       setError(e instanceof Error ? e.message : "Error al cobrar");
+      // Un atajo que falla no se queda en su pantalla de espera: pasa a la de efectivo, con el
+      // error, para que la cajera cobre a mano sin volver a empezar.
+      setVista((v) => (v === "atajo" ? "efectivo" : v));
     } finally {
       setProcesando(false);
     }
   }
+
+  // Efectivo exacto: se aplica UNA vez al llegar a su vista (después de la propina, si la hubo).
+  const atajoAplicado = useRef(false);
+  useEffect(() => {
+    if (vista !== "atajo" || atajoAplicado.current) return;
+    atajoAplicado.current = true;
+    void aplicarUnPago("EFECTIVO", totalesEf.pendiente, totalesEf.pendiente);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [vista]);
 
   /** Aplica una lista de pagos divididos SECUENCIALMENTE (no en paralelo). Navega solo al final. */
   async function aplicarPagosDivididos(lista: { metodo: MetodoPago; monto: number }[]) {
@@ -1117,7 +1108,7 @@ export function ModalCobro({
         t = await aplicarPago(token, totales.ticketId, { metodo: p.metodo, monto: p.monto }, nuevoClientId());
       }
       setTotales(t);
-      if (t.estadoFiscal === "PAGADO") onPagado(t.folio, t.cambio);
+      if (t.estadoFiscal === "PAGADO") onPagado(t.folio, t.cambio, t.total);
       else setError("Los pagos no cubrieron el total del ticket.");
     } catch (e) {
       setError(e instanceof Error ? e.message : "Error al cobrar");
@@ -1139,8 +1130,9 @@ export function ModalCobro({
     }
   }
 
-  // Tamaño del modal según la vista activa
-  const esFullscreen = vista === "efectivo" || vista === "otro" || vista === "dividido";
+  // Tamaño del modal según la vista activa. El efectivo mide lo que su contenido (80 % de la
+  // pantalla con tope de 960px): al 80 % de 1920 mediría 1536 y los números quedarían perdidos.
+  const esFullscreen = vista === "otro" || vista === "dividido";
 
   return (
     <div
@@ -1151,9 +1143,11 @@ export function ModalCobro({
       <div
         className={[
           "bg-surface rounded-lg shadow-xl overflow-hidden flex flex-col",
-          esFullscreen
-            ? "w-full max-w-[920px] h-full max-h-[700px]"
-            : "w-full max-w-[560px] max-h-[90vh] overflow-y-auto p-6",
+          vista === "efectivo"
+            ? "w-[min(960px,80vw)] max-h-full overflow-y-auto"
+            : esFullscreen
+              ? "w-full max-w-[920px] h-full max-h-[700px]"
+              : "w-full max-w-[560px] max-h-[90vh] overflow-y-auto p-6",
         ].join(" ")}
       >
         {vista === "propina" && (
@@ -1170,6 +1164,12 @@ export function ModalCobro({
           ) : (
             <div className="flex items-center justify-center py-16 text-sm text-ink-3">Cargando…</div>
           )
+        )}
+        {vista === "atajo" && (
+          <div className="flex flex-col items-center gap-2 py-10 text-center" role="status">
+            <div className="font-display text-[22px] font-semibold">Cobrando en efectivo exacto…</div>
+            <div className="font-display text-[32px] font-bold tabular-nums">{fmtMxn(totalesEf.pendiente)}</div>
+          </div>
         )}
         {vista === "selector" && (
           <VistaSelector
