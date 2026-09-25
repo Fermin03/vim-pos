@@ -1,160 +1,108 @@
 "use client";
-import { useCallback, useEffect, useState } from "react";
-import { PageBody, PageHeader } from "../../../components/page-header";
-import { RangoFechas } from "../../../components/rango-fechas";
-import { fmtMxn, leerZHistorico, rangoUltimosDias, type FilaZHistorico } from "../../../lib/reportes";
-import { mensajeError } from "../../../lib/errores";
-import { fechaLegible } from "@vim/fecha";
+import { useState } from "react";
+import { Nota, ReporteMarco, useConsulta, useRangoReporte, type Cifra } from "../../../components/reporte";
+import { leerZHistorico, type FilaZHistorico } from "../../../lib/reportes";
+import { formatear, type Columna } from "../../../lib/reporte-tabla";
 
-export default function ZHistoricoPage() {
-  const r0 = rangoUltimosDias(30);
-  const [desde, setDesde] = useState(r0.desde);
-  const [hasta, setHasta] = useState(r0.hasta);
-  const [filas, setFilas] = useState<FilaZHistorico[] | null>(null);
-  const [error, setError] = useState<string | null>(null);
+const cuadra = (n: number) => Math.abs(n) < 0.01;
+// Faltante en rojo (es dinero que no está); sobrante en ámbar (hay que revisar, no se perdió nada).
+const colorDif = (n: number) => (cuadra(n) ? "text-ink-2" : n < 0 ? "text-danger" : "text-warning");
+
+export default function CortesDeTurnoPage() {
+  const { rango, cambiar } = useRangoReporte();
+  const consulta = useConsulta((r) => leerZHistorico(r.desde, r.hasta), rango);
   const [soloDiferencia, setSoloDiferencia] = useState(false);
+  const todas = consulta.datos ?? [];
+  const filas = soloDiferencia ? todas.filter((f) => !cuadra(f.diferencia_efectivo)) : todas;
 
-  const cargar = useCallback(async (d: string, h: string) => {
-    setFilas(null);
-    setError(null);
-    try {
-      setFilas(await leerZHistorico(d, h));
-    } catch (e) {
-      setError(mensajeError(e, "Error al cargar"));
-    }
-  }, []);
+  const dif = todas.reduce((s, f) => s + f.diferencia_efectivo, 0);
+  const conFaltante = todas.filter((f) => f.diferencia_efectivo < -0.01).length;
+  const dias = new Set(todas.map((f) => f.dia_contable)).size;
+  const porDia = dias > 0 ? todas.length / dias : 0;
 
-  useEffect(() => {
-    cargar(desde, hasta);
-  }, [cargar, desde, hasta]);
+  const cifras: Cifra[] = [
+    {
+      etiqueta: "Cortes",
+      valor: todas.length,
+      tipo: "entero",
+      pie: dias > 0 ? `${porDia.toFixed(1).replace(/\.0$/, "")} por día` : "sin cierres en estas fechas",
+    },
+    { etiqueta: "Vendido", valor: todas.reduce((s, f) => s + f.total_ventas, 0), tipo: "mxn" },
+    {
+      etiqueta: "Diferencia de efectivo",
+      valor: dif,
+      tipo: "mxn",
+      tono: todas.length === 0 ? "neutro" : cuadra(dif) ? "bien" : dif < 0 ? "mal" : "atencion",
+      pie: todas.length === 0 ? undefined : cuadra(dif) ? "sin diferencia" : dif < 0 ? "faltante, sumando todos los cortes" : "sobrante, sumando todos los cortes",
+    },
+    {
+      etiqueta: "Cortes con faltante",
+      valor: `${conFaltante} de ${todas.length}`,
+      tono: todas.length === 0 ? "neutro" : conFaltante > 0 ? "mal" : "bien",
+      pie: todas.length === 0 ? undefined : conFaltante > 0 ? "revísalos con quien cerró" : "todo cuadrado",
+    },
+  ];
 
-  const totales = (filas ?? []).reduce(
-    (s, f) => ({
-      ventas: s.ventas + f.total_ventas,
-      tickets: s.tickets + f.total_tickets,
-      dif: s.dif + f.diferencia_efectivo,
-    }),
-    { ventas: 0, tickets: 0, dif: 0 },
+  const columnas: Columna<FilaZHistorico>[] = [
+    { id: "folio", titulo: "Folio", valor: (f) => f.folio_z, ancho: 16, celda: (f) => <span className="font-mono text-[12.5px]">{f.folio_z}</span> },
+    { id: "dia", titulo: "Día", tipo: "fecha", valor: (f) => f.dia_contable, enfasis: "suave", ancho: 12 },
+    { id: "caja", titulo: "Caja", valor: (f) => f.caja, enfasis: "suave" },
+    { id: "cerro", titulo: "Cerró", valor: (f) => f.cerro, ancho: 18 },
+    { id: "tickets", titulo: "Tickets", tipo: "entero", valor: (f) => f.total_tickets, total: "suma" },
+    { id: "vendido", titulo: "Vendido", tipo: "mxn", valor: (f) => f.total_ventas, total: "suma" },
+    { id: "propinas", titulo: "Propinas", tipo: "mxn", valor: (f) => f.total_propinas, total: "suma", enfasis: "suave" },
+    { id: "esperado", titulo: "Efectivo esperado", tipo: "mxn", valor: (f) => f.efectivo_esperado, total: "suma", enfasis: "suave", ancho: 18 },
+    { id: "contado", titulo: "Efectivo contado", tipo: "mxn", valor: (f) => f.efectivo_declarado, total: "suma", enfasis: "suave", ancho: 18 },
+    {
+      id: "diferencia",
+      titulo: "Diferencia",
+      tipo: "mxn",
+      valor: (f) => f.diferencia_efectivo,
+      total: "suma",
+      celda: (f) => <span className={`font-semibold ${colorDif(f.diferencia_efectivo)}`}>{formatear(f.diferencia_efectivo, "mxn")}</span>,
+    },
+  ];
+
+  const filtro = (
+    <div role="group" aria-label="Qué cortes mostrar" className="inline-flex gap-0.5 rounded border border-line bg-hover p-[3px]">
+      {[
+        { v: false, l: "Todos" },
+        { v: true, l: "Con diferencia" },
+      ].map((t) => (
+        <button
+          key={t.l}
+          type="button"
+          aria-pressed={soloDiferencia === t.v}
+          onClick={() => setSoloDiferencia(t.v)}
+          className={`min-h-[40px] whitespace-nowrap rounded-[4px] px-3 text-[13px] font-semibold transition-colors ${soloDiferencia === t.v ? "bg-surface text-ink shadow-sm" : "text-ink-2 hover:text-ink"}`}
+        >
+          {t.l}
+        </button>
+      ))}
+    </div>
   );
-  // "Con faltante" = diferencia negativa: falta efectivo en caja, que es lo que se audita.
-  const conFaltante = (filas ?? []).filter((f) => f.diferencia_efectivo < -0.01).length;
-  const dias = new Set((filas ?? []).map((f) => f.dia_contable)).size;
-
-  function colorDif(n: number): string {
-    if (Math.abs(n) < 0.01) return "text-success";
-    if (n < 0) return "text-danger";
-    return "text-warning";
-  }
-
-  const visibles = (filas ?? []).filter((f) => (soloDiferencia ? Math.abs(f.diferencia_efectivo) >= 0.01 : true));
 
   return (
-    <>
-      <PageHeader
-        titulo="Cortes Z históricos"
-        subtitulo="Cada cierre de turno genera un corte Z. Revisa los totales y diferencias de efectivo de tu operación."
-        migas={[{ label: "Reportes" }, { label: "Cortes Z" }]}
-      />
-      <PageBody>
-        <div className="mb-4">
-          <RangoFechas desde={desde} hasta={hasta} onCambio={(d, h) => { setDesde(d); setHasta(h); }} />
-        </div>
-
-        {filas === null && !error && <p className="text-sm text-ink-3">Cargando…</p>}
-        {error && <p className="text-sm font-medium text-danger" role="alert">{error}</p>}
-        {filas && (
-          <>
-            <div className="mb-4 grid grid-cols-2 gap-3 lg:grid-cols-4">
-              <div className="rounded-lg border border-line bg-surface p-4">
-                <div className="text-[11.5px] font-bold uppercase tracking-wide text-ink-3">Cortes en el período</div>
-                <div className="font-display mt-1 text-[18px] font-bold tabular-nums lg:text-[22px]">{filas.length}</div>
-                <div className="mt-0.5 text-[11.5px] text-ink-3">
-                  {dias > 0 ? `${(filas.length / dias).toFixed(1).replace(/\.0$/, "")} turno${filas.length / dias === 1 ? "" : "s"} por día` : "sin cierres"}
-                </div>
-              </div>
-              <div className="rounded-lg border border-line bg-surface p-4">
-                <div className="text-[11.5px] font-bold uppercase tracking-wide text-ink-3">Total acumulado</div>
-                <div className="font-display mt-1 text-[18px] font-bold tabular-nums lg:text-[22px]">{fmtMxn(totales.ventas)}</div>
-                <div className="mt-0.5 text-[11.5px] text-ink-3">ventas brutas</div>
-              </div>
-              <div className="rounded-lg border border-line bg-surface p-4">
-                <div className="text-[11.5px] font-bold uppercase tracking-wide text-ink-3">Diferencia acumulada</div>
-                <div className={`font-display mt-1 text-[18px] font-bold tabular-nums lg:text-[22px] ${colorDif(totales.dif)}`}>{fmtMxn(totales.dif)}</div>
-                <div className="mt-0.5 text-[11.5px] text-ink-3">
-                  {Math.abs(totales.dif) < 0.01 ? "sin diferencia" : totales.dif < 0 ? "faltante neto" : "sobrante neto"}
-                </div>
-              </div>
-              <div className="rounded-lg border border-line bg-surface p-4">
-                <div className="text-[11.5px] font-bold uppercase tracking-wide text-ink-3">Cortes con faltante</div>
-                <div className={`font-display mt-1 text-[18px] font-bold tabular-nums lg:text-[22px] ${conFaltante > 0 ? "text-danger" : ""}`}>
-                  {conFaltante} de {filas.length}
-                </div>
-                <div className="mt-0.5 text-[11.5px] text-ink-3">{conFaltante > 0 ? "requieren revisión" : "todo cuadrado"}</div>
-              </div>
-            </div>
-
-            <div className="mb-3 scroll-x-limpio inline-flex max-w-full gap-0.5 overflow-x-auto rounded border border-line bg-hover p-[3px] lg:max-w-none lg:overflow-x-visible">
-              {[
-                { v: false, l: "Todos" },
-                { v: true, l: "Con diferencia" },
-              ].map((t) => (
-                <button
-                  key={String(t.v)}
-                  type="button"
-                  onClick={() => setSoloDiferencia(t.v)}
-                  className={["flex-shrink-0 whitespace-nowrap rounded-[4px] px-3 py-[11px] text-[12.5px] font-semibold transition lg:py-1.5", soloDiferencia === t.v ? "bg-surface text-ink shadow-sm" : "text-ink-2 hover:text-ink"].join(" ")}
-                >
-                  {t.l}
-                </button>
-              ))}
-            </div>
-
-            <div className="tabla-caja tabla-caja-xl overflow-hidden rounded-lg border border-line bg-surface">
-              <table className="w-full text-[13px]">
-                <thead>
-                  <tr className="border-b border-line bg-sel text-left text-[11.5px] font-bold uppercase tracking-wide text-ink-3">
-                    <th className="px-4 py-2.5">Folio Z</th>
-                    <th className="px-4 py-2.5">Día</th>
-                    <th className="px-4 py-2.5 text-right">Tickets</th>
-                    <th className="px-4 py-2.5 text-right">Vendido</th>
-                    <th className="px-4 py-2.5 text-right">Propinas</th>
-                    <th className="px-4 py-2.5 text-right">Esperado</th>
-                    <th className="px-4 py-2.5 text-right">Declarado</th>
-                    <th className="px-4 py-2.5 text-right">Diferencia</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {visibles.length === 0 && (
-                    <tr>
-                      <td colSpan={8} className="px-4 py-8 text-center">
-                        <p className="text-[14px] font-semibold text-ink-2">Sin resultados</p>
-                        <p className="mt-1 text-[12.5px] text-ink-3">
-                          {soloDiferencia && filas.length > 0 ? "Ningún corte del período tiene diferencia de efectivo." : "No hay cortes Z en el rango elegido."}
-                        </p>
-                      </td>
-                    </tr>
-                  )}
-                  {visibles.map((f) => (
-                    <tr key={f.id} className="border-b border-line last:border-b-0">
-                      <td className="px-4 py-2.5 font-mono text-[12px]">{f.folio_z}</td>
-                      <td className="px-4 py-2.5 text-ink-2">{fechaLegible(f.dia_contable)}</td>
-                      <td className="px-4 py-2.5 text-right tabular-nums">{f.total_tickets}</td>
-                      <td className="px-4 py-2.5 text-right font-medium tabular-nums">{fmtMxn(f.total_ventas)}</td>
-                      <td className="px-4 py-2.5 text-right tabular-nums text-ink-2">{fmtMxn(f.total_propinas)}</td>
-                      <td className="px-4 py-2.5 text-right tabular-nums text-ink-2">{fmtMxn(f.efectivo_esperado)}</td>
-                      <td className="px-4 py-2.5 text-right tabular-nums text-ink-2">{fmtMxn(f.efectivo_declarado)}</td>
-                      <td className={`px-4 py-2.5 text-right font-semibold tabular-nums ${colorDif(f.diferencia_efectivo)}`}>{fmtMxn(f.diferencia_efectivo)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-              <div className="border-t border-line px-4 py-3 text-[12.5px] text-ink-3">
-                Mostrando <b className="text-ink-2">{visibles.length}</b> de <b className="text-ink-2">{filas.length}</b> cortes
-              </div>
-            </div>
-          </>
-        )}
-      </PageBody>
-    </>
+    <ReporteMarco
+      titulo="Cortes de turno"
+      subtitulo="Cada cierre de caja: lo vendido, el efectivo que debía haber contra el que se contó, y quién cerró."
+      rango={{ valor: rango, cambiar }}
+      filtros={filtro}
+      consulta={consulta}
+      cifras={cifras}
+      tabla={{
+        columnas,
+        filas,
+        clave: (f) => f.id,
+        minimo: 1180,
+        vacio: soloDiferencia && todas.length > 0 ? "Ningún corte de estas fechas tiene diferencia de efectivo." : "No hubo cortes en estas fechas.",
+      }}
+    >
+      {soloDiferencia && todas.length > 0 && (
+        <Nota>
+          Mostrando {filas.length} de {todas.length} cortes. El Excel descarga lo que ves.
+        </Nota>
+      )}
+    </ReporteMarco>
   );
 }

@@ -13,10 +13,12 @@ import { mensajeError } from "../../lib/errores";
 const REPORTES_RAPIDOS = [
   // Decía "Estado de resultados · Ventas, IVA, descuentos, comisiones" y abría el consolidado, que
   // no tiene IVA ni comisiones. El nombre dice ahora lo que hay detrás.
-  { href: "/reportes/consolidado", nombre: "Consolidado por sucursal", desc: "Venta, tickets y participación de cada sucursal" },
-  { href: "/reportes/ventas-producto", nombre: "Ventas por producto", desc: "Top productos y unidades" },
-  { href: "/reportes/ventas-mesero", nombre: "Ventas por mesero", desc: "Desempeño del equipo" },
-  { href: "/reportes/z-historico", nombre: "Cortes Z", desc: "Histórico de cierres de turno" },
+  // Con los nombres del índice de reportes. El consolidado salió: a un negocio de una sucursal
+  // (casi todos) no le dice nada, y sigue en Reportes para las cadenas.
+  { href: "/reportes/ventas-producto", nombre: "Ventas por producto", desc: "Qué se vende más" },
+  { href: "/reportes/ventas-categoria", nombre: "Ventas por categoría", desc: "La venta por categoría del menú" },
+  { href: "/reportes/ventas-mesero", nombre: "Ventas por mesero", desc: "Tickets, venta y propinas" },
+  { href: "/reportes/z-historico", nombre: "Cortes de turno", desc: "Cada cierre de caja y sus diferencias" },
 ];
 
 /** Cada cuánto se vuelve a leer el panel mirando hoy. */

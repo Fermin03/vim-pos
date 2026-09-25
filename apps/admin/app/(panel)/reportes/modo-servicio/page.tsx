@@ -1,52 +1,53 @@
 "use client";
-import { useCallback, useEffect, useState } from "react";
-import { PageBody, PageHeader } from "../../../components/page-header";
-import { RangoFechas } from "../../../components/rango-fechas";
-import { fmtMxn, leerVentasPorModo, rangoUltimosDias, type FilaModo } from "../../../lib/reportes";
-import { mensajeError } from "../../../lib/errores";
+import { Barra, ReporteMarco, useConsulta, useRangoReporte, type Cifra } from "../../../components/reporte";
+import { leerVentasPorModo, type FilaModo } from "../../../lib/reportes";
 import { etiquetaModo } from "../../../lib/modo-servicio";
+import { formatear, type Columna } from "../../../lib/reporte-tabla";
 
 export default function VentasPorModoServicioPage() {
-  const r0 = rangoUltimosDias(30);
-  const [desde, setDesde] = useState(r0.desde);
-  const [hasta, setHasta] = useState(r0.hasta);
-  const [filas, setFilas] = useState<FilaModo[] | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const { rango, cambiar } = useRangoReporte();
+  const consulta = useConsulta((r) => leerVentasPorModo(r.desde, r.hasta), rango);
+  const filas = consulta.datos ?? [];
 
-  const cargar = useCallback(async (d: string, h: string) => {
-    setFilas(null); setError(null);
-    try { setFilas(await leerVentasPorModo(d, h)); }
-    catch (e) { setError(mensajeError(e, "Error")); }
-  }, []);
-  useEffect(() => { cargar(desde, hasta); }, [cargar, desde, hasta]);
+  const venta = filas.reduce((s, f) => s + f.total_mxn, 0);
+  const tickets = filas.reduce((s, f) => s + f.tickets, 0);
+  const pct = (n: number) => (venta > 0 ? (n / venta) * 100 : 0);
+  const principal = [...filas].sort((a, b) => b.total_mxn - a.total_mxn)[0];
+
+  const cifras: Cifra[] = [
+    { etiqueta: "Venta", valor: venta, tipo: "mxn" },
+    { etiqueta: "Tickets", valor: tickets, tipo: "entero" },
+    { etiqueta: "Ticket promedio", valor: tickets > 0 ? venta / tickets : 0, tipo: "mxn" },
+    {
+      etiqueta: "Lo que más vende",
+      valor: principal ? etiquetaModo(principal.modo) : "—",
+      pie: principal ? `${formatear(pct(principal.total_mxn), "pct")} de la venta` : undefined,
+    },
+  ];
+
+  const columnas: Columna<FilaModo>[] = [
+    { id: "modo", titulo: "Tipo de servicio", valor: (f) => etiquetaModo(f.modo), ancho: 24 },
+    { id: "tickets", titulo: "Tickets", tipo: "entero", valor: (f) => f.tickets, total: "suma" },
+    { id: "venta", titulo: "Venta", tipo: "mxn", valor: (f) => f.total_mxn, total: "suma", enfasis: "fuerte" },
+    {
+      id: "promedio",
+      titulo: "Ticket promedio",
+      tipo: "mxn",
+      valor: (f) => (f.tickets > 0 ? f.total_mxn / f.tickets : 0),
+      total: () => (tickets > 0 ? venta / tickets : 0),
+      enfasis: "suave",
+    },
+    { id: "pct", titulo: "% de la venta", tipo: "pct", valor: (f) => pct(f.total_mxn), total: () => 100, celda: (f) => <Barra pct={pct(f.total_mxn)} /> },
+  ];
 
   return (
-    <>
-      <PageHeader
-        titulo="Ventas por modo de servicio"
-        subtitulo="Comparativa entre comer aquí, para llevar, domicilio propio y apps de delivery."
-        migas={[{ label: "Reportes" }, { label: "Tipo de servicio" }]}
-      />
-      <PageBody>
-        <div className="mb-4"><RangoFechas desde={desde} hasta={hasta} onCambio={(d, h) => { setDesde(d); setHasta(h); }} /></div>
-        {filas === null && !error && <p className="text-sm text-ink-3">Cargando…</p>}
-        {error && <p className="text-sm font-medium text-danger" role="alert">{error}</p>}
-        {filas && filas.length === 0 && <p className="rounded-lg border border-line bg-surface p-6 text-center text-sm text-ink-3">Sin ventas en el rango.</p>}
-        {filas && filas.length > 0 && (
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-            {filas.map((f) => (
-              <div key={f.modo} className="rounded-lg border border-line bg-surface p-5">
-                <div className="text-[11.5px] font-bold uppercase tracking-wide text-ink-3">{etiquetaModo(f.modo)}</div>
-                <div className="font-display mt-2 text-[26px] font-bold tabular-nums">{fmtMxn(f.total_mxn)}</div>
-                <div className="mt-1 text-[12.5px] text-ink-2 tabular-nums">{f.tickets} tickets · {f.porcentaje}%</div>
-                <div className="mt-3 h-2 rounded-full bg-hover">
-                  <div className="h-2 rounded-full bg-ink" style={{ width: `${Math.min(100, f.porcentaje)}%` }} />
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </PageBody>
-    </>
+    <ReporteMarco
+      titulo="Ventas por tipo de servicio"
+      subtitulo="Comer aquí, para llevar, a domicilio y apps de delivery: cuánto aporta cada uno."
+      rango={{ valor: rango, cambiar }}
+      consulta={consulta}
+      cifras={cifras}
+      tabla={{ columnas, filas, clave: (f) => f.modo, orden: { id: "venta", dir: "desc" }, vacio: "No hubo ventas en estas fechas." }}
+    />
   );
 }

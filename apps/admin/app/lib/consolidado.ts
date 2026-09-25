@@ -1,5 +1,6 @@
 "use client";
 import { supabase } from "./supabase";
+import { leerTodas } from "./reportes";
 
 // B5 Enterprise · reporteo central: consolidado comparativo por sucursal sobre
 // vw_estado_resultados_dia (una fila por sucursal/día, RLS por tenant). Sin migración.
@@ -71,20 +72,26 @@ export function consolidarFilas(
 export type AgruparPor = "sucursal" | "franquicia";
 
 export async function leerConsolidadoPorSucursal(desde: string, hasta: string, agrupar: AgruparPor = "sucursal"): Promise<Consolidado> {
-  const [{ data: er, error: e1 }, { data: sucs, error: e2 }, { data: frs, error: e3 }] = await Promise.all([
-    supabase
-      .from("vw_estado_resultados_dia")
-      .select("sucursal_id, tickets_completados, tickets_cancelados, total_neto_mxn, propinas_capturadas_mxn, descuentos_manuales_mxn, devoluciones_mxn")
-      .gte("dia_contable", desde)
-      .lte("dia_contable", hasta),
+  // Por páginas: una fila por día y sucursal rebasa las 1000 que entrega PostgREST con una cadena
+  // de 12 sucursales en tres meses (ver leerTodas).
+  const [er, { data: sucs, error: e2 }, { data: frs, error: e3 }] = await Promise.all([
+    leerTodas((a, b) =>
+      supabase
+        .from("vw_estado_resultados_dia")
+        .select("sucursal_id, tickets_completados, tickets_cancelados, total_neto_mxn, propinas_capturadas_mxn, descuentos_manuales_mxn, devoluciones_mxn")
+        .gte("dia_contable", desde)
+        .lte("dia_contable", hasta)
+        .order("dia_contable")
+        .order("sucursal_id")
+        .range(a, b) as unknown as ReturnType<Parameters<typeof leerTodas>[0]>,
+    ),
     supabase.from("sucursales").select("id, nombre, franquicia_id").is("deleted_at", null),
     supabase.from("franquicias").select("id, nombre"),
   ]);
-  if (e1) throw new Error(e1.message);
   if (e2) throw new Error(e2.message);
   if (e3) throw new Error(e3.message);
 
-  const filas = (er ?? []) as Parameters<typeof consolidarFilas>[0];
+  const filas = er as unknown as Parameters<typeof consolidarFilas>[0];
   const sucursales = (sucs ?? []) as { id: string; nombre: string; franquicia_id: string | null }[];
 
   if (agrupar === "sucursal") {

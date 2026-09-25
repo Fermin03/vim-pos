@@ -1,56 +1,51 @@
 "use client";
-import { useCallback, useEffect, useState } from "react";
-import { PageBody, PageHeader } from "../../../components/page-header";
-import { RangoFechas } from "../../../components/rango-fechas";
-import { fmtMxn, leerDescuentosPorUsuario, rangoUltimosDias, type FilaDescuento } from "../../../lib/reportes";
-import { mensajeError } from "../../../lib/errores";
+import { Nota, ReporteMarco, useConsulta, useRangoReporte, type Cifra } from "../../../components/reporte";
+import { leerDescuentosPorUsuario, leerVentaDelPeriodo, type FilaDescuento } from "../../../lib/reportes";
+import { formatear, type Columna } from "../../../lib/reporte-tabla";
 
 export default function DescuentosPage() {
-  const r0 = rangoUltimosDias(30);
-  const [desde, setDesde] = useState(r0.desde);
-  const [hasta, setHasta] = useState(r0.hasta);
-  const [filas, setFilas] = useState<FilaDescuento[] | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const { rango, cambiar } = useRangoReporte();
+  const consulta = useConsulta(
+    async (r) => {
+      const [filas, venta] = await Promise.all([leerDescuentosPorUsuario(r.desde, r.hasta), leerVentaDelPeriodo(r.desde, r.hasta)]);
+      return { filas, venta };
+    },
+    rango,
+  );
+  const filas = consulta.datos?.filas ?? [];
+  const venta = consulta.datos?.venta ?? 0;
 
-  const cargar = useCallback(async (d: string, h: string) => {
-    setFilas(null); setError(null);
-    try { setFilas(await leerDescuentosPorUsuario(d, h)); } catch (e) { setError(mensajeError(e, "Error")); }
-  }, []);
-  useEffect(() => { cargar(desde, hasta); }, [cargar, desde, hasta]);
+  const total = filas.reduce((s, f) => s + f.total, 0);
+  const cantidad = filas.reduce((s, f) => s + f.cantidad, 0);
+  const mayor = filas[0];
 
-  const totalGeneral = (filas ?? []).reduce((s, f) => s + f.total, 0);
+  const cifras: Cifra[] = [
+    { etiqueta: "Total descontado", valor: total, tipo: "mxn", pie: `${formatear(cantidad, "entero")} descuentos` },
+    // Antes solo se daba el monto: sin la venta al lado no se sabe si $2,000 es mucho o poco.
+    { etiqueta: "Frente a la venta", valor: venta > 0 ? (total / venta) * 100 : 0, tipo: "pct", pie: `de ${formatear(venta, "mxn")} vendidos` },
+    { etiqueta: "Cortesías", valor: filas.reduce((s, f) => s + f.cortesias, 0), tipo: "entero", pie: "descuentos con motivo cortesía" },
+    { etiqueta: "Quién descontó más", valor: mayor?.usuario ?? "—", pie: mayor ? formatear(mayor.total, "mxn") : undefined },
+  ];
+
+  const columnas: Columna<FilaDescuento>[] = [
+    { id: "usuario", titulo: "Usuario", valor: (f) => f.usuario, ancho: 24 },
+    { id: "cantidad", titulo: "Descuentos", tipo: "entero", valor: (f) => f.cantidad, total: "suma" },
+    { id: "cortesias", titulo: "Cortesías", tipo: "entero", valor: (f) => f.cortesias, total: "suma", enfasis: "suave" },
+    { id: "total", titulo: "Total descontado", tipo: "mxn", valor: (f) => f.total, total: "suma", enfasis: "fuerte", ancho: 18 },
+    { id: "promedio", titulo: "Promedio", tipo: "mxn", valor: (f) => f.promedio, total: () => (cantidad > 0 ? total / cantidad : 0), enfasis: "suave" },
+    { id: "pct", titulo: "% de lo descontado", tipo: "pct", valor: (f) => (total > 0 ? (f.total / total) * 100 : 0), total: () => 100, enfasis: "suave", ancho: 18 },
+  ];
 
   return (
-    <>
-      <PageHeader titulo="Descuentos por usuario" subtitulo="Auditoría de descuentos y cortesías otorgados. Revísalos para descartar o confirmar abusos." migas={[{ label: "Reportes" }, { label: "Auditoría" }, { label: "Descuentos" }]} />
-      <PageBody>
-        <div className="mb-4"><RangoFechas desde={desde} hasta={hasta} onCambio={(d, h) => { setDesde(d); setHasta(h); }} /></div>
-        {filas === null && !error && <p className="text-sm text-ink-3">Cargando…</p>}
-        {error && <p className="text-sm font-medium text-danger" role="alert">{error}</p>}
-        {filas && (
-          <>
-            {filas.length > 0 && <p className="mb-3 text-[13px] text-ink-2">Total descontado en el rango: <b>{fmtMxn(totalGeneral)}</b></p>}
-            <div className="tabla-caja tabla-caja-sm overflow-hidden rounded-lg border border-line bg-surface">
-              <table className="w-full text-[13px]">
-                <thead><tr className="border-b border-line bg-sel text-left text-[11.5px] font-bold uppercase tracking-wide text-ink-3">
-                  <th className="px-4 py-2.5">Usuario</th><th className="px-4 py-2.5 text-right">Descuentos</th><th className="px-4 py-2.5 text-right">Total</th><th className="px-4 py-2.5 text-right">Promedio</th>
-                </tr></thead>
-                <tbody>
-                  {filas.length === 0 && <tr><td colSpan={4} className="px-4 py-6 text-center text-ink-3">Sin descuentos en el rango.</td></tr>}
-                  {filas.map((f) => (
-                    <tr key={f.clave} className="border-b border-line last:border-b-0">
-                      <td className="px-4 py-2.5 font-medium">{f.usuario}</td>
-                      <td className="px-4 py-2.5 text-right tabular-nums">{f.cantidad}</td>
-                      <td className="px-4 py-2.5 text-right font-semibold tabular-nums">{fmtMxn(f.total)}</td>
-                      <td className="px-4 py-2.5 text-right text-ink-2 tabular-nums">{fmtMxn(f.promedio)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </>
-        )}
-      </PageBody>
-    </>
+    <ReporteMarco
+      titulo="Descuentos por usuario"
+      subtitulo="Quién da descuentos y cortesías, y cuánto suman frente a la venta."
+      rango={{ valor: rango, cambiar }}
+      consulta={consulta}
+      cifras={cifras}
+      tabla={{ columnas, filas, clave: (f) => f.clave, orden: { id: "total", dir: "desc" }, vacio: "No hubo descuentos en estas fechas." }}
+    >
+      <Nota>Cada descuento queda registrado con su motivo y su ticket. Si algo no cuadra, revísalo con la persona.</Nota>
+    </ReporteMarco>
   );
 }

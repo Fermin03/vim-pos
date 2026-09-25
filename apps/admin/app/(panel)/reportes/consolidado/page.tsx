@@ -1,105 +1,62 @@
 "use client";
-import { useCallback, useEffect, useState } from "react";
-import { PageBody, PageHeader } from "../../../components/page-header";
-import { RangoFechas } from "../../../components/rango-fechas";
-import { fmtMxn, rangoUltimosDias } from "../../../lib/reportes";
-import { leerConsolidadoPorSucursal, type AgruparPor, type Consolidado } from "../../../lib/consolidado";
-import { mensajeError } from "../../../lib/errores";
+import { useState } from "react";
+import { Barra, ReporteMarco, useConsulta, useRangoReporte, type Cifra } from "../../../components/reporte";
+import { leerConsolidadoPorSucursal, type AgruparPor, type FilaConsolidado } from "../../../lib/consolidado";
+import type { Columna } from "../../../lib/reporte-tabla";
 
-/** B5 Enterprise — reporteo central: comparativo consolidado por sucursal. */
+/** Comparativo de la cadena: cada sucursal (o franquicia) una junto a otra. */
 export default function ConsolidadoPage() {
-  const r0 = rangoUltimosDias(30);
-  const [desde, setDesde] = useState(r0.desde);
-  const [hasta, setHasta] = useState(r0.hasta);
-  const [datos, setDatos] = useState<Consolidado | null>(null);
+  const { rango, cambiar } = useRangoReporte();
   const [agrupar, setAgrupar] = useState<AgruparPor>("sucursal");
-  const [error, setError] = useState<string | null>(null);
+  const consulta = useConsulta((r) => leerConsolidadoPorSucursal(r.desde, r.hasta, agrupar), rango, agrupar);
+  const datos = consulta.datos;
+  const filas = datos?.filas ?? [];
+  const t = datos?.total;
 
-  const cargar = useCallback(async (d: string, h: string, a: AgruparPor) => {
-    setDatos(null); setError(null);
-    try { setDatos(await leerConsolidadoPorSucursal(d, h, a)); } catch (e) { setError(mensajeError(e, "Error")); }
-  }, []);
-  useEffect(() => { cargar(desde, hasta, agrupar); }, [cargar, desde, hasta, agrupar]);
+  const cifras: Cifra[] = [
+    { etiqueta: "Venta de la cadena", valor: t?.venta ?? 0, tipo: "mxn" },
+    { etiqueta: "Tickets", valor: t?.tickets ?? 0, tipo: "entero" },
+    { etiqueta: "Ticket promedio", valor: t?.ticketPromedio ?? 0, tipo: "mxn" },
+    { etiqueta: "Propinas", valor: t?.propinas ?? 0, tipo: "mxn" },
+  ];
+
+  const nombre = agrupar === "sucursal" ? "Sucursal" : "Franquicia";
+  const columnas: Columna<FilaConsolidado>[] = [
+    { id: "nombre", titulo: nombre, valor: (f) => f.sucursal, ancho: 24 },
+    { id: "tickets", titulo: "Tickets", tipo: "entero", valor: (f) => f.tickets, total: "suma" },
+    { id: "venta", titulo: "Venta", tipo: "mxn", valor: (f) => f.venta, total: "suma", enfasis: "fuerte" },
+    { id: "promedio", titulo: "Ticket promedio", tipo: "mxn", valor: (f) => f.ticketPromedio, total: () => t?.ticketPromedio ?? 0, enfasis: "suave" },
+    { id: "propinas", titulo: "Propinas", tipo: "mxn", valor: (f) => f.propinas, total: "suma", enfasis: "suave" },
+    { id: "descuentos", titulo: "Descuentos", tipo: "mxn", valor: (f) => f.descuentos, total: "suma", enfasis: "suave" },
+    { id: "devoluciones", titulo: "Devoluciones", tipo: "mxn", valor: (f) => f.devoluciones, total: "suma", enfasis: "suave" },
+    { id: "pct", titulo: "% de la venta", tipo: "pct", valor: (f) => f.participacionPct, total: () => 100, celda: (f) => <Barra pct={f.participacionPct} /> },
+  ];
+
+  const filtro = (
+    <div role="group" aria-label="Agrupar por" className="inline-flex gap-0.5 rounded border border-line bg-hover p-[3px]">
+      {(["sucursal", "franquicia"] as const).map((a) => (
+        <button
+          key={a}
+          type="button"
+          aria-pressed={agrupar === a}
+          onClick={() => setAgrupar(a)}
+          className={`min-h-[40px] whitespace-nowrap rounded-[4px] px-3 text-[13px] font-semibold transition-colors ${agrupar === a ? "bg-surface text-ink shadow-sm" : "text-ink-2 hover:text-ink"}`}
+        >
+          {a === "sucursal" ? "Por sucursal" : "Por franquicia"}
+        </button>
+      ))}
+    </div>
+  );
 
   return (
-    <>
-      <PageHeader titulo="Consolidado por sucursal" subtitulo="Comparativo central de la cadena: venta, tickets y participación de cada sucursal." migas={[{ label: "Reportes" }, { label: "Consolidado" }]} />
-      <PageBody>
-        <div className="mb-4 flex flex-wrap items-center gap-3">
-          <RangoFechas desde={desde} hasta={hasta} onCambio={(d, h) => { setDesde(d); setHasta(h); }} />
-          {/* Fase 5 — agrupar el consolidado por franquicia */}
-          <div className="flex gap-1 rounded-lg bg-sel p-0.5">
-            {(["sucursal", "franquicia"] as const).map((a) => (
-              <button key={a} type="button" onClick={() => setAgrupar(a)}
-                className={["rounded px-3 py-1.5 text-[12.5px] font-semibold transition", agrupar === a ? "bg-ink text-white" : "text-ink-2"].join(" ")}>
-                {a === "sucursal" ? "Por sucursal" : "Por franquicia"}
-              </button>
-            ))}
-          </div>
-        </div>
-        {datos === null && !error && <p className="text-sm text-ink-3">Cargando…</p>}
-        {error && <p className="text-sm font-medium text-danger" role="alert">{error}</p>}
-        {datos && (
-          <>
-            {/* KPIs del consolidado */}
-            <div className="mb-4 grid grid-cols-2 gap-3 md:grid-cols-4">
-              {[
-                { label: "Venta consolidada", valor: fmtMxn(datos.total.venta) },
-                { label: "Tickets", valor: String(datos.total.tickets) },
-                { label: "Ticket promedio", valor: fmtMxn(datos.total.ticketPromedio) },
-                { label: "Propinas", valor: fmtMxn(datos.total.propinas) },
-              ].map((k) => (
-                <div key={k.label} className="rounded-lg border border-line bg-surface px-4 py-3">
-                  <div className="text-[11.5px] font-bold uppercase tracking-wide text-ink-3">{k.label}</div>
-                  <div className="mt-1 font-display text-[18px] font-bold tabular-nums lg:text-[22px]">{k.valor}</div>
-                </div>
-              ))}
-            </div>
-
-            <div className="tabla-caja tabla-caja-xl overflow-hidden rounded-lg border border-line bg-surface">
-              <table className="w-full text-[13px]">
-                <thead><tr className="border-b border-line bg-sel text-left text-[11.5px] font-bold uppercase tracking-wide text-ink-3">
-                  <th className="px-4 py-2.5">{agrupar === "sucursal" ? "Sucursal" : "Franquicia"}</th><th className="px-4 py-2.5 text-right">Tickets</th><th className="px-4 py-2.5 text-right">Venta</th><th className="px-4 py-2.5 text-right">Ticket prom.</th><th className="px-4 py-2.5 text-right">Propinas</th><th className="px-4 py-2.5 text-right">Descuentos</th><th className="px-4 py-2.5 text-right">Devoluciones</th><th className="px-4 py-2.5 text-right">Participación</th>
-                </tr></thead>
-                <tbody>
-                  {datos.filas.length === 0 && <tr><td colSpan={8} className="px-4 py-6 text-center text-ink-3">Sin ventas en el rango.</td></tr>}
-                  {datos.filas.map((f) => (
-                    <tr key={f.sucursalId} className="border-b border-line">
-                      <td className="px-4 py-2.5 font-medium">{f.sucursal}</td>
-                      <td className="px-4 py-2.5 text-right tabular-nums">{f.tickets}</td>
-                      <td className="px-4 py-2.5 text-right font-semibold tabular-nums">{fmtMxn(f.venta)}</td>
-                      <td className="px-4 py-2.5 text-right text-ink-2 tabular-nums">{fmtMxn(f.ticketPromedio)}</td>
-                      <td className="px-4 py-2.5 text-right text-ink-2 tabular-nums">{fmtMxn(f.propinas)}</td>
-                      <td className="px-4 py-2.5 text-right text-ink-2 tabular-nums">{fmtMxn(f.descuentos)}</td>
-                      <td className="px-4 py-2.5 text-right text-ink-2 tabular-nums">{fmtMxn(f.devoluciones)}</td>
-                      <td className="px-4 py-2.5 text-right">
-                        <div className="flex items-center justify-end gap-2">
-                          <div className="h-1.5 w-20 overflow-hidden rounded-full bg-sel">
-                            <div className="h-full rounded-full bg-accent" style={{ width: `${Math.min(100, f.participacionPct)}%` }} />
-                          </div>
-                          <span className="w-12 text-right font-semibold tabular-nums">{f.participacionPct}%</span>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                  {datos.filas.length > 0 && (
-                    <tr className="bg-sel font-bold">
-                      <td className="px-4 py-2.5">Total cadena</td>
-                      <td className="px-4 py-2.5 text-right tabular-nums">{datos.total.tickets}</td>
-                      <td className="px-4 py-2.5 text-right tabular-nums">{fmtMxn(datos.total.venta)}</td>
-                      <td className="px-4 py-2.5 text-right tabular-nums">{fmtMxn(datos.total.ticketPromedio)}</td>
-                      <td className="px-4 py-2.5 text-right tabular-nums">{fmtMxn(datos.total.propinas)}</td>
-                      <td className="px-4 py-2.5 text-right tabular-nums">{fmtMxn(datos.total.descuentos)}</td>
-                      <td className="px-4 py-2.5 text-right tabular-nums">{fmtMxn(datos.total.devoluciones)}</td>
-                      <td className="px-4 py-2.5 text-right tabular-nums">100%</td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </>
-        )}
-      </PageBody>
-    </>
+    <ReporteMarco
+      titulo="Consolidado por sucursal"
+      subtitulo="Venta, tickets y participación de cada sucursal, una junto a otra."
+      rango={{ valor: rango, cambiar }}
+      filtros={filtro}
+      consulta={consulta}
+      cifras={cifras}
+      tabla={{ columnas, filas, clave: (f) => f.sucursalId, orden: { id: "venta", dir: "desc" }, minimo: 960, vacio: "No hubo ventas en estas fechas." }}
+    />
   );
 }

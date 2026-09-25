@@ -1,78 +1,69 @@
 "use client";
-import { useCallback, useEffect, useState } from "react";
-import { PageBody, PageHeader } from "../../../components/page-header";
-import { RangoFechas } from "../../../components/rango-fechas";
-import { fmtMxn, leerVentasAppsExternas, rangoUltimosDias, type FilaAppExterna } from "../../../lib/reportes";
-import { mensajeError } from "../../../lib/errores";
-import { fechaLegible } from "@vim/fecha";
+import Link from "next/link";
+import { Nota, ReporteMarco, useConsulta, useRangoReporte, type Cifra } from "../../../components/reporte";
+import { leerVentasAppsExternas, type FilaAppExterna } from "../../../lib/reportes";
+import { formatear, type Columna } from "../../../lib/reporte-tabla";
 
-const ESTADO_BADGE: Record<string, { label: string; cls: string }> = {
-  CONCILIADO_OK: { label: "Conciliado", cls: "bg-success-soft text-success" },
-  CONCILIADO_CON_DIFERENCIA: { label: "Con diferencia", cls: "bg-danger-soft text-danger" },
-  EN_LIQUIDACION_SIN_MATCH: { label: "Sin match", cls: "bg-warning-soft text-[#B26A00]" },
-  NO_LIQUIDADO_TODAVIA: { label: "Pendiente", cls: "bg-sel text-ink-2" },
+// Los estados de la conciliación como los diría el dueño. "Sin match" no le decía nada.
+const ESTADO: Record<string, { label: string; cls: string }> = {
+  CONCILIADO_OK: { label: "Cuadra", cls: "bg-success-soft text-success" },
+  CONCILIADO_CON_DIFERENCIA: { label: "Con diferencia", cls: "bg-warning-soft text-warning" },
+  EN_LIQUIDACION_SIN_MATCH: { label: "Falta en la liquidación", cls: "bg-warning-soft text-warning" },
+  NO_LIQUIDADO_TODAVIA: { label: "Aún no liquida", cls: "bg-sel text-ink-2" },
 };
+const POR_REVISAR = new Set(["CONCILIADO_CON_DIFERENCIA", "EN_LIQUIDACION_SIN_MATCH"]);
 
-/** Ventas por apps de delivery (Rappi/Uber/DiDi) con su estado de conciliación. */
 export default function AppsExternasPage() {
-  const r0 = rangoUltimosDias(30);
-  const [desde, setDesde] = useState(r0.desde);
-  const [hasta, setHasta] = useState(r0.hasta);
-  const [filas, setFilas] = useState<FilaAppExterna[] | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const { rango, cambiar } = useRangoReporte();
+  const consulta = useConsulta((r) => leerVentasAppsExternas(r.desde, r.hasta), rango);
+  const filas = consulta.datos ?? [];
 
-  const cargar = useCallback(async (d: string, h: string) => {
-    setFilas(null); setError(null);
-    try { setFilas(await leerVentasAppsExternas(d, h)); } catch (e) { setError(mensajeError(e, "Error")); }
-  }, []);
-  useEffect(() => { cargar(desde, hasta); }, [cargar, desde, hasta]);
+  const venta = filas.reduce((s, f) => s + f.totalPos, 0);
+  const comision = filas.reduce((s, f) => s + f.comision, 0);
+  const neto = filas.reduce((s, f) => s + f.netoApp, 0);
+  const revisar = filas.filter((f) => POR_REVISAR.has(f.estado)).length;
 
-  const totVenta = (filas ?? []).reduce((s, f) => s + f.totalPos, 0);
-  const totComision = (filas ?? []).reduce((s, f) => s + f.comision, 0);
+  const cifras: Cifra[] = [
+    { etiqueta: "Venta por apps", valor: venta, tipo: "mxn", pie: `${formatear(filas.length, "entero")} pedidos` },
+    { etiqueta: "Comisiones", valor: comision, tipo: "mxn", pie: venta > 0 ? `${formatear((comision / venta) * 100, "pct")} de la venta` : undefined },
+    { etiqueta: "Depositado por las apps", valor: neto, tipo: "mxn" },
+    { etiqueta: "Pedidos por revisar", valor: revisar, tipo: "entero", tono: revisar > 0 ? "atencion" : "bien", pie: revisar > 0 ? "con diferencia o sin liquidar" : "todo cuadra" },
+  ];
+
+  const columnas: Columna<FilaAppExterna>[] = [
+    { id: "dia", titulo: "Día", tipo: "fecha", valor: (f) => f.dia, ancho: 12 },
+    { id: "app", titulo: "App", valor: (f) => f.app, enfasis: "fuerte" },
+    { id: "folio", titulo: "Folio", valor: (f) => f.folioPos },
+    { id: "folioApp", titulo: "Folio de la app", valor: (f) => f.folioApp, enfasis: "suave", ancho: 18 },
+    { id: "total", titulo: "Venta", tipo: "mxn", valor: (f) => f.totalPos, total: "suma", enfasis: "fuerte" },
+    { id: "comision", titulo: "Comisión", tipo: "mxn", valor: (f) => f.comision || null, total: "suma", enfasis: "suave" },
+    { id: "neto", titulo: "Depositado", tipo: "mxn", valor: (f) => f.netoApp || null, total: "suma", enfasis: "suave" },
+    {
+      id: "estado",
+      titulo: "Conciliación",
+      valor: (f) => ESTADO[f.estado]?.label ?? f.estado,
+      ancho: 22,
+      celda: (f) => {
+        const e = ESTADO[f.estado] ?? { label: f.estado, cls: "bg-sel text-ink-2" };
+        return <span className={`whitespace-nowrap rounded px-2 py-0.5 text-[12px] font-semibold ${e.cls}`}>{e.label}</span>;
+      },
+    },
+  ];
 
   return (
-    <>
-      <PageHeader titulo="Ventas por apps externas" subtitulo="Pedidos de Rappi, Uber Eats y DiDi: venta registrada en el POS, comisión y estado de conciliación contra la liquidación de la app." migas={[{ label: "Reportes" }, { label: "Apps externas" }]} />
-      <PageBody>
-        <div className="mb-4"><RangoFechas desde={desde} hasta={hasta} onCambio={(d, h) => { setDesde(d); setHasta(h); }} /></div>
-        {filas === null && !error && <p className="text-sm text-ink-3">Cargando…</p>}
-        {error && <p className="text-sm font-medium text-danger" role="alert">{error}</p>}
-        {filas && (
-          <>
-            {filas.length > 0 && (
-              <p className="mb-3 text-[13px] text-ink-2">
-                Venta por apps en el rango: <b>{fmtMxn(totVenta)}</b> · Comisiones registradas: <b>{fmtMxn(totComision)}</b>
-              </p>
-            )}
-            <div className="tabla-caja tabla-caja-xl overflow-hidden rounded-lg border border-line bg-surface">
-              <table className="w-full text-[13px]">
-                <thead><tr className="border-b border-line bg-sel text-left text-[11.5px] font-bold uppercase tracking-wide text-ink-3">
-                  <th className="px-4 py-2.5">Día</th><th className="px-4 py-2.5">App</th><th className="px-4 py-2.5">Folio POS</th><th className="px-4 py-2.5">Folio app</th><th className="px-4 py-2.5 text-right">Total POS</th><th className="px-4 py-2.5 text-right">Comisión</th><th className="px-4 py-2.5 text-right">Neto app</th><th className="px-4 py-2.5">Conciliación</th>
-                </tr></thead>
-                <tbody>
-                  {filas.length === 0 && <tr><td colSpan={8} className="px-4 py-6 text-center text-ink-3">Sin ventas por apps en el rango.</td></tr>}
-                  {filas.map((f) => {
-                    const badge = ESTADO_BADGE[f.estado] ?? { label: f.estado, cls: "bg-sel text-ink-2" };
-                    return (
-                      <tr key={f.ticketId} className="border-b border-line last:border-b-0">
-                        <td className="px-4 py-2.5 text-ink-2">{fechaLegible(f.dia)}</td>
-                        <td className="px-4 py-2.5 font-medium">{f.app}</td>
-                        <td className="px-4 py-2.5">{f.folioPos ?? "—"}</td>
-                        <td className="px-4 py-2.5 text-ink-2">{f.folioApp ?? "—"}</td>
-                        <td className="px-4 py-2.5 text-right font-semibold tabular-nums">{fmtMxn(f.totalPos)}</td>
-                        <td className="px-4 py-2.5 text-right text-ink-2 tabular-nums">{f.comision ? fmtMxn(f.comision) : "—"}</td>
-                        <td className="px-4 py-2.5 text-right text-ink-2 tabular-nums">{f.netoApp ? fmtMxn(f.netoApp) : "—"}</td>
-                        <td className="px-4 py-2.5"><span className={`rounded px-2 py-0.5 text-[11.5px] font-bold ${badge.cls}`}>{badge.label}</span></td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-            <p className="mt-3 max-w-2xl text-[12px] text-ink-3">La conciliación contra las liquidaciones de cada app se captura en <b>Conciliación apps</b>; aquí se ve el resultado por pedido.</p>
-          </>
-        )}
-      </PageBody>
-    </>
+    <ReporteMarco
+      titulo="Ventas por apps de delivery"
+      subtitulo="Pedidos de Uber Eats, Rappi y DiDi: lo que se cobró en la caja, la comisión y lo que la app depositó."
+      rango={{ valor: rango, cambiar }}
+      consulta={consulta}
+      cifras={cifras}
+      tabla={{ columnas, filas, clave: (f) => f.ticketId, orden: { id: "dia", dir: "desc" }, vacio: "No hubo pedidos por apps en estas fechas." }}
+    >
+      <Nota>
+        La liquidación de cada app se captura en{" "}
+        <Link href="/conciliacion" className="font-semibold text-ink underline underline-offset-2">Conciliación de apps</Link>; aquí se ve el
+        resultado pedido por pedido.
+      </Nota>
+    </ReporteMarco>
   );
 }

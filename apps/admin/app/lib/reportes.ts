@@ -3,11 +3,32 @@ import { supabase } from "./supabase";
 import { hoyMx, sumarDias } from "@vim/fecha";
 import { LABEL_APP, type AppExterna } from "./conciliacion";
 import { resumirCaja, serieHoraria, type ResumenCaja, type TurnoDia } from "./dashboard-calculos";
+import { leerModulos } from "./modulos";
 
 // F13 — Reportes y analítica. Las vistas SQL ya existen (0011/0012); el admin solo las
 // consume bajo RLS (heredan del tenant_id de las tablas base). Rangos por día_contable.
 
 const num = (v: unknown) => Number(v ?? 0);
+
+/**
+ * PostgREST entrega como máximo 1000 filas por consulta y corta el resto SIN avisar. Las vistas
+ * de reportes vienen por día × sucursal × producto (o mesero, o categoría…), así que 90 días de
+ * un negocio con 40 productos son 3,600 filas: los totales salían incompletos y nada lo decía.
+ * Se lee por páginas. El orden tiene que identificar cada fila (las columnas del GROUP BY de la
+ * vista): con un orden ambiguo, una fila puede repetirse en dos páginas y otra no salir.
+ */
+const PAGINA = 1000;
+type RespuestaPagina = PromiseLike<{ data: unknown[] | null; error: { message: string } | null }>;
+export async function leerTodas(pagina: (desde: number, hasta: number) => RespuestaPagina): Promise<Record<string, unknown>[]> {
+  const out: Record<string, unknown>[] = [];
+  for (let i = 0; ; i += PAGINA) {
+    const { data, error } = await pagina(i, i + PAGINA - 1);
+    if (error) throw new Error(error.message);
+    const filas = (data ?? []) as Record<string, unknown>[];
+    out.push(...filas);
+    if (filas.length < PAGINA) return out;
+  }
+}
 
 /** Rango "últimos N días contables" (incluye hoy). */
 export function rangoUltimosDias(n: number): { desde: string; hasta: string } {
@@ -282,20 +303,39 @@ export type FilaZHistorico = {
   efectivo_esperado: number;
   efectivo_declarado: number;
   diferencia_efectivo: number;
+  caja: string;
+  cerro: string;
 };
 
+/** id → nombre de unas cuantas filas (cajas, usuarios). Sin permiso o sin red, mapa vacío. */
+async function nombresPorId(tabla: "cajas" | "usuarios_perfil", ids: string[]): Promise<Map<string, string>> {
+  const unicos = [...new Set(ids.filter(Boolean))];
+  if (unicos.length === 0) return new Map();
+  const { data } = await supabase.from(tabla).select("id, nombre").in("id", unicos);
+  return new Map(((data ?? []) as { id: string; nombre: string | null }[]).map((r) => [r.id, r.nombre ?? ""]));
+}
+
 export async function leerZHistorico(desde: string, hasta: string): Promise<FilaZHistorico[]> {
-  const { data, error } = await supabase
-    .from("reportes_z_historico")
-    .select(
-      "id, folio_z, dia_contable, fecha_cierre, total_ventas_mxn, total_propinas_mxn, total_tickets, efectivo_esperado_mxn, efectivo_declarado_mxn, diferencia_efectivo_mxn",
-    )
-    .gte("dia_contable", desde)
-    .lte("dia_contable", hasta)
-    .order("fecha_cierre", { ascending: false })
-    .limit(200);
-  if (error) throw new Error(error.message);
-  return ((data ?? []) as Record<string, unknown>[]).map((r) => ({
+  // Antes había un tope de 200 cortes que recortaba el periodo sin decirlo.
+  const data = await leerTodas((a, b) =>
+    supabase
+      .from("reportes_z_historico")
+      .select(
+        "id, folio_z, dia_contable, fecha_cierre, caja_id, cerrado_por_usuario_id, total_ventas_mxn, total_propinas_mxn, total_tickets, efectivo_esperado_mxn, efectivo_declarado_mxn, diferencia_efectivo_mxn",
+      )
+      .gte("dia_contable", desde)
+      .lte("dia_contable", hasta)
+      .order("fecha_cierre", { ascending: false })
+      .order("id")
+      .range(a, b) as unknown as RespuestaPagina,
+  );
+  const [cajas, usuarios] = await Promise.all([
+    nombresPorId("cajas", data.map((r) => String(r.caja_id ?? ""))),
+    nombresPorId("usuarios_perfil", data.map((r) => String(r.cerrado_por_usuario_id ?? ""))),
+  ]);
+  return data.map((r) => ({
+    caja: cajas.get(String(r.caja_id ?? "")) || "—",
+    cerro: usuarios.get(String(r.cerrado_por_usuario_id ?? "")) || "—",
     id: String(r.id),
     folio_z: String(r.folio_z ?? "—"),
     dia_contable: String(r.dia_contable),
@@ -319,15 +359,16 @@ export type FilaProducto = {
 };
 
 export async function leerVentasPorProducto(desde: string, hasta: string): Promise<FilaProducto[]> {
-  const { data, error } = await supabase
-    .from("vw_ventas_por_producto")
-    .select("producto_id, producto_nombre, unidades_vendidas, total_mxn, tickets_con_producto, dia_contable")
-    .gte("dia_contable", desde)
-    .lte("dia_contable", hasta);
-  if (error) throw new Error(error.message);
+  const data = await leerVista(
+    "vw_ventas_por_producto",
+    "producto_id, producto_nombre, unidades_vendidas, total_mxn, tickets_con_producto, dia_contable",
+    desde,
+    hasta,
+    ["sucursal_id", "producto_id", "producto_nombre"],
+  );
   // Agregamos por producto sobre el rango (la vista es por día).
   const agg = new Map<string, FilaProducto>();
-  for (const r of (data ?? []) as Record<string, unknown>[]) {
+  for (const r of data) {
     const id = String(r.producto_id);
     const x = agg.get(id) ?? {
       producto_id: id,
@@ -353,14 +394,15 @@ export type FilaCategoria = {
 };
 
 export async function leerVentasPorCategoria(desde: string, hasta: string): Promise<FilaCategoria[]> {
-  const { data, error } = await supabase
-    .from("vw_ventas_por_categoria")
-    .select("categoria, unidades_vendidas, total_mxn, tickets_con_categoria, dia_contable")
-    .gte("dia_contable", desde)
-    .lte("dia_contable", hasta);
-  if (error) throw new Error(error.message);
+  const data = await leerVista(
+    "vw_ventas_por_categoria",
+    "categoria, unidades_vendidas, total_mxn, tickets_con_categoria, dia_contable",
+    desde,
+    hasta,
+    ["sucursal_id", "categoria"],
+  );
   const agg = new Map<string, FilaCategoria>();
-  for (const r of (data ?? []) as Record<string, unknown>[]) {
+  for (const r of data) {
     const cat = String(r.categoria ?? "—");
     const x = agg.get(cat) ?? { categoria: cat, unidades: 0, total_mxn: 0, tickets: 0 };
     x.unidades += num(r.unidades_vendidas);
@@ -375,16 +417,11 @@ export async function leerVentasPorCategoria(desde: string, hasta: string): Prom
 export type FilaModo = { modo: string; total_mxn: number; tickets: number; porcentaje: number };
 
 export async function leerVentasPorModo(desde: string, hasta: string): Promise<FilaModo[]> {
-  const { data, error } = await supabase
-    .from("vw_ventas_por_modo_servicio")
-    .select("*")
-    .gte("dia_contable", desde)
-    .lte("dia_contable", hasta);
-  if (error) throw new Error(error.message);
+  const data = await leerVista("vw_ventas_por_modo_servicio", "*", desde, hasta, ["sucursal_id", "modo_servicio"]);
   // La vista tiene un set de columnas distinto por implementación; lo robusto es agregar
   // por la primera columna textual que parezca el modo.
   const agg = new Map<string, { total: number; tickets: number }>();
-  for (const r of (data ?? []) as Record<string, unknown>[]) {
+  for (const r of data) {
     const modo = String(r.modo_servicio ?? r.modo ?? "—");
     const x = agg.get(modo) ?? { total: 0, tickets: 0 };
     x.total += num(r.total_mxn ?? r.subtotal_mxn);
@@ -409,20 +446,19 @@ export function fmtMxn(n: number): string {
 
 // ── Batch T3: reportes adicionales (vistas existentes, agregadas por entidad en el rango) ────
 
-async function leerVista(vista: string, cols: string, desde: string, hasta: string): Promise<Record<string, unknown>[]> {
-  const { data, error } = await supabase
-    .from(vista)
-    .select(cols)
-    .gte("dia_contable", desde)
-    .lte("dia_contable", hasta);
-  if (error) throw new Error(error.message);
-  return (data ?? []) as unknown as Record<string, unknown>[];
+/** Una vista por día en el rango, completa. `orden`: las demás columnas de su GROUP BY. */
+async function leerVista(vista: string, cols: string, desde: string, hasta: string, orden: string[], colDia = "dia_contable"): Promise<Record<string, unknown>[]> {
+  return leerTodas((a, b) => {
+    let q = supabase.from(vista).select(cols).gte(colDia, desde).lte(colDia, hasta).order(colDia);
+    for (const o of orden) q = q.order(o);
+    return q.range(a, b) as unknown as RespuestaPagina;
+  });
 }
 
 // Ventas por mesero (P-186)
 export type FilaMesero = { clave: string; nombre: string; tickets: number; total: number; propinas: number; promedio: number };
 export async function leerVentasPorMesero(desde: string, hasta: string): Promise<FilaMesero[]> {
-  const filas = await leerVista("vw_ventas_por_mesero", "mesero_id, mesero_email, tickets_atendidos, total_vendido_mxn, propinas_capturadas_mxn", desde, hasta);
+  const filas = await leerVista("vw_ventas_por_mesero", "mesero_id, mesero_email, tickets_atendidos, total_vendido_mxn, propinas_capturadas_mxn", desde, hasta, ["sucursal_id", "mesero_id"]);
   const map = new Map<string, FilaMesero>();
   for (const f of filas) {
     const k = String(f.mesero_id ?? f.mesero_email ?? "—");
@@ -436,7 +472,7 @@ export async function leerVentasPorMesero(desde: string, hasta: string): Promise
 // Ventas por área de cocina (P-187)
 export type FilaArea = { clave: string; area: string; tickets: number; unidades: number; total: number };
 export async function leerVentasPorArea(desde: string, hasta: string): Promise<FilaArea[]> {
-  const filas = await leerVista("vw_ventas_por_area_cocina", "area_cocina, tickets_con_area, unidades_preparadas, total_vendido_mxn", desde, hasta);
+  const filas = await leerVista("vw_ventas_por_area_cocina", "area_cocina, tickets_con_area, unidades_preparadas, total_vendido_mxn", desde, hasta, ["sucursal_id", "area_cocina"]);
   const map = new Map<string, FilaArea>();
   for (const f of filas) {
     const k = String(f.area_cocina ?? "General");
@@ -450,7 +486,7 @@ export async function leerVentasPorArea(desde: string, hasta: string): Promise<F
 // Ventas por marca virtual (P-189)
 export type FilaMarca = { clave: string; nombre: string; color: string; tickets: number; total: number; promedio: number };
 export async function leerVentasPorMarca(desde: string, hasta: string): Promise<FilaMarca[]> {
-  const filas = await leerVista("vw_ventas_por_marca", "marca_virtual_id, marca_nombre, marca_color, tickets_completados, total_neto_mxn", desde, hasta);
+  const filas = await leerVista("vw_ventas_por_marca", "marca_virtual_id, marca_nombre, marca_color, tickets_completados, total_neto_mxn", desde, hasta, ["sucursal_id", "marca_virtual_id"]);
   const map = new Map<string, FilaMarca>();
   for (const f of filas) {
     const k = String(f.marca_virtual_id ?? f.marca_nombre ?? "—");
@@ -490,6 +526,7 @@ export async function leerTiemposCocina(desde: string, hasta: string): Promise<F
     "modo_servicio, tickets_total, minutos_cocina_promedio, minutos_cocina_p95, tickets_cocina_bajo_15min, tickets_cocina_16_30min, tickets_cocina_mayor_30min",
     desde,
     hasta,
+    ["sucursal_id", "modo_servicio"],
   );
   return agregarTiemposCocina(filas);
 }
@@ -521,17 +558,23 @@ export function agregarTiemposCocina(filas: Record<string, unknown>[]): FilaTiem
 }
 
 // Descuentos por usuario (P-194)
-export type FilaDescuento = { clave: string; usuario: string; cantidad: number; total: number; promedio: number };
+export type FilaDescuento = { clave: string; usuario: string; cantidad: number; cortesias: number; total: number; promedio: number };
 export async function leerDescuentosPorUsuario(desde: string, hasta: string): Promise<FilaDescuento[]> {
-  const filas = await leerVista("vw_descuentos_por_usuario", "usuario_id, usuario_email, cantidad_descuentos, total_descontado_mxn", desde, hasta);
+  const filas = await leerVista("vw_descuentos_por_usuario", "usuario_id, usuario_email, cantidad_descuentos, cortesia_count, total_descontado_mxn", desde, hasta, ["sucursal_id", "usuario_id"]);
   const map = new Map<string, FilaDescuento>();
   for (const f of filas) {
     const k = String(f.usuario_id ?? f.usuario_email ?? "—");
-    const cur = map.get(k) ?? { clave: k, usuario: String(f.usuario_email ?? "—"), cantidad: 0, total: 0, promedio: 0 };
-    cur.cantidad += num(f.cantidad_descuentos); cur.total += num(f.total_descontado_mxn);
+    const cur = map.get(k) ?? { clave: k, usuario: String(f.usuario_email ?? "—"), cantidad: 0, cortesias: 0, total: 0, promedio: 0 };
+    cur.cantidad += num(f.cantidad_descuentos); cur.cortesias += num(f.cortesia_count); cur.total += num(f.total_descontado_mxn);
     map.set(k, cur);
   }
   return [...map.values()].map((m) => ({ ...m, promedio: m.cantidad > 0 ? m.total / m.cantidad : 0 })).sort((a, b) => b.total - a.total);
+}
+
+/** Venta neta del periodo (para poner descuentos en proporción). */
+export async function leerVentaDelPeriodo(desde: string, hasta: string): Promise<number> {
+  const filas = await leerVista("vw_estado_resultados_dia", "total_neto_mxn", desde, hasta, ["sucursal_id"]);
+  return filas.reduce((s, f) => s + num(f.total_neto_mxn), 0);
 }
 
 // B3 Foodtruck — ventas por evento (vw_ventas_por_evento, 0049)
@@ -559,14 +602,9 @@ export async function leerVentasPorEvento(): Promise<FilaEvento[]> {
 // Reimpresión frecuente = posible salida de producto sin cobrar.
 export type FilaReimpresion = { clave: string; cajero: string; reimpresiones: number; ticketsDistintos: number };
 export async function leerReimpresionesPorCajero(desde: string, hasta: string): Promise<FilaReimpresion[]> {
-  const { data, error } = await supabase
-    .from("vw_reimpresiones_por_cajero")
-    .select("cajero_id, cajero_email, reimpresiones_count, tickets_distintos, dia")
-    .gte("dia", desde)
-    .lte("dia", hasta);
-  if (error) throw new Error(error.message);
+  const data = await leerVista("vw_reimpresiones_por_cajero", "cajero_id, cajero_email, reimpresiones_count, tickets_distintos, dia", desde, hasta, ["sucursal_id", "cajero_id"], "dia");
   const map = new Map<string, FilaReimpresion>();
-  for (const r of (data ?? []) as unknown as Record<string, unknown>[]) {
+  for (const r of data) {
     const k = String(r.cajero_id ?? r.cajero_email ?? "—");
     const cur = map.get(k) ?? { clave: k, cajero: String(r.cajero_email ?? "—"), reimpresiones: 0, ticketsDistintos: 0 };
     cur.reimpresiones += num(r.reimpresiones_count);
@@ -582,14 +620,14 @@ export type FilaAppExterna = {
   totalPos: number; comision: number; netoApp: number; estado: string;
 };
 export async function leerVentasAppsExternas(desde: string, hasta: string): Promise<FilaAppExterna[]> {
-  const { data, error } = await supabase
-    .from("vw_ventas_apps_externas")
-    .select("ticket_id, folio_pos, folio_app, app_externa, dia_contable, total_pos_mxn, comision_app, monto_neto_liquidado_app, estado_conciliacion")
-    .gte("dia_contable", desde)
-    .lte("dia_contable", hasta)
-    .order("dia_contable", { ascending: false });
-  if (error) throw new Error(error.message);
-  return ((data ?? []) as unknown as Record<string, unknown>[]).map((r) => ({
+  const data = await leerVista(
+    "vw_ventas_apps_externas",
+    "ticket_id, folio_pos, folio_app, app_externa, dia_contable, total_pos_mxn, comision_app, monto_neto_liquidado_app, estado_conciliacion, liquidacion_id",
+    desde,
+    hasta,
+    ["ticket_id", "liquidacion_id"],
+  );
+  return data.map((r) => ({
     ticketId: String(r.ticket_id),
     folioPos: (r.folio_pos as string) ?? null,
     folioApp: (r.folio_app as string) ?? null,
@@ -612,21 +650,60 @@ export type FilaNoShow = {
   noShows: number; tasaPct: number; comensalesPerdidos: number;
 };
 export async function leerNoShows(desde: string, hasta: string): Promise<FilaNoShow[]> {
-  const { data, error } = await supabase
-    .from("vw_no_shows_reservaciones")
-    .select("dia_reserva, reservas_total, llegaron, terminadas, canceladas, no_shows, tasa_no_show_pct, comensales_no_show")
-    .gte("dia_reserva", desde)
-    .lte("dia_reserva", hasta)
-    .order("dia_reserva", { ascending: false });
-  if (error) throw new Error(error.message);
-  return ((data ?? []) as unknown as Record<string, unknown>[]).map((r) => ({
-    dia: String(r.dia_reserva),
-    total: num(r.reservas_total),
-    llegaron: num(r.llegaron),
-    terminadas: num(r.terminadas),
-    canceladas: num(r.canceladas),
-    noShows: num(r.no_shows),
-    tasaPct: num(r.tasa_no_show_pct),
-    comensalesPerdidos: num(r.comensales_no_show),
-  }));
+  const data = await leerVista(
+    "vw_no_shows_reservaciones",
+    "dia_reserva, reservas_total, llegaron, terminadas, canceladas, no_shows, comensales_no_show",
+    desde,
+    hasta,
+    ["sucursal_id"],
+    "dia_reserva",
+  );
+  // La vista es por sucursal y día; con más de una sucursal el mismo día salía dos veces.
+  const porDia = new Map<string, FilaNoShow>();
+  for (const r of data) {
+    const dia = String(r.dia_reserva);
+    const x = porDia.get(dia) ?? { dia, total: 0, llegaron: 0, terminadas: 0, canceladas: 0, noShows: 0, tasaPct: 0, comensalesPerdidos: 0 };
+    x.total += num(r.reservas_total);
+    x.llegaron += num(r.llegaron);
+    x.terminadas += num(r.terminadas);
+    x.canceladas += num(r.canceladas);
+    x.noShows += num(r.no_shows);
+    x.comensalesPerdidos += num(r.comensales_no_show);
+    porDia.set(dia, x);
+  }
+  return [...porDia.values()]
+    .map((x) => ({ ...x, tasaPct: x.total > 0 ? Math.round((x.noShows / x.total) * 1000) / 10 : 0 }))
+    .sort((a, b) => (a.dia < b.dia ? 1 : -1));
+}
+
+// ── Qué reportes le sirven a este negocio ──────────────────────────────────────────────────
+export type ReportesDisponibles = { marcas: boolean; eventos: boolean; reservaciones: boolean; apps: boolean; variasSucursales: boolean };
+
+/**
+ * Los reportes de módulos que el negocio no usa se esconden del índice: antes aparecían
+ * marcas virtuales, eventos, no-shows y consolidado a una taquería con una sola sucursal. Se
+ * muestran si el módulo está activo O si ya hay datos (no se le esconde a nadie su historia).
+ * Ante un error se muestran: esconder de más aquí sí confunde.
+ */
+export async function leerReportesDisponibles(): Promise<ReportesDisponibles> {
+  const hay = async (q: PromiseLike<{ count: number | null; error: unknown }>) => {
+    const { count, error } = await q;
+    return !!error || (count ?? 0) > 0;
+  };
+  const modulos = await leerModulos().catch(() => null);
+  const [marcas, eventos, reservas, apps, sucursales] = await Promise.all([
+    hay(supabase.from("marcas_virtuales").select("id", { count: "exact", head: true })),
+    hay(supabase.from("turnos").select("id", { count: "exact", head: true }).not("evento_nombre", "is", null)),
+    hay(supabase.from("reservaciones").select("id", { count: "exact", head: true })),
+    hay(supabase.from("vw_ventas_apps_externas").select("ticket_id", { count: "exact", head: true })),
+    supabase.from("sucursales").select("id", { count: "exact", head: true }).is("deleted_at", null),
+  ]);
+  const ef = modulos?.efectivos ?? {};
+  return {
+    marcas,
+    eventos,
+    reservaciones: reservas || !!ef.reservaciones,
+    apps: apps || !!ef.delivery_apps,
+    variasSucursales: !!sucursales.error || (sucursales.count ?? 0) > 1,
+  };
 }
