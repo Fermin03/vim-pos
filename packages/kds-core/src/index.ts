@@ -20,6 +20,8 @@ export {
   SELECCION_TICKET_ITEMS_KDS,
   avanzarCocina,
   cerrarComanda,
+  marcarListoCocina,
+  type ResultadoListo,
   labelModo,
   siguienteEstado,
   minutosEnCocina,
@@ -29,4 +31,4 @@ export {
   type FilaTicketKds,
   type FilaItemKds,
 } from "./comandas";
-export { areasDeComandas, comandasNuevas, SIN_AREA } from "./estado";
+export { areasDeComandas, comandasNuevas, vistaDeArea, areaParaRpc, SIN_AREA, TODAS_LAS_AREAS } from "./estado";

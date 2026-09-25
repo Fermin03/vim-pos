@@ -29,3 +29,39 @@ DROP TRIGGER IF EXISTS trg_vim_kds_notify ON tickets;
 CREATE TRIGGER trg_vim_kds_notify
   AFTER INSERT OR UPDATE ON tickets
   FOR EACH ROW EXECUTE FUNCTION _vim_kds_notify();
+
+-- LISTO por estación (0120, ADR 0018): cuando una estación marca sus renglones, la orden NO cambia
+-- de estado_cocina hasta que termina la última, así que el trigger de arriba no avisa. Sin esto,
+-- las demás pantallas de la LAN veían el cambio hasta el siguiente sondeo de 5 s. Un aviso por
+-- sentencia y no por fila: marcar LISTO toca varios renglones del mismo ticket a la vez.
+CREATE OR REPLACE FUNCTION _vim_kds_notify_items() RETURNS trigger
+LANGUAGE plpgsql
+AS $$
+DECLARE r record;
+BEGIN
+  FOR r IN
+    SELECT DISTINCT t.id, t.sucursal_id, t.estado_cocina, t.folio_completo, t.modo_servicio
+      FROM nuevas n
+      JOIN viejas v ON v.id = n.id
+      JOIN tickets t ON t.id = n.ticket_id
+     WHERE n.listo_at IS DISTINCT FROM v.listo_at
+  LOOP
+    PERFORM pg_notify('vim_kds', json_build_object(
+      'ticket_id',     r.id,
+      'sucursal_id',   r.sucursal_id,
+      'estado_cocina', r.estado_cocina,
+      'folio',         r.folio_completo,
+      'modo_servicio', r.modo_servicio,
+      'op',            'LISTO_ESTACION',
+      'at',            extract(epoch from clock_timestamp())
+    )::text);
+  END LOOP;
+  RETURN NULL;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS trg_vim_kds_notify_items ON ticket_items;
+CREATE TRIGGER trg_vim_kds_notify_items
+  AFTER UPDATE ON ticket_items
+  REFERENCING NEW TABLE AS nuevas OLD TABLE AS viejas
+  FOR EACH STATEMENT EXECUTE FUNCTION _vim_kds_notify_items();

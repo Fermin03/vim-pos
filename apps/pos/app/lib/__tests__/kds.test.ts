@@ -8,6 +8,9 @@ import {
   SIN_AREA,
   comandasDesdeFilas,
   SELECCION_TICKET_ITEMS_KDS,
+  vistaDeArea,
+  areaParaRpc,
+  TODAS_LAS_AREAS,
   type FilaTicketKds,
   type FilaItemKds,
 } from "@vim/kds-core";
@@ -57,6 +60,12 @@ describe("kds — F15 multi-área + nuevos pedidos", () => {
   it("areasDeComandas con todo null → solo General", () => {
     expect(areasDeComandas([{ items: [{ area: null }, { area: null }] }])).toEqual([SIN_AREA]);
   });
+  it("areasDeComandas ignora lo que su estación ya marcó LISTO (ADR 0018)", () => {
+    const comandas = [
+      { items: [{ area: "Plancha", listo: true }, { area: "Barra", listo: false }] },
+    ];
+    expect(areasDeComandas(comandas)).toEqual(["Barra"]);
+  });
   it("comandasNuevas cuenta solo los ids no vistos antes", () => {
     const previos = new Set(["a", "b"]);
     expect(comandasNuevas(previos, ["a", "b"])).toBe(0);
@@ -76,6 +85,7 @@ describe("comandasDesdeFilas — la comanda del KDS ignora los cargos", () => {
     combo_rol: null,
     orden_visualizacion: 1,
     cargo_tipo: null,
+    listo_at: null,
     ticket_item_modificadores: [],
     ...x,
   });
@@ -110,5 +120,71 @@ describe("comandasDesdeFilas — la comanda del KDS ignora los cargos", () => {
 describe("SELECCION_TICKET_ITEMS_KDS — la proyección que pide leerComandas", () => {
   it("incluye cargo_tipo: sin este campo el filtro de cargos deja de filtrar en silencio", () => {
     expect(SELECCION_TICKET_ITEMS_KDS).toContain("cargo_tipo");
+  });
+  it("incluye listo_at: sin él todo renglón se ve pendiente y ninguna estación termina (ADR 0018)", () => {
+    expect(SELECCION_TICKET_ITEMS_KDS).toContain("listo_at");
+  });
+});
+
+describe("KDS por estación (ADR 0018)", () => {
+  type It = { id: string; area: string | null; listo: boolean };
+  const orden = (ticketId: string, items: It[]) => ({ ticketId, items });
+  const mixta = orden("T1", [
+    { id: "burger", area: "Plancha", listo: false },
+    { id: "papas", area: "Freidora", listo: false },
+    { id: "agua", area: null, listo: false },
+  ]);
+
+  it("filtrada en un área muestra solo lo pendiente de esa área y dice qué falta en las demás", () => {
+    const [c] = vistaDeArea([mixta], "Plancha");
+    expect(c!.items.map((i) => i.id)).toEqual(["burger"]);
+    expect(c!.otrasPendientes).toEqual(["Freidora", SIN_AREA]);
+  });
+
+  it("una estación que ya marcó LISTO deja de ver la orden; las demás la siguen viendo", () => {
+    const tras = orden("T1", [
+      { id: "burger", area: "Plancha", listo: true },
+      { id: "papas", area: "Freidora", listo: false },
+    ]);
+    expect(vistaDeArea([tras], "Plancha")).toEqual([]);
+    const [c] = vistaDeArea([tras], "Freidora");
+    expect(c!.items.map((i) => i.id)).toEqual(["papas"]);
+    expect(c!.otrasPendientes).toEqual([]);
+  });
+
+  it("en Todas se ven todos los renglones, los listos incluidos, mientras quede algo pendiente", () => {
+    const tras = orden("T1", [
+      { id: "burger", area: "Plancha", listo: true },
+      { id: "papas", area: "Freidora", listo: false },
+    ]);
+    const [c] = vistaDeArea([tras], TODAS_LAS_AREAS);
+    expect(c!.items.map((i) => i.id)).toEqual(["burger", "papas"]);
+    const terminada = orden("T2", [{ id: "x", area: "Plancha", listo: true }]);
+    expect(vistaDeArea([terminada], TODAS_LAS_AREAS)).toEqual([]);
+  });
+
+  it("el área General del KDS viaja al RPC como NULL", () => {
+    expect(areaParaRpc(SIN_AREA)).toBeNull();
+    expect(areaParaRpc("Plancha")).toBe("Plancha");
+  });
+});
+
+describe("comandasDesdeFilas — listo por renglón", () => {
+  it("un renglón con listo_at llega marcado como listo", () => {
+    const [c] = comandasDesdeFilas([
+      {
+        id: "T1", folio_completo: "KC-1", modo_servicio: "COMER_AQUI", estado_cocina: "EN_COCINA",
+        fecha_envio_cocina: null, nota_general: null,
+        ticket_items: [
+          { id: "a", cantidad: 1, producto_nombre_snapshot: "Hamburguesa", nota_cocina: null, cancelado: false,
+            area_cocina_nombre_snapshot: "Plancha", parent_item_id: null, combo_rol: null, orden_visualizacion: 1,
+            cargo_tipo: null, listo_at: "2026-09-24T20:00:00Z", ticket_item_modificadores: [] },
+          { id: "b", cantidad: 1, producto_nombre_snapshot: "Papas", nota_cocina: null, cancelado: false,
+            area_cocina_nombre_snapshot: "Freidora", parent_item_id: null, combo_rol: null, orden_visualizacion: 2,
+            cargo_tipo: null, listo_at: null, ticket_item_modificadores: [] },
+        ],
+      },
+    ]);
+    expect(c!.items.map((i) => [i.id, i.listo])).toEqual([["a", true], ["b", false]]);
   });
 });

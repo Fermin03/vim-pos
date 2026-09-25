@@ -17,6 +17,8 @@ export type ItemComanda = {
    *  del mismo combo aunque salgan en tarjetas separadas. null en un ítem suelto o en un hijo
    *  huérfano (envío parcial donde el padre no llegó en esta lectura). */
   comboEtiqueta: string | null;
+  /** Su estación ya lo marcó LISTO (ticket_items.listo_at, ADR 0018). */
+  listo: boolean;
 };
 
 export type ComandaKds = {
@@ -44,6 +46,7 @@ export type FilaItemKds = {
   combo_rol: "PADRE" | "HIJO" | null;
   orden_visualizacion: number;
   cargo_tipo: string | null;
+  listo_at: string | null;
   ticket_item_modificadores: { opcion_nombre_snapshot: string }[] | null;
 };
 
@@ -71,7 +74,7 @@ export type FilaTicketKds = {
  */
 export const SELECCION_TICKET_ITEMS_KDS =
   "id, cantidad, producto_nombre_snapshot, nota_cocina, cancelado, area_cocina_nombre_snapshot, " +
-  "parent_item_id, combo_rol, orden_visualizacion, cargo_tipo, ticket_item_modificadores(opcion_nombre_snapshot)";
+  "parent_item_id, combo_rol, orden_visualizacion, cargo_tipo, listo_at, ticket_item_modificadores(opcion_nombre_snapshot)";
 
 /**
  * De las filas crudas de `tickets`+`ticket_items` a las comandas que pinta el KDS: descarta
@@ -120,6 +123,7 @@ export function comandasDesdeFilas(rows: FilaTicketKds[]): ComandaKds[] {
         comboEtiqueta: i.combo_rol === "HIJO" && i.parent_item_id && numero.has(i.parent_item_id)
           ? [`Combo #${numero.get(i.parent_item_id)}`, ...(ctxPadre.get(i.parent_item_id) ?? [])].join(" · ")
           : null,
+        listo: Boolean(i.listo_at),
       }));
     return {
       ticketId: t.id,
@@ -167,9 +171,35 @@ export async function avanzarCocina(token: string, ticketId: string, nuevoEstado
   if (error) throw new Error(error.message);
 }
 
+export type ResultadoListo = { cerrada: boolean; pendientes: string[] };
+
 /**
- * Un solo toque "LISTO" cierra la comanda: queda ENTREGADO y sale del panel.
- * El validador exige pasos (EN_COCINA→LISTO→ENTREGADO), así que encadena los updates.
+ * LISTO de una estación (ADR 0018): marca los renglones pendientes de `area` —`null` es el área
+ * "General"— o de todas (`todas`), y la base cierra la orden sola cuando ya no queda ninguno. Es
+ * un RPC y no dos UPDATE desde aquí para que dos estaciones que marcan casi a la vez no dejen la
+ * orden abierta ni la cierren dos veces: `marcar_listo_cocina` bloquea el ticket y decide.
+ */
+export async function marcarListoCocina(
+  token: string,
+  ticketId: string,
+  area: string | null,
+  todas: boolean,
+): Promise<ResultadoListo> {
+  const { data, error } = await clienteConToken(token).rpc("marcar_listo_cocina", {
+    p_ticket_id: ticketId,
+    p_area: area,
+    p_todas: todas,
+  });
+  if (error) throw new Error(error.message);
+  const r = data as { ok: boolean; motivo?: string; cerrada?: boolean; pendientes?: string[] } | null;
+  if (!r?.ok) throw new Error(r?.motivo ?? "No se pudo marcar la comanda");
+  return { cerrada: Boolean(r.cerrada), pendientes: r.pendientes ?? [] };
+}
+
+/**
+ * Cierra la orden entera con dos UPDATE. Es lo que hacía LISTO antes de 0120; lo reemplaza
+ * {@link marcarListoCocina}, que además respeta las estaciones. Se conserva exportado para quien
+ * aún lo importe.
  */
 export async function cerrarComanda(token: string, ticketId: string, estadoActual: EstadoCocina): Promise<void> {
   if (estadoActual === "EN_COCINA") {
