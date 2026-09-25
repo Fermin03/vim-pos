@@ -18,9 +18,13 @@ import { createClient } from "jsr:@supabase/supabase-js@2";
 import { corsHeaders } from "../_shared/cors.ts";
 
 const VERTICALES = ["FOODTRUCK", "QUICK_SERVICE", "FULL_SERVICE", "CAFE_BAR", "DARK_KITCHEN", "ENTERPRISE"];
+// Los planes por giro (QS, FT, FS…) se desactivaron con los tres escalones de precios (ago 2026)
+// y el registro seguía pidiéndolos: fallaba con «Plan QS no existe o inactivo». Los escalones no
+// dependen del giro —Esencial ya trae cocina y mesas—; una cadena empieza en Cadena. El plan se
+// cambia después desde /platform.
 const PLAN_DE_VERTICAL: Record<string, string> = {
-  FOODTRUCK: "FT", QUICK_SERVICE: "QS", FULL_SERVICE: "FS",
-  CAFE_BAR: "CB", DARK_KITCHEN: "DK", ENTERPRISE: "ENT",
+  FOODTRUCK: "ESENCIAL", QUICK_SERVICE: "ESENCIAL", FULL_SERVICE: "ESENCIAL",
+  CAFE_BAR: "ESENCIAL", DARK_KITCHEN: "ESENCIAL", ENTERPRISE: "CADENA",
 };
 
 const SLUG_RE = /^[a-z0-9](?:[a-z0-9-]{1,48}[a-z0-9])?$/;

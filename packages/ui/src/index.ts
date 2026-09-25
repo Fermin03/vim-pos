@@ -1,5 +1,5 @@
 export { cn } from "./cn";
-export { Button, type ButtonProps } from "./components/button";
+export { Button, botonClases, type ButtonProps } from "./components/button";
 export { PinKeypad, type PinKeypadProps } from "./components/pin-keypad";
 export { Modal, type ModalProps } from "./components/modal";
 export { useConfirmar, type OpcionesConfirmar } from "./components/confirmar";

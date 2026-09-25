@@ -230,7 +230,7 @@ export default function CajasPage() {
           dejaba la caja sin forma de vincularse. Solo se cierra con el botón. */}
       {creds && (
         <Modal open onClose={() => { /* solo con «Ya la capturé» */ }} title="Credenciales del dispositivo" className="w-full max-w-[480px] rounded-lg border border-line bg-surface p-6 shadow-xl">
-          <p className="text-[13px] text-ink-2">Captura esto <b>una sola vez</b> en el POS de la tablet de <b className="text-ink">{creds.caja_nombre}</b> (pantalla «Vincular este dispositivo»).</p>
+          <p className="text-[13px] text-ink-2">Captura esto <b>una sola vez</b> en VIM POS, en la computadora de <b className="text-ink">{creds.caja_nombre}</b> (pantalla «Vincular este dispositivo»).</p>
           <div className="mt-4 space-y-3">
             <CampoCopiable label="Identificador del dispositivo" valor={creds.identificador} />
             <CampoCopiable label="Clave del dispositivo" valor={creds.clave} />

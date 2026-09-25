@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { Button, LogoVim } from "@vim/ui/styles";
 import { entrar } from "../lib/supabase";
@@ -8,37 +8,52 @@ import { mensajeError } from "../lib/errores";
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
 const ANON = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? "";
 
+// Los valores son los de la base; las etiquetas, como las diría el dueño (antes en inglés).
 const VERTICALES = [
-  { v: "QUICK_SERVICE", l: "Quick Service · hamburguesas, pizza, pollo" },
-  { v: "FULL_SERVICE", l: "Full Service · restaurante con mesero" },
-  { v: "CAFE_BAR", l: "Café & Bar" },
-  { v: "DARK_KITCHEN", l: "Dark Kitchen · solo apps" },
-  { v: "FOODTRUCK", l: "Foodtruck" },
-  { v: "ENTERPRISE", l: "Enterprise · cadena multi-sucursal" },
+  { v: "QUICK_SERVICE", l: "Comida rápida · hamburguesas, pizza, pollo" },
+  { v: "FULL_SERVICE", l: "Restaurante con meseros" },
+  { v: "CAFE_BAR", l: "Cafetería o bar" },
+  { v: "DARK_KITCHEN", l: "Cocina solo para apps de entrega" },
+  { v: "FOODTRUCK", l: "Food truck" },
+  { v: "ENTERPRISE", l: "Cadena con varias sucursales" },
 ];
 
 const ERR_LABELS: Record<string, string> = {
-  EMAIL_YA_REGISTRADO: "Ese correo ya tiene una cuenta. Inicia sesión.",
-  CODIGO_YA_USADO: "Ese código ya está en uso. Prueba otro.",
-  EMAIL_INVALIDO: "Correo inválido.",
+  CODIGO_YA_USADO: "Esa dirección ya la usa otro negocio. Prueba con otra.",
+  EMAIL_INVALIDO: "Revisa tu correo: parece que le falta algo.",
   PASSWORD_DEBIL: "La contraseña debe tener al menos 8 caracteres.",
-  CODIGO_INVALIDO: "El código solo lleva minúsculas, números y guiones (3-50).",
-  VERTICAL_INVALIDA: "Tipo de negocio inválido.",
+  CODIGO_INVALIDO: "La dirección solo lleva minúsculas, números y guiones (de 3 a 50).",
+  VERTICAL_INVALIDA: "Elige el tipo de negocio.",
 };
 
+/** «Knock-Out Burger» → «knock-out-burger»: sin acentos, minúsculas y guiones. */
+function direccionDesde(nombre: string): string {
+  return nombre
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 50);
+}
+
 const input =
-  "w-full rounded border border-line-strong bg-surface px-[13px] py-3 text-[15px] outline-none transition focus:border-ink focus:shadow-[0_0_0_3px_rgba(22,22,26,.06)]";
-const label = "mb-[7px] block text-[13px] font-medium text-ink-2";
+  "w-full rounded border border-line-strong bg-surface px-[13px] py-3 text-[15px] outline-none transition-[border-color,box-shadow] focus:border-ink focus:shadow-[0_0_0_3px_rgba(22,22,26,.06)]";
+const label = "mb-[7px] block text-[13.5px] font-medium text-ink-2";
+const ayuda = "mt-1.5 text-[13px] text-ink-2";
 
 export default function RegistroPage() {
   const router = useRouter();
   const [paso, setPaso] = useState<1 | 2>(1);
   const [creando, setCreando] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Correo ya registrado: se ofrece entrar en vez de solo decirlo.
+  const [yaTieneCuenta, setYaTieneCuenta] = useState(false);
 
-  // Paso 1: negocio
-  const [codigo, setCodigo] = useState("");
+  // Paso 1: negocio. La dirección se sugiere a partir del nombre hasta que la edites.
   const [nombre, setNombre] = useState("");
+  const [codigo, setCodigo] = useState("");
+  const [codigoEditado, setCodigoEditado] = useState(false);
   const [vertical, setVertical] = useState("QUICK_SERVICE");
   // Paso 2: dueño
   const [nombreOwner, setNombreOwner] = useState("");
@@ -46,21 +61,29 @@ export default function RegistroPage() {
   const [tel, setTel] = useState("");
   const [pass, setPass] = useState("");
 
-  function siguiente() {
+  function cambiarNombre(v: string) {
+    setNombre(v);
+    if (!codigoEditado) setCodigo(direccionDesde(v));
+  }
+
+  function siguiente(e: FormEvent) {
+    e.preventDefault();
     setError(null);
+    if (!nombre.trim()) { setError("Escribe el nombre de tu negocio."); return; }
     if (codigo.length < 3 || !/^[a-z0-9-]+$/.test(codigo)) {
-      setError("Código inválido (mínimo 3, solo minúsculas/números/guiones)");
+      setError("La dirección necesita al menos 3 caracteres: minúsculas, números y guiones.");
       return;
     }
-    if (!nombre.trim()) { setError("Nombre comercial obligatorio"); return; }
     setPaso(2);
   }
 
-  async function registrar() {
+  async function registrar(e: FormEvent) {
+    e.preventDefault();
     setError(null);
-    if (!nombreOwner.trim()) { setError("Tu nombre es obligatorio"); return; }
-    if (!email.trim()) { setError("Correo obligatorio"); return; }
-    if (pass.length < 8) { setError("Contraseña mínimo 8 caracteres"); return; }
+    setYaTieneCuenta(false);
+    if (!nombreOwner.trim()) { setError("Escribe tu nombre."); return; }
+    if (!email.trim()) { setError("Escribe tu correo."); return; }
+    if (pass.length < 8) { setError("La contraseña debe tener al menos 8 caracteres."); return; }
 
     setCreando(true);
     try {
@@ -79,15 +102,23 @@ export default function RegistroPage() {
       });
       const data = await res.json();
       if (!res.ok || !data.ok) {
-        setError(ERR_LABELS[data.error] ?? data.detalle ?? data.error ?? "No se pudo crear la cuenta");
+        if (data.error === "EMAIL_YA_REGISTRADO") {
+          setYaTieneCuenta(true);
+        } else if (data.error === "CODIGO_YA_USADO" || data.error === "CODIGO_INVALIDO") {
+          // El error es del paso 1: volver ahí, donde está el campo.
+          setPaso(1);
+          setError(ERR_LABELS[data.error]!);
+        } else {
+          setError(ERR_LABELS[data.error] ?? data.detalle ?? "No se pudo crear la cuenta. Intenta de nuevo.");
+        }
         setCreando(false);
         return;
       }
-      // Login automático para que entre directo a su admin nuevo.
+      // Entra solo y va directo a la lista de pasos: antes caía en un dashboard vacío.
       await entrar(email.trim().toLowerCase(), pass);
-      router.replace("/dashboard");
-    } catch (e) {
-      setError(mensajeError(e, "Error de red"));
+      router.replace("/bienvenida");
+    } catch (err) {
+      setError(mensajeError(err, "Sin conexión. Revisa tu internet e intenta de nuevo."));
       setCreando(false);
     }
   }
@@ -102,24 +133,29 @@ export default function RegistroPage() {
 
         <div className="mb-6 text-center">
           <h1 className="mb-1.5 font-display text-[26px] font-semibold tracking-tight">Empieza con VIM POS</h1>
-          <p className="text-sm text-ink-2">
+          <p className="text-[14.5px] text-ink-2">
             {paso === 1 ? "Cuéntanos de tu negocio" : "Crea tu cuenta de dueño"} · paso {paso} de 2
           </p>
         </div>
 
         <div className="rounded-lg border border-line bg-surface p-6">
           {paso === 1 && (
-            <div className="flex flex-col gap-4">
+            <form className="flex flex-col gap-4" onSubmit={siguiente} noValidate>
               <div>
-                <label className={label} htmlFor="codigo">Código del negocio (slug)</label>
-                <input id="codigo" className={input} value={codigo} maxLength={50}
-                  onChange={(e) => setCodigo(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ""))}
-                  placeholder="knockout-burger" />
-                <p className="mt-1.5 text-[11.5px] text-ink-3">Usado en subdominios y prefijos de folio. Mínimo 3 caracteres.</p>
+                <label className={label} htmlFor="nombre">Nombre de tu negocio</label>
+                <input id="nombre" className={input} value={nombre} maxLength={150} autoFocus autoComplete="organization"
+                  onChange={(e) => cambiarNombre(e.target.value)} placeholder="Knock-Out Burger" />
               </div>
               <div>
-                <label className={label} htmlFor="nombre">Nombre comercial</label>
-                <input id="nombre" className={input} value={nombre} maxLength={150} onChange={(e) => setNombre(e.target.value)} placeholder="Knock-Out Burger" />
+                <label className={label} htmlFor="codigo">Dirección de tu portal de facturas</label>
+                <input id="codigo" className={input} value={codigo} maxLength={50} autoCapitalize="none" spellCheck={false}
+                  aria-describedby="codigo-ayuda"
+                  onChange={(e) => { setCodigoEditado(true); setCodigo(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, "")); }}
+                  placeholder="knock-out-burger" />
+                <p id="codigo-ayuda" className={ayuda}>
+                  Tus clientes piden su factura en
+                  <span className="block break-all font-medium text-ink">factura.vimpos.com.mx/{codigo || "tu-negocio"}</span>
+                </p>
               </div>
               <div>
                 <label className={label} htmlFor="vertical">Tipo de negocio</label>
@@ -130,42 +166,53 @@ export default function RegistroPage() {
 
               {error && <p className="text-sm font-medium text-danger" role="alert">{error}</p>}
 
-              <Button size="lg" className="mt-1 w-full" onClick={siguiente}>Continuar</Button>
-            </div>
+              <Button type="submit" size="lg" className="mt-1 w-full">Continuar</Button>
+            </form>
           )}
 
           {paso === 2 && (
-            <div className="flex flex-col gap-4">
+            <form className="flex flex-col gap-4" onSubmit={registrar} noValidate>
               <div>
                 <label className={label} htmlFor="on">Tu nombre</label>
-                <input id="on" className={input} value={nombreOwner} maxLength={150} onChange={(e) => setNombreOwner(e.target.value)} />
+                <input id="on" className={input} value={nombreOwner} maxLength={150} autoFocus autoComplete="name"
+                  onChange={(e) => setNombreOwner(e.target.value)} />
               </div>
               <div>
                 <label className={label} htmlFor="email">Correo electrónico</label>
-                <input id="email" type="email" className={input} value={email} onChange={(e) => setEmail(e.target.value)} placeholder="tu@negocio.mx" />
+                <input id="email" type="email" className={input} value={email} autoComplete="email" autoCapitalize="none"
+                  onChange={(e) => setEmail(e.target.value)} placeholder="tu@negocio.mx" />
               </div>
               <div>
-                <label className={label} htmlFor="tel">Teléfono · <span className="text-ink-3">opcional</span></label>
-                <input id="tel" className={input} value={tel} maxLength={20} onChange={(e) => setTel(e.target.value)} />
+                <label className={label} htmlFor="tel">Teléfono <span className="font-normal text-ink-2">· opcional</span></label>
+                <input id="tel" type="tel" inputMode="tel" className={input} value={tel} maxLength={20} autoComplete="tel"
+                  onChange={(e) => setTel(e.target.value)} />
               </div>
               <div>
                 <label className={label} htmlFor="pass">Contraseña</label>
-                <input id="pass" type="password" className={input} value={pass} onChange={(e) => setPass(e.target.value)} placeholder="mínimo 8 caracteres" />
+                <input id="pass" type="password" className={input} value={pass} autoComplete="new-password"
+                  aria-describedby="pass-ayuda" onChange={(e) => setPass(e.target.value)} />
+                <p id="pass-ayuda" className={ayuda}>Mínimo 8 caracteres.</p>
               </div>
 
+              {yaTieneCuenta && (
+                <p className="rounded border border-line-strong bg-sel px-3 py-2.5 text-[14px] text-ink-2" role="alert">
+                  Ese correo ya tiene una cuenta.{" "}
+                  <a href="/" className="font-semibold text-ink underline underline-offset-2">Inicia sesión</a>
+                </p>
+              )}
               {error && <p className="text-sm font-medium text-danger" role="alert">{error}</p>}
 
               <div className="flex gap-2">
-                <Button variant="ghost" className="flex-1" onClick={() => setPaso(1)} disabled={creando}>Atrás</Button>
-                <Button size="lg" className="flex-1" onClick={registrar} disabled={creando}>
+                <Button variant="ghost" className="flex-1" onClick={() => { setError(null); setYaTieneCuenta(false); setPaso(1); }} disabled={creando}>Atrás</Button>
+                <Button type="submit" size="lg" className="flex-1" disabled={creando}>
                   {creando ? "Creando…" : "Crear mi cuenta"}
                 </Button>
               </div>
-            </div>
+            </form>
           )}
         </div>
 
-        <p className="mt-6 text-center text-[13px] text-ink-3">
+        <p className="mt-6 text-center text-[14px] text-ink-2">
           ¿Ya tienes cuenta? <a href="/" className="font-medium text-ink underline-offset-2 hover:underline">Inicia sesión</a>
         </p>
       </div>

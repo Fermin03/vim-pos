@@ -51,10 +51,11 @@ export function ConfigSideNav({ permitidoDelivery }: { permitidoDelivery: boolea
   const todos = secciones.flatMap((s) => s.items);
   return (
     <>
-      {/* --- Móvil: tira horizontal --- */}
+      {/* --- Móvil: tira horizontal (sin margen negativo: con -mx-px la página entera se
+           desplazaba 1 px de lado en celular y tablet) --- */}
       <nav
         aria-label="Secciones de configuración"
-        className="scroll-x-limpio -mx-px flex flex-shrink-0 gap-1.5 overflow-x-auto border-b border-line bg-surface px-4 py-2.5 lg:hidden"
+        className="scroll-x-limpio flex flex-shrink-0 gap-1.5 overflow-x-auto border-b border-line bg-surface px-4 py-2.5 lg:hidden"
       >
         {todos.map((it) => {
           const active = pathname === it.href || pathname.startsWith(it.href + "/");

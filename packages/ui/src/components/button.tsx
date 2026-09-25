@@ -29,6 +29,12 @@ const sizes: Record<Size, string> = {
   lg: "h-14 px-6 text-base",
 };
 
+/** Las clases del botón, para un enlace que debe verse como botón (un <button> dentro de un <a>
+ *  es HTML inválido: dos paradas de tabulador y un clic que no siempre navega). */
+export function botonClases({ variant = "primary", size = "md" }: { variant?: Variant; size?: Size } = {}): string {
+  return cn(base, variants[variant], sizes[size]);
+}
+
 /** Botón base accesible. Siempre <button> real (foco por teclado, no <div onclick>). */
 export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
   ({ variant = "primary", size = "md", className, type = "button", ...props }, ref) => (
