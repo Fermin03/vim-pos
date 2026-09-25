@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import { Button, useConfirmar } from "@vim/ui/styles";
+import { fechaLegible } from "@vim/fecha";
 import { PageBody, PageHeader } from "../../components/page-header";
 import {
   actualizarPromo,
@@ -15,17 +16,13 @@ import {
   type TipoPromo,
 } from "../../lib/promociones";
 import { mensajeError } from "../../lib/errores";
+import { aDatetimeLocal } from "../../lib/fechas";
 
 const input = "h-11 w-full rounded border border-line-strong px-3 text-sm outline-none focus:border-ink focus:shadow-[0_0_0_3px_rgba(22,22,26,.06)]";
 const label = "mb-1.5 block text-[13px] font-medium text-ink-2";
 
 type FormDatos = { nombre: string; descripcion: string; tipo: TipoPromo; valor: string; fecha_inicio: string; fecha_fin: string };
-function ahoraLocal(): string {
-  const d = new Date();
-  d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
-  return d.toISOString().slice(0, 16);
-}
-const VACIO = (): FormDatos => ({ nombre: "", descripcion: "", tipo: "PORCENTAJE", valor: "", fecha_inicio: ahoraLocal(), fecha_fin: "" });
+const VACIO = (): FormDatos => ({ nombre: "", descripcion: "", tipo: "PORCENTAJE", valor: "", fecha_inicio: aDatetimeLocal(), fecha_fin: "" });
 
 const COLOR_ESTADO: Record<EstadoPromo, string> = {
   ACTIVA: "bg-success-soft text-success", PAUSADA: "bg-warning-soft text-warning",
@@ -172,11 +169,11 @@ export default function PromocionesPage() {
                       <td className="px-4 py-2.5"><div className="font-medium">{p.nombre}</div>{p.descripcion && <div className="text-[12px] text-ink-3">{p.descripcion}</div>}</td>
                       <td className="px-4 py-2.5 font-semibold tabular-nums">{p.valorTexto}</td>
                       <td className="px-4 py-2.5 text-[12.5px] text-ink-2">
-                        {new Date(p.fechaInicio).toLocaleDateString("es-MX")}{p.fechaFin ? ` → ${new Date(p.fechaFin).toLocaleDateString("es-MX")}` : " → sin fin"}
+                        {fechaLegible(p.fechaInicio)}{p.fechaFin ? ` → ${fechaLegible(p.fechaFin)}` : " → sin fin"}
                       </td>
                       <td className="px-4 py-2.5"><span className={`rounded-full px-2 py-0.5 text-[11px] font-bold ${COLOR_VISTA[estadoVista(p)]}`}>{LABEL_VISTA[estadoVista(p)]}</span></td>
                       <td className="px-4 py-2.5 text-right">
-                        <button type="button" onClick={() => setEditando({ id: p.id, datos: { nombre: p.nombre, descripcion: p.descripcion, tipo: p.tipo, valor: p.valorTexto.replace(/[^0-9.]/g, ""), fecha_inicio: p.fechaInicio.slice(0, 16), fecha_fin: p.fechaFin ? p.fechaFin.slice(0, 16) : "" } })} className="text-[12.5px] font-semibold text-ink-2 hover:text-ink">Editar</button>
+                        <button type="button" onClick={() => setEditando({ id: p.id, datos: { nombre: p.nombre, descripcion: p.descripcion, tipo: p.tipo, valor: p.valorTexto.replace(/[^0-9.]/g, ""), fecha_inicio: aDatetimeLocal(p.fechaInicio), fecha_fin: p.fechaFin ? aDatetimeLocal(p.fechaFin) : "" } })} className="text-[12.5px] font-semibold text-ink-2 hover:text-ink">Editar</button>
                         {(p.estado === "ACTIVA" || p.estado === "PAUSADA") && <button type="button" onClick={() => alternar(p)} className="ml-3 text-[12.5px] font-semibold text-ink-3 hover:text-ink">{p.estado === "ACTIVA" ? "Pausar" : "Activar"}</button>}
                         <button type="button" onClick={() => borrar(p)} className="ml-3 text-[12.5px] font-semibold text-ink-3 hover:text-danger">Eliminar</button>
                       </td>

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { aFechaMx, fechaLegible, rangoLegible, sumarDias, sumarMeses } from "../index";
+import { aFechaMx, fechaLegible, haceCuanto, rangoLegible, sumarDias, sumarMeses } from "../index";
 
 describe("aFechaMx", () => {
   it("de noche en México sigue siendo HOY, aunque en UTC ya sea mañana", () => {
@@ -78,5 +78,20 @@ describe("fechaLegible", () => {
   it("un rango de un solo día no repite la fecha", () => {
     expect(rangoLegible("2026-09-03", "2026-09-03")).toBe("3 sep 2026");
     expect(rangoLegible("2026-09-03", "2026-09-09")).toBe("3 sep 2026 – 9 sep 2026");
+  });
+});
+
+describe("haceCuanto", () => {
+  const ahora = Date.parse("2026-09-25T03:00:00Z");
+  it("minutos, horas y días en palabras", () => {
+    expect(haceCuanto("2026-09-25T02:56:00Z", ahora)).toBe("hace 4 min");
+    expect(haceCuanto("2026-09-25T01:00:00Z", ahora)).toBe("hace 2 h");
+    expect(haceCuanto("2026-09-22T03:00:00Z", ahora)).toBe("hace 3 días");
+    expect(haceCuanto("2026-09-24T03:00:00Z", ahora)).toBe("hace 1 día");
+  });
+  it("recién, nunca y más de un mes", () => {
+    expect(haceCuanto("2026-09-25T02:59:40Z", ahora)).toBe("hace un momento");
+    expect(haceCuanto(null, ahora)).toBe("nunca");
+    expect(haceCuanto("2026-07-01T18:00:00Z", ahora)).toBe("1 jul 2026");
   });
 });

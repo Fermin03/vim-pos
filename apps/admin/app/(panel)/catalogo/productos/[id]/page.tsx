@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import { PageHeader, PageBody } from "../../../../components/page-header";
@@ -11,6 +11,14 @@ import { obtenerProducto, type Producto } from "../../../../lib/catalogo";
 export default function EditarProductoPage() {
   const params = useParams<{ id: string }>();
   const [prod, setProd] = useState<Producto | null | undefined>(undefined);
+  // Los modificadores marcados y aún sin guardar: "Guardar cambios" los guarda antes de salir.
+  const modsPendientes = useRef<(() => Promise<void>) | null>(null);
+  const registrarPendiente = useCallback((fn: (() => Promise<void>) | null) => {
+    modsPendientes.current = fn;
+  }, []);
+  const guardarMods = useCallback(async () => {
+    await modsPendientes.current?.();
+  }, []);
 
   useEffect(() => {
     obtenerProducto(params.id)
@@ -35,8 +43,8 @@ export default function EditarProductoPage() {
         {prod === null && <p className="text-sm text-danger">Producto no encontrado.</p>}
         {prod && (
           <>
-            <ProductoForm producto={prod} />
-            <ProductoModificadores productoId={prod.id} />
+            <ProductoForm producto={prod} guardarTambien={guardarMods} />
+            <ProductoModificadores productoId={prod.id} onPendiente={registrarPendiente} />
           </>
         )}
       </PageBody>

@@ -22,6 +22,7 @@ const label = "mb-1.5 block text-[13px] font-medium text-ink-2";
 export function ProductoForm({
   producto,
   alGuardar,
+  guardarTambien,
 }: {
   producto: Producto | null;
   /**
@@ -30,6 +31,12 @@ export function ProductoForm({
    * combos lo usa para quedarse en la pantalla de slots y recargar el producto en vez de navegar.
    */
   alGuardar?: () => void;
+  /**
+   * Lo que la pantalla tenga pendiente de guardar además del producto (hoy: los modificadores
+   * marcados abajo). Se espera ANTES de salir. Sin esto, "Guardar cambios" navegaba a la lista y
+   * los modificadores recién marcados se perdían sin aviso (revisión de diseño, sep 2026).
+   */
+  guardarTambien?: () => Promise<void>;
 }) {
   const router = useRouter();
   const editar = !!producto;
@@ -91,6 +98,7 @@ export function ProductoForm({
     try {
       if (editar) await actualizarProducto(producto!.id, parsed.data);
       else await crearProducto(parsed.data);
+      if (guardarTambien) await guardarTambien();
       if (alGuardar) {
         // A diferencia del comportamiento por defecto, aquí no se navega: el componente sigue
         // montado, así que el botón debe volver a habilitarse.
