@@ -20,6 +20,7 @@ export function ModalAutorizacionPin({
   cajaId,
   turnoId,
   motivo,
+  quienAutoriza,
   onAutorizado,
   onCancelar,
 }: {
@@ -32,8 +33,11 @@ export function ModalAutorizacionPin({
   entidadTipo: string;
   entidadId: string | null;
   cajaId: string;
-  turnoId: string;
+  /** null fuera de un turno (p. ej. desvincular desde la pantalla de acceso). */
+  turnoId: string | null;
   motivo: string;
+  /** Quién puede autorizar, cuando no es "un supervisor o admin" (p. ej. un permiso solo de dueño/admin). */
+  quienAutoriza?: string;
   onAutorizado: (a: Autorizacion) => void;
   onCancelar: () => void;
 }) {
@@ -44,7 +48,7 @@ export function ModalAutorizacionPin({
 
   function mensajeError(codigo: string): string {
     if (codigo === "SIN_PERMISO")
-      return "Ese PIN es válido, pero pertenece a un rol que no puede autorizar esta operación. Pide el PIN de un supervisor o administrador.";
+      return `Ese PIN es válido, pero pertenece a un rol que no puede autorizar esta operación. Pide el PIN de ${quienAutoriza ?? "un supervisor o administrador"}.`;
     if (codigo === "BLOQUEADO") return "Demasiados intentos. Espera unos minutos e inténtalo de nuevo.";
     if (codigo === "PIN_INCORRECTO") return "PIN incorrecto. Inténtalo de nuevo.";
     return codigo;
@@ -99,7 +103,7 @@ export function ModalAutorizacionPin({
         <h3 className="mb-[6px] font-display text-xl font-semibold tracking-tight">Autorización requerida</h3>
         <p className="text-[13.5px] font-medium text-ink-2">{descripcion}</p>
         <p className="mt-1 text-[12.5px] text-ink-3">
-          Lo ejecuta <b className="font-semibold text-ink-2">{ejecutaNombre}</b> · debe autorizar un supervisor o admin.
+          Lo ejecuta <b className="font-semibold text-ink-2">{ejecutaNombre}</b> · debe autorizar {quienAutoriza ?? "un supervisor o admin"}.
         </p>
       </div>
 

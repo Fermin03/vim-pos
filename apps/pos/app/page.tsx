@@ -165,6 +165,7 @@ export default function Page() {
           <SelectorEmpleados
             sucursal={SUCURSAL_DEV}
             caja={CAJA_DEV}
+            cajaId={cajaId}
             onElegir={(empleado) => setEstado({ paso: "selector", pinPara: empleado })}
             onDesvincular={desvincular}
             onSesionInvalida={sesionDispositivoInvalida}

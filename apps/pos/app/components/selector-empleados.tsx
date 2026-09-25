@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import { TopbarPos } from "./topbar-pos";
+import { ModalDesvincular } from "./modal-desvincular";
 import { listarEmpleados, nombreDelNegocio, SesionDispositivoInvalida, type Empleado } from "../lib/supabase";
 
 export const ROL_LABEL: Record<string, string> = {
@@ -25,6 +26,7 @@ export function SelectorEmpleados({
   negocio: negocioProp,
   sucursal,
   caja,
+  cajaId,
   onElegir,
   onDesvincular,
   onSesionInvalida,
@@ -32,6 +34,8 @@ export function SelectorEmpleados({
   negocio?: string;
   sucursal: string;
   caja: string;
+  /** Caja de este dispositivo: contra ella se valida el PIN que autoriza desvincular. */
+  cajaId: string | null;
   onElegir: (e: Empleado) => void;
   onDesvincular: () => void;
   /** La sesión del dispositivo ya no es válida: hay que re-vincular la caja. */
@@ -39,6 +43,7 @@ export function SelectorEmpleados({
 }) {
   const [empleados, setEmpleados] = useState<Empleado[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [desvinculando, setDesvinculando] = useState(false);
 
   /* El nombre del negocio se lee aquí y no se recibe por prop porque en esta
      pantalla todavía no hay sesión de empleado —solo la del dispositivo— y es
@@ -116,7 +121,7 @@ export function SelectorEmpleados({
           <div className="mt-8 text-center">
             <button
               type="button"
-              onClick={onDesvincular}
+              onClick={() => setDesvinculando(true)}
               className="border-b border-transparent text-[13px] font-medium text-ink-3 transition-colors hover:border-line-strong hover:text-ink-2"
             >
               Desvincular este dispositivo
@@ -124,6 +129,14 @@ export function SelectorEmpleados({
           </div>
         </div>
       </div>
+
+      {desvinculando && (
+        <ModalDesvincular
+          cajaId={cajaId}
+          onDesvincular={onDesvincular}
+          onCerrar={() => setDesvinculando(false)}
+        />
+      )}
     </div>
   );
 }
