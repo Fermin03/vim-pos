@@ -27,6 +27,8 @@ export type CajaSalud = {
   /** Versión del escritorio. NULL = anterior a 0.4.60, que no late. */
   versionApp: string | null;
   so: string | null;
+  /** Pantalla que reportó en su último latido (0121). null = caja anterior a 0.4.87. */
+  pantalla: Pantalla | null;
   ultimaIp: string | null;
   horasSinConexion: number | null;
   bloqueoMotivo: string | null;
@@ -65,6 +67,30 @@ export type Acceso = {
 };
 
 /** Antigüedad en palabras: "hace 3 días" se entiende de un vistazo; una fecha ISO no. */
+/** Pantalla de una caja: píxeles físicos y escala de Windows (0121). */
+export type Pantalla = { ancho: number; alto: number; escala: number };
+
+/** De las tres columnas de `cajas` a una Pantalla, o null si la caja no la ha reportado. */
+export function pantallaDeFila(f: { pantalla_ancho: number | null; pantalla_alto: number | null; pantalla_escala: number | string | null }): Pantalla | null {
+  if (f.pantalla_ancho == null || f.pantalla_alto == null || f.pantalla_escala == null) return null;
+  return { ancho: f.pantalla_ancho, alto: f.pantalla_alto, escala: Number(f.pantalla_escala) };
+}
+
+/**
+ * "1280×1024 · 125 %". La escala va aparte porque cambia lo que ve la interfaz: 1280×1024 al 125 %
+ * es un lienzo de 1024×819 — por eso `areaUtil` también se enseña (en el title de la celda).
+ */
+export function pantallaTexto(p: Pantalla | null): string {
+  if (!p) return "—";
+  return `${p.ancho}×${p.alto} · ${Math.round(p.escala * 100)} %`;
+}
+
+/** El lienzo que ve la interfaz: los píxeles físicos entre la escala. */
+export function areaUtil(p: Pantalla | null): string {
+  if (!p) return "";
+  return `La interfaz ve ${Math.round(p.ancho / p.escala)}×${Math.round(p.alto / p.escala)}`;
+}
+
 export function hace(iso: string | null): string {
   if (!iso) return "nunca";
   const ms = Date.now() - new Date(iso).getTime();
@@ -166,6 +192,7 @@ export type CajaParque = {
   sucursal: string;
   versionApp: string | null;
   so: string | null;
+  pantalla: Pantalla | null;
   ultimoLatido: string | null;
   /** No ha latido nunca: es anterior a 0.4.60. No es lo mismo que estar desactualizada. */
   sinLatido: boolean;

@@ -3,7 +3,7 @@
 //    gateway) + UI del POS. Hace de HUB en la LAN. Fase 3: bandeja (no se apaga por accidente) +
 //    watchdog (se auto-recupera) + respaldo del pgdata al cerrar y bajo demanda.
 //  • COCINA (--role=cocina): pantalla de cocina como CLIENTE DELGADO del hub. SIN backend local.
-import { app, BrowserWindow, Tray, Menu, nativeImage, clipboard, Notification, dialog, shell, safeStorage, ipcMain } from "electron";
+import { app, BrowserWindow, Tray, Menu, nativeImage, clipboard, Notification, dialog, shell, safeStorage, ipcMain, screen } from "electron";
 import { existsSync, readFileSync, writeFileSync, mkdirSync, openSync, writeSync } from "node:fs";
 import { inspect } from "node:util";
 import path from "node:path";
@@ -18,6 +18,7 @@ import { crearWatchdog } from "./watchdog.mjs";
 import { crearCicloSync } from "./sync-ciclo.mjs";
 import { crearSondeoCatalogo } from "./sondeo-catalogo.mjs";
 import { crearAlmacenDirectivas, estadoDeVersion } from "./directivas.mjs";
+import { pantallaDeLaCaja } from "./pantalla.mjs";
 import { crearEspejo } from "./delivery-espejo.mjs";
 import { debeSondearApps } from "./delivery-espejo-modulo.mjs";
 import { registrarErrorLocal, subirErrores } from "./sync-errores.mjs";
@@ -536,6 +537,9 @@ async function latir() {
       version: app.getVersion(),
       so: `${os.type()} ${os.release()}`,
       avisos_vistos: vistos,
+      // Tamaño y escala de la pantalla de la caja (0121): el panel interno los enseña por caja,
+      // para diseñar pensando en el monitor real de cada cliente. null si no se pudo leer.
+      pantalla: pantallaDeLaCaja(screen, win),
     }),
     signal: AbortSignal.timeout(10000),
   });

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { autorizar, auditar } from "../../lib/server";
 import { validarManifiesto } from "../../lib/manifiesto";
+import { pantallaDeFila } from "../../lib/tipos";
 
 /**
  * Versiones del escritorio (ADR 0014, entrega 4).
@@ -41,7 +42,7 @@ export async function GET(req: Request) {
     sb.from("versiones_caja")
       .select("version, url, sha512, notas, fecha, publicada, es_minima, bloquea_bajo_minima, bloquea_desde, created_at")
       .limit(200),
-    sb.from("cajas").select("id, nombre, tenant_id, sucursal_id, version_app, so, ultimo_latido")
+    sb.from("cajas").select("id, nombre, tenant_id, sucursal_id, version_app, so, ultimo_latido, pantalla_ancho, pantalla_alto, pantalla_escala")
       .is("deleted_at", null).eq("activa", true).limit(2000),
     sb.from("sucursales").select("id, nombre").is("deleted_at", null).limit(500),
     sb.from("tenants").select("id, nombre_comercial, estado").is("deleted_at", null).limit(1000),
@@ -65,6 +66,7 @@ export async function GET(req: Request) {
   const cajas = ((cajasRes.data ?? []) as {
     id: string; nombre: string; tenant_id: string; sucursal_id: string;
     version_app: string | null; so: string | null; ultimo_latido: string | null;
+    pantalla_ancho: number | null; pantalla_alto: number | null; pantalla_escala: number | string | null;
   }[])
     .filter((c) => vivos.has(c.tenant_id))
     .map((c) => ({
@@ -75,6 +77,7 @@ export async function GET(req: Request) {
       sucursal: nombreSuc.get(c.sucursal_id) ?? "—",
       versionApp: c.version_app,
       so: c.so,
+      pantalla: pantallaDeFila(c),
       ultimoLatido: c.ultimo_latido,
       // Una caja sin versión es anterior a 0.4.60: no late, y no es lo mismo que estar
       // desactualizada respecto a la mínima. Se cuentan aparte para no mezclar dos problemas.

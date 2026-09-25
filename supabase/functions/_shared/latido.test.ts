@@ -39,6 +39,27 @@ test("descarta avisos que no son uuid y limita la lista", () => {
 });
 
 test("un cuerpo que no es objeto no revienta", () => {
-  assert.deepEqual(validarCuerpo(null), { version: null, so: null, avisos_vistos: [] });
-  assert.deepEqual(validarCuerpo("hola"), { version: null, so: null, avisos_vistos: [] });
+  assert.deepEqual(validarCuerpo(null), { version: null, so: null, avisos_vistos: [], pantalla: null });
+  assert.deepEqual(validarCuerpo("hola"), { version: null, so: null, avisos_vistos: [], pantalla: null });
+});
+
+test("la pantalla válida pasa con su escala redondeada a centésimas (0121)", () => {
+  const r = validarCuerpo({ pantalla: { ancho: 1280, alto: 1024, escala: 1.25 } });
+  assert.deepEqual(r.pantalla, { ancho: 1280, alto: 1024, escala: 1.25 });
+  assert.deepEqual(validarCuerpo({ pantalla: { ancho: 1920, alto: 1080, escala: 1.3333333 } }).pantalla, { ancho: 1920, alto: 1080, escala: 1.33 });
+});
+
+test("una pantalla incompleta o fuera de rango se descarta, sin tumbar el latido", () => {
+  assert.equal(validarCuerpo({ pantalla: { ancho: 1280, alto: 1024 } }).pantalla, null);
+  assert.equal(validarCuerpo({ pantalla: { ancho: 99999, alto: 1024, escala: 1 } }).pantalla, null);
+  assert.equal(validarCuerpo({ pantalla: { ancho: "1280", alto: 1024, escala: 1 } }).pantalla, null);
+  assert.equal(validarCuerpo({ pantalla: { ancho: 1280.5, alto: 1024, escala: 1 } }).pantalla, null);
+  assert.equal(validarCuerpo({ pantalla: { ancho: 1280, alto: 1024, escala: 9 } }).pantalla, null);
+  const r = validarCuerpo({ version: "0.4.87", pantalla: "1280x1024" });
+  assert.equal(r.version, "0.4.87");
+  assert.equal(r.pantalla, null);
+});
+
+test("sin pantalla (cajas anteriores a 0.4.87) el campo es null", () => {
+  assert.equal(validarCuerpo({ version: "0.4.86" }).pantalla, null);
 });

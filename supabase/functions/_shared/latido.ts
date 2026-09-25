@@ -13,7 +13,33 @@ export function cajaIdDeEmail(email: string | null | undefined): string | null {
   return m ? m[1]!.toLowerCase() : null;
 }
 
-export type CuerpoLatido = { version: string | null; so: string | null; avisos_vistos: string[] };
+/** Pantalla de la caja (0121): píxeles físicos y escala de Windows (1.25 = 125 %). */
+export type PantallaLatido = { ancho: number; alto: number; escala: number };
+
+export type CuerpoLatido = {
+  version: string | null;
+  so: string | null;
+  avisos_vistos: string[];
+  pantalla: PantallaLatido | null;
+};
+
+/**
+ * La pantalla va completa y en rangos razonables, o no va. Un dato raro se descarta en silencio
+ * —el latido se atiende igual— porque inventar o recortar una resolución diría algo falso de la
+ * caja del cliente. Mismos rangos que los CHECK de la migración 0121.
+ */
+function pantallaValida(v: unknown): PantallaLatido | null {
+  if (!v || typeof v !== "object") return null;
+  const p = v as Record<string, unknown>;
+  const entero = (n: unknown, min: number, max: number) =>
+    typeof n === "number" && Number.isInteger(n) && n >= min && n <= max ? n : null;
+  const ancho = entero(p.ancho, 320, 16384);
+  const alto = entero(p.alto, 240, 16384);
+  const escala = typeof p.escala === "number" && Number.isFinite(p.escala) && p.escala >= 0.5 && p.escala <= 5
+    ? Math.round(p.escala * 100) / 100
+    : null;
+  return ancho !== null && alto !== null && escala !== null ? { ancho, alto, escala } : null;
+}
 
 /**
  * Nada del cuerpo llega a SQL sin pasar por aquí. Recorta en vez de rechazar: un SO con un
@@ -32,5 +58,6 @@ export function validarCuerpo(x: unknown): CuerpoLatido {
     version: texto(o.version, 20),
     so: texto(o.so, 80),
     avisos_vistos: vistos.filter((v): v is string => typeof v === "string" && UUID.test(v)).slice(0, 50),
+    pantalla: pantallaValida(o.pantalla),
   };
 }
