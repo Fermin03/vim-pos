@@ -137,11 +137,14 @@ export async function facturarTicket(ticketId: string, receptor: ReceptorInput):
   if (e2) return { ok: false, cfdiId: null, error: e2.message };
   const t = (ten ?? {}) as Record<string, string | null>;
   if (!t.rfc || !t.razon_social || !t.regimen_fiscal || !t.codigo_postal_fiscal) {
-    return { ok: false, cfdiId: null, error: "Faltan datos fiscales del negocio (Configuración → Datos fiscales)." };
+    return { ok: false, cfdiId: null, error: "Faltan datos fiscales del negocio (Configuración → Facturación)." };
   }
   const emisor = emi as { proveedor_pac?: string; estado?: string } | null;
   if (!emisor) {
-    return { ok: false, cfdiId: null, error: "No hay emisor CFDI configurado (Configuración → CFDI / PAC)." };
+    return { ok: false, cfdiId: null, error: "Falta cargar el sello digital (Configuración → Facturación)." };
+  }
+  if (emisor.estado === "INACTIVO") {
+    return { ok: false, cfdiId: null, error: "La facturación está pausada. Reanúdala en Configuración → Facturación." };
   }
 
   const { data: cfdiId, error: eB } = await supabase.rpc("cfdi_crear_borrador", {

@@ -94,6 +94,18 @@ Deno.serve(async (req) => {
     );
   }
 
+  // Facturación pausada por el negocio (Configuración → Facturación): no se timbra nada nuevo.
+  // Solo "INACTIVO" bloquea; "PRUEBA" y "ACTIVO" timbran igual que siempre, para no cortarle la
+  // facturación a nadie que ya la usa con el modo viejo en "Pruebas".
+  const { data: emisorEstado } = await sb
+    .from("tenant_cfdi_emisor")
+    .select("estado")
+    .eq("tenant_id", (cfdi as { tenant_id: string }).tenant_id)
+    .maybeSingle();
+  if ((emisorEstado as { estado?: string } | null)?.estado === "INACTIVO") {
+    return json({ error: "FACTURACION_PAUSADA", detalle: "La facturación está pausada. Reanúdala en Configuración → Facturación." }, 409);
+  }
+
   if (cfdi.estado_sat === "TIMBRADO") return json({ error: "YA_TIMBRADO" }, 409);
   if (cfdi.estado_sat !== "BORRADOR" && cfdi.estado_sat !== "ERROR_TIMBRADO") {
     return json({ error: "ESTADO_NO_TIMBRABLE", estado: cfdi.estado_sat }, 409);

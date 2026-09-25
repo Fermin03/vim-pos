@@ -111,6 +111,20 @@ Deno.serve(async (req) => {
     }, 409);
   }
 
+  // Facturación pausada por el negocio: el portal no emite nada nuevo, pero quien ya tiene su
+  // factura la puede volver a bajar. Solo "INACTIVO" pausa (ver timbrar-cfdi).
+  if (body.accion !== "recuperar" && body.accion !== "enviar") {
+    const { data: emisorEstado } = await sb.from("tenant_cfdi_emisor").select("estado").eq("tenant_id", tenant.id).maybeSingle();
+    if ((emisorEstado as { estado?: string } | null)?.estado === "INACTIVO") {
+      return json({
+        estado: "SIN_FACTURACION",
+        mensaje: `${tenant.nombre_comercial} tiene la facturación en línea en pausa. Pídela en el mostrador.`,
+        negocio: tenant.nombre_comercial,
+        logo: tenant.logo_png_url,
+      }, 409);
+    }
+  }
+
   // ── El negocio (paso 1) ─────────────────────────────────────────────────────────────────────
   // El portal enseña el nombre y el logo del restaurante desde la primera pantalla: quien llega
   // por el QR tiene que ver que está facturando en su restaurante, no en "VIM POS".
