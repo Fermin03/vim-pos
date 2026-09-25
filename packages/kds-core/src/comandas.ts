@@ -8,7 +8,11 @@ export type ItemComanda = {
   id: string;
   cantidad: number;
   nombre: string;
+  /** Lo que se agrega o se prepara distinto ("Término medio", "Extra queso"). */
   modificadores: string[];
+  /** Lo que se QUITA ("Sin cebolla"): naturaleza OMISION. Va aparte y en negritas porque confundir
+   *  un "sin" con un "extra" es el error de cocina que más cuesta. */
+  sin: string[];
   notaCocina: string | null;
   /** Área de cocina del ítem (para el filtro multi-área). null = sin área. */
   area: string | null;
@@ -31,6 +35,8 @@ export type ComandaKds = {
   fechaEnvio: string | null;
   /** Nota de cocina de TODA la orden (tickets.nota_general). */
   notaOrden: string | null;
+  /** A quién o de dónde: "Mesa 4", el nombre del cliente, o el código del pedido de la app. */
+  detalle: string | null;
   items: ItemComanda[];
 };
 
@@ -47,7 +53,7 @@ export type FilaItemKds = {
   orden_visualizacion: number;
   cargo_tipo: string | null;
   listo_at: string | null;
-  ticket_item_modificadores: { opcion_nombre_snapshot: string }[] | null;
+  ticket_item_modificadores: { opcion_nombre_snapshot: string; naturaleza_snapshot?: string | null }[] | null;
 };
 
 /** Una fila de `tickets` con sus `ticket_items` anidados, tal cual la devuelve `leerComandas`. */
@@ -58,6 +64,8 @@ export type FilaTicketKds = {
   estado_cocina: EstadoCocina;
   fecha_envio_cocina: string | null;
   nota_general: string | null;
+  nombre_cliente?: string | null;
+  folio_externo_app?: string | null;
   ticket_items: FilaItemKds[] | null;
 };
 
@@ -74,7 +82,7 @@ export type FilaTicketKds = {
  */
 export const SELECCION_TICKET_ITEMS_KDS =
   "id, cantidad, producto_nombre_snapshot, nota_cocina, cancelado, area_cocina_nombre_snapshot, " +
-  "parent_item_id, combo_rol, orden_visualizacion, cargo_tipo, listo_at, ticket_item_modificadores(opcion_nombre_snapshot)";
+  "parent_item_id, combo_rol, orden_visualizacion, cargo_tipo, listo_at, ticket_item_modificadores(opcion_nombre_snapshot, naturaleza_snapshot)";
 
 /**
  * De las filas crudas de `tickets`+`ticket_items` a las comandas que pinta el KDS: descarta
@@ -117,7 +125,12 @@ export function comandasDesdeFilas(rows: FilaTicketKds[]): ComandaKds[] {
         id: i.id,
         cantidad: Number(i.cantidad),
         nombre: i.producto_nombre_snapshot,
-        modificadores: (i.ticket_item_modificadores ?? []).map((m) => m.opcion_nombre_snapshot),
+        modificadores: (i.ticket_item_modificadores ?? [])
+          .filter((m) => m.naturaleza_snapshot !== "OMISION")
+          .map((m) => m.opcion_nombre_snapshot),
+        sin: (i.ticket_item_modificadores ?? [])
+          .filter((m) => m.naturaleza_snapshot === "OMISION")
+          .map((m) => m.opcion_nombre_snapshot),
         notaCocina: i.nota_cocina,
         area: i.area_cocina_nombre_snapshot,
         comboEtiqueta: i.combo_rol === "HIJO" && i.parent_item_id && numero.has(i.parent_item_id)
@@ -133,6 +146,7 @@ export function comandasDesdeFilas(rows: FilaTicketKds[]): ComandaKds[] {
       estadoCocina: t.estado_cocina,
       fechaEnvio: t.fecha_envio_cocina,
       notaOrden: t.nota_general,
+      detalle: t.folio_externo_app?.trim() || t.nombre_cliente?.trim() || null,
       items,
     };
   });
@@ -146,16 +160,49 @@ export async function leerComandas(token: string, sucursalId: string): Promise<C
   const { data, error } = await clienteConToken(token)
     .from("tickets")
     .select(
-      "id, folio_completo, modo_servicio, estado_cocina, fecha_envio_cocina, nota_general, " +
+      "id, folio_completo, modo_servicio, estado_cocina, fecha_envio_cocina, nota_general, nombre_cliente, folio_externo_app, " +
         `ticket_items(${SELECCION_TICKET_ITEMS_KDS})`,
     )
     .eq("sucursal_id", sucursalId)
+    // Un ticket borrado no se cocina. Sin este filtro seguía en la pantalla para siempre.
+    .is("deleted_at", null)
     .in("estado_cocina", ["EN_COCINA", "LISTO"])
     .order("fecha_envio_cocina", { ascending: true });
   if (error) throw new Error(error.message);
 
   const rows = (data ?? []) as unknown as FilaTicketKds[];
-  return comandasDesdeFilas(rows);
+  const comandas = comandasDesdeFilas(rows);
+  const mesas = await mesasDeTickets(token, comandas.map((c) => c.ticketId));
+  return comandas.map((c) => (mesas.has(c.ticketId) ? { ...c, detalle: `Mesa ${mesas.get(c.ticketId)}` } : c));
+}
+
+/**
+ * Número de mesa de cada ticket de comedor, para "Mesa 4" en la tarjeta.
+ *
+ * Aparte de `leerComandas` y a prueba de fallas: si esta lectura truena (una base local sin la
+ * relación, un permiso), la cocina sigue enseñando sus comandas, solo sin el número de mesa. El
+ * nombre de la relación va explícito porque `tickets_mesas` apunta dos veces a `mesas`
+ * (la actual y la anterior de un cambio de mesa).
+ */
+async function mesasDeTickets(token: string, ticketIds: string[]): Promise<Map<string, string>> {
+  const mapa = new Map<string, string>();
+  if (ticketIds.length === 0) return mapa;
+  try {
+    const { data, error } = await clienteConToken(token)
+      .from("tickets_mesas")
+      .select("ticket_id, es_mesa_principal, mesas!tickets_mesas_mesa_id_fkey(numero)")
+      .in("ticket_id", ticketIds)
+      .is("fecha_liberacion", null);
+    if (error) return mapa;
+    const filas = (data ?? []) as unknown as { ticket_id: string; es_mesa_principal: boolean | null; mesas: { numero: string | number } | null }[];
+    for (const f of filas) {
+      if (!f.mesas) continue;
+      if (!mapa.has(f.ticket_id) || f.es_mesa_principal) mapa.set(f.ticket_id, String(f.mesas.numero));
+    }
+  } catch {
+    /* sin número de mesa: la comanda se enseña igual */
+  }
+  return mapa;
 }
 
 /**

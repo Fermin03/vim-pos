@@ -91,3 +91,77 @@ export function comandasNuevas(previos: Set<string>, actualesIds: string[]): num
   for (const id of actualesIds) if (!previos.has(id)) n++;
   return n;
 }
+
+/** Minutos a partir de los cuales una comanda pide atención (ámbar) y está tarde (roja). */
+export const UMBRAL_ATENCION_MIN = 8;
+export const UMBRAL_TARDE_MIN = 15;
+
+export type EstadoTiempo = "a-tiempo" | "atencion" | "tarde";
+
+/**
+ * El color de una comanda es SOLO su tiempo (docs/diseno/kds.md): nada de colores por modo o por
+ * estación, para que el cocinero no tenga que traducir. Va además con palabra ("TARDE"), porque un
+ * cocinero daltónico no distingue un borde verde de uno rojo.
+ */
+export function estadoDelTiempo(minutos: number): EstadoTiempo {
+  if (minutos >= UMBRAL_TARDE_MIN) return "tarde";
+  if (minutos >= UMBRAL_ATENCION_MIN) return "atencion";
+  return "a-tiempo";
+}
+
+/** Ancho mínimo de una tarjeta: el mismo en una tele de 1920 que en la caja de 1024. */
+export const ANCHO_MIN_TARJETA = 300;
+
+/**
+ * Columnas de tarjetas que caben en `ancho` px. La tarjeta mide lo mismo en cualquier pantalla: la
+ * grande enseña MÁS comandas, no letra más grande (mismo criterio que el catálogo de la caja).
+ */
+export function columnasKds(ancho: number, gap: number): number {
+  return Math.max(1, Math.floor((ancho + gap) / (ANCHO_MIN_TARJETA + gap)));
+}
+
+/**
+ * Reparte las comandas en páginas de filas COMPLETAS, sin cortar ninguna tarjeta.
+ *
+ * Las comandas vienen en orden de llegada (la más vieja primero) y se acomodan por filas de
+ * `columnas`; una fila mide lo que su tarjeta más alta. Caben filas mientras su suma (con los
+ * `gap`) no pase de `alto`. La página 1 son siempre las más viejas: al cerrar una, las demás se
+ * recorren y la primera en espera entra sola.
+ *
+ * Una fila que por sí sola no cabe va sola en su página (la tarjeta hace scroll por dentro): nunca
+ * se queda una comanda sin página.
+ */
+export function paginarPorFilas(alturas: number[], columnas: number, alto: number, gap: number): number[][] {
+  const cols = Math.max(1, columnas);
+  const paginas: number[][] = [];
+  let actual: number[] = [];
+  let usado = 0;
+  for (let inicio = 0; inicio < alturas.length; inicio += cols) {
+    const fila = alturas.slice(inicio, inicio + cols);
+    const altoFila = Math.max(...fila);
+    const conGap = actual.length > 0 ? usado + gap + altoFila : altoFila;
+    if (actual.length > 0 && conGap > alto) {
+      paginas.push(actual);
+      actual = [];
+      usado = 0;
+    }
+    usado = actual.length > 0 ? usado + gap + altoFila : altoFila;
+    for (let i = inicio; i < inicio + fila.length; i++) actual.push(i);
+  }
+  if (actual.length > 0) paginas.push(actual);
+  return paginas;
+}
+
+/**
+ * Agrupa los renglones de un combo bajo un solo encabezado: antes cada hijo repetía
+ * "↳ Combo #1 · …". Solo junta renglones SEGUIDOS del mismo combo, que es como llegan.
+ */
+export function bloquesDeComanda<I extends { comboEtiqueta: string | null }>(items: I[]): { combo: string | null; items: I[] }[] {
+  const bloques: { combo: string | null; items: I[] }[] = [];
+  for (const it of items) {
+    const ultimo = bloques[bloques.length - 1];
+    if (it.comboEtiqueta && ultimo && ultimo.combo === it.comboEtiqueta) ultimo.items.push(it);
+    else bloques.push({ combo: it.comboEtiqueta, items: [it] });
+  }
+  return bloques;
+}

@@ -11,6 +11,10 @@ import {
   vistaDeArea,
   areaParaRpc,
   TODAS_LAS_AREAS,
+  estadoDelTiempo,
+  columnasKds,
+  paginarPorFilas,
+  bloquesDeComanda,
   type FilaTicketKds,
   type FilaItemKds,
 } from "@vim/kds-core";
@@ -186,5 +190,88 @@ describe("comandasDesdeFilas — listo por renglón", () => {
       },
     ]);
     expect(c!.items.map((i) => [i.id, i.listo])).toEqual([["a", true], ["b", false]]);
+  });
+});
+
+describe("rediseño de la cocina (sep 2026)", () => {
+  it("el color es solo tiempo: a tiempo, atención a los 8 min y tarde a los 15", () => {
+    expect(estadoDelTiempo(0)).toBe("a-tiempo");
+    expect(estadoDelTiempo(7)).toBe("a-tiempo");
+    expect(estadoDelTiempo(8)).toBe("atencion");
+    expect(estadoDelTiempo(14)).toBe("atencion");
+    expect(estadoDelTiempo(15)).toBe("tarde");
+  });
+
+  it("la tarjeta mide lo mismo en cualquier pantalla: la grande enseña más columnas", () => {
+    // Ancho útil real: 1024 − 32 de margen y 1920 − 32.
+    expect(columnasKds(992, 14)).toBe(3);
+    expect(columnasKds(1888, 14)).toBe(6);
+    expect(columnasKds(200, 14)).toBe(1);
+  });
+
+  it("pagina por filas completas: lo que no cabe espera en la siguiente página", () => {
+    // 3 columnas; filas de 400 y 300 caben en 720 (400 + 14 + 300); la tercera no.
+    const alturas = [400, 250, 300, 300, 280, 200, 350];
+    expect(paginarPorFilas(alturas, 3, 720, 14)).toEqual([[0, 1, 2, 3, 4, 5], [6]]);
+  });
+
+  it("la página 1 son siempre las más viejas y ninguna comanda se queda sin página", () => {
+    const paginas = paginarPorFilas([900, 100, 100, 100], 1, 500, 14);
+    // Una tarjeta más alta que la pantalla va sola en su página (scroll por dentro).
+    expect(paginas[0]).toEqual([0]);
+    expect(paginas.flat()).toEqual([0, 1, 2, 3]);
+  });
+
+  it("sin comandas no hay páginas", () => {
+    expect(paginarPorFilas([], 4, 800, 14)).toEqual([]);
+  });
+
+  it("agrupa los renglones seguidos de un combo bajo un solo nombre", () => {
+    const b = bloquesDeComanda([
+      { id: "a", comboEtiqueta: "Combo #1 · Clásico" },
+      { id: "b", comboEtiqueta: "Combo #1 · Clásico" },
+      { id: "c", comboEtiqueta: null },
+      { id: "d", comboEtiqueta: "Combo #2" },
+    ]);
+    expect(b.map((x) => [x.combo, x.items.map((i) => i.id)])).toEqual([
+      ["Combo #1 · Clásico", ["a", "b"]],
+      [null, ["c"]],
+      ["Combo #2", ["d"]],
+    ]);
+  });
+
+  it("lo que se quita (OMISION) va aparte de lo que se agrega", () => {
+    const [c] = comandasDesdeFilas([
+      {
+        id: "T1", folio_completo: "KC-1", modo_servicio: "PARA_LLEVAR", estado_cocina: "EN_COCINA",
+        fecha_envio_cocina: null, nota_general: null,
+        ticket_items: [{
+          id: "1", cantidad: 1, producto_nombre_snapshot: "Clásica", nota_cocina: null, cancelado: false,
+          area_cocina_nombre_snapshot: null, parent_item_id: null, combo_rol: null, orden_visualizacion: 1,
+          cargo_tipo: null, listo_at: null,
+          ticket_item_modificadores: [
+            { opcion_nombre_snapshot: "Sin cebolla", naturaleza_snapshot: "OMISION" },
+            { opcion_nombre_snapshot: "Término medio", naturaleza_snapshot: "PREPARACION" },
+            { opcion_nombre_snapshot: "Extra queso", naturaleza_snapshot: "EXTRA" },
+          ],
+        }],
+      },
+    ]);
+    expect(c!.items[0]!.sin).toEqual(["Sin cebolla"]);
+    expect(c!.items[0]!.modificadores).toEqual(["Término medio", "Extra queso"]);
+  });
+
+  it("la proyección pide la naturaleza del modificador", () => {
+    expect(SELECCION_TICKET_ITEMS_KDS).toContain("naturaleza_snapshot");
+  });
+
+  it("de dónde viene: primero el código de la app, luego el nombre del cliente", () => {
+    const base = {
+      id: "T1", folio_completo: "KC-1", modo_servicio: "APP_UBEREATS", estado_cocina: "EN_COCINA" as const,
+      fecha_envio_cocina: null, nota_general: null, ticket_items: [],
+    };
+    expect(comandasDesdeFilas([{ ...base, folio_externo_app: "8F2K", nombre_cliente: "Laura" }])[0]!.detalle).toBe("8F2K");
+    expect(comandasDesdeFilas([{ ...base, nombre_cliente: " Laura " }])[0]!.detalle).toBe("Laura");
+    expect(comandasDesdeFilas([base])[0]!.detalle).toBeNull();
   });
 });
