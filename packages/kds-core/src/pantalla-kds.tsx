@@ -2,18 +2,23 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { type CajaKds } from "./caja";
 import {
-  cerrarComanda,
   labelModo,
   leerComandas,
+  marcarListoCocina,
   minutosEnCocina,
   type ComandaKds,
 } from "./comandas";
-import { areasDeComandas, comandasNuevas, SIN_AREA } from "./estado";
+import { areaParaRpc, areasDeComandas, comandasNuevas, SIN_AREA, TODAS_LAS_AREAS, vistaDeArea } from "./estado";
 
 const REFRESCO_MS = 5000; // re-lee comandas de BD cada 5s (polling robusto + Realtime del hub)
 const UMBRAL_MEDIO = 8; // min → ámbar
 const UMBRAL_VENCIDO = 15; // min → rojo (pulso)
-const TODAS = "__todas__";
+const TODAS = TODAS_LAS_AREAS;
+/** LISTO espera esto antes de mandarse, con "Deshacer" a la vista (ADR 0018). */
+const DESHACER_MS = 5000;
+
+/** Un LISTO tocado que todavía no se manda: la tarjeta se oculta y se puede deshacer. */
+type Espera = { id: string; ticketId: string; area: string; folioCorto: string };
 
 /** Reproduce un "beep" corto con la Web Audio API (sin assets). */
 function beep() {
@@ -61,15 +66,23 @@ export function PantallaKds({
   token,
   caja,
   onSalir,
+  etiquetaSalir = "Salir",
+  confirmarSalir,
 }: {
   token: string;
   caja: CajaKds;
   onSalir: () => void;
+  /** Texto del botón de salida. En la pantalla dedicada de cocina salir es desvincular. */
+  etiquetaSalir?: string;
+  /** Si salir cuesta algo (desvincular el dispositivo), se confirma antes con este texto. */
+  confirmarSalir?: { titulo: string; mensaje: string; boton: string };
 }) {
   const [comandas, setComandas] = useState<ComandaKds[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [ahora, setAhora] = useState<number>(() => Date.now());
-  const [procesando, setProcesando] = useState<Set<string>>(new Set());
+  const [esperas, setEsperas] = useState<Espera[]>([]);
+  const timers = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
+  const [confirmandoSalir, setConfirmandoSalir] = useState(false);
   // Filtro multi-área, alto contraste, sonido, toasts.
   const [areaSel, setAreaSel] = useState<string>(TODAS);
   const [altoContraste, setAltoContraste] = useState(false);
@@ -131,21 +144,53 @@ export function PantallaKds({
     return () => clearInterval(id);
   }, []);
 
-  async function avanzar(c: ComandaKds) {
-    setProcesando((p) => new Set(p).add(c.ticketId));
+  // El timer de un LISTO se crea en un render y dispara 5 s después: tiene que llamar al
+  // `recargar` vigente, no al de aquel render (cambia con el sonido o la sucursal).
+  const recargarRef = useRef(recargar);
+  recargarRef.current = recargar;
+
+  // Al desmontar se sueltan los LISTO pendientes SIN mandarlos: la orden reaparece al volver. Es
+  // la falla segura — mandar un cierre que nadie alcanzó a deshacer sería la peligrosa.
+  useEffect(() => {
+    const t = timers.current;
+    return () => {
+      for (const id of t.values()) clearTimeout(id);
+      t.clear();
+    };
+  }, []);
+
+  function quitarEspera(id: string) {
+    const t = timers.current.get(id);
+    if (t) clearTimeout(t);
+    timers.current.delete(id);
+    setEsperas((es) => es.filter((e) => e.id !== id));
+  }
+
+  async function mandarListo(e: Espera) {
+    timers.current.delete(e.id);
     try {
-      // Un toque: LISTO cierra la comanda (queda ENTREGADO y sale del panel).
-      await cerrarComanda(token, c.ticketId, c.estadoCocina);
-      await recargar();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "No se pudo actualizar la comanda");
+      const todas = e.area === TODAS;
+      await marcarListoCocina(token, e.ticketId, todas ? null : areaParaRpc(e.area), todas);
+      await recargarRef.current();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "No se pudo marcar la comanda");
+      await recargarRef.current();
     } finally {
-      setProcesando((p) => {
-        const n = new Set(p);
-        n.delete(c.ticketId);
-        return n;
-      });
+      // Se quita DESPUÉS de recargar: antes, la tarjeta volvía un instante con los datos viejos.
+      setEsperas((es) => es.filter((x) => x.id !== e.id));
     }
+  }
+
+  /** LISTO: oculta la tarjeta en esta vista y la manda en 5 s, salvo que se deshaga. */
+  function listo(c: ComandaKds) {
+    const e: Espera = { id: `${c.ticketId}:${areaSel}:${Date.now()}`, ticketId: c.ticketId, area: areaSel, folioCorto: c.folioCorto };
+    setEsperas((es) => [...es, e]);
+    timers.current.set(e.id, setTimeout(() => { void mandarListo(e); }, DESHACER_MS));
+  }
+
+  /** ¿Esta orden tiene un LISTO en espera que la saca de la vista actual? */
+  function ocultaPorEspera(ticketId: string): boolean {
+    return esperas.some((e) => e.ticketId === ticketId && (e.area === areaSel || e.area === TODAS));
   }
 
   // Paleta: alto contraste sube el contraste del fondo/texto para cocinas con luz fuerte.
@@ -153,16 +198,13 @@ export function PantallaKds({
     ? { bg: "#000000", surface: "#15151A", line: "#444", text: "#FFFFFF", text2: "#D0D0D6", text3: "#9090A0" }
     : { bg: "#1A1A1E", surface: "#242429", line: "#333338", text: "#F0F0EC", text2: "#A0A0A6", text3: "#6E6E74" };
 
-  // Áreas presentes + filtrado.
+  // Áreas con algo pendiente + la vista del filtro (ADR 0018). El área elegida se queda en la
+  // barra aunque ya no tenga pendientes: antes la barra desaparecía con el filtro puesto y no
+  // había cómo volver a "Todas".
   const areas = comandas ? areasDeComandas(comandas) : [];
-  const hayAreas = areas.length > 1; // solo mostramos el filtro si hay más de un área real
-  const comandasFiltradas = (comandas ?? [])
-    .map((c) =>
-      areaSel === TODAS
-        ? c
-        : { ...c, items: c.items.filter((it) => (it.area ?? SIN_AREA) === areaSel) },
-    )
-    .filter((c) => c.items.length > 0);
+  const areasBarra = areaSel !== TODAS && !areas.includes(areaSel) ? [...areas, areaSel] : areas;
+  const hayAreas = areas.length > 1 || areaSel !== TODAS;
+  const comandasFiltradas = vistaDeArea(comandas ?? [], areaSel).filter((c) => !ocultaPorEspera(c.ticketId));
 
   const pendientes = comandasFiltradas.length;
 
@@ -207,12 +249,12 @@ export function PantallaKds({
           </button>
           <button
             type="button"
-            onClick={onSalir}
+            onClick={() => (confirmarSalir ? setConfirmandoSalir(true) : onSalir())}
             className="flex h-9 items-center gap-1.5 rounded border px-3 text-[13px] font-semibold text-[#C8C8CC] transition hover:text-white"
             style={{ borderColor: tema.line }}
           >
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4"><path d="M19 12H5M12 19l-7-7 7-7" /></svg>
-            Salir
+            {etiquetaSalir}
           </button>
         </div>
       </header>
@@ -220,7 +262,7 @@ export function PantallaKds({
       {/* Filtro multi-área (solo si hay >1 área) */}
       {hayAreas && (
         <div className="flex flex-shrink-0 gap-1.5 overflow-x-auto border-b px-6 py-2.5" style={{ borderColor: tema.line }}>
-          {[TODAS, ...areas].map((a) => (
+          {[TODAS, ...areasBarra].map((a) => (
             <button
               key={a}
               type="button"
@@ -265,7 +307,6 @@ export function PantallaKds({
             {comandasFiltradas.map((c) => {
               const min = minutosEnCocina(c.fechaEnvio, ahora);
               const { borde, pulso } = colorEdad(min);
-              const enProceso = procesando.has(c.ticketId);
               return (
                 <div
                   key={c.ticketId}
@@ -299,10 +340,18 @@ export function PantallaKds({
                   {/* Ítems — tipografía para leer a ~80 cm */}
                   <div className="min-h-0 overflow-y-auto px-4 py-2.5">
                     {c.items.map((it) => (
-                      <div key={it.id} className="flex gap-3 border-b border-[#2C2C32] py-2.5 last:border-b-0">
+                      <div
+                        key={it.id}
+                        className="flex gap-3 border-b border-[#2C2C32] py-2.5 last:border-b-0"
+                        // En "Todas", lo que otra estación ya terminó se queda a la vista, apagado.
+                        style={it.listo ? { opacity: 0.4 } : undefined}
+                      >
                         <span className="font-display min-w-[44px] text-[30px] font-extrabold leading-none text-[#F0F0EC]">{it.cantidad}</span>
                         <div className="min-w-0 flex-1">
-                          <div className="text-[22px] font-bold leading-snug">{it.nombre}</div>
+                          <div className={`text-[22px] font-bold leading-snug ${it.listo ? "line-through" : ""}`}>{it.nombre}</div>
+                          {it.listo && (
+                            <div className="mt-0.5 text-[15px] font-bold leading-snug text-[#8FD4A8]">✓ Listo · {it.area ?? SIN_AREA}</div>
+                          )}
                           {it.comboEtiqueta && (
                             <div className="mt-0.5 text-[15px] font-bold leading-snug text-[#B8B8C0]">↳ {it.comboEtiqueta}</div>
                           )}
@@ -317,15 +366,22 @@ export function PantallaKds({
                     ))}
                   </div>
 
-                  {/* Un toque: LISTO cierra la comanda (queda ENTREGADO y sale del panel) */}
+                  {/* La orden sigue viva en otras estaciones: que la plancha lo sepa aunque la
+                      tarjeta salga de su pantalla al marcar LISTO. */}
+                  {c.otrasPendientes.length > 0 && (
+                    <div className="px-4 pb-1 text-[15px] font-semibold" style={{ color: tema.text2 }}>
+                      Falta en {c.otrasPendientes.join(", ")}
+                    </div>
+                  )}
+
+                  {/* LISTO marca lo de esta vista (un área, o todo); se manda en 5 s si no se deshace. */}
                   <div className="p-2.5">
                     <button
                       type="button"
-                      disabled={enProceso}
-                      onClick={() => avanzar(c)}
-                      className="font-display flex h-14 w-full items-center justify-center gap-2 rounded bg-[#2E7D52] text-[20px] font-extrabold tracking-wide text-white transition hover:bg-[#267045] active:scale-[0.97] disabled:opacity-60"
+                      onClick={() => listo(c)}
+                      className="font-display flex h-14 w-full items-center justify-center gap-2 rounded bg-[#2E7D52] text-[20px] font-extrabold tracking-wide text-white transition-[transform,background-color] duration-150 hover:bg-[#267045] active:scale-[0.97]"
                     >
-                      {enProceso ? "…" : "LISTO"}
+                      LISTO
                     </button>
                   </div>
                 </div>
@@ -335,7 +391,64 @@ export function PantallaKds({
         )}
       </div>
 
-      <style>{`@keyframes kdsPulse { 0%,100%{border-left-color:#E04040} 50%{border-left-color:#FF6B6B} }`}</style>
+      {/* LISTO en espera: "Deshacer" grande, a la mano durante 5 s. La barra de abajo se vacía en
+          ese tiempo para que se vea cuánto queda. */}
+      {esperas.length > 0 && (
+        <div className="fixed bottom-4 left-1/2 z-50 flex w-[min(560px,calc(100%-2rem))] -translate-x-1/2 flex-col gap-2" role="status">
+          {esperas.slice(-3).map((e) => (
+            <div key={e.id} className="relative overflow-hidden rounded-lg bg-[#F0F0EC] text-[#16161A] shadow-2xl">
+              <div className="flex items-center gap-3 py-2 pl-5 pr-2">
+                <div className="min-w-0 flex-1">
+                  <div className="font-display text-[20px] font-extrabold tabular-nums">#{e.folioCorto} lista</div>
+                  {e.area !== TODAS && <div className="text-[15px] font-semibold text-[#4A4A50]">{e.area}</div>}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => quitarEspera(e.id)}
+                  className="font-display h-14 rounded border-2 border-[#16161A] px-6 text-[18px] font-extrabold transition-transform duration-150 active:scale-[0.97]"
+                >
+                  Deshacer
+                </button>
+              </div>
+              <div
+                className="kds-cuenta absolute bottom-0 left-0 h-1 w-full origin-left bg-[#2E7D52]"
+                style={{ animation: `kdsCuenta ${DESHACER_MS}ms linear forwards` }}
+              />
+            </div>
+          ))}
+        </div>
+      )}
+
+      {confirmandoSalir && confirmarSalir && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/70 p-4" role="dialog" aria-modal="true" aria-labelledby="kds-salir-titulo">
+          <div className="w-full max-w-[440px] rounded-lg p-6" style={{ background: tema.surface }}>
+            <h2 id="kds-salir-titulo" className="font-display text-[22px] font-bold">{confirmarSalir.titulo}</h2>
+            <p className="mt-2 text-[16px] leading-snug" style={{ color: tema.text2 }}>{confirmarSalir.mensaje}</p>
+            <div className="mt-6 flex gap-2">
+              <button
+                type="button"
+                autoFocus
+                onClick={() => setConfirmandoSalir(false)}
+                className="font-display h-14 flex-1 rounded border text-[17px] font-bold"
+                style={{ borderColor: tema.line, color: tema.text }}
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={() => { setConfirmandoSalir(false); onSalir(); }}
+                className="font-display h-14 flex-1 rounded bg-[#C0392B] text-[17px] font-bold text-white"
+              >
+                {confirmarSalir.boton}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <style>{`@keyframes kdsPulse { 0%,100%{border-left-color:#E04040} 50%{border-left-color:#FF6B6B} }
+@keyframes kdsCuenta { from { transform: scaleX(1) } to { transform: scaleX(0) } }
+@media (prefers-reduced-motion: reduce) { .kds-cuenta { animation: none !important } }`}</style>
     </div>
   );
 }

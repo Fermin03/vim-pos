@@ -30,6 +30,15 @@ type Estado =
 const TIMEOUT_MS = 7000;
 const REINTENTO_MS = 4000;
 
+/** En esta pantalla salir ES desvincular: volver cuesta teclear en la tele el identificador y la
+ *  clave del dispositivo. Por eso se pregunta antes (revisión de diseño sep 2026, kds.md P1). */
+const CONFIRMAR_DESVINCULAR = {
+  titulo: "¿Desvincular esta pantalla?",
+  mensaje:
+    "La cocina deja de recibir comandas en esta pantalla. Para volver a usarla hay que vincularla otra vez con el identificador y la clave del dispositivo.",
+  boton: "Desvincular",
+};
+
 /** Corre una promesa con límite de tiempo (evita que una llamada al hub caído cuelgue el arranque). */
 function conTimeout<T>(p: Promise<T>, ms: number): Promise<T> {
   return Promise.race([
@@ -40,6 +49,7 @@ function conTimeout<T>(p: Promise<T>, ms: number): Promise<T> {
 
 export default function Page() {
   const [estado, setEstado] = useState<Estado>({ paso: "boot" });
+  const [confirmandoCambio, setConfirmandoCambio] = useState(false);
   const activo = useRef(true);
 
   const entrarCocina = useCallback(async () => {
@@ -125,12 +135,37 @@ export default function Page() {
             </button>
             <button
               type="button"
-              onClick={desvincular}
+              onClick={() => setConfirmandoCambio(true)}
               className="h-10 rounded border border-[#3A3A42] px-4 text-sm font-semibold text-[#C8C8CC] hover:text-white"
             >
               Cambiar de caja
             </button>
           </div>
+          {/* Mientras la caja no responde es fácil tocar "Cambiar de caja" creyendo que reconecta:
+              en realidad desvincula. Se pregunta igual que el botón de salir de la cocina. */}
+          {confirmandoCambio && (
+            <div className="mt-4 max-w-[440px] rounded-lg border border-[#3A3A42] bg-[#242429] p-5 text-left" role="alertdialog" aria-labelledby="kds-cambio-titulo">
+              <h2 id="kds-cambio-titulo" className="text-lg font-bold text-[#F0F0EC]">{CONFIRMAR_DESVINCULAR.titulo}</h2>
+              <p className="mt-1 text-sm text-[#A0A0A6]">{CONFIRMAR_DESVINCULAR.mensaje}</p>
+              <div className="mt-4 flex gap-2">
+                <button
+                  type="button"
+                  autoFocus
+                  onClick={() => setConfirmandoCambio(false)}
+                  className="h-11 flex-1 rounded border border-[#3A3A42] text-sm font-semibold text-[#F0F0EC]"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { setConfirmandoCambio(false); void desvincular(); }}
+                  className="h-11 flex-1 rounded bg-[#C0392B] text-sm font-semibold text-white"
+                >
+                  {CONFIRMAR_DESVINCULAR.boton}
+                </button>
+              </div>
+            </div>
+          )}
         </main>
       );
 
@@ -152,6 +187,14 @@ export default function Page() {
       );
 
     case "cocina":
-      return <PantallaKds token={estado.token} caja={estado.caja} onSalir={desvincular} />;
+      return (
+        <PantallaKds
+          token={estado.token}
+          caja={estado.caja}
+          onSalir={desvincular}
+          etiquetaSalir="Desvincular"
+          confirmarSalir={CONFIRMAR_DESVINCULAR}
+        />
+      );
   }
 }

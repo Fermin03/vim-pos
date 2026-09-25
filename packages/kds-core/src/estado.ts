@@ -32,14 +32,57 @@ export function minutosEnCocina(fechaEnvio: string | null, ahora: number): numbe
 /** Etiqueta canónica de "sin área" para el filtro multi-área. */
 export const SIN_AREA = "General";
 
+/** Valor del filtro que muestra todas las áreas. */
+export const TODAS_LAS_AREAS = "__todas__";
+
+type ItemConArea = { area: string | null; listo?: boolean };
+
 /**
- * Áreas presentes en un conjunto de comandas (para el tab-bar del filtro multi-área).
- * Orden alfabético estable.
+ * Áreas con algo PENDIENTE en un conjunto de comandas (para el tab-bar del filtro multi-área).
+ * Un área que ya marcó LISTO todo lo suyo no aparece. Orden alfabético estable.
  */
-export function areasDeComandas(comandas: { items: { area: string | null }[] }[]): string[] {
+export function areasDeComandas(comandas: { items: ItemConArea[] }[]): string[] {
   const set = new Set<string>();
-  for (const c of comandas) for (const it of c.items) set.add(it.area ?? SIN_AREA);
+  for (const c of comandas) for (const it of c.items) if (!it.listo) set.add(it.area ?? SIN_AREA);
   return [...set].sort((a, b) => a.localeCompare(b));
+}
+
+/**
+ * Lo que pinta el KDS con un filtro puesto (ADR 0018).
+ *
+ * - "Todas": cada orden con algo pendiente, con TODOS sus renglones (los ya listos se pintan
+ *   tachados para que se vea qué falta).
+ * - Un área: solo las órdenes con algo pendiente EN ESA ÁREA, y solo esos renglones. Lo que otras
+ *   estaciones aún no terminan va en `otrasPendientes`, para que la plancha sepa que la orden
+ *   sigue viva en la barra aunque desaparezca de su pantalla.
+ */
+export function vistaDeArea<I extends ItemConArea, C extends { items: I[] }>(
+  comandas: C[],
+  area: string,
+): (C & { otrasPendientes: string[] })[] {
+  const out: (C & { otrasPendientes: string[] })[] = [];
+  for (const c of comandas) {
+    const pendientes = c.items.filter((it) => !it.listo);
+    if (pendientes.length === 0) continue;
+    if (area === TODAS_LAS_AREAS) {
+      out.push({ ...c, otrasPendientes: [] });
+      continue;
+    }
+    const propios = pendientes.filter((it) => (it.area ?? SIN_AREA) === area);
+    if (propios.length === 0) continue;
+    const otras = new Set<string>();
+    for (const it of pendientes) {
+      const a = it.area ?? SIN_AREA;
+      if (a !== area) otras.add(a);
+    }
+    out.push({ ...c, items: propios, otrasPendientes: [...otras].sort((a, b) => a.localeCompare(b)) });
+  }
+  return out;
+}
+
+/** El área del filtro como la espera `marcar_listo_cocina`: "General" es el área nula. */
+export function areaParaRpc(area: string): string | null {
+  return area === SIN_AREA ? null : area;
 }
 
 /**
