@@ -1,52 +1,50 @@
 "use client";
-import { useCallback, useEffect, useState } from "react";
-import { PageBody, PageHeader } from "../../../components/page-header";
-import { RangoFechas } from "../../../components/rango-fechas";
-import { fmtMxn, leerVentasPorMesero, rangoUltimosDias, type FilaMesero } from "../../../lib/reportes";
-import { mensajeError } from "../../../lib/errores";
+import { Nota, ReporteMarco, useConsulta, useRangoReporte, type Cifra } from "../../../components/reporte";
+import { leerVentasPorMesero, type FilaMesero } from "../../../lib/reportes";
+import type { Columna } from "../../../lib/reporte-tabla";
 
 export default function VentasPorMeseroPage() {
-  const r0 = rangoUltimosDias(30);
-  const [desde, setDesde] = useState(r0.desde);
-  const [hasta, setHasta] = useState(r0.hasta);
-  const [filas, setFilas] = useState<FilaMesero[] | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const { rango, cambiar } = useRangoReporte();
+  const consulta = useConsulta((r) => leerVentasPorMesero(r.desde, r.hasta), rango);
+  const filas = consulta.datos ?? [];
 
-  const cargar = useCallback(async (d: string, h: string) => {
-    setFilas(null); setError(null);
-    try { setFilas(await leerVentasPorMesero(d, h)); } catch (e) { setError(mensajeError(e, "Error")); }
-  }, []);
-  useEffect(() => { cargar(desde, hasta); }, [cargar, desde, hasta]);
+  const venta = filas.reduce((s, f) => s + f.total, 0);
+  const tickets = filas.reduce((s, f) => s + f.tickets, 0);
+  const propinas = filas.reduce((s, f) => s + f.propinas, 0);
+
+  const cifras: Cifra[] = [
+    { etiqueta: "Venta atendida", valor: venta, tipo: "mxn" },
+    { etiqueta: "Tickets", valor: tickets, tipo: "entero" },
+    { etiqueta: "Ticket promedio", valor: tickets > 0 ? venta / tickets : 0, tipo: "mxn" },
+    { etiqueta: "Propinas", valor: propinas, tipo: "mxn", pie: venta > 0 ? `${((propinas / venta) * 100).toFixed(1)}% de la venta` : undefined },
+  ];
+
+  const columnas: Columna<FilaMesero>[] = [
+    { id: "mesero", titulo: "Mesero", valor: (f) => f.nombre, ancho: 24 },
+    { id: "tickets", titulo: "Tickets", tipo: "entero", valor: (f) => f.tickets, total: "suma" },
+    { id: "venta", titulo: "Venta", tipo: "mxn", valor: (f) => f.total, total: "suma", enfasis: "fuerte" },
+    { id: "promedio", titulo: "Ticket promedio", tipo: "mxn", valor: (f) => f.promedio, total: () => (tickets > 0 ? venta / tickets : 0), enfasis: "suave" },
+    { id: "propinas", titulo: "Propinas", tipo: "mxn", valor: (f) => f.propinas, total: "suma" },
+    {
+      id: "propinaPct",
+      titulo: "Propina / venta",
+      tipo: "pct",
+      valor: (f) => (f.total > 0 ? (f.propinas / f.total) * 100 : 0),
+      total: () => (venta > 0 ? (propinas / venta) * 100 : 0),
+      enfasis: "suave",
+    },
+  ];
 
   return (
-    <>
-      <PageHeader titulo="Desempeño del equipo" subtitulo="Ventas, tickets y propinas por empleado. Compara el rendimiento de tu personal." migas={[{ label: "Reportes" }, { label: "Ventas" }, { label: "Por mesero" }]} />
-      <PageBody>
-        <div className="mb-4"><RangoFechas desde={desde} hasta={hasta} onCambio={(d, h) => { setDesde(d); setHasta(h); }} /></div>
-        {filas === null && !error && <p className="text-sm text-ink-3">Cargando…</p>}
-        {error && <p className="text-sm font-medium text-danger" role="alert">{error}</p>}
-        {filas && (
-          <div className="tabla-caja overflow-hidden rounded-lg border border-line bg-surface">
-            <table className="w-full text-[13px]">
-              <thead><tr className="border-b border-line bg-sel text-left text-[11.5px] font-bold uppercase tracking-wide text-ink-3">
-                <th className="px-4 py-2.5">Mesero</th><th className="px-4 py-2.5 text-right">Tickets</th><th className="px-4 py-2.5 text-right">Venta</th><th className="px-4 py-2.5 text-right">Ticket prom.</th><th className="px-4 py-2.5 text-right">Propinas</th>
-              </tr></thead>
-              <tbody>
-                {filas.length === 0 && <tr><td colSpan={5} className="px-4 py-6 text-center text-ink-3">Sin datos en el rango.</td></tr>}
-                {filas.map((f) => (
-                  <tr key={f.clave} className="border-b border-line last:border-b-0">
-                    <td className="px-4 py-2.5 font-medium">{f.nombre}</td>
-                    <td className="px-4 py-2.5 text-right tabular-nums">{f.tickets}</td>
-                    <td className="px-4 py-2.5 text-right font-semibold tabular-nums">{fmtMxn(f.total)}</td>
-                    <td className="px-4 py-2.5 text-right text-ink-2 tabular-nums">{fmtMxn(f.promedio)}</td>
-                    <td className="px-4 py-2.5 text-right text-ink-2 tabular-nums">{fmtMxn(f.propinas)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </PageBody>
-    </>
+    <ReporteMarco
+      titulo="Ventas por mesero"
+      subtitulo="Tickets, venta y propinas de cada mesero."
+      rango={{ valor: rango, cambiar }}
+      consulta={consulta}
+      cifras={cifras}
+      tabla={{ columnas, filas, clave: (f) => f.clave, orden: { id: "venta", dir: "desc" }, vacio: "Ningún ticket con mesero en estas fechas." }}
+    >
+      <Nota>Cuenta solo los tickets con mesero asignado, es decir, las cuentas de mesa.</Nota>
+    </ReporteMarco>
   );
 }

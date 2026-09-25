@@ -1,51 +1,51 @@
 "use client";
-import { useCallback, useEffect, useState } from "react";
-import { PageBody, PageHeader } from "../../../components/page-header";
-import { RangoFechas } from "../../../components/rango-fechas";
-import { fmtMxn, leerVentasPorMarca, rangoUltimosDias, type FilaMarca } from "../../../lib/reportes";
-import { mensajeError } from "../../../lib/errores";
+import { Barra, ReporteMarco, useConsulta, useRangoReporte, type Cifra } from "../../../components/reporte";
+import { leerVentasPorMarca, type FilaMarca } from "../../../lib/reportes";
+import type { Columna } from "../../../lib/reporte-tabla";
 
 export default function VentasPorMarcaPage() {
-  const r0 = rangoUltimosDias(30);
-  const [desde, setDesde] = useState(r0.desde);
-  const [hasta, setHasta] = useState(r0.hasta);
-  const [filas, setFilas] = useState<FilaMarca[] | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const { rango, cambiar } = useRangoReporte();
+  const consulta = useConsulta((r) => leerVentasPorMarca(r.desde, r.hasta), rango);
+  const filas = consulta.datos ?? [];
 
-  const cargar = useCallback(async (d: string, h: string) => {
-    setFilas(null); setError(null);
-    try { setFilas(await leerVentasPorMarca(d, h)); } catch (e) { setError(mensajeError(e, "Error")); }
-  }, []);
-  useEffect(() => { cargar(desde, hasta); }, [cargar, desde, hasta]);
+  const venta = filas.reduce((s, f) => s + f.total, 0);
+  const tickets = filas.reduce((s, f) => s + f.tickets, 0);
+  const pct = (n: number) => (venta > 0 ? (n / venta) * 100 : 0);
+
+  const cifras: Cifra[] = [
+    { etiqueta: "Venta neta", valor: venta, tipo: "mxn" },
+    { etiqueta: "Tickets", valor: tickets, tipo: "entero" },
+    { etiqueta: "Ticket promedio", valor: tickets > 0 ? venta / tickets : 0, tipo: "mxn" },
+    { etiqueta: "Marcas con venta", valor: filas.filter((f) => f.total > 0).length, tipo: "entero" },
+  ];
+
+  const columnas: Columna<FilaMarca>[] = [
+    {
+      id: "marca",
+      titulo: "Marca",
+      valor: (f) => f.nombre,
+      ancho: 26,
+      celda: (f) => (
+        <>
+          <span className="mr-2 inline-block h-2.5 w-2.5 rounded-full align-middle" style={{ background: f.color }} aria-hidden="true" />
+          {f.nombre}
+        </>
+      ),
+    },
+    { id: "tickets", titulo: "Tickets", tipo: "entero", valor: (f) => f.tickets, total: "suma" },
+    { id: "venta", titulo: "Venta neta", tipo: "mxn", valor: (f) => f.total, total: "suma", enfasis: "fuerte" },
+    { id: "promedio", titulo: "Ticket promedio", tipo: "mxn", valor: (f) => f.promedio, total: () => (tickets > 0 ? venta / tickets : 0), enfasis: "suave" },
+    { id: "pct", titulo: "% de la venta", tipo: "pct", valor: (f) => pct(f.total), total: () => 100, celda: (f) => <Barra pct={pct(f.total)} /> },
+  ];
 
   return (
-    <>
-      <PageHeader titulo="Ventas por marca virtual" subtitulo="Desempeño de cada marca que opera desde esta cocina. Disponible para cocinas con marcas virtuales activas." migas={[{ label: "Reportes" }, { label: "Ventas por marca" }]} />
-      <PageBody>
-        <div className="mb-4"><RangoFechas desde={desde} hasta={hasta} onCambio={(d, h) => { setDesde(d); setHasta(h); }} /></div>
-        {filas === null && !error && <p className="text-sm text-ink-3">Cargando…</p>}
-        {error && <p className="text-sm font-medium text-danger" role="alert">{error}</p>}
-        {filas && (
-          <div className="tabla-caja tabla-caja-sm overflow-hidden rounded-lg border border-line bg-surface">
-            <table className="w-full text-[13px]">
-              <thead><tr className="border-b border-line bg-sel text-left text-[11.5px] font-bold uppercase tracking-wide text-ink-3">
-                <th className="px-4 py-2.5">Marca</th><th className="px-4 py-2.5 text-right">Tickets</th><th className="px-4 py-2.5 text-right">Venta neta</th><th className="px-4 py-2.5 text-right">Ticket prom.</th>
-              </tr></thead>
-              <tbody>
-                {filas.length === 0 && <tr><td colSpan={4} className="px-4 py-6 text-center text-ink-3">Sin ventas por marca en el rango.</td></tr>}
-                {filas.map((f) => (
-                  <tr key={f.clave} className="border-b border-line last:border-b-0">
-                    <td className="px-4 py-2.5 font-medium"><span className="mr-2 inline-block h-2.5 w-2.5 rounded-full align-middle" style={{ background: f.color }} />{f.nombre}</td>
-                    <td className="px-4 py-2.5 text-right tabular-nums">{f.tickets}</td>
-                    <td className="px-4 py-2.5 text-right font-semibold tabular-nums">{fmtMxn(f.total)}</td>
-                    <td className="px-4 py-2.5 text-right text-ink-2 tabular-nums">{fmtMxn(f.promedio)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </PageBody>
-    </>
+    <ReporteMarco
+      titulo="Ventas por marca virtual"
+      subtitulo="Cómo le va a cada marca que opera desde tu cocina."
+      rango={{ valor: rango, cambiar }}
+      consulta={consulta}
+      cifras={cifras}
+      tabla={{ columnas, filas, clave: (f) => f.clave, orden: { id: "venta", dir: "desc" }, vacio: "Ninguna marca vendió en estas fechas." }}
+    />
   );
 }
