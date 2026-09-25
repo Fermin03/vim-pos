@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { Button, Modal } from "@vim/ui/styles";
 import { PageHeader, PageBody } from "../../../components/page-header";
 import {
@@ -88,6 +89,14 @@ export default function AreasPage() {
 
         {error && !editando && !borrar && <p className="mb-4 text-sm font-medium text-danger" role="alert">{error}</p>}
         {areas === null && <p className="text-sm text-ink-3">Cargando…</p>}
+
+        {/* Sin sucursal, el botón de alta salía deshabilitado sin decir por qué. */}
+        {areas !== null && sucursales.length === 0 && (
+          <p className="mb-5 rounded-lg border border-[#E8DCC0] bg-warning-soft px-4 py-3 text-[13.5px] font-medium text-warning">
+            Primero da de alta tu caja: con ella se crea tu sucursal.{" "}
+            <Link href="/configuracion/cajas" className="font-semibold underline underline-offset-2">Ir a Cajas</Link>
+          </p>
+        )}
 
         {areas !== null && areas.length === 0 && (
           <div className="rounded-lg border border-dashed border-line-strong p-12 text-center">

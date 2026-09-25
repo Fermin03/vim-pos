@@ -463,10 +463,11 @@ export async function obtenerSucursal(id: string): Promise<Sucursal | null> {
   };
 }
 
-export async function crearSucursal(input: SucursalInput): Promise<void> {
+/** Devuelve el id de la sucursal nueva (la primera caja la crea al vuelo; ver ModalCaja). */
+export async function crearSucursal(input: SucursalInput): Promise<string> {
   const datos = sucursalSchema.parse(input);
   const tid = await tenantId();
-  const { error } = await supabase.from("sucursales").insert({
+  const { data, error } = await supabase.from("sucursales").insert({
     tenant_id: tid,
     codigo: datos.codigo,
     nombre: datos.nombre,
@@ -475,8 +476,9 @@ export async function crearSucursal(input: SucursalInput): Promise<void> {
     estado_geo: datos.estado_geo || null,
     telefono: datos.telefono || null,
     activa: datos.activa,
-  });
+  }).select("id").single();
   if (error) throw new Error(error.message);
+  return (data as { id: string }).id;
 }
 
 export async function actualizarSucursal(id: string, input: SucursalInput): Promise<void> {

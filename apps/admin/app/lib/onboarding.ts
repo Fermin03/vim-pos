@@ -33,6 +33,17 @@ async function contar(tabla: string, filtros: Record<string, unknown> = {}): Pro
   return count ?? 0;
 }
 
+/** Cajas cuya computadora ya mandó al menos una señal (latido, ADR 0014): están vinculadas. */
+async function contarCajasVinculadas(): Promise<number> {
+  const { count, error } = await supabase
+    .from("cajas")
+    .select("id", { count: "exact", head: true })
+    .is("deleted_at", null)
+    .not("ultimo_latido", "is", null);
+  if (error) return 0;
+  return count ?? 0;
+}
+
 export async function leerEstadoOnboarding(): Promise<EstadoOnboarding> {
   // Fase actual (puede no existir fila → tratamos como INVITADO).
   const { data: ob } = await supabase.from("tenant_onboarding_estado").select("fase").maybeSingle();
@@ -47,16 +58,20 @@ export async function leerEstadoOnboarding(): Promise<EstadoOnboarding> {
   const e = emisor as { estado?: string; csd_numero_certificado?: string | null } | null;
   const facturacionActiva = tieneRfcYCp && !!e?.csd_numero_certificado && e?.estado !== "INACTIVO";
 
-  const [productos, cajas, usuarios] = await Promise.all([
+  const [productos, cajas, usuarios, cajasVinculadas] = await Promise.all([
     contar("productos"),
     contar("cajas"),
     contar("usuarios_perfil"),
+    contarCajasVinculadas(),
   ]);
 
   const pasos: PasoOnboarding[] = [
     { clave: "negocio", titulo: "Datos del negocio", descripcion: "Nombre, zona horaria y hora de corte.", href: "/configuracion/negocio", completo: tieneNegocio, opcional: false },
     { clave: "catalogo", titulo: "Tu menú", descripcion: "Importa o captura tus productos y categorías.", href: "/catalogo/importar", completo: productos > 0, opcional: false },
-    { clave: "caja", titulo: "Sucursal y caja", descripcion: "Al menos una caja para poder vender.", href: "/configuracion/cajas", completo: cajas > 0, opcional: false },
+    { clave: "caja", titulo: "Tu caja", descripcion: "Da de alta tu punto de cobro; tu sucursal se crea con ella.", href: "/configuracion/cajas", completo: cajas > 0, opcional: false },
+    // Dar de alta la caja en el admin no es vender: falta conectar la computadora. Antes el
+    // asistente decía «listo» sin que ninguna caja hubiera mandado señal.
+    { clave: "vincular", titulo: "Conecta la computadora de tu caja", descripcion: "Te damos una clave para capturarla una vez en VIM POS.", href: "/configuracion/cajas", completo: cajasVinculadas > 0, opcional: false },
     { clave: "equipo", titulo: "Tu equipo", descripcion: "Crea cajeros y cocina con su PIN.", href: "/usuarios", completo: usuarios > 1, opcional: false },
     // Completo con la facturación ACTIVA, no con la pura razón social: antes se marcaba hecho
     // sin que el negocio pudiera emitir una sola factura.

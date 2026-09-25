@@ -2,7 +2,7 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Button } from "@vim/ui/styles";
+import { Button, botonClases } from "@vim/ui/styles";
 import { usePerfil } from "../../components/admin-shell";
 import {
   actualizarFase,
@@ -53,7 +53,10 @@ export default function BienvenidaPage() {
     }
   }
 
-  const pct = estado ? Math.round((estado.obligatoriosHechos / Math.max(1, estado.obligatoriosTotal)) * 100) : 0;
+  const avance = estado ? estado.obligatoriosHechos / Math.max(1, estado.obligatoriosTotal) : 0;
+  const faltan = estado ? estado.obligatoriosTotal - estado.obligatoriosHechos : 0;
+  // El siguiente paso pendiente es el único botón primario: los demás, secundarios.
+  const siguiente = estado?.pasos.find((p) => !p.completo && !p.opcional)?.clave;
 
   return (
     <div className="mx-auto flex min-h-full w-full max-w-[680px] flex-col px-4 py-8 sm:px-6 sm:py-10">
@@ -61,24 +64,35 @@ export default function BienvenidaPage() {
       <h1 className="font-display text-[24px] font-bold leading-tight tracking-tight sm:text-[30px]">
         {primer ? `Hola, ${primer}.` : "¡Hola!"} Pongamos tu negocio a vender.
       </h1>
-      <p className="mt-2 text-[14.5px] text-ink-2">
-        Estos son los pasos para dejar todo listo. Puedes hacerlos en cualquier orden; se marcan solos
-        cuando los completas.
+      <p className="mt-2 text-[15px] text-ink-2">
+        Estos son los pasos para dejar todo listo. Puedes hacerlos en cualquier orden y se marcan solos
+        cuando los terminas.
       </p>
 
       {error && <p className="mt-4 text-sm font-medium text-danger">{error}</p>}
-      {estado === null && !error && <p className="mt-6 text-sm text-ink-3">Cargando…</p>}
+      {estado === null && !error && <p className="mt-6 text-sm text-ink-2">Cargando…</p>}
 
       {estado && (
         <>
           {/* Progreso */}
           <div className="mt-6 rounded-lg border border-line bg-surface p-4">
-            <div className="mb-2 flex items-center justify-between text-[13px]">
-              <span className="font-semibold">Progreso de configuración</span>
-              <span className="tabular-nums text-ink-2">{estado.obligatoriosHechos}/{estado.obligatoriosTotal} pasos</span>
+            <div className="mb-2 flex items-center justify-between text-[13.5px]">
+              <span id="progreso-titulo" className="font-semibold">Tu avance</span>
+              <span className="tabular-nums text-ink-2">{estado.obligatoriosHechos} de {estado.obligatoriosTotal} pasos</span>
             </div>
-            <div className="h-2.5 overflow-hidden rounded-full bg-hover">
-              <div className="h-full rounded-full bg-accent transition-all" style={{ width: `${pct}%` }} />
+            {/* scaleX en vez de width: se anima en el compositor, sin recalcular el layout. */}
+            <div
+              role="progressbar"
+              aria-labelledby="progreso-titulo"
+              aria-valuemin={0}
+              aria-valuemax={estado.obligatoriosTotal}
+              aria-valuenow={estado.obligatoriosHechos}
+              className="h-2.5 overflow-hidden rounded-full bg-hover"
+            >
+              <div
+                className="h-full origin-left rounded-full bg-accent transition-transform duration-500 ease-vim motion-reduce:transition-none"
+                style={{ transform: `scaleX(${avance})` }}
+              />
             </div>
           </div>
 
@@ -95,12 +109,15 @@ export default function BienvenidaPage() {
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2">
                     <span className={`text-[14.5px] font-semibold ${p.completo ? "text-ink-2" : ""}`}>{p.titulo}</span>
-                    {p.opcional && <span className="rounded-full bg-hover px-2 py-0.5 text-[10.5px] font-bold text-ink-3">Opcional</span>}
+                    {p.opcional && <span className="rounded-full bg-hover px-2 py-0.5 text-[12px] font-semibold text-ink-2">Opcional</span>}
                   </div>
-                  <div className="mt-0.5 text-[12.5px] text-ink-3">{p.descripcion}</div>
+                  <div className="mt-0.5 text-[13.5px] text-ink-2">{p.descripcion}</div>
                 </div>
-                <Link href={p.href} className="w-full sm:w-auto">
-                  <Button variant={p.completo ? "ghost" : "primary"} className="w-full sm:w-auto">{p.completo ? "Revisar" : "Configurar"}</Button>
+                <Link
+                  href={p.href}
+                  className={`${botonClases({ variant: p.clave === siguiente ? "primary" : "ghost" })} w-full sm:w-auto`}
+                >
+                  {p.completo ? "Revisar" : p.clave === "vincular" ? "Conectar" : "Configurar"}
                 </Link>
               </div>
             ))}
@@ -110,23 +127,23 @@ export default function BienvenidaPage() {
           <div className="mt-6 rounded-lg border border-line bg-surface p-5">
             {estado.listoParaVender ? (
               <>
-                <h2 className="font-display text-[17px] font-semibold">¡Todo listo para vender! 🎉</h2>
-                <p className="mt-1 text-[13.5px] text-ink-2">
-                  Completaste lo esencial. Abre el POS en tu tablet, inicia sesión con el PIN de un cajero y abre el turno.
+                <h2 className="font-display text-[17px] font-semibold">Todo listo para vender</h2>
+                <p className="mt-1 text-[14px] text-ink-2">
+                  En la computadora de tu caja, entra a VIM POS con el PIN de un cajero y abre el turno.
                 </p>
-                <div className="mt-4 flex gap-2">
-                  <Button onClick={finalizar} disabled={finalizando}>{finalizando ? "Guardando…" : "Finalizar configuración"}</Button>
-                  <Link href="/dashboard"><Button variant="ghost">Ir al panel</Button></Link>
+                <div className="mt-4 flex flex-wrap gap-2">
+                  <Button onClick={finalizar} disabled={finalizando}>{finalizando ? "Guardando…" : "Terminar configuración"}</Button>
+                  <Link href="/dashboard" className={botonClases({ variant: "ghost" })}>Ir al panel</Link>
                 </div>
               </>
             ) : (
               <>
-                <h2 className="font-display text-[15px] font-semibold">Te faltan {estado.obligatoriosTotal - estado.obligatoriosHechos} pasos</h2>
-                <p className="mt-1 text-[13.5px] text-ink-2">
-                  Completa los pasos obligatorios y aquí aparecerá el botón para finalizar. Puedes salir y volver cuando quieras.
+                <h2 className="font-display text-[15px] font-semibold">{faltan === 1 ? "Te falta 1 paso" : `Te faltan ${faltan} pasos`}</h2>
+                <p className="mt-1 text-[14px] text-ink-2">
+                  Puedes salir y volver cuando quieras: esta lista te espera en el inicio del panel hasta que termines.
                 </p>
                 <div className="mt-4">
-                  <Link href="/dashboard"><Button variant="ghost">Continuar después</Button></Link>
+                  <Link href="/dashboard" className={botonClases({ variant: "ghost" })}>Continuar después</Link>
                 </div>
               </>
             )}

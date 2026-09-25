@@ -1,6 +1,6 @@
 "use client";
 import Link from "next/link";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { PageHeader, PageBody } from "../../components/page-header";
 import { usePerfil } from "../../components/admin-shell";
 import { leerDashboard, variacionPct, type Dashboard, type ResumenDia } from "../../lib/reportes";
@@ -21,6 +21,8 @@ const REPORTES_RAPIDOS = [
 
 /** Cada cuánto se vuelve a leer el panel mirando hoy. */
 const REFRESCO_MS = 60_000;
+// Al volver a la pestaña no se relee si la última lectura tiene menos de esto.
+const VOLVER_MIN_MS = 30_000;
 
 const fmt = (n: number) => new Intl.NumberFormat("es-MX", { style: "currency", currency: "MXN" }).format(n);
 const fmtInt = (n: number) => new Intl.NumberFormat("es-MX").format(n);
@@ -261,6 +263,10 @@ export default function DashboardPage() {
      hoy, se vuelve a leer cada minuto y al regresar a la pestaña, sin borrar la pantalla, y el
      encabezado dice a qué hora fue la última lectura. */
   const [refrescando, setRefrescando] = useState(false);
+  const ultimaLectura = useRef(0);
+  useEffect(() => {
+    if (data) ultimaLectura.current = new Date(data.leidoEn).getTime();
+  }, [data]);
   const refrescar = useCallback(async () => {
     setRefrescando(true);
     try {
@@ -277,7 +283,13 @@ export default function DashboardPage() {
   useEffect(() => {
     if (!mirandoHoy) return;
     const id = setInterval(() => { if (document.visibilityState === "visible") void refrescar(); }, REFRESCO_MS);
-    const alVolver = () => { if (document.visibilityState === "visible") void refrescar(); };
+    // Al volver a la pestaña, solo si la última lectura ya tiene rato: cambiar de ventana varias
+    // veces seguidas disparaba una lectura completa cada vez.
+    const alVolver = () => {
+      if (document.visibilityState !== "visible") return;
+      if (Date.now() - ultimaLectura.current < VOLVER_MIN_MS) return;
+      void refrescar();
+    };
     document.addEventListener("visibilitychange", alVolver);
     return () => { clearInterval(id); document.removeEventListener("visibilitychange", alVolver); };
   }, [mirandoHoy, refrescar]);
@@ -289,7 +301,9 @@ export default function DashboardPage() {
       .catch(() => {});
   }, []);
 
-  const mostrarOnboarding = onb && onb.fase !== "GO_LIVE" && !onb.listoParaVender;
+  // Hasta que el dueño termine la configuración; con todo listo, el aviso lo manda a terminarla.
+  const mostrarOnboarding = onb && onb.fase !== "GO_LIVE";
+  const faltanOnb = onb ? onb.obligatoriosTotal - onb.obligatoriosHechos : 0;
 
   const hoy: ResumenDia | undefined = data?.hoy;
   const ayer = data?.ayer ?? null;
@@ -364,10 +378,11 @@ export default function DashboardPage() {
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={`h-4 w-4 ${refrescando ? "animate-spin" : ""}`} aria-hidden="true"><path d="M21 12a9 9 0 1 1-2.6-6.4" /><path d="M21 4v5h-5" /></svg>
                 </button>
               </span>
-            ) : (
+            ) : data ? (
               /* «En vivo» mintiendo sobre un día pasado sería peor que no
                  decir nada: se cambia por la salida a hoy, que es lo que hace
-                 falta cuando ya miraste el día que querías. */
+                 falta cuando ya miraste el día que querías. Mientras carga no
+                 se ofrece: todavía no se sabe qué día es. */
               <button
                 type="button"
                 onClick={() => setDia(null)}
@@ -375,7 +390,7 @@ export default function DashboardPage() {
               >
                 Volver a hoy
               </button>
-            )}
+            ) : null}
           </div>
         }
       />
@@ -388,8 +403,12 @@ export default function DashboardPage() {
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" className="h-5 w-5"><path d="M5 12h14M13 5l7 7-7 7" /></svg>
             </div>
             <div className="min-w-0 flex-1">
-              <div className="text-[14.5px] font-semibold">Termina de configurar tu negocio</div>
-              <div className="text-[12.5px] text-ink-2">{onb.obligatoriosHechos} de {onb.obligatoriosTotal} pasos · te faltan {onb.obligatoriosTotal - onb.obligatoriosHechos} para empezar a vender.</div>
+              <div className="text-[14.5px] font-semibold">{onb.listoParaVender ? "Ya puedes vender" : "Termina de configurar tu negocio"}</div>
+              <div className="text-[13px] text-ink-2">
+                {onb.listoParaVender
+                  ? "Completaste los pasos. Entra para terminar la configuración."
+                  : `${onb.obligatoriosHechos} de ${onb.obligatoriosTotal} pasos · ${faltanOnb === 1 ? "te falta 1" : `te faltan ${faltanOnb}`} para empezar a vender.`}
+              </div>
             </div>
             <span className="text-[13px] font-semibold text-accent">Continuar →</span>
           </Link>
