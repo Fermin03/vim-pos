@@ -31,4 +31,19 @@ export {
   type FilaTicketKds,
   type FilaItemKds,
 } from "./comandas";
-export { areasDeComandas, comandasNuevas, vistaDeArea, areaParaRpc, SIN_AREA, TODAS_LAS_AREAS } from "./estado";
+export {
+  areasDeComandas,
+  comandasNuevas,
+  vistaDeArea,
+  areaParaRpc,
+  SIN_AREA,
+  TODAS_LAS_AREAS,
+  estadoDelTiempo,
+  columnasKds,
+  paginarPorFilas,
+  bloquesDeComanda,
+  UMBRAL_ATENCION_MIN,
+  UMBRAL_TARDE_MIN,
+  ANCHO_MIN_TARJETA,
+  type EstadoTiempo,
+} from "./estado";
