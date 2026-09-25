@@ -8,7 +8,15 @@ import {
 import { mensajeError } from "../lib/errores";
 
 /** Asignación de grupos de modificadores a UN producto (checkboxes + guardar). */
-export function ProductoModificadores({ productoId }: { productoId: string }) {
+export function ProductoModificadores({
+  productoId,
+  onPendiente,
+}: {
+  productoId: string;
+  /** Avisa si hay cambios sin guardar, con la función que los guarda (o null si no hay), para que
+   *  "Guardar cambios" del producto los guarde también antes de salir de la pantalla. */
+  onPendiente?: (guardar: (() => Promise<void>) | null) => void;
+}) {
   const [grupos, setGrupos] = useState<Grupo[] | null>(null);
   const [sel, setSel] = useState<Set<string>>(new Set());
   const [original, setOriginal] = useState<Set<string>>(new Set());
@@ -28,6 +36,18 @@ export function ProductoModificadores({ productoId }: { productoId: string }) {
   }, [productoId]);
 
   const cambio = grupos !== null && (sel.size !== original.size || [...sel].some((g) => !original.has(g)));
+
+  useEffect(() => {
+    if (!onPendiente) return;
+    onPendiente(
+      cambio
+        ? async () => {
+            await asignarGruposAProducto(productoId, [...sel]);
+            setOriginal(new Set(sel));
+          }
+        : null,
+    );
+  }, [cambio, sel, productoId, onPendiente]);
 
   async function guardar() {
     setGuardando(true);
@@ -88,6 +108,9 @@ export function ProductoModificadores({ productoId }: { productoId: string }) {
           </div>
           <div className="mt-4 flex items-center justify-end gap-3">
             {msg && <span className="text-[13px] font-medium text-success">{msg}</span>}
+            {cambio && !msg && onPendiente && (
+              <span className="text-[13px] text-ink-2">Sin guardar · también se guardan con «Guardar cambios»</span>
+            )}
             <Button onClick={guardar} disabled={!cambio || guardando}>
               {guardando ? "Guardando…" : "Guardar modificadores"}
             </Button>

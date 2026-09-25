@@ -97,3 +97,22 @@ export function rangoLegible(desde: string | null | undefined, hasta: string | n
   if (!desde || !hasta || desde === hasta) return fechaLegible(desde ?? hasta);
   return `${fechaLegible(desde)} – ${fechaLegible(hasta)}`;
 }
+
+/**
+ * Hace cuánto pasó algo, en palabras: `hace 4 min`, `hace 2 h`, `hace 3 días`. Pasado un mes
+ * devuelve la fecha. Para señales de vida (el latido de una caja, la última venta): "hace 4 min"
+ * se lee de un vistazo; "24 sep 2026 20:58" obliga a hacer la resta.
+ */
+export function haceCuanto(valor: string | null | undefined, ahora: number = Date.now()): string {
+  if (!valor) return "nunca";
+  const t = new Date(valor).getTime();
+  if (Number.isNaN(t)) return "—";
+  const min = Math.max(0, Math.floor((ahora - t) / 60000));
+  if (min < 1) return "hace un momento";
+  if (min < 60) return `hace ${min} min`;
+  const h = Math.floor(min / 60);
+  if (h < 24) return `hace ${h} h`;
+  const d = Math.floor(h / 24);
+  if (d < 30) return d === 1 ? "hace 1 día" : `hace ${d} días`;
+  return fechaLegible(valor);
+}

@@ -25,7 +25,10 @@ export default function FiscalPage() {
 
   const [rfc, setRfc] = useState("");
   const [razon, setRazon] = useState("");
-  const [regimen, setRegimen] = useState("612");
+  // Sin valor de fábrica: antes arrancaba en "612" (persona física), y con un RFC de persona moral
+  // la lista enseñaba 601 mientras se guardaba 612 (revisión de diseño, sep 2026).
+  const [regimen, setRegimen] = useState("");
+  const [rfcTocado, setRfcTocado] = useState(false);
   const [cp, setCp] = useState("");
   const [email, setEmail] = useState("");
 
@@ -43,7 +46,7 @@ export default function FiscalPage() {
       setDatos(d);
       setRfc(d.rfc);
       setRazon(d.razon_social);
-      setRegimen(d.regimen_fiscal ?? "612");
+      setRegimen(d.regimen_fiscal ?? "");
       setCp(d.codigo_postal_fiscal);
       setEmail(d.email_fiscal);
     } catch (e) {
@@ -58,6 +61,14 @@ export default function FiscalPage() {
   async function guardar() {
     setError(null);
     setOkMsg(null);
+    if (!regimenValido) {
+      setError(
+        personaPorRfc
+          ? `Elige tu régimen fiscal: el guardado no corresponde a una persona ${personaPorRfc === "MORAL" ? "moral" : "física"}.`
+          : "Elige tu régimen fiscal, tal como aparece en tu Constancia de Situación Fiscal.",
+      );
+      return;
+    }
     const parsed = datosFiscalesSchema.safeParse({
       rfc,
       razon_social: razon,
@@ -97,6 +108,9 @@ export default function FiscalPage() {
   const regimenesVisibles = personaPorRfc
     ? REGIMENES_FISCALES.filter((r) => r.persona === personaPorRfc)
     : REGIMENES_FISCALES;
+  // Lo que se ve es lo que se guarda: si el régimen no está en la lista del tipo de persona, el
+  // campo sale vacío y pide elegir, en vez de enseñar la primera opción y guardar otra.
+  const regimenValido = regimenesVisibles.some((r) => r.codigo === regimen);
 
   return (
     <>
@@ -115,23 +129,13 @@ export default function FiscalPage() {
               <div className="mb-1 font-display text-[16px] font-semibold tracking-tight">Identificación fiscal</div>
               <p className="mb-4 text-[12.5px] text-ink-3">Tal como aparece en tu Constancia de Situación Fiscal (CSF).</p>
 
-              {/* Segmento persona (derivado del RFC) */}
-              <div className="mb-4 scroll-x-limpio inline-flex max-w-full gap-0.5 overflow-x-auto rounded border border-line bg-hover p-[3px] lg:max-w-none lg:overflow-x-visible">
-                {(["MORAL", "FISICA"] as const).map((p) => (
-                  <span
-                    key={p}
-                    className={[
-                      "flex-shrink-0 whitespace-nowrap rounded-[4px] px-4 py-[11px] text-[12.5px] font-semibold transition lg:py-1.5",
-                      personaPorRfc === p ? "bg-surface text-ink shadow-sm" : "text-ink-3",
-                    ].join(" ")}
-                  >
-                    {p === "MORAL" ? "Persona moral" : "Persona física"}
-                  </span>
-                ))}
-                {!personaPorRfc && (
-                  <span className="px-2 py-1.5 text-[11.5px] text-ink-3">se detecta por el RFC</span>
-                )}
-              </div>
+              {/* Tipo de persona: se deriva del RFC, no se elige. Antes era un control segmentado que
+                  parecía clicable y no hacía nada. */}
+              <p className="mb-4 text-[13px] text-ink-2">
+                {personaPorRfc
+                  ? <><b className="font-semibold text-ink">Persona {personaPorRfc === "MORAL" ? "moral" : "física"}</b> <span className="text-ink-3">(detectada por tu RFC)</span></>
+                  : <span className="text-ink-3">El tipo de persona se detecta al capturar el RFC.</span>}
+              </p>
 
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div>
@@ -143,9 +147,11 @@ export default function FiscalPage() {
                     maxLength={13}
                     autoCapitalize="characters"
                     onChange={(e) => setRfc(e.target.value.toUpperCase().replace(/[^A-ZÑ&0-9]/g, ""))}
+                    onBlur={() => setRfcTocado(true)}
                     placeholder="XAXX010101000"
                   />
-                  {rfc.length > 0 && (
+                  {/* Se valida al salir del campo o al completar la longitud, no desde la primera letra. */}
+                  {rfc.length > 0 && (rfcTocado || rfc.length >= 12 || rfcValido) && (
                     <p className={`mt-1.5 inline-flex items-center gap-1 text-[11.5px] font-semibold ${rfcValido ? "text-success" : "text-danger"}`}>
                       {rfcValido ? "✓ RFC con formato válido" : "✗ Formato de RFC incompleto"}
                     </p>
@@ -153,7 +159,8 @@ export default function FiscalPage() {
                 </div>
                 <div>
                   <label className={label} htmlFor="f-regimen">Régimen fiscal *</label>
-                  <select id="f-regimen" className={input} value={regimen} onChange={(e) => setRegimen(e.target.value)}>
+                  <select id="f-regimen" className={input} value={regimenValido ? regimen : ""} onChange={(e) => setRegimen(e.target.value)}>
+                    {!regimenValido && <option value="" disabled>Elige tu régimen…</option>}
                     {regimenesVisibles.map((r) => (
                       <option key={r.codigo} value={r.codigo}>{r.codigo} · {r.label}</option>
                     ))}

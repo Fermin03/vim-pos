@@ -517,14 +517,22 @@ export type Caja = CajaInput & {
   id: string;
   sucursalNombre: string;
   bloqueada: boolean;
+  /** Última señal de la caja de escritorio (latido cada 10 min, ADR 0014). null = nunca mandó. */
+  ultimoLatido: string | null;
+  /** Versión de VIM POS que reportó en ese latido. */
+  versionApp: string | null;
 };
 
-type FilaCaja = Omit<Caja, "sucursalNombre"> & { sucursal: { nombre: string } | null };
+type FilaCaja = Omit<Caja, "sucursalNombre" | "ultimoLatido" | "versionApp"> & {
+  sucursal: { nombre: string } | null;
+  ultimo_latido: string | null;
+  version_app: string | null;
+};
 
 export async function listarCajas(): Promise<Caja[]> {
   const { data, error } = await supabase
     .from("cajas")
-    .select("id, sucursal_id, numero, nombre, activa, bloqueada, sucursal:sucursales(nombre)")
+    .select("id, sucursal_id, numero, nombre, activa, bloqueada, ultimo_latido, version_app, sucursal:sucursales(nombre)")
     .is("deleted_at", null)
     .order("sucursal_id", { ascending: true })
     .order("numero", { ascending: true });
@@ -537,6 +545,8 @@ export async function listarCajas(): Promise<Caja[]> {
     activa: f.activa,
     bloqueada: f.bloqueada,
     sucursalNombre: f.sucursal?.nombre ?? "—",
+    ultimoLatido: f.ultimo_latido,
+    versionApp: f.version_app,
   }));
 }
 
