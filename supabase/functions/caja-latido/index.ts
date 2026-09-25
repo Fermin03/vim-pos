@@ -70,6 +70,11 @@ Deno.serve(async (req) => {
     // una llamada propia para que un aviso leído sin internet no se pierda: la caja los guarda
     // y los reporta cuando puede.
     p_avisos_vistos: cuerpo.avisos_vistos.length > 0 ? cuerpo.avisos_vistos : null,
+    // Pantalla de la caja (0121). Las cajas anteriores a 0.4.87 no la mandan: va null y la base
+    // conserva lo último que se supo.
+    p_pantalla_ancho: cuerpo.pantalla?.ancho ?? null,
+    p_pantalla_alto: cuerpo.pantalla?.alto ?? null,
+    p_pantalla_escala: cuerpo.pantalla?.escala ?? null,
   });
   if (error) return json({ error: "RPC_ERROR", detalle: error.message }, 500);
   // La caja fue borrada o desactivada mientras seguía encendida: que lo sepa con un código

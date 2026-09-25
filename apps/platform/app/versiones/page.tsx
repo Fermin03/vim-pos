@@ -7,7 +7,7 @@ import { fechaCorta, fechaHoraMx, input } from "../lib/formato";
 import { fechaBloqueo } from "../lib/bloqueo";
 import { Seccion } from "../components/seccion";
 import { DialogoConfirmar } from "../components/dialogo-confirmar";
-import type { CajaParque, VersionCaja } from "../lib/tipos";
+import { areaUtil, pantallaTexto, type CajaParque, type VersionCaja } from "../lib/tipos";
 
 /**
  * Versiones de la caja (ADR 0014, entrega 4).
@@ -148,6 +148,7 @@ export default function VersionesPage() {
                   <th className="px-4 py-2 font-semibold">Caja</th>
                   <th className="px-4 py-2 font-semibold">Versión</th>
                   <th className="px-4 py-2 font-semibold">Sistema</th>
+                  <th className="px-4 py-2 font-semibold">Pantalla</th>
                   <th className="px-4 py-2 font-semibold">Último latido</th>
                 </tr>
               </thead>
@@ -166,6 +167,7 @@ export default function VersionesPage() {
                       )}
                     </td>
                     <td className="px-4 py-2 text-ink-2">{c.so ?? "—"}</td>
+                    <td className="px-4 py-2 tabular-nums text-ink-2" title={areaUtil(c.pantalla)}>{pantallaTexto(c.pantalla)}</td>
                     <td className="px-4 py-2 text-ink-2">
                       {c.ultimoLatido ? fechaHoraMx(c.ultimoLatido, "corto") : "nunca"}
                     </td>

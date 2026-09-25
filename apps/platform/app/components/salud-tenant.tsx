@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
-import { hace, type Api, type Salud } from "../lib/tipos";
+import { areaUtil, hace, pantallaTexto, type Api, type Salud } from "../lib/tipos";
 
 const COLOR: Record<string, string> = {
   ok: "bg-[#EAF3EE] text-success",
@@ -11,8 +11,8 @@ const COLOR: Record<string, string> = {
   inactiva: "bg-sel text-ink-3",
 };
 const TEXTO: Record<string, string> = {
-  ok: "Conectada",
-  tibia: "Sin conexión",
+  ok: "En línea",
+  tibia: "Sin señal",
   caida: "Caída",
   nunca: "Nunca conectó",
   bloqueada: "Bloqueada",
@@ -68,6 +68,7 @@ export function SaludTenant({ api, id }: { api: Api; id: string }) {
                 <th className="p-2 text-left font-semibold">Sucursal</th>
                 <th className="p-2 text-left font-semibold">Estado</th>
                 <th className="p-2 text-left font-semibold">Versión</th>
+                <th className="p-2 text-left font-semibold">Pantalla</th>
                 <th className="p-2 text-right font-semibold">Última conexión</th>
               </tr>
             </thead>
@@ -85,6 +86,7 @@ export function SaludTenant({ api, id }: { api: Api; id: string }) {
                   <td className="p-2 text-ink-2">
                     {c.versionApp ?? <span className="text-ink-3">anterior a 0.4.60</span>}
                   </td>
+                  <td className="p-2 tabular-nums text-ink-2" title={areaUtil(c.pantalla)}>{pantallaTexto(c.pantalla)}</td>
                   <td className="p-2 text-right tabular-nums text-ink-2">
                     {hace(c.ultimaConexion)}
                     {/* De dónde sale el dato. "Conectada" apoyado en una venta de hace tres horas

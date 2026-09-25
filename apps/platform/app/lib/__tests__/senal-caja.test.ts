@@ -36,7 +36,7 @@ describe("señalDeCaja", () => {
   });
 
   it("sin ninguna señal no inventa una", () => {
-    expect(señalDeCaja({}, AHORA)).toEqual({ señal: null, origen: null, horas: null });
+    expect(señalDeCaja({}, AHORA)).toEqual({ señal: null, origen: null, horas: null, minutos: null });
   });
 
   it("una fecha ilegible cuenta como ausencia, no como recién conectada", () => {
@@ -68,5 +68,33 @@ describe("estadoDeCaja", () => {
   it("bloqueada e inactiva mandan sobre la frescura", () => {
     expect(estadoDeCaja({ bloqueada: true, activa: true }, 1)).toBe("bloqueada");
     expect(estadoDeCaja({ bloqueada: false, activa: false }, 1)).toBe("inactiva");
+  });
+});
+
+describe("estadoDeCaja con latido (se mide en minutos)", () => {
+  const viva = { bloqueada: false, activa: true };
+  const latido = (minutos: number) => ({ origen: "latido" as const, minutos });
+
+  it("este era el bug: 5 horas sin latir ya no es 'ok' (antes lo era hasta 24 h)", () => {
+    expect(estadoDeCaja(viva, 5, latido(300))).toBe("tibia");
+  });
+
+  it("latió hace menos de 20 min → en línea; a los 20 → sin señal", () => {
+    expect(estadoDeCaja(viva, 0, latido(9))).toBe("ok");
+    expect(estadoDeCaja(viva, 0, latido(19))).toBe("ok");
+    expect(estadoDeCaja(viva, 0, latido(20))).toBe("tibia");
+  });
+
+  it("3 días sin latir sigue siendo caída", () => {
+    expect(estadoDeCaja(viva, 72, latido(72 * 60))).toBe("caida");
+  });
+
+  it("sin latido (caja vieja) se conservan los umbrales en horas", () => {
+    expect(estadoDeCaja(viva, 5, { origen: "venta", minutos: 300 })).toBe("ok");
+    expect(estadoDeCaja(viva, 30, { origen: "sync", minutos: 1800 })).toBe("tibia");
+  });
+
+  it("señalDeCaja entrega los minutos", () => {
+    expect(señalDeCaja({ ultimoLatido: new Date(AHORA - 7 * 60_000).toISOString() }, AHORA).minutos).toBe(7);
   });
 });
