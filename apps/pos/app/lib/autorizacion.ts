@@ -12,7 +12,7 @@ export type PayloadAutorizacion = {
   monto: number | null;
   motivo: string;
   cajaId: string;
-  turnoId: string;
+  turnoId: string | null;
 };
 
 /** Resultado uniforme de ambos caminos: id de la autorización + quién autorizó. */
