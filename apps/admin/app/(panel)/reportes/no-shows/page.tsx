@@ -4,6 +4,7 @@ import { PageBody, PageHeader } from "../../../components/page-header";
 import { RangoFechas } from "../../../components/rango-fechas";
 import { leerNoShows, rangoUltimosDias, type FilaNoShow } from "../../../lib/reportes";
 import { mensajeError } from "../../../lib/errores";
+import { fechaLegible } from "@vim/fecha";
 
 /** Reservaciones: cuánta gente reserva y no llega (no-show) por día. */
 export default function NoShowsPage() {
@@ -47,7 +48,7 @@ export default function NoShowsPage() {
                   {filas.length === 0 && <tr><td colSpan={7} className="px-4 py-6 text-center text-ink-3">Sin reservaciones en el rango.</td></tr>}
                   {filas.map((f) => (
                     <tr key={f.dia} className="border-b border-line last:border-b-0">
-                      <td className="px-4 py-2.5 font-medium">{f.dia}</td>
+                      <td className="px-4 py-2.5 font-medium">{fechaLegible(f.dia)}</td>
                       <td className="px-4 py-2.5 text-right tabular-nums">{f.total}</td>
                       <td className="px-4 py-2.5 text-right tabular-nums">{f.llegaron + f.terminadas}</td>
                       <td className="px-4 py-2.5 text-right text-ink-2 tabular-nums">{f.canceladas}</td>

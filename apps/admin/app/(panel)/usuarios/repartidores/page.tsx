@@ -287,7 +287,7 @@ export default function RepartidoresPage() {
             >
               Cancelar
             </button>
-            <Button className="flex-1" onClick={confirmarBorrado} disabled={guardando}>
+            <Button variant="danger" className="flex-1" onClick={confirmarBorrado} disabled={guardando}>
               {guardando ? "Eliminando…" : "Eliminar"}
             </Button>
           </div>

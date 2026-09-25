@@ -4,6 +4,7 @@ import { PageBody, PageHeader } from "../../../components/page-header";
 import { RangoFechas } from "../../../components/rango-fechas";
 import { fmtMxn, leerZHistorico, rangoUltimosDias, type FilaZHistorico } from "../../../lib/reportes";
 import { mensajeError } from "../../../lib/errores";
+import { fechaLegible } from "@vim/fecha";
 
 export default function ZHistoricoPage() {
   const r0 = rangoUltimosDias(30);
@@ -136,7 +137,7 @@ export default function ZHistoricoPage() {
                   {visibles.map((f) => (
                     <tr key={f.id} className="border-b border-line last:border-b-0">
                       <td className="px-4 py-2.5 font-mono text-[12px]">{f.folio_z}</td>
-                      <td className="px-4 py-2.5 text-ink-2">{f.dia_contable}</td>
+                      <td className="px-4 py-2.5 text-ink-2">{fechaLegible(f.dia_contable)}</td>
                       <td className="px-4 py-2.5 text-right tabular-nums">{f.total_tickets}</td>
                       <td className="px-4 py-2.5 text-right font-medium tabular-nums">{fmtMxn(f.total_ventas)}</td>
                       <td className="px-4 py-2.5 text-right tabular-nums text-ink-2">{fmtMxn(f.total_propinas)}</td>

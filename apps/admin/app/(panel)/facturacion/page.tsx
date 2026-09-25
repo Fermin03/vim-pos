@@ -1,6 +1,6 @@
 "use client";
 import { useCallback, useEffect, useState } from "react";
-import { Button } from "@vim/ui/styles";
+import { Button, useConfirmar } from "@vim/ui/styles";
 import { PageBody, PageHeader } from "../../components/page-header";
 import { RangoFechas } from "../../components/rango-fechas";
 import { fmtMxn, rangoUltimosDias } from "../../lib/reportes";
@@ -14,6 +14,7 @@ import {
 } from "../../lib/facturacion";
 import { leerCfdiEmisor } from "../../lib/configuracion";
 import { mensajeError } from "../../lib/errores";
+import { fechaLegible } from "@vim/fecha";
 
 const ESTADO_CFDI_BADGE: Record<string, { label: string; cls: string }> = {
   TIMBRADO: { label: "Facturado", cls: "bg-success-soft text-success" },
@@ -27,6 +28,7 @@ const ESTADO_CFDI_BADGE: Record<string, { label: string; cls: string }> = {
 
 /** Facturación — punto de entrada del flujo CFDI: ticket PAGADO → receptor → timbrar. */
 export default function FacturacionPage() {
+  const [confirmar, dialogoConfirmar] = useConfirmar();
   const r0 = rangoUltimosDias(7);
   const [desde, setDesde] = useState(r0.desde);
   const [hasta, setHasta] = useState(r0.hasta);
@@ -60,13 +62,12 @@ export default function FacturacionPage() {
 
   async function emitirGlobal() {
     if (!porCerrar) return;
-    const ok = confirm(
-      `Vas a emitir la factura global del ${porCerrar.desde} al ${porCerrar.hasta}: ` +
-        `${porCerrar.nTickets} ventas por ${fmtMxn(porCerrar.totalMxn)}.
-
-` +
-        "A partir de ese momento tus clientes YA NO podrán facturar esos tickets. ¿Continuar?",
-    );
+    const ok = await confirmar({
+      titulo: `¿Emitir la factura global del ${fechaLegible(porCerrar.desde)} al ${fechaLegible(porCerrar.hasta)}?`,
+      mensaje: `${porCerrar.nTickets} ventas por ${fmtMxn(porCerrar.totalMxn)}. A partir de ese momento tus clientes ya no podrán facturar esos tickets.`,
+      boton: "Emitir factura global",
+      peligrosa: false,
+    });
     if (!ok) return;
     setTimbrandoGlobal(true);
     setAvisoGlobal(null);
@@ -92,6 +93,7 @@ export default function FacturacionPage() {
 
   return (
     <>
+      {dialogoConfirmar}
       <PageHeader titulo="Facturación" subtitulo="Emite el CFDI de un ticket pagado: captura los datos fiscales del cliente y timbra." migas={[{ label: "Facturación" }]} />
       <PageBody>
         {/* ── Factura global ────────────────────────────────────────────────
@@ -109,7 +111,7 @@ export default function FacturacionPage() {
             <div className="flex flex-wrap items-center justify-between gap-3 rounded border border-line bg-bg px-4 py-3">
               <div>
                 <div className="text-[13px] font-semibold">
-                  Periodo del {porCerrar.desde} al {porCerrar.hasta}
+                  Periodo del {fechaLegible(porCerrar.desde)} al {fechaLegible(porCerrar.hasta)}
                 </div>
                 <div className="text-[12px] text-ink-3">
                   {porCerrar.nTickets === 0
@@ -133,7 +135,7 @@ export default function FacturacionPage() {
               <div className="flex flex-col gap-1.5">
                 {periodos.map((p) => (
                   <div key={p.id} className="flex items-center justify-between gap-3 text-[12.5px]">
-                    <span className="text-ink-2">{p.desde} → {p.hasta}</span>
+                    <span className="text-ink-2">{fechaLegible(p.desde)} → {fechaLegible(p.hasta)}</span>
                     <span className="flex items-center gap-3">
                       {p.estado === "TIMBRADA" && (
                         <span className="text-ink-3">{p.nTickets} ventas · {fmtMxn(p.totalMxn)}</span>
@@ -181,7 +183,7 @@ export default function FacturacionPage() {
                   return (
                     <tr key={t.ticketId} className="border-b border-line">
                       <td className="px-4 py-2.5 font-semibold">{t.folio ?? "—"}</td>
-                      <td className="px-4 py-2.5 text-ink-2">{t.diaContable}</td>
+                      <td className="px-4 py-2.5 text-ink-2">{fechaLegible(t.diaContable)}</td>
                       <td className="px-4 py-2.5 text-right font-semibold tabular-nums">{fmtMxn(t.total)}</td>
                       <td className="px-4 py-2.5">
                         {badge

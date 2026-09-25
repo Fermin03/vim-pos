@@ -293,7 +293,7 @@ export function ModalCancelarItems({
           >
             Cerrar
           </button>
-          <Button onClick={confirmar} disabled={procesando || seleccionados.length === 0}>
+          <Button variant="danger" onClick={confirmar} disabled={procesando || seleccionados.length === 0}>
             {procesando ? "Cancelando…" : "Confirmar cancelación"}
           </Button>
         </div>

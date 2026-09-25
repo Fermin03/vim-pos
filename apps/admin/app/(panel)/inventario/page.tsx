@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Button } from "@vim/ui/styles";
+import { Button, useConfirmar } from "@vim/ui/styles";
 import { PageBody, PageHeader } from "../../components/page-header";
 import {
   activarModuloInventario,
@@ -59,6 +59,7 @@ function KpiInsumos({ label: etiqueta, valor, pie }: { label: string; valor: num
 }
 
 export default function InventarioPage() {
+  const [confirmar, dialogoConfirmar] = useConfirmar();
   const [insumos, setInsumos] = useState<Insumo[] | null>(null);
   const [unidades, setUnidades] = useState<Unidad[]>([]);
   const [sucursales, setSucursales] = useState<SucursalOpcion[]>([]);
@@ -92,7 +93,7 @@ export default function InventarioPage() {
 
   /** Enciende o apaga el descuento automático de inventario al vender (ADR 0013). */
   async function cambiarDescuento(activo: boolean) {
-    if (!activo && !confirm("Las ventas dejarán de descontar inventario. Las existencias no cambian. ¿Apagar?")) return;
+    if (!activo && !(await confirmar({ titulo: "¿Apagar el descuento de inventario?", mensaje: "Las ventas dejarán de descontar inventario. Las existencias no cambian.", boton: "Apagar" }))) return;
     setCambiando(true);
     setError(null);
     try {
@@ -149,7 +150,7 @@ export default function InventarioPage() {
   }
 
   async function borrar(i: Insumo) {
-    if (!confirm(`¿Eliminar el insumo "${i.nombre}"?`)) return;
+    if (!(await confirmar({ titulo: `¿Eliminar el insumo ${i.nombre}?`, boton: "Eliminar" }))) return;
     try {
       await eliminarInsumo(i.id);
       recargar();
@@ -188,6 +189,7 @@ export default function InventarioPage() {
 
   return (
     <>
+      {dialogoConfirmar}
       <PageHeader
         titulo="Inventario"
         subtitulo="Existencias de ingredientes y productos. Bajan solas al vender."

@@ -1,17 +1,14 @@
 // Helpers PUROS del KDS (sin dependencias de cliente/red, testeables). Máquina de estados de
 // cocina y cálculos de tiempo. comandas.ts (que sí habla con Supabase) los reexporta.
 
+import { etiquetaModo } from "@vim/db/modos-servicio";
+
 export type EstadoCocina = "EN_COCINA" | "LISTO" | "ENTREGADO" | "EN_RUTA" | "ENTREGADO_DOMICILIO" | "SIN_ENVIAR";
 
-const MODO_LABEL: Record<string, string> = {
-  COMER_AQUI: "Comedor",
-  PARA_LLEVAR: "Para llevar",
-  DRIVE_THRU: "Pick-up",
-  DELIVERY_PROPIO: "Domicilio",
-};
-
+/** Nombre del modo de servicio. La lista vive en `@vim/db/modos-servicio`: aquí había solo cuatro
+ *  de los doce, y la cocina leía `APP_UBEREATS` en crudo. */
 export function labelModo(m: string): string {
-  return MODO_LABEL[m] ?? m;
+  return etiquetaModo(m);
 }
 
 /** El siguiente estado al que avanza una comanda desde el KDS (null si ya está fuera de cocina). */

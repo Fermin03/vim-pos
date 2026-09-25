@@ -1,5 +1,6 @@
 "use client";
 import { employeeClient } from "./supabase";
+import { etiquetaModo } from "@vim/db/modos-servicio";
 
 // Consulta de cuentas — historial de tickets ya CERRADOS (PAGADO) o CANCELADO, para revisarlos,
 // reimprimirlos y (fases siguientes) cancelar/reabrir/cambiar forma de pago. El detalle completo
@@ -44,9 +45,6 @@ export async function listarCuentas(token: string, filtro: FiltroCuentas): Promi
   }));
 }
 
-const MODO_LABEL: Record<string, string> = {
-  COMER_AQUI: "Comedor", MESA: "Mesa", PARA_LLEVAR: "Para llevar", DRIVE_THRU: "Pick-up", DELIVERY_PROPIO: "Domicilio",
-};
 export function labelModoCuenta(m: string): string {
-  return MODO_LABEL[m] ?? m;
+  return etiquetaModo(m);
 }

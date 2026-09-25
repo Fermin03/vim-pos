@@ -9,6 +9,7 @@ import { listarProveedores, type Proveedor } from "../../../lib/proveedores";
 import { listarSucursalesOpciones, type SucursalOpcion } from "../../../lib/inventario";
 import { mensajeError } from "../../../lib/errores";
 import { haceDiasISO, hoyISO } from "../../../lib/fechas";
+import { fechaLegible } from "@vim/fecha";
 
 const fmt = (n: number) => new Intl.NumberFormat("es-MX", { style: "currency", currency: "MXN" }).format(n);
 const input = "h-10 rounded border border-line-strong px-2 text-sm outline-none focus:border-ink";
@@ -77,7 +78,7 @@ export default function ComprasPage() {
                 {filas.map((c) => (
                   <tr key={c.id} className="h-10 border-b border-line-soft hover:bg-hover">
                     <td className="pr-3"><Link className="font-mono text-[12.5px] font-medium text-ink underline-offset-2 hover:underline" href={`/inventario/compras/${c.id}`}>{c.folio}</Link></td>
-                    <td className="pr-3 tabular-nums text-ink-2">{c.fecha}</td>
+                    <td className="pr-3 tabular-nums text-ink-2">{fechaLegible(c.fecha)}</td>
                     <td className="pr-3">{c.proveedorNombre}</td>
                     <td className="pr-3 text-ink-2">{c.referencia ?? "—"}{c.origen === "XML" && <span className="ml-2 rounded bg-accent-soft px-1.5 text-[11px] font-medium text-accent">XML</span>}</td>
                     <td className="pr-3 text-ink-2">{c.sucursalNombre}</td>

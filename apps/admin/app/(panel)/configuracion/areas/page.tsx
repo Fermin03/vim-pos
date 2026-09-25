@@ -183,7 +183,7 @@ export default function AreasPage() {
           {error && <p className="mt-3 text-[13px] font-medium text-danger" role="alert">{error}</p>}
           <div className="mt-5 flex gap-2">
             <button type="button" onClick={() => setBorrar(null)} disabled={guardando} className="h-11 flex-1 rounded border border-line-strong text-[14px] font-semibold text-ink-2 transition hover:border-ink hover:text-ink disabled:opacity-50">Cancelar</button>
-            <Button className="flex-1" onClick={confirmarBorrado} disabled={guardando}>{guardando ? "Eliminando…" : "Eliminar"}</Button>
+            <Button variant="danger" className="flex-1" onClick={confirmarBorrado} disabled={guardando}>{guardando ? "Eliminando…" : "Eliminar"}</Button>
           </div>
         </Modal>
       )}

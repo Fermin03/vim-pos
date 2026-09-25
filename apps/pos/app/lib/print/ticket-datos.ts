@@ -1,5 +1,6 @@
 "use client";
 import { employeeClient } from "../supabase";
+import { etiquetaModo } from "@vim/db/modos-servicio";
 import type { DatosEntrega, DatosTicketImpresion, LineaImpresion, PagoImpresion } from "./tipos";
 
 const METODO_LABEL: Record<string, string> = {
@@ -8,9 +9,6 @@ const METODO_LABEL: Record<string, string> = {
   TARJETA_DEBITO: "Tarjeta de débito",
   TRANSFERENCIA: "Transferencia",
   APP_RAPPI: "Rappi", APP_UBEREATS: "Uber Eats", APP_DIDI: "DiDi", APP_IFOOD: "iFood", APP_OTRO: "App externa",
-};
-const MODO_LABEL: Record<string, string> = {
-  COMER_AQUI: "Comedor", PARA_LLEVAR: "Para llevar", DRIVE_THRU: "Pick-up", DELIVERY_PROPIO: "Domicilio",
 };
 
 type Ctx = { token: string; cajeroNombre: string; cajaNombre: string };
@@ -186,7 +184,7 @@ export async function leerTicketParaImpresion(ticketId: string, ctx: Ctx): Promi
       fechaIso: (tk.fecha_pago as string) ?? (tk.created_at as string) ?? new Date().toISOString(),
       cajero: ctx.cajeroNombre,
       caja: ctx.cajaNombre,
-      modoServicio: MODO_LABEL[tk.modo_servicio as string] ?? (tk.modo_servicio as string) ?? "",
+      modoServicio: etiquetaModo((tk.modo_servicio as string) ?? ""),
       modo: (tk.modo_servicio as string) ?? "",
       nombreCliente: (tk.nombre_cliente as string) ?? null,
     },

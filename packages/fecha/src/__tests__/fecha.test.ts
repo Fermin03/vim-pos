@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { aFechaMx, sumarDias, sumarMeses } from "../index";
+import { aFechaMx, fechaLegible, rangoLegible, sumarDias, sumarMeses } from "../index";
 
 describe("aFechaMx", () => {
   it("de noche en México sigue siendo HOY, aunque en UTC ya sea mañana", () => {
@@ -61,5 +61,22 @@ describe("sumarDias", () => {
 
   it("29 de febrero en bisiesto", () => {
     expect(sumarDias("2028-03-01", -1)).toBe("2028-02-29");
+  });
+});
+
+describe("fechaLegible", () => {
+  it("una fecha de la base se lee sin correrse de día", () => {
+    expect(fechaLegible("2026-09-24")).toBe("24 sep 2026");
+    expect(fechaLegible("2026-01-01")).toBe("1 ene 2026");
+  });
+  it("un instante de noche en México sigue siendo ese día aunque en UTC ya sea mañana", () => {
+    expect(fechaLegible("2026-09-25T03:30:00Z")).toBe("24 sep 2026");
+  });
+  it("sin valor pone un guion", () => {
+    expect(fechaLegible(null)).toBe("—");
+  });
+  it("un rango de un solo día no repite la fecha", () => {
+    expect(rangoLegible("2026-09-03", "2026-09-03")).toBe("3 sep 2026");
+    expect(rangoLegible("2026-09-03", "2026-09-09")).toBe("3 sep 2026 – 9 sep 2026");
   });
 });

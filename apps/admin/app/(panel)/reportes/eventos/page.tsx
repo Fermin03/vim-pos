@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { PageBody, PageHeader } from "../../../components/page-header";
 import { fmtMxn, leerVentasPorEvento, type FilaEvento } from "../../../lib/reportes";
 import { mensajeError } from "../../../lib/errores";
+import { rangoLegible } from "@vim/fecha";
 
 const TIPO: Record<string, string> = {
   FERIA: "Feria", FESTIVAL: "Festival", CONCIERTO: "Concierto", PRIVADO: "Privado", CORPORATIVO: "Corporativo", OTRO: "Otro",
@@ -41,7 +42,7 @@ export default function VentasPorEventoPage() {
                       <span className="font-medium">{f.evento}</span>
                       {f.tipo && <span className="ml-2 rounded-full bg-sel px-2 py-0.5 text-[10.5px] font-semibold text-ink-3">{TIPO[f.tipo] ?? f.tipo}</span>}
                     </td>
-                    <td className="px-4 py-2.5 text-ink-2 tabular-nums">{f.primerDia}{f.ultimoDia !== f.primerDia ? ` – ${f.ultimoDia}` : ""}</td>
+                    <td className="px-4 py-2.5 text-ink-2 tabular-nums">{rangoLegible(f.primerDia, f.ultimoDia)}</td>
                     <td className="px-4 py-2.5 text-right tabular-nums">{f.turnos}</td>
                     <td className="px-4 py-2.5 text-right tabular-nums">{f.tickets}</td>
                     <td className="px-4 py-2.5 text-right font-semibold tabular-nums">{fmtMxn(f.total)}</td>
