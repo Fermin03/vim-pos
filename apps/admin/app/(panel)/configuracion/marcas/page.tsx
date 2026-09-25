@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
-import { Button } from "@vim/ui/styles";
+import { Button, useConfirmar } from "@vim/ui/styles";
 import { PageBody, PageHeader } from "../../../components/page-header";
 import {
   actualizarMarca,
@@ -19,6 +19,7 @@ const label = "mb-1.5 block text-[13px] font-medium text-ink-2";
 const VACIA = { codigo: "", nombre: "", descripcion: "", color_primario_hex: "#E8502E", activa: true };
 
 export default function MarcasPage() {
+  const [confirmar, dialogoConfirmar] = useConfirmar();
   const [marcas, setMarcas] = useState<Marca[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [okMsg, setOkMsg] = useState<string | null>(null);
@@ -73,7 +74,7 @@ export default function MarcasPage() {
   }
 
   async function borrar(m: Marca) {
-    if (!confirm(`¿Eliminar la marca "${m.nombre}"?`)) return;
+    if (!(await confirmar({ titulo: `¿Eliminar la marca ${m.nombre}?`, boton: "Eliminar" }))) return;
     try {
       await eliminarMarca(m.id);
       recargar();
@@ -84,6 +85,7 @@ export default function MarcasPage() {
 
   return (
     <>
+      {dialogoConfirmar}
       <PageHeader
         titulo="Marcas virtuales"
         subtitulo="Marcas adicionales que operan desde la misma cocina, vendiendo en apps de delivery con identidad propia."

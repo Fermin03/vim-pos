@@ -1,5 +1,6 @@
 "use client";
 import { employeeClient } from "./supabase";
+import { etiquetaModo } from "@vim/db/modos-servicio";
 import type { ModoServicio } from "./carrito";
 import { leerEntrega } from "./print/ticket-datos";
 
@@ -206,10 +207,11 @@ export type CuentaBloqueante = {
   desdeIso: string | null;
 };
 
-const MODO_LABEL: Record<string, string> = {
-  COMER_AQUI: "Comedor", MESA: "Comedor", PARA_LLEVAR: "Para llevar",
-  DRIVE_THRU: "Pick-up", DELIVERY_PROPIO: "Domicilio",
-};
+/** Una cuenta de MESA se busca en Comedor: ahí vive su lista en la caja. El resto, con la lista
+ *  única de `@vim/db/modos-servicio`. */
+function etiquetaCuenta(modo: string): string {
+  return modo === "MESA" ? etiquetaModo("COMER_AQUI") : etiquetaModo(modo);
+}
 
 /**
  * Las cuentas abiertas que bloquean el corte de ESTE turno.
@@ -240,7 +242,7 @@ export async function listarCuentasQueBloqueanCorte(
     return {
       ticketId: String(t.id),
       folio: (t.folio_completo as string) ?? null,
-      modo: MODO_LABEL[modo] ?? modo,
+      modo: etiquetaCuenta(modo),
       total: Number(t.total_mxn ?? 0),
       nItems: items.filter((i) => !i.cancelado).length,
       enEspera: t.en_espera === true,

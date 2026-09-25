@@ -4,6 +4,7 @@ import { PageBody, PageHeader } from "../../../components/page-header";
 import { RangoFechas } from "../../../components/rango-fechas";
 import { fmtMxn, leerVentasAppsExternas, rangoUltimosDias, type FilaAppExterna } from "../../../lib/reportes";
 import { mensajeError } from "../../../lib/errores";
+import { fechaLegible } from "@vim/fecha";
 
 const ESTADO_BADGE: Record<string, { label: string; cls: string }> = {
   CONCILIADO_OK: { label: "Conciliado", cls: "bg-success-soft text-success" },
@@ -54,7 +55,7 @@ export default function AppsExternasPage() {
                     const badge = ESTADO_BADGE[f.estado] ?? { label: f.estado, cls: "bg-sel text-ink-2" };
                     return (
                       <tr key={f.ticketId} className="border-b border-line last:border-b-0">
-                        <td className="px-4 py-2.5 text-ink-2">{f.dia}</td>
+                        <td className="px-4 py-2.5 text-ink-2">{fechaLegible(f.dia)}</td>
                         <td className="px-4 py-2.5 font-medium">{f.app}</td>
                         <td className="px-4 py-2.5">{f.folioPos ?? "—"}</td>
                         <td className="px-4 py-2.5 text-ink-2">{f.folioApp ?? "—"}</td>

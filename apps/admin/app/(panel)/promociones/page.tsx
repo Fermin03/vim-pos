@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
-import { Button } from "@vim/ui/styles";
+import { Button, useConfirmar } from "@vim/ui/styles";
 import { PageBody, PageHeader } from "../../components/page-header";
 import {
   actualizarPromo,
@@ -52,6 +52,7 @@ const LABEL_VISTA: Record<EstadoVista, string> = {
 type FiltroPromo = "TODAS" | "ACTIVAS" | "PROGRAMADAS" | "INACTIVAS";
 
 export default function PromocionesPage() {
+  const [confirmar, dialogoConfirmar] = useConfirmar();
   const [promos, setPromos] = useState<Promo[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [okMsg, setOkMsg] = useState<string | null>(null);
@@ -93,7 +94,7 @@ export default function PromocionesPage() {
     catch (e) { setError(mensajeError(e, "Error")); }
   }
   async function borrar(p: Promo) {
-    if (!confirm(`¿Eliminar "${p.nombre}"?`)) return;
+    if (!(await confirmar({ titulo: `¿Eliminar la promoción ${p.nombre}?`, boton: "Eliminar" }))) return;
     try { await eliminarPromo(p.id); recargar(); } catch (e) { setError(mensajeError(e, "Error")); }
   }
 
@@ -112,6 +113,7 @@ export default function PromocionesPage() {
 
   return (
     <>
+      {dialogoConfirmar}
       <PageHeader
         titulo="Promociones"
         subtitulo="Ofertas y descuentos del negocio, con su vigencia."

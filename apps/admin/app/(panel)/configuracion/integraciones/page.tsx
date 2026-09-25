@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Button, Modal } from "@vim/ui/styles";
+import { Button, Modal, useConfirmar } from "@vim/ui/styles";
 import { PageHeader, PageBody } from "../../../components/page-header";
 import { listarSucursales, type Sucursal } from "../../../lib/configuracion";
 import {
@@ -23,6 +23,7 @@ type Modulos = { permitidos: Record<string, boolean>; efectivos: Record<string, 
  * Uber, que solo aparece cuando de verdad está encendido.
  */
 export default function IntegracionesPage() {
+  const [confirmar, dialogoConfirmar] = useConfirmar();
   const router = useRouter();
   const [modulos, setModulos] = useState<Modulos | null>(null);
   const [cambiando, setCambiando] = useState(false);
@@ -103,7 +104,7 @@ export default function IntegracionesPage() {
   /** Enciende o apaga las apps de delivery (ADR 0014). Apagar con conexiones activas exige
    *  confirmación explícita, nombrando la consecuencia (docs/diseno/admin.md "Acciones peligrosas"). */
   async function cambiarActivo(activo: boolean) {
-    if (!activo && hayConexionesActivas && !confirm("Uber seguirá mandando pedidos a tu tienda y no los verás aquí. ¿Apagar de todas formas?")) return;
+    if (!activo && hayConexionesActivas && !(await confirmar({ titulo: "¿Apagar las apps de delivery?", mensaje: "Uber seguirá mandando pedidos a tu tienda y no los verás aquí.", boton: "Apagar" }))) return;
     setCambiando(true);
     setErrorModulo(null);
     try {
@@ -175,6 +176,7 @@ export default function IntegracionesPage() {
 
   return (
     <>
+      {dialogoConfirmar}
       <PageHeader
         titulo="Apps de delivery"
         subtitulo={encendido ? "Conecta tus tiendas de las apps de reparto para que los pedidos entren solos al POS." : undefined}

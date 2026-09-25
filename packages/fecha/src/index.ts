@@ -73,3 +73,27 @@ export function sumarDias(fecha: string, n: number): string {
   t.setUTCDate(t.getUTCDate() + n);
   return t.toISOString().slice(0, 10);
 }
+
+const MESES = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
+
+/**
+ * Una fecha para leerla, no para guardarla: `2026-09-24` → `24 sep 2026`.
+ *
+ * Las pantallas del panel enseñaban la fecha tal como sale de la base (`2026-09-03–2026-09-03`),
+ * que es formato de máquina (revisión de diseño, sep 2026). Acepta una fecha `YYYY-MM-DD` —que
+ * se toma tal cual, sin pasar por `Date`, porque `new Date("2026-09-24")` es medianoche UTC y en
+ * México ya sería el 23— o un instante ISO completo, que se lleva a la fecha de México.
+ */
+export function fechaLegible(valor: string | null | undefined): string {
+  if (!valor) return "—";
+  const dia = /^\d{4}-\d{2}-\d{2}$/.test(valor) ? valor : aFechaMx(new Date(valor));
+  const [a, m, d] = dia.split("-").map(Number);
+  if (!a || !m || !d) return valor;
+  return `${d} ${MESES[m - 1]} ${a}`;
+}
+
+/** Un rango legible: `24 sep 2026` si es un solo día, `3 – 9 sep 2026` si no. */
+export function rangoLegible(desde: string | null | undefined, hasta: string | null | undefined): string {
+  if (!desde || !hasta || desde === hasta) return fechaLegible(desde ?? hasta);
+  return `${fechaLegible(desde)} – ${fechaLegible(hasta)}`;
+}

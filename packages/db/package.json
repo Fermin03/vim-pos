@@ -9,6 +9,7 @@
     "./service": "./src/client.service.ts",
     "./types": "./src/database.types.ts",
     "./modulos": "./src/modulos.ts",
+    "./modos-servicio": "./src/modos-servicio.ts",
     "./fixtures-combos": "./src/fixtures-combos.ts"
   },
   "scripts": {

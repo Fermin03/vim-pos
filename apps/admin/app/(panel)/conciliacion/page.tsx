@@ -7,6 +7,7 @@ import {
   APPS, LABEL_APP, type Liquidacion, type ItemConciliado, type Renglon, type AppExterna,
 } from "../../lib/conciliacion";
 import { mensajeError } from "../../lib/errores";
+import { rangoLegible } from "@vim/fecha";
 
 const mxn = (n: number) => n.toLocaleString("es-MX", { style: "currency", currency: "MXN" });
 const input = "h-10 w-full rounded border border-line-strong px-3 text-sm outline-none focus:border-ink";
@@ -69,7 +70,7 @@ export default function ConciliacionPage() {
                 {list.map((l) => (
                   <tr key={l.id} className="cursor-pointer border-t border-line hover:bg-hover" onClick={() => abrirDetalle(l)}>
                     <td className="px-4 py-3 font-semibold">{LABEL_APP[l.appExterna]}</td>
-                    <td className="px-4 py-3 text-ink-2">{l.periodoInicio} – {l.periodoFin}</td>
+                    <td className="px-4 py-3 text-ink-2">{rangoLegible(l.periodoInicio, l.periodoFin)}</td>
                     <td className="px-4 py-3 text-right tabular-nums">{mxn(l.totalLiquidadoMxn)}</td>
                     <td className="px-4 py-3 text-right tabular-nums">{l.totalPosMxn == null ? "—" : mxn(l.totalPosMxn)}</td>
                     <td className={["px-4 py-3 text-right tabular-nums font-semibold", Math.abs(l.diferenciaMxn ?? 0) < 0.01 ? "text-ink-3" : "text-danger"].join(" ")}>

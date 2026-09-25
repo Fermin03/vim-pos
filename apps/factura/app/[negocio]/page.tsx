@@ -2,6 +2,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { use } from "react";
 import { LogoVim } from "@vim/ui/styles";
+import { fechaLegible } from "@vim/fecha";
 import {
   buscarTicket, descargar, timbrar, ErrorPortal, REGIMENES, USOS,
   type Receptor, type TicketEncontrado, type Timbrado,
@@ -183,7 +184,7 @@ export default function PortalFactura({
         <div className="text-[13px] font-semibold">{encontrado.negocio}</div>
         <div className="mt-0.5 flex items-baseline justify-between gap-2">
           <span className="text-[12.5px] text-ink-3">
-            Folio {encontrado.ticket.folio} · {encontrado.ticket.fecha}
+            Folio {encontrado.ticket.folio} · {fechaLegible(encontrado.ticket.fecha)}
           </span>
           <span className="font-display text-[18px] font-semibold tabular-nums">
             {mxn(encontrado.ticket.total)}

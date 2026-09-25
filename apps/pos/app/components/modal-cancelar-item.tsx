@@ -185,7 +185,7 @@ export function ModalCancelarItem({
 
       <div className="flex items-center justify-end gap-2">
         <Button variant="ghost" onClick={onCerrar} disabled={procesando}>Volver</Button>
-        <Button onClick={onConfirmar} disabled={procesando}>
+        <Button variant="danger" onClick={onConfirmar} disabled={procesando}>
           {procesando ? "Cancelando…" : "Cancelar ítem"}
         </Button>
       </div>
