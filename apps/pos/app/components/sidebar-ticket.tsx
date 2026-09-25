@@ -1,19 +1,13 @@
 "use client";
 import { useState } from "react";
-import type { EstadoCarrito, LineaCarrito, ModoServicio } from "../lib/carrito";
+import type { EstadoCarrito, LineaCarrito } from "../lib/carrito";
+import { etiquetaModo } from "@vim/db/modos-servicio";
 import { calcularTotalesDisplay, totalLinea } from "../lib/carrito";
 import { setPreciosVisibles, usePreciosVisibles } from "../lib/precios-visibles";
 import { fmtMxn } from "../lib/turno";
 import { RenglonItem } from "./renglon-item";
 
 /* ── helpers ─────────────────────────────────────────────────── */
-const MODO_LABELS: Record<ModoServicio, string> = {
-  COMER_AQUI: "Comedor",
-  PARA_LLEVAR: "Para llevar",
-  DRIVE_THRU: "Pick-up",
-  DELIVERY_PROPIO: "Domicilio",
-};
-
 /* ── Íconos SVG inline (del mockup P-066) ────────────────────── */
 function IconoTicket() {
   return (
@@ -197,7 +191,7 @@ export function SidebarTicket({
         <div className="mt-3">
           <div className="flex items-center gap-2 rounded-md bg-[#ECEEF1] px-3 py-2">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4 flex-shrink-0 text-[#4A5568]"><path d="M20 6 9 17l-5-5" /></svg>
-            <span className="text-[13px] font-semibold text-[#4A5568]">{MODO_LABELS[estado.modoServicio]}</span>
+            <span className="text-[13px] font-semibold text-[#4A5568]">{etiquetaModo(estado.modoServicio)}</span>
           </div>
           {/* Sin handler no se pinta: un boton que no hace nada es peor que no tenerlo. */}
           {estado.modoServicio === "DELIVERY_PROPIO" && onEditarCliente && (

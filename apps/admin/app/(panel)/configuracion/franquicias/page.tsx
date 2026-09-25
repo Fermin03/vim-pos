@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
-import { Button } from "@vim/ui/styles";
+import { Button, useConfirmar } from "@vim/ui/styles";
 import { PageHeader, PageBody } from "../../../components/page-header";
 import {
   asignarFranquicia, crearFranquicia, eliminarFranquicia, listarFranquicias,
@@ -10,6 +10,7 @@ import { mensajeError } from "../../../lib/errores";
 
 /** Fase 5 · Franquicias: agrupa sucursales para el reporteo central (consolidado por franquicia). */
 export default function FranquiciasPage() {
+  const [confirmar, dialogoConfirmar] = useConfirmar();
   const [franquicias, setFranquicias] = useState<Franquicia[] | null>(null);
   const [sucursales, setSucursales] = useState<SucursalFranquicia[]>([]);
   const [nombre, setNombre] = useState("");
@@ -34,8 +35,18 @@ export default function FranquiciasPage() {
     finally { setTrabajando(false); }
   }
 
+  /** Antes borraba al primer clic, sin preguntar (revisión de diseño, sep 2026). */
+  async function eliminar(f: Franquicia) {
+    const mensaje = f.nSucursales > 0
+      ? `Sus ${f.nSucursales} sucursal${f.nSucursales === 1 ? "" : "es"} quedan sin franquicia en el reporteo central.`
+      : undefined;
+    if (!(await confirmar({ titulo: `¿Eliminar la franquicia ${f.nombre}?`, mensaje, boton: "Eliminar" }))) return;
+    await correr(() => eliminarFranquicia(f.id));
+  }
+
   return (
     <>
+      {dialogoConfirmar}
       <PageHeader titulo="Franquicias" subtitulo="Agrupa sucursales por franquiciatario para el reporteo central." migas={[{ label: "Configuración" }, { label: "Franquicias" }]} />
       <PageBody>
           {error && <p className="mb-3 text-sm font-medium text-danger" role="alert">{error}</p>}
@@ -68,7 +79,7 @@ export default function FranquiciasPage() {
                       <div className="text-[14px] font-semibold">{f.nombre}</div>
                       <div className="text-[12px] text-ink-3">{f.nSucursales} sucursal{f.nSucursales === 1 ? "" : "es"}</div>
                     </div>
-                    <button type="button" disabled={trabajando} onClick={() => correr(() => eliminarFranquicia(f.id))}
+                    <button type="button" disabled={trabajando} onClick={() => { void eliminar(f); }}
                       className="rounded px-2 py-1 text-[12.5px] font-semibold text-ink-3 transition hover:bg-hover hover:text-danger">
                       Eliminar
                     </button>

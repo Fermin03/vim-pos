@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
-import { Button } from "@vim/ui/styles";
+import { Button, useConfirmar } from "@vim/ui/styles";
 import { PageBody, PageHeader } from "../../components/page-header";
 import {
   actualizarCliente,
@@ -47,6 +47,7 @@ function fmtVisita(iso: string | null): string {
 }
 
 export default function ClientesPage() {
+  const [confirmar, dialogoConfirmar] = useConfirmar();
   const [clientes, setClientes] = useState<ClienteConResumen[] | null>(null);
   const [total, setTotal] = useState(0);
   const [kpis, setKpis] = useState<KpisClientes | null>(null);
@@ -146,7 +147,7 @@ export default function ClientesPage() {
   }
 
   async function borrar(c: Cliente) {
-    if (!confirm(`¿Eliminar a "${c.nombre}"?`)) return;
+    if (!(await confirmar({ titulo: `¿Eliminar a ${c.nombre}?`, boton: "Eliminar" }))) return;
     try {
       await eliminarCliente(c.id);
       recargar();
@@ -161,6 +162,7 @@ export default function ClientesPage() {
 
   return (
     <>
+      {dialogoConfirmar}
       <PageHeader
         titulo="Clientes"
         subtitulo="Quienes han comprado o facturado en tu negocio. Se registran al pedir factura o por delivery."

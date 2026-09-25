@@ -324,7 +324,7 @@ function ModalDevolucion({
 
       <div className="flex items-center justify-end gap-2">
         <Button variant="ghost" onClick={onCerrar} disabled={procesando}>Cancelar</Button>
-        <Button onClick={confirmar} disabled={procesando || items === null}>{procesando ? "Devolviendo…" : "Confirmar devolución"}</Button>
+        <Button variant="danger" onClick={confirmar} disabled={procesando || items === null}>{procesando ? "Devolviendo…" : "Confirmar devolución"}</Button>
       </div>
     </Modal>
   );

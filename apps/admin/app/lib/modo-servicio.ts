@@ -16,27 +16,8 @@
  * agrega un valor al enum y se regeneran los tipos, esto deja de compilar y el
  * hueco aparece en el build, no en la pantalla de un cliente.
  */
-import type { Database } from "@vim/db/types";
-
-export type ModoServicio = Database["public"]["Enums"]["modo_servicio"];
-
-const ETIQUETA: Record<ModoServicio, string> = {
-  COMER_AQUI: "Comer aquí",
-  MESA: "Mesa",
-  BARRA: "Barra",
-  PARA_LLEVAR: "Para llevar",
-  DRIVE_THRU: "Drive-thru",
-  DELIVERY_PROPIO: "Domicilio propio",
-  APP_RAPPI: "Rappi",
-  APP_UBEREATS: "Uber Eats",
-  APP_DIDI: "DiDi Food",
-  APP_IFOOD: "iFood",
-  APP_OTRO: "Otra app",
-  EVENTO_PRIVADO: "Evento privado",
-};
-
-/** Nombre legible de un modo. Acepta `string` porque las vistas SQL lo devuelven
- *  sin tipar; un valor desconocido se devuelve tal cual antes que romper la página. */
-export function etiquetaModo(modo: string): string {
-  return ETIQUETA[modo as ModoServicio] ?? modo;
-}
+//
+// Sep 2026: la lista se mudó a `@vim/db/modos-servicio` para que la caja, la cocina y el panel
+// digan lo mismo (aquí decía "Drive-thru" y "Comer aquí" donde la caja dice "Pick-up" y
+// "Comedor"). Este archivo se queda como reexportación para no tocar los imports.
+export { etiquetaModo, type ModoServicio } from "@vim/db/modos-servicio";

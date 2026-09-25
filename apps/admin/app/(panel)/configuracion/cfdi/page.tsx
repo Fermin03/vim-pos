@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
-import { Button } from "@vim/ui/styles";
+import { Button, useConfirmar } from "@vim/ui/styles";
 import { PageHeader, PageBody } from "../../../components/page-header";
 import {
   cfdiEmisorSchema,
@@ -27,6 +27,7 @@ const ESTADOS = [
 ] as const;
 
 export default function CfdiPage() {
+  const [confirmar, dialogoConfirmar] = useConfirmar();
   const [emisor, setEmisor] = useState<CfdiEmisor | null | undefined>(undefined);
   const [error, setError] = useState<string | null>(null);
   const [okMsg, setOkMsg] = useState<string | null>(null);
@@ -123,7 +124,7 @@ export default function CfdiPage() {
   }
 
   async function quitarSello() {
-    if (!confirm("¿Retirar el sello digital de este negocio? Dejará de poder facturar hasta que se cargue de nuevo.")) return;
+    if (!(await confirmar({ titulo: "¿Retirar el sello digital?", mensaje: "Este negocio dejará de poder facturar hasta que se cargue de nuevo.", boton: "Retirar sello" }))) return;
     setError(null);
     setOkMsg(null);
     setSubiendo(true);
@@ -140,6 +141,7 @@ export default function CfdiPage() {
 
   return (
     <>
+      {dialogoConfirmar}
       <PageHeader
         titulo="Facturación electrónica"
         subtitulo="Conecta tu PAC (Proveedor Autorizado de Certificación) para que VIM POS timbre facturas CFDI 4.0 automáticamente al cobrar."

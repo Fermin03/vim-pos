@@ -2,6 +2,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { BotonVolver } from "./boton-volver";
 import { Button } from "@vim/ui/styles";
+import { etiquetaModo } from "@vim/db/modos-servicio";
 import { fmtMxn, type DatosCaja, type Turno } from "../lib/turno";
 import {
   leerReporteX,
@@ -21,12 +22,6 @@ const METODO_LABEL: Record<string, string> = {
   APP_DIDI: "DiDi Food",
 };
 
-const MODO_LABEL: Record<string, string> = {
-  COMER_AQUI: "Comedor",
-  PARA_LLEVAR: "Para llevar",
-  DRIVE_THRU: "Pick-up",
-  DELIVERY_PROPIO: "Domicilio",
-};
 
 type Filtro = "TODO" | "MODO" | "PAGO";
 
@@ -160,7 +155,7 @@ export function PantallaMonitorVentas({
                   stats.ventaPorModoServicio.map((m) => (
                     <Fila
                       key={m.modo}
-                      etiqueta={MODO_LABEL[m.modo] ?? m.modo}
+                      etiqueta={etiquetaModo(m.modo)}
                       detalle={`${m.cantidad} ticket${m.cantidad === 1 ? "" : "s"}`}
                       valor={fmtMxn(m.total)}
                       pct={m.porcentaje}

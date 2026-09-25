@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Button } from "@vim/ui/styles";
+import { Button, useConfirmar } from "@vim/ui/styles";
 import { PageBody, PageHeader, TablaScroll } from "../../../components/page-header";
 import {
   actualizarProveedor, crearProveedor, eliminarProveedor, listarProveedores, proveedorSchema, type Proveedor,
@@ -15,6 +15,7 @@ type Form = { nombre: string; rfc: string; telefono: string; email: string; nota
 const VACIO: Form = { nombre: "", rfc: "", telefono: "", email: "", notas: "" };
 
 export default function ProveedoresPage() {
+  const [confirmar, dialogoConfirmar] = useConfirmar();
   const [filas, setFilas] = useState<Proveedor[] | null>(null);
   const [editando, setEditando] = useState<{ id: string | null; datos: Form } | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -52,13 +53,14 @@ export default function ProveedoresPage() {
   }
 
   async function borrar(p: Proveedor) {
-    if (!confirm(`¿Dar de baja a "${p.nombre}"? No podrás registrarle compras; las anteriores se conservan.`)) return;
+    if (!(await confirmar({ titulo: `¿Dar de baja a ${p.nombre}?`, mensaje: "No podrás registrarle compras; las anteriores se conservan.", boton: "Dar de baja" }))) return;
     try { await eliminarProveedor(p.id); recargar(); }
     catch (e) { setError(mensajeError(e, "No se pudo dar de baja")); }
   }
 
   return (
     <>
+      {dialogoConfirmar}
       <PageHeader
         titulo="Proveedores"
         subtitulo="A quién le compras. El RFC sirve para reconocer sus facturas al registrar una compra."

@@ -1,5 +1,6 @@
 "use client";
 import { employeeClient } from "./supabase";
+import { etiquetaModo } from "@vim/db/modos-servicio";
 
 const num = (v: unknown) => Number(v ?? 0);
 
@@ -218,12 +219,6 @@ export type EstadisticasTurno = {
   ventaPorModoServicio: ModoServicioVenta[];
 };
 
-const MODO_LABEL_SOFT: Record<string, string> = {
-  COMER_AQUI: "COMEDOR",
-  PARA_LLEVAR: "PARA LLEVAR",
-  DRIVE_THRU: "PICK-UP",
-  DELIVERY_PROPIO: "DOMICILIO",
-};
 
 /** Estadísticas adicionales del turno para el cierre estilo Soft. Bajo RLS. */
 export async function leerEstadisticasTurno(token: string, turnoId: string): Promise<EstadisticasTurno> {
@@ -262,7 +257,8 @@ export async function leerEstadisticasTurno(token: string, turnoId: string): Pro
     porModo.set(r.modo_servicio, acc);
   }
   const ventaPorModoServicio: ModoServicioVenta[] = [...porModo.entries()].map(([modo, v]) => ({
-    modo: MODO_LABEL_SOFT[modo] ?? modo,
+    // En mayúsculas como en el corte de Soft; el nombre sale de la lista única.
+    modo: etiquetaModo(modo).toUpperCase(),
     total: Math.round(v.total * 100) / 100,
     cantidad: v.cantidad,
     porcentaje: totalVendido > 0 ? Math.round((v.total / totalVendido) * 1000) / 10 : 0,
