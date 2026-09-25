@@ -2,6 +2,7 @@
 import { supabase } from "./supabase";
 import { hoyMx, sumarDias } from "@vim/fecha";
 import { LABEL_APP, type AppExterna } from "./conciliacion";
+import { resumirCaja, serieHoraria, type ResumenCaja, type TurnoDia } from "./dashboard-calculos";
 
 // F13 — Reportes y analítica. Las vistas SQL ya existen (0011/0012); el admin solo las
 // consume bajo RLS (heredan del tenant_id de las tablas base). Rangos por día_contable.
@@ -93,8 +94,13 @@ export type Dashboard = {
   combosVendidos: number;
   /** Serie de total_neto por día (para la mini-tendencia), del más antiguo al más reciente. */
   tendencia: { dia: string; total: number }[];
-  /** Ventas por hora del día más reciente (solo horas con venta, ordenadas). */
+  /** Ventas por hora del día que se mira: eje continuo de la primera a la última hora con venta,
+   *  en el orden del día contable y con ceros donde no se vendió (ver `serieHoraria`). */
   ventasPorHora: VentaHora[];
+  /** ¿Cuadró la caja? Turnos del día que se mira y su diferencia de efectivo. */
+  caja: ResumenCaja;
+  /** Cuándo se leyó esto (ISO), para "Actualizado 21:14". */
+  leidoEn: string;
 };
 
 /** Suma las filas (una por sucursal) de vw_estado_resultados_dia en un resumen del día. */
@@ -139,10 +145,12 @@ function sumarDia(filas: Record<string, unknown>[], dia: string): ResumenDia {
  *  Sin argumento sigue siendo "hoy", así que el resto de llamadas no cambian. */
 export async function leerDashboard(diaElegido?: string): Promise<Dashboard> {
   const { data: ten, error: eTen } = await supabase
-    .from("tenants").select("id, timezone").limit(1).maybeSingle();
+    .from("tenants").select("id, timezone, hora_cierre_dia_contable").limit(1).maybeSingle();
   if (eTen) throw new Error(eTen.message);
   const tenantId = (ten as { id?: string } | null)?.id ?? null;
   const zona = (ten as { timezone?: string } | null)?.timezone || "America/Mexico_City";
+  // "03:00:00" → 3. La hora en que empieza el día contable ordena la gráfica por hora.
+  const horaCierre = Number(String((ten as { hora_cierre_dia_contable?: string } | null)?.hora_cierre_dia_contable ?? "03").slice(0, 2)) || 0;
 
   /* El día de HOY según el negocio, que no es el del reloj: un bar que cierra
      a las 3 a.m. sigue en el día de ayer a la 1 a.m. */
@@ -226,7 +234,9 @@ export async function leerDashboard(diaElegido?: string): Promise<Dashboard> {
     .from("tickets")
     .select("fecha_pago, total_mxn")
     .eq("dia_contable", diaVista)
-    .eq("estado_fiscal", "PAGADO")
+    // PAGADO y FACTURADO, igual que los combos de arriba: una venta que el cliente facturó sigue
+    // siendo venta de esa hora. Antes la gráfica la perdía y no cuadraba con las tarjetas.
+    .in("estado_fiscal", ["PAGADO", "FACTURADO"])
     .is("deleted_at", null)
     .not("fecha_pago", "is", null);
   if (e3) throw new Error(e3.message);
@@ -239,11 +249,25 @@ export async function leerDashboard(diaElegido?: string): Promise<Dashboard> {
     const h = Number(hora.format(new Date(String(r.fecha_pago))));
     porHora.set(h, (porHora.get(h) ?? 0) + num(r.total_mxn));
   }
-  const ventasPorHora = [...porHora.entries()]
-    .map(([hora, total]) => ({ hora, total: Math.round(total * 100) / 100 }))
-    .sort((a, b) => a.hora - b.hora);
+  const ventasPorHora = serieHoraria(porHora, horaCierre);
 
-  return { dia: diaVista, hoyContable, esHoy: diaVista === hoyContable, ultimoDiaConVentas, hoy, ayer, topProductos, combosVendidos, tendencia, ventasPorHora };
+  // Turnos del día que se mira (todas las cajas, bajo RLS): cuántos cerraron y cuánto faltó o sobró.
+  const { data: tu, error: e5 } = await supabase
+    .from("turnos")
+    .select("estado, diferencia_mxn")
+    .eq("dia_contable", diaVista);
+  if (e5) throw new Error(e5.message);
+  const caja = resumirCaja(
+    ((tu ?? []) as Record<string, unknown>[]).map((t): TurnoDia => ({
+      estado: String(t.estado),
+      diferencia: t.diferencia_mxn == null ? null : num(t.diferencia_mxn),
+    })),
+  );
+
+  return {
+    dia: diaVista, hoyContable, esHoy: diaVista === hoyContable, ultimoDiaConVentas, hoy, ayer, topProductos, combosVendidos,
+    tendencia, ventasPorHora, caja, leidoEn: new Date().toISOString(),
+  };
 }
 
 // ── Reporte Z histórico (P-181) ─────────────────────────────────────────────
