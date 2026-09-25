@@ -23,7 +23,16 @@ import { createClient } from "jsr:@supabase/supabase-js@2";
 import { corsHeaders } from "../_shared/cors.ts";
 import { timbrarConFailover, obtenerFacturama, PAC_NO_CONFIGURADO } from "../_shared/pac/index.ts";
 import { armarConceptos, ConceptosIncoherentes, type LineaTicket } from "../_shared/pac/conceptos.ts";
-import { archivarCfdi, subidorSupabase } from "../_shared/pac/archivo.ts";
+import { archivarCfdi, bytesABase64, partirRutaLogica, subidorSupabase } from "../_shared/pac/archivo.ts";
+import {
+  campoDelRechazo,
+  REGIMENES_RECEPTOR,
+  RFC_VALIDO,
+  traducirRechazo,
+  USOS_CFDI,
+  usosParaRegimen,
+  usosPorRegimen,
+} from "../_shared/pac/receptor.ts";
 
 /**
  * Ritmo máximo por IP. Generoso para una persona —quien factura su comida lo intenta tres o cuatro
@@ -43,20 +52,7 @@ function ritmoExcedido(ip: string): boolean {
   return e.n > MAX_POR_VENTANA;
 }
 
-/** Regímenes del receptor y los usos de CFDI que el SAT admite en cada uno. */
-const USOS_POR_REGIMEN: Record<string, string[]> = {
-  "601": ["G01", "G03", "I01", "I08", "P01"],   // General de ley personas morales
-  "603": ["G01", "G03", "I01", "I08", "P01"],   // Personas morales sin fines de lucro
-  "605": ["D01", "D02", "D03", "D04", "D07", "D10", "P01"], // Sueldos y salarios
-  "606": ["G01", "G03", "I01", "I08", "D01", "D04", "P01"], // Arrendamiento
-  "612": ["G01", "G03", "I01", "I08", "D01", "D02", "D04", "D07", "D10", "P01"], // Actividad empresarial
-  "614": ["G01", "G03", "D01", "D04", "P01"],   // Ingresos por intereses
-  "616": ["G01", "G03", "P01"],                 // Sin obligaciones fiscales
-  "621": ["G01", "G03", "I01", "P01"],          // Incorporación fiscal
-  "626": ["G01", "G03", "I01", "I08", "P01"],   // RESICO
-};
-
-const RFC_VALIDO = /^[A-ZÑ&]{3,4}\d{6}[A-Z0-9]{3}$/;
+const CORREO_VALIDO = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 Deno.serve(async (req) => {
   const cors = corsHeaders(req);
@@ -72,7 +68,7 @@ Deno.serve(async (req) => {
   }
 
   let body: {
-    accion?: string; negocio?: string; folio?: string;
+    accion?: string; negocio?: string; folio?: string; rfc?: string; email?: string;
     receptor?: { rfc?: string; razonSocial?: string; regimenFiscal?: string; codigoPostal?: string; usoCfdi?: string; email?: string };
   };
   try {
@@ -83,7 +79,9 @@ Deno.serve(async (req) => {
 
   const codigoNegocio = String(body.negocio ?? "").trim().toLowerCase();
   const folio = String(body.folio ?? "").trim().toUpperCase();
-  if (!codigoNegocio || !folio) return json({ error: "FALTAN_DATOS" }, 400);
+  if (!codigoNegocio) return json({ error: "FALTAN_DATOS" }, 400);
+  // Sin folio solo se puede preguntar por el negocio (el encabezado del paso 1).
+  if (!folio && body.accion !== "negocio") return json({ error: "FALTAN_DATOS" }, 400);
 
   const sb = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!, {
     auth: { persistSession: false },
@@ -108,7 +106,16 @@ Deno.serve(async (req) => {
     return json({
       estado: "SIN_FACTURACION",
       mensaje: `${tenant.nombre_comercial} todavía no tiene la facturación en línea activada. Pídela en el mostrador.`,
+      negocio: tenant.nombre_comercial,
+      logo: tenant.logo_png_url,
     }, 409);
+  }
+
+  // ── El negocio (paso 1) ─────────────────────────────────────────────────────────────────────
+  // El portal enseña el nombre y el logo del restaurante desde la primera pantalla: quien llega
+  // por el QR tiene que ver que está facturando en su restaurante, no en "VIM POS".
+  if (body.accion === "negocio") {
+    return json({ estado: "OK", negocio: tenant.nombre_comercial, logo: tenant.logo_png_url });
   }
 
   // ── El ticket ───────────────────────────────────────────────────────────────────────────────
@@ -134,21 +141,45 @@ Deno.serve(async (req) => {
 
   // ── Buscar ──────────────────────────────────────────────────────────────────────────────────
   if (body.accion !== "timbrar") {
-    if (puede !== true) {
+    const entrega = body.accion === "recuperar" || body.accion === "enviar";
+    if (puede !== true && !entrega) {
+      // Ya facturado: quien la pidió puede volver a bajarla con su RFC. Antes el mensaje mandaba al
+      // mostrador aunque el XML y el PDF estuvieran archivados, y quien cerró la pantalla sin
+      // descargar se quedaba sin factura. El RFC es la llave: sin él no se entrega nada.
+      if (await cfdiVigente(sb, tenant.id, ticket.id)) {
+        return json({
+          estado: "YA_FACTURADO",
+          mensaje: "Este ticket ya tiene factura. Si la pediste tú, escribe tu RFC para descargarla otra vez.",
+          negocio: tenant.nombre_comercial,
+          logo: tenant.logo_png_url,
+          ticket: { folio: ticket.folio_completo, fecha: ticket.dia_contable, total: Number(ticket.total_mxn) },
+        }, 409);
+      }
       return json({
         estado: "NO_DISPONIBLE",
-        // Sin detallar el porqué: para quien factura, "ya no se puede" y "ya está facturado" llevan
-        // al mismo sitio —al mostrador— y precisar cuál es le diría a un curioso si el folio existe.
+        // Sin detallar el porqué: "ya no se puede" lleva al mismo sitio —al mostrador— sea cual sea.
         mensaje: "Este ticket ya no se puede facturar en línea. Acude al negocio y te ayudan.",
         negocio: tenant.nombre_comercial,
+        logo: tenant.logo_png_url,
       }, 409);
+    }
+    if (entrega) {
+      return await entregarFacturaExistente(sb, json, {
+        tenantId: tenant.id,
+        negocio: tenant.nombre_comercial,
+        ticketId: ticket.id,
+        rfc: String(body.rfc ?? "").trim().toUpperCase(),
+        email: body.accion === "enviar" ? String(body.email ?? "").trim() : null,
+      });
     }
     return json({
       estado: "OK",
       negocio: tenant.nombre_comercial,
       logo: tenant.logo_png_url,
       ticket: { folio: ticket.folio_completo, fecha: ticket.dia_contable, total: Number(ticket.total_mxn) },
-      usosPorRegimen: USOS_POR_REGIMEN,
+      regimenes: REGIMENES_RECEPTOR,
+      usos: USOS_CFDI,
+      usosPorRegimen: usosPorRegimen(),
     });
   }
 
@@ -168,8 +199,8 @@ Deno.serve(async (req) => {
   if (!RFC_VALIDO.test(rfc)) return json({ estado: "DATOS", campo: "rfc", mensaje: "El RFC no tiene un formato válido." }, 400);
   if (razonSocial.length < 3) return json({ estado: "DATOS", campo: "razonSocial", mensaje: "Falta el nombre o razón social." }, 400);
   if (!/^\d{5}$/.test(codigoPostal)) return json({ estado: "DATOS", campo: "codigoPostal", mensaje: "El código postal son 5 dígitos." }, 400);
-  const usosValidos = USOS_POR_REGIMEN[regimenFiscal];
-  if (!usosValidos) return json({ estado: "DATOS", campo: "regimenFiscal", mensaje: "Elige tu régimen fiscal." }, 400);
+  const usosValidos = usosParaRegimen(regimenFiscal);
+  if (usosValidos.length === 0) return json({ estado: "DATOS", campo: "regimenFiscal", mensaje: "Elige tu régimen fiscal." }, 400);
   if (!usosValidos.includes(usoCfdi)) {
     // El PAC rechaza esta combinación, y su mensaje no dice qué hacer. Se ataja antes.
     return json({ estado: "DATOS", campo: "usoCfdi", mensaje: "Ese uso de CFDI no aplica a tu régimen fiscal." }, 400);
@@ -314,7 +345,7 @@ Deno.serve(async (req) => {
         mensaje: "La facturación de este restaurante todavía no está activa. Guarda tu ticket y pídesela directamente en el negocio.",
       }, 503);
     }
-    return json({ estado: "RECHAZO", campo: campoDelRechazo(res.mensajeError), mensaje: traducir(res.mensajeError) }, 400);
+    return json({ estado: "RECHAZO", campo: campoDelRechazo(res.mensajeError), mensaje: traducirRechazo(res.mensajeError) }, 400);
   }
 
   await sb.rpc("cfdi_marcar_timbrado", {
@@ -361,36 +392,106 @@ Deno.serve(async (req) => {
     negocio: tenant.nombre_comercial,
     total: armado.total,
     correoEnviado,
-    correo: correoEnviado ? email : null,
+    correo: email || null,
     xml,   // base64
     pdf,   // base64
   });
 });
 
-/** Qué campo del formulario resaltar cuando el PAC rechaza. */
-function campoDelRechazo(mensaje: string): string | null {
-  if (/DomicilioFiscalReceptor|c[oó]digo postal/i.test(mensaje)) return "codigoPostal";
-  if (/Nombre del receptor/i.test(mensaje)) return "razonSocial";
-  if (/UsoCFDI/i.test(mensaje)) return "usoCfdi";
-  if (/Rfc/i.test(mensaje)) return "rfc";
-  return null;
+type Json = (body: unknown, status?: number) => Response;
+// deno-lint-ignore no-explicit-any
+type Cliente = any;
+
+/** ¿El ticket ya tiene un CFDI vigente (timbrado o en proceso de cancelación)? */
+async function cfdiVigente(sb: Cliente, tenantId: string, ticketId: string): Promise<boolean> {
+  const { data } = await sb
+    .from("tickets_cfdi")
+    .select("id")
+    .eq("tenant_id", tenantId)
+    .eq("ticket_id", ticketId)
+    .eq("tipo_comprobante", "INGRESO")
+    .in("estado_sat", ["TIMBRADO", "EN_PROCESO_CANCELACION"])
+    .limit(1);
+  return Array.isArray(data) && data.length > 0;
 }
 
 /**
- * Traduce el rechazo del PAC a algo accionable.
+ * Entrega otra vez una factura ya timbrada: la descarga (`email` null) o el reenvío por correo.
  *
- * No es cosmético: el error del código postal es el más frecuente de cualquier portal de
- * autofactura, porque mucha gente pone el CP de su casa y no el de su constancia. Mostrar el
- * mensaje del SAT tal cual —«debe encontrarse en la lista de RFC inscritos no cancelados»— hace
- * que abandonen; decirles dónde buscarlo los rescata.
+ * La llave es el RFC con que se pidió: el folio va impreso en un papel que cualquiera puede ver,
+ * el RFC no. Si no coinciden, la respuesta es la misma que si no hubiera factura, para no confirmar
+ * a un curioso qué RFC facturó ese ticket. El ritmo por IP de arriba ya acota los intentos.
  */
-function traducir(mensaje: string): string {
-  if (/DomicilioFiscalReceptor/i.test(mensaje)) {
-    return "El código postal no coincide con el que el SAT tiene registrado para tu RFC. Búscalo en tu Constancia de Situación Fiscal.";
+async function entregarFacturaExistente(
+  sb: Cliente,
+  json: Json,
+  p: { tenantId: string; negocio: string; ticketId: string; rfc: string; email: string | null },
+): Promise<Response> {
+  if (!RFC_VALIDO.test(p.rfc)) {
+    return json({ estado: "DATOS", campo: "rfc", mensaje: "El RFC no tiene un formato válido." }, 400);
   }
-  if (/Nombre del receptor/i.test(mensaje)) {
-    return "El nombre no coincide con el registrado en el SAT. Escríbelo igual que en tu Constancia, en mayúsculas y sin S.A. de C.V.";
+  if (p.email !== null && !CORREO_VALIDO.test(p.email)) {
+    return json({ estado: "DATOS", campo: "email", mensaje: "Revisa el correo: le falta algo." }, 400);
   }
-  if (/UsoCFDI/i.test(mensaje)) return "Ese uso de CFDI no aplica a tu régimen fiscal. Elige otro.";
-  return "El SAT rechazó los datos. Revísalos en tu Constancia de Situación Fiscal e inténtalo de nuevo.";
+  const { data } = await sb
+    .from("tickets_cfdi")
+    .select("id, uuid_fiscal, total_mxn, pac_proveedor, pac_referencia, xml_storage_path, pdf_storage_path")
+    .eq("tenant_id", p.tenantId)
+    .eq("ticket_id", p.ticketId)
+    .eq("tipo_comprobante", "INGRESO")
+    .eq("receptor_rfc", p.rfc)
+    .in("estado_sat", ["TIMBRADO", "EN_PROCESO_CANCELACION"])
+    .limit(1)
+    .maybeSingle();
+  const c = data as {
+    id: string; uuid_fiscal: string | null; total_mxn: number; pac_proveedor: string | null; pac_referencia: string | null;
+    xml_storage_path: string | null; pdf_storage_path: string | null;
+  } | null;
+  if (!c) {
+    return json({
+      estado: "NO_ENCONTRADA",
+      campo: "rfc",
+      mensaje: "No encontramos una factura de este ticket con ese RFC. Tiene que ser el mismo con que la pediste.",
+    }, 404);
+  }
+
+  const pac = obtenerFacturama();
+
+  // Reenvío: lo manda Facturama con los adjuntos, igual que al timbrar.
+  if (p.email !== null) {
+    if (!pac || c.pac_proveedor !== "FACTURAMA" || !c.pac_referencia) {
+      return json({ estado: "ERROR", mensaje: "No pudimos enviar el correo. Descarga la factura en esta pantalla." }, 503);
+    }
+    const envio = await pac.enviarPorCorreo(c.pac_referencia, p.email);
+    if (!envio.ok) {
+      console.error(`[autofactura] reenvío de ${c.id} falló: ${envio.mensaje}`);
+      return json({ estado: "ERROR", mensaje: "No pudimos enviar el correo. Descarga la factura en esta pantalla." }, 502);
+    }
+    return json({ estado: "ENVIADA", correo: p.email });
+  }
+
+  // Descarga: primero lo archivado en el bucket; si falta, se repone desde el PAC.
+  const leer = async (ruta: string | null, formato: "xml" | "pdf"): Promise<string | null> => {
+    const guardada = partirRutaLogica(ruta);
+    if (guardada) {
+      const { data: blob } = await sb.storage.from(guardada.bucket).download(guardada.nombre);
+      if (blob) return bytesABase64(new Uint8Array(await blob.arrayBuffer()));
+    }
+    if (pac && c.pac_proveedor === "FACTURAMA" && c.pac_referencia) return await pac.descargar(c.pac_referencia, formato);
+    return null;
+  };
+  const [xml, pdf] = await Promise.all([leer(c.xml_storage_path, "xml"), leer(c.pdf_storage_path, "pdf")]);
+  if (!xml && !pdf) {
+    return json({ estado: "ERROR", mensaje: "La factura existe, pero no pudimos recuperar los archivos. Pídela en el negocio." }, 502);
+  }
+  return json({
+    estado: "TIMBRADO",
+    uuid: c.uuid_fiscal,
+    negocio: p.negocio,
+    total: Number(c.total_mxn),
+    correoEnviado: false,
+    correo: null,
+    xml,
+    pdf,
+  });
 }
