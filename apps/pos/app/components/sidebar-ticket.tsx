@@ -25,23 +25,6 @@ function IconoTicket() {
     </svg>
   );
 }
-function IconoDescuento() {
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      className="h-4 w-4"
-    >
-      <line x1="19" y1="5" x2="5" y2="19" />
-      <circle cx="6.5" cy="6.5" r="2.5" />
-      <circle cx="17.5" cy="17.5" r="2.5" />
-    </svg>
-  );
-}
 
 /* ── Botones del renglón ──────────────────────────────────────── */
 // 44px de alto: el mínimo táctil del doc de diseño. Eran de 36 y de 26 ("Nota", "Quitar"), y en
@@ -54,6 +37,11 @@ const BOTON_RENGLON =
 // 60px fijos, no un padding que cambia con la letra. Es el botón que cierra cada venta.
 const BOTON_PRINCIPAL =
   "flex h-[60px] w-full items-center justify-center gap-[10px] rounded-lg bg-accent px-5 font-display text-[19px] font-bold text-white shadow-[0_1px_3px_rgb(var(--accent)/0.3)] transition-[transform,background-color] duration-150 ease-vim hover:bg-accent-hover active:scale-[.98] disabled:cursor-not-allowed disabled:bg-line-strong disabled:shadow-none disabled:active:scale-100";
+// Fila secundaria (Precios, Descuento, En espera): tres en 256px útiles a 1024, así que sin icono.
+// `flex-auto` y no `flex-1`: cada botón parte del ancho de su palabra y se reparte el resto; a
+// tercios iguales "Descuento" no cabía y se cortaba a "Descuen…".
+const BOTON_SECUNDARIO =
+  "flex h-11 min-w-0 flex-auto items-center justify-center rounded-md border px-2 text-[14px] font-semibold transition-[transform,background-color,border-color,color] duration-150 ease-vim active:scale-[.98] disabled:cursor-default disabled:active:scale-100";
 // Botones del pie que no son Cobrar: mismo alto (44px), mismo peso.
 const BOTON_PIE =
   "flex h-11 w-full items-center justify-center gap-2 rounded-md border px-4 text-[14px] font-semibold transition-[transform,background-color,border-color,color] duration-150 ease-vim active:scale-[.98] disabled:cursor-default disabled:active:scale-100";
@@ -72,6 +60,8 @@ export function SidebarTicket({
   onNotaLinea,
   onNotaOrden,
   onCobrar,
+  onEfectivoExacto,
+  cambioAnterior = null,
   titulo,
   accionSecundaria,
   onEnviarCocina,
@@ -116,6 +106,11 @@ export function SidebarTicket({
   /** Edita la nota de cocina de TODA la orden. */
   onNotaOrden?: (nota: string | null) => void;
   onCobrar?: () => void;
+  /** Cobra el total en efectivo exacto, sin pasar por el selector ni el teclado. Mismo camino que
+   *  Cobrar (guarda el ticket y abre el cajón); solo se salta los pasos. */
+  onEfectivoExacto?: () => void;
+  /** Cambio de la venta anterior: se enseña mientras el ticket nuevo está vacío. */
+  cambioAnterior?: number | null;
   /** Sustituye el título de la cabecera. Sin esto: "Cuenta <folio>" o "Ticket nuevo". */
   titulo?: string;
   /** Botón extra bajo la acción principal del pie (p. ej. "Guardar sin mandar"). */
@@ -160,6 +155,9 @@ export function SidebarTicket({
    * pregunta cuánto cuesta algo en cualquiera de los cuatro modos.
    */
   const seCobraDespues = onEnviarCocinaAbierto != null;
+  // "En espera" vive en la fila secundaria solo en el pie de Cobrar; en el de mesa (Enviar a
+  // cocina) no existe, igual que antes.
+  const enEsperaEnFila = !seCobraDespues && !onEnviarCocina;
   // No depende de `bloqueado`: en cuenta de mesa los renglones que no han salido a cocina sí se
   // editan (0119). Quien pasa `onEditar` decide qué renglón se abre y avisa del que no.
   const editable = onEditar != null && !procesando;
@@ -217,6 +215,14 @@ export function SidebarTicket({
               {totalProductos} {totalProductos === 1 ? "producto" : "productos"}
             </span>
           </div>
+          {/* "Cobro completado" se cierra solo; si la cajera todavía está contando el dinero, aquí
+              sigue el número. Se va con el primer producto. */}
+          {vacio && cambioAnterior != null && cambioAnterior > 0 && (
+            <div className="mt-2 flex h-10 items-center justify-between gap-2 rounded-md bg-success-soft px-3 text-success" role="status">
+              <span className="text-[14px] font-semibold">Cambio anterior</span>
+              <span className="font-display text-[18px] font-bold tabular-nums">{fmtMxn(cambioAnterior)}</span>
+            </div>
+          )}
           {/* Sin handler no se pinta: un boton que no hace nada es peor que no tenerlo. */}
           {estado.modoServicio === "DELIVERY_PROPIO" && onEditarCliente && (
             <button
@@ -454,6 +460,8 @@ export function SidebarTicket({
       {/* Donde estaba "Nota": ese botón nació `disabled` con un "F5.2b — diferido" y nunca se
           implementó, mientras la nota de la orden SÍ funciona desde el encabezado del ticket
           ("+ Nota de la orden"). Ocupaba la mitad del renglón para no hacer nada. */}
+      {/* "En espera" subió aquí desde el pie: su lugar bajo Cobrar es ahora "Efectivo exacto", que se
+          usa en casi cada venta. Tres botones iguales; a 288px no cabe un icono más. */}
       <div className="flex flex-shrink-0 gap-1.5 px-4 pt-2.5">
         <InterruptorPrecios />
         {!seCobraDespues && (
@@ -461,15 +469,28 @@ export function SidebarTicket({
           type="button"
           disabled={vacio || hayDescuento || procesando || !onAplicarDescuento}
           onClick={() => onAplicarDescuento?.()}
-          className={`${BOTON_PIE} min-w-0 flex-1 border-line-strong bg-surface text-ink hover:border-ink disabled:opacity-[.45] disabled:hover:border-line-strong`}
+          className={[
+            BOTON_SECUNDARIO,
+            hayDescuento ? "border-success/40 bg-success-soft text-success disabled:opacity-100" : "border-line-strong bg-surface text-ink hover:border-ink disabled:opacity-[.45] disabled:hover:border-line-strong",
+          ].join(" ")}
         >
-          <IconoDescuento />
-          {hayDescuento ? "Descuento aplicado" : "Descuento"}
+          <span className="truncate">Descuento</span>
         </button>
+        )}
+        {enEsperaEnFila && (
+          <button
+            type="button"
+            disabled={vacio || procesando || !onPonerEnEspera}
+            onClick={onPonerEnEspera}
+            aria-label="Poner pedido en espera"
+            className={`${BOTON_SECUNDARIO} border-line-strong bg-surface text-ink hover:border-ink disabled:opacity-[.45] disabled:hover:border-line-strong`}
+          >
+            <span className="truncate">En espera</span>
+          </button>
         )}
       </div>
 
-      {/* ── Pie: Cobrar + En espera ───────────────────────────── */}
+      {/* ── Pie: Cobrar + Efectivo exacto ─────────────────────── */}
       {/* Pie compactado (mockup: pt-4 pb-5, Cobrar py-18px). "Cobrar" conserva un alto cómodo para
           usar con el dedo; lo que se recorta es el aire alrededor y los botones secundarios. */}
       <div className="flex flex-shrink-0 flex-col gap-1.5 px-4 pb-3 pt-2.5">
@@ -535,14 +556,16 @@ export function SidebarTicket({
             )}
           </button>
         ) : (
-          /* D45 §12 — guarda el pedido con etiqueta para retomarlo después */
+          /* Efectivo exacto: un toque en vez de cinco (Cobrar → Efectivo → Pago exacto → Cobrar).
+             Es el cobro más común de mostrador. Borde de tinta: es la segunda acción del pie, no
+             una más de las grises. */
           <button
             type="button"
-            disabled={vacio || procesando || !onPonerEnEspera}
-            onClick={onPonerEnEspera}
-            className={`${BOTON_PIE} border-line-strong bg-surface text-ink hover:border-ink disabled:opacity-[.45] disabled:hover:border-line-strong`}
+            disabled={vacio || procesando || !onEfectivoExacto}
+            onClick={() => onEfectivoExacto?.()}
+            className="flex h-12 w-full items-center justify-center rounded-lg border border-ink bg-surface text-[16px] font-bold text-ink transition-[transform,background-color] duration-150 ease-vim hover:bg-hover active:scale-[.98] disabled:cursor-default disabled:border-line-strong disabled:opacity-[.45] disabled:active:scale-100"
           >
-            Poner pedido en espera
+            Efectivo exacto
           </button>
         )}
         </>
@@ -573,20 +596,13 @@ function InterruptorPrecios() {
       // algo; el texto completo queda para lectores de pantalla.
       aria-label="Mostrar precios en el catálogo"
       onClick={() => setPreciosVisibles(!visibles)}
+      // Sin el interruptor dibujado: en un tercio de 288px no cabía junto a la palabra. Encendido se
+      // pinta como la categoría elegida (negro), que ya se lee como "activo" en esta pantalla.
       className={[
-        "inline-flex h-11 min-w-0 flex-1 items-center justify-center gap-[7px] rounded-md border px-3 text-[14px] font-semibold transition-[transform,background-color,border-color] duration-150 ease-vim active:scale-[.98]",
-        visibles ? "border-ink bg-sel text-ink" : "border-line-strong bg-surface text-ink hover:border-ink",
+        BOTON_SECUNDARIO,
+        visibles ? "border-ink bg-ink text-white" : "border-line-strong bg-surface text-ink hover:border-ink",
       ].join(" ")}
     >
-      <span
-        className={["relative h-[18px] w-[32px] flex-shrink-0 rounded-full transition-colors", visibles ? "bg-ink" : "bg-line-strong"].join(" ")}
-        aria-hidden="true"
-      >
-        <span
-          className="absolute left-[2px] top-[2px] h-[14px] w-[14px] rounded-full bg-white transition-transform duration-150 ease-out"
-          style={{ transform: visibles ? "translateX(14px)" : "translateX(0)" }}
-        />
-      </span>
       <span className="truncate">Precios</span>
     </button>
   );
