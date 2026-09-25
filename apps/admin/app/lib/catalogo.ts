@@ -120,6 +120,20 @@ export async function actualizarCategoria(id: string, input: CategoriaInput): Pr
   if (error) throw new Error(error.message);
 }
 
+/**
+ * Guarda el orden de las categorías tal como quedaron en la lista: 1, 2, 3… Solo escribe las que
+ * cambiaron. La caja las muestra en ese orden. Antes la pantalla decía "el orden define cómo
+ * aparecen en el POS" y no había forma de cambiarlo.
+ */
+export async function reordenarCategorias(lista: { id: string; orden_visualizacion: number }[]): Promise<void> {
+  for (let i = 0; i < lista.length; i++) {
+    const c = lista[i]!;
+    if (c.orden_visualizacion === i + 1) continue;
+    const { error } = await supabase.from("categorias").update({ orden_visualizacion: i + 1 }).eq("id", c.id);
+    if (error) throw new Error(error.message);
+  }
+}
+
 export async function toggleActiva(id: string, activa: boolean): Promise<void> {
   const { error } = await supabase.from("categorias").update({ activa }).eq("id", id);
   if (error) throw new Error(error.message);

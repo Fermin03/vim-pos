@@ -98,6 +98,7 @@ export default function ProductosPage() {
             <input
               value={query}
               onChange={(e) => setQuery(e.target.value)}
+              aria-label="Buscar producto"
               placeholder="Buscar producto…"
               className="h-10 w-full rounded border border-line-strong pl-[38px] pr-3 text-sm outline-none focus:border-ink"
             />
@@ -163,10 +164,11 @@ export default function ProductosPage() {
                         </span>
                       </td>
                       <td className="px-4 py-3.5 text-right" onClick={(e) => e.stopPropagation()}>
-                        <span className="inline-flex gap-1 transition-opacity lg:opacity-0 lg:group-hover:opacity-100">
+                        <span className="inline-flex gap-1">
                           <button
                             type="button"
                             title="Editar"
+                            aria-label={`Editar ${p.nombre}`}
                             onClick={() => router.push(editarHref)}
                             className="flex h-10 w-10 items-center justify-center rounded border border-transparent lg:h-8 lg:w-8 text-ink-3 transition hover:border-line-strong hover:bg-surface hover:text-ink"
                           >
@@ -175,6 +177,7 @@ export default function ProductosPage() {
                           <button
                             type="button"
                             title="Eliminar"
+                            aria-label={`Eliminar ${p.nombre}`}
                             onClick={() => setBorrar(p)}
                             className="flex h-10 w-10 items-center justify-center rounded border border-transparent lg:h-8 lg:w-8 text-ink-3 transition hover:border-[#E8C5C0] hover:text-danger"
                           >

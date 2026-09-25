@@ -25,13 +25,13 @@ export function ComboPreview({ comboId, base, refreshToken }: { comboId: string;
 
   if (error) {
     return (
-      <p className="mt-8 border-t border-line pt-6 text-sm font-medium text-danger" role="alert">
+      <p className="rounded-lg border border-line bg-surface p-4 text-sm font-medium text-danger" role="alert">
         {error}
       </p>
     );
   }
   if (slots === null) {
-    return <p className="mt-8 border-t border-line pt-6 text-sm text-ink-3">Calculando vista previa…</p>;
+    return <p className="rounded-lg border border-line bg-surface p-4 text-sm text-ink-2">Calculando el precio…</p>;
   }
 
   const { principales, deltas } = vistaPrevia(base, slots);
@@ -42,41 +42,46 @@ export function ComboPreview({ comboId, base, refreshToken }: { comboId: string;
   const avisoPrimerSlot = !!primero && primero.modo_precio !== "SUMA_PRECIO_PRODUCTO";
 
   return (
-    <div className="mt-8 max-w-[640px] border-t border-line pt-6">
-      <h2 className="font-display text-base font-semibold">Vista previa de precio</h2>
-      <p className="mb-3 text-[12.5px] text-ink-3">Lo que realmente pagará el cliente, tal como lo calcula la caja.</p>
+    <div className="rounded-lg border border-line bg-surface p-4" aria-live="polite">
+      <h2 className="font-display text-base font-semibold">Cuánto va a pagar el cliente</h2>
+      <p className="mb-3 text-[13px] text-ink-2">Tal como lo calcula la caja. Se actualiza con cada cambio.</p>
 
       {avisoPrimerSlot && (
-        <p className="mb-3 rounded border border-info/40 bg-info-soft px-3 py-2 text-[12.5px] font-medium text-info">
-          El primer slot ({primero.nombre}) no suma el precio del producto: todas sus opciones costarán lo mismo dentro
-          del combo. Si el primer slot es la hamburguesa (o el producto principal), probablemente quieras &quot;Se suma
-          el precio del producto elegido&quot;.
+        <p className="mb-3 rounded border border-warning/30 bg-warning-soft px-3 py-2 text-[13px] font-medium text-warning">
+          El primer paso ({primero.nombre}) no cobra el producto elegido: todas sus opciones costarán lo mismo dentro
+          del combo. Si es la hamburguesa (o el producto principal), elige «Se cobra el precio del producto elegido».
         </p>
       )}
 
-      {slots.length === 0 && <p className="text-sm text-ink-3">Agrega slots para ver el precio.</p>}
+      {slots.length === 0 && <p className="text-sm text-ink-2">Agrega pasos para ver el precio.</p>}
 
+      {/* Un renglón por opción principal: en línea, con varias hamburguesas, era un párrafo. */}
       {principales.length > 0 && (
-        <p className="font-display text-[17px] font-semibold tabular-nums">
-          {principales.map((p, i) => (
-            <span key={p.nombre}>
-              {i > 0 && " · "}
-              Con {p.nombre} {precioMxn(p.precio)}
-            </span>
+        <ul className="flex flex-col gap-1">
+          {principales.map((p) => (
+            <li key={p.nombre} className="flex items-baseline justify-between gap-3 font-display text-[15px] tabular-nums">
+              <span className="font-sans text-[14px]">Con {p.nombre}</span>
+              <span className="font-semibold">{precioMxn(p.precio)}</span>
+            </li>
           ))}
-        </p>
+        </ul>
       )}
 
       {deltas.length > 0 && (
-        <p className="mt-1.5 font-display tabular-nums text-[13.5px] text-ink-2">
-          {deltas.map((d, i) => (
-            <span key={d.slot + d.nombre}>
-              {i > 0 && " · "}
-              {d.nombre} {d.delta > 0 ? "+" : ""}
-              {precioMxn(d.delta)}
-            </span>
-          ))}
-        </p>
+        <div className="mt-3 border-t border-line pt-3">
+          <p className="mb-1 text-[13px] font-medium text-ink-2">Cambios que cuestan distinto</p>
+          <ul className="flex flex-col gap-0.5 text-[13.5px] tabular-nums text-ink-2">
+            {deltas.map((d) => (
+              <li key={d.slot + d.nombre} className="flex justify-between gap-3">
+                <span>{d.nombre}</span>
+                <span>
+                  {d.delta > 0 ? "+" : ""}
+                  {precioMxn(d.delta)}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </div>
       )}
     </div>
   );

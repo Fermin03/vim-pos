@@ -4,6 +4,8 @@ import { useRouter } from "next/navigation";
 import { Button } from "@vim/ui/styles";
 import { CLAVE_SAT_COMBO, comboSchema, crearCombo } from "../lib/combos";
 import { listarCategoriasOpciones, type CategoriaOpcion } from "../lib/catalogo";
+import { limpiarPrecio } from "../lib/numeros";
+import { AYUDA_IVA, OPCIONES_IVA } from "./producto-form";
 import { mensajeError } from "../lib/errores";
 
 // Mismas clases que producto-form.tsx: misma app, mismo look.
@@ -53,7 +55,7 @@ export function ComboForm() {
     setGuardando(true);
     try {
       const id = await crearCombo(parsed.data);
-      // Después de crear, a agregarle slots: sin ellos la caja no puede venderlo.
+      // Después de crear, a agregarle pasos: sin ellos la caja no puede venderlo.
       router.replace(`/catalogo/combos/${id}`);
     } catch (e) {
       setError(mensajeError(e, "No se pudo guardar"));
@@ -102,7 +104,7 @@ export function ComboForm() {
               className={input}
               value={precio}
               inputMode="decimal"
-              onChange={(e) => setPrecio(e.target.value.replace(/[^0-9.]/g, ""))}
+              onChange={(e) => setPrecio(limpiarPrecio(e.target.value))}
               placeholder="0.00"
             />
             <p className="mt-1 text-[11.5px] text-ink-3">
@@ -148,10 +150,11 @@ export function ComboForm() {
                 Tasa de IVA
               </label>
               <select id="tasa-iva" className={input} value={tasaIva} onChange={(e) => setTasaIva(e.target.value)}>
-                <option value="16">16% · consumo en el lugar</option>
-                <option value="0">0% · alimentos para llevar</option>
-                <option value="8">8% · región fronteriza</option>
+                {OPCIONES_IVA.map((o) => (
+                  <option key={o.v} value={o.v}>{o.l}</option>
+                ))}
               </select>
+              <p className="mt-1 text-[12.5px] text-ink-2">{AYUDA_IVA}</p>
             </div>
           </div>
           <label className="mt-3 flex items-center gap-2.5">
@@ -175,9 +178,9 @@ export function ComboForm() {
         <div className="rounded-lg border border-line bg-surface p-4">
           <p className="text-sm font-medium">El combo se crea pausado</p>
           <p className="mt-1 text-[12.5px] text-ink-2">
-            Todavía no tiene slots, así que la caja no debe venderlo. En la siguiente pantalla le
-            agregas sus slots (qué hamburguesa, qué acompañamiento, qué bebida) y ahí mismo lo
-            publicas cambiando su estado a <b className="text-ink">Activo</b>.
+            Todavía no tiene pasos, así que la caja no debe venderlo. En la siguiente pantalla le
+            agregas sus pasos (qué hamburguesa, qué acompañamiento, qué bebida) y ahí mismo lo
+            publicas eligiendo <b className="text-ink">Se vende</b>.
           </p>
         </div>
 

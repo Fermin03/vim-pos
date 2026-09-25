@@ -1,7 +1,7 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
-import { Button } from "@vim/ui/styles";
+import { Button, useConfirmar } from "@vim/ui/styles";
 import {
   actualizarProducto,
   crearProducto,
@@ -14,32 +14,53 @@ import {
 } from "../lib/catalogo";
 import { listarAreasCocina, type AreaCocina } from "../lib/areas-cocina";
 import { mensajeError } from "../lib/errores";
+import { limpiarPrecio } from "../lib/numeros";
+import { Plegable } from "./plegable";
 
 const input =
   "h-11 w-full rounded border border-line-strong px-3 text-sm outline-none focus:border-ink focus:shadow-[0_0_0_3px_rgba(22,22,26,.06)]";
 const label = "mb-1.5 block text-[13px] font-medium text-ink-2";
+const ayuda = "mt-1 text-[12.5px] text-ink-2";
+
+/**
+ * Las tasas de IVA como las diría el contador. Antes la opción decía "0% · alimentos para
+ * llevar" y la ayuda de abajo "la tasa 0 solo aplica a alimentos no preparados": se
+ * contradecían, y la correcta es la segunda (la comida preparada paga 16 % también para
+ * llevar o a domicilio).
+ */
+export const OPCIONES_IVA = [
+  { v: "16", l: "16% · comida y bebida preparadas" },
+  { v: "0", l: "0% · productos sin preparar" },
+  { v: "8", l: "8% · región fronteriza" },
+];
+export const AYUDA_IVA = "La comida preparada paga 16 % aunque sea para llevar o a domicilio. Ante la duda, pregúntale a tu contador.";
 
 export function ProductoForm({
   producto,
   alGuardar,
   guardarTambien,
+  extra,
+  volverA = "/catalogo/productos",
 }: {
   producto: Producto | null;
   /**
-   * Qué hacer al guardar, en vez de salir a la lista de productos. Por defecto (sin este prop)
-   * el comportamiento es el de siempre — el editor de producto normal no cambia. El editor de
-   * combos lo usa para quedarse en la pantalla de slots y recargar el producto en vez de navegar.
+   * Qué hacer al guardar, en vez de salir a la lista de productos. El editor de combos lo usa
+   * para quedarse en la pantalla de pasos y recargar el producto.
    */
   alGuardar?: () => void;
   /**
    * Lo que la pantalla tenga pendiente de guardar además del producto (hoy: los modificadores
-   * marcados abajo). Se espera ANTES de salir. Sin esto, "Guardar cambios" navegaba a la lista y
-   * los modificadores recién marcados se perdían sin aviso (revisión de diseño, sep 2026).
+   * marcados). Se espera ANTES de salir: sin esto se perdían sin aviso.
    */
   guardarTambien?: () => Promise<void>;
+  /** Contenido que va dentro del formulario, antes del botón de guardar (los modificadores). */
+  extra?: ReactNode;
+  /** A dónde lleva "Cancelar" (antes, dentro de un combo, mandaba a Productos). */
+  volverA?: string;
 }) {
   const router = useRouter();
   const editar = !!producto;
+  const [confirmar, dialogoConfirmar] = useConfirmar();
 
   const [cats, setCats] = useState<CategoriaOpcion[]>([]);
   const [marcas, setMarcas] = useState<MarcaOpcion[]>([]);
@@ -51,9 +72,7 @@ export function ProductoForm({
   const [precio, setPrecio] = useState(producto ? String(producto.precio_base_mxn) : "");
   const [descripcion, setDescripcion] = useState(producto?.descripcion ?? "");
   const [codigo, setCodigo] = useState(producto?.codigo_interno ?? "");
-  const [estado, setEstado] = useState<"ACTIVO" | "PAUSADO">(
-    producto?.estado === "PAUSADO" ? "PAUSADO" : "ACTIVO",
-  );
+  const [estado, setEstado] = useState<"ACTIVO" | "PAUSADO">(producto?.estado === "PAUSADO" ? "PAUSADO" : "ACTIVO");
   const [agotado, setAgotado] = useState(producto?.estado === "AGOTADO" || (producto?.agotado_manual ?? false));
   const [visible, setVisible] = useState(producto?.visible_en_pos ?? true);
   const [claveSat, setClaveSat] = useState(producto?.clave_sat ?? "");
@@ -61,6 +80,17 @@ export function ProductoForm({
   const [ivaIncluido, setIvaIncluido] = useState(producto?.iva_incluido_en_precio ?? true);
   const [error, setError] = useState<string | null>(null);
   const [guardando, setGuardando] = useState(false);
+
+  // ¿Hay cambios sin guardar? Se compara contra lo que había al abrir (o al último guardado).
+  const valores = JSON.stringify([nombre, categoriaId, marcaId, areaId, precio, descripcion, codigo, estado, agotado, visible, claveSat, tasaIva, ivaIncluido]);
+  const guardado = useRef(valores);
+  const sucio = valores !== guardado.current;
+  useEffect(() => {
+    if (!sucio) return;
+    const avisar = (e: BeforeUnloadEvent) => e.preventDefault();
+    window.addEventListener("beforeunload", avisar);
+    return () => window.removeEventListener("beforeunload", avisar);
+  }, [sucio]);
 
   useEffect(() => {
     listarCategoriasOpciones()
@@ -73,7 +103,8 @@ export function ProductoForm({
     listarAreasCocina().then((a) => setAreas(a.filter((x) => x.activa))).catch(() => setAreas([]));
   }, []);
 
-  async function guardar() {
+  async function guardar(e?: FormEvent) {
+    e?.preventDefault();
     setError(null);
     const parsed = productoSchema.safeParse({
       nombre,
@@ -91,7 +122,7 @@ export function ProductoForm({
       iva_incluido_en_precio: ivaIncluido,
     });
     if (!parsed.success) {
-      setError(parsed.error.issues[0]?.message ?? "Datos inválidos");
+      setError(parsed.error.issues[0]?.message ?? "Revisa los datos del producto.");
       return;
     }
     setGuardando(true);
@@ -99,49 +130,78 @@ export function ProductoForm({
       if (editar) await actualizarProducto(producto!.id, parsed.data);
       else await crearProducto(parsed.data);
       if (guardarTambien) await guardarTambien();
+      guardado.current = valores;
       if (alGuardar) {
-        // A diferencia del comportamiento por defecto, aquí no se navega: el componente sigue
-        // montado, así que el botón debe volver a habilitarse.
+        // Aquí no se navega: el componente sigue montado, así que el botón vuelve a habilitarse.
         setGuardando(false);
         alGuardar();
       } else {
-        router.push("/catalogo/productos");
+        router.push(volverA);
       }
-    } catch (e) {
-      setError(mensajeError(e, "No se pudo guardar"));
+    } catch (err) {
+      setError(mensajeError(err, "No se pudo guardar"));
       setGuardando(false);
     }
   }
 
+  async function volver() {
+    if (
+      sucio &&
+      !(await confirmar({ titulo: "¿Salir sin guardar?", mensaje: "Los cambios que hiciste en este producto se van a perder.", boton: "Salir sin guardar" }))
+    )
+      return;
+    router.push(volverA);
+  }
+
+  const masDatos = [descripcion && "descripción", codigo && "código", marcaId && "marca", areaId && "estación"].filter(Boolean) as string[];
+  const tasa = OPCIONES_IVA.find((o) => o.v === tasaIva)?.v ?? tasaIva;
+  const fiscalDistinto = !!claveSat || tasaIva !== "16" || !ivaIncluido;
+
   return (
-    <div className="max-w-[640px]">
+    <form onSubmit={guardar} noValidate className="max-w-[640px]">
       <div className="flex flex-col gap-5">
+        {/* Lo esencial primero: con esto la caja ya puede venderlo. */}
         <div>
           <label className={label} htmlFor="nombre">
-            Nombre del producto
+            Nombre
           </label>
           <input
             id="nombre"
             className={input}
             value={nombre}
             maxLength={200}
-            autoFocus
+            autoFocus={!editar}
             onChange={(e) => setNombre(e.target.value)}
-            placeholder="Ej. Hamburguesa Clásica"
+            placeholder={producto?.es_combo ? "Ej. Combo Clásico" : "Ej. Hamburguesa Clásica"}
           />
         </div>
 
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <div>
+            <label className={label} htmlFor="precio">
+              Precio
+            </label>
+            <div className="relative">
+              <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-ink-2" aria-hidden="true">$</span>
+              <input
+                id="precio"
+                className={`${input} pl-7 tabular-nums`}
+                value={precio}
+                inputMode="decimal"
+                onChange={(e) => setPrecio(limpiarPrecio(e.target.value))}
+                placeholder="0.00"
+                aria-describedby="precio-ayuda"
+              />
+            </div>
+            <p id="precio-ayuda" className={ayuda}>
+              {ivaIncluido ? `Con IVA de ${tasa}% incluido.` : `Al cobrar se le suma ${tasa}% de IVA.`}
+            </p>
+          </div>
+          <div>
             <label className={label} htmlFor="categoria">
               Categoría
             </label>
-            <select
-              id="categoria"
-              className={input}
-              value={categoriaId}
-              onChange={(e) => setCategoriaId(e.target.value)}
-            >
+            <select id="categoria" className={input} value={categoriaId} onChange={(e) => setCategoriaId(e.target.value)}>
               <option value="">Elige una categoría…</option>
               {cats.map((c) => (
                 <option key={c.id} value={c.id}>
@@ -150,117 +210,119 @@ export function ProductoForm({
               ))}
             </select>
           </div>
-          <div>
-            <label className={label} htmlFor="precio">
-              Precio base (MXN)
-            </label>
-            <input
-              id="precio"
-              className={input}
-              value={precio}
-              inputMode="decimal"
-              onChange={(e) => setPrecio(e.target.value.replace(/[^0-9.]/g, ""))}
-              placeholder="0.00"
-            />
-            <p className="mt-1 text-[11.5px] text-ink-3">
-              {ivaIncluido ? `IVA ${tasaIva}% incluido en el precio.` : `Se le suma ${tasaIva}% de IVA al cobrar.`}
-            </p>
-          </div>
         </div>
 
-        <div>
-          <label className={label} htmlFor="desc">
-            Descripción <span className="text-ink-3">· opcional</span>
-          </label>
-          <textarea
-            id="desc"
-            className="min-h-[72px] w-full rounded border border-line-strong px-3 py-2.5 text-sm outline-none focus:border-ink focus:shadow-[0_0_0_3px_rgba(22,22,26,.06)]"
-            value={descripcion}
-            maxLength={500}
-            onChange={(e) => setDescripcion(e.target.value)}
-            placeholder="Breve descripción que verá el cliente"
-          />
-        </div>
-
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <div>
-            <label className={label} htmlFor="codigo">
-              Código interno <span className="text-ink-3">· opcional</span>
-            </label>
-            <input
-              id="codigo"
-              className={input}
-              value={codigo}
-              maxLength={50}
-              onChange={(e) => setCodigo(e.target.value)}
-              placeholder="Ej. HAM-001"
-            />
-          </div>
+        <fieldset className="flex flex-col gap-3 rounded-lg border border-line bg-surface p-4">
+          <legend className="sr-only">Disponibilidad</legend>
           <div>
             <label className={label} htmlFor="estado">
-              Estado
+              En la caja
             </label>
             <select
               id="estado"
               className={input}
-              value={estado}
-              disabled={agotado}
-              onChange={(e) => setEstado(e.target.value as "ACTIVO" | "PAUSADO")}
+              value={agotado ? "AGOTADO" : estado}
+              onChange={(e) => {
+                const v = e.target.value;
+                setAgotado(v === "AGOTADO");
+                if (v !== "AGOTADO") setEstado(v as "ACTIVO" | "PAUSADO");
+              }}
             >
-              <option value="ACTIVO">Activo · visible y vendible</option>
-              <option value="PAUSADO">Pausado · oculto del POS</option>
+              <option value="ACTIVO">Se vende</option>
+              <option value="AGOTADO">Agotado · se ve en gris y no se puede vender</option>
+              <option value="PAUSADO">Pausado · no aparece</option>
             </select>
           </div>
-        </div>
+          <label className="flex min-h-[44px] items-center gap-2.5">
+            <input type="checkbox" className="h-5 w-5 accent-ink" checked={!visible} onChange={(e) => setVisible(!e.target.checked)} />
+            <span className="text-sm">
+              <span className="font-medium">Producto interno</span> <span className="text-ink-2">· no se muestra en la caja</span>
+            </span>
+          </label>
+        </fieldset>
 
-        {marcas.length > 0 && (
+        <Plegable titulo="Más datos" resumen={masDatos.length ? masDatos.join(", ") : "descripción, código, estación"} abierto={masDatos.length > 0 && !editar}>
           <div>
-            <label className={label} htmlFor="marca">
-              Marca virtual <span className="text-ink-3">· opcional</span>
+            <label className={label} htmlFor="desc">
+              Descripción
             </label>
-            <select id="marca" className={input} value={marcaId} onChange={(e) => setMarcaId(e.target.value)}>
-              <option value="">Sin marca</option>
-              {marcas.map((m) => (
-                <option key={m.id} value={m.id}>
-                  {m.nombre}
-                </option>
-              ))}
-            </select>
-            <p className="mt-1 text-[11.5px] text-ink-3">Para operar varios conceptos desde el mismo local.</p>
+            <textarea
+              id="desc"
+              className="min-h-[72px] w-full rounded border border-line-strong px-3 py-2.5 text-sm outline-none focus:border-ink focus:shadow-[0_0_0_3px_rgba(22,22,26,.06)]"
+              value={descripcion}
+              maxLength={500}
+              onChange={(e) => setDescripcion(e.target.value)}
+              placeholder="Lo que verá el cliente"
+            />
           </div>
-        )}
-
-        {/* Un combo no tiene estación propia: la comanda la generan los productos que el
-            cliente elige dentro de cada slot, cada uno con la suya. */}
-        {areas.length > 0 && !producto?.es_combo && (
           <div>
-            <label className={label} htmlFor="area">
-              Estación de preparación <span className="text-ink-3">· opcional</span>
+            <label className={label} htmlFor="codigo">
+              Código interno
             </label>
-            <select id="area" className={input} value={areaId} onChange={(e) => setAreaId(e.target.value)}>
-              <option value="">La de su categoría</option>
-              {areas.map((a) => (
-                <option key={a.id} value={a.id}>
-                  {a.nombre}
-                </option>
-              ))}
-            </select>
-            <p className="mt-1 text-[11.5px] text-ink-3">
-              Dónde se imprime su comanda. Normalmente se deja heredada de la categoría; esto es
-              para la excepción — una limonada preparada en cocina dentro de Bebidas, por ejemplo.
-            </p>
+            <input id="codigo" className={input} value={codigo} maxLength={50} onChange={(e) => setCodigo(e.target.value)} placeholder="Ej. HAM-001" />
           </div>
-        )}
+          {marcas.length > 0 && (
+            <div>
+              <label className={label} htmlFor="marca">
+                Marca virtual
+              </label>
+              <select id="marca" className={input} value={marcaId} onChange={(e) => setMarcaId(e.target.value)}>
+                <option value="">Sin marca</option>
+                {marcas.map((m) => (
+                  <option key={m.id} value={m.id}>
+                    {m.nombre}
+                  </option>
+                ))}
+              </select>
+              <p className={ayuda}>Para operar varios conceptos desde el mismo local.</p>
+            </div>
+          )}
+          {/* Un combo no tiene estación propia: la comanda la generan los productos que el
+              cliente elige en cada paso, cada uno con la suya. */}
+          {areas.length > 0 && !producto?.es_combo && (
+            <div>
+              <label className={label} htmlFor="area">
+                Estación de preparación
+              </label>
+              <select id="area" className={input} value={areaId} onChange={(e) => setAreaId(e.target.value)}>
+                <option value="">La de su categoría</option>
+                {areas.map((a) => (
+                  <option key={a.id} value={a.id}>
+                    {a.nombre}
+                  </option>
+                ))}
+              </select>
+              <p className={ayuda}>
+                Dónde se imprime su comanda. Casi siempre se deja la de su categoría; esto es para la
+                excepción, como una limonada que se prepara en cocina.
+              </p>
+            </div>
+          )}
+        </Plegable>
 
-        {/* Datos fiscales (P-131). Alimentan el CFDI: hasta que esto se pudo capturar, cada factura
-            declaraba la clave genérica del giro y 16 % de IVA sobre todo, incluida la comida para
-            llevar, que va a tasa 0. */}
-        <div className="rounded-lg border border-line bg-surface p-4">
-          <p className="mb-3 text-[13px] font-medium text-ink-2">Datos fiscales</p>
+        {/* Datos fiscales: alimentan el CFDI. Cerrados salvo que ya tengan algo distinto de lo
+            normal (clave propia, otra tasa o IVA por fuera). */}
+        <Plegable
+          titulo="Datos fiscales"
+          resumen={`IVA ${tasaIva}% ${ivaIncluido ? "incluido" : "aparte"}${claveSat ? ` · clave ${claveSat}` : ""}`}
+          abierto={fiscalDistinto && !editar}
+        >
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div>
+              <label className={label} htmlFor="tasa-iva">
+                Tasa de IVA
+              </label>
+              <select id="tasa-iva" className={input} value={tasaIva} onChange={(e) => setTasaIva(e.target.value)}>
+                {OPCIONES_IVA.map((o) => (
+                  <option key={o.v} value={o.v}>
+                    {o.l}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
               <label className={label} htmlFor="clave-sat">
-                Clave de producto SAT <span className="text-ink-3">· opcional</span>
+                Clave de producto SAT <span className="font-normal text-ink-2">· opcional</span>
               </label>
               <input
                 id="clave-sat"
@@ -271,59 +333,20 @@ export function ProductoForm({
                 onChange={(e) => setClaveSat(e.target.value.replace(/\D/g, ""))}
                 placeholder="90101500"
               />
-              <p className="mt-1 text-[11.5px] text-ink-3">
-                Si la dejas vacía se factura como servicio de restaurante. Cámbiala si tu contador lo indica.
-              </p>
-            </div>
-            <div>
-              <label className={label} htmlFor="tasa-iva">
-                Tasa de IVA
-              </label>
-              <select id="tasa-iva" className={input} value={tasaIva} onChange={(e) => setTasaIva(e.target.value)}>
-                <option value="16">16% · consumo en el lugar</option>
-                <option value="0">0% · alimentos para llevar</option>
-                <option value="8">8% · región fronteriza</option>
-              </select>
-              <p className="mt-1 text-[11.5px] text-ink-3">
-                Ante la duda, 16%. La tasa 0 solo aplica a alimentos no preparados.
-              </p>
             </div>
           </div>
-          <label className="mt-3 flex items-center gap-2.5">
-            <input
-              type="checkbox"
-              className="h-4 w-4 accent-ink"
-              checked={ivaIncluido}
-              onChange={(e) => setIvaIncluido(e.target.checked)}
-            />
+          <p className="-mt-1 text-[12.5px] text-ink-2">
+            {AYUDA_IVA} Sin clave, se factura como servicio de restaurante.
+          </p>
+          <label className="flex min-h-[44px] items-center gap-2.5">
+            <input type="checkbox" className="h-5 w-5 accent-ink" checked={ivaIncluido} onChange={(e) => setIvaIncluido(e.target.checked)} />
             <span className="text-sm">
-              <span className="font-medium">IVA incluido en el precio</span>{" "}
-              <span className="text-ink-3">(como se acostumbra en restaurante)</span>
+              <span className="font-medium">El precio ya incluye el IVA</span> <span className="text-ink-2">· lo normal en restaurante</span>
             </span>
           </label>
-        </div>
+        </Plegable>
 
-        <div className="flex flex-col gap-2.5 rounded-lg border border-line bg-surface p-4">
-          <label className="flex items-center gap-2.5">
-            <input type="checkbox" className="h-4 w-4 accent-ink" checked={agotado} onChange={(e) => setAgotado(e.target.checked)} />
-            <span className="text-sm">
-              <span className="font-medium">Marcar como agotado</span>{" "}
-              <span className="text-ink-3">(visible en gris, no se puede agregar al ticket)</span>
-            </span>
-          </label>
-          <label className="flex items-center gap-2.5">
-            <input type="checkbox" className="h-4 w-4 accent-ink" checked={visible} onChange={(e) => setVisible(e.target.checked)} />
-            <span className="text-sm">
-              <span className="font-medium">Visible en el POS</span>{" "}
-              <span className="text-ink-3">(desmarca para productos internos)</span>
-            </span>
-          </label>
-        </div>
-
-        <p className="text-[12.5px] text-ink-3">
-          Imagen, precios por modo de servicio, grupos de modificadores y área de cocina se configuran
-          en sus módulos (rebanadas siguientes de F4).
-        </p>
+        {extra}
 
         {error && (
           <p className="text-sm font-medium text-danger" role="alert">
@@ -331,15 +354,18 @@ export function ProductoForm({
           </p>
         )}
 
-        <div className="flex items-center justify-end gap-2 border-t border-line pt-5">
-          <Button variant="ghost" onClick={() => router.push("/catalogo/productos")} disabled={guardando}>
-            Cancelar
+        {/* Barra fija abajo: en el celular, "Guardar" siempre a la mano sin bajar hasta el final. */}
+        <div className="sticky bottom-0 z-10 -mx-4 flex items-center justify-end gap-2 border-t border-line bg-bg/95 px-4 py-3 backdrop-blur-sm lg:mx-0 lg:px-0">
+          {sucio && !guardando && <span className="mr-auto text-[13px] text-ink-2" aria-live="polite">Cambios sin guardar</span>}
+          <Button variant="ghost" onClick={() => void volver()} disabled={guardando}>
+            {editar ? "Volver" : "Cancelar"}
           </Button>
-          <Button onClick={guardar} disabled={guardando}>
+          <Button type="submit" disabled={guardando}>
             {guardando ? "Guardando…" : editar ? "Guardar cambios" : "Crear producto"}
           </Button>
         </div>
       </div>
-    </div>
+      {dialogoConfirmar}
+    </form>
   );
 }

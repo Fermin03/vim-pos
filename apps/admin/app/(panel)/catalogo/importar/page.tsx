@@ -1,10 +1,11 @@
 "use client";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import Link from "next/link";
-import { Button } from "@vim/ui/styles";
+import { Button, botonClases } from "@vim/ui/styles";
 import { PageBody, PageHeader } from "../../../components/page-header";
 import { FORMATOS_ORIGEN, importarMenu, parsearConFormato, type FormatoOrigen, type ResultadoImport, type ResultadoParse } from "../../../lib/importar-menu";
 import { mensajeError } from "../../../lib/errores";
+import { textoDeArchivo } from "../../../lib/leer-archivo";
 
 const EJEMPLO = `Categoría,Producto,Precio,Descripción
 Hamburguesas,Clásica,120,Carne 150g con queso
@@ -22,14 +23,32 @@ export default function ImportarMenuPage() {
   const [resultado, setResultado] = useState<ResultadoImport | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [importando, setImportando] = useState(false);
+  const [archivo, setArchivo] = useState<string | null>(null);
+  const entradaArchivo = useRef<HTMLInputElement>(null);
 
-  function revisar() {
+  function revisar(t = texto) {
     setError(null);
     setResultado(null);
-    const r = parsearConFormato(texto, formato);
+    const r = parsearConFormato(t, formato);
     setParse(r);
     setFormatoUsado(r.formatoUsado);
     if (r.filas.length === 0) setError("No se detectaron productos. Revisa el formato u origen seleccionado.");
+  }
+
+  /** Subir el export del POS anterior: antes solo se podía pegar texto. */
+  async function subirArchivo(file: File | undefined) {
+    if (!file) return;
+    setError(null);
+    try {
+      const t = await textoDeArchivo(file);
+      setArchivo(file.name);
+      setTexto(t);
+      revisar(t);
+    } catch (e) {
+      setError(mensajeError(e, "No se pudo leer el archivo."));
+    } finally {
+      if (entradaArchivo.current) entradaArchivo.current.value = "";
+    }
   }
 
   async function importar() {
@@ -49,16 +68,32 @@ export default function ImportarMenuPage() {
     <>
       <PageHeader
         titulo="Importar menú"
-        subtitulo="Migra desde tu POS anterior (Square, Toast, Loyverse, Clip) pegando su export, o usa el formato simple de VIM."
+        subtitulo="Sube el archivo que exporta tu POS anterior (Square, Toast, Loyverse, Clip) o pega tu menú."
         migas={[{ label: "Catálogo", href: "/catalogo" }, { label: "Importar" }]}
       />
       <PageBody>
         {!resultado && (
           <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
             <div>
+              <div className="mb-4 flex flex-wrap items-center gap-3 rounded-lg border border-dashed border-line-strong bg-surface p-4">
+                <input
+                  ref={entradaArchivo}
+                  id="archivo"
+                  type="file"
+                  accept=".csv,.txt,.tsv,.xlsx,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                  className="sr-only"
+                  onChange={(e) => void subirArchivo(e.target.files?.[0])}
+                />
+                <label htmlFor="archivo" className={`${botonClases({ variant: "ghost" })} cursor-pointer`}>
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4" aria-hidden="true"><path d="M12 15V3M7 8l5-5 5 5M5 21h14" /></svg>
+                  Subir archivo
+                </label>
+                <span className="text-[13px] text-ink-2">{archivo ? `Leído: ${archivo}` : "Excel (.xlsx) o CSV"}</span>
+              </div>
+              {error && !parse && <p className="mb-3 text-sm font-medium text-danger" role="alert">{error}</p>}
               <div className="mb-2 flex flex-wrap items-center justify-between gap-x-3 gap-y-1.5">
-                <label className="text-[13px] font-medium text-ink-2" htmlFor="csv">Pega aquí tu menú</label>
-                <button type="button" className="text-[12px] font-semibold text-ink-3 hover:text-ink" onClick={() => { setTexto(EJEMPLO); setParse(null); }}>Usar ejemplo</button>
+                <label className="text-[13px] font-medium text-ink-2" htmlFor="csv">O pégalo aquí</label>
+                <button type="button" className="min-h-[40px] text-[13px] font-semibold text-ink-2 underline-offset-2 hover:text-ink hover:underline" onClick={() => { setTexto(EJEMPLO); setParse(null); setArchivo(null); }}>Usar ejemplo</button>
               </div>
               <textarea
                 id="csv"
@@ -67,7 +102,7 @@ export default function ImportarMenuPage() {
                 className="h-72 w-full rounded border border-line-strong p-3 font-mono text-[12.5px] outline-none focus:border-ink focus:shadow-[0_0_0_3px_rgba(22,22,26,.06)]"
                 placeholder={"Categoría,Producto,Precio,Descripción\nHamburguesas,Clásica,120,Con queso\n…"}
               />
-              <p className="mt-2 text-[12px] text-ink-3">
+              <p className="mt-2 text-[13px] text-ink-2">
                 Una fila por producto. Separadores: coma, punto y coma o tabulador. La primera fila puede ser encabezado.
                 Las categorías que no existan se crean solas.
               </p>
@@ -84,9 +119,10 @@ export default function ImportarMenuPage() {
                 </select>
               </div>
               <div className="mt-3 flex flex-wrap items-center gap-3">
-                <Button onClick={revisar} disabled={!texto.trim()}>Revisar</Button>
+                {/* Una vez revisado, el botón principal es "Importar": dos azules competían. */}
+                <Button variant={parse ? "ghost" : "primary"} onClick={() => revisar()} disabled={!texto.trim()}>Revisar</Button>
                 {parse && formatoUsado && (
-                  <span className="rounded-full bg-sel px-2.5 py-1 text-[11.5px] font-semibold text-ink-3">
+                  <span className="rounded-full bg-sel px-2.5 py-1 text-[12px] font-semibold text-ink-2">
                     Formato detectado: {formatoUsado}
                   </span>
                 )}
@@ -133,7 +169,7 @@ export default function ImportarMenuPage() {
                     </div>
                   )}
 
-                  {error && <p className="mt-3 text-sm font-medium text-danger">{error}</p>}
+                  {error && <p className="mt-3 text-sm font-medium text-danger" role="alert">{error}</p>}
 
                   <div className="mt-3">
                     <Button onClick={importar} disabled={importando || parse.filas.length === 0}>
@@ -142,7 +178,7 @@ export default function ImportarMenuPage() {
                   </div>
                 </>
               )}
-              {!parse && <p className="text-sm text-ink-3">Pega tu menú y presiona “Revisar” para ver la vista previa.</p>}
+              {!parse && <p className="text-sm text-ink-2">Sube el archivo o pega tu menú y presiona «Revisar» para ver cómo quedará.</p>}
             </div>
           </div>
         )}
@@ -166,8 +202,8 @@ export default function ImportarMenuPage() {
               </div>
             )}
             <div className="mt-5 flex gap-2">
-              <Link href="/catalogo/productos"><Button>Ver productos</Button></Link>
-              <Button variant="ghost" onClick={() => { setResultado(null); setParse(null); setTexto(""); }}>Importar más</Button>
+              <Link href="/catalogo/productos" className={botonClases()}>Ver productos</Link>
+              <Button variant="ghost" onClick={() => { setResultado(null); setParse(null); setTexto(""); setArchivo(null); }}>Importar más</Button>
             </div>
           </div>
         )}

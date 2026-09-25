@@ -221,7 +221,7 @@ export default function UsuariosPage() {
                     </td>
                     <td className="px-4 py-3.5 text-[13.5px] text-ink-3">{fechaCorta(u.fechaUltimoLoginPin)}</td>
                     <td className="px-4 py-3.5 text-right">
-                      <span className="inline-flex gap-1 transition-opacity lg:opacity-0 lg:group-hover:opacity-100">
+                      <span className="inline-flex gap-1">
                         <button
                           type="button"
                           title="Cambiar rol"

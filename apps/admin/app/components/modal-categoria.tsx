@@ -112,10 +112,10 @@ export function ModalCategoria({
           />
         </label>
 
-        <div className="flex gap-5">
-          <div className="flex flex-col gap-1.5">
+        <div className="flex flex-wrap gap-5">
+          <div className="flex min-w-0 flex-col gap-1.5">
             <span className="text-[13px] font-medium text-ink-2">Color</span>
-            <div className="flex gap-2">
+            <div className="flex flex-wrap gap-2">
               {COLORES.map((c) => (
                 <button
                   key={c.hex}

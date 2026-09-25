@@ -6,15 +6,17 @@ export const TIPO_SELECCION = {
   UNICA_OBLIGATORIA: "Elige una (obligatorio)",
   UNICA_OPCIONAL: "Elige una o ninguna",
   MULTIPLE_OPCIONAL: "Elige varias o ninguna",
-  MULTIPLE_OBLIGATORIA_RANGO: "Elige entre N y M",
+  MULTIPLE_OBLIGATORIA_RANGO: "Elige varias, con mínimo y máximo",
 } as const;
 export type TipoSeleccion = keyof typeof TIPO_SELECCION;
 
+// Cómo sale en la comanda. "Neutro (categórico)" no le decía nada al dueño; los valores de la
+// base no cambian (la cocina usa OMISION para destacar los "sin").
 export const NATURALEZA = {
-  EXTRA: "Extra (agrega ingredientes)",
-  OMISION: "Sin / Omisión",
-  PREPARACION: "Preparación (término, etc.)",
-  NEUTRO: "Neutro (categórico)",
+  EXTRA: "Extra · agrega algo",
+  OMISION: "Sin · quita un ingrediente",
+  PREPARACION: "Preparación · término, cocción",
+  NEUTRO: "Variante · sabor, tamaño, tipo",
 } as const;
 export type Naturaleza = keyof typeof NATURALEZA;
 

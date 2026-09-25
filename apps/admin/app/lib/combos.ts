@@ -3,9 +3,11 @@ import { z } from "zod";
 import { supabase, leerSesion } from "./supabase";
 import type { EstadoProducto } from "./catalogo";
 
+// Lo que lee el dueño; los valores (DELTA…) son los de la base. Antes decía "Solo el delta de
+// la opción": "delta" es jerga de quien lo programó.
 export const MODO_PRECIO = {
-  DELTA: "Solo el delta de la opción",
-  SUMA_PRECIO_PRODUCTO: "Se suma el precio del producto elegido",
+  DELTA: "Ya va incluido: solo se cobra lo que cueste de más",
+  SUMA_PRECIO_PRODUCTO: "Se cobra el precio del producto elegido",
 } as const;
 export type ModoPrecio = keyof typeof MODO_PRECIO;
 
@@ -111,7 +113,7 @@ export const slotSchema = z.object({
   // el grupo de modificadores obligatorio de cada opción elegida, así que una hamburguesa dentro de
   // un slot múltiple se iría a cocina sin término. `maximo_selecciones` es un campo expuesto —el
   // dueño podría crear uno mañana— así que se limita aquí hasta que la caja sepa atenderlo.
-  maximo_selecciones: z.number().int().min(1).max(1, "Por ahora cada slot deja elegir una sola opción"),
+  maximo_selecciones: z.number().int().min(1).max(1, "Por ahora cada paso deja elegir una sola opción"),
   modo_precio: z.enum(["DELTA", "SUMA_PRECIO_PRODUCTO"]),
   categoria_id: z.string().uuid().nullable(),
   activo: z.boolean(),
@@ -161,7 +163,7 @@ export async function eliminarSlot(id: string): Promise<void> {
 
 // ── Opciones ─────────────────────────────────────────────────────────────────
 export const opcionSchema = z.object({
-  precio_delta_mxn: z.number({ invalid_type_error: "Delta inválido" }),
+  precio_delta_mxn: z.number({ invalid_type_error: "Revisa cuánto cuesta de más" }),
   es_default: z.boolean(),
   activa: z.boolean(),
 });
