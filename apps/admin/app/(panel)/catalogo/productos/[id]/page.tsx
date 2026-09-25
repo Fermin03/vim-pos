@@ -35,17 +35,18 @@ export default function EditarProductoPage() {
           { label: "Productos", href: "/catalogo/productos" },
           { label: prod ? prod.nombre : "Editar" },
         ]}
-        right={prod ? <Link className="text-sm font-medium text-accent underline-offset-2 hover:underline" href={`/catalogo/recetas/${prod.id}`}>Receta y costo</Link> : undefined}
+        right={prod ? <Link className="text-sm font-semibold text-ink underline underline-offset-2" href={`/catalogo/recetas/${prod.id}`}>Receta y costo</Link> : undefined}
       />
       <CatalogoTabs />
       <PageBody>
-        {prod === undefined && <p className="text-sm text-ink-3">Cargando…</p>}
+        {prod === undefined && <p className="text-sm text-ink-2">Cargando…</p>}
         {prod === null && <p className="text-sm text-danger">Producto no encontrado.</p>}
         {prod && (
-          <>
-            <ProductoForm producto={prod} guardarTambien={guardarMods} />
-            <ProductoModificadores productoId={prod.id} onPendiente={registrarPendiente} />
-          </>
+          <ProductoForm
+            producto={prod}
+            guardarTambien={guardarMods}
+            extra={<ProductoModificadores productoId={prod.id} onPendiente={registrarPendiente} />}
+          />
         )}
       </PageBody>
     </>

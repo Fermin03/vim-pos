@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
-import { Button, Modal } from "@vim/ui/styles";
+import { Button, Modal, useConfirmar } from "@vim/ui/styles";
 import {
   actualizarOpcion,
   crearOpcion,
@@ -11,6 +11,7 @@ import {
   type Opcion,
 } from "../lib/modificadores";
 import { mensajeError } from "../lib/errores";
+import { limpiarPrecio } from "../lib/numeros";
 
 const input =
   "h-11 w-full rounded border border-line-strong px-3 text-sm outline-none focus:border-ink focus:shadow-[0_0_0_3px_rgba(22,22,26,.06)]";
@@ -61,12 +62,12 @@ function ModalOpcion({
         </div>
         <div>
           <label className="mb-1.5 block text-[13px] font-medium text-ink-2" htmlFor="op-precio">Precio extra (MXN)</label>
-          <input id="op-precio" className={input} value={precio} inputMode="decimal" onChange={(e) => setPrecio(e.target.value.replace(/[^0-9.-]/g, ""))} placeholder="0.00" />
-          <p className="mt-1 text-[11.5px] text-ink-3">0 = sin costo. Puede ser negativo (descuento).</p>
+          <input id="op-precio" className={input} value={precio} inputMode="decimal" onChange={(e) => setPrecio(limpiarPrecio(e.target.value, { negativo: true }))} placeholder="0.00" />
+          <p className="mt-1 text-[12.5px] text-ink-2">0 = sin costo. Con signo menos, descuenta (por ejemplo «sin queso» −5).</p>
         </div>
         <label className="flex items-center gap-2.5">
           <input type="checkbox" className="h-4 w-4 accent-ink" checked={esDefault} onChange={(e) => setEsDefault(e.target.checked)} />
-          <span className="text-sm"><span className="font-medium">Opción por defecto</span> <span className="text-ink-3">(pre-seleccionada)</span></span>
+          <span className="text-sm"><span className="font-medium">Ya elegida</span> <span className="text-ink-2">· la caja la marca sola; el cajero la puede cambiar</span></span>
         </label>
         <label className="flex items-center gap-2.5">
           <input type="checkbox" className="h-4 w-4 accent-ink" checked={activa} onChange={(e) => setActiva(e.target.checked)} />
@@ -86,6 +87,7 @@ export function OpcionesEditor({ grupoId }: { grupoId: string }) {
   const [opciones, setOpciones] = useState<Opcion[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [modal, setModal] = useState<{ opcion: Opcion | null } | null>(null);
+  const [confirmar, dialogoConfirmar] = useConfirmar();
 
   async function recargar() {
     setError(null);
@@ -100,6 +102,8 @@ export function OpcionesEditor({ grupoId }: { grupoId: string }) {
   }, [grupoId]);
 
   async function borrar(o: Opcion) {
+    // Borrar una opción no pedía confirmación.
+    if (!(await confirmar({ titulo: `¿Eliminar «${o.nombre}»?`, mensaje: "La caja deja de ofrecerla. Los tickets ya vendidos no cambian.", boton: "Eliminar" }))) return;
     try {
       await eliminarOpcion(o.id);
       await recargar();
@@ -113,7 +117,7 @@ export function OpcionesEditor({ grupoId }: { grupoId: string }) {
       <div className="mb-3 flex flex-wrap items-center justify-between gap-x-3 gap-y-2.5">
         <div>
           <h2 className="font-display text-base font-semibold">Opciones del grupo</h2>
-          <p className="text-[12.5px] text-ink-3">Lo que el cliente puede elegir dentro de este grupo.</p>
+          <p className="text-[13px] text-ink-2">Lo que el cliente puede elegir dentro de este grupo.</p>
         </div>
         <Button variant="ghost" onClick={() => setModal({ opcion: null })}>
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" className="h-[15px] w-[15px]"><path d="M12 5v14M5 12h14" /></svg>
@@ -136,15 +140,15 @@ export function OpcionesEditor({ grupoId }: { grupoId: string }) {
             <li key={o.id} className="group flex items-center gap-3 border-b border-line px-4 py-3 last:border-none hover:bg-hover">
               <div className="flex-1">
                 <span className="text-[14.5px] font-medium">{o.nombre}</span>
-                {o.es_default && <span className="ml-2 rounded-full bg-hover px-2 py-0.5 text-[11px] font-semibold text-ink-2">Por defecto</span>}
-                {!o.activa && <span className="ml-2 rounded-full bg-hover px-2 py-0.5 text-[11px] font-semibold text-ink-3">Inactiva</span>}
+                {o.es_default && <span className="ml-2 whitespace-nowrap rounded-full bg-hover px-2 py-0.5 text-[12px] font-semibold text-ink-2">Ya elegida</span>}
+                {!o.activa && <span className="ml-2 whitespace-nowrap rounded-full bg-hover px-2 py-0.5 text-[12px] font-semibold text-ink-2">Inactiva</span>}
               </div>
               <span className="text-[14px] font-semibold tabular-nums text-ink-2">{precioExtra(o.precio_extra_mxn)}</span>
-              <span className="flex gap-1 transition-opacity lg:opacity-0 lg:group-hover:opacity-100">
-                <button type="button" title="Editar" onClick={() => setModal({ opcion: o })} className="flex h-10 w-10 items-center justify-center rounded border border-transparent lg:h-8 lg:w-8 text-ink-3 transition hover:border-line-strong hover:bg-surface hover:text-ink">
+              <span className="flex gap-1">
+                <button type="button" title="Editar" aria-label={`Editar ${o.nombre}`} onClick={() => setModal({ opcion: o })} className="flex h-10 w-10 items-center justify-center rounded border border-transparent lg:h-8 lg:w-8 text-ink-3 transition hover:border-line-strong hover:bg-surface hover:text-ink">
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-[15px] w-[15px]"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" /><path d="M18.5 2.5a2.1 2.1 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" /></svg>
                 </button>
-                <button type="button" title="Eliminar" onClick={() => borrar(o)} className="flex h-10 w-10 items-center justify-center rounded border border-transparent lg:h-8 lg:w-8 text-ink-3 transition hover:border-[#E8C5C0] hover:text-danger">
+                <button type="button" title="Eliminar" aria-label={`Eliminar ${o.nombre}`} onClick={() => borrar(o)} className="flex h-10 w-10 items-center justify-center rounded border border-transparent lg:h-8 lg:w-8 text-ink-3 transition hover:border-[#E8C5C0] hover:text-danger">
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-[15px] w-[15px]"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" /></svg>
                 </button>
               </span>
@@ -153,6 +157,7 @@ export function OpcionesEditor({ grupoId }: { grupoId: string }) {
         </ul>
       )}
 
+      {dialogoConfirmar}
       {modal && (
         <ModalOpcion
           grupoId={grupoId}

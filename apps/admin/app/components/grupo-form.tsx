@@ -30,6 +30,7 @@ export function GrupoForm({ grupo }: { grupo: Grupo | null }) {
   const [activo, setActivo] = useState(grupo?.activo ?? true);
   const [error, setError] = useState<string | null>(null);
   const [guardando, setGuardando] = useState(false);
+  const [guardadoOk, setGuardadoOk] = useState(false);
 
   const esRango = tipo === "MULTIPLE_OBLIGATORIA_RANGO";
 
@@ -52,7 +53,10 @@ export function GrupoForm({ grupo }: { grupo: Grupo | null }) {
     try {
       if (editar) {
         await actualizarGrupo(grupo!.id, parsed.data);
-        router.push("/catalogo/modificadores");
+        // Se queda aquí: abajo están las opciones del grupo, que es lo que se viene a editar.
+        setGuardando(false);
+        setGuardadoOk(true);
+        setTimeout(() => setGuardadoOk(false), 3000);
       } else {
         const id = await crearGrupo(parsed.data);
         // Tras crear, ir a la edición para agregar opciones.
@@ -87,12 +91,13 @@ export function GrupoForm({ grupo }: { grupo: Grupo | null }) {
             </select>
           </div>
           <div>
-            <label className={label} htmlFor="nat">Naturaleza</label>
-            <select id="nat" className={input} value={naturaleza} onChange={(e) => setNaturaleza(e.target.value as Naturaleza)}>
+            <label className={label} htmlFor="nat">Qué es</label>
+            <select id="nat" className={input} value={naturaleza} aria-describedby="nat-ayuda" onChange={(e) => setNaturaleza(e.target.value as Naturaleza)}>
               {(Object.keys(NATURALEZA) as Naturaleza[]).map((n) => (
                 <option key={n} value={n}>{NATURALEZA[n]}</option>
               ))}
             </select>
+            <p id="nat-ayuda" className="mt-1 text-[12.5px] text-ink-2">Los «Sin» salen marcados aparte en la comanda para que cocina no los pase por alto.</p>
           </div>
         </div>
 
@@ -111,17 +116,18 @@ export function GrupoForm({ grupo }: { grupo: Grupo | null }) {
 
         <label className="flex items-center gap-2.5">
           <input type="checkbox" className="h-4 w-4 accent-ink" checked={activo} onChange={(e) => setActivo(e.target.checked)} />
-          <span className="text-sm"><span className="font-medium">Grupo activo</span> <span className="text-ink-3">(disponible para asignar a productos)</span></span>
+          <span className="text-sm"><span className="font-medium">Grupo activo</span> <span className="text-ink-2">· se puede asignar a productos</span></span>
         </label>
 
         {!editar && (
-          <p className="text-[12.5px] text-ink-3">Después de crear el grupo podrás agregarle sus opciones.</p>
+          <p className="text-[13px] text-ink-2">Después de crear el grupo le agregas sus opciones.</p>
         )}
 
         {error && <p className="text-sm font-medium text-danger" role="alert">{error}</p>}
 
         <div className="flex items-center justify-end gap-2 border-t border-line pt-5">
-          <Button variant="ghost" onClick={() => router.push("/catalogo/modificadores")} disabled={guardando}>Cancelar</Button>
+          {guardadoOk && <span className="mr-auto text-[13px] font-medium text-success" aria-live="polite">Guardado</span>}
+          <Button variant="ghost" onClick={() => router.push("/catalogo/modificadores")} disabled={guardando}>{editar ? "Volver" : "Cancelar"}</Button>
           <Button onClick={guardar} disabled={guardando}>
             {guardando ? "Guardando…" : editar ? "Guardar cambios" : "Crear grupo"}
           </Button>

@@ -32,18 +32,23 @@ export default function EditarComboPage() {
       />
       <CatalogoTabs />
       <PageBody>
-        {combo === undefined && <p className="text-sm text-ink-3">Cargando…</p>}
+        {combo === undefined && <p className="text-sm text-ink-2">Cargando…</p>}
         {combo === null && <p className="text-sm text-danger">Combo no encontrado.</p>}
         {combo && !combo.es_combo && <p className="text-sm text-danger">Este producto no es un combo.</p>}
         {combo && combo.es_combo && (
-          <>
-            {/* alGuardar: se queda en esta pantalla (es la de slots) en vez de navegar a
-                /catalogo/productos, y recarga el producto para que el nombre en la cabecera y el
-                precio base que alimenta la vista previa reflejen el cambio sin recargar a mano. */}
-            <ProductoForm producto={combo} alGuardar={cargar} />
-            <ComboSlotsEditor comboId={combo.id} onCambio={() => setRefreshToken((v) => v + 1)} />
-            <ComboPreview comboId={combo.id} base={combo.precio_base_mxn} refreshToken={refreshToken} />
-          </>
+          // El precio que pagará el cliente es lo esencial de esta pantalla: antes quedaba al
+          // fondo, debajo de todo. En lg va fijo a la derecha; en el celular, tras los pasos.
+          <div className="lg:grid lg:grid-cols-[minmax(0,1fr)_320px] lg:items-start lg:gap-8">
+            <div className="min-w-0">
+              {/* alGuardar: se queda en esta pantalla en vez de navegar, y recarga el producto
+                  para que el nombre y el precio base de la vista previa reflejen el cambio. */}
+              <ProductoForm producto={combo} alGuardar={cargar} volverA="/catalogo/combos" />
+              <ComboSlotsEditor comboId={combo.id} onCambio={() => setRefreshToken((v) => v + 1)} />
+            </div>
+            <aside className="mt-6 lg:sticky lg:top-0 lg:mt-0">
+              <ComboPreview comboId={combo.id} base={combo.precio_base_mxn} refreshToken={refreshToken} />
+            </aside>
+          </div>
         )}
       </PageBody>
     </>

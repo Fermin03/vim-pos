@@ -5,6 +5,7 @@ import { PageHeader, PageBody } from "../../../components/page-header";
 import { CatalogoTabs } from "../../../components/catalogo-tabs";
 import { ModalCategoria } from "../../../components/modal-categoria";
 import {
+  reordenarCategorias,
   ICONOS,
   bgDe,
   eliminarCategoria,
@@ -36,6 +37,29 @@ export default function CategoriasPage() {
   const [modal, setModal] = useState<{ cat: Categoria | null } | null>(null);
   const [borrar, setBorrar] = useState<Categoria | null>(null);
   const [borrando, setBorrando] = useState(false);
+
+  // Mover solo tiene sentido viendo la lista completa: con un filtro o una búsqueda, "subir"
+  // saltaría sobre categorías que no se ven.
+  const puedeOrdenar = filtro === "all" && query.trim() === "";
+  const [moviendo, setMoviendo] = useState(false);
+  async function mover(c: Categoria, dir: -1 | 1) {
+    if (!cats) return;
+    const i = cats.findIndex((x) => x.id === c.id);
+    const j = i + dir;
+    if (i < 0 || j < 0 || j >= cats.length) return;
+    const copia = [...cats];
+    [copia[i], copia[j]] = [copia[j]!, copia[i]!];
+    setCats(copia.map((x, k) => ({ ...x, orden_visualizacion: k + 1 }))); // respuesta inmediata
+    setMoviendo(true);
+    try {
+      await reordenarCategorias(copia);
+    } catch (e) {
+      setError(mensajeError(e, "No se pudo cambiar el orden"));
+    } finally {
+      setMoviendo(false);
+      await recargar();
+    }
+  }
 
   async function recargar() {
     setError(null);
@@ -78,7 +102,7 @@ export default function CategoriasPage() {
     <>
       <PageHeader
         titulo="Categorías"
-        subtitulo="Los grupos en los que se ordena tu menú. El orden define cómo aparecen en el POS."
+        subtitulo="Los grupos de tu menú. Con las flechas eliges en qué orden aparecen en la caja."
         migas={[{ label: "Catálogo" }, { label: "Categorías" }]}
         right={
           <Button onClick={() => setModal({ cat: null })}>
@@ -100,6 +124,7 @@ export default function CategoriasPage() {
             </svg>
             <input
               value={query}
+              aria-label="Buscar categoría"
               onChange={(e) => setQuery(e.target.value)}
               placeholder="Buscar categoría…"
               className="h-10 w-full rounded border border-line-strong pl-[38px] pr-3 text-sm outline-none focus:border-ink"
@@ -137,7 +162,7 @@ export default function CategoriasPage() {
                 <tr>
                   <th className="border-b border-line bg-sel px-4 py-[13px] text-left text-[11.5px] font-bold uppercase tracking-wide text-ink-3">Categoría</th>
                   <th className="w-[130px] border-b border-line bg-sel px-4 py-[13px] text-left text-[11.5px] font-bold uppercase tracking-wide text-ink-3">Productos</th>
-                  <th className="w-[90px] border-b border-line bg-sel px-4 py-[13px] text-center text-[11.5px] font-bold uppercase tracking-wide text-ink-3">Orden</th>
+                  <th className="w-[130px] border-b border-line bg-sel px-4 py-[13px] text-center text-[11.5px] font-bold uppercase tracking-wide text-ink-3">Orden</th>
                   <th className="w-[120px] border-b border-line bg-sel px-4 py-[13px] text-left text-[11.5px] font-bold uppercase tracking-wide text-ink-3">Estado</th>
                   <th className="w-[104px] border-b border-line bg-sel px-4 py-[13px]"></th>
                 </tr>
@@ -158,9 +183,29 @@ export default function CategoriasPage() {
                       <span className="font-display text-[15px] font-semibold tabular-nums">{c.nProductos}</span>{" "}
                       <span className="text-xs text-ink-3">productos</span>
                     </td>
-                    <td className="px-4 py-3.5 text-center">
-                      <span className="inline-flex h-6 min-w-[26px] items-center justify-center rounded border border-line bg-hover px-[7px] font-display text-[13px] font-semibold tabular-nums text-ink-2">
-                        {c.orden_visualizacion}
+                    <td className="px-2 py-3.5">
+                      <span className="flex items-center justify-center gap-0.5">
+                        <button
+                          type="button"
+                          aria-label={`Subir ${c.nombre}`}
+                          title={puedeOrdenar ? "Subir" : "Quita el filtro para ordenar"}
+                          disabled={!puedeOrdenar || moviendo || cats[0]?.id === c.id}
+                          onClick={() => void mover(c, -1)}
+                          className="flex h-10 w-10 items-center justify-center rounded text-ink-2 transition-colors hover:bg-hover hover:text-ink disabled:opacity-30 lg:h-8 lg:w-8"
+                        >
+                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-4 w-4" aria-hidden="true"><path d="M12 19V5M5 12l7-7 7 7" /></svg>
+                        </button>
+                        <span className="min-w-[22px] text-center font-display text-[13px] font-semibold tabular-nums text-ink-2">{c.orden_visualizacion}</span>
+                        <button
+                          type="button"
+                          aria-label={`Bajar ${c.nombre}`}
+                          title={puedeOrdenar ? "Bajar" : "Quita el filtro para ordenar"}
+                          disabled={!puedeOrdenar || moviendo || cats[cats.length - 1]?.id === c.id}
+                          onClick={() => void mover(c, 1)}
+                          className="flex h-10 w-10 items-center justify-center rounded text-ink-2 transition-colors hover:bg-hover hover:text-ink disabled:opacity-30 lg:h-8 lg:w-8"
+                        >
+                          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-4 w-4" aria-hidden="true"><path d="M12 5v14M5 12l7 7 7-7" /></svg>
+                        </button>
                       </span>
                     </td>
                     <td className="px-4 py-3.5">
@@ -175,10 +220,11 @@ export default function CategoriasPage() {
                       </span>
                     </td>
                     <td className="px-4 py-3.5 text-right">
-                      <span className="inline-flex gap-1 transition-opacity lg:opacity-0 lg:group-hover:opacity-100">
+                      <span className="inline-flex gap-1">
                         <button
                           type="button"
                           title="Editar"
+                          aria-label={`Editar ${c.nombre}`}
                           onClick={() => setModal({ cat: c })}
                           className="flex h-10 w-10 items-center justify-center rounded border border-transparent lg:h-8 lg:w-8 text-ink-3 transition hover:border-line-strong hover:bg-surface hover:text-ink"
                         >
@@ -187,6 +233,7 @@ export default function CategoriasPage() {
                         <button
                           type="button"
                           title="Eliminar"
+                          aria-label={`Eliminar ${c.nombre}`}
                           onClick={() => setBorrar(c)}
                           className="flex h-10 w-10 items-center justify-center rounded border border-transparent lg:h-8 lg:w-8 text-ink-3 transition hover:border-[#E8C5C0] hover:text-danger"
                         >
