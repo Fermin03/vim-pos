@@ -6,9 +6,9 @@ import { fmtMxn, leerVentasAppsExternas, rangoUltimosDias, type FilaAppExterna }
 import { mensajeError } from "../../../lib/errores";
 
 const ESTADO_BADGE: Record<string, { label: string; cls: string }> = {
-  CONCILIADO_OK: { label: "Conciliado", cls: "bg-[#EAF3EE] text-success" },
-  CONCILIADO_CON_DIFERENCIA: { label: "Con diferencia", cls: "bg-[#FBECEA] text-danger" },
-  EN_LIQUIDACION_SIN_MATCH: { label: "Sin match", cls: "bg-[#FDF3E7] text-[#B26A00]" },
+  CONCILIADO_OK: { label: "Conciliado", cls: "bg-success-soft text-success" },
+  CONCILIADO_CON_DIFERENCIA: { label: "Con diferencia", cls: "bg-danger-soft text-danger" },
+  EN_LIQUIDACION_SIN_MATCH: { label: "Sin match", cls: "bg-warning-soft text-[#B26A00]" },
   NO_LIQUIDADO_TODAVIA: { label: "Pendiente", cls: "bg-sel text-ink-2" },
 };
 

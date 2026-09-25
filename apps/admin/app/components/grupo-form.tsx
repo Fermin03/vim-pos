@@ -110,7 +110,7 @@ export function GrupoForm({ grupo }: { grupo: Grupo | null }) {
         )}
 
         <label className="flex items-center gap-2.5">
-          <input type="checkbox" className="h-4 w-4 accent-[#16161A]" checked={activo} onChange={(e) => setActivo(e.target.checked)} />
+          <input type="checkbox" className="h-4 w-4 accent-ink" checked={activo} onChange={(e) => setActivo(e.target.checked)} />
           <span className="text-sm"><span className="font-medium">Grupo activo</span> <span className="text-ink-3">(disponible para asignar a productos)</span></span>
         </label>
 

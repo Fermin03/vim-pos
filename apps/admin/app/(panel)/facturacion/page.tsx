@@ -16,13 +16,13 @@ import { leerCfdiEmisor } from "../../lib/configuracion";
 import { mensajeError } from "../../lib/errores";
 
 const ESTADO_CFDI_BADGE: Record<string, { label: string; cls: string }> = {
-  TIMBRADO: { label: "Facturado", cls: "bg-[#EAF3EE] text-success" },
+  TIMBRADO: { label: "Facturado", cls: "bg-success-soft text-success" },
   BORRADOR: { label: "Borrador", cls: "bg-sel text-ink-2" },
   EN_PROCESO_TIMBRADO: { label: "En proceso", cls: "bg-sel text-ink-2" },
-  ERROR_TIMBRADO: { label: "Error", cls: "bg-[#FBECEA] text-danger" },
+  ERROR_TIMBRADO: { label: "Error", cls: "bg-danger-soft text-danger" },
   CANCELADO: { label: "Cancelado", cls: "bg-sel text-ink-3" },
-  EN_PROCESO_CANCELACION: { label: "Cancelación en proceso", cls: "bg-[#FCF3E6] text-warning" },
-  CANCELACION_RECHAZADA: { label: "Cancelación rechazada", cls: "bg-[#FBECEA] text-danger" },
+  EN_PROCESO_CANCELACION: { label: "Cancelación en proceso", cls: "bg-warning-soft text-warning" },
+  CANCELACION_RECHAZADA: { label: "Cancelación rechazada", cls: "bg-danger-soft text-danger" },
 };
 
 /** Facturación — punto de entrada del flujo CFDI: ticket PAGADO → receptor → timbrar. */
@@ -140,8 +140,8 @@ export default function FacturacionPage() {
                       )}
                       <span className={[
                         "rounded px-2 py-0.5 text-[11.5px] font-medium",
-                        p.estado === "TIMBRADA" ? "bg-[#EAF3EE] text-success"
-                          : p.estado === "ERROR" ? "bg-[#FBECEA] text-danger"
+                        p.estado === "TIMBRADA" ? "bg-success-soft text-success"
+                          : p.estado === "ERROR" ? "bg-danger-soft text-danger"
                           : "bg-sel text-ink-2",
                       ].join(" ")}>
                         {p.estado === "TIMBRADA" ? "Timbrada"
@@ -302,7 +302,7 @@ function PanelFacturar({ ticket, onCerrar }: { ticket: TicketFacturable; onCerra
         </div>
 
         {resultado?.ok ? (
-          <div className="rounded-lg border border-success/40 bg-[#EAF3EE] p-5 text-center">
+          <div className="rounded-lg border border-success/40 bg-success-soft p-5 text-center">
             <div className="text-[15px] font-bold text-success">CFDI timbrado correctamente</div>
             <div className="mt-2 break-all font-mono text-[13px] text-ink-2">UUID: {resultado.uuidFiscal}</div>
             {resultado.serie && <div className="mt-1 text-[13px] text-ink-2">Serie {resultado.serie} · Folio {resultado.folioFiscal}</div>}
@@ -426,7 +426,7 @@ function PanelCancelar({ ticket, onCerrar }: { ticket: TicketFacturable; onCerra
               </div>
             )}
 
-            <p className="mt-4 rounded border border-[#F0DCC0] bg-[#FCF3E6] px-3 py-2 text-[12.5px] font-medium leading-relaxed text-warning">
+            <p className="mt-4 rounded border border-[#F0DCC0] bg-warning-soft px-3 py-2 text-[12.5px] font-medium leading-relaxed text-warning">
               Si tu cliente ya usó esta factura, el SAT puede pedirle que acepte la cancelación. En
               ese caso queda <b>en proceso</b> hasta que responda.
             </p>

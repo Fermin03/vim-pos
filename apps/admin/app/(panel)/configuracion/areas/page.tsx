@@ -118,7 +118,7 @@ export default function AreasPage() {
                     <td className="px-4 py-3 text-ink-2">{TIPOS_AREA.find((t) => t.v === a.tipo)?.l ?? "—"}</td>
                     <td className="hidden px-4 py-3 text-ink-3 lg:table-cell">{a.sucursalNombre || "—"}</td>
                     <td className="px-4 py-3">
-                      <span className={["inline-block rounded-full px-2 py-0.5 text-[12px] font-semibold", a.activa ? "bg-[#EAF3EE] text-success" : "bg-hover text-ink-3"].join(" ")}>
+                      <span className={["inline-block rounded-full px-2 py-0.5 text-[12px] font-semibold", a.activa ? "bg-success-soft text-success" : "bg-hover text-ink-3"].join(" ")}>
                         {a.activa ? "Activa" : "Inactiva"}
                       </span>
                     </td>

@@ -88,7 +88,7 @@ export function VincularDispositivo({
       </header>
 
       {motivo === "sesion-invalida" && (
-        <div className="flex w-full max-w-sm items-start gap-2.5 rounded border border-[#E8DCC0] bg-[#F6EEDD] px-3 py-2.5 text-[12.5px] text-ink-2" role="status">
+        <div className="flex w-full max-w-sm items-start gap-2.5 rounded border border-[#E8DCC0] bg-warning-soft px-3 py-2.5 text-[12.5px] text-ink-2" role="status">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="mt-px h-4 w-4 flex-shrink-0 text-warning"><circle cx="12" cy="12" r="9" /><path d="M12 8v4M12 16h.01" /></svg>
           <span>
             ¿No tienes la clave? Se genera de nuevo desde el panel: <b>Configuración → Cajas → Generar credenciales</b>.

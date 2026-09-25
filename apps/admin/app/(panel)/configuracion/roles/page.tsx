@@ -93,7 +93,7 @@ export default function RolesPermisosPage() {
           {matriz && (
             <>
               {/* ── D71: matriz restrictiva ── */}
-              <div className="mb-2 rounded-lg border border-[#E8DCC0] bg-[#F6EEDD] px-4 py-2.5 text-[12.5px] font-medium text-warning">
+              <div className="mb-2 rounded-lg border border-[#E8DCC0] bg-warning-soft px-4 py-2.5 text-[12.5px] font-medium text-warning">
                 Solo puedes <b>quitar</b> permisos (los roles del sistema no se amplían: esas reglas antifraude te protegen a ti).
               </div>
               <div className="overflow-x-auto rounded-lg border border-line bg-surface">
@@ -128,7 +128,7 @@ export default function RolesPermisosPage() {
                                     title={activo ? "Quitar este permiso en mi negocio" : "Restaurar el permiso del sistema"}
                                     className={[
                                       "inline-flex h-6 w-6 items-center justify-center rounded transition disabled:opacity-50",
-                                      activo ? "bg-[#EAF3EE] text-success hover:bg-[#d9eadf]" : "bg-[#FBF1EF] text-danger hover:bg-[#f3dcd7]",
+                                      activo ? "bg-success-soft text-success hover:bg-[#d9eadf]" : "bg-[#FBF1EF] text-danger hover:bg-[#f3dcd7]",
                                     ].join(" ")}
                                   >
                                     {activo ? "✓" : "✕"}

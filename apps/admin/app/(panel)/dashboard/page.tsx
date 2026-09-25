@@ -24,7 +24,7 @@ function Delta({ pct, comparativo, sobreOscuro }: { pct: number | null; comparat
   const sube = pct >= 0;
   const claseChip = sobreOscuro
     ? sube ? "bg-success/25 text-[#7FD1A3]" : "bg-danger/25 text-[#E8927F]"
-    : sube ? "bg-[#E8F1EC] text-success" : "bg-[#FBF1EF] text-danger";
+    : sube ? "bg-success-soft text-success" : "bg-[#FBF1EF] text-danger";
   return (
     <>
       <span className={`inline-flex items-center gap-[3px] rounded-full px-[7px] py-0.5 text-[12.5px] font-bold ${claseChip}`}>
@@ -227,7 +227,7 @@ export default function DashboardPage() {
         {error && <p className="mb-4 text-sm font-medium text-danger">{error}</p>}
 
         {mostrarOnboarding && onb && (
-          <Link href="/bienvenida" className="mb-6 flex items-center gap-4 rounded-lg border border-[#E8DCC0] bg-[#F6EEDD] p-4 transition hover:border-accent">
+          <Link href="/bienvenida" className="mb-6 flex items-center gap-4 rounded-lg border border-[#E8DCC0] bg-warning-soft p-4 transition hover:border-accent">
             <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-accent text-white">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" className="h-5 w-5"><path d="M5 12h14M13 5l7 7-7 7" /></svg>
             </div>
@@ -252,7 +252,7 @@ export default function DashboardPage() {
                 abrimos" o "la caja lleva días sin subir nada", y son cosas muy distintas: sin este
                 dato, la segunda pasa desapercibida hasta que las cuentas no cuadran. */}
             {ultimaVenta && ultimaVenta !== data?.dia && (
-              <p className="mt-3 rounded border border-[#F0DCC0] bg-[#FCF3E6] px-3 py-2 text-[13px] font-medium text-warning">
+              <p className="mt-3 rounded border border-[#F0DCC0] bg-warning-soft px-3 py-2 text-[13px] font-medium text-warning">
                 La última venta registrada es del {fmtDia(ultimaVenta)}. Si el negocio ha vendido
                 desde entonces, la caja no está enviando sus ventas.
               </p>

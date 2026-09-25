@@ -151,7 +151,7 @@ export function ModalCancelarTicket({
         </p>
       </div>
 
-      <div className="mb-4 rounded border border-[#E8DCC0] bg-[#F6EEDD] px-3 py-2 text-[12.5px] font-medium text-warning">
+      <div className="mb-4 rounded border border-[#E8DCC0] bg-warning-soft px-3 py-2 text-[12.5px] font-medium text-warning">
         {pagada
           ? <>Cancela el folio <b>pagado</b>: se registra una <b>devolución total</b> (el dinero se devuelve) y la cuenta queda cancelada. Es <b>irreversible</b>. El inventario regresa al stock.</>
           : <>Esta acción cancela el ticket completo. Es <b>irreversible</b>. El inventario regresa al stock.</>}
@@ -187,8 +187,8 @@ export function ModalCancelarTicket({
         className={[
           "mb-4 rounded border px-3 py-2 text-[12.5px] font-medium",
           tienePermisoRol
-            ? "border-[#D6E8DD] bg-[#EAF3EE] text-success"
-            : "border-[#E8DCC0] bg-[#F6EEDD] text-warning",
+            ? "border-[#D6E8DD] bg-success-soft text-success"
+            : "border-[#E8DCC0] bg-warning-soft text-warning",
         ].join(" ")}
       >
         {tienePermisoRol ? "Dentro de tu rol · no requiere autorización." : "Requiere PIN de un supervisor."}

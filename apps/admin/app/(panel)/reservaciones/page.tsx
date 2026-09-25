@@ -22,8 +22,8 @@ const input = "h-11 w-full rounded border border-line-strong px-3 text-sm outlin
 const label = "mb-1.5 block text-[13px] font-medium text-ink-2";
 
 const COLOR: Record<ReservacionEstado, string> = {
-  CONFIRMADA: "bg-[#EAF0F8] text-[#2C5AA0]", LLEGO: "bg-[#EAF3EE] text-success",
-  CANCELADA: "bg-[#F2F2F0] text-ink-3", NO_SHOW: "bg-[#FBECEA] text-danger", TERMINADA: "bg-[#F2F2F0] text-ink-3",
+  CONFIRMADA: "bg-[#EAF0F8] text-[#2C5AA0]", LLEGO: "bg-success-soft text-success",
+  CANCELADA: "bg-[#F2F2F0] text-ink-3", NO_SHOW: "bg-danger-soft text-danger", TERMINADA: "bg-[#F2F2F0] text-ink-3",
 };
 
 function hoyISO() {

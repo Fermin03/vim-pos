@@ -11,7 +11,7 @@ import { mensajeError } from "../../../lib/errores";
 // Mismo estilo que BADGE en catalogo/productos/page.tsx: un combo también puede quedar AGOTADO
 // (el formulario de producto lo permite), y sin esta entrada el fallback lo mostraba como "Pausado".
 const ESTADO: Record<string, { txt: string; cls: string; dot: string }> = {
-  ACTIVO: { txt: "Activo", cls: "bg-[#EAF3EE] text-success", dot: "bg-success" },
+  ACTIVO: { txt: "Activo", cls: "bg-success-soft text-success", dot: "bg-success" },
   PAUSADO: { txt: "Pausado", cls: "bg-hover text-ink-3", dot: "bg-ink-3" },
   AGOTADO: { txt: "Agotado", cls: "bg-[#FBF1EF] text-danger", dot: "bg-danger" },
 };

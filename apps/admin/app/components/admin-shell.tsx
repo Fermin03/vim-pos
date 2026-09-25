@@ -61,7 +61,7 @@ const NAV: Seccion[] = [
 function SinAcceso({ rol }: { rol: string }) {
   return (
     <main className="flex flex-1 flex-col items-center justify-center gap-3 px-6 py-16 text-center">
-      <div className="flex h-12 w-12 items-center justify-center rounded-full bg-[#F6EEDD] text-warning">
+      <div className="flex h-12 w-12 items-center justify-center rounded-full bg-warning-soft text-warning">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-6 w-6" aria-hidden="true">
           <rect x="4" y="11" width="16" height="9" rx="1.5" /><path d="M8 11V7a4 4 0 0 1 8 0v4" />
         </svg>
@@ -147,7 +147,7 @@ export function AdminShell({ children }: { children: ReactNode }) {
   if (listo && sinAcceso) {
     return (
       <main className="flex min-h-[100dvh] flex-col items-center justify-center gap-3 px-6 py-10 text-center">
-        <div className="flex h-12 w-12 items-center justify-center rounded-full bg-[#F6EEDD] text-warning">
+        <div className="flex h-12 w-12 items-center justify-center rounded-full bg-warning-soft text-warning">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-6 w-6"><circle cx="12" cy="12" r="9" /><path d="M12 8v4M12 16h.01" /></svg>
         </div>
         <h1 className="font-display text-[22px] font-semibold tracking-tight">Tu correo no tiene acceso todavía</h1>
@@ -186,7 +186,7 @@ export function AdminShell({ children }: { children: ReactNode }) {
   if (perfil && perfil.jerarquia < JERARQUIA_MINIMA_PANEL) {
     return (
       <main className="flex min-h-[100dvh] flex-col items-center justify-center gap-3 px-6 py-10 text-center">
-        <div className="flex h-12 w-12 items-center justify-center rounded-full bg-[#F6EEDD] text-warning">
+        <div className="flex h-12 w-12 items-center justify-center rounded-full bg-warning-soft text-warning">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-6 w-6" aria-hidden="true">
             <rect x="4" y="11" width="16" height="9" rx="1.5" /><path d="M8 11V7a4 4 0 0 1 8 0v4" />
           </svg>
@@ -351,7 +351,7 @@ export function AdminShell({ children }: { children: ReactNode }) {
               role="status"
               className={[
                 "flex-shrink-0 px-5 py-2.5 text-center text-[13px] font-semibold",
-                acceso.nivel === "bloqueado" ? "bg-[#FBECEA] text-danger" : "bg-[#F6EEDD] text-warning",
+                acceso.nivel === "bloqueado" ? "bg-danger-soft text-danger" : "bg-warning-soft text-warning",
               ].join(" ")}
             >
               {acceso.mensaje}

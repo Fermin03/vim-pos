@@ -116,7 +116,7 @@ export function ModalReabrirCuenta({
         <p className="mt-0.5 text-[13px] text-ink-3">{folio ? `${folio} · ` : ""}{fmtMxn(total)}</p>
       </div>
 
-      <div className="mb-4 rounded border border-[#E8DCC0] bg-[#F6EEDD] px-3 py-2 text-[12.5px] font-medium text-warning">
+      <div className="mb-4 rounded border border-[#E8DCC0] bg-warning-soft px-3 py-2 text-[12.5px] font-medium text-warning">
         La cuenta vuelve a <b>abierta</b> para editarla o volver a cobrarla. Se <b>anula el pago</b> registrado y el efectivo deja de contar en el corte hasta que se cobre de nuevo. El folio se conserva.
       </div>
 
@@ -126,7 +126,7 @@ export function ModalReabrirCuenta({
 
       <div className={[
         "mb-4 rounded border px-3 py-2 text-[12.5px] font-medium",
-        tienePermisoRol ? "border-[#D6E8DD] bg-[#EAF3EE] text-success" : "border-[#E8DCC0] bg-[#F6EEDD] text-warning",
+        tienePermisoRol ? "border-[#D6E8DD] bg-success-soft text-success" : "border-[#E8DCC0] bg-warning-soft text-warning",
       ].join(" ")}>
         {tienePermisoRol ? "Dentro de tu rol · no requiere autorización." : "Requiere PIN de un supervisor."}
       </div>

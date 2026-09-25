@@ -48,7 +48,7 @@ export default function CompraDetallePage() {
         {compra && (
           <div className="grid gap-5">
             {compra.estado === "ANULADA" && (
-              <p className="rounded border border-danger/30 bg-[#FBECEA] p-3 text-sm text-danger">Anulada. Motivo: {compra.motivoAnulacion ?? "—"}. Las existencias se regresaron; el costo promedio no se modificó.</p>
+              <p className="rounded border border-danger/30 bg-danger-soft p-3 text-sm text-danger">Anulada. Motivo: {compra.motivoAnulacion ?? "—"}. Las existencias se regresaron; el costo promedio no se modificó.</p>
             )}
             <dl className="grid grid-cols-2 gap-x-6 gap-y-2 text-sm md:grid-cols-4">
               <div><dt className="text-[11.5px] uppercase tracking-[0.04em] text-ink-3">Referencia</dt><dd>{compra.referencia ?? "—"}</dd></div>

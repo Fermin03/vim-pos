@@ -71,7 +71,7 @@ export default function SincronizacionPage() {
 
           {conflictos !== null && conflictos.length === 0 && (
             <div className="flex flex-col items-center justify-center gap-2 rounded-lg border border-line bg-surface py-16 text-center">
-              <div className="flex h-12 w-12 items-center justify-center rounded-full bg-[#EAF3EE] text-success">
+              <div className="flex h-12 w-12 items-center justify-center rounded-full bg-success-soft text-success">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="h-6 w-6"><path d="M20 6 9 17l-5-5" /></svg>
               </div>
               <p className="text-[15px] font-semibold">Todo sincronizado</p>
@@ -81,7 +81,7 @@ export default function SincronizacionPage() {
 
           {conflictos !== null && conflictos.length > 0 && (
             <>
-              <div className="mb-4 flex flex-wrap items-center justify-between gap-x-3 gap-y-2.5 rounded-lg border border-[#E8DCC0] bg-[#F6EEDD] px-4 py-3">
+              <div className="mb-4 flex flex-wrap items-center justify-between gap-x-3 gap-y-2.5 rounded-lg border border-[#E8DCC0] bg-warning-soft px-4 py-3">
                 <p className="text-[13px] font-medium text-warning">
                   {conflictos.length} conflicto{conflictos.length === 1 ? "" : "s"} por resolver · {elegidos} elegido{elegidos === 1 ? "" : "s"}
                 </p>

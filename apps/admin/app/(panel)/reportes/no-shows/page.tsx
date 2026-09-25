@@ -53,7 +53,7 @@ export default function NoShowsPage() {
                       <td className="px-4 py-2.5 text-right text-ink-2 tabular-nums">{f.canceladas}</td>
                       <td className="px-4 py-2.5 text-right font-semibold tabular-nums">{f.noShows}</td>
                       <td className="px-4 py-2.5 text-right">
-                        <span className={["rounded px-2 py-0.5 text-[11.5px] font-bold tabular-nums", f.tasaPct >= 20 ? "bg-[#FBECEA] text-danger" : f.tasaPct >= 10 ? "bg-[#FDF3E7] text-[#B26A00]" : "bg-sel text-ink-2"].join(" ")}>
+                        <span className={["rounded px-2 py-0.5 text-[11.5px] font-bold tabular-nums", f.tasaPct >= 20 ? "bg-danger-soft text-danger" : f.tasaPct >= 10 ? "bg-warning-soft text-[#B26A00]" : "bg-sel text-ink-2"].join(" ")}>
                           {f.tasaPct}%
                         </span>
                       </td>

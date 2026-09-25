@@ -11,7 +11,11 @@ export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
 
 const base =
   "inline-flex items-center justify-center gap-2 font-display font-semibold rounded " +
-  "transition-colors disabled:opacity-50 disabled:pointer-events-none " +
+  // Responde al presionar: scale .97 al instante (60 ms) y vuelve con la curva de la casa. Sin
+  // esto, en táctil un botón no daba ninguna señal de haber sido tocado — ni Cobrar.
+  "transition-[background-color,color,opacity,transform] duration-150 ease-vim " +
+  "active:scale-[.97] active:duration-[60ms] " +
+  "disabled:opacity-50 disabled:pointer-events-none " +
   "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink";
 
 const variants: Record<Variant, string> = {

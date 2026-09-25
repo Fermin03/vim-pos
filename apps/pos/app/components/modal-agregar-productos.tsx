@@ -194,7 +194,7 @@ export function ModalAgregarProductos({
       </div>
 
       {error && (
-        <p className="flex-shrink-0 bg-[#FBECEA] px-4 py-2 text-[13px] font-medium text-danger" role="alert">
+        <p className="flex-shrink-0 bg-danger-soft px-4 py-2 text-[13px] font-medium text-danger" role="alert">
           {error}
         </p>
       )}

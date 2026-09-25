@@ -43,9 +43,9 @@ function estadoDe(i: Insumo): EstadoStock {
 }
 
 const BADGE: Record<EstadoStock, { texto: string; clase: string }> = {
-  AGOTADO: { texto: "Agotado", clase: "bg-[#FBECEA] text-danger" },
+  AGOTADO: { texto: "Agotado", clase: "bg-danger-soft text-danger" },
   BAJO: { texto: "Stock bajo", clase: "bg-[#FDF3E2] text-warning" },
-  EN_NIVEL: { texto: "En nivel", clase: "bg-[#E8F1EC] text-success" },
+  EN_NIVEL: { texto: "En nivel", clase: "bg-success-soft text-success" },
 };
 
 function KpiInsumos({ label: etiqueta, valor, pie }: { label: string; valor: number; pie: string }) {
@@ -215,7 +215,7 @@ export default function InventarioPage() {
         {/* Sin unidades no se puede dar de alta nada, así que se dice arriba
             del todo y con qué hacer al respecto — no un botón gris y silencio. */}
         {unidades.length === 0 && (
-          <div role="status" className="mb-4 rounded-lg border border-[#F0DCC0] bg-[#FCF3E6] px-4 py-3">
+          <div role="status" className="mb-4 rounded-lg border border-[#F0DCC0] bg-warning-soft px-4 py-3">
             <p className="text-[13px] font-semibold text-warning">
               Tu negocio no tiene unidades de medida, y sin ellas no se puede crear un insumo.
             </p>

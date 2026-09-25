@@ -151,7 +151,7 @@ function ModalSlot({
           <p className={label}>Fuente de las opciones</p>
           <div className="flex flex-col gap-2.5">
             <label className="flex items-center gap-2.5">
-              <input type="radio" name="fuente" className="h-4 w-4 accent-[#16161A]" checked={fuente === "categoria"} onChange={() => setFuente("categoria")} />
+              <input type="radio" name="fuente" className="h-4 w-4 accent-ink" checked={fuente === "categoria"} onChange={() => setFuente("categoria")} />
               <span className="text-sm">Toda una categoría</span>
             </label>
             {fuente === "categoria" && (
@@ -165,14 +165,14 @@ function ModalSlot({
               </select>
             )}
             <label className="flex items-center gap-2.5">
-              <input type="radio" name="fuente" className="h-4 w-4 accent-[#16161A]" checked={fuente === "lista"} onChange={() => setFuente("lista")} />
+              <input type="radio" name="fuente" className="h-4 w-4 accent-ink" checked={fuente === "lista"} onChange={() => setFuente("lista")} />
               <span className="text-sm">Lista de productos elegidos a mano</span>
             </label>
           </div>
         </div>
         {editar && (
           <label className="flex items-center gap-2.5">
-            <input type="checkbox" className="h-4 w-4 accent-[#16161A]" checked={activo} onChange={(e) => setActivo(e.target.checked)} />
+            <input type="checkbox" className="h-4 w-4 accent-ink" checked={activo} onChange={(e) => setActivo(e.target.checked)} />
             <span className="text-sm">
               <span className="font-medium">Slot activo</span>
             </span>
@@ -255,7 +255,7 @@ function TablaOpciones({
               <input
                 type="radio"
                 name="default"
-                className="h-4 w-4 accent-[#16161A]"
+                className="h-4 w-4 accent-ink"
                 checked={f.esDefault}
                 disabled={guardando === f.productoId}
                 onChange={() => onElegirDefault(f.productoId)}
@@ -264,7 +264,7 @@ function TablaOpciones({
             <td className="px-3 py-2.5 text-center">
               <input
                 type="checkbox"
-                className="h-4 w-4 accent-[#16161A]"
+                className="h-4 w-4 accent-ink"
                 checked={f.activa}
                 disabled={guardando === f.productoId}
                 onChange={(e) => onToggleIncluido(f.productoId, e.target.checked)}

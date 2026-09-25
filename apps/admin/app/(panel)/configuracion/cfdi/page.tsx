@@ -183,7 +183,7 @@ export default function CfdiPage() {
                   ticket de ayer ya no se puede facturar hoy.
                 </p>
                 {periodicidad === "05" && (
-                  <p className="mt-2 rounded border border-[#F0DCC0] bg-[#FCF3E6] px-3 py-2 text-[12.5px] font-medium text-warning">
+                  <p className="mt-2 rounded border border-[#F0DCC0] bg-warning-soft px-3 py-2 text-[12.5px] font-medium text-warning">
                     El SAT solo admite periodicidad bimestral si tu régimen fiscal es <b>621
                     (Incorporación Fiscal)</b>. Con cualquier otro, el timbrado se rechaza.
                   </p>
@@ -235,7 +235,7 @@ export default function CfdiPage() {
                   </button>
                 </div>
               ) : (
-                <p className="mb-4 rounded border border-[#F0DCC0] bg-[#FCF3E6] px-3 py-2 text-[12.5px] font-medium text-warning">
+                <p className="mb-4 rounded border border-[#F0DCC0] bg-warning-soft px-3 py-2 text-[12.5px] font-medium text-warning">
                   Todavía no hay sello cargado. Sin él no se puede emitir ninguna factura.
                 </p>
               )}
@@ -289,7 +289,7 @@ export default function CfdiPage() {
                 </span>
               </label>
               {qrTicket && estado !== "ACTIVO" && (
-                <p className="mt-3 rounded border border-[#F0DCC0] bg-[#FCF3E6] px-3 py-2 text-[12.5px] font-medium text-warning">
+                <p className="mt-3 rounded border border-[#F0DCC0] bg-warning-soft px-3 py-2 text-[12.5px] font-medium text-warning">
                   El emisor no está en modo <b>Activo (producción)</b>, así que hoy no se pueden generar
                   CFDI válidos. El ticket ofrecerá una factura que el negocio todavía no puede emitir.
                 </p>

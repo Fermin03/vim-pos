@@ -23,8 +23,8 @@ const label = "mb-1.5 block text-[13px] font-medium text-ink-2";
 type FormDatos = { sucursal_id: string; numero: string; nombre: string; capacidad: string; forma: FormaMesa };
 
 const COLOR_ESTADO: Record<string, string> = {
-  LIBRE: "bg-[#EAF3EE] text-success", OCUPADA: "bg-[#FBECEA] text-danger",
-  RESERVADA: "bg-[#FCF3E6] text-warning", EN_LIMPIEZA: "bg-hover text-ink-3", FUERA_DE_SERVICIO: "bg-hover text-ink-3",
+  LIBRE: "bg-success-soft text-success", OCUPADA: "bg-danger-soft text-danger",
+  RESERVADA: "bg-warning-soft text-warning", EN_LIMPIEZA: "bg-hover text-ink-3", FUERA_DE_SERVICIO: "bg-hover text-ink-3",
 };
 
 export default function MesasPage() {

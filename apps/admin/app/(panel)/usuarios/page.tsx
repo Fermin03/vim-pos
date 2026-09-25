@@ -214,7 +214,7 @@ export default function UsuariosPage() {
                     </td>
                     <td className="px-4 py-3.5 text-[13.5px] text-ink-2">{u.rolNombre}</td>
                     <td className="px-4 py-3.5">
-                      <span className={["inline-flex items-center gap-1.5 rounded-full px-[11px] py-1 text-[12.5px] font-semibold", u.activo ? "bg-[#EAF3EE] text-success" : "bg-hover text-ink-3"].join(" ")}>
+                      <span className={["inline-flex items-center gap-1.5 rounded-full px-[11px] py-1 text-[12.5px] font-semibold", u.activo ? "bg-success-soft text-success" : "bg-hover text-ink-3"].join(" ")}>
                         <span className={["h-1.5 w-1.5 rounded-full", u.activo ? "bg-success" : "bg-ink-3"].join(" ")} />
                         {u.activo ? "Activo" : "Inactivo"}
                       </span>

@@ -247,7 +247,7 @@ export default function ClientesPage() {
                       <div className="font-medium">
                         {c.nombre} {c.apellido_paterno}
                         {c.estado !== "ACTIVO" && (
-                          <span className="ml-2 rounded-full bg-[#FBECEA] px-2 py-0.5 text-[11px] font-bold text-danger">Bloqueado</span>
+                          <span className="ml-2 rounded-full bg-danger-soft px-2 py-0.5 text-[11px] font-bold text-danger">Bloqueado</span>
                         )}
                       </div>
                       {c.rfc && <div className="mt-px font-mono text-[11.5px] text-ink-3">{c.rfc}</div>}

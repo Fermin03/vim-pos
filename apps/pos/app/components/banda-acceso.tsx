@@ -54,7 +54,7 @@ export function BandaAcceso({ mensaje, desde }: { mensaje: string; desde: string
   return (
     <div
       role="status"
-      className="flex flex-wrap items-center justify-center gap-x-2 bg-[#F6EEDD] px-4 py-2 text-center text-[13px] font-semibold text-warning"
+      className="flex flex-wrap items-center justify-center gap-x-2 bg-warning-soft px-4 py-2 text-center text-[13px] font-semibold text-warning"
     >
       <span>{mensaje}</span>
       {f && <span className="font-normal text-ink-2">La caja dejará de vender el {f}.</span>}

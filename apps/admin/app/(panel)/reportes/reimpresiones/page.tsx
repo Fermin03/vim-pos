@@ -42,7 +42,7 @@ export default function ReimpresionesPage() {
                       <td className="px-4 py-2.5 text-right font-semibold tabular-nums">{f.reimpresiones}</td>
                       <td className="px-4 py-2.5 text-right tabular-nums">{f.ticketsDistintos}</td>
                       <td className="px-4 py-2.5 text-right">
-                        <span className={["rounded px-2 py-0.5 text-[11.5px] font-bold tabular-nums", ratio >= 2 ? "bg-[#FBECEA] text-danger" : ratio > 1.2 ? "bg-[#FDF3E7] text-[#B26A00]" : "bg-sel text-ink-2"].join(" ")}>
+                        <span className={["rounded px-2 py-0.5 text-[11.5px] font-bold tabular-nums", ratio >= 2 ? "bg-danger-soft text-danger" : ratio > 1.2 ? "bg-warning-soft text-[#B26A00]" : "bg-sel text-ink-2"].join(" ")}>
                           {ratio.toFixed(1)}×
                         </span>
                       </td>

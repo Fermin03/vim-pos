@@ -157,7 +157,7 @@ export function ComboForm() {
           <label className="mt-3 flex items-center gap-2.5">
             <input
               type="checkbox"
-              className="h-4 w-4 accent-[#16161A]"
+              className="h-4 w-4 accent-ink"
               checked={ivaIncluido}
               onChange={(e) => setIvaIncluido(e.target.checked)}
             />

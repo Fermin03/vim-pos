@@ -99,7 +99,7 @@ export default function SucursalesPage() {
                       <span className="text-xs text-ink-3">{s.nAreas === 1 ? "área" : "áreas"}</span>
                     </td>
                     <td className="px-4 py-3.5">
-                      <span className={["inline-flex items-center gap-1.5 rounded-full px-[11px] py-1 text-[12.5px] font-semibold", s.activa ? "bg-[#EAF3EE] text-success" : "bg-hover text-ink-3"].join(" ")}>
+                      <span className={["inline-flex items-center gap-1.5 rounded-full px-[11px] py-1 text-[12.5px] font-semibold", s.activa ? "bg-success-soft text-success" : "bg-hover text-ink-3"].join(" ")}>
                         <span className={["h-1.5 w-1.5 rounded-full", s.activa ? "bg-success" : "bg-ink-3"].join(" ")} />
                         {s.activa ? "Activa" : "Inactiva"}
                       </span>

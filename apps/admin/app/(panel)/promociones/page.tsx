@@ -28,8 +28,8 @@ function ahoraLocal(): string {
 const VACIO = (): FormDatos => ({ nombre: "", descripcion: "", tipo: "PORCENTAJE", valor: "", fecha_inicio: ahoraLocal(), fecha_fin: "" });
 
 const COLOR_ESTADO: Record<EstadoPromo, string> = {
-  ACTIVA: "bg-[#EAF3EE] text-success", PAUSADA: "bg-[#FCF3E6] text-warning",
-  EXPIRADA: "bg-[#F2F2F0] text-ink-3", AGOTADA: "bg-[#FBECEA] text-danger",
+  ACTIVA: "bg-success-soft text-success", PAUSADA: "bg-warning-soft text-warning",
+  EXPIRADA: "bg-[#F2F2F0] text-ink-3", AGOTADA: "bg-danger-soft text-danger",
 };
 
 /**

@@ -4,9 +4,9 @@ import { marcarAvisoVisto, type Aviso, type NivelAviso } from "../lib/directivas
 
 /** Colores por nivel. `danger` es lo que impide o rompe algo; `warning`, lo que hay que atender. */
 const ESTILO: Record<NivelAviso, { cabecera: string; texto: string; etiqueta: string }> = {
-  info: { cabecera: "bg-[#EAF3FB]", texto: "text-[#0063A8]", etiqueta: "Aviso de VIM" },
-  warning: { cabecera: "bg-[#F6EEDD]", texto: "text-warning", etiqueta: "Atención" },
-  danger: { cabecera: "bg-[#FBECEA]", texto: "text-danger", etiqueta: "Importante" },
+  info: { cabecera: "bg-[#EAF3FB]", texto: "text-accent-hover", etiqueta: "Aviso de VIM" },
+  warning: { cabecera: "bg-warning-soft", texto: "text-warning", etiqueta: "Atención" },
+  danger: { cabecera: "bg-danger-soft", texto: "text-danger", etiqueta: "Importante" },
 };
 
 /**

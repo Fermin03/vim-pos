@@ -96,7 +96,7 @@ export default function ModificadoresPage() {
                       <span className="text-xs text-ink-3">opciones</span>
                     </td>
                     <td className="px-4 py-3.5">
-                      <span className={["inline-flex items-center gap-1.5 rounded-full px-[11px] py-1 text-[12.5px] font-semibold", g.activo ? "bg-[#EAF3EE] text-success" : "bg-hover text-ink-3"].join(" ")}>
+                      <span className={["inline-flex items-center gap-1.5 rounded-full px-[11px] py-1 text-[12.5px] font-semibold", g.activo ? "bg-success-soft text-success" : "bg-hover text-ink-3"].join(" ")}>
                         <span className={["h-1.5 w-1.5 rounded-full", g.activo ? "bg-success" : "bg-ink-3"].join(" ")} />
                         {g.activo ? "Activo" : "Inactivo"}
                       </span>

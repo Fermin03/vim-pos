@@ -31,7 +31,11 @@
   /* ── Tinta ─────────────────────────────────────────────────────────── */
   --ink: 22 22 26;              /* #16161A */
   --ink-2: 90 90 96;            /* #5A5A60 */
-  --ink-3: 142 142 148;         /* #8E8E94 */
+  /* Era #8E8E94: 3.3:1 sobre blanco, bajo el mínimo de 4.5 para texto. Y no era "texto de
+     adorno": lo usaban encabezados de tabla, ayudas de formulario y botones secundarios en las
+     cinco apps (revisión de diseño, sep 2026). #6E6E74 da 5.0:1 y sigue claramente por debajo
+     de ink-2 en la jerarquía. */
+  --ink-3: 110 110 116;         /* #6E6E74 */
 
   /* ── Semánticos. Los `-soft` son los fondos de aviso del design system. ── */
   --success: 46 125 82;         /* #2E7D52 */
@@ -81,6 +85,23 @@
   /* ── Espaciado ─────────────────────────────────────────────────────── */
   --sp-1: 4px; --sp-2: 8px; --sp-3: 12px; --sp-4: 16px;
   --sp-5: 20px; --sp-6: 24px; --sp-8: 32px;
+
+  /* ── Movimiento ───────────────────────────────────────────────────────
+     Curvas fuertes: las de CSS por defecto (ease, ease-out) arrancan tibias y la interfaz se
+     siente lenta aunque dure lo mismo. Duraciones de UI entre 150 y 250 ms.
+     Regla de frecuencia: lo que se toca cientos de veces al día (cobro, catálogo, teclado) NO se
+     anima; responde al presionar y ya. */
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
+  --ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+/* Movimiento reducido: menos movimiento, no cero. Se quita el desplazamiento y la sacudida; se
+   conserva el fundido, que ayuda a entender qué apareció. Vive aquí porque este archivo lo
+   importan las cinco apps. */
+@media (prefers-reduced-motion: reduce) {
+  .animate-vim-pop { animation-name: vim-fade !important; }
+  .animate-vim-shake { animation: none !important; }
 }
 
 /* KDS — tema oscuro (doc 14). Aplicar en el contenedor del KDS con [data-theme="kds"].

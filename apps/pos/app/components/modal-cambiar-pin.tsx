@@ -47,7 +47,7 @@ export function ModalCambiarPin({ token, onListo, onCerrar }: { token: string; o
 
       {ok ? (
         <div className="flex flex-col items-center gap-2 py-6 text-center">
-          <div className="flex h-12 w-12 items-center justify-center rounded-full bg-[#EAF3EE] text-success">
+          <div className="flex h-12 w-12 items-center justify-center rounded-full bg-success-soft text-success">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="h-6 w-6"><path d="M20 6 9 17l-5-5" /></svg>
           </div>
           <p className="text-[14px] font-semibold">PIN actualizado</p>
