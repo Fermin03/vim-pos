@@ -37,6 +37,12 @@ verify_jwt = false
 [functions.solicitar-demo]
 verify_jwt = false
 
+# Portal público de autofactura: lo llama un comensal sin sesión con la llave publicable
+# (sb_publishable_…), que NO es un JWT. Faltaba aquí y un `functions deploy` sin
+# `--no-verify-jwt` lo dejó respondiendo "Invalid JWT" en producción (25 sep 2026).
+[functions.autofacturar]
+verify_jwt = false
+
 # Webhook de Uber Eats (ADR 0011): sin JWT, la autenticidad la da X-Uber-Signature.
 [functions.delivery-webhook-uber]
 verify_jwt = false

@@ -10,10 +10,15 @@
 const SB_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const SB_ANON = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
 
+export type Negocio = { nombre: string; logo: string | null };
+
 export type TicketEncontrado = {
   negocio: string;
   logo: string | null;
   ticket: { folio: string; fecha: string; total: number };
+  /** Regímenes que se ofrecen, en orden. Vienen del servidor: el catálogo vive en un solo lugar. */
+  regimenes: { clave: string; nombre: string }[];
+  usos: Record<string, string>;
   usosPorRegimen: Record<string, string[]>;
 };
 
@@ -34,13 +39,19 @@ export type Timbrado = {
   correo: string | null;
 };
 
-/** Un fallo con la forma que la pantalla necesita: qué decir y qué campo señalar. */
+/** Un fallo con la forma que la pantalla necesita: qué decir, qué campo señalar y qué pasó. */
 export class ErrorPortal extends Error {
   readonly campo: string | null;
-  constructor(mensaje: string, campo: string | null = null) {
+  /** El `estado` de la función: "YA_FACTURADO" abre la recuperación en vez de un error. */
+  readonly estado: string | null;
+  /** Lo que la función manda junto al error (el nombre del negocio, el ticket…). */
+  readonly datos: Record<string, unknown>;
+  constructor(mensaje: string, campo: string | null = null, estado: string | null = null, datos: Record<string, unknown> = {}) {
     super(mensaje);
     this.name = "ErrorPortal";
     this.campo = campo;
+    this.estado = estado;
+    this.datos = datos;
   }
 }
 
@@ -60,9 +71,25 @@ async function llamar(cuerpo: Record<string, unknown>): Promise<Record<string, u
     throw new ErrorPortal(
       String(d.mensaje ?? "No se pudo completar la operación."),
       (d.campo as string) ?? null,
+      (d.estado as string) ?? null,
+      d,
     );
   }
   return d;
+}
+
+/** Nombre y logo del restaurante, para el encabezado desde el primer paso. */
+export async function buscarNegocio(negocio: string): Promise<Negocio> {
+  try {
+    const d = await llamar({ accion: "negocio", negocio });
+    return { nombre: String(d.negocio), logo: (d.logo as string) ?? null };
+  } catch (e) {
+    // Sin facturación activada también trae el nombre: el encabezado se pinta igual.
+    if (e instanceof ErrorPortal && typeof e.datos.negocio === "string") {
+      throw new ErrorPortal(e.message, null, e.estado, e.datos);
+    }
+    throw e;
+  }
 }
 
 export async function buscarTicket(negocio: string, folio: string): Promise<TicketEncontrado> {
@@ -71,12 +98,13 @@ export async function buscarTicket(negocio: string, folio: string): Promise<Tick
     negocio: String(d.negocio),
     logo: (d.logo as string) ?? null,
     ticket: d.ticket as TicketEncontrado["ticket"],
+    regimenes: (d.regimenes ?? []) as TicketEncontrado["regimenes"],
+    usos: (d.usos ?? {}) as Record<string, string>,
     usosPorRegimen: (d.usosPorRegimen ?? {}) as Record<string, string[]>,
   };
 }
 
-export async function timbrar(negocio: string, folio: string, receptor: Receptor): Promise<Timbrado> {
-  const d = await llamar({ accion: "timbrar", negocio, folio, receptor });
+function aTimbrado(d: Record<string, unknown>): Timbrado {
   return {
     uuid: String(d.uuid),
     negocio: String(d.negocio),
@@ -86,6 +114,20 @@ export async function timbrar(negocio: string, folio: string, receptor: Receptor
     correoEnviado: d.correoEnviado === true,
     correo: (d.correo as string) ?? null,
   };
+}
+
+/** Una factura ya emitida, otra vez: con el folio y el RFC con que se pidió. */
+export async function recuperar(negocio: string, folio: string, rfc: string): Promise<Timbrado> {
+  return aTimbrado(await llamar({ accion: "recuperar", negocio, folio, rfc }));
+}
+
+/** Reenvía la factura por correo (la manda el PAC con el XML y el PDF adjuntos). */
+export async function enviarPorCorreo(negocio: string, folio: string, rfc: string, email: string): Promise<void> {
+  await llamar({ accion: "enviar", negocio, folio, rfc, email });
+}
+
+export async function timbrar(negocio: string, folio: string, receptor: Receptor): Promise<Timbrado> {
+  return aTimbrado(await llamar({ accion: "timbrar", negocio, folio, receptor }));
 }
 
 /**
@@ -103,31 +145,10 @@ export function descargar(base64: string, nombre: string, tipo: string): void {
   a.href = url;
   a.download = nombre;
   a.click();
-  URL.revokeObjectURL(url);
+  // Revocar en el mismo instante aborta la descarga en Safari: se le da tiempo a empezar.
+  setTimeout(() => URL.revokeObjectURL(url), 30_000);
 }
 
-export const REGIMENES = [
-  { v: "601", l: "601 · General de Ley Personas Morales" },
-  { v: "603", l: "603 · Personas Morales sin fines de lucro" },
-  { v: "605", l: "605 · Sueldos y salarios" },
-  { v: "606", l: "606 · Arrendamiento" },
-  { v: "612", l: "612 · Actividades empresariales y profesionales" },
-  { v: "614", l: "614 · Ingresos por intereses" },
-  { v: "616", l: "616 · Sin obligaciones fiscales" },
-  { v: "621", l: "621 · Incorporación Fiscal" },
-  { v: "626", l: "626 · RESICO" },
-] as const;
-
-export const USOS: Record<string, string> = {
-  G01: "G01 · Adquisición de mercancías",
-  G03: "G03 · Gastos en general",
-  I01: "I01 · Construcciones",
-  I08: "I08 · Otra maquinaria y equipo",
-  D01: "D01 · Honorarios médicos",
-  D02: "D02 · Gastos médicos por incapacidad",
-  D03: "D03 · Gastos funerales",
-  D04: "D04 · Donativos",
-  D07: "D07 · Primas de seguros de gastos médicos",
-  D10: "D10 · Pagos por servicios educativos",
-  P01: "P01 · Por definir",
-};
+/** Misma regla que el servidor (`_shared/pac/receptor.ts`): empresa 12, persona física 13. */
+export const RFC_VALIDO = /^[A-ZÑ&]{3,4}\d{6}[A-Z0-9]{3}$/;
+export const CORREO_VALIDO = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
