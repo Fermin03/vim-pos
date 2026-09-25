@@ -1,30 +1,39 @@
 "use client";
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { PageHeader, PageBody } from "../../components/page-header";
 import { usePerfil } from "../../components/admin-shell";
 import { leerDashboard, variacionPct, type Dashboard, type ResumenDia } from "../../lib/reportes";
+import { type ResumenCaja } from "../../lib/dashboard-calculos";
 import { leerEstadoOnboarding, type EstadoOnboarding } from "../../lib/onboarding";
 import { listarSucursales } from "../../lib/configuracion";
 import { mensajeError } from "../../lib/errores";
 
 // Accesos rápidos del P-177: son de Reportes, no navegación genérica.
 const REPORTES_RAPIDOS = [
-  { href: "/reportes/consolidado", nombre: "Estado de resultados", desc: "Ventas, IVA, descuentos, comisiones" },
+  // Decía "Estado de resultados · Ventas, IVA, descuentos, comisiones" y abría el consolidado, que
+  // no tiene IVA ni comisiones. El nombre dice ahora lo que hay detrás.
+  { href: "/reportes/consolidado", nombre: "Consolidado por sucursal", desc: "Venta, tickets y participación de cada sucursal" },
   { href: "/reportes/ventas-producto", nombre: "Ventas por producto", desc: "Top productos y unidades" },
   { href: "/reportes/ventas-mesero", nombre: "Ventas por mesero", desc: "Desempeño del equipo" },
   { href: "/reportes/z-historico", nombre: "Cortes Z", desc: "Histórico de cierres de turno" },
 ];
 
+/** Cada cuánto se vuelve a leer el panel mirando hoy. */
+const REFRESCO_MS = 60_000;
+
 const fmt = (n: number) => new Intl.NumberFormat("es-MX", { style: "currency", currency: "MXN" }).format(n);
 const fmtInt = (n: number) => new Intl.NumberFormat("es-MX").format(n);
 
 function Delta({ pct, comparativo, sobreOscuro }: { pct: number | null; comparativo?: string; sobreOscuro?: boolean }) {
-  if (pct === null) return comparativo ? <span className={`text-[11.5px] ${sobreOscuro ? "text-white/50" : "text-ink-3"}`}>{comparativo}</span> : null;
+  const claseComparativo = `text-[12.5px] ${sobreOscuro ? "text-white/70" : "text-ink-2"}`;
+  if (pct === null) return comparativo ? <span className={claseComparativo}>{comparativo}</span> : null;
   const sube = pct >= 0;
+  // Bajar contra ayer no es una alarma (un martes vende menos que un sábado): va en neutro. El
+  // rojo se guarda para lo que sí hay que atender, como un faltante de caja.
   const claseChip = sobreOscuro
-    ? sube ? "bg-success/25 text-[#7FD1A3]" : "bg-danger/25 text-[#E8927F]"
-    : sube ? "bg-success-soft text-success" : "bg-[#FBF1EF] text-danger";
+    ? sube ? "bg-success/25 text-[#7FD1A3]" : "bg-white/15 text-white"
+    : sube ? "bg-success-soft text-success" : "bg-hover text-ink-2";
   return (
     <>
       <span className={`inline-flex items-center gap-[3px] rounded-full px-[7px] py-0.5 text-[12.5px] font-bold ${claseChip}`}>
@@ -33,7 +42,7 @@ function Delta({ pct, comparativo, sobreOscuro }: { pct: number | null; comparat
         </svg>
         {Math.abs(pct)}%
       </span>
-      {comparativo && <span className={`text-[11.5px] ${sobreOscuro ? "text-white/50" : "text-ink-3"}`}>{comparativo}</span>}
+      {comparativo && <span className={claseComparativo}>{comparativo}</span>}
     </>
   );
 }
@@ -56,7 +65,7 @@ function Kpi({
   return (
     <div className={`relative min-w-0 rounded-lg border p-4 lg:p-5 ${primario ? "border-ink bg-ink" : "border-line bg-surface"}`}>
       <div className="flex items-center justify-between gap-2">
-        <span className={`min-w-0 truncate text-[11.5px] font-semibold uppercase tracking-[0.04em] lg:text-[12px] ${primario ? "text-white/60" : "text-ink-3"}`}>{label}</span>
+        <span className={`min-w-0 truncate text-[12px] font-semibold uppercase tracking-[0.04em] lg:text-[12.5px] ${primario ? "text-white/75" : "text-ink-2"}`}>{label}</span>
         <span className={`flex h-[30px] w-[30px] flex-shrink-0 items-center justify-center rounded ${primario ? "bg-white/10 text-white" : "bg-hover text-ink-2"}`}>{icono}</span>
       </div>
       <div className={`mt-3 font-display text-[22px] font-bold tracking-[-0.025em] tabular-nums lg:mt-3.5 lg:text-[30px] ${primario ? "text-white" : ""}`}>{valor}</div>
@@ -74,47 +83,154 @@ const ICONOS = {
   propinas: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-4 w-4"><circle cx="12" cy="12" r="9" /><path d="M12 7v10M9.5 9.5h4a1.8 1.8 0 0 1 0 3.5h-3a1.8 1.8 0 0 0 0 3.5h4.5" /></svg>,
 };
 
-/** Gráfica de ventas por hora del día (P-177). La barra de la hora pico va en negro. */
+/**
+ * Gráfica de ventas por hora del día (P-177). La barra de la hora pico va en negro.
+ *
+ * El eje es continuo y en el orden del día contable (`serieHoraria`): antes saltaba de las 15 a
+ * las 18 como si fueran seguidas y las ventas de la 1 a.m. salían antes del mediodía. Las barras
+ * van en gris con contraste suficiente (antes #DDDDD9, 1.4:1) y nunca en el azul de marca: el azul
+ * significa "acción", no dato. Cada barra se enfoca con el teclado y dice su valor; en el celular,
+ * donde no hay hover, abajo van las tres mejores horas por escrito.
+ */
 function GraficaPorHora({ datos }: { datos: { hora: number; total: number }[] }) {
   const max = Math.max(1, ...datos.map((d) => d.total));
   const pico = datos.reduce((a, b) => (b.total > a.total ? b : a), datos[0]!);
   const promedio = datos.reduce((a, d) => a + d.total, 0) / datos.length;
+  const mejores = [...datos].filter((d) => d.total > 0).sort((a, b) => b.total - a.total).slice(0, 3);
+  const rotulo = (h: number) => `${h}:00`;
 
   return (
     <>
       {/* En móvil la gráfica se desliza en horizontal: 24 barras en 343px serían ilegibles. */}
       <div className="-mx-5 overflow-x-auto px-5 lg:mx-0 lg:overflow-x-visible lg:px-0">
-      <div className="grafica-min flex h-[200px] items-end gap-1.5 pt-4 lg:h-[240px]">
+      <ul className="grafica-min flex h-[200px] items-end gap-1.5 pt-6 lg:h-[240px]" aria-label="Ventas por hora">
         {datos.map((d) => {
           const esPico = d.hora === pico.hora;
           return (
-            <div key={d.hora} className="group flex h-full flex-1 cursor-default flex-col items-center justify-end gap-[7px]">
+            <li
+              key={d.hora}
+              tabIndex={0}
+              aria-label={`${rotulo(d.hora)}: ${fmt(d.total)}${esPico ? ", hora pico" : ""}`}
+              className="group flex h-full flex-1 cursor-default flex-col items-center justify-end gap-[7px] rounded outline-none focus-visible:ring-2 focus-visible:ring-ink"
+            >
               <div className="relative flex w-full flex-1 items-end justify-center">
                 <div
-                  className={`w-full max-w-[26px] rounded-t-[3px] transition-colors group-hover:bg-accent ${esPico ? "bg-ink" : "bg-line-strong"}`}
-                  style={{ height: `${Math.max(2, (d.total / max) * 100)}%` }}
+                  className={`w-full max-w-[26px] rounded-t-[3px] transition-colors duration-150 ${esPico ? "bg-ink" : "bg-ink-3 group-hover:bg-ink-2 group-focus-visible:bg-ink-2"}`}
+                  style={{ height: `${d.total > 0 ? Math.max(3, (d.total / max) * 100) : 1}%` }}
                 />
-                <span className="pointer-events-none absolute bottom-full left-1/2 mb-1.5 -translate-x-1/2 whitespace-nowrap rounded bg-ink px-2 py-1 text-[11px] font-semibold text-white opacity-0 transition-opacity group-hover:opacity-100">
-                  {d.hora}:00 · {fmt(d.total)}
+                <span className="pointer-events-none absolute bottom-full left-1/2 z-10 mb-1.5 -translate-x-1/2 whitespace-nowrap rounded bg-ink px-2 py-1 text-[12px] font-semibold text-white opacity-0 transition-opacity duration-150 group-hover:opacity-100 group-focus-visible:opacity-100">
+                  {rotulo(d.hora)} · {fmt(d.total)}
                 </span>
               </div>
-              <div className="text-[10px] font-semibold text-ink-3">{d.hora}</div>
-            </div>
+              <div className="text-[12px] font-semibold tabular-nums text-ink-2">{d.hora}</div>
+            </li>
           );
         })}
-      </div>
+      </ul>
       </div>
       <div className="mt-4 flex flex-wrap items-center gap-x-5 gap-y-2 border-t border-line pt-4">
-        <div className="flex items-center gap-[7px] text-[12px] text-ink-2">
-          <span className="h-[11px] w-[11px] rounded-[3px] bg-ink" />
-          Hora pico <span className="font-semibold">{pico.hora}:00 ({fmt(pico.total)})</span>
+        <div className="flex items-center gap-[7px] text-[13px] text-ink-2">
+          <span className="h-[11px] w-[11px] rounded-[3px] bg-ink" aria-hidden="true" />
+          Hora pico <span className="font-semibold text-ink">{rotulo(pico.hora)} ({fmt(pico.total)})</span>
         </div>
-        <div className="flex items-center gap-[7px] text-[12px] text-ink-2">
-          <span className="h-[11px] w-[11px] rounded-[3px] bg-line-strong" />
-          Promedio/hora <span className="font-semibold">{fmt(Math.round(promedio * 100) / 100)}</span>
+        <div className="flex items-center gap-[7px] text-[13px] text-ink-2">
+          <span className="h-[11px] w-[11px] rounded-[3px] bg-ink-3" aria-hidden="true" />
+          Promedio por hora <span className="font-semibold text-ink">{fmt(Math.round(promedio * 100) / 100)}</span>
         </div>
       </div>
+      {/* Sin hover en el celular: las mejores horas, por escrito. */}
+      {mejores.length > 1 && (
+        <ol className="mt-4 flex flex-col gap-1.5 lg:hidden" aria-label="Mejores horas">
+          {mejores.map((d, i) => (
+            <li key={d.hora} className="flex items-center justify-between text-[14px]">
+              <span className="text-ink-2">{i + 1}. {rotulo(d.hora)}</span>
+              <span className="font-semibold tabular-nums">{fmt(d.total)}</span>
+            </li>
+          ))}
+        </ol>
+      )}
     </>
+  );
+}
+
+/**
+ * ¿Cuadró la caja? Es lo primero que un dueño quiere saber del día, antes que cuánto vendió, y el
+ * panel no lo decía aunque la base ya lo tenía: turnos cerrados, diferencia de efectivo,
+ * cancelaciones y descuentos.
+ */
+function FranjaCaja({ caja, cancelados, descuentos, devoluciones }: {
+  caja: ResumenCaja; cancelados: number; descuentos: number; devoluciones: number;
+}) {
+  const total = caja.cerrados + caja.abiertos;
+  let tono: "ok" | "falta" | "sobra" | "neutro";
+  let titulo: string;
+  let detalle: string;
+  if (total === 0) {
+    tono = "neutro";
+    titulo = "Sin turnos este día";
+    detalle = "Ninguna caja abrió turno.";
+  } else if (caja.cerrados === 0) {
+    tono = "neutro";
+    titulo = "Caja abierta";
+    detalle = `${caja.abiertos === 1 ? "El turno sigue" : `${caja.abiertos} turnos siguen`} abierto${caja.abiertos === 1 ? "" : "s"}: el corte todavía no se hace.`;
+  } else if (caja.conDiferencia === 0) {
+    tono = "ok";
+    titulo = "La caja cuadró";
+    detalle = caja.cerrados === 1 ? "El corte cuadró al centavo." : `Los ${caja.cerrados} cortes cuadraron al centavo.`;
+  } else if (caja.diferenciaNeta < 0) {
+    tono = "falta";
+    titulo = `Faltan ${fmt(Math.abs(caja.diferenciaNeta))}`;
+    detalle = `${caja.conDiferencia} de ${caja.cerrados} ${caja.cerrados === 1 ? "corte" : "cortes"} con diferencia.`;
+  } else {
+    tono = "sobra";
+    titulo = caja.diferenciaNeta > 0 ? `Sobran ${fmt(caja.diferenciaNeta)}` : "Diferencias que se compensan";
+    detalle = `${caja.conDiferencia} de ${caja.cerrados} ${caja.cerrados === 1 ? "corte" : "cortes"} con diferencia.`;
+  }
+  if (caja.cerrados > 0 && caja.abiertos > 0) detalle += ` ${caja.abiertos} sigue${caja.abiertos === 1 ? "" : "n"} abierto${caja.abiertos === 1 ? "" : "s"}.`;
+
+  const estilo = {
+    ok: { caja: "border-success/30 bg-success-soft", icono: "bg-success text-white", texto: "text-success" },
+    falta: { caja: "border-danger/30 bg-danger-soft", icono: "bg-danger text-white", texto: "text-danger" },
+    sobra: { caja: "border-warning/30 bg-warning-soft", icono: "bg-warning text-white", texto: "text-warning" },
+    neutro: { caja: "border-line bg-surface", icono: "bg-hover text-ink-2", texto: "text-ink" },
+  }[tono];
+
+  return (
+    <section aria-label="Caja del día" className={`mb-5 flex flex-col gap-4 rounded-lg border p-4 lg:flex-row lg:items-center lg:gap-6 lg:px-5 ${estilo.caja}`}>
+      <div className="flex min-w-0 flex-1 items-center gap-3.5">
+        <span className={`flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full ${estilo.icono}`} aria-hidden="true">
+          {tono === "ok" ? (
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5"><path d="M20 6 9 17l-5-5" /></svg>
+          ) : tono === "neutro" ? (
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5"><rect x="3" y="7" width="18" height="13" rx="2" /><path d="M3 11h18M8 3h8v4H8z" /></svg>
+          ) : (
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5"><path d="M12 8v5M12 16.5v.5" /><circle cx="12" cy="12" r="9" /></svg>
+          )}
+        </span>
+        <div className="min-w-0">
+          <div className="text-[12.5px] font-semibold uppercase tracking-[0.04em] text-ink-2">Caja del día</div>
+          <div className={`font-display text-[20px] font-bold leading-tight tabular-nums ${estilo.texto}`}>{titulo}</div>
+          <div className="text-[14px] text-ink-2">{detalle}</div>
+        </div>
+      </div>
+      <dl className="grid grid-cols-3 gap-4 text-[13px] lg:flex lg:gap-6">
+        <div>
+          <dt className="text-ink-2">Cancelaciones</dt>
+          <dd className="font-display text-[16px] font-semibold tabular-nums">{fmtInt(cancelados)}</dd>
+        </div>
+        <div>
+          <dt className="text-ink-2">Descuentos</dt>
+          <dd className="font-display text-[16px] font-semibold tabular-nums">{fmt(descuentos)}</dd>
+        </div>
+        <div>
+          <dt className="text-ink-2">Devoluciones</dt>
+          <dd className="font-display text-[16px] font-semibold tabular-nums">{fmt(devoluciones)}</dd>
+        </div>
+      </dl>
+      <Link href="/reportes/z-historico" className="text-[14px] font-semibold text-accent transition-colors hover:text-accent-hover lg:flex-shrink-0">
+        Ver cortes →
+      </Link>
+    </section>
   );
 }
 
@@ -136,10 +252,35 @@ export default function DashboardPage() {
   useEffect(() => {
     setCargandoDia(true);
     leerDashboard(dia ?? undefined)
-      .then(setData)
+      .then((d) => { setData(d); setError(null); })
       .catch((e) => setError(mensajeError(e, "No se pudo cargar")))
       .finally(() => setCargandoDia(false));
   }, [dia]);
+
+  /* «En vivo» era un punto que parpadeaba sobre datos que nadie volvía a pedir. Ahora, mirando
+     hoy, se vuelve a leer cada minuto y al regresar a la pestaña, sin borrar la pantalla, y el
+     encabezado dice a qué hora fue la última lectura. */
+  const [refrescando, setRefrescando] = useState(false);
+  const refrescar = useCallback(async () => {
+    setRefrescando(true);
+    try {
+      const d = await leerDashboard(undefined);
+      setData(d);
+      setError(null);
+    } catch (e) {
+      setError(mensajeError(e, "No se pudo actualizar"));
+    } finally {
+      setRefrescando(false);
+    }
+  }, []);
+  const mirandoHoy = dia === null && (data?.esHoy ?? false);
+  useEffect(() => {
+    if (!mirandoHoy) return;
+    const id = setInterval(() => { if (document.visibilityState === "visible") void refrescar(); }, REFRESCO_MS);
+    const alVolver = () => { if (document.visibilityState === "visible") void refrescar(); };
+    document.addEventListener("visibilitychange", alVolver);
+    return () => { clearInterval(id); document.removeEventListener("visibilitychange", alVolver); };
+  }, [mirandoHoy, refrescar]);
 
   useEffect(() => {
     leerEstadoOnboarding().then(setOnb).catch(() => {});
@@ -204,9 +345,24 @@ export default function DashboardPage() {
             </label>
 
             {data?.esHoy ? (
-              <span className="inline-flex items-center gap-[5px] text-[11px] font-semibold text-success">
-                <span className={`h-1.5 w-1.5 rounded-full bg-success ${cargandoDia ? "" : "animate-pulse"}`} />
-                En vivo
+              <span className="inline-flex items-center gap-2">
+                <span className="inline-flex items-center gap-[6px] text-[13px] font-semibold text-success">
+                  <span className="h-2 w-2 rounded-full bg-success" aria-hidden="true" />
+                  En vivo
+                  <span className="font-medium text-ink-2">
+                    · {new Intl.DateTimeFormat("es-MX", { hour: "2-digit", minute: "2-digit" }).format(new Date(data.leidoEn))}
+                  </span>
+                </span>
+                <button
+                  type="button"
+                  onClick={() => void refrescar()}
+                  disabled={refrescando}
+                  aria-label="Actualizar ahora"
+                  title="Actualizar ahora"
+                  className="flex h-9 w-9 items-center justify-center rounded border border-line-strong text-ink-2 transition-[transform,color,border-color] duration-150 ease-vim hover:border-ink hover:text-ink active:scale-[.95] disabled:opacity-50"
+                >
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={`h-4 w-4 ${refrescando ? "animate-spin" : ""}`} aria-hidden="true"><path d="M21 12a9 9 0 1 1-2.6-6.4" /><path d="M21 4v5h-5" /></svg>
+                </button>
               </span>
             ) : (
               /* «En vivo» mintiendo sobre un día pasado sería peor que no
@@ -262,6 +418,14 @@ export default function DashboardPage() {
 
         {hoy && !sinVentas && (
           <>
+            {/* Arriba de las cifras: "¿cuadró la caja?" es lo primero que el dueño busca. */}
+            <FranjaCaja
+              caja={data!.caja}
+              cancelados={hoy.ticketsCancelados}
+              descuentos={hoy.descuentos}
+              devoluciones={hoy.devoluciones}
+            />
+
             {/* KPIs con variación contra el día anterior (P-177).
 
                 Las etiquetas y los comparativos dicen "hoy" y "ayer" solo
@@ -306,14 +470,14 @@ export default function DashboardPage() {
                 <div className="border-b border-line px-5 py-4">
                   <div className="font-display text-[15px] font-semibold">
                     Ventas por hora
-                    <div className="mt-0.5 text-[12px] font-normal text-ink-3">Distribución del día contable</div>
+                    <div className="mt-0.5 text-[13px] font-normal text-ink-2">Distribución del día contable</div>
                   </div>
                 </div>
                 <div className="p-5">
                   {(data?.ventasPorHora.length ?? 0) > 0 ? (
                     <GraficaPorHora datos={data!.ventasPorHora} />
                   ) : (
-                    <p className="py-12 text-center text-[13px] text-ink-3">Sin ventas con hora registrada hoy.</p>
+                    <p className="py-12 text-center text-[14px] text-ink-2">Sin ventas con hora registrada hoy.</p>
                   )}
                 </div>
               </div>
@@ -323,7 +487,7 @@ export default function DashboardPage() {
                   <div className="flex items-center justify-between gap-3">
                     <div className="font-display text-[15px] font-semibold">Top productos{data?.esHoy ? " hoy" : ""}</div>
                     <div className="flex items-center gap-2">
-                      <Link href="/reportes/ventas-producto" className="text-[12px] font-semibold text-ink-3 transition-colors hover:text-ink">Ver todos</Link>
+                      <Link href="/reportes/ventas-producto" className="text-[13px] font-semibold text-ink-2 transition-colors hover:text-ink">Ver todos</Link>
                       <span className="rounded-full bg-accent-soft px-2.5 py-0.5 text-[12px] font-semibold text-accent" title="Combos cobrados en el día">
                         {data?.combosVendidos ?? 0} combos
                       </span>
@@ -354,14 +518,14 @@ export default function DashboardPage() {
                             </div>
                             <div className="flex-shrink-0 text-right">
                               <div className="text-[13px] font-bold tabular-nums">{fmt(p.total)}</div>
-                              <div className="text-[11.5px] text-ink-3 tabular-nums">{fmtInt(p.unidades)} u.</div>
+                              <div className="text-[12.5px] text-ink-2 tabular-nums">{fmtInt(p.unidades)} u.</div>
                             </div>
                           </div>
                         );
                       })}
                     </div>
                   ) : (
-                    <p className="py-10 text-center text-[13px] text-ink-3">Sin productos vendidos hoy.</p>
+                    <p className="py-10 text-center text-[14px] text-ink-2">Sin productos vendidos hoy.</p>
                   )}
                 </div>
               </div>
@@ -378,7 +542,7 @@ export default function DashboardPage() {
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-[18px] w-[18px]"><path d="M3 3v18h18" /><path d="M7 14l3-3 3 3 4-5" /></svg>
               </div>
               <div className="text-[13.5px] font-semibold">{a.nombre}</div>
-              <div className="mt-0.5 text-[11.5px] leading-snug text-ink-3">{a.desc}</div>
+              <div className="mt-0.5 text-[12.5px] leading-snug text-ink-2">{a.desc}</div>
             </Link>
           ))}
         </div>
