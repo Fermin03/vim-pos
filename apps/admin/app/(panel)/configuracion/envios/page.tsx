@@ -181,7 +181,7 @@ export default function ZonasEnvioPage() {
                           <span
                             className={[
                               "inline-block rounded-full px-2 py-0.5 text-[12px] font-semibold",
-                              z.activa ? "bg-[#EAF3EE] text-success" : "bg-hover text-ink-3",
+                              z.activa ? "bg-success-soft text-success" : "bg-hover text-ink-3",
                             ].join(" ")}
                           >
                             {z.activa ? "Activa" : "Inactiva"}

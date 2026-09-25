@@ -19,6 +19,10 @@ const token = (nombre) => `rgb(var(--${nombre}) / <alpha-value>)`;
 
 /** @type {import('tailwindcss').Config} */
 module.exports = {
+  // El hover solo existe con puntero fino (mouse). En pantalla táctil, Tailwind 3 dejaba el
+  // estilo de hover pegado al último elemento tocado: en la caja, el último producto o tecla
+  // parecía seleccionado. Con esto todo `hover:` va detrás de @media (hover: hover).
+  future: { hoverOnlyWhenSupported: true },
   theme: {
     extend: {
       colors: {
@@ -79,10 +83,16 @@ module.exports = {
           to: { opacity: "1", transform: "none" },
         },
       },
+      // Las curvas viven en tokens.css (--ease-*), igual que los colores.
+      transitionTimingFunction: {
+        vim: "var(--ease-out)",
+        "vim-in-out": "var(--ease-in-out)",
+        "vim-drawer": "var(--ease-drawer)",
+      },
       animation: {
-        "vim-shake": "vim-shake .4s",
+        "vim-shake": "vim-shake .3s var(--ease-in-out)",
         "vim-fade": "vim-fade .18s ease",
-        "vim-pop": "vim-pop .2s cubic-bezier(.22,1,.36,1)",
+        "vim-pop": "vim-pop .2s var(--ease-out)",
       },
     },
   },

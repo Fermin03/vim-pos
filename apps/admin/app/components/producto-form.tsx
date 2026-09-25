@@ -284,7 +284,7 @@ export function ProductoForm({
           <label className="mt-3 flex items-center gap-2.5">
             <input
               type="checkbox"
-              className="h-4 w-4 accent-[#16161A]"
+              className="h-4 w-4 accent-ink"
               checked={ivaIncluido}
               onChange={(e) => setIvaIncluido(e.target.checked)}
             />
@@ -297,14 +297,14 @@ export function ProductoForm({
 
         <div className="flex flex-col gap-2.5 rounded-lg border border-line bg-surface p-4">
           <label className="flex items-center gap-2.5">
-            <input type="checkbox" className="h-4 w-4 accent-[#16161A]" checked={agotado} onChange={(e) => setAgotado(e.target.checked)} />
+            <input type="checkbox" className="h-4 w-4 accent-ink" checked={agotado} onChange={(e) => setAgotado(e.target.checked)} />
             <span className="text-sm">
               <span className="font-medium">Marcar como agotado</span>{" "}
               <span className="text-ink-3">(visible en gris, no se puede agregar al ticket)</span>
             </span>
           </label>
           <label className="flex items-center gap-2.5">
-            <input type="checkbox" className="h-4 w-4 accent-[#16161A]" checked={visible} onChange={(e) => setVisible(e.target.checked)} />
+            <input type="checkbox" className="h-4 w-4 accent-ink" checked={visible} onChange={(e) => setVisible(e.target.checked)} />
             <span className="text-sm">
               <span className="font-medium">Visible en el POS</span>{" "}
               <span className="text-ink-3">(desmarca para productos internos)</span>

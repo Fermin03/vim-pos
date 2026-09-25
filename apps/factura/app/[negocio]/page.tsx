@@ -23,7 +23,7 @@ import {
  */
 
 const input =
-  "h-12 w-full rounded-lg border border-line-strong px-3.5 text-[15px] outline-none focus:border-accent focus:shadow-[0_0_0_3px_rgb(var(--accent-soft))]";
+  "h-12 w-full rounded-lg border border-line-strong px-3.5 text-[16px] outline-none focus:border-accent focus:shadow-[0_0_0_3px_rgb(var(--accent-soft))]";
 const label = "mb-1.5 block text-[13px] font-medium text-ink-2";
 
 const mxn = (n: number) => n.toLocaleString("es-MX", { style: "currency", currency: "MXN" });
@@ -93,7 +93,7 @@ export default function PortalFactura({
     return (
       <Marco>
         <div className="text-center">
-          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-[#EAF3EE]">
+          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-success-soft">
             <svg viewBox="0 0 24 24" className="h-7 w-7 text-success" fill="none" stroke="currentColor" strokeWidth="2.5">
               <path d="M20 6L9 17l-5-5" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
@@ -270,7 +270,7 @@ export default function PortalFactura({
         </div>
 
         {error && (
-          <p className="rounded-lg border border-[#F0C7C2] bg-[#FBECEA] px-3.5 py-3 text-[13.5px] font-medium leading-relaxed text-danger" role="alert">
+          <p className="rounded-lg border border-[#F0C7C2] bg-danger-soft px-3.5 py-3 text-[13.5px] font-medium leading-relaxed text-danger" role="alert">
             {error}
             {campoMal === "codigoPostal" && (
               <span className="mt-1 block font-normal">

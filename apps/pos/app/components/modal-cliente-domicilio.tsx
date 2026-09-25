@@ -223,7 +223,7 @@ export function ModalClienteDomicilio({
       </div>
 
       {avisoZonas && (
-        <div className="mb-3 rounded border border-[#E8DCC0] bg-[#F6EEDD] px-3 py-2 text-[12.5px] font-medium text-warning" role="alert">
+        <div className="mb-3 rounded border border-[#E8DCC0] bg-warning-soft px-3 py-2 text-[12.5px] font-medium text-warning" role="alert">
           {avisoZonas}
         </div>
       )}

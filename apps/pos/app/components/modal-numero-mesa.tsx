@@ -119,7 +119,7 @@ export function ModalNumeroMesa({
         {error && <p className="mt-3 text-[13px] font-medium text-danger" role="alert">{error}</p>}
 
         {ofrecerCrear && (
-          <div className="mt-3 rounded border border-[#F0DCC0] bg-[#FCF3E6] px-3 py-2.5">
+          <div className="mt-3 rounded border border-[#F0DCC0] bg-warning-soft px-3 py-2.5">
             <p className="text-[13px] font-medium text-warning">
               La mesa {ofrecerCrear} no existe todavía.
             </p>

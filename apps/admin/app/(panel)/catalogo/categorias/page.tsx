@@ -167,7 +167,7 @@ export default function CategoriasPage() {
                       <span
                         className={[
                           "inline-flex items-center gap-1.5 rounded-full px-[11px] py-1 text-[12.5px] font-semibold",
-                          c.activa ? "bg-[#EAF3EE] text-success" : "bg-hover text-ink-3",
+                          c.activa ? "bg-success-soft text-success" : "bg-hover text-ink-3",
                         ].join(" ")}
                       >
                         <span className={["h-1.5 w-1.5 rounded-full", c.activa ? "bg-success" : "bg-ink-3"].join(" ")} />

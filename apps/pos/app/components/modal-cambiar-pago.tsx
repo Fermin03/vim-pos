@@ -149,7 +149,7 @@ export function ModalCambiarPago({
 
       <div className={[
         "mb-4 rounded border px-3 py-2 text-[12.5px] font-medium",
-        tienePermisoRol ? "border-[#D6E8DD] bg-[#EAF3EE] text-success" : "border-[#E8DCC0] bg-[#F6EEDD] text-warning",
+        tienePermisoRol ? "border-[#D6E8DD] bg-success-soft text-success" : "border-[#E8DCC0] bg-warning-soft text-warning",
       ].join(" ")}>
         {tienePermisoRol ? "Dentro de tu rol · no requiere autorización." : "Requiere PIN de un supervisor."}
       </div>

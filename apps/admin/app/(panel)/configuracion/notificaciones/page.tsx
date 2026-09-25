@@ -38,7 +38,7 @@ export default function NotificacionesPage() {
             </p>
 
             {!soportado && (
-              <p className="mt-4 rounded border border-[#E8DCC0] bg-[#F6EEDD] px-3 py-2 text-[12.5px] font-medium text-warning">
+              <p className="mt-4 rounded border border-[#E8DCC0] bg-warning-soft px-3 py-2 text-[12.5px] font-medium text-warning">
                 Este navegador no soporta notificaciones push (o falta configurar la llave pública VAPID).
               </p>
             )}

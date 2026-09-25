@@ -245,7 +245,7 @@ export function SidebarTicket({
             />
           )}
           {estado.notaOrden && !notaOrdenAbierta && (
-            <div className="mt-1.5 rounded border-l-2 border-[#D4A017] bg-[#FBF6E8] px-2.5 py-1.5 text-[12.5px] font-medium italic text-[#7A5A10]">
+            <div className="mt-1.5 rounded border-l-2 border-[#D4A017] bg-warning-soft px-2.5 py-1.5 text-[12.5px] font-medium italic text-[#7A5A10]">
               “{estado.notaOrden}”
             </div>
           )}
@@ -457,7 +457,7 @@ export function SidebarTicket({
               type="button"
               disabled={vacio || procesando}
               onClick={onEnviarCocinaAbierto}
-              className="flex w-full items-center justify-center gap-[10px] rounded-lg bg-accent px-5 py-[14px] text-[16.5px] font-bold text-white shadow-[0_1px_3px_rgba(232,80,46,.3)] transition-colors hover:bg-accent-hover disabled:cursor-not-allowed disabled:bg-line-strong disabled:shadow-none"
+              className="flex w-full items-center justify-center gap-[10px] rounded-lg bg-accent px-5 py-[14px] text-[16.5px] font-bold text-white shadow-[0_1px_3px_rgb(var(--accent)/0.3)] transition-colors hover:bg-accent-hover disabled:cursor-not-allowed disabled:bg-line-strong disabled:shadow-none"
             >
               {procesando ? "Enviando…" : (
                 <><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5"><path d="M3 11l19-9-9 19-2-8-8-2z" /></svg> Enviar a cocina</>
@@ -480,7 +480,7 @@ export function SidebarTicket({
           type="button"
           disabled={vacio || procesando || !onCobrar}
           onClick={() => onCobrar?.()}
-          className="flex w-full items-center justify-center gap-[10px] rounded-lg bg-accent px-5 py-[14px] text-[17px] font-bold text-white shadow-[0_1px_3px_rgba(232,80,46,.3)] transition-colors hover:bg-accent-hover disabled:cursor-not-allowed disabled:bg-line-strong disabled:shadow-none"
+          className="flex w-full items-center justify-center gap-[10px] rounded-lg bg-accent px-5 py-[14px] text-[17px] font-bold text-white shadow-[0_1px_3px_rgb(var(--accent)/0.3)] transition-colors hover:bg-accent-hover disabled:cursor-not-allowed disabled:bg-line-strong disabled:shadow-none"
         >
           {procesando ? (
             "Procesando…"
@@ -500,7 +500,7 @@ export function SidebarTicket({
             className={[
               "flex w-full items-center justify-center gap-2 rounded border px-5 py-[10px] text-[14px] font-semibold transition-all disabled:cursor-default",
               cocinaEnviada
-                ? "border-success/40 bg-[#EAF3EE] text-success disabled:opacity-100"
+                ? "border-success/40 bg-success-soft text-success disabled:opacity-100"
                 : "border-line-strong text-ink-2 hover:border-ink hover:text-ink disabled:opacity-[.45]",
             ].join(" ")}
           >

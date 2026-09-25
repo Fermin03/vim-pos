@@ -16,7 +16,7 @@ import { mensajeError } from "../../../lib/errores";
 type Filtro = "all" | "ACTIVO" | "PAUSADO" | "AGOTADO";
 
 const BADGE: Record<EstadoProducto, { txt: string; cls: string; dot: string }> = {
-  ACTIVO: { txt: "Activo", cls: "bg-[#EAF3EE] text-success", dot: "bg-success" },
+  ACTIVO: { txt: "Activo", cls: "bg-success-soft text-success", dot: "bg-success" },
   PAUSADO: { txt: "Pausado", cls: "bg-hover text-ink-3", dot: "bg-ink-3" },
   AGOTADO: { txt: "Agotado", cls: "bg-[#FBF1EF] text-danger", dot: "bg-danger" },
 };

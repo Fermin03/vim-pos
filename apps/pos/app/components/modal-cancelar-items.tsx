@@ -268,7 +268,7 @@ export function ModalCancelarItems({
       </div>
 
       {enCocina && (
-        <p className="mt-3 rounded border border-[#F0DCC0] bg-[#FCF3E6] px-3 py-2 text-[12.5px] font-medium text-warning">
+        <p className="mt-3 rounded border border-[#F0DCC0] bg-warning-soft px-3 py-2 text-[12.5px] font-medium text-warning">
           Este pedido ya está en cocina: se pedirá autorización con PIN.
         </p>
       )}

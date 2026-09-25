@@ -82,7 +82,7 @@ export default function ComprasPage() {
                     <td className="pr-3 text-ink-2">{c.referencia ?? "—"}{c.origen === "XML" && <span className="ml-2 rounded bg-accent-soft px-1.5 text-[11px] font-medium text-accent">XML</span>}</td>
                     <td className="pr-3 text-ink-2">{c.sucursalNombre}</td>
                     <td className="pr-3 text-right tabular-nums">{fmt(c.total)}</td>
-                    <td><span className={`rounded px-2 py-0.5 text-[12px] font-medium ${c.estado === "ANULADA" ? "bg-[#FBECEA] text-danger" : "bg-[#E8F1EC] text-success"}`}>{c.estado === "ANULADA" ? "Anulada" : "Confirmada"}</span></td>
+                    <td><span className={`rounded px-2 py-0.5 text-[12px] font-medium ${c.estado === "ANULADA" ? "bg-danger-soft text-danger" : "bg-success-soft text-success"}`}>{c.estado === "ANULADA" ? "Anulada" : "Confirmada"}</span></td>
                   </tr>
                 ))}
                 {filas.length === 0 && <tr><td colSpan={7} className="py-6 text-center text-sm text-ink-3">No hay compras en este rango.</td></tr>}

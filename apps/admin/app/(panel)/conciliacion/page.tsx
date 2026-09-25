@@ -94,7 +94,7 @@ export default function ConciliacionPage() {
 function EstadoChip({ estado }: { estado: string }) {
   const ok = estado === "CONCILIADA";
   const pend = estado === "PENDIENTE" || estado === "EN_PROCESO";
-  const cls = ok ? "bg-[#EAF3EE] text-success" : pend ? "bg-sel text-ink-3" : "bg-[#FBF1EF] text-danger";
+  const cls = ok ? "bg-success-soft text-success" : pend ? "bg-sel text-ink-3" : "bg-[#FBF1EF] text-danger";
   const txt = ok ? "Conciliada" : pend ? "Pendiente" : "Con diferencias";
   return <span className={["inline-flex rounded-full px-2.5 py-1 text-[12px] font-semibold", cls].join(" ")}>{txt}</span>;
 }

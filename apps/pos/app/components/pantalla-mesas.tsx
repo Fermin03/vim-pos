@@ -125,7 +125,7 @@ export function PantallaMesas({
       </header>
 
       {error && (
-        <div className="mx-6 mt-3 rounded border border-[#EDC4BE] bg-[#FBECEA] px-3 py-2 text-[13px] font-medium text-danger" role="alert">{error}</div>
+        <div className="mx-6 mt-3 rounded border border-[#EDC4BE] bg-danger-soft px-3 py-2 text-[13px] font-medium text-danger" role="alert">{error}</div>
       )}
 
       {/* Leyenda */}

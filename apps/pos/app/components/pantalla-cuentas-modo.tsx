@@ -419,7 +419,7 @@ export function PantallaCuentasModo({
                   {entrega.direccion && <p className="mt-1 text-[13px] leading-snug text-ink-2">{entrega.direccion}</p>}
                   {entrega.referencias && <p className="mt-0.5 text-[12.5px] leading-snug text-ink-3">Referencias: {entrega.referencias}</p>}
                   {entrega.notasRepartidor && (
-                    <p className="mt-1 rounded border border-[#F0DCC0] bg-[#FCF3E6] px-2 py-1 text-[12.5px] leading-snug text-ink-2">
+                    <p className="mt-1 rounded border border-[#F0DCC0] bg-warning-soft px-2 py-1 text-[12.5px] leading-snug text-ink-2">
                       Para el repartidor: {entrega.notasRepartidor}
                     </p>
                   )}

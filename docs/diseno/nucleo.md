@@ -81,7 +81,7 @@ de la interfaz. Hoy coinciden en el mismo azul, pero son dos decisiones distinta
 |---|---|---|
 | `ink` | `#16161A` | Texto principal, cifras, títulos. |
 | `ink-2` | `#5A5A60` | Texto secundario, etiquetas de campo. |
-| `ink-3` | `#8E8E94` | Texto de apoyo, ayudas, marcas de tiempo. |
+| `ink-3` | `#6E6E74` | Texto de apoyo, ayudas, marcas de tiempo. Era `#8E8E94` hasta sep 2026: daba 3.3:1 y no llegaba al mínimo de lectura. |
 
 Tres niveles bastan. Un cuarto tono intermedio siempre acaba usándose "porque el otro no se veía
 bien", que es la manera educada de decir que la jerarquía se rompió.
@@ -194,6 +194,28 @@ Alturas usadas, por frecuencia: `h-11` (44px) · `h-10` (40px) · `h-12` (48px) 
 **Nada por debajo de 36px en superficies que se tocan.** El POS se opera de pie, con prisa y a
 veces con guantes; un objetivo de 32px se falla lo suficiente como para que el cajero deje de
 confiar en la pantalla.
+
+### Presionar y pasar el mouse
+
+- **Todo lo que se toca responde al presionar**: `active:scale-[.97]` (60 ms de ida, vuelta con
+  `ease-vim`). `Button` ya lo trae; un botón hecho a mano lo copia.
+- **El hover es solo para mouse.** El preset activa `hoverOnlyWhenSupported`: en táctil el hover
+  no existe, así que nada puede depender de él para verse o para entenderse (lo destructivo va
+  en rojo en reposo, no solo al pasar el mouse).
+
+### Movimiento
+
+Curvas en `tokens.css` (`--ease-out`, `--ease-in-out`, `--ease-drawer`) y en Tailwind como
+`ease-vim`, `ease-vim-in-out`, `ease-vim-drawer`. Duraciones de interfaz entre 150 y 250 ms.
+
+| Frecuencia | Qué hacer |
+|---|---|
+| Cientos de veces al día (cobro, catálogo, teclado, paginar) | **Sin animación.** Solo la respuesta al presionar. |
+| Decenas (modales de uso diario, avisos) | Entrada corta (≤200 ms), salida más rápida que la entrada. |
+| Ocasional o raro (cierre de turno, primera vez) | Se permite un momento con intención. |
+
+Solo se animan `transform` y `opacity`. Con `prefers-reduced-motion` se quita el desplazamiento
+y la sacudida y se conserva el fundido (`tokens.css`).
 
 ---
 

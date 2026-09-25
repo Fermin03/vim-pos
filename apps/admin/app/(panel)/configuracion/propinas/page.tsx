@@ -122,7 +122,7 @@ export default function PropinasPage() {
             ) : (
               <div className="flex flex-col gap-5 rounded-lg border border-line bg-surface p-5">
                 <label className="flex items-start gap-2.5">
-                  <input type="checkbox" className="mt-0.5 h-4 w-4 accent-[#16161A]" checked={capturar} onChange={(e) => setCapturar(e.target.checked)} />
+                  <input type="checkbox" className="mt-0.5 h-4 w-4 accent-ink" checked={capturar} onChange={(e) => setCapturar(e.target.checked)} />
                   <div>
                     <div className="text-sm font-medium">Capturar propina en el cobro</div>
                     <div className="text-[12.5px] text-ink-3">Si lo apagas, el POS nunca pide propina.</div>
@@ -136,7 +136,7 @@ export default function PropinasPage() {
                 </div>
 
                 <label className="flex items-start gap-2.5">
-                  <input type="checkbox" className="mt-0.5 h-4 w-4 accent-[#16161A]" checked={libre} onChange={(e) => setLibre(e.target.checked)} />
+                  <input type="checkbox" className="mt-0.5 h-4 w-4 accent-ink" checked={libre} onChange={(e) => setLibre(e.target.checked)} />
                   <div>
                     <div className="text-sm font-medium">Permitir monto libre</div>
                     <div className="text-[12.5px] text-ink-3">El cliente puede teclear una cantidad distinta.</div>
@@ -144,7 +144,7 @@ export default function PropinasPage() {
                 </label>
 
                 <label className="flex items-start gap-2.5">
-                  <input type="checkbox" className="mt-0.5 h-4 w-4 accent-[#16161A]" checked={sin} onChange={(e) => setSin(e.target.checked)} />
+                  <input type="checkbox" className="mt-0.5 h-4 w-4 accent-ink" checked={sin} onChange={(e) => setSin(e.target.checked)} />
                   <div>
                     <div className="text-sm font-medium">Permitir “Sin propina”</div>
                     <div className="text-[12.5px] text-ink-3">Si lo apagas, hay que elegir al menos una sugerencia.</div>
@@ -152,7 +152,7 @@ export default function PropinasPage() {
                 </label>
 
                 <label className="flex items-start gap-2.5">
-                  <input type="checkbox" className="mt-0.5 h-4 w-4 accent-[#16161A]" checked={redondear} onChange={(e) => setRedondear(e.target.checked)} />
+                  <input type="checkbox" className="mt-0.5 h-4 w-4 accent-ink" checked={redondear} onChange={(e) => setRedondear(e.target.checked)} />
                   <div>
                     <div className="text-sm font-medium">Redondear a pesos</div>
                     <div className="text-[12.5px] text-ink-3">Quita los centavos al calcular la propina.</div>

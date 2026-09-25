@@ -1969,7 +1969,7 @@ export function HomePos({
           invisible: "Este combo no tiene slots", "Cuenta desincronizada", y el de un producto
           que ya salió a cocina y no se puede editar. */}
       {error && (
-        <div className="flex flex-shrink-0 items-center gap-3 bg-[#FBECEA] px-4 py-2" role="alert">
+        <div className="flex flex-shrink-0 items-center gap-3 bg-danger-soft px-4 py-2" role="alert">
           <p className="min-w-0 flex-1 text-[13px] font-medium text-danger">{error}</p>
           <button
             type="button"

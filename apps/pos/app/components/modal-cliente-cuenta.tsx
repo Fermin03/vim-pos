@@ -223,7 +223,7 @@ export function ModalClienteCuenta({
           <div><label htmlFor="cc-notas" className={label}>Notas</label><input id="cc-notas" className={input} value={datos.notas} maxLength={300} onChange={(e) => set("notas", e.target.value)} placeholder="Alergias, preferencias…" /></div>
 
           {duplicado && (
-            <div className="flex items-center justify-between gap-3 rounded border border-[#E8DCC0] bg-[#F6EEDD] px-3 py-2.5" role="alert">
+            <div className="flex items-center justify-between gap-3 rounded border border-[#E8DCC0] bg-warning-soft px-3 py-2.5" role="alert">
               <span className="text-[12.5px] font-medium text-warning">Ese teléfono ya es de <b>{duplicado.nombre}</b>.</span>
               {!duplicado.bloqueado && (
                 <button type="button" disabled={guardando} onClick={() => void asignar(duplicado)}

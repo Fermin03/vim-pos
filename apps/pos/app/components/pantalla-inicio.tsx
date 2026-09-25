@@ -243,7 +243,7 @@ export function PantallaInicio({
           <button
             type="button"
             onClick={onAbrirTurno}
-            className="flex items-center gap-3 rounded-xl border border-[#E8DCC0] bg-[#F6EEDD] px-5 py-3 text-left transition hover:border-warning"
+            className="flex items-center gap-3 rounded-xl border border-[#E8DCC0] bg-warning-soft px-5 py-3 text-left transition hover:border-warning"
           >
             <span className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full bg-warning/15 text-warning">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5"><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></svg>

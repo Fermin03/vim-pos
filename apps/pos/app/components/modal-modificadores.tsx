@@ -446,7 +446,7 @@ export function ModalModificadores({
               type="button"
               disabled={!todoValido}
               onClick={confirmar}
-              className="flex h-[52px] w-[min(340px,40%)] flex-shrink-0 items-center justify-between gap-2 rounded-lg border-none bg-accent px-4 text-[16px] font-bold text-white shadow-[0_1px_3px_rgba(232,80,46,.3)] transition hover:bg-accent-hover active:scale-[.98] disabled:cursor-not-allowed disabled:bg-line-strong disabled:shadow-none"
+              className="flex h-[52px] w-[min(340px,40%)] flex-shrink-0 items-center justify-between gap-2 rounded-lg border-none bg-accent px-4 text-[16px] font-bold text-white shadow-[0_1px_3px_rgb(var(--accent)/0.3)] transition hover:bg-accent-hover active:scale-[.98] disabled:cursor-not-allowed disabled:bg-line-strong disabled:shadow-none"
             >
               <span className="truncate">{editando ? "Guardar cambios" : "Agregar al ticket"}</span>
               <span className="font-display tabular-nums">

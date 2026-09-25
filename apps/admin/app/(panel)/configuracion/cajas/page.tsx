@@ -119,7 +119,7 @@ export default function CajasPage() {
                                 <span className="h-1.5 w-1.5 rounded-full bg-danger" />Bloqueada
                               </span>
                             ) : (
-                              <span className={["inline-flex items-center gap-1.5 rounded-full px-[11px] py-1 text-[12.5px] font-semibold", c.activa ? "bg-[#EAF3EE] text-success" : "bg-hover text-ink-3"].join(" ")}>
+                              <span className={["inline-flex items-center gap-1.5 rounded-full px-[11px] py-1 text-[12.5px] font-semibold", c.activa ? "bg-success-soft text-success" : "bg-hover text-ink-3"].join(" ")}>
                                 <span className={["h-1.5 w-1.5 rounded-full", c.activa ? "bg-success" : "bg-ink-3"].join(" ")} />
                                 {c.activa ? "Activa" : "Inactiva"}
                               </span>
@@ -177,7 +177,7 @@ export default function CajasPage() {
             <CampoCopiable label="Identificador del dispositivo" valor={creds.identificador} />
             <CampoCopiable label="Clave del dispositivo" valor={creds.clave} />
           </div>
-          <div className="mt-4 rounded border border-[#E8DCC0] bg-[#F6EEDD] px-3 py-2 text-[12.5px] font-medium text-warning">
+          <div className="mt-4 rounded border border-[#E8DCC0] bg-warning-soft px-3 py-2 text-[12.5px] font-medium text-warning">
             La clave no se vuelve a mostrar. Si la pierdes, vuelve a generar (se invalida la anterior).
           </div>
           <div className="mt-5 flex justify-end">

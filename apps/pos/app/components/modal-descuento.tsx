@@ -239,7 +239,7 @@ export function ModalDescuento({
           {puestas.map((p) => (
             <div
               key={p.aplicacionId}
-              className="mb-1.5 flex items-center justify-between gap-3 rounded border border-[#D6E8DD] bg-[#EAF3EE] px-3 py-2"
+              className="mb-1.5 flex items-center justify-between gap-3 rounded border border-[#D6E8DD] bg-success-soft px-3 py-2"
             >
               <div className="min-w-0">
                 <div className="truncate text-[13px] font-semibold text-success">{p.nombre}</div>
@@ -365,7 +365,7 @@ export function ModalDescuento({
 
       {/* Banner de autorización */}
       <div className={["mb-4 rounded border px-3 py-2 text-[12.5px] font-medium",
-        tienePermiso ? "border-[#D6E8DD] bg-[#EAF3EE] text-success" : "border-[#E8DCC0] bg-[#F6EEDD] text-warning"].join(" ")}>
+        tienePermiso ? "border-[#D6E8DD] bg-success-soft text-success" : "border-[#E8DCC0] bg-warning-soft text-warning"].join(" ")}>
         {tienePermiso ? "Dentro de tu rol · no requiere autorización." : "Requiere PIN de un supervisor."}
       </div>
 

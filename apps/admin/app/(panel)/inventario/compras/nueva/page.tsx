@@ -221,7 +221,7 @@ export default function NuevaCompraPage() {
                   const res = c && c.insumoId && c.cantidadCapturada > 0 && c.factor > 0 ? resolverLinea(c) : null;
                   return (
                     <tr key={i} className={`border-b border-line-soft align-top ${f.omitir ? "opacity-50" : ""}`}>
-                      {cfdi && <td className="max-w-[220px] py-2 pr-2 text-[12px] text-ink-2">{f.descripcionOrigen}{f.emparejado && <span className="ml-1 rounded bg-[#E8F1EC] px-1 text-[10.5px] font-medium text-success">Emparejado</span>}</td>}
+                      {cfdi && <td className="max-w-[220px] py-2 pr-2 text-[12px] text-ink-2">{f.descripcionOrigen}{f.emparejado && <span className="ml-1 rounded bg-success-soft px-1 text-[10.5px] font-medium text-success">Emparejado</span>}</td>}
                       <td className="py-1.5 pr-2">
                         <select className={input} value={f.insumoId} disabled={f.omitir} onChange={(e) => elegirInsumo(i, e.target.value)} aria-label="Insumo">
                           <option value="">Elige…</option>{insumos.map((o) => <option key={o.id} value={o.id}>{o.nombre}</option>)}

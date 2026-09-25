@@ -122,7 +122,7 @@ export default function ImportarMenuPage() {
                   </div>
 
                   {parse.errores.length > 0 && (
-                    <div className="mt-3 rounded border border-[#E8DCC0] bg-[#F6EEDD] px-3 py-2 text-[12px] text-warning">
+                    <div className="mt-3 rounded border border-[#E8DCC0] bg-warning-soft px-3 py-2 text-[12px] text-warning">
                       <div className="font-semibold">Líneas que se omitirán:</div>
                       <ul className="mt-1 list-disc pl-4">
                         {parse.errores.slice(0, 6).map((e) => (
@@ -158,7 +158,7 @@ export default function ImportarMenuPage() {
               {resultado.categoriasCreadas > 0 && <> y <b>{resultado.categoriasCreadas}</b> categorías nuevas</>}.
             </p>
             {resultado.fallos.length > 0 && (
-              <div className="mt-3 rounded border border-[#EDC4BE] bg-[#FBECEA] px-3 py-2 text-[12.5px] text-danger">
+              <div className="mt-3 rounded border border-[#EDC4BE] bg-danger-soft px-3 py-2 text-[12.5px] text-danger">
                 <div className="font-semibold">{resultado.fallos.length} no se pudieron crear:</div>
                 <ul className="mt-1 list-disc pl-4">
                   {resultado.fallos.slice(0, 8).map((f, i) => <li key={i}>{f.nombre}: {f.motivo}</li>)}

@@ -125,7 +125,7 @@ export function AsignacionMasivaGrupo({ grupoId, grupoNombre }: { grupoId: strin
               <span className="min-w-0 flex-1 truncate text-[13.5px] font-medium">{p.nombre}</span>
               <span className="text-[11.5px] text-ink-3">{p.categoriaNombre}</span>
               {conGrupo.has(p.id) && (
-                <span className="rounded-full bg-[#EAF3EE] px-2 py-0.5 text-[10.5px] font-bold text-success">Ya lo tiene</span>
+                <span className="rounded-full bg-success-soft px-2 py-0.5 text-[10.5px] font-bold text-success">Ya lo tiene</span>
               )}
             </label>
           ))}

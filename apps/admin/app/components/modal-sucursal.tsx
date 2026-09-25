@@ -121,7 +121,7 @@ export function ModalSucursal({
       </div>
 
       <label className="mt-4 flex items-center gap-2.5">
-        <input type="checkbox" className="h-4 w-4 accent-[#16161A]" checked={activa} onChange={(e) => setActiva(e.target.checked)} />
+        <input type="checkbox" className="h-4 w-4 accent-ink" checked={activa} onChange={(e) => setActiva(e.target.checked)} />
         <span className="text-sm"><span className="font-medium">Sucursal activa</span> <span className="text-ink-3">(operando)</span></span>
       </label>
 

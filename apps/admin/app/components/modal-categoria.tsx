@@ -183,7 +183,7 @@ export function ModalCategoria({
             type="checkbox"
             checked={activa}
             onChange={(e) => setActiva(e.target.checked)}
-            className="h-4 w-4 accent-[#16161A]"
+            className="h-4 w-4 accent-ink"
           />
           <span className="text-sm">
             <span className="font-medium">Categoría activa</span>{" "}

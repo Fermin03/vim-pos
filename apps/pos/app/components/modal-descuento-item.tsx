@@ -196,7 +196,7 @@ export function ModalDescuentoItem({
           onChange={(e) => setMotivoTexto(e.target.value)} placeholder="Describe el motivo" />
       )}
 
-      <div className={["mb-4 rounded border px-3 py-2 text-[12.5px] font-medium", tienePermiso ? "border-[#D6E8DD] bg-[#EAF3EE] text-success" : "border-[#E8DCC0] bg-[#F6EEDD] text-warning"].join(" ")}>
+      <div className={["mb-4 rounded border px-3 py-2 text-[12.5px] font-medium", tienePermiso ? "border-[#D6E8DD] bg-success-soft text-success" : "border-[#E8DCC0] bg-warning-soft text-warning"].join(" ")}>
         {tienePermiso ? "Dentro de tu rol · no requiere autorización." : "Requiere PIN de un supervisor."}
       </div>
 

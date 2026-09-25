@@ -170,8 +170,8 @@ export function ModalCancelarItem({
         className={[
           "mb-4 rounded border px-3 py-2 text-[12.5px] font-medium",
           requierePin
-            ? "border-[#E8DCC0] bg-[#F6EEDD] text-warning"
-            : "border-[#D6E8DD] bg-[#EAF3EE] text-success",
+            ? "border-[#E8DCC0] bg-warning-soft text-warning"
+            : "border-[#D6E8DD] bg-success-soft text-success",
         ].join(" ")}
       >
         {enCocina

@@ -76,7 +76,7 @@ export function PantallaDevoluciones({
         </div>
       </header>
 
-      {error && <div className="mx-6 mt-3 rounded border border-[#EDC4BE] bg-[#FBECEA] px-3 py-2 text-[13px] font-medium text-danger" role="alert">{error}</div>}
+      {error && <div className="mx-6 mt-3 rounded border border-[#EDC4BE] bg-danger-soft px-3 py-2 text-[13px] font-medium text-danger" role="alert">{error}</div>}
 
       <div className="min-h-0 flex-1 overflow-y-auto p-6">
         {ventas === null && <p className="text-center text-ink-3">Cargando ventas…</p>}
@@ -94,7 +94,7 @@ export function PantallaDevoluciones({
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2">
                     <span className="font-display text-[15px] font-bold">{v.folio}</span>
-                    {v.tieneDevolucion && <span className="rounded-full bg-[#FCF3E6] px-2 py-0.5 text-[10.5px] font-bold text-warning">Con devolución</span>}
+                    {v.tieneDevolucion && <span className="rounded-full bg-warning-soft px-2 py-0.5 text-[10.5px] font-bold text-warning">Con devolución</span>}
                   </div>
                   {v.fechaCobro && (
                     <div className="mt-0.5 text-[12px] text-ink-3">
@@ -316,7 +316,7 @@ function ModalDevolucion({
         <p className="mb-4 -mt-2 text-[12px] text-ink-3">{MEDIOS_DEV.find((m) => m.codigo === medio)?.nota}</p>
       )}
 
-      <div className={["mb-4 rounded border px-3 py-2 text-[12.5px] font-medium", tienePermiso ? "border-[#D6E8DD] bg-[#EAF3EE] text-success" : "border-[#E8DCC0] bg-[#F6EEDD] text-warning"].join(" ")}>
+      <div className={["mb-4 rounded border px-3 py-2 text-[12.5px] font-medium", tienePermiso ? "border-[#D6E8DD] bg-success-soft text-success" : "border-[#E8DCC0] bg-warning-soft text-warning"].join(" ")}>
         {tienePermiso ? "Dentro de tu rol · no requiere autorización." : "Requiere PIN de un supervisor."}
       </div>
 

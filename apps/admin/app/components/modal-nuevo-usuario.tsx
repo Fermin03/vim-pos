@@ -132,7 +132,7 @@ export function ModalNuevoUsuario({
                   value={r}
                   checked={rol === r}
                   onChange={() => setRol(r)}
-                  className="mt-1 h-4 w-4 accent-[#16161A]"
+                  className="mt-1 h-4 w-4 accent-ink"
                 />
                 <div>
                   <div className="text-[14px] font-semibold">{ROL_LABEL[r]}</div>

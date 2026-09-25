@@ -65,11 +65,11 @@ function ModalOpcion({
           <p className="mt-1 text-[11.5px] text-ink-3">0 = sin costo. Puede ser negativo (descuento).</p>
         </div>
         <label className="flex items-center gap-2.5">
-          <input type="checkbox" className="h-4 w-4 accent-[#16161A]" checked={esDefault} onChange={(e) => setEsDefault(e.target.checked)} />
+          <input type="checkbox" className="h-4 w-4 accent-ink" checked={esDefault} onChange={(e) => setEsDefault(e.target.checked)} />
           <span className="text-sm"><span className="font-medium">Opción por defecto</span> <span className="text-ink-3">(pre-seleccionada)</span></span>
         </label>
         <label className="flex items-center gap-2.5">
-          <input type="checkbox" className="h-4 w-4 accent-[#16161A]" checked={activa} onChange={(e) => setActiva(e.target.checked)} />
+          <input type="checkbox" className="h-4 w-4 accent-ink" checked={activa} onChange={(e) => setActiva(e.target.checked)} />
           <span className="text-sm"><span className="font-medium">Activa</span></span>
         </label>
         {error && <p className="text-sm font-medium text-danger" role="alert">{error}</p>}

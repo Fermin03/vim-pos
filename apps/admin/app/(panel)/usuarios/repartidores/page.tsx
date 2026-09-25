@@ -161,7 +161,7 @@ export default function RepartidoresPage() {
                       <span
                         className={[
                           "inline-block rounded-full px-2 py-0.5 text-[12px] font-semibold",
-                          r.activo ? "bg-[#EAF3EE] text-success" : "bg-hover text-ink-3",
+                          r.activo ? "bg-success-soft text-success" : "bg-hover text-ink-3",
                         ].join(" ")}
                       >
                         {r.activo ? "Activo" : "Inactivo"}

@@ -155,7 +155,7 @@ export function PantallaReservaciones({
       </header>
 
       {error && (
-        <div className="mx-6 mt-3 rounded border border-[#EDC4BE] bg-[#FBECEA] px-3 py-2 text-[13px] font-medium text-danger" role="alert">
+        <div className="mx-6 mt-3 rounded border border-[#EDC4BE] bg-danger-soft px-3 py-2 text-[13px] font-medium text-danger" role="alert">
           {error}
         </div>
       )}
@@ -280,7 +280,7 @@ function Fila({
             type="button"
             disabled={ocupado}
             onClick={() => onModo({ t: "cancelar", r })}
-            className="h-10 rounded border border-danger/40 px-3 text-[13px] font-semibold text-danger transition hover:bg-[#FBECEA] disabled:opacity-40"
+            className="h-10 rounded border border-danger/40 px-3 text-[13px] font-semibold text-danger transition hover:bg-danger-soft disabled:opacity-40"
           >
             Cancelar
           </button>
