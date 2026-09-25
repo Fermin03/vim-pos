@@ -87,11 +87,15 @@ Deno.serve(async (req) => {
   // ── Datos del emisor ────────────────────────────────────────────────────────────────────────
   const { data: emisorRaw } = await sb
     .from("tenant_cfdi_emisor")
-    .select("rfc, periodicidad_global, csd_numero_certificado")
+    .select("rfc, periodicidad_global, csd_numero_certificado, estado")
     .eq("tenant_id", tenantId)
     .maybeSingle();
-  const emisor = emisorRaw as { rfc: string; periodicidad_global: string; csd_numero_certificado: string | null } | null;
+  const emisor = emisorRaw as { rfc: string; periodicidad_global: string; csd_numero_certificado: string | null; estado: string } | null;
   if (!emisor) return json({ error: "SIN_EMISOR", detalle: "Captura los datos fiscales del negocio" }, 409);
+  // Pausada por el negocio: solo "INACTIVO" bloquea (ver timbrar-cfdi).
+  if (emisor.estado === "INACTIVO") {
+    return json({ error: "FACTURACION_PAUSADA", detalle: "La facturación está pausada. Reanúdala en Configuración → Facturación." }, 409);
+  }
   if (!emisor.csd_numero_certificado) {
     return json({ error: "SIN_SELLO", detalle: "Carga el sello digital antes de facturar" }, 409);
   }

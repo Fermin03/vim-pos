@@ -39,9 +39,13 @@ export async function leerEstadoOnboarding(): Promise<EstadoOnboarding> {
   const fase = ((ob?.fase as OnboardingFase) ?? "INVITADO") as OnboardingFase;
 
   // Señales reales de completitud.
-  const { data: negocio } = await supabase.from("tenants").select("nombre_comercial, razon_social").maybeSingle();
+  const { data: negocio } = await supabase.from("tenants").select("nombre_comercial, razon_social, rfc, codigo_postal_fiscal").maybeSingle();
+  const tieneRfcYCp = !!(negocio?.rfc && negocio?.codigo_postal_fiscal);
   const tieneNegocio = !!(negocio?.nombre_comercial && String(negocio.nombre_comercial).trim());
-  const tieneFiscal = !!(negocio?.razon_social && String(negocio.razon_social).trim());
+  const { data: emisor } = await supabase.from("tenant_cfdi_emisor").select("estado, csd_numero_certificado").maybeSingle();
+  // Lista para facturar: sello cargado y sin pausa (solo "INACTIVO" pausa; ver lib/facturacion-estado.ts).
+  const e = emisor as { estado?: string; csd_numero_certificado?: string | null } | null;
+  const facturacionActiva = tieneRfcYCp && !!e?.csd_numero_certificado && e?.estado !== "INACTIVO";
 
   const [productos, cajas, usuarios] = await Promise.all([
     contar("productos"),
@@ -54,7 +58,9 @@ export async function leerEstadoOnboarding(): Promise<EstadoOnboarding> {
     { clave: "catalogo", titulo: "Tu menú", descripcion: "Importa o captura tus productos y categorías.", href: "/catalogo/importar", completo: productos > 0, opcional: false },
     { clave: "caja", titulo: "Sucursal y caja", descripcion: "Al menos una caja para poder vender.", href: "/configuracion/cajas", completo: cajas > 0, opcional: false },
     { clave: "equipo", titulo: "Tu equipo", descripcion: "Crea cajeros y cocina con su PIN.", href: "/usuarios", completo: usuarios > 1, opcional: false },
-    { clave: "fiscal", titulo: "Datos fiscales", descripcion: "Solo si vas a facturar (CFDI).", href: "/configuracion/fiscal", completo: tieneFiscal, opcional: true },
+    // Completo con la facturación ACTIVA, no con la pura razón social: antes se marcaba hecho
+    // sin que el negocio pudiera emitir una sola factura.
+    { clave: "fiscal", titulo: "Facturación", descripcion: "Solo si vas a facturar: tus datos fiscales y tu sello digital.", href: "/configuracion/facturacion", completo: facturacionActiva, opcional: true },
   ];
 
   const obligatorios = pasos.filter((p) => !p.opcional);
