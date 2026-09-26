@@ -516,6 +516,15 @@ body[data-menu-abierto="true"] { overflow: hidden; }
 
 .hero p.entradilla { font-size: var(--t-18); max-width: 52ch; }
 
+/* El precio bajo los botones del hero: dato, no anuncio. Mismo cuerpo que la letra
+   de apoyo, con la cifra en tinta para que se encuentre de un vistazo. */
+.hero-precio { font-size: var(--t-15); color: var(--ink-2); max-width: none; }
+.hero-precio strong { color: var(--ink); font-weight: 600; }
+.hero-precio a { color: var(--ink-2); text-underline-offset: 3px; white-space: nowrap; }
+@media (hover: hover) and (pointer: fine) {
+  .hero-precio a:hover { color: var(--accent); }
+}
+
 .prueba-social {
   display: inline-flex; align-items: center; gap: var(--sp-2);
   font-size: var(--t-13); color: var(--ink-2);
@@ -580,10 +589,10 @@ body[data-menu-abierto="true"] { overflow: hidden; }
 
 .hechos {
   display: grid; gap: 1px;
+  grid-template-columns: repeat(2, 1fr);
   background: var(--line);
   border-block: 1px solid var(--line);
 }
-@media (min-width: 620px) { .hechos { grid-template-columns: repeat(2, 1fr); } }
 @media (min-width: 980px) { .hechos { grid-template-columns: repeat(4, 1fr); } }
 .hecho { background: var(--bg); padding: var(--sp-6) var(--sp-5); }
 .hecho p { font-size: var(--t-15); color: var(--ink); font-weight: 500; max-width: none; }
@@ -655,6 +664,7 @@ body[data-menu-abierto="true"] { overflow: hidden; }
 @media (min-width: 860px) { .planes { grid-template-columns: repeat(3, 1fr); } }
 
 .plan {
+  background: var(--bg);
   display: flex; flex-direction: column; gap: var(--sp-4);
   border: 1px solid var(--line);
   border-radius: var(--r-lg);
@@ -683,7 +693,7 @@ body[data-menu-abierto="true"] { overflow: hidden; }
 }
 
 /* Fondo suave para la sección de sin internet, que es la de más peso. */
-.destacada-suave { background: var(--surface); border-block: 1px solid var(--line); }
+.destacada-suave { background: var(--hover); border-block: 1px solid var(--line); }
 
 /* ==========================================================================
    Rejilla de dos
@@ -826,7 +836,7 @@ body[data-menu-abierto="true"] { overflow: hidden; }
   border: 0; border-radius: 999px; background: none; cursor: pointer;
   font-family: var(--font); font-size: var(--t-13); font-weight: 600;
   color: var(--ink-2);
-  transition: background var(--v-corta) ease, color var(--v-corta) ease;
+  transition: background var(--v-corta) ease, color var(--v-corta) ease, transform var(--v-toque) var(--sal);
 }
 .conmutador button[aria-pressed="true"] {
   background: var(--bg); color: var(--ink);
@@ -870,7 +880,9 @@ body[data-menu-abierto="true"] { overflow: hidden; }
   border-radius: var(--r);
   background: var(--bg);
   color: var(--ink);
-  font-family: var(--font); font-size: var(--t-15);
+  /* 16 px y no 15: por debajo de 16, Safari de iPhone hace zoom al tocar el campo
+     y la página se queda desencuadrada. Única excepción a la escala de ocho pasos. */
+  font-family: var(--font); font-size: 16px;
   letter-spacing: -0.01em;
   transition: border-color var(--v-corta) ease, box-shadow var(--v-corta) ease;
 }
@@ -1013,59 +1025,15 @@ body[data-menu-abierto="true"] { overflow: hidden; }
 .hecho p { margin-inline: auto; }
 
 /* ==========================================================================
-   Franja de hechos en móvil — marquesina
+   Franja de hechos en el teléfono — rejilla de dos por dos, quieta
 
-   Apilados, los cuatro hechos son cuatro pantallazos de una lista vertical
-   antes de llegar a lo siguiente, y son frases sueltas: no se leen en orden ni
-   hace falta. Desfilando de lado ocupan una línea y se leen igual.
-
-   No es un carrusel: no se toca, no tiene puntos y no se detiene. Por eso va
-   con `animation` y `linear` —movimiento constante— y no con scroll-snap.
-
-   CÓMO SE CIERRA EL BUCLE: el JS duplica los cuatro hechos, así que la pista
-   contiene ocho. La animación recorre exactamente la mitad (-50%) y vuelve a
-   empezar: en ese instante el quinto elemento está justo donde estaba el
-   primero, así que el salto es invisible. Sin duplicar, al llegar al final
-   habría un hueco y un tirón.
+   Fue una marquesina de 26 s que no se podía pausar (WCAG 2.2.2): texto que se
+   lee no se mueve solo. Dos por dos cabe en una pantalla y se lee de un vistazo.
    ========================================================================== */
 
 @media (max-width: 619px) {
-  .hechos {
-    display: flex;
-    grid-template-columns: none;
-    width: max-content;
-    gap: 0;
-    animation: desfile 26s linear infinite;
-  }
-  /* La franja recorta lo que sobresale; la pista de dentro es la que se mueve. */
-  .hechos-marco { overflow: hidden; border-block: 1px solid var(--line); }
-
-  .hecho {
-    flex: 0 0 auto;
-    padding-inline: var(--sp-6);
-    border-right: 1px solid var(--line);
-    white-space: nowrap;
-  }
-  .hecho p { font-size: var(--t-15); }
-}
-
-/* Fuera de la marquesina, las copias sobran: en la rejilla de escritorio se
-   verían los cuatro hechos DOS VECES. Las pone el JS para cerrar el bucle y
-   solo tienen sentido mientras el bucle existe. */
-@media (min-width: 620px) {
-  .hecho[aria-hidden="true"] { display: none; }
-}
-
-@keyframes desfile {
-  from { transform: translateX(0); }
-  to   { transform: translateX(-50%); }
-}
-
-/* Quien pide menos movimiento no ve nada moverse solo. Se para y se deja que
-   la franja se desplace con el dedo, que sigue siendo mejor que apilarla. */
-@media (max-width: 619px) and (prefers-reduced-motion: reduce) {
-  .hechos { animation: none; }
-  .hechos-marco { overflow-x: auto; }
+  .hecho { padding: var(--sp-5) var(--sp-4); }
+  .hecho p { font-size: var(--t-13); line-height: 1.45; }
 }
 
 /* ==========================================================================
@@ -1148,30 +1116,8 @@ body[data-menu-abierto="true"] { overflow: hidden; }
   }
 }
 
-@media (max-width: 859px) {
-  .planes {
-    grid-template-columns: none;
-    grid-auto-flow: column;
-    grid-auto-columns: 82%;
-
-    overflow-x: auto;
-    overscroll-behavior-x: contain;    /* no arrastra la página al llegar al final */
-    scroll-snap-type: x mandatory;
-    scroll-padding-inline-start: var(--sp-5);
-
-    margin-inline: calc(-1 * var(--sp-5));
-    padding-inline: var(--sp-5);
-    padding-block: 2px;                /* que no se recorte la sombra ni el borde de 2 px */
-
-    scrollbar-width: none;
-  }
-  .planes::-webkit-scrollbar { display: none; }
-  .planes > * { scroll-snap-align: start; }
-
-  @media (prefers-reduced-motion: reduce) {
-    .planes { scroll-snap-type: none; }   /* sin el tirón al soltar */
-  }
-}
+/* `.planes` NO es carrusel: apilados, los tres precios se comparan bajando, y
+   en carrusel el plan que recomendamos quedaba fuera de pantalla. */
 
 /* ==========================================================================
    Puntos del carrusel
@@ -1196,7 +1142,6 @@ body[data-menu-abierto="true"] { overflow: hidden; }
 /* Cada tira de puntos aparece en el mismo corte que su rejilla. */
 @media (max-width: 759px) { .puntos[data-hasta="759"] { display: flex; } }
 @media (max-width: 799px) { .puntos[data-hasta="799"] { display: flex; } }
-@media (max-width: 859px) { .puntos[data-hasta="859"] { display: flex; } }
 
 .punto {
   /* El botón mide 24 px aunque el punto se vea de 7: por debajo de 24 el dedo
@@ -1326,3 +1271,59 @@ body[data-menu-abierto="true"] { overflow: hidden; }
   text-decoration: underline;
   text-underline-offset: 2px;
 }
+
+/* ==========================================================================
+   Diagrama de arquitectura: ancho en pantalla grande, vertical en el teléfono
+   El ancho a 350 px dejaba la letra en 5 px. Son dos dibujos con las mismas
+   clases y el botón corta los dos (vim.js).
+   ========================================================================== */
+
+.diagrama-alto { display: none; }
+@media (max-width: 619px) {
+  .diagrama-ancho { display: none; }
+  .diagrama-alto { display: block; width: 100%; max-width: 420px; }
+}
+
+/* ==========================================================================
+   Capturas en el teléfono
+   Por debajo de 620 px, `<picture>` cambia a la versión del teléfono: el panel
+   capturado a 390 px de verdad y, de la caja, el ticket recortado. Son más
+   altas que anchas, así que se enmarcan a 4:5 para no ocupar pantalla y media:
+   el panel se ve desde arriba (saludo y ventas); el ticket, desde abajo (el
+   total y el botón de cobrar, que es lo que cuenta).
+   ========================================================================== */
+
+@media (max-width: 619px) {
+  .monitor img[src*="capturas/admin-dashboard."],
+  .monitor img[src*="capturas/admin-inventario."],
+  .monitor img[src*="capturas/pos-home."] {
+    aspect-ratio: 4 / 5;
+    width: 100%;
+    object-fit: cover;
+    object-position: top;
+  }
+  .monitor img[src*="capturas/pos-home."] { object-position: bottom; }
+}
+
+/* Resumen de la columna de tranquilidad de /demo, adelantado sobre el formulario
+   solo cuando las columnas se apilan (la rejilla del hero pasa a una a 980 px). */
+.demo-resumen { display: none; }
+@media (max-width: 979px) {
+  .demo-resumen {
+    display: flex; flex-direction: column; gap: var(--sp-2);
+    list-style: none; margin: 0; padding: 0;
+  }
+  .demo-resumen li {
+    display: flex; align-items: baseline; gap: var(--sp-2);
+    font-size: var(--t-15); color: var(--ink-2);
+  }
+  .demo-resumen li::before {
+    content: ""; width: 6px; height: 6px; border-radius: 50%;
+    background: var(--success); flex-shrink: 0; transform: translateY(-2px);
+  }
+}
+
+/* Lo que va para agentes (contacto, 404): plegado y en letra de apoyo. */
+.para-robots { font-size: var(--t-13); color: var(--ink-2); }
+.para-robots summary { cursor: pointer; font-weight: 600; width: fit-content; }
+.para-robots p { margin-top: var(--sp-3); font-size: var(--t-13); }

@@ -36,7 +36,7 @@
 <link rel="manifest" href="site.webmanifest">
 <meta name="theme-color" content="#0078C9">
 
-<link rel="stylesheet" href="assets/css/vim.css?v=16">
+<link rel="stylesheet" href="assets/css/vim.css?v=17">
 <!-- Consentimiento de cookies. Va ANTES que gtm.js y el orden NO es
      cosmético: los dos llevan `defer`, que respeta el orden del documento, y
      Consent Mode descarta un estado por defecto que llegue después de que el
@@ -119,6 +119,14 @@
             productos tuyos y te dejamos cobrar una venta de prueba en el sistema de verdad.
             Después preguntas lo que quieras y te decimos qué plan te toca.
           </p>
+
+          <!-- En el teléfono la columna de la derecha cae DEBAJO del formulario, y es la que
+               quita el miedo a llenarlo. Lo esencial se adelanta aquí, en tres renglones. -->
+          <ul class="demo-resumen" aria-label="Qué pasa después de enviar">
+            <li>Te escribimos por WhatsApp el mismo día hábil</li>
+            <li>Media hora, con tus productos y tus precios</li>
+            <li>No te va a llamar un vendedor</li>
+          </ul>
 
           <form class="formulario pila pila-5" data-form novalidate>
             <div class="campos">
@@ -251,8 +259,10 @@
             <div class="monitor-barra" aria-hidden="true">
               <span class="monitor-punto"></span><span class="monitor-punto"></span><span class="monitor-punto"></span>
             </div>
-            <img src="assets/img/capturas/pos-home.webp?v=2" alt="La caja en plena venta: el catálogo por categorías y un ticket en curso con una hamburguesa, papas y refresco."
-                 width="1600" height="1000" fetchpriority="high" decoding="async">
+            <picture>
+              <source media="(max-width: 619px)" srcset="assets/img/capturas/pos-home-movil.webp?v=3" width="816" height="1640">
+              <img src="assets/img/capturas/pos-home.webp?v=3" alt="La caja en plena venta: el catálogo por categorías y un ticket en curso con una hamburguesa, papas y refresco." width="1600" height="1000" fetchpriority="high" decoding="async">
+            </picture>
           </div>
           <figcaption>Esto es lo que vas a ver en la demostración, con tus productos y tus precios cargados.</figcaption>
         </figure>
@@ -325,7 +335,7 @@
   </div>
 </footer>
 
-<script src="assets/js/vim.js?v=14" defer></script>
+<script src="assets/js/vim.js?v=15" defer></script>
 <!-- Medición sin cookies (Vercel Web Analytics). Se sirve desde este dominio y
      solo existe si está encendida en el proyecto de Vercel; si no, es un 404
      inofensivo. Los eventos se mandan desde vim.js. -->
