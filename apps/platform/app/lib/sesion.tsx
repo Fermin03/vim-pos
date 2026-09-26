@@ -40,7 +40,7 @@ export function SesionProvider({ children }: { children: ReactNode }) {
     });
     const data = (await res.json().catch(() => ({}))) as Record<string, unknown>;
     if (res.status === 401) { salir(); throw new Error("La clave ya no es válida. Vuelve a entrar."); }
-    if (!res.ok) throw new Error(String(data.error ?? data.detalle ?? "Error"));
+    if (!res.ok) throw new Error(mensajeDeError(res.status, data));
     return data;
   }, [clave, salir]);
 
@@ -58,6 +58,17 @@ export function SesionProvider({ children }: { children: ReactNode }) {
   return <Ctx.Provider value={{ api, salir }}>{children}</Ctx.Provider>;
 }
 
+/**
+ * El error del servidor en palabras del operador. El detalle manda sobre el código: "Escribe el
+ * motivo (10 caracteres o más)" dice qué hacer; "MOTIVO_REQUERIDO" no.
+ */
+function mensajeDeError(status: number, data: Record<string, unknown>): string {
+  if (data.error === "IP_NO_PERMITIDA") {
+    return `Esta red no tiene permiso para entrar al panel (tu IP: ${String(data.ip ?? "desconocida")}). Agrégala a PLATFORM_IP_ALLOWLIST en Vercel.`;
+  }
+  return String(data.detalle ?? data.error ?? `El servidor respondió ${status}`);
+}
+
 function Entrada({ onEntrar }: { onEntrar: (clave: string) => void }) {
   const [k, setK] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -70,6 +81,7 @@ function Entrada({ onEntrar }: { onEntrar: (clave: string) => void }) {
     try {
       const r = await fetch("/api/tenants", { headers: { "X-Platform-Key": k } });
       if (r.status === 401) throw new Error("Clave incorrecta");
+      if (r.status === 403) throw new Error(mensajeDeError(403, (await r.json().catch(() => ({}))) as Record<string, unknown>));
       if (r.status === 429) throw new Error("Demasiados intentos. Espera 15 minutos.");
       if (!r.ok) {
         // El motivo real, no un "no se pudo entrar" genérico: un 500 por una migración que

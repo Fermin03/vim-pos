@@ -16,6 +16,9 @@ export type Alerta = {
   detalle: string;
 };
 
+/** Una caja en la franja "Ahora" de Atención (ver api/alertas). minutos: null = nunca latió. */
+export type CajaAhora = { id: string; nombre: string; tenantId: string; tenant: string; minutos: number | null; version: string | null };
+
 export type CajaSalud = {
   id: string;
   nombre: string;
@@ -112,6 +115,8 @@ export type Tenant = {
   bloqueo_desde?: string | null;
   plan?: { codigo: string; nombre: string; precio_mensual_mxn: number } | null;
   onboarding?: { fase: string; fecha_go_live: string | null } | null;
+  /** Resumen de sus cajas por latido (ver api/tenants). */
+  cajas?: { total: number; enLinea: number; calladaMin: number | null; sinReportar: number; version: string | null } | null;
 };
 
 export type Metricas = {

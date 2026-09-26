@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { MODULOS, type CodigoModulo } from "@vim/db/modulos";
 import type { Detalle, LimitesTrio } from "../lib/tipos";
 import { input, label } from "../lib/formato";
@@ -33,7 +33,14 @@ const aCampos = (d: Detalle): Campos => ({
 export function ModulosLimites({ d, nombre, accion, busy }: { d: Detalle; nombre: string; accion: Accion; busy: boolean }) {
   const [pendiente, setPendiente] = useState<Pendiente>(null);
   const [f, setF] = useState<Campos>(() => aCampos(d));
-  useEffect(() => { setF(aCampos(d)); }, [d]);
+  // El refresco automático (cada 60 s) trae `d` nuevo. Antes reponía los campos con lo del servidor
+  // y se llevaba lo que se estaba escribiendo; ahora solo lo hace si no hay cambios sin guardar.
+  const servidor = JSON.stringify(aCampos(d));
+  const ultimoServidor = useRef(servidor);
+  useEffect(() => {
+    setF((actual) => (JSON.stringify(actual) === ultimoServidor.current ? (JSON.parse(servidor) as Campos) : actual));
+    ultimoServidor.current = servidor;
+  }, [servidor]);
   const lim = d.limites;
 
   const origen = (codigo: string): { texto: string; clase: string } => {
@@ -141,7 +148,7 @@ export function ModulosLimites({ d, nombre, accion, busy }: { d: Detalle; nombre
           pendiente?.tipo === "limites"
             ? <>Los límites de <b>{nombre}</b> dejarán de seguir su plan. Se aplican al dar de alta cajas, sucursales y usuarios.</>
             : pendiente?.tipo === "quitar"
-              ? <>El módulo dejará de estar disponible para <b>{nombre}</b> aunque su plan lo incluya. La caja lo obedecerá cuando reciba directivas (entrega 2).</>
+              ? <>El módulo dejará de estar disponible para <b>{nombre}</b> aunque su plan lo incluya. La caja lo obedece en su siguiente conexión (unos 10 minutos).</>
               : <>Se le permite a <b>{nombre}</b> un módulo que su plan no incluye. Queda como excepción con tu motivo.</>
         }
         nombreEsperado={nombre}

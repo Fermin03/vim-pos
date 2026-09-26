@@ -420,9 +420,8 @@ function PerfilPac() {
       <div className="text-[11.5px] font-bold uppercase tracking-wide text-ink-3">Timbres en la cuenta del PAC</div>
       <p className="mt-2 max-w-[70ch] text-[13px] text-ink-2">
         Este es el inventario propio de VIM, del que salen los folios de todos los clientes de
-        arriba. Queda por conectar: la cuenta Multiemisor con Facturama todavía no está activada, y
-        hasta poder comprobarlo contra la cuenta real no se pone aquí un número — es justo el dato
-        con el que se decide si hay que recargar, y uno inventado sería peor que ninguno.
+        arriba. El saldo de la cuenta de Facturama todavía no se lee desde aquí, y no se pone un
+        número inventado: es justo el dato con el que se decide si hay que recargar.
       </p>
       <p className="mt-2 text-[12.5px] text-ink-3">Mientras tanto, se consulta en el portal de Facturama.</p>
     </div>

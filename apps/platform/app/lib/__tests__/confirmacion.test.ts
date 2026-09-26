@@ -26,4 +26,8 @@ describe("evaluarConfirmacion", () => {
     expect(evaluarConfirmacion({ ...base, requiereEntiendo: true, entiendo: false }).faltantes).toContain("entiendo");
     expect(evaluarConfirmacion({ ...base, requiereEntiendo: true, entiendo: true }).ok).toBe(true);
   });
+  it("con requiereNombre: false basta el motivo (fricción para lo reversible de un solo cliente)", () => {
+    expect(evaluarConfirmacion({ ...base, requiereNombre: false, nombreEscrito: "" }).ok).toBe(true);
+    expect(evaluarConfirmacion({ ...base, requiereNombre: false, nombreEscrito: "", motivo: "corto" }).faltantes).toEqual(["motivo"]);
+  });
 });

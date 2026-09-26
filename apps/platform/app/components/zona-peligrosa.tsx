@@ -43,7 +43,7 @@ export function ZonaPeligrosa({ estado, nombre, bloqueoDesde, accion, busy }: { 
         abierto={modo === "suspender"}
         onCerrar={cerrar}
         titulo="Suspender con gracia"
-        descripcion={<><b>{nombre}</b> pasa a SUSPENDIDO hoy. Su caja seguirá vendiendo durante los días de gracia con un aviso, y a partir de la fecha indicada dejará de vender (cuando la caja reciba directivas, entrega 2).</>}
+        descripcion={<><b>{nombre}</b> pasa a SUSPENDIDO hoy. Su caja seguirá vendiendo durante los días de gracia con un aviso, y a partir de la fecha indicada dejará de vender.</>}
         nombreEsperado={nombre}
         etiquetaBoton="Suspender"
         peligroso

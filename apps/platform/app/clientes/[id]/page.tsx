@@ -1,9 +1,10 @@
 "use client";
-import { useParams, useRouter } from "next/navigation";
+import Link from "next/link";
+import { useParams } from "next/navigation";
 import { useCallback, useState } from "react";
 import { useSesion } from "../../lib/sesion";
 import { textoActualizado, useRefresco } from "../../lib/refresco";
-import { fechaHoraMx, fmtMxn, nombreFase } from "../../lib/formato";
+import { fechaHoraMx, fmtMxn, nombreFase, nombreVertical } from "../../lib/formato";
 import type { Detalle, Plan } from "../../lib/tipos";
 import { Seccion } from "../../components/seccion";
 import { TarjetaCifra } from "../../components/tarjeta-cifra";
@@ -30,7 +31,6 @@ const ANCLAS = [
  */
 export default function FichaCliente() {
   const { id } = useParams<{ id: string }>();
-  const router = useRouter();
   const { api } = useSesion();
   const [d, setD] = useState<Detalle | null>(null);
   const [planes, setPlanes] = useState<Plan[]>([]);
@@ -100,28 +100,28 @@ export default function FichaCliente() {
   const t = d.tenant;
   const nombre = String(t.nombre_comercial);
   const estado = String(t.estado);
-  const plan = t.plan as { codigo?: string; precio_mensual_mxn?: number } | null;
+  const plan = t.plan as { codigo?: string; nombre?: string; precio_mensual_mxn?: number } | null;
   const bloqueoDesde = t.bloqueo_desde ? String(t.bloqueo_desde) : null;
 
   return (
     <>
-      <div className="sticky top-0 z-10 -mx-8 -mt-7 mb-6 border-b border-line bg-bg/95 px-8 pb-3 pt-4 backdrop-blur">
-        <button onClick={() => router.push("/clientes")} className="text-[12px] font-semibold text-ink-3 hover:text-ink">← Clientes</button>
+      <div className="sticky top-0 z-10 -mx-4 -mt-5 mb-6 border-b border-line bg-bg/95 px-4 pb-3 pt-4 backdrop-blur lg:-mx-8 lg:-mt-7 lg:px-8">
+        <Link href="/clientes" className="text-[13px] font-semibold text-ink-2 hover:text-ink">← Clientes</Link>
         <div className="mt-1 flex flex-wrap items-center justify-between gap-3">
           <div className="flex flex-wrap items-center gap-3">
             <h1 className="font-display text-[22px] font-bold tracking-tight">{nombre}</h1>
             <PastillaEstado estado={estado} grande />
-            <span className="font-mono text-[12px] text-ink-3">{String(t.codigo)} · {String(t.vertical_principal)}</span>
+            <span className="text-[13px] text-ink-2"><span className="font-mono">{String(t.codigo)}</span> · {nombreVertical(String(t.vertical_principal))}</span>
           </div>
           <div className="flex items-center gap-2">
-            <nav className="flex gap-1">
+            <nav className="hidden gap-1 md:flex" aria-label="Secciones de la ficha">
               {ANCLAS.map(([a, l]) => (
                 <a key={a} href={`#${a}`} className={["rounded px-2.5 py-1 text-[12.5px] font-semibold hover:bg-hover", a === "peligro" ? "text-danger" : "text-ink-2"].join(" ")}>
                   {l}
                 </a>
               ))}
             </nav>
-            <button onClick={() => setImpersonando(true)} disabled={busy} className="btn h-9 rounded border border-line-strong px-3 text-[13px] font-semibold hover:bg-hover disabled:opacity-50">
+            <button onClick={() => setImpersonando(true)} disabled={busy} className="btn h-10 whitespace-nowrap rounded border border-line-strong px-3 text-[13px] font-semibold hover:bg-hover disabled:opacity-50">
               Entrar como este cliente
             </button>
           </div>
@@ -149,7 +149,7 @@ export default function FichaCliente() {
       <div className="flex flex-col gap-6">
         <Seccion id="operacion" titulo="Operación" descripcion="Lo que hace este cliente hoy: cajas, sincronización y ventas.">
           <div className="mb-4 grid grid-cols-2 gap-3 lg:grid-cols-4">
-            <TarjetaCifra titulo="Plan" valor={plan?.codigo ?? "—"} sub={fmtMxn(Number(plan?.precio_mensual_mxn ?? 0)) + "/mes"} texto />
+            <TarjetaCifra titulo="Plan" valor={plan?.nombre ?? plan?.codigo ?? "—"} sub={fmtMxn(Number(plan?.precio_mensual_mxn ?? 0)) + "/mes"} texto />
             <TarjetaCifra titulo="Sucursales" valor={String(d.nSucursales)} />
             <TarjetaCifra titulo="Folios" valor={String(d.foliosSaldo)} sub={d.foliosBase ? `+${Math.max(d.foliosBase.mensuales - d.foliosBase.consumidos, 0)} de base este mes` : undefined} />
             <TarjetaCifra titulo="Fase" valor={nombreFase((t.onboarding as { fase?: string } | null)?.fase)} texto />

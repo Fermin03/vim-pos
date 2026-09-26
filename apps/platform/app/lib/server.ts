@@ -100,7 +100,10 @@ export function autorizar(req: Request): { sb: SbClient } | { error: NextRespons
   // una lista de direcciones exactas deja fuera al dueño del panel en cuestión de horas.
   if (!permitida(ip, process.env.PLATFORM_IP_ALLOWLIST)) {
     console.warn(`[SEC CN-003] acceso al panel desde IP fuera de la allowlist: ${ip}`);
-    return { error: NextResponse.json({ error: "NO_AUTORIZADO" }, { status: 401 }) };
+    // 403 y no 401: con la clave correcta, desde casa o el teléfono, el panel decía "Clave
+    // incorrecta" y se perdía el rato buscando el problema en la clave. La IP que se devuelve es la
+    // de quien pregunta: no revela nada que no sepa.
+    return { error: NextResponse.json({ error: "IP_NO_PERMITIDA", ip }, { status: 403 }) };
   }
 
   if (bloqueada(ip)) {

@@ -137,13 +137,22 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
     return NextResponse.json({ ok: true, bloqueo_desde: patch.bloqueo_desde ?? null });
   }
 
+  /** El motivo que escribió el operador, o null si falta o es menor a 10 caracteres. */
+  const motivoDe = (): string | null => {
+    const m = (body.motivo as string | undefined)?.trim() ?? "";
+    return m.length >= 10 ? m : null;
+  };
+  const faltaMotivo = () => NextResponse.json({ error: "MOTIVO_REQUERIDO", detalle: "Escribe el motivo (10 caracteres o más)." }, { status: 400 });
+
   if (accion === "marcar_fase") {
     const fase = String(body.fase ?? "");
     if (!["INVITADO", "EN_CONFIGURACION", "GO_LIVE", "ABANDONADO"].includes(fase)) return NextResponse.json({ error: "FASE_INVALIDA" }, { status: 400 });
+    // Dar por abandonado a un cliente se justifica; marcarlo en operación no hace falta.
+    if (fase === "ABANDONADO" && !motivoDe()) return faltaMotivo();
     // upsert: algunos tenants (sembrados/INTERNO) no tienen fila de onboarding.
     const { error } = await sb.from("tenant_onboarding_estado").upsert({ tenant_id: id, fase }, { onConflict: "tenant_id" });
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-    await auditar(sb, { accion: "tenant.marcar_fase", tenantId: id, payload: { fase } });
+    await auditar(sb, { accion: "tenant.marcar_fase", tenantId: id, motivo: motivoDe(), payload: { fase } });
     return NextResponse.json({ ok: true });
   }
 
@@ -165,6 +174,7 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
     let paqueteId: string | null = null;
     let precio: number | null = null;
     let tipo: "AJUSTE_MANUAL" | "COMPRA_PAQUETE" = "AJUSTE_MANUAL";
+    if (accion === "ajustar_folios" && !motivoDe()) return faltaMotivo();
     let motivo = (body.motivo as string | undefined)?.trim() || "Ajuste manual desde plataforma";
 
     if (accion === "acreditar_paquete") {
@@ -263,13 +273,15 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
       });
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
     await auditar(sb, {
-      accion: "tenant.addon_activar", tenantId: id, motivo: `Alta del add-on ${addon.nombre}`,
+      accion: "tenant.addon_activar", tenantId: id, motivo: motivoDe() ?? `Alta del add-on ${addon.nombre}`,
       payload: { codigo, precio, reactivada: decision.accion === "reactivar" },
     });
     return NextResponse.json({ ok: true });
   }
 
   if (accion === "addon_desactivar") {
+    // Antes era un clic, y en Delivery pausa las tiendas de Uber del cliente.
+    if (!motivoDe()) return faltaMotivo();
     const codigo = String(body.addon_codigo ?? "");
     if (!codigo) return NextResponse.json({ error: "ADDON_REQUERIDO" }, { status: 400 });
     const { data: addonRaw } = await sb.from("addons").select("id, nombre").eq("codigo", codigo).maybeSingle();
@@ -350,7 +362,7 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
     }
 
     await auditar(sb, {
-      accion: "tenant.addon_desactivar", tenantId: id, motivo: `Baja del add-on ${addon.nombre}`,
+      accion: "tenant.addon_desactivar", tenantId: id, motivo: `Baja del add-on ${addon.nombre}: ${motivoDe()}`,
       payload: { codigo, pausadas, fallos },
     });
     return NextResponse.json({ ok: true, pausadas, fallos });
@@ -359,14 +371,20 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
   if (accion === "cambiar_plan") {
     const planId = String(body.plan_id ?? "");
     if (!planId) return NextResponse.json({ error: "PLAN_REQUERIDO" }, { status: 400 });
+    if (!motivoDe()) return faltaMotivo();
+    const { data: antes } = await sb.from("tenants").select("plan_actual_id").eq("id", id).maybeSingle();
     const { error } = await sb.from("tenants").update({ plan_actual_id: planId }).eq("id", id);
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-    await auditar(sb, { accion: "tenant.cambiar_plan", tenantId: id, payload: { plan_id: planId } });
+    await auditar(sb, {
+      accion: "tenant.cambiar_plan", tenantId: id, motivo: motivoDe(),
+      payload: { plan_anterior: (antes as { plan_actual_id?: string } | null)?.plan_actual_id ?? null, plan_id: planId },
+    });
     return NextResponse.json({ ok: true });
   }
 
   if (accion === "suscripcion_activar") {
     // Convierte un cliente en pagador: una suscripción ACTIVA con el precio del plan actual.
+    if (!motivoDe()) return faltaMotivo();
     const { data: t } = await sb.from("tenants").select("plan_actual_id, plan:planes(precio_mensual_mxn)").eq("id", id).maybeSingle();
     const planId = (t as { plan_actual_id?: string } | null)?.plan_actual_id;
     if (!planId) return NextResponse.json({ error: "TENANT_SIN_PLAN" }, { status: 400 });
@@ -386,13 +404,14 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
     // Al activar el cobro, el tenant pasa a ACTIVO si estaba en TRIAL.
     await sb.from("tenants").update({ estado: "ACTIVO" }).eq("id", id).eq("estado", "TRIAL");
-    await auditar(sb, { accion: "tenant.suscripcion_activar", tenantId: id, payload: { precio, ciclo } });
+    await auditar(sb, { accion: "tenant.suscripcion_activar", tenantId: id, motivo: motivoDe(), payload: { precio, ciclo } });
     return NextResponse.json({ ok: true });
   }
 
   if (accion === "suscripcion_estado") {
     const nuevo = String(body.estado ?? "");
     if (!["ACTIVA", "PAUSADA", "CANCELADA", "EXPIRADA"].includes(nuevo)) return NextResponse.json({ error: "ESTADO_INVALIDO" }, { status: 400 });
+    if (!motivoDe()) return faltaMotivo();
     const patch: Record<string, unknown> = { estado: nuevo };
     if (nuevo === "CANCELADA" || nuevo === "EXPIRADA") patch.fecha_fin = new Date().toISOString();
     const { error } = await sb.from("suscripciones").update(patch).eq("tenant_id", id).in("estado", ["ACTIVA", "PAUSADA"]);

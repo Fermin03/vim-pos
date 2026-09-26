@@ -1,12 +1,35 @@
 "use client";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useState } from "react";
 import { useSesion } from "../lib/sesion";
 import { textoActualizado, useRefresco } from "../lib/refresco";
-import { fechaCorta, fmtMxn, input, nombreFase } from "../lib/formato";
+import { fechaCorta, fmtMxn, input, nombreFase, nombreVertical } from "../lib/formato";
+import { haceMinutos } from "../lib/fechas-panel";
 import type { Metricas, Tenant } from "../lib/tipos";
 import { TarjetaCifra } from "../components/tarjeta-cifra";
 import { PastillaEstado } from "../components/pastilla-estado";
+
+/** Cómo están sus cajas ahora, por latido. Lo que antes obligaba a abrir cada ficha. */
+function CeldaCajas({ c }: { c: Tenant["cajas"] }) {
+  if (!c || c.total === 0) return <span className="text-ink-2">sin cajas</span>;
+  const callada = c.calladaMin !== null;
+  return (
+    <div className="leading-tight">
+      <div className={callada ? "font-semibold text-ink" : c.enLinea > 0 ? "font-semibold text-success" : "text-ink-2"}>
+        {callada
+          ? `sin señal ${haceMinutos(c.calladaMin)}`
+          : c.enLinea > 0
+            ? `${c.enLinea} de ${c.total} en línea`
+            : "sin reportar"}
+      </div>
+      <div className="text-[12px] text-ink-2">
+        {c.version ?? "versión anterior a 0.4.60"}
+        {c.sinReportar > 0 && c.sinReportar < c.total ? ` · ${c.sinReportar} sin reportar` : ""}
+      </div>
+    </div>
+  );
+}
 
 const FILTROS = [
   ["", "Todos"],
@@ -51,9 +74,9 @@ export default function ClientesPage() {
 
   return (
     <div>
-      <div className="mb-4 flex items-center justify-between">
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <h1 className="font-display text-[18px] font-semibold tracking-tight">Clientes</h1>
-        <input className={`${input} w-[280px]`} placeholder="Buscar código o nombre…" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Buscar cliente" />
+        <input className={`${input} w-full sm:w-[280px]`} placeholder="Buscar código o nombre…" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Buscar cliente" autoFocus />
       </div>
 
       {m && (
@@ -73,6 +96,7 @@ export default function ClientesPage() {
             key={k}
             type="button"
             onClick={() => setEstado(k)}
+            aria-pressed={estado === k}
             className={["btn rounded px-2.5 py-1 text-[12.5px] font-semibold", estado === k ? "bg-ink text-white" : "text-ink-2 hover:bg-hover"].join(" ")}
           >
             {l} ({cuenta(k)})
@@ -82,13 +106,13 @@ export default function ClientesPage() {
 
       {tenants === null && !error && <p className="text-sm text-ink-3">Cargando…</p>}
       {tenants && (
-        <div className="overflow-hidden rounded-lg border border-line bg-surface">
-          <table className="w-full text-[13px]">
+        <div className="overflow-x-auto rounded-lg border border-line bg-surface">
+          <table className="w-full min-w-[760px] text-[13.5px]">
             <thead>
-              <tr className="border-b border-line bg-sel text-left text-[11.5px] font-bold uppercase tracking-wide text-ink-3">
-                <th className="px-4 py-2.5">Código</th>
-                <th className="px-4 py-2.5">Nombre</th>
-                <th className="px-4 py-2.5">Vertical</th>
+              <tr className="border-b border-line bg-sel text-left text-[12px] font-semibold uppercase tracking-wide text-ink-2">
+                <th className="px-4 py-2.5">Cliente</th>
+                <th className="px-4 py-2.5">Cajas</th>
+                <th className="px-4 py-2.5">Giro</th>
                 <th className="px-4 py-2.5">Plan</th>
                 <th className="px-4 py-2.5">Fase</th>
                 <th className="px-4 py-2.5">Estado</th>
@@ -96,17 +120,24 @@ export default function ClientesPage() {
             </thead>
             <tbody>
               {lista.length === 0 && (
-                <tr><td colSpan={6} className="px-4 py-6 text-center text-ink-3">{tenants.length === 0 ? "Sin clientes." : "Nada con ese filtro."}</td></tr>
+                <tr><td colSpan={6} className="px-4 py-6 text-center text-ink-2">{tenants.length === 0 ? "Sin clientes." : "Nada con ese filtro."}</td></tr>
               )}
               {lista.map((t) => {
                 const bloqueo = t.bloqueo_desde && new Date(t.bloqueo_desde).getTime() > ahora ? t.bloqueo_desde : null;
                 return (
-                  <tr key={t.id} className="cursor-pointer border-b border-line transition-colors duration-150 last:border-b-0 hover:bg-hover" onClick={() => router.push("/clientes/" + t.id)}>
-                    <td className="px-4 py-2.5 font-mono text-[12px]">{t.codigo}</td>
-                    <td className="px-4 py-2.5 font-medium">{t.nombre_comercial}</td>
-                    <td className="px-4 py-2.5 text-ink-2">{t.vertical_principal}</td>
-                    <td className="px-4 py-2.5 text-ink-2">{t.plan?.codigo ?? "—"}</td>
-                    <td className="px-4 py-2.5 text-[12px] text-ink-3">{nombreFase(t.onboarding?.fase)}</td>
+                  // La fila entera abre la ficha con el mouse; el nombre es un enlace de verdad (teclado,
+                  // lector de pantalla y abrir varios clientes en pestañas).
+                  <tr key={t.id} className="cursor-pointer border-b border-line last:border-b-0 hover:bg-hover" onClick={() => router.push("/clientes/" + t.id)}>
+                    <td className="px-4 py-2.5">
+                      <Link href={`/clientes/${t.id}`} onClick={(e) => e.stopPropagation()} className="font-semibold text-ink underline-offset-2 hover:underline">
+                        {t.nombre_comercial}
+                      </Link>
+                      <div className="font-mono text-[12px] text-ink-2">{t.codigo}</div>
+                    </td>
+                    <td className="px-4 py-2.5"><CeldaCajas c={t.cajas} /></td>
+                    <td className="px-4 py-2.5 text-ink-2">{nombreVertical(t.vertical_principal)}</td>
+                    <td className="px-4 py-2.5 text-ink-2">{t.plan?.nombre ?? t.plan?.codigo ?? "—"}</td>
+                    <td className="px-4 py-2.5 text-ink-2">{nombreFase(t.onboarding?.fase)}</td>
                     <td className="px-4 py-2.5">
                       <PastillaEstado estado={t.estado} />
                       {bloqueo && <div className="mt-0.5 text-[11px] font-semibold text-warning">bloquea el {fechaCorta(bloqueo)}</div>}

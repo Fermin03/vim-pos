@@ -1,5 +1,6 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useCallback, useState } from "react";
+import { useRefresco } from "../lib/refresco";
 import { areaUtil, hace, pantallaTexto, type Api, type Salud } from "../lib/tipos";
 
 const COLOR: Record<string, string> = {
@@ -31,18 +32,21 @@ export function SaludTenant({ api, id }: { api: Api; id: string }) {
   const [s, setS] = useState<Salud | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    (async () => {
-      try {
-        setS((await api(`/api/tenants/${id}/salud`)) as unknown as Salud);
-      } catch (e) {
-        setError(e instanceof Error ? e.message : "Error");
-      }
-    })();
+  // Con el mismo refresco que el resto de la ficha: antes cargaba una vez y el pie decía
+  // "Actualizado ahora" sobre una caja que llevaba horas sin señal. Un refresco fallido conserva
+  // lo último que se vio.
+  const cargar = useCallback(async () => {
+    try {
+      setS((await api(`/api/tenants/${id}/salud`)) as unknown as Salud);
+      setError(null);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Error");
+    }
   }, [api, id]);
+  useRefresco(cargar);
 
-  if (error) return <p className="text-[12.5px] text-danger">{error}</p>;
-  if (!s) return <p className="text-[12.5px] text-ink-3">Cargando salud…</p>;
+  if (error && !s) return <p className="text-[13px] text-danger" role="alert">{error}</p>;
+  if (!s) return <p className="text-[13px] text-ink-2">Cargando salud…</p>;
 
   return (
     <div>
@@ -61,7 +65,7 @@ export function SaludTenant({ api, id }: { api: Api; id: string }) {
         <p className="text-[12.5px] text-ink-3">Sin cajas dadas de alta todavía.</p>
       ) : (
         <div className="overflow-x-auto rounded border border-line">
-          <table className="w-full text-[12.5px]">
+          <table className="w-full min-w-[640px] text-[13px]">
             <thead className="bg-sel text-ink-3">
               <tr>
                 <th className="p-2 text-left font-semibold">Caja</th>

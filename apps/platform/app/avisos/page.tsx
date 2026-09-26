@@ -1,4 +1,5 @@
 "use client";
+import { finDelDiaMx } from "../lib/fechas-panel";
 import { useCallback, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { useSesion } from "../lib/sesion";
@@ -22,6 +23,9 @@ const CUERPO_MAX = 600;
  * Lo que hace útil esta pantalla es el conteo de lecturas: mandar un aviso sin saber si llegó es
  * gritar al vacío. Por eso cada fila dice "visto por N de M cajas" y no solo que se envió.
  */
+/** Valor del destinatario "Todos los clientes". */
+const TODOS = "*";
+
 export default function AvisosPage() {
   const { api } = useSesion();
   const [avisos, setAvisos] = useState<AvisoPanel[] | null>(null);
@@ -55,12 +59,12 @@ export default function AvisosPage() {
   }, [api]);
   const { hace, recargar } = useRefresco(cargar);
 
-  const esGlobal = f.tenant_id === "";
-  // Un aviso importante a TODOS los clientes es lo más ruidoso que se puede hacer desde aquí:
-  // se confirma escribiendo TODOS, igual que lo destructivo se confirma con el nombre del cliente.
-  const necesitaConfirmar = esGlobal && f.nivel === "danger";
+  // "" = todavía no se elige; "*" = todos. Antes "" era "Todos los clientes" y el formulario
+  // arrancaba ahí (y volvía ahí tras cada envío): el valor por defecto era el más ruidoso.
+  const esGlobal = f.tenant_id === TODOS;
+  // Un aviso a todos los clientes se confirma escribiendo TODOS; a uno solo, con su nombre.
   const nombreCliente = clientes.find((c) => c.id === f.tenant_id)?.nombre_comercial ?? "";
-  const listo = f.titulo.trim().length > 0 && f.cuerpo.trim().length > 0 && f.cuerpo.length <= CUERPO_MAX;
+  const listo = f.tenant_id !== "" && f.titulo.trim().length > 0 && f.cuerpo.trim().length > 0 && f.cuerpo.length <= CUERPO_MAX;
 
   async function crear(motivo: string) {
     setBusy(true); setError(null);
@@ -68,12 +72,14 @@ export default function AvisosPage() {
       await api("/api/avisos", {
         method: "POST",
         body: JSON.stringify({
-          tenant_id: f.tenant_id || null,
+          tenant_id: esGlobal ? null : f.tenant_id,
           nivel: f.nivel,
           titulo: f.titulo.trim(),
           cuerpo: f.cuerpo.trim(),
           requiere_confirmacion: f.requiere_confirmacion,
-          vigente_hasta: f.vigente_hasta ? new Date(f.vigente_hasta).toISOString() : null,
+          // Fin del día elegido en hora de México: con new Date("2026-09-30") el aviso dejaba de
+          // verse el 29 a las 18:00.
+          vigente_hasta: f.vigente_hasta ? finDelDiaMx(f.vigente_hasta) : null,
           motivo,
         }),
       });
@@ -178,7 +184,8 @@ export default function AvisosPage() {
             <div>
               <label className={label} htmlFor="av-dest">Para</label>
               <select id="av-dest" className={input} value={f.tenant_id} onChange={(e) => setF({ ...f, tenant_id: e.target.value })}>
-                <option value="">Todos los clientes</option>
+                <option value="">Elige a quién…</option>
+                <option value={TODOS}>Todos los clientes</option>
                 {clientes.map((c) => <option key={c.id} value={c.id}>{c.nombre_comercial}</option>)}
               </select>
             </div>
@@ -200,7 +207,7 @@ export default function AvisosPage() {
               <div className="mt-1 text-right text-[11.5px] text-ink-3">{f.cuerpo.length} / {CUERPO_MAX}</div>
             </div>
             <div>
-              <label className={label} htmlFor="av-hasta">Dejar de mostrarlo · opcional</label>
+              <label className={label} htmlFor="av-hasta">Mostrarlo hasta el día · opcional</label>
               <input id="av-hasta" type="date" className={input} value={f.vigente_hasta} onChange={(e) => setF({ ...f, vigente_hasta: e.target.value })} />
             </div>
             <label className="flex items-start gap-2 text-[13px]">
@@ -227,7 +234,7 @@ export default function AvisosPage() {
             ? <>Lo verán los cajeros de <b>todos los clientes</b> en su próxima conexión.</>
             : <>Lo verán los cajeros de <b>{nombreCliente}</b> en su próxima conexión.</>
         }
-        nombreEsperado={necesitaConfirmar ? "TODOS" : (nombreCliente || "TODOS")}
+        nombreEsperado={esGlobal ? "TODOS" : nombreCliente}
         etiquetaBoton="Enviar"
         peligroso={f.nivel === "danger"}
         ocupado={busy}
