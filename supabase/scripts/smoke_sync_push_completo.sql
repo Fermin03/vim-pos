@@ -22,6 +22,7 @@ DECLARE
   v_maria  uuid := '99999999-0000-0000-0000-000000000001';
   v_turno  uuid; v_prod uuid; v_ticket uuid; v_mesa uuid;
   v_fila   jsonb; v_res jsonb; v_estado text; v_listo timestamptz; v_nombre text; v_n integer;
+  v_auth   uuid; v_area uuid;
 BEGIN
   PERFORM set_config('request.jwt.claims',
     json_build_object('sub', v_maria::text, 'tenant_id', v_tenant::text)::text, true);
@@ -36,13 +37,50 @@ BEGIN
   v_ticket := abrir_ticket(v_suc, v_caja, v_turno, 'PARA_LLEVAR'::modo_servicio, NULL, NULL, 'sp-t', v_maria);
   PERFORM agregar_item_a_ticket(v_ticket, v_prod, 1, NULL, '[]'::jsonb, 'sp-i');
 
-  -- ── A) La nube facturó; la caja manda su copia PAGADO con la hora de "listo" ─────
-  -- En réplica para poner el estado a mano sin pasar por el flujo de cobro y timbrado.
-  PERFORM set_config('session_replication_role', 'replica', true);
-  UPDATE tickets SET estado_fiscal = 'FACTURADO' WHERE id = v_ticket;
-  PERFORM set_config('session_replication_role', 'origin', true);
+  -- ── D) Descuentos y reimpresiones: antes se quedaban en la caja ────────────────
+  -- Como en la caja: la fila completa (to_jsonb de una fila real, con sus defaults). Se crean con el
+  -- ticket todavía abierto y se suben como copias con id nuevo: el push tiene que insertarlas.
+  -- (Sin session_replication_role: en el CI el smoke no corre como superusuario.)
+  INSERT INTO autorizaciones_pin(tenant_id, sucursal_id, caja_id, turno_id,
+    usuario_solicitante_id, usuario_autorizo_id, accion, permiso_codigo, entidad_tipo, entidad_id, monto_mxn, motivo)
+  VALUES (v_tenant, v_suc, v_caja, v_turno, v_maria, v_maria, 'descuento_manual', 'descuento.manual_aplicar',
+          'ticket', v_ticket, 10, 'Smoke sync')
+  RETURNING id INTO v_auth;
+  SELECT id INTO v_area FROM areas_cocina WHERE tenant_id = v_tenant LIMIT 1;
+  IF v_area IS NULL THEN
+    INSERT INTO areas_cocina(tenant_id, sucursal_id, nombre) VALUES (v_tenant, v_suc, 'Cocina smoke') RETURNING id INTO v_area;
+  END IF;
 
+  INSERT INTO ticket_descuentos_manuales(tenant_id, ticket_id, tipo, valor_monto_mxn, monto_descontado_mxn,
+    motivo_categoria, autorizacion_pin_id, usuario_solicitante_id, usuario_autorizo_id)
+  VALUES (v_tenant, v_ticket, 'MONTO_FIJO', 10, 10, 'CLIENTE_FRECUENTE', v_auth, v_maria, v_maria)
+  RETURNING to_jsonb(ticket_descuentos_manuales.*) INTO v_fila;
+  INSERT INTO comanda_impresiones(tenant_id, sucursal_id, ticket_id, area_cocina_id, area_cocina_nombre_snapshot,
+    evento_tipo, usuario_id)
+  VALUES (v_tenant, v_suc, v_ticket, v_area, 'Cocina', 'IMPRESION_INICIAL', v_maria)
+  RETURNING to_jsonb(comanda_impresiones.*) INTO v_res;
+
+  v_res := sync_push_snapshot(v_tenant, jsonb_build_object(
+    'ticket_descuentos_manuales', jsonb_build_array(v_fila || jsonb_build_object('id', gen_random_uuid())),
+    'comanda_impresiones', jsonb_build_array(v_res || jsonb_build_object('id', gen_random_uuid()))));
+  IF (v_res->>'ticket_descuentos_manuales')::int <> 1 OR (v_res->>'comanda_impresiones')::int <> 1 THEN
+    RAISE EXCEPTION 'D: descuentos/reimpresiones no se aplicaron: %', v_res;
+  END IF;
+  IF v_res ? '_ignoradas' THEN
+    RAISE EXCEPTION 'D: la nube ignoró tablas que ya debería replicar: %', v_res->'_ignoradas';
+  END IF;
+  SELECT count(*) INTO v_n FROM ticket_descuentos_manuales WHERE ticket_id = v_ticket;
+  IF v_n <> 2 THEN RAISE EXCEPTION 'D: la copia del descuento no quedó (hay %)', v_n; END IF;
+  RAISE NOTICE 'D ok: descuentos y reimpresiones arriba';
+
+  -- ── A) La nube facturó; la caja manda su copia PAGADO con la hora de "listo" ─────
+  -- La "nube" lo tiene FACTURADO: se pone con el mismo push (corre en réplica como su dueño), sin
+  -- pasar por el flujo de cobro y timbrado.
   SELECT to_jsonb(t) INTO v_fila FROM tickets t WHERE id = v_ticket;
+  PERFORM sync_push_snapshot(v_tenant, jsonb_build_object('tickets', jsonb_build_array(v_fila || jsonb_build_object('estado_fiscal', 'FACTURADO'))));
+  IF (SELECT estado_fiscal::text FROM tickets WHERE id = v_ticket) <> 'FACTURADO' THEN
+    RAISE EXCEPTION 'A: preparación — no se pudo dejar el ticket FACTURADO';
+  END IF;
   v_fila := v_fila || jsonb_build_object('estado_fiscal', 'PAGADO', 'fecha_listo', now());
   v_res := sync_push_snapshot(v_tenant, jsonb_build_object('tickets', jsonb_build_array(v_fila)));
 
@@ -82,33 +120,5 @@ BEGIN
   END IF;
   RAISE NOTICE 'C ok: estado arriba, catálogo intacto';
 
-  -- ── D) Descuentos y reimpresiones: antes se quedaban en la caja ────────────────
-  -- Como en la caja: la fila completa (to_jsonb de una fila real). Se crea, se copia y se borra, y
-  -- el push tiene que volver a ponerla. Sin triggers: el ticket ya quedó CANCELADO en B.
-  PERFORM set_config('session_replication_role', 'replica', true);
-  INSERT INTO ticket_descuentos_manuales(tenant_id, ticket_id, tipo, valor_monto_mxn, monto_descontado_mxn,
-    motivo_categoria, autorizacion_pin_id, usuario_solicitante_id, usuario_autorizo_id)
-  VALUES (v_tenant, v_ticket, 'MONTO_FIJO', 10, 10, 'CLIENTE_FRECUENTE', gen_random_uuid(), v_maria, v_maria)
-  RETURNING to_jsonb(ticket_descuentos_manuales.*) INTO v_fila;
-  INSERT INTO comanda_impresiones(tenant_id, sucursal_id, ticket_id, area_cocina_id, area_cocina_nombre_snapshot,
-    evento_tipo, usuario_id)
-  VALUES (v_tenant, v_suc, v_ticket, gen_random_uuid(), 'Cocina', 'IMPRESION_INICIAL', v_maria)
-  RETURNING to_jsonb(comanda_impresiones.*) INTO v_res;
-  DELETE FROM ticket_descuentos_manuales WHERE ticket_id = v_ticket;
-  DELETE FROM comanda_impresiones WHERE ticket_id = v_ticket;
-  PERFORM set_config('session_replication_role', 'origin', true);
-
-  v_res := sync_push_snapshot(v_tenant, jsonb_build_object(
-    'ticket_descuentos_manuales', jsonb_build_array(v_fila),
-    'comanda_impresiones', jsonb_build_array(v_res)));
-  IF (v_res->>'ticket_descuentos_manuales')::int <> 1 OR (v_res->>'comanda_impresiones')::int <> 1 THEN
-    RAISE EXCEPTION 'D: descuentos/reimpresiones no se aplicaron: %', v_res;
-  END IF;
-  IF v_res ? '_ignoradas' THEN
-    RAISE EXCEPTION 'D: la nube ignoró tablas que ya debería replicar: %', v_res->'_ignoradas';
-  END IF;
-  SELECT count(*) INTO v_n FROM ticket_descuentos_manuales WHERE ticket_id = v_ticket;
-  IF v_n <> 1 THEN RAISE EXCEPTION 'D: el descuento no quedó (hay %)', v_n; END IF;
-  RAISE NOTICE 'D ok: descuentos y reimpresiones arriba';
 END $$;
 ROLLBACK;
