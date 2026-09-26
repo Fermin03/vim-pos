@@ -19,7 +19,7 @@
 // difícil de montar. El SQL real lo cubre `npm run verify:push`.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { listarPendientes, pushToCloud, sembrarRepartidoresUnaVez, sembrarZonasUnaVez } from "./sync-push.mjs";
+import { HUELLA_TICKET, listarPendientes, pushToCloud, sembrarRepartidoresUnaVez, sembrarZonasUnaVez } from "./sync-push.mjs";
 
 /**
  * Un pool que sabe lo justo para este archivo: sin ventas, sin turnos, sin movimientos, y los
@@ -55,7 +55,7 @@ function crearPoolFalso({
       if (sql.startsWith("CREATE TABLE")) return { rows: [], rowCount: 0 };
       // Migración de la libreta de zonas a huella (C3): columna y relleno. Aquí no hay huellas que
       // rellenar; lo que hacen de verdad lo prueba el bloque con Postgres real al final del archivo.
-      if (sql.startsWith("ALTER TABLE _vim_zonas_ok")) return { rows: [], rowCount: 0 };
+      if (sql.startsWith("ALTER TABLE")) return { rows: [], rowCount: 0 };
       if (sql.startsWith("UPDATE _vim_zonas_ok")) return { rows: [], rowCount: 0 };
 
       // `_vim_migraciones_sync`: el marcador de "esto ya corrió una vez en esta caja".
@@ -107,7 +107,8 @@ function crearPoolFalso({
       const pendientes = pool.catalogo.filter((id) => !marcados.has(id));
       const pendientesZonas = pool.catalogoZonas.map((z) => z.id).filter((id) => !marcadasZonas.has(id));
 
-      if (sql.includes("array_agg(id ORDER BY fecha_apertura)")) {
+      // Las ventas pendientes (desde la 0.4.91 con alias: `array_agg(x.id ORDER BY x.fecha_apertura)`).
+      if (sql.includes("ORDER BY x.fecha_apertura") || sql.includes("array_agg(id ORDER BY fecha_apertura)")) {
         return {
           rows: [{
             ids: null, turnos: null, movimientos: null,
@@ -394,7 +395,7 @@ describe("libreta de zonas por huella (Postgres real)", { skip: SOLO_WINDOWS }, 
     db = backend.pool;
     // Que ninguna venta del fixture de dev viaje en los push de abajo: aquí solo importan las zonas.
     await listarPendientes(db);
-    await db.query("INSERT INTO _vim_push_ok (ticket_id) SELECT id FROM tickets ON CONFLICT DO NOTHING");
+    await db.query(`INSERT INTO _vim_push_ok (ticket_id, huella) SELECT x.id, ${HUELLA_TICKET} FROM tickets x ON CONFLICT (ticket_id) DO UPDATE SET huella = EXCLUDED.huella`);
   }, { timeout: 120_000 });
 
   after(async () => {
@@ -586,7 +587,7 @@ describe("clientes de la caja suben a la nube (Postgres real)", { skip: SOLO_WIN
     backend = await startLocalBackend({ dataRoot: dir, pgPort: 54391, restPort: 54392, log: () => {} });
     db = backend.pool;
     await listarPendientes(db);
-    await db.query("INSERT INTO _vim_push_ok (ticket_id) SELECT id FROM tickets ON CONFLICT DO NOTHING");
+    await db.query(`INSERT INTO _vim_push_ok (ticket_id, huella) SELECT x.id, ${HUELLA_TICKET} FROM tickets x ON CONFLICT (ticket_id) DO UPDATE SET huella = EXCLUDED.huella`);
   }, { timeout: 120_000 });
 
   after(async () => {
@@ -631,5 +632,154 @@ describe("clientes de la caja suben a la nube (Postgres real)", { skip: SOLO_WIN
       await pushToCloud(db, OPTS, () => {});
     } finally { nube.restaurar(); }
     assert.ok((await pend()).clienteIds.includes(cliente), "marcar un rechazado lo perdería para siempre");
+  });
+});
+
+// ── 0.4.91: lo que la caja hace DESPUÉS de cobrar, y el piso de las mesas (Postgres real) ─────
+//
+// Antes cada venta subía una sola vez, en cuanto quedaba terminal: una cancelación, una
+// reimpresión o la cocina marcándola lista se quedaban en la caja para siempre. Y el pull bajaba
+// la fila entera de cada mesa, así que la nube pisaba el piso de la caja en cada ciclo. Va con
+// Postgres real porque lo que decide es SQL (la huella de la venta y la de la mesa).
+describe("ventas que cambian después de subir, y el piso de las mesas (Postgres real)", { skip: SOLO_WINDOWS }, () => {
+  let dir, backend, db, ticket;
+
+  const pend = () => listarPendientes(db);
+  /** Sin triggers, como cambia la fila una RPC de la caja que aquí no hace falta montar entera. */
+  const enReplica = async (sql, params) => {
+    const c = await db.connect();
+    try {
+      await c.query("BEGIN");
+      await c.query("SET LOCAL session_replication_role = replica");
+      const r = await c.query(sql, params);
+      await c.query("COMMIT");
+      return r;
+    } finally { c.release(); }
+  };
+  const subir = async (respuesta = { resultado: {} }) => {
+    const nube = nubeFalsa(respuesta);
+    try {
+      await pushToCloud(db, OPTS, () => {});
+      return nube.peticiones.map((p) => p.snapshot ?? {});
+    } finally { nube.restaurar(); }
+  };
+
+  const TENANT = "99999999-0000-0000-0000-0000000000aa";
+  const SUC = "99999999-0000-0000-0000-0000000000bb";
+  const CAJA = "99999999-0000-0000-0000-0000000000cc";
+  const MARIA = "99999999-0000-0000-0000-000000000001";
+  let turno = null;
+  /** Una venta con una hamburguesa, abierta con las RPC de la caja (como smoke_mesa_huerfana.sql). */
+  const crearVenta = async (clave) => {
+    const c = await db.connect();
+    try {
+      await c.query("SELECT set_config('request.jwt.claims', $1, false)", [JSON.stringify({ sub: MARIA, tenant_id: TENANT })]);
+      if (!turno) {
+        await c.query("UPDATE turnos SET estado = 'CERRADO', fecha_cierre = now() WHERE caja_id = $1 AND estado = 'ABIERTO'", [CAJA]);
+        ({ rows: [{ id: turno }] } = await c.query(
+          `INSERT INTO turnos (tenant_id, sucursal_id, caja_id, codigo_turno, dia_contable, usuario_apertura_id, fondo_inicial_mxn, fondo_modo)
+           VALUES ($1, $2, $3, 'PRUEBA-PC', CURRENT_DATE, $4, 0, 'TOTAL') RETURNING id`, [TENANT, SUC, CAJA, MARIA]));
+      }
+      const { rows: [{ id }] } = await c.query(
+        "SELECT abrir_ticket($1, $2, $3, 'PARA_LLEVAR'::modo_servicio, NULL, NULL, $4, $5) AS id", [SUC, CAJA, turno, clave, MARIA]);
+      await c.query(
+        `SELECT agregar_item_a_ticket($1, (SELECT id FROM productos WHERE tenant_id = $2 AND nombre = 'Hamburguesa Clásica' LIMIT 1), 1, NULL, '[]'::jsonb, $3)`,
+        [id, TENANT, clave + "-i"]);
+      return id;
+    } finally { c.release(); }
+  };
+
+  before(async () => {
+    dir = mkdtempSync(path.join(tmpdir(), "vim-push-cambios-"));
+    backend = await startLocalBackend({ dataRoot: dir, pgPort: 54389, restPort: 54390, log: () => {} });
+    db = backend.pool;
+    await listarPendientes(db);
+    // Dos ventas de verdad, con las RPC de la caja (la base recién sembrada no trae ninguna).
+    ticket = await crearVenta('pc-1');
+    await crearVenta('pc-2');
+    await enReplica("UPDATE tickets SET estado_fiscal = 'PAGADO', fecha_apertura = now() WHERE estado_fiscal IN ('BORRADOR', 'ABIERTO')");
+    // Todo lo demás, ya subido tal como está: aquí solo importa lo que cambie después.
+    await db.query(`INSERT INTO _vim_push_ok (ticket_id, huella) SELECT x.id, ${HUELLA_TICKET} FROM tickets x
+                    ON CONFLICT (ticket_id) DO UPDATE SET huella = EXCLUDED.huella`);
+    // Una mesa (la base recién sembrada no trae), ya subida tal como está.
+    await db.query(
+      `INSERT INTO mesas (tenant_id, sucursal_id, numero, nombre, capacidad, estado, forma)
+       VALUES ($1, $2, 51, 'Mesa 51', 4, 'LIBRE', 'CUADRADA')`, [TENANT, SUC]);
+    await db.query("INSERT INTO _vim_mesas_ok (mesa_id, estado) SELECT id, estado::text FROM mesas ON CONFLICT DO NOTHING");
+  }, { timeout: 120_000 });
+
+  after(async () => {
+    if (backend) await backend.stop();
+    if (dir) rmSync(dir, { recursive: true, force: true });
+  });
+
+  test("una venta cancelada DESPUÉS de subir vuelve a subir, cancelada; confirmada, ya no", async () => {
+    assert.ok(!(await pend()).ids.includes(ticket), "recién subida y sin cambios, no está pendiente");
+    await enReplica("UPDATE tickets SET estado_fiscal = 'CANCELADO' WHERE id = $1", [ticket]);
+    assert.ok((await pend()).ids.includes(ticket), "cancelarla en la caja tiene que hacerla volver a subir");
+
+    const [snap] = await subir();
+    const viajo = (snap?.tickets ?? []).find((t) => t.id === ticket);
+    assert.equal(viajo?.estado_fiscal, "CANCELADO", "el push debía llevarla cancelada");
+    assert.ok(!(await pend()).ids.includes(ticket), "confirmada por la nube, no vuelve a subir");
+  });
+
+  test("una reimpresión de comanda después de subir también viaja", async () => {
+    const { rows: [t] } = await db.query("SELECT tenant_id, sucursal_id FROM tickets WHERE id = $1", [ticket]);
+    const { rows: [{ id: usuario }] } = await db.query("SELECT id FROM usuarios_perfil LIMIT 1");
+    await enReplica(
+      `INSERT INTO comanda_impresiones (tenant_id, sucursal_id, ticket_id, area_cocina_id, area_cocina_nombre_snapshot, evento_tipo, usuario_id)
+       VALUES ($1, $2, $3, gen_random_uuid(), 'Cocina', 'IMPRESION_INICIAL', $4)`, [t.tenant_id, t.sucursal_id, ticket, usuario]);
+    assert.ok((await pend()).ids.includes(ticket), "una impresión nueva mueve la huella de la venta");
+    const [snap] = await subir();
+    assert.ok((snap?.comanda_impresiones ?? []).some((c) => c.ticket_id === ticket), "y viaja con ella");
+  });
+
+  test("la libreta vieja (sin huella) rescata lo reciente UNA vez, y no lo de hace meses", async () => {
+    const { rows: [{ id: viejo }] } = await db.query("SELECT id FROM tickets WHERE id <> $1 LIMIT 1", [ticket]);
+    await enReplica("UPDATE tickets SET estado_fiscal = 'PAGADO', fecha_apertura = now() - interval '90 days' WHERE id = $1", [viejo]);
+    await db.query("UPDATE _vim_push_ok SET huella = NULL WHERE ticket_id = ANY($1::uuid[])", [[ticket, viejo]]);
+
+    const p = await pend();
+    assert.ok(p.ids.includes(ticket), "una venta reciente anotada por la versión anterior sube una vez más");
+    assert.ok(!p.ids.includes(viejo), "una de hace 90 días no: fuera de la ventana de revisión");
+    await subir();
+    assert.ok(!(await pend()).ids.includes(ticket), "rescatada, queda anotada con su huella");
+  });
+
+  test("el estado de una mesa sube; el catálogo no; un rechazo se reintenta", async () => {
+    const { rows: [{ id: mesa }] } = await db.query("SELECT id FROM mesas WHERE deleted_at IS NULL LIMIT 1");
+    assert.ok(!(await pend()).mesaIds.includes(mesa));
+
+    await enReplica("UPDATE mesas SET estado = 'OCUPADA' WHERE id = $1", [mesa]);
+    assert.ok((await pend()).mesaIds.includes(mesa), "ocupar la mesa en la caja la deja pendiente de subir");
+
+    // La nube la rechaza: sigue pendiente.
+    await subir({ resultado: { _errores: [{ tabla: "mesas_estado", id: mesa, error: "x" }] } });
+    assert.ok((await pend()).mesaIds.includes(mesa), "marcar un rechazo lo perdería");
+
+    const [snap] = await subir();
+    const m = (snap?.mesas_estado ?? []).find((x) => x.id === mesa);
+    assert.deepEqual(Object.keys(m ?? {}).sort(), ["estado", "id", "tenant_id"], "solo el estado: el nombre y la capacidad son del panel");
+    assert.equal(m.estado, "OCUPADA");
+    assert.ok(!(await pend()).mesaIds.includes(mesa), "confirmada, ya no");
+  });
+
+  test("el pull ya no pisa el piso: trae el catálogo de la mesa pero respeta su estado", async () => {
+    const { rows: [local] } = await db.query("SELECT to_jsonb(m) AS f FROM mesas m WHERE deleted_at IS NULL LIMIT 1");
+    const id = local.f.id;
+    await enReplica("UPDATE mesas SET estado = 'OCUPADA' WHERE id = $1", [id]);
+
+    // La nube la tiene LIBRE y con otro nombre (se renombró en el panel).
+    await pullSnapshot(db, { mesas: [{ ...local.f, estado: "LIBRE", nombre: "Terraza 1" }] });
+    const { rows: [m] } = await db.query("SELECT estado::text, nombre FROM mesas WHERE id = $1", [id]);
+    assert.equal(m.estado, "OCUPADA", "la nube no debe liberar una mesa que está ocupada en la caja");
+    assert.equal(m.nombre, "Terraza 1", "pero el cambio de nombre del panel sí baja");
+
+    // Una mesa nueva del panel llega con su estado.
+    const nueva = { ...local.f, id: "99999999-0000-0000-0000-00000000f0f0", numero: 777, nombre: "Nueva", estado: "RESERVADA" };
+    await pullSnapshot(db, { mesas: [nueva] });
+    const { rows: [n] } = await db.query("SELECT estado::text FROM mesas WHERE id = $1", [nueva.id]);
+    assert.equal(n?.estado, "RESERVADA", "una mesa que no existía entra completa");
   });
 });

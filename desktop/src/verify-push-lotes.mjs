@@ -48,7 +48,9 @@ function crearPoolFalso({ nTickets = 450, nTurnos = 5, turnosCambiados = [], rep
     async query(sql, params = []) {
       pool.consultas++;
 
-      if (sql.startsWith("CREATE TABLE")) return { rows: [] };
+      if (sql.startsWith("CREATE TABLE") || sql.startsWith("ALTER TABLE")) return { rows: [] };
+      // Relleno de huellas de la libreta de zonas (0116): aquí no hay zonas.
+      if (sql.startsWith("UPDATE _vim_zonas_ok")) return { rows: [], rowCount: 0 };
 
       // La libreta de repartidores ya no se siembra desde el push (la siembra vive en el arranque,
       // `sembrarRepartidoresUnaVez`), así que aquí solo llega el marcado de lo que la nube confirmó.
@@ -57,7 +59,7 @@ function crearPoolFalso({ nTickets = 450, nTurnos = 5, turnosCambiados = [], rep
         return { rows: [] };
       }
 
-      if (sql.includes("array_agg(id ORDER BY fecha_apertura)")) {
+      if (sql.includes("ORDER BY x.fecha_apertura") || sql.includes("array_agg(id ORDER BY fecha_apertura)")) {
         const pendientes = tickets.filter((t) => !subidos.has(t.id)).map((t) => t.id);
         const cambiados = turnosCambiados.filter((id) => !turnosMarcados.has(id));
         // repartidores: los del parámetro de la prueba que aún no están en la libreta (aquí no hay
@@ -85,6 +87,7 @@ function crearPoolFalso({ nTickets = 450, nTurnos = 5, turnosCambiados = [], rep
         return {
           rows: [{
             ids: idsLote.length ? idsLote : null,
+            tickets_huella: idsLote.length ? idsLote.map((id) => ({ id, huella: `h-${id}` })) : null,
             turnos: delLoteTurnos.length ? delLoteTurnos.map((t) => ({ id: t.id, huella: `h-${t.id}` })) : null,
             repartidores: repPend.length ? repPend : null,
             snapshot: {
@@ -98,6 +101,11 @@ function crearPoolFalso({ nTickets = 450, nTurnos = 5, turnosCambiados = [], rep
         };
       }
 
+      // Desde la 0.4.91 se anota con la huella de la venta: [{ id, huella }] en JSON.
+      if (sql.includes("_vim_push_ok (ticket_id, huella)")) {
+        for (const t of JSON.parse(params[0])) subidos.add(t.id);
+        return { rows: [] };
+      }
       if (sql.includes("_vim_push_ok(ticket_id)")) {
         for (const id of params[0]) subidos.add(id);
         return { rows: [] };

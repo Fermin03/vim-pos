@@ -7,8 +7,9 @@
 // En el desktop las ventas se escriben directo al Postgres LOCAL (no al outbox de Dexie del POS
 // web), así que el push LEE las filas operativas locales aún no subidas y las replica VERBATIM
 // a la nube vía la RPC sync_push_snapshot (modo réplica → conserva folio/totales/PAGADO exactos).
-// Solo sube tickets terminales (PAGADO/FACTURADO/CANCELADO): no cambian, así que subir una vez basta.
-// Idempotente por id en el servidor; el device marca lo subido en _vim_push_ok para no re-trabajar.
+// Solo sube tickets terminales (PAGADO/FACTURADO/CANCELADO), y los vuelve a subir si cambian después
+// (ver HUELLA_TICKET). Idempotente por id en el servidor; el device anota en _vim_push_ok la huella
+// de lo que la nube ya tiene, para no re-trabajar.
 //
 // POR QUÉ VA EN LOTES Y NO DE UN JALÓN.
 //
@@ -69,8 +70,63 @@ export const MAX_CLIENTES_POR_PUSH = 500;
 /** Huella de un cliente o una dirección: la fila completa, igual que la de los turnos y las zonas. */
 const HUELLA_FILA = "md5(to_jsonb(x)::text)";
 
+/**
+ * Cuántos días hacia atrás se vuelve a mirar una venta ya subida por si cambió en la caja.
+ *
+ * Lo que cambia una venta después de cobrarla pasa en días, no en meses: una cancelación, una
+ * devolución, la cocina marcándola lista, una reimpresión. Mirar más atrás cuesta una huella por
+ * ticket en cada ciclo sin ganar nada. 60 y no 30 porque la primera vez que corre esta versión
+ * cubre también lo que ya se había quedado atrapado en la caja (el piloto arrancó a mediados de
+ * agosto de 2026).
+ */
+export const DIAS_REVISION_TICKETS = 60;
+
+/**
+ * Huella de una venta: la fila del ticket MÁS lo que cuelga de ella y puede cambiar después de
+ * cobrar. `x` es `tickets`.
+ *
+ * POR QUÉ UNA VENTA YA SUBIDA TIENE QUE VOLVER A VIAJAR.
+ *
+ * Antes cada ticket subía una sola vez, en cuanto quedaba terminal, con la idea de que un terminal
+ * "no cambia". Sí cambia: se cancela (y la nube lo seguía contando como venta), se devuelve, la
+ * cocina lo marca listo después de cobrado (servicio rápido: se cobra primero), se reimprime su
+ * comanda. Nada de eso llegaba. En la nube, al 26 sep 2026, Knock-Out tenía 32 tickets cancelados
+ * y una sola fila de cancelación.
+ *
+ * Los hijos van resumidos por md5 de cada fila (o por conteo, las reimpresiones: solo se agregan),
+ * en orden estable, para que cualquier alta o cambio mueva la huella. Lo que cambie en la NUBE no
+ * cuenta: la huella se calcula sobre la copia local. La nube protege lo que solo ella sabe (que
+ * se facturó; ver la guarda de la 0122).
+ */
+export const HUELLA_TICKET = `md5(to_jsonb(x)::text
+  || COALESCE((SELECT string_agg(md5(to_jsonb(h)::text), '' ORDER BY h.id) FROM ticket_items h WHERE h.ticket_id = x.id), '')
+  || COALESCE((SELECT string_agg(md5(to_jsonb(h)::text), '' ORDER BY h.id) FROM pagos h WHERE h.ticket_id = x.id), '')
+  || COALESCE((SELECT string_agg(md5(to_jsonb(h)::text), '' ORDER BY h.id) FROM ticket_descuentos_manuales h WHERE h.ticket_id = x.id), '')
+  || COALESCE((SELECT string_agg(md5(to_jsonb(h)::text), '' ORDER BY h.id) FROM ticket_promociones_aplicadas h WHERE h.ticket_id = x.id), '')
+  || COALESCE((SELECT string_agg(md5(to_jsonb(h)::text), '' ORDER BY h.id) FROM cancelaciones_ticket h WHERE h.ticket_id = x.id), '')
+  || COALESCE((SELECT string_agg(md5(to_jsonb(h)::text), '' ORDER BY h.id) FROM devoluciones h WHERE h.ticket_original_id = x.id), '')
+  || COALESCE((SELECT string_agg(md5(to_jsonb(h)::text), '' ORDER BY h.id) FROM delivery_asignaciones h WHERE h.ticket_id = x.id), '')
+  || (SELECT count(*)::text FROM comanda_impresiones h WHERE h.ticket_id = x.id))`;
+
+/**
+ * Venta terminal que hay que mandar: la que nunca subió, o una reciente cuya huella ya no es la
+ * que la nube recibió. `o` es `_vim_push_ok`. Una fila de la libreta sin huella (la dejó una
+ * versión anterior, que solo anotaba "ya subió") cuenta como cambiada: así la primera corrida
+ * rescata lo que se había quedado atrapado, una sola vez.
+ */
+const TICKET_PENDIENTE = `(o.ticket_id IS NULL
+    OR (x.fecha_apertura >= now() - interval '${DIAS_REVISION_TICKETS} days'
+        AND o.huella IS DISTINCT FROM ${HUELLA_TICKET}))`;
+
 async function asegurarTabla(pool) {
   await pool.query("CREATE TABLE IF NOT EXISTS _vim_push_ok (ticket_id uuid PRIMARY KEY, pushed_at timestamptz DEFAULT now())");
+  // La huella de la venta tal como la recibió la nube (ver HUELLA_TICKET). Nace NULL en las filas
+  // viejas y eso es a propósito: cuentan como cambiadas y suben una vez más.
+  await pool.query("ALTER TABLE _vim_push_ok ADD COLUMN IF NOT EXISTS huella text NULL");
+  // El estado de cada mesa que la nube ya tiene (0122). Solo el estado: la mesa como catálogo baja
+  // del panel; el piso lo manda la caja. Sin fila = nunca subió: la primera corrida sube el piso
+  // entero, y eso es lo que cura una mesa atorada en la nube.
+  await pool.query("CREATE TABLE IF NOT EXISTS _vim_mesas_ok (mesa_id uuid PRIMARY KEY, estado text NULL, subido_at timestamptz DEFAULT now())");
   // Los turnos se rastrean por HUELLA, no por "ya lo mandé": un ticket terminal nunca cambia,
   // pero un turno sí —se abre, se cierra, se le cuenta el efectivo— y cada cambio tiene que
   // volver a viajar. Ver el porqué en el comentario de `construirSnapshotPush`.
@@ -407,10 +463,15 @@ export async function listarPendientes(pool) {
     SELECT
       -- En orden cronológico: si el envío se corta a media lista, lo que quedó arriba es un
       -- prefijo del historial y no un revoltijo.
-      (SELECT array_agg(id ORDER BY fecha_apertura)
-         FROM tickets
-        WHERE estado_fiscal = ANY($1)
-          AND id NOT IN (SELECT ticket_id FROM _vim_push_ok)) AS ids,
+      (SELECT array_agg(x.id ORDER BY x.fecha_apertura)
+         FROM tickets x
+         LEFT JOIN _vim_push_ok o ON o.ticket_id = x.id
+        WHERE x.estado_fiscal = ANY($1)
+          AND ${TICKET_PENDIENTE}) AS ids,
+      -- Mesas cuyo estado la nube aún no tiene (ver _vim_mesas_ok).
+      (SELECT array_agg(x.id) FROM mesas x
+         LEFT JOIN _vim_mesas_ok o ON o.mesa_id = x.id
+        WHERE x.deleted_at IS NULL AND o.estado IS DISTINCT FROM x.estado::text) AS mesas,
       -- Turnos que cambiaron (o que nunca viajaron) aunque no arrastren ventas nuevas.
       (SELECT array_agg(x.id)
          FROM turnos x
@@ -443,7 +504,7 @@ export async function listarPendientes(pool) {
         WHERE o.direccion_id IS NULL OR o.huella IS DISTINCT FROM ${HUELLA_FILA}) AS direcciones
   `, [TERMINALES]);
   return {
-    ids: rows[0].ids ?? [], turnosCambiados: rows[0].turnos ?? [],
+    ids: rows[0].ids ?? [], turnosCambiados: rows[0].turnos ?? [], mesaIds: rows[0].mesas ?? [],
     movimientoIds: rows[0].movimientos ?? [], repartidorIds: rows[0].repartidores ?? [],
     zonaIds: rows[0].zonas ?? [],
     clienteIds: rows[0].clientes ?? [], direccionIds: rows[0].direcciones ?? [],
@@ -479,16 +540,25 @@ export async function listarPendientes(pool) {
  * `movimientos_caja` sigue a los mismos turnos y no solo a los de las ventas: un turno con puras
  * entradas y salidas de efectivo, sin vender nada, tampoco subía jamás.
  */
-export async function construirSnapshotPush(pool, { ticketIds = null, turnoIds = null, movimientoIds = null, clienteIds = null, direccionIds = null } = {}) {
+export async function construirSnapshotPush(pool, { ticketIds = null, turnoIds = null, movimientoIds = null, clienteIds = null, direccionIds = null, conMesas = true } = {}) {
   await asegurarTabla(pool);
   const { rows } = await pool.query(`
     WITH tk AS (
       -- Con lista: exactamente ese lote. Sin lista: todo lo pendiente (comportamiento original).
-      SELECT id, turno_id FROM tickets
-       WHERE ($2::uuid[] IS NOT NULL AND id = ANY($2::uuid[]))
+      -- La huella se calcula aquí, en la misma sentencia que arma lo que viaja: si la venta cambia
+      -- mientras sube, la anotada no coincide y vuelve a subir en el siguiente ciclo.
+      SELECT x.id, x.turno_id, ${HUELLA_TICKET} AS huella FROM tickets x
+        LEFT JOIN _vim_push_ok o ON o.ticket_id = x.id
+       WHERE ($2::uuid[] IS NOT NULL AND x.id = ANY($2::uuid[]))
           OR ($2::uuid[] IS NULL
-              AND estado_fiscal = ANY($1)
-              AND id NOT IN (SELECT ticket_id FROM _vim_push_ok))
+              AND x.estado_fiscal = ANY($1)
+              AND ${TICKET_PENDIENTE})
+    ),
+    ms AS (
+      -- El piso: solo las mesas cuyo estado la nube no tiene. Viaja con el primer lote (o solo).
+      SELECT x.id, x.tenant_id, x.estado::text AS estado FROM mesas x
+        LEFT JOIN _vim_mesas_ok o ON o.mesa_id = x.id
+       WHERE $7::boolean AND x.deleted_at IS NULL AND o.estado IS DISTINCT FROM x.estado::text
     ),
     cl AS (
       -- Clientes: igual que los movimientos — con lista, exactamente esos; sin lista (modo
@@ -517,6 +587,8 @@ export async function construirSnapshotPush(pool, { ticketIds = null, turnoIds =
     )
     SELECT
       (SELECT array_agg(id) FROM tk) AS ids,
+      (SELECT jsonb_agg(jsonb_build_object('id', id, 'huella', huella)) FROM tk) AS tickets_huella,
+      (SELECT jsonb_agg(jsonb_build_object('id', id, 'estado', estado)) FROM ms) AS mesas,
       (SELECT jsonb_agg(jsonb_build_object('id', id, 'huella', huella)) FROM tn) AS turnos,
       (SELECT array_agg(id) FROM movimientos_inventario x WHERE ($4::uuid[] IS NOT NULL AND x.id = ANY($4::uuid[])) OR ($4::uuid[] IS NULL AND $2::uuid[] IS NULL AND x.id NOT IN (SELECT movimiento_id FROM _vim_mov_ok))) AS movimientos,
       (SELECT array_agg(id) FROM repartidores x WHERE x.id NOT IN (SELECT repartidor_id FROM _vim_repartidores_ok)) AS repartidores,
@@ -541,6 +613,18 @@ export async function construirSnapshotPush(pool, { ticketIds = null, turnoIds =
         -- salida, antes de cobrar, así que para cuando el ticket entra en esta rebanada ya está
         -- liquidada y sube completa.
         'delivery_asignaciones',     (SELECT jsonb_agg(to_jsonb(x)) FROM delivery_asignaciones x WHERE x.ticket_id IN (SELECT id FROM tk)),
+
+        -- Lo que cuelga de la venta y no subía nunca (0122): el reporte de descuentos y el de
+        -- reimpresiones salían vacíos en el panel, y las cancelaciones se quedaban en la caja.
+        'ticket_descuentos_manuales',   (SELECT jsonb_agg(to_jsonb(x)) FROM ticket_descuentos_manuales x WHERE x.ticket_id IN (SELECT id FROM tk)),
+        'ticket_promociones_aplicadas', (SELECT jsonb_agg(to_jsonb(x)) FROM ticket_promociones_aplicadas x WHERE x.ticket_id IN (SELECT id FROM tk)),
+        'comanda_impresiones',          (SELECT jsonb_agg(to_jsonb(x)) FROM comanda_impresiones x WHERE x.ticket_id IN (SELECT id FROM tk)),
+        'devoluciones',                 (SELECT jsonb_agg(to_jsonb(x)) FROM devoluciones x WHERE x.ticket_original_id IN (SELECT id FROM tk)),
+        'devolucion_items',             (SELECT jsonb_agg(to_jsonb(x)) FROM devolucion_items x WHERE x.devolucion_id IN (SELECT id FROM devoluciones WHERE ticket_original_id IN (SELECT id FROM tk))),
+        'cancelaciones_ticket',         (SELECT jsonb_agg(to_jsonb(x)) FROM cancelaciones_ticket x WHERE x.ticket_id IN (SELECT id FROM tk)),
+
+        -- El piso de la caja: solo el estado de cada mesa (ver _vim_mesas_ok).
+        'mesas_estado',                 (SELECT jsonb_agg(jsonb_build_object('id', id, 'tenant_id', tenant_id, 'estado', estado)) FROM ms),
 
         -- El catálogo de repartidores, solo los que la nube aún no confirmó. Ver _vim_repartidores_ok.
         'repartidores',              (SELECT jsonb_agg(to_jsonb(x)) FROM repartidores x
@@ -572,20 +656,48 @@ export async function construirSnapshotPush(pool, { ticketIds = null, turnoIds =
                                            OR ($4::uuid[] IS NULL AND $2::uuid[] IS NULL
                                                AND x.id NOT IN (SELECT movimiento_id FROM _vim_mov_ok)))
       )) AS snapshot
-  `, [TERMINALES, ticketIds, turnoIds, movimientoIds, clienteIds, direccionIds]);
+  `, [TERMINALES, ticketIds, turnoIds, movimientoIds, clienteIds, direccionIds, conMesas]);
   return {
     snapshot: rows[0].snapshot ?? {}, ids: rows[0].ids ?? [], turnos: rows[0].turnos ?? [],
+    tickets: rows[0].tickets_huella ?? [], mesas: rows[0].mesas ?? [],
     movimientos: rows[0].movimientos ?? [], repartidores: rows[0].repartidores ?? [],
     zonas: rows[0].zonas ?? [],
     clientes: rows[0].clientes ?? [], direcciones: rows[0].direcciones ?? [],
   };
 }
 
-/** Marca tickets como subidos (para no re-enviarlos). */
-export async function marcarPushed(pool, ids) {
-  if (!ids?.length) return;
+/**
+ * Anota las ventas que la nube ya tiene, con la huella que viajó (`[{ id, huella }]`). Se
+ * ACTUALIZA en conflicto, como los turnos: lo que importa es la última versión que la nube recibió.
+ * Acepta también ids sueltos, como antes (así los llaman las verificaciones): a esos se les calcula
+ * la huella con la fila local actual, que es lo que "ya subió" significa en ese momento.
+ */
+export async function marcarPushed(pool, tickets) {
+  if (!tickets?.length) return;
+  const sueltos = tickets.filter((t) => typeof t === "string");
+  if (sueltos.length) {
+    await pool.query(
+      `INSERT INTO _vim_push_ok (ticket_id, huella)
+       SELECT x.id, ${HUELLA_TICKET} FROM tickets x WHERE x.id = ANY($1::uuid[])
+       ON CONFLICT (ticket_id) DO UPDATE SET huella = EXCLUDED.huella, pushed_at = now()`, [sueltos]);
+  }
+  const filas = tickets.filter((t) => typeof t !== "string");
+  if (!filas.length) return;
   await pool.query(
-    "INSERT INTO _vim_push_ok(ticket_id) SELECT unnest($1::uuid[]) ON CONFLICT (ticket_id) DO NOTHING", [ids]);
+    `INSERT INTO _vim_push_ok (ticket_id, huella)
+     SELECT (x->>'id')::uuid, x->>'huella' FROM jsonb_array_elements($1::jsonb) AS x
+     ON CONFLICT (ticket_id) DO UPDATE SET huella = EXCLUDED.huella, pushed_at = now()`,
+    [JSON.stringify(filas)]);
+}
+
+/** Anota el estado de cada mesa que la nube ya recibió (`[{ id, estado }]`). */
+export async function marcarMesasSubidas(pool, mesas) {
+  if (!mesas?.length) return;
+  await pool.query(
+    `INSERT INTO _vim_mesas_ok (mesa_id, estado)
+     SELECT (x->>'id')::uuid, x->>'estado' FROM jsonb_array_elements($1::jsonb) AS x
+     ON CONFLICT (mesa_id) DO UPDATE SET estado = EXCLUDED.estado, subido_at = now()`,
+    [JSON.stringify(mesas)]);
 }
 
 /** Marca movimientos de inventario confirmados por la nube. */
@@ -684,9 +796,21 @@ function rechazadosPorTicket(errores, snapshot) {
       // Tampoco cuelgan de ningún ticket: se reintentan solos (ver filasRechazadas). Que no suba un
       // cliente no invalida la venta que lo menciona.
       continue;
-    } else if (e.tabla === "ticket_items" || e.tabla === "pagos") {
+    } else if (e.tabla === "comanda_impresiones" || e.tabla === "mesas_estado") {
+      // La bitácora de impresiones no invalida la venta, y una mesa no cuelga de ninguna: retener
+      // el ticket por esto lo dejaría reintentándose para siempre. La mesa se reintenta sola.
+      continue;
+    } else if (["ticket_items", "pagos", "ticket_descuentos_manuales", "ticket_promociones_aplicadas", "cancelaciones_ticket"].includes(e.tabla)) {
+      // El ticket llegó incompleto: no se da por subido y se reintenta con todo lo suyo.
       const fila = (snapshot[e.tabla] ?? []).find((x) => x.id === e.id);
       if (fila?.ticket_id) fuera.add(fila.ticket_id);
+    } else if (e.tabla === "devoluciones") {
+      const fila = (snapshot.devoluciones ?? []).find((x) => x.id === e.id);
+      if (fila?.ticket_original_id) fuera.add(fila.ticket_original_id);
+    } else if (e.tabla === "devolucion_items") {
+      const item = (snapshot.devolucion_items ?? []).find((x) => x.id === e.id);
+      const dev = item && (snapshot.devoluciones ?? []).find((x) => x.id === item.devolucion_id);
+      if (dev?.ticket_original_id) fuera.add(dev.ticket_original_id);
     } else if (e.tabla === "movimientos_inventario") {
       // Un movimiento rechazado se reintenta solo (ver movimientosRechazados); no invalida la venta.
       continue;
@@ -735,9 +859,9 @@ function filasRechazadas(errores, tabla) {
  * reintentando lo mismo). Partir a la mitad en vez de recalcular un tamaño "correcto" converge
  * en pocas vueltas y no necesita saber cuál es el límite del otro lado.
  */
-async function enviarLote(pool, { cloudUrl, anonKey, deviceToken }, { ticketIds, turnoIds, movimientoIds = [], clienteIds = [], direccionIds = [], maxBytes }, log) {
-  const { snapshot, ids, turnos, movimientos, repartidores, zonas, clientes, direcciones } =
-    await construirSnapshotPush(pool, { ticketIds, turnoIds, movimientoIds, clienteIds, direccionIds });
+async function enviarLote(pool, { cloudUrl, anonKey, deviceToken }, { ticketIds, turnoIds, movimientoIds = [], clienteIds = [], direccionIds = [], conMesas = false, maxBytes }, log) {
+  const { snapshot, ids, tickets, turnos, movimientos, repartidores, zonas, clientes, direcciones, mesas } =
+    await construirSnapshotPush(pool, { ticketIds, turnoIds, movimientoIds, clienteIds, direccionIds, conMesas });
   const cuerpo = JSON.stringify({ snapshot });
   const bytes = Buffer.byteLength(cuerpo);
 
@@ -755,7 +879,7 @@ async function enviarLote(pool, { cloudUrl, anonKey, deviceToken }, { ticketIds,
     // Los movimientos se parten a la mitad en ambas: no tienen FK que los arrastre solos.
     // Los clientes, igual que los turnos forzados, con la primera mitad (su techo por corrida ya
     // los mantiene muy por debajo del límite de bytes).
-    const a = await enviarLote(pool, { cloudUrl, anonKey, deviceToken }, { ticketIds: ticketIds.slice(0, mitadT), turnoIds, movimientoIds: movimientoIds.slice(0, mitadM), clienteIds, direccionIds, maxBytes }, log);
+    const a = await enviarLote(pool, { cloudUrl, anonKey, deviceToken }, { ticketIds: ticketIds.slice(0, mitadT), turnoIds, movimientoIds: movimientoIds.slice(0, mitadM), clienteIds, direccionIds, conMesas, maxBytes }, log);
     const b = await enviarLote(pool, { cloudUrl, anonKey, deviceToken }, { ticketIds: ticketIds.slice(mitadT), turnoIds: [], movimientoIds: movimientoIds.slice(mitadM), maxBytes }, log);
     return { subidos: a.subidos + b.subidos, turnos: a.turnos + b.turnos, movimientos: a.movimientos + b.movimientos, rechazados: a.rechazados + b.rechazados };
   };
@@ -780,7 +904,9 @@ async function enviarLote(pool, { cloudUrl, anonKey, deviceToken }, { ticketIds,
   const respuesta = await res.json().catch(() => ({}));
   const errores = respuesta?.resultado?._errores ?? [];
   const fuera = rechazadosPorTicket(errores, snapshot);
-  await marcarPushed(pool, ids.filter((id) => !fuera.has(id)));
+  await marcarPushed(pool, tickets.filter((t) => !fuera.has(t.id)));
+  const mesaFuera = filasRechazadas(errores, "mesas_estado");
+  await marcarMesasSubidas(pool, mesas.filter((m) => !mesaFuera.has(m.id)));
   await marcarTurnosPushed(pool, turnos.filter((t) => !fuera.has(t.id)));
   const movFuera = movimientosRechazados(errores);
   await marcarMovimientosPushed(pool, movimientos.filter((id) => !movFuera.has(id)));
@@ -814,7 +940,7 @@ export async function pushToCloud(pool, opts, log = () => {}, cfg = {}) {
   const maxClientes = cfg.maxClientesPorPush ?? MAX_CLIENTES_POR_PUSH;
 
   const pendientes = await listarPendientes(pool);
-  const { ids, turnosCambiados, movimientoIds: movimientoIdsTodos, repartidorIds, zonaIds } = pendientes;
+  const { ids, turnosCambiados, movimientoIds: movimientoIdsTodos, repartidorIds, zonaIds, mesaIds = [] } = pendientes;
   const clienteIds = pendientes.clienteIds.slice(0, maxClientes);
   const direccionIds = pendientes.direccionIds.slice(0, maxClientes);
   if (pendientes.clienteIds.length > clienteIds.length || pendientes.direccionIds.length > direccionIds.length) {
@@ -836,8 +962,9 @@ export async function pushToCloud(pool, opts, log = () => {}, cfg = {}) {
   // construirSnapshotPush, y se quedaba atorada en la caja hasta que ALGO ajeno volviera a hacerla
   // pasar — en silencio, sin error, contra el motivo de tener el catálogo aquí.
   // Lo mismo con un cliente registrado sin que la venta se haya cobrado todavía.
+  // Y con una mesa que se liberó sin que se cobrara nada (una cuenta vacía cancelada, 0104).
   if (!ids.length && !turnosCambiados.length && !movimientoIds.length && !repartidorIds.length && !zonaIds.length
-      && !clienteIds.length && !direccionIds.length) { log("nada pendiente por subir"); return { subidos: 0, turnos: 0, movimientos: 0, rechazados: 0, lotes: 0 }; }
+      && !clienteIds.length && !direccionIds.length && !mesaIds.length) { log("nada pendiente por subir"); return { subidos: 0, turnos: 0, movimientos: 0, rechazados: 0, lotes: 0 }; }
 
   const parte = [
     ids.length ? `${ids.length} venta${ids.length === 1 ? "" : "s"}` : null,
@@ -847,6 +974,7 @@ export async function pushToCloud(pool, opts, log = () => {}, cfg = {}) {
     zonaIds.length ? `${zonaIds.length} zona(s) de envío` : null,
     clienteIds.length ? `${clienteIds.length} cliente(s)` : null,
     direccionIds.length ? `${direccionIds.length} dirección(es) de cliente` : null,
+    mesaIds.length ? `el estado de ${mesaIds.length} mesa(s)` : null,
   ].filter(Boolean).join(" y ");
 
   // Sin ventas queda un solo lote vacío: el que lleva los turnos que cambiaron (y los movimientos).
@@ -868,7 +996,7 @@ export async function pushToCloud(pool, opts, log = () => {}, cfg = {}) {
     const dirIds = n === 0 ? direccionIds : [];
     n++;
     try {
-      const r = await enviarLote(pool, opts, { ticketIds: lote, turnoIds, movimientoIds: movIds, clienteIds: cliIds, direccionIds: dirIds, maxBytes }, log);
+      const r = await enviarLote(pool, opts, { ticketIds: lote, turnoIds, movimientoIds: movIds, clienteIds: cliIds, direccionIds: dirIds, conMesas: n === 1, maxBytes }, log);
       subidos += r.subidos;
       turnos += r.turnos;
       movimientos += r.movimientos;

@@ -46,6 +46,21 @@ export const PULL_ORDER = [
   { t: "usuarios_acceso" },
 ];
 
+/**
+ * Columnas que la NUBE no manda sobre una fila que la caja ya tiene: se escriben al insertar (una
+ * mesa nueva del panel llega con su estado) pero el pull no las pisa después.
+ *
+ * mesas.estado y mesas.reservacion_actual_id son el estado del PISO, no catálogo: ahí se sientan,
+ * se cobran y se reservan, y todo eso pasa en la caja. Antes el pull bajaba la fila entera en cada
+ * ciclo y la nube —que no se entera de lo que pasa en el mostrador— pisaba el piso de la caja: una
+ * mesa atorada OCUPADA en la nube volvía a aparecer ocupada aunque se liberara en la caja, y no
+ * había forma de arreglarlo desde el mostrador. Ahora el piso lo manda la caja, y lo sube
+ * (`mesas_estado` en el push, 0122) para que la nube lo refleje.
+ */
+export const SOLO_AL_INSERTAR = {
+  mesas: new Set(["estado", "reservacion_actual_id"]),
+};
+
 const metaCache = new Map();
 async function tablaMeta(client, schema, tabla) {
   const key = `${schema}.${tabla}`;
@@ -82,7 +97,8 @@ async function upsertTabla(client, schema, tabla, filas) {
       params.push(v); // arrays (udt _xxx) y escalares: node-pg los mapea directo
       return `$${i + 1}`;
     });
-    const setCols = cols.filter((c) => !meta.pk.includes(c));
+    const soloAlInsertar = SOLO_AL_INSERTAR[tabla];
+    const setCols = cols.filter((c) => !meta.pk.includes(c) && !soloAlInsertar?.has(c));
     const conflict = meta.pk.map((c) => `"${c}"`).join(", ");
     const setSql = setCols.length ? setCols.map((c) => `"${c}"=EXCLUDED."${c}"`).join(", ") : `"${meta.pk[0]}"=EXCLUDED."${meta.pk[0]}"`;
     await client.query(
