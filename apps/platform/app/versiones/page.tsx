@@ -1,4 +1,5 @@
 "use client";
+import { compararVersiones } from "../lib/fechas-panel";
 import { useCallback, useMemo, useState } from "react";
 import { hoyMx } from "@vim/fecha";
 import { useSesion } from "../lib/sesion";
@@ -105,6 +106,22 @@ export default function VersionesPage() {
   const parseable = (() => {
     try { return typeof JSON.parse(manifiesto).version === "string"; } catch { return false; }
   })();
+
+  // Lo que se va a publicar, para verlo antes de confirmar: el diálogo pedía TODOS sin decir qué
+  // versión, de dónde se descarga ni contra cuál se compara (revisión de diseño, sep 2026).
+  const nueva = (() => {
+    try {
+      const m = JSON.parse(manifiesto) as { version?: string; url?: string; sha512?: string; notas?: string };
+      let host = "—";
+      try { host = m.url ? new URL(m.url).host : "—"; } catch { host = "URL inválida"; }
+      return { version: String(m.version ?? ""), host, sha: String(m.sha512 ?? "").slice(0, 12), notas: m.notas ?? "" };
+    } catch { return null; }
+  })();
+  const vigente = (versiones ?? [])
+    .filter((v) => v.publicada)
+    .map((v) => v.version)
+    .sort((a, b) => compararVersiones(b, a))[0] ?? null;
+  const orden = nueva && vigente ? compararVersiones(nueva.version, vigente) : 1;
 
   return (
     <div>
@@ -288,8 +305,30 @@ export default function VersionesPage() {
             obliga a instalarla ahora mismo, pero el instalador que descarguen será este.
           </>
         }
+        detalle={
+          nueva && (
+            <div className="flex flex-col gap-2 text-[13px]">
+              <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2 rounded border border-line bg-sel px-3 py-2.5">
+                <div>{vigente ?? "ninguna"}</div>
+                <span className="text-ink-2" aria-hidden="true">→</span>
+                <div className="font-semibold">{nueva.version}</div>
+              </div>
+              <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-ink-2">
+                <dt>Se descarga de</dt><dd className="font-medium text-ink">{nueva.host}</dd>
+                <dt>Huella</dt><dd className="font-mono text-ink">{nueva.sha}…</dd>
+                <dt>Notas</dt><dd className="text-ink">{nueva.notas || "—"}</dd>
+              </dl>
+              {orden < 0 && (
+                <p className="rounded border border-warning/30 bg-warning-soft px-3 py-2 font-medium text-warning">
+                  Es menor que la vigente ({vigente}): las cajas seguirán recomendando la más alta.
+                </p>
+              )}
+            </div>
+          )
+        }
+        listo={{ ok: !!nueva && orden !== 0, falta: "una versión distinta de la vigente" }}
         nombreEsperado="TODOS"
-        etiquetaBoton="Publicar"
+        etiquetaBoton={nueva ? `Publicar ${nueva.version}` : "Publicar"}
         ocupado={busy}
         onConfirmar={({ motivo }) => publicar(motivo)}
       />

@@ -37,6 +37,20 @@ export type Alerta = {
 
 const DIA = 24 * 3600 * 1000;
 
+/**
+ * Una caja con latido (0.4.60+), para la franja "Ahora": ¿está viva en este momento?
+ *
+ * No es una alerta. De noche las cajas se apagan porque el local cerró, y una alerta por cada caja
+ * sin latido sonaría todas las noches hasta que nadie la mirara. Es el estado del parque, con el
+ * dato que importa a las 11 de la noche: hace cuánto habló cada una (revisión de diseño, sep 2026).
+ */
+export type CajaAhora = {
+  id: string; nombre: string; tenantId: string; tenant: string;
+  /** Minutos desde su último latido; null = nunca latió (versión anterior a 0.4.60). */
+  minutos: number | null;
+  version: string | null;
+};
+
 /** Días transcurridos desde una fecha ISO (negativo si es futura). */
 function diasDesde(iso: string | null): number | null {
   if (!iso) return null;
@@ -66,7 +80,7 @@ export async function GET(req: Request) {
   const activos = new Set(tenants.filter((t) => t.estado !== "CANCELADO" && t.estado !== "BAJA").map((t) => t.id));
 
   const [cajasRes, subsRes, foliosRes, onbRes, ventasRes, syncRes] = await Promise.all([
-    sb.from("cajas").select("id, nombre, tenant_id, activa, bloqueada, bloqueo_motivo").is("deleted_at", null).limit(2000),
+    sb.from("cajas").select("id, nombre, tenant_id, activa, bloqueada, bloqueo_motivo, ultimo_latido, version_app").is("deleted_at", null).limit(2000),
     sb.from("suscripciones").select("tenant_id, estado, fecha_fin, proxima_fecha_cobro, precio_mensual_mxn").limit(1000),
     sb.from("tenant_folios_saldo").select("tenant_id, folios_base_mensuales, folios_base_consumidos, saldo_paquetes, umbral_alerta").limit(1000),
     sb.from("tenant_onboarding_estado").select("tenant_id, fase, fecha_go_live, updated_at").limit(1000),
@@ -95,7 +109,21 @@ export async function GET(req: Request) {
   // no cuando llegue la queja.
   const cajas = (cajasRes.data ?? []) as {
     id: string; nombre: string; tenant_id: string; activa: boolean; bloqueada: boolean; bloqueo_motivo: string | null;
+    ultimo_latido: string | null; version_app: string | null;
   }[];
+  const minutosDesde = (iso: string | null) => {
+    if (!iso) return null;
+    const t = new Date(iso).getTime();
+    return Number.isNaN(t) ? null : Math.max(0, Math.floor((Date.now() - t) / 60_000));
+  };
+  const ahora: CajaAhora[] = cajas
+    .filter((c) => c.activa && !c.bloqueada && activos.has(c.tenant_id))
+    .map((c) => ({
+      id: c.id, nombre: c.nombre, tenantId: c.tenant_id, tenant: nombreDe.get(c.tenant_id) ?? "—",
+      minutos: minutosDesde(c.ultimo_latido), version: c.version_app,
+    }))
+    // Las que llevan más tiempo calladas primero; las que nunca latieron, al final (no dicen nada).
+    .sort((a, b) => (a.minutos === null ? 1 : b.minutos === null ? -1 : b.minutos - a.minutos));
   for (const c of cajas) {
     if (!c.bloqueada || !c.activa || !activos.has(c.tenant_id)) continue;
     alertas.push({
@@ -128,9 +156,13 @@ export async function GET(req: Request) {
       continue;
     }
     const diasSync = diasDesde(ultimoSync.get(t.id) ?? null);
+    // Una caja que late (0.4.60+) está viva aunque no sincronice: el push solo corre cuando hay algo
+    // que subir, así que un día sin ventas se veía como "Sin sincronizar" en rojo sobre una caja
+    // encendida. Con latido reciente, la falta de sync no es una falla.
+    const latioHoy = cajas.some((c) => c.tenant_id === t.id && c.activa && (minutosDesde(c.ultimo_latido) ?? Infinity) < 24 * 60);
 
     // Caja muda: reportaba y dejó de hacerlo. Es un fallo técnico, no comercial.
-    if (diasSync !== null && diasSync >= 1) {
+    if (diasSync !== null && diasSync >= 1 && !latioHoy) {
       alertas.push({
         id: `muda-${t.id}`, severidad: diasSync >= 3 ? "critica" : "alta", tipo: "Caja sin sincronizar",
         tenantId: t.id, tenant: t.nombre_comercial,
@@ -266,6 +298,7 @@ export async function GET(req: Request) {
 
   return NextResponse.json({
     alertas,
+    ahora,
     resumen: {
       critica: alertas.filter((a) => a.severidad === "critica").length,
       alta: alertas.filter((a) => a.severidad === "alta").length,
