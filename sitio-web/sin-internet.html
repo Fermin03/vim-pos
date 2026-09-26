@@ -36,7 +36,7 @@
 <link rel="manifest" href="site.webmanifest">
 <meta name="theme-color" content="#0078C9">
 
-<link rel="stylesheet" href="assets/css/vim.css?v=16">
+<link rel="stylesheet" href="assets/css/vim.css?v=17">
 <!-- Consentimiento de cookies. Va ANTES que gtm.js y el orden NO es
      cosmético: los dos llevan `defer`, que respeta el orden del documento, y
      Consent Mode descarta un estado por defecto que llegue después de que el
@@ -225,7 +225,7 @@
             <div class="monitor-barra" aria-hidden="true">
               <span class="monitor-punto"></span><span class="monitor-punto"></span><span class="monitor-punto"></span>
             </div>
-            <img src="assets/img/capturas/pos-sin-conexion.webp?v=2" alt="La caja con el aviso de que no hay conexión, con el ticket y el catálogo funcionando igual."
+            <img src="assets/img/capturas/pos-sin-conexion.webp?v=3" alt="La caja con el aviso de que no hay conexión, con el ticket y el catálogo funcionando igual."
                  width="1600" height="1000" fetchpriority="high" decoding="async">
           </div>
           <figcaption>La caja avisa que no hay internet y sigue cobrando. No hay pantalla de error ni «reintentando»: el aviso es informativo y el turno no se detiene.</figcaption>
@@ -277,7 +277,7 @@
       <div class="pila pila-5">
         <div>
 <svg viewBox="0 0 760 468" role="img" aria-labelledby="arq2-titulo arq2-desc"
-     class="diagrama-arquitectura" data-diagrama xmlns="http://www.w3.org/2000/svg">
+     class="diagrama-arquitectura diagrama-ancho" data-diagrama xmlns="http://www.w3.org/2000/svg">
   <title id="arq2-titulo">Qué sigue funcionando cuando se cae el internet</title>
   <desc id="arq2-desc">
     Todo lo que hace falta para vender —la caja, las impresoras, la pantalla de cocina y una
@@ -353,6 +353,44 @@
     <text class="a-t-sub" x="534" y="394">Comparte el mismo turno</text>
   </g>
 </svg>
+<!-- La misma idea en vertical, para el teléfono: el dibujo ancho a 350 px dejaba la letra en
+     5 px. Mismas clases, así que el botón «Cortar el internet» apaga los dos. -->
+<svg viewBox="0 0 360 548" role="img" aria-labelledby="arqv2-titulo" class="diagrama-arquitectura diagrama-alto" data-diagrama xmlns="http://www.w3.org/2000/svg">
+  <title id="arqv2-titulo">Qué sigue funcionando cuando se cae el internet: la caja, la cocina, las impresoras y una segunda caja viven en el local; lo de fuera cuelga de una sola línea.</title>
+  <g class="a-nube-grupo">
+    <rect class="a-fuera" x="20" y="8" width="320" height="68" rx="8"/>
+    <text class="a-t-etq" x="40" y="32">FUERA · OPCIONAL</text>
+    <text class="a-t-sub" x="40" y="56">Respaldo, panel del dueño y reportes</text>
+  </g>
+  <path class="a-enlace" d="M180 76 L180 124"/>
+  <g class="a-corte">
+    <circle cx="180" cy="100" r="13" fill="var(--bg, #FFFFFF)"/>
+    <path d="M174 94 L186 106 M186 94 L174 106" stroke="var(--danger, #C0392B)" stroke-width="2" stroke-linecap="round"/>
+    <text class="a-t-etq" x="202" y="104" fill="var(--danger, #C0392B)">SE CAYÓ</text>
+  </g>
+
+  <rect class="a-local" x="4" y="124" width="352" height="416" rx="12"/>
+  <text class="a-t-etq" x="24" y="152" fill="var(--accent-hover, #0063A8)">EN TU LOCAL</text>
+
+  <rect class="a-caja" x="24" y="170" width="312" height="88" rx="10"/>
+  <text class="a-t-titulo" x="44" y="202">La caja</text>
+  <text class="a-t-sub" x="44" y="224">Tus ventas y tu menú viven aquí.</text>
+  <text class="a-t-sub" x="44" y="242">Cobra e imprime sin señal.</text>
+
+  <path class="a-hilo" d="M48 258 V478 M48 318 H76 M48 398 H76 M48 478 H76"/>
+
+  <rect class="a-tarjeta" x="76" y="286" width="260" height="64" rx="10"/>
+  <text class="a-t-titulo" x="96" y="312">Cocina</text>
+  <text class="a-t-sub" x="96" y="334">Comandas en pantalla</text>
+
+  <rect class="a-tarjeta" x="76" y="366" width="260" height="64" rx="10"/>
+  <text class="a-t-titulo" x="96" y="392">Impresoras</text>
+  <text class="a-t-sub" x="96" y="414">Tickets y comandas por área</text>
+
+  <rect class="a-tarjeta" x="76" y="446" width="260" height="64" rx="10"/>
+  <text class="a-t-titulo" x="96" y="472">Segunda caja</text>
+  <text class="a-t-sub" x="96" y="494">Comparte el mismo turno</text>
+</svg>
         </div>
         <div class="fila">
           <button class="btn btn-fantasma" type="button" data-diagrama-boton aria-pressed="false">
@@ -425,7 +463,7 @@
             <div class="monitor-barra" aria-hidden="true">
               <span class="monitor-punto"></span><span class="monitor-punto"></span><span class="monitor-punto"></span>
             </div>
-            <img src="assets/img/capturas/pos-arqueo.webp?v=2" alt="Arqueo del cierre de turno: efectivo esperado, efectivo contado y la diferencia, con cada forma de pago en su renglón."
+            <img src="assets/img/capturas/pos-arqueo.webp?v=3" alt="Arqueo del cierre de turno: efectivo esperado, efectivo contado y la diferencia, con cada forma de pago en su renglón."
                  width="1600" height="1000" loading="lazy" decoding="async">
           </div>
           <figcaption>El arqueo al cerrar el turno: lo que dice el sistema, lo que hay en el cajón y la diferencia. Sale igual haya habido internet o no.</figcaption>
@@ -554,7 +592,7 @@
   </div>
 </footer>
 
-<script src="assets/js/vim.js?v=14" defer></script>
+<script src="assets/js/vim.js?v=15" defer></script>
 <!-- Medición sin cookies (Vercel Web Analytics). Se sirve desde este dominio y
      solo existe si está encendida en el proyecto de Vercel; si no, es un 404
      inofensivo. Los eventos se mandan desde vim.js. -->

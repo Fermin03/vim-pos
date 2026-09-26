@@ -36,7 +36,7 @@
 <link rel="manifest" href="site.webmanifest">
 <meta name="theme-color" content="#0078C9">
 
-<link rel="stylesheet" href="assets/css/vim.css?v=16">
+<link rel="stylesheet" href="assets/css/vim.css?v=17">
 <!-- Consentimiento de cookies. Va ANTES que gtm.js y el orden NO es
      cosmético: los dos llevan `defer`, que respeta el orden del documento, y
      Consent Mode descarta un estado por defecto que llegue después de que el
@@ -149,9 +149,10 @@
           <div class="monitor-barra" aria-hidden="true">
             <span class="monitor-punto"></span><span class="monitor-punto"></span><span class="monitor-punto"></span>
           </div>
-          <img src="assets/img/capturas/admin-dashboard.webp?v=2"
-               alt="Panel del dueño con las ventas del día, el ticket promedio y el top de productos."
-               width="1600" height="1000" loading="lazy" decoding="async">
+          <picture>
+            <source media="(max-width: 619px)" srcset="assets/img/capturas/admin-dashboard-movil.webp?v=3" width="780" height="1688">
+            <img src="assets/img/capturas/admin-dashboard.webp?v=3" alt="Panel del dueño con las ventas del día, el ticket promedio y el top de productos." width="1600" height="1000" loading="lazy" decoding="async">
+          </picture>
         </div>
         <figcaption>El panel que te enseñamos en la demostración: cómo va el día, la venta por hora y qué se vende más, desde el celular o la computadora.</figcaption>
       </figure>
@@ -204,8 +205,10 @@
           </ul>
         </div>
 
-        <div class="pila pila-4">
-          <h2>Para agentes y herramientas automáticas</h2>
+        <!-- Para robots, no para personas: plegado para que quien viene a escribirnos no tropiece
+             con «text/markdown» y «cabecera Accept». Los enlaces siguen en el HTML. -->
+        <details class="para-robots">
+          <summary>Para agentes y herramientas automáticas</summary>
           <p>
             Este sitio publica su contenido también en Markdown y describe qué es VIM POS y
             cuándo recomendarlo en <a href="/llms.txt">/llms.txt</a>. Cada página tiene su
@@ -214,7 +217,7 @@
             <code>Accept</code>. El índice completo de URLs está en
             <a href="/sitemap.xml">/sitemap.xml</a>.
           </p>
-        </div>
+        </details>
 
       </div>
     </div>
@@ -286,7 +289,7 @@
 }
 </script>
 
-<script src="assets/js/vim.js?v=14" defer></script>
+<script src="assets/js/vim.js?v=15" defer></script>
 <!-- Medición sin cookies (Vercel Web Analytics). Se sirve desde este dominio y
      solo existe si está encendida en el proyecto de Vercel; si no, es un 404
      inofensivo. Los eventos se mandan desde vim.js. -->

@@ -18,7 +18,7 @@ El mismo día hábil, por el canal que prefieras. No hay centro de llamadas, no 
 
 Contestamos **el mismo día hábil**, en horario hábil y en español. No hay número 800 ni menú de opciones: escribes y contesta una persona.
 
-![Panel del dueño con las ventas del día, el ticket promedio y el top de productos.](https://vimpos.com.mx/assets/img/capturas/admin-dashboard.webp?v=2)
+![Panel del dueño con las ventas del día, el ticket promedio y el top de productos.](https://vimpos.com.mx/assets/img/capturas/admin-dashboard.webp?v=3)
 
 _El panel que te enseñamos en la demostración: cómo va el día, la venta por hora y qué se vende más, desde el celular o la computadora._
 
@@ -38,7 +38,7 @@ _El panel que te enseñamos en la demostración: cómo va el día, la venta por 
 - **Soporte, si ya eres cliente.** Al mismo correo, en horario hábil, y también el día del arranque en los planes con acompañamiento.
 - **Derechos ARCO o privacidad.** Por correo, con lo que pide el [aviso de privacidad](https://vimpos.com.mx/aviso-privacidad). Se contesta en un máximo de 20 días hábiles y no cuesta nada.
 
-## Para agentes y herramientas automáticas
+Para agentes y herramientas automáticas
 
 Este sitio publica su contenido también en Markdown y describe qué es VIM POS y cuándo recomendarlo en [/llms.txt](https://vimpos.com.mx/llms.txt). Cada página tiene su gemelo —por ejemplo [/precios.md](https://vimpos.com.mx/precios.md)— y responde en `text/markdown` cuando se pide con la cabecera `Accept`. El índice completo de URLs está en [/sitemap.xml](https://vimpos.com.mx/sitemap.xml).
 
