@@ -3,7 +3,7 @@ import { Button, LogoVim, Modal } from "@vim/ui/styles";
 import { type ReactNode, useCallback, useEffect, useState } from "react";
 import { useReloj } from "./topbar-pos";
 import { evaluarSync, leerEstadoSync, type NivelSync } from "../lib/estado-sync";
-import { BandaAcceso, useAcceso } from "./banda-acceso";
+import { BandaAcceso, BandaActualizacion, useAcceso } from "./banda-acceso";
 import { DialogoAvisos } from "./dialogo-avisos";
 import { avisosDe, leerDirectivas, type Aviso } from "../lib/directivas";
 import { evaluarFolios, leerFolios, type NivelFolios } from "../lib/folios";
@@ -136,6 +136,9 @@ export function PantallaInicio({
       {/* Aviso de suspensión con gracia: el cajero puede seguir cobrando, pero el negocio tiene
           que enterarse antes de la fecha en que la caja deje de vender (ADR 0014). */}
       {acceso.nivel === "gracia" && <BandaAcceso mensaje={acceso.mensaje} desde={acceso.desde} />}
+      {/* Versión nueva sin instalar: aquí y no en la pantalla de cobro, para que se instale entre
+          turnos y no a media venta. */}
+      {acceso.actualizacion && acceso.nivel !== "bloqueado" && <BandaActualizacion version={acceso.actualizacion} />}
       {avisos && avisos.length > 0 && <DialogoAvisos avisos={avisos} onCerrar={() => setAvisos([])} />}
       {/* ── Barra superior: quién opera y dónde ─────────────────────────────── */}
       <header className="flex h-[clamp(2.75rem,6.5vh,3.5rem)] flex-shrink-0 items-center justify-between gap-3 border-b border-line px-[clamp(0.75rem,2vw,1.25rem)]">

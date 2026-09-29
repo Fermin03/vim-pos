@@ -273,7 +273,11 @@ async function bootCaja() {
           ? { ...d.acceso, bloqueado: true, motivo: "version",
               mensaje: "Actualiza VIM POS para poder seguir vendiendo." }
           : d.acceso;
-        return { disponible: true, recibido: recibidoIso, directivas: { ...d, acceso } };
+        // La versión instalada y si hay una más nueva, para que el POS pinte su banda de
+        // "hay versión nueva" en la pantalla de inicio. La nube no sabe qué corre esta caja;
+        // la notificación y el renglón de la bandeja solos no los veía nadie.
+        const version = { ...(d.version ?? {}), instalada: app.getVersion(), hay_nueva: ver.hayNueva };
+        return { disponible: true, recibido: recibidoIso, directivas: { ...d, acceso, version } };
       },
     });
     posUrl = `http://localhost:${UI_PORT}`;

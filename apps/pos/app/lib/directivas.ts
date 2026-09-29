@@ -93,6 +93,23 @@ export async function marcarAvisoVisto(id: string): Promise<void> {
   }
 }
 
+/**
+ * La versión nueva que esta caja todavía no instala, o null. FUNCIÓN PURA.
+ *
+ * `hay_nueva` e `instalada` los pone el ESCRITORIO al servir `/__directivas` (compara la
+ * recomendada de la nube con su propia versión). La nube sola no puede saber qué versión corre
+ * la caja, así que en el POS web —donde no hay nada que instalar— esto siempre es null.
+ *
+ * Existe porque el aviso de siempre (notificación de Windows y un renglón en el menú de la
+ * bandeja) no lo ve nadie: Knock-Out siguió en 0.4.90 tres días después de publicarse la 0.4.91,
+ * con la caja encendida y reportándose.
+ */
+export function actualizacionPendiente(d: Directivas | null): string | null {
+  const v = d?.version;
+  if (!v || v.hay_nueva !== true) return null;
+  return typeof v.recomendada === "string" && /^\d+\.\d+\.\d+$/.test(v.recomendada) ? v.recomendada : null;
+}
+
 const MENSAJE_POR_DEFECTO =
   "Tu servicio de VIM POS está suspendido. Ponte en contacto con VIM para reactivarlo.";
 const MENSAJE_VERSION =
