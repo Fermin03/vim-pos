@@ -731,6 +731,14 @@ o $19,990 al año, más IVA
 
 ¿Más de tres sucursales? Es el mismo plan Cadena con sucursales de más; escríbenos y te decimos el número exacto.
 
+_Piloto · 5 negocios_
+
+## El primer mes sin costo, y $499 al mes hasta el séptimo
+
+Buscamos cinco negocios de comida rápida, cafetería o servicio en mostrador para arrancar con nosotros en el plan Esencial. El mes 1 no pagas; del 2 al 7 pagas $499 en lugar de $699, y del mes 8 en adelante, el precio de lista. Todo más IVA, sin contrato forzoso. Te ahorras $1,899 el primer año.
+
+[Quiero un lugar](https://vimpos.com.mx/demo?utm_source=sitio&amp;utm_campaign=piloto)
+
 _Lado a lado_
 
 ## Qué cambia de un plan a otro
@@ -751,6 +759,7 @@ _Comparación de los tres planes de VIM POS._
 | Reporte que suma sucursales | No | No | Sí |
 | Facturación electrónica | $349 al mes aparte | Incluida | Incluida |
 | Folios de factura al mes | 10, con el extra de facturación | 20 | 40 |
+| Pedidos de Uber Eats en la caja | $100 al mes aparte | Incluido | Incluido |
 | Quién carga tu menú | Tú, con nuestra guía | Nosotros | Nosotros |
 | Capacitación | Videos y guía escrita | 3 horas con tu equipo | 3 horas con tu equipo |
 | Soporte | WhatsApp y correo | WhatsApp y correo | WhatsApp y correo |
@@ -829,6 +838,12 @@ Al mes, más IVA. Comparte turno y comandas con la principal.
 $349
 
 Al mes, más IVA, y **solo si estás en Esencial**: en Negocio y en Cadena ya va incluida. Se enciende desde el panel con tu Constancia y tu sello digital, y ese mismo día tus tickets salen con su código para facturar.
+
+### Pedidos de Uber Eats
+
+$100
+
+Al mes, más IVA, y **solo si estás en Esencial**: en Negocio y en Cadena ya va incluido. Cada pedido de Uber Eats entra a tu caja como un ticket y su comanda sale a cocina, sin volver a teclearlo.
 
 _Facturación_
 

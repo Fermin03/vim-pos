@@ -1327,3 +1327,22 @@ body[data-menu-abierto="true"] { overflow: hidden; }
 .para-robots { font-size: var(--t-13); color: var(--ink-2); }
 .para-robots summary { cursor: pointer; font-weight: 600; width: fit-content; }
 .para-robots p { margin-top: var(--sp-3); font-size: var(--t-13); }
+
+/* ==========================================================================
+   Oferta del piloto (precios)
+   Un solo recuadro con borde de marca, no una banda de colores: es una oferta
+   con fecha de caducidad y no debe pesar más que los planes que tiene arriba.
+   ========================================================================== */
+
+.oferta-piloto {
+  display: grid; gap: var(--sp-5); align-items: center;
+  padding: var(--sp-6);
+  border: 2px solid var(--accent);
+  border-radius: var(--r-lg);
+  background: var(--bg);
+}
+@media (min-width: 860px) {
+  .oferta-piloto { grid-template-columns: 1fr auto; gap: var(--sp-8); }
+}
+.oferta-titulo { font-size: var(--t-24); }
+.oferta-piloto p { max-width: 64ch; }
