@@ -36,7 +36,7 @@
 <link rel="manifest" href="site.webmanifest">
 <meta name="theme-color" content="#0078C9">
 
-<link rel="stylesheet" href="assets/css/vim.css?v=18">
+<link rel="stylesheet" href="assets/css/vim.css?v=19">
 <!-- Consentimiento de cookies. Va ANTES que gtm.js y el orden NO es
      cosmético: los dos llevan `defer`, que respeta el orden del documento, y
      Consent Mode descarta un estado por defecto que llegue después de que el
@@ -139,55 +139,55 @@
       </div>
 
       <div class="tabla-envoltura">
-        <table class="tabla">
+        <table class="tabla tabla-apilada tabla-apilada-lista" role="table">
           <caption class="solo-lectores">
             Comparación entre un punto de venta que vive en internet, un sistema instalado
             de los de siempre, y VIM POS.
           </caption>
           <thead>
-            <tr>
-              <th scope="col"><span class="solo-lectores">Situación</span></th>
-              <th scope="col">Punto de venta en internet</th>
-              <th scope="col">El sistema instalado de siempre</th>
-              <th scope="col" class="col-vim">VIM POS</th>
+            <tr role="row">
+              <th role="columnheader" scope="col"><span class="solo-lectores">Situación</span></th>
+              <th role="columnheader" scope="col">Punto de venta en internet</th>
+              <th role="columnheader" scope="col">El sistema instalado de siempre</th>
+              <th role="columnheader" scope="col" class="col-vim">VIM POS</th>
             </tr>
           </thead>
           <tbody>
-            <tr>
-              <th scope="row">Se cae el internet</th>
-              <td><span class="marca marca-no">Se detiene o pasa a apuntar en papel</span></td>
-              <td><span class="marca marca-si">Sigue vendiendo</span></td>
-              <td class="col-vim"><span class="marca marca-si">Sigue vendiendo</span></td>
+            <tr role="row">
+              <th role="rowheader" scope="row">Se cae el internet</th>
+              <td role="cell" data-plan="Punto de venta en internet"><span class="marca marca-no">Se detiene o pasa a apuntar en papel</span></td>
+              <td role="cell" data-plan="El sistema instalado de siempre"><span class="marca marca-si">Sigue vendiendo</span></td>
+              <td role="cell" data-plan="VIM POS" class="col-vim"><span class="marca marca-si">Sigue vendiendo</span></td>
             </tr>
-            <tr>
-              <th scope="row">Ver cómo va el día sin estar ahí</th>
-              <td><span class="marca marca-si">Sí, desde el celular</span></td>
-              <td><span class="marca marca-no">No, hay que ir al local</span></td>
-              <td class="col-vim"><span class="marca marca-si">Sí, desde el celular</span></td>
+            <tr role="row">
+              <th role="rowheader" scope="row">Ver cómo va el día sin estar ahí</th>
+              <td role="cell" data-plan="Punto de venta en internet"><span class="marca marca-si">Sí, desde el celular</span></td>
+              <td role="cell" data-plan="El sistema instalado de siempre"><span class="marca marca-no">No, hay que ir al local</span></td>
+              <td role="cell" data-plan="VIM POS" class="col-vim"><span class="marca marca-si">Sí, desde el celular</span></td>
             </tr>
-            <tr>
-              <th scope="row">Si se muere la computadora</th>
-              <td><span class="marca marca-si">Tus datos están fuera</span></td>
-              <td><span class="marca marca-no">El respaldo que hayas hecho tú</span></td>
-              <td class="col-vim"><span class="marca marca-si">Copia diaria en el local y fuera de él</span></td>
+            <tr role="row">
+              <th role="rowheader" scope="row">Si se muere la computadora</th>
+              <td role="cell" data-plan="Punto de venta en internet"><span class="marca marca-si">Tus datos están fuera</span></td>
+              <td role="cell" data-plan="El sistema instalado de siempre"><span class="marca marca-no">El respaldo que hayas hecho tú</span></td>
+              <td role="cell" data-plan="VIM POS" class="col-vim"><span class="marca marca-si">Copia diaria en el local y fuera de él</span></td>
             </tr>
-            <tr>
-              <th scope="row">Actualizaciones</th>
-              <td><span class="marca marca-si">Solas</span></td>
-              <td><span class="marca marca-mas">Visita del técnico</span></td>
-              <td class="col-vim"><span class="marca marca-si">Solas, sin que nadie vaya</span></td>
+            <tr role="row">
+              <th role="rowheader" scope="row">Actualizaciones</th>
+              <td role="cell" data-plan="Punto de venta en internet"><span class="marca marca-si">Solas</span></td>
+              <td role="cell" data-plan="El sistema instalado de siempre"><span class="marca marca-mas">Visita del técnico</span></td>
+              <td role="cell" data-plan="VIM POS" class="col-vim"><span class="marca marca-si">Solas, sin que nadie vaya</span></td>
             </tr>
-            <tr>
-              <th scope="row">Varias sucursales sumadas</th>
-              <td><span class="marca marca-si">Sí</span></td>
-              <td><span class="marca marca-mas">Depende de la versión</span></td>
-              <td class="col-vim"><span class="marca marca-si">Sí, un reporte con todo</span></td>
+            <tr role="row">
+              <th role="rowheader" scope="row">Varias sucursales sumadas</th>
+              <td role="cell" data-plan="Punto de venta en internet"><span class="marca marca-si">Sí</span></td>
+              <td role="cell" data-plan="El sistema instalado de siempre"><span class="marca marca-mas">Depende de la versión</span></td>
+              <td role="cell" data-plan="VIM POS" class="col-vim"><span class="marca marca-si">Sí, un reporte con todo</span></td>
             </tr>
-            <tr>
-              <th scope="row">Dónde vive tu información</th>
-              <td>Solo fuera</td>
-              <td>Solo en tu local</td>
-              <td class="col-vim">En tu local, con copia fuera</td>
+            <tr role="row">
+              <th role="rowheader" scope="row">Dónde vive tu información</th>
+              <td role="cell" data-plan="Punto de venta en internet">Solo fuera</td>
+              <td role="cell" data-plan="El sistema instalado de siempre">Solo en tu local</td>
+              <td role="cell" data-plan="VIM POS" class="col-vim">En tu local, con copia fuera</td>
             </tr>
           </tbody>
         </table>
