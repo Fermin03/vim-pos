@@ -50,4 +50,4 @@ DESPLIEGUE.md
 # El package.json de esta carpeta no es del sitio: la marca como parte del
 # workspace de pnpm para que Vercel no despliegue las apps por un cambio aquí
 # (ver pnpm-workspace.yaml). Publicarlo no aporta nada.
-package.json
+/sitio-web/package.json
