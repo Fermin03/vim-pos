@@ -36,7 +36,7 @@
 <link rel="manifest" href="site.webmanifest">
 <meta name="theme-color" content="#0078C9">
 
-<link rel="stylesheet" href="assets/css/vim.css?v=18">
+<link rel="stylesheet" href="assets/css/vim.css?v=19">
 <!-- Consentimiento de cookies. Va ANTES que gtm.js y el orden NO es
      cosmético: los dos llevan `defer`, que respeta el orden del documento, y
      Consent Mode descarta un estado por defecto que llegue después de que el
@@ -240,106 +240,106 @@
       </div>
 
       <div class="tabla-envoltura">
-        <table class="tabla">
+        <table class="tabla tabla-apilada" role="table">
           <caption class="solo-lectores">Comparación de los tres planes de VIM POS.</caption>
           <thead>
-            <tr>
-              <th scope="col"><span class="solo-lectores">Concepto</span></th>
-              <th scope="col">Esencial</th>
-              <th scope="col" class="col-vim">Negocio</th>
-              <th scope="col">Cadena</th>
+            <tr role="row">
+              <th role="columnheader" scope="col"><span class="solo-lectores">Concepto</span></th>
+              <th role="columnheader" scope="col">Esencial</th>
+              <th role="columnheader" scope="col" class="col-vim">Negocio</th>
+              <th role="columnheader" scope="col">Cadena</th>
             </tr>
           </thead>
           <tbody>
-            <tr>
-              <th scope="row">Al mes, más IVA</th>
-              <td>$699</td>
-              <td class="col-vim">$999</td>
-              <td>$1,999</td>
+            <tr role="row">
+              <th role="rowheader" scope="row">Al mes, más IVA</th>
+              <td role="cell" data-plan="Esencial">$699</td>
+              <td role="cell" data-plan="Negocio" class="col-vim">$999</td>
+              <td role="cell" data-plan="Cadena">$1,999</td>
             </tr>
-            <tr>
-              <th scope="row">Sucursales</th>
-              <td>1</td>
-              <td class="col-vim">1</td>
-              <td>3</td>
+            <tr role="row">
+              <th role="rowheader" scope="row">Sucursales</th>
+              <td role="cell" data-plan="Esencial">1</td>
+              <td role="cell" data-plan="Negocio" class="col-vim">1</td>
+              <td role="cell" data-plan="Cadena">3</td>
             </tr>
-            <tr>
-              <th scope="row">Cajas</th>
-              <td>1</td>
-              <td class="col-vim">3</td>
-              <td>Sin límite</td>
+            <tr role="row">
+              <th role="rowheader" scope="row">Cajas</th>
+              <td role="cell" data-plan="Esencial">1</td>
+              <td role="cell" data-plan="Negocio" class="col-vim">3</td>
+              <td role="cell" data-plan="Cadena">Sin límite</td>
             </tr>
-            <tr>
-              <th scope="row">Cobrar sin internet</th>
-              <td><span class="marca marca-si">Sí</span></td>
-              <td class="col-vim"><span class="marca marca-si">Sí</span></td>
-              <td><span class="marca marca-si">Sí</span></td>
+            <tr role="row">
+              <th role="rowheader" scope="row">Cobrar sin internet</th>
+              <td role="cell" data-plan="Esencial"><span class="marca marca-si">Sí</span></td>
+              <td role="cell" data-plan="Negocio" class="col-vim"><span class="marca marca-si">Sí</span></td>
+              <td role="cell" data-plan="Cadena"><span class="marca marca-si">Sí</span></td>
             </tr>
-            <tr>
-              <th scope="row">Pantalla de cocina</th>
-              <td><span class="marca marca-si">Sí</span></td>
-              <td class="col-vim"><span class="marca marca-si">Sí</span></td>
-              <td><span class="marca marca-si">Sí</span></td>
+            <tr role="row">
+              <th role="rowheader" scope="row">Pantalla de cocina</th>
+              <td role="cell" data-plan="Esencial"><span class="marca marca-si">Sí</span></td>
+              <td role="cell" data-plan="Negocio" class="col-vim"><span class="marca marca-si">Sí</span></td>
+              <td role="cell" data-plan="Cadena"><span class="marca marca-si">Sí</span></td>
             </tr>
-            <tr>
-              <th scope="row">Mesas y cuentas abiertas</th>
-              <td><span class="marca marca-si">Sí</span></td>
-              <td class="col-vim"><span class="marca marca-si">Sí</span></td>
-              <td><span class="marca marca-si">Sí</span></td>
+            <tr role="row">
+              <th role="rowheader" scope="row">Mesas y cuentas abiertas</th>
+              <td role="cell" data-plan="Esencial"><span class="marca marca-si">Sí</span></td>
+              <td role="cell" data-plan="Negocio" class="col-vim"><span class="marca marca-si">Sí</span></td>
+              <td role="cell" data-plan="Cadena"><span class="marca marca-si">Sí</span></td>
             </tr>
-            <tr>
-              <th scope="row">Inventario y mermas</th>
-              <td><span class="marca marca-no">No</span></td>
-              <td class="col-vim"><span class="marca marca-si">Sí</span></td>
-              <td><span class="marca marca-si">Sí</span></td>
+            <tr role="row">
+              <th role="rowheader" scope="row">Inventario y mermas</th>
+              <td role="cell" data-plan="Esencial"><span class="marca marca-no">No</span></td>
+              <td role="cell" data-plan="Negocio" class="col-vim"><span class="marca marca-si">Sí</span></td>
+              <td role="cell" data-plan="Cadena"><span class="marca marca-si">Sí</span></td>
             </tr>
-            <tr>
-              <th scope="row">Reporte que suma sucursales</th>
-              <td><span class="marca marca-no">No</span></td>
-              <td class="col-vim"><span class="marca marca-no">No</span></td>
-              <td><span class="marca marca-si">Sí</span></td>
+            <tr role="row">
+              <th role="rowheader" scope="row">Reporte que suma sucursales</th>
+              <td role="cell" data-plan="Esencial"><span class="marca marca-no">No</span></td>
+              <td role="cell" data-plan="Negocio" class="col-vim"><span class="marca marca-no">No</span></td>
+              <td role="cell" data-plan="Cadena"><span class="marca marca-si">Sí</span></td>
             </tr>
-            <tr>
-              <th scope="row">Facturación electrónica</th>
-              <td>$349 al mes aparte</td>
-              <td class="col-vim"><span class="marca marca-si">Incluida</span></td>
-              <td><span class="marca marca-si">Incluida</span></td>
+            <tr role="row">
+              <th role="rowheader" scope="row">Facturación electrónica</th>
+              <td role="cell" data-plan="Esencial">$349 al mes aparte</td>
+              <td role="cell" data-plan="Negocio" class="col-vim"><span class="marca marca-si">Incluida</span></td>
+              <td role="cell" data-plan="Cadena"><span class="marca marca-si">Incluida</span></td>
             </tr>
-            <tr>
-              <th scope="row">Folios de factura al mes</th>
-              <td>10, con el extra de facturación</td>
-              <td class="col-vim">20</td>
-              <td>40</td>
+            <tr role="row">
+              <th role="rowheader" scope="row">Folios de factura al mes</th>
+              <td role="cell" data-plan="Esencial">10, con el extra de facturación</td>
+              <td role="cell" data-plan="Negocio" class="col-vim">20</td>
+              <td role="cell" data-plan="Cadena">40</td>
             </tr>
-            <tr>
-              <th scope="row">Pedidos de Uber Eats en la caja</th>
-              <td>$100 al mes aparte</td>
-              <td class="col-vim"><span class="marca marca-si">Incluido</span></td>
-              <td><span class="marca marca-si">Incluido</span></td>
+            <tr role="row">
+              <th role="rowheader" scope="row">Pedidos de Uber Eats en la caja</th>
+              <td role="cell" data-plan="Esencial">$100 al mes aparte</td>
+              <td role="cell" data-plan="Negocio" class="col-vim"><span class="marca marca-si">Incluido</span></td>
+              <td role="cell" data-plan="Cadena"><span class="marca marca-si">Incluido</span></td>
             </tr>
-            <tr>
-              <th scope="row">Quién carga tu menú</th>
-              <td>Tú, con nuestra guía</td>
-              <td class="col-vim">Nosotros</td>
-              <td>Nosotros</td>
+            <tr role="row">
+              <th role="rowheader" scope="row">Quién carga tu menú</th>
+              <td role="cell" data-plan="Esencial">Tú, con nuestra guía</td>
+              <td role="cell" data-plan="Negocio" class="col-vim">Nosotros</td>
+              <td role="cell" data-plan="Cadena">Nosotros</td>
             </tr>
-            <tr>
-              <th scope="row">Capacitación</th>
-              <td>Videos y guía escrita</td>
-              <td class="col-vim">3 horas con tu equipo</td>
-              <td>3 horas con tu equipo</td>
+            <tr role="row">
+              <th role="rowheader" scope="row">Capacitación</th>
+              <td role="cell" data-plan="Esencial">Videos y guía escrita</td>
+              <td role="cell" data-plan="Negocio" class="col-vim">3 horas con tu equipo</td>
+              <td role="cell" data-plan="Cadena">3 horas con tu equipo</td>
             </tr>
-            <tr>
-              <th scope="row">Soporte</th>
-              <td>WhatsApp y correo</td>
-              <td class="col-vim">WhatsApp y correo</td>
-              <td>WhatsApp y correo</td>
+            <tr role="row">
+              <th role="rowheader" scope="row">Soporte</th>
+              <td role="cell" data-plan="Esencial">WhatsApp y correo</td>
+              <td role="cell" data-plan="Negocio" class="col-vim">WhatsApp y correo</td>
+              <td role="cell" data-plan="Cadena">WhatsApp y correo</td>
             </tr>
-            <tr>
-              <th scope="row">El día del arranque</th>
-              <td>Te ayudamos por WhatsApp</td>
-              <td class="col-vim">Te acompañamos en línea</td>
-              <td>Vamos a tu local</td>
+            <tr role="row">
+              <th role="rowheader" scope="row">El día del arranque</th>
+              <td role="cell" data-plan="Esencial">Te ayudamos por WhatsApp</td>
+              <td role="cell" data-plan="Negocio" class="col-vim">Te acompañamos en línea</td>
+              <td role="cell" data-plan="Cadena">Vamos a tu local</td>
             </tr>
           </tbody>
         </table>
