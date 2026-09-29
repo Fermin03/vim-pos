@@ -1,0 +1,5 @@
+{
+  "name": "@vim/sitio-web",
+  "private": true,
+  "description": "Marcador de workspace (ver pnpm-workspace.yaml): permite a Vercel saber que un cambio aquí no afecta a las apps."
+}

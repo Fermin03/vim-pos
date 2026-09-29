@@ -1,3 +1,13 @@
 packages:
   - "apps/*"
   - "packages/*"
+  # No son paquetes de código: están aquí para que Vercel NO trate sus cambios como globales.
+  # Vercel ("skip unaffected projects") considera global todo archivo fuera del workspace y
+  # despliega las cinco apps: un PR de pura migración gastaba 10 de los 100 despliegues diarios
+  # del plan. Dentro del workspace y sin que ninguna app dependa de ellos, no despliegan nada.
+  # supabase/functions y desktop/ quedan fuera a propósito: un package.json ahí cambiaría cómo
+  # Deno y npm resuelven sus dependencias.
+  - "supabase/migrations"
+  - "supabase/scripts"
+  - "sitio-web"
+  - "docs"
