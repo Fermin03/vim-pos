@@ -549,9 +549,12 @@ function vercelJson() {
     {
       $schema: 'https://openapi.vercel.sh/vercel.json',
       framework: null,
-      buildCommand: '',
+      // Comandos explícitos y no vacíos: desde que sitio-web es parte del workspace de pnpm
+      // (para que Vercel no despliegue las apps por un cambio aquí), Vercel «detecta Turbo» y un
+      // "" ya no le basta para no instalar el monorepo entero ni correr turbo build.
+      buildCommand: 'echo sitio estático: sin build',
       outputDirectory: '.',
-      installCommand: '',
+      installCommand: 'echo sitio estático: sin instalación',
       cleanUrls: false,
       trailingSlash: false,
       redirects,
