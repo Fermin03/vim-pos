@@ -106,7 +106,10 @@ export const HUELLA_TICKET = `md5(to_jsonb(x)::text
   || COALESCE((SELECT string_agg(md5(to_jsonb(h)::text), '' ORDER BY h.id) FROM cancelaciones_ticket h WHERE h.ticket_id = x.id), '')
   || COALESCE((SELECT string_agg(md5(to_jsonb(h)::text), '' ORDER BY h.id) FROM devoluciones h WHERE h.ticket_original_id = x.id), '')
   || COALESCE((SELECT string_agg(md5(to_jsonb(h)::text), '' ORDER BY h.id) FROM delivery_asignaciones h WHERE h.ticket_id = x.id), '')
-  || (SELECT count(*)::text FROM comanda_impresiones h WHERE h.ticket_id = x.id))`;
+  || (SELECT count(*)::text FROM comanda_impresiones h WHERE h.ticket_id = x.id)
+  -- 0126: las reimpresiones del ticket, solo si hay. Sin ellas la huella queda idéntica a la de
+  -- antes, y actualizar no re-sube 60 días de ventas.
+  || COALESCE(NULLIF((SELECT count(*) FROM ticket_reimpresiones h WHERE h.ticket_id = x.id), 0)::text, ''))`;
 
 /**
  * Venta terminal que hay que mandar: la que nunca subió, o una reciente cuya huella ya no es la
@@ -619,6 +622,7 @@ export async function construirSnapshotPush(pool, { ticketIds = null, turnoIds =
         'ticket_descuentos_manuales',   (SELECT jsonb_agg(to_jsonb(x)) FROM ticket_descuentos_manuales x WHERE x.ticket_id IN (SELECT id FROM tk)),
         'ticket_promociones_aplicadas', (SELECT jsonb_agg(to_jsonb(x)) FROM ticket_promociones_aplicadas x WHERE x.ticket_id IN (SELECT id FROM tk)),
         'comanda_impresiones',          (SELECT jsonb_agg(to_jsonb(x)) FROM comanda_impresiones x WHERE x.ticket_id IN (SELECT id FROM tk)),
+        'ticket_reimpresiones',         (SELECT jsonb_agg(to_jsonb(x)) FROM ticket_reimpresiones x WHERE x.ticket_id IN (SELECT id FROM tk)),
         'devoluciones',                 (SELECT jsonb_agg(to_jsonb(x)) FROM devoluciones x WHERE x.ticket_original_id IN (SELECT id FROM tk)),
         'devolucion_items',             (SELECT jsonb_agg(to_jsonb(x)) FROM devolucion_items x WHERE x.devolucion_id IN (SELECT id FROM devoluciones WHERE ticket_original_id IN (SELECT id FROM tk))),
         'cancelaciones_ticket',         (SELECT jsonb_agg(to_jsonb(x)) FROM cancelaciones_ticket x WHERE x.ticket_id IN (SELECT id FROM tk)),

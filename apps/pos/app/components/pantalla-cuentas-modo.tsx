@@ -97,7 +97,9 @@ export function PantallaCuentasModo({
   /** Carga la cuenta y abre el cobro. */
   onCobrar: (ticketId: string) => void;
   /** Imprime el ticket del cliente de esa cuenta. */
-  onImprimirTicket: (ticketId: string) => Promise<void>;
+  /** `reimpresion` solo cuando es una REimpresión autorizada con PIN: lleva la autorización para
+   *  que quede registrada (0126). La primera impresión va sin ella. */
+  onImprimirTicket: (ticketId: string, reimpresion?: { autorizacionPinId: string }) => Promise<void>;
   /** Avisa a cocina de lo que se acaba de cancelar. Sin esto la cocina prepara lo cancelado. */
   onComandaCancelacion: (ticketId: string, lineas: LineaCancelada[]) => Promise<void>;
   /** Acciones propias del modo (p. ej. "Marcar salida" en domicilio). */
@@ -211,10 +213,10 @@ export function PantallaCuentasModo({
   const vacia = detalle === null ? null : detalle.length === 0;
   const hayDescuento = (totales?.descuentos ?? 0) > 0;
 
-  const imprimir = useCallback(async (ticketId: string) => {
+  const imprimir = useCallback(async (ticketId: string, reimpresion?: { autorizacionPinId: string }) => {
     setImprimiendo(true);
     try {
-      await onImprimirTicket(ticketId);
+      await onImprimirTicket(ticketId, reimpresion);
       setYaImpresas((s) => new Set(s).add(ticketId));
       // Imprimir ya NO marca la salida. Lo hacía —sellaba comanda_impresa_at y la tarjeta se
       // pintaba naranja— y ese era el camino por el que los pedidos "salían" sin repartidor: el
@@ -623,7 +625,7 @@ export function PantallaCuentasModo({
           cajaId={turno.caja_id}
           turnoId={turno.id}
           motivo="Reimpresión de ticket"
-          onAutorizado={() => { setPidiendoPinReimpresion(false); imprimir(sel.ticketId); }}
+          onAutorizado={(a) => { setPidiendoPinReimpresion(false); imprimir(sel.ticketId, { autorizacionPinId: a.autorizacionPinId }); }}
           onCancelar={() => setPidiendoPinReimpresion(false)}
         />
       )}
