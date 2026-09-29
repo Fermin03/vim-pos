@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { avisosDe, evaluarAcceso, type Directivas } from "../directivas";
+import { actualizacionPendiente, avisosDe, evaluarAcceso, type Directivas } from "../directivas";
 
 const AHORA = new Date("2026-09-05T18:00:00Z");
 const con = (acceso: Partial<Directivas["acceso"]>): Directivas => ({
@@ -114,5 +114,30 @@ describe("evaluarAcceso · motivo", () => {
   it("sin bloqueo el motivo no importa y se sigue vendiendo", () => {
     const r = evaluarAcceso(con({ estado: "ACTIVO", motivo: "version" }), AHORA);
     expect(r.nivel).toBe("ok");
+  });
+});
+
+describe("actualizacionPendiente", () => {
+  const conVersion = (version: Record<string, unknown>): Directivas => ({ ...con({}), version });
+
+  it("sin directivas o sin datos de versión no enseña nada", () => {
+    expect(actualizacionPendiente(null)).toBeNull();
+    expect(actualizacionPendiente(conVersion({}))).toBeNull();
+  });
+
+  it("devuelve la versión cuando el escritorio dice que hay una nueva", () => {
+    expect(actualizacionPendiente(conVersion({ recomendada: "0.4.92", instalada: "0.4.90", hay_nueva: true }))).toBe("0.4.92");
+  });
+
+  it("no la enseña si la caja ya está al día", () => {
+    expect(actualizacionPendiente(conVersion({ recomendada: "0.4.92", instalada: "0.4.92", hay_nueva: false }))).toBeNull();
+  });
+
+  it("en el POS web (la nube no manda hay_nueva) nunca la enseña: ahí no hay nada que instalar", () => {
+    expect(actualizacionPendiente(conVersion({ recomendada: "0.4.92" }))).toBeNull();
+  });
+
+  it("ignora una versión que no parece versión", () => {
+    expect(actualizacionPendiente(conVersion({ recomendada: "<script>", hay_nueva: true }))).toBeNull();
   });
 });
