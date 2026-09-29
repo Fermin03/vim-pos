@@ -1,16 +1,18 @@
 # Todo lo que tu restaurante necesita, sin letra chica.
 
-> Caja, cocina, mesas, inventario y facturación CFDI en un solo sistema. Precio publicado desde $699 al mes, implementación incluida y cobra sin internet. Hecho en León, Gto.
+> Caja, cocina, mesas, inventario y facturación CFDI en un solo sistema. Precio publicado desde $699 al mes, sin pago inicial y cobra sin internet. Hecho en León, Gto.
 
 **VIM POS** · punto de venta para restaurantes en México · versión en HTML: https://vimpos.com.mx/
 
-Caja, cocina, mesas, inventario y facturación en un solo sistema. La implementación va incluida en los tres planes; desde Negocio, cargamos tu menú y capacitamos a tu equipo. El precio está publicado en esta página.
+Caja, cocina, mesas, inventario y facturación en un solo sistema. Sin pago inicial: desde Negocio cargamos tu menú y capacitamos a tu equipo, y en Esencial arrancas con nuestra guía.
 
 [Pide una demo](https://vimpos.com.mx/demo)
 
 [Escríbenos por correo](mailto:hola@vimpos.com.mx)
 
-![La caja en plena venta: el catálogo por categorías y un ticket en curso con una hamburguesa, papas y refresco.](https://vimpos.com.mx/assets/img/capturas/pos-home.webp?v=2)
+Desde **$699 al mes**, más IVA · sin contrato forzoso · [ver los tres planes](https://vimpos.com.mx/precios)
+
+![La caja en plena venta: el catálogo por categorías y un ticket en curso con una hamburguesa, papas y refresco.](https://vimpos.com.mx/assets/img/capturas/pos-home.webp?v=3)
 
 Todo tu sistema vive en tu caja, no en internet
 
@@ -44,6 +46,12 @@ Casi todos los puntos de venta de hoy viven en internet: si se cae la señal, se
 
 **Pruébalo:** se apaga la nube y el local sigue entero.
 
+### No es un «modo offline». Es que no depende del internet.
+
+Los sistemas que se anuncian con «modo sin conexión» guardan tus ventas a medias en el navegador y esperan a que suban después. Aquí no hay modo ni versión reducida: el sistema completo está en tu caja y hace exactamente lo mismo haya señal o no. Cuando vuelve, lo del día sube solo y conserva los folios que ya imprimiste.
+
+[Cómo funciona por dentro](https://vimpos.com.mx/sin-internet)
+
 _Lo que hace_
 
 ## Cuatro cosas, bien
@@ -52,33 +60,25 @@ _Lo que hace_
 
 Catálogo por categorías, modificadores con precio —queso extra, sin cebolla, término de la carne— y cobro en efectivo, tarjeta o transferencia. Con propina y con cambio calculado.
 
-![Un producto abierto con sus opciones: término de la carne y extras con su precio.](https://vimpos.com.mx/assets/img/capturas/pos-catalogo.webp?v=2)
+![Un producto abierto con sus opciones: término de la carne y extras con su precio.](https://vimpos.com.mx/assets/img/capturas/pos-catalogo.webp?v=3)
 
 ### Mandar a cocina
 
 La comanda sale impresa donde tiene que salir: las bebidas en la barra y la comida en cocina, cada papel con el rótulo de su estación. O en una pantalla, si prefieres no imprimir.
 
-![Pantalla de cocina con siete comandas activas, cada una con su tiempo, el término de la carne, los extras y las notas.](https://vimpos.com.mx/assets/img/capturas/kds.webp?v=2)
+![Pantalla de cocina con las comandas activas, cada una con su tiempo, el término de la carne, los extras y las notas.](https://vimpos.com.mx/assets/img/capturas/kds.webp?v=3)
 
 ### Cerrar el turno
 
 Arqueo contra lo que dice el sistema, con sobrante y faltante a la vista, y corte Z sellado. Con el mismo formato de siempre, para que nadie tenga que reaprender a leerlo.
 
-![Arqueo del cierre de turno: efectivo esperado, efectivo contado y la diferencia, con cada forma de pago en su renglón.](https://vimpos.com.mx/assets/img/capturas/pos-arqueo.webp?v=2)
+![Arqueo del cierre de turno: efectivo esperado, efectivo contado y la diferencia, con cada forma de pago en su renglón.](https://vimpos.com.mx/assets/img/capturas/pos-arqueo.webp?v=3)
 
 ### Ver tu negocio
 
 Desde el celular: cuánto llevas hoy contra ayer, qué se vende y qué no, inventario con costo, y catorce reportes. Con aviso si tu caja lleva días sin subir las ventas.
 
-![Panel del dueño con las ventas del día y el estado de las cajas.](https://vimpos.com.mx/assets/img/capturas/admin-dashboard.webp?v=2)
-
-_El diferenciador_
-
-## No es un «modo offline». Es que no depende del internet.
-
-Los sistemas que se anuncian con «modo sin conexión» guardan tus ventas a medias en el navegador y esperan a que suban después. Aquí no hay modo ni versión reducida: el sistema completo está en tu caja y hace exactamente lo mismo haya señal o no. Cuando vuelve, lo del día sube solo y conserva los folios que ya imprimiste.
-
-[Cómo funciona por dentro](https://vimpos.com.mx/sin-internet)
+![Panel del dueño con las ventas del día y el estado de las cajas.](https://vimpos.com.mx/assets/img/capturas/admin-dashboard.webp?v=3)
 
 _Para tu giro_
 
@@ -118,7 +118,7 @@ _Si ya usas otro_
 
 ## Cambiar de punto de venta sin volver a capturar tu menú
 
-![Importador de menú mostrando lo que se va a dar de alta antes de confirmar.](https://vimpos.com.mx/assets/img/capturas/admin-importador.webp?v=2)
+![Importador de menú mostrando lo que se va a dar de alta antes de confirmar.](https://vimpos.com.mx/assets/img/capturas/admin-importador.webp?v=3)
 
 _Pegas el menú del sistema que usas hoy y lo ves antes de aceptarlo: qué producto entra, con qué precio y en qué categoría. Nada se guarda hasta que tú lo confirmas._
 
@@ -145,8 +145,8 @@ Mensual, en pesos, más IVA. Sin cotización ni «contáctanos para conocer el p
 $699
 
 - 1 sucursal · 1 caja
-- Implementación en autoservicio guiado
-- Soporte por chat
+- Cocina, mesas, reportes y corte
+- Arrancas tú, con nuestra guía
 
 _El que recomendamos_
 
@@ -156,15 +156,15 @@ $999
 
 - 1 sucursal · 3 cajas
 - Facturación incluida · 20 folios al mes
-- Carga de tu menú y capacitación
+- Cargamos tu menú y capacitamos a tu equipo
 
 ### Cadena
 
 $1,999
 
-- 3 sucursales · cajas ilimitadas
-- Reporte consolidado
-- Acompañamiento con visita
+- 3 sucursales · cajas sin límite
+- Un reporte que suma todas
+- Vamos a tu local el día del arranque
 
 [Ver todo lo que incluye](https://vimpos.com.mx/precios)
 
@@ -186,11 +186,11 @@ Sí. Descargas tu menú del sistema que usas hoy y lo pegas tal cual. Si el form
 
 ### ¿Emite facturas?
 
-Sí. Factura global del periodo, timbrado individual de cualquier ticket y portal de autofacturación por QR, con CFDI 4.0 timbrado por un proveedor autorizado por el SAT. Los folios se pagan aparte; el precio está en la página de precios.
+Sí. Factura global del periodo, timbrado individual de cualquier ticket y portal de autofacturación por QR, con CFDI 4.0 timbrado por un proveedor autorizado por el SAT. Cada plan trae folios al mes para tus facturas —10 en Esencial con el extra de facturación, 20 en Negocio y 40 en Cadena— y, si se acaban, compras un paquete. Los precios están en la página de precios.
 
 ### ¿Cuánto tarda la implementación?
 
-Alrededor de un día: carga del menú, configuración y tres horas de capacitación. En el plan Esencial lo haces tú con una guía; desde Negocio lo hacemos nosotros y te acompañamos el día del arranque.
+Alrededor de un día. Desde Negocio lo hacemos nosotros: cargamos tu menú, lo dejamos configurado y capacitamos a tu equipo tres horas. En Esencial lo haces tú con nuestra guía y te ayudamos por WhatsApp.
 
 ### ¿Y si se va la luz o alguien cierra el programa?
 

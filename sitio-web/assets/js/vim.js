@@ -176,10 +176,14 @@
      debajo de donde estás leyendo y pierdes el sitio. */
   var items = document.querySelectorAll("[data-acordeon-item]");
 
+  /* Un panel cerrado mide 0 px pero sus enlaces seguían en el orden de tabulación: el foco se
+     metía en texto invisible. `inert` lo saca del foco y del lector de pantalla mientras está
+     cerrado. */
   items.forEach(function (item) {
     var boton = item.querySelector("[data-acordeon-boton]");
     var panel = item.querySelector("[data-acordeon-panel]");
     if (!boton || !panel) return;
+    if (item.getAttribute("data-abierto") !== "true") panel.inert = true;
 
     boton.addEventListener("click", function () {
       var abierto = item.getAttribute("data-abierto") === "true";
@@ -191,12 +195,14 @@
           var p = otro.querySelector("[data-acordeon-panel]");
           var b = otro.querySelector("[data-acordeon-boton]");
           p.style.height = "0px";
+          p.inert = true;
           otro.setAttribute("data-abierto", "false");
           b.setAttribute("aria-expanded", "false");
         });
       }
 
       panel.style.height = abierto ? "0px" : panel.scrollHeight + "px";
+      panel.inert = abierto;
       item.setAttribute("data-abierto", String(!abierto));
       boton.setAttribute("aria-expanded", String(!abierto));
       if (!abierto) medir("acordeon", { titulo: boton.textContent.trim().slice(0, 80), pagina: location.pathname });
@@ -208,12 +214,15 @@
      no responde a una acción de navegación: existe porque ES el argumento —
      enseñar que al caerse el internet el local sigue entero explica el producto
      mejor que tres párrafos. */
-  var diagrama = document.querySelector("[data-diagrama]");
+  /* Hay dos dibujos del mismo diagrama —el ancho y uno vertical para el teléfono, donde el
+     ancho quedaba con letra de 5 px— y el CSS enseña uno. El botón corta los dos. */
+  var diagramas = document.querySelectorAll("[data-diagrama]");
   var interruptor = document.querySelector("[data-diagrama-boton]");
 
-  if (diagrama && interruptor) {
+  if (diagramas.length && interruptor) {
     interruptor.addEventListener("click", function () {
-      var caido = diagrama.classList.toggle("sin-red");
+      var caido = interruptor.getAttribute("aria-pressed") !== "true";
+      diagramas.forEach(function (d) { d.classList.toggle("sin-red", caido); });
       interruptor.setAttribute("aria-pressed", String(caido));
       interruptor.textContent = caido ? "Devolver el internet" : "Cortar el internet";
     });
@@ -399,31 +408,6 @@
     });
   }
 
-  /* ---- Marquesina de la franja de hechos ----------------------------------
-     Los cuatro hechos se duplican para que el bucle cierre sin salto (ver la
-     nota en vim.css). Las copias van con `aria-hidden`: para quien usa lector
-     de pantalla son la misma información dos veces, y oírla repetida no es un
-     detalle menor sino ruido que hay que atravesar.
-
-     Se hace aquí y no en el HTML porque duplicar cuatro nodos a mano es
-     contenido repetido en el archivo, que es peor de mantener y peor para
-     quien lea el código. Si el JS no carga, la franja se queda como una
-     rejilla normal — que es exactamente lo que era antes. */
-  var hechos = document.querySelector(".hechos");
-
-  if (hechos && !hechos.parentElement.classList.contains("hechos-marco")) {
-    var marco = document.createElement("div");
-    marco.className = "hechos-marco";
-    hechos.parentElement.insertBefore(marco, hechos);
-    marco.appendChild(hechos);
-
-    Array.prototype.slice.call(hechos.children).forEach(function (h) {
-      var copia = h.cloneNode(true);
-      copia.setAttribute("aria-hidden", "true");
-      hechos.appendChild(copia);
-    });
-  }
-
   /* ---- Puntos de los carruseles -------------------------------------------
      El carrusel es CSS puro (scroll-snap): esto solo le añade los puntos y no
      lo hace funcionar. Si este archivo falla en cargar, la tira se sigue
@@ -432,9 +416,9 @@
 
      Ver abajo la nota sobre por qué el punto activo se calcula del scroll y no
      con IntersectionObserver. */
-  var CORTES = { tira: 759, tres: 799, dos: 799, planes: 859 };
+  var CORTES = { tira: 759, tres: 799, dos: 799 };
 
-  document.querySelectorAll(".tres, .dos, .planes, .tira").forEach(function (pista) {
+  document.querySelectorAll(".tres, .dos, .tira").forEach(function (pista) {
     var tarjetas = Array.prototype.slice.call(pista.children);
     if (tarjetas.length < 2) return;
 
@@ -496,9 +480,10 @@
   /* ---- La página actual se marca sola -------------------------------------
      Evita tener que acordarse de poner aria-current a mano en cada archivo, que
      es exactamente el tipo de cosa que se olvida en la quinta página. */
-  var aqui = location.pathname.split("/").pop() || "index.html";
+  function ruta(p) { return p.replace(/\.html$/, "").replace(/\/+$/, "").replace(/^\/?index$/, "") || "/"; }
+  var aqui = ruta(location.pathname);
   document.querySelectorAll(".nav-enlace, .nav-movil-lista a").forEach(function (a) {
     var destino = a.getAttribute("href");
-    if (destino === aqui) a.setAttribute("aria-current", "page");
+    if (destino && destino.charAt(0) === "/" && ruta(destino) === aqui) a.setAttribute("aria-current", "page");
   });
 })();

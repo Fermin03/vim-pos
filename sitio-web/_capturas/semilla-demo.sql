@@ -182,6 +182,14 @@ BEGIN
     (v_tenant, v_cat_ham, 'BBQ Tocino',           179.00, 16, true, 'ACTIVO', true, 3),
     (v_tenant, v_cat_ham, 'Pollo Crispy',         149.00, 16, true, 'ACTIVO', true, 4),
     (v_tenant, v_cat_ham, 'Vegetariana',          139.00, 16, true, 'ACTIVO', true, 5),
+    -- Doce hamburguesas y no cinco: con cinco, la captura del hero era 60 % pantalla vacía.
+    (v_tenant, v_cat_ham, 'Hawaiana',             159.00, 16, true, 'ACTIVO', true, 6),
+    (v_tenant, v_cat_ham, 'Chipotle',             159.00, 16, true, 'ACTIVO', true, 7),
+    (v_tenant, v_cat_ham, 'Arrachera',            189.00, 16, true, 'ACTIVO', true, 8),
+    (v_tenant, v_cat_ham, 'Jalapeño',             155.00, 16, true, 'ACTIVO', true, 9),
+    (v_tenant, v_cat_ham, 'Champiñones',          165.00, 16, true, 'ACTIVO', true, 10),
+    (v_tenant, v_cat_ham, 'Triple Crazy',         219.00, 16, true, 'ACTIVO', true, 11),
+    (v_tenant, v_cat_ham, 'Mini Crazy',            99.00, 16, true, 'ACTIVO', true, 12),
     (v_tenant, v_cat_ali, 'Papas gajo',            65.00, 16, true, 'ACTIVO', true, 1),
     (v_tenant, v_cat_ali, 'Papas con queso',       85.00, 16, true, 'ACTIVO', true, 2),
     (v_tenant, v_cat_ali, 'Aros de cebolla',       75.00, 16, true, 'ACTIVO', true, 3),
@@ -653,6 +661,11 @@ BEGIN
               FROM apps_liquidacion_items WHERE liquidacion_id = v_liq) s
      WHERE l.id = v_liq;
   END;
+
+  -- Un negocio ya operando: sin esto el panel abre con «Termina de configurar tu negocio»
+  -- encima de las ventas, y la captura del dashboard parece de alguien a medio instalar.
+  INSERT INTO tenant_onboarding_estado (tenant_id, fase) VALUES (v_tenant, 'GO_LIVE')
+  ON CONFLICT (tenant_id) DO UPDATE SET fase = 'GO_LIVE';
 
   RAISE NOTICE 'Crazy Burgers creado. Caja: caja-9c3a71e0-...-000000000003@dispositivos.vimpos.mx / demo-dispositivo. PIN de Ana: 1234. Panel: duena@crazyburgers.demo / demo1234';
 END $$;

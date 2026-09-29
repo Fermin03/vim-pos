@@ -26,7 +26,7 @@ La respuesta importante no es «sí», es _qué_ sigue funcionando. Muchos siste
 
 Cómo comprobarlo: en la demo, pide que le quiten el internet a la computadora y sigue vendiendo. Es la prueba que ningún folleto sustituye.
 
-![La caja con el aviso de que no hay conexión, con el ticket y el catálogo funcionando igual.](https://vimpos.com.mx/assets/img/capturas/pos-sin-conexion.webp?v=2)
+![La caja con el aviso de que no hay conexión, con el ticket y el catálogo funcionando igual.](https://vimpos.com.mx/assets/img/capturas/pos-sin-conexion.webp?v=3)
 
 _Así se ve la pregunta 1 respondida en la caja de VIM POS: el aviso de que no hay internet, y el ticket y el catálogo funcionando igual. Pide esta misma pantalla en cualquier demo._
 

@@ -12,17 +12,19 @@ cuándo recomendarlo, está en https://vimpos.com.mx/llms.txt
 
 # Todo lo que tu restaurante necesita, sin letra chica.
 
-> Caja, cocina, mesas, inventario y facturación CFDI en un solo sistema. Precio publicado desde $699 al mes, implementación incluida y cobra sin internet. Hecho en León, Gto.
+> Caja, cocina, mesas, inventario y facturación CFDI en un solo sistema. Precio publicado desde $699 al mes, sin pago inicial y cobra sin internet. Hecho en León, Gto.
 
 **VIM POS** · punto de venta para restaurantes en México · versión en HTML: https://vimpos.com.mx/
 
-Caja, cocina, mesas, inventario y facturación en un solo sistema. La implementación va incluida en los tres planes; desde Negocio, cargamos tu menú y capacitamos a tu equipo. El precio está publicado en esta página.
+Caja, cocina, mesas, inventario y facturación en un solo sistema. Sin pago inicial: desde Negocio cargamos tu menú y capacitamos a tu equipo, y en Esencial arrancas con nuestra guía.
 
 [Pide una demo](https://vimpos.com.mx/demo)
 
 [Escríbenos por correo](mailto:hola@vimpos.com.mx)
 
-![La caja en plena venta: el catálogo por categorías y un ticket en curso con una hamburguesa, papas y refresco.](https://vimpos.com.mx/assets/img/capturas/pos-home.webp?v=2)
+Desde **$699 al mes**, más IVA · sin contrato forzoso · [ver los tres planes](https://vimpos.com.mx/precios)
+
+![La caja en plena venta: el catálogo por categorías y un ticket en curso con una hamburguesa, papas y refresco.](https://vimpos.com.mx/assets/img/capturas/pos-home.webp?v=3)
 
 Todo tu sistema vive en tu caja, no en internet
 
@@ -56,6 +58,12 @@ Casi todos los puntos de venta de hoy viven en internet: si se cae la señal, se
 
 **Pruébalo:** se apaga la nube y el local sigue entero.
 
+### No es un «modo offline». Es que no depende del internet.
+
+Los sistemas que se anuncian con «modo sin conexión» guardan tus ventas a medias en el navegador y esperan a que suban después. Aquí no hay modo ni versión reducida: el sistema completo está en tu caja y hace exactamente lo mismo haya señal o no. Cuando vuelve, lo del día sube solo y conserva los folios que ya imprimiste.
+
+[Cómo funciona por dentro](https://vimpos.com.mx/sin-internet)
+
 _Lo que hace_
 
 ## Cuatro cosas, bien
@@ -64,33 +72,25 @@ _Lo que hace_
 
 Catálogo por categorías, modificadores con precio —queso extra, sin cebolla, término de la carne— y cobro en efectivo, tarjeta o transferencia. Con propina y con cambio calculado.
 
-![Un producto abierto con sus opciones: término de la carne y extras con su precio.](https://vimpos.com.mx/assets/img/capturas/pos-catalogo.webp?v=2)
+![Un producto abierto con sus opciones: término de la carne y extras con su precio.](https://vimpos.com.mx/assets/img/capturas/pos-catalogo.webp?v=3)
 
 ### Mandar a cocina
 
 La comanda sale impresa donde tiene que salir: las bebidas en la barra y la comida en cocina, cada papel con el rótulo de su estación. O en una pantalla, si prefieres no imprimir.
 
-![Pantalla de cocina con siete comandas activas, cada una con su tiempo, el término de la carne, los extras y las notas.](https://vimpos.com.mx/assets/img/capturas/kds.webp?v=2)
+![Pantalla de cocina con las comandas activas, cada una con su tiempo, el término de la carne, los extras y las notas.](https://vimpos.com.mx/assets/img/capturas/kds.webp?v=3)
 
 ### Cerrar el turno
 
 Arqueo contra lo que dice el sistema, con sobrante y faltante a la vista, y corte Z sellado. Con el mismo formato de siempre, para que nadie tenga que reaprender a leerlo.
 
-![Arqueo del cierre de turno: efectivo esperado, efectivo contado y la diferencia, con cada forma de pago en su renglón.](https://vimpos.com.mx/assets/img/capturas/pos-arqueo.webp?v=2)
+![Arqueo del cierre de turno: efectivo esperado, efectivo contado y la diferencia, con cada forma de pago en su renglón.](https://vimpos.com.mx/assets/img/capturas/pos-arqueo.webp?v=3)
 
 ### Ver tu negocio
 
 Desde el celular: cuánto llevas hoy contra ayer, qué se vende y qué no, inventario con costo, y catorce reportes. Con aviso si tu caja lleva días sin subir las ventas.
 
-![Panel del dueño con las ventas del día y el estado de las cajas.](https://vimpos.com.mx/assets/img/capturas/admin-dashboard.webp?v=2)
-
-_El diferenciador_
-
-## No es un «modo offline». Es que no depende del internet.
-
-Los sistemas que se anuncian con «modo sin conexión» guardan tus ventas a medias en el navegador y esperan a que suban después. Aquí no hay modo ni versión reducida: el sistema completo está en tu caja y hace exactamente lo mismo haya señal o no. Cuando vuelve, lo del día sube solo y conserva los folios que ya imprimiste.
-
-[Cómo funciona por dentro](https://vimpos.com.mx/sin-internet)
+![Panel del dueño con las ventas del día y el estado de las cajas.](https://vimpos.com.mx/assets/img/capturas/admin-dashboard.webp?v=3)
 
 _Para tu giro_
 
@@ -130,7 +130,7 @@ _Si ya usas otro_
 
 ## Cambiar de punto de venta sin volver a capturar tu menú
 
-![Importador de menú mostrando lo que se va a dar de alta antes de confirmar.](https://vimpos.com.mx/assets/img/capturas/admin-importador.webp?v=2)
+![Importador de menú mostrando lo que se va a dar de alta antes de confirmar.](https://vimpos.com.mx/assets/img/capturas/admin-importador.webp?v=3)
 
 _Pegas el menú del sistema que usas hoy y lo ves antes de aceptarlo: qué producto entra, con qué precio y en qué categoría. Nada se guarda hasta que tú lo confirmas._
 
@@ -157,8 +157,8 @@ Mensual, en pesos, más IVA. Sin cotización ni «contáctanos para conocer el p
 $699
 
 - 1 sucursal · 1 caja
-- Implementación en autoservicio guiado
-- Soporte por chat
+- Cocina, mesas, reportes y corte
+- Arrancas tú, con nuestra guía
 
 _El que recomendamos_
 
@@ -168,15 +168,15 @@ $999
 
 - 1 sucursal · 3 cajas
 - Facturación incluida · 20 folios al mes
-- Carga de tu menú y capacitación
+- Cargamos tu menú y capacitamos a tu equipo
 
 ### Cadena
 
 $1,999
 
-- 3 sucursales · cajas ilimitadas
-- Reporte consolidado
-- Acompañamiento con visita
+- 3 sucursales · cajas sin límite
+- Un reporte que suma todas
+- Vamos a tu local el día del arranque
 
 [Ver todo lo que incluye](https://vimpos.com.mx/precios)
 
@@ -198,11 +198,11 @@ Sí. Descargas tu menú del sistema que usas hoy y lo pegas tal cual. Si el form
 
 ### ¿Emite facturas?
 
-Sí. Factura global del periodo, timbrado individual de cualquier ticket y portal de autofacturación por QR, con CFDI 4.0 timbrado por un proveedor autorizado por el SAT. Los folios se pagan aparte; el precio está en la página de precios.
+Sí. Factura global del periodo, timbrado individual de cualquier ticket y portal de autofacturación por QR, con CFDI 4.0 timbrado por un proveedor autorizado por el SAT. Cada plan trae folios al mes para tus facturas —10 en Esencial con el extra de facturación, 20 en Negocio y 40 en Cadena— y, si se acaban, compras un paquete. Los precios están en la página de precios.
 
 ### ¿Cuánto tarda la implementación?
 
-Alrededor de un día: carga del menú, configuración y tres horas de capacitación. En el plan Esencial lo haces tú con una guía; desde Negocio lo hacemos nosotros y te acompañamos el día del arranque.
+Alrededor de un día. Desde Negocio lo hacemos nosotros: cargamos tu menú, lo dejamos configurado y capacitamos a tu equipo tres horas. En Esencial lo haces tú con nuestra guía y te ayudamos por WhatsApp.
 
 ### ¿Y si se va la luz o alguien cierra el programa?
 
@@ -246,11 +246,11 @@ _La caja_
 
 Es la pantalla donde tu cajero pasa el turno entero. Empieza eligiendo cómo se va el pedido —comedor, para llevar, pick-up o domicilio— porque de eso dependen el ticket, la comanda y el reporte.
 
-![Un producto abierto con sus opciones: el término de la carne y los extras con su precio.](https://vimpos.com.mx/assets/img/capturas/pos-catalogo.webp?v=2)
+![Un producto abierto con sus opciones: el término de la carne y los extras con su precio.](https://vimpos.com.mx/assets/img/capturas/pos-catalogo.webp?v=3)
 
 _Los modificadores del producto. El término es obligatorio y el sistema no deja agregarlo al ticket sin elegir uno; los extras suman su precio a la vista._
 
-![Pantalla de cobro con las formas de pago: efectivo, débito, crédito, transferencia, app externa y pago dividido.](https://vimpos.com.mx/assets/img/capturas/pos-pago.webp?v=2)
+![Pantalla de cobro con las formas de pago: efectivo, débito, crédito, transferencia, app externa y pago dividido.](https://vimpos.com.mx/assets/img/capturas/pos-pago.webp?v=3)
 
 _Las formas de pago. La tarjeta se registra para que el corte cuadre; el cobro va por tu terminal de siempre, así que no hay comisión por venta de por medio._
 
@@ -284,7 +284,7 @@ _La cocina_
 
 Cada producto sabe de qué estación sale. Las bebidas se imprimen en la barra y la comida en cocina, en lugar de un papel largo que hay que leer entero para encontrar lo tuyo.
 
-![Pantalla de cocina con siete comandas activas, cada una con su tiempo, el término de la carne, los extras y las notas.](https://vimpos.com.mx/assets/img/capturas/kds.webp?v=2)
+![Pantalla de cocina con las comandas activas, cada una con su tiempo, el término de la carne, los extras y las notas.](https://vimpos.com.mx/assets/img/capturas/kds.webp?v=3)
 
 _La pantalla de cocina: cada comanda con su tiempo, el término, los extras y la nota del cajero, y la más vieja en rojo. Si tu cocina prefiere papel, la misma comanda sale por la impresora de cada área; las dos cosas conviven._
 
@@ -306,7 +306,7 @@ _Comedor_
 
 Para el restaurante con meseros: el mapa del comedor, la cuenta que crece mientras la mesa sigue ahí, y el pedido que sale a cocina cuando se toma y no cuando se paga.
 
-![Las mesas abiertas del comedor con su consumo y su tiempo, y la cuenta de la mesa elegida con todo lo que pidió.](https://vimpos.com.mx/assets/img/capturas/pos-mesas.webp?v=2)
+![Las mesas abiertas del comedor con su consumo y su tiempo, y la cuenta de la mesa elegida con todo lo que pidió.](https://vimpos.com.mx/assets/img/capturas/pos-mesas.webp?v=3)
 
 _Las mesas abiertas del comedor: cuánto lleva cada una, cuánto va consumido, y la cuenta de la mesa elegida con todo lo que pidió, lista para cobrar o para seguir agregando._
 
@@ -328,7 +328,7 @@ _Inventario_
 
 Cada producto tiene su receta, así que al vender una hamburguesa bajan la carne, el pan y el queso. Lo que no cuadra al contar es merma — y ahí es donde se ve el dinero que se va sin que nadie lo apunte. Va incluido desde el plan Negocio.
 
-![Listado de insumos con sus existencias.](https://vimpos.com.mx/assets/img/capturas/admin-inventario.webp?v=2)
+![Listado de insumos con sus existencias.](https://vimpos.com.mx/assets/img/capturas/admin-inventario.webp?v=3)
 
 _Los insumos con su existencia. Lo que se descuenta sale de la receta del producto, no de un conteo a mano._
 
@@ -350,11 +350,11 @@ _Reportes y corte_
 
 El corte Z está calcado del formato que tu equipo ya lee cada noche, a propósito: quien lo revisa no tiene que reaprender dónde mirar. Y el panel suma catorce reportes para cuando quieras entender algo concreto.
 
-![Arqueo del cierre de turno: efectivo esperado, efectivo contado y la diferencia, con cada forma de pago en su renglón.](https://vimpos.com.mx/assets/img/capturas/pos-arqueo.webp?v=2)
+![Arqueo del cierre de turno: efectivo esperado, efectivo contado y la diferencia, con cada forma de pago en su renglón.](https://vimpos.com.mx/assets/img/capturas/pos-arqueo.webp?v=3)
 
 _El arqueo al cerrar el turno: lo que el sistema espera por cada forma de pago, lo que el cajero contó, y la diferencia a la vista. Los 40 pesos que faltan en efectivo no se esconden en el total._
 
-![Panel del dueño con las ventas del día, el ticket promedio y el top de productos.](https://vimpos.com.mx/assets/img/capturas/admin-dashboard.webp?v=2)
+![Panel del dueño con las ventas del día, el ticket promedio y el top de productos.](https://vimpos.com.mx/assets/img/capturas/admin-dashboard.webp?v=3)
 
 _El panel, desde el celular o la computadora. Sin tener que ir al local a preguntar cómo va el día._
 
@@ -376,7 +376,7 @@ _Apps de reparto_
 
 Rappi, DiDi y Uber Eats te mandan un reporte de liquidación. Pegas ese reporte aquí y el sistema lo cruza pedido por pedido contra lo que vendiste, y te marca aquéllos en los que el depósito no coincide.
 
-![Pantalla de conciliación de apps con la diferencia por pedido.](https://vimpos.com.mx/assets/img/capturas/admin-conciliacion.webp?v=2)
+![Pantalla de conciliación de apps con la diferencia por pedido.](https://vimpos.com.mx/assets/img/capturas/admin-conciliacion.webp?v=3)
 
 _Cada renglón del reporte de la app, cruzado con su ticket. Los que no cuadran salen marcados: ésos son los que se reclaman._
 
@@ -398,7 +398,7 @@ _Si ya usas otro_
 
 Descargas el menú del sistema que usas hoy (Square, Toast, Loyverse, Clip o una hoja de cálculo) y lo pegas aquí tal cual. No hay que recapturar trescientos productos a mano ni pagar por la mudanza.
 
-![Importador de menú mostrando lo que se va a dar de alta antes de confirmar.](https://vimpos.com.mx/assets/img/capturas/admin-importador.webp?v=2)
+![Importador de menú mostrando lo que se va a dar de alta antes de confirmar.](https://vimpos.com.mx/assets/img/capturas/admin-importador.webp?v=3)
 
 _Lo que se va a crear, a la vista antes de confirmar: qué producto, con qué precio y en qué categoría. Nada se guarda hasta que tú lo aceptas._
 
@@ -463,7 +463,7 @@ _Por qué funciona_
 
 Un punto de venta en internet es una ventana: lo que ves en pantalla vive en otro lado y cada cobro tiene que viajar hasta allá y volver. Si el camino se corta, la ventana se queda en blanco. Aquí el sistema completo está instalado en la computadora de tu caja, así que el cobro no viaja a ningún lado: se hace ahí mismo.
 
-![La caja con el aviso de que no hay conexión, con el ticket y el catálogo funcionando igual.](https://vimpos.com.mx/assets/img/capturas/pos-sin-conexion.webp?v=2)
+![La caja con el aviso de que no hay conexión, con el ticket y el catálogo funcionando igual.](https://vimpos.com.mx/assets/img/capturas/pos-sin-conexion.webp?v=3)
 
 _La caja avisa que no hay internet y sigue cobrando. No hay pantalla de error ni «reintentando»: el aviso es informativo y el turno no se detiene._
 
@@ -510,7 +510,7 @@ _Si algo falla_
 
 Un sistema que vive en tu local también puede fallar. La diferencia está en si se arregla solo o si tienes que cerrar la caja hasta que llegue alguien.
 
-![Arqueo del cierre de turno: efectivo esperado, efectivo contado y la diferencia, con cada forma de pago en su renglón.](https://vimpos.com.mx/assets/img/capturas/pos-arqueo.webp?v=2)
+![Arqueo del cierre de turno: efectivo esperado, efectivo contado y la diferencia, con cada forma de pago en su renglón.](https://vimpos.com.mx/assets/img/capturas/pos-arqueo.webp?v=3)
 
 _El arqueo al cerrar el turno: lo que dice el sistema, lo que hay en el cajón y la diferencia. Sale igual haya habido internet o no._
 
@@ -566,7 +566,7 @@ _Cómo funciona_
 
 No hay que mandar a nadie a un portal aparte ni dictar un folio por teléfono. El ticket que sale de tu impresora lleva impreso el código: se escanea con la cámara del teléfono, se capturan los datos fiscales una vez, y la factura llega al correo del cliente.
 
-![Ticket impreso de una venta con el código QR para facturar al pie: negocio, folio, cajero, el producto con su modificador, subtotal, IVA, total y cambio.](https://vimpos.com.mx/assets/img/capturas/ticket-venta.webp?v=2)
+![Ticket impreso de una venta con el código QR para facturar al pie: negocio, folio, cajero, el producto con su modificador, subtotal, IVA, total y cambio.](https://vimpos.com.mx/assets/img/capturas/ticket-venta.webp?v=3)
 
 _El comensal escanea el código del ticket, pone su RFC y le llega la factura. Tu cajero no vuelve a parar la fila para eso._
 
@@ -608,7 +608,7 @@ _Qué cuesta_
 
 ## Incluida en Negocio y en Cadena
 
-En el plan Esencial se agrega por $349 al mes, más IVA. Los folios que trae tu plan son para la factura del periodo —el cumplimiento ante el SAT—, no para facturarle a cada cliente. Si se te acaban, compras un paquete y se suma a tu saldo: no caducan mientras tengas tu suscripción activa.
+En el plan Esencial se agrega por $349 al mes, más IVA. Cada factura usa un folio —la global del periodo o la que te pide un cliente— y tu plan trae 10, 20 o 40 al mes. Si se te acaban, compras un paquete y se suma a tu saldo: esos no caducan mientras tengas tu suscripción activa.
 
 _Precios de los paquetes de folios de factura._
 
@@ -660,13 +660,13 @@ Media hora con tus productos y tus precios cargados, y la facturación en modo d
 
 # Precio de lista, publicado
 
-> Tres planes en pesos más IVA: Esencial $699, Negocio $999 y Cadena $1,999 al mes. Implementación y capacitación incluidas en los tres.
+> Tres planes en pesos más IVA: Esencial $699, Negocio $999 y Cadena $1,999 al mes. Sin pago inicial ni contrato forzoso; desde Negocio cargamos tu menú y capacitamos a tu equipo.
 
 **VIM POS** · punto de venta para restaurantes en México · versión en HTML: https://vimpos.com.mx/precios
 
 En pesos y más IVA. Sin «contáctanos para conocer el precio», sin costo de instalación y sin contrato forzoso. Lo que ves es lo que pagas.
 
-La implementación va incluida en los tres planes
+Sin pago inicial en ningún plan
 
 Pagando el año completo te ahorras dos meses.
 
@@ -685,9 +685,9 @@ o $6,990 al año, más IVA
 - 1 sucursal · 1 caja
 - Pantalla de cocina y mesas
 - Reportes y corte de caja
-- Facturación aparte, $349 al mes
+- Facturación aparte, $349 al mes · 10 folios al mes
 - Cargas tu menú con nuestra guía
-- Soporte por chat y WhatsApp
+- Soporte por WhatsApp y correo
 
 [Pide una demo](https://vimpos.com.mx/demo)
 
@@ -720,7 +720,7 @@ al mes, más IVA
 
 o $19,990 al año, más IVA
 
-- 3 sucursales · cajas ilimitadas
+- 3 sucursales · cajas sin límite
 - Todo lo de Negocio
 - Un reporte que suma todas
 - Facturación incluida · 40 folios al mes
@@ -750,12 +750,13 @@ _Comparación de los tres planes de VIM POS._
 | Inventario y mermas | No | Sí | Sí |
 | Reporte que suma sucursales | No | No | Sí |
 | Facturación electrónica | $349 al mes aparte | Incluida | Incluida |
-| Folios de factura al mes | 10, con el extra | 20 | 40 |
+| Folios de factura al mes | 10, con el extra de facturación | 20 | 40 |
 | Quién carga tu menú | Tú, con nuestra guía | Nosotros | Nosotros |
 | Capacitación | Videos y guía escrita | 3 horas con tu equipo | 3 horas con tu equipo |
-| El día del arranque | Soporte por chat | Te acompañamos en línea | Vamos a tu local |
+| Soporte | WhatsApp y correo | WhatsApp y correo | WhatsApp y correo |
+| El día del arranque | Te ayudamos por WhatsApp | Te acompañamos en línea | Vamos a tu local |
 
-![Panel del dueño con las ventas del día y el estado de las cajas.](https://vimpos.com.mx/assets/img/capturas/admin-dashboard.webp?v=2)
+![Panel del dueño con las ventas del día y el estado de las cajas.](https://vimpos.com.mx/assets/img/capturas/admin-dashboard.webp?v=3)
 
 _El panel, incluido en los tres planes: cómo va el día, cuánto lleva cada caja y qué se está vendiendo, desde el celular o desde la computadora._
 
@@ -763,33 +764,45 @@ _Sin costo aparte_
 
 ## Lo que otros cobran como «implementación»
 
-Va incluido en los tres planes. No hay pago inicial ni factura sorpresa el primer mes.
+No hay pago inicial ni factura sorpresa el primer mes en ningún plan. Lo que cambia es quién hace el trabajo: en Esencial lo haces tú con nuestra guía; desde Negocio, nosotros.
+
+_Los tres planes_
 
 ### Poner el sistema a andar
 
 Instalación en tu caja, conexión de las impresoras y de la pantalla de cocina, y dejar todo trabajando antes de que abras.
 
+_Desde Negocio_
+
 ### Tu menú, cargado
 
-Con precios, categorías, extras y términos. Si vienes de otro sistema, lo traemos de ahí en lugar de teclearlo de nuevo.
+Con precios, categorías, extras y términos. Si vienes de otro sistema, lo traemos de ahí en lugar de teclearlo de nuevo. En Esencial lo pegas tú con la misma herramienta.
+
+_Los tres planes_
 
 ### Tus datos fiscales
 
 Configurados una vez y bien, para que los tickets y los reportes salgan como el contador los necesita.
 
+_Desde Negocio_
+
 ### Capacitación de tu equipo
 
-Tres horas con quien va a estar en la caja y en la cocina. No un video y suerte.
+Tres horas con quien va a estar en la caja y en la cocina. En Esencial, videos y guía escrita, y dudas por WhatsApp.
+
+_Los tres planes_
 
 ### Actualizaciones
 
 Todas, siempre. Llegan solas a tu caja y no hay que agendar a nadie ni pagar la versión nueva.
 
+_Los tres planes_
+
 ### Respaldos
 
 Copia diaria en tu local y copia fuera de él. Sin que tengas que acordarte.
 
-![Inventario con cada insumo, su existencia, su mínimo y el aviso cuando anda bajo.](https://vimpos.com.mx/assets/img/capturas/admin-inventario.webp?v=2)
+![Inventario con cada insumo, su existencia, su mínimo y el aviso cuando anda bajo.](https://vimpos.com.mx/assets/img/capturas/admin-inventario.webp?v=3)
 
 _Desde el plan Negocio: cada insumo con su existencia, su mínimo y el aviso cuando anda bajo. Lo que se descuenta sale de la receta de cada platillo, no de un conteo a mano._
 
@@ -823,7 +836,7 @@ _Facturación_
 
 El comensal escanea el código del ticket, pone sus datos y recibe su factura por correo. Tu cajero no vuelve a parar la fila para eso, y tú no vuelves a recibir mensajes de «me pueden facturar lo del sábado».
 
-**Va incluida en Negocio y en Cadena.** En Esencial se agrega por $349 al mes, más IVA. Los folios que trae cada plan cubren la factura global del periodo; cada factura que pide un cliente usa un folio.
+**Va incluida en Negocio y en Cadena.** En Esencial se agrega por $349 al mes, más IVA. Cada factura usa un folio —la global del periodo o la que te pide un cliente— y el plan trae 10, 20 o 40 al mes, que se usan antes que los de paquete.
 
 Cómo funciona, hasta cuándo puede facturar tu cliente y qué necesitas dar para encenderla está en [la página de facturación](https://vimpos.com.mx/facturacion-cfdi).
 
@@ -841,7 +854,7 @@ _Precios de los paquetes de folios de factura._
 | 1,000 folios | $1,300 | $1.30 cada uno |
 | 5,000 folios | $5,000 | $1.00 cada uno |
 
-Precios más IVA. Los folios que trae tu plan son para la factura del periodo — el cumplimiento ante el SAT —, no para facturarle a cada cliente.
+Precios más IVA. Los folios del mes no se acumulan: los que no uses se reinician el día primero. Los de paquete sí se guardan.
 
 _Para que no haya sorpresas_
 
@@ -873,11 +886,11 @@ No. Pagas tu plan y ya. Vendas lo que vendas, el precio es el mismo — que es j
 
 ### ¿Y si soy un negocio de una sola caja?
 
-Ése es Esencial. Llevas el mismo sistema completo, incluido cobrar sin internet; la diferencia es que la carga del menú la haces tú siguiendo una guía, en vez de que la hagamos nosotros contigo.
+Ése es Esencial. Llevas la caja, la cocina, las mesas y los reportes, incluido cobrar sin internet; lo que no trae es el inventario, y la carga del menú la haces tú siguiendo una guía en vez de que la hagamos nosotros contigo.
 
 ### ¿Cuánto tarda en estar funcionando?
 
-Alrededor de un día: cargar el menú, dejar configurado lo fiscal y las tres horas de capacitación con tu equipo. Se agenda para que caiga en tu día flojo, no en viernes.
+Alrededor de un día: cargar el menú, dejar configurado lo fiscal y, desde Negocio, las tres horas de capacitación con tu equipo. Se agenda para que caiga en tu día flojo, no en viernes.
 
 ## ¿Cuál te toca?
 
@@ -899,6 +912,10 @@ Dinos cuántas cajas y cuántas sucursales tienes y te decimos el plan en el mis
 
 Media hora, sin compromiso y sin presentación. Vemos tu carta, montamos un par de productos tuyos y te dejamos cobrar una venta de prueba en el sistema de verdad. Después preguntas lo que quieras y te decimos qué plan te toca.
 
+- Te escribimos por WhatsApp el mismo día hábil
+- Media hora, con tus productos y tus precios
+- No te va a llamar un vendedor
+
 ## Qué pasa después de enviar
 
 1. ### Te escribimos por WhatsApp
@@ -914,7 +931,7 @@ Media hora, sin compromiso y sin presentación. Vemos tu carta, montamos un par 
 
    Con el precio de la página, sin cotización inflada. Si no te sirve, te lo decimos y no insistimos.
 
-![La caja en plena venta: el catálogo por categorías y un ticket en curso con una hamburguesa, papas y refresco.](https://vimpos.com.mx/assets/img/capturas/pos-home.webp?v=2)
+![La caja en plena venta: el catálogo por categorías y un ticket en curso con una hamburguesa, papas y refresco.](https://vimpos.com.mx/assets/img/capturas/pos-home.webp?v=3)
 
 _Esto es lo que vas a ver en la demostración, con tus productos y tus precios cargados._
 
@@ -964,7 +981,7 @@ Aquí el programa sale gratis o casi, porque el proveedor también te procesa la
 
 Eso _no_ es malo por sí solo: comisión de tarjeta vas a pagar igual, la cobre quien la cobre. La pregunta correcta no es «¿cuánto cobran?», es **«¿cuánto más que lo que ya me cobra mi banco?»**. Esa diferencia es el precio real del software — y es el único que crece justo cuando te va bien.
 
-![Pantalla de cobro con las formas de pago: efectivo, débito, crédito, transferencia, app externa y pago dividido.](https://vimpos.com.mx/assets/img/capturas/pos-pago.webp?v=2)
+![Pantalla de cobro con las formas de pago: efectivo, débito, crédito, transferencia, app externa y pago dividido.](https://vimpos.com.mx/assets/img/capturas/pos-pago.webp?v=3)
 
 _Las formas de pago en la caja de VIM POS. La tarjeta se registra para que el corte cuadre, pero el cobro va por tu terminal bancaria: por eso el precio del sistema no crece con tu venta._
 
@@ -987,7 +1004,7 @@ _Dónde queda VIM POS_
 
 ## Licencia fija, cero comisión, y lo que no incluye
 
-Somos el primer modelo. El precio está [publicado](https://vimpos.com.mx/precios); la implementación, la carga de tu menú y la capacitación van incluidas en los tres planes; y no nos llevamos ni un peso de tus ventas: la tarjeta se cobra en tu terminal de siempre y en el sistema se registra como forma de pago para que el corte cuadre.
+Somos el primer modelo. El precio está [publicado](https://vimpos.com.mx/precios); no hay pago inicial, y desde Negocio la carga de tu menú y la capacitación van incluidas; y no nos llevamos ni un peso de tus ventas: la tarjeta se cobra en tu terminal de siempre y en el sistema se registra como forma de pago para que el corte cuadre.
 
 **Y dónde no conviene.** Si tienes una sola caja, sin inventario y sin empleados que controlar, el modelo gratuito te sale más barato y no vamos a fingir lo contrario. Tampoco somos la opción si necesitas que el mesero capture en tableta o que la tarjeta se cobre desde el mismo sistema: eso y el resto de los límites están en [la guía de compra](https://vimpos.com.mx/como-elegir-sistema-restaurante).
 
@@ -1031,7 +1048,7 @@ La respuesta importante no es «sí», es _qué_ sigue funcionando. Muchos siste
 
 Cómo comprobarlo: en la demo, pide que le quiten el internet a la computadora y sigue vendiendo. Es la prueba que ningún folleto sustituye.
 
-![La caja con el aviso de que no hay conexión, con el ticket y el catálogo funcionando igual.](https://vimpos.com.mx/assets/img/capturas/pos-sin-conexion.webp?v=2)
+![La caja con el aviso de que no hay conexión, con el ticket y el catálogo funcionando igual.](https://vimpos.com.mx/assets/img/capturas/pos-sin-conexion.webp?v=3)
 
 _Así se ve la pregunta 1 respondida en la caja de VIM POS: el aviso de que no hay internet, y el ticket y el catálogo funcionando igual. Pide esta misma pantalla en cualquier demo._
 
@@ -1119,7 +1136,7 @@ Porque un restaurante mexicano hoy escoge entre un sistema de fuera, caro y en d
 
 VIM POS es el intento de que no haya que escoger: el sistema completo vive en la computadora de tu caja —así que cobra aunque se caiga el internet— y la nube es el respaldo y el panel, no el motor.
 
-![La caja en plena venta: el catálogo por categorías y un ticket en curso con una hamburguesa, papas y refresco.](https://vimpos.com.mx/assets/img/capturas/pos-home.webp?v=2)
+![La caja en plena venta: el catálogo por categorías y un ticket en curso con una hamburguesa, papas y refresco.](https://vimpos.com.mx/assets/img/capturas/pos-home.webp?v=3)
 
 _La caja, tal como la ve quien cobra. Todo lo que hay en este sitio son capturas del sistema funcionando, no dibujos._
 
@@ -1128,7 +1145,7 @@ _La caja, tal como la ve quien cobra. Todo lo que hay en este sitio son capturas
 Competimos contra marcas con veinticinco años encima, y ahí no se gana con promesas. Somos concretos donde el resto es vago:
 
 - **El precio está publicado.** Los tres planes, los extras y los paquetes de folios están en la [página de precios](https://vimpos.com.mx/precios). No hay «contáctanos para conocer el precio».
-- **La implementación va incluida.** En los tres planes: instalación, carga de tu menú, datos fiscales y capacitación. No es un pago inicial que aparece en la primera factura.
+- **No hay pago inicial.** En ningún plan. Desde Negocio cargamos tu menú, dejamos lo fiscal configurado y capacitamos a tu equipo; en Esencial lo haces tú con nuestra guía.
 - **No vendemos equipo.** Te decimos qué computadora, qué impresora y qué cajón buscar, y los compras donde te salga mejor.
 - **No cobramos comisión por venta.** El cobro con tarjeta se hace en tu terminal bancaria de siempre; el dinero no pasa por nosotros.
 - **Los límites están escritos.** No hay app de mesero en tableta, no hay terminal bancaria integrada y la liquidación de las apps de reparto se pega a mano. Está en la [página de funciones](https://vimpos.com.mx/funciones), no en una nota al pie.
@@ -1168,7 +1185,7 @@ El mismo día hábil, por el canal que prefieras. No hay centro de llamadas, no 
 
 Contestamos **el mismo día hábil**, en horario hábil y en español. No hay número 800 ni menú de opciones: escribes y contesta una persona.
 
-![Panel del dueño con las ventas del día, el ticket promedio y el top de productos.](https://vimpos.com.mx/assets/img/capturas/admin-dashboard.webp?v=2)
+![Panel del dueño con las ventas del día, el ticket promedio y el top de productos.](https://vimpos.com.mx/assets/img/capturas/admin-dashboard.webp?v=3)
 
 _El panel que te enseñamos en la demostración: cómo va el día, la venta por hora y qué se vende más, desde el celular o la computadora._
 
@@ -1188,7 +1205,7 @@ _El panel que te enseñamos en la demostración: cómo va el día, la venta por 
 - **Soporte, si ya eres cliente.** Al mismo correo, en horario hábil, y también el día del arranque en los planes con acompañamiento.
 - **Derechos ARCO o privacidad.** Por correo, con lo que pide el [aviso de privacidad](https://vimpos.com.mx/aviso-privacidad). Se contesta en un máximo de 20 días hábiles y no cuesta nada.
 
-## Para agentes y herramientas automáticas
+Para agentes y herramientas automáticas
 
 Este sitio publica su contenido también en Markdown y describe qué es VIM POS y cuándo recomendarlo en [/llms.txt](https://vimpos.com.mx/llms.txt). Cada página tiene su gemelo —por ejemplo [/precios.md](https://vimpos.com.mx/precios.md)— y responde en `text/markdown` cuando se pide con la cabecera `Accept`. El índice completo de URLs está en [/sitemap.xml](https://vimpos.com.mx/sitemap.xml).
 

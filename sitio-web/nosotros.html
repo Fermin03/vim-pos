@@ -36,7 +36,7 @@
 <link rel="manifest" href="site.webmanifest">
 <meta name="theme-color" content="#0078C9">
 
-<link rel="stylesheet" href="assets/css/vim.css?v=16">
+<link rel="stylesheet" href="assets/css/vim.css?v=17">
 <!-- Consentimiento de cookies. Va ANTES que gtm.js y el orden NO es
      cosmético: los dos llevan `defer`, que respeta el orden del documento, y
      Consent Mode descarta un estado por defecto que llegue después de que el
@@ -146,9 +146,10 @@
           <div class="monitor-barra" aria-hidden="true">
             <span class="monitor-punto"></span><span class="monitor-punto"></span><span class="monitor-punto"></span>
           </div>
-          <img src="assets/img/capturas/pos-home.webp?v=2"
-               alt="La caja en plena venta: el catálogo por categorías y un ticket en curso con una hamburguesa, papas y refresco."
-               width="1600" height="1000" loading="lazy" decoding="async">
+          <picture>
+            <source media="(max-width: 619px)" srcset="assets/img/capturas/pos-home-movil.webp?v=3" width="816" height="1640">
+            <img src="assets/img/capturas/pos-home.webp?v=3" alt="La caja en plena venta: el catálogo por categorías y un ticket en curso con una hamburguesa, papas y refresco." width="1600" height="1000" loading="lazy" decoding="async">
+          </picture>
         </div>
         <figcaption>La caja, tal como la ve quien cobra. Todo lo que hay en este sitio son capturas del sistema funcionando, no dibujos.</figcaption>
       </figure>
@@ -168,9 +169,9 @@
               hay «contáctanos para conocer el precio».
             </li>
             <li>
-              <strong>La implementación va incluida.</strong> En los tres planes: instalación,
-              carga de tu menú, datos fiscales y capacitación. No es un pago inicial que
-              aparece en la primera factura.
+              <strong>No hay pago inicial.</strong> En ningún plan. Desde Negocio cargamos tu
+              menú, dejamos lo fiscal configurado y capacitamos a tu equipo; en Esencial lo
+              haces tú con nuestra guía.
             </li>
             <li>
               <strong>No vendemos equipo.</strong> Te decimos qué computadora, qué impresora
@@ -286,7 +287,7 @@
 }
 </script>
 
-<script src="assets/js/vim.js?v=14" defer></script>
+<script src="assets/js/vim.js?v=15" defer></script>
 <!-- Medición sin cookies (Vercel Web Analytics). Se sirve desde este dominio y
      solo existe si está encendida en el proyecto de Vercel; si no, es un 404
      inofensivo. Los eventos se mandan desde vim.js. -->

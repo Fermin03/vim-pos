@@ -18,7 +18,7 @@ _Cómo funciona_
 
 No hay que mandar a nadie a un portal aparte ni dictar un folio por teléfono. El ticket que sale de tu impresora lleva impreso el código: se escanea con la cámara del teléfono, se capturan los datos fiscales una vez, y la factura llega al correo del cliente.
 
-![Ticket impreso de una venta con el código QR para facturar al pie: negocio, folio, cajero, el producto con su modificador, subtotal, IVA, total y cambio.](https://vimpos.com.mx/assets/img/capturas/ticket-venta.webp?v=2)
+![Ticket impreso de una venta con el código QR para facturar al pie: negocio, folio, cajero, el producto con su modificador, subtotal, IVA, total y cambio.](https://vimpos.com.mx/assets/img/capturas/ticket-venta.webp?v=3)
 
 _El comensal escanea el código del ticket, pone su RFC y le llega la factura. Tu cajero no vuelve a parar la fila para eso._
 
@@ -60,7 +60,7 @@ _Qué cuesta_
 
 ## Incluida en Negocio y en Cadena
 
-En el plan Esencial se agrega por $349 al mes, más IVA. Los folios que trae tu plan son para la factura del periodo —el cumplimiento ante el SAT—, no para facturarle a cada cliente. Si se te acaban, compras un paquete y se suma a tu saldo: no caducan mientras tengas tu suscripción activa.
+En el plan Esencial se agrega por $349 al mes, más IVA. Cada factura usa un folio —la global del periodo o la que te pide un cliente— y tu plan trae 10, 20 o 40 al mes. Si se te acaban, compras un paquete y se suma a tu saldo: esos no caducan mientras tengas tu suscripción activa.
 
 _Precios de los paquetes de folios de factura._
 

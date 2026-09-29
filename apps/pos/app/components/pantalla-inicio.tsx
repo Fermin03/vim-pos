@@ -285,7 +285,7 @@ export function PantallaInicio({
         </span>
         <span className="flex flex-shrink-0 items-center gap-1.5">
           <span className={["h-1.5 w-1.5 rounded-full", online ? "bg-success" : "bg-warning"].join(" ")} aria-hidden="true" />
-          {online ? "Conectado" : "Sin conexión · modo offline"}
+          {online ? "Conectado" : "Sin internet · la caja sigue cobrando"}
         </span>
         {/* Solo aparece en la caja de escritorio (en el POS web no hay servidor local que
             responda). Si lleva más de un día sin subir se pinta en rojo: ahí ya hay un turno

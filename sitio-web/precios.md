@@ -1,12 +1,12 @@
 # Precio de lista, publicado
 
-> Tres planes en pesos más IVA: Esencial $699, Negocio $999 y Cadena $1,999 al mes. Implementación y capacitación incluidas en los tres.
+> Tres planes en pesos más IVA: Esencial $699, Negocio $999 y Cadena $1,999 al mes. Sin pago inicial ni contrato forzoso; desde Negocio cargamos tu menú y capacitamos a tu equipo.
 
 **VIM POS** · punto de venta para restaurantes en México · versión en HTML: https://vimpos.com.mx/precios
 
 En pesos y más IVA. Sin «contáctanos para conocer el precio», sin costo de instalación y sin contrato forzoso. Lo que ves es lo que pagas.
 
-La implementación va incluida en los tres planes
+Sin pago inicial en ningún plan
 
 Pagando el año completo te ahorras dos meses.
 
@@ -25,9 +25,9 @@ o $6,990 al año, más IVA
 - 1 sucursal · 1 caja
 - Pantalla de cocina y mesas
 - Reportes y corte de caja
-- Facturación aparte, $349 al mes
+- Facturación aparte, $349 al mes · 10 folios al mes
 - Cargas tu menú con nuestra guía
-- Soporte por chat y WhatsApp
+- Soporte por WhatsApp y correo
 
 [Pide una demo](https://vimpos.com.mx/demo)
 
@@ -60,7 +60,7 @@ al mes, más IVA
 
 o $19,990 al año, más IVA
 
-- 3 sucursales · cajas ilimitadas
+- 3 sucursales · cajas sin límite
 - Todo lo de Negocio
 - Un reporte que suma todas
 - Facturación incluida · 40 folios al mes
@@ -90,12 +90,13 @@ _Comparación de los tres planes de VIM POS._
 | Inventario y mermas | No | Sí | Sí |
 | Reporte que suma sucursales | No | No | Sí |
 | Facturación electrónica | $349 al mes aparte | Incluida | Incluida |
-| Folios de factura al mes | 10, con el extra | 20 | 40 |
+| Folios de factura al mes | 10, con el extra de facturación | 20 | 40 |
 | Quién carga tu menú | Tú, con nuestra guía | Nosotros | Nosotros |
 | Capacitación | Videos y guía escrita | 3 horas con tu equipo | 3 horas con tu equipo |
-| El día del arranque | Soporte por chat | Te acompañamos en línea | Vamos a tu local |
+| Soporte | WhatsApp y correo | WhatsApp y correo | WhatsApp y correo |
+| El día del arranque | Te ayudamos por WhatsApp | Te acompañamos en línea | Vamos a tu local |
 
-![Panel del dueño con las ventas del día y el estado de las cajas.](https://vimpos.com.mx/assets/img/capturas/admin-dashboard.webp?v=2)
+![Panel del dueño con las ventas del día y el estado de las cajas.](https://vimpos.com.mx/assets/img/capturas/admin-dashboard.webp?v=3)
 
 _El panel, incluido en los tres planes: cómo va el día, cuánto lleva cada caja y qué se está vendiendo, desde el celular o desde la computadora._
 
@@ -103,33 +104,45 @@ _Sin costo aparte_
 
 ## Lo que otros cobran como «implementación»
 
-Va incluido en los tres planes. No hay pago inicial ni factura sorpresa el primer mes.
+No hay pago inicial ni factura sorpresa el primer mes en ningún plan. Lo que cambia es quién hace el trabajo: en Esencial lo haces tú con nuestra guía; desde Negocio, nosotros.
+
+_Los tres planes_
 
 ### Poner el sistema a andar
 
 Instalación en tu caja, conexión de las impresoras y de la pantalla de cocina, y dejar todo trabajando antes de que abras.
 
+_Desde Negocio_
+
 ### Tu menú, cargado
 
-Con precios, categorías, extras y términos. Si vienes de otro sistema, lo traemos de ahí en lugar de teclearlo de nuevo.
+Con precios, categorías, extras y términos. Si vienes de otro sistema, lo traemos de ahí en lugar de teclearlo de nuevo. En Esencial lo pegas tú con la misma herramienta.
+
+_Los tres planes_
 
 ### Tus datos fiscales
 
 Configurados una vez y bien, para que los tickets y los reportes salgan como el contador los necesita.
 
+_Desde Negocio_
+
 ### Capacitación de tu equipo
 
-Tres horas con quien va a estar en la caja y en la cocina. No un video y suerte.
+Tres horas con quien va a estar en la caja y en la cocina. En Esencial, videos y guía escrita, y dudas por WhatsApp.
+
+_Los tres planes_
 
 ### Actualizaciones
 
 Todas, siempre. Llegan solas a tu caja y no hay que agendar a nadie ni pagar la versión nueva.
 
+_Los tres planes_
+
 ### Respaldos
 
 Copia diaria en tu local y copia fuera de él. Sin que tengas que acordarte.
 
-![Inventario con cada insumo, su existencia, su mínimo y el aviso cuando anda bajo.](https://vimpos.com.mx/assets/img/capturas/admin-inventario.webp?v=2)
+![Inventario con cada insumo, su existencia, su mínimo y el aviso cuando anda bajo.](https://vimpos.com.mx/assets/img/capturas/admin-inventario.webp?v=3)
 
 _Desde el plan Negocio: cada insumo con su existencia, su mínimo y el aviso cuando anda bajo. Lo que se descuenta sale de la receta de cada platillo, no de un conteo a mano._
 
@@ -163,7 +176,7 @@ _Facturación_
 
 El comensal escanea el código del ticket, pone sus datos y recibe su factura por correo. Tu cajero no vuelve a parar la fila para eso, y tú no vuelves a recibir mensajes de «me pueden facturar lo del sábado».
 
-**Va incluida en Negocio y en Cadena.** En Esencial se agrega por $349 al mes, más IVA. Los folios que trae cada plan cubren la factura global del periodo; cada factura que pide un cliente usa un folio.
+**Va incluida en Negocio y en Cadena.** En Esencial se agrega por $349 al mes, más IVA. Cada factura usa un folio —la global del periodo o la que te pide un cliente— y el plan trae 10, 20 o 40 al mes, que se usan antes que los de paquete.
 
 Cómo funciona, hasta cuándo puede facturar tu cliente y qué necesitas dar para encenderla está en [la página de facturación](https://vimpos.com.mx/facturacion-cfdi).
 
@@ -181,7 +194,7 @@ _Precios de los paquetes de folios de factura._
 | 1,000 folios | $1,300 | $1.30 cada uno |
 | 5,000 folios | $5,000 | $1.00 cada uno |
 
-Precios más IVA. Los folios que trae tu plan son para la factura del periodo — el cumplimiento ante el SAT —, no para facturarle a cada cliente.
+Precios más IVA. Los folios del mes no se acumulan: los que no uses se reinician el día primero. Los de paquete sí se guardan.
 
 _Para que no haya sorpresas_
 
@@ -213,11 +226,11 @@ No. Pagas tu plan y ya. Vendas lo que vendas, el precio es el mismo — que es j
 
 ### ¿Y si soy un negocio de una sola caja?
 
-Ése es Esencial. Llevas el mismo sistema completo, incluido cobrar sin internet; la diferencia es que la carga del menú la haces tú siguiendo una guía, en vez de que la hagamos nosotros contigo.
+Ése es Esencial. Llevas la caja, la cocina, las mesas y los reportes, incluido cobrar sin internet; lo que no trae es el inventario, y la carga del menú la haces tú siguiendo una guía en vez de que la hagamos nosotros contigo.
 
 ### ¿Cuánto tarda en estar funcionando?
 
-Alrededor de un día: cargar el menú, dejar configurado lo fiscal y las tres horas de capacitación con tu equipo. Se agenda para que caiga en tu día flojo, no en viernes.
+Alrededor de un día: cargar el menú, dejar configurado lo fiscal y, desde Negocio, las tres horas de capacitación con tu equipo. Se agenda para que caiga en tu día flojo, no en viernes.
 
 ## ¿Cuál te toca?
 

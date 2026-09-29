@@ -39,7 +39,7 @@
 <link rel="manifest" href="site.webmanifest">
 <meta name="theme-color" content="#0078C9">
 
-<link rel="stylesheet" href="assets/css/vim.css?v=16">
+<link rel="stylesheet" href="assets/css/vim.css?v=17">
 <!-- Consentimiento de cookies. Va ANTES que gtm.js y el orden NO es
      cosmético: los dos llevan `defer`, que respeta el orden del documento, y
      Consent Mode descarta un estado por defecto que llegue después de que el
@@ -143,7 +143,12 @@
        archivos son legibles por los dos. -->
   <section class="seccion" style="padding-top:0">
     <div class="contenedor">
-      <div class="letra-chica">
+      <p style="margin-bottom:var(--sp-5)">
+        Lo más buscado: <a href="/funciones">qué hace</a>, <a href="/precios">cuánto cuesta</a>
+        y <a href="/demo">pedir una demo</a>.
+      </p>
+      <details class="para-robots">
+        <summary>Para agentes y herramientas automáticas</summary>
         <p>
           <strong>¿Buscabas algo en concreto?</strong> El índice completo de las direcciones
           de este sitio está en <a href="/sitemap.xml">/sitemap.xml</a>. Qué es VIM POS,
@@ -160,7 +165,7 @@
           <a href="/contacto.md">/contacto.md</a> — y las mismas direcciones responden en
           <code>text/markdown</code> si se piden con la cabecera <code>Accept</code>.
         </p>
-      </div>
+      </details>
     </div>
   </section>
 </main>
@@ -215,7 +220,7 @@
   </div>
 </footer>
 
-<script src="assets/js/vim.js?v=14" defer></script>
+<script src="assets/js/vim.js?v=15" defer></script>
 <!-- Medición sin cookies (Vercel Web Analytics). Se sirve desde este dominio y
      solo existe si está encendida en el proyecto de Vercel; si no, es un 404
      inofensivo. Los eventos se mandan desde vim.js. -->

@@ -20,7 +20,7 @@
      búsqueda POR NOMBRE. Cuando el sitio esté indexado y Google muestre el
      nombre solo, se puede quitar. -->
 <title>Punto de venta para restaurantes, desde $699 al mes — VIM POS</title>
-<meta name="description" content="Caja, cocina, mesas, inventario y facturación CFDI en un solo sistema. Precio publicado desde $699 al mes, implementación incluida y cobra sin internet. Hecho en León, Gto.">
+<meta name="description" content="Caja, cocina, mesas, inventario y facturación CFDI en un solo sistema. Precio publicado desde $699 al mes, sin pago inicial y cobra sin internet. Hecho en León, Gto.">
 <link rel="canonical" href="https://vimpos.com.mx/">
 <link rel="alternate" type="text/markdown" href="https://vimpos.com.mx/index.md" title="Esta página en Markdown">
 
@@ -51,7 +51,7 @@
 <link rel="manifest" href="site.webmanifest">
 <meta name="theme-color" content="#0078C9">
 
-<link rel="stylesheet" href="assets/css/vim.css?v=16">
+<link rel="stylesheet" href="assets/css/vim.css?v=17">
 <!-- Consentimiento de cookies. Va ANTES que gtm.js y el orden NO es
      cosmético: los dos llevan `defer`, que respeta el orden del documento, y
      Consent Mode descarta un estado por defecto que llegue después de que el
@@ -135,14 +135,17 @@
         <div class="pila pila-5">
           <h1>Todo lo que tu restaurante necesita, sin letra chica.</h1>
           <p class="entradilla">
-            Caja, cocina, mesas, inventario y facturación en un solo sistema. La implementación va
-            incluida en los tres planes; desde Negocio, cargamos tu menú y capacitamos a tu equipo.
-            El precio está publicado en esta página.
+            Caja, cocina, mesas, inventario y facturación en un solo sistema. Sin pago inicial:
+            desde Negocio cargamos tu menú y capacitamos a tu equipo, y en Esencial arrancas con
+            nuestra guía.
           </p>
           <div class="fila">
             <a class="btn btn-primario btn-hero" href="/demo">Pide una demo</a>
             <a class="btn btn-fantasma btn-hero" href="mailto:hola@vimpos.com.mx">Escríbenos por correo</a>
           </div>
+          <!-- El precio en el primer pantallazo: en el teléfono estaba a ocho pantallas de
+               distancia, y «sin letra chica» no se sostiene si hay que buscarlo. -->
+          <p class="hero-precio">Desde <strong>$699 al mes</strong>, más IVA · sin contrato forzoso · <a href="/precios">ver los tres planes</a></p>
         </div>
 
         <div class="monitor-envoltura">
@@ -150,8 +153,10 @@
             <div class="monitor-barra" aria-hidden="true">
               <span class="monitor-punto"></span><span class="monitor-punto"></span><span class="monitor-punto"></span>
             </div>
-            <img src="assets/img/capturas/pos-home.webp?v=2" alt="La caja en plena venta: el catálogo por categorías y un ticket en curso con una hamburguesa, papas y refresco."
-                 width="1600" height="1000" fetchpriority="high" decoding="async">
+            <picture>
+              <source media="(max-width: 619px)" srcset="assets/img/capturas/pos-home-movil.webp?v=3" width="816" height="1640">
+              <img src="assets/img/capturas/pos-home.webp?v=3" alt="La caja en plena venta: el catálogo por categorías y un ticket en curso con una hamburguesa, papas y refresco." width="1600" height="1000" fetchpriority="high" decoding="async">
+            </picture>
           </div>
         </div>
       </div>
@@ -226,7 +231,7 @@
              color de la página. Su fuente está en assets/img/arquitectura.svg;
              si se toca allá, hay que traerlo aquí. -->
 <svg viewBox="0 0 760 468" role="img" aria-labelledby="arq-titulo arq-desc"
-                     class="diagrama-arquitectura" data-diagrama>
+                     class="diagrama-arquitectura diagrama-ancho" data-diagrama>
           <title id="arq-titulo">Qué sigue funcionando cuando se cae el internet</title>
           <desc id="arq-desc">
             Todo lo que hace falta para vender —la caja, las impresoras, la pantalla de cocina y una
@@ -317,6 +322,44 @@
             <text class="a-t-sub" x="534" y="394">Comparte el mismo turno</text>
           </g>
         </svg>
+<!-- La misma idea en vertical, para el teléfono: el dibujo ancho a 350 px dejaba la letra en
+     5 px. Mismas clases, así que el botón «Cortar el internet» apaga los dos. -->
+<svg viewBox="0 0 360 548" role="img" aria-labelledby="arqv-titulo" class="diagrama-arquitectura diagrama-alto" data-diagrama xmlns="http://www.w3.org/2000/svg">
+  <title id="arqv-titulo">Qué sigue funcionando cuando se cae el internet: la caja, la cocina, las impresoras y una segunda caja viven en el local; lo de fuera cuelga de una sola línea.</title>
+  <g class="a-nube-grupo">
+    <rect class="a-fuera" x="20" y="8" width="320" height="68" rx="8"/>
+    <text class="a-t-etq" x="40" y="32">FUERA · OPCIONAL</text>
+    <text class="a-t-sub" x="40" y="56">Respaldo, panel del dueño y reportes</text>
+  </g>
+  <path class="a-enlace" d="M180 76 L180 124"/>
+  <g class="a-corte">
+    <circle cx="180" cy="100" r="13" fill="var(--bg, #FFFFFF)"/>
+    <path d="M174 94 L186 106 M186 94 L174 106" stroke="var(--danger, #C0392B)" stroke-width="2" stroke-linecap="round"/>
+    <text class="a-t-etq" x="202" y="104" fill="var(--danger, #C0392B)">SE CAYÓ</text>
+  </g>
+
+  <rect class="a-local" x="4" y="124" width="352" height="416" rx="12"/>
+  <text class="a-t-etq" x="24" y="152" fill="var(--accent-hover, #0063A8)">EN TU LOCAL</text>
+
+  <rect class="a-caja" x="24" y="170" width="312" height="88" rx="10"/>
+  <text class="a-t-titulo" x="44" y="202">La caja</text>
+  <text class="a-t-sub" x="44" y="224">Tus ventas y tu menú viven aquí.</text>
+  <text class="a-t-sub" x="44" y="242">Cobra e imprime sin señal.</text>
+
+  <path class="a-hilo" d="M48 258 V478 M48 318 H76 M48 398 H76 M48 478 H76"/>
+
+  <rect class="a-tarjeta" x="76" y="286" width="260" height="64" rx="10"/>
+  <text class="a-t-titulo" x="96" y="312">Cocina</text>
+  <text class="a-t-sub" x="96" y="334">Comandas en pantalla</text>
+
+  <rect class="a-tarjeta" x="76" y="366" width="260" height="64" rx="10"/>
+  <text class="a-t-titulo" x="96" y="392">Impresoras</text>
+  <text class="a-t-sub" x="96" y="414">Tickets y comandas por área</text>
+
+  <rect class="a-tarjeta" x="76" y="446" width="260" height="64" rx="10"/>
+  <text class="a-t-titulo" x="96" y="472">Segunda caja</text>
+  <text class="a-t-sub" x="96" y="494">Comparte el mismo turno</text>
+</svg>
         <div class="fila">
           <button class="btn btn-fantasma" type="button" data-diagrama-boton aria-pressed="false">
             Cortar el internet
@@ -325,6 +368,19 @@
             <strong>Pruébalo:</strong> se apaga la nube y el local sigue entero.
           </span>
         </div>
+      </div>
+
+      <!-- Lo que era la sección 7 («El diferenciador») vive aquí desde el 26-sep: repetía el
+           argumento del diagrama en una banda propia, y el inicio tenía once secciones. -->
+      <div class="pila pila-4" style="max-width:var(--ancho-texto)">
+        <h3>No es un «modo offline». Es que no depende del internet.</h3>
+        <p>
+          Los sistemas que se anuncian con «modo sin conexión» guardan tus ventas a medias en el
+          navegador y esperan a que suban después. Aquí no hay modo ni versión reducida: el sistema
+          completo está en tu caja y hace exactamente lo mismo haya señal o no. Cuando vuelve, lo del
+          día sube solo y conserva los folios que ya imprimiste.
+        </p>
+        <p><a href="/sin-internet">Cómo funciona por dentro</a></p>
       </div>
     </div>
   </section>
@@ -348,7 +404,7 @@
         </div>
         <div class="monitor">
           <div class="monitor-barra" aria-hidden="true"><span class="monitor-punto"></span><span class="monitor-punto"></span><span class="monitor-punto"></span></div>
-          <img src="assets/img/capturas/pos-catalogo.webp?v=2" alt="Un producto abierto con sus opciones: término de la carne y extras con su precio."
+          <img src="assets/img/capturas/pos-catalogo.webp?v=3" alt="Un producto abierto con sus opciones: término de la carne y extras con su precio."
                  width="1600" height="1000" loading="lazy" decoding="async">
         </div>
       </div>
@@ -364,8 +420,10 @@
         </div>
         <div class="monitor">
           <div class="monitor-barra" aria-hidden="true"><span class="monitor-punto"></span><span class="monitor-punto"></span><span class="monitor-punto"></span></div>
-          <img src="assets/img/capturas/kds.webp?v=2" alt="Pantalla de cocina con siete comandas activas, cada una con su tiempo, el término de la carne, los extras y las notas."
-                 width="1600" height="1000" loading="lazy" decoding="async">
+          <picture>
+            <source media="(max-width: 619px)" srcset="assets/img/capturas/kds-movil.webp?v=3" width="1400" height="920">
+            <img src="assets/img/capturas/kds.webp?v=3" alt="Pantalla de cocina con las comandas activas, cada una con su tiempo, el término de la carne, los extras y las notas." width="1600" height="1000" loading="lazy" decoding="async">
+          </picture>
         </div>
       </div>
 
@@ -379,7 +437,7 @@
         </div>
         <div class="monitor">
           <div class="monitor-barra" aria-hidden="true"><span class="monitor-punto"></span><span class="monitor-punto"></span><span class="monitor-punto"></span></div>
-          <img src="assets/img/capturas/pos-arqueo.webp?v=2" alt="Arqueo del cierre de turno: efectivo esperado, efectivo contado y la diferencia, con cada forma de pago en su renglón."
+          <img src="assets/img/capturas/pos-arqueo.webp?v=3" alt="Arqueo del cierre de turno: efectivo esperado, efectivo contado y la diferencia, con cada forma de pago en su renglón."
                  width="1600" height="1000" loading="lazy" decoding="async">
         </div>
       </div>
@@ -394,32 +452,17 @@
         </div>
         <div class="monitor">
           <div class="monitor-barra" aria-hidden="true"><span class="monitor-punto"></span><span class="monitor-punto"></span><span class="monitor-punto"></span></div>
-          <img src="assets/img/capturas/admin-dashboard.webp?v=2" alt="Panel del dueño con las ventas del día y el estado de las cajas."
-                 width="1600" height="1000" loading="lazy" decoding="async">
+          <picture>
+            <source media="(max-width: 619px)" srcset="assets/img/capturas/admin-dashboard-movil.webp?v=3" width="780" height="1688">
+            <img src="assets/img/capturas/admin-dashboard.webp?v=3" alt="Panel del dueño con las ventas del día y el estado de las cajas." width="1600" height="1000" loading="lazy" decoding="async">
+          </picture>
         </div>
       </div>
     </div>
   </section>
 
-  <!-- ═══ 7 · Sin internet ═══════════════════════════════════════════════ -->
-  <section class="seccion destacada-suave">
-    <div class="contenedor pila pila-5">
-      <p class="eyebrow">El diferenciador</p>
-      <h2>No es un «modo offline». Es que no depende del internet.</h2>
-      <p>
-        Los sistemas que se anuncian con «modo sin conexión» guardan tus ventas a medias en el
-        navegador y esperan a que suban después. Aquí no hay modo ni versión reducida: el sistema
-        completo está en tu caja y hace exactamente lo mismo haya señal o no. Cuando vuelve, lo del
-        día sube solo y conserva los folios que ya imprimiste.
-      </p>
-      <div class="fila">
-        <a class="btn btn-fantasma" href="/sin-internet">Cómo funciona por dentro</a>
-      </div>
-    </div>
-  </section>
-
   <!-- ═══ 8 · Para tu giro ═══════════════════════════════════════════════ -->
-  <section class="seccion">
+  <section class="seccion destacada-suave">
     <div class="contenedor pila pila-8">
       <div class="pila pila-4">
         <p class="eyebrow">Para tu giro</p>
@@ -520,7 +563,7 @@
           <div class="monitor-barra" aria-hidden="true">
             <span class="monitor-punto"></span><span class="monitor-punto"></span><span class="monitor-punto"></span>
           </div>
-          <img src="assets/img/capturas/admin-importador.webp?v=2" alt="Importador de menú mostrando lo que se va a dar de alta antes de confirmar."
+          <img src="assets/img/capturas/admin-importador.webp?v=3" alt="Importador de menú mostrando lo que se va a dar de alta antes de confirmar."
                  width="1600" height="1000" loading="lazy" decoding="async">
         </div>
         <figcaption>
@@ -573,8 +616,8 @@
           </div>
           <ul class="plan-lista">
             <li>1 sucursal · 1 caja</li>
-            <li>Implementación en autoservicio guiado</li>
-            <li>Soporte por chat</li>
+            <li>Cocina, mesas, reportes y corte</li>
+            <li>Arrancas tú, con nuestra guía</li>
           </ul>
         </div>
 
@@ -587,7 +630,7 @@
           <ul class="plan-lista">
             <li>1 sucursal · 3 cajas</li>
             <li>Facturación incluida · 20 folios al mes</li>
-            <li>Carga de tu menú y capacitación</li>
+            <li>Cargamos tu menú y capacitamos a tu equipo</li>
           </ul>
         </div>
 
@@ -597,9 +640,9 @@
             <div class="plan-precio">$1,999</div>
           </div>
           <ul class="plan-lista">
-            <li>3 sucursales · cajas ilimitadas</li>
-            <li>Reporte consolidado</li>
-            <li>Acompañamiento con visita</li>
+            <li>3 sucursales · cajas sin límite</li>
+            <li>Un reporte que suma todas</li>
+            <li>Vamos a tu local el día del arranque</li>
           </ul>
         </div>
       </div>
@@ -655,7 +698,7 @@
             <svg class="acordeon-signo" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
           </button>
           <div class="acordeon-panel" data-acordeon-panel><div>
-            <p>Sí. Factura global del periodo, timbrado individual de cualquier ticket y portal de autofacturación por QR, con CFDI 4.0 timbrado por un proveedor autorizado por el SAT. Los folios se pagan aparte; el precio está en la página de precios.</p>
+            <p>Sí. Factura global del periodo, timbrado individual de cualquier ticket y portal de autofacturación por QR, con CFDI 4.0 timbrado por un proveedor autorizado por el SAT. Cada plan trae folios al mes para tus facturas —10 en Esencial con el extra de facturación, 20 en Negocio y 40 en Cadena— y, si se acaban, compras un paquete. Los precios están en la página de precios.</p>
           </div></div>
         </div>
 
@@ -665,7 +708,7 @@
             <svg class="acordeon-signo" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
           </button>
           <div class="acordeon-panel" data-acordeon-panel><div>
-            <p>Alrededor de un día: carga del menú, configuración y tres horas de capacitación. En el plan Esencial lo haces tú con una guía; desde Negocio lo hacemos nosotros y te acompañamos el día del arranque.</p>
+            <p>Alrededor de un día. Desde Negocio lo hacemos nosotros: cargamos tu menú, lo dejamos configurado y capacitamos a tu equipo tres horas. En Esencial lo haces tú con nuestra guía y te ayudamos por WhatsApp.</p>
           </div></div>
         </div>
 
@@ -843,7 +886,7 @@
       "countriesSupported": "MX",
       "publisher": { "@id": "https://vimpos.com.mx/#organizacion" },
       "screenshot": "https://vimpos.com.mx/assets/img/capturas/pos-home.png",
-      "description": "Sistema de punto de venta para restaurantes en México: caja, cocina, mesas, inventario y facturación, con la implementación y la capacitación incluidas.",
+      "description": "Sistema de punto de venta para restaurantes en México: caja, cocina, mesas, inventario y facturación, sin pago inicial y con la carga del menú y la capacitación incluidas desde el plan Negocio.",
       "featureList": [
         "Cobrar sin internet: el sistema completo vive en la computadora de la caja",
         "Catálogo con categorías y modificadores con precio",
@@ -912,7 +955,7 @@
         {
           "@type": "Offer",
           "name": "Cadena",
-          "description": "3 sucursales y cajas ilimitadas. Reporte consolidado y visita presencial.",
+          "description": "3 sucursales y cajas sin límite. Reporte consolidado y visita presencial.",
           "url": "https://vimpos.com.mx/precios",
           "price": "1999",
           "priceCurrency": "MXN",
@@ -949,7 +992,7 @@
         { "@type": "Question", "name": "¿De verdad funciona sin internet?", "acceptedAnswer": { "@type": "Answer", "text": "Sí. El programa se instala en la computadora de tu caja y trabaja ahí, así que cobrar, imprimir y mandar a cocina no pasan por internet en ningún momento." } },
         { "@type": "Question", "name": "¿Qué necesito comprar?", "acceptedAnswer": { "@type": "Answer", "text": "Una computadora con Windows, una impresora de tickets, un cajón de dinero y el módem que ya tienes. VIM no vende equipo." } },
         { "@type": "Question", "name": "¿Puedo traer mi menú de otro sistema?", "acceptedAnswer": { "@type": "Answer", "text": "Sí. Descargas tu menú del sistema que usas hoy y lo pegas tal cual." } },
-        { "@type": "Question", "name": "¿Cuánto tarda la implementación?", "acceptedAnswer": { "@type": "Answer", "text": "Alrededor de un día: carga del menú, configuración y tres horas de capacitación." } },
+        { "@type": "Question", "name": "¿Cuánto tarda la implementación?", "acceptedAnswer": { "@type": "Answer", "text": "Alrededor de un día. Desde Negocio cargamos el menú, lo configuramos y capacitamos al equipo tres horas; en Esencial se hace con una guía y ayuda por WhatsApp." } },
         { "@type": "Question", "name": "¿Funciona con varias sucursales?", "acceptedAnswer": { "@type": "Answer", "text": "Sí. Cada sucursal opera con su propia caja y su propio turno, y el panel suma todo en un reporte consolidado." } },
         { "@type": "Question", "name": "¿Puedo cobrar con tarjeta desde el sistema?", "acceptedAnswer": { "@type": "Answer", "text": "No. La tarjeta se registra como forma de pago para que el corte cuadre, pero el cobro se hace con la terminal bancaria del negocio." } }
       ]
@@ -958,7 +1001,7 @@
 }
 </script>
 
-<script src="assets/js/vim.js?v=14" defer></script>
+<script src="assets/js/vim.js?v=15" defer></script>
 <!-- Medición sin cookies (Vercel Web Analytics). Se sirve desde este dominio y
      solo existe si está encendida en el proyecto de Vercel; si no, es un 404
      inofensivo. Los eventos se mandan desde vim.js. -->

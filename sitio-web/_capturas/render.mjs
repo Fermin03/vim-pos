@@ -72,11 +72,11 @@ const TOMAS = [
      medio; ahora es la caja en plena venta: catálogo abierto y un ticket con
      tres productos. Es la primera imagen que ve un prospecto, y tiene que
      enseñar el producto haciendo lo suyo. */
-  { id: "pos-home",            app: "pos",   ruta: "/",             titulo: "Caja con un ticket en curso",  accion: "armarTicket", limpiar: "descartarTicket", espera: /^Cobrar/i },  // index, demo
+  { id: "pos-home",            app: "pos",   ruta: "/",             titulo: "Caja con un ticket en curso",  accion: "armarTicket", limpiar: "descartarTicket", espera: /^Cobrar/i, movil: { recorte: { x: 1032, y: 80, width: 408, height: 820 } } },  // index, demo
   { id: "pos-catalogo",        app: "pos",   ruta: "/",             titulo: "Catálogo con modificadores", accion: "abrirModificadores", espera: "Término de la carne" }, // index
   { id: "pos-pago",            app: "pos",   ruta: "/",             titulo: "Método de pago",             accion: "abrirCobro", limpiar: "descartarTicket", espera: /efectivo/i },          // index
   { id: "pos-mesas",           app: "pos",   ruta: "/",             titulo: "Mapa de mesas",              accion: "abrirMesas",         espera: /mesa/i },              // index
-  { id: "pos-sin-conexion",    app: "pos",   ruta: "/",             titulo: "Banner de sin conexión",     accion: "cortarRed",          espera: /sin conexión|sin internet/i }, // sin-internet
+  { id: "pos-sin-conexion",    app: "pos",   ruta: "/",             titulo: "Venta en curso sin internet", accion: "venderSinRed", limpiar: "descartarTicket", sinRed: true,          espera: /sin conexión|sin internet/i }, // sin-internet
   /* El monitor del turno. Se conserva con su nombre de siempre porque tres
      páginas lo enlazan; el arqueo de verdad es la toma "pos-cierre". */
   { id: "pos-monitor",         app: "pos",   ruta: "/",             titulo: "Monitor del turno",          accion: "abrirCorteX", espera: /efectivo esperado/i },
@@ -84,10 +84,12 @@ const TOMAS = [
      de vinculación también dice "cocina", y así fue como la primera versión
      publicó un formulario de credenciales como si fuera la pantalla de
      comandas. */
-  { id: "kds",                 app: "kds",   ruta: "/",             titulo: "Pantalla de cocina",         espera: /Crazy Clásica|Doble Queso/ },                       // index, funciones
-  { id: "admin-dashboard",     app: "admin", ruta: "/dashboard",            titulo: "Dashboard del panel",           espera: /ventas|hoy|resumen/i },      // precios, index
+  /* Sin `espera` de texto: la cocina sí pinta las comandas, pero ni getByText ni innerText las
+     encuentran (se leía solo "V"). Se espera por el botón LISTO, que es lo que la hace cocina. */
+  { id: "kds",                 app: "kds",   ruta: "/",             titulo: "Pantalla de cocina",         accion: "esperarComandas", movil: { recorte: { x: 0, y: 0, width: 700, height: 460 } } },                       // index, funciones
+  { id: "admin-dashboard",     app: "admin", ruta: "/dashboard",            titulo: "Dashboard del panel",           espera: /ventas|hoy|resumen/i, movil: { pantalla: { width: 390, height: 844 } } },      // precios, index
   { id: "admin-resultados",    app: "admin", ruta: "/reportes/consolidado", titulo: "Estado de resultados del día",  espera: /resultados|consolidado/i },  // index
-  { id: "admin-inventario",    app: "admin", ruta: "/inventario",           titulo: "Inventario",                    espera: /inventario|insumo/i },       // precios
+  { id: "admin-inventario",    app: "admin", ruta: "/inventario",           titulo: "Inventario",                    espera: /inventario|insumo/i, movil: { pantalla: { width: 390, height: 844 } } },       // precios
   { id: "admin-conciliacion",  app: "admin", ruta: "/conciliacion",         titulo: "Conciliación de apps",          accion: "abrirLiquidacion", espera: /RP-884/ },  // funciones
   { id: "admin-importador",    app: "admin", ruta: "/catalogo/importar",    titulo: "Importador de menú",            accion: "revisarEjemplo", espera: /Hamburguesas/ },  // index, funciones
   { id: "ticket-venta",        app: "pos",   ruta: "/", papel: true, titulo: "Ticket de venta",  accion: "vistaPreviaTicket", espera: /Crazy Burgers/i },  // precios, facturacion
@@ -230,8 +232,10 @@ const ACCIONES = {
      durante treinta segundos hasta rendirse. Por eso se acota al `dialog`. */
   async vistaPreviaTicket(page) {
     await ACCIONES.abrirCobro(page);
-    await page.getByRole("button", { name: /^Efectivo/i }).first().click();
-    await page.getByRole("button", { name: /pago exacto/i }).first().click();
+    /* Acotado al diálogo: detrás, el panel del ticket tiene "Efectivo exacto" y el velo lo tapa. */
+    const dialogo = page.getByRole("dialog");
+    await dialogo.getByRole("button", { name: /^Efectivo/i }).first().click();
+    await dialogo.getByRole("button", { name: /pago exacto/i }).first().click();
     await page.getByRole("dialog").getByRole("button", { name: /^Cobrar/i }).first().click();
 
     /* NO se pulsa "Ver / Imprimir": al cerrar la venta, la caja ABRE SOLA la
@@ -248,7 +252,7 @@ const ACCIONES = {
   async abrirCorteX(page) {
     /* El corte del turno se abre desde el concentrador, no por URL:
        `/turno/cierre` no existe como ruta. */
-    await page.getByRole("button", { name: /corte caja X/i }).first().click();
+    await page.getByRole("button", { name: /monitor ventas|corte caja X/i }).first().click();
     await page.getByText(/efectivo esperado/i).waitFor({ timeout: 8000 });
   },
 
@@ -269,6 +273,18 @@ const ACCIONES = {
     /* Con una cuenta elegida, el panel derecho enseña lo que la mesa lleva
        consumido; vacío, la mitad de la captura es un letrero. */
     await page.getByText(/^Mesa 4$/).first().click().catch(() => {});
+    await page.waitForTimeout(800);
+  },
+
+  /* Sin internet A MEDIA VENTA: el concentrador vacío con el aviso en la barra de abajo no
+     enseñaba nada. Con un ticket armado se ve que la caja sigue cobrando. */
+  async venderSinRed(page) {
+    await ACCIONES.armarTicket(page);
+    await ACCIONES.cortarRed(page);
+  },
+
+  async esperarComandas(page) {
+    await page.locator("button", { hasText: "LISTO" }).first().waitFor({ timeout: 15000 });
     await page.waitForTimeout(800);
   },
 
@@ -318,14 +334,17 @@ const ACCIONES = {
    PIN. La versión anterior buscaba una etiqueta «correo» que no existe en esta
    pantalla — se llama «Identificador del dispositivo». */
 async function entrarAlPos(page) {
-  await page.goto(POS, { waitUntil: "networkidle" });
+  await page.goto(POS, { waitUntil: "load" });
+  /* Sin "networkidle" (la caja late y consulta sin parar, así que nunca llega): se da tiempo a
+     que la pantalla se hidrate antes de preguntar qué se ve. */
+  await page.waitForTimeout(2500);
 
   const idCaja = page.getByLabel(/identificador del dispositivo/i);
   if (await idCaja.isVisible().catch(() => false)) {
     await idCaja.fill(CAJA.email);
     await page.getByLabel(/clave del dispositivo/i).fill(CAJA.password);
     await page.getByRole("button", { name: /vincular dispositivo/i }).click();
-    await page.waitForLoadState("networkidle");
+    await page.waitForTimeout(2000);
   }
 
   /* Después, el empleado. El PIN se pulsa en el numpad de la pantalla.
@@ -340,7 +359,7 @@ async function entrarAlPos(page) {
       await page.getByRole("button", { name: d, exact: true }).click();
       await page.waitForTimeout(150);
     }
-    await page.waitForLoadState("networkidle");
+    await page.waitForTimeout(2000);
     await page.waitForTimeout(1500);
   }
   await page.waitForTimeout(800);
@@ -351,13 +370,14 @@ async function entrarAlPos(page) {
    caja del fixture de Knock-Out; se sobreescribe, que si no la cocina enseña
    las comandas del negocio equivocado — o ninguna. */
 async function entrarAlKds(page) {
-  await page.goto(KDS, { waitUntil: "networkidle" });
+  await page.goto(KDS, { waitUntil: "load" });
+  await page.waitForTimeout(2500);
   const id = page.getByLabel(/identificador del dispositivo/i);
   if (await id.isVisible().catch(() => false)) {
     await id.fill(CAJA.email);
     await page.getByLabel(/clave del dispositivo/i).fill(CAJA.password);
     await page.getByRole("button", { name: /vincular pantalla/i }).click();
-    await page.waitForLoadState("networkidle");
+    await page.waitForTimeout(2000);
     await page.waitForTimeout(1500);
   }
 }
@@ -365,7 +385,7 @@ async function entrarAlKds(page) {
 /* El panel es una sesión aparte: correo y contraseña de la dueña. Sin esto las
    cinco tomas de /admin salen siendo la pantalla de inicio de sesión. */
 async function entrarAlPanel(page) {
-  await page.goto(ADMIN, { waitUntil: "networkidle" });
+  await page.goto(ADMIN, { waitUntil: "load" });
 
   const correo = page.getByLabel(/correo/i);
   if (await correo.isVisible().catch(() => false)) {
@@ -374,7 +394,7 @@ async function entrarAlPanel(page) {
        que lleva esa palabra en su aria-label. */
     await page.getByLabel(/^contraseña$/i).fill(DUENA.password);
     await page.getByRole("button", { name: /^entrar$/i }).click();
-    await page.waitForLoadState("networkidle");
+    await page.waitForTimeout(2000);
     await page.waitForTimeout(800);
   }
 }
@@ -382,7 +402,7 @@ async function entrarAlPanel(page) {
 async function capturar(page, toma) {
   const base = toma.app === "pos" ? POS : toma.app === "kds" ? KDS : ADMIN;
   await page.setViewportSize(toma.papel ? PAPEL : PANTALLA);
-  await page.goto(base + toma.ruta, { waitUntil: "networkidle" });
+  await page.goto(base + toma.ruta, { waitUntil: "load" });
 
   /* La sesión del EMPLEADO no sobrevive a una recarga: el token vive en el
      estado de React de page.tsx, no en disco (a propósito — el sync-pull baja
@@ -399,7 +419,7 @@ async function capturar(page, toma) {
        que volver a ella. Sin esto la captura sale del concentrador con el
        nombre de otra pantalla — y como el concentrador tiene botones con
        palabras como "corte", la verificación la daba por buena. */
-    if (toma.ruta !== "/") await page.goto(base + toma.ruta, { waitUntil: "networkidle" });
+    if (toma.ruta !== "/") await page.goto(base + toma.ruta, { waitUntil: "load" });
   }
 
   if (toma.accion) {
@@ -431,6 +451,8 @@ async function capturar(page, toma) {
       await page.getByText(toma.espera).first().waitFor({ timeout: 8000 });
     } catch {
       console.warn(`  ✗ ${toma.id}: la página no muestra ${toma.espera} — ¿sesión caída o ruta cambiada?`);
+      await page.screenshot({ path: path.join(process.env.TEMP || ".", `fallo-${toma.id}.png`) }).catch(() => {});
+      console.warn("    se ve: " + (await page.evaluate(() => document.body.innerText)).replace(/s+/g, " ").slice(0, 240));
       return false;
     }
   }
@@ -463,6 +485,25 @@ async function capturar(page, toma) {
     await papel.screenshot({ path: destino });
   } else {
     await page.screenshot({ path: destino, fullPage: false });
+  }
+
+  /* LA VERSIÓN PARA EL TELÉFONO (`<picture>` en el sitio). A 350 px de ancho, una toma de 1440
+     queda a un cuarto de escala y su letra en 3 px. Dos maneras según la app:
+       · recorte: la caja y la cocina no son responsivas —son pantallas de mostrador—, así que
+         se recorta la parte que cuenta (el ticket, las comandas).
+       · pantalla: el panel del dueño SÍ se usa en el celular, así que se captura a 390 px de
+         verdad, que es exactamente lo que el sitio promete ("ves la venta desde tu celular"). */
+  if (toma.movil) {
+    const destinoMovil = path.join(SALIDA, `${toma.id}-movil.png`);
+    if (toma.movil.recorte) {
+      await page.screenshot({ path: destinoMovil, clip: toma.movil.recorte });
+    } else if (toma.movil.pantalla) {
+      await page.setViewportSize(toma.movil.pantalla);
+      await page.waitForTimeout(1500);
+      await page.screenshot({ path: destinoMovil, fullPage: false });
+      await page.setViewportSize(PANTALLA);
+      await page.waitForTimeout(500);
+    }
   }
   /* LIMPIAR DESPUÉS DE CAPTURAR.
   
@@ -526,6 +567,16 @@ console.log(`Capturando en ${SALIDA}\n`);
    uno tiene su sesión; compartir una sola pestaña obligaba a re-entrar en la
    otra app cada vez que se cambiaba de una a la otra. */
 const paginaPanel = await contexto.newPage();
+/* La cocina en su PROPIO CONTEXTO: las cookies de localhost no distinguen puerto, así que la
+   sesión que la caja deja en :3000 la leía la cocina en :3003 y se quedaba en el logotipo de
+   carga, esperando algo que esa sesión no le iba a dar. */
+const contextoCocina = await navegador.newContext({ deviceScaleFactor: 2, locale: "es-MX", viewport: PANTALLA });
+await contextoCocina.addInitScript(({ url, anon }) => {
+  window.__VIM_SUPABASE_URL = url;
+  window.__VIM_SUPABASE_ANON = anon;
+}, { url: process.env.VIM_SUPABASE_LOCAL ?? "http://127.0.0.1:54321", anon: ANON_LOCAL });
+const paginaCocina = await contextoCocina.newPage();
+if (process.env.DEPURAR) { paginaCocina.on("console", (m) => console.log("   [cocina]", m.type(), m.text().slice(0, 160))); paginaCocina.on("request", (q) => console.log("   [cocina req]", q.method(), q.url().slice(0, 120))); paginaCocina.on("pageerror", (e) => console.log("   [cocina err]", e.message)); }
 await entrarAlPos(page);
 await entrarAlPanel(paginaPanel);
 
@@ -535,9 +586,9 @@ let hechas = 0;
    caja. */
 const SOLO = process.argv.slice(2);
 for (const toma of TOMAS.filter((t) => !SOLO.length || SOLO.includes(t.id))) {
-  const hoja = toma.app === "admin" ? paginaPanel : page;
+  const hoja = toma.app === "admin" ? paginaPanel : toma.app === "kds" ? paginaCocina : page;
   if (await capturar(hoja, toma)) hechas++;
-  if (toma.accion === "cortarRed") await hoja.context().setOffline(false);
+  if (toma.sinRed || toma.accion === "cortarRed") await hoja.context().setOffline(false);
 }
 
 await navegador.close();

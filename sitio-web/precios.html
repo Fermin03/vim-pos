@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 
 <title>Precios de VIM POS — publicados, sin cotización</title>
-<meta name="description" content="Tres planes en pesos más IVA: Esencial $699, Negocio $999 y Cadena $1,999 al mes. Implementación y capacitación incluidas en los tres.">
+<meta name="description" content="Tres planes en pesos más IVA: Esencial $699, Negocio $999 y Cadena $1,999 al mes. Sin pago inicial ni contrato forzoso; desde Negocio cargamos tu menú y capacitamos a tu equipo.">
 <link rel="canonical" href="https://vimpos.com.mx/precios">
 <link rel="alternate" type="text/markdown" href="https://vimpos.com.mx/precios.md" title="Esta página en Markdown">
 
@@ -13,7 +13,7 @@
 <meta property="og:locale" content="es_MX">
 <meta property="og:site_name" content="VIM POS">
 <meta property="og:title" content="Precios de VIM POS — publicados, sin cotización">
-<meta property="og:description" content="Tres planes en pesos, más IVA. La implementación, la carga de tu menú y la capacitación van incluidas en todos.">
+<meta property="og:description" content="Tres planes en pesos, más IVA. Sin pago inicial ni contrato forzoso.">
 <meta property="og:url" content="https://vimpos.com.mx/precios">
 <meta property="og:image" content="https://vimpos.com.mx/assets/img/og/precios.png">
 <meta property="og:image:width" content="1200">
@@ -36,7 +36,7 @@
 <link rel="manifest" href="site.webmanifest">
 <meta name="theme-color" content="#0078C9">
 
-<link rel="stylesheet" href="assets/css/vim.css?v=16">
+<link rel="stylesheet" href="assets/css/vim.css?v=17">
 <!-- Consentimiento de cookies. Va ANTES que gtm.js y el orden NO es
      cosmético: los dos llevan `defer`, que respeta el orden del documento, y
      Consent Mode descarta un estado por defecto que llegue después de que el
@@ -114,7 +114,7 @@
         En pesos y más IVA. Sin «contáctanos para conocer el precio», sin costo de instalación y
         sin contrato forzoso. Lo que ves es lo que pagas.
       </p>
-      <p class="prueba-social">La implementación va incluida en los tres planes</p>
+      <p class="prueba-social">Sin pago inicial en ningún plan</p>
     </div>
   </section>
 
@@ -150,9 +150,9 @@
             <li>1 sucursal · 1 caja</li>
             <li>Pantalla de cocina y mesas</li>
             <li>Reportes y corte de caja</li>
-            <li>Facturación aparte, $349 al mes</li>
+            <li>Facturación aparte, $349 al mes · 10 folios al mes</li>
             <li>Cargas tu menú con nuestra guía</li>
-            <li>Soporte por chat y WhatsApp</li>
+            <li>Soporte por WhatsApp y correo</li>
           </ul>
           <a class="btn btn-fantasma" href="/demo">Pide una demo</a>
         </div>
@@ -185,7 +185,7 @@
             <span class="plan-periodo">o $19,990 al año, más IVA</span>
           </div>
           <ul class="plan-lista">
-            <li>3 sucursales · cajas ilimitadas</li>
+            <li>3 sucursales · cajas sin límite</li>
             <li>Todo lo de Negocio</li>
             <li>Un reporte que suma todas</li>
             <li>Facturación incluida · 40 folios al mes</li>
@@ -288,7 +288,7 @@
             </tr>
             <tr>
               <th scope="row">Folios de factura al mes</th>
-              <td>10, con el extra</td>
+              <td>10, con el extra de facturación</td>
               <td class="col-vim">20</td>
               <td>40</td>
             </tr>
@@ -305,8 +305,14 @@
               <td>3 horas con tu equipo</td>
             </tr>
             <tr>
+              <th scope="row">Soporte</th>
+              <td>WhatsApp y correo</td>
+              <td class="col-vim">WhatsApp y correo</td>
+              <td>WhatsApp y correo</td>
+            </tr>
+            <tr>
               <th scope="row">El día del arranque</th>
-              <td>Soporte por chat</td>
+              <td>Te ayudamos por WhatsApp</td>
               <td class="col-vim">Te acompañamos en línea</td>
               <td>Vamos a tu local</td>
             </tr>
@@ -319,8 +325,10 @@
             <div class="monitor-barra" aria-hidden="true">
               <span class="monitor-punto"></span><span class="monitor-punto"></span><span class="monitor-punto"></span>
             </div>
-            <img src="assets/img/capturas/admin-dashboard.webp?v=2" alt="Panel del dueño con las ventas del día y el estado de las cajas."
-                 width="1600" height="1000" fetchpriority="high" decoding="async">
+            <picture>
+              <source media="(max-width: 619px)" srcset="assets/img/capturas/admin-dashboard-movil.webp?v=3" width="780" height="1688">
+              <img src="assets/img/capturas/admin-dashboard.webp?v=3" alt="Panel del dueño con las ventas del día y el estado de las cajas." width="1600" height="1000" fetchpriority="high" decoding="async">
+            </picture>
           </div>
           <figcaption>El panel, incluido en los tres planes: cómo va el día, cuánto lleva cada caja y qué se está vendiendo, desde el celular o desde la computadora.</figcaption>
         </figure>
@@ -338,12 +346,14 @@
         <p class="eyebrow">Sin costo aparte</p>
         <h2>Lo que otros cobran como «implementación»</h2>
         <p>
-          Va incluido en los tres planes. No hay pago inicial ni factura sorpresa el primer mes.
+          No hay pago inicial ni factura sorpresa el primer mes en ningún plan. Lo que cambia es
+          quién hace el trabajo: en Esencial lo haces tú con nuestra guía; desde Negocio, nosotros.
         </p>
       </div>
 
       <div class="tres">
         <div class="tarjeta pila pila-3">
+          <p class="eyebrow">Los tres planes</p>
           <h3>Poner el sistema a andar</h3>
           <p>
             Instalación en tu caja, conexión de las impresoras y de la pantalla de cocina, y dejar
@@ -351,13 +361,15 @@
           </p>
         </div>
         <div class="tarjeta pila pila-3">
+          <p class="eyebrow">Desde Negocio</p>
           <h3>Tu menú, cargado</h3>
           <p>
             Con precios, categorías, extras y términos. Si vienes de otro sistema, lo traemos de
-            ahí en lugar de teclearlo de nuevo.
+            ahí en lugar de teclearlo de nuevo. En Esencial lo pegas tú con la misma herramienta.
           </p>
         </div>
         <div class="tarjeta pila pila-3">
+          <p class="eyebrow">Los tres planes</p>
           <h3>Tus datos fiscales</h3>
           <p>
             Configurados una vez y bien, para que los tickets y los reportes salgan como el
@@ -365,12 +377,15 @@
           </p>
         </div>
         <div class="tarjeta pila pila-3">
+          <p class="eyebrow">Desde Negocio</p>
           <h3>Capacitación de tu equipo</h3>
           <p>
-            Tres horas con quien va a estar en la caja y en la cocina. No un video y suerte.
+            Tres horas con quien va a estar en la caja y en la cocina. En Esencial, videos y guía
+            escrita, y dudas por WhatsApp.
           </p>
         </div>
         <div class="tarjeta pila pila-3">
+          <p class="eyebrow">Los tres planes</p>
           <h3>Actualizaciones</h3>
           <p>
             Todas, siempre. Llegan solas a tu caja y no hay que agendar a nadie ni pagar la
@@ -378,6 +393,7 @@
           </p>
         </div>
         <div class="tarjeta pila pila-3">
+          <p class="eyebrow">Los tres planes</p>
           <h3>Respaldos</h3>
           <p>
             Copia diaria en tu local y copia fuera de él. Sin que tengas que acordarte.
@@ -396,8 +412,10 @@
             <div class="monitor-barra" aria-hidden="true">
               <span class="monitor-punto"></span><span class="monitor-punto"></span><span class="monitor-punto"></span>
             </div>
-            <img src="assets/img/capturas/admin-inventario.webp?v=2" alt="Inventario con cada insumo, su existencia, su mínimo y el aviso cuando anda bajo."
-                 width="1600" height="1000" loading="lazy" decoding="async">
+            <picture>
+              <source media="(max-width: 619px)" srcset="assets/img/capturas/admin-inventario-movil.webp?v=3" width="780" height="1688">
+              <img src="assets/img/capturas/admin-inventario.webp?v=3" alt="Inventario con cada insumo, su existencia, su mínimo y el aviso cuando anda bajo." width="1600" height="1000" loading="lazy" decoding="async">
+            </picture>
           </div>
           <figcaption>Desde el plan Negocio: cada insumo con su existencia, su mínimo y el aviso cuando anda bajo. Lo que se descuenta sale de la receta de cada platillo, no de un conteo a mano.</figcaption>
         </figure>
@@ -456,8 +474,8 @@
         </p>
         <p>
           <strong>Va incluida en Negocio y en Cadena.</strong> En Esencial se agrega por $349 al
-          mes, más IVA. Los folios que trae cada plan cubren la factura global del periodo; cada
-          factura que pide un cliente usa un folio.
+          mes, más IVA. Cada factura usa un folio —la global del periodo o la que te pide un
+          cliente— y el plan trae 10, 20 o 40 al mes, que se usan antes que los de paquete.
         </p>
         <p>
           Cómo funciona, hasta cuándo puede facturar tu cliente y qué necesitas dar para
@@ -493,8 +511,8 @@
           </table>
         </div>
         <p style="font-size:var(--t-13);color:var(--ink-2)">
-          Precios más IVA. Los folios que trae tu plan son para la factura del periodo — el
-          cumplimiento ante el SAT —, no para facturarle a cada cliente.
+          Precios más IVA. Los folios del mes no se acumulan: los que no uses se reinician el
+          día primero. Los de paquete sí se guardan.
         </p>
       </div>
     </div>
@@ -598,9 +616,9 @@
           </button>
           <div class="acordeon-panel" data-acordeon-panel><div>
             <p>
-              Ése es Esencial. Llevas el mismo sistema completo, incluido cobrar sin internet; la
-              diferencia es que la carga del menú la haces tú siguiendo una guía, en vez de que la
-              hagamos nosotros contigo.
+              Ése es Esencial. Llevas la caja, la cocina, las mesas y los reportes, incluido cobrar
+              sin internet; lo que no trae es el inventario, y la carga del menú la haces tú
+              siguiendo una guía en vez de que la hagamos nosotros contigo.
             </p>
           </div></div>
         </div>
@@ -615,8 +633,9 @@
           </button>
           <div class="acordeon-panel" data-acordeon-panel><div>
             <p>
-              Alrededor de un día: cargar el menú, dejar configurado lo fiscal y las tres horas de
-              capacitación con tu equipo. Se agenda para que caiga en tu día flojo, no en viernes.
+              Alrededor de un día: cargar el menú, dejar configurado lo fiscal y, desde Negocio,
+              las tres horas de capacitación con tu equipo. Se agenda para que caiga en tu día
+              flojo, no en viernes.
             </p>
           </div></div>
         </div>
@@ -693,7 +712,7 @@
   </div>
 </footer>
 
-<script src="assets/js/vim.js?v=14" defer></script>
+<script src="assets/js/vim.js?v=15" defer></script>
 <!-- Medición sin cookies (Vercel Web Analytics). Se sirve desde este dominio y
      solo existe si está encendida en el proyecto de Vercel; si no, es un 404
      inofensivo. Los eventos se mandan desde vim.js. -->
@@ -707,7 +726,7 @@
       "@id": "https://vimpos.com.mx/precios#pagina",
       "url": "https://vimpos.com.mx/precios",
       "name": "Precios de VIM POS",
-      "description": "Tres planes en pesos más IVA, con la implementación y la capacitación incluidas en los tres.",
+      "description": "Tres planes en pesos más IVA, sin pago inicial; desde Negocio con la carga del menú y la capacitación incluidas.",
       "inLanguage": "es-MX",
       "isPartOf": {
         "@id": "https://vimpos.com.mx/#sitio"
@@ -833,7 +852,7 @@
           "name": "¿Cuánto tarda en estar funcionando?",
           "acceptedAnswer": {
             "@type": "Answer",
-            "text": "Alrededor de un día: cargar el menú, dejar configurado lo fiscal y las tres horas de capacitación con tu equipo. Se agenda para que caiga en tu día flojo, no en viernes."
+            "text": "Alrededor de un día: cargar el menú, dejar configurado lo fiscal y, desde Negocio, las tres horas de capacitación con tu equipo. Se agenda para que caiga en tu día flojo, no en viernes."
           }
         }
       ]

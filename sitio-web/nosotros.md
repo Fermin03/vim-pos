@@ -18,7 +18,7 @@ Porque un restaurante mexicano hoy escoge entre un sistema de fuera, caro y en d
 
 VIM POS es el intento de que no haya que escoger: el sistema completo vive en la computadora de tu caja —así que cobra aunque se caiga el internet— y la nube es el respaldo y el panel, no el motor.
 
-![La caja en plena venta: el catálogo por categorías y un ticket en curso con una hamburguesa, papas y refresco.](https://vimpos.com.mx/assets/img/capturas/pos-home.webp?v=2)
+![La caja en plena venta: el catálogo por categorías y un ticket en curso con una hamburguesa, papas y refresco.](https://vimpos.com.mx/assets/img/capturas/pos-home.webp?v=3)
 
 _La caja, tal como la ve quien cobra. Todo lo que hay en este sitio son capturas del sistema funcionando, no dibujos._
 
@@ -27,7 +27,7 @@ _La caja, tal como la ve quien cobra. Todo lo que hay en este sitio son capturas
 Competimos contra marcas con veinticinco años encima, y ahí no se gana con promesas. Somos concretos donde el resto es vago:
 
 - **El precio está publicado.** Los tres planes, los extras y los paquetes de folios están en la [página de precios](https://vimpos.com.mx/precios). No hay «contáctanos para conocer el precio».
-- **La implementación va incluida.** En los tres planes: instalación, carga de tu menú, datos fiscales y capacitación. No es un pago inicial que aparece en la primera factura.
+- **No hay pago inicial.** En ningún plan. Desde Negocio cargamos tu menú, dejamos lo fiscal configurado y capacitamos a tu equipo; en Esencial lo haces tú con nuestra guía.
 - **No vendemos equipo.** Te decimos qué computadora, qué impresora y qué cajón buscar, y los compras donde te salga mejor.
 - **No cobramos comisión por venta.** El cobro con tarjeta se hace en tu terminal bancaria de siempre; el dinero no pasa por nosotros.
 - **Los límites están escritos.** No hay app de mesero en tableta, no hay terminal bancaria integrada y la liquidación de las apps de reparto se pega a mano. Está en la [página de funciones](https://vimpos.com.mx/funciones), no en una nota al pie.

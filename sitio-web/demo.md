@@ -6,6 +6,10 @@
 
 Media hora, sin compromiso y sin presentación. Vemos tu carta, montamos un par de productos tuyos y te dejamos cobrar una venta de prueba en el sistema de verdad. Después preguntas lo que quieras y te decimos qué plan te toca.
 
+- Te escribimos por WhatsApp el mismo día hábil
+- Media hora, con tus productos y tus precios
+- No te va a llamar un vendedor
+
 ## Qué pasa después de enviar
 
 1. ### Te escribimos por WhatsApp
@@ -21,7 +25,7 @@ Media hora, sin compromiso y sin presentación. Vemos tu carta, montamos un par 
 
    Con el precio de la página, sin cotización inflada. Si no te sirve, te lo decimos y no insistimos.
 
-![La caja en plena venta: el catálogo por categorías y un ticket en curso con una hamburguesa, papas y refresco.](https://vimpos.com.mx/assets/img/capturas/pos-home.webp?v=2)
+![La caja en plena venta: el catálogo por categorías y un ticket en curso con una hamburguesa, papas y refresco.](https://vimpos.com.mx/assets/img/capturas/pos-home.webp?v=3)
 
 _Esto es lo que vas a ver en la demostración, con tus productos y tus precios cargados._
 
