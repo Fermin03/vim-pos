@@ -36,7 +36,7 @@
 <link rel="manifest" href="site.webmanifest">
 <meta name="theme-color" content="#0078C9">
 
-<link rel="stylesheet" href="assets/css/vim.css?v=17">
+<link rel="stylesheet" href="assets/css/vim.css?v=18">
 <!-- Consentimiento de cookies. Va ANTES que gtm.js y el orden NO es
      cosmético: los dos llevan `defer`, que respeta el orden del documento, y
      Consent Mode descarta un estado por defecto que llegue después de que el
@@ -200,6 +200,25 @@
         ¿Más de tres sucursales? Es el mismo plan Cadena con sucursales de más; escríbenos y te
         decimos el número exacto.
       </p>
+
+      <!-- La convocatoria del piloto (abierta el 10-sep-2026). Los términos son los que fijó
+           Fermín y los mismos de las stories: SOLO Esencial, mes 1 sin costo, meses 2 a 7 a $499
+           y del mes 8 el precio de lista. Se dice todo aquí mismo —incluido cuándo vuelve el
+           precio— porque una oferta con la letra chica en otra página contradice el titular del
+           sitio. Si cambian los números, cambian también las stories. -->
+      <div class="oferta-piloto">
+        <div class="pila pila-3">
+          <p class="eyebrow" style="color:var(--accent-hover)">Piloto · 5 negocios</p>
+          <h2 class="oferta-titulo">El primer mes sin costo, y $499 al mes hasta el séptimo</h2>
+          <p>
+            Buscamos cinco negocios de comida rápida, cafetería o servicio en mostrador para
+            arrancar con nosotros en el plan Esencial. El mes 1 no pagas; del 2 al 7 pagas $499 en
+            lugar de $699, y del mes 8 en adelante, el precio de lista. Todo más IVA, sin contrato
+            forzoso. Te ahorras $1,899 el primer año.
+          </p>
+        </div>
+        <a class="btn btn-primario" href="/demo?utm_source=sitio&amp;utm_campaign=piloto">Quiero un lugar</a>
+      </div>
     </div>
   </section>
 
@@ -291,6 +310,12 @@
               <td>10, con el extra de facturación</td>
               <td class="col-vim">20</td>
               <td>40</td>
+            </tr>
+            <tr>
+              <th scope="row">Pedidos de Uber Eats en la caja</th>
+              <td>$100 al mes aparte</td>
+              <td class="col-vim"><span class="marca marca-si">Incluido</span></td>
+              <td><span class="marca marca-si">Incluido</span></td>
             </tr>
             <tr>
               <th scope="row">Quién carga tu menú</th>
@@ -433,7 +458,8 @@
         </p>
       </div>
 
-      <div class="tres">
+      <!-- Cuatro extras en rejilla de dos: en la de tres, el cuarto quedaba solo en su renglón. -->
+      <div class="dos">
         <div class="tarjeta pila pila-3">
           <h3>Sucursal adicional</h3>
           <div class="plan-precio">$599</div>
@@ -451,6 +477,18 @@
             Al mes, más IVA, y <strong>solo si estás en Esencial</strong>: en Negocio y en Cadena
             ya va incluida. Se enciende desde el panel con tu Constancia y tu sello digital, y ese
             mismo día tus tickets salen con su código para facturar.
+          </p>
+        </div>
+        <!-- El add-on DELIVERY del catálogo (mig. 0113): $100 en Esencial, incluido desde
+             Negocio. Solo Uber Eats: DiDi y Rappi no se anuncian hasta estar conectados. Y no
+             se promete quitar la tableta de Uber (contrato con Uber, docs/integraciones). -->
+        <div class="tarjeta pila pila-3">
+          <h3>Pedidos de Uber Eats</h3>
+          <div class="plan-precio">$100</div>
+          <p>
+            Al mes, más IVA, y <strong>solo si estás en Esencial</strong>: en Negocio y en Cadena
+            ya va incluido. Cada pedido de Uber Eats entra a tu caja como un ticket y su comanda
+            sale a cocina, sin volver a teclearlo.
           </p>
         </div>
       </div>
