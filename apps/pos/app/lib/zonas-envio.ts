@@ -75,14 +75,24 @@ export async function crearZona(
   return mapZona(data as Record<string, unknown>);
 }
 
-/** Repreciar una zona existente. El PIN lo pide la pantalla ANTES de llamar aquí. */
-export async function cambiarCostoZona(token: string, zonaId: string, costoMxn: number): Promise<void> {
+/**
+ * Repreciar una zona existente. El PIN lo pide la pantalla ANTES de llamar aquí, y la BD lo
+ * CONSUME (`cambiar_costo_zona`, 0139): antes esto era un `update` directo que cualquier empleado
+ * podía hacer sin PIN, así que el PIN no protegía nada.
+ */
+export async function cambiarCostoZona(
+  token: string,
+  zonaId: string,
+  costoMxn: number,
+  autorizacionPinId: string | null,
+): Promise<void> {
   const invalido = validarCostoZona(costoMxn);
   if (invalido) throw new Error(invalido);
-  const { error } = await employeeClient(token)
-    .from("zonas_envio")
-    .update({ costo_mxn: costoMxn })
-    .eq("id", zonaId);
+  const { error } = await employeeClient(token).rpc("cambiar_costo_zona", {
+    p_zona_id: zonaId,
+    p_costo_mxn: costoMxn,
+    p_autorizacion_pin_id: autorizacionPinId,
+  });
   if (error) throw new Error(error.message);
 }
 

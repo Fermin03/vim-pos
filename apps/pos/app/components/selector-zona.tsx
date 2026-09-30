@@ -80,11 +80,11 @@ export function SelectorZona({
 
   /** La autorización misma dispara la escritura (como `ejecutarConAutorizacion` en modal-descuento),
    *  nunca un clic posterior: lo que el supervisor autorizó es exactamente lo que se guarda. */
-  async function aplicarNuevoCosto(_a: Autorizacion) {
+  async function aplicarNuevoCosto(a: Autorizacion) {
     if (!repreciando) return;
     const costo = Number(repreciando.costo || 0);
     try {
-      await cambiarCostoZona(token, repreciando.zona.id, costo);
+      await cambiarCostoZona(token, repreciando.zona.id, costo, a.autorizacionPinId);
       const actualizada: ZonaEnvio = { ...repreciando.zona, costoMxn: costo };
       // Mismo callback que el alta: para el modal dueño, "una zona cambió" se resuelve igual
       // creándola o repreciándola (upsert por id).
