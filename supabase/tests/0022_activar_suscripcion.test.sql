@@ -15,11 +15,11 @@ insert into suscripciones (tenant_id, plan_id, fecha_inicio, estado, precio_mens
   values (:'tenant', (select plan_actual_id from tenants where id = :'tenant'), '2026-08-01', 'ACTIVA', 500, 'MENSUAL', '2026-09-01');
 
 -- 1) Solo service_role puede llamarla.
-select ok(not has_function_privilege('authenticated', 'activar_suscripcion(uuid, numeric, text, date, date)', 'execute'),
+select ok(not has_function_privilege('authenticated', 'activar_suscripcion(uuid, numeric, text, date, date, numeric, date, text)', 'execute'),
   'authenticated no puede activar cobros');
-select ok(not has_function_privilege('anon', 'activar_suscripcion(uuid, numeric, text, date, date)', 'execute'),
+select ok(not has_function_privilege('anon', 'activar_suscripcion(uuid, numeric, text, date, date, numeric, date, text)', 'execute'),
   'anon no puede activar cobros');
-select ok(has_function_privilege('service_role', 'activar_suscripcion(uuid, numeric, text, date, date)', 'execute'),
+select ok(has_function_privilege('service_role', 'activar_suscripcion(uuid, numeric, text, date, date, numeric, date, text)', 'execute'),
   'service_role (el panel) sí');
 
 -- 2) Precio inválido: se rechaza ANTES de tocar nada, y la suscripción vigente sigue ACTIVA.
