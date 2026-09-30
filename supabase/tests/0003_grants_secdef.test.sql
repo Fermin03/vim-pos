@@ -29,6 +29,7 @@ insert into _secdef_solo_service (fn, motivo) values
   ('resetear_pin_empleado',      'cambia el pin_hash de cualquier usuario, sin chequeo de tenant en el GRANT'),
   ('crear_perfil_con_pin',       'crea perfil con PIN elegido por el llamante'),
   ('crear_tenant_con_owner',     'da de alta tenants y su dueño'),
+  ('alta_autoservicio',          'da de alta tenants del registro público y sella los términos (0142)'),
   ('verificar_pin_login',        'permite fuerza bruta de PIN y bloqueo (DoS) de empleados'),
   ('verificar_autorizacion_pin', 'permite fuerza bruta del PIN de un supervisor'),
   ('sync_pull_snapshot',         'devuelve el snapshot del tenant, incluidos pin_hash y auth.users'),

@@ -7484,6 +7484,10 @@ export type Database = {
           fecha_invitacion: string
           notas_internas: string | null
           recordatorios_enviados: number
+          ciudad_registro: string | null
+          terminos_aceptados_at: string | null
+          terminos_aceptados_por: string | null
+          terminos_version: string | null
           tenant_id: string
           ultimo_recordatorio: string | null
           updated_at: string
@@ -7496,6 +7500,10 @@ export type Database = {
           fecha_invitacion?: string
           notas_internas?: string | null
           recordatorios_enviados?: number
+          ciudad_registro?: string | null
+          terminos_aceptados_at?: string | null
+          terminos_aceptados_por?: string | null
+          terminos_version?: string | null
           tenant_id: string
           ultimo_recordatorio?: string | null
           updated_at?: string
@@ -7508,6 +7516,10 @@ export type Database = {
           fecha_invitacion?: string
           notas_internas?: string | null
           recordatorios_enviados?: number
+          ciudad_registro?: string | null
+          terminos_aceptados_at?: string | null
+          terminos_aceptados_por?: string | null
+          terminos_version?: string | null
           tenant_id?: string
           ultimo_recordatorio?: string | null
           updated_at?: string
@@ -10143,6 +10155,25 @@ export type Database = {
       precio_vigente_suscripcion: {
         Args: { p_fecha?: string; p_precio_lista: number; p_precio_promo: number; p_promo_hasta: string }
         Returns: number
+      }
+      // 0142 (a mano).
+      soporte_plataforma: {
+        Args: Record<PropertyKey, never>
+        Returns: { correo: string | null; horario: string | null; whatsapp: string }[]
+      }
+      alta_autoservicio: {
+        Args: {
+          p_ciudad: string
+          p_codigo: string
+          p_nombre_comercial: string
+          p_nombre_owner: string
+          p_owner_user_id: string
+          p_plan_codigo: string
+          p_telefono_owner: string
+          p_terminos_version: string
+          p_vertical: Database["public"]["Enums"]["vertical_tipo"]
+        }
+        Returns: string
       }
       abrir_cuenta: {
         Args: {
