@@ -51,17 +51,41 @@ export async function leerMatriz(): Promise<MatrizPermisos> {
   };
 }
 
+// Desde la migración 0132 la base decide quién toca qué: DUEÑO/ADMIN del negocio, nunca el rol
+// Dueño, el rol Administrador solo lo ajusta un Dueño y nadie edita sus propios permisos
+// personalizados. Un INSERT rechazado llega como 42501 ("row-level security"), pero un DELETE
+// rechazado NO da error: el RLS simplemente no ve la fila y borra cero. Por eso los borrados piden
+// las filas de vuelta y cuentan, en vez de dar por hecho que se borraron.
+export const MSG_SIN_PERMISO_ROL =
+  "No tienes permiso para cambiar este rol. El rol Administrador solo lo ajusta el dueño.";
+export const MSG_SIN_PERMISO_USUARIO =
+  "No tienes permiso para cambiar los permisos de este usuario (los tuyos o los del dueño los cambia el dueño).";
+
+type ErrorPg = { code?: string; message: string };
+
+export function esRechazoDePermisos(error: ErrorPg): boolean {
+  return error.code === "42501" || /row-level security|permission denied/i.test(error.message);
+}
+
 /** D71 — quita un permiso a un rol del sistema en ESTE tenant (solo restrictivo). */
 export async function quitarPermiso(rolId: string, permisoId: string): Promise<void> {
   const tid = await tenantId();
   const { error } = await supabase.from("rol_permiso_overrides").insert({ tenant_id: tid, rol_id: rolId, permiso_id: permisoId });
+  if (error && esRechazoDePermisos(error)) throw new Error(MSG_SIN_PERMISO_ROL);
   if (error && !/duplicate|unique/i.test(error.message)) throw new Error(error.message);
 }
 
 /** Restaura el permiso del sistema (borra el override). */
 export async function restaurarPermiso(rolId: string, permisoId: string): Promise<void> {
-  const { error } = await supabase.from("rol_permiso_overrides").delete().eq("rol_id", rolId).eq("permiso_id", permisoId);
-  if (error) throw new Error(error.message);
+  const { data, error } = await supabase
+    .from("rol_permiso_overrides")
+    .delete()
+    .eq("rol_id", rolId)
+    .eq("permiso_id", permisoId)
+    .select("id");
+  if (error) throw new Error(esRechazoDePermisos(error) ? MSG_SIN_PERMISO_ROL : error.message);
+  // La pantalla solo ofrece "restaurar" cuando el override existe: cero filas = el RLS lo impidió.
+  if ((data ?? []).length === 0) throw new Error(MSG_SIN_PERMISO_ROL);
 }
 
 // ── D72: permisos del rol PERSONALIZADO por usuario ──────────────────────────
@@ -107,13 +131,19 @@ export async function asignarPermisosUsuario(usuarioId: string, permisoIds: stri
   const quitar = actuales.filter((p) => !permisoIds.includes(p));
   const poner = permisoIds.filter((p) => !actuales.includes(p));
   if (quitar.length > 0) {
-    const { error } = await supabase.from("permisos_personalizados").delete().eq("usuario_id", usuarioId).in("permiso_id", quitar);
-    if (error) throw new Error(error.message);
+    const { data, error } = await supabase
+      .from("permisos_personalizados")
+      .delete()
+      .eq("usuario_id", usuarioId)
+      .in("permiso_id", quitar)
+      .select("id");
+    if (error) throw new Error(esRechazoDePermisos(error) ? MSG_SIN_PERMISO_USUARIO : error.message);
+    if ((data ?? []).length < quitar.length) throw new Error(MSG_SIN_PERMISO_USUARIO);
   }
   if (poner.length > 0) {
     const { error } = await supabase.from("permisos_personalizados").insert(
       poner.map((p) => ({ tenant_id: tid, usuario_id: usuarioId, permiso_id: p })),
     );
-    if (error) throw new Error(error.message);
+    if (error) throw new Error(esRechazoDePermisos(error) ? MSG_SIN_PERMISO_USUARIO : error.message);
   }
 }
