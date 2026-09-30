@@ -66,6 +66,18 @@ combo?" que la caja le hace al cliente cuando el cajero agrega suelto un product
 de un combo. Vive aquí, no en Configuración, porque solo afecta a los combos — mismo criterio que
 el switch de descuento de inventario, que vive en Inventario y no en Configuración.
 
+## Plan y pagos
+
+El dueño ve lo que paga HOY y hasta cuándo ("$499 al mes hasta el 31 mar 2027, después $699"),
+nunca solo el precio de lista (0141, ADR 0021). La prueba gratis es un `Aviso` que no se cierra
+ni bloquea: `info` mientras corre, `warning` al vencer — la caja sigue vendiendo, así que no es
+rojo. Sale también arriba del dashboard, con enlace a Plan y pagos.
+
+"Cómo pagar" enseña los datos que VIM captura en su panel (banco, titular, CLABE en grupos de
+cuatro, correo) con botón de copiar, y un botón de WhatsApp con el mensaje del comprobante ya
+escrito — la única acción azul de la pantalla. Sin datos capturados, un texto neutro que manda a
+escribirle a VIM: **nunca datos de ejemplo**, porque un dato de pago falso manda dinero a otro lado.
+
 ## Lo que NO se hereda del POS
 
 - Los objetivos de 44–56px. Con mouse, 36–40px es lo correcto; 44 se ve infantil.

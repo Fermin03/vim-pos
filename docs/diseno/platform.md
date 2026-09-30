@@ -63,6 +63,16 @@ nombre comercial escrito, días de gracia cuando aplica y una casilla "entiendo"
 bloqueo con gracia (`tenants.bloqueo_desde`, a las 06:00 de México); la caja lo obedece desde la
 entrega 2.
 
+**Cobro, plan y prueba (0141, ADR 0021).** Activar el cobro pide precio de lista, ciclo y una
+promoción opcional; en Esencial hay un botón "Piloto 5 negocios" ($499 seis meses) y siempre
+"Otra…". Donde se enseña un precio se dice entero: "$499 hasta 31 mar 2027, después $699".
+Cambiar de plan enseña ANTES de confirmar lo que cambia —folios del mes, add-ons que gana o
+pierde (lo que pierde, en `danger`) y el cobro antes → después—, porque la base mueve todo eso
+en la misma transacción. La prueba gratis sale en Contrato con su fecha y "Extender prueba…"
+(motivo, a la bitácora); vencida va en `warning`, no en rojo: no corta nada. **Datos de pago**
+es la única pantalla que escribe algo que ven TODOS los clientes, así que se confirma
+escribiendo `TODOS`, como un aviso importante a todos.
+
 ## Los datos son de otro
 
 Cada pantalla deja claro **de qué tenant** estás viendo datos, siempre, incluso en las tablas.
