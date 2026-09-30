@@ -2,7 +2,8 @@
 import { useCallback, useEffect, useState } from "react";
 import { Aviso, Modal, StatusChip, type TonoEstado } from "@vim/ui/styles";
 import { fechaLegible, hoyMx } from "@vim/fecha";
-import { ETIQUETA_METODO_COBRO, estadoCobro, textoEstadoCobro, type EstadoCobro, type MetodoCobro } from "@vim/db/cobro";
+import { ETIQUETA_METODO_COBRO, estadoCobro, textoEstadoCobro, type EstadoCobro, type MetodoCobro, type PrecioSuscripcion } from "@vim/db/cobro";
+import { montoPeriodos } from "../lib/promocion";
 import type { Api } from "../lib/tipos";
 import { fmtMxn, input, label } from "../lib/formato";
 import { DialogoConfirmar } from "./dialogo-confirmar";
@@ -20,7 +21,7 @@ type Pago = {
   anulado_motivo: string | null;
 };
 
-type Suscripcion = { estado: string; precio_mensual_mxn: number; proxima_fecha_cobro: string | null; ciclo_facturacion?: string };
+type Suscripcion = PrecioSuscripcion & { estado: string; proxima_fecha_cobro: string | null; ciclo_facturacion?: string };
 
 export const TONO_COBRO: Record<EstadoCobro["tipo"], TonoEstado> = {
   SIN_COBRO: "neutral", AL_CORRIENTE: "success", POR_VENCER: "warning", HOY: "warning", VENCIDO: "danger",
@@ -134,10 +135,12 @@ function RegistrarPago({ api, tenantId, suscripcion, onCerrar, onListo }: {
   api: Api; tenantId: string; suscripcion: Suscripcion; onCerrar: () => void; onListo: () => Promise<void>;
 }) {
   const anual = suscripcion.ciclo_facturacion === "ANUAL";
-  // El precio de la suscripción es mensual aun en el ciclo anual; un periodo anual son doce.
-  const precioPeriodo = Number(suscripcion.precio_mensual_mxn) * (anual ? 12 : 1);
+  // Lo acordado por N periodos, cada uno al precio vigente en su fecha de cobro (con la promoción
+  // mientras dure, 0141). El precio es mensual aun en el ciclo anual; un periodo anual son doce.
+  const desde = (suscripcion.proxima_fecha_cobro ?? hoyMx()).slice(0, 10);
+  const acordado = (n: number) => montoPeriodos(suscripcion, desde, n, anual);
   const [periodos, setPeriodos] = useState(1);
-  const [monto, setMonto] = useState(String(precioPeriodo));
+  const [monto, setMonto] = useState(String(acordado(1)));
   const [metodo, setMetodo] = useState<MetodoCobro>("TRANSFERENCIA");
   const [fecha, setFecha] = useState(hoyMx());
   const [referencia, setReferencia] = useState("");
@@ -147,7 +150,7 @@ function RegistrarPago({ api, tenantId, suscripcion, onCerrar, onListo }: {
 
   function cambiarPeriodos(n: number) {
     setPeriodos(n);
-    setMonto(String(Math.round(precioPeriodo * n * 100) / 100));
+    setMonto(String(acordado(n)));
   }
 
   async function guardar() {
@@ -200,9 +203,9 @@ function RegistrarPago({ api, tenantId, suscripcion, onCerrar, onListo }: {
       <input id="pg-ref" className={input} value={referencia} maxLength={120} onChange={(e) => setReferencia(e.target.value)} placeholder="Clave de rastreo SPEI, folio del depósito…" />
       <label className={`${label} mt-3`} htmlFor="pg-notas">Notas (opcional)</label>
       <input id="pg-notas" className={input} value={notas} maxLength={500} onChange={(e) => setNotas(e.target.value)} />
-      {Number(monto) > 0 && Math.abs(Number(monto) - precioPeriodo * periodos) >= 0.01 && (
+      {Number(monto) > 0 && Math.abs(Number(monto) - acordado(periodos)) >= 0.01 && (
         <Aviso tono="info" className="mt-3">
-          El precio acordado es {fmtMxn(precioPeriodo * periodos)}. Se registra lo que escribiste; la fecha de cobro avanza igual.
+          El precio acordado es {fmtMxn(acordado(periodos))}. Se registra lo que escribiste; la fecha de cobro avanza igual.
         </Aviso>
       )}
       {error && <Aviso tono="danger" role="alert" className="mt-3">{error}</Aviso>}

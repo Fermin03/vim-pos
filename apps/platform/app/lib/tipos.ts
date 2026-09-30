@@ -129,11 +129,17 @@ export type Metricas = {
 export type AddonCatalogo = { id: string; codigo: string; nombre: string; descripcion: string | null; precio_mensual_mxn: number };
 export type AddonContratado = {
   id: string; activo: boolean; fecha_inicio: string; fecha_fin: string | null; precio_mensual_mxn: number;
+  /** Lo dio el plan a $0 (0141): bajar de plan lo retira. */
+  incluido_en_plan?: boolean;
   addon: { id: string; codigo: string; nombre: string; precio_mensual_mxn: number } | null;
 };
 export type Paquete = { id: string; codigo: string; nombre: string; cantidad_folios: number; precio_mxn: number };
 /** `vertical` es null en los planes por tamaño (0086) y solo trae valor en los heredados. */
-export type Plan = { id: string; codigo: string; nombre: string; vertical: string | null; precio_mensual_mxn: number };
+export type Plan = {
+  id: string; codigo: string; nombre: string; vertical: string | null; precio_mensual_mxn: number;
+  /** Base mensual de folios CFDI y lo que el plan incluye (`cfdi_incluido`, `delivery_incluido`, 0141). */
+  timbres_cfdi_mensuales?: number | null; features_incluidos?: Record<string, unknown> | null;
+};
 
 export type Modulos = {
   permitidos: Record<string, boolean>;

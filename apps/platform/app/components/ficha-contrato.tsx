@@ -1,7 +1,11 @@
 "use client";
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { fechaLegible } from "@vim/fecha";
+import { fechaLegible, hoyMx, sumarDias, sumarMeses } from "@vim/fecha";
+import { estadoPrueba, textoPrecio, type PrecioSuscripcion } from "@vim/db/cobro";
 import type { AddonCatalogo, Detalle, Plan } from "../lib/tipos";
+import { PILOTO, promocionPiloto } from "../lib/promocion";
+import { vistaPreviaCambioPlan, type AddonDelTenant } from "../lib/cambio-plan";
+import { precioValido } from "../lib/precio";
 import { fmtMxn, input, label, NOMBRE_SUSCRIPCION, nombreFase } from "../lib/formato";
 import { DialogoConfirmar } from "./dialogo-confirmar";
 
@@ -28,7 +32,15 @@ type Pendiente =
   | { tipo: "suscripcion"; estado: "ACTIVA" | "PAUSADA" | "NUEVA" }
   | { tipo: "abandonado" | "reactivar" }
   | { tipo: "cancelar_suscripcion" }
+  | { tipo: "prueba" }
   | null;
+
+type ModoPromo = "ninguna" | "piloto" | "otra";
+
+/** Suscripción tal como llega en la ficha (con la promoción de 0141). */
+type SuscripcionFicha = PrecioSuscripcion & { estado: string; proxima_fecha_cobro: string | null; ciclo_facturacion?: string };
+
+const fmtPrecio = { fecha: fechaLegible, mxn: fmtMxn };
 
 /** Antes → después, en dos columnas. */
 function Cambio({ antes, despues }: { antes: ReactNode; despues: ReactNode }) {
@@ -55,6 +67,16 @@ export function FichaContrato({ d, planes, accion, busy }: { d: Detalle; planes:
   const nombre = String(t.nombre_comercial);
   const [pendiente, setPendiente] = useState<Pendiente>(null);
   const [planNuevo, setPlanNuevo] = useState("");
+  const [precioPlan, setPrecioPlan] = useState("");
+  // Activar el cobro (0141): precio pactado, ciclo y promoción opcional.
+  const [precioAct, setPrecioAct] = useState("");
+  const [ciclo, setCiclo] = useState<"MENSUAL" | "ANUAL">("MENSUAL");
+  const [modoPromo, setModoPromo] = useState<ModoPromo>("ninguna");
+  const [promoPrecio, setPromoPrecio] = useState("");
+  const [promoHasta, setPromoHasta] = useState("");
+  const [promoNombre, setPromoNombre] = useState("");
+  const [pruebaNueva, setPruebaNueva] = useState("");
+  const hoy = hoyMx();
 
   // Notas: el refresco automático (cada 60 s) traía la versión del servidor y pisaba lo que se
   // estaba escribiendo. Solo se reponen si no hay cambios sin guardar.
@@ -68,12 +90,44 @@ export function FichaContrato({ d, planes, accion, busy }: { d: Detalle; planes:
   }, [notasServidor]);
 
   // La lista trae los planes vigentes MÁS el que tenga este cliente aunque esté retirado.
-  const actual = t.plan as { id?: string; codigo?: string; nombre?: string; precio_mensual_mxn?: number } | null;
+  const actual = t.plan as { id?: string; codigo?: string; nombre?: string; precio_mensual_mxn?: number; timbres_cfdi_mensuales?: number | null; features_incluidos?: Record<string, unknown> | null } | null;
   const retirado = actual?.id && !planes.some((p) => p.id === actual.id) ? actual : null;
   const elegido = planes.find((p) => p.id === planNuevo) ?? null;
 
-  const subs = (t.suscripcion as { estado: string; precio_mensual_mxn: number; proxima_fecha_cobro: string | null; ciclo_facturacion?: string }[]) ?? [];
+  const subs = (t.suscripcion as SuscripcionFicha[]) ?? [];
   const suscripcion = subs.find((s) => s.estado === "ACTIVA" || s.estado === "PAUSADA") ?? null;
+
+  const prueba = estadoPrueba(String(t.estado), (t.prueba_hasta as string | null | undefined) ?? null, hoy);
+
+  // Vista previa del cambio de plan: espejo de lo que hará cambiar_plan_tenant (0141).
+  const addonsTenant: AddonDelTenant[] = d.addons.map((x) => ({
+    codigo: x.addon?.codigo ?? "", activo: x.activo, precio: Number(x.precio_mensual_mxn), incluidoEnPlan: Boolean(x.incluido_en_plan),
+  }));
+  const precioPlanNum = precioPlan.trim() === "" ? null : precioValido(precioPlan);
+  const vista = elegido
+    ? vistaPreviaCambioPlan({ nuevo: elegido, addons: addonsTenant, foliosAntes: d.foliosBase?.mensuales ?? null, suscripcion, precio: precioPlanNum })
+    : null;
+  const nombreAddon = (c: string) => d.catalogoAddons.find((a) => a.codigo === c)?.nombre ?? c;
+
+  // Activar: precio de lista del plan por omisión; el piloto solo se ofrece en Esencial.
+  const listaPlan = Number(actual?.precio_mensual_mxn ?? 0);
+  const precioActNum = precioAct.trim() === "" ? listaPlan : precioValido(precioAct);
+  const esEsencial = actual?.codigo === PILOTO.plan;
+  const promo =
+    modoPromo === "piloto" ? promocionPiloto(hoy)
+      : modoPromo === "otra" ? { precio: precioValido(promoPrecio), hasta: promoHasta, nombre: promoNombre.trim() || null }
+        : null;
+  const faltaActivar =
+    precioActNum === null ? "un precio válido"
+      : promo && (promo.precio === null || !/^\d{4}-\d{2}-\d{2}$/.test(promo.hasta)) ? "el precio y la fecha de fin de la promoción"
+        : promo && promo.precio !== null && promo.precio >= precioActNum ? "una promoción menor que el precio de lista"
+          : promo && promo.hasta <= hoy ? "una fecha de fin de promoción posterior a hoy"
+            : null;
+  const abrirActivar = () => {
+    setPrecioAct(String(listaPlan)); setCiclo("MENSUAL"); setModoPromo("ninguna");
+    setPromoPrecio(""); setPromoHasta(sumarDias(sumarMeses(hoy, 3), -1)); setPromoNombre("");
+    setPendiente({ tipo: "suscripcion", estado: "NUEVA" });
+  };
 
   const ob = t.onboarding as { fase?: string } | null;
   const fase = ob?.fase ?? "—";
@@ -114,12 +168,13 @@ export function FichaContrato({ d, planes, accion, busy }: { d: Detalle; planes:
           </div>
           {suscripcion && (
             <div className="mb-2 text-13 text-ink-2">
-              {fmtMxn(suscripcion.precio_mensual_mxn)}/mes{suscripcion.proxima_fecha_cobro ? ` · próximo cobro el ${fechaLegible(suscripcion.proxima_fecha_cobro)}` : ""}
+              {textoPrecio(suscripcion, hoy, fmtPrecio)}/mes{suscripcion.promocion_nombre && suscripcion.promocion_hasta && suscripcion.promocion_hasta >= hoy ? ` (${suscripcion.promocion_nombre})` : ""}
+              {suscripcion.proxima_fecha_cobro ? ` · próximo cobro el ${fechaLegible(suscripcion.proxima_fecha_cobro)}` : ""}
             </div>
           )}
           <div className="flex flex-wrap gap-2">
             {(!suscripcion || suscripcion.estado === "PAUSADA") && (
-              <button onClick={() => setPendiente({ tipo: "suscripcion", estado: suscripcion ? "ACTIVA" : "NUEVA" })} disabled={busy} className="btn h-9 rounded bg-ink px-3 text-13 font-semibold text-white disabled:opacity-50">
+              <button onClick={() => (suscripcion ? setPendiente({ tipo: "suscripcion", estado: "ACTIVA" }) : abrirActivar())} disabled={busy} className="btn h-9 rounded bg-ink px-3 text-13 font-semibold text-white disabled:opacity-50">
                 {suscripcion ? "Reanudar cobro…" : "Activar cobro…"}
               </button>
             )}
@@ -134,6 +189,24 @@ export function FichaContrato({ d, planes, accion, busy }: { d: Detalle; planes:
             </button>
           )}
         </div>
+
+        {/* Prueba gratis (0141): no bloquea nada, solo avisa; extenderla queda en la bitácora. */}
+        {prueba.tipo !== "NO_APLICA" && (
+          <div className={`${bloque} mt-4`}>
+            <div className={sub}>
+              <span className={subTitulo}>Prueba gratis</span>
+              <span className={`rounded-full px-2 py-0.5 text-12 font-semibold ${prueba.tipo === "VENCIDA" ? "bg-warning-soft text-warning" : "bg-sel text-ink-2"}`}>
+                {prueba.tipo === "VENCIDA" ? `Vencida hace ${prueba.dias} ${prueba.dias === 1 ? "día" : "días"}` : prueba.dias === 0 ? "Último día" : `Faltan ${prueba.dias} ${prueba.dias === 1 ? "día" : "días"}`}
+              </span>
+            </div>
+            <div className="mb-2 text-13 text-ink-2">
+              {prueba.tipo === "VENCIDA" ? "Terminó" : "Termina"} el {fechaLegible(prueba.hasta)}. La caja sigue vendiendo: para cortarla se suspende con gracia.
+            </div>
+            <button onClick={() => { setPruebaNueva(sumarDias(prueba.hasta < hoy ? hoy : prueba.hasta, 15)); setPendiente({ tipo: "prueba" }); }} disabled={busy} className={btnFantasma}>
+              Extender prueba…
+            </button>
+          </div>
+        )}
       </div>
 
       <div>
@@ -208,22 +281,49 @@ export function FichaContrato({ d, planes, accion, busy }: { d: Detalle; planes:
         abierto={pendiente?.tipo === "plan"}
         onCerrar={cerrar}
         titulo="Cambiar plan"
-        descripcion={<>Cambia lo que paga <b>{nombre}</b> y lo que puede usar. Si tiene cobro activo, el precio de la suscripción no cambia solo: ajústalo aparte.</>}
+        descripcion={<>Cambia lo que paga <b>{nombre}</b> y lo que puede usar. Los folios del mes, los add-ons que incluye el plan y el precio del cobro cambian junto con él.</>}
         detalle={
           <div className="flex flex-col gap-2">
             <label className={label} htmlFor="plan-nuevo">Plan nuevo</label>
-            <select id="plan-nuevo" className={input} value={planNuevo} onChange={(e) => setPlanNuevo(e.target.value)}>
+            <select id="plan-nuevo" className={input} value={planNuevo} onChange={(e) => { setPlanNuevo(e.target.value); setPrecioPlan(""); }}>
               <option value="">Elige un plan…</option>
               {planes.map((p) => <option key={p.id} value={p.id} disabled={p.id === actual?.id}>{p.nombre} · {fmtMxn(p.precio_mensual_mxn)}/mes</option>)}
             </select>
             {elegido && <Cambio antes={planTexto(actual)} despues={planTexto(elegido)} />}
+            {elegido && vista && (
+              <>
+                {vista.precio && (
+                  <div>
+                    <label className={label} htmlFor="plan-precio">Precio pactado al mes (vacío = el de lista)</label>
+                    <input id="plan-precio" className={`${input} w-40`} inputMode="decimal" value={precioPlan} placeholder={String(elegido.precio_mensual_mxn)} onChange={(e) => setPrecioPlan(e.target.value)} />
+                  </div>
+                )}
+                <ul className="flex flex-col gap-1 rounded border border-line px-3 py-2.5 text-13 text-ink-2">
+                  <li>Folios CFDI del mes: <b className="text-ink">{vista.folios.antes ?? "—"} → {vista.folios.despues}</b></li>
+                  {vista.precio && (
+                    <li>Cobro: <b className="text-ink">{fmtMxn(vista.precio.antes)} → {fmtMxn(vista.precio.despues)}/mes</b></li>
+                  )}
+                  {vista.quitaPromocion && <li>Se quita la promoción «{vista.quitaPromocion}»: se pactó para el plan actual.</li>}
+                  {vista.concede.map((c) => (
+                    <li key={`c-${c}`}>Gana <b className="text-ink">{nombreAddon(c)}</b>, incluido a $0{vista.dejaDePagar.some((x) => x.codigo === c) ? ` (deja de pagar ${fmtMxn(vista.dejaDePagar.find((x) => x.codigo === c)?.precio ?? 0)} aparte)` : ""}.</li>
+                  ))}
+                  {vista.retira.map((c) => (
+                    <li key={`r-${c}`} className="text-danger">Pierde <b>{nombreAddon(c)}</b>: lo tenía por el plan.{c === "DELIVERY" ? " Se pausan sus tiendas en Uber Eats." : ""}</li>
+                  ))}
+                  {!vista.precio && <li>No tiene cobro activo: el precio se fija al activarlo.</li>}
+                </ul>
+              </>
+            )}
           </div>
         }
-        listo={{ ok: !!elegido && elegido.id !== actual?.id, falta: "elegir un plan distinto al actual" }}
+        listo={{
+          ok: !!elegido && elegido.id !== actual?.id && (precioPlan.trim() === "" || precioPlanNum !== null),
+          falta: !elegido || elegido.id === actual?.id ? "elegir un plan distinto al actual" : "un precio válido",
+        }}
         nombreEsperado={nombre}
         etiquetaBoton="Cambiar plan"
         ocupado={busy}
-        onConfirmar={({ motivo }) => hacer({ accion: "cambiar_plan", plan_id: planNuevo, motivo })}
+        onConfirmar={({ motivo }) => hacer({ accion: "cambiar_plan", plan_id: planNuevo, precio: precioPlanNum, motivo })}
       />
 
       <DialogoConfirmar
@@ -264,8 +364,64 @@ export function FichaContrato({ d, planes, accion, busy }: { d: Detalle; planes:
         descripcion={
           pendiente?.tipo === "suscripcion" && pendiente.estado === "PAUSADA"
             ? <>No se le cobra a <b>{nombre}</b> mientras esté en pausa. La caja sigue funcionando.</>
-            : <>Se le empieza a cobrar a <b>{nombre}</b> {actual ? <>{fmtMxn(Number(actual.precio_mensual_mxn ?? 0))}/mes, el precio de su plan</> : "el precio de su plan"}. Si estaba en prueba, pasa a activo.</>
+            : pendiente?.tipo === "suscripcion" && pendiente.estado === "NUEVA"
+              ? <>Se le empieza a cobrar a <b>{nombre}</b> desde hoy. Si estaba en prueba, pasa a activo.</>
+              : <>Se le vuelve a cobrar a <b>{nombre}</b> con el precio que ya tenía.</>
         }
+        detalle={pendiente?.tipo === "suscripcion" && pendiente.estado === "NUEVA" ? (
+          <div className="flex flex-col gap-3">
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className={label} htmlFor="act-precio">Precio de lista al mes</label>
+                <input id="act-precio" className={input} inputMode="decimal" value={precioAct} onChange={(e) => setPrecioAct(e.target.value)} />
+              </div>
+              <div>
+                <label className={label} htmlFor="act-ciclo">Se cobra</label>
+                <select id="act-ciclo" className={input} value={ciclo} onChange={(e) => setCiclo(e.target.value === "ANUAL" ? "ANUAL" : "MENSUAL")}>
+                  <option value="MENSUAL">Cada mes</option>
+                  <option value="ANUAL">Cada año (12 meses)</option>
+                </select>
+              </div>
+            </div>
+            <fieldset>
+              <legend className={label}>Promoción</legend>
+              <div className="flex flex-wrap gap-2">
+                <button type="button" onClick={() => setModoPromo("ninguna")} aria-pressed={modoPromo === "ninguna"} className={`${btnFantasma} ${modoPromo === "ninguna" ? "border-ink bg-sel" : ""}`}>Sin promoción</button>
+                {esEsencial && (
+                  <button type="button" onClick={() => setModoPromo("piloto")} aria-pressed={modoPromo === "piloto"} className={`${btnFantasma} ${modoPromo === "piloto" ? "border-ink bg-sel" : ""}`}>
+                    {PILOTO.nombre}: {fmtMxn(PILOTO.precio)} por {PILOTO.meses} meses
+                  </button>
+                )}
+                <button type="button" onClick={() => setModoPromo("otra")} aria-pressed={modoPromo === "otra"} className={`${btnFantasma} ${modoPromo === "otra" ? "border-ink bg-sel" : ""}`}>Otra…</button>
+              </div>
+              {modoPromo === "otra" && (
+                <div className="mt-3 grid grid-cols-2 gap-3">
+                  <div>
+                    <label className={label} htmlFor="promo-precio">Precio de promoción</label>
+                    <input id="promo-precio" className={input} inputMode="decimal" value={promoPrecio} onChange={(e) => setPromoPrecio(e.target.value)} />
+                  </div>
+                  <div>
+                    <label className={label} htmlFor="promo-hasta">Vale hasta (inclusive)</label>
+                    <input id="promo-hasta" type="date" className={input} min={sumarDias(hoy, 1)} value={promoHasta} onChange={(e) => setPromoHasta(e.target.value)} />
+                  </div>
+                  <div className="col-span-2">
+                    <label className={label} htmlFor="promo-nombre">Nombre (opcional, lo ve el cliente)</label>
+                    <input id="promo-nombre" className={input} maxLength={80} value={promoNombre} onChange={(e) => setPromoNombre(e.target.value)} />
+                  </div>
+                </div>
+              )}
+            </fieldset>
+            {precioActNum !== null && (
+              <Cambio
+                antes={<span className="text-ink-2">{prueba.tipo !== "NO_APLICA" ? "En prueba" : "Sin cobro"}</span>}
+                despues={promo && promo.precio !== null && /^\d{4}-\d{2}-\d{2}$/.test(promo.hasta)
+                  ? <>{textoPrecio({ precio_mensual_mxn: precioActNum, precio_promocional_mxn: promo.precio, promocion_hasta: promo.hasta }, hoy, fmtPrecio)}/mes</>
+                  : <>{fmtMxn(precioActNum)}/mes</>}
+              />
+            )}
+          </div>
+        ) : undefined}
+        listo={pendiente?.tipo === "suscripcion" && pendiente.estado === "NUEVA" ? { ok: faltaActivar === null, falta: faltaActivar ?? "" } : undefined}
         sinNombre
         nombreEsperado={nombre}
         etiquetaBoton={pendiente?.tipo === "suscripcion" && pendiente.estado === "PAUSADA" ? "Pausar" : "Activar"}
@@ -273,7 +429,10 @@ export function FichaContrato({ d, planes, accion, busy }: { d: Detalle; planes:
         onConfirmar={({ motivo }) =>
           hacer(
             pendiente?.tipo === "suscripcion" && pendiente.estado === "NUEVA"
-              ? { accion: "suscripcion_activar", motivo }
+              ? {
+                accion: "suscripcion_activar", motivo, precio: precioActNum, ciclo,
+                promocion: promo ? { precio: promo.precio, hasta: promo.hasta, nombre: promo.nombre } : null,
+              }
               : { accion: "suscripcion_estado", estado: pendiente?.tipo === "suscripcion" ? pendiente.estado : "ACTIVA", motivo },
           )
         }
@@ -305,6 +464,26 @@ export function FichaContrato({ d, planes, accion, busy }: { d: Detalle; planes:
         peligroso
         ocupado={busy}
         onConfirmar={({ motivo }) => hacer({ accion: "suscripcion_estado", estado: "CANCELADA", motivo })}
+      />
+
+      <DialogoConfirmar
+        abierto={pendiente?.tipo === "prueba"}
+        onCerrar={cerrar}
+        titulo="Extender la prueba"
+        descripcion={<>Mueve la fecha en que termina la prueba gratis de <b>{nombre}</b>. No cambia nada en su caja: solo corre los avisos, a él y a este panel.</>}
+        detalle={
+          <div>
+            <label className={label} htmlFor="prueba-hasta">Nueva fecha de fin</label>
+            <input id="prueba-hasta" type="date" className={`${input} w-48`} min={hoy} max={sumarMeses(hoy, 6)} value={pruebaNueva} onChange={(e) => setPruebaNueva(e.target.value)} />
+            {prueba.tipo !== "NO_APLICA" && <p className="mt-1 text-13 text-ink-2">Hoy termina el {fechaLegible(prueba.hasta)}.</p>}
+          </div>
+        }
+        listo={{ ok: /^\d{4}-\d{2}-\d{2}$/.test(pruebaNueva) && pruebaNueva >= hoy && pruebaNueva <= sumarMeses(hoy, 6), falta: "una fecha de hoy a seis meses" }}
+        sinNombre
+        nombreEsperado={nombre}
+        etiquetaBoton="Extender prueba"
+        ocupado={busy}
+        onConfirmar={({ motivo }) => hacer({ accion: "prueba_extender", prueba_hasta: pruebaNueva, motivo })}
       />
     </div>
   );

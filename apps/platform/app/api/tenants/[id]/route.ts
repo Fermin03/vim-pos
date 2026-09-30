@@ -5,6 +5,8 @@ import { MODULOS } from "@vim/db/modulos";
 import { fechaBloqueo, mensajeBloqueoPorDefecto } from "../../../lib/bloqueo";
 import { decidirAltaAddon, precioAltaDelivery, type FilaAddon } from "../../../lib/addons";
 import { precioValido } from "../../../lib/precio";
+import { leerPromocion } from "../../../lib/promocion";
+import type { SbClient } from "../../../lib/server";
 
 // Detalle y acciones sobre un tenant (suspender/reactivar/cancelar, notas, plan).
 // Todo auditado en super_admin_accesos. service_role, gated por X-Platform-Key.
@@ -21,10 +23,10 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }
     .from("tenants")
     .select(
       "id, codigo, nombre_comercial, estado, vertical_principal, razon_social, rfc, regimen_fiscal, " +
-        "codigo_postal_fiscal, email_fiscal, fecha_alta, fecha_baja, motivo_baja, bloqueo_desde, bloqueo_mensaje, created_at, " +
-        "plan:planes(id, codigo, nombre, precio_mensual_mxn), " +
+        "codigo_postal_fiscal, email_fiscal, fecha_alta, fecha_baja, motivo_baja, bloqueo_desde, bloqueo_mensaje, created_at, prueba_hasta, " +
+        "plan:planes(id, codigo, nombre, precio_mensual_mxn, timbres_cfdi_mensuales, features_incluidos), " +
         "onboarding:tenant_onboarding_estado(fase, fase_wizard, fecha_invitacion, fecha_activacion, fecha_go_live, notas_internas), " +
-        "suscripcion:suscripciones(estado, precio_mensual_mxn, proxima_fecha_cobro, ciclo_facturacion)",
+        "suscripcion:suscripciones(estado, precio_mensual_mxn, proxima_fecha_cobro, ciclo_facturacion, precio_promocional_mxn, promocion_hasta, promocion_nombre)",
     )
     .eq("id", id)
     .maybeSingle();
@@ -47,7 +49,7 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }
 
   const { data: addonsRaw } = await sb
     .from("tenant_addons")
-    .select("id, activo, fecha_inicio, fecha_fin, precio_mensual_mxn, addon:addons(id, codigo, nombre, precio_mensual_mxn)")
+    .select("id, activo, fecha_inicio, fecha_fin, precio_mensual_mxn, incluido_en_plan, addon:addons(id, codigo, nombre, precio_mensual_mxn)")
     .eq("tenant_id", id)
     .order("fecha_inicio", { ascending: false });
 
@@ -265,15 +267,18 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
     // error. El spec (§4) fija esta nota para Negocio/Cadena; solo se usa cuando el precio salió
     // en cero y nadie mandó un motivo propio — un motivo explícito (cortesía, promoción) manda.
     const motivo = (body.motivo as string | undefined)?.trim() || (precio === 0 ? "incluido en el plan" : null);
+    // El $0 salió del plan (nadie mandó precio): se marca, para que bajar de plan lo retire (0141).
+    // Un $0 explícito es cortesía y se queda aunque baje.
+    const incluidoEnPlan = body.precio_mensual_mxn == null && precio === 0 && precioLista === 0;
     // Reactivar es deshacer la baja de hoy: se le pone el precio y el motivo del formulario, que
     // son los que el operador acaba de decidir, y se borra la fecha de fin.
     const { error } = decision.accion === "reactivar"
       ? await sb.from("tenant_addons")
-        .update({ activo: true, fecha_fin: null, precio_mensual_mxn: precio, notas: motivo })
+        .update({ activo: true, fecha_fin: null, precio_mensual_mxn: precio, notas: motivo, incluido_en_plan: incluidoEnPlan })
         .eq("id", decision.id)
       : await sb.from("tenant_addons").insert({
         tenant_id: id, addon_id: addon.id, fecha_inicio: hoyMx(), activo: true,
-        precio_mensual_mxn: precio, notas: motivo,
+        precio_mensual_mxn: precio, notas: motivo, incluido_en_plan: incluidoEnPlan,
       });
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
     await auditar(sb, {
@@ -299,71 +304,8 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
       .eq("activo", true);
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
-    // Uber no lee nuestra base: si no se le avisa, sigue ofreciendo la tienda y cobrándole al
-    // cliente final por comida que nadie va a preparar. Se le avisa por cada conexión viva de Uber
-    // (`.eq("app", "APP_UBEREATS")`: cuando exista DiDi, sus conexiones no deben mandarse a este
-    // endpoint, que solo sabe hablar con Uber).
-    //
-    // El add-on ya quedó retirado arriba —el cliente dejó de pagar— así que un fallo de red aquí
-    // NO deshace eso: un fallo de red no puede dejarle el servicio encendido. Queda registrado en
-    // `fallos` (y en `delivery_eventos`, del lado de la Edge Function) para que alguien reintente.
-    //
-    // `delivery-uber-conexion` valida por JWT de dueño y exige el módulo `delivery_apps` para
-    // "pausar"; ninguna de las dos cosas aplica aquí (no hay dueño con sesión, y el módulo se
-    // acaba de apagar arriba). Por eso esa función acepta, SOLO para "pausar", el camino interno
-    // `x-vim-interno` (mismo ESQUEMA que cargar-csd/enviar-push, pero con secreto PROPIO —
-    // `VIM_DELIVERY_INTERNO_SECRET`, no el que comparten esas dos: compartirlo habría dejado tres
-    // funciones con poderes muy distintos colgando de una sola credencial), con el tenant resuelto
-    // desde la conexión, no del JWT que esta llamada no trae. `x-vim-interno` es la valla de la
-    // FUNCIÓN, no la del gateway: `verify_jwt` normal sigue activo ahí (spec
-    // 2026-09-02-delivery-f1b-conectar-uber-design.md:81 lo pide explícito), así que igual hace
-    // falta un `Authorization` que la pase — se manda la `service_role key`, la misma que ya viaja
-    // como `apikey`. Ver el comentario en supabase/functions/delivery-uber-conexion/index.ts.
-    let pausadas = 0;
-    const fallos: string[] = [];
-    if (codigo === "DELIVERY") {
-      // "ACTIVA" y "ERROR". La segunda se sumó el 14 sep 2026 por decisión de negocio: una conexión
-      // rota que no se cierra le sigue apareciendo abierta al cliente final, que pide comida que el
-      // POS va a rechazar. El camino interno de `delivery-uber-conexion` usa para eso la regla
-      // `pausar_vim`, que sí admite ERROR (el dueño conserva la estrecha).
-      // PENDIENTE sigue fuera: nunca estuvo abierta en Uber, así que su pausa vuelve con 409, se
-      // apuntaría en `fallos` y el operador vería "Uber no confirmó la pausa" de una tienda que
-      // jamás estuvo activa.
-      const { data: cxs } = await sb.from("delivery_conexiones")
-        .select("id, estado").eq("tenant_id", id).eq("app", "APP_UBEREATS").in("estado", ["ACTIVA", "ERROR"]);
-      const supabaseUrl = process.env.SUPABASE_URL;
-      const claveServicio = process.env.SUPABASE_SERVICE_ROLE_KEY;
-      const secretoInterno = process.env.VIM_DELIVERY_INTERNO_SECRET;
-      for (const cx of (cxs ?? []) as { id: string; estado: string }[]) {
-        try {
-          if (!supabaseUrl || !claveServicio || !secretoInterno) throw new Error("SERVIDOR_SIN_CONFIG");
-          const r = await fetch(`${supabaseUrl}/functions/v1/delivery-uber-conexion`, {
-            method: "POST",
-            // `Authorization`: sin ella, `verify_jwt` normal del gateway rechaza la llamada antes
-            // de llegar al código de la función — necesaria, no una suposición: es justo lo que
-            // hace que esta función funcione hoy para admin/lib/integraciones.ts, aunque con un
-            // JWT de usuario en vez de la `service_role key` (ver "Comprobar antes de desplegar"
-            // en el informe de la Task 6: que ESTA clave en particular la pase no está probado).
-            // `apikey`: se deja por el precedente de /api/versiones (Storage, con la misma clave
-            // rotada) — no confirmado que el gateway de Functions también lo exija, pero no hace
-            // daño tenerlo de más.
-            // `x-vim-interno` es la valla de la función, no la del gateway: identifica esta
-            // llamada como el camino interno para que no necesite JWT de dueño.
-            headers: {
-              "content-type": "application/json",
-              apikey: claveServicio,
-              authorization: `Bearer ${claveServicio}`,
-              "x-vim-interno": secretoInterno,
-            },
-            body: JSON.stringify({ accion: "pausar", conexion_id: cx.id, habilitar: false }),
-          });
-          if (!r.ok) throw new Error(`HTTP ${r.status}`);
-          pausadas += 1;
-        } catch (e) {
-          fallos.push(`${cx.id}: ${e instanceof Error ? e.message : String(e)}`);
-        }
-      }
-    }
+    // Uber no lee nuestra base: se le pausa cada tienda viva (ver `pausarTiendasUber`, abajo).
+    const { pausadas, fallos } = codigo === "DELIVERY" ? await pausarTiendasUber(sb, id) : { pausadas: 0, fallos: [] as string[] };
 
     await auditar(sb, {
       accion: "tenant.addon_desactivar", tenantId: id, motivo: `Baja del add-on ${addon.nombre}: ${motivoDe()}`,
@@ -373,21 +315,34 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
   }
 
   if (accion === "cambiar_plan") {
+    // Plan, folios del mes, add-ons incluidos y precio del cobro van en UNA transacción
+    // (`cambiar_plan_tenant`, 0141). Antes solo se movía `plan_actual_id`: subir a Negocio no daba la
+    // facturación que incluye, bajar a Esencial se la dejaba gratis, y los folios no se enteraban.
     const planId = String(body.plan_id ?? "");
     if (!planId) return NextResponse.json({ error: "PLAN_REQUERIDO" }, { status: 400 });
     if (!motivoDe()) return faltaMotivo();
-    const { data: antes } = await sb.from("tenants").select("plan_actual_id").eq("id", id).maybeSingle();
-    const { error } = await sb.from("tenants").update({ plan_actual_id: planId }).eq("id", id);
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-    await auditar(sb, {
-      accion: "tenant.cambiar_plan", tenantId: id, motivo: motivoDe(),
-      payload: { plan_anterior: (antes as { plan_actual_id?: string } | null)?.plan_actual_id ?? null, plan_id: planId },
-    });
-    return NextResponse.json({ ok: true });
+    // Precio pactado opcional; sin él, el de lista del plan nuevo (lo decide la base).
+    const precio = body.precio == null || body.precio === "" ? null : precioValido(body.precio);
+    if (body.precio != null && body.precio !== "" && precio === null) {
+      return NextResponse.json({ error: "PRECIO_INVALIDO", detalle: "El precio debe ser un importe de $0 en adelante." }, { status: 400 });
+    }
+    const { data, error } = await sb.rpc("cambiar_plan_tenant", { p_tenant_id: id, p_plan_id: planId, p_precio: precio });
+    if (error) {
+      const conocido = /PRECIO_INVALIDO|MISMO_PLAN|PLAN_RETIRADO|PLAN_NO_EXISTE|TENANT_NO_EXISTE/.exec(error.message)?.[0];
+      return NextResponse.json({ error: conocido ?? error.message }, { status: conocido ? 400 : 500 });
+    }
+    const res = (data ?? {}) as { addons?: { concedidos?: string[]; retirados?: string[] } } & Record<string, unknown>;
+    // Si el plan nuevo ya no incluye delivery, la base lo retiró; a Uber hay que avisarle igual que
+    // en una baja manual, o seguiría ofreciendo la tienda.
+    const uber = res.addons?.retirados?.includes("DELIVERY") ? await pausarTiendasUber(sb, id) : null;
+    await auditar(sb, { accion: "tenant.cambiar_plan", tenantId: id, motivo: motivoDe(), payload: { ...res, precio_pedido: precio, uber } });
+    return NextResponse.json({ ok: true, ...res, fallos: uber?.fallos ?? [] });
   }
 
   if (accion === "suscripcion_activar") {
-    // Convierte un cliente en pagador: una suscripción ACTIVA con el precio del plan actual.
+    // Convierte un cliente en pagador: una suscripción ACTIVA con el precio pactado y, si se
+    // acordó, una promoción con fecha de fin (0141). El regreso al precio de lista queda
+    // programado desde hoy: no depende de que alguien se acuerde en el mes 8.
     if (!motivoDe()) return faltaMotivo();
     const { data: t } = await sb.from("tenants").select("plan_actual_id, plan:planes(precio_mensual_mxn)").eq("id", id).maybeSingle();
     const planId = (t as { plan_actual_id?: string } | null)?.plan_actual_id;
@@ -403,17 +358,39 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
     // que un alta el 31 de enero cobre el 28 de febrero y no se desborde al 3 de marzo.
     const inicio = hoyMx();
     const prox = sumarMeses(inicio, ciclo === "ANUAL" ? 12 : 1);
+    const promo = leerPromocion(body.promocion, precio, inicio);
+    if (!promo.ok) return NextResponse.json({ error: promo.error, detalle: promo.detalle }, { status: 400 });
     // Expirar la vigente, crear la nueva y pasar TRIAL→ACTIVO van en UNA transacción (0137).
     // Antes eran tres escrituras sueltas: si el INSERT fallaba después del UPDATE, el cliente
     // quedaba con la anterior EXPIRADA y ninguna nueva — sin cobro vigente.
     const { error } = await sb.rpc("activar_suscripcion", {
       p_tenant_id: id, p_precio: precio, p_ciclo: ciclo, p_inicio: inicio, p_proxima: prox,
+      p_promo_precio: promo.promo?.precio ?? null, p_promo_hasta: promo.promo?.hasta ?? null, p_promo_nombre: promo.promo?.nombre ?? null,
     });
     if (error) {
-      const conocido = /PRECIO_INVALIDO|CICLO_INVALIDO|FECHAS_INVALIDAS|TENANT_SIN_PLAN|TENANT_NO_EXISTE/.exec(error.message)?.[0];
+      const conocido = /PRECIO_INVALIDO|CICLO_INVALIDO|FECHAS_INVALIDAS|TENANT_SIN_PLAN|TENANT_NO_EXISTE|PROMOCION_[A-Z_]+/.exec(error.message)?.[0];
       return NextResponse.json({ error: conocido ?? error.message }, { status: conocido ? 400 : 500 });
     }
-    await auditar(sb, { accion: "tenant.suscripcion_activar", tenantId: id, motivo: motivoDe(), payload: { precio, ciclo } });
+    await auditar(sb, { accion: "tenant.suscripcion_activar", tenantId: id, motivo: motivoDe(), payload: { precio, ciclo, promocion: promo.promo } });
+    return NextResponse.json({ ok: true });
+  }
+
+  if (accion === "prueba_extender") {
+    // La prueba no bloquea nada (0141): extenderla solo mueve la fecha de los avisos. Aun así va con
+    // motivo y a la bitácora, porque es una concesión comercial y alguien preguntará por qué.
+    if (!motivoDe()) return faltaMotivo();
+    const hasta = typeof body.prueba_hasta === "string" && /^\d{4}-\d{2}-\d{2}$/.test(body.prueba_hasta) ? body.prueba_hasta : null;
+    if (!hasta) return NextResponse.json({ error: "FECHA_INVALIDA", detalle: "Elige la nueva fecha de fin." }, { status: 400 });
+    const hoy = hoyMx();
+    if (hasta < hoy) return NextResponse.json({ error: "FECHA_INVALIDA", detalle: "La nueva fecha no puede ser anterior a hoy." }, { status: 400 });
+    if (hasta > sumarMeses(hoy, 6)) return NextResponse.json({ error: "FECHA_INVALIDA", detalle: "Más de seis meses de prueba ya no es prueba: activa el cobro con una promoción." }, { status: 400 });
+    const { data: tRaw } = await sb.from("tenants").select("estado, prueba_hasta").eq("id", id).maybeSingle();
+    const t = tRaw as { estado?: string; prueba_hasta?: string | null } | null;
+    if (!t) return NextResponse.json({ error: "NO_EXISTE" }, { status: 404 });
+    if (t.estado !== "TRIAL") return NextResponse.json({ error: "NO_ESTA_EN_PRUEBA", detalle: "Solo se extiende la prueba de un cliente en prueba." }, { status: 400 });
+    const { error } = await sb.from("tenants").update({ prueba_hasta: hasta }).eq("id", id);
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    await auditar(sb, { accion: "tenant.prueba_extender", tenantId: id, motivo: motivoDe(), payload: { antes: t.prueba_hasta ?? null, despues: hasta } });
     return NextResponse.json({ ok: true });
   }
 
@@ -475,4 +452,69 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
   }
 
   return NextResponse.json({ error: "ACCION_DESCONOCIDA" }, { status: 400 });
+}
+
+/**
+ * Pausa en Uber las tiendas del cliente cuando se le retira el add-on de delivery (baja manual o
+ * bajar de plan, 0141). Uber no lee nuestra base: si no se le avisa, sigue ofreciendo la tienda y
+ * cobrándole al cliente final por comida que nadie va a preparar.
+ *
+ * El add-on ya quedó retirado antes de llamar aquí, así que un fallo de red NO lo deshace: un fallo
+ * de red no puede dejarle el servicio encendido. Queda en `fallos` (y en `delivery_eventos`, del
+ * lado de la Edge Function) para que alguien reintente.
+ *
+ * `delivery-uber-conexion` valida por JWT de dueño y exige el módulo `delivery_apps` para "pausar";
+ * ninguna de las dos cosas aplica aquí (no hay dueño con sesión, y el módulo se acaba de apagar).
+ * Por eso esa función acepta, SOLO para "pausar", el camino interno `x-vim-interno` (mismo ESQUEMA
+ * que cargar-csd/enviar-push, pero con secreto PROPIO — `VIM_DELIVERY_INTERNO_SECRET`: compartirlo
+ * habría dejado tres funciones con poderes muy distintos colgando de una sola credencial), con el
+ * tenant resuelto desde la conexión. `x-vim-interno` es la valla de la FUNCIÓN, no la del gateway:
+ * `verify_jwt` sigue activo ahí, así que hace falta un `Authorization` que la pase — se manda la
+ * `service_role key`. Ver el comentario en supabase/functions/delivery-uber-conexion/index.ts.
+ */
+async function pausarTiendasUber(sb: SbClient, id: string): Promise<{ pausadas: number; fallos: string[] }> {
+  let pausadas = 0;
+  const fallos: string[] = [];
+  // "ACTIVA" y "ERROR". La segunda se sumó el 14 sep 2026 por decisión de negocio: una conexión
+  // rota que no se cierra le sigue apareciendo abierta al cliente final, que pide comida que el
+  // POS va a rechazar. El camino interno de `delivery-uber-conexion` usa para eso la regla
+  // `pausar_vim`, que sí admite ERROR (el dueño conserva la estrecha).
+  // PENDIENTE sigue fuera: nunca estuvo abierta en Uber, así que su pausa vuelve con 409, se
+  // apuntaría en `fallos` y el operador vería "Uber no confirmó la pausa" de una tienda que
+  // jamás estuvo activa.
+  const { data: cxs } = await sb.from("delivery_conexiones")
+    .select("id, estado").eq("tenant_id", id).eq("app", "APP_UBEREATS").in("estado", ["ACTIVA", "ERROR"]);
+  const supabaseUrl = process.env.SUPABASE_URL;
+  const claveServicio = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const secretoInterno = process.env.VIM_DELIVERY_INTERNO_SECRET;
+  for (const cx of (cxs ?? []) as { id: string; estado: string }[]) {
+    try {
+      if (!supabaseUrl || !claveServicio || !secretoInterno) throw new Error("SERVIDOR_SIN_CONFIG");
+      const r = await fetch(`${supabaseUrl}/functions/v1/delivery-uber-conexion`, {
+        method: "POST",
+        // `Authorization`: sin ella, `verify_jwt` normal del gateway rechaza la llamada antes
+        // de llegar al código de la función — necesaria, no una suposición: es justo lo que
+        // hace que esta función funcione hoy para admin/lib/integraciones.ts, aunque con un
+        // JWT de usuario en vez de la `service_role key` (ver "Comprobar antes de desplegar"
+        // en el informe de la Task 6: que ESTA clave en particular la pase no está probado).
+        // `apikey`: se deja por el precedente de /api/versiones (Storage, con la misma clave
+        // rotada) — no confirmado que el gateway de Functions también lo exija, pero no hace
+        // daño tenerlo de más.
+        // `x-vim-interno` es la valla de la función, no la del gateway: identifica esta
+        // llamada como el camino interno para que no necesite JWT de dueño.
+        headers: {
+          "content-type": "application/json",
+          apikey: claveServicio,
+          authorization: `Bearer ${claveServicio}`,
+          "x-vim-interno": secretoInterno,
+        },
+        body: JSON.stringify({ accion: "pausar", conexion_id: cx.id, habilitar: false }),
+      });
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      pausadas += 1;
+    } catch (e) {
+      fallos.push(`${cx.id}: ${e instanceof Error ? e.message : String(e)}`);
+    }
+  }
+  return { pausadas, fallos };
 }
