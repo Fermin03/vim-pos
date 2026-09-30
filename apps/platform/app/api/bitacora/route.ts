@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { autorizar } from "../../lib/server";
+import { autorizar, SYSTEM_ADMIN_ID } from "../../lib/server";
 
 /**
  * Bitácora de accesos de super admin.
@@ -11,7 +11,7 @@ import { autorizar } from "../../lib/server";
  */
 
 export async function GET(req: Request) {
-  const auth = autorizar(req);
+  const auth = await autorizar(req);
   if ("error" in auth) return auth.error;
   const sb = auth.sb;
 
@@ -20,7 +20,7 @@ export async function GET(req: Request) {
 
   let q = sb
     .from("super_admin_accesos")
-    .select("id, accion, tenant_id, motivo, ip_address, payload, created_at")
+    .select("id, accion, tenant_id, super_admin_id, motivo, ip_address, payload, created_at")
     .order("created_at", { ascending: false })
     .limit(200);
   if (tenantId) q = q.eq("tenant_id", tenantId);
@@ -29,7 +29,7 @@ export async function GET(req: Request) {
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
   const filas = (data ?? []) as {
-    id: string; accion: string; tenant_id: string | null; motivo: string | null;
+    id: string; accion: string; tenant_id: string | null; super_admin_id: string; motivo: string | null;
     ip_address: string | null; payload: unknown; created_at: string;
   }[];
 
@@ -43,12 +43,19 @@ export async function GET(req: Request) {
     for (const t of (ts ?? []) as { id: string; nombre_comercial: string }[]) nombres.set(t.id, t.nombre_comercial);
   }
 
+  // Quién (A8): el operador de cada acción. Lo de antes de las cuentas —y lo que se haga con la
+  // clave compartida mientras siga sirviendo— queda como "Clave compartida".
+  const operadores = new Map<string, string>();
+  const { data: ops } = await sb.from("plataforma_operadores").select("usuario_id, nombre");
+  for (const o of (ops ?? []) as { usuario_id: string; nombre: string }[]) operadores.set(o.usuario_id, o.nombre);
+
   return NextResponse.json({
     accesos: filas.map((f) => ({
       id: f.id,
       accion: f.accion,
       tenantId: f.tenant_id,
       tenant: f.tenant_id ? (nombres.get(f.tenant_id) ?? "(empresa eliminada)") : "—",
+      quien: f.super_admin_id === SYSTEM_ADMIN_ID ? "Clave compartida" : (operadores.get(f.super_admin_id) ?? "(operador eliminado)"),
       motivo: f.motivo,
       ip: f.ip_address,
       fecha: f.created_at,

@@ -15,7 +15,7 @@ import { pantallaDeFila } from "../../../../lib/tipos";
 const DIA = 24 * 3600 * 1000;
 
 export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }) {
-  const auth = autorizar(req);
+  const auth = await autorizar(req);
   if ("error" in auth) return auth.error;
   const sb = auth.sb;
   const { id } = await ctx.params;

@@ -1,5 +1,6 @@
 "use client";
 import { useState, type ReactNode } from "react";
+import { usePathname } from "next/navigation";
 import { LogoVim } from "@vim/ui/styles";
 import { SesionProvider } from "../lib/sesion";
 import { BarraLateral, InsigniaEntorno } from "./barra-lateral";
@@ -11,6 +12,8 @@ import { BarraLateral, InsigniaEntorno } from "./barra-lateral";
  */
 export function Shell({ children }: { children: ReactNode }) {
   const [menu, setMenu] = useState(false);
+  // /acceso es donde se consigue la entrada (A8): no puede estar detrás de ella.
+  if (usePathname() === "/acceso") return <>{children}</>;
   return (
     <SesionProvider>
       <div className="flex min-h-screen bg-bg">

@@ -6,7 +6,7 @@ import { autorizar, auditar } from "../../../../lib/server";
 // service_role server-side, gated por X-Platform-Key.
 
 export async function POST(req: Request, ctx: { params: Promise<{ id: string }> }) {
-  const auth = autorizar(req);
+  const auth = await autorizar(req);
   if ("error" in auth) return auth.error;
   const sb = auth.sb;
   const { id } = await ctx.params;

@@ -64,6 +64,8 @@ export type Acceso = {
   id: string;
   accion: string;
   tenant: string;
+  /** Operador que lo hizo (A8), o "Clave compartida". */
+  quien: string;
   motivo: string | null;
   ip: string | null;
   fecha: string;

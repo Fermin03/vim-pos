@@ -13,6 +13,7 @@ const NAV: { href: string; label: string }[] = [
   { href: "/cfdi", label: "Facturación" },
   { href: "/errores", label: "Errores" },
   { href: "/bitacora", label: "Bitácora" },
+  { href: "/operadores", label: "Operadores" },
 ];
 
 /**
@@ -44,7 +45,7 @@ export function InsigniaEntorno() {
  */
 export function BarraLateral({ abierto = false, onCerrar = () => {} }: { abierto?: boolean; onCerrar?: () => void }) {
   const path = usePathname();
-  const { api, salir } = useSesion();
+  const { api, salir, operador } = useSesion();
   const [criticas, setCriticas] = useState<number>(0);
 
   useEffect(() => {
@@ -122,6 +123,10 @@ export function BarraLateral({ abierto = false, onCerrar = () => {} }: { abierto
           <Link href="/clientes/nuevo" className="btn mb-2 flex h-10 items-center justify-center rounded border border-line-strong text-13 font-semibold text-ink-2 hover:border-ink hover:text-ink">
             Nuevo cliente
           </Link>
+          {/* Quién está dentro (A8). Con la clave compartida se dice, para que nadie la dé por buena. */}
+          <p className="truncate px-1 pb-1 text-12 text-ink-3" title={operador.nombre}>
+            {operador.via === "cuenta" ? operador.nombre : "Con la clave compartida"}
+          </p>
           <button onClick={salir} className="btn h-10 w-full rounded text-13 font-medium text-ink-2 hover:bg-hover hover:text-ink">
             Salir
           </button>

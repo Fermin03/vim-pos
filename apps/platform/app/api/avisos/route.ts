@@ -23,7 +23,7 @@ type Aviso = {
 };
 
 export async function GET(req: Request) {
-  const auth = autorizar(req);
+  const auth = await autorizar(req);
   if ("error" in auth) return auth.error;
   const sb = auth.sb;
 
@@ -82,7 +82,7 @@ export async function GET(req: Request) {
 }
 
 export async function POST(req: Request) {
-  const auth = autorizar(req);
+  const auth = await autorizar(req);
   if ("error" in auth) return auth.error;
   const sb = auth.sb;
 
@@ -127,7 +127,7 @@ export async function POST(req: Request) {
 }
 
 export async function DELETE(req: Request) {
-  const auth = autorizar(req);
+  const auth = await autorizar(req);
   if ("error" in auth) return auth.error;
   const sb = auth.sb;
 
