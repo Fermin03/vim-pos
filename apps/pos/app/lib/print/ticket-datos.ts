@@ -54,6 +54,20 @@ export function foldearHijosEnPadre(lineas: LineaImpresion[]): LineaImpresion[] 
   });
 }
 
+/**
+ * URL del QR de autofactura. Pura, con pruebas.
+ *
+ * `t` es el token del ticket (`autofactura_token`, migración 0135): sin él, el folio —impreso y
+ * secuencial— bastaba para que cualquiera recorriera los tickets del negocio y los facturara a su
+ * nombre (auditoría 30/09/2026, C1-4). Si no hay token (caja de escritorio sin secreto, o la
+ * consulta falló) el QR sale igual sin `t` y el portal le pide al comensal el total del ticket.
+ */
+export function urlAutofactura(codigoNegocio: string | null, folio: string | null, token: string | null): string {
+  const q = new URLSearchParams({ folio: folio ?? "" });
+  if (token && /^[A-Za-z0-9_-]{16}$/.test(token)) q.set("t", token);
+  return `https://factura.vimpos.com.mx/${encodeURIComponent(codigoNegocio ?? "negocio")}?${q.toString()}`;
+}
+
 /** Lee el ticket persistido y arma los datos planos para impresión (bajo RLS del empleado). */
 export async function leerTicketParaImpresion(ticketId: string, ctx: Ctx): Promise<DatosTicketImpresion> {
   const sb = employeeClient(ctx.token);
@@ -163,6 +177,18 @@ export async function leerTicketParaImpresion(ticketId: string, ctx: Ctx): Promi
     .maybeSingle();
   const qrActivo = ((cfg ?? null) as { mostrar_qr_factura_ticket: boolean } | null)?.mostrar_qr_factura_ticket === true;
 
+  // El token del QR solo se pide si el QR se va a imprimir. Un fallo no detiene la impresión: el
+  // ticket sale con el QR sin token y el portal pide el total (ver `urlAutofactura`).
+  let tokenQr: string | null = null;
+  if (qrActivo) {
+    try {
+      const { data: tq } = await sb.rpc("autofactura_token", { p_ticket_id: ticketId });
+      tokenQr = typeof tq === "string" ? tq : null;
+    } catch {
+      tokenQr = null;
+    }
+  }
+
   const { data: ten } = await sb
     .from("tenants")
     .select("codigo, nombre_comercial, razon_social, rfc, logo_url")
@@ -192,7 +218,7 @@ export async function leerTicketParaImpresion(ticketId: string, ctx: Ctx): Promi
     // Dominio .com.mx: el que VIM tiene registrado. Antes decía `factura.vimpos.mx`, sin el
     // `.com`, que es de alguien más — cada ticket impreso habría mandado a los clientes del
     // restaurante a una dirección ajena en cuanto se encendiera el QR.
-    qrUrl: qrActivo ? `https://factura.vimpos.com.mx/${tn.codigo ?? "negocio"}?folio=${tk.folio_completo ?? ""}` : null,
+    qrUrl: qrActivo ? urlAutofactura(tn.codigo ?? null, (tk.folio_completo as string | null) ?? null, tokenQr) : null,
     ancho: 80,
   };
 }

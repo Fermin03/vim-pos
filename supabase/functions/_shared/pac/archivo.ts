@@ -28,7 +28,26 @@ export function rutaArchivoCfdi(cfdiId: string, tipo: TipoArchivoCfdi): {
   };
 }
 
-/** "cfdi/<id>.xml" (lo que hay en `tickets_cfdi.*_storage_path`) → bucket y nombre de objeto. */
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/**
+ * El objeto a LEER con service_role para un CFDI: siempre derivado del id, nunca de la ruta que
+ * guarda la fila. Antes `descargar-cfdi` y `autofacturar` bajaban `*_storage_path` tal cual, y esa
+ * columna la podía reescribir cualquier usuario del tenant: con service_role eso era leer
+ * cualquier objeto de cualquier bucket (auditoría 30/09/2026, C1-3). Las rutas que se han guardado
+ * siempre fueron `cfdi/<id>.xml|pdf` y `cfdi/<id>-acuse.xml`, así que derivarlas no pierde nada.
+ * Devuelve null si el id no es un UUID (nada de `../` ni prefijos ajenos).
+ */
+export function objetoArchivoCfdi(cfdiId: string, tipo: TipoArchivoCfdi): { bucket: string; nombre: string } | null {
+  if (!UUID.test(cfdiId)) return null;
+  const r = rutaArchivoCfdi(cfdiId.toLowerCase(), tipo);
+  return { bucket: r.bucket, nombre: r.nombre };
+}
+
+/**
+ * "cfdi/<id>.xml" (lo que hay en `tickets_cfdi.*_storage_path`) → bucket y nombre de objeto.
+ * Solo para mostrar/diagnosticar: para LEER un archivo usa `objetoArchivoCfdi`.
+ */
 export function partirRutaLogica(ruta: string | null | undefined): { bucket: string; nombre: string } | null {
   const t = (ruta ?? "").trim();
   const i = t.indexOf("/");

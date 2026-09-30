@@ -14,6 +14,15 @@
 // se registran en logs y no viajan en ninguna respuesta. De la carga solo queda el número de
 // certificado y su vigencia, que son públicos y sirven para avisar antes de que venza.
 //
+// LA PRUEBA DE PROPIEDAD DEL RFC (auditoría 30/09/2026, C1-1 y C1-2)
+//
+// Cargar con éxito el .cer + .key + contraseña de un RFC es la única forma de demostrar que ese RFC
+// es de quien lo pide: el RFC que el admin escribe en su configuración no prueba nada. Por eso, al
+// cargar, esta función escribe `tenant_cfdi_emisor.rfc_verificado` (con service_role: la 0135 se
+// lo quitó a los usuarios) y es ese RFC —no el escrito— el que usan para timbrar `timbrar-cfdi`,
+// `timbrar-global` y `autofacturar`. Y al BORRAR solo se toca el sello de `rfc_verificado`: antes se
+// borraba en la cuenta compartida el sello del RFC escrito, que podía ser el de otro cliente.
+//
 // Local: supabase functions serve cargar-csd --env-file supabase/functions/.env
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import { corsHeaders } from "../_shared/cors.ts";
@@ -80,7 +89,7 @@ Deno.serve(async (req) => {
     .eq("usuario_id", u.user.id)
     .eq("tenant_id", tenantId)
     .eq("activo", true);
-  const roles = ((acc ?? []) as { rol: { codigo: string } | null }[])
+  const roles = ((acc ?? []) as unknown as { rol: { codigo: string } | null }[])
     .map((a) => a.rol?.codigo)
     .filter(Boolean) as string[];
   if (!roles.some((r) => ROLES_CSD.includes(r))) {
@@ -96,7 +105,7 @@ Deno.serve(async (req) => {
 
   const { data: emisor, error: eErr } = await sb
     .from("tenant_cfdi_emisor")
-    .select("tenant_id, rfc")
+    .select("tenant_id, rfc, rfc_verificado")
     .eq("tenant_id", tenantId)
     .maybeSingle();
   if (eErr) return json({ error: "RLS_ERROR", detalle: eErr.message }, 500);
@@ -107,20 +116,34 @@ Deno.serve(async (req) => {
     );
   }
   const rfc = String((emisor as { rfc: string }).rfc).trim().toUpperCase();
+  const rfcVerificado = String((emisor as { rfc_verificado: string | null }).rfc_verificado ?? "").trim().toUpperCase();
 
   const pac = obtenerFacturama();
   if (!pac) return json({ error: "PAC_NO_CONFIGURADO", detalle: "Falta la credencial del PAC" }, 503);
 
+  // Escrituras de `rfc_verificado` y `csd_*`: solo service_role (0135). Se usa después de
+  // comprobar arriba, con el JWT del llamante, que es DUEÑO/ADMIN de ESTE tenant.
+  const admin = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!, {
+    auth: { persistSession: false },
+  });
+
   // ── Baja del sello (offboarding) ────────────────────────────────────────────────────────────
+  // Solo el sello que ESTE tenant demostró suyo. El RFC escrito en la configuración no cuenta: con
+  // él se podía borrar de la cuenta compartida el sello de otro cliente de VIM.
   if (body.accion === "borrar") {
-    const ok = await pac.borrarSello(rfc);
+    if (!rfcVerificado) {
+      return json({ error: "SIN_SELLO_VERIFICADO", detalle: "Este negocio no tiene un sello cargado que borrar." }, 409);
+    }
+    const ok = await pac.borrarSello(rfcVerificado);
     if (!ok) return json({ error: "PAC_NO_BORRO", detalle: "El PAC no confirmó la baja del sello" }, 502);
-    const { error } = await sb
+    const { error } = await admin
       .from("tenant_cfdi_emisor")
       .update({
         csd_subido_at: null,
         csd_numero_certificado: null,
         csd_vigencia_hasta: null,
+        rfc_verificado: null,
+        rfc_verificado_at: null,
         // INACTIVO y no SUSPENDIDO: es el vocabulario que usa el panel. Escribir un valor que el
         // formulario no conoce dejaría su selector en blanco y rompería el siguiente guardado.
         estado: "INACTIVO",
@@ -131,6 +154,13 @@ Deno.serve(async (req) => {
   }
 
   // ── Carga del sello ─────────────────────────────────────────────────────────────────────────
+  // Requiere el add-on CFDI (C1-5): cargar un sello es el primer paso para timbrar. La baja y la
+  // verificación de cuenta no lo exigen: retirar el sello de quien dejó de pagar debe poder hacerse.
+  const { data: addonActivo } = await sb.rpc("tenant_addon_activo", { p_tenant_id: tenantId, p_codigo: "CFDI" });
+  if (addonActivo !== true) {
+    return json({ error: "SIN_ADDON_CFDI", detalle: "La facturación no está contratada para este negocio. Contacta a VIM." }, 403);
+  }
+
   const cer = (body.cer_base64 ?? "").trim();
   const key = (body.key_base64 ?? "").trim();
   const password = body.password ?? "";
@@ -177,9 +207,13 @@ Deno.serve(async (req) => {
     }, 400);
   }
 
-  const { error: upErr } = await sb
+  // El PAC aceptó .cer + .key + contraseña del RFC `rfc` (y el .cer es de ese RFC, validado
+  // arriba): a partir de aquí ese RFC es de este tenant. Es la ÚNICA escritura de rfc_verificado.
+  const { error: upErr } = await admin
     .from("tenant_cfdi_emisor")
     .update({
+      rfc_verificado: rfc,
+      rfc_verificado_at: new Date().toISOString(),
       csd_subido_at: new Date().toISOString(),
       csd_numero_certificado: datos.numeroCertificado,
       csd_vigencia_hasta: datos.vigenciaHasta,

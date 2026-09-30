@@ -14,13 +14,26 @@
 // esa puerta ya cerrada.
 //
 // Corre con el JWT de quien la pide, no con service_role: el RLS sigue teniendo la última palabra
-// sobre qué tenant se toca.
+// sobre qué tenant se toca. Las ÚNICAS escrituras con service_role son las de `tickets_cfdi` y las
+// `cfdi_marcar_*` / `consumir_folio_cfdi`, que desde la 0135 no están abiertas a los usuarios; se
+// hacen después de comprobar el rol en ESTE tenant y siempre con su `tenant_id`.
+//
+// EMISOR: `tenant_cfdi_emisor.rfc_verificado` y nada más (auditoría 30/09/2026, C1-1). Antes salía
+// de `tenant_cfdi_emisor.rfc`, que el admin del tenant escribe a mano: con el RFC de otro cliente
+// de VIM, la global se timbraba con el sello de ese otro cliente.
+//
+// FOLIOS: la global NO se frena por falta de folios, a propósito — es obligación ante el SAT y el
+// diseño lo decidió así (D96; `consumir_folio_cfdi` tolera el saldo negativo solo con
+// `p_es_global`). Lo que evita abusar de esa tolerancia es que (1) solo DUEÑO/ADMIN con add-on y
+// sello propio verificado la emiten, (2) el periodo tiene que ser un periodo real y ya cerrado
+// (se valida abajo contra `periodo_global_de`) y (3) cada periodo se timbra una vez (candado).
 //
 // Local: supabase functions serve timbrar-global --env-file supabase/functions/.env
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import { corsHeaders } from "../_shared/cors.ts";
 import { timbrarConFailover, obtenerFacturama } from "../_shared/pac/index.ts";
 import { archivarCfdi, subidorSupabase } from "../_shared/pac/archivo.ts";
+import { resolverEmisorVerificado } from "../_shared/pac/emisor.ts";
 import { armarConceptosGlobal, ConceptosIncoherentes, type LineaTicket, type TicketDelPeriodo } from "../_shared/pac/conceptos.ts";
 
 const ROLES_FACTURA = ["DUENO", "ADMIN"];
@@ -67,10 +80,16 @@ Deno.serve(async (req) => {
     .eq("usuario_id", u.user.id)
     .eq("tenant_id", tenantId)
     .eq("activo", true);
-  const roles = ((acc ?? []) as { rol: { codigo: string } | null }[]).map((a) => a.rol?.codigo).filter(Boolean) as string[];
+  const roles = ((acc ?? []) as unknown as { rol: { codigo: string } | null }[]).map((a) => a.rol?.codigo).filter(Boolean) as string[];
   if (!roles.some((r) => ROLES_FACTURA.includes(r))) {
     return json({ error: "SIN_PERMISO", detalle: "Solo DUEÑO/ADMIN pueden emitir la factura global" }, 403);
   }
+  // Sin el add-on CFDI no se timbra (C1-5).
+  const { data: addonActivo } = await sb.rpc("tenant_addon_activo", { p_tenant_id: tenantId, p_codigo: "CFDI" });
+  if (addonActivo !== true) {
+    return json({ error: "SIN_ADDON_CFDI", detalle: "La facturación no está contratada para este negocio. Contacta a VIM." }, 403);
+  }
+  const admin = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!, { auth: { persistSession: false } });
 
   // Servicio suspendido: no se timbra (ADR 0014). Mismo motivo que en `timbrar-cfdi`: cada folio
   // sale de la cuenta que VIM le paga al PAC, así que este control vive en el servidor y no en
@@ -87,10 +106,12 @@ Deno.serve(async (req) => {
   // ── Datos del emisor ────────────────────────────────────────────────────────────────────────
   const { data: emisorRaw } = await sb
     .from("tenant_cfdi_emisor")
-    .select("rfc, periodicidad_global, csd_numero_certificado, estado")
+    .select("rfc, rfc_verificado, periodicidad_global, csd_numero_certificado, estado")
     .eq("tenant_id", tenantId)
     .maybeSingle();
-  const emisor = emisorRaw as { rfc: string; periodicidad_global: string; csd_numero_certificado: string | null; estado: string } | null;
+  const emisor = emisorRaw as {
+    rfc: string; rfc_verificado: string | null; periodicidad_global: string; csd_numero_certificado: string | null; estado: string;
+  } | null;
   if (!emisor) return json({ error: "SIN_EMISOR", detalle: "Captura los datos fiscales del negocio" }, 409);
   // Pausada por el negocio: solo "INACTIVO" bloquea (ver timbrar-cfdi).
   if (emisor.estado === "INACTIVO") {
@@ -102,16 +123,18 @@ Deno.serve(async (req) => {
 
   const { data: tenantRaw } = await sb
     .from("tenants")
-    .select("razon_social, regimen_fiscal, codigo_postal_fiscal, logo_png_url")
+    .select("rfc, razon_social, regimen_fiscal, codigo_postal_fiscal, logo_png_url")
     .eq("id", tenantId)
     .maybeSingle();
   const tenant = tenantRaw as {
-    razon_social: string | null; regimen_fiscal: string | null;
+    rfc: string | null; razon_social: string | null; regimen_fiscal: string | null;
     codigo_postal_fiscal: string | null; logo_png_url: string | null;
   } | null;
   if (!tenant?.razon_social || !tenant.regimen_fiscal || !tenant.codigo_postal_fiscal) {
     return json({ error: "DATOS_FISCALES_INCOMPLETOS", detalle: "Falta razón social, régimen o código postal" }, 409);
   }
+  const emisorRfc = resolverEmisorVerificado(emisor.rfc_verificado, [emisor.rfc, tenant.rfc]);
+  if (!emisorRfc.ok) return json({ ok: false, error: emisorRfc.error, mensaje: emisorRfc.mensaje }, 409);
 
   const periodicidad = emisor.periodicidad_global || "04";
 
@@ -135,6 +158,21 @@ Deno.serve(async (req) => {
     if (!prev) return json({ error: "PERIODO_NO_CALCULADO" }, 500);
     desde = prev.desde;
     hasta = prev.hasta;
+  } else {
+    // Un periodo pedido a mano tiene que ser un periodo de verdad (el que contiene `desde`, con
+    // sus límites exactos) y ya cerrado. Sin esto, con rangos inventados —1 al 1, 1 al 2, 2 al 2…—
+    // se podían emitir globales sin límite, y la global no se frena por folios.
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(desde) || !/^\d{4}-\d{2}-\d{2}$/.test(hasta)) {
+      return json({ error: "PERIODO_INVALIDO", mensaje: "Fechas inválidas." }, 400);
+    }
+    const { data: real } = await sb.rpc("periodo_global_de", { p_periodicidad: periodicidad, p_fecha: desde });
+    const r0 = (real as { desde: string; hasta: string }[] | null)?.[0];
+    if (!r0 || r0.desde !== desde || r0.hasta !== hasta || hasta >= hoyMx()) {
+      return json({
+        error: "PERIODO_INVALIDO",
+        mensaje: "Ese rango no es un periodo cerrado de la factura global de este negocio.",
+      }, 400);
+    }
   }
 
   // ── El candado ──────────────────────────────────────────────────────────────────────────────
@@ -188,7 +226,7 @@ Deno.serve(async (req) => {
     if (iErr) throw new Error(`No se pudieron leer los renglones: ${iErr.message}`);
 
     const porTicket = new Map<string, LineaTicket[]>();
-    for (const f of (itemsRaw ?? []) as Record<string, unknown>[]) {
+    for (const f of (itemsRaw ?? []) as unknown as Record<string, unknown>[]) {
       const id = String(f.ticket_id);
       const lista = porTicket.get(id) ?? [];
       lista.push({
@@ -224,7 +262,7 @@ Deno.serve(async (req) => {
 
     // ── El borrador ───────────────────────────────────────────────────────────────────────────
     const folioGlobal = `G-${String(desde).replace(/-/g, "")}`;
-    const { data: draftRaw, error: dErr } = await sb
+    const { data: draftRaw, error: dErr } = await admin
       .from("tickets_cfdi")
       .insert({
         tenant_id: tenantId,
@@ -236,7 +274,7 @@ Deno.serve(async (req) => {
         receptor_uso_cfdi: RECEPTOR_PUBLICO.usoCfdi,
         receptor_codigo_postal: tenant.codigo_postal_fiscal,
         receptor_regimen_fiscal: RECEPTOR_PUBLICO.regimenFiscal,
-        emisor_rfc: emisor.rfc,
+        emisor_rfc: emisorRfc.rfc,
         emisor_razon_social: tenant.razon_social,
         emisor_regimen_fiscal: tenant.regimen_fiscal,
         emisor_lugar_expedicion: tenant.codigo_postal_fiscal,
@@ -248,6 +286,9 @@ Deno.serve(async (req) => {
         forma_pago_sat: "01",
         estado_sat: "BORRADOR",
         pac_proveedor: "FACTURAMA",
+        // Con service_role auth.uid() es NULL: la autoría se pone a mano.
+        created_by: u.user.id,
+        updated_by: u.user.id,
       })
       .select("id")
       .single();
@@ -259,7 +300,7 @@ Deno.serve(async (req) => {
       cfdiId,
       tipoComprobante: "INGRESO",
       emisor: {
-        rfc: emisor.rfc,
+        rfc: emisorRfc.rfc,
         razonSocial: tenant.razon_social,
         regimenFiscal: tenant.regimen_fiscal,
         lugarExpedicion: tenant.codigo_postal_fiscal,
@@ -285,18 +326,18 @@ Deno.serve(async (req) => {
     });
 
     if (!res.ok) {
-      await sb.rpc("cfdi_marcar_error", {
+      await admin.rpc("cfdi_marcar_error", {
         p_cfdi_id: cfdiId,
         p_codigo_error: res.codigoError,
         p_mensaje_error: res.mensajeError,
-        p_request_payload: { pac: res.pacUsado, periodo: { desde, hasta }, tickets: delPeriodo.length },
+        p_request_payload: { pac: res.pacUsado, periodo: { desde, hasta }, tickets: delPeriodo.length, usuario_id: u.user.id },
         p_response_payload: res.responsePayload,
       });
       await soltarPeriodo("ERROR");
       return json({ ok: false, error: res.codigoError, mensaje: res.mensajeError }, 502);
     }
 
-    await sb.rpc("cfdi_marcar_timbrado", {
+    await admin.rpc("cfdi_marcar_timbrado", {
       p_cfdi_id: cfdiId,
       p_uuid_fiscal: res.uuidFiscal,
       p_serie: res.serie,
@@ -307,7 +348,7 @@ Deno.serve(async (req) => {
       p_pdf_storage_path: `cfdi/${cfdiId}.pdf`,
       p_pac_referencia: res.pacReferencia,
       p_pac_costo_centavos: res.costoCentavos,
-      p_request_payload: { pac: res.pacUsado, periodo: { desde, hasta }, tickets: delPeriodo.length },
+      p_request_payload: { pac: res.pacUsado, periodo: { desde, hasta }, tickets: delPeriodo.length, usuario_id: u.user.id },
       p_response_payload: res.responsePayload,
     });
 
@@ -315,7 +356,6 @@ Deno.serve(async (req) => {
     {
       const pacF = obtenerFacturama();
       if (pacF && res.pacReferencia) {
-        const admin = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!, { auth: { persistSession: false } });
         const [xml, pdf] = await Promise.all([pacF.descargar(res.pacReferencia, "xml"), pacF.descargar(res.pacReferencia, "pdf")]);
         const archivo = await archivarCfdi(cfdiId, { xml, pdf }, subidorSupabase(admin));
         if (archivo.errores.length) console.error(`[global] ${cfdiId} archivo incompleto: ${archivo.errores.join("; ")}`);
@@ -347,7 +387,8 @@ Deno.serve(async (req) => {
 
     // La global se timbra aunque no queden folios: es una obligación ante el SAT y no puede
     // quedarse sin emitir por saldo. `consumir_folio_cfdi` lo contempla con `p_es_global`.
-    await sb.rpc("consumir_folio_cfdi", { p_tenant_id: tenantId, p_cfdi_id: cfdiId, p_es_global: true });
+    // (Ver FOLIOS en la cabecera: por qué esto es intencional y qué lo acota.)
+    await admin.rpc("consumir_folio_cfdi", { p_tenant_id: tenantId, p_cfdi_id: cfdiId, p_es_global: true });
 
     return json({
       ok: true,

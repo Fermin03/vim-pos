@@ -129,7 +129,9 @@ async function enviarCorreo(payload: { to: string; subject: string; html: string
      La regla de este archivo es que después del insert nada puede devolver un
      error al visitante. Escribirla en un comentario no la hace cumplirse; hay
      que envolver el bloque entero. */
-  let cliente: { send: (m: unknown) => Promise<unknown>; close: () => Promise<void> } | null = null;
+  // `null as …` y no `: … = null`: con la anotación, TS estrecha a `null` y dentro del `finally`
+  // (tras la asignación en el `try`) daba `never`, así que `cliente.close()` no tipaba.
+  let cliente = null as { send: (m: unknown) => Promise<unknown>; close: () => Promise<void> } | null;
 
   try {
     const { SMTPClient } = await import("https://deno.land/x/denomailer@1.6.0/mod.ts");

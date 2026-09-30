@@ -18,12 +18,27 @@
 // tenant que resolvió el código del negocio de la URL, y ninguna acepta un identificador que venga
 // del cliente. Si alguna vez hace falta tocar otra tabla desde aquí, ese filtro es obligatorio.
 //
+// QUIÉN PUEDE VER UN TICKET (auditoría 30/09/2026, C1-4)
+//
+// El folio va impreso y es secuencial: con él solo, cualquiera recorría los tickets de un negocio
+// (fecha y total) y los timbraba a RFC inventados, gastando sus folios y dejando al cliente real
+// con "ya facturado". Ahora toda acción sobre un ticket exige un segundo factor ANTES de buscarlo:
+// el token del QR (`t`, HMAC del ticket con un secreto que solo tiene la base, `autofactura_token`)
+// o, si no viene —tickets ya impresos, caja de escritorio, folio tecleado—, el total exacto.
+// Un fallo del factor responde igual que un folio inexistente: no confirma nada.
+//
+// EMISOR: `tenant_cfdi_emisor.rfc_verificado` (C1-1). Antes era `tenants.rfc`, que el negocio
+// edita: con el RFC de otro cliente de VIM, el portal timbraba con el sello de ese otro cliente.
+//
 // Local: supabase functions serve autofacturar --env-file supabase/functions/.env
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import { corsHeaders } from "../_shared/cors.ts";
 import { timbrarConFailover, obtenerFacturama, PAC_NO_CONFIGURADO } from "../_shared/pac/index.ts";
 import { armarConceptos, ConceptosIncoherentes, type LineaTicket } from "../_shared/pac/conceptos.ts";
-import { archivarCfdi, bytesABase64, partirRutaLogica, subidorSupabase } from "../_shared/pac/archivo.ts";
+import { archivarCfdi, bytesABase64, objetoArchivoCfdi, subidorSupabase } from "../_shared/pac/archivo.ts";
+import { aCentavos, accesoAlTicket, normalizarToken } from "../_shared/pac/acceso-ticket.ts";
+import { resolverEmisorVerificado } from "../_shared/pac/emisor.ts";
+import { consumirCupo, ipDeLaPeticion } from "../_shared/limite.ts";
 import {
   campoDelRechazo,
   REGIMENES_RECEPTOR,
@@ -35,22 +50,18 @@ import {
 } from "../_shared/pac/receptor.ts";
 
 /**
- * Ritmo máximo por IP. Generoso para una persona —quien factura su comida lo intenta tres o cuatro
- * veces mientras encuentra su código postal— y estrecho para un script que recorre folios.
+ * Ritmo máximo. Generoso para una persona —quien factura su comida lo intenta tres o cuatro veces
+ * mientras encuentra su código postal— y estrecho para un script que recorre folios.
+ *
+ * Auditoría integral 30/09/2026: antes era un `Map` en memoria de UNA instancia, indexado por la
+ * PRIMERA entrada de X-Forwarded-For (la escribe quien llama) y que nunca se purgaba. Ahora el
+ * contador vive en la base (`consumir_cupo`, 0136) y la IP sale de `ipDeLaPeticion` (ver
+ * `_shared/limite.ts`). Además del cupo por IP hay uno POR NEGOCIO: recorrer folios es un ataque a
+ * un negocio concreto, y ese tope no depende de ninguna cabecera. Si la base no responde se deja
+ * pasar ("abrir"): la consulta del ticket necesita la base igual, así que cerrar no quitaría abuso.
  */
-const MAX_POR_VENTANA = 20;
-const VENTANA_MS = 10 * 60 * 1000;
-const intentos = new Map<string, { n: number; desde: number }>();
-
-function ritmoExcedido(ip: string): boolean {
-  const e = intentos.get(ip);
-  if (!e || Date.now() - e.desde > VENTANA_MS) {
-    intentos.set(ip, { n: 1, desde: Date.now() });
-    return false;
-  }
-  e.n += 1;
-  return e.n > MAX_POR_VENTANA;
-}
+const CUPO_IP = { ventanaSeg: 10 * 60, max: 20 };
+const CUPO_NEGOCIO = { ventanaSeg: 60 * 60, max: 300 };
 
 const CORREO_VALIDO = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -62,13 +73,23 @@ Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
   if (req.method !== "POST") return json({ error: "METHOD_NOT_ALLOWED" }, 405);
 
-  const ip = (req.headers.get("x-forwarded-for") ?? "").split(",")[0].trim() || "desconocida";
-  if (ritmoExcedido(ip)) {
-    return json({ error: "DEMASIADOS_INTENTOS", mensaje: "Demasiados intentos. Espera unos minutos." }, 429);
+  const sb = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!, {
+    auth: { persistSession: false },
+  });
+  const demasiados = () =>
+    json({ error: "DEMASIADOS_INTENTOS", mensaje: "Demasiados intentos. Espera unos minutos." }, 429);
+
+  const ip = ipDeLaPeticion(req);
+  if (!(await consumirCupo(sb, { clave: `autofactura:ip:${ip}`, ...CUPO_IP }, "abrir")).permitido) {
+    return demasiados();
   }
 
   let body: {
     accion?: string; negocio?: string; folio?: string; rfc?: string; email?: string;
+    /** Token del QR (`?t=`). */
+    token?: string;
+    /** Total del ticket, como lo escribe el comensal ("$186.50"): segundo factor sin token. */
+    total?: string | number;
     receptor?: { rfc?: string; razonSocial?: string; regimenFiscal?: string; codigoPostal?: string; usoCfdi?: string; email?: string };
   };
   try {
@@ -83,9 +104,9 @@ Deno.serve(async (req) => {
   // Sin folio solo se puede preguntar por el negocio (el encabezado del paso 1).
   if (!folio && body.accion !== "negocio") return json({ error: "FALTAN_DATOS" }, 400);
 
-  const sb = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!, {
-    auth: { persistSession: false },
-  });
+  if (!(await consumirCupo(sb, { clave: `autofactura:negocio:${codigoNegocio.slice(0, 60)}`, ...CUPO_NEGOCIO }, "abrir")).permitido) {
+    return demasiados();
+  }
 
   // ── El negocio ──────────────────────────────────────────────────────────────────────────────
   const { data: tenantRaw } = await sb
@@ -132,6 +153,21 @@ Deno.serve(async (req) => {
     return json({ estado: "OK", negocio: tenant.nombre_comercial, logo: tenant.logo_png_url });
   }
 
+  // ── El segundo factor ───────────────────────────────────────────────────────────────────────
+  // Antes de tocar el ticket: sin token ni total no se busca nada, así que esta respuesta no dice
+  // si el folio existe.
+  const tokenRecibido = normalizarToken(body.token);
+  const totalRecibido = aCentavos(body.total);
+  if (!tokenRecibido && totalRecibido === null) {
+    return json({
+      estado: "PIDE_TOTAL",
+      campo: "total",
+      mensaje: "Escribe el total de tu ticket, tal como viene impreso.",
+      negocio: tenant.nombre_comercial,
+      logo: tenant.logo_png_url,
+    }, 400);
+  }
+
   // ── El ticket ───────────────────────────────────────────────────────────────────────────────
   const { data: ticketRaw } = await sb
     .from("tickets")
@@ -143,10 +179,27 @@ Deno.serve(async (req) => {
     id: string; folio_completo: string; dia_contable: string; total_mxn: number; estado_fiscal: string;
   } | null;
 
-  if (!ticket) {
+  let tokenEsperado: string | null = null;
+  if (ticket && tokenRecibido) {
+    const { data: t } = await sb.rpc("autofactura_token", { p_ticket_id: ticket.id });
+    tokenEsperado = typeof t === "string" ? t : null;
+  }
+  const conAcceso = ticket !== null && accesoAlTicket({
+    tokenRecibido,
+    tokenEsperado,
+    totalRecibidoCentavos: totalRecibido,
+    totalTicketMxn: ticket.total_mxn,
+  });
+
+  if (!ticket || !conAcceso) {
+    // Folio inexistente y factor equivocado dan la MISMA respuesta: no se confirma que el folio
+    // exista. Si vino con token y no valió, se pide el total (un QR viejo o de otra caja).
     return json({
-      estado: "NO_EXISTE",
-      mensaje: "No encontramos ese folio. Revísalo en tu ticket: va completo, con letras y guion.",
+      estado: tokenRecibido && totalRecibido === null ? "PIDE_TOTAL" : "NO_EXISTE",
+      campo: totalRecibido === null ? "total" : null,
+      mensaje: totalRecibido === null
+        ? "No pudimos comprobar tu ticket con el código QR. Escribe el total, tal como viene impreso."
+        : "No encontramos un ticket con ese folio y ese total. Revísalos en tu ticket: el folio va completo, con letras y guion.",
       negocio: tenant.nombre_comercial,
     }, 404);
   }
@@ -224,6 +277,19 @@ Deno.serve(async (req) => {
     return json({ estado: "ERROR", mensaje: "El negocio no tiene completos sus datos fiscales." }, 409);
   }
 
+  // El emisor: el RFC cuyo sello cargó este negocio, y tiene que ser el que imprime en su ticket.
+  const { data: emisorRaw } = await sb
+    .from("tenant_cfdi_emisor")
+    .select("rfc, rfc_verificado")
+    .eq("tenant_id", tenant.id)
+    .maybeSingle();
+  const emisorFila = emisorRaw as { rfc: string | null; rfc_verificado: string | null } | null;
+  const emisorRfc = resolverEmisorVerificado(emisorFila?.rfc_verificado, [emisorFila?.rfc, tenant.rfc]);
+  if (!emisorRfc.ok) {
+    console.error(`[autofactura] tenant ${tenant.id} sin emisor utilizable: ${emisorRfc.error}`);
+    return json({ estado: "ERROR", mensaje: "El negocio no puede emitir facturas en este momento. Avísale en el mostrador." }, 409);
+  }
+
   // Folios: si no quedan, no se timbra. Se dice en lenguaje del comensal, que no tiene por qué
   // saber qué es un folio fiscal ni de quién es la culpa.
   const { data: saldoRaw } = await sb
@@ -251,7 +317,7 @@ Deno.serve(async (req) => {
     .order("orden_visualizacion");
   if (iErr) return json({ estado: "ERROR", mensaje: "No se pudo leer el ticket." }, 500);
 
-  const lineas: LineaTicket[] = ((itemsRaw ?? []) as Record<string, unknown>[]).map((f) => ({
+  const lineas: LineaTicket[] = ((itemsRaw ?? []) as unknown as Record<string, unknown>[]).map((f) => ({
     id: String(f.id),
     parentId: (f.parent_item_id as string) ?? null,
     comboRol: (f.combo_rol as "PADRE" | "HIJO" | null) ?? null,
@@ -293,7 +359,7 @@ Deno.serve(async (req) => {
       receptor_codigo_postal: codigoPostal,
       receptor_regimen_fiscal: regimenFiscal,
       receptor_email: email || null,
-      emisor_rfc: tenant.rfc,
+      emisor_rfc: emisorRfc.rfc,
       emisor_razon_social: tenant.razon_social,
       emisor_regimen_fiscal: tenant.regimen_fiscal,
       emisor_lugar_expedicion: tenant.codigo_postal_fiscal,
@@ -323,7 +389,7 @@ Deno.serve(async (req) => {
     cfdiId,
     tipoComprobante: "INGRESO",
     emisor: {
-      rfc: tenant.rfc,
+      rfc: emisorRfc.rfc,
       razonSocial: tenant.razon_social,
       regimenFiscal: tenant.regimen_fiscal,
       lugarExpedicion: tenant.codigo_postal_fiscal,
@@ -449,7 +515,7 @@ async function entregarFacturaExistente(
   }
   const { data } = await sb
     .from("tickets_cfdi")
-    .select("id, uuid_fiscal, total_mxn, pac_proveedor, pac_referencia, xml_storage_path, pdf_storage_path")
+    .select("id, uuid_fiscal, total_mxn, pac_proveedor, pac_referencia")
     .eq("tenant_id", p.tenantId)
     .eq("ticket_id", p.ticketId)
     .eq("tipo_comprobante", "INGRESO")
@@ -459,7 +525,6 @@ async function entregarFacturaExistente(
     .maybeSingle();
   const c = data as {
     id: string; uuid_fiscal: string | null; total_mxn: number; pac_proveedor: string | null; pac_referencia: string | null;
-    xml_storage_path: string | null; pdf_storage_path: string | null;
   } | null;
   if (!c) {
     return json({
@@ -484,9 +549,11 @@ async function entregarFacturaExistente(
     return json({ estado: "ENVIADA", correo: p.email });
   }
 
-  // Descarga: primero lo archivado en el bucket; si falta, se repone desde el PAC.
-  const leer = async (ruta: string | null, formato: "xml" | "pdf"): Promise<string | null> => {
-    const guardada = partirRutaLogica(ruta);
+  // Descarga: primero lo archivado en el bucket; si falta, se repone desde el PAC. El objeto sale
+  // del id del CFDI y no de `*_storage_path` (C1-3: esa ruta la podía reescribir un empleado, y
+  // aquí se lee con service_role).
+  const leer = async (formato: "xml" | "pdf"): Promise<string | null> => {
+    const guardada = objetoArchivoCfdi(c.id, formato);
     if (guardada) {
       const { data: blob } = await sb.storage.from(guardada.bucket).download(guardada.nombre);
       if (blob) return bytesABase64(new Uint8Array(await blob.arrayBuffer()));
@@ -494,7 +561,7 @@ async function entregarFacturaExistente(
     if (pac && c.pac_proveedor === "FACTURAMA" && c.pac_referencia) return await pac.descargar(c.pac_referencia, formato);
     return null;
   };
-  const [xml, pdf] = await Promise.all([leer(c.xml_storage_path, "xml"), leer(c.pdf_storage_path, "pdf")]);
+  const [xml, pdf] = await Promise.all([leer("xml"), leer("pdf")]);
   if (!xml && !pdf) {
     return json({ estado: "ERROR", mensaje: "La factura existe, pero no pudimos recuperar los archivos. Pídela en el negocio." }, 502);
   }
