@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import { Button, DialogoPeligro, Modal, useConfirmar } from "@vim/ui/styles";
 import { haceCuanto } from "@vim/fecha";
 import { PageHeader, PageBody } from "../../../components/page-header";
@@ -109,12 +110,23 @@ export default function CajasPage() {
         subtitulo="Los puntos de cobro de cada sucursal. Cada caja maneja su propio turno, fondo y arqueo."
         migas={[{ label: "Configuración" }, { label: "Cajas" }]}
         right={
+          <div className="flex flex-wrap gap-2">
+          <Link
+            href="/configuracion/cajas/descargar"
+            className="inline-flex h-11 items-center gap-2 rounded border border-line-strong px-4 text-14 font-semibold text-ink-2 transition-colors hover:border-ink hover:text-ink"
+          >
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-[17px] w-[17px]" aria-hidden="true">
+              <path d="M12 3v12M7 10l5 5 5-5M5 21h14" />
+            </svg>
+            Descargar VIM POS
+          </Link>
           <Button onClick={() => setModal({ caja: null })}>
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" className="h-[17px] w-[17px]">
               <path d="M12 5v14M5 12h14" />
             </svg>
             Nueva caja
           </Button>
+          </div>
         }
       />
       <PageBody>
@@ -239,6 +251,10 @@ export default function CajasPage() {
       {creds && (
         <Modal open onClose={() => { /* solo con «Ya la capturé» */ }} title="Credenciales del dispositivo" className="w-full max-w-[480px] rounded-lg border border-line bg-surface p-6 shadow-xl">
           <p className="text-13 text-ink-2">Captura esto <b>una sola vez</b> en VIM POS, en la computadora de <b className="text-ink">{creds.caja_nombre}</b> (pantalla «Vincular este dispositivo»).</p>
+          <p className="mt-2 text-13 text-ink-2">
+            ¿Aún no instalas VIM POS en esa computadora?{" "}
+            <Link href="/configuracion/cajas/descargar" className="font-semibold text-ink underline underline-offset-2">Descárgalo aquí</Link>.
+          </p>
           <div className="mt-4 space-y-3">
             <CampoCopiable label="Identificador del dispositivo" valor={creds.identificador} />
             <CampoCopiable label="Clave del dispositivo" valor={creds.clave} />

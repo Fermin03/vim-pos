@@ -9,6 +9,8 @@ import { salir } from "../lib/supabase";
 import { listarSucursales } from "../lib/configuracion";
 import { JERARQUIA_MINIMA_PANEL, puedeVer } from "../lib/acceso";
 import { leerAcceso, ACCESO_OK, type Acceso } from "../lib/acceso-tenant";
+import { enlaceWhatsapp, mensajeAyudaAdmin, SOPORTE_POR_DEFECTO, textoHorario } from "@vim/db/soporte";
+import { leerAyuda, type AyudaAdmin } from "../lib/soporte";
 
 const PerfilCtx = createContext<Perfil | null>(null);
 export const usePerfil = () => useContext(PerfilCtx);
@@ -86,6 +88,8 @@ export function AdminShell({ children }: { children: ReactNode }) {
   const [sinAcceso, setSinAcceso] = useState<string | null>(null);
   const [sucursales, setSucursales] = useState<{ nombre: string; total: number } | null>(null);
   const [acceso, setAcceso] = useState<Acceso>(ACCESO_OK);
+  // Soporte de VIM (0142). Arranca con el de fábrica: el enlace nunca queda en blanco.
+  const [ayuda, setAyuda] = useState<AyudaAdmin>({ soporte: SOPORTE_POR_DEFECTO, negocio: null, codigo: null });
   // Cajón lateral: solo existe por debajo de `lg`. En escritorio el <aside> es estático.
   const [menuAbierto, setMenuAbierto] = useState(false);
 
@@ -132,6 +136,7 @@ export function AdminShell({ children }: { children: ReactNode }) {
       }
       setPerfil(await cargarPerfil());
       setListo(true);
+      leerAyuda().then(setAyuda).catch(() => {});
       // El selector del sidebar muestra la sucursal real del tenant (antes decía "León Centro"
       // fijo, que es el dato del mockup: cualquier cliente nuevo veía el nombre equivocado).
       listarSucursales()
@@ -209,6 +214,11 @@ export function AdminShell({ children }: { children: ReactNode }) {
   }
 
   const jer = perfil?.jerarquia ?? 0;
+  const waAyuda = enlaceWhatsapp(
+    ayuda.soporte.whatsapp,
+    mensajeAyudaAdmin({ usuario: perfil?.nombre, negocio: ayuda.negocio, codigo: ayuda.codigo }),
+  );
+  const horarioAyuda = textoHorario(ayuda.soporte);
 
   return (
     <PerfilCtx.Provider value={perfil}>
@@ -291,6 +301,25 @@ export function AdminShell({ children }: { children: ReactNode }) {
               );
             })}
           </nav>
+
+          {/* Ayuda por WhatsApp (0142): fuera de las secciones porque no es una pantalla, y a la
+              vista en el cajón del celular igual que en el escritorio. Abre en otra pestaña. */}
+          {waAyuda && (
+            <a
+              href={waAyuda}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="mx-3 mb-3 flex min-h-[44px] items-center gap-[11px] rounded border border-[#2C2C32] px-3 py-2 text-sm font-medium text-[#C8C8CC] transition-colors hover:bg-[#1E1E23] hover:text-white lg:min-h-0"
+            >
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-[18px] w-[18px] flex-shrink-0" aria-hidden="true">
+                <path d="M20 11.5a8 8 0 0 1-11.8 7L4 20l1.5-4.1A8 8 0 1 1 20 11.5z" />
+              </svg>
+              <span className="min-w-0">
+                <span className="block">Ayuda por WhatsApp</span>
+                {horarioAyuda && <span className="block text-12 font-normal text-[#76767E]">{horarioAyuda}</span>}
+              </span>
+            </a>
+          )}
 
           <div className="flex flex-shrink-0 items-center gap-2.5 border-t border-[#2C2C32] p-3 pb-[max(12px,env(safe-area-inset-bottom))] lg:pb-3">
             <div className="flex h-[34px] w-[34px] flex-shrink-0 items-center justify-center rounded-full border border-[#2C2C32] bg-[#2A2A30] font-display text-13 font-semibold text-white">
