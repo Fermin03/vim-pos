@@ -2,6 +2,8 @@
 
 **Fecha:** 24 sep 2026 · **Alcance:** las seis superficies de VIM POS · **Estado:** registro (no se edita)
 
+> **Seguimiento:** qué se arregló y qué sigue abierto, comprobado contra el código, en [`ESTADO.md`](ESTADO.md) (30 sep 2026).
+
 Revisión del diseño visual de todo el producto con dos herramientas: **Impeccable** (crítica de
 diseño con heurísticas de Nielsen, carga cognitiva y personas) y la filosofía de **Emil Kowalski**
 (movimiento, retroalimentación al tocar, detalles invisibles). No se tocó código: esto es la lista
