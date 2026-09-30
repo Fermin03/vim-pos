@@ -4,7 +4,7 @@
 // Requiere (env), tras despausar el cloud y desplegar las 2 Edge + migraciones 0055/0056:
 //   VIM_CLOUD_URL     = https://pbiaxzvmssjsxdwqrumb.supabase.co
 //   VIM_CLOUD_ANON    = <anon key del proyecto>            (pública; Vercel/dashboard)
-//   VIM_DEVICE_EMAIL  = caja-<caja_id>@dispositivos.vimpos.mx
+//   VIM_DEVICE_EMAIL  = caja-<caja_id>@dispositivos.vimpos.com.mx
 //   VIM_DEVICE_PASS   = <clave del dispositivo>
 // Uso:  VIM_CLOUD_URL=… VIM_CLOUD_ANON=… VIM_DEVICE_EMAIL=… VIM_DEVICE_PASS=… npm run verify:cloud
 import { startBackend } from "./backend.mjs";

@@ -1,10 +1,11 @@
 // Edge Function: provisionar-dispositivo — el DUEÑO/ADMIN genera (o regenera) las credenciales
-// del dispositivo de una caja. Crea la cuenta sintética caja-{caja_id}@dispositivos.vimpos.mx
+// del dispositivo de una caja. Crea la cuenta sintética caja-{caja_id}@dispositivos.vimpos.com.mx
 // + usuarios_perfil + usuarios_acceso (rol DISPOSITIVO). Devuelve email + password UNA vez.
 // service_role server-side. Requiere JWT de un DUEÑO/ADMIN del tenant dueño de la caja.
 
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import { corsHeaders } from "../_shared/cors.ts";
+import { cajaIdDeEmail, correoDispositivo } from "../_shared/dispositivo.ts";
 
 const admin = createClient(
   Deno.env.get("SUPABASE_URL")!,
@@ -61,26 +62,28 @@ Deno.serve(async (req) => {
   const cajaNombre = (caja as { nombre: string }).nombre ?? "Caja";
 
   // 5) Cuenta de dispositivo: email sintético derivado del caja_id
-  const email = `caja-${cajaId}@dispositivos.vimpos.mx`;
+  const email = correoDispositivo(cajaId);
   const password = generarPassword();
 
-  // Crear; si ya existe, ubicarla y solo actualizar la contraseña (regenerar).
+  // Regenerar: la cuenta de esta caja ya existe, quizá con el dominio viejo (`vimpos.mx`, que no
+  // es de VIM; ver `_shared/dispositivo.ts`). Se busca por el id de caja, no por el correo, y se
+  // le pone la contraseña nueva y el correo bueno de una vez: la caja se vuelve a vincular con
+  // estas credenciales de todos modos. Buscar solo por el correo nuevo crearía una segunda cuenta
+  // para la misma caja.
   let uid: string;
-  const { data: created, error: createErr } = await admin.auth.admin.createUser({
-    email, password, email_confirm: true, user_metadata: { nombre: cajaNombre, tipo: "DISPOSITIVO" },
-  });
-  if (created?.user) {
-    uid = created.user.id;
-  } else if (createErr && /already|registered|exists/i.test(createErr.message)) {
-    // Buscar la cuenta existente por email y regenerar su contraseña.
-    const { data: lista } = await admin.auth.admin.listUsers({ page: 1, perPage: 1000 });
-    const existente = lista?.users.find((u) => u.email?.toLowerCase() === email.toLowerCase());
-    if (!existente) return json({ error: "DISPOSITIVO_EXISTENTE_NO_UBICABLE" }, 500);
+  const { data: lista, error: listErr } = await admin.auth.admin.listUsers({ page: 1, perPage: 1000 });
+  if (listErr) return json({ error: "ERROR_LISTAR_AUTH", detalle: listErr.message }, 500);
+  const existente = lista?.users.find((u) => cajaIdDeEmail(u.email) === cajaId.toLowerCase());
+  if (existente) {
     uid = existente.id;
-    const { error: updErr } = await admin.auth.admin.updateUserById(uid, { password });
+    const { error: updErr } = await admin.auth.admin.updateUserById(uid, { email, email_confirm: true, password });
     if (updErr) return json({ error: "ERROR_ACTUALIZAR", detalle: updErr.message }, 500);
   } else {
-    return json({ error: "ERROR_CREAR_AUTH", detalle: createErr?.message ?? "?" }, 400);
+    const { data: created, error: createErr } = await admin.auth.admin.createUser({
+      email, password, email_confirm: true, user_metadata: { nombre: cajaNombre, tipo: "DISPOSITIVO" },
+    });
+    if (!created?.user) return json({ error: "ERROR_CREAR_AUTH", detalle: createErr?.message ?? "?" }, 400);
+    uid = created.user.id;
   }
 
   // 6) Perfil del dispositivo (sin PIN) — upsert idempotente

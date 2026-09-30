@@ -6,7 +6,7 @@ import pg from "pg";
 
 const GW_PORT = 54350;
 const GW = `http://localhost:${GW_PORT}`;
-const DEVICE_EMAIL = "caja-99999999-0000-0000-0000-0000000000cc@dispositivos.vimpos.mx";
+const DEVICE_EMAIL = "caja-99999999-0000-0000-0000-0000000000cc@dispositivos.vimpos.com.mx";
 const DEVICE_PASS = "vim-device-dev";
 const CAJA = "99999999-0000-0000-0000-0000000000cc";
 

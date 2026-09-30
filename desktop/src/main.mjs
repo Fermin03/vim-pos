@@ -12,6 +12,7 @@ import { fileURLToPath } from "node:url";
 import { startBackend } from "./backend.mjs";
 import { startUiServer } from "./ui-server.mjs";
 import { pullFromCloud } from "./sync-pull.mjs";
+import { loginDispositivoNube } from "./dispositivo.mjs";
 import { pushToCloud } from "./sync-push.mjs";
 import { respaldar } from "./backup.mjs";
 import { crearWatchdog } from "./watchdog.mjs";
@@ -162,6 +163,17 @@ function leerNube() {
     return cfg;
   } catch { return null; }
 }
+/**
+ * La nube aceptó esta caja con el correo del otro dominio (su cuenta se movió de
+ * `dispositivos.vimpos.mx` a `dispositivos.vimpos.com.mx`, ver dispositivo.mjs): se guarda el
+ * bueno para no gastar un intento rechazado en cada ciclo. Con credenciales del env no se toca
+ * nada: esas las pone quien corre la prueba.
+ */
+function recordarCorreoNube(nube, email) {
+  if (!email || email === nube.email || process.env.VIM_DEVICE_EMAIL) return;
+  guardarNube({ cloudUrl: nube.cloudUrl, anon: nube.anon, email, pass: nube.pass });
+  console.log(`· [nube] la cuenta de esta caja cambió de dominio; se guarda ${email}`);
+}
 function guardarNube({ cloudUrl, anon, email, pass }) {
   try {
     mkdirSync(CONFIG_DIR, { recursive: true });
@@ -192,14 +204,11 @@ async function vincularConNube({ email, password } = {}) {
 
   let token;
   try {
-    const r = await fetch(`${CLOUD_URL}/auth/v1/token?grant_type=password`, {
-      method: "POST",
-      headers: { apikey: CLOUD_ANON, "Content-Type": "application/json" },
-      body: JSON.stringify({ email, password }),
-      signal: AbortSignal.timeout(15000),
-    });
-    const s = await r.json().catch(() => ({}));
-    token = s.access_token;
+    // Prueba también el otro dominio (dispositivo.mjs): quien vincula puede traer apuntado el
+    // correo viejo de una cuenta que ya se movió, o al revés.
+    const l = await loginDispositivoNube({ cloudUrl: CLOUD_URL, anon: CLOUD_ANON, email, pass: password });
+    token = l.token;
+    if (token) email = l.email;
     if (!token) {
       // La nube contestó y dijo que no: son las credenciales, no la red.
       return { ok: false, motivo: "CREDENCIALES", error: "La nube rechazó estas credenciales del dispositivo." };
@@ -503,13 +512,10 @@ async function tokenDeNube() {
   const { cloudUrl, anon, email, pass } = nube;
   if (!cloudUrl || !anon || !email || !pass) return null;
   try {
-    const r = await fetch(`${cloudUrl}/auth/v1/token?grant_type=password`, {
-      method: "POST", headers: { apikey: anon, "Content-Type": "application/json" },
-      body: JSON.stringify({ email, password: pass }),
-      signal: AbortSignal.timeout(10000),
-    });
-    const s = await r.json();
-    return s.access_token ? { cloudUrl, anonKey: anon, deviceToken: s.access_token } : null;
+    const l = await loginDispositivoNube({ cloudUrl, anon, email, pass, timeoutMs: 10000 });
+    if (!l.token) return null;
+    recordarCorreoNube(nube, l.email);
+    return { cloudUrl, anonKey: anon, deviceToken: l.token };
   } catch {
     return null;
   }
@@ -606,13 +612,10 @@ async function syncBestEffort({ conPull = true } = {}) {
   const { cloudUrl, anon, email, pass } = nube;
   if (!cloudUrl || !anon || !email || !pass) { console.log("· [sync] omitido (configuración de nube incompleta)"); return false; }
   try {
-    const r = await fetch(`${cloudUrl}/auth/v1/token?grant_type=password`, {
-      method: "POST", headers: { apikey: anon, "Content-Type": "application/json" },
-      body: JSON.stringify({ email, password: pass }),
-    });
-    const s = await r.json();
-    if (!s.access_token) { console.log("· [sync] omitido (login de dispositivo en la nube falló)"); return false; }
-    const deviceToken = s.access_token;
+    const l = await loginDispositivoNube({ cloudUrl, anon, email, pass, timeoutMs: 30000 });
+    if (!l.token) { console.log("· [sync] omitido (login de dispositivo en la nube falló)"); return false; }
+    recordarCorreoNube(nube, l.email);
+    const deviceToken = l.token;
     const opts = { cloudUrl, anonKey: anon, deviceToken };
     let pushOk = false;
     try {

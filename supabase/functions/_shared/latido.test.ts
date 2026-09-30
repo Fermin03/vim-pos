@@ -4,7 +4,7 @@ import { cajaIdDeEmail, validarCuerpo } from "./latido.ts";
 
 test("saca el caja_id del correo sintético del dispositivo", () => {
   assert.equal(
-    cajaIdDeEmail("caja-99999999-0000-0000-0000-0000000000cc@dispositivos.vimpos.mx"),
+    cajaIdDeEmail("caja-99999999-0000-0000-0000-0000000000cc@dispositivos.vimpos.com.mx"),
     "99999999-0000-0000-0000-0000000000cc",
   );
 });

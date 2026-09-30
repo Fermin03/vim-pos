@@ -11,6 +11,7 @@
     "./modulos": "./src/modulos.ts",
     "./modos-servicio": "./src/modos-servicio.ts",
     "./metodos-pago": "./src/metodos-pago.ts",
+    "./dispositivo": "./src/dispositivo.ts",
     "./fixtures-combos": "./src/fixtures-combos.ts"
   },
   "scripts": {

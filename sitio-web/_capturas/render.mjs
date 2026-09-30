@@ -49,7 +49,7 @@ const KDS = process.env.VIM_KDS_URL ?? "http://localhost:3003";
    apps/pos/app/lib/supabase.ts). Un correo con otra forma se acepta en el
    formulario y falla al vincular. */
 const CAJA = {
-  email: "caja-9c3a71e0-0000-4000-8000-000000000003@dispositivos.vimpos.mx",
+  email: "caja-9c3a71e0-0000-4000-8000-000000000003@dispositivos.vimpos.com.mx",
   password: "demo-dispositivo",
 };
 const PIN = "1234";           // Ana Ruiz

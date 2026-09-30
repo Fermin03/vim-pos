@@ -318,7 +318,7 @@ la bandeja de Atención y no bloquea solo.
 
 `POST /functions/v1/caja-latido`, `Authorization: Bearer <JWT del dispositivo>`. Misma
 validación que `sync-push`: usuario válido, `tipo_identidad = DISPOSITIVO`. El `caja_id` sale
-del correo sintético del dispositivo (`caja-<uuid>@dispositivos.vimpos.mx`, regla de
+del correo sintético del dispositivo (`caja-<uuid>@dispositivos.vimpos.com.mx`, regla de
 `desktop/src/auth.mjs`), nunca del cuerpo. Cuerpo: `{ version, so, avisos_vistos: [] }`. La IP
 se toma de `x-forwarded-for`. Responde `{ directivas }`. Cualquier error del RPC responde 500 y
 la caja conserva sus directivas anteriores.

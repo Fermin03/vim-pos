@@ -31,8 +31,8 @@ export function VincularDispositivo({
   /** Login contra la base LOCAL. Es el que decide si la caja queda vinculada. */
   async function intentarLocal(correo: string, clave: string): Promise<boolean> {
     try {
-      await deviceSignIn(correo, clave);
-      guardarIdent({ email: correo }); // SEC CN-006: solo el correo; la sesión la sostiene supabase-js
+      const entro = await deviceSignIn(correo, clave);
+      guardarIdent({ email: entro }); // SEC CN-006: solo el correo; la sesión la sostiene supabase-js
       return true;
     } catch {
       return false;

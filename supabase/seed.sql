@@ -328,7 +328,7 @@ DECLARE
   v_tenant  uuid := '99999999-0000-0000-0000-0000000000aa';
   v_suc     uuid := '99999999-0000-0000-0000-0000000000bb';
   v_caja    uuid := '99999999-0000-0000-0000-0000000000cc';
-  v_disp_email text := 'caja-99999999-0000-0000-0000-0000000000cc@dispositivos.vimpos.mx';
+  v_disp_email text := 'caja-99999999-0000-0000-0000-0000000000cc@dispositivos.vimpos.com.mx';
 BEGIN
   -- Usuario de auth (local dev). Si ya existe, no repetir.
   INSERT INTO auth.users (instance_id, id, aud, role, email, encrypted_password,

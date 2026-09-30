@@ -16,7 +16,7 @@
 - **Numeración de migraciones:** la siguiente libre es **0105**. Antes de fijarla, correr `supabase migration list --linked` y confirmar que 0105 no está tomada en producción. Si lo está, subir el número aquí y en la spec. Una migración cuyo número ya figura en el historial remoto **se salta en silencio**.
 - **La venta nunca se bloquea por falta de red** (§3). Solo bloquea una directiva que diga `bloqueado: true`. Una directiva vieja o ausente **no** bloquea, aunque su `bloquea_desde` ya haya pasado.
 - **El latido no puede frenar el push.** Su fallo se registra y el ciclo sigue; no cuenta como fallo ni dispara backoff.
-- **Identidad por token, nunca por cuerpo.** El `caja_id` sale del correo sintético del dispositivo (`caja-<uuid>@dispositivos.vimpos.mx`), como en `desktop/src/auth.mjs`.
+- **Identidad por token, nunca por cuerpo.** El `caja_id` sale del correo sintético del dispositivo (`caja-<uuid>@dispositivos.vimpos.com.mx`), como en `desktop/src/auth.mjs`.
 - **`service_role` solo en Edge Functions y `apps/platform`** (regla dura 1). `mi_acceso()` es la única pieza nueva ejecutable por `authenticated`, solo lee y solo del tenant de la sesión.
 - **Sin `any`**: `unknown` + Zod o tipos declarados. `pnpm turbo run typecheck` en cero tras cada tarea.
 - **Español en dominio**, archivos `kebab-case`, componentes `PascalCase`.
@@ -384,7 +384,7 @@ import { cajaIdDeEmail, validarCuerpo } from "./latido.ts";
 
 test("saca el caja_id del correo sintético del dispositivo", () => {
   assert.equal(
-    cajaIdDeEmail("caja-99999999-0000-0000-0000-0000000000cc@dispositivos.vimpos.mx"),
+    cajaIdDeEmail("caja-99999999-0000-0000-0000-0000000000cc@dispositivos.vimpos.com.mx"),
     "99999999-0000-0000-0000-0000000000cc",
   );
 });

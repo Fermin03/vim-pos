@@ -55,7 +55,7 @@ caja y una cocina pueden convivir en la misma PC.
 El UI se sirve en `localhost:54360` (offline) y el gateway de datos en `localhost:54350`; si no
 existe `pos-ui/` (no corriste `build:ui`), cae a `VIM_POS_URL` o al dominio desplegado.
 
-Fixtures de dev (seed): dispositivo `caja-99999999-…cc@dispositivos.vimpos.mx` / `vim-device-dev`;
+Fixtures de dev (seed): dispositivo `caja-99999999-…cc@dispositivos.vimpos.com.mx` / `vim-device-dev`;
 cajera **María G. PIN 1234**; dueño `dueno@knockout.dev` / `devadmin`.
 
 ## Empaquetar (probado)
@@ -320,6 +320,26 @@ La caja no puede recibir avisos (vive detrás del NAT del local), así que **pre
 Una caja que arranca **sin red** deja el sondeo sin versión conocida, así que el primer sondeo que
 alcance la nube baja el catálogo. Es a propósito: su copia local es de la sesión anterior.
 
+## Dominio de las cuentas de caja (0.4.97)
+
+Cada caja entra a la nube como `caja-<caja_id>@dispositivos.<dominio>`. El dominio era
+`dispositivos.vimpos.mx`, que **no es de VIM** (nadie lo tiene registrado: quien lo registrara
+recibiría el "restablecer contraseña" de las cajas). Pasa a `dispositivos.vimpos.com.mx`, sin MX:
+un correo a esas cuentas no llega a ningún lado. El código de los dominios vive en tres espejos:
+`desktop/src/dispositivo.mjs`, `supabase/functions/_shared/dispositivo.ts` y `@vim/db/dispositivo`.
+
+El cambio va sin corte, en este orden:
+
+1. **Funciones** (reconocen los dos dominios): `caja-latido`, `delivery-espejo`, `pin-login`,
+   `sync-pull`, `sync-push` y, AL FINAL, `provisionar-dispositivo` (crea las cuentas nuevas ya con
+   `.com.mx` y, al regenerar, mueve la cuenta existente de la caja en vez de crear otra).
+2. **Instalador 0.4.97**: si la nube rechaza su correo, la caja prueba el del otro dominio con la
+   misma contraseña y guarda el bueno en `nube.json` (log: `la cuenta de esta caja cambió de dominio`).
+3. **Con TODAS las cajas en 0.4.97 o más** (panel → Versiones), mover las cuentas:
+   `npx supabase db query --linked -f supabase/scripts/migrar_dominio_dispositivos.sql`.
+   Se niega a correr si queda alguna caja atrasada y dice cuál. Una caja anterior a 0.4.97 no sabe
+   reintentar: se quedaría sin sincronizar hasta que alguien la vuelva a vincular.
+
 ## Conectar a la nube (deploy del sync real) — #3
 
 Requiere: (a) **despausar** el proyecto Supabase (plan FREE se pausa) desde el dashboard;
@@ -337,7 +357,7 @@ Luego probar el sync real desde el device:
 cd desktop
 VIM_CLOUD_URL=https://pbiaxzvmssjsxdwqrumb.supabase.co \
 VIM_CLOUD_ANON=<anon key del proyecto> \
-VIM_DEVICE_EMAIL=caja-<caja_id>@dispositivos.vimpos.mx \
+VIM_DEVICE_EMAIL=caja-<caja_id>@dispositivos.vimpos.com.mx \
 VIM_DEVICE_PASS=<clave del dispositivo> \
   npm run verify:cloud        # device sign-in en la nube → PULL (referencia↓) + PUSH (ventas↑)
 ```

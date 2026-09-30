@@ -1,5 +1,6 @@
 "use client";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+import { correoAlternoDispositivo } from "@vim/db/dispositivo";
 
 // Fase 1 (escritorio local-first): en Electron, el preload inyecta el endpoint del gateway
 // local (window.__VIM_SUPABASE_URL). En el navegador/nube cae al env de build. Mismo código,
@@ -29,10 +30,15 @@ export type SesionDispositivo = {
   sucursalNombre: string | null;
 };
 
-/** Inicia la sesión de dispositivo. Lanza Error si las credenciales fallan. */
-export async function deviceSignIn(email: string, password: string): Promise<void> {
+/** Inicia la sesión de dispositivo. Lanza Error si las credenciales fallan. Devuelve el correo
+ *  con el que entró: si el apuntado es de una cuenta que ya cambió de dominio (vimpos.mx →
+ *  vimpos.com.mx), se prueba el otro y se devuelve ése (ver @vim/db/dispositivo). */
+export async function deviceSignIn(email: string, password: string): Promise<string> {
   const { error } = await deviceClient.auth.signInWithPassword({ email, password });
-  if (error) throw new Error(error.message);
+  if (!error) return email;
+  const otro = correoAlternoDispositivo(email);
+  if (otro && !(await deviceClient.auth.signInWithPassword({ email: otro, password })).error) return otro;
+  throw new Error(error.message);
 }
 
 /** ¿Hay sesión de dispositivo viva? Devuelve el email del dispositivo o null. */
@@ -86,7 +92,7 @@ export async function deviceToken(): Promise<string | null> {
 
 /**
  * El caja_id va codificado en el email sintético del dispositivo
- * (`caja-{caja_id}@dispositivos.vimpos.mx`, Parte 1F §1.1). El dispositivo ES una caja.
+ * (`caja-{caja_id}@dispositivos.vimpos.com.mx`, Parte 1F §1.1). El dispositivo ES una caja.
  */
 export function cajaIdFromEmail(email: string): string | null {
   const m = /^caja-([0-9a-f-]{36})@/i.exec(email);

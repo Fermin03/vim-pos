@@ -45,6 +45,6 @@ export const CREDS_DEV_FIXTURE: DeviceCreds | null =
   process.env.NODE_ENV === "production"
     ? null
     : {
-        email: "caja-99999999-0000-0000-0000-0000000000cc@dispositivos.vimpos.mx",
+        email: "caja-99999999-0000-0000-0000-0000000000cc@dispositivos.vimpos.com.mx",
         password: "vim-device-dev",
       };

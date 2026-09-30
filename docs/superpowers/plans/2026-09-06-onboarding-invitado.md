@@ -215,7 +215,7 @@ Expected: falla en #1, `codigos_vinculacion` no existe.
 -- ============================================================================
 -- 0109 — Vinculación de la caja con un código de 6 dígitos.
 --
--- Vincular era teclear `caja-<uuid>@dispositivos.vimpos.mx` y una contraseña de 16 caracteres en
+-- Vincular era teclear `caja-<uuid>@dispositivos.vimpos.com.mx` y una contraseña de 16 caracteres en
 -- la PC de la caja, leyéndolos de otra pantalla. Es justo el punto donde el dueño llama por
 -- teléfono, y este onboarding existe para que no tenga a quién llamar.
 --
@@ -502,7 +502,7 @@ El cuerpo, en orden:
 2. IP con `x-forwarded-for` (primer elemento) y `limite.permitir(ip, Date.now())`; si no → `429` con `Retry-After`.
 3. Leer `{ codigo }`; si no casa con `/^[0-9]{6}$/` → `400 CODIGO_INVALIDO` (el mismo error que el resto).
 4. `admin.rpc("consumir_codigo_vinculacion", { p_codigo: codigo })`; si devuelve `null` → `400 CODIGO_INVALIDO`.
-5. Con `caja_id`, repetir el aprovisionamiento del dispositivo **exactamente igual que en `provisionar-dispositivo/index.ts` pasos 5-7**: cuenta sintética `caja-<caja_id>@dispositivos.vimpos.mx`, crear o rotar contraseña, `usuarios_perfil` upsert, `usuarios_acceso` con rol `DISPOSITIVO`.
+5. Con `caja_id`, repetir el aprovisionamiento del dispositivo **exactamente igual que en `provisionar-dispositivo/index.ts` pasos 5-7**: cuenta sintética `caja-<caja_id>@dispositivos.vimpos.com.mx`, crear o rotar contraseña, `usuarios_perfil` upsert, `usuarios_acceso` con rol `DISPOSITIVO`.
 6. Responder `{ ok: true, identificador, clave, caja_nombre }`.
 
 - [ ] **Step 6: Confirmar**

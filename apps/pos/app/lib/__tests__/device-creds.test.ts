@@ -27,31 +27,31 @@ describe("device-creds — SEC CN-006", () => {
   it("guarda solo el correo, nunca la contraseña", async () => {
     const store = montarWindow();
     const { guardarIdent } = await mod();
-    guardarIdent({ email: "caja-1@dispositivos.vimpos.mx" });
+    guardarIdent({ email: "caja-1@dispositivos.vimpos.com.mx" });
 
     const guardado = store.get(KEY)!;
-    expect(JSON.parse(guardado)).toEqual({ email: "caja-1@dispositivos.vimpos.mx" });
+    expect(JSON.parse(guardado)).toEqual({ email: "caja-1@dispositivos.vimpos.com.mx" });
     expect(guardado).not.toContain("password");
   });
 
   it("lee el correo del formato nuevo", async () => {
-    montarWindow({ [KEY]: JSON.stringify({ email: "caja-2@dispositivos.vimpos.mx" }) });
+    montarWindow({ [KEY]: JSON.stringify({ email: "caja-2@dispositivos.vimpos.com.mx" }) });
     const { leerIdent } = await mod();
-    expect(leerIdent()).toEqual({ email: "caja-2@dispositivos.vimpos.mx" });
+    expect(leerIdent()).toEqual({ email: "caja-2@dispositivos.vimpos.com.mx" });
   });
 
   it("migra el formato viejo: devuelve el correo y BORRA la contraseña del disco", async () => {
     // Una caja ya instalada trae {email, password} en localStorage. Al leerla por primera vez
     // con esta versión, la contraseña tiene que desaparecer sin que el usuario haga nada.
     const store = montarWindow({
-      [KEY]: JSON.stringify({ email: "caja-3@dispositivos.vimpos.mx", password: "vim-secreto" }),
+      [KEY]: JSON.stringify({ email: "caja-3@dispositivos.vimpos.com.mx", password: "vim-secreto" }),
     });
     const { leerIdent } = await mod();
 
-    expect(leerIdent()).toEqual({ email: "caja-3@dispositivos.vimpos.mx" });
+    expect(leerIdent()).toEqual({ email: "caja-3@dispositivos.vimpos.com.mx" });
     const tras = store.get(KEY)!;
     expect(tras).not.toContain("vim-secreto");
-    expect(JSON.parse(tras)).toEqual({ email: "caja-3@dispositivos.vimpos.mx" });
+    expect(JSON.parse(tras)).toEqual({ email: "caja-3@dispositivos.vimpos.com.mx" });
   });
 
   it("devuelve null si no hay nada, si el JSON está roto o si falta el correo", async () => {
@@ -66,7 +66,7 @@ describe("device-creds — SEC CN-006", () => {
   });
 
   it("olvidarCreds borra la entrada completa", async () => {
-    const store = montarWindow({ [KEY]: JSON.stringify({ email: "caja-4@dispositivos.vimpos.mx" }) });
+    const store = montarWindow({ [KEY]: JSON.stringify({ email: "caja-4@dispositivos.vimpos.com.mx" }) });
     const { olvidarCreds } = await mod();
     olvidarCreds();
     expect(store.has(KEY)).toBe(false);

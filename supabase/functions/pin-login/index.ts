@@ -10,6 +10,7 @@
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import { create, getNumericDate } from "https://deno.land/x/djwt@v3.0.2/mod.ts";
 import { corsHeaders } from "../_shared/cors.ts";
+import { cajaIdDeEmail } from "../_shared/dispositivo.ts";
 
 // OJO: las Edge Functions NO permiten secretos con prefijo SUPABASE_ (reservado).
 // Por eso el JWT secret del proyecto se inyecta como VIM_JWT_SECRET.
@@ -32,9 +33,8 @@ const admin = createClient(
   { auth: { persistSession: false } },
 );
 
-// El caja_id va codificado en el email sintético del dispositivo
-// (`caja-{caja_id}@dispositivos.vimpos.mx`, 1F §1.1). El dispositivo ES una caja.
-const EMAIL_DISPOSITIVO = /^caja-([0-9a-f-]{36})@dispositivos\.vimpos\.mx$/i;
+// El caja_id va codificado en el email sintético del dispositivo (`caja-{caja_id}@dispositivos…`,
+// 1F §1.1; los dos dominios en `_shared/dispositivo.ts`). El dispositivo ES una caja.
 
 /** Lee los claims de un JWT cuya firma YA validó getUser (no re-verifica). */
 function leerClaims(token: string): Record<string, unknown> {
@@ -66,7 +66,7 @@ Deno.serve(async (req) => {
   // El llamante debe ser una cuenta de DISPOSITIVO (caja): su JWT porta
   // tipo_identidad='DISPOSITIVO' (hook 0006) y su email codifica el caja_id.
   const claims = leerClaims(token);
-  const cajaDelDispositivo = EMAIL_DISPOSITIVO.exec(u.user.email ?? "")?.[1] ?? null;
+  const cajaDelDispositivo = cajaIdDeEmail(u.user.email);
   if (claims.tipo_identidad !== "DISPOSITIVO" || !cajaDelDispositivo) {
     return json({ error: "NO_ES_DISPOSITIVO" }, 403);
   }

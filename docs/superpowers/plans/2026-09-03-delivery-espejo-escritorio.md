@@ -13,7 +13,7 @@
 ## Global Constraints
 
 - RLS sagrado; el escritorio solo habla con la nube con el token de **dispositivo**; el gateway nunca expone ese token al navegador.
-- El id de caja de un dispositivo sale de su correo `caja-<uuid_caja>@dispositivos.vimpos.mx` (patrón de alta) y se verifica contra `cajas` del tenant.
+- El id de caja de un dispositivo sale de su correo `caja-<uuid_caja>@dispositivos.vimpos.com.mx` (patrón de alta) y se verifica contra `cajas` del tenant.
 - `payload_raw` es NOT NULL: el espejo escribe `{}`; nunca baja `payload_raw` ni `credencial_*`.
 - Migración aditiva 0096; después `pnpm db:types`.
 - Docker puede no estar disponible: las pruebas SQL se corren contra el Postgres embebido (`desktop/`: `npm run backend`, puerto 54329, base `vimpos`, password en `desktop/bin/.pg-password`) con el patrón de `scratchpad/retencion_embebido.mjs`; pgTAP queda para cuando Docker vuelva.
@@ -122,7 +122,7 @@ Y `CREATE OR REPLACE FUNCTION crear_ticket_desde_app` = copia íntegra de 0094 c
   - El select del pedido añade `gestion, gestion_caja_id, sucursal_id`.
 - [ ] **delivery-espejo** (`verify_jwt` normal): solo `tipo_identidad = DISPOSITIVO` (403 `SOLO_DISPOSITIVO`); caja por correo; `UPDATE cajas SET espejo_apps_at = now()`; responde `{ ahora, conexiones: [...sin credencial_tienda/credencial_vence], pedidos: [...sin payload_raw] }` de la sucursal de la caja: `delivery_conexiones` (todas), `delivery_pedidos` con `estado in (RECIBIDO, ACEPTADO, EN_PREPARACION, LISTO, ERROR) OR recibido_at >= now()-24h`, límite 200.
 - [ ] **sync-push**: tras la RPC, `const { data: enlazados } = await admin.rpc("delivery_enlazar_tickets", { p_tenant: tenant })` y devolver `{ resultado: data, enlazados }`.
-- [ ] README de funciones. Commit. (Prueba local si hay Docker: `functions serve` + curl con el JWT del dispositivo `caja-…cc@dispositivos.vimpos.mx` / `vim-device-dev`.)
+- [ ] README de funciones. Commit. (Prueba local si hay Docker: `functions serve` + curl con el JWT del dispositivo `caja-…cc@dispositivos.vimpos.com.mx` / `vim-device-dev`.)
 
 ---
 
