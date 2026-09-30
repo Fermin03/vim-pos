@@ -87,7 +87,7 @@ La cuenta de dispositivo tiene poderes mínimos:
 - Invocar la Edge Function `pin-login` para que un empleado se autentique.
 - **No** puede operar ventas, ni cerrar turnos, ni nada operativo por sí misma. Es solo el "cascarón" que sostiene la app hasta que un humano entra con PIN.
 
-> **Implementación:** la cuenta de dispositivo es una `auth.users` con email sintético (ej. `caja-{caja_id}@dispositivos.vimpos.mx`) y `usuarios_acceso` con un rol de sistema reservado `DISPOSITIVO` (jerarquía 0, sin permisos operativos). Sus credenciales se generan en setup y se guardan en el almacenamiento seguro del dispositivo (no en código, no en localStorage plano).
+> **Implementación:** la cuenta de dispositivo es una `auth.users` con email sintético (ej. `caja-{caja_id}@dispositivos.vimpos.com.mx`) y `usuarios_acceso` con un rol de sistema reservado `DISPOSITIVO` (jerarquía 0, sin permisos operativos). Sus credenciales se generan en setup y se guardan en el almacenamiento seguro del dispositivo (no en código, no en localStorage plano).
 
 ### 1.2 La regla de un tenant por cuenta
 

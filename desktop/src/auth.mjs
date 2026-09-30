@@ -8,7 +8,8 @@ import jwt from "jsonwebtoken";
 const ahora = () => Math.floor(Date.now() / 1000);
 
 /** El caja_id va codificado en el email sintético del dispositivo (1F §1.1). El dispositivo ES una caja. */
-const EMAIL_DISPOSITIVO = /^caja-([0-9a-f-]{36})@dispositivos\.vimpos\.mx$/i;
+// Los dos dominios (el viejo, `vimpos.mx`, y el de VIM, `vimpos.com.mx`): ver dispositivo.mjs.
+import { cajaIdDeEmail, correoAlterno } from "./dispositivo.mjs";
 
 /**
  * SEC CN-017 — verificación de JWT endurecida, en un solo sitio.
@@ -47,7 +48,7 @@ export async function exigirDispositivo(pool, secret, token) {
       WHERE u.id = $1 LIMIT 1`, [dec.sub]);
   if (rows.length === 0) return { error: 401, body: { error: "AUTH_INVALIDA" } };
 
-  const cajaId = EMAIL_DISPOSITIVO.exec(rows[0].email ?? "")?.[1] ?? null;
+  const cajaId = cajaIdDeEmail(rows[0].email);
   if (rows[0].rol !== "DISPOSITIVO" || !cajaId) return { error: 403, body: { error: "NO_ES_DISPOSITIVO" } };
   return { cajaId, tenantId: rows[0].tenant_id, sub: dec.sub };
 }
@@ -75,9 +76,12 @@ export async function deviceSignIn(pool, secret, { email, password }) {
        FROM auth.users u
        JOIN usuarios_acceso ua ON ua.usuario_id = u.id AND ua.activo = true
        LEFT JOIN roles r ON r.id = ua.rol_id
-      WHERE lower(u.email) = lower($1)
+      WHERE lower(u.email) IN (lower($1), lower($3))
         AND u.encrypted_password = crypt($2, u.encrypted_password)
-      LIMIT 1`, [email, password]);
+      LIMIT 1`,
+    // $3: el mismo correo con el otro dominio. El pull reescribe auth.users con lo que tenga la
+    // nube, así que tras mover la cuenta de dominio la pantalla puede seguir mandando el viejo.
+    [email, password, correoAlterno(email) ?? email]);
   if (rows.length === 0) return { error: 400, body: { error: "invalid_grant", error_description: "Credenciales inválidas" } };
   const row = rows[0];
   const tipo = row.rol === "DISPOSITIVO" ? "DISPOSITIVO" : "EMPLEADO";

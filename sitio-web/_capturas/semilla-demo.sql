@@ -143,7 +143,7 @@ BEGIN
      'beto@crazyburgers.demo', crypt('demo1234', gen_salt('bf')), now(), now(), now(),
      '{"provider":"email","providers":["email"]}', '{}', '', '', '', ''),
     ('00000000-0000-0000-0000-000000000000', v_disp, 'authenticated', 'authenticated',
-     'caja-9c3a71e0-0000-4000-8000-000000000003@dispositivos.vimpos.mx', crypt('demo-dispositivo', gen_salt('bf')), now(), now(), now(),
+     'caja-9c3a71e0-0000-4000-8000-000000000003@dispositivos.vimpos.com.mx', crypt('demo-dispositivo', gen_salt('bf')), now(), now(), now(),
      '{"provider":"email","providers":["email"]}', '{}', '', '', '', ''),
     ('00000000-0000-0000-0000-000000000000', v_duena, 'authenticated', 'authenticated',
      'duena@crazyburgers.demo', crypt('demo1234', gen_salt('bf')), now(), now(), now(),
@@ -667,5 +667,5 @@ BEGIN
   INSERT INTO tenant_onboarding_estado (tenant_id, fase) VALUES (v_tenant, 'GO_LIVE')
   ON CONFLICT (tenant_id) DO UPDATE SET fase = 'GO_LIVE';
 
-  RAISE NOTICE 'Crazy Burgers creado. Caja: caja-9c3a71e0-...-000000000003@dispositivos.vimpos.mx / demo-dispositivo. PIN de Ana: 1234. Panel: duena@crazyburgers.demo / demo1234';
+  RAISE NOTICE 'Crazy Burgers creado. Caja: caja-9c3a71e0-...-000000000003@dispositivos.vimpos.com.mx / demo-dispositivo. PIN de Ana: 1234. Panel: duena@crazyburgers.demo / demo1234';
 END $$;

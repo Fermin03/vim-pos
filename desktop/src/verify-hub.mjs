@@ -8,7 +8,7 @@ import { startBackend } from "./backend.mjs";
 const GW_PORT = 54350;
 const GW = `http://127.0.0.1:${GW_PORT}`;
 const CAJA = "99999999-0000-0000-0000-0000000000cc";
-const DEVICE_EMAIL = "caja-99999999-0000-0000-0000-0000000000cc@dispositivos.vimpos.mx";
+const DEVICE_EMAIL = "caja-99999999-0000-0000-0000-0000000000cc@dispositivos.vimpos.com.mx";
 const DEVICE_PASS = "vim-device-dev";
 const TENANT = "99999999-0000-0000-0000-0000000000aa";
 const SUC = "99999999-0000-0000-0000-0000000000bb";

@@ -4,14 +4,12 @@
 // Deno y no está en el workspace de pnpm, así que sus módulos puros se prueban con el runner de
 // Node (mismo patrón que `_shared/pac` y `_shared/delivery`).
 
-const EMAIL_DISPOSITIVO = /^caja-([0-9a-f-]{36})@dispositivos\.vimpos\.mx$/i;
-const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+import { cajaIdDeEmail } from "./dispositivo.ts";
 
-/** El dispositivo ES una caja: su id va en el correo sintético (1F §1.1, desktop/src/auth.mjs). */
-export function cajaIdDeEmail(email: string | null | undefined): string | null {
-  const m = EMAIL_DISPOSITIVO.exec(String(email ?? ""));
-  return m ? m[1]!.toLowerCase() : null;
-}
+/** El dispositivo ES una caja: su id va en el correo sintético (ver `_shared/dispositivo.ts`). */
+export { cajaIdDeEmail };
+
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /** Pantalla de la caja (0121): píxeles físicos y escala de Windows (1.25 = 125 %). */
 export type PantallaLatido = { ancho: number; alto: number; escala: number };

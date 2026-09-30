@@ -26,7 +26,7 @@
 //   node scripts/capturar-plantilla.mjs --dia 2026-08-19
 //
 //   # 2) credenciales: un dispositivo por tenant simulado, en un JSON
-//   #    [{ "etiqueta": "tenant-01", "email": "caja-…@dispositivos.vimpos.mx", "pass": "…" }]
+//   #    [{ "etiqueta": "tenant-01", "email": "caja-…@dispositivos.vimpos.com.mx", "pass": "…" }]
 //   VIM_CLOUD_URL=https://<staging>.supabase.co VIM_CLOUD_ANON=<anon> \
 //     node scripts/carga-nube.mjs --plantilla plantillas/plantilla-2026-08-19.json \
 //                                 --dispositivos dispositivos.json

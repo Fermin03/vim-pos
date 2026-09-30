@@ -149,7 +149,7 @@ CREATE FUNCTION version_recomendada() RETURNS jsonb
 
 ### 4.1 Por qué un código y no las credenciales
 
-Hoy vincular significa que el dueño teclee `caja-9f3f…@dispositivos.vimpos.mx` y
+Hoy vincular significa que el dueño teclee `caja-9f3f…@dispositivos.vimpos.com.mx` y
 `vim-Kp3nQx7ftYbz` en la PC de la caja, leyéndolos de su laptop. Es exactamente el punto donde
 alguien llama por teléfono. Un código de seis dígitos que caduca es lo que hace todo el mundo
 porque funciona con dos pantallas y dos manos.
