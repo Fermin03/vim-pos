@@ -25,8 +25,11 @@ Vive en `precio_vigente_suscripcion()` (SQL) y en `precioVigente()` de `@vim/db/
 los mismos casos probados en `smoke_cobro_plan.sql` y en `cobro-promocion.test.ts`. Todo lo que
 enseña o suma precio (MRR, alertas, ficha, registro de pagos, Plan y pagos del dueño) usa esa
 regla. Al registrar varios meses de una vez, cada mes se cobra al precio de su fecha de cobro.
-El botón "Piloto 5 negocios" pone $499 hasta el día anterior al sexto aniversario del inicio del
-cobro: el séptimo cobro ya sale a lista.
+**El cobro es por adelantado** (decisión de Fermín, 30/09/2026): al activar, el primer cobro vence
+ese mismo día y paga el mes que empieza; el pago cubre [inicio, inicio + 1 mes) y la fecha
+siguiente la calcula 0130 anclada al día de alta. El botón "Piloto 5 negocios" (solo Esencial y
+solo cobro mensual; en anual no hay promociones) pone $499 hasta el día anterior al séptimo cobro
+(inicio + 6 meses): exactamente seis pagos a $499, y el séptimo ya a lista.
 
 **Prueba con fecha.** `tenants.prueba_hasta`, que un trigger pone a +30 días (México) en toda alta
 en `TRIAL`. No bloquea: avisa al dueño (dashboard y Plan y pagos) y al panel ("Prueba por vencer",

@@ -4,7 +4,7 @@
 -- un INSERT fallido (precio negativo) dejaba al cliente con la anterior EXPIRADA y ninguna nueva.
 -- ============================================================================
 begin;
-select plan(12);
+select plan(15);
 
 \set tenant '22222222-0000-0000-0000-0000000000aa'
 
@@ -42,6 +42,14 @@ select is((select precio_mensual_mxn from suscripciones where tenant_id = :'tena
 select is((select estado::text from suscripciones where tenant_id = :'tenant' and fecha_inicio = '2026-08-01'), 'EXPIRADA',
   'la anterior quedó EXPIRADA');
 select is((select estado::text from tenants where id = :'tenant'), 'ACTIVO', 'el tenant en prueba pasa a ACTIVO');
+
+-- 4) Cobro por adelantado (0141): el primer cobro vence el mismo día del inicio; antes, no.
+select lives_ok($$ select activar_suscripcion('22222222-0000-0000-0000-0000000000aa', 699, 'MENSUAL', '2026-10-01', '2026-10-01') $$,
+  'el primer cobro puede vencer el día de la activación');
+select throws_ok($$ select activar_suscripcion('22222222-0000-0000-0000-0000000000aa', 699, 'MENSUAL', '2026-10-01', '2026-09-30') $$,
+  'P0001', 'FECHAS_INVALIDAS', 'un primer cobro anterior al inicio se rechaza');
+select throws_ok($$ select activar_suscripcion('22222222-0000-0000-0000-0000000000aa', 699, 'ANUAL', '2026-10-01', '2026-10-01', 499, '2027-03-31', null) $$,
+  'P0001', 'PROMOCION_CICLO_INVALIDO', 'no hay promociones en cobro anual');
 
 select * from finish();
 rollback;

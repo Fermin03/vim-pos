@@ -53,20 +53,28 @@ BEGIN
 
   -- ── 3) Activar con promoción: validaciones y alta buena ─────────────────
   BEGIN
-    PERFORM activar_suscripcion(v_tenant, 699, 'MENSUAL', '2026-10-01', '2026-11-01', 499, NULL, NULL);
+    PERFORM activar_suscripcion(v_tenant, 699, 'MENSUAL', '2026-10-01', '2026-10-01', 499, NULL, NULL);
     RAISE EXCEPTION 'aceptó una promoción sin fecha de fin';
   EXCEPTION WHEN raise_exception THEN IF SQLERRM <> 'PROMOCION_INCOMPLETA' THEN RAISE; END IF; END;
   BEGIN
-    PERFORM activar_suscripcion(v_tenant, 699, 'MENSUAL', '2026-10-01', '2026-11-01', 799, '2027-03-31', 'Cara');
+    PERFORM activar_suscripcion(v_tenant, 699, 'MENSUAL', '2026-10-01', '2026-10-01', 799, '2027-03-31', 'Cara');
     RAISE EXCEPTION 'aceptó una promoción más cara que la lista';
   EXCEPTION WHEN raise_exception THEN IF SQLERRM <> 'PROMOCION_PRECIO_INVALIDO' THEN RAISE; END IF; END;
   BEGIN
-    PERFORM activar_suscripcion(v_tenant, 699, 'MENSUAL', '2026-10-01', '2026-11-01', 499, '2026-10-01', NULL);
-    RAISE EXCEPTION 'aceptó una promoción que termina el día que empieza';
+    PERFORM activar_suscripcion(v_tenant, 699, 'MENSUAL', '2026-10-01', '2026-10-01', 499, '2026-09-30', NULL);
+    RAISE EXCEPTION 'aceptó una promoción que termina antes del primer cobro';
   EXCEPTION WHEN raise_exception THEN IF SQLERRM <> 'PROMOCION_FECHA_INVALIDA' THEN RAISE; END IF; END;
+  BEGIN
+    PERFORM activar_suscripcion(v_tenant, 699, 'ANUAL', '2026-10-01', '2026-10-01', 499, '2027-03-31', NULL);
+    RAISE EXCEPTION 'aceptó una promoción en cobro anual';
+  EXCEPTION WHEN raise_exception THEN IF SQLERRM <> 'PROMOCION_CICLO_INVALIDO' THEN RAISE; END IF; END;
+  BEGIN
+    PERFORM activar_suscripcion(v_tenant, 699, 'MENSUAL', '2026-10-01', '2026-09-30');
+    RAISE EXCEPTION 'aceptó un primer cobro anterior al inicio';
+  EXCEPTION WHEN raise_exception THEN IF SQLERRM <> 'FECHAS_INVALIDAS' THEN RAISE; END IF; END;
   IF EXISTS (SELECT 1 FROM suscripciones WHERE tenant_id = v_tenant) THEN RAISE EXCEPTION 'un rechazo dejó una suscripción escrita'; END IF;
 
-  r := activar_suscripcion(v_tenant, 699, 'MENSUAL', '2026-10-01', '2026-11-01', 499, '2027-03-31', 'Piloto 5 negocios');
+  r := activar_suscripcion(v_tenant, 699, 'MENSUAL', '2026-10-01', '2026-10-01', 499, '2027-03-31', 'Piloto 5 negocios');
   v_susc := (r->>'suscripcion_id')::uuid;
   SELECT * INTO v_s FROM suscripciones WHERE id = v_susc;
   IF v_s.precio_mensual_mxn <> 699 OR v_s.precio_promocional_mxn <> 499 OR v_s.promocion_hasta <> '2027-03-31' OR v_s.promocion_nombre <> 'Piloto 5 negocios' THEN
@@ -74,10 +82,29 @@ BEGIN
   END IF;
   IF (SELECT estado::text FROM tenants WHERE id = v_tenant) <> 'ACTIVO' THEN RAISE EXCEPTION 'activar no pasó el tenant a ACTIVO'; END IF;
   -- Sin promoción sigue funcionando con cinco argumentos (los nuevos tienen DEFAULT).
-  PERFORM activar_suscripcion(v_tenant, 699, 'MENSUAL', '2026-10-01', '2026-11-01');
+  PERFORM activar_suscripcion(v_tenant, 699, 'MENSUAL', '2026-10-01', '2026-10-01');
   -- …y vuelve a quedar la de promoción para lo que sigue.
-  r := activar_suscripcion(v_tenant, 699, 'MENSUAL', '2026-10-01', '2026-11-01', 499, '2027-03-31', 'Piloto 5 negocios');
+  r := activar_suscripcion(v_tenant, 699, 'MENSUAL', '2026-10-01', '2026-10-01', 499, '2027-03-31', 'Piloto 5 negocios');
   v_susc := (r->>'suscripcion_id')::uuid;
+
+  -- ── 3b) Cobro por adelantado: el piloto son EXACTAMENTE seis pagos a $499 ─────────────
+  -- Activado el 1 oct con primer cobro ese mismo día; promocion_hasta = 31 mar (día anterior al 7.º).
+  IF (SELECT proxima_fecha_cobro FROM suscripciones WHERE id = v_susc) <> '2026-10-01' THEN
+    RAISE EXCEPTION 'el primer cobro debía vencer el día de la activación';
+  END IF;
+  FOR v_n IN 1..7 LOOP
+    SELECT * INTO v_s FROM suscripciones WHERE id = v_susc;
+    r := registrar_pago_suscripcion(v_tenant,
+           precio_vigente_suscripcion(v_s.precio_mensual_mxn, v_s.precio_promocional_mxn, v_s.promocion_hasta, v_s.proxima_fecha_cobro),
+           'TRANSFERENCIA', v_s.proxima_fecha_cobro, 1, NULL, NULL, '00000000-0000-0000-0000-0000000000a1');
+    IF v_n = 1 AND (r->>'cubre_desde' <> '2026-10-01' OR r->>'cubre_hasta' <> '2026-10-31' OR r->>'proxima_fecha_cobro' <> '2026-11-01') THEN
+      RAISE EXCEPTION 'el pago del día de activación debía cubrir 1–31 oct y mover el cobro al 1 nov: %', r;
+    END IF;
+  END LOOP;
+  IF (SELECT count(*) FROM pagos_suscripcion WHERE suscripcion_id = v_susc AND monto_mxn = 499) <> 6
+     OR (SELECT monto_mxn FROM pagos_suscripcion WHERE suscripcion_id = v_susc ORDER BY cubre_desde DESC LIMIT 1) <> 699 THEN
+    RAISE EXCEPTION 'el piloto debía dar seis pagos a 499 y el séptimo a 699';
+  END IF;
 
   -- ── 4) Subir de plan: folios, add-ons a $0 incluidos, precio, promoción fuera ──
   -- El cliente pagaba delivery aparte desde antes: al subir, esa fila se cierra y entra una a $0.

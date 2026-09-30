@@ -18,6 +18,17 @@
 -- TODO ES ADITIVO. Columnas nuevas NULL, una tabla nueva, funciones nuevas y dos reemplazos
 -- (`activar_suscripcion`, `crear_tenant_con_owner`) cuyo contrato con quien las llama se conserva.
 --
+-- COBRO POR ADELANTADO (decisión de Fermín, 30/09/2026). Al activar, el primer cobro vence EL
+-- MISMO DÍA (`p_proxima = p_inicio`): se paga el mes que empieza. Un pago registrado ese día cubre
+-- [inicio, inicio + 1 mes) con `registrar_pago_suscripcion`/`_fecha_cobro_siguiente` de 0130, sin
+-- cambiarles nada: la fecha pendiente es el inicio y la siguiente sale anclada al día de alta.
+--
+-- DESPUÉS DE MEZCLAR, correr UNA vez más el relleno de `incluido_en_plan` (sección C): entre
+-- aplicar esta migración y publicar el panel nuevo, el panel viejo puede dar de alta add-ons "incluido
+-- en el plan" a $0 sin la marca:
+--   UPDATE public.tenant_addons SET incluido_en_plan = true
+--    WHERE incluido_en_plan = false AND precio_mensual_mxn = 0 AND notas ILIKE 'incluido en el plan%';
+--
 -- SEGURO EN EL ESCRITORIO. La caja aplica estas mismas migraciones en su Postgres embebido. Aquí no
 -- hay nada de storage ni de auth más allá de `auth.jwt()`/`auth.uid()`, que el shim del escritorio
 -- ya define; los UPDATE de datos son idempotentes y sobre una caja no tocan nada que la caja use.
@@ -121,7 +132,8 @@ BEGIN
   IF p_ciclo IS NULL OR p_ciclo NOT IN ('MENSUAL', 'ANUAL') THEN
     RAISE EXCEPTION 'CICLO_INVALIDO';
   END IF;
-  IF p_inicio IS NULL OR p_proxima IS NULL OR p_proxima <= p_inicio THEN
+  -- Cobro por adelantado: el primer cobro puede ser el mismo día del inicio (lo normal), nunca antes.
+  IF p_inicio IS NULL OR p_proxima IS NULL OR p_proxima < p_inicio THEN
     RAISE EXCEPTION 'FECHAS_INVALIDAS';
   END IF;
 
@@ -130,12 +142,17 @@ BEGIN
     RAISE EXCEPTION 'PROMOCION_INCOMPLETA' USING HINT = 'Precio y fecha de fin de la promoción van juntos.';
   END IF;
   IF p_promo_precio IS NOT NULL THEN
+    -- Solo mensual: el ciclo anual cobra doce meses de una vez y una promoción de meses no cabe ahí.
+    IF p_ciclo <> 'MENSUAL' THEN
+      RAISE EXCEPTION 'PROMOCION_CICLO_INVALIDO' USING HINT = 'Las promociones son solo para cobro mensual.';
+    END IF;
     -- Una "promoción" igual o más cara que la lista no es promoción: casi seguro es un error de captura.
     IF p_promo_precio < 0 OR p_promo_precio > 99999999.99 OR p_promo_precio <> round(p_promo_precio, 2) OR p_promo_precio >= p_precio THEN
       RAISE EXCEPTION 'PROMOCION_PRECIO_INVALIDO' USING HINT = 'Menor que el precio de lista, de 0 en adelante, con hasta dos decimales.';
     END IF;
-    IF p_promo_hasta <= p_inicio THEN
-      RAISE EXCEPTION 'PROMOCION_FECHA_INVALIDA' USING HINT = 'La promoción termina después del inicio del cobro.';
+    -- Tiene que alcanzar al menos el primer cobro, o no la vería ningún pago.
+    IF p_promo_hasta < p_proxima THEN
+      RAISE EXCEPTION 'PROMOCION_FECHA_INVALIDA' USING HINT = 'La promoción debe durar al menos hasta el primer cobro.';
     END IF;
     IF v_nombre IS NOT NULL AND length(v_nombre) > 80 THEN
       RAISE EXCEPTION 'PROMOCION_NOMBRE_INVALIDO';
