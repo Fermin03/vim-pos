@@ -82,6 +82,24 @@ test("tick: sin turno abierto solo espeja; el ticket local que falla deja ultimo
   assert.ok(!n2.llamadas.some((l) => l.body.accion === "aceptar"), "no acepta si no hay ticket");
 });
 
+test("si el accept en Uber falla tras crear el ticket, la vuelta siguiente lo reintenta sin duplicar el ticket (D7)", async () => {
+  // Vuelta 1: ticket creado, accept rechazado.
+  const pool1 = poolFalso();
+  const n1 = nubeFalsa({ pedidos: [pedido()], aceptarStatus: 502 });
+  const r1 = await crearEspejo({ pool: pool1, nube: async () => NUBE, cajaId: CAJA, fetchFn: n1.fetchFn }).tick();
+  assert.equal(r1.creados, 1);
+  assert.equal(r1.aceptados, 0);
+  // Vuelta 2: la nube lo sigue mandando RECIBIDO (ya reclamado por esta caja) y la copia local ya
+  // tiene el ticket. Antes se saltaba para siempre; ahora se vuelve a aceptar.
+  const pool2 = poolFalso({ locales: [{ id: "p1", ticket_id: "tk-local", estado: "RECIBIDO" }] });
+  const n2 = nubeFalsa({ pedidos: [pedido({ gestion_caja_id: CAJA })] });
+  const r2 = await crearEspejo({ pool: pool2, nube: async () => NUBE, cajaId: CAJA, fetchFn: n2.fetchFn }).tick();
+  assert.equal(r2.creados, 0, "no se crea un segundo ticket");
+  assert.equal(r2.aceptados, 1);
+  assert.ok(!pool2.sql.some((q) => q.texto.startsWith("SELECT crear_ticket_desde_app")));
+  assert.deepEqual(n2.llamadas.filter((l) => l.url.endsWith("/delivery-accion")).map((l) => l.body.accion), ["aceptar"]);
+});
+
 test("tick: la app canceló un pedido con ticket local → aviso; sin nube → omitido", async () => {
   const pool = poolFalso({ locales: [{ id: "p1", ticket_id: "tk", estado: "ACEPTADO" }] });
   const nube = nubeFalsa({ pedidos: [pedido({ estado: "CANCELADO" })] });

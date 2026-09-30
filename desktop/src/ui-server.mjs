@@ -9,6 +9,7 @@
 import http from "node:http";
 import { readFile, stat } from "node:fs/promises";
 import path from "node:path";
+import { hostnameDe, hostPermitido, hostsPropiosCacheados } from "./hosts-propios.mjs";
 
 const MIME = {
   ".html": "text/html; charset=utf-8", ".js": "text/javascript", ".mjs": "text/javascript",
@@ -123,17 +124,42 @@ function mismaProcedencia(req, port, { exigirJson = true } = {}) {
   const sitio = req.headers["sec-fetch-site"];
   if (sitio && sitio !== "same-origin" && sitio !== "none") return false;
 
+  // Auditoría integral 30/09/2026, D3: antes el Origin se comparaba con el Host de la propia
+  // petición, y bajo DNS rebinding los dos dicen lo mismo (el dominio del atacante). Ahora el
+  // Origin tiene que nombrar a ESTA máquina (hosts-propios.mjs), igual que el Host.
+  if (!hostPermitido(req.headers.host)) return false;
   const origin = req.headers["origin"];
   if (origin) {
     let u;
     try { u = new URL(origin); } catch { return false; }
-    const propio = LOCALES.has(u.hostname) || u.hostname === "localhost" ||
-      u.hostname === (req.headers.host ?? "").split(":")[0];
+    const propio = hostsPropiosCacheados().has(u.hostname.toLowerCase());
     if (!propio || Number(u.port) !== Number(port)) return false;
   }
 
   if (exigirJson && !(req.headers["content-type"] ?? "").includes("application/json")) return false;
   return true;
+}
+
+// D4 — tope del cuerpo de las rutas que escriben. El más grande legítimo es /__imprimir: los bytes
+// ESC/POS de un ticket en base64, logo incluido, rondan decenas de KB. 2 MB sobra de lejos.
+export const TOPE_CUERPO_UI = 2 * 1024 * 1024;
+
+/** Lee el cuerpo con tope; null si se pasó (y deja la conexión para cerrarse). */
+async function leerCuerpo(req, max = TOPE_CUERPO_UI) {
+  if (Number(req.headers["content-length"] ?? 0) > max) return null;
+  let body = "";
+  let total = 0;
+  for await (const chunk of req) {
+    total += chunk.length;
+    if (total > max) return null;
+    body += chunk;
+  }
+  return body;
+}
+
+function responder413(res) {
+  res.writeHead(413, { "Content-Type": "application/json", Connection: "close" });
+  return res.end(JSON.stringify({ ok: false, error: "Cuerpo demasiado grande." }));
 }
 
 // Freno del botón "Actualizar menú". Diez segundos: suficiente para que un doble clic o un
@@ -151,6 +177,13 @@ export async function startUiServer(dir, port, gatewayPort = 54350, host = "0.0.
 
   const server = http.createServer(async (req, res) => {
     try {
+      // D3 — DNS rebinding: una web que haga resolver su dominio a 127.0.0.1 se vuelve "mismo
+      // origen" para el navegador y puede leer /__directivas, /__folios, el propio POS… Lo único
+      // que no puede cambiar es que el Host diga SU dominio. Solo se sirve a nombres propios.
+      if (!hostPermitido(req.headers.host)) {
+        res.writeHead(403, { "Content-Type": "text/plain; charset=utf-8" });
+        return res.end(`Host no permitido: ${hostnameDe(req.headers.host) ?? "?"}. Abre la caja por su IP o por localhost.`);
+      }
       // Estado de sincronización, para que el POS pueda avisarle al cajero si sus ventas
       // llevan días sin subir. Va por HTTP y no por IPC de Electron a propósito: la 2ª caja y
       // la cocina cargan la interfaz desde este mismo servidor y no tienen preload.
@@ -186,8 +219,8 @@ export async function startUiServer(dir, port, gatewayPort = 54350, host = "0.0.
           res.writeHead(403, { "Content-Type": "application/json" });
           return res.end(JSON.stringify({ ok: false, error: "Origen no permitido." }));
         }
-        let body = "";
-        for await (const chunk of req) body += chunk;
+        const body = await leerCuerpo(req);
+        if (body === null) return responder413(res);
         let id = null;
         try { id = JSON.parse(body || "{}").id ?? null; } catch { /* cuerpo inválido: se ignora */ }
         opts.avisoVisto?.(id);
@@ -254,8 +287,8 @@ export async function startUiServer(dir, port, gatewayPort = 54350, host = "0.0.
           res.writeHead(403, { "Content-Type": "application/json" });
           return res.end(JSON.stringify({ ok: false, error: "Origen no permitido." }));
         }
-        let body = "";
-        for await (const chunk of req) body += chunk;
+        const body = await leerCuerpo(req);
+        if (body === null) return responder413(res);
         let url = null;
         try { url = normalizarHub(JSON.parse(body || "{}").ip, gatewayPort); } catch { /* */ }
         if (!url) { res.writeHead(400, { "Content-Type": "application/json" }); return res.end(JSON.stringify({ ok: false, error: "Dirección inválida." })); }
@@ -296,8 +329,8 @@ export async function startUiServer(dir, port, gatewayPort = 54350, host = "0.0.
           res.writeHead(403, { "Content-Type": "application/json" });
           return res.end(JSON.stringify({ ok: false, error: "Solo desde la caja." }));
         }
-        let body = "";
-        for await (const chunk of req) body += chunk;
+        const body = await leerCuerpo(req);
+        if (body === null) return responder413(res);
         let p = {};
         try { p = JSON.parse(body || "{}"); } catch { /* */ }
         res.writeHead(200, { "Content-Type": "application/json" });
@@ -316,8 +349,8 @@ export async function startUiServer(dir, port, gatewayPort = 54350, host = "0.0.
           res.writeHead(403, { "Content-Type": "application/json" });
           return res.end(JSON.stringify({ ok: false, error: "Solo desde la caja." }));
         }
-        let body = "";
-        for await (const chunk of req) body += chunk;
+        const body = await leerCuerpo(req);
+        if (body === null) return responder413(res);
         let p = {};
         try { p = JSON.parse(body || "{}"); } catch { /* */ }
         res.writeHead(200, { "Content-Type": "application/json" });

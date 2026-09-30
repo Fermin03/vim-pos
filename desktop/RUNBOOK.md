@@ -178,6 +178,36 @@ notificación + (en la caja) ítem en la bandeja "⬇ Actualización vX — inst
    devolviendo la versión anterior: es caché de borde, no un fallo de la subida. Confírmalo leyendo
    el objeto autenticado (sin CDN) o con `?v=$(date +%s)`, y vuelve a mirar la URL limpia al rato.
 
+**Reglas del manifiesto (desde la auditoría del 30/09/2026):** la caja rechaza un `latest.json`
+cuya `version` no sea `x.y.z` estricto o cuya `url` no sea `https://`. `release-manifest` aborta en
+el mismo caso, para que te enteres aquí y no en la caja.
+
+#### Firmar `latest.json` (Ed25519) — preparado, DESACTIVADO hasta que haya llave
+
+Hoy el manifiesto no va firmado y trae la URL y el SHA-512 juntos: quien pueda escribir el bucket
+controla las dos cosas. La verificación de firma ya está en `src/updater.mjs`, y se enciende sola en
+cuanto `LLAVE_PUBLICA_ACTUALIZACIONES` tenga una llave. Para activarla:
+
+1. Genera el par **una sola vez**, en una máquina de confianza (no en una caja). La privada NO va
+   al repositorio ni al bucket; guárdala en el gestor de secretos de VIM y en un respaldo offline:
+   ```bash
+   openssl genpkey -algorithm ed25519 -out vim-actualizaciones.key
+   openssl pkey -in vim-actualizaciones.key -pubout -out vim-actualizaciones.pub
+   ```
+2. Pega el contenido de `vim-actualizaciones.pub` (el bloque `-----BEGIN PUBLIC KEY-----…`) como
+   valor de `LLAVE_PUBLICA_ACTUALIZACIONES` en `src/updater.mjs` y publica ESA versión con un
+   manifiesto ya firmado (paso 3).
+3. Al publicar, firma con la privada:
+   ```bash
+   VIM_UPDATE_LLAVE_PRIVADA=/ruta/segura/vim-actualizaciones.key \
+   VIM_UPDATE_URL="<la URL real>" npm run release-manifest -- "Qué cambió"
+   ```
+   El script añade `firma` (base64) sobre `version`, `url` y `sha512` (ver `mensajeAFirmar`).
+
+Orden importante: una caja que ya tenga la llave rechaza cualquier manifiesto sin firma válida, así
+que **desde la versión que incluya la llave, todo `latest.json` debe ir firmado**. Perder la privada
+obliga a publicar un instalador con otra llave que cada caja tendría que recibir a mano.
+
 Las cajas/cocinas detectan la nueva versión en su próximo arranque. Feed por defecto:
 `https://pbiaxzvmssjsxdwqrumb.supabase.co/storage/v1/object/public/actualizaciones/latest.json`
 (override con `VIM_UPDATE_FEED`; base del `.exe` con `VIM_UPDATE_BASE` en release-manifest).
@@ -263,6 +293,27 @@ escribe Postgres, reintenta hasta 3 veces con 3 s y limpieza entre intentos
 (`src/arranque-reintentos.mjs`), y si aun así falla el diálogo y el log dicen la causa
 (`arranque: Postgres no arrancó (intento 1/3): el puerto de Postgres sigue ocupado…`). Si a un
 cliente le vuelve a pasar, pedir `%APPDATA%im-pos-desktopim-pos.log` y buscar `arranque:`.
+
+## Endurecimiento de la auditoría integral (30/09/2026)
+
+- **Privilegios de la BD local.** El arranque ya NO hace `GRANT … ON ALL TABLES` (deshacía los
+  `REVOKE` de las migraciones y dejaba las libretas `_vim_*` escribibles desde la LAN). Los
+  privilegios los ponen los default privileges (shim + 0065) y las migraciones, como en Supabase.
+  Las tablas `_vim_*` quedan fuera de la API (`src/privilegios.mjs` + event trigger del shim). Una
+  sola vez, las cajas ya instaladas reaplican los `REVOKE` que el GRANT viejo les había deshecho
+  (marcador `reaplicar_revokes_d1` en `_vim_migraciones_sync`). Prueba contra un Postgres:
+  `VIM_TEST_PG=… VIM_TEST_PG_PLANTILLA=… VIM_TEST_PG_HASTA=… node --test src/privilegios.test.mjs`.
+- **Login local solo para cuentas de caja.** `/auth/v1/token` acepta únicamente usuarios con rol
+  DISPOSITIVO (el dueño entra al panel en la nube, no aquí) y frena a 10 fallos en 5 min por IP y
+  por cuenta (429 durante 15 min; la propia caja por `localhost` no se bloquea por cuenta).
+- **Host permitido.** Gateway y ui-server solo atienden si el `Host` es `localhost`, `127.0.0.1`,
+  una IP de la máquina o su nombre de equipo (contra DNS rebinding). Si en un local la cocina llega
+  a la caja por un nombre DNS propio, añádelo en `VIM_HOSTS_PERMITIDOS=caja.lan,otro`.
+- **KDS por SSE.** Tope de 32 conexiones y token obligatorio (`?access_token=`, lo manda
+  `abrirStreamHub` de `packages/kds-core`). Si un local se queda sin tiempo real en cocina tras
+  actualizar, `VIM_KDS_STREAM_AUTH=0` lo apaga mientras se investiga (el sondeo cubre igual).
+- **Ventana de Electron** con `sandbox: true`; no navega fuera del POS local (o
+  `https://pos.vimpos.com.mx`) y `window.open` solo abre `https://` en el navegador del sistema.
 
 ## Espejo de pedidos de apps (Uber Eats) — spec 2026-09-03
 

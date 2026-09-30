@@ -7,6 +7,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import path from "node:path";
+import http from "node:http";
 import { fileURLToPath } from "node:url";
 import { startUiServer, ESPERA_CATALOGO_MANUAL_MS } from "./ui-server.mjs";
 
@@ -87,5 +88,61 @@ test("un escritorio viejo sin el gancho no revienta: contesta que no pudo", asyn
   await conServidor({}, async ({ pedir }) => {
     const j = await (await pedir()).json();
     assert.equal(j.ok, false);
+  });
+});
+
+// ── Auditoría integral 30/09/2026, D3/D4 ─────────────────────────────────────
+// DNS rebinding: la web del atacante hace que SU dominio resuelva a 127.0.0.1. Para el navegador
+// es mismo origen, y Origin y Host dicen lo mismo (su dominio). fetch no deja fijar Host: http.request.
+
+function pedirCrudo(port, { method = "GET", path = "/", headers = {}, body = null } = {}) {
+  return new Promise((resolve, reject) => {
+    const req = http.request({ host: "127.0.0.1", port, method, path, headers }, (res) => {
+      const chunks = [];
+      res.on("data", (c) => chunks.push(c));
+      res.on("end", () => resolve({ status: res.statusCode, text: Buffer.concat(chunks).toString() }));
+    });
+    req.on("error", reject);
+    if (body !== null) req.write(body);
+    req.end();
+  });
+}
+
+test("D3: con DNS rebinding (Host y Origin del atacante) no se dispara nada ni se lee nada", async () => {
+  let veces = 0;
+  await conServidor({
+    onSincronizarCatalogo: async () => { veces++; return true; },
+    directivas: () => ({ disponible: true, secreto: "avisos" }),
+  }, async ({ port }) => {
+    const evil = `evil.example:${port}`;
+    const w = await pedirCrudo(port, {
+      method: "POST", path: "/__sincronizar-catalogo",
+      headers: { Host: evil, Origin: `http://${evil}`, "Content-Type": "application/json", "Sec-Fetch-Site": "same-origin" }, body: "{}",
+    });
+    assert.equal(w.status, 403);
+    assert.equal(veces, 0);
+    const r = await pedirCrudo(port, { path: "/__directivas", headers: { Host: evil } });
+    assert.equal(r.status, 403);
+    assert.ok(!r.text.includes("secreto"));
+    // La propia caja sigue funcionando por localhost.
+    const ok = await pedirCrudo(port, {
+      method: "POST", path: "/__sincronizar-catalogo",
+      headers: { Host: `localhost:${port}`, Origin: `http://localhost:${port}`, "Content-Type": "application/json" }, body: "{}",
+    });
+    assert.equal(ok.status, 200);
+    assert.equal(veces, 1);
+  });
+});
+
+test("D4: un cuerpo gigante en una ruta que escribe se corta con 413", async () => {
+  let llamadas = 0;
+  await conServidor({ avisoVisto: () => { llamadas++; } }, async ({ port }) => {
+    const r = await pedirCrudo(port, {
+      method: "POST", path: "/__aviso-visto",
+      headers: { Host: `127.0.0.1:${port}`, Origin: `http://127.0.0.1:${port}`, "Content-Type": "application/json" },
+      body: "x".repeat(2 * 1024 * 1024 + 10),
+    });
+    assert.equal(r.status, 413);
+    assert.equal(llamadas, 0);
   });
 });

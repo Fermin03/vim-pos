@@ -68,14 +68,26 @@ function goTrueUser(row) {
   };
 }
 
-/** Login del DISPOSITIVO (lo que hace supabase.auth.signInWithPassword contra GoTrue). */
-export async function deviceSignIn(pool, secret, { email, password }) {
-  if (!email || !password) return { error: 400, body: { error: "invalid_request", error_description: "Faltan credenciales" } };
+/**
+ * Login del DISPOSITIVO (lo que hace supabase.auth.signInWithPassword contra GoTrue).
+ *
+ * SOLO cuentas con rol DISPOSITIVO (Auditoría integral 30/09/2026, D2). Antes aceptaba el correo y
+ * la contraseña de CUALQUIER usuario activo: el sync-pull baja los encrypted_password del tenant
+ * (dueño y administradores incluidos) y este endpoint escucha en la LAN sin límite de intentos, así
+ * que desde el Wi-Fi del restaurante se podía adivinar en línea la contraseña del panel del dueño.
+ * Ningún flujo local legítimo entra con la cuenta de un humano: la caja (vincular-dispositivo del
+ * POS) y la cocina (kds-core) usan la cuenta caja-<id>@dispositivos…; los humanos entran por PIN.
+ * El límite de intentos vive en el gateway (limitador.mjs).
+ */
+export async function deviceSignIn(pool, secret, { email, password } = {}) {
+  if (!email || !password || typeof email !== "string" || typeof password !== "string") {
+    return { error: 400, body: { error: "invalid_request", error_description: "Faltan credenciales" } };
+  }
   const { rows } = await pool.query(
     `SELECT u.id, u.email, ua.tenant_id, ua.sucursal_id, r.codigo AS rol
        FROM auth.users u
        JOIN usuarios_acceso ua ON ua.usuario_id = u.id AND ua.activo = true
-       LEFT JOIN roles r ON r.id = ua.rol_id
+       JOIN roles r ON r.id = ua.rol_id AND r.codigo = 'DISPOSITIVO'
       WHERE lower(u.email) IN (lower($1), lower($3))
         AND u.encrypted_password = crypt($2, u.encrypted_password)
       LIMIT 1`,
@@ -108,10 +120,12 @@ export async function refreshSession(pool, secret, refresh_token) {
     dec = jwt.verify(refresh_token, secret, { algorithms: ["HS256"] });
     if (dec?.typ !== "refresh") throw new Error("no es un refresh token");
   } catch { return { error: 400, body: { error: "invalid_grant", error_description: "refresh inválido" } }; }
+  // Solo dispositivos, igual que deviceSignIn (D2): un refresh acuñado antes para un humano no
+  // debe seguir renovándose.
   const { rows } = await pool.query(
     `SELECT u.id, u.email, ua.tenant_id, ua.sucursal_id, r.codigo AS rol
        FROM auth.users u JOIN usuarios_acceso ua ON ua.usuario_id=u.id AND ua.activo=true
-       LEFT JOIN roles r ON r.id=ua.rol_id WHERE u.id=$1 LIMIT 1`, [dec.sub]);
+       JOIN roles r ON r.id=ua.rol_id AND r.codigo = 'DISPOSITIVO' WHERE u.id=$1 LIMIT 1`, [dec.sub]);
   if (rows.length === 0) return { error: 400, body: { error: "invalid_grant", error_description: "usuario no existe" } };
   const row = rows[0];
   const tipo = row.rol === "DISPOSITIVO" ? "DISPOSITIVO" : "EMPLEADO";
@@ -152,7 +166,10 @@ export async function autorizarPin(pool, secret, token, body) {
   const r = rows[0].r;
   if (!r?.ok) {
     const motivoR = r?.motivo ?? "PIN_INCORRECTO";
-    const status = motivoR === "USUARIO_BLOQUEADO" ? 423 : motivoR === "SIN_PERMISO" ? 403 : 401;
+    // verificar_autorizacion_pin (0064/0132) devuelve 'BLOQUEADO', no 'USUARIO_BLOQUEADO' (ese es
+    // de verificar_pin_login): se comparaba con el de la otra función y un supervisor bloqueado
+    // salía como 401 "PIN incorrecto" en vez de 423. Igual que la Edge autorizar-pin de la nube.
+    const status = (motivoR === "BLOQUEADO" || motivoR === "USUARIO_BLOQUEADO") ? 423 : motivoR === "SIN_PERMISO" ? 403 : 401;
     return { error: status, body: { error: motivoR } };
   }
   return { body: { ok: true, autorizacion_pin_id: r.autorizacion_pin_id, autorizo_id: r.autorizo_id } };

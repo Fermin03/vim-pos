@@ -45,6 +45,10 @@ export function puedeCrear(pedido, conexion) {
  *  - aCrear: ids de pedidos ESCRITORIO (de esta caja o sin reclamar) sin ticket local, que toca
  *    crear ya: ACEPTADO (lo aceptó la nube por orden del cajero) o RECIBIDO con auto-aceptar,
  *    turno abierto y posibilidad de crearlo. Ordenados por vencimiento.
+ *  - aAceptar: pedidos ESCRITORIO de esta caja que SIGUEN en RECIBIDO en la nube pero ya tienen
+ *    ticket local: el accept en la app falló después de crear el ticket (red, Uber caído). Antes
+ *    el `conTicketLocal` los saltaba para siempre y la cocina preparaba un pedido que Uber acababa
+ *    cancelando por no aceptado (Auditoría integral 30/09/2026, D7). Se reintenta el accept.
  *  - avisos: pedidos que la app cerró (CANCELADO/EXPIRADO) y que tienen ticket local.
  */
 export function planificarEspejo({ conexiones = [], pedidos = [], localPedidos = [], turnoAbierto = false, cajaId }) {
@@ -53,6 +57,7 @@ export function planificarEspejo({ conexiones = [], pedidos = [], localPedidos =
   const upserts = [];
   const candidatos = [];
   const avisos = [];
+  const aAceptar = [];
   for (const p of pedidos) {
     const local = porId.get(p.id);
     upserts.push(filaLocal(p, local));
@@ -61,15 +66,20 @@ export function planificarEspejo({ conexiones = [], pedidos = [], localPedidos =
       avisos.push({ pedidoId: p.id, motivo: "La app canceló este pedido: cancela el ticket en caja" });
       continue;
     }
-    if (p.gestion !== "ESCRITORIO" || conTicketLocal) continue;
+    if (p.gestion !== "ESCRITORIO") continue;
     if (p.gestion_caja_id && p.gestion_caja_id !== cajaId) continue;
+    if (conTicketLocal) {
+      if (p.estado === "RECIBIDO") aAceptar.push(p);
+      continue;
+    }
     const cx = conexionDe.get(p.conexion_id);
     const porCajero = p.estado === "ACEPTADO";
     const autoOk = p.estado === "RECIBIDO" && cx?.auto_aceptar === true && turnoAbierto && puedeCrear(p, cx);
     if (porCajero || autoOk) candidatos.push(p);
   }
   candidatos.sort((a, b) => String(a.vence_aceptacion ?? "").localeCompare(String(b.vence_aceptacion ?? "")));
-  return { upserts, aCrear: candidatos.map((p) => p.id), avisos };
+  aAceptar.sort((a, b) => String(a.vence_aceptacion ?? "").localeCompare(String(b.vence_aceptacion ?? "")));
+  return { upserts, aCrear: candidatos.map((p) => p.id), aAceptar: aAceptar.map((p) => p.id), avisos };
 }
 
 /**

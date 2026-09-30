@@ -23,6 +23,36 @@ GRANT anon, authenticated, service_role, supabase_auth_admin TO postgres;
 GRANT USAGE ON SCHEMA public TO anon, authenticated, service_role;
 ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO authenticated;
 ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT USAGE, SELECT ON SEQUENCES TO authenticated;
+-- Con esto (y la 0065) cada tabla nace con sus privilegios, como en Supabase, y una migración que
+-- los recorta se queda recortada. Por eso el arranque YA NO hace "GRANT … ON ALL TABLES" (ver
+-- src/privilegios.mjs, Auditoría integral 30/09/2026, hallazgo D1).
+
+-- ---------- Tablas internas del escritorio (_vim_*): fuera de la API ----------
+-- Las libretas del sync (_vim_migraciones, _vim_push_ok, _vim_mov_ok, …) no tienen RLS y no son
+-- de nadie más que del proceso main. Los default privileges de arriba se las darían a
+-- `authenticated` al crearlas, y el gateway escucha en la LAN: cualquiera con un JWT de la caja
+-- podría borrar _vim_migraciones (la caja no vuelve a arrancar) o marcar movimientos como ya
+-- subidos (no llegan nunca a la nube). Varias se crean a media jornada con CREATE TABLE IF NOT
+-- EXISTS desde el sync; este event trigger las blinda en el acto, sin depender de que cada helper
+-- se acuerde. El arranque, además, barre las que ya existan (blindarTablasInternas).
+CREATE OR REPLACE FUNCTION public._vim_blindar_tabla_interna() RETURNS event_trigger
+LANGUAGE plpgsql AS $$
+DECLARE r record;
+BEGIN
+  FOR r IN SELECT objid, schema_name FROM pg_event_trigger_ddl_commands() WHERE object_type = 'table' LOOP
+    IF r.schema_name = 'public' AND (SELECT relname FROM pg_class WHERE oid = r.objid) LIKE '\_vim\_%' THEN
+      EXECUTE format('REVOKE ALL ON %s FROM PUBLIC, anon, authenticated', r.objid::regclass);
+    END IF;
+  END LOOP;
+EXCEPTION WHEN OTHERS THEN
+  -- Nunca tumbar el CREATE TABLE de un sync: el barrido del arranque lo cubre la próxima vez.
+  RAISE WARNING '_vim_blindar_tabla_interna: %', SQLERRM;
+END $$;
+REVOKE ALL ON FUNCTION public._vim_blindar_tabla_interna() FROM PUBLIC, anon, authenticated;
+DROP EVENT TRIGGER IF EXISTS vim_blindar_tablas_internas;
+CREATE EVENT TRIGGER vim_blindar_tablas_internas ON ddl_command_end
+  WHEN TAG IN ('CREATE TABLE', 'CREATE TABLE AS', 'SELECT INTO')
+  EXECUTE FUNCTION public._vim_blindar_tabla_interna();
 
 -- ---------- Schema auth + shim de GoTrue ----------
 CREATE SCHEMA IF NOT EXISTS auth AUTHORIZATION supabase_auth_admin;

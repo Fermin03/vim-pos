@@ -19,6 +19,7 @@ import crypto from "node:crypto";
 import { readFileSync, writeFileSync, existsSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { mensajeAFirmar } from "../src/updater.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const pkg = JSON.parse(readFileSync(path.join(root, "package.json"), "utf8"));
@@ -41,6 +42,23 @@ const manifest = {
   notas: process.argv.slice(2).join(" "),
   fecha: new Date().toISOString().slice(0, 10),
 };
+
+// La caja rechaza un manifiesto con URL que no sea https (updater.mjs, D10): mejor enterarse aquí.
+if (!manifest.url.startsWith("https://")) {
+  console.error(`La URL del instalador tiene que ser https: ${manifest.url}`);
+  process.exit(1);
+}
+
+// Firma Ed25519 del manifiesto (RUNBOOK.md, "Firmar latest.json"). Con VIM_UPDATE_LLAVE_PRIVADA
+// apuntando a la llave privada (PEM), se añade `firma`. Sin ella el manifiesto sale sin firmar, que
+// es lo que aceptan las cajas mientras LLAVE_PUBLICA_ACTUALIZACIONES siga en null.
+if (process.env.VIM_UPDATE_LLAVE_PRIVADA) {
+  const llave = crypto.createPrivateKey(readFileSync(process.env.VIM_UPDATE_LLAVE_PRIVADA));
+  manifest.firma = crypto.sign(null, Buffer.from(mensajeAFirmar(manifest), "utf8"), llave).toString("base64");
+  console.log("· manifiesto firmado (Ed25519)");
+} else {
+  console.log("· manifiesto SIN firmar (no hay VIM_UPDATE_LLAVE_PRIVADA)");
+}
 
 const out = path.join(root, "dist", "latest.json");
 writeFileSync(out, JSON.stringify(manifest, null, 2));

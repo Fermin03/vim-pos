@@ -36,24 +36,42 @@ export async function startBackend(opts = {}) {
   // orígenes reciben cabeceras CORS: cualquier otro puede llamar al gateway pero no leer la
   // respuesta. Los valores coinciden con UI_PORT / KDS_UI_PORT de main.mjs.
   const uiPorts = opts.uiPorts ?? [54360, 54361];
-  const gateway = crearGateway({ ...backend, kds, uiPorts });
-  await new Promise((resolve) => gateway.listen(gatewayPort, host, resolve));
   const lan = ipLan();
-  log(`Gateway Supabase-compat en http://localhost:${gatewayPort}`);
-  if (host === "0.0.0.0" && lan !== "127.0.0.1") log(`Hub en la LAN: http://${lan}:${gatewayPort} (KDS/2ª caja se conectan aquí)`);
-
-  return {
+  const resultado = {
     ...backend,
     kds,
     gatewayPort,
     lanIp: lan,
     url: `http://localhost:${gatewayPort}`,
     lanUrl: `http://${lan}:${gatewayPort}`,
+    // Proveedor del token de nube del dispositivo (puente de delivery-accion). Puede venir en las
+    // opciones o asignarse después (`backend.nube = …`): el gateway lo lee en cada petición.
+    nube: opts.nube ?? null,
     stop: async () => {
       try { await kds.stop(); } catch { /* */ }
       await new Promise((r) => gateway.close(r));
       await backend.stop();
     },
+  };
+  const gateway = crearGateway(opcionesGateway(resultado, { kds, uiPorts }));
+  await new Promise((resolve) => gateway.listen(gatewayPort, host, resolve));
+  log(`Gateway Supabase-compat en http://localhost:${gatewayPort}`);
+  if (host === "0.0.0.0" && lan !== "127.0.0.1") log(`Hub en la LAN: http://${lan}:${gatewayPort} (KDS/2ª caja se conectan aquí)`);
+  return resultado;
+}
+
+/**
+ * Lo que recibe el gateway. `nube` NO se copia: se lee del objeto vivo que devuelve startBackend.
+ *
+ * Auditoría integral 30/09/2026, D5. Antes se pasaba una copia (`{ ...backend, kds, uiPorts }`) y
+ * main.mjs asignaba `backend.nube` sobre OTRO objeto, el devuelto; el gateway nunca lo veía y
+ * `delivery-accion` contestaba siempre 503 FUNCION_REQUIERE_NUBE: aceptar o pausar un pedido de
+ * Uber desde el POS fallaba aunque hubiera internet. Exportada para probarla.
+ */
+export function opcionesGateway(vivo, extra = {}) {
+  return {
+    restPort: vivo.restPort, secret: vivo.secret, pool: vivo.pool, ...extra,
+    nube: (o) => (typeof vivo.nube === "function" ? vivo.nube(o) : Promise.resolve(null)),
   };
 }
 

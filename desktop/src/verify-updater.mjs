@@ -35,20 +35,20 @@ try {
   console.log("· esMasNueva OK");
 
   // detección
-  const info = await buscarActualizacion(feed, "0.1.0");
+  const info = await buscarActualizacion(feed, "0.1.0", { permitirHttp: true });
   if (!info.hay || info.version !== "9.9.9") fail("no detectó la actualización"); else console.log("· detecta v9.9.9 sobre v0.1.0 ✓");
-  const info2 = await buscarActualizacion(feed, "9.9.9");
+  const info2 = await buscarActualizacion(feed, "9.9.9", { permitirHttp: true });
   if (info2.hay) fail("no debería reportar update en la misma versión"); else console.log("· al día no reporta update ✓");
 
   // descarga + SHA-512 correcto
   try { rmSync(dest, { force: true }); } catch { /* */ }
-  await descargarInstalador(manifest.url, sha, dest);
+  await descargarInstalador(manifest.url, sha, dest, undefined, { permitirHttp: true });
   if (!existsSync(dest)) fail("no descargó el instalador"); else console.log("· descarga + SHA-512 correcto ✓");
 
   // hash MALO → rechaza + borra
   try { rmSync(dest, { force: true }); } catch { /* */ }
   let rechazado = false;
-  try { await descargarInstalador(manifest.url, "deadbeef00", dest); } catch { rechazado = true; }
+  try { await descargarInstalador(manifest.url, "deadbeef00", dest, undefined, { permitirHttp: true }); } catch { rechazado = true; }
   if (!rechazado) fail("no rechazó el hash equivocado");
   else if (existsSync(dest)) fail("no borró la descarga corrupta");
   else console.log("· hash equivocado RECHAZADO + archivo borrado ✓");

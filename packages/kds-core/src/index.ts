@@ -17,6 +17,7 @@ export {
 } from "./cliente";
 export { leerIdent, leerCredsLegadas, guardarIdent, olvidarCreds, CREDS_DEV_FIXTURE, type DeviceCreds, type DeviceIdent } from "./device-creds";
 export { leerCaja, type CajaKds } from "./caja";
+export { abrirStreamHub, urlStreamHub, type OpcionesStreamHub, type FuenteEventos } from "./stream-hub";
 export {
   leerComandas,
   comandasDesdeFilas,
