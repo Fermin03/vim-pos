@@ -92,7 +92,9 @@ Deno.serve(async (req) => {
   }
   const tenantDelCfdi = (cfdi as unknown as { tenant_id: string }).tenant_id;
   // Sin el add-on CFDI no se timbra (C1-5): mismo criterio que el portal de autofactura.
-  const { data: addonActivo } = await sb.rpc("tenant_addon_activo", { p_tenant_id: tenantDelCfdi, p_codigo: "CFDI" });
+  // Con service_role: `tenant_addon_activo` no es ejecutable por usuarios desde la 0132 (era un
+  // oráculo). El tenant ya se validó arriba contra el rol del llamante.
+  const { data: addonActivo } = await admin.rpc("tenant_addon_activo", { p_tenant_id: tenantDelCfdi, p_codigo: "CFDI" });
   if (addonActivo !== true) {
     return json({ error: "SIN_ADDON_CFDI", detalle: "La facturación no está contratada para este negocio. Contacta a VIM." }, 403);
   }

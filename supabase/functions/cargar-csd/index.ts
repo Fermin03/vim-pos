@@ -156,7 +156,9 @@ Deno.serve(async (req) => {
   // ── Carga del sello ─────────────────────────────────────────────────────────────────────────
   // Requiere el add-on CFDI (C1-5): cargar un sello es el primer paso para timbrar. La baja y la
   // verificación de cuenta no lo exigen: retirar el sello de quien dejó de pagar debe poder hacerse.
-  const { data: addonActivo } = await sb.rpc("tenant_addon_activo", { p_tenant_id: tenantId, p_codigo: "CFDI" });
+  // Con service_role: `tenant_addon_activo` no es ejecutable por usuarios desde la 0132 (era un
+  // oráculo). El tenant ya se validó arriba contra el rol del llamante.
+  const { data: addonActivo } = await admin.rpc("tenant_addon_activo", { p_tenant_id: tenantId, p_codigo: "CFDI" });
   if (addonActivo !== true) {
     return json({ error: "SIN_ADDON_CFDI", detalle: "La facturación no está contratada para este negocio. Contacta a VIM." }, 403);
   }
