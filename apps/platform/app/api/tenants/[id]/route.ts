@@ -5,7 +5,7 @@ import { MODULOS } from "@vim/db/modulos";
 import { fechaBloqueo, mensajeBloqueoPorDefecto } from "../../../lib/bloqueo";
 import { decidirAltaAddon, precioAltaDelivery, type FilaAddon } from "../../../lib/addons";
 import { precioValido } from "../../../lib/precio";
-import { leerPromocion } from "../../../lib/promocion";
+import { fechaValida, leerPromocion } from "../../../lib/promocion";
 import type { SbClient } from "../../../lib/server";
 
 // Detalle y acciones sobre un tenant (suspender/reactivar/cancelar, notas, plan).
@@ -26,7 +26,7 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }
         "codigo_postal_fiscal, email_fiscal, fecha_alta, fecha_baja, motivo_baja, bloqueo_desde, bloqueo_mensaje, created_at, prueba_hasta, " +
         "plan:planes(id, codigo, nombre, precio_mensual_mxn, timbres_cfdi_mensuales, features_incluidos), " +
         "onboarding:tenant_onboarding_estado(fase, fase_wizard, fecha_invitacion, fecha_activacion, fecha_go_live, notas_internas), " +
-        "suscripcion:suscripciones(estado, precio_mensual_mxn, proxima_fecha_cobro, ciclo_facturacion, precio_promocional_mxn, promocion_hasta, promocion_nombre)",
+        "suscripcion:suscripciones(estado, precio_mensual_mxn, proxima_fecha_cobro, ciclo_facturacion, fecha_inicio, precio_promocional_mxn, promocion_hasta, promocion_nombre)",
     )
     .eq("id", id)
     .maybeSingle();
@@ -354,11 +354,13 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
     const ciclo = String(body.ciclo ?? "MENSUAL");
     if (ciclo !== "MENSUAL" && ciclo !== "ANUAL") return NextResponse.json({ error: "CICLO_INVALIDO" }, { status: 400 });
     // Fechas en hora de México, no del servidor: en UTC, activar una suscripción por la tarde
-    // la dejaba fechada al día siguiente. `sumarMeses` además recorta al último día del mes, para
-    // que un alta el 31 de enero cobre el 28 de febrero y no se desborde al 3 de marzo.
+    // la dejaba fechada al día siguiente.
+    // COBRO POR ADELANTADO (decisión de Fermín, 30/09/2026): el primer cobro vence HOY, el día de
+    // la activación — se paga el mes que empieza. El pago de hoy cubre [hoy, hoy + 1 mes) y la base
+    // (0130) mueve la fecha siguiente anclada al día de alta, con su recorte a fin de mes.
     const inicio = hoyMx();
-    const prox = sumarMeses(inicio, ciclo === "ANUAL" ? 12 : 1);
-    const promo = leerPromocion(body.promocion, precio, inicio);
+    const prox = inicio;
+    const promo = leerPromocion(body.promocion, precio, prox, ciclo);
     if (!promo.ok) return NextResponse.json({ error: promo.error, detalle: promo.detalle }, { status: 400 });
     // Expirar la vigente, crear la nueva y pasar TRIAL→ACTIVO van en UNA transacción (0137).
     // Antes eran tres escrituras sueltas: si el INSERT fallaba después del UPDATE, el cliente
@@ -379,8 +381,10 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
     // La prueba no bloquea nada (0141): extenderla solo mueve la fecha de los avisos. Aun así va con
     // motivo y a la bitácora, porque es una concesión comercial y alguien preguntará por qué.
     if (!motivoDe()) return faltaMotivo();
-    const hasta = typeof body.prueba_hasta === "string" && /^\d{4}-\d{2}-\d{2}$/.test(body.prueba_hasta) ? body.prueba_hasta : null;
-    if (!hasta) return NextResponse.json({ error: "FECHA_INVALIDA", detalle: "Elige la nueva fecha de fin." }, { status: 400 });
+    if (body.prueba_hasta == null || body.prueba_hasta === "") return NextResponse.json({ error: "FECHA_INVALIDA", detalle: "Elige la nueva fecha de fin." }, { status: 400 });
+    // Una fecha que no existe (2027-02-30) se contesta aquí en español, no con el 500 crudo de la base.
+    if (!fechaValida(body.prueba_hasta)) return NextResponse.json({ error: "FECHA_INVALIDA", detalle: "Esa fecha no existe en el calendario." }, { status: 400 });
+    const hasta = body.prueba_hasta;
     const hoy = hoyMx();
     if (hasta < hoy) return NextResponse.json({ error: "FECHA_INVALIDA", detalle: "La nueva fecha no puede ser anterior a hoy." }, { status: 400 });
     if (hasta > sumarMeses(hoy, 6)) return NextResponse.json({ error: "FECHA_INVALIDA", detalle: "Más de seis meses de prueba ya no es prueba: activa el cobro con una promoción." }, { status: 400 });

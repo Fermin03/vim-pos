@@ -101,7 +101,7 @@ export default function FichaCliente() {
   if (!d) return <p className="text-sm text-ink-3">Cargando…</p>;
 
   const t = d.tenant;
-  const suscripcion = ((t.suscripcion as (PrecioSuscripcion & { estado: string; proxima_fecha_cobro: string | null; ciclo_facturacion?: string })[] | null) ?? [])
+  const suscripcion = ((t.suscripcion as (PrecioSuscripcion & { estado: string; proxima_fecha_cobro: string | null; ciclo_facturacion?: string; fecha_inicio: string })[] | null) ?? [])
     .find((s) => s.estado === "ACTIVA" || s.estado === "PAUSADA") ?? null;
   const nombre = String(t.nombre_comercial);
   const estado = String(t.estado);

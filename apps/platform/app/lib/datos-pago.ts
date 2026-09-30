@@ -2,6 +2,7 @@
 //
 // Las mismas reglas que los CHECK de `plataforma_datos_pago`: aquí para contestar con un error que
 // se entienda antes de llegar a la base, que igual las vuelve a comprobar.
+import { z } from "zod";
 import { clabeValida } from "@vim/db/cobro";
 
 export type DatosPago = {
@@ -14,6 +15,20 @@ export type DatosPago = {
 };
 
 export const CAMPOS_DATOS_PAGO = ["banco", "titular", "clabe", "whatsapp", "correo", "instrucciones"] as const;
+
+/**
+ * El PUT es el REGISTRO COMPLETO, no un parche: las seis llaves son obligatorias (null o "" = vacío).
+ * Un cuerpo parcial se rechaza, porque interpretarlo como parche o como "borra lo que no mandé" son
+ * dos lecturas opuestas, y con una CLABE de por medio no se adivina.
+ */
+export const CuerpoDatosPago = z.object({
+  banco: z.string().nullable(),
+  titular: z.string().nullable(),
+  clabe: z.string().nullable(),
+  whatsapp: z.string().nullable(),
+  correo: z.string().nullable(),
+  instrucciones: z.string().nullable(),
+});
 
 /** Texto limpio o null si viene vacío. Solo acepta texto: un número o un objeto no es un dato de pago. */
 function texto(v: unknown): string | null | undefined {
@@ -28,12 +43,13 @@ function texto(v: unknown): string | null | undefined {
  * (se aceptan con espacios o guiones, como la copia la gente del estado de cuenta).
  */
 export function leerDatosPago(body: Record<string, unknown>): { ok: true; datos: DatosPago } | { ok: false; campo: string; detalle: string } {
-  const d: Partial<DatosPago> = {};
-  for (const c of CAMPOS_DATOS_PAGO) {
-    const v = texto(body[c]);
-    if (v === undefined) return { ok: false, campo: c, detalle: "Debe ser texto." };
-    d[c] = v;
+  const completo = CuerpoDatosPago.safeParse(body);
+  if (!completo.success) {
+    const campo = String(completo.error.issues[0]?.path[0] ?? "cuerpo");
+    return { ok: false, campo, detalle: `Manda el registro completo: falta "${campo}" o no es texto (usa null para dejarlo vacío).` };
   }
+  const d: Partial<DatosPago> = {};
+  for (const c of CAMPOS_DATOS_PAGO) d[c] = texto(completo.data[c]) ?? null;
   const clabe = d.clabe ? d.clabe.replace(/[\s-]/g, "") : null;
   const whatsapp = d.whatsapp ? d.whatsapp.replace(/[\s()+-]/g, "") : null;
   if (d.banco && (d.banco.length < 2 || d.banco.length > 80)) return { ok: false, campo: "banco", detalle: "El banco va de 2 a 80 caracteres." };

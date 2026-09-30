@@ -4,6 +4,7 @@
 // supabase/migrations/0141_cobro_promocion_prueba_plan.sql. La base es la que decide; esto solo le
 // enseña al operador, ANTES de confirmar, lo que la base va a hacer: folios del mes, add-ons que
 // entran o salen y el precio del cobro. Si cambias la regla allá, cámbiala aquí.
+import { precioVigente, promocionVigente } from "@vim/db/cobro";
 
 /** Qué bandera de `planes.features_incluidos` dice que el plan incluye cada add-on. */
 export const ADDONS_DEL_PLAN = [
@@ -24,6 +25,7 @@ export type AddonDelTenant = { codigo: string; activo: boolean; precio: number; 
 export type SuscripcionParaCambio = {
   precio_mensual_mxn: number | string;
   precio_promocional_mxn?: number | string | null;
+  promocion_hasta?: string | null;
   promocion_nombre?: string | null;
 } | null;
 
@@ -51,6 +53,8 @@ export function vistaPreviaCambioPlan(args: {
   suscripcion: SuscripcionParaCambio;
   /** Precio pactado distinto al de lista; null/undefined = el de lista del plan nuevo. */
   precio?: number | null;
+  /** Hoy en México (`hoyMx()`): una promoción ya vencida no se "quita", ya no está. */
+  hoy: string;
 }): VistaPreviaPlan {
   const { nuevo, addons, suscripcion } = args;
   const concede: string[] = [];
@@ -72,7 +76,8 @@ export function vistaPreviaCambioPlan(args: {
     concede,
     dejaDePagar,
     retira,
-    precio: suscripcion ? { antes: Number(suscripcion.precio_mensual_mxn), despues: args.precio ?? Number(nuevo.precio_mensual_mxn) } : null,
-    quitaPromocion: suscripcion?.precio_promocional_mxn != null ? (suscripcion.promocion_nombre ?? "la promoción") : null,
+    // "Antes" es lo que paga HOY (con promoción si sigue vigente), no el precio de lista.
+    precio: suscripcion ? { antes: precioVigente(suscripcion, args.hoy), despues: args.precio ?? Number(nuevo.precio_mensual_mxn) } : null,
+    quitaPromocion: suscripcion && promocionVigente(suscripcion, args.hoy) ? (suscripcion.promocion_nombre ?? "la promoción") : null,
   };
 }

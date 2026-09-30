@@ -325,6 +325,7 @@ export default function VersionesPage() {
         }
         listo={{ ok: !!nueva && orden !== 0, falta: "una versión distinta de la vigente" }}
         nombreEsperado="TODOS"
+        faltaNombre="escribir TODOS"
         etiquetaBoton={nueva ? `Publicar ${nueva.version}` : "Publicar"}
         ocupado={busy}
         onConfirmar={({ motivo }) => publicar(motivo)}
@@ -336,6 +337,7 @@ export default function VersionesPage() {
         titulo={TITULO[accion?.tipo ?? ""] ?? "Confirmar"}
         descripcion={descripcionDe(accion?.tipo ?? "", accion?.v.version ?? "")}
         nombreEsperado={accion?.tipo === "bloquear" ? "BLOQUEAR" : "TODOS"}
+        faltaNombre={`escribir ${accion?.tipo === "bloquear" ? "BLOQUEAR" : "TODOS"}`}
         etiquetaBoton={TITULO[accion?.tipo ?? ""] ?? "Aplicar"}
         peligroso={accion?.tipo === "bloquear"}
         conGracia={accion?.tipo === "bloquear"}

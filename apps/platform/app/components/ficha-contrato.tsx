@@ -3,7 +3,7 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import { fechaLegible, hoyMx, sumarDias, sumarMeses } from "@vim/fecha";
 import { estadoPrueba, textoPrecio, type PrecioSuscripcion } from "@vim/db/cobro";
 import type { AddonCatalogo, Detalle, Plan } from "../lib/tipos";
-import { PILOTO, promocionPiloto } from "../lib/promocion";
+import { fechaValida, PILOTO, promocionPiloto } from "../lib/promocion";
 import { vistaPreviaCambioPlan, type AddonDelTenant } from "../lib/cambio-plan";
 import { precioValido } from "../lib/precio";
 import { fmtMxn, input, label, NOMBRE_SUSCRIPCION, nombreFase } from "../lib/formato";
@@ -105,7 +105,7 @@ export function FichaContrato({ d, planes, accion, busy }: { d: Detalle; planes:
   }));
   const precioPlanNum = precioPlan.trim() === "" ? null : precioValido(precioPlan);
   const vista = elegido
-    ? vistaPreviaCambioPlan({ nuevo: elegido, addons: addonsTenant, foliosAntes: d.foliosBase?.mensuales ?? null, suscripcion, precio: precioPlanNum })
+    ? vistaPreviaCambioPlan({ nuevo: elegido, addons: addonsTenant, foliosAntes: d.foliosBase?.mensuales ?? null, suscripcion, precio: precioPlanNum, hoy })
     : null;
   const nombreAddon = (c: string) => d.catalogoAddons.find((a) => a.codigo === c)?.nombre ?? c;
 
@@ -113,15 +113,16 @@ export function FichaContrato({ d, planes, accion, busy }: { d: Detalle; planes:
   const listaPlan = Number(actual?.precio_mensual_mxn ?? 0);
   const precioActNum = precioAct.trim() === "" ? listaPlan : precioValido(precioAct);
   const esEsencial = actual?.codigo === PILOTO.plan;
-  const promo =
-    modoPromo === "piloto" ? promocionPiloto(hoy)
+  // Promociones solo con cobro mensual (0141): en anual no se ofrecen.
+  const promo = ciclo !== "MENSUAL" ? null
+    : modoPromo === "piloto" ? promocionPiloto(hoy)
       : modoPromo === "otra" ? { precio: precioValido(promoPrecio), hasta: promoHasta, nombre: promoNombre.trim() || null }
         : null;
   const faltaActivar =
     precioActNum === null ? "un precio válido"
-      : promo && (promo.precio === null || !/^\d{4}-\d{2}-\d{2}$/.test(promo.hasta)) ? "el precio y la fecha de fin de la promoción"
+      : promo && (promo.precio === null || !fechaValida(promo.hasta)) ? "el precio y la fecha de fin de la promoción"
         : promo && promo.precio !== null && promo.precio >= precioActNum ? "una promoción menor que el precio de lista"
-          : promo && promo.hasta <= hoy ? "una fecha de fin de promoción posterior a hoy"
+          : promo && promo.hasta < hoy ? "una promoción que dure al menos hasta el primer cobro (hoy)"
             : null;
   const abrirActivar = () => {
     setPrecioAct(String(listaPlan)); setCiclo("MENSUAL"); setModoPromo("ninguna");
@@ -365,7 +366,7 @@ export function FichaContrato({ d, planes, accion, busy }: { d: Detalle; planes:
           pendiente?.tipo === "suscripcion" && pendiente.estado === "PAUSADA"
             ? <>No se le cobra a <b>{nombre}</b> mientras esté en pausa. La caja sigue funcionando.</>
             : pendiente?.tipo === "suscripcion" && pendiente.estado === "NUEVA"
-              ? <>Se le empieza a cobrar a <b>{nombre}</b> desde hoy. Si estaba en prueba, pasa a activo.</>
+              ? <>El cobro es por adelantado: el primer pago de <b>{nombre}</b> vence hoy y cubre el mes que empieza. Si estaba en prueba, pasa a activo.</>
               : <>Se le vuelve a cobrar a <b>{nombre}</b> con el precio que ya tenía.</>
         }
         detalle={pendiente?.tipo === "suscripcion" && pendiente.estado === "NUEVA" ? (
@@ -377,12 +378,15 @@ export function FichaContrato({ d, planes, accion, busy }: { d: Detalle; planes:
               </div>
               <div>
                 <label className={label} htmlFor="act-ciclo">Se cobra</label>
-                <select id="act-ciclo" className={input} value={ciclo} onChange={(e) => setCiclo(e.target.value === "ANUAL" ? "ANUAL" : "MENSUAL")}>
+                <select id="act-ciclo" className={input} value={ciclo} onChange={(e) => { const c = e.target.value === "ANUAL" ? "ANUAL" : "MENSUAL"; setCiclo(c); if (c === "ANUAL") setModoPromo("ninguna"); }}>
                   <option value="MENSUAL">Cada mes</option>
                   <option value="ANUAL">Cada año (12 meses)</option>
                 </select>
               </div>
             </div>
+            {ciclo === "ANUAL" ? (
+              <p className="text-13 text-ink-2">Las promociones son solo para cobro mensual.</p>
+            ) : (
             <fieldset>
               <legend className={label}>Promoción</legend>
               <div className="flex flex-wrap gap-2">
@@ -402,7 +406,7 @@ export function FichaContrato({ d, planes, accion, busy }: { d: Detalle; planes:
                   </div>
                   <div>
                     <label className={label} htmlFor="promo-hasta">Vale hasta (inclusive)</label>
-                    <input id="promo-hasta" type="date" className={input} min={sumarDias(hoy, 1)} value={promoHasta} onChange={(e) => setPromoHasta(e.target.value)} />
+                    <input id="promo-hasta" type="date" className={input} min={hoy} value={promoHasta} onChange={(e) => setPromoHasta(e.target.value)} />
                   </div>
                   <div className="col-span-2">
                     <label className={label} htmlFor="promo-nombre">Nombre (opcional, lo ve el cliente)</label>
@@ -411,6 +415,7 @@ export function FichaContrato({ d, planes, accion, busy }: { d: Detalle; planes:
                 </div>
               )}
             </fieldset>
+            )}
             {precioActNum !== null && (
               <Cambio
                 antes={<span className="text-ink-2">{prueba.tipo !== "NO_APLICA" ? "En prueba" : "Sin cobro"}</span>}

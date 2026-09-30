@@ -132,6 +132,7 @@ export default function DatosPagoPage() {
         titulo="Cambiar los datos de pago"
         descripcion={<>Todos los clientes verán estos datos desde ya para pagarle a VIM. Si la CLABE está mal, sus pagos se van a otra cuenta.</>}
         nombreEsperado="TODOS"
+        faltaNombre="escribir TODOS"
         etiquetaBoton="Guardar datos de pago"
         ocupado={ocupado}
         onConfirmar={guardar}

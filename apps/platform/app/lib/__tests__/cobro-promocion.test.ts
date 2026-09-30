@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { clabeValida, estadoPrueba, precioVigente, promocionVigente, textoPrecio } from "@vim/db/cobro";
-import { leerPromocion, montoPeriodos, promocionPiloto } from "../promocion";
+import { fechaCobro, fechaValida, leerPromocion, montoPeriodos, promocionPiloto } from "../promocion";
 import { leerDatosPago } from "../datos-pago";
 import { vistaPreviaCambioPlan } from "../cambio-plan";
 
@@ -27,33 +27,57 @@ describe("precioVigente", () => {
   });
 });
 
-describe("promocionPiloto", () => {
-  it("seis meses desde el inicio del cobro, inclusive hasta el día anterior al sexto aniversario", () => {
+describe("promocionPiloto (cobro por adelantado)", () => {
+  it("vale hasta el día anterior al séptimo cobro (inicio + 6 meses, anclado al alta)", () => {
     expect(promocionPiloto("2026-10-01")).toEqual({ precio: 499, hasta: "2027-03-31", nombre: "Piloto 5 negocios" });
-    // Alta un 31: el recorte a fin de mes de sumarMeses (31 ago → 28 feb) y un día antes.
+    // Alta un 31: el séptimo cobro cae el 28 feb (recorte a fin de mes, como la base) y un día antes.
     expect(promocionPiloto("2026-08-31").hasta).toBe("2027-02-27");
   });
-  it("el séptimo cobro ya sale a precio de lista", () => {
-    const p = promocionPiloto("2026-10-01");
-    const s = { precio_mensual_mxn: 699, precio_promocional_mxn: p.precio, promocion_hasta: p.hasta };
-    expect(precioVigente(s, "2027-03-01")).toBe(499); // sexto cobro
-    expect(precioVigente(s, "2027-04-01")).toBe(699); // séptimo
+  it("son EXACTAMENTE seis cobros a $499 y el séptimo a $699", () => {
+    for (const inicio of ["2026-10-01", "2026-08-31", "2027-01-31"]) {
+      const p = promocionPiloto(inicio);
+      const s = { precio_mensual_mxn: 699, precio_promocional_mxn: p.precio, promocion_hasta: p.hasta };
+      // Por adelantado: los cobros caen en inicio, +1, …, +6 meses, anclados al día de alta.
+      const cobros = Array.from({ length: 7 }, (_, k) => precioVigente(s, fechaCobro(inicio, inicio, k)));
+      expect(cobros).toEqual([499, 499, 499, 499, 499, 499, 699]);
+    }
+  });
+});
+
+describe("fechaCobro (espejo de _fecha_cobro_siguiente)", () => {
+  it("se ancla al día de alta: el 31 cobra 28 feb y luego 31 mar, no 28 para siempre", () => {
+    expect(fechaCobro("2027-01-31", "2027-01-31", 1)).toBe("2027-02-28");
+    expect(fechaCobro("2027-01-31", "2027-02-28", 1)).toBe("2027-03-31");
+  });
+});
+
+describe("fechaValida", () => {
+  it("rechaza fechas que no existen", () => {
+    expect(fechaValida("2027-02-30")).toBe(false);
+    expect(fechaValida("2027-13-01")).toBe(false);
+    expect(fechaValida("2028-02-29")).toBe(true);
+    expect(fechaValida("2027-2-1")).toBe(false);
   });
 });
 
 describe("leerPromocion", () => {
   it("sin promoción es válido", () => {
-    expect(leerPromocion(undefined, 699, "2026-10-01")).toEqual({ ok: true, promo: null });
+    expect(leerPromocion(undefined, 699, "2026-10-01", "MENSUAL")).toEqual({ ok: true, promo: null });
   });
-  it("rechaza incompleta, igual o más cara que la lista y con fin en el pasado", () => {
-    expect(leerPromocion({ precio: 499 }, 699, "2026-10-01")).toMatchObject({ ok: false, error: "PROMOCION_INCOMPLETA" });
-    expect(leerPromocion({ precio: 699, hasta: "2027-03-31" }, 699, "2026-10-01")).toMatchObject({ ok: false, error: "PROMOCION_PRECIO_INVALIDO" });
-    expect(leerPromocion({ precio: -1, hasta: "2027-03-31" }, 699, "2026-10-01")).toMatchObject({ ok: false, error: "PROMOCION_INCOMPLETA" });
-    expect(leerPromocion({ precio: 499, hasta: "2026-10-01" }, 699, "2026-10-01")).toMatchObject({ ok: false, error: "PROMOCION_FECHA_INVALIDA" });
+  it("rechaza incompleta, igual o más cara que la lista, antes del primer cobro y fechas inexistentes", () => {
+    expect(leerPromocion({ precio: 499 }, 699, "2026-10-01", "MENSUAL")).toMatchObject({ ok: false, error: "PROMOCION_INCOMPLETA" });
+    expect(leerPromocion({ precio: 699, hasta: "2027-03-31" }, 699, "2026-10-01", "MENSUAL")).toMatchObject({ ok: false, error: "PROMOCION_PRECIO_INVALIDO" });
+    expect(leerPromocion({ precio: -1, hasta: "2027-03-31" }, 699, "2026-10-01", "MENSUAL")).toMatchObject({ ok: false, error: "PROMOCION_INCOMPLETA" });
+    expect(leerPromocion({ precio: 499, hasta: "2026-09-30" }, 699, "2026-10-01", "MENSUAL")).toMatchObject({ ok: false, error: "PROMOCION_FECHA_INVALIDA" });
+    expect(leerPromocion({ precio: 499, hasta: "2027-02-30" }, 699, "2026-10-01", "MENSUAL")).toMatchObject({ ok: false, error: "PROMOCION_FECHA_INVALIDA" });
   });
-  it("acepta una buena y limpia el nombre", () => {
-    expect(leerPromocion({ precio: "499", hasta: "2027-03-31", nombre: "  Piloto  " }, 699, "2026-10-01"))
+  it("con cobro anual no hay promoción", () => {
+    expect(leerPromocion({ precio: 499, hasta: "2027-03-31" }, 699, "2026-10-01", "ANUAL")).toMatchObject({ ok: false, error: "PROMOCION_CICLO_INVALIDO" });
+  });
+  it("acepta una buena (incluso hasta el mismo día del primer cobro) y limpia el nombre", () => {
+    expect(leerPromocion({ precio: "499", hasta: "2027-03-31", nombre: "  Piloto  " }, 699, "2026-10-01", "MENSUAL"))
       .toEqual({ ok: true, promo: { precio: 499, hasta: "2027-03-31", nombre: "Piloto" } });
+    expect(leerPromocion({ precio: 499, hasta: "2026-10-01" }, 699, "2026-10-01", "MENSUAL")).toMatchObject({ ok: true });
   });
 });
 
@@ -86,14 +110,14 @@ describe("vistaPreviaCambioPlan (espejo de cambiar_plan_tenant)", () => {
     const v = vistaPreviaCambioPlan({
       nuevo: NEGOCIO, foliosAntes: 10,
       addons: [{ codigo: "DELIVERY", activo: true, precio: 100, incluidoEnPlan: false }],
-      suscripcion: { precio_mensual_mxn: 699, precio_promocional_mxn: 499, promocion_nombre: "Piloto 5 negocios" },
+      suscripcion: { precio_mensual_mxn: 699, precio_promocional_mxn: 499, promocion_hasta: "2027-03-31", promocion_nombre: "Piloto 5 negocios" }, hoy: "2026-11-15",
     });
     expect(v).toEqual({
       folios: { antes: 10, despues: 20 },
       concede: ["CFDI", "DELIVERY"],
       dejaDePagar: [{ codigo: "DELIVERY", precio: 100 }],
       retira: [],
-      precio: { antes: 699, despues: 999 },
+      precio: { antes: 499, despues: 999 },
       quitaPromocion: "Piloto 5 negocios",
     });
   });
@@ -105,7 +129,7 @@ describe("vistaPreviaCambioPlan (espejo de cambiar_plan_tenant)", () => {
         { codigo: "CFDI", activo: true, precio: 0, incluidoEnPlan: true },
         { codigo: "DELIVERY", activo: true, precio: 0, incluidoEnPlan: false },
       ],
-      suscripcion: { precio_mensual_mxn: 999 },
+      suscripcion: { precio_mensual_mxn: 999 }, hoy: "2026-11-15",
     });
     expect(v.retira).toEqual(["CFDI"]);
     expect(v.concede).toEqual([]);
@@ -113,30 +137,50 @@ describe("vistaPreviaCambioPlan (espejo de cambiar_plan_tenant)", () => {
     expect(v.quitaPromocion).toBeNull();
   });
 
+  it("una promoción que ya venció no se anuncia como que se quita", () => {
+    const v = vistaPreviaCambioPlan({
+      nuevo: NEGOCIO, foliosAntes: 10, addons: [], hoy: "2027-05-01",
+      suscripcion: { precio_mensual_mxn: 699, precio_promocional_mxn: 499, promocion_hasta: "2027-03-31", promocion_nombre: "Piloto 5 negocios" },
+    });
+    expect(v.quitaPromocion).toBeNull();
+    expect(v.precio).toEqual({ antes: 699, despues: 999 });
+  });
+
   it("sin cobro vigente no hay precio que cambiar", () => {
-    expect(vistaPreviaCambioPlan({ nuevo: NEGOCIO, foliosAntes: null, addons: [], suscripcion: null }).precio).toBeNull();
+    expect(vistaPreviaCambioPlan({ nuevo: NEGOCIO, foliosAntes: null, addons: [], suscripcion: null, hoy: "2026-11-15" }).precio).toBeNull();
   });
 });
 
 describe("montoPeriodos", () => {
-  const s = { precio_mensual_mxn: 699, precio_promocional_mxn: 499, promocion_hasta: "2027-03-31" };
+  const s = { precio_mensual_mxn: 699, precio_promocional_mxn: 499, promocion_hasta: "2027-03-31", fecha_inicio: "2026-10-01" };
   it("cada periodo al precio de su fecha de cobro", () => {
     expect(montoPeriodos(s, "2027-02-01", 1, false)).toBe(499);
     expect(montoPeriodos(s, "2027-02-01", 3, false)).toBe(499 + 499 + 699);
   });
   it("anual: doce meses por periodo", () => {
-    expect(montoPeriodos({ precio_mensual_mxn: 699 }, "2027-01-01", 1, true)).toBe(8388);
+    expect(montoPeriodos({ precio_mensual_mxn: 699, fecha_inicio: "2027-01-01" }, "2027-01-01", 1, true)).toBe(8388);
+  });
+  it("se ancla al día de alta como la base: una alta del 31 cobra el 31 de marzo, no el 28", () => {
+    // Promoción hasta el 30 mar: el cobro de marzo (el 31, anclado) ya es a lista. Encadenando
+    // "+1 mes" desde el 28 feb saldría el 28 mar, a precio de promoción.
+    const s31 = { precio_mensual_mxn: 699, precio_promocional_mxn: 499, promocion_hasta: "2027-03-30", fecha_inicio: "2027-01-31" };
+    expect(montoPeriodos(s31, "2027-02-28", 2, false)).toBe(499 + 699);
   });
 });
 
 describe("leerDatosPago", () => {
   it("normaliza CLABE y WhatsApp a dígitos y vacíos a null", () => {
-    expect(leerDatosPago({ banco: " BBVA ", clabe: "002 010 077777777771", whatsapp: "+52 (477) 123-4567", correo: "", titular: null }))
+    expect(leerDatosPago({ banco: " BBVA ", clabe: "002 010 077777777771", whatsapp: "+52 (477) 123-4567", correo: "", titular: null, instrucciones: null }))
       .toEqual({ ok: true, datos: { banco: "BBVA", titular: null, clabe: "002010077777777771", whatsapp: "524771234567", correo: null, instrucciones: null } });
   });
   it("rechaza una CLABE con dígito de control malo y un correo roto", () => {
-    expect(leerDatosPago({ clabe: "012180001234567897" })).toMatchObject({ ok: false, campo: "clabe" });
-    expect(leerDatosPago({ correo: "no-es-correo" })).toMatchObject({ ok: false, campo: "correo" });
-    expect(leerDatosPago({ banco: 5 })).toMatchObject({ ok: false, campo: "banco" });
+    const vacio = { banco: null, titular: null, clabe: null, whatsapp: null, correo: null, instrucciones: null };
+    expect(leerDatosPago({ ...vacio, clabe: "012180001234567897" })).toMatchObject({ ok: false, campo: "clabe" });
+    expect(leerDatosPago({ ...vacio, correo: "no-es-correo" })).toMatchObject({ ok: false, campo: "correo" });
+    expect(leerDatosPago({ ...vacio, banco: 5 })).toMatchObject({ ok: false, campo: "banco" });
+  });
+  it("un cuerpo parcial se rechaza: el PUT es el registro completo", () => {
+    expect(leerDatosPago({ clabe: "002010077777777771" })).toMatchObject({ ok: false });
+    expect(leerDatosPago({ banco: "BBVA", titular: null, clabe: null, whatsapp: null, correo: null })).toMatchObject({ ok: false, campo: "instrucciones" });
   });
 });

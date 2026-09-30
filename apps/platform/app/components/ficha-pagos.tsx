@@ -21,7 +21,7 @@ type Pago = {
   anulado_motivo: string | null;
 };
 
-type Suscripcion = PrecioSuscripcion & { estado: string; proxima_fecha_cobro: string | null; ciclo_facturacion?: string };
+type Suscripcion = PrecioSuscripcion & { estado: string; proxima_fecha_cobro: string | null; ciclo_facturacion?: string; fecha_inicio: string };
 
 export const TONO_COBRO: Record<EstadoCobro["tipo"], TonoEstado> = {
   SIN_COBRO: "neutral", AL_CORRIENTE: "success", POR_VENCER: "warning", HOY: "warning", VENCIDO: "danger",

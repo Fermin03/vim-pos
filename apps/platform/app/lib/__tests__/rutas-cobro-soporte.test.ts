@@ -177,3 +177,22 @@ describe("prueba_extender (0141)", () => {
     expect(llamadas.some((l) => l.op === "update")).toBe(false);
   });
 });
+
+describe("cobro por adelantado (decisión 30/09/2026)", () => {
+  it("el primer cobro vence el mismo día de la activación", async () => {
+    await PATCH(pedir({ accion: "suscripcion_activar", motivo: MOTIVO }), ctx);
+    const args = llamadas.find((l) => l.tipo === "rpc")!.args as { p_inicio: string; p_proxima: string };
+    expect(args.p_proxima).toBe(args.p_inicio);
+  });
+  it("una promoción con cobro anual se rechaza con 400 sin llamar a la base", async () => {
+    const r = await PATCH(pedir({ accion: "suscripcion_activar", motivo: MOTIVO, ciclo: "ANUAL", promocion: { precio: 499, hasta: "2099-03-31" } }), ctx);
+    expect(r.status).toBe(400);
+    expect((await r.json()).error).toBe("PROMOCION_CICLO_INVALIDO");
+    expect(llamadas.some((l) => l.tipo === "rpc")).toBe(false);
+  });
+  it("una fecha que no existe se contesta con 400 en español, no con el 500 de la base", async () => {
+    const r = await PATCH(pedir({ accion: "prueba_extender", prueba_hasta: "2027-02-30", motivo: MOTIVO }), ctx);
+    expect(r.status).toBe(400);
+    expect((await r.json()).detalle).toMatch(/no existe/);
+  });
+});

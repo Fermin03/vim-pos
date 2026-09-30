@@ -208,9 +208,11 @@ export async function GET(req: Request) {
   const subs = (subsRes.data ?? []) as ({
     tenant_id: string; estado: string; fecha_fin: string | null; proxima_fecha_cobro: string | null;
   } & PrecioSuscripcion)[];
-  const conCobro = new Set(subs.filter((s) => s.estado === "ACTIVA").map((s) => s.tenant_id));
+  // "Con cobro" = una suscripción ACTIVA o en PAUSA: pausar el cobro es una decisión tomada, no un olvido.
+  const conCobro = new Set(subs.filter((s) => s.estado === "ACTIVA" || s.estado === "PAUSADA").map((s) => s.tenant_id));
   for (const t of tenants) {
-    if (!activos.has(t.id) || conCobro.has(t.id)) continue;
+    // Los internos (Knock-Out, demos de VIM) no pagan: nunca son "prueba vencida".
+    if (!activos.has(t.id) || conCobro.has(t.id) || t.estado === "INTERNO") continue;
     const p = estadoPrueba(t.estado, t.prueba_hasta, hoy);
     if (p.tipo === "VENCIDA") {
       alertas.push({

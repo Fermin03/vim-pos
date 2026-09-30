@@ -17,6 +17,7 @@ export async function GET(req: Request) {
   return NextResponse.json({ datos: data ?? null });
 }
 
+/** PUT = el registro COMPLETO (las seis llaves, null para vaciar) + `motivo`. Un cuerpo parcial es 400. */
 export async function PUT(req: Request) {
   const auth = await autorizar(req);
   if ("error" in auth) return auth.error;
