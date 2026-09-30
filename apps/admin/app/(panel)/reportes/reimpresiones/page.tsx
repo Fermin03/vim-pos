@@ -7,7 +7,8 @@ import { formatear, type Columna } from "../../../lib/reporte-tabla";
 const UMBRAL = 2;
 const razon = (f: FilaReimpresion) => (f.ticketsDistintos > 0 ? f.reimpresiones / f.ticketsDistintos : 0);
 
-/** Antifraude: cajeros que reimprimen comandas con frecuencia (posible salida sin cobrar). */
+/** Antifraude: cajeros que reimprimen comandas con frecuencia (posible salida sin cobrar), y
+ *  reimpresiones del ticket del cliente (desde la 0126 las dos quedan registradas en la caja). */
 export default function ReimpresionesPage() {
   const { rango, cambiar } = useRangoReporte();
   const consulta = useConsulta((r) => leerReimpresionesPorCajero(r.desde, r.hasta), rango);
@@ -15,11 +16,12 @@ export default function ReimpresionesPage() {
 
   const reimpresiones = filas.reduce((s, f) => s + f.reimpresiones, 0);
   const tickets = filas.reduce((s, f) => s + f.ticketsDistintos, 0);
+  const ticketsCliente = filas.reduce((s, f) => s + f.ticketsCliente, 0);
   const aRevisar = filas.filter((f) => razon(f) >= UMBRAL).length;
 
   const cifras: Cifra[] = [
-    { etiqueta: "Reimpresiones", valor: reimpresiones, tipo: "entero" },
-    { etiqueta: "Tickets reimpresos", valor: tickets, tipo: "entero" },
+    { etiqueta: "Comandas reimpresas", valor: reimpresiones, tipo: "entero", pie: tickets > 0 ? `de ${tickets} ${tickets === 1 ? "pedido" : "pedidos"}` : undefined },
+    { etiqueta: "Tickets del cliente", valor: ticketsCliente, tipo: "entero", pie: "reimpresos" },
     { etiqueta: "Por ticket", valor: tickets > 0 ? `${(reimpresiones / tickets).toFixed(1)}×` : "—", pie: "en promedio" },
     {
       etiqueta: "Cajeros a revisar",
@@ -32,8 +34,9 @@ export default function ReimpresionesPage() {
 
   const columnas: Columna<FilaReimpresion>[] = [
     { id: "cajero", titulo: "Cajero", valor: (f) => f.cajero, ancho: 24 },
-    { id: "reimpresiones", titulo: "Reimpresiones", tipo: "entero", valor: (f) => f.reimpresiones, total: "suma", enfasis: "fuerte" },
-    { id: "tickets", titulo: "Tickets distintos", tipo: "entero", valor: (f) => f.ticketsDistintos, total: "suma" },
+    { id: "reimpresiones", titulo: "Comandas", tipo: "entero", valor: (f) => f.reimpresiones, total: "suma", enfasis: "fuerte" },
+    { id: "tickets", titulo: "Pedidos distintos", tipo: "entero", valor: (f) => f.ticketsDistintos, total: "suma" },
+    { id: "ticketsCliente", titulo: "Tickets del cliente", tipo: "entero", valor: (f) => f.ticketsCliente, total: "suma" },
     {
       id: "razon",
       titulo: "Por ticket",
@@ -51,15 +54,15 @@ export default function ReimpresionesPage() {
   return (
     <ReporteMarco
       titulo="Reimpresiones por cajero"
-      subtitulo="Reimprimir comandas con frecuencia puede esconder producto que salió sin cobrar."
+      subtitulo="Reimprimir comandas con frecuencia puede esconder producto que salió sin cobrar. Cada reimpresión pide motivo y autorización."
       rango={{ valor: rango, cambiar }}
       consulta={consulta}
       cifras={cifras}
-      tabla={{ columnas, filas, clave: (f) => f.clave, orden: { id: "reimpresiones", dir: "desc" }, vacio: "Nadie reimprimió comandas en estas fechas." }}
+      tabla={{ columnas, filas, clave: (f) => f.clave, orden: { id: "reimpresiones", dir: "desc" }, vacio: "Nadie reimprimió comandas ni tickets en estas fechas." }}
     >
       <Nota>
-        Con {UMBRAL} reimpresiones o más por ticket conviene revisar con el cajero. Cada reimpresión queda registrada con
-        su fecha y su ticket.
+        Con {UMBRAL} reimpresiones de comanda o más por pedido conviene revisar con el cajero. Cada reimpresión queda
+        registrada con su fecha, su ticket, el motivo y quién la autorizó. Se registran desde la versión 0.4.93 de la caja.
       </Nota>
     </ReporteMarco>
   );

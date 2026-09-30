@@ -600,18 +600,28 @@ export async function leerVentasPorEvento(): Promise<FilaEvento[]> {
 
 // Antifraude — reimpresiones de comanda por cajero (vw_reimpresiones_por_cajero, doc 11 §8).
 // Reimpresión frecuente = posible salida de producto sin cobrar.
-export type FilaReimpresion = { clave: string; cajero: string; reimpresiones: number; ticketsDistintos: number };
+/** Por cajero: comandas reimpresas (con los tickets a los que pertenecen) y tickets del cliente
+ *  reimpresos. Las dos cosas desde la 0126; antes el reporte solo miraba comandas y salía vacío. */
+export type FilaReimpresion = { clave: string; cajero: string; reimpresiones: number; ticketsDistintos: number; ticketsCliente: number };
 export async function leerReimpresionesPorCajero(desde: string, hasta: string): Promise<FilaReimpresion[]> {
-  const data = await leerVista("vw_reimpresiones_por_cajero", "cajero_id, cajero_email, reimpresiones_count, tickets_distintos, dia", desde, hasta, ["sucursal_id", "cajero_id"], "dia");
+  const [comandas, tickets] = await Promise.all([
+    leerVista("vw_reimpresiones_por_cajero", "cajero_id, cajero_email, reimpresiones_count, tickets_distintos, dia", desde, hasta, ["sucursal_id", "cajero_id"], "dia"),
+    leerVista("vw_reimpresiones_ticket_por_cajero", "cajero_id, cajero_email, reimpresiones_count, dia", desde, hasta, ["sucursal_id", "cajero_id"], "dia"),
+  ]);
   const map = new Map<string, FilaReimpresion>();
-  for (const r of data) {
+  const fila = (r: Record<string, unknown>) => {
     const k = String(r.cajero_id ?? r.cajero_email ?? "—");
-    const cur = map.get(k) ?? { clave: k, cajero: String(r.cajero_email ?? "—"), reimpresiones: 0, ticketsDistintos: 0 };
+    const cur = map.get(k) ?? { clave: k, cajero: String(r.cajero_email ?? "—"), reimpresiones: 0, ticketsDistintos: 0, ticketsCliente: 0 };
+    map.set(k, cur);
+    return cur;
+  };
+  for (const r of comandas) {
+    const cur = fila(r);
     cur.reimpresiones += num(r.reimpresiones_count);
     cur.ticketsDistintos += num(r.tickets_distintos);
-    map.set(k, cur);
   }
-  return [...map.values()].sort((a, b) => b.reimpresiones - a.reimpresiones);
+  for (const r of tickets) fila(r).ticketsCliente += num(r.reimpresiones_count);
+  return [...map.values()].sort((a, b) => b.reimpresiones + b.ticketsCliente - (a.reimpresiones + a.ticketsCliente));
 }
 
 // Apps externas — ventas Rappi/Uber/DiDi con estado de conciliación (vw_ventas_apps_externas).

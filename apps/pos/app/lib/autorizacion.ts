@@ -18,7 +18,7 @@ export type PayloadAutorizacion = {
 /** Resultado uniforme de ambos caminos: id de la autorización + quién autorizó. */
 export type Autorizacion = { autorizacionPinId: string; autorizoId: string };
 
-function subDeToken(token: string): string {
+export function subDeToken(token: string): string {
   const payload = token.split(".")[1];
   if (!payload) throw new Error("TOKEN_INVALIDO");
   const c = JSON.parse(atob(payload.replace(/-/g, "+").replace(/_/g, "/")));

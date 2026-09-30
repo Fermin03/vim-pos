@@ -88,6 +88,8 @@ import { useEscape } from "../lib/use-escape";
 import { ModalAsignarRepartidor } from "./modal-asignar-repartidor";
 import type { LineaCancelada } from "./modal-cancelar-items";
 import { cerrarRepartoAlCobrar } from "../lib/delivery";
+import { registrarImpresionComanda, registrarReimpresionTicket, type OrigenReimpresionTicket, type RegistroComanda } from "../lib/impresiones";
+import { ModalReimprimirComanda } from "./modal-reimprimir-comanda";
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
 
@@ -283,6 +285,13 @@ export function HomePos({
   const [datosTicket, setDatosTicket] = useState<DatosTicketImpresion | null>(null);
   const [datosComanda, setDatosComanda] = useState<DatosComanda | null>(null);
   const [mostrarRecibo, setMostrarRecibo] = useState(false);
+  // El ticket cuyo recibo está en pantalla: la vista previa no lo trae y hace falta para registrar
+  // la copia o la reimpresión de su comanda (0126).
+  const [ticketImpresoId, setTicketImpresoId] = useState<string | null>(null);
+  const [reimprimiendoComanda, setReimprimiendoComanda] = useState(false);
+  // Cuántas veces se imprimió el ticket desde la vista previa en esta apertura: la primera, si la
+  // vista previa se abrió porque no hay impresora (no por "Imprimir copia"), no es una copia.
+  const impresionesPreview = useRef(0);
   const [estadoTicket, setEstadoTicket] = useState<"idle" | "lista" | "error">("idle");
   // D45 §12 — pedidos en espera: modal de etiqueta (guardar), lista (retomar) y contador del chip.
   const [esperaPidiendoEtiqueta, setEsperaPidiendoEtiqueta] = useState(false);
@@ -379,6 +388,7 @@ export function HomePos({
   const cerrarRecibo = useCallback(() => {
     setConfirmacion(null);
     setDatosTicket(null);
+    setTicketImpresoId(null);
     setDatosComanda(null);
     setMostrarRecibo(false);
   }, []);
@@ -704,22 +714,34 @@ export function HomePos({
    *
    * Devuelve los nombres de las estaciones cuyo papel NO salió, para avisarle al cajero cuál falta.
    */
-  const imprimirComandaPorAreas = useCallback(async (dc: DatosComanda, lineas: LineaConArea[]): Promise<string[]> => {
+  const imprimirComandaPorAreas = useCallback(async (dc: DatosComanda, lineas: LineaConArea[], registro?: RegistroComanda): Promise<string[]> => {
     const fallidas: string[] = [];
     for (const g of agruparComandaPorArea(lineas)) {
       const job = construirComandaJob({ ...dc, area: g.areaNombre, lineas: g.lineas });
       // onMostrar vacío: si la estación no está configurada (adaptador de preview) no se abre
       // ningún diálogo encima del cajero; simplemente no hay papel.
-      const imp = obtenerImpresoraDeEstacion(estacionParaArea(g.areaId), { onMostrar: () => {} });
+      const estacion = estacionParaArea(g.areaId);
+      const imp = obtenerImpresoraDeEstacion(estacion, { onMostrar: () => {} });
+      let resultado: "OK" | "IMPRESORA_OFFLINE" | "ERROR_DESCONOCIDO" = "OK";
+      let errorDetalle: string | null = null;
       try {
         const r = await imp.imprimir(job);
-        if (!r.ok) fallidas.push(g.areaNombre ?? "cocina");
-      } catch {
+        if (!r.ok) { fallidas.push(g.areaNombre ?? "cocina"); resultado = "IMPRESORA_OFFLINE"; }
+      } catch (e) {
         fallidas.push(g.areaNombre ?? "cocina");
+        resultado = "ERROR_DESCONOCIDO";
+        errorDetalle = e instanceof Error ? e.message : null;
+      }
+      // Bitácora de cocina (0126): cada papel, salga o no. Sin `await`: registrar nunca retrasa
+      // el papel de la siguiente estación.
+      if (registro) {
+        void registrarImpresionComanda(token, {
+          ...registro, areaId: g.areaId, impresora: estacion, lineas: g.lineas, resultado, errorDetalle,
+        });
       }
     }
     return fallidas;
-  }, []);
+  }, [token]);
 
   const imprimirComandaCocina = useCallback(async (ticketId: string, soloItems: string[], esAgregado: boolean) => {
     if (soloItems.length === 0) return; // nada nuevo que mandar: no se gasta papel
@@ -747,7 +769,7 @@ export function HomePos({
         lineas,
         ancho: 80,
       };
-      const fallidas = await imprimirComandaPorAreas(dc, lineas);
+      const fallidas = await imprimirComandaPorAreas(dc, lineas, { ticketId, evento: "IMPRESION_INICIAL" });
       // El pedido YA está en cocina (KDS): un fallo de papel no debe deshacer nada ni bloquear.
       // Pero tampoco se calla: si nadie avisa, la cocina se queda sin comanda y nadie se entera.
       if (fallidas.length > 0) {
@@ -756,7 +778,7 @@ export function HomePos({
     } catch {
       setError("El pedido se envió a cocina, pero no se pudo imprimir la comanda.");
     }
-  }, [token, empleado.nombre, caja.nombre]);
+  }, [token, empleado.nombre, caja.nombre, imprimirComandaPorAreas]);
 
   /**
    * Avisa a cocina de productos CANCELADOS.
@@ -789,7 +811,7 @@ export function HomePos({
       // barra y la cancelación se imprime en cocina, la barra la sigue preparando.
       const areas = await leerAreasDeItems(token, lineas.map((l) => l.ticketItemId));
       const conArea: LineaConArea[] = lineas.map((l) => ({ ...l, ...(areas.get(l.ticketItemId) ?? {}) }));
-      const fallidas = await imprimirComandaPorAreas(dc, conArea);
+      const fallidas = await imprimirComandaPorAreas(dc, conArea, { ticketId, evento: "ANULACION_COMANDA" });
       if (fallidas.length > 0) {
         setError(`Los productos se cancelaron, pero NO se pudo avisar a ${fallidas.join(" y ")}. Avísales a mano.`);
       }
@@ -1048,6 +1070,32 @@ export function HomePos({
   }, [caja.logoUrl]);
 
   /**
+   * Reimprime la comanda completa de un ticket, repartida por estación como la original, ya con
+   * motivo y autorización (0126). Cada papel queda en comanda_impresiones como REIMPRESION_CAJERO.
+   */
+  const reimprimirComanda = useCallback(async (ticketId: string, motivo: string, autorizacionPinId: string) => {
+    try {
+      const datos = await leerTicketParaImpresion(ticketId, { token, cajeroNombre: empleado.nombre, cajaNombre: caja.nombre });
+      const lineas = lineasParaComanda(datos.lineas);
+      if (lineas.length === 0) return;
+      const dc: DatosComanda = {
+        folio: datos.meta.folio,
+        modoServicio: datos.meta.modoServicio,
+        cajero: datos.meta.cajero,
+        caja: datos.meta.caja,
+        fechaIso: datos.meta.fechaIso,
+        cliente: datos.entrega?.cliente ?? datos.meta.nombreCliente ?? null,
+        lineas,
+        ancho: 80,
+      };
+      const fallidas = await imprimirComandaPorAreas(dc, lineas, { ticketId, evento: "REIMPRESION_CAJERO", razon: motivo, autorizacionPinId });
+      if (fallidas.length > 0) setError(`No se pudo reimprimir la comanda de ${fallidas.join(" y ")}.`);
+    } catch {
+      setError("No se pudo reimprimir la comanda.");
+    }
+  }, [token, empleado.nombre, caja.nombre, imprimirComandaPorAreas]);
+
+  /**
    * Imprime el ticket de una cuenta (botón "Imprimir ticket" y Consulta de cuentas).
    *
    * El envío se ESPERA. Antes se disparaba sin `await`: la promesa se resolvía al instante, la
@@ -1057,11 +1105,18 @@ export function HomePos({
    *
    * Si falla, la excepción sube a quien llamó: ahí se avisa y NO se marca como impreso.
    */
-  const reimprimirCuenta = useCallback(async (ticketId: string) => {
+  const reimprimirCuenta = useCallback(async (ticketId: string, reimpresion?: { origen: OrigenReimpresionTicket; autorizacionPinId?: string }) => {
     const datos = await leerTicketParaImpresion(ticketId, { token, cajeroNombre: empleado.nombre, cajaNombre: caja.nombre });
     const imp = obtenerImpresora("CAJA", { onMostrar: () => window.print() });
     await imp.imprimir(construirTicketJob(datos, await logoParaTicket(datos.ancho)));
-  }, [token, empleado.nombre, caja.nombre]);
+    // Solo si es REimpresión, y solo después de que el papel salió (0126).
+    if (reimpresion) {
+      void registrarReimpresionTicket(token, {
+        tenantId: caja.tenant_id, sucursalId: caja.sucursal_id, cajaId: turno.caja_id, turnoId: turno.id,
+        ticketId, origen: reimpresion.origen, autorizacionPinId: reimpresion.autorizacionPinId ?? null,
+      });
+    }
+  }, [token, empleado.nombre, caja.nombre, caja.tenant_id, caja.sucursal_id, turno.caja_id, turno.id]);
 
   /** Retoma un pedido en espera: lo carga al carrito como cuenta editable (misma maquinaria de mesas). */
   const retomarEspera = useCallback(async (ticketId: string, etiqueta: string) => {
@@ -1186,6 +1241,7 @@ export function HomePos({
   const nuevoTicket = useCallback(() => {
     setConfirmacion(null);
     setDatosTicket(null);
+    setTicketImpresoId(null);
     setDatosComanda(null);
     setMostrarRecibo(false);
     setImprimirCopia(false);
@@ -1235,6 +1291,8 @@ export function HomePos({
       [cancelandoItem != null, () => setCancelandoItem(null)],
       [descuentoItem != null, () => setDescuentoItem(null)],
       [cancelandoTicket, () => setCancelandoTicket(false)],
+      // Reimprimir comanda (0126) se abre encima del recibo: Escape lo cierra antes que al recibo.
+      [reimprimiendoComanda, () => setReimprimiendoComanda(false)],
       // El aviso del reparto se pinta encima del recibo y de la confirmación de cobro, así que
       // Escape tiene que cerrarlo a él primero.
       [avisoReparto != null, () => setAvisoReparto(null)],
@@ -1264,7 +1322,7 @@ export function HomePos({
         && !enDelivery && !enPickup && !enMesas, () => intentarSalirDeCaptura("atras")],
     ];
     return capaVisible(capas);
-  }, [modGrupos, comboAbierto, hojaCombo, agregarSuelto, cancelandoItem, descuentoItem, cancelandoTicket, avisoReparto, mostrarRecibo, confirmacion, totalesCobro,
+  }, [modGrupos, comboAbierto, hojaCombo, agregarSuelto, cancelandoItem, descuentoItem, cancelandoTicket, reimprimiendoComanda, avisoReparto, mostrarRecibo, confirmacion, totalesCobro,
       procesandoCobro, agregandoA, viendoMapaMesas, pidiendoMesa, nombreCuentaAbierto,
       clienteDomAbierto, clienteCuentaAbierto, zonaPedidoAbierto, esperaPidiendoEtiqueta, esperaListaAbierta, movimientoAbierto,
       abrirCajaAbierto, cambiarPinAbierto, misPropinasAbierto, configImpresoraAbierto,
@@ -1341,6 +1399,7 @@ export function HomePos({
                 ancho: 80,
               };
               setDatosTicket(datos);
+              setTicketImpresoId(ticketId);
               setDatosComanda(datosCom);
               setEstadoTicket("lista");
               // Solo "Para llevar": es el único modo que va del carrito al cobro sin pasar por la
@@ -1370,7 +1429,7 @@ export function HomePos({
               // sola impresora, el ticket que acaba de salir ya es el papel.
               if (debeImprimirComandaAlCobrar(datos.meta.modo, hayEstacionDeCocinaDedicada())) {
                 // También repartida: en Para llevar la bebida va a la barra igual que en el resto.
-                imprimirComandaPorAreas(datosCom, lineasCom).catch(() => {});
+                imprimirComandaPorAreas(datosCom, lineasCom, { ticketId, evento: "IMPRESION_INICIAL" }).catch(() => {});
               }
               // Reparto a domicilio: se cierra con lo que de verdad entró. Best-effort — la venta
               // ya quedó cobrada y un fallo aquí no debe deshacerla.
@@ -1447,14 +1506,27 @@ export function HomePos({
           onImprimir={(vista) => {
             // Con Epson/genérica manda ESC/POS; con Preview, window.print() imprime el recibo visible.
             if (vista === "cocina" && datosComanda) {
-              obtenerImpresora("COCINA", { onMostrar: () => window.print() }).imprimir(construirComandaJob(datosComanda));
+              // Reimprimir la comanda pide motivo y autorización (0126): es la forma más barata de
+              // sacar comida sin cobrar. Sin el id del ticket no hay dónde registrarla, así que
+              // tampoco se imprime.
+              if (ticketImpresoId) setReimprimiendoComanda(true);
             } else {
-              logoParaTicket(datosTicket.ancho).then((logo) =>
-                obtenerImpresora("CAJA", { onMostrar: () => window.print() }).imprimir(construirTicketJob(datosTicket, logo)),
-              );
+              const esCopia = imprimirCopia || impresionesPreview.current > 0;
+              impresionesPreview.current += 1;
+              logoParaTicket(datosTicket.ancho)
+                .then((logo) => obtenerImpresora("CAJA", { onMostrar: () => window.print() }).imprimir(construirTicketJob(datosTicket, logo)))
+                .then(() => {
+                  if (esCopia && ticketImpresoId) {
+                    void registrarReimpresionTicket(token, {
+                      tenantId: caja.tenant_id, sucursalId: caja.sucursal_id, cajaId: turno.caja_id, turnoId: turno.id,
+                      ticketId: ticketImpresoId, origen: "COPIA_COBRO",
+                    });
+                  }
+                })
+                .catch(() => {});
             }
           }}
-          onCerrar={() => { setMostrarRecibo(false); setImprimirCopia(false); }}
+          onCerrar={() => { setMostrarRecibo(false); setImprimirCopia(false); impresionesPreview.current = 0; }}
           onNuevoTicket={nuevoTicket}
           autoImprimir={imprimirCopia}
         />
@@ -1463,6 +1535,21 @@ export function HomePos({
           de cobro (z-50) y del recibo (z-[60]): es lo único de esta pantalla que el cajero no puede
           pasar por alto, porque ese pedido ya no va a poder cuadrarse contra nadie. No detiene nada
           — el cobro ya quedó registrado. */}
+      {reimprimiendoComanda && ticketImpresoId && (
+        <ModalReimprimirComanda
+          token={token}
+          empleado={empleado}
+          ticketId={ticketImpresoId}
+          folio={datosTicket?.meta.folio ?? null}
+          cajaId={turno.caja_id}
+          turnoId={turno.id}
+          onCerrar={() => setReimprimiendoComanda(false)}
+          onAutorizado={({ motivo, autorizacionPinId }) => {
+            setReimprimiendoComanda(false);
+            void reimprimirComanda(ticketImpresoId, motivo, autorizacionPinId);
+          }}
+        />
+      )}
       {avisoReparto && (
         <div className="fixed inset-0 z-[70] flex items-center justify-center bg-ink/50 p-4" role="alertdialog" aria-modal="true">
           <div className="w-full max-w-md rounded-xl bg-surface p-6 text-center shadow-xl">
@@ -1717,7 +1804,7 @@ export function HomePos({
             setError(e instanceof Error ? e.message : "No se pudo abrir el cobro");
           }
         }}
-        onImprimirTicket={reimprimirCuenta}
+        onImprimirTicket={(id, r) => reimprimirCuenta(id, r ? { origen: "CUENTAS", autorizacionPinId: r.autorizacionPinId } : undefined)}
         onComandaCancelacion={imprimirComandaCancelacion}
         extraPorCuenta={
           enDelivery
@@ -1808,7 +1895,7 @@ export function HomePos({
   }
 
   if (enConsultaCuentas) {
-    return <PantallaConsultaCuentas token={token} caja={caja} turno={turno} empleado={empleado} onSalir={volverAlInicio} onReimprimir={reimprimirCuenta} />;
+    return <PantallaConsultaCuentas token={token} caja={caja} turno={turno} empleado={empleado} onSalir={volverAlInicio} onReimprimir={(id) => reimprimirCuenta(id, { origen: "CONSULTA" })} />;
   }
 
   if (enDevoluciones) {

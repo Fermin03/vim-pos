@@ -21,6 +21,7 @@ export function ModalAutorizacionPin({
   turnoId,
   motivo,
   quienAutoriza,
+  capa,
   onAutorizado,
   onCancelar,
 }: {
@@ -38,6 +39,8 @@ export function ModalAutorizacionPin({
   motivo: string;
   /** Quién puede autorizar, cuando no es "un supervisor o admin" (p. ej. un permiso solo de dueño/admin). */
   quienAutoriza?: string;
+  /** Capa extra (p. ej. "z-[70]") cuando se abre encima de algo que ya está sobre z-50, como el recibo. */
+  capa?: string;
   onAutorizado: (a: Autorizacion) => void;
   onCancelar: () => void;
 }) {
@@ -89,7 +92,7 @@ export function ModalAutorizacionPin({
       onClose={onCancelar}
       title="Autorización requerida"
       hideTitle
-      backdropClassName="bg-ink/40 backdrop-blur-sm"
+      backdropClassName={`bg-ink/40 backdrop-blur-sm ${capa ?? ""}`}
       className="w-[380px] rounded-lg border border-line bg-surface p-6 shadow-[0_18px_44px_rgba(22,22,26,.18)]"
     >
       <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full border border-line bg-hover">
