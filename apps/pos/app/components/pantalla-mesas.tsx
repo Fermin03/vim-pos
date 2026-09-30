@@ -9,9 +9,10 @@ const REFRESCO_MS = 8000;
 
 // Colores funcionales de estado (P-086): NO el naranja de marca.
 const ESTILO: Record<MesaEstado, { bg: string; line: string; text: string }> = {
-  LIBRE: { bg: "#EAF4EE", line: "#BFE0CC", text: "#2E7D52" },
-  OCUPADA: { bg: "#FBECEA", line: "#EDC4BE", text: "#C0392B" },
-  RESERVADA: { bg: "#EAF0F8", line: "#C4D5ED", text: "#2C5AA0" },
+  LIBRE: { bg: "rgb(var(--success-soft))", line: "rgb(var(--success) / .3)", text: "rgb(var(--success))" },
+  OCUPADA: { bg: "rgb(var(--danger-soft))", line: "rgb(var(--danger) / .3)", text: "rgb(var(--danger))" },
+  RESERVADA: { bg: "rgb(var(--info-soft))", line: "rgb(var(--info) / .3)", text: "rgb(var(--info))" },
+  // Limpieza y fuera de servicio no tienen tono en la paleta: se quedan con el suyo.
   EN_LIMPIEZA: { bg: "#FBF8E4", line: "#E8E0AE", text: "#9A8408" },
   FUERA_DE_SERVICIO: { bg: "#F2F2F0", line: "#DDDDD9", text: "#6E6E73" },
 };
@@ -27,10 +28,10 @@ function AlertaCuenta({ m }: { m: MesaVista }) {
   const horas = Math.floor(m.minutosOcupada / 60);
   const cfg =
     a === "OCUPADA_4H"
-      ? { bg: "#FBECEA", text: "#C0392B", msg: `Cuenta muy larga (${horas} h) — avisa al supervisor` }
+      ? { bg: "rgb(var(--danger-soft))", text: "rgb(var(--danger))", msg: `Cuenta muy larga (${horas} h) — avisa al supervisor` }
       : a === "OCUPADA_2H"
-        ? { bg: "#F6EEDD", text: "#9A6B12", msg: `Cliente lleva ${horas} h, ¿todo OK?` }
-        : { bg: "#F6EEDD", text: "#9A6B12", msg: `Sin pedidos nuevos hace ${m.minutosSinMovimiento} min` };
+        ? { bg: "rgb(var(--warning-soft))", text: "rgb(var(--warning))", msg: `Cliente lleva ${horas} h, ¿todo OK?` }
+        : { bg: "rgb(var(--warning-soft))", text: "rgb(var(--warning))", msg: `Sin pedidos nuevos hace ${m.minutosSinMovimiento} min` };
   return (
     <div className="mt-1.5 flex w-full items-center gap-1.5 rounded px-2 py-1 text-[10.5px] font-bold leading-tight" style={{ background: cfg.bg, color: cfg.text }}>
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" className="h-3 w-3 flex-shrink-0"><path d="M12 9v4M12 17h.01M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z" /></svg>

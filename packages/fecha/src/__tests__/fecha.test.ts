@@ -95,3 +95,12 @@ describe("haceCuanto", () => {
     expect(haceCuanto("2026-07-01T18:00:00Z", ahora)).toBe("1 jul 2026");
   });
 });
+
+describe("diaCorto", () => {
+  it("día y mes sin año, tomando la fecha tal cual", async () => {
+    const { diaCorto } = await import("../index");
+    expect(diaCorto("2026-09-24")).toBe("24 sep");
+    expect(diaCorto("2026-01-01")).toBe("1 ene");
+    expect(diaCorto(null)).toBe("—");
+  });
+});

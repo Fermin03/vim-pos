@@ -1,4 +1,5 @@
 "use client";
+import { etiquetaMetodoPago } from "@vim/db/metodos-pago";
 import { useEffect, useMemo, useState } from "react";
 import { Button } from "@vim/ui/styles";
 import { employeeClient, type Empleado } from "../lib/supabase";
@@ -26,13 +27,6 @@ import { obtenerImpresora } from "../lib/print/adapter";
 import { ReciboPreview } from "./recibo-preview";
 import { listarCuentasQueBloqueanCorte, type CuentaBloqueante } from "../lib/cuentas-abiertas";
 
-const METODO_LABEL: Record<string, string> = {
-  EFECTIVO: "Efectivo",
-  TARJETA_CREDITO: "Tarjeta de crédito",
-  TARJETA_DEBITO: "Tarjeta de débito",
-  TRANSFERENCIA: "Transferencia / SPEI",
-  APP_RAPPI: "Rappi", APP_UBEREATS: "Uber Eats", APP_DIDI: "DiDi", APP_IFOOD: "iFood", APP_OTRO: "App externa",
-};
 
 /** Etiqueta del método en MAYÚSCULAS estilo Soft Restaurant (EFECTIVO/VISA/…). */
 const METODO_LABEL_SOFT_MAP: Record<string, string> = {
@@ -45,7 +39,7 @@ const METODO_LABEL_SOFT_MAP: Record<string, string> = {
 const labelSoft = (m: string) => METODO_LABEL_SOFT_MAP[m] ?? m.toUpperCase();
 
 const round2 = (n: number) => Math.round(n * 100) / 100;
-const label = (m: string) => METODO_LABEL[m] ?? m;
+const label = etiquetaMetodoPago;
 const ROLES_CIERRE = ["CAJERO", "SUPERVISOR", "ADMIN", "DUENO"];
 /** Roles con `turno.recontar_arqueo` (0127): se autorizan solos para volver a contar. */
 const ROLES_RECONTAR = ["SUPERVISOR", "ADMIN", "DUENO"];

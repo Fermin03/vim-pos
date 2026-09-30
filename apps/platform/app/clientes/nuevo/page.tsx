@@ -115,7 +115,7 @@ export default function NuevoClientePage() {
         </div>
         {error && <p className="text-sm font-medium text-danger" role="alert">{error}</p>}
         {resultado && (
-          <div className="rounded border border-[#D6E8DD] bg-[#EAF3EE] px-3 py-2.5 text-[12.5px] text-success">
+          <div className="rounded border border-[#D6E8DD] bg-success-soft px-3 py-2.5 text-[12.5px] text-success">
             <div className="font-semibold">Cliente creado.</div>
             <div className="mt-1 text-ink-2">Invitación enviada a <b>{resultado.email}</b>. El dueño recibirá un correo para crear su contraseña y entrar al panel.</div>
           </div>

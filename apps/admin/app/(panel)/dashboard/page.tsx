@@ -1,4 +1,5 @@
 "use client";
+import { diaCorto } from "@vim/fecha";
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { PageHeader, PageBody } from "../../components/page-header";
@@ -314,13 +315,9 @@ export default function DashboardPage() {
   // pintaba `new Date()` junto a cifras que podían ser de días atrás: el rótulo decía "hoy" y los
   // números eran del 17. Además el día contable cierra a las 3 am, así que a la 1 de la mañana
   // esto sigue diciendo —correctamente— la fecha de ayer.
-  const fmtDia = (iso: string) => {
-    const p = iso.split("-").map(Number);
-    // Se construye la fecha en hora LOCAL a partir de las partes, no con `new Date(iso)`: esa
-    // ruta interpreta "2026-08-19" como medianoche UTC y en México lo pinta como el día 18.
-    const fecha = new Date(p[0] ?? 1970, (p[1] ?? 1) - 1, p[2] ?? 1);
-    return new Intl.DateTimeFormat("es-MX", { day: "numeric", month: "short" }).format(fecha);
-  };
+  // `diaCorto` de @vim/fecha: la fecha se toma tal cual, sin pasar por `new Date(iso)` (medianoche
+  // UTC, que en México ya es el día anterior).
+  const fmtDia = diaCorto;
   const fechaCorta = data ? fmtDia(data.dia) : "—";
   const ultimaVenta = data?.ultimoDiaConVentas ?? null;
 

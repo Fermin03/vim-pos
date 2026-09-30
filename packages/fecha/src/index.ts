@@ -92,6 +92,18 @@ export function fechaLegible(valor: string | null | undefined): string {
   return `${d} ${MESES[m - 1]} ${a}`;
 }
 
+/**
+ * Día y mes, sin año: `2026-09-24` → `24 sep`. Para rótulos donde el año sobra (el dashboard
+ * del día). Misma regla que `fechaLegible`: una fecha `YYYY-MM-DD` se toma tal cual.
+ */
+export function diaCorto(valor: string | null | undefined): string {
+  if (!valor) return "—";
+  const dia = /^\d{4}-\d{2}-\d{2}$/.test(valor) ? valor : aFechaMx(new Date(valor));
+  const [, m, d] = dia.split("-").map(Number);
+  if (!m || !d) return valor;
+  return `${d} ${MESES[m - 1]}`;
+}
+
 /** Un rango legible: `24 sep 2026` si es un solo día, `3 – 9 sep 2026` si no. */
 export function rangoLegible(desde: string | null | undefined, hasta: string | null | undefined): string {
   if (!desde || !hasta || desde === hasta) return fechaLegible(desde ?? hasta);

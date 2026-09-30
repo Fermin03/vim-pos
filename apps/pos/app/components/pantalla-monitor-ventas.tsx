@@ -3,6 +3,7 @@ import { useCallback, useEffect, useState } from "react";
 import { BotonVolver } from "./boton-volver";
 import { Button } from "@vim/ui/styles";
 import { etiquetaModo } from "@vim/db/modos-servicio";
+import { etiquetaMetodoPago } from "@vim/db/metodos-pago";
 import { fmtMxn, type DatosCaja, type Turno } from "../lib/turno";
 import {
   leerReporteX,
@@ -11,16 +12,6 @@ import {
   type EstadisticasTurno,
 } from "../lib/cierre";
 
-const METODO_LABEL: Record<string, string> = {
-  EFECTIVO: "Efectivo",
-  TARJETA_DEBITO: "Tarjeta de débito",
-  TARJETA_CREDITO: "Tarjeta de crédito",
-  TRANSFERENCIA: "Transferencia",
-  VALE: "Vale",
-  APP_RAPPI: "Rappi",
-  APP_UBER: "Uber Eats",
-  APP_DIDI: "DiDi Food",
-};
 
 
 type Filtro = "TODO" | "MODO" | "PAGO";
@@ -137,7 +128,7 @@ export function PantallaMonitorVentas({
                   x.pagosPorMetodo.map((p) => (
                     <Fila
                       key={p.metodo}
-                      etiqueta={METODO_LABEL[p.metodo] ?? p.metodo}
+                      etiqueta={etiquetaMetodoPago(p.metodo)}
                       detalle={`${p.cantidad} cobro${p.cantidad === 1 ? "" : "s"}`}
                       valor={fmtMxn(p.total)}
                       pct={x.ventaNeta > 0 ? (p.total / x.ventaNeta) * 100 : 0}

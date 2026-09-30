@@ -1,4 +1,5 @@
 "use client";
+import { StatusChip, type TonoEstado } from "@vim/ui/styles";
 import { useCallback, useEffect, useState } from "react";
 import type { Api } from "../lib/tipos";
 import { hace } from "../lib/tipos";
@@ -52,10 +53,10 @@ function fechaCorta(iso: string | null): string {
   return `${d}/${m}/${a}`;
 }
 
-const NIVEL: Record<Cliente["nivel"], { pastilla: string; texto: string }> = {
-  agotado: { pastilla: "bg-[#FBECEA] text-danger", texto: "Sin folios" },
-  pocos: { pastilla: "bg-[#FCF3E6] text-warning", texto: "Van pocos" },
-  ok: { pastilla: "bg-[#EAF3EE] text-success", texto: "Con folios" },
+const NIVEL: Record<Cliente["nivel"], { tono: TonoEstado; texto: string }> = {
+  agotado: { tono: "danger", texto: "Sin folios" },
+  pocos: { tono: "warning", texto: "Van pocos" },
+  ok: { tono: "success", texto: "Con folios" },
 };
 
 export function Cfdi({ api, onAbrirEmpresa }: { api: Api; onAbrirEmpresa: (id: string) => void }) {
@@ -231,9 +232,7 @@ function FilaCliente({
         <td className="px-4 py-3 text-right">
           <div className="flex items-center justify-end gap-2">
             <span className="font-display text-[17px] font-bold tabular-nums">{fmtInt(c.disponibles)}</span>
-            <span className={["rounded px-1.5 py-0.5 text-[11px] font-semibold", nivel.pastilla].join(" ")}>
-              {nivel.texto}
-            </span>
+            <StatusChip tone={nivel.tono}>{nivel.texto}</StatusChip>
           </div>
           <div className="mt-0.5 text-[12px] tabular-nums text-ink-3">
             {fmtInt(c.baseRestante)} del plan · {fmtInt(c.paquetes)} prepagados
@@ -266,7 +265,7 @@ function FilaCliente({
 
       {c.sinFilaDeSaldo && (
         <tr className="border-b border-line">
-          <td colSpan={6} className="bg-[#FBECEA] px-4 py-2 text-[12.5px] text-danger">
+          <td colSpan={6} className="bg-danger-soft px-4 py-2 text-[12.5px] text-danger">
             Este cliente paga el add-on pero no tiene registro de saldo de folios, así que no puede
             timbrar nada. Acredítale un paquete aquí para crearlo.
           </td>
@@ -377,7 +376,7 @@ function FilaCliente({
                     <button
                       type="button"
                       onClick={() => setConfirmarBaja(true)}
-                      className="h-8 rounded border border-danger/40 px-3 text-[12px] font-semibold text-danger transition hover:bg-[#FBECEA]"
+                      className="h-8 rounded border border-danger/40 px-3 text-[12px] font-semibold text-danger transition hover:bg-danger-soft"
                     >
                       Desactivar facturación
                     </button>

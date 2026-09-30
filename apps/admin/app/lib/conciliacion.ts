@@ -1,4 +1,5 @@
 "use client";
+import { etiquetaApp } from "@vim/db/metodos-pago";
 import { z } from "zod";
 import { supabase, leerSesion } from "./supabase";
 import { conciliarItems, resumenConciliacion, type LiqItem, type TicketPos } from "./conciliacion-match";
@@ -13,7 +14,8 @@ const N = (v: unknown): number => Number(v ?? 0);
 export const APPS = ["APP_RAPPI", "APP_UBEREATS", "APP_DIDI", "APP_IFOOD", "APP_OTRO"] as const;
 export type AppExterna = (typeof APPS)[number];
 export const LABEL_APP: Record<AppExterna, string> = {
-  APP_RAPPI: "Rappi", APP_UBEREATS: "Uber Eats", APP_DIDI: "DiDi Food", APP_IFOOD: "iFood", APP_OTRO: "Otra",
+  APP_RAPPI: etiquetaApp("APP_RAPPI"), APP_UBEREATS: etiquetaApp("APP_UBEREATS"), APP_DIDI: etiquetaApp("APP_DIDI"),
+  APP_IFOOD: etiquetaApp("APP_IFOOD"), APP_OTRO: etiquetaApp("APP_OTRO"),
 };
 
 export type Liquidacion = {

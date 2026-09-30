@@ -1,4 +1,5 @@
 "use client";
+import { etiquetaApp as etiquetaAppCompartida } from "@vim/db/metodos-pago";
 // Pedidos que llegan de las apps de delivery (ADR 0011). Lectura bajo RLS (delivery_pedidos) y
 // acciones vía la edge function delivery-accion: el POS nunca habla con Uber/DiDi/Rappi.
 import { employeeClient } from "./supabase";
@@ -146,7 +147,7 @@ export function segundosRestantes(venceAceptacion: string | null, ahora: Date): 
 }
 
 export function etiquetaApp(app: AppPedido): string {
-  return { APP_UBEREATS: "Uber Eats", APP_DIDI: "DiDi Food", APP_RAPPI: "Rappi" }[app];
+  return etiquetaAppCompartida(app);
 }
 
 const ETIQUETA_ESTADO: Record<PedidoAppEstado, string> = {

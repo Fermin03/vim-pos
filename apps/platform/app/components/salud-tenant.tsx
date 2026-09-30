@@ -1,15 +1,16 @@
 "use client";
+import { StatusChip, type TonoEstado } from "@vim/ui/styles";
 import { useCallback, useState } from "react";
 import { useRefresco } from "../lib/refresco";
 import { areaUtil, hace, pantallaTexto, type Api, type Salud } from "../lib/tipos";
 
-const COLOR: Record<string, string> = {
-  ok: "bg-[#EAF3EE] text-success",
-  tibia: "bg-[#FCF3E6] text-warning",
-  caida: "bg-[#FBECEA] text-danger",
-  nunca: "bg-[#FBECEA] text-danger",
-  bloqueada: "bg-[#FBECEA] text-danger",
-  inactiva: "bg-sel text-ink-3",
+const TONO: Record<string, TonoEstado> = {
+  ok: "success",
+  tibia: "warning",
+  caida: "danger",
+  nunca: "danger",
+  bloqueada: "danger",
+  inactiva: "neutral",
 };
 const TEXTO: Record<string, string> = {
   ok: "En línea",
@@ -82,9 +83,9 @@ export function SaludTenant({ api, id }: { api: Api; id: string }) {
                   <td className="p-2 font-semibold">{c.nombre}</td>
                   <td className="p-2 text-ink-2">{c.sucursal}</td>
                   <td className="p-2">
-                    <span className={["rounded px-1.5 py-0.5 text-[11px] font-bold", COLOR[c.estado] ?? "bg-sel text-ink-3"].join(" ")}>
+                    <StatusChip tone={TONO[c.estado] ?? "neutral"} punto>
                       {TEXTO[c.estado] ?? c.estado}
-                    </span>
+                    </StatusChip>
                     {c.bloqueoMotivo && <span className="ml-1 text-[11px] text-ink-3">{c.bloqueoMotivo}</span>}
                   </td>
                   <td className="p-2 text-ink-2">

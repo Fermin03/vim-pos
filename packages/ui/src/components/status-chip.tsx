@@ -1,24 +1,44 @@
 import { cn } from "../cn";
 
-type Tone = "success" | "warning" | "danger" | "info" | "neutral";
+export type TonoEstado = "success" | "warning" | "danger" | "info" | "neutral";
 
-const tones: Record<Tone, string> = {
-  success: "text-success bg-success/10",
-  warning: "text-warning bg-warning/10",
-  danger: "text-danger bg-danger/10",
-  info: "text-info bg-info/10",
-  neutral: "text-ink-2 bg-hover",
+/** Los tonos suaves de la paleta (tokens.css), no el color al 10 %: así el chip se ve igual que los
+ *  avisos y bandas del resto del producto. */
+const tones: Record<TonoEstado, string> = {
+  success: "bg-success-soft text-success",
+  warning: "bg-warning-soft text-warning",
+  danger: "bg-danger-soft text-danger",
+  info: "bg-info-soft text-info",
+  neutral: "bg-sel text-ink-2",
 };
 
-export function StatusChip({ tone = "neutral", children }: { tone?: Tone; children: React.ReactNode }) {
+/**
+ * La etiqueta de estado de todo el producto ("En línea", "Sin folios", "Conciliada"…).
+ *
+ * Existía sin un solo uso y cada pantalla dibujaba la suya, con tamaños y colores ligeramente
+ * distintos (revisión de diseño, sep 2026). `punto` agrega el círculo de color para los estados
+ * "vivos" (una caja en línea); en una lista de estados de papeleo sobra.
+ */
+export function StatusChip({
+  tone = "neutral",
+  punto = false,
+  className,
+  children,
+}: {
+  tone?: TonoEstado;
+  punto?: boolean;
+  className?: string;
+  children: React.ReactNode;
+}) {
   return (
     <span
       className={cn(
-        "inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold",
+        "inline-flex items-center gap-1.5 whitespace-nowrap rounded-full px-2 py-0.5 text-[11.5px] font-semibold leading-5",
         tones[tone],
+        className,
       )}
     >
-      <span className={cn("h-2 w-2 rounded-full", `bg-current`)} aria-hidden="true" />
+      {punto && <span className="h-1.5 w-1.5 rounded-full bg-current" aria-hidden="true" />}
       {children}
     </span>
   );

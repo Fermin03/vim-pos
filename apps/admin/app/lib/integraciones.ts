@@ -1,4 +1,5 @@
 "use client";
+import { etiquetaApp as etiquetaAppCompartida } from "@vim/db/metodos-pago";
 import { supabase, leerSesion } from "./supabase";
 
 // Apps de delivery (spec F1b): estado de las conexiones por sucursal y el flujo OAuth con Uber.
@@ -161,7 +162,7 @@ export function etiquetaEstado(estado: EstadoConexion): string {
 }
 
 export function etiquetaApp(app: AppDelivery): string {
-  return { APP_UBEREATS: "Uber Eats", APP_DIDI: "DiDi Food", APP_RAPPI: "Rappi" }[app];
+  return etiquetaAppCompartida(app);
 }
 
 export function horaCorta(iso: string | null, zona = "America/Mexico_City"): string | null {
