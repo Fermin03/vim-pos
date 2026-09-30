@@ -1,13 +1,15 @@
 "use client";
+import { StatusChip, type TonoEstado } from "@vim/ui/styles";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import type { Api, AvisoPanel } from "../lib/tipos";
 import { fechaHoraMx, label } from "../lib/formato";
 
-const PASTILLA: Record<string, string> = {
-  info: "bg-[#EAF3FB] text-[#0063A8]",
-  warning: "bg-[#F6EEDD] text-warning",
-  danger: "bg-[#FBECEA] text-danger",
+// El nivel se enseñaba en crudo ("WARNING", "DANGER"): mismos nombres que la página de avisos.
+const NIVEL: Record<string, { tono: TonoEstado; nombre: string }> = {
+  info: { tono: "info", nombre: "Informativo" },
+  warning: { tono: "warning", nombre: "Atención" },
+  danger: { tono: "danger", nombre: "Importante" },
 };
 
 /**
@@ -53,9 +55,7 @@ export function AvisosCliente({ api, tenantId, nombre }: { api: Api; tenantId: s
           <div key={a.id} className="flex flex-wrap items-center justify-between gap-2 rounded border border-line px-3 py-2">
             <div className="min-w-0">
               <div className="flex flex-wrap items-center gap-2">
-                <span className={`rounded-full px-1.5 py-0.5 text-[10.5px] font-bold uppercase ${PASTILLA[a.nivel] ?? "bg-sel text-ink-3"}`}>
-                  {a.nivel}
-                </span>
+                <StatusChip tone={NIVEL[a.nivel]?.tono ?? "neutral"}>{NIVEL[a.nivel]?.nombre ?? a.nivel}</StatusChip>
                 <span className="text-[13px] font-semibold">{a.titulo}</span>
                 {a.tenantId === null && <span className="text-[11px] text-ink-3">(a todos los clientes)</span>}
               </div>

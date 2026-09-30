@@ -43,9 +43,9 @@ import {
  */
 
 const ESTILO_ESTADO: Record<ReservacionEstado, { bg: string; text: string }> = {
-  CONFIRMADA: { bg: "#EAF0F8", text: "#2C5AA0" },
-  LLEGO: { bg: "#EAF4EE", text: "#2E7D52" },
-  NO_SHOW: { bg: "#FBECEA", text: "#C0392B" },
+  CONFIRMADA: { bg: "rgb(var(--info-soft))", text: "rgb(var(--info))" },
+  LLEGO: { bg: "rgb(var(--success-soft))", text: "rgb(var(--success))" },
+  NO_SHOW: { bg: "rgb(var(--danger-soft))", text: "rgb(var(--danger))" },
   CANCELADA: { bg: "#F2F2F0", text: "#6E6E73" },
   TERMINADA: { bg: "#F2F2F0", text: "#6E6E73" },
 };

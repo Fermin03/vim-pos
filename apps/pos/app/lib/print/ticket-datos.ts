@@ -1,15 +1,9 @@
 "use client";
 import { employeeClient } from "../supabase";
 import { etiquetaModo } from "@vim/db/modos-servicio";
+import { etiquetaMetodoPago } from "@vim/db/metodos-pago";
 import type { DatosEntrega, DatosTicketImpresion, LineaImpresion, PagoImpresion } from "./tipos";
 
-const METODO_LABEL: Record<string, string> = {
-  EFECTIVO: "Efectivo",
-  TARJETA_CREDITO: "Tarjeta de crédito",
-  TARJETA_DEBITO: "Tarjeta de débito",
-  TRANSFERENCIA: "Transferencia",
-  APP_RAPPI: "Rappi", APP_UBEREATS: "Uber Eats", APP_DIDI: "DiDi", APP_IFOOD: "iFood", APP_OTRO: "App externa",
-};
 
 type Ctx = { token: string; cajeroNombre: string; cajaNombre: string };
 
@@ -133,7 +127,7 @@ export async function leerTicketParaImpresion(ticketId: string, ctx: Ctx): Promi
   const pagosImp: PagoImpresion[] = (pagos ?? []).map((p) => {
     const r = p as { metodo_pago: string; monto_mxn: string | number; monto_recibido_mxn: string | number | null; cambio_mxn: string | number };
     return {
-      metodo: METODO_LABEL[r.metodo_pago] ?? r.metodo_pago,
+      metodo: etiquetaMetodoPago(r.metodo_pago),
       montoMxn: Number(r.monto_mxn),
       recibidoMxn: r.monto_recibido_mxn == null ? null : Number(r.monto_recibido_mxn),
       cambioMxn: Number(r.cambio_mxn),

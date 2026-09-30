@@ -1,4 +1,5 @@
 "use client";
+import { StatusChip, type TonoEstado } from "@vim/ui/styles";
 import { finDelDiaMx } from "../lib/fechas-panel";
 import { useCallback, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
@@ -9,10 +10,10 @@ import { Seccion } from "../components/seccion";
 import { DialogoConfirmar } from "../components/dialogo-confirmar";
 import type { AvisoPanel, Tenant } from "../lib/tipos";
 
-const NIVEL: Record<string, { pastilla: string; nombre: string }> = {
-  info: { pastilla: "bg-[#EAF3FB] text-[#0063A8]", nombre: "Informativo" },
-  warning: { pastilla: "bg-[#F6EEDD] text-warning", nombre: "Atención" },
-  danger: { pastilla: "bg-[#FBECEA] text-danger", nombre: "Importante" },
+const NIVEL: Record<string, { tono: TonoEstado; nombre: string }> = {
+  info: { tono: "info", nombre: "Informativo" },
+  warning: { tono: "warning", nombre: "Atención" },
+  danger: { tono: "danger", nombre: "Importante" },
 };
 
 const CUERPO_MAX = 600;
@@ -136,9 +137,9 @@ export default function AvisosPage() {
                 <div className="flex flex-wrap items-start justify-between gap-2">
                   <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-2">
-                      <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${NIVEL[a.nivel]?.pastilla ?? "bg-sel text-ink-3"}`}>
+                      <StatusChip tone={NIVEL[a.nivel]?.tono ?? "neutral"}>
                         {NIVEL[a.nivel]?.nombre ?? a.nivel}
-                      </span>
+                      </StatusChip>
                       <span className="font-display text-[14.5px] font-semibold">{a.titulo}</span>
                       {a.requiereConfirmacion && <span className="text-[11px] font-semibold text-ink-3">pide confirmación</span>}
                     </div>

@@ -1,4 +1,5 @@
 "use client";
+import { StatusChip } from "@vim/ui/styles";
 import { compararVersiones } from "../lib/fechas-panel";
 import { useCallback, useMemo, useState } from "react";
 import { hoyMx } from "@vim/fecha";
@@ -178,9 +179,7 @@ export default function VersionesPage() {
                     <td className="px-4 py-2 tabular-nums">
                       {c.versionApp ?? <span className="text-ink-3">anterior a 0.4.60</span>}
                       {c.desactualizada && (
-                        <span className="ml-2 rounded-full bg-[#FCF3E6] px-2 py-0.5 text-[11px] font-semibold text-warning">
-                          por actualizar
-                        </span>
+                        <StatusChip tone="warning" className="ml-2">por actualizar</StatusChip>
                       )}
                     </td>
                     <td className="px-4 py-2 text-ink-2">{c.so ?? "—"}</td>
@@ -251,12 +250,10 @@ export default function VersionesPage() {
                   <div className="flex flex-wrap items-center gap-2">
                     <span className="font-display text-[14.5px] font-semibold tabular-nums">{v.version}</span>
                     {v.es_minima && (
-                      <span className="rounded-full bg-sel px-2 py-0.5 text-[11px] font-semibold text-ink-2">mínima</span>
+                      <StatusChip>mínima</StatusChip>
                     )}
                     {v.bloquea_bajo_minima && (
-                      <span className="rounded-full bg-[#FBECEA] px-2 py-0.5 text-[11px] font-semibold text-danger">
-                        exigida
-                      </span>
+                      <StatusChip tone="danger">exigida</StatusChip>
                     )}
                     {!v.publicada && (
                       <span className="rounded-full bg-sel px-2 py-0.5 text-[11px] font-semibold text-ink-3">retirada</span>

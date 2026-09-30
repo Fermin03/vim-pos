@@ -10,6 +10,7 @@
     "./types": "./src/database.types.ts",
     "./modulos": "./src/modulos.ts",
     "./modos-servicio": "./src/modos-servicio.ts",
+    "./metodos-pago": "./src/metodos-pago.ts",
     "./fixtures-combos": "./src/fixtures-combos.ts"
   },
   "scripts": {
