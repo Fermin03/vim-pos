@@ -110,4 +110,30 @@ describe("tabla de reporte", () => {
   it("totales: 'Total' en la primera columna y la suma donde se pide", () => {
     expect(filaTotales(columnas, filas)).toEqual(["Total", 13, 600.5, null]);
   });
+  it("cantidad: los decimales que traiga, hasta tres — 0.15 kg no se vuelve 0.2", () => {
+    expect(formatear(0.15, "cantidad")).toBe("0.15");
+    expect(formatear(2, "cantidad")).toBe("2");
+    expect(formatear(1234.5678, "cantidad")).toBe("1,234.568");
+    expect(formatear(0.15, "decimal")).toBe("0.1"); // por eso existe `cantidad`
+  });
+});
+
+describe("columnas solo para el Excel", () => {
+  type Mov = { insumo: string; cantidad: number; unidad: string };
+  const cols: Columna<Mov>[] = [
+    { id: "insumo", titulo: "Insumo", valor: (m) => m.insumo },
+    { id: "cantidad", titulo: "Cantidad", tipo: "cantidad", valor: (m) => m.cantidad },
+    { id: "unidad", titulo: "Unidad", valor: (m) => m.unidad, pantalla: false },
+  ];
+  const hoja = hojaDeReporte({ titulo: "Movimientos", columnas: cols, filas: [{ insumo: "Carne", cantidad: -0.15, unidad: "kg" }] });
+
+  it("van en la hoja con su encabezado", () => {
+    expect(hoja.encabezados).toEqual(["Insumo", "Cantidad", "Unidad"]);
+    expect(hoja.filas[0]!.map((c) => c.valor)).toEqual(["Carne", -0.15, "kg"]);
+  });
+
+  it("la cantidad va como número en formato General, con su signo y sin redondear", () => {
+    const x = leerZip(libroXlsx(hoja)).get("xl/worksheets/sheet1.xml")!;
+    expect(x).toMatch(/<c r="B\d+" s="0"><v>-0.15<\/v><\/c>/);
+  });
 });

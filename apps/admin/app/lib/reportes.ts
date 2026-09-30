@@ -687,7 +687,7 @@ export async function leerNoShows(desde: string, hasta: string): Promise<FilaNoS
 }
 
 // ── Qué reportes le sirven a este negocio ──────────────────────────────────────────────────
-export type ReportesDisponibles = { marcas: boolean; eventos: boolean; reservaciones: boolean; apps: boolean; variasSucursales: boolean };
+export type ReportesDisponibles = { marcas: boolean; eventos: boolean; reservaciones: boolean; apps: boolean; variasSucursales: boolean; inventario: boolean };
 
 /**
  * Los reportes de módulos que el negocio no usa se esconden del índice: antes aparecían
@@ -701,12 +701,15 @@ export async function leerReportesDisponibles(): Promise<ReportesDisponibles> {
     return !!error || (count ?? 0) > 0;
   };
   const modulos = await leerModulos().catch(() => null);
-  const [marcas, eventos, reservas, apps, sucursales] = await Promise.all([
+  const [marcas, eventos, reservas, apps, sucursales, movimientos] = await Promise.all([
     hay(supabase.from("marcas_virtuales").select("id", { count: "exact", head: true })),
     hay(supabase.from("turnos").select("id", { count: "exact", head: true }).not("evento_nombre", "is", null)),
     hay(supabase.from("reservaciones").select("id", { count: "exact", head: true })),
     hay(supabase.from("vw_ventas_apps_externas").select("ticket_id", { count: "exact", head: true })),
     supabase.from("sucursales").select("id", { count: "exact", head: true }).is("deleted_at", null),
+    // Basta con que exista uno (una compra capturada ya es historial), y contarlos todos sería
+    // recorrer miles de filas: cada venta escribe un movimiento por insumo.
+    supabase.from("movimientos_inventario").select("id").limit(1).then(({ data, error }) => !!error || (data ?? []).length > 0),
   ]);
   const ef = modulos?.efectivos ?? {};
   return {
@@ -715,5 +718,6 @@ export async function leerReportesDisponibles(): Promise<ReportesDisponibles> {
     reservaciones: reservas || !!ef.reservaciones,
     apps: apps || !!ef.delivery_apps,
     variasSucursales: !!sucursales.error || (sucursales.count ?? 0) > 1,
+    inventario: movimientos || !!ef.recetas,
   };
 }

@@ -2,6 +2,8 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { PageBody, PageHeader } from "../../components/page-header";
+import { usePerfil } from "../../components/admin-shell";
+import { puedeVer } from "../../lib/acceso";
 import { leerReportesDisponibles, type ReportesDisponibles } from "../../lib/reportes";
 
 /**
@@ -11,8 +13,11 @@ import { leerReportesDisponibles, type ReportesDisponibles } from "../../lib/rep
  * turno" abría "Cortes Z históricos", "Ventas por mesero" abría "Desempeño del equipo").
  *
  * Los reportes de módulos que el negocio no usa (marcas, eventos, reservaciones, apps, varias
- * sucursales) se esconden, con un enlace para verlos: una taquería con una sucursal veía
- * "Consolidado por sucursal" y "Ventas por marca virtual".
+ * sucursales, inventario) se esconden, con un enlace para verlos: una taquería con una sucursal
+ * veía "Consolidado por sucursal" y "Ventas por marca virtual".
+ *
+ * Tampoco se enseña un reporte que el rol no puede abrir (costo de ventas pide administrador; el
+ * historial vive en Inventario): una tarjeta que lleva a "no disponible para ti" solo estorba.
  */
 type Modulo = keyof ReportesDisponibles;
 type Reporte = { href: string; titulo: string; descripcion: string; modulo?: Modulo };
@@ -42,6 +47,14 @@ const GRUPOS: Grupo[] = [
     ],
   },
   {
+    titulo: "Inventario y costos",
+    ayuda: "Lo que entra y sale de tu inventario, y cuánto te cuesta lo que vendes.",
+    reportes: [
+      { href: "/reportes/costo-ventas", titulo: "Costo de ventas y margen", descripcion: "Cuánto te costó lo que vendiste y cuánto te quedó, producto por producto.", modulo: "inventario" },
+      { href: "/inventario/movimientos", titulo: "Movimientos de inventario", descripcion: "Compras, consumo por ventas, mermas y ajustes, insumo por insumo.", modulo: "inventario" },
+    ],
+  },
+  {
     titulo: "Qué vigilar",
     ayuda: "Señales que conviene revisar de cerca.",
     reportes: [
@@ -60,6 +73,7 @@ const GRUPOS: Grupo[] = [
 ];
 
 export default function ReportesHub() {
+  const perfil = usePerfil();
   const [disponibles, setDisponibles] = useState<ReportesDisponibles | null>(null);
   const [verTodos, setVerTodos] = useState(false);
 
@@ -67,11 +81,13 @@ export default function ReportesHub() {
     leerReportesDisponibles()
       .then(setDisponibles)
       // Sin respuesta se muestran todos: esconder un reporte que sí usa confunde más.
-      .catch(() => setDisponibles({ marcas: true, eventos: true, reservaciones: true, apps: true, variasSucursales: true }));
+      .catch(() => setDisponibles({ marcas: true, eventos: true, reservaciones: true, apps: true, variasSucursales: true, inventario: true }));
   }, []);
 
-  const visible = (r: Reporte) => verTodos || !r.modulo || !disponibles || disponibles[r.modulo];
-  const ocultos = disponibles ? GRUPOS.flatMap((g) => g.reportes).filter((r) => r.modulo && !disponibles[r.modulo]).length : 0;
+  // Sin perfil todavía se muestran todas: el guardián de rutas es quien decide al entrar.
+  const permitido = (r: Reporte) => !perfil || puedeVer(perfil.jerarquia, r.href);
+  const visible = (r: Reporte) => permitido(r) && (verTodos || !r.modulo || !disponibles || disponibles[r.modulo]);
+  const ocultos = disponibles ? GRUPOS.flatMap((g) => g.reportes).filter((r) => permitido(r) && r.modulo && !disponibles[r.modulo]).length : 0;
 
   return (
     <>

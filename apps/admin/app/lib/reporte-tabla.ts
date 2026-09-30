@@ -24,12 +24,18 @@ export type Columna<T> = {
   enfasis?: "fuerte" | "suave";
   /** Ancho aproximado en el Excel (caracteres). */
   ancho?: number;
+  /**
+   * `false` = solo va al Excel. Para el dato que en pantalla ya se lee dentro de otra celda
+   * ("+0.150 kg") pero que en la hoja conviene en su propia columna, para poder filtrar y sumar.
+   */
+  pantalla?: false;
 };
 
 export type Orden = { id: string; dir: "asc" | "desc" };
 
 const numero = new Intl.NumberFormat("es-MX", { maximumFractionDigits: 0 });
 const moneda = new Intl.NumberFormat("es-MX", { style: "currency", currency: "MXN" });
+const cantidad = new Intl.NumberFormat("es-MX", { maximumFractionDigits: 3 });
 
 /** El texto en pantalla de un valor según su tipo. Un solo criterio de decimales para todos. */
 export function formatear(v: string | number | null, tipo: TipoCelda = "texto"): string {
@@ -46,6 +52,9 @@ export function formatear(v: string | number | null, tipo: TipoCelda = "texto"):
       return `${v.toFixed(1)}%`;
     case "decimal":
       return v.toFixed(1);
+    case "cantidad":
+      // Los decimales que traiga, hasta tres (la precisión de la base): 0.15 kg, 2 pza.
+      return cantidad.format(v);
     default:
       return String(v);
   }

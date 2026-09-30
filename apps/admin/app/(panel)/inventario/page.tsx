@@ -205,6 +205,7 @@ export default function InventarioPage() {
            faltar por lo que sea, la pantalla lo dice en vez de callarse. */
         right={
           <div className="flex gap-2">
+            <Link href="/inventario/movimientos" className="inline-flex h-11 items-center rounded border border-line-strong px-4 text-sm font-semibold text-ink-2 hover:bg-hover">Movimientos</Link>
             <Link href="/inventario/compras" className="inline-flex h-11 items-center rounded border border-line-strong px-4 text-sm font-semibold text-ink-2 hover:bg-hover">Compras</Link>
             <Link href="/inventario/proveedores" className="inline-flex h-11 items-center rounded border border-line-strong px-4 text-sm font-semibold text-ink-2 hover:bg-hover">Proveedores</Link>
             <Button onClick={nuevo} disabled={unidades.length === 0} title={unidades.length === 0 ? "Faltan las unidades de medida de tu negocio" : undefined}>

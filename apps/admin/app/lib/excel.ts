@@ -10,7 +10,9 @@
  * equipos configurados de otra forma los acentos o las columnas salen rotos.
  */
 
-export type TipoCelda = "texto" | "mxn" | "entero" | "pct" | "decimal" | "fecha";
+/** `cantidad` es para existencias y consumos (0.150 kg, 2 pza): van con los decimales que traigan,
+ *  en formato General, porque `decimal` los redondea a uno y 0.15 kg saldría como 0.2. */
+export type TipoCelda = "texto" | "mxn" | "entero" | "pct" | "decimal" | "cantidad" | "fecha";
 
 export type Celda = { valor: string | number | null; tipo?: TipoCelda; negrita?: boolean };
 
@@ -35,6 +37,7 @@ const ESTILO: Record<TipoCelda, [normal: number, negrita: number]> = {
   pct: [4, 8],
   fecha: [5, 1],
   decimal: [9, 10],
+  cantidad: [0, 1],
 };
 
 const STYLES = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
