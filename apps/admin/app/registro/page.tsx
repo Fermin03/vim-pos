@@ -21,6 +21,9 @@ const VERTICALES = [
 const ERR_LABELS: Record<string, string> = {
   CODIGO_YA_USADO: "Esa dirección ya la usa otro negocio. Prueba con otra.",
   EMAIL_INVALIDO: "Revisa tu correo: parece que le falta algo.",
+  // Límite de altas por IP y por hora (signup-tenant, 0136).
+  DEMASIADOS_INTENTOS: "Hubo demasiados intentos de registro desde esta conexión. Espera un rato e intenta de nuevo.",
+  NO_DISPONIBLE: "El registro no está disponible en este momento. Intenta de nuevo en unos minutos.",
   PASSWORD_DEBIL: "La contraseña debe tener al menos 8 caracteres.",
   CODIGO_INVALIDO: "La dirección solo lleva minúsculas, números y guiones (de 3 a 50).",
   VERTICAL_INVALIDA: "Elige el tipo de negocio.",

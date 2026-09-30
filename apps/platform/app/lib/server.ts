@@ -51,10 +51,18 @@ const VENTANA_MS = 15 * 60 * 1000;
  */
 const intentos = new Map<string, { fallos: number; desde: number }>();
 
+/**
+ * IP del cliente para la allowlist y el contador de fallos. Primero las cabeceras que escribe la
+ * plataforma y el cliente no puede fijar (`x-vercel-forwarded-for`, `x-real-ip`); la primera
+ * entrada de `x-forwarded-for` solo como último recurso: fuera de Vercel la escribe quien llama
+ * (auditoría integral 30/09/2026). En Vercel las tres dicen lo mismo.
+ */
 function ipDe(req: Request): string {
+  const propia = req.headers.get("x-vercel-forwarded-for") ?? req.headers.get("x-real-ip");
+  if (propia) return propia.split(",")[0]!.trim();
   const fwd = req.headers.get("x-forwarded-for");
   if (fwd) return fwd.split(",")[0]!.trim();
-  return req.headers.get("x-real-ip") ?? "desconocida";
+  return "desconocida";
 }
 
 /**
