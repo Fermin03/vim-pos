@@ -65,7 +65,8 @@ recibió.
 - **Gracia** — banda amarilla arriba con el mensaje que escribió VIM y la fecha en que la caja
   dejará de vender. El cajero **sigue cobrando**. El aviso es para que el dueño lo resuelva, no
   para frenar el mostrador.
-- **Bloqueado** — pantalla completa antes del PIN, con el teléfono de soporte. Dice que las
+- **Bloqueado** — pantalla completa antes del PIN, con el WhatsApp de soporte (número legible,
+  horario y botón «Abrir WhatsApp»; ver «Ayuda por WhatsApp» abajo). Dice que las
   ventas anteriores están a salvo y se siguen respaldando, porque esa es la primera pregunta de
   un dueño bloqueado. La sincronización **no se detiene**: quien se ponga al corriente no perdió
   nada.
@@ -98,12 +99,23 @@ trae un botón que **instala la actualización** ahí mismo.
 **Un bloqueo sin salida sería una trampa.** A diferencia de la suspensión, esta la decide la
 caja comparando con su propia versión, así que puede morder sin internet; y a diferencia de la
 suspensión, el cajero *sí* puede resolverla solo. Por eso el botón va en la pantalla y no en un
-menú. El teléfono de soporte se queda igualmente: si la actualización no encuentra nada —caso
+menú. El WhatsApp de soporte se queda igualmente: si la actualización no encuentra nada —caso
 típico de una **segunda caja de la LAN**, que no puede instalar desde ahí— la pantalla lo dice
 con esas palabras y le manda a actualizar la caja principal.
 
 Cualquier motivo de bloqueo que la caja no reconozca se trata como suspensión, no como versión:
 un valor raro no puede dejar la pantalla a medio pintar ni ofrecer un botón que no lleva a nada.
+
+### Ayuda por WhatsApp
+
+Desde 0142 (ADR 0022) el menú trae, en **Ajustes**, la tarjeta **Ayuda por WhatsApp**, con el
+horario debajo («Atendemos de 9:00 a 18:00»). Abre WhatsApp fuera de la caja con el mensaje ya
+escrito: negocio, sucursal, caja y versión de VIM POS — lo primero que pregunta soporte. El menú se
+queda abierto: al volver, el cajero sigue donde estaba.
+
+El número lo edita VIM en /platform y **viaja en el latido**: la caja lo guarda con sus directivas y
+lo sigue enseñando sin internet. Sin nada guardado —una caja recién instalada— sale el número de
+fábrica. Nunca hay un botón de ayuda en blanco.
 
 ### El menú se actualiza solo
 

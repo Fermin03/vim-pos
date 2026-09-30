@@ -178,3 +178,38 @@ test("una mínima con basura por versión no bloquea", () => {
   const raro = { minima: "no-es-una-version", bloquea_bajo_minima: true };
   assert.equal(estadoDeVersion(normalizar(conVersion(raro)), "0.4.61").bloqueaPorVersion, false);
 });
+
+// ── Soporte de VIM (0142) ─────────────────────────────────────────────────────
+
+test("el soporte que manda la nube se guarda y se lee sin internet", () => {
+  const fs = fsFalso();
+  const a = crearAlmacenDirectivas({ archivo: "d.json", fs });
+  a.guardar({ acceso: { bloqueado: false }, soporte: { whatsapp: "525665083346", horario: "9:00 a 18:00", correo: null } });
+  // Otro almacén sobre el mismo archivo = la caja reiniciada, sin red.
+  const b = crearAlmacenDirectivas({ archivo: "d.json", fs });
+  assert.deepEqual(b.leer().directivas.soporte, { whatsapp: "525665083346", horario: "9:00 a 18:00", correo: null });
+});
+
+test("sin directivas guardadas no hay soporte: el POS pone el de fábrica", () => {
+  const a = crearAlmacenDirectivas({ archivo: "d.json", fs: fsFalso() });
+  assert.equal(a.leer().directivas.soporte, null);
+  assert.equal(DIRECTIVAS_VACIAS.soporte, null);
+});
+
+test("un WhatsApp que no sirve no se guarda", () => {
+  assert.equal(normalizar({ soporte: { whatsapp: "123" } }).soporte, null);
+  assert.equal(normalizar({ soporte: "525665083346" }).soporte, null);
+  assert.equal(normalizar({ soporte: [] }).soporte, null);
+  assert.deepEqual(normalizar({ soporte: { whatsapp: "+52 56 6508 3346", horario: "  " } }).soporte,
+    { whatsapp: "525665083346", horario: null, correo: null });
+});
+
+test("una directiva sin soporte no borra el último soporte bueno", () => {
+  const fs = fsFalso();
+  const a = crearAlmacenDirectivas({ archivo: "d.json", fs });
+  a.guardar({ soporte: { whatsapp: "5214771234567", horario: null } });
+  a.guardar({ acceso: { bloqueado: false } });   // latido de una nube anterior a 0142
+  assert.equal(a.leer().directivas.soporte.whatsapp, "5214771234567");
+  a.guardar({ soporte: { whatsapp: "525665083346" } });   // y uno nuevo sí lo reemplaza
+  assert.equal(a.leer().directivas.soporte.whatsapp, "525665083346");
+});

@@ -22,7 +22,22 @@ export const DIRECTIVAS_VACIAS = Object.freeze({
   limites: Object.freeze({}),
   avisos: Object.freeze([]),
   version: Object.freeze({}),
+  soporte: null,
 });
+
+/**
+ * Soporte de VIM (0142): WhatsApp, horario y correo. Viaja en cada latido y se queda en el archivo,
+ * así que la caja lo enseña aunque se quede sin internet. `null` si no vino o no sirve: el POS pone
+ * entonces el número de fábrica (WHATSAPP_SOPORTE_VIM en @vim/db/soporte). Un número raro NO se
+ * guarda: mejor el de fábrica que un botón que abre un chat a ninguna parte.
+ */
+export function soporteValido(v) {
+  if (!v || typeof v !== "object" || Array.isArray(v)) return null;
+  const whatsapp = typeof v.whatsapp === "string" ? v.whatsapp.replace(/\D/g, "") : "";
+  if (!/^[0-9]{10,15}$/.test(whatsapp)) return null;
+  const txt = (x, max) => (typeof x === "string" && x.trim() ? x.trim().slice(0, max) : null);
+  return { whatsapp, horario: txt(v.horario, 80), correo: txt(v.correo, 254) };
+}
 
 /** Deja el JSON de la nube en una forma con la que el resto puede contar sin comprobar nada. */
 export function normalizar(x) {
@@ -43,6 +58,7 @@ export function normalizar(x) {
     limites: obj(x.limites),
     avisos: Array.isArray(x.avisos) ? x.avisos : [],
     version: obj(x.version),
+    soporte: soporteValido(x.soporte),
   };
 }
 
@@ -120,7 +136,11 @@ export function crearAlmacenDirectivas({
       // Conserva los acuses pendientes: llega una directiva nueva cada 10 minutos y perderlos
       // haría que el cajero volviera a ver un aviso que ya cerró.
       const actual = leerCrudo();
-      escribir({ recibido: ahora(), directivas: normalizar(directivas), vistos: actual.vistos ?? [] });
+      const nuevas = normalizar(directivas);
+      // Una directiva sin soporte (una nube anterior a 0142, un JSON a medias) no borra el último
+      // soporte bueno: el cajero sin internet sigue viendo el número que ya tenía.
+      if (!nuevas.soporte) nuevas.soporte = soporteValido(actual.directivas?.soporte);
+      escribir({ recibido: ahora(), directivas: nuevas, vistos: actual.vistos ?? [] });
     },
     leer() {
       const j = leerCrudo();

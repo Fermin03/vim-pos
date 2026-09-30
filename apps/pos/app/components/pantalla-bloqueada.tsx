@@ -3,9 +3,8 @@ import { useState } from "react";
 import { LogoVim } from "@vim/ui/styles";
 import { buscarActualizacion } from "../lib/actualizacion";
 import type { MotivoBloqueo } from "../lib/directivas";
-
-/** Soporte de VIM. Va aquí y no en un env: el cajero necesita verlo aunque no haya red. */
-const TELEFONO_SOPORTE = "477 235 8901";
+import { enlaceWhatsapp, mensajeAyudaCaja, textoHorario, whatsappLegible } from "@vim/db/soporte";
+import { useSoporte } from "../lib/soporte";
 
 /**
  * Pantalla de bloqueo. Sin salida y antes del PIN: el cajero no puede cobrar.
@@ -14,7 +13,7 @@ const TELEFONO_SOPORTE = "477 235 8901";
  * siguen subiendo, para que un cliente que se ponga al corriente no haya perdido nada. Y lo dice
  * en pantalla, porque la primera pregunta de un dueño bloqueado es "¿y mis ventas?".
  *
- * Dos motivos, dos salidas (ADR 0014, entrega 4). Por suscripción, la única salida es llamar a
+ * Dos motivos, dos salidas (ADR 0014, entrega 4). Por suscripción, la única salida es escribirle a
  * VIM. Por versión, la salida está en esta misma pantalla: el botón instala la actualización.
  * Un bloqueo por versión SIN una forma de salir sería una trampa, porque a diferencia de la
  * suspensión esta la decide la caja y puede morder sin internet.
@@ -29,6 +28,11 @@ export function PantallaBloqueada({
   motivo?: MotivoBloqueo;
 }) {
   const porVersion = motivo === "version";
+  // Soporte por WhatsApp (0142): el que trajo el último latido, o el de fábrica. Nunca en blanco:
+  // esta pantalla es justo donde el cajero más lo necesita, y a veces sin internet.
+  const { soporte, version } = useSoporte();
+  const wa = enlaceWhatsapp(soporte.whatsapp, mensajeAyudaCaja({ negocio, version }));
+  const horario = textoHorario(soporte);
   const [estado, setEstado] = useState<"listo" | "buscando" | "error">("listo");
   const [detalle, setDetalle] = useState<string | null>(null);
 
@@ -77,9 +81,20 @@ export function PantallaBloqueada({
         </>
       )}
 
-      <div className="mt-2 rounded-lg border border-line-strong bg-surface px-5 py-3">
-        <div className="text-12 font-bold uppercase tracking-wide text-ink-3">Llama a VIM</div>
-        <div className="font-display text-20 font-bold tabular-nums">{TELEFONO_SOPORTE}</div>
+      <div className="mt-2 flex flex-col items-center gap-1 rounded-lg border border-line-strong bg-surface px-5 py-3">
+        <div className="text-12 font-bold uppercase tracking-wide text-ink-3">Escríbele a VIM por WhatsApp</div>
+        <div className="font-display text-20 font-bold tabular-nums">{whatsappLegible(soporte.whatsapp)}</div>
+        {horario && <div className="text-13 text-ink-3">{horario}</div>}
+        {wa && (
+          <a
+            href={wa}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="mt-1 inline-flex h-11 items-center rounded border border-line-strong px-4 text-14 font-semibold text-ink-2 transition-transform duration-150 ease-vim hover:border-ink hover:text-ink active:scale-[.97]"
+          >
+            Abrir WhatsApp
+          </a>
+        )}
       </div>
       <p className="max-w-md text-13 text-ink-3">
         Tus ventas anteriores están a salvo y se siguen respaldando en la nube.

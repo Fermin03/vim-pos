@@ -3,6 +3,8 @@ import { LogoVim } from "@vim/ui/styles";
 import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { buscarActualizacion, esEscritorio } from "../lib/actualizacion";
 import { pedirActualizacionCatalogo } from "../lib/catalogo-eventos";
+import { enlaceWhatsapp, mensajeAyudaCaja, textoHorario } from "@vim/db/soporte";
+import { useSoporte } from "../lib/soporte";
 
 /**
  * Menú de pantalla completa del POS.
@@ -25,6 +27,7 @@ export function MenuGeneral({
   onMisPropinas,
   onImpresora,
   onCerrarTurno,
+  ayuda,
 }: {
   onCerrar: () => void;
   onKds: () => void;
@@ -39,6 +42,8 @@ export function MenuGeneral({
   onMisPropinas: () => void;
   onImpresora: () => void;
   onCerrarTurno: () => void;
+  /** Para el mensaje de "Ayuda por WhatsApp": desde qué negocio, sucursal y caja se escribe. */
+  ayuda?: { negocio?: string | null; sucursal?: string | null; caja?: string | null; cajero?: string | null };
 }) {
   // Actualizar solo aplica dentro de la app de escritorio; se resuelve en efecto porque el
   // export estático se prerenderiza sin window.
@@ -47,6 +52,9 @@ export function MenuGeneral({
   const [avisoUpd, setAvisoUpd] = useState<string | null>(null);
   const [bajandoMenu, setBajandoMenu] = useState(false);
   useEffect(() => { setEnEscritorio(esEscritorio()); }, []);
+  // Soporte de VIM (0142): el WhatsApp vigente (o el de fábrica) con el mensaje ya escrito.
+  const { soporte, version } = useSoporte();
+  const waAyuda = enlaceWhatsapp(soporte.whatsapp, mensajeAyudaCaja({ ...ayuda, version }));
 
   /**
    * Trae el menú de la nube en el momento. El escritorio ya lo sondea solo cada minuto; esto es
@@ -133,6 +141,14 @@ export function MenuGeneral({
               />
               </>
             )}
+            {waAyuda && (
+              <TileEnlace
+                label="Ayuda por WhatsApp"
+                detalle={textoHorario(soporte)}
+                href={waAyuda}
+                icon={<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" className="h-8 w-8"><path d="M20 11.5a8 8 0 0 1-11.8 7L4 20l1.5-4.1A8 8 0 1 1 20 11.5z" /><path d="M9.5 9.5a2.5 2.5 0 0 1 5 0c0 1.5-2.5 2-2.5 3.5M12 16h.01" /></svg>}
+              />
+            )}
             <TileMenu label="Cerrar turno" onClick={con(onCerrarTurno)} peligro icon={<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" className="h-8 w-8"><path d="M9 11l3 3L22 4" /><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" /></svg>} />
           </SeccionMenu>
           {avisoUpd && <p className="-mt-4 text-13 font-medium text-ink-2" role="status">{avisoUpd}</p>}
@@ -157,6 +173,29 @@ function TileMenu({ icon, label, onClick, peligro, badge }: { icon: ReactNode; l
       <span className="flex h-10 w-10 items-center justify-center">{icon}</span>
       <span className="text-center text-15 font-semibold leading-tight">{label}</span>
     </button>
+  );
+}
+
+/**
+ * Igual que `TileMenu`, pero es un enlace: abre WhatsApp fuera de la caja (el escritorio manda
+ * los `https:` con `target=_blank` al navegador del sistema). El menú se queda abierto: al volver,
+ * el cajero sigue donde estaba.
+ */
+function TileEnlace({ icon, label, detalle, href }: { icon: ReactNode; label: string; detalle?: string | null; href: string }) {
+  return (
+    <a
+      href={href}
+      target="_blank"
+      rel="noopener noreferrer"
+      role="menuitem"
+      className="relative flex min-h-[140px] flex-col items-center justify-center gap-4 rounded-2xl border border-line-strong p-6 text-ink-2 transition hover:border-ink hover:bg-hover hover:text-ink"
+    >
+      <span className="flex h-10 w-10 items-center justify-center">{icon}</span>
+      <span className="flex flex-col items-center gap-1">
+        <span className="text-center text-15 font-semibold leading-tight">{label}</span>
+        {detalle && <span className="text-center text-12 text-ink-3">{detalle}</span>}
+      </span>
+    </a>
   );
 }
 
