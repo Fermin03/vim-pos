@@ -20,6 +20,9 @@ BEGIN
   PERFORM aplicar_descuento_manual(v_ticket,NULL,'PORCENTAJE'::descuento_manual_tipo,10,'CLIENTE_FRECUENTE'::descuento_manual_motivo,'10',v_auth,v_maria,v_maria,'orf-desc');
   SELECT total_mxn INTO v_total FROM tickets WHERE id=v_ticket;
   PERFORM aplicar_pago(v_ticket,'EFECTIVO'::metodo_pago,v_total,v_total,NULL,NULL,NULL,false,NULL,'orf-pago');
+  -- 0134: la devolución lleva su propia autorización (venta.devolucion); la del descuento ya se usó.
+  INSERT INTO autorizaciones_pin(tenant_id,usuario_solicitante_id,usuario_autorizo_id,accion,permiso_codigo,motivo,caja_id,turno_id)
+    VALUES(v_tenant,v_maria,v_maria,'devolucion','venta.devolucion','t',v_caja,v_turno) RETURNING id INTO v_auth;
   v_dev:=crear_devolucion(v_ticket,v_caja,v_turno,'TOTAL'::devolucion_alcance,'PRODUCTO_DEFECTUOSO'::devolucion_motivo,'x','EFECTIVO'::devolucion_medio,v_auth,v_maria,v_maria,jsonb_build_array(jsonb_build_object('ticket_item_id',v_item,'cantidad_devuelta',1)),false,NULL,'orf-dev');
   SELECT total_devuelto_mxn INTO v_devuelto FROM devoluciones WHERE id=v_dev;
   IF v_devuelto <> v_total THEN RAISE EXCEPTION 'over/under-refund: devuelto % != pagado %', v_devuelto, v_total; END IF;

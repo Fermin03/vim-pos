@@ -41,10 +41,11 @@ BEGIN
   VALUES (v_tenant, v_suc, v_caja, v_turno, v_maria, v_maria, 'cerrar_turno', 'turno.cerrar_propio', 'turno', v_turno, NULL, 'Cierre de turno')
   RETURNING id INTO v_auth;
 
-  -- arquear (efectivo declarado 620, exacto)
+  -- arquear (efectivo declarado 620, exacto). El primer conteo no lleva autorización (como el
+  -- POS); la de cierre es para reporte_z y, desde la 0134, solo sirve para eso.
   v_corte := arquear_caja(v_turno,
     jsonb_build_array(jsonb_build_object('metodo_pago','EFECTIVO','monto_declarado_mxn',620)),
-    'CIERRE_TURNO', v_maria, v_auth);
+    'CIERRE_TURNO', v_maria, NULL);
   RAISE NOTICE 'corte diferencia_total=%', v_corte->>'diferencia_total_mxn';
   IF (v_corte->>'diferencia_total_mxn')::numeric <> 0 THEN RAISE EXCEPTION 'corte no cuadra: %', v_corte; END IF;
 

@@ -44,6 +44,12 @@ BEGIN
   RAISE NOTICE 'sangría folio: %', v_folio_san;
 
   -- 2) Inyección de fondo 100 (entra efectivo a la caja). DEPOSITO (al banco) saldría también.
+  -- 0134: cada movimiento con su propia autorización, y del permiso que pide el POS para ese
+  -- tipo (INYECCION_FONDO → caja.deposito). Reusar la de la sangría es justo lo que se cerró.
+  INSERT INTO autorizaciones_pin(tenant_id, usuario_solicitante_id, usuario_autorizo_id,
+                                 accion, permiso_codigo, motivo, caja_id, turno_id)
+  VALUES (v_tenant, v_maria, v_maria, 'movimiento_inyeccion_fondo', 'caja.deposito', 'smoke', v_caja, v_turno)
+  RETURNING id INTO v_auth;
   INSERT INTO movimientos_caja(tenant_id, sucursal_id, caja_id, turno_id,
                                tipo, monto_mxn, dia_contable,
                                usuario_solicitante_id, motivo, autorizacion_pin_id, usuario_autorizo_id)

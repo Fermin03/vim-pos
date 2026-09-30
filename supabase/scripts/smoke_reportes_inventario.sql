@@ -114,6 +114,9 @@ BEGIN
   PERFORM aplicar_pago(v_t4, 'EFECTIVO'::metodo_pago, v_total, v_total, NULL, NULL, NULL, false, NULL, 'cv-smoke-t4-pago');
 
   -- 5) Devolución de 1 de las 2 Burger de t2, de regreso al inventario (carne, pan y queso +1).
+  -- 0134: con su propia autorización (venta.devolucion); la del descuento de t3 ya se usó.
+  INSERT INTO autorizaciones_pin (tenant_id, usuario_solicitante_id, usuario_autorizo_id, accion, permiso_codigo, motivo, caja_id, turno_id)
+  VALUES (v_t, v_m, v_m, 'devolucion', 'venta.devolucion', 't', v_c, v_turno) RETURNING id INTO v_auth;
   v_dev := crear_devolucion(v_t2, v_c, v_turno, 'PARCIAL'::devolucion_alcance, 'PRODUCTO_DEFECTUOSO'::devolucion_motivo, 'x',
     'EFECTIVO'::devolucion_medio, v_auth, v_m, v_m,
     jsonb_build_array(jsonb_build_object('ticket_item_id', v_item_b, 'cantidad_devuelta', 1)), true, NULL, NULL, 'cv-smoke-dev');

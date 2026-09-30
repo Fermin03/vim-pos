@@ -41,7 +41,13 @@ BEGIN
   PERFORM confirmar_devolucion(v_dev, v_maria);
   RAISE NOTICE '1a devolución OK: total=%', (SELECT total_devuelto_mxn FROM devoluciones WHERE id=v_dev);
 
-  -- 2ª devolución total del MISMO ticket/ítem → debe FALLAR
+  -- 2ª devolución total del MISMO ticket/ítem → debe FALLAR por el tope acumulado. 0134: con
+  -- una autorización NUEVA; si se reusara la primera, la rechazaría "ya se usó" y este smoke
+  -- dejaría de probar el tope.
+  INSERT INTO autorizaciones_pin(tenant_id, sucursal_id, caja_id, turno_id,
+    usuario_solicitante_id, usuario_autorizo_id, accion, permiso_codigo, entidad_tipo, entidad_id, motivo)
+  VALUES (v_tenant, v_suc, v_caja, v_turno, v_maria, v_maria, 'devolucion', 'venta.devolucion', 'ticket', v_ticket, 'def-2')
+  RETURNING id INTO v_auth;
   BEGIN
     PERFORM crear_devolucion(
       p_ticket_original_id := v_ticket, p_caja_id := v_caja, p_turno_id := v_turno,
@@ -50,6 +56,9 @@ BEGIN
       p_autorizacion_pin_id := v_auth, p_usuario_solicitante_id := v_maria, p_usuario_autorizo_id := v_maria,
       p_items := v_items, p_reversar_inventario := false, p_nota := '2a');
   EXCEPTION WHEN others THEN
+    IF SQLERRM ILIKE '%autorizaci%' THEN
+      RAISE EXCEPTION 'la 2a devolución se rechazó por la autorización, no por el tope: %', SQLERRM;
+    END IF;
     v_segunda_rechazada := true;
     RAISE NOTICE '2a devolución RECHAZADA (correcto): %', SQLERRM;
   END;
