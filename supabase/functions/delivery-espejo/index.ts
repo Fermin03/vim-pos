@@ -12,6 +12,7 @@
 //     simples, cada uno con su índice (migración 0110).
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import { corsHeaders } from "../_shared/cors.ts";
+import { registrarError } from "../_shared/errores.ts";
 import { cajaIdDeEmail } from "../_shared/latido.ts";
 import { cadenciaEspejo, cursorPedido, respuestaSinModulo, TOPE_PEDIDOS, unirPedidos } from "../_shared/delivery/espejo.ts";
 
@@ -54,9 +55,18 @@ Deno.serve(async (req) => {
   const token = (req.headers.get("authorization") ?? "").replace(/^Bearer\s+/i, "");
   if (!token) return json({ error: "NO_AUTH" }, 401);
   const { data: userResp, error: userErr } = await admin.auth.getUser(token);
-  // El detalle (mensaje de GoTrue: expirado, sesión inexistente…) va al log de la caja; sin él
-  // el 6 sep 2026 no se pudo saber por qué la caja de escritorio se quedaba sin espejo.
-  if (userErr || !userResp?.user) return json({ error: "AUTH_INVALIDA", detalle: userErr?.message ?? "sin usuario" }, 401);
+  // El detalle va al log de la caja; sin él el 6 sep 2026 no se pudo saber por qué la caja de
+  // escritorio se quedaba sin espejo. Desde la auditoría del 30/09/2026 (C2-9) ya no es el texto
+  // crudo de GoTrue sino una clasificación fija: lo que el log necesitaba (¿expiró o es inválido?)
+  // sin repetir mensajes internos. El texto completo queda en el log de la función.
+  if (userErr || !userResp?.user) {
+    const crudo = userErr?.message ?? "sin usuario";
+    registrarError("delivery-espejo", "AUTH_INVALIDA", crudo);
+    const detalle = /expired|expirad/i.test(crudo) ? "token expirado"
+      : /session|sesi/i.test(crudo) ? "sesión inexistente"
+      : userErr ? "token inválido" : "sin usuario";
+    return json({ error: "AUTH_INVALIDA", detalle }, 401);
+  }
   const claims = claimsDe(token);
   if (claims.tipo_identidad !== "DISPOSITIVO") return json({ error: "SOLO_DISPOSITIVO" }, 403);
   const tenantId = typeof claims.tenant_id === "string" ? claims.tenant_id : null;
@@ -101,7 +111,7 @@ Deno.serve(async (req) => {
     desde ? pedidosDe().gte("updated_at", desde) : pedidosDe().gte("recibido_at", hace24h),
   ]);
   for (const r of [cx, viv, dlt]) {
-    if (r.error) return json({ error: "DB_ERROR", detalle: r.error.message }, 500);
+    if (r.error) { registrarError("delivery-espejo", "DB_ERROR", r.error); return json({ error: "DB_ERROR" }, 500); }
   }
 
   const conexiones = cx.data ?? [];

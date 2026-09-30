@@ -7,6 +7,8 @@
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import webpush from "npm:web-push@3.6.7";
 import { corsHeaders } from "../_shared/cors.ts";
+import { registrarError } from "../_shared/errores.ts";
+import { tenantDelToken } from "../_shared/identidad.ts";
 import { igualesEnTiempoConstante } from "../_shared/delivery/firma.ts";
 
 // Camino interno (0097): la base de datos avisa desde pg_cron/pg_net con el secreto compartido
@@ -49,10 +51,15 @@ Deno.serve(async (req) => {
     if (!token) return json({ error: "NO_AUTH" }, 401);
     const { data: userResp, error: userErr } = await admin.auth.getUser(token);
     if (userErr || !userResp?.user) return json({ error: "AUTH_INVALIDA" }, 401);
+    // C2-6: el tenant es el de la SESIÓN (claim del token ya verificado), y el acceso se comprueba
+    // en ESE tenant. Antes: el primer acceso activo que devolviera Postgres, fuera del negocio que fuera.
+    const tenantToken = tenantDelToken(token);
+    if (!tenantToken) return json({ error: "SIN_TENANT" }, 403);
     const { data: acceso } = await admin
-      .from("usuarios_acceso").select("tenant_id").eq("usuario_id", userResp.user.id).eq("activo", true).limit(1).maybeSingle();
+      .from("usuarios_acceso").select("tenant_id").eq("usuario_id", userResp.user.id)
+      .eq("tenant_id", tenantToken).eq("activo", true).limit(1).maybeSingle();
     if (!acceso) return json({ error: "SIN_TENANT" }, 403);
-    tenantId = (acceso as { tenant_id: string }).tenant_id;
+    tenantId = tenantToken;
   }
   const titulo = body.titulo?.trim()?.slice(0, 120);
   const cuerpo = body.cuerpo?.trim()?.slice(0, 300);
@@ -61,7 +68,7 @@ Deno.serve(async (req) => {
   // 3) Suscripciones del tenant → enviar; limpiar las muertas (410/404)
   const { data: subs, error: subErr } = await admin
     .from("push_suscripciones").select("id, endpoint, p256dh, auth").eq("tenant_id", tenantId);
-  if (subErr) return json({ error: "DB_ERROR", detalle: subErr.message }, 500);
+  if (subErr) { registrarError("enviar-push", "DB_ERROR", subErr); return json({ error: "DB_ERROR" }, 500); }
 
   // SEC CN-014 — `titulo` y `cuerpo` se recortaban pero `url` iba tal cual, y esta función la puede
   // disparar cualquier usuario autenticado del tenant (incluido un dispositivo comprometido). Eso

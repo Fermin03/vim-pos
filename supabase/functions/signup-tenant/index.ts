@@ -9,13 +9,37 @@
 //   - Email único en auth.users (createUser falla si ya existe).
 //   - Rollback del owner si la creación del tenant falla.
 //
+//   - Límite de altas en la base (consumir_cupo, 0136): por IP y un tope global por hora.
+//
+// LÍMITE (auditoría integral 30/09/2026, C2-3). Antes no había ninguno: cada petición creaba una
+// cuenta de Auth ya confirmada y un tenant TRIAL, sin verificar el correo. Un guion creaba miles.
+// Ahora, antes de tocar Auth:
+//   · por IP: MAX_POR_IP altas por hora (la IP de confianza, ver _shared/limite.ts);
+//   · global: MAX_GLOBAL por hora, que no depende de ninguna cabecera y es el que de verdad acota
+//     el daño si alguien rota IPs. Muy por encima del ritmo real de altas de VIM.
+// Se consume ANTES de validar el cuerpo a propósito: un intento inválido también cuesta, así no se
+// puede sondear gratis qué correos o códigos existen.
+//
+// FAIL-CLOSED si la base no responde: esta función crea cuentas en Auth, que es otro servicio y
+// puede seguir vivo aunque la RPC falle. Abrir en ese caso sería dejar las altas sin límite justo
+// cuando no se ve nada. El visitante recibe 503 "intenta en un momento".
+//
+// VERIFICACIÓN DE CORREO: sigue diferida, y es decisión de producto, no olvido. La pantalla de
+// registro (apps/admin/app/registro/page.tsx) entra con la contraseña recién creada y lleva al dueño
+// directo a /bienvenida; con `email_confirm: false` GoTrue rechazaría ese login ("Email not
+// confirmed") y el onboarding se rompería a la mitad. Propuesta en el informe de la auditoría.
+//
 // DIFERIDO (cuando haya tráfico real):
 //   - hCaptcha/Turnstile para bloquear bots.
-//   - Email de verificación obligatorio antes de poder operar.
-//   - Rate-limit por IP para impedir abuso (hoy depende del WAF/CDN delante).
+//   - Email de verificación obligatorio antes de poder operar (ver arriba).
 
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import { corsHeaders } from "../_shared/cors.ts";
+import { consumirCupos, ipDeLaPeticion } from "../_shared/limite.ts";
+
+const MAX_POR_IP = 10;      // intentos por IP y hora: holgado para quien se equivoca de correo o código
+const MAX_GLOBAL = 60;      // altas (o intentos) de todo el mundo por hora
+const HORA = 60 * 60;
 
 const VERTICALES = ["FOODTRUCK", "QUICK_SERVICE", "FULL_SERVICE", "CAFE_BAR", "DARK_KITCHEN", "ENTERPRISE"];
 // Los planes por giro (QS, FT, FS…) se desactivaron con los tres escalones de precios (ago 2026)
@@ -38,6 +62,22 @@ Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
   if (req.method !== "POST") return json({ error: "METHOD_NOT_ALLOWED" }, 405);
 
+  const admin = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!, {
+    auth: { persistSession: false },
+  });
+
+  // ── Límite (antes de todo lo demás; ver el encabezado) ──────────────────────
+  const ip = ipDeLaPeticion(req);
+  const cupo = await consumirCupos(admin, [
+    { clave: `signup:ip:${ip}`, ventanaSeg: HORA, max: MAX_POR_IP },
+    { clave: "signup:global", ventanaSeg: HORA, max: MAX_GLOBAL },
+  ], "cerrar");
+  if (!cupo.permitido) {
+    if (cupo.motivo === "BD_NO_RESPONDE") return json({ error: "NO_DISPONIBLE", detalle: "Intenta de nuevo en un momento." }, 503);
+    console.warn(`[signup-tenant] límite alcanzado desde ${ip}`);
+    return json({ error: "DEMASIADOS_INTENTOS", detalle: "Demasiados registros seguidos. Intenta más tarde." }, 429);
+  }
+
   let b: Record<string, string | undefined>;
   try { b = await req.json(); } catch { return json({ error: "BAD_JSON" }, 400); }
 
@@ -58,10 +98,6 @@ Deno.serve(async (req) => {
   if (password.length < 8) return json({ error: "PASSWORD_DEBIL", detalle: "mínimo 8 caracteres" }, 400);
   if (!VERTICALES.includes(vertical)) return json({ error: "VERTICAL_INVALIDA" }, 400);
 
-  const admin = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!, {
-    auth: { persistSession: false },
-  });
-
   // 1) Crear la cuenta del dueño con SU password (no autogenerada).
   const { data: created, error: cErr } = await admin.auth.admin.createUser({
     email: email_owner,
@@ -74,7 +110,9 @@ Deno.serve(async (req) => {
     if (/already.*registered|exists|duplicate/i.test(msg)) {
       return json({ error: "EMAIL_YA_REGISTRADO" }, 409);
     }
-    return json({ error: "ALTA_OWNER_FALLO", detalle: msg }, 400);
+    // C2-9: el mensaje de GoTrue va al log, no al visitante.
+    console.error("[signup-tenant] createUser:", msg);
+    return json({ error: "ALTA_OWNER_FALLO" }, 400);
   }
   const ownerId = created.user.id;
 
@@ -97,7 +135,8 @@ Deno.serve(async (req) => {
     if (/duplicate|unique|already/i.test(pErr.message)) {
       return json({ error: "CODIGO_YA_USADO" }, 409);
     }
-    return json({ error: "PROVISION_FALLO", detalle: pErr.message }, 400);
+    console.error("[signup-tenant] crear_tenant_con_owner:", pErr.message);
+    return json({ error: "PROVISION_FALLO" }, 400);
   }
 
   return json({

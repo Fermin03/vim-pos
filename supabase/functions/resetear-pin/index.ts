@@ -4,6 +4,7 @@
 
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import { corsHeaders } from "../_shared/cors.ts";
+import { registrarError } from "../_shared/errores.ts";
 
 const admin = createClient(
   Deno.env.get("SUPABASE_URL")!,
@@ -85,7 +86,7 @@ Deno.serve(async (req) => {
     p_usuario_id: usuario_id,
     p_pin_nuevo: pin_nuevo,
   });
-  if (rpcErr) return json({ error: "DB_ERROR", detalle: rpcErr.message }, 500);
+  if (rpcErr) { registrarError("resetear-pin", "DB_ERROR", rpcErr); return json({ error: "DB_ERROR" }, 500); }
 
   return json({ ok: true });
 });

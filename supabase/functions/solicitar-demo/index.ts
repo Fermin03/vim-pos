@@ -44,15 +44,22 @@
 //
 //   · Honeypot: un campo que ningún humano ve. Si viene lleno, se responde 200 y se tira.
 //     Responder 200 y no 400 es deliberado — un bot que recibe error reintenta con otra forma.
-//   · Tiempo mínimo de llenado: el formulario manda cuándo se abrió. Menos de 3 s es un guion.
-//     El dato lo pone el cliente, así que un bot decente lo falsea; filtra a los que no se
-//     molestan, que son la mayoría.
-//   · Límite por IP en memoria. Cada instancia tiene su propio contador y las instancias van y
-//     vienen, así que esto NO es un rate-limit fuerte: es un tope al accidente y al bot torpe.
-//     El día que haya spam de verdad, la respuesta es un captcha o el WAF de delante, no esto.
+//   · Tiempo mínimo de llenado: el formulario manda cuándo se abrió (`abierto_en`) y es
+//     OBLIGATORIO: sin él se trata como bot (200 y se tira). Antes, si faltaba, el chequeo
+//     simplemente no se hacía, así que bastaba con no mandarlo (auditoría 30/09/2026, C2-2). El
+//     sitio lo manda siempre (sitio-web/assets/js/vim.js). Menos de 3 s es un guion. El dato lo
+//     pone el cliente, así que un bot decente lo falsea; filtra a los que no se molestan.
+//   · Límite en la base (consumir_cupo, 0136; auditoría 30/09/2026, C2-1): por IP de confianza
+//     (ver _shared/limite.ts) y un tope GLOBAL por hora. Antes era un Map en memoria por instancia
+//     y por el PRIMER valor de X-Forwarded-For, que lo escribe el cliente: no limitaba nada.
+//     Pasado el tope global el prospecto SÍ se guarda (no se tira un lead) pero NO se manda el
+//     correo: así un bot no puede usar esta función para inundar el buzón de hola@. Si la base no
+//     responde, se deja pasar (fail-open): un lead vale más, y sin base el insert fallaría igual.
+//     El día que haya spam de verdad, la respuesta es un captcha o el WAF de delante.
 
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import { corsHeaders } from "../_shared/cors.ts";
+import { consumirCupo, ipDeLaPeticion } from "../_shared/limite.ts";
 
 const GIROS = ["FOODTRUCK", "QUICK_SERVICE", "FULL_SERVICE", "CAFE_BAR", "DARK_KITCHEN", "ENTERPRISE"];
 
@@ -66,26 +73,9 @@ const GIRO_ETIQUETA: Record<string, string> = {
 };
 
 const MIN_SEGUNDOS_LLENADO = 3;
-const MAX_POR_IP = 5;
-const VENTANA_MS = 60 * 60 * 1000; // una hora
-
-/** IP → marcas de tiempo de los envíos recientes. Ver la nota del encabezado sobre su alcance. */
-const porIp = new Map<string, number[]>();
-
-function demasiados(ip: string): boolean {
-  const ahora = Date.now();
-  const recientes = (porIp.get(ip) ?? []).filter((t) => ahora - t < VENTANA_MS);
-  recientes.push(ahora);
-  porIp.set(ip, recientes);
-
-  // Sin esto el Map crece hasta que la instancia muere. Barato porque solo corre al recibir algo.
-  if (porIp.size > 5000) {
-    for (const [k, v] of porIp) {
-      if (v.every((t) => ahora - t >= VENTANA_MS)) porIp.delete(k);
-    }
-  }
-  return recientes.length > MAX_POR_IP;
-}
+const MAX_POR_IP = 5;          // envíos por IP y hora
+const MAX_GLOBAL = 40;         // envíos de todo el mundo por hora; pasado esto se guarda sin correo
+const HORA = 60 * 60;
 
 /** Deja solo dígitos y quita el 52 / +52 de lada para guardar los 10 de siempre. */
 function normalizarWhatsapp(v: string): string {
@@ -201,15 +191,20 @@ Deno.serve(async (req) => {
   if (texto(b.sitio_web, 200)) return json({ ok: true });
 
   // ── Tiempo de llenado ─────────────────────────────────────────────────────
+  // Obligatorio: sin `abierto_en` (o con uno absurdo, del futuro) es un guion, no el formulario.
   const abierto = entero(b.abierto_en);
-  if (abierto !== null && (Date.now() - abierto) / 1000 < MIN_SEGUNDOS_LLENADO) {
-    return json({ ok: true });
-  }
+  const segundos = abierto === null ? -1 : (Date.now() - abierto) / 1000;
+  if (segundos < MIN_SEGUNDOS_LLENADO) return json({ ok: true });
+
+  const admin = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!, {
+    auth: { persistSession: false },
+  });
 
   // ── Límite por IP ─────────────────────────────────────────────────────────
-  const ip = (req.headers.get("x-forwarded-for") ?? "").split(",")[0]!.trim() || "desconocida";
-  if (demasiados(ip)) {
-    return json({ error: "DEMASIADOS_ENVIOS", detalle: "Inténtalo más tarde o escríbenos por WhatsApp." }, 429);
+  const ip = ipDeLaPeticion(req);
+  const porIp = await consumirCupo(admin, { clave: `demo:ip:${ip}`, ventanaSeg: HORA, max: MAX_POR_IP }, "abrir");
+  if (!porIp.permitido) {
+    return json({ error: "DEMASIADOS_ENVIOS", detalle: "Inténtalo más tarde o escríbenos a hola@vimpos.com.mx." }, 429);
   }
 
   // ── Validación ────────────────────────────────────────────────────────────
@@ -233,10 +228,6 @@ Deno.serve(async (req) => {
   if (faltan.length) return json({ error: "DATOS_INVALIDOS", campos: faltan }, 400);
 
   // ── La fila ───────────────────────────────────────────────────────────────
-  const admin = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!, {
-    auth: { persistSession: false },
-  });
-
   const { data: fila, error } = await admin
     .from("prospectos")
     .insert({
@@ -257,11 +248,19 @@ Deno.serve(async (req) => {
 
   if (error) {
     console.error("[solicitar-demo] no se pudo guardar el prospecto:", error.message);
-    return json({ error: "NO_GUARDADO", detalle: "Escríbenos por WhatsApp mientras lo arreglamos." }, 500);
+    return json({ error: "NO_GUARDADO", detalle: "Escríbenos a hola@vimpos.com.mx mientras lo arreglamos." }, 500);
   }
 
   // ── El aviso ──────────────────────────────────────────────────────────────
   // A partir de aquí nada puede devolver un error al visitante: su solicitud ya quedó registrada.
+
+  // Tope global: pasado, el prospecto queda en la tabla (se ve en /platform) pero no sale correo.
+  // Se cuenta aquí, después del insert, para que solo cuenten los envíos que de verdad pasaron.
+  const global = await consumirCupo(admin, { clave: "demo:global", ventanaSeg: HORA, max: MAX_GLOBAL }, "abrir");
+  if (!global.permitido) {
+    console.warn(`[solicitar-demo] prospecto ${fila.id}: tope global de ${MAX_GLOBAL}/h alcanzado; guardado SIN aviso.`);
+    return json({ ok: true, id: fila.id });
+  }
   const avisoA = Deno.env.get("VIM_AVISOS_A") ?? "hola@vimpos.com.mx";
   const escalon = sucursales! > 1 ? "Cadena" : cajas! > 1 ? "Negocio" : "Esencial";
 

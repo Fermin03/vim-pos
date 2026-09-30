@@ -10,6 +10,7 @@
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import { create, getNumericDate } from "https://deno.land/x/djwt@v3.0.2/mod.ts";
 import { corsHeaders } from "../_shared/cors.ts";
+import { registrarError } from "../_shared/errores.ts";
 import { cajaIdDeEmail } from "../_shared/dispositivo.ts";
 
 // OJO: las Edge Functions NO permiten secretos con prefijo SUPABASE_ (reservado).
@@ -90,7 +91,7 @@ Deno.serve(async (req) => {
     p_caja_id: caja_id,
   });
 
-  if (error) return json({ error: "RPC_ERROR", detalle: error.message }, 500);
+  if (error) { registrarError("pin-login", "RPC_ERROR", error); return json({ error: "RPC_ERROR" }, 500); }
   if (!data?.ok) {
     const motivo = data?.motivo ?? "PIN_INCORRECTO";
     const status = motivo === "USUARIO_BLOQUEADO" ? 423

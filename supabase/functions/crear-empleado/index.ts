@@ -7,6 +7,8 @@
 
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import { corsHeaders } from "../_shared/cors.ts";
+import { registrarError } from "../_shared/errores.ts";
+import { tenantDelToken } from "../_shared/identidad.ts";
 
 // Cliente service_role: corre server-side, nunca se expone al cliente.
 const admin = createClient(
@@ -53,13 +55,19 @@ Deno.serve(async (req) => {
   if (!pin || !/^\d{4,6}$/.test(pin)) return json({ error: "PIN_INVALIDO" }, 400);
   if (!rol_codigo || !ROLES_ASIGNABLES.includes(rol_codigo)) return json({ error: "ROL_INVALIDO" }, 400);
 
-  // 3) Verificar que el caller es DUENO/ADMIN y obtener su tenant_id
+  // 3) Verificar que el caller es DUENO/ADMIN del tenant DE SU SESIÓN.
+  // C2-6: el tenant sale del claim del token ya verificado y el rol se busca en ESE tenant. Antes
+  // se tomaba el primer acceso de administrador que apareciera (`.find`), de cualquier negocio: con
+  // una cuenta en dos negocios, el empleado podía acabar creado en el que no era.
+  const tenantToken = tenantDelToken(token);
+  if (!tenantToken) return json({ error: "SIN_PERMISO" }, 403);
   const { data: accesoCaller, error: accErr } = await admin
     .from("usuarios_acceso")
     .select("tenant_id, rol:roles(codigo)")
     .eq("usuario_id", callerId)
+    .eq("tenant_id", tenantToken)
     .eq("activo", true);
-  if (accErr) return json({ error: "DB_ERROR", detalle: accErr.message }, 500);
+  if (accErr) { registrarError("crear-empleado", "DB_ERROR", accErr); return json({ error: "DB_ERROR" }, 500); }
 
   type Acc = { tenant_id: string; rol: { codigo: string } | null };
   const accesos = (accesoCaller ?? []) as unknown as Acc[];
@@ -107,7 +115,9 @@ Deno.serve(async (req) => {
   });
   if (createErr || !created?.user) {
     const msg = createErr?.message ?? "ERROR_CREAR_AUTH";
-    return json({ error: /already/i.test(msg) ? "EMAIL_DUPLICADO" : "ERROR_CREAR_AUTH", detalle: msg }, 400);
+    const codigo = /already/i.test(msg) ? "EMAIL_DUPLICADO" : "ERROR_CREAR_AUTH";
+    registrarError("crear-empleado", codigo, msg);
+    return json({ error: codigo }, 400);
   }
   const uid = created.user.id;
 
@@ -120,7 +130,8 @@ Deno.serve(async (req) => {
   if (perfErr) {
     // rollback del auth.users
     await admin.auth.admin.deleteUser(uid).catch(() => {});
-    return json({ error: "DB_ERROR", detalle: perfErr.message }, 500);
+    registrarError("crear-empleado", "DB_ERROR", perfErr);
+    return json({ error: "DB_ERROR" }, 500);
   }
 
   // 7) Crear usuarios_acceso con el rol pedido
@@ -144,7 +155,8 @@ Deno.serve(async (req) => {
   });
   if (accInsErr) {
     await admin.auth.admin.deleteUser(uid).catch(() => {});
-    return json({ error: "DB_ERROR", detalle: accInsErr.message }, 500);
+    registrarError("crear-empleado", "DB_ERROR", accInsErr);
+    return json({ error: "DB_ERROR" }, 500);
   }
 
   return json({ ok: true, usuario_id: uid });

@@ -2,31 +2,41 @@
 // Crea la cuenta del dueño (auth.users) + el tenant con todo su andamiaje (crear_tenant_con_owner
 // de 0012: perfil, acceso DUEÑO, saldo de folios, onboarding, auditoría). service_role server-side.
 //
-// AUTORIZACIÓN: herramienta interna de VIM. Como aún no existe un modelo de "super-admin" en el
-// esquema, se protege con un secreto compartido (header X-Platform-Key === PLATFORM_PROVISION_KEY).
-// Fail-closed: si el secreto no está configurado en el entorno, rechaza. Cuando exista el modelo
-// super-admin, sustituir por validación de JWT + rol de plataforma.
+// AUTORIZACIÓN: la llama SOLO el servidor del panel de plataforma (apps/platform, /api/provisionar),
+// que ya exigió un operador con segundo factor y deja la bitácora. Esta función no ve al operador:
+// ve un secreto de servidor a servidor.
+//
+// Auditoría integral 30/09/2026 (C2-7). Antes el secreto era la clave compartida del arranque
+// (`PLATFORM_PROVISION_KEY`), la misma que el panel "retira" al activar operadores con 2FA; pero esa
+// retirada solo vale DENTRO del panel, y con la clave cualquiera podía llamar aquí directo, sin
+// operador ni bitácora, sin allowlist ni límite. Ahora:
+//   · secreto PROPIO: `PROVISION_INTERNAL_SECRET` en la cabecera `X-Vim-Provision`
+//     (`openssl rand -hex 32`, el MISMO valor en Supabase y en Vercel). Configurado aquí, la clave
+//     compartida deja de servir en esta función.
+//   · sin él configurado, modo legado (la clave compartida, como antes) para no cortar el alta de
+//     clientes a medio despliegue; se avisa en cada uso.
+//   · límite de fallos por IP con la base (consumir_cupo, 0136), cerrado si la base no responde.
+//
+// ORDEN DE DESPLIEGUE (ninguno de los pasos corta el alta):
+//   1. Vercel (apps/platform): añadir PROVISION_INTERNAL_SECRET y desplegar. El panel manda las dos
+//      cabeceras mientras tenga las dos variables; la función vieja sigue usando X-Platform-Key.
+//   2. `supabase secrets set PROVISION_INTERNAL_SECRET=<el mismo>` y desplegar esta función. Desde
+//      aquí solo vale X-Vim-Provision.
+//   3. `supabase secrets unset PLATFORM_PROVISION_KEY` (la función ya no la lee). En Vercel se queda
+//      mientras sirva para el arranque del panel (server.ts).
 //
 // Local: supabase functions serve provisionar-tenant --env-file supabase/functions/.env
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import { corsHeaders } from "../_shared/cors.ts";
+import { consumirCupo, cupoAgotado, ipDeLaPeticion, type Cupo } from "../_shared/limite.ts";
+import { cabeceraDeModo, igualSeguro, modoProvision } from "../_shared/provision.ts";
 
 const VERTICALES = ["FOODTRUCK", "QUICK_SERVICE", "FULL_SERVICE", "CAFE_BAR", "DARK_KITCHEN", "ENTERPRISE"];
 
-/** SEC CN-024 — comparación de secretos en tiempo constante (WebCrypto, disponible en Deno). */
-async function igualSeguro(a: string, b: string): Promise<boolean> {
-  const enc = new TextEncoder();
-  const [ha, hb] = await Promise.all([
-    // `.trim()` en los dos lados: un salto de línea al pegar el secreto en el panel rompería la
-    // comparación para siempre, con un 401 que parece de permisos. Ver la nota en platform/server.ts.
-    crypto.subtle.digest("SHA-256", enc.encode(a.trim())),
-    crypto.subtle.digest("SHA-256", enc.encode(b.trim())),
-  ]);
-  const x = new Uint8Array(ha), y = new Uint8Array(hb);
-  let dif = 0;
-  for (let i = 0; i < x.length; i++) dif |= x[i]! ^ y[i]!;
-  return dif === 0;
-}
+/** Fallos de secreto por IP. Con un secreto de 256 bits la fuerza bruta no es el riesgo real: esto
+ *  corta el ruido y deja rastro. No hay tope GLOBAL de fallos a propósito: permitiría que
+ *  cualquiera bloqueara el alta de clientes de VIM con peticiones basura. */
+const fallosPorIp = (ip: string): Cupo => ({ clave: `provision:fallo:${ip}`, ventanaSeg: 15 * 60, max: 10 });
 
 Deno.serve(async (req) => {
   const cors = corsHeaders(req);
@@ -36,14 +46,31 @@ Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
   if (req.method !== "POST") return json({ error: "METHOD_NOT_ALLOWED" }, 405);
 
-  // Gate por secreto compartido (fail-closed).
-  const expected = Deno.env.get("PLATFORM_PROVISION_KEY");
-  if (!expected) return json({ error: "PROVISION_DESHABILITADO" }, 503);
-  // SEC CN-024 — comparación en tiempo constante. `!==` corta en el primer byte distinto, así que
-  // el tiempo de respuesta filtra cuánto prefijo se acertó. Se hashean ambos primero: timingSafeEqual
-  // exige la misma longitud, y así tampoco se filtra el tamaño del secreto.
-  if (!(await igualSeguro(req.headers.get("x-platform-key") ?? "", expected))) {
+  const admin = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!, {
+    auth: { persistSession: false },
+  });
+
+  // Gate por secreto de servidor (fail-closed si no hay ninguno configurado).
+  const interno = Deno.env.get("PROVISION_INTERNAL_SECRET") ?? "";
+  const legado = Deno.env.get("PLATFORM_PROVISION_KEY") ?? "";
+  const modo = modoProvision({ interno, legado });
+  const cabecera = cabeceraDeModo(modo);
+  if (!cabecera) return json({ error: "PROVISION_DESHABILITADO" }, 503);
+
+  const ip = ipDeLaPeticion(req);
+  if (await cupoAgotado(admin, fallosPorIp(ip), "cerrar")) {
+    console.warn(`[provisionar-tenant] demasiados fallos desde ${ip}`);
+    return json({ error: "DEMASIADOS_INTENTOS" }, 429);
+  }
+  // SEC CN-024 — comparación en tiempo constante (ver _shared/provision.ts).
+  if (!(await igualSeguro(req.headers.get(cabecera) ?? "", modo === "interno" ? interno : legado))) {
+    await consumirCupo(admin, fallosPorIp(ip), "cerrar");
+    console.warn(`[provisionar-tenant] secreto inválido (${cabecera}) desde ${ip}`);
     return json({ error: "NO_AUTORIZADO" }, 401);
+  }
+  if (modo === "legado") {
+    console.warn("[provisionar-tenant] autorizado con PLATFORM_PROVISION_KEY (modo legado). " +
+      "Configura PROVISION_INTERNAL_SECRET: ver el orden de despliegue en el encabezado.");
   }
 
   let b: Record<string, string | undefined>;
@@ -69,10 +96,6 @@ Deno.serve(async (req) => {
   if (!/^[a-z0-9-]+$/.test(codigo)) return json({ error: "CODIGO_INVALIDO", detalle: "minúsculas, números y guiones" }, 400);
   if (!VERTICALES.includes(vertical)) return json({ error: "VERTICAL_INVALIDA" }, 400);
 
-  const admin = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!, {
-    auth: { persistSession: false },
-  });
-
   // 1) Invitar al dueño por correo: crea la cuenta y envía un email con un link para que
   //    el dueño fije SU contraseña (página /establecer-acceso del admin). No viaja ninguna
   //    contraseña por correo. Requiere SMTP configurado en el proyecto para enviar de verdad.
@@ -82,7 +105,13 @@ Deno.serve(async (req) => {
     redirectTo: `${adminUrl}/establecer-acceso`,
   });
   if (cErr || !invited?.user) {
-    return json({ error: "ALTA_OWNER_FALLO", detalle: cErr?.message ?? "no se pudo invitar al usuario" }, 400);
+    console.error("[provisionar-tenant] inviteUserByEmail:", cErr?.message ?? "sin usuario");
+    const yaExiste = /already.*registered|exists|duplicate/i.test(cErr?.message ?? "");
+    // `detalle` se conserva SOLO en esta función (C2-9): la respuesta la lee únicamente el
+    // servidor del panel, detrás de este secreto, y se la enseña a un operador de VIM con 2FA, que
+    // necesita saber por qué no se pudo dar de alta. Las funciones públicas ya no lo devuelven.
+    return json({ error: yaExiste ? "EMAIL_YA_REGISTRADO" : "ALTA_OWNER_FALLO", detalle: cErr?.message ?? null },
+      yaExiste ? 409 : 400);
   }
   const ownerId = invited.user.id;
 
@@ -101,7 +130,9 @@ Deno.serve(async (req) => {
   if (pErr) {
     // Rollback parcial: si el tenant falló, borrar el owner recién creado para no dejar huérfanos.
     await admin.auth.admin.deleteUser(ownerId).catch(() => {});
-    return json({ error: "PROVISION_FALLO", detalle: pErr.message }, 400);
+    console.error("[provisionar-tenant] crear_tenant_con_owner:", pErr.message);
+    if (/duplicate|unique|already/i.test(pErr.message)) return json({ error: "CODIGO_YA_USADO" }, 409);
+    return json({ error: "PROVISION_FALLO", detalle: pErr.message }, 400); // ver la nota de arriba
   }
 
   return json({

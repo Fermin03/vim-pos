@@ -2,6 +2,7 @@
 // la autorización. El PIN NUNCA se verifica en el cliente. Espeja resetear-pin.
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import { corsHeaders } from "../_shared/cors.ts";
+import { registrarError } from "../_shared/errores.ts";
 
 const admin = createClient(
   Deno.env.get("SUPABASE_URL")!,
@@ -45,7 +46,7 @@ Deno.serve(async (req) => {
     p_turno_id: turno_id ?? null,
     p_usuario_solicitante_id: solicitanteId,
   });
-  if (error) return json({ error: "RPC_ERROR", detalle: error.message }, 500);
+  if (error) { registrarError("autorizar-pin", "RPC_ERROR", error); return json({ error: "RPC_ERROR" }, 500); }
   if (!data?.ok) {
     const motivoR = data?.motivo ?? "PIN_INCORRECTO";
     const status = motivoR === "BLOQUEADO" ? 423 : motivoR === "SIN_PERMISO" ? 403 : 401;
