@@ -47,6 +47,8 @@ const labelSoft = (m: string) => METODO_LABEL_SOFT_MAP[m] ?? m.toUpperCase();
 const round2 = (n: number) => Math.round(n * 100) / 100;
 const label = (m: string) => METODO_LABEL[m] ?? m;
 const ROLES_CIERRE = ["CAJERO", "SUPERVISOR", "ADMIN", "DUENO"];
+/** Roles con `turno.recontar_arqueo` (0127): se autorizan solos para volver a contar. */
+const ROLES_RECONTAR = ["SUPERVISOR", "ADMIN", "DUENO"];
 
 type Fila = { metodo: string; esperado: number };
 type Paso = "arqueo" | "resultado" | "z";
@@ -81,6 +83,23 @@ export function PantallaCierre({
   const [procesando, setProcesando] = useState(false);
   const [corte, setCorte] = useState<CorteResultado | null>(null);
   const [pidiendoPin, setPidiendoPin] = useState(false);
+  // Corte ciego (0.4.94): volver a contar después de ver la diferencia pide autorización. La del
+  // recuento viaja con el corte siguiente, así queda ligada a él; el corte anterior no se borra.
+  const [pidiendoPinRecuento, setPidiendoPinRecuento] = useState(false);
+  const [autorizacionRecuento, setAutorizacionRecuento] = useState<string | null>(null);
+  // ¿Este turno ya tiene un conteo? Salir del resultado (flecha o Escape) y volver a entrar no
+  // puede ser la forma de contar otra vez sin autorización: el corte se generó y quedó registrado.
+  const [hayCortePrevio, setHayCortePrevio] = useState(false);
+  // Autorizar ANTES de generar (cuando se entró de nuevo a un turno con conteo): el PIN llega y
+  // el corte se genera con él.
+  const [pidiendoPinGenerar, setPidiendoPinGenerar] = useState(false);
+  useEffect(() => {
+    let vivo = true;
+    employeeClient(token).from("cortes_caja").select("id").eq("turno_id", turno.id).eq("motivo", "CIERRE_TURNO").limit(1)
+      .then(({ data }) => { if (vivo && (data?.length ?? 0) > 0) setHayCortePrevio(true); });
+    return () => { vivo = false; };
+  }, [token, turno.id]);
+  const necesitaAutorizacion = hayCortePrevio && !autorizacionRecuento;
   const [cierre, setCierre] = useState<CierreZ | null>(null);
   const [ticketsAbiertos, setTicketsAbiertos] = useState(0);
 
@@ -133,14 +152,20 @@ export function PantallaCierre({
   // BUG B: no se puede cerrar el turno con cuentas abiertas (quedarían huérfanas).
   const puedeGenerar = (declarado["EFECTIVO"] ?? "").trim() !== "" && ticketsAbiertos === 0;
 
-  function dif(metodo: string, esperado: number): number | null {
-    const v = declarado[metodo];
-    if (v == null || v.trim() === "") return null;
-    return Math.round((Number(v) - esperado) * 100) / 100;
-  }
-
-  async function generarCorte() {
+  async function generarCorte(autorizacionDada?: string) {
     if (!resumen || !puedeGenerar) return;
+    const autorizacion = autorizacionDada ?? autorizacionRecuento;
+    if (hayCortePrevio && !autorizacion) {
+      setError(null);
+      if (!ROLES_RECONTAR.includes(empleado.rol)) { setPidiendoPinGenerar(true); return; }
+      try {
+        const a = await autorizacionPropia(token, payloadRecuento());
+        return generarCorte(a.autorizacionPinId);
+      } catch (e) {
+        setError(e instanceof Error ? e.message : "No se pudo autorizar el recuento");
+        return;
+      }
+    }
     setProcesando(true);
     setError(null);
     try {
@@ -149,8 +174,11 @@ export function PantallaCierre({
         await registrarComisionEvento(token, turno.id, Number(comisionEvento) || 0);
       }
       const declaraciones = filas.map((f) => ({ metodoPago: f.metodo, montoDeclarado: Number(declarado[f.metodo] || 0) }));
-      const r = await arquearCaja(token, { turnoId: turno.id, declaraciones, usuarioId: empleado.id });
+      const r = await arquearCaja(token, { turnoId: turno.id, declaraciones, usuarioId: empleado.id, autorizacionPinId: autorizacion });
       setCorte(r);
+      // Ya hay un conteo registrado: el siguiente, si lo hay, vuelve a pedir autorización.
+      setHayCortePrevio(true);
+      setAutorizacionRecuento(null);
       setPaso("resultado");
       // Evento crítico: el corte tiene diferencia → avisar a los dispositivos del dueño.
       if (Math.abs(r.diferenciaTotal) > 0.01) {
@@ -181,6 +209,33 @@ export function PantallaCierre({
   useEffect(() => {
     obtenerImpresora("CAJA", { onMostrar: () => {} }).abrirCajon().catch(() => {});
   }, []);
+
+  function payloadRecuento(): PayloadAutorizacion {
+    return {
+      accion: "recontar_arqueo", permisoCodigo: "turno.recontar_arqueo",
+      entidadTipo: "turno", entidadId: turno.id, monto: corte?.diferenciaTotal ?? null,
+      motivo: "Volver a contar el arqueo", cajaId: turno.caja_id, turnoId: turno.id,
+    };
+  }
+
+  /** Regresa al conteo con el efectivo en blanco: se cuenta otra vez, no se corrige la cifra. */
+  function volverAContar(a: Autorizacion) {
+    setAutorizacionRecuento(a.autorizacionPinId);
+    setPidiendoPinRecuento(false);
+    setDeclarado((d) => ({ ...d, EFECTIVO: "" }));
+    setCorte(null);
+    setPaso("arqueo");
+  }
+
+  async function pedirRecuento() {
+    setError(null);
+    if (!ROLES_RECONTAR.includes(empleado.rol)) { setPidiendoPinRecuento(true); return; }
+    try {
+      volverAContar(await autorizacionPropia(token, payloadRecuento()));
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "No se pudo autorizar el recuento");
+    }
+  }
 
   async function ejecutarCierre(a: Autorizacion) {
     setProcesando(true);
@@ -347,22 +402,23 @@ export function PantallaCierre({
               <thead>
                 <tr className="text-[11px] font-bold uppercase tracking-wide text-ink-3">
                   <th className="pb-3 text-left">Método de pago</th>
-                  <th className="pb-3 text-right">Esperado</th>
-                  <th className="pb-3 text-center">Declarado</th>
-                  <th className="pb-3 text-right">Diferencia</th>
+                  <th className="pb-3 text-right">Contado</th>
                 </tr>
               </thead>
               <tbody>
+                {/* CORTE CIEGO: aquí no hay "Esperado" ni "Diferencia". Con la cifra a la vista, el
+                    conteo se ajusta a ella (cuentas hasta que te da) y el faltante desaparece del
+                    corte. La diferencia sale en el resultado, cuando ya no se puede acomodar. */}
                 {filas.map((f) => {
-                  const d = dif(f.metodo, f.esperado);
                   return (
                     <tr key={f.metodo} className="border-b border-line">
                       <td className="py-4">
                         <div className="text-[15px] font-semibold">{label(f.metodo)}</div>
-                        {f.metodo === "EFECTIVO" && <div className="text-[11.5px] text-ink-3">Incluye fondo, ventas y movimientos</div>}
+                        {f.metodo === "EFECTIVO"
+                          ? <div className="text-[11.5px] text-ink-3">Cuenta todo lo que hay en el cajón, fondo incluido</div>
+                          : <div className="text-[11.5px] text-ink-3">Del sistema: confírmalo con el cierre de tu terminal</div>}
                       </td>
-                      <td className="py-4 text-right font-display text-[15px] font-semibold tabular-nums text-ink-2">{fmtMxn(f.esperado)}</td>
-                      <td className="py-4 text-center">
+                      <td className="py-4 text-right">
                         <input
                           className={input}
                           inputMode="decimal"
@@ -370,12 +426,6 @@ export function PantallaCierre({
                           value={declarado[f.metodo] ?? ""}
                           onChange={(e) => setDeclarado((s) => ({ ...s, [f.metodo]: e.target.value.replace(/[^0-9.]/g, "") }))}
                         />
-                      </td>
-                      <td className="py-4 text-right font-display text-[15px] font-bold tabular-nums">
-                        {d == null ? <span className="text-ink-3">—</span>
-                          : d === 0 ? <span className="text-success">$0.00 ✓</span>
-                          : d < 0 ? <span className="text-danger">−{fmtMxn(Math.abs(d))} faltante</span>
-                          : <span className="text-warning">+{fmtMxn(d)} sobrante</span>}
                       </td>
                     </tr>
                   );
@@ -390,15 +440,12 @@ export function PantallaCierre({
             <div className="flex-1 overflow-y-auto px-5 py-4 text-[13.5px]">
               <Row l="Tickets pagados" v={String(resumen.ticketsPagados)} />
               <Row l="Tickets cancelados" v={String(resumen.ticketsCancelados)} />
-              <Row l="Venta neta" v={fmtMxn(resumen.ventaNeta)} />
-              <Row l="IVA" v={fmtMxn(resumen.iva)} />
-              {resumen.descuentos > 0 && <Row l="Descuentos" v={`−${fmtMxn(resumen.descuentos)}`} />}
-              <Row l="Propinas" v={fmtMxn(resumen.propinaTotal)} />
               <Row l="Fondo de apertura" v={fmtMxn(resumen.fondoApertura)} />
-              <div className="mt-3 flex items-center justify-between border-t-2 border-ink pt-3">
-                <span className="font-display text-[15px] font-bold">Efectivo esperado</span>
-                <span className="font-display text-[18px] font-bold tabular-nums">{fmtMxn(resumen.efectivoEsperado)}</span>
-              </div>
+              {/* Venta, propinas y efectivo esperado se ven en el resultado: con ellos a la vista
+                  se puede sacar la cuenta del cajón y el conteo deja de ser ciego. */}
+              <p className="mt-4 rounded border border-line bg-sel px-3 py-2.5 text-[12.5px] leading-snug text-ink-2">
+                Cuenta el efectivo y escríbelo. Lo que debería haber aparece al generar el corte.
+              </p>
             </div>
             <div className="border-t border-line p-4">
               {/* B3 — turno de evento: comisión del organizador */}
@@ -465,8 +512,13 @@ export function PantallaCierre({
                   )}
                 </div>
               )}
-              <Button className="w-full" onClick={generarCorte} disabled={!puedeGenerar || procesando}>
-                {procesando ? "Generando…" : "Generar corte"}
+              {necesitaAutorizacion && (
+                <p className="mb-3 rounded border border-[#E8DCC0] bg-warning-soft px-3 py-2 text-[12.5px] font-medium text-warning">
+                  Este turno ya tiene un conteo registrado. Contar de nuevo pide autorización de un supervisor.
+                </p>
+              )}
+              <Button className="w-full" onClick={() => void generarCorte()} disabled={!puedeGenerar || procesando}>
+                {procesando ? "Generando…" : necesitaAutorizacion ? "Autorizar y generar corte" : "Generar corte"}
               </Button>
             </div>
           </aside>
@@ -503,13 +555,53 @@ export function PantallaCierre({
               </div>
             </div>
             <div className="mt-5 flex items-center justify-between gap-3">
-              <button type="button" onClick={() => setPaso("arqueo")} className="rounded border border-line-strong px-5 py-3 text-[14px] font-semibold text-ink-2 hover:border-ink hover:text-ink">Volver</button>
+              {/* Sin diferencia no hay nada que recontar. Con diferencia, volver pide autorización:
+                  si no, el corte ciego se vuelve "ver la cifra y corregir". */}
+              {corte.diferenciaTotal !== 0 ? (
+                <button type="button" onClick={() => void pedirRecuento()} disabled={procesando} className="rounded border border-line-strong px-5 py-3 text-[14px] font-semibold text-ink-2 hover:border-ink hover:text-ink">
+                  Volver a contar
+                </button>
+              ) : <span />}
               <Button onClick={cerrar} disabled={procesando}>{procesando ? "Cerrando…" : "Cerrar turno"}</Button>
             </div>
           </div>
         </div>
       )}
 
+      {pidiendoPinGenerar && (
+        <ModalAutorizacionPin
+          token={token}
+          accion="recontar_arqueo"
+          permisoCodigo="turno.recontar_arqueo"
+          descripcion={`Contar de nuevo el arqueo del turno ${turno.codigo_turno}`}
+          ejecutaNombre={empleado.nombre}
+          monto={null}
+          entidadTipo="turno"
+          entidadId={turno.id}
+          cajaId={turno.caja_id}
+          turnoId={turno.id}
+          motivo="Volver a contar el arqueo"
+          onAutorizado={(a) => { setPidiendoPinGenerar(false); void generarCorte(a.autorizacionPinId); }}
+          onCancelar={() => setPidiendoPinGenerar(false)}
+        />
+      )}
+      {pidiendoPinRecuento && (
+        <ModalAutorizacionPin
+          token={token}
+          accion="recontar_arqueo"
+          permisoCodigo="turno.recontar_arqueo"
+          descripcion={`Volver a contar el arqueo del turno ${turno.codigo_turno}`}
+          ejecutaNombre={empleado.nombre}
+          monto={corte?.diferenciaTotal ?? null}
+          entidadTipo="turno"
+          entidadId={turno.id}
+          cajaId={turno.caja_id}
+          turnoId={turno.id}
+          motivo="Volver a contar el arqueo"
+          onAutorizado={volverAContar}
+          onCancelar={() => setPidiendoPinRecuento(false)}
+        />
+      )}
       {pidiendoPin && (
         <ModalAutorizacionPin
           token={token}
