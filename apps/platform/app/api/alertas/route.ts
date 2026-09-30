@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
 import { autorizar } from "../../lib/server";
+import { fechaLegible, hoyMx } from "@vim/fecha";
+import { AVISO_PRUEBA_DIAS, diasEntre, estadoPrueba, precioVigente, promocionVigente, type PrecioSuscripcion } from "@vim/db/cobro";
 
 /**
  * Bandeja de "requiere tu atención": lo que hay que hacer HOY, no lo que pasó.
@@ -37,6 +39,9 @@ export type Alerta = {
 
 const DIA = 24 * 3600 * 1000;
 
+/** Días antes del fin de una promoción en que el panel empieza a avisar (0141). */
+const DIAS_AVISO_PROMOCION = 15;
+
 /**
  * Una caja con latido (0.4.60+), para la franja "Ahora": ¿está viva en este momento?
  *
@@ -70,18 +75,18 @@ export async function GET(req: Request) {
 
   const { data: tenantsRaw } = await sb
     .from("tenants")
-    .select("id, codigo, nombre_comercial, estado, fecha_alta")
+    .select("id, codigo, nombre_comercial, estado, fecha_alta, prueba_hasta")
     .is("deleted_at", null)
     .limit(1000);
   const tenants = (tenantsRaw ?? []) as {
-    id: string; codigo: string; nombre_comercial: string; estado: string; fecha_alta: string | null;
+    id: string; codigo: string; nombre_comercial: string; estado: string; fecha_alta: string | null; prueba_hasta: string | null;
   }[];
   const nombreDe = new Map(tenants.map((t) => [t.id, t.nombre_comercial]));
   const activos = new Set(tenants.filter((t) => t.estado !== "CANCELADO" && t.estado !== "BAJA").map((t) => t.id));
 
   const [cajasRes, subsRes, foliosRes, onbRes, ventasRes, syncRes] = await Promise.all([
     sb.from("cajas").select("id, nombre, tenant_id, activa, bloqueada, bloqueo_motivo, ultimo_latido, version_app").is("deleted_at", null).limit(2000),
-    sb.from("suscripciones").select("tenant_id, estado, fecha_fin, proxima_fecha_cobro, precio_mensual_mxn").limit(1000),
+    sb.from("suscripciones").select("tenant_id, estado, fecha_fin, proxima_fecha_cobro, precio_mensual_mxn, precio_promocional_mxn, promocion_hasta, promocion_nombre").limit(1000),
     sb.from("tenant_folios_saldo").select("tenant_id, folios_base_mensuales, folios_base_consumidos, saldo_paquetes, umbral_alerta").limit(1000),
     sb.from("tenant_onboarding_estado").select("tenant_id, fase, fecha_go_live, updated_at").limit(1000),
     // Una sola pasada por los tickets recientes: basta la fecha más nueva por tenant.
@@ -195,42 +200,67 @@ export async function GET(req: Request) {
     }
   }
 
-  // ── Suscripciones: trials por vencer y cobros vencidos ─────────────────────────────────
-  const subs = (subsRes.data ?? []) as {
-    tenant_id: string; estado: string; fecha_fin: string | null;
-    proxima_fecha_cobro: string | null; precio_mensual_mxn: number | null;
-  }[];
-  for (const s of subs) {
-    if (!activos.has(s.tenant_id)) continue;
-    const tenant = nombreDe.get(s.tenant_id) ?? "—";
-    const esTrial = s.estado === "TRIAL" || s.estado === "PRUEBA";
+  // ── Prueba gratis (0141) ────────────────────────────────────────────────────────────────
+  // Antes esto buscaba `suscripciones.estado = 'TRIAL'`, un valor que el enum no tiene: la alerta
+  // nunca salió. La prueba vive en el TENANT (`estado = 'TRIAL'` + `prueba_hasta`, que la base pone
+  // sola al alta). No bloquea nada: suspender sigue siendo decisión de VIM con días de gracia.
+  const hoy = hoyMx();
+  const subs = (subsRes.data ?? []) as ({
+    tenant_id: string; estado: string; fecha_fin: string | null; proxima_fecha_cobro: string | null;
+  } & PrecioSuscripcion)[];
+  // "Con cobro" = una suscripción ACTIVA o en PAUSA: pausar el cobro es una decisión tomada, no un olvido.
+  const conCobro = new Set(subs.filter((s) => s.estado === "ACTIVA" || s.estado === "PAUSADA").map((s) => s.tenant_id));
+  for (const t of tenants) {
+    // Los internos (Knock-Out, demos de VIM) no pagan: nunca son "prueba vencida".
+    if (!activos.has(t.id) || conCobro.has(t.id) || t.estado === "INTERNO") continue;
+    const p = estadoPrueba(t.estado, t.prueba_hasta, hoy);
+    if (p.tipo === "VENCIDA") {
+      alertas.push({
+        id: `prueba-vencida-${t.id}`, severidad: "alta", tipo: "Prueba vencida sin cobro",
+        tenantId: t.id, tenant: t.nombre_comercial,
+        titulo: `La prueba terminó hace ${plural(p.dias, "día", "días")}`,
+        detalle: `Terminó el ${fechaLegible(p.hasta)} y sigue sin cobro activo. Activa el cobro, extiende la prueba o suspéndelo con gracia.`,
+        orden: -p.dias,
+      });
+    } else if (p.tipo === "EN_PRUEBA" && p.dias <= AVISO_PRUEBA_DIAS) {
+      alertas.push({
+        id: `prueba-vence-${t.id}`, severidad: "media", tipo: "Prueba por vencer",
+        tenantId: t.id, tenant: t.nombre_comercial,
+        titulo: p.dias === 0 ? "Hoy es el último día de su prueba" : `Su prueba termina en ${plural(p.dias, "día", "días")}`,
+        detalle: `Termina el ${fechaLegible(p.hasta)}. Buen momento para cerrar la venta y activar el cobro.`,
+        orden: p.dias,
+      });
+    }
+  }
 
-    const paraFin = diasDesde(s.fecha_fin);
-    if (esTrial && paraFin !== null && paraFin >= -10) {
-      const faltan = -paraFin;
-      alertas.push(
-        faltan < 0
-          ? {
-              id: `trial-vencido-${s.tenant_id}`, severidad: "critica", tipo: "Trial vencido",
-              tenantId: s.tenant_id, tenant,
-              titulo: `El trial venció hace ${plural(-faltan, "día", "días")}`,
-              detalle: "Sigue operando sin plan de pago. Cierra la venta o suspéndelo.",
-              orden: faltan,
-            }
-          : {
-              id: `trial-vence-${s.tenant_id}`, severidad: "alta", tipo: "Trial por vencer",
-              tenantId: s.tenant_id, tenant,
-              titulo: faltan === 0 ? "El trial vence HOY" : `El trial vence en ${plural(faltan, "día", "días")}`,
-              detalle: "Es el momento de cerrar la conversión, antes de que se quede sin sistema.",
-              orden: faltan,
-            },
-      );
+  // ── Suscripciones: promociones por terminar y cobros vencidos ───────────────────────────
+  for (const s of subs) {
+    if (!activos.has(s.tenant_id) || s.estado !== "ACTIVA") continue;
+    const tenant = nombreDe.get(s.tenant_id) ?? "—";
+
+    // Promoción por terminar (0141): el cliente va a ver subir su mensualidad. Mejor que se entere
+    // por VIM, con tiempo, que por el comprobante.
+    const promo = promocionVigente(s, hoy);
+    if (promo) {
+      const faltan = diasEntre(hoy, promo.hasta);
+      if (faltan <= DIAS_AVISO_PROMOCION) {
+        const mxn = (n: number) => `$${n.toLocaleString("es-MX", { minimumFractionDigits: 2 })}`;
+        alertas.push({
+          id: `promo-${s.tenant_id}`, severidad: "media", tipo: "Promoción por terminar",
+          tenantId: s.tenant_id, tenant,
+          titulo: faltan === 0 ? `Hoy termina ${promo.nombre ?? "su promoción"}` : `${promo.nombre ?? "Su promoción"} termina en ${plural(faltan, "día", "días")}`,
+          detalle: `Paga ${mxn(promo.precio)} hasta el ${fechaLegible(promo.hasta)}; después, ${mxn(promo.lista)}. Avísale antes de su siguiente cobro.`,
+          orden: faltan,
+        });
+      }
     }
 
-    // Cobro vencido: dinero ya devengado que nadie fue a cobrar.
-    const vencido = diasDesde(s.proxima_fecha_cobro);
-    if (!esTrial && vencido !== null && vencido > 0 && (s.estado === "ACTIVA" || s.estado === "ACTIVO")) {
-      const monto = Number(s.precio_mensual_mxn ?? 0);
+    // Cobro vencido: dinero ya devengado que nadie fue a cobrar. El monto es el que tocaba en ESA
+    // fecha de cobro (con promoción si seguía vigente), no el de lista.
+    if (!s.proxima_fecha_cobro) continue;
+    const vencido = diasEntre(s.proxima_fecha_cobro.slice(0, 10), hoy);
+    if (vencido > 0) {
+      const monto = precioVigente(s, s.proxima_fecha_cobro.slice(0, 10));
       alertas.push({
         id: `cobro-${s.tenant_id}`, severidad: vencido >= 7 ? "critica" : "alta", tipo: "Cobro vencido",
         tenantId: s.tenant_id, tenant,

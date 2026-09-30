@@ -6995,6 +6995,9 @@ export type Database = {
           notas: string | null
           plan_id: string
           precio_mensual_mxn: number
+          precio_promocional_mxn: number | null
+          promocion_hasta: string | null
+          promocion_nombre: string | null
           proxima_fecha_cobro: string | null
           tenant_id: string
           ultima_fecha_cobro: string | null
@@ -7012,6 +7015,9 @@ export type Database = {
           notas?: string | null
           plan_id: string
           precio_mensual_mxn: number
+          precio_promocional_mxn?: number | null
+          promocion_hasta?: string | null
+          promocion_nombre?: string | null
           proxima_fecha_cobro?: string | null
           tenant_id: string
           ultima_fecha_cobro?: string | null
@@ -7029,6 +7035,9 @@ export type Database = {
           notas?: string | null
           plan_id?: string
           precio_mensual_mxn?: number
+          precio_promocional_mxn?: number | null
+          promocion_hasta?: string | null
+          promocion_nombre?: string | null
           proxima_fecha_cobro?: string | null
           tenant_id?: string
           ultima_fecha_cobro?: string | null
@@ -7232,6 +7241,7 @@ export type Database = {
           fecha_fin: string | null
           fecha_inicio: string
           id: string
+          incluido_en_plan: boolean
           notas: string | null
           precio_mensual_mxn: number
           tenant_id: string
@@ -7245,6 +7255,7 @@ export type Database = {
           fecha_fin?: string | null
           fecha_inicio: string
           id?: string
+          incluido_en_plan?: boolean
           notas?: string | null
           precio_mensual_mxn: number
           tenant_id: string
@@ -7258,6 +7269,7 @@ export type Database = {
           fecha_fin?: string | null
           fecha_inicio?: string
           id?: string
+          incluido_en_plan?: boolean
           notas?: string | null
           precio_mensual_mxn?: number
           tenant_id?: string
@@ -7529,6 +7541,7 @@ export type Database = {
           motivo_baja: string | null
           nombre_comercial: string
           plan_actual_id: string | null
+          prueba_hasta: string | null
           razon_social: string | null
           regimen_fiscal:
             | Database["public"]["Enums"]["regimen_fiscal_sat"]
@@ -7557,6 +7570,7 @@ export type Database = {
           motivo_baja?: string | null
           nombre_comercial: string
           plan_actual_id?: string | null
+          prueba_hasta?: string | null
           razon_social?: string | null
           regimen_fiscal?:
             | Database["public"]["Enums"]["regimen_fiscal_sat"]
@@ -7585,6 +7599,7 @@ export type Database = {
           motivo_baja?: string | null
           nombre_comercial?: string
           plan_actual_id?: string | null
+          prueba_hasta?: string | null
           razon_social?: string | null
           regimen_fiscal?:
             | Database["public"]["Enums"]["regimen_fiscal_sat"]
@@ -10093,6 +10108,40 @@ export type Database = {
         Args: {
           p_tipo: Database["public"]["Enums"]["movimiento_inventario_tipo"]
         }
+        Returns: number
+      }
+      // 0141 (a mano: `pnpm db:types` necesita el stack local al día).
+      activar_suscripcion: {
+        Args: {
+          p_ciclo: string
+          p_inicio: string
+          p_precio: number
+          p_promo_hasta?: string
+          p_promo_nombre?: string
+          p_promo_precio?: number
+          p_proxima: string
+          p_tenant_id: string
+        }
+        Returns: Json
+      }
+      cambiar_plan_tenant: {
+        Args: { p_plan_id: string; p_precio?: number; p_tenant_id: string }
+        Returns: Json
+      }
+      clabe_valida: { Args: { p_clabe: string }; Returns: boolean }
+      datos_pago_plataforma: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          banco: string | null
+          clabe: string | null
+          correo: string | null
+          instrucciones: string | null
+          titular: string | null
+          whatsapp: string | null
+        }[]
+      }
+      precio_vigente_suscripcion: {
+        Args: { p_fecha?: string; p_precio_lista: number; p_precio_promo: number; p_promo_hasta: string }
         Returns: number
       }
       abrir_cuenta: {

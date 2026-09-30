@@ -5,6 +5,8 @@ import { useCallback, useState } from "react";
 import { useSesion } from "../../lib/sesion";
 import { textoActualizado, useRefresco } from "../../lib/refresco";
 import { fechaHoraMx, fmtMxn, nombreFase, nombreVertical } from "../../lib/formato";
+import { fechaLegible, hoyMx } from "@vim/fecha";
+import { textoPrecio, type PrecioSuscripcion } from "@vim/db/cobro";
 import type { Detalle, Plan } from "../../lib/tipos";
 import { Seccion } from "../../components/seccion";
 import { TarjetaCifra } from "../../components/tarjeta-cifra";
@@ -99,7 +101,7 @@ export default function FichaCliente() {
   if (!d) return <p className="text-sm text-ink-3">Cargando…</p>;
 
   const t = d.tenant;
-  const suscripcion = ((t.suscripcion as { estado: string; precio_mensual_mxn: number; proxima_fecha_cobro: string | null; ciclo_facturacion?: string }[] | null) ?? [])
+  const suscripcion = ((t.suscripcion as (PrecioSuscripcion & { estado: string; proxima_fecha_cobro: string | null; ciclo_facturacion?: string; fecha_inicio: string })[] | null) ?? [])
     .find((s) => s.estado === "ACTIVA" || s.estado === "PAUSADA") ?? null;
   const nombre = String(t.nombre_comercial);
   const estado = String(t.estado);
@@ -152,7 +154,10 @@ export default function FichaCliente() {
       <div className="flex flex-col gap-6">
         <Seccion id="operacion" titulo="Operación" descripcion="Lo que hace este cliente hoy: cajas, sincronización y ventas.">
           <div className="mb-4 grid grid-cols-2 gap-3 lg:grid-cols-4">
-            <TarjetaCifra titulo="Plan" valor={plan?.nombre ?? plan?.codigo ?? "—"} sub={fmtMxn(Number(plan?.precio_mensual_mxn ?? 0)) + "/mes"} texto />
+            <TarjetaCifra titulo="Plan" valor={plan?.nombre ?? plan?.codigo ?? "—"} sub={suscripcion
+              // Lo que paga de verdad (con promoción mientras dure, 0141), no el precio de lista del plan.
+              ? textoPrecio(suscripcion, hoyMx(), { fecha: fechaLegible, mxn: fmtMxn }) + "/mes"
+              : fmtMxn(Number(plan?.precio_mensual_mxn ?? 0)) + "/mes de lista"} texto />
             <TarjetaCifra titulo="Sucursales" valor={String(d.nSucursales)} />
             <TarjetaCifra titulo="Folios" valor={String(d.foliosSaldo)} sub={d.foliosBase ? `+${Math.max(d.foliosBase.mensuales - d.foliosBase.consumidos, 0)} de base este mes` : undefined} />
             <TarjetaCifra titulo="Fase" valor={nombreFase((t.onboarding as { fase?: string } | null)?.fase)} texto />

@@ -9,6 +9,8 @@ import { type ResumenCaja } from "../../lib/dashboard-calculos";
 import { leerEstadoOnboarding, type EstadoOnboarding } from "../../lib/onboarding";
 import { listarSucursales } from "../../lib/configuracion";
 import { mensajeError } from "../../lib/errores";
+import { leerPrueba } from "../../lib/plan";
+import { AvisoPrueba } from "../../components/aviso-prueba";
 
 // Accesos rápidos del P-177: son de Reportes, no navegación genérica.
 const REPORTES_RAPIDOS = [
@@ -246,6 +248,7 @@ export default function DashboardPage() {
   const [error, setError] = useState<string | null>(null);
   const [onb, setOnb] = useState<EstadoOnboarding | null>(null);
   const [sucursal, setSucursal] = useState<string | null>(null);
+  const [prueba, setPrueba] = useState<{ estado: string; prueba_hasta: string | null } | null>(null);
 
   /* El día que se está mirando. `null` = hoy, que es lo que se ve al entrar.
      Se guarda aparte de `data` porque el selector tiene que responder al
@@ -299,6 +302,8 @@ export default function DashboardPage() {
 
   useEffect(() => {
     leerEstadoOnboarding().then(setOnb).catch(() => {});
+    // La prueba gratis (0141): un aviso que no bloquea; si la lectura falla, simplemente no sale.
+    leerPrueba().then(setPrueba).catch(() => {});
     listarSucursales()
       .then((s) => setSucursal(s.length === 1 ? s[0]!.nombre : null))
       .catch(() => {});
@@ -395,6 +400,8 @@ export default function DashboardPage() {
       />
       <PageBody>
         {error && <p className="mb-4 text-sm font-medium text-danger">{error}</p>}
+
+        <AvisoPrueba estado={prueba?.estado} pruebaHasta={prueba?.prueba_hasta} conEnlace className="mb-6" />
 
         {mostrarOnboarding && onb && (
           <Link href="/bienvenida" className="mb-6 flex items-center gap-4 rounded-lg border border-warning-line bg-warning-soft p-4 transition hover:border-accent">

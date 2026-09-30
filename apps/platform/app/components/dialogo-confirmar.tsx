@@ -16,6 +16,11 @@ export type DialogoConfirmarProps = {
   /** Nombre comercial que hay que escribir para habilitar el botón. */
   nombreEsperado: string;
   /**
+   * Cómo se nombra, en el aviso de lo que falta, eso que hay que escribir. Por omisión "escribir el
+   * nombre"; cuando lo que se escribe es una palabra de confirmación (`TODOS`), se dice esa palabra.
+   */
+  faltaNombre?: string;
+  /**
    * Fricción graduada: lo reversible que toca a UN cliente (pausar el cobro, activar un add-on,
    * marcar abandonado) pide motivo pero no el nombre. Escribir el nombre se reserva para lo que
    * cuesta dinero o corta la operación: si se pide para todo, deja de frenar.
@@ -72,7 +77,10 @@ export function DialogoConfirmar(p: DialogoConfirmarProps) {
     }),
     [p.sinNombre, p.nombreEsperado, p.conGracia, p.conEntiendo, nombre, motivo, gracia, entiendo],
   );
-  const faltan = [...(p.listo && !p.listo.ok ? [p.listo.falta] : []), ...r.faltantes.map((f) => FALTA[f])];
+  const faltan = [
+    ...(p.listo && !p.listo.ok ? [p.listo.falta] : []),
+    ...r.faltantes.map((f) => (f === "nombre" && p.faltaNombre ? p.faltaNombre : FALTA[f])),
+  ];
   const puede = faltan.length === 0 && !p.ocupado;
 
   const fechaBloq = p.conGracia && Number.isInteger(gracia) && gracia >= 1 ? fechaBloqueo(hoyMx(), gracia) : null;

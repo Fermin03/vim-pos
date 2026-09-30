@@ -21,7 +21,7 @@ import { createServiceClient } from "@vim/db/service";
 /** UUID de sistema: lo que se hizo con la clave compartida, sin persona detrás. */
 export const SYSTEM_ADMIN_ID = "00000000-0000-0000-0000-0000000000a1";
 
-type SbClient = ReturnType<typeof createServiceClient>;
+export type SbClient = ReturnType<typeof createServiceClient>;
 
 /** Quién está haciendo la petición. `via: "clave"` = la clave compartida del arranque. */
 export type Actor = { id: string; nombre: string; via: "cuenta" | "clave" };

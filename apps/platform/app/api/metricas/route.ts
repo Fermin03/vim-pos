@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
 import { autorizar } from "../../lib/server";
+import { hoyMx } from "@vim/fecha";
+import { precioVigente, type PrecioSuscripcion } from "@vim/db/cobro";
 
 // Métricas globales del negocio VIM (doc 12 §6.1 "Métricas globales"). service_role.
 
@@ -22,11 +24,16 @@ export async function GET(req: Request) {
     porVertical[t.vertical_principal] = (porVertical[t.vertical_principal] ?? 0) + 1;
   }
 
-  // MRR = suma de la mensualidad de las suscripciones ACTIVAS.
-  const { data: subs } = await sb.from("suscripciones").select("estado, precio_mensual_mxn").limit(1000);
-  const mrr = ((subs ?? []) as { estado: string; precio_mensual_mxn: number }[])
-    .filter((s) => s.estado === "ACTIVA" || s.estado === "ACTIVO")
-    .reduce((acc, s) => acc + Number(s.precio_mensual_mxn ?? 0), 0);
+  // MRR = suma de lo que HOY paga cada suscripción ACTIVA: el precio de promoción mientras dure
+  // (0141). Antes sumaba el de lista, y un piloto a $499 contaba como $699.
+  const { data: subs } = await sb
+    .from("suscripciones")
+    .select("estado, precio_mensual_mxn, precio_promocional_mxn, promocion_hasta")
+    .limit(1000);
+  const hoy = hoyMx();
+  const mrr = ((subs ?? []) as ({ estado: string } & PrecioSuscripcion)[])
+    .filter((s) => s.estado === "ACTIVA")
+    .reduce((acc, s) => acc + precioVigente(s, hoy), 0);
 
   // Folios vendidos (compras de paquetes) en los últimos 30 días.
   const hace30 = new Date(Date.now() - 30 * 24 * 3600 * 1000).toISOString();
