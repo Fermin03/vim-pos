@@ -8,6 +8,12 @@ En pesos y más IVA. Sin «contáctanos para conocer el precio», sin costo de i
 
 Sin pago inicial en ningún plan
 
+[Pide una demo](https://vimpos.com.mx/demo)
+
+[Pruébalo 30 días gratis](https://admin.vimpos.com.mx/registro)
+
+La prueba dura 30 días y no pide tarjeta.
+
 Pagando el año completo te ahorras dos meses.
 
 ## Los tres planes
@@ -217,7 +223,7 @@ _Para que no haya sorpresas_
 
 ### El equipo
 
-Necesitas una computadora con Windows, una impresora de tickets, un cajón de dinero y el módem que ya tienes. No vendemos equipo: te decimos exactamente qué buscar y lo compras donde te salga mejor. Si ya tienes algo, casi siempre sirve.
+Necesitas una computadora con Windows 10 u 11, una impresora térmica de tickets de 80 mm con puerto de red (cable Ethernet o Wi-Fi) y compatible con ESC/POS —por ejemplo, una Epson TM-T20III o TM-m30 en su versión de red; las de USB hoy no funcionan con la caja—, un cajón de dinero y el módem que ya tienes. No vendemos equipo: te decimos exactamente qué buscar y lo compras donde te salga mejor.
 
 ### La terminal del banco
 

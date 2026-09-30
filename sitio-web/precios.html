@@ -36,7 +36,7 @@
 <link rel="manifest" href="site.webmanifest">
 <meta name="theme-color" content="#0078C9">
 
-<link rel="stylesheet" href="assets/css/vim.css?v=19">
+<link rel="stylesheet" href="assets/css/vim.css?v=20">
 <!-- Consentimiento de cookies. Va ANTES que gtm.js y el orden NO es
      cosmético: los dos llevan `defer`, que respeta el orden del documento, y
      Consent Mode descarta un estado por defecto que llegue después de que el
@@ -67,6 +67,7 @@
         <a class="nav-enlace" href="/precios" aria-current="page">Precios</a>
       </nav>
       <div class="nav-acciones">
+        <a class="btn btn-fantasma nav-prueba" href="https://admin.vimpos.com.mx/registro">Pruébalo 30 días gratis</a>
         <a class="btn btn-primario" href="/demo">Pide una demo</a>
         <button class="nav-hamburguesa" data-menu-boton type="button"
                 aria-expanded="false" aria-controls="menu-movil" aria-label="Abrir menú">
@@ -93,6 +94,7 @@
           <a href="/facturacion-cfdi">Facturación</a>
           <a href="/precios">Precios</a>
           <a href="/demo">Pide una demo</a>
+          <a href="https://admin.vimpos.com.mx/registro">Pruébalo 30 días gratis</a>
       </div>
     </nav>
   </div>
@@ -115,6 +117,11 @@
         sin contrato forzoso. Lo que ves es lo que pagas.
       </p>
       <p class="prueba-social">Sin pago inicial en ningún plan</p>
+      <div class="fila">
+        <a class="btn btn-primario btn-hero" href="/demo">Pide una demo</a>
+        <a class="btn btn-fantasma btn-hero" href="https://admin.vimpos.com.mx/registro">Pruébalo 30 días gratis</a>
+      </div>
+      <p style="font-size:var(--t-13);color:var(--ink-2);margin:0">La prueba dura 30 días y no pide tarjeta.</p>
     </div>
   </section>
 
@@ -570,9 +577,11 @@
         <div class="tarjeta pila pila-3">
           <h3>El equipo</h3>
           <p>
-            Necesitas una computadora con Windows, una impresora de tickets, un cajón de dinero y
-            el módem que ya tienes. No vendemos equipo: te decimos exactamente qué buscar y lo
-            compras donde te salga mejor. Si ya tienes algo, casi siempre sirve.
+            Necesitas una computadora con Windows 10 u 11, una impresora térmica de tickets de
+            80 mm con puerto de red (cable Ethernet o Wi-Fi) y compatible con ESC/POS —por ejemplo,
+            una Epson TM-T20III o TM-m30 en su versión de red; las de USB hoy no funcionan con la
+            caja—, un cajón de dinero y el módem que ya tienes. No vendemos equipo: te decimos
+            exactamente qué buscar y lo compras donde te salga mejor.
           </p>
         </div>
         <div class="tarjeta pila pila-3">
