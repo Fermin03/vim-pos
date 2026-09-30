@@ -1,10 +1,11 @@
 "use client";
 import { useMemo, useState } from "react";
-import { Button, Modal } from "@vim/ui/styles";
+import { DialogoPeligro } from "@vim/ui/styles";
 import { type Empleado } from "../lib/supabase";
 import { cancelarItem, MOTIVOS_CANCELACION, type MotivoCancelacion } from "../lib/cancelacion";
 import { autorizacionPropia, type Autorizacion, type PayloadAutorizacion } from "../lib/autorizacion";
 import { ModalAutorizacionPin } from "./modal-autorizacion-pin";
+import { AvisoAutorizacion, MotivoChips } from "./motivo-y-autorizacion";
 import { fmtMxn } from "../lib/turno";
 import { useEscape } from "../lib/use-escape";
 
@@ -187,117 +188,69 @@ export function ModalCancelarItems({
     );
   }
 
-  const input =
-    "h-11 w-full rounded border border-line-strong px-3 text-sm outline-none focus:border-ink focus:shadow-[0_0_0_3px_rgba(22,22,26,.06)]";
-
   return (
-    <Modal
-      open
-      onClose={onCerrar}
-      title="Cancelar productos"
-      hideTitle
-      className="w-[520px] rounded-lg border border-line bg-surface p-6 shadow-[0_18px_44px_rgba(22,22,26,.18)]"
+    <DialogoPeligro
+      titulo="Cancelar productos"
+      contexto={folio ?? undefined}
+      consecuencia="Marca los que se cancelan. Cocina recibe el aviso al confirmar."
+      ancho="lg"
+      error={error}
+      nota={seleccionados.length > 0
+        ? `${seleccionados.length} seleccionado(s) · ${fmtMxn(montoTotal)}`
+        : "Nada seleccionado"}
+      boton="Cancelar productos"
+      ocupado={procesando}
+      textoOcupado="Cancelando…"
+      deshabilitado={seleccionados.length === 0}
+      onConfirmar={() => void confirmar()}
+      onCerrar={onCerrar}
     >
-      <div className="mb-4">
-        <h2 className="font-display text-xl font-semibold tracking-tight">Cancelar productos</h2>
-        <p className="mt-0.5 text-[13px] text-ink-3">
-          {folio ? `${folio} · ` : ""}Marca los que se cancelan. Cocina recibe el aviso al confirmar.
-        </p>
-      </div>
-
-      <div className="max-h-[280px] overflow-y-auto rounded border border-line">
-        {items.length === 0 && (
-          <p className="p-4 text-center text-[13px] text-ink-3">Esta cuenta no tiene productos por cancelar.</p>
-        )}
-        {items.map((i) => {
-          const marcado = elegidos.has(i.ticketItemId);
-          return (
-            <button
-              key={i.ticketItemId}
-              type="button"
-              onClick={() => alternar(i.ticketItemId)}
-              className={[
-                "flex w-full items-start gap-3 border-b border-line p-3 text-left transition last:border-0",
-                marcado ? "bg-danger/5" : "hover:bg-hover",
-              ].join(" ")}
-            >
-              <span
+        <div className="max-h-[280px] overflow-y-auto rounded border border-line">
+          {items.length === 0 && (
+            <p className="p-4 text-center text-13 text-ink-3">Esta cuenta no tiene productos por cancelar.</p>
+          )}
+          {items.map((i) => {
+            const marcado = elegidos.has(i.ticketItemId);
+            return (
+              <button
+                key={i.ticketItemId}
+                type="button"
+                onClick={() => alternar(i.ticketItemId)}
                 className={[
-                  "mt-px flex h-5 w-5 flex-shrink-0 items-center justify-center rounded border",
-                  marcado ? "border-danger bg-danger text-white" : "border-line-strong",
+                  "flex w-full items-start gap-3 border-b border-line p-3 text-left transition last:border-0",
+                  marcado ? "bg-danger/5" : "hover:bg-hover",
                 ].join(" ")}
               >
-                {marcado && (
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" className="h-3.5 w-3.5">
-                    <path d="M20 6 9 17l-5-5" />
-                  </svg>
-                )}
-              </span>
-              <span className="min-w-0 flex-1">
-                <span className="block text-[14px] font-semibold">
-                  {i.cantidad}× {i.nombre}
+                <span
+                  className={[
+                    "mt-px flex h-5 w-5 flex-shrink-0 items-center justify-center rounded border",
+                    marcado ? "border-danger bg-danger text-white" : "border-line-strong",
+                  ].join(" ")}
+                >
+                  {marcado && (
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" className="h-3.5 w-3.5">
+                      <path d="M20 6 9 17l-5-5" />
+                    </svg>
+                  )}
                 </span>
-                {i.modificadores.length > 0 && (
-                  <span className="block text-[12px] text-ink-3">{i.modificadores.join(" · ")}</span>
-                )}
-              </span>
-              <span className="flex-shrink-0 font-display text-[13.5px] tabular-nums text-ink-2">{fmtMxn(i.total)}</span>
-            </button>
-          );
-        })}
-      </div>
-
-      <div className="mt-4">
-        <label className="mb-1 block text-[12.5px] font-semibold text-ink-2">Motivo</label>
-        <select className={input} value={motivo} onChange={(e) => setMotivo(e.target.value as MotivoCancelacion)}>
-          {MOTIVOS_CANCELACION.map((m) => (
-            <option key={m.codigo} value={m.codigo}>
-              {m.label}
-            </option>
-          ))}
-        </select>
-        {motivo === "OTRO" && (
-          <input
-            className={`${input} mt-2`}
-            placeholder="Describe el motivo"
-            value={motivoTexto}
-            onChange={(e) => setMotivoTexto(e.target.value)}
-            maxLength={120}
-          />
-        )}
-      </div>
-
-      {enCocina && (
-        <p className="mt-3 rounded border border-[#F0DCC0] bg-warning-soft px-3 py-2 text-[12.5px] font-medium text-warning">
-          Este pedido ya está en cocina: se pedirá autorización con PIN.
-        </p>
-      )}
-      {error && (
-        <p className="mt-3 text-[13px] font-medium text-danger" role="alert">
-          {error}
-        </p>
-      )}
-
-      <div className="mt-5 flex items-center justify-between gap-2">
-        <span className="text-[13px] text-ink-3">
-          {seleccionados.length > 0
-            ? `${seleccionados.length} seleccionado(s) · ${fmtMxn(montoTotal)}`
-            : "Nada seleccionado"}
-        </span>
-        <div className="flex gap-2">
-          <button
-            type="button"
-            onClick={onCerrar}
-            disabled={procesando}
-            className="h-11 rounded border border-line-strong px-4 text-[14px] font-semibold text-ink-2 transition hover:border-ink hover:text-ink disabled:opacity-50"
-          >
-            Cerrar
-          </button>
-          <Button variant="danger" onClick={confirmar} disabled={procesando || seleccionados.length === 0}>
-            {procesando ? "Cancelando…" : "Confirmar cancelación"}
-          </Button>
+                <span className="min-w-0 flex-1">
+                  <span className="block text-14 font-semibold">
+                    {i.cantidad}× {i.nombre}
+                  </span>
+                  {i.modificadores.length > 0 && (
+                    <span className="block text-12 text-ink-3">{i.modificadores.join(" · ")}</span>
+                  )}
+                </span>
+                <span className="flex-shrink-0 font-display text-14 tabular-nums text-ink-2">{fmtMxn(i.total)}</span>
+              </button>
+            );
+          })}
         </div>
-      </div>
-    </Modal>
+      <MotivoChips opciones={MOTIVOS_CANCELACION} valor={motivo} onCambiar={setMotivo} texto={motivoTexto} onTexto={setMotivoTexto} maxLength={120} />
+      <AvisoAutorizacion
+        propia={!requierePin}
+        texto={enCocina ? "Este pedido ya está en cocina: se pedirá autorización con PIN." : undefined}
+      />
+    </DialogoPeligro>
   );
 }

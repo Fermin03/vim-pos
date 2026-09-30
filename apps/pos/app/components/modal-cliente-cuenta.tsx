@@ -10,7 +10,7 @@ import { listarZonas, type ZonaEnvio } from "../lib/zonas-envio";
 import { CamposDireccion, DIR_VACIA } from "./modal-cliente-domicilio";
 
 const input = "h-11 w-full rounded border border-line-strong px-3 text-sm outline-none focus:border-ink focus:shadow-[0_0_0_3px_rgba(22,22,26,.06)]";
-const label = "mb-1 block text-[12.5px] font-medium text-ink-2";
+const label = "mb-1 block text-13 font-medium text-ink-2";
 
 const REGISTRO_VACIO: DatosRegistro = { nombre: "", apellido: "", telefono: "", email: "", notas: "" };
 
@@ -154,7 +154,7 @@ export function ModalClienteCuenta({
         <div className="flex gap-1 rounded-lg bg-sel p-0.5">
           {(["buscar", "registrar"] as const).map((m) => (
             <button key={m} type="button" onClick={() => (m === "registrar" ? irARegistrar() : (setModo("buscar"), setError(null)))}
-              className={["rounded px-3 py-1 text-[12.5px] font-semibold transition", modo === m ? "bg-ink text-white" : "text-ink-2"].join(" ")}>
+              className={["rounded px-3 py-1 text-13 font-semibold transition", modo === m ? "bg-ink text-white" : "text-ink-2"].join(" ")}>
               {m === "buscar" ? "Buscar" : "Nuevo"}
             </button>
           ))}
@@ -165,11 +165,11 @@ export function ModalClienteCuenta({
         <div className="mb-3 flex items-center gap-3 rounded-lg border border-line bg-hover px-3 py-2.5">
           <IconoClienteAsignado className="h-5 w-5 flex-shrink-0 text-accent" />
           <div className="min-w-0 flex-1">
-            <div className="truncate text-[14px] font-semibold">{actual.nombre}</div>
-            {actual.telefono && <div className="font-mono text-[12px] text-ink-3">{actual.telefono}</div>}
+            <div className="truncate text-14 font-semibold">{actual.nombre}</div>
+            {actual.telefono && <div className="font-mono text-12 text-ink-3">{actual.telefono}</div>}
           </div>
           <button type="button" disabled={guardando} onClick={() => void asignar(null)}
-            className="text-[13px] font-semibold text-ink-3 transition hover:text-danger disabled:opacity-50">
+            className="text-13 font-semibold text-ink-3 transition hover:text-danger disabled:opacity-50">
             Quitar
           </button>
         </div>
@@ -179,17 +179,17 @@ export function ModalClienteCuenta({
         <>
           <input ref={campoBusqueda} aria-label="Buscar cliente por teléfono o nombre" className={input} placeholder="Teléfono o nombre…" value={q} onChange={(e) => setQ(e.target.value)} />
           <div className="mt-3 max-h-[300px] overflow-y-auto">
-            {buscando && <p className="py-3 text-center text-[13px] text-ink-3">Buscando…</p>}
+            {buscando && <p className="py-3 text-center text-13 text-ink-3">Buscando…</p>}
             {!buscando && q.trim().length >= 2 && res.length === 0 && (
               <div className="py-4 text-center">
-                <p className="text-[13px] text-ink-3">Sin coincidencias.</p>
-                <button type="button" onClick={irARegistrar} className="mt-1 text-[13px] font-semibold text-accent hover:underline">
+                <p className="text-13 text-ink-3">Sin coincidencias.</p>
+                <button type="button" onClick={irARegistrar} className="mt-1 text-13 font-semibold text-accent hover:underline">
                   Registrar cliente nuevo
                 </button>
               </div>
             )}
             {!buscando && q.trim().length < 2 && (
-              <p className="py-3 text-center text-[12.5px] text-ink-3">Escribe al menos 2 letras o números.</p>
+              <p className="py-3 text-center text-13 text-ink-3">Escribe al menos 2 letras o números.</p>
             )}
             <div className="flex flex-col gap-1.5">
               {res.map((c) => {
@@ -199,11 +199,11 @@ export function ModalClienteCuenta({
                     onClick={() => void asignar(c)}
                     className="flex min-h-[48px] items-center justify-between gap-3 rounded-lg border border-line px-3 py-2 text-left transition hover:border-ink disabled:cursor-default disabled:hover:border-line">
                     <span className="min-w-0">
-                      <span className="block truncate text-[14px] font-semibold">{c.nombre || "Sin nombre"}</span>
-                      {c.bloqueado && <span className="text-[11.5px] font-bold text-danger">Bloqueado desde el panel</span>}
-                      {esActual && <span className="text-[11.5px] font-semibold text-ink-3">Ya asignado</span>}
+                      <span className="block truncate text-14 font-semibold">{c.nombre || "Sin nombre"}</span>
+                      {c.bloqueado && <span className="text-12 font-bold text-danger">Bloqueado desde el panel</span>}
+                      {esActual && <span className="text-12 font-semibold text-ink-3">Ya asignado</span>}
                     </span>
-                    {c.telefono && <span className="flex-shrink-0 font-mono text-[12px] text-ink-3">{c.telefono}</span>}
+                    {c.telefono && <span className="flex-shrink-0 font-mono text-12 text-ink-3">{c.telefono}</span>}
                   </button>
                 );
               })}
@@ -223,11 +223,11 @@ export function ModalClienteCuenta({
           <div><label htmlFor="cc-notas" className={label}>Notas</label><input id="cc-notas" className={input} value={datos.notas} maxLength={300} onChange={(e) => set("notas", e.target.value)} placeholder="Alergias, preferencias…" /></div>
 
           {duplicado && (
-            <div className="flex items-center justify-between gap-3 rounded border border-[#E8DCC0] bg-warning-soft px-3 py-2.5" role="alert">
-              <span className="text-[12.5px] font-medium text-warning">Ese teléfono ya es de <b>{duplicado.nombre}</b>.</span>
+            <div className="flex items-center justify-between gap-3 rounded border border-warning-line bg-warning-soft px-3 py-2.5" role="alert">
+              <span className="text-13 font-medium text-warning">Ese teléfono ya es de <b>{duplicado.nombre}</b>.</span>
               {!duplicado.bloqueado && (
                 <button type="button" disabled={guardando} onClick={() => void asignar(duplicado)}
-                  className="flex-shrink-0 text-[12.5px] font-semibold text-accent hover:underline">
+                  className="flex-shrink-0 text-13 font-semibold text-accent hover:underline">
                   Asignar a {duplicado.nombre.split(" ")[0]}
                 </button>
               )}
@@ -237,8 +237,8 @@ export function ModalClienteCuenta({
           {conDomicilio ? (
             <div className="flex flex-col gap-2.5 border-t border-line pt-3">
               <div className="flex items-center justify-between">
-                <span className="text-[12.5px] font-semibold uppercase tracking-wide text-ink-3">Domicilio</span>
-                <button type="button" onClick={() => { setConDomicilio(false); setDir(DIR_VACIA); }} className="text-[12.5px] font-semibold text-ink-3 hover:text-ink">Quitar domicilio</button>
+                <span className="text-13 font-semibold uppercase tracking-wide text-ink-3">Domicilio</span>
+                <button type="button" onClick={() => { setConDomicilio(false); setDir(DIR_VACIA); }} className="text-13 font-semibold text-ink-3 hover:text-ink">Quitar domicilio</button>
               </div>
               <CamposDireccion
                 dir={dir} onCambio={setDir}
@@ -246,10 +246,10 @@ export function ModalClienteCuenta({
                 empleadoNombre={empleadoNombre} zonas={zonas}
                 onZonaSincronizada={(z) => setZonas((zs) => (zs.some((x) => x.id === z.id) ? zs.map((x) => (x.id === z.id ? z : x)) : [...zs, z]))}
               />
-              <p className="text-[11.5px] text-ink-3">Solo se guarda en la ficha del cliente: este pedido no se convierte en domicilio.</p>
+              <p className="text-12 text-ink-3">Solo se guarda en la ficha del cliente: este pedido no se convierte en domicilio.</p>
             </div>
           ) : (
-            <button type="button" onClick={() => setConDomicilio(true)} className="self-start text-[13px] font-semibold text-accent hover:underline">
+            <button type="button" onClick={() => setConDomicilio(true)} className="self-start text-13 font-semibold text-accent hover:underline">
               + Agregar domicilio
             </button>
           )}

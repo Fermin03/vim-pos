@@ -43,7 +43,7 @@ export function ModalCuentasParaLlevar({
 
   return (
     <Modal open onClose={onCerrar} title="Cuentas abiertas · Para llevar" className="w-full max-w-lg rounded-lg bg-surface p-6 shadow-xl">
-      {(error ?? errorCarga) && <p className="mb-3 text-[13px] font-medium text-danger" role="alert">{error ?? errorCarga}</p>}
+      {(error ?? errorCarga) && <p className="mb-3 text-13 font-medium text-danger" role="alert">{error ?? errorCarga}</p>}
       {cuentas === null && !errorCarga && <p className="py-6 text-center text-sm text-ink-3">Cargando…</p>}
       {cuentas !== null && cuentas.length === 0 && (
         <p className="py-6 text-center text-sm text-ink-3">No hay cuentas abiertas de Para llevar.</p>
@@ -61,15 +61,15 @@ export function ModalCuentasParaLlevar({
                 className="flex w-full items-center justify-between gap-3 border-b border-line px-4 py-3 text-left transition last:border-b-0 hover:bg-hover disabled:opacity-60"
               >
                 <div className="min-w-0">
-                  <div className="truncate text-[14.5px] font-semibold">{c.cliente ?? c.folio}</div>
-                  <div className="mt-0.5 text-[12px] text-ink-3">
+                  <div className="truncate text-15 font-semibold">{c.cliente ?? c.folio}</div>
+                  <div className="mt-0.5 text-12 text-ink-3">
                     {c.nItems} art. · {min < 60 ? `hace ${min} min` : `hace ${Math.floor(min / 60)} h ${min % 60} min`}
                     {c.cliente ? ` · ${c.folio}` : ""}
                   </div>
                 </div>
                 <div className="flex flex-shrink-0 items-center gap-3">
-                  <span className="font-display text-[16px] font-bold tabular-nums">{fmtMxn(c.total)}</span>
-                  <span className="rounded bg-ink px-2.5 py-1 text-[12px] font-semibold text-white">Abrir</span>
+                  <span className="font-display text-16 font-bold tabular-nums">{fmtMxn(c.total)}</span>
+                  <span className="rounded bg-ink px-2.5 py-1 text-12 font-semibold text-white">Abrir</span>
                 </div>
               </button>
             );

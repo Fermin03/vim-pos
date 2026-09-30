@@ -5,8 +5,8 @@ export function Seccion({ id, titulo, descripcion, peligrosa, children }: { id: 
   return (
     <section id={id} className={["scroll-mt-28 rounded-lg border p-5", peligrosa ? "mt-6 border-danger/30 bg-danger/5" : "border-line bg-surface"].join(" ")}>
       <div className="mb-4">
-        <h2 className={["font-display text-[16px] font-semibold tracking-tight", peligrosa ? "text-danger" : ""].join(" ")}>{titulo}</h2>
-        {descripcion && <p className="mt-0.5 text-[12.5px] text-ink-3">{descripcion}</p>}
+        <h2 className={["font-display text-16 font-semibold tracking-tight", peligrosa ? "text-danger" : ""].join(" ")}>{titulo}</h2>
+        {descripcion && <p className="mt-0.5 text-13 text-ink-3">{descripcion}</p>}
       </div>
       {children}
     </section>

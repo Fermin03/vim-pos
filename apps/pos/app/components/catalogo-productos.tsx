@@ -261,7 +261,7 @@ export function CatalogoProductos({
                       {p.nombre}
                     </span>
                     {p.agotado ? (
-                      <span className="self-start rounded bg-hover px-1.5 py-0.5 text-[12px] font-bold uppercase tracking-[0.04em] text-ink-2">
+                      <span className="self-start rounded bg-hover px-1.5 py-0.5 text-12 font-bold uppercase tracking-[0.04em] text-ink-2">
                         Agotado
                       </span>
                     ) : (

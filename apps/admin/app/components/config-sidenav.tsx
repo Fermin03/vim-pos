@@ -65,7 +65,7 @@ export function ConfigSideNav({ permitidoDelivery }: { permitidoDelivery: boolea
               href={it.href}
               aria-current={active ? "page" : undefined}
               className={[
-                "flex min-h-[36px] flex-shrink-0 items-center whitespace-nowrap rounded-full px-3.5 text-[13px] font-semibold transition-colors",
+                "flex min-h-[36px] flex-shrink-0 items-center whitespace-nowrap rounded-full px-3.5 text-13 font-semibold transition-colors",
                 active ? "bg-ink text-white" : "bg-hover text-ink-2",
               ].join(" ")}
             >
@@ -86,7 +86,7 @@ function DesktopSideNav({ pathname, secciones }: { pathname: string; secciones: 
     <aside className="hidden w-[220px] flex-shrink-0 flex-col gap-4 border-r border-line bg-surface px-4 py-6 lg:flex">
       {secciones.map((sec) => (
         <div key={sec.titulo}>
-          <div className="px-3 pb-2 text-[10.5px] font-bold uppercase tracking-[0.07em] text-ink-3">{sec.titulo}</div>
+          <div className="px-3 pb-2 text-11 font-bold uppercase tracking-[0.07em] text-ink-3">{sec.titulo}</div>
           <div className="flex flex-col gap-px">
             {sec.items.map((it) => {
               const active = pathname === it.href || pathname.startsWith(it.href + "/");

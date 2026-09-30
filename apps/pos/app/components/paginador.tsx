@@ -30,7 +30,7 @@ export function Paginador({
         compacto ? "px-5 py-1.5" : "px-5 py-2",
       ].join(" ")}
     >
-      <span className="mr-1 text-[13px] font-semibold tabular-nums text-ink-3">
+      <span className="mr-1 text-13 font-semibold tabular-nums text-ink-3">
         {pagina} / {paginas}
       </span>
       <Boton etiqueta="Página anterior" onClick={() => onIr(pagina - 1)} disabled={pagina === 1} compacto={compacto}>

@@ -4,6 +4,7 @@ import { Button, Modal } from "@vim/ui/styles";
 import { type Empleado } from "../lib/supabase";
 import { autorizacionPropia, type Autorizacion, type PayloadAutorizacion } from "../lib/autorizacion";
 import { ModalAutorizacionPin } from "./modal-autorizacion-pin";
+import { AvisoAutorizacion } from "./motivo-y-autorizacion";
 import { cambiarFormaPago, METODOS_PAGO, labelMetodoPago } from "../lib/cuentas-acciones";
 import { fmtMxn } from "../lib/turno";
 
@@ -117,12 +118,12 @@ export function ModalCambiarPago({
     <Modal open onClose={onCerrar} title="Cambiar forma de pago" hideTitle className="w-[480px] rounded-lg border border-line bg-surface p-6 shadow-[0_18px_44px_rgba(22,22,26,.18)]">
       <div className="mb-5">
         <h2 className="font-display text-xl font-semibold tracking-tight">Cambiar forma de pago</h2>
-        <p className="mt-0.5 text-[13px] text-ink-3">
+        <p className="mt-0.5 text-13 text-ink-3">
           {folio ? `${folio} · ` : ""}{fmtMxn(total)} · actual: {labelMetodoPago(metodoActual ?? "—")}
         </p>
       </div>
 
-      <div className="mb-1.5 text-[13px] font-medium text-ink-2">Nueva forma de pago</div>
+      <div className="mb-1.5 text-13 font-medium text-ink-2">Nueva forma de pago</div>
       <div className="mb-3 flex flex-wrap gap-2">
         {opciones.map((m) => (
           <button
@@ -130,7 +131,7 @@ export function ModalCambiarPago({
             type="button"
             onClick={() => setMetodo(m.codigo)}
             className={[
-              "rounded-full border px-3 py-1.5 text-[12.5px] font-semibold transition",
+              "rounded-full border px-3 py-1.5 text-13 font-semibold transition",
               metodo === m.codigo ? "border-ink bg-ink text-white" : "border-line-strong text-ink-2 hover:border-ink",
             ].join(" ")}
           >
@@ -141,18 +142,13 @@ export function ModalCambiarPago({
 
       {metodo === "EFECTIVO" && (
         <div className="mb-3">
-          <label className="mb-1.5 block text-[13px] font-medium text-ink-2">Efectivo recibido (opcional)</label>
+          <label className="mb-1.5 block text-13 font-medium text-ink-2">Efectivo recibido (opcional)</label>
           <input className={input} value={recibido} inputMode="decimal" placeholder={fmtMxn(total)}
             onChange={(e) => setRecibido(e.target.value.replace(/[^0-9.]/g, ""))} />
         </div>
       )}
 
-      <div className={[
-        "mb-4 rounded border px-3 py-2 text-[12.5px] font-medium",
-        tienePermisoRol ? "border-[#D6E8DD] bg-success-soft text-success" : "border-[#E8DCC0] bg-warning-soft text-warning",
-      ].join(" ")}>
-        {tienePermisoRol ? "Dentro de tu rol · no requiere autorización." : "Requiere PIN de un supervisor."}
-      </div>
+      <div className="mb-4"><AvisoAutorizacion propia={tienePermisoRol} /></div>
 
       {error && <p className="mb-3 text-sm font-medium text-danger" role="alert">{error}</p>}
 

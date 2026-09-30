@@ -132,11 +132,11 @@ export function Cifras({ cifras }: { cifras: Cifra[] }) {
     <div className={`mb-5 grid grid-cols-2 gap-3 ${cols}`}>
       {cifras.map((c) => (
         <div key={c.etiqueta} className="rounded-lg border border-line bg-surface p-4">
-          <div className="text-[12.5px] font-semibold text-ink-2">{c.etiqueta}</div>
-          <div className={`mt-1 font-display text-[20px] font-bold leading-tight tabular-nums lg:text-[24px] ${COLOR_TONO[c.tono ?? "neutro"]}`}>
+          <div className="text-13 font-semibold text-ink-2">{c.etiqueta}</div>
+          <div className={`mt-1 font-display text-20 font-bold leading-tight tabular-nums lg:text-24 ${COLOR_TONO[c.tono ?? "neutro"]}`}>
             {typeof c.valor === "number" ? formatear(c.valor, c.tipo ?? "entero") : (c.valor ?? "—")}
           </div>
-          {c.pie && <div className="mt-0.5 text-[12.5px] text-ink-2">{c.pie}</div>}
+          {c.pie && <div className="mt-0.5 text-13 text-ink-2">{c.pie}</div>}
         </div>
       ))}
     </div>
@@ -180,7 +180,7 @@ export function Tabla<T>({ columnas, filas, clave, orden: ordenInicial, vacio, m
   return (
     <TablaScroll min={minimo ?? Math.max(520, columnas.length * 118)}>
       <div className="overflow-hidden rounded-lg border border-line bg-surface">
-        <table className="w-full text-[13.5px]">
+        <table className="w-full text-14">
           <thead>
             <tr className="border-b border-line bg-sel text-left">
               {columnas.map((c) => {
@@ -195,7 +195,7 @@ export function Tabla<T>({ columnas, filas, clave, orden: ordenInicial, vacio, m
                     <button
                       type="button"
                       onClick={() => alternar(c)}
-                      className={`inline-flex min-h-[40px] items-center gap-1 text-[12px] font-semibold uppercase tracking-wide transition-colors hover:text-ink ${dir ? "text-ink" : "text-ink-2"} ${esNumerica(c) ? "flex-row-reverse" : ""}`}
+                      className={`inline-flex min-h-[40px] items-center gap-1 text-12 font-semibold uppercase tracking-wide transition-colors hover:text-ink ${dir ? "text-ink" : "text-ink-2"} ${esNumerica(c) ? "flex-row-reverse" : ""}`}
                     >
                       {c.titulo}
                       <Flecha dir={dir} />
@@ -208,7 +208,7 @@ export function Tabla<T>({ columnas, filas, clave, orden: ordenInicial, vacio, m
           <tbody>
             {visibles.length === 0 && (
               <tr>
-                <td colSpan={columnas.length} className="px-4 py-8 text-center text-[13.5px] text-ink-2">
+                <td colSpan={columnas.length} className="px-4 py-8 text-center text-14 text-ink-2">
                   {vacio}
                 </td>
               </tr>
@@ -306,14 +306,14 @@ export function ReporteMarco<D, T>({
 
         {error && (
           <div role="alert" className="mb-5 flex flex-wrap items-center gap-3 rounded-lg border border-danger/30 bg-danger-soft px-4 py-3">
-            <p className="flex-1 text-[14px] font-medium text-danger">{error}</p>
+            <p className="flex-1 text-14 font-medium text-danger">{error}</p>
             <Button variant="ghost" onClick={reintentar} disabled={cargando}>
               {cargando ? "Reintentando…" : "Reintentar"}
             </Button>
           </div>
         )}
 
-        {datos === null && !error && <p className="text-[14px] text-ink-2">Cargando…</p>}
+        {datos === null && !error && <p className="text-14 text-ink-2">Cargando…</p>}
 
         {datos !== null && (
           <div aria-busy={cargando} className={`transition-opacity duration-150 ${cargando ? "opacity-60" : ""}`}>
@@ -342,5 +342,5 @@ export function Barra({ pct }: { pct: number }) {
 
 /** Nota al pie de un reporte. */
 export function Nota({ children }: { children: ReactNode }) {
-  return <p className="mt-3 max-w-2xl text-[13px] leading-relaxed text-ink-2">{children}</p>;
+  return <p className="mt-3 max-w-2xl text-13 leading-relaxed text-ink-2">{children}</p>;
 }

@@ -30,21 +30,21 @@ function IconoTicket() {
 // 44px de alto: el mínimo táctil del doc de diseño. Eran de 36 y de 26 ("Nota", "Quitar"), y en
 // hora pico se tocaba el de al lado. Solo se anima el apachurrón (transform) y el fondo.
 const BOTON_STEPPER =
-  "flex h-11 w-11 items-center justify-center rounded-md text-[20px] font-semibold leading-none text-ink transition-[transform,background-color] duration-150 ease-vim hover:bg-hover active:scale-[.97] disabled:cursor-default disabled:text-ink-3 disabled:opacity-50 disabled:hover:bg-transparent";
+  "flex h-11 w-11 items-center justify-center rounded-md text-20 font-semibold leading-none text-ink transition-[transform,background-color] duration-150 ease-vim hover:bg-hover active:scale-[.97] disabled:cursor-default disabled:text-ink-3 disabled:opacity-50 disabled:hover:bg-transparent";
 const BOTON_RENGLON =
-  "h-11 flex-shrink-0 rounded-md px-2.5 text-[14px] font-semibold transition-[transform,background-color,border-color] duration-150 ease-vim active:scale-[.97]";
+  "h-11 flex-shrink-0 rounded-md px-2.5 text-14 font-semibold transition-[transform,background-color,border-color] duration-150 ease-vim active:scale-[.97]";
 // La acción principal del pie (Cobrar, o Enviar a cocina en las cuentas que se cobran después):
 // 60px fijos, no un padding que cambia con la letra. Es el botón que cierra cada venta.
 const BOTON_PRINCIPAL =
-  "flex h-[60px] w-full items-center justify-center gap-[10px] rounded-lg bg-accent px-5 font-display text-[19px] font-bold text-white shadow-[0_1px_3px_rgb(var(--accent)/0.3)] transition-[transform,background-color] duration-150 ease-vim hover:bg-accent-hover active:scale-[.98] disabled:cursor-not-allowed disabled:bg-line-strong disabled:shadow-none disabled:active:scale-100";
+  "flex h-[60px] w-full items-center justify-center gap-[10px] rounded-lg bg-accent px-5 font-display text-20 font-bold text-white shadow-[0_1px_3px_rgb(var(--accent)/0.3)] transition-[transform,background-color] duration-150 ease-vim hover:bg-accent-hover active:scale-[.98] disabled:cursor-not-allowed disabled:bg-line-strong disabled:shadow-none disabled:active:scale-100";
 // Fila secundaria (Precios, Descuento, En espera): tres en 256px útiles a 1024, así que sin icono.
 // `flex-auto` y no `flex-1`: cada botón parte del ancho de su palabra y se reparte el resto; a
 // tercios iguales "Descuento" no cabía y se cortaba a "Descuen…".
 const BOTON_SECUNDARIO =
-  "flex h-11 min-w-0 flex-auto items-center justify-center rounded-md border px-2 text-[14px] font-semibold transition-[transform,background-color,border-color,color] duration-150 ease-vim active:scale-[.98] disabled:cursor-default disabled:active:scale-100";
+  "flex h-11 min-w-0 flex-auto items-center justify-center rounded-md border px-2 text-14 font-semibold transition-[transform,background-color,border-color,color] duration-150 ease-vim active:scale-[.98] disabled:cursor-default disabled:active:scale-100";
 // Botones del pie que no son Cobrar: mismo alto (44px), mismo peso.
 const BOTON_PIE =
-  "flex h-11 w-full items-center justify-center gap-2 rounded-md border px-4 text-[14px] font-semibold transition-[transform,background-color,border-color,color] duration-150 ease-vim active:scale-[.98] disabled:cursor-default disabled:active:scale-100";
+  "flex h-11 w-full items-center justify-center gap-2 rounded-md border px-4 text-14 font-semibold transition-[transform,background-color,border-color,color] duration-150 ease-vim active:scale-[.98] disabled:cursor-default disabled:active:scale-100";
 
 /* ── Componente principal ─────────────────────────────────────── */
 export function SidebarTicket({
@@ -179,7 +179,7 @@ export function SidebarTicket({
           {/* El título decía siempre "Ticket nuevo", incluso editando una cuenta ya abierta:
               el cajero no tenía forma de saber si estaba agregando a un pedido existente o
               capturando uno nuevo, que es justo la diferencia entre mandar a cocina y cobrar. */}
-          <span className="truncate font-display text-[18px] font-semibold leading-tight tracking-[-0.02em]">
+          <span className="truncate font-display text-18 font-semibold leading-tight tracking-[-0.02em]">
             {titulo ?? (folioCuenta ? `Cuenta ${folioCuenta}` : "Ticket nuevo")}
           </span>
           {/* Dos botones en uno: con la cuenta ya guardada en BD esto CANCELA la cuenta; con un
@@ -196,7 +196,7 @@ export function SidebarTicket({
             type="button"
             disabled={procesando || (bloqueado ? !onCancelarTicket : vacio || !onLimpiar)}
             onClick={() => (bloqueado && onCancelarTicket ? onCancelarTicket() : onLimpiar?.())}
-            className="-mr-2.5 h-11 flex-shrink-0 rounded-md px-2.5 text-[14px] font-semibold text-danger transition-colors hover:bg-danger-soft disabled:cursor-default disabled:text-ink-3 disabled:opacity-60 disabled:hover:bg-transparent"
+            className="-mr-2.5 h-11 flex-shrink-0 rounded-md px-2.5 text-14 font-semibold text-danger transition-colors hover:bg-danger-soft disabled:cursor-default disabled:text-ink-3 disabled:opacity-60 disabled:hover:bg-transparent"
           >
             {bloqueado && onCancelarTicket ? "Cancelar cuenta" : "Limpiar"}
           </button>
@@ -208,10 +208,10 @@ export function SidebarTicket({
           {/* Sin palomita y en gris neutro: con ella parecía una opción marcada que se podía
               desmarcar, y no es un botón. */}
           <div className="flex items-center justify-between gap-2">
-            <span className="inline-flex h-8 min-w-0 items-center rounded-md bg-hover px-2.5 text-[14px] font-semibold text-ink-2">
+            <span className="inline-flex h-8 min-w-0 items-center rounded-md bg-hover px-2.5 text-14 font-semibold text-ink-2">
               <span className="truncate">{etiquetaModo(estado.modoServicio)}</span>
             </span>
-            <span className="flex-shrink-0 text-[13px] font-semibold text-ink-3">
+            <span className="flex-shrink-0 text-13 font-semibold text-ink-3">
               {totalProductos} {totalProductos === 1 ? "producto" : "productos"}
             </span>
           </div>
@@ -219,8 +219,8 @@ export function SidebarTicket({
               sigue el número. Se va con el primer producto. */}
           {vacio && cambioAnterior != null && cambioAnterior > 0 && (
             <div className="mt-2 flex h-10 items-center justify-between gap-2 rounded-md bg-success-soft px-3 text-success" role="status">
-              <span className="text-[14px] font-semibold">Cambio anterior</span>
-              <span className="font-display text-[18px] font-bold tabular-nums">{fmtMxn(cambioAnterior)}</span>
+              <span className="text-14 font-semibold">Cambio anterior</span>
+              <span className="font-display text-18 font-bold tabular-nums">{fmtMxn(cambioAnterior)}</span>
             </div>
           )}
           {/* Sin handler no se pinta: un boton que no hace nada es peor que no tenerlo. */}
@@ -234,11 +234,11 @@ export function SidebarTicket({
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="mt-0.5 h-4 w-4 flex-shrink-0 text-ink-3"><path d="M12 2a8 8 0 0 0-8 8c0 5.5 8 12 8 12s8-6.5 8-12a8 8 0 0 0-8-8z" /><circle cx="12" cy="10" r="3" /></svg>
               {estado.clienteDomicilio ? (
                 <span className="min-w-0 flex-1">
-                  <span className="block truncate text-[13px] font-semibold">{estado.clienteDomicilio.nombre || "Cliente"}</span>
-                  <span className="block truncate text-[11.5px] text-ink-3">{estado.clienteDomicilio.direccionPreview ?? estado.clienteDomicilio.telefono ?? "Sin domicilio"}</span>
+                  <span className="block truncate text-13 font-semibold">{estado.clienteDomicilio.nombre || "Cliente"}</span>
+                  <span className="block truncate text-12 text-ink-3">{estado.clienteDomicilio.direccionPreview ?? estado.clienteDomicilio.telefono ?? "Sin domicilio"}</span>
                 </span>
               ) : (
-                <span className="flex-1 text-[13px] font-semibold text-accent">Asignar cliente y domicilio</span>
+                <span className="flex-1 text-13 font-semibold text-accent">Asignar cliente y domicilio</span>
               )}
             </button>
           )}
@@ -248,7 +248,7 @@ export function SidebarTicket({
               type="button"
               onClick={() => setNotaOrdenAbierta((v) => !v)}
               className={[
-                "mt-2 flex h-10 w-full items-center rounded-md border border-dashed px-2.5 text-[14px] font-medium transition-colors",
+                "mt-2 flex h-10 w-full items-center rounded-md border border-dashed px-2.5 text-14 font-medium transition-colors",
                 estado.notaOrden ? "border-warning/50 text-warning" : "border-line-strong text-ink-2 hover:border-ink hover:text-ink",
               ].join(" ")}
             >
@@ -262,13 +262,13 @@ export function SidebarTicket({
               defaultValue={estado.notaOrden ?? ""}
               maxLength={300}
               placeholder="Nota para cocina de toda la orden…"
-              className="mt-1.5 h-10 w-full rounded border border-line-strong px-3 text-[13px] outline-none focus:border-ink"
+              className="mt-1.5 h-10 w-full rounded border border-line-strong px-3 text-13 outline-none focus:border-ink"
               onBlur={(e) => { onNotaOrden?.(e.target.value.trim() || null); setNotaOrdenAbierta(false); }}
               onKeyDown={(e) => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }}
             />
           )}
           {estado.notaOrden && !notaOrdenAbierta && (
-            <div className="mt-1.5 rounded border-l-2 border-[#D4A017] bg-warning-soft px-2.5 py-1.5 text-[12.5px] font-medium italic text-[#7A5A10]">
+            <div className="mt-1.5 rounded border-l-2 border-[#D4A017] bg-warning-soft px-2.5 py-1.5 text-13 font-medium italic text-[#7A5A10]">
               “{estado.notaOrden}”
             </div>
           )}
@@ -281,10 +281,10 @@ export function SidebarTicket({
           /* Estado vacío */
           <div className="flex h-full flex-col items-center justify-center gap-3 p-8 text-center text-ink-3">
             <IconoTicket />
-            <p className="text-[15px] font-semibold text-ink-2">
+            <p className="text-15 font-semibold text-ink-2">
               Agrega productos para empezar
             </p>
-            <span className="text-[13px]">
+            <span className="text-13">
               Toca un producto del catálogo para iniciar el ticket.
             </span>
           </div>
@@ -338,7 +338,7 @@ export function SidebarTicket({
                     >
                       −
                     </button>
-                    <span className="min-w-[28px] text-center font-display text-[16px] font-bold tabular-nums">
+                    <span className="min-w-[28px] text-center font-display text-16 font-bold tabular-nums">
                       {l.cantidad}
                     </span>
                     <button
@@ -394,7 +394,7 @@ export function SidebarTicket({
                       defaultValue={l.notaCocina ?? ""}
                       maxLength={200}
                       placeholder="Nota para cocina de este producto…"
-                      className="h-10 w-full rounded border border-line-strong px-3 text-[13px] outline-none focus:border-ink"
+                      className="h-10 w-full rounded border border-line-strong px-3 text-13 outline-none focus:border-ink"
                       onBlur={(e) => { onNotaLinea?.(l.clientId, e.target.value.trim() || null); setEditandoNota(null); }}
                       onKeyDown={(e) => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }}
                     />
@@ -420,37 +420,37 @@ export function SidebarTicket({
           <button
             type="button"
             onClick={onCambiarZona}
-            className="mb-1 flex w-full items-center justify-between text-[13px] text-ink-2 hover:text-ink"
+            className="mb-1 flex w-full items-center justify-between text-13 text-ink-2 hover:text-ink"
           >
             <span>{estado.envio.nombre}</span>
             <span className="tabular-nums font-medium text-ink">{fmtMxn(estado.envio.costoMxn)}</span>
           </button>
         )}
-        <div className="mb-1 flex justify-between text-[13px] text-ink-2">
+        <div className="mb-1 flex justify-between text-13 text-ink-2">
           <span>Subtotal</span>
           <span className="tabular-nums font-medium text-ink">{fmtMxn(totales.subtotal)}</span>
         </div>
-        <div className="mb-1 flex justify-between text-[13px] text-ink-2">
+        <div className="mb-1 flex justify-between text-13 text-ink-2">
           <span>IVA (16%)</span>
           <span className="tabular-nums font-medium text-ink">{fmtMxn(totales.iva)}</span>
         </div>
         {hayPromocion && (
-          <div className="mb-1 flex justify-between text-[13px] font-medium text-success">
+          <div className="mb-1 flex justify-between text-13 font-medium text-success">
             <span>Promoción</span>
             <span className="tabular-nums">−{fmtMxn(promocionMxn)}</span>
           </div>
         )}
         {hayDescuento && (
-          <div className="mb-1 flex justify-between text-[13px] font-medium text-danger">
+          <div className="mb-1 flex justify-between text-13 font-medium text-danger">
             <span>Descuento</span>
             <span className="tabular-nums">−{fmtMxn(descuentoMxn)}</span>
           </div>
         )}
         <div className="mt-1.5 flex items-baseline justify-between gap-2">
-          <span className="text-[15px] font-bold uppercase tracking-[0.04em] text-ink">
+          <span className="text-15 font-bold uppercase tracking-[0.04em] text-ink">
             Total
           </span>
-          <span className="font-display text-[28px] font-bold leading-none tabular-nums tracking-[-0.02em] text-ink">
+          <span className="font-display text-28 font-bold leading-none tabular-nums tracking-[-0.02em] text-ink">
             {fmtMxn(totalFinal)}
           </span>
         </div>
@@ -563,7 +563,7 @@ export function SidebarTicket({
             type="button"
             disabled={vacio || procesando || !onEfectivoExacto}
             onClick={() => onEfectivoExacto?.()}
-            className="flex h-12 w-full items-center justify-center rounded-lg border border-ink bg-surface text-[16px] font-bold text-ink transition-[transform,background-color] duration-150 ease-vim hover:bg-hover active:scale-[.98] disabled:cursor-default disabled:border-line-strong disabled:opacity-[.45] disabled:active:scale-100"
+            className="flex h-12 w-full items-center justify-center rounded-lg border border-ink bg-surface text-16 font-bold text-ink transition-[transform,background-color] duration-150 ease-vim hover:bg-hover active:scale-[.98] disabled:cursor-default disabled:border-line-strong disabled:opacity-[.45] disabled:active:scale-100"
           >
             Efectivo exacto
           </button>

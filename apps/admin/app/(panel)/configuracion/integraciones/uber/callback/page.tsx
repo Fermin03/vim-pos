@@ -83,7 +83,7 @@ function Callback() {
   }
 
   const usadas = new Set(Object.values(asig).map((a) => a.sucursal_id).filter(Boolean));
-  const th = "border-b border-line bg-sel px-4 py-[13px] text-left text-[11.5px] font-bold uppercase tracking-wide text-ink-3";
+  const th = "border-b border-line bg-sel px-4 py-[13px] text-left text-12 font-bold uppercase tracking-wide text-ink-3";
 
   return (
     <>
@@ -135,17 +135,17 @@ function Callback() {
                     return (
                       <tr key={t.id} className="border-b border-line last:border-none">
                         <td className="px-4 py-3.5">
-                          <div className="text-[15px] font-semibold">{t.nombre}</div>
-                          <div className="text-[13px] text-ink-3">{[t.direccion, t.ciudad].filter(Boolean).join(", ") || "Sin dirección"}</div>
+                          <div className="text-15 font-semibold">{t.nombre}</div>
+                          <div className="text-13 text-ink-3">{[t.direccion, t.ciudad].filter(Boolean).join(", ") || "Sin dirección"}</div>
                         </td>
                         <td className="px-4 py-3.5">
                           {ya ? (
-                            <span className="text-[13px] text-ink-2">Conectada a <b className="text-ink">{t.conectada_a!.sucursal_nombre}</b></span>
+                            <span className="text-13 text-ink-2">Conectada a <b className="text-ink">{t.conectada_a!.sucursal_nombre}</b></span>
                           ) : (
                             <select
                               value={a.sucursal_id} disabled={bloqueada} aria-label={`Sucursal para ${t.nombre}`}
                               onChange={(e) => pon(t.id, { sucursal_id: e.target.value })}
-                              className="h-9 w-full rounded border border-line bg-surface px-2 text-[13.5px]"
+                              className="h-9 w-full rounded border border-line bg-surface px-2 text-14"
                             >
                               <option value="">No conectar</option>
                               {sucursales.map((s) => (
@@ -162,18 +162,18 @@ function Callback() {
                             <input
                               type="number" min={1} max={180} value={a.tiempo_prep_min} disabled={bloqueada} aria-label="Minutos de preparación"
                               onChange={(e) => pon(t.id, { tiempo_prep_min: Number(e.target.value) || 15 })}
-                              className="h-9 w-[76px] rounded border border-line bg-surface px-2 text-right text-[13.5px] tabular-nums"
+                              className="h-9 w-[76px] rounded border border-line bg-surface px-2 text-right text-14 tabular-nums"
                             />
                           )}
                         </td>
                         <td className="px-4 py-3.5 text-right">
-                          {!ya && a.resultado === "ok" && <span className="text-[13px] font-semibold text-success">Conectada</span>}
+                          {!ya && a.resultado === "ok" && <span className="text-13 font-semibold text-success">Conectada</span>}
                           {!ya && a.resultado !== "ok" && (
                             <Button disabled={!a.sucursal_id || !terminos || a.resultado === "activando"} onClick={() => activar(t)}>
                               {a.resultado === "activando" ? "Activando…" : "Activar"}
                             </Button>
                           )}
-                          {!ya && fallo && <div className="mt-1 text-[12.5px] text-danger" role="alert">{a.resultado}</div>}
+                          {!ya && fallo && <div className="mt-1 text-13 text-danger" role="alert">{a.resultado}</div>}
                         </td>
                       </tr>
                     );
@@ -182,7 +182,7 @@ function Callback() {
               </table>
             </div>
 
-            <label className="mt-4 flex items-start gap-2.5 text-[13px] text-ink-2">
+            <label className="mt-4 flex items-start gap-2.5 text-13 text-ink-2">
               <input type="checkbox" checked={terminos} onChange={(e) => setTerminos(e.target.checked)} className="mt-0.5 h-4 w-4 accent-accent" />
               <span>
                 Autorizo a VIM POS a recibir en mi nombre los pedidos y datos de mis tiendas de Uber Eats y a usarlos

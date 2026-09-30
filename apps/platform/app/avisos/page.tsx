@@ -113,8 +113,8 @@ export default function AvisosPage() {
 
   return (
     <div>
-      <h1 className="mb-1 font-display text-[18px] font-semibold tracking-tight">Avisos a las cajas</h1>
-      <p className="mb-5 text-[12.5px] text-ink-3">
+      <h1 className="mb-1 font-display text-18 font-semibold tracking-tight">Avisos a las cajas</h1>
+      <p className="mb-5 text-13 text-ink-3">
         Lo que escribas aquí le sale al cajero en su pantalla, dentro de los 10 minutos siguientes.
         Un aviso nunca impide vender.
       </p>
@@ -127,8 +127,8 @@ export default function AvisosPage() {
           {avisos === null && !error && <p className="text-sm text-ink-3">Cargando…</p>}
           {avisos && vigentes.length === 0 && (
             <div className="rounded-lg border border-line bg-surface p-10 text-center">
-              <div className="font-display text-[17px] font-semibold">Ningún aviso vigente</div>
-              <p className="mt-1 text-[13px] text-ink-3">Las cajas no están viendo nada de tu parte ahora mismo.</p>
+              <div className="font-display text-18 font-semibold">Ningún aviso vigente</div>
+              <p className="mt-1 text-13 text-ink-3">Las cajas no están viendo nada de tu parte ahora mismo.</p>
             </div>
           )}
           <div className="flex flex-col gap-2">
@@ -140,35 +140,35 @@ export default function AvisosPage() {
                       <StatusChip tone={NIVEL[a.nivel]?.tono ?? "neutral"}>
                         {NIVEL[a.nivel]?.nombre ?? a.nivel}
                       </StatusChip>
-                      <span className="font-display text-[14.5px] font-semibold">{a.titulo}</span>
-                      {a.requiereConfirmacion && <span className="text-[11px] font-semibold text-ink-3">pide confirmación</span>}
+                      <span className="font-display text-15 font-semibold">{a.titulo}</span>
+                      {a.requiereConfirmacion && <span className="text-11 font-semibold text-ink-3">pide confirmación</span>}
                     </div>
-                    <div className="mt-0.5 text-[12px] text-ink-3">
+                    <div className="mt-0.5 text-12 text-ink-3">
                       {a.tenantNombre ?? "Todos los clientes"}
                       {a.vigenteHasta ? ` · hasta el ${fechaHoraMx(a.vigenteHasta, "corto")}` : " · sin fecha de fin"}
                     </div>
                   </div>
                   <div className="flex flex-shrink-0 items-center gap-3">
-                    <span className="text-[12.5px] tabular-nums text-ink-2">
+                    <span className="text-13 tabular-nums text-ink-2">
                       visto por <b>{a.vistos}</b> de {a.cajasAlcance} {a.cajasAlcance === 1 ? "caja" : "cajas"}
                       {a.vistosWeb > 0 && <span className="text-ink-3"> · {a.vistosWeb} desde el POS web</span>}
                     </span>
-                    <button onClick={() => setBorrando(a)} disabled={busy} className="btn h-8 rounded border border-line-strong px-3 text-[12.5px] font-semibold text-ink-3 hover:text-danger disabled:opacity-50">
+                    <button onClick={() => setBorrando(a)} disabled={busy} className="btn h-8 rounded border border-line-strong px-3 text-13 font-semibold text-ink-3 hover:text-danger disabled:opacity-50">
                       Retirar…
                     </button>
                   </div>
                 </div>
-                <p className="mt-2 whitespace-pre-wrap text-[13px] leading-snug text-ink-2">{a.cuerpo}</p>
+                <p className="mt-2 whitespace-pre-wrap text-13 leading-snug text-ink-2">{a.cuerpo}</p>
               </article>
             ))}
           </div>
 
           {pasados.length > 0 && (
             <details className="mt-5">
-              <summary className="cursor-pointer text-[12.5px] font-semibold text-ink-2">Retirados ({pasados.length})</summary>
+              <summary className="cursor-pointer text-13 font-semibold text-ink-2">Retirados ({pasados.length})</summary>
               <div className="mt-2 flex flex-col gap-1">
                 {pasados.map((a) => (
-                  <div key={a.id} className="flex items-baseline justify-between gap-2 border-b border-line py-1.5 text-[12.5px] last:border-0">
+                  <div key={a.id} className="flex items-baseline justify-between gap-2 border-b border-line py-1.5 text-13 last:border-0">
                     <span className="truncate text-ink-2">{a.titulo} · {a.tenantNombre ?? "Todos"}</span>
                     <span className="flex-shrink-0 tabular-nums text-ink-3">lo vieron {a.vistos}</span>
                   </div>
@@ -176,7 +176,7 @@ export default function AvisosPage() {
               </div>
             </details>
           )}
-          <p className="mt-4 text-[11.5px] text-ink-3">{textoActualizado(hace)}</p>
+          <p className="mt-4 text-12 text-ink-3">{textoActualizado(hace)}</p>
         </div>
 
         {/* ── Formulario ────────────────────────────────────────────────────── */}
@@ -205,13 +205,13 @@ export default function AvisosPage() {
             <div>
               <label className={label} htmlFor="av-cuerpo">Mensaje</label>
               <textarea id="av-cuerpo" className={`${input} h-28 py-2`} maxLength={CUERPO_MAX} value={f.cuerpo} onChange={(e) => setF({ ...f, cuerpo: e.target.value })} />
-              <div className="mt-1 text-right text-[11.5px] text-ink-3">{f.cuerpo.length} / {CUERPO_MAX}</div>
+              <div className="mt-1 text-right text-12 text-ink-3">{f.cuerpo.length} / {CUERPO_MAX}</div>
             </div>
             <div>
               <label className={label} htmlFor="av-hasta">Mostrarlo hasta el día · opcional</label>
               <input id="av-hasta" type="date" className={input} value={f.vigente_hasta} onChange={(e) => setF({ ...f, vigente_hasta: e.target.value })} />
             </div>
-            <label className="flex items-start gap-2 text-[13px]">
+            <label className="flex items-start gap-2 text-13">
               <input type="checkbox" className="mt-0.5" checked={f.requiere_confirmacion} onChange={(e) => setF({ ...f, requiere_confirmacion: e.target.checked })} />
               <span>Pedir que el cajero confirme que lo leyó</span>
             </label>

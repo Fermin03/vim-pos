@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { Button, Modal } from "@vim/ui/styles";
+import { Button, DialogoPeligro, Modal } from "@vim/ui/styles";
 import { PageHeader, PageBody } from "../../components/page-header";
 import { ModalNuevoUsuario } from "../../components/modal-nuevo-usuario";
 import { ModalResetearPin } from "../../components/modal-resetear-pin";
@@ -100,7 +100,7 @@ export default function UsuariosPage() {
           <>
             <Link
               href="/usuarios/repartidores"
-              className="flex h-11 items-center rounded border border-line-strong px-3.5 text-[14px] font-semibold text-ink-2 transition hover:border-ink hover:text-ink"
+              className="flex h-11 items-center rounded border border-line-strong px-3.5 text-14 font-semibold text-ink-2 transition hover:border-ink hover:text-ink"
             >
               Repartidores
             </Link>
@@ -118,24 +118,24 @@ export default function UsuariosPage() {
         {usuarios !== null && (
           <div className="mb-6 grid grid-cols-2 gap-4 lg:grid-cols-4">
             <div className="rounded-lg border border-line bg-surface p-4">
-              <div className="text-[11.5px] font-bold uppercase tracking-wide text-ink-3">Total usuarios</div>
+              <div className="text-12 font-bold uppercase tracking-wide text-ink-3">Total usuarios</div>
               <div className="mt-1 font-display text-2xl font-bold tabular-nums">{usuarios.length}</div>
-              <div className="text-[11.5px] text-ink-3">con acceso al negocio</div>
+              <div className="text-12 text-ink-3">con acceso al negocio</div>
             </div>
             <div className="rounded-lg border border-line bg-surface p-4">
-              <div className="text-[11.5px] font-bold uppercase tracking-wide text-ink-3">Activos</div>
+              <div className="text-12 font-bold uppercase tracking-wide text-ink-3">Activos</div>
               <div className="mt-1 font-display text-2xl font-bold tabular-nums text-success">{totalActivos}</div>
-              <div className="text-[11.5px] text-ink-3">pueden iniciar sesión</div>
+              <div className="text-12 text-ink-3">pueden iniciar sesión</div>
             </div>
             <div className="rounded-lg border border-line bg-surface p-4">
-              <div className="text-[11.5px] font-bold uppercase tracking-wide text-ink-3">Bloqueados</div>
+              <div className="text-12 font-bold uppercase tracking-wide text-ink-3">Bloqueados</div>
               <div className={`mt-1 font-display text-2xl font-bold tabular-nums ${totalBloqueados > 0 ? "text-warning" : "text-ink-3"}`}>{totalBloqueados}</div>
-              <div className="text-[11.5px] text-ink-3">requieren desbloqueo</div>
+              <div className="text-12 text-ink-3">requieren desbloqueo</div>
             </div>
             <div className="rounded-lg border border-line bg-surface p-4">
-              <div className="text-[11.5px] font-bold uppercase tracking-wide text-ink-3">Inactivos</div>
+              <div className="text-12 font-bold uppercase tracking-wide text-ink-3">Inactivos</div>
               <div className="mt-1 font-display text-2xl font-bold tabular-nums text-ink-3">{totalInactivos}</div>
-              <div className="text-[11.5px] text-ink-3">sin acceso al sistema</div>
+              <div className="text-12 text-ink-3">sin acceso al sistema</div>
             </div>
           </div>
         )}
@@ -171,7 +171,7 @@ export default function UsuariosPage() {
                 type="button"
                 onClick={() => setEstado(s)}
                 className={[
-                  "flex-shrink-0 whitespace-nowrap rounded-[4px] px-3 py-2.5 text-[13px] font-semibold transition lg:py-[7px]",
+                  "flex-shrink-0 whitespace-nowrap rounded-[4px] px-3 py-2.5 text-13 font-semibold transition lg:py-[7px]",
                   estado === s ? "bg-surface text-ink shadow-sm" : "text-ink-2 hover:text-ink",
                 ].join(" ")}
               >
@@ -192,10 +192,10 @@ export default function UsuariosPage() {
             <table className="w-full border-collapse">
               <thead>
                 <tr>
-                  <th className="border-b border-line bg-sel px-4 py-[13px] text-left text-[11.5px] font-bold uppercase tracking-wide text-ink-3">Usuario</th>
-                  <th className="w-[150px] border-b border-line bg-sel px-4 py-[13px] text-left text-[11.5px] font-bold uppercase tracking-wide text-ink-3">Rol</th>
-                  <th className="w-[120px] border-b border-line bg-sel px-4 py-[13px] text-left text-[11.5px] font-bold uppercase tracking-wide text-ink-3">Estado</th>
-                  <th className="w-[140px] border-b border-line bg-sel px-4 py-[13px] text-left text-[11.5px] font-bold uppercase tracking-wide text-ink-3">Último acceso</th>
+                  <th className="border-b border-line bg-sel px-4 py-[13px] text-left text-12 font-bold uppercase tracking-wide text-ink-3">Usuario</th>
+                  <th className="w-[150px] border-b border-line bg-sel px-4 py-[13px] text-left text-12 font-bold uppercase tracking-wide text-ink-3">Rol</th>
+                  <th className="w-[120px] border-b border-line bg-sel px-4 py-[13px] text-left text-12 font-bold uppercase tracking-wide text-ink-3">Estado</th>
+                  <th className="w-[140px] border-b border-line bg-sel px-4 py-[13px] text-left text-12 font-bold uppercase tracking-wide text-ink-3">Último acceso</th>
                   <th className="w-[140px] border-b border-line bg-sel px-4 py-[13px]"></th>
                 </tr>
               </thead>
@@ -204,22 +204,22 @@ export default function UsuariosPage() {
                   <tr key={u.id} className="group border-b border-line last:border-none hover:bg-hover">
                     <td className="px-4 py-3.5">
                       <div className="flex items-center gap-3">
-                        <span className="flex h-[34px] w-[34px] flex-shrink-0 items-center justify-center rounded-full border border-line bg-hover font-display text-[13px] font-semibold text-ink-2">
+                        <span className="flex h-[34px] w-[34px] flex-shrink-0 items-center justify-center rounded-full border border-line bg-hover font-display text-13 font-semibold text-ink-2">
                           {iniciales(u.nombre)}
                         </span>
                         <div>
-                          <div className="text-[14.5px] font-semibold">{u.nombre}</div>
+                          <div className="text-15 font-semibold">{u.nombre}</div>
                         </div>
                       </div>
                     </td>
-                    <td className="px-4 py-3.5 text-[13.5px] text-ink-2">{u.rolNombre}</td>
+                    <td className="px-4 py-3.5 text-14 text-ink-2">{u.rolNombre}</td>
                     <td className="px-4 py-3.5">
-                      <span className={["inline-flex items-center gap-1.5 rounded-full px-[11px] py-1 text-[12.5px] font-semibold", u.activo ? "bg-success-soft text-success" : "bg-hover text-ink-3"].join(" ")}>
+                      <span className={["inline-flex items-center gap-1.5 rounded-full px-[11px] py-1 text-13 font-semibold", u.activo ? "bg-success-soft text-success" : "bg-hover text-ink-3"].join(" ")}>
                         <span className={["h-1.5 w-1.5 rounded-full", u.activo ? "bg-success" : "bg-ink-3"].join(" ")} />
                         {u.activo ? "Activo" : "Inactivo"}
                       </span>
                     </td>
-                    <td className="px-4 py-3.5 text-[13.5px] text-ink-3">{fechaCorta(u.fechaUltimoLoginPin)}</td>
+                    <td className="px-4 py-3.5 text-14 text-ink-3">{fechaCorta(u.fechaUltimoLoginPin)}</td>
                     <td className="px-4 py-3.5 text-right">
                       <span className="inline-flex gap-1">
                         <button
@@ -276,7 +276,7 @@ export default function UsuariosPage() {
         )}
 
         {usuarios !== null && visibles.length > 0 && (
-          <p className="mt-4 text-[13px] text-ink-3">
+          <p className="mt-4 text-13 text-ink-3">
             Mostrando <b className="text-ink-2">{visibles.length}</b> de <b className="text-ink-2">{usuarios.length}</b> usuarios
           </p>
         )}
@@ -304,24 +304,16 @@ export default function UsuariosPage() {
       )}
 
       {confirmar && (
-        <Modal
-          open
-          onClose={() => setConfirmar(null)}
-          title={confirmar.activar ? "Activar usuario" : "Desactivar usuario"}
-          className="w-full max-w-[400px] rounded-lg border border-line bg-surface p-6 shadow-xl"
-        >
-          <p className="text-sm text-ink-2">
-            {confirmar.activar ? "Activar " : "Desactivar "}
-            <b className="text-ink">{confirmar.u.nombre}</b>?
-            {!confirmar.activar && " No podrá iniciar sesión en el POS."}
-          </p>
-          <div className="mt-6 flex justify-end gap-2">
-            <Button variant="ghost" onClick={() => setConfirmar(null)}>Cancelar</Button>
-            <Button variant={confirmar.activar ? "primary" : "danger"} onClick={() => aplicarActivar(confirmar.u, confirmar.activar)}>
-              {confirmar.activar ? "Activar" : "Desactivar"}
-            </Button>
-          </div>
-        </Modal>
+        <DialogoPeligro
+          titulo={confirmar.activar ? "¿Activar este usuario?" : "¿Desactivar este usuario?"}
+          contexto={confirmar.u.nombre}
+          consecuencia={confirmar.activar ? undefined : "No podrá iniciar sesión en el POS."}
+          boton={confirmar.activar ? "Activar" : "Desactivar"}
+          peligrosa={!confirmar.activar}
+          ancho="sm"
+          onConfirmar={() => aplicarActivar(confirmar.u, confirmar.activar)}
+          onCerrar={() => setConfirmar(null)}
+        />
       )}
 
       {cambiarRolModal && (
@@ -350,7 +342,7 @@ export default function UsuariosPage() {
                 ].join(" ")}
               >
                 <span className="font-medium">{ROL_LABEL[r]}</span>
-                {r === cambiarRolModal.rolCodigo && <span className="text-[12px]">Actual</span>}
+                {r === cambiarRolModal.rolCodigo && <span className="text-12">Actual</span>}
               </button>
             ))}
           </div>

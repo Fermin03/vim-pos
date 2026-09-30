@@ -4,7 +4,7 @@ import { Button, Modal } from "@vim/ui/styles";
 import { cambiarPinPropio } from "../lib/supabase";
 
 const input = "h-12 w-full rounded border border-line-strong px-3 text-center font-mono text-lg tracking-[0.4em] outline-none focus:border-ink focus:shadow-[0_0_0_3px_rgba(22,22,26,.06)]";
-const label = "mb-1 block text-[12.5px] font-medium text-ink-2";
+const label = "mb-1 block text-13 font-medium text-ink-2";
 
 const MENSAJES: Record<string, string> = {
   PIN_ACTUAL_INCORRECTO: "El PIN actual no es correcto.",
@@ -43,14 +43,14 @@ export function ModalCambiarPin({ token, onListo, onCerrar }: { token: string; o
     <Modal open onClose={onCerrar} title="Cambiar mi PIN" hideTitle
       className="w-[380px] rounded-lg border border-line bg-surface p-6 shadow-[0_18px_44px_rgba(22,22,26,.18)]">
       <h2 className="mb-1 font-display text-xl font-semibold tracking-tight">Cambiar mi PIN</h2>
-      <p className="mb-4 text-[13px] text-ink-3">Verifica tu PIN actual y elige uno nuevo de 4 a 6 dígitos.</p>
+      <p className="mb-4 text-13 text-ink-3">Verifica tu PIN actual y elige uno nuevo de 4 a 6 dígitos.</p>
 
       {ok ? (
         <div className="flex flex-col items-center gap-2 py-6 text-center">
           <div className="flex h-12 w-12 items-center justify-center rounded-full bg-success-soft text-success">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="h-6 w-6"><path d="M20 6 9 17l-5-5" /></svg>
           </div>
-          <p className="text-[14px] font-semibold">PIN actualizado</p>
+          <p className="text-14 font-semibold">PIN actualizado</p>
         </div>
       ) : (
         <div className="flex flex-col gap-3">

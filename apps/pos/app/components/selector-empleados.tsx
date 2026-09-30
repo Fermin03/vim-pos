@@ -108,7 +108,7 @@ export function SelectorEmpleados({
                   onClick={() => onElegir(e)}
                   className="flex flex-col items-center gap-3 rounded-lg border border-line bg-surface px-3 py-5 text-center transition-[border-color,transform] hover:border-ink active:scale-[.98] focus-visible:outline focus-visible:outline-2 focus-visible:outline-ink"
                 >
-                  <span className="flex h-[60px] w-[60px] items-center justify-center rounded-full border border-line bg-hover font-display text-[21px] font-semibold tracking-tight text-ink-2">
+                  <span className="flex h-[60px] w-[60px] items-center justify-center rounded-full border border-line bg-hover font-display text-20 font-semibold tracking-tight text-ink-2">
                     {iniciales(e.nombre)}
                   </span>
                   <span className="text-sm font-semibold leading-tight text-ink">{e.nombre}</span>
@@ -122,7 +122,7 @@ export function SelectorEmpleados({
             <button
               type="button"
               onClick={() => setDesvinculando(true)}
-              className="border-b border-transparent text-[13px] font-medium text-ink-3 transition-colors hover:border-line-strong hover:text-ink-2"
+              className="border-b border-transparent text-13 font-medium text-ink-3 transition-colors hover:border-line-strong hover:text-ink-2"
             >
               Desvincular este dispositivo
             </button>

@@ -395,7 +395,7 @@ export function PantallaKds({
   const estacion = areaSel === TODAS ? "Todas las estaciones" : `Estación ${areaSel}`;
 
   const botonEncabezado =
-    "inline-flex h-12 items-center gap-2 rounded-lg border px-4 text-[18px] font-semibold transition-[transform,background-color,color] duration-150 ease-vim active:scale-[0.97]";
+    "inline-flex h-12 items-center gap-2 rounded-lg border px-4 text-18 font-semibold transition-[transform,background-color,color] duration-150 ease-vim active:scale-[0.97]";
 
   return (
     <div className="flex h-screen flex-col" style={{ background: tema.bg, color: tema.text }}>
@@ -403,11 +403,11 @@ export function PantallaKds({
       <header className="flex h-[72px] flex-shrink-0 items-center justify-between gap-4 border-b px-5" style={{ borderColor: tema.line }}>
         <div className="flex min-w-0 items-center gap-3.5">
           <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-[10px] bg-[#F0F0EC]">
-            <span className="font-display text-[20px] font-extrabold text-[#16161A]">V</span>
+            <span className="font-display text-20 font-extrabold text-[#16161A]">V</span>
           </div>
           <div className="min-w-0">
-            <div className="font-display text-[22px] font-bold leading-tight tracking-[-0.01em]">Cocina</div>
-            <div className="truncate text-[16px] font-medium" style={{ color: tema.text2 }}>
+            <div className="font-display text-24 font-bold leading-tight tracking-[-0.01em]">Cocina</div>
+            <div className="truncate text-16 font-medium" style={{ color: tema.text2 }}>
               {pendientes} {pendientes === 1 ? "comanda" : "comandas"} · {estacion}
             </div>
           </div>
@@ -415,7 +415,7 @@ export function PantallaKds({
         <div className="flex flex-shrink-0 items-center gap-2.5">
           {/* Estado de la conexión, siempre a la vista: un punto verde es lo que dice que lo que se
               ve es de ahora. */}
-          <span className="inline-flex items-center gap-2 px-2 text-[16px] font-semibold" style={{ color: sinConexion ? "#FF8A80" : tema.text2 }}>
+          <span className="inline-flex items-center gap-2 px-2 text-16 font-semibold" style={{ color: sinConexion ? "#FF8A80" : tema.text2 }}>
             <span className="h-3 w-3 rounded-full" style={{ background: sinConexion ? "#E04040" : "#8FE0AE" }} aria-hidden="true" />
             {sinConexion ? "Sin conexión" : "En línea"}
           </span>
@@ -470,7 +470,7 @@ export function PantallaKds({
                   <button
                     type="button"
                     onClick={() => { setAjustesAbierto(false); setConfirmandoSalir(true); }}
-                    className="flex h-14 w-full items-center rounded-md px-4 text-left text-[18px] font-semibold text-[#FF8A80] transition-colors duration-150 hover:bg-white/5"
+                    className="flex h-14 w-full items-center rounded-md px-4 text-left text-18 font-semibold text-[#FF8A80] transition-colors duration-150 hover:bg-white/5"
                   >
                     {etiquetaSalir} esta pantalla
                   </button>
@@ -490,8 +490,8 @@ export function PantallaKds({
           pantalla seguía igual, como una cocina tranquila. */}
       {sinConexion && (
         <div role="alert" className="flex min-h-16 flex-shrink-0 flex-wrap items-center gap-x-4 gap-y-1 bg-[#E04040] px-5 py-2 text-white">
-          <span className="font-display text-[24px] font-extrabold tracking-[0.02em]">SIN CONEXIÓN</span>
-          <span className="text-[18px] font-semibold">
+          <span className="font-display text-24 font-extrabold tracking-[0.02em]">SIN CONEXIÓN</span>
+          <span className="text-18 font-semibold">
             {ultimaOk ? `Última actualización hace ${haceCuanto(ultimaOk, ahora)}` : "No se han podido leer las comandas"} · reintentando cada 5 s
           </span>
         </div>
@@ -508,7 +508,7 @@ export function PantallaKds({
                 type="button"
                 onClick={() => elegirArea(a)}
                 aria-pressed={activa}
-                className="inline-flex h-12 flex-shrink-0 items-center gap-2.5 rounded-full px-5 text-[18px] font-bold transition-colors duration-150"
+                className="inline-flex h-12 flex-shrink-0 items-center gap-2.5 rounded-full px-5 text-18 font-bold transition-colors duration-150"
                 style={activa ? { background: "#F0F0EC", color: "#16161A" } : { background: tema.surface, color: tema.text }}
               >
                 {a === TODAS ? "Todas" : a}
@@ -521,15 +521,15 @@ export function PantallaKds({
 
       {/* Aviso de pedido nuevo */}
       {toast && (
-        <div role="status" className="pointer-events-none fixed left-1/2 top-24 z-50 -translate-x-1/2 animate-vim-pop rounded-full bg-[#F0F0EC] px-6 py-3 text-[20px] font-bold text-[#16161A] shadow-2xl motion-reduce:animate-none">
+        <div role="status" className="pointer-events-none fixed left-1/2 top-24 z-50 -translate-x-1/2 animate-vim-pop rounded-full bg-[#F0F0EC] px-6 py-3 text-20 font-bold text-[#16161A] shadow-2xl motion-reduce:animate-none">
           {toast}
         </div>
       )}
 
       {error && (
-        <div className="mx-5 mt-3 flex flex-shrink-0 items-center gap-3 rounded-lg border border-[#5A2E2E] bg-[#2A1A1A] px-4 py-3 text-[18px] font-semibold text-[#FF8A80]" role="alert">
+        <div className="mx-5 mt-3 flex flex-shrink-0 items-center gap-3 rounded-lg border border-[#5A2E2E] bg-[#2A1A1A] px-4 py-3 text-18 font-semibold text-[#FF8A80]" role="alert">
           <span className="min-w-0 flex-1">{error}</span>
-          <button type="button" onClick={() => setError(null)} aria-label="Cerrar aviso" className="h-11 rounded-md px-3 text-[18px] font-bold">
+          <button type="button" onClick={() => setError(null)} aria-label="Cerrar aviso" className="h-11 rounded-md px-3 text-18 font-bold">
             ✕
           </button>
         </div>
@@ -549,12 +549,12 @@ export function PantallaKds({
           ))}
         </div>
 
-        {comandas === null && <p className="p-8 text-center text-[18px]" style={{ color: tema.text2 }}>Cargando comandas…</p>}
+        {comandas === null && <p className="p-8 text-center text-18" style={{ color: tema.text2 }}>Cargando comandas…</p>}
         {comandas !== null && comandasFiltradas.length === 0 && (
           <div className="flex h-full flex-col items-center justify-center gap-2 text-center">
             <svg viewBox="0 0 24 24" fill="none" stroke={tema.text3} strokeWidth="1.5" className="h-14 w-14" aria-hidden="true"><path d="M3 11l18-5v12L3 14v-3z" /><path d="M11.6 16.8a3 3 0 1 1-5.8-1.6" /></svg>
-            <p className="text-[22px] font-semibold" style={{ color: tema.text2 }}>Sin pedidos pendientes</p>
-            <p className="text-[18px]" style={{ color: tema.text2 }}>Los nuevos pedidos aparecerán aquí solos.</p>
+            <p className="text-24 font-semibold" style={{ color: tema.text2 }}>Sin pedidos pendientes</p>
+            <p className="text-18" style={{ color: tema.text2 }}>Los nuevos pedidos aparecerán aquí solos.</p>
           </div>
         )}
         {enPantalla.length > 0 && (
@@ -586,13 +586,13 @@ export function PantallaKds({
             <div className="min-w-0">
               {paginaActual === 0 ? (
                 <>
-                  <div className="font-display text-[22px] font-extrabold tabular-nums">{enEspera} en espera</div>
-                  <div className="truncate text-[16px] font-medium" style={{ color: tema.text2 }}>Entran solas conforme se cierran las de arriba</div>
+                  <div className="font-display text-24 font-extrabold tabular-nums">{enEspera} en espera</div>
+                  <div className="truncate text-16 font-medium" style={{ color: tema.text2 }}>Entran solas conforme se cierran las de arriba</div>
                 </>
               ) : (
                 <>
-                  <div className="font-display text-[22px] font-extrabold">Viendo la página {paginaActual + 1}</div>
-                  <div className="truncate text-[16px] font-medium" style={{ color: tema.text2 }}>Vuelve sola a la primera en 20 s</div>
+                  <div className="font-display text-24 font-extrabold">Viendo la página {paginaActual + 1}</div>
+                  <div className="truncate text-16 font-medium" style={{ color: tema.text2 }}>Vuelve sola a la primera en 20 s</div>
                 </>
               )}
             </div>
@@ -607,7 +607,7 @@ export function PantallaKds({
               >
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" className="h-[26px] w-[26px]" aria-hidden="true"><path d="M15 18l-6-6 6-6" /></svg>
               </button>
-              <span className="min-w-[72px] text-center text-[20px] font-bold tabular-nums">{paginaActual + 1} de {totalPaginas}</span>
+              <span className="min-w-[72px] text-center text-20 font-bold tabular-nums">{paginaActual + 1} de {totalPaginas}</span>
               <button
                 type="button"
                 aria-label="Página siguiente"
@@ -636,13 +636,13 @@ export function PantallaKds({
             <div key={e.id} className="relative overflow-hidden rounded-lg bg-[#F0F0EC] text-[#16161A] shadow-2xl">
               <div className="flex items-center gap-3 py-2 pl-5 pr-2">
                 <div className="min-w-0 flex-1">
-                  <div className="font-display text-[20px] font-extrabold tabular-nums">#{e.folioCorto} lista</div>
-                  {e.area !== TODAS && <div className="text-[16px] font-semibold text-[#4A4A50]">{e.area}</div>}
+                  <div className="font-display text-20 font-extrabold tabular-nums">#{e.folioCorto} lista</div>
+                  {e.area !== TODAS && <div className="text-16 font-semibold text-[#4A4A50]">{e.area}</div>}
                 </div>
                 <button
                   type="button"
                   onClick={() => quitarEspera(e.id)}
-                  className="font-display h-14 rounded border-2 border-[#16161A] px-6 text-[18px] font-extrabold transition-transform duration-150 active:scale-[0.97]"
+                  className="font-display h-14 rounded border-2 border-[#16161A] px-6 text-18 font-extrabold transition-transform duration-150 active:scale-[0.97]"
                 >
                   Deshacer
                 </button>
@@ -659,14 +659,14 @@ export function PantallaKds({
       {confirmandoSalir && confirmarSalir && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/70 p-4" role="dialog" aria-modal="true" aria-labelledby="kds-salir-titulo">
           <div className="w-full max-w-[440px] rounded-lg p-6" style={{ background: tema.surface }}>
-            <h2 id="kds-salir-titulo" className="font-display text-[22px] font-bold">{confirmarSalir.titulo}</h2>
-            <p className="mt-2 text-[18px] leading-snug" style={{ color: tema.text2 }}>{confirmarSalir.mensaje}</p>
+            <h2 id="kds-salir-titulo" className="font-display text-24 font-bold">{confirmarSalir.titulo}</h2>
+            <p className="mt-2 text-18 leading-snug" style={{ color: tema.text2 }}>{confirmarSalir.mensaje}</p>
             <div className="mt-6 flex gap-2">
               <button
                 type="button"
                 autoFocus
                 onClick={() => setConfirmandoSalir(false)}
-                className="font-display h-14 flex-1 rounded border text-[18px] font-bold"
+                className="font-display h-14 flex-1 rounded border text-18 font-bold"
                 style={{ borderColor: tema.line, color: tema.text }}
               >
                 Cancelar
@@ -674,7 +674,7 @@ export function PantallaKds({
               <button
                 type="button"
                 onClick={() => { setConfirmandoSalir(false); onSalir(); }}
-                className="font-display h-14 flex-1 rounded bg-[#C0392B] text-[18px] font-bold text-white"
+                className="font-display h-14 flex-1 rounded bg-[#C0392B] text-18 font-bold text-white"
               >
                 {confirmarSalir.boton}
               </button>
@@ -722,7 +722,7 @@ function Tarjeta({
   const origen = c.detalle?.startsWith("Mesa ") && modo === "Mesa" ? c.detalle : [modo, c.detalle].filter(Boolean).join(" · ");
   const etiquetaListo = areaSel === TODAS ? "LISTO" : `LISTO · ${areaSel}`;
   const claseListo =
-    "font-display flex h-16 w-full items-center justify-center rounded-lg bg-[#F0F0EC] text-[22px] font-extrabold tracking-[0.04em] text-[#16161A]";
+    "font-display flex h-16 w-full items-center justify-center rounded-lg bg-[#F0F0EC] text-24 font-extrabold tracking-[0.04em] text-[#16161A]";
 
   return (
     <article
@@ -746,15 +746,15 @@ function Tarjeta({
             etiqueta NUEVA; y TARDE va ENCIMA del reloj, no al lado, para que a 300 px quepan los
             tres sin encimarse. */}
         <div className="flex min-w-0 items-center gap-2 overflow-hidden">
-          <span className="flex-shrink-0 font-display text-[28px] font-extrabold leading-none tabular-nums">#{c.folioCorto}</span>
+          <span className="flex-shrink-0 font-display text-28 font-extrabold leading-none tabular-nums">#{c.folioCorto}</span>
           {nueva && (
-            <span className="min-w-0 truncate rounded-full bg-[#F0F0EC] px-2.5 text-[16px] font-extrabold leading-7 text-[#16161A]">NUEVA</span>
+            <span className="min-w-0 truncate rounded-full bg-[#F0F0EC] px-2.5 text-16 font-extrabold leading-7 text-[#16161A]">NUEVA</span>
           )}
         </div>
         <div className="flex flex-shrink-0 flex-col items-end justify-center">
-          {estado === "tarde" && <span className="font-display text-[16px] font-extrabold leading-none tracking-[0.08em]">TARDE</span>}
+          {estado === "tarde" && <span className="font-display text-16 font-extrabold leading-none tracking-[0.08em]">TARDE</span>}
           <span
-            className={`font-display font-extrabold leading-none tabular-nums ${estado === "tarde" ? "mt-0.5 text-[30px]" : "text-[34px]"}`}
+            className={`font-display font-extrabold leading-none tabular-nums ${estado === "tarde" ? "mt-0.5 text-32" : "text-32"}`}
             style={{ color: f.reloj }}
           >
             {reloj(c.fechaEnvio, ahora)}
@@ -764,11 +764,11 @@ function Tarjeta({
 
       {/* De dónde viene: en su renglón, neutro. En la franja se cortaba en una tarjeta angosta, y
           con color propio Rappi se veía como una comanda tardada. */}
-      <div className="px-[18px] pt-3 text-[18px] font-semibold leading-snug text-[#C8C8CC]">{origen}</div>
+      <div className="px-[18px] pt-3 text-18 font-semibold leading-snug text-[#C8C8CC]">{origen}</div>
 
       {/* Nota de TODA la orden */}
       {c.notaOrden && (
-        <div className="mx-[18px] mt-3 rounded-md bg-[#3A2F12] px-3.5 py-2.5 text-[20px] font-bold leading-snug text-[#F2CB5C]">
+        <div className="mx-[18px] mt-3 rounded-md bg-[#3A2F12] px-3.5 py-2.5 text-20 font-bold leading-snug text-[#F2CB5C]">
           {c.notaOrden}
         </div>
       )}
@@ -778,7 +778,7 @@ function Tarjeta({
         {bloquesDeComanda(c.items).map((b, bi) => (
           <div key={`${b.combo ?? "suelto"}-${bi}`}>
             {b.combo && (
-              <div className="pb-0.5 pt-3.5 text-[16px] font-bold uppercase tracking-[0.06em]" style={{ color: tema.text2 }}>{b.combo}</div>
+              <div className="pb-0.5 pt-3.5 text-16 font-bold uppercase tracking-[0.06em]" style={{ color: tema.text2 }}>{b.combo}</div>
             )}
             {b.items.map((it) => (
               <Renglon key={it.id} it={it} enCombo={b.combo != null} tema={tema} />
@@ -790,7 +790,7 @@ function Tarjeta({
       {/* La orden sigue viva en otras estaciones: que la plancha lo sepa aunque la tarjeta salga
           de su pantalla al marcar LISTO. */}
       {c.otrasPendientes.length > 0 && (
-        <div className="px-[18px] pt-3 text-[18px] font-semibold" style={{ color: tema.text2 }}>
+        <div className="px-[18px] pt-3 text-18 font-semibold" style={{ color: tema.text2 }}>
           Falta en {c.otrasPendientes.join(", ")}
         </div>
       )}
@@ -822,21 +822,21 @@ function Renglon({ it, enCombo, tema }: { it: ItemComanda; enCombo: boolean; tem
     >
       {/* La cantidad solo cuando es más de uno: un "1" de 30 px en cada renglón era ruido. */}
       {it.cantidad > 1 && (
-        <span className="font-display h-9 min-w-12 flex-shrink-0 self-start rounded-md bg-[#F0F0EC] px-2 text-center text-[22px] font-extrabold leading-9 text-[#16161A] tabular-nums">
+        <span className="font-display h-9 min-w-12 flex-shrink-0 self-start rounded-md bg-[#F0F0EC] px-2 text-center text-24 font-extrabold leading-9 text-[#16161A] tabular-nums">
           {it.cantidad}×
         </span>
       )}
       <div className="flex min-w-0 flex-1 flex-col gap-1">
-        <div className={`text-[24px] font-bold leading-tight ${it.listo ? "line-through" : ""}`}>{it.nombre}</div>
-        {it.listo && <div className="text-[18px] font-bold text-[#8FE0AE]">✓ Listo · {it.area ?? SIN_AREA}</div>}
+        <div className={`text-24 font-bold leading-tight ${it.listo ? "line-through" : ""}`}>{it.nombre}</div>
+        {it.listo && <div className="text-18 font-bold text-[#8FE0AE]">✓ Listo · {it.area ?? SIN_AREA}</div>}
         {/* Lo que se QUITA, en negritas y primero: confundirlo con un extra es el error caro. */}
         {it.sin.map((s) => (
-          <div key={`sin-${s}`} className="text-[20px] font-extrabold leading-snug" style={{ color: tema.text }}>{textoSin(s)}</div>
+          <div key={`sin-${s}`} className="text-20 font-extrabold leading-snug" style={{ color: tema.text }}>{textoSin(s)}</div>
         ))}
         {it.modificadores.length > 0 && (
-          <div className="text-[20px] font-medium leading-snug text-[#C8C8CC]">{it.modificadores.join(" · ")}</div>
+          <div className="text-20 font-medium leading-snug text-[#C8C8CC]">{it.modificadores.join(" · ")}</div>
         )}
-        {it.notaCocina && <div className="text-[20px] font-semibold leading-snug text-[#F2CB5C]">“{it.notaCocina}”</div>}
+        {it.notaCocina && <div className="text-20 font-semibold leading-snug text-[#F2CB5C]">“{it.notaCocina}”</div>}
       </div>
     </div>
   );

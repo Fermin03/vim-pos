@@ -29,8 +29,8 @@ export function Bitacora({ api }: { api: Api }) {
     })();
   }, [api]);
 
-  if (error) return <p className="text-[13px] text-danger">{error}</p>;
-  if (!accesos) return <p className="text-[13px] text-ink-3">Cargando…</p>;
+  if (error) return <p className="text-13 text-danger">{error}</p>;
+  if (!accesos) return <p className="text-13 text-ink-3">Cargando…</p>;
 
   const acciones = Array.from(new Set(accesos.map((a) => a.accion))).sort();
   const lista = accesos.filter(
@@ -39,8 +39,8 @@ export function Bitacora({ api }: { api: Api }) {
 
   return (
     <div>
-      <h2 className="mb-1 font-display text-[18px] font-semibold tracking-tight">Bitácora de accesos</h2>
-      <p className="mb-4 text-[12.5px] text-ink-3">
+      <h2 className="mb-1 font-display text-18 font-semibold tracking-tight">Bitácora de accesos</h2>
+      <p className="mb-4 text-13 text-ink-3">
         Toda acción sobre los datos de un cliente queda aquí. Es lo que te permite responder con hechos si alguna vez
         preguntan quién tocó su información.
       </p>
@@ -51,14 +51,14 @@ export function Bitacora({ api }: { api: Api }) {
             {acciones.map((a) => <option key={a} value={a}>{a}</option>)}
           </select>
           <input className={`${input} w-[260px]`} placeholder="Filtrar por empresa…" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Filtrar por empresa" />
-          <span className="self-center text-[12px] text-ink-3">{lista.length} de {accesos.length}</span>
+          <span className="self-center text-12 text-ink-3">{lista.length} de {accesos.length}</span>
         </div>
       )}
       {accesos.length === 0 ? (
-        <p className="text-[13px] text-ink-3">Sin accesos registrados.</p>
+        <p className="text-13 text-ink-3">Sin accesos registrados.</p>
       ) : (
         <div className="overflow-x-auto rounded-lg border border-line bg-surface">
-          <table className="w-full text-[13px]">
+          <table className="w-full text-13">
             <thead className="bg-sel text-ink-3">
               <tr>
                 <th className="p-2.5 text-left font-semibold">Cuándo</th>

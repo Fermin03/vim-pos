@@ -17,7 +17,7 @@ type Modo = "suspender" | "cancelar" | "reactivar" | null;
  */
 export function ZonaPeligrosa({ estado, nombre, bloqueoDesde, accion, busy }: { estado: string; nombre: string; bloqueoDesde: string | null; accion: Accion; busy: boolean }) {
   const [modo, setModo] = useState<Modo>(null);
-  const boton = "btn h-10 rounded px-4 text-[13px] font-semibold text-white disabled:opacity-50";
+  const boton = "btn h-10 rounded px-4 text-13 font-semibold text-white disabled:opacity-50";
   const cerrar = () => setModo(null);
 
   return (
@@ -34,7 +34,7 @@ export function ZonaPeligrosa({ estado, nombre, bloqueoDesde, accion, busy }: { 
         )}
       </div>
       {bloqueoDesde && (
-        <p className="mt-3 text-[12.5px] text-ink-2">
+        <p className="mt-3 text-13 text-ink-2">
           Bloqueo programado: {fechaHoraMx(bloqueoDesde)} (hora de México). Reactivar lo cancela.
         </p>
       )}

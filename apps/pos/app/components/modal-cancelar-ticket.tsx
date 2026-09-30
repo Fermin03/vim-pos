@@ -1,10 +1,11 @@
 "use client";
 import { useState } from "react";
-import { Button, Modal } from "@vim/ui/styles";
+import { DialogoPeligro } from "@vim/ui/styles";
 import { type Empleado } from "../lib/supabase";
 import { cancelarTicket, MOTIVOS_TICKET, type MotivoTicket } from "../lib/cancelacion";
 import { autorizacionPropia, type Autorizacion, type PayloadAutorizacion } from "../lib/autorizacion";
 import { ModalAutorizacionPin } from "./modal-autorizacion-pin";
+import { AvisoAutorizacion, MotivoChips } from "./motivo-y-autorizacion";
 import { fmtMxn } from "../lib/turno";
 
 /** Roles con `venta.cancelar_abierta` por defecto (matriz §2.2). */
@@ -133,75 +134,22 @@ export function ModalCancelarTicket({
     );
   }
 
-  const input =
-    "h-11 w-full rounded border border-line-strong px-3 text-sm outline-none focus:border-ink focus:shadow-[0_0_0_3px_rgba(22,22,26,.06)]";
-
   return (
-    <Modal
-      open
-      onClose={onCerrar}
-      title="Cancelar ticket"
-      hideTitle
-      className="w-[480px] rounded-lg border border-line bg-surface p-6 shadow-[0_18px_44px_rgba(22,22,26,.18)]"
+    <DialogoPeligro
+      titulo={pagada ? "Cancelar folio" : "Cancelar ticket"}
+      contexto={`${folio ? `${folio} · ` : ""}${fmtMxn(totalActual)}`}
+      consecuencia={pagada
+        ? <>Se registra una <b className="text-ink">devolución total</b> (el dinero se devuelve) y la cuenta queda cancelada. <b className="text-ink">No se puede deshacer.</b> El inventario regresa al stock.</>
+        : <>Se cancela el ticket completo. <b className="text-ink">No se puede deshacer.</b> El inventario regresa al stock.</>}
+      error={error}
+      boton={pagada ? "Cancelar folio" : "Cancelar ticket"}
+      ocupado={procesando}
+      textoOcupado="Cancelando…"
+      onConfirmar={() => void onConfirmar()}
+      onCerrar={onCerrar}
     >
-      <div className="mb-5">
-        <h2 className="font-display text-xl font-semibold tracking-tight">{pagada ? "Cancelar folio" : "Cancelar ticket"}</h2>
-        <p className="mt-0.5 text-[13px] text-ink-3">
-          {folio ? `${folio} · ` : ""}{fmtMxn(totalActual)}
-        </p>
-      </div>
-
-      <div className="mb-4 rounded border border-[#E8DCC0] bg-warning-soft px-3 py-2 text-[12.5px] font-medium text-warning">
-        {pagada
-          ? <>Cancela el folio <b>pagado</b>: se registra una <b>devolución total</b> (el dinero se devuelve) y la cuenta queda cancelada. Es <b>irreversible</b>. El inventario regresa al stock.</>
-          : <>Esta acción cancela el ticket completo. Es <b>irreversible</b>. El inventario regresa al stock.</>}
-      </div>
-
-      <div className="mb-1.5 text-[13px] font-medium text-ink-2">Motivo</div>
-      <div className="mb-3 flex flex-wrap gap-2">
-        {MOTIVOS_TICKET.map((m) => (
-          <button
-            key={m.codigo}
-            type="button"
-            onClick={() => setMotivo(m.codigo)}
-            className={[
-              "rounded-full border px-3 py-1.5 text-[12.5px] font-semibold transition",
-              motivo === m.codigo ? "border-ink bg-ink text-white" : "border-line-strong text-ink-2 hover:border-ink",
-            ].join(" ")}
-          >
-            {m.label}
-          </button>
-        ))}
-      </div>
-      {motivo === "OTRO" && (
-        <input
-          className={`${input} mb-3`}
-          value={motivoTexto}
-          maxLength={200}
-          onChange={(e) => setMotivoTexto(e.target.value)}
-          placeholder="Describe el motivo"
-        />
-      )}
-
-      <div
-        className={[
-          "mb-4 rounded border px-3 py-2 text-[12.5px] font-medium",
-          tienePermisoRol
-            ? "border-[#D6E8DD] bg-success-soft text-success"
-            : "border-[#E8DCC0] bg-warning-soft text-warning",
-        ].join(" ")}
-      >
-        {tienePermisoRol ? "Dentro de tu rol · no requiere autorización." : "Requiere PIN de un supervisor."}
-      </div>
-
-      {error && <p className="mb-3 text-sm font-medium text-danger" role="alert">{error}</p>}
-
-      <div className="flex items-center justify-end gap-2">
-        <Button variant="ghost" onClick={onCerrar} disabled={procesando}>Volver</Button>
-        <Button variant="danger" onClick={onConfirmar} disabled={procesando}>
-          {procesando ? "Cancelando…" : pagada ? "Cancelar folio" : "Cancelar ticket"}
-        </Button>
-      </div>
-    </Modal>
+      <MotivoChips opciones={MOTIVOS_TICKET} valor={motivo} onCambiar={setMotivo} texto={motivoTexto} onTexto={setMotivoTexto} />
+      <AvisoAutorizacion propia={tienePermisoRol} />
+    </DialogoPeligro>
   );
 }

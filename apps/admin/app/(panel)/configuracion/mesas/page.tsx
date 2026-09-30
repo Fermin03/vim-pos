@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { Button, Modal } from "@vim/ui/styles";
+import { Button, DialogoPeligro, Modal } from "@vim/ui/styles";
 import { PageHeader, PageBody } from "../../../components/page-header";
 import {
   actualizarMesa,
@@ -19,7 +19,7 @@ import {
 import { mensajeError } from "../../../lib/errores";
 
 const input = "h-11 w-full rounded border border-line-strong px-3 text-sm outline-none focus:border-ink focus:shadow-[0_0_0_3px_rgba(22,22,26,.06)]";
-const label = "mb-1.5 block text-[13px] font-medium text-ink-2";
+const label = "mb-1.5 block text-13 font-medium text-ink-2";
 
 type FormDatos = { sucursal_id: string; numero: string; nombre: string; capacidad: string; forma: FormaMesa };
 
@@ -107,7 +107,7 @@ export default function MesasPage() {
 
         {/* Sin sucursal, el botón de alta salía deshabilitado sin decir por qué. */}
         {mesas !== null && sucursales.length === 0 && (
-          <p className="mb-5 rounded-lg border border-[#E8DCC0] bg-warning-soft px-4 py-3 text-[13.5px] font-medium text-warning">
+          <p className="mb-5 rounded-lg border border-warning-line bg-warning-soft px-4 py-3 text-14 font-medium text-warning">
             Primero da de alta tu caja: con ella se crea tu sucursal.{" "}
             <Link href="/configuracion/cajas" className="font-semibold underline underline-offset-2">Ir a Cajas</Link>
           </p>
@@ -125,9 +125,9 @@ export default function MesasPage() {
           <div className="flex flex-col gap-6">
             {grupos.map((g) => (
               <div key={g.nombre} className="tabla-caja overflow-hidden rounded-lg border border-line bg-surface">
-                <div className="border-b border-line bg-sel px-4 py-2.5"><h2 className="font-display text-[14px] font-semibold">{g.nombre}</h2></div>
-                <table className="w-full border-collapse text-[13.5px]">
-                  <thead><tr className="text-left text-[11.5px] font-bold uppercase tracking-wide text-ink-3">
+                <div className="border-b border-line bg-sel px-4 py-2.5"><h2 className="font-display text-14 font-semibold">{g.nombre}</h2></div>
+                <table className="w-full border-collapse text-14">
+                  <thead><tr className="text-left text-12 font-bold uppercase tracking-wide text-ink-3">
                     <th className="w-[90px] border-b border-line px-4 py-[11px]">N°</th>
                     <th className="border-b border-line px-4 py-[11px]">Nombre</th>
                     <th className="w-[110px] border-b border-line px-4 py-[11px]">Capacidad</th>
@@ -138,17 +138,17 @@ export default function MesasPage() {
                   <tbody>
                     {g.mesas.map((m) => (
                       <tr key={m.id} className="group border-b border-line last:border-none hover:bg-hover">
-                        <td className="px-4 py-3 font-display text-[14px] font-bold tabular-nums">{m.numero}</td>
+                        <td className="px-4 py-3 font-display text-14 font-bold tabular-nums">{m.numero}</td>
                         <td className="px-4 py-3">{m.nombre || <span className="text-ink-3">—</span>}</td>
                         <td className="px-4 py-3 tabular-nums">{m.capacidad} <span className="text-ink-3">pers.</span></td>
                         <td className="px-4 py-3">{FORMAS.find((f) => f.v === m.forma)?.l ?? m.forma}</td>
-                        <td className="px-4 py-3"><span className={`rounded-full px-2.5 py-1 text-[12px] font-semibold ${COLOR_ESTADO[m.estado] ?? "bg-hover text-ink-3"}`}>{ESTADO_LABEL[m.estado]}</span></td>
+                        <td className="px-4 py-3"><span className={`rounded-full px-2.5 py-1 text-12 font-semibold ${COLOR_ESTADO[m.estado] ?? "bg-hover text-ink-3"}`}>{ESTADO_LABEL[m.estado]}</span></td>
                         <td className="px-4 py-3 text-right" onClick={(e) => e.stopPropagation()}>
                           <span className="inline-flex gap-1">
                             <button type="button" title="Editar" onClick={() => editar(m)} className="flex h-10 w-10 items-center justify-center rounded border border-transparent lg:h-8 lg:w-8 text-ink-3 transition hover:border-line-strong hover:bg-surface hover:text-ink">
                               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-4 w-4"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" /><path d="M18.5 2.5a2.1 2.1 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" /></svg>
                             </button>
-                            <button type="button" title="Eliminar" disabled={m.estado === "OCUPADA"} onClick={() => setBorrar(m)} className="flex h-10 w-10 items-center justify-center rounded border border-transparent lg:h-8 lg:w-8 text-ink-3 transition hover:border-[#E8C5C0] hover:text-danger disabled:cursor-not-allowed disabled:opacity-30">
+                            <button type="button" title="Eliminar" disabled={m.estado === "OCUPADA"} onClick={() => setBorrar(m)} className="flex h-10 w-10 items-center justify-center rounded border border-transparent lg:h-8 lg:w-8 text-ink-3 transition hover:border-danger-line hover:text-danger disabled:cursor-not-allowed disabled:opacity-30">
                               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-4 w-4"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" /></svg>
                             </button>
                           </span>
@@ -202,13 +202,21 @@ export default function MesasPage() {
       )}
 
       {borrar && (
-        <Modal open onClose={() => setBorrar(null)} title="Eliminar mesa" className="w-full max-w-[400px] rounded-lg border border-line bg-surface p-6 shadow-xl">
-          <p className="text-sm text-ink-2">¿Eliminar la <b className="text-ink">Mesa {borrar.numero}</b>?</p>
-          <div className="mt-6 flex justify-end gap-2">
-            <Button variant="ghost" onClick={() => setBorrar(null)} disabled={guardando}>Cancelar</Button>
-            <Button variant="danger" onClick={confirmarBorrado} disabled={guardando}>{guardando ? "Eliminando…" : "Eliminar"}</Button>
-          </div>
-        </Modal>
+        <DialogoPeligro
+          error={error}
+          titulo="¿Eliminar esta mesa?"
+          consecuencia={
+            <>
+              Se elimina la <b className="text-ink">Mesa {borrar.numero}</b>.
+            </>
+          }
+          boton="Eliminar"
+          ocupado={guardando}
+          textoOcupado="Eliminando…"
+          ancho="sm"
+          onConfirmar={confirmarBorrado}
+          onCerrar={() => setBorrar(null)}
+        />
       )}
     </>
   );

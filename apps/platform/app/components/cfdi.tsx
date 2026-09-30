@@ -82,22 +82,22 @@ export function Cfdi({ api, onAbrirEmpresa }: { api: Api; onAbrirEmpresa: (id: s
     void cargar();
   }, [cargar]);
 
-  if (error) return <p className="text-[13px] text-danger">{error}</p>;
-  if (!clientes) return <p className="text-[13px] text-ink-3">Cargando…</p>;
+  if (error) return <p className="text-13 text-danger">{error}</p>;
+  if (!clientes) return <p className="text-13 text-ink-3">Cargando…</p>;
 
   return (
     <div>
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h2 className="font-display text-[18px] font-semibold tracking-tight">Facturación electrónica</h2>
-          <p className="mt-0.5 text-[13px] text-ink-3">
+          <h2 className="font-display text-18 font-semibold tracking-tight">Facturación electrónica</h2>
+          <p className="mt-0.5 text-13 text-ink-3">
             Clientes con el add-on CFDI contratado. Ordenados por quién necesita folios antes.
           </p>
         </div>
         <button
           type="button"
           onClick={() => void cargar()}
-          className="h-9 rounded border border-line-strong px-3 text-[12.5px] font-semibold text-ink-2 transition hover:border-ink hover:text-ink"
+          className="h-9 rounded border border-line-strong px-3 text-13 font-semibold text-ink-2 transition hover:border-ink hover:text-ink"
         >
           Actualizar
         </button>
@@ -119,15 +119,15 @@ export function Cfdi({ api, onAbrirEmpresa }: { api: Api; onAbrirEmpresa: (id: s
 
       {clientes.length === 0 ? (
         <div className="rounded-lg border border-line bg-surface p-10 text-center">
-          <div className="font-display text-[17px] font-semibold">Todavía nadie tiene CFDI contratado</div>
-          <p className="mt-1 text-[13px] text-ink-3">
+          <div className="font-display text-18 font-semibold">Todavía nadie tiene CFDI contratado</div>
+          <p className="mt-1 text-13 text-ink-3">
             El add-on se da de alta desde la ficha de cada cliente, en Clientes.
           </p>
         </div>
       ) : (
         <div className="overflow-x-auto rounded-lg border border-line bg-surface">
-          <table className="w-full text-[13px]">
-            <thead className="border-b border-line bg-bg text-[11.5px] uppercase tracking-wide text-ink-3">
+          <table className="w-full text-13">
+            <thead className="border-b border-line bg-bg text-12 uppercase tracking-wide text-ink-3">
               <tr>
                 <th className="px-4 py-2.5 text-left font-bold">Cliente</th>
                 <th className="px-4 py-2.5 text-right font-bold">Folios</th>
@@ -163,11 +163,11 @@ export function Cfdi({ api, onAbrirEmpresa }: { api: Api; onAbrirEmpresa: (id: s
 function Dato({ titulo, valor, sub, alerta }: { titulo: string; valor: string; sub?: string; alerta?: boolean }) {
   return (
     <div className={["rounded-lg border bg-surface p-4", alerta ? "border-danger/30" : "border-line"].join(" ")}>
-      <div className="text-[11.5px] font-bold uppercase tracking-wide text-ink-3">{titulo}</div>
-      <div className={["font-display mt-1 text-[24px] font-bold tabular-nums", alerta ? "text-danger" : ""].join(" ")}>
+      <div className="text-12 font-bold uppercase tracking-wide text-ink-3">{titulo}</div>
+      <div className={["font-display mt-1 text-24 font-bold tabular-nums", alerta ? "text-danger" : ""].join(" ")}>
         {valor}
       </div>
-      {sub && <div className="mt-0.5 text-[12px] text-ink-3">{sub}</div>}
+      {sub && <div className="mt-0.5 text-12 text-ink-3">{sub}</div>}
     </div>
   );
 }
@@ -222,19 +222,19 @@ function FilaCliente({
           >
             {c.nombre}
           </button>
-          <div className="mt-0.5 flex items-center gap-2 text-[12px] text-ink-3">
+          <div className="mt-0.5 flex items-center gap-2 text-12 text-ink-3">
             <span>{c.codigo}</span>
             {c.estadoTenant !== "ACTIVO" && (
-              <span className="rounded bg-sel px-1.5 py-0.5 text-[11px] font-semibold text-ink-3">{c.estadoTenant}</span>
+              <span className="rounded bg-sel px-1.5 py-0.5 text-11 font-semibold text-ink-3">{c.estadoTenant}</span>
             )}
           </div>
         </td>
         <td className="px-4 py-3 text-right">
           <div className="flex items-center justify-end gap-2">
-            <span className="font-display text-[17px] font-bold tabular-nums">{fmtInt(c.disponibles)}</span>
+            <span className="font-display text-18 font-bold tabular-nums">{fmtInt(c.disponibles)}</span>
             <StatusChip tone={nivel.tono}>{nivel.texto}</StatusChip>
           </div>
-          <div className="mt-0.5 text-[12px] tabular-nums text-ink-3">
+          <div className="mt-0.5 text-12 tabular-nums text-ink-3">
             {fmtInt(c.baseRestante)} del plan · {fmtInt(c.paquetes)} prepagados
           </div>
         </td>
@@ -243,7 +243,7 @@ function FilaCliente({
           {c.ultimaRecarga ? (
             <>
               <div className="tabular-nums">{fechaCorta(c.ultimaRecarga.fecha)}</div>
-              <div className="text-[12px] text-ink-3">
+              <div className="text-12 text-ink-3">
                 +{fmtInt(c.ultimaRecarga.cantidad)} · {hace(c.ultimaRecarga.fecha)}
               </div>
             </>
@@ -256,7 +256,7 @@ function FilaCliente({
           <button
             type="button"
             onClick={onAlternar}
-            className="h-8 rounded border border-line-strong px-2.5 text-[12px] font-semibold text-ink-2 transition hover:border-ink hover:text-ink"
+            className="h-8 rounded border border-line-strong px-2.5 text-12 font-semibold text-ink-2 transition hover:border-ink hover:text-ink"
           >
             {abierta ? "Cerrar" : "Gestionar"}
           </button>
@@ -265,7 +265,7 @@ function FilaCliente({
 
       {c.sinFilaDeSaldo && (
         <tr className="border-b border-line">
-          <td colSpan={6} className="bg-danger-soft px-4 py-2 text-[12.5px] text-danger">
+          <td colSpan={6} className="bg-danger-soft px-4 py-2 text-13 text-danger">
             Este cliente paga el add-on pero no tiene registro de saldo de folios, así que no puede
             timbrar nada. Acredítale un paquete aquí para crearlo.
           </td>
@@ -277,12 +277,12 @@ function FilaCliente({
           <td colSpan={6} className="bg-bg px-4 py-4">
             <div className="grid gap-4 lg:grid-cols-2">
               <div className="rounded-lg border border-line bg-surface p-4">
-                <div className="text-[11.5px] font-bold uppercase tracking-wide text-ink-3">Acreditar folios</div>
+                <div className="text-12 font-bold uppercase tracking-wide text-ink-3">Acreditar folios</div>
                 <div className="mt-3 flex flex-wrap items-center gap-2">
                   <select
                     value={paqueteId}
                     onChange={(e) => setPaqueteId(e.target.value)}
-                    className="h-9 rounded border border-line-strong px-2 text-[12.5px] outline-none focus:border-ink"
+                    className="h-9 rounded border border-line-strong px-2 text-13 outline-none focus:border-ink"
                   >
                     <option value="">Elige un paquete…</option>
                     {paquetes.map((p) => (
@@ -302,7 +302,7 @@ function FilaCliente({
                       );
                       setPaqueteId("");
                     }}
-                    className="h-9 rounded bg-ink px-3 text-[12.5px] font-semibold text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
+                    className="h-9 rounded bg-ink px-3 text-13 font-semibold text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
                   >
                     Acreditar
                   </button>
@@ -312,13 +312,13 @@ function FilaCliente({
                     corrección. Mezclarlos en un solo campo hace que el histórico deje de
                     distinguir lo que se cobró de lo que se regaló. */}
                 <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-line pt-3">
-                  <span className="text-[12px] text-ink-3">Ajuste manual</span>
+                  <span className="text-12 text-ink-3">Ajuste manual</span>
                   <input
                     type="number"
                     value={manual}
                     onChange={(e) => setManual(e.target.value)}
                     placeholder="ej. 50"
-                    className="h-9 w-28 rounded border border-line-strong px-2 text-[12.5px] tabular-nums outline-none focus:border-ink"
+                    className="h-9 w-28 rounded border border-line-strong px-2 text-13 tabular-nums outline-none focus:border-ink"
                   />
                   <button
                     type="button"
@@ -330,17 +330,17 @@ function FilaCliente({
                       );
                       setManual("");
                     }}
-                    className="h-9 rounded border border-line-strong px-3 text-[12.5px] font-semibold text-ink-2 transition hover:border-ink hover:text-ink disabled:cursor-not-allowed disabled:opacity-40"
+                    className="h-9 rounded border border-line-strong px-3 text-13 font-semibold text-ink-2 transition hover:border-ink hover:text-ink disabled:cursor-not-allowed disabled:opacity-40"
                   >
                     Aplicar
                   </button>
-                  <span className="text-[12px] text-ink-3">En negativo, resta.</span>
+                  <span className="text-12 text-ink-3">En negativo, resta.</span>
                 </div>
               </div>
 
               <div className="rounded-lg border border-line bg-surface p-4">
-                <div className="text-[11.5px] font-bold uppercase tracking-wide text-ink-3">Estado del servicio</div>
-                <dl className="mt-3 space-y-1.5 text-[12.5px]">
+                <div className="text-12 font-bold uppercase tracking-wide text-ink-3">Estado del servicio</div>
+                <dl className="mt-3 space-y-1.5 text-13">
                   <Renglon k="Base del plan" v={`${fmtInt(c.baseConsumidos)} de ${fmtInt(c.baseMensual)} usados`} />
                   <Renglon k="Periodo" v={c.periodo ?? "—"} />
                   <Renglon k="Avisa cuando queden" v={`${fmtInt(c.umbral)} folios`} />
@@ -350,7 +350,7 @@ function FilaCliente({
                 <div className="mt-4 border-t border-line pt-3">
                   {confirmarBaja ? (
                     <div className="flex flex-wrap items-center gap-2">
-                      <span className="text-[12.5px] font-medium text-danger">
+                      <span className="text-13 font-medium text-danger">
                         ¿Dar de baja el CFDI de {c.nombre}? Dejará de poder facturar.
                       </span>
                       <button
@@ -360,14 +360,14 @@ function FilaCliente({
                           void accion({ accion: "addon_desactivar", addon_codigo: "CFDI" }, "Add-on CFDI dado de baja.");
                           setConfirmarBaja(false);
                         }}
-                        className="h-8 rounded bg-danger px-3 text-[12px] font-semibold text-white transition hover:opacity-90 disabled:opacity-40"
+                        className="h-8 rounded bg-danger px-3 text-12 font-semibold text-white transition hover:opacity-90 disabled:opacity-40"
                       >
                         Sí, dar de baja
                       </button>
                       <button
                         type="button"
                         onClick={() => setConfirmarBaja(false)}
-                        className="h-8 rounded border border-line-strong px-3 text-[12px] font-semibold text-ink-2"
+                        className="h-8 rounded border border-line-strong px-3 text-12 font-semibold text-ink-2"
                       >
                         Cancelar
                       </button>
@@ -376,7 +376,7 @@ function FilaCliente({
                     <button
                       type="button"
                       onClick={() => setConfirmarBaja(true)}
-                      className="h-8 rounded border border-danger/40 px-3 text-[12px] font-semibold text-danger transition hover:bg-danger-soft"
+                      className="h-8 rounded border border-danger/40 px-3 text-12 font-semibold text-danger transition hover:bg-danger-soft"
                     >
                       Desactivar facturación
                     </button>
@@ -384,7 +384,7 @@ function FilaCliente({
                 </div>
               </div>
             </div>
-            {aviso && <p className="mt-3 text-[12.5px] font-medium text-ink-2">{aviso}</p>}
+            {aviso && <p className="mt-3 text-13 font-medium text-ink-2">{aviso}</p>}
           </td>
         </tr>
       )}
@@ -416,13 +416,13 @@ function Renglon({ k, v }: { k: string; v: string }) {
 function PerfilPac() {
   return (
     <div className="mt-4 rounded-lg border border-line bg-surface p-4">
-      <div className="text-[11.5px] font-bold uppercase tracking-wide text-ink-3">Timbres en la cuenta del PAC</div>
-      <p className="mt-2 max-w-[70ch] text-[13px] text-ink-2">
+      <div className="text-12 font-bold uppercase tracking-wide text-ink-3">Timbres en la cuenta del PAC</div>
+      <p className="mt-2 max-w-[70ch] text-13 text-ink-2">
         Este es el inventario propio de VIM, del que salen los folios de todos los clientes de
         arriba. El saldo de la cuenta de Facturama todavía no se lee desde aquí, y no se pone un
         número inventado: es justo el dato con el que se decide si hay que recargar.
       </p>
-      <p className="mt-2 text-[12.5px] text-ink-3">Mientras tanto, se consulta en el portal de Facturama.</p>
+      <p className="mt-2 text-13 text-ink-3">Mientras tanto, se consulta en el portal de Facturama.</p>
     </div>
   );
 }

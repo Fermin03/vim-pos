@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { Button } from "@vim/ui/styles";
 
 const input =
-  "h-12 w-full rounded border border-line-strong px-3 text-[15px] outline-none focus:border-ink focus:shadow-[0_0_0_3px_rgba(22,22,26,.06)]";
+  "h-12 w-full rounded border border-line-strong px-3 text-15 outline-none focus:border-ink focus:shadow-[0_0_0_3px_rgba(22,22,26,.06)]";
 
 /**
  * Pide un nombre para identificar la cuenta (Pick-up).
@@ -41,8 +41,8 @@ export function ModalNombreCuenta({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" role="dialog" aria-modal="true">
       <div className="w-full max-w-[420px] rounded-lg bg-surface p-5 shadow-lg">
-        <h2 className="font-display text-[17px] font-bold">¿A nombre de quién?</h2>
-        <p className="mt-1 text-[12.5px] text-ink-3">Para identificar el pedido al recogerlo.</p>
+        <h2 className="font-display text-18 font-bold">¿A nombre de quién?</h2>
+        <p className="mt-1 text-13 text-ink-3">Para identificar el pedido al recogerlo.</p>
         <input
           ref={campo}
           className={`${input} mt-3`}
@@ -61,7 +61,7 @@ export function ModalNombreCuenta({
           <button
             type="button"
             onClick={onOmitir}
-            className="h-10 rounded border border-line-strong px-4 text-[13.5px] font-semibold text-ink-2 transition hover:border-ink hover:text-ink"
+            className="h-10 rounded border border-line-strong px-4 text-14 font-semibold text-ink-2 transition hover:border-ink hover:text-ink"
           >
             Omitir
           </button>

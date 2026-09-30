@@ -77,8 +77,8 @@ export function AsignacionMasivaGrupo({ grupoId, grupoNombre }: { grupoId: strin
 
   return (
     <section className="mt-6 rounded-lg border border-line bg-surface p-5">
-      <h2 className="font-display text-[16px] font-semibold tracking-tight">Asignar a productos</h2>
-      <p className="mb-4 text-[12.5px] text-ink-3">
+      <h2 className="font-display text-16 font-semibold tracking-tight">Asignar a productos</h2>
+      <p className="mb-4 text-13 text-ink-3">
         Selecciona productos (filtra por categoría o busca) y asigna este grupo en masa. Los que ya lo tienen aparecen marcados con la etiqueta.
       </p>
 
@@ -86,7 +86,7 @@ export function AsignacionMasivaGrupo({ grupoId, grupoNombre }: { grupoId: strin
         <select
           value={cat}
           onChange={(e) => setCat(e.target.value)}
-          className="h-10 rounded border border-line-strong bg-surface px-3 text-[13px] outline-none focus:border-ink"
+          className="h-10 rounded border border-line-strong bg-surface px-3 text-13 outline-none focus:border-ink"
         >
           <option value="__todas__">Todas las categorías</option>
           {categorias.map(([id, nombre]) => <option key={id} value={id}>{nombre}</option>)}
@@ -95,12 +95,12 @@ export function AsignacionMasivaGrupo({ grupoId, grupoNombre }: { grupoId: strin
           value={q}
           onChange={(e) => setQ(e.target.value)}
           placeholder="Buscar producto…"
-          className="h-10 w-56 rounded border border-line-strong px-3 text-[13px] outline-none focus:border-ink"
+          className="h-10 w-56 rounded border border-line-strong px-3 text-13 outline-none focus:border-ink"
         />
-        <button type="button" onClick={toggleTodasVisibles} className="rounded border border-line-strong px-3 py-2 text-[12.5px] font-semibold text-ink-2 transition hover:border-ink hover:text-ink">
+        <button type="button" onClick={toggleTodasVisibles} className="rounded border border-line-strong px-3 py-2 text-13 font-semibold text-ink-2 transition hover:border-ink hover:text-ink">
           {todasVisiblesSel ? "Deseleccionar visibles" : `Seleccionar visibles (${visibles.length})`}
         </button>
-        <span className="ml-auto text-[12.5px] font-semibold text-ink-3">{sel.size} seleccionados</span>
+        <span className="ml-auto text-13 font-semibold text-ink-3">{sel.size} seleccionados</span>
       </div>
 
       {error && <p className="mb-3 text-sm font-medium text-danger" role="alert">{error}</p>}
@@ -109,7 +109,7 @@ export function AsignacionMasivaGrupo({ grupoId, grupoNombre }: { grupoId: strin
 
       {productos !== null && (
         <div className="max-h-[360px] overflow-y-auto rounded border border-line">
-          {visibles.length === 0 && <p className="px-4 py-6 text-center text-[13px] text-ink-3">Sin productos con ese filtro.</p>}
+          {visibles.length === 0 && <p className="px-4 py-6 text-center text-13 text-ink-3">Sin productos con ese filtro.</p>}
           {visibles.map((p) => (
             <label key={p.id} className="flex cursor-pointer items-center gap-3 border-b border-line px-3.5 py-2 last:border-b-0 hover:bg-hover">
               <input
@@ -122,10 +122,10 @@ export function AsignacionMasivaGrupo({ grupoId, grupoNombre }: { grupoId: strin
                 }}
                 className="h-4 w-4 accent-ink"
               />
-              <span className="min-w-0 flex-1 truncate text-[13.5px] font-medium">{p.nombre}</span>
-              <span className="text-[11.5px] text-ink-3">{p.categoriaNombre}</span>
+              <span className="min-w-0 flex-1 truncate text-14 font-medium">{p.nombre}</span>
+              <span className="text-12 text-ink-3">{p.categoriaNombre}</span>
               {conGrupo.has(p.id) && (
-                <span className="rounded-full bg-success-soft px-2 py-0.5 text-[10.5px] font-bold text-success">Ya lo tiene</span>
+                <span className="rounded-full bg-success-soft px-2 py-0.5 text-11 font-bold text-success">Ya lo tiene</span>
               )}
             </label>
           ))}

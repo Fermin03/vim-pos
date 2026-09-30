@@ -54,23 +54,23 @@ export function PantallaBloqueada({
   return (
     <main className="flex h-screen flex-col items-center justify-center gap-4 bg-sel px-8 text-center">
       <LogoVim className="h-12 w-12" />
-      {negocio && <div className="font-display text-[15px] font-semibold text-ink-2">{negocio}</div>}
-      <h1 className="font-display text-[26px] font-bold tracking-tight text-danger">
+      {negocio && <div className="font-display text-15 font-semibold text-ink-2">{negocio}</div>}
+      <h1 className="font-display text-28 font-bold tracking-tight text-danger">
         {porVersion ? "Actualiza para seguir vendiendo" : "Esta caja no puede vender"}
       </h1>
-      <p className="max-w-md text-[15px] leading-relaxed text-ink-2">{mensaje}</p>
+      <p className="max-w-md text-15 leading-relaxed text-ink-2">{mensaje}</p>
 
       {porVersion && (
         <>
           <button
             onClick={actualizar}
             disabled={estado === "buscando"}
-            className="btn mt-1 h-12 rounded bg-accent px-6 text-[15px] font-semibold text-white hover:bg-accent-hover disabled:opacity-60"
+            className="btn mt-1 h-12 rounded bg-accent px-6 text-15 font-semibold text-white hover:bg-accent-hover disabled:opacity-60"
           >
             {estado === "buscando" ? "Buscando la actualización…" : "Instalar la actualización"}
           </button>
-          {detalle && <p className="max-w-md text-[13px] text-danger">{detalle}</p>}
-          <p className="max-w-md text-[12.5px] text-ink-3">
+          {detalle && <p className="max-w-md text-13 text-danger">{detalle}</p>}
+          <p className="max-w-md text-13 text-ink-3">
             VIM POS se cerrará para instalar y volverá a abrirse solo. No pierdes nada de lo que
             ya cobraste.
           </p>
@@ -78,10 +78,10 @@ export function PantallaBloqueada({
       )}
 
       <div className="mt-2 rounded-lg border border-line-strong bg-surface px-5 py-3">
-        <div className="text-[12px] font-bold uppercase tracking-wide text-ink-3">Llama a VIM</div>
-        <div className="font-display text-[20px] font-bold tabular-nums">{TELEFONO_SOPORTE}</div>
+        <div className="text-12 font-bold uppercase tracking-wide text-ink-3">Llama a VIM</div>
+        <div className="font-display text-20 font-bold tabular-nums">{TELEFONO_SOPORTE}</div>
       </div>
-      <p className="max-w-md text-[12.5px] text-ink-3">
+      <p className="max-w-md text-13 text-ink-3">
         Tus ventas anteriores están a salvo y se siguen respaldando en la nube.
       </p>
     </main>

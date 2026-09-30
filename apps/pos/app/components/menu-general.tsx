@@ -88,7 +88,7 @@ export function MenuGeneral({
       <div className="flex h-[68px] flex-shrink-0 items-center justify-between border-b border-line px-8">
         <div className="flex items-center gap-3">
           <LogoVim className="h-[34px] w-[34px]" />
-          <span className="font-display text-[17px] font-semibold tracking-tight">Menú</span>
+          <span className="font-display text-18 font-semibold tracking-tight">Menú</span>
         </div>
         <button
           type="button"
@@ -135,7 +135,7 @@ export function MenuGeneral({
             )}
             <TileMenu label="Cerrar turno" onClick={con(onCerrarTurno)} peligro icon={<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" className="h-8 w-8"><path d="M9 11l3 3L22 4" /><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" /></svg>} />
           </SeccionMenu>
-          {avisoUpd && <p className="-mt-4 text-[13px] font-medium text-ink-2" role="status">{avisoUpd}</p>}
+          {avisoUpd && <p className="-mt-4 text-13 font-medium text-ink-2" role="status">{avisoUpd}</p>}
         </div>
       </div>
     </div>
@@ -152,10 +152,10 @@ function TileMenu({ icon, label, onClick, peligro, badge }: { icon: ReactNode; l
       className={`relative flex min-h-[140px] flex-col items-center justify-center gap-4 rounded-2xl border p-6 transition ${peligro ? "border-danger/30 text-danger hover:border-danger hover:bg-danger/[0.06]" : "border-line-strong text-ink-2 hover:border-ink hover:bg-hover hover:text-ink"}`}
     >
       {badge != null && badge > 0 && (
-        <span className="absolute right-3 top-3 flex h-[22px] min-w-[22px] items-center justify-center rounded-full bg-accent px-1.5 text-[12px] font-bold text-white">{badge}</span>
+        <span className="absolute right-3 top-3 flex h-[22px] min-w-[22px] items-center justify-center rounded-full bg-accent px-1.5 text-12 font-bold text-white">{badge}</span>
       )}
       <span className="flex h-10 w-10 items-center justify-center">{icon}</span>
-      <span className="text-center text-[14.5px] font-semibold leading-tight">{label}</span>
+      <span className="text-center text-15 font-semibold leading-tight">{label}</span>
     </button>
   );
 }
@@ -163,7 +163,7 @@ function TileMenu({ icon, label, onClick, peligro, badge }: { icon: ReactNode; l
 function SeccionMenu({ titulo, children }: { titulo: string; children: ReactNode }) {
   return (
     <section>
-      <h3 className="mb-3.5 text-[12px] font-semibold uppercase tracking-[0.06em] text-ink-3">{titulo}</h3>
+      <h3 className="mb-3.5 text-12 font-semibold uppercase tracking-[0.06em] text-ink-3">{titulo}</h3>
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">{children}</div>
     </section>
   );

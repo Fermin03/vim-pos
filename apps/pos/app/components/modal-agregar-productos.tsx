@@ -184,7 +184,7 @@ export function ModalAgregarProductos({
         <button
           type="button"
           onClick={() => onCerrar(false)}
-          className="flex h-10 flex-shrink-0 items-center gap-2 rounded border border-line-strong px-3 text-[13.5px] font-semibold text-ink transition hover:border-ink hover:bg-hover"
+          className="flex h-10 flex-shrink-0 items-center gap-2 rounded border border-line-strong px-3 text-14 font-semibold text-ink transition hover:border-ink hover:bg-hover"
         >
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4" aria-hidden="true">
             <path d="M19 12H5M12 19l-7-7 7-7" />
@@ -194,7 +194,7 @@ export function ModalAgregarProductos({
       </div>
 
       {error && (
-        <p className="flex-shrink-0 bg-danger-soft px-4 py-2 text-[13px] font-medium text-danger" role="alert">
+        <p className="flex-shrink-0 bg-danger-soft px-4 py-2 text-13 font-medium text-danger" role="alert">
           {error}
         </p>
       )}

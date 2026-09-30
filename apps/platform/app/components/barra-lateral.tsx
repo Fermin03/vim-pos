@@ -27,11 +27,11 @@ export function InsigniaEntorno() {
   }, []);
   if (local === null) return null;
   return local ? (
-    <span className="rounded bg-warning-soft px-2 py-0.5 text-[11.5px] font-bold uppercase tracking-wide text-warning" title="En localhost el panel lee la base de desarrollo">
+    <span className="rounded bg-warning-soft px-2 py-0.5 text-12 font-bold uppercase tracking-wide text-warning" title="En localhost el panel lee la base de desarrollo">
       Local
     </span>
   ) : (
-    <span className="rounded bg-danger-soft px-2 py-0.5 text-[11.5px] font-bold uppercase tracking-wide text-danger" title="Estás cambiando datos reales de clientes">
+    <span className="rounded bg-danger-soft px-2 py-0.5 text-12 font-bold uppercase tracking-wide text-danger" title="Estás cambiando datos reales de clientes">
       Producción
     </span>
   );
@@ -90,7 +90,7 @@ export function BarraLateral({ abierto = false, onCerrar = () => {} }: { abierto
         <div className="flex items-center gap-2.5 px-5 py-4">
           <LogoVim className="h-8 w-8" />
           <div className="min-w-0 leading-tight">
-            <div className="font-display text-[15px] font-bold tracking-tight">VIM Plataforma</div>
+            <div className="font-display text-15 font-bold tracking-tight">VIM Plataforma</div>
             <div className="mt-0.5"><InsigniaEntorno /></div>
           </div>
         </div>
@@ -104,13 +104,13 @@ export function BarraLateral({ abierto = false, onCerrar = () => {} }: { abierto
                 aria-current={activo ? "page" : undefined}
                 // Sin transición: se usa decenas de veces al día y un cambio de color animado deja estela.
                 className={[
-                  "flex min-h-[40px] items-center justify-between rounded px-3 py-2 text-[14px] font-semibold",
+                  "flex min-h-[40px] items-center justify-between rounded px-3 py-2 text-14 font-semibold",
                   activo ? "bg-ink text-white" : "text-ink-2 hover:bg-hover",
                 ].join(" ")}
               >
                 <span>{n.label}</span>
                 {n.href === "/atencion" && criticas > 0 && (
-                  <span className={["rounded-full px-1.5 py-0.5 text-[12px] font-bold tabular-nums", activo ? "bg-white text-danger" : "bg-danger text-white"].join(" ")}>
+                  <span className={["rounded-full px-1.5 py-0.5 text-12 font-bold tabular-nums", activo ? "bg-white text-danger" : "bg-danger text-white"].join(" ")}>
                     {criticas}
                   </span>
                 )}
@@ -119,10 +119,10 @@ export function BarraLateral({ abierto = false, onCerrar = () => {} }: { abierto
           })}
         </nav>
         <div className="mt-auto px-3 pb-4">
-          <Link href="/clientes/nuevo" className="btn mb-2 flex h-10 items-center justify-center rounded border border-line-strong text-[13px] font-semibold text-ink-2 hover:border-ink hover:text-ink">
+          <Link href="/clientes/nuevo" className="btn mb-2 flex h-10 items-center justify-center rounded border border-line-strong text-13 font-semibold text-ink-2 hover:border-ink hover:text-ink">
             Nuevo cliente
           </Link>
-          <button onClick={salir} className="btn h-10 w-full rounded text-[13px] font-medium text-ink-2 hover:bg-hover hover:text-ink">
+          <button onClick={salir} className="btn h-10 w-full rounded text-13 font-medium text-ink-2 hover:bg-hover hover:text-ink">
             Salir
           </button>
         </div>

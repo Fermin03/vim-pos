@@ -1,6 +1,6 @@
 "use client";
 import { useState } from "react";
-import { Button, Modal } from "@vim/ui/styles";
+import { DialogoPeligro } from "@vim/ui/styles";
 import { type Empleado } from "../lib/supabase";
 import { autorizacionPropia, type PayloadAutorizacion } from "../lib/autorizacion";
 import {
@@ -9,6 +9,7 @@ import {
   type MotivoReimpresionComanda,
 } from "../lib/impresiones";
 import { ModalAutorizacionPin } from "./modal-autorizacion-pin";
+import { AvisoAutorizacion, MotivoChips } from "./motivo-y-autorizacion";
 
 const PERMISO = "cocina.reimprimir_comanda";
 
@@ -106,73 +107,23 @@ export function ModalReimprimirComanda({
     );
   }
 
-  const input =
-    "h-11 w-full rounded border border-line-strong px-3 text-sm outline-none focus:border-ink focus:shadow-[0_0_0_3px_rgba(22,22,26,.06)]";
-
   return (
-    <Modal
-      open
-      onClose={onCerrar}
-      title="Reimprimir comanda"
-      hideTitle
+    <DialogoPeligro
+      titulo="Reimprimir comanda"
+      contexto={folio ?? undefined}
+      consecuencia="La comanda vuelve a salir en cocina y en barra. Queda registrado quién la reimprimió y por qué."
+      peligrosa={false}
       // Se abre sobre el recibo (z-[60]): sin esto el papel lo tapa.
       backdropClassName="z-[70]"
-      className="w-[480px] rounded-lg border border-line bg-surface p-6 shadow-[0_18px_44px_rgba(22,22,26,.18)]"
+      error={error}
+      boton="Reimprimir"
+      ocupado={procesando}
+      textoOcupado="Autorizando…"
+      onConfirmar={() => void onConfirmar()}
+      onCerrar={onCerrar}
     >
-      <div className="mb-5">
-        <h2 className="font-display text-xl font-semibold tracking-tight">Reimprimir comanda</h2>
-        <p className="mt-0.5 text-[13px] text-ink-3">{folio ?? ""}</p>
-      </div>
-
-      <p className="mb-4 text-[13px] text-ink-2">
-        La comanda vuelve a salir en cocina y en barra. Queda registrado quién la reimprimió y por qué.
-      </p>
-
-      <div className="mb-1.5 text-[13px] font-medium text-ink-2">Motivo</div>
-      <div className="mb-3 flex flex-wrap gap-2">
-        {MOTIVOS_REIMPRESION_COMANDA.map((m) => (
-          <button
-            key={m.codigo}
-            type="button"
-            onClick={() => setMotivo(m.codigo)}
-            className={[
-              "rounded-full border px-3 py-1.5 text-[12.5px] font-semibold transition",
-              motivo === m.codigo ? "border-ink bg-ink text-white" : "border-line-strong text-ink-2 hover:border-ink",
-            ].join(" ")}
-          >
-            {m.label}
-          </button>
-        ))}
-      </div>
-      {motivo === "OTRO" && (
-        <input
-          className={`${input} mb-3`}
-          value={motivoTexto}
-          maxLength={200}
-          onChange={(e) => setMotivoTexto(e.target.value)}
-          placeholder="Describe el motivo"
-        />
-      )}
-
-      <div
-        className={[
-          "mb-4 rounded border px-3 py-2 text-[12.5px] font-medium",
-          tienePermisoRol
-            ? "border-[#D6E8DD] bg-success-soft text-success"
-            : "border-[#E8DCC0] bg-warning-soft text-warning",
-        ].join(" ")}
-      >
-        {tienePermisoRol ? "Dentro de tu rol · no requiere autorización." : "Requiere PIN de un supervisor."}
-      </div>
-
-      {error && <p className="mb-3 text-sm font-medium text-danger" role="alert">{error}</p>}
-
-      <div className="flex items-center justify-end gap-2">
-        <Button variant="ghost" onClick={onCerrar} disabled={procesando}>Volver</Button>
-        <Button onClick={onConfirmar} disabled={procesando}>
-          {procesando ? "Autorizando…" : "Reimprimir"}
-        </Button>
-      </div>
-    </Modal>
+      <MotivoChips opciones={MOTIVOS_REIMPRESION_COMANDA} valor={motivo} onCambiar={setMotivo} texto={motivoTexto} onTexto={setMotivoTexto} />
+      <AvisoAutorizacion propia={tienePermisoRol} />
+    </DialogoPeligro>
   );
 }

@@ -64,7 +64,7 @@ export function PantallaBloqueo({
       <PosSkeletonBg variant="caja" />
       <div className="fixed inset-0 z-30 flex flex-col items-center justify-center gap-6 bg-white/[.74] p-8 backdrop-blur-md animate-vim-fade">
         <div className="text-center">
-          <div className="font-display text-[54px] font-semibold leading-none tabular-nums tracking-tight">
+          <div className="font-display text-40 font-semibold leading-none tabular-nums tracking-tight">
             {ahora ? ahora.toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit", hour12: false }) : "—"}
           </div>
           <div className="mt-1.5 text-sm capitalize text-ink-2">
@@ -78,13 +78,13 @@ export function PantallaBloqueo({
           </span>
           <div className="text-center">
             <div className="font-display text-lg font-semibold tracking-tight">{empleado.nombre}</div>
-            <div className="-mt-2 text-[13px] text-ink-3">
+            <div className="-mt-2 text-13 text-ink-3">
               {ROL_LABEL[empleado.rol] ?? "Empleado"} · {caja}
             </div>
           </div>
         </div>
 
-        <p className="text-center text-[13px] text-ink-2">
+        <p className="text-center text-13 text-ink-2">
           Pantalla bloqueada por inactividad. Ingresa tu PIN para continuar.
         </p>
 
@@ -98,7 +98,7 @@ export function PantallaBloqueo({
           className="w-[230px]"
         />
 
-        <div className="flex items-center gap-[7px] text-[12.5px] text-ink-3">
+        <div className="flex items-center gap-[7px] text-13 text-ink-3">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-3.5 w-3.5 text-success">
             <path d="M20 6 9 17l-5-5" />
           </svg>
@@ -108,7 +108,7 @@ export function PantallaBloqueo({
         <button
           type="button"
           onClick={onCambiarUsuario}
-          className="inline-flex items-center gap-[7px] rounded px-3 py-2 text-[13px] font-medium text-ink-2 transition-colors hover:bg-hover hover:text-ink"
+          className="inline-flex items-center gap-[7px] rounded px-3 py-2 text-13 font-medium text-ink-2 transition-colors hover:bg-hover hover:text-ink"
         >
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4">
             <path d="M16 3.13a4 4 0 0 1 0 7.75" />

@@ -7,6 +7,7 @@ import { registrarMovimiento, TIPOS_MOVIMIENTO, type DefMovimiento, type TipoMov
 import { leerReporteX } from "../lib/cierre";
 import { autorizacionPropia, type Autorizacion, type PayloadAutorizacion } from "../lib/autorizacion";
 import { ModalAutorizacionPin } from "./modal-autorizacion-pin";
+import { AvisoAutorizacion } from "./motivo-y-autorizacion";
 
 /** Roles que tienen `caja.sangria` y `caja.deposito` (matriz §2.2). */
 const ROLES_CAJA = ["SUPERVISOR", "ADMIN", "DUENO"];
@@ -182,7 +183,7 @@ export function ModalMovimientoCaja({
 
   const campo =
     "h-11 w-full rounded border border-line-strong px-3 text-sm outline-none transition-colors focus:border-ink focus:shadow-[0_0_0_3px_rgba(22,22,26,.06)]";
-  const etiqueta = "mb-1.5 flex items-baseline gap-2 text-[13px] font-medium text-ink-2";
+  const etiqueta = "mb-1.5 flex items-baseline gap-2 text-13 font-medium text-ink-2";
   const sale = def.signo < 0;
 
   return (
@@ -204,10 +205,10 @@ export function ModalMovimientoCaja({
           {sale ? <IconoRetiro /> : <IconoDeposito />}
         </div>
         <div className="min-w-0">
-          <h2 className="font-display text-[17px] font-semibold tracking-[-0.02em]">
+          <h2 className="font-display text-18 font-semibold tracking-[-0.02em]">
             {sale ? "Retirar efectivo de caja" : "Depositar efectivo en caja"}
           </h2>
-          <p className="text-[12.5px] text-ink-3">
+          <p className="text-13 text-ink-3">
             Turno {turno.codigo_turno} · {caja.nombre}
           </p>
         </div>
@@ -216,8 +217,8 @@ export function ModalMovimientoCaja({
       <div className="px-5 py-4">
         {/* Efectivo actual — el dato con el que el cajero decide cuánto puede sacar. */}
         <div className="mb-4 flex items-center justify-between rounded-lg border border-line bg-sel px-3.5 py-3">
-          <span className="text-[13px] font-medium text-ink-2">Efectivo actual en caja</span>
-          <span className="font-display text-[19px] font-bold tabular-nums">
+          <span className="text-13 font-medium text-ink-2">Efectivo actual en caja</span>
+          <span className="font-display text-20 font-bold tabular-nums">
             {caja_ ? fmtMxn(caja_.efectivo) : "—"}
           </span>
         </div>
@@ -244,15 +245,15 @@ export function ModalMovimientoCaja({
                 <div className="flex items-center gap-1.5">
                   <span
                     className={[
-                      "font-display text-[15px] font-bold leading-none tabular-nums",
+                      "font-display text-15 font-bold leading-none tabular-nums",
                       negativo ? "text-danger" : "text-success",
                     ].join(" ")}
                   >
                     {negativo ? "−" : "+"}
                   </span>
-                  <span className="text-[14.5px] font-semibold">{t.label}</span>
+                  <span className="text-15 font-semibold">{t.label}</span>
                 </div>
-                <div className="mt-1 text-[12px] leading-tight text-ink-3">{t.descripcion}</div>
+                <div className="mt-1 text-12 leading-tight text-ink-3">{t.descripcion}</div>
               </button>
             );
           })}
@@ -261,7 +262,7 @@ export function ModalMovimientoCaja({
         {/* Monto */}
         <label className={etiqueta} htmlFor="mov-monto">
           {sale ? "Monto a retirar" : "Monto a depositar"}
-          <span className="text-[11.5px] font-normal text-ink-3">Obligatorio</span>
+          <span className="text-12 font-normal text-ink-3">Obligatorio</span>
         </label>
         <div className="relative mb-4">
           <input
@@ -279,7 +280,7 @@ export function ModalMovimientoCaja({
         {/* Motivo: los que antes eran botones de tipo viven aquí. */}
         <label className={etiqueta} htmlFor="mov-motivo">
           Motivo
-          <span className="text-[11.5px] font-normal text-ink-3">Obligatorio</span>
+          <span className="text-12 font-normal text-ink-3">Obligatorio</span>
         </label>
         <select
           id="mov-motivo"
@@ -306,7 +307,7 @@ export function ModalMovimientoCaja({
         {/* Descripción opcional */}
         <label className={`${etiqueta} mt-2`} htmlFor="mov-desc">
           Descripción
-          <span className="text-[11.5px] font-normal text-ink-3">Opcional</span>
+          <span className="text-12 font-normal text-ink-3">Opcional</span>
         </label>
         <textarea
           id="mov-desc"
@@ -330,12 +331,12 @@ export function ModalMovimientoCaja({
             ].join(" ")}
           >
             <div className="flex items-center justify-between">
-              <span className="text-[13px] font-medium text-ink-2">
+              <span className="text-13 font-medium text-ink-2">
                 {sale ? "Saldo después del retiro" : "Saldo después del depósito"}
               </span>
               <span
                 className={[
-                  "font-display text-[19px] font-bold tabular-nums",
+                  "font-display text-20 font-bold tabular-nums",
                   dejaEnRojo ? "text-danger" : bajoFondo ? "text-warning" : "text-ink",
                 ].join(" ")}
               >
@@ -343,26 +344,19 @@ export function ModalMovimientoCaja({
               </span>
             </div>
             {dejaEnRojo && (
-              <p className="mt-1 text-[12px] font-medium leading-snug text-danger" role="alert">
+              <p className="mt-1 text-12 font-medium leading-snug text-danger" role="alert">
                 No hay tanto efectivo en la caja: solo puedes retirar hasta {fmtMxn(caja_.efectivo)}.
               </p>
             )}
             {bajoFondo && (
-              <p className="mt-1 text-[12px] font-medium leading-snug text-warning">
+              <p className="mt-1 text-12 font-medium leading-snug text-warning">
                 Queda por debajo del fondo con el que abrió la caja ({fmtMxn(caja_.fondo)}).
               </p>
             )}
           </div>
         )}
 
-        <div
-          className={[
-            "mb-4 rounded border px-3 py-2 text-[12.5px] font-medium",
-            tienePermiso ? "border-success/25 bg-success-soft text-success" : "border-warning/25 bg-warning-soft text-warning",
-          ].join(" ")}
-        >
-          {tienePermiso ? "Dentro de tu rol · no requiere autorización." : "Requiere PIN de un supervisor."}
-        </div>
+        <div className="mb-4"><AvisoAutorizacion propia={tienePermiso} /></div>
 
         {error && <p className="mb-3 text-sm font-medium text-danger" role="alert">{error}</p>}
 

@@ -19,7 +19,7 @@ import { mensajeError } from "../../lib/errores";
 import { aDatetimeLocal } from "../../lib/fechas";
 
 const input = "h-11 w-full rounded border border-line-strong px-3 text-sm outline-none focus:border-ink focus:shadow-[0_0_0_3px_rgba(22,22,26,.06)]";
-const label = "mb-1.5 block text-[13px] font-medium text-ink-2";
+const label = "mb-1.5 block text-13 font-medium text-ink-2";
 
 type FormDatos = { nombre: string; descripcion: string; tipo: TipoPromo; valor: string; fecha_inicio: string; fecha_fin: string };
 const VACIO = (): FormDatos => ({ nombre: "", descripcion: "", tipo: "PORCENTAJE", valor: "", fecha_inicio: aDatetimeLocal(), fecha_fin: "" });
@@ -122,7 +122,7 @@ export default function PromocionesPage() {
             compartido para que Reservaciones se vea igual y el patrón viva en
             un solo sitio. El texto no cambia: dice qué no pasa y con qué se
             suple mientras tanto, que es lo que hay que decir. */}
-        <p className="mb-4 max-w-[70ch] text-[13px] text-ink-2">
+        <p className="mb-4 max-w-[70ch] text-13 text-ink-2">
           Mientras estén vigentes, aparecen en la caja al momento de cobrar: el cajero las
           aplica de un toque, sin pedir autorización. Salen en el ticket como
           <b> Promoción</b>, separadas de los descuentos que se hacen a mano.
@@ -133,8 +133,8 @@ export default function PromocionesPage() {
         {promos === null && <p className="text-sm text-ink-3">Cargando…</p>}
         {promos && promos.length === 0 && !editando && (
           <div className="rounded-lg border border-line bg-surface p-8 text-center text-ink-3">
-            <p className="text-[15px] font-semibold text-ink-2">Sin promociones</p>
-            <p className="mt-1 text-[13px]">Crea descuentos o precios especiales con su rango de vigencia.</p>
+            <p className="text-15 font-semibold text-ink-2">Sin promociones</p>
+            <p className="mt-1 text-13">Crea descuentos o precios especiales con su rango de vigencia.</p>
           </div>
         )}
         {promos && promos.length > 0 && (
@@ -151,7 +151,7 @@ export default function PromocionesPage() {
                     key={t.v}
                     type="button"
                     onClick={() => setFiltro(t.v)}
-                    className={["flex-shrink-0 whitespace-nowrap rounded-[4px] px-3 py-[11px] text-[12.5px] font-semibold transition lg:py-1.5", filtro === t.v ? "bg-surface text-ink shadow-sm" : "text-ink-2 hover:text-ink"].join(" ")}
+                    className={["flex-shrink-0 whitespace-nowrap rounded-[4px] px-3 py-[11px] text-13 font-semibold transition lg:py-1.5", filtro === t.v ? "bg-surface text-ink shadow-sm" : "text-ink-2 hover:text-ink"].join(" ")}
                   >
                     {t.l}
                   </button>
@@ -159,38 +159,38 @@ export default function PromocionesPage() {
               </div>
             </div>
             <div className="tabla-caja">
-              <table className="w-full text-[13.5px]">
-                <thead><tr className="border-b border-line bg-sel text-left text-[11.5px] font-bold uppercase tracking-wide text-ink-3">
+              <table className="w-full text-14">
+                <thead><tr className="border-b border-line bg-sel text-left text-12 font-bold uppercase tracking-wide text-ink-3">
                   <th className="px-4 py-2.5">Promoción</th><th className="px-4 py-2.5">Beneficio</th><th className="px-4 py-2.5">Vigencia</th><th className="px-4 py-2.5">Estado</th><th className="px-4 py-2.5"></th>
                 </tr></thead>
                 <tbody>
                   {visibles.map((p) => (
                     <tr key={p.id} className="border-b border-line last:border-b-0">
-                      <td className="px-4 py-2.5"><div className="font-medium">{p.nombre}</div>{p.descripcion && <div className="text-[12px] text-ink-3">{p.descripcion}</div>}</td>
+                      <td className="px-4 py-2.5"><div className="font-medium">{p.nombre}</div>{p.descripcion && <div className="text-12 text-ink-3">{p.descripcion}</div>}</td>
                       <td className="px-4 py-2.5 font-semibold tabular-nums">{p.valorTexto}</td>
-                      <td className="px-4 py-2.5 text-[12.5px] text-ink-2">
+                      <td className="px-4 py-2.5 text-13 text-ink-2">
                         {fechaLegible(p.fechaInicio)}{p.fechaFin ? ` → ${fechaLegible(p.fechaFin)}` : " → sin fin"}
                       </td>
-                      <td className="px-4 py-2.5"><span className={`rounded-full px-2 py-0.5 text-[11px] font-bold ${COLOR_VISTA[estadoVista(p)]}`}>{LABEL_VISTA[estadoVista(p)]}</span></td>
+                      <td className="px-4 py-2.5"><span className={`rounded-full px-2 py-0.5 text-11 font-bold ${COLOR_VISTA[estadoVista(p)]}`}>{LABEL_VISTA[estadoVista(p)]}</span></td>
                       <td className="px-4 py-2.5 text-right">
-                        <button type="button" onClick={() => setEditando({ id: p.id, datos: { nombre: p.nombre, descripcion: p.descripcion, tipo: p.tipo, valor: p.valorTexto.replace(/[^0-9.]/g, ""), fecha_inicio: aDatetimeLocal(p.fechaInicio), fecha_fin: p.fechaFin ? aDatetimeLocal(p.fechaFin) : "" } })} className="text-[12.5px] font-semibold text-ink-2 hover:text-ink">Editar</button>
-                        {(p.estado === "ACTIVA" || p.estado === "PAUSADA") && <button type="button" onClick={() => alternar(p)} className="ml-3 text-[12.5px] font-semibold text-ink-3 hover:text-ink">{p.estado === "ACTIVA" ? "Pausar" : "Activar"}</button>}
-                        <button type="button" onClick={() => borrar(p)} className="ml-3 text-[12.5px] font-semibold text-ink-3 hover:text-danger">Eliminar</button>
+                        <button type="button" onClick={() => setEditando({ id: p.id, datos: { nombre: p.nombre, descripcion: p.descripcion, tipo: p.tipo, valor: p.valorTexto.replace(/[^0-9.]/g, ""), fecha_inicio: aDatetimeLocal(p.fechaInicio), fecha_fin: p.fechaFin ? aDatetimeLocal(p.fechaFin) : "" } })} className="text-13 font-semibold text-ink-2 hover:text-ink">Editar</button>
+                        {(p.estado === "ACTIVA" || p.estado === "PAUSADA") && <button type="button" onClick={() => alternar(p)} className="ml-3 text-13 font-semibold text-ink-3 hover:text-ink">{p.estado === "ACTIVA" ? "Pausar" : "Activar"}</button>}
+                        <button type="button" onClick={() => borrar(p)} className="ml-3 text-13 font-semibold text-ink-3 hover:text-danger">Eliminar</button>
                       </td>
                     </tr>
                   ))}
                   {visibles.length === 0 && (
                     <tr>
                       <td colSpan={5} className="px-4 py-10 text-center">
-                        <p className="text-[14px] font-semibold text-ink-2">Sin resultados</p>
-                        <p className="mt-1 text-[12.5px] text-ink-3">No hay promociones que coincidan con tu filtro.</p>
+                        <p className="text-14 font-semibold text-ink-2">Sin resultados</p>
+                        <p className="mt-1 text-13 text-ink-3">No hay promociones que coincidan con tu filtro.</p>
                       </td>
                     </tr>
                   )}
                 </tbody>
               </table>
             </div>
-            <div className="border-t border-line px-4 py-3 text-[12.5px] text-ink-3">
+            <div className="border-t border-line px-4 py-3 text-13 text-ink-3">
               Mostrando <b className="text-ink-2">{visibles.length}</b> de <b className="text-ink-2">{todas.length}</b> promociones
             </div>
           </div>
@@ -198,7 +198,7 @@ export default function PromocionesPage() {
 
         {editando && (
           <div className="mt-5 max-w-[560px] rounded-lg border border-line bg-surface p-5">
-            <div className="mb-4 font-display text-[16px] font-semibold tracking-tight">{editando.id ? "Editar promoción" : "Nueva promoción"}</div>
+            <div className="mb-4 font-display text-16 font-semibold tracking-tight">{editando.id ? "Editar promoción" : "Nueva promoción"}</div>
             <div className="flex flex-col gap-3.5">
               <div>
                 <label className={label} htmlFor="p-nom">Nombre</label>

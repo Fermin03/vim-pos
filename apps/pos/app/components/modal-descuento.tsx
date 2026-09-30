@@ -14,6 +14,7 @@ import {
 } from "../lib/descuento";
 import { autorizacionPropia, type Autorizacion, type PayloadAutorizacion } from "../lib/autorizacion";
 import { ModalAutorizacionPin } from "./modal-autorizacion-pin";
+import { AvisoAutorizacion } from "./motivo-y-autorizacion";
 import { fmtMxn } from "../lib/turno";
 import {
   aplicarPromo,
@@ -218,7 +219,7 @@ export function ModalDescuento({
     >
       <div className="mb-5">
         <h2 className="font-display text-xl font-semibold tracking-tight">Aplicar descuento</h2>
-        <p className="mt-0.5 text-[13px] text-ink-3">Total actual {fmtMxn(totalActual)}</p>
+        <p className="mt-0.5 text-13 text-ink-3">Total actual {fmtMxn(totalActual)}</p>
       </div>
 
       {/* ── Promociones del negocio ──────────────────────────────
@@ -232,24 +233,24 @@ export function ModalDescuento({
           pantalla de caja. */}
       {(promos.length > 0 || puestas.length > 0) && (
         <div className="mb-5">
-          <div className="mb-2 text-[11.5px] font-bold uppercase tracking-wide text-ink-3">
+          <div className="mb-2 text-12 font-bold uppercase tracking-wide text-ink-3">
             Promociones
           </div>
 
           {puestas.map((p) => (
             <div
               key={p.aplicacionId}
-              className="mb-1.5 flex items-center justify-between gap-3 rounded border border-[#D6E8DD] bg-success-soft px-3 py-2"
+              className="mb-1.5 flex items-center justify-between gap-3 rounded border border-success-line bg-success-soft px-3 py-2"
             >
               <div className="min-w-0">
-                <div className="truncate text-[13px] font-semibold text-success">{p.nombre}</div>
-                <div className="text-[12px] tabular-nums text-ink-2">−{fmtMxn(p.monto)} aplicado</div>
+                <div className="truncate text-13 font-semibold text-success">{p.nombre}</div>
+                <div className="text-12 tabular-nums text-ink-2">−{fmtMxn(p.monto)} aplicado</div>
               </div>
               <button
                 type="button"
                 disabled={promoOcupada != null}
                 onClick={() => void onQuitarPromo(p)}
-                className="flex-shrink-0 rounded border border-line-strong bg-surface px-2.5 py-1.5 text-[12px] font-semibold text-ink-2 transition hover:border-ink hover:text-ink disabled:opacity-40"
+                className="flex-shrink-0 rounded border border-line-strong bg-surface px-2.5 py-1.5 text-12 font-semibold text-ink-2 transition hover:border-ink hover:text-ink disabled:opacity-40"
               >
                 Quitar
               </button>
@@ -264,15 +265,15 @@ export function ModalDescuento({
               onClick={() => void onPonerPromo(p)}
               className="mb-1.5 flex w-full items-center justify-between gap-3 rounded border border-line-strong bg-surface px-3 py-2.5 text-left transition hover:border-ink disabled:opacity-40"
             >
-              <span className="min-w-0 truncate text-[13px] font-semibold">{p.nombre}</span>
-              <span className="flex-shrink-0 text-[12.5px] font-semibold tabular-nums text-ink-2">
+              <span className="min-w-0 truncate text-13 font-semibold">{p.nombre}</span>
+              <span className="flex-shrink-0 text-13 font-semibold tabular-nums text-ink-2">
                 −{fmtMxn(p.descuentoEstimado)}
               </span>
             </button>
           ))}
 
           <div className="mt-3 h-px bg-line" />
-          <div className="mt-3 text-[11.5px] font-bold uppercase tracking-wide text-ink-3">
+          <div className="mt-3 text-12 font-bold uppercase tracking-wide text-ink-3">
             Descuento a mano
           </div>
         </div>
@@ -286,7 +287,7 @@ export function ModalDescuento({
             type="button"
             onClick={() => setTipo(t)}
             className={[
-              "flex-1 rounded-[4px] px-3 py-2 text-[12.5px] font-semibold transition",
+              "flex-1 rounded-[4px] px-3 py-2 text-13 font-semibold transition",
               tipo === t ? "bg-surface text-ink shadow-sm" : "text-ink-2 hover:text-ink",
             ].join(" ")}
           >
@@ -298,7 +299,7 @@ export function ModalDescuento({
       {/* Valor (oculto para cortesía 100%) */}
       {tipo !== "CORTESIA_TOTAL" && (
         <>
-          <label className="mb-1.5 block text-[13px] font-medium text-ink-2" htmlFor="d-valor">
+          <label className="mb-1.5 block text-13 font-medium text-ink-2" htmlFor="d-valor">
             Valor del descuento
           </label>
           <div className="relative mb-4">
@@ -319,7 +320,7 @@ export function ModalDescuento({
       )}
 
       {/* Motivo */}
-      <div className="mb-1.5 text-[13px] font-medium text-ink-2">Motivo</div>
+      <div className="mb-1.5 text-13 font-medium text-ink-2">Motivo</div>
       <div className="mb-3 flex flex-wrap gap-2">
         {MOTIVOS.map((m) => (
           <button
@@ -327,7 +328,7 @@ export function ModalDescuento({
             type="button"
             onClick={() => setMotivo(m.codigo)}
             className={[
-              "rounded-full border px-3 py-1.5 text-[12.5px] font-semibold transition",
+              "rounded-full border px-3 py-1.5 text-13 font-semibold transition",
               motivo === m.codigo ? "border-ink bg-ink text-white" : "border-line-strong text-ink-2 hover:border-ink",
             ].join(" ")}
           >
@@ -346,7 +347,7 @@ export function ModalDescuento({
       )}
 
       {/* Preview */}
-      <div className="mb-4 rounded-lg border border-line bg-hover p-3 text-[13.5px]">
+      <div className="mb-4 rounded-lg border border-line bg-hover p-3 text-14">
         <div className="flex justify-between text-ink-2">
           <span>Total actual</span><span className="tabular-nums">{fmtMxn(totalActual)}</span>
         </div>
@@ -354,20 +355,17 @@ export function ModalDescuento({
           <span>Descuento</span><span className="tabular-nums text-danger">−{fmtMxn(descuento)}</span>
         </div>
         {envio > 0 && (
-          <div className="mt-1 text-[12px] text-ink-3">
+          <div className="mt-1 text-12 text-ink-3">
             El envío ({fmtMxn(envio)}) no se descuenta: se cobra completo.
           </div>
         )}
-        <div className="mt-2 flex justify-between border-t border-line pt-2 font-display text-[16px] font-bold">
+        <div className="mt-2 flex justify-between border-t border-line pt-2 font-display text-16 font-bold">
           <span>Nuevo total</span><span className="tabular-nums">{fmtMxn(nuevoTotal)}</span>
         </div>
       </div>
 
       {/* Banner de autorización */}
-      <div className={["mb-4 rounded border px-3 py-2 text-[12.5px] font-medium",
-        tienePermiso ? "border-[#D6E8DD] bg-success-soft text-success" : "border-[#E8DCC0] bg-warning-soft text-warning"].join(" ")}>
-        {tienePermiso ? "Dentro de tu rol · no requiere autorización." : "Requiere PIN de un supervisor."}
-      </div>
+      <div className="mb-4"><AvisoAutorizacion propia={tienePermiso} /></div>
 
       {error && <p className="mb-3 text-sm font-medium text-danger" role="alert">{error}</p>}
 

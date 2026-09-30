@@ -27,16 +27,16 @@ import {
 
 // 16 px en los campos: con menos, iOS hace zoom en cada uno.
 const input =
-  "h-12 w-full rounded-lg border bg-surface px-3.5 text-[16px] text-ink outline-none transition-[border-color,box-shadow] duration-150 " +
+  "h-12 w-full rounded-lg border bg-surface px-3.5 text-16 text-ink outline-none transition-[border-color,box-shadow] duration-150 " +
   "focus-visible:border-accent focus-visible:shadow-[0_0_0_3px_rgb(var(--accent)/0.3)] " +
   // Con error sigue rojo aunque tenga el foco: el azul del foco borraba justo la señal del error.
   "aria-[invalid=true]:focus-visible:border-danger aria-[invalid=true]:focus-visible:shadow-[0_0_0_3px_rgb(var(--danger)/0.25)]";
 const inputOk = "border-line-strong";
 const inputMal = "border-danger shadow-[0_0_0_3px_rgb(var(--danger)/0.15)]";
-const label = "mb-1.5 block text-[15px] font-semibold text-ink";
+const label = "mb-1.5 block text-15 font-semibold text-ink";
 // Las ayudas son lo que rescata a quien no sabe qué poner: legibles con sol (14 px, ink-2).
-const ayuda = "mt-1.5 text-[14px] leading-snug text-ink-2";
-const errorCampo = "mt-1.5 text-[14px] font-semibold leading-snug text-danger";
+const ayuda = "mt-1.5 text-14 leading-snug text-ink-2";
+const errorCampo = "mt-1.5 text-14 font-semibold leading-snug text-danger";
 
 const mxn = (n: number) => n.toLocaleString("es-MX", { style: "currency", currency: "MXN" });
 
@@ -241,8 +241,8 @@ export default function PortalFactura({
     return (
       <Marco marca={marca} paso={1}>
         <form className="flex flex-1 flex-col" onSubmit={(e) => { e.preventDefault(); buscar(folio); }} noValidate>
-          <h1 className="font-display text-[26px] font-semibold leading-tight tracking-tight">Factura tu consumo</h1>
-          <p className="mt-2 text-[16px] leading-relaxed text-ink-2">
+          <h1 className="font-display text-28 font-semibold leading-tight tracking-tight">Factura tu consumo</h1>
+          <p className="mt-2 text-16 leading-relaxed text-ink-2">
             Escribe el folio que viene en tu ticket.
           </p>
 
@@ -271,7 +271,7 @@ export default function PortalFactura({
           </div>
 
           <BarraAccion>
-            <Button type="submit" size="lg" disabled={cargando} className="h-14 w-full text-[17px]">
+            <Button type="submit" size="lg" disabled={cargando} className="h-14 w-full text-18">
               {cargando ? <><Girando /> Buscando…</> : "Continuar"}
             </Button>
           </BarraAccion>
@@ -302,23 +302,23 @@ export default function PortalFactura({
     <Marco marca={marca} paso={2}>
       <div className="flex items-center justify-between gap-3 rounded-lg border border-line bg-surface px-4 py-3">
         <div className="min-w-0">
-          <div className="font-display text-[16px] font-semibold tabular-nums">Folio {encontrado.ticket.folio}</div>
-          <div className="text-[14px] text-ink-2">{fechaLegible(encontrado.ticket.fecha)}</div>
+          <div className="font-display text-16 font-semibold tabular-nums">Folio {encontrado.ticket.folio}</div>
+          <div className="text-14 text-ink-2">{fechaLegible(encontrado.ticket.fecha)}</div>
         </div>
         <div className="text-right">
-          <div className="font-display text-[20px] font-semibold tabular-nums">{mxn(encontrado.ticket.total)}</div>
+          <div className="font-display text-20 font-semibold tabular-nums">{mxn(encontrado.ticket.total)}</div>
           <button
             type="button"
             onClick={() => { setEncontrado(null); setErrores({}); setError(null); }}
-            className="text-[14px] font-semibold text-accent underline-offset-2 hover:underline"
+            className="text-14 font-semibold text-accent underline-offset-2 hover:underline"
           >
             ¿No es tu ticket?
           </button>
         </div>
       </div>
 
-      <h1 className="mt-7 font-display text-[24px] font-semibold tracking-tight">Tus datos fiscales</h1>
-      <p className="mt-1.5 text-[15px] leading-relaxed text-ink-2">
+      <h1 className="mt-7 font-display text-24 font-semibold tracking-tight">Tus datos fiscales</h1>
+      <p className="mt-1.5 text-15 leading-relaxed text-ink-2">
         Como aparecen en tu <b>Constancia de Situación Fiscal</b>. Si no la tienes a mano, la
         descargas en{" "}
         <a href="https://www.sat.gob.mx" target="_blank" rel="noreferrer" className="font-semibold text-accent underline underline-offset-2">
@@ -413,7 +413,7 @@ export default function PortalFactura({
             />
             <MensajeCampo campo="email">Te la mandamos con el XML y el PDF. Igual la descargas en la siguiente pantalla.</MensajeCampo>
           </div>
-          <label className="flex min-h-11 cursor-pointer items-center gap-3 text-[15px] text-ink">
+          <label className="flex min-h-11 cursor-pointer items-center gap-3 text-15 text-ink">
             <input
               type="checkbox" checked={recordar} onChange={(e) => setRecordar(e.target.checked)}
               className="h-5 w-5 flex-shrink-0 accent-[rgb(var(--accent))]"
@@ -426,7 +426,7 @@ export default function PortalFactura({
           <p
             ref={errorGeneralRef}
             tabIndex={-1}
-            className="mt-6 rounded-lg border border-danger/30 bg-danger-soft px-4 py-3 text-[15px] font-semibold leading-relaxed text-danger outline-none"
+            className="mt-6 rounded-lg border border-danger/30 bg-danger-soft px-4 py-3 text-15 font-semibold leading-relaxed text-danger outline-none"
             role="alert"
           >
             {error}
@@ -436,11 +436,11 @@ export default function PortalFactura({
         <BarraAccion>
           {/* Siempre activo: si falta algo, al tocarlo se dice qué y se lleva al campo. Antes se
               quedaba gris sin explicar por qué. */}
-          <Button type="submit" size="lg" disabled={cargando} className="h-14 w-full text-[17px]">
+          <Button type="submit" size="lg" disabled={cargando} className="h-14 w-full text-18">
             {cargando ? <><Girando /> Emitiendo tu factura…</> : "Emitir factura"}
           </Button>
           {lento && (
-            <p className="mt-2 text-center text-[14px] leading-snug text-ink-2" role="status">
+            <p className="mt-2 text-center text-14 leading-snug text-ink-2" role="status">
               Conectando con el SAT, puede tardar unos segundos. No cierres esta pantalla.
             </p>
           )}
@@ -483,48 +483,48 @@ function FacturaLista({ timbrado, onEnviar }: { timbrado: TimbradoConRfc; onEnvi
             <path d="M20 6L9 17l-5-5" strokeLinecap="round" strokeLinejoin="round" />
           </svg>
         </div>
-        <h1 className="mt-5 font-display text-[26px] font-semibold tracking-tight">Tu factura está lista</h1>
-        <p className="mt-1.5 text-[16px] text-ink-2">
+        <h1 className="mt-5 font-display text-28 font-semibold tracking-tight">Tu factura está lista</h1>
+        <p className="mt-1.5 text-16 text-ink-2">
           {timbrado.negocio} · <span className="tabular-nums">{mxn(timbrado.total)}</span>
         </p>
       </div>
 
       {timbrado.correoEnviado && (
-        <p className="mt-5 rounded-lg border border-success/30 bg-success-soft px-4 py-3 text-[15px] leading-relaxed text-ink" role="status">
+        <p className="mt-5 rounded-lg border border-success/30 bg-success-soft px-4 py-3 text-15 leading-relaxed text-ink" role="status">
           También te la mandamos a <b>{timbrado.correo}</b>. Si no llega en unos minutos, revisa tu
           carpeta de correo no deseado.
         </p>
       )}
       {correoFallo && (
-        <p className="mt-5 rounded-lg border border-warning/40 bg-warning-soft px-4 py-3 text-[15px] leading-relaxed text-ink" role="alert">
+        <p className="mt-5 rounded-lg border border-warning/40 bg-warning-soft px-4 py-3 text-15 leading-relaxed text-ink" role="alert">
           <b>No pudimos enviarla a {timbrado.correo}.</b> Descárgala ahora, o prueba otra vez abajo.
         </p>
       )}
 
       <div className="mt-6 flex flex-col gap-2.5">
         {timbrado.pdf && (
-          <Button size="lg" className="h-14 text-[17px]" onClick={() => descargar(timbrado.pdf!, `factura-${timbrado.uuid}.pdf`, "application/pdf")}>
+          <Button size="lg" className="h-14 text-18" onClick={() => descargar(timbrado.pdf!, `factura-${timbrado.uuid}.pdf`, "application/pdf")}>
             Descargar PDF
           </Button>
         )}
         {timbrado.xml && (
-          <Button variant="ghost" size="lg" className="h-14 text-[17px] text-ink" onClick={() => descargar(timbrado.xml!, `factura-${timbrado.uuid}.xml`, "application/xml")}>
+          <Button variant="ghost" size="lg" className="h-14 text-18 text-ink" onClick={() => descargar(timbrado.xml!, `factura-${timbrado.uuid}.xml`, "application/xml")}>
             Descargar XML
           </Button>
         )}
       </div>
-      <p className="mt-3 text-[14px] leading-relaxed text-ink-2">
+      <p className="mt-3 text-14 leading-relaxed text-ink-2">
         Guarda los dos. El <b>XML</b> es la factura ante el SAT; el PDF es su versión para imprimir.
       </p>
 
       <div className="mt-6 rounded-lg border border-line bg-surface px-4 py-3">
-        <div className="text-[14px] font-semibold text-ink-2">Folio fiscal</div>
+        <div className="text-14 font-semibold text-ink-2">Folio fiscal</div>
         <div className="mt-0.5 flex items-center gap-2">
-          <span className="min-w-0 flex-1 break-all font-display text-[15px] tabular-nums text-ink">{timbrado.uuid}</span>
+          <span className="min-w-0 flex-1 break-all font-display text-15 tabular-nums text-ink">{timbrado.uuid}</span>
           <button
             type="button"
             onClick={() => { void navigator.clipboard?.writeText(timbrado.uuid).then(() => setCopiado(true)); }}
-            className="h-11 flex-shrink-0 rounded-md border border-line-strong px-3 text-[14px] font-semibold text-ink transition-transform duration-150 ease-vim active:scale-[.97]"
+            className="h-11 flex-shrink-0 rounded-md border border-line-strong px-3 text-14 font-semibold text-ink transition-transform duration-150 ease-vim active:scale-[.97]"
           >
             {copiado ? "Copiado" : "Copiar"}
           </button>
@@ -539,16 +539,16 @@ function FacturaLista({ timbrado, onEnviar }: { timbrado: TimbradoConRfc; onEnvi
             className={`${input} ${envio.estado === "error" ? inputMal : inputOk}`}
             value={email} onChange={(e) => { setEmail(e.target.value); if (envio.estado !== "enviando") setEnvio({ estado: "idle" }); }}
           />
-          <Button type="submit" variant="ghost" size="lg" disabled={envio.estado === "enviando"} className="h-12 flex-shrink-0 px-5 text-[16px] text-ink">
+          <Button type="submit" variant="ghost" size="lg" disabled={envio.estado === "enviando"} className="h-12 flex-shrink-0 px-5 text-16 text-ink">
             {envio.estado === "enviando" ? <Girando /> : "Enviar"}
           </Button>
         </div>
         {envio.texto && (
-          <p className={envio.estado === "error" ? errorCampo : "mt-1.5 text-[14px] font-semibold text-success"} role="status">{envio.texto}</p>
+          <p className={envio.estado === "error" ? errorCampo : "mt-1.5 text-14 font-semibold text-success"} role="status">{envio.texto}</p>
         )}
       </form>
 
-      <p className="mt-6 text-[14px] leading-relaxed text-ink-2">
+      <p className="mt-6 text-14 leading-relaxed text-ink-2">
         Si cierras esta página sin descargarla, vuelve con el QR de tu ticket y tu RFC: la vuelves a
         bajar sin pedirla otra vez.
       </p>
@@ -589,8 +589,8 @@ function Recuperar({
 
   return (
     <form className="flex flex-1 flex-col" onSubmit={(e) => { e.preventDefault(); void enviar(); }} noValidate>
-      <h1 className="font-display text-[26px] font-semibold leading-tight tracking-tight">Este ticket ya tiene factura</h1>
-      <p className="mt-2 text-[16px] leading-relaxed text-ink-2">
+      <h1 className="font-display text-28 font-semibold leading-tight tracking-tight">Este ticket ya tiene factura</h1>
+      <p className="mt-2 text-16 leading-relaxed text-ink-2">
         {ticket ? <>Folio {ticket.folio} · {mxn(ticket.total)}. </> : null}
         Si la pediste tú, escribe tu RFC para descargarla otra vez.
       </p>
@@ -608,11 +608,11 @@ function Recuperar({
           <p className={ayuda}>El mismo con que la pediste.</p>
         )}
       </div>
-      <button type="button" onClick={onOtroFolio} className="mt-4 self-start text-[15px] font-semibold text-accent underline-offset-2 hover:underline">
+      <button type="button" onClick={onOtroFolio} className="mt-4 self-start text-15 font-semibold text-accent underline-offset-2 hover:underline">
         Es otro ticket
       </button>
       <BarraAccion>
-        <Button type="submit" size="lg" disabled={cargando} className="h-14 w-full text-[17px]">
+        <Button type="submit" size="lg" disabled={cargando} className="h-14 w-full text-18">
           {cargando ? <><Girando /> Buscando…</> : "Descargar mi factura"}
         </Button>
       </BarraAccion>
@@ -623,7 +623,7 @@ function Recuperar({
 function Grupo({ titulo, children }: { titulo: string; children: React.ReactNode }) {
   return (
     <fieldset className="mt-7 flex flex-col gap-5">
-      <legend className="mb-4 text-[13px] font-bold uppercase tracking-[0.08em] text-ink-2">{titulo}</legend>
+      <legend className="mb-4 text-13 font-bold uppercase tracking-[0.08em] text-ink-2">{titulo}</legend>
       {children}
     </fieldset>
   );
@@ -661,13 +661,13 @@ function Marco({ marca, paso, children }: { marca: Negocio | null; paso: 1 | 2 |
           // eslint-disable-next-line @next/next/no-img-element
           <img src={marca.logo} alt="" className="h-11 w-11 flex-shrink-0 rounded-lg border border-line bg-surface object-contain" />
         ) : (
-          <div className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-lg bg-ink font-display text-[18px] font-bold text-white" aria-hidden="true">
+          <div className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-lg bg-ink font-display text-18 font-bold text-white" aria-hidden="true">
             {(marca?.nombre ?? " ").trim().charAt(0).toUpperCase()}
           </div>
         )}
         <div className="min-w-0">
-          <div className="truncate font-display text-[18px] font-semibold leading-tight">{marca?.nombre ?? " "}</div>
-          <div className="text-[14px] text-ink-2">Facturación en línea</div>
+          <div className="truncate font-display text-18 font-semibold leading-tight">{marca?.nombre ?? " "}</div>
+          <div className="text-14 text-ink-2">Facturación en línea</div>
         </div>
       </header>
 
@@ -675,14 +675,14 @@ function Marco({ marca, paso, children }: { marca: Negocio | null; paso: 1 | 2 |
         {PASOS.map((p, i) => (
           <li key={p} aria-current={i + 1 === paso ? "step" : undefined}>
             <div className={["h-1.5 rounded-full transition-colors duration-200", i + 1 <= paso ? "bg-accent" : "bg-line-strong"].join(" ")} />
-            <div className={["mt-1.5 text-[13px] font-semibold", i + 1 === paso ? "text-ink" : "text-ink-2"].join(" ")}>{p}</div>
+            <div className={["mt-1.5 text-13 font-semibold", i + 1 === paso ? "text-ink" : "text-ink-2"].join(" ")}>{p}</div>
           </li>
         ))}
       </ol>
 
       <div key={paso} className="mt-7 flex flex-1 animate-vim-fade flex-col motion-reduce:animate-none sm:flex-none">{children}</div>
 
-      <footer className="mt-10 flex items-center justify-center gap-2 pb-6 text-[13px] text-ink-2">
+      <footer className="mt-10 flex items-center justify-center gap-2 pb-6 text-13 text-ink-2">
         <LogoVim className="h-4 w-4" />
         Facturación por VIM POS
       </footer>

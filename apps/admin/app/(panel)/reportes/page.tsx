@@ -83,8 +83,8 @@ export default function ReportesHub() {
             if (reportes.length === 0) return null;
             return (
               <section key={g.titulo}>
-                <h2 className="font-display text-[15px] font-semibold tracking-tight">{g.titulo}</h2>
-                <p className="mb-3 mt-0.5 text-[13px] text-ink-2">{g.ayuda}</p>
+                <h2 className="font-display text-15 font-semibold tracking-tight">{g.titulo}</h2>
+                <p className="mb-3 mt-0.5 text-13 text-ink-2">{g.ayuda}</p>
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
                   {reportes.map((r) => (
                     <Link
@@ -92,9 +92,9 @@ export default function ReportesHub() {
                       href={r.href}
                       className="group flex flex-col rounded-lg border border-line bg-surface p-5 transition-[border-color,box-shadow,transform] duration-150 ease-vim hover:border-ink hover:shadow-[0_4px_14px_rgba(22,22,26,.06)] active:scale-[.98]"
                     >
-                      <span className="mb-1.5 font-display text-[16px] font-semibold tracking-tight">{r.titulo}</span>
-                      <p className="flex-1 text-[13px] leading-snug text-ink-2">{r.descripcion}</p>
-                      <span className="mt-3 inline-flex items-center gap-1 text-[13px] font-semibold text-ink">
+                      <span className="mb-1.5 font-display text-16 font-semibold tracking-tight">{r.titulo}</span>
+                      <p className="flex-1 text-13 leading-snug text-ink-2">{r.descripcion}</p>
+                      <span className="mt-3 inline-flex items-center gap-1 text-13 font-semibold text-ink">
                         Abrir
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" className="h-3.5 w-3.5 transition-transform duration-150 ease-vim group-hover:translate-x-0.5" aria-hidden="true">
                           <path d="M5 12h14M13 6l6 6-6 6" />
@@ -108,7 +108,7 @@ export default function ReportesHub() {
           })}
 
           {ocultos > 0 && (
-            <p className="text-[13.5px] text-ink-2">
+            <p className="text-14 text-ink-2">
               {verTodos
                 ? "Se muestran también los reportes de funciones que tu negocio no usa."
                 : `${ocultos === 1 ? "Hay 1 reporte" : `Hay ${ocultos} reportes`} de funciones que tu negocio no usa.`}{" "}

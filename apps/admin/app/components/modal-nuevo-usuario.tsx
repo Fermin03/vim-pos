@@ -6,7 +6,7 @@ import { mensajeError } from "../lib/errores";
 
 const input =
   "h-11 w-full rounded border border-line-strong px-3 text-sm outline-none focus:border-ink focus:shadow-[0_0_0_3px_rgba(22,22,26,.06)]";
-const label = "mb-1.5 block text-[13px] font-medium text-ink-2";
+const label = "mb-1.5 block text-13 font-medium text-ink-2";
 
 const ROL_DESC: Record<string, string> = {
   ADMIN: "Configura el sistema y gestiona al equipo",
@@ -70,7 +70,7 @@ export function ModalNuevoUsuario({
     >
       <div className="mb-5">
         <h2 className="font-display text-xl font-semibold tracking-tight">Invitar usuario</h2>
-        <p className="mt-0.5 text-[13px] text-ink-3">Crea su cuenta con un PIN inicial; podrá cambiarlo después.</p>
+        <p className="mt-0.5 text-13 text-ink-3">Crea su cuenta con un PIN inicial; podrá cambiarlo después.</p>
       </div>
 
       <div className="flex flex-col gap-4">
@@ -97,7 +97,7 @@ export function ModalNuevoUsuario({
             onChange={(e) => setEmail(e.target.value)}
             placeholder="pedro@knockoutburger.mx"
           />
-          <p className="mt-1 text-[11.5px] text-ink-3">Identifica la cuenta. El empleado opera con su PIN en el POS.</p>
+          <p className="mt-1 text-12 text-ink-3">Identifica la cuenta. El empleado opera con su PIN en el POS.</p>
         </div>
 
         <div>
@@ -112,7 +112,7 @@ export function ModalNuevoUsuario({
             onChange={(e) => setPin(e.target.value.replace(/[^0-9]/g, ""))}
             placeholder="4 a 6 dígitos"
           />
-          <p className="mt-1 text-[11.5px] text-ink-3">Compártelo en persona. El empleado puede cambiarlo después.</p>
+          <p className="mt-1 text-12 text-ink-3">Compártelo en persona. El empleado puede cambiarlo después.</p>
         </div>
 
         <div>
@@ -135,8 +135,8 @@ export function ModalNuevoUsuario({
                   className="mt-1 h-4 w-4 accent-ink"
                 />
                 <div>
-                  <div className="text-[14px] font-semibold">{ROL_LABEL[r]}</div>
-                  <div className="text-[12.5px] text-ink-3">{ROL_DESC[r]}</div>
+                  <div className="text-14 font-semibold">{ROL_LABEL[r]}</div>
+                  <div className="text-13 text-ink-3">{ROL_DESC[r]}</div>
                 </div>
               </label>
             ))}

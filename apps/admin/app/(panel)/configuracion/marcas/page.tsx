@@ -14,7 +14,7 @@ import { mensajeError } from "../../../lib/errores";
 
 const input =
   "h-11 w-full rounded border border-line-strong px-3 text-sm outline-none focus:border-ink focus:shadow-[0_0_0_3px_rgba(22,22,26,.06)]";
-const label = "mb-1.5 block text-[13px] font-medium text-ink-2";
+const label = "mb-1.5 block text-13 font-medium text-ink-2";
 
 const VACIA = { codigo: "", nombre: "", descripcion: "", color_primario_hex: "#E8502E", activa: true };
 
@@ -99,8 +99,8 @@ export default function MarcasPage() {
         {marcas === null && <p className="text-sm text-ink-3">Cargando…</p>}
         {marcas && marcas.length === 0 && !editando && (
           <div className="rounded-lg border border-line bg-surface p-8 text-center text-ink-3">
-            <p className="text-[15px] font-semibold text-ink-2">Sin marcas todavía</p>
-            <p className="mt-1 text-[13px]">Crea tu primera marca virtual para operar varios conceptos desde el mismo local.</p>
+            <p className="text-15 font-semibold text-ink-2">Sin marcas todavía</p>
+            <p className="mt-1 text-13">Crea tu primera marca virtual para operar varios conceptos desde el mismo local.</p>
           </div>
         )}
         {marcas && marcas.length > 0 && (
@@ -110,15 +110,15 @@ export default function MarcasPage() {
                 <div className="flex items-center gap-2.5">
                   <span className="h-8 w-8 flex-shrink-0 rounded-lg" style={{ background: m.color_primario_hex || "#E8502E" }} />
                   <div className="min-w-0 flex-1">
-                    <div className="truncate font-display text-[15px] font-semibold">{m.nombre}</div>
-                    <div className="font-mono text-[11px] text-ink-3">{m.codigo}</div>
+                    <div className="truncate font-display text-15 font-semibold">{m.nombre}</div>
+                    <div className="font-mono text-11 text-ink-3">{m.codigo}</div>
                   </div>
-                  {!m.activa && <span className="rounded-full bg-sel px-2 py-0.5 text-[10.5px] font-bold text-ink-3">Inactiva</span>}
+                  {!m.activa && <span className="rounded-full bg-sel px-2 py-0.5 text-11 font-bold text-ink-3">Inactiva</span>}
                 </div>
-                {m.descripcion && <p className="mt-2 line-clamp-2 text-[12.5px] text-ink-3">{m.descripcion}</p>}
+                {m.descripcion && <p className="mt-2 line-clamp-2 text-13 text-ink-3">{m.descripcion}</p>}
                 <div className="mt-3 flex gap-2 border-t border-line pt-3">
-                  <button type="button" onClick={() => editar(m)} className="text-[12.5px] font-semibold text-ink-2 hover:text-ink">Editar</button>
-                  <button type="button" onClick={() => borrar(m)} className="ml-auto text-[12.5px] font-semibold text-ink-3 hover:text-danger">Eliminar</button>
+                  <button type="button" onClick={() => editar(m)} className="text-13 font-semibold text-ink-2 hover:text-ink">Editar</button>
+                  <button type="button" onClick={() => borrar(m)} className="ml-auto text-13 font-semibold text-ink-3 hover:text-danger">Eliminar</button>
                 </div>
               </div>
             ))}
@@ -128,7 +128,7 @@ export default function MarcasPage() {
         {/* Editor inline */}
         {editando && (
           <div className="mt-5 max-w-[560px] rounded-lg border border-line bg-surface p-5">
-            <div className="mb-4 font-display text-[16px] font-semibold tracking-tight">{editando.id ? "Editar marca" : "Nueva marca"}</div>
+            <div className="mb-4 font-display text-16 font-semibold tracking-tight">{editando.id ? "Editar marca" : "Nueva marca"}</div>
             <div className="flex flex-col gap-3.5">
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div>
@@ -152,7 +152,7 @@ export default function MarcasPage() {
                 <textarea id="m-desc" className={`${input} h-20 resize-none py-2`} value={editando.datos.descripcion} maxLength={500}
                   onChange={(e) => setEditando({ ...editando, datos: { ...editando.datos, descripcion: e.target.value } })} />
               </div>
-              <label className="flex items-center gap-2 text-[13px] font-medium text-ink-2">
+              <label className="flex items-center gap-2 text-13 font-medium text-ink-2">
                 <input type="checkbox" checked={editando.datos.activa} onChange={(e) => setEditando({ ...editando, datos: { ...editando.datos, activa: e.target.checked } })} />
                 Marca activa
               </label>

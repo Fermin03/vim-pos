@@ -45,26 +45,26 @@ export default function ComprasPage() {
       />
       <PageBody>
         <div className="mb-4 flex flex-wrap items-end gap-3">
-          <label className="grid gap-1 text-[12px] text-ink-2">Desde<input type="date" className={input} value={desde} max={hoyISO()} onChange={(e) => setDesde(e.target.value)} /></label>
-          <label className="grid gap-1 text-[12px] text-ink-2">Hasta<input type="date" className={input} value={hasta} max={hoyISO()} onChange={(e) => setHasta(e.target.value)} /></label>
-          <label className="grid gap-1 text-[12px] text-ink-2">Proveedor
+          <label className="grid gap-1 text-12 text-ink-2">Desde<input type="date" className={input} value={desde} max={hoyISO()} onChange={(e) => setDesde(e.target.value)} /></label>
+          <label className="grid gap-1 text-12 text-ink-2">Hasta<input type="date" className={input} value={hasta} max={hoyISO()} onChange={(e) => setHasta(e.target.value)} /></label>
+          <label className="grid gap-1 text-12 text-ink-2">Proveedor
             <select className={input} value={proveedorId} onChange={(e) => setProveedorId(e.target.value)}><option value="">Todos</option>{proveedores.map((p) => <option key={p.id} value={p.id}>{p.nombre}</option>)}</select>
           </label>
           {sucursales.length > 1 && (
-            <label className="grid gap-1 text-[12px] text-ink-2">Sucursal
+            <label className="grid gap-1 text-12 text-ink-2">Sucursal
               <select className={input} value={sucursalId} onChange={(e) => setSucursalId(e.target.value)}><option value="">Todas</option>{sucursales.map((s) => <option key={s.id} value={s.id}>{s.nombre}</option>)}</select>
             </label>
           )}
           <Button variant="ghost" onClick={cargar} disabled={!!rangoInvalido}>Aplicar</Button>
-          {rangoInvalido && <span className="text-[12px] text-danger">{rangoInvalido}</span>}
+          {rangoInvalido && <span className="text-12 text-danger">{rangoInvalido}</span>}
         </div>
         {error && <p role="alert" className="mb-3 text-sm font-medium text-danger">{error}</p>}
         {filas === null && <p className="text-sm text-ink-3">Cargando…</p>}
         {filas !== null && (
           <TablaScroll min={800}>
-            <table className="w-full text-[13.5px]">
+            <table className="w-full text-14">
               <thead>
-                <tr className="border-b border-line text-left text-[11.5px] uppercase tracking-[0.04em] text-ink-3">
+                <tr className="border-b border-line text-left text-12 uppercase tracking-[0.04em] text-ink-3">
                   <th className="py-2 pr-3 font-semibold">Folio</th>
                   <th className="py-2 pr-3 font-semibold">Fecha</th>
                   <th className="py-2 pr-3 font-semibold">Proveedor</th>
@@ -77,13 +77,13 @@ export default function ComprasPage() {
               <tbody>
                 {filas.map((c) => (
                   <tr key={c.id} className="h-10 border-b border-line-soft hover:bg-hover">
-                    <td className="pr-3"><Link className="font-mono text-[12.5px] font-medium text-ink underline-offset-2 hover:underline" href={`/inventario/compras/${c.id}`}>{c.folio}</Link></td>
+                    <td className="pr-3"><Link className="font-mono text-13 font-medium text-ink underline-offset-2 hover:underline" href={`/inventario/compras/${c.id}`}>{c.folio}</Link></td>
                     <td className="pr-3 tabular-nums text-ink-2">{fechaLegible(c.fecha)}</td>
                     <td className="pr-3">{c.proveedorNombre}</td>
-                    <td className="pr-3 text-ink-2">{c.referencia ?? "—"}{c.origen === "XML" && <span className="ml-2 rounded bg-accent-soft px-1.5 text-[11px] font-medium text-accent">XML</span>}</td>
+                    <td className="pr-3 text-ink-2">{c.referencia ?? "—"}{c.origen === "XML" && <span className="ml-2 rounded bg-accent-soft px-1.5 text-11 font-medium text-accent">XML</span>}</td>
                     <td className="pr-3 text-ink-2">{c.sucursalNombre}</td>
                     <td className="pr-3 text-right tabular-nums">{fmt(c.total)}</td>
-                    <td><span className={`rounded px-2 py-0.5 text-[12px] font-medium ${c.estado === "ANULADA" ? "bg-danger-soft text-danger" : "bg-success-soft text-success"}`}>{c.estado === "ANULADA" ? "Anulada" : "Confirmada"}</span></td>
+                    <td><span className={`rounded px-2 py-0.5 text-12 font-medium ${c.estado === "ANULADA" ? "bg-danger-soft text-danger" : "bg-success-soft text-success"}`}>{c.estado === "ANULADA" ? "Anulada" : "Confirmada"}</span></td>
                   </tr>
                 ))}
                 {filas.length === 0 && <tr><td colSpan={7} className="py-6 text-center text-sm text-ink-3">No hay compras en este rango.</td></tr>}

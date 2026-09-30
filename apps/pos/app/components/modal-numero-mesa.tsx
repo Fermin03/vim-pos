@@ -4,7 +4,7 @@ import { Button } from "@vim/ui/styles";
 import { buscarMesaPorNumero, crearMesaConNumero } from "../lib/mesas-numero";
 
 const input =
-  "h-14 w-full rounded border border-line-strong px-3 text-center font-display text-[28px] font-bold tabular-nums outline-none focus:border-ink focus:shadow-[0_0_0_3px_rgba(22,22,26,.06)]";
+  "h-14 w-full rounded border border-line-strong px-3 text-center font-display text-28 font-bold tabular-nums outline-none focus:border-ink focus:shadow-[0_0_0_3px_rgba(22,22,26,.06)]";
 
 /**
  * Abrir cuenta de comedor escribiendo el número de mesa.
@@ -95,8 +95,8 @@ export function ModalNumeroMesa({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" role="dialog" aria-modal="true">
       <div className="w-full max-w-[420px] rounded-lg bg-surface p-5 shadow-lg">
-        <h2 className="font-display text-[17px] font-bold">¿Qué mesa?</h2>
-        <p className="mt-1 text-[12.5px] text-ink-3">Escribe el número y presiona Enter.</p>
+        <h2 className="font-display text-18 font-bold">¿Qué mesa?</h2>
+        <p className="mt-1 text-13 text-ink-3">Escribe el número y presiona Enter.</p>
 
         <input
           ref={campo}
@@ -116,18 +116,18 @@ export function ModalNumeroMesa({
           }}
         />
 
-        {error && <p className="mt-3 text-[13px] font-medium text-danger" role="alert">{error}</p>}
+        {error && <p className="mt-3 text-13 font-medium text-danger" role="alert">{error}</p>}
 
         {ofrecerCrear && (
-          <div className="mt-3 rounded border border-[#F0DCC0] bg-warning-soft px-3 py-2.5">
-            <p className="text-[13px] font-medium text-warning">
+          <div className="mt-3 rounded border border-warning-line bg-warning-soft px-3 py-2.5">
+            <p className="text-13 font-medium text-warning">
               La mesa {ofrecerCrear} no existe todavía.
             </p>
             <button
               type="button"
               onClick={crear}
               disabled={buscando}
-              className="mt-2 h-9 rounded bg-ink px-3 text-[13px] font-semibold text-white disabled:opacity-50"
+              className="mt-2 h-9 rounded bg-ink px-3 text-13 font-semibold text-white disabled:opacity-50"
             >
               Crearla y abrir cuenta
             </button>
@@ -139,7 +139,7 @@ export function ModalNumeroMesa({
             <button
               type="button"
               onClick={onVerMesas}
-              className="h-10 rounded border border-line-strong px-3 text-[13px] font-semibold text-ink-2 transition hover:border-ink hover:text-ink"
+              className="h-10 rounded border border-line-strong px-3 text-13 font-semibold text-ink-2 transition hover:border-ink hover:text-ink"
             >
               Ver mesas
             </button>
@@ -150,7 +150,7 @@ export function ModalNumeroMesa({
             <button
               type="button"
               onClick={onCerrar}
-              className="h-10 rounded border border-line-strong px-4 text-[13.5px] font-semibold text-ink-2 transition hover:border-ink hover:text-ink"
+              className="h-10 rounded border border-line-strong px-4 text-14 font-semibold text-ink-2 transition hover:border-ink hover:text-ink"
             >
               Cancelar
             </button>

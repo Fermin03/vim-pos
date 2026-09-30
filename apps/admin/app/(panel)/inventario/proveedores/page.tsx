@@ -9,7 +9,7 @@ import {
 import { mensajeError } from "../../../lib/errores";
 
 const input = "h-11 w-full rounded border border-line-strong px-3 text-sm outline-none focus:border-ink focus:shadow-[0_0_0_3px_rgba(22,22,26,.06)]";
-const label = "mb-1.5 block text-[13px] font-medium text-ink-2";
+const label = "mb-1.5 block text-13 font-medium text-ink-2";
 
 type Form = { nombre: string; rfc: string; telefono: string; email: string; notas: string };
 const VACIO: Form = { nombre: "", rfc: "", telefono: "", email: "", notas: "" };
@@ -73,9 +73,9 @@ export default function ProveedoresPage() {
         {filas === null && <p className="text-sm text-ink-3">Cargando…</p>}
         {filas !== null && (
           <TablaScroll min={720}>
-            <table className="w-full text-[13.5px]">
+            <table className="w-full text-14">
               <thead>
-                <tr className="border-b border-line text-left text-[11.5px] uppercase tracking-[0.04em] text-ink-3">
+                <tr className="border-b border-line text-left text-12 uppercase tracking-[0.04em] text-ink-3">
                   <th className="py-2 pr-3 font-semibold">Nombre</th>
                   <th className="py-2 pr-3 font-semibold">RFC</th>
                   <th className="py-2 pr-3 font-semibold">Teléfono</th>
@@ -87,7 +87,7 @@ export default function ProveedoresPage() {
                 {filas.map((p) => (
                   <tr key={p.id} className="h-10 border-b border-line-soft hover:bg-hover">
                     <td className="pr-3 font-medium">{p.nombre}</td>
-                    <td className="pr-3 font-mono text-[12.5px] text-ink-2">{p.rfc ?? "—"}</td>
+                    <td className="pr-3 font-mono text-13 text-ink-2">{p.rfc ?? "—"}</td>
                     <td className="pr-3 text-ink-2">{p.telefono ?? "—"}</td>
                     <td className="pr-3 text-right tabular-nums">{p.compras}</td>
                     <td className="text-right">

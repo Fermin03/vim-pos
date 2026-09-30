@@ -145,8 +145,8 @@ export function PantallaInicio({
         <div className="flex min-w-0 items-center gap-3">
           <LogoVim className="h-8 w-8 flex-shrink-0" />
           <div className="min-w-0">
-            <div className="truncate font-display text-[13.5px] font-semibold tracking-tight">{caja.sucursalNombre}</div>
-            <div className="truncate text-[11px] text-ink-3">
+            <div className="truncate font-display text-14 font-semibold tracking-tight">{caja.sucursalNombre}</div>
+            <div className="truncate text-11 text-ink-3">
               {caja.nombre} ·{" "}
               {turno ? (
                 <span className="text-success">Turno {turno.codigo_turno}</span>
@@ -158,18 +158,18 @@ export function PantallaInicio({
         </div>
         <div className="flex flex-shrink-0 items-center gap-3">
           <div className="flex items-center gap-2">
-            <span className="flex h-8 w-8 items-center justify-center rounded-full bg-hover font-display text-[12px] font-semibold text-ink-2">
+            <span className="flex h-8 w-8 items-center justify-center rounded-full bg-hover font-display text-12 font-semibold text-ink-2">
               {empleado.nombre.split(/\s+/).slice(0, 2).map((p) => p[0]).join("").toUpperCase()}
             </span>
             <div className="hidden sm:block">
-              <div className="text-[12.5px] font-semibold leading-tight">{empleado.nombre}</div>
-              <div className="text-[10.5px] text-ink-3">{empleado.rol === "CAJERO" ? "Cajero" : empleado.rol}</div>
+              <div className="text-13 font-semibold leading-tight">{empleado.nombre}</div>
+              <div className="text-11 text-ink-3">{empleado.rol === "CAJERO" ? "Cajero" : empleado.rol}</div>
             </div>
           </div>
           <button
             type="button"
             onClick={onMenu}
-            className="flex h-8 items-center gap-1.5 rounded border border-line-strong px-2.5 text-[12.5px] font-semibold text-ink-2 transition hover:border-ink hover:text-ink"
+            className="flex h-8 items-center gap-1.5 rounded border border-line-strong px-2.5 text-13 font-semibold text-ink-2 transition hover:border-ink hover:text-ink"
           >
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" className="h-4 w-4"><path d="M4 6h16M4 12h16M4 18h16" /></svg>
             Menú
@@ -182,7 +182,7 @@ export function PantallaInicio({
           type="button"
           onClick={onPedidosApps}
           role="alert"
-          className="mx-4 mt-3 flex flex-shrink-0 items-center gap-2 rounded border border-danger bg-danger-soft px-3 py-2.5 text-left text-[14px] font-semibold text-danger"
+          className="mx-4 mt-3 flex flex-shrink-0 items-center gap-2 rounded border border-danger bg-danger-soft px-3 py-2.5 text-left text-14 font-semibold text-danger"
         >
           <span className="h-2.5 w-2.5 flex-shrink-0 rounded-full bg-danger" />
           {expiradosApps === 1 ? "Se venció 1 pedido de app sin aceptar." : `Se vencieron ${expiradosApps} pedidos de apps sin aceptar.`} Toca para ver Pedidos de apps.
@@ -246,14 +246,14 @@ export function PantallaInicio({
           <button
             type="button"
             onClick={onAbrirTurno}
-            className="flex items-center gap-3 rounded-xl border border-[#E8DCC0] bg-warning-soft px-5 py-3 text-left transition hover:border-warning"
+            className="flex items-center gap-3 rounded-xl border border-warning-line bg-warning-soft px-5 py-3 text-left transition hover:border-warning"
           >
             <span className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full bg-warning/15 text-warning">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5"><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></svg>
             </span>
             <span>
-              <span className="block font-display text-[15px] font-semibold tracking-tight">Abre el turno para empezar a vender</span>
-              <span className="mt-0.5 block text-[12.5px] text-ink-2">Declara el fondo con el que arranca la caja.</span>
+              <span className="block font-display text-15 font-semibold tracking-tight">Abre el turno para empezar a vender</span>
+              <span className="mt-0.5 block text-13 text-ink-2">Declara el fondo con el que arranca la caja.</span>
             </span>
           </button>
         )}
@@ -366,23 +366,23 @@ export function PantallaInicio({
           {/* Esta computadora es el hub de la LAN: al apagarla, la cocina y cualquier segunda caja
               se quedan sin backend. Decirlo es la diferencia entre cerrar a propósito y descubrir
               a media comida que la cocina dejó de recibir comandas. */}
-          <p className="mt-2 text-[13.5px] leading-snug text-ink-2">
+          <p className="mt-2 text-14 leading-snug text-ink-2">
             La cocina y las demás pantallas conectadas a esta computadora dejarán de funcionar
             hasta que la vuelvas a abrir.
           </p>
           {!sinTurno && (
-            <p className="mt-2 text-[13.5px] font-semibold leading-snug text-ink-2">
+            <p className="mt-2 text-14 font-semibold leading-snug text-ink-2">
               Además, la caja tiene un turno abierto. Se queda abierto y podrás retomarlo al volver.
             </p>
           )}
-          <p className="mt-2 text-[12.5px] leading-snug text-ink-3">
+          <p className="mt-2 text-13 leading-snug text-ink-3">
             Antes de cerrar se guarda un respaldo. No se pierde ninguna venta.
           </p>
           <div className="mt-5 flex gap-2">
             <button
               type="button"
               onClick={() => setConfirmandoSalir(false)}
-              className="h-11 flex-1 rounded border border-line-strong text-[14px] font-semibold text-ink-2 transition hover:border-ink hover:text-ink"
+              className="h-11 flex-1 rounded border border-line-strong text-14 font-semibold text-ink-2 transition hover:border-ink hover:text-ink"
             >
               Cancelar
             </button>

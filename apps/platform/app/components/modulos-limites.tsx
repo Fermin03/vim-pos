@@ -73,12 +73,12 @@ export function ModulosLimites({ d, nombre, accion, busy }: { d: Detalle; nombre
               return (
                 <li key={m.codigo} className="flex items-center justify-between gap-3 rounded border border-line px-3 py-2">
                   <div className="min-w-0">
-                    <div className="text-[13px] font-semibold">{m.nombre}</div>
-                    <div className={["text-[11.5px]", m.porAddon ? (permitido ? "text-success" : "text-ink-3") : o.clase].join(" ")}>
+                    <div className="text-13 font-semibold">{m.nombre}</div>
+                    <div className={["text-12", m.porAddon ? (permitido ? "text-success" : "text-ink-3") : o.clase].join(" ")}>
                       {m.porAddon ? (permitido ? `Por el add-on ${m.nombre}` : `Sin add-on ${m.nombre} · se activa arriba, en Add-ons`) : o.texto}
                     </div>
                     {permitido && !efectivo && m.interruptorDueno && (
-                      <div className="text-[11.5px] text-ink-3">Permitido, pero el dueño no lo ha encendido en su admin.</div>
+                      <div className="text-12 text-ink-3">Permitido, pero el dueño no lo ha encendido en su admin.</div>
                     )}
                   </div>
                   {!m.porAddon && (
@@ -87,7 +87,7 @@ export function ModulosLimites({ d, nombre, accion, busy }: { d: Detalle; nombre
                         <button
                           onClick={() => void accion({ accion: "modulo_segun_plan", codigo: m.codigo })}
                           disabled={busy}
-                          className="btn h-8 rounded px-2 text-[12px] font-semibold text-ink-3 hover:bg-hover disabled:opacity-50"
+                          className="btn h-8 rounded px-2 text-12 font-semibold text-ink-3 hover:bg-hover disabled:opacity-50"
                         >
                           Según plan
                         </button>
@@ -95,7 +95,7 @@ export function ModulosLimites({ d, nombre, accion, busy }: { d: Detalle; nombre
                       <button
                         onClick={() => setPendiente({ tipo: permitido ? "quitar" : "permitir", codigo: m.codigo, nombre: m.nombre })}
                         disabled={busy}
-                        className={["btn h-8 rounded px-3 text-[12.5px] font-semibold disabled:opacity-50", permitido ? "border border-line-strong hover:bg-hover" : "bg-ink text-white"].join(" ")}
+                        className={["btn h-8 rounded px-3 text-13 font-semibold disabled:opacity-50", permitido ? "border border-line-strong hover:bg-hover" : "bg-ink text-white"].join(" ")}
                       >
                         {permitido ? "Quitar" : "Permitir"}
                       </button>
@@ -109,13 +109,13 @@ export function ModulosLimites({ d, nombre, accion, busy }: { d: Detalle; nombre
 
         <div>
           <label className={label}>Límites</label>
-          <p className="mb-2 text-[12px] text-ink-3">En gris, lo que da el plan. Escribe un número para hacer una excepción; vacío = según plan.</p>
+          <p className="mb-2 text-12 text-ink-3">En gris, lo que da el plan. Escribe un número para hacer una excepción; vacío = según plan.</p>
           {CLAVES.map((k) => {
             const delPlan = lim?.del_plan[k];
             return (
               <div key={k} className="mb-2 flex items-center gap-3">
-                <label className="w-36 text-[13px]" htmlFor={`lim-${k}`}>{NOMBRE_LIMITE[k]}</label>
-                <span className="w-24 text-[12px] text-ink-3">plan: {delPlan ?? "sin límite"}</span>
+                <label className="w-36 text-13" htmlFor={`lim-${k}`}>{NOMBRE_LIMITE[k]}</label>
+                <span className="w-24 text-12 text-ink-3">plan: {delPlan ?? "sin límite"}</span>
                 <input
                   id={`lim-${k}`}
                   className={`${input} w-24`}
@@ -130,12 +130,12 @@ export function ModulosLimites({ d, nombre, accion, busy }: { d: Detalle; nombre
           <button
             onClick={() => setPendiente({ tipo: "limites", valores: f })}
             disabled={busy || CLAVES.every((k) => f[k] === (lim?.excepcion[k]?.toString() ?? ""))}
-            className="btn mt-1 h-9 rounded border border-line-strong px-3 text-[13px] font-semibold hover:bg-hover disabled:opacity-50"
+            className="btn mt-1 h-9 rounded border border-line-strong px-3 text-13 font-semibold hover:bg-hover disabled:opacity-50"
           >
             Guardar límites
           </button>
           {lim?.excepcion.motivo && CLAVES.some((k) => lim.excepcion[k] !== null) && (
-            <p className="mt-2 text-[11.5px] text-ink-3">Excepción vigente: {lim.excepcion.motivo}</p>
+            <p className="mt-2 text-12 text-ink-3">Excepción vigente: {lim.excepcion.motivo}</p>
           )}
         </div>
       </div>

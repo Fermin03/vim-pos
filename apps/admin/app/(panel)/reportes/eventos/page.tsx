@@ -35,7 +35,7 @@ export default function VentasPorEventoPage() {
       celda: (f) => (
         <>
           <span className="font-medium">{f.evento}</span>
-          {f.tipo && <span className="ml-2 whitespace-nowrap rounded-full bg-sel px-2 py-0.5 text-[12px] font-semibold text-ink-2">{TIPO[f.tipo] ?? f.tipo}</span>}
+          {f.tipo && <span className="ml-2 whitespace-nowrap rounded-full bg-sel px-2 py-0.5 text-12 font-semibold text-ink-2">{TIPO[f.tipo] ?? f.tipo}</span>}
         </>
       ),
     },

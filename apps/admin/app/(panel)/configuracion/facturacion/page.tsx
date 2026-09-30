@@ -32,9 +32,9 @@ import { mensajeError } from "../../../lib/errores";
  */
 
 const input =
-  "h-11 w-full rounded border border-line-strong bg-surface px-3 text-[15px] outline-none transition-[border-color,box-shadow] duration-150 focus-visible:border-ink focus-visible:shadow-[0_0_0_3px_rgba(22,22,26,.08)] aria-[invalid=true]:border-danger";
-const label = "mb-1.5 block text-[14px] font-semibold text-ink";
-const ayuda = "mt-1.5 text-[13px] leading-snug text-ink-2";
+  "h-11 w-full rounded border border-line-strong bg-surface px-3 text-15 outline-none transition-[border-color,box-shadow] duration-150 focus-visible:border-ink focus-visible:shadow-[0_0_0_3px_rgba(22,22,26,.08)] aria-[invalid=true]:border-danger";
+const label = "mb-1.5 block text-14 font-semibold text-ink";
+const ayuda = "mt-1.5 text-13 leading-snug text-ink-2";
 const RFC_REGEX = /^[A-ZÑ&]{3,4}[0-9]{6}[A-Z0-9]{3}$/;
 
 type Aviso = { tono: "ok" | "error"; texto: string } | null;
@@ -44,7 +44,7 @@ function AvisoPaso({ aviso }: { aviso: Aviso }) {
   return (
     <p
       role={aviso.tono === "error" ? "alert" : "status"}
-      className={`mt-4 rounded border px-3 py-2 text-[14px] font-medium ${aviso.tono === "error" ? "border-danger/30 bg-danger-soft text-danger" : "border-success/30 bg-success-soft text-success"}`}
+      className={`mt-4 rounded border px-3 py-2 text-14 font-medium ${aviso.tono === "error" ? "border-danger/30 bg-danger-soft text-danger" : "border-success/30 bg-success-soft text-success"}`}
     >
       {aviso.texto}
     </p>
@@ -60,7 +60,7 @@ function Paso({
     <section id={id} aria-labelledby={`${id}-titulo`} className={`mb-5 scroll-mt-6 rounded-lg border bg-surface p-5 ${bloqueado ? "border-line opacity-60" : "border-line"}`}>
       <div className="flex items-start gap-3.5">
         <span
-          className={`flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full font-display text-[14px] font-bold ${hecho ? "bg-success text-white" : "bg-hover text-ink-2"}`}
+          className={`flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full font-display text-14 font-bold ${hecho ? "bg-success text-white" : "bg-hover text-ink-2"}`}
           aria-hidden="true"
         >
           {hecho ? (
@@ -68,11 +68,11 @@ function Paso({
           ) : numero}
         </span>
         <div className="min-w-0 flex-1">
-          <h2 id={`${id}-titulo`} className="font-display text-[17px] font-semibold tracking-tight">
+          <h2 id={`${id}-titulo`} className="font-display text-18 font-semibold tracking-tight">
             {titulo}
             <span className="sr-only">{hecho ? " (listo)" : " (pendiente)"}</span>
           </h2>
-          {resumen && <div className="mt-1 text-[14px] text-ink-2">{resumen}</div>}
+          {resumen && <div className="mt-1 text-14 text-ink-2">{resumen}</div>}
           <div className="mt-4">{children}</div>
         </div>
       </div>
@@ -326,11 +326,11 @@ export default function FacturacionPage() {
                 {estado.lista ? (
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5"><path d="M20 6 9 17l-5-5" /></svg>
                 ) : (
-                  <span className="font-display text-[16px] font-bold">{estado.faltan.length}</span>
+                  <span className="font-display text-16 font-bold">{estado.faltan.length}</span>
                 )}
               </span>
               <div className="min-w-0">
-                <div className="font-display text-[18px] font-bold leading-tight">
+                <div className="font-display text-18 font-bold leading-tight">
                   {estado.lista
                     ? "Lista para facturar"
                     : estado.selloVencido
@@ -339,7 +339,7 @@ export default function FacturacionPage() {
                         ? "La facturación está en pausa"
                         : `Te ${estado.faltan.length === 1 ? "falta 1 paso" : `faltan ${estado.faltan.length} pasos`} para facturar`}
                 </div>
-                <div className="text-[14px] text-ink-2">
+                <div className="text-14 text-ink-2">
                   {estado.faltan.length === 0
                     ? "Tus clientes ya pueden pedir factura en el portal y tú emitirlas desde Facturación."
                     : `Falta: ${estado.faltan.join(", ")}.`}
@@ -434,9 +434,9 @@ export default function FacturacionPage() {
             >
               {emisor.csd.numeroCertificado && !mostrarFormSello && (
                 <div className="flex flex-wrap items-center gap-3">
-                  <span className="text-[14px] text-ink-2">Certificado {emisor.csd.numeroCertificado}</span>
+                  <span className="text-14 text-ink-2">Certificado {emisor.csd.numeroCertificado}</span>
                   <Button variant="ghost" onClick={() => { setCambiandoSello(true); setAvisoSello(null); }}>Reemplazar sello</Button>
-                  <button type="button" onClick={() => void quitarSello()} disabled={subiendo} className="h-11 rounded px-2 text-[14px] font-semibold text-danger transition-colors hover:bg-danger-soft disabled:opacity-50">
+                  <button type="button" onClick={() => void quitarSello()} disabled={subiendo} className="h-11 rounded px-2 text-14 font-semibold text-danger transition-colors hover:bg-danger-soft disabled:opacity-50">
                     Retirar sello
                   </button>
                 </div>
@@ -495,7 +495,7 @@ export default function FacturacionPage() {
                   type="button"
                   onClick={() => void cambiarEstado("INACTIVO")}
                   disabled={activando}
-                  className="-ml-2 h-11 rounded px-2 text-[14px] font-semibold text-ink-2 transition-colors hover:bg-hover hover:text-ink disabled:opacity-50"
+                  className="-ml-2 h-11 rounded px-2 text-14 font-semibold text-ink-2 transition-colors hover:bg-hover hover:text-ink disabled:opacity-50"
                 >
                   Pausar facturación
                 </button>
@@ -505,7 +505,7 @@ export default function FacturacionPage() {
 
             {/* ── Ajustes ── */}
             <section aria-labelledby="ajustes-titulo" className="mb-6 rounded-lg border border-line bg-surface p-5">
-              <h2 id="ajustes-titulo" className="font-display text-[17px] font-semibold tracking-tight">Ajustes</h2>
+              <h2 id="ajustes-titulo" className="font-display text-18 font-semibold tracking-tight">Ajustes</h2>
               <div className="mt-4 max-w-[400px]">
                 <label className={label} htmlFor="c-per">Factura global: cada cuánto la emites</label>
                 <select id="c-per" className={input} value={periodicidad} onChange={(e) => setPeriodicidad(e.target.value)}>
@@ -516,7 +516,7 @@ export default function FacturacionPage() {
                   facturar tu cliente</b>: con periodicidad diaria, el ticket de ayer ya no se puede facturar hoy.
                 </p>
                 {periodicidad === "05" && (
-                  <p className="mt-2 rounded border border-warning/30 bg-warning-soft px-3 py-2 text-[13px] font-medium text-warning">
+                  <p className="mt-2 rounded border border-warning/30 bg-warning-soft px-3 py-2 text-13 font-medium text-warning">
                     El SAT solo admite bimestral con régimen <b>621 (Incorporación Fiscal)</b>. Con otro, el timbrado se rechaza.
                   </p>
                 )}
@@ -524,14 +524,14 @@ export default function FacturacionPage() {
               <label className="mt-5 flex cursor-pointer items-start gap-3">
                 <input type="checkbox" className="mt-[3px] h-5 w-5 flex-shrink-0 accent-accent" checked={qrTicket} onChange={(e) => setQrTicket(e.target.checked)} />
                 <span className="min-w-0">
-                  <span className="block text-[15px] font-semibold">Imprimir el QR de autofactura en el ticket</span>
-                  <span className="block text-[13px] leading-snug text-ink-2">
+                  <span className="block text-15 font-semibold">Imprimir el QR de autofactura en el ticket</span>
+                  <span className="block text-13 leading-snug text-ink-2">
                     «¿Necesitas factura? Escanea el código» al pie del ticket, con el enlace al portal.
                   </span>
                 </span>
               </label>
               {qrTicket && !estado.lista && (
-                <p className="mt-3 rounded border border-warning/30 bg-warning-soft px-3 py-2 text-[13px] font-medium text-warning">
+                <p className="mt-3 rounded border border-warning/30 bg-warning-soft px-3 py-2 text-13 font-medium text-warning">
                   Todavía no puedes facturar: el ticket ofrecería una factura que aún no puedes emitir.
                 </p>
               )}

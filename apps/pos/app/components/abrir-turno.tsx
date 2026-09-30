@@ -115,10 +115,10 @@ export function AbrirTurno({
 
           {/* Captura del fondo */}
           <div className="rounded-lg border border-line bg-surface p-5">
-            <label className="block text-[13px] font-medium text-ink-2" htmlFor="fondo">
+            <label className="block text-13 font-medium text-ink-2" htmlFor="fondo">
               Fondo inicial (MXN)
             </label>
-            <p className="mb-2 text-[12px] text-ink-3">Suma total del efectivo con el que abres la caja.</p>
+            <p className="mb-2 text-12 text-ink-3">Suma total del efectivo con el que abres la caja.</p>
             <input
               id="fondo"
               className="h-14 w-full rounded border border-line-strong px-4 text-center font-display text-2xl font-bold tabular-nums outline-none focus:border-ink focus:shadow-[0_0_0_3px_rgba(22,22,26,.06)]"
@@ -134,14 +134,14 @@ export function AbrirTurno({
                   key={s}
                   type="button"
                   onClick={() => setFondo(String(s))}
-                  className="rounded border border-line-strong bg-hover px-3 py-1.5 text-[13px] font-semibold text-ink-2 transition hover:border-ink hover:text-ink"
+                  className="rounded border border-line-strong bg-hover px-3 py-1.5 text-13 font-semibold text-ink-2 transition hover:border-ink hover:text-ink"
                 >
                   {fmtMxn(s)}
                 </button>
               ))}
             </div>
 
-            <label className="mt-5 block text-[13px] font-medium text-ink-2" htmlFor="notas">
+            <label className="mt-5 block text-13 font-medium text-ink-2" htmlFor="notas">
               Notas <span className="text-ink-3">· opcional</span>
             </label>
             <input
@@ -156,7 +156,7 @@ export function AbrirTurno({
             {/* B3 — ¿Es un evento o ubicación especial? (Foodtruck §4) */}
             {ofreceEvento && (
             <div className="mt-5 border-t border-line pt-4">
-              <label className="flex cursor-pointer items-center gap-2.5 text-[13.5px] font-medium text-ink-2">
+              <label className="flex cursor-pointer items-center gap-2.5 text-14 font-medium text-ink-2">
                 <input
                   type="checkbox"
                   checked={esEvento}
@@ -182,7 +182,7 @@ export function AbrirTurno({
                           key={s}
                           type="button"
                           onClick={() => setEventoNombre(s)}
-                          className="rounded-full bg-sel px-3 py-1 text-[12px] font-semibold text-ink-2 transition hover:bg-hover"
+                          className="rounded-full bg-sel px-3 py-1 text-12 font-semibold text-ink-2 transition hover:bg-hover"
                         >
                           {s}
                         </button>
@@ -196,7 +196,7 @@ export function AbrirTurno({
                     onChange={(e) => setEventoNotas(e.target.value)}
                     placeholder="Notas del evento · opcional (contacto, stand, condiciones)"
                   />
-                  <p className="mt-1.5 text-[11.5px] text-ink-3">
+                  <p className="mt-1.5 text-12 text-ink-3">
                     Si el organizador cobra comisión, la capturas al cerrar el turno. Las ventas se reportan por evento.
                   </p>
                 </div>
@@ -217,13 +217,13 @@ export function AbrirTurno({
             <button
               type="button"
               onClick={onVolver}
-              className="flex h-11 items-center gap-2 rounded border border-line-strong px-4 text-[13.5px] font-semibold text-ink-2 transition hover:border-ink hover:text-ink"
+              className="flex h-11 items-center gap-2 rounded border border-line-strong px-4 text-14 font-semibold text-ink-2 transition hover:border-ink hover:text-ink"
             >
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4"><path d="M19 12H5M12 19l-7-7 7-7" /></svg>
               Volver
             </button>
             <div className="flex items-center gap-3">
-              <span className="text-[13px] text-ink-3">Total fondo</span>
+              <span className="text-13 text-ink-3">Total fondo</span>
               <span className="font-display text-xl font-bold tabular-nums">{fmtMxn(monto)}</span>
               <Button size="lg" onClick={abrir} disabled={!valido || abriendo}>
                 {abriendo ? "Abriendo…" : "Abrir turno"}

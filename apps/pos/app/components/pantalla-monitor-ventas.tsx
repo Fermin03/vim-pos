@@ -69,8 +69,8 @@ export function PantallaMonitorVentas({
       <header className="flex h-[68px] flex-shrink-0 items-center justify-between border-b border-line px-3">
         <BotonVolver onClick={onSalir} />
         <div className="mr-auto">
-          <h1 className="font-display text-[19px] font-semibold tracking-tight">Monitor de ventas</h1>
-          <p className="text-[12.5px] text-ink-3">
+          <h1 className="font-display text-20 font-semibold tracking-tight">Monitor de ventas</h1>
+          <p className="text-13 text-ink-3">
             {caja.nombre} · Turno {turno.codigo_turno}
             {x?.fechaApertura ? ` · desde las ${new Date(x.fechaApertura).toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit", hour12: false })}` : ""}
           </p>
@@ -85,9 +85,9 @@ export function PantallaMonitorVentas({
           <div className="mx-auto max-w-4xl">
             {/* Titular: lo que se vendió en el turno */}
             <div className="mb-5 rounded-xl border border-line bg-ink p-6 text-white">
-              <div className="text-[12px] font-semibold uppercase tracking-[0.06em] text-white/60">Venta del turno</div>
-              <div className="mt-1.5 font-display text-[44px] font-bold leading-none tabular-nums">{fmtMxn(x.ventaNeta)}</div>
-              <div className="mt-3 flex flex-wrap gap-x-6 gap-y-1 text-[13px] text-white/70">
+              <div className="text-12 font-semibold uppercase tracking-[0.06em] text-white/60">Venta del turno</div>
+              <div className="mt-1.5 font-display text-40 font-bold leading-none tabular-nums">{fmtMxn(x.ventaNeta)}</div>
+              <div className="mt-3 flex flex-wrap gap-x-6 gap-y-1 text-13 text-white/70">
                 <span><b className="font-semibold text-white">{x.ticketsPagados}</b> tickets cobrados</span>
                 <span>Ticket promedio <b className="font-semibold text-white">{fmtMxn(stats.ticketPromedio)}</b></span>
                 {x.propinaTotal > 0 && <span>Propinas <b className="font-semibold text-white">{fmtMxn(x.propinaTotal)}</b></span>}
@@ -113,7 +113,7 @@ export function PantallaMonitorVentas({
                   key={t.v}
                   type="button"
                   onClick={() => setFiltro(t.v)}
-                  className={["rounded-md px-4 py-2 text-[13.5px] font-semibold transition", filtro === t.v ? "bg-surface text-ink shadow-sm" : "text-ink-2 hover:text-ink"].join(" ")}
+                  className={["rounded-md px-4 py-2 text-14 font-semibold transition", filtro === t.v ? "bg-surface text-ink shadow-sm" : "text-ink-2 hover:text-ink"].join(" ")}
                 >
                   {t.l}
                 </button>
@@ -157,7 +157,7 @@ export function PantallaMonitorVentas({
             )}
 
             {filtro === "TODO" && (stats.folioInicial || stats.folioFinal) && (
-              <p className="mt-4 text-[12.5px] text-ink-3">
+              <p className="mt-4 text-13 text-ink-3">
                 Folios del turno: <b className="text-ink-2">{stats.folioInicial ?? "—"}</b> → <b className="text-ink-2">{stats.folioFinal ?? "—"}</b>
               </p>
             )}
@@ -171,9 +171,9 @@ export function PantallaMonitorVentas({
 function Tarjeta({ titulo, valor, pie, destacar, alerta }: { titulo: string; valor: string; pie?: string; destacar?: boolean; alerta?: boolean }) {
   return (
     <div className={["rounded-lg border bg-surface p-4", destacar ? "border-ink" : "border-line"].join(" ")}>
-      <div className="text-[11.5px] font-bold uppercase tracking-wide text-ink-3">{titulo}</div>
-      <div className={["mt-1 font-display text-[24px] font-bold tabular-nums", alerta ? "text-warning" : ""].join(" ")}>{valor}</div>
-      {pie && <div className="mt-0.5 text-[11.5px] text-ink-3">{pie}</div>}
+      <div className="text-12 font-bold uppercase tracking-wide text-ink-3">{titulo}</div>
+      <div className={["mt-1 font-display text-24 font-bold tabular-nums", alerta ? "text-warning" : ""].join(" ")}>{valor}</div>
+      {pie && <div className="mt-0.5 text-12 text-ink-3">{pie}</div>}
     </div>
   );
 }
@@ -181,7 +181,7 @@ function Tarjeta({ titulo, valor, pie, destacar, alerta }: { titulo: string; val
 function Bloque({ titulo, children }: { titulo: string; children: React.ReactNode }) {
   return (
     <section className="mb-4 overflow-hidden rounded-lg border border-line bg-surface">
-      <h2 className="border-b border-line bg-sel px-4 py-2.5 text-[12px] font-bold uppercase tracking-wide text-ink-3">{titulo}</h2>
+      <h2 className="border-b border-line bg-sel px-4 py-2.5 text-12 font-bold uppercase tracking-wide text-ink-3">{titulo}</h2>
       <div className="divide-y divide-line">{children}</div>
     </section>
   );
@@ -191,8 +191,8 @@ function Fila({ etiqueta, detalle, valor, pct }: { etiqueta: string; detalle: st
   return (
     <div className="flex items-center gap-4 px-4 py-3">
       <div className="min-w-0 flex-1">
-        <div className="text-[14px] font-semibold">{etiqueta}</div>
-        <div className="text-[12px] text-ink-3">{detalle}</div>
+        <div className="text-14 font-semibold">{etiqueta}</div>
+        <div className="text-12 text-ink-3">{detalle}</div>
       </div>
       <div className="hidden w-40 sm:block">
         <div className="h-2 overflow-hidden rounded-full bg-hover">
@@ -200,13 +200,13 @@ function Fila({ etiqueta, detalle, valor, pct }: { etiqueta: string; detalle: st
         </div>
       </div>
       <div className="w-24 text-right">
-        <div className="font-display text-[15px] font-bold tabular-nums">{valor}</div>
-        <div className="text-[11.5px] text-ink-3 tabular-nums">{pct.toFixed(0)}%</div>
+        <div className="font-display text-15 font-bold tabular-nums">{valor}</div>
+        <div className="text-12 text-ink-3 tabular-nums">{pct.toFixed(0)}%</div>
       </div>
     </div>
   );
 }
 
 function Vacio({ texto }: { texto: string }) {
-  return <p className="px-4 py-6 text-center text-[13px] text-ink-3">{texto}</p>;
+  return <p className="px-4 py-6 text-center text-13 text-ink-3">{texto}</p>;
 }

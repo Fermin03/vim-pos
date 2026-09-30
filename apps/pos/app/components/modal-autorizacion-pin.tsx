@@ -104,8 +104,8 @@ export function ModalAutorizacionPin({
 
       <div className="mb-4 text-center">
         <h3 className="mb-[6px] font-display text-xl font-semibold tracking-tight">Autorización requerida</h3>
-        <p className="text-[13.5px] font-medium text-ink-2">{descripcion}</p>
-        <p className="mt-1 text-[12.5px] text-ink-3">
+        <p className="text-14 font-medium text-ink-2">{descripcion}</p>
+        <p className="mt-1 text-13 text-ink-3">
           Lo ejecuta <b className="font-semibold text-ink-2">{ejecutaNombre}</b> · debe autorizar {quienAutoriza ?? "un supervisor o admin"}.
         </p>
       </div>
@@ -116,7 +116,7 @@ export function ModalAutorizacionPin({
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" className="h-6 w-6"><path d="M20 6 9 17l-5-5" /></svg>
           </div>
           <p className="font-display text-base font-semibold text-success">Autorizado</p>
-          <p className="text-[12.5px] text-ink-3">La operación se ejecutará.</p>
+          <p className="text-13 text-ink-3">La operación se ejecutará.</p>
         </div>
       ) : (
         <PinKeypad
@@ -134,7 +134,7 @@ export function ModalAutorizacionPin({
         type="button"
         onClick={onCancelar}
         disabled={busy && status === "ok"}
-        className="mt-4 block w-full text-center text-[13px] font-medium text-ink-3 transition-colors hover:text-ink-2 disabled:opacity-50"
+        className="mt-4 block w-full text-center text-13 font-medium text-ink-3 transition-colors hover:text-ink-2 disabled:opacity-50"
       >
         Cancelar
       </button>

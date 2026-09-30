@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Button, Modal } from "@vim/ui/styles";
+import { Button, DialogoPeligro, Modal } from "@vim/ui/styles";
 import { PageHeader, PageBody } from "../../../components/page-header";
 import {
   crearRepartidor,
@@ -16,7 +16,7 @@ import { mensajeError } from "../../../lib/errores";
 
 const input =
   "h-11 w-full rounded border border-line-strong px-3 text-sm outline-none focus:border-ink focus:shadow-[0_0_0_3px_rgba(22,22,26,.06)]";
-const label = "mb-1.5 block text-[13px] font-medium text-ink-2";
+const label = "mb-1.5 block text-13 font-medium text-ink-2";
 
 type FormDatos = { nombre: string; telefono: string; notas: string };
 
@@ -112,7 +112,7 @@ export default function RepartidoresPage() {
         right={<Button onClick={nuevo}>Nuevo repartidor</Button>}
       />
       <PageBody>
-        <p className="mb-5 rounded-lg border border-line bg-surface px-4 py-3 text-[13px] leading-relaxed text-ink-2">
+        <p className="mb-5 rounded-lg border border-line bg-surface px-4 py-3 text-13 leading-relaxed text-ink-2">
           Los repartidores <strong>no usan el sistema</strong>: no tienen PIN ni aparecen al elegir
           quién opera la caja. Se registran aquí solo para saber quién llevó cada pedido y poder
           cuadrarle el efectivo cuando regresa.
@@ -141,7 +141,7 @@ export default function RepartidoresPage() {
           <div className="overflow-hidden rounded-lg border border-line bg-surface">
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b border-line bg-bg text-left text-[11.5px] font-bold uppercase tracking-wide text-ink-3">
+                <tr className="border-b border-line bg-bg text-left text-12 font-bold uppercase tracking-wide text-ink-3">
                   <th className="px-4 py-2.5">Nombre</th>
                   <th className="px-4 py-2.5">Teléfono</th>
                   <th className="hidden px-4 py-2.5 lg:table-cell">Notas</th>
@@ -160,7 +160,7 @@ export default function RepartidoresPage() {
                     <td className="px-4 py-3">
                       <span
                         className={[
-                          "inline-block rounded-full px-2 py-0.5 text-[12px] font-semibold",
+                          "inline-block rounded-full px-2 py-0.5 text-12 font-semibold",
                           r.activo ? "bg-success-soft text-success" : "bg-hover text-ink-3",
                         ].join(" ")}
                       >
@@ -172,21 +172,21 @@ export default function RepartidoresPage() {
                         <button
                           type="button"
                           onClick={() => editar(r)}
-                          className="h-9 rounded border border-line-strong px-3 text-[13px] font-semibold text-ink-2 transition hover:border-ink hover:text-ink"
+                          className="h-9 rounded border border-line-strong px-3 text-13 font-semibold text-ink-2 transition hover:border-ink hover:text-ink"
                         >
                           Editar
                         </button>
                         <button
                           type="button"
                           onClick={() => alternarActivo(r)}
-                          className="h-9 rounded border border-line-strong px-3 text-[13px] font-semibold text-ink-2 transition hover:border-ink hover:text-ink"
+                          className="h-9 rounded border border-line-strong px-3 text-13 font-semibold text-ink-2 transition hover:border-ink hover:text-ink"
                         >
                           {r.activo ? "Desactivar" : "Activar"}
                         </button>
                         <button
                           type="button"
                           onClick={() => setBorrar(r)}
-                          className="h-9 rounded border border-line-strong px-3 text-[13px] font-semibold text-danger transition hover:border-danger"
+                          className="h-9 rounded border border-line-strong px-3 text-13 font-semibold text-danger transition hover:border-danger"
                         >
                           Eliminar
                         </button>
@@ -199,7 +199,7 @@ export default function RepartidoresPage() {
           </div>
         )}
 
-        <p className="mt-5 text-[13px] text-ink-3">
+        <p className="mt-5 text-13 text-ink-3">
           ¿Buscabas las cuentas del personal que sí opera el POS?{" "}
           <Link href="/usuarios" className="font-semibold text-ink-2 underline underline-offset-2 hover:text-ink">
             Usuarios y permisos
@@ -248,14 +248,14 @@ export default function RepartidoresPage() {
             />
           </div>
 
-          {error && <p className="mt-3 text-[13px] font-medium text-danger" role="alert">{error}</p>}
+          {error && <p className="mt-3 text-13 font-medium text-danger" role="alert">{error}</p>}
 
           <div className="mt-5 flex gap-2">
             <button
               type="button"
               onClick={() => setEditando(null)}
               disabled={guardando}
-              className="h-11 flex-1 rounded border border-line-strong text-[14px] font-semibold text-ink-2 transition hover:border-ink hover:text-ink disabled:opacity-50"
+              className="h-11 flex-1 rounded border border-line-strong text-14 font-semibold text-ink-2 transition hover:border-ink hover:text-ink disabled:opacity-50"
             >
               Cancelar
             </button>
@@ -267,31 +267,22 @@ export default function RepartidoresPage() {
       )}
 
       {borrar && (
-        <Modal
-          open
-          onClose={() => setBorrar(null)}
-          title="Eliminar repartidor"
-          className="w-[420px] rounded-lg border border-line bg-surface p-6 shadow-[0_18px_44px_rgba(22,22,26,.18)]"
-        >
-          <p className="mt-3 text-sm leading-relaxed text-ink-2">
-            Se quita <strong>{borrar.nombre}</strong> de la lista del POS. Los pedidos que ya
-            repartió conservan su nombre.
-          </p>
-          {error && <p className="mt-3 text-[13px] font-medium text-danger" role="alert">{error}</p>}
-          <div className="mt-5 flex gap-2">
-            <button
-              type="button"
-              onClick={() => setBorrar(null)}
-              disabled={guardando}
-              className="h-11 flex-1 rounded border border-line-strong text-[14px] font-semibold text-ink-2 transition hover:border-ink hover:text-ink disabled:opacity-50"
-            >
-              Cancelar
-            </button>
-            <Button variant="danger" className="flex-1" onClick={confirmarBorrado} disabled={guardando}>
-              {guardando ? "Eliminando…" : "Eliminar"}
-            </Button>
-          </div>
-        </Modal>
+        <DialogoPeligro
+          titulo="¿Eliminar este repartidor?"
+          consecuencia={
+            <>
+              Se quita <strong>{borrar.nombre}</strong> de la lista del POS. Los pedidos que ya
+              repartió conservan su nombre.
+            </>
+          }
+          error={error}
+          boton="Eliminar"
+          ocupado={guardando}
+          textoOcupado="Eliminando…"
+          ancho="sm"
+          onConfirmar={confirmarBorrado}
+          onCerrar={() => setBorrar(null)}
+        />
       )}
     </>
   );

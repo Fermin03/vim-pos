@@ -45,12 +45,12 @@ El 4 conserva una excepción: una caja anterior a 0.4.60 no late, y para ella si
 | Contraste de `ink-3` | Hecho (#36) | Ahora #6E6E74 |
 | Inputs a 16 px | Hecho (#36, #52) | Factura y sitio |
 | Sombra naranja retirada | Hecho | 0 restos en código |
-| Confirmación de peligro compartida | A medias | `useConfirmar` en `@vim/ui` (#38), usado en 12 archivos del admin; la caja y platform tienen la suya |
-| Mapa de etiquetas compartido | A medias | Modos de servicio compartidos (`packages/db/src/modos-servicio.ts`, #38); métodos de pago y apps (`APP_RAPPI`…) siguen copiados en ~6 archivos |
-| Formato de fechas compartido | A medias | `@vim/fecha` en 17 archivos (#38); quedan 3 `fmtDia` locales en el dashboard |
-| Escala tipográfica | A medias | El sitio tiene la suya (`--t-*`); las apps siguen con ~1,760 `text-[Npx]` |
-| Colores suaves a tokens | **Abierto** | 26 hex fijos en `apps/` (#FBECEA ×13, #F6EEDD ×6, #FCF3E6 ×4, #EAF3EE ×3) |
-| `StatusChip` | **Abierto** | 0 usos en admin y platform; el admin dibuja su `EstadoChip` en conciliación |
+| Confirmación de peligro compartida | Hecho (#64) | `DialogoPeligro` en `@vim/ui`: `useConfirmar` y 14 diálogos del admin, 6 de la caja y el `DialogoConfirmar` del panel dibujan con él. Salida "Volver", `AvisoAutorizacion` y `MotivoChips` compartidos en la caja |
+| Mapa de etiquetas compartido | Hecho (#63) | `@vim/db/metodos-pago` (métodos de pago y apps) |
+| Formato de fechas compartido | Hecho (#63) | `diaCorto()` en `@vim/fecha` |
+| Escala tipográfica | Hecho (#64) | 12 pasos (`text-11`…`text-40`) en el preset; 1,620 clases migradas; `pnpm tipografia` en CI. Fuera: los recibos (imitan el papel) |
+| Colores suaves a tokens | Hecho (#63, #64) | Fondos a `*-soft` (#63); bordes de aviso a `*-line` (#64) |
+| `StatusChip` | Hecho (#63) | Admin, platform y caja |
 
 ## Preguntas que quedaron abiertas
 

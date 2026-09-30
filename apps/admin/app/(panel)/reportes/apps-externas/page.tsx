@@ -45,7 +45,7 @@ export default function AppsExternasPage() {
       ancho: 22,
       celda: (f) => {
         const e = ESTADO[f.estado] ?? { label: f.estado, cls: "bg-sel text-ink-2" };
-        return <span className={`whitespace-nowrap rounded px-2 py-0.5 text-[12px] font-semibold ${e.cls}`}>{e.label}</span>;
+        return <span className={`whitespace-nowrap rounded px-2 py-0.5 text-12 font-semibold ${e.cls}`}>{e.label}</span>;
       },
     },
   ];

@@ -78,12 +78,12 @@ export function ModalSesionExpirada({
 
         <div className="mb-5 text-center">
           <h3 className="mb-[7px] font-display text-xl font-semibold tracking-tight">Tu sesión expiró</h3>
-          <p className="text-[13.5px] leading-normal text-ink-2">
+          <p className="text-14 leading-normal text-ink-2">
             Por seguridad cerramos tu sesión tras un rato. Vuelve a entrar para continuar.
           </p>
         </div>
 
-        <p className="mb-5 text-center text-[13px] text-ink-3">
+        <p className="mb-5 text-center text-13 text-ink-3">
           Sesión de <b className="font-semibold text-ink-2">{empleado.nombre}</b> ({ROL_LABEL[empleado.rol] ?? "Empleado"})
         </p>
 
@@ -99,7 +99,7 @@ export function ModalSesionExpirada({
           className="mx-auto w-[208px]"
         />
 
-        <div className="my-4 flex items-start gap-2 rounded border border-line bg-hover px-3 py-2.5 text-[12.5px] leading-snug text-ink-2">
+        <div className="my-4 flex items-start gap-2 rounded border border-line bg-hover px-3 py-2.5 text-13 leading-snug text-ink-2">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mt-px h-[15px] w-[15px] flex-shrink-0 text-success">
             <path d="M20 6 9 17l-5-5" />
           </svg>
@@ -113,7 +113,7 @@ export function ModalSesionExpirada({
         <button
           type="button"
           onClick={onCerrarSesion}
-          className="mt-4 block w-full text-center text-[13px] font-medium text-ink-3 transition-colors hover:text-ink-2"
+          className="mt-4 block w-full text-center text-13 font-medium text-ink-3 transition-colors hover:text-ink-2"
         >
           Cerrar sesión
         </button>

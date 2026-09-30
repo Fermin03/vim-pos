@@ -1,7 +1,7 @@
 "use client";
 import { PantallaEstado } from "../components/pantalla-estado";
 
-const btnAccent = "inline-flex items-center gap-2 rounded-lg bg-accent px-5 py-2.5 text-[14px] font-semibold text-white transition hover:brightness-95";
+const btnAccent = "inline-flex items-center gap-2 rounded-lg bg-accent px-5 py-2.5 text-14 font-semibold text-white transition hover:brightness-95";
 
 export default function Mantenimiento() {
   return (

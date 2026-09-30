@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useMemo, useState } from "react";
-import { Button, Modal } from "@vim/ui/styles";
+import { Button, DialogoPeligro } from "@vim/ui/styles";
 import { PageHeader, PageBody } from "../../../components/page-header";
 import { CatalogoTabs } from "../../../components/catalogo-tabs";
 import { ModalCategoria } from "../../../components/modal-categoria";
@@ -137,7 +137,7 @@ export default function CategoriasPage() {
                 type="button"
                 onClick={() => setFiltro(f)}
                 className={[
-                  "flex-shrink-0 whitespace-nowrap rounded-[4px] px-3 py-2.5 text-[13px] font-semibold transition lg:py-[7px]",
+                  "flex-shrink-0 whitespace-nowrap rounded-[4px] px-3 py-2.5 text-13 font-semibold transition lg:py-[7px]",
                   filtro === f ? "bg-surface text-ink shadow-sm" : "text-ink-2 hover:text-ink",
                 ].join(" ")}
               >
@@ -160,10 +160,10 @@ export default function CategoriasPage() {
             <table className="w-full border-collapse">
               <thead>
                 <tr>
-                  <th className="border-b border-line bg-sel px-4 py-[13px] text-left text-[11.5px] font-bold uppercase tracking-wide text-ink-3">Categoría</th>
-                  <th className="w-[130px] border-b border-line bg-sel px-4 py-[13px] text-left text-[11.5px] font-bold uppercase tracking-wide text-ink-3">Productos</th>
-                  <th className="w-[130px] border-b border-line bg-sel px-4 py-[13px] text-center text-[11.5px] font-bold uppercase tracking-wide text-ink-3">Orden</th>
-                  <th className="w-[120px] border-b border-line bg-sel px-4 py-[13px] text-left text-[11.5px] font-bold uppercase tracking-wide text-ink-3">Estado</th>
+                  <th className="border-b border-line bg-sel px-4 py-[13px] text-left text-12 font-bold uppercase tracking-wide text-ink-3">Categoría</th>
+                  <th className="w-[130px] border-b border-line bg-sel px-4 py-[13px] text-left text-12 font-bold uppercase tracking-wide text-ink-3">Productos</th>
+                  <th className="w-[130px] border-b border-line bg-sel px-4 py-[13px] text-center text-12 font-bold uppercase tracking-wide text-ink-3">Orden</th>
+                  <th className="w-[120px] border-b border-line bg-sel px-4 py-[13px] text-left text-12 font-bold uppercase tracking-wide text-ink-3">Estado</th>
                   <th className="w-[104px] border-b border-line bg-sel px-4 py-[13px]"></th>
                 </tr>
               </thead>
@@ -174,13 +174,13 @@ export default function CategoriasPage() {
                       <div className="flex items-center gap-3">
                         <Dot cat={c} />
                         <div>
-                          <div className="text-[15px] font-semibold">{c.nombre}</div>
-                          {c.descripcion && <div className="mt-px text-[12.5px] text-ink-3">{c.descripcion}</div>}
+                          <div className="text-15 font-semibold">{c.nombre}</div>
+                          {c.descripcion && <div className="mt-px text-13 text-ink-3">{c.descripcion}</div>}
                         </div>
                       </div>
                     </td>
                     <td className="px-4 py-3.5">
-                      <span className="font-display text-[15px] font-semibold tabular-nums">{c.nProductos}</span>{" "}
+                      <span className="font-display text-15 font-semibold tabular-nums">{c.nProductos}</span>{" "}
                       <span className="text-xs text-ink-3">productos</span>
                     </td>
                     <td className="px-2 py-3.5">
@@ -195,7 +195,7 @@ export default function CategoriasPage() {
                         >
                           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-4 w-4" aria-hidden="true"><path d="M12 19V5M5 12l7-7 7 7" /></svg>
                         </button>
-                        <span className="min-w-[22px] text-center font-display text-[13px] font-semibold tabular-nums text-ink-2">{c.orden_visualizacion}</span>
+                        <span className="min-w-[22px] text-center font-display text-13 font-semibold tabular-nums text-ink-2">{c.orden_visualizacion}</span>
                         <button
                           type="button"
                           aria-label={`Bajar ${c.nombre}`}
@@ -211,7 +211,7 @@ export default function CategoriasPage() {
                     <td className="px-4 py-3.5">
                       <span
                         className={[
-                          "inline-flex items-center gap-1.5 rounded-full px-[11px] py-1 text-[12.5px] font-semibold",
+                          "inline-flex items-center gap-1.5 rounded-full px-[11px] py-1 text-13 font-semibold",
                           c.activa ? "bg-success-soft text-success" : "bg-hover text-ink-3",
                         ].join(" ")}
                       >
@@ -235,7 +235,7 @@ export default function CategoriasPage() {
                           title="Eliminar"
                           aria-label={`Eliminar ${c.nombre}`}
                           onClick={() => setBorrar(c)}
-                          className="flex h-10 w-10 items-center justify-center rounded border border-transparent lg:h-8 lg:w-8 text-ink-3 transition hover:border-[#E8C5C0] hover:text-danger"
+                          className="flex h-10 w-10 items-center justify-center rounded border border-transparent lg:h-8 lg:w-8 text-ink-3 transition hover:border-danger-line hover:text-danger"
                         >
                           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-4 w-4"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" /></svg>
                         </button>
@@ -263,7 +263,7 @@ export default function CategoriasPage() {
         )}
 
         {cats !== null && visibles.length > 0 && (
-          <p className="mt-4 text-[13px] text-ink-3">
+          <p className="mt-4 text-13 text-ink-3">
             Mostrando <b className="text-ink-2">{visibles.length}</b> de <b className="text-ink-2">{cats.length}</b> categorías
           </p>
         )}
@@ -281,30 +281,27 @@ export default function CategoriasPage() {
       )}
 
       {borrar && (
-        <Modal
-          open
-          onClose={() => setBorrar(null)}
-          title="Eliminar categoría"
-          className="w-full max-w-[400px] rounded-lg border border-line bg-surface p-6 shadow-xl"
-        >
-          <p className="text-sm text-ink-2">
-            ¿Eliminar <b className="text-ink">{borrar.nombre}</b>? Esta acción la oculta del catálogo y del POS.
-            {borrar.nProductos > 0 && (
-              <>
-                {" "}
-                Tiene <b>{borrar.nProductos}</b> producto(s) asociados.
-              </>
-            )}
-          </p>
-          <div className="mt-6 flex justify-end gap-2">
-            <Button variant="ghost" onClick={() => setBorrar(null)} disabled={borrando}>
-              Cancelar
-            </Button>
-            <Button variant="danger" onClick={confirmarBorrado} disabled={borrando}>
-              {borrando ? "Eliminando…" : "Eliminar"}
-            </Button>
-          </div>
-        </Modal>
+        <DialogoPeligro
+          error={error}
+          titulo="¿Eliminar esta categoría?"
+          consecuencia={
+            <>
+              <b className="text-ink">{borrar.nombre}</b> se ocultará del catálogo y del POS.
+              {borrar.nProductos > 0 && (
+                <>
+                  {" "}
+                  Tiene <b>{borrar.nProductos}</b> producto(s) asociados.
+                </>
+              )}
+            </>
+          }
+          boton="Eliminar"
+          ocupado={borrando}
+          textoOcupado="Eliminando…"
+          ancho="sm"
+          onConfirmar={confirmarBorrado}
+          onCerrar={() => setBorrar(null)}
+        />
       )}
     </>
   );

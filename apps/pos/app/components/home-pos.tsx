@@ -1556,8 +1556,8 @@ export function HomePos({
             <div className="mx-auto mb-3 flex h-16 w-16 items-center justify-center rounded-full bg-danger/10 text-danger">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="h-8 w-8"><path d="M12 9v4" /><path d="M12 17h.01" /><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z" /></svg>
             </div>
-            <div className="font-display text-[22px] font-semibold">{avisoReparto.titulo}</div>
-            <p className="mt-2 text-[14px] leading-relaxed text-ink-2">{avisoReparto.texto}</p>
+            <div className="font-display text-24 font-semibold">{avisoReparto.titulo}</div>
+            <p className="mt-2 text-14 leading-relaxed text-ink-2">{avisoReparto.texto}</p>
             <Button className="mt-5 w-full" onClick={() => setAvisoReparto(null)}>Entendido</Button>
           </div>
         </div>
@@ -1574,8 +1574,8 @@ export function HomePos({
       {salidaPendiente && !esperaPidiendoEtiqueta && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/40 p-4" role="dialog" aria-modal="true">
           <div className="w-full max-w-md rounded-xl bg-surface p-6 shadow-xl">
-            <div className="font-display text-[19px] font-semibold">Esta cuenta ya tiene folio</div>
-            <p className="mt-2 text-[13.5px] leading-snug text-ink-2">
+            <div className="font-display text-20 font-semibold">Esta cuenta ya tiene folio</div>
+            <p className="mt-2 text-14 leading-snug text-ink-2">
               {ticketBd?.folio ? <><span className="font-semibold">{ticketBd.folio}</span> · </> : null}
               {fmtMxn(ticketBd?.total ?? 0)}.{" "}
               {carrito.modoServicio === "PARA_LLEVAR"
@@ -1599,14 +1599,14 @@ export function HomePos({
               <button
                 type="button"
                 onClick={() => setCancelandoTicket(true)}
-                className="h-11 rounded border border-danger/40 text-[14px] font-semibold text-danger transition hover:bg-danger/5"
+                className="h-11 rounded border border-danger/40 text-14 font-semibold text-danger transition hover:bg-danger/5"
               >
                 Cancelar la cuenta
               </button>
               <button
                 type="button"
                 onClick={() => setSalidaPendiente(null)}
-                className="h-11 rounded border border-line-strong text-[14px] font-semibold text-ink-2 transition hover:border-ink hover:text-ink"
+                className="h-11 rounded border border-line-strong text-14 font-semibold text-ink-2 transition hover:border-ink hover:text-ink"
               >
                 Seguir capturando
               </button>
@@ -1617,8 +1617,8 @@ export function HomePos({
       {confirmandoCierre && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/40 p-4" role="dialog" aria-modal="true">
           <div className="w-full max-w-md rounded-xl bg-surface p-6 shadow-xl">
-            <div className="font-display text-[19px] font-semibold">¿Cerrar el turno actual?</div>
-            <p className="mt-2 text-[13.5px] leading-snug text-ink-2">
+            <div className="font-display text-20 font-semibold">¿Cerrar el turno actual?</div>
+            <p className="mt-2 text-14 leading-snug text-ink-2">
               Vas a pasar al arqueo de caja: contar el efectivo, declararlo y generar el corte.
               El turno queda cerrado y hay que abrir uno nuevo para seguir vendiendo.
             </p>
@@ -1626,7 +1626,7 @@ export function HomePos({
               <button
                 type="button"
                 onClick={() => setConfirmandoCierre(false)}
-                className="h-11 flex-1 rounded border border-line-strong text-[14px] font-semibold text-ink-2 transition hover:border-ink hover:text-ink"
+                className="h-11 flex-1 rounded border border-line-strong text-14 font-semibold text-ink-2 transition hover:border-ink hover:text-ink"
               >
                 Cancelar
               </button>
@@ -1812,7 +1812,7 @@ export function HomePos({
                 <button
                   type="button"
                   onClick={() => setAsignandoRepartidor({ ticketId: c.ticketId, folio: c.folio, total: c.total, recargar })}
-                  className="flex h-9 flex-shrink-0 items-center rounded border border-line-strong px-3 text-[13px] font-semibold text-ink-2 transition hover:border-ink hover:text-ink"
+                  className="flex h-9 flex-shrink-0 items-center rounded border border-line-strong px-3 text-13 font-semibold text-ink-2 transition hover:border-ink hover:text-ink"
                 >
                   Asignar repartidor
                 </button>
@@ -1912,13 +1912,13 @@ export function HomePos({
   return (
     <div className="flex h-screen flex-col">
       {!online && (
-        <div className="flex flex-shrink-0 items-center justify-center gap-2 bg-[#9A6B12] px-4 py-1.5 text-[12.5px] font-semibold text-white" role="status">
+        <div className="flex flex-shrink-0 items-center justify-center gap-2 bg-[#9A6B12] px-4 py-1.5 text-13 font-semibold text-white" role="status">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4"><path d="M1 1l22 22M16.72 11.06A10.94 10.94 0 0 1 19 12.55M5 12.55a10.94 10.94 0 0 1 5.17-2.39M10.71 5.05A16 16 0 0 1 22.58 9M1.42 9a15.91 15.91 0 0 1 4.7-2.88M8.53 16.11a6 6 0 0 1 6.95 0M12 20h.01" /></svg>
           Sin internet: la caja sigue cobrando igual. Las ventas suben solas cuando vuelva la señal.
         </div>
       )}
       {online && pendientesSync > 0 && (
-        <div className="flex flex-shrink-0 items-center justify-center gap-2 bg-[#2C5AA0] px-4 py-1.5 text-[12.5px] font-semibold text-white" role="status">
+        <div className="flex flex-shrink-0 items-center justify-center gap-2 bg-[#2C5AA0] px-4 py-1.5 text-13 font-semibold text-white" role="status">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-4 w-4 animate-spin"><path d="M21 12a9 9 0 1 1-6.219-8.56" /></svg>
           Sincronizando {pendientesSync} operación{pendientesSync === 1 ? "" : "es"} pendiente{pendientesSync === 1 ? "" : "s"}…
         </div>
@@ -1943,7 +1943,7 @@ export function HomePos({
             type="button"
             onClick={() => setClienteCuentaAbierto(true)}
             className={[
-              "ml-auto flex h-10 max-w-[240px] flex-shrink-0 items-center gap-2 rounded border px-3 text-[13.5px] font-semibold transition hover:border-ink hover:bg-hover",
+              "ml-auto flex h-10 max-w-[240px] flex-shrink-0 items-center gap-2 rounded border px-3 text-14 font-semibold transition hover:border-ink hover:bg-hover",
               carrito.clienteCuenta ? "border-accent text-ink" : "border-line-strong text-ink",
             ].join(" ")}
           >
@@ -1959,14 +1959,14 @@ export function HomePos({
           <button
             type="button"
             onClick={() => { setLlevarError(null); setLlevarListaAbierta(true); }}
-            className="flex h-10 flex-shrink-0 items-center gap-2 rounded border border-line-strong px-3 text-[13.5px] font-semibold text-ink transition hover:border-ink hover:bg-hover"
+            className="flex h-10 flex-shrink-0 items-center gap-2 rounded border border-line-strong px-3 text-14 font-semibold text-ink transition hover:border-ink hover:bg-hover"
           >
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4" aria-hidden="true">
               <path d="M6 3h12v18l-3-2-3 2-3-2-3 2z" /><path d="M9 8h6M9 12h6" />
             </svg>
             Cuentas abiertas
             {nAbiertasLlevar > 0 && (
-              <span className="flex h-[22px] min-w-[22px] items-center justify-center rounded-full bg-ink px-1.5 text-[12px] font-bold tabular-nums text-white">
+              <span className="flex h-[22px] min-w-[22px] items-center justify-center rounded-full bg-ink px-1.5 text-12 font-bold tabular-nums text-white">
                 {nAbiertasLlevar}
               </span>
             )}
@@ -1976,14 +1976,14 @@ export function HomePos({
           <button
             type="button"
             onClick={() => { setEsperaError(null); setEsperaListaAbierta(true); }}
-            className="flex h-10 flex-shrink-0 items-center gap-2 rounded border border-line-strong px-3 text-[13.5px] font-semibold text-ink transition hover:border-ink hover:bg-hover"
+            className="flex h-10 flex-shrink-0 items-center gap-2 rounded border border-line-strong px-3 text-14 font-semibold text-ink transition hover:border-ink hover:bg-hover"
           >
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4" aria-hidden="true">
               <circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" />
             </svg>
             Cuentas en espera
             {nEnEspera > 0 && (
-              <span className="flex h-[22px] min-w-[22px] items-center justify-center rounded-full bg-ink px-1.5 text-[12px] font-bold tabular-nums text-white">
+              <span className="flex h-[22px] min-w-[22px] items-center justify-center rounded-full bg-ink px-1.5 text-12 font-bold tabular-nums text-white">
                 {nEnEspera}
               </span>
             )}
@@ -2055,7 +2055,7 @@ export function HomePos({
           que ya salió a cocina y no se puede editar. */}
       {error && (
         <div className="flex flex-shrink-0 items-center gap-3 bg-danger-soft px-4 py-2" role="alert">
-          <p className="min-w-0 flex-1 text-[13px] font-medium text-danger">{error}</p>
+          <p className="min-w-0 flex-1 text-13 font-medium text-danger">{error}</p>
           <button
             type="button"
             onClick={() => setError(null)}
@@ -2201,7 +2201,7 @@ export function HomePos({
         />
       )}
       {movimientoToast && (
-        <div className="fixed left-1/2 top-20 z-[80] -translate-x-1/2 rounded-lg bg-ink px-5 py-3 text-[13.5px] font-medium text-white shadow-xl">
+        <div className="fixed left-1/2 top-20 z-[80] -translate-x-1/2 rounded-lg bg-ink px-5 py-3 text-14 font-medium text-white shadow-xl">
           <span className="font-semibold">{movimientoToast.folio}</span> · {movimientoToast.etiqueta} · {fmtMxn(movimientoToast.monto)} registrado
         </div>
       )}

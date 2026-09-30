@@ -116,7 +116,7 @@ export function PinKeypad({
         })}
       </div>
 
-      <p className="min-h-[17px] text-center text-[12.5px] font-medium text-danger" role="alert">
+      <p className="min-h-[17px] text-center text-13 font-medium text-danger" role="alert">
         {error ?? ""}
       </p>
 
@@ -133,7 +133,7 @@ export function PinKeypad({
               onClick={() => press(k)}
               aria-label={k === "del" ? "Borrar" : k}
               className={cn(
-                "flex aspect-square items-center justify-center rounded font-display text-[22px] font-semibold",
+                "flex aspect-square items-center justify-center rounded font-display text-24 font-semibold",
                 "select-none border border-line-strong text-ink",
                 "transition-colors hover:bg-hover active:border-ink active:bg-hover",
                 "focus-visible:outline focus-visible:outline-2 focus-visible:outline-ink",

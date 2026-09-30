@@ -1,6 +1,6 @@
 "use client";
 import { useCallback, useEffect, useState } from "react";
-import { Button, useConfirmar } from "@vim/ui/styles";
+import { Aviso, Button, DialogoPeligro, Modal, useConfirmar } from "@vim/ui/styles";
 import { PageBody, PageHeader } from "../../components/page-header";
 import { RangoFechas } from "../../components/rango-fechas";
 import { fmtMxn, rangoUltimosDias } from "../../lib/reportes";
@@ -100,8 +100,8 @@ export default function FacturacionPage() {
             Va arriba porque es una obligación con fecha límite —24 horas tras cerrar el periodo—
             mientras que facturar un ticket suelto es a demanda. */}
         <div className="mb-6 rounded-lg border border-line bg-surface p-5">
-          <div className="mb-1 font-display text-[16px] font-semibold tracking-tight">Factura global</div>
-          <p className="mb-4 text-[12.5px] text-ink-3">
+          <div className="mb-1 font-display text-16 font-semibold tracking-tight">Factura global</div>
+          <p className="mb-4 text-13 text-ink-3">
             Ampara las ventas del periodo en las que nadie pidió factura. Debe emitirse dentro de las
             24 horas siguientes al cierre del periodo. <b>Al timbrarla, esos tickets dejan de poder
             facturarse por tus clientes.</b>
@@ -110,10 +110,10 @@ export default function FacturacionPage() {
           {porCerrar ? (
             <div className="flex flex-wrap items-center justify-between gap-3 rounded border border-line bg-bg px-4 py-3">
               <div>
-                <div className="text-[13px] font-semibold">
+                <div className="text-13 font-semibold">
                   Periodo del {fechaLegible(porCerrar.desde)} al {fechaLegible(porCerrar.hasta)}
                 </div>
-                <div className="text-[12px] text-ink-3">
+                <div className="text-12 text-ink-3">
                   {porCerrar.nTickets === 0
                     ? "Sin ventas pendientes de amparar"
                     : `${porCerrar.nTickets} ventas · ${fmtMxn(porCerrar.totalMxn)}`}
@@ -124,24 +124,24 @@ export default function FacturacionPage() {
               </Button>
             </div>
           ) : (
-            <p className="text-[12.5px] text-ink-3">Configura tus datos fiscales para emitir la global.</p>
+            <p className="text-13 text-ink-3">Configura tus datos fiscales para emitir la global.</p>
           )}
 
-          {avisoGlobal && <p className="mt-3 text-[13px] font-medium">{avisoGlobal}</p>}
+          {avisoGlobal && <p className="mt-3 text-13 font-medium">{avisoGlobal}</p>}
 
           {periodos.length > 0 && (
             <div className="mt-4 border-t border-line pt-3">
-              <div className="mb-2 text-[12px] font-medium text-ink-2">Periodos anteriores</div>
+              <div className="mb-2 text-12 font-medium text-ink-2">Periodos anteriores</div>
               <div className="flex flex-col gap-1.5">
                 {periodos.map((p) => (
-                  <div key={p.id} className="flex items-center justify-between gap-3 text-[12.5px]">
+                  <div key={p.id} className="flex items-center justify-between gap-3 text-13">
                     <span className="text-ink-2">{fechaLegible(p.desde)} → {fechaLegible(p.hasta)}</span>
                     <span className="flex items-center gap-3">
                       {p.estado === "TIMBRADA" && (
                         <span className="text-ink-3">{p.nTickets} ventas · {fmtMxn(p.totalMxn)}</span>
                       )}
                       <span className={[
-                        "rounded px-2 py-0.5 text-[11.5px] font-medium",
+                        "rounded px-2 py-0.5 text-12 font-medium",
                         p.estado === "TIMBRADA" ? "bg-success-soft text-success"
                           : p.estado === "ERROR" ? "bg-danger-soft text-danger"
                           : "bg-sel text-ink-2",
@@ -172,8 +172,8 @@ export default function FacturacionPage() {
         {tickets === null && !error && <p className="text-sm text-ink-3">Cargando…</p>}
         {tickets !== null && (
           <div className="tabla-caja overflow-hidden rounded-lg border border-line bg-surface">
-            <table className="w-full text-[13px]">
-              <thead><tr className="border-b border-line bg-sel text-left text-[11.5px] font-bold uppercase tracking-wide text-ink-3">
+            <table className="w-full text-13">
+              <thead><tr className="border-b border-line bg-sel text-left text-12 font-bold uppercase tracking-wide text-ink-3">
                 <th className="px-4 py-2.5">Folio</th><th className="px-4 py-2.5">Día</th><th className="px-4 py-2.5 text-right">Total</th><th className="px-4 py-2.5">CFDI</th><th className="px-4 py-2.5 text-right">Acción</th>
               </tr></thead>
               <tbody>
@@ -187,18 +187,18 @@ export default function FacturacionPage() {
                       <td className="px-4 py-2.5 text-right font-semibold tabular-nums">{fmtMxn(t.total)}</td>
                       <td className="px-4 py-2.5">
                         {badge
-                          ? <span className={`rounded px-2 py-0.5 text-[11.5px] font-bold ${badge.cls}`} title={t.cfdiUuid ?? undefined}>{badge.label}</span>
+                          ? <span className={`rounded px-2 py-0.5 text-12 font-bold ${badge.cls}`} title={t.cfdiUuid ?? undefined}>{badge.label}</span>
                           : <span className="text-ink-3">—</span>}
                       </td>
                       <td className="px-4 py-2.5 text-right">
                         {t.cfdiEstado === "TIMBRADO"
                           ? (
                             <span className="flex items-center justify-end gap-3">
-                              <span className="text-[12px] text-ink-3" title={t.cfdiUuid ?? ""}>UUID {t.cfdiUuid ? `${t.cfdiUuid.slice(0, 8)}…` : ""}</span>
+                              <span className="text-12 text-ink-3" title={t.cfdiUuid ?? ""}>UUID {t.cfdiUuid ? `${t.cfdiUuid.slice(0, 8)}…` : ""}</span>
                               {t.cfdiId && <DescargasCfdi cfdiId={t.cfdiId} estado={t.cfdiEstado} />}
                               <button
                                 onClick={() => setCancelando(t)}
-                                className="text-[12.5px] font-medium text-danger underline underline-offset-2"
+                                className="text-13 font-medium text-danger underline underline-offset-2"
                               >
                                 Cancelar
                               </button>
@@ -210,7 +210,7 @@ export default function FacturacionPage() {
                                 {t.cfdiId && <DescargasCfdi cfdiId={t.cfdiId} estado={t.cfdiEstado} />}
                                 <button
                                   onClick={() => setCancelando(t)}
-                                  className="text-[12.5px] font-medium text-warning underline underline-offset-2"
+                                  className="text-13 font-medium text-warning underline underline-offset-2"
                                   title="Vuelve a preguntar al SAT si la cancelación ya procedió"
                                 >
                                   Revisar cancelación
@@ -293,27 +293,27 @@ function PanelFacturar({ ticket, onCerrar }: { ticket: TicketFacturable; onCerra
   }
 
   const input = "h-10 w-full rounded border border-line-strong px-3 text-sm outline-none focus:border-ink";
-  const label = "mb-1 block text-[11.5px] font-bold uppercase tracking-wide text-ink-3";
+  const label = "mb-1 block text-12 font-bold uppercase tracking-wide text-ink-3";
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/40 p-4" role="dialog" aria-modal="true" aria-label="Facturar ticket">
       <div className="w-full max-w-xl rounded-lg bg-surface p-6 shadow-xl">
         <div className="mb-4 flex flex-wrap items-start justify-between gap-x-3 gap-y-2 sm:items-center">
           <h2 className="font-display text-lg font-semibold">Facturar {ticket.folio ?? "ticket"} · {fmtMxn(ticket.total)}</h2>
-          <button type="button" onClick={() => onCerrar(resultado?.ok === true)} className="rounded px-2 py-1 text-[13px] font-semibold text-ink-3 hover:bg-hover hover:text-ink">Cerrar</button>
+          <button type="button" onClick={() => onCerrar(resultado?.ok === true)} className="rounded px-2 py-1 text-13 font-semibold text-ink-3 hover:bg-hover hover:text-ink">Cerrar</button>
         </div>
 
         {resultado?.ok ? (
           <div className="rounded-lg border border-success/40 bg-success-soft p-5 text-center">
-            <div className="text-[15px] font-bold text-success">CFDI timbrado correctamente</div>
-            <div className="mt-2 break-all font-mono text-[13px] text-ink-2">UUID: {resultado.uuidFiscal}</div>
-            {resultado.serie && <div className="mt-1 text-[13px] text-ink-2">Serie {resultado.serie} · Folio {resultado.folioFiscal}</div>}
+            <div className="text-15 font-bold text-success">CFDI timbrado correctamente</div>
+            <div className="mt-2 break-all font-mono text-13 text-ink-2">UUID: {resultado.uuidFiscal}</div>
+            {resultado.serie && <div className="mt-1 text-13 text-ink-2">Serie {resultado.serie} · Folio {resultado.folioFiscal}</div>}
             <Button className="mt-4" onClick={() => onCerrar(true)}>Listo</Button>
           </div>
         ) : (
           <>
             <div className="mb-3">
-              <button type="button" onClick={publicoGeneral} className="rounded border border-line-strong px-3 py-1.5 text-[12.5px] font-semibold text-ink-2 transition hover:border-ink hover:text-ink">
+              <button type="button" onClick={publicoGeneral} className="rounded border border-line-strong px-3 py-1.5 text-13 font-semibold text-ink-2 transition hover:border-ink hover:text-ink">
                 Usar “Público en general” (XAXX010101000)
               </button>
             </div>
@@ -342,7 +342,7 @@ function PanelFacturar({ ticket, onCerrar }: { ticket: TicketFacturable; onCerra
               </div>
               <div className="md:col-span-2"><span className={label}>Correo para enviar la factura (opcional)</span><input className={input} value={form.email} onChange={set("email")} maxLength={255} placeholder="cliente@correo.com" /></div>
             </div>
-            {error && <p className="mt-3 text-[13px] font-medium text-danger" role="alert">{error}</p>}
+            {error && <p className="mt-3 text-13 font-medium text-danger" role="alert">{error}</p>}
             <div className="mt-5 flex justify-end gap-2">
               <Button variant="ghost" onClick={() => onCerrar(false)} disabled={procesando}>Cancelar</Button>
               <Button onClick={timbrar} disabled={procesando}>{procesando ? "Timbrando…" : "Crear y timbrar CFDI"}</Button>
@@ -380,80 +380,76 @@ function PanelCancelar({ ticket, onCerrar }: { ticket: TicketFacturable; onCerra
     setAviso(r.mensaje);
   }
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 px-4">
-      <div className="w-full max-w-[440px] rounded-lg border border-line bg-surface p-5 shadow-lg">
-        <div className="font-display text-[17px] font-semibold tracking-tight">Cancelar factura</div>
-        <p className="mt-1 text-[12.5px] text-ink-3">
+  // Ya se envió: el resultado (cancelada o en proceso) no es una confirmación, es un acuse.
+  if (aviso) {
+    return (
+      <Modal
+        open
+        onClose={() => onCerrar(true)}
+        title="Cancelar factura"
+        hideTitle
+        className="w-[min(440px,calc(100vw-2rem))] rounded-lg border border-line bg-surface p-6 shadow-[0_18px_44px_rgba(22,22,26,.18)]"
+      >
+        <div className="font-display text-18 font-semibold tracking-tight">Cancelar factura</div>
+        <p className="mt-1 text-13 text-ink-3">
           Ticket {ticket.folio} · UUID {ticket.cfdiUuid?.slice(0, 8)}…
         </p>
+        <p className="mt-4 rounded border border-line bg-bg px-3 py-2.5 text-14 leading-relaxed">{aviso}</p>
+        <div className="mt-4 flex justify-end">
+          <Button onClick={() => onCerrar(true)}>Entendido</Button>
+        </div>
+      </Modal>
+    );
+  }
 
-        {aviso ? (
-          <>
-            <p className="mt-4 rounded border border-line bg-bg px-3 py-2.5 text-[13.5px] leading-relaxed">{aviso}</p>
-            <div className="mt-4 flex justify-end">
-              <Button onClick={() => onCerrar(true)}>Entendido</Button>
-            </div>
-          </>
-        ) : (
-          <>
-            <div className="mt-4">
-              <label className="mb-1.5 block text-[13px] font-medium text-ink-2" htmlFor="motivo">Motivo</label>
-              <select
-                id="motivo"
-                className="h-11 w-full rounded border border-line-strong px-3 text-sm outline-none focus:border-ink"
-                value={motivo}
-                onChange={(e) => setMotivo(e.target.value)}
-              >
-                {MOTIVOS_CANCELACION.map((m) => <option key={m.v} value={m.v}>{m.v} · {m.l}</option>)}
-              </select>
-              {elegido && <p className="mt-1.5 text-[11.5px] text-ink-3">{elegido.ayuda}</p>}
-            </div>
-
-            {motivo === "01" && (
-              <div className="mt-4">
-                <label className="mb-1.5 block text-[13px] font-medium text-ink-2" htmlFor="sust">
-                  Folio fiscal (UUID) del comprobante que lo sustituye
-                </label>
-                <input
-                  id="sust"
-                  className="h-11 w-full rounded border border-line-strong px-3 font-mono text-[13px] outline-none focus:border-ink"
-                  value={sustituto}
-                  onChange={(e) => setSustituto(e.target.value)}
-                  placeholder="00000000-0000-0000-0000-000000000000"
-                />
-                <p className="mt-1.5 text-[11.5px] text-ink-3">
-                  Emite primero la factura correcta y pega aquí su folio fiscal.
-                </p>
-              </div>
-            )}
-
-            <p className="mt-4 rounded border border-[#F0DCC0] bg-warning-soft px-3 py-2 text-[12.5px] font-medium leading-relaxed text-warning">
-              Si tu cliente ya usó esta factura, el SAT puede pedirle que acepte la cancelación. En
-              ese caso queda <b>en proceso</b> hasta que responda.
-            </p>
-
-            {error && <p className="mt-3 text-[13px] font-medium text-danger" role="alert">{error}</p>}
-
-            <div className="mt-5 flex justify-end gap-2">
-              <button
-                onClick={() => onCerrar(false)}
-                className="h-10 rounded border border-line-strong px-4 text-[13px] font-semibold transition hover:bg-hover"
-              >
-                Volver
-              </button>
-              <button
-                onClick={ejecutar}
-                disabled={ocupado || faltaSustituto}
-                className="h-10 rounded bg-danger px-4 text-[13px] font-semibold text-white transition disabled:opacity-50"
-              >
-                {ocupado ? "Enviando…" : "Cancelar factura"}
-              </button>
-            </div>
-          </>
-        )}
+  return (
+    <DialogoPeligro
+      titulo="¿Cancelar esta factura?"
+      contexto={<>Ticket {ticket.folio} · UUID {ticket.cfdiUuid?.slice(0, 8)}…</>}
+      error={error}
+      boton="Cancelar factura"
+      ocupado={ocupado}
+      textoOcupado="Enviando…"
+      deshabilitado={faltaSustituto}
+      onConfirmar={ejecutar}
+      onCerrar={() => onCerrar(false)}
+    >
+      <div>
+        <label className="mb-1.5 block text-13 font-medium text-ink-2" htmlFor="motivo">Motivo</label>
+        <select
+          id="motivo"
+          className="h-11 w-full rounded border border-line-strong px-3 text-sm outline-none focus:border-ink"
+          value={motivo}
+          onChange={(e) => setMotivo(e.target.value)}
+        >
+          {MOTIVOS_CANCELACION.map((m) => <option key={m.v} value={m.v}>{m.v} · {m.l}</option>)}
+        </select>
+        {elegido && <p className="mt-1.5 text-12 text-ink-3">{elegido.ayuda}</p>}
       </div>
-    </div>
+
+      {motivo === "01" && (
+        <div>
+          <label className="mb-1.5 block text-13 font-medium text-ink-2" htmlFor="sust">
+            Folio fiscal (UUID) del comprobante que lo sustituye
+          </label>
+          <input
+            id="sust"
+            className="h-11 w-full rounded border border-line-strong px-3 font-mono text-13 outline-none focus:border-ink"
+            value={sustituto}
+            onChange={(e) => setSustituto(e.target.value)}
+            placeholder="00000000-0000-0000-0000-000000000000"
+          />
+          <p className="mt-1.5 text-12 text-ink-3">
+            Emite primero la factura correcta y pega aquí su folio fiscal.
+          </p>
+        </div>
+      )}
+
+      <Aviso tono="warning">
+        Si tu cliente ya usó esta factura, el SAT puede pedirle que acepte la cancelación. En
+        ese caso queda <b>en proceso</b> hasta que responda.
+      </Aviso>
+    </DialogoPeligro>
   );
 }
 
@@ -476,13 +472,13 @@ function DescargasCfdi({ cfdiId, estado }: { cfdiId: string; estado: string }) {
           type="button"
           onClick={() => bajar(f)}
           disabled={ocupado !== null}
-          className="text-[12.5px] font-medium text-ink-2 underline underline-offset-2 disabled:opacity-50"
+          className="text-13 font-medium text-ink-2 underline underline-offset-2 disabled:opacity-50"
           title={f === "acuse" ? "Acuse de cancelación del SAT" : `Descargar ${f.toUpperCase()}`}
         >
           {ocupado === f ? "…" : f === "acuse" ? "Acuse" : f.toUpperCase()}
         </button>
       ))}
-      {fallo && <span className="text-[11.5px] text-danger" role="alert">{fallo}</span>}
+      {fallo && <span className="text-12 text-danger" role="alert">{fallo}</span>}
     </span>
   );
 }

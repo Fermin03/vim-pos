@@ -106,28 +106,28 @@ export default function FichaCliente() {
   return (
     <>
       <div className="sticky top-0 z-10 -mx-4 -mt-5 mb-6 border-b border-line bg-bg/95 px-4 pb-3 pt-4 backdrop-blur lg:-mx-8 lg:-mt-7 lg:px-8">
-        <Link href="/clientes" className="text-[13px] font-semibold text-ink-2 hover:text-ink">← Clientes</Link>
+        <Link href="/clientes" className="text-13 font-semibold text-ink-2 hover:text-ink">← Clientes</Link>
         <div className="mt-1 flex flex-wrap items-center justify-between gap-3">
           <div className="flex flex-wrap items-center gap-3">
-            <h1 className="font-display text-[22px] font-bold tracking-tight">{nombre}</h1>
+            <h1 className="font-display text-24 font-bold tracking-tight">{nombre}</h1>
             <PastillaEstado estado={estado} grande />
-            <span className="text-[13px] text-ink-2"><span className="font-mono">{String(t.codigo)}</span> · {nombreVertical(String(t.vertical_principal))}</span>
+            <span className="text-13 text-ink-2"><span className="font-mono">{String(t.codigo)}</span> · {nombreVertical(String(t.vertical_principal))}</span>
           </div>
           <div className="flex items-center gap-2">
             <nav className="hidden gap-1 md:flex" aria-label="Secciones de la ficha">
               {ANCLAS.map(([a, l]) => (
-                <a key={a} href={`#${a}`} className={["rounded px-2.5 py-1 text-[12.5px] font-semibold hover:bg-hover", a === "peligro" ? "text-danger" : "text-ink-2"].join(" ")}>
+                <a key={a} href={`#${a}`} className={["rounded px-2.5 py-1 text-13 font-semibold hover:bg-hover", a === "peligro" ? "text-danger" : "text-ink-2"].join(" ")}>
                   {l}
                 </a>
               ))}
             </nav>
-            <button onClick={() => setImpersonando(true)} disabled={busy} className="btn h-10 whitespace-nowrap rounded border border-line-strong px-3 text-[13px] font-semibold hover:bg-hover disabled:opacity-50">
+            <button onClick={() => setImpersonando(true)} disabled={busy} className="btn h-10 whitespace-nowrap rounded border border-line-strong px-3 text-13 font-semibold hover:bg-hover disabled:opacity-50">
               Entrar como este cliente
             </button>
           </div>
         </div>
         {bloqueoDesde && (
-          <p className="mt-2 text-[12.5px] font-semibold text-warning">
+          <p className="mt-2 text-13 font-semibold text-warning">
             Bloqueo programado: la caja dejará de vender el {fechaHoraMx(bloqueoDesde)} (hora de México).
           </p>
         )}
@@ -135,12 +135,12 @@ export default function FichaCliente() {
 
       {error && <p className="mb-3 text-sm text-danger" role="alert">{error}</p>}
       {avisoUber && (
-        <div className="mb-3 rounded-lg border border-warning/40 bg-surface p-3 text-[13px] text-warning" role="alert">
+        <div className="mb-3 rounded-lg border border-warning/40 bg-surface p-3 text-13 text-warning" role="alert">
           <p className="font-semibold">
             El add-on de delivery se dio de baja, pero Uber no confirmó la pausa de {avisoUber.length} conexión(es).
             Repórtalo para pausarlas a mano.
           </p>
-          <ul className="mt-1 list-disc pl-4 text-[12px]">
+          <ul className="mt-1 list-disc pl-4 text-12">
             {avisoUber.map((f) => <li key={f}>{f}</li>)}
           </ul>
         </div>
@@ -169,7 +169,7 @@ export default function FichaCliente() {
 
         <ZonaPeligrosa estado={estado} nombre={nombre} bloqueoDesde={bloqueoDesde} accion={accion} busy={busy} />
       </div>
-      <p className="mt-4 text-[11.5px] text-ink-3">{textoActualizado(hace)}</p>
+      <p className="mt-4 text-12 text-ink-3">{textoActualizado(hace)}</p>
 
       <DialogoConfirmar
         abierto={impersonando}

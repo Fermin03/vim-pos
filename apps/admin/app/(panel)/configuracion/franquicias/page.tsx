@@ -71,16 +71,16 @@ export default function FranquiciasPage() {
           {franquicias !== null && (
             <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
               <div className="rounded-lg border border-line bg-surface">
-                <div className="border-b border-line px-4 py-2.5 text-[11.5px] font-bold uppercase tracking-wide text-ink-3">Franquicias</div>
-                {franquicias.length === 0 && <p className="px-4 py-6 text-center text-[13px] text-ink-3">Sin franquicias aún. La operación propia no necesita una.</p>}
+                <div className="border-b border-line px-4 py-2.5 text-12 font-bold uppercase tracking-wide text-ink-3">Franquicias</div>
+                {franquicias.length === 0 && <p className="px-4 py-6 text-center text-13 text-ink-3">Sin franquicias aún. La operación propia no necesita una.</p>}
                 {franquicias.map((f) => (
                   <div key={f.id} className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2 border-b border-line px-4 py-3 last:border-b-0">
                     <div>
-                      <div className="text-[14px] font-semibold">{f.nombre}</div>
-                      <div className="text-[12px] text-ink-3">{f.nSucursales} sucursal{f.nSucursales === 1 ? "" : "es"}</div>
+                      <div className="text-14 font-semibold">{f.nombre}</div>
+                      <div className="text-12 text-ink-3">{f.nSucursales} sucursal{f.nSucursales === 1 ? "" : "es"}</div>
                     </div>
                     <button type="button" disabled={trabajando} onClick={() => { void eliminar(f); }}
-                      className="rounded px-2 py-1 text-[12.5px] font-semibold text-ink-3 transition hover:bg-hover hover:text-danger">
+                      className="rounded px-2 py-1 text-13 font-semibold text-ink-3 transition hover:bg-hover hover:text-danger">
                       Eliminar
                     </button>
                   </div>
@@ -89,15 +89,15 @@ export default function FranquiciasPage() {
 
               {/* Asignación de sucursales */}
               <div className="rounded-lg border border-line bg-surface">
-                <div className="border-b border-line px-4 py-2.5 text-[11.5px] font-bold uppercase tracking-wide text-ink-3">Sucursales</div>
+                <div className="border-b border-line px-4 py-2.5 text-12 font-bold uppercase tracking-wide text-ink-3">Sucursales</div>
                 {sucursales.map((s) => (
                   <div key={s.id} className="flex items-center justify-between gap-3 border-b border-line px-4 py-3 last:border-b-0">
-                    <span className="min-w-0 truncate text-[13.5px] font-medium">{s.nombre}</span>
+                    <span className="min-w-0 truncate text-14 font-medium">{s.nombre}</span>
                     <select
                       value={s.franquiciaId ?? ""}
                       disabled={trabajando}
                       onChange={(e) => correr(() => asignarFranquicia(s.id, e.target.value || null))}
-                      className="h-9 rounded border border-line-strong bg-surface px-2 text-[12.5px] outline-none focus:border-ink"
+                      className="h-9 rounded border border-line-strong bg-surface px-2 text-13 outline-none focus:border-ink"
                     >
                       <option value="">Operación propia</option>
                       {(franquicias ?? []).map((f) => <option key={f.id} value={f.id}>{f.nombre}</option>)}
@@ -108,7 +108,7 @@ export default function FranquiciasPage() {
             </div>
           )}
 
-          <p className="mt-4 max-w-2xl text-[12px] text-ink-3">
+          <p className="mt-4 max-w-2xl text-12 text-ink-3">
             El acceso del franquiciatario se da en <b>Usuarios</b>: invítalo con rol Admin/Supervisor asignado a sus sucursales.
             El reporte <b>Consolidado</b> puede agruparse por franquicia.
           </p>

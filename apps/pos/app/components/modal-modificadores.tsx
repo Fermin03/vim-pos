@@ -243,14 +243,14 @@ export function ModalModificadores({
         {/* Cabecera: nombre + precio base. (Aquí vivía un hero de 150px con un icono genérico de
             hamburguesa, igual para todos los productos: se llevaba una quinta parte del drawer.) */}
         <div className="flex flex-shrink-0 items-start gap-3 border-b border-line px-5 py-4">
-          <span className="min-w-0 flex-1 font-display text-[21px] font-semibold leading-tight tracking-[-0.02em] text-ink">
+          <span className="min-w-0 flex-1 font-display text-20 font-semibold leading-tight tracking-[-0.02em] text-ink">
             {producto.nombre}
           </span>
           <span className="flex-shrink-0 text-right">
-            <small className="mb-[-2px] block font-sans text-[11px] font-semibold uppercase tracking-[0.04em] text-ink-3">
+            <small className="mb-[-2px] block font-sans text-11 font-semibold uppercase tracking-[0.04em] text-ink-3">
               Precio base
             </small>
-            <span className="font-display text-[21px] font-bold tabular-nums text-ink">
+            <span className="font-display text-20 font-bold tabular-nums text-ink">
               {fmtMxn(producto.precio_base_mxn)}
             </span>
           </span>
@@ -282,26 +282,26 @@ export function ModalModificadores({
                 <div key={`${g.id}-${t.desde}`} className="flex flex-col">
                   {/* Cabecera del grupo */}
                   <div className="flex flex-shrink-0 items-center gap-2" style={{ height: ALTO_CABECERA }}>
-                    <span className={["truncate text-[14px] font-bold", !valido && obligatorio ? "text-danger" : "text-ink"].join(" ")}>
+                    <span className={["truncate text-14 font-bold", !valido && obligatorio ? "text-danger" : "text-ink"].join(" ")}>
                       {g.nombre}
                       {/* Un grupo partido entre páginas lo dice, para que nadie crea que ya las vio todas. */}
                       {continuacion && <span className="font-medium text-ink-3"> (sigue)</span>}
                     </span>
                     {obligatorio ? (
                       valido ? (
-                        <span className="inline-flex flex-shrink-0 items-center gap-1 rounded-full bg-[#E7F2EC] px-2 py-0.5 text-[10.5px] font-bold uppercase tracking-[0.04em] text-success">
+                        <span className="inline-flex flex-shrink-0 items-center gap-1 rounded-full bg-[#E7F2EC] px-2 py-0.5 text-11 font-bold uppercase tracking-[0.04em] text-success">
                           <IconCheck className="h-[11px] w-[11px]" />
                           Listo
                         </span>
                       ) : (
-                        <span className="flex-shrink-0 rounded-full bg-accent-soft px-2 py-0.5 text-[10.5px] font-bold uppercase tracking-[0.04em] text-accent">
+                        <span className="flex-shrink-0 rounded-full bg-accent-soft px-2 py-0.5 text-11 font-bold uppercase tracking-[0.04em] text-accent">
                           Obligatorio
                         </span>
                       )
                     ) : (
-                      <span className="flex-shrink-0 text-[12px] font-medium text-ink-3">Opcional</span>
+                      <span className="flex-shrink-0 text-12 font-medium text-ink-3">Opcional</span>
                     )}
-                    <span className="ml-auto flex-shrink-0 text-[11.5px] font-medium text-ink-3">{reglaTipoLabel(g)}</span>
+                    <span className="ml-auto flex-shrink-0 text-12 font-medium text-ink-3">{reglaTipoLabel(g)}</span>
                   </div>
 
                   {/* Opciones: celdas iguales, todas las del trozo caben */}
@@ -377,7 +377,7 @@ export function ModalModificadores({
             <div className="mb-3 flex items-center gap-4">
               {preguntaAlcance && (
                 <div className="inline-flex flex-shrink-0 items-center gap-2">
-                  <span className="text-[13px] font-bold text-ink">Cambiar</span>
+                  <span className="text-13 font-bold text-ink">Cambiar</span>
                   <span role="radiogroup" aria-label="A cuántas unidades aplicar el cambio" className="inline-flex overflow-hidden rounded border border-line-strong">
                     {([
                       ["una", "Solo 1"],
@@ -390,7 +390,7 @@ export function ModalModificadores({
                         aria-checked={alcance === valor}
                         onClick={() => setAlcance(valor)}
                         className={[
-                          "h-11 px-4 text-[14px] font-semibold transition-colors",
+                          "h-11 px-4 text-14 font-semibold transition-colors",
                           alcance === valor ? "bg-ink text-white" : "bg-surface text-ink-2 hover:bg-hover",
                         ].join(" ")}
                       >
@@ -398,13 +398,13 @@ export function ModalModificadores({
                       </button>
                     ))}
                   </span>
-                  <span className="text-[12.5px] font-medium text-ink-3">
+                  <span className="text-13 font-medium text-ink-3">
                     {alcance === "una" ? "se separa en su propio renglón" : "cambia el renglón entero"}
                   </span>
                 </div>
               )}
               {!todoValido && primerGrupoInvalido && (
-                <div className="ml-auto flex items-center gap-[7px] text-[12.5px] font-semibold text-warning">
+                <div className="ml-auto flex items-center gap-[7px] text-13 font-semibold text-warning">
                   <IconAlert className="h-[15px] w-[15px] flex-shrink-0" />
                   <span>
                     {primerGrupoInvalido.tipoSeleccion === "UNICA_OBLIGATORIA"
@@ -426,7 +426,7 @@ export function ModalModificadores({
                 maxLength={200}
                 aria-label="Nota para cocina (opcional)"
                 placeholder="Nota para cocina (opcional): bien dorada, poca sal…"
-                className="h-[52px] min-w-0 flex-1 rounded border border-line-strong px-[13px] font-sans text-[14px] text-ink outline-none placeholder:text-ink-3 focus:border-ink focus:shadow-[inset_0_0_0_1px_rgb(var(--ink))]"
+                className="h-[52px] min-w-0 flex-1 rounded border border-line-strong px-[13px] font-sans text-14 text-ink outline-none placeholder:text-ink-3 focus:border-ink focus:shadow-[inset_0_0_0_1px_rgb(var(--ink))]"
               />
             )}
 
@@ -434,7 +434,7 @@ export function ModalModificadores({
               type="button"
               onClick={onCancelar}
               className={[
-                "flex h-[52px] flex-shrink-0 items-center justify-center rounded border border-line-strong bg-surface px-5 text-[15px] font-semibold text-ink-2 transition hover:bg-hover active:bg-sel",
+                "flex h-[52px] flex-shrink-0 items-center justify-center rounded border border-line-strong bg-surface px-5 text-15 font-semibold text-ink-2 transition hover:bg-hover active:bg-sel",
                 sinNota ? "mr-auto" : "",
               ].join(" ")}
             >
@@ -446,7 +446,7 @@ export function ModalModificadores({
               type="button"
               disabled={!todoValido}
               onClick={confirmar}
-              className="flex h-[52px] w-[min(340px,40%)] flex-shrink-0 items-center justify-between gap-2 rounded-lg border-none bg-accent px-4 text-[16px] font-bold text-white shadow-[0_1px_3px_rgb(var(--accent)/0.3)] transition hover:bg-accent-hover active:scale-[.98] disabled:cursor-not-allowed disabled:bg-line-strong disabled:shadow-none"
+              className="flex h-[52px] w-[min(340px,40%)] flex-shrink-0 items-center justify-between gap-2 rounded-lg border-none bg-accent px-4 text-16 font-bold text-white shadow-[0_1px_3px_rgb(var(--accent)/0.3)] transition hover:bg-accent-hover active:scale-[.98] disabled:cursor-not-allowed disabled:bg-line-strong disabled:shadow-none"
             >
               <span className="truncate">{editando ? "Guardar cambios" : "Agregar al ticket"}</span>
               <span className="font-display tabular-nums">

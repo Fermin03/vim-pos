@@ -40,7 +40,7 @@ export default function ConsolidadoPage() {
           type="button"
           aria-pressed={agrupar === a}
           onClick={() => setAgrupar(a)}
-          className={`min-h-[40px] whitespace-nowrap rounded-[4px] px-3 text-[13px] font-semibold transition-colors ${agrupar === a ? "bg-surface text-ink shadow-sm" : "text-ink-2 hover:text-ink"}`}
+          className={`min-h-[40px] whitespace-nowrap rounded-[4px] px-3 text-13 font-semibold transition-colors ${agrupar === a ? "bg-surface text-ink shadow-sm" : "text-ink-2 hover:text-ink"}`}
         >
           {a === "sucursal" ? "Por sucursal" : "Por franquicia"}
         </button>

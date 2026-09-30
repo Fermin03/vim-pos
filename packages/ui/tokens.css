@@ -46,6 +46,12 @@
   --danger-soft: 251 235 233;   /* #FBEBE9 */
   --info: 44 90 160;            /* #2C5AA0 */
   --info-soft: 234 240 248;     /* #EAF0F8 */
+  /* Borde de un aviso (`bg-*-soft`): el mismo tono, un paso más oscuro que el fondo. Antes iban
+     escritos a mano (#E8DCC0, #F0DCC0, #D6E8DD, #E8C5C0…) en treinta y tantos lugares. */
+  --success-line: 214 232 221;  /* #D6E8DD */
+  --warning-line: 232 220 192;  /* #E8DCC0 */
+  --danger-line: 232 197 192;   /* #E8C5C0 */
+  --info-line: 208 221 240;     /* #D0DDF0 */
 
   /* ── Superficies y líneas ──────────────────────────────────────────── */
   --bg: 255 255 255;            /* #FFFFFF */
