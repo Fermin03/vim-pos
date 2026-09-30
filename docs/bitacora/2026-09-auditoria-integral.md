@@ -14,7 +14,7 @@
    reproducía. Mientras no estén **desplegados**, esos huecos siguen abiertos en producción.
    Recomendación: **desplegar el mismo día en que se haga merge** (orden en §5), o poner el repo en
    privado antes del push.
-2. Los arreglos de BD son migraciones **aditivas** (0131–0139). Ninguna migración aplicada se editó.
+2. Los arreglos de BD son migraciones **aditivas** (0131–0140). Ninguna migración aplicada se editó.
 3. Nada de esto está desplegado. Lo de §5 es obligatorio para que surta efecto.
 
 ---
@@ -152,17 +152,39 @@ mayor) · ⏸️ teléfono de soporte en `pantalla-bloqueada.tsx` en un repo pú
 
 | Batería | Resultado |
 |---|---|
-| Migraciones 0001–0139 + seed sobre Postgres 16 limpio | ✅ aplican |
+| Migraciones 0001–0140 + seed sobre Postgres 16 limpio | ✅ aplican |
 | Smokes de negocio (`supabase/scripts/smoke_*.sql`) | ✅ 52/52 |
-| pgTAP (`supabase/tests`, 23 archivos) | ✅ 301/301 |
+| pgTAP (`supabase/tests`, 24 archivos) | ✅ 308/308 |
 | Vitest (pos 369 · admin 185 · platform 87 · fecha 20) | ✅ 661/661 |
-| Edge Functions (`pnpm test:functions`) | ✅ 224/224 |
+| Edge Functions (`pnpm test:functions`) | ✅ 226/226 |
 | `deno check` de las 22 Edge Functions | ✅ 0 errores (antes: 17 en 6 funciones) |
 | Escritorio (`node --test`, 8 contra Postgres real) | ✅ 147/147 |
 | Sitio (`pnpm test:sitio`) | ✅ 49/49 |
 | Typecheck de las 5 apps · build de producción · escala tipográfica | ✅ |
 | `pnpm audit --prod` · `npm audit` (escritorio, incluido dev) | ✅ 0 vulnerabilidades |
 | Gitleaks, historial completo (920 commits) | ✅ solo llaves `anon` públicas, la demo local y ejemplos de proveedores |
+
+### Revisión independiente de regresiones
+
+Después de integrar, un revisor recorrió **cada flujo con PIN** del POS (cancelar renglones y
+tickets, devoluciones, descuentos de cuenta y de renglón, cambio de forma de pago, reabrir,
+reimpresión por estación, retiros/depósitos, arqueo, recuento, cierre Z, costo de zona) y **cada
+escritura directa** de POS, KDS y panel contra las migraciones nuevas, reproduciéndolos como
+cajera, supervisor y dueño. Encontró y se arregló:
+
+- **Grave:** la 0132 dejó **toda la facturación del panel en 403** (tres Edge Functions llamaban
+  con el cliente del usuario una RPC que ya no le está permitida). Arreglado, con una prueba
+  estática que lo impide para cualquier RPC solo-service_role.
+- **Menor:** un descuento fijo mayor que el renglón se rechazaba (0140).
+- **Preventivos (0140):** el guardián reconoce `/rpc/` aunque la ruta conserve `/rest/v1`, y la
+  autorización por PIN prefiere el negocio de la caja.
+- **Rara, sin arreglar:** en `pantalla-cuentas-modo.tsx:514`, si `totales` es null y `sel.total`
+  quedó viejo, la vista previa del descuento de cuenta se autoriza por menos y la BD lo rechaza
+  (el cajero vuelve a pedir el PIN).
+
+Todo lo demás cuadró: los montos que autoriza la pantalla coinciden con los que calcula cada RPC,
+las autorizaciones que se usan en serie (varios renglones, varias estaciones) pasan, y una RPC
+fallida no gasta la autorización.
 
 **No se pudo probar aquí:** Electron en ventana real ni el instalador de Windows; las Edge
 Functions contra un runtime de Supabase o contra Facturama; que el PostgREST del escritorio fije
@@ -178,7 +200,7 @@ Functions contra un runtime de Supabase o contra Facturama; que el PostgREST del
      `provisionar-tenant`; al final `supabase secrets unset PLATFORM_PROVISION_KEY` (en Vercel se queda).
    - Opcional: `VIM_IP_CABECERA` si en producción no llega `cf-connecting-ip`
      (comprobarlo una vez como indica `_shared/limite.ts`).
-2. **Migraciones 0131–0139** (`supabase db push`), luego `pnpm db:types` y commit de los tipos
+2. **Migraciones 0131–0140** (`supabase db push`), luego `pnpm db:types` y commit de los tipos
    (no se pudo regenerar aquí: la CLI necesita Docker).
 3. **Edge Functions** — **inmediatamente después** de la 0135/0136, y las seis de CFDI juntas
    (`timbrar-cfdi`, `timbrar-global`, `autofacturar`, `cargar-csd`, `descargar-cfdi`,
@@ -236,4 +258,4 @@ Functions contra un runtime de Supabase o contra Facturama; que el PostgREST del
 `6b8bde9` skill · `176e7f6` 0131 sync · `55a69f8` POS/KDS · `3031849` 0132 RLS · `34c878f`
 admin/plataforma/sitio/CI + 0137 · `b0ec8e0` prueba de grants · `c325712` Edge públicas + 0136 ·
 `31af51b` CFDI + 0135 · `db276d6` escritorio · `afb8504` 0133/0134 dinero · `17cc8f3` 0138/0139 ·
-`3b24b71` registro e IP del panel.
+`3b24b71` registro e IP del panel · `e95b714` regresiones de la revisión final + 0140.
