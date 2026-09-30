@@ -1,17 +1,18 @@
 import { NextResponse } from "next/server";
 import { autorizar, auditar } from "../../lib/server";
-import { CAMPOS_DATOS_PAGO, leerDatosPago, type DatosPago } from "../../lib/datos-pago";
+import { leerDatosPago, type DatosPago } from "../../lib/datos-pago";
 
 // Datos para pagarle a VIM (0141): banco, CLABE, WhatsApp… Los ve el dueño en "Plan y pagos" por la
 // RPC `datos_pago_plataforma()`; aquí se leen y se escriben con service_role, y cada cambio va a la
 // bitácora con antes y después — una CLABE cambiada es justo lo que alguien querría falsificar.
 
-const COLUMNAS = CAMPOS_DATOS_PAGO.join(", ");
+// Escritas a mano (no con join) para que scripts/auditar-consultas.mjs las pueda probar.
+const COLUMNAS = "banco, titular, clabe, whatsapp, correo, instrucciones";
 
 export async function GET(req: Request) {
   const auth = await autorizar(req);
   if ("error" in auth) return auth.error;
-  const { data, error } = await auth.sb.from("plataforma_datos_pago").select(`${COLUMNAS}, updated_at`).eq("id", true).maybeSingle();
+  const { data, error } = await auth.sb.from("plataforma_datos_pago").select("banco, titular, clabe, whatsapp, correo, instrucciones, updated_at").eq("id", true).maybeSingle();
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   return NextResponse.json({ datos: data ?? null });
 }

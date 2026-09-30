@@ -2,9 +2,12 @@
 import { useEffect, useState } from "react";
 import { Aviso, StatusChip, type TonoEstado } from "@vim/ui/styles";
 import { fechaLegible, hoyMx } from "@vim/fecha";
-import { ETIQUETA_METODO_COBRO, estadoCobro, textoEstadoCobro, type EstadoCobro } from "@vim/db/cobro";
+import { ETIQUETA_METODO_COBRO, estadoCobro, precioVigente, promocionVigente, textoEstadoCobro, type EstadoCobro } from "@vim/db/cobro";
 import { PageHeader, PageBody } from "../../../components/page-header";
+import { AvisoPrueba } from "../../../components/aviso-prueba";
+import { BotonCopiar } from "../../../components/boton-copiar";
 import { leerPlanYPagos, type PlanYPagos } from "../../../lib/plan";
+import { clabeLegible, enlaceWhatsapp, hayDatosPago, mensajeComprobante, mesDe, type DatosPago } from "../../../lib/datos-pago";
 import { mensajeError } from "../../../lib/errores";
 
 const TONO: Record<EstadoCobro["tipo"], TonoEstado> = {
@@ -29,6 +32,11 @@ export default function PlanPage() {
   const s = d?.suscripcion ?? null;
   const estado = estadoCobro(s?.estado === "ACTIVA" ? s.proxima_fecha_cobro : null, hoyMx());
   const anual = s?.ciclo_facturacion === "ANUAL";
+  const hoy = hoyMx();
+  // Lo que se paga HOY (con promoción mientras dure, 0141) y, si hay promoción, hasta cuándo.
+  const promo = s ? promocionVigente(s, hoy) : null;
+  const vigente = s ? precioVigente(s, hoy) : 0;
+  const mesAPagar = mesDe(s?.proxima_fecha_cobro ?? hoy);
 
   return (
     <>
@@ -45,9 +53,11 @@ export default function PlanPage() {
                   <p className="mt-1 font-display text-20 font-semibold tracking-tight">{d.plan?.nombre ?? "Sin plan asignado"}</p>
                   {s && (
                     <p className="mt-0.5 text-14 text-ink-2 tabular-nums">
-                      {anual ? `${mxn(Number(s.precio_mensual_mxn) * 12)} al año` : `${mxn(Number(s.precio_mensual_mxn))} al mes`}
+                      {anual ? `${mxn(vigente * 12)} al año` : `${mxn(vigente)} al mes`}
+                      {promo && <> hasta el {fechaLegible(promo.hasta)}, después {anual ? `${mxn(promo.lista * 12)} al año` : `${mxn(promo.lista)} al mes`}</>}
                     </p>
                   )}
+                  {promo?.nombre && <p className="mt-0.5 text-12 text-ink-3">Precio de promoción: {promo.nombre}</p>}
                 </div>
                 {s?.estado === "ACTIVA" && <StatusChip tone={TONO[estado.tipo]} punto>{textoEstadoCobro(estado)}</StatusChip>}
                 {s?.estado === "PAUSADA" && <StatusChip tone="neutral">Cobro en pausa</StatusChip>}
@@ -58,14 +68,13 @@ export default function PlanPage() {
                   Siguiente pago: <b className="text-ink">{fechaLegible(s.proxima_fecha_cobro)}</b>
                 </p>
               )}
-              {!s && (
-                <p className="mt-4 text-14 text-ink-2">
-                  Todavía no tienes un cobro activo. Si estás en periodo de prueba, VIM te contactará antes de que termine.
-                </p>
+              <AvisoPrueba estado={d.negocio?.estado} pruebaHasta={d.negocio?.prueba_hasta} className="mt-4" />
+              {!s && d.negocio?.estado !== "TRIAL" && (
+                <p className="mt-4 text-14 text-ink-2">Todavía no tienes un cobro activo.</p>
               )}
               {estado.tipo === "VENCIDO" && (
                 <Aviso tono="danger" className="mt-4">
-                  Tu pago está vencido. Si ya lo hiciste, mándale el comprobante a VIM para que lo registre; si no, comunícate con VIM para ponerte al corriente.
+                  Tu pago está vencido. Si ya lo hiciste, mándanos el comprobante para registrarlo; si no, abajo están los datos para pagar.
                 </Aviso>
               )}
               {(estado.tipo === "POR_VENCER" || estado.tipo === "HOY") && (
@@ -74,6 +83,8 @@ export default function PlanPage() {
                 </Aviso>
               )}
             </section>
+
+            <ComoPagar datos={d.datosPago} negocio={d.negocio?.nombre_comercial ?? ""} mes={mesAPagar} />
 
             <section className="rounded-lg border border-line bg-surface">
               <h2 className="border-b border-line px-5 py-3 font-display text-16 font-semibold tracking-tight">Pagos registrados</h2>
@@ -105,5 +116,63 @@ export default function PlanPage() {
         )}
       </PageBody>
     </>
+  );
+}
+
+/** Un renglón con su botón de copiar. */
+function Dato({ titulo, valor, mostrar, copiar }: { titulo: string; valor: string; mostrar?: string; copiar?: boolean }) {
+  return (
+    <div className="flex items-center justify-between gap-3 py-2.5">
+      <div className="min-w-0">
+        <p className="text-12 text-ink-3">{titulo}</p>
+        <p className="break-words font-mono text-14 tabular-nums">{mostrar ?? valor}</p>
+      </div>
+      {copiar && <BotonCopiar valor={valor} etiqueta={titulo.toLowerCase()} />}
+    </div>
+  );
+}
+
+/**
+ * A dónde pagar y a quién mandar el comprobante (0141). Los datos los captura VIM en su panel; si
+ * todavía no hay, se dice que se escriba a VIM y no se inventa nada — un dato de pago falso es peor
+ * que ninguno.
+ */
+function ComoPagar({ datos, negocio, mes }: { datos: DatosPago | null; negocio: string; mes: string }) {
+  if (!datos || !hayDatosPago(datos)) {
+    return (
+      <section className="rounded-lg border border-line bg-surface p-5">
+        <h2 className="font-display text-16 font-semibold tracking-tight">Cómo pagar</h2>
+        <p className="mt-1 text-14 text-ink-2">Pídele a VIM los datos para pagar; te los damos por el mismo medio por el que te dimos de alta.</p>
+      </section>
+    );
+  }
+  const wa = enlaceWhatsapp(datos.whatsapp, mensajeComprobante(negocio, mes));
+  return (
+    <section className="rounded-lg border border-line bg-surface">
+      <div className="border-b border-line px-5 py-3">
+        <h2 className="font-display text-16 font-semibold tracking-tight">Cómo pagar</h2>
+        <p className="text-13 text-ink-3">Transfiere y mándanos el comprobante. Registramos tu pago y aquí ves la fecha del siguiente.</p>
+      </div>
+      <div className="divide-y divide-line px-5">
+        {datos.banco && <Dato titulo="Banco" valor={datos.banco} />}
+        {datos.titular && <Dato titulo="A nombre de" valor={datos.titular} copiar />}
+        {datos.clabe && <Dato titulo="CLABE" valor={datos.clabe} mostrar={clabeLegible(datos.clabe)} copiar />}
+        {datos.correo && <Dato titulo="Correo para el comprobante" valor={datos.correo} copiar />}
+      </div>
+      {datos.instrucciones && <p className="px-5 pb-1 pt-2 text-13 text-ink-2">{datos.instrucciones}</p>}
+      {wa && (
+        <div className="px-5 pb-5 pt-3">
+          <a
+            href={wa}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex h-10 items-center rounded bg-accent px-4 text-14 font-semibold text-white transition-colors hover:bg-accent-hover active:scale-[.97]"
+          >
+            Mandar comprobante por WhatsApp
+          </a>
+          <p className="mt-1.5 text-12 text-ink-3">Se abre con el mensaje ya escrito; solo adjunta la foto o el PDF.</p>
+        </div>
+      )}
+    </section>
   );
 }
