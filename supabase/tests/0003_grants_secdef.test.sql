@@ -34,6 +34,7 @@ insert into _secdef_solo_service (fn, motivo) values
   ('sync_pull_snapshot',         'devuelve el snapshot del tenant, incluidos pin_hash y auth.users'),
   ('sync_push_snapshot',         'escribe verbatim la rebanada operativa, sin disparar triggers'),
   ('registrar_pago_suscripcion', 'marca como pagado a cualquier negocio y le recorre la fecha de cobro (0130)'),
+  ('activar_suscripcion',        'crea/expira suscripciones de cualquier negocio (0137)'),
   ('anular_pago_suscripcion',    'anula el pago de cualquier negocio y lo deja con cobro vencido (0130)');
 
 -- #2 — CRÍTICA: ninguna de ellas es ejecutable por `authenticated`.
