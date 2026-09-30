@@ -9,7 +9,7 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { Button } from "@vim/ui/styles";
 import { hoyMx } from "@vim/fecha";
-import { PageBody, PageHeader, TablaScroll } from "./page-header";
+import { PageBody, PageHeader, TablaScroll, type Miga } from "./page-header";
 import { RangoFechas } from "./rango-fechas";
 import { mensajeError } from "../lib/errores";
 import { rangoUltimosDias } from "../lib/reportes";
@@ -144,7 +144,7 @@ export function Cifras({ cifras }: { cifras: Cifra[] }) {
 }
 
 // ── Tabla ────────────────────────────────────────────────────────────────────────────────────
-const NUMERICOS = new Set(["mxn", "entero", "pct", "decimal"]);
+const NUMERICOS = new Set(["mxn", "entero", "pct", "decimal", "cantidad"]);
 const esNumerica = <T,>(c: Columna<T>) => NUMERICOS.has(c.tipo ?? "texto");
 
 function Flecha({ dir }: { dir: "asc" | "desc" | null }) {
@@ -164,11 +164,18 @@ export type DefTabla<T> = {
   vacio: ReactNode;
   /** Ancho mínimo en móvil antes de desplazarse de lado. */
   minimo?: number;
+  /**
+   * `false` cuando las filas son UNA página de algo que se pagina en el servidor: ordenar aquí
+   * solo reacomodaría esa página y se leería como si fuera el orden de todo.
+   */
+  ordenable?: boolean;
 };
 
-export function Tabla<T>({ columnas, filas, clave, orden: ordenInicial, vacio, minimo }: DefTabla<T>) {
+export function Tabla<T>({ columnas: todas, filas, clave, orden: ordenInicial, vacio, minimo, ordenable = true }: DefTabla<T>) {
   const [orden, setOrden] = useState<Orden | null>(ordenInicial ?? null);
-  const visibles = ordenar(filas, columnas, orden);
+  // Las columnas `pantalla: false` solo van al Excel.
+  const columnas = todas.filter((c) => c.pantalla !== false);
+  const visibles = ordenable ? ordenar(filas, columnas, orden) : filas;
   const totales = tieneTotales(columnas) && filas.length > 0 ? filaTotales(columnas, filas) : null;
 
   function alternar(c: Columna<T>) {
@@ -184,6 +191,17 @@ export function Tabla<T>({ columnas, filas, clave, orden: ordenInicial, vacio, m
           <thead>
             <tr className="border-b border-line bg-sel text-left">
               {columnas.map((c) => {
+                if (!ordenable) {
+                  return (
+                    <th
+                      key={c.id}
+                      scope="col"
+                      className={`h-10 px-4 text-12 font-semibold uppercase tracking-wide text-ink-2 ${esNumerica(c) ? "text-right" : ""}`}
+                    >
+                      {c.titulo}
+                    </th>
+                  );
+                }
                 const dir = orden?.id === c.id ? orden.dir : null;
                 return (
                   <th
@@ -257,6 +275,8 @@ export function ReporteMarco<D, T>({
   cifras,
   antes,
   tabla,
+  migas,
+  filasExcel,
   children,
 }: {
   titulo: string;
@@ -268,15 +288,37 @@ export function ReporteMarco<D, T>({
   cifras?: Cifra[];
   antes?: ReactNode;
   tabla?: DefTabla<T>;
+  /** Para un reporte que vive en su sección (Inventario) y no bajo Reportes. */
+  migas?: Miga[];
+  /**
+   * Cuando la tabla es UNA página de algo paginado en el servidor, el Excel no puede salir de lo
+   * que se ve: esto lee todas las filas con los mismos filtros al momento de descargar.
+   */
+  filasExcel?: () => Promise<T[]>;
   children?: ReactNode;
 }) {
   const { datos, error, cargando, reintentar } = consulta;
-  const puedeExportar = !!tabla && datos !== null && tabla.filas.length > 0;
+  const [exportando, setExportando] = useState(false);
+  const [errorExcel, setErrorExcel] = useState<string | null>(null);
+  const puedeExportar = !!tabla && datos !== null && tabla.filas.length > 0 && !exportando;
 
-  function exportar() {
+  async function exportar() {
     if (!tabla) return;
     const r = rango?.valor ?? null;
-    descargarXlsx(hojaDeReporte({ titulo, rango: r, cifras, columnas: tabla.columnas, filas: tabla.filas }), nombreArchivo(titulo, r));
+    let filas = tabla.filas;
+    setErrorExcel(null);
+    if (filasExcel) {
+      setExportando(true);
+      try {
+        filas = await filasExcel();
+      } catch (e) {
+        setErrorExcel(mensajeError(e, "No se pudo preparar el Excel"));
+        return;
+      } finally {
+        setExportando(false);
+      }
+    }
+    descargarXlsx(hojaDeReporte({ titulo, rango: r, cifras, columnas: tabla.columnas, filas }), nombreArchivo(titulo, r));
   }
 
   return (
@@ -284,14 +326,14 @@ export function ReporteMarco<D, T>({
       <PageHeader
         titulo={titulo}
         subtitulo={subtitulo}
-        migas={[{ label: "Reportes", href: "/reportes" }, { label: titulo }]}
+        migas={migas ?? [{ label: "Reportes", href: "/reportes" }, { label: titulo }]}
         right={
           tabla ? (
-            <Button variant="ghost" onClick={exportar} disabled={!puedeExportar}>
+            <Button variant="ghost" onClick={() => void exportar()} disabled={!puedeExportar}>
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4" aria-hidden="true">
                 <path d="M12 3v12M7 10l5 5 5-5M5 21h14" />
               </svg>
-              Descargar Excel
+              {exportando ? "Preparando Excel…" : "Descargar Excel"}
             </Button>
           ) : undefined
         }
@@ -302,6 +344,12 @@ export function ReporteMarco<D, T>({
             {rango?.valor && <RangoFechas desde={rango.valor.desde} hasta={rango.valor.hasta} onCambio={rango.cambiar} />}
             {filtros}
           </div>
+        )}
+
+        {errorExcel && (
+          <p role="alert" className="mb-4 text-14 font-medium text-danger">
+            {errorExcel}
+          </p>
         )}
 
         {error && (

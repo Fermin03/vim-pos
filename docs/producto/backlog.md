@@ -146,7 +146,10 @@ alertas y AGOTADO automático), con el aislamiento de fila restaurado y
 `descontar_inventario_por_venta` a prueba de tenants sin `configuracion_tenant`. El panel enciende el
 módulo desde Inventario.
 
-Pendiente, sin resolver en este ciclo:
-
-- Historial de movimientos filtrable (P-149).
-- Reporte de costo de ventas y margen por periodo (P-150).
+**Reportes de inventario: construidos (migración 0129, smoke `smoke_reportes_inventario.sql`).**
+El historial de movimientos filtrable (P-149, `/inventario/movimientos`, paginado en la base) y el
+costo de ventas y margen por periodo (P-150, `/reportes/costo-ventas`, solo administrador y dueño).
+El costo sale de los movimientos de venta al costo con que salió cada insumo; como el movimiento no
+guarda el renglón del ticket, el reparto por producto usa la receta de hoy. Si algún día se quiere
+el reparto exacto, `descontar_inventario_por_venta` tendría que guardar `ticket_item_id` (la columna
+ya existe y hoy va vacía); es un cambio de la venta y de la caja, no del reporte.

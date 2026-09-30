@@ -34,6 +34,15 @@ describe("puedeVer", () => {
     expect(puedeVer(SUPERVISOR, "/reportes/ventas-producto")).toBe(true);
   });
 
+  it("costos y márgenes son del dueño y el administrador: el supervisor ve reportes, no ése", () => {
+    expect(puedeVer(SUPERVISOR, "/reportes/costo-ventas")).toBe(false);
+    expect(puedeVer(ADMIN, "/reportes/costo-ventas")).toBe(true);
+    expect(puedeVer(DUENO, "/reportes/costo-ventas")).toBe(true);
+    // El historial de movimientos vive en Inventario y hereda su mínimo.
+    expect(puedeVer(SUPERVISOR, "/inventario/movimientos")).toBe(false);
+    expect(puedeVer(ADMIN, "/inventario/movimientos")).toBe(true);
+  });
+
   it("una ruta parecida no se cuela por empezar igual", () => {
     // "/catalogos-x" NO debe tomar el mínimo de "/catalogo".
     expect(jerarquiaRequerida("/catalogos-x")).toBeNull();

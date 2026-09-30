@@ -25,6 +25,9 @@ export const MIN_JERARQUIA: { prefijo: string; min: number }[] = [
   { prefijo: "/facturacion", min: 4 },
   { prefijo: "/configuracion", min: 4 },
   { prefijo: "/reportes", min: 3 },
+  // Costos y márgenes son cosa del dueño y del administrador, igual que las recetas con su costo
+  // (/catalogo): un supervisor ve la venta, no cuánto le queda al negocio de cada producto.
+  { prefijo: "/reportes/costo-ventas", min: 4 },
   { prefijo: "/bienvenida", min: 0 },
 ];
 
