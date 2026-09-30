@@ -93,13 +93,13 @@ export default function RolesPermisosPage() {
           {matriz && (
             <>
               {/* ── D71: matriz restrictiva ── */}
-              <div className="mb-2 rounded-lg border border-[#E8DCC0] bg-warning-soft px-4 py-2.5 text-[12.5px] font-medium text-warning">
+              <div className="mb-2 rounded-lg border border-warning-line bg-warning-soft px-4 py-2.5 text-13 font-medium text-warning">
                 Solo puedes <b>quitar</b> permisos (los roles del sistema no se amplían: esas reglas antifraude te protegen a ti).
               </div>
               <div className="overflow-x-auto rounded-lg border border-line bg-surface">
-                <table className="w-full text-[12.5px]">
+                <table className="w-full text-13">
                   <thead>
-                    <tr className="border-b border-line bg-sel text-left text-[11px] font-bold uppercase tracking-wide text-ink-3">
+                    <tr className="border-b border-line bg-sel text-left text-11 font-bold uppercase tracking-wide text-ink-3">
                       <th className="sticky left-0 bg-sel px-4 py-2.5">Permiso</th>
                       {matriz.roles.map((r) => <th key={r.id} className="px-3 py-2.5 text-center">{r.nombre}</th>)}
                     </tr>
@@ -108,7 +108,7 @@ export default function RolesPermisosPage() {
                     {categorias.map(([cat, permisos]) => (
                       <>
                         <tr key={cat} className="border-b border-line bg-hover">
-                          <td colSpan={1 + matriz.roles.length} className="px-4 py-1.5 text-[10.5px] font-bold uppercase tracking-wide text-ink-3">{cat}</td>
+                          <td colSpan={1 + matriz.roles.length} className="px-4 py-1.5 text-11 font-bold uppercase tracking-wide text-ink-3">{cat}</td>
                         </tr>
                         {permisos.map((p) => (
                           <tr key={p.id} className="border-b border-line last:border-b-0">
@@ -146,13 +146,13 @@ export default function RolesPermisosPage() {
 
               {/* ── D72: permisos explícitos del rol PERSONALIZADO ── */}
               <section className="mt-6 rounded-lg border border-line bg-surface p-5">
-                <h2 className="font-display text-[16px] font-semibold tracking-tight">Usuarios personalizados</h2>
-                <p className="mb-4 text-[12.5px] text-ink-3">
+                <h2 className="font-display text-16 font-semibold tracking-tight">Usuarios personalizados</h2>
+                <p className="mb-4 text-13 text-ink-3">
                   Un usuario con rol <b>Personalizado</b> solo puede hacer lo que marques aquí (p.ej. un "jefe de parrilla" que
                   marca pedidos listos y ve tiempos de cocina, sin acceso a nada más).
                 </p>
                 {personalizados.length === 0 ? (
-                  <p className="text-[13px] text-ink-3">
+                  <p className="text-13 text-ink-3">
                     No hay usuarios con rol Personalizado. Créalo en <b>Usuarios → Nuevo</b> eligiendo el rol "Personalizado" y vuelve aquí para marcar sus permisos.
                   </p>
                 ) : (
@@ -160,7 +160,7 @@ export default function RolesPermisosPage() {
                     <select
                       value={usuarioSel}
                       onChange={(e) => setUsuarioSel(e.target.value)}
-                      className="h-10 rounded border border-line-strong bg-surface px-3 text-[13px] outline-none focus:border-ink"
+                      className="h-10 rounded border border-line-strong bg-surface px-3 text-13 outline-none focus:border-ink"
                     >
                       <option value="">Elige un usuario…</option>
                       {personalizados.map((u) => <option key={u.usuarioId} value={u.usuarioId}>{u.nombre}</option>)}
@@ -169,7 +169,7 @@ export default function RolesPermisosPage() {
                       <>
                         <div className="mt-4 grid grid-cols-1 gap-1.5 md:grid-cols-2 lg:grid-cols-3">
                           {matriz.permisos.map((p) => (
-                            <label key={p.id} className="flex cursor-pointer items-center gap-2 rounded border border-line px-3 py-2 text-[12.5px] hover:border-line-strong">
+                            <label key={p.id} className="flex cursor-pointer items-center gap-2 rounded border border-line px-3 py-2 text-13 hover:border-line-strong">
                               <input
                                 type="checkbox"
                                 checked={permisosSel.has(p.id)}
@@ -185,7 +185,7 @@ export default function RolesPermisosPage() {
                           ))}
                         </div>
                         <div className="mt-4 flex items-center justify-end gap-3">
-                          {msgPers && <span className="text-[13px] font-medium text-success">{msgPers}</span>}
+                          {msgPers && <span className="text-13 font-medium text-success">{msgPers}</span>}
                           <Button onClick={guardarPersonalizado} disabled={guardandoPers}>
                             {guardandoPers ? "Guardando…" : `Guardar (${permisosSel.size} permisos)`}
                           </Button>

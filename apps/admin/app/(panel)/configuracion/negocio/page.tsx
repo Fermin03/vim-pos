@@ -8,7 +8,7 @@ import { mensajeError } from "../../../lib/errores";
 
 const input =
   "h-11 w-full rounded border border-line-strong px-3 text-sm outline-none focus:border-ink focus:shadow-[0_0_0_3px_rgba(22,22,26,.06)]";
-const label = "mb-1.5 block text-[13px] font-medium text-ink-2";
+const label = "mb-1.5 block text-13 font-medium text-ink-2";
 
 const TIMEZONES = [
   "America/Mexico_City",
@@ -97,13 +97,13 @@ export default function NegocioPage() {
         {neg && (
           <div className="max-w-[640px]">
             <div className="mb-5 rounded-lg border border-line bg-surface p-4">
-              <div className="grid grid-cols-2 gap-x-6 gap-y-3 text-[13px]">
+              <div className="grid grid-cols-2 gap-x-6 gap-y-3 text-13">
                 <div>
-                  <div className="text-[11.5px] font-bold uppercase tracking-wide text-ink-3">Vertical</div>
+                  <div className="text-12 font-bold uppercase tracking-wide text-ink-3">Vertical</div>
                   <div className="mt-0.5 font-medium">{VERT_LABEL[neg.vertical_principal] ?? neg.vertical_principal}</div>
                 </div>
                 <div>
-                  <div className="text-[11.5px] font-bold uppercase tracking-wide text-ink-3">Estado</div>
+                  <div className="text-12 font-bold uppercase tracking-wide text-ink-3">Estado</div>
                   <div className="mt-0.5 font-medium">{neg.estado}</div>
                 </div>
               </div>
@@ -111,8 +111,8 @@ export default function NegocioPage() {
 
             {/* Logo del negocio — sale en la pantalla principal del POS y encima del ticket. */}
             <div className="mb-5 rounded-lg border border-line bg-surface p-4">
-              <div className="text-[13px] font-semibold">Logotipo</div>
-              <p className="mt-0.5 text-[12.5px] text-ink-3">
+              <div className="text-13 font-semibold">Logotipo</div>
+              <p className="mt-0.5 text-13 text-ink-3">
                 Aparece en la pantalla principal de la caja y en la parte superior del ticket del cliente.
                 PNG o JPG, preferentemente cuadrado. Se reduce solo antes de guardarse.
               </p>
@@ -122,11 +122,11 @@ export default function NegocioPage() {
                     // eslint-disable-next-line @next/next/no-img-element -- data URI local, no remoto
                     <img src={neg.logo_url} alt="Logotipo del negocio" className="h-full w-full object-contain" />
                   ) : (
-                    <span className="text-[11px] text-ink-3">Sin logo</span>
+                    <span className="text-11 text-ink-3">Sin logo</span>
                   )}
                 </div>
                 <div className="flex flex-col gap-2">
-                  <label className={["inline-flex cursor-pointer items-center justify-center rounded border border-line-strong px-3 py-2 text-[13px] font-semibold text-ink-2 transition hover:border-ink hover:text-ink", logoOcupado ? "pointer-events-none opacity-50" : ""].join(" ")}>
+                  <label className={["inline-flex cursor-pointer items-center justify-center rounded border border-line-strong px-3 py-2 text-13 font-semibold text-ink-2 transition hover:border-ink hover:text-ink", logoOcupado ? "pointer-events-none opacity-50" : ""].join(" ")}>
                     {logoOcupado ? "Procesando…" : neg.logo_url ? "Cambiar logotipo" : "Subir logotipo"}
                     <input
                       type="file"
@@ -162,7 +162,7 @@ export default function NegocioPage() {
                           setError(mensajeError(err, "No se pudo quitar el logotipo"));
                         } finally { setLogoOcupado(false); }
                       }}
-                      className="text-[12.5px] font-semibold text-ink-3 transition hover:text-danger disabled:opacity-50"
+                      className="text-13 font-semibold text-ink-3 transition hover:text-danger disabled:opacity-50"
                     >
                       Quitar
                     </button>
@@ -179,7 +179,7 @@ export default function NegocioPage() {
               <div>
                 <label className={label} htmlFor="n-codigo">Código (slug)</label>
                 <input id="n-codigo" className={input} value={codigo} maxLength={50} onChange={(e) => setCodigo(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ""))} />
-                <p className="mt-1 text-[11.5px] text-ink-3">Usado en subdominios y prefijos de folio. Solo minúsculas, números y guiones.</p>
+                <p className="mt-1 text-12 text-ink-3">Usado en subdominios y prefijos de folio. Solo minúsculas, números y guiones.</p>
               </div>
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div>
@@ -193,7 +193,7 @@ export default function NegocioPage() {
                 <div>
                   <label className={label} htmlFor="n-hora">Cierre de día contable</label>
                   <input id="n-hora" type="time" className={input} value={hora} onChange={(e) => setHora(e.target.value)} />
-                  <p className="mt-1 text-[11.5px] text-ink-3">Las ventas hasta esta hora cuentan en el día anterior.</p>
+                  <p className="mt-1 text-12 text-ink-3">Las ventas hasta esta hora cuentan en el día anterior.</p>
                 </div>
               </div>
 

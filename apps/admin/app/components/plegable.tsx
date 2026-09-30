@@ -23,8 +23,8 @@ export function Plegable({
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" aria-hidden="true" className="h-4 w-4 flex-shrink-0 text-ink-2 transition-transform duration-150 ease-vim group-open:rotate-90 motion-reduce:transition-none">
           <path d="M9 6l6 6-6 6" />
         </svg>
-        <span className="text-[14px] font-semibold">{titulo}</span>
-        {resumen && <span className="ml-auto truncate text-[13px] text-ink-2 group-open:hidden">{resumen}</span>}
+        <span className="text-14 font-semibold">{titulo}</span>
+        {resumen && <span className="ml-auto truncate text-13 text-ink-2 group-open:hidden">{resumen}</span>}
       </summary>
       <div className="flex flex-col gap-4 border-t border-line px-4 pb-4 pt-4">{children}</div>
     </details>

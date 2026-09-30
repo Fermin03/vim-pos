@@ -70,9 +70,9 @@ function Recetas() {
         {filas === null && <p className="text-sm text-ink-3">Cargando…</p>}
         {filas !== null && (
           <TablaScroll min={760}>
-            <table className="w-full text-[13.5px]">
+            <table className="w-full text-14">
               <thead>
-                <tr className="border-b border-line text-left text-[11.5px] uppercase tracking-[0.04em] text-ink-3">
+                <tr className="border-b border-line text-left text-12 uppercase tracking-[0.04em] text-ink-3">
                   <th className="py-2 pr-3 font-semibold">Producto</th>
                   <th className="py-2 pr-3 font-semibold">Categoría</th>
                   <th className="py-2 pr-3 text-right font-semibold">Precio sin IVA</th>
@@ -94,7 +94,7 @@ function Recetas() {
                       <td className="pr-3 text-right tabular-nums">{r.costo == null ? "—" : fmt(r.costo)}</td>
                       <td className={`pr-3 text-right tabular-nums ${m && m.pesos < 0 ? "text-danger" : ""}`}>{m ? fmt(m.pesos) : "—"}</td>
                       <td className={`pr-3 text-right tabular-nums ${m && m.porcentaje != null && m.porcentaje < 0 ? "text-danger" : ""}`}>{m ? pct(m.porcentaje) : "—"}</td>
-                      <td><span className={`rounded px-2 py-0.5 text-[12px] font-medium ${BADGE[est].clase}`}>{BADGE[est].texto}</span></td>
+                      <td><span className={`rounded px-2 py-0.5 text-12 font-medium ${BADGE[est].clase}`}>{BADGE[est].texto}</span></td>
                     </tr>
                   );
                 })}

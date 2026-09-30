@@ -139,9 +139,9 @@ export default function EditorRecetaPage() {
             </div>
 
             <TablaScroll min={820}>
-              <table className="w-full text-[13.5px]">
+              <table className="w-full text-14">
                 <thead>
-                  <tr className="border-b border-line text-left text-[11.5px] uppercase tracking-[0.04em] text-ink-3">
+                  <tr className="border-b border-line text-left text-12 uppercase tracking-[0.04em] text-ink-3">
                     <th className="py-2 pr-3 font-semibold">Insumo</th>
                     <th className="py-2 pr-3 text-right font-semibold">Cantidad</th>
                     <th className="py-2 pr-3 font-semibold">Unidad</th>
@@ -163,7 +163,7 @@ export default function EditorRecetaPage() {
                             <option value="">Elige…</option>
                             {insumos.map((o) => <option key={o.id} value={o.id}>{o.nombre}</option>)}
                           </select>
-                          {err && f.insumoId && <p className="mt-1 text-[12px] text-danger">{err}</p>}
+                          {err && f.insumoId && <p className="mt-1 text-12 text-danger">{err}</p>}
                         </td>
                         <td className="py-1.5 pr-3">
                           <input className={`${input} text-right tabular-nums`} inputMode="decimal" value={f.cantidadTexto} aria-label="Cantidad"
@@ -204,7 +204,7 @@ export default function EditorRecetaPage() {
             <div><Button variant="ghost" onClick={agregar} disabled={insumos.length === 0}>Agregar insumo</Button></div>
 
             <div>
-              <label className="mb-1.5 block text-[13px] font-medium text-ink-2" htmlFor="notas">Notas de preparación</label>
+              <label className="mb-1.5 block text-13 font-medium text-ink-2" htmlFor="notas">Notas de preparación</label>
               <textarea id="notas" className="min-h-[80px] w-full rounded border border-line-strong p-2 text-sm" value={notas} onChange={(e) => setNotas(e.target.value)} />
             </div>
 
@@ -213,7 +213,7 @@ export default function EditorRecetaPage() {
             <div className="flex gap-2">
               <Button onClick={guardar} disabled={guardando || hayErrores}>{guardando ? "Guardando…" : "Guardar receta"}</Button>
             </div>
-            <p className="text-[12px] text-ink-3">Marca como crítico el insumo sin el cual el producto se agota solo cuando no hay existencia.</p>
+            <p className="text-12 text-ink-3">Marca como crítico el insumo sin el cual el producto se agota solo cuando no hay existencia.</p>
           </div>
         )}
       </PageBody>

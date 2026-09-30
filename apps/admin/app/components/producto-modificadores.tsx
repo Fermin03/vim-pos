@@ -68,12 +68,12 @@ export function ProductoModificadores({
   return (
     <section className={onPendiente ? "rounded-lg border border-line bg-surface p-4" : "mt-6 rounded-lg border border-line bg-surface p-5"}>
       <div className="mb-1 flex flex-wrap items-center justify-between gap-2">
-        <h2 className="text-[14px] font-semibold">Modificadores</h2>
-        <Link href="/catalogo/modificadores" className="text-[13px] font-semibold text-ink underline underline-offset-2">
+        <h2 className="text-14 font-semibold">Modificadores</h2>
+        <Link href="/catalogo/modificadores" className="text-13 font-semibold text-ink underline underline-offset-2">
           Ver todos los grupos
         </Link>
       </div>
-      <p className="mb-3 text-[13px] text-ink-2">
+      <p className="mb-3 text-13 text-ink-2">
         Lo que la caja pregunta al vender este producto: término, extras, sin ingredientes…
       </p>
 
@@ -100,8 +100,8 @@ export function ProductoModificadores({
                   className="mt-0.5 h-5 w-5 accent-ink"
                 />
                 <span className="min-w-0">
-                  <span className="block text-[13.5px] font-semibold">{g.nombre}</span>
-                  <span className="block text-[12.5px] text-ink-2">{TIPO_SELECCION[g.tipo_seleccion]}</span>
+                  <span className="block text-14 font-semibold">{g.nombre}</span>
+                  <span className="block text-13 text-ink-2">{TIPO_SELECCION[g.tipo_seleccion]}</span>
                 </span>
               </label>
             ))}
@@ -109,10 +109,10 @@ export function ProductoModificadores({
           {/* Dentro del formulario del producto se guardan con su botón: un solo "Guardar" por
               pantalla (antes había dos y el de abajo quedaba después del de arriba). */}
           {onPendiente ? (
-            cambio && <p className="mt-3 text-[13px] text-ink-2">Se guardan con «Guardar cambios».</p>
+            cambio && <p className="mt-3 text-13 text-ink-2">Se guardan con «Guardar cambios».</p>
           ) : (
             <div className="mt-4 flex items-center justify-end gap-3">
-              {msg && <span className="text-[13px] font-medium text-success" aria-live="polite">{msg}</span>}
+              {msg && <span className="text-13 font-medium text-success" aria-live="polite">{msg}</span>}
               <Button onClick={guardar} disabled={!cambio || guardando}>
                 {guardando ? "Guardando…" : "Guardar modificadores"}
               </Button>

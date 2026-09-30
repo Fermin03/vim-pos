@@ -3,8 +3,8 @@ import { useEffect } from "react";
 import { PantallaEstado } from "./components/pantalla-estado";
 import { reportarErrorSinEsperar } from "./lib/reportar-error";
 
-const btnAccent = "inline-flex items-center gap-2 rounded-lg bg-accent px-5 py-2.5 text-[14px] font-semibold text-white transition hover:brightness-95";
-const btnGhost = "inline-flex items-center gap-2 rounded-lg border border-line-strong px-5 py-2.5 text-[14px] font-semibold text-ink-2 transition hover:border-ink";
+const btnAccent = "inline-flex items-center gap-2 rounded-lg bg-accent px-5 py-2.5 text-14 font-semibold text-white transition hover:brightness-95";
+const btnGhost = "inline-flex items-center gap-2 rounded-lg border border-line-strong px-5 py-2.5 text-14 font-semibold text-ink-2 transition hover:border-ink";
 
 export default function Error({ error, reset }: { error: Error & { digest?: string }; reset: () => void }) {
   useEffect(() => {

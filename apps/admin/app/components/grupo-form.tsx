@@ -16,7 +16,7 @@ import { mensajeError } from "../lib/errores";
 
 const input =
   "h-11 w-full rounded border border-line-strong px-3 text-sm outline-none focus:border-ink focus:shadow-[0_0_0_3px_rgba(22,22,26,.06)]";
-const label = "mb-1.5 block text-[13px] font-medium text-ink-2";
+const label = "mb-1.5 block text-13 font-medium text-ink-2";
 
 export function GrupoForm({ grupo }: { grupo: Grupo | null }) {
   const router = useRouter();
@@ -97,7 +97,7 @@ export function GrupoForm({ grupo }: { grupo: Grupo | null }) {
                 <option key={n} value={n}>{NATURALEZA[n]}</option>
               ))}
             </select>
-            <p id="nat-ayuda" className="mt-1 text-[12.5px] text-ink-2">Los «Sin» salen marcados aparte en la comanda para que cocina no los pase por alto.</p>
+            <p id="nat-ayuda" className="mt-1 text-13 text-ink-2">Los «Sin» salen marcados aparte en la comanda para que cocina no los pase por alto.</p>
           </div>
         </div>
 
@@ -120,13 +120,13 @@ export function GrupoForm({ grupo }: { grupo: Grupo | null }) {
         </label>
 
         {!editar && (
-          <p className="text-[13px] text-ink-2">Después de crear el grupo le agregas sus opciones.</p>
+          <p className="text-13 text-ink-2">Después de crear el grupo le agregas sus opciones.</p>
         )}
 
         {error && <p className="text-sm font-medium text-danger" role="alert">{error}</p>}
 
         <div className="flex items-center justify-end gap-2 border-t border-line pt-5">
-          {guardadoOk && <span className="mr-auto text-[13px] font-medium text-success" aria-live="polite">Guardado</span>}
+          {guardadoOk && <span className="mr-auto text-13 font-medium text-success" aria-live="polite">Guardado</span>}
           <Button variant="ghost" onClick={() => router.push("/catalogo/modificadores")} disabled={guardando}>{editar ? "Volver" : "Cancelar"}</Button>
           <Button onClick={guardar} disabled={guardando}>
             {guardando ? "Guardando…" : editar ? "Guardar cambios" : "Crear grupo"}

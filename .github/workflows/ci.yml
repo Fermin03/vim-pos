@@ -56,6 +56,10 @@ jobs:
         # Si alguien sube un package.json desincronizado del lockfile, falla aquí.
         run: pnpm install --frozen-lockfile
 
+      - name: Escala tipográfica
+        # Falla si alguien escribe un `text-[Npx]` fuera de la escala del preset (scripts/tipografia.mjs).
+        run: pnpm tipografia
+
       - name: Typecheck apps
         # Solo apps/* tienen el script typecheck; packages se construyen con tsc al ser
         # importados desde las apps (transpilePackages en next.config).

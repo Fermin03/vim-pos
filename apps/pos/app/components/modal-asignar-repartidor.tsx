@@ -126,13 +126,13 @@ export function ModalAsignarRepartidor({
       className="w-[440px] rounded-lg border border-line bg-surface p-6 shadow-[0_18px_44px_rgba(22,22,26,.18)]"
     >
       <h2 className="font-display text-xl font-semibold tracking-tight">¿Quién se lo lleva?</h2>
-      <p className="mt-0.5 text-[13px] text-ink-3">
+      <p className="mt-0.5 text-13 text-ink-3">
         {folio ? `${folio} · ` : ""}
         {fmtMxn(totalViaje)} a cobrar en la puerta.
       </p>
 
       <div className="mt-4">
-        {repartidores === null && <p className="text-[13px] text-ink-3">Cargando repartidores…</p>}
+        {repartidores === null && <p className="text-13 text-ink-3">Cargando repartidores…</p>}
 
         {repartidores !== null && repartidores.length > 0 && (
           <div className="max-h-[240px] overflow-y-auto rounded border border-line">
@@ -159,8 +159,8 @@ export function ModalAsignarRepartidor({
                     {activo ? "✓" : ""}
                   </span>
                   <span className="min-w-0 flex-1">
-                    <span className="block truncate text-[14px] font-semibold text-ink">{r.nombre}</span>
-                    {r.telefono && <span className="block text-[12px] text-ink-3">{r.telefono}</span>}
+                    <span className="block truncate text-14 font-semibold text-ink">{r.nombre}</span>
+                    {r.telefono && <span className="block text-12 text-ink-3">{r.telefono}</span>}
                   </span>
                 </button>
               );
@@ -170,7 +170,7 @@ export function ModalAsignarRepartidor({
       </div>
 
       {repartidores !== null && repartidores.length === 0 && !altaAbierta && (
-        <p className="mt-4 rounded border border-line bg-bg px-3 py-2.5 text-[12.5px] leading-snug text-ink-2">
+        <p className="mt-4 rounded border border-line bg-bg px-3 py-2.5 text-13 leading-snug text-ink-2">
           No hay repartidores dados de alta. Dale de alta a quien se lo lleve para que el pedido
           pueda salir; después se administran en el panel, en{" "}
           <span className="font-semibold">Usuarios → Repartidores</span>.
@@ -181,7 +181,7 @@ export function ModalAsignarRepartidor({
         <button
           type="button"
           onClick={() => setAltaAbierta(true)}
-          className="mt-2 text-[12.5px] font-semibold text-info underline-offset-2 hover:underline"
+          className="mt-2 text-13 font-semibold text-info underline-offset-2 hover:underline"
         >
           ¿Falta alguien? Darlo de alta
         </button>
@@ -208,7 +208,7 @@ export function ModalAsignarRepartidor({
             <button
               type="button"
               onClick={() => setAltaAbierta(false)}
-              className="h-10 flex-1 rounded border border-line-strong text-[13px] font-semibold text-ink-2"
+              className="h-10 flex-1 rounded border border-line-strong text-13 font-semibold text-ink-2"
             >
               Cancelar
             </button>
@@ -221,7 +221,7 @@ export function ModalAsignarRepartidor({
 
       {otros.length > 0 && (
         <div className="mt-4">
-          <p className="mb-1 text-[12.5px] font-semibold text-ink-2">¿Se lleva algo más?</p>
+          <p className="mb-1 text-13 font-semibold text-ink-2">¿Se lleva algo más?</p>
           <div className="max-h-[180px] overflow-y-auto rounded border border-line">
             {otros.map((o) => {
               const activo = tambien.has(o.ticketId);
@@ -245,10 +245,10 @@ export function ModalAsignarRepartidor({
                   >
                     {activo ? "✓" : ""}
                   </span>
-                  <span className="min-w-0 flex-1 truncate text-[14px] font-semibold text-ink">
+                  <span className="min-w-0 flex-1 truncate text-14 font-semibold text-ink">
                     {o.cliente ?? o.folio ?? "Cuenta"}
                   </span>
-                  <span className="flex-shrink-0 text-[13px] font-semibold tabular-nums">{fmtMxn(o.total)}</span>
+                  <span className="flex-shrink-0 text-13 font-semibold tabular-nums">{fmtMxn(o.total)}</span>
                 </button>
               );
             })}
@@ -257,7 +257,7 @@ export function ModalAsignarRepartidor({
       )}
 
       <div className="mt-3">
-        <label className="mb-1 block text-[12.5px] font-semibold text-ink-2" htmlFor="min">
+        <label className="mb-1 block text-13 font-semibold text-ink-2" htmlFor="min">
           Tiempo prometido · minutos
         </label>
         <input
@@ -270,14 +270,14 @@ export function ModalAsignarRepartidor({
         />
       </div>
 
-      {error && <p className="mt-3 text-[13px] font-medium text-danger" role="alert">{error}</p>}
+      {error && <p className="mt-3 text-13 font-medium text-danger" role="alert">{error}</p>}
 
       <div className="mt-5 flex gap-2">
         <button
           type="button"
           onClick={onCerrar}
           disabled={procesando}
-          className="h-11 flex-1 rounded border border-line-strong text-[14px] font-semibold text-ink-2 transition hover:border-ink hover:text-ink disabled:opacity-50"
+          className="h-11 flex-1 rounded border border-line-strong text-14 font-semibold text-ink-2 transition hover:border-ink hover:text-ink disabled:opacity-50"
         >
           Cancelar
         </button>

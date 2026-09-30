@@ -26,7 +26,7 @@ export function ModalEtiquetaEspera({
 
   return (
     <Modal open onClose={onCerrar} title="Poner pedido en espera">
-      <p className="mb-3 text-[13px] leading-relaxed text-ink-2">
+      <p className="mb-3 text-13 leading-relaxed text-ink-2">
         El pedido se guarda con su cuenta y lo retomas en cualquier momento desde <b>En espera</b>.
         Ponle una etiqueta para identificar al cliente.
       </p>
@@ -35,10 +35,10 @@ export function ModalEtiquetaEspera({
         onChange={(e) => setEtiqueta(e.target.value)}
         maxLength={100}
         placeholder='P. ej. "Cliente camisa azul" o "Pedido de Laura"'
-        className="h-12 w-full rounded border border-line-strong px-3 text-[15px] outline-none focus:border-ink focus:shadow-[0_0_0_3px_rgba(22,22,26,.06)]"
+        className="h-12 w-full rounded border border-line-strong px-3 text-15 outline-none focus:border-ink focus:shadow-[0_0_0_3px_rgba(22,22,26,.06)]"
         onKeyDown={(e) => { if (e.key === "Enter" && lista && !procesando) onConfirmar(etiqueta); }}
       />
-      {error && <p className="mt-2 text-[13px] font-medium text-danger" role="alert">{error}</p>}
+      {error && <p className="mt-2 text-13 font-medium text-danger" role="alert">{error}</p>}
       <div className="mt-4 flex gap-2">
         <Button variant="ghost" className="flex-1" onClick={onCerrar} disabled={procesando}>Cancelar</Button>
         <Button className="flex-1" onClick={() => onConfirmar(etiqueta)} disabled={!lista || procesando}>
@@ -75,7 +75,7 @@ export function ModalListaEspera({
 
   return (
     <Modal open onClose={onCerrar} title="Pedidos en espera" className="w-full max-w-lg rounded-lg bg-surface p-6 shadow-xl">
-      {(error ?? errorCarga) && <p className="mb-3 text-[13px] font-medium text-danger" role="alert">{error ?? errorCarga}</p>}
+      {(error ?? errorCarga) && <p className="mb-3 text-13 font-medium text-danger" role="alert">{error ?? errorCarga}</p>}
       {tickets === null && !errorCarga && <p className="py-6 text-center text-sm text-ink-3">Cargando…</p>}
       {tickets !== null && tickets.length === 0 && (
         <p className="py-6 text-center text-sm text-ink-3">No hay pedidos en espera en esta caja.</p>
@@ -93,15 +93,15 @@ export function ModalListaEspera({
                 className="flex w-full items-center justify-between gap-3 border-b border-line px-4 py-3 text-left transition last:border-b-0 hover:bg-hover disabled:opacity-60"
               >
                 <div className="min-w-0">
-                  <div className="truncate text-[14.5px] font-semibold">{t.etiqueta}</div>
-                  <div className="mt-0.5 text-[12px] text-ink-3">
+                  <div className="truncate text-15 font-semibold">{t.etiqueta}</div>
+                  <div className="mt-0.5 text-12 text-ink-3">
                     {t.nItems} art. · {min < 60 ? `hace ${min} min` : `hace ${Math.floor(min / 60)} h ${min % 60} min`}
                     {t.folio ? ` · ${t.folio}` : ""}
                   </div>
                 </div>
                 <div className="flex flex-shrink-0 items-center gap-3">
-                  <span className="font-display text-[16px] font-bold tabular-nums">{fmtMxn(t.total)}</span>
-                  <span className="rounded bg-ink px-2.5 py-1 text-[12px] font-semibold text-white">Retomar</span>
+                  <span className="font-display text-16 font-bold tabular-nums">{fmtMxn(t.total)}</span>
+                  <span className="rounded bg-ink px-2.5 py-1 text-12 font-semibold text-white">Retomar</span>
                 </div>
               </button>
             );

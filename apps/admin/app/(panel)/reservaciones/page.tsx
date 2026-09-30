@@ -19,7 +19,7 @@ import {
 import { mensajeError } from "../../lib/errores";
 
 const input = "h-11 w-full rounded border border-line-strong px-3 text-sm outline-none focus:border-ink focus:shadow-[0_0_0_3px_rgba(22,22,26,.06)]";
-const label = "mb-1.5 block text-[13px] font-medium text-ink-2";
+const label = "mb-1.5 block text-13 font-medium text-ink-2";
 
 const COLOR: Record<ReservacionEstado, string> = {
   CONFIRMADA: "bg-[#EAF0F8] text-[#2C5AA0]", LLEGO: "bg-success-soft text-success",
@@ -99,7 +99,7 @@ export default function ReservacionesPage() {
             existe en la base con su clave foránea, pero ninguna pantalla de la
             caja lo lee. Sin este aviso, un anfitrión reserva la mesa 4 aquí y
             el cajero la ocupa sin enterarse. */}
-        <p className="mb-4 max-w-[70ch] text-[13px] text-ink-2">
+        <p className="mb-4 max-w-[70ch] text-13 text-ink-2">
           La caja ya las ve: en <b>Comedor → Reservaciones</b> aparece la agenda del día, y
           desde ahí se sienta al cliente asignándole mesa. Al asignarla, la mesa deja de
           verse libre en el mapa.
@@ -109,16 +109,16 @@ export default function ReservacionesPage() {
         {error && !creando && <p className="mb-3 text-sm font-medium text-danger">{error}</p>}
 
         <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center">
-          <label className="text-[13px] font-medium text-ink-2" htmlFor="dia">Día</label>
+          <label className="text-13 font-medium text-ink-2" htmlFor="dia">Día</label>
           <input id="dia" type="date" className={`${input} w-44`} value={dia} onChange={(e) => setDia(e.target.value)} />
-          <span className="text-[13px] text-ink-3">{lista?.length ?? 0} reservaciones</span>
+          <span className="text-13 text-ink-3">{lista?.length ?? 0} reservaciones</span>
         </div>
 
         {lista === null && <p className="text-sm text-ink-3">Cargando…</p>}
         {lista && lista.length === 0 && !creando && (
           <div className="rounded-lg border border-line bg-surface p-8 text-center text-ink-3">
-            <p className="text-[15px] font-semibold text-ink-2">Sin reservaciones este día</p>
-            <p className="mt-1 text-[13px]">Crea una con el botón de arriba.</p>
+            <p className="text-15 font-semibold text-ink-2">Sin reservaciones este día</p>
+            <p className="mt-1 text-13">Crea una con el botón de arriba.</p>
           </div>
         )}
         {lista && lista.length > 0 && (
@@ -129,23 +129,23 @@ export default function ReservacionesPage() {
               return (
                 <div key={r.id} className="flex flex-wrap items-center gap-x-4 gap-y-3 rounded-lg border border-line bg-surface p-4">
                   <div className="text-center">
-                    <div className="font-display text-[18px] font-bold tabular-nums">{hora}</div>
-                    <div className="text-[11px] text-ink-3">{r.comensales} pers.</div>
+                    <div className="font-display text-18 font-bold tabular-nums">{hora}</div>
+                    <div className="text-11 text-ink-3">{r.comensales} pers.</div>
                   </div>
                   <div className="min-w-[140px] flex-1">
                     <div className="flex items-center gap-2">
                       <span className="font-semibold">{r.clienteNombre}</span>
-                      <span className={`rounded-full px-2 py-0.5 text-[10.5px] font-bold ${COLOR[r.estado]}`}>{labelEstadoReserva(r.estado)}</span>
+                      <span className={`rounded-full px-2 py-0.5 text-11 font-bold ${COLOR[r.estado]}`}>{labelEstadoReserva(r.estado)}</span>
                     </div>
-                    <div className="mt-0.5 text-[12.5px] text-ink-3">
+                    <div className="mt-0.5 text-13 text-ink-3">
                       {r.clienteTelefono || "—"} · {labelCanal(r.canal)}{r.nota ? ` · ${r.nota}` : ""}
                     </div>
                   </div>
                   {activa && (
                     <div className="flex flex-wrap gap-1.5">
-                      <button type="button" onClick={() => accion(() => confirmarLlegada(r.id))} className="rounded border border-line-strong px-2.5 py-1.5 text-[12px] font-semibold text-success hover:border-success">Llegó</button>
-                      <button type="button" onClick={() => accion(() => marcarNoShow(r.id))} className="rounded border border-line-strong px-2.5 py-1.5 text-[12px] font-semibold text-ink-2 hover:border-ink">No llegó</button>
-                      <button type="button" onClick={() => { const m = prompt("Motivo de cancelación:"); if (m) accion(() => cancelarReservacion(r.id, m)); }} className="rounded border border-line-strong px-2.5 py-1.5 text-[12px] font-semibold text-ink-3 hover:text-danger">Cancelar</button>
+                      <button type="button" onClick={() => accion(() => confirmarLlegada(r.id))} className="rounded border border-line-strong px-2.5 py-1.5 text-12 font-semibold text-success hover:border-success">Llegó</button>
+                      <button type="button" onClick={() => accion(() => marcarNoShow(r.id))} className="rounded border border-line-strong px-2.5 py-1.5 text-12 font-semibold text-ink-2 hover:border-ink">No llegó</button>
+                      <button type="button" onClick={() => { const m = prompt("Motivo de cancelación:"); if (m) accion(() => cancelarReservacion(r.id, m)); }} className="rounded border border-line-strong px-2.5 py-1.5 text-12 font-semibold text-ink-3 hover:text-danger">Cancelar</button>
                     </div>
                   )}
                 </div>
@@ -156,7 +156,7 @@ export default function ReservacionesPage() {
 
         {creando && (
           <div className="mt-5 max-w-[560px] rounded-lg border border-line bg-surface p-5">
-            <div className="mb-4 font-display text-[16px] font-semibold tracking-tight">Nueva reservación</div>
+            <div className="mb-4 font-display text-16 font-semibold tracking-tight">Nueva reservación</div>
             <div className="flex flex-col gap-3.5">
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div>

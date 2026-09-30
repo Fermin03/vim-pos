@@ -147,13 +147,29 @@ Tres familias, cargadas desde Google Fonts en el `layout` de cada app:
 efectivo. Necesitan peso y anchura constante. Siempre acompañados de `tabular-nums`, o las cifras
 bailan al actualizarse y obligan a releer.
 
-### Escala real
+### Escala
 
-La escala **no está tokenizada**. El código usa valores literales, y estos son los que de verdad
-aparecen en el POS:
+Doce pasos, en `packages/config/tailwind-preset.js` (`fontSize`). El nombre dice el tamaño, igual
+que los `--t-*` del sitio:
 
-| Tamaño | Apariciones | Papel de hecho |
-|---|---|---|
+| Clase | Papel |
+|---|---|
+| `text-11` | Chips, marcas de tiempo, notas al pie. |
+| `text-12` | Etiquetas y metadatos. |
+| `text-13` | El caballo de batalla: texto de interfaz y ayudas. |
+| `text-14` | Botones, controles, la consecuencia de un diálogo. |
+| `text-15` | Texto destacado dentro de un bloque. |
+| `text-16` | Campos en celular (menos de 16 px y iOS hace zoom) y cifras chicas. |
+| `text-18` · `text-20` | Títulos de bloque y de diálogo. |
+| `text-24` · `text-28` · `text-32` · `text-40` | Títulos de página y cifras de dinero. |
+
+Hasta sep 2026 no había escala: ~1,750 clases `text-[Npx]` en 35 valores, con 12, 12.5 y 13 px
+conviviendo. La migración redondeó al paso más cercano y, en empate, hacia arriba (12.5 → 13): en
+la caja se lee a un metro. **`pnpm tipografia`** (en CI) falla si vuelve a aparecer un
+`text-[Npx]`. Quedan fuera los recibos (`recibo-*.tsx`), que imitan la letra de la impresora, y
+los números de adorno de 60 px o más.
+
+---|---|---|
 | `13px` | 116 | El caballo de batalla: texto de interfaz. |
 | `12.5px` | 84 | Texto secundario y ayudas. |
 | `15px` | 49 | Texto destacado dentro de un bloque. |
@@ -228,6 +244,12 @@ Viven en `packages/ui/src/components` y se importan desde `@vim/ui/styles`:
 - **`Modal`** — contenedor de diálogo con título opcional.
 - **`PinKeypad`** — teclado numérico para PIN.
 - **`StatusChip`** — etiqueta de estado.
+- **`Aviso`** — la tarjeta de aviso (`success`, `warning`, `danger`, `info`) con su borde
+  `*-line`. Nada de bordes en hexadecimal.
+- **`DialogoPeligro`** — el marco de TODA confirmación peligrosa: título, contexto, consecuencia,
+  lo que se pide (motivo, PIN, nombre) como `children`, error adentro y dos botones: **Volver**
+  primero y el verbo en rojo. `useConfirmar` es su versión de una línea para un sí/no. En la caja,
+  `AvisoAutorizacion` y `MotivoChips` (`app/components/motivo-y-autorizacion.tsx`) van adentro.
 
 **Regla:** si un patrón aparece en dos apps, sube a `@vim/ui`. Si aparece dos veces en la misma
 app, sube a `app/components`. Copiar y pegar la tercera vez es cuando el sistema empieza a

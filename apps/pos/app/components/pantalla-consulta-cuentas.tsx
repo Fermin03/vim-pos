@@ -105,40 +105,40 @@ export function PantallaConsultaCuentas({
         <div className="mr-auto flex items-center gap-3">
           <LogoVim className="h-8 w-8" />
           <div>
-            <div className="font-display text-[16px] font-bold leading-tight">Cuentas · {caja.nombre}</div>
-            <div className="text-[11.5px] text-ink-3">{cuentas?.length ?? 0} cuentas</div>
+            <div className="font-display text-16 font-bold leading-tight">Cuentas · {caja.nombre}</div>
+            <div className="text-12 text-ink-3">{cuentas?.length ?? 0} cuentas</div>
           </div>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <div className="flex rounded-md border border-line-strong p-0.5">
-            <button type="button" onClick={() => setModoFiltro("turno")} className={`rounded px-3 py-1.5 text-[12.5px] font-semibold transition ${modoFiltro === "turno" ? "bg-ink text-white" : "text-ink-2 hover:text-ink"}`}>Turno actual</button>
-            <button type="button" onClick={() => setModoFiltro("fechas")} className={`rounded px-3 py-1.5 text-[12.5px] font-semibold transition ${modoFiltro === "fechas" ? "bg-ink text-white" : "text-ink-2 hover:text-ink"}`}>Por fechas</button>
+            <button type="button" onClick={() => setModoFiltro("turno")} className={`rounded px-3 py-1.5 text-13 font-semibold transition ${modoFiltro === "turno" ? "bg-ink text-white" : "text-ink-2 hover:text-ink"}`}>Turno actual</button>
+            <button type="button" onClick={() => setModoFiltro("fechas")} className={`rounded px-3 py-1.5 text-13 font-semibold transition ${modoFiltro === "fechas" ? "bg-ink text-white" : "text-ink-2 hover:text-ink"}`}>Por fechas</button>
           </div>
           {modoFiltro === "fechas" && (
-            <div className="flex items-center gap-1.5 text-[12.5px]">
+            <div className="flex items-center gap-1.5 text-13">
               <input type="date" value={desde} onChange={(e) => setDesde(e.target.value)} className="h-9 rounded border border-line-strong px-2 text-ink" />
               <span className="text-ink-3">a</span>
               <input type="date" value={hasta} onChange={(e) => setHasta(e.target.value)} className="h-9 rounded border border-line-strong px-2 text-ink" />
             </div>
           )}
-          <button type="button" onClick={recargar} className="flex h-9 items-center gap-1.5 rounded border border-line-strong px-3 text-[13px] font-semibold text-ink-2 transition hover:border-ink hover:text-ink">
+          <button type="button" onClick={recargar} className="flex h-9 items-center gap-1.5 rounded border border-line-strong px-3 text-13 font-semibold text-ink-2 transition hover:border-ink hover:text-ink">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4"><path d="M23 4v6h-6M1 20v-6h6" /><path d="M3.5 9a9 9 0 0 1 14.9-3.4L23 10M1 14l4.6 4.4A9 9 0 0 0 20.5 15" /></svg>
             Actualizar
           </button>
         </div>
       </header>
 
-      {error && <div className="mx-6 mt-3 rounded border border-[#EDC4BE] bg-danger-soft px-3 py-2 text-[13px] font-medium text-danger" role="alert">{error}</div>}
+      {error && <div className="mx-6 mt-3 rounded border border-danger-line bg-danger-soft px-3 py-2 text-13 font-medium text-danger" role="alert">{error}</div>}
 
       <div className="flex min-h-0 flex-1">
         {/* Lista */}
         <div className="flex w-[420px] flex-shrink-0 flex-col border-r border-line">
-          <div className="grid grid-cols-[1fr_auto] gap-2 border-b border-line px-4 py-2 text-[11px] font-bold uppercase tracking-wide text-ink-3">
+          <div className="grid grid-cols-[1fr_auto] gap-2 border-b border-line px-4 py-2 text-11 font-bold uppercase tracking-wide text-ink-3">
             <span>Folio · Fecha</span><span>Total</span>
           </div>
           <div className="min-h-0 flex-1 overflow-y-auto">
-            {cuentas === null && <p className="p-6 text-center text-[13px] text-ink-3">Cargando…</p>}
-            {cuentas !== null && cuentas.length === 0 && <p className="p-6 text-center text-[13px] text-ink-3">Sin cuentas en este filtro.</p>}
+            {cuentas === null && <p className="p-6 text-center text-13 text-ink-3">Cargando…</p>}
+            {cuentas !== null && cuentas.length === 0 && <p className="p-6 text-center text-13 text-ink-3">Sin cuentas en este filtro.</p>}
             {cuentas?.map((c) => (
               <button
                 key={c.ticketId}
@@ -148,12 +148,12 @@ export function PantallaConsultaCuentas({
               >
                 <span className="min-w-0">
                   <span className="flex items-center gap-2">
-                    <span className="font-display text-[14px] font-bold tabular-nums">{c.folio ?? c.ticketId.slice(-6)}</span>
-                    {c.estado === "CANCELADO" && <span className="rounded-full bg-danger/10 px-2 py-0.5 text-[10.5px] font-bold text-danger">Cancelada</span>}
+                    <span className="font-display text-14 font-bold tabular-nums">{c.folio ?? c.ticketId.slice(-6)}</span>
+                    {c.estado === "CANCELADO" && <span className="rounded-full bg-danger/10 px-2 py-0.5 text-11 font-bold text-danger">Cancelada</span>}
                   </span>
-                  <span className="block truncate text-[11.5px] text-ink-3">{fechaCorta(c.fechaIso)} · {labelModoCuenta(c.modo)}{c.cliente ? ` · ${c.cliente}` : ""}</span>
+                  <span className="block truncate text-12 text-ink-3">{fechaCorta(c.fechaIso)} · {labelModoCuenta(c.modo)}{c.cliente ? ` · ${c.cliente}` : ""}</span>
                 </span>
-                <span className={`font-display text-[14px] font-bold tabular-nums ${c.estado === "CANCELADO" ? "text-ink-3 line-through" : "text-ink"}`}>{fmtMxn(c.total)}</span>
+                <span className={`font-display text-14 font-bold tabular-nums ${c.estado === "CANCELADO" ? "text-ink-3 line-through" : "text-ink"}`}>{fmtMxn(c.total)}</span>
               </button>
             ))}
           </div>
@@ -161,22 +161,22 @@ export function PantallaConsultaCuentas({
 
         {/* Detalle */}
         <div className="flex min-h-0 flex-1 flex-col p-5">
-          {!sel && <div className="flex flex-1 items-center justify-center text-center text-[13px] text-ink-3">Elige una cuenta de la lista para ver su detalle.</div>}
+          {!sel && <div className="flex flex-1 items-center justify-center text-center text-13 text-ink-3">Elige una cuenta de la lista para ver su detalle.</div>}
           {sel && cargandoDet && <div className="flex flex-1 items-center justify-center text-center text-ink-3">Cargando detalle…</div>}
           {sel && detalle && (
             <div className="flex min-h-0 flex-1 flex-col">
               {/* Encabezado — fijo */}
               <div className="flex flex-shrink-0 items-start justify-between">
                 <div>
-                  <div className="font-display text-[22px] font-bold tabular-nums">{detalle.meta.folio}</div>
-                  <div className="text-[12.5px] text-ink-3">{fechaCorta(detalle.meta.fechaIso)} · {labelModoCuenta(detalle.meta.modoServicio)} · Cajero: {detalle.meta.cajero}</div>
+                  <div className="font-display text-24 font-bold tabular-nums">{detalle.meta.folio}</div>
+                  <div className="text-13 text-ink-3">{fechaCorta(detalle.meta.fechaIso)} · {labelModoCuenta(detalle.meta.modoServicio)} · Cajero: {detalle.meta.cajero}</div>
                 </div>
                 <div className="flex items-center gap-2">
                   <button
                     type="button"
                     disabled={imprimiendo}
                     onClick={reimprimir}
-                    className="flex h-10 items-center gap-2 rounded-lg border border-line-strong px-4 text-[13.5px] font-semibold text-ink-2 transition hover:border-ink hover:text-ink disabled:opacity-60"
+                    className="flex h-10 items-center gap-2 rounded-lg border border-line-strong px-4 text-14 font-semibold text-ink-2 transition hover:border-ink hover:text-ink disabled:opacity-60"
                   >
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4"><path d="M6 9V2h12v7M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2M6 14h12v8H6z" /></svg>
                     {imprimiendo ? "Imprimiendo…" : "Reimprimir"}
@@ -186,7 +186,7 @@ export function PantallaConsultaCuentas({
                       <button
                         type="button"
                         onClick={() => setCambiandoPago(cuentaSel)}
-                        className="flex h-10 items-center gap-2 rounded-lg border border-line-strong px-4 text-[13.5px] font-semibold text-ink-2 transition hover:border-ink hover:text-ink"
+                        className="flex h-10 items-center gap-2 rounded-lg border border-line-strong px-4 text-14 font-semibold text-ink-2 transition hover:border-ink hover:text-ink"
                       >
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4"><rect x="2" y="6" width="20" height="12" rx="2" /><path d="M2 10h20M7 15h4" /></svg>
                         Cambiar pago
@@ -194,7 +194,7 @@ export function PantallaConsultaCuentas({
                       <button
                         type="button"
                         onClick={() => setReabriendo(cuentaSel)}
-                        className="flex h-10 items-center gap-2 rounded-lg border border-line-strong px-4 text-[13.5px] font-semibold text-ink-2 transition hover:border-ink hover:text-ink"
+                        className="flex h-10 items-center gap-2 rounded-lg border border-line-strong px-4 text-14 font-semibold text-ink-2 transition hover:border-ink hover:text-ink"
                       >
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4"><path d="M3 12a9 9 0 1 0 3-6.7L3 8m0-5v5h5" /></svg>
                         Reabrir
@@ -202,7 +202,7 @@ export function PantallaConsultaCuentas({
                       <button
                         type="button"
                         onClick={() => setCancelando(cuentaSel)}
-                        className="flex h-10 items-center gap-2 rounded-lg border border-danger/40 px-4 text-[13.5px] font-semibold text-danger transition hover:border-danger hover:bg-danger/[0.06]"
+                        className="flex h-10 items-center gap-2 rounded-lg border border-danger/40 px-4 text-14 font-semibold text-danger transition hover:border-danger hover:bg-danger/[0.06]"
                       >
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4"><path d="M18 6 6 18M6 6l12 12" /></svg>
                         Cancelar folio
@@ -214,17 +214,17 @@ export function PantallaConsultaCuentas({
 
               {/* Productos — ocupa el alto disponible con scroll interno (mini-ventana) */}
               <div className="mt-4 flex min-h-0 flex-1 flex-col overflow-hidden rounded-lg border border-line">
-                <div className="grid flex-shrink-0 grid-cols-[56px_1fr_110px] gap-2 border-b border-line bg-hover px-4 py-2.5 text-[11px] font-bold uppercase tracking-wide text-ink-3">
+                <div className="grid flex-shrink-0 grid-cols-[56px_1fr_110px] gap-2 border-b border-line bg-hover px-4 py-2.5 text-11 font-bold uppercase tracking-wide text-ink-3">
                   <span>Cant.</span><span>Descripción</span><span className="text-right">Importe</span>
                 </div>
                 <div className="min-h-0 flex-1 overflow-y-auto">
                   {detalle.lineas.map((l, i) => (
                     <div key={i} className="grid grid-cols-[56px_1fr_110px] gap-2 border-b border-line px-4 py-2.5 last:border-b-0">
-                      <span className="font-display text-[15px] font-bold tabular-nums">{l.cantidad}</span>
+                      <span className="font-display text-15 font-bold tabular-nums">{l.cantidad}</span>
                       <span className="min-w-0">
-                        <span className="block text-[14px] font-medium">{l.nombre}</span>
-                        {l.modificadores.length > 0 && <span className="block text-[12px] text-ink-3">{l.modificadores.join(" · ")}</span>}
-                        {l.notaCocina && <span className="block text-[12px] italic text-ink-3">“{l.notaCocina}”</span>}
+                        <span className="block text-14 font-medium">{l.nombre}</span>
+                        {l.modificadores.length > 0 && <span className="block text-12 text-ink-3">{l.modificadores.join(" · ")}</span>}
+                        {l.notaCocina && <span className="block text-12 italic text-ink-3">“{l.notaCocina}”</span>}
                       </span>
                       <span className="text-right font-display tabular-nums">{fmtMxn(l.totalMxn)}</span>
                     </div>
@@ -235,11 +235,11 @@ export function PantallaConsultaCuentas({
               {/* Forma de pago + totales — fijos abajo */}
               <div className="mt-4 grid flex-shrink-0 grid-cols-1 gap-4 sm:grid-cols-2">
                 <div className="rounded-lg border border-line p-3.5">
-                  <div className="mb-2 text-[11px] font-bold uppercase tracking-wide text-ink-3">Forma de pago</div>
+                  <div className="mb-2 text-11 font-bold uppercase tracking-wide text-ink-3">Forma de pago</div>
                   {detalle.pagos.length === 0 ? (
-                    <div className="text-[13px] text-ink-3">Sin pagos registrados.</div>
+                    <div className="text-13 text-ink-3">Sin pagos registrados.</div>
                   ) : detalle.pagos.map((p, i) => (
-                    <div key={i} className="flex items-center justify-between py-0.5 text-[13.5px]">
+                    <div key={i} className="flex items-center justify-between py-0.5 text-14">
                       <span className="text-ink-2">{p.metodo}{p.recibidoMxn != null ? ` · recibido ${fmtMxn(p.recibidoMxn)} · cambio ${fmtMxn(p.cambioMxn)}` : ""}</span>
                       <span className="font-display tabular-nums">{fmtMxn(p.montoMxn)}</span>
                     </div>
@@ -251,8 +251,8 @@ export function PantallaConsultaCuentas({
                   <Row k="IVA" v={detalle.totales.iva} />
                   {detalle.totales.propina > 0 && <Row k="Propina" v={detalle.totales.propina} />}
                   <div className="mt-1.5 flex items-center justify-between border-t border-line pt-2">
-                    <span className="text-[14px] font-bold uppercase tracking-wide">Total</span>
-                    <span className="font-display text-[19px] font-bold tabular-nums">{fmtMxn(detalle.totales.total + detalle.totales.propina)}</span>
+                    <span className="text-14 font-bold uppercase tracking-wide">Total</span>
+                    <span className="font-display text-20 font-bold tabular-nums">{fmtMxn(detalle.totales.total + detalle.totales.propina)}</span>
                   </div>
                 </div>
               </div>
@@ -310,7 +310,7 @@ export function PantallaConsultaCuentas({
 
 function Row({ k, v }: { k: string; v: number }) {
   return (
-    <div className="flex items-center justify-between py-0.5 text-[13.5px]">
+    <div className="flex items-center justify-between py-0.5 text-14">
       <span className="text-ink-2">{k}</span>
       <span className="font-display tabular-nums">{fmtMxn(v)}</span>
     </div>

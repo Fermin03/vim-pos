@@ -103,9 +103,9 @@ function Entrada({ onEntrar }: { onEntrar: (clave: string) => void }) {
       <div className="w-[400px] rounded-lg border border-line bg-surface p-6 shadow-sm">
         <div className="mb-1 flex items-center gap-2">
           <LogoVim className="h-8 w-8" />
-          <span className="font-display text-[17px] font-bold tracking-tight">VIM Plataforma</span>
+          <span className="font-display text-18 font-bold tracking-tight">VIM Plataforma</span>
         </div>
-        <p className="mb-5 text-[13px] text-ink-3">Panel de control interno de VIM. Acceso restringido.</p>
+        <p className="mb-5 text-13 text-ink-3">Panel de control interno de VIM. Acceso restringido.</p>
         <label className={label} htmlFor="pk">Clave de plataforma</label>
         <input id="pk" type="password" className={input} value={k} onChange={(e) => setK(e.target.value)} onKeyDown={(e) => e.key === "Enter" && entrar()} autoFocus />
         {error && <p className="mt-3 text-sm font-medium text-danger" role="alert">{error}</p>}

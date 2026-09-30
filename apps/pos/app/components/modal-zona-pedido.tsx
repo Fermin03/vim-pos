@@ -82,7 +82,7 @@ export function ModalZonaPedido({
       className="w-[420px] rounded-lg border border-line bg-surface p-6 shadow-[0_18px_44px_rgba(22,22,26,.18)]"
     >
       <h2 className="mb-1 font-display text-xl font-semibold tracking-tight">Zona de reparto</h2>
-      <p className="mb-4 text-[12.5px] text-ink-3">Cambia el envío de este pedido. No cambia la zona guardada del cliente.</p>
+      <p className="mb-4 text-13 text-ink-3">Cambia el envío de este pedido. No cambia la zona guardada del cliente.</p>
       <SelectorZona
         token={token}
         tenantId={tenantId}
@@ -95,9 +95,9 @@ export function ModalZonaPedido({
         onCambio={(z) => void elegir(z)}
         onZonaSincronizada={onZonaSincronizada}
       />
-      {guardando && <p className="mt-2 text-[12.5px] text-ink-3">Guardando…</p>}
-      {errorCarga && <p className="mt-3 text-[12.5px] font-medium text-danger" role="alert">{errorCarga}</p>}
-      {errorGuardado && <p className="mt-3 text-[12.5px] font-medium text-danger" role="alert">{errorGuardado}</p>}
+      {guardando && <p className="mt-2 text-13 text-ink-3">Guardando…</p>}
+      {errorCarga && <p className="mt-3 text-13 font-medium text-danger" role="alert">{errorCarga}</p>}
+      {errorGuardado && <p className="mt-3 text-13 font-medium text-danger" role="alert">{errorGuardado}</p>}
       <div className="mt-5 flex justify-end border-t border-line pt-4">
         <Button variant="ghost" onClick={onCerrar}>Cerrar</Button>
       </div>

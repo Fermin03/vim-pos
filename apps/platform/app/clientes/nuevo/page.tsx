@@ -74,8 +74,8 @@ export default function NuevoClientePage() {
 
   return (
     <div className="max-w-[460px]">
-      <h1 className="mb-1 font-display text-[18px] font-semibold tracking-tight">Nuevo cliente</h1>
-      <p className="mb-4 text-[12.5px] text-ink-3">Da de alta el negocio y la cuenta de su dueño. Queda en periodo de prueba, y al dueño le llega una invitación por correo para entrar.</p>
+      <h1 className="mb-1 font-display text-18 font-semibold tracking-tight">Nuevo cliente</h1>
+      <p className="mb-4 text-13 text-ink-3">Da de alta el negocio y la cuenta de su dueño. Queda en periodo de prueba, y al dueño le llega una invitación por correo para entrar.</p>
       <div className="flex flex-col gap-3.5 rounded-lg border border-line bg-surface p-5">
         <div>
           <label className={label} htmlFor="codigo">Código (slug)</label>
@@ -90,7 +90,7 @@ export default function NuevoClientePage() {
           <select id="vertical" className={input} value={vertical} onChange={(e) => setVertical(e.target.value)}>
             {VERTICALES.map((x) => <option key={x.v} value={x.v}>{x.l}</option>)}
           </select>
-          <p className="mt-1 text-[12px] text-ink-3">Configura el producto. No influye en el precio.</p>
+          <p className="mt-1 text-12 text-ink-3">Configura el producto. No influye en el precio.</p>
         </div>
         <div>
           <label className={label} htmlFor="plan">Plan</label>
@@ -98,7 +98,7 @@ export default function NuevoClientePage() {
             {planes.length === 0 && <option value="">Cargando…</option>}
             {planes.map((p) => <option key={p.id} value={p.codigo}>{p.nombre} · {fmtMxn(Number(p.precio_mensual_mxn))} al mes</option>)}
           </select>
-          <p className="mt-1 text-[12px] text-ink-3">Esto es lo que paga. Los precios son los publicados en el sitio.</p>
+          <p className="mt-1 text-12 text-ink-3">Esto es lo que paga. Los precios son los publicados en el sitio.</p>
         </div>
         <div className="h-px bg-line" />
         <div>
@@ -115,7 +115,7 @@ export default function NuevoClientePage() {
         </div>
         {error && <p className="text-sm font-medium text-danger" role="alert">{error}</p>}
         {resultado && (
-          <div className="rounded border border-[#D6E8DD] bg-success-soft px-3 py-2.5 text-[12.5px] text-success">
+          <div className="rounded border border-success-line bg-success-soft px-3 py-2.5 text-13 text-success">
             <div className="font-semibold">Cliente creado.</div>
             <div className="mt-1 text-ink-2">Invitación enviada a <b>{resultado.email}</b>. El dueño recibirá un correo para crear su contraseña y entrar al panel.</div>
           </div>

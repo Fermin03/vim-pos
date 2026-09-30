@@ -3,5 +3,7 @@ export { Button, botonClases, type ButtonProps } from "./components/button";
 export { PinKeypad, type PinKeypadProps } from "./components/pin-keypad";
 export { Modal, type ModalProps } from "./components/modal";
 export { useConfirmar, type OpcionesConfirmar } from "./components/confirmar";
+export { DialogoPeligro, type DialogoPeligroProps } from "./components/dialogo-peligro";
+export { Aviso, type TonoAviso } from "./components/aviso";
 export { StatusChip, type TonoEstado } from "./components/status-chip";
 export { LogoVim } from "./components/logo-vim";

@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useMemo, useState } from "react";
-import { Button, Modal } from "@vim/ui/styles";
+import { Button, DialogoPeligro, Modal } from "@vim/ui/styles";
 import {
   MODO_PRECIO,
   actualizarSlot,
@@ -28,7 +28,7 @@ const input =
   "h-11 w-full rounded border border-line-strong px-3 text-sm outline-none focus:border-ink focus:shadow-[0_0_0_3px_rgba(22,22,26,.06)]";
 const inputSm =
   "h-9 w-24 rounded border border-line-strong px-2 text-sm outline-none focus:border-ink focus:shadow-[0_0_0_3px_rgba(22,22,26,.06)]";
-const label = "mb-1.5 block text-[13px] font-medium text-ink-2";
+const label = "mb-1.5 block text-13 font-medium text-ink-2";
 
 const MODO_CORTO: Record<ModoPrecio, string> = {
   DELTA: "Incluido en el combo",
@@ -46,7 +46,7 @@ function reglaSlot(min: number, max: number): string {
 // producto agotado hoy sigue siendo parte del combo, así que aquí solo se avisa, no se oculta.
 function BadgeAgotado() {
   return (
-    <span className="ml-2 inline-flex items-center gap-1.5 rounded-full bg-[#FBF1EF] px-2 py-0.5 text-[11px] font-semibold text-danger">
+    <span className="ml-2 inline-flex items-center gap-1.5 rounded-full bg-[#FBF1EF] px-2 py-0.5 text-11 font-semibold text-danger">
       <span className="h-1.5 w-1.5 rounded-full bg-danger" />
       Agotado
     </span>
@@ -126,7 +126,7 @@ function ModalSlot({
           <input type="checkbox" className="mt-0.5 h-5 w-5 accent-ink" checked={minimo === "1"} onChange={(e) => setMinimo(e.target.checked ? "1" : "0")} />
           <span className="text-sm">
             <span className="font-medium">Obligatorio</span>
-            <span className="block text-[13px] text-ink-2">La caja no deja cobrar el combo sin elegir algo aquí. Por ahora se elige una opción por paso.</span>
+            <span className="block text-13 text-ink-2">La caja no deja cobrar el combo sin elegir algo aquí. Por ahora se elige una opción por paso.</span>
           </span>
         </label>
         <div>
@@ -140,7 +140,7 @@ function ModalSlot({
               </option>
             ))}
           </select>
-          <p className="mt-1 text-[12.5px] text-ink-2">
+          <p className="mt-1 text-13 text-ink-2">
             En el paso principal (la hamburguesa) usa «{MODO_PRECIO.SUMA_PRECIO_PRODUCTO}»; en los demás, «Ya va incluido».
           </p>
         </div>
@@ -225,7 +225,7 @@ function ListaOpciones({
   const cols = onQuitar
     ? "lg:grid-cols-[minmax(0,1fr)_88px_132px_104px_104px_44px]"
     : "lg:grid-cols-[minmax(0,1fr)_88px_132px_104px_104px]";
-  const enc = "text-[12px] font-semibold uppercase tracking-wide text-ink-2";
+  const enc = "text-12 font-semibold uppercase tracking-wide text-ink-2";
   return (
     <div>
       <div className={`hidden border-b border-line px-3 py-2 lg:grid lg:items-center lg:gap-3 ${cols}`} aria-hidden="true">
@@ -245,18 +245,18 @@ function ListaOpciones({
               className={`flex flex-col gap-2 border-b border-line px-3 py-3 last:border-none lg:grid lg:items-center lg:gap-3 lg:py-2 ${cols} ${f.activa ? "" : "bg-bg"}`}
             >
               <div className="flex items-baseline justify-between gap-3">
-                <span className={`text-[14px] font-medium ${f.activa ? "" : "text-ink-2"}`}>
+                <span className={`text-14 font-medium ${f.activa ? "" : "text-ink-2"}`}>
                   {f.nombre}
                   {f.agotado && <BadgeAgotado />}
                 </span>
-                <span className="flex-shrink-0 font-display text-[13px] tabular-nums text-ink-2 lg:hidden">{precioMxn(f.precio)}</span>
+                <span className="flex-shrink-0 font-display text-13 tabular-nums text-ink-2 lg:hidden">{precioMxn(f.precio)}</span>
               </div>
-              <span className="hidden text-right font-display text-[13px] tabular-nums text-ink-2 lg:block">{precioMxn(f.precio)}</span>
+              <span className="hidden text-right font-display text-13 tabular-nums text-ink-2 lg:block">{precioMxn(f.precio)}</span>
               <div className="flex flex-wrap items-center gap-x-5 gap-y-1 lg:contents">
                 <label className="flex items-center gap-2 lg:justify-end">
-                  <span className="text-[13px] text-ink-2 lg:hidden">Cuesta de más</span>
+                  <span className="text-13 text-ink-2 lg:hidden">Cuesta de más</span>
                   <span className="relative">
-                    <span className="pointer-events-none absolute left-2 top-1/2 -translate-y-1/2 text-[13px] text-ink-2" aria-hidden="true">$</span>
+                    <span className="pointer-events-none absolute left-2 top-1/2 -translate-y-1/2 text-13 text-ink-2" aria-hidden="true">$</span>
                     {/* No controlado a propósito: si `value` viniera de `filas` cada tecla se
                         pisaría con el estado viejo (que solo cambia tras guardar). Se guarda al
                         salir del campo o con Enter; la `key` lo refresca si `filas` cambia. */}
@@ -290,7 +290,7 @@ function ListaOpciones({
                     disabled={ocupado}
                     onChange={() => onElegirDefault(f.productoId)}
                   />
-                  <span className="text-[13px] lg:hidden">Ya elegida</span>
+                  <span className="text-13 lg:hidden">Ya elegida</span>
                 </label>
                 <label className="flex min-h-[44px] items-center gap-2 lg:justify-center">
                   <input
@@ -301,7 +301,7 @@ function ListaOpciones({
                     disabled={ocupado}
                     onChange={(e) => onToggleIncluido(f.productoId, e.target.checked)}
                   />
-                  <span className="text-[13px] lg:hidden">En el combo</span>
+                  <span className="text-13 lg:hidden">En el combo</span>
                 </label>
                 {onQuitar && (
                   <button
@@ -309,7 +309,7 @@ function ListaOpciones({
                     aria-label={`Quitar ${f.nombre}`}
                     title="Quitar"
                     onClick={() => onQuitar(f.productoId)}
-                    className="ml-auto flex h-11 w-11 items-center justify-center rounded border border-transparent text-ink-2 transition-colors hover:border-[#E8C5C0] hover:text-danger lg:ml-0 lg:h-9 lg:w-9"
+                    className="ml-auto flex h-11 w-11 items-center justify-center rounded border border-transparent text-ink-2 transition-colors hover:border-danger-line hover:text-danger lg:ml-0 lg:h-9 lg:w-9"
                   >
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-4 w-4" aria-hidden="true">
                       <path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
@@ -440,7 +440,7 @@ function PanelOpciones({ slot, productos, onCambio }: { slot: Slot; productos: P
   return (
     <div className="border-t border-line bg-bg px-3 py-4 sm:px-4">
       {/* Aquí todo se guarda solo al cambiarlo: se dice, y se confirma cuando pasó. */}
-      <p className="mb-3 text-[13px] text-ink-2" aria-live="polite">
+      <p className="mb-3 text-13 text-ink-2" aria-live="polite">
         {guardando ? "Guardando…" : guardadoOk ? "Guardado." : "Los cambios de esta lista se guardan solos."}
       </p>
       {error && (
@@ -465,7 +465,7 @@ function PanelOpciones({ slot, productos, onCambio }: { slot: Slot; productos: P
                   <button
                     type="button"
                     onClick={() => agregar(p.id)}
-                    className="flex min-h-[44px] w-full items-center justify-between px-3 py-2 text-left text-[14px] hover:bg-hover"
+                    className="flex min-h-[44px] w-full items-center justify-between px-3 py-2 text-left text-14 hover:bg-hover"
                   >
                     <span>{p.nombre}</span>
                     <span className="tabular-nums text-ink-2">{precioMxn(p.precio_base_mxn)}</span>
@@ -576,7 +576,7 @@ export function ComboSlotsEditor({ comboId, onCambio }: { comboId: string; onCam
       <div className="mb-3 flex flex-wrap items-center justify-between gap-x-3 gap-y-2.5">
         <div>
           <h2 className="font-display text-base font-semibold">Pasos del combo</h2>
-          <p className="text-[13px] text-ink-2">Lo que la caja va preguntando: qué hamburguesa, qué acompañamiento, qué bebida.</p>
+          <p className="text-13 text-ink-2">Lo que la caja va preguntando: qué hamburguesa, qué acompañamiento, qué bebida.</p>
         </div>
         <Button variant="ghost" onClick={() => setModal({ slot: null })}>
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" className="h-[15px] w-[15px]">
@@ -619,10 +619,10 @@ export function ComboSlotsEditor({ comboId, onCambio }: { comboId: string; onCam
                     </svg>
                     <div className="min-w-0">
                       <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-                        <span className="text-[14.5px] font-semibold">{s.nombre}</span>
-                        {!s.activo && <span className="rounded-full bg-hover px-2 py-0.5 text-[12px] font-semibold text-ink-2">Inactivo</span>}
+                        <span className="text-15 font-semibold">{s.nombre}</span>
+                        {!s.activo && <span className="rounded-full bg-hover px-2 py-0.5 text-12 font-semibold text-ink-2">Inactivo</span>}
                       </div>
-                      <p className="text-[13px] text-ink-2">
+                      <p className="text-13 text-ink-2">
                         {reglaSlot(s.minimo_selecciones, s.maximo_selecciones)} · {MODO_CORTO[s.modo_precio]} ·{" "}
                         {s.categoria_id ? `Categoría ${categoriaNombre(s.categoria_id)}` : "Productos elegidos"}
                       </p>
@@ -638,7 +638,7 @@ export function ComboSlotsEditor({ comboId, onCambio }: { comboId: string; onCam
                     <button type="button" title="Editar" aria-label={`Editar ${s.nombre}`} onClick={() => setModal({ slot: s })} className="flex h-10 w-10 items-center justify-center rounded border border-transparent lg:h-8 lg:w-8 text-ink-3 transition hover:border-line-strong hover:bg-hover hover:text-ink">
                       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-4 w-4"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" /><path d="M18.5 2.5a2.1 2.1 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" /></svg>
                     </button>
-                    <button type="button" title="Quitar" aria-label={`Quitar ${s.nombre}`} onClick={() => setBorrar(s)} className="flex h-10 w-10 items-center justify-center rounded border border-transparent lg:h-8 lg:w-8 text-ink-3 transition hover:border-[#E8C5C0] hover:text-danger">
+                    <button type="button" title="Quitar" aria-label={`Quitar ${s.nombre}`} onClick={() => setBorrar(s)} className="flex h-10 w-10 items-center justify-center rounded border border-transparent lg:h-8 lg:w-8 text-ink-3 transition hover:border-danger-line hover:text-danger">
                       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-4 w-4"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" /></svg>
                     </button>
                   </span>
@@ -653,19 +653,20 @@ export function ComboSlotsEditor({ comboId, onCambio }: { comboId: string; onCam
       {modal && <ModalSlot slot={modal.slot} categorias={categorias} onCerrar={() => setModal(null)} onGuardar={guardarSlot} />}
 
       {borrar && (
-        <Modal open onClose={() => setBorrar(null)} title="Quitar paso" className="w-full max-w-[400px] rounded-lg border border-line bg-surface p-6 shadow-xl">
-          <p className="text-sm text-ink-2">
-            ¿Quitar <b className="text-ink">{borrar.nombre}</b>? La caja dejará de preguntarlo; los combos ya vendidos no cambian.
-          </p>
-          <div className="mt-6 flex justify-end gap-2">
-            <Button variant="ghost" onClick={() => setBorrar(null)} disabled={borrando}>
-              Cancelar
-            </Button>
-            <Button variant="danger" onClick={confirmarBorrado} disabled={borrando}>
-              {borrando ? "Quitando…" : "Quitar"}
-            </Button>
-          </div>
-        </Modal>
+        <DialogoPeligro
+          titulo="¿Quitar este paso?"
+          consecuencia={
+            <>
+              La caja dejará de preguntar <b className="text-ink">{borrar.nombre}</b>; los combos ya vendidos no cambian.
+            </>
+          }
+          boton="Quitar"
+          ocupado={borrando}
+          textoOcupado="Quitando…"
+          ancho="sm"
+          onConfirmar={confirmarBorrado}
+          onCerrar={() => setBorrar(null)}
+        />
       )}
     </div>
   );

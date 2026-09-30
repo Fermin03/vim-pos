@@ -31,7 +31,7 @@ const fmt = (n: number) => new Intl.NumberFormat("es-MX", { style: "currency", c
 const fmtInt = (n: number) => new Intl.NumberFormat("es-MX").format(n);
 
 function Delta({ pct, comparativo, sobreOscuro }: { pct: number | null; comparativo?: string; sobreOscuro?: boolean }) {
-  const claseComparativo = `text-[12.5px] ${sobreOscuro ? "text-white/70" : "text-ink-2"}`;
+  const claseComparativo = `text-13 ${sobreOscuro ? "text-white/70" : "text-ink-2"}`;
   if (pct === null) return comparativo ? <span className={claseComparativo}>{comparativo}</span> : null;
   const sube = pct >= 0;
   // Bajar contra ayer no es una alarma (un martes vende menos que un sábado): va en neutro. El
@@ -41,7 +41,7 @@ function Delta({ pct, comparativo, sobreOscuro }: { pct: number | null; comparat
     : sube ? "bg-success-soft text-success" : "bg-hover text-ink-2";
   return (
     <>
-      <span className={`inline-flex items-center gap-[3px] rounded-full px-[7px] py-0.5 text-[12.5px] font-bold ${claseChip}`}>
+      <span className={`inline-flex items-center gap-[3px] rounded-full px-[7px] py-0.5 text-13 font-bold ${claseChip}`}>
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" className="h-3 w-3">
           {sube ? <path d="M7 17L17 7M17 7H8M17 7v9" /> : <path d="M7 7l10 10M17 17H8M17 17V8" />}
         </svg>
@@ -70,10 +70,10 @@ function Kpi({
   return (
     <div className={`relative min-w-0 rounded-lg border p-4 lg:p-5 ${primario ? "border-ink bg-ink" : "border-line bg-surface"}`}>
       <div className="flex items-center justify-between gap-2">
-        <span className={`min-w-0 truncate text-[12px] font-semibold uppercase tracking-[0.04em] lg:text-[12.5px] ${primario ? "text-white/75" : "text-ink-2"}`}>{label}</span>
+        <span className={`min-w-0 truncate text-12 font-semibold uppercase tracking-[0.04em] lg:text-13 ${primario ? "text-white/75" : "text-ink-2"}`}>{label}</span>
         <span className={`flex h-[30px] w-[30px] flex-shrink-0 items-center justify-center rounded ${primario ? "bg-white/10 text-white" : "bg-hover text-ink-2"}`}>{icono}</span>
       </div>
-      <div className={`mt-3 font-display text-[22px] font-bold tracking-[-0.025em] tabular-nums lg:mt-3.5 lg:text-[30px] ${primario ? "text-white" : ""}`}>{valor}</div>
+      <div className={`mt-3 font-display text-24 font-bold tracking-[-0.025em] tabular-nums lg:mt-3.5 lg:text-32 ${primario ? "text-white" : ""}`}>{valor}</div>
       <div className="mt-2 flex flex-wrap items-center gap-x-[7px] gap-y-1">
         <Delta pct={pct} comparativo={comparativo} sobreOscuro={primario} />
       </div>
@@ -123,22 +123,22 @@ function GraficaPorHora({ datos }: { datos: { hora: number; total: number }[] })
                   className={`w-full max-w-[26px] rounded-t-[3px] transition-colors duration-150 ${esPico ? "bg-ink" : "bg-ink-3 group-hover:bg-ink-2 group-focus-visible:bg-ink-2"}`}
                   style={{ height: `${d.total > 0 ? Math.max(3, (d.total / max) * 100) : 1}%` }}
                 />
-                <span className="pointer-events-none absolute bottom-full left-1/2 z-10 mb-1.5 -translate-x-1/2 whitespace-nowrap rounded bg-ink px-2 py-1 text-[12px] font-semibold text-white opacity-0 transition-opacity duration-150 group-hover:opacity-100 group-focus-visible:opacity-100">
+                <span className="pointer-events-none absolute bottom-full left-1/2 z-10 mb-1.5 -translate-x-1/2 whitespace-nowrap rounded bg-ink px-2 py-1 text-12 font-semibold text-white opacity-0 transition-opacity duration-150 group-hover:opacity-100 group-focus-visible:opacity-100">
                   {rotulo(d.hora)} · {fmt(d.total)}
                 </span>
               </div>
-              <div className="text-[12px] font-semibold tabular-nums text-ink-2">{d.hora}</div>
+              <div className="text-12 font-semibold tabular-nums text-ink-2">{d.hora}</div>
             </li>
           );
         })}
       </ul>
       </div>
       <div className="mt-4 flex flex-wrap items-center gap-x-5 gap-y-2 border-t border-line pt-4">
-        <div className="flex items-center gap-[7px] text-[13px] text-ink-2">
+        <div className="flex items-center gap-[7px] text-13 text-ink-2">
           <span className="h-[11px] w-[11px] rounded-[3px] bg-ink" aria-hidden="true" />
           Hora pico <span className="font-semibold text-ink">{rotulo(pico.hora)} ({fmt(pico.total)})</span>
         </div>
-        <div className="flex items-center gap-[7px] text-[13px] text-ink-2">
+        <div className="flex items-center gap-[7px] text-13 text-ink-2">
           <span className="h-[11px] w-[11px] rounded-[3px] bg-ink-3" aria-hidden="true" />
           Promedio por hora <span className="font-semibold text-ink">{fmt(Math.round(promedio * 100) / 100)}</span>
         </div>
@@ -147,7 +147,7 @@ function GraficaPorHora({ datos }: { datos: { hora: number; total: number }[] })
       {mejores.length > 1 && (
         <ol className="mt-4 flex flex-col gap-1.5 lg:hidden" aria-label="Mejores horas">
           {mejores.map((d, i) => (
-            <li key={d.hora} className="flex items-center justify-between text-[14px]">
+            <li key={d.hora} className="flex items-center justify-between text-14">
               <span className="text-ink-2">{i + 1}. {rotulo(d.hora)}</span>
               <span className="font-semibold tabular-nums">{fmt(d.total)}</span>
             </li>
@@ -213,26 +213,26 @@ function FranjaCaja({ caja, cancelados, descuentos, devoluciones }: {
           )}
         </span>
         <div className="min-w-0">
-          <div className="text-[12.5px] font-semibold uppercase tracking-[0.04em] text-ink-2">Caja del día</div>
-          <div className={`font-display text-[20px] font-bold leading-tight tabular-nums ${estilo.texto}`}>{titulo}</div>
-          <div className="text-[14px] text-ink-2">{detalle}</div>
+          <div className="text-13 font-semibold uppercase tracking-[0.04em] text-ink-2">Caja del día</div>
+          <div className={`font-display text-20 font-bold leading-tight tabular-nums ${estilo.texto}`}>{titulo}</div>
+          <div className="text-14 text-ink-2">{detalle}</div>
         </div>
       </div>
-      <dl className="grid grid-cols-3 gap-4 text-[13px] lg:flex lg:gap-6">
+      <dl className="grid grid-cols-3 gap-4 text-13 lg:flex lg:gap-6">
         <div>
           <dt className="text-ink-2">Cancelaciones</dt>
-          <dd className="font-display text-[16px] font-semibold tabular-nums">{fmtInt(cancelados)}</dd>
+          <dd className="font-display text-16 font-semibold tabular-nums">{fmtInt(cancelados)}</dd>
         </div>
         <div>
           <dt className="text-ink-2">Descuentos</dt>
-          <dd className="font-display text-[16px] font-semibold tabular-nums">{fmt(descuentos)}</dd>
+          <dd className="font-display text-16 font-semibold tabular-nums">{fmt(descuentos)}</dd>
         </div>
         <div>
           <dt className="text-ink-2">Devoluciones</dt>
-          <dd className="font-display text-[16px] font-semibold tabular-nums">{fmt(devoluciones)}</dd>
+          <dd className="font-display text-16 font-semibold tabular-nums">{fmt(devoluciones)}</dd>
         </div>
       </dl>
-      <Link href="/reportes/z-historico" className="text-[14px] font-semibold text-accent transition-colors hover:text-accent-hover lg:flex-shrink-0">
+      <Link href="/reportes/z-historico" className="text-14 font-semibold text-accent transition-colors hover:text-accent-hover lg:flex-shrink-0">
         Ver cortes →
       </Link>
     </section>
@@ -341,12 +341,12 @@ export default function DashboardPage() {
              calendario propio: en el teléfono abre el selector del sistema, que
              el dueño ya sabe usar, y no hay que mantener un widget. */
           <div className="flex items-center gap-2">
-            <label className="inline-flex items-center gap-2 rounded border border-line-strong bg-surface px-3 py-[7px] text-[13px] font-semibold focus-within:border-ink focus-within:shadow-[0_0_0_3px_rgba(22,22,26,.06)]">
+            <label className="inline-flex items-center gap-2 rounded border border-line-strong bg-surface px-3 py-[7px] text-13 font-semibold focus-within:border-ink focus-within:shadow-[0_0_0_3px_rgba(22,22,26,.06)]">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-[15px] w-[15px] flex-shrink-0 text-ink-3" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2" /><path d="M16 3v4M8 3v4M3 10h18" /></svg>
               <span className="sr-only">Día que se muestra</span>
               <input
                 type="date"
-                className="bg-transparent text-[13px] font-semibold outline-none"
+                className="bg-transparent text-13 font-semibold outline-none"
                 value={dia ?? data?.hoyContable ?? ""}
                 /* Sin tope, se puede elegir mañana y la pantalla sale en cero
                    sin explicar por qué. El tope es el día contable del negocio,
@@ -359,7 +359,7 @@ export default function DashboardPage() {
 
             {data?.esHoy ? (
               <span className="inline-flex items-center gap-2">
-                <span className="inline-flex items-center gap-[6px] text-[13px] font-semibold text-success">
+                <span className="inline-flex items-center gap-[6px] text-13 font-semibold text-success">
                   <span className="h-2 w-2 rounded-full bg-success" aria-hidden="true" />
                   En vivo
                   <span className="font-medium text-ink-2">
@@ -385,7 +385,7 @@ export default function DashboardPage() {
               <button
                 type="button"
                 onClick={() => setDia(null)}
-                className="text-[12px] font-semibold text-accent transition-colors hover:text-accent-hover"
+                className="text-12 font-semibold text-accent transition-colors hover:text-accent-hover"
               >
                 Volver a hoy
               </button>
@@ -397,19 +397,19 @@ export default function DashboardPage() {
         {error && <p className="mb-4 text-sm font-medium text-danger">{error}</p>}
 
         {mostrarOnboarding && onb && (
-          <Link href="/bienvenida" className="mb-6 flex items-center gap-4 rounded-lg border border-[#E8DCC0] bg-warning-soft p-4 transition hover:border-accent">
+          <Link href="/bienvenida" className="mb-6 flex items-center gap-4 rounded-lg border border-warning-line bg-warning-soft p-4 transition hover:border-accent">
             <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-accent text-white">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" className="h-5 w-5"><path d="M5 12h14M13 5l7 7-7 7" /></svg>
             </div>
             <div className="min-w-0 flex-1">
-              <div className="text-[14.5px] font-semibold">{onb.listoParaVender ? "Ya puedes vender" : "Termina de configurar tu negocio"}</div>
-              <div className="text-[13px] text-ink-2">
+              <div className="text-15 font-semibold">{onb.listoParaVender ? "Ya puedes vender" : "Termina de configurar tu negocio"}</div>
+              <div className="text-13 text-ink-2">
                 {onb.listoParaVender
                   ? "Completaste los pasos. Entra para terminar la configuración."
                   : `${onb.obligatoriosHechos} de ${onb.obligatoriosTotal} pasos · ${faltanOnb === 1 ? "te falta 1" : `te faltan ${faltanOnb}`} para empezar a vender.`}
               </div>
             </div>
-            <span className="text-[13px] font-semibold text-accent">Continuar →</span>
+            <span className="text-13 font-semibold text-accent">Continuar →</span>
           </Link>
         )}
 
@@ -426,7 +426,7 @@ export default function DashboardPage() {
                 abrimos" o "la caja lleva días sin subir nada", y son cosas muy distintas: sin este
                 dato, la segunda pasa desapercibida hasta que las cuentas no cuadran. */}
             {ultimaVenta && ultimaVenta !== data?.dia && (
-              <p className="mt-3 rounded border border-[#F0DCC0] bg-warning-soft px-3 py-2 text-[13px] font-medium text-warning">
+              <p className="mt-3 rounded border border-warning-line bg-warning-soft px-3 py-2 text-13 font-medium text-warning">
                 La última venta registrada es del {fmtDia(ultimaVenta)}. Si el negocio ha vendido
                 desde entonces, la caja no está enviando sus ventas.
               </p>
@@ -486,16 +486,16 @@ export default function DashboardPage() {
             <div className="mb-5 grid grid-cols-1 gap-5 lg:grid-cols-[1fr_340px]">
               <div className="rounded-lg border border-line bg-surface">
                 <div className="border-b border-line px-5 py-4">
-                  <div className="font-display text-[15px] font-semibold">
+                  <div className="font-display text-15 font-semibold">
                     Ventas por hora
-                    <div className="mt-0.5 text-[13px] font-normal text-ink-2">Distribución del día contable</div>
+                    <div className="mt-0.5 text-13 font-normal text-ink-2">Distribución del día contable</div>
                   </div>
                 </div>
                 <div className="p-5">
                   {(data?.ventasPorHora.length ?? 0) > 0 ? (
                     <GraficaPorHora datos={data!.ventasPorHora} />
                   ) : (
-                    <p className="py-12 text-center text-[14px] text-ink-2">Sin ventas con hora registrada hoy.</p>
+                    <p className="py-12 text-center text-14 text-ink-2">Sin ventas con hora registrada hoy.</p>
                   )}
                 </div>
               </div>
@@ -503,10 +503,10 @@ export default function DashboardPage() {
               <div className="rounded-lg border border-line bg-surface">
                 <div className="border-b border-line px-5 py-4">
                   <div className="flex items-center justify-between gap-3">
-                    <div className="font-display text-[15px] font-semibold">Top productos{data?.esHoy ? " hoy" : ""}</div>
+                    <div className="font-display text-15 font-semibold">Top productos{data?.esHoy ? " hoy" : ""}</div>
                     <div className="flex items-center gap-2">
-                      <Link href="/reportes/ventas-producto" className="text-[13px] font-semibold text-ink-2 transition-colors hover:text-ink">Ver todos</Link>
-                      <span className="rounded-full bg-accent-soft px-2.5 py-0.5 text-[12px] font-semibold text-accent" title="Combos cobrados en el día">
+                      <Link href="/reportes/ventas-producto" className="text-13 font-semibold text-ink-2 transition-colors hover:text-ink">Ver todos</Link>
+                      <span className="rounded-full bg-accent-soft px-2.5 py-0.5 text-12 font-semibold text-accent" title="Combos cobrados en el día">
                         {data?.combosVendidos ?? 0} combos
                       </span>
                     </div>
@@ -527,23 +527,23 @@ export default function DashboardPage() {
                         const maxTotal = Math.max(1, ...data!.topProductos.map((t) => t.total));
                         return (
                           <div key={p.nombre} className="flex items-center gap-[11px] border-b border-line py-[11px] last:border-b-0">
-                            <span className={`flex h-[22px] w-[22px] flex-shrink-0 items-center justify-center rounded-full font-display text-[11px] font-bold ${i === 0 ? "bg-ink text-white" : "bg-hover text-ink-2"}`}>{i + 1}</span>
+                            <span className={`flex h-[22px] w-[22px] flex-shrink-0 items-center justify-center rounded-full font-display text-11 font-bold ${i === 0 ? "bg-ink text-white" : "bg-hover text-ink-2"}`}>{i + 1}</span>
                             <div className="min-w-0 flex-1">
-                              <div className="truncate text-[13px] font-semibold">{p.nombre}</div>
+                              <div className="truncate text-13 font-semibold">{p.nombre}</div>
                               <div className="mt-[5px] h-1 overflow-hidden rounded-full bg-hover">
                                 <span className="block h-full rounded-full bg-ink-3" style={{ width: `${(p.total / maxTotal) * 100}%` }} />
                               </div>
                             </div>
                             <div className="flex-shrink-0 text-right">
-                              <div className="text-[13px] font-bold tabular-nums">{fmt(p.total)}</div>
-                              <div className="text-[12.5px] text-ink-2 tabular-nums">{fmtInt(p.unidades)} u.</div>
+                              <div className="text-13 font-bold tabular-nums">{fmt(p.total)}</div>
+                              <div className="text-13 text-ink-2 tabular-nums">{fmtInt(p.unidades)} u.</div>
                             </div>
                           </div>
                         );
                       })}
                     </div>
                   ) : (
-                    <p className="py-10 text-center text-[14px] text-ink-2">Sin productos vendidos hoy.</p>
+                    <p className="py-10 text-center text-14 text-ink-2">Sin productos vendidos hoy.</p>
                   )}
                 </div>
               </div>
@@ -559,8 +559,8 @@ export default function DashboardPage() {
               <div className="mb-2.5 flex h-9 w-9 items-center justify-center rounded bg-hover text-ink-2 transition-colors group-hover:bg-surface group-hover:text-ink">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-[18px] w-[18px]"><path d="M3 3v18h18" /><path d="M7 14l3-3 3 3 4-5" /></svg>
               </div>
-              <div className="text-[13.5px] font-semibold">{a.nombre}</div>
-              <div className="mt-0.5 text-[12.5px] leading-snug text-ink-2">{a.desc}</div>
+              <div className="text-14 font-semibold">{a.nombre}</div>
+              <div className="mt-0.5 text-13 leading-snug text-ink-2">{a.desc}</div>
             </Link>
           ))}
         </div>

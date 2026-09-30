@@ -38,7 +38,7 @@ export default function ReservasQueNoLlegaronPage() {
       valor: (f) => f.tasaPct,
       total: () => tasa,
       celda: (f) => (
-        <span className={`rounded px-2 py-0.5 text-[12.5px] font-semibold tabular-nums ${f.tasaPct >= 20 ? "bg-warning-soft text-warning" : "text-ink-2"}`}>
+        <span className={`rounded px-2 py-0.5 text-13 font-semibold tabular-nums ${f.tasaPct >= 20 ? "bg-warning-soft text-warning" : "text-ink-2"}`}>
           {formatear(f.tasaPct, "pct")}
         </span>
       ),

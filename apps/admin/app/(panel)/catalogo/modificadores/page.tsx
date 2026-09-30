@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Button, Modal } from "@vim/ui/styles";
+import { Button, DialogoPeligro } from "@vim/ui/styles";
 import { PageHeader, PageBody } from "../../../components/page-header";
 import { CatalogoTabs } from "../../../components/catalogo-tabs";
 import { TIPO_SELECCION, eliminarGrupo, listarGrupos, type Grupo } from "../../../lib/modificadores";
@@ -71,10 +71,10 @@ export default function ModificadoresPage() {
             <table className="w-full border-collapse">
               <thead>
                 <tr>
-                  <th className="border-b border-line bg-sel px-4 py-[13px] text-left text-[11.5px] font-bold uppercase tracking-wide text-ink-3">Grupo</th>
-                  <th className="w-[230px] border-b border-line bg-sel px-4 py-[13px] text-left text-[11.5px] font-bold uppercase tracking-wide text-ink-3">Selección</th>
-                  <th className="w-[120px] border-b border-line bg-sel px-4 py-[13px] text-left text-[11.5px] font-bold uppercase tracking-wide text-ink-3">Opciones</th>
-                  <th className="w-[110px] border-b border-line bg-sel px-4 py-[13px] text-left text-[11.5px] font-bold uppercase tracking-wide text-ink-3">Estado</th>
+                  <th className="border-b border-line bg-sel px-4 py-[13px] text-left text-12 font-bold uppercase tracking-wide text-ink-3">Grupo</th>
+                  <th className="w-[230px] border-b border-line bg-sel px-4 py-[13px] text-left text-12 font-bold uppercase tracking-wide text-ink-3">Selección</th>
+                  <th className="w-[120px] border-b border-line bg-sel px-4 py-[13px] text-left text-12 font-bold uppercase tracking-wide text-ink-3">Opciones</th>
+                  <th className="w-[110px] border-b border-line bg-sel px-4 py-[13px] text-left text-12 font-bold uppercase tracking-wide text-ink-3">Estado</th>
                   <th className="w-[104px] border-b border-line bg-sel px-4 py-[13px]"></th>
                 </tr>
               </thead>
@@ -82,21 +82,21 @@ export default function ModificadoresPage() {
                 {grupos.map((g) => (
                   <tr key={g.id} className="group cursor-pointer border-b border-line last:border-none hover:bg-hover" onClick={() => router.push(`/catalogo/modificadores/${g.id}`)}>
                     <td className="px-4 py-3.5">
-                      <div className="text-[15px] font-semibold">{g.nombre}</div>
-                      {g.descripcion && <div className="mt-px text-[12.5px] text-ink-3">{g.descripcion}</div>}
+                      <div className="text-15 font-semibold">{g.nombre}</div>
+                      {g.descripcion && <div className="mt-px text-13 text-ink-3">{g.descripcion}</div>}
                     </td>
-                    <td className="px-4 py-3.5 text-[13.5px] text-ink-2">
+                    <td className="px-4 py-3.5 text-14 text-ink-2">
                       {TIPO_SELECCION[g.tipo_seleccion]}
                       {g.tipo_seleccion === "MULTIPLE_OBLIGATORIA_RANGO" && g.minimo_selecciones !== null && (
                         <span className="text-ink-3"> ({g.minimo_selecciones}–{g.maximo_selecciones})</span>
                       )}
                     </td>
                     <td className="px-4 py-3.5">
-                      <span className="font-display text-[15px] font-semibold tabular-nums">{g.nOpciones}</span>{" "}
+                      <span className="font-display text-15 font-semibold tabular-nums">{g.nOpciones}</span>{" "}
                       <span className="text-xs text-ink-3">opciones</span>
                     </td>
                     <td className="px-4 py-3.5">
-                      <span className={["inline-flex items-center gap-1.5 rounded-full px-[11px] py-1 text-[12.5px] font-semibold", g.activo ? "bg-success-soft text-success" : "bg-hover text-ink-3"].join(" ")}>
+                      <span className={["inline-flex items-center gap-1.5 rounded-full px-[11px] py-1 text-13 font-semibold", g.activo ? "bg-success-soft text-success" : "bg-hover text-ink-3"].join(" ")}>
                         <span className={["h-1.5 w-1.5 rounded-full", g.activo ? "bg-success" : "bg-ink-3"].join(" ")} />
                         {g.activo ? "Activo" : "Inactivo"}
                       </span>
@@ -106,7 +106,7 @@ export default function ModificadoresPage() {
                         <button type="button" title="Editar" aria-label={`Editar ${g.nombre}`} onClick={() => router.push(`/catalogo/modificadores/${g.id}`)} className="flex h-10 w-10 items-center justify-center rounded border border-transparent lg:h-8 lg:w-8 text-ink-3 transition hover:border-line-strong hover:bg-surface hover:text-ink">
                           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-4 w-4"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" /><path d="M18.5 2.5a2.1 2.1 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" /></svg>
                         </button>
-                        <button type="button" title="Eliminar" aria-label={`Eliminar ${g.nombre}`} onClick={() => setBorrar(g)} className="flex h-10 w-10 items-center justify-center rounded border border-transparent lg:h-8 lg:w-8 text-ink-3 transition hover:border-[#E8C5C0] hover:text-danger">
+                        <button type="button" title="Eliminar" aria-label={`Eliminar ${g.nombre}`} onClick={() => setBorrar(g)} className="flex h-10 w-10 items-center justify-center rounded border border-transparent lg:h-8 lg:w-8 text-ink-3 transition hover:border-danger-line hover:text-danger">
                           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-4 w-4"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" /></svg>
                         </button>
                       </span>
@@ -129,22 +129,28 @@ export default function ModificadoresPage() {
         )}
 
         {grupos !== null && grupos.length > 0 && (
-          <p className="mt-4 text-[13px] text-ink-3">
+          <p className="mt-4 text-13 text-ink-3">
             <b className="text-ink-2">{grupos.length}</b> grupo(s)
           </p>
         )}
       </PageBody>
 
       {borrar && (
-        <Modal open onClose={() => setBorrar(null)} title="Eliminar grupo" className="w-full max-w-[400px] rounded-lg border border-line bg-surface p-6 shadow-xl">
-          <p className="text-sm text-ink-2">
-            ¿Eliminar <b className="text-ink">{borrar.nombre}</b>? Se quitará de los productos que lo usen.
-          </p>
-          <div className="mt-6 flex justify-end gap-2">
-            <Button variant="ghost" onClick={() => setBorrar(null)} disabled={borrando}>Cancelar</Button>
-            <Button variant="danger" onClick={confirmarBorrado} disabled={borrando}>{borrando ? "Eliminando…" : "Eliminar"}</Button>
-          </div>
-        </Modal>
+        <DialogoPeligro
+          error={error}
+          titulo="¿Eliminar este grupo?"
+          consecuencia={
+            <>
+              <b className="text-ink">{borrar.nombre}</b> se quitará de los productos que lo usen.
+            </>
+          }
+          boton="Eliminar"
+          ocupado={borrando}
+          textoOcupado="Eliminando…"
+          ancho="sm"
+          onConfirmar={confirmarBorrado}
+          onCerrar={() => setBorrar(null)}
+        />
       )}
     </>
   );

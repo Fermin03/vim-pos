@@ -249,11 +249,11 @@ export function PantallaCuentasModo({
         <div className="mr-auto flex min-w-0 items-center gap-3">
           <LogoVim className="h-8 w-8 flex-shrink-0" />
           <div className="min-w-0">
-            <div className="truncate font-display text-[15px] font-semibold tracking-tight">{copia.titulo} · {caja.nombre}</div>
+            <div className="truncate font-display text-15 font-semibold tracking-tight">{copia.titulo} · {caja.nombre}</div>
             {/* Cuenta lo mismo que se ve debajo: en domicilio, `items` sin filtrar incluiría lo
                 que ya está en reparto y el número de aquí arriba contradiría a las dos pestañas
                 de abajo (el motivo real por el que se separaron en 3+2, no una cifra suelta). */}
-            <div className="truncate text-[12px] text-ink-3">{copia.subtitulo((items ?? []).length)}</div>
+            <div className="truncate text-12 text-ink-3">{copia.subtitulo((items ?? []).length)}</div>
           </div>
         </div>
         <div className="flex flex-shrink-0 items-center gap-2">
@@ -261,7 +261,7 @@ export function PantallaCuentasModo({
             <button
               type="button"
               onClick={onVerReservaciones}
-              className="flex h-10 items-center gap-2 rounded border border-line-strong bg-surface px-3.5 text-[13.5px] font-semibold text-ink-2 transition hover:border-ink hover:text-ink"
+              className="flex h-10 items-center gap-2 rounded border border-line-strong bg-surface px-3.5 text-14 font-semibold text-ink-2 transition hover:border-ink hover:text-ink"
             >
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" className="h-[17px] w-[17px]">
                 <rect x="3" y="4" width="18" height="17" rx="2" />
@@ -277,7 +277,7 @@ export function PantallaCuentasModo({
         </div>
       </header>
 
-      {error && <p className="flex-shrink-0 bg-[#FBF1EF] px-4 py-2 text-[13px] font-medium text-danger" role="alert">{error}</p>}
+      {error && <p className="flex-shrink-0 bg-[#FBF1EF] px-4 py-2 text-13 font-medium text-danger" role="alert">{error}</p>}
 
       <div className="flex min-h-0 flex-1">
         {/* ── Lista de cuentas ─────────────────────────────────────────── */}
@@ -286,8 +286,8 @@ export function PantallaCuentasModo({
             {items === null && <p className="p-3 text-sm text-ink-3">Cargando…</p>}
             {items?.length === 0 && (
               <div className="flex h-full flex-col items-center justify-center gap-2 px-4 text-center">
-                <p className="text-[14px] font-semibold text-ink-2">{copia.vacioTitulo}</p>
-                <p className="text-[12.5px] text-ink-3">{copia.vacioTexto}</p>
+                <p className="text-14 font-semibold text-ink-2">{copia.vacioTitulo}</p>
+                <p className="text-13 text-ink-3">{copia.vacioTexto}</p>
               </div>
             )}
             <div className="flex flex-col gap-2">
@@ -315,25 +315,25 @@ export function PantallaCuentasModo({
                   >
                     <button type="button" onClick={() => setSelId(c.ticketId)} className="min-w-0 flex-1 p-3 text-left">
                     <div className="flex items-baseline justify-between gap-2">
-                      <span className="truncate font-display text-[15px] font-semibold">{(esComedor && c.mesa ? `Mesa ${c.mesa}` : null) ?? c.cliente ?? c.folio ?? "Cuenta"}</span>
-                      <span className="flex-shrink-0 font-display text-[15px] font-bold tabular-nums">{fmtMxn(c.total)}</span>
+                      <span className="truncate font-display text-15 font-semibold">{(esComedor && c.mesa ? `Mesa ${c.mesa}` : null) ?? c.cliente ?? c.folio ?? "Cuenta"}</span>
+                      <span className="flex-shrink-0 font-display text-15 font-bold tabular-nums">{fmtMxn(c.total)}</span>
                     </div>
                     {/* Quién lo lleva, debajo del nombre. Va rotulado y no suelto: el renglón de
                         arriba ya es un nombre —el del cliente— y dos nombres seguidos sin etiqueta
                         se confunden. Solo aparece si hay repartidor asignado. */}
                     {repartidorPorTicket.has(c.ticketId) && (
-                      <div className={["mt-0.5 truncate text-[12px] font-semibold", salio ? "text-white/85" : "text-ink-2"].join(" ")}>
+                      <div className={["mt-0.5 truncate text-12 font-semibold", salio ? "text-white/85" : "text-ink-2"].join(" ")}>
                         Repartidor: {repartidorPorTicket.get(c.ticketId)}
                       </div>
                     )}
                     {/* En comedor el título es la mesa: el cliente va debajo, rotulado. En Pick-up
                         el título ya es su nombre y repetirlo sobraría. */}
                     {esComedor && c.mesa && c.clienteId && c.cliente && (
-                      <div className={["mt-0.5 truncate text-[12px] font-semibold", salio ? "text-white/85" : "text-ink-2"].join(" ")}>
+                      <div className={["mt-0.5 truncate text-12 font-semibold", salio ? "text-white/85" : "text-ink-2"].join(" ")}>
                         Cliente: {c.cliente}
                       </div>
                     )}
-                    <div className={["mt-0.5 flex items-center justify-between gap-2 text-[12px]", salio ? "text-white/75" : "text-ink-3"].join(" ")}>
+                    <div className={["mt-0.5 flex items-center justify-between gap-2 text-12", salio ? "text-white/75" : "text-ink-3"].join(" ")}>
                       <span className="truncate">{c.nItems} {c.nItems === 1 ? "producto" : "productos"}</span>
                       <span className="flex-shrink-0">{minutosAbierta(c.desdeIso, ahora)} min</span>
                     </div>
@@ -365,8 +365,8 @@ export function PantallaCuentasModo({
           {!sel ? (
             <div className="flex flex-1 flex-col items-center justify-center gap-2 px-6 text-center">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.4" className="h-10 w-10 text-line-strong"><path d="M6 2h9l3 3v15a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V3a1 1 0 0 1 1-1z" /><path d="M9 8h6M9 12h6M9 16h4" /></svg>
-              <p className="text-[14px] font-semibold text-ink-2">Elige una cuenta</p>
-              <p className="text-[12.5px] text-ink-3">Verás lo que se ordenó y podrás cobrarla o modificarla.</p>
+              <p className="text-14 font-semibold text-ink-2">Elige una cuenta</p>
+              <p className="text-13 text-ink-3">Verás lo que se ordenó y podrás cobrarla o modificarla.</p>
             </div>
           ) : (
             <>
@@ -374,8 +374,8 @@ export function PantallaCuentasModo({
               <div className="flex flex-shrink-0 flex-wrap items-center gap-2 border-b border-line px-4 py-3">
                 <div className="mr-auto min-w-0">
                   {/* En comedor manda la mesa (igual que en la tarjeta); el cliente, si hay, va abajo. */}
-                  <div className="truncate font-display text-[16px] font-semibold">{(esComedor && sel.mesa ? `Mesa ${sel.mesa}` : null) ?? sel.cliente ?? sel.folio ?? "Cuenta"}</div>
-                  <div className="truncate text-[12px] text-ink-3">
+                  <div className="truncate font-display text-16 font-semibold">{(esComedor && sel.mesa ? `Mesa ${sel.mesa}` : null) ?? sel.cliente ?? sel.folio ?? "Cuenta"}</div>
+                  <div className="truncate text-12 text-ink-3">
                     {esComedor && sel.mesa && sel.clienteId && sel.cliente ? `${sel.cliente} · ` : ""}{sel.folio ? `${sel.folio} · ` : ""}{fmtMxn(sel.total)}
                   </div>
                 </div>
@@ -411,17 +411,17 @@ export function PantallaCuentasModo({
               {entrega && (entrega.cliente || entrega.telefono || entrega.direccion) && (
                 <div className="border-b border-line bg-sel px-4 py-3">
                   <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-                    {entrega.cliente && <span className="font-display text-[14px] font-semibold">{entrega.cliente}</span>}
+                    {entrega.cliente && <span className="font-display text-14 font-semibold">{entrega.cliente}</span>}
                     {entrega.telefono && (
-                      <a href={`tel:${entrega.telefono}`} className="text-[13px] font-semibold text-info underline-offset-2 hover:underline">
+                      <a href={`tel:${entrega.telefono}`} className="text-13 font-semibold text-info underline-offset-2 hover:underline">
                         {entrega.telefono}
                       </a>
                     )}
                   </div>
-                  {entrega.direccion && <p className="mt-1 text-[13px] leading-snug text-ink-2">{entrega.direccion}</p>}
-                  {entrega.referencias && <p className="mt-0.5 text-[12.5px] leading-snug text-ink-3">Referencias: {entrega.referencias}</p>}
+                  {entrega.direccion && <p className="mt-1 text-13 leading-snug text-ink-2">{entrega.direccion}</p>}
+                  {entrega.referencias && <p className="mt-0.5 text-13 leading-snug text-ink-3">Referencias: {entrega.referencias}</p>}
                   {entrega.notasRepartidor && (
-                    <p className="mt-1 rounded border border-[#F0DCC0] bg-warning-soft px-2 py-1 text-[12.5px] leading-snug text-ink-2">
+                    <p className="mt-1 rounded border border-warning-line bg-warning-soft px-2 py-1 text-13 leading-snug text-ink-2">
                       Para el repartidor: {entrega.notasRepartidor}
                     </p>
                   )}
@@ -451,7 +451,7 @@ export function PantallaCuentasModo({
                         type="button"
                         onClick={() => setCancelando(it)}
                         title="Eliminar producto"
-                        className="flex-shrink-0 rounded px-2 py-1 text-[12.5px] font-semibold text-ink-3 transition hover:bg-hover hover:text-danger"
+                        className="flex-shrink-0 rounded px-2 py-1 text-13 font-semibold text-ink-3 transition hover:bg-hover hover:text-danger"
                       >
                         Eliminar
                       </button>
@@ -463,20 +463,20 @@ export function PantallaCuentasModo({
               {/* Totales de la BD: es la cifra con la que se va a cobrar. */}
               {totales && (
                 <div className="flex-shrink-0 border-t border-line bg-sel px-4 py-3">
-                  <div className="flex justify-between text-[13px] text-ink-2">
+                  <div className="flex justify-between text-13 text-ink-2">
                     <span>Subtotal</span><span className="font-medium tabular-nums text-ink">{fmtMxn(totales.subtotal)}</span>
                   </div>
-                  <div className="mt-0.5 flex justify-between text-[13px] text-ink-2">
+                  <div className="mt-0.5 flex justify-between text-13 text-ink-2">
                     <span>IVA (16%)</span><span className="font-medium tabular-nums text-ink">{fmtMxn(totales.iva)}</span>
                   </div>
                   {hayDescuento && (
-                    <div className="mt-0.5 flex justify-between text-[13px] font-medium text-danger">
+                    <div className="mt-0.5 flex justify-between text-13 font-medium text-danger">
                       <span>Descuento</span><span className="tabular-nums">−{fmtMxn(totales.descuentos)}</span>
                     </div>
                   )}
                   <div className="mt-1.5 flex items-baseline justify-between">
-                    <span className="text-[14px] font-bold uppercase tracking-[0.03em]">Total</span>
-                    <span className="font-display text-[25px] font-bold leading-none tabular-nums">{fmtMxn(totales.total)}</span>
+                    <span className="text-14 font-bold uppercase tracking-[0.03em]">Total</span>
+                    <span className="font-display text-24 font-bold leading-none tabular-nums">{fmtMxn(totales.total)}</span>
                   </div>
                 </div>
               )}
@@ -525,20 +525,20 @@ export function PantallaCuentasModo({
       {borrandoCuenta && sel && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" role="dialog" aria-modal="true">
           <div className="w-full max-w-[420px] rounded-lg bg-surface p-5 shadow-lg">
-            <h2 className="font-display text-[17px] font-bold">¿Borrar esta cuenta?</h2>
-            <p className="mt-2 text-[13px] text-ink-2">
+            <h2 className="font-display text-18 font-bold">¿Borrar esta cuenta?</h2>
+            <p className="mt-2 text-13 text-ink-2">
               {sel.mesa ? `Mesa ${sel.mesa}` : (sel.cliente ?? sel.folio ?? "La cuenta")} está vacía y
               desaparecerá de la lista. Si es de comedor, la mesa queda libre.
             </p>
-            <p className="mt-2 text-[12.5px] text-ink-3">
+            <p className="mt-2 text-13 text-ink-3">
               No es una cancelación: al no tener productos, no ensucia el corte con un folio cancelado.
             </p>
-            {error && <p className="mt-3 text-[13px] font-medium text-danger" role="alert">{error}</p>}
+            {error && <p className="mt-3 text-13 font-medium text-danger" role="alert">{error}</p>}
             <div className="mt-4 flex justify-end gap-2">
               <button
                 type="button"
                 onClick={() => setBorrandoCuenta(false)}
-                className="h-10 rounded border border-line-strong px-4 text-[13.5px] font-semibold text-ink-2 transition hover:border-ink hover:text-ink"
+                className="h-10 rounded border border-line-strong px-4 text-14 font-semibold text-ink-2 transition hover:border-ink hover:text-ink"
               >
                 Cancelar
               </button>
@@ -559,7 +559,7 @@ export function PantallaCuentasModo({
                     setBorrando(false);
                   }
                 }}
-                className="h-10 rounded bg-danger px-4 text-[13.5px] font-semibold text-white transition hover:brightness-95 disabled:opacity-50"
+                className="h-10 rounded bg-danger px-4 text-14 font-semibold text-white transition hover:brightness-95 disabled:opacity-50"
               >
                 {borrando ? "Borrando…" : "Borrar cuenta"}
               </button>
@@ -659,7 +659,7 @@ function Accion({
       onClick={onClick}
       disabled={ocupado || inactivo}
       className={[
-        "flex h-9 flex-shrink-0 items-center rounded px-3 text-[13px] font-semibold transition disabled:cursor-default disabled:opacity-45",
+        "flex h-9 flex-shrink-0 items-center rounded px-3 text-13 font-semibold transition disabled:cursor-default disabled:opacity-45",
         destacado
           ? "bg-accent text-white hover:bg-accent-hover"
           : peligro

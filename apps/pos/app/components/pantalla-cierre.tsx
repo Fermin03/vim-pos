@@ -370,7 +370,7 @@ export function PantallaCierre({
     );
   }
 
-  const input = "h-11 w-[150px] rounded border border-line-strong px-3 text-right font-display text-[17px] font-bold outline-none focus:border-ink focus:shadow-[0_0_0_3px_rgba(22,22,26,.06)]";
+  const input = "h-11 w-[150px] rounded border border-line-strong px-3 text-right font-display text-18 font-bold outline-none focus:border-ink focus:shadow-[0_0_0_3px_rgba(22,22,26,.06)]";
 
   return (
     <div className="flex h-screen flex-col bg-bg">
@@ -380,9 +380,9 @@ export function PantallaCierre({
           <button type="button" onClick={onCancelar} className="flex h-9 w-9 items-center justify-center rounded border border-line-strong text-ink-2 hover:border-ink hover:text-ink">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-4 w-4"><polyline points="15 18 9 12 15 6" /></svg>
           </button>
-          <h1 className="font-display text-[17px] font-semibold tracking-tight">{paso === "resultado" ? "Resultado del corte" : "Arqueo / Cierre de turno"}</h1>
+          <h1 className="font-display text-18 font-semibold tracking-tight">{paso === "resultado" ? "Resultado del corte" : "Arqueo / Cierre de turno"}</h1>
         </div>
-        <span className="text-[12.5px] text-ink-3">Turno <b className="text-ink-2">{turno.codigo_turno}</b> · Cajero <b className="text-ink-2">{empleado.nombre}</b></span>
+        <span className="text-13 text-ink-3">Turno <b className="text-ink-2">{turno.codigo_turno}</b> · Cajero <b className="text-ink-2">{empleado.nombre}</b></span>
       </div>
 
       {error && <p className="mx-6 mt-3 text-sm font-medium text-danger" role="alert">{error}</p>}
@@ -394,7 +394,7 @@ export function PantallaCierre({
           <div className="flex-1 overflow-y-auto p-6">
             <table className="w-full border-collapse">
               <thead>
-                <tr className="text-[11px] font-bold uppercase tracking-wide text-ink-3">
+                <tr className="text-11 font-bold uppercase tracking-wide text-ink-3">
                   <th className="pb-3 text-left">Método de pago</th>
                   <th className="pb-3 text-right">Contado</th>
                 </tr>
@@ -407,10 +407,10 @@ export function PantallaCierre({
                   return (
                     <tr key={f.metodo} className="border-b border-line">
                       <td className="py-4">
-                        <div className="text-[15px] font-semibold">{label(f.metodo)}</div>
+                        <div className="text-15 font-semibold">{label(f.metodo)}</div>
                         {f.metodo === "EFECTIVO"
-                          ? <div className="text-[11.5px] text-ink-3">Cuenta todo lo que hay en el cajón, fondo incluido</div>
-                          : <div className="text-[11.5px] text-ink-3">Del sistema: confírmalo con el cierre de tu terminal</div>}
+                          ? <div className="text-12 text-ink-3">Cuenta todo lo que hay en el cajón, fondo incluido</div>
+                          : <div className="text-12 text-ink-3">Del sistema: confírmalo con el cierre de tu terminal</div>}
                       </td>
                       <td className="py-4 text-right">
                         <input
@@ -430,14 +430,14 @@ export function PantallaCierre({
 
           {/* Resumen del turno */}
           <aside className="flex w-[360px] flex-shrink-0 flex-col border-l border-line bg-surface">
-            <div className="border-b border-line px-5 py-4"><h2 className="font-display text-[15px] font-semibold">Resumen del turno</h2></div>
-            <div className="flex-1 overflow-y-auto px-5 py-4 text-[13.5px]">
+            <div className="border-b border-line px-5 py-4"><h2 className="font-display text-15 font-semibold">Resumen del turno</h2></div>
+            <div className="flex-1 overflow-y-auto px-5 py-4 text-14">
               <Row l="Tickets pagados" v={String(resumen.ticketsPagados)} />
               <Row l="Tickets cancelados" v={String(resumen.ticketsCancelados)} />
               <Row l="Fondo de apertura" v={fmtMxn(resumen.fondoApertura)} />
               {/* Venta, propinas y efectivo esperado se ven en el resultado: con ellos a la vista
                   se puede sacar la cuenta del cajón y el conteo deja de ser ciego. */}
-              <p className="mt-4 rounded border border-line bg-sel px-3 py-2.5 text-[12.5px] leading-snug text-ink-2">
+              <p className="mt-4 rounded border border-line bg-sel px-3 py-2.5 text-13 leading-snug text-ink-2">
                 Cuenta el efectivo y escríbelo. Lo que debería haber aparece al generar el corte.
               </p>
             </div>
@@ -445,8 +445,8 @@ export function PantallaCierre({
               {/* B3 — turno de evento: comisión del organizador */}
               {turno.evento_nombre && (
                 <div className="mb-3 rounded-lg border border-line bg-sel px-3.5 py-3">
-                  <div className="text-[12px] font-semibold text-ink-2">Evento: {turno.evento_nombre}</div>
-                  <label className="mt-1.5 block text-[12px] text-ink-3" htmlFor="comision-evento">
+                  <div className="text-12 font-semibold text-ink-2">Evento: {turno.evento_nombre}</div>
+                  <label className="mt-1.5 block text-12 text-ink-3" htmlFor="comision-evento">
                     Comisión del organizador (MXN) · opcional
                   </label>
                   <input
@@ -463,7 +463,7 @@ export function PantallaCierre({
                 <div className="mb-3 rounded-lg border border-danger/30 bg-danger/5 px-3.5 py-3" role="alert">
                   <div className="flex items-start gap-2.5">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" className="mt-px h-[18px] w-[18px] flex-shrink-0 text-danger"><path d="M12 9v4M12 17h.01M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z" /></svg>
-                    <div className="text-[12.5px] leading-snug">
+                    <div className="text-13 leading-snug">
                       <span className="font-semibold text-danger">{ticketsAbiertos} {ticketsAbiertos === 1 ? "cuenta abierta" : "cuentas abiertas"} sin cobrar.</span>
                       <span className="text-ink-2"> Cóbralas o cancélalas antes de cerrar el turno; si no, quedarían sin registrar y la mesa trabada.</span>
                     </div>
@@ -473,9 +473,9 @@ export function PantallaCierre({
                       —"Para llevar" no tiene dónde verse—, así que una cuenta olvidada ahí no
                       aparecía en ninguna pantalla: el corte quedaba trabado sin pista de por qué. */}
                   {bloqueantes === null ? (
-                    <div className="mt-2.5 pl-[26px] text-[12px] text-ink-3">Buscando cuáles son…</div>
+                    <div className="mt-2.5 pl-[26px] text-12 text-ink-3">Buscando cuáles son…</div>
                   ) : bloqueantes.length === 0 ? (
-                    <div className="mt-2.5 pl-[26px] text-[12px] text-ink-3">
+                    <div className="mt-2.5 pl-[26px] text-12 text-ink-3">
                       No se pudo listar cuáles. Revisa las cuentas abiertas de cada modo y los pedidos en espera.
                     </div>
                   ) : (
@@ -483,11 +483,11 @@ export function PantallaCierre({
                       {bloqueantes.map((c) => (
                         <li key={c.ticketId} className="flex items-center gap-2 rounded border border-line bg-surface px-2.5 py-2">
                           <span className="min-w-0 flex-1">
-                            <span className="block truncate font-display text-[13px] font-semibold">
+                            <span className="block truncate font-display text-13 font-semibold">
                               {c.folio ?? "Sin folio"} · {c.modo}
-                              {c.enEspera && <span className="ml-1.5 rounded bg-sel px-1.5 py-px text-[11px] font-semibold text-ink-3">en espera</span>}
+                              {c.enEspera && <span className="ml-1.5 rounded bg-sel px-1.5 py-px text-11 font-semibold text-ink-3">en espera</span>}
                             </span>
-                            <span className="block text-[11.5px] text-ink-3">
+                            <span className="block text-12 text-ink-3">
                               {c.nItems} {c.nItems === 1 ? "producto" : "productos"} · {fmtMxn(c.total)}
                             </span>
                           </span>
@@ -495,7 +495,7 @@ export function PantallaCierre({
                             <button
                               type="button"
                               onClick={() => onIrACuenta(c.ticketId)}
-                              className="flex-shrink-0 rounded border border-line-strong px-2.5 py-1 text-[12px] font-semibold text-ink-2 transition hover:border-ink hover:text-ink"
+                              className="flex-shrink-0 rounded border border-line-strong px-2.5 py-1 text-12 font-semibold text-ink-2 transition hover:border-ink hover:text-ink"
                             >
                               Ir a la cuenta
                             </button>
@@ -507,7 +507,7 @@ export function PantallaCierre({
                 </div>
               )}
               {necesitaAutorizacion && (
-                <p className="mb-3 rounded border border-[#E8DCC0] bg-warning-soft px-3 py-2 text-[12.5px] font-medium text-warning">
+                <p className="mb-3 rounded border border-warning-line bg-warning-soft px-3 py-2 text-13 font-medium text-warning">
                   Este turno ya tiene un conteo registrado. Contar de nuevo pide autorización de un supervisor.
                 </p>
               )}
@@ -526,11 +526,11 @@ export function PantallaCierre({
               <div className={["mx-auto mb-2 flex h-12 w-12 items-center justify-center rounded-full", corte.diferenciaTotal === 0 ? "bg-success/10 text-success" : "bg-warning/10 text-warning"].join(" ")}>
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" className="h-6 w-6"><path d="M20 6 9 17l-5-5" /></svg>
               </div>
-              <h2 className="font-display text-[20px] font-semibold">Corte generado</h2>
+              <h2 className="font-display text-20 font-semibold">Corte generado</h2>
             </div>
             <div className="overflow-hidden rounded-lg border border-line">
               {corte.detalle.map((d) => (
-                <div key={d.metodo} className="flex items-center justify-between border-b border-line px-4 py-3 text-[14px] last:border-b-0">
+                <div key={d.metodo} className="flex items-center justify-between border-b border-line px-4 py-3 text-14 last:border-b-0">
                   <span className="font-semibold">{label(d.metodo)}</span>
                   <span className="flex items-center gap-4 tabular-nums">
                     <span className="text-ink-3">esp {fmtMxn(d.esperado)}</span>
@@ -542,8 +542,8 @@ export function PantallaCierre({
                 </div>
               ))}
               <div className="flex items-center justify-between bg-sel px-4 py-3">
-                <span className="font-display text-[15px] font-bold uppercase tracking-wide">Diferencia total</span>
-                <span className={["font-display text-[18px] font-bold tabular-nums", corte.diferenciaTotal === 0 ? "text-success" : corte.diferenciaTotal < 0 ? "text-danger" : "text-warning"].join(" ")}>
+                <span className="font-display text-15 font-bold uppercase tracking-wide">Diferencia total</span>
+                <span className={["font-display text-18 font-bold tabular-nums", corte.diferenciaTotal === 0 ? "text-success" : corte.diferenciaTotal < 0 ? "text-danger" : "text-warning"].join(" ")}>
                   {corte.diferenciaTotal === 0 ? "$0.00" : corte.diferenciaTotal < 0 ? `−${fmtMxn(Math.abs(corte.diferenciaTotal))}` : `+${fmtMxn(corte.diferenciaTotal)}`}
                 </span>
               </div>
@@ -552,7 +552,7 @@ export function PantallaCierre({
               {/* Sin diferencia no hay nada que recontar. Con diferencia, volver pide autorización:
                   si no, el corte ciego se vuelve "ver la cifra y corregir". */}
               {corte.diferenciaTotal !== 0 ? (
-                <button type="button" onClick={() => void pedirRecuento()} disabled={procesando} className="rounded border border-line-strong px-5 py-3 text-[14px] font-semibold text-ink-2 hover:border-ink hover:text-ink">
+                <button type="button" onClick={() => void pedirRecuento()} disabled={procesando} className="rounded border border-line-strong px-5 py-3 text-14 font-semibold text-ink-2 hover:border-ink hover:text-ink">
                   Volver a contar
                 </button>
               ) : <span />}

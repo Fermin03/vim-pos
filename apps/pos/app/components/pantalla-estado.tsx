@@ -26,7 +26,7 @@ export function PantallaEstado({
     <main className="flex min-h-screen flex-col bg-surface">
       <header className="flex h-[68px] flex-shrink-0 items-center gap-3 border-b border-line px-6">
         <BrandMark size={32} />
-        <span className="font-display text-[15px] font-semibold tracking-tight">VIM POS</span>
+        <span className="font-display text-15 font-semibold tracking-tight">VIM POS</span>
       </header>
 
       <div className="flex flex-1 flex-col items-center justify-center px-6 py-12 text-center">
@@ -41,19 +41,19 @@ export function PantallaEstado({
           )}
         </div>
 
-        <h1 className="max-w-md font-display text-[26px] font-semibold tracking-tight">{titulo}</h1>
-        <p className="mt-2 max-w-md text-[14.5px] leading-relaxed text-ink-3">{texto}</p>
+        <h1 className="max-w-md font-display text-28 font-semibold tracking-tight">{titulo}</h1>
+        <p className="mt-2 max-w-md text-15 leading-relaxed text-ink-3">{texto}</p>
 
         {acciones && <div className="mt-7 flex flex-wrap items-center justify-center gap-2.5">{acciones}</div>}
 
         {referencia && (
           <div className="mt-8 rounded-lg border border-line bg-sel px-4 py-2.5">
-            <div className="text-[11px] font-medium uppercase tracking-wide text-ink-3">Referencia</div>
-            <code className="font-mono text-[13px] font-semibold text-ink-2">{referencia}</code>
+            <div className="text-11 font-medium uppercase tracking-wide text-ink-3">Referencia</div>
+            <code className="font-mono text-13 font-semibold text-ink-2">{referencia}</code>
           </div>
         )}
 
-        {pie && <div className="mt-6 max-w-sm text-[12.5px] text-ink-3">{pie}</div>}
+        {pie && <div className="mt-6 max-w-sm text-13 text-ink-3">{pie}</div>}
       </div>
     </main>
   );

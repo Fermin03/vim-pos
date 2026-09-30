@@ -20,7 +20,7 @@ import { mensajeError } from "../../lib/errores";
 
 const input =
   "h-11 w-full rounded border border-line-strong px-3 text-sm outline-none focus:border-ink focus:shadow-[0_0_0_3px_rgba(22,22,26,.06)]";
-const label = "mb-1.5 block text-[13px] font-medium text-ink-2";
+const label = "mb-1.5 block text-13 font-medium text-ink-2";
 
 type FormDatos = {
   nombre: string; apellido_paterno: string; telefono: string; email: string; rfc: string;
@@ -175,24 +175,24 @@ export default function ClientesPage() {
         {kpis !== null && kpis.total > 0 && (
           <div className="mb-5 grid grid-cols-2 gap-4 lg:grid-cols-4">
             <div className="rounded-lg border border-line bg-surface p-4">
-              <div className="text-[11.5px] font-bold uppercase tracking-wide text-ink-3">Total clientes</div>
+              <div className="text-12 font-bold uppercase tracking-wide text-ink-3">Total clientes</div>
               <div className="mt-1 font-display text-2xl font-bold tabular-nums">{kpis.total}</div>
-              <div className="text-[11.5px] text-ink-3">registrados</div>
+              <div className="text-12 text-ink-3">registrados</div>
             </div>
             <div className="rounded-lg border border-line bg-surface p-4">
-              <div className="text-[11.5px] font-bold uppercase tracking-wide text-ink-3">Con factura</div>
+              <div className="text-12 font-bold uppercase tracking-wide text-ink-3">Con factura</div>
               <div className="mt-1 font-display text-2xl font-bold tabular-nums">{kpis.conRfc}</div>
-              <div className="text-[11.5px] text-ink-3">tienen RFC capturado</div>
+              <div className="text-12 text-ink-3">tienen RFC capturado</div>
             </div>
             <div className="rounded-lg border border-line bg-surface p-4">
-              <div className="text-[11.5px] font-bold uppercase tracking-wide text-ink-3">Recurrentes</div>
+              <div className="text-12 font-bold uppercase tracking-wide text-ink-3">Recurrentes</div>
               <div className="mt-1 font-display text-2xl font-bold tabular-nums">{kpis.recurrentes}</div>
-              <div className="text-[11.5px] text-ink-3">3+ compras</div>
+              <div className="text-12 text-ink-3">3+ compras</div>
             </div>
             <div className="rounded-lg border border-line bg-surface p-4">
-              <div className="text-[11.5px] font-bold uppercase tracking-wide text-ink-3">Ticket promedio</div>
+              <div className="text-12 font-bold uppercase tracking-wide text-ink-3">Ticket promedio</div>
               <div className="mt-1 font-display text-2xl font-bold tabular-nums">{fmt(kpis.ticketPromedio)}</div>
-              <div className="text-[11.5px] text-ink-3">por visita</div>
+              <div className="text-12 text-ink-3">por visita</div>
             </div>
           </div>
         )}
@@ -208,14 +208,14 @@ export default function ClientesPage() {
                 key={t.v}
                 type="button"
                 onClick={() => setFiltro(t.v)}
-                className={["flex-shrink-0 whitespace-nowrap rounded-[4px] px-3 py-[11px] text-[12.5px] font-semibold transition lg:py-1.5", filtro === t.v ? "bg-surface text-ink shadow-sm" : "text-ink-2 hover:text-ink"].join(" ")}
+                className={["flex-shrink-0 whitespace-nowrap rounded-[4px] px-3 py-[11px] text-13 font-semibold transition lg:py-1.5", filtro === t.v ? "bg-surface text-ink shadow-sm" : "text-ink-2 hover:text-ink"].join(" ")}
               >
                 {t.l}
               </button>
             ))}
           </div>
           <input
-            className="h-9 max-w-sm flex-1 rounded border border-line-strong px-3 text-[13px] outline-none focus:border-ink"
+            className="h-9 max-w-sm flex-1 rounded border border-line-strong px-3 text-13 outline-none focus:border-ink"
             value={busqueda}
             placeholder="Buscar por nombre, teléfono, RFC o correo…"
             onChange={(e) => setBusqueda(e.target.value)}
@@ -225,15 +225,15 @@ export default function ClientesPage() {
         {clientes === null && <p className="text-sm text-ink-3">Cargando…</p>}
         {clientes && kpis?.total === 0 && !editando && (
           <div className="rounded-lg border border-line bg-surface p-8 text-center text-ink-3">
-            <p className="text-[15px] font-semibold text-ink-2">{busqueda ? "Sin coincidencias" : "Sin clientes todavía"}</p>
-            <p className="mt-1 text-[13px]">Agrega clientes para facturarles más rápido y llevar su historial.</p>
+            <p className="text-15 font-semibold text-ink-2">{busqueda ? "Sin coincidencias" : "Sin clientes todavía"}</p>
+            <p className="mt-1 text-13">Agrega clientes para facturarles más rápido y llevar su historial.</p>
           </div>
         )}
         {clientes && kpis !== null && kpis.total > 0 && (
           <div className="tabla-caja overflow-hidden rounded-lg border border-line bg-surface">
-            <table className="w-full text-[13.5px]">
+            <table className="w-full text-14">
               <thead>
-                <tr className="border-b border-line bg-sel text-left text-[11.5px] uppercase tracking-wide text-ink-3">
+                <tr className="border-b border-line bg-sel text-left text-12 uppercase tracking-wide text-ink-3">
                   <th className="px-4 py-2.5 font-semibold">Cliente</th>
                   <th className="px-4 py-2.5 font-semibold">Contacto</th>
                   <th className="px-4 py-2.5 text-right font-semibold">Compras</th>
@@ -249,10 +249,10 @@ export default function ClientesPage() {
                       <div className="font-medium">
                         {c.nombre} {c.apellido_paterno}
                         {c.estado !== "ACTIVO" && (
-                          <span className="ml-2 rounded-full bg-danger-soft px-2 py-0.5 text-[11px] font-bold text-danger">Bloqueado</span>
+                          <span className="ml-2 rounded-full bg-danger-soft px-2 py-0.5 text-11 font-bold text-danger">Bloqueado</span>
                         )}
                       </div>
-                      {c.rfc && <div className="mt-px font-mono text-[11.5px] text-ink-3">{c.rfc}</div>}
+                      {c.rfc && <div className="mt-px font-mono text-12 text-ink-3">{c.rfc}</div>}
                     </td>
                     <td className="px-4 py-2.5 text-ink-2">{c.telefono || c.email || "—"}</td>
                     <td className="px-4 py-2.5 text-right tabular-nums">
@@ -263,23 +263,23 @@ export default function ClientesPage() {
                     </td>
                     <td className="px-4 py-2.5 text-ink-2">{fmtVisita(c.ultimaVisita)}</td>
                     <td className="px-4 py-2.5 text-right whitespace-nowrap">
-                      <button type="button" onClick={() => editar(c)} className="text-[12.5px] font-semibold text-ink-2 hover:text-ink">Editar</button>
-                      <button type="button" onClick={() => alternarBloqueo(c)} className="ml-3 text-[12.5px] font-semibold text-ink-3 hover:text-ink">{c.estado === "ACTIVO" ? "Bloquear" : "Activar"}</button>
-                      <button type="button" onClick={() => borrar(c)} className="ml-3 text-[12.5px] font-semibold text-ink-3 hover:text-danger">Eliminar</button>
+                      <button type="button" onClick={() => editar(c)} className="text-13 font-semibold text-ink-2 hover:text-ink">Editar</button>
+                      <button type="button" onClick={() => alternarBloqueo(c)} className="ml-3 text-13 font-semibold text-ink-3 hover:text-ink">{c.estado === "ACTIVO" ? "Bloquear" : "Activar"}</button>
+                      <button type="button" onClick={() => borrar(c)} className="ml-3 text-13 font-semibold text-ink-3 hover:text-danger">Eliminar</button>
                     </td>
                   </tr>
                 ))}
                 {clientes.length === 0 && (
                   <tr>
                     <td colSpan={6} className="px-4 py-10 text-center">
-                      <p className="text-[14px] font-semibold text-ink-2">Sin resultados</p>
-                      <p className="mt-1 text-[12.5px] text-ink-3">No hay clientes que coincidan con tu búsqueda o filtro.</p>
+                      <p className="text-14 font-semibold text-ink-2">Sin resultados</p>
+                      <p className="mt-1 text-13 text-ink-3">No hay clientes que coincidan con tu búsqueda o filtro.</p>
                     </td>
                   </tr>
                 )}
               </tbody>
             </table>
-            <div className="flex flex-wrap items-center justify-between gap-3 border-t border-line px-4 py-3 text-[12.5px] text-ink-3">
+            <div className="flex flex-wrap items-center justify-between gap-3 border-t border-line px-4 py-3 text-13 text-ink-3">
               <span>
                 Mostrando <b className="tabular-nums text-ink-2">{textoRango(pagina, CLIENTES_POR_PAGINA, total)}</b> clientes
               </span>
@@ -307,7 +307,7 @@ export default function ClientesPage() {
         {/* Editor inline */}
         {editando && (
           <div className="mt-5 max-w-[620px] rounded-lg border border-line bg-surface p-5">
-            <div className="mb-4 font-display text-[16px] font-semibold tracking-tight">{editando.id ? "Editar cliente" : "Nuevo cliente"}</div>
+            <div className="mb-4 font-display text-16 font-semibold tracking-tight">{editando.id ? "Editar cliente" : "Nuevo cliente"}</div>
             <div className="flex flex-col gap-3.5">
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div>
@@ -330,7 +330,7 @@ export default function ClientesPage() {
                 </div>
               </div>
 
-              <div className="border-t border-line pt-3 text-[12.5px] font-semibold uppercase tracking-wide text-ink-3">Datos fiscales · opcional</div>
+              <div className="border-t border-line pt-3 text-13 font-semibold uppercase tracking-wide text-ink-3">Datos fiscales · opcional</div>
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div>
                   <label className={label} htmlFor="c-tipo">Tipo</label>

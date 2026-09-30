@@ -77,14 +77,14 @@ export function ModalCategoria({
         <h2 className="font-display text-xl font-semibold tracking-tight">
           {editar ? "Editar categoría" : "Nueva categoría"}
         </h2>
-        <p className="mt-0.5 text-[13px] text-ink-3">
+        <p className="mt-0.5 text-13 text-ink-3">
           {editar ? "Actualiza los datos del grupo." : "Agrega un grupo a tu menú."}
         </p>
       </div>
 
       <div className="flex flex-col gap-4">
         <label className="flex flex-col gap-1.5">
-          <span className="flex items-center justify-between text-[13px] font-medium text-ink-2">
+          <span className="flex items-center justify-between text-13 font-medium text-ink-2">
             <span>Nombre de la categoría</span>
             <span className="text-ink-3">{nombre.length} / 40</span>
           </span>
@@ -99,7 +99,7 @@ export function ModalCategoria({
         </label>
 
         <label className="flex flex-col gap-1.5">
-          <span className="flex items-center justify-between text-[13px] font-medium text-ink-2">
+          <span className="flex items-center justify-between text-13 font-medium text-ink-2">
             <span>Descripción <span className="text-ink-3">· opcional</span></span>
             <span className="text-ink-3">{descripcion.length} / 80</span>
           </span>
@@ -114,7 +114,7 @@ export function ModalCategoria({
 
         <div className="flex flex-wrap gap-5">
           <div className="flex min-w-0 flex-col gap-1.5">
-            <span className="text-[13px] font-medium text-ink-2">Color</span>
+            <span className="text-13 font-medium text-ink-2">Color</span>
             <div className="flex flex-wrap gap-2">
               {COLORES.map((c) => (
                 <button
@@ -136,7 +136,7 @@ export function ModalCategoria({
           </div>
 
           <div className="flex flex-1 flex-col gap-1.5">
-            <span className="text-[13px] font-medium text-ink-2">Icono</span>
+            <span className="text-13 font-medium text-ink-2">Icono</span>
             <div className="flex flex-wrap gap-2">
               {Object.keys(ICONOS).map((name) => (
                 <button
@@ -159,7 +159,7 @@ export function ModalCategoria({
 
         {areas.length > 0 && (
           <div>
-            <label className="mb-1.5 block text-[13px] font-medium text-ink-2" htmlFor="area-cat">
+            <label className="mb-1.5 block text-13 font-medium text-ink-2" htmlFor="area-cat">
               Estación de preparación
             </label>
             <select
@@ -171,7 +171,7 @@ export function ModalCategoria({
               <option value="">Cocina (por defecto)</option>
               {areas.map((a) => <option key={a.id} value={a.id}>{a.nombre}</option>)}
             </select>
-            <p className="mt-1 text-[12px] leading-snug text-ink-3">
+            <p className="mt-1 text-12 leading-snug text-ink-3">
               Dónde se imprime la comanda de los productos de esta categoría. Cada producto puede
               llevar la contraria desde su ficha.
             </p>
@@ -208,7 +208,7 @@ export function ModalCategoria({
       </div>
 
       {/* preview del dot con el color/icono elegido */}
-      <div className="mt-4 flex items-center gap-2 border-t border-line pt-4 text-[12.5px] text-ink-3">
+      <div className="mt-4 flex items-center gap-2 border-t border-line pt-4 text-13 text-ink-3">
         Vista previa:
         <span
           className="flex h-7 w-7 items-center justify-center rounded"

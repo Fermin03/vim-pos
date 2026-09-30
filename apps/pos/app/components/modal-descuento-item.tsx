@@ -13,6 +13,7 @@ import {
 } from "../lib/descuento";
 import { autorizacionPropia, type Autorizacion, type PayloadAutorizacion } from "../lib/autorizacion";
 import { ModalAutorizacionPin } from "./modal-autorizacion-pin";
+import { AvisoAutorizacion } from "./motivo-y-autorizacion";
 
 // Descuento por ítem (F6.5): el cajero ajusta UN ítem del ticket persistido. Override de precio
 // requiere un permiso más alto. Roles con permiso de descuento/override por defecto (§2.2).
@@ -152,19 +153,19 @@ export function ModalDescuentoItem({
       className="w-[440px] rounded-lg border border-line bg-surface p-6 shadow-[0_18px_44px_rgba(22,22,26,.18)]">
       <div className="mb-5">
         <h2 className="font-display text-xl font-semibold tracking-tight">Ajustar ítem</h2>
-        <p className="mt-0.5 text-[13px] text-ink-3">{cantidad}× {productoNombre} · {fmtMxn(totalItem)}</p>
+        <p className="mt-0.5 text-13 text-ink-3">{cantidad}× {productoNombre} · {fmtMxn(totalItem)}</p>
       </div>
 
       <div className="mb-4 inline-flex w-full gap-0.5 rounded border border-line bg-hover p-[3px]">
         {TIPOS.map((t) => (
           <button key={t.v} type="button" onClick={() => setTipo(t.v)}
-            className={["flex-1 rounded-[4px] px-3 py-2 text-[12.5px] font-semibold transition", tipo === t.v ? "bg-surface text-ink shadow-sm" : "text-ink-2 hover:text-ink"].join(" ")}>
+            className={["flex-1 rounded-[4px] px-3 py-2 text-13 font-semibold transition", tipo === t.v ? "bg-surface text-ink shadow-sm" : "text-ink-2 hover:text-ink"].join(" ")}>
             {t.l}
           </button>
         ))}
       </div>
 
-      <label className="mb-1.5 block text-[13px] font-medium text-ink-2" htmlFor="di-valor">
+      <label className="mb-1.5 block text-13 font-medium text-ink-2" htmlFor="di-valor">
         {tipo === "OVERRIDE_PRECIO" ? "Nuevo precio del ítem" : "Valor del descuento"}
       </label>
       <div className="relative mb-3">
@@ -177,16 +178,16 @@ export function ModalDescuentoItem({
       </div>
 
       {valor > 0 && (
-        <div className="mb-4 rounded border border-line bg-sel px-3 py-2 text-[12.5px] text-ink-2">
+        <div className="mb-4 rounded border border-line bg-sel px-3 py-2 text-13 text-ink-2">
           {tipo === "OVERRIDE_PRECIO" ? "Ahorro" : "Descuento"}: <b>{fmtMxn(descuento)}</b> · Nuevo total del ítem: <b>{fmtMxn(nuevoTotal)}</b>
         </div>
       )}
 
-      <div className="mb-1.5 text-[13px] font-medium text-ink-2">Motivo</div>
+      <div className="mb-1.5 text-13 font-medium text-ink-2">Motivo</div>
       <div className="mb-3 flex flex-wrap gap-2">
         {MOTIVOS.map((m) => (
           <button key={m.codigo} type="button" onClick={() => setMotivo(m.codigo)}
-            className={["rounded-full border px-3 py-1.5 text-[12.5px] font-semibold transition", motivo === m.codigo ? "border-ink bg-ink text-white" : "border-line-strong text-ink-2 hover:border-ink"].join(" ")}>
+            className={["rounded-full border px-3 py-1.5 text-13 font-semibold transition", motivo === m.codigo ? "border-ink bg-ink text-white" : "border-line-strong text-ink-2 hover:border-ink"].join(" ")}>
             {m.label}
           </button>
         ))}
@@ -196,9 +197,7 @@ export function ModalDescuentoItem({
           onChange={(e) => setMotivoTexto(e.target.value)} placeholder="Describe el motivo" />
       )}
 
-      <div className={["mb-4 rounded border px-3 py-2 text-[12.5px] font-medium", tienePermiso ? "border-[#D6E8DD] bg-success-soft text-success" : "border-[#E8DCC0] bg-warning-soft text-warning"].join(" ")}>
-        {tienePermiso ? "Dentro de tu rol · no requiere autorización." : "Requiere PIN de un supervisor."}
-      </div>
+      <div className="mb-4"><AvisoAutorizacion propia={tienePermiso} /></div>
 
       {error && <p className="mb-3 text-sm font-medium text-danger" role="alert">{error}</p>}
 

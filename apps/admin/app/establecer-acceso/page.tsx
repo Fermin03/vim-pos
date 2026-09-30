@@ -6,7 +6,7 @@ import { supabase, establecerPassword } from "../lib/supabase";
 import { mensajeError } from "../lib/errores";
 
 const inputCls =
-  "w-full rounded border border-line-strong bg-surface px-[13px] py-3 pr-11 text-[15px] outline-none transition focus:border-ink focus:shadow-[0_0_0_3px_rgba(22,22,26,.06)]";
+  "w-full rounded border border-line-strong bg-surface px-[13px] py-3 pr-11 text-15 outline-none transition focus:border-ink focus:shadow-[0_0_0_3px_rgba(22,22,26,.06)]";
 
 /**
  * Aterrizaje del link de invitación / recuperación. El link de Supabase ya dejó
@@ -72,14 +72,14 @@ export default function EstablecerAccesoPage() {
       <div className="flex w-full max-w-[380px] flex-col">
         <div className="mb-8 flex flex-col items-center gap-4">
           <LogoVim className="h-[46px] w-[46px]" />
-          <div className="font-display text-[19px] font-bold tracking-tight">VIM POS<span className="text-accent">.</span></div>
+          <div className="font-display text-20 font-bold tracking-tight">VIM POS<span className="text-accent">.</span></div>
         </div>
 
         {estado === "validando" && <p className="text-center text-sm text-ink-2">Validando tu invitación…</p>}
 
         {estado === "invalido" && (
           <div className="text-center">
-            <h1 className="mb-1.5 font-display text-[22px] font-semibold tracking-tight">Enlace no válido o expirado</h1>
+            <h1 className="mb-1.5 font-display text-24 font-semibold tracking-tight">Enlace no válido o expirado</h1>
             <p className="mb-6 text-sm text-ink-2">Pídele a VIM que te reenvíe la invitación, o entra con tu correo y contraseña si ya la creaste.</p>
             <Button onClick={() => router.replace("/")}>Ir a iniciar sesión</Button>
           </div>
@@ -88,23 +88,23 @@ export default function EstablecerAccesoPage() {
         {estado === "listo" && (
           <>
             <div className="mb-8 text-center">
-              <h1 className="mb-1.5 font-display text-[26px] font-semibold tracking-tight">Crea tu contraseña</h1>
+              <h1 className="mb-1.5 font-display text-28 font-semibold tracking-tight">Crea tu contraseña</h1>
               <p className="text-sm text-ink-2">{email ? <>Para <b>{email}</b>. </> : null}Define tu contraseña para entrar a tu panel.</p>
             </div>
             <form onSubmit={onSubmit} noValidate>
               <div className="mb-5">
-                <label htmlFor="p1" className="mb-[7px] block text-[13px] font-medium text-ink-2">Nueva contraseña</label>
+                <label htmlFor="p1" className="mb-[7px] block text-13 font-medium text-ink-2">Nueva contraseña</label>
                 <div className="relative">
                   <input id="p1" type={ver ? "text" : "password"} autoComplete="new-password" placeholder="Mínimo 8 caracteres"
                     value={pass} onChange={(e) => setPass(e.target.value)} className={inputCls} />
                   <button type="button" onClick={() => setVer((v) => !v)} aria-label={ver ? "Ocultar" : "Mostrar"}
-                    className="absolute right-1.5 top-1/2 flex h-[34px] w-[34px] -translate-y-1/2 items-center justify-center rounded-sm text-ink-3 transition-colors hover:bg-hover hover:text-ink-2 text-[12px] font-semibold">
+                    className="absolute right-1.5 top-1/2 flex h-[34px] w-[34px] -translate-y-1/2 items-center justify-center rounded-sm text-ink-3 transition-colors hover:bg-hover hover:text-ink-2 text-12 font-semibold">
                     {ver ? "Ocultar" : "Ver"}
                   </button>
                 </div>
               </div>
               <div className="mb-5">
-                <label htmlFor="p2" className="mb-[7px] block text-[13px] font-medium text-ink-2">Confirmar contraseña</label>
+                <label htmlFor="p2" className="mb-[7px] block text-13 font-medium text-ink-2">Confirmar contraseña</label>
                 <input id="p2" type={ver ? "text" : "password"} autoComplete="new-password" placeholder="Repite la contraseña"
                   value={pass2} onChange={(e) => setPass2(e.target.value)} className={inputCls.replace(" pr-11", "")} />
               </div>

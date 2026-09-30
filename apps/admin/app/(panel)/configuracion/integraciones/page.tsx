@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Button, Modal, useConfirmar } from "@vim/ui/styles";
+import { Button, DialogoPeligro, useConfirmar } from "@vim/ui/styles";
 import { PageHeader, PageBody } from "../../../components/page-header";
 import { listarSucursales, type Sucursal } from "../../../lib/configuracion";
 import {
@@ -159,7 +159,7 @@ export default function IntegracionesPage() {
     finally { setOcupada(null); }
   }
 
-  const th = "border-b border-line bg-sel px-4 py-[13px] text-left text-[11.5px] font-bold uppercase tracking-wide text-ink-3";
+  const th = "border-b border-line bg-sel px-4 py-[13px] text-left text-12 font-bold uppercase tracking-wide text-ink-3";
 
   // Cargando el módulo: no se sabe todavía si la sección existe para este cliente.
   if (!modulos) {
@@ -196,7 +196,7 @@ export default function IntegracionesPage() {
           </button>
           <div className="min-w-0">
             <div className="text-sm font-semibold">Apps de delivery {encendido ? "· Encendido" : "· Apagado"}</div>
-            <p className="mt-0.5 text-[12.5px] text-ink-2">
+            <p className="mt-0.5 text-13 text-ink-2">
               Cuando está encendido, los pedidos de Uber Eats entran a la caja como un ticket, con su comanda a cocina.
               {cargandoConexiones && " Comprobando tus conexiones antes de dejarte apagarlo…"}
             </p>
@@ -233,21 +233,21 @@ export default function IntegracionesPage() {
                       const trabajando = cx !== null && ocupada === cx.id;
                       return (
                         <tr key={s.id} className="border-b border-line last:border-none">
-                          <td className="px-4 py-3.5"><div className="text-[15px] font-semibold">{s.nombre}</div></td>
+                          <td className="px-4 py-3.5"><div className="text-15 font-semibold">{s.nombre}</div></td>
                           <td className="px-4 py-3.5">
                             <Estado estado={cx?.estado ?? "SIN_CONECTAR"} />
-                            {conectada && cx?.tienda_nombre_app && <div className="mt-1 text-[13px] text-ink-2">{cx.tienda_nombre_app}</div>}
+                            {conectada && cx?.tienda_nombre_app && <div className="mt-1 text-13 text-ink-2">{cx.tienda_nombre_app}</div>}
                             {conectada && cx && (
-                              <div className={`mt-1 inline-flex items-center gap-1.5 text-[12.5px] font-semibold ${cx.tienda?.estado === "EN_LINEA" ? "text-success" : cx.tienda?.estado === "PAUSADA" ? "text-warning" : "text-ink-3"}`}>
+                              <div className={`mt-1 inline-flex items-center gap-1.5 text-13 font-semibold ${cx.tienda?.estado === "EN_LINEA" ? "text-success" : cx.tienda?.estado === "PAUSADA" ? "text-warning" : "text-ink-3"}`}>
                                 <span className={`h-1.5 w-1.5 rounded-full ${cx.tienda?.estado === "EN_LINEA" ? "bg-success" : cx.tienda?.estado === "PAUSADA" ? "bg-warning" : "bg-ink-3"}`} />
                                 Tienda: {etiquetaTienda(cx.tienda)}
                               </div>
                             )}
-                            {cx?.estado === "ERROR" && cx.ultimo_error && <div className="mt-1 text-[12.5px] text-danger">{cx.ultimo_error}</div>}
+                            {cx?.estado === "ERROR" && cx.ultimo_error && <div className="mt-1 text-13 text-danger">{cx.ultimo_error}</div>}
                           </td>
                           <td className="px-4 py-3.5">
                             {conectada && cx && (
-                              <label className="inline-flex items-center gap-2 text-[13px]">
+                              <label className="inline-flex items-center gap-2 text-13">
                                 <input type="checkbox" checked={cx.auto_aceptar} onChange={(e) => cambiar(cx, { auto_aceptar: e.target.checked })} className="h-4 w-4 accent-accent" />
                                 {cx.auto_aceptar ? "Sí" : "No"}
                               </label>
@@ -258,13 +258,13 @@ export default function IntegracionesPage() {
                               <input
                                 type="number" min={1} max={180} defaultValue={cx.tiempo_prep_min} aria-label="Minutos de preparación" disabled={trabajando}
                                 onBlur={(e) => cambiarPrep(cx, e.target)}
-                                className="h-9 w-[76px] rounded border border-line bg-surface px-2 text-right text-[13.5px] tabular-nums disabled:opacity-50"
+                                className="h-9 w-[76px] rounded border border-line bg-surface px-2 text-right text-14 tabular-nums disabled:opacity-50"
                               />
                             )}
                           </td>
                           <td className="px-4 py-3.5 text-right">
                             {(expirados[s.id] ?? 0) > 0
-                              ? <span className="font-display text-[15px] font-semibold tabular-nums text-danger">{expirados[s.id]}</span>
+                              ? <span className="font-display text-15 font-semibold tabular-nums text-danger">{expirados[s.id]}</span>
                               : <span className="text-ink-3">—</span>}
                           </td>
                           <td className="px-4 py-3.5 text-right">
@@ -292,7 +292,7 @@ export default function IntegracionesPage() {
 
             <div className="mt-6 grid gap-3 sm:grid-cols-2 lg:max-w-[720px]">
               {["DiDi Food", "Rappi"].map((n) => (
-                <div key={n} className="rounded-lg border border-dashed border-line bg-surface px-4 py-3 text-[13px] text-ink-3">
+                <div key={n} className="rounded-lg border border-dashed border-line bg-surface px-4 py-3 text-13 text-ink-3">
                   <span className="font-semibold text-ink-2">{n}</span> · Próximamente
                 </div>
               ))}
@@ -302,18 +302,21 @@ export default function IntegracionesPage() {
       </PageBody>
 
       {encendido && desconectar && (
-        <Modal open onClose={() => setDesconectar(null)} title="Desconectar Uber Eats" className="w-full max-w-[420px] rounded-lg border border-line bg-surface p-6 shadow-xl">
-          <p className="text-sm text-ink-2">
-            Los pedidos de Uber Eats de <b className="text-ink">{desconectar.sucursal_nombre}</b> dejarán de llegar al POS.
-            La tienda sigue existiendo en Uber y podrás volver a conectarla.
-          </p>
-          <div className="mt-6 flex justify-end gap-2">
-            <Button variant="ghost" onClick={() => setDesconectar(null)} disabled={ocupada !== null}>Cancelar</Button>
-            <Button variant="danger" onClick={() => correr(desconectar, "desconectar")} disabled={ocupada !== null}>
-              {ocupada ? "Desconectando…" : "Desconectar"}
-            </Button>
-          </div>
-        </Modal>
+        <DialogoPeligro
+          titulo="¿Desconectar Uber Eats?"
+          consecuencia={
+            <>
+              Los pedidos de Uber Eats de <b className="text-ink">{desconectar.sucursal_nombre}</b> dejarán de llegar al POS.
+              La tienda sigue existiendo en Uber y podrás volver a conectarla.
+            </>
+          }
+          boton="Desconectar"
+          ocupado={ocupada !== null}
+          textoOcupado="Desconectando…"
+          ancho="sm"
+          onConfirmar={() => correr(desconectar, "desconectar")}
+          onCerrar={() => setDesconectar(null)}
+        />
       )}
     </>
   );
@@ -326,7 +329,7 @@ function Estado({ estado }: { estado: EstadoConexion }) {
   const clase = activa ? "bg-success-soft text-success" : alerta ? "bg-[#FBE9E7] text-danger" : pausada ? "bg-warning-soft text-warning" : "bg-hover text-ink-3";
   const punto = activa ? "bg-success" : alerta ? "bg-danger" : pausada ? "bg-warning" : "bg-ink-3";
   return (
-    <span className={["inline-flex items-center gap-1.5 rounded-full px-[11px] py-1 text-[12.5px] font-semibold", clase].join(" ")}>
+    <span className={["inline-flex items-center gap-1.5 rounded-full px-[11px] py-1 text-13 font-semibold", clase].join(" ")}>
       <span className={["h-1.5 w-1.5 rounded-full", punto].join(" ")} />
       {etiquetaEstado(estado)}
     </span>

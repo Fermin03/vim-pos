@@ -41,7 +41,7 @@ body {
 
   /* iOS hace zoom automático al enfocar un input con font-size < 16px.
      Los `:not([...])` están para ganarle en especificidad a las clases de
-     Tailwind (text-sm, text-[13px]…) sin recurrir a !important. */
+     Tailwind (text-sm, text-13…) sin recurrir a !important. */
   input:not([type="checkbox"]):not([type="radio"]),
   select:not([hidden]),
   textarea:not([hidden]) {

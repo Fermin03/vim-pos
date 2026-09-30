@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Button, Modal } from "@vim/ui/styles";
+import { Button, DialogoPeligro } from "@vim/ui/styles";
 import { PageHeader, PageBody } from "../../../components/page-header";
 import { CatalogoTabs } from "../../../components/catalogo-tabs";
 import {
@@ -110,7 +110,7 @@ export default function ProductosPage() {
                 type="button"
                 onClick={() => setFiltro(f)}
                 className={[
-                  "flex-shrink-0 whitespace-nowrap rounded-[4px] px-3 py-2.5 text-[13px] font-semibold transition lg:py-[7px]",
+                  "flex-shrink-0 whitespace-nowrap rounded-[4px] px-3 py-2.5 text-13 font-semibold transition lg:py-[7px]",
                   filtro === f ? "bg-surface text-ink shadow-sm" : "text-ink-2 hover:text-ink",
                 ].join(" ")}
               >
@@ -133,10 +133,10 @@ export default function ProductosPage() {
             <table className="w-full border-collapse">
               <thead>
                 <tr>
-                  <th className="border-b border-line bg-sel px-4 py-[13px] text-left text-[11.5px] font-bold uppercase tracking-wide text-ink-3">Producto</th>
-                  <th className="w-[180px] border-b border-line bg-sel px-4 py-[13px] text-left text-[11.5px] font-bold uppercase tracking-wide text-ink-3">Categoría</th>
-                  <th className="w-[120px] border-b border-line bg-sel px-4 py-[13px] text-right text-[11.5px] font-bold uppercase tracking-wide text-ink-3">Precio</th>
-                  <th className="w-[120px] border-b border-line bg-sel px-4 py-[13px] text-left text-[11.5px] font-bold uppercase tracking-wide text-ink-3">Estado</th>
+                  <th className="border-b border-line bg-sel px-4 py-[13px] text-left text-12 font-bold uppercase tracking-wide text-ink-3">Producto</th>
+                  <th className="w-[180px] border-b border-line bg-sel px-4 py-[13px] text-left text-12 font-bold uppercase tracking-wide text-ink-3">Categoría</th>
+                  <th className="w-[120px] border-b border-line bg-sel px-4 py-[13px] text-right text-12 font-bold uppercase tracking-wide text-ink-3">Precio</th>
+                  <th className="w-[120px] border-b border-line bg-sel px-4 py-[13px] text-left text-12 font-bold uppercase tracking-wide text-ink-3">Estado</th>
                   <th className="w-[104px] border-b border-line bg-sel px-4 py-[13px]"></th>
                 </tr>
               </thead>
@@ -150,15 +150,15 @@ export default function ProductosPage() {
                     <tr key={p.id} className="group cursor-pointer border-b border-line last:border-none hover:bg-hover" onClick={() => router.push(editarHref)}>
                       <td className="px-4 py-3.5">
                         <div className="flex items-center gap-2">
-                          <span className="text-[15px] font-semibold">{p.nombre}</span>
-                          {p.es_combo && <span className="rounded-full bg-accent-soft px-2 py-0.5 text-[11px] font-semibold text-accent">Combo</span>}
+                          <span className="text-15 font-semibold">{p.nombre}</span>
+                          {p.es_combo && <span className="rounded-full bg-accent-soft px-2 py-0.5 text-11 font-semibold text-accent">Combo</span>}
                         </div>
-                        {p.codigo_interno && <div className="mt-px text-[12.5px] text-ink-3">{p.codigo_interno}</div>}
+                        {p.codigo_interno && <div className="mt-px text-13 text-ink-3">{p.codigo_interno}</div>}
                       </td>
-                      <td className="px-4 py-3.5 text-[14px] text-ink-2">{p.categoriaNombre}</td>
-                      <td className="px-4 py-3.5 text-right font-display text-[15px] font-semibold tabular-nums">{precioMxn(p.precio_base_mxn)}</td>
+                      <td className="px-4 py-3.5 text-14 text-ink-2">{p.categoriaNombre}</td>
+                      <td className="px-4 py-3.5 text-right font-display text-15 font-semibold tabular-nums">{precioMxn(p.precio_base_mxn)}</td>
                       <td className="px-4 py-3.5">
-                        <span className={["inline-flex items-center gap-1.5 rounded-full px-[11px] py-1 text-[12.5px] font-semibold", b.cls].join(" ")}>
+                        <span className={["inline-flex items-center gap-1.5 rounded-full px-[11px] py-1 text-13 font-semibold", b.cls].join(" ")}>
                           <span className={["h-1.5 w-1.5 rounded-full", b.dot].join(" ")} />
                           {b.txt}
                         </span>
@@ -179,7 +179,7 @@ export default function ProductosPage() {
                             title="Eliminar"
                             aria-label={`Eliminar ${p.nombre}`}
                             onClick={() => setBorrar(p)}
-                            className="flex h-10 w-10 items-center justify-center rounded border border-transparent lg:h-8 lg:w-8 text-ink-3 transition hover:border-[#E8C5C0] hover:text-danger"
+                            className="flex h-10 w-10 items-center justify-center rounded border border-transparent lg:h-8 lg:w-8 text-ink-3 transition hover:border-danger-line hover:text-danger"
                           >
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-4 w-4"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" /></svg>
                           </button>
@@ -206,26 +206,28 @@ export default function ProductosPage() {
         )}
 
         {prods !== null && visibles.length > 0 && (
-          <p className="mt-4 text-[13px] text-ink-3">
+          <p className="mt-4 text-13 text-ink-3">
             Mostrando <b className="text-ink-2">{visibles.length}</b> de <b className="text-ink-2">{prods.length}</b> productos
           </p>
         )}
       </PageBody>
 
       {borrar && (
-        <Modal open onClose={() => setBorrar(null)} title="Eliminar producto" className="w-full max-w-[400px] rounded-lg border border-line bg-surface p-6 shadow-xl">
-          <p className="text-sm text-ink-2">
-            ¿Eliminar <b className="text-ink">{borrar.nombre}</b>? Esta acción lo oculta del catálogo y del POS.
-          </p>
-          <div className="mt-6 flex justify-end gap-2">
-            <Button variant="ghost" onClick={() => setBorrar(null)} disabled={borrando}>
-              Cancelar
-            </Button>
-            <Button variant="danger" onClick={confirmarBorrado} disabled={borrando}>
-              {borrando ? "Eliminando…" : "Eliminar"}
-            </Button>
-          </div>
-        </Modal>
+        <DialogoPeligro
+          error={error}
+          titulo="¿Eliminar este producto?"
+          consecuencia={
+            <>
+              <b className="text-ink">{borrar.nombre}</b> se ocultará del catálogo y del POS.
+            </>
+          }
+          boton="Eliminar"
+          ocupado={borrando}
+          textoOcupado="Eliminando…"
+          ancho="sm"
+          onConfirmar={confirmarBorrado}
+          onCerrar={() => setBorrar(null)}
+        />
       )}
     </>
   );

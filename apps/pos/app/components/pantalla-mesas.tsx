@@ -33,7 +33,7 @@ function AlertaCuenta({ m }: { m: MesaVista }) {
         ? { bg: "rgb(var(--warning-soft))", text: "rgb(var(--warning))", msg: `Cliente lleva ${horas} h, ¿todo OK?` }
         : { bg: "rgb(var(--warning-soft))", text: "rgb(var(--warning))", msg: `Sin pedidos nuevos hace ${m.minutosSinMovimiento} min` };
   return (
-    <div className="mt-1.5 flex w-full items-center gap-1.5 rounded px-2 py-1 text-[10.5px] font-bold leading-tight" style={{ background: cfg.bg, color: cfg.text }}>
+    <div className="mt-1.5 flex w-full items-center gap-1.5 rounded px-2 py-1 text-11 font-bold leading-tight" style={{ background: cfg.bg, color: cfg.text }}>
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" className="h-3 w-3 flex-shrink-0"><path d="M12 9v4M12 17h.01M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z" /></svg>
       {cfg.msg}
     </div>
@@ -104,8 +104,8 @@ export function PantallaMesas({
         <div className="mr-auto flex items-center gap-3">
           <LogoVim className="h-8 w-8" />
           <div>
-            <div className="font-display text-[16px] font-bold leading-tight">Mesas · {caja.nombre}</div>
-            <div className="text-[11.5px] text-ink-3">
+            <div className="font-display text-16 font-bold leading-tight">Mesas · {caja.nombre}</div>
+            <div className="text-12 text-ink-3">
               {total} mesas · <span className="text-success">{libres} libres</span> · <span className="text-danger">{ocupadas} ocupadas</span>
             </div>
           </div>
@@ -114,7 +114,7 @@ export function PantallaMesas({
           <button
             type="button"
             onClick={onVerReservaciones}
-            className="flex h-10 items-center gap-2 rounded border border-line-strong bg-surface px-3.5 text-[13.5px] font-semibold text-ink-2 transition hover:border-ink hover:text-ink"
+            className="flex h-10 items-center gap-2 rounded border border-line-strong bg-surface px-3.5 text-14 font-semibold text-ink-2 transition hover:border-ink hover:text-ink"
           >
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" className="h-4 w-4">
               <rect x="3" y="4" width="18" height="17" rx="2" />
@@ -126,11 +126,11 @@ export function PantallaMesas({
       </header>
 
       {error && (
-        <div className="mx-6 mt-3 rounded border border-[#EDC4BE] bg-danger-soft px-3 py-2 text-[13px] font-medium text-danger" role="alert">{error}</div>
+        <div className="mx-6 mt-3 rounded border border-danger-line bg-danger-soft px-3 py-2 text-13 font-medium text-danger" role="alert">{error}</div>
       )}
 
       {/* Leyenda */}
-      <div className="flex flex-shrink-0 items-center gap-4 border-b border-line bg-sel px-6 py-2.5 text-[11.5px] font-semibold text-ink-2">
+      <div className="flex flex-shrink-0 items-center gap-4 border-b border-line bg-sel px-6 py-2.5 text-12 font-semibold text-ink-2">
         {(["LIBRE", "OCUPADA", "RESERVADA", "EN_LIMPIEZA"] as MesaEstado[]).map((e) => (
           <span key={e} className="inline-flex items-center gap-1.5">
             <span className="h-2.5 w-2.5 rounded-full" style={{ background: ESTILO[e].text }} />
@@ -145,15 +145,15 @@ export function PantallaMesas({
         {mesas !== null && mesas.length === 0 && (
           <div className="flex h-full flex-col items-center justify-center gap-2 text-center text-ink-3">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="h-12 w-12"><rect x="3" y="3" width="18" height="18" rx="2" /><path d="M3 9h18M9 3v18" /></svg>
-            <p className="text-[17px] font-semibold text-ink-2">No hay mesas configuradas</p>
-            <p className="text-[13px]">El dueño las da de alta en el admin: Configuración → Mesas.</p>
+            <p className="text-18 font-semibold text-ink-2">No hay mesas configuradas</p>
+            <p className="text-13">El dueño las da de alta en el admin: Configuración → Mesas.</p>
           </div>
         )}
         {mesas !== null && mesas.length > 0 && (
           <div className="flex flex-col gap-7">
             {[...porSeccion.entries()].map(([seccion, lista]) => (
               <div key={seccion}>
-                <div className="mb-3 text-[11.5px] font-bold uppercase tracking-[0.07em] text-ink-3">{seccion}</div>
+                <div className="mb-3 text-12 font-bold uppercase tracking-[0.07em] text-ink-3">{seccion}</div>
                 <div className="grid grid-cols-[repeat(auto-fill,minmax(150px,1fr))] gap-3">
                   {lista.map((m) => {
                     const st = ESTILO[m.estado];
@@ -177,16 +177,16 @@ export function PantallaMesas({
                         style={{ background: st.bg, borderColor: st.line, borderRadius: esRedonda ? "16px" : "8px" }}
                       >
                         <div className="flex w-full items-center justify-between">
-                          <span className="font-display text-[20px] font-extrabold tabular-nums" style={{ color: st.text }}>
+                          <span className="font-display text-20 font-extrabold tabular-nums" style={{ color: st.text }}>
                             {m.numero}
                           </span>
-                          <span className="text-[11px] font-bold" style={{ color: st.text }}>{labelEstadoMesa(m.estado)}</span>
+                          <span className="text-11 font-bold" style={{ color: st.text }}>{labelEstadoMesa(m.estado)}</span>
                         </div>
-                        <div className="text-[11.5px] font-medium text-ink-3">
+                        <div className="text-12 font-medium text-ink-3">
                           {m.capacidad} {m.capacidad === 1 ? "lugar" : "lugares"}
                         </div>
                         {m.estado === "OCUPADA" && (
-                          <div className="mt-1 flex w-full items-center justify-between border-t pt-1.5 text-[12px] font-semibold" style={{ borderColor: st.line }}>
+                          <div className="mt-1 flex w-full items-center justify-between border-t pt-1.5 text-12 font-semibold" style={{ borderColor: st.line }}>
                             <span style={{ color: st.text }}>{m.minutosOcupada} min</span>
                             <span className="tabular-nums" style={{ color: st.text }}>{fmtMxn(m.ticketTotal)}</span>
                           </div>

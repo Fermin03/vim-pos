@@ -66,12 +66,12 @@ function SinAcceso({ rol }: { rol: string }) {
           <rect x="4" y="11" width="16" height="9" rx="1.5" /><path d="M8 11V7a4 4 0 0 1 8 0v4" />
         </svg>
       </div>
-      <h1 className="font-display text-[19px] font-semibold tracking-tight">Esta sección no está disponible para ti</h1>
-      <p className="max-w-sm text-[13.5px] leading-snug text-ink-2">
+      <h1 className="font-display text-20 font-semibold tracking-tight">Esta sección no está disponible para ti</h1>
+      <p className="max-w-sm text-14 leading-snug text-ink-2">
         Tu cuenta tiene el rol <b>{rol}</b>. Si necesitas entrar aquí, pídele al dueño del negocio
         que ajuste tus permisos.
       </p>
-      <Link href="/dashboard" className="mt-2 inline-flex h-10 items-center rounded border border-line-strong px-4 text-[13.5px] font-semibold text-ink-2 transition hover:border-ink hover:text-ink">
+      <Link href="/dashboard" className="mt-2 inline-flex h-10 items-center rounded border border-line-strong px-4 text-14 font-semibold text-ink-2 transition hover:border-ink hover:text-ink">
         Ir al panel
       </Link>
     </main>
@@ -150,15 +150,15 @@ export function AdminShell({ children }: { children: ReactNode }) {
         <div className="flex h-12 w-12 items-center justify-center rounded-full bg-warning-soft text-warning">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-6 w-6"><circle cx="12" cy="12" r="9" /><path d="M12 8v4M12 16h.01" /></svg>
         </div>
-        <h1 className="font-display text-[22px] font-semibold tracking-tight">Tu correo no tiene acceso todavía</h1>
-        <p className="max-w-md text-[14px] leading-relaxed text-ink-3">
+        <h1 className="font-display text-24 font-semibold tracking-tight">Tu correo no tiene acceso todavía</h1>
+        <p className="max-w-md text-14 leading-relaxed text-ink-3">
           Entraste como <b className="text-ink-2">{sinAcceso}</b>, pero ese correo no está invitado a ningún negocio en VIM POS.
           Pide al dueño que te invite desde su panel (Usuarios) con este mismo correo, o crea tu negocio.
         </p>
         <div className="mt-2 flex gap-2">
-          <a href="/registro" className="rounded-lg bg-accent px-5 py-2.5 text-[14px] font-semibold text-white transition hover:brightness-95">Crear mi negocio</a>
+          <a href="/registro" className="rounded-lg bg-accent px-5 py-2.5 text-14 font-semibold text-white transition hover:brightness-95">Crear mi negocio</a>
           <button type="button" onClick={async () => { const { supabase } = await import("../lib/supabase"); await supabase.auth.signOut(); router.replace("/"); }}
-            className="rounded-lg border border-line-strong px-5 py-2.5 text-[14px] font-semibold text-ink-2 transition hover:border-ink">
+            className="rounded-lg border border-line-strong px-5 py-2.5 text-14 font-semibold text-ink-2 transition hover:border-ink">
             Salir
           </button>
         </div>
@@ -191,8 +191,8 @@ export function AdminShell({ children }: { children: ReactNode }) {
             <rect x="4" y="11" width="16" height="9" rx="1.5" /><path d="M8 11V7a4 4 0 0 1 8 0v4" />
           </svg>
         </div>
-        <h1 className="font-display text-[22px] font-semibold tracking-tight">Este panel es para la administración</h1>
-        <p className="max-w-md text-[14px] leading-relaxed text-ink-3">
+        <h1 className="font-display text-24 font-semibold tracking-tight">Este panel es para la administración</h1>
+        <p className="max-w-md text-14 leading-relaxed text-ink-3">
           Tu cuenta tiene el rol <b className="text-ink-2">{perfil.rolNombre}</b>, que opera el
           punto de venta. Entra desde la caja con tu PIN. Si necesitas ver reportes o
           configuración, pídele al dueño del negocio que ajuste tus permisos.
@@ -200,7 +200,7 @@ export function AdminShell({ children }: { children: ReactNode }) {
         <button
           type="button"
           onClick={async () => { const { supabase } = await import("../lib/supabase"); await supabase.auth.signOut(); router.replace("/"); }}
-          className="mt-2 rounded-lg border border-line-strong px-5 py-2.5 text-[14px] font-semibold text-ink-2 transition hover:border-ink"
+          className="mt-2 rounded-lg border border-line-strong px-5 py-2.5 text-14 font-semibold text-ink-2 transition hover:border-ink"
         >
           Salir
         </button>
@@ -252,8 +252,8 @@ export function AdminShell({ children }: { children: ReactNode }) {
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-4 w-4"><path d="M3 21h18M5 21V7l8-4v18M19 21V11l-6-3" /></svg>
             </div>
             <div className="min-w-0 flex-1">
-              <div className="truncate text-[13.5px] font-semibold text-white">{sucursales?.nombre ?? "—"}</div>
-              <div className="mt-px text-[11.5px] text-[#76767E]">
+              <div className="truncate text-14 font-semibold text-white">{sucursales?.nombre ?? "—"}</div>
+              <div className="mt-px text-12 text-[#76767E]">
                 {sucursales ? `1 de ${sucursales.total} ${sucursales.total === 1 ? "sucursal" : "sucursales"}` : "Cargando…"}
               </div>
             </div>
@@ -265,7 +265,7 @@ export function AdminShell({ children }: { children: ReactNode }) {
               if (items.length === 0) return null;
               return (
                 <div key={sec.titulo} className="contents">
-                  <div className="px-3 pb-2 pt-4 text-[10.5px] font-bold uppercase tracking-[0.07em] text-[#76767E] first:pt-2">
+                  <div className="px-3 pb-2 pt-4 text-11 font-bold uppercase tracking-[0.07em] text-[#76767E] first:pt-2">
                     {sec.titulo}
                   </div>
                   {items.map((it) => {
@@ -293,12 +293,12 @@ export function AdminShell({ children }: { children: ReactNode }) {
           </nav>
 
           <div className="flex flex-shrink-0 items-center gap-2.5 border-t border-[#2C2C32] p-3 pb-[max(12px,env(safe-area-inset-bottom))] lg:pb-3">
-            <div className="flex h-[34px] w-[34px] flex-shrink-0 items-center justify-center rounded-full border border-[#2C2C32] bg-[#2A2A30] font-display text-[13px] font-semibold text-white">
+            <div className="flex h-[34px] w-[34px] flex-shrink-0 items-center justify-center rounded-full border border-[#2C2C32] bg-[#2A2A30] font-display text-13 font-semibold text-white">
               {iniciales(perfil?.nombre ?? "U")}
             </div>
             <div className="min-w-0 flex-1">
-              <div className="truncate text-[13.5px] font-semibold text-white">{perfil?.nombre}</div>
-              <div className="text-[11.5px] text-[#76767E]">{perfil?.rolNombre}</div>
+              <div className="truncate text-14 font-semibold text-white">{perfil?.nombre}</div>
+              <div className="text-12 text-[#76767E]">{perfil?.rolNombre}</div>
             </div>
             <button
               type="button"
@@ -330,10 +330,10 @@ export function AdminShell({ children }: { children: ReactNode }) {
             </button>
             <LogoVim className="h-7 w-7 flex-shrink-0" />
             <div className="min-w-0 flex-1">
-              <div className="truncate font-display text-[14px] font-bold leading-tight tracking-tight text-white">VIM POS</div>
-              <div className="truncate text-[11.5px] leading-tight text-[#76767E]">{sucursales?.nombre ?? "—"}</div>
+              <div className="truncate font-display text-14 font-bold leading-tight tracking-tight text-white">VIM POS</div>
+              <div className="truncate text-12 leading-tight text-[#76767E]">{sucursales?.nombre ?? "—"}</div>
             </div>
-            <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full border border-[#2C2C32] bg-[#2A2A30] font-display text-[12px] font-semibold text-white">
+            <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full border border-[#2C2C32] bg-[#2A2A30] font-display text-12 font-semibold text-white">
               {iniciales(perfil?.nombre ?? "U")}
             </div>
           </header>
@@ -350,7 +350,7 @@ export function AdminShell({ children }: { children: ReactNode }) {
             <div
               role="status"
               className={[
-                "flex-shrink-0 px-5 py-2.5 text-center text-[13px] font-semibold",
+                "flex-shrink-0 px-5 py-2.5 text-center text-13 font-semibold",
                 acceso.nivel === "bloqueado" ? "bg-danger-soft text-danger" : "bg-warning-soft text-warning",
               ].join(" ")}
             >

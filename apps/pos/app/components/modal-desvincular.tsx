@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
-import { Button, Modal } from "@vim/ui/styles";
+import { DialogoPeligro } from "@vim/ui/styles";
 import { deviceToken } from "../lib/supabase";
 import { ModalAutorizacionPin } from "./modal-autorizacion-pin";
 
@@ -70,37 +70,19 @@ export function ModalDesvincular({
   const pidePin = Boolean(cajaId && token);
 
   return (
-    <Modal
-      open
-      onClose={onCerrar}
-      title="Desvincular esta caja"
-      hideTitle
-      className="w-[420px] rounded-lg border border-line bg-surface p-6 shadow-[0_18px_44px_rgba(22,22,26,.18)]"
-    >
-      <h2 className="font-display text-xl font-semibold tracking-tight">¿Desvincular esta caja?</h2>
-      <p className="mt-2 text-[14px] leading-snug text-ink-2">
+    <DialogoPeligro
+      titulo="¿Desvincular esta caja?"
+      consecuencia={<>
         La caja deja de vender en este momento. Para volver a usarla hay que vincularla otra vez
         con el <b className="font-semibold text-ink">correo y la contraseña del dispositivo</b>, que
         se consiguen en el panel de administración.
-      </p>
-      {pidePin && (
-        <p className="mt-2 text-[14px] leading-snug text-ink-2">
-          Lo autoriza un administrador o el dueño con su PIN.
-        </p>
-      )}
-      <div className="mt-5 flex gap-2">
-        <Button variant="ghost" className="flex-1" onClick={onCerrar}>
-          Cancelar
-        </Button>
-        <Button
-          variant="danger"
-          className="flex-1"
-          disabled={token === undefined}
-          onClick={() => (pidePin ? setPaso("pin") : onDesvincular())}
-        >
-          Desvincular
-        </Button>
-      </div>
-    </Modal>
+        {pidePin && <span className="mt-2 block">Lo autoriza un administrador o el dueño con su PIN.</span>}
+      </>}
+      ancho="sm"
+      boton="Desvincular"
+      deshabilitado={token === undefined}
+      onConfirmar={() => (pidePin ? setPaso("pin") : onDesvincular())}
+      onCerrar={onCerrar}
+    />
   );
 }

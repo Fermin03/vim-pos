@@ -19,8 +19,8 @@ import { Plegable } from "./plegable";
 
 const input =
   "h-11 w-full rounded border border-line-strong px-3 text-sm outline-none focus:border-ink focus:shadow-[0_0_0_3px_rgba(22,22,26,.06)]";
-const label = "mb-1.5 block text-[13px] font-medium text-ink-2";
-const ayuda = "mt-1 text-[12.5px] text-ink-2";
+const label = "mb-1.5 block text-13 font-medium text-ink-2";
+const ayuda = "mt-1 text-13 text-ink-2";
 
 /**
  * Las tasas de IVA como las diría el contador. Antes la opción decía "0% · alimentos para
@@ -335,7 +335,7 @@ export function ProductoForm({
               />
             </div>
           </div>
-          <p className="-mt-1 text-[12.5px] text-ink-2">
+          <p className="-mt-1 text-13 text-ink-2">
             {AYUDA_IVA} Sin clave, se factura como servicio de restaurante.
           </p>
           <label className="flex min-h-[44px] items-center gap-2.5">
@@ -356,7 +356,7 @@ export function ProductoForm({
 
         {/* Barra fija abajo: en el celular, "Guardar" siempre a la mano sin bajar hasta el final. */}
         <div className="sticky bottom-0 z-10 -mx-4 flex items-center justify-end gap-2 border-t border-line bg-bg/95 px-4 py-3 backdrop-blur-sm lg:mx-0 lg:px-0">
-          {sucio && !guardando && <span className="mr-auto text-[13px] text-ink-2" aria-live="polite">Cambios sin guardar</span>}
+          {sucio && !guardando && <span className="mr-auto text-13 text-ink-2" aria-live="polite">Cambios sin guardar</span>}
           <Button variant="ghost" onClick={() => void volver()} disabled={guardando}>
             {editar ? "Volver" : "Cancelar"}
           </Button>

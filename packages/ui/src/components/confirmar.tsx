@@ -1,7 +1,6 @@
 "use client";
 import { useCallback, useRef, useState, type ReactNode } from "react";
-import { Button } from "./button";
-import { Modal } from "./modal";
+import { DialogoPeligro } from "./dialogo-peligro";
 
 export type OpcionesConfirmar = {
   /** La pregunta: "¿Eliminar la marca Tacos Doña Mary?". */
@@ -29,8 +28,8 @@ export type OpcionesConfirmar = {
  *   …
  *   return <>{…}{dialogoConfirmar}</>;
  *
- * "Cancelar" va primero en el DOM a propósito: el `Modal` enfoca el primer control, y un Enter
- * accidental tiene que caer en la opción que no destruye nada.
+ * Dibuja con `DialogoPeligro`, el mismo marco que la caja y el panel. Para lo que además pide
+ * motivo, espera una respuesta o muestra un error, se usa `DialogoPeligro` directamente.
  */
 export function useConfirmar(): [(o: OpcionesConfirmar) => Promise<boolean>, ReactNode] {
   const [abierto, setAbierto] = useState<OpcionesConfirmar | null>(null);
@@ -52,28 +51,15 @@ export function useConfirmar(): [(o: OpcionesConfirmar) => Promise<boolean>, Rea
   }, []);
 
   const dialogo = abierto ? (
-    <Modal
-      open
-      onClose={() => cerrar(false)}
-      title={abierto.titulo}
-      hideTitle
-      className="w-[min(440px,calc(100vw-2rem))] rounded-lg border border-line bg-surface p-6 shadow-[0_18px_44px_rgba(22,22,26,.18)]"
-    >
-      <h2 className="font-display text-lg font-semibold tracking-tight text-ink">{abierto.titulo}</h2>
-      {abierto.mensaje && <div className="mt-2 text-[14px] leading-snug text-ink-2">{abierto.mensaje}</div>}
-      <div className="mt-5 flex gap-2">
-        <Button variant="ghost" className="flex-1" onClick={() => cerrar(false)}>
-          Cancelar
-        </Button>
-        <Button
-          variant={abierto.peligrosa === false ? "primary" : "danger"}
-          className="flex-1"
-          onClick={() => cerrar(true)}
-        >
-          {abierto.boton}
-        </Button>
-      </div>
-    </Modal>
+    <DialogoPeligro
+      titulo={abierto.titulo}
+      consecuencia={abierto.mensaje}
+      boton={abierto.boton}
+      peligrosa={abierto.peligrosa !== false}
+      ancho="sm"
+      onConfirmar={() => cerrar(true)}
+      onCerrar={() => cerrar(false)}
+    />
   ) : null;
 
   return [confirmar, dialogo];

@@ -37,9 +37,9 @@ export function RangoFechas({
   }
 
   const input =
-    "h-11 min-w-0 flex-1 rounded border border-line-strong px-2.5 text-[13px] outline-none focus:border-ink lg:h-9 lg:flex-none";
+    "h-11 min-w-0 flex-1 rounded border border-line-strong px-2.5 text-13 outline-none focus:border-ink lg:h-9 lg:flex-none";
   const boton =
-    "h-11 whitespace-nowrap rounded border px-2 text-[13px] font-semibold transition-[background-color,border-color,color,opacity,transform] duration-150 ease-vim active:scale-[.97] lg:h-9 lg:flex-none";
+    "h-11 whitespace-nowrap rounded border px-2 text-13 font-semibold transition-[background-color,border-color,color,opacity,transform] duration-150 ease-vim active:scale-[.97] lg:h-9 lg:flex-none";
 
   return (
     <div className="w-full rounded-lg border border-line bg-surface p-3 lg:w-auto">
@@ -47,7 +47,7 @@ export function RangoFechas({
         {/* En el celular, las dos fechas lado a lado a todo el ancho y los atajos abajo: antes
             se partían en renglones con la flecha colgando al final de uno. */}
         <div className="flex items-center gap-2">
-          <span className="hidden text-[12.5px] font-semibold text-ink-2 lg:inline">Rango</span>
+          <span className="hidden text-13 font-semibold text-ink-2 lg:inline">Rango</span>
           <input
             type="date"
             aria-label="Desde"
@@ -106,7 +106,7 @@ export function RangoFechas({
         </div>
       </div>
       {invertido && (
-        <p className="mt-2 text-[13px] font-medium text-danger" role="alert">
+        <p className="mt-2 text-13 font-medium text-danger" role="alert">
           La fecha de inicio es posterior a la de fin. Corrige el rango para poder aplicarlo.
         </p>
       )}

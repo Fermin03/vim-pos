@@ -88,32 +88,32 @@ export default function ImportarMenuPage() {
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4" aria-hidden="true"><path d="M12 15V3M7 8l5-5 5 5M5 21h14" /></svg>
                   Subir archivo
                 </label>
-                <span className="text-[13px] text-ink-2">{archivo ? `Leído: ${archivo}` : "Excel (.xlsx) o CSV"}</span>
+                <span className="text-13 text-ink-2">{archivo ? `Leído: ${archivo}` : "Excel (.xlsx) o CSV"}</span>
               </div>
               {error && !parse && <p className="mb-3 text-sm font-medium text-danger" role="alert">{error}</p>}
               <div className="mb-2 flex flex-wrap items-center justify-between gap-x-3 gap-y-1.5">
-                <label className="text-[13px] font-medium text-ink-2" htmlFor="csv">O pégalo aquí</label>
-                <button type="button" className="min-h-[40px] text-[13px] font-semibold text-ink-2 underline-offset-2 hover:text-ink hover:underline" onClick={() => { setTexto(EJEMPLO); setParse(null); setArchivo(null); }}>Usar ejemplo</button>
+                <label className="text-13 font-medium text-ink-2" htmlFor="csv">O pégalo aquí</label>
+                <button type="button" className="min-h-[40px] text-13 font-semibold text-ink-2 underline-offset-2 hover:text-ink hover:underline" onClick={() => { setTexto(EJEMPLO); setParse(null); setArchivo(null); }}>Usar ejemplo</button>
               </div>
               <textarea
                 id="csv"
                 value={texto}
                 onChange={(e) => { setTexto(e.target.value); setParse(null); }}
-                className="h-72 w-full rounded border border-line-strong p-3 font-mono text-[12.5px] outline-none focus:border-ink focus:shadow-[0_0_0_3px_rgba(22,22,26,.06)]"
+                className="h-72 w-full rounded border border-line-strong p-3 font-mono text-13 outline-none focus:border-ink focus:shadow-[0_0_0_3px_rgba(22,22,26,.06)]"
                 placeholder={"Categoría,Producto,Precio,Descripción\nHamburguesas,Clásica,120,Con queso\n…"}
               />
-              <p className="mt-2 text-[13px] text-ink-2">
+              <p className="mt-2 text-13 text-ink-2">
                 Una fila por producto. Separadores: coma, punto y coma o tabulador. La primera fila puede ser encabezado.
                 Las categorías que no existan se crean solas.
               </p>
               {/* Fase 4 — POS de origen (preset de columnas, con autodetección) */}
               <div className="mt-3 flex flex-wrap items-center gap-2">
-                <label className="text-[12.5px] font-medium text-ink-2" htmlFor="origen">POS de origen</label>
+                <label className="text-13 font-medium text-ink-2" htmlFor="origen">POS de origen</label>
                 <select
                   id="origen"
                   value={formato}
                   onChange={(e) => { setFormato(e.target.value as FormatoOrigen); setParse(null); }}
-                  className="h-10 rounded border border-line-strong bg-surface px-3 text-[13px] outline-none focus:border-ink"
+                  className="h-10 rounded border border-line-strong bg-surface px-3 text-13 outline-none focus:border-ink"
                 >
                   {FORMATOS_ORIGEN.map((f) => <option key={f.codigo} value={f.codigo}>{f.label}</option>)}
                 </select>
@@ -122,7 +122,7 @@ export default function ImportarMenuPage() {
                 {/* Una vez revisado, el botón principal es "Importar": dos azules competían. */}
                 <Button variant={parse ? "ghost" : "primary"} onClick={() => revisar()} disabled={!texto.trim()}>Revisar</Button>
                 {parse && formatoUsado && (
-                  <span className="rounded-full bg-sel px-2.5 py-1 text-[12px] font-semibold text-ink-2">
+                  <span className="rounded-full bg-sel px-2.5 py-1 text-12 font-semibold text-ink-2">
                     Formato detectado: {formatoUsado}
                   </span>
                 )}
@@ -132,14 +132,14 @@ export default function ImportarMenuPage() {
             <div>
               {parse && (
                 <>
-                  <div className="mb-2 text-[13px] font-medium text-ink-2">
+                  <div className="mb-2 text-13 font-medium text-ink-2">
                     Vista previa · <span className="text-ink">{parse.filas.length}</span> productos
                     {parse.errores.length > 0 && <span className="text-danger"> · {parse.errores.length} con error</span>}
                   </div>
                   <div className="max-h-72 overflow-y-auto rounded-lg border border-line bg-surface">
-                    <table className="w-full text-[12.5px]">
+                    <table className="w-full text-13">
                       <thead className="sticky top-0 bg-sel">
-                        <tr className="border-b border-line text-left text-[11px] uppercase tracking-wide text-ink-3">
+                        <tr className="border-b border-line text-left text-11 uppercase tracking-wide text-ink-3">
                           <th className="px-3 py-2 font-semibold">Categoría</th>
                           <th className="px-3 py-2 font-semibold">Producto</th>
                           <th className="px-3 py-2 text-right font-semibold">Precio</th>
@@ -158,7 +158,7 @@ export default function ImportarMenuPage() {
                   </div>
 
                   {parse.errores.length > 0 && (
-                    <div className="mt-3 rounded border border-[#E8DCC0] bg-warning-soft px-3 py-2 text-[12px] text-warning">
+                    <div className="mt-3 rounded border border-warning-line bg-warning-soft px-3 py-2 text-12 text-warning">
                       <div className="font-semibold">Líneas que se omitirán:</div>
                       <ul className="mt-1 list-disc pl-4">
                         {parse.errores.slice(0, 6).map((e) => (
@@ -189,12 +189,12 @@ export default function ImportarMenuPage() {
               <svg viewBox="0 0 24 24" fill="none" stroke="#2E7D52" strokeWidth="2.5" className="h-6 w-6"><path d="M20 6L9 17l-5-5" /></svg>
               <h2 className="font-display text-lg font-semibold">Importación completada</h2>
             </div>
-            <p className="text-[14px] text-ink-2">
+            <p className="text-14 text-ink-2">
               Se crearon <b>{resultado.productosCreados}</b> productos
               {resultado.categoriasCreadas > 0 && <> y <b>{resultado.categoriasCreadas}</b> categorías nuevas</>}.
             </p>
             {resultado.fallos.length > 0 && (
-              <div className="mt-3 rounded border border-[#EDC4BE] bg-danger-soft px-3 py-2 text-[12.5px] text-danger">
+              <div className="mt-3 rounded border border-danger-line bg-danger-soft px-3 py-2 text-13 text-danger">
                 <div className="font-semibold">{resultado.fallos.length} no se pudieron crear:</div>
                 <ul className="mt-1 list-disc pl-4">
                   {resultado.fallos.slice(0, 8).map((f, i) => <li key={i}>{f.nombre}: {f.motivo}</li>)}

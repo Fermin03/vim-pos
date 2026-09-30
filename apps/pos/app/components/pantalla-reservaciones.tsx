@@ -51,8 +51,8 @@ const ESTILO_ESTADO: Record<ReservacionEstado, { bg: string; text: string }> = {
 };
 
 const inputCls =
-  "h-11 w-full rounded border border-line-strong px-3 text-[14px] outline-none focus:border-ink focus:shadow-[0_0_0_3px_rgba(22,22,26,.06)]";
-const labelCls = "mb-1.5 block text-[13px] font-medium text-ink-2";
+  "h-11 w-full rounded border border-line-strong px-3 text-14 outline-none focus:border-ink focus:shadow-[0_0_0_3px_rgba(22,22,26,.06)]";
+const labelCls = "mb-1.5 block text-13 font-medium text-ink-2";
 
 type Modo =
   | { t: "lista" }
@@ -133,8 +133,8 @@ export function PantallaReservaciones({
         <div className="mr-auto flex items-center gap-3">
           <LogoVim className="h-8 w-8" />
           <div>
-            <div className="font-display text-[16px] font-bold leading-tight">Reservaciones</div>
-            <div className="text-[11.5px] text-ink-3">
+            <div className="font-display text-16 font-bold leading-tight">Reservaciones</div>
+            <div className="text-12 text-ink-3">
               {pendientes} por llegar · <span className="text-success">{llegaron} sentadas</span> · {comensales} personas
             </div>
           </div>
@@ -143,19 +143,19 @@ export function PantallaReservaciones({
           type="date"
           value={dia}
           onChange={(e) => setDia(e.target.value)}
-          className="h-10 rounded border border-line-strong px-2.5 text-[13px] outline-none focus:border-ink"
+          className="h-10 rounded border border-line-strong px-2.5 text-13 outline-none focus:border-ink"
         />
         <button
           type="button"
           onClick={() => setModo({ t: "nueva" })}
-          className="h-10 rounded bg-ink px-4 text-[13.5px] font-semibold text-white transition hover:opacity-90"
+          className="h-10 rounded bg-ink px-4 text-14 font-semibold text-white transition hover:opacity-90"
         >
           Nueva reservación
         </button>
       </header>
 
       {error && (
-        <div className="mx-6 mt-3 rounded border border-[#EDC4BE] bg-danger-soft px-3 py-2 text-[13px] font-medium text-danger" role="alert">
+        <div className="mx-6 mt-3 rounded border border-danger-line bg-danger-soft px-3 py-2 text-13 font-medium text-danger" role="alert">
           {error}
         </div>
       )}
@@ -169,8 +169,8 @@ export function PantallaReservaciones({
               <rect x="3" y="4" width="18" height="17" rx="2" />
               <path d="M3 10h18M8 2v4M16 2v4" />
             </svg>
-            <p className="text-[17px] font-semibold text-ink-2">Sin reservaciones este día</p>
-            <p className="text-[13px]">Con «Nueva reservación» la agendas en el momento, por teléfono o en la puerta.</p>
+            <p className="text-18 font-semibold text-ink-2">Sin reservaciones este día</p>
+            <p className="text-13">Con «Nueva reservación» la agendas en el momento, por teléfono o en la puerta.</p>
           </div>
         )}
 
@@ -233,31 +233,31 @@ function Fila({
   const st = ESTILO_ESTADO[r.estado];
   const viva = r.estado === "CONFIRMADA";
   const btn =
-    "h-10 rounded border border-line-strong bg-surface px-3 text-[13px] font-semibold text-ink-2 transition hover:border-ink hover:text-ink disabled:opacity-40";
+    "h-10 rounded border border-line-strong bg-surface px-3 text-13 font-semibold text-ink-2 transition hover:border-ink hover:text-ink disabled:opacity-40";
 
   return (
     <div className="flex flex-wrap items-center gap-x-4 gap-y-3 rounded-lg border border-line bg-surface p-4">
       {/* La hora es lo que se busca al mirar la lista, así que es lo más grande. */}
       <div className="w-[92px] flex-shrink-0">
-        <div className="font-display text-[21px] font-bold leading-none tabular-nums">{horaDe(r.fechaHora)}</div>
-        <div className="mt-1 text-[11.5px] text-ink-3">{r.folio}</div>
+        <div className="font-display text-20 font-bold leading-none tabular-nums">{horaDe(r.fechaHora)}</div>
+        <div className="mt-1 text-12 text-ink-3">{r.folio}</div>
       </div>
 
       <div className="min-w-[180px] flex-1">
         <div className="flex flex-wrap items-center gap-2">
-          <span className="text-[15px] font-semibold">{r.clienteNombre}</span>
-          <span className="rounded px-1.5 py-0.5 text-[11px] font-bold" style={{ background: st.bg, color: st.text }}>
+          <span className="text-15 font-semibold">{r.clienteNombre}</span>
+          <span className="rounded px-1.5 py-0.5 text-11 font-bold" style={{ background: st.bg, color: st.text }}>
             {labelEstado(r.estado)}
           </span>
           {r.mesaNumero != null && (
-            <span className="rounded bg-sel px-1.5 py-0.5 text-[11px] font-bold text-ink-2">Mesa {r.mesaNumero}</span>
+            <span className="rounded bg-sel px-1.5 py-0.5 text-11 font-bold text-ink-2">Mesa {r.mesaNumero}</span>
           )}
         </div>
-        <div className="mt-0.5 text-[12.5px] text-ink-3">
+        <div className="mt-0.5 text-13 text-ink-3">
           {r.comensales} {r.comensales === 1 ? "persona" : "personas"} · {labelCanal(r.canal)}
           {r.clienteTelefono && ` · ${r.clienteTelefono}`}
         </div>
-        {r.nota && <div className="mt-1 text-[12.5px] font-medium text-warning">{r.nota}</div>}
+        {r.nota && <div className="mt-1 text-13 font-medium text-warning">{r.nota}</div>}
       </div>
 
       {viva && (
@@ -266,7 +266,7 @@ function Fila({
             type="button"
             disabled={ocupado}
             onClick={() => onModo({ t: "mesa", r })}
-            className="h-10 rounded bg-ink px-4 text-[13.5px] font-semibold text-white transition hover:opacity-90 disabled:opacity-40"
+            className="h-10 rounded bg-ink px-4 text-14 font-semibold text-white transition hover:opacity-90 disabled:opacity-40"
           >
             Asignar mesa
           </button>
@@ -280,7 +280,7 @@ function Fila({
             type="button"
             disabled={ocupado}
             onClick={() => onModo({ t: "cancelar", r })}
-            className="h-10 rounded border border-danger/40 px-3 text-[13px] font-semibold text-danger transition hover:bg-danger-soft disabled:opacity-40"
+            className="h-10 rounded border border-danger/40 px-3 text-13 font-semibold text-danger transition hover:bg-danger-soft disabled:opacity-40"
           >
             Cancelar
           </button>
@@ -297,7 +297,7 @@ function Dialogo({ titulo, sub, children }: { titulo: string; sub?: string; chil
       <div className="max-h-[88vh] w-[520px] overflow-y-auto rounded-lg border border-line bg-surface p-6 shadow-[0_18px_44px_rgba(22,22,26,.18)]">
         <div className="mb-5">
           <h2 className="font-display text-xl font-semibold tracking-tight">{titulo}</h2>
-          {sub && <p className="mt-0.5 text-[13px] text-ink-3">{sub}</p>}
+          {sub && <p className="mt-0.5 text-13 text-ink-3">{sub}</p>}
         </div>
         {children}
       </div>
@@ -323,7 +323,7 @@ function Pie({
       <button
         type="button"
         onClick={onCerrar}
-        className="h-11 rounded border border-line-strong px-4 text-[14px] font-semibold text-ink-2 transition hover:border-ink hover:text-ink"
+        className="h-11 rounded border border-line-strong px-4 text-14 font-semibold text-ink-2 transition hover:border-ink hover:text-ink"
       >
         Cerrar
       </button>
@@ -332,7 +332,7 @@ function Pie({
         disabled={ocupado}
         onClick={onOk}
         className={[
-          "h-11 rounded px-5 text-[14px] font-semibold text-white transition hover:opacity-90 disabled:opacity-40",
+          "h-11 rounded px-5 text-14 font-semibold text-white transition hover:opacity-90 disabled:opacity-40",
           peligro ? "bg-danger" : "bg-ink",
         ].join(" ")}
       >
@@ -421,7 +421,7 @@ function ModalNueva({
                 type="button"
                 onClick={() => setCanal(c.v)}
                 className={[
-                  "h-10 rounded border px-3 text-[13px] font-semibold transition",
+                  "h-10 rounded border px-3 text-13 font-semibold transition",
                   canal === c.v ? "border-ink bg-ink text-white" : "border-line-strong text-ink-2 hover:border-ink",
                 ].join(" ")}
               >
@@ -434,7 +434,7 @@ function ModalNueva({
           <label className={labelCls} htmlFor="r-nota">Nota · opcional</label>
           <input id="r-nota" className={inputCls} value={nota} maxLength={300} placeholder="Cumpleaños, alergia, mesa junto a la ventana…" onChange={(e) => setNota(e.target.value)} />
         </div>
-        {err && <p className="text-[13px] font-medium text-danger" role="alert">{err}</p>}
+        {err && <p className="text-13 font-medium text-danger" role="alert">{err}</p>}
       </div>
       <Pie ocupado={ocupado} onCerrar={onCerrar} onOk={guardar} okLabel="Guardar reservación" />
     </Dialogo>
@@ -497,7 +497,7 @@ function ModalEditar({
           <label className={labelCls} htmlFor="e-nota">Nota</label>
           <input id="e-nota" className={inputCls} value={nota} maxLength={300} onChange={(e) => setNota(e.target.value)} />
         </div>
-        {err && <p className="text-[13px] font-medium text-danger" role="alert">{err}</p>}
+        {err && <p className="text-13 font-medium text-danger" role="alert">{err}</p>}
       </div>
       <Pie ocupado={ocupado} onCerrar={onCerrar} onOk={guardar} okLabel="Guardar cambios" />
     </Dialogo>
@@ -529,7 +529,7 @@ function ModalMesa({
       sub={`${r.clienteNombre} · ${r.comensales} ${r.comensales === 1 ? "persona" : "personas"} · ${horaDe(r.fechaHora)}`}
     >
       {libres.length === 0 ? (
-        <p className="rounded border border-line bg-sel p-5 text-center text-[13.5px] text-ink-2">
+        <p className="rounded border border-line bg-sel p-5 text-center text-14 text-ink-2">
           Ahora mismo no hay mesas libres. En cuanto se cobre una cuenta, la mesa aparece aquí.
         </p>
       ) : (
@@ -544,17 +544,17 @@ function ModalMesa({
                 onClick={() => onElegir(m.mesaId)}
                 className="flex flex-col items-start gap-0.5 rounded border border-[#BFE0CC] bg-[#EAF4EE] p-3 text-left transition hover:shadow-[0_4px_14px_rgba(22,22,26,.08)] disabled:opacity-40"
               >
-                <span className="font-display text-[20px] font-extrabold tabular-nums text-[#2E7D52]">{m.numero}</span>
-                <span className="text-[11.5px] font-medium text-ink-3">
+                <span className="font-display text-20 font-extrabold tabular-nums text-[#2E7D52]">{m.numero}</span>
+                <span className="text-12 font-medium text-ink-3">
                   {m.capacidad} {m.capacidad === 1 ? "lugar" : "lugares"}
                 </span>
-                {chica && <span className="text-[11px] font-bold text-warning">Quedan chicos</span>}
+                {chica && <span className="text-11 font-bold text-warning">Quedan chicos</span>}
               </button>
             );
           })}
         </div>
       )}
-      <p className="mt-4 text-[12.5px] text-ink-3">
+      <p className="mt-4 text-13 text-ink-3">
         Al asignarla, la reservación queda como <b>llegó</b> y la mesa deja de aparecer libre en el mapa. La cuenta se
         abre desde Comedor, como siempre.
       </p>
@@ -562,7 +562,7 @@ function ModalMesa({
         <button
           type="button"
           onClick={onCerrar}
-          className="h-11 rounded border border-line-strong px-4 text-[14px] font-semibold text-ink-2 transition hover:border-ink hover:text-ink"
+          className="h-11 rounded border border-line-strong px-4 text-14 font-semibold text-ink-2 transition hover:border-ink hover:text-ink"
         >
           Cerrar
         </button>
@@ -600,7 +600,7 @@ function ModalCancelar({
             type="button"
             onClick={() => setMotivo(m)}
             className={[
-              "h-11 rounded border px-3 text-left text-[14px] font-semibold transition",
+              "h-11 rounded border px-3 text-left text-14 font-semibold transition",
               motivo === m ? "border-ink bg-ink text-white" : "border-line-strong text-ink-2 hover:border-ink",
             ].join(" ")}
           >
@@ -618,7 +618,7 @@ function ModalCancelar({
           />
         )}
       </div>
-      <p className="mt-4 text-[12.5px] text-ink-3">
+      <p className="mt-4 text-13 text-ink-3">
         Si tenía mesa apartada, se libera. La reservación no se borra: queda cancelada con su motivo.
       </p>
       <Pie

@@ -41,7 +41,7 @@ export function VincularDispositivo({ onVinculado }: { onVinculado: () => void }
     <main className="flex min-h-screen flex-col items-center justify-center gap-7 bg-[#1A1A1E] p-6 text-[#F0F0EC]">
       <header className="flex max-w-sm flex-col items-center gap-2 text-center">
         <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-white">
-          <span className="font-display text-[20px] font-bold text-[#16161A]">V</span>
+          <span className="font-display text-20 font-bold text-[#16161A]">V</span>
         </div>
         <h1 className="mt-1 font-display text-xl font-semibold tracking-tight">Vincular esta pantalla de cocina</h1>
         <p className="text-sm text-[#A0A0A6]">
@@ -86,7 +86,7 @@ export function VincularDispositivo({ onVinculado }: { onVinculado: () => void }
         <button
           type="submit"
           disabled={cargando}
-          className="font-display mt-1 flex h-12 w-full items-center justify-center rounded bg-[#2E7D52] text-[15px] font-bold text-white transition hover:bg-[#267045] active:scale-[0.98] disabled:opacity-60"
+          className="font-display mt-1 flex h-12 w-full items-center justify-center rounded bg-[#2E7D52] text-15 font-bold text-white transition hover:bg-[#267045] active:scale-[0.98] disabled:opacity-60"
         >
           {cargando ? "Vinculando…" : "Vincular pantalla"}
         </button>

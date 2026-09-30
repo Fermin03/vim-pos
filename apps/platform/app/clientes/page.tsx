@@ -23,7 +23,7 @@ function CeldaCajas({ c }: { c: Tenant["cajas"] }) {
             ? `${c.enLinea} de ${c.total} en línea`
             : "sin reportar"}
       </div>
-      <div className="text-[12px] text-ink-2">
+      <div className="text-12 text-ink-2">
         {c.version ?? "versión anterior a 0.4.60"}
         {c.sinReportar > 0 && c.sinReportar < c.total ? ` · ${c.sinReportar} sin reportar` : ""}
       </div>
@@ -75,7 +75,7 @@ export default function ClientesPage() {
   return (
     <div>
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-        <h1 className="font-display text-[18px] font-semibold tracking-tight">Clientes</h1>
+        <h1 className="font-display text-18 font-semibold tracking-tight">Clientes</h1>
         <input className={`${input} w-full sm:w-[280px]`} placeholder="Buscar código o nombre…" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Buscar cliente" autoFocus />
       </div>
 
@@ -97,7 +97,7 @@ export default function ClientesPage() {
             type="button"
             onClick={() => setEstado(k)}
             aria-pressed={estado === k}
-            className={["btn rounded px-2.5 py-1 text-[12.5px] font-semibold", estado === k ? "bg-ink text-white" : "text-ink-2 hover:bg-hover"].join(" ")}
+            className={["btn rounded px-2.5 py-1 text-13 font-semibold", estado === k ? "bg-ink text-white" : "text-ink-2 hover:bg-hover"].join(" ")}
           >
             {l} ({cuenta(k)})
           </button>
@@ -107,9 +107,9 @@ export default function ClientesPage() {
       {tenants === null && !error && <p className="text-sm text-ink-3">Cargando…</p>}
       {tenants && (
         <div className="overflow-x-auto rounded-lg border border-line bg-surface">
-          <table className="w-full min-w-[760px] text-[13.5px]">
+          <table className="w-full min-w-[760px] text-14">
             <thead>
-              <tr className="border-b border-line bg-sel text-left text-[12px] font-semibold uppercase tracking-wide text-ink-2">
+              <tr className="border-b border-line bg-sel text-left text-12 font-semibold uppercase tracking-wide text-ink-2">
                 <th className="px-4 py-2.5">Cliente</th>
                 <th className="px-4 py-2.5">Cajas</th>
                 <th className="px-4 py-2.5">Giro</th>
@@ -132,7 +132,7 @@ export default function ClientesPage() {
                       <Link href={`/clientes/${t.id}`} onClick={(e) => e.stopPropagation()} className="font-semibold text-ink underline-offset-2 hover:underline">
                         {t.nombre_comercial}
                       </Link>
-                      <div className="font-mono text-[12px] text-ink-2">{t.codigo}</div>
+                      <div className="font-mono text-12 text-ink-2">{t.codigo}</div>
                     </td>
                     <td className="px-4 py-2.5"><CeldaCajas c={t.cajas} /></td>
                     <td className="px-4 py-2.5 text-ink-2">{nombreVertical(t.vertical_principal)}</td>
@@ -140,7 +140,7 @@ export default function ClientesPage() {
                     <td className="px-4 py-2.5 text-ink-2">{nombreFase(t.onboarding?.fase)}</td>
                     <td className="px-4 py-2.5">
                       <PastillaEstado estado={t.estado} />
-                      {bloqueo && <div className="mt-0.5 text-[11px] font-semibold text-warning">bloquea el {fechaCorta(bloqueo)}</div>}
+                      {bloqueo && <div className="mt-0.5 text-11 font-semibold text-warning">bloquea el {fechaCorta(bloqueo)}</div>}
                     </td>
                   </tr>
                 );
@@ -149,7 +149,7 @@ export default function ClientesPage() {
           </table>
         </div>
       )}
-      <p className="mt-4 text-[11.5px] text-ink-3">{textoActualizado(hace)}</p>
+      <p className="mt-4 text-12 text-ink-3">{textoActualizado(hace)}</p>
     </div>
   );
 }

@@ -44,7 +44,7 @@ export default function ReimpresionesPage() {
       valor: razon,
       total: () => (tickets > 0 ? reimpresiones / tickets : 0),
       celda: (f) => (
-        <span className={`rounded px-2 py-0.5 text-[12.5px] font-semibold tabular-nums ${razon(f) >= UMBRAL ? "bg-warning-soft text-warning" : "text-ink-2"}`}>
+        <span className={`rounded px-2 py-0.5 text-13 font-semibold tabular-nums ${razon(f) >= UMBRAL ? "bg-warning-soft text-warning" : "text-ink-2"}`}>
           {formatear(razon(f), "decimal")}×
         </span>
       ),

@@ -5,8 +5,8 @@ import { fmtMxn } from "../lib/turno";
 import type { Autorizacion } from "../lib/autorizacion";
 import { ModalAutorizacionPin } from "./modal-autorizacion-pin";
 
-const chip = "rounded-full px-3.5 py-1.5 text-[12.5px] font-semibold transition";
-const mini = "h-9 rounded border border-line-strong px-2 text-[13px] outline-none focus:border-ink";
+const chip = "rounded-full px-3.5 py-1.5 text-13 font-semibold transition";
+const mini = "h-9 rounded border border-line-strong px-2 text-13 outline-none focus:border-ink";
 
 const pesos = (n: number) => (n === 0 ? "$0" : `$${n.toFixed(0)}`);
 
@@ -115,7 +115,7 @@ export function SelectorZona({
             </button>
             <button type="button" title="Cambiar el costo (pide PIN)"
               onClick={() => empezarRepreciar(z)}
-              className="text-[11px] text-ink-3 hover:text-ink">✎</button>
+              className="text-11 text-ink-3 hover:text-ink">✎</button>
           </span>
         ))}
         {!alta && (
@@ -134,22 +134,22 @@ export function SelectorZona({
             value={alta.costo} onChange={(e) => setAlta({ ...alta, costo: e.target.value })} />
           <button type="button" onClick={() => void guardarAlta()} className={[chip, "bg-ink text-white"].join(" ")}>Guardar</button>
           <button type="button" onClick={() => { setAlta(null); setError(null); }}
-            className="text-[12px] text-ink-3 hover:text-ink-2">Cancelar</button>
+            className="text-12 text-ink-3 hover:text-ink-2">Cancelar</button>
         </div>
       )}
 
       {repreciando && !pinAbierto && (
         <div className="flex items-center gap-1.5">
-          <span className="text-[12.5px] text-ink-2">{repreciando.zona.nombre}</span>
+          <span className="text-13 text-ink-2">{repreciando.zona.nombre}</span>
           <input className={`${mini} w-24`} inputMode="decimal" autoFocus
             value={repreciando.costo} onChange={(e) => setRepreciando({ ...repreciando, costo: e.target.value })} />
           <button type="button" onClick={pedirAutorizacionCosto} className={[chip, "bg-ink text-white"].join(" ")}>Aplicar</button>
           <button type="button" onClick={() => setRepreciando(null)}
-            className="text-[12px] text-ink-3 hover:text-ink-2">Cancelar</button>
+            className="text-12 text-ink-3 hover:text-ink-2">Cancelar</button>
         </div>
       )}
 
-      {error && <p className="text-[12px] font-medium text-danger" role="alert">{error}</p>}
+      {error && <p className="text-12 font-medium text-danger" role="alert">{error}</p>}
 
       {pinAbierto && repreciando && (
         <ModalAutorizacionPin

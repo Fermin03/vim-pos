@@ -29,7 +29,7 @@ export function Shell({ children }: { children: ReactNode }) {
               </svg>
             </button>
             <LogoVim className="h-7 w-7" />
-            <span className="font-display text-[15px] font-bold tracking-tight">VIM Plataforma</span>
+            <span className="font-display text-15 font-bold tracking-tight">VIM Plataforma</span>
             <span className="ml-auto"><InsigniaEntorno /></span>
           </div>
           <div className="mx-auto max-w-[1100px]">{children}</div>

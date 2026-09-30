@@ -38,20 +38,20 @@ export function DialogoAvisos({ avisos, onCerrar }: { avisos: Aviso[]; onCerrar:
     <div className="fixed inset-0 z-[60] flex items-center justify-center bg-ink/50 p-6" role="dialog" aria-modal="true" aria-label={aviso.titulo}>
       <div className="w-full max-w-lg overflow-hidden rounded-lg bg-surface shadow-xl">
         <div className={["px-6 py-3", e.cabecera].join(" ")}>
-          <div className={["text-[11.5px] font-bold uppercase tracking-wide", e.texto].join(" ")}>{e.etiqueta}</div>
-          <h2 className="mt-0.5 font-display text-[19px] font-bold tracking-tight">{aviso.titulo}</h2>
+          <div className={["text-12 font-bold uppercase tracking-wide", e.texto].join(" ")}>{e.etiqueta}</div>
+          <h2 className="mt-0.5 font-display text-20 font-bold tracking-tight">{aviso.titulo}</h2>
         </div>
         {/* Texto plano: el cuerpo lo escribe VIM y se renderiza como texto, nunca como HTML. */}
-        <p className="whitespace-pre-wrap px-6 py-5 text-[15px] leading-relaxed text-ink-2">{aviso.cuerpo}</p>
+        <p className="whitespace-pre-wrap px-6 py-5 text-15 leading-relaxed text-ink-2">{aviso.cuerpo}</p>
         <div className="flex items-center justify-between gap-3 border-t border-line px-6 py-4">
           {avisos.length > 1 ? (
-            <span className="text-[12.5px] text-ink-3">{i + 1} de {avisos.length}</span>
+            <span className="text-13 text-ink-3">{i + 1} de {avisos.length}</span>
           ) : <span />}
           <button
             type="button"
             onClick={siguiente}
             disabled={pasando}
-            className="h-12 min-w-[140px] rounded bg-ink px-6 text-[15px] font-semibold text-white transition active:scale-[0.98] disabled:opacity-60"
+            className="h-12 min-w-[140px] rounded bg-ink px-6 text-15 font-semibold text-white transition active:scale-[0.98] disabled:opacity-60"
           >
             {aviso.requiere_confirmacion ? "Entendido" : "Cerrar"}
           </button>

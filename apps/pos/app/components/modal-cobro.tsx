@@ -282,13 +282,13 @@ function VistaSelector({
     <div className="flex flex-col h-full">
       {/* Total a cobrar */}
       <div className="text-center px-6 py-5 border border-line rounded-lg bg-sel mb-5">
-        <div className="text-[12px] font-bold uppercase tracking-widest text-ink-3 mt-3">Total a cobrar</div>
-        <div className="font-display text-[46px] font-bold tracking-tight text-ink tabular-nums leading-none mt-1 mb-1">
+        <div className="text-12 font-bold uppercase tracking-widest text-ink-3 mt-3">Total a cobrar</div>
+        <div className="font-display text-40 font-bold tracking-tight text-ink tabular-nums leading-none mt-1 mb-1">
           {fmtMxn(totales.total)}
         </div>
       </div>
 
-      <div className="text-[14.5px] font-semibold text-ink-2 mb-3">¿Cómo paga el cliente?</div>
+      <div className="text-15 font-semibold text-ink-2 mb-3">¿Cómo paga el cliente?</div>
 
       {/* Lista de métodos */}
       <div className="border border-line rounded-lg overflow-hidden">
@@ -309,15 +309,15 @@ function VistaSelector({
               <m.icoFn cls="w-[25px] h-[25px]" />
             </span>
             <span className="flex-1 min-w-0">
-              <span className="block text-[16.5px] font-semibold text-ink">{m.etiqueta}</span>
-              <span className="block text-[12.5px] text-ink-3 mt-[1px]">{m.sub}</span>
+              <span className="block text-16 font-semibold text-ink">{m.etiqueta}</span>
+              <span className="block text-13 text-ink-3 mt-[1px]">{m.sub}</span>
             </span>
             <IcoChevron cls="w-5 h-5 text-ink-3 flex-shrink-0" />
           </button>
         ))}
 
         {/* Separador dividido */}
-        <div className="px-[18px] py-[9px] text-[11px] font-bold uppercase tracking-widest text-ink-3 bg-sel border-t border-line">
+        <div className="px-[18px] py-[9px] text-11 font-bold uppercase tracking-widest text-ink-3 bg-sel border-t border-line">
           Combinar formas de pago
         </div>
 
@@ -333,8 +333,8 @@ function VistaSelector({
             <IcoDividido cls="w-[25px] h-[25px]" />
           </span>
           <span className="flex-1 min-w-0">
-            <span className="block text-[16.5px] font-semibold text-ink">Pago dividido</span>
-            <span className="block text-[12.5px] text-ink-3 mt-[1px]">Combina efectivo, tarjeta u otros en un mismo ticket</span>
+            <span className="block text-16 font-semibold text-ink">Pago dividido</span>
+            <span className="block text-13 text-ink-3 mt-[1px]">Combina efectivo, tarjeta u otros en un mismo ticket</span>
           </span>
           <IcoChevron cls="w-5 h-5 text-ink-3 flex-shrink-0" />
         </button>
@@ -345,12 +345,12 @@ function VistaSelector({
         <button
           type="button"
           onClick={onCerrar}
-          className="inline-flex items-center gap-2 text-[15px] font-semibold text-ink-2 border border-line-strong rounded px-[22px] py-[14px] hover:bg-hover hover:text-ink transition-colors"
+          className="inline-flex items-center gap-2 text-15 font-semibold text-ink-2 border border-line-strong rounded px-[22px] py-[14px] hover:bg-hover hover:text-ink transition-colors"
         >
           <IcoBack cls="w-4 h-4" />
           Volver al ticket
         </button>
-        <span className="text-[12.5px] text-ink-3">Efectivo es el más usado</span>
+        <span className="text-13 text-ink-3">Efectivo es el más usado</span>
       </div>
     </div>
   );
@@ -408,10 +408,10 @@ function VistaEfectivo({
   return (
     <div className="flex flex-col gap-4 p-6">
       <div className="flex items-baseline justify-between gap-4">
-        <h1 className="font-display text-[22px] font-semibold tracking-[-0.02em]">Cobro en efectivo</h1>
-        <div className="text-[16px] font-semibold text-ink-2">
+        <h1 className="font-display text-24 font-semibold tracking-[-0.02em]">Cobro en efectivo</h1>
+        <div className="text-16 font-semibold text-ink-2">
           Total{" "}
-          <span className="font-display text-[22px] font-bold tabular-nums text-ink">{fmtMxn(pendiente)}</span>
+          <span className="font-display text-24 font-bold tabular-nums text-ink">{fmtMxn(pendiente)}</span>
         </div>
       </div>
 
@@ -420,8 +420,8 @@ function VistaEfectivo({
           {/* Recibido y cambio ARRIBA y en grande: son los dos números que se miran mientras se
               cuenta el dinero. El cambio iba abajo, lejos de los billetes. */}
           <div className="flex items-center justify-between gap-3 rounded-lg border-2 border-ink px-4 py-3.5">
-            <span className="text-[16px] font-semibold text-ink-2">Recibido</span>
-            <span className={["font-display text-[40px] font-bold leading-none tracking-[-0.02em] tabular-nums", recibido > 0 ? "text-ink" : "text-ink-3"].join(" ")}>
+            <span className="text-16 font-semibold text-ink-2">Recibido</span>
+            <span className={["font-display text-40 font-bold leading-none tracking-[-0.02em] tabular-nums", recibido > 0 ? "text-ink" : "text-ink-3"].join(" ")}>
               {fmtMxn(recibido)}
             </span>
           </div>
@@ -431,12 +431,12 @@ function VistaEfectivo({
               falta ? "bg-warning-soft" : recibido > 0 ? "bg-success-soft" : "bg-hover",
             ].join(" ")}
           >
-            <span className={["text-[16px] font-semibold", falta ? "text-warning" : recibido > 0 ? "text-success" : "text-ink-3"].join(" ")}>
+            <span className={["text-16 font-semibold", falta ? "text-warning" : recibido > 0 ? "text-success" : "text-ink-3"].join(" ")}>
               {falta ? "Falta" : "Entrega de cambio"}
             </span>
             <span
               className={[
-                "font-display text-[48px] font-bold leading-none tracking-[-0.02em] tabular-nums",
+                "font-display text-40 font-bold leading-none tracking-[-0.02em] tabular-nums",
                 falta ? "text-warning" : recibido > 0 ? "text-success" : "text-ink-3",
               ].join(" ")}
             >
@@ -450,7 +450,7 @@ function VistaEfectivo({
                 key={d}
                 type="button"
                 onClick={() => addDenom(d)}
-                className="h-14 rounded-lg border border-line-strong bg-surface font-display text-[18px] font-bold tabular-nums text-ink transition-[transform,background-color,border-color] duration-150 ease-vim hover:border-ink active:scale-[.97] active:bg-hover"
+                className="h-14 rounded-lg border border-line-strong bg-surface font-display text-18 font-bold tabular-nums text-ink transition-[transform,background-color,border-color] duration-150 ease-vim hover:border-ink active:scale-[.97] active:bg-hover"
               >
                 ${d >= 1000 ? "1,000" : d}
               </button>
@@ -459,7 +459,7 @@ function VistaEfectivo({
           <button
             type="button"
             onClick={() => setRecibBuffer(aBuffer(pendiente))}
-            className="h-12 rounded-lg border border-line-strong bg-surface text-[16px] font-bold tabular-nums text-ink transition-[transform,border-color] duration-150 ease-vim hover:border-ink active:scale-[.98]"
+            className="h-12 rounded-lg border border-line-strong bg-surface text-16 font-bold tabular-nums text-ink transition-[transform,border-color] duration-150 ease-vim hover:border-ink active:scale-[.98]"
           >
             Pago exacto · {fmtMxn(pendiente)}
           </button>
@@ -476,7 +476,7 @@ function VistaEfectivo({
           type="button"
           onClick={onVolver}
           disabled={procesando}
-          className="h-14 w-40 flex-shrink-0 rounded-lg border border-line-strong bg-surface text-[16px] font-semibold text-ink transition-[transform,border-color] duration-150 ease-vim hover:border-ink active:scale-[.98] disabled:opacity-50"
+          className="h-14 w-40 flex-shrink-0 rounded-lg border border-line-strong bg-surface text-16 font-semibold text-ink transition-[transform,border-color] duration-150 ease-vim hover:border-ink active:scale-[.98] disabled:opacity-50"
         >
           Volver
         </button>
@@ -484,7 +484,7 @@ function VistaEfectivo({
           type="button"
           onClick={handleCobrar}
           disabled={!puedeCobrar || procesando}
-          className="h-14 min-w-0 flex-1 rounded-lg bg-accent px-4 font-display text-[18px] font-bold tabular-nums text-white shadow-sm transition-[transform,background-color] duration-150 ease-vim hover:bg-accent-hover active:scale-[.98] disabled:cursor-not-allowed disabled:bg-line-strong disabled:shadow-none disabled:active:scale-100"
+          className="h-14 min-w-0 flex-1 rounded-lg bg-accent px-4 font-display text-18 font-bold tabular-nums text-white shadow-sm transition-[transform,background-color] duration-150 ease-vim hover:bg-accent-hover active:scale-[.98] disabled:cursor-not-allowed disabled:bg-line-strong disabled:shadow-none disabled:active:scale-100"
         >
           <span className="block truncate">{etiquetaCobrar}</span>
         </button>
@@ -525,18 +525,18 @@ function VistaOtro({
           </span>
           <div>
             <h1 className="font-display text-xl font-semibold tracking-tight">{cfg.etiqueta}</h1>
-            <p className="text-[12.5px] text-ink-3">Ticket #{totales.ticketId.slice(-6)}</p>
+            <p className="text-13 text-ink-3">Ticket #{totales.ticketId.slice(-6)}</p>
           </div>
         </div>
 
         <div className="flex flex-col gap-3">
           <div className="flex items-baseline justify-between py-3 border-b border-line">
-            <span className="text-[15px] text-ink-2 font-medium">Total pendiente</span>
-            <span className="font-display text-[22px] font-semibold text-ink tabular-nums">{fmtMxn(pendiente)}</span>
+            <span className="text-15 text-ink-2 font-medium">Total pendiente</span>
+            <span className="font-display text-24 font-semibold text-ink tabular-nums">{fmtMxn(pendiente)}</span>
           </div>
           <div className="flex items-baseline justify-between py-3">
-            <span className="text-[15px] text-ink-2 font-medium">A aplicar</span>
-            <span className="font-display text-[28px] font-bold text-ink tabular-nums">
+            <span className="text-15 text-ink-2 font-medium">A aplicar</span>
+            <span className="font-display text-28 font-bold text-ink tabular-nums">
               {monto > 0 ? fmtMxn(monto) : "$0.00"}
             </span>
           </div>
@@ -551,7 +551,7 @@ function VistaOtro({
           <button
             type="button"
             onClick={() => setBuffer(aBuffer(pendiente))}
-            className="w-full py-[13px] border border-dashed border-line-strong bg-surface rounded font-sans text-[15px] font-semibold text-ink-2 cursor-pointer transition-all hover:text-ink hover:bg-hover tabular-nums"
+            className="w-full py-[13px] border border-dashed border-line-strong bg-surface rounded font-sans text-15 font-semibold text-ink-2 cursor-pointer transition-all hover:text-ink hover:bg-hover tabular-nums"
           >
             Monto exacto · {fmtMxn(pendiente)}
           </button>
@@ -563,7 +563,7 @@ function VistaOtro({
           type="button"
           onClick={() => { if (monto > 0 && !procesando) onAplicar(monto); }}
           disabled={monto <= 0 || procesando}
-          className="mt-3 w-full font-sans text-[18px] font-bold text-white bg-accent border-none py-[18px] rounded-lg cursor-pointer transition-colors hover:bg-accent-hover disabled:bg-line-strong disabled:cursor-not-allowed flex items-center justify-center gap-[10px] shadow-sm"
+          className="mt-3 w-full font-sans text-18 font-bold text-white bg-accent border-none py-[18px] rounded-lg cursor-pointer transition-colors hover:bg-accent-hover disabled:bg-line-strong disabled:cursor-not-allowed flex items-center justify-center gap-[10px] shadow-sm"
         >
           {procesando ? "Aplicando…" : <>Aplicar pago <span className="font-display tabular-nums opacity-90">{monto > 0 ? fmtMxn(monto) : ""}</span></>}
         </button>
@@ -571,7 +571,7 @@ function VistaOtro({
           type="button"
           onClick={onVolver}
           disabled={procesando}
-          className="mt-2 flex items-center justify-center gap-[7px] font-sans text-[13.5px] font-semibold text-ink-3 bg-transparent border-none cursor-pointer py-2 px-3 rounded transition-colors hover:text-ink"
+          className="mt-2 flex items-center justify-center gap-[7px] font-sans text-14 font-semibold text-ink-3 bg-transparent border-none cursor-pointer py-2 px-3 rounded transition-colors hover:text-ink"
         >
           <IcoBack cls="w-[15px] h-[15px]" />
           Cambiar método de pago
@@ -610,7 +610,7 @@ function ModalAgregarPago({
       <div className="w-[440px] max-h-[90vh] bg-surface border border-line rounded-lg shadow-xl flex flex-col animate-vim-pop">
         {/* Cabecera */}
         <div className="flex items-center justify-between px-5 py-5 border-b border-line">
-          <h2 className="font-display text-[18px] font-semibold">Agregar pago</h2>
+          <h2 className="font-display text-18 font-semibold">Agregar pago</h2>
           <button type="button" onClick={onCerrar} className="w-[34px] h-[34px] border border-line-strong bg-surface rounded flex items-center justify-center text-ink-2 hover:border-ink hover:text-ink transition-colors">
             <IcoClose cls="w-[17px] h-[17px]" />
           </button>
@@ -618,7 +618,7 @@ function ModalAgregarPago({
 
         <div className="px-5 py-5 overflow-y-auto">
           {/* Método */}
-          <div className="text-[12.5px] font-bold uppercase tracking-widest text-ink-2 mb-3">Método</div>
+          <div className="text-13 font-bold uppercase tracking-widest text-ink-2 mb-3">Método</div>
           <div className="grid grid-cols-2 gap-2 mb-5">
             {METODOS.map((m) => (
               <button
@@ -635,22 +635,22 @@ function ModalAgregarPago({
                 <span className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0" style={{ background: m.icoBg, color: m.icoColor }}>
                   <m.icoFn cls="w-[18px] h-[18px]" />
                 </span>
-                <span className="text-[14px] font-semibold text-ink">{m.etiqueta}</span>
+                <span className="text-14 font-semibold text-ink">{m.etiqueta}</span>
               </button>
             ))}
           </div>
 
           {/* Monto */}
-          <div className="text-[12.5px] font-bold uppercase tracking-widest text-ink-2 mb-3">Monto</div>
-          <div className="text-center font-display text-[38px] font-bold text-ink tabular-nums mb-2">
+          <div className="text-13 font-bold uppercase tracking-widest text-ink-2 mb-3">Monto</div>
+          <div className="text-center font-display text-40 font-bold text-ink tabular-nums mb-2">
             {monto > 0 ? fmtMxn(monto) : "$0.00"}
           </div>
-          <div className="text-center text-[12.5px] text-ink-3 mb-4">
+          <div className="text-center text-13 text-ink-3 mb-4">
             Restante por cubrir: <span className="tabular-nums">{fmtMxn(pendiente)}</span>
             <button
               type="button"
               onClick={() => setBuffer(aBuffer(pendiente))}
-              className="ml-[6px] border-none bg-hover text-ink-2 font-sans text-[12px] font-semibold px-[11px] py-[4px] rounded-full cursor-pointer hover:bg-line hover:text-ink transition-colors"
+              className="ml-[6px] border-none bg-hover text-ink-2 font-sans text-12 font-semibold px-[11px] py-[4px] rounded-full cursor-pointer hover:bg-line hover:text-ink transition-colors"
             >
               Usar todo el restante
             </button>
@@ -664,7 +664,7 @@ function ModalAgregarPago({
             type="button"
             onClick={handleAgregar}
             disabled={monto <= 0}
-            className="w-full font-sans text-[15px] font-bold text-white bg-ink border-none py-[14px] rounded cursor-pointer transition-opacity hover:opacity-90 disabled:bg-line-strong disabled:cursor-not-allowed"
+            className="w-full font-sans text-15 font-bold text-white bg-ink border-none py-[14px] rounded cursor-pointer transition-opacity hover:opacity-90 disabled:bg-line-strong disabled:cursor-not-allowed"
           >
             Agregar pago
           </button>
@@ -728,7 +728,7 @@ function VistaDividida({
           </span>
           <div>
             <h1 className="font-display text-xl font-semibold tracking-tight">Pago dividido</h1>
-            <p className="text-[12.5px] text-ink-3">Cubre el total con varios métodos</p>
+            <p className="text-13 text-ink-3">Cubre el total con varios métodos</p>
           </div>
         </div>
 
@@ -736,20 +736,20 @@ function VistaDividida({
         <div className="border border-line rounded-lg p-5 mb-5 bg-sel">
           <div className="flex justify-between gap-4">
             <div className="text-center flex-1">
-              <div className="text-[11.5px] font-bold uppercase tracking-widest text-ink-3">Total</div>
-              <div className="font-display text-[24px] font-semibold text-ink tabular-nums mt-[3px]">{fmtMxn(pendiente)}</div>
+              <div className="text-12 font-bold uppercase tracking-widest text-ink-3">Total</div>
+              <div className="font-display text-24 font-semibold text-ink tabular-nums mt-[3px]">{fmtMxn(pendiente)}</div>
             </div>
             <div className="w-px bg-line" />
             <div className="text-center flex-1">
-              <div className="text-[11.5px] font-bold uppercase tracking-widest text-ink-3">Pagado</div>
-              <div className="font-display text-[24px] font-semibold text-ink tabular-nums mt-[3px]">{fmtMxn(pagado)}</div>
+              <div className="text-12 font-bold uppercase tracking-widest text-ink-3">Pagado</div>
+              <div className="font-display text-24 font-semibold text-ink tabular-nums mt-[3px]">{fmtMxn(pagado)}</div>
             </div>
             <div className="w-px bg-line" />
             <div className="text-center flex-1">
-              <div className={["text-[11.5px] font-bold uppercase tracking-widest", cubierto ? "text-success" : "text-accent"].join(" ")}>
+              <div className={["text-12 font-bold uppercase tracking-widest", cubierto ? "text-success" : "text-accent"].join(" ")}>
                 {cubierto ? "Cubierto" : "Restante"}
               </div>
-              <div className={["font-display font-bold tabular-nums mt-[3px]", cubierto ? "text-[24px] text-success" : "text-[30px] text-accent"].join(" ")}>
+              <div className={["font-display font-bold tabular-nums mt-[3px]", cubierto ? "text-24 text-success" : "text-32 text-accent"].join(" ")}>
                 {fmtMxn(restante)}
               </div>
             </div>
@@ -764,10 +764,10 @@ function VistaDividida({
         </div>
 
         {/* Lista de pagos */}
-        <div className="text-[13px] font-bold text-ink mb-3">Pagos agregados</div>
+        <div className="text-13 font-bold text-ink mb-3">Pagos agregados</div>
         <div className="flex flex-col gap-2 mb-4">
           {pagos.length === 0 ? (
-            <div className="text-center py-5 text-[13.5px] text-ink-3 border border-dashed border-line-strong rounded">
+            <div className="text-center py-5 text-14 text-ink-3 border border-dashed border-line-strong rounded">
               Aún no hay pagos. Toca "Agregar pago" para empezar.
             </div>
           ) : (
@@ -778,8 +778,8 @@ function VistaDividida({
                   <span className="w-9 h-9 rounded-[9px] flex items-center justify-center flex-shrink-0" style={{ background: cfg.icoBg, color: cfg.icoColor }}>
                     <cfg.icoFn cls="w-[19px] h-[19px]" />
                   </span>
-                  <span className="flex-1 text-[14.5px] font-semibold text-ink">{cfg.etiqueta}</span>
-                  <span className="font-display text-[16px] font-semibold text-ink tabular-nums">{fmtMxn(p.monto)}</span>
+                  <span className="flex-1 text-15 font-semibold text-ink">{cfg.etiqueta}</span>
+                  <span className="font-display text-16 font-semibold text-ink tabular-nums">{fmtMxn(p.monto)}</span>
                   <button
                     type="button"
                     onClick={() => quitarPago(p.id)}
@@ -798,7 +798,7 @@ function VistaDividida({
           type="button"
           onClick={() => setMostrarModal(true)}
           disabled={cubierto}
-          className="w-full inline-flex items-center justify-center gap-[9px] font-sans text-[14.5px] font-semibold text-ink bg-surface border border-line-strong py-[14px] rounded cursor-pointer transition-all hover:border-ink hover:bg-hover disabled:opacity-45 disabled:cursor-default"
+          className="w-full inline-flex items-center justify-center gap-[9px] font-sans text-15 font-semibold text-ink bg-surface border border-line-strong py-[14px] rounded cursor-pointer transition-all hover:border-ink hover:bg-hover disabled:opacity-45 disabled:cursor-default"
         >
           <IcoPlus cls="w-[17px] h-[17px]" />
           Agregar pago
@@ -813,7 +813,7 @@ function VistaDividida({
           type="button"
           onClick={onVolver}
           disabled={procesando}
-          className="inline-flex items-center gap-2 text-[15px] font-semibold text-ink-2 border border-line-strong rounded px-[20px] py-[14px] hover:bg-hover hover:text-ink transition-colors disabled:opacity-50"
+          className="inline-flex items-center gap-2 text-15 font-semibold text-ink-2 border border-line-strong rounded px-[20px] py-[14px] hover:bg-hover hover:text-ink transition-colors disabled:opacity-50"
         >
           <IcoBack cls="w-4 h-4" />
           Cambiar método
@@ -869,7 +869,7 @@ function VistaPropina({
   const grand = Math.round((totalBase + tip) * 100) / 100;
 
   const altBase =
-    "inline-flex items-center justify-center gap-2 px-[13px] py-[13px] border rounded text-[14.5px] font-semibold cursor-pointer transition-all";
+    "inline-flex items-center justify-center gap-2 px-[13px] py-[13px] border rounded text-15 font-semibold cursor-pointer transition-all";
   const altOn = "border-ink bg-sel text-ink shadow-[inset_0_0_0_1.5px_#16161A]";
   const altOff = "border-line bg-surface text-ink-2 hover:border-line-strong hover:text-ink";
 
@@ -877,11 +877,11 @@ function VistaPropina({
     <div className="flex flex-col">
       {/* Prompt */}
       <div className="mb-5 text-center">
-        <div className="mb-1.5 text-[12px] font-bold uppercase tracking-[0.07em] text-ink-3">
+        <div className="mb-1.5 text-12 font-bold uppercase tracking-[0.07em] text-ink-3">
           Cobro · Ticket #{ticketId.slice(-6)}
         </div>
-        <h1 className="font-display text-[25px] font-semibold tracking-tight">¿Agregar propina?</h1>
-        <p className="mt-1 text-[14px] text-ink-2">Se calcula sobre el total de {fmtMxn(totalBase)}</p>
+        <h1 className="font-display text-24 font-semibold tracking-tight">¿Agregar propina?</h1>
+        <p className="mt-1 text-14 text-ink-2">Se calcula sobre el total de {fmtMxn(totalBase)}</p>
       </div>
 
       {/* Porcentajes sugeridos */}
@@ -898,8 +898,8 @@ function VistaPropina({
                 on ? "border-ink bg-sel shadow-[inset_0_0_0_1.5px_#16161A]" : "border-line bg-surface hover:border-line-strong",
               ].join(" ")}
             >
-              <span className="font-display text-[24px] font-bold text-ink">{p}%</span>
-              <span className={["text-[13px] font-semibold tabular-nums", on ? "text-ink-2" : "text-ink-3"].join(" ")}>
+              <span className="font-display text-24 font-bold text-ink">{p}%</span>
+              <span className={["text-13 font-semibold tabular-nums", on ? "text-ink-2" : "text-ink-3"].join(" ")}>
                 {fmtMxn(calcTip(p))}
               </span>
             </button>
@@ -938,7 +938,7 @@ function VistaPropina({
       {/* Numpad de monto libre */}
       {mode === "free" && (
         <div className="mb-5">
-          <div className="mb-3 text-center font-display text-[34px] font-bold tabular-nums text-ink">
+          <div className="mb-3 text-center font-display text-32 font-bold tabular-nums text-ink">
             {fmtMxn(aMonto(freeBuffer))}
           </div>
           <div className="mx-auto max-w-[300px]">
@@ -950,16 +950,16 @@ function VistaPropina({
       {/* Resumen */}
       <div className="overflow-hidden rounded-lg border border-line">
         <div className="flex items-center justify-between border-b border-line px-[18px] py-[13px]">
-          <span className="text-[14.5px] text-ink-2">Total del ticket</span>
-          <span className="font-display text-[16px] font-semibold tabular-nums text-ink">{fmtMxn(totalBase)}</span>
+          <span className="text-15 text-ink-2">Total del ticket</span>
+          <span className="font-display text-16 font-semibold tabular-nums text-ink">{fmtMxn(totalBase)}</span>
         </div>
         <div className="flex items-center justify-between border-b border-line px-[18px] py-[13px]">
-          <span className="text-[14.5px] font-semibold text-success">Propina</span>
-          <span className="font-display text-[16px] font-semibold tabular-nums text-success">{fmtMxn(tip)}</span>
+          <span className="text-15 font-semibold text-success">Propina</span>
+          <span className="font-display text-16 font-semibold tabular-nums text-success">{fmtMxn(tip)}</span>
         </div>
         <div className="flex items-center justify-between bg-sel px-[18px] py-[13px]">
-          <span className="text-[15px] font-bold uppercase tracking-[0.03em] text-ink">Total a cobrar</span>
-          <span className="font-display text-[28px] font-bold tabular-nums tracking-[-0.02em] text-ink">{fmtMxn(grand)}</span>
+          <span className="text-15 font-bold uppercase tracking-[0.03em] text-ink">Total a cobrar</span>
+          <span className="font-display text-28 font-bold tabular-nums tracking-[-0.02em] text-ink">{fmtMxn(grand)}</span>
         </div>
       </div>
 
@@ -971,7 +971,7 @@ function VistaPropina({
           type="button"
           onClick={onAtras}
           disabled={procesando}
-          className="inline-flex items-center gap-2 rounded border border-line-strong px-[20px] py-[14px] text-[15px] font-semibold text-ink-2 transition-colors hover:bg-hover hover:text-ink disabled:opacity-50"
+          className="inline-flex items-center gap-2 rounded border border-line-strong px-[20px] py-[14px] text-15 font-semibold text-ink-2 transition-colors hover:bg-hover hover:text-ink disabled:opacity-50"
         >
           <IcoBack cls="w-4 h-4" />
           Atrás
@@ -980,7 +980,7 @@ function VistaPropina({
           type="button"
           onClick={() => { if (!procesando) onConfirmar(tip); }}
           disabled={procesando}
-          className="inline-flex items-center gap-[9px] rounded bg-accent px-[30px] py-[14px] text-[15px] font-bold text-white shadow-sm transition-colors hover:bg-accent-hover disabled:cursor-not-allowed disabled:bg-line-strong"
+          className="inline-flex items-center gap-[9px] rounded bg-accent px-[30px] py-[14px] text-15 font-bold text-white shadow-sm transition-colors hover:bg-accent-hover disabled:cursor-not-allowed disabled:bg-line-strong"
         >
           {procesando ? "Guardando…" : <>Confirmar <span className="font-display tabular-nums opacity-90">{fmtMxn(grand)}</span></>}
         </button>
@@ -1167,8 +1167,8 @@ export function ModalCobro({
         )}
         {vista === "atajo" && (
           <div className="flex flex-col items-center gap-2 py-10 text-center" role="status">
-            <div className="font-display text-[22px] font-semibold">Cobrando en efectivo exacto…</div>
-            <div className="font-display text-[32px] font-bold tabular-nums">{fmtMxn(totalesEf.pendiente)}</div>
+            <div className="font-display text-24 font-semibold">Cobrando en efectivo exacto…</div>
+            <div className="font-display text-32 font-bold tabular-nums">{fmtMxn(totalesEf.pendiente)}</div>
           </div>
         )}
         {vista === "selector" && (

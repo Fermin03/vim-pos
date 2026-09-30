@@ -44,7 +44,7 @@ export default function CortesDeTurnoPage() {
   ];
 
   const columnas: Columna<FilaZHistorico>[] = [
-    { id: "folio", titulo: "Folio", valor: (f) => f.folio_z, ancho: 16, celda: (f) => <span className="font-mono text-[12.5px]">{f.folio_z}</span> },
+    { id: "folio", titulo: "Folio", valor: (f) => f.folio_z, ancho: 16, celda: (f) => <span className="font-mono text-13">{f.folio_z}</span> },
     { id: "dia", titulo: "Día", tipo: "fecha", valor: (f) => f.dia_contable, enfasis: "suave", ancho: 12 },
     { id: "caja", titulo: "Caja", valor: (f) => f.caja, enfasis: "suave" },
     { id: "cerro", titulo: "Cerró", valor: (f) => f.cerro, ancho: 18 },
@@ -74,7 +74,7 @@ export default function CortesDeTurnoPage() {
           type="button"
           aria-pressed={soloDiferencia === t.v}
           onClick={() => setSoloDiferencia(t.v)}
-          className={`min-h-[40px] whitespace-nowrap rounded-[4px] px-3 text-[13px] font-semibold transition-colors ${soloDiferencia === t.v ? "bg-surface text-ink shadow-sm" : "text-ink-2 hover:text-ink"}`}
+          className={`min-h-[40px] whitespace-nowrap rounded-[4px] px-3 text-13 font-semibold transition-colors ${soloDiferencia === t.v ? "bg-surface text-ink shadow-sm" : "text-ink-2 hover:text-ink"}`}
         >
           {t.l}
         </button>

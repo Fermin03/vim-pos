@@ -13,14 +13,14 @@ function Version({ titulo, sub, payload, activo, onClick }: { titulo: string; su
     <button type="button" onClick={onClick}
       className={["flex-1 rounded-lg border-2 p-3.5 text-left transition", activo ? "border-ink bg-sel" : "border-line hover:border-line-strong"].join(" ")}>
       <div className="mb-1.5 flex items-center justify-between">
-        <span className="text-[12px] font-bold uppercase tracking-wide text-ink-3">{titulo}</span>
-        {activo && <span className="rounded-full bg-ink px-2 py-0.5 text-[10.5px] font-bold text-white">Elegido</span>}
+        <span className="text-12 font-bold uppercase tracking-wide text-ink-3">{titulo}</span>
+        {activo && <span className="rounded-full bg-ink px-2 py-0.5 text-11 font-bold text-white">Elegido</span>}
       </div>
-      <div className="mb-2 text-[11.5px] text-ink-3">{sub}</div>
+      <div className="mb-2 text-12 text-ink-3">{sub}</div>
       <dl className="space-y-0.5">
-        {campos.length === 0 && <span className="text-[12px] text-ink-3">—</span>}
+        {campos.length === 0 && <span className="text-12 text-ink-3">—</span>}
         {campos.map(([k, v]) => (
-          <div key={k} className="flex justify-between gap-2 text-[12.5px]">
+          <div key={k} className="flex justify-between gap-2 text-13">
             <dt className="text-ink-3">{k}</dt>
             <dd className="truncate font-medium text-ink-2">{String(v)}</dd>
           </div>
@@ -74,15 +74,15 @@ export default function SincronizacionPage() {
               <div className="flex h-12 w-12 items-center justify-center rounded-full bg-success-soft text-success">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="h-6 w-6"><path d="M20 6 9 17l-5-5" /></svg>
               </div>
-              <p className="text-[15px] font-semibold">Todo sincronizado</p>
-              <p className="max-w-sm text-[13px] text-ink-3">No hay conflictos pendientes. Si dos dispositivos editan los mismos datos sin conexión, aparecerán aquí para que elijas qué versión conservar.</p>
+              <p className="text-15 font-semibold">Todo sincronizado</p>
+              <p className="max-w-sm text-13 text-ink-3">No hay conflictos pendientes. Si dos dispositivos editan los mismos datos sin conexión, aparecerán aquí para que elijas qué versión conservar.</p>
             </div>
           )}
 
           {conflictos !== null && conflictos.length > 0 && (
             <>
-              <div className="mb-4 flex flex-wrap items-center justify-between gap-x-3 gap-y-2.5 rounded-lg border border-[#E8DCC0] bg-warning-soft px-4 py-3">
-                <p className="text-[13px] font-medium text-warning">
+              <div className="mb-4 flex flex-wrap items-center justify-between gap-x-3 gap-y-2.5 rounded-lg border border-warning-line bg-warning-soft px-4 py-3">
+                <p className="text-13 font-medium text-warning">
                   {conflictos.length} conflicto{conflictos.length === 1 ? "" : "s"} por resolver · {elegidos} elegido{elegidos === 1 ? "" : "s"}
                 </p>
                 <Button onClick={aplicar} disabled={elegidos === 0 || aplicando}>{aplicando ? "Aplicando…" : "Aplicar resoluciones"}</Button>
@@ -92,9 +92,9 @@ export default function SincronizacionPage() {
                 {conflictos.map((c) => (
                   <div key={c.id} className="rounded-lg border border-line bg-surface p-4">
                     <div className="mb-2 flex items-center gap-2">
-                      <span className="rounded bg-sel px-2 py-0.5 text-[11px] font-bold uppercase text-ink-3">{c.entidad}</span>
-                      <span className="text-[13px] font-semibold">{c.tipo}</span>
-                      {c.diferencia && <span className="text-[12px] text-ink-3">· {c.diferencia}</span>}
+                      <span className="rounded bg-sel px-2 py-0.5 text-11 font-bold uppercase text-ink-3">{c.entidad}</span>
+                      <span className="text-13 font-semibold">{c.tipo}</span>
+                      {c.diferencia && <span className="text-12 text-ink-3">· {c.diferencia}</span>}
                     </div>
                     <div className="flex flex-col gap-2.5 md:flex-row">
                       <Version titulo="Este dispositivo" sub="Versión capturada sin conexión" payload={c.payloadLocal}

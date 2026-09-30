@@ -57,7 +57,7 @@ export function BandaAcceso({ mensaje, desde }: { mensaje: string; desde: string
   return (
     <div
       role="status"
-      className="flex flex-wrap items-center justify-center gap-x-2 bg-warning-soft px-4 py-2 text-center text-[13px] font-semibold text-warning"
+      className="flex flex-wrap items-center justify-center gap-x-2 bg-warning-soft px-4 py-2 text-center text-13 font-semibold text-warning"
     >
       <span>{mensaje}</span>
       {f && <span className="font-normal text-ink-2">La caja dejará de vender el {f}.</span>}
@@ -80,7 +80,7 @@ export function BandaActualizacion({ version }: { version: string }) {
   return (
     <div
       role="status"
-      className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1 bg-info-soft px-4 py-2 text-center text-[13px] text-info"
+      className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1 bg-info-soft px-4 py-2 text-center text-13 text-info"
     >
       <span className="font-semibold">Hay una versión nueva de VIM POS ({version}).</span>
       <span className="text-ink-2">
@@ -92,7 +92,7 @@ export function BandaActualizacion({ version }: { version: string }) {
         type="button"
         onClick={() => void instalar()}
         disabled={estado === "revisando"}
-        className="h-8 rounded border border-info px-3 text-[12.5px] font-semibold text-info transition-transform duration-150 ease-vim active:scale-[.97] disabled:opacity-60"
+        className="h-8 rounded border border-info px-3 text-13 font-semibold text-info transition-transform duration-150 ease-vim active:scale-[.97] disabled:opacity-60"
       >
         {estado === "revisando" ? "Abriendo…" : "Instalar"}
       </button>

@@ -14,7 +14,7 @@ import { mensajeError } from "../lib/errores";
 
 const input =
   "h-11 w-full rounded border border-line-strong px-3 text-sm outline-none focus:border-ink focus:shadow-[0_0_0_3px_rgba(22,22,26,.06)]";
-const label = "mb-1.5 block text-[13px] font-medium text-ink-2";
+const label = "mb-1.5 block text-13 font-medium text-ink-2";
 
 export function ModalCaja({
   caja,
@@ -122,7 +122,7 @@ export function ModalCaja({
           <div>
             <label className={label} htmlFor="c-suc-nueva">Sucursal</label>
             <input id="c-suc-nueva" className={input} value={nombreSucursal} maxLength={150} onChange={(e) => setNombreSucursal(e.target.value)} />
-            <p className="mt-1.5 text-[12.5px] text-ink-2">Es tu primera caja: con ella se crea tu sucursal. Si tienes más de una, las agregas después en Sucursales.</p>
+            <p className="mt-1.5 text-13 text-ink-2">Es tu primera caja: con ella se crea tu sucursal. Si tienes más de una, las agregas después en Sucursales.</p>
           </div>
         ) : (
           <div>

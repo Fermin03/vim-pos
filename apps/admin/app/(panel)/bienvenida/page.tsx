@@ -60,11 +60,11 @@ export default function BienvenidaPage() {
 
   return (
     <div className="mx-auto flex min-h-full w-full max-w-[680px] flex-col px-4 py-8 sm:px-6 sm:py-10">
-      <div className="mb-1 text-[13px] font-semibold uppercase tracking-[0.08em] text-accent">Bienvenido a VIM POS</div>
-      <h1 className="font-display text-[24px] font-bold leading-tight tracking-tight sm:text-[30px]">
+      <div className="mb-1 text-13 font-semibold uppercase tracking-[0.08em] text-accent">Bienvenido a VIM POS</div>
+      <h1 className="font-display text-24 font-bold leading-tight tracking-tight sm:text-32">
         {primer ? `Hola, ${primer}.` : "¡Hola!"} Pongamos tu negocio a vender.
       </h1>
-      <p className="mt-2 text-[15px] text-ink-2">
+      <p className="mt-2 text-15 text-ink-2">
         Estos son los pasos para dejar todo listo. Puedes hacerlos en cualquier orden y se marcan solos
         cuando los terminas.
       </p>
@@ -76,7 +76,7 @@ export default function BienvenidaPage() {
         <>
           {/* Progreso */}
           <div className="mt-6 rounded-lg border border-line bg-surface p-4">
-            <div className="mb-2 flex items-center justify-between text-[13.5px]">
+            <div className="mb-2 flex items-center justify-between text-14">
               <span id="progreso-titulo" className="font-semibold">Tu avance</span>
               <span className="tabular-nums text-ink-2">{estado.obligatoriosHechos} de {estado.obligatoriosTotal} pasos</span>
             </div>
@@ -104,14 +104,14 @@ export default function BienvenidaPage() {
                 className={`flex flex-col items-start gap-3 rounded-lg border p-4 sm:flex-row sm:items-center sm:gap-4 ${p.completo ? "border-line bg-sel" : "border-line-strong bg-surface"}`}
               >
                 <div className={`flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full ${p.completo ? "bg-success text-white" : "border border-line-strong text-ink-3"}`}>
-                  {p.completo ? <IconCheck /> : <span className="text-[13px] font-bold">{i + 1}</span>}
+                  {p.completo ? <IconCheck /> : <span className="text-13 font-bold">{i + 1}</span>}
                 </div>
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2">
-                    <span className={`text-[14.5px] font-semibold ${p.completo ? "text-ink-2" : ""}`}>{p.titulo}</span>
-                    {p.opcional && <span className="rounded-full bg-hover px-2 py-0.5 text-[12px] font-semibold text-ink-2">Opcional</span>}
+                    <span className={`text-15 font-semibold ${p.completo ? "text-ink-2" : ""}`}>{p.titulo}</span>
+                    {p.opcional && <span className="rounded-full bg-hover px-2 py-0.5 text-12 font-semibold text-ink-2">Opcional</span>}
                   </div>
-                  <div className="mt-0.5 text-[13.5px] text-ink-2">{p.descripcion}</div>
+                  <div className="mt-0.5 text-14 text-ink-2">{p.descripcion}</div>
                 </div>
                 <Link
                   href={p.href}
@@ -127,8 +127,8 @@ export default function BienvenidaPage() {
           <div className="mt-6 rounded-lg border border-line bg-surface p-5">
             {estado.listoParaVender ? (
               <>
-                <h2 className="font-display text-[17px] font-semibold">Todo listo para vender</h2>
-                <p className="mt-1 text-[14px] text-ink-2">
+                <h2 className="font-display text-18 font-semibold">Todo listo para vender</h2>
+                <p className="mt-1 text-14 text-ink-2">
                   En la computadora de tu caja, entra a VIM POS con el PIN de un cajero y abre el turno.
                 </p>
                 <div className="mt-4 flex flex-wrap gap-2">
@@ -138,8 +138,8 @@ export default function BienvenidaPage() {
               </>
             ) : (
               <>
-                <h2 className="font-display text-[15px] font-semibold">{faltan === 1 ? "Te falta 1 paso" : `Te faltan ${faltan} pasos`}</h2>
-                <p className="mt-1 text-[14px] text-ink-2">
+                <h2 className="font-display text-15 font-semibold">{faltan === 1 ? "Te falta 1 paso" : `Te faltan ${faltan} pasos`}</h2>
+                <p className="mt-1 text-14 text-ink-2">
                   Puedes salir y volver cuando quieras: esta lista te espera en el inicio del panel hasta que termines.
                 </p>
                 <div className="mt-4">

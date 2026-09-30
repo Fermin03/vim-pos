@@ -40,15 +40,15 @@ export function AvisosCliente({ api, tenantId, nombre }: { api: Api; tenantId: s
         <label className={`${label} mb-0`}>Avisos de VIM a sus cajas</label>
         <Link
           href={`/avisos?cliente=${tenantId}`}
-          className="btn h-8 rounded border border-line-strong px-3 text-[12.5px] font-semibold text-ink-2 hover:border-ink hover:text-ink"
+          className="btn h-8 rounded border border-line-strong px-3 text-13 font-semibold text-ink-2 hover:border-ink hover:text-ink"
         >
           Escribirle un aviso
         </Link>
       </div>
 
-      {avisos === null && <p className="text-[12.5px] text-ink-3">Cargando…</p>}
+      {avisos === null && <p className="text-13 text-ink-3">Cargando…</p>}
       {avisos && avisos.length === 0 && (
-        <p className="text-[12.5px] text-ink-3">No le estamos mostrando ningún aviso a {nombre}.</p>
+        <p className="text-13 text-ink-3">No le estamos mostrando ningún aviso a {nombre}.</p>
       )}
       <div className="flex flex-col gap-1.5">
         {(avisos ?? []).map((a) => (
@@ -56,14 +56,14 @@ export function AvisosCliente({ api, tenantId, nombre }: { api: Api; tenantId: s
             <div className="min-w-0">
               <div className="flex flex-wrap items-center gap-2">
                 <StatusChip tone={NIVEL[a.nivel]?.tono ?? "neutral"}>{NIVEL[a.nivel]?.nombre ?? a.nivel}</StatusChip>
-                <span className="text-[13px] font-semibold">{a.titulo}</span>
-                {a.tenantId === null && <span className="text-[11px] text-ink-3">(a todos los clientes)</span>}
+                <span className="text-13 font-semibold">{a.titulo}</span>
+                {a.tenantId === null && <span className="text-11 text-ink-3">(a todos los clientes)</span>}
               </div>
-              <div className="mt-0.5 text-[11.5px] text-ink-3">
+              <div className="mt-0.5 text-12 text-ink-3">
                 {a.vigenteHasta ? `hasta el ${fechaHoraMx(a.vigenteHasta, "corto")}` : "sin fecha de fin"}
               </div>
             </div>
-            <span className="flex-shrink-0 text-[12px] tabular-nums text-ink-2">
+            <span className="flex-shrink-0 text-12 tabular-nums text-ink-2">
               visto por {a.vistos} de {a.cajasAlcance}
             </span>
           </div>

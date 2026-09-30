@@ -31,10 +31,10 @@ module.exports = {
         // Tinta
         ink: { DEFAULT: token("ink"), 2: token("ink-2"), 3: token("ink-3") },
         // Semánticos
-        success: { DEFAULT: token("success"), soft: token("success-soft") },
-        warning: { DEFAULT: token("warning"), soft: token("warning-soft") },
-        danger: { DEFAULT: token("danger"), soft: token("danger-soft") },
-        info: { DEFAULT: token("info"), soft: token("info-soft") },
+        success: { DEFAULT: token("success"), soft: token("success-soft"), line: token("success-line") },
+        warning: { DEFAULT: token("warning"), soft: token("warning-soft"), line: token("warning-line") },
+        danger: { DEFAULT: token("danger"), soft: token("danger-soft"), line: token("danger-line") },
+        info: { DEFAULT: token("info"), soft: token("info-soft"), line: token("info-line") },
         // Superficies / líneas
         bg: token("bg"),
         surface: token("surface"),
@@ -63,6 +63,19 @@ module.exports = {
         sans: ["'Inter Tight'", "system-ui", "sans-serif"],
         display: ["Sora", "system-ui", "sans-serif"],
         mono: ["'JetBrains Mono'", "ui-monospace", "monospace"], // tickets/reportes
+      },
+      // Escala tipográfica: `text-13`, `text-24`… Doce pasos en vez de los ~35 tamaños sueltos
+      // (`text-13`, `text-14`…) que había repartidos en 1,750 clases (revisión de
+      // diseño, sep 2026). Los nombres dicen el tamaño, igual que los `--t-*` del sitio.
+      //   11 micro (chips, horas)   12 etiquetas   13 texto de interfaz   14 controles
+      //   15 texto destacado        16 campos en celular y cifras chicas
+      //   18 · 20 títulos de bloque y de diálogo   24 · 28 · 32 · 40 títulos de página y cifras
+      // Solo el tamaño: el interlineado sigue en `leading-*`, como con las clases a mano.
+      // `text-xs/sm/base/lg/xl/2xl` de Tailwind caen en 12/14/16/18/20/24, dentro de la escala.
+      // `pnpm tipografia` falla si alguien vuelve a escribir un `text-[Npx]`.
+      fontSize: {
+        11: "11px", 12: "12px", 13: "13px", 14: "14px", 15: "15px", 16: "16px",
+        18: "18px", 20: "20px", 24: "24px", 28: "28px", 32: "32px", 40: "40px",
       },
       borderRadius: { sm: "4px", DEFAULT: "6px", lg: "8px" },
       spacing: {

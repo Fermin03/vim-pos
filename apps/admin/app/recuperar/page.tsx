@@ -6,7 +6,7 @@ import { enviarEnlaceRecuperacion } from "../lib/supabase";
 import { mensajeError } from "../lib/errores";
 
 const inputCls =
-  "w-full rounded border border-line-strong bg-surface px-[13px] py-3 text-[15px] outline-none transition focus:border-ink focus:shadow-[0_0_0_3px_rgba(22,22,26,.06)]";
+  "w-full rounded border border-line-strong bg-surface px-[13px] py-3 text-15 outline-none transition focus:border-ink focus:shadow-[0_0_0_3px_rgba(22,22,26,.06)]";
 
 /** Enmascara el correo para la confirmación (P-004): "mario@knockout.com" → "m•••@knockout.com". */
 function enmascarar(email: string): string {
@@ -65,18 +65,18 @@ export default function RecuperarPage() {
       <div className="flex w-full max-w-[380px] flex-col">
         <div className="mb-8 flex flex-col items-center gap-4">
           <LogoVim className="h-[46px] w-[46px]" />
-          <div className="font-display text-[19px] font-bold tracking-tight">VIM POS<span className="text-accent">.</span></div>
+          <div className="font-display text-20 font-bold tracking-tight">VIM POS<span className="text-accent">.</span></div>
         </div>
 
         {!enviado ? (
           <>
             <div className="mb-8 text-center">
-              <h1 className="mb-1.5 font-display text-[26px] font-semibold tracking-tight">Restablece tu contraseña</h1>
+              <h1 className="mb-1.5 font-display text-28 font-semibold tracking-tight">Restablece tu contraseña</h1>
               <p className="text-sm text-ink-2">Escribe tu correo y te enviaremos un enlace para crear una nueva.</p>
             </div>
             <form onSubmit={enviar} noValidate>
               <div className="mb-5">
-                <label htmlFor="email" className="mb-[7px] block text-[13px] font-medium text-ink-2">Correo electrónico</label>
+                <label htmlFor="email" className="mb-[7px] block text-13 font-medium text-ink-2">Correo electrónico</label>
                 <input
                   id="email"
                   type="email"
@@ -88,7 +88,7 @@ export default function RecuperarPage() {
                   className={inputCls}
                   aria-invalid={error ? true : undefined}
                 />
-                {error && <p className="mt-1.5 text-[13px] font-medium text-danger" role="alert">{error}</p>}
+                {error && <p className="mt-1.5 text-13 font-medium text-danger" role="alert">{error}</p>}
               </div>
               <Button type="submit" size="lg" className="w-full" disabled={cargando}>
                 {cargando ? "Enviando…" : "Enviar enlace"}
@@ -103,11 +103,11 @@ export default function RecuperarPage() {
                 <path d="m2 7 10 6 10-6" />
               </svg>
             </div>
-            <h1 className="mb-1.5 font-display text-[26px] font-semibold tracking-tight">Revisa tu correo</h1>
+            <h1 className="mb-1.5 font-display text-28 font-semibold tracking-tight">Revisa tu correo</h1>
             <p className="text-sm leading-relaxed text-ink-2">
               Si existe una cuenta, enviamos un enlace para restablecer tu contraseña a <b className="text-ink">{enmascarar(email.trim())}</b>.
             </p>
-            <p className="mt-3 text-[13px] text-ink-3">¿No lo ves? Revisa tu carpeta de spam o correo no deseado.</p>
+            <p className="mt-3 text-13 text-ink-3">¿No lo ves? Revisa tu carpeta de spam o correo no deseado.</p>
             {error && <p className="mt-4 text-sm font-medium text-danger" role="alert">{error}</p>}
             <Button variant="ghost" className="mt-6 w-full" onClick={reenviar} disabled={cargando}>
               {cargando ? "Reenviando…" : reenviado ? "Enlace reenviado ✓" : "Reenviar enlace"}
@@ -116,7 +116,7 @@ export default function RecuperarPage() {
         )}
 
         <div className="mt-6 text-center">
-          <Link href="/" className="text-[13px] font-medium text-ink-2 transition-colors hover:text-ink">
+          <Link href="/" className="text-13 font-medium text-ink-2 transition-colors hover:text-ink">
             Volver a inicio de sesión
           </Link>
         </div>

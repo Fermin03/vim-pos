@@ -126,8 +126,8 @@ export default function VersionesPage() {
 
   return (
     <div>
-      <h1 className="mb-1 font-display text-[18px] font-semibold tracking-tight">Versiones de la caja</h1>
-      <p className="mb-5 text-[12.5px] text-ink-3">
+      <h1 className="mb-1 font-display text-18 font-semibold tracking-tight">Versiones de la caja</h1>
+      <p className="mb-5 text-13 text-ink-3">
         Qué versión corre cada caja, y desde dónde se publica la siguiente. Publicar no obliga a
         nadie: la caja se actualiza sola cuando le toca. Exigir una versión mínima sí puede
         impedirle vender, y por eso se enciende aparte.
@@ -144,23 +144,23 @@ export default function VersionesPage() {
 
       <section className="rounded-lg border border-line bg-surface">
         <div className="flex items-center justify-between border-b border-line px-4 py-3">
-          <h2 className="font-display text-[16px] font-semibold tracking-tight">Parque de cajas</h2>
-          <label className="flex items-center gap-2 text-[12.5px] text-ink-2">
+          <h2 className="font-display text-16 font-semibold tracking-tight">Parque de cajas</h2>
+          <label className="flex items-center gap-2 text-13 text-ink-2">
             <input type="checkbox" checked={soloAtras} onChange={(e) => setSoloAtras(e.target.checked)} />
             Solo desactualizadas
           </label>
         </div>
         {versiones === null && !error && <p className="p-4 text-sm text-ink-3">Cargando…</p>}
         {versiones !== null && listadas.length === 0 && (
-          <p className="p-6 text-center text-[13px] text-ink-3">
+          <p className="p-6 text-center text-13 text-ink-3">
             {soloAtras ? "Ninguna caja está por debajo de la mínima." : "Todavía no hay cajas activas."}
           </p>
         )}
         {listadas.length > 0 && (
           <div className="overflow-x-auto">
-            <table className="w-full text-[13px]">
+            <table className="w-full text-13">
               <thead>
-                <tr className="border-b border-line text-left text-[11.5px] uppercase tracking-wide text-ink-3">
+                <tr className="border-b border-line text-left text-12 uppercase tracking-wide text-ink-3">
                   <th className="px-4 py-2 font-semibold">Cliente</th>
                   <th className="px-4 py-2 font-semibold">Sucursal</th>
                   <th className="px-4 py-2 font-semibold">Caja</th>
@@ -194,7 +194,7 @@ export default function VersionesPage() {
           </div>
         )}
         {cifras.sinLatido > 0 && !soloAtras && (
-          <p className="border-t border-line px-4 py-2.5 text-[11.5px] text-ink-3">
+          <p className="border-t border-line px-4 py-2.5 text-12 text-ink-3">
             Las cajas en gris no reportan versión porque instalaron VIM POS antes de la 0.4.60. No
             están caídas: se pondrán al corriente en cuanto se actualicen.
           </p>
@@ -211,7 +211,7 @@ export default function VersionesPage() {
           <textarea
             id="ver-manifiesto"
             aria-label="Manifiesto de la versión"
-            className={`${input} h-40 py-2 font-mono text-[12px]`}
+            className={`${input} h-40 py-2 font-mono text-12`}
             value={manifiesto}
             onChange={(e) => { setManifiesto(e.target.value); setPublicado(null); }}
             placeholder={'{\n  "version": "0.4.62",\n  "url": "https://github.com/…",\n  "sha512": "…",\n  "notas": "…"\n}'}
@@ -225,11 +225,11 @@ export default function VersionesPage() {
               Publicar
             </button>
             {manifiesto.trim().length > 0 && !parseable && (
-              <span className="text-[12.5px] text-ink-3">Eso todavía no es un JSON con versión.</span>
+              <span className="text-13 text-ink-3">Eso todavía no es un JSON con versión.</span>
             )}
           </div>
           {publicado && (
-            <p className="mt-3 rounded border border-line bg-sel px-3 py-2 text-[12.5px] text-ink-2">
+            <p className="mt-3 rounded border border-line bg-sel px-3 py-2 text-13 text-ink-2">
               Publicada la <b>{publicado}</b>. El CDN puede seguir sirviendo la versión anterior
               hasta un minuto: si compruebas el enlace ahora mismo y ves la vieja, no es un error.
             </p>
@@ -241,14 +241,14 @@ export default function VersionesPage() {
       <div className="mt-6">
         <Seccion id="historial" titulo="Publicadas" descripcion="La más alta publicada es la que se recomienda a las cajas.">
           {versiones !== null && versiones.length === 0 && (
-            <p className="text-[13px] text-ink-3">Todavía no se ha publicado ninguna versión desde el panel.</p>
+            <p className="text-13 text-ink-3">Todavía no se ha publicado ninguna versión desde el panel.</p>
           )}
           <div className="flex flex-col">
             {(versiones ?? []).map((v) => (
               <div key={v.version} className="flex flex-wrap items-start justify-between gap-3 border-b border-line py-3 last:border-0">
                 <div className="min-w-0">
                   <div className="flex flex-wrap items-center gap-2">
-                    <span className="font-display text-[14.5px] font-semibold tabular-nums">{v.version}</span>
+                    <span className="font-display text-15 font-semibold tabular-nums">{v.version}</span>
                     {v.es_minima && (
                       <StatusChip>mínima</StatusChip>
                     )}
@@ -256,14 +256,14 @@ export default function VersionesPage() {
                       <StatusChip tone="danger">exigida</StatusChip>
                     )}
                     {!v.publicada && (
-                      <span className="rounded-full bg-sel px-2 py-0.5 text-[11px] font-semibold text-ink-3">retirada</span>
+                      <span className="rounded-full bg-sel px-2 py-0.5 text-11 font-semibold text-ink-3">retirada</span>
                     )}
                   </div>
-                  <div className="mt-0.5 text-[12px] text-ink-3">
+                  <div className="mt-0.5 text-12 text-ink-3">
                     {fechaCorta(v.fecha ?? v.created_at.slice(0, 10))}
                     {v.bloquea_desde && ` · bloquea desde el ${fechaHoraMx(v.bloquea_desde, "corto")}`}
                   </div>
-                  {v.notas && <p className="mt-1 whitespace-pre-wrap text-[12.5px] leading-snug text-ink-2">{v.notas}</p>}
+                  {v.notas && <p className="mt-1 whitespace-pre-wrap text-13 leading-snug text-ink-2">{v.notas}</p>}
                 </div>
                 <div className="flex flex-shrink-0 flex-wrap items-center gap-1.5">
                   {!v.es_minima && v.publicada && (
@@ -288,7 +288,7 @@ export default function VersionesPage() {
               </div>
             ))}
           </div>
-          <p className="mt-4 text-[11.5px] text-ink-3">{textoActualizado(hace)}</p>
+          <p className="mt-4 text-12 text-ink-3">{textoActualizado(hace)}</p>
         </Seccion>
       </div>
 
@@ -304,7 +304,7 @@ export default function VersionesPage() {
         }
         detalle={
           nueva && (
-            <div className="flex flex-col gap-2 text-[13px]">
+            <div className="flex flex-col gap-2 text-13">
               <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2 rounded border border-line bg-sel px-3 py-2.5">
                 <div>{vigente ?? "ninguna"}</div>
                 <span className="text-ink-2" aria-hidden="true">→</span>
@@ -388,8 +388,8 @@ function descripcionDe(tipo: string, version: string) {
 function Cifra({ n, texto, alerta }: { n: number; texto: string; alerta?: boolean }) {
   return (
     <div className={["rounded-lg border bg-surface px-4 py-3", alerta ? "border-warning/40" : "border-line"].join(" ")}>
-      <div className={["font-display text-[22px] font-semibold tabular-nums", alerta ? "text-warning" : ""].join(" ")}>{n}</div>
-      <div className="text-[12px] text-ink-3">{texto}</div>
+      <div className={["font-display text-24 font-semibold tabular-nums", alerta ? "text-warning" : ""].join(" ")}>{n}</div>
+      <div className="text-12 text-ink-3">{texto}</div>
     </div>
   );
 }
@@ -400,7 +400,7 @@ function Boton({ onClick, disabled, peligroso, children }: { onClick: () => void
       onClick={onClick}
       disabled={disabled}
       className={[
-        "btn h-8 rounded border px-3 text-[12.5px] font-semibold disabled:opacity-50",
+        "btn h-8 rounded border px-3 text-13 font-semibold disabled:opacity-50",
         peligroso ? "border-danger/40 text-danger hover:bg-danger/5" : "border-line-strong text-ink-2 hover:border-ink hover:text-ink",
       ].join(" ")}
     >

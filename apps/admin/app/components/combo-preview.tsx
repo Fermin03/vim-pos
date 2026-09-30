@@ -44,10 +44,10 @@ export function ComboPreview({ comboId, base, refreshToken }: { comboId: string;
   return (
     <div className="rounded-lg border border-line bg-surface p-4" aria-live="polite">
       <h2 className="font-display text-base font-semibold">Cuánto va a pagar el cliente</h2>
-      <p className="mb-3 text-[13px] text-ink-2">Tal como lo calcula la caja. Se actualiza con cada cambio.</p>
+      <p className="mb-3 text-13 text-ink-2">Tal como lo calcula la caja. Se actualiza con cada cambio.</p>
 
       {avisoPrimerSlot && (
-        <p className="mb-3 rounded border border-warning/30 bg-warning-soft px-3 py-2 text-[13px] font-medium text-warning">
+        <p className="mb-3 rounded border border-warning/30 bg-warning-soft px-3 py-2 text-13 font-medium text-warning">
           El primer paso ({primero.nombre}) no cobra el producto elegido: todas sus opciones costarán lo mismo dentro
           del combo. Si es la hamburguesa (o el producto principal), elige «Se cobra el precio del producto elegido».
         </p>
@@ -59,8 +59,8 @@ export function ComboPreview({ comboId, base, refreshToken }: { comboId: string;
       {principales.length > 0 && (
         <ul className="flex flex-col gap-1">
           {principales.map((p) => (
-            <li key={p.nombre} className="flex items-baseline justify-between gap-3 font-display text-[15px] tabular-nums">
-              <span className="font-sans text-[14px]">Con {p.nombre}</span>
+            <li key={p.nombre} className="flex items-baseline justify-between gap-3 font-display text-15 tabular-nums">
+              <span className="font-sans text-14">Con {p.nombre}</span>
               <span className="font-semibold">{precioMxn(p.precio)}</span>
             </li>
           ))}
@@ -69,8 +69,8 @@ export function ComboPreview({ comboId, base, refreshToken }: { comboId: string;
 
       {deltas.length > 0 && (
         <div className="mt-3 border-t border-line pt-3">
-          <p className="mb-1 text-[13px] font-medium text-ink-2">Cambios que cuestan distinto</p>
-          <ul className="flex flex-col gap-0.5 text-[13.5px] tabular-nums text-ink-2">
+          <p className="mb-1 text-13 font-medium text-ink-2">Cambios que cuestan distinto</p>
+          <ul className="flex flex-col gap-0.5 text-14 tabular-nums text-ink-2">
             {deltas.map((d) => (
               <li key={d.slot + d.nombre} className="flex justify-between gap-3">
                 <span>{d.nombre}</span>

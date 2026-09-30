@@ -46,12 +46,12 @@ export function SaludTenant({ api, id }: { api: Api; id: string }) {
   }, [api, id]);
   useRefresco(cargar);
 
-  if (error && !s) return <p className="text-[13px] text-danger" role="alert">{error}</p>;
-  if (!s) return <p className="text-[13px] text-ink-2">Cargando salud…</p>;
+  if (error && !s) return <p className="text-13 text-danger" role="alert">{error}</p>;
+  if (!s) return <p className="text-13 text-ink-2">Cargando salud…</p>;
 
   return (
     <div>
-      <div className="mb-2 flex flex-wrap gap-x-4 gap-y-1 text-[12.5px] text-ink-2">
+      <div className="mb-2 flex flex-wrap gap-x-4 gap-y-1 text-13 text-ink-2">
         <span>
           Sucursales: <b>{s.sucursalesActivas}/{s.sucursales}</b>
         </span>
@@ -63,10 +63,10 @@ export function SaludTenant({ api, id }: { api: Api; id: string }) {
       </div>
 
       {s.cajas.length === 0 ? (
-        <p className="text-[12.5px] text-ink-3">Sin cajas dadas de alta todavía.</p>
+        <p className="text-13 text-ink-3">Sin cajas dadas de alta todavía.</p>
       ) : (
         <div className="overflow-x-auto rounded border border-line">
-          <table className="w-full min-w-[640px] text-[13px]">
+          <table className="w-full min-w-[640px] text-13">
             <thead className="bg-sel text-ink-3">
               <tr>
                 <th className="p-2 text-left font-semibold">Caja</th>
@@ -86,7 +86,7 @@ export function SaludTenant({ api, id }: { api: Api; id: string }) {
                     <StatusChip tone={TONO[c.estado] ?? "neutral"} punto>
                       {TEXTO[c.estado] ?? c.estado}
                     </StatusChip>
-                    {c.bloqueoMotivo && <span className="ml-1 text-[11px] text-ink-3">{c.bloqueoMotivo}</span>}
+                    {c.bloqueoMotivo && <span className="ml-1 text-11 text-ink-3">{c.bloqueoMotivo}</span>}
                   </td>
                   <td className="p-2 text-ink-2">
                     {c.versionApp ?? <span className="text-ink-3">anterior a 0.4.60</span>}
@@ -101,7 +101,7 @@ export function SaludTenant({ api, id }: { api: Api; id: string }) {
                         señales sí: "Conectada" apoyado en una venta de hace tres horas no es lo
                         mismo, y en soporte esa diferencia decide si hay que llamar al cliente. */}
                     {c.origenSenal && c.origenSenal !== "latido" && c.origenSenal !== "conexion" && (
-                      <span className="ml-1.5 text-[11px] font-normal text-ink-3">
+                      <span className="ml-1.5 text-11 font-normal text-ink-3">
                         ({c.origenSenal === "sync" ? "por sync" : "por su última venta"})
                       </span>
                     )}
@@ -123,14 +123,14 @@ export function SaludTenant({ api, id }: { api: Api; id: string }) {
         return (
           <div className="mt-3 rounded-lg border border-danger/30 bg-danger/5 p-3.5" role="alert">
             <div className="flex items-baseline justify-between gap-2">
-              <span className="font-display text-[13.5px] font-semibold text-danger">
+              <span className="font-display text-14 font-semibold text-danger">
                 La nube rechazó {fallido.errores} {fallido.errores === 1 ? "fila" : "filas"} al sincronizar
               </span>
-              <span className="flex-shrink-0 text-[11.5px] text-ink-3">
+              <span className="flex-shrink-0 text-12 text-ink-3">
                 {hace(fallido.fecha)}{fallido.dispositivo ? ` · ${fallido.dispositivo}` : ""}
               </span>
             </div>
-            <p className="mt-1 text-[12px] text-ink-2">
+            <p className="mt-1 text-12 text-ink-2">
               Entraron {fallido.exitosas} de {fallido.total}. Lo rechazado se reintenta solo; si el
               motivo no se corrige, se quedará ahí.
             </p>
@@ -138,10 +138,10 @@ export function SaludTenant({ api, id }: { api: Api; id: string }) {
               <ul className="mt-2 flex flex-col gap-1">
                 {fallido.detalles.map((d, i) => (
                   <li key={`${d.id}-${i}`} className="rounded border border-line bg-surface px-2.5 py-1.5">
-                    <span className="font-mono text-[11px] font-semibold text-ink-2">
+                    <span className="font-mono text-11 font-semibold text-ink-2">
                       {d.tabla}{d.id ? ` · ${d.id.slice(0, 8)}` : ""}
                     </span>
-                    <span className="mt-0.5 block break-words text-[11.5px] leading-snug text-ink-3">{d.error}</span>
+                    <span className="mt-0.5 block break-words text-12 leading-snug text-ink-3">{d.error}</span>
                   </li>
                 ))}
               </ul>
@@ -152,10 +152,10 @@ export function SaludTenant({ api, id }: { api: Api; id: string }) {
 
       {s.sync.length > 0 && (
         <details className="mt-2">
-          <summary className="cursor-pointer text-[12px] font-semibold text-ink-2">Últimas sincronizaciones</summary>
+          <summary className="cursor-pointer text-12 font-semibold text-ink-2">Últimas sincronizaciones</summary>
           <div className="mt-1.5 flex flex-col gap-1">
             {s.sync.slice(0, 8).map((e) => (
-              <div key={e.id} className="flex items-baseline justify-between gap-2 border-b border-line py-1 text-[12px] last:border-0">
+              <div key={e.id} className="flex items-baseline justify-between gap-2 border-b border-line py-1 text-12 last:border-0">
                 <span className="truncate text-ink-2">
                   {hace(e.fecha)}
                   {e.dispositivo ? ` · ${e.dispositivo}` : ""}

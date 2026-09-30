@@ -80,31 +80,31 @@ export function CobroCompletado({
             <path d="M20 6 9 17l-5-5" />
           </svg>
         </div>
-        <h2 id="cobro-completado-titulo" className="mt-2.5 font-display text-[22px] font-semibold tracking-[-0.02em]">
+        <h2 id="cobro-completado-titulo" className="mt-2.5 font-display text-24 font-semibold tracking-[-0.02em]">
           Cobro completado
         </h2>
-        {folio && <div className="text-[13px] text-ink-3">Ticket {folio}</div>}
+        {folio && <div className="text-13 text-ink-3">Ticket {folio}</div>}
 
         {conCambio ? (
           <>
-            <div className="mt-3 text-[16px] font-semibold text-success">Entrega de cambio</div>
+            <div className="mt-3 text-16 font-semibold text-success">Entrega de cambio</div>
             <div className="font-display text-[72px] font-bold leading-none tracking-[-0.03em] tabular-nums text-success">
               {fmtMxn(cambio)}
             </div>
             {total != null && (
-              <div className="mt-2 text-[16px] font-medium tabular-nums text-ink-2">
+              <div className="mt-2 text-16 font-medium tabular-nums text-ink-2">
                 Recibió {fmtMxn(total + cambio)} · Total {fmtMxn(total)}
               </div>
             )}
           </>
         ) : (
           total != null && (
-            <div className="mt-2 text-[16px] font-medium tabular-nums text-ink-2">Total {fmtMxn(total)} · sin cambio</div>
+            <div className="mt-2 text-16 font-medium tabular-nums text-ink-2">Total {fmtMxn(total)} · sin cambio</div>
           )
         )}
 
         {estadoTicket === "error" && (
-          <p className="mt-2 text-[14px] font-medium text-danger" role="alert">
+          <p className="mt-2 text-14 font-medium text-danger" role="alert">
             El ticket del cliente no se pudo armar.
           </p>
         )}
@@ -117,14 +117,14 @@ export function CobroCompletado({
               onImprimirCopia();
             }}
             disabled={!puedeImprimir}
-            className="h-14 w-[180px] flex-shrink-0 rounded-lg border border-line-strong bg-surface text-[16px] font-semibold text-ink transition-[transform,border-color] duration-150 ease-vim hover:border-ink active:scale-[.98] disabled:cursor-default disabled:opacity-50"
+            className="h-14 w-[180px] flex-shrink-0 rounded-lg border border-line-strong bg-surface text-16 font-semibold text-ink transition-[transform,border-color] duration-150 ease-vim hover:border-ink active:scale-[.98] disabled:cursor-default disabled:opacity-50"
           >
             {puedeImprimir || estadoTicket === "error" ? "Imprimir copia" : "Preparando…"}
           </button>
           <button
             type="button"
             onClick={onNuevoTicket}
-            className="h-14 min-w-0 flex-1 rounded-lg bg-accent font-display text-[18px] font-bold text-white transition-[transform,background-color] duration-150 ease-vim hover:bg-accent-hover active:scale-[.98]"
+            className="h-14 min-w-0 flex-1 rounded-lg bg-accent font-display text-18 font-bold text-white transition-[transform,background-color] duration-150 ease-vim hover:bg-accent-hover active:scale-[.98]"
           >
             Nuevo ticket ahora
           </button>
@@ -132,7 +132,7 @@ export function CobroCompletado({
 
         {!parada && !pausa && (
           <div className="mt-3.5 flex w-full flex-col gap-2">
-            <div className="text-[15px] font-medium tabular-nums text-ink-2">
+            <div className="text-15 font-medium tabular-nums text-ink-2">
               {restante > 0 ? (
                 <>
                   Se abre un ticket nuevo en <b className="text-ink">{restante} s</b>

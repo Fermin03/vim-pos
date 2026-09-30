@@ -38,9 +38,9 @@ function direccionDesde(nombre: string): string {
 }
 
 const input =
-  "w-full rounded border border-line-strong bg-surface px-[13px] py-3 text-[15px] outline-none transition-[border-color,box-shadow] focus:border-ink focus:shadow-[0_0_0_3px_rgba(22,22,26,.06)]";
-const label = "mb-[7px] block text-[13.5px] font-medium text-ink-2";
-const ayuda = "mt-1.5 text-[13px] text-ink-2";
+  "w-full rounded border border-line-strong bg-surface px-[13px] py-3 text-15 outline-none transition-[border-color,box-shadow] focus:border-ink focus:shadow-[0_0_0_3px_rgba(22,22,26,.06)]";
+const label = "mb-[7px] block text-14 font-medium text-ink-2";
+const ayuda = "mt-1.5 text-13 text-ink-2";
 
 export default function RegistroPage() {
   const router = useRouter();
@@ -128,12 +128,12 @@ export default function RegistroPage() {
       <div className="flex w-full max-w-[460px] flex-col">
         <div className="mb-8 flex flex-col items-center gap-4">
           <LogoVim className="h-[46px] w-[46px]" />
-          <div className="font-display text-[19px] font-bold tracking-tight">VIM POS<span className="text-accent">.</span></div>
+          <div className="font-display text-20 font-bold tracking-tight">VIM POS<span className="text-accent">.</span></div>
         </div>
 
         <div className="mb-6 text-center">
-          <h1 className="mb-1.5 font-display text-[26px] font-semibold tracking-tight">Empieza con VIM POS</h1>
-          <p className="text-[14.5px] text-ink-2">
+          <h1 className="mb-1.5 font-display text-28 font-semibold tracking-tight">Empieza con VIM POS</h1>
+          <p className="text-15 text-ink-2">
             {paso === 1 ? "Cuéntanos de tu negocio" : "Crea tu cuenta de dueño"} · paso {paso} de 2
           </p>
         </div>
@@ -195,7 +195,7 @@ export default function RegistroPage() {
               </div>
 
               {yaTieneCuenta && (
-                <p className="rounded border border-line-strong bg-sel px-3 py-2.5 text-[14px] text-ink-2" role="alert">
+                <p className="rounded border border-line-strong bg-sel px-3 py-2.5 text-14 text-ink-2" role="alert">
                   Ese correo ya tiene una cuenta.{" "}
                   <a href="/" className="font-semibold text-ink underline underline-offset-2">Inicia sesión</a>
                 </p>
@@ -212,7 +212,7 @@ export default function RegistroPage() {
           )}
         </div>
 
-        <p className="mt-6 text-center text-[14px] text-ink-2">
+        <p className="mt-6 text-center text-14 text-ink-2">
           ¿Ya tienes cuenta? <a href="/" className="font-medium text-ink underline-offset-2 hover:underline">Inicia sesión</a>
         </p>
       </div>

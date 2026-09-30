@@ -8,9 +8,9 @@ import { DialogoConfirmar } from "./dialogo-confirmar";
 type Accion = (b: Record<string, unknown>) => Promise<void>;
 
 const sub = "mb-1.5 flex items-center justify-between";
-const subTitulo = "text-[12px] font-semibold uppercase tracking-wide text-ink-2";
+const subTitulo = "text-12 font-semibold uppercase tracking-wide text-ink-2";
 const bloque = "rounded-lg border border-line p-3";
-const btnFantasma = "btn h-9 rounded border border-line-strong px-3 text-[13px] font-semibold hover:bg-hover disabled:opacity-50";
+const btnFantasma = "btn h-9 rounded border border-line-strong px-3 text-13 font-semibold hover:bg-hover disabled:opacity-50";
 
 /**
  * Lo que dar de baja cada add-on le hace al cliente. Va en el diálogo porque la baja antes era un
@@ -33,7 +33,7 @@ type Pendiente =
 /** Antes → después, en dos columnas. */
 function Cambio({ antes, despues }: { antes: ReactNode; despues: ReactNode }) {
   return (
-    <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2 rounded border border-line bg-sel px-3 py-2.5 text-[13px]">
+    <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2 rounded border border-line bg-sel px-3 py-2.5 text-13">
       <div>{antes}</div>
       <span className="text-ink-2" aria-hidden="true">→</span>
       <div className="font-semibold">{despues}</div>
@@ -98,9 +98,9 @@ export function FichaContrato({ d, planes, accion, busy }: { d: Detalle; planes:
               Cambiar plan…
             </button>
           </div>
-          <div className="text-[14px] font-semibold">{planTexto(actual)}</div>
+          <div className="text-14 font-semibold">{planTexto(actual)}</div>
           {retirado && (
-            <p className="mt-1 text-[12.5px] text-ink-2">Está en un plan que ya no se vende. Se le respeta mientras no se acuerde el cambio con él.</p>
+            <p className="mt-1 text-13 text-ink-2">Está en un plan que ya no se vende. Se le respeta mientras no se acuerde el cambio con él.</p>
           )}
         </div>
 
@@ -109,17 +109,17 @@ export function FichaContrato({ d, planes, accion, busy }: { d: Detalle; planes:
           <div className={sub}>
             <span className={subTitulo}>Cobro</span>
             {suscripcion
-              ? <span className={`rounded-full px-2 py-0.5 text-[12px] font-semibold ${suscripcion.estado === "ACTIVA" ? "bg-success-soft text-success" : "bg-warning-soft text-warning"}`}>{NOMBRE_SUSCRIPCION[suscripcion.estado] ?? suscripcion.estado}</span>
-              : <span className="text-[12.5px] text-ink-2">sin cobro</span>}
+              ? <span className={`rounded-full px-2 py-0.5 text-12 font-semibold ${suscripcion.estado === "ACTIVA" ? "bg-success-soft text-success" : "bg-warning-soft text-warning"}`}>{NOMBRE_SUSCRIPCION[suscripcion.estado] ?? suscripcion.estado}</span>
+              : <span className="text-13 text-ink-2">sin cobro</span>}
           </div>
           {suscripcion && (
-            <div className="mb-2 text-[13px] text-ink-2">
+            <div className="mb-2 text-13 text-ink-2">
               {fmtMxn(suscripcion.precio_mensual_mxn)}/mes{suscripcion.proxima_fecha_cobro ? ` · próximo cobro el ${fechaLegible(suscripcion.proxima_fecha_cobro)}` : ""}
             </div>
           )}
           <div className="flex flex-wrap gap-2">
             {(!suscripcion || suscripcion.estado === "PAUSADA") && (
-              <button onClick={() => setPendiente({ tipo: "suscripcion", estado: suscripcion ? "ACTIVA" : "NUEVA" })} disabled={busy} className="btn h-9 rounded bg-ink px-3 text-[13px] font-semibold text-white disabled:opacity-50">
+              <button onClick={() => setPendiente({ tipo: "suscripcion", estado: suscripcion ? "ACTIVA" : "NUEVA" })} disabled={busy} className="btn h-9 rounded bg-ink px-3 text-13 font-semibold text-white disabled:opacity-50">
                 {suscripcion ? "Reanudar cobro…" : "Activar cobro…"}
               </button>
             )}
@@ -129,7 +129,7 @@ export function FichaContrato({ d, planes, accion, busy }: { d: Detalle; planes:
           </div>
           {/* Cancelar, aparte y abajo: antes estaba junto a "Pausar", a un clic de distancia. */}
           {suscripcion && (
-            <button onClick={() => setPendiente({ tipo: "cancelar_suscripcion" })} disabled={busy} className="mt-3 text-[13px] font-semibold text-danger underline-offset-2 hover:underline disabled:opacity-50">
+            <button onClick={() => setPendiente({ tipo: "cancelar_suscripcion" })} disabled={busy} className="mt-3 text-13 font-semibold text-danger underline-offset-2 hover:underline disabled:opacity-50">
               Cancelar suscripción…
             </button>
           )}
@@ -141,7 +141,7 @@ export function FichaContrato({ d, planes, accion, busy }: { d: Detalle; planes:
         <div className={bloque}>
           <div className={sub}>
             <span className={subTitulo}>Alta</span>
-            <span className="rounded-full bg-sel px-2 py-0.5 text-[12px] font-semibold text-ink-2">{nombreFase(fase)}</span>
+            <span className="rounded-full bg-sel px-2 py-0.5 text-12 font-semibold text-ink-2">{nombreFase(fase)}</span>
           </div>
           <div className="flex flex-wrap gap-2">
             {fase !== "GO_LIVE" && fase !== "ABANDONADO" && (
@@ -152,7 +152,7 @@ export function FichaContrato({ d, planes, accion, busy }: { d: Detalle; planes:
             )}
           </div>
           {fase !== "ABANDONADO" && (
-            <button onClick={() => setPendiente({ tipo: "abandonado" })} disabled={busy} className="mt-3 text-[13px] font-semibold text-ink-2 underline-offset-2 hover:text-danger hover:underline disabled:opacity-50">
+            <button onClick={() => setPendiente({ tipo: "abandonado" })} disabled={busy} className="mt-3 text-13 font-semibold text-ink-2 underline-offset-2 hover:text-danger hover:underline disabled:opacity-50">
               Marcar como abandonado…
             </button>
           )}
@@ -163,15 +163,15 @@ export function FichaContrato({ d, planes, accion, busy }: { d: Detalle; planes:
         <div className="mt-4">
           <span className={label}>Add-ons</span>
           <div className="flex flex-col gap-2">
-            {d.catalogoAddons.length === 0 && <p className="text-[12.5px] text-ink-2">No hay add-ons en el catálogo.</p>}
+            {d.catalogoAddons.length === 0 && <p className="text-13 text-ink-2">No hay add-ons en el catálogo.</p>}
             {d.catalogoAddons.map((a) => {
               const contratado = d.addons.find((x) => x.addon?.codigo === a.codigo && x.activo);
               const precio = Number(contratado ? contratado.precio_mensual_mxn : a.precio_mensual_mxn);
               return (
                 <div key={a.id} className="flex items-center justify-between gap-3 rounded border border-line px-3 py-2">
                   <div className="min-w-0">
-                    <div className="text-[13.5px] font-semibold">{a.nombre}</div>
-                    <div className="text-[12.5px] text-ink-2">
+                    <div className="text-14 font-semibold">{a.nombre}</div>
+                    <div className="text-13 text-ink-2">
                       {/* Con fila contratada, el precio real es el que se grabó al contratar (puede ser
                           $0.00 si el plan lo incluye), no el de catálogo. */}
                       {fmtMxn(precio)}/mes{contratado ? ` · activo desde el ${fechaLegible(contratado.fecha_inicio)}` : ""}
@@ -180,7 +180,7 @@ export function FichaContrato({ d, planes, accion, busy }: { d: Detalle; planes:
                   <button
                     onClick={() => setPendiente(contratado ? { tipo: "addon_desactivar", addon: a, precio } : { tipo: "addon_activar", addon: a })}
                     disabled={busy}
-                    className={`btn h-9 shrink-0 rounded px-3 text-[13px] font-semibold disabled:opacity-50 ${contratado ? "border border-line-strong hover:bg-hover" : "bg-ink text-white"}`}
+                    className={`btn h-9 shrink-0 rounded px-3 text-13 font-semibold disabled:opacity-50 ${contratado ? "border border-line-strong hover:bg-hover" : "bg-ink text-white"}`}
                   >
                     {contratado ? "Dar de baja…" : "Activar…"}
                   </button>
@@ -196,10 +196,10 @@ export function FichaContrato({ d, planes, accion, busy }: { d: Detalle; planes:
         <label className={label} htmlFor="notas">Notas internas</label>
         <textarea id="notas" className={`${input} h-20 py-2`} value={notas} onChange={(e) => setNotas(e.target.value)} />
         <div className="mt-2 flex items-center gap-3">
-          <button onClick={() => void accion({ accion: "notas", notas }).catch(() => {})} disabled={busy || !notasSucias} className="btn h-9 rounded border border-line-strong px-3 text-[13px] font-semibold hover:bg-hover disabled:opacity-50">
+          <button onClick={() => void accion({ accion: "notas", notas }).catch(() => {})} disabled={busy || !notasSucias} className="btn h-9 rounded border border-line-strong px-3 text-13 font-semibold hover:bg-hover disabled:opacity-50">
             Guardar notas
           </button>
-          {notasSucias && <span className="text-[12.5px] text-ink-2" aria-live="polite">Sin guardar: el refresco automático no las toca.</span>}
+          {notasSucias && <span className="text-13 text-ink-2" aria-live="polite">Sin guardar: el refresco automático no las toca.</span>}
         </div>
       </div>
 

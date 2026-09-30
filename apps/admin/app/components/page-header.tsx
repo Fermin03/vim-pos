@@ -20,7 +20,7 @@ export function PageHeader({
     <header className="flex flex-shrink-0 flex-col gap-3 border-b border-line px-4 pb-4 pt-4 lg:flex-row lg:items-end lg:justify-between lg:gap-4 lg:px-8 lg:pt-5">
       <div className="min-w-0">
         {migas && migas.length > 0 && (
-          <nav aria-label="Ruta" className="mb-1.5 flex flex-wrap items-center gap-1.5 text-[12.5px] text-ink-3">
+          <nav aria-label="Ruta" className="mb-1.5 flex flex-wrap items-center gap-1.5 text-13 text-ink-3">
             {migas.map((m, i) => (
               <Fragment key={i}>
                 {i > 0 && <span aria-hidden="true">/</span>}
@@ -35,8 +35,8 @@ export function PageHeader({
             ))}
           </nav>
         )}
-        <h1 className="font-display text-[21px] font-bold tracking-tight lg:text-[25px]">{titulo}</h1>
-        {subtitulo && <p className="mt-[3px] text-[13px] text-ink-2 lg:text-[13.5px]">{subtitulo}</p>}
+        <h1 className="font-display text-20 font-bold tracking-tight lg:text-24">{titulo}</h1>
+        {subtitulo && <p className="mt-[3px] text-13 text-ink-2 lg:text-14">{subtitulo}</p>}
       </div>
       {/* En móvil las acciones bajan y se reparten el ancho; en escritorio quedan igual (fila derecha). */}
       {/* En móvil las acciones bajan y se reparten el ancho; los rótulos no se parten en dos

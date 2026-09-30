@@ -184,12 +184,12 @@ export function ModalCombo({ combo, token, linea, preset, onConfirmar, onCancela
         <div className="flex-shrink-0 border-b border-line px-5 pb-3 pt-4">
           <div className="flex items-start justify-between gap-4">
             <div>
-              <div className="font-display text-[21px] font-semibold leading-tight tracking-[-0.02em] text-ink">{combo.producto.nombre}</div>
-              <div className="mt-0.5 text-[12.5px] font-medium text-ink-3">{enResumen ? "Revisa y agrega" : `Paso ${paso + 1} de ${slots.length + 1} · ${slot!.nombre}`}</div>
+              <div className="font-display text-20 font-semibold leading-tight tracking-[-0.02em] text-ink">{combo.producto.nombre}</div>
+              <div className="mt-0.5 text-13 font-medium text-ink-3">{enResumen ? "Revisa y agrega" : `Paso ${paso + 1} de ${slots.length + 1} · ${slot!.nombre}`}</div>
             </div>
             <div className="flex-shrink-0 text-right">
-              <small className="mb-[-2px] block text-[11px] font-semibold uppercase tracking-[0.04em] text-ink-3">{enResumen ? "Total" : "Precio"}</small>
-              <span className="font-display text-[21px] font-bold tabular-nums text-ink">{fmtMxn(enResumen ? precio * cantidadEfectiva : precio)}</span>
+              <small className="mb-[-2px] block text-11 font-semibold uppercase tracking-[0.04em] text-ink-3">{enResumen ? "Total" : "Precio"}</small>
+              <span className="font-display text-20 font-bold tabular-nums text-ink">{fmtMxn(enResumen ? precio * cantidadEfectiva : precio)}</span>
             </div>
           </div>
           <div className="mt-3 flex gap-1.5">
@@ -200,17 +200,17 @@ export function ModalCombo({ combo, token, linea, preset, onConfirmar, onCancela
         </div>
 
         {/* Cuerpo */}
-        {error && <div className="mx-5 mt-3 flex-shrink-0 rounded border border-line bg-accent-soft px-3 py-2 text-[12.5px] font-medium text-danger">{error}</div>}
+        {error && <div className="mx-5 mt-3 flex-shrink-0 rounded border border-line bg-accent-soft px-3 py-2 text-13 font-medium text-danger">{error}</div>}
         {slot && (
           <>
               <div className="flex flex-shrink-0 items-center gap-2 px-5 pb-3 pt-5">
-                <span className="text-[14.5px] font-bold text-ink">{slot.nombre}</span>
+                <span className="text-15 font-bold text-ink">{slot.nombre}</span>
                 {slot.min > 0 ? (
                   slotValido(slot, componentes)
-                    ? <span className="inline-flex items-center gap-1 rounded-full bg-success-soft px-2 py-0.5 text-[10.5px] font-bold uppercase tracking-[0.04em] text-success"><IconCheck className="h-[11px] w-[11px]" />Listo</span>
-                    : <span className="rounded-full bg-accent-soft px-2 py-0.5 text-[10.5px] font-bold uppercase tracking-[0.04em] text-accent">Obligatorio</span>
-                ) : <span className="text-[12px] font-medium text-ink-3">Opcional</span>}
-                <span className="ml-auto text-[11.5px] font-medium text-ink-3">{slot.max === 1 ? "Elige 1" : `Elige ${slot.min}–${slot.max}`}{slot.modo === "SUMA_PRECIO_PRODUCTO" ? " · se suma su precio" : ""}</span>
+                    ? <span className="inline-flex items-center gap-1 rounded-full bg-success-soft px-2 py-0.5 text-11 font-bold uppercase tracking-[0.04em] text-success"><IconCheck className="h-[11px] w-[11px]" />Listo</span>
+                    : <span className="rounded-full bg-accent-soft px-2 py-0.5 text-11 font-bold uppercase tracking-[0.04em] text-accent">Obligatorio</span>
+                ) : <span className="text-12 font-medium text-ink-3">Opcional</span>}
+                <span className="ml-auto text-12 font-medium text-ink-3">{slot.max === 1 ? "Elige 1" : `Elige ${slot.min}–${slot.max}`}{slot.modo === "SUMA_PRECIO_PRODUCTO" ? " · se suma su precio" : ""}</span>
               </div>
               {/* El hueco se mide en un elemento sin padding: así el número que entra al
                   cálculo es el ancho real de la cuadrícula. */}
@@ -236,22 +236,22 @@ export function ModalCombo({ combo, token, linea, preset, onConfirmar, onCancela
                         className={["relative flex h-full w-full flex-col items-center justify-center gap-2 rounded-lg border px-2.5 py-2 text-center transition active:scale-[.98]",
                           disabled ? "cursor-not-allowed border-line opacity-45" : c ? "border-ink bg-sel shadow-[inset_0_0_0_1px_rgb(var(--ink))]" : "border-line"].join(" ")}>
                         {disabled
-                          ? <span className="absolute right-2.5 top-2.5 rounded-full bg-danger/10 px-2 py-0.5 text-[10.5px] font-bold uppercase tracking-wide text-danger">Agotado</span>
+                          ? <span className="absolute right-2.5 top-2.5 rounded-full bg-danger/10 px-2 py-0.5 text-11 font-bold uppercase tracking-wide text-danger">Agotado</span>
                           : <span className={["absolute right-2.5 top-2.5 flex h-5 w-5 items-center justify-center rounded-full border-[1.5px]", c ? "border-ink bg-ink" : "border-line-strong"].join(" ")}><IconCheck className={["h-3 w-3 text-white", c ? "opacity-100" : "opacity-0"].join(" ")} /></span>}
                         <span>
                           <span className="line-clamp-3 block break-words font-semibold leading-tight text-ink">{o.producto.nombre}</span>
-                          {c && c.modificadores.length > 0 && <span className="mt-0.5 block text-[12px] text-ink-3">{c.modificadores.map((m) => m.opcionNombre).join(" · ")}</span>}
+                          {c && c.modificadores.length > 0 && <span className="mt-0.5 block text-12 text-ink-3">{c.modificadores.map((m) => m.opcionNombre).join(" · ")}</span>}
                         </span>
                         <span className="flex w-full items-baseline justify-between">
                           {importe > 0
-                            ? <span className="font-display text-[14px] font-semibold tabular-nums text-ink-2">{slot.modo === "SUMA_PRECIO_PRODUCTO" ? "" : "+"}{fmtMxn(importe)}</span>
-                            : <span className="text-[12.5px] font-medium text-ink-3">Incluido</span>}
-                          {o.esDefault && !c && <span className="text-[10.5px] font-bold uppercase tracking-[0.04em] text-success">Default</span>}
+                            ? <span className="font-display text-14 font-semibold tabular-nums text-ink-2">{slot.modo === "SUMA_PRECIO_PRODUCTO" ? "" : "+"}{fmtMxn(importe)}</span>
+                            : <span className="text-13 font-medium text-ink-3">Incluido</span>}
+                          {o.esDefault && !c && <span className="text-11 font-bold uppercase tracking-[0.04em] text-success">Default</span>}
                         </span>
                       </button>
                       {c && (
                         <button type="button" onClick={(e) => { e.stopPropagation(); void personalizar(c, false, false); }}
-                          className="absolute bottom-1 right-1 z-10 flex h-11 min-w-[44px] items-center justify-center rounded px-2.5 text-[12.5px] font-semibold text-accent transition hover:bg-hover">
+                          className="absolute bottom-1 right-1 z-10 flex h-11 min-w-[44px] items-center justify-center rounded px-2.5 text-13 font-semibold text-accent transition hover:bg-hover">
                           Personalizar
                         </button>
                       )}
@@ -264,7 +264,7 @@ export function ModalCombo({ combo, token, linea, preset, onConfirmar, onCancela
               {slot.min === 0 && (
                 <div className="flex-shrink-0 px-5 pt-3">
                   <button type="button" onClick={() => { setComponentes((prev) => prev.filter((c) => c.grupoId !== slot.id)); avanzar(); }}
-                    className="flex h-[52px] items-center justify-center rounded border border-line-strong px-6 text-[15px] font-semibold text-ink-2 transition hover:bg-hover">
+                    className="flex h-[52px] items-center justify-center rounded border border-line-strong px-6 text-15 font-semibold text-ink-2 transition hover:bg-hover">
                     Sin {slot.nombre.toLowerCase()}
                   </button>
                 </div>
@@ -280,9 +280,9 @@ export function ModalCombo({ combo, token, linea, preset, onConfirmar, onCancela
                   const del = componentes.filter((c) => c.grupoId === s.id);
                   if (del.length === 0) return (
                     <div key={s.id} className="flex items-start gap-3 border-b border-line py-3">
-                      <span className="w-[104px] flex-shrink-0 pt-[3px] text-[10px] font-bold uppercase tracking-[0.04em] text-ink-3">{s.nombre}</span>
-                      <b className="flex-1 text-[15px] font-semibold text-ink-3">Sin {s.nombre.toLowerCase()}</b>
-                      <button type="button" onClick={() => setPaso(i)} className="rounded px-2 py-1 text-[12.5px] font-semibold text-accent">Elegir</button>
+                      <span className="w-[104px] flex-shrink-0 pt-[3px] text-11 font-bold uppercase tracking-[0.04em] text-ink-3">{s.nombre}</span>
+                      <b className="flex-1 text-15 font-semibold text-ink-3">Sin {s.nombre.toLowerCase()}</b>
+                      <button type="button" onClick={() => setPaso(i)} className="rounded px-2 py-1 text-13 font-semibold text-accent">Elegir</button>
                     </div>
                   );
                   return del.map((c) => {
@@ -290,34 +290,34 @@ export function ModalCombo({ combo, token, linea, preset, onConfirmar, onCancela
                     const ex = extrasDe(c.modificadores);
                     return (
                       <div key={c.clientId} className="flex items-start gap-3 border-b border-line py-3">
-                        <span className="w-[104px] flex-shrink-0 pt-[3px] text-[10px] font-bold uppercase tracking-[0.04em] text-ink-3">{s.nombre}</span>
+                        <span className="w-[104px] flex-shrink-0 pt-[3px] text-11 font-bold uppercase tracking-[0.04em] text-ink-3">{s.nombre}</span>
                         <div className="min-w-0 flex-1">
-                          <b className="block text-[15px] font-semibold">{c.cantidad > 1 ? `${c.cantidad}× ` : ""}{c.producto.nombre}</b>
-                          {c.modificadores.length > 0 && <span className="mt-0.5 block text-[12.5px] text-ink-2">{c.modificadores.map((m) => m.opcionNombre).join(" · ")}</span>}
+                          <b className="block text-15 font-semibold">{c.cantidad > 1 ? `${c.cantidad}× ` : ""}{c.producto.nombre}</b>
+                          {c.modificadores.length > 0 && <span className="mt-0.5 block text-13 text-ink-2">{c.modificadores.map((m) => m.opcionNombre).join(" · ")}</span>}
                         </div>
-                        <span className="font-display whitespace-nowrap text-[14px] font-semibold tabular-nums text-ink-2">
+                        <span className="font-display whitespace-nowrap text-14 font-semibold tabular-nums text-ink-2">
                           {imp > 0 ? `${s.modo === "SUMA_PRECIO_PRODUCTO" ? "" : "+"}${fmtMxn(imp)}` : "incl."}{ex > 0 && <span className="text-ink-3"> +{fmtMxn(ex)}</span>}
                         </span>
-                        <button type="button" onClick={() => setPaso(i)} className="rounded px-2 py-1 text-[12.5px] font-semibold text-accent">Cambiar</button>
+                        <button type="button" onClick={() => setPaso(i)} className="rounded px-2 py-1 text-13 font-semibold text-accent">Cambiar</button>
                       </div>
                     );
                   });
                 })}
                 <div className="flex items-start gap-3 py-3">
-                  <span className="w-[104px] flex-shrink-0 pt-[3px] text-[10px] font-bold uppercase tracking-[0.04em] text-ink-3">Combo</span>
-                  <div className="flex-1"><b className="block text-[15px] font-semibold">Hacerlo combo</b><span className="block text-[12.5px] text-ink-2">Precio base del combo</span></div>
-                  <span className="font-display text-[14px] font-semibold tabular-nums text-ink-2">{fmtMxn(combo.producto.precio_base_mxn)}</span>
+                  <span className="w-[104px] flex-shrink-0 pt-[3px] text-11 font-bold uppercase tracking-[0.04em] text-ink-3">Combo</span>
+                  <div className="flex-1"><b className="block text-15 font-semibold">Hacerlo combo</b><span className="block text-13 text-ink-2">Precio base del combo</span></div>
+                  <span className="font-display text-14 font-semibold tabular-nums text-ink-2">{fmtMxn(combo.producto.precio_base_mxn)}</span>
                 </div>
               </div>
               {preguntaAlcance && (
                 <div className="mt-5 flex items-center justify-between gap-3">
-                  <b className="text-[14.5px] font-bold">Cambiar</b>
+                  <b className="text-15 font-bold">Cambiar</b>
                   <span className="flex items-center gap-2">
-                    <span className="text-[12.5px] font-medium text-ink-3">{alcance === "una" ? "se separa en su propio renglón" : "cambia el renglón entero"}</span>
+                    <span className="text-13 font-medium text-ink-3">{alcance === "una" ? "se separa en su propio renglón" : "cambia el renglón entero"}</span>
                     <span role="radiogroup" aria-label="A cuántos combos aplicar el cambio" className="inline-flex overflow-hidden rounded border border-line-strong">
                       {([["una", "Solo 1"], ["todas", `Los ${linea!.cantidad}`]] as const).map(([valor, etiqueta]) => (
                         <button key={valor} type="button" role="radio" aria-checked={alcance === valor} onClick={() => setAlcance(valor)}
-                          className={["h-11 px-4 text-[14px] font-semibold transition-colors", alcance === valor ? "bg-ink text-white" : "bg-surface text-ink-2 hover:bg-hover"].join(" ")}>
+                          className={["h-11 px-4 text-14 font-semibold transition-colors", alcance === valor ? "bg-ink text-white" : "bg-surface text-ink-2 hover:bg-hover"].join(" ")}>
                           {etiqueta}
                         </button>
                       ))}
@@ -327,18 +327,18 @@ export function ModalCombo({ combo, token, linea, preset, onConfirmar, onCancela
               )}
               {!(preguntaAlcance && alcance === "una") && (
               <div className="mt-5 flex items-center justify-between">
-                <b className="text-[14.5px] font-bold">Cantidad</b>
+                <b className="text-15 font-bold">Cantidad</b>
                 <span className="inline-flex items-center overflow-hidden rounded border border-line-strong">
-                  <button type="button" aria-label="Menos" onClick={() => setCantidad((n) => Math.max(1, n - 1))} className="flex h-11 w-11 items-center justify-center text-[19px] text-ink-2 hover:bg-hover">−</button>
-                  <span className="font-display min-w-[44px] text-center text-[17px] font-semibold tabular-nums">{cantidad}</span>
-                  <button type="button" aria-label="Más" onClick={() => setCantidad((n) => n + 1)} className="flex h-11 w-11 items-center justify-center text-[19px] text-ink-2 hover:bg-hover">+</button>
+                  <button type="button" aria-label="Menos" onClick={() => setCantidad((n) => Math.max(1, n - 1))} className="flex h-11 w-11 items-center justify-center text-20 text-ink-2 hover:bg-hover">−</button>
+                  <span className="font-display min-w-[44px] text-center text-18 font-semibold tabular-nums">{cantidad}</span>
+                  <button type="button" aria-label="Más" onClick={() => setCantidad((n) => n + 1)} className="flex h-11 w-11 items-center justify-center text-20 text-ink-2 hover:bg-hover">+</button>
                 </span>
               </div>
               )}
               <div className="mt-5">
-                <label className="mb-2.5 block text-[14.5px] font-bold text-ink">Nota para cocina <span className="text-[12px] font-medium text-ink-3">(opcional, para todo el combo)</span></label>
+                <label className="mb-2.5 block text-15 font-bold text-ink">Nota para cocina <span className="text-12 font-medium text-ink-3">(opcional, para todo el combo)</span></label>
                 <textarea value={nota} onChange={(e) => setNota(e.target.value)} rows={2} placeholder="Ej. todo para llevar, sin servilletas"
-                  className="w-full resize-y rounded border border-line-strong px-[13px] py-[11px] font-sans text-[15px] text-ink outline-none placeholder:text-ink-3 focus:border-ink focus:shadow-[inset_0_0_0_1px_rgb(var(--ink))]" />
+                  className="w-full resize-y rounded border border-line-strong px-[13px] py-[11px] font-sans text-15 text-ink outline-none placeholder:text-ink-3 focus:border-ink focus:shadow-[inset_0_0_0_1px_rgb(var(--ink))]" />
               </div>
           </div>
         )}
@@ -347,17 +347,17 @@ export function ModalCombo({ combo, token, linea, preset, onConfirmar, onCancela
         <div className="flex-shrink-0 border-t border-line px-5 py-4">
           <div className="flex items-center gap-3">
             <button type="button" onClick={() => (paso === 0 && !linea ? onCancelar() : setPaso((p) => Math.max(0, p - 1)))}
-              className="flex h-[52px] items-center justify-center gap-2 rounded border border-line-strong bg-surface px-5 text-[15px] font-semibold text-ink-2 transition hover:bg-hover">
+              className="flex h-[52px] items-center justify-center gap-2 rounded border border-line-strong bg-surface px-5 text-15 font-semibold text-ink-2 transition hover:bg-hover">
               {paso === 0 && !linea ? "Cancelar" : <><IconBack className="h-4 w-4" />Atrás</>}
             </button>
             {enResumen ? (
               <button type="button" disabled={!todoValido} onClick={confirmar}
-                className="ml-auto flex h-[52px] w-[min(340px,40%)] flex-shrink-0 items-center justify-between gap-2 rounded-lg bg-accent px-4 text-[16px] font-bold text-white shadow-[0_1px_3px_rgb(var(--accent)/0.3)] transition hover:bg-accent-hover active:scale-[.98] disabled:cursor-not-allowed disabled:bg-line-strong disabled:shadow-none">
+                className="ml-auto flex h-[52px] w-[min(340px,40%)] flex-shrink-0 items-center justify-between gap-2 rounded-lg bg-accent px-4 text-16 font-bold text-white shadow-[0_1px_3px_rgb(var(--accent)/0.3)] transition hover:bg-accent-hover active:scale-[.98] disabled:cursor-not-allowed disabled:bg-line-strong disabled:shadow-none">
                 <span>{linea ? "Guardar cambios" : "Agregar al ticket"}</span><span className="font-display tabular-nums">{fmtMxn(precio * cantidadEfectiva)}</span>
               </button>
             ) : (
               <button type="button" disabled={!slotValido(slot!, componentes)} onClick={avanzar}
-                className="ml-auto flex h-[52px] w-[min(340px,40%)] flex-shrink-0 items-center justify-between gap-2 rounded-lg bg-accent px-4 text-[16px] font-bold text-white shadow-[0_1px_3px_rgb(var(--accent)/0.3)] transition hover:bg-accent-hover active:scale-[.98] disabled:cursor-not-allowed disabled:bg-line-strong disabled:shadow-none">
+                className="ml-auto flex h-[52px] w-[min(340px,40%)] flex-shrink-0 items-center justify-between gap-2 rounded-lg bg-accent px-4 text-16 font-bold text-white shadow-[0_1px_3px_rgb(var(--accent)/0.3)] transition hover:bg-accent-hover active:scale-[.98] disabled:cursor-not-allowed disabled:bg-line-strong disabled:shadow-none">
                 <span>{paso === slots.length - 1 ? "Revisar" : "Siguiente"}</span><span className="font-display tabular-nums">{fmtMxn(precio)}</span>
               </button>
             )}

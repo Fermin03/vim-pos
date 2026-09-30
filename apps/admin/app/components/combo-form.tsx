@@ -11,7 +11,7 @@ import { mensajeError } from "../lib/errores";
 // Mismas clases que producto-form.tsx: misma app, mismo look.
 const input =
   "h-11 w-full rounded border border-line-strong px-3 text-sm outline-none focus:border-ink focus:shadow-[0_0_0_3px_rgba(22,22,26,.06)]";
-const label = "mb-1.5 block text-[13px] font-medium text-ink-2";
+const label = "mb-1.5 block text-13 font-medium text-ink-2";
 
 /**
  * Alta de un combo. Solo crea (no hay edición aquí): una vez creado, los campos propios del
@@ -107,7 +107,7 @@ export function ComboForm() {
               onChange={(e) => setPrecio(limpiarPrecio(e.target.value))}
               placeholder="0.00"
             />
-            <p className="mt-1 text-[11.5px] text-ink-3">
+            <p className="mt-1 text-12 text-ink-3">
               Lo que cuesta hacerlo combo. El precio de la hamburguesa (u otro producto principal) se suma después.
             </p>
           </div>
@@ -128,7 +128,7 @@ export function ComboForm() {
         </div>
 
         <div className="rounded-lg border border-line bg-surface p-4">
-          <p className="mb-3 text-[13px] font-medium text-ink-2">Datos fiscales</p>
+          <p className="mb-3 text-13 font-medium text-ink-2">Datos fiscales</p>
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div>
               <label className={label} htmlFor="clave-sat">
@@ -143,7 +143,7 @@ export function ComboForm() {
                 onChange={(e) => setClaveSat(e.target.value.replace(/\D/g, ""))}
                 placeholder="90101503"
               />
-              <p className="mt-1 text-[11.5px] text-ink-3">Prellenada con la clave genérica de comida rápida. Cámbiala si tu contador lo indica.</p>
+              <p className="mt-1 text-12 text-ink-3">Prellenada con la clave genérica de comida rápida. Cámbiala si tu contador lo indica.</p>
             </div>
             <div>
               <label className={label} htmlFor="tasa-iva">
@@ -154,7 +154,7 @@ export function ComboForm() {
                   <option key={o.v} value={o.v}>{o.l}</option>
                 ))}
               </select>
-              <p className="mt-1 text-[12.5px] text-ink-2">{AYUDA_IVA}</p>
+              <p className="mt-1 text-13 text-ink-2">{AYUDA_IVA}</p>
             </div>
           </div>
           <label className="mt-3 flex items-center gap-2.5">
@@ -177,7 +177,7 @@ export function ComboForm() {
             publica desde la ficha del combo cuando ya tiene sus slots. */}
         <div className="rounded-lg border border-line bg-surface p-4">
           <p className="text-sm font-medium">El combo se crea pausado</p>
-          <p className="mt-1 text-[12.5px] text-ink-2">
+          <p className="mt-1 text-13 text-ink-2">
             Todavía no tiene pasos, así que la caja no debe venderlo. En la siguiente pantalla le
             agregas sus pasos (qué hamburguesa, qué acompañamiento, qué bebida) y ahí mismo lo
             publicas eligiendo <b className="text-ink">Se vende</b>.

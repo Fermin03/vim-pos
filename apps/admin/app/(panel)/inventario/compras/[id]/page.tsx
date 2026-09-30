@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { Button } from "@vim/ui/styles";
+import { Button, DialogoPeligro } from "@vim/ui/styles";
 import { PageBody, PageHeader, TablaScroll } from "../../../../components/page-header";
 import { anularCompra, obtenerCompra, type CompraDetalle } from "../../../../lib/compras";
 import { mensajeError } from "../../../../lib/errores";
@@ -51,15 +51,15 @@ export default function CompraDetallePage() {
               <p className="rounded border border-danger/30 bg-danger-soft p-3 text-sm text-danger">Anulada. Motivo: {compra.motivoAnulacion ?? "—"}. Las existencias se regresaron; el costo promedio no se modificó.</p>
             )}
             <dl className="grid grid-cols-2 gap-x-6 gap-y-2 text-sm md:grid-cols-4">
-              <div><dt className="text-[11.5px] uppercase tracking-[0.04em] text-ink-3">Referencia</dt><dd>{compra.referencia ?? "—"}</dd></div>
-              <div><dt className="text-[11.5px] uppercase tracking-[0.04em] text-ink-3">Origen</dt><dd>{compra.origen === "XML" ? "Factura XML" : "Captura manual"}</dd></div>
-              <div className="col-span-2"><dt className="text-[11.5px] uppercase tracking-[0.04em] text-ink-3">UUID fiscal</dt><dd className="font-mono text-[12.5px]">{compra.cfdiUuid ?? "—"}</dd></div>
-              {compra.notas && <div className="col-span-2 md:col-span-4"><dt className="text-[11.5px] uppercase tracking-[0.04em] text-ink-3">Notas</dt><dd>{compra.notas}</dd></div>}
+              <div><dt className="text-12 uppercase tracking-[0.04em] text-ink-3">Referencia</dt><dd>{compra.referencia ?? "—"}</dd></div>
+              <div><dt className="text-12 uppercase tracking-[0.04em] text-ink-3">Origen</dt><dd>{compra.origen === "XML" ? "Factura XML" : "Captura manual"}</dd></div>
+              <div className="col-span-2"><dt className="text-12 uppercase tracking-[0.04em] text-ink-3">UUID fiscal</dt><dd className="font-mono text-13">{compra.cfdiUuid ?? "—"}</dd></div>
+              {compra.notas && <div className="col-span-2 md:col-span-4"><dt className="text-12 uppercase tracking-[0.04em] text-ink-3">Notas</dt><dd>{compra.notas}</dd></div>}
             </dl>
             <TablaScroll min={860}>
-              <table className="w-full text-[13.5px]">
+              <table className="w-full text-14">
                 <thead>
-                  <tr className="border-b border-line text-left text-[11.5px] uppercase tracking-[0.04em] text-ink-3">
+                  <tr className="border-b border-line text-left text-12 uppercase tracking-[0.04em] text-ink-3">
                     <th className="py-2 pr-3 font-semibold">Insumo</th>
                     <th className="py-2 pr-3 font-semibold">Descripción de origen</th>
                     <th className="py-2 pr-3 text-right font-semibold">Capturado</th>
@@ -91,19 +91,26 @@ export default function CompraDetallePage() {
         )}
 
         {anulando && compra && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/30 p-4">
-            <div role="dialog" aria-modal="true" aria-label="Anular compra" className="w-full max-w-md rounded-lg bg-surface p-5 shadow-xl">
-              <h2 className="mb-2 font-display text-lg font-bold">Anular la compra {compra.folio}</h2>
-              <p className="mb-4 text-sm text-ink-2">Se regresarán las existencias de {compra.lineas.length} insumo{compra.lineas.length === 1 ? "" : "s"} en {compra.sucursalNombre}. El costo promedio no se modifica.</p>
-              <label className="mb-1.5 block text-[13px] font-medium text-ink-2" htmlFor="motivo">Motivo</label>
+          <DialogoPeligro
+            titulo="¿Anular esta compra?"
+            contexto={`Compra ${compra.folio}`}
+            consecuencia={
+              <>
+                Se regresarán las existencias de {compra.lineas.length} insumo{compra.lineas.length === 1 ? "" : "s"} en {compra.sucursalNombre}. El costo promedio no se modifica.
+              </>
+            }
+            error={error}
+            boton="Anular compra"
+            ocupado={ocupado}
+            textoOcupado="Anulando…"
+            onConfirmar={confirmarAnulacion}
+            onCerrar={() => setAnulando(false)}
+          >
+            <div>
+              <label className="mb-1.5 block text-13 font-medium text-ink-2" htmlFor="motivo">Motivo</label>
               <textarea id="motivo" className="min-h-[70px] w-full rounded border border-line-strong p-2 text-sm" value={motivo} onChange={(e) => setMotivo(e.target.value)} />
-              {error && <p role="alert" className="mt-2 text-sm font-medium text-danger">{error}</p>}
-              <div className="mt-5 flex justify-end gap-2">
-                <Button variant="ghost" onClick={() => setAnulando(false)} disabled={ocupado}>Cancelar</Button>
-                <Button variant="danger" onClick={confirmarAnulacion} disabled={ocupado}>{ocupado ? "Anulando…" : "Anular compra"}</Button>
-              </div>
             </div>
-          </div>
+          </DialogoPeligro>
         )}
       </PageBody>
     </>

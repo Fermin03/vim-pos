@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
-import { Modal } from "@vim/ui/styles";
+import { DialogoPeligro } from "@vim/ui/styles";
 import { hoyMx } from "@vim/fecha";
 import { evaluarConfirmacion, MOTIVO_MINIMO, type ResultadoConfirmacion } from "../lib/confirmacion";
 import { fechaBloqueo, GRACIA_POR_DEFECTO } from "../lib/bloqueo";
@@ -47,8 +47,10 @@ const FALTA: Record<ResultadoConfirmacion["faltantes"][number], string> = {
  * motivo, diciendo a quién afecta y desde cuándo, y —si cuesta dinero o corta la operación—
  * escribiendo su nombre. Sustituye a los `prompt()` y `confirm()` del navegador.
  *
- * El error se pinta AQUÍ, dentro del diálogo: antes iba a la página, detrás del velo, y el
- * operador veía un botón que dejaba de decir "Aplicando…" sin saber si había pasado algo.
+ * El marco es `DialogoPeligro` de `@vim/ui`, el mismo de la caja y el admin; lo propio del panel
+ * (motivo, nombre, gracia) va adentro. El error se pinta dentro del diálogo: antes iba a la página,
+ * detrás del velo, y el operador veía un botón que dejaba de decir "Aplicando…" sin saber si había
+ * pasado algo.
  */
 export function DialogoConfirmar(p: DialogoConfirmarProps) {
   const [nombre, setNombre] = useState("");
@@ -89,18 +91,30 @@ export function DialogoConfirmar(p: DialogoConfirmarProps) {
   }
 
   return (
-    <Modal open={p.abierto} onClose={p.onCerrar} title={p.titulo} hideTitle className="w-full max-w-lg rounded-lg bg-surface p-6 shadow-xl">
-      <h2 className={["font-display text-[18px] font-semibold tracking-tight", p.peligroso ? "text-danger" : ""].join(" ")}>{p.titulo}</h2>
-      <div className="mt-2 text-[13.5px] leading-snug text-ink-2">{p.descripcion}</div>
-      {p.detalle && <div className="mt-3">{p.detalle}</div>}
+    <DialogoPeligro
+      abierto={p.abierto}
+      titulo={p.titulo}
+      consecuencia={p.descripcion}
+      ancho="lg"
+      error={error}
+      // Qué falta, en vez de un botón gris que no explica nada.
+      nota={faltan.length > 0 && !p.ocupado ? `Falta ${faltan.join(", ")}.` : null}
+      boton={p.etiquetaBoton}
+      ocupado={p.ocupado}
+      deshabilitado={!puede}
+      peligrosa={Boolean(p.peligroso)}
+      onConfirmar={() => void confirmar()}
+      onCerrar={p.onCerrar}
+    >
+      {p.detalle && <div>{p.detalle}</div>}
 
-      <div className="mt-4">
+      <div>
         <label className={label} htmlFor="dc-motivo">Motivo (queda en la bitácora)</label>
         <textarea id="dc-motivo" className={`${input} h-20 py-2`} value={motivo} onChange={(e) => setMotivo(e.target.value)} />
       </div>
 
       {p.conGracia && (
-        <div className="mt-3">
+        <div>
           <label className={label} htmlFor="dc-gracia">Días de gracia antes de bloquear la caja</label>
           <input
             id="dc-gracia"
@@ -109,14 +123,14 @@ export function DialogoConfirmar(p: DialogoConfirmarProps) {
             value={gracia}
             onChange={(e) => setGracia(Math.trunc(Number(e.target.value.replace(/[^0-9]/g, "")) || 0))}
           />
-          <p className="mt-1 text-[12.5px] text-ink-2">
+          <p className="mt-1 text-13 text-ink-2">
             {fechaBloq ? `La caja dejará de vender el ${fechaHoraMx(fechaBloq)} (hora de México).` : "Escribe al menos 1 día."}
           </p>
         </div>
       )}
 
       {p.conMensaje && (
-        <div className="mt-3">
+        <div>
           <label className={label} htmlFor="dc-mensaje">Mensaje que verá el cajero (opcional)</label>
           <textarea
             id="dc-mensaje"
@@ -129,45 +143,20 @@ export function DialogoConfirmar(p: DialogoConfirmarProps) {
       )}
 
       {p.conEntiendo && (
-        <label className="mt-3 flex items-start gap-2 text-[13.5px]">
+        <label className="flex items-start gap-2 text-14">
           <input type="checkbox" className="mt-0.5 h-4 w-4" checked={entiendo} onChange={(e) => setEntiendo(e.target.checked)} />
           <span>{p.conEntiendo}</span>
         </label>
       )}
 
       {!p.sinNombre && (
-        <div className="mt-4">
+        <div>
           <label className={label} htmlFor="dc-nombre">
             Escribe <b className="text-ink">{p.nombreEsperado}</b> para confirmar
           </label>
           <input id="dc-nombre" className={input} value={nombre} onChange={(e) => setNombre(e.target.value)} autoComplete="off" />
         </div>
       )}
-
-      {error && (
-        <p className="mt-4 rounded border border-danger/30 bg-danger-soft px-3 py-2 text-[13px] font-medium text-danger" role="alert">
-          {error}
-        </p>
-      )}
-
-      <div className="mt-5 flex flex-wrap items-center justify-end gap-2">
-        {/* Qué falta, en vez de un botón gris que no explica nada. */}
-        {faltan.length > 0 && !p.ocupado && (
-          <p className="basis-full text-[12.5px] text-ink-2" aria-live="polite">Falta {faltan.join(", ")}.</p>
-        )}
-        <button type="button" onClick={p.onCerrar} className="btn h-10 rounded border border-line-strong px-4 text-[13px] font-semibold hover:bg-hover">
-          Volver
-        </button>
-        <button
-          type="button"
-          disabled={!puede}
-          onClick={() => void confirmar()}
-          // Ancho mínimo: "Aplicando…" no debe hacer brincar el botón bajo el cursor.
-          className={["btn h-10 min-w-[120px] rounded px-4 text-[13px] font-semibold text-white disabled:opacity-50", p.peligroso ? "bg-danger" : "bg-ink"].join(" ")}
-        >
-          {p.ocupado ? "Aplicando…" : p.etiquetaBoton}
-        </button>
-      </div>
-    </Modal>
+    </DialogoPeligro>
   );
 }

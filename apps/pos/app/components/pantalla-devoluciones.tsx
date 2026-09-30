@@ -1,7 +1,7 @@
 "use client";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { BotonVolver } from "./boton-volver";
-import { Button, LogoVim, Modal } from "@vim/ui/styles";
+import { Button, DialogoPeligro, LogoVim } from "@vim/ui/styles";
 import { type DatosCaja, type Turno, fmtMxn } from "../lib/turno";
 import { type Empleado } from "../lib/supabase";
 import {
@@ -17,6 +17,7 @@ import {
 } from "../lib/devoluciones";
 import { autorizacionPropia, type Autorizacion } from "../lib/autorizacion";
 import { ModalAutorizacionPin } from "./modal-autorizacion-pin";
+import { AvisoAutorizacion, MotivoChips } from "./motivo-y-autorizacion";
 import { leerTicketParaImpresion } from "../lib/print/ticket-datos";
 import { obtenerImpresora } from "../lib/print/adapter";
 import { construirDevolucionJob, type DatosDevolucion } from "../lib/print/devolucion-builder";
@@ -70,21 +71,21 @@ export function PantallaDevoluciones({
         <div className="mr-auto flex items-center gap-3">
           <LogoVim className="h-8 w-8" />
           <div>
-            <div className="font-display text-[16px] font-bold leading-tight">Devoluciones · {caja.nombre}</div>
-            <div className="text-[11.5px] text-ink-3">Selecciona la venta a devolver. La venta queda en el historial; el reembolso sale de la caja.</div>
+            <div className="font-display text-16 font-bold leading-tight">Devoluciones · {caja.nombre}</div>
+            <div className="text-12 text-ink-3">Selecciona la venta a devolver. La venta queda en el historial; el reembolso sale de la caja.</div>
           </div>
         </div>
       </header>
 
-      {error && <div className="mx-6 mt-3 rounded border border-[#EDC4BE] bg-danger-soft px-3 py-2 text-[13px] font-medium text-danger" role="alert">{error}</div>}
+      {error && <div className="mx-6 mt-3 rounded border border-danger-line bg-danger-soft px-3 py-2 text-13 font-medium text-danger" role="alert">{error}</div>}
 
       <div className="min-h-0 flex-1 overflow-y-auto p-6">
         {ventas === null && <p className="text-center text-ink-3">Cargando ventas…</p>}
         {ventas !== null && ventas.length === 0 && (
           <div className="flex h-full flex-col items-center justify-center gap-2 text-center text-ink-3">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="h-12 w-12"><path d="M9 14l-4-4 4-4M5 10h11a4 4 0 0 1 0 8h-1" /></svg>
-            <p className="text-[17px] font-semibold text-ink-2">No hay ventas en el turno</p>
-            <p className="text-[13px]">Las ventas cobradas aparecerán aquí para poder devolverlas.</p>
+            <p className="text-18 font-semibold text-ink-2">No hay ventas en el turno</p>
+            <p className="text-13">Las ventas cobradas aparecerán aquí para poder devolverlas.</p>
           </div>
         )}
         {ventas !== null && ventas.length > 0 && (
@@ -93,16 +94,16 @@ export function PantallaDevoluciones({
               <div key={v.ticketId} className="flex items-center gap-4 rounded-lg border border-line bg-surface p-4">
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2">
-                    <span className="font-display text-[15px] font-bold">{v.folio}</span>
-                    {v.tieneDevolucion && <span className="rounded-full bg-warning-soft px-2 py-0.5 text-[10.5px] font-bold text-warning">Con devolución</span>}
+                    <span className="font-display text-15 font-bold">{v.folio}</span>
+                    {v.tieneDevolucion && <span className="rounded-full bg-warning-soft px-2 py-0.5 text-11 font-bold text-warning">Con devolución</span>}
                   </div>
                   {v.fechaCobro && (
-                    <div className="mt-0.5 text-[12px] text-ink-3">
+                    <div className="mt-0.5 text-12 text-ink-3">
                       {new Date(v.fechaCobro).toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit" })}
                     </div>
                   )}
                 </div>
-                <div className="font-display text-[16px] font-bold tabular-nums">{fmtMxn(v.total)}</div>
+                <div className="font-display text-16 font-bold tabular-nums">{fmtMxn(v.total)}</div>
                 <Button variant="ghost" onClick={() => setSel(v)}>Devolver</Button>
               </div>
             ))}
@@ -266,66 +267,47 @@ function ModalDevolucion({
     );
   }
 
-  const input = "h-11 w-full rounded border border-line-strong px-3 text-sm outline-none focus:border-ink focus:shadow-[0_0_0_3px_rgba(22,22,26,.06)]";
-
   return (
-    <Modal open onClose={onCerrar} title="Devolver venta" hideTitle
-      className="w-[460px] rounded-lg border border-line bg-surface p-6 shadow-[0_18px_44px_rgba(22,22,26,.18)]">
-      <div className="mb-4">
-        <h2 className="font-display text-xl font-semibold tracking-tight">Devolver venta</h2>
-        <p className="mt-0.5 text-[13px] text-ink-3">{venta.folio} · se reembolsará {fmtMxn(venta.total)} (la venta queda en el historial).</p>
-      </div>
-
+    <DialogoPeligro
+      titulo="Devolver venta"
+      contexto={`${venta.folio} · se reembolsan ${fmtMxn(venta.total)}`}
+      consecuencia="Se devuelven todos los productos. La venta queda en el historial."
+      error={error}
+      boton="Devolver venta"
+      ocupado={procesando}
+      textoOcupado="Devolviendo…"
+      deshabilitado={items === null}
+      onConfirmar={() => void confirmar()}
+      onCerrar={onCerrar}
+    >
       {items === null ? (
-        <p className="mb-4 text-sm text-ink-3">Cargando ítems…</p>
+        <p className="text-sm text-ink-3">Cargando ítems…</p>
       ) : (
-        <div className="mb-4 max-h-32 overflow-y-auto rounded border border-line bg-sel p-3 text-[12.5px] text-ink-2">
+        <div className="max-h-32 overflow-y-auto rounded border border-line bg-sel p-3 text-13 text-ink-2">
           {items.map((i) => (
             <div key={i.ticketItemId} className="flex justify-between py-0.5">
               <span>{i.cantidad}× {i.nombre}</span>
               <span className="tabular-nums">{fmtMxn(i.totalItem)}</span>
             </div>
           ))}
-          <p className="mt-1 border-t border-line pt-1 text-[11.5px] text-ink-3">Devolución total (todos los ítems).</p>
         </div>
       )}
-
-      <div className="mb-1.5 text-[13px] font-medium text-ink-2">Motivo</div>
-      <div className="mb-3 flex flex-wrap gap-2">
-        {MOTIVOS_DEV.map((m) => (
-          <button key={m.codigo} type="button" onClick={() => setMotivo(m.codigo)}
-            className={["rounded-full border px-3 py-1.5 text-[12.5px] font-semibold transition", motivo === m.codigo ? "border-ink bg-ink text-white" : "border-line-strong text-ink-2 hover:border-ink"].join(" ")}>
-            {m.label}
-          </button>
-        ))}
+      <MotivoChips opciones={MOTIVOS_DEV} valor={motivo} onCambiar={setMotivo} texto={motivoTexto} onTexto={setMotivoTexto} />
+      <div>
+        <div className="mb-1.5 text-13 font-medium text-ink-2">Reembolso en</div>
+        <div className="flex gap-2">
+          {MEDIOS_DEV.map((m) => (
+            <button key={m.codigo} type="button" onClick={() => setMedio(m.codigo)}
+              className={["flex-1 rounded border px-3 py-2 text-13 font-semibold transition", medio === m.codigo ? "border-ink bg-ink text-white" : "border-line-strong text-ink-2 hover:border-ink"].join(" ")}>
+              {m.label}
+            </button>
+          ))}
+        </div>
+        {MEDIOS_DEV.find((m) => m.codigo === medio)?.nota && (
+          <p className="mt-1.5 text-12 text-ink-3">{MEDIOS_DEV.find((m) => m.codigo === medio)?.nota}</p>
+        )}
       </div>
-      {motivo === "OTRO" && (
-        <input className={`${input} mb-3`} value={motivoTexto} maxLength={200} onChange={(e) => setMotivoTexto(e.target.value)} placeholder="Describe el motivo" />
-      )}
-
-      <div className="mb-1.5 text-[13px] font-medium text-ink-2">Reembolso en</div>
-      <div className="mb-4 flex gap-2">
-        {MEDIOS_DEV.map((m) => (
-          <button key={m.codigo} type="button" onClick={() => setMedio(m.codigo)}
-            className={["flex-1 rounded border px-3 py-2 text-[12.5px] font-semibold transition", medio === m.codigo ? "border-ink bg-ink text-white" : "border-line-strong text-ink-2 hover:border-ink"].join(" ")}>
-            {m.label}
-          </button>
-        ))}
-      </div>
-      {MEDIOS_DEV.find((m) => m.codigo === medio)?.nota && (
-        <p className="mb-4 -mt-2 text-[12px] text-ink-3">{MEDIOS_DEV.find((m) => m.codigo === medio)?.nota}</p>
-      )}
-
-      <div className={["mb-4 rounded border px-3 py-2 text-[12.5px] font-medium", tienePermiso ? "border-[#D6E8DD] bg-success-soft text-success" : "border-[#E8DCC0] bg-warning-soft text-warning"].join(" ")}>
-        {tienePermiso ? "Dentro de tu rol · no requiere autorización." : "Requiere PIN de un supervisor."}
-      </div>
-
-      {error && <p className="mb-3 text-sm font-medium text-danger" role="alert">{error}</p>}
-
-      <div className="flex items-center justify-end gap-2">
-        <Button variant="ghost" onClick={onCerrar} disabled={procesando}>Cancelar</Button>
-        <Button variant="danger" onClick={confirmar} disabled={procesando || items === null}>{procesando ? "Devolviendo…" : "Confirmar devolución"}</Button>
-      </div>
-    </Modal>
+      <AvisoAutorizacion propia={tienePermiso} />
+    </DialogoPeligro>
   );
 }

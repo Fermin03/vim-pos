@@ -34,29 +34,29 @@ export function RenglonItem({
 }) {
   return (
     <div className="flex items-start gap-3">
-      <span className="font-display min-w-[28px] text-[16px] font-semibold tabular-nums text-ink-2">{cantidad}×</span>
+      <span className="font-display min-w-[28px] text-16 font-semibold tabular-nums text-ink-2">{cantidad}×</span>
       <div className="min-w-0 flex-1">
-        <div className="text-[15.5px] font-semibold leading-tight text-ink">{nombre}</div>
+        <div className="text-16 font-semibold leading-tight text-ink">{nombre}</div>
         {modificadores.length > 0 && (
-          <div className="mt-[3px] text-[13px] leading-[1.4] text-ink-2">{modificadores.join(" · ")}</div>
+          <div className="mt-[3px] text-13 leading-[1.4] text-ink-2">{modificadores.join(" · ")}</div>
         )}
         {hijos.length > 0 && (
           <div className="mt-1.5 flex flex-col gap-1 border-l-2 border-line-strong pl-2.5">
             {hijos.map((h, i) => (
-              <div key={i} className="flex items-baseline gap-2 text-[13px] leading-[1.35]">
+              <div key={i} className="flex items-baseline gap-2 text-13 leading-[1.35]">
                 <span className="min-w-0 flex-1 [overflow-wrap:anywhere]">
-                  <span className="mr-0.5 text-[10.5px] font-bold uppercase tracking-[0.04em] text-ink-3">{h.slot}</span>{" "}
+                  <span className="mr-0.5 text-11 font-bold uppercase tracking-[0.04em] text-ink-3">{h.slot}</span>{" "}
                   <span className="font-medium text-ink">{h.nombre}</span>
                   {h.detalle && <span className="text-ink-2"> · {h.detalle}</span>}
                 </span>
-                {h.extraMxn > 0 && <span className="font-display whitespace-nowrap text-[13px] font-semibold tabular-nums text-ink-2">+{fmtMxn(h.extraMxn)}</span>}
+                {h.extraMxn > 0 && <span className="font-display whitespace-nowrap text-13 font-semibold tabular-nums text-ink-2">+{fmtMxn(h.extraMxn)}</span>}
               </div>
             ))}
           </div>
         )}
-        {notaCocina && <div className="mt-1 text-[12.5px] italic text-ink-3">&quot;{notaCocina}&quot;</div>}
+        {notaCocina && <div className="mt-1 text-13 italic text-ink-3">&quot;{notaCocina}&quot;</div>}
       </div>
-      <span className="font-display whitespace-nowrap text-[15.5px] font-semibold tabular-nums text-ink">
+      <span className="font-display whitespace-nowrap text-16 font-semibold tabular-nums text-ink">
         {fmtMxn(totalMxn)}
       </span>
     </div>

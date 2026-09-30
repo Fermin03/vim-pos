@@ -26,7 +26,7 @@ import { listarRecetasResumen } from "../../lib/recetas";
 import { mensajeError } from "../../lib/errores";
 
 const input = "h-11 w-full rounded border border-line-strong px-3 text-sm outline-none focus:border-ink focus:shadow-[0_0_0_3px_rgba(22,22,26,.06)]";
-const label = "mb-1.5 block text-[13px] font-medium text-ink-2";
+const label = "mb-1.5 block text-13 font-medium text-ink-2";
 const fmt = (n: number) => new Intl.NumberFormat("es-MX", { style: "currency", currency: "MXN" }).format(n);
 
 type FormDatos = { nombre: string; unidad_medida_id: string; categoria: (typeof CATEGORIAS_INSUMO)[number]; costo: string; stockMin: string };
@@ -51,9 +51,9 @@ const BADGE: Record<EstadoStock, { texto: string; clase: string }> = {
 function KpiInsumos({ label: etiqueta, valor, pie }: { label: string; valor: number; pie: string }) {
   return (
     <div className="rounded-lg border border-line bg-surface p-4">
-      <div className="text-[11.5px] font-semibold uppercase tracking-[0.04em] text-ink-3">{etiqueta}</div>
-      <div className="mt-1 font-display text-[26px] font-bold tabular-nums">{valor}</div>
-      <div className="mt-0.5 text-[11.5px] text-ink-3">{pie}</div>
+      <div className="text-12 font-semibold uppercase tracking-[0.04em] text-ink-3">{etiqueta}</div>
+      <div className="mt-1 font-display text-28 font-bold tabular-nums">{valor}</div>
+      <div className="mt-0.5 text-12 text-ink-3">{pie}</div>
     </div>
   );
 }
@@ -217,11 +217,11 @@ export default function InventarioPage() {
         {/* Sin unidades no se puede dar de alta nada, así que se dice arriba
             del todo y con qué hacer al respecto — no un botón gris y silencio. */}
         {unidades.length === 0 && (
-          <div role="status" className="mb-4 rounded-lg border border-[#F0DCC0] bg-warning-soft px-4 py-3">
-            <p className="text-[13px] font-semibold text-warning">
+          <div role="status" className="mb-4 rounded-lg border border-warning-line bg-warning-soft px-4 py-3">
+            <p className="text-13 font-semibold text-warning">
               Tu negocio no tiene unidades de medida, y sin ellas no se puede crear un insumo.
             </p>
-            <p className="mt-1 text-[12.5px] leading-snug text-ink-2">
+            <p className="mt-1 text-13 leading-snug text-ink-2">
               Es un asunto nuestro, no tuyo: se siembran al dar de alta el negocio y a éste le
               faltaron. Escríbenos y lo dejamos listo en minutos — no se pierde nada de lo que ya
               tengas cargado.
@@ -244,7 +244,7 @@ export default function InventarioPage() {
               </button>
               <span className="text-sm font-semibold">Descontar inventario al vender {descuenta === null ? "" : descuenta ? "· Encendido" : "· Apagado"}</span>
             </div>
-            <p className="text-[12.5px] text-ink-2">Cuando está encendido, cada venta descuenta los insumos de la receta del producto. Los productos sin receta se venden sin descontar.</p>
+            <p className="text-13 text-ink-2">Cuando está encendido, cada venta descuenta los insumos de la receta del producto. Los productos sin receta se venden sin descontar.</p>
           </div>
           {sinReceta > 0 && (
             <Link href="/catalogo/recetas?sin=1" className="text-sm font-medium text-warning underline-offset-2 hover:underline">
@@ -266,8 +266,8 @@ export default function InventarioPage() {
 
         {insumos && insumos.length === 0 && !editando && (
           <div className="rounded-lg border border-line bg-surface p-8 text-center text-ink-3">
-            <p className="text-[15px] font-semibold text-ink-2">Sin insumos todavía</p>
-            <p className="mt-1 text-[13px]">Agrega los insumos que compras para controlar existencias y mermas.</p>
+            <p className="text-15 font-semibold text-ink-2">Sin insumos todavía</p>
+            <p className="mt-1 text-13">Agrega los insumos que compras para controlar existencias y mermas.</p>
           </div>
         )}
 
@@ -281,14 +281,14 @@ export default function InventarioPage() {
                     key={t.v}
                     type="button"
                     onClick={() => { setFiltro(t.v); setPagina(1); }}
-                    className={["flex-shrink-0 whitespace-nowrap rounded-[4px] px-3 py-[11px] text-[12.5px] font-semibold transition lg:py-1.5", filtro === t.v ? "bg-surface text-ink shadow-sm" : "text-ink-2 hover:text-ink"].join(" ")}
+                    className={["flex-shrink-0 whitespace-nowrap rounded-[4px] px-3 py-[11px] text-13 font-semibold transition lg:py-1.5", filtro === t.v ? "bg-surface text-ink shadow-sm" : "text-ink-2 hover:text-ink"].join(" ")}
                   >
                     {t.l}
                   </button>
                 ))}
               </div>
               <input
-                className="h-9 w-full rounded border sm:w-[220px] border-line-strong px-3 text-[13px] outline-none focus:border-ink"
+                className="h-9 w-full rounded border sm:w-[220px] border-line-strong px-3 text-13 outline-none focus:border-ink"
                 value={busqueda}
                 onChange={(e) => { setBusqueda(e.target.value); setPagina(1); }}
                 placeholder="Buscar insumo…"
@@ -297,9 +297,9 @@ export default function InventarioPage() {
             </div>
 
             <div className="tabla-caja tabla-caja-xl">
-              <table className="w-full text-[13.5px]">
+              <table className="w-full text-14">
                 <thead>
-                  <tr className="border-b border-line bg-sel text-left text-[11.5px] uppercase tracking-wide text-ink-3">
+                  <tr className="border-b border-line bg-sel text-left text-12 uppercase tracking-wide text-ink-3">
                     <th className="px-4 py-2.5 font-semibold">Insumo</th>
                     <th className="px-4 py-2.5 font-semibold">Categoría</th>
                     <th className="px-4 py-2.5 text-right font-semibold">Stock actual</th>
@@ -323,13 +323,13 @@ export default function InventarioPage() {
                         </td>
                         <td className="px-4 py-2.5 text-right tabular-nums text-ink-3">{i.stockMinimo} {i.unidadSimbolo}</td>
                         <td className="px-4 py-2.5">
-                          <span className={`inline-block rounded-full px-2 py-0.5 text-[11px] font-bold ${BADGE[est].clase}`}>{BADGE[est].texto}</span>
+                          <span className={`inline-block rounded-full px-2 py-0.5 text-11 font-bold ${BADGE[est].clase}`}>{BADGE[est].texto}</span>
                         </td>
                         <td className="px-4 py-2.5 text-right tabular-nums text-ink-2">{fmt(i.costoUnitario)}</td>
                         <td className="px-4 py-2.5 text-right whitespace-nowrap">
-                          <button type="button" onClick={() => setMoviendo(i)} className="text-[12.5px] font-semibold text-ink-2 hover:text-ink">Movimiento</button>
-                          <button type="button" onClick={() => editar(i)} className="ml-3 text-[12.5px] font-semibold text-ink-3 hover:text-ink">Editar</button>
-                          <button type="button" onClick={() => borrar(i)} className="ml-3 text-[12.5px] font-semibold text-ink-3 hover:text-danger">Eliminar</button>
+                          <button type="button" onClick={() => setMoviendo(i)} className="text-13 font-semibold text-ink-2 hover:text-ink">Movimiento</button>
+                          <button type="button" onClick={() => editar(i)} className="ml-3 text-13 font-semibold text-ink-3 hover:text-ink">Editar</button>
+                          <button type="button" onClick={() => borrar(i)} className="ml-3 text-13 font-semibold text-ink-3 hover:text-danger">Eliminar</button>
                         </td>
                       </tr>
                     );
@@ -337,8 +337,8 @@ export default function InventarioPage() {
                   {visibles.length === 0 && (
                     <tr>
                       <td colSpan={7} className="px-4 py-10 text-center">
-                        <p className="text-[14px] font-semibold text-ink-2">Sin resultados</p>
-                        <p className="mt-1 text-[12.5px] text-ink-3">No hay insumos que coincidan con tu búsqueda o filtro.</p>
+                        <p className="text-14 font-semibold text-ink-2">Sin resultados</p>
+                        <p className="mt-1 text-13 text-ink-3">No hay insumos que coincidan con tu búsqueda o filtro.</p>
                       </td>
                     </tr>
                   )}
@@ -347,14 +347,14 @@ export default function InventarioPage() {
             </div>
 
             <div className="flex flex-wrap items-center justify-between gap-3 border-t border-line px-4 py-3">
-              <span className="text-[12.5px] text-ink-3">Mostrando {visibles.length} de {filtrados.length} insumos</span>
+              <span className="text-13 text-ink-3">Mostrando {visibles.length} de {filtrados.length} insumos</span>
               {totalPaginas > 1 && (
                 <div className="flex items-center gap-1">
                   <button type="button" onClick={() => setPagina((p) => Math.max(1, p - 1))} disabled={paginaActual === 1}
-                    className="rounded border border-line-strong px-2.5 py-1 text-[13px] font-semibold text-ink-2 transition hover:border-ink disabled:opacity-40 disabled:hover:border-line-strong">‹</button>
-                  <span className="px-2 text-[12.5px] font-semibold tabular-nums">{paginaActual} / {totalPaginas}</span>
+                    className="rounded border border-line-strong px-2.5 py-1 text-13 font-semibold text-ink-2 transition hover:border-ink disabled:opacity-40 disabled:hover:border-line-strong">‹</button>
+                  <span className="px-2 text-13 font-semibold tabular-nums">{paginaActual} / {totalPaginas}</span>
                   <button type="button" onClick={() => setPagina((p) => Math.min(totalPaginas, p + 1))} disabled={paginaActual === totalPaginas}
-                    className="rounded border border-line-strong px-2.5 py-1 text-[13px] font-semibold text-ink-2 transition hover:border-ink disabled:opacity-40 disabled:hover:border-line-strong">›</button>
+                    className="rounded border border-line-strong px-2.5 py-1 text-13 font-semibold text-ink-2 transition hover:border-ink disabled:opacity-40 disabled:hover:border-line-strong">›</button>
                 </div>
               )}
             </div>
@@ -364,7 +364,7 @@ export default function InventarioPage() {
         {/* Editor de insumo */}
         {editando && (
           <div className="mt-5 max-w-[560px] rounded-lg border border-line bg-surface p-5">
-            <div className="mb-4 font-display text-[16px] font-semibold tracking-tight">{editando.id ? "Editar insumo" : "Nuevo insumo"}</div>
+            <div className="mb-4 font-display text-16 font-semibold tracking-tight">{editando.id ? "Editar insumo" : "Nuevo insumo"}</div>
             <div className="flex flex-col gap-3.5">
               <div>
                 <label className={label} htmlFor="i-nombre">Nombre</label>
@@ -471,18 +471,18 @@ function ModalMovimiento({
       <div role="dialog" aria-modal="true" aria-label="Movimiento de inventario" className="w-full max-w-[420px] rounded-lg border border-line bg-surface p-6 shadow-[0_18px_44px_rgba(22,22,26,.18)]">
         <div className="mb-4">
           <h2 className="font-display text-xl font-semibold tracking-tight">Movimiento de inventario</h2>
-          <p className="mt-0.5 text-[13px] text-ink-3">{insumo.nombre} · stock {insumo.stockActual} {insumo.unidadSimbolo}</p>
+          <p className="mt-0.5 text-13 text-ink-3">{insumo.nombre} · stock {insumo.stockActual} {insumo.unidadSimbolo}</p>
         </div>
 
         <div className="mb-3 inline-flex w-full gap-0.5 rounded border border-line bg-hover p-[3px]">
           {TIPOS_MOV.map((t) => (
             <button key={t.v} type="button" onClick={() => setTipo(t.v)}
-              className={["flex-1 rounded-[4px] px-2 py-2 text-[11.5px] font-semibold transition", tipo === t.v ? "bg-surface text-ink shadow-sm" : "text-ink-2 hover:text-ink"].join(" ")}>
+              className={["flex-1 rounded-[4px] px-2 py-2 text-12 font-semibold transition", tipo === t.v ? "bg-surface text-ink shadow-sm" : "text-ink-2 hover:text-ink"].join(" ")}>
               {t.l}
             </button>
           ))}
         </div>
-        <p className="mb-3 text-[12px] text-ink-3">Las entradas por compra se registran en Compras.</p>
+        <p className="mb-3 text-12 text-ink-3">Las entradas por compra se registran en Compras.</p>
 
         {sucursales.length > 1 && (
           <div className="mb-3">

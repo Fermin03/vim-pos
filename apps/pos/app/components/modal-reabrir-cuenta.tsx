@@ -4,6 +4,7 @@ import { Button, Modal } from "@vim/ui/styles";
 import { type Empleado } from "../lib/supabase";
 import { autorizacionPropia, type Autorizacion, type PayloadAutorizacion } from "../lib/autorizacion";
 import { ModalAutorizacionPin } from "./modal-autorizacion-pin";
+import { AvisoAutorizacion } from "./motivo-y-autorizacion";
 import { reabrirCuenta } from "../lib/cuentas-acciones";
 import { fmtMxn } from "../lib/turno";
 
@@ -113,23 +114,18 @@ export function ModalReabrirCuenta({
     <Modal open onClose={onCerrar} title="Reabrir cuenta" hideTitle className="w-[480px] rounded-lg border border-line bg-surface p-6 shadow-[0_18px_44px_rgba(22,22,26,.18)]">
       <div className="mb-5">
         <h2 className="font-display text-xl font-semibold tracking-tight">Reabrir cuenta</h2>
-        <p className="mt-0.5 text-[13px] text-ink-3">{folio ? `${folio} · ` : ""}{fmtMxn(total)}</p>
+        <p className="mt-0.5 text-13 text-ink-3">{folio ? `${folio} · ` : ""}{fmtMxn(total)}</p>
       </div>
 
-      <div className="mb-4 rounded border border-[#E8DCC0] bg-warning-soft px-3 py-2 text-[12.5px] font-medium text-warning">
+      <div className="mb-4 rounded border border-warning-line bg-warning-soft px-3 py-2 text-13 font-medium text-warning">
         La cuenta vuelve a <b>abierta</b> para editarla o volver a cobrarla. Se <b>anula el pago</b> registrado y el efectivo deja de contar en el corte hasta que se cobre de nuevo. El folio se conserva.
       </div>
 
-      <label className="mb-1.5 block text-[13px] font-medium text-ink-2">Motivo (opcional)</label>
+      <label className="mb-1.5 block text-13 font-medium text-ink-2">Motivo (opcional)</label>
       <input className={`${input} mb-3`} value={motivo} maxLength={200}
         onChange={(e) => setMotivo(e.target.value)} placeholder="Ej. corregir productos, cobro equivocado…" />
 
-      <div className={[
-        "mb-4 rounded border px-3 py-2 text-[12.5px] font-medium",
-        tienePermisoRol ? "border-[#D6E8DD] bg-success-soft text-success" : "border-[#E8DCC0] bg-warning-soft text-warning",
-      ].join(" ")}>
-        {tienePermisoRol ? "Dentro de tu rol · no requiere autorización." : "Requiere PIN de un supervisor."}
-      </div>
+      <div className="mb-4"><AvisoAutorizacion propia={tienePermisoRol} /></div>
 
       {error && <p className="mb-3 text-sm font-medium text-danger" role="alert">{error}</p>}
 

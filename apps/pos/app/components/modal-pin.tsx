@@ -69,16 +69,16 @@ export function ModalPin({
       </button>
 
       <div className="mb-5 flex flex-col items-center gap-3">
-        <span className="flex h-[54px] w-[54px] items-center justify-center rounded-full border border-line bg-hover font-display text-[19px] font-semibold text-ink-2">
+        <span className="flex h-[54px] w-[54px] items-center justify-center rounded-full border border-line bg-hover font-display text-20 font-semibold text-ink-2">
           {iniciales(empleado.nombre)}
         </span>
         <div className="text-center">
-          <div className="font-display text-[17px] font-semibold tracking-tight">{empleado.nombre}</div>
+          <div className="font-display text-18 font-semibold tracking-tight">{empleado.nombre}</div>
           <div className="text-xs text-ink-3">{ROL_LABEL[empleado.rol] ?? "Empleado"}</div>
         </div>
       </div>
 
-      <p className="mb-4 text-center text-[13px] text-ink-2">
+      <p className="mb-4 text-center text-13 text-ink-2">
         {okMsg ?? "Ingresa tu PIN de 4 dígitos"}
       </p>
 

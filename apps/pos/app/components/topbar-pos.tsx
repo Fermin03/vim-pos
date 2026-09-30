@@ -52,13 +52,13 @@ export function TopbarPos({
         <BrandMark />
         <div className="h-[26px] w-px bg-line-strong" />
         <div>
-          <div className="font-display text-[15px] font-semibold tracking-tight">{negocio}</div>
+          <div className="font-display text-15 font-semibold tracking-tight">{negocio}</div>
           <div className="mt-px text-xs text-ink-3">
             {sucursal} · {caja}
           </div>
         </div>
       </div>
-      <div className="font-display text-[15px] font-semibold tabular-nums text-ink-2">
+      <div className="font-display text-15 font-semibold tabular-nums text-ink-2">
         {ahora ? ahora.toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit", hour12: false }) : "—"}
       </div>
     </header>

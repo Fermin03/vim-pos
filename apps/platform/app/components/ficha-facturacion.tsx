@@ -27,12 +27,12 @@ export function FichaFacturacion({ d, accion, busy }: { d: Detalle; accion: Acci
 
   return (
     <div className="grid gap-4 lg:grid-cols-2">
-      <div className="rounded-lg border border-line p-3 text-[13px]">
-        <div className="mb-1 text-[12px] font-semibold uppercase tracking-wide text-ink-2">Fiscal</div>
+      <div className="rounded-lg border border-line p-3 text-13">
+        <div className="mb-1 text-12 font-semibold uppercase tracking-wide text-ink-2">Fiscal</div>
         <div>RFC: <b>{String(t.rfc ?? "—")}</b></div>
         <div>Razón social: {String(t.razon_social ?? "—")}</div>
         <div>Régimen: {String(t.regimen_fiscal ?? "—")} · CP {String(t.codigo_postal_fiscal ?? "—")}</div>
-        <div className="mt-3 text-[12px] font-semibold uppercase tracking-wide text-ink-2">Folios</div>
+        <div className="mt-3 text-12 font-semibold uppercase tracking-wide text-ink-2">Folios</div>
         <div>
           Saldo de paquetes: <b>{d.foliosSaldo}</b>
           {d.foliosBase && (
@@ -53,12 +53,12 @@ export function FichaFacturacion({ d, accion, busy }: { d: Detalle; accion: Acci
             <button
               onClick={() => setDialogo("paquete")}
               disabled={busy || !paquete}
-              className="btn h-11 shrink-0 rounded bg-ink px-4 text-[13px] font-semibold text-white disabled:opacity-50"
+              className="btn h-11 shrink-0 rounded bg-ink px-4 text-13 font-semibold text-white disabled:opacity-50"
             >
               Acreditar…
             </button>
           </div>
-          <p className="mt-1 text-[12.5px] text-ink-2">Queda como compra de paquete con su precio, en la bitácora.</p>
+          <p className="mt-1 text-13 text-ink-2">Queda como compra de paquete con su precio, en la bitácora.</p>
         </div>
 
         {/* Ajuste manual: para correcciones y cortesías, no para vender. */}
@@ -78,12 +78,12 @@ export function FichaFacturacion({ d, accion, busy }: { d: Detalle; accion: Acci
             <button
               onClick={() => setDialogo("ajuste")}
               disabled={busy || ajuste === null}
-              className="btn h-11 shrink-0 rounded bg-ink px-4 text-[13px] font-semibold text-white disabled:opacity-50"
+              className="btn h-11 shrink-0 rounded bg-ink px-4 text-13 font-semibold text-white disabled:opacity-50"
             >
               Aplicar…
             </button>
           </div>
-          <p id="adj-ayuda" className={`mt-1 text-[12.5px] ${ajusteInvalido ? "font-medium text-danger" : "text-ink-2"}`}>
+          <p id="adj-ayuda" className={`mt-1 text-13 ${ajusteInvalido ? "font-medium text-danger" : "text-ink-2"}`}>
             {ajusteInvalido ? "Escribe un número entero: +50 para regalar, -10 para descontar." : "Positivo = regalar folios · negativo = descontar."}
           </p>
         </div>

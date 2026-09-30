@@ -15,7 +15,7 @@ import { hoyISO } from "../../../../lib/fechas";
 
 const fmt = (n: number) => new Intl.NumberFormat("es-MX", { style: "currency", currency: "MXN" }).format(n);
 const input = "h-10 w-full rounded border border-line-strong px-2 text-sm outline-none focus:border-ink";
-const label = "mb-1 block text-[12px] font-medium text-ink-2";
+const label = "mb-1 block text-12 font-medium text-ink-2";
 
 /** Fila tal como se edita en pantalla (texto), más lo que vino del XML. */
 type Fila = {
@@ -174,11 +174,11 @@ export default function NuevaCompraPage() {
           <label className="flex cursor-pointer flex-col items-center justify-center gap-1 rounded-lg border-2 border-dashed border-line-strong p-6 text-center text-sm text-ink-2 hover:bg-hover"
             onDragOver={(e) => e.preventDefault()} onDrop={(e) => { e.preventDefault(); const f = e.dataTransfer.files?.[0]; if (f) leerArchivo(f); }}>
             <span className="font-medium text-ink">Arrastra el XML de la factura o haz clic</span>
-            <span className="text-[12px] text-ink-3">CFDI 4.0 de ingreso, en pesos</span>
+            <span className="text-12 text-ink-3">CFDI 4.0 de ingreso, en pesos</span>
             <input type="file" accept=".xml,text/xml,application/xml" className="sr-only" onChange={(e) => { const f = e.target.files?.[0]; if (f) leerArchivo(f); e.target.value = ""; }} />
           </label>
           {avisoArchivo && <p role="alert" className="text-sm font-medium text-warning">{avisoArchivo}</p>}
-          {cfdi && <p className="text-[12px] text-ink-3">Factura {cfdi.uuid} de {cfdi.emisor.nombre} ({cfdi.emisor.rfc}), total {fmt(cfdi.total)}.</p>}
+          {cfdi && <p className="text-12 text-ink-3">Factura {cfdi.uuid} de {cfdi.emisor.nombre} ({cfdi.emisor.rfc}), total {fmt(cfdi.total)}.</p>}
           {duplicada && <p role="alert" className="text-sm font-medium text-danger">Esta factura ya está registrada como la compra <Link className="underline" href={`/inventario/compras/${duplicada.id}`}>{duplicada.folio}</Link>.</p>}
 
           <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
@@ -188,7 +188,7 @@ export default function NuevaCompraPage() {
                 <option value="">Elige…</option>{proveedores.map((p) => <option key={p.id} value={p.id}>{p.nombre}</option>)}
               </select>
               {proveedorSugerido && !proveedorId && (
-                <button type="button" className="mt-1 text-[12px] font-medium text-accent hover:underline" onClick={crearProveedorSugerido}>Crear proveedor "{proveedorSugerido.nombre || proveedorSugerido.rfc}"</button>
+                <button type="button" className="mt-1 text-12 font-medium text-accent hover:underline" onClick={crearProveedorSugerido}>Crear proveedor "{proveedorSugerido.nombre || proveedorSugerido.rfc}"</button>
               )}
             </div>
             {sucursales.length > 1 && (
@@ -200,9 +200,9 @@ export default function NuevaCompraPage() {
           </div>
 
           <TablaScroll min={1000}>
-            <table className="w-full text-[13px]">
+            <table className="w-full text-13">
               <thead>
-                <tr className="border-b border-line text-left text-[11.5px] uppercase tracking-[0.04em] text-ink-3">
+                <tr className="border-b border-line text-left text-12 uppercase tracking-[0.04em] text-ink-3">
                   {cfdi && <th className="py-2 pr-2 font-semibold">En la factura</th>}
                   <th className="py-2 pr-2 font-semibold">Insumo</th>
                   <th className="py-2 pr-2 text-right font-semibold">Cantidad</th>
@@ -221,12 +221,12 @@ export default function NuevaCompraPage() {
                   const res = c && c.insumoId && c.cantidadCapturada > 0 && c.factor > 0 ? resolverLinea(c) : null;
                   return (
                     <tr key={i} className={`border-b border-line-soft align-top ${f.omitir ? "opacity-50" : ""}`}>
-                      {cfdi && <td className="max-w-[220px] py-2 pr-2 text-[12px] text-ink-2">{f.descripcionOrigen}{f.emparejado && <span className="ml-1 rounded bg-success-soft px-1 text-[10.5px] font-medium text-success">Emparejado</span>}</td>}
+                      {cfdi && <td className="max-w-[220px] py-2 pr-2 text-12 text-ink-2">{f.descripcionOrigen}{f.emparejado && <span className="ml-1 rounded bg-success-soft px-1 text-11 font-medium text-success">Emparejado</span>}</td>}
                       <td className="py-1.5 pr-2">
                         <select className={input} value={f.insumoId} disabled={f.omitir} onChange={(e) => elegirInsumo(i, e.target.value)} aria-label="Insumo">
                           <option value="">Elige…</option>{insumos.map((o) => <option key={o.id} value={o.id}>{o.nombre}</option>)}
                         </select>
-                        {!f.omitir && errores[i] && <p className="mt-1 text-[11.5px] text-danger">{errores[i]}</p>}
+                        {!f.omitir && errores[i] && <p className="mt-1 text-12 text-danger">{errores[i]}</p>}
                       </td>
                       <td className="py-1.5 pr-2"><input className={`${input} text-right tabular-nums`} inputMode="decimal" disabled={f.omitir} value={f.cantidadTexto} onChange={(e) => set(i, { cantidadTexto: e.target.value.replace(/[^0-9.]/g, "") })} aria-label="Cantidad" /></td>
                       <td className="py-1.5 pr-2">
@@ -240,8 +240,8 @@ export default function NuevaCompraPage() {
                       <td className="py-3 pr-2 text-right tabular-nums">{res ? fmt(res.costoUnitario) : "—"}</td>
                       <td className="py-1.5 text-right">
                         {cfdi
-                          ? <button type="button" className="text-[12px] text-ink-2 hover:text-ink" onClick={() => set(i, { omitir: !f.omitir })}>{f.omitir ? "Incluir" : "Omitir"}</button>
-                          : <button type="button" className="text-[12px] text-ink-2 hover:text-ink" onClick={() => setFilas((p) => p.filter((_, k) => k !== i))}>Quitar</button>}
+                          ? <button type="button" className="text-12 text-ink-2 hover:text-ink" onClick={() => set(i, { omitir: !f.omitir })}>{f.omitir ? "Incluir" : "Omitir"}</button>
+                          : <button type="button" className="text-12 text-ink-2 hover:text-ink" onClick={() => setFilas((p) => p.filter((_, k) => k !== i))}>Quitar</button>}
                       </td>
                     </tr>
                   );
@@ -262,7 +262,7 @@ export default function NuevaCompraPage() {
           <div className="flex gap-2">
             <Button onClick={registrar} disabled={!puedeGuardar || guardando}>{guardando ? "Registrando…" : "Registrar compra"}</Button>
           </div>
-          <p className="text-[12px] text-ink-3">El factor dice cuántas unidades del insumo trae una unidad del proveedor: una caja de 12 piezas es factor 12. Se recuerda para la próxima factura del mismo proveedor.</p>
+          <p className="text-12 text-ink-3">El factor dice cuántas unidades del insumo trae una unidad del proveedor: una caja de 12 piezas es factor 12. Se recuerda para la próxima factura del mismo proveedor.</p>
         </div>
       </PageBody>
     </>
