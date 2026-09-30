@@ -11,7 +11,7 @@ import { decidirAltaAddon, precioAltaDelivery, type FilaAddon } from "../../../l
 const ESTADOS_VALIDOS = ["TRIAL", "ACTIVO", "SUSPENDIDO", "CANCELADO", "INTERNO"];
 
 export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }) {
-  const auth = autorizar(req);
+  const auth = await autorizar(req);
   if ("error" in auth) return auth.error;
   const sb = auth.sb;
   const { id } = await ctx.params;
@@ -97,7 +97,7 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }
 }
 
 export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }> }) {
-  const auth = autorizar(req);
+  const auth = await autorizar(req);
   if ("error" in auth) return auth.error;
   const sb = auth.sb;
   const { id } = await ctx.params;

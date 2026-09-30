@@ -20,7 +20,7 @@ type ResumenCajas = {
 };
 
 export async function GET(req: Request) {
-  const auth = autorizar(req);
+  const auth = await autorizar(req);
   if ("error" in auth) return auth.error;
   const sb = auth.sb;
 

@@ -4,7 +4,7 @@ import { autorizar } from "../../lib/server";
 // Catálogo de planes (para el selector de plan en el detalle de un tenant).
 
 export async function GET(req: Request) {
-  const auth = autorizar(req);
+  const auth = await autorizar(req);
   if ("error" in auth) return auth.error;
   const { data, error } = await auth.sb
     .from("planes")

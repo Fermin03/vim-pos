@@ -16,6 +16,12 @@ enable_signup = true
 enabled = true
 uri = "pg-functions://postgres/public/custom_access_token_hook"
 
+# Segundo factor por app autenticadora: lo exige el panel de plataforma a cada operador (ADR 0019).
+# En los proyectos de Supabase en la nube viene encendido; en local hay que pedirlo.
+[auth.mfa.totp]
+enroll_enabled = true
+verify_enabled = true
+
 [realtime]
 enabled = true
 

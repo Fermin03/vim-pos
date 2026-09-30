@@ -11,6 +11,7 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@supabase/supabase-js": "^2.45.0",
     "@vim/db": "workspace:*",
     "@vim/fecha": "workspace:*",
     "@vim/ui": "workspace:*",

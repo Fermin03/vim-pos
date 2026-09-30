@@ -64,19 +64,21 @@ export function Bitacora({ api }: { api: Api }) {
                 <th className="p-2.5 text-left font-semibold">Cuándo</th>
                 <th className="p-2.5 text-left font-semibold">Acción</th>
                 <th className="p-2.5 text-left font-semibold">Empresa</th>
+                <th className="p-2.5 text-left font-semibold">Quién</th>
                 <th className="p-2.5 text-left font-semibold">Motivo</th>
                 <th className="p-2.5 text-left font-semibold">IP</th>
               </tr>
             </thead>
             <tbody>
               {lista.length === 0 && (
-                <tr><td colSpan={5} className="p-4 text-center text-ink-3">Nada con ese filtro.</td></tr>
+                <tr><td colSpan={6} className="p-4 text-center text-ink-3">Nada con ese filtro.</td></tr>
               )}
               {lista.map((a) => (
                 <tr key={a.id} className="border-t border-line">
                   <td className="whitespace-nowrap p-2.5 text-ink-2">{hace(a.fecha)}</td>
                   <td className="p-2.5 font-semibold">{a.accion}</td>
                   <td className="p-2.5">{a.tenant}</td>
+                  <td className="whitespace-nowrap p-2.5 text-ink-2">{a.quien}</td>
                   <td className="p-2.5 text-ink-2">{a.motivo ?? "—"}</td>
                   <td className="p-2.5 tabular-nums text-ink-3">{a.ip ?? "—"}</td>
                 </tr>

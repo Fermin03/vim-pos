@@ -4,25 +4,39 @@ import { createHash, timingSafeEqual } from "node:crypto";
 import { createServiceClient } from "@vim/db/service";
 
 // Capa server-side del panel de plataforma. Corre con service_role, FUERA de RLS (doc 12 §9).
-// Gated por el secreto PLATFORM_PROVISION_KEY (header X-Platform-Key) — mismo modelo que el
-// provisioning. A8 del roadmap reemplazará esto por login individual de super-admin.
 //
-// SEC CN-003 — endurecimiento de la clave compartida. Lo que concede una sola cadena es enorme
-// (listar todos los tenants, impersonar a cualquier dueño, mover planes y folios), así que hasta
-// que llegue A8 se le ponen los controles que sí caben hoy:
-//   · comparación en tiempo constante (antes `!==`, que filtra el prefijo por temporización),
-//   · límite de intentos por IP (frena la fuerza bruta contra /api/tenants),
-//   · allowlist de IP opcional (PLATFORM_IP_ALLOWLIST) para cerrar el panel a la red de VIM,
-//   · registro de los intentos FALLIDOS, que antes no dejaban ningún rastro.
+// A8 — quién entra. Cada operador de VIM tiene su cuenta (Supabase Auth: contraseña + segundo
+// factor TOTP) y la lista de operadores vive en `plataforma_operadores` (0128). El navegador
+// manda su token como `Authorization: Bearer`; aquí se exige que sea válido, que venga con el
+// segundo factor (`aal2`) y que la cuenta sea un operador activo.
 //
-// Lo que esto NO arregla, y sigue pendiente de A8: no hay cuentas individuales, ni MFA, ni
-// expiración de sesión, y la bitácora atribuye todo al mismo UUID de sistema. El control con
-// mejor relación esfuerzo/beneficio sigue siendo poner el panel detrás de Cloudflare Access.
+// La clave compartida (PLATFORM_PROVISION_KEY en `X-Platform-Key`) queda para el arranque: sirve
+// solo mientras NO haya ningún operador activado. En cuanto el primero entra con su segundo
+// factor deja de servir sola — sin tocar variables en Vercel —, y si un día se desactiva a todos
+// (o se restablece al único), vuelve a servir para no dejar a VIM fuera de su propio panel.
+//
+// SEC CN-003 — se conservan para los dos caminos: allowlist de IP opcional
+// (PLATFORM_IP_ALLOWLIST), límite de intentos por IP y registro de los fallidos.
 
-/** UUID de sistema que representa al operador VIM mientras la auth es por clave compartida. */
+/** UUID de sistema: lo que se hizo con la clave compartida, sin persona detrás. */
 export const SYSTEM_ADMIN_ID = "00000000-0000-0000-0000-0000000000a1";
 
 type SbClient = ReturnType<typeof createServiceClient>;
+
+/** Quién está haciendo la petición. `via: "clave"` = la clave compartida del arranque. */
+export type Actor = { id: string; nombre: string; via: "cuenta" | "clave" };
+
+/**
+ * El operador de cada petición, pegado a SU cliente service_role (cada `autorizar` crea uno
+ * nuevo). Así `auditar(sb, …)` sabe a quién atribuir sin que cada una de sus llamadas en las
+ * rutas tenga que pasarlo a mano — y ninguna puede olvidarlo.
+ */
+const actores = new WeakMap<SbClient, Actor>();
+
+/** El operador de la petición a la que pertenece este cliente. */
+export function actorDe(sb: SbClient): Actor {
+  return actores.get(sb) ?? { id: SYSTEM_ADMIN_ID, nombre: "Clave compartida", via: "clave" };
+}
 
 const MAX_INTENTOS = 5;
 const VENTANA_MS = 15 * 60 * 1000;
@@ -74,25 +88,41 @@ function registrarFallo(ip: string): void {
   else e.fallos += 1;
 }
 
-/**
- * Valida la clave de plataforma. Devuelve el cliente service_role o una respuesta de error.
- *
- * Orden deliberado: allowlist → bloqueo por intentos → clave. Así una IP no autorizada nunca llega
- * a consumir el comparador, y una IP ya bloqueada no puede seguir probando claves.
- */
-export function autorizar(req: Request): { sb: SbClient } | { error: NextResponse } {
-  const key = process.env.PLATFORM_PROVISION_KEY;
-  if (!key) return { error: NextResponse.json({ error: "PROVISION_DESHABILITADO" }, { status: 503 }) };
-
-  // Una clave corta en producción es tan grave como no tenerla: se avisa fuerte en el log del
-  // servidor. No se bloquea el arranque para no tumbar el panel por una config heredada.
-  if (process.env.NODE_ENV === "production" && key.length < 32) {
-    console.warn(
-      "[SEC CN-003] PLATFORM_PROVISION_KEY tiene menos de 32 caracteres. " +
-        "Genera una con `openssl rand -hex 32` y rótala.",
-    );
+/** Lee los claims de un JWT cuya firma YA validó `auth.getUser` (no re-verifica). */
+function claimsDe(token: string): Record<string, unknown> {
+  try {
+    const p = token.split(".")[1] ?? "";
+    return JSON.parse(Buffer.from(p.replace(/-/g, "+").replace(/_/g, "/"), "base64").toString("utf8"));
+  } catch {
+    return {};
   }
+}
 
+const IP_POR_CLIENTE = new WeakMap<SbClient, string>();
+
+/** ¿Hay algún operador activo que ya entró con su segundo factor? Entonces la clave ya no sirve. */
+async function hayOperadorActivado(sb: SbClient): Promise<boolean> {
+  const { count, error } = await sb
+    .from("plataforma_operadores")
+    .select("usuario_id", { count: "exact", head: true })
+    .eq("activo", true)
+    .not("activado_at", "is", null);
+  // Si la consulta falla, se trata como "sí hay": ante la duda, la clave compartida NO abre.
+  if (error) {
+    console.error(`[A8] no se pudo saber si hay operadores activados: ${error.message}`);
+    return true;
+  }
+  return (count ?? 0) > 0;
+}
+
+/**
+ * Valida quién pide. Devuelve el cliente service_role (con su operador pegado) o una respuesta de
+ * error.
+ *
+ * Orden deliberado: allowlist → bloqueo por intentos → cuenta o clave. Así una IP no autorizada
+ * nunca llega a consumir el comparador ni a GoTrue, y una IP bloqueada no puede seguir probando.
+ */
+export async function autorizar(req: Request): Promise<{ sb: SbClient; actor: Actor } | { error: NextResponse }> {
   const ip = ipDe(req);
 
   // Acepta IPs exactas y prefijos CIDR. Lo segundo no es un lujo: los proveedores entregan IPv6
@@ -116,6 +146,56 @@ export function autorizar(req: Request): { sb: SbClient } | { error: NextRespons
     };
   }
 
+  const sb = createServiceClient();
+  IP_POR_CLIENTE.set(sb, ip);
+  const bearer = (req.headers.get("authorization") ?? "").replace(/^Bearer\s+/i, "").trim();
+
+  // ── Camino 1: la cuenta del operador ──────────────────────────────────────────────────────
+  if (bearer) {
+    const { data, error } = await sb.auth.getUser(bearer);
+    if (error || !data?.user) {
+      registrarFallo(ip);
+      return { error: NextResponse.json({ error: "SESION_INVALIDA", detalle: "Tu sesión venció. Vuelve a entrar." }, { status: 401 }) };
+    }
+    // Contraseña sola no basta: el token tiene que traer el segundo factor verificado.
+    if (claimsDe(bearer).aal !== "aal2") {
+      return { error: NextResponse.json({ error: "FALTA_SEGUNDO_FACTOR", detalle: "Falta el código de tu app autenticadora." }, { status: 401 }) };
+    }
+    const { data: op } = await sb
+      .from("plataforma_operadores")
+      .select("usuario_id, nombre, activo, activado_at")
+      .eq("usuario_id", data.user.id)
+      .maybeSingle();
+    const fila = op as { usuario_id: string; nombre: string; activo: boolean; activado_at: string | null } | null;
+    if (!fila || !fila.activo) {
+      registrarFallo(ip);
+      console.warn(`[A8] cuenta sin acceso al panel: ${data.user.email ?? data.user.id} desde ${ip}`);
+      return { error: NextResponse.json({ error: "NO_ES_OPERADOR", detalle: "Esta cuenta no tiene acceso al panel." }, { status: 403 }) };
+    }
+    // Primera entrada con segundo factor: queda activado, y con él se retira la clave compartida.
+    if (!fila.activado_at) {
+      await sb.from("plataforma_operadores").update({ activado_at: new Date().toISOString() }).eq("usuario_id", fila.usuario_id);
+      console.log(`[A8] operador activado: ${fila.nombre}. La clave compartida deja de servir.`);
+    }
+    intentos.delete(ip);
+    const actor: Actor = { id: fila.usuario_id, nombre: fila.nombre, via: "cuenta" };
+    actores.set(sb, actor);
+    return { sb, actor };
+  }
+
+  // ── Camino 2: la clave compartida, solo para el arranque ──────────────────────────────────
+  const key = process.env.PLATFORM_PROVISION_KEY;
+  if (!key) return { error: NextResponse.json({ error: "NO_AUTORIZADO", detalle: "Entra con tu cuenta." }, { status: 401 }) };
+
+  // Una clave corta en producción es tan grave como no tenerla: se avisa fuerte en el log del
+  // servidor. No se bloquea el arranque para no tumbar el panel por una config heredada.
+  if (process.env.NODE_ENV === "production" && key.length < 32) {
+    console.warn(
+      "[SEC CN-003] PLATFORM_PROVISION_KEY tiene menos de 32 caracteres. " +
+        "Genera una con `openssl rand -hex 32` y rótala.",
+    );
+  }
+
   const recibida = req.headers.get("x-platform-key") ?? "";
   if (!igualSeguro(recibida, key)) {
     registrarFallo(ip);
@@ -125,35 +205,51 @@ export function autorizar(req: Request): { sb: SbClient } | { error: NextRespons
     return { error: NextResponse.json({ error: "NO_AUTORIZADO" }, { status: 401 }) };
   }
 
+  if (await hayOperadorActivado(sb)) {
+    console.warn(`[A8] intento con la clave compartida ya retirada desde ${ip}`);
+    return {
+      error: NextResponse.json(
+        { error: "CLAVE_RETIRADA", detalle: "La clave compartida ya no sirve: entra con tu cuenta." },
+        { status: 401 },
+      ),
+    };
+  }
+
   intentos.delete(ip); // clave correcta → se limpia el contador de esa IP
-  return { sb: createServiceClient() };
+  const actor: Actor = { id: SYSTEM_ADMIN_ID, nombre: "Clave compartida", via: "clave" };
+  actores.set(sb, actor);
+  return { sb, actor };
 }
 
 /**
- * Registra una acción de plataforma en super_admin_accesos (auditoría, doc 12 §9.2).
+ * Registra una acción de plataforma en super_admin_accesos (auditoría, doc 12 §9.2), a nombre del
+ * operador de la petición (`actorDe(sb)`) y con su IP.
  *
  * SEC CN-003 — antes esta función perdía la mayoría de los registros en silencio: la tabla declara
- * `tenant_id NOT NULL REFERENCES tenants(id)` y `motivo text NOT NULL` (migración 0012), pero aquí
- * se insertaban `null` en ambos y el error del insert nunca se revisaba. En la práctica solo
- * quedaban asentadas `impersonar` y `ajustar_folios` (las dos que traen motivo por defecto);
- * cambiar el estado de un tenant, su plan o su suscripción no dejaba rastro alguno.
+ * `motivo text NOT NULL` y `payload jsonb NOT NULL` (0012), pero aquí se insertaban `null` y el error
+ * del insert nunca se revisaba. Desde 0128 `tenant_id` admite NULL: lo que no es de un negocio
+ * (invitar o desactivar a un operador) también se asienta.
  */
 export async function auditar(
   sb: SbClient,
   args: { accion: string; tenantId?: string | null; motivo?: string | null; payload?: Record<string, unknown> },
 ): Promise<void> {
-  if (!args.tenantId) {
-    console.warn(`[auditoría] acción "${args.accion}" sin tenant_id: no se puede asentar (columna NOT NULL).`);
-    return;
-  }
+  const actor = actorDe(sb);
   const { error } = await sb.from("super_admin_accesos").insert({
-    super_admin_id: SYSTEM_ADMIN_ID,
-    tenant_id: args.tenantId,
+    super_admin_id: actor.id,
+    tenant_id: args.tenantId ?? null,
     accion: args.accion,
     // NOT NULL en el esquema: sin un texto explícito el insert se caía y la acción quedaba sin rastro.
     motivo: args.motivo?.trim() || "Acción desde el panel de plataforma (sin motivo capturado)",
-    payload: args.payload ?? null,
+    payload: args.payload ?? {},
+    ip_address: ipValida(IP_POR_CLIENTE.get(sb)),
   });
   // La auditoría no debe tumbar la operación, pero su fallo TIENE que ser visible.
   if (error) console.error(`[auditoría] no se pudo asentar "${args.accion}": ${error.message}`);
+}
+
+/** `inet` rechaza "desconocida": mejor sin IP que perder el registro entero. */
+function ipValida(ip: string | undefined): string | null {
+  if (!ip) return null;
+  return /^[0-9a-f.:]+$/i.test(ip) ? ip : null;
 }
