@@ -1,5 +1,7 @@
 "use client";
+import { abrirStreamHub } from "@vim/kds-core";
 import { esEscritorio } from "./actualizacion";
+import { deviceToken } from "./supabase";
 
 /**
  * "El menú cambió": aviso del escritorio y actualización a petición del cajero.
@@ -26,14 +28,15 @@ export function alCambiarCatalogo(alCambiar: () => void): () => void {
   if (!esEscritorio() || !w?.__VIM_SUPABASE_URL || typeof EventSource === "undefined") {
     return () => {};
   }
-  // Sin `?sucursal=`: un cambio de menú es del negocio entero, no de una sucursal.
-  const es = new EventSource(`${w.__VIM_SUPABASE_URL}/kds/stream`);
-  es.addEventListener("catalogo", () => alCambiar());
-  es.onerror = () => {
-    // EventSource reconecta solo. Y si no lo consigue, el hueco lo cubre el sondeo del escritorio:
-    // la próxima carga de la pantalla trae el menú al día de todas formas.
-  };
-  return () => es.close();
+  // Sin `?sucursal=`: un cambio de menú es del negocio entero, no de una sucursal. Con el token
+  // del dispositivo (el hub lo exige desde la auditoría del 30/09/2026) y reapertura si caduca.
+  // Si aun así no conecta, el hueco lo cubre el sondeo del escritorio: la próxima carga de la
+  // pantalla trae el menú al día de todas formas.
+  return abrirStreamHub({
+    base: w.__VIM_SUPABASE_URL,
+    obtenerToken: deviceToken,
+    eventos: { catalogo: () => alCambiar() },
+  });
 }
 
 export type ResultadoMenu = { ok: boolean; error?: string };

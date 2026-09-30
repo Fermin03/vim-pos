@@ -511,8 +511,9 @@ BEGIN
   INSERT INTO zonas_envio (tenant_id, sucursal_id, nombre, costo_mxn)
   VALUES (v_tenant, v_suc, 'Descuentos Norte', 35.00) RETURNING id INTO v_zona;
 
-  -- Una autorización de supervisor (Diego, PIN 4321), reutilizada: aplicar_descuento_manual solo
-  -- exige que exista, y lo que se prueba aquí es el monto, no el flujo de PIN.
+  -- Una autorización de supervisor (Diego, PIN 4321) para sacar quién autoriza. Desde la 0134 cada
+  -- descuento consume la suya (antes se reutilizaba esta), así que abajo se siembra una por
+  -- descuento: lo que se prueba aquí es el monto, no el flujo de PIN.
   v_t := abrir_ticket(v_suc, v_caja, v_turno, 'DELIVERY_PROPIO', NULL, NULL, NULL, v_maria);
   v_auth := verificar_autorizacion_pin('4321', 'descuento_manual', 'descuento.manual_aplicar',
               'ticket', v_t, 24, 'CLIENTE_FRECUENTE', v_caja, v_turno, v_maria);
@@ -523,6 +524,9 @@ BEGIN
   -- a) Descuento manual de ticket, 10%: 24.00 (el 10% de 240), no 27.50 (el de 275).
   PERFORM agregar_item_a_ticket(v_t, v_prod, 2, NULL, '[]'::jsonb, NULL);
   PERFORM fijar_envio_ticket(v_t, v_zona);
+  -- 0134: una autorización por descuento, del permiso que pide el POS para el tipo.
+  INSERT INTO autorizaciones_pin(tenant_id, usuario_solicitante_id, usuario_autorizo_id, accion, permiso_codigo, motivo, caja_id, turno_id)
+    VALUES (v_tenant, v_maria, v_autorizo, 'descuento_manual', 'descuento.manual_aplicar', 'smoke', v_caja, v_turno) RETURNING id INTO v_pin;
   PERFORM aplicar_descuento_manual(v_t, NULL, 'PORCENTAJE', 10, 'CLIENTE_FRECUENTE', NULL,
             v_pin, v_maria, v_autorizo, NULL);
   SELECT monto_descontado_mxn INTO v_monto FROM ticket_descuentos_manuales
@@ -545,6 +549,9 @@ BEGIN
   v_t := abrir_ticket(v_suc, v_caja, v_turno, 'DELIVERY_PROPIO', NULL, NULL, NULL, v_maria);
   PERFORM agregar_item_a_ticket(v_t, v_prod, 2, NULL, '[]'::jsonb, NULL);
   PERFORM fijar_envio_ticket(v_t, v_zona);
+  -- 0134: una autorización por descuento, del permiso que pide el POS para el tipo.
+  INSERT INTO autorizaciones_pin(tenant_id, usuario_solicitante_id, usuario_autorizo_id, accion, permiso_codigo, motivo, caja_id, turno_id)
+    VALUES (v_tenant, v_maria, v_autorizo, 'descuento_manual', 'descuento.manual_aplicar', 'smoke', v_caja, v_turno) RETURNING id INTO v_pin;
   PERFORM aplicar_descuento_manual(v_t, NULL, 'MONTO_FIJO', 300, 'CLIENTE_FRECUENTE', NULL,
             v_pin, v_maria, v_autorizo, NULL);
   SELECT monto_descontado_mxn INTO v_monto FROM ticket_descuentos_manuales
@@ -558,6 +565,9 @@ BEGIN
   v_t := abrir_ticket(v_suc, v_caja, v_turno, 'DELIVERY_PROPIO', NULL, NULL, NULL, v_maria);
   PERFORM agregar_item_a_ticket(v_t, v_prod, 2, NULL, '[]'::jsonb, NULL);
   PERFORM fijar_envio_ticket(v_t, v_zona);
+  -- 0134: una autorización por descuento, del permiso que pide el POS para el tipo.
+  INSERT INTO autorizaciones_pin(tenant_id, usuario_solicitante_id, usuario_autorizo_id, accion, permiso_codigo, motivo, caja_id, turno_id)
+    VALUES (v_tenant, v_maria, v_autorizo, 'descuento_manual', 'descuento.cortesia_total', 'smoke', v_caja, v_turno) RETURNING id INTO v_pin;
   PERFORM aplicar_descuento_manual(v_t, NULL, 'CORTESIA_TOTAL', 0, 'CORTESIA_INVITADO', NULL,
             v_pin, v_maria, v_autorizo, NULL);
   SELECT total_mxn INTO v_total FROM tickets WHERE id = v_t;
@@ -642,12 +652,18 @@ BEGIN
   PERFORM agregar_item_a_ticket(v_t, v_prod, 2, NULL, '[]'::jsonb, NULL);
   v_envio := fijar_envio_ticket(v_t, v_zona);
   BEGIN
+    -- 0134: una autorización por descuento, del permiso que pide el POS para el tipo.
+    INSERT INTO autorizaciones_pin(tenant_id, usuario_solicitante_id, usuario_autorizo_id, accion, permiso_codigo, motivo, caja_id, turno_id)
+      VALUES (v_tenant, v_maria, v_autorizo, 'descuento_manual', 'descuento.manual_aplicar', 'smoke', v_caja, v_turno) RETURNING id INTO v_pin;
     PERFORM aplicar_descuento_manual(v_t, v_envio, 'PORCENTAJE', 50, 'CLIENTE_FRECUENTE', NULL,
               v_pin, v_maria, v_autorizo, NULL);
     v_fallos := v_fallos || 'h) se permitió un descuento de renglón sobre el envío'::text;
   EXCEPTION WHEN check_violation THEN NULL;
   END;
   BEGIN
+    -- 0134: una autorización por descuento, del permiso que pide el POS para el tipo.
+    INSERT INTO autorizaciones_pin(tenant_id, usuario_solicitante_id, usuario_autorizo_id, accion, permiso_codigo, motivo, caja_id, turno_id)
+      VALUES (v_tenant, v_maria, v_autorizo, 'descuento_manual', 'descuento.manual_aplicar', 'smoke', v_caja, v_turno) RETURNING id INTO v_pin;
     PERFORM aplicar_descuento_manual(v_t, v_envio, 'OVERRIDE_PRECIO', 0, 'CLIENTE_FRECUENTE', NULL,
               v_pin, v_maria, v_autorizo, NULL);
     v_fallos := v_fallos || 'h) se permitió cambiarle el precio al renglón de envío'::text;
@@ -721,6 +737,9 @@ BEGIN
   v_h1 := agregar_item_a_ticket(v_t, v_prod, 1, NULL, '[]'::jsonb, NULL);
   v_h2 := agregar_item_a_ticket(v_t, v_prod, 1, NULL, '[]'::jsonb, NULL);
   PERFORM fijar_envio_ticket(v_t, v_zona);
+  -- 0134: una autorización por descuento, del permiso que pide el POS para el tipo.
+  INSERT INTO autorizaciones_pin(tenant_id, usuario_solicitante_id, usuario_autorizo_id, accion, permiso_codigo, motivo, caja_id, turno_id)
+    VALUES (v_tenant, v_maria, v_autorizo, 'descuento_manual', 'descuento.cortesia_total', 'smoke', v_caja, v_turno) RETURNING id INTO v_pin;
   PERFORM aplicar_descuento_manual(v_t, NULL, 'CORTESIA_TOTAL', 0, 'CORTESIA_INVITADO', NULL,
             v_pin, v_maria, v_autorizo, NULL);
   PERFORM cancelar_item_ticket(v_h2, 'smoke tope', NULL);
@@ -753,6 +772,9 @@ BEGIN
   v_h2 := agregar_item_a_ticket(v_t, v_prod, 1, NULL, '[]'::jsonb, NULL);
   PERFORM agregar_item_a_ticket(v_t, v_prod, 1, NULL, '[]'::jsonb, NULL);
   PERFORM fijar_envio_ticket(v_t, v_zona);
+  -- 0134: una autorización por descuento, del permiso que pide el POS para el tipo.
+  INSERT INTO autorizaciones_pin(tenant_id, usuario_solicitante_id, usuario_autorizo_id, accion, permiso_codigo, motivo, caja_id, turno_id)
+    VALUES (v_tenant, v_maria, v_autorizo, 'descuento_manual', 'descuento.manual_aplicar', 'smoke', v_caja, v_turno) RETURNING id INTO v_pin;
   PERFORM aplicar_descuento_manual(v_t, NULL, 'PORCENTAJE', 50, 'CLIENTE_FRECUENTE', NULL,
             v_pin, v_maria, v_autorizo, NULL);
   PERFORM cancelar_item_ticket(v_h1, 'smoke tope', NULL);
@@ -796,6 +818,9 @@ BEGIN
   v_t := abrir_ticket(v_suc, v_caja, v_turno, 'PARA_LLEVAR', NULL, NULL, NULL, v_maria);
   v_h1 := agregar_item_a_ticket(v_t, v_prod, 1, NULL, '[]'::jsonb, NULL);
   PERFORM agregar_item_a_ticket(v_t, v_prod, 1, NULL, '[]'::jsonb, NULL);
+  -- 0134: una autorización por descuento, del permiso que pide el POS para el tipo.
+  INSERT INTO autorizaciones_pin(tenant_id, usuario_solicitante_id, usuario_autorizo_id, accion, permiso_codigo, motivo, caja_id, turno_id)
+    VALUES (v_tenant, v_maria, v_autorizo, 'descuento_manual', 'descuento.cortesia_total', 'smoke', v_caja, v_turno) RETURNING id INTO v_pin;
   PERFORM aplicar_descuento_manual(v_t, NULL, 'CORTESIA_TOTAL', 0, 'CORTESIA_INVITADO', NULL,
             v_pin, v_maria, v_autorizo, NULL);
   PERFORM cancelar_item_ticket(v_h1, 'smoke tope', NULL);

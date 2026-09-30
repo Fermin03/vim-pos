@@ -37,3 +37,14 @@ test("archivar: una excepción del subidor se convierte en error, no en caída",
   assert.deepEqual(r.guardados, []);
   assert.deepEqual(r.errores, ["xml: red caída"]);
 });
+
+test("objeto a leer: sale del id y nunca de la ruta guardada; id que no es UUID → null", async () => {
+  const { objetoArchivoCfdi } = await import("./archivo.ts");
+  const id = "0f8fad5b-d9cb-469f-a165-70867728950e";
+  assert.deepEqual(objetoArchivoCfdi(id, "xml"), { bucket: "cfdi", nombre: `${id}.xml` });
+  assert.deepEqual(objetoArchivoCfdi(id.toUpperCase(), "pdf"), { bucket: "cfdi", nombre: `${id}.pdf` });
+  assert.deepEqual(objetoArchivoCfdi(id, "acuse"), { bucket: "cfdi", nombre: `${id}-acuse.xml` });
+  assert.equal(objetoArchivoCfdi("../avatars/dueno", "xml"), null);
+  assert.equal(objetoArchivoCfdi(`${id}/../../otro`, "xml"), null);
+  assert.equal(objetoArchivoCfdi("", "pdf"), null);
+});

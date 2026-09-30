@@ -74,11 +74,17 @@ jobs:
         run: pnpm -r build
 
       - name: Vitest (POS + Admin)
-        # `pnpm -r test` ejecuta el script `test` de cada paquete que lo define (pos + admin);
-        # kds/platform no tienen tests.
+        # `pnpm -r test` ejecuta el script `test` de cada paquete que lo define (pos, admin,
+        # platform…).
         # Pendiente (docs/bitacora/2026-08-remediacion.md Fase 6): montar ESLint (hoy ninguna app lo tiene
         # configurado, `next lint` es interactivo).
         run: pnpm -r test
+
+      - name: Pruebas del sitio web
+        # 45+ pruebas que protegen el middleware, las cabeceras de seguridad (CSP igual en
+        # vercel.json, middleware.ts y .htaccess), el 404 y el sitemap. Existían y el CI no las
+        # corría. Node pelado, sin dependencias. Auditoría integral 30/09/2026, E-5a.
+        run: pnpm test:sitio
 
       - name: Pruebas de las Edge Functions
         # supabase/functions es código Deno y no está en el workspace de pnpm, así que sus
@@ -113,15 +119,43 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
-          # Aquí SÍ se queda en 20, a propósito: es el Node que empaqueta Electron 33, así que
-          # `node --check` comprueba las fuentes contra la versión que de verdad las va a ejecutar.
-          node-version: "20"
+          # El Node que empaqueta Electron, a propósito: `node --check` y `node --test` comprueban
+          # las fuentes contra la versión que de verdad las va a ejecutar en la caja del cliente.
+          # Electron 43 trae Node 24 (DEPS de electron/electron: v43.0.0 → v24.17.0,
+          # v43.4.0 → v24.18.1). Antes decía "20 = Electron 33", que dejó de ser cierto al subir
+          # Electron; al volver a subirlo de mayor, revisa `node_version` en su DEPS y ajusta esto.
+          node-version: "24"
 
       - name: Auditoría de deps de producción del escritorio
         # npm audit lee package-lock.json: no hace falta instalar (electron y el Postgres
         # embebido son pesados y específicos de plataforma).
         working-directory: desktop
         run: npm audit --omit=dev --audit-level=high
+
+      - name: Auditoría de Electron — BLOQUEANTE
+        # `--omit=dev` de arriba deja fuera a electron porque en package.json es devDependency
+        # (así lo pide electron-builder), pero su binario —Chromium + Node— VA DENTRO del
+        # instalador y es lo que corre en la caja. Una CVE alta de Electron tiene que detener el
+        # merge igual que la de pg. Se filtra solo `electron`: el resto de la cadena de
+        # electron-builder (xmldom, js-yaml…) produce el instalador pero no viaja en él, y queda
+        # en el paso informativo de abajo. Auditoría integral 30/09/2026, hallazgo E-5c.
+        working-directory: desktop
+        run: |
+          npm audit --json > /tmp/audit-desktop.json || true
+          node -e '
+            const a = require("/tmp/audit-desktop.json");
+            const v = (a.vulnerabilities || {}).electron;
+            if (v && ["high", "critical"].includes(v.severity)) {
+              const avisos = v.via.filter((x) => typeof x === "object").map((x) => `  - ${x.title} (${x.url})`);
+              console.error(`❌ electron ${v.range}: vulnerabilidad ${v.severity}\n${avisos.join("\n")}`);
+              process.exit(1);
+            }
+            console.log("✅ electron sin vulnerabilidades altas");
+          '
+
+      - name: Auditoría completa del escritorio — informativa (cadena de electron-builder)
+        working-directory: desktop
+        run: npm audit || true
 
       - name: Las fuentes parsean
         working-directory: desktop
@@ -135,7 +169,7 @@ jobs:
         run: npm ci --omit=dev --ignore-scripts
 
       - name: Pruebas del escritorio
-        # Corren sobre el mismo Node 20 del paso anterior a propósito: es el que empaqueta
+        # Corren sobre el mismo Node 24 del paso anterior a propósito: es el que empaqueta
         # Electron, así que se prueban contra la versión que de verdad las va a ejecutar en la
         # caja del cliente. Los verify:* de extremo a extremo siguen fuera: necesitan el Postgres
         # embebido de Windows.
@@ -143,15 +177,10 @@ jobs:
         run: node --test src/*.test.mjs
 
   rls-tests:
+    # Sin `services: postgres`: había un postgres:15 que ningún paso usaba (`supabase start`
+    # levanta su propio Postgres en Docker y todo se conecta por el DB_URL de `supabase status`).
+    # Solo gastaba arranque y ocupaba el 5432 del runner. Auditoría integral 30/09/2026, E-5d.
     runs-on: ubuntu-latest
-    services:
-      postgres:
-        image: postgres:15
-        env:
-          POSTGRES_PASSWORD: postgres
-        ports: ["5432:5432"]
-        options: >-
-          --health-cmd pg_isready --health-interval 10s --health-timeout 5s --health-retries 5
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 

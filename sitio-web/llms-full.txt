@@ -1236,7 +1236,7 @@ Este sitio publica su contenido también en Markdown y describe qué es VIM POS 
 
 Qué datos te pedimos, para qué los usamos y cómo pedirnos que los borremos. En corto: te pedimos lo mínimo para poder contestarte, y no los vendemos ni los compartimos con nadie que quiera venderte algo.
 
-Última actualización: 13 de septiembre de 2026.
+Última actualización: 30 de septiembre de 2026.
 
 ## Quién es responsable de tus datos
 
@@ -1289,13 +1289,13 @@ Puedes pedirnos **acceder** a tus datos, que los **rectifiquemos** si están mal
 
 Escríbenos a [hola@vimpos.com.mx](mailto:hola@vimpos.com.mx) diciendo qué quieres y desde dónde nos contactaste. Te contestamos en un plazo máximo de **20 días hábiles** y, si procede, lo aplicamos dentro de los **15 días hábiles** siguientes. No cuesta nada.
 
-Si consideras que no atendimos bien tu solicitud, puedes acudir al **INAI** ([home.inai.org.mx](https://home.inai.org.mx)).
+Si consideras que no atendimos bien tu solicitud, puedes acudir a la autoridad de protección de datos personales, que es la **Secretaría Anticorrupción y Buen Gobierno**: desde la nueva Ley Federal de Protección de Datos Personales en Posesión de los Particulares (DOF, 20 de marzo de 2025) ya no es el INAI, que se extinguió.
 
 ## Cookies y medición
 
 **Este sitio mide sus visitas con Google Analytics**, que se carga a través de Google Tag Manager. Para no contarte dos veces, Google Analytics guarda en tu navegador una cookie de este mismo dominio con un identificador aleatorio. Ese identificador no lleva tu nombre, tu teléfono ni nada de lo que hayas escrito aquí, y no lo cruzamos con las solicitudes de demostración.
 
-**Qué se mide:** qué páginas ves, desde qué país entras, en qué tipo de dispositivo, y las cuatro acciones que nos dicen si el sitio sirve para algo — si se hizo clic en WhatsApp, si se envió el formulario de demostración, si se consultó el precio anual y qué pregunta frecuente se abrió. Nada de eso identifica a una persona.
+**Qué se mide:** qué páginas ves, desde qué país entras, en qué tipo de dispositivo, y las cuatro acciones que nos dicen si el sitio sirve para algo — si se hizo clic en el correo para escribirnos, si se envió el formulario de demostración, si se consultó el precio anual y qué pregunta frecuente se abrió. Nada de eso identifica a una persona.
 
 **Qué NO hacemos:** no ponemos cookies de publicidad ni de remarketing, no te seguimos a otras páginas y no vendemos ni cedemos tu visita a nadie. Tampoco cargamos tipografías de terceros: todas viven en este mismo sitio. En la configuración de Google que usa este sitio, el consentimiento para publicidad está **denegado** desde que carga la página y ahí se queda; si algún día anunciamos en Google Ads, te lo preguntaremos aparte y este aviso lo dirá antes.
 

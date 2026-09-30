@@ -5,6 +5,7 @@
 import EmbeddedPostgres from "embedded-postgres";
 import { arrancarConReintentos, crearCapturaDeLog } from "./arranque-reintentos.mjs";
 import { sembrarRepartidoresUnaVez, sembrarZonasUnaVez } from "./sync-push.mjs";
+import { blindarTablasInternas, repararRevokesUnaVez } from "./privilegios.mjs";
 import pg from "pg";
 import { spawn, execFileSync } from "node:child_process";
 import { randomBytes } from "node:crypto";
@@ -50,27 +51,87 @@ export function explicarFalloDeSpawn(e, ruta) {
 }
 
 /**
+ * Nombre del ejecutable de cada PID (en minúsculas), o null si no se pudo preguntar al sistema.
+ * Un PID que ya no existe simplemente no aparece en el Map.
+ *
+ * Windows: una sola consulta CIM para todos (powershell tarda ~1 s en arrancar; no se paga por PID).
+ * Linux: /proc/<pid>/comm (solo para desarrollo). Otros: null.
+ */
+export function nombresDeProcesos(pids) {
+  const validos = pids.map(Number).filter((n) => Number.isInteger(n) && n > 0);
+  if (!validos.length) return new Map();
+  try {
+    if (process.platform === "win32") {
+      const filtro = validos.map((n) => `ProcessId=${n}`).join(" OR ");
+      const salida = execFileSync("powershell", [
+        "-NoProfile", "-NonInteractive", "-Command",
+        `Get-CimInstance Win32_Process -Filter "${filtro}" | ForEach-Object { "$($_.ProcessId)|$($_.Name)" }`,
+      ], { encoding: "utf8", timeout: 15000 });
+      const m = new Map();
+      for (const linea of salida.split("\n")) {
+        const [pid, nombre] = linea.trim().split("|");
+        if (pid && nombre) m.set(Number(pid), nombre.toLowerCase());
+      }
+      return m;
+    }
+    if (process.platform === "linux") {
+      const m = new Map();
+      for (const n of validos) {
+        try { m.set(n, readFileSync(`/proc/${n}/comm`, "utf8").trim().toLowerCase()); } catch { /* no existe */ }
+      }
+      return m;
+    }
+  } catch { /* powershell/CIM no disponible */ }
+  return null;
+}
+
+/** ¿Es uno de los nuestros? postgres(.exe) o postgrest(.exe). */
+const ES_NUESTRO = /^postgres(t)?(\.exe)?$/;
+
+/**
  * Mata procesos huérfanos (Postgres/PostgREST) que quedaron de un arranque anterior que no cerró
  * limpio (crash / kill forzado). Lee el pidfile del run previo + el postmaster.pid del data dir.
  * Con la instancia única de Electron, aquí no hay riesgo de matar la instancia viva. Exportada
  * para poder probarla. Idempotente.
+ *
+ * Auditoría integral 30/09/2026, D11 — antes mataba esos PID a ciegas. Tras un corte de luz el
+ * pidfile y el postmaster.pid sobreviven, pero Windows RECICLA los PID: al arrancar, ese número
+ * puede ser ya el antivirus, el explorador o el spooler de impresión. Ahora se comprueba que el
+ * proceso se llame postgres/postgrest antes de matarlo. Si el sistema no deja preguntar (CIM
+ * caído), se conserva el comportamiento anterior: una caja que no arranca por un PostgREST huérfano
+ * ocupando su puerto es peor, y ese caso ya es raro.
  */
-export function matarHuerfanos(dataDir, log = () => {}, pidfile = PIDFILE) {
+export function matarHuerfanos(dataDir, log = () => {}, pidfile = PIDFILE, { nombres = nombresDeProcesos, matar = (pid) => process.kill(pid, "SIGKILL") } = {}) {
+  let candidatos = [];
   try {
     if (existsSync(pidfile)) {
       const { pids = [] } = JSON.parse(readFileSync(pidfile, "utf8"));
-      for (const pid of pids) {
-        try { process.kill(pid, "SIGKILL"); log(`huérfano ${pid} terminado`); } catch { /* ya no existe */ }
-      }
-      rmSync(pidfile, { force: true });
+      candidatos.push(...pids.map((pid) => ({ pid, que: "huérfano" })));
     }
   } catch { /* pidfile ilegible: ignorar */ }
   // postmaster.pid: un Postgres previo sobre el MISMO data dir bloquearía el arranque.
+  const pm = path.join(dataDir, "postmaster.pid");
   try {
-    const pm = path.join(dataDir, "postmaster.pid");
     if (existsSync(pm)) {
       const pid = parseInt(readFileSync(pm, "utf8").split("\n")[0], 10);
-      if (pid > 0) { try { process.kill(pid, "SIGKILL"); log(`postgres previo ${pid} terminado`); } catch { /* */ } }
+      if (pid > 0) candidatos.push({ pid, que: "postgres previo" });
+    }
+  } catch { /* */ }
+  candidatos = candidatos.filter((c) => Number.isInteger(Number(c.pid)) && Number(c.pid) > 0 && Number(c.pid) !== process.pid);
+
+  const conocidos = candidatos.length ? nombres(candidatos.map((c) => Number(c.pid))) : new Map();
+  for (const { pid, que } of candidatos) {
+    const n = Number(pid);
+    if (conocidos) {
+      const nombre = conocidos.get(n);
+      if (nombre === undefined) continue; // ya no existe
+      if (!ES_NUESTRO.test(nombre)) { log(`PID ${n} ahora es ${nombre}: no se toca (el PID se recicló)`); continue; }
+    }
+    try { matar(n); log(`${que} ${n} terminado`); } catch { /* ya no existe */ }
+  }
+  try { rmSync(pidfile, { force: true }); } catch { /* */ }
+  try {
+    if (existsSync(pm)) {
       // Borrar SIEMPRE el candado: si el proceso ya no existe (corte de luz, cierre forzado, o
       // Windows matando la app), el archivo queda huérfano e impide que Postgres vuelva a arrancar.
       rmSync(pm, { force: true });
@@ -177,6 +238,31 @@ function secretoDeInstalacion(dataRoot) {
   return s;
 }
 
+/** Contraseña con la que nace el superusuario en las cajas anteriores a CN-018. */
+const CLAVE_DE_FABRICA = "postgres";
+
+/**
+ * Conecta como superusuario con `password`; si Postgres la rechaza (28P01) y no era ya la de
+ * fábrica, reintenta con la de fábrica y, si entra, deja puesta `password` (ALTER ROLE). Es el caso
+ * de restaurar un respaldo del pgdata tomado antes de la rotación: sin esto la caja no abría.
+ * Exportada para probarla con un cliente falso.
+ */
+export async function conectarSuperusuario(crearCliente, password, log = () => {}) {
+  const c = crearCliente(password);
+  try {
+    await c.connect();
+    return { client: c, rotada: false };
+  } catch (e) {
+    try { await c.end(); } catch { /* */ }
+    if (e?.code !== "28P01" || password === CLAVE_DE_FABRICA) throw e;
+  }
+  const f = crearCliente(CLAVE_DE_FABRICA);
+  await f.connect(); // si tampoco entra, que el error de autenticación suba tal cual
+  await f.query(`ALTER ROLE postgres PASSWORD '${password}'`); // base64url: sin comillas ni backslashes
+  log("la BD traía la contraseña de fábrica (¿respaldo restaurado de antes de la rotación?): rotada de nuevo");
+  return { client: f, rotada: true };
+}
+
 /** Arranca el backend local y devuelve puertos + pool + stop(). Idempotente entre arranques. */
 export async function startLocalBackend(opts = {}) {
   // Empaquetado (Electron): recursos read-only en resDir (extraResources) y datos escribibles en
@@ -267,8 +353,12 @@ export async function startLocalBackend(opts = {}) {
   log(`Postgres embebido en localhost:${pgPort}`);
 
   // 1) Asegurar la BD vimpos en UTF8 (Windows arranca el clúster en WIN1252).
-  const su = new pg.Client({ host: "localhost", port: pgPort, user: "postgres", password, database: "postgres" });
-  await su.connect();
+  // Un respaldo restaurado de ANTES de la rotación (CN-018) trae la contraseña de fábrica, mientras
+  // .pg-password ya guarda la nueva: se reintenta con la de fábrica y se vuelve a rotar (D11).
+  const conexion = await conectarSuperusuario(
+    (pw) => new pg.Client({ host: "localhost", port: pgPort, user: "postgres", password: pw, database: "postgres" }),
+    password, log);
+  const su = conexion.client;
   const existe = (await su.query("SELECT 1 FROM pg_database WHERE datname='vimpos'")).rowCount > 0;
   if (!existe) await su.query("CREATE DATABASE vimpos WITH ENCODING 'UTF8' TEMPLATE template0 LC_COLLATE 'C' LC_CTYPE 'C'");
 
@@ -298,6 +388,9 @@ export async function startLocalBackend(opts = {}) {
   // 3) Migraciones idempotentes (registradas en _vim_migraciones).
   await db.query("CREATE TABLE IF NOT EXISTS _vim_migraciones (nombre text PRIMARY KEY, aplicada_at timestamptz DEFAULT now())");
   const aplicadas = new Set((await db.query("SELECT nombre FROM _vim_migraciones")).rows.map((r) => r.nombre));
+  // Antes de las migraciones nuevas: devolver a las cajas ya instaladas los REVOKE que el antiguo
+  // GRANT masivo del arranque les deshizo (una sola vez; ver privilegios.mjs, hallazgo D1).
+  await repararRevokesUnaVez(db, { hayMigracionesPrevias: aplicadas.size > 0, log });
   const files = readdirSync(migrationsDir).filter((f) => f.endsWith(".sql")).sort();
   let nuevas = 0;
   for (const f of files) {
@@ -337,13 +430,13 @@ export async function startLocalBackend(opts = {}) {
   // en sync-push.mjs, que reusa el razonamiento completo de `sembrarRepartidoresUnaVez` de arriba.
   await sembrarZonasUnaVez(db, log);
 
-  // 4) Grants a los roles API (lo que Supabase da fuera de las migraciones).
-  await db.query(`
-    GRANT USAGE ON SCHEMA public TO anon, authenticated, service_role;
-    GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO authenticated, service_role;
-    GRANT SELECT ON ALL TABLES IN SCHEMA public TO anon;
-    GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO authenticated, service_role;
-  `);
+  // 4) Privilegios de los roles API. Aquí había un GRANT … ON ALL TABLES a authenticated/anon en
+  //    cada arranque: dejaba las libretas _vim_* escribibles desde la LAN y deshacía los REVOKE de
+  //    las migraciones (Auditoría integral 30/09/2026, D1). Los privilegios de cada tabla los
+  //    ponen ya los default privileges (shim + 0065) y las propias migraciones, como en Supabase.
+  //    Solo queda el USAGE del esquema y sacar las tablas internas de la API.
+  await db.query("GRANT USAGE ON SCHEMA public TO anon, authenticated, service_role");
+  await blindarTablasInternas(db);
 
   // 4b) Trigger de tiempo real del KDS (Fase 2, local-only): NOTIFY al cambiar estado de cocina.
   await db.query(readFileSync(kdsNotifyFile, "utf8"));

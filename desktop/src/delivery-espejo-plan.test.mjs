@@ -65,6 +65,26 @@ test("planificarEspejo: avisa cuando la app canceló un pedido con ticket local;
   assert.deepEqual(r.avisos, [{ pedidoId: "canc", motivo: "La app canceló este pedido: cancela el ticket en caja" }]);
 });
 
+test("planificarEspejo: RECIBIDO con ticket local de esta caja → aAceptar (el accept anterior falló) (D7)", () => {
+  const r = planificarEspejo({
+    conexiones: [cx()],
+    pedidos: [ped({ gestion_caja_id: CAJA })],
+    localPedidos: [{ id: "p1", ticket_id: "tk" }],
+    turnoAbierto: true, cajaId: CAJA,
+  });
+  assert.deepEqual(r.aAceptar, ["p1"]);
+  assert.deepEqual(r.aCrear, [], "el ticket no se vuelve a crear");
+  // Ya aceptado, de otra caja o de gestión NUBE: nada que reintentar aquí.
+  const ok = planificarEspejo({ conexiones: [cx()], pedidos: [ped({ estado: "ACEPTADO", gestion_caja_id: CAJA })], localPedidos: [{ id: "p1", ticket_id: "tk" }], turnoAbierto: true, cajaId: CAJA });
+  assert.deepEqual(ok.aAceptar, []);
+  const otra = planificarEspejo({ conexiones: [cx()], pedidos: [ped({ gestion_caja_id: OTRA })], localPedidos: [{ id: "p1", ticket_id: "tk" }], turnoAbierto: true, cajaId: CAJA });
+  assert.deepEqual(otra.aAceptar, []);
+  const nube = planificarEspejo({ conexiones: [cx()], pedidos: [ped({ gestion: "NUBE" })], localPedidos: [{ id: "p1", ticket_id: "tk" }], turnoAbierto: true, cajaId: CAJA });
+  assert.deepEqual(nube.aAceptar, []);
+  const sinTicket = planificarEspejo({ conexiones: [cx()], pedidos: [ped()], localPedidos: [], turnoAbierto: true, cajaId: CAJA });
+  assert.deepEqual(sinTicket.aAceptar, [], "sin ticket local va por aCrear, no por aquí");
+});
+
 // ── Cursor del delta ─────────────────────────────────────────────────────────
 // El cursor vive en memoria del agente y NO se espeja: el trigger set_updated_at pisa updated_at
 // con el reloj local en cada UPDATE, así que la copia local no sirve para preguntarle a la nube

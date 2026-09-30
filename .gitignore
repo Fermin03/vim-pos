@@ -24,8 +24,10 @@ supabase/.temp/
 .vscode/
 .idea/
 
-# claude code — config local de preview/tooling
-.claude/
+# claude code — config local de preview/tooling. Las skills del proyecto SÍ se versionan
+# (.claude/skills/), para que cualquier sesión las tenga; el resto de .claude/ sigue siendo local.
+.claude/*
+!.claude/skills/
 
 # Vercel
 .vercel

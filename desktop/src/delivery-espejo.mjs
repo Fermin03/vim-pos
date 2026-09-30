@@ -139,7 +139,7 @@ export function crearEspejo({
 
       // Con el delta vacío no hay nada que planear: ni consultar la copia local ni preguntar por
       // el turno. Esa es la vuelta normal de un cliente sin delivery, y tiene que salir casi gratis.
-      let plan = { upserts: [], aCrear: [], avisos: [] };
+      let plan = { upserts: [], aCrear: [], aAceptar: [], avisos: [] };
       if (pedidos.length) {
         const { rows: localPedidos } = await pool.query(
           `SELECT id, ticket_id, estado FROM delivery_pedidos WHERE id = ANY($1::uuid[])`, [pedidos.map((p) => p.id)]);
@@ -189,6 +189,16 @@ export function crearEspejo({
           if (ac.ok || ac.body?.error === "ACCION_INVALIDA") aceptados++;
           else { reintentables++; log(`pedido ${pedido?.folio_corto ?? id}: accept en Uber falló (${ac.body?.error ?? ac.status}); se reintenta`); }
         }
+      }
+      // Accept pendiente de una vuelta anterior: el ticket local ya existe (la cocina ya lo tiene),
+      // pero en la nube el pedido sigue RECIBIDO. Sin este reintento, Uber lo cancelaba por no
+      // aceptado mientras la cocina lo preparaba (D7).
+      for (const id of plan.aAceptar ?? []) {
+        const pedido = pedidos.find((p) => p.id === id);
+        const conexion = conexiones.find((c) => c.id === pedido?.conexion_id);
+        const ac = await llamar(opts, "delivery-accion", { accion: "aceptar", pedido_id: id, tiempo_prep_min: conexion?.tiempo_prep_min ?? 15 });
+        if (ac.ok || ac.body?.error === "ACCION_INVALIDA") aceptados++;
+        else { reintentables++; log(`pedido ${pedido?.folio_corto ?? id}: accept en Uber sigue fallando (${ac.body?.error ?? ac.status}); se reintenta`); }
       }
       // Un reclamo que otra caja ganó NO cuenta: ese pedido ya no es de aquí y volver pronto no
       // lo arregla. Solo cuenta lo que este equipo puede reintentar con provecho.

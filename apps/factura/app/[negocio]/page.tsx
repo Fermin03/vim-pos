@@ -5,8 +5,8 @@ import { Button, LogoVim } from "@vim/ui/styles";
 import { fechaLegible } from "@vim/fecha";
 import {
   buscarNegocio, buscarTicket, descargar, enviarPorCorreo, recuperar, timbrar, ErrorPortal,
-  CORREO_VALIDO, RFC_VALIDO,
-  type Negocio, type Receptor, type TicketEncontrado, type Timbrado,
+  CORREO_VALIDO, RFC_VALIDO, TOKEN_QR, TOTAL_VALIDO,
+  type Acceso, type Negocio, type Receptor, type TicketEncontrado, type Timbrado,
 } from "../lib/portal";
 
 /**
@@ -16,6 +16,9 @@ import {
  *
  * Todo lo de aquí está ordenado por esa persona:
  *   · el folio llega en la URL, así que lo normal es que NO tenga que escribir nada para empezar;
+ *     con él llega el token del QR (`t`), que prueba que tiene el ticket en la mano. Sin token
+ *     (QR viejo o folio tecleado) se le pide también el total del ticket: el folio es secuencial y
+ *     solo con él cualquiera facturaba tickets ajenos (auditoría 30/09/2026, C1-4);
  *   · arriba va el restaurante, no VIM: tiene que ver que está facturando donde comió;
  *   · el formulario pide cinco datos, agrupados como vienen en su constancia;
  *   · los errores dicen qué hacer, junto al campo que hay que corregir;
@@ -68,13 +71,18 @@ export default function PortalFactura({
   searchParams,
 }: {
   params: Promise<{ negocio: string }>;
-  searchParams: Promise<{ folio?: string }>;
+  searchParams: Promise<{ folio?: string; t?: string }>;
 }) {
   const { negocio } = use(params);
-  const { folio: folioUrl } = use(searchParams);
+  const { folio: folioUrl, t: tokenCrudo } = use(searchParams);
+  const tokenUrl = tokenCrudo && TOKEN_QR.test(tokenCrudo) ? tokenCrudo : null;
 
   const [marca, setMarca] = useState<Negocio | null>(null);
   const [folio, setFolio] = useState(folioUrl ?? "");
+  const [total, setTotal] = useState("");
+  // Se pide el total si no hay token, o si el servidor no pudo validar el del QR.
+  const [pideTotal, setPideTotal] = useState(!tokenUrl);
+  const acceso: Acceso = { token: tokenUrl, total: pideTotal ? total : "" };
   const [encontrado, setEncontrado] = useState<TicketEncontrado | null>(null);
   const [yaFacturado, setYaFacturado] = useState<TicketEncontrado["ticket"] | null>(null);
   const [timbrado, setTimbrado] = useState<TimbradoConRfc | null>(null);
@@ -115,22 +123,33 @@ export default function PortalFactura({
     }
   }, []);
 
-  const buscar = useCallback(async (f: string) => {
+  const [errorTotal, setErrorTotal] = useState<string | null>(null);
+
+  const buscar = useCallback(async (f: string, a: Acceso) => {
     if (!f.trim()) {
       setError("Escribe el folio de tu ticket.");
       return;
     }
+    if (!a.token && !TOTAL_VALIDO.test(a.total.trim())) {
+      setErrorTotal(a.total.trim() ? "Escribe el total con números, como viene impreso." : "Escribe el total de tu ticket.");
+      return;
+    }
     setCargando(true);
     setError(null);
+    setErrorTotal(null);
     setYaFacturado(null);
     try {
-      const t = await buscarTicket(negocio, f.trim());
+      const t = await buscarTicket(negocio, f.trim(), a);
       setEncontrado(t);
       setMarca((m) => m ?? { nombre: t.negocio, logo: t.logo });
     } catch (e) {
       setEncontrado(null);
       if (e instanceof ErrorPortal && e.estado === "YA_FACTURADO") {
         setYaFacturado((e.datos.ticket as TicketEncontrado["ticket"]) ?? null);
+      } else if (e instanceof ErrorPortal && e.estado === "PIDE_TOTAL") {
+        // El QR no validó (viejo, o de una caja sin conexión a la nube): se pide el total.
+        setPideTotal(true);
+        setErrorTotal(e.message);
       } else {
         setError(e instanceof ErrorPortal ? e.message : "No se pudo buscar el ticket.");
       }
@@ -139,11 +158,12 @@ export default function PortalFactura({
     }
   }, [negocio]);
 
-  // Con el folio en la URL —el caso normal, viene del QR— se busca solo. Obligar a pulsar un botón
-  // para algo que ya sabemos sería pedirle trabajo a quien no tiene por qué hacerlo.
+  // Con folio y token en la URL —el caso normal, viene del QR— se busca solo. Obligar a pulsar un
+  // botón para algo que ya sabemos sería pedirle trabajo a quien no tiene por qué hacerlo. Sin
+  // token hace falta el total, así que se espera a que lo escriba.
   useEffect(() => {
-    if (folioUrl) buscar(folioUrl);
-  }, [folioUrl, buscar]);
+    if (folioUrl && tokenUrl) buscar(folioUrl, { token: tokenUrl, total: "" });
+  }, [folioUrl, tokenUrl, buscar]);
 
   // Timbrar tarda (PAC + SAT + descarga + correo): a los 3 s se explica, para que nadie se vaya.
   useEffect(() => {
@@ -176,7 +196,7 @@ export default function PortalFactura({
     }
     setCargando(true);
     try {
-      const t = await timbrar(negocio, folio.trim(), { ...r, email: r.email.trim() });
+      const t = await timbrar(negocio, folio.trim(), acceso, { ...r, email: r.email.trim() });
       try {
         if (recordar) window.localStorage.setItem(CLAVE_RECORDAR, JSON.stringify({ ...r, email: r.email.trim() }));
         else window.localStorage.removeItem(CLAVE_RECORDAR);
@@ -212,7 +232,7 @@ export default function PortalFactura({
       <Marco marca={marca} paso={3}>
         <FacturaLista
           timbrado={timbrado}
-          onEnviar={(email) => enviarPorCorreo(negocio, folio.trim(), (r.rfc || timbrado.rfcRecuperado) ?? "", email)}
+          onEnviar={(email) => enviarPorCorreo(negocio, folio.trim(), acceso, (r.rfc || timbrado.rfcRecuperado) ?? "", email)}
         />
       </Marco>
     );
@@ -226,7 +246,7 @@ export default function PortalFactura({
           ticket={yaFacturado}
           rfcInicial={r.rfc}
           onRecuperar={async (rfc) => {
-            const t = await recuperar(negocio, folio.trim(), rfc);
+            const t = await recuperar(negocio, folio.trim(), acceso, rfc);
             setR((prev) => ({ ...prev, rfc }));
             setTimbrado({ ...t, rfcRecuperado: rfc });
           }}
@@ -240,10 +260,10 @@ export default function PortalFactura({
   if (!encontrado) {
     return (
       <Marco marca={marca} paso={1}>
-        <form className="flex flex-1 flex-col" onSubmit={(e) => { e.preventDefault(); buscar(folio); }} noValidate>
+        <form className="flex flex-1 flex-col" onSubmit={(e) => { e.preventDefault(); buscar(folio, acceso); }} noValidate>
           <h1 className="font-display text-28 font-semibold leading-tight tracking-tight">Factura tu consumo</h1>
           <p className="mt-2 text-16 leading-relaxed text-ink-2">
-            Escribe el folio que viene en tu ticket.
+            {pideTotal ? "Escribe el folio y el total que vienen en tu ticket." : "Escribe el folio que viene en tu ticket."}
           </p>
 
           <div className="mt-6">
@@ -269,6 +289,30 @@ export default function PortalFactura({
               <p id="folio-ayuda" className={ayuda}>Va completo, con letras y guiones.</p>
             )}
           </div>
+
+          {pideTotal && (
+            <div className="mt-5">
+              <label className={label} htmlFor="total">Total del ticket</label>
+              <input
+                id="total"
+                className={`${input} ${errorTotal ? inputMal : inputOk} font-display tabular-nums`}
+                value={total}
+                inputMode="decimal"
+                autoComplete="off"
+                autoFocus={Boolean(folioUrl)}
+                enterKeyHint="search"
+                aria-invalid={errorTotal ? true : undefined}
+                aria-describedby={errorTotal ? "total-error" : "total-ayuda"}
+                onChange={(e) => { setTotal(e.target.value); setErrorTotal(null); }}
+                placeholder="$0.00"
+              />
+              {errorTotal ? (
+                <p id="total-error" className={errorCampo} role="alert">{errorTotal}</p>
+              ) : (
+                <p id="total-ayuda" className={ayuda}>El importe total, con centavos, tal como viene impreso.</p>
+              )}
+            </div>
+          )}
 
           <BarraAccion>
             <Button type="submit" size="lg" disabled={cargando} className="h-14 w-full text-18">

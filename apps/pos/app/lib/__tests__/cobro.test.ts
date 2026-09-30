@@ -6,9 +6,10 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 // ESTA tarea —cuándo se llama a `fijar_envio_ticket` y cuándo no— sin levantar Supabase, se
 // sustituye el módulo entero por un doble mínimo que solo entiende las llamadas que
 // `persistirTicket` hace de verdad (rpc + el select de `leerTotales`).
-const { rpcMock, singleMock } = vi.hoisted(() => ({
+const { rpcMock, singleMock, updateMock } = vi.hoisted(() => ({
   rpcMock: vi.fn(),
   singleMock: vi.fn(),
+  updateMock: vi.fn(),
 }));
 
 vi.mock("../supabase", () => ({
@@ -16,12 +17,14 @@ vi.mock("../supabase", () => ({
     rpc: rpcMock,
     from: () => ({
       select: () => ({ eq: () => ({ single: singleMock }) }),
-      update: () => ({ eq: () => Promise.resolve({ error: null }) }),
+      update: (valores: Record<string, unknown>) => ({ eq: () => updateMock(valores) }),
     }),
   }),
 }));
 
-import { persistirTicket, cambiarZonaDePedido, ErrorEnvioNoFijado } from "../cobro";
+import { persistirTicket, cambiarZonaDePedido, ErrorEnvioNoFijado, ErrorTicketParcial } from "../cobro";
+import type { LineaCarrito } from "../carrito";
+import type { Producto } from "../catalogo";
 
 const TOTALES_ROW = {
   id: "ticket-1",
@@ -47,6 +50,8 @@ const persistir = (envioZonaId?: string | null) =>
 
 describe("persistirTicket — el cargo de envío (Task 7)", () => {
   beforeEach(() => {
+    updateMock.mockReset();
+    updateMock.mockImplementation(async () => ({ error: null }));
     rpcMock.mockReset();
     rpcMock.mockImplementation(async () => ({ data: "ticket-1", error: null }));
     singleMock.mockReset();
@@ -139,5 +144,84 @@ describe("cambiarZonaDePedido — cambiar la zona de un pedido en curso (Task 7,
     rpcMock.mockImplementation(async () => ({ data: null, error: { message: "El envío solo se puede fijar en tickets BORRADOR o ABIERTO (estado actual: PAGADO)" } }));
     await expect(cambiarZonaDePedido("t", "ticket-1", "zona-9")).rejects.toThrow(/BORRADOR o ABIERTO/);
     expect(singleMock).not.toHaveBeenCalled();
+  });
+});
+
+const linea = (id: string, nombre: string): LineaCarrito => ({
+  clientId: id,
+  producto: { id: `prod-${id}`, nombre, descripcion: null, precio_base_mxn: 10, categoria_id: "c", agotado: false } as unknown as Producto,
+  cantidad: 1,
+  modificadores: [],
+  notaCocina: null,
+});
+
+describe("persistirTicket — un corte a medias lleva el ticket (auditoría 30/09/2026, B2-3/B2-4)", () => {
+  beforeEach(() => {
+    rpcMock.mockReset();
+    singleMock.mockReset();
+    singleMock.mockImplementation(async () => ({ data: TOTALES_ROW, error: null }));
+    updateMock.mockReset();
+    updateMock.mockImplementation(async () => ({ error: null }));
+  });
+
+  it("si un renglón falla DESPUÉS de abrir, el error es ErrorTicketParcial con el id (no un Error pelón)", async () => {
+    rpcMock.mockImplementation(async (nombre: string, args: { p_client_id_local?: string }) =>
+      nombre === "agregar_item_a_ticket" && args.p_client_id_local === "l2"
+        ? { data: null, error: { message: "Producto inactivo" } }
+        : { data: "ticket-1", error: null },
+    );
+    const error = await persistirTicket(ctx, "PARA_LLEVAR", [linea("l1", "Taco"), linea("l2", "Agua")], "cli-9").catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(ErrorTicketParcial);
+    expect(error).not.toBeInstanceOf(ErrorEnvioNoFijado);
+    const e = error as ErrorTicketParcial;
+    expect(e.ticketId).toBe("ticket-1");
+    expect(e.fase).toBe("renglones");
+    expect(e.message).toMatch(/Agua.*Producto inactivo/);
+    expect(e.totales?.ticketId).toBe("ticket-1");
+  });
+
+  it("el reintento manda el MISMO client id del ticket y de cada renglón (la BD los hace idempotentes)", async () => {
+    let falla = true;
+    rpcMock.mockImplementation(async (nombre: string, args: { p_client_id_local?: string }) => {
+      if (nombre === "agregar_item_a_ticket" && args.p_client_id_local === "l2" && falla) {
+        falla = false;
+        return { data: null, error: { message: "red" } };
+      }
+      return { data: "ticket-1", error: null };
+    });
+    const lineas = [linea("l1", "Taco"), linea("l2", "Agua")];
+    await persistirTicket(ctx, "PARA_LLEVAR", lineas, "cli-9").catch(() => null);
+    const totales = await persistirTicket(ctx, "PARA_LLEVAR", lineas, "cli-9");
+    expect(totales.ticketId).toBe("ticket-1");
+    const aperturas = rpcMock.mock.calls.filter((c) => c[0] === "abrir_ticket").map((c) => c[1].p_client_id_local);
+    expect(aperturas).toEqual(["cli-9", "cli-9"]);
+    const renglones = rpcMock.mock.calls.filter((c) => c[0] === "agregar_item_a_ticket").map((c) => c[1].p_client_id_local);
+    expect(renglones).toEqual(["l1", "l2", "l1", "l2"]);
+  });
+
+  it("un update de la nota que falla YA NO se traga: sale ErrorTicketParcial con el id (fase encabezado)", async () => {
+    rpcMock.mockImplementation(async () => ({ data: "ticket-1", error: null }));
+    updateMock.mockImplementation(async (valores: Record<string, unknown>) =>
+      "nota_general" in valores ? { error: { message: "permission denied" } } : { error: null },
+    );
+    const error = await persistirTicket(ctx, "PARA_LLEVAR", [linea("l1", "Taco")], "cli-1", null, null, "Sin cacahuate: alergia").catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(ErrorTicketParcial);
+    const e = error as ErrorTicketParcial;
+    expect(e.fase).toBe("encabezado");
+    expect(e.ticketId).toBe("ticket-1");
+    expect(e.message).toMatch(/nota de la orden.*permission denied/);
+  });
+
+  it("también revisa el error del nombre de la cuenta y de la dirección de entrega", async () => {
+    rpcMock.mockImplementation(async () => ({ data: "ticket-1", error: null }));
+    updateMock.mockImplementation(async () => ({ error: { message: "x" } }));
+    await expect(persistirTicket(ctx, "DRIVE_THRU", [], "c", null, null, null, "Juan")).rejects.toThrow(/nombre de la cuenta/);
+    await expect(persistirTicket(ctx, "DELIVERY_PROPIO", [], "c", "cli", "dir")).rejects.toThrow(/dirección de entrega/);
+  });
+
+  it("ErrorEnvioNoFijado sigue siendo un ErrorTicketParcial (fase envio) para que se adopte igual", () => {
+    const e = new ErrorEnvioNoFijado("zona", "t", null);
+    expect(e).toBeInstanceOf(ErrorTicketParcial);
+    expect(e.fase).toBe("envio");
   });
 });

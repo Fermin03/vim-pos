@@ -316,7 +316,9 @@ export async function guardarCfdiEmisor(input: CfdiEmisorInput): Promise<void> {
       rfc: datos.rfc,
       proveedor_pac: datos.proveedor_pac,
       facturama_issuer_ref: datos.facturama_issuer_ref || datos.rfc, // NOT NULL en BD
-      csd_vigencia_hasta: datos.csd_vigencia_hasta || null,
+      // `csd_vigencia_hasta` (y todo `csd_*` y `rfc_verificado`) ya no se escribe desde aquí: lo
+      // escribe solo `cargar-csd` al leer el .cer, con service_role (migración 0135). La base le
+      // quitó el privilegio a `authenticated`; mandarlo haría fallar el guardado entero.
       estado: datos.estado,
       periodicidad_global: datos.periodicidad_global,
     },

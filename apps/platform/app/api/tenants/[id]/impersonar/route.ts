@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { autorizar, auditar } from "../../../../lib/server";
+import { motivoValido } from "../../../../lib/operadores";
 
 // A7 — Impersonación de soporte (doc 12 §9.2). Genera un magic-link para el DUEÑO del tenant
 // para que VIM entre a su admin y diagnostique. SIEMPRE auditado en super_admin_accesos.
@@ -12,8 +13,13 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
   const { id } = await ctx.params;
 
   let body: Record<string, unknown> = {};
-  try { body = await req.json(); } catch { /* motivo opcional */ }
-  const motivo = (body.motivo as string | undefined)?.trim() || "Soporte / diagnóstico";
+  try { body = await req.json(); } catch { /* sin cuerpo → sin motivo → 400 abajo */ }
+  // Entrar al admin de un cliente como su dueño es la acción más poderosa del panel, y tenía un
+  // motivo por defecto ("Soporte / diagnóstico"): la bitácora se llenaba de una frase que no
+  // explica nada. Ahora exige un motivo real, como las demás acciones destructivas.
+  // Auditoría integral 30/09/2026, hallazgo E-4.
+  const motivo = motivoValido(body.motivo);
+  if (!motivo) return NextResponse.json({ error: "MOTIVO_REQUERIDO", detalle: "Escribe el motivo (10 caracteres o más)." }, { status: 400 });
 
   const { data: tenant } = await sb.from("tenants").select("usuario_dueno_id, nombre_comercial").eq("id", id).maybeSingle();
   const ownerId = (tenant as { usuario_dueno_id?: string } | null)?.usuario_dueno_id;

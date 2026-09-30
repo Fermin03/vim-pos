@@ -23,7 +23,10 @@ import { pantallaDeLaCaja } from "./pantalla.mjs";
 import { crearEspejo } from "./delivery-espejo.mjs";
 import { debeSondearApps } from "./delivery-espejo-modulo.mjs";
 import { registrarErrorLocal, subirErrores } from "./sync-errores.mjs";
-import { buscarActualizacion, descargarInstalador } from "./updater.mjs";
+import { buscarActualizacion, descargarInstalador, nombreInstaladorTemporal } from "./updater.mjs";
+import { poolVigente } from "./pool-vigente.mjs";
+import { crearCacheCorta } from "./cache-corta.mjs";
+import { origenesDe, navegacionPermitida, abrirFueraPermitido } from "./navegacion.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const UI_PORT = 54360;       // UI del POS (caja)
@@ -230,7 +233,12 @@ async function vincularConNube({ email, password } = {}) {
   }
 }
 
-function crearVentana(preloadArgs) {
+/**
+ * `origenes`: URLs a las que la ventana puede navegar (D9). Todo lo demás se bloquea; una ventana
+ * nueva (window.open, target=_blank) nunca se abre dentro de la app: si es https se manda al
+ * navegador del sistema, y si no, se descarta.
+ */
+function crearVentana(preloadArgs, origenes = []) {
   const w = new BrowserWindow({
     width: 1440, height: 900, backgroundColor: "#1a1a1e", show: false,
     icon: APP_ICON,
@@ -239,10 +247,25 @@ function crearVentana(preloadArgs) {
       // Endurecimiento (remediación Fase 4.1): contextIsolation:true aísla el mundo del preload del
       // de la página. La config se pasa por contextBridge (ver preload.cjs). nodeIntegration:false
       // ya evitaba node en el renderer; con isolation activado se cierra el anti-patrón de Electron.
-      contextIsolation: true, nodeIntegration: false, sandbox: false,
+      // sandbox:true (Auditoría integral 30/09/2026, D9): el preload solo usa contextBridge,
+      // ipcRenderer y process.argv, que existen en el preload con sandbox. Sin sandbox, un fallo del
+      // renderer tendría a mano un proceso con acceso a Node.
+      contextIsolation: true, nodeIntegration: false, sandbox: true,
       additionalArguments: preloadArgs,
     },
   });
+  const permitidos = origenesDe(origenes);
+  w.webContents.setWindowOpenHandler(({ url }) => {
+    if (abrirFueraPermitido(url)) shell.openExternal(url).catch(() => {});
+    return { action: "deny" };
+  });
+  const frenar = (e, url) => {
+    if (navegacionPermitida(url, permitidos)) return;
+    e.preventDefault();
+    console.log(`· [ventana] navegación bloqueada a ${url}`);
+  };
+  w.webContents.on("will-navigate", frenar);
+  w.webContents.on("will-redirect", frenar);
   w.once("ready-to-show", () => w.show());
   return w;
 }
@@ -250,12 +273,23 @@ function crearVentana(preloadArgs) {
 // ── Rol CAJA: POS local-first + hub de la LAN + endurecimiento (Fase 3) ──────
 async function bootCaja() {
   const dataRoot = EMPAQUETADO ? (process.env.VIM_DATA_DIR || app.getPath("userData")) : (process.env.VIM_DATA_DIR || undefined);
-  opcionesBackend = { log: (m) => console.log("· [backend]", m), resDir: RES_DIR ?? undefined, dataRoot };
+  // `nube` va en las opciones (y no solo asignado después) para que CADA backend que se levante
+  // —el del arranque, el del perro guardián, el del respaldo— lo tenga: D5.
+  opcionesBackend = {
+    log: (m) => console.log("· [backend]", m), resDir: RES_DIR ?? undefined, dataRoot,
+    nube: (o) => tokenDeNubeCacheado(o),
+  };
   backend = await startBackend(opcionesBackend);
   backupsDir = path.join(backend.dataRoot, "backups");
   console.log(`· [backend] gateway local: ${backend.url}`);
 
-  win = crearVentana([`--vim-url=${backend.url}`]);
+  // Adónde puede navegar la ventana de la caja: el POS local (por localhost o 127.0.0.1), el POS de
+  // desarrollo si se pidió con VIM_POS_URL, y el POS desplegado, que es el respaldo cuando no hay
+  // pos-ui/ empaquetado (ver más abajo).
+  win = crearVentana([`--vim-url=${backend.url}`], [
+    `http://localhost:${UI_PORT}`, `http://127.0.0.1:${UI_PORT}`,
+    process.env.VIM_POS_URL, "https://pos.vimpos.com.mx",
+  ]);
   // Cerrar la ventana la MANDA A LA BANDEJA (no apaga la caja). Solo "Salir" (bandeja) o apagar la
   // PC la cierran de verdad → así nadie tumba el servidor del local sin querer.
   win.on("close", (e) => {
@@ -317,7 +351,7 @@ async function bootCocina() {
     onSetHub: (url) => { guardarHubUrl(url); console.log(`· [cocina] hub configurado: ${url}`); },
   });
   console.log(`· [cocina] UI de cocina en http://localhost:${KDS_UI_PORT} · hub: ${hub ?? "(sin configurar → setup)"}`);
-  win = crearVentana([]);
+  win = crearVentana([], [`http://localhost:${KDS_UI_PORT}`, `http://127.0.0.1:${KDS_UI_PORT}`]);
   await win.loadURL(`http://localhost:${KDS_UI_PORT}`);
   revisarActualizacion().catch(() => {}); // la cocina también se actualiza (sin bandeja: notificación)
 }
@@ -333,6 +367,7 @@ async function reiniciarBackend() {
   backend = null;
   try { if (prev) await prev.stop(); } catch { /* */ }
   backend = await startBackend(opcionesBackend);
+  backend.nube = tokenDeNubeCacheado; // redundante con opcionesBackend.nube; explícito por D5
 }
 
 /** Respaldo bajo demanda: pausa el watchdog, detiene el backend (para copiar en frío), respalda
@@ -348,6 +383,7 @@ async function respaldarAhora() {
     await prev.stop();
     respaldar(dd, bd, 7, (m) => console.log("· [backup]", m));
     backend = await startBackend(opcionesBackend);
+    backend.nube = tokenDeNubeCacheado; // D5
     console.log("· [backup] respaldo terminado; la caja está de vuelta en línea");
   } catch (e) {
     console.error("· [backup] error en respaldo bajo demanda:", e.message);
@@ -455,8 +491,9 @@ async function ofrecerInstalar() {
   });
   if (q.response !== 0) return;
   descargandoUpdate = true;
-  const destino = path.join(app.getPath("temp"), `VIM-POS-Setup-${updateInfo.version}.exe`);
   try {
+    // Dentro del try: una versión que no sea x.y.z lanza aquí (D10) y cae en el diálogo de error.
+    const destino = path.join(app.getPath("temp"), nombreInstaladorTemporal(updateInfo.version));
     if (win) win.setProgressBar(0.02);
     const { path: instalador } = await descargarInstalador(updateInfo.url, updateInfo.sha512, destino, (frac) => { if (win) win.setProgressBar(frac); });
     if (win) win.setProgressBar(-1);
@@ -495,11 +532,10 @@ async function ofrecerInstalar() {
  * cobrando, mientras que subir las ventas cuanto antes sí urge.
  */
 /**
- * Token de nube del dispositivo, para la consulta de folios.
- *
- * Se pide en cada llamada en vez de cachearlo: el cajero pulsa el botón de vez en cuando, y un
- * token cacheado que caduca daría un fallo intermitente carísimo de diagnosticar a cambio de
- * ahorrar una petición.
+ * Token de nube del dispositivo: un login nuevo en cada llamada. Lo usan el latido (cada 10 min) y
+ * `tokenDeNubeCacheado`. La consulta de folios lo pedía directo en cada petición; como /__folios
+ * está abierto a la LAN sin autenticar, eso dejaba a cualquiera disparar logins contra Supabase
+ * Auth (Auditoría integral 30/09/2026, D4): ahora va por el cacheado, con reintento ante un 401.
  *
  * `syncBestEffort` hace este mismo login y NO se refactorizó para usar esta función: allí cada
  * modo de fallo escribe su propio mensaje en el log —sin vincular, credenciales incompletas, login
@@ -579,8 +615,15 @@ async function latir() {
  * el POS no pinta el indicador, en vez de enseñar un cero que asustaría sin motivo a un negocio
  * que ni siquiera contrató facturación.
  */
-async function consultarFolios() {
-  const opts = await tokenDeNube();
+// D4: /__folios no tiene autenticación y escucha en la LAN. Antes hacía un login a Supabase Auth
+// por petición; ahora usa el token cacheado y la respuesta se guarda un minuto (cache-corta.mjs).
+const cacheFolios = crearCacheCorta({ ttlMs: 60_000 });
+function consultarFolios() {
+  return cacheFolios.obtener(() => consultarFoliosNube());
+}
+
+async function consultarFoliosNube(reintento = false) {
+  const opts = await tokenDeNubeCacheado({ forzar: reintento });
   if (!opts) return { ok: false, aplica: false };
   try {
     const r = await fetch(
@@ -590,6 +633,8 @@ async function consultarFolios() {
         signal: AbortSignal.timeout(10000),
       },
     );
+    // Token cacheado caducado: un solo reintento con login nuevo, no uno por petición.
+    if (r.status === 401 && !reintento) return consultarFoliosNube(true);
     if (!r.ok) return { ok: false, error: `HTTP ${r.status}` };
     // RLS acota la respuesta al tenant del dispositivo, así que viene una fila o ninguna.
     const [f] = await r.json();
@@ -799,6 +844,9 @@ function cajaDeEstaCaja() {
   return m ? m[1].toLowerCase() : null;
 }
 let espejo = null;
+// D6: el espejo vive más que un backend (el perro guardián y "Respaldar ahora" lo reinician y el
+// pool viejo queda cerrado). Se le da un pool que resuelve SIEMPRE el del backend vigente.
+const poolLocal = poolVigente(() => backend?.pool);
 let arranqueSondeo = null;  // temporizador del arranque diferido del sondeo del menú
 
 /** Arranca el ciclo: una sincronización completa ya, y de ahí en adelante cada 10 minutos.
@@ -823,7 +871,7 @@ function iniciarSync() {
   // latido decide, y de ahí en adelante manda `sincronizarEspejoConModulo`.
   const { directivas: d } = directivas.leer();
   if (backend?.pool && cajaId && debeSondearApps(d) && !espejo) {
-    espejo = crearEspejo({ pool: backend.pool, nube: tokenDeNubeCacheado, cajaId, log: (m) => console.log("· [espejo]", m) });
+    espejo = crearEspejo({ pool: poolLocal, nube: tokenDeNubeCacheado, cajaId, log: (m) => console.log("· [espejo]", m) });
     espejo.iniciar();
   } else if (!cajaId) {
     console.log("· [espejo] omitido (la caja no está vinculada a la nube)");
@@ -848,7 +896,7 @@ function sincronizarEspejoConModulo(d) {
   } else if (activo && !espejo) {
     const cajaId = cajaDeEstaCaja();
     if (backend?.pool && cajaId) {
-      espejo = crearEspejo({ pool: backend.pool, nube: tokenDeNubeCacheado, cajaId, log: (m) => console.log("· [espejo]", m) });
+      espejo = crearEspejo({ pool: poolLocal, nube: tokenDeNubeCacheado, cajaId, log: (m) => console.log("· [espejo]", m) });
       espejo.iniciar();
       console.log("· [espejo] iniciado (el cliente encendió el módulo de apps de delivery)");
     }

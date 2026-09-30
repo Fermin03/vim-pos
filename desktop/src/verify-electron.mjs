@@ -51,7 +51,7 @@ app.whenReady().then(async () => {
     if (!existsSync(preload)) throw new Error("no se encontró preload.cjs");
     win = new BrowserWindow({
       show: false,
-      webPreferences: { preload, contextIsolation: true, nodeIntegration: false, sandbox: false },
+      webPreferences: { preload, contextIsolation: true, nodeIntegration: false, sandbox: true }, // igual que main.mjs (D9): el preload tiene que funcionar con sandbox
     });
     return "creada oculta";
   });

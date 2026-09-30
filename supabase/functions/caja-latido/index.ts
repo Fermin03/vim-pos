@@ -7,6 +7,7 @@
 // Respuesta: { directivas }
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import { corsHeaders } from "../_shared/cors.ts";
+import { registrarError } from "../_shared/errores.ts";
 import { cajaIdDeEmail, validarCuerpo } from "../_shared/latido.ts";
 
 const admin = createClient(
@@ -76,7 +77,7 @@ Deno.serve(async (req) => {
     p_pantalla_alto: cuerpo.pantalla?.alto ?? null,
     p_pantalla_escala: cuerpo.pantalla?.escala ?? null,
   });
-  if (error) return json({ error: "RPC_ERROR", detalle: error.message }, 500);
+  if (error) { registrarError("caja-latido", "RPC_ERROR", error); return json({ error: "RPC_ERROR" }, 500); }
   // La caja fue borrada o desactivada mientras seguía encendida: que lo sepa con un código
   // propio, en vez de un 500 que parecería un problema de la nube.
   if (!data) return json({ error: "CAJA_NO_EXISTE" }, 404);

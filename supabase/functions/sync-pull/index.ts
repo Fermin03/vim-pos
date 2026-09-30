@@ -7,6 +7,7 @@
 // Respuesta: { snapshot: { <tabla>: [filas…], __watermark } }
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import { corsHeaders } from "../_shared/cors.ts";
+import { registrarError } from "../_shared/errores.ts";
 import { cajaIdDeEmail } from "../_shared/latido.ts";
 
 const admin = createClient(
@@ -71,7 +72,7 @@ Deno.serve(async (req) => {
 
   // La RPC (service_role) arma el snapshot del tenant (incluye pin_hash y auth.users).
   const { data, error } = await admin.rpc("sync_pull_snapshot", { p_tenant: tenant });
-  if (error) return json({ error: "RPC_ERROR", detalle: error.message }, 500);
+  if (error) { registrarError("sync-pull", "RPC_ERROR", error); return json({ error: "RPC_ERROR" }, 500); }
 
   return json({ snapshot: data });
 });

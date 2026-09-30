@@ -1,7 +1,7 @@
 "use client";
 import { employeeClient } from "./supabase";
 import type { Producto } from "./catalogo";
-import { admiteClienteCuenta, type EnvioCarrito, type LineaCarrito, type ModificadorSel, type ModoServicio } from "./carrito";
+import { admiteClienteCuenta, nuevoClientId, type EnvioCarrito, type LineaCarrito, type ModificadorSel, type ModoServicio } from "./carrito";
 import type { ClienteCuenta } from "./clientes-cuenta";
 import type { ComboDef, ComponenteSel } from "./combos";
 
@@ -12,7 +12,8 @@ import type { ComboDef, ComponenteSel } from "./combos";
 
 function clientIdLocal(): string {
   // UUID real para idempotencia robusta (un contador en memoria se reinicia al recargar y colisiona).
-  return typeof crypto !== "undefined" && crypto.randomUUID ? `cuenta-${crypto.randomUUID()}` : `cuenta-${Date.now()}-${Math.round(Math.random() * 1e9)}`;
+  // `nuevoClientId` ya trae el respaldo para cuando no hay crypto.randomUUID (http de la LAN).
+  return `cuenta-${nuevoClientId()}`;
 }
 
 /** Renglón de `ticket_items` tal como lo devuelve PostgREST, con sus modificadores anidados. */

@@ -2,7 +2,7 @@
 import { employeeClient } from "./supabase";
 import { cacheGet, cachePut } from "./outbox";
 import type { Producto } from "./catalogo";
-import type { ModificadorSel } from "./carrito";
+import { nuevoClientId, type ModificadorSel } from "./carrito";
 
 export type ModoPrecioSlot = "DELTA" | "SUMA_PRECIO_PRODUCTO";
 export type OpcionSlot = { producto: Producto; delta: number; esDefault: boolean };
@@ -88,7 +88,8 @@ export function slotValido(slot: SlotCombo, componentes: ComponenteSel[]): boole
 }
 
 export function nuevoClientIdComponente(): string {
-  return `comp-${crypto.randomUUID()}`;
+  // Con el respaldo de `nuevoClientId`: fuera de https no hay crypto.randomUUID (B2-8).
+  return `comp-${nuevoClientId()}`;
 }
 
 /** El default de cada slot obligatorio, si no está agotado. */

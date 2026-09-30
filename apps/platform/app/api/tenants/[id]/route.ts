@@ -4,6 +4,7 @@ import { hoyMx, sumarMeses } from "@vim/fecha";
 import { MODULOS } from "@vim/db/modulos";
 import { fechaBloqueo, mensajeBloqueoPorDefecto } from "../../../lib/bloqueo";
 import { decidirAltaAddon, precioAltaDelivery, type FilaAddon } from "../../../lib/addons";
+import { precioValido } from "../../../lib/precio";
 
 // Detalle y acciones sobre un tenant (suspender/reactivar/cancelar, notas, plan).
 // Todo auditado en super_admin_accesos. service_role, gated por X-Platform-Key.
@@ -256,7 +257,10 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
       const planCodigo = (tRaw as { plan?: { codigo?: string } } | null)?.plan?.codigo ?? "";
       precioLista = precioAltaDelivery(planCodigo, precioLista);
     }
-    const precio = body.precio_mensual_mxn != null ? Number(body.precio_mensual_mxn) : precioLista;
+    // Un precio explícito se valida (hallazgo E-3): antes un negativo reventaba el CHECK de la base
+    // con un 500, y "abc" o "" se guardaban como NaN o como un $0 que nadie decidió.
+    const precio = body.precio_mensual_mxn != null ? precioValido(body.precio_mensual_mxn) : precioLista;
+    if (precio === null) return NextResponse.json({ error: "PRECIO_INVALIDO", detalle: "El precio debe ser un importe de $0 en adelante." }, { status: 400 });
     // Una fila en $0.00 sin explicación invita a preguntar, dentro de seis meses, si el cero es un
     // error. El spec (§4) fija esta nota para Negocio/Cadena; solo se usa cuando el precio salió
     // en cero y nadie mandó un motivo propio — un motivo explícito (cortesía, promoción) manda.
@@ -388,22 +392,27 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
     const { data: t } = await sb.from("tenants").select("plan_actual_id, plan:planes(precio_mensual_mxn)").eq("id", id).maybeSingle();
     const planId = (t as { plan_actual_id?: string } | null)?.plan_actual_id;
     if (!planId) return NextResponse.json({ error: "TENANT_SIN_PLAN" }, { status: 400 });
-    const precio = Number((body.precio as number | undefined) ?? (t as { plan?: { precio_mensual_mxn?: number } } | null)?.plan?.precio_mensual_mxn ?? 0);
+    // El precio del cuerpo (cortesía, precio pactado) gana; si no viene, el de lista del plan.
+    // Validado (hallazgo E-3): `Number(body.precio)` aceptaba negativos y NaN.
+    const precio = precioValido(body.precio ?? (t as { plan?: { precio_mensual_mxn?: number } } | null)?.plan?.precio_mensual_mxn ?? 0);
+    if (precio === null) return NextResponse.json({ error: "PRECIO_INVALIDO", detalle: "El precio debe ser un importe de $0 en adelante." }, { status: 400 });
     const ciclo = String(body.ciclo ?? "MENSUAL");
+    if (ciclo !== "MENSUAL" && ciclo !== "ANUAL") return NextResponse.json({ error: "CICLO_INVALIDO" }, { status: 400 });
     // Fechas en hora de México, no del servidor: en UTC, activar una suscripción por la tarde
     // la dejaba fechada al día siguiente. `sumarMeses` además recorta al último día del mes, para
     // que un alta el 31 de enero cobre el 28 de febrero y no se desborde al 3 de marzo.
     const inicio = hoyMx();
     const prox = sumarMeses(inicio, ciclo === "ANUAL" ? 12 : 1);
-    // Expira cualquier suscripción ACTIVA previa para que solo haya una vigente.
-    await sb.from("suscripciones").update({ estado: "EXPIRADA", fecha_fin: inicio }).eq("tenant_id", id).eq("estado", "ACTIVA");
-    const { error } = await sb.from("suscripciones").insert({
-      tenant_id: id, plan_id: planId, fecha_inicio: inicio,
-      estado: "ACTIVA", precio_mensual_mxn: precio, ciclo_facturacion: ciclo, proxima_fecha_cobro: prox,
+    // Expirar la vigente, crear la nueva y pasar TRIAL→ACTIVO van en UNA transacción (0137).
+    // Antes eran tres escrituras sueltas: si el INSERT fallaba después del UPDATE, el cliente
+    // quedaba con la anterior EXPIRADA y ninguna nueva — sin cobro vigente.
+    const { error } = await sb.rpc("activar_suscripcion", {
+      p_tenant_id: id, p_precio: precio, p_ciclo: ciclo, p_inicio: inicio, p_proxima: prox,
     });
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-    // Al activar el cobro, el tenant pasa a ACTIVO si estaba en TRIAL.
-    await sb.from("tenants").update({ estado: "ACTIVO" }).eq("id", id).eq("estado", "TRIAL");
+    if (error) {
+      const conocido = /PRECIO_INVALIDO|CICLO_INVALIDO|FECHAS_INVALIDAS|TENANT_SIN_PLAN|TENANT_NO_EXISTE/.exec(error.message)?.[0];
+      return NextResponse.json({ error: conocido ?? error.message }, { status: conocido ? 400 : 500 });
+    }
     await auditar(sb, { accion: "tenant.suscripcion_activar", tenantId: id, motivo: motivoDe(), payload: { precio, ciclo } });
     return NextResponse.json({ ok: true });
   }

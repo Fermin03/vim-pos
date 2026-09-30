@@ -8,6 +8,7 @@
 // Respuesta: { resultado: { <tabla>: n } }
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import { corsHeaders } from "../_shared/cors.ts";
+import { registrarError } from "../_shared/errores.ts";
 import { cajaIdDeEmail } from "../_shared/latido.ts";
 
 const admin = createClient(
@@ -79,7 +80,7 @@ Deno.serve(async (req) => {
 
   // La RPC (service_role) aplica el snapshot en modo réplica, forzando tenant_id = tenant.
   const { data, error } = await admin.rpc("sync_push_snapshot", { p_tenant: tenant, p_snapshot: body.snapshot });
-  if (error) return json({ error: "RPC_ERROR", detalle: error.message }, 500);
+  if (error) { registrarError("sync-push", "RPC_ERROR", error); return json({ error: "RPC_ERROR" }, 500); }
 
   // Espejo de apps (spec 2026-09-03): los tickets creados en la caja para pedidos de apps suben
   // aquí; se enlazan al pedido por folio_externo_app. Best-effort: no puede tirar el push.

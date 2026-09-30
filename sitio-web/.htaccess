@@ -96,9 +96,12 @@ ErrorDocument 404 /404.html
   # por si algún día se cuela un script de terceros que sí quiera pedirlos.
   Header always set Permissions-Policy "camera=(), microphone=(), geolocation=(), interest-cohort=()"
 
-  # El sitio no carga nada de fuera; lo único que sale es la solicitud de demo
-  # a la función de Supabase. Tiene que decir lo mismo que vercel.json.
-  Header always set Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self' https://pbiaxzvmssjsxdwqrumb.supabase.co; object-src 'none'; base-uri 'self'; frame-ancestors 'self'; form-action 'self'"
+  # Lo único que sale del dominio: la solicitud de demo (función de Supabase) y la
+  # medición (Google Tag Manager → Google Analytics; tagassistant para depurarla).
+  # Tiene que decir EXACTAMENTE lo mismo que vercel.json y middleware.ts, y una
+  # prueba (pruebas.test.mjs) lo compara: esta decía otra cosa —sin GTM ni GA—, así
+  # que en un Apache la medición se bloqueaba sin que nadie se enterara.
+  Header always set Content-Security-Policy "default-src 'self'; script-src 'self' https://www.googletagmanager.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: https://*.google-analytics.com https://*.googletagmanager.com; font-src 'self'; connect-src 'self' https://pbiaxzvmssjsxdwqrumb.supabase.co https://*.google-analytics.com https://*.analytics.google.com https://*.googletagmanager.com; object-src 'none'; base-uri 'self'; frame-ancestors 'self' https://tagassistant.google.com; form-action 'self'"
 
   # La misma dirección devuelve HTML o Markdown según la cabecera Accept. Sin
   # este Vary, una caché compartida guarda la primera de las dos versiones que

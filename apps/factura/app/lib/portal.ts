@@ -12,6 +12,20 @@ const SB_ANON = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
 
 export type Negocio = { nombre: string; logo: string | null };
 
+/**
+ * Cómo demuestra el comensal que tiene el ticket en la mano (auditoría 30/09/2026, C1-4): el
+ * token `t` que trae el QR o, si no hay token (QR viejo, folio tecleado), el total del ticket. El
+ * folio solo no basta: es secuencial y va impreso, así que cualquiera podía recorrerlos.
+ */
+export type Acceso = { token: string | null; total: string };
+
+function camposAcceso(a: Acceso): Record<string, string> {
+  const out: Record<string, string> = {};
+  if (a.token) out.token = a.token;
+  if (a.total.trim()) out.total = a.total.trim();
+  return out;
+}
+
 export type TicketEncontrado = {
   negocio: string;
   logo: string | null;
@@ -92,8 +106,8 @@ export async function buscarNegocio(negocio: string): Promise<Negocio> {
   }
 }
 
-export async function buscarTicket(negocio: string, folio: string): Promise<TicketEncontrado> {
-  const d = await llamar({ accion: "buscar", negocio, folio });
+export async function buscarTicket(negocio: string, folio: string, acceso: Acceso): Promise<TicketEncontrado> {
+  const d = await llamar({ accion: "buscar", negocio, folio, ...camposAcceso(acceso) });
   return {
     negocio: String(d.negocio),
     logo: (d.logo as string) ?? null,
@@ -117,17 +131,17 @@ function aTimbrado(d: Record<string, unknown>): Timbrado {
 }
 
 /** Una factura ya emitida, otra vez: con el folio y el RFC con que se pidió. */
-export async function recuperar(negocio: string, folio: string, rfc: string): Promise<Timbrado> {
-  return aTimbrado(await llamar({ accion: "recuperar", negocio, folio, rfc }));
+export async function recuperar(negocio: string, folio: string, acceso: Acceso, rfc: string): Promise<Timbrado> {
+  return aTimbrado(await llamar({ accion: "recuperar", negocio, folio, rfc, ...camposAcceso(acceso) }));
 }
 
 /** Reenvía la factura por correo (la manda el PAC con el XML y el PDF adjuntos). */
-export async function enviarPorCorreo(negocio: string, folio: string, rfc: string, email: string): Promise<void> {
-  await llamar({ accion: "enviar", negocio, folio, rfc, email });
+export async function enviarPorCorreo(negocio: string, folio: string, acceso: Acceso, rfc: string, email: string): Promise<void> {
+  await llamar({ accion: "enviar", negocio, folio, rfc, email, ...camposAcceso(acceso) });
 }
 
-export async function timbrar(negocio: string, folio: string, receptor: Receptor): Promise<Timbrado> {
-  return aTimbrado(await llamar({ accion: "timbrar", negocio, folio, receptor }));
+export async function timbrar(negocio: string, folio: string, acceso: Acceso, receptor: Receptor): Promise<Timbrado> {
+  return aTimbrado(await llamar({ accion: "timbrar", negocio, folio, receptor, ...camposAcceso(acceso) }));
 }
 
 /**
@@ -152,3 +166,7 @@ export function descargar(base64: string, nombre: string, tipo: string): void {
 /** Misma regla que el servidor (`_shared/pac/receptor.ts`): empresa 12, persona física 13. */
 export const RFC_VALIDO = /^[A-ZÑ&]{3,4}\d{6}[A-Z0-9]{3}$/;
 export const CORREO_VALIDO = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+/** Forma del token del QR (mismo formato que `_shared/pac/acceso-ticket.ts`). */
+export const TOKEN_QR = /^[A-Za-z0-9_-]{16}$/;
+/** Un importe como lo escribe una persona: "$1,234.50", "186.5", "120". */
+export const TOTAL_VALIDO = /^\$?\s*\d{1,3}(,?\d{3})*(\.\d{1,2})?$/;

@@ -5,6 +5,7 @@ import { createClient } from "jsr:@supabase/supabase-js@2";
 import { hmacSha256Hex, igualesEnTiempoConstante } from "../_shared/delivery/firma.ts";
 import { crearClienteUber } from "../_shared/delivery/uber.ts";
 import { procesarNotificacionUber, type DbMinima } from "../_shared/delivery/procesar-uber.ts";
+import { consumirCupo, leerCuerpoAcotado } from "../_shared/limite.ts";
 
 const admin = createClient(
   Deno.env.get("SUPABASE_URL")!,
@@ -22,6 +23,8 @@ const LLAVES_FIRMA = [
   CLIENT_SECRET,
 ].filter((k) => k !== "");
 const MAX_BODY = 256 * 1024;
+// Cuántas peticiones con firma inválida se asientan por hora (C2-4). Más allá solo va al log.
+const MAX_REGISTROS_FIRMA_INVALIDA = 60;
 
 const uber = crearClienteUber({
   entorno: ENTORNO, clientId: CLIENT_ID, clientSecret: CLIENT_SECRET,
@@ -47,8 +50,14 @@ Deno.serve(async (req) => {
   if (req.method !== "POST") return new Response("method not allowed", { status: 405 });
   if (LLAVES_FIRMA.length === 0) return new Response("webhook no configurado", { status: 503 });
 
-  const cuerpoTexto = await req.text();
-  if (cuerpoTexto.length > MAX_BODY) return new Response("payload too large", { status: 413 });
+  // Auditoría integral 30/09/2026 (C2-4). Antes: `await req.text()` y el tamaño se miraba DESPUÉS
+  // (el cuerpo ya estaba entero en memoria), y cada petición con firma inválida se guardaba en
+  // delivery_eventos CON su cuerpo (hasta 256 KB) — cualquiera, sin credenciales, podía llenar la
+  // tabla. Ahora el tamaño se corta al leer (content-length primero, y contando mientras llega), y
+  // lo que no trae firma válida ni se parsea ni se guarda: a lo sumo una fila mínima, sin cuerpo,
+  // con tope por hora.
+  const cuerpoTexto = await leerCuerpoAcotado(req, MAX_BODY);
+  if (cuerpoTexto === null) return new Response("payload too large", { status: 413 });
 
   const firmaRecibida = (req.headers.get("x-uber-signature") ?? "").trim().toLowerCase();
   let firmaValida = false;
@@ -58,6 +67,23 @@ Deno.serve(async (req) => {
     }
   }
 
+  if (!firmaValida) {
+    // Sin event_id (no bloquear el índice de idempotencia con un evento falso), sin payload y sin
+    // tipo leído del cuerpo: nada de lo que mandó un desconocido llega a la base. El registro sirve
+    // para notar una llave de firma mal configurada, y para eso bastan unas cuantas filas por hora.
+    const registrar = await consumirCupo(admin,
+      { clave: "uber:firma-invalida", ventanaSeg: 60 * 60, max: MAX_REGISTROS_FIRMA_INVALIDA }, "cerrar");
+    if (registrar.permitido) {
+      await admin.from("delivery_eventos").insert({
+        app: "APP_UBEREATS", direccion: "ENTRADA", tipo: "firma_invalida", payload: null,
+        firma_valida: false, error: `firma inválida (${cuerpoTexto.length} bytes)`,
+      });
+    } else {
+      console.warn(`[delivery-webhook-uber] firma inválida (${cuerpoTexto.length} bytes); tope de registro alcanzado.`);
+    }
+    return new Response("invalid signature", { status: 401 });
+  }
+
   let cuerpo: unknown;
   try { cuerpo = JSON.parse(cuerpoTexto); } catch { return new Response("bad json", { status: 400 }); }
   const ev = (cuerpo && typeof cuerpo === "object" ? cuerpo : {}) as EventoUber;
@@ -65,12 +91,6 @@ Deno.serve(async (req) => {
     app: "APP_UBEREATS", direccion: "ENTRADA", tipo: ev.event_type ?? "desconocido",
     id_externo: ev.meta?.resource_id ?? null, payload: cuerpo,
   };
-
-  if (!firmaValida) {
-    // Se registra sin event_id para no bloquear el índice de idempotencia con un evento falso.
-    await admin.from("delivery_eventos").insert({ ...filaEvento, firma_valida: false, error: "firma inválida" });
-    return new Response("invalid signature", { status: 401 });
-  }
 
   // Idempotencia por event_id: el índice único devuelve 23505 y contestamos 200 sin reprocesar.
   const { error: errEv } = await admin.from("delivery_eventos").insert({

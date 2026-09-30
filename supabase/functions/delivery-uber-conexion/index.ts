@@ -5,6 +5,8 @@
 // interno de "pausar" (Task 6, ver `INTERNO` más abajo), que usa `x-vim-interno` en vez de JWT.
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import { corsHeaders } from "../_shared/cors.ts";
+import { registrarError } from "../_shared/errores.ts";
+import { tenantDelToken } from "../_shared/identidad.ts";
 import {
   armarCombosCarta, armarGruposModificadorCarta, construirMenuUber, type CategoriaCarta, type ProductoCarta,
 } from "../_shared/delivery/menu-uber.ts";
@@ -98,13 +100,18 @@ Deno.serve(async (req) => {
     const { data: userResp, error: userErr } = await admin.auth.getUser(token);
     if (userErr || !userResp?.user) return json({ error: "AUTH_INVALIDA" }, 401);
     usuarioId = userResp.user.id;
-    const { data: accesoData } = await admin.from("usuarios_acceso").select("tenant_id, rol:roles(jerarquia)")
-      .eq("usuario_id", usuarioId).eq("activo", true).limit(1).maybeSingle();
-    const acceso = accesoData as unknown as Acceso | null;
-    if (!acceso) return json({ error: "SIN_TENANT" }, 403);
-    tenantId = acceso.tenant_id;
-    const rol = Array.isArray(acceso.rol) ? acceso.rol[0] : acceso.rol;
-    if ((rol?.jerarquia ?? 0) < JERARQUIA_MINIMA) return json({ error: "SIN_PERMISO" }, 403);
+    // C2-6: el tenant es el del token verificado; la jerarquía, la MAYOR de sus accesos en ESE
+    // tenant. Antes: el primer acceso que devolviera Postgres (`.limit(1)`), de cualquier negocio y
+    // de cualquier sucursal — un dueño con dos filas podía salir como su acceso de menor rango.
+    const tenantToken = tenantDelToken(token);
+    if (!tenantToken) return json({ error: "SIN_TENANT" }, 403);
+    const { data: accesosData } = await admin.from("usuarios_acceso").select("tenant_id, rol:roles(jerarquia)")
+      .eq("usuario_id", usuarioId).eq("tenant_id", tenantToken).eq("activo", true);
+    const accesos = (accesosData ?? []) as unknown as Acceso[];
+    if (accesos.length === 0) return json({ error: "SIN_TENANT" }, 403);
+    tenantId = tenantToken;
+    const jerarquia = Math.max(0, ...accesos.map((a) => (Array.isArray(a.rol) ? a.rol[0] : a.rol)?.jerarquia ?? 0));
+    if (jerarquia < JERARQUIA_MINIMA) return json({ error: "SIN_PERMISO" }, 403);
   } else {
     tenantId = ""; // se resuelve abajo, desde la conexión — hace falta el cuerpo, que aún no existe.
     usuarioId = null; // actor de sistema, no una persona con fila en auth.users.
@@ -196,7 +203,7 @@ Deno.serve(async (req) => {
         if (!REDIRECT_URI) return json({ error: "UBER_ERROR", detalle: "UBER_REDIRECT_URI no configurado" }, 502);
         let canje: { accessToken: string; venceAt: Date };
         try { canje = await uber.canjearCodigo(body.code, REDIRECT_URI); }
-        catch (e) { await registrar("oauth_canje", false, msg(e), null, null); return json({ error: "UBER_ERROR", detalle: msg(e) }, 502); }
+        catch (e) { await registrar("oauth_canje", false, msg(e), null, null); registrarError("delivery-uber-conexion", "UBER_ERROR", msg(e)); return json({ error: "UBER_ERROR" }, 502); }
         await admin.from("delivery_autorizaciones").upsert({
           tenant_id: tenantId, app: "APP_UBEREATS", entorno: ENTORNO, access_token: canje.accessToken,
           vence_at: canje.venceAt.toISOString(), creado_por: usuarioId, created_at: new Date().toISOString(),
@@ -236,7 +243,8 @@ Deno.serve(async (req) => {
           // 409 = la tienda ya estaba asociada a nuestra app: se toma como éxito y se sigue.
           if (!msg(e).startsWith("YA_PROCESADA")) {
             await registrar("pos_data_crear", false, msg(e), cx?.id ?? null, body.tienda_id);
-            return json({ error: "UBER_ERROR", detalle: msg(e) }, 502);
+            registrarError("delivery-uber-conexion", "UBER_ERROR", msg(e));
+            return json({ error: "UBER_ERROR" }, 502);
           }
         }
         const tiendas = normalizarTiendasUber({ stores: await uber.listarTiendas(tok).catch(() => []) });
@@ -251,7 +259,7 @@ Deno.serve(async (req) => {
         const { data: guardada, error: errCx } = cx
           ? await admin.from("delivery_conexiones").update(fila).eq("id", cx.id).select("id").single()
           : await admin.from("delivery_conexiones").insert({ ...fila, created_by: usuarioId }).select("id").single();
-        if (errCx) return json({ error: "INTERNO", detalle: errCx.message }, 500);
+        if (errCx) { registrarError("delivery-uber-conexion", "INTERNO", errCx); return json({ error: "INTERNO" }, 500); }
         const conexionId = (guardada as { id: string }).id;
         await registrar("pos_data_crear", true, cuerpo, conexionId, body.tienda_id);
         return json({ conexion_id: conexionId });
@@ -273,7 +281,8 @@ Deno.serve(async (req) => {
         try { await uber.posData(cx.tienda_id_externo).actualizar({ integration_enabled: habilitar }); }
         catch (e) {
           await registrar("pos_data_actualizar", false, msg(e), cx.id, cx.tienda_id_externo);
-          return json({ error: "UBER_ERROR", detalle: msg(e) }, 502);
+          registrarError("delivery-uber-conexion", "UBER_ERROR", msg(e));
+          return json({ error: "UBER_ERROR" }, 502);
         }
         await admin.from("delivery_conexiones").update({ estado: nuevo, ultimo_evento_at: new Date().toISOString(), ultimo_error: null, updated_by: usuarioId }).eq("id", cx.id);
         await registrar("pos_data_actualizar", true, { integration_enabled: habilitar }, cx.id, cx.tienda_id_externo);
@@ -289,7 +298,8 @@ Deno.serve(async (req) => {
           // 404 = Uber ya no la tiene asociada: queda desconectada igual.
           if (!msg(e).startsWith("UBER_HTTP_404")) {
             await registrar("pos_data_borrar", false, msg(e), cx.id, cx.tienda_id_externo);
-            return json({ error: "UBER_ERROR", detalle: msg(e) }, 502);
+            registrarError("delivery-uber-conexion", "UBER_ERROR", msg(e));
+            return json({ error: "UBER_ERROR" }, 502);
           }
         }
         await admin.from("delivery_conexiones").update({ estado: nuevo, desconectada_at: new Date().toISOString(), updated_by: usuarioId }).eq("id", cx.id);
@@ -303,7 +313,9 @@ Deno.serve(async (req) => {
           return json(await cambiarPrepTienda(depsTienda(), await comoTienda(cx), Number(body.minutos)));
         } catch (e) {
           const m = msg(e);
-          return m === "PREP_FUERA_DE_RANGO" ? json({ error: "PREP_FUERA_DE_RANGO" }, 400) : json({ error: "UBER_ERROR", detalle: m }, 502);
+          if (m === "PREP_FUERA_DE_RANGO") return json({ error: "PREP_FUERA_DE_RANGO" }, 400);
+          registrarError("delivery-uber-conexion", "UBER_ERROR", m);
+          return json({ error: "UBER_ERROR" }, 502);
         }
       }
       case "verificar": {
@@ -317,7 +329,8 @@ Deno.serve(async (req) => {
         } catch (e) {
           await admin.from("delivery_conexiones").update({ ultimo_error: msg(e), ultimo_evento_at: new Date().toISOString() }).eq("id", cx.id);
           await registrar("verificar", false, msg(e), cx.id, cx.tienda_id_externo);
-          return json({ error: "UBER_ERROR", detalle: msg(e) }, 502);
+          registrarError("delivery-uber-conexion", "UBER_ERROR", msg(e));
+          return json({ error: "UBER_ERROR" }, 502);
         }
         const integracionActiva = pos.integration_enabled === true && pos.integrator_store_id === cx.sucursal_id;
         const tiendaOnline = tienda.estado === "EN_LINEA";
@@ -391,7 +404,8 @@ Deno.serve(async (req) => {
         try { await uber.reemplazarMenu(cx.tienda_id_externo, carta.menu); }
         catch (e) {
           await registrar("menu", false, msg(e), cx.id, cx.tienda_id_externo);
-          return json({ error: "UBER_ERROR", detalle: msg(e) }, 502);
+          registrarError("delivery-uber-conexion", "UBER_ERROR", msg(e));
+          return json({ error: "UBER_ERROR" }, 502);
         }
         const ahora = new Date().toISOString();
         await admin.from("delivery_conexiones").update({
@@ -414,6 +428,7 @@ Deno.serve(async (req) => {
         return json({ error: "ACCION_DESCONOCIDA" }, 400);
     }
   } catch (e) {
-    return json({ error: "INTERNO", detalle: msg(e) }, 500);
+    registrarError("delivery-uber-conexion", "INTERNO", msg(e));
+    return json({ error: "INTERNO" }, 500);
   }
 });

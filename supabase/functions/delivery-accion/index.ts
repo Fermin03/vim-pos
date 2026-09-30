@@ -2,6 +2,8 @@
 // acción aquí con su JWT de empleado; se valida que el pedido sea de SU tenant y se llama a la app.
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import { corsHeaders } from "../_shared/cors.ts";
+import { registrarError } from "../_shared/errores.ts";
+import { claimsDe, tenantDeClaims } from "../_shared/identidad.ts";
 import { crearClienteUber, motivoRechazoUber, segundosAReadyTime, type MotivoRechazo } from "../_shared/delivery/uber.ts";
 import { cambiarPrepTienda, consultarEstadoTienda, pausarTienda, reanudarTienda, type ConexionTienda } from "../_shared/delivery/tienda-uber-acciones.ts";
 import { ACCIONES_TIENDA, accionExigeModulo, moduloDeliveryActivo } from "../_shared/delivery/modulo.ts";
@@ -48,9 +50,6 @@ function cajaDesdeCorreo(email: string | undefined): string | null {
   const m = /^caja-([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})@/i.exec(email ?? "");
   return m ? m[1].toLowerCase() : null;
 }
-function claimsDe(token: string): Record<string, unknown> {
-  try { const p = token.split(".")[1] ?? ""; return JSON.parse(atob(p.replace(/-/g, "+").replace(/_/g, "/"))); } catch { return {}; }
-}
 const MOTIVOS: MotivoRechazo[] = ["AGOTADO", "CERRADO", "SATURADO", "POS_OFFLINE", "OTRO"];
 const msg = (e: unknown) => (e instanceof Error ? e.message : String(e));
 
@@ -66,12 +65,17 @@ Deno.serve(async (req) => {
   if (!token) return json({ error: "NO_AUTH" }, 401);
   const { data: userResp, error: userErr } = await admin.auth.getUser(token);
   if (userErr || !userResp?.user) return json({ error: "AUTH_INVALIDA" }, 401);
+  // C2-6: el tenant es el del token verificado y el acceso se comprueba en ESE tenant (antes: el
+  // primer acceso activo que devolviera Postgres, de cualquier negocio).
+  const claims = claimsDe(token);
+  const tenantToken = tenantDeClaims(claims);
+  if (!tenantToken) return json({ error: "SIN_TENANT" }, 403);
   const { data: acceso } = await admin.from("usuarios_acceso").select("tenant_id")
-    .eq("usuario_id", userResp.user.id).eq("activo", true).limit(1).maybeSingle();
+    .eq("usuario_id", userResp.user.id).eq("tenant_id", tenantToken).eq("activo", true).limit(1).maybeSingle();
   if (!acceso) return json({ error: "SIN_TENANT" }, 403);
-  const tenantId = (acceso as { tenant_id: string }).tenant_id;
+  const tenantId = tenantToken;
   // Dispositivo (caja instalada, espejo): su caja sale del correo y se verifica contra el tenant.
-  const esDispositivo = claimsDe(token).tipo_identidad === "DISPOSITIVO";
+  const esDispositivo = claims.tipo_identidad === "DISPOSITIVO";
   let cajaDispositivo: { id: string; sucursal_id: string } | null = null;
   if (esDispositivo) {
     const cid = cajaDesdeCorreo(userResp.user.email);
@@ -125,7 +129,8 @@ Deno.serve(async (req) => {
       if (m === "TIENDA_ESTRATEGIA_UBER") return json({ error: "TIENDA_ESTRATEGIA_UBER" }, 409);
       if (m === "PREP_FUERA_DE_RANGO") return json({ error: "PREP_FUERA_DE_RANGO" }, 400);
       // Aunque Uber no responda, el POS puede mostrar los minutos que tenemos en VIM.
-      return json({ error: "UBER_ERROR", detalle: m, tiempo_prep_min: cx.tiempo_prep_min }, 502);
+      registrarError("delivery-accion", "UBER_ERROR", m);
+      return json({ error: "UBER_ERROR", tiempo_prep_min: cx.tiempo_prep_min }, 502);
     }
   }
 
@@ -174,7 +179,7 @@ Deno.serve(async (req) => {
             await registrarSalida("accept", true, { minutos, gestion: "ESCRITORIO" });
           } catch (e) {
             await registrarSalida("accept", false, msg(e));
-            if (!msg(e).startsWith("YA_PROCESADA")) return json({ error: "UBER_ERROR", detalle: msg(e) }, 502);
+            if (!msg(e).startsWith("YA_PROCESADA")) { registrarError("delivery-accion", "UBER_ERROR", msg(e)); return json({ error: "UBER_ERROR" }, 502); }
           }
           await admin.rpc("delivery_pedido_transicion", { p_pedido_id: pedido.id, p_estado: "ACEPTADO", p_detalle: null });
           return json({ ok: true, gestion: "ESCRITORIO" });
@@ -183,14 +188,15 @@ Deno.serve(async (req) => {
         if (errRpc) {
           const m = errRpc.message ?? String(errRpc);
           const codigo = m.includes("SIN_TURNO_ABIERTO") ? "SIN_TURNO_ABIERTO" : m.includes("ITEM_SIN_MAPEAR") ? "ITEM_SIN_MAPEAR" : "RPC_ERROR";
-          return json({ error: codigo, detalle: m }, 409);
+          registrarError("delivery-accion", codigo, m);
+          return json({ error: codigo }, 409);
         }
         try {
           await uber.aceptar(pedido.id_externo, segundosAReadyTime(new Date(), minutos), pedido.folio_corto ?? pedido.id);
           await registrarSalida("accept", true, { minutos });
         } catch (e) {
           await registrarSalida("accept", false, msg(e));
-          if (!msg(e).startsWith("YA_PROCESADA")) return json({ error: "UBER_ERROR", detalle: msg(e) }, 502);
+          if (!msg(e).startsWith("YA_PROCESADA")) { registrarError("delivery-accion", "UBER_ERROR", msg(e)); return json({ error: "UBER_ERROR" }, 502); }
         }
         return json({ ok: true, ticket_id: ticketId });
       }
@@ -202,7 +208,7 @@ Deno.serve(async (req) => {
           await registrarSalida("deny", true, { motivo });
         } catch (e) {
           await registrarSalida("deny", false, msg(e));
-          if (!msg(e).startsWith("YA_PROCESADA")) return json({ error: "UBER_ERROR", detalle: msg(e) }, 502);
+          if (!msg(e).startsWith("YA_PROCESADA")) { registrarError("delivery-accion", "UBER_ERROR", msg(e)); return json({ error: "UBER_ERROR" }, 502); }
         }
         await admin.rpc("delivery_pedido_transicion", {
           p_pedido_id: pedido.id, p_estado: "RECHAZADO", p_detalle: `${motivo}${body.detalle ? ": " + body.detalle : ""}`,
@@ -216,7 +222,8 @@ Deno.serve(async (req) => {
           await registrarSalida("ready", true, {});
         } catch (e) {
           await registrarSalida("ready", false, msg(e));
-          return json({ error: "UBER_ERROR", detalle: msg(e) }, 502);
+          registrarError("delivery-accion", "UBER_ERROR", msg(e));
+          return json({ error: "UBER_ERROR" }, 502);
         }
         await admin.rpc("delivery_pedido_transicion", { p_pedido_id: pedido.id, p_estado: "LISTO", p_detalle: null });
         return json({ ok: true });
@@ -225,6 +232,7 @@ Deno.serve(async (req) => {
         return json({ error: "ACCION_INVALIDA" }, 400);
     }
   } catch (e) {
-    return json({ error: "INTERNO", detalle: msg(e) }, 500);
+    registrarError("delivery-accion", "INTERNO", msg(e));
+    return json({ error: "INTERNO" }, 500);
   }
 });

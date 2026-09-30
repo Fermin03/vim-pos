@@ -1,6 +1,7 @@
 "use client";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { type CajaKds } from "./caja";
+import { abrirStreamHub } from "./stream-hub";
 import {
   labelModo,
   leerComandas,
@@ -178,6 +179,9 @@ export function PantallaKds({
   const primeraCarga = useRef(true);
   const sonidoRef = useRef(sonido);
   sonidoRef.current = sonido;
+  // El stream SSE pide el token al (re)abrirse: por ref, para no reabrirlo en cada render.
+  const tokenRef = useRef(token);
+  tokenRef.current = token;
 
   // Preferencias guardadas. En un efecto y no en el useState inicial: la pantalla se pinta en el
   // servidor (Next) y ahí no hay localStorage.
@@ -262,10 +266,14 @@ export function PantallaKds({
   useEffect(() => {
     const w = typeof window !== "undefined" ? (window as unknown as { __VIM_SUPABASE_URL?: string; __VIM_DESKTOP?: boolean }) : undefined;
     if (!w?.__VIM_DESKTOP || !w.__VIM_SUPABASE_URL || typeof EventSource === "undefined") return;
-    const es = new EventSource(`${w.__VIM_SUPABASE_URL}/kds/stream?sucursal=${caja.sucursal_id}`);
-    es.addEventListener("cocina", () => { recargar(); });
-    es.onerror = () => { /* EventSource reconecta solo; el polling cubre el hueco */ };
-    return () => es.close();
+    // Con el token de la pantalla (el hub exige uno desde la auditoría del 30/09/2026) y
+    // reapertura si caduca; mientras tanto, el polling cubre el hueco.
+    return abrirStreamHub({
+      base: w.__VIM_SUPABASE_URL,
+      params: { sucursal: caja.sucursal_id },
+      obtenerToken: () => tokenRef.current,
+      eventos: { cocina: () => { recargar(); } },
+    });
   }, [recargar, caja.sucursal_id]);
 
   // Tick del reloj (1s) para los cronómetros, sin re-leer BD

@@ -41,19 +41,40 @@ type CtxCobro = {
   turnoId: string;
 };
 
+/** En qué paso de `persistirTicket` se cortó un ticket que YA se abrió. */
+export type FaseTicketParcial = "encabezado" | "renglones" | "envio";
+
 /**
- * El ticket se abrió y sus renglones entraron, pero el envío no se pudo fijar (zona desactivada,
- * de otra sucursal…). Lleva el `ticketId` —y los totales, si se pudieron leer— porque ese ticket
- * YA EXISTE ABIERTO: si el llamador no lo adopta, el reintento abre otro y el primero se queda
- * huérfano trabando el corte (el fantasma del comentario de `iniciarCobro` en home-pos.tsx).
+ * `abrir_ticket` ya devolvió un id —el ticket EXISTE en la base— pero un paso posterior de
+ * `persistirTicket` falló. Lleva el `ticketId` (y los totales, si se pudieron leer) para que el
+ * llamador lo adopte: si no se entera, el reintento abre otro y el primero se queda huérfano
+ * trabando el corte (el fantasma del comentario de `iniciarCobro` en home-pos.tsx).
+ *
+ * Auditoría integral 30/09/2026 (B2-3/B2-4): antes solo el fallo del envío llevaba el id; un
+ * `agregar_item_a_ticket` rechazado, o un `update` de la nota/nombre/dirección que fallaba, salía
+ * como `Error` pelón —o ni eso: los `update` no revisaban `error` y la nota de alergias se perdía
+ * sin aviso—.
  */
-export class ErrorEnvioNoFijado extends Error {
+export class ErrorTicketParcial extends Error {
   constructor(
     mensaje: string,
     readonly ticketId: string,
     readonly totales: TotalesTicket | null,
+    readonly fase: FaseTicketParcial,
   ) {
     super(mensaje);
+    this.name = "ErrorTicketParcial";
+  }
+}
+
+/**
+ * El ticket se abrió y sus renglones entraron, pero el envío no se pudo fijar (zona desactivada,
+ * de otra sucursal…). Caso particular de `ErrorTicketParcial`: el ticket está COMPLETO salvo el
+ * envío, y el cajero lo arregla tocando el renglón de envío.
+ */
+export class ErrorEnvioNoFijado extends ErrorTicketParcial {
+  constructor(mensaje: string, ticketId: string, totales: TotalesTicket | null) {
+    super(mensaje, ticketId, totales, "envio");
     this.name = "ErrorEnvioNoFijado";
   }
 }
@@ -62,7 +83,14 @@ function modifsJsonb(linea: LineaCarrito): { opcion_modificador_id: string; cant
   return linea.modificadores.map((m) => ({ opcion_modificador_id: m.opcionId, cantidad: m.cantidad }));
 }
 
-/** Persiste el ticket completo (abrir + items) y devuelve los totales autoritativos de la BD. */
+/**
+ * Persiste el ticket completo (abrir + items) y devuelve los totales autoritativos de la BD.
+ *
+ * Es REINTENTABLE con el mismo `ticketClientId` y las mismas líneas: `abrir_ticket` devuelve el
+ * ticket existente para ese `client_id_local`, y `agregar_item_a_ticket`/`agregar_combo_a_ticket`
+ * ignoran un renglón cuyo `client_id_local` ya entró. Por eso un fallo a medias se completa
+ * volviendo a llamar, en vez de abrir un segundo ticket.
+ */
 export async function persistirTicket(
   ctx: CtxCobro,
   modoServicio: ModoServicio,
@@ -89,20 +117,31 @@ export async function persistirTicket(
   if (e1) throw new Error(e1.message);
   const tid = ticketId as string;
 
+  // Desde aquí el ticket existe: cualquier fallo sale como ErrorTicketParcial con su id.
+  const parcial = async (mensaje: string, fase: FaseTicketParcial): Promise<never> => {
+    const totales = await leerTotales(ctx.token, tid).catch(() => null);
+    throw new ErrorTicketParcial(mensaje, tid, totales, fase);
+  };
+
+  // Los tres `update` revisan `error` (auditoría B2-4): la nota general es donde van las
+  // alergias, y un fallo silencioso aquí mandaba la orden a cocina sin ella.
   // Domicilio: persistir QUÉ dirección del cliente es la entrega (requiere cliente_id, ya puesto).
   if (direccionEntregaId && clienteId) {
-    await sb.from("tickets").update({ direccion_entrega_id: direccionEntregaId }).eq("id", tid);
+    const { error } = await sb.from("tickets").update({ direccion_entrega_id: direccionEntregaId }).eq("id", tid);
+    if (error) await parcial(`No se guardó la dirección de entrega: ${error.message}`, "encabezado");
   }
 
   // Pick-up: nombre suelto para identificar la cuenta. Etiqueta del ticket, no un cliente
   // registrado (no se toca `clientes` ni `cliente_id`).
   if (nombreCliente?.trim()) {
-    await sb.from("tickets").update({ nombre_cliente: nombreCliente.trim().slice(0, 100) }).eq("id", tid);
+    const { error } = await sb.from("tickets").update({ nombre_cliente: nombreCliente.trim().slice(0, 100) }).eq("id", tid);
+    if (error) await parcial(`No se guardó el nombre de la cuenta: ${error.message}`, "encabezado");
   }
 
   // Nota de cocina de TODA la orden → tickets.nota_general (la lee el KDS y la comanda).
   if (notaOrden?.trim()) {
-    await sb.from("tickets").update({ nota_general: notaOrden.trim(), nota_imprime_en_comanda: true }).eq("id", tid);
+    const { error } = await sb.from("tickets").update({ nota_general: notaOrden.trim(), nota_imprime_en_comanda: true }).eq("id", tid);
+    if (error) await parcial(`No se guardó la nota de la orden: ${error.message}`, "encabezado");
   }
 
   for (const l of lineas) {
@@ -124,7 +163,7 @@ export async function persistirTicket(
           p_modificadores: modifsJsonb(l),
           p_client_id_local: l.clientId,
         });
-    if (error) throw new Error(error.message);
+    if (error) await parcial(`No se guardó «${l.producto.nombre}»: ${error.message}`, "renglones");
   }
 
   // El envío entra DESPUÉS del bucle de renglones: fijar_envio_ticket hereda la tasa de IVA y el

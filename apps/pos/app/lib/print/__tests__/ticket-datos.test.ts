@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { foldearHijosEnPadre, SELECCION_TICKET_ITEMS_IMPRESION } from "../ticket-datos";
+import { foldearHijosEnPadre, SELECCION_TICKET_ITEMS_IMPRESION, urlAutofactura } from "../ticket-datos";
 import type { LineaImpresion } from "../tipos";
 
 /** Fixture mínima: solo llena lo que cada caso necesita, el resto son valores neutros. */
@@ -94,5 +94,24 @@ describe("foldearHijosEnPadre", () => {
 describe("SELECCION_TICKET_ITEMS_IMPRESION — la proyección que pide leerTicketParaImpresion", () => {
   it("incluye cargo_tipo: sin este campo el ticket pierde de dónde sale cargoTipo", () => {
     expect(SELECCION_TICKET_ITEMS_IMPRESION).toContain("cargo_tipo");
+  });
+});
+
+describe("urlAutofactura — el QR lleva el token del ticket (auditoría 30/09/2026, C1-4)", () => {
+  it("con token: folio + t, sin más", () => {
+    expect(urlAutofactura("knockout-dev", "KO1C-2026-000130", "oHXZ0mOEW2qggLEN")).toBe(
+      "https://factura.vimpos.com.mx/knockout-dev?folio=KO1C-2026-000130&t=oHXZ0mOEW2qggLEN",
+    );
+  });
+  it("sin token (escritorio sin secreto o fallo de la consulta): solo el folio; el portal pide el total", () => {
+    expect(urlAutofactura("knockout-dev", "KO1C-2026-000130", null)).toBe(
+      "https://factura.vimpos.com.mx/knockout-dev?folio=KO1C-2026-000130",
+    );
+  });
+  it("un token con otra forma no se imprime (no se promete un QR que el portal va a rechazar)", () => {
+    expect(urlAutofactura("knockout-dev", "F-1", "corto")).toBe("https://factura.vimpos.com.mx/knockout-dev?folio=F-1");
+  });
+  it("escapa el código y el folio", () => {
+    expect(urlAutofactura(null, "A&B", null)).toBe("https://factura.vimpos.com.mx/negocio?folio=A%26B");
   });
 });

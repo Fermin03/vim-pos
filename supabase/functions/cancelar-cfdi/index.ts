@@ -14,6 +14,11 @@
 // resto de la API, pero la cancelación de verdad hay que probarla en producción con un comprobante
 // real antes de dársela a un cliente.
 //
+// `pac_referencia` (lo que se cancela ante el SAT) ya no lo puede reescribir un usuario: desde la
+// 0135 `tickets_cfdi` es de solo lectura para `authenticated`. Antes, cualquier empleado podía
+// poner en su fila la referencia de la factura de OTRO cliente y un admin la cancelaba aquí
+// (auditoría 30/09/2026, C1-3). Por lo mismo, el resultado se asienta con service_role.
+//
 // Local: supabase functions serve cancelar-cfdi --env-file supabase/functions/.env
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import { corsHeaders } from "../_shared/cors.ts";
@@ -78,7 +83,7 @@ Deno.serve(async (req) => {
     .eq("usuario_id", u.user.id)
     .eq("tenant_id", cfdi.tenant_id)
     .eq("activo", true);
-  const roles = ((acc ?? []) as { rol: { codigo: string } | null }[]).map((a) => a.rol?.codigo).filter(Boolean) as string[];
+  const roles = ((acc ?? []) as unknown as { rol: { codigo: string } | null }[]).map((a) => a.rol?.codigo).filter(Boolean) as string[];
   if (!roles.some((r) => ROLES_CANCELA.includes(r))) {
     return json({ error: "SIN_PERMISO", detalle: "Solo DUEÑO/ADMIN pueden cancelar" }, 403);
   }
@@ -100,14 +105,16 @@ Deno.serve(async (req) => {
   const pac = obtenerFacturama();
   if (!pac) return json({ error: "PAC_NO_CONFIGURADO" }, 503);
 
+  const admin = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!, { auth: { persistSession: false } });
+
   const res = await pac.cancelar(cfdi.pac_referencia, motivo, body.uuid_sustituto);
   if (!res.ok) {
-    await sb.rpc("cfdi_registrar_cancelacion", {
+    await admin.rpc("cfdi_registrar_cancelacion", {
       p_cfdi_id: cfdiId,
       p_estado: "CANCELACION_RECHAZADA",
       p_motivo: motivo,
       p_pac_mensaje: res.mensaje,
-      p_response_payload: { codigo: res.codigo },
+      p_response_payload: { codigo: res.codigo, usuario_id: u.user.id },
     });
     return json({ ok: false, error: res.codigo, mensaje: res.mensaje }, 400);
   }
@@ -132,7 +139,6 @@ Deno.serve(async (req) => {
   // El acuse se archiva SOLO cuando hay cancelación: guardar como acuse otra cosa es mentir.
   const rutaAcuse = confirmada && acuse ? `cfdi/${cfdiId}-acuse.xml` : null;
   if (rutaAcuse && acuse) {
-    const admin = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!, { auth: { persistSession: false } });
     const archivo = await archivarCfdi(cfdiId, { acuse }, subidorSupabase(admin));
     if (archivo.errores.length) console.error(`[cancelar] ${cfdiId} acuse sin archivar: ${archivo.errores.join("; ")}`);
   }
@@ -143,13 +149,13 @@ Deno.serve(async (req) => {
     : rechazada
       ? `El receptor rechazó la cancelación${res.mensaje ? ` · ${res.mensaje}` : ""}`
       : `Solicitud enviada, en espera del receptor${res.mensaje ? ` · ${res.mensaje}` : ""}`;
-  const { error: rErr } = await sb.rpc("cfdi_registrar_cancelacion", {
+  const { error: rErr } = await admin.rpc("cfdi_registrar_cancelacion", {
     p_cfdi_id: cfdiId,
     p_estado: estadoFinal,
     p_motivo: motivo,
     p_acuse_storage_path: rutaAcuse,
     p_pac_mensaje: mensajePac,
-    p_response_payload: { status: res.statusPac, mensaje: res.mensaje, respuesta: res.cuerpo.slice(0, 2000) },
+    p_response_payload: { status: res.statusPac, mensaje: res.mensaje, respuesta: res.cuerpo.slice(0, 2000), usuario_id: u.user.id },
   });
   if (rErr) return json({ error: "NO_SE_REGISTRO", detalle: rErr.message }, 500);
 

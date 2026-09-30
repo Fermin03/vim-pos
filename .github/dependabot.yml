@@ -1,0 +1,52 @@
+# Actualizaciones de dependencias (Auditoría integral 30/09/2026, hallazgo E-5e).
+#
+# Antes nadie avisaba de una versión con CVE: se descubrían al correr `pnpm audit` a mano, y así
+# el escritorio llegó a producción con un Electron vulnerable. Dependabot abre PRs que pasan por
+# el mismo CI (typecheck, build, pruebas, smokes, auditoría bloqueante).
+#
+# Semanal y AGRUPADO para no inundar: un PR por ecosistema con todos los parches/menores, y los
+# saltos de versión mayor aparte (esos rompen y se revisan uno por uno). Las alertas de seguridad
+# (security updates) no esperan a la semana: Dependabot las abre en cuanto se publican.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      timezone: America/Mexico_City
+    # Las acciones van pinneadas por SHA (CN-015); Dependabot sube el SHA y el comentario del tag.
+    groups:
+      acciones:
+        patterns: ["*"]
+
+  # Monorepo pnpm (apps/*, packages/*). El ecosistema "npm" de Dependabot entiende pnpm-lock.yaml.
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      timezone: America/Mexico_City
+    open-pull-requests-limit: 5
+    groups:
+      web-menores:
+        update-types: ["minor", "patch"]
+      web-mayores:
+        update-types: ["major"]
+
+  # Escritorio (npm con package-lock.json propio). Electron va en su propio grupo: su binario viaja
+  # en el instalador y un salto de Electron cambia el Node que ejecuta la caja (ver job `desktop`
+  # del CI y la lista "Antes de empaquetar" de desktop/RUNBOOK.md).
+  - package-ecosystem: npm
+    directory: /desktop
+    schedule:
+      interval: weekly
+      day: monday
+      timezone: America/Mexico_City
+    open-pull-requests-limit: 5
+    groups:
+      electron:
+        patterns: ["electron", "electron-builder"]
+      escritorio-menores:
+        update-types: ["minor", "patch"]
+        exclude-patterns: ["electron", "electron-builder"]

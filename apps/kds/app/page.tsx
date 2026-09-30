@@ -1,12 +1,12 @@
 "use client";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
-  deviceEmail,
   deviceSignIn,
   deviceSignOut,
-  deviceToken,
+  sesionDispositivo,
   cajaIdFromEmail,
-  leerCreds,
+  leerCredsLegadas,
+  guardarIdent,
   olvidarCreds,
   leerCaja,
   type CajaKds,
@@ -39,6 +39,13 @@ const CONFIRMAR_DESVINCULAR = {
   boton: "Desvincular",
 };
 
+/** ¿El fallo es "no llegué a la caja" (y no "la caja dijo que no")? Mismo criterio que la
+ *  pantalla de vinculación. */
+function esErrorDeRed(e: unknown): boolean {
+  const msg = e instanceof Error ? `${e.name} ${e.message}` : String(e);
+  return /fetch|network|load failed|ECONN|timeout|abort|NetworkError|ErrorHubSinRespuesta/i.test(msg);
+}
+
 /** Corre una promesa con límite de tiempo (evita que una llamada al hub caído cuelgue el arranque). */
 function conTimeout<T>(p: Promise<T>, ms: number): Promise<T> {
   return Promise.race([
@@ -54,37 +61,43 @@ export default function Page() {
 
   const entrarCocina = useCallback(async () => {
     try {
-      // 1) Con credenciales guardadas: re-login FRESCO (llamada de red con timeout). Evita
-      //    getSession()/refresh que se cuelga sin timeout si el hub no responde.
-      const creds = leerCreds();
-      let email: string | null = null;
-      if (creds) {
-        await conTimeout(deviceSignIn(creds.email, creds.password), TIMEOUT_MS);
-        email = creds.email;
-      } else {
-        // Sin credenciales guardadas: ¿hay una sesión viva? (caso borde). Con timeout por si acaso.
-        email = await conTimeout(deviceEmail(), TIMEOUT_MS).catch(() => null);
+      // 1) Sesión persistida de supabase-js (SEC CN-006, B2-5). Ya no se re-loguea con una
+      //    contraseña guardada: el deviceClient de cocina aborta las llamadas de auth que tardan
+      //    (fetchConTimeoutAuth), así que getSession()/refresh no se cuelgan con el hub caído.
+      //    `sesionDispositivo` lanza si el hub no contestó → "reconectando"; null → vincular.
+      let s = await conTimeout(sesionDispositivo(), TIMEOUT_MS);
+      // 2) Migración de teles ya instaladas: traen la contraseña del formato viejo. Si no hay
+      //    sesión viva, se usa UNA vez para abrirla; en cuanto hay sesión, `guardarIdent` la borra.
+      if (!s) {
+        const legadas = leerCredsLegadas();
+        if (legadas) {
+          try {
+            await conTimeout(deviceSignIn(legadas.email, legadas.password), TIMEOUT_MS);
+            s = await conTimeout(sesionDispositivo(), TIMEOUT_MS);
+          } catch (e) {
+            // Hub caído: se conserva la contraseña legada para el siguiente intento.
+            if (esErrorDeRed(e)) throw e;
+            // La caja la rechazó (clave rotada): ya no sirve; se olvida y se pide vincular.
+            guardarIdent({ email: legadas.email });
+            s = null;
+          }
+        }
       }
       if (!activo.current) return;
-      if (!email) {
+      if (!s) {
         setEstado({ paso: "vincular" });
         return;
       }
+      guardarIdent({ email: s.email }); // hay sesión: fuera cualquier contraseña del disco
       // 2) Caja del dispositivo → sucursal → comandas.
-      const cid = cajaIdFromEmail(email);
+      const cid = cajaIdFromEmail(s.email);
       if (!cid) {
         setEstado({ paso: "sin-caja" });
         return;
       }
-      const tok = await conTimeout(deviceToken(), TIMEOUT_MS);
+      const caja = await conTimeout(leerCaja(s.token, cid), TIMEOUT_MS);
       if (!activo.current) return;
-      if (!tok) {
-        setEstado({ paso: "vincular" });
-        return;
-      }
-      const caja = await conTimeout(leerCaja(tok, cid), TIMEOUT_MS);
-      if (!activo.current) return;
-      setEstado({ paso: "cocina", token: tok, caja });
+      setEstado({ paso: "cocina", token: s.token, caja });
     } catch {
       // Hub caído / sin red / credenciales que ya no responden → reconectar solo.
       if (activo.current) setEstado({ paso: "reconectando", msg: "No se pudo conectar con la caja. Reintentando…" });

@@ -1,6 +1,7 @@
 "use client";
 import { z } from "zod";
 import { employeeClient } from "./supabase";
+import { redondearCentavos } from "./dinero";
 
 export type TipoDescuento = "PORCENTAJE" | "MONTO_FIJO" | "CORTESIA_TOTAL" | "OVERRIDE_PRECIO";
 export type MotivoDescuento =
@@ -87,12 +88,12 @@ export async function aplicarDescuento(
  *  §3, ADR 0017): la base lo excluye en `aplicar_descuento_manual`, así que la vista previa también
  *  —si no, el cajero anunciaría un descuento distinto del que se aplica. */
 export function previewDescuento(tipo: TipoDescuento, valor: number, totalActual: number, envioMxn = 0): number {
-  const base = Math.max(0, Math.round((totalActual - Math.max(0, envioMxn)) * 100) / 100);
+  const base = Math.max(0, redondearCentavos(totalActual - Math.max(0, envioMxn)));
   if (tipo === "CORTESIA_TOTAL") return base; // 100% off de la comida
-  if (tipo === "OVERRIDE_PRECIO") return Math.max(0, Math.round((base - Math.max(0, valor)) * 100) / 100);
+  if (tipo === "OVERRIDE_PRECIO") return Math.max(0, redondearCentavos(base - Math.max(0, valor)));
   if (!valor || valor <= 0) return 0;
   const m = tipo === "PORCENTAJE" ? (base * Math.min(valor, 100)) / 100 : Math.min(valor, base);
-  return Math.round(m * 100) / 100;
+  return redondearCentavos(m);
 }
 
 /** Lo que el ticket cobra de envío (renglones de cargo vivos). 0 si no hay. Alimenta la vista
@@ -106,5 +107,5 @@ export async function leerEnvioDelTicket(token: string, ticketId: string): Promi
     .not("cargo_tipo", "is", null);
   if (error) throw new Error(error.message);
   const filas = z.array(z.object({ total_item_mxn: z.union([z.number(), z.string()]) })).parse(data ?? []);
-  return Math.round(filas.reduce((acc, f) => acc + Number(f.total_item_mxn) * 100, 0)) / 100;
+  return redondearCentavos(filas.reduce((acc, f) => acc + Number(f.total_item_mxn), 0));
 }

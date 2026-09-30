@@ -4,7 +4,14 @@
 //   1) valida el JWT del llamante (debe ser DUEÑO/ADMIN del tenant),
 //   2) carga el borrador (RLS del llamante),
 //   3) llama al PAC (mock en dev / Facturapi @sin-verificar en prod),
-//   4) marca TIMBRADO o ERROR con el JWT del llamante (auth.uid() = admin, respeta RLS).
+//   4) marca TIMBRADO o ERROR con service_role (0135: `tickets_cfdi` ya no es escribible por
+//      los usuarios y las `cfdi_marcar_*` solo las ejecuta service_role; quién lo pidió queda en
+//      `usuario_id` del payload del movimiento).
+//
+// El emisor (Issuer.Rfc) es SIEMPRE `tenant_cfdi_emisor.rfc_verificado`, que solo escribe
+// `cargar-csd` tras cargar el sello con éxito. Facturama Multiemisor es una cuenta compartida y
+// elige el sello por ese RFC: tomarlo de algo que el cliente escribe permitía timbrar con el sello
+// de otro cliente de VIM (auditoría 30/09/2026, C1-1).
 //
 // Local: supabase functions serve timbrar-cfdi --env-file supabase/functions/.env
 import { createClient } from "jsr:@supabase/supabase-js@2";
@@ -12,6 +19,7 @@ import { corsHeaders } from "../_shared/cors.ts";
 import { timbrarConFailover, obtenerFacturama } from "../_shared/pac/index.ts";
 import { armarConceptos, ConceptosIncoherentes, type LineaTicket } from "../_shared/pac/conceptos.ts";
 import { archivarCfdi, subidorSupabase } from "../_shared/pac/archivo.ts";
+import { resolverEmisorVerificado } from "../_shared/pac/emisor.ts";
 
 const ROLES_FACTURA = ["DUENO", "ADMIN"];
 
@@ -36,6 +44,9 @@ Deno.serve(async (req) => {
 
   const { data: u, error: uErr } = await sb.auth.getUser(token);
   if (uErr || !u?.user) return json({ error: "AUTH_INVALIDA" }, 401);
+  // Escrituras de lo que respondió el PAC: con service_role (ver cabecera). Solo se usa DESPUÉS de
+  // comprobar con el cliente del usuario que el CFDI es de su tenant y que es DUEÑO/ADMIN ahí.
+  const admin = createClient(url, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!, { auth: { persistSession: false } });
 
   let body: { cfdi_id?: string };
   try {
@@ -71,13 +82,21 @@ Deno.serve(async (req) => {
     .from("usuarios_acceso")
     .select("rol:roles(codigo)")
     .eq("usuario_id", u.user.id)
-    .eq("tenant_id", (cfdi as { tenant_id: string }).tenant_id)
+    .eq("tenant_id", (cfdi as unknown as { tenant_id: string }).tenant_id)
     .eq("activo", true);
-  const roles = ((acc ?? []) as { rol: { codigo: string } | null }[])
+  const roles = ((acc ?? []) as unknown as { rol: { codigo: string } | null }[])
     .map((a) => a.rol?.codigo)
     .filter(Boolean) as string[];
   if (!roles.some((r) => ROLES_FACTURA.includes(r))) {
     return json({ error: "SIN_PERMISO", detalle: "Solo DUEÑO/ADMIN pueden facturar" }, 403);
+  }
+  const tenantDelCfdi = (cfdi as unknown as { tenant_id: string }).tenant_id;
+  // Sin el add-on CFDI no se timbra (C1-5): mismo criterio que el portal de autofactura.
+  // Con service_role: `tenant_addon_activo` no es ejecutable por usuarios desde la 0132 (era un
+  // oráculo). El tenant ya se validó arriba contra el rol del llamante.
+  const { data: addonActivo } = await admin.rpc("tenant_addon_activo", { p_tenant_id: tenantDelCfdi, p_codigo: "CFDI" });
+  if (addonActivo !== true) {
+    return json({ error: "SIN_ADDON_CFDI", detalle: "La facturación no está contratada para este negocio. Contacta a VIM." }, 403);
   }
   // Servicio suspendido: no se timbra (ADR 0014, entrega 2).
   //
@@ -99,19 +118,28 @@ Deno.serve(async (req) => {
   // facturación a nadie que ya la usa con el modo viejo en "Pruebas".
   const { data: emisorEstado } = await sb
     .from("tenant_cfdi_emisor")
-    .select("estado")
-    .eq("tenant_id", (cfdi as { tenant_id: string }).tenant_id)
+    .select("estado, rfc, rfc_verificado")
+    .eq("tenant_id", tenantDelCfdi)
     .maybeSingle();
-  if ((emisorEstado as { estado?: string } | null)?.estado === "INACTIVO") {
+  const emisorFila = emisorEstado as { estado?: string; rfc?: string | null; rfc_verificado?: string | null } | null;
+  if (emisorFila?.estado === "INACTIVO") {
     return json({ error: "FACTURACION_PAUSADA", detalle: "La facturación está pausada. Reanúdala en Configuración → Facturación." }, 409);
   }
+  // El RFC del borrador y el de la configuración tienen que ser el del sello cargado.
+  const emisorRfc = resolverEmisorVerificado(emisorFila?.rfc_verificado, [
+    emisorFila?.rfc,
+    (cfdi as unknown as { emisor_rfc?: string | null }).emisor_rfc,
+  ]);
+  if (!emisorRfc.ok) return json({ ok: false, error: emisorRfc.error, mensaje: emisorRfc.mensaje }, 409);
 
-  if (cfdi.estado_sat === "TIMBRADO") return json({ error: "YA_TIMBRADO" }, 409);
-  if (cfdi.estado_sat !== "BORRADOR" && cfdi.estado_sat !== "ERROR_TIMBRADO") {
-    return json({ error: "ESTADO_NO_TIMBRABLE", estado: cfdi.estado_sat }, 409);
+  // El select lleva embebidos con alias que el inferidor de supabase-js no sabe tipar
+  // (GenericStringError): se nombra la forma una vez, en vez de castear en cada uso.
+  const c = cfdi as unknown as Record<string, unknown> & { estado_sat: string };
+  if (c.estado_sat === "TIMBRADO") return json({ error: "YA_TIMBRADO" }, 409);
+  if (c.estado_sat !== "BORRADOR" && c.estado_sat !== "ERROR_TIMBRADO") {
+    return json({ error: "ESTADO_NO_TIMBRABLE", estado: c.estado_sat }, 409);
   }
 
-  const c = cfdi as Record<string, unknown>;
   const num = (v: unknown) => Number(v ?? 0);
 
   // Llamar al PAC con redundancia (Fase 4): principal → respaldo solo ante fallo de transporte.
@@ -147,7 +175,7 @@ Deno.serve(async (req) => {
     .order("orden_visualizacion", { ascending: true });
   if (iErr) return json({ error: "ITEMS_ERROR", detalle: iErr.message }, 500);
 
-  const lineas: LineaTicket[] = ((filas ?? []) as Record<string, unknown>[]).map((f) => ({
+  const lineas: LineaTicket[] = ((filas ?? []) as unknown as Record<string, unknown>[]).map((f) => ({
     id: String(f.id),
     parentId: (f.parent_item_id as string) ?? null,
     comboRol: (f.combo_rol as "PADRE" | "HIJO" | null) ?? null,
@@ -181,7 +209,7 @@ Deno.serve(async (req) => {
   const { data: saldoRaw } = await sb
     .from("tenant_folios_saldo")
     .select("folios_base_mensuales, folios_base_consumidos, saldo_paquetes")
-    .eq("tenant_id", (cfdi as { tenant_id: string }).tenant_id)
+    .eq("tenant_id", tenantDelCfdi)
     .maybeSingle();
   const saldo = saldoRaw as { folios_base_mensuales: number; folios_base_consumidos: number; saldo_paquetes: number } | null;
   const foliosDisponibles = saldo
@@ -202,11 +230,11 @@ Deno.serve(async (req) => {
     // Datos incoherentes: no se reintenta ni se timbra "de todos modos". Se registra el error en
     // el CFDI para que quede rastro y alguien lo revise, porque el ticket ya se cobró.
     if (e instanceof ConceptosIncoherentes) {
-      await sb.rpc("cfdi_marcar_error", {
+      await admin.rpc("cfdi_marcar_error", {
         p_cfdi_id: cfdiId,
         p_codigo_error: "CONCEPTOS_INCOHERENTES",
         p_mensaje_error: e.message,
-        p_request_payload: { renglones: lineas.length, total_ticket: num(c.total_mxn) },
+        p_request_payload: { renglones: lineas.length, total_ticket: num(c.total_mxn), usuario_id: u.user.id },
         p_response_payload: {},
       });
       return json({ ok: false, estado: "ERROR_TIMBRADO", error: "CONCEPTOS_INCOHERENTES", mensaje: e.message }, 422);
@@ -218,7 +246,7 @@ Deno.serve(async (req) => {
     cfdiId: String(c.id),
     tipoComprobante: String(c.tipo_comprobante),
     emisor: {
-      rfc: String(c.emisor_rfc),
+      rfc: emisorRfc.rfc,
       razonSocial: String(c.emisor_razon_social),
       regimenFiscal: String(c.emisor_regimen_fiscal),
       lugarExpedicion: String(c.emisor_lugar_expedicion),
@@ -247,11 +275,11 @@ Deno.serve(async (req) => {
   });
 
   if (!res.ok) {
-    await sb.rpc("cfdi_marcar_error", {
+    await admin.rpc("cfdi_marcar_error", {
       p_cfdi_id: cfdiId,
       p_codigo_error: res.codigoError,
       p_mensaje_error: res.mensajeError,
-      p_request_payload: { pac: res.pacUsado, failover: res.failover },
+      p_request_payload: { pac: res.pacUsado, failover: res.failover, usuario_id: u.user.id },
       p_response_payload: res.responsePayload,
     });
     return json({ ok: false, estado: "ERROR_TIMBRADO", error: res.codigoError, mensaje: res.mensajeError }, 502);
@@ -262,7 +290,7 @@ Deno.serve(async (req) => {
   const xmlPath = `cfdi/${cfdiId}.xml`;
   const pdfPath = `cfdi/${cfdiId}.pdf`;
 
-  const { error: tErr } = await sb.rpc("cfdi_marcar_timbrado", {
+  const { error: tErr } = await admin.rpc("cfdi_marcar_timbrado", {
     p_cfdi_id: cfdiId,
     p_uuid_fiscal: res.uuidFiscal,
     p_serie: res.serie,
@@ -273,7 +301,7 @@ Deno.serve(async (req) => {
     p_pdf_storage_path: pdfPath,
     p_pac_referencia: res.pacReferencia,
     p_pac_costo_centavos: res.costoCentavos,
-    p_request_payload: { pac: res.pacUsado, failover: res.failover },
+    p_request_payload: { pac: res.pacUsado, failover: res.failover, usuario_id: u.user.id },
     p_response_payload: res.responsePayload,
   });
   if (tErr) return json({ error: "MARCAR_TIMBRADO_ERROR", detalle: tErr.message }, 500);
@@ -284,7 +312,6 @@ Deno.serve(async (req) => {
   // privado `cfdi` con service_role (el bucket no tiene políticas para usuarios). Si algo falla,
   // el CFDI sigue timbrado y `descargar-cfdi` los repone del PAC cuando alguien los pida.
   if (pac && res.pacReferencia) {
-    const admin = createClient(url, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!, { auth: { persistSession: false } });
     const [xml, pdf] = await Promise.all([pac.descargar(res.pacReferencia, "xml"), pac.descargar(res.pacReferencia, "pdf")]);
     const archivo = await archivarCfdi(cfdiId, { xml, pdf }, subidorSupabase(admin));
     if (archivo.errores.length) console.error(`[cfdi] ${cfdiId} archivo incompleto: ${archivo.errores.join("; ")}`);
@@ -306,14 +333,14 @@ Deno.serve(async (req) => {
   // cae en OTRO en vez de reventar el update.
   const PAC_EN_BD = ["FACTURAPI", "SOLUCIONFACTIBLE", "FINKOK", "EDICOM", "PRODIGIA", "FACTURAMA"];
   const pacReal = PAC_EN_BD.includes(res.pacUsado) ? res.pacUsado : "OTRO";
-  await sb.from("tickets_cfdi").update({ pac_proveedor: pacReal }).eq("id", cfdiId);
+  await admin.from("tickets_cfdi").update({ pac_proveedor: pacReal }).eq("id", cfdiId).eq("tenant_id", tenantDelCfdi);
 
   // El CFDI ya existe ante el SAT. Si el descuento falla, NO se deshace el timbrado ni se devuelve
   // error: el comprobante es real y tiene que quedar registrado. Se avisa en la respuesta para que
   // el descuadre se vea en vez de perderse.
   let folioConsumido = true;
-  const { data: consumo, error: cErr2 } = await sb.rpc("consumir_folio_cfdi", {
-    p_tenant_id: (cfdi as { tenant_id: string }).tenant_id,
+  const { data: consumo, error: cErr2 } = await admin.rpc("consumir_folio_cfdi", {
+    p_tenant_id: tenantDelCfdi,
     p_cfdi_id: cfdiId,
     p_es_global: false,
   });
