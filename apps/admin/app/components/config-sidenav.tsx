@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 const SECCIONES_BASE = [
   { titulo: "Negocio", items: [
     { label: "Datos del negocio", href: "/configuracion/negocio" },
+    { label: "Plan y pagos", href: "/configuracion/plan" },
     { label: "Facturación", href: "/configuracion/facturacion" },
   ]},
   { titulo: "Operación", items: [

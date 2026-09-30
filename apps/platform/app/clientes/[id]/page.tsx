@@ -12,6 +12,7 @@ import { PastillaEstado } from "../../components/pastilla-estado";
 import { SaludTenant } from "../../components/salud-tenant";
 import { AvisosCliente } from "../../components/avisos-cliente";
 import { FichaContrato } from "../../components/ficha-contrato";
+import { FichaPagos } from "../../components/ficha-pagos";
 import { FichaFacturacion } from "../../components/ficha-facturacion";
 import { ModulosLimites } from "../../components/modulos-limites";
 import { ZonaPeligrosa } from "../../components/zona-peligrosa";
@@ -98,6 +99,8 @@ export default function FichaCliente() {
   if (!d) return <p className="text-sm text-ink-3">Cargando…</p>;
 
   const t = d.tenant;
+  const suscripcion = ((t.suscripcion as { estado: string; precio_mensual_mxn: number; proxima_fecha_cobro: string | null; ciclo_facturacion?: string }[] | null) ?? [])
+    .find((s) => s.estado === "ACTIVA" || s.estado === "PAUSADA") ?? null;
   const nombre = String(t.nombre_comercial);
   const estado = String(t.estado);
   const plan = t.plan as { codigo?: string; nombre?: string; precio_mensual_mxn?: number } | null;
@@ -160,6 +163,7 @@ export default function FichaCliente() {
 
         <Seccion id="contrato" titulo="Contrato" descripcion="Qué paga, qué tiene contratado y qué puede usar.">
           <FichaContrato d={d} planes={planes} accion={accion} busy={busy} />
+          <FichaPagos api={api} tenantId={id} suscripcion={suscripcion} onCambio={recargar} />
           <ModulosLimites d={d} nombre={nombre} accion={accion} busy={busy} />
         </Seccion>
 
