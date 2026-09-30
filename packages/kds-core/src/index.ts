@@ -9,10 +9,13 @@ export {
   deviceEmail,
   deviceSignOut,
   deviceToken,
+  sesionDispositivo,
+  ErrorHubSinRespuesta,
+  fetchConTimeoutAuth,
   cajaIdFromEmail,
   clienteConToken,
 } from "./cliente";
-export { leerCreds, guardarCreds, olvidarCreds, CREDS_DEV_FIXTURE, type DeviceCreds } from "./device-creds";
+export { leerIdent, leerCredsLegadas, guardarIdent, olvidarCreds, CREDS_DEV_FIXTURE, type DeviceCreds, type DeviceIdent } from "./device-creds";
 export { leerCaja, type CajaKds } from "./caja";
 export {
   leerComandas,

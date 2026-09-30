@@ -1,15 +1,16 @@
 "use client";
 import { useState } from "react";
 import { deviceSignIn } from "./cliente";
-import { guardarCreds, CREDS_DEV_FIXTURE } from "./device-creds";
+import { guardarIdent, leerIdent, CREDS_DEV_FIXTURE } from "./device-creds";
 
 /**
- * Vinculación del dispositivo de cocina. One-time: guarda las credenciales del dispositivo y abre
- * su sesión base contra el hub. Autónomo (sin dependencias de @vim/ui) para que el paquete sea
+ * Vinculación del dispositivo de cocina. One-time: abre su sesión base contra el hub (que
+ * supabase-js persiste y refresca) y recuerda SOLO el correo — la contraseña nunca toca el disco
+ * (SEC CN-006, B2-5). Si la sesión se pierde, esta pantalla vuelve con el correo puesto. Autónomo (sin dependencias de @vim/ui) para que el paquete sea
  * consumible por cualquier app. En producción CREDS_DEV_FIXTURE es null (no prellena credenciales).
  */
 export function VincularDispositivo({ onVinculado }: { onVinculado: () => void }) {
-  const [email, setEmail] = useState(CREDS_DEV_FIXTURE?.email ?? "");
+  const [email, setEmail] = useState(() => leerIdent()?.email ?? CREDS_DEV_FIXTURE?.email ?? "");
   const [password, setPassword] = useState(CREDS_DEV_FIXTURE?.password ?? "");
   const [error, setError] = useState<string | null>(null);
   const [cargando, setCargando] = useState(false);
@@ -18,8 +19,8 @@ export function VincularDispositivo({ onVinculado }: { onVinculado: () => void }
     setCargando(true);
     setError(null);
     try {
-      await deviceSignIn(email.trim(), password);
-      guardarCreds({ email: email.trim(), password });
+      const entro = await deviceSignIn(email.trim(), password);
+      guardarIdent({ email: entro });
       onVinculado();
     } catch (e) {
       // Distinguir "no llegué a la caja" de "la caja dijo que no". Culpar siempre a las credenciales

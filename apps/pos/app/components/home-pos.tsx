@@ -26,7 +26,7 @@ import {
 } from "../lib/carrito";
 import { listarCombos, combosQueAdmiten, diferencialCombo, type ComboDef } from "../lib/combos";
 import { obtenerGruposDeProducto, type GrupoModificadores } from "../lib/modificadores";
-import { persistirTicket, leerTotales, cambiarZonaDePedido, ErrorEnvioNoFijado, type TotalesTicket } from "../lib/cobro";
+import { persistirTicket, leerTotales, cambiarZonaDePedido, ErrorEnvioNoFijado, ErrorTicketParcial, type TotalesTicket } from "../lib/cobro";
 import { SidebarTicket } from "./sidebar-ticket";
 import { ModalModificadores } from "./modal-modificadores";
 import { ModalCombo } from "./modal-combo";
@@ -80,6 +80,7 @@ import { abrirCuentaEnMesa, agregarComboAlTicket, agregarItemAlTicket, reconstru
 import { atribuirMesero, contarPendientesCocina, enviarACocina, yaEnviadoACocina } from "../lib/mesero";
 import { useConexion } from "../lib/conexion";
 import { cacheGet, cachePut, contarPendientes } from "../lib/outbox";
+import { claveCatalogo, esErrorDeRed } from "../lib/catalogo-cache";
 import { sincronizar } from "../lib/sync";
 import { notificarEventoCritico } from "../lib/push-eventos";
 import type { DatosTicketImpresion } from "../lib/print/tipos";
@@ -164,6 +165,10 @@ export function HomePos({
   const hayDelivery = modulos?.delivery_apps === true;
   // F16 — estado de conexión (avisa al cajero si se cae la red).
   const { online } = useConexion(SUPABASE_URL ? `${SUPABASE_URL}/auth/v1/health` : undefined);
+  // En ref para que `recargarCatalogo` lo consulte sin recrearse (y recargar el menú) cada vez
+  // que la conexión parpadea.
+  const onlineRef = useRef(online);
+  onlineRef.current = online;
   // Fase 3 — outbox offline: pendientes por sincronizar + auto-sync al reconectar.
   const [pendientesSync, setPendientesSync] = useState(0);
   const sincronizando = useRef(false);
@@ -246,6 +251,24 @@ export function HomePos({
   // Ticket ya persistido en BD por el flujo de descuento. Mientras exista, el carrito
   // queda comprometido (bloqueado) y el cobro reusa este mismo ticket (no re-persiste).
   const [ticketBd, setTicketBd] = useState<TotalesTicket | null>(null);
+  /**
+   * Auditoría integral 30/09/2026 (B2-3) — `client_id_local` del ticket de ESTE carrito.
+   *
+   * Antes cada intento de persistir mandaba un `nuevoClientId()`: si un renglón fallaba después
+   * de `abrir_ticket`, el reintento abría OTRO ticket y el primero quedaba ABIERTO, huérfano,
+   * trabando el corte. Con un id fijo por carrito, `abrir_ticket` devuelve el mismo ticket y los
+   * renglones que ya entraron no se duplican (su propio `client_id_local`). Se suelta cuando el
+   * carrito queda vacío (venta cobrada, cancelada, puesta en espera o limpiada).
+   */
+  const ticketClientIdRef = useRef<string | null>(null);
+  const idTicketDelCarrito = (): string => (ticketClientIdRef.current ??= nuevoClientId());
+  /**
+   * El `ticketBd` adoptado tras un `ErrorTicketParcial` que NO es de envío: el ticket existe pero le
+   * falta algo (un renglón, la nota…). Mientras sea `true` el carrito sigue bloqueado —para que el
+   * reintento mande exactamente las mismas líneas— y todo camino que persiste vuelve a llamar a
+   * `persistirTicket` (idempotente) en vez de reusar el ticket incompleto.
+   */
+  const [ticketIncompleto, setTicketIncompleto] = useState(false);
   // T2 — modo "cuenta por mesa": el carrito refleja un ticket persistido y los taps agregan
   // incrementalmente. Sólo se activa al abrir/retomar una mesa; QS no cambia.
   const [enModoMesa, setEnModoMesa] = useState(false);
@@ -324,11 +347,14 @@ export function HomePos({
       // Mismo motivo que la línea de arriba. `true` porque encendido es el default de la
       // columna (ver catalogo.ts) y es lo menos sorprendente si la consulta falla.
       setUpsellActivo(await leerComboUpsellActivo(token).catch(() => true));
-      // Fase 3 — cache de lectura: el menú sobrevive sin red (recargas offline).
-      cachePut("catalogo", { categorias: cs, productos: ps });
+      // Fase 3 — cache de lectura: el menú sobrevive sin red (recargas offline). La clave lleva
+      // negocio y sucursal (B2-6): una caja revinculada no pinta el menú de la anterior.
+      cachePut(claveCatalogo(caja.tenant_id, caja.sucursal_id), { categorias: cs, productos: ps });
     } catch (e) {
-      // Sin red: servir el catálogo desde el cache local (Dexie).
-      const cacheado = await cacheGet<{ categorias: Categoria[]; productos: Producto[] }>("catalogo");
+      // SOLO sin red se sirve el catálogo desde el cache local (Dexie). Un error de verdad (RLS,
+      // sesión, esquema) se deja ver: taparlo con un menú viejo escondía el problema.
+      if (!esErrorDeRed(e, onlineRef.current)) throw e;
+      const cacheado = await cacheGet<{ categorias: Categoria[]; productos: Producto[] }>(claveCatalogo(caja.tenant_id, caja.sucursal_id));
       if (cacheado) {
         setCategorias(cacheado.categorias);
         setProductos(cacheado.productos);
@@ -337,7 +363,7 @@ export function HomePos({
       }
       throw e;
     }
-  }, [token]);
+  }, [token, caja.tenant_id, caja.sucursal_id]);
 
   useEffect(() => {
     let activo = true;
@@ -842,18 +868,38 @@ export function HomePos({
   }, [token, ticketBd, cocinaEnviada, imprimirComandaCocina, volverAtras]);
 
   /**
-   * Si `persistirTicket` falló DESPUÉS de abrir el ticket (el envío no se pudo fijar), ese ticket
-   * ya existe ABIERTO: la pantalla lo adopta como `ticketBd` ANTES de mostrar el error, para que el
-   * reintento lo reuse en vez de abrir otro y dejar el primero huérfano trabando el corte. El
-   * carrito conserva su envío a propósito: tocar ese renglón fija la zona sobre el ticket ya
-   * persistido (`cambiarZonaPedido`). Devuelve el mensaje que hay que mostrar.
+   * Si `persistirTicket` falló DESPUÉS de abrir el ticket, ese ticket ya existe en la base: la
+   * pantalla lo adopta como `ticketBd` ANTES de mostrar el error, para que la guarda de salida lo
+   * vea y el reintento no deje el primero huérfano trabando el corte. Devuelve el mensaje que hay
+   * que mostrar.
+   *
+   * - Envío no fijado: el ticket está completo salvo el envío. El carrito conserva su envío a
+   *   propósito: tocar ese renglón fija la zona sobre el ticket ya persistido (`cambiarZonaPedido`).
+   * - Cualquier otro corte (un renglón, la nota, el nombre, la dirección — B2-3/B2-4): el ticket
+   *   queda marcado INCOMPLETO. El carrito sigue bloqueado y el siguiente intento vuelve a llamar a
+   *   `persistirTicket` con el mismo `client_id_local`, que completa ESE ticket en vez de abrir otro.
    */
   const adoptarTicketSiQuedoAbierto = useCallback(async (e: unknown, porDefecto: string): Promise<string> => {
-    if (!(e instanceof ErrorEnvioNoFijado)) return e instanceof Error ? e.message : porDefecto;
+    if (!(e instanceof ErrorTicketParcial)) return e instanceof Error ? e.message : porDefecto;
     const bd = e.totales ?? await leerTotales(token, e.ticketId).catch(() => null);
     if (bd) setTicketBd(bd);
-    return `El pedido se guardó, pero sin envío: ${e.message}. Toca el renglón de envío para elegir otra zona.`;
+    if (e instanceof ErrorEnvioNoFijado) {
+      // Los renglones sí entraron: si venía de un intento incompleto, ya no lo está.
+      setTicketIncompleto(false);
+      return `El pedido se guardó, pero sin envío: ${e.message}. Toca el renglón de envío para elegir otra zona.`;
+    }
+    setTicketIncompleto(true);
+    return `El pedido quedó guardado a medias. ${e.message}. Vuelve a intentarlo: se completa el mismo ticket, no se abre otro.`;
   }, [token]);
+
+  // Carrito vacío = venta terminada (cobrada, cancelada, en espera o limpiada): el siguiente
+  // carrito es otra venta y lleva su propio `client_id_local`.
+  useEffect(() => {
+    if (carrito.lineas.length === 0) {
+      ticketClientIdRef.current = null;
+      setTicketIncompleto(false);
+    }
+  }, [carrito.lineas.length]);
 
   /**
    * Asigna (o quita) el cliente de la cuenta. Si la cuenta ya existe en la base —comedor y pick-up
@@ -874,12 +920,12 @@ export function HomePos({
     setError(null);
     try {
       let bd = ticketBd;
-      if (!bd) {
+      if (!bd || ticketIncompleto) {
         bd = await persistirTicket(
           { token, sucursalId: caja.sucursal_id, cajaId: turno.caja_id, turnoId: turno.id },
           carrito.modoServicio,
           carrito.lineas,
-          nuevoClientId(),
+          idTicketDelCarrito(),
           clienteIdParaTicket(carrito),
           carrito.clienteDomicilio?.direccionId ?? null,
           carrito.notaOrden ?? null,
@@ -887,6 +933,7 @@ export function HomePos({
           carrito.envio?.zonaId ?? null,
         );
         setTicketBd(bd);
+        setTicketIncompleto(false);
       }
       // Cargar items persistidos (mapping clientId ↔ ticket_item_id real para cancelaciones F6).
       try { setItemsPersistidos(await leerItemsPersistidos(token, bd.ticketId)); } catch { /* no bloquear */ }
@@ -896,7 +943,7 @@ export function HomePos({
     } finally {
       setProcesandoCobro(false);
     }
-  }, [carrito, ticketBd, token, caja.sucursal_id, turno.caja_id, turno.id, imprimirComandaCocina, adoptarTicketSiQuedoAbierto]);
+  }, [carrito, ticketBd, ticketIncompleto, token, caja.sucursal_id, turno.caja_id, turno.id, imprimirComandaCocina, adoptarTicketSiQuedoAbierto]);
 
   /**
    * Abre el cajón al empezar el cobro.
@@ -917,8 +964,9 @@ export function HomePos({
     if (carrito.lineas.length === 0) return;
     abrirCajonParaCobrar();
     setAtajoCobro(atajo);
-    // Si el ticket ya se persistió (flujo de descuento), reusarlo: nada de re-abrir.
-    if (ticketBd) {
+    // Si el ticket ya se persistió (flujo de descuento), reusarlo: nada de re-abrir. Uno incompleto
+    // (B2-3) no se cobra así: se vuelve a persistir abajo, que lo completa sin abrir otro.
+    if (ticketBd && !ticketIncompleto) {
       setTotalesCobro(ticketBd);
       return;
     }
@@ -932,7 +980,7 @@ export function HomePos({
         { token, sucursalId: caja.sucursal_id, cajaId: turno.caja_id, turnoId: turno.id },
         carrito.modoServicio,
         carrito.lineas,
-        nuevoClientId(),
+        idTicketDelCarrito(),
         clienteIdParaTicket(carrito),
         carrito.clienteDomicilio?.direccionId ?? null,
         carrito.notaOrden ?? null,
@@ -948,13 +996,14 @@ export function HomePos({
          de cuentas, era invisible en todas partes y reaparecía días después trabando el corte.
          Y la guarda de salida, que existe justo para eso, miraba `ticketBd`... en null. */
       setTicketBd(totales);
+      setTicketIncompleto(false);
       setTotalesCobro(totales);
     } catch (e) {
       setError(await adoptarTicketSiQuedoAbierto(e, "Error al abrir el ticket"));
     } finally {
       setProcesandoCobro(false);
     }
-  }, [carrito, ticketBd, token, caja.sucursal_id, turno.caja_id, turno.id, online, adoptarTicketSiQuedoAbierto]);
+  }, [carrito, ticketBd, ticketIncompleto, token, caja.sucursal_id, turno.caja_id, turno.id, online, adoptarTicketSiQuedoAbierto]);
 
   /**
    * Ronda de arreglos 1/5 (Task 7) — cambiar la zona de ESTE pedido desde el renglón de envío.
@@ -992,12 +1041,12 @@ export function HomePos({
     setEsperaError(null);
     try {
       let bd = ticketBd;
-      if (!bd) {
+      if (!bd || ticketIncompleto) {
         bd = await persistirTicket(
           { token, sucursalId: caja.sucursal_id, cajaId: turno.caja_id, turnoId: turno.id },
           carrito.modoServicio,
           carrito.lineas,
-          nuevoClientId(),
+          idTicketDelCarrito(),
           clienteIdParaTicket(carrito),
           carrito.clienteDomicilio?.direccionId ?? null,
           carrito.notaOrden ?? null,
@@ -1020,7 +1069,7 @@ export function HomePos({
     } finally {
       setEsperaProcesando(false);
     }
-  }, [carrito, ticketBd, token, caja.sucursal_id, turno.caja_id, turno.id, refrescarEspera, adoptarTicketSiQuedoAbierto]);
+  }, [carrito, ticketBd, ticketIncompleto, token, caja.sucursal_id, turno.caja_id, turno.id, refrescarEspera, adoptarTicketSiQuedoAbierto]);
 
   /** Pick-up / Domicilio — persiste la orden, la envía a cocina y la deja ABIERTA (sin cobrar).
    *  Queda en "Ver cuentas" del modo; se cobra al recoger / al regresar el repartidor. */
@@ -1029,12 +1078,12 @@ export function HomePos({
     setError(null);
     try {
       let bd = ticketBd;
-      if (!bd) {
+      if (!bd || ticketIncompleto) {
         bd = await persistirTicket(
           { token, sucursalId: caja.sucursal_id, cajaId: turno.caja_id, turnoId: turno.id },
           carrito.modoServicio,
           carrito.lineas,
-          nuevoClientId(),
+          idTicketDelCarrito(),
           clienteIdParaTicket(carrito),
           carrito.clienteDomicilio?.direccionId ?? null,
           carrito.notaOrden ?? null,
@@ -1045,6 +1094,7 @@ export function HomePos({
         // muestra y el cajero sigue en la pantalla; sin esto la pantalla no sabía que el ticket
         // existía y "Volver" lo abandonaba sin preguntar.
         setTicketBd(bd);
+        setTicketIncompleto(false);
       }
       const enviados = await enviarACocina(token, bd.ticketId);
       await imprimirComandaCocina(bd.ticketId, enviados, cocinaEnviada);
@@ -1059,7 +1109,7 @@ export function HomePos({
     } finally {
       setProcesandoCobro(false);
     }
-  }, [carrito, ticketBd, token, caja.sucursal_id, turno.caja_id, turno.id, cocinaEnviada, imprimirComandaCocina, volverAtras, adoptarTicketSiQuedoAbierto]);
+  }, [carrito, ticketBd, ticketIncompleto, token, caja.sucursal_id, turno.caja_id, turno.id, cocinaEnviada, imprimirComandaCocina, volverAtras, adoptarTicketSiQuedoAbierto]);
 
   /** Logo del negocio listo para la térmica. Se rasteriza al vuelo (es rápido y evita
    *  guardar estado que se desincronice si cambian el logo desde el panel). Si no hay logo
@@ -2114,7 +2164,7 @@ export function HomePos({
           onAplicarDescuento={onAplicarDescuento}
           descuentoMxn={ticketBd?.descuentos ?? 0}
             promocionMxn={ticketBd?.promociones ?? 0}
-          totalConDescuento={ticketBd ? ticketBd.total : undefined}
+          totalConDescuento={ticketBd && !ticketIncompleto ? ticketBd.total : undefined}
           bloqueado={bloqueado}
           procesando={procesandoCobro}
         />

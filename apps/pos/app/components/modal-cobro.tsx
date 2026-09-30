@@ -6,11 +6,13 @@ import {
   aplicarPago,
   establecerPropina,
   leerSugerenciasPropina,
+  leerTotales,
   type MetodoPago,
   type SugerenciasPropina,
   type TotalesTicket,
 } from "../lib/cobro";
 import { nuevoClientId } from "../lib/carrito";
+import { aplicarPagosEnOrden, pagoEntroPeseAlError, ventaQuedoPagada, type PagoPorAplicar } from "../lib/cobro-pagos";
 
 // ─── Íconos SVG inline (calcan los mockups) ────────────────────────────────
 
@@ -189,11 +191,8 @@ type Vista = "propina" | "selector" | "efectivo" | "otro" | "dividido" | "atajo"
 
 // ─── Tipos locales ───────────────────────────────────────────────────────────
 
-type PagoAplicado = {
-  id: number;
-  metodo: MetodoPago;
-  monto: number;
-};
+/** Pago dividido capturado. Su `clientId` se fija al agregarlo y viaja a `aplicar_pago` (B2-2). */
+type PagoAplicado = PagoPorAplicar;
 
 // El numpad trabaja en CENTAVOS (estándar POS): cada dígito desplaza los decimales, así se
 // capturan totales fraccionarios (p.ej. $49.50 tras un % de descuento) sin tecla de punto.
@@ -686,12 +685,12 @@ function VistaDividida({
   totales: TotalesTicket;
   procesando: boolean;
   error: string | null;
-  /** Aplica TODOS los pagos divididos de una (secuencial en el padre, no en paralelo). */
-  onAplicarPagos: (pagos: { metodo: MetodoPago; monto: number }[]) => void | Promise<void>;
+  /** Aplica TODOS los pagos divididos de una (secuencial en el padre, no en paralelo) y devuelve
+   *  los `clientId` que entraron, para quitarlos de la lista. */
+  onAplicarPagos: (pagos: PagoPorAplicar[]) => Promise<string[]>;
   onVolver: () => void;
 }) {
   const [pagos, setPagos] = useState<PagoAplicado[]>([]);
-  const [seq, setSeq] = useState(0);
   const [mostrarModal, setMostrarModal] = useState(false);
 
   const pendiente = totales.pendiente;
@@ -701,21 +700,24 @@ function VistaDividida({
   const pct = Math.min(100, pendiente > 0 ? (pagado / pendiente) * 100 : 0);
 
   function agregarPago(metodo: MetodoPago, monto: number) {
-    const id = seq + 1;
-    setSeq(id);
-    setPagos((prev) => [...prev, { id, metodo, monto }]);
+    // El id de idempotencia nace AQUÍ y no cambia entre reintentos (B2-2).
+    setPagos((prev) => [...prev, { clientId: nuevoClientId(), metodo, monto }]);
     setMostrarModal(false);
   }
 
-  function quitarPago(id: number) {
-    setPagos((prev) => prev.filter((p) => p.id !== id));
+  function quitarPago(clientId: string) {
+    setPagos((prev) => prev.filter((p) => p.clientId !== clientId));
   }
 
   function completar() {
     if (!cubierto || procesando) return;
     // FIX (auditoría): se enviaban N pagos en paralelo (carrera en la ruta de dinero).
-    // Ahora se manda la lista completa y el padre los aplica SECUENCIALMENTE.
-    void onAplicarPagos(pagos.map((p) => ({ metodo: p.metodo, monto: p.monto })));
+    // Ahora se manda la lista completa y el padre los aplica SECUENCIALMENTE. Los que entran se
+    // quitan de la lista: si uno falla, el reintento manda solo los que faltan (B2-2), y el total
+    // de arriba ya viene releído de la base con lo cobrado descontado.
+    void onAplicarPagos(pagos).then((aplicados) => {
+      if (aplicados.length > 0) setPagos((prev) => prev.filter((p) => !aplicados.includes(p.clientId)));
+    });
   }
 
   return (
@@ -774,7 +776,7 @@ function VistaDividida({
             pagos.map((p) => {
               const cfg = metodoCfg(p.metodo);
               return (
-                <div key={p.id} className="flex items-center gap-3 px-[14px] py-[12px] border border-line rounded animate-vim-fade">
+                <div key={p.clientId} className="flex items-center gap-3 px-[14px] py-[12px] border border-line rounded animate-vim-fade">
                   <span className="w-9 h-9 rounded-[9px] flex items-center justify-center flex-shrink-0" style={{ background: cfg.icoBg, color: cfg.icoColor }}>
                     <cfg.icoFn cls="w-[19px] h-[19px]" />
                   </span>
@@ -782,7 +784,7 @@ function VistaDividida({
                   <span className="font-display text-16 font-semibold text-ink tabular-nums">{fmtMxn(p.monto)}</span>
                   <button
                     type="button"
-                    onClick={() => quitarPago(p.id)}
+                    onClick={() => quitarPago(p.clientId)}
                     className="w-8 h-8 border-none bg-transparent rounded flex items-center justify-center text-ink-3 hover:bg-hover hover:text-danger transition-colors flex-shrink-0"
                     title="Quitar"
                   >
@@ -1059,17 +1061,43 @@ export function ModalCobro({
     }
   }
 
+  /**
+   * `client_id_local` del pago suelto en curso (B2-2). Se crea al primer intento y se REUSA en los
+   * reintentos: si la RPC sí se aplicó pero la respuesta se perdió, el reintento no cobra dos
+   * veces. Se suelta solo cuando el pago entró (éxito, o releído tras el error).
+   */
+  const pagoUnicoId = useRef<string | null>(null);
+
+  /**
+   * Tras un fallo de cobro: relee los totales de la base (en TODO catch, para no quedarse con un
+   * pendiente viejo) y, si el ticket ya quedó PAGADO, da la venta por cobrada en vez de mostrar
+   * un error que invita a cobrar otra vez (B2-1). Devuelve los totales releídos.
+   */
+  async function trasFalloDeCobro(e: unknown): Promise<TotalesTicket | null> {
+    const t = await leerTotales(token, totales.ticketId).catch(() => null);
+    if (t) setTotales(t);
+    if (ventaQuedoPagada(t)) {
+      onPagado(t.folio, t.cambio, t.total);
+      return t;
+    }
+    setError(e instanceof Error ? e.message : "Error al cobrar");
+    return t;
+  }
+
   async function aplicarUnPago(m: MetodoPago, monto: number, recibido?: number) {
     setError(null);
     if (!(monto > 0)) { setError("Monto inválido"); return; }
     setProcesando(true);
+    const antes = totales;
+    const clientId = (pagoUnicoId.current ??= nuevoClientId());
     try {
       const t = await aplicarPago(
         token,
         totales.ticketId,
         { metodo: m, monto, montoRecibido: recibido },
-        nuevoClientId(),
+        clientId,
       );
+      pagoUnicoId.current = null;
       setTotales(t);
       if (t.estadoFiscal === "PAGADO") {
         onPagado(t.folio, t.cambio, t.total);
@@ -1078,10 +1106,11 @@ export function ModalCobro({
         setVista("selector");
       }
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Error al cobrar");
+      const t = await trasFalloDeCobro(e);
+      if (pagoEntroPeseAlError(antes, t)) pagoUnicoId.current = null;
       // Un atajo que falla no se queda en su pantalla de espera: pasa a la de efectivo, con el
       // error, para que la cajera cobre a mano sin volver a empezar.
-      setVista((v) => (v === "atajo" ? "efectivo" : v));
+      if (!ventaQuedoPagada(t)) setVista((v) => (v === "atajo" ? "efectivo" : v));
     } finally {
       setProcesando(false);
     }
@@ -1097,21 +1126,24 @@ export function ModalCobro({
   }, [vista]);
 
   /** Aplica una lista de pagos divididos SECUENCIALMENTE (no en paralelo). Navega solo al final. */
-  async function aplicarPagosDivididos(lista: { metodo: MetodoPago; monto: number }[]) {
+  async function aplicarPagosDivididos(lista: PagoPorAplicar[]): Promise<string[]> {
     setError(null);
-    if (lista.length === 0) return;
+    if (lista.length === 0) return [];
     setProcesando(true);
     try {
-      let t = totales;
-      for (const p of lista) {
-        if (!(p.monto > 0)) continue;
-        t = await aplicarPago(token, totales.ticketId, { metodo: p.metodo, monto: p.monto }, nuevoClientId());
-      }
-      setTotales(t);
-      if (t.estadoFiscal === "PAGADO") onPagado(t.folio, t.cambio, t.total);
+      const ticketId = totales.ticketId;
+      const r = await aplicarPagosEnOrden(
+        lista,
+        (p) => aplicarPago(token, ticketId, { metodo: p.metodo, monto: p.monto }, p.clientId),
+        () => leerTotales(token, ticketId),
+      );
+      if (r.totales) setTotales(r.totales);
+      // PAGADO manda aunque un pago haya fallado: con propina, el primero podía cerrar el ticket y
+      // el segundo rebotaba con "estado PAGADO" — la venta estaba cobrada y la pantalla decía error.
+      if (ventaQuedoPagada(r.totales)) onPagado(r.totales.folio, r.totales.cambio, r.totales.total);
+      else if (r.error !== null) setError(r.error instanceof Error ? r.error.message : "Error al cobrar");
       else setError("Los pagos no cubrieron el total del ticket.");
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Error al cobrar");
+      return r.aplicados;
     } finally {
       setProcesando(false);
     }

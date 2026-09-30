@@ -8,7 +8,6 @@ import { ModalAutorizacionPin } from "./modal-autorizacion-pin";
 const chip = "rounded-full px-3.5 py-1.5 text-13 font-semibold transition";
 const mini = "h-9 rounded border border-line-strong px-2 text-13 outline-none focus:border-ink";
 
-const pesos = (n: number) => (n === 0 ? "$0" : `$${n.toFixed(0)}`);
 
 /**
  * Zonas de reparto: elegir, dar de alta en el acto, y repreciar con PIN.
@@ -111,7 +110,7 @@ export function SelectorZona({
             <button type="button"
               onClick={() => onCambio(valor === z.id ? null : z)}
               className={[chip, valor === z.id ? "bg-ink text-white" : "bg-sel text-ink-2 hover:bg-hover"].join(" ")}>
-              {z.nombre} · {pesos(z.costoMxn)}
+              {z.nombre} · {fmtMxn(z.costoMxn)}
             </button>
             <button type="button" title="Cambiar el costo (pide PIN)"
               onClick={() => empezarRepreciar(z)}

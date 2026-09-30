@@ -4,6 +4,7 @@ import type { GrupoModificadores, OpcionModificador } from "./modificadores";
 import type { ClienteDomicilio } from "./clientes-domicilio";
 import type { ClienteCuenta } from "./clientes-cuenta";
 import type { ComboDef, ComponenteSel } from "./combos";
+import { redondearCentavos } from "./dinero";
 
 export type ModoServicio = "COMER_AQUI" | "PARA_LLEVAR" | "DRIVE_THRU" | "DELIVERY_PROPIO";
 
@@ -186,7 +187,8 @@ export function lineasDeEdicion(original: LineaCarrito, editada: LineaCarrito, a
   return [{ ...editada, clientId: original.clientId }];
 }
 
-const r2 = (n: number): number => Math.round(n * 100) / 100;
+// Mismo redondeo que `numeric` en la base (B2-7): ver dinero.ts.
+const r2 = redondearCentavos;
 
 const extrasDe = (mods: ModificadorSel[]): number => mods.reduce((acc, m) => acc + m.precioExtra * m.cantidad, 0);
 
@@ -233,7 +235,27 @@ export function seleccionInicialGrupo(g: GrupoModificadores): OpcionModificador[
   return [];
 }
 
-/** Genera un uuid de cliente para `client_id_local`. */
+/**
+ * Genera un uuid de cliente para `client_id_local`.
+ *
+ * `crypto.randomUUID` solo existe en contexto seguro (https o localhost): una tablet que abre la
+ * caja por `http://192.168.x.x` de la LAN no lo tiene y la captura tronaba al primer producto
+ * (auditoría 30/09/2026, B2-8). Mismo respaldo que `cuenta-mesa.ts`, pero con formato uuid v4
+ * (`client_id_local` es varchar, pero así el id se ve igual venga de donde venga).
+ */
 export function nuevoClientId(): string {
-  return crypto.randomUUID();
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") return crypto.randomUUID();
+  return uuidV4Respaldo();
+}
+
+/** uuid v4 sin `crypto.randomUUID`. Usa `getRandomValues` (sí existe fuera de https) y, si ni eso,
+ *  `Math.random`: para un id de idempotencia basta con que no choque, no con que sea secreto. */
+export function uuidV4Respaldo(): string {
+  const b = new Uint8Array(16);
+  if (typeof crypto !== "undefined" && typeof crypto.getRandomValues === "function") crypto.getRandomValues(b);
+  else for (let i = 0; i < 16; i++) b[i] = Math.floor(Math.random() * 256);
+  b[6] = (b[6]! & 0x0f) | 0x40;
+  b[8] = (b[8]! & 0x3f) | 0x80;
+  const h = Array.from(b, (x) => x.toString(16).padStart(2, "0")).join("");
+  return `${h.slice(0, 8)}-${h.slice(8, 12)}-${h.slice(12, 16)}-${h.slice(16, 20)}-${h.slice(20)}`;
 }

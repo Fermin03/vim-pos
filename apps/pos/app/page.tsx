@@ -11,6 +11,7 @@ import {
 } from "./lib/supabase";
 import { leerCaja, type DatosCaja } from "./lib/turno";
 import { olvidarCreds } from "./lib/device-creds";
+import { cacheLimpiar } from "./lib/outbox";
 import { VincularDispositivo } from "./components/vincular-dispositivo";
 import { SelectorEmpleados } from "./components/selector-empleados";
 import { ModalPin } from "./components/modal-pin";
@@ -90,6 +91,8 @@ export default function Page() {
   const desvincular = useCallback(async () => {
     await deviceSignOut();
     olvidarCreds();
+    // El menú cacheado era de ESTA vinculación (B2-6): la siguiente puede ser otro negocio.
+    await cacheLimpiar();
     setCajaId(null);
     setEstado({ paso: "vincular" });
   }, []);

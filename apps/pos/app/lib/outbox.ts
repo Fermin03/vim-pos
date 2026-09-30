@@ -77,3 +77,9 @@ export async function cacheGet<T>(clave: string): Promise<T | null> {
     return e ? (e.valor as T) : null;
   } catch { return null; }
 }
+
+/** Borra TODO el cache de lectura. Al desvincular la caja: lo guardado era de otro negocio/sucursal
+ *  (auditoría 30/09/2026, B2-6). Best-effort, como el resto del cache. */
+export async function cacheLimpiar(): Promise<void> {
+  try { await db().cache.clear(); } catch { /* cache best-effort */ }
+}
