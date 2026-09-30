@@ -70,7 +70,7 @@ Cambiar de plan enseña ANTES de confirmar lo que cambia —folios del mes, add-
 pierde (lo que pierde, en `danger`) y el cobro antes → después—, porque la base mueve todo eso
 en la misma transacción. La prueba gratis sale en Contrato con su fecha y "Extender prueba…"
 (motivo, a la bitácora); vencida va en `warning`, no en rojo: no corta nada. **Datos de pago**
-es la única pantalla que escribe algo que ven TODOS los clientes, así que se confirma
+y **Soporte** (0142, en la misma pantalla "Pagos y soporte") son las únicas que escriben algo que ven TODOS los clientes, así que se confirman
 escribiendo `TODOS`, como un aviso importante a todos.
 
 ## Los datos son de otro

@@ -1,12 +1,16 @@
 "use client";
 import { useState, type FormEvent } from "react";
-import { useRouter } from "next/navigation";
 import { Button, LogoVim } from "@vim/ui/styles";
-import { entrar } from "../lib/supabase";
+import { errorDeRegistro, telefonoMx10 } from "@vim/db/registro";
 import { mensajeError } from "../lib/errores";
+import { ERRORES_REGISTRO, registrarNegocio } from "../lib/registro";
+import { Captcha, SITE_KEY_TURNSTILE } from "../components/captcha";
+import { ReenviarConfirmacion } from "../components/reenviar-confirmacion";
 
-const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
-const ANON = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? "";
+// Registro PÚBLICO desde el sitio (0142, ADR 0022): contacto obligatorio, términos aceptados,
+// captcha y correo verificado. Al terminar NO entra: le llega un enlace para confirmar su correo.
+const TERMINOS_URL = "https://vimpos.com.mx/terminos";
+const AVISO_URL = "https://vimpos.com.mx/aviso-privacidad";
 
 // Los valores son los de la base; las etiquetas, como las diría el dueño (antes en inglés).
 const VERTICALES = [
@@ -17,17 +21,6 @@ const VERTICALES = [
   { v: "FOODTRUCK", l: "Food truck" },
   { v: "ENTERPRISE", l: "Cadena con varias sucursales" },
 ];
-
-const ERR_LABELS: Record<string, string> = {
-  CODIGO_YA_USADO: "Esa dirección ya la usa otro negocio. Prueba con otra.",
-  EMAIL_INVALIDO: "Revisa tu correo: parece que le falta algo.",
-  // Límite de altas por IP y por hora (signup-tenant, 0136).
-  DEMASIADOS_INTENTOS: "Hubo demasiados intentos de registro desde esta conexión. Espera un rato e intenta de nuevo.",
-  NO_DISPONIBLE: "El registro no está disponible en este momento. Intenta de nuevo en unos minutos.",
-  PASSWORD_DEBIL: "La contraseña debe tener al menos 8 caracteres.",
-  CODIGO_INVALIDO: "La dirección solo lleva minúsculas, números y guiones (de 3 a 50).",
-  VERTICAL_INVALIDA: "Elige el tipo de negocio.",
-};
 
 /** «Knock-Out Burger» → «knock-out-burger»: sin acentos, minúsculas y guiones. */
 function direccionDesde(nombre: string): string {
@@ -46,8 +39,7 @@ const label = "mb-[7px] block text-14 font-medium text-ink-2";
 const ayuda = "mt-1.5 text-13 text-ink-2";
 
 export default function RegistroPage() {
-  const router = useRouter();
-  const [paso, setPaso] = useState<1 | 2>(1);
+  const [paso, setPaso] = useState<1 | 2 | 3>(1);
   const [creando, setCreando] = useState(false);
   const [error, setError] = useState<string | null>(null);
   // Correo ya registrado: se ofrece entrar en vez de solo decirlo.
@@ -62,7 +54,14 @@ export default function RegistroPage() {
   const [nombreOwner, setNombreOwner] = useState("");
   const [email, setEmail] = useState("");
   const [tel, setTel] = useState("");
+  const [ciudad, setCiudad] = useState("");
   const [pass, setPass] = useState("");
+  const [acepta, setAcepta] = useState(false);
+  const [captcha, setCaptcha] = useState("");
+  const [reinicioCaptcha, setReinicioCaptcha] = useState(0);
+  // Paso 3: a qué correo se mandó la confirmación, y si de verdad salió.
+  const [enviadoA, setEnviadoA] = useState("");
+  const [correoSalio, setCorreoSalio] = useState(true);
 
   function cambiarNombre(v: string) {
     setNombre(v);
@@ -84,45 +83,52 @@ export default function RegistroPage() {
     e.preventDefault();
     setError(null);
     setYaTieneCuenta(false);
-    if (!nombreOwner.trim()) { setError("Escribe tu nombre."); return; }
-    if (!email.trim()) { setError("Escribe tu correo."); return; }
-    if (pass.length < 8) { setError("La contraseña debe tener al menos 8 caracteres."); return; }
+    const correo = email.trim().toLowerCase();
+    const falta = errorDeRegistro({
+      nombre_owner: nombreOwner, telefono_owner: tel, email_owner: correo, ciudad, password: pass, acepta_terminos: acepta,
+    });
+    if (falta) { setError(falta); return; }
+    if (SITE_KEY_TURNSTILE && !captcha) {
+      setError("Estamos comprobando que no eres un robot. Intenta de nuevo en un segundo.");
+      return;
+    }
 
     setCreando(true);
     try {
-      const res = await fetch(`${SUPABASE_URL}/functions/v1/signup-tenant`, {
-        method: "POST",
-        headers: { apikey: ANON, Authorization: `Bearer ${ANON}`, "Content-Type": "application/json" },
-        body: JSON.stringify({
-          codigo,
-          nombre_comercial: nombre.trim(),
-          nombre_owner: nombreOwner.trim(),
-          email_owner: email.trim().toLowerCase(),
-          telefono_owner: tel.trim() || null,
-          vertical,
-          password: pass,
-        }),
+      const r = await registrarNegocio({
+        codigo,
+        nombre_comercial: nombre.trim(),
+        vertical,
+        nombre_owner: nombreOwner.trim(),
+        telefono_owner: telefonoMx10(tel) ?? "",
+        email_owner: correo,
+        ciudad: ciudad.trim(),
+        password: pass,
+        acepta_terminos: acepta,
+        captcha,
       });
-      const data = await res.json();
-      if (!res.ok || !data.ok) {
-        if (data.error === "EMAIL_YA_REGISTRADO") {
+      if (!r.ok) {
+        if (r.error === "EMAIL_YA_REGISTRADO") {
           setYaTieneCuenta(true);
-        } else if (data.error === "CODIGO_YA_USADO" || data.error === "CODIGO_INVALIDO") {
+        } else if (r.error === "CODIGO_YA_USADO" || r.error === "CODIGO_INVALIDO") {
           // El error es del paso 1: volver ahí, donde está el campo.
           setPaso(1);
-          setError(ERR_LABELS[data.error]!);
+          setError(ERRORES_REGISTRO[r.error]!);
         } else {
-          setError(ERR_LABELS[data.error] ?? data.detalle ?? "No se pudo crear la cuenta. Intenta de nuevo.");
+          setError(ERRORES_REGISTRO[r.error ?? ""] ?? r.detalle ?? "No se pudo crear la cuenta. Intenta de nuevo.");
         }
-        setCreando(false);
         return;
       }
-      // Entra solo y va directo a la lista de pasos: antes caía en un dashboard vacío.
-      await entrar(email.trim().toLowerCase(), pass);
-      router.replace("/bienvenida");
+      // Ya no entra solo: primero confirma su correo (el enlace lo lleva a la primera vez).
+      setPass("");
+      setEnviadoA(correo);
+      setCorreoSalio(r.correoEnviado !== false);
+      setPaso(3);
     } catch (err) {
       setError(mensajeError(err, "Sin conexión. Revisa tu internet e intenta de nuevo."));
+    } finally {
       setCreando(false);
+      setReinicioCaptcha((n) => n + 1);   // el token ya se usó
     }
   }
 
@@ -135,9 +141,9 @@ export default function RegistroPage() {
         </div>
 
         <div className="mb-6 text-center">
-          <h1 className="mb-1.5 font-display text-28 font-semibold tracking-tight">Empieza con VIM POS</h1>
+          <h1 className="mb-1.5 font-display text-28 font-semibold tracking-tight">{paso === 3 ? "Revisa tu correo" : "Prueba VIM POS 30 días"}</h1>
           <p className="text-15 text-ink-2">
-            {paso === 1 ? "Cuéntanos de tu negocio" : "Crea tu cuenta de dueño"} · paso {paso} de 2
+            {paso === 1 ? "Cuéntanos de tu negocio · paso 1 de 2" : paso === 2 ? "Crea tu cuenta de dueño · paso 2 de 2" : "Ya casi: confirma tu correo"}
           </p>
         </div>
 
@@ -186,9 +192,15 @@ export default function RegistroPage() {
                   onChange={(e) => setEmail(e.target.value)} placeholder="tu@negocio.mx" />
               </div>
               <div>
-                <label className={label} htmlFor="tel">Teléfono <span className="font-normal text-ink-2">· opcional</span></label>
+                <label className={label} htmlFor="tel">Tu WhatsApp</label>
                 <input id="tel" type="tel" inputMode="tel" className={input} value={tel} maxLength={20} autoComplete="tel"
-                  onChange={(e) => setTel(e.target.value)} />
+                  aria-describedby="tel-ayuda" onChange={(e) => setTel(e.target.value)} placeholder="477 123 4567" />
+                <p id="tel-ayuda" className={ayuda}>10 dígitos. Por aquí te escribimos si algo sale mal con tu cuenta.</p>
+              </div>
+              <div>
+                <label className={label} htmlFor="ciudad">Ciudad</label>
+                <input id="ciudad" className={input} value={ciudad} maxLength={80} autoComplete="address-level2"
+                  onChange={(e) => setCiudad(e.target.value)} placeholder="León, Gto." />
               </div>
               <div>
                 <label className={label} htmlFor="pass">Contraseña</label>
@@ -197,10 +209,24 @@ export default function RegistroPage() {
                 <p id="pass-ayuda" className={ayuda}>Mínimo 8 caracteres.</p>
               </div>
 
+              <label className="flex items-start gap-2.5 text-14 text-ink-2">
+                <input type="checkbox" checked={acepta} onChange={(e) => setAcepta(e.target.checked)}
+                  className="mt-0.5 h-[18px] w-[18px] flex-shrink-0 accent-[rgb(var(--accent))]" />
+                <span>
+                  Acepto los{" "}
+                  <a href={TERMINOS_URL} target="_blank" rel="noopener noreferrer" className="font-medium text-ink underline underline-offset-2">términos</a>{" "}
+                  y el{" "}
+                  <a href={AVISO_URL} target="_blank" rel="noopener noreferrer" className="font-medium text-ink underline underline-offset-2">aviso de privacidad</a>.
+                </span>
+              </label>
+
+              <Captcha onToken={setCaptcha} reinicio={reinicioCaptcha} />
+
               {yaTieneCuenta && (
                 <p className="rounded border border-line-strong bg-sel px-3 py-2.5 text-14 text-ink-2" role="alert">
                   Ese correo ya tiene una cuenta.{" "}
                   <a href="/" className="font-semibold text-ink underline underline-offset-2">Inicia sesión</a>
+                  {" "}(si no la has confirmado, ahí mismo puedes pedir otro correo).
                 </p>
               )}
               {error && <p className="text-sm font-medium text-danger" role="alert">{error}</p>}
@@ -212,6 +238,26 @@ export default function RegistroPage() {
                 </Button>
               </div>
             </form>
+          )}
+
+          {paso === 3 && (
+            <div className="flex flex-col gap-4">
+              {correoSalio ? (
+                <p className="text-15 text-ink-2">
+                  Te mandamos un correo a <b className="break-all text-ink">{enviadoA}</b> para confirmar tu cuenta. Abre el enlace y
+                  entras directo a configurar tu negocio.
+                </p>
+              ) : (
+                <p className="text-15 text-ink-2">
+                  Tu cuenta quedó creada, pero no pudimos mandar el correo a <b className="break-all text-ink">{enviadoA}</b>. Pide que te
+                  lo reenviemos:
+                </p>
+              )}
+              <p className="text-13 text-ink-3">
+                Si no llega en unos minutos, revisa la carpeta de spam o promociones. Tu prueba de 30 días ya empezó.
+              </p>
+              <ReenviarConfirmacion email={enviadoA} />
+            </div>
           )}
         </div>
 

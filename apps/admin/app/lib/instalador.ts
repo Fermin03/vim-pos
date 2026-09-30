@@ -13,16 +13,20 @@ export const RESPALDO_URL = "https://github.com/Fermin03/vim-pos/releases/latest
 
 export type Instalador = { version: string; url: string; fecha: string | null };
 
-// Solo se ofrece un .exe servido por GitHub o por nuestro Storage, por https. Un manifiesto
-// manipulado no puede convertir este botón en una descarga de cualquier otro sitio.
-const HOSTS_PERMITIDOS = ["github.com", "objects.githubusercontent.com", "pbiaxzvmssjsxdwqrumb.supabase.co"];
+// Solo se ofrece un .exe de NUESTRAS releases de GitHub (el mismo prefijo que exige /versiones,
+// PLATFORM_RELEASES_PREFIX) o de nuestro Storage, por https. En github.com publica cualquiera: un
+// manifiesto manipulado no puede convertir este botón en la descarga del binario de otro.
+const PREFIJOS_PERMITIDOS = [
+  "https://github.com/Fermin03/vim-pos/releases/download/",
+  "https://pbiaxzvmssjsxdwqrumb.supabase.co/storage/v1/object/public/actualizaciones/",
+];
 
 const Manifiesto = z.object({
   version: z.string().regex(/^\d+\.\d+\.\d+$/),
   url: z.string().url().refine((u) => {
     try {
       const x = new URL(u);
-      return x.protocol === "https:" && HOSTS_PERMITIDOS.includes(x.hostname) && x.pathname.toLowerCase().endsWith(".exe");
+      return PREFIJOS_PERMITIDOS.some((p) => x.href.startsWith(p)) && x.pathname.toLowerCase().endsWith(".exe");
     } catch {
       return false;
     }

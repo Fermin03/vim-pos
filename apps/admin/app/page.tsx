@@ -5,6 +5,7 @@ import Link from "next/link";
 import { Button, LogoVim } from "@vim/ui/styles";
 import { entrar, entrarConProveedor, leerSesion } from "./lib/supabase";
 import { mensajeError } from "./lib/errores";
+import { ReenviarConfirmacion } from "./components/reenviar-confirmacion";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -16,6 +17,8 @@ export default function LoginPage() {
   const [emailErr, setEmailErr] = useState(false);
   const [alerta, setAlerta] = useState<string | null>(null);
   const [cargando, setCargando] = useState(false);
+  // Registro público (0142): la cuenta existe pero el correo no se ha confirmado.
+  const [sinConfirmar, setSinConfirmar] = useState<string | null>(null);
 
   // Si ya hay sesión, al dashboard.
   useEffect(() => {
@@ -27,6 +30,7 @@ export default function LoginPage() {
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     setAlerta(null);
+    setSinConfirmar(null);
     const emailOk = EMAIL_RE.test(email.trim());
     setEmailErr(!emailOk);
     if (!emailOk || !password) return;
@@ -36,6 +40,13 @@ export default function LoginPage() {
       await entrar(email.trim(), password);
       router.replace("/dashboard");
     } catch (e) {
+      // Correo sin confirmar: no es un error de datos, es un paso pendiente. Se dice qué hacer y
+      // se ofrece reenviar el enlace ahí mismo.
+      if (e instanceof Error && /email not confirmed/i.test(e.message)) {
+        setSinConfirmar(email.trim().toLowerCase());
+        setCargando(false);
+        return;
+      }
       // Antes cualquier fallo decía "contraseña incorrecta", incluso cuando el backend
       // estaba caído: el usuario revisaba sus datos una y otra vez sin razón.
       setAlerta(mensajeError(e, "No se pudo iniciar sesión. Inténtalo de nuevo."));
@@ -139,6 +150,16 @@ export default function LoginPage() {
                 <path d="M12 16h.01" />
               </svg>
               <span>{alerta}</span>
+            </div>
+          )}
+
+          {sinConfirmar && (
+            <div role="alert" className="mb-5 flex flex-col gap-2 rounded border border-line border-l-[3px] border-l-warning bg-surface px-[13px] py-[11px] text-14 text-ink-2">
+              <p>
+                Falta confirmar tu correo. Abre el enlace que te mandamos a <b className="break-all text-ink">{sinConfirmar}</b> y
+                vuelve a entrar.
+              </p>
+              <ReenviarConfirmacion email={sinConfirmar} />
             </div>
           )}
 

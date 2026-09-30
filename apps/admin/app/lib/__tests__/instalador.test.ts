@@ -17,6 +17,7 @@ describe("instalador de la caja (0142)", () => {
 
   it("no ofrece descargas de otro sitio, sin https o que no sean .exe", () => {
     expect(leerManifiesto({ ...REAL, url: "https://malo.example/VIM.exe" })).toBeNull();
+    expect(leerManifiesto({ ...REAL, url: "https://github.com/otro/repo/releases/download/v1/VIM.exe" })).toBeNull();
     expect(leerManifiesto({ ...REAL, url: "http://github.com/x/VIM.exe" })).toBeNull();
     expect(leerManifiesto({ ...REAL, url: "https://github.com/Fermin03/vim-pos/releases/latest" })).toBeNull();
     expect(leerManifiesto({ ...REAL, version: "latest" })).toBeNull();
