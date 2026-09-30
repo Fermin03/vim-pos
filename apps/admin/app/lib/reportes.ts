@@ -56,6 +56,25 @@ export type ResumenDia = {
 
 export type TopProducto = { nombre: string; unidades: number; total: number };
 
+/**
+ * Top N de productos del día a partir de las filas de `vw_ventas_por_producto`, que vienen por
+ * sucursal (y por nombre/SKU del momento): primero se suman por `producto_id` y después se
+ * ordena por importe y se corta. Cortar antes de sumar repetía productos y dejaba fuera al líder
+ * cuando su venta estaba repartida entre sucursales. Pura para poder probarla.
+ */
+export function agregarTopProductos(filas: Record<string, unknown>[], n: number): TopProducto[] {
+  const agg = new Map<string, TopProducto>();
+  for (const r of filas) {
+    // Sin producto_id (renglón libre) se agrupa por nombre para no fundir productos distintos.
+    const clave = r.producto_id == null ? `nombre:${String(r.producto_nombre ?? "—")}` : String(r.producto_id);
+    const x = agg.get(clave) ?? { nombre: String(r.producto_nombre ?? "—"), unidades: 0, total: 0 };
+    x.unidades += num(r.unidades_vendidas);
+    x.total += num(r.total_mxn);
+    agg.set(clave, x);
+  }
+  return [...agg.values()].sort((a, b) => b.total - a.total).slice(0, n);
+}
+
 /** Venta acumulada en una hora del día contable (P-177: gráfica de ventas por hora). */
 export type VentaHora = { hora: number; total: number };
 
@@ -220,53 +239,68 @@ export async function leerDashboard(diaElegido?: string): Promise<Dashboard> {
      pantalla enseña el importe: antes ordenaba por dinero y mostraba unidades,
      así que la lista parecía desordenada — el número 1 podía tener menos piezas
      que el 3. Orden y cifra tienen que hablar de lo mismo. */
-  const { data: tp, error: e2 } = await supabase
-    .from("vw_ventas_por_producto")
-    .select("producto_nombre, unidades_vendidas, total_mxn, dia_contable")
-    .eq("dia_contable", diaVista)
-    .order("total_mxn", { ascending: false })
-    .limit(6);
-  if (e2) throw new Error(e2.message);
-  const topProductos = ((tp ?? []) as Record<string, unknown>[]).map((r) => ({
-    nombre: String(r.producto_nombre ?? "—"),
-    unidades: num(r.unidades_vendidas),
-    total: num(r.total_mxn),
-  }));
+  /* La vista viene por sucursal × día × producto: con `.limit(6)` directo sobre ella, un negocio
+     con dos sucursales veía el mismo producto dos veces (una por sucursal, cada una con su
+     monto parcial) y el líder real podía quedar fuera del top si su venta estaba repartida.
+     Se lee el día completo (paginado) y se agrega por producto antes de cortar, igual que
+     `leerVentasPorProducto`. Auditoría integral 30/09/2026, hallazgo E-1. */
+  const tp = await leerTodas((a, b) =>
+    supabase
+      .from("vw_ventas_por_producto")
+      .select("producto_id, producto_nombre, unidades_vendidas, total_mxn, dia_contable")
+      .eq("dia_contable", diaVista)
+      .order("sucursal_id")
+      .order("producto_id")
+      .order("producto_nombre")
+      .order("producto_sku")
+      .range(a, b) as unknown as RespuestaPagina,
+  );
+  const topProductos = agregarTopProductos(tp, 6);
 
   /* Combos vendidos (ADR 0015): un combo escribe un renglón PADRE (cobra) más sus HIJOS
      (precio 0). Contar combos es contar PADRES de tickets pagados del día que se mira —
      mismo día contable y mismo filtro de "pagado" que el resto del panel (ver
      vw_estado_resultados_dia), para que la cifra no contradiga a las de al lado.
      Cantidad, no filas: un combo vendido x3 en un mismo renglón son tres combos. */
-  const { data: cv, error: e4 } = await supabase
-    .from("ticket_items")
-    .select("cantidad, ticket:tickets!inner(dia_contable, estado_fiscal, deleted_at)")
-    .eq("combo_rol", "PADRE")
-    .eq("cancelado", false)
-    .eq("ticket.dia_contable", diaVista)
-    .in("ticket.estado_fiscal", ["PAGADO", "FACTURADO"])
-    .is("ticket.deleted_at", null);
-  if (e4) throw new Error(e4.message);
-  const combosVendidos = ((cv ?? []) as Record<string, unknown>[]).reduce((a, r) => a + num(r.cantidad), 0);
+  // Paginado (PostgREST corta en 1000 filas sin avisar); `id` da un orden que no repite ni
+  // salta filas entre páginas. Hallazgo E-2.
+  const cv = await leerTodas((a, b) =>
+    supabase
+      .from("ticket_items")
+      .select("id, cantidad, ticket:tickets!inner(dia_contable, estado_fiscal, deleted_at)")
+      .eq("combo_rol", "PADRE")
+      .eq("cancelado", false)
+      .eq("ticket.dia_contable", diaVista)
+      .in("ticket.estado_fiscal", ["PAGADO", "FACTURADO"])
+      .is("ticket.deleted_at", null)
+      .order("id")
+      .range(a, b) as unknown as RespuestaPagina,
+  );
+  const combosVendidos = cv.reduce((a, r) => a + num(r.cantidad), 0);
 
   // Ventas por hora del día más reciente (P-177). No hay vista SQL agregada por hora, así que se
-  // agrupa en el cliente desde los tickets pagados del día: son decenas, no miles, por día/sucursal.
-  const { data: th, error: e3 } = await supabase
-    .from("tickets")
-    .select("fecha_pago, total_mxn")
-    .eq("dia_contable", diaVista)
-    // PAGADO y FACTURADO, igual que los combos de arriba: una venta que el cliente facturó sigue
-    // siendo venta de esa hora. Antes la gráfica la perdía y no cuadraba con las tarjetas.
-    .in("estado_fiscal", ["PAGADO", "FACTURADO"])
-    .is("deleted_at", null)
-    .not("fecha_pago", "is", null);
-  if (e3) throw new Error(e3.message);
+  // agrupa en el cliente desde los tickets pagados del día. "Son decenas, no miles" dejó de ser
+  // cierto con varias sucursales o un día fuerte: pasadas 1000 filas PostgREST cortaba en
+  // silencio y las últimas horas salían vacías. Se pagina con orden por `id`. Hallazgo E-2.
+  const th = await leerTodas((a, b) =>
+    supabase
+      .from("tickets")
+      .select("id, fecha_pago, total_mxn")
+      .eq("dia_contable", diaVista)
+      // PAGADO y FACTURADO, igual que los combos de arriba: una venta que el cliente facturó sigue
+      // siendo venta de esa hora. Antes la gráfica la perdía y no cuadraba con las tarjetas.
+      .in("estado_fiscal", ["PAGADO", "FACTURADO"])
+      .is("deleted_at", null)
+      .not("fecha_pago", "is", null)
+      .order("id")
+      .range(a, b) as unknown as RespuestaPagina,
+  );
   // La hora, en la zona del NEGOCIO. `getHours()` daba la del navegador: el mismo ticket salía
   // en una hora distinta según desde dónde se mirara el panel, y la "hora pico" dejaba de
   // significar algo. Un dueño revisando desde otro estado veía su cocina llena a deshoras.
   const hora = new Intl.DateTimeFormat("en-US", { timeZone: zona, hour: "2-digit", hour12: false });
   const porHora = new Map<number, number>();
-  for (const r of (th ?? []) as Record<string, unknown>[]) {
+  for (const r of th) {
     const h = Number(hora.format(new Date(String(r.fecha_pago))));
     porHora.set(h, (porHora.get(h) ?? 0) + num(r.total_mxn));
   }

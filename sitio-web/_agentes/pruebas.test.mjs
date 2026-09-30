@@ -20,7 +20,7 @@ import { execFileSync } from 'node:child_process';
 
 import { RAIZ, config, resolver, ACEPTA_MD, MATCHER_MIDDLEWARE } from './rutas.mjs';
 import { BASE, PAGINAS, TODAS, PAGINA_404, NEGOCIO } from './paginas.mjs';
-import middleware, { prefiereHtml, respuesta404, MANTENIMIENTO, config as configMiddleware } from '../middleware.ts';
+import middleware, { prefiereHtml, respuesta404, MANTENIMIENTO, CUERPO_MARKDOWN, config as configMiddleware } from '../middleware.ts';
 
 const leer = (rel) => fs.readFileSync(path.join(RAIZ, rel), 'utf8');
 const cuerpo = (res) => (res.cuerpo != null ? res.cuerpo : fs.readFileSync(res.archivo, 'utf8'));
@@ -192,6 +192,56 @@ test('el 404 apunta a dónde seguir buscando', () => {
     assert.ok(md.includes(BASE + destino), `404.md no enlaza ${destino}`);
   }
   assert.ok(md.length > 400 && md.length < 4000, 'el 404 en Markdown debe ser corto');
+});
+
+test('el 404 carga su CSS, JS e iconos con rutas absolutas', () => {
+  // El 404 se sirve desde CUALQUIER dirección que no existe. Con `assets/…` relativo,
+  // en /foo/bar el navegador pedía /foo/assets/vim.css (otro 404) y la página salía
+  // sin estilos ni menú. Auditoría integral 30/09/2026, hallazgo E-8a.
+  const html = leer('404.html').replace(/<!--[\s\S]*?-->/g, '');
+  const refs = [...html.matchAll(/\s(?:href|src)="([^"]*)"/g)].map((m) => m[1]);
+  assert.ok(refs.length > 5, 'no se encontraron referencias en el 404');
+  for (const r of refs) {
+    assert.match(r, /^(\/|https?:|mailto:|#|data:)/, `el 404 usa la ruta relativa «${r}»: en /a/b no carga`);
+  }
+});
+
+test('la CSP es la misma en vercel.json, middleware.ts y .htaccess', async () => {
+  // Las tres dicen servir el mismo sitio; la de .htaccess se había quedado sin GTM ni GA,
+  // así que en un Apache la medición se bloqueaba en silencio. Hallazgo E-8b.
+  const deVercel = config.headers
+    .flatMap((h) => h.headers)
+    .filter((x) => x.key === 'Content-Security-Policy')
+    .map((x) => x.value);
+  assert.ok(deVercel.length >= 1, 'vercel.json no declara CSP');
+  assert.equal(new Set(deVercel).size, 1, 'vercel.json declara CSP distintas según la ruta');
+  const res = await respuesta404(new Request('https://vimpos.com.mx/no-existe', { headers: { accept: 'text/html' } }));
+  const deMiddleware = res.headers.get('content-security-policy');
+  const htaccess = leer('.htaccess').match(/Header always set Content-Security-Policy "([^"]*)"/);
+  assert.ok(htaccess, '.htaccess no declara CSP');
+  assert.equal(deMiddleware, deVercel[0], 'la CSP del middleware difiere de la de vercel.json');
+  assert.equal(htaccess[1], deVercel[0], 'la CSP de .htaccess difiere de la de vercel.json');
+});
+
+test('el 404 en Markdown del middleware no repite el correo', () => {
+  // Decía «hola@vimpos.com.mx · hola@vimpos.com.mx»: restos de cuando el segundo era WhatsApp.
+  for (const linea of CUERPO_MARKDOWN.split('\n')) {
+    const correos = linea.match(/[\w.+-]+@[\w.-]+/g) ?? [];
+    assert.equal(new Set(correos).size, correos.length, `correo repetido en «${linea}»`);
+  }
+});
+
+test('el aviso de privacidad no remite al INAI ni mide clics en WhatsApp', () => {
+  // La LFPDPPP publicada en el DOF el 20/03/2025 extinguió el INAI; sus funciones de datos
+  // personales pasaron a la Secretaría Anticorrupción y Buen Gobierno. Y el sitio ya no
+  // publica WhatsApp, así que no puede medir clics en él. Hallazgo E-8d.
+  for (const archivo of ['aviso-privacidad.html', 'aviso-privacidad.md']) {
+    const texto = soloTexto(leer(archivo));
+    assert.ok(!/inai\.org\.mx/.test(texto), `${archivo} todavía enlaza al INAI`);
+    assert.ok(!/acudir al INAI/.test(texto), `${archivo} todavía manda las quejas al INAI`);
+    assert.match(texto, /Secretaría Anticorrupción y Buen Gobierno/, `${archivo} no dice a qué autoridad acudir`);
+    assert.ok(!/clic en WhatsApp/.test(texto), `${archivo} dice medir clics en WhatsApp`);
+  }
 });
 
 // ── El middleware del 404 ───────────────────────────────────────────────────
@@ -499,7 +549,8 @@ test('todas las tipografías que se nombran existen', () => {
   for (const p of TODAS) {
     const html = leer(p.archivo);
     for (const [, ruta] of html.matchAll(/rel="preload"\s+href="([^"]+\.woff2)"/g)) {
-      const archivo = ruta.replace(/^assets\/fonts\//, '');
+      // Relativa en las páginas normales, absoluta en el 404 (se sirve desde cualquier ruta).
+      const archivo = ruta.replace(/^\/?assets\/fonts\//, '');
       assert.ok(enCss.includes(archivo), `${p.archivo} precarga ${archivo}, que fuentes.css no declara`);
     }
   }
