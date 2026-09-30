@@ -165,16 +165,16 @@ export function PantallaConsultaCuentas({
           {sel && cargandoDet && <div className="flex flex-1 items-center justify-center text-center text-ink-3">Cargando detalle…</div>}
           {sel && detalle && (
             <div className="flex min-h-0 flex-1 flex-col">
-              {/* Encabezado — fijo. Envuelve en vez de repartir: a 1024×768 el folio y los cuatro
-                  botones no caben en una línea, y el reparto partía el folio en tres renglones
-                  ("KC-" / "2026-" / "000015") y "Cancelar folio" en dos. Ahora el folio nunca se
-                  parte y, si no hay ancho, los botones bajan completos debajo de él. */}
-              <div className="flex flex-shrink-0 flex-wrap items-start justify-between gap-x-4 gap-y-3">
+              {/* Encabezado — fijo. Los datos de la cuenta arriba y los botones en una fila debajo,
+                  igual que en Comedor, Pickup y Domicilio. Antes compartían renglón y se repartían
+                  el ancho: a 1024×768 el folio salía en tres renglones ("KC-" / "2026-" /
+                  "000015") y "Cancelar folio" en dos. */}
+              <div className="flex-shrink-0">
                 <div className="min-w-0">
                   <div className="whitespace-nowrap font-display text-24 font-bold tabular-nums">{detalle.meta.folio}</div>
                   <div className="text-13 text-ink-3">{fechaCorta(detalle.meta.fechaIso)} · {labelModoCuenta(detalle.meta.modoServicio)} · Cajero: {detalle.meta.cajero}</div>
                 </div>
-                <div className="flex flex-wrap items-center gap-2">
+                <div className="mt-3 flex flex-wrap items-center gap-2">
                   <button
                     type="button"
                     disabled={imprimiendo}

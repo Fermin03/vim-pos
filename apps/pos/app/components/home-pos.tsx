@@ -1812,7 +1812,7 @@ export function HomePos({
                 <button
                   type="button"
                   onClick={() => setAsignandoRepartidor({ ticketId: c.ticketId, folio: c.folio, total: c.total, recargar })}
-                  className="flex h-9 flex-shrink-0 items-center rounded border border-line-strong px-3 text-13 font-semibold text-ink-2 transition hover:border-ink hover:text-ink"
+                  className="flex h-9 flex-shrink-0 items-center whitespace-nowrap rounded border border-line-strong px-2.5 text-13 font-semibold text-ink-2 transition hover:border-ink hover:text-ink"
                 >
                   Asignar repartidor
                 </button>
