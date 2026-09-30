@@ -13,7 +13,9 @@
     "./metodos-pago": "./src/metodos-pago.ts",
     "./cobro": "./src/cobro.ts",
     "./dispositivo": "./src/dispositivo.ts",
-    "./fixtures-combos": "./src/fixtures-combos.ts"
+    "./fixtures-combos": "./src/fixtures-combos.ts",
+    "./soporte": "./src/soporte.ts",
+    "./registro": "./src/registro.ts"
   },
   "scripts": {
     "gen-types": "supabase gen types typescript --local > src/database.types.ts"

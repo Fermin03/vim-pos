@@ -24,12 +24,9 @@ export function mensajeComprobante(nombreComercial: string, mes: string): string
   return `Hola, les envío el comprobante de pago de ${nombreComercial.trim() || "mi negocio"}${mes ? `, ${mes}` : ""}.`;
 }
 
-/** wa.me con el mensaje. Null si el número no son 10 a 15 dígitos: mejor sin botón que uno que no abre. */
-export function enlaceWhatsapp(numero: string | null | undefined, texto: string): string | null {
-  const n = (numero ?? "").replace(/\D/g, "");
-  if (!/^[0-9]{10,15}$/.test(n)) return null;
-  return `https://wa.me/${n}?text=${encodeURIComponent(texto)}`;
-}
+// El enlace wa.me vive en un solo lugar (0142): @vim/db/soporte. Se re-exporta para no mover a
+// quien ya lo importaba de aquí.
+export { enlaceWhatsapp } from "@vim/db/soporte";
 
 /** "0020 1007 7777 7777 71": la CLABE en grupos de cuatro, para leerla y dictarla. Se copia sin espacios. */
 export function clabeLegible(clabe: string): string {
