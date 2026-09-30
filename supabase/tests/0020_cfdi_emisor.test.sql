@@ -139,6 +139,10 @@ select is(encode(_vim_hmac_sha256(convert_to('Jefe', 'UTF8'), convert_to('what d
 select is(encode(_vim_hmac_sha256(decode(repeat('aa', 131), 'hex'), convert_to('Test Using Larger Than Block-Size Key - Hash Key First', 'UTF8')), 'hex'),
   '60e431591ee0b67f0d8a26aacbf5b77f8e0bc6213728c5140546040f0ee37f54', 'HMAC-SHA256: RFC 4231 caso 6 (llave > bloque)');
 
+-- Caja de escritorio = base SIN secreto. En la nube (y en el Supabase del CI) la 0135 lo genera,
+-- así que se quita aquí, dentro de la transacción, en vez de depender del entorno.
+delete from cfdi_autofactura_secreto;
+
 set local role authenticated;
 select set_config('request.jwt.claims', json_build_object('sub', :'maria', 'tenant_id', :'tenant_a', 'role', 'authenticated')::text, true);
 select is(autofactura_token((select ticket from _t)), null, 'sin secreto (caja de escritorio) no hay token');
