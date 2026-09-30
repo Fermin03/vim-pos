@@ -60,6 +60,7 @@
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import { corsHeaders } from "../_shared/cors.ts";
 import { consumirCupo, ipDeLaPeticion } from "../_shared/limite.ts";
+import { enviarCorreo, esc, soloAscii } from "../_shared/correo.ts";
 
 const GIROS = ["FOODTRUCK", "QUICK_SERVICE", "FULL_SERVICE", "CAFE_BAR", "DARK_KITCHEN", "ENTERPRISE"];
 
@@ -92,85 +93,6 @@ function texto(v: unknown, max: number): string {
 function entero(v: unknown): number | null {
   const n = typeof v === "number" ? v : Number.parseInt(String(v ?? ""), 10);
   return Number.isInteger(n) ? n : null;
-}
-
-/** Quita acentos y cualquier cosa fuera de ASCII, para el asunto del correo.
- *  Ver la nota en el `subject` sobre por qué esto no es opcional. */
-function soloAscii(v: string): string {
-  return v
-    .normalize("NFD").replace(/[̀-ͯ]/g, "")   // "México" -> "Mexico"
-    .replace(/[^ -~]/g, "")                       // lo que quede fuera, fuera
-    .slice(0, 160);                                      // asuntos largos se pliegan y se rompen
-}
-
-/** Escapa lo que va dentro del correo HTML. El nombre y el negocio los escribe un desconocido. */
-function esc(s: string): string {
-  return s.replace(/[&<>"']/g, (c) =>
-    ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]!
-  );
-}
-
-async function enviarCorreo(payload: { to: string; subject: string; html: string }) {
-  const host = Deno.env.get("VIM_SMTP_HOST");
-  const user = Deno.env.get("VIM_SMTP_USER");
-  const pass = Deno.env.get("VIM_SMTP_PASS");
-  if (!host || !user || !pass) return { enviado: false, motivo: "SIN_SMTP" };
-
-  const port = Number(Deno.env.get("VIM_SMTP_PORT") ?? "465");
-
-  /* TODO dentro del try, incluidos el import y el constructor.
-  
-     La primera versión los dejó fuera "porque no lanzan", y sí lanzan: en el
-     primer intento contra producción el import reventó y la excepción subió
-     hasta el handler, que devolvió un 500 crudo — con el prospecto YA guardado
-     en la base. Es decir, el visitante veía un error por un fallo que no le
-     afectaba y que él no podía arreglar reintentando.
-  
-     La regla de este archivo es que después del insert nada puede devolver un
-     error al visitante. Escribirla en un comentario no la hace cumplirse; hay
-     que envolver el bloque entero. */
-  // `null as …` y no `: … = null`: con la anotación, TS estrecha a `null` y dentro del `finally`
-  // (tras la asignación en el `try`) daba `never`, así que `cliente.close()` no tipaba.
-  let cliente = null as { send: (m: unknown) => Promise<unknown>; close: () => Promise<void> } | null;
-
-  try {
-    const { SMTPClient } = await import("https://deno.land/x/denomailer@1.6.0/mod.ts");
-
-    cliente = new SMTPClient({
-      connection: {
-        hostname: host,
-        port,
-        tls: port === 465,    // 465 = TLS desde el primer byte; 587 = STARTTLS
-        auth: { username: user, password: pass },
-      },
-    }) as unknown as typeof cliente;
-
-    await cliente!.send({
-      from: user,             // Hostinger rechaza un `from` que no sea el buzón autenticado
-      to: payload.to,
-      subject: payload.subject,
-      html: payload.html,
-    });
-    return { enviado: true, motivo: "" };
-  } catch (e) {
-    return { enviado: false, motivo: `SMTP: ${e instanceof Error ? e.message : String(e)}` };
-  } finally {
-    /* Cerrar la conexión, PERO CON PRISA.
-
-       En el primer intento contra producción el correo se envió y aun así la
-       función devolvió 500: `close()` se quedó colgado, y como estaba en un
-       `finally`, el valor de retorno nunca llegó a salir. El lead guardado, el
-       correo enviado, y el visitante viendo un error.
-
-       Dos segundos y seguimos. Dejar la conexión sin cerrar del todo es un mal
-       menor —la instancia se recicla sola— comparado con tumbar la respuesta. */
-    if (cliente) {
-      await Promise.race([
-        cliente.close().catch(() => {}),
-        new Promise((r) => setTimeout(r, 2000)),
-      ]);
-    }
-  }
 }
 
 Deno.serve(async (req) => {
