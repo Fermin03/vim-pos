@@ -2,7 +2,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { BotonVolver } from "./boton-volver";
 import { RenglonItem } from "./renglon-item";
-import { Button, LogoVim } from "@vim/ui/styles";
+import { Button, DialogoPeligro, LogoVim, Modal } from "@vim/ui/styles";
 import { fmtMxn, type DatosCaja, type Turno } from "../lib/turno";
 import { borrarCuentaVacia, leerEntregaCuenta, listarCuentasAbiertas, leerRenglonesCuenta, marcarComandaImpresa, minutosAbierta, type CuentaAbierta, type RenglonCuenta } from "../lib/cuentas-abiertas";
 import { leerTotales, type TotalesTicket } from "../lib/cobro";
@@ -122,6 +122,8 @@ export function PantallaCuentasModo({
   const [yaImpresas, setYaImpresas] = useState<Set<string>>(new Set());
   const [borrandoCuenta, setBorrandoCuenta] = useState(false);
   const [cancelandoItems, setCancelandoItems] = useState(false);
+  // "Cancelar…": primero se elige QUÉ se cancela (algunos productos o toda la cuenta).
+  const [eligiendoCancelacion, setEligiendoCancelacion] = useState(false);
   /** A quién y dónde se entrega. Solo en domicilio; en los demás modos el cliente está enfrente. */
   const [entrega, setEntrega] = useState<Awaited<ReturnType<typeof leerEntregaCuenta>>>(null);
   const [borrando, setBorrando] = useState(false);
@@ -198,6 +200,7 @@ export function PantallaCuentasModo({
   const alEscapar = useMemo(() => {
     const capas: [boolean, () => void][] = [
       [clienteDe != null, () => setClienteDe(null)],
+      [eligiendoCancelacion, () => setEligiendoCancelacion(false)],
       [cancelandoItems, () => setCancelandoItems(false)],
       [borrandoCuenta, () => setBorrandoCuenta(false)],
       [cancelandoCuenta, () => setCancelandoCuenta(false)],
@@ -207,7 +210,7 @@ export function PantallaCuentasModo({
       [true, onSalir],
     ];
     return capaVisible(capas);
-  }, [clienteDe, cancelandoItems, borrandoCuenta, cancelandoCuenta, descontando, pidiendoPinReimpresion, selId, onSalir]);
+  }, [clienteDe, eligiendoCancelacion, cancelandoItems, borrandoCuenta, cancelandoCuenta, descontando, pidiendoPinReimpresion, selId, onSalir]);
   useEscape(alEscapar);
 
   const vacia = detalle === null ? null : detalle.length === 0;
@@ -370,39 +373,38 @@ export function PantallaCuentasModo({
             </div>
           ) : (
             <>
-              {/* Barra de acciones sobre la cuenta seleccionada */}
-              <div className="flex flex-shrink-0 flex-wrap items-center gap-2 border-b border-line px-4 py-3">
-                <div className="mr-auto min-w-0">
+              {/* Encabezado de la cuenta: primero QUÉ cuenta es y, debajo, una fila con lo que se le
+                  puede hacer. Antes el nombre y los botones compartían renglón y se repartían el
+                  ancho: a 1024×768 el nombre se cortaba y los botones caían en filas desparejas
+                  (igual que en Consultar cuentas). */}
+              <div className="flex-shrink-0 border-b border-line px-4 py-3">
+                <div className="min-w-0">
                   {/* En comedor manda la mesa (igual que en la tarjeta); el cliente, si hay, va abajo. */}
                   <div className="truncate font-display text-16 font-semibold">{(esComedor && sel.mesa ? `Mesa ${sel.mesa}` : null) ?? sel.cliente ?? sel.folio ?? "Cuenta"}</div>
                   <div className="truncate text-12 text-ink-3">
                     {esComedor && sel.mesa && sel.clienteId && sel.cliente ? `${sel.cliente} · ` : ""}{sel.folio ? `${sel.folio} · ` : ""}{fmtMxn(sel.total)}
                   </div>
                 </div>
+                <div className="mt-2.5 flex flex-wrap items-center gap-1.5">
                 <Accion label="Agregar producto" onClick={() => onAgregarProductos(sel.ticketId)} />
                 <Accion label={hayDescuento ? "Descuento aplicado" : "Descuento"} onClick={() => setDescontando(true)} inactivo={hayDescuento} />
                 <Accion label={yaSeImprimio ? "Reimprimir" : "Imprimir ticket"} onClick={() => (yaSeImprimio ? setPidiendoPinReimpresion(true) : imprimir(sel.ticketId))} ocupado={imprimiendo} />
                 {extraPorCuenta?.(sel, recargar)}
-                {/* Borrar es para la cuenta abierta POR ERROR (mesa equivocada, nombre mal
-                    escrito). Solo con cero productos: con productos lo correcto es cancelarlos
-                    uno por uno —queda el rastro de qué se echó atrás— o cancelar la cuenta. */}
-                <Accion
-                  label="Borrar cuenta"
-                  onClick={() => setBorrandoCuenta(true)}
-                  inactivo={vacia !== true}
-                  ocupado={borrando}
-                  peligro
-                />
-                {/* Cancelar VARIOS renglones de una vez. Uno por uno eran seis modales con la
-                    gente esperando, y en la prisa se cancelaba de más. Inactivo sin productos. */}
-                <Accion
-                  label="Cancelar productos"
-                  onClick={() => setCancelandoItems(true)}
-                  inactivo={!detalle || detalle.length === 0}
-                  peligro
-                />
-                <Accion label="Cancelar cuenta" onClick={() => setCancelandoCuenta(true)} peligro />
-                <Accion label={`Cobrar ${fmtMxn(totales?.total ?? sel.total)}`} onClick={() => onCobrar(sel.ticketId)} destacado />
+                {/* Un solo botón de peligro, para que la fila quepa en la caja de 1024×768.
+                    Con la cuenta VACÍA es "Borrar cuenta" (la abierta por error: mesa equivocada,
+                    nombre mal escrito; no ensucia el corte con un folio cancelado). Con productos es
+                    "Cancelar…", que pregunta si son algunos productos o toda la cuenta. Antes eran
+                    tres botones y dos de ellos siempre estaban grises. */}
+                {vacia === true ? (
+                  <Accion label="Borrar cuenta" onClick={() => setBorrandoCuenta(true)} ocupado={borrando} textoOcupado="Borrando…" peligro />
+                ) : (
+                  <Accion label="Cancelar…" onClick={() => setEligiendoCancelacion(true)} inactivo={vacia === null} peligro />
+                )}
+                {/* Cobrar, la acción principal, al final de la fila y pegado a la derecha. */}
+                <span className="ml-auto">
+                  <Accion label={`Cobrar ${fmtMxn(totales?.total ?? sel.total)}`} onClick={() => onCobrar(sel.ticketId)} destacado />
+                </span>
+                </div>
               </div>
 
               {/* A quién y dónde se entrega. Va ARRIBA de los productos porque es lo que se
@@ -523,49 +525,44 @@ export function PantallaCuentasModo({
       )}
 
       {borrandoCuenta && sel && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" role="dialog" aria-modal="true">
-          <div className="w-full max-w-[420px] rounded-lg bg-surface p-5 shadow-lg">
-            <h2 className="font-display text-18 font-bold">¿Borrar esta cuenta?</h2>
-            <p className="mt-2 text-13 text-ink-2">
-              {sel.mesa ? `Mesa ${sel.mesa}` : (sel.cliente ?? sel.folio ?? "La cuenta")} está vacía y
-              desaparecerá de la lista. Si es de comedor, la mesa queda libre.
-            </p>
-            <p className="mt-2 text-13 text-ink-3">
-              No es una cancelación: al no tener productos, no ensucia el corte con un folio cancelado.
-            </p>
-            {error && <p className="mt-3 text-13 font-medium text-danger" role="alert">{error}</p>}
-            <div className="mt-4 flex justify-end gap-2">
-              <button
-                type="button"
-                onClick={() => setBorrandoCuenta(false)}
-                className="h-10 rounded border border-line-strong px-4 text-14 font-semibold text-ink-2 transition hover:border-ink hover:text-ink"
-              >
-                Cancelar
-              </button>
-              <button
-                type="button"
-                disabled={borrando}
-                onClick={async () => {
-                  setBorrando(true);
-                  setError(null);
-                  try {
-                    await borrarCuentaVacia(token, sel.ticketId, empleado.id);
-                    setBorrandoCuenta(false);
-                    setSelId(null);
-                    await recargar();
-                  } catch (e) {
-                    setError(e instanceof Error ? e.message : "No se pudo borrar la cuenta");
-                  } finally {
-                    setBorrando(false);
-                  }
-                }}
-                className="h-10 rounded bg-danger px-4 text-14 font-semibold text-white transition hover:brightness-95 disabled:opacity-50"
-              >
-                {borrando ? "Borrando…" : "Borrar cuenta"}
-              </button>
-            </div>
-          </div>
-        </div>
+        <DialogoPeligro
+          titulo="¿Borrar esta cuenta?"
+          consecuencia={<>
+            {sel.mesa ? `Mesa ${sel.mesa}` : (sel.cliente ?? sel.folio ?? "La cuenta")} está vacía y desaparecerá de la lista. Si es de
+            comedor, la mesa queda libre.
+            <span className="mt-2 block text-13 text-ink-3">No es una cancelación: al no tener productos, no ensucia el corte con un folio cancelado.</span>
+          </>}
+          ancho="sm"
+          error={error}
+          boton="Borrar cuenta"
+          ocupado={borrando}
+          textoOcupado="Borrando…"
+          onConfirmar={async () => {
+            setBorrando(true);
+            setError(null);
+            try {
+              await borrarCuentaVacia(token, sel.ticketId, empleado.id);
+              setBorrandoCuenta(false);
+              setSelId(null);
+              await recargar();
+            } catch (e) {
+              setError(e instanceof Error ? e.message : "No se pudo borrar la cuenta");
+            } finally {
+              setBorrando(false);
+            }
+          }}
+          onCerrar={() => setBorrandoCuenta(false)}
+        />
+      )}
+      {eligiendoCancelacion && sel && (
+        <ElegirCancelacion
+          nombre={(esComedor && sel.mesa ? `Mesa ${sel.mesa}` : null) ?? sel.cliente ?? sel.folio ?? "La cuenta"}
+          total={totales?.total ?? sel.total}
+          hayProductos={(detalle?.length ?? 0) > 0}
+          onProductos={() => { setEligiendoCancelacion(false); setCancelandoItems(true); }}
+          onCuenta={() => { setEligiendoCancelacion(false); setCancelandoCuenta(true); }}
+          onCerrar={() => setEligiendoCancelacion(false)}
+        />
       )}
       {cancelandoItems && sel && detalle && (
         <ModalCancelarItems
@@ -651,15 +648,15 @@ export function PantallaCuentasModo({
 }
 
 function Accion({
-  label, onClick, destacado, ocupado, inactivo, peligro,
-}: { label: string; onClick: () => void; destacado?: boolean; ocupado?: boolean; inactivo?: boolean; peligro?: boolean }) {
+  label, onClick, destacado, ocupado, inactivo, peligro, textoOcupado = "Imprimiendo…",
+}: { label: string; onClick: () => void; destacado?: boolean; ocupado?: boolean; inactivo?: boolean; peligro?: boolean; textoOcupado?: string }) {
   return (
     <button
       type="button"
       onClick={onClick}
       disabled={ocupado || inactivo}
       className={[
-        "flex h-9 flex-shrink-0 items-center rounded px-3 text-13 font-semibold transition disabled:cursor-default disabled:opacity-45",
+        "flex h-9 flex-shrink-0 items-center whitespace-nowrap rounded px-2.5 text-13 font-semibold transition disabled:cursor-default disabled:opacity-45",
         destacado
           ? "bg-accent text-white hover:bg-accent-hover"
           : peligro
@@ -667,10 +664,38 @@ function Accion({
             : "border border-line-strong text-ink-2 hover:border-ink hover:text-ink",
       ].join(" ")}
     >
-      {ocupado ? "Imprimiendo…" : label}
+      {ocupado ? textoOcupado : label}
     </button>
   );
 }
 
 /** Misma pinta que los botones de la cabecera (borde + fondo claro); la activa se marca como
  *  la tarjeta seleccionada de la lista, para no inventar un tercer estilo de "seleccionado". */
+
+/**
+ * "Cancelar…": qué se cancela de la cuenta. Es un paso de más a propósito —las dos salidas son
+ * destructivas y vivían en dos botones rojos juntos— y es lo que deja caber la fila de acciones en
+ * una línea a 1024×768. Cada opción abre su propio diálogo, con motivo y autorización.
+ */
+function ElegirCancelacion({ nombre, total, hayProductos, onProductos, onCuenta, onCerrar }: {
+  nombre: string; total: number; hayProductos: boolean; onProductos: () => void; onCuenta: () => void; onCerrar: () => void;
+}) {
+  const opcion = "flex w-full flex-col items-start rounded-lg border border-line-strong px-4 py-3 text-left transition hover:border-danger disabled:cursor-default disabled:opacity-45 disabled:hover:border-line-strong";
+  return (
+    <Modal open onClose={onCerrar} title="Qué quieres cancelar" hideTitle className="w-[min(440px,calc(100vw-2rem))] rounded-lg border border-line bg-surface p-6 shadow-[0_18px_44px_rgba(22,22,26,.18)]">
+      <h2 className="font-display text-20 font-semibold leading-tight tracking-tight">¿Qué quieres cancelar?</h2>
+      <p className="mt-1 text-13 text-ink-3">{nombre} · {fmtMxn(total)}</p>
+      <div className="mt-4 flex flex-col gap-2">
+        <button type="button" onClick={onProductos} disabled={!hayProductos} className={opcion}>
+          <span className="text-15 font-semibold text-ink">Algunos productos</span>
+          <span className="text-13 text-ink-3">Eliges cuáles. El resto de la cuenta sigue abierta.</span>
+        </button>
+        <button type="button" onClick={onCuenta} className={opcion}>
+          <span className="text-15 font-semibold text-danger">Toda la cuenta</span>
+          <span className="text-13 text-ink-3">Se cancela completa, con motivo. No se puede deshacer.</span>
+        </button>
+      </div>
+      <Button variant="ghost" className="mt-4 w-full" onClick={onCerrar}>Volver</Button>
+    </Modal>
+  );
+}

@@ -165,18 +165,21 @@ export function PantallaConsultaCuentas({
           {sel && cargandoDet && <div className="flex flex-1 items-center justify-center text-center text-ink-3">Cargando detalle…</div>}
           {sel && detalle && (
             <div className="flex min-h-0 flex-1 flex-col">
-              {/* Encabezado — fijo */}
-              <div className="flex flex-shrink-0 items-start justify-between">
-                <div>
-                  <div className="font-display text-24 font-bold tabular-nums">{detalle.meta.folio}</div>
+              {/* Encabezado — fijo. Los datos de la cuenta arriba y los botones en una fila debajo,
+                  igual que en Comedor, Pickup y Domicilio. Antes compartían renglón y se repartían
+                  el ancho: a 1024×768 el folio salía en tres renglones ("KC-" / "2026-" /
+                  "000015") y "Cancelar folio" en dos. */}
+              <div className="flex-shrink-0">
+                <div className="min-w-0">
+                  <div className="whitespace-nowrap font-display text-24 font-bold tabular-nums">{detalle.meta.folio}</div>
                   <div className="text-13 text-ink-3">{fechaCorta(detalle.meta.fechaIso)} · {labelModoCuenta(detalle.meta.modoServicio)} · Cajero: {detalle.meta.cajero}</div>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="mt-3 flex flex-wrap items-center gap-2">
                   <button
                     type="button"
                     disabled={imprimiendo}
                     onClick={reimprimir}
-                    className="flex h-10 items-center gap-2 rounded-lg border border-line-strong px-4 text-14 font-semibold text-ink-2 transition hover:border-ink hover:text-ink disabled:opacity-60"
+                    className="flex h-10 items-center gap-2 whitespace-nowrap rounded-lg border border-line-strong px-4 text-14 font-semibold text-ink-2 transition hover:border-ink hover:text-ink disabled:opacity-60"
                   >
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4"><path d="M6 9V2h12v7M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2M6 14h12v8H6z" /></svg>
                     {imprimiendo ? "Imprimiendo…" : "Reimprimir"}
@@ -186,7 +189,7 @@ export function PantallaConsultaCuentas({
                       <button
                         type="button"
                         onClick={() => setCambiandoPago(cuentaSel)}
-                        className="flex h-10 items-center gap-2 rounded-lg border border-line-strong px-4 text-14 font-semibold text-ink-2 transition hover:border-ink hover:text-ink"
+                        className="flex h-10 items-center gap-2 whitespace-nowrap rounded-lg border border-line-strong px-4 text-14 font-semibold text-ink-2 transition hover:border-ink hover:text-ink"
                       >
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4"><rect x="2" y="6" width="20" height="12" rx="2" /><path d="M2 10h20M7 15h4" /></svg>
                         Cambiar pago
@@ -194,7 +197,7 @@ export function PantallaConsultaCuentas({
                       <button
                         type="button"
                         onClick={() => setReabriendo(cuentaSel)}
-                        className="flex h-10 items-center gap-2 rounded-lg border border-line-strong px-4 text-14 font-semibold text-ink-2 transition hover:border-ink hover:text-ink"
+                        className="flex h-10 items-center gap-2 whitespace-nowrap rounded-lg border border-line-strong px-4 text-14 font-semibold text-ink-2 transition hover:border-ink hover:text-ink"
                       >
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4"><path d="M3 12a9 9 0 1 0 3-6.7L3 8m0-5v5h5" /></svg>
                         Reabrir
@@ -202,7 +205,7 @@ export function PantallaConsultaCuentas({
                       <button
                         type="button"
                         onClick={() => setCancelando(cuentaSel)}
-                        className="flex h-10 items-center gap-2 rounded-lg border border-danger/40 px-4 text-14 font-semibold text-danger transition hover:border-danger hover:bg-danger/[0.06]"
+                        className="flex h-10 items-center gap-2 whitespace-nowrap rounded-lg border border-danger/40 px-4 text-14 font-semibold text-danger transition hover:border-danger hover:bg-danger/[0.06]"
                       >
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4"><path d="M18 6 6 18M6 6l12 12" /></svg>
                         Cancelar folio
