@@ -11,6 +11,8 @@
  * "PRUEBA" y "ACTIVO" timbran igual que siempre.
  */
 
+import { rangoLegible } from "@vim/fecha";
+
 const RFC_REGEX = /^[A-ZÑ&]{3,4}[0-9]{6}[A-Z0-9]{3}$/;
 
 export type DatosParaFacturar = {
@@ -72,4 +74,31 @@ export function estadoFacturacion(datos: DatosParaFacturar, emisor: EmisorParaFa
     lista: datosCompletos && selloVigente && !pausada,
     faltan,
   };
+}
+
+/**
+ * ¿Hay que avisar de facturas globales pendientes? Solo a un negocio que DE VERDAD factura: con
+ * sello cargado y sin pausa. A uno que aún no configura nada, "tienes 3 periodos sin factura
+ * global" le sonaría a multa por algo que nunca contrató.
+ */
+export function debeAvisarGlobal(emisor: { existe: boolean } & EmisorParaFacturar): boolean {
+  return emisor.existe && !!emisor.csd.numeroCertificado && emisor.estado !== "INACTIVO";
+}
+
+/**
+ * El texto del aviso: "Tienes 2 periodos sin factura global: 1 jul 2026 – 31 jul 2026 y 1 ago 2026
+ * – 31 ago 2026." Con más de tres se nombran los tres más viejos —son los que más urgen— y se
+ * cuenta el resto. `null` si no hay nada pendiente.
+ */
+export function textoGlobalesPendientes(periodos: { desde: string; hasta: string }[]): string | null {
+  if (periodos.length === 0) return null;
+  const orden = [...periodos].sort((x, y) => x.desde.localeCompare(y.desde));
+  const nombres = orden.slice(0, 3).map((p) => rangoLegible(p.desde, p.hasta));
+  const resto = orden.length - nombres.length;
+  const lista =
+    resto > 0 ? `${nombres.join(", ")} y ${resto} más`
+    : nombres.length === 1 ? nombres[0]!
+    : `${nombres.slice(0, -1).join(", ")} y ${nombres[nombres.length - 1]}`;
+  const n = orden.length;
+  return `Tienes ${n} ${n === 1 ? "periodo" : "periodos"} sin factura global: ${lista}.`;
 }

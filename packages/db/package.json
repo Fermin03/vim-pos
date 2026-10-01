@@ -12,6 +12,7 @@
     "./modos-servicio": "./src/modos-servicio.ts",
     "./metodos-pago": "./src/metodos-pago.ts",
     "./cobro": "./src/cobro.ts",
+    "./sello": "./src/sello.ts",
     "./dispositivo": "./src/dispositivo.ts",
     "./fixtures-combos": "./src/fixtures-combos.ts",
     "./soporte": "./src/soporte.ts",

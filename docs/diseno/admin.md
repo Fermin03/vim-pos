@@ -95,6 +95,22 @@ caja"). Un solo botón azul con la versión y la fecha de la última publicada; 
 restaurantero, lo que hace falta y el paso a paso. La impresora de **red** se dice en negritas
 porque es lo que más se compra mal; los modelos van como ejemplos, nunca como "probados".
 
+## Avisos de facturación (0143)
+
+La factura global **se emite a mano** y el sello digital vence: las dos cosas tienen fecha límite
+ante el SAT y ninguna se le puede pasar al dueño. Salen como `Aviso` arriba del dashboard y de
+Facturación, con la misma lectura (`useAvisosFacturacion`), sin poder cerrarse:
+
+- **Sello por vencer** — `warning` desde 30 días antes, con la fecha y los días que faltan; a 7 días
+  el mismo tono con la consecuencia en negritas ("tu negocio deja de facturar"); **vencido** es
+  `danger`, porque ahí sí hay algo impedido. Las reglas son de `@vim/db/sello`, las mismas que usa
+  la bandeja de VIM ("Sello por vencer").
+- **Periodos sin factura global** — "Tienes N periodos sin factura global: … Emitir". Solo a un
+  negocio con sello y sin pausa. En Facturación cada periodo pendiente tiene su botón, el más viejo
+  primero. Qué es un periodo y qué venta cuenta lo decide la base (`periodos_globales_pendientes`).
+
+Nada de correos ni tareas programadas: el aviso vive donde el dueño ya entra.
+
 ## Lo que NO se hereda del POS
 
 - Los objetivos de 44–56px. Con mouse, 36–40px es lo correcto; 44 se ve infantil.

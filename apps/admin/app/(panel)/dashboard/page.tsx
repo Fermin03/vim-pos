@@ -11,6 +11,7 @@ import { listarSucursales } from "../../lib/configuracion";
 import { mensajeError } from "../../lib/errores";
 import { leerPrueba } from "../../lib/plan";
 import { AvisoPrueba } from "../../components/aviso-prueba";
+import { AvisosFacturacion } from "../../components/avisos-facturacion";
 
 // Accesos rápidos del P-177: son de Reportes, no navegación genérica.
 const REPORTES_RAPIDOS = [
@@ -402,6 +403,8 @@ export default function DashboardPage() {
         {error && <p className="mb-4 text-sm font-medium text-danger">{error}</p>}
 
         <AvisoPrueba estado={prueba?.estado} pruebaHasta={prueba?.prueba_hasta} conEnlace className="mb-6" />
+        {/* Sello por vencer y periodos sin factura global: lo que tiene fecha límite ante el SAT. */}
+        <AvisosFacturacion className="mb-6" />
 
         {mostrarOnboarding && onb && (
           <Link href="/bienvenida" className="mb-6 flex items-center gap-4 rounded-lg border border-warning-line bg-warning-soft p-4 transition hover:border-accent">

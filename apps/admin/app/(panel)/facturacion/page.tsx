@@ -8,13 +8,13 @@ import { REGIMENES_FISCALES } from "../../lib/configuracion";
 import {
   facturarTicket, FORMAS_PAGO_SAT, listarTicketsFacturables, RECEPTOR_PUBLICO_GENERAL,
   receptorSchema, USOS_CFDI, type ReceptorInput, type ResultadoTimbrado, type TicketFacturable,
-  listarPeriodosGlobales, periodoPorCerrar, timbrarFacturaGlobal,
+  listarPeriodosGlobales, timbrarFacturaGlobal, type PeriodoPendiente,
   cancelarCfdi, MOTIVOS_CANCELACION, descargarCfdi, type FormatoCfdi,
   type PeriodoGlobal,
 } from "../../lib/facturacion";
-import { leerCfdiEmisor } from "../../lib/configuracion";
+import { AvisoGlobalPendiente, AvisoSello, useAvisosFacturacion } from "../../components/avisos-facturacion";
 import { mensajeError } from "../../lib/errores";
-import { fechaLegible } from "@vim/fecha";
+import { fechaLegible, rangoLegible } from "@vim/fecha";
 
 const ESTADO_CFDI_BADGE: Record<string, { label: string; cls: string }> = {
   TIMBRADO: { label: "Facturado", cls: "bg-success-soft text-success" },
@@ -39,29 +39,27 @@ export default function FacturacionPage() {
 
   // ── Factura global ───────────────────────────────────────────────────────
   const [periodos, setPeriodos] = useState<PeriodoGlobal[]>([]);
-  const [porCerrar, setPorCerrar] = useState<{ desde: string; hasta: string; nTickets: number; totalMxn: number } | null>(null);
-  const [timbrandoGlobal, setTimbrandoGlobal] = useState(false);
+  // Los periodos cerrados con ventas sin amparar (0143) y el estado del sello: la misma lectura que
+  // usa el dashboard para sus avisos.
+  const avisos = useAvisosFacturacion();
+  /** `desde` del periodo que se está timbrando ahora (uno a la vez). */
+  const [timbrandoGlobal, setTimbrandoGlobal] = useState<string | null>(null);
   const [cancelando, setCancelando] = useState<TicketFacturable | null>(null);
   const [avisoGlobal, setAvisoGlobal] = useState<string | null>(null);
 
+  const recargarAvisos = avisos.recargar;
   const cargarGlobal = useCallback(async () => {
+    void recargarAvisos();
     try {
-      const emisor = await leerCfdiEmisor();
-      const [lista, pendiente] = await Promise.all([
-        listarPeriodosGlobales(),
-        periodoPorCerrar(emisor.periodicidad_global),
-      ]);
-      setPeriodos(lista);
-      setPorCerrar(pendiente);
+      setPeriodos(await listarPeriodosGlobales());
     } catch {
       // La global es una sección secundaria de esta pantalla: si no carga, no debe impedir
       // facturar un ticket, que es a lo que la gente entra aquí.
     }
-  }, []);
+  }, [recargarAvisos]);
   useEffect(() => { cargarGlobal(); }, [cargarGlobal]);
 
-  async function emitirGlobal() {
-    if (!porCerrar) return;
+  async function emitirGlobal(porCerrar: PeriodoPendiente) {
     const ok = await confirmar({
       titulo: `¿Emitir la factura global del ${fechaLegible(porCerrar.desde)} al ${fechaLegible(porCerrar.hasta)}?`,
       mensaje: `${porCerrar.nTickets} ventas por ${fmtMxn(porCerrar.totalMxn)}. A partir de ese momento tus clientes ya no podrán facturar esos tickets.`,
@@ -69,7 +67,7 @@ export default function FacturacionPage() {
       peligrosa: false,
     });
     if (!ok) return;
-    setTimbrandoGlobal(true);
+    setTimbrandoGlobal(porCerrar.desde);
     setAvisoGlobal(null);
     try {
       const r = await timbrarFacturaGlobal(porCerrar.desde, porCerrar.hasta);
@@ -80,7 +78,7 @@ export default function FacturacionPage() {
       );
       cargarGlobal();
     } finally {
-      setTimbrandoGlobal(false);
+      setTimbrandoGlobal(null);
     }
   }
 
@@ -96,10 +94,12 @@ export default function FacturacionPage() {
       {dialogoConfirmar}
       <PageHeader titulo="Facturación" subtitulo="Emite el CFDI de un ticket pagado: captura los datos fiscales del cliente y timbra." migas={[{ label: "Facturación" }]} />
       <PageBody>
+        <AvisoSello sello={avisos.sello} className="mb-4" />
+        <AvisoGlobalPendiente pendientes={avisos.pendientes} href="#factura-global" className="mb-4" />
         {/* ── Factura global ────────────────────────────────────────────────
             Va arriba porque es una obligación con fecha límite —24 horas tras cerrar el periodo—
             mientras que facturar un ticket suelto es a demanda. */}
-        <div className="mb-6 rounded-lg border border-line bg-surface p-5">
+        <div id="factura-global" className="mb-6 scroll-mt-4 rounded-lg border border-line bg-surface p-5">
           <div className="mb-1 font-display text-16 font-semibold tracking-tight">Factura global</div>
           <p className="mb-4 text-13 text-ink-3">
             Ampara las ventas del periodo en las que nadie pidió factura. Debe emitirse dentro de las
@@ -107,24 +107,32 @@ export default function FacturacionPage() {
             facturarse por tus clientes.</b>
           </p>
 
-          {porCerrar ? (
-            <div className="flex flex-wrap items-center justify-between gap-3 rounded border border-line bg-bg px-4 py-3">
-              <div>
-                <div className="text-13 font-semibold">
-                  Periodo del {fechaLegible(porCerrar.desde)} al {fechaLegible(porCerrar.hasta)}
-                </div>
-                <div className="text-12 text-ink-3">
-                  {porCerrar.nTickets === 0
-                    ? "Sin ventas pendientes de amparar"
-                    : `${porCerrar.nTickets} ventas · ${fmtMxn(porCerrar.totalMxn)}`}
-                </div>
-              </div>
-              <Button onClick={emitirGlobal} disabled={timbrandoGlobal || porCerrar.nTickets === 0}>
-                {timbrandoGlobal ? "Timbrando… (puede tardar un minuto)" : "Emitir factura global"}
-              </Button>
-            </div>
+          {/* No se emite sola: la emite el dueño, un periodo a la vez. Aquí salen TODOS los periodos
+              cerrados con ventas sin amparar, el más viejo primero — es el que más urge. */}
+          {!avisos.cargado ? (
+            <p className="text-13 text-ink-3">Cargando…</p>
+          ) : !avisos.factura ? (
+            <p className="text-13 text-ink-3">Configura tus datos fiscales y carga tu sello para emitir la global.</p>
+          ) : avisos.pendientes.length === 0 ? (
+            <p className="rounded border border-line bg-bg px-4 py-3 text-13 text-ink-2">
+              Estás al día: no hay periodos cerrados con ventas sin factura global.
+            </p>
           ) : (
-            <p className="text-13 text-ink-3">Configura tus datos fiscales para emitir la global.</p>
+            <div className="flex flex-col gap-2">
+              {avisos.pendientes.map((p) => (
+                <div key={p.desde} className="flex flex-wrap items-center justify-between gap-3 rounded border border-line bg-bg px-4 py-3">
+                  <div>
+                    <div className="text-13 font-semibold">Periodo del {rangoLegible(p.desde, p.hasta)}</div>
+                    <div className="text-12 text-ink-3 tabular-nums">
+                      {p.nTickets} {p.nTickets === 1 ? "venta" : "ventas"} sin factura · {fmtMxn(p.totalMxn)}
+                    </div>
+                  </div>
+                  <Button onClick={() => emitirGlobal(p)} disabled={timbrandoGlobal !== null}>
+                    {timbrandoGlobal === p.desde ? "Timbrando… (puede tardar un minuto)" : "Emitir factura global"}
+                  </Button>
+                </div>
+              ))}
+            </div>
           )}
 
           {avisoGlobal && <p className="mt-3 text-13 font-medium">{avisoGlobal}</p>}
