@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { autorizar, auditar } from "../../../lib/server";
 import { hoyMx, sumarMeses } from "@vim/fecha";
 import { MODULOS } from "@vim/db/modulos";
+import { esExtra, EXTRAS_MAXIMO } from "@vim/db/cobro";
 import { fechaBloqueo, mensajeBloqueoPorDefecto } from "../../../lib/bloqueo";
 import { decidirAltaAddon, precioAltaDelivery, type FilaAddon } from "../../../lib/addons";
 import { precioValido } from "../../../lib/precio";
@@ -50,7 +51,7 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }
 
   const { data: addonsRaw } = await sb
     .from("tenant_addons")
-    .select("id, activo, fecha_inicio, fecha_fin, precio_mensual_mxn, incluido_en_plan, addon:addons(id, codigo, nombre, precio_mensual_mxn)")
+    .select("id, activo, fecha_inicio, fecha_fin, precio_mensual_mxn, cantidad, incluido_en_plan, addon:addons(id, codigo, nombre, precio_mensual_mxn)")
     .eq("tenant_id", id)
     .order("fecha_inicio", { ascending: false });
 
@@ -235,9 +236,52 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
   // Activar escribe en `tenant_addons`; el efecto en el producto lo resuelve `tenant_addon_activo()`.
   // Desactivar NO borra la fila: le pone fecha de fin. La historia de qué tuvo contratado un
   // cliente y hasta cuándo es justamente lo que hace falta cuando reclama un cobro.
+  // Los extras por cantidad (sucursal y caja adicional, 0147) NO entran por el alta y la baja de
+  // los add-ons de siempre: ese camino no sabe de cantidades ni comprueba lo que el cliente ya usa.
+  const esExtraPorCantidad = () => NextResponse.json(
+    { error: "ES_EXTRA_POR_CANTIDAD", detalle: "La sucursal y la caja adicional se cambian por cantidad, en Extras." },
+    { status: 400 },
+  );
+
+  // ── Extras por cantidad (0147, ADR 0024) ──────────────────────────────────────────────────
+  // Poner cuántas sucursales o cajas adicionales tiene contratadas (0 = quitar). La regla entera
+  // vive en `fijar_extra_tenant`: el límite sube solo, no deja bajar por debajo de lo que el
+  // cliente ya usa, rechaza una caja adicional donde no hay límite de cajas, y cambiar la cantidad
+  // el mismo día actualiza la fila en vez de chocar con `addon_unico_activo`.
+  if (accion === "extra_fijar") {
+    const codigo = String(body.addon_codigo ?? "");
+    if (!esExtra(codigo)) return NextResponse.json({ error: "EXTRA_INVALIDO", detalle: "Solo la sucursal adicional y la caja adicional se contratan por cantidad." }, { status: 400 });
+    // Es un cambio al contrato (sube o baja lo que paga): siempre con motivo.
+    if (!motivoDe()) return faltaMotivo();
+    const cantidad = typeof body.cantidad === "number" ? body.cantidad : Number.NaN;
+    if (!Number.isInteger(cantidad) || cantidad < 0 || cantidad > EXTRAS_MAXIMO) {
+      return NextResponse.json({ error: "CANTIDAD_INVALIDA", detalle: `La cantidad es un número entero de 0 a ${EXTRAS_MAXIMO}.` }, { status: 400 });
+    }
+    // Sin precio = el que ya tenía pactado y, si no tenía, el de catálogo (lo decide la base).
+    const sinPrecio = body.precio_mensual_mxn == null || body.precio_mensual_mxn === "";
+    const precio = sinPrecio ? null : precioValido(body.precio_mensual_mxn);
+    if (!sinPrecio && precio === null) return NextResponse.json({ error: "PRECIO_INVALIDO", detalle: "El precio debe ser un importe de $0 en adelante." }, { status: 400 });
+
+    const { data, error } = await sb.rpc("fijar_extra_tenant", {
+      p_tenant_id: id, p_codigo: codigo, p_cantidad: cantidad, p_precio: precio, p_notas: motivoDe(),
+    });
+    if (error) {
+      const conocido = /EXTRA_EN_USO|SIN_LIMITE|SIN_CAMBIOS|EXTRA_INVALIDO|CANTIDAD_INVALIDA|PRECIO_INVALIDO|TENANT_NO_EXISTE/.exec(error.message)?.[0];
+      if (!conocido) return NextResponse.json({ error: error.message }, { status: 500 });
+      // El porqué lo escribe la base en el HINT, con los números del cliente ("tiene 3 cajas activas…").
+      const detalle = (error as { hint?: string | null }).hint || conocido;
+      const choque = conocido === "EXTRA_EN_USO" || conocido === "SIN_LIMITE";
+      return NextResponse.json({ error: conocido, detalle }, { status: choque ? 409 : 400 });
+    }
+    const res = (data ?? {}) as Record<string, unknown>;
+    await auditar(sb, { accion: "tenant.extra_fijar", tenantId: id, motivo: motivoDe(), payload: { ...res, precio_pedido: precio } });
+    return NextResponse.json({ ok: true, ...res });
+  }
+
   if (accion === "addon_activar") {
     const codigo = String(body.addon_codigo ?? "");
     if (!codigo) return NextResponse.json({ error: "ADDON_REQUERIDO" }, { status: 400 });
+    if (esExtra(codigo)) return esExtraPorCantidad();
     const { data: addonRaw } = await sb
       .from("addons")
       .select("id, nombre, precio_mensual_mxn")
@@ -305,6 +349,7 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
     if (!motivoDe()) return faltaMotivo();
     const codigo = String(body.addon_codigo ?? "");
     if (!codigo) return NextResponse.json({ error: "ADDON_REQUERIDO" }, { status: 400 });
+    if (esExtra(codigo)) return esExtraPorCantidad();
     const { data: addonRaw } = await sb.from("addons").select("id, nombre").eq("codigo", codigo).maybeSingle();
     const addon = addonRaw as unknown as { id: string; nombre: string } | null;
     if (!addon) return NextResponse.json({ error: "ADDON_NO_EXISTE" }, { status: 404 });

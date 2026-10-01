@@ -109,7 +109,7 @@ export function ModulosLimites({ d, nombre, accion, busy }: { d: Detalle; nombre
 
         <div>
           <label className={label}>Límites</label>
-          <p className="mb-2 text-12 text-ink-3">En gris, lo que da el plan. Escribe un número para hacer una excepción; vacío = según plan.</p>
+          <p className="mb-2 text-12 text-ink-3">En gris, lo que da el plan. Escribe un número para hacer una excepción; vacío = según plan. Las sucursales y cajas adicionales (arriba, en Extras) se suman encima.</p>
           {CLAVES.map((k) => {
             const delPlan = lim?.del_plan[k];
             return (
@@ -124,6 +124,8 @@ export function ModulosLimites({ d, nombre, accion, busy }: { d: Detalle; nombre
                   value={f[k]}
                   onChange={(e) => setF({ ...f, [k]: e.target.value.replace(/[^0-9]/g, "") })}
                 />
+                {/* Lo que de verdad aplica hoy: la excepción (o el plan) más los extras contratados (0147). */}
+                <span className="text-12 text-ink-2">hoy: <b className="tabular-nums text-ink">{lim?.[k] ?? "sin límite"}</b></span>
               </div>
             );
           })}

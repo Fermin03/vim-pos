@@ -101,6 +101,98 @@ export function textoPrecio(
   return `${fmt.mxn(p.precio)} hasta ${fmt.fecha(p.hasta)}, después ${fmt.mxn(p.lista)}`;
 }
 
+// ── Add-ons y total al mes (0147) ───────────────────────────────────────────────────────────────
+//
+// Lo que un negocio paga al mes = el precio vigente de su suscripción + los add-ons que paga aparte,
+// cada uno por su CANTIDAD (`tenant_addons.cantidad`, 0147). Es el único lugar donde se suma: lo
+// usan el MRR y la ficha del panel, el registro de pagos y "Plan y pagos" del dueño.
+
+/** Lo mínimo de una fila de `tenant_addons` para saber si se cobra y cuánto. */
+export type AddonCobro = {
+  activo: boolean;
+  /** Precio UNITARIO al mes. Con cantidad 2, se paga el doble. */
+  precio_mensual_mxn: number | string;
+  /** Solo los extras por cantidad la usan (0147); NULL o ausente = 1. */
+  cantidad?: number | null;
+  fecha_inicio?: string | null;
+  fecha_fin?: string | null;
+};
+
+/**
+ * ¿El add-on está vigente en `fecha` (`YYYY-MM-DD`, hora de México)? ESPEJO de
+ * `tenant_addon_activo()` (0081): activo, ya empezó y no ha terminado (el último día cuenta).
+ */
+export function addonVigente(a: AddonCobro, fecha: string): boolean {
+  if (!a.activo) return false;
+  const f = fecha.slice(0, 10);
+  if (a.fecha_inicio && a.fecha_inicio.slice(0, 10) > f) return false;
+  if (a.fecha_fin && a.fecha_fin.slice(0, 10) < f) return false;
+  return true;
+}
+
+const centavos = (n: number) => Math.round(n * 100) / 100;
+
+/** Lo que cuesta al mes una fila: precio unitario por cantidad. */
+export function importeAddon(a: AddonCobro): number {
+  const cantidad = a.cantidad == null ? 1 : Math.max(0, Math.trunc(Number(a.cantidad)));
+  return centavos(Number(a.precio_mensual_mxn) * cantidad);
+}
+
+/** La suma de los add-ons vigentes en `fecha`. */
+export function totalAddons(addons: AddonCobro[], fecha: string): number {
+  return centavos(addons.filter((a) => addonVigente(a, fecha)).reduce((acc, a) => acc + importeAddon(a), 0));
+}
+
+/**
+ * Lo que se paga al mes en `fecha`. Sin cobro activo (`s` null: en prueba, sin suscripción) el total
+ * es cero, add-ons incluidos: mientras no se cobra el plan no se cobra nada.
+ */
+export function totalMensual(
+  s: PrecioSuscripcion | null | undefined,
+  addons: AddonCobro[],
+  fecha: string,
+): { suscripcion: number; addons: number; total: number } {
+  if (!s) return { suscripcion: 0, addons: 0, total: 0 };
+  const suscripcion = precioVigente(s, fecha);
+  const extras = totalAddons(addons, fecha);
+  return { suscripcion, addons: extras, total: centavos(suscripcion + extras) };
+}
+
+// ── Extras por cantidad: sucursal y caja adicional (0147) ───────────────────────────────────────
+//
+// Los dos add-ons que se contratan por cantidad y suben un límite del plan. ESPEJO de
+// `limites_efectivos()` y `fijar_extra_tenant()` en supabase/migrations/0147_extras_por_cantidad.sql.
+
+export const EXTRAS = {
+  SUCURSAL_EXTRA: { limite: "max_sucursales", unidad: "sucursal", unidades: "sucursales" },
+  CAJA_EXTRA: { limite: "max_cajas_por_sucursal", unidad: "caja por sucursal", unidades: "cajas por sucursal" },
+} as const;
+export type CodigoExtra = keyof typeof EXTRAS;
+
+/** Tope de extras de un mismo tipo. El mismo que el CHECK de `fijar_extra_tenant`. */
+export const EXTRAS_MAXIMO = 50;
+
+export function esExtra(codigo: string | null | undefined): codigo is CodigoExtra {
+  return codigo === "SUCURSAL_EXTRA" || codigo === "CAJA_EXTRA";
+}
+
+/** Cuántos extras vigentes de ese código tiene el negocio en `fecha`. */
+export function cantidadDeExtra(filas: (AddonCobro & { codigo: string | null | undefined })[], codigo: CodigoExtra, fecha: string): number {
+  return filas
+    .filter((f) => f.codigo === codigo && addonVigente(f, fecha))
+    .reduce((acc, f) => acc + (f.cantidad == null ? 1 : Math.max(0, Math.trunc(Number(f.cantidad)))), 0);
+}
+
+/**
+ * El límite efectivo. LA PRECEDENCIA (ADR 0024): la base es la excepción de VIM si existe y, si no,
+ * el plan; los extras contratados se suman ENCIMA de esa base. `null` es "sin límite" y lo sigue
+ * siendo: a un plan sin tope de cajas un extra no le pone uno.
+ */
+export function limiteConExtras(d: { plan: number | null; excepcion: number | null; extras: number }): number | null {
+  const base = d.excepcion ?? d.plan;
+  return base === null ? null : base + d.extras;
+}
+
 // ── Prueba gratis (0141) ───────────────────────────────────────────────────────────────────────
 
 /** Días de prueba desde el alta. El número lo pone la base (trigger de `tenants`); este es su eco. */

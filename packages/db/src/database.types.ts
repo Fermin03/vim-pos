@@ -7239,6 +7239,7 @@ export type Database = {
         Row: {
           activo: boolean
           addon_id: string
+          cantidad: number
           created_at: string
           created_by: string | null
           fecha_fin: string | null
@@ -7253,6 +7254,7 @@ export type Database = {
         Insert: {
           activo?: boolean
           addon_id: string
+          cantidad?: number
           created_at?: string
           created_by?: string | null
           fecha_fin?: string | null
@@ -7267,6 +7269,7 @@ export type Database = {
         Update: {
           activo?: boolean
           addon_id?: string
+          cantidad?: number
           created_at?: string
           created_by?: string | null
           fecha_fin?: string | null
@@ -10693,6 +10696,16 @@ export type Database = {
         }[]
       }
       f_unaccent: { Args: { "": string }; Returns: string }
+      fijar_extra_tenant: {
+        Args: {
+          p_cantidad: number
+          p_codigo: string
+          p_notas?: string
+          p_precio?: number
+          p_tenant_id: string
+        }
+        Returns: Json
+      }
       generar_folio: {
         Args: {
           p_anio?: number

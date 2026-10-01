@@ -73,6 +73,12 @@ nunca solo el precio de lista (0141, ADR 0021). La prueba gratis es un `Aviso` q
 ni bloquea: `info` mientras corre, `warning` al vencer — la caja sigue vendiendo, así que no es
 rojo. Sale también arriba del dashboard, con enlace a Plan y pagos.
 
+Debajo, **"Lo que tienes contratado"** (0147): un renglón por cosa —el plan y cada add-on, con
+"2 × $249.00" cuando va por cantidad e "incluido en tu plan" cuando no cuesta— y el **total al
+mes**, que es el mismo número que ve VIM en su panel. Solo aparece si hay algo además del plan:
+con un solo renglón no dice nada. Sin cobro activo no hay total; se dice que empieza a cobrarse
+junto con el plan.
+
 "Cómo pagar" enseña los datos que VIM captura en su panel (banco, titular, CLABE en grupos de
 cuatro, correo) con botón de copiar, y un botón de WhatsApp con el mensaje del comprobante ya
 escrito — la única acción azul de la pantalla. Sin datos capturados, un texto neutro que manda a

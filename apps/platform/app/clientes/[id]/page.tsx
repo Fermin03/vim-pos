@@ -6,7 +6,7 @@ import { useSesion } from "../../lib/sesion";
 import { textoActualizado, useRefresco } from "../../lib/refresco";
 import { fechaHoraMx, fmtMxn, nombreFase, nombreVertical } from "../../lib/formato";
 import { fechaLegible, hoyMx } from "@vim/fecha";
-import { textoPrecio, type PrecioSuscripcion } from "@vim/db/cobro";
+import { textoPrecio, totalAddons, type PrecioSuscripcion } from "@vim/db/cobro";
 import type { Detalle, Plan } from "../../lib/tipos";
 import { Seccion } from "../../components/seccion";
 import { TarjetaCifra } from "../../components/tarjeta-cifra";
@@ -169,7 +169,7 @@ export default function FichaCliente() {
 
         <Seccion id="contrato" titulo="Contrato" descripcion="Qué paga, qué tiene contratado y qué puede usar.">
           <FichaContrato d={d} planes={planes} accion={accion} busy={busy} accesoDueno={<AccesoDueno api={api} tenantId={id} dueno={d.dueno} onCambio={recargar} />} />
-          <FichaPagos api={api} tenantId={id} suscripcion={suscripcion} onCambio={recargar} />
+          <FichaPagos api={api} tenantId={id} suscripcion={suscripcion} addonsAlMes={totalAddons(d.addons, hoyMx())} onCambio={recargar} />
           <ModulosLimites d={d} nombre={nombre} accion={accion} busy={busy} />
         </Seccion>
 

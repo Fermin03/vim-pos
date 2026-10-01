@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { fechaLegible, hoyMx, sumarDias, sumarMeses } from "@vim/fecha";
-import { estadoPrueba, textoPrecio, type PrecioSuscripcion } from "@vim/db/cobro";
+import { cantidadDeExtra, esExtra, estadoPrueba, EXTRAS, EXTRAS_MAXIMO, limiteConExtras, textoPrecio, totalMensual, type CodigoExtra, type PrecioSuscripcion } from "@vim/db/cobro";
 import type { AddonCatalogo, Detalle, Plan } from "../lib/tipos";
 import { fechaValida, PILOTO, promocionPiloto } from "../lib/promocion";
 import { vistaPreviaCambioPlan, type AddonDelTenant } from "../lib/cambio-plan";
@@ -33,6 +33,7 @@ type Pendiente =
   | { tipo: "abandonado" | "reactivar" }
   | { tipo: "cancelar_suscripcion" }
   | { tipo: "prueba" }
+  | { tipo: "extra"; codigo: CodigoExtra }
   | null;
 
 type ModoPromo = "ninguna" | "piloto" | "otra";
@@ -41,6 +42,9 @@ type ModoPromo = "ninguna" | "piloto" | "otra";
 type SuscripcionFicha = PrecioSuscripcion & { estado: string; proxima_fecha_cobro: string | null; ciclo_facturacion?: string };
 
 const fmtPrecio = { fecha: fechaLegible, mxn: fmtMxn };
+
+/** "1 caja por sucursal", "3 cajas por sucursal". */
+const enUnidades = (codigo: CodigoExtra, n: number) => `${n} ${n === 1 ? EXTRAS[codigo].unidad : EXTRAS[codigo].unidades}`;
 
 /** Antes → después, en dos columnas. */
 function Cambio({ antes, despues }: { antes: ReactNode; despues: ReactNode }) {
@@ -76,6 +80,9 @@ export function FichaContrato({ d, planes, accion, busy, accesoDueno }: { d: Det
   const [promoHasta, setPromoHasta] = useState("");
   const [promoNombre, setPromoNombre] = useState("");
   const [pruebaNueva, setPruebaNueva] = useState("");
+  // Extras por cantidad (0147): la cantidad y el precio unitario que se están capturando.
+  const [extraCantidad, setExtraCantidad] = useState("");
+  const [extraPrecio, setExtraPrecio] = useState("");
   const hoy = hoyMx();
 
   // Notas: el refresco automático (cada 60 s) traía la versión del servidor y pisaba lo que se
@@ -101,12 +108,49 @@ export function FichaContrato({ d, planes, accion, busy, accesoDueno }: { d: Det
 
   // Vista previa del cambio de plan: espejo de lo que hará cambiar_plan_tenant (0141).
   const addonsTenant: AddonDelTenant[] = d.addons.map((x) => ({
-    codigo: x.addon?.codigo ?? "", activo: x.activo, precio: Number(x.precio_mensual_mxn), incluidoEnPlan: Boolean(x.incluido_en_plan),
+    codigo: x.addon?.codigo ?? "", activo: x.activo, precio: Number(x.precio_mensual_mxn), incluidoEnPlan: Boolean(x.incluido_en_plan), cantidad: x.cantidad ?? 1,
   }));
   const precioPlanNum = precioPlan.trim() === "" ? null : precioValido(precioPlan);
   const vista = elegido
-    ? vistaPreviaCambioPlan({ nuevo: elegido, addons: addonsTenant, foliosAntes: d.foliosBase?.mensuales ?? null, suscripcion, precio: precioPlanNum, hoy })
+    ? vistaPreviaCambioPlan({ nuevo: elegido, addons: addonsTenant, foliosAntes: d.foliosBase?.mensuales ?? null, suscripcion, precio: precioPlanNum, hoy, excepcion: d.limites?.excepcion ?? null })
     : null;
+
+  // ── Extras por cantidad (0147, ADR 0024) ────────────────────────────────────────────────
+  // Lo que paga al mes: suscripción vigente + add-ons pagados × cantidad. La misma función que
+  // usan el MRR y "Plan y pagos" del dueño.
+  const filasCobro = d.addons.map((x) => ({ ...x, codigo: x.addon?.codigo }));
+  const total = totalMensual(suscripcion, d.addons, hoy);
+  const extras = (Object.keys(EXTRAS) as CodigoExtra[]).flatMap((codigo) => {
+    const cat = d.catalogoAddons.find((a) => a.codigo === codigo);
+    if (!cat) return [];
+    const limite = EXTRAS[codigo].limite;
+    const cantidad = cantidadDeExtra(filasCobro, codigo, hoy);
+    const vigente = d.addons.find((x) => x.addon?.codigo === codigo && x.activo);
+    const delPlan = d.limites?.del_plan[limite] ?? null;
+    const excepcion = d.limites?.excepcion[limite] ?? null;
+    return [{
+      codigo, cat, cantidad, limite,
+      precio: Number(vigente ? vigente.precio_mensual_mxn : cat.precio_mensual_mxn),
+      base: limiteConExtras({ plan: delPlan, excepcion, extras: 0 }),
+      porExcepcion: excepcion !== null,
+    }];
+  });
+  const extraSel = pendiente?.tipo === "extra" ? extras.find((e) => e.codigo === pendiente.codigo) ?? null : null;
+  const extraCantidadNum = /^\d{1,2}$/.test(extraCantidad.trim()) ? Number(extraCantidad) : null;
+  const extraPrecioNum = extraPrecio.trim() === "" ? null : precioValido(extraPrecio);
+  const extraPrecioFinal = extraPrecioNum ?? extraSel?.precio ?? 0;
+  const extraCambia = extraSel !== null && extraCantidadNum !== null
+    && (extraCantidadNum !== extraSel.cantidad || (extraCantidadNum > 0 && extraPrecioFinal !== extraSel.precio));
+  const extraReduce = extraSel !== null && extraCantidadNum !== null && extraCantidadNum < extraSel.cantidad;
+  const faltaExtra =
+    extraCantidadNum === null || extraCantidadNum > EXTRAS_MAXIMO ? `una cantidad de 0 a ${EXTRAS_MAXIMO}`
+      : extraPrecio.trim() !== "" && extraPrecioNum === null ? "un precio válido"
+        : !extraCambia ? "una cantidad o un precio distintos a los que ya tiene"
+          : null;
+  const abrirExtra = (codigo: CodigoExtra, cantidad: number, precio: number) => {
+    setExtraCantidad(String(cantidad === 0 ? 1 : cantidad)); setExtraPrecio(String(precio));
+    setPendiente({ tipo: "extra", codigo });
+  };
   const nombreAddon = (c: string) => d.catalogoAddons.find((a) => a.codigo === c)?.nombre ?? c;
 
   // Activar: precio de lista del plan por omisión; el piloto solo se ofrece en Esencial.
@@ -171,6 +215,13 @@ export function FichaContrato({ d, planes, accion, busy, accesoDueno }: { d: Det
             <div className="mb-2 text-13 text-ink-2">
               {textoPrecio(suscripcion, hoy, fmtPrecio)}/mes{suscripcion.promocion_nombre && suscripcion.promocion_hasta && suscripcion.promocion_hasta >= hoy ? ` (${suscripcion.promocion_nombre})` : ""}
               {suscripcion.proxima_fecha_cobro ? ` · próximo cobro el ${fechaLegible(suscripcion.proxima_fecha_cobro)}` : ""}
+            </div>
+          )}
+          {/* El total con lo que paga aparte (0147): es el número que se le cobra, no solo el plan. */}
+          {suscripcion && total.addons > 0 && (
+            <div className="mb-2 text-13">
+              <b className="tabular-nums text-ink">{fmtMxn(total.total)} al mes en total</b>
+              <span className="text-ink-2"> · plan {fmtMxn(total.suscripcion)} + add-ons y extras {fmtMxn(total.addons)}</span>
             </div>
           )}
           <div className="flex flex-wrap gap-2">
@@ -239,7 +290,7 @@ export function FichaContrato({ d, planes, accion, busy, accesoDueno }: { d: Det
           <span className={label}>Add-ons</span>
           <div className="flex flex-col gap-2">
             {d.catalogoAddons.length === 0 && <p className="text-13 text-ink-2">No hay add-ons en el catálogo.</p>}
-            {d.catalogoAddons.map((a) => {
+            {d.catalogoAddons.filter((a) => !esExtra(a.codigo)).map((a) => {
               const contratado = d.addons.find((x) => x.addon?.codigo === a.codigo && x.activo);
               const precio = Number(contratado ? contratado.precio_mensual_mxn : a.precio_mensual_mxn);
               return (
@@ -264,6 +315,47 @@ export function FichaContrato({ d, planes, accion, busy, accesoDueno }: { d: Det
             })}
           </div>
         </div>
+
+        {/* Extras por cantidad (0147): sucursal y caja adicional. Suben el límite por sí solos. */}
+        {extras.length > 0 && (
+          <div className="mt-4">
+            <span className={label}>Extras</span>
+            <div className="flex flex-col gap-2">
+              {extras.map((e) => {
+                const efectivo = limiteConExtras({ plan: e.base, excepcion: null, extras: e.cantidad });
+                const u = EXTRAS[e.codigo];
+                return (
+                  <div key={e.codigo} className="flex items-center justify-between gap-3 rounded border border-line px-3 py-2">
+                    <div className="min-w-0">
+                      <div className="text-14 font-semibold">
+                        {e.cat.nombre}
+                        {e.cantidad > 0 && <span className="ml-1.5 rounded-full bg-sel px-2 py-0.5 text-12 font-semibold tabular-nums text-ink-2">× {e.cantidad}</span>}
+                      </div>
+                      <div className="text-13 text-ink-2">
+                        {e.cantidad > 0
+                          ? <>{fmtMxn(e.precio)} c/u · {fmtMxn(e.precio * e.cantidad)}/mes</>
+                          : <>{fmtMxn(e.precio)}/mes cada una</>}
+                      </div>
+                      <div className="text-13 text-ink-2">
+                        {e.base === null
+                          ? <>Su plan trae {u.unidades} sin límite: no hay nada que ampliar.</>
+                          : <>Límite: {e.base} {e.porExcepcion ? "por excepción" : "del plan"}{e.cantidad > 0 ? ` + ${e.cantidad} extra` : ""} = <b className="text-ink">{enUnidades(e.codigo, efectivo ?? 0)}</b></>}
+                      </div>
+                    </div>
+                    {(e.base !== null || e.cantidad > 0) && (
+                      <button onClick={() => abrirExtra(e.codigo, e.cantidad, e.precio)} disabled={busy} className={`${btnFantasma} shrink-0`}>
+                        {e.cantidad > 0 ? "Cambiar…" : "Agregar…"}
+                      </button>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+            {!suscripcion && extras.some((e) => e.cantidad > 0) && (
+              <p className="mt-1.5 text-13 text-ink-2">Sin cobro activo todavía: los extras se empiezan a cobrar junto con el plan.</p>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Notas internas */}
@@ -312,6 +404,14 @@ export function FichaContrato({ d, planes, accion, busy, accesoDueno }: { d: Det
                   {vista.retira.map((c) => (
                     <li key={`r-${c}`} className="text-danger">Pierde <b>{nombreAddon(c)}</b>: lo tenía por el plan.{c === "DELIVERY" ? " Se pausan sus tiendas en Uber Eats." : ""}</li>
                   ))}
+                  {vista.retiraExtras.map((x) => (
+                    <li key={`x-${x.codigo}`} className="text-danger">
+                      Se {x.cantidad === 1 ? "retira" : "retiran"} <b>{x.cantidad} × {nombreAddon(x.codigo)}</b> (deja de pagar {fmtMxn(x.importe)}/mes): el plan nuevo trae {EXTRAS[x.codigo].unidades} sin límite.
+                    </li>
+                  ))}
+                  {d.addons.some((x) => x.activo && esExtra(x.addon?.codigo)) && vista.retiraExtras.length === 0 && (
+                    <li>Sus extras (sucursales y cajas adicionales) se conservan: se pagan aparte del plan.</li>
+                  )}
                   {!vista.precio && <li>No tiene cobro activo: el precio se fija al activarlo.</li>}
                 </ul>
               </>
@@ -470,6 +570,62 @@ export function FichaContrato({ d, planes, accion, busy, accesoDueno }: { d: Det
         peligroso
         ocupado={busy}
         onConfirmar={({ motivo }) => hacer({ accion: "suscripcion_estado", estado: "CANCELADA", motivo })}
+      />
+
+      <DialogoConfirmar
+        abierto={pendiente?.tipo === "extra"}
+        onCerrar={cerrar}
+        titulo={extraSel ? extraSel.cat.nombre : ""}
+        descripcion={extraSel ? (
+          <>Cuántas tiene contratadas <b>{nombre}</b>. El límite cambia en cuanto confirmas; lo que paga, desde hoy. Con 0 se le quita.</>
+        ) : null}
+        detalle={extraSel ? (
+          <div className="flex flex-col gap-3">
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className={label} htmlFor="extra-cantidad">Cantidad</label>
+                <input id="extra-cantidad" className={`${input} tabular-nums`} inputMode="numeric" value={extraCantidad} onChange={(e) => setExtraCantidad(e.target.value.replace(/[^0-9]/g, "").slice(0, 2))} />
+              </div>
+              <div>
+                <label className={label} htmlFor="extra-precio">Precio por cada una, al mes</label>
+                <input id="extra-precio" className={`${input} tabular-nums`} inputMode="decimal" value={extraPrecio} placeholder={String(extraSel.cat.precio_mensual_mxn)} onChange={(e) => setExtraPrecio(e.target.value)} />
+              </div>
+            </div>
+            {extraCantidadNum !== null && extraSel.base !== null && (
+              <Cambio
+                antes={<>Límite: {enUnidades(extraSel.codigo, extraSel.base + extraSel.cantidad)}</>}
+                despues={<>{enUnidades(extraSel.codigo, extraSel.base + extraCantidadNum)}</>}
+              />
+            )}
+            {extraCantidadNum !== null && (
+              <Cambio
+                antes={<>Por este extra: {fmtMxn(extraSel.precio * extraSel.cantidad)}/mes</>}
+                despues={<>{fmtMxn(extraPrecioFinal * extraCantidadNum)}/mes</>}
+              />
+            )}
+            {extraCantidadNum !== null && suscripcion && (
+              <p className="text-13 text-ink-2">
+                Total al mes: <b className="tabular-nums text-ink">{fmtMxn(total.total)} → {fmtMxn(total.total - extraSel.precio * extraSel.cantidad + extraPrecioFinal * extraCantidadNum)}</b>
+              </p>
+            )}
+            {extraReduce && (
+              <p className="text-13 text-ink-2">Si ya usa más de lo que quedaría, no se aplica y se te dice cuántas tiene que desactivar antes.</p>
+            )}
+          </div>
+        ) : undefined}
+        listo={{ ok: faltaExtra === null, falta: faltaExtra ?? "" }}
+        // Subir es reversible y solo pide motivo; bajar le quita algo que puede estar usando.
+        sinNombre={!extraReduce}
+        peligroso={extraReduce}
+        nombreEsperado={nombre}
+        etiquetaBoton={extraCantidadNum === 0 ? "Quitar extra" : "Guardar"}
+        ocupado={busy}
+        onConfirmar={({ motivo }) => hacer({
+          accion: "extra_fijar", addon_codigo: extraSel?.codigo ?? "", cantidad: extraCantidadNum,
+          // El precio solo viaja si se cambió: sin él, la base conserva el pactado.
+          precio_mensual_mxn: extraSel && extraPrecioNum !== null && extraPrecioNum !== extraSel.precio ? extraPrecioNum : null,
+          motivo,
+        })}
       />
 
       <DialogoConfirmar

@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { autorizar } from "../../lib/server";
 import { fechaLegible, hoyMx } from "@vim/fecha";
-import { AVISO_PRUEBA_DIAS, diasEntre, estadoPrueba, precioVigente, promocionVigente, type PrecioSuscripcion } from "@vim/db/cobro";
+import { AVISO_PRUEBA_DIAS, diasEntre, estadoPrueba, precioVigente, promocionVigente, totalAddons, type AddonCobro, type PrecioSuscripcion } from "@vim/db/cobro";
 import { alertaDeSello } from "../../lib/alerta-sello";
 import { alertaProspectos } from "../../lib/prospectos";
 
@@ -88,7 +88,7 @@ export async function GET(req: Request) {
   const nombreDe = new Map(tenants.map((t) => [t.id, t.nombre_comercial]));
   const activos = new Set(tenants.filter((t) => t.estado !== "CANCELADO" && t.estado !== "BAJA").map((t) => t.id));
 
-  const [cajasRes, subsRes, foliosRes, onbRes, ventasRes, syncRes, sellosRes, prospectosRes] = await Promise.all([
+  const [cajasRes, subsRes, foliosRes, onbRes, ventasRes, syncRes, sellosRes, prospectosRes, addonsRes] = await Promise.all([
     sb.from("cajas").select("id, nombre, tenant_id, activa, bloqueada, bloqueo_motivo, ultimo_latido, version_app").is("deleted_at", null).limit(2000),
     sb.from("suscripciones").select("tenant_id, estado, fecha_fin, proxima_fecha_cobro, precio_mensual_mxn, precio_promocional_mxn, promocion_hasta, promocion_nombre").limit(1000),
     sb.from("tenant_folios_saldo").select("tenant_id, folios_base_mensuales, folios_base_consumidos, saldo_paquetes, umbral_alerta").limit(1000),
@@ -101,7 +101,13 @@ export async function GET(req: Request) {
     sb.from("tenant_cfdi_emisor").select("tenant_id, csd_numero_certificado, csd_vigencia_hasta").limit(1000),
     // Solo los que nadie ha tocado (0145): son los únicos que pueden ser una alerta.
     sb.from("prospectos").select("negocio, estado, creado_en").eq("estado", "NUEVO").order("creado_en", { ascending: true }).limit(500),
+    // Lo que cada cliente paga aparte (0147): el cobro vencido dice el total, no solo el plan.
+    sb.from("tenant_addons").select("tenant_id, activo, precio_mensual_mxn, cantidad, fecha_inicio, fecha_fin").eq("activo", true).limit(5000),
   ]);
+  const addonsDe = new Map<string, AddonCobro[]>();
+  for (const a of (addonsRes.data ?? []) as (AddonCobro & { tenant_id: string })[]) {
+    addonsDe.set(a.tenant_id, [...(addonsDe.get(a.tenant_id) ?? []), a]);
+  }
 
   const ultimaVenta = new Map<string, string>();
   for (const t of (ventasRes.data ?? []) as { tenant_id: string; created_at: string }[]) {
@@ -267,7 +273,8 @@ export async function GET(req: Request) {
     if (!s.proxima_fecha_cobro) continue;
     const vencido = diasEntre(s.proxima_fecha_cobro.slice(0, 10), hoy);
     if (vencido > 0) {
-      const monto = precioVigente(s, s.proxima_fecha_cobro.slice(0, 10));
+      // El plan al precio de ESA fecha de cobro, más los add-ons y extras que paga hoy (0147).
+      const monto = Math.round((precioVigente(s, s.proxima_fecha_cobro.slice(0, 10)) + totalAddons(addonsDe.get(s.tenant_id) ?? [], hoy)) * 100) / 100;
       alertas.push({
         id: `cobro-${s.tenant_id}`, severidad: vencido >= 7 ? "critica" : "alta", tipo: "Cobro vencido",
         tenantId: s.tenant_id, tenant,

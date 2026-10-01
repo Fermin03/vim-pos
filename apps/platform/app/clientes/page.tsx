@@ -94,7 +94,7 @@ export default function ClientesPage() {
 
       {m && (
         <div className="mb-5 grid grid-cols-2 gap-4 lg:grid-cols-4">
-          <TarjetaCifra titulo="MRR" valor={fmtMxn(m.mrr)} sub="suscripciones activas" />
+          <TarjetaCifra titulo="MRR" valor={fmtMxn(m.mrr)} sub={(m.mrrAddons ?? 0) > 0 ? `planes ${fmtMxn(m.mrrSuscripciones ?? 0)} + extras ${fmtMxn(m.mrrAddons ?? 0)}` : "suscripciones activas"} />
           <TarjetaCifra titulo="Clientes" valor={String(m.totalTenants)} sub={`${m.activos} activos · ${m.trial} en prueba`} />
           <TarjetaCifra titulo="Suspendidos / cancelados" valor={`${m.suspendidos} / ${m.cancelados}`} />
           <TarjetaCifra titulo="Folios vendidos" valor={String(m.foliosVendidos30d)} sub="últimos 30 días" />

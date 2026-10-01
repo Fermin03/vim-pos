@@ -89,7 +89,19 @@ promoción opcional; en Esencial hay un botón "Piloto 5 negocios" ($499 seis me
 Cambiar de plan enseña ANTES de confirmar lo que cambia —folios del mes, add-ons que gana o
 pierde (lo que pierde, en `danger`) y el cobro antes → después—, porque la base mueve todo eso
 en la misma transacción. La prueba gratis sale en Contrato con su fecha y "Extender prueba…"
-(motivo, a la bitácora); vencida va en `warning`, no en rojo: no corta nada. **Datos de pago**
+(motivo, a la bitácora); vencida va en `warning`, no en rojo: no corta nada. **Extras por cantidad (0147, ADR 0024).** La sucursal y la caja adicional no van en la lista de
+add-ons (activar / dar de baja) sino en su propio bloque, **Extras**, porque se contratan por
+cantidad. Cada renglón dice el precio por unidad, lo que suma al mes y la cuenta del límite a la
+vista: "Límite: 1 del plan + 2 extra = **3 cajas por sucursal**" (o "por excepción" si la base es
+una excepción). El diálogo enseña antes → después del límite y del total al mes. **Subir** pide
+solo motivo; **bajar o quitar** pide además el nombre del cliente y va en `danger`: le quita algo
+que puede estar usando. Si lo está usando, la base lo rechaza y el diálogo dice cuántas tiene que
+desactivar antes. Donde el plan no tiene límite no hay botón: se dice por qué. El bloque Cobro
+enseña el **total al mes** (plan + add-ons y extras) cuando paga algo aparte, y "Registrar pago"
+propone ese total. Al cambiar de plan, los extras que el plan nuevo deja sin sentido salen en
+`danger` con lo que deja de pagar; los demás, en una línea que dice que se conservan.
+
+**Datos de pago**
 y **Soporte** (0142, en la misma pantalla "Pagos y soporte") son las únicas que escriben algo que ven TODOS los clientes, así que se confirman
 escribiendo `TODOS`, como un aviso importante a todos.
 

@@ -4,7 +4,7 @@
 // supabase/migrations/0141_cobro_promocion_prueba_plan.sql. La base es la que decide; esto solo le
 // enseña al operador, ANTES de confirmar, lo que la base va a hacer: folios del mes, add-ons que
 // entran o salen y el precio del cobro. Si cambias la regla allá, cámbiala aquí.
-import { precioVigente, promocionVigente } from "@vim/db/cobro";
+import { EXTRAS, precioVigente, promocionVigente, type CodigoExtra } from "@vim/db/cobro";
 
 /** Qué bandera de `planes.features_incluidos` dice que el plan incluye cada add-on. */
 export const ADDONS_DEL_PLAN = [
@@ -18,9 +18,15 @@ export type PlanParaCambio = {
   precio_mensual_mxn: number;
   timbres_cfdi_mensuales?: number | null;
   features_incluidos?: Record<string, unknown> | null;
+  /** Límites del plan; null = sin límite. Deciden qué extras por cantidad dejan de tener sentido (0147). */
+  max_sucursales?: number | null;
+  max_cajas_por_sucursal?: number | null;
 };
 
-export type AddonDelTenant = { codigo: string; activo: boolean; precio: number; incluidoEnPlan: boolean };
+export type AddonDelTenant = { codigo: string; activo: boolean; precio: number; incluidoEnPlan: boolean; /** Unidades (0147); sin dato, una. */ cantidad?: number };
+
+/** La excepción de límites del cliente (`tenant_limites`): si existe, es la base sobre la que suman los extras. */
+export type ExcepcionLimites = { max_sucursales: number | null; max_cajas_por_sucursal: number | null };
 
 export type SuscripcionParaCambio = {
   precio_mensual_mxn: number | string;
@@ -37,6 +43,11 @@ export type VistaPreviaPlan = {
   dejaDePagar: { codigo: string; precio: number }[];
   /** Add-ons que daba el plan anterior y el nuevo no incluye: se retiran. */
   retira: string[];
+  /**
+   * Extras por cantidad que se retiran porque el plan nuevo ya no tiene ese límite (cajas
+   * adicionales al subir a Cadena, 0147). Los demás extras se conservan: se pagan aparte.
+   */
+  retiraExtras: { codigo: CodigoExtra; cantidad: number; importe: number }[];
   /** null si no hay cobro vigente (no hay precio que cambiar). */
   precio: { antes: number; despues: number } | null;
   quitaPromocion: string | null;
@@ -55,6 +66,8 @@ export function vistaPreviaCambioPlan(args: {
   precio?: number | null;
   /** Hoy en México (`hoyMx()`): una promoción ya vencida no se "quita", ya no está. */
   hoy: string;
+  /** Excepción de límites vigente del cliente; con ella la base no es el plan. */
+  excepcion?: ExcepcionLimites | null;
 }): VistaPreviaPlan {
   const { nuevo, addons, suscripcion } = args;
   const concede: string[] = [];
@@ -71,11 +84,23 @@ export function vistaPreviaCambioPlan(args: {
       retira.push(codigo);
     }
   }
+  // Espejo de `_retirar_extras_sin_limite()` (0147): la base es la excepción si existe y, si no,
+  // el plan nuevo. Sin límite que ampliar, el extra se cierra para que no pague por nada.
+  const retiraExtras: VistaPreviaPlan["retiraExtras"] = [];
+  for (const codigo of Object.keys(EXTRAS) as CodigoExtra[]) {
+    const limite = EXTRAS[codigo].limite;
+    const base = args.excepcion?.[limite] ?? nuevo[limite] ?? null;
+    if (base !== null) continue;
+    const filas = addons.filter((a) => a.codigo === codigo && a.activo);
+    const cantidad = filas.reduce((acc, a) => acc + (a.cantidad ?? 1), 0);
+    if (cantidad > 0) retiraExtras.push({ codigo, cantidad, importe: filas.reduce((acc, a) => acc + a.precio * (a.cantidad ?? 1), 0) });
+  }
   return {
     folios: { antes: args.foliosAntes, despues: Number(nuevo.timbres_cfdi_mensuales ?? 0) },
     concede,
     dejaDePagar,
     retira,
+    retiraExtras,
     // "Antes" es lo que paga HOY (con promoción si sigue vigente), no el precio de lista.
     precio: suscripcion ? { antes: precioVigente(suscripcion, args.hoy), despues: args.precio ?? Number(nuevo.precio_mensual_mxn) } : null,
     quitaPromocion: suscripcion && promocionVigente(suscripcion, args.hoy) ? (suscripcion.promocion_nombre ?? "la promoción") : null,
