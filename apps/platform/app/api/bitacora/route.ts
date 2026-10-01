@@ -10,6 +10,15 @@ import { autorizar, SYSTEM_ADMIN_ID } from "../../lib/server";
  * por qué, sobre todo cuando un cliente pregunta quién tocó su información.
  */
 
+/**
+ * Las filas de un negocio eliminado (0144) ya no tienen `tenant_id`: `eliminar_tenant` les deja
+ * quién era en `payload.tenant_eliminado`, y de ahí sale el nombre.
+ */
+function eliminado(payload: unknown): string | null {
+  const t = (payload as { tenant_eliminado?: { nombre_comercial?: unknown } } | null)?.tenant_eliminado;
+  return typeof t?.nombre_comercial === "string" ? `${t.nombre_comercial} (eliminado)` : null;
+}
+
 export async function GET(req: Request) {
   const auth = await autorizar(req);
   if ("error" in auth) return auth.error;
@@ -54,7 +63,7 @@ export async function GET(req: Request) {
       id: f.id,
       accion: f.accion,
       tenantId: f.tenant_id,
-      tenant: f.tenant_id ? (nombres.get(f.tenant_id) ?? "(empresa eliminada)") : "—",
+      tenant: f.tenant_id ? (nombres.get(f.tenant_id) ?? "(empresa eliminada)") : (eliminado(f.payload) ?? "—"),
       quien: f.super_admin_id === SYSTEM_ADMIN_ID ? "Clave compartida" : (operadores.get(f.super_admin_id) ?? "(operador eliminado)"),
       motivo: f.motivo,
       ip: f.ip_address,

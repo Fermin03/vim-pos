@@ -176,7 +176,7 @@ export default function FichaCliente() {
           <FichaFacturacion d={d} accion={accion} busy={busy} />
         </Seccion>
 
-        <ZonaPeligrosa estado={estado} nombre={nombre} bloqueoDesde={bloqueoDesde} accion={accion} busy={busy} />
+        <ZonaPeligrosa estado={estado} nombre={nombre} bloqueoDesde={bloqueoDesde} accion={accion} busy={busy} api={api} tenantId={id} />
       </div>
       <p className="mt-4 text-12 text-ink-3">{textoActualizado(hace)}</p>
 

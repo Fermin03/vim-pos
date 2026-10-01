@@ -3,6 +3,8 @@ import { useState } from "react";
 import { fechaHoraMx } from "../lib/formato";
 import { Seccion } from "./seccion";
 import { DialogoConfirmar } from "./dialogo-confirmar";
+import { EliminarCliente } from "./eliminar-cliente";
+import type { Api } from "../lib/tipos";
 
 type Accion = (b: Record<string, unknown>) => Promise<void>;
 type Modo = "suspender" | "cancelar" | "reactivar" | null;
@@ -14,8 +16,10 @@ type Modo = "suspender" | "cancelar" | "reactivar" | null;
  * Suspender y cancelar llevan gracia (spec §3): la caja avisa esos días y bloquea después. Para
  * un bloqueo "ya", se escribe 1: entra a las 06:00 de mañana, que es lo más inmediato que se
  * puede hacer sin dejar a un cajero a media jornada.
+ *
+ * Eliminar es otra cosa y va aparte, debajo: solo con el cliente ya cancelado (`EliminarCliente`).
  */
-export function ZonaPeligrosa({ estado, nombre, bloqueoDesde, accion, busy }: { estado: string; nombre: string; bloqueoDesde: string | null; accion: Accion; busy: boolean }) {
+export function ZonaPeligrosa({ estado, nombre, bloqueoDesde, accion, busy, api, tenantId }: { estado: string; nombre: string; bloqueoDesde: string | null; accion: Accion; busy: boolean; api: Api; tenantId: string }) {
   const [modo, setModo] = useState<Modo>(null);
   const boton = "btn h-10 rounded px-4 text-13 font-semibold text-white disabled:opacity-50";
   const cerrar = () => setModo(null);
@@ -39,6 +43,9 @@ export function ZonaPeligrosa({ estado, nombre, bloqueoDesde, accion, busy }: { 
         </p>
       )}
 
+      {/* Dos pasos (ADR 0023): eliminar solo existe para quien ya está cancelado. */}
+      {estado === "CANCELADO" && <EliminarCliente api={api} tenantId={tenantId} nombre={nombre} />}
+
       <DialogoConfirmar
         abierto={modo === "suspender"}
         onCerrar={cerrar}
@@ -59,7 +66,7 @@ export function ZonaPeligrosa({ estado, nombre, bloqueoDesde, accion, busy }: { 
         abierto={modo === "cancelar"}
         onCerrar={cerrar}
         titulo="Cancelar cliente"
-        descripcion={<><b>{nombre}</b> pasa a CANCELADO. Con 1 día de gracia el bloqueo entra mañana a las 6:00. Su historial no se borra y se puede reactivar después.</>}
+        descripcion={<><b>{nombre}</b> pasa a CANCELADO. Con 1 día de gracia el bloqueo entra mañana a las 6:00. Su historial no se borra y se puede reactivar después. Ya cancelado, aquí mismo aparece la opción de eliminarlo por completo.</>}
         nombreEsperado={nombre}
         etiquetaBoton="Cancelar cliente"
         peligroso
