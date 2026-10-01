@@ -6,7 +6,7 @@
 
 - **Doc 12 §9 y ADR 0014:** el panel administra el ciclo de vida de un tenant por su `estado`
   (`TRIAL`, `ACTIVO`, `SUSPENDIDO`, `CANCELADO`). Cancelar "no borra su historial y se puede
-  reactivar". No existe la eliminación: todas las llaves a `tenants` son `ON DELETE RESTRICT` a
+  reactivar". No existe la eliminación: las llaves de las tablas operativas a `tenants` son `ON DELETE RESTRICT` a
   propósito.
 - **0010 y 0133:** el reporte Z no se borra nunca (`trg_reporte_z_inmutable`) y las tablas de
   dinero no admiten DELETE desde el cliente (`guardia_escritura_directa`).
@@ -58,7 +58,7 @@
   de las migraciones no puede fijarlo en Supabase, y apagar las llaves es justo lo contrario de
   "que falle si queda algo".
 - Una lista de tablas a mano se pudre con la primera migración que añada una; un `CASCADE` en las
-  88 llaves a `tenants` convertiría un `DELETE` suelto en la pérdida de un cliente.
+  cien llaves a `tenants` convertiría un `DELETE` suelto en la pérdida de un cliente.
 - El asiento de bitácora va dentro de la función y no en la ruta: una eliminación sin rastro no
   puede existir, ni siquiera si el servidor del panel se cae entre el commit y el `auditar`.
 
