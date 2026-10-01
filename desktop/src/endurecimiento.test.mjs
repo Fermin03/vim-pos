@@ -120,7 +120,10 @@ test("D10: el manifiesto exige versión x.y.z y URL https", async () => {
     await assert.rejects(buscarActualizacion(feed, "0.1.0"), /https/);
   });
   await conFeed({ version: "9.9.9", url: "https://x/y.exe", sha512: SHA }, async (feed) => {
-    assert.equal((await buscarActualizacion(feed, "0.1.0")).hay, true, "sin llave configurada no se exige firma");
+    // Desde la 0.4.103 la caja trae llave: un manifiesto sin firma se rechaza por omisión…
+    await assert.rejects(buscarActualizacion(feed, "0.1.0"), /firma/);
+    // …y solo sin llave (pruebas, o una caja anterior) se acepta sin firmar.
+    assert.equal((await buscarActualizacion(feed, "0.1.0", { llavePublica: null })).hay, true);
   });
   await assert.rejects(descargarInstalador("http://x/y.exe", SHA, path.join(tmpdir(), "no")), /https/);
 });

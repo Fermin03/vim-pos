@@ -1,6 +1,6 @@
 {
   "name": "vim-pos-desktop",
-  "version": "0.4.102",
+  "version": "0.4.103",
   "private": true,
   "type": "module",
   "description": "VIM POS · Punto de venta para restaurantes",

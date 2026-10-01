@@ -120,7 +120,7 @@ export async function POST(req: Request) {
   // La caché corta es obligatoria: sin ella el CDN sirve el manifiesto anterior hasta un minuto y
   // parece que la publicación no surtió efecto. Pasó en las entregas 2 y 3.
   const cuerpo = JSON.stringify(
-    { version: m.version, url: m.url, sha512: m.sha512, notas: m.notas, fecha: m.fecha },
+    { version: m.version, url: m.url, sha512: m.sha512, notas: m.notas, fecha: m.fecha, firma: m.firma },
     null, 2,
   ) + "\n";
   const clave = process.env.SUPABASE_SERVICE_ROLE_KEY!;

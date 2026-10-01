@@ -213,31 +213,29 @@ notificación + (en la caja) ítem en la bandeja "⬇ Actualización vX — inst
 cuya `version` no sea `x.y.z` estricto o cuya `url` no sea `https://`. `release-manifest` aborta en
 el mismo caso, para que te enteres aquí y no en la caja.
 
-#### Firmar `latest.json` (Ed25519) — preparado, DESACTIVADO hasta que haya llave
+#### Firmar `latest.json` (Ed25519) — ACTIVO desde la 0.4.103 (1 oct 2026)
 
-Hoy el manifiesto no va firmado y trae la URL y el SHA-512 juntos: quien pueda escribir el bucket
-controla las dos cosas. La verificación de firma ya está en `src/updater.mjs`, y se enciende sola en
-cuanto `LLAVE_PUBLICA_ACTUALIZACIONES` tenga una llave. Para activarla:
+El manifiesto va **firmado**. La caja lleva la llave pública en `src/updater.mjs`
+(`LLAVE_PUBLICA_ACTUALIZACIONES`) y rechaza cualquier `latest.json` sin una firma válida sobre
+`version`, `url` y `sha512` (ver `mensajeAFirmar`). Quien logre escribir en el bucket ya no puede
+mandarle a las cajas un instalador suyo: le falta la llave privada.
 
-1. Genera el par **una sola vez**, en una máquina de confianza (no en una caja). La privada NO va
-   al repositorio ni al bucket; guárdala en el gestor de secretos de VIM y en un respaldo offline:
-   ```bash
-   openssl genpkey -algorithm ed25519 -out vim-actualizaciones.key
-   openssl pkey -in vim-actualizaciones.key -pubout -out vim-actualizaciones.pub
-   ```
-2. Pega el contenido de `vim-actualizaciones.pub` (el bloque `-----BEGIN PUBLIC KEY-----…`) como
-   valor de `LLAVE_PUBLICA_ACTUALIZACIONES` en `src/updater.mjs` y publica ESA versión con un
-   manifiesto ya firmado (paso 3).
-3. Al publicar, firma con la privada:
-   ```bash
-   VIM_UPDATE_LLAVE_PRIVADA=/ruta/segura/vim-actualizaciones.key \
-   VIM_UPDATE_URL="<la URL real>" npm run release-manifest -- "Qué cambió"
-   ```
-   El script añade `firma` (base64) sobre `version`, `url` y `sha512` (ver `mensajeAFirmar`).
-
-Orden importante: una caja que ya tenga la llave rechaza cualquier manifiesto sin firma válida, así
-que **desde la versión que incluya la llave, todo `latest.json` debe ir firmado**. Perder la privada
-obliga a publicar un instalador con otra llave que cada caja tendría que recibir a mano.
+- **La llave privada NO está en el repo ni en ningún servidor.** Vive en la máquina que publica:
+  `%USERPROFILE%.vim-pos-llavesim-actualizaciones.key` (o donde apunte
+  `VIM_UPDATE_LLAVE_PRIVADA`). Hay que tener **un respaldo fuera de esa máquina** (USB o gestor de
+  contraseñas). **Si se pierde, las cajas instaladas dejan de poder actualizarse** y habría que
+  reinstalarlas a mano con un instalador que traiga otra llave.
+- `npm run release-manifest -- "Qué cambió"` firma solo, comprueba la firma contra la llave pública
+  de las cajas y **aborta si falta la llave** o si no es la pareja. Ya no existe el manifiesto sin firmar.
+- La `url` por omisión es la del repo público de descargas
+  (`Fermin03/vim-pos-descargas`); el del código es privado y sus releases dan 404.
+- El panel (`/versiones`) valida la firma con la misma llave pública
+  (`apps/platform/app/lib/llave-actualizaciones.ts`) y la conserva al subir el manifiesto; una prueba
+  comprueba que las dos copias de la llave coinciden.
+- Las cajas anteriores a la 0.4.103 no verifican firma: aceptan el manifiesto firmado igual (ignoran
+  el campo) y, al instalar la 0.4.103, empiezan a exigirla.
+- Para cambiar de llave: publicar (firmado con la llave VIEJA) una versión que traiga la pública
+  NUEVA; desde esa versión se firma con la nueva.
 
 Las cajas/cocinas detectan la nueva versión en su próximo arranque. Feed por defecto:
 `https://pbiaxzvmssjsxdwqrumb.supabase.co/storage/v1/object/public/actualizaciones/latest.json`
