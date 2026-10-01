@@ -167,12 +167,17 @@ export function totalMensual(
 
 // ── Extras por cantidad: sucursal y caja adicional (0147) ───────────────────────────────────────
 //
-// Los dos add-ons que se contratan por cantidad y suben un límite del plan. ESPEJO de
-// `limites_efectivos()` y `fijar_extra_tenant()` en supabase/migrations/0147_extras_por_cantidad.sql.
+// Los dos add-ons que se contratan por cantidad. ESPEJO de `limites_efectivos()` y
+// `fijar_extra_tenant()` en supabase/migrations/0147_extras_por_cantidad.sql. NO funcionan igual:
+//
+//   · SUCURSAL_EXTRA: cada una es una sucursal más (el límite es base + cantidad).
+//   · CAJA_EXTRA: "$249 por cada caja nueva que se abra". La base del plan es POR SUCURSAL y no se
+//     le suma nada; la cantidad son cajas adicionales para TODO el negocio, usables en la sucursal
+//     que sea. Nunca se expresan como un solo número: ver `textoLimiteCajas`.
 
 export const EXTRAS = {
-  SUCURSAL_EXTRA: { limite: "max_sucursales", unidad: "sucursal", unidades: "sucursales" },
-  CAJA_EXTRA: { limite: "max_cajas_por_sucursal", unidad: "caja por sucursal", unidades: "cajas por sucursal" },
+  SUCURSAL_EXTRA: { limite: "max_sucursales", unidad: "sucursal", unidades: "sucursales", porCada: "por cada sucursal adicional" },
+  CAJA_EXTRA: { limite: "max_cajas_por_sucursal", unidad: "caja", unidades: "cajas", porCada: "por cada caja adicional" },
 } as const;
 export type CodigoExtra = keyof typeof EXTRAS;
 
@@ -191,13 +196,30 @@ export function cantidadDeExtra(filas: (AddonCobro & { codigo: string | null | u
 }
 
 /**
- * El límite efectivo. LA PRECEDENCIA (ADR 0024): la base es la excepción de VIM si existe y, si no,
- * el plan; los extras contratados se suman ENCIMA de esa base. `null` es "sin límite" y lo sigue
- * siendo: a un plan sin tope de cajas un extra no le pone uno.
+ * El límite efectivo de SUCURSALES. LA PRECEDENCIA (ADR 0024): la base es la excepción de VIM si
+ * existe y, si no, el plan; las sucursales adicionales se suman ENCIMA de esa base. `null` es "sin
+ * límite" y lo sigue siendo. (Para cajas la base es la misma regla, pero las adicionales NO se
+ * suman a ella: con `extras: 0` esto da la base por sucursal.)
  */
 export function limiteConExtras(d: { plan: number | null; excepcion: number | null; extras: number }): number | null {
   const base = d.excepcion ?? d.plan;
   return base === null ? null : base + d.extras;
+}
+
+/**
+ * Cómo se DICE el límite de cajas, igual en el panel de VIM y en el del dueño:
+ * "3 cajas por sucursal + 2 cajas adicionales (1 en uso)". La base es por sucursal; las adicionales
+ * son del negocio entero y se usan donde hagan falta, así que sumarlas en un número mentiría.
+ * Los tres datos salen de `limites_efectivos()`: `max_cajas_por_sucursal`, `cajas_adicionales` y
+ * `cajas_adicionales_en_uso`.
+ */
+export function textoLimiteCajas(d: { base: number | null | undefined; adicionales?: number | null; enUso?: number | null }): string {
+  if (d.base == null) return "cajas sin límite";
+  const base = `${d.base} ${d.base === 1 ? "caja" : "cajas"} por sucursal`;
+  const n = Math.max(0, Math.trunc(Number(d.adicionales ?? 0)) || 0);
+  if (n === 0) return base;
+  const uso = Math.max(0, Math.trunc(Number(d.enUso ?? 0)) || 0);
+  return `${base} + ${n} ${n === 1 ? "caja adicional" : "cajas adicionales"} (${uso} en uso)`;
 }
 
 // ── Prueba gratis (0141) ───────────────────────────────────────────────────────────────────────

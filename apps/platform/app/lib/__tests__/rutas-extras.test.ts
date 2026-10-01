@@ -106,6 +106,18 @@ describe("extra_fijar", () => {
   });
 });
 
+describe("cambiar_plan con cajas que no caben (0147)", () => {
+  it("la base lo rechaza y la ruta lo dice con sus números, como un choque (409), no como un error del servidor", async () => {
+    rpcRespuesta = { data: null, error: { message: "CAJAS_EXCEDEN_PLAN", hint: "El plan Esencial da 1 caja(s) por sucursal. Tiene 2 caja(s) de más y 1 adicional(es) contratada(s): contrata 1 caja(s) adicional(es) o desactiva cajas antes de cambiar." } };
+    const r = await PATCH(pedir({ accion: "cambiar_plan", plan_id: "plan-2", motivo: MOTIVO }), ctx);
+    expect(r.status).toBe(409);
+    const j = await r.json();
+    expect(j.error).toBe("CAJAS_EXCEDEN_PLAN");
+    expect(j.detalle).toContain("Tiene 2 caja(s) de más");
+    expect(auditorias).toEqual([]);
+  });
+});
+
 describe("los extras no entran por el camino de los add-ons de siempre", () => {
   it("addon_activar y addon_desactivar los rechazan: saltarían la cantidad y la comprobación de uso", async () => {
     for (const accion of ["addon_activar", "addon_desactivar"]) {

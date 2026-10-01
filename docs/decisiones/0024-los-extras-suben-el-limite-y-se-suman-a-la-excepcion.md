@@ -1,4 +1,4 @@
-# 0024 — La sucursal y la caja adicional son extras por cantidad: suben el límite y se suman a la excepción
+# 0024 — La sucursal y la caja adicional son extras por cantidad; la caja adicional es UNA caja, no una por sucursal
 
 **Fecha:** 2026-10-01 · **Estado:** vigente
 
@@ -22,18 +22,30 @@
 
 2. **La precedencia de los límites, escrita:**
 
-   > base = la excepción de `tenant_limites` si existe; si no, el plan
-   > efectivo = base + extras vigentes × cantidad · `NULL` (sin límite) sigue siendo `NULL`
+   > base = la excepción de `tenant_limites` si existe; si no, el plan · `NULL` = sin límite
 
-   Vive en `limites_efectivos()` (SQL) y en `limiteConExtras()` de `@vim/db/cobro` (TS, para
-   pintar el desglose). Las llaves del JSON no cambian, así que `resolver_directivas` no se tocó
-   y a la caja le sigue llegando solo el número final.
+   - **Sucursales:** efectivo = base + `SUCURSAL_EXTRA` × cantidad. Cada una es una sucursal más.
+   - **Cajas — "$249 por cada caja nueva que se abra"** (decisión del dueño, 1 oct 2026). La base
+     es **por sucursal** y no se le suma nada. `CAJA_EXTRA.cantidad` son cajas adicionales para
+     **todo el negocio**, usables en la sucursal que sea:
+
+     > excedente = Σ por sucursal de max(0, cajas activas − base)
+     > se puede abrir una caja si su sucursal está bajo la base, **o** si excedente < adicionales
+
+     La primera versión de esta migración sumaba el extra a la base por sucursal: con tres
+     sucursales, una caja adicional de $249 daba tres cajas. Se corrigió antes de aplicarla.
+
+   Vive en `limites_efectivos()` (SQL): `max_cajas_por_sucursal` es la base, y dos llaves nuevas,
+   `cajas_adicionales` y `cajas_adicionales_en_uso`, dicen el resto. Todos lo expresan igual, con
+   `textoLimiteCajas()` de `@vim/db/cobro`: **"3 cajas por sucursal + 2 cajas adicionales (1 en
+   uso)"** — nunca un número sumado. `resolver_directivas` no se tocó (solo quita `del_plan` y
+   `excepcion`), así que las dos llaves nuevas también llegan a la caja.
 
 3. **Una sola puerta para cambiarlos:** `fijar_extra_tenant(tenant, código, cantidad, precio)`,
    solo `service_role`. Cantidad 0 = quitar. Rechaza:
    - `SIN_LIMITE` — una caja adicional donde el plan ya no limita las cajas (Cadena);
-   - `EXTRA_EN_USO` — bajar la cantidad por debajo de lo que el cliente ya usa, diciendo cuánto
-     usa y cuántas tiene que desactivar antes.
+   - `EXTRA_EN_USO` — bajar la cantidad por debajo de lo que el cliente ya usa (sucursales
+     activas; cajas adicionales en uso), diciendo cuánto usa y cuántas tiene que desactivar antes.
 
    Cambiar la cantidad **el mismo día** actualiza la fila de hoy (`addon_unico_activo` es una alta
    por día, no "uno activo"); otro día cierra la vigente y abre otra, y así la historia dice
@@ -42,10 +54,13 @@
    precio en silencio. El alta y la baja de los add-ons de siempre **no** aceptan estos
    dos códigos: ese camino no sabe de cantidades ni comprueba el uso.
 
-4. **Cambio de plan:** los extras se **conservan** — se pagan aparte. La única excepción es la que
-   dejaría al cliente pagando por nada: si el plan nuevo no limita las cajas (o las sucursales),
-   el extra correspondiente se retira en la misma transacción y sale en `addons.retirados`. La
-   vista previa del panel lo dice antes de confirmar, con lo que deja de pagar.
+4. **Cambio de plan:** los extras se **conservan** — se pagan aparte. Dos casos:
+   - el plan nuevo no limita las cajas (o las sucursales): el extra correspondiente se retira en
+     la misma transacción y sale en `addons.retirados` (pagaría por nada). La vista previa del
+     panel lo dice antes de confirmar, con lo que deja de pagar;
+   - el plan nuevo da **menos cajas por sucursal** y las ya abiertas no caben ni con sus
+     adicionales: el cambio se **rechaza** (`CAJAS_EXCEDEN_PLAN`) diciendo cuántas sobran. O
+     contrata las adicionales que faltan o desactiva cajas, y entonces sí.
 
 5. **Un solo total.** `totalMensual()` de `@vim/db/cobro` = precio vigente de la suscripción
    (ADR 0021) + add-ons vigentes × cantidad. Lo marcado `incluido_en_plan` vale cero siempre,
@@ -69,17 +84,22 @@
 
 ## Consecuencias
 
-- **El límite de cajas es por sucursal**, así que una caja adicional sube el tope de *cada*
-  sucursal. Con una sola sucursal (Esencial, Negocio) es exacto. Con varias, un cliente que paga
-  una caja adicional puede poner una más en cada una. Se acepta mientras los clientes con varias
-  sucursales sean pocos; si deja de valer, el arreglo es contar cajas por negocio y no por
-  sucursal, y es otro ADR.
-- **Las excepciones existentes no se convirtieron en extras de pago.** Quien hoy tiene una caja de
-  más por excepción la sigue teniendo sin pagar. Cobrársela es cambiarle el contrato, y eso se
-  habla con él: se quita la excepción y se le da de alta el extra.
+- **El candado de cajas ya no es "N por sucursal" a secas.** Una caja se rechaza cuando su
+  sucursal está en la base Y no queda adicional libre en todo el negocio; el mensaje dice cuántas
+  adicionales usa y lo que cuesta otra. Para contar las de todas las sucursales, el trigger pasó
+  a `SECURITY DEFINER` (solo lee).
+- **Una adicional no pertenece a una sucursal.** Si se desactiva la caja de más en una, la
+  adicional queda libre para cualquier otra.
+- **Las excepciones son cortesías, no ventas.** En producción no hay ninguna fila en
+  `tenant_limites`, así que no hubo nada que convertir. Siguen existiendo —la excepción reemplaza
+  la base del plan y los extras cuentan encima—, y el panel las llama por su nombre: **"Excepción
+  sin cobro"**, con su motivo. Crecer se vende como extra; la excepción es para una cortesía o
+  algo temporal.
+- **Bajar de plan puede rechazarse** por cajas que no caben (antes no se comprobaba nada). Las
+  sucursales siguen sin comprobarse al bajar.
 - **Con una excepción encima de un plan sin límite** (o al revés) puede quedar un extra que no
   amplía nada. La ficha lo dice ("su plan trae cajas sin límite") y deja quitarlo.
-- **Bajar de plan sigue sin comprobar el uso** (ya era así: los candados actúan al dar de alta).
+- **Bajar de plan no comprueba las sucursales** (ya era así: el candado actúa al dar de alta).
   Un cliente que baja de Cadena a Negocio con tres sucursales las conserva hasta que desactive
   alguna; no podrá crear más.
 - **El MRR sube** el día que esto se despliega solo si ya hay add-ons de pago vigentes: antes no

@@ -89,7 +89,8 @@ Debajo, **"Lo que tienes contratado"** (0147): un renglón por cosa —el plan y
 "2 × $249.00" cuando va por cantidad e "incluido en tu plan" cuando no cuesta— y el **total al
 mes**, que es el mismo número que ve VIM en su panel. Solo aparece si hay algo además del plan:
 con un solo renglón no dice nada. Sin cobro activo no hay total; se dice que empieza a cobrarse
-junto con el plan.
+junto con el plan. Bajo el nombre del plan va hasta dónde puede crecer, con las mismas palabras
+que usa VIM: "Hasta 2 sucursales · 1 caja por sucursal + 2 cajas adicionales (1 en uso)".
 
 "Cómo pagar" enseña los datos que VIM captura en su panel (banco, titular, CLABE en grupos de
 cuatro, correo) con botón de copiar, y un botón de WhatsApp con el mensaje del comprobante ya

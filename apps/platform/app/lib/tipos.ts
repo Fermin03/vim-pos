@@ -155,7 +155,11 @@ export type Modulos = {
   excepciones: { codigo: string; activado: boolean; motivo: string | null; fecha_fin: string | null }[];
 };
 export type LimitesTrio = { max_sucursales: number | null; max_cajas_por_sucursal: number | null; max_usuarios: number | null };
-export type Limites = LimitesTrio & { del_plan: LimitesTrio; excepcion: LimitesTrio & { motivo: string | null } };
+export type Limites = LimitesTrio & {
+  del_plan: LimitesTrio; excepcion: LimitesTrio & { motivo: string | null };
+  /** CAJA_EXTRA contratadas, para todo el negocio, y cuántas están en uso (0147). `max_cajas_por_sucursal` es solo la base. */
+  cajas_adicionales?: number; cajas_adicionales_en_uso?: number;
+};
 
 export type Detalle = {
   tenant: Record<string, unknown>;

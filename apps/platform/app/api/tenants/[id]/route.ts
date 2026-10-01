@@ -385,7 +385,12 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
     }
     const { data, error } = await sb.rpc("cambiar_plan_tenant", { p_tenant_id: id, p_plan_id: planId, p_precio: precio });
     if (error) {
-      const conocido = /PRECIO_INVALIDO|MISMO_PLAN|PLAN_RETIRADO|PLAN_NO_EXISTE|TENANT_NO_EXISTE/.exec(error.message)?.[0];
+      const conocido = /PRECIO_INVALIDO|MISMO_PLAN|PLAN_RETIRADO|PLAN_NO_EXISTE|TENANT_NO_EXISTE|CAJAS_EXCEDEN_PLAN/.exec(error.message)?.[0];
+      // Las cajas ya abiertas no caben en el plan nuevo (0147): la base lo rechaza y dice cuántas
+      // sobran en el HINT. Es un choque con el estado del cliente (409), no un dato mal capturado.
+      if (conocido === "CAJAS_EXCEDEN_PLAN") {
+        return NextResponse.json({ error: conocido, detalle: (error as { hint?: string | null }).hint || conocido }, { status: 409 });
+      }
       return NextResponse.json({ error: conocido ?? error.message }, { status: conocido ? 400 : 500 });
     }
     const res = (data ?? {}) as { addons?: { concedidos?: string[]; retirados?: string[] } } & Record<string, unknown>;

@@ -115,11 +115,26 @@ Activa el cobro el día que de verdad vaya a pagar, no antes.
    método, fecha y referencia. Puedes registrar varios meses de una vez.
 3. La fecha del siguiente cobro avanza sola. Si te equivocaste, **Anular** el último pago (con motivo).
 
-> **Referidos:** un mes gratis por cada recomendado que contrate y ya esté vendiendo; se aplica
-> en el siguiente cobro de quien recomendó. **El panel todavía no tiene cómo registrar un mes en
-> $0** ("Registrar pago" exige un monto mayor a cero). Mientras se decide cómo, anótalo en
-> **Notas internas** de la ficha (quién recomendó a quién y qué mes se regala) y no suspendas a
-> ese cliente por ese mes aunque Atención lo marque como cobro vencido.
+### Mes de cortesía por referido (a mano)
+
+La regla: **un mes gratis por cada recomendado que contrate y ya esté vendiendo**, aplicado en el
+siguiente cobro de quien recomendó. No hay botón; se hace con lo que existe.
+
+**No se puede registrar un pago en $0**: "Registrar pago" exige un monto mayor a cero (la pantalla,
+la función y la tabla lo rechazan). Así que el mes de cortesía no se registra como pago; se
+**pausa** el cobro ese mes y el pago siguiente cubre dos:
+
+1. **El día que le tocaba pagar** el mes de cortesía: **Contrato → Cobro → Pausar cobro…**, con el
+   motivo **"Mes de cortesía por referido de [negocio recomendado]"**. Eso es lo que queda en la
+   bitácora. En pausa no sale como "Cobro vencido" en Atención, su caja sigue vendiendo y él ve
+   "Cobro en pausa" en su panel, no un aviso de pago vencido.
+2. Anótalo también en **Notas internas** (quién recomendó a quién y qué mes fue).
+3. **Al mes siguiente**, cuando pague: **Reanudar cobro…** y luego **Registrar pago** con
+   **Meses = 2**, **Monto = lo de UN mes** y, en Notas del pago, "Incluye mes de cortesía por
+   referido de [negocio]". El panel avisará de que lo acordado por dos meses es el doble: es lo
+   esperado. La fecha del siguiente cobro avanza los dos meses y queda donde debe.
+
+No lo dejes en "pausa" más de ese mes: en pausa no hay alerta que te recuerde cobrarle.
 
 ---
 
@@ -131,11 +146,22 @@ En **Contrato**. Lo que se activa aquí se suma al total que ve el dueño en Pla
 |---|---|---|
 | **Facturación electrónica** (CFDI) | $349/mes en Esencial; incluida en Negocio y Cadena | Los folios se compran aparte por paquete (Ficha → Facturación). Activarlo solo le da permiso: el sello lo sube él (sección 6). |
 | **Apps de delivery** (Uber Eats) | $100/mes en Esencial; incluido desde Negocio | Después de activarlo, el dueño lo enciende y conecta su tienda en **Configuración → Integraciones**. Ver `delivery-uber-sandbox.md`. |
-| **Sucursal adicional** | $599/mes cada una | En **Extras**. Sube el límite de sucursales. |
-| **Caja adicional** | $249/mes cada una | En **Extras**. Sube el límite de cajas por sucursal. En Cadena no aplica: ya son sin límite. |
+| **Sucursal adicional** | $599/mes por cada sucursal adicional | En **Extras**. Cada una es una sucursal más. |
+| **Caja adicional** | $249/mes por cada caja nueva que abra | En **Extras**. Es **una caja**, en la sucursal que sea — no una por sucursal. En Cadena no aplica: sus cajas ya son sin límite. |
 
+**Cómo se cuentan las cajas.** El plan da un número de cajas **por sucursal** (Esencial 1,
+Negocio 3). Cada caja que abra por encima de eso, en cualquier sucursal, ocupa una **caja
+adicional**. El panel lo dice así: *"1 caja por sucursal + 2 cajas adicionales (1 en uso)"*.
+Ejemplo: dos sucursales en un plan de 1 caja por sucursal y **una** adicional → puede tener tres
+cajas en total (la tercera, en la sucursal que quiera); la cuarta se rechaza hasta contratar otra.
+
+- [ ] **Crecer se vende como extra, no como excepción.** En **Módulos y límites** se puede subir
+      un límite a mano, pero eso es una **"Excepción sin cobro"**: solo para una cortesía o algo
+      temporal, siempre con motivo. Si el cliente va a pagar por la caja o la sucursal, es un extra.
 - [ ] **Extras → Agregar… / Cambiar…**: cantidad, precio por unidad y motivo. El diálogo enseña
       el límite y el total al mes, antes → después.
+- [ ] Al **bajar de plan**, si las cajas que ya tiene abiertas no caben (ni con sus adicionales),
+      el panel rechaza el cambio y dice cuántas sobran: o contrata las que faltan o desactiva cajas.
 - [ ] Para **quitar** un extra, primero tiene que desactivar la caja o la sucursal de más; si no,
       el panel lo rechaza y dice cuántas sobran.
 - [ ] **Inventario, recetas y mermas** vienen desde **Negocio**. En Esencial el dueño ve la
@@ -255,7 +281,7 @@ Bloqueado, su panel queda en solo lectura (ve sus reportes y cómo pagar) y **no
 | **La caja no aparece en línea** | Que la abran y tenga internet. En la ficha, Operación dice hace cuánto dio señal y qué versión tiene. |
 | **Se dañó la computadora** | La caja se **respalda sola cada día** (con la caja quieta y sin turno abierto) y sus ventas sincronizadas están en la nube. Instalar en otra computadora y vincular con una **clave nueva**. Si lleva tres días sin respaldo, llega aviso a Errores. Detalle: `../../desktop/RUNBOOK.md`. |
 | **Un error raro en pantalla** | **Errores** en el panel de VIM: trae el mensaje, la versión y cuántas veces pasó. |
-| **No puede crear otra caja o sucursal** | Es el límite de su plan: se le da de alta el extra (sección 4). |
+| **No puede crear otra caja o sucursal** | Es el límite de su plan: se le da de alta el extra (sección 4). El mensaje que ve dice cuántas cajas adicionales tiene en uso. |
 | **No ve Inventario** | Su plan es Esencial (sección 4). |
 | **Quedó bloqueado y ya pagó** | Registrar el pago y **Reactivar** (sección 8). |
 

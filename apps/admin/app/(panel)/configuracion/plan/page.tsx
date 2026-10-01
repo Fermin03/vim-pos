@@ -6,7 +6,7 @@ import { ETIQUETA_METODO_COBRO, estadoCobro, precioVigente, promocionVigente, te
 import { PageHeader, PageBody } from "../../../components/page-header";
 import { AvisoPrueba } from "../../../components/aviso-prueba";
 import { BotonCopiar } from "../../../components/boton-copiar";
-import { desgloseMensual, leerPlanYPagos, type PlanYPagos } from "../../../lib/plan";
+import { desgloseMensual, leerPlanYPagos, textoLimites, type PlanYPagos } from "../../../lib/plan";
 import { clabeLegible, enlaceWhatsapp, hayDatosPago, mensajeComprobante, mesDe, type DatosPago } from "../../../lib/datos-pago";
 import { mensajeError } from "../../../lib/errores";
 
@@ -61,6 +61,8 @@ export default function PlanPage() {
                     </p>
                   )}
                   {promo?.nombre && <p className="mt-0.5 text-12 text-ink-3">Precio de promoción: {promo.nombre}</p>}
+                  {/* Hasta dónde puede crecer hoy, con las mismas palabras que usa VIM (0147). */}
+                  {textoLimites(d.limites) && <p className="mt-1 text-13 text-ink-2">{textoLimites(d.limites)}</p>}
                 </div>
                 {s?.estado === "ACTIVA" && <StatusChip tone={TONO[estado.tipo]} punto>{textoEstadoCobro(estado)}</StatusChip>}
                 {s?.estado === "PAUSADA" && <StatusChip tone="neutral">Cobro en pausa</StatusChip>}

@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 // `plan.ts` importa el cliente de Supabase al cargarse; aquí solo se prueba la función pura.
 vi.mock("../supabase", () => ({ supabase: {}, leerSesion: vi.fn() }));
 
-import { desgloseMensual, type AddonContratado } from "../plan";
+import { desgloseMensual, textoLimites, type AddonContratado } from "../plan";
 
 /*
  * "Plan y pagos" le dice al dueño cuánto paga al mes y por qué: su plan al precio vigente (con la
@@ -78,5 +78,15 @@ describe("desgloseMensual", () => {
   it("sin plan no escribe 'Plan undefined'", () => {
     const d = desgloseMensual(null, { precio_mensual_mxn: 699 }, [], HOY);
     expect(d.renglones[0]?.concepto).toBe("Tu plan");
+  });
+});
+
+describe("textoLimites", () => {
+  it("dice la base por sucursal y las cajas adicionales aparte, con cuántas están en uso", () => {
+    expect(textoLimites({ max_sucursales: 2, max_cajas_por_sucursal: 1, cajas_adicionales: 2, cajas_adicionales_en_uso: 1 }))
+      .toBe("Hasta 2 sucursales · 1 caja por sucursal + 2 cajas adicionales (1 en uso)");
+    expect(textoLimites({ max_sucursales: 1, max_cajas_por_sucursal: 3 })).toBe("Hasta 1 sucursal · 3 cajas por sucursal");
+    expect(textoLimites({ max_sucursales: 3, max_cajas_por_sucursal: null })).toBe("Hasta 3 sucursales · cajas sin límite");
+    expect(textoLimites(null)).toBeNull();
   });
 });

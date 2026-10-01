@@ -49,6 +49,7 @@ insert into _secdef_solo_service (fn, motivo) values
   ('fijar_extra_tenant',         'amplía o reduce sucursales y cajas contratadas de cualquier negocio (0147)'),
   ('_extras_vigentes',           'lee los extras contratados de cualquier negocio (0147)'),
   ('_retirar_extras_sin_limite', 'cierra extras contratados de cualquier negocio (0147)'),
+  ('_cajas_excedente',           'cuenta las cajas abiertas de cualquier negocio (0147)'),
   ('_inventario_apagar_si_no_permitido', 'apaga el descuento de inventario de cualquier negocio (0148)'),
   ('inventario_respetar_uso_previo', 'concede el módulo de inventario por excepción a negocios enteros (0148)');
 

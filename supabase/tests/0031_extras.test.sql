@@ -8,7 +8,7 @@
 -- Se corre con:  supabase test db
 -- ============================================================================
 begin;
-select plan(9);
+select plan(11);
 
 -- 1) Las funciones que mueven el contrato: solo service_role.
 select ok(not has_function_privilege('authenticated', 'fijar_extra_tenant(uuid, text, integer, numeric, text)', 'execute')
@@ -18,7 +18,9 @@ select ok(not has_function_privilege('authenticated', 'fijar_extra_tenant(uuid, 
 select ok(not has_function_privilege('authenticated', '_extras_vigentes(uuid, text)', 'execute')
       and not has_function_privilege('anon', '_extras_vigentes(uuid, text)', 'execute')
       and not has_function_privilege('authenticated', '_retirar_extras_sin_limite(uuid)', 'execute')
-      and not has_function_privilege('anon', '_retirar_extras_sin_limite(uuid)', 'execute'),
+      and not has_function_privilege('anon', '_retirar_extras_sin_limite(uuid)', 'execute')
+      and not has_function_privilege('authenticated', '_cajas_excedente(uuid, integer, uuid)', 'execute')
+      and not has_function_privilege('anon', '_cajas_excedente(uuid, integer, uuid)', 'execute'),
   'las internas de extras no se llaman desde el navegador');
 
 -- 2) El catálogo trae los dos extras con el precio del sitio.
@@ -47,11 +49,17 @@ select results_eq(
        from tenant_addons ta join addons a on a.id = ta.addon_id where ta.activo $$,
   $$ values ('CAJA_EXTRA', 1, 249.00::numeric(10,2)) $$,
   'el dueño lee su extra con cantidad y precio (Plan y pagos)');
-select is((limites_efectivos('ffffffff-0000-0000-0000-0000000031a0')->>'max_cajas_por_sucursal'), '2',
-  'el límite que ve el dueño ya lleva el extra');
+select is(limites_efectivos('ffffffff-0000-0000-0000-0000000031a0') - 'del_plan' - 'excepcion',
+  '{"max_sucursales": 1, "max_cajas_por_sucursal": 1, "cajas_adicionales": 1, "cajas_adicionales_en_uso": 0, "max_usuarios": null}'::jsonb,
+  'lo que ve el dueño: 1 caja por sucursal + 1 caja adicional (0 en uso) — la base no se infla');
 select lives_ok($$ insert into cajas (tenant_id, sucursal_id, numero, nombre)
                    values ('ffffffff-0000-0000-0000-0000000031a0', 'ffffffff-0000-0000-0000-0000000031a1', 2, 'Caja 2') $$,
-  'con el extra, el dueño crea su segunda caja');
+  'con la adicional, el dueño abre su segunda caja');
+select is((limites_efectivos('ffffffff-0000-0000-0000-0000000031a0')->>'cajas_adicionales_en_uso'), '1', 'y la adicional queda en uso');
+select throws_ok($$ insert into cajas (tenant_id, sucursal_id, numero, nombre)
+                    values ('ffffffff-0000-0000-0000-0000000031a0', 'ffffffff-0000-0000-0000-0000000031a1', 3, 'Caja 3') $$,
+  'P0001', 'Tu plan permite 1 caja(s) por sucursal y ya usas 1 de 1 caja(s) adicional(es). Cada caja adicional cuesta $249 al mes: pídela a VIM.',
+  'la tercera se rechaza diciendo cuántas adicionales usa y lo que cuesta otra');
 select throws_ok($$ select fijar_extra_tenant('ffffffff-0000-0000-0000-0000000031a0', 'CAJA_EXTRA', 5) $$, '42501', null,
   'el dueño no puede ampliarse el contrato él solo');
 

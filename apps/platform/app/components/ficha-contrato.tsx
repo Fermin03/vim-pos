@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { fechaLegible, hoyMx, sumarDias, sumarMeses } from "@vim/fecha";
-import { cantidadDeExtra, esExtra, estadoPrueba, EXTRAS, EXTRAS_MAXIMO, limiteConExtras, textoPrecio, totalMensual, type CodigoExtra, type PrecioSuscripcion } from "@vim/db/cobro";
+import { cantidadDeExtra, esExtra, estadoPrueba, EXTRAS, EXTRAS_MAXIMO, limiteConExtras, textoLimiteCajas, textoPrecio, totalMensual, type CodigoExtra, type PrecioSuscripcion } from "@vim/db/cobro";
 import type { AddonCatalogo, Detalle, Plan } from "../lib/tipos";
 import { fechaValida, PILOTO, promocionPiloto } from "../lib/promocion";
 import { vistaPreviaCambioPlan, type AddonDelTenant } from "../lib/cambio-plan";
@@ -43,7 +43,7 @@ type SuscripcionFicha = PrecioSuscripcion & { estado: string; proxima_fecha_cobr
 
 const fmtPrecio = { fecha: fechaLegible, mxn: fmtMxn };
 
-/** "1 caja por sucursal", "3 cajas por sucursal". */
+/** "1 sucursal", "3 cajas". */
 const enUnidades = (codigo: CodigoExtra, n: number) => `${n} ${n === 1 ? EXTRAS[codigo].unidad : EXTRAS[codigo].unidades}`;
 
 /** Antes → después, en dos columnas. */
@@ -133,6 +133,8 @@ export function FichaContrato({ d, planes, accion, busy, accesoDueno }: { d: Det
       precio: Number(vigente ? vigente.precio_mensual_mxn : cat.precio_mensual_mxn),
       base: limiteConExtras({ plan: delPlan, excepcion, extras: 0 }),
       porExcepcion: excepcion !== null,
+      // Solo cajas: cuántas adicionales tiene abiertas hoy (el excedente sobre la base de cada sucursal).
+      enUso: codigo === "CAJA_EXTRA" ? Number(d.limites?.cajas_adicionales_en_uso ?? 0) : 0,
     }];
   });
   const extraSel = pendiente?.tipo === "extra" ? extras.find((e) => e.codigo === pendiente.codigo) ?? null : null;
@@ -334,12 +336,15 @@ export function FichaContrato({ d, planes, accion, busy, accesoDueno }: { d: Det
                       <div className="text-13 text-ink-2">
                         {e.cantidad > 0
                           ? <>{fmtMxn(e.precio)} c/u · {fmtMxn(e.precio * e.cantidad)}/mes</>
-                          : <>{fmtMxn(e.precio)}/mes cada una</>}
+                          : <>{fmtMxn(e.precio)}/mes {u.porCada}</>}
                       </div>
                       <div className="text-13 text-ink-2">
                         {e.base === null
                           ? <>Su plan trae {u.unidades} sin límite: no hay nada que ampliar.</>
-                          : <>Límite: {e.base} {e.porExcepcion ? "por excepción" : "del plan"}{e.cantidad > 0 ? ` + ${e.cantidad} extra` : ""} = <b className="text-ink">{enUnidades(e.codigo, efectivo ?? 0)}</b></>}
+                          : e.codigo === "CAJA_EXTRA"
+                            // Cajas: la base es por sucursal y las adicionales son del negocio. No se suman.
+                            ? <><b className="text-ink">{textoLimiteCajas({ base: e.base, adicionales: e.cantidad, enUso: e.enUso })}</b>{e.porExcepcion ? " · la base es una excepción sin cobro" : ""}</>
+                            : <>Límite: {e.base} {e.porExcepcion ? "por excepción sin cobro" : "del plan"}{e.cantidad > 0 ? ` + ${e.cantidad} ${e.cantidad === 1 ? "adicional" : "adicionales"}` : ""} = <b className="text-ink">{enUnidades(e.codigo, efectivo ?? 0)}</b></>}
                       </div>
                     </div>
                     {(e.base !== null || e.cantidad > 0) && (
@@ -577,7 +582,9 @@ export function FichaContrato({ d, planes, accion, busy, accesoDueno }: { d: Det
         onCerrar={cerrar}
         titulo={extraSel ? extraSel.cat.nombre : ""}
         descripcion={extraSel ? (
-          <>Cuántas tiene contratadas <b>{nombre}</b>. El límite cambia en cuanto confirmas; lo que paga, desde hoy. Con 0 se le quita.</>
+          extraSel.codigo === "CAJA_EXTRA"
+            ? <>Cuántas cajas adicionales tiene contratadas <b>{nombre}</b>: una por cada caja que abra por encima de las que da su plan en cada sucursal, en la sucursal que sea. Vale en cuanto confirmas; lo que paga, desde hoy. Con 0 se le quitan.</>
+            : <>Cuántas sucursales adicionales tiene contratadas <b>{nombre}</b>: una por cada sucursal de más. El límite cambia en cuanto confirmas; lo que paga, desde hoy. Con 0 se le quitan.</>
         ) : null}
         detalle={extraSel ? (
           <div className="flex flex-col gap-3">
@@ -587,15 +594,25 @@ export function FichaContrato({ d, planes, accion, busy, accesoDueno }: { d: Det
                 <input id="extra-cantidad" className={`${input} tabular-nums`} inputMode="numeric" value={extraCantidad} onChange={(e) => setExtraCantidad(e.target.value.replace(/[^0-9]/g, "").slice(0, 2))} />
               </div>
               <div>
-                <label className={label} htmlFor="extra-precio">Precio por cada una, al mes</label>
+                <label className={label} htmlFor="extra-precio">Precio al mes, {EXTRAS[extraSel.codigo].porCada}</label>
                 <input id="extra-precio" className={`${input} tabular-nums`} inputMode="decimal" value={extraPrecio} placeholder={String(extraSel.cat.precio_mensual_mxn)} onChange={(e) => setExtraPrecio(e.target.value)} />
               </div>
             </div>
             {extraCantidadNum !== null && extraSel.base !== null && (
-              <Cambio
-                antes={<>Límite: {enUnidades(extraSel.codigo, extraSel.base + extraSel.cantidad)}</>}
-                despues={<>{enUnidades(extraSel.codigo, extraSel.base + extraCantidadNum)}</>}
-              />
+              extraSel.codigo === "CAJA_EXTRA" ? (
+                <Cambio
+                  antes={<>{textoLimiteCajas({ base: extraSel.base, adicionales: extraSel.cantidad, enUso: extraSel.enUso })}</>}
+                  despues={<>{textoLimiteCajas({ base: extraSel.base, adicionales: extraCantidadNum, enUso: extraSel.enUso })}</>}
+                />
+              ) : (
+                <Cambio
+                  antes={<>Límite: {enUnidades(extraSel.codigo, extraSel.base + extraSel.cantidad)}</>}
+                  despues={<>{enUnidades(extraSel.codigo, extraSel.base + extraCantidadNum)}</>}
+                />
+              )
+            )}
+            {extraSel.codigo === "CAJA_EXTRA" && extraCantidadNum !== null && extraCantidadNum < extraSel.enUso && (
+              <p className="text-13 text-danger">Tiene {extraSel.enUso} en uso: no se puede bajar de ahí sin que desactive cajas antes.</p>
             )}
             {extraCantidadNum !== null && (
               <Cambio

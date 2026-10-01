@@ -6,6 +6,7 @@ import {
   esExtra,
   importeAddon,
   limiteConExtras,
+  textoLimiteCajas,
   totalMensual,
   type AddonCobro,
 } from "@vim/db/cobro";
@@ -82,6 +83,9 @@ describe("extras por cantidad", () => {
   it("son dos y cada uno sube un límite", () => {
     expect(EXTRAS.SUCURSAL_EXTRA.limite).toBe("max_sucursales");
     expect(EXTRAS.CAJA_EXTRA.limite).toBe("max_cajas_por_sucursal");
+    // El texto del panel: una sucursal adicional es una sucursal más; una caja adicional, una caja más.
+    expect(EXTRAS.SUCURSAL_EXTRA.porCada).toBe("por cada sucursal adicional");
+    expect(EXTRAS.CAJA_EXTRA.porCada).toBe("por cada caja adicional");
     expect(esExtra("CAJA_EXTRA")).toBe(true);
     expect(esExtra("CFDI")).toBe(false);
   });
@@ -97,15 +101,25 @@ describe("extras por cantidad", () => {
     expect(cantidadDeExtra([], "CAJA_EXTRA", HOY)).toBe(0);
   });
 
-  it("limiteConExtras: la excepción reemplaza al plan como base y los extras se suman encima", () => {
-    // Esencial (1 caja) + 2 extras = 3.
+  it("limiteConExtras (SUCURSALES): la excepción reemplaza al plan como base y cada extra es una sucursal más", () => {
+    // Esencial (1 sucursal) + 2 extras = 3.
     expect(limiteConExtras({ plan: 1, excepcion: null, extras: 2 })).toBe(3);
-    // Con excepción a 2 cajas y 1 extra = 3: la excepción no absorbe lo que el cliente paga.
+    // Con excepción a 2 y 1 extra = 3: la excepción no absorbe lo que el cliente paga.
     expect(limiteConExtras({ plan: 1, excepcion: 2, extras: 1 })).toBe(3);
     // Sin extras, la excepción sigue mandando como antes de 0147.
     expect(limiteConExtras({ plan: 1, excepcion: 4, extras: 0 })).toBe(4);
-    // Sin límite (Cadena) sigue sin límite: los extras no le ponen techo.
+    // Sin límite sigue sin límite: los extras no le ponen techo.
     expect(limiteConExtras({ plan: null, excepcion: null, extras: 3 })).toBeNull();
+  });
+
+  it("textoLimiteCajas: la base es por sucursal y las adicionales son del negocio — nunca se suman en un número", () => {
+    // Así lo dicen el panel de VIM, la ficha y Plan y pagos del dueño: con las mismas palabras.
+    expect(textoLimiteCajas({ base: 3, adicionales: 2, enUso: 1 })).toBe("3 cajas por sucursal + 2 cajas adicionales (1 en uso)");
+    expect(textoLimiteCajas({ base: 1, adicionales: 1, enUso: 0 })).toBe("1 caja por sucursal + 1 caja adicional (0 en uso)");
+    expect(textoLimiteCajas({ base: 1, adicionales: 0, enUso: 0 })).toBe("1 caja por sucursal");
+    expect(textoLimiteCajas({ base: null, adicionales: 0, enUso: 0 })).toBe("cajas sin límite");
+    // Lo que venga de una lectura vieja o incompleta no escribe "undefined".
+    expect(textoLimiteCajas({ base: 2, adicionales: undefined, enUso: undefined })).toBe("2 cajas por sucursal");
   });
 });
 

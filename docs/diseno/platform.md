@@ -91,9 +91,13 @@ pierde (lo que pierde, en `danger`) y el cobro antes → después—, porque la 
 en la misma transacción. La prueba gratis sale en Contrato con su fecha y "Extender prueba…"
 (motivo, a la bitácora); vencida va en `warning`, no en rojo: no corta nada. **Extras por cantidad (0147, ADR 0024).** La sucursal y la caja adicional no van en la lista de
 add-ons (activar / dar de baja) sino en su propio bloque, **Extras**, porque se contratan por
-cantidad. Cada renglón dice el precio por unidad, lo que suma al mes y la cuenta del límite a la
-vista: "Límite: 1 del plan + 2 extra = **3 cajas por sucursal**" (o "por excepción" si la base es
-una excepción). El diálogo enseña antes → después del límite y del total al mes. **Subir** pide
+cantidad. Cada renglón dice el precio ("por cada sucursal adicional", "por cada caja adicional"),
+lo que suma al mes y el límite a la vista. Sucursales: "Límite: 1 del plan + 2 adicionales = **3
+sucursales**". **Cajas nunca se suman en un número**: la base es por sucursal y las adicionales
+son del negocio entero — "**1 caja por sucursal + 2 cajas adicionales (1 en uso)**", con las
+mismas palabras que ve el dueño (`textoLimiteCajas`). Un límite subido a mano en Módulos y límites
+se llama **"Excepción sin cobro"** y enseña su motivo: tiene que verse que es una cortesía y no
+algo que el cliente paga. El diálogo enseña antes → después del límite y del total al mes. **Subir** pide
 solo motivo; **bajar o quitar** pide además el nombre del cliente y va en `danger`: le quita algo
 que puede estar usando. Si lo está usando, la base lo rechaza y el diálogo dice cuántas tiene que
 desactivar antes. Donde el plan no tiene límite no hay botón: se dice por qué. El bloque Cobro

@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
 import { MODULOS, type CodigoModulo } from "@vim/db/modulos";
+import { textoLimiteCajas } from "@vim/db/cobro";
 import type { Detalle, LimitesTrio } from "../lib/tipos";
 import { input, label } from "../lib/formato";
 import { DialogoConfirmar } from "./dialogo-confirmar";
@@ -109,7 +110,10 @@ export function ModulosLimites({ d, nombre, accion, busy }: { d: Detalle; nombre
 
         <div>
           <label className={label}>Límites</label>
-          <p className="mb-2 text-12 text-ink-3">En gris, lo que da el plan. Escribe un número para hacer una excepción; vacío = según plan. Las sucursales y cajas adicionales (arriba, en Extras) se suman encima.</p>
+          <p className="mb-2 text-12 text-ink-3">
+            En gris, lo que da el plan. Un número aquí es una <b className="text-ink-2">excepción sin cobro</b>: una cortesía o algo temporal, con su motivo. Vacío = según plan.
+            Crecer se vende: las sucursales y cajas adicionales van arriba, en Extras.
+          </p>
           {CLAVES.map((k) => {
             const delPlan = lim?.del_plan[k];
             return (
@@ -125,7 +129,13 @@ export function ModulosLimites({ d, nombre, accion, busy }: { d: Detalle; nombre
                   onChange={(e) => setF({ ...f, [k]: e.target.value.replace(/[^0-9]/g, "") })}
                 />
                 {/* Lo que de verdad aplica hoy: la excepción (o el plan) más los extras contratados (0147). */}
-                <span className="text-12 text-ink-2">hoy: <b className="tabular-nums text-ink">{lim?.[k] ?? "sin límite"}</b></span>
+                <span className="text-12 text-ink-2">
+                  hoy: <b className="tabular-nums text-ink">
+                    {k === "max_cajas_por_sucursal"
+                      ? textoLimiteCajas({ base: lim?.max_cajas_por_sucursal, adicionales: lim?.cajas_adicionales, enUso: lim?.cajas_adicionales_en_uso })
+                      : (lim?.[k] ?? "sin límite")}
+                  </b>
+                </span>
               </div>
             );
           })}
@@ -137,7 +147,9 @@ export function ModulosLimites({ d, nombre, accion, busy }: { d: Detalle; nombre
             Guardar límites
           </button>
           {lim?.excepcion.motivo && CLAVES.some((k) => lim.excepcion[k] !== null) && (
-            <p className="mt-2 text-12 text-ink-3">Excepción vigente: {lim.excepcion.motivo}</p>
+            <p className="mt-2 rounded border border-line bg-sel px-2.5 py-1.5 text-12 text-ink-2">
+              <b className="text-ink">Excepción sin cobro</b> ({CLAVES.filter((k) => lim.excepcion[k] !== null).map((k) => `${NOMBRE_LIMITE[k].toLowerCase()}: ${lim.excepcion[k]}`).join(", ")}) · {lim.excepcion.motivo}
+            </p>
           )}
         </div>
       </div>
@@ -148,7 +160,7 @@ export function ModulosLimites({ d, nombre, accion, busy }: { d: Detalle; nombre
         titulo={titulo}
         descripcion={
           pendiente?.tipo === "limites"
-            ? <>Los límites de <b>{nombre}</b> dejarán de seguir su plan. Se aplican al dar de alta cajas, sucursales y usuarios.</>
+            ? <>Los límites de <b>{nombre}</b> dejarán de seguir su plan, <b>sin cobro</b>: es una excepción de cortesía o temporal y queda con tu motivo. Si va a pagar por crecer, usa Extras. Se aplican al dar de alta cajas, sucursales y usuarios.</>
             : pendiente?.tipo === "quitar"
               ? <>El módulo dejará de estar disponible para <b>{nombre}</b> aunque su plan lo incluya. La caja lo obedece en su siguiente conexión (unos 10 minutos).</>
               : <>Se le permite a <b>{nombre}</b> un módulo que su plan no incluye. Queda como excepción con tu motivo.</>

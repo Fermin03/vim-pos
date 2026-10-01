@@ -1,5 +1,5 @@
 import { supabase, leerSesion } from "./supabase";
-import { addonVigente, importeAddon, precioVigente, totalMensual, type AddonCobro, type MetodoCobro, type PrecioSuscripcion } from "@vim/db/cobro";
+import { addonVigente, importeAddon, precioVigente, textoLimiteCajas, totalMensual, type AddonCobro, type MetodoCobro, type PrecioSuscripcion } from "@vim/db/cobro";
 import type { DatosPago } from "./datos-pago";
 
 /** Lo que el dueño ve de su contrato con VIM: plan, cobro, prueba, pagos y a dónde pagar (0130, 0141). Solo lectura. */
@@ -26,7 +26,27 @@ export type PlanYPagos = {
   datosPago: DatosPago | null;
   /** Lo que tiene contratado aparte del plan: facturación, delivery y extras por cantidad (0147). */
   addons: AddonContratado[];
+  /** Hasta dónde puede crecer hoy (`limites_efectivos`). null si la lectura falló. */
+  limites: LimitesDueno | null;
 };
+
+/** Lo que el dueño necesita de `limites_efectivos()`. */
+export type LimitesDueno = {
+  max_sucursales: number | null; max_cajas_por_sucursal: number | null;
+  cajas_adicionales?: number | null; cajas_adicionales_en_uso?: number | null;
+};
+
+/**
+ * "Hasta 2 sucursales · 1 caja por sucursal + 2 cajas adicionales (1 en uso)". Las mismas palabras
+ * que usa el panel de VIM (`textoLimiteCajas`): la base de cajas es por sucursal y las adicionales
+ * son del negocio entero.
+ */
+export function textoLimites(l: LimitesDueno | null): string | null {
+  if (!l) return null;
+  const suc = l.max_sucursales == null ? "sucursales sin límite" : `hasta ${l.max_sucursales} ${l.max_sucursales === 1 ? "sucursal" : "sucursales"}`;
+  const cajas = textoLimiteCajas({ base: l.max_cajas_por_sucursal, adicionales: l.cajas_adicionales, enUso: l.cajas_adicionales_en_uso });
+  return `${suc[0]!.toUpperCase()}${suc.slice(1)} · ${cajas}`;
+}
 
 /** Una fila de `tenant_addons` con el nombre de su add-on, como la ve el dueño. */
 export type AddonContratado = AddonCobro & { codigo: string; nombre: string; incluido_en_plan: boolean };
@@ -76,7 +96,7 @@ export async function leerPlanYPagos(): Promise<PlanYPagos> {
   if (!s?.tenantId) throw new Error("Sesión sin tenant");
   const tid = s.tenantId;
 
-  const [t, sub, pag, dp, ad] = await Promise.all([
+  const [t, sub, pag, dp, ad, lim] = await Promise.all([
     supabase.from("tenants").select("nombre_comercial, estado, prueba_hasta, plan:planes(nombre, precio_mensual_mxn)").eq("id", tid).maybeSingle(),
     supabase
       .from("suscripciones")
@@ -101,6 +121,7 @@ export async function leerPlanYPagos(): Promise<PlanYPagos> {
       .select("activo, precio_mensual_mxn, cantidad, fecha_inicio, fecha_fin, incluido_en_plan, addon:addons(codigo, nombre, orden_visualizacion)")
       .eq("tenant_id", tid)
       .eq("activo", true),
+    supabase.rpc("limites_efectivos", { p_tenant: tid }),
   ]);
   if (t.error) throw t.error;
   if (sub.error) throw sub.error;
@@ -115,6 +136,7 @@ export async function leerPlanYPagos(): Promise<PlanYPagos> {
     suscripcion: (sub.data as PlanYPagos["suscripcion"]) ?? null,
     pagos: (pag.data ?? []) as PlanYPagos["pagos"],
     datosPago: filaPago,
+    limites: lim.error ? null : ((lim.data ?? null) as LimitesDueno | null),
     // Si esta lectura falla, la pantalla sigue: enseña el plan sin el desglose.
     addons: ad.error ? [] : ((ad.data ?? []) as unknown as (AddonCobro & { incluido_en_plan?: boolean; addon?: { codigo?: string; nombre?: string; orden_visualizacion?: number } | null })[])
       .filter((f) => f.addon?.codigo)
