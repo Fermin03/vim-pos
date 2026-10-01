@@ -24,6 +24,7 @@ Cada archivo dice **qué decía el plan, qué hacemos hoy y por qué**. Manda lo
 | [0018](0018-listo-por-estacion.md) | Cada estación marca LISTO lo suyo | 24/09/2026 |
 | [0021](0021-precio-vigente-y-lo-que-incluye-el-plan.md) | El precio vigente sale de una regla, y cambiar de plan ajusta lo que el plan incluye | 30/09/2026 |
 | [0022](0022-llegada-del-cliente-registro-y-soporte.md) | El registro es público y verificado, y el soporte viaja a la caja por el latido | 30/09/2026 |
+| [0023](0023-eliminar-un-cliente-es-el-segundo-paso-de-la-baja.md) | Eliminar un cliente es el segundo paso de la baja, y la base decide si se puede | 01/10/2026 |
 
 ## Pendientes de escribir
 
