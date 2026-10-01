@@ -543,7 +543,8 @@ function ultimoRespaldoOk() {
 function refrescarMenuTray() {
   if (!tray) return;
   const ip = backend?.lanIp ?? "127.0.0.1";
-  tray.setToolTip(`VIM POS — Caja (servidor del local). La cocina se conecta a ${ip}. No la cierres durante el servicio.`);
+  // La IP para la cocina ya está en el menú (clic derecho); el aviso al pasar el ratón es para el cajero.
+  tray.setToolTip("VIM POS · Caja en servicio — no la cierres mientras atiendes");
   const items = [];
   if (updateInfo) items.push({ label: `⬇ Actualización v${updateInfo.version} — instalar`, click: () => ofrecerInstalar() }, { type: "separator" });
   items.push(
