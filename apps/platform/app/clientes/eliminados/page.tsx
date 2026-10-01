@@ -17,6 +17,8 @@ type Eliminado = {
   resumen: Record<string, number>;
   pagos: { cuantos: number; total: number };
   contacto: { nombre?: string; email?: string; telefono?: string };
+  /** Archivos de Storage que todavía no se lograron borrar. */
+  archivosPendientes: number;
 };
 
 /**
@@ -28,6 +30,7 @@ export default function ClientesEliminados() {
   const { api } = useSesion();
   const [filas, setFilas] = useState<Eliminado[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [reintentando, setReintentando] = useState<string | null>(null);
 
   const cargar = useCallback(async () => {
     try {
@@ -38,6 +41,19 @@ export default function ClientesEliminados() {
     }
   }, [api]);
   useEffect(() => { void cargar(); }, [cargar]);
+
+  /** Vuelve a pedirle a Storage que borre lo que quedó pendiente de ese cliente. */
+  async function reintentar(id: string) {
+    setReintentando(id);
+    try {
+      await api("/api/tenants/eliminados", { method: "POST", body: JSON.stringify({ id }) });
+      await cargar();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "No se pudo reintentar");
+    } finally {
+      setReintentando(null);
+    }
+  }
 
   return (
     <div>
@@ -82,6 +98,21 @@ export default function ClientesEliminados() {
                   <td className="px-4 py-2.5 tabular-nums text-ink-2">
                     <div>{fmtInt(f.resumen.tickets ?? 0)} tickets</div>
                     <div className="text-12">{fmtInt(f.resumen.filas ?? 0)} filas · {fmtInt(f.resumen.cuentas ?? 0)} cuentas</div>
+                    {f.archivosPendientes > 0 && (
+                      <div className="mt-1.5">
+                        <div className="text-12 font-semibold text-warning">
+                          {fmtInt(f.archivosPendientes)} {f.archivosPendientes === 1 ? "archivo sin borrar" : "archivos sin borrar"}
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => void reintentar(f.id)}
+                          disabled={reintentando !== null}
+                          className="btn mt-1 h-9 rounded border border-line-strong px-3 text-13 font-semibold text-ink hover:bg-hover disabled:opacity-50"
+                        >
+                          {reintentando === f.id ? "Borrando…" : "Reintentar"}
+                        </button>
+                      </div>
+                    )}
                   </td>
                   <td className="px-4 py-2.5 tabular-nums text-ink-2">
                     {f.pagos.cuantos > 0 ? <>{fmtMxn(f.pagos.total)}<div className="text-12">{fmtInt(f.pagos.cuantos)} {f.pagos.cuantos === 1 ? "pago" : "pagos"}</div></> : "—"}

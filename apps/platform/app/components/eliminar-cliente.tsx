@@ -2,8 +2,9 @@
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { Api } from "../lib/tipos";
+import { useSesion } from "../lib/sesion";
 import { fmtInt } from "../lib/formato";
-import { PALABRA_ELIMINAR, type ResumenEliminacion, type VistaPreviaEliminacion } from "../lib/eliminar";
+import { AVISO_CORTE, PALABRA_ELIMINAR, respuestaCortada, type ResumenEliminacion, type VistaPreviaEliminacion } from "../lib/eliminar";
 import { DialogoConfirmar } from "./dialogo-confirmar";
 
 /** Dónde deja el aviso para la lista de clientes, que es a donde se vuelve después de eliminar. */
@@ -36,6 +37,9 @@ function renglones(r: ResumenEliminacion): string[] {
  */
 export function EliminarCliente({ api, tenantId, nombre }: { api: Api; tenantId: string; nombre: string }) {
   const router = useRouter();
+  const { operador } = useSesion();
+  // Solo con la cuenta individual del operador (segundo factor). El servidor lo exige igual.
+  const conCuenta = operador.via === "cuenta";
   const [previa, setPrevia] = useState<VistaPreviaEliminacion | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [abierto, setAbierto] = useState(false);
@@ -65,16 +69,22 @@ export function EliminarCliente({ api, tenantId, nombre }: { api: Api; tenantId:
         method: "POST",
         body: JSON.stringify({ motivo: r.motivo, nombre: r.nombre, confirmacion: r.palabra ?? "" }),
       });
-      const fallos = (res.archivos as { fallos?: string[] } | undefined)?.fallos ?? [];
+      const pendientes = Number((res.archivos as { pendientes?: number } | undefined)?.pendientes ?? 0);
       const conservadas = Array.isArray(res.cuentas_conservadas) ? res.cuentas_conservadas.length : 0;
       const extra = [
         conservadas > 0 ? `${plural(conservadas, "cuenta se conservó", "cuentas se conservaron")} porque otro negocio la usa` : "",
-        fallos.length > 0 ? `${plural(fallos.length, "archivo no se pudo borrar", "archivos no se pudieron borrar")}: revisa la bitácora` : "",
+        pendientes > 0 ? `${plural(pendientes, "archivo quedó sin borrar", "archivos quedaron sin borrar")}: reinténtalo desde Clientes eliminados` : "",
       ].filter(Boolean).join(". ");
       try {
-        sessionStorage.setItem(CLAVE_AVISO_ELIMINADO, JSON.stringify({ nombre, extra, problema: fallos.length > 0 }));
+        sessionStorage.setItem(CLAVE_AVISO_ELIMINADO, JSON.stringify({ nombre, extra, problema: pendientes > 0 }));
       } catch { /* sin sessionStorage solo se pierde el aviso */ }
       router.push("/clientes");
+    } catch (e) {
+      // Un rechazo del servidor ya dice que no se borró nada. Un corte no dice nada: se avisa de
+      // que hay que comprobar antes de reintentar (reintentar es seguro: si ya se eliminó, el
+      // servidor contesta que ese cliente no existe).
+      if (respuestaCortada(e)) throw new Error(AVISO_CORTE);
+      throw e;
     } finally {
       setOcupado(false);
     }
@@ -98,10 +108,22 @@ export function EliminarCliente({ api, tenantId, nombre }: { api: Api; tenantId:
         <div className="mt-3 rounded border border-line-strong bg-surface p-3 text-13" role="status">
           <p className="font-semibold text-ink">No se puede eliminar.</p>
           {bloqueos.map((b) => <p key={b.codigo} className="mt-1 text-ink-2">{b.mensaje}</p>)}
+          {bloqueos.some((b) => b.codigo === "ESPERA_TIMBRADOS") && (
+            <button type="button" onClick={() => void cargar()} className="btn mt-2 h-9 rounded border border-line-strong px-3 text-13 font-semibold hover:bg-hover">
+              Volver a comprobar
+            </button>
+          )}
         </div>
       )}
 
-      {previa && previa.puede_eliminar && (
+      {previa && previa.puede_eliminar && !conCuenta && (
+        <div className="mt-3 rounded border border-line-strong bg-surface p-3 text-13" role="status">
+          <p className="font-semibold text-ink">Eliminar un cliente requiere entrar con tu cuenta de operador.</p>
+          <p className="mt-1 text-ink-2">Entraste con la clave compartida, que no identifica a nadie. Sal y entra con tu correo y tu código de la app autenticadora.</p>
+        </div>
+      )}
+
+      {previa && previa.puede_eliminar && conCuenta && (
         <button onClick={() => void abrir()} disabled={ocupado} className="btn mt-3 h-10 rounded bg-danger px-4 text-13 font-semibold text-white disabled:opacity-50">
           Eliminar cliente…
         </button>
