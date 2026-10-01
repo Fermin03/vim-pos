@@ -66,6 +66,18 @@ combo?" que la caja le hace al cliente cuando el cajero agrega suelto un product
 de un combo. Vive aquí, no en Configuración, porque solo afecta a los combos — mismo criterio que
 el switch de descuento de inventario, que vive en Inventario y no en Configuración.
 
+## Inventario desde el plan Negocio (0148, ADR 0025)
+
+Un negocio cuyo plan no incluye inventario **sigue viendo** Inventario en el menú y Recetas en
+Catálogo, con una etiqueta pequeña "Plan Negocio". No se esconden: esconder una sección que el
+sitio anuncia hace pensar que el producto no la tiene. Al entrar, en lugar de las pantallas, una
+tarjeta tranquila: qué es ("El inventario viene desde el plan Negocio"), las cinco cosas que
+incluye en palabras de restaurantero y **un** botón azul, "Preguntar por el plan Negocio", que
+abre WhatsApp con el mensaje ya escrito (quién, negocio y código). Sin precios —los dice quien
+contesta, que sabe qué promoción tiene el cliente—, sin rojo, sin candados dibujados y sin
+`Aviso`: no es una alerta, es el contenido de la pantalla. Si la lectura de módulos falla se
+enseñan las pantallas de siempre; el candado de verdad está en la base.
+
 ## Plan y pagos
 
 El dueño ve lo que paga HOY y hasta cuándo ("$499 al mes hasta el 31 mar 2027, después $699"),

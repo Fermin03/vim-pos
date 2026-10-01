@@ -10744,6 +10744,7 @@ export type Database = {
         Args: { p_fecha: string; p_sucursal_id: string }
         Returns: Json
       }
+      inventario_permitido: { Args: { p_tenant: string }; Returns: boolean }
       limites_efectivos: { Args: { p_tenant: string }; Returns: Json }
       liberar_bienvenida: { Args: { p_tenant_id: string }; Returns: undefined }
       liquidar_delivery: {

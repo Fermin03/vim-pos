@@ -1,6 +1,8 @@
 "use client";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useModulos } from "./admin-shell";
+import { estadoInventario, rutaEsDeInventario } from "../lib/inventario-plan";
 
 const TABS = [
   { label: "Categorías", href: "/catalogo/categorias" },
@@ -13,6 +15,8 @@ const TABS = [
 /** Sub-navegación del módulo Catálogo. */
 export function CatalogoTabs() {
   const pathname = usePathname();
+  // Recetas es parte del inventario (0148): la pestaña se queda, marcada, y dentro se explica.
+  const sinInventario = estadoInventario(useModulos()) === "no_incluido";
   return (
     <div className="scroll-x-limpio flex flex-shrink-0 items-center gap-1 overflow-x-auto border-b border-line px-4 lg:overflow-x-visible lg:px-8">
       {TABS.map((t) => {
@@ -28,6 +32,9 @@ export function CatalogoTabs() {
             ].join(" ")}
           >
             {t.label}
+            {sinInventario && rutaEsDeInventario(t.href) && (
+              <span className="ml-1.5 rounded-full border border-line-strong px-1.5 py-px text-11 font-semibold text-ink-3">Plan Negocio</span>
+            )}
           </Link>
         );
       })}
