@@ -8,8 +8,10 @@ import { z } from "zod";
 export const MANIFIESTO_URL =
   "https://pbiaxzvmssjsxdwqrumb.supabase.co/storage/v1/object/public/actualizaciones/latest.json";
 
-/** Si el manifiesto no responde: la página de la última versión publicada en GitHub. */
-export const RESPALDO_URL = "https://github.com/Fermin03/vim-pos/releases/latest";
+/** Si el manifiesto no responde: la página de la última versión publicada en GitHub.
+ *  Los instaladores viven en un repo público aparte (`vim-pos-descargas`): el del código es privado
+ *  desde el 1 oct 2026 y sus releases responden 404 a quien no inició sesión. */
+export const RESPALDO_URL = "https://github.com/Fermin03/vim-pos-descargas/releases/latest";
 
 export type Instalador = { version: string; url: string; fecha: string | null };
 
@@ -17,7 +19,7 @@ export type Instalador = { version: string; url: string; fecha: string | null };
 // PLATFORM_RELEASES_PREFIX) o de nuestro Storage, por https. En github.com publica cualquiera: un
 // manifiesto manipulado no puede convertir este botón en la descarga del binario de otro.
 const PREFIJOS_PERMITIDOS = [
-  "https://github.com/Fermin03/vim-pos/releases/download/",
+  "https://github.com/Fermin03/vim-pos-descargas/releases/download/",
   "https://pbiaxzvmssjsxdwqrumb.supabase.co/storage/v1/object/public/actualizaciones/",
 ];
 

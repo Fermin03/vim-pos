@@ -19,7 +19,7 @@ const MOTIVO_MINIMO = 10;
  * `github.com` publica cualquiera. Se puede mover con una variable, sin tocar código.
  */
 const PREFIJO_RELEASES =
-  process.env.PLATFORM_RELEASES_PREFIX ?? "https://github.com/Fermin03/vim-pos/releases/download/";
+  process.env.PLATFORM_RELEASES_PREFIX ?? "https://github.com/Fermin03/vim-pos-descargas/releases/download/";
 
 /** Compara "0.4.61" con "0.4.9" por número. Como texto, la segunda ganaría. */
 function menorQue(a: string | null, b: string | null): boolean {
