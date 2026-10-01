@@ -1,8 +1,10 @@
 // Fase 3 · Respaldo local del pgdata (respaldo FÍSICO en frío).
 // El bin de Postgres embebido es mínimo (no trae pg_dump), así que respaldamos copiando el
-// directorio de datos con Postgres DETENIDO → copia 100% consistente. Se dispara al cerrar limpio
-// la caja (Postgres ya está apagado) y bajo demanda (stop→copia→start). La nube (sync PUSH) es el
-// respaldo offsite de las ventas; esto protege el estado completo local y permite restaurar rápido.
+// directorio de datos con Postgres DETENIDO → copia 100% consistente. Se dispara una vez al día
+// cuando la caja está quieta (respaldo-diario.mjs), al cerrar limpio la caja (Postgres ya está
+// apagado) y bajo demanda (stop→copia→start). La nube (sync PUSH) guarda las VENTAS fuera del
+// local; esto protege el estado completo local y permite restaurar rápido. No es una copia de la
+// base entera fuera del local: si se pierde la computadora, se recuperan las ventas ya subidas.
 import { cpSync, existsSync, mkdirSync, readdirSync, renameSync, rmSync } from "node:fs";
 import path from "node:path";
 

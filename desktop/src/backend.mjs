@@ -53,7 +53,7 @@ export async function startBackend(opts = {}) {
       await backend.stop();
     },
   };
-  const gateway = crearGateway(opcionesGateway(resultado, { kds, uiPorts }));
+  const gateway = crearGateway(opcionesGateway(resultado, { kds, uiPorts, alHaberActividad: opts.alHaberActividad ?? null }));
   await new Promise((resolve) => gateway.listen(gatewayPort, host, resolve));
   log(`Gateway Supabase-compat en http://localhost:${gatewayPort}`);
   if (host === "0.0.0.0" && lan !== "127.0.0.1") log(`Hub en la LAN: http://${lan}:${gatewayPort} (KDS/2ª caja se conectan aquí)`);

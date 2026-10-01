@@ -1,7 +1,8 @@
 // Fase 1/2/3 · Proceso main de Electron. Una sola app, dos roles:
 //  • CAJA (por defecto): POS local-first — backend en la caja (Postgres embebido + PostgREST +
 //    gateway) + UI del POS. Hace de HUB en la LAN. Fase 3: bandeja (no se apaga por accidente) +
-//    watchdog (se auto-recupera) + respaldo del pgdata al cerrar y bajo demanda.
+//    watchdog (se auto-recupera) + respaldo del pgdata diario (con la caja quieta), al cerrar y
+//    bajo demanda.
 //  • COCINA (--role=cocina): pantalla de cocina como CLIENTE DELGADO del hub. SIN backend local.
 import { app, BrowserWindow, Tray, Menu, nativeImage, clipboard, Notification, dialog, shell, safeStorage, ipcMain, screen } from "electron";
 import { existsSync, readFileSync, writeFileSync, mkdirSync, openSync, writeSync } from "node:fs";
@@ -15,6 +16,7 @@ import { pullFromCloud } from "./sync-pull.mjs";
 import { loginDispositivoNube } from "./dispositivo.mjs";
 import { pushToCloud } from "./sync-push.mjs";
 import { respaldar } from "./backup.mjs";
+import { crearRespaldoDiario, guardarEstado as guardarEstadoRespaldo, leerEstado as leerEstadoRespaldo, textoUltimoRespaldo } from "./respaldo-diario.mjs";
 import { crearWatchdog } from "./watchdog.mjs";
 import { crearCicloSync } from "./sync-ciclo.mjs";
 import { crearSondeoCatalogo } from "./sondeo-catalogo.mjs";
@@ -114,6 +116,10 @@ ipcMain.handle("vim:salir", () => {
 });
 let arrancado = false;        // ya terminó el boot: después, un rechazo suelto no debe matar la caja
 let respaldando = false;
+let respaldoDiario = null;    // temporizador del respaldo diario (respaldo-diario.mjs)
+// Última vez que alguien OPERÓ la caja (una escritura por el gateway). Arranca en "ahora": recién
+// abierta la app, lo prudente es suponer que alguien está por usarla.
+let ultimaActividad = Date.now();
 let updateInfo = null;        // manifiesto de la actualización disponible (o null)
 let descargandoUpdate = false;
 
@@ -278,6 +284,8 @@ async function bootCaja() {
   opcionesBackend = {
     log: (m) => console.log("· [backend]", m), resDir: RES_DIR ?? undefined, dataRoot,
     nube: (o) => tokenDeNubeCacheado(o),
+    // En las opciones para que también lo tenga el backend que levantan el watchdog y el respaldo.
+    alHaberActividad: () => { ultimaActividad = Date.now(); },
   };
   backend = await startBackend(opcionesBackend);
   backupsDir = path.join(backend.dataRoot, "backups");
@@ -334,6 +342,7 @@ async function bootCaja() {
   watchdog = crearWatchdog({ url: backend.url, alReiniciar: reiniciarBackend, log: (m) => console.log("· [watchdog]", m) });
 
   iniciarSync();
+  iniciarRespaldoDiario();
   revisarActualizacion().catch(() => {}); // best-effort, no bloquea
 }
 
@@ -370,28 +379,80 @@ async function reiniciarBackend() {
   backend.nube = tokenDeNubeCacheado; // redundante con opcionesBackend.nube; explícito por D5
 }
 
-/** Respaldo bajo demanda: pausa el watchdog, detiene el backend (para copiar en frío), respalda
- *  y lo vuelve a levantar. Breve interrupción (~segundos); pensado para el fin de turno. */
+/** Copia en frío + anotar el resultado en `ultimo-respaldo.json`. Postgres DEBE estar detenido.
+ *  Es el único sitio que llama a `respaldar`: así el diario, el manual y el de salir cuentan igual
+ *  como "último respaldo" y ninguno hace una copia de más. */
+function copiarYAnotar(dd, bd) {
+  let ultimoMensaje = "";
+  const dest = respaldar(dd, bd, 7, (m) => { ultimoMensaje = m; console.log("· [backup]", m); });
+  const ahora = new Date().toISOString();
+  if (dest) { guardarEstadoRespaldo(bd, { ultimoOk: ahora, ultimoError: null }); return { ok: true }; }
+  const error = ultimoMensaje || "no se pudo copiar el pgdata";
+  guardarEstadoRespaldo(bd, { ultimoFallo: ahora, ultimoError: error });
+  return { ok: false, error };
+}
+
+/** Respaldo con la caja encendida: pausa el watchdog, detiene el backend (para copiar en frío),
+ *  respalda y lo vuelve a levantar. Breve interrupción (~segundos). Lo usan "Respaldar ahora" de la
+ *  bandeja —a criterio del cajero— y el respaldo diario, que solo lo llama con la caja quieta.
+ *  Devuelve { ok, error? } y NUNCA deja la caja sin backend: si algo falla, lo vuelve a levantar. */
 async function respaldarAhora() {
-  if (respaldando || !backend) return;
+  if (respaldando || !backend) return { ok: false, error: "ya hay un respaldo en curso" };
   respaldando = true;
   watchdog?.pausar();
   const dd = backend.dataDir;
   const bd = backupsDir || path.join(backend.dataRoot, "backups");
+  let resultado = { ok: false, error: "no se pudo detener la base para copiarla" };
   try {
     const prev = backend; backend = null;
     await prev.stop();
-    respaldar(dd, bd, 7, (m) => console.log("· [backup]", m));
+    resultado = copiarYAnotar(dd, bd);
     backend = await startBackend(opcionesBackend);
     backend.nube = tokenDeNubeCacheado; // D5
     console.log("· [backup] respaldo terminado; la caja está de vuelta en línea");
   } catch (e) {
-    console.error("· [backup] error en respaldo bajo demanda:", e.message);
-    if (!backend) { try { backend = await startBackend(opcionesBackend); } catch { /* */ } }
+    console.error("· [backup] error en respaldo con la caja encendida:", e.message);
+    resultado = { ok: false, error: e.message };
+    guardarEstadoRespaldo(bd, { ultimoFallo: new Date().toISOString(), ultimoError: e.message });
+    if (!backend) { try { backend = await startBackend(opcionesBackend); } catch { /* el watchdog lo reintenta */ } }
   } finally {
     watchdog?.reanudar();
     respaldando = false;
+    refrescarMenuTray();
   }
+  return resultado;
+}
+
+/** El respaldo diario (respaldo-diario.mjs): una vez al día como mucho, y solo con la caja quieta
+ *  —sin turno abierto y sin que nadie la haya operado en 10 minutos—. Nunca interrumpe un turno. */
+function iniciarRespaldoDiario() {
+  if (respaldoDiario) return;
+  const bd = () => backupsDir || (backend ? path.join(backend.dataRoot, "backups") : null);
+  respaldoDiario = crearRespaldoDiario({
+    contexto: async () => {
+      let turnoAbierto = null; // null = no se pudo saber → no se respalda
+      try {
+        const { rows } = await backend.pool.query("SELECT EXISTS (SELECT 1 FROM turnos WHERE estado = 'ABIERTO') AS abierto");
+        turnoAbierto = rows[0]?.abierto === true;
+      } catch { /* la base no contestó: se queda en null */ }
+      return {
+        turnoAbierto,
+        ultimaActividad,
+        ocupado: respaldando || cerrando || descargandoUpdate || !backend || ciclo.estado().sincronizando === true,
+      };
+    },
+    respaldar: () => respaldarAhora(),
+    leerEstado: () => leerEstadoRespaldo(bd()),
+    guardarEstado: (c) => guardarEstadoRespaldo(bd(), c),
+    // A la bitácora que VIM sí ve (errores_app → sube sola en el siguiente ciclo de sync).
+    reportar: async (mensaje, contexto) => {
+      if (!backend?.pool) return;
+      await registrarErrorLocal(backend.pool, { mensaje, contexto: { ...contexto, rol: ROL }, version: app.getVersion() });
+    },
+    alCambiar: () => refrescarMenuTray(),
+    log: (m) => console.log("· [respaldo diario]", m),
+  });
+  respaldoDiario.iniciar();
 }
 
 /** Bandeja (solo caja): abrir, respaldar, salir. Evita que cerrar la ventana apague el servidor. */
@@ -402,6 +463,13 @@ function crearTray() {
   } catch { return; }
   tray.on("double-click", () => { if (win) { win.show(); win.focus(); } });
   refrescarMenuTray();
+}
+
+/** Cuándo fue el último respaldo que sí terminó (para el renglón de la bandeja). */
+function ultimoRespaldoOk() {
+  const bd = backupsDir || (backend ? path.join(backend.dataRoot, "backups") : null);
+  if (!bd) return null;
+  try { return leerEstadoRespaldo(bd).ultimoOk; } catch { return null; }
 }
 
 /** (Re)construye el menú de la bandeja — incluye el ítem de actualización si hay una disponible. */
@@ -416,7 +484,8 @@ function refrescarMenuTray() {
     { label: "Copiar IP", click: () => clipboard.writeText(ip) },
     { type: "separator" },
     { label: "Abrir caja", click: () => { if (win) { win.show(); win.focus(); } } },
-    { label: "Respaldar ahora", click: () => respaldarAhora() },
+    { label: "Respaldar ahora", click: () => { respaldarAhora().catch(() => {}); } },
+    { label: textoUltimoRespaldo(ultimoRespaldoOk()), enabled: false },
     { type: "separator" },
     { label: "Salir (apaga la caja)", click: () => { saliendoDeVerdad = true; app.quit(); } },
   );
@@ -916,6 +985,7 @@ let cerrando = false;
 async function cerrarTodo() {
   if (cerrando) return;
   cerrando = true;
+  try { respaldoDiario?.detener(); } catch { /* */ }
   try { detenerSync(); } catch { /* */ }
   try { watchdog?.stop(); } catch { /* */ }
   try { if (uiServer) uiServer.close(); } catch { /* */ }
@@ -924,7 +994,7 @@ async function cerrarTodo() {
       const dd = backend.dataDir;
       const bd = backupsDir || path.join(backend.dataRoot, "backups");
       await backend.stop(); // Postgres detenido → el pgdata queda consistente para copiar en frío.
-      if (dd && bd) respaldar(dd, bd, 7, (m) => console.log("· [backup]", m));
+      if (dd && bd) copiarYAnotar(dd, bd);
     }
   } catch (e) { console.error("· [backup] al cerrar:", e.message); }
   try { tray?.destroy(); } catch { /* */ }

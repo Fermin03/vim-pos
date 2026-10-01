@@ -9,6 +9,7 @@ import { deviceSignIn, refreshSession, getUser, pinLogin, autorizarPin, exigirDi
 import { hostsPropiosCacheados, hostPermitido } from "./hosts-propios.mjs";
 import { crearLimitador } from "./limitador.mjs";
 import { cajaIdDeEmail } from "./dispositivo.mjs";
+import { esActividadDeOperacion } from "./respaldo-diario.mjs";
 
 // SEC CN-004 — CORS con allowlist en vez de "*".
 //
@@ -97,6 +98,9 @@ export function crearGateway(backend) {
     // VIM_KDS_STREAM_AUTH=0 lo apaga.
     kdsExigeToken = process.env.VIM_KDS_STREAM_AUTH !== "0",
     topeClientesKds = TOPE_CLIENTES_KDS,
+    // Respaldo diario: avisa cuando alguien OPERA la caja (escribe), para no respaldar encima de
+    // un cajero. Los sondeos del POS y del KDS (GET) no cuentan. Ver respaldo-diario.mjs.
+    alHaberActividad = null,
   } = backend;
 
   return http.createServer(async (req, res) => {
@@ -115,6 +119,9 @@ export function crearGateway(backend) {
     try {
       const url = new URL(req.url, "http://localhost");
       const p = url.pathname;
+      if (alHaberActividad && esActividadDeOperacion(req.method, p, url.search)) {
+        try { alHaberActividad(); } catch { /* un aviso no tumba una venta */ }
+      }
 
       if (req.method === "OPTIONS") {
         // Lista FIJA de headers permitidos. Antes se reflejaba access-control-request-headers tal
