@@ -17,6 +17,8 @@ export const ERRORES_REGISTRO: Record<string, string> = {
   NOMBRE_OWNER_INVALIDO: "Escribe tu nombre.",
   TERMINOS_REQUERIDOS: "Para crear tu cuenta, acepta los términos y el aviso de privacidad.",
   CAPTCHA_INVALIDO: "No pudimos comprobar que no eres un robot. Espera un momento e intenta de nuevo.",
+  CAPTCHA_NO_CONFIGURADO: "El registro no está disponible en este momento. Escríbenos por WhatsApp y te damos de alta.",
+  ESPERA_UN_MINUTO: "Espera un minuto y vuelve a intentar.",
   DEMASIADOS_INTENTOS: "Hubo demasiados intentos desde esta conexión. Espera un rato e intenta de nuevo.",
   NO_DISPONIBLE: "El registro no está disponible en este momento. Intenta de nuevo en unos minutos.",
   PASSWORD_DEBIL: "La contraseña debe tener al menos 8 caracteres.",

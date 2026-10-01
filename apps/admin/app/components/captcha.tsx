@@ -41,7 +41,11 @@ function cargarScript(): Promise<void> {
   return cargando;
 }
 
-export function Captcha({ onToken, reinicio = 0 }: { onToken: (token: string) => void; reinicio?: number }) {
+/**
+ * `accion` viaja dentro del token y la función la comprueba: un token resuelto para reenviar el
+ * correo no sirve para dar de alta, y al revés.
+ */
+export function Captcha({ onToken, accion, reinicio = 0 }: { onToken: (token: string) => void; accion: "registro" | "reenvio"; reinicio?: number }) {
   const caja = useRef<HTMLDivElement>(null);
   const id = useRef<string | null>(null);
   const cb = useRef(onToken);
@@ -55,6 +59,7 @@ export function Captcha({ onToken, reinicio = 0 }: { onToken: (token: string) =>
         if (!vivo || !caja.current || !window.turnstile || id.current) return;
         id.current = window.turnstile.render(caja.current, {
           sitekey: SITE_KEY_TURNSTILE,
+          action: accion,
           language: "es",
           theme: "light",   // el admin no tiene tema oscuro
           appearance: "interaction-only",
@@ -69,6 +74,7 @@ export function Captcha({ onToken, reinicio = 0 }: { onToken: (token: string) =>
       if (id.current && window.turnstile) window.turnstile.remove(id.current);
       id.current = null;
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- el widget se crea una vez; la acción no cambia
   }, []);
 
   // Pedir un token nuevo después de cada envío (el anterior ya se gastó).

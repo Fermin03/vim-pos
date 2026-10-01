@@ -220,7 +220,7 @@ export default function RegistroPage() {
                 </span>
               </label>
 
-              <Captcha onToken={setCaptcha} reinicio={reinicioCaptcha} />
+              <Captcha onToken={setCaptcha} accion="registro" reinicio={reinicioCaptcha} />
 
               {yaTieneCuenta && (
                 <p className="rounded border border-line-strong bg-sel px-3 py-2.5 text-14 text-ink-2" role="alert">
@@ -256,7 +256,7 @@ export default function RegistroPage() {
               <p className="text-13 text-ink-3">
                 Si no llega en unos minutos, revisa la carpeta de spam o promociones. Tu prueba de 30 días ya empezó.
               </p>
-              <ReenviarConfirmacion email={enviadoA} />
+              <ReenviarConfirmacion email={enviadoA} esperaInicial={correoSalio ? 60 : 0} />
             </div>
           )}
         </div>

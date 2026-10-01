@@ -44,7 +44,8 @@ soporte era un teléfono fijo escrito en la pantalla de bloqueo de la caja.
 
 - Hay que configurar fuera del código: llaves de Turnstile, *Redirect URL* de
   `/cuenta-confirmada` y la plantilla *Confirm signup* en español (`operacion/registro-publico.md`).
-- Sin `TURNSTILE_SECRET_KEY` el captcha no se verifica (a propósito, para local y la transición).
+- El captcha es fail-closed: sin `TURNSTILE_SECRET_KEY` el registro contesta 503 (solo `CAPTCHA_OPCIONAL=1`, en local, lo omite).
+- El registro revela si un correo ya tiene cuenta (`EMAIL_YA_REGISTRADO`): riesgo aceptado, mitigado por captcha y límites (`operacion/registro-publico.md` §6).
 - Cambiar el texto de los términos obliga a subir `TERMINOS_VERSION`; las aceptaciones viejas
   conservan su versión. Las altas hechas por VIM desde el panel quedan con `terminos_version` NULL.
 - Un cambio de número de soporte tarda hasta un latido (~10 min) en llegar a cada caja, y una caja

@@ -86,6 +86,9 @@ export function AdminShell({ children }: { children: ReactNode }) {
   const [perfil, setPerfil] = useState<Perfil | null>(null);
   const [listo, setListo] = useState(false);
   const [sinAcceso, setSinAcceso] = useState<string | null>(null);
+  // Cuenta del registro público SIN negocio: el alta se quedó a medias (0142). No es "no te han
+  // invitado": se le dice que escriba a soporte.
+  const [altaIncompleta, setAltaIncompleta] = useState(false);
   const [sucursales, setSucursales] = useState<{ nombre: string; total: number } | null>(null);
   const [acceso, setAcceso] = useState<Acceso>(ACCESO_OK);
   // Soporte de VIM (0142). Arranca con el de fábrica: el enlace nunca queda en blanco.
@@ -131,6 +134,7 @@ export function AdminShell({ children }: { children: ReactNode }) {
       // Fase 4 (SSO): sesión válida pero SIN tenant = correo no invitado a ningún negocio.
       if (!s.tenantId) {
         setSinAcceso(s.email);
+        setAltaIncompleta(s.autoservicio);
         setListo(true);
         return;
       }
@@ -148,6 +152,39 @@ export function AdminShell({ children }: { children: ReactNode }) {
         .catch(() => {});
     })();
   }, [router]);
+
+  if (listo && sinAcceso && altaIncompleta) {
+    // Sin tenant la RPC de soporte no devuelve nada: va el número oficial de fábrica.
+    const wa = enlaceWhatsapp(
+      SOPORTE_POR_DEFECTO.whatsapp,
+      `Hola, me registré en VIM POS con ${sinAcceso} y mi cuenta no terminó de crearse. ¿Me ayudan?`,
+    );
+    const horario = textoHorario(SOPORTE_POR_DEFECTO);
+    return (
+      <main className="flex min-h-[100dvh] flex-col items-center justify-center gap-3 px-6 py-10 text-center">
+        <div className="flex h-12 w-12 items-center justify-center rounded-full bg-warning-soft text-warning">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-6 w-6" aria-hidden="true"><circle cx="12" cy="12" r="9" /><path d="M12 8v4M12 16h.01" /></svg>
+        </div>
+        <h1 className="font-display text-24 font-semibold tracking-tight">Tu cuenta no terminó de crearse</h1>
+        <p className="max-w-md text-14 leading-relaxed text-ink-3">
+          Tu correo <b className="text-ink-2">{sinAcceso}</b> quedó confirmado, pero tu negocio no se dio de alta. No tienes que
+          registrarte otra vez: escríbenos por WhatsApp y lo terminamos contigo.
+        </p>
+        {horario && <p className="text-13 text-ink-3">{horario}</p>}
+        <div className="mt-2 flex flex-wrap justify-center gap-2">
+          {wa && (
+            <a href={wa} target="_blank" rel="noopener noreferrer" className="rounded-lg bg-accent px-5 py-2.5 text-14 font-semibold text-white transition hover:bg-accent-hover">
+              Escríbenos por WhatsApp
+            </a>
+          )}
+          <button type="button" onClick={async () => { const { supabase } = await import("../lib/supabase"); await supabase.auth.signOut(); router.replace("/"); }}
+            className="rounded-lg border border-line-strong px-5 py-2.5 text-14 font-semibold text-ink-2 transition hover:border-ink">
+            Salir
+          </button>
+        </div>
+      </main>
+    );
+  }
 
   if (listo && sinAcceso) {
     return (
