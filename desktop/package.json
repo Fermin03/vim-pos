@@ -1,6 +1,6 @@
 {
   "name": "vim-pos-desktop",
-  "version": "0.4.103",
+  "version": "0.4.104",
   "private": true,
   "type": "module",
   "description": "VIM POS · Punto de venta para restaurantes",
@@ -32,6 +32,7 @@
     "verify:cierre-turno": "node src/verify-cierre-turno.mjs",
     "verify:push-aislado": "node src/verify-push-aislado.mjs",
     "verify:push-lotes": "node src/verify-push-lotes.mjs",
+    "verify:ticket-impreso": "node src/verify-ticket-impreso.mjs",
     "iconos": "node scripts/generar-iconos.mjs",
     "carga:plantilla": "node scripts/capturar-plantilla.mjs",
     "carga": "node scripts/carga-nube.mjs",

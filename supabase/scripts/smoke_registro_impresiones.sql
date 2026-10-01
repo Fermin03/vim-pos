@@ -69,6 +69,19 @@ BEGIN
     RAISE EXCEPTION 'sync_push_snapshot no aplicó ticket_reimpresiones: %', v_res;
   END IF;
 
+  -- 6) La comanda de cocina NO cuenta como ticket del cliente impreso (0149): a estas alturas la
+  --    comanda ya salió y se reimprimió, y el ticket sigue sin sello hasta que la caja lo marca.
+  IF (SELECT comanda_impresa_at FROM tickets WHERE id = v_ticket) IS NULL THEN
+    RAISE EXCEPTION 'la comanda inicial debía sellar comanda_impresa_at';
+  END IF;
+  IF (SELECT ticket_impreso_at FROM tickets WHERE id = v_ticket) IS NOT NULL THEN
+    RAISE EXCEPTION 'imprimir la comanda no debe sellar ticket_impreso_at';
+  END IF;
+  PERFORM marcar_ticket_impreso(v_ticket);
+  IF (SELECT ticket_impreso_at FROM tickets WHERE id = v_ticket) IS NULL THEN
+    RAISE EXCEPTION 'marcar_ticket_impreso no selló el ticket';
+  END IF;
+
   RAISE NOTICE 'smoke_registro_impresiones OK';
 END $$;
 ROLLBACK;

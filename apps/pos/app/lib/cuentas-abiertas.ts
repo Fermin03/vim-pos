@@ -7,8 +7,10 @@ import { leerEntrega } from "./print/ticket-datos";
 // Cuentas ABIERTAS por modo de servicio: tickets comprometidos (BORRADOR/ABIERTO) que NO están en
 // espera ni pagados. Se usan en "Ver cuentas" de cada pestaña: Pick-up (por recolectar) y Domicilio
 // (pedidos activos). El modelo ya trae todo lo necesario — sin migración:
-//   comanda_impresa_at → marca de "se imprimió" nada más. Desde la 0114 NO es etapa de entrega:
-//   lo que saca un domicilio a la calle es asignarle repartidor, no imprimir su ticket.
+//   ticket_impreso_at → el ticket del CLIENTE ya se imprimió (0149). No es `comanda_impresa_at`:
+//   ése lo sella la comanda de cocina, y leerlo aquí hacía que toda cuenta enviada a cocina
+//   pidiera PIN para su primera impresión. Desde la 0114 tampoco es etapa de entrega: lo que
+//   saca un domicilio a la calle es asignarle repartidor, no imprimir su ticket.
 export type CuentaAbierta = {
   ticketId: string;
   folio: string | null;
@@ -17,7 +19,7 @@ export type CuentaAbierta = {
   nItems: number;
   desdeIso: string | null;        // fecha_apertura
   estadoCocina: string;           // SIN_ENVIAR | EN_COCINA | LISTO | ENTREGADO…
-  impresaAt: string | null;       // comanda_impresa_at → ya se imprimió
+  impresaAt: string | null;       // ticket_impreso_at → el ticket del cliente ya se imprimió
   cliente: string | null;         // nombre del cliente registrado o, si no hay, el nombre suelto (Pick-up)
   clienteId: string | null;       // cliente registrado de la cuenta (null = sin cliente)
   mesa: string | null;            // número de mesa (comedor), desde tickets_mesas
@@ -51,7 +53,7 @@ export async function listarCuentasAbiertas(
     // (`mesa_id` y `mesa_anterior_id`, esta última para transferencias). Sin la pista,
     // PostgREST no sabe cuál seguir y rechaza la consulta entera con "more than one
     // relationship was found" — dejando sin lista a los TRES modos, no solo a comedor.
-    .select("id, folio_completo, total_mxn, monto_pendiente_mxn, fecha_apertura, estado_cocina, comanda_impresa_at, nombre_cliente, cliente_id, cliente:clientes(nombre, apellido_paterno), tickets_mesas(fecha_liberacion, mesas!mesa_id(numero)), ticket_items(cantidad, cancelado)")
+    .select("id, folio_completo, total_mxn, monto_pendiente_mxn, fecha_apertura, estado_cocina, ticket_impreso_at, nombre_cliente, cliente_id, cliente:clientes(nombre, apellido_paterno), tickets_mesas(fecha_liberacion, mesas!mesa_id(numero)), ticket_items(cantidad, cancelado)")
     .eq("sucursal_id", sucursalId)
     .in("modo_servicio", modos)
     .is("deleted_at", null)
@@ -69,7 +71,7 @@ export async function listarCuentasAbiertas(
       .reduce((a, i) => a + Number(i.cantidad), 0)),
     desdeIso: (t.fecha_apertura as string) ?? null,
     estadoCocina: String(t.estado_cocina ?? "SIN_ENVIAR"),
-    impresaAt: (t.comanda_impresa_at as string) ?? null,
+    impresaAt: (t.ticket_impreso_at as string) ?? null,
     // Cliente registrado (domicilio) manda; si no, el nombre suelto de Pick-up.
     cliente: nombreClienteFila(t.cliente) ?? ((t.nombre_cliente as string) ?? null),
     clienteId: (t.cliente_id as string) ?? null,
@@ -79,13 +81,10 @@ export async function listarCuentasAbiertas(
   }));
 }
 
-/** Sella que la comanda del ticket se imprimió. NO significa que el pedido haya salido: lo que lo
- *  saca a la calle es asignarle repartidor (0114). Se usa para ofrecer "Reimprimir" con PIN. */
-export async function marcarComandaImpresa(token: string, ticketId: string): Promise<void> {
-  const { error } = await employeeClient(token)
-    .from("tickets")
-    .update({ comanda_impresa_at: new Date().toISOString() })
-    .eq("id", ticketId);
+/** Sella que el ticket del cliente se imprimió (0149). NO significa que el pedido haya salido: lo
+ *  que lo saca a la calle es asignarle repartidor (0114). Se usa para ofrecer "Reimprimir" con PIN. */
+export async function marcarTicketImpreso(token: string, ticketId: string): Promise<void> {
+  const { error } = await employeeClient(token).rpc("marcar_ticket_impreso", { p_ticket_id: ticketId });
   if (error) throw new Error(error.message);
 }
 

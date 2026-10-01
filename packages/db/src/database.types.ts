@@ -8214,6 +8214,7 @@ export type Database = {
           subtotal_mxn: number
           sucursal_id: string
           tenant_id: string
+          ticket_impreso_at: string | null
           total_mxn: number
           turno_id: string
           updated_at: string
@@ -8270,6 +8271,7 @@ export type Database = {
           subtotal_mxn?: number
           sucursal_id: string
           tenant_id: string
+          ticket_impreso_at?: string | null
           total_mxn?: number
           turno_id: string
           updated_at?: string
@@ -8326,6 +8328,7 @@ export type Database = {
           subtotal_mxn?: number
           sucursal_id?: string
           tenant_id?: string
+          ticket_impreso_at?: string | null
           total_mxn?: number
           turno_id?: string
           updated_at?: string
@@ -10767,6 +10770,10 @@ export type Database = {
         Returns: undefined
       }
       marcar_pedido_listo: { Args: { p_ticket_id: string }; Returns: undefined }
+      marcar_ticket_impreso: {
+        Args: { p_ticket_id: string }
+        Returns: undefined
+      }
       mi_acceso: { Args: never; Returns: Json }
       modificar_reservacion: {
         Args: {
