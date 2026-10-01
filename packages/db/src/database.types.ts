@@ -7487,6 +7487,7 @@ export type Database = {
           fecha_invitacion: string
           notas_internas: string | null
           recordatorios_enviados: number
+          bienvenida_enviada_at: string | null
           ciudad_registro: string | null
           terminos_aceptados_at: string | null
           terminos_aceptados_por: string | null
@@ -7503,6 +7504,7 @@ export type Database = {
           fecha_invitacion?: string
           notas_internas?: string | null
           recordatorios_enviados?: number
+          bienvenida_enviada_at?: string | null
           ciudad_registro?: string | null
           terminos_aceptados_at?: string | null
           terminos_aceptados_por?: string | null
@@ -7519,6 +7521,7 @@ export type Database = {
           fecha_invitacion?: string
           notas_internas?: string | null
           recordatorios_enviados?: number
+          bienvenida_enviada_at?: string | null
           ciudad_registro?: string | null
           terminos_aceptados_at?: string | null
           terminos_aceptados_por?: string | null
@@ -10729,6 +10732,7 @@ export type Database = {
         Returns: Json
       }
       limites_efectivos: { Args: { p_tenant: string }; Returns: Json }
+      liberar_bienvenida: { Args: { p_tenant_id: string }; Returns: undefined }
       liquidar_delivery: {
         Args: {
           p_asignacion_id: string
@@ -10800,6 +10804,7 @@ export type Database = {
         }
         Returns: undefined
       }
+      reclamar_bienvenida: { Args: { p_tenant_id: string }; Returns: string }
       recalcular_costo_recetas: {
         Args: { p_insumo_id: string }
         Returns: undefined

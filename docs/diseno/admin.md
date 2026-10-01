@@ -95,6 +95,15 @@ caja"). Un solo botón azul con la versión y la fecha de la última publicada; 
 restaurantero, lo que hace falta y el paso a paso. La impresora de **red** se dice en negritas
 porque es lo que más se compra mal; los modelos van como ejemplos, nunca como "probados".
 
+**Correo de bienvenida (0146).** Con la cuenta confirmada —al abrir el enlace del registro o al
+fijar la contraseña de la invitación— sale UN correo al dueño con lo mismo que "primeros pasos",
+en el mismo orden, más la descarga de la caja, el equipo que hace falta (Windows 10 u 11 e
+impresora **de red**), cómo se paga y el WhatsApp de soporte con su horario. Es para el día en que
+instale la caja, que casi nunca es el día en que se registró. Texto de restaurantero, sin
+imágenes ni adornos, y cada enlace enseña su dirección. La pantalla no espera ese correo ni dice
+nada si falla: si los pasos cambian en `lib/onboarding.ts`, cambian también en
+`supabase/functions/_shared/bienvenida.ts`.
+
 ## Avisos de facturación (0143)
 
 La factura global **se emite a mano** y el sello digital vence: las dos cosas tienen fecha límite

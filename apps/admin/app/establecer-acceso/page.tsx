@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { Button, LogoVim } from "@vim/ui/styles";
 import { supabase, establecerPassword } from "../lib/supabase";
 import { mensajeError } from "../lib/errores";
+import { pedirBienvenida } from "../lib/bienvenida";
 
 const inputCls =
   "w-full rounded border border-line-strong bg-surface px-[13px] py-3 pr-11 text-15 outline-none transition focus:border-ink focus:shadow-[0_0_0_3px_rgba(22,22,26,.06)]";
@@ -60,6 +61,9 @@ export default function EstablecerAccesoPage() {
     setGuardando(true);
     try {
       await establecerPassword(pass);
+      // Ya tiene acceso: sale el correo de bienvenida (0146). Aquí también llega quien restablece
+      // su contraseña; a ese el servidor no le manda nada (no es un negocio recién llegado).
+      void pedirBienvenida();
       router.replace("/dashboard");
     } catch (err) {
       setError(mensajeError(err, "No se pudo guardar la contraseña."));

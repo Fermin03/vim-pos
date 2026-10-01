@@ -3,12 +3,14 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button, LogoVim } from "@vim/ui/styles";
 import { supabase } from "../lib/supabase";
+import { pedirBienvenida } from "../lib/bienvenida";
 
 /**
  * Aterrizaje del enlace "confirma tu correo" del registro público (0142, ADR 0022).
  *
  * GoTrue confirma el correo al abrir el enlace y regresa aquí con la sesión en la URL; el cliente
- * la toma solo (detectSessionInUrl). Con sesión, a la primera vez. Sin sesión en unos segundos,
+ * la toma solo (detectSessionInUrl). Con sesión, se pide el correo de bienvenida (0146) y a la
+ * primera vez. Sin sesión en unos segundos,
  * el enlace venció o ya se usó: se manda a iniciar sesión, donde se puede pedir otro.
  */
 export default function CuentaConfirmadaPage() {
@@ -17,7 +19,14 @@ export default function CuentaConfirmadaPage() {
 
   useEffect(() => {
     let cancelado = false;
-    const seguir = () => { if (!cancelado) router.replace("/bienvenida"); };
+    // Con la cuenta confirmada sale el correo de bienvenida (0146). Una vez por visita desde aquí
+    // y una sola vez por negocio en el servidor; no se espera ni se enseña su resultado.
+    let pedida = false;
+    const seguir = () => {
+      if (cancelado) return;
+      if (!pedida) { pedida = true; void pedirBienvenida(); }
+      router.replace("/bienvenida");
+    };
     // Un enlace vencido regresa con `#error=…` en vez de la sesión: no hace falta esperar.
     if (/[#&]error=/.test(window.location.hash)) { setEstado("invalido"); return; }
     supabase.auth.getSession().then(({ data }) => { if (data.session) seguir(); });
