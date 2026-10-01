@@ -1,10 +1,10 @@
 import { describe, it, expect } from "vitest";
 import { validarManifiesto } from "../manifiesto";
 
-const PREFIJO = "https://github.com/Fermin03/vim-pos/releases/download/";
+const PREFIJO = "https://github.com/Fermin03/vim-pos-descargas/releases/download/";
 const bueno = JSON.stringify({
   version: "0.4.62",
-  url: "https://github.com/Fermin03/vim-pos/releases/download/v0.4.62/VIM.POS.Setup.0.4.62.exe",
+  url: "https://github.com/Fermin03/vim-pos-descargas/releases/download/v0.4.62/VIM.POS.Setup.0.4.62.exe",
   sha512: "a".repeat(128),
   notas: "Notas con acentos: versión y configuración.",
   fecha: "2026-09-06",
@@ -40,7 +40,7 @@ describe("validarManifiesto", () => {
   it("en github.com publica cualquiera: otro repo NO vale", () => {
     // Comprobar solo el host dejaría pasar esto, y publicaría el binario de un desconocido a
     // todas las cajas de todos los clientes a la vez.
-    const ajeno = bueno.replace("Fermin03/vim-pos", "un-desconocido/vim-pos");
+    const ajeno = bueno.replace("Fermin03/vim-pos-descargas", "un-desconocido/vim-pos-descargas");
     expect(validarManifiesto(ajeno, PREFIJO).ok).toBe(false);
   });
 

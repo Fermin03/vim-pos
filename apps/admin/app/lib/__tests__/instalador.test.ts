@@ -3,7 +3,7 @@ import { fechaLarga, leerInstalador, leerManifiesto, MANIFIESTO_URL } from "../i
 
 const REAL = {
   version: "0.4.99",
-  url: "https://github.com/Fermin03/vim-pos/releases/download/v0.4.99/VIM.POS.Setup.0.4.99.exe",
+  url: "https://github.com/Fermin03/vim-pos-descargas/releases/download/v0.4.99/VIM.POS.Setup.0.4.99.exe",
   sha512: "cc9c",
   notas: "…",
   fecha: "2026-09-30",
@@ -19,7 +19,7 @@ describe("instalador de la caja (0142)", () => {
     expect(leerManifiesto({ ...REAL, url: "https://malo.example/VIM.exe" })).toBeNull();
     expect(leerManifiesto({ ...REAL, url: "https://github.com/otro/repo/releases/download/v1/VIM.exe" })).toBeNull();
     expect(leerManifiesto({ ...REAL, url: "http://github.com/x/VIM.exe" })).toBeNull();
-    expect(leerManifiesto({ ...REAL, url: "https://github.com/Fermin03/vim-pos/releases/latest" })).toBeNull();
+    expect(leerManifiesto({ ...REAL, url: "https://github.com/Fermin03/vim-pos-descargas/releases/latest" })).toBeNull();
     expect(leerManifiesto({ ...REAL, version: "latest" })).toBeNull();
     expect(leerManifiesto(null)).toBeNull();
   });

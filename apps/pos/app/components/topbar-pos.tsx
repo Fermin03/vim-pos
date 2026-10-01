@@ -1,18 +1,14 @@
 "use client";
 import { useEffect, useState } from "react";
+import { LogoVim } from "@vim/ui/styles";
 
-/** Marca VIM (cuadro tinta con "V" y punto de acento), igual a los mockups. */
+/** Marca VIM: el isotipo vigente (`LogoVim`). Era el último sitio que aún dibujaba a mano el cuadro
+ *  negro con la "V" de los mockups: topbar del selector de cajero, vincular y pantalla de estado. */
 export function BrandMark({ size = 34 }: { size?: number }) {
   return (
-    <div
-      className="relative flex items-center justify-center rounded-lg bg-ink"
-      style={{ width: size, height: size }}
-    >
-      <span className="font-display font-bold leading-none tracking-tight text-white" style={{ fontSize: size * 0.5 }}>
-        V
-      </span>
-      <span className="absolute bottom-1.5 right-1.5 h-1 w-1 rounded-full bg-accent" aria-hidden="true" />
-    </div>
+    <span className="block flex-shrink-0" style={{ width: size, height: size }}>
+      <LogoVim className="h-full w-full" />
+    </span>
   );
 }
 

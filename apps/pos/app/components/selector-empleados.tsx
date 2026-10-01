@@ -100,13 +100,13 @@ export function SelectorEmpleados({
           )}
 
           {empleados && empleados.length > 0 && (
-            <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4">
+            <div className="flex flex-wrap justify-center gap-4">
               {empleados.map((e) => (
                 <button
                   key={e.id}
                   type="button"
                   onClick={() => onElegir(e)}
-                  className="flex flex-col items-center gap-3 rounded-lg border border-line bg-surface px-3 py-5 text-center transition-[border-color,transform] hover:border-ink active:scale-[.98] focus-visible:outline focus-visible:outline-2 focus-visible:outline-ink"
+                  className="flex w-[calc(50%-0.5rem)] flex-col items-center gap-3 rounded-lg border border-line bg-surface px-3 py-5 text-center sm:w-[168px] transition-[border-color,transform] hover:border-ink active:scale-[.98] focus-visible:outline focus-visible:outline-2 focus-visible:outline-ink"
                 >
                   <span className="flex h-[60px] w-[60px] items-center justify-center rounded-full border border-line bg-hover font-display text-20 font-semibold tracking-tight text-ink-2">
                     {iniciales(e.nombre)}
