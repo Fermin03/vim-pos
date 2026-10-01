@@ -14,17 +14,22 @@
 
 ## Qué hacemos ahora
 
-1. **Dos pasos.** Solo se elimina un cliente que ya está `CANCELADO`. Un `INTERNO`, nunca. El
+1. **Dos pasos.** Solo se elimina un cliente que ya está `CANCELADO` y fuera de su gracia. Un `INTERNO`, nunca. El
    botón vive en la Zona peligrosa de la ficha y solo aparece con el cliente cancelado.
 2. **Guardia fiscal, sin excepción.** Con un solo CFDI que haya llegado al SAT (`uuid_fiscal`,
    vigente o cancelado) no se elimina: "Tiene facturas timbradas: se conservan por obligación
    fiscal. Queda dado de baja." Tampoco con un timbrado a medias (`EN_PROCESO_TIMBRADO`).
-   **Y un cancelado ya no timbra.** Mientras un comprobante viaja al PAC su fila sigue en
-   `BORRADOR`; eliminar en esos segundos dejaría un CFDI válido en el SAT sin registro. Dos capas:
-   `timbrar-cfdi`, `timbrar-global` y `autofacturar` se niegan con el negocio `CANCELADO` —al
-   entrar y otra vez justo antes de llamar al PAC—, y `eliminar_tenant` hace esperar 15 minutos
-   desde la baja (y desde el último borrador tocado) a todo negocio que pudo facturar: tiene
-   sello o alguna fila en `tickets_cfdi`. Quien nunca tuvo sello no espera.
+   **Y con la baja en vigor ya no se timbra.** Mientras un comprobante viaja al PAC su fila
+   sigue en `BORRADOR`; eliminar en esos segundos dejaría un CFDI válido en el SAT sin registro.
+   Dos capas: `timbrar-cfdi`, `timbrar-global` y `autofacturar` se niegan cuando el negocio está
+   `CANCELADO` **y su bloqueo ya entró** (`bloqueo_desde` NULL o cumplido) —al entrar y otra vez
+   justo antes de llamar al PAC—, y `eliminar_tenant` hace esperar 15 minutos desde que dejó de
+   poder facturar (lo más tarde entre `fecha_baja` y `bloqueo_desde`, y el último borrador
+   tocado) a todo negocio que pudo: tiene sello o alguna fila en `tickets_cfdi`. Quien nunca
+   tuvo sello no espera.
+   **En sus días de gracia no se elimina** (`EN_GRACIA`), con o sin sello: un cancelado con
+   `bloqueo_desde` en el futuro sigue vendiendo y facturando hasta esa fecha (ADR 0014), y la
+   vista previa dice desde cuándo se podrá.
 3. **La base decide y borra, en una transacción** (`eliminar_tenant`, 0144, solo `service_role`).
    No hay lista de tablas escrita a mano: salen del catálogo (toda tabla de `public` con
    `tenant_id`) y se borran en **una sola sentencia**, con las llaves foráneas encendidas. Postgres
@@ -101,12 +106,13 @@
   un negocio así de grande se elimina desde SQL con el tiempo ampliado. Si la petición se corta
   sin respuesta, el panel pide revisar Clientes eliminados antes de reintentar; reintentar es
   seguro (un cliente ya eliminado contesta "no existe").
-- **Un cancelado deja de facturar en el acto, aunque le queden días de gracia.** Antes, un
-  `CANCELADO` con bloqueo programado seguía timbrando hasta la fecha del bloqueo. Es el precio de
-  que cancelar sea de verdad el paso previo a eliminar; suspender (que no lleva a eliminar) no
-  cambia.
-- **Un cliente que pudo facturar no se elimina en los primeros 15 minutos de la baja.** La vista
-  previa dice cuántos faltan.
+- **Cancelar con gracia no cambia nada para el cliente hasta la fecha del bloqueo:** sigue
+  vendiendo y facturando, y no se le puede eliminar. La regla nueva solo actúa cuando el bloqueo
+  ya entró — que es justo cuando `mi_acceso()` ya frenaba a `timbrar-cfdi` y `timbrar-global`;
+  lo que se añade de verdad es el portal de autofactura (que no consultaba nada) y la segunda
+  comprobación antes del PAC.
+- **Un cliente que pudo facturar no se elimina en los 15 minutos siguientes a su bloqueo.** La
+  vista previa dice cuántos faltan.
 - **Una tabla nueva sin `tenant_id` que cuelgue de una del negocio** necesita `ON DELETE CASCADE`
   (como `rol_permisos`); si no, la eliminación falla diciendo qué llave estorba. Es el
   comportamiento buscado, pero hay que saberlo al diseñar tablas hijas.

@@ -69,8 +69,9 @@ pasos: primero la baja), en un bloque propio debajo de los demás botones de la 
 Antes de pedir nada enseña lo que se va a borrar —sucursales, cajas, usuarios, productos,
 tickets, cuentas—, leído de la base al abrir el diálogo. Confirmar pide motivo, el nombre del
 negocio **y además** la palabra `ELIMINAR` (`palabra` en `DialogoConfirmar`): el nombre dice a
-quién, la palabra dice qué. Si la base no lo permite (facturas timbradas, o menos de 15 minutos
-desde la baja de un cliente que podía facturar), no hay botón: se dice por qué, en `ink`, no en
+quién, la palabra dice qué. Si la base no lo permite (facturas timbradas, el cliente sigue en
+sus días de gracia —se dice hasta cuándo—, o hace menos de 15 minutos que dejó de poder
+facturar), no hay botón: se dice por qué, en `ink`, no en
 rojo — no es un error, es una regla; la espera trae los minutos que faltan y un "Volver a
 comprobar". Con la **clave compartida** tampoco hay botón: se dice que hace falta la cuenta del
 operador. Al terminar se vuelve a Clientes con un aviso que no se cierra solo, y lo que queda del
