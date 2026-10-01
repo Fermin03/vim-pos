@@ -120,11 +120,23 @@ BEGIN
 
   -- Lo que genera una VENTA (descuento al cobrar, extras, reversa por cancelación o devolución)
   -- no se toca nunca: una venta no puede fallar por el plan del negocio.
-  -- `to_jsonb(NEW)` y no `NEW.tipo`: la función sirve a ocho tablas y solo una tiene esa columna.
-  IF TG_TABLE_NAME = 'movimientos_inventario' THEN
+  -- `to_jsonb(NEW)` y no `NEW.tipo`: la función sirve a varias tablas y solo una tiene esa columna.
+  --
+  -- La exención es para la venta DE VERDAD, que escribe por RPC (cobrar, cancelar, devolver) o
+  -- desde un trigger. Un INSERT directo por REST a la tabla con tipo SALIDA_VENTA no es una venta:
+  -- es alguien fabricando movimientos, y ese sí pasa por el candado.
+  IF TG_TABLE_NAME = 'movimientos_inventario'
+     AND NOT (pg_trigger_depth() = 1 AND _es_escritura_rest_directa()) THEN
     IF (to_jsonb(NEW) ->> 'tipo') IN ('SALIDA_VENTA', 'SALIDA_MODIFICADOR_EXTRA', 'REVERSA_CANCELACION') THEN
       RETURN NEW;
     END IF;
+  END IF;
+
+  -- Las existencias las mueve la venta en cada cobro (por RPC): ahí no se pregunta nada. Solo se
+  -- cierra la escritura DIRECTA por REST, que ninguna pantalla hace.
+  IF TG_TABLE_NAME = 'insumo_stock_sucursal'
+     AND NOT (pg_trigger_depth() = 1 AND _es_escritura_rest_directa()) THEN
+    RETURN CASE WHEN TG_OP = 'DELETE' THEN OLD ELSE NEW END;
   END IF;
 
   IF NOT inventario_permitido(v_tenant) THEN
@@ -153,6 +165,12 @@ END $$;
 -- manuales — los de venta salen por la puerta de arriba.
 CREATE OR REPLACE TRIGGER a10_inventario_exigir_modulo
   BEFORE INSERT ON public.movimientos_inventario
+  FOR EACH ROW EXECUTE FUNCTION public.inventario_exigir_modulo();
+
+-- Existencias: la venta las mueve por RPC y pasa siempre. Lo que se cierra es escribirlas DIRECTO
+-- por REST sin el módulo (mismo criterio que la guardia de 0133: `_es_escritura_rest_directa`).
+CREATE OR REPLACE TRIGGER a10_inventario_exigir_modulo
+  BEFORE INSERT OR UPDATE OR DELETE ON public.insumo_stock_sucursal
   FOR EACH ROW EXECUTE FUNCTION public.inventario_exigir_modulo();
 
 -- ── 3. El interruptor del dueño no puede estar encendido sin el módulo ───────
@@ -231,6 +249,152 @@ CREATE OR REPLACE TRIGGER trg_flags_inventario
   AFTER INSERT OR UPDATE OR DELETE ON public.tenant_feature_flags
   FOR EACH ROW EXECUTE FUNCTION public.trg_inventario_al_cambiar_permiso();
 
+-- ── 3 bis. La reversa sigue a la venta, no al interruptor ─────────────────────
+--
+-- Cancelar o devolver una venta regresaba los insumos solo si el interruptor estaba encendido EN
+-- ESE MOMENTO. Con el candado, el interruptor puede apagarse solo (bajó de plan, VIM quitó la
+-- excepción): una venta que SÍ descontó se cancelaba después sin devolver nada, y las existencias
+-- quedaban cortas para siempre. Ahora también regresa si esa venta tiene descuento pendiente de
+-- regresar: lo que salió por ella (SALIDA_VENTA) menos lo que ya volvió (REVERSA_CANCELACION).
+-- Con el interruptor encendido no cambia nada. Cuerpos de 0057 con ese único cambio.
+CREATE OR REPLACE FUNCTION public._venta_con_descuento_pendiente(p_ticket_id uuid)
+RETURNS boolean
+LANGUAGE sql
+STABLE
+SET search_path = public, pg_temp
+AS $$
+  SELECT COALESCE(sum(CASE m.tipo WHEN 'SALIDA_VENTA' THEN m.cantidad
+                                  WHEN 'REVERSA_CANCELACION' THEN -m.cantidad ELSE 0 END), 0) > 0
+    FROM movimientos_inventario m
+   WHERE m.ticket_id = p_ticket_id AND m.tipo IN ('SALIDA_VENTA', 'REVERSA_CANCELACION');
+$$;
+REVOKE ALL ON FUNCTION public._venta_con_descuento_pendiente(uuid) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public._venta_con_descuento_pendiente(uuid) TO authenticated, service_role;
+
+CREATE OR REPLACE FUNCTION reversar_inventario_por_cancelacion(
+  p_cancelacion_id uuid
+) RETURNS void
+LANGUAGE plpgsql
+AS $$
+DECLARE
+  v_cancelacion   cancelaciones_ticket%ROWTYPE;
+  v_item          record;
+  v_componente    record;
+  v_modulo_activo boolean;
+BEGIN
+  SELECT * INTO v_cancelacion FROM cancelaciones_ticket WHERE id = p_cancelacion_id;
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'Cancelación % no existe', p_cancelacion_id;
+  END IF;
+
+  IF v_cancelacion.inventario_reversado_at IS NOT NULL THEN
+    RETURN;     -- idempotencia
+  END IF;
+
+  SELECT ct.modulo_inventario_activo INTO v_modulo_activo
+  FROM configuracion_tenant ct
+  WHERE ct.tenant_id = v_cancelacion.tenant_id;
+
+  -- Interruptor encendido (como siempre) O la venta descontó y aún no se le ha regresado (0148).
+  IF COALESCE(v_modulo_activo, false) OR public._venta_con_descuento_pendiente(v_cancelacion.ticket_id) THEN
+    FOR v_item IN
+      SELECT ti.producto_id, ti.cantidad
+      FROM ticket_items ti
+      WHERE ti.ticket_id = v_cancelacion.ticket_id
+        AND ti.cancelado = false
+        AND ti.producto_id IS NOT NULL
+    LOOP
+      -- El stock vive en insumos: explotar la receta activa del producto.
+      FOR v_componente IN
+        SELECT rc.insumo_id, rc.cantidad AS cantidad_unitaria
+        FROM receta_componentes rc
+        JOIN recetas r ON r.id = rc.receta_id
+        WHERE r.producto_id = v_item.producto_id
+          AND r.activa = true
+      LOOP
+        PERFORM aplicar_movimiento_inventario(
+          p_tenant_id   := v_cancelacion.tenant_id,
+          p_sucursal_id := v_cancelacion.sucursal_id,
+          p_insumo_id   := v_componente.insumo_id,
+          p_tipo        := 'REVERSA_CANCELACION',
+          p_cantidad    := v_componente.cantidad_unitaria * v_item.cantidad,
+          p_descripcion := 'Cancelación ticket ' || v_cancelacion.ticket_folio_snapshot,
+          p_ticket_id   := v_cancelacion.ticket_id
+        );
+      END LOOP;
+    END LOOP;
+  END IF;
+
+  UPDATE cancelaciones_ticket
+  SET inventario_reversado_at = now()
+  WHERE id = p_cancelacion_id;
+END;
+$$;
+COMMENT ON FUNCTION reversar_inventario_por_cancelacion IS
+  'Regresa al stock los insumos de un ticket cancelado explotando la receta activa de cada producto (tipo REVERSA_CANCELACION). Idempotente por inventario_reversado_at. Actúa con el interruptor encendido o si la venta descontó y aún no se le ha regresado (0148).';
+
+CREATE OR REPLACE FUNCTION reversar_inventario_por_devolucion(
+  p_devolucion_id uuid
+) RETURNS void
+LANGUAGE plpgsql
+AS $$
+DECLARE
+  v_devolucion    devoluciones%ROWTYPE;
+  v_item          record;
+  v_componente    record;
+  v_modulo_activo boolean;
+BEGIN
+  SELECT * INTO v_devolucion FROM devoluciones WHERE id = p_devolucion_id;
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'Devolución % no existe', p_devolucion_id;
+  END IF;
+
+  IF v_devolucion.inventario_reversado_at IS NOT NULL THEN
+    RETURN;     -- idempotencia
+  END IF;
+
+  SELECT ct.modulo_inventario_activo INTO v_modulo_activo
+  FROM configuracion_tenant ct
+  WHERE ct.tenant_id = v_devolucion.tenant_id;
+
+  -- Interruptor encendido (como siempre) O la venta descontó y aún no se le ha regresado (0148).
+  IF COALESCE(v_modulo_activo, false) OR public._venta_con_descuento_pendiente(v_devolucion.ticket_original_id) THEN
+    FOR v_item IN
+      SELECT ti.producto_id, di.cantidad_devuelta
+      FROM devolucion_items di
+      JOIN ticket_items ti ON ti.id = di.ticket_item_id_original
+      WHERE di.devolucion_id = p_devolucion_id
+        AND di.reversar_inventario_item = true
+        AND ti.producto_id IS NOT NULL
+    LOOP
+      FOR v_componente IN
+        SELECT rc.insumo_id, rc.cantidad AS cantidad_unitaria
+        FROM receta_componentes rc
+        JOIN recetas r ON r.id = rc.receta_id
+        WHERE r.producto_id = v_item.producto_id
+          AND r.activa = true
+      LOOP
+        PERFORM aplicar_movimiento_inventario(
+          p_tenant_id   := v_devolucion.tenant_id,
+          p_sucursal_id := v_devolucion.sucursal_id,
+          p_insumo_id   := v_componente.insumo_id,
+          p_tipo        := 'REVERSA_CANCELACION',
+          p_cantidad    := v_componente.cantidad_unitaria * v_item.cantidad_devuelta,
+          p_descripcion := 'Devolución folio ' || v_devolucion.folio_completo,
+          p_ticket_id   := v_devolucion.ticket_original_id
+        );
+      END LOOP;
+    END LOOP;
+  END IF;
+
+  UPDATE devoluciones
+  SET inventario_reversado_at = now()
+  WHERE id = p_devolucion_id;
+END;
+$$;
+COMMENT ON FUNCTION reversar_inventario_por_devolucion IS
+  'Regresa al stock los insumos de los items devueltos explotando la receta activa de cada producto (tipo REVERSA_CANCELACION). Idempotente por inventario_reversado_at. Actúa con el interruptor encendido o si la venta descontó y aún no se le ha regresado (0148).';
+
 -- ── 4. Nadie pierde lo que ya usa ────────────────────────────────────────────
 -- A quien YA tiene insumos o recetas y su plan no incluye el módulo, se le concede por excepción.
 -- Y a quien no lo tiene y dejó el interruptor encendido sin usarlo, se le apaga.
@@ -243,8 +407,8 @@ SECURITY DEFINER
 SET search_path = public, pg_temp
 AS $$
 DECLARE
-  v_concedidos text[] := '{}';
-  v_apagados   text[] := '{}';
+  v_concedidos jsonb := '[]'::jsonb;
+  v_apagados   jsonb := '[]'::jsonb;
   r            record;
 BEGIN
   IF to_regclass('public._vim_migraciones') IS NOT NULL THEN
@@ -258,14 +422,20 @@ BEGIN
        AND (EXISTS (SELECT 1 FROM insumos i WHERE i.tenant_id = t.id)
             OR EXISTS (SELECT 1 FROM recetas x WHERE x.tenant_id = t.id))
        AND NOT inventario_permitido(t.id)
-       -- Una excepción que VIM puso a propósito para NEGARLO se respeta: no se pisa.
-       AND NOT EXISTS (SELECT 1 FROM tenant_feature_flags f WHERE f.tenant_id = t.id AND f.flag_codigo = 'recetas')
+       -- Una excepción VIGENTE que VIM puso a propósito para NEGARLO se respeta. Una vencida (o
+       -- que aún no empieza) no cuenta: ya no dice nada, y ese negocio conserva lo que usa.
+       AND NOT EXISTS (
+         SELECT 1 FROM tenant_feature_flags f
+          WHERE f.tenant_id = t.id AND f.flag_codigo = 'recetas'
+            AND f.fecha_inicio <= now() AND (f.fecha_fin IS NULL OR f.fecha_fin > now()))
      ORDER BY t.codigo
   LOOP
+    -- Si quedaba una fila vencida, se renueva en su lugar (la llave es tenant + flag).
     INSERT INTO tenant_feature_flags (tenant_id, flag_codigo, activado, motivo)
     VALUES (r.id, 'recetas', true, 'Ya usaba inventario antes del candado por plan (0148): se le respeta')
-    ON CONFLICT (tenant_id, flag_codigo) DO NOTHING;
-    v_concedidos := v_concedidos || r.codigo::text;
+    ON CONFLICT (tenant_id, flag_codigo) DO UPDATE
+      SET activado = true, fecha_inicio = now(), fecha_fin = NULL, motivo = EXCLUDED.motivo;
+    v_concedidos := v_concedidos || jsonb_build_object('id', r.id, 'codigo', r.codigo);
   END LOOP;
 
   FOR r IN
@@ -273,12 +443,12 @@ BEGIN
        SET modulo_inventario_activo = false
       FROM tenants t
      WHERE t.id = c.tenant_id AND c.modulo_inventario_activo AND NOT inventario_permitido(c.tenant_id)
-    RETURNING t.codigo
+    RETURNING t.id, t.codigo
   LOOP
-    v_apagados := v_apagados || r.codigo::text;
+    v_apagados := v_apagados || jsonb_build_object('id', r.id, 'codigo', r.codigo);
   END LOOP;
 
-  RETURN jsonb_build_object('concedidos', to_jsonb(v_concedidos), 'apagados', to_jsonb(v_apagados), 'caja', false);
+  RETURN jsonb_build_object('concedidos', v_concedidos, 'apagados', v_apagados, 'caja', false);
 END;
 $$;
 COMMENT ON FUNCTION public.inventario_respetar_uso_previo() IS
@@ -294,6 +464,7 @@ BEGIN
   IF (v->>'caja')::boolean THEN
     RAISE NOTICE '0148: caja instalada — el candado de inventario no actúa aquí; manda lo que baja de la nube.';
   ELSE
+    -- Con id y código de cada negocio: es lo que hay que revisar al aplicarla en producción.
     RAISE NOTICE '0148: inventario concedido por excepción (ya lo usaban): %', COALESCE(NULLIF(v->>'concedidos', '[]'), 'ninguno');
     RAISE NOTICE '0148: interruptor de descuento apagado (sin módulo y sin datos): %', COALESCE(NULLIF(v->>'apagados', '[]'), 'ninguno');
   END IF;

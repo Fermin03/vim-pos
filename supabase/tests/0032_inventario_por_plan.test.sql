@@ -13,7 +13,7 @@
 -- Se corre con:  supabase test db   (la nube; en la caja instalada el candado no actúa)
 -- ============================================================================
 begin;
-select plan(27);
+select plan(28);
 
 -- Dos negocios: uno en Esencial (sin inventario) y uno en Negocio (con).
 insert into tenants (id, codigo, nombre_comercial, vertical_principal, estado, plan_actual_id) values
@@ -118,8 +118,25 @@ select lives_ok($$ delete from insumos where tenant_id = 'abababab-0000-0000-000
   'y borra insumos (eliminar un negocio no se atora)');
 
 -- 7) Quien ya usaba inventario lo conserva: se le concede por los DATOS.
-select is(inventario_respetar_uso_previo()->'concedidos', '["inv-esencial"]'::jsonb, 'al de Esencial con insumos se le concede por excepción');
+-- Un tercero, también en Esencial y con insumos, al que le quedó una excepción VENCIDA en contra:
+-- una excepción que ya no vale no puede dejarlo sin lo que usa.
+insert into tenants (id, codigo, nombre_comercial, vertical_principal, estado, plan_actual_id)
+values ('abababab-0000-0000-0000-0000000032c0', 'inv-vencida', 'Inv Vencida', 'QUICK_SERVICE', 'ACTIVO', (select id from planes where codigo = 'ESENCIAL'));
+select sembrar_unidades_base('abababab-0000-0000-0000-0000000032c0');
+insert into insumos (tenant_id, nombre, unidad_medida_id, categoria, costo_unitario_mxn)
+values ('abababab-0000-0000-0000-0000000032c0', 'Pan',
+        (select id from unidades_medida where tenant_id = 'abababab-0000-0000-0000-0000000032c0' and codigo = 'KG' limit 1), 'OTROS', 10);
+insert into tenant_feature_flags (tenant_id, flag_codigo, activado, motivo, fecha_inicio, fecha_fin)
+values ('abababab-0000-0000-0000-0000000032c0', 'recetas', false, 'vieja, ya vencida', now() - interval '60 days', now() - interval '30 days');
+
+select is(
+  (select jsonb_agg(x order by x->>'codigo') from jsonb_array_elements(inventario_respetar_uso_previo()->'concedidos') x),
+  jsonb_build_array(
+    jsonb_build_object('id', 'abababab-0000-0000-0000-0000000032a0', 'codigo', 'inv-esencial'),
+    jsonb_build_object('id', 'abababab-0000-0000-0000-0000000032c0', 'codigo', 'inv-vencida')),
+  'se le concede a quien ya tiene insumos, con su id — también si solo le quedaba una excepción vencida');
 select is(inventario_permitido('abababab-0000-0000-0000-0000000032a0'), true, 'y desde ahí lo tiene');
+select is(inventario_permitido('abababab-0000-0000-0000-0000000032c0'), true, 'el de la excepción vencida también');
 select is(inventario_respetar_uso_previo()->'concedidos', '[]'::jsonb, 'volver a correrla no concede dos veces');
 select lives_ok(
   $$ update configuracion_tenant set modulo_inventario_activo = true where tenant_id = 'abababab-0000-0000-0000-0000000032a0' $$,

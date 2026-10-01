@@ -28,14 +28,24 @@
    - el interruptor del dueño (`modulo_inventario_activo`) **no puede estar encendido sin el
      módulo**: no se deja encender, y se apaga solo al perder el permiso (bajar de plan, quitar la
      excepción). Todas las funciones de venta ya leen ese interruptor: apagado, no descuentan.
-     **No se tocó ninguna función de cobro, de descuento ni de reversa.**
+     **No se tocó ninguna función de cobro ni de descuento.**
    - los movimientos que genera una venta (`SALIDA_VENTA`, `SALIDA_MODIFICADOR_EXTRA`,
-     `REVERSA_CANCELACION`) están fuera del candado aunque el negocio no tenga el módulo.
+     `REVERSA_CANCELACION`) están fuera del candado aunque el negocio no tenga el módulo —
+     cuando los escribe la venta, por RPC. Un INSERT **directo por REST** con uno de esos tipos
+     no es una venta y sí pasa por el candado, igual que escribir `insumo_stock_sucursal` directo
+     (mismo criterio que la guardia de 0133, `_es_escritura_rest_directa`).
+
+   **La reversa sigue a la venta, no al interruptor.** Como el interruptor ahora puede apagarse
+   solo, cancelar o devolver una venta que SÍ descontó regresa sus insumos aunque esté apagado:
+   `reversar_inventario_por_cancelacion` y `…_por_devolucion` actúan con el interruptor encendido
+   (como siempre) **o** si a ese ticket le salió más de lo que le ha vuelto
+   (`_venta_con_descuento_pendiente`). Son las dos únicas funciones de venta que se tocaron.
 
 4. **Nadie pierde lo que ya usa.** La migración concede el módulo por excepción a todo negocio que
    ya tenga insumos o recetas y cuyo plan no lo incluya (`inventario_respetar_uso_previo()`, por
-   los datos, no por nombre). Una excepción que VIM hubiera puesto a propósito para negarlo no se
-   pisa.
+   los datos, no por nombre). Una excepción **vigente** que VIM hubiera puesto a propósito para
+   negarlo no se pisa; una vencida no cuenta. El aviso de la migración lista id y código de cada
+   negocio al que se le concedió y de cada uno al que se le apagó el descuento.
 
 5. **En la caja instalada el candado no actúa.** La caja aplica las mismas migraciones a su
    Postgres local, donde no hay planes fiables ni excepciones (no viajan en el pull). Ahí
@@ -79,4 +89,8 @@
 - **La regla de "permitido" vive dos veces en SQL** (`modulos_efectivos` e
   `inventario_permitido`); pgTAP 0032 comprueba que digan lo mismo.
 - **Los smokes corren también en el Postgres de la caja**, donde el candado no actúa:
-  `smoke_inventario_plan.sql` tiene una rama para eso. Lo que depende del rol está en pgTAP 0032.
+  `smoke_inventario_plan.sql` hace los mismos flujos en los dos (venta, cancelación y devolución
+  con el descuento apagado) y solo cambia cómo se apaga. Lo que depende del rol —la cajera por
+  RPC, `service_role`, el push de una caja— está en pgTAP 0032 y 0033.
+- **Reabrir una cuenta o cambiarle el pago** (0058, 0134) sigue mirando solo el interruptor: con
+  él apagado no regresa ni vuelve a descontar, así que queda neto. No se tocó.
