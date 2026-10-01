@@ -4,7 +4,7 @@ import { BotonVolver } from "./boton-volver";
 import { RenglonItem } from "./renglon-item";
 import { Button, DialogoPeligro, LogoVim, Modal } from "@vim/ui/styles";
 import { fmtMxn, type DatosCaja, type Turno } from "../lib/turno";
-import { borrarCuentaVacia, leerEntregaCuenta, listarCuentasAbiertas, leerRenglonesCuenta, marcarComandaImpresa, minutosAbierta, type CuentaAbierta, type RenglonCuenta } from "../lib/cuentas-abiertas";
+import { borrarCuentaVacia, leerEntregaCuenta, listarCuentasAbiertas, leerRenglonesCuenta, marcarTicketImpreso, minutosAbierta, type CuentaAbierta, type RenglonCuenta } from "../lib/cuentas-abiertas";
 import { leerTotales, type TotalesTicket } from "../lib/cobro";
 import { leerDeliveries } from "../lib/delivery";
 import { ModalCancelarItem } from "./modal-cancelar-item";
@@ -221,7 +221,7 @@ export function PantallaCuentasModo({
     try {
       await onImprimirTicket(ticketId, reimpresion);
       setYaImpresas((s) => new Set(s).add(ticketId));
-      // Imprimir ya NO marca la salida. Lo hacía —sellaba comanda_impresa_at y la tarjeta se
+      // Imprimir ya NO marca la salida. Lo hacía —sellaba el ticket como impreso y la tarjeta se
       // pintaba naranja— y ese era el camino por el que los pedidos "salían" sin repartidor: el
       // cajero que imprimía nunca pasaba por el modal. Desde la 0114 lo que saca un pedido a la
       // calle es asignarle repartidor, y nada más.
@@ -233,7 +233,7 @@ export function PantallaCuentasModo({
       // ticket ya salió de la impresora, así que un fallo aquí no debe molestar al cajero.
       if (modo === "DELIVERY_PROPIO") {
         try {
-          await marcarComandaImpresa(token, ticketId);
+          await marcarTicketImpreso(token, ticketId);
         } catch {
           /* la marca local (yaImpresas) ya cubre esta sesión */
         }
