@@ -34,7 +34,7 @@
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import { corsHeaders } from "../_shared/cors.ts";
 import { timbrarConFailover, obtenerFacturama, PAC_NO_CONFIGURADO } from "../_shared/pac/index.ts";
-import { negocioPuedeTimbrar, NEGOCIO_DADO_DE_BAJA } from "../_shared/pac/negocio.ts";
+import { COLUMNAS_NEGOCIO, negocioPuedeTimbrar, NEGOCIO_DADO_DE_BAJA } from "../_shared/pac/negocio.ts";
 import { armarConceptos, ConceptosIncoherentes, type LineaTicket } from "../_shared/pac/conceptos.ts";
 import { archivarCfdi, bytesABase64, objetoArchivoCfdi, subidorSupabase } from "../_shared/pac/archivo.ts";
 import { aCentavos, accesoAlTicket, normalizarToken } from "../_shared/pac/acceso-ticket.ts";
@@ -122,7 +122,8 @@ Deno.serve(async (req) => {
   } | null;
   if (!tenant) return json({ estado: "NEGOCIO_NO_EXISTE", mensaje: "No encontramos ese negocio." }, 404);
 
-  // Negocio dado de baja: su portal ya no factura (0144, ADR 0023; ver `_shared/pac/negocio.ts`).
+  // Negocio dado de baja y con la baja ya en vigor: su portal ya no factura (0144, ADR 0023; ver
+  // `_shared/pac/negocio.ts`). En sus días de gracia sigue facturando.
   // El portal no tiene sesión del negocio, así que aquí no hay `mi_acceso()` que lo frene.
   const negocioDeBaja = () => json({
     estado: "SIN_FACTURACION",
@@ -131,7 +132,7 @@ Deno.serve(async (req) => {
     negocio: tenant.nombre_comercial,
     logo: tenant.logo_png_url,
   }, 409);
-  const estadoDelNegocio = () => sb.from("tenants").select("estado").eq("id", tenant.id).maybeSingle();
+  const estadoDelNegocio = () => sb.from("tenants").select(COLUMNAS_NEGOCIO).eq("id", tenant.id).maybeSingle();
   if (!await negocioPuedeTimbrar(estadoDelNegocio)) return negocioDeBaja();
 
   // El add-on decide si este negocio ofrece autofactura. Sin él, el portal no expone nada suyo.

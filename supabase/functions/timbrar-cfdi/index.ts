@@ -20,7 +20,7 @@ import { timbrarConFailover, obtenerFacturama } from "../_shared/pac/index.ts";
 import { armarConceptos, ConceptosIncoherentes, type LineaTicket } from "../_shared/pac/conceptos.ts";
 import { archivarCfdi, subidorSupabase } from "../_shared/pac/archivo.ts";
 import { resolverEmisorVerificado } from "../_shared/pac/emisor.ts";
-import { negocioPuedeTimbrar, NEGOCIO_DADO_DE_BAJA } from "../_shared/pac/negocio.ts";
+import { COLUMNAS_NEGOCIO, negocioPuedeTimbrar, NEGOCIO_DADO_DE_BAJA } from "../_shared/pac/negocio.ts";
 
 const ROLES_FACTURA = ["DUENO", "ADMIN"];
 
@@ -99,9 +99,9 @@ Deno.serve(async (req) => {
   if (addonActivo !== true) {
     return json({ error: "SIN_ADDON_CFDI", detalle: "La facturación no está contratada para este negocio. Contacta a VIM." }, 403);
   }
-  // Negocio dado de baja: no se timbra, aunque siga en sus días de gracia (0144, ADR 0023). Un
-  // CANCELADO se puede eliminar por completo; ver `_shared/pac/negocio.ts`.
-  const estadoDelNegocio = () => admin.from("tenants").select("estado").eq("id", tenantDelCfdi).maybeSingle();
+  // Negocio dado de baja y con la baja ya en vigor: no se timbra (0144, ADR 0023). En sus días de
+  // gracia sigue facturando, igual que su caja sigue vendiendo. Ver `_shared/pac/negocio.ts`.
+  const estadoDelNegocio = () => admin.from("tenants").select(COLUMNAS_NEGOCIO).eq("id", tenantDelCfdi).maybeSingle();
   if (!await negocioPuedeTimbrar(estadoDelNegocio)) return json(NEGOCIO_DADO_DE_BAJA, 403);
 
   // Servicio suspendido: no se timbra (ADR 0014, entrega 2).
