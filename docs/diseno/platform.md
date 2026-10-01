@@ -69,10 +69,17 @@ pasos: primero la baja), en un bloque propio debajo de los demás botones de la 
 Antes de pedir nada enseña lo que se va a borrar —sucursales, cajas, usuarios, productos,
 tickets, cuentas—, leído de la base al abrir el diálogo. Confirmar pide motivo, el nombre del
 negocio **y además** la palabra `ELIMINAR` (`palabra` en `DialogoConfirmar`): el nombre dice a
-quién, la palabra dice qué. Si la base no lo permite (facturas timbradas), no hay botón: se dice
-por qué, en `ink`, no en rojo — no es un error, es una regla. Al terminar se vuelve a Clientes
-con un aviso que no se cierra solo, y lo que queda del negocio se ve en **Clientes eliminados**
-(enlace al pie de la lista), de solo lectura.
+quién, la palabra dice qué. Si la base no lo permite (facturas timbradas, o menos de 15 minutos
+desde la baja de un cliente que podía facturar), no hay botón: se dice por qué, en `ink`, no en
+rojo — no es un error, es una regla; la espera trae los minutos que faltan y un "Volver a
+comprobar". Con la **clave compartida** tampoco hay botón: se dice que hace falta la cuenta del
+operador. Al terminar se vuelve a Clientes con un aviso que no se cierra solo, y lo que queda del
+negocio se ve en **Clientes eliminados** (enlace al pie de la lista). Ahí lo único que se puede
+hacer es **Reintentar** el borrado de archivos que hayan quedado pendientes, en `warning`.
+
+Si la petición se corta sin respuesta, el diálogo no dice "error": dice que no se sabe si terminó
+y manda a mirar Clientes eliminados antes de reintentar. Un mensaje ambiguo aquí acaba en un
+operador que reintenta a ciegas o que da por borrado lo que no se borró.
 
 **Cobro, plan y prueba (0141, ADR 0021).** Activar el cobro pide precio de lista, ciclo y una
 promoción opcional; en Esencial hay un botón "Piloto 5 negocios" ($499 seis meses) y siempre
