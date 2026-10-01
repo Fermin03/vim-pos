@@ -112,20 +112,30 @@ export function correoValido(v: unknown): string | null {
 
 /** Lo que el handler le da a `procesarAlta`. Cada pieza se simula en las pruebas. */
 export type DepsAlta = {
-  verificarCaptcha(token: unknown): Promise<{ ok: boolean }>;
+  /** `noConfigurado`: falta TURNSTILE_SECRET_KEY y no es local (fail-closed → 503). */
+  verificarCaptcha(token: unknown, accion: "registro" | "reenvio"): Promise<{ ok: boolean; noConfigurado?: boolean }>;
   /** Crea la cuenta de Auth SIN confirmar. */
   crearUsuario(a: { email: string; password: string; nombre: string }): Promise<{ id: string } | { error: string }>;
   borrarUsuario(id: string): Promise<void>;
   /** RPC `alta_autoservicio` (0142): tenant TRIAL + términos + ciudad en una transacción. */
   altaNegocio(a: DatosAlta & { owner_id: string; plan: string; terminos_version: string }): Promise<{ tenantId: string } | { error: string }>;
-  /** Manda el correo de confirmación (GoTrue). */
-  enviarConfirmacion(email: string): Promise<{ ok: boolean; error?: string }>;
+  /** Manda el correo de confirmación (GoTrue). `limitado`: GoTrue dijo "espera" (límite de correos). */
+  enviarConfirmacion(email: string): Promise<{ ok: boolean; error?: string; limitado?: boolean }>;
   /** Aviso interno a VIM. Se lanza sin esperarlo: nunca decide la respuesta. */
   avisarVim(d: DatosAlta & { tenantId: string }): void;
   log?: (nivel: "info" | "warn" | "error", msg: string) => void;
 };
 
 export type Respuesta = { status: number; body: Record<string, unknown> };
+
+/** Respuesta del captcha fallido: 503 si falta configurarlo (es nuestro), 400 si el token no sirve. */
+const captchaFallido = (c: { noConfigurado?: boolean }): Respuesta =>
+  c.noConfigurado ? { status: 503, body: { error: "CAPTCHA_NO_CONFIGURADO" } } : { status: 400, body: { error: "CAPTCHA_INVALIDO" } };
+
+/** ¿El error de GoTrue es un límite de envío? ("over_email_send_rate_limit", "only request this after 60 seconds"). */
+export function esLimiteDeCorreo(error: string | undefined): boolean {
+  return /rate limit|after \d+ seconds|too many|429/i.test(error ?? "");
+}
 
 const rechazo = (r: Rechazo): Respuesta => {
   const { ok: _ok, status, ...body } = r;
@@ -138,8 +148,8 @@ export async function procesarAlta(b: Record<string, unknown>, deps: DepsAlta): 
   if (!v.ok) return rechazo(v);
   const d = v.datos;
 
-  const captcha = await deps.verificarCaptcha(b.captcha);
-  if (!captcha.ok) return { status: 400, body: { error: "CAPTCHA_INVALIDO" } };
+  const captcha = await deps.verificarCaptcha(b.captcha, "registro");
+  if (!captcha.ok) return captchaFallido(captcha);
 
   // 1) La cuenta, SIN confirmar: no entra hasta abrir el enlace del correo.
   const u = await deps.crearUsuario({ email: d.email_owner, password: d.password, nombre: d.nombre_owner });
@@ -152,7 +162,9 @@ export async function procesarAlta(b: Record<string, unknown>, deps: DepsAlta): 
   // 2) El negocio en prueba, con los términos sellados. Si falla, se borra la cuenta.
   const t = await deps.altaNegocio({ ...d, owner_id: u.id, plan: PLAN_DE_VERTICAL[d.vertical], terminos_version: TERMINOS_VERSION });
   if ("error" in t) {
-    await deps.borrarUsuario(u.id).catch(() => {});
+    // Si el borrado también falla queda una cuenta sin negocio: se deja en el log para limpiarla a
+    // mano (el admin le enseña al dueño "tu cuenta no terminó de crearse" con el WhatsApp).
+    await deps.borrarUsuario(u.id).catch((e) => log("error", `rollback: no se pudo borrar la cuenta ${u.id} sin negocio — ${String(e)}`));
     if (/duplicate|unique|already/i.test(t.error)) return { status: 409, body: { error: "CODIGO_YA_USADO" } };
     log("error", `alta_autoservicio: ${t.error}`);
     return { status: 400, body: { error: "PROVISION_FALLO" } };
@@ -179,10 +191,15 @@ export async function procesarAlta(b: Record<string, unknown>, deps: DepsAlta): 
 export async function procesarReenvio(b: Record<string, unknown>, deps: Pick<DepsAlta, "verificarCaptcha" | "enviarConfirmacion" | "log">): Promise<Respuesta> {
   const email = correoValido(b.email);
   if (!email) return { status: 400, body: { error: "EMAIL_INVALIDO" } };
-  const captcha = await deps.verificarCaptcha(b.captcha);
-  if (!captcha.ok) return { status: 400, body: { error: "CAPTCHA_INVALIDO" } };
-  const r = await deps.enviarConfirmacion(email).catch((e) => ({ ok: false, error: String(e) }));
-  if (!r.ok) (deps.log ?? (() => {}))("warn", `reenvío de confirmación falló: ${r.error ?? "?"}`);
+  const captcha = await deps.verificarCaptcha(b.captcha, "reenvio");
+  if (!captcha.ok) return captchaFallido(captcha);
+  const r: { ok: boolean; error?: string; limitado?: boolean } = await deps.enviarConfirmacion(email).catch((e) => ({ ok: false, error: String(e) }));
+  if (r.ok) return { status: 200, body: { ok: true } };
+  // GoTrue solo pone su límite de 60 s a cuentas que existen; contestarlo tal cual delataría la
+  // cuenta. Por eso el handler aplica ANTES su propio "un reenvío por correo por minuto" a todo
+  // correo, exista o no: este 429 solo sale además por el tope de correos del proyecto.
+  if (r.limitado || esLimiteDeCorreo(r.error)) return { status: 429, body: { error: "ESPERA_UN_MINUTO" } };
+  (deps.log ?? (() => {}))("warn", `reenvío de confirmación falló: ${r.error ?? "?"}`);
   return { status: 200, body: { ok: true } };
 }
 

@@ -7,13 +7,16 @@
 //   POST { accion: "reenviar", email, captcha }               → reenviar el correo de confirmación
 //
 // CONTROLES
-//   · Captcha Cloudflare Turnstile (_shared/turnstile.ts). Sin TURNSTILE_SECRET_KEY no se verifica
-//     y se avisa en el log (local, y hasta que Fermín cree las llaves); con él, token malo = 400.
+//   · Captcha Cloudflare Turnstile (_shared/turnstile.ts), FAIL-CLOSED: sin TURNSTILE_SECRET_KEY
+//     contesta 503 CAPTCHA_NO_CONFIGURADO, salvo CAPTCHA_OPCIONAL=1 (solo local). Token malo, de
+//     otro dominio (TURNSTILE_HOSTNAMES) o de otra acción (registro/reenvio) = 400.
 //   · Límites en la base (consumir_cupo, 0136), antes de validar: un intento inválido también
 //     cuesta. FAIL-CLOSED si la base no responde: crear cuentas sin límite justo cuando no se ve
 //     nada sería lo peor (503 "intenta en un momento").
 //       alta:     MAX_POR_IP por IP y hora + MAX_GLOBAL por hora.
-//       reenvío:  por IP, por correo (hash) y global. GoTrue además limita sus propios correos.
+//       reenvío:  UNO por correo por minuto (exista o no la cuenta: así el límite de 60 s de GoTrue,
+//                 que solo aplica a cuentas existentes, no delata a nadie), y por IP, por correo
+//                 (hash) por hora y global.
 //   · Términos aceptados OBLIGATORIOS: sin `acepta_terminos: true` no se toca Auth, y la base
 //     (alta_autoservicio) tampoco da de alta sin la versión.
 //   · Contacto obligatorio: nombre, WhatsApp (10 dígitos), correo y ciudad.
@@ -23,15 +26,15 @@
 //   · Aviso a VIM de cada alta por correo (VIM_AVISOS_A), sin esperarlo ni dejar que falle el alta.
 //
 // SECRETOS: ADMIN_APP_URL (a dónde regresa el enlace del correo), PLATFORM_APP_URL (enlace a la
-// ficha en el aviso, por defecto https://platform.vimpos.com.mx), TURNSTILE_SECRET_KEY, VIM_SMTP_*,
+// ficha en el aviso, por defecto https://platform.vimpos.com.mx), TURNSTILE_SECRET_KEY, TURNSTILE_HOSTNAMES (por defecto admin.vimpos.com.mx), CAPTCHA_OPCIONAL (solo local), VIM_SMTP_*,
 // VIM_AVISOS_A. La configuración de Auth que esto necesita está en docs/operacion/registro-publico.md.
 
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import { corsHeaders } from "../_shared/cors.ts";
 import { consumirCupos, ipDeLaPeticion, type Cupo } from "../_shared/limite.ts";
-import { verificarTurnstile } from "../_shared/turnstile.ts";
+import { hostnamesPermitidos, verificarTurnstile } from "../_shared/turnstile.ts";
 import { enSegundoPlano, enviarCorreo } from "../_shared/correo.ts";
-import { correoAvisoAlta, procesarAlta, procesarReenvio, type DepsAlta } from "../_shared/alta.ts";
+import { correoAvisoAlta, esLimiteDeCorreo, procesarAlta, procesarReenvio, type DepsAlta } from "../_shared/alta.ts";
 
 const MAX_POR_IP = 10;       // altas (o intentos) por IP y hora: holgado para quien se equivoca
 const MAX_GLOBAL = 60;       // altas (o intentos) de todo el mundo por hora
@@ -69,12 +72,20 @@ Deno.serve(async (req) => {
 
   // ── Límite (antes de validar; ver el encabezado) ────────────────────────────────────────────
   const ip = ipDeLaPeticion(req);
+  const correoReenvio = reenvio && typeof b.email === "string" && b.email.trim() ? await huella(b.email) : null;
+  // Un reenvío por correo por minuto, ANTES que todo: el mismo trato exista o no la cuenta.
+  if (correoReenvio) {
+    const minuto = await consumirCupos(admin, [{ clave: `signup-reenvio:minuto:${correoReenvio}`, ventanaSeg: 60, max: 1 }], "cerrar");
+    if (!minuto.permitido) {
+      return minuto.motivo === "BD_NO_RESPONDE"
+        ? json({ error: "NO_DISPONIBLE", detalle: "Intenta de nuevo en un momento." }, 503)
+        : json({ error: "ESPERA_UN_MINUTO" }, 429);
+    }
+  }
   const cupos: Cupo[] = reenvio
     ? [
         { clave: `signup-reenvio:ip:${ip}`, ventanaSeg: HORA, max: REENVIO_POR_IP },
-        ...(typeof b.email === "string" && b.email.trim()
-          ? [{ clave: `signup-reenvio:correo:${await huella(b.email)}`, ventanaSeg: HORA, max: REENVIO_POR_CORREO }]
-          : []),
+        ...(correoReenvio ? [{ clave: `signup-reenvio:correo:${correoReenvio}`, ventanaSeg: HORA, max: REENVIO_POR_CORREO }] : []),
         { clave: "signup-reenvio:global", ventanaSeg: HORA, max: REENVIO_GLOBAL },
       ]
     : [
@@ -89,14 +100,20 @@ Deno.serve(async (req) => {
   }
 
   const secreto = Deno.env.get("TURNSTILE_SECRET_KEY");
+  const captchaOpcional = Deno.env.get("CAPTCHA_OPCIONAL") === "1";
+  const hostnames = hostnamesPermitidos(Deno.env.get("TURNSTILE_HOSTNAMES"));
   const adminUrl = (Deno.env.get("ADMIN_APP_URL") ?? "http://localhost:3001").replace(/\/+$/, "");
   const platformUrl = Deno.env.get("PLATFORM_APP_URL") ?? "https://platform.vimpos.com.mx";
   const log: NonNullable<DepsAlta["log"]> = (nivel, msg) => console[nivel](`[signup-tenant] ${msg}`);
 
   const deps: DepsAlta = {
-    async verificarCaptcha(token) {
-      const r = await verificarTurnstile({ secreto, token, ip });
-      if (r.ok && r.omitido) console.warn("[signup-tenant] TURNSTILE_SECRET_KEY no configurada: captcha NO verificado.");
+    async verificarCaptcha(token, accion) {
+      const r = await verificarTurnstile({ secreto, opcional: captchaOpcional, token, accion, hostnames, ip });
+      if (r.ok && r.omitido) console.warn("[signup-tenant] CAPTCHA_OPCIONAL=1 y sin TURNSTILE_SECRET_KEY: captcha NO verificado (solo local).");
+      if (!r.ok && r.motivo === "NO_CONFIGURADO") {
+        console.error("[signup-tenant] falta TURNSTILE_SECRET_KEY: registro cerrado (503). `supabase secrets set TURNSTILE_SECRET_KEY=…`");
+        return { ok: false, noConfigurado: true };
+      }
       if (!r.ok) console.warn(`[signup-tenant] captcha rechazado desde ${ip}: ${r.motivo} ${r.codigos?.join(",") ?? ""}`);
       return { ok: r.ok };
     },
@@ -132,7 +149,7 @@ Deno.serve(async (req) => {
       // GoTrue manda su plantilla "Confirm signup" por el SMTP del proyecto. El enlace regresa a
       // /cuenta-confirmada del admin, que toma la sesión y lleva a la primera vez.
       const { error } = await admin.auth.resend({ type: "signup", email, options: { emailRedirectTo: `${adminUrl}/cuenta-confirmada` } });
-      return error ? { ok: false, error: error.message } : { ok: true };
+      return error ? { ok: false, error: error.message, limitado: error.status === 429 || esLimiteDeCorreo(error.message) } : { ok: true };
     },
     avisarVim(d) {
       const { subject, html } = correoAvisoAlta(d, platformUrl);

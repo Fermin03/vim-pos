@@ -133,3 +133,36 @@ test("el aviso a VIM escapa lo que escribió el visitante y enlaza la ficha", ()
   assert.match(subject, /^[ -~]*$/, "asunto en ASCII puro");
   assert.ok(subject.includes("tacos-ana"));
 });
+
+test("sin captcha configurado (y no es local) = 503 CAPTCHA_NO_CONFIGURADO, sin tocar Auth", async () => {
+  const { d, llamadas } = deps({ verificarCaptcha: async () => ({ ok: false, noConfigurado: true }) });
+  assert.deepEqual(await procesarAlta(BUENO, d), { status: 503, body: { error: "CAPTCHA_NO_CONFIGURADO" } });
+  assert.equal(llamadas.crearUsuario!.length, 0);
+  assert.deepEqual(await procesarReenvio({ email: "ana@tacos.mx" }, d), { status: 503, body: { error: "CAPTCHA_NO_CONFIGURADO" } });
+});
+
+test("cada acción pide su captcha: registro y reenvio", async () => {
+  const acciones: string[] = [];
+  const { d } = deps({ verificarCaptcha: async (_t, a) => { acciones.push(a); return { ok: true }; } });
+  await procesarAlta(BUENO, d);
+  await procesarReenvio({ email: "ana@tacos.mx" }, d);
+  assert.deepEqual(acciones, ["registro", "reenvio"]);
+});
+
+test("si el rollback no puede borrar la cuenta, queda en el log", async () => {
+  const logs: string[] = [];
+  const { d } = deps({
+    altaNegocio: async () => ({ error: "boom" }),
+    borrarUsuario: async () => { throw new Error("auth caído"); },
+    log: (n, m) => logs.push(`${n}: ${m}`),
+  });
+  assert.equal((await procesarAlta(BUENO, d)).status, 400);
+  assert.ok(logs.some((l) => l.startsWith("error: rollback") && l.includes("u-1")), logs.join("\n"));
+});
+
+test("reenvío con el límite de GoTrue = 429 ESPERA_UN_MINUTO (nunca 'listo')", async () => {
+  const { d } = deps({ enviarConfirmacion: async () => ({ ok: false, error: "For security purposes, you can only request this after 52 seconds." }) });
+  assert.deepEqual(await procesarReenvio({ email: "ana@tacos.mx" }, d), { status: 429, body: { error: "ESPERA_UN_MINUTO" } });
+  const { d: d2 } = deps({ enviarConfirmacion: async () => ({ ok: false, error: "email rate limit exceeded" }) });
+  assert.equal((await procesarReenvio({ email: "ana@tacos.mx" }, d2)).status, 429);
+});
