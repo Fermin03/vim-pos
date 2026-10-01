@@ -71,6 +71,32 @@ Sale por el mismo SMTP que el formulario de demo (`VIM_SMTP_*`, `VIM_AVISOS_A`; 
 ficha (`PLATFORM_APP_URL`, por defecto `https://platform.vimpos.com.mx`). Si falla, el alta sigue:
 se ve en el log de `signup-tenant`.
 
+## 4 bis. El correo de bienvenida al dueño (0146)
+
+Con la cuenta confirmada sale **un** correo al dueño: primeros pasos, descarga de la caja, equipo
+que hace falta, cómo se paga y el WhatsApp de soporte. Lo manda la Edge Function
+**`correo-bienvenida`**, que el admin llama desde `/cuenta-confirmada` (registro público) y desde
+`/establecer-acceso` (invitación de VIM).
+
+- **Desplegar:** migración 0146 antes; después `supabase functions deploy correo-bienvenida`. Va
+  **con** JWT (no lleva `verify_jwt = false` en `config.toml`): la llama un dueño con sesión.
+- **Secretos:** los mismos `VIM_SMTP_*` y `ADMIN_APP_URL` que ya existen. Sin `VIM_SMTP_*` no sale
+  nada (y la marca se libera, así que saldrá el día que estén).
+- **Solo la dispara el dueño**, con su sesión: un administrador invitado que fija su contraseña
+  en `/establecer-acceso` no le manda la bienvenida al dueño.
+- **Una vez por negocio:** la marca es `tenant_onboarding_estado.bienvenida_enviada_at`. Para
+  **volver a mandarla** a un cliente: ponerla en `NULL` y pedirle que abra otra vez el enlace de su
+  correo o inicie sesión por `/establecer-acceso`.
+- **A quién no:** negocios con más de 30 días, internos, suspendidos o cancelados (así quien
+  restablece su contraseña meses después no recibe una "bienvenida").
+- **El horario y el WhatsApp** salen de `plataforma_soporte` (/platform → Pagos y soporte). El
+  horario admite hasta 80 caracteres: conviene capturarlo completo, p. ej.
+  `lunes a viernes de 9:00 a 18:00; sábado y domingo de 9:00 a 14:00`.
+- **Si falla** no se entera el dueño: queda en el log de la función
+  (`bienvenida de <tenant> NO enviada (…)`).
+- Admin viejo con función nueva, o al revés: no pasa nada. El admin viejo no la llama; el admin
+  nuevo sin función recibe un 404 que ignora.
+
 ## 5. Límites
 
 Por hora: 10 intentos de alta por IP y 60 en total. Reenvíos: **uno por correo por minuto** (a

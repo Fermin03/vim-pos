@@ -6,7 +6,7 @@ import { ETIQUETA_METODO_COBRO, estadoCobro, precioVigente, promocionVigente, te
 import { PageHeader, PageBody } from "../../../components/page-header";
 import { AvisoPrueba } from "../../../components/aviso-prueba";
 import { BotonCopiar } from "../../../components/boton-copiar";
-import { leerPlanYPagos, type PlanYPagos } from "../../../lib/plan";
+import { desgloseMensual, leerPlanYPagos, textoLimites, type PlanYPagos } from "../../../lib/plan";
 import { clabeLegible, enlaceWhatsapp, hayDatosPago, mensajeComprobante, mesDe, type DatosPago } from "../../../lib/datos-pago";
 import { mensajeError } from "../../../lib/errores";
 
@@ -37,6 +37,9 @@ export default function PlanPage() {
   const promo = s ? promocionVigente(s, hoy) : null;
   const vigente = s ? precioVigente(s, hoy) : 0;
   const mesAPagar = mesDe(s?.proxima_fecha_cobro ?? hoy);
+  // Lo que paga aparte del plan (facturación, delivery, sucursales y cajas adicionales) y el total
+  // del mes (0147). Mismo número que ve VIM en su panel.
+  const desglose = d ? desgloseMensual(d.plan, s, d.addons, hoy) : null;
 
   return (
     <>
@@ -58,10 +61,44 @@ export default function PlanPage() {
                     </p>
                   )}
                   {promo?.nombre && <p className="mt-0.5 text-12 text-ink-3">Precio de promoción: {promo.nombre}</p>}
+                  {/* Hasta dónde puede crecer hoy, con las mismas palabras que usa VIM (0147). */}
+                  {textoLimites(d.limites) && <p className="mt-1 text-13 text-ink-2">{textoLimites(d.limites)}</p>}
                 </div>
                 {s?.estado === "ACTIVA" && <StatusChip tone={TONO[estado.tipo]} punto>{textoEstadoCobro(estado)}</StatusChip>}
                 {s?.estado === "PAUSADA" && <StatusChip tone="neutral">Cobro en pausa</StatusChip>}
               </div>
+
+              {/* El desglose solo aparece si hay algo además del plan: con una sola línea no dice nada. */}
+              {desglose && desglose.renglones.length > (s ? 1 : 0) && (
+                <div className="mt-4 border-t border-line pt-3">
+                  <p className="text-12 font-semibold uppercase tracking-wide text-ink-3">Lo que tienes contratado</p>
+                  <ul className="mt-1.5 flex flex-col gap-1">
+                    {desglose.renglones.map((r) => (
+                      <li key={r.clave} className="flex items-baseline justify-between gap-3 text-14">
+                        <span className="min-w-0">
+                          {r.concepto}
+                          {r.detalle && <span className="text-ink-3"> · {r.detalle}</span>}
+                        </span>
+                        <span className="tabular-nums text-ink-2">{r.importe > 0 ? `${mxn(r.importe)} al mes` : "—"}</span>
+                      </li>
+                    ))}
+                  </ul>
+                  {s && desglose.hayExtras && (
+                    <p className="mt-2 flex items-baseline justify-between gap-3 border-t border-line pt-2 text-14 font-semibold">
+                      <span>Total al mes</span>
+                      <span className="font-display text-16 tabular-nums">{mxn(desglose.total)}</span>
+                    </p>
+                  )}
+                  {anual && desglose.hayExtras && (
+                    <p className="mt-1 text-12 text-ink-3">Tu plan se cobra por año; aquí se muestra lo que equivale al mes.</p>
+                  )}
+                  {!s && desglose.hayExtras && (
+                    <p className="mt-2 text-12 text-ink-3">
+                      Se empieza a cobrar junto con tu plan{d.negocio?.estado === "TRIAL" ? ", cuando termine tu prueba" : ""}.
+                    </p>
+                  )}
+                </div>
+              )}
 
               {s?.estado === "ACTIVA" && s.proxima_fecha_cobro && (
                 <p className="mt-4 text-14 text-ink-2">

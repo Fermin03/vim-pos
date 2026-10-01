@@ -14,6 +14,8 @@ export type Alerta = {
   tenant: string;
   titulo: string;
   detalle: string;
+  /** A dónde lleva "Abrir" cuando la alerta no es de un cliente (prospectos, 0145). */
+  href?: string;
 };
 
 /** Una caja en la franja "Ahora" de Atención (ver api/alertas). minutos: null = nunca latió. */
@@ -124,11 +126,15 @@ export type Tenant = {
 export type Metricas = {
   totalTenants: number; activos: number; trial: number; suspendidos: number; cancelados: number;
   porVertical: Record<string, number>; mrr: number; foliosVendidos30d: number;
+  /** Desglose del MRR (0147): planes y add-ons pagados aparte. */
+  mrrSuscripciones?: number; mrrAddons?: number;
 };
 
 export type AddonCatalogo = { id: string; codigo: string; nombre: string; descripcion: string | null; precio_mensual_mxn: number };
 export type AddonContratado = {
   id: string; activo: boolean; fecha_inicio: string; fecha_fin: string | null; precio_mensual_mxn: number;
+  /** Unidades contratadas (0147). Solo los extras por cantidad pasan de 1. */
+  cantidad?: number;
   /** Lo dio el plan a $0 (0141): bajar de plan lo retira. */
   incluido_en_plan?: boolean;
   addon: { id: string; codigo: string; nombre: string; precio_mensual_mxn: number } | null;
@@ -139,6 +145,8 @@ export type Plan = {
   id: string; codigo: string; nombre: string; vertical: string | null; precio_mensual_mxn: number;
   /** Base mensual de folios CFDI y lo que el plan incluye (`cfdi_incluido`, `delivery_incluido`, 0141). */
   timbres_cfdi_mensuales?: number | null; features_incluidos?: Record<string, unknown> | null;
+  /** Límites del plan (null = sin límite). Los usa la vista previa del cambio de plan (0147). */
+  max_sucursales?: number | null; max_cajas_por_sucursal?: number | null;
 };
 
 export type Modulos = {
@@ -147,10 +155,16 @@ export type Modulos = {
   excepciones: { codigo: string; activado: boolean; motivo: string | null; fecha_fin: string | null }[];
 };
 export type LimitesTrio = { max_sucursales: number | null; max_cajas_por_sucursal: number | null; max_usuarios: number | null };
-export type Limites = LimitesTrio & { del_plan: LimitesTrio; excepcion: LimitesTrio & { motivo: string | null } };
+export type Limites = LimitesTrio & {
+  del_plan: LimitesTrio; excepcion: LimitesTrio & { motivo: string | null };
+  /** CAJA_EXTRA contratadas, para todo el negocio, y cuántas están en uso (0147). `max_cajas_por_sucursal` es solo la base. */
+  cajas_adicionales?: number; cajas_adicionales_en_uso?: number;
+};
 
 export type Detalle = {
   tenant: Record<string, unknown>;
+  /** Acceso del dueño a su panel (lib/acceso-dueno.ts). null = el negocio no tiene cuenta de dueño. */
+  dueno?: import("./acceso-dueno").AccesoDueno | null;
   foliosSaldo: number;
   foliosBase: { mensuales: number; consumidos: number; periodo: string } | null;
   addons: AddonContratado[];

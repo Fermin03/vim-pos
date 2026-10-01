@@ -6,7 +6,7 @@ import { useSesion } from "../../lib/sesion";
 import { textoActualizado, useRefresco } from "../../lib/refresco";
 import { fechaHoraMx, fmtMxn, nombreFase, nombreVertical } from "../../lib/formato";
 import { fechaLegible, hoyMx } from "@vim/fecha";
-import { textoPrecio, type PrecioSuscripcion } from "@vim/db/cobro";
+import { textoPrecio, totalAddons, type PrecioSuscripcion } from "@vim/db/cobro";
 import type { Detalle, Plan } from "../../lib/tipos";
 import { Seccion } from "../../components/seccion";
 import { TarjetaCifra } from "../../components/tarjeta-cifra";
@@ -14,6 +14,7 @@ import { PastillaEstado } from "../../components/pastilla-estado";
 import { SaludTenant } from "../../components/salud-tenant";
 import { AvisosCliente } from "../../components/avisos-cliente";
 import { FichaContrato } from "../../components/ficha-contrato";
+import { AccesoDueno } from "../../components/acceso-dueno";
 import { FichaPagos } from "../../components/ficha-pagos";
 import { FichaFacturacion } from "../../components/ficha-facturacion";
 import { ModulosLimites } from "../../components/modulos-limites";
@@ -167,8 +168,8 @@ export default function FichaCliente() {
         </Seccion>
 
         <Seccion id="contrato" titulo="Contrato" descripcion="Qué paga, qué tiene contratado y qué puede usar.">
-          <FichaContrato d={d} planes={planes} accion={accion} busy={busy} />
-          <FichaPagos api={api} tenantId={id} suscripcion={suscripcion} onCambio={recargar} />
+          <FichaContrato d={d} planes={planes} accion={accion} busy={busy} accesoDueno={<AccesoDueno api={api} tenantId={id} dueno={d.dueno} onCambio={recargar} />} />
+          <FichaPagos api={api} tenantId={id} suscripcion={suscripcion} addonsAlMes={totalAddons(d.addons, hoyMx())} onCambio={recargar} />
           <ModulosLimites d={d} nombre={nombre} accion={accion} busy={busy} />
         </Seccion>
 

@@ -117,6 +117,7 @@ describe("vistaPreviaCambioPlan (espejo de cambiar_plan_tenant)", () => {
       concede: ["CFDI", "DELIVERY"],
       dejaDePagar: [{ codigo: "DELIVERY", precio: 100 }],
       retira: [],
+      retiraExtras: [],
       precio: { antes: 499, despues: 999 },
       quitaPromocion: "Piloto 5 negocios",
     });

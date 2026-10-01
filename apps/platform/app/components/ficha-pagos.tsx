@@ -34,7 +34,7 @@ const subTitulo = "text-12 font-semibold uppercase tracking-wide text-ink-2";
  * Pagos del cliente (0130). Registrar un pago recorre la fecha de cobro; el periodo lo pone la
  * base desde la fecha que tocaba, así que aquí solo se dice cuánto, cómo, cuándo y cuántos meses.
  */
-export function FichaPagos({ api, tenantId, suscripcion, onCambio }: { api: Api; tenantId: string; suscripcion: Suscripcion | null; onCambio: () => Promise<void> | void }) {
+export function FichaPagos({ api, tenantId, suscripcion, addonsAlMes = 0, onCambio }: { api: Api; tenantId: string; suscripcion: Suscripcion | null; /** Lo que paga aparte cada mes (`totalAddons`, 0147): entra en el monto acordado. */ addonsAlMes?: number; onCambio: () => Promise<void> | void }) {
   const [pagos, setPagos] = useState<Pago[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [registrando, setRegistrando] = useState(false);
@@ -108,6 +108,7 @@ export function FichaPagos({ api, tenantId, suscripcion, onCambio }: { api: Api;
           api={api}
           tenantId={tenantId}
           suscripcion={suscripcion}
+          addonsAlMes={addonsAlMes}
           onCerrar={() => setRegistrando(false)}
           onListo={async () => { setRegistrando(false); await Promise.all([cargar(), onCambio()]); }}
         />
@@ -131,14 +132,15 @@ export function FichaPagos({ api, tenantId, suscripcion, onCambio }: { api: Api;
 
 const METODOS: MetodoCobro[] = ["TRANSFERENCIA", "EFECTIVO", "DEPOSITO", "TARJETA", "OTRO"];
 
-function RegistrarPago({ api, tenantId, suscripcion, onCerrar, onListo }: {
-  api: Api; tenantId: string; suscripcion: Suscripcion; onCerrar: () => void; onListo: () => Promise<void>;
+function RegistrarPago({ api, tenantId, suscripcion, addonsAlMes, onCerrar, onListo }: {
+  api: Api; tenantId: string; suscripcion: Suscripcion; addonsAlMes: number; onCerrar: () => void; onListo: () => Promise<void>;
 }) {
   const anual = suscripcion.ciclo_facturacion === "ANUAL";
   // Lo acordado por N periodos, cada uno al precio vigente en su fecha de cobro (con la promoción
   // mientras dure, 0141). El precio es mensual aun en el ciclo anual; un periodo anual son doce.
   const desde = (suscripcion.proxima_fecha_cobro ?? hoyMx()).slice(0, 10);
-  const acordado = (n: number) => montoPeriodos(suscripcion, desde, n, anual);
+  // Más los add-ons y extras que paga aparte (0147): es el total que se le cobra, no solo el plan.
+  const acordado = (n: number) => montoPeriodos(suscripcion, desde, n, anual, addonsAlMes);
   const [periodos, setPeriodos] = useState(1);
   const [monto, setMonto] = useState(String(acordado(1)));
   const [metodo, setMetodo] = useState<MetodoCobro>("TRANSFERENCIA");
@@ -205,7 +207,7 @@ function RegistrarPago({ api, tenantId, suscripcion, onCerrar, onListo }: {
       <input id="pg-notas" className={input} value={notas} maxLength={500} onChange={(e) => setNotas(e.target.value)} />
       {Number(monto) > 0 && Math.abs(Number(monto) - acordado(periodos)) >= 0.01 && (
         <Aviso tono="info" className="mt-3">
-          El precio acordado es {fmtMxn(acordado(periodos))}. Se registra lo que escribiste; la fecha de cobro avanza igual.
+          Lo acordado es {fmtMxn(acordado(periodos))}{addonsAlMes > 0 ? ` (incluye ${fmtMxn(addonsAlMes)} al mes de add-ons y extras)` : ""}. Se registra lo que escribiste; la fecha de cobro avanza igual.
         </Aviso>
       )}
       {error && <Aviso tono="danger" role="alert" className="mt-3">{error}</Aviso>}

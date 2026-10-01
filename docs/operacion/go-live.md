@@ -1,5 +1,9 @@
 # 🚀 Runbook de Go-Live — Knock-Out Burger (F11)
 
+> ⚠️ **Este documento es histórico** (junio de 2026, el arranque del primer cliente) y ya no
+> describe el producto: habla de Facturapi, de contraseñas temporales y de un POS solo en línea.
+> Para dar de alta a un cliente hoy, usa **[`alta-de-cliente.md`](alta-de-cliente.md)**.
+
 > **Qué es esto:** la lista de pasos para llevar VIM POS de "verde en local" a "operando
 > en producción con Knock-Out Burger". El software de la ruta crítica está completo y
 > verificado (F0–F10). Lo que queda son pasos de **infraestructura, hardware y servicios

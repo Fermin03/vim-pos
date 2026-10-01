@@ -5725,6 +5725,7 @@ export type Database = {
           cajas: number
           creado_en: string
           estado: string
+          estado_cambiado_en: string | null
           giro: string | null
           id: string
           mensaje: string | null
@@ -5743,6 +5744,7 @@ export type Database = {
           cajas: number
           creado_en?: string
           estado?: string
+          estado_cambiado_en?: string | null
           giro?: string | null
           id?: string
           mensaje?: string | null
@@ -5761,6 +5763,7 @@ export type Database = {
           cajas?: number
           creado_en?: string
           estado?: string
+          estado_cambiado_en?: string | null
           giro?: string | null
           id?: string
           mensaje?: string | null
@@ -7236,6 +7239,7 @@ export type Database = {
         Row: {
           activo: boolean
           addon_id: string
+          cantidad: number
           created_at: string
           created_by: string | null
           fecha_fin: string | null
@@ -7250,6 +7254,7 @@ export type Database = {
         Insert: {
           activo?: boolean
           addon_id: string
+          cantidad?: number
           created_at?: string
           created_by?: string | null
           fecha_fin?: string | null
@@ -7264,6 +7269,7 @@ export type Database = {
         Update: {
           activo?: boolean
           addon_id?: string
+          cantidad?: number
           created_at?: string
           created_by?: string | null
           fecha_fin?: string | null
@@ -7484,6 +7490,7 @@ export type Database = {
           fecha_invitacion: string
           notas_internas: string | null
           recordatorios_enviados: number
+          bienvenida_enviada_at: string | null
           ciudad_registro: string | null
           terminos_aceptados_at: string | null
           terminos_aceptados_por: string | null
@@ -7500,6 +7507,7 @@ export type Database = {
           fecha_invitacion?: string
           notas_internas?: string | null
           recordatorios_enviados?: number
+          bienvenida_enviada_at?: string | null
           ciudad_registro?: string | null
           terminos_aceptados_at?: string | null
           terminos_aceptados_por?: string | null
@@ -7516,6 +7524,7 @@ export type Database = {
           fecha_invitacion?: string
           notas_internas?: string | null
           recordatorios_enviados?: number
+          bienvenida_enviada_at?: string | null
           ciudad_registro?: string | null
           terminos_aceptados_at?: string | null
           terminos_aceptados_por?: string | null
@@ -10687,6 +10696,16 @@ export type Database = {
         }[]
       }
       f_unaccent: { Args: { "": string }; Returns: string }
+      fijar_extra_tenant: {
+        Args: {
+          p_cantidad: number
+          p_codigo: string
+          p_notas?: string
+          p_precio?: number
+          p_tenant_id: string
+        }
+        Returns: Json
+      }
       generar_folio: {
         Args: {
           p_anio?: number
@@ -10725,7 +10744,9 @@ export type Database = {
         Args: { p_fecha: string; p_sucursal_id: string }
         Returns: Json
       }
+      inventario_permitido: { Args: { p_tenant: string }; Returns: boolean }
       limites_efectivos: { Args: { p_tenant: string }; Returns: Json }
+      liberar_bienvenida: { Args: { p_tenant_id: string }; Returns: undefined }
       liquidar_delivery: {
         Args: {
           p_asignacion_id: string
@@ -10797,6 +10818,7 @@ export type Database = {
         }
         Returns: undefined
       }
+      reclamar_bienvenida: { Args: { p_tenant_id: string }; Returns: string }
       recalcular_costo_recetas: {
         Args: { p_insumo_id: string }
         Returns: undefined

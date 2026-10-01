@@ -241,7 +241,7 @@ export async function autorizar(req: Request): Promise<{ sb: SbClient; actor: Ac
 export async function auditar(
   sb: SbClient,
   args: { accion: string; tenantId?: string | null; motivo?: string | null; payload?: Record<string, unknown> },
-): Promise<void> {
+): Promise<boolean> {
   const actor = actorDe(sb);
   const { error } = await sb.from("super_admin_accesos").insert({
     super_admin_id: actor.id,
@@ -252,8 +252,11 @@ export async function auditar(
     payload: args.payload ?? {},
     ip_address: ipValida(IP_POR_CLIENTE.get(sb)),
   });
-  // La auditoría no debe tumbar la operación, pero su fallo TIENE que ser visible.
+  // La auditoría no debe tumbar la operación, pero su fallo TIENE que ser visible. Devuelve si
+  // quedó asentada: lo que no se puede deshacer (borrar un prospecto) la escribe ANTES de actuar
+  // y no sigue si esto contesta `false`.
   if (error) console.error(`[auditoría] no se pudo asentar "${args.accion}": ${error.message}`);
+  return !error;
 }
 
 /**

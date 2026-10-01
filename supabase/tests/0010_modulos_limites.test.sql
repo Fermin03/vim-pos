@@ -62,7 +62,7 @@ values ('aaaaaaaa-0000-0000-0000-0000000000d0', 'aaaaaaaa-0000-0000-0000-0000000
 select throws_ok(
   $$ insert into cajas (tenant_id, sucursal_id, numero, nombre)
      values ('aaaaaaaa-0000-0000-0000-0000000000d0', 'aaaaaaaa-0000-0000-0000-0000000000d1', 3, 'Caja 3') $$,
-  'P0001', 'Tu plan permite 2 caja(s) por sucursal. Pide a VIM ampliar el límite.', 'la tercera caja se rechaza');
+  'P0001', 'Tu plan permite 2 caja(s) por sucursal y ya usas 0 de 0 caja(s) adicional(es). Cada caja adicional cuesta $249 al mes: pídela a VIM.', 'la tercera caja se rechaza');
 
 -- #12 el UPDATE tampoco se salta el candado: desactivar, crear otra y reactivar la primera
 update cajas set activa = false where tenant_id = 'aaaaaaaa-0000-0000-0000-0000000000d0' and numero = 1;
@@ -70,7 +70,7 @@ insert into cajas (tenant_id, sucursal_id, numero, nombre)
 values ('aaaaaaaa-0000-0000-0000-0000000000d0', 'aaaaaaaa-0000-0000-0000-0000000000d1', 3, 'Caja 3');
 select throws_ok(
   $$ update cajas set activa = true where tenant_id = 'aaaaaaaa-0000-0000-0000-0000000000d0' and numero = 1 $$,
-  'P0001', 'Tu plan permite 2 caja(s) por sucursal. Pide a VIM ampliar el límite.', 'reactivar la caja de más se rechaza');
+  'P0001', 'Tu plan permite 2 caja(s) por sucursal y ya usas 0 de 0 caja(s) adicional(es). Cada caja adicional cuesta $249 al mes: pídela a VIM.', 'reactivar la caja de más se rechaza');
 -- #13 un UPDATE que no toca activa/sucursal/deleted_at pasa aunque la sucursal esté llena
 select lives_ok(
   $$ update cajas set nombre = 'Caja 3 barra' where tenant_id = 'aaaaaaaa-0000-0000-0000-0000000000d0' and numero = 3 $$,

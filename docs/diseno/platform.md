@@ -9,8 +9,9 @@ revisa el CFDI de los clientes. Es la única app que usa `service_role` y la ún
 puede romper el negocio de alguien más.
 
 Poca superficie y mucho poder por pantalla. Desde la entrega 1 del ADR 0014 (04/09/2026) el
-panel es una barra lateral con cinco pantallas globales (Atención, Clientes, Facturación,
-Errores, Bitácora) y una **ficha de cliente** con cuatro secciones en este orden: Operación,
+panel es una barra lateral con sus pantallas globales (Atención, Clientes, Prospectos, Avisos,
+Versiones, Facturación, Pagos y soporte, Errores, Bitácora, Operadores) y una **ficha de
+cliente** con cuatro secciones en este orden: Operación,
 Contrato, Facturación y Zona peligrosa. El orden es el del trabajo diario: primero si está
 operando, luego qué paga, luego lo que factura, y al final, aparte, lo que puede romperle el
 negocio. Las pantallas se refrescan solas cada minuto mientras la pestaña está visible.
@@ -88,9 +89,47 @@ promoción opcional; en Esencial hay un botón "Piloto 5 negocios" ($499 seis me
 Cambiar de plan enseña ANTES de confirmar lo que cambia —folios del mes, add-ons que gana o
 pierde (lo que pierde, en `danger`) y el cobro antes → después—, porque la base mueve todo eso
 en la misma transacción. La prueba gratis sale en Contrato con su fecha y "Extender prueba…"
-(motivo, a la bitácora); vencida va en `warning`, no en rojo: no corta nada. **Datos de pago**
+(motivo, a la bitácora); vencida va en `warning`, no en rojo: no corta nada. **Extras por cantidad (0147, ADR 0024).** La sucursal y la caja adicional no van en la lista de
+add-ons (activar / dar de baja) sino en su propio bloque, **Extras**, porque se contratan por
+cantidad. Cada renglón dice el precio ("por cada sucursal adicional", "por cada caja adicional"),
+lo que suma al mes y el límite a la vista. Sucursales: "Límite: 1 del plan + 2 adicionales = **3
+sucursales**". **Cajas nunca se suman en un número**: la base es por sucursal y las adicionales
+son del negocio entero — "**1 caja por sucursal + 2 cajas adicionales (1 en uso)**", con las
+mismas palabras que ve el dueño (`textoLimiteCajas`). Un límite subido a mano en Módulos y límites
+se llama **"Excepción sin cobro"** y enseña su motivo: tiene que verse que es una cortesía y no
+algo que el cliente paga. El diálogo enseña antes → después del límite y del total al mes. **Subir** pide
+solo motivo; **bajar o quitar** pide además el nombre del cliente y va en `danger`: le quita algo
+que puede estar usando. Si lo está usando, la base lo rechaza y el diálogo dice cuántas tiene que
+desactivar antes. Donde el plan no tiene límite no hay botón: se dice por qué. El bloque Cobro
+enseña el **total al mes** (plan + add-ons y extras) cuando paga algo aparte, y "Registrar pago"
+propone ese total. Al cambiar de plan, los extras que el plan nuevo deja sin sentido salen en
+`danger` con lo que deja de pagar; los demás, en una línea que dice que se conservan.
+
+**Datos de pago**
 y **Soporte** (0142, en la misma pantalla "Pagos y soporte") son las únicas que escriben algo que ven TODOS los clientes, así que se confirman
 escribiendo `TODOS`, como un aviso importante a todos.
+
+**Prospectos (0145).** Quien pide una demo en el sitio aparece en `/prospectos`, lo más nuevo
+primero; abre filtrada en **Nuevo** si hay alguno. Es la única pantalla del panel con un botón
+azul por tarjeta —**WhatsApp**, con el saludo ya escrito— porque aquí sí hay un "lo que sigue":
+contestarle. El seguimiento es un `<select>` (Nuevo → Contactado → Demo agendada → Ganado /
+Perdido) y una nota de una línea que solo se guarda al pulsar; el refresco de cada minuto no pisa
+lo que se está escribiendo. **Eliminar** es para entradas de prueba: enlace en `danger`, abajo y
+aparte, con motivo; a un prospecto real que no cerró se le marca Perdido. El borrado se asienta
+en la bitácora **antes** de ocurrir: si el asiento falla, no se borra. La bitácora guarda el
+negocio y el estado, **nunca** el nombre ni el WhatsApp de la persona. En la barra lateral, el
+contador de Prospectos va en `warning`, no en rojo: nada está roto. En Atención, los que llevan
+más de 24 h como nuevos son **una sola** alerta (alta; crítica a los tres días). "Convertir en
+cliente…" abre Nuevo cliente con el negocio, la persona, el teléfono, el giro y el plan sugerido
+por tamaño; en la URL solo viaja el id del prospecto.
+
+**Acceso del dueño (roadmap A5).** El bloque "Alta" de la ficha dice el correo del dueño y si ya
+lo confirmó ("Correo confirmado el …", con su último acceso). Sin confirmar va en `warning` —no
+puede entrar, pero nada está roto— con un botón que reenvía **el correo de su camino de alta**: la
+invitación si lo dio de alta VIM, la confirmación de registro si se registró solo. No pide motivo
+(no cambia nada del contrato) pero sí queda en la bitácora, y el servidor limita a uno por minuto
+y cinco por hora por negocio. El resultado se dice ahí mismo y no lo borra el refresco. Confirmado,
+el botón no existe: a quien ya entra no se le reenvía nada desde el panel.
 
 ## Los datos son de otro
 

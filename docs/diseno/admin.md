@@ -66,12 +66,31 @@ combo?" que la caja le hace al cliente cuando el cajero agrega suelto un product
 de un combo. Vive aquí, no en Configuración, porque solo afecta a los combos — mismo criterio que
 el switch de descuento de inventario, que vive en Inventario y no en Configuración.
 
+## Inventario desde el plan Negocio (0148, ADR 0025)
+
+Un negocio cuyo plan no incluye inventario **sigue viendo** Inventario en el menú y Recetas en
+Catálogo, con una etiqueta pequeña "Plan Negocio". No se esconden: esconder una sección que el
+sitio anuncia hace pensar que el producto no la tiene. Al entrar, en lugar de las pantallas, una
+tarjeta tranquila: qué es ("El inventario viene desde el plan Negocio"), las cinco cosas que
+incluye en palabras de restaurantero y **un** botón azul, "Preguntar por el plan Negocio", que
+abre WhatsApp con el mensaje ya escrito (quién, negocio y código). Sin precios —los dice quien
+contesta, que sabe qué promoción tiene el cliente—, sin rojo, sin candados dibujados y sin
+`Aviso`: no es una alerta, es el contenido de la pantalla. Si la lectura de módulos falla se
+enseñan las pantallas de siempre; el candado de verdad está en la base.
+
 ## Plan y pagos
 
 El dueño ve lo que paga HOY y hasta cuándo ("$499 al mes hasta el 31 mar 2027, después $699"),
 nunca solo el precio de lista (0141, ADR 0021). La prueba gratis es un `Aviso` que no se cierra
 ni bloquea: `info` mientras corre, `warning` al vencer — la caja sigue vendiendo, así que no es
 rojo. Sale también arriba del dashboard, con enlace a Plan y pagos.
+
+Debajo, **"Lo que tienes contratado"** (0147): un renglón por cosa —el plan y cada add-on, con
+"2 × $249.00" cuando va por cantidad e "incluido en tu plan" cuando no cuesta— y el **total al
+mes**, que es el mismo número que ve VIM en su panel. Solo aparece si hay algo además del plan:
+con un solo renglón no dice nada. Sin cobro activo no hay total; se dice que empieza a cobrarse
+junto con el plan. Bajo el nombre del plan va hasta dónde puede crecer, con las mismas palabras
+que usa VIM: "Hasta 2 sucursales · 1 caja por sucursal + 2 cajas adicionales (1 en uso)".
 
 "Cómo pagar" enseña los datos que VIM captura en su panel (banco, titular, CLABE en grupos de
 cuatro, correo) con botón de copiar, y un botón de WhatsApp con el mensaje del comprobante ya
@@ -94,6 +113,15 @@ escrito (quién, negocio y código). Nunca queda sin número: si la consulta fal
 caja"). Un solo botón azul con la versión y la fecha de la última publicada; debajo, en lenguaje de
 restaurantero, lo que hace falta y el paso a paso. La impresora de **red** se dice en negritas
 porque es lo que más se compra mal; los modelos van como ejemplos, nunca como "probados".
+
+**Correo de bienvenida (0146).** Con la cuenta confirmada —al abrir el enlace del registro o al
+fijar la contraseña de la invitación— sale UN correo al dueño con lo mismo que "primeros pasos",
+en el mismo orden, más la descarga de la caja, el equipo que hace falta (Windows 10 u 11 e
+impresora **de red**), cómo se paga y el WhatsApp de soporte con su horario. Es para el día en que
+instale la caja, que casi nunca es el día en que se registró. Texto de restaurantero, sin
+imágenes ni adornos, y cada enlace enseña su dirección. La pantalla no espera ese correo ni dice
+nada si falla: si los pasos cambian en `lib/onboarding.ts`, cambian también en
+`supabase/functions/_shared/bienvenida.ts`.
 
 ## Avisos de facturación (0143)
 

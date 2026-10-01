@@ -11,6 +11,8 @@ import { JERARQUIA_MINIMA_PANEL, puedeVer } from "../lib/acceso";
 import { leerAcceso, ACCESO_OK, type Acceso } from "../lib/acceso-tenant";
 import { enlaceWhatsapp, mensajeAyudaAdmin, SOPORTE_POR_DEFECTO, textoHorario } from "@vim/db/soporte";
 import { leerAyuda, type AyudaAdmin } from "../lib/soporte";
+import { leerModulos } from "../lib/modulos";
+import { estadoInventario, rutaEsDeInventario, type ModulosLeidos } from "../lib/inventario-plan";
 
 const PerfilCtx = createContext<Perfil | null>(null);
 export const usePerfil = () => useContext(PerfilCtx);
@@ -19,6 +21,13 @@ export const usePerfil = () => useContext(PerfilCtx);
  *  apagar sus botones cuando el servicio está bloqueado. */
 const AccesoCtx = createContext<Acceso>(ACCESO_OK);
 export const useAccesoTenant = () => useContext(AccesoCtx);
+
+/**
+ * Lo que VIM le permite al negocio (ADR 0014), leído una vez al entrar. `null` = leyendo;
+ * `"error"` = la consulta falló (quien lo use decide qué hacer: ver `estadoInventario`).
+ */
+const ModulosCtx = createContext<ModulosLeidos | "error" | null>(null);
+export const useModulos = () => useContext(ModulosCtx);
 
 type Item = { label: string; href: string; icon: ReactNode };
 type Seccion = { titulo: string; items: Item[] };
@@ -93,6 +102,8 @@ export function AdminShell({ children }: { children: ReactNode }) {
   const [acceso, setAcceso] = useState<Acceso>(ACCESO_OK);
   // Soporte de VIM (0142). Arranca con el de fábrica: el enlace nunca queda en blanco.
   const [ayuda, setAyuda] = useState<AyudaAdmin>({ soporte: SOPORTE_POR_DEFECTO, negocio: null, codigo: null });
+  // Módulos que el plan (o una excepción de VIM) le permite. Hoy lo usa Inventario (0148).
+  const [modulos, setModulos] = useState<ModulosLeidos | "error" | null>(null);
   // Cajón lateral: solo existe por debajo de `lg`. En escritorio el <aside> es estático.
   const [menuAbierto, setMenuAbierto] = useState(false);
 
@@ -141,6 +152,7 @@ export function AdminShell({ children }: { children: ReactNode }) {
       setPerfil(await cargarPerfil());
       setListo(true);
       leerAyuda().then(setAyuda).catch(() => {});
+      leerModulos().then(setModulos).catch(() => setModulos("error"));
       // El selector del sidebar muestra la sucursal real del tenant (antes decía "León Centro"
       // fijo, que es el dato del mockup: cualquier cliente nuevo veía el nombre equivocado).
       listarSucursales()
@@ -256,9 +268,12 @@ export function AdminShell({ children }: { children: ReactNode }) {
     mensajeAyudaAdmin({ usuario: perfil?.nombre, negocio: ayuda.negocio, codigo: ayuda.codigo }),
   );
   const horarioAyuda = textoHorario(ayuda.soporte);
+  // Inventario sigue en el menú aunque el plan no lo incluya: se marca, no se esconde (0148).
+  const sinInventario = estadoInventario(modulos) === "no_incluido";
 
   return (
     <PerfilCtx.Provider value={perfil}>
+     <ModulosCtx.Provider value={modulos}>
      <AccesoCtx.Provider value={acceso}>
       <div className="flex h-[100dvh] lg:h-screen">
         {/* Velo del cajón (solo móvil/tablet). */}
@@ -331,6 +346,11 @@ export function AdminShell({ children }: { children: ReactNode }) {
                       >
                         {it.icon}
                         {it.label}
+                        {sinInventario && rutaEsDeInventario(it.href) && (
+                          <span className={["ml-auto rounded-full border px-1.5 py-px text-11 font-semibold", active ? "border-line-strong text-ink-2" : "border-[#3A3A42] text-[#9A9AA2]"].join(" ")}>
+                            Plan Negocio
+                          </span>
+                        )}
                       </Link>
                     );
                   })}
@@ -430,6 +450,7 @@ export function AdminShell({ children }: { children: ReactNode }) {
         </div>
       </div>
      </AccesoCtx.Provider>
+     </ModulosCtx.Provider>
     </PerfilCtx.Provider>
   );
 }

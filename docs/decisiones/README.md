@@ -22,9 +22,13 @@ Cada archivo dice **qué decía el plan, qué hacemos hoy y por qué**. Manda lo
 | [0016](0016-un-viaje-es-una-columna-no-una-tabla.md) | Un viaje es una columna, no una tabla: y asignar ES salir | 20/09/2026 |
 | [0017](0017-el-envio-es-un-renglon.md) | El envío es un renglón, no una columna | 22/09/2026 |
 | [0018](0018-listo-por-estacion.md) | Cada estación marca LISTO lo suyo | 24/09/2026 |
+| [0019](0019-una-cuenta-por-operador.md) | Una cuenta por operador del panel, con segundo factor | 30/09/2026 |
+| [0020](0020-los-pagos-se-registran-no-se-cobran-solos.md) | Los pagos a VIM se registran; el cobro automático viene después | 30/09/2026 |
 | [0021](0021-precio-vigente-y-lo-que-incluye-el-plan.md) | El precio vigente sale de una regla, y cambiar de plan ajusta lo que el plan incluye | 30/09/2026 |
 | [0022](0022-llegada-del-cliente-registro-y-soporte.md) | El registro es público y verificado, y el soporte viaja a la caja por el latido | 30/09/2026 |
 | [0023](0023-eliminar-un-cliente-es-el-segundo-paso-de-la-baja.md) | Eliminar un cliente es el segundo paso de la baja, y la base decide si se puede | 01/10/2026 |
+| [0024](0024-los-extras-suben-el-limite-y-se-suman-a-la-excepcion.md) | La sucursal y la caja adicional son extras por cantidad; la caja adicional es UNA caja, no una por sucursal | 01/10/2026 |
+| [0025](0025-el-inventario-se-cierra-por-plan-sin-tocar-la-venta.md) | El inventario se cierra por plan sin tocar la venta, y en la caja manda la nube | 01/10/2026 |
 
 ## Pendientes de escribir
 

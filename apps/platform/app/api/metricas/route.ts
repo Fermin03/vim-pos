@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { autorizar } from "../../lib/server";
 import { hoyMx } from "@vim/fecha";
-import { precioVigente, type PrecioSuscripcion } from "@vim/db/cobro";
+import { totalMensual, type AddonCobro, type PrecioSuscripcion } from "@vim/db/cobro";
 
 // Métricas globales del negocio VIM (doc 12 §6.1 "Métricas globales"). service_role.
 
@@ -24,16 +24,37 @@ export async function GET(req: Request) {
     porVertical[t.vertical_principal] = (porVertical[t.vertical_principal] ?? 0) + 1;
   }
 
-  // MRR = suma de lo que HOY paga cada suscripción ACTIVA: el precio de promoción mientras dure
-  // (0141). Antes sumaba el de lista, y un piloto a $499 contaba como $699.
-  const { data: subs } = await sb
-    .from("suscripciones")
-    .select("estado, precio_mensual_mxn, precio_promocional_mxn, promocion_hasta")
-    .limit(1000);
+  // MRR = lo que HOY paga cada negocio con cobro ACTIVO: su suscripción al precio vigente (con
+  // promoción mientras dure, 0141) MÁS los add-ons que paga aparte, por su cantidad (0147). El
+  // número sale de `totalMensual`, la misma función que usan la ficha y "Plan y pagos" del dueño:
+  // antes aquí solo se sumaba la suscripción y una sucursal adicional no existía para el panel.
+  const [{ data: subs }, { data: addonsRaw }] = await Promise.all([
+    sb.from("suscripciones")
+      .select("tenant_id, estado, precio_mensual_mxn, precio_promocional_mxn, promocion_hasta")
+      .limit(1000),
+    sb.from("tenant_addons")
+      .select("tenant_id, activo, precio_mensual_mxn, cantidad, fecha_inicio, fecha_fin, incluido_en_plan")
+      .eq("activo", true)
+      .limit(5000),
+  ]);
   const hoy = hoyMx();
-  const mrr = ((subs ?? []) as ({ estado: string } & PrecioSuscripcion)[])
-    .filter((s) => s.estado === "ACTIVA")
-    .reduce((acc, s) => acc + precioVigente(s, hoy), 0);
+  const addonsDe = new Map<string, AddonCobro[]>();
+  for (const a of (addonsRaw ?? []) as (AddonCobro & { tenant_id: string })[]) {
+    addonsDe.set(a.tenant_id, [...(addonsDe.get(a.tenant_id) ?? []), a]);
+  }
+  let mrrSuscripciones = 0;
+  let mrrAddons = 0;
+  const yaSumados = new Set<string>();
+  for (const s of (subs ?? []) as ({ tenant_id: string; estado: string } & PrecioSuscripcion)[]) {
+    if (s.estado !== "ACTIVA") continue;
+    // Los add-ons de un negocio se suman UNA vez aunque tuviera dos suscripciones activas.
+    const t = totalMensual(s, yaSumados.has(s.tenant_id) ? [] : (addonsDe.get(s.tenant_id) ?? []), hoy);
+    yaSumados.add(s.tenant_id);
+    mrrSuscripciones += t.suscripcion;
+    mrrAddons += t.addons;
+  }
+  const centavos = (n: number) => Math.round(n * 100) / 100;
+  const mrr = centavos(mrrSuscripciones + mrrAddons);
 
   // Folios vendidos (compras de paquetes) en los últimos 30 días.
   const hace30 = new Date(Date.now() - 30 * 24 * 3600 * 1000).toISOString();
@@ -55,6 +76,9 @@ export async function GET(req: Request) {
     porEstado,
     porVertical,
     mrr,
+    /** El desglose del MRR: planes y add-ons (extras, facturación, delivery) pagados aparte. */
+    mrrSuscripciones: centavos(mrrSuscripciones),
+    mrrAddons: centavos(mrrAddons),
     foliosVendidos30d: foliosVendidos,
   });
 }

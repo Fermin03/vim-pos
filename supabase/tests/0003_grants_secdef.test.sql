@@ -43,7 +43,15 @@ insert into _secdef_solo_service (fn, motivo) values
   ('consumir_cupo',              'contador de límites de tasa de las funciones públicas (0136)'),
   ('eliminar_tenant',            'borra por completo a cualquier negocio cancelado, con sus cuentas (0144)'),
   ('eliminar_tenant_vista_previa', 'cuenta las filas y las cuentas de cualquier negocio (0144)'),
-  ('anular_pago_suscripcion',    'anula el pago de cualquier negocio y lo deja con cobro vencido (0130)');
+  ('anular_pago_suscripcion',    'anula el pago de cualquier negocio y lo deja con cobro vencido (0130)'),
+  ('reclamar_bienvenida',        'marca como enviado el correo de bienvenida de cualquier negocio (0146)'),
+  ('liberar_bienvenida',         'borra esa marca y permitiría reenviar el correo a discreción (0146)'),
+  ('fijar_extra_tenant',         'amplía o reduce sucursales y cajas contratadas de cualquier negocio (0147)'),
+  ('_extras_vigentes',           'lee los extras contratados de cualquier negocio (0147)'),
+  ('_retirar_extras_sin_limite', 'cierra extras contratados de cualquier negocio (0147)'),
+  ('_cajas_excedente',           'cuenta las cajas abiertas de cualquier negocio (0147)'),
+  ('_inventario_apagar_si_no_permitido', 'apaga el descuento de inventario de cualquier negocio (0148)'),
+  ('inventario_respetar_uso_previo', 'concede el módulo de inventario por excepción a negocios enteros (0148)');
 
 -- #2 — CRÍTICA: ninguna de ellas es ejecutable por `authenticated`.
 select is_empty($$

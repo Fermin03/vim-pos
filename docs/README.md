@@ -22,7 +22,7 @@ por vertical, la matriz de permisos, CFDI, impresión. Lo que envejeció está l
 |---|---|---|
 | `decisiones/` | Un archivo por decisión que superó al plan. Corto: qué decía el plan, qué hacemos, por qué. | Se añade; rara vez se edita |
 | `diseno/` | El núcleo de marca y un documento por app | Sí, en el mismo commit que el código |
-| `operacion/` | Runbooks: publicar, desplegar, go-live, sitio, SSO, revocar una caja | Sí, cuando cambia el procedimiento |
+| `operacion/` | Runbooks: **alta de cliente**, publicar, desplegar, sitio, SSO, revocar una caja | Sí, cuando cambia el procedimiento |
 | `producto/` | Roadmap y backlog | Sí |
 | `bitacora/` | Auditorías, remediaciones, cosas que pasaron. Fechadas. | **No.** Son un registro, no un documento vivo |
 
@@ -30,6 +30,9 @@ por vertical, la matriz de permisos, CFDI, impresión. Lo que envejeció está l
 
 - **Retomas el proyecto:** `../../MEMORY.md`, luego `decisiones/`.
 - **Vas a tocar una pantalla:** `diseno/nucleo.md` + el de esa app.
+- **Vas a dar de alta a un cliente** (de "dijo que sí" a la primera venta, cobro, add-ons,
+  suspender, dar de baja): [`operacion/alta-de-cliente.md`](operacion/alta-de-cliente.md).
+  `operacion/go-live.md` es histórico.
 - **Vas a publicar:** `operacion/` y `../desktop/RUNBOOK.md`.
 - **Algo no cuadra con la especificación:** `decisiones/`. Probablemente ya está explicado.
 

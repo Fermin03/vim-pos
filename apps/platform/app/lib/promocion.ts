@@ -88,10 +88,13 @@ export function leerPromocion(
  * se cobra al precio vigente EN SU fecha de cobro —anclada al día de alta, como la calcula la base
  * (`fechaCobro`)—: tres meses pagados de una vez, con la promoción terminando a la mitad, son dos a
  * $499 y uno a $699. En el ciclo anual el precio sigue siendo mensual, así que un periodo son doce.
+ * `addonsAlMes` = `totalAddons()` de @vim/db/cobro: lo que paga aparte cada mes.
  */
-export function montoPeriodos(s: PrecioSuscripcion & { fecha_inicio: string }, desde: string, n: number, anual: boolean): number {
+export function montoPeriodos(s: PrecioSuscripcion & { fecha_inicio: string }, desde: string, n: number, anual: boolean, addonsAlMes = 0): number {
   const paso = anual ? 12 : 1;
   let total = 0;
-  for (let k = 0; k < n; k++) total += precioVigente(s, fechaCobro(s.fecha_inicio, desde, k * paso)) * paso;
+  // Los add-ons que paga aparte (0147) van en cada mes, al importe de HOY: no tienen fecha de fin
+  // pactada como la promoción, así que para los meses que vienen se asume lo que tiene contratado.
+  for (let k = 0; k < n; k++) total += (precioVigente(s, fechaCobro(s.fecha_inicio, desde, k * paso)) + addonsAlMes) * paso;
   return Math.round(total * 100) / 100;
 }

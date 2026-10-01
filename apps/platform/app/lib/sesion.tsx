@@ -125,7 +125,9 @@ function mensajeDeError(status: number, data: Record<string, unknown>): string {
   if (data.error === "IP_NO_PERMITIDA") {
     return `Esta red no tiene permiso para entrar al panel (tu IP: ${String(data.ip ?? "desconocida")}). Agrégala a PLATFORM_IP_ALLOWLIST en Vercel.`;
   }
-  if (status === 429) return "Demasiados intentos. Espera 15 minutos.";
+  // Solo el bloqueo de la entrada al panel (lib/server.ts). Otros 429 traen su propio detalle
+  // ("espera un minuto antes de reenviar"), y decirles "15 minutos" sería mentir.
+  if (status === 429 && (data.error === "DEMASIADOS_INTENTOS" || !data.detalle)) return "Demasiados intentos. Espera 15 minutos.";
   if (data.error === "NO_AUTORIZADO") return "Clave incorrecta.";
   return String(data.detalle ?? data.error ?? `El servidor respondió ${status}`);
 }
