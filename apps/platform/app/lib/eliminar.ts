@@ -58,6 +58,7 @@ const ESTADO_POR_CODIGO: Record<string, number> = {
   // La petición está bien formada; es el estado del negocio el que no lo permite.
   TENANT_NO_CANCELADO: 409,
   TENANT_INTERNO: 409,
+  EN_GRACIA: 409,
   TIENE_TIMBRADOS: 409,
   TIMBRADO_EN_PROCESO: 409,
   ESPERA_TIMBRADOS: 409,

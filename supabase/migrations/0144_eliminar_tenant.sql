@@ -15,7 +15,10 @@
 --   2. Guardia fiscal: con un solo CFDI que haya llegado al SAT (uuid_fiscal, vigente o
 --      cancelado) no se elimina. Tampoco con un timbrado o una cancelación a medias.
 --      Y un negocio que PUDO facturar (tiene sello, o alguna fila en tickets_cfdi) espera 15
---      minutos desde la baja: ver "TIMBRADOS EN VUELO".
+--      minutos desde que dejó de poder: ver "TIMBRADOS EN VUELO".
+--   2b. En sus días de gracia no se elimina (`EN_GRACIA`): un cancelado con `bloqueo_desde` en el
+--      futuro sigue vendiendo y facturando hasta esa fecha (ADR 0014). Aplica a todos, con o sin
+--      sello.
 --   3. Los pagos de la suscripción (0130) no impiden eliminar, pero se archivan.
 --   4. El código queda libre: el mismo negocio puede volver a registrarse.
 --
@@ -60,13 +63,16 @@
 --   Mientras un comprobante viaja al PAC su fila sigue en BORRADOR, y BORRADOR no impide
 --   eliminar. Si se eliminara en esos segundos, el PAC devolvería un UUID sin fila donde
 --   guardarlo: un CFDI válido en el SAT del que no queda registro. Dos capas:
---     1) timbrar-cfdi, timbrar-global y autofacturar se niegan con el negocio CANCELADO, al
---        entrar y otra vez justo antes de llamar al PAC (`_shared/pac/negocio.ts`).
---     2) Aquí: un negocio que pudo facturar no se elimina hasta 15 minutos después de su
---        `fecha_baja` (sin fecha no se puede probar, así que tampoco), ni mientras tenga un
---        borrador tocado en los últimos 15 minutos. Es más de lo que vive cualquier llamada que
---        hubiera pasado la comprobación 1 antes de la baja. Código `ESPERA_TIMBRADOS`.
---   Un negocio que nunca tuvo sello ni facturas no espera.
+--     1) timbrar-cfdi, timbrar-global y autofacturar se niegan cuando la baja ya está EN VIGOR
+--        —CANCELADO y (`bloqueo_desde` NULL o ya cumplido)—, al entrar y otra vez justo antes de
+--        llamar al PAC (`_shared/pac/negocio.ts`). En sus días de gracia el negocio sigue
+--        facturando, igual que su caja sigue vendiendo.
+--     2) Aquí: un negocio que pudo facturar no se elimina hasta 15 minutos después de que DEJÓ
+--        de poder —lo más tarde entre `fecha_baja` y `bloqueo_desde`; sin ninguna de las dos no
+--        se puede probar, así que tampoco—, ni mientras tenga un borrador tocado en los últimos
+--        15 minutos. Es más de lo que vive cualquier llamada que hubiera pasado la comprobación
+--        1. Código `ESPERA_TIMBRADOS`.
+--   Un negocio que nunca tuvo sello ni facturas no espera (pero tampoco se elimina en gracia).
 --
 -- CUENTAS (auth.users)
 --   Se borran en la misma transacción las cuentas que SOLO eran de este negocio: el dueño, los
@@ -365,11 +371,15 @@ DECLARE
   c_espera  CONSTANT interval := interval '15 minutes';
   v_estado  text;
   v_baja    timestamptz;
+  v_bloqueo timestamptz;
+  v_gracia  boolean := false;
+  v_desde   timestamptz;
   v_ultimo  timestamptz;
   v_falta   interval;
   v_res     jsonb := '[]'::jsonb;
 BEGIN
-  SELECT t.estado::text, t.fecha_baja INTO v_estado, v_baja FROM public.tenants t WHERE t.id = p_tenant_id;
+  SELECT t.estado::text, t.fecha_baja, t.bloqueo_desde INTO v_estado, v_baja, v_bloqueo
+    FROM public.tenants t WHERE t.id = p_tenant_id;
   IF NOT FOUND THEN
     RETURN pg_catalog.jsonb_build_array(pg_catalog.jsonb_build_object(
       'codigo', 'TENANT_NO_EXISTE', 'mensaje', 'Ese cliente no existe (o ya se eliminó).'));
@@ -381,6 +391,16 @@ BEGIN
     v_res := v_res || pg_catalog.jsonb_build_object(
       'codigo', 'TENANT_NO_CANCELADO',
       'mensaje', 'Solo se elimina un cliente cancelado. Primero dalo de baja con "Cancelar cliente".');
+  ELSIF v_bloqueo IS NOT NULL AND v_bloqueo > pg_catalog.clock_timestamp() THEN
+    -- Cancelado, pero todavía en sus días de gracia: su caja vende y factura hasta esa fecha
+    -- (ADR 0014). Eliminarlo ahora sería quitarle el sistema antes de lo que se le dijo.
+    v_gracia := true;
+    v_res := v_res || pg_catalog.jsonb_build_object(
+      'codigo', 'EN_GRACIA',
+      'desde', v_bloqueo,
+      'mensaje', pg_catalog.format(
+        'Sigue en sus días de gracia: su caja opera y factura hasta el %s (hora de México). Se podrá eliminar después.',
+        pg_catalog.to_char(v_bloqueo AT TIME ZONE 'America/Mexico_City', 'DD/MM/YYYY HH24:MI')));
   END IF;
 
   IF EXISTS (SELECT 1 FROM public.tickets_cfdi c WHERE c.tenant_id = p_tenant_id AND c.uuid_fiscal IS NOT NULL) THEN
@@ -394,7 +414,7 @@ BEGIN
     v_res := v_res || pg_catalog.jsonb_build_object(
       'codigo', 'TIMBRADO_EN_PROCESO',
       'mensaje', 'Tiene un timbrado a medias con el SAT. Espera a que termine (o falle) antes de eliminar.');
-  ELSIF v_estado = 'CANCELADO'
+  ELSIF v_estado = 'CANCELADO' AND NOT v_gracia
         AND (EXISTS (SELECT 1 FROM public.tickets_cfdi c WHERE c.tenant_id = p_tenant_id)
              OR EXISTS (SELECT 1 FROM public.tenant_cfdi_emisor e
                          WHERE e.tenant_id = p_tenant_id
@@ -406,20 +426,24 @@ BEGIN
       FROM public.tickets_cfdi c
      WHERE c.tenant_id = p_tenant_id AND c.estado_sat::text = 'BORRADOR';
 
-    IF v_baja IS NULL THEN
+    -- Desde cuándo NO puede facturar: lo más tarde entre la baja y el fin de su gracia (hasta
+    -- entonces las funciones que timbran lo dejaban pasar). GREATEST ignora los NULL.
+    v_desde := GREATEST(v_baja, v_bloqueo);
+
+    IF v_desde IS NULL THEN
       v_res := v_res || pg_catalog.jsonb_build_object(
         'codigo', 'ESPERA_TIMBRADOS', 'espera_min', 15,
         'mensaje', 'Este cliente podía facturar y no tiene fecha de baja: no se puede saber si ya pasaron 15 minutos. Vuelve a cancelarlo y espera 15 minutos.');
     ELSE
-      v_falta := GREATEST(v_baja, coalesce(v_ultimo, v_baja)) + c_espera - pg_catalog.clock_timestamp();
+      v_falta := GREATEST(v_desde, v_ultimo) + c_espera - pg_catalog.clock_timestamp();
       IF v_falta > interval '0' THEN
         v_res := v_res || pg_catalog.jsonb_build_object(
           'codigo', 'ESPERA_TIMBRADOS',
           'espera_min', pg_catalog.ceil(extract(epoch FROM v_falta) / 60.0)::int,
           'mensaje', pg_catalog.format(
-            CASE WHEN v_ultimo IS NOT NULL AND v_ultimo > v_baja
+            CASE WHEN v_ultimo IS NOT NULL AND v_ultimo > v_desde
                  THEN 'Tiene una factura en borrador de hace menos de 15 minutos: puede estar timbrándose. Espera %s min.'
-                 ELSE 'Este cliente podía facturar y se dio de baja hace menos de 15 minutos: puede haber un timbrado en curso. Espera %s min.' END,
+                 ELSE 'Este cliente podía facturar hasta hace menos de 15 minutos: puede haber un timbrado en curso. Espera %s min.' END,
             pg_catalog.ceil(extract(epoch FROM v_falta) / 60.0)::int));
       END IF;
     END IF;

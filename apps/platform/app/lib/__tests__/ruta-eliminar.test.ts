@@ -169,7 +169,8 @@ describe("POST /api/tenants/[id]/eliminar — la base decide", () => {
     ["TENANT_INTERNO: Es un negocio interno de VIM: no se elimina.", "TENANT_INTERNO", 409],
     ["TIENE_TIMBRADOS: Tiene facturas timbradas: se conservan por obligación fiscal. Queda dado de baja.", "TIENE_TIMBRADOS", 409],
     ["TIMBRADO_EN_PROCESO: Tiene un timbrado a medias con el SAT.", "TIMBRADO_EN_PROCESO", 409],
-    ["ESPERA_TIMBRADOS: Este cliente podía facturar y se dio de baja hace menos de 15 minutos: puede haber un timbrado en curso. Espera 12 min.", "ESPERA_TIMBRADOS", 409],
+    ["ESPERA_TIMBRADOS: Este cliente podía facturar hasta hace menos de 15 minutos: puede haber un timbrado en curso. Espera 12 min.", "ESPERA_TIMBRADOS", 409],
+    ["EN_GRACIA: Sigue en sus días de gracia: su caja opera y factura hasta el 04/10/2026 06:00 (hora de México). Se podrá eliminar después.", "EN_GRACIA", 409],
     ["TENANT_NO_EXISTE: ese cliente no existe (o ya se eliminó).", "TENANT_NO_EXISTE", 404],
   ])("un rechazo de la base (%s) sale con su código y su motivo", async (mensaje, codigo, status) => {
     rpc.eliminar_tenant = { data: null, error: { message: mensaje, code: "P0001" } };
@@ -182,7 +183,7 @@ describe("POST /api/tenants/[id]/eliminar — la base decide", () => {
   });
 
   it("la espera por timbrados dice cuántos minutos faltan (A1)", async () => {
-    rpc.eliminar_tenant = { data: null, error: { message: "ESPERA_TIMBRADOS: Este cliente podía facturar y se dio de baja hace menos de 15 minutos: puede haber un timbrado en curso. Espera 12 min.", code: "P0001" } };
+    rpc.eliminar_tenant = { data: null, error: { message: "ESPERA_TIMBRADOS: Este cliente podía facturar hasta hace menos de 15 minutos: puede haber un timbrado en curso. Espera 12 min.", code: "P0001" } };
     const cuerpo = await (await POST(pedir(BUENO), ctx)).json();
     expect(cuerpo.detalle).toMatch(/Espera 12 min/);
   });
@@ -294,7 +295,7 @@ describe("GET /api/tenants/[id]/eliminar — vista previa", () => {
   const PREVIA = {
     tenant: { id: "t1", codigo: "tacos-prueba-piloto", nombre_comercial: "Tacos Prueba Piloto", estado: "CANCELADO", fecha_baja: null },
     puede_eliminar: false,
-    bloqueos: [{ codigo: "ESPERA_TIMBRADOS", mensaje: "Este cliente podía facturar y se dio de baja hace menos de 15 minutos: puede haber un timbrado en curso. Espera 12 min.", espera_min: 12 }],
+    bloqueos: [{ codigo: "ESPERA_TIMBRADOS", mensaje: "Este cliente podía facturar hasta hace menos de 15 minutos: puede haber un timbrado en curso. Espera 12 min.", espera_min: 12 }],
     resumen: RESUMEN,
     tablas: { sucursales: 1 },
   };

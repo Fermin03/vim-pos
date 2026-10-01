@@ -66,7 +66,7 @@ export function ZonaPeligrosa({ estado, nombre, bloqueoDesde, accion, busy, api,
         abierto={modo === "cancelar"}
         onCerrar={cerrar}
         titulo="Cancelar cliente"
-        descripcion={<><b>{nombre}</b> pasa a CANCELADO. Con 1 día de gracia el bloqueo entra mañana a las 6:00. Su historial no se borra y se puede reactivar después. Ya cancelado, aquí mismo aparece la opción de eliminarlo por completo.</>}
+        descripcion={<><b>{nombre}</b> pasa a CANCELADO. Con 1 día de gracia el bloqueo entra mañana a las 6:00. Su historial no se borra y se puede reactivar después. Ya cancelado y terminada su gracia, aquí mismo aparece la opción de eliminarlo por completo.</>}
         nombreEsperado={nombre}
         etiquetaBoton="Cancelar cliente"
         peligroso

@@ -8,7 +8,7 @@
 -- supabase/scripts/smoke_eliminar_tenant.sql, que además corre en el Postgres del escritorio.
 -- ============================================================================
 begin;
-select plan(44);
+select plan(51);
 
 \set tenant '99999999-0000-0000-0000-0000000000aa'
 \set suc    '99999999-0000-0000-0000-0000000000bb'
@@ -19,6 +19,7 @@ select plan(44);
 \set dueno2 '28282828-0000-0000-0000-0000000000e1'
 \set sello  '28282828-0000-0000-0000-0000000000a2'
 \set viejo  '28282828-0000-0000-0000-0000000000a3'
+\set gracia '28282828-0000-0000-0000-0000000000a4'
 
 -- ── 1) Quién puede ejecutar ──────────────────────────────────────────────────────────────────
 select ok(not has_function_privilege('authenticated', 'eliminar_tenant(uuid, text, uuid, text, inet)', 'execute'),
@@ -260,6 +261,37 @@ select lives_ok(
 select ok(not exists (select 1 from tenants where id = :'sello')
       and not exists (select 1 from tenant_cfdi_emisor where tenant_id = :'sello'),
   'y no queda ni el negocio ni su emisor');
+
+-- ── 8) En sus días de gracia sigue vendiendo y facturando: todavía no se elimina ─────────────
+-- Sin sello: no hay espera por timbrados, pero la gracia manda igual.
+insert into tenants (id, codigo, nombre_comercial, vertical_principal, estado, fecha_baja, motivo_baja, bloqueo_desde)
+values (:'gracia', 'gracia-0028', 'En Gracia 0028', 'QUICK_SERVICE', 'CANCELADO', now() - interval '2 days', 'Dejó de pagar', now() + interval '3 days');
+
+select throws_like(
+  format($$ select eliminar_tenant(%L, 'Dejó de pagar hace meses', %L, 'ELIMINAR') $$, :'gracia', :'op'),
+  'EN_GRACIA%', 'cancelado con el bloqueo en el futuro: su caja sigue operando, no se elimina');
+select is((select eliminar_tenant_vista_previa(:'gracia') -> 'bloqueos' -> 0 ->> 'codigo'), 'EN_GRACIA',
+  'la vista previa dice que sigue en gracia');
+select ok((select eliminar_tenant_vista_previa(:'gracia') -> 'bloqueos' -> 0 ->> 'mensaje')
+            like '%' || to_char((now() + interval '3 days') at time zone 'America/Mexico_City', 'DD/MM/YYYY HH24:MI') || '%',
+  'y desde cuándo se podrá, en hora de México');
+select is(jsonb_array_length(eliminar_tenant_vista_previa(:'gracia') -> 'bloqueos'), 1,
+  'un solo motivo: en gracia no se suma además la espera por timbrados');
+
+-- Con sello: la espera cuenta desde que DEJÓ de poder facturar (el bloqueo), no desde la baja.
+insert into tenant_cfdi_emisor (tenant_id, rfc, facturama_issuer_ref, csd_numero_certificado, rfc_verificado)
+values (:'gracia', 'AAA010101AAA', 'ref-0028-g', '00001000000500000001', 'AAA010101AAA');
+update tenants set bloqueo_desde = now() - interval '3 minutes' where id = :'gracia';
+select throws_like(
+  format($$ select eliminar_tenant(%L, 'Dejó de pagar hace meses', %L, 'ELIMINAR') $$, :'gracia', :'op'),
+  'ESPERA_TIMBRADOS%', 'baja de hace 2 días pero bloqueo de hace 3 minutos: facturó hasta hace 3 minutos, hay que esperar');
+select is((select (eliminar_tenant_vista_previa(:'gracia') -> 'bloqueos' -> 0 ->> 'espera_min')::int), 12,
+  'faltan 12 minutos contados desde el bloqueo');
+
+update tenants set bloqueo_desde = now() - interval '16 minutes' where id = :'gracia';
+select lives_ok(
+  format($$ select eliminar_tenant(%L, 'Dejó de pagar hace meses', %L, 'ELIMINAR') $$, :'gracia', :'op'),
+  'terminada la gracia y pasados 15 minutos del bloqueo, se elimina');
 
 select * from finish();
 rollback;
