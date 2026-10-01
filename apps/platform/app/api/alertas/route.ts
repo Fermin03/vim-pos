@@ -3,6 +3,7 @@ import { autorizar } from "../../lib/server";
 import { fechaLegible, hoyMx } from "@vim/fecha";
 import { AVISO_PRUEBA_DIAS, diasEntre, estadoPrueba, precioVigente, promocionVigente, type PrecioSuscripcion } from "@vim/db/cobro";
 import { alertaDeSello } from "../../lib/alerta-sello";
+import { alertaProspectos } from "../../lib/prospectos";
 
 /**
  * Bandeja de "requiere tu atención": lo que hay que hacer HOY, no lo que pasó.
@@ -36,6 +37,8 @@ export type Alerta = {
   detalle: string;
   /** Para ordenar dentro de la misma severidad: más chico = más urgente. */
   orden: number;
+  /** A dónde lleva "Abrir" cuando la alerta no es de un cliente (prospectos, 0145). */
+  href?: string;
 };
 
 const DIA = 24 * 3600 * 1000;
@@ -85,7 +88,7 @@ export async function GET(req: Request) {
   const nombreDe = new Map(tenants.map((t) => [t.id, t.nombre_comercial]));
   const activos = new Set(tenants.filter((t) => t.estado !== "CANCELADO" && t.estado !== "BAJA").map((t) => t.id));
 
-  const [cajasRes, subsRes, foliosRes, onbRes, ventasRes, syncRes, sellosRes] = await Promise.all([
+  const [cajasRes, subsRes, foliosRes, onbRes, ventasRes, syncRes, sellosRes, prospectosRes] = await Promise.all([
     sb.from("cajas").select("id, nombre, tenant_id, activa, bloqueada, bloqueo_motivo, ultimo_latido, version_app").is("deleted_at", null).limit(2000),
     sb.from("suscripciones").select("tenant_id, estado, fecha_fin, proxima_fecha_cobro, precio_mensual_mxn, precio_promocional_mxn, promocion_hasta, promocion_nombre").limit(1000),
     sb.from("tenant_folios_saldo").select("tenant_id, folios_base_mensuales, folios_base_consumidos, saldo_paquetes, umbral_alerta").limit(1000),
@@ -96,6 +99,8 @@ export async function GET(req: Request) {
     sb.from("sync_eventos").select("tenant_id, fecha_recepcion, operaciones_error")
       .order("fecha_recepcion", { ascending: false }).limit(2000),
     sb.from("tenant_cfdi_emisor").select("tenant_id, csd_numero_certificado, csd_vigencia_hasta").limit(1000),
+    // Solo los que nadie ha tocado (0145): son los únicos que pueden ser una alerta.
+    sb.from("prospectos").select("negocio, estado, creado_en").eq("estado", "NUEVO").order("creado_en", { ascending: true }).limit(500),
   ]);
 
   const ultimaVenta = new Map<string, string>();
@@ -336,12 +341,21 @@ export async function GET(req: Request) {
     }
   }
 
+  // ── Prospectos de demo sin contactar (0145) ────────────────────────────────────────────
+  // El sitio promete contestar el mismo día hábil. Uno que sigue NUEVO pasadas 24 horas es una
+  // venta enfriándose; van todos en UNA alerta para no enterrar la bandeja el día que entran diez.
+  const prospectosNuevos = (prospectosRes.data ?? []) as { negocio: string; estado: string; creado_en: string }[];
+  const deProspectos = alertaProspectos(prospectosNuevos);
+  if (deProspectos) alertas.push(deProspectos);
+
   const peso: Record<Severidad, number> = { critica: 0, alta: 1, media: 2 };
   alertas.sort((a, b) => peso[a.severidad] - peso[b.severidad] || a.orden - b.orden || a.tenant.localeCompare(b.tenant));
 
   return NextResponse.json({
     alertas,
     ahora,
+    // Para el contador de la barra lateral: cuántos esperan respuesta, lleven lo que lleven.
+    prospectosNuevos: prospectosNuevos.length,
     resumen: {
       critica: alertas.filter((a) => a.severidad === "critica").length,
       alta: alertas.filter((a) => a.severidad === "alta").length,

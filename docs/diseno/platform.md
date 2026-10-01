@@ -9,8 +9,9 @@ revisa el CFDI de los clientes. Es la única app que usa `service_role` y la ún
 puede romper el negocio de alguien más.
 
 Poca superficie y mucho poder por pantalla. Desde la entrega 1 del ADR 0014 (04/09/2026) el
-panel es una barra lateral con cinco pantallas globales (Atención, Clientes, Facturación,
-Errores, Bitácora) y una **ficha de cliente** con cuatro secciones en este orden: Operación,
+panel es una barra lateral con sus pantallas globales (Atención, Clientes, Prospectos, Avisos,
+Versiones, Facturación, Pagos y soporte, Errores, Bitácora, Operadores) y una **ficha de
+cliente** con cuatro secciones en este orden: Operación,
 Contrato, Facturación y Zona peligrosa. El orden es el del trabajo diario: primero si está
 operando, luego qué paga, luego lo que factura, y al final, aparte, lo que puede romperle el
 negocio. Las pantallas se refrescan solas cada minuto mientras la pestaña está visible.
@@ -91,6 +92,19 @@ en la misma transacción. La prueba gratis sale en Contrato con su fecha y "Exte
 (motivo, a la bitácora); vencida va en `warning`, no en rojo: no corta nada. **Datos de pago**
 y **Soporte** (0142, en la misma pantalla "Pagos y soporte") son las únicas que escriben algo que ven TODOS los clientes, así que se confirman
 escribiendo `TODOS`, como un aviso importante a todos.
+
+**Prospectos (0145).** Quien pide una demo en el sitio aparece en `/prospectos`, lo más nuevo
+primero; abre filtrada en **Nuevo** si hay alguno. Es la única pantalla del panel con un botón
+azul por tarjeta —**WhatsApp**, con el saludo ya escrito— porque aquí sí hay un "lo que sigue":
+contestarle. El seguimiento es un `<select>` (Nuevo → Contactado → Demo agendada → Ganado /
+Perdido) y una nota de una línea que solo se guarda al pulsar; el refresco de cada minuto no pisa
+lo que se está escribiendo. **Eliminar** es para entradas de prueba: enlace en `danger`, abajo y
+aparte, con motivo; a un prospecto real que no cerró se le marca Perdido. La bitácora guarda el
+negocio y el estado, **nunca** el nombre ni el WhatsApp de la persona. En la barra lateral, el
+contador de Prospectos va en `warning`, no en rojo: nada está roto. En Atención, los que llevan
+más de 24 h como nuevos son **una sola** alerta (alta; crítica a los tres días). "Convertir en
+cliente…" abre Nuevo cliente con el negocio, la persona, el teléfono, el giro y el plan sugerido
+por tamaño; en la URL solo viaja el id del prospecto.
 
 ## Los datos son de otro
 

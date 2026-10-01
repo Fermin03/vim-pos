@@ -14,6 +14,8 @@ export type Alerta = {
   tenant: string;
   titulo: string;
   detalle: string;
+  /** A dónde lleva "Abrir" cuando la alerta no es de un cliente (prospectos, 0145). */
+  href?: string;
 };
 
 /** Una caja en la franja "Ahora" de Atención (ver api/alertas). minutos: null = nunca latió. */

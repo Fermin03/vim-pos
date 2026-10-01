@@ -8,6 +8,7 @@ import { useSesion } from "../lib/sesion";
 const NAV: { href: string; label: string }[] = [
   { href: "/atencion", label: "Atención" },
   { href: "/clientes", label: "Clientes" },
+  { href: "/prospectos", label: "Prospectos" },
   { href: "/avisos", label: "Avisos" },
   { href: "/versiones", label: "Versiones" },
   { href: "/cfdi", label: "Facturación" },
@@ -42,18 +43,24 @@ export function InsigniaEntorno() {
 /**
  * Se ve distinto al admin a propósito (docs/diseno/platform.md): leyenda "interno" bajo el
  * logotipo y sin el sidebar oscuro del cliente. El conteo de críticas acompaña a Atención
- * desde cualquier pantalla. Por debajo de lg es un cajón que se abre desde el Shell.
+ * desde cualquier pantalla, y el de prospectos sin contestar a Prospectos. Por debajo de lg es un cajón que se abre desde el Shell.
  */
 export function BarraLateral({ abierto = false, onCerrar = () => {} }: { abierto?: boolean; onCerrar?: () => void }) {
   const path = usePathname();
   const { api, salir, operador } = useSesion();
   const [criticas, setCriticas] = useState<number>(0);
+  // Prospectos de demo que nadie ha contestado (0145): la misma lectura de alertas los cuenta.
+  const [prospectos, setProspectos] = useState<number>(0);
 
   useEffect(() => {
     let vivo = true;
     const carga = () =>
       api("/api/alertas")
-        .then((r) => { if (vivo) setCriticas(Number((r.resumen as { critica?: number } | undefined)?.critica ?? 0)); })
+        .then((r) => {
+          if (!vivo) return;
+          setCriticas(Number((r.resumen as { critica?: number } | undefined)?.critica ?? 0));
+          setProspectos(Number(r.prospectosNuevos ?? 0));
+        })
         .catch(() => {});
     carga();
     const id = setInterval(carga, 60_000);
@@ -114,6 +121,15 @@ export function BarraLateral({ abierto = false, onCerrar = () => {} }: { abierto
                 {n.href === "/atencion" && criticas > 0 && (
                   <span className={["rounded-full px-1.5 py-0.5 text-12 font-bold tabular-nums", activo ? "bg-white text-danger" : "bg-danger text-white"].join(" ")}>
                     {criticas}
+                  </span>
+                )}
+                {/* En ámbar y no en rojo: un prospecto sin contestar pide atención, no está roto nada. */}
+                {n.href === "/prospectos" && prospectos > 0 && (
+                  <span
+                    className={["rounded-full px-1.5 py-0.5 text-12 font-bold tabular-nums", activo ? "bg-white text-ink" : "bg-warning-soft text-warning"].join(" ")}
+                    aria-label={`${prospectos} sin contactar`}
+                  >
+                    {prospectos}
                   </span>
                 )}
               </Link>

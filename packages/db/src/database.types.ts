@@ -5725,6 +5725,7 @@ export type Database = {
           cajas: number
           creado_en: string
           estado: string
+          estado_cambiado_en: string | null
           giro: string | null
           id: string
           mensaje: string | null
@@ -5743,6 +5744,7 @@ export type Database = {
           cajas: number
           creado_en?: string
           estado?: string
+          estado_cambiado_en?: string | null
           giro?: string | null
           id?: string
           mensaje?: string | null
@@ -5761,6 +5763,7 @@ export type Database = {
           cajas?: number
           creado_en?: string
           estado?: string
+          estado_cambiado_en?: string | null
           giro?: string | null
           id?: string
           mensaje?: string | null

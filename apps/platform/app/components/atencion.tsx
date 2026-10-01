@@ -135,7 +135,7 @@ export function Atencion({ api }: { api: Api }) {
         <div className="rounded-lg border border-line bg-surface p-8 text-center">
           <div className="font-display text-18 font-semibold">Nada pendiente</div>
           <p className="mt-1 text-14 text-ink-2">
-            Revisé cajas bloqueadas, sincronización, ventas, pruebas por vencer, cobros, folios y altas estancadas.
+            Revisé cajas bloqueadas, sincronización, ventas, pruebas por vencer, cobros, folios, altas estancadas y prospectos sin contactar.
           </p>
         </div>
       ) : lista.length === 0 ? (
@@ -156,9 +156,9 @@ export function Atencion({ api }: { api: Api }) {
                 </span>
               </div>
               {/* Enlace, no botón: se puede abrir en otra pestaña (varios clientes a la vez). */}
-              {a.tenantId && (
+              {(a.tenantId || a.href) && (
                 <Link
-                  href={`/clientes/${a.tenantId}`}
+                  href={a.href ?? `/clientes/${a.tenantId}`}
                   className="btn flex-shrink-0 rounded border border-line-strong bg-surface px-3 py-1.5 text-13 font-semibold text-ink-2 hover:border-ink hover:text-ink"
                 >
                   Abrir
