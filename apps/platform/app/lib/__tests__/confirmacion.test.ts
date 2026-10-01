@@ -18,8 +18,10 @@ describe("evaluarConfirmacion", () => {
   it("exige motivo de al menos 10 caracteres", () => {
     expect(evaluarConfirmacion({ ...base, motivo: "corto" }).faltantes).toContain("motivo");
   });
-  it("si pide gracia, exige entero >= 1", () => {
-    expect(evaluarConfirmacion({ ...base, requiereGracia: true, graciaDias: 0 }).faltantes).toContain("gracia");
+  it("si pide gracia, exige un entero de 0 en adelante (0 = bloqueo inmediato)", () => {
+    expect(evaluarConfirmacion({ ...base, requiereGracia: true, graciaDias: 0 }).ok).toBe(true);
+    expect(evaluarConfirmacion({ ...base, requiereGracia: true, graciaDias: -1 }).faltantes).toContain("gracia");
+    expect(evaluarConfirmacion({ ...base, requiereGracia: true, graciaDias: 1.5 }).faltantes).toContain("gracia");
     expect(evaluarConfirmacion({ ...base, requiereGracia: true, graciaDias: 3 }).ok).toBe(true);
   });
   it("si pide la casilla, exige marcarla", () => {

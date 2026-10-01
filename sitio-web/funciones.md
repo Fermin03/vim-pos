@@ -116,9 +116,9 @@ Antes de quedarte sin algo en plena hora pico, no cuando ya te quedaste.
 
 _Reportes y corte_
 
-## El corte que ya conoces, y catorce reportes más
+## El corte que ya conoces, y quince reportes más
 
-El corte Z está calcado del formato que tu equipo ya lee cada noche, a propósito: quien lo revisa no tiene que reaprender dónde mirar. Y el panel suma catorce reportes para cuando quieras entender algo concreto.
+El corte Z está calcado del formato que tu equipo ya lee cada noche, a propósito: quien lo revisa no tiene que reaprender dónde mirar. Y el panel suma quince reportes para cuando quieras entender algo concreto.
 
 ![Arqueo del cierre de turno: efectivo esperado, efectivo contado y la diferencia, con cada forma de pago en su renglón.](https://vimpos.com.mx/assets/img/capturas/pos-arqueo.webp?v=3)
 
@@ -132,7 +132,7 @@ _El panel, desde el celular o la computadora. Sin tener que ir al local a pregun
 
 Cuentas el cajón, el sistema dice lo que debería haber, y la diferencia queda registrada junto con quién cerró el turno.
 
-### Catorce reportes
+### Quince reportes
 
 Por producto, categoría, mesero, área, marca, tipo de servicio, tiempos de cocina, descuentos, reimpresiones, no-shows y el histórico de cortes.
 

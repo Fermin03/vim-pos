@@ -76,7 +76,7 @@ Arqueo contra lo que dice el sistema, con sobrante y faltante a la vista, y cort
 
 ### Ver tu negocio
 
-Desde el celular: cuánto llevas hoy contra ayer, qué se vende y qué no, inventario con costo, y catorce reportes. Con aviso si tu caja lleva días sin subir las ventas.
+Desde el celular: cuánto llevas hoy contra ayer, qué se vende y qué no, inventario con costo, y quince reportes. Con aviso si tu caja lleva días sin subir las ventas.
 
 ![Panel del dueño con las ventas del día y el estado de las cajas.](https://vimpos.com.mx/assets/img/capturas/admin-dashboard.webp?v=3)
 
