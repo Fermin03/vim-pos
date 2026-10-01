@@ -153,6 +153,8 @@ export type Limites = LimitesTrio & { del_plan: LimitesTrio; excepcion: LimitesT
 
 export type Detalle = {
   tenant: Record<string, unknown>;
+  /** Acceso del dueño a su panel (lib/acceso-dueno.ts). null = el negocio no tiene cuenta de dueño. */
+  dueno?: import("./acceso-dueno").AccesoDueno | null;
   foliosSaldo: number;
   foliosBase: { mensuales: number; consumidos: number; periodo: string } | null;
   addons: AddonContratado[];

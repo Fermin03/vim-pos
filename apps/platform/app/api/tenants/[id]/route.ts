@@ -6,6 +6,7 @@ import { fechaBloqueo, mensajeBloqueoPorDefecto } from "../../../lib/bloqueo";
 import { decidirAltaAddon, precioAltaDelivery, type FilaAddon } from "../../../lib/addons";
 import { precioValido } from "../../../lib/precio";
 import { fechaValida, leerPromocion } from "../../../lib/promocion";
+import { accesoDeDueno, type UsuarioAuth } from "../../../lib/acceso-dueno";
 import type { SbClient } from "../../../lib/server";
 
 // Detalle y acciones sobre un tenant (suspender/reactivar/cancelar, notas, plan).
@@ -23,9 +24,9 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }
     .from("tenants")
     .select(
       "id, codigo, nombre_comercial, estado, vertical_principal, razon_social, rfc, regimen_fiscal, " +
-        "codigo_postal_fiscal, email_fiscal, fecha_alta, fecha_baja, motivo_baja, bloqueo_desde, bloqueo_mensaje, created_at, prueba_hasta, " +
+        "codigo_postal_fiscal, email_fiscal, fecha_alta, fecha_baja, motivo_baja, bloqueo_desde, bloqueo_mensaje, created_at, prueba_hasta, usuario_dueno_id, " +
         "plan:planes(id, codigo, nombre, precio_mensual_mxn, timbres_cfdi_mensuales, features_incluidos), " +
-        "onboarding:tenant_onboarding_estado(fase, fase_wizard, fecha_invitacion, fecha_activacion, fecha_go_live, notas_internas), " +
+        "onboarding:tenant_onboarding_estado(fase, fase_wizard, fecha_invitacion, fecha_activacion, fecha_go_live, notas_internas, terminos_version, bienvenida_enviada_at), " +
         "suscripcion:suscripciones(estado, precio_mensual_mxn, proxima_fecha_cobro, ciclo_facturacion, fecha_inicio, precio_promocional_mxn, promocion_hasta, promocion_nombre)",
     )
     .eq("id", id)
@@ -84,8 +85,19 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }
   };
   const limites = (limRaw ?? null) as Record<string, unknown> | null;
 
+  // El acceso del dueño (roadmap A5): ¿ya confirmó su correo? Si no, la ficha ofrece reenviarle
+  // la invitación o la confirmación, según cómo se dio de alta. Vive en auth.users, no en una tabla.
+  const t = tenant as unknown as { usuario_dueno_id?: string | null; onboarding?: { terminos_version?: string | null } | { terminos_version?: string | null }[] | null };
+  const onb = Array.isArray(t.onboarding) ? t.onboarding[0] : t.onboarding;
+  let dueno = null;
+  if (t.usuario_dueno_id) {
+    const { data: u } = await sb.auth.admin.getUserById(t.usuario_dueno_id);
+    dueno = accesoDeDueno((u?.user ?? null) as UsuarioAuth | null, onb?.terminos_version ?? null);
+  }
+
   return NextResponse.json({
     tenant,
+    dueno,
     modulos,
     limites,
     foliosSaldo: saldo?.saldo_paquetes ?? 0,

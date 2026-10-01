@@ -106,6 +106,14 @@ más de 24 h como nuevos son **una sola** alerta (alta; crítica a los tres día
 cliente…" abre Nuevo cliente con el negocio, la persona, el teléfono, el giro y el plan sugerido
 por tamaño; en la URL solo viaja el id del prospecto.
 
+**Acceso del dueño (roadmap A5).** El bloque "Alta" de la ficha dice el correo del dueño y si ya
+lo confirmó ("Correo confirmado el …", con su último acceso). Sin confirmar va en `warning` —no
+puede entrar, pero nada está roto— con un botón que reenvía **el correo de su camino de alta**: la
+invitación si lo dio de alta VIM, la confirmación de registro si se registró solo. No pide motivo
+(no cambia nada del contrato) pero sí queda en la bitácora, y el servidor limita a uno por minuto
+y cinco por hora por negocio. El resultado se dice ahí mismo y no lo borra el refresco. Confirmado,
+el botón no existe: a quien ya entra no se le reenvía nada desde el panel.
+
 ## Los datos son de otro
 
 Cada pantalla deja claro **de qué tenant** estás viendo datos, siempre, incluso en las tablas.

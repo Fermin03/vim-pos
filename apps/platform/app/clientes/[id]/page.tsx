@@ -14,6 +14,7 @@ import { PastillaEstado } from "../../components/pastilla-estado";
 import { SaludTenant } from "../../components/salud-tenant";
 import { AvisosCliente } from "../../components/avisos-cliente";
 import { FichaContrato } from "../../components/ficha-contrato";
+import { AccesoDueno } from "../../components/acceso-dueno";
 import { FichaPagos } from "../../components/ficha-pagos";
 import { FichaFacturacion } from "../../components/ficha-facturacion";
 import { ModulosLimites } from "../../components/modulos-limites";
@@ -167,7 +168,7 @@ export default function FichaCliente() {
         </Seccion>
 
         <Seccion id="contrato" titulo="Contrato" descripcion="Qué paga, qué tiene contratado y qué puede usar.">
-          <FichaContrato d={d} planes={planes} accion={accion} busy={busy} />
+          <FichaContrato d={d} planes={planes} accion={accion} busy={busy} accesoDueno={<AccesoDueno api={api} tenantId={id} dueno={d.dueno} onCambio={recargar} />} />
           <FichaPagos api={api} tenantId={id} suscripcion={suscripcion} onCambio={recargar} />
           <ModulosLimites d={d} nombre={nombre} accion={accion} busy={busy} />
         </Seccion>

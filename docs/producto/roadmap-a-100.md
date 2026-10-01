@@ -13,7 +13,7 @@ El plano de control de VIM. Corre con `service_role` fuera de RLS, gated por `PL
 - ✅ **A2 — Métricas globales:** tenants por estado/vertical, MRR, folios vendidos 30d. (Falta: churn histórico.)
 - ✅ **A3 — Folios CFDI:** regalar/ajustar folios (`AJUSTE_MANUAL`) desde el drawer del tenant, auditado.
 - ⏸️ **A4 — Feature flags:** DIFERIDO — ningún consumidor en el runtime lee `tenant_feature_flags` aún; el toggle sería un control sin efecto. Construir cuando el app consuma flags.
-- ✅ **A5 — Onboarding:** ver fase + marcar ABANDONADO/GO_LIVE/reactivar (upsert, auditado). (Falta: reenviar invitación por email.)
+- ✅ **A5 — Onboarding:** ver fase + marcar ABANDONADO/GO_LIVE/reactivar (upsert, auditado). Reenviar la invitación o la confirmación al dueño sin confirmar, desde el bloque "Alta" de la ficha (1 oct 2026; `lib/acceso-dueno.ts`).
 - ✅ **A6 — Suscripciones:** activar cobro (TRIAL→ACTIVO + suscripción ACTIVA, alimenta MRR) · pausar · reanudar · cancelar. (Stripe = Fase 3.)
 - ✅ **A7 — Soporte / Impersonación auditada:** botón "Impersonar" en el drawer → genera un magic-link al admin del dueño (auth.admin.generateLink), auditado en super_admin_accesos. (Necesita tenant provisionado con dueño + redirectTo permitido en Supabase.)
 - ⏸️ **A8 — Login real de super-admin:** DIFERIDO (post-verticales, roadmap) — la clave compartida sirve para 1 operador VIM; sustituir por cuentas individuales cuando crezca el equipo.

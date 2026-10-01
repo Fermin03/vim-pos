@@ -62,7 +62,7 @@ function Cambio({ antes, despues }: { antes: ReactNode; despues: ReactNode }) {
  * lo que cuesta dinero o corta la operación pide además el nombre del cliente; lo reversible, solo
  * el motivo; marcarlo en operación, nada.
  */
-export function FichaContrato({ d, planes, accion, busy }: { d: Detalle; planes: Plan[]; accion: Accion; busy: boolean }) {
+export function FichaContrato({ d, planes, accion, busy, accesoDueno }: { d: Detalle; planes: Plan[]; accion: Accion; busy: boolean; /** El acceso del dueño (correo confirmado o reenviar), dentro del bloque Alta. */ accesoDueno?: ReactNode }) {
   const t = d.tenant;
   const nombre = String(t.nombre_comercial);
   const [pendiente, setPendiente] = useState<Pendiente>(null);
@@ -217,6 +217,7 @@ export function FichaContrato({ d, planes, accion, busy }: { d: Detalle; planes:
             <span className={subTitulo}>Alta</span>
             <span className="rounded-full bg-sel px-2 py-0.5 text-12 font-semibold text-ink-2">{nombreFase(fase)}</span>
           </div>
+          {accesoDueno}
           <div className="flex flex-wrap gap-2">
             {fase !== "GO_LIVE" && fase !== "ABANDONADO" && (
               <button onClick={() => void accion({ accion: "marcar_fase", fase: "GO_LIVE" }).catch(() => {})} disabled={busy} className={btnFantasma}>Marcar en operación</button>
