@@ -13,7 +13,7 @@ import { esc, soloAscii } from "./correo.ts";
  * cada alta (tenant_onboarding_estado.terminos_version). CAMBIARLA cuando cambie el texto de
  * https://vimpos.com.mx/terminos o /aviso-privacidad: así se sabe qué versión aceptó cada quien.
  */
-export const TERMINOS_VERSION = "2026-09-30";
+export const TERMINOS_VERSION = "2026-10-01"; // sin días de tolerancia en el pago
 
 export const VERTICALES = ["FOODTRUCK", "QUICK_SERVICE", "FULL_SERVICE", "CAFE_BAR", "DARK_KITCHEN", "ENTERPRISE"] as const;
 export type Vertical = (typeof VERTICALES)[number];

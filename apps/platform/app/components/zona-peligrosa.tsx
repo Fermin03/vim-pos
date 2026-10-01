@@ -28,7 +28,7 @@ export function ZonaPeligrosa({ estado, nombre, bloqueoDesde, accion, busy, api,
     <Seccion id="peligro" titulo="Zona peligrosa" descripcion="Lo que puede dejar a este negocio sin sistema. Cada acción pide motivo y el nombre del cliente." peligrosa>
       <div className="flex flex-wrap gap-2">
         {estado !== "SUSPENDIDO" && estado !== "CANCELADO" && (
-          <button onClick={() => setModo("suspender")} disabled={busy} className={`${boton} bg-warning`}>Suspender con gracia…</button>
+          <button onClick={() => setModo("suspender")} disabled={busy} className={`${boton} bg-warning`}>Suspender…</button>
         )}
         {estado !== "CANCELADO" && (
           <button onClick={() => setModo("cancelar")} disabled={busy} className={`${boton} bg-danger`}>Cancelar cliente…</button>
@@ -49,8 +49,8 @@ export function ZonaPeligrosa({ estado, nombre, bloqueoDesde, accion, busy, api,
       <DialogoConfirmar
         abierto={modo === "suspender"}
         onCerrar={cerrar}
-        titulo="Suspender con gracia"
-        descripcion={<><b>{nombre}</b> pasa a SUSPENDIDO hoy. Su caja seguirá vendiendo durante los días de gracia con un aviso, y a partir de la fecha indicada dejará de vender.</>}
+        titulo="Suspender"
+        descripcion={<><b>{nombre}</b> pasa a SUSPENDIDO hoy. Con 0 días de gracia su caja se bloquea en cuanto reciba el aviso; si das días, seguirá vendiendo con un aviso hasta la fecha indicada.</>}
         nombreEsperado={nombre}
         etiquetaBoton="Suspender"
         peligroso

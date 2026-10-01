@@ -124,10 +124,10 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
     if (esBaja) {
       patch.fecha_baja = new Date().toISOString();
       patch.motivo_baja = motivo;
-      // Suspender siempre lleva gracia (>= 1 día): entre decidirlo y que la caja deje de vender
-      // hay días de aviso. Cancelar bloquea ya, salvo que se capture gracia.
+      // Suspender pide los días de gracia de forma explícita; 0 = bloqueo inmediato (el pago no
+      // tiene días de tolerancia, regla del 1 oct 2026). Cancelar bloquea ya, salvo que se capture gracia.
       const graciaRaw = body.gracia_dias == null ? null : Math.trunc(Number(body.gracia_dias));
-      if (nuevo === "SUSPENDIDO" && (graciaRaw === null || !(graciaRaw >= 1))) return NextResponse.json({ error: "GRACIA_REQUERIDA" }, { status: 400 });
+      if (nuevo === "SUSPENDIDO" && (graciaRaw === null || !(graciaRaw >= 0))) return NextResponse.json({ error: "GRACIA_REQUERIDA" }, { status: 400 });
       const bloqueoDesde = graciaRaw !== null && graciaRaw >= 1 ? fechaBloqueo(hoyMx(), graciaRaw) : new Date().toISOString();
       patch.bloqueo_desde = bloqueoDesde;
       patch.bloqueo_mensaje = (body.mensaje as string | undefined)?.trim() || mensajeBloqueoPorDefecto(bloqueoDesde);

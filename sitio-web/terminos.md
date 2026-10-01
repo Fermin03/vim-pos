@@ -34,13 +34,13 @@ Los límites de cada plan —cuántas cajas y cuántas sucursales— son los pub
 - Por mes adelantado, en pesos mexicanos, más IVA. O por año, con el descuento publicado.
 - Los precios son los de la página de precios el día que contratas.
 - Si subimos el precio, te avisamos con **30 días** de anticipación. Si no te parece, cancelas antes de que aplique y no se te cobra el precio nuevo.
-- Si un pago no entra, te avisamos y tienes **10 días naturales** para regularizarlo antes de que el servicio se suspenda.
+- **No hay días de tolerancia.** Te recordamos el pago antes de su fecha; si llega la fecha y el pago no entra, el servicio se suspende: la caja se bloquea y no permite abrir cuentas. En cuanto pagas, se reactiva ese mismo día y tu información sigue completa.
 
 ## Cancelar
 
 **No hay contrato forzoso ni penalización.** Cancelas cuando quieras y el servicio sigue hasta que termine el periodo que ya pagaste. El mes en curso no se devuelve; si pagaste el año, se devuelve la parte proporcional de los meses completos que falten.
 
-Podemos suspender el servicio si hay un pago pendiente pasado el plazo de arriba, o si se usa para algo ilegal. En cualquier caso te avisamos antes, salvo que la ley nos obligue a lo contrario.
+Podemos suspender el servicio si un pago no entra en su fecha, o si se usa para algo ilegal. En cualquier caso te avisamos antes, salvo que la ley nos obligue a lo contrario.
 
 ## Tus datos son tuyos
 

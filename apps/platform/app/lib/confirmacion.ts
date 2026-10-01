@@ -34,7 +34,8 @@ export function evaluarConfirmacion(e: EntradaConfirmacion): ResultadoConfirmaci
   const faltantes: ResultadoConfirmacion["faltantes"] = [];
   if (e.requiereNombre !== false && normal(e.nombreEscrito) !== normal(e.nombreEsperado)) faltantes.push("nombre");
   if (e.motivo.trim().length < MOTIVO_MINIMO) faltantes.push("motivo");
-  if (e.requiereGracia && !(Number.isInteger(e.graciaDias) && (e.graciaDias as number) >= 1)) faltantes.push("gracia");
+  // 0 es válido: bloqueo inmediato (sin días de tolerancia, regla del 1 oct 2026).
+  if (e.requiereGracia && !(Number.isInteger(e.graciaDias) && (e.graciaDias as number) >= 0)) faltantes.push("gracia");
   if (e.requiereEntiendo && !e.entiendo) faltantes.push("entiendo");
   if (e.palabraEsperada && (e.palabraEscrita ?? "").trim() !== e.palabraEsperada) faltantes.push("palabra");
   return { ok: faltantes.length === 0, faltantes };

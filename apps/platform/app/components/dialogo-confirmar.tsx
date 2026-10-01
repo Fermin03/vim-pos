@@ -94,6 +94,7 @@ export function DialogoConfirmar(p: DialogoConfirmarProps) {
   const puede = faltan.length === 0 && !p.ocupado;
 
   const fechaBloq = p.conGracia && Number.isInteger(gracia) && gracia >= 1 ? fechaBloqueo(hoyMx(), gracia) : null;
+  const inmediato = p.conGracia && gracia === 0;
 
   async function confirmar() {
     setError(null);
@@ -136,7 +137,7 @@ export function DialogoConfirmar(p: DialogoConfirmarProps) {
 
       {p.conGracia && (
         <div>
-          <label className={label} htmlFor="dc-gracia">Días de gracia antes de bloquear la caja</label>
+          <label className={label} htmlFor="dc-gracia">Días de gracia antes de bloquear la caja (0 = bloquear ya)</label>
           <input
             id="dc-gracia"
             className={`${input} w-28`}
@@ -145,7 +146,11 @@ export function DialogoConfirmar(p: DialogoConfirmarProps) {
             onChange={(e) => setGracia(Math.trunc(Number(e.target.value.replace(/[^0-9]/g, "")) || 0))}
           />
           <p className="mt-1 text-13 text-ink-2">
-            {fechaBloq ? `La caja dejará de vender el ${fechaHoraMx(fechaBloq)} (hora de México).` : "Escribe al menos 1 día."}
+            {fechaBloq
+              ? `La caja dejará de vender el ${fechaHoraMx(fechaBloq)} (hora de México).`
+              : inmediato
+                ? "Sin días de gracia: la caja se bloquea en cuanto reciba el aviso (unos minutos), aunque esté a media jornada."
+                : "Escribe un número de días (0 para bloquear ya)."}
           </p>
         </div>
       )}
