@@ -8,7 +8,7 @@
 -- supabase/scripts/smoke_eliminar_tenant.sql, que además corre en el Postgres del escritorio.
 -- ============================================================================
 begin;
-select plan(27);
+select plan(44);
 
 \set tenant '99999999-0000-0000-0000-0000000000aa'
 \set suc    '99999999-0000-0000-0000-0000000000bb'
@@ -17,6 +17,8 @@ select plan(27);
 \set op     '00000000-0000-0000-0000-0000000000a1'
 \set nuevo  '28282828-0000-0000-0000-0000000000a1'
 \set dueno2 '28282828-0000-0000-0000-0000000000e1'
+\set sello  '28282828-0000-0000-0000-0000000000a2'
+\set viejo  '28282828-0000-0000-0000-0000000000a3'
 
 -- ── 1) Quién puede ejecutar ──────────────────────────────────────────────────────────────────
 select ok(not has_function_privilege('authenticated', 'eliminar_tenant(uuid, text, uuid, text, inet)', 'execute'),
@@ -54,6 +56,52 @@ select ok(has_table_privilege('service_role', 'tenants_eliminados', 'select')
       and not has_table_privilege('service_role', 'tenants_eliminados', 'update')
       and not has_table_privilege('service_role', 'tenants_eliminados', 'delete'),
   'el panel la lee pero no la escribe: solo eliminar_tenant');
+
+-- ── 2b) Archivos pendientes (M2) y tiempo (M4) ───────────────────────────────────────────────
+select has_column('public', 'tenants_eliminados', 'archivos_pendientes',
+  'el archivo guarda la lista de objetos de Storage que faltan por borrar');
+select ok(not has_function_privilege('authenticated', 'marcar_archivos_eliminados(uuid, jsonb)', 'execute')
+      and not has_function_privilege('anon', 'marcar_archivos_eliminados(uuid, jsonb)', 'execute')
+      and has_function_privilege('service_role', 'marcar_archivos_eliminados(uuid, jsonb)', 'execute'),
+  'marcar los archivos como borrados, solo service_role');
+select ok((select proconfig from pg_proc where oid = 'public.eliminar_tenant(uuid, text, uuid, text, inet)'::regprocedure)
+            @> array['statement_timeout=50s'],
+  'eliminar_tenant trae su propio statement_timeout (PostgREST lo aplica antes de llamar)');
+
+insert into tenants_eliminados (id, codigo, nombre_comercial, vertical_principal, fecha_alta, eliminado_por, motivo, archivos_pendientes)
+values (:'viejo', 'viejo-0028', 'Viejo 0028', 'QUICK_SERVICE', now(), :'op', 'Fila de prueba del archivo',
+        '[{"bucket":"cfdi","nombre":"a.xml"},{"bucket":"cfdi","nombre":"a.pdf"}]');
+select is(marcar_archivos_eliminados(:'viejo', '[{"bucket":"cfdi","nombre":"a.pdf"}]'), 1,
+  'tras borrar uno, queda pendiente el otro');
+select is((select archivos_pendientes from tenants_eliminados where id = :'viejo'), '[{"bucket":"cfdi","nombre":"a.pdf"}]'::jsonb,
+  'la lista guardada es la de los que faltan');
+select throws_like(
+  format($$ select marcar_archivos_eliminados(%L, '[{"bucket":"descargas","nombre":"latest.json"}]') $$, :'viejo'),
+  'ARCHIVOS_INVALIDOS%', 'no se puede colar un objeto que no estaba en la lista');
+select is(marcar_archivos_eliminados(:'viejo', '[]'), 0, 'con todos borrados, la lista queda vacía');
+
+-- ── 2c) Nadie más abre la puerta del reporte Z (B1) ──────────────────────────────────────────
+-- Dentro de cualquier función SECURITY DEFINER el rol ya no está sujeto a RLS: ahí lo único que
+-- protege es la variable. Así que: solo eliminar_tenant la escribe, ninguna función que pueda
+-- llamar el navegador fija variables con nombre libre, y ninguna otra borra reportes Z.
+select is_empty($$
+  select p.proname from pg_proc p
+   where p.pronamespace = 'public'::regnamespace and p.prosrc ~* 'vim\.eliminando_tenant'
+     and p.proname not in ('eliminar_tenant', '_eliminando_tenant')
+$$, 'solo eliminar_tenant escribe vim.eliminando_tenant (y _eliminando_tenant la lee)');
+select is_empty($$
+  select p.proname from pg_proc p
+   where p.pronamespace = 'public'::regnamespace
+     and p.prosrc ~* 'set_config\s*\(\s*[^''[:space:]]'
+     and (has_function_privilege('authenticated', p.oid, 'execute') or has_function_privilege('anon', p.oid, 'execute'))
+$$, 'ninguna función al alcance del navegador llama a set_config con un nombre que no sea literal');
+select is_empty($$
+  select p.proname from pg_proc p
+   where p.pronamespace = 'public'::regnamespace
+     and (p.prosrc ~* 'delete\s+from\s+(public\.)?"?reportes_z_historico'
+          or (p.prosrc ~* 'delete\s+from\s+[^a-z_"]*%' and p.proname <> 'eliminar_tenant'
+              and (has_function_privilege('authenticated', p.oid, 'execute') or has_function_privilege('anon', p.oid, 'execute'))))
+$$, 'ninguna otra función borra reportes Z, ni hay un DELETE dinámico al alcance del navegador');
 
 -- ── SETUP: un turno cerrado con Z en el negocio del seed (como postgres) ─────────────────────
 create temp table ctx (ticket uuid, pago uuid);
@@ -173,7 +221,7 @@ update tenants set estado = 'CANCELADO', fecha_baja = now(), motivo_baja = 'Alta
 
 select lives_ok(
   format($$ select eliminar_tenant(%L, 'Alta de prueba que nunca operó', %L, 'ELIMINAR') $$, :'nuevo', :'op'),
-  'un negocio CANCELADO sin timbrados se elimina');
+  'un negocio CANCELADO que nunca tuvo sello se elimina sin esperar, recién dado de baja');
 select ok(not exists (select 1 from tenants where id = :'nuevo')
       and not exists (select 1 from auth.users where id = :'dueno2')
       and not exists (select 1 from usuarios_acceso where tenant_id = :'nuevo'),
@@ -183,6 +231,35 @@ select is((select contacto ->> 'email' from tenants_eliminados where id = :'nuev
 select lives_ok(
   $$ insert into tenants (codigo, nombre_comercial, vertical_principal) values ('prueba-0028', 'Prueba 0028 otra vez', 'QUICK_SERVICE') $$,
   'el código queda libre para volver a registrarse');
+
+-- ── 7) Un negocio que pudo facturar espera 15 minutos desde la baja (A1) ────────────────────
+insert into tenants (id, codigo, nombre_comercial, vertical_principal, estado, fecha_baja, motivo_baja)
+values (:'sello', 'sello-0028', 'Con Sello 0028', 'QUICK_SERVICE', 'CANCELADO', now() - interval '3 minutes', 'Dejó de pagar');
+insert into tenant_cfdi_emisor (tenant_id, rfc, facturama_issuer_ref, csd_numero_certificado, rfc_verificado)
+values (:'sello', 'AAA010101AAA', 'ref-0028', '00001000000500000000', 'AAA010101AAA');
+
+select throws_like(
+  format($$ select eliminar_tenant(%L, 'Dejó de pagar hace meses', %L, 'ELIMINAR') $$, :'sello', :'op'),
+  'ESPERA_TIMBRADOS%', 'con sello cargado y 3 minutos de baja: hay que esperar');
+select is((select eliminar_tenant_vista_previa(:'sello') -> 'bloqueos' -> 0 ->> 'codigo'), 'ESPERA_TIMBRADOS',
+  'la vista previa lo dice antes de intentarlo');
+select is((select (eliminar_tenant_vista_previa(:'sello') -> 'bloqueos' -> 0 ->> 'espera_min')::int), 12,
+  'y dice cuántos minutos faltan');
+select ok(exists (select 1 from tenants where id = :'sello'), 'el rechazo no borró nada');
+
+-- Sin fecha de baja no hay forma de saber cuánto lleva cancelado: también espera.
+update tenants set fecha_baja = null where id = :'sello';
+select throws_like(
+  format($$ select eliminar_tenant(%L, 'Dejó de pagar hace meses', %L, 'ELIMINAR') $$, :'sello', :'op'),
+  'ESPERA_TIMBRADOS%', 'con sello y sin fecha de baja: no se puede probar que pasó el tiempo');
+
+update tenants set fecha_baja = now() - interval '16 minutes' where id = :'sello';
+select lives_ok(
+  format($$ select eliminar_tenant(%L, 'Dejó de pagar hace meses', %L, 'ELIMINAR') $$, :'sello', :'op'),
+  'pasados 15 minutos de la baja, se elimina');
+select ok(not exists (select 1 from tenants where id = :'sello')
+      and not exists (select 1 from tenant_cfdi_emisor where tenant_id = :'sello'),
+  'y no queda ni el negocio ni su emisor');
 
 select * from finish();
 rollback;

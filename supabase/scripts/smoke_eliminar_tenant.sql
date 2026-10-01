@@ -24,6 +24,8 @@ DECLARE
   v_disp   uuid := '99999999-0000-0000-0000-0000000000d1';
   v_op     uuid := '00000000-0000-0000-0000-0000000000a1';
   v_vecino uuid := '99999999-0000-0000-0000-0000000000ee';
+  v_paco   uuid := '99999999-0000-0000-0000-0000000000a7';
+  v_globales jsonb;
   v_codigo text;
   v_prod uuid; v_opc uuid; v_turno uuid; v_auth uuid; v_plan uuid;
   v_t1 uuid; v_t2 uuid; v_t3 uuid; v_t4 uuid; v_item uuid; v_dev uuid; v_cfdi uuid;
@@ -48,6 +50,20 @@ BEGIN
   INSERT INTO turnos(tenant_id, sucursal_id, caja_id, codigo_turno, dia_contable, usuario_apertura_id, fondo_inicial_mxn, fondo_modo)
   VALUES (v_vecino, v_suc_b, v_caja_b, 'VECINO-1', '2026-09-30', v_maria, 0, 'TOTAL') RETURNING id INTO v_turno_b;
   v_tb := abrir_ticket(v_suc_b, v_caja_b, v_turno_b, 'PARA_LLEVAR'::modo_servicio, NULL, NULL, 'smk-elim-vecino', v_maria);
+
+  -- Paco (M1): hoy solo tiene acceso a Knock-Out, pero antes trabajó con el vecino y dejó ahí
+  -- filas que cuelgan de su cuenta con ON DELETE CASCADE: un permiso, una suscripción push y el
+  -- token de Uber del vecino. Si su cuenta se borrara, esas filas se irían en silencio.
+  INSERT INTO auth.users(id, instance_id, aud, role, email, encrypted_password, email_confirmed_at, raw_app_meta_data, raw_user_meta_data)
+  VALUES (v_paco, '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated', 'paco-smoke-elim@prueba.test', '',
+          now(), '{"provider":"email","providers":["email"]}', '{}');
+  INSERT INTO usuarios_perfil(id, nombre) VALUES (v_paco, 'Paco Smoke');
+  INSERT INTO usuarios_acceso(usuario_id, tenant_id, rol_id)
+  SELECT v_paco, v_tenant, id FROM roles WHERE tenant_id IS NULL AND codigo = 'ADMIN';
+  INSERT INTO permisos_personalizados(tenant_id, usuario_id, permiso_id) SELECT v_vecino, v_paco, id FROM permisos LIMIT 1;
+  INSERT INTO push_suscripciones(tenant_id, usuario_id, endpoint, p256dh, auth) VALUES (v_vecino, v_paco, 'https://push.invalid/smoke-elim', 'k', 'a');
+  INSERT INTO delivery_autorizaciones(tenant_id, app, entorno, access_token, vence_at, creado_por)
+  VALUES (v_vecino, 'APP_UBEREATS', 'sandbox', 'token-del-vecino', now() + interval '1 hour', v_paco);
 
   -- ── Datos del negocio que se va a eliminar ─────────────────────────────────────────────────
   PERFORM set_config('request.jwt.claims', json_build_object('sub', v_maria::text, 'tenant_id', v_tenant::text)::text, true);
@@ -193,6 +209,31 @@ BEGIN
     IF SQLERRM NOT LIKE 'TENANT_NO_CANCELADO%' THEN RAISE EXCEPTION 'ACTIVO debió rechazarse, salió: %', SQLERRM; END IF;
   END;
   UPDATE tenants SET estado = 'CANCELADO', fecha_baja = now(), motivo_baja = 'Dejó de pagar hace tres meses' WHERE id = v_tenant;
+
+  -- Recién dado de baja y con facturas (aunque sean borradores): puede haber un timbrado en vuelo.
+  v_previa := eliminar_tenant_vista_previa(v_tenant);
+  IF (v_previa->>'puede_eliminar')::boolean OR v_previa->'bloqueos'->0->>'codigo' <> 'ESPERA_TIMBRADOS'
+     OR (v_previa->'bloqueos'->0->>'espera_min')::int NOT BETWEEN 1 AND 15 THEN
+    RAISE EXCEPTION 'la vista previa no pidió esperar tras la baja: %', v_previa->'bloqueos';
+  END IF;
+  BEGIN
+    PERFORM eliminar_tenant(v_tenant, 'Prueba de eliminación completa', v_op, 'ELIMINAR');
+    RAISE EXCEPTION 'NO_RECHAZO';
+  EXCEPTION WHEN OTHERS THEN
+    IF SQLERRM NOT LIKE 'ESPERA_TIMBRADOS%' THEN RAISE EXCEPTION 'recién dado de baja debió pedir espera, salió: %', SQLERRM; END IF;
+  END;
+  -- Pasados los 15 minutos de la baja, sigue estorbando el borrador recién tocado.
+  UPDATE tenants SET fecha_baja = now() - interval '20 minutes' WHERE id = v_tenant;
+  BEGIN
+    PERFORM eliminar_tenant(v_tenant, 'Prueba de eliminación completa', v_op, 'ELIMINAR');
+    RAISE EXCEPTION 'NO_RECHAZO';
+  EXCEPTION WHEN OTHERS THEN
+    IF SQLERRM NOT LIKE 'ESPERA_TIMBRADOS%' THEN RAISE EXCEPTION 'un borrador reciente debió pedir espera, salió: %', SQLERRM; END IF;
+  END;
+  -- El borrador envejece (el trigger de updated_at lo volvería a sellar con la hora de ahora).
+  ALTER TABLE tickets_cfdi DISABLE TRIGGER trg_tickets_cfdi_updated_at;
+  UPDATE tickets_cfdi SET created_at = now() - interval '20 minutes', updated_at = now() - interval '20 minutes' WHERE tenant_id = v_tenant;
+  ALTER TABLE tickets_cfdi ENABLE TRIGGER trg_tickets_cfdi_updated_at;
   -- Sin la palabra, o con motivo corto.
   BEGIN
     PERFORM eliminar_tenant(v_tenant, 'Prueba de eliminación completa', v_op, 'eliminar');
@@ -239,12 +280,35 @@ BEGIN
   v_previa := eliminar_tenant_vista_previa(v_tenant);
   IF NOT (v_previa->>'puede_eliminar')::boolean THEN RAISE EXCEPTION 'debería poderse: %', v_previa->'bloqueos'; END IF;
   IF (v_previa->'resumen'->>'tickets')::int <> 4 OR (v_previa->'resumen'->>'cfdi')::int <> 1
-     OR (v_previa->'resumen'->>'pagos_suscripcion')::int <> 2 OR (v_previa->'resumen'->>'cuentas')::int <> 3
-     OR (v_previa->'resumen'->>'cuentas_conservadas')::int <> 1 THEN
+     OR (v_previa->'resumen'->>'pagos_suscripcion')::int <> 2 OR (v_previa->'resumen'->>'cuentas')::int <> 2
+     OR (v_previa->'resumen'->>'cuentas_conservadas')::int <> 3 THEN
     RAISE EXCEPTION 'vista previa inesperada: %', v_previa->'resumen';
   END IF;
 
   v_despues := _eliminar_tenant_inventario(v_vecino);
+
+  -- Filas GLOBALES (B3): las de tenant_id NULL en cada tabla (roles de sistema, avisos a todos…)
+  -- y las tablas sin tenant_id (planes, addons, permisos…). No se puede mover ni una. Fuera:
+  -- la bitácora de plataforma (gana filas a propósito), tenants y su archivo, usuarios_perfil
+  -- (se va con cada cuenta borrada) y las libretas internas del escritorio (_vim_*).
+  v_globales := '{}'::jsonb;
+  FOR v_tabla IN
+    SELECT c.relname AS t,
+           EXISTS (SELECT 1 FROM pg_attribute a WHERE a.attrelid = c.oid AND a.attname = 'tenant_id' AND NOT a.attisdropped) AS con_tenant
+      FROM pg_class c
+     WHERE c.relnamespace = 'public'::regnamespace AND c.relkind = 'r'
+       AND c.relname NOT IN ('super_admin_accesos', 'tenants', 'tenants_eliminados', 'usuarios_perfil')
+       AND left(c.relname, 5) <> '_vim_'
+  LOOP
+    EXECUTE format('SELECT count(*) FROM public.%I %s', v_tabla.t,
+      CASE WHEN v_tabla.con_tenant THEN 'WHERE tenant_id IS NULL'
+           WHEN v_tabla.t = 'rol_permisos' THEN 'rp WHERE EXISTS (SELECT 1 FROM public.roles ro WHERE ro.id = rp.rol_id AND ro.tenant_id IS NULL)'
+           ELSE '' END) INTO v_n;
+    v_globales := v_globales || jsonb_build_object(v_tabla.t, v_n);
+  END LOOP;
+  IF (v_globales->>'roles')::int = 0 OR (v_globales->>'planes')::int = 0 OR (v_globales->>'rol_permisos')::int = 0 THEN
+    RAISE EXCEPTION 'el conteo de filas globales no ve los catálogos: %', v_globales;
+  END IF;
   v_res := eliminar_tenant(v_tenant, '  Dejó de pagar y pidió borrar todo  ', v_op, 'ELIMINAR', '10.0.0.7'::inet);
   RAISE NOTICE '3) eliminado: %', v_res->'resumen';
   IF v_res->'tablas' <> v_antes THEN
@@ -280,6 +344,33 @@ BEGIN
     RAISE EXCEPTION 'se tocó al vecino: % vs %', _eliminar_tenant_inventario(v_vecino), v_despues;
   END IF;
   IF NOT EXISTS (SELECT 1 FROM tickets WHERE id = v_tb) THEN RAISE EXCEPTION 'se borró el ticket del vecino'; END IF;
+  -- M1: lo que Paco dejó en el vecino sigue ahí, y por eso su cuenta también.
+  IF NOT EXISTS (SELECT 1 FROM delivery_autorizaciones WHERE tenant_id = v_vecino AND creado_por = v_paco)
+     OR NOT EXISTS (SELECT 1 FROM permisos_personalizados WHERE tenant_id = v_vecino AND usuario_id = v_paco)
+     OR NOT EXISTS (SELECT 1 FROM push_suscripciones WHERE tenant_id = v_vecino AND usuario_id = v_paco) THEN
+    RAISE EXCEPTION 'borrar una cuenta arrastró filas del vecino (token de Uber, permisos o push)';
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM auth.users WHERE id = v_paco) THEN RAISE EXCEPTION 'se borró la cuenta de Paco, que tiene filas en el vecino'; END IF;
+  IF EXISTS (SELECT 1 FROM usuarios_acceso WHERE usuario_id = v_paco) THEN RAISE EXCEPTION 'Paco conservó un acceso que no debía'; END IF;
+
+  -- B3: las filas globales, intactas tabla por tabla.
+  FOR v_tabla IN
+    SELECT c.relname AS t,
+           EXISTS (SELECT 1 FROM pg_attribute a WHERE a.attrelid = c.oid AND a.attname = 'tenant_id' AND NOT a.attisdropped) AS con_tenant
+      FROM pg_class c
+     WHERE c.relnamespace = 'public'::regnamespace AND c.relkind = 'r'
+       AND c.relname NOT IN ('super_admin_accesos', 'tenants', 'tenants_eliminados', 'usuarios_perfil')
+       AND left(c.relname, 5) <> '_vim_'
+  LOOP
+    EXECUTE format('SELECT count(*) FROM public.%I %s', v_tabla.t,
+      CASE WHEN v_tabla.con_tenant THEN 'WHERE tenant_id IS NULL'
+           WHEN v_tabla.t = 'rol_permisos' THEN 'rp WHERE EXISTS (SELECT 1 FROM public.roles ro WHERE ro.id = rp.rol_id AND ro.tenant_id IS NULL)'
+           ELSE '' END) INTO v_n;
+    IF v_n IS DISTINCT FROM (v_globales->>v_tabla.t)::bigint THEN
+      RAISE EXCEPTION 'cambiaron las filas globales de %: % → %', v_tabla.t, v_globales->>v_tabla.t, v_n;
+    END IF;
+  END LOOP;
+  RAISE NOTICE '5) vecino y filas globales intactos (% tablas)', (SELECT count(*) FROM jsonb_object_keys(v_globales));
 
   -- ── 6) Cuentas ─────────────────────────────────────────────────────────────────────────────
   IF NOT EXISTS (SELECT 1 FROM auth.users WHERE id = v_maria) THEN RAISE EXCEPTION 'se borró la cuenta compartida (María)'; END IF;
@@ -290,11 +381,12 @@ BEGIN
   IF EXISTS (SELECT 1 FROM usuarios_perfil WHERE id IN (v_dueno, v_disp)) THEN RAISE EXCEPTION 'quedaron perfiles de cuentas borradas'; END IF;
   -- Diego era exclusivo pero firma un cliente del vecino: se conserva y se reporta.
   IF NOT EXISTS (SELECT 1 FROM auth.users WHERE id = v_diego) THEN RAISE EXCEPTION 'se borró una cuenta referenciada por otro negocio'; END IF;
-  IF v_res->'cuentas_conservadas'->0->>'usuario_id' <> v_diego::text
-     OR v_res->'cuentas_conservadas'->0->>'motivo' <> 'REFERENCIADA_POR_OTRO_NEGOCIO' THEN
-    RAISE EXCEPTION 'no se reportó la cuenta conservada: %', v_res->'cuentas_conservadas';
+  IF NOT v_res->'cuentas_conservadas' @> jsonb_build_array(jsonb_build_object('usuario_id', v_diego, 'motivo', 'REFERENCIADA_POR_OTRO_NEGOCIO'))
+     OR NOT v_res->'cuentas_conservadas' @> jsonb_build_array(jsonb_build_object('usuario_id', v_paco, 'motivo', 'REFERENCIADA_POR_OTRO_NEGOCIO'))
+     OR NOT v_res->'cuentas_conservadas' @> jsonb_build_array(jsonb_build_object('usuario_id', v_maria, 'motivo', 'ACCESO_A_OTRO_NEGOCIO')) THEN
+    RAISE EXCEPTION 'no se reportaron las cuentas conservadas con su motivo: %', v_res->'cuentas_conservadas';
   END IF;
-  IF (v_res->'resumen'->>'cuentas')::int <> 2 OR (v_res->'resumen'->>'cuentas_conservadas')::int <> 2 THEN
+  IF (v_res->'resumen'->>'cuentas')::int <> 2 OR (v_res->'resumen'->>'cuentas_conservadas')::int <> 3 THEN
     RAISE EXCEPTION 'conteo de cuentas inesperado: %', v_res->'resumen';
   END IF;
   RAISE NOTICE '6) cuentas OK';
@@ -311,6 +403,7 @@ BEGIN
     RAISE EXCEPTION 'los pagos de la suscripción no se archivaron bien: %', v_arch.pagos_suscripcion;
   END IF;
   IF jsonb_array_length(v_arch.suscripciones) < 1 THEN RAISE EXCEPTION 'no se archivó la suscripción'; END IF;
+  IF v_arch.archivos_pendientes <> '[]'::jsonb THEN RAISE EXCEPTION 'sin archivos en Storage no debe quedar nada pendiente: %', v_arch.archivos_pendientes; END IF;
   IF v_arch.contacto->>'email' IS NULL THEN RAISE EXCEPTION 'no se archivó el contacto del dueño: %', v_arch.contacto; END IF;
   IF (v_arch.conteos->'resumen'->>'tickets')::int <> 4 OR v_arch.conteos->'tablas' <> v_antes THEN
     RAISE EXCEPTION 'conteos archivados inesperados: %', v_arch.conteos->'resumen';
