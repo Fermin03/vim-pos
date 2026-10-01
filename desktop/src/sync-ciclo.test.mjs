@@ -7,7 +7,7 @@
 // lo que queremos.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { crearCicloSync } from "./sync-ciclo.mjs";
+import { crearCicloSync, OMITIDO } from "./sync-ciclo.mjs";
 
 /** Temporizadores inertes: el ciclo corre su primer tick y no se re-arma solo. */
 const sinTimers = { setTimeoutFn: () => ({ unref() {} }), clearTimeoutFn: () => {} };
@@ -62,4 +62,19 @@ test("sin gancho de latido el ciclo sigue funcionando igual", async () => {
   await asentar();
   ciclo.detener();
   assert.equal(pushes, 1);
+});
+
+test("un ciclo OMITIDO (la base está detenida por el respaldo) no cuenta como fallo ni dispara el backoff", async () => {
+  const esperas = [];
+  const ciclo = crearCicloSync({
+    ejecutar: async () => OMITIDO,
+    setTimeoutFn: (_fn, ms) => { esperas.push(ms); return { unref() {} }; },
+    clearTimeoutFn: () => {},
+    cadaMs: 600_000, reintentoMs: 60_000,
+  });
+  ciclo.iniciar();
+  await asentar();
+  assert.equal(ciclo.estado().fallos, 0);
+  assert.equal(ciclo.estado().ciclos, 0, "tampoco consume el turno del PULL");
+  assert.deepEqual(esperas, [60_000], "vuelve a intentar pronto, sin esperar el ciclo entero");
 });

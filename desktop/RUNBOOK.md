@@ -136,7 +136,19 @@ con `contexto.origen = "respaldo-diario"`. Y una caja que lleva **3 días o más
 (típico: un negocio que nunca cierra el turno) lo reporta una vez al día, diciendo por qué. Tras un
 fallo no se reintenta antes de una hora: cada intento detiene Postgres.
 
-Los respaldos van a `<dataRoot>/backups/pgdata-<fecha>_<hora>/`, rotando los **últimos 7**.
+**Quieta también es "nadie en el teclado".** Además del gateway se pide que el sistema lleve 10
+minutos sin teclado ni mouse (`powerMonitor.getSystemIdleTime()`): un cajero contando el fondo no
+escribe nada en la base. Y si aun así alguien toca la caja en los segundos que dura la copia, el
+puerto no queda cerrado: un gateway de espera contesta **503 "La caja está haciendo su respaldo
+diario; intenta en unos segundos."**, que es lo que el POS enseña en vez de un fallo de red.
+
+**Antes de detener la base se comprueba que el respaldo quepa** (tamaño del pgdata + holgura contra
+el espacio libre). Si no cabe se purgan respaldos del más viejo al más nuevo, dejando siempre al
+menos uno bueno; si ni así, **la base no se detiene** y se reporta (`causa: "sin-espacio"`). Cada
+causa de fallo se reporta una vez cada 24 h. La copia con la caja encendida es asíncrona (no congela
+la bandeja ni el servidor del POS); salir de la app espera al respaldo en curso.
+
+Los respaldos van a `<dataRoot>/backups/pgdata-<fecha>_<hora>/`, rotando los **últimos 7**. Una copia a medias (`.parcial`) no cuenta como respaldo y se borra al empezar el siguiente.
 
 **Qué protege y qué no.** Esto es una copia **en la misma computadora**: salva de una base dañada o
 de un error humano, no de que se robe o se queme el equipo. Fuera del local están **las ventas**,

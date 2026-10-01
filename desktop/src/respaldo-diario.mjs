@@ -9,7 +9,8 @@
 // (es una copia en frío, el bin embebido no trae pg_dump), así que solo se intenta cuando la caja
 // está QUIETA:
 //   · no hay ningún turno abierto, y
-//   · nadie ha operado la caja en los últimos 10 minutos, y
+//   · nadie ha operado la caja en los últimos 10 minutos (una escritura por el gateway), y
+//   · nadie ha tocado el teclado ni el mouse de esa computadora en 10 minutos, y
 //   · no hay otra cosa en curso (una sincronización, una actualización, otro respaldo).
 // Se revisa cada 15 minutos. Si el día se va sin una ventana quieta, se respalda en la primera que
 // aparezca: no se "salta" el día, se corre. Y si pasan días sin poder —un negocio que nunca cierra
@@ -47,6 +48,17 @@ const ms = (iso) => {
 };
 
 /**
+ * Como `ms`, pero una fecha "en el futuro" no vale. Si la computadora tuvo el reloj adelantado
+ * —pila agotada, alguien puso 2027— y luego se corrigió, el "último respaldo" queda por delante de
+ * hoy y `ahora - ultimoOk` sería negativo para siempre: la caja no volvería a respaldar nunca.
+ * Una hora de tolerancia absorbe el ruido normal de un reloj que se sincroniza.
+ */
+const msPasado = (iso, ahora) => {
+  const t = ms(iso);
+  return t !== null && t > ahora + HORA ? null : t;
+};
+
+/**
  * ¿Toca respaldar AHORA? Pura.
  *
  * @param {object} c
@@ -56,17 +68,24 @@ const ms = (iso) => {
  * @param {string|null} c.ultimoFallo ISO del último intento fallido
  * @param {boolean|null} c.turnoAbierto  null = no se pudo saber (la base no contestó)
  * @param {number|null} c.ultimaActividad epoch ms de la última operación en el gateway
+ * @param {number|null} c.inactividadSistemaSeg segundos desde la última tecla o movimiento del mouse
+ *                                    en la computadora de la caja (`powerMonitor.getSystemIdleTime()`);
+ *                                    null = el sistema no lo sabe decir
  * @param {boolean} c.ocupado         hay una sincronización, actualización u otro respaldo en curso
  * @returns {{ respaldar: boolean, motivo: string }}
  */
-export function debeRespaldar({ ahora, ultimoOk = null, ultimoFallo = null, turnoAbierto, ultimaActividad = null, ocupado = false }) {
-  const ok = ms(ultimoOk);
+export function debeRespaldar({ ahora, ultimoOk = null, ultimoFallo = null, turnoAbierto, ultimaActividad = null, inactividadSistemaSeg = null, ocupado = false }) {
+  const ok = msPasado(ultimoOk, ahora);
   if (ok !== null && ahora - ok < HORAS_ENTRE_RESPALDOS * HORA) return { respaldar: false, motivo: "al-dia" };
   // De aquí en adelante SÍ toca; lo que sigue decide si se puede.
   if (ocupado) return { respaldar: false, motivo: "ocupado" };
   // Sin saber si hay turno abierto no se arriesga: la duda se resuelve a favor del cajero.
   if (turnoAbierto !== false) return { respaldar: false, motivo: turnoAbierto === true ? "turno-abierto" : "sin-dato-de-turno" };
   if (ultimaActividad !== null && ahora - ultimaActividad < MIN_SIN_ACTIVIDAD * MIN) return { respaldar: false, motivo: "actividad-reciente" };
+  // El gateway solo ve ESCRITURAS. Un cajero puede pasar once minutos contando el fondo sin
+  // escribir nada y pulsar «Abrir turno» justo cuando la base está detenida. El teclado y el mouse
+  // sí lo delatan.
+  if (inactividadSistemaSeg !== null && inactividadSistemaSeg < MIN_SIN_ACTIVIDAD * 60) return { respaldar: false, motivo: "equipo-en-uso" };
   const fallo = ms(ultimoFallo);
   if (fallo !== null && (ok === null || fallo > ok) && ahora - fallo < MIN_ENTRE_REINTENTOS * MIN) return { respaldar: false, motivo: "reintento-pendiente" };
   return { respaldar: true, motivo: "toca" };
@@ -79,7 +98,7 @@ export function debeRespaldar({ ahora, ultimoOk = null, ultimoFallo = null, turn
  * módulo corrió ahí), para no reportar "sin respaldo" a la hora de instalarla.
  */
 export function diasSinRespaldo({ ahora, ultimoOk = null, desde = null, ultimoAviso = null }) {
-  const ref = ms(ultimoOk) ?? ms(desde);
+  const ref = msPasado(ultimoOk, ahora) ?? ms(desde);
   if (ref === null) return null;
   const dias = Math.floor((ahora - ref) / DIA);
   if (dias < DIAS_PARA_AVISAR) return null;
@@ -163,6 +182,8 @@ export function leerEstado(backupsDir) {
     ultimoFallo: e.ultimoFallo ?? null,
     ultimoError: e.ultimoError ?? null,
     ultimoAviso: e.ultimoAviso ?? null,
+    // Cuándo se reportó por última vez cada causa de fallo ({ ENOSPC: iso, … }).
+    avisos: e.avisos && typeof e.avisos === "object" && !Array.isArray(e.avisos) ? e.avisos : {},
   };
 }
 
@@ -176,6 +197,15 @@ export function guardarEstado(backupsDir, cambios) {
   } catch {
     return null;
   }
+}
+
+/**
+ * La CAUSA de un fallo, para no reportar lo mismo en cada reintento: el código del sistema
+ * (`ENOSPC`, `EPERM`, `EBUSY`) si el mensaje empieza por uno, o la que diga quien falló.
+ */
+export function causaDe(resultado) {
+  if (resultado?.causa) return String(resultado.causa);
+  return /^([A-Z][A-Z0-9_]{2,})\b/.exec(String(resultado?.error ?? ""))?.[1] ?? "otro";
 }
 
 // ── El temporizador ──────────────────────────────────────────────────────────────────────────
@@ -199,6 +229,14 @@ export function crearRespaldoDiario({
 }) {
   let timer = null;
   let enCurso = false;
+  // Cuándo se reportó cada cosa, TAMBIÉN en memoria. El estado en disco manda entre reinicios, pero
+  // si el disco está lleno —justo cuando hay algo que reportar— no se puede escribir, y sin esta
+  // copia el mismo aviso saldría en cada revisión, cada 15 minutos.
+  const avisosMem = new Map();
+  const ultimoAvisoDe = (clave, enDisco) => {
+    const a = ms(enDisco), b = avisosMem.get(clave) ?? null;
+    return a === null ? b : b === null ? a : Math.max(a, b);
+  };
 
   /** Una revisión. Devuelve qué decidió (para las pruebas y para el log). */
   async function revisar() {
@@ -222,16 +260,30 @@ export function crearRespaldoDiario({
           log("respaldo diario hecho");
         } else {
           const error = r?.error ?? "motivo desconocido";
+          const causa = causaDe(r);
           log(`respaldo diario FALLÓ: ${error}`);
-          try { await reportar(`Respaldo diario de la caja falló: ${error}`, { origen: "respaldo-diario", tipo: "fallo" }); } catch { /* */ }
+          // Una vez cada 24 h por causa: el reintento es cada hora y el disco lleno no se arregla
+          // solo; quince reportes iguales al día entierran el que importa.
+          const clave = `fallo:${causa}`;
+          const previo = ultimoAvisoDe(clave, leer().avisos?.[causa]);
+          if (previo === null || t - previo >= DIA) {
+            avisosMem.set(clave, t);
+            guardar({ avisos: { ...(leer().avisos ?? {}), [causa]: new Date(t).toISOString() } });
+            try { await reportar(`Respaldo diario de la caja falló: ${error}`, { origen: "respaldo-diario", tipo: "fallo", causa }); } catch { /* */ }
+          }
         }
         estado = leer();
       }
 
       // Atraso: se mira SIEMPRE, también cuando no se pudo respaldar por turno abierto. Es el caso
       // que importa — el negocio que nunca cierra turno y por eso nunca respalda.
-      const dias = diasSinRespaldo({ ahora: ahora(), ultimoOk: estado.ultimoOk, desde: estado.desde, ultimoAviso: estado.ultimoAviso });
+      const avisoAtraso = ultimoAvisoDe("atraso", estado.ultimoAviso);
+      const dias = diasSinRespaldo({
+        ahora: ahora(), ultimoOk: estado.ultimoOk, desde: estado.desde,
+        ultimoAviso: avisoAtraso === null ? null : new Date(avisoAtraso).toISOString(),
+      });
       if (dias !== null) {
+        avisosMem.set("atraso", ahora());
         const porque = d.motivo === "turno-abierto" ? " (hay un turno abierto desde entonces)" : "";
         log(`la caja lleva ${dias} días sin respaldo local${porque}`);
         try {

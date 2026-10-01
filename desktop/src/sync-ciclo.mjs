@@ -21,6 +21,13 @@ export function esperaSiguiente(fallosSeguidos, { cadaMs = SYNC_CADA_MS, reinten
   return Math.min(cadaMs, reintentoMs * 2 ** (fallosSeguidos - 1));
 }
 
+/**
+ * Lo que devuelve `ejecutar` cuando el ciclo NO SE PUDO NI INTENTAR por algo propio y pasajero: la
+ * base local está detenida (el respaldo diario la apaga unos segundos). No es un fallo de la nube:
+ * no cuenta para el backoff ni consume el turno del PULL. Se vuelve a intentar pronto.
+ */
+export const OMITIDO = "omitido";
+
 /** ¿A este ciclo le toca bajar el catálogo, o solo subir ventas? */
 export function tocaPull(nCiclo, cada = SYNC_PULL_CADA) {
   return nCiclo % cada === 0;
@@ -78,14 +85,18 @@ export function crearCicloSync({
       log(`latido omitido: ${e?.message ?? e}`);
     }
     let ok = false;
+    let omitido = false;
     try {
-      ok = (await ejecutar({ conPull: tocaPull(ciclos, pullCada) })) === true;
-      ciclos++;
+      const r = await ejecutar({ conPull: tocaPull(ciclos, pullCada) });
+      omitido = r === OMITIDO;
+      ok = r === true;
+      if (!omitido) ciclos++;
     } catch (e) {
       log(`ciclo falló: ${e?.message ?? e}`);
     } finally {
       enCurso = false;
     }
+    if (omitido) { programar(reintentoMs); return; }
     ultimoIntentoIso = new Date().toISOString();
     if (ok) ultimoOkIso = ultimoIntentoIso;
     fallos = ok ? 0 : fallos + 1;

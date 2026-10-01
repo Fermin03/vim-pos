@@ -144,11 +144,11 @@ function conCarpeta(fn) {
 
 test("guardarEstado mezcla y leerEstado devuelve lo guardado", () => conCarpeta((dir) => {
   const bd = path.join(dir, "backups"); // todavía no existe: guardar la crea
-  assert.deepEqual(leerEstado(bd), { desde: null, ultimoOk: null, ultimoFallo: null, ultimoError: null, ultimoAviso: null });
+  assert.deepEqual(leerEstado(bd), { desde: null, ultimoOk: null, ultimoFallo: null, ultimoError: null, ultimoAviso: null, avisos: {} });
   guardarEstado(bd, { desde: "2026-09-01T00:00:00.000Z" });
   guardarEstado(bd, { ultimoOk: "2026-09-30T09:12:00.000Z" });
   assert.deepEqual(JSON.parse(readFileSync(path.join(bd, ARCHIVO_ESTADO), "utf8")), {
-    desde: "2026-09-01T00:00:00.000Z", ultimoOk: "2026-09-30T09:12:00.000Z", ultimoFallo: null, ultimoError: null, ultimoAviso: null,
+    desde: "2026-09-01T00:00:00.000Z", ultimoOk: "2026-09-30T09:12:00.000Z", ultimoFallo: null, ultimoError: null, ultimoAviso: null, avisos: {},
   });
 }));
 
@@ -252,4 +252,76 @@ test("la primera revisión en una caja anota desde cuándo se cuenta", async () 
   const { r, mem } = armar({ ctx: { ...quieta, turnoAbierto: true }, estado: { desde: null } });
   await r.revisar();
   assert.equal(mem.desde, iso(AHORA));
+});
+
+// ── Revisión del 1 oct 2026 ──────────────────────────────────────────────────────────────────
+
+test("alguien usó el teclado o el mouse hace menos de 10 minutos: espera, aunque no haya escrito nada", () => {
+  // El cajero cuenta el fondo 11 minutos sin tocar el gateway y luego pulsa «Abrir turno».
+  const base = { ahora: AHORA, ultimoOk: null, ...quieta };
+  assert.deepEqual(debeRespaldar({ ...base, inactividadSistemaSeg: 599 }), { respaldar: false, motivo: "equipo-en-uso" });
+  assert.equal(debeRespaldar({ ...base, inactividadSistemaSeg: 600 }).respaldar, true);
+  // Si el sistema no sabe decirlo (null), manda la actividad del gateway como antes.
+  assert.equal(debeRespaldar({ ...base, inactividadSistemaSeg: null }).respaldar, true);
+});
+
+test("un último respaldo «en el futuro» (se corrigió el reloj) no bloquea los respaldos para siempre", () => {
+  assert.equal(debeRespaldar({ ahora: AHORA, ultimoOk: iso(AHORA + 30 * DIA), ...quieta }).respaldar, true);
+  // Un desfase chico (menos de una hora) sí se respeta: es ruido de reloj, no un error.
+  assert.equal(debeRespaldar({ ahora: AHORA, ultimoOk: iso(AHORA + 30 * MIN), ...quieta }).motivo, "al-dia");
+  // Y el atraso se cuenta desde la instalación, no desde esa fecha imposible.
+  assert.equal(diasSinRespaldo({ ahora: AHORA, ultimoOk: iso(AHORA + 30 * DIA), desde: iso(AHORA - 5 * DIA) }), 5);
+});
+
+/** Un respaldo que siempre falla con `error()`, con reloj que se puede mover. */
+function queFalla(error, estado = {}) {
+  const reloj = { t: AHORA };
+  const mem = { desde: iso(AHORA - DIA), ultimoOk: iso(AHORA - 2 * DIA), ultimoFallo: null, ultimoError: null, ultimoAviso: null, ...estado };
+  const reportes = [];
+  const r = crearRespaldoDiario({
+    contexto: async () => quieta,
+    respaldar: async () => { mem.ultimoFallo = iso(reloj.t); return { ok: false, error: error() }; },
+    leerEstado: () => ({ ...mem }), guardarEstado: (c) => Object.assign(mem, c),
+    reportar: async (mensaje, contexto) => { reportes.push({ mensaje, contexto }); }, ahora: () => reloj.t,
+  });
+  return { r, reloj, reportes, mem };
+}
+
+test("el mismo fallo se reporta una vez cada 24 horas, no en cada reintento", async () => {
+  const { r, reloj, reportes } = queFalla(() => "ENOSPC: no space left on device, copyfile 'a' -> 'b'");
+  await r.revisar();
+  reloj.t += 61 * MIN; await r.revisar(); // reintenta y vuelve a fallar: sin reporte nuevo
+  reloj.t += 61 * MIN; await r.revisar();
+  assert.equal(reportes.filter((x) => x.contexto.tipo === "fallo").length, 1);
+  reloj.t += 24 * HORA; await r.revisar(); // al día siguiente, sí
+  assert.equal(reportes.filter((x) => x.contexto.tipo === "fallo").length, 2);
+});
+
+test("una causa distinta sí se reporta aunque la otra esté en silencio", async () => {
+  let error = "ENOSPC: lleno";
+  const { r, reloj, reportes } = queFalla(() => error);
+  await r.revisar();
+  reloj.t += 61 * MIN; error = "EPERM: operation not permitted"; await r.revisar();
+  assert.deepEqual(reportes.map((x) => x.contexto.causa), ["ENOSPC", "EPERM"]);
+});
+
+test("si no se puede guardar el estado (disco lleno), los avisos NO salen cada 15 minutos", async () => {
+  let t = AHORA;
+  const mem = { desde: iso(AHORA - 9 * DIA), ultimoOk: iso(AHORA - 5 * DIA), ultimoFallo: null, ultimoError: null, ultimoAviso: null };
+  const reportes = [];
+  const r = crearRespaldoDiario({
+    contexto: async () => ({ ...quieta, turnoAbierto: true }),
+    respaldar: async () => ({ ok: true }),
+    leerEstado: () => ({ ...mem }),
+    guardarEstado: () => { /* el disco no deja escribir: nada se guarda */ },
+    reportar: async (m) => { reportes.push(m); }, ahora: () => t,
+  });
+  for (let i = 0; i < 5; i++) { await r.revisar(); t += 15 * MIN; }
+  assert.equal(reportes.length, 1);
+});
+
+test("sin espacio para la copia: se reporta como su propia causa", async () => {
+  const { r, llamadas } = armar({ estado: { ultimoOk: iso(AHORA - 2 * DIA) }, resultado: { ok: false, causa: "sin-espacio", error: "no hay espacio en el disco para el respaldo" } });
+  await r.revisar();
+  assert.equal(llamadas.reportes[0].contexto.causa, "sin-espacio");
 });

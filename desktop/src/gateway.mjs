@@ -79,6 +79,33 @@ const leerJson = async (req) => {
 // sockets y memoria del hub.
 export const TOPE_CLIENTES_KDS = 32;
 
+/** Lo que lee el cajero si toca la caja justo durante el respaldo. */
+export const MENSAJE_RESPALDO = "La caja está haciendo su respaldo diario; intenta en unos segundos.";
+
+/**
+ * El gateway "de espera": ocupa el puerto MIENTRAS el backend está detenido por el respaldo.
+ *
+ * Sin él, el puerto queda cerrado y el POS recibe un fallo de red pelado («Failed to fetch»), que
+ * el cajero lee como "se cayó el sistema". Con él, toda petición recibe un 503 con un mensaje que
+ * se entiende y que dice qué hacer. Va en `message` —lo que supabase-js enseña de un error de
+ * PostgREST— y en `error` / `error_description` —lo que leen el login y las funciones—. Lleva
+ * las mismas cabeceras CORS que el gateway de verdad: sin ellas el navegador bloquea la lectura y
+ * el POS vuelve a ver solo un fallo de red.
+ */
+export function crearGatewayDeEspera({ uiPorts = [54360, 54361], mensaje = MENSAJE_RESPALDO } = {}) {
+  return http.createServer((req, res) => {
+    const cors = corsPara(req, uiPorts);
+    req.resume(); // el cuerpo no interesa
+    if (!hostPermitido(req.headers.host)) {
+      res.writeHead(403, { "Content-Type": "application/json", ...cors });
+      return res.end(JSON.stringify({ error: "HOST_NO_PERMITIDO" }));
+    }
+    if (req.method === "OPTIONS") { res.writeHead(204, cors); return res.end(""); }
+    res.writeHead(503, { "Content-Type": "application/json", "Retry-After": "5", ...cors });
+    res.end(JSON.stringify({ error: "RESPALDO_EN_CURSO", code: "RESPALDO_EN_CURSO", message: mensaje, error_description: mensaje, ok: false }));
+  });
+}
+
 const bearer = (req) => (req.headers["authorization"] ?? "").replace(/^Bearer\s+/i, "");
 
 /**
