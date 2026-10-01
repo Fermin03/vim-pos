@@ -17,9 +17,10 @@
 //     npm run release-manifest -- "Notas"
 import crypto from "node:crypto";
 import { readFileSync, writeFileSync, existsSync } from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { mensajeAFirmar } from "../src/updater.mjs";
+import { LLAVE_PUBLICA_ACTUALIZACIONES, firmaValida, mensajeAFirmar } from "../src/updater.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const pkg = JSON.parse(readFileSync(path.join(root, "package.json"), "utf8"));
@@ -35,9 +36,12 @@ if (!existsSync(exe)) {
 const sha512 = crypto.createHash("sha512").update(readFileSync(exe)).digest("hex");
 const BASE = (process.env.VIM_UPDATE_BASE || "https://pbiaxzvmssjsxdwqrumb.supabase.co/storage/v1/object/public/actualizaciones").replace(/\/$/, "");
 const fileName = path.basename(exe);
+// El .exe se publica en el repo público de descargas (el del código es privado desde el 1 oct
+// 2026 y sus releases dan 404). GitHub sirve los espacios del nombre como puntos.
+const URL_DESCARGAS = `https://github.com/Fermin03/vim-pos-descargas/releases/download/v${version}/${fileName.replace(/ /g, ".")}`;
 const manifest = {
   version,
-  url: process.env.VIM_UPDATE_URL || `${BASE}/${encodeURIComponent(fileName)}`,
+  url: process.env.VIM_UPDATE_URL || (process.env.VIM_UPDATE_BASE ? `${BASE}/${encodeURIComponent(fileName)}` : URL_DESCARGAS),
   sha512,
   notas: process.argv.slice(2).join(" "),
   fecha: new Date().toISOString().slice(0, 10),
@@ -52,18 +56,26 @@ if (!manifest.url.startsWith("https://")) {
 // Firma Ed25519 del manifiesto (RUNBOOK.md, "Firmar latest.json"). Con VIM_UPDATE_LLAVE_PRIVADA
 // apuntando a la llave privada (PEM), se añade `firma`. Sin ella el manifiesto sale sin firmar, que
 // es lo que aceptan las cajas mientras LLAVE_PUBLICA_ACTUALIZACIONES siga en null.
-if (process.env.VIM_UPDATE_LLAVE_PRIVADA) {
-  const llave = crypto.createPrivateKey(readFileSync(process.env.VIM_UPDATE_LLAVE_PRIVADA));
-  manifest.firma = crypto.sign(null, Buffer.from(mensajeAFirmar(manifest), "utf8"), llave).toString("base64");
-  console.log("· manifiesto firmado (Ed25519)");
-} else {
-  console.log("· manifiesto SIN firmar (no hay VIM_UPDATE_LLAVE_PRIVADA)");
+// Desde la 0.4.103 las cajas RECHAZAN un manifiesto sin firma válida, así que aquí no se genera
+// uno sin firmar: si falta la llave, se aborta. La llave privada vive fuera del repo.
+const rutaLlave = process.env.VIM_UPDATE_LLAVE_PRIVADA || path.join(os.homedir(), ".vim-pos-llaves", "vim-actualizaciones.key");
+if (!existsSync(rutaLlave)) {
+  console.error(`No encuentro la llave privada de actualizaciones en ${rutaLlave}.
+Sin ella no se puede publicar: las cajas rechazan un manifiesto sin firma. Ver RUNBOOK.md, "Firmar latest.json".`);
+  process.exit(1);
 }
+const llave = crypto.createPrivateKey(readFileSync(rutaLlave));
+manifest.firma = crypto.sign(null, Buffer.from(mensajeAFirmar(manifest), "utf8"), llave).toString("base64");
+if (!firmaValida(manifest, LLAVE_PUBLICA_ACTUALIZACIONES)) {
+  console.error("La firma generada NO valida contra la llave pública que llevan las cajas: la llave privada no es la pareja. No se publica.");
+  process.exit(1);
+}
+console.log("· manifiesto firmado (Ed25519) y verificado contra la llave pública de las cajas");
 
 const out = path.join(root, "dist", "latest.json");
 writeFileSync(out, JSON.stringify(manifest, null, 2));
 console.log(`✅ ${out}\n`);
 console.log(JSON.stringify(manifest, null, 2));
 console.log(`\nPublicar:`);
-console.log(`  • ${fileName} → GitHub Releases (pesa más de los 50 MB que acepta Supabase Free)`);
+console.log(`  • ${fileName} → gh release create v${version} "dist/${fileName.replace(/ /g, ".")}" --repo Fermin03/vim-pos-descargas`);
 console.log(`  • latest.json → bucket público 'actualizaciones' de Supabase Storage (URL fija)`);

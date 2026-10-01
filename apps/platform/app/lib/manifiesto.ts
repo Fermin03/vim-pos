@@ -16,12 +16,34 @@
  * verificarla. Función PURA, para probarla sin red ni base.
  */
 
+import { createPublicKey, verify } from "node:crypto";
+import { LLAVE_PUBLICA_ACTUALIZACIONES } from "./llave-actualizaciones";
+
+/** El mismo mensaje que firma `desktop/scripts/release-manifest.mjs` (ver `mensajeAFirmar`). */
+export function mensajeAFirmar(m: { version: string; url: string; sha512: string }): string {
+  return `vim-pos-actualizacion
+version=${m.version}
+url=${m.url}
+sha512=${m.sha512.toLowerCase()}
+`;
+}
+
+function firmaValida(m: { version: string; url: string; sha512: string }, firmaB64: string, llavePem: string): boolean {
+  try {
+    return verify(null, Buffer.from(mensajeAFirmar(m), "utf8"), createPublicKey(llavePem), Buffer.from(firmaB64, "base64"));
+  } catch {
+    return false;
+  }
+}
+
 export type Manifiesto = {
   version: string;
   url: string;
   sha512: string;
   notas: string;
   fecha: string | null;
+  /** Firma Ed25519 (base64) de version+url+sha512. Las cajas ≥ 0.4.103 no instalan sin ella. */
+  firma: string;
 };
 
 export type ResultadoManifiesto =
@@ -32,7 +54,11 @@ const SEMVER = /^\d+\.\d+\.\d+$/;
 const SHA512 = /^[0-9a-f]{128}$/i;
 const FECHA = /^\d{4}-\d{2}-\d{2}$/;
 
-export function validarManifiesto(texto: string, prefijoPermitido: string): ResultadoManifiesto {
+export function validarManifiesto(
+  texto: string,
+  prefijoPermitido: string,
+  llavePublicaPem: string = LLAVE_PUBLICA_ACTUALIZACIONES,
+): ResultadoManifiesto {
   let j: unknown;
   try {
     j = JSON.parse(texto);
@@ -79,6 +105,17 @@ export function validarManifiesto(texto: string, prefijoPermitido: string): Resu
     return { ok: false, error: "La fecha debe tener el formato 2026-09-06." };
   }
 
+  // La firma: sin ella las cajas rechazan la actualización, y publicar un manifiesto sin firmar
+  // dejaría a TODAS sin poder actualizarse sin que nada lo delate. Se verifica aquí con la misma
+  // llave pública que llevan las cajas y sobre el mismo mensaje (`mensajeAFirmar` en updater.mjs).
+  const firma = typeof o.firma === "string" ? o.firma.trim() : "";
+  if (!firma) {
+    return { ok: false, error: "El manifiesto no trae firma. Genéralo con `npm run release-manifest` en la máquina que tiene la llave." };
+  }
+  if (!firmaValida({ version, url, sha512 }, firma, llavePublicaPem)) {
+    return { ok: false, error: "La firma no es válida para esta versión, url y sha512: el manifiesto se alteró después de firmarlo, o se firmó con otra llave." };
+  }
+
   return {
     ok: true,
     manifiesto: {
@@ -87,6 +124,7 @@ export function validarManifiesto(texto: string, prefijoPermitido: string): Resu
       sha512: sha512.toLowerCase(),
       notas: typeof o.notas === "string" ? o.notas : "",
       fecha,
+      firma,
     },
   };
 }

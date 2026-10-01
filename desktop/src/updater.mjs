@@ -1,4 +1,4 @@
-// Fase 3 · Actualizador in-app (Opción B — sin firma). La app revisa un manifiesto JSON en un
+// Fase 3 · Actualizador in-app (Opción B — sin certificado; el manifiesto SÍ va firmado). La app revisa un manifiesto JSON en un
 // hosting (bucket público de Supabase Storage por defecto), compara versiones y, si hay una nueva,
 // avisa y ofrece descargar el instalador verificando su SHA-512 (integridad garantizada aunque no
 // haya certificado de firma). El main lo instala cerrando la app y lanzando el instalador NSIS.
@@ -30,8 +30,16 @@ export function esMasNueva(remota, actual) {
 // Y queda preparada la firma Ed25519 del manifiesto (ver RUNBOOK.md, "Firmar latest.json"): en
 // cuanto LLAVE_PUBLICA_ACTUALIZACIONES tenga una llave, un manifiesto sin firma válida se rechaza.
 
-/** Llave pública Ed25519 (PEM, SPKI) con la que VIM firma latest.json. null = firma desactivada. */
-export const LLAVE_PUBLICA_ACTUALIZACIONES = null;
+/**
+ * Llave pública Ed25519 (PEM, SPKI) con la que VIM firma latest.json. Activada el 1 oct 2026
+ * (0.4.103): desde esta versión, un manifiesto sin firma válida se rechaza. La privada vive FUERA
+ * del repo, en la máquina que publica (RUNBOOK.md, "Firmar latest.json"). La misma llave pública
+ * está en apps/platform/app/lib/llave-actualizaciones.ts; una prueba comprueba que coinciden.
+ */
+export const LLAVE_PUBLICA_ACTUALIZACIONES = `-----BEGIN PUBLIC KEY-----
+MCowBQYDK2VwAyEAuhG8DQnYVNubeVr1xwovi9ulC9M9L3GHtuqEnZJ2tCQ=
+-----END PUBLIC KEY-----
+`;
 
 const VERSION_ESTRICTA = /^\d+\.\d+\.\d+$/;
 
