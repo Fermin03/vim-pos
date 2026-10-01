@@ -23,6 +23,8 @@ export type Sesion = {
   userId: string;
   tenantId: string | null;
   tipoIdentidad: string | null;
+  /** La cuenta nació en el registro público (user_metadata.onboarding_self_service). */
+  autoservicio: boolean;
 };
 
 /** Lee la sesión actual y extrae los claims del JWT (tenant_id, tipo_identidad). */
@@ -42,7 +44,8 @@ export async function leerSesion(): Promise<Sesion | null> {
   } catch {
     /* ignore */
   }
-  return { email: s.user.email ?? "", userId: s.user.id, tenantId, tipoIdentidad };
+  const autoservicio = (s.user.user_metadata as Record<string, unknown> | undefined)?.onboarding_self_service === true;
+  return { email: s.user.email ?? "", userId: s.user.id, tenantId, tipoIdentidad, autoservicio };
 }
 
 /**

@@ -8,7 +8,7 @@ Caja, cocina, mesas, inventario y facturación en un solo sistema. Sin pago inic
 
 [Pide una demo](https://vimpos.com.mx/demo)
 
-[Escríbenos por correo](mailto:hola@vimpos.com.mx)
+[Pruébalo 30 días gratis](https://admin.vimpos.com.mx/registro)
 
 Desde **$699 al mes**, más IVA · sin contrato forzoso · [ver los tres planes](https://vimpos.com.mx/precios)
 
@@ -16,7 +16,7 @@ Desde **$699 al mes**, más IVA · sin contrato forzoso · [ver los tres planes]
 
 Todo tu sistema vive en tu caja, no en internet
 
-Funciona con las impresoras de tickets de siempre
+Imprime en impresoras térmicas de tickets conectadas a tu red
 
 El corte de caja cuadra contra lo que hay en el cajón
 
@@ -178,7 +178,7 @@ Sí. El programa se instala en la computadora de tu caja y trabaja ahí, así qu
 
 ### ¿Qué necesito comprar?
 
-Una computadora con Windows, una impresora de tickets, un cajón de dinero y el módem que ya tienes. VIM no vende equipo: te decimos qué modelos funcionan y lo compras donde te salga mejor.
+Una computadora con Windows 10 u 11, una impresora térmica de tickets de 80 mm con puerto de red (cable Ethernet o Wi-Fi) y compatible con ESC/POS —por ejemplo, una Epson TM-T20III o TM-m30 en su versión de red; las de USB hoy no funcionan con la caja—, un cajón de dinero y el módem que ya tienes. VIM no vende equipo: te decimos qué buscar y lo compras donde te salga mejor.
 
 ### ¿Puedo traer mi menú de otro sistema?
 

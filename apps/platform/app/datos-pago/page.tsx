@@ -6,6 +6,7 @@ import { useSesion } from "../lib/sesion";
 import { hace } from "../lib/tipos";
 import { input, label } from "../lib/formato";
 import { DialogoConfirmar } from "../components/dialogo-confirmar";
+import { SeccionSoporte } from "../components/seccion-soporte";
 import { CAMPOS_DATOS_PAGO, type DatosPago } from "../lib/datos-pago";
 
 type Form = Record<(typeof CAMPOS_DATOS_PAGO)[number], string>;
@@ -137,6 +138,8 @@ export default function DatosPagoPage() {
         ocupado={ocupado}
         onConfirmar={guardar}
       />
+
+      <SeccionSoporte />
     </div>
   );
 }

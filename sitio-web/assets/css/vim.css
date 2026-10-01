@@ -312,6 +312,12 @@ a { color: var(--ink); text-underline-offset: 3px; }
 
 .nav-acciones { display: flex; align-items: center; gap: var(--sp-3); }
 
+/* La prueba gratis es la acción SECUNDARIA: fantasma, a la izquierda de la
+   demo, y solo cuando hay ancho de sobra. En el teléfono no cabe junto al logo
+   y la hamburguesa, así que vive en el cajón del menú. */
+.nav-prueba { display: none; }
+@media (min-width: 1024px) { .nav-prueba { display: inline-flex; } }
+
 .nav-hamburguesa {
   display: inline-flex;
   align-items: center;

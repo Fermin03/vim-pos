@@ -71,7 +71,7 @@ export async function leerEstadoOnboarding(): Promise<EstadoOnboarding> {
     { clave: "caja", titulo: "Tu caja", descripcion: "Da de alta tu punto de cobro; tu sucursal se crea con ella.", href: "/configuracion/cajas", completo: cajas > 0, opcional: false },
     // Dar de alta la caja en el admin no es vender: falta conectar la computadora. Antes el
     // asistente decía «listo» sin que ninguna caja hubiera mandado señal.
-    { clave: "vincular", titulo: "Conecta la computadora de tu caja", descripcion: "Te damos una clave para capturarla una vez en VIM POS.", href: "/configuracion/cajas", completo: cajasVinculadas > 0, opcional: false },
+    { clave: "vincular", titulo: "Conecta la computadora de tu caja", descripcion: "Descarga VIM POS en ella y captura una vez la clave que te damos.", href: "/configuracion/cajas/descargar", completo: cajasVinculadas > 0, opcional: false },
     { clave: "equipo", titulo: "Tu equipo", descripcion: "Crea cajeros y cocina con su PIN.", href: "/usuarios", completo: usuarios > 1, opcional: false },
     // Completo con la facturación ACTIVA, no con la pura razón social: antes se marcaba hecho
     // sin que el negocio pudiera emitir una sola factura.

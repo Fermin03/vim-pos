@@ -12,6 +12,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readdirSync, readFileSync, existsSync } from "node:fs";
 import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 
 const SOLO_SERVICE_ROLE = new Set([
   "tenant_addon_activo", "ticket_autofacturable", "consumir_folio_cfdi", "cfdi_marcar_timbrado",
@@ -19,10 +20,11 @@ const SOLO_SERVICE_ROLE = new Set([
   "cupo_agotado", "sync_pull_snapshot", "sync_push_snapshot", "verificar_pin_login",
   "verificar_autorizacion_pin", "resetear_pin_empleado", "crear_perfil_con_pin",
   "crear_tenant_con_owner", "activar_suscripcion", "registrar_pago_suscripcion",
-  "anular_pago_suscripcion", "caja_latido", "delivery_pedido_transicion",
+  "anular_pago_suscripcion", "caja_latido", "delivery_pedido_transicion", "alta_autoservicio",
 ]);
 
-const RAIZ = new URL("..", import.meta.url).pathname;
+// fileURLToPath y no `.pathname`: en Windows `.pathname` da "/D:/…" con espacios como %20.
+const RAIZ = fileURLToPath(new URL("..", import.meta.url));
 
 /** Variables que el archivo crea con `createClient(...)` SIN la llave de service_role. */
 function clientesDeUsuario(src: string): Set<string> {

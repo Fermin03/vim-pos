@@ -1787,6 +1787,7 @@ export function HomePos({
             onMisPropinas={() => setMisPropinasAbierto(true)}
             onImpresora={() => setConfigImpresoraAbierto(true)}
             onCerrarTurno={() => setConfirmandoCierre(true)}
+            ayuda={{ negocio: caja.negocioNombre, sucursal: caja.sucursalNombre, caja: caja.nombre, cajero: empleado.nombre }}
           />
         )}
         {configImpresoraAbierto && <ModalConfigImpresora token={token} sucursalId={caja.sucursal_id} onCerrar={() => setConfigImpresoraAbierto(false)} />}

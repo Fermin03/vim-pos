@@ -78,6 +78,23 @@ cuatro, correo) con botón de copiar, y un botón de WhatsApp con el mensaje del
 escrito — la única acción azul de la pantalla. Sin datos capturados, un texto neutro que manda a
 escribirle a VIM: **nunca datos de ejemplo**, porque un dato de pago falso manda dinero a otro lado.
 
+## Llegada del cliente (0142, ADR 0022)
+
+**Registro.** Es público (el sitio enlaza "Pruébalo 30 días gratis"). Paso 2 pide nombre, WhatsApp
+de 10 dígitos, correo, ciudad y contraseña, la casilla de términos y aviso de privacidad (enlaces
+al sitio, en pestaña nueva) y el captcha, que casi nunca pide nada. Al terminar **no entra**: la
+pantalla dice a qué correo se mandó el enlace y ofrece reenviarlo. Iniciar sesión sin confirmar no
+es un error rojo: es un aviso `warning` con el mismo "Reenviar el correo de confirmación".
+
+**Ayuda por WhatsApp.** Va al pie del menú lateral —también en el cajón del celular—, fuera de
+las secciones porque no es una pantalla, con el horario debajo. Abre WhatsApp con el mensaje ya
+escrito (quién, negocio y código). Nunca queda sin número: si la consulta falla, sale el oficial.
+
+**Descargar la caja** (Configuración → Cajas → Descargar, y el paso "Conecta la computadora de tu
+caja"). Un solo botón azul con la versión y la fecha de la última publicada; debajo, en lenguaje de
+restaurantero, lo que hace falta y el paso a paso. La impresora de **red** se dice en negritas
+porque es lo que más se compra mal; los modelos van como ejemplos, nunca como "probados".
+
 ## Lo que NO se hereda del POS
 
 - Los objetivos de 44–56px. Con mouse, 36–40px es lo correcto; 44 se ve infantil.
