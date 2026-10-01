@@ -541,7 +541,7 @@ function vercelJson() {
         { key: 'Access-Control-Allow-Origin', value: '*' },
       ],
     },
-        {
+    {
       source: '/assets/img/(.*)',
       headers: [{ key: 'Cache-Control', value: 'public, max-age=2592000' }],
     },

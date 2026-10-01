@@ -106,7 +106,7 @@ ErrorDocument 404 /404.html
   # La misma dirección devuelve HTML o Markdown según la cabecera Accept. Sin
   # este Vary, una caché compartida guarda la primera de las dos versiones que
   # pase por ella y se la sirve a todo el mundo.
-    <FilesMatch "\.(html|md)$">
+  <FilesMatch "\.(html|md)$">
     Header always set Vary "Accept, Accept-Encoding"
   </FilesMatch>
 

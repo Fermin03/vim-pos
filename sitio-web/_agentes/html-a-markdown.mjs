@@ -151,7 +151,7 @@ export function convertir(html, { base = 'https://vimpos.com.mx' } = {}) {
       }
       case 'br':
         return '\n';
-            case 'img': {
+      case 'img': {
         if (sinMarkdown(nodo)) return '';
         const alt = desescapar(nodo.atributos.alt || '').trim();
         return alt ? `![${alt}](${absoluta(nodo.atributos.src)})` : '';
@@ -268,7 +268,7 @@ export function convertir(html, { base = 'https://vimpos.com.mx' } = {}) {
 
     if (n === 'figure') {
       const salida = [];
-            const img = buscar(nodo, 'img');
+      const img = buscar(nodo, 'img');
       if (img && !sinMarkdown(img)) {
         const alt = desescapar(img.atributos.alt || '').trim();
         if (alt) salida.push(`![${alt}](${absoluta(img.atributos.src)})`);
@@ -277,7 +277,7 @@ export function convertir(html, { base = 'https://vimpos.com.mx' } = {}) {
       return salida;
     }
 
-        if (n === 'img') {
+    if (n === 'img') {
       if (sinMarkdown(nodo)) return [];
       const alt = desescapar(nodo.atributos.alt || '').trim();
       return alt ? [`![${alt}](${absoluta(nodo.atributos.src)})`] : [];
