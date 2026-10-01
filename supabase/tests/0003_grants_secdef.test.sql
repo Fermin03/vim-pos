@@ -41,6 +41,8 @@ insert into _secdef_solo_service (fn, motivo) values
   ('consumir_folio_cfdi',        'descuenta folios CFDI de cualquier negocio; solo lo usan las Edge Functions (0135)'),
   ('cfdi_marcar_timbrado',       'marca un ticket como facturado sin timbre real (0135)'),
   ('consumir_cupo',              'contador de límites de tasa de las funciones públicas (0136)'),
+  ('eliminar_tenant',            'borra por completo a cualquier negocio cancelado, con sus cuentas (0144)'),
+  ('eliminar_tenant_vista_previa', 'cuenta las filas y las cuentas de cualquier negocio (0144)'),
   ('anular_pago_suscripcion',    'anula el pago de cualquier negocio y lo deja con cobro vencido (0130)');
 
 -- #2 — CRÍTICA: ninguna de ellas es ejecutable por `authenticated`.
