@@ -256,6 +256,14 @@ export async function auditar(
   if (error) console.error(`[auditoría] no se pudo asentar "${args.accion}": ${error.message}`);
 }
 
+/**
+ * La IP de la petición a la que pertenece este cliente, lista para una columna `inet` (o null).
+ * Para las RPC que asientan su propia fila de bitácora dentro de su transacción (eliminar_tenant).
+ */
+export function ipDeCliente(sb: SbClient): string | null {
+  return ipValida(IP_POR_CLIENTE.get(sb));
+}
+
 /** `inet` rechaza "desconocida": mejor sin IP que perder el registro entero. */
 function ipValida(ip: string | undefined): string | null {
   if (!ip) return null;

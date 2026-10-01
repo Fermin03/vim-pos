@@ -20,6 +20,7 @@ import { timbrarConFailover, obtenerFacturama } from "../_shared/pac/index.ts";
 import { armarConceptos, ConceptosIncoherentes, type LineaTicket } from "../_shared/pac/conceptos.ts";
 import { archivarCfdi, subidorSupabase } from "../_shared/pac/archivo.ts";
 import { resolverEmisorVerificado } from "../_shared/pac/emisor.ts";
+import { COLUMNAS_NEGOCIO, negocioPuedeTimbrar, NEGOCIO_DADO_DE_BAJA } from "../_shared/pac/negocio.ts";
 
 const ROLES_FACTURA = ["DUENO", "ADMIN"];
 
@@ -98,6 +99,11 @@ Deno.serve(async (req) => {
   if (addonActivo !== true) {
     return json({ error: "SIN_ADDON_CFDI", detalle: "La facturación no está contratada para este negocio. Contacta a VIM." }, 403);
   }
+  // Negocio dado de baja y con la baja ya en vigor: no se timbra (0144, ADR 0023). En sus días de
+  // gracia sigue facturando, igual que su caja sigue vendiendo. Ver `_shared/pac/negocio.ts`.
+  const estadoDelNegocio = () => admin.from("tenants").select(COLUMNAS_NEGOCIO).eq("id", tenantDelCfdi).maybeSingle();
+  if (!await negocioPuedeTimbrar(estadoDelNegocio)) return json(NEGOCIO_DADO_DE_BAJA, 403);
+
   // Servicio suspendido: no se timbra (ADR 0014, entrega 2).
   //
   // El bloqueo de la caja lo aplica el cliente con sus directivas, y eso basta para la operación
@@ -241,6 +247,10 @@ Deno.serve(async (req) => {
     }
     throw e;
   }
+
+  // Otra vez, justo antes de salir al PAC: armar los conceptos tomó varias lecturas, y entre la
+  // primera comprobación y esta el negocio pudo darse de baja. Después de aquí ya no hay vuelta.
+  if (!await negocioPuedeTimbrar(estadoDelNegocio)) return json(NEGOCIO_DADO_DE_BAJA, 403);
 
   const res = await timbrarConFailover({
     cfdiId: String(c.id),

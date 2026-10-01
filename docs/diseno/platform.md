@@ -63,6 +63,25 @@ nombre comercial escrito, días de gracia cuando aplica y una casilla "entiendo"
 bloqueo con gracia (`tenants.bloqueo_desde`, a las 06:00 de México); la caja lo obedece desde la
 entrega 2.
 
+**Eliminar un cliente (0144, ADR 0023).** Lo único del panel que no se puede deshacer, y por eso
+lleva un escalón más de fricción que cancelar. Solo aparece con el cliente ya **CANCELADO** (dos
+pasos: primero la baja), en un bloque propio debajo de los demás botones de la Zona peligrosa.
+Antes de pedir nada enseña lo que se va a borrar —sucursales, cajas, usuarios, productos,
+tickets, cuentas—, leído de la base al abrir el diálogo. Confirmar pide motivo, el nombre del
+negocio **y además** la palabra `ELIMINAR` (`palabra` en `DialogoConfirmar`): el nombre dice a
+quién, la palabra dice qué. Si la base no lo permite (facturas timbradas, el cliente sigue en
+sus días de gracia —se dice hasta cuándo—, o hace menos de 15 minutos que dejó de poder
+facturar), no hay botón: se dice por qué, en `ink`, no en
+rojo — no es un error, es una regla; la espera trae los minutos que faltan y un "Volver a
+comprobar". Con la **clave compartida** tampoco hay botón: se dice que hace falta la cuenta del
+operador. Al terminar se vuelve a Clientes con un aviso que no se cierra solo, y lo que queda del
+negocio se ve en **Clientes eliminados** (enlace al pie de la lista). Ahí lo único que se puede
+hacer es **Reintentar** el borrado de archivos que hayan quedado pendientes, en `warning`.
+
+Si la petición se corta sin respuesta, el diálogo no dice "error": dice que no se sabe si terminó
+y manda a mirar Clientes eliminados antes de reintentar. Un mensaje ambiguo aquí acaba en un
+operador que reintenta a ciegas o que da por borrado lo que no se borró.
+
 **Cobro, plan y prueba (0141, ADR 0021).** Activar el cobro pide precio de lista, ciclo y una
 promoción opcional; en Esencial hay un botón "Piloto 5 negocios" ($499 seis meses) y siempre
 "Otra…". Donde se enseña un precio se dice entero: "$499 hasta 31 mar 2027, después $699".

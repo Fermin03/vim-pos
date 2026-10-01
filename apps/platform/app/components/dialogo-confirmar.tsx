@@ -36,8 +36,15 @@ export type DialogoConfirmarProps = {
   conEntiendo?: string;
   /** Campo opcional "mensaje que verá el cajero". */
   conMensaje?: boolean;
+  /**
+   * Para lo que NO se puede deshacer: además del nombre, hay que escribir esta palabra tal cual
+   * (`ELIMINAR`). El nombre dice a quién; la palabra, qué. Va al final, junto al botón.
+   */
+  palabra?: string;
+  /** Lo que dice el botón mientras trabaja ("Eliminando…"). */
+  textoOcupado?: string;
   ocupado?: boolean;
-  onConfirmar: (r: { motivo: string; graciaDias?: number; mensaje?: string }) => void | Promise<void>;
+  onConfirmar: (r: { motivo: string; graciaDias?: number; mensaje?: string; nombre: string; palabra?: string }) => void | Promise<void>;
 };
 
 const FALTA: Record<ResultadoConfirmacion["faltantes"][number], string> = {
@@ -45,6 +52,7 @@ const FALTA: Record<ResultadoConfirmacion["faltantes"][number], string> = {
   nombre: "escribir el nombre",
   gracia: "los días de gracia",
   entiendo: "marcar la casilla",
+  palabra: "escribir la palabra de confirmación",
 };
 
 /**
@@ -63,10 +71,11 @@ export function DialogoConfirmar(p: DialogoConfirmarProps) {
   const [gracia, setGracia] = useState<number>(GRACIA_POR_DEFECTO);
   const [entiendo, setEntiendo] = useState(false);
   const [mensaje, setMensaje] = useState("");
+  const [palabra, setPalabra] = useState("");
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (p.abierto) { setNombre(""); setMotivo(""); setGracia(GRACIA_POR_DEFECTO); setEntiendo(false); setMensaje(""); setError(null); }
+    if (p.abierto) { setNombre(""); setMotivo(""); setGracia(GRACIA_POR_DEFECTO); setEntiendo(false); setMensaje(""); setPalabra(""); setError(null); }
   }, [p.abierto]);
 
   const r = useMemo(
@@ -74,12 +83,13 @@ export function DialogoConfirmar(p: DialogoConfirmarProps) {
       requiereNombre: !p.sinNombre,
       nombreEsperado: p.nombreEsperado, nombreEscrito: nombre, motivo,
       requiereGracia: p.conGracia, graciaDias: gracia, requiereEntiendo: Boolean(p.conEntiendo), entiendo,
+      palabraEsperada: p.palabra, palabraEscrita: palabra,
     }),
-    [p.sinNombre, p.nombreEsperado, p.conGracia, p.conEntiendo, nombre, motivo, gracia, entiendo],
+    [p.sinNombre, p.nombreEsperado, p.conGracia, p.conEntiendo, p.palabra, nombre, motivo, gracia, entiendo, palabra],
   );
   const faltan = [
     ...(p.listo && !p.listo.ok ? [p.listo.falta] : []),
-    ...r.faltantes.map((f) => (f === "nombre" && p.faltaNombre ? p.faltaNombre : FALTA[f])),
+    ...r.faltantes.map((f) => (f === "nombre" && p.faltaNombre ? p.faltaNombre : f === "palabra" && p.palabra ? `escribir ${p.palabra}` : FALTA[f])),
   ];
   const puede = faltan.length === 0 && !p.ocupado;
 
@@ -92,6 +102,8 @@ export function DialogoConfirmar(p: DialogoConfirmarProps) {
         motivo: motivo.trim(),
         graciaDias: p.conGracia ? gracia : undefined,
         mensaje: p.conMensaje ? mensaje.trim() || undefined : undefined,
+        nombre: nombre.trim(),
+        palabra: p.palabra ? palabra.trim() : undefined,
       });
     } catch (e) {
       setError(e instanceof Error ? e.message : "No se pudo aplicar");
@@ -109,6 +121,7 @@ export function DialogoConfirmar(p: DialogoConfirmarProps) {
       nota={faltan.length > 0 && !p.ocupado ? `Falta ${faltan.join(", ")}.` : null}
       boton={p.etiquetaBoton}
       ocupado={p.ocupado}
+      textoOcupado={p.textoOcupado}
       deshabilitado={!puede}
       peligrosa={Boolean(p.peligroso)}
       onConfirmar={() => void confirmar()}
@@ -163,6 +176,15 @@ export function DialogoConfirmar(p: DialogoConfirmarProps) {
             Escribe <b className="text-ink">{p.nombreEsperado}</b> para confirmar
           </label>
           <input id="dc-nombre" className={input} value={nombre} onChange={(e) => setNombre(e.target.value)} autoComplete="off" />
+        </div>
+      )}
+
+      {p.palabra && (
+        <div>
+          <label className={label} htmlFor="dc-palabra">
+            Y escribe <b className="text-danger">{p.palabra}</b>, en mayúsculas
+          </label>
+          <input id="dc-palabra" className={`${input} font-mono`} value={palabra} onChange={(e) => setPalabra(e.target.value)} autoComplete="off" autoCapitalize="characters" spellCheck={false} />
         </div>
       )}
     </DialogoPeligro>

@@ -1,7 +1,7 @@
 "use client";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useSesion } from "../lib/sesion";
 import { textoActualizado, useRefresco } from "../lib/refresco";
 import { fechaCorta, fmtMxn, input, nombreFase, nombreVertical } from "../lib/formato";
@@ -9,6 +9,7 @@ import { haceMinutos } from "../lib/fechas-panel";
 import type { Metricas, Tenant } from "../lib/tipos";
 import { TarjetaCifra } from "../components/tarjeta-cifra";
 import { PastillaEstado } from "../components/pastilla-estado";
+import { CLAVE_AVISO_ELIMINADO } from "../components/eliminar-cliente";
 
 /** Cómo están sus cajas ahora, por latido. Lo que antes obligaba a abrir cada ficha. */
 function CeldaCajas({ c }: { c: Tenant["cajas"] }) {
@@ -51,6 +52,18 @@ export default function ClientesPage() {
   const [error, setError] = useState<string | null>(null);
   const [q, setQ] = useState("");
   const [estado, setEstado] = useState<string>("");
+  // Lo deja la ficha al eliminar a un cliente (0144): se lee una vez y se borra, así no reaparece
+  // al recargar. Se queda en pantalla hasta cerrarlo: el refresco automático no lo quita.
+  const [eliminado, setEliminado] = useState<{ nombre: string; extra: string; problema: boolean } | null>(null);
+  useEffect(() => {
+    try {
+      const crudo = sessionStorage.getItem(CLAVE_AVISO_ELIMINADO);
+      if (!crudo) return;
+      sessionStorage.removeItem(CLAVE_AVISO_ELIMINADO);
+      const a = JSON.parse(crudo) as { nombre?: unknown; extra?: unknown; problema?: unknown };
+      if (typeof a.nombre === "string") setEliminado({ nombre: a.nombre, extra: typeof a.extra === "string" ? a.extra : "", problema: a.problema === true });
+    } catch { /* aviso ilegible: no se enseña */ }
+  }, []);
 
   const cargar = useCallback(async () => {
     try {
@@ -89,6 +102,17 @@ export default function ClientesPage() {
       )}
 
       {error && <p className="mb-3 text-sm text-danger" role="alert">{error}</p>}
+
+      {eliminado && (
+        <div className={["mb-4 flex items-start justify-between gap-3 rounded-lg border bg-surface p-3 text-13", eliminado.problema ? "border-warning/40" : "border-line-strong"].join(" ")} role="status">
+          <p>
+            <b>{eliminado.nombre}</b> se eliminó por completo. Quedó su ficha en{" "}
+            <Link href="/clientes/eliminados" className="font-semibold underline underline-offset-2">Clientes eliminados</Link>.
+            {eliminado.extra && <span className={eliminado.problema ? "text-warning" : "text-ink-2"}> {eliminado.extra}.</span>}
+          </p>
+          <button type="button" onClick={() => setEliminado(null)} className="btn -my-1 h-9 shrink-0 rounded px-2 text-13 font-semibold text-ink-2 hover:bg-hover">Cerrar</button>
+        </div>
+      )}
 
       <div className="mb-3 flex flex-wrap gap-1">
         {FILTROS.map(([k, l]) => (
@@ -149,7 +173,10 @@ export default function ClientesPage() {
           </table>
         </div>
       )}
-      <p className="mt-4 text-12 text-ink-3">{textoActualizado(hace)}</p>
+      <p className="mt-4 flex flex-wrap justify-between gap-2 text-12 text-ink-3">
+        <span>{textoActualizado(hace)}</span>
+        <Link href="/clientes/eliminados" className="font-semibold text-ink-2 underline-offset-2 hover:underline">Clientes eliminados</Link>
+      </p>
     </div>
   );
 }

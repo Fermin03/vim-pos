@@ -32,6 +32,7 @@
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import { corsHeaders } from "../_shared/cors.ts";
 import { timbrarConFailover, obtenerFacturama } from "../_shared/pac/index.ts";
+import { COLUMNAS_NEGOCIO, negocioPuedeTimbrar, NEGOCIO_DADO_DE_BAJA } from "../_shared/pac/negocio.ts";
 import { archivarCfdi, subidorSupabase } from "../_shared/pac/archivo.ts";
 import { resolverEmisorVerificado } from "../_shared/pac/emisor.ts";
 import { armarConceptosGlobal, ConceptosIncoherentes, type LineaTicket, type TicketDelPeriodo } from "../_shared/pac/conceptos.ts";
@@ -92,6 +93,11 @@ Deno.serve(async (req) => {
   if (addonActivo !== true) {
     return json({ error: "SIN_ADDON_CFDI", detalle: "La facturación no está contratada para este negocio. Contacta a VIM." }, 403);
   }
+
+  // Negocio dado de baja y con la baja ya en vigor: no se timbra (0144, ADR 0023). En sus días de
+  // gracia sigue facturando. Ver `_shared/pac/negocio.ts`.
+  const estadoDelNegocio = () => admin.from("tenants").select(COLUMNAS_NEGOCIO).eq("id", tenantId).maybeSingle();
+  if (!await negocioPuedeTimbrar(estadoDelNegocio)) return json(NEGOCIO_DADO_DE_BAJA, 403);
 
   // Servicio suspendido: no se timbra (ADR 0014). Mismo motivo que en `timbrar-cfdi`: cada folio
   // sale de la cuenta que VIM le paga al PAC, así que este control vive en el servidor y no en
@@ -296,6 +302,20 @@ Deno.serve(async (req) => {
       .single();
     if (dErr) throw new Error(`No se pudo crear el borrador: ${dErr.message}`);
     const cfdiId = String((draftRaw as { id: string }).id);
+
+    // Otra vez, justo antes de salir al PAC (ver `_shared/pac/negocio.ts`). El borrador se marca
+    // con error para que no quede como un timbrado "en curso", y el periodo se suelta.
+    if (!await negocioPuedeTimbrar(estadoDelNegocio)) {
+      await admin.rpc("cfdi_marcar_error", {
+        p_cfdi_id: cfdiId,
+        p_codigo_error: NEGOCIO_DADO_DE_BAJA.error,
+        p_mensaje_error: NEGOCIO_DADO_DE_BAJA.detalle,
+        p_request_payload: { periodo: { desde, hasta }, usuario_id: u.user.id },
+        p_response_payload: {},
+      });
+      await soltarPeriodo("ERROR");
+      return json(NEGOCIO_DADO_DE_BAJA, 403);
+    }
 
     // ── Timbrado ──────────────────────────────────────────────────────────────────────────────
     const res = await timbrarConFailover({

@@ -1,0 +1,121 @@
+# 0023 — Eliminar un cliente es el segundo paso de la baja, y la base decide si se puede
+
+**Fecha:** 2026-10-01 · **Estado:** vigente
+
+## Qué decía el plan
+
+- **Doc 12 §9 y ADR 0014:** el panel administra el ciclo de vida de un tenant por su `estado`
+  (`TRIAL`, `ACTIVO`, `SUSPENDIDO`, `CANCELADO`). Cancelar "no borra su historial y se puede
+  reactivar". No existe la eliminación: las llaves de las tablas operativas a `tenants` son `ON DELETE RESTRICT` a
+  propósito.
+- **0010 y 0133:** el reporte Z no se borra nunca (`trg_reporte_z_inmutable`) y las tablas de
+  dinero no admiten DELETE desde el cliente (`guardia_escritura_directa`).
+- **0130:** un pago de suscripción "se anula, no se borra".
+
+## Qué hacemos ahora
+
+1. **Dos pasos.** Solo se elimina un cliente que ya está `CANCELADO` y fuera de su gracia. Un `INTERNO`, nunca. El
+   botón vive en la Zona peligrosa de la ficha y solo aparece con el cliente cancelado.
+2. **Guardia fiscal, sin excepción.** Con un solo CFDI que haya llegado al SAT (`uuid_fiscal`,
+   vigente o cancelado) no se elimina: "Tiene facturas timbradas: se conservan por obligación
+   fiscal. Queda dado de baja." Tampoco con un timbrado a medias (`EN_PROCESO_TIMBRADO`).
+   **Y con la baja en vigor ya no se timbra.** Mientras un comprobante viaja al PAC su fila
+   sigue en `BORRADOR`; eliminar en esos segundos dejaría un CFDI válido en el SAT sin registro.
+   Dos capas: `timbrar-cfdi`, `timbrar-global` y `autofacturar` se niegan cuando el negocio está
+   `CANCELADO` **y su bloqueo ya entró** (`bloqueo_desde` NULL o cumplido) —al entrar y otra vez
+   justo antes de llamar al PAC—, y `eliminar_tenant` hace esperar 15 minutos desde que dejó de
+   poder facturar (lo más tarde entre `fecha_baja` y `bloqueo_desde`, y el último borrador
+   tocado) a todo negocio que pudo: tiene sello o alguna fila en `tickets_cfdi`. Quien nunca
+   tuvo sello no espera.
+   **En sus días de gracia no se elimina** (`EN_GRACIA`), con o sin sello: un cancelado con
+   `bloqueo_desde` en el futuro sigue vendiendo y facturando hasta esa fecha (ADR 0014), y la
+   vista previa dice desde cuándo se podrá.
+3. **La base decide y borra, en una transacción** (`eliminar_tenant`, 0144, solo `service_role`).
+   No hay lista de tablas escrita a mano: salen del catálogo (toda tabla de `public` con
+   `tenant_id`) y se borran en **una sola sentencia**, con las llaves foráneas encendidas. Postgres
+   las comprueba al terminar la sentencia, así que el orden y los ciclos (tickets ↔ mesas ↔
+   cuentas) no importan, y cualquier fila ajena que apunte al negocio hace fallar todo. Al final se
+   recorre el catálogo otra vez: una fila que quede con ese `tenant_id` aborta la transacción.
+4. **Qué queda.** Una fila en `tenants_eliminados` (id, código, nombre, giro, plan, fechas de
+   alta/baja/eliminación, motivo, quién, cuántas filas se borraron por tabla, copia de
+   `suscripciones` y `pagos_suscripcion`, y nombre/correo/teléfono del dueño) y la bitácora:
+   las filas de `super_admin_accesos` del negocio se quedan sin la llave y con
+   `payload.tenant_eliminado`, más un asiento `tenant.eliminar` escrito en la misma transacción.
+5. **Qué se va.** Todo lo demás, incluidas las cuentas de `auth.users` que solo eran de ese
+   negocio (dueño, empleados, dispositivos `caja-…@dispositivos…`). "Solo" se decide contra el
+   catálogo: se recorre **toda** llave foránea a `auth.users` y la cuenta se conserva si alguna
+   tabla tiene una fila suya de otro negocio o de plataforma. Varias de esas llaves son
+   `ON DELETE CASCADE` (permisos, push, el token de Uber): borrar la cuenta de alguien que dejó
+   filas en otro negocio se las habría llevado en silencio. Se decide después de borrar el
+   negocio y con las cuentas bloqueadas. Los archivos de Storage los borra el servidor del panel
+   por la API **después** del commit; la lista queda en `tenants_eliminados.archivos_pendientes`
+   dentro de la transacción y se reintenta desde Clientes eliminados. Sus nombres salen del id
+   del CFDI, no de `*_storage_path`.
+6. **El código queda libre**: el mismo negocio puede volver a registrarse.
+7. **Confirmación:** motivo (10+), el nombre del negocio y además la palabra `ELIMINAR`. Antes de
+   pedir nada, el diálogo enseña lo que se va a borrar, leído de la base en ese momento.
+8. **Solo con la cuenta del operador.** La clave compartida del arranque (ADR 0019) ve la vista
+   previa pero no elimina: no tiene segundo factor ni persona detrás.
+
+### Cómo pasa las guardas de dinero
+
+- `guardia_escritura_directa` (0133) **no se toca**: solo actúa en escrituras REST directas a
+  tabla de un rol sujeto a RLS, y esto es una RPC que corre como el dueño de la función.
+- `trg_reporte_z_inmutable` rechaza todo DELETE, venga de quien venga. Se le añade **una**
+  excepción, `_eliminando_tenant(OLD.tenant_id)`, que exige las dos cosas: la variable de
+  transacción `vim.eliminando_tenant` con ese mismo tenant (la pone y la quita `eliminar_tenant`)
+  **y** que quien ejecuta no esté sujeto a RLS. `authenticated` no cumple lo segundo nunca, así
+  que fijar la variable desde una sesión del negocio no abre nada (pgTAP 0028 lo prueba con una
+  política de DELETE abierta a propósito). No se desactiva ningún trigger.
+- **Lo que esa excepción no hace:** dentro de cualquier función `SECURITY DEFINER` la condición
+  del rol es cierta siempre; ahí solo protege la variable. Por eso pgTAP 0028 comprueba contra el
+  catálogo que nadie más la escribe, que ninguna función al alcance del navegador fija variables
+  con nombre libre y que ninguna otra borra reportes Z. Una función futura que lo rompa pone el
+  CI en rojo.
+
+## Por qué
+
+- El registro público (0142) deja altas de prueba y pruebas abandonadas con el código tomado.
+  Cancelarlas no las quita de las cifras ni libera el código.
+- `session_replication_role = replica` habría sido lo fácil (sin triggers ni llaves), pero el rol
+  de las migraciones no puede fijarlo en Supabase, y apagar las llaves es justo lo contrario de
+  "que falle si queda algo".
+- Una lista de tablas a mano se pudre con la primera migración que añada una; un `CASCADE` en las
+  cien llaves a `tenants` convertiría un `DELETE` suelto en la pérdida de un cliente.
+- El asiento de bitácora va dentro de la función y no en la ruta: una eliminación sin rastro no
+  puede existir, ni siquiera si el servidor del panel se cae entre el commit y el `auditar`.
+
+## Consecuencias
+
+- **No hay vuelta atrás ni respaldo propio.** Lo único que rescata a un cliente eliminado por
+  error es el respaldo de la plataforma (PITR), y restaurarlo es restaurar la base entera.
+- **Un cliente que facturó no se elimina nunca** desde el panel. Si algún día hace falta (ARCO),
+  es una decisión con contador de por medio, no un botón.
+- **Se guarda un dato personal del dueño** (correo y teléfono) después de eliminarlo, para el
+  seguimiento comercial. Si pide que se borre, se vacía `tenants_eliminados.contacto` a mano.
+- **La caja instalada de un cliente eliminado** se queda sin cuenta: `caja-latido`, `sync-pull`
+  y `sync-push` contestan 401 (`AUTH_INVALIDA`) en cuanto intenta renovar su sesión, y `pin-login`
+  igual. Nada se escribe en la nube —toda tabla exige un tenant que ya no existe— y la caja no
+  entra en bucle: registra el fallo y reintenta en su ciclo normal. Sigue vendiendo en local,
+  como cualquier caja sin directivas (ADR 0014: el bloqueo no es una barrera de seguridad); esas
+  ventas no suben a ningún lado. Por eso el orden es cancelar (que sí bloquea la caja por
+  latido) y eliminar después.
+- **Corre dentro del límite de tiempo de una petición.** La función trae su propio
+  `statement_timeout` de 50 s (PostgREST lo aplica antes de llamarla; sin él valdrían los 8 s
+  del rol) y la ruta, `maxDuration` de 60 s. Si se agota no se borra nada y el panel lo dice;
+  un negocio así de grande se elimina desde SQL con el tiempo ampliado. Si la petición se corta
+  sin respuesta, el panel pide revisar Clientes eliminados antes de reintentar; reintentar es
+  seguro (un cliente ya eliminado contesta "no existe").
+- **Cancelar con gracia no cambia nada para el cliente hasta la fecha del bloqueo:** sigue
+  vendiendo y facturando, y no se le puede eliminar. La regla nueva solo actúa cuando el bloqueo
+  ya entró — que es justo cuando `mi_acceso()` ya frenaba a `timbrar-cfdi` y `timbrar-global`;
+  lo que se añade de verdad es el portal de autofactura (que no consultaba nada) y la segunda
+  comprobación antes del PAC.
+- **Un cliente que pudo facturar no se elimina en los 15 minutos siguientes a su bloqueo.** La
+  vista previa dice cuántos faltan.
+- **Una tabla nueva sin `tenant_id` que cuelgue de una del negocio** necesita `ON DELETE CASCADE`
+  (como `rol_permisos`); si no, la eliminación falla diciendo qué llave estorba. Es el
+  comportamiento buscado, pero hay que saberlo al diseñar tablas hijas.
+- **Un trigger nuevo que prohíba el DELETE** en una tabla del negocio romperá la eliminación
+  hasta que consulte `_eliminando_tenant()`. `smoke_eliminar_tenant.sql` lo caza: llena 42
+  tablas y exige cero filas al terminar.
