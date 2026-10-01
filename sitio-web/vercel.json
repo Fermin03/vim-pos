@@ -897,6 +897,15 @@
           "value": "public, max-age=2592000"
         }
       ]
+    },
+    {
+      "source": "/assets/img/aviso/(.*)",
+      "headers": [
+        {
+          "key": "X-Robots-Tag",
+          "value": "noindex, noimageindex"
+        }
+      ]
     }
   ]
 }

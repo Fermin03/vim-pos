@@ -186,7 +186,7 @@ Sí. Descargas tu menú del sistema que usas hoy y lo pegas tal cual. Si el form
 
 ### ¿Emite facturas?
 
-Sí. Factura global del periodo, timbrado individual de cualquier ticket y portal de autofacturación por QR, con CFDI 4.0 timbrado por un proveedor autorizado por el SAT. Cada plan trae folios al mes para tus facturas —10 en Esencial con el extra de facturación, 20 en Negocio y 40 en Cadena— y, si se acaban, compras un paquete. Los precios están en la página de precios.
+Sí. Factura global del periodo (la emites con un botón desde el panel), timbrado individual de cualquier ticket y portal de autofacturación por QR, con CFDI 4.0 timbrado por un proveedor autorizado por el SAT. Cada plan trae folios al mes para tus facturas —10 en Esencial con el extra de facturación, 20 en Negocio y 40 en Cadena— y, si se acaban, compras un paquete. Los precios están en la página de precios.
 
 ### ¿Cuánto tarda la implementación?
 
@@ -194,7 +194,7 @@ Alrededor de un día. Desde Negocio lo hacemos nosotros: cargamos tu menú, lo d
 
 ### ¿Y si se va la luz o alguien cierra el programa?
 
-El programa se queda junto al reloj de Windows y se vuelve a abrir solo si alguien lo cierra. Guarda copias de tus ventas por su cuenta, y las que no alcanzaron a subir suben en cuanto vuelve la señal.
+El programa se queda junto al reloj de Windows y sigue trabajando aunque alguien cierre la ventana. Guarda sola una copia diaria en la misma computadora, y las ventas que no alcanzaron a subir suben en cuanto vuelve la señal.
 
 ### ¿Funciona con varias sucursales?
 

@@ -22,10 +22,10 @@ _Comparación entre un punto de venta que vive en internet, un sistema instalado
 | --- | --- | --- | --- |
 | Se cae el internet | Se detiene o pasa a apuntar en papel | Sigue vendiendo | Sigue vendiendo |
 | Ver cómo va el día sin estar ahí | Sí, desde el celular | No, hay que ir al local | Sí, desde el celular |
-| Si se muere la computadora | Tus datos están fuera | El respaldo que hayas hecho tú | Copia diaria en el local y fuera de él |
-| Actualizaciones | Solas | Visita del técnico | Solas, sin que nadie vaya |
+| Si se muere la computadora | Tus datos están fuera | El respaldo que hayas hecho tú | Copia diaria en la caja; tus ventas, también en la nube |
+| Actualizaciones | Solas | Visita del técnico | Con un clic, sin que nadie vaya |
 | Varias sucursales sumadas | Sí | Depende de la versión | Sí, un reporte con todo |
-| Dónde vive tu información | Solo fuera | Solo en tu local | En tu local, con copia fuera |
+| Dónde vive tu información | Solo fuera | Solo en tu local | En tu local; tus ventas, también en la nube |
 
 La columna de en medio existe porque es honesta: hay sistemas instalados que tampoco se detienen sin internet. Ahí no ganamos por seguir vendiendo — ganamos por el resto de la tabla.
 
@@ -92,7 +92,7 @@ La caja comprueba cada pocos segundos que todo responda. Si algo se cayó, lo le
 
 ### Siete copias, siempre
 
-Guarda una copia completa al cerrar el día y conserva las siete más recientes. Además de la copia fuera del local: si se muere la computadora, no se muere el negocio.
+Guarda sola una copia completa cada día —cuando la caja está quieta, sin turno abierto— y conserva las siete más recientes en la misma computadora. Tus ventas, además, suben a la nube cuando hay internet: si se muere la computadora, lo vendido y ya subido no se pierde.
 
 ### No se apaga por accidente
 
@@ -100,7 +100,7 @@ Si alguien cierra la ventana en plena hora pico, la caja sigue trabajando: se qu
 
 ### Se actualiza sin visita
 
-Las versiones nuevas llegan solas y se comprueban antes de instalarse, para que lo que entra a tu caja sea lo que mandamos y nada más. No tienes que agendar a un técnico.
+La caja te avisa cuando hay una versión nueva y la instalas con un clic. Se comprueba antes de instalarse, para que lo que entra a tu caja sea lo que mandamos y nada más. No tienes que agendar a un técnico.
 
 Todo lo de esta página lo hace el programa que se instala en la computadora de tu caja, con Windows. Si abres el punto de venta desde el navegador y se cae el internet, te avisa en pantalla, pero ahí no cobra sin conexión.
 

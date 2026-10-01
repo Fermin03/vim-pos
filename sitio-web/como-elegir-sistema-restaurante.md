@@ -44,7 +44,7 @@ Tu menú, tus ventas y tu histórico son tuyos. Pregunta en qué formato te los 
 
 ### 5 · ¿La facturación va incluida o es aparte?
 
-En México esto casi nunca está incluido del todo. Pregunta si el timbrado se cobra por folio, si la factura global del periodo sale sola, y hasta cuándo puede facturar tu cliente. La diferencia entre «el mes en curso» y «hasta que tú cierres el periodo» son llamadas que acabas atendiendo tú.
+En México esto casi nunca está incluido del todo. Pregunta si el timbrado se cobra por folio, si la factura global del periodo sale sola o hay que emitirla, y hasta cuándo puede facturar tu cliente. La diferencia entre «el mes en curso» y «hasta que tú emitas la global del periodo» son llamadas que acabas atendiendo tú.
 
 ### 6 · ¿La implementación y la capacitación se cobran aparte?
 

@@ -6,15 +6,17 @@
 
 Qué datos te pedimos, para qué los usamos y cómo pedirnos que los borremos. En corto: te pedimos lo mínimo para poder contestarte, y no los vendemos ni los compartimos con nadie que quiera venderte algo.
 
-Última actualización: 30 de septiembre de 2026.
+Última actualización: 1 de octubre de 2026.
 
 ## Quién es responsable de tus datos
 
-**VIM POS**, persona física con actividad empresarial, en Guanajuato, México.
+**VIM POS** es el nombre comercial. Quien responde por tus datos es una persona física con actividad empresarial, en Guanajuato, México. Su nombre completo y la dirección donde atiende son éstos:
 
-El nombre, el RFC y el domicilio fiscal completos del responsable se entregan a quien los pida por el correo de abajo, y van en el contrato de cualquier cliente. No se publican aquí.
+Por seguridad publicamos estos datos como imagen. Si no puedes verla o usas lector de pantalla, pídelos a [hola@vimpos.com.mx](mailto:hola@vimpos.com.mx) y te los enviamos.
 
-Para cualquier cosa de este aviso: [hola@vimpos.com.mx](mailto:hola@vimpos.com.mx).
+RFC disponible a solicitud del titular.
+
+Para cualquier cosa de este aviso, y para ejercer tus derechos de acceso, rectificación, cancelación u oposición, escribe a [hola@vimpos.com.mx](mailto:hola@vimpos.com.mx). Más abajo, en [«Tus derechos ARCO»](#arco), dice qué poner en el mensaje y en cuánto tiempo contestamos.
 
 ## Qué datos recabamos
 

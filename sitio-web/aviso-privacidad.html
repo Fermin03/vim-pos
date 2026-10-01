@@ -100,10 +100,17 @@
   </div>
 
 <!-- ═══════════════════════════════════════════════════════════════════════
-     El aviso SÍ lleva el nombre completo, el RFC y el domicilio fiscal, aunque
-     el pie de las demás páginas diga solo «VIM POS». No es una firma: la
-     LFPDPPP (art. 16) obliga a identificar al responsable del tratamiento con
-     nombre y domicilio, y una marca comercial no identifica a nadie.
+     El aviso identifica al responsable con su nombre y su domicilio, aunque el
+     pie de las demás páginas diga solo «VIM POS»: la ley pide identificar a
+     quien trata los datos, y una marca comercial no identifica a nadie.
+
+     PERO VAN COMO IMAGEN, NUNCA COMO TEXTO. Son los datos de una persona; en
+     septiembre de 2026 se purgaron del sitio y de todo el historial del
+     repositorio, que es público. Escritos aquí los copiaría cualquier
+     rastreador o modelo de lenguaje, para siempre. La imagen se genera con
+     `_capturas/responsable.mjs`, que recibe los datos al correrlo y no los
+     guarda. No se escriben en el alt, ni en un title, ni en el JSON-LD, ni en
+     un comentario como este. El RFC no se publica: se entrega a quien lo pida.
 
      Escrito en segunda persona y sin jerga legal de relleno. Un aviso que no
      se entiende cumple el trámite y no cumple el propósito.
@@ -119,7 +126,7 @@
         borremos. En corto: te pedimos lo mínimo para poder contestarte, y no
         los vendemos ni los compartimos con nadie que quiera venderte algo.
       </p>
-      <p style="font-size:var(--t-13);color:var(--ink-2)">Última actualización: 30 de septiembre de 2026.</p>
+      <p style="font-size:var(--t-13);color:var(--ink-2)">Última actualización: 1 de octubre de 2026.</p>
     </div>
   </section>
 
@@ -130,17 +137,28 @@
         <div class="pila pila-4">
           <h2>Quién es responsable de tus datos</h2>
           <p>
-            <strong>VIM POS</strong>, persona física con actividad empresarial, en
-            Guanajuato, México.
+            <strong>VIM POS</strong> es el nombre comercial. Quien responde por tus datos es una
+            persona física con actividad empresarial, en Guanajuato, México. Su nombre completo
+            y la dirección donde atiende son éstos:
           </p>
+          <!-- data-nosnippet: que un buscador no use este bloque como fragmento. La imagen no
+               viaja al gemelo en Markdown (data-sin-markdown) y su carpeta está cerrada en
+               robots.txt y con X-Robots-Tag. El ancho y el alto van ANTES del alt a propósito. -->
+          <div class="pila pila-3" data-nosnippet>
+            <img src="assets/img/aviso/responsable.png?v=1" width="328" height="161" alt="Nombre y domicilio del responsable — imagen" loading="lazy" decoding="async" data-sin-markdown="si">
+            <p style="font-size:var(--t-13);color:var(--ink-2)">
+              Por seguridad publicamos estos datos como imagen. Si no puedes verla o usas lector
+              de pantalla, pídelos a <a href="mailto:hola@vimpos.com.mx">hola@vimpos.com.mx</a>
+              y te los enviamos.
+            </p>
+          </div>
+          <p>RFC disponible a solicitud del titular.</p>
           <p>
-            El nombre, el RFC y el domicilio fiscal completos del responsable se entregan a
-            quien los pida por el correo de abajo, y van en el contrato de cualquier cliente.
-            No se publican aquí.
-          </p>
-          <p>
-            Para cualquier cosa de este aviso:
-            <a href="mailto:hola@vimpos.com.mx">hola@vimpos.com.mx</a>.
+            Para cualquier cosa de este aviso, y para ejercer tus derechos de acceso,
+            rectificación, cancelación u oposición, escribe a
+            <a href="mailto:hola@vimpos.com.mx">hola@vimpos.com.mx</a>. Más abajo, en
+            <a href="#arco">«Tus derechos ARCO»</a>, dice qué poner en el mensaje y en cuánto
+            tiempo contestamos.
           </p>
         </div>
 
@@ -211,7 +229,7 @@
         </div>
 
         <div class="pila pila-4">
-          <h2>Tus derechos ARCO</h2>
+          <h2 id="arco">Tus derechos ARCO</h2>
           <p>
             Puedes pedirnos <strong>acceder</strong> a tus datos, que los <strong>rectifiquemos</strong>
             si están mal, que los <strong>cancelemos</strong>, o <strong>oponerte</strong> a que los

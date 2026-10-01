@@ -70,7 +70,7 @@ o $19,990 al año, más IVA
 - Todo lo de Negocio
 - Un reporte que suma todas
 - Facturación incluida · 40 folios al mes
-- Menú compartido o propio por sucursal
+- El mismo menú en todas tus sucursales
 - Visita presencial el día del arranque
 
 [Pide una demo](https://vimpos.com.mx/demo)
@@ -107,7 +107,7 @@ _Comparación de los tres planes de VIM POS._
 | Folios de factura al mes | 10, con el extra de facturación | 20 | 40 |
 | Pedidos de Uber Eats en la caja | $100 al mes aparte | Incluido | Incluido |
 | Quién carga tu menú | Tú, con nuestra guía | Nosotros | Nosotros |
-| Capacitación | Videos y guía escrita | 3 horas con tu equipo | 3 horas con tu equipo |
+| Capacitación | Guía paso a paso en el panel | 3 horas con tu equipo | 3 horas con tu equipo |
 | Soporte | WhatsApp y correo | WhatsApp y correo | WhatsApp y correo |
 | El día del arranque | Te ayudamos por WhatsApp | Te acompañamos en línea | Vamos a tu local |
 
@@ -131,7 +131,7 @@ _Desde Negocio_
 
 ### Tu menú, cargado
 
-Con precios, categorías, extras y términos. Si vienes de otro sistema, lo traemos de ahí en lugar de teclearlo de nuevo. En Esencial lo pegas tú con la misma herramienta.
+Con sus categorías, precios y descripciones. Si vienes de otro sistema, lo traemos de ahí en lugar de teclearlo de nuevo; los extras y los términos se capturan después, ya en el panel. En Esencial lo pegas tú con la misma herramienta.
 
 _Los tres planes_
 
@@ -143,19 +143,19 @@ _Desde Negocio_
 
 ### Capacitación de tu equipo
 
-Tres horas con quien va a estar en la caja y en la cocina. En Esencial, videos y guía escrita, y dudas por WhatsApp.
+Tres horas con quien va a estar en la caja y en la cocina. En Esencial, el panel te lleva paso a paso hasta dejar todo listo, y las dudas se resuelven por WhatsApp, de 9:00 a 18:00.
 
 _Los tres planes_
 
 ### Actualizaciones
 
-Todas, siempre. Llegan solas a tu caja y no hay que agendar a nadie ni pagar la versión nueva.
+Todas, siempre. Tu caja te avisa cuando hay una versión nueva y la instalas con un clic («Descargar e instalar»). No hay que agendar a nadie ni pagar la versión nueva.
 
 _Los tres planes_
 
 ### Respaldos
 
-Copia diaria en tu local y copia fuera de él. Sin que tengas que acordarte.
+Tu caja guarda sola una copia diaria de todo en su propia computadora y conserva las siete más recientes. Además, tus ventas suben a la nube cada vez que hay internet. Sin que tengas que acordarte.
 
 ![Inventario con cada insumo, su existencia, su mínimo y el aviso cuando anda bajo.](https://vimpos.com.mx/assets/img/capturas/admin-inventario.webp?v=3)
 
@@ -177,7 +177,7 @@ Al mes, más IVA. Entra al reporte que suma todas.
 
 $249
 
-Al mes, más IVA. Comparte turno y comandas con la principal.
+Al mes, más IVA. Comparte cocina, comandas y cuentas abiertas con la principal; cada caja lleva su propio turno y su corte.
 
 ### Facturación
 
