@@ -21,6 +21,8 @@ const datos: Record<string, unknown[]> = {
     { tenant_id: "t1", activo: true, precio_mensual_mxn: 249, cantidad: 2, fecha_inicio: "2026-09-01", fecha_fin: null },   // 498
     { tenant_id: "t2", activo: true, precio_mensual_mxn: 599, cantidad: 1, fecha_inicio: "2026-09-01", fecha_fin: null },   // 599
     { tenant_id: "t2", activo: true, precio_mensual_mxn: 0, cantidad: 1, fecha_inicio: "2026-09-01", fecha_fin: null },     // incluido
+    // Incluido en el plan pero con un precio que se coló: NO cuenta.
+    { tenant_id: "t2", activo: true, precio_mensual_mxn: 349, cantidad: 1, fecha_inicio: "2026-09-01", fecha_fin: null, incluido_en_plan: true },
     { tenant_id: "t2", activo: false, precio_mensual_mxn: 349, cantidad: 1, fecha_inicio: "2026-08-01", fecha_fin: "2026-08-31" }, // dado de baja
     { tenant_id: "t3", activo: true, precio_mensual_mxn: 599, cantidad: 3, fecha_inicio: "2026-09-01", fecha_fin: null },   // cobro en pausa
     { tenant_id: "t9", activo: true, precio_mensual_mxn: 599, cantidad: 1, fecha_inicio: "2026-09-01", fecha_fin: null },   // en prueba, sin cobro

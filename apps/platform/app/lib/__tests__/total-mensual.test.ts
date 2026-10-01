@@ -64,6 +64,15 @@ describe("totalMensual", () => {
     expect(totalMensual(null, [addon({ precio_mensual_mxn: 599 })], HOY)).toEqual({ suscripcion: 0, addons: 0, total: 0 });
   });
 
+  it("lo INCLUIDO en el plan nunca se cobra, aunque su fila traiga un precio por error", () => {
+    // Una fila marcada `incluido_en_plan` con precio (un alta vieja, una corrección a mano): el
+    // cliente ya lo paga dentro de su plan. Contarla lo cobraría dos veces e inflaría el MRR.
+    const colada = addon({ precio_mensual_mxn: 349, incluido_en_plan: true });
+    expect(importeAddon(colada)).toBe(0);
+    expect(totalMensual({ precio_mensual_mxn: 999 }, [colada, addon({ precio_mensual_mxn: 249, cantidad: 2 })], HOY))
+      .toEqual({ suscripcion: 999, addons: 498, total: 1497 });
+  });
+
   it("no arrastra centavos de coma flotante", () => {
     expect(totalMensual({ precio_mensual_mxn: "699.10" }, [addon({ precio_mensual_mxn: "0.20", cantidad: 3 })], HOY).total).toBe(699.7);
   });

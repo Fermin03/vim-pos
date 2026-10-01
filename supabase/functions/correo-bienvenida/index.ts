@@ -8,7 +8,8 @@
 // CONTROLES
 //   · Con sesión: el gateway verifica el JWT (verify_jwt por defecto, NO va en config.toml) y aquí
 //     se vuelve a validar con getUser. El tenant sale del claim del token ya verificado
-//     (_shared/identidad.ts) y quien llama tiene que ser DUEÑO o ADMIN de ESE negocio.
+//     (_shared/identidad.ts) y quien llama tiene que ser el DUEÑO de ESE negocio
+//     (`tenants.usuario_dueno_id`): un administrador invitado que fija su contraseña no la dispara.
 //   · Límite en la base (consumir_cupo, 0136): por usuario y global. Si la base no responde se
 //     rechaza ("cerrar"): sin base tampoco se podría reclamar la marca.
 //   · Una vez por negocio: `reclamar_bienvenida` (0146) decide en la base, de forma atómica, y
@@ -31,7 +32,6 @@ import { enSegundoPlano, enviarCorreo } from "../_shared/correo.ts";
 import { bearerDe, tenantDelToken } from "../_shared/identidad.ts";
 import { procesarBienvenida, type DepsBienvenida, type ReclamoBienvenida } from "../_shared/bienvenida.ts";
 
-const ROLES_ADMINISTRADORES = ["DUENO", "ADMIN"];
 const MAX_POR_USUARIO = 6;   // por hora: confirmar, recargar, el doble clic… con margen
 const MAX_GLOBAL = 120;      // por hora, de todo el mundo
 const HORA = 60 * 60;
@@ -54,18 +54,9 @@ Deno.serve(async (req) => {
       if (!token) return null;
       const { data, error } = await admin.auth.getUser(token);
       if (error || !data?.user) return null;
-      const tenantId = tenantDelToken(token);
-      if (!tenantId) return { usuarioId: data.user.id, tenantId: null, esAdministrador: false };
-      const { data: accesos, error: e2 } = await admin
-        .from("usuarios_acceso")
-        .select("rol:roles(codigo)")
-        .eq("usuario_id", data.user.id)
-        .eq("tenant_id", tenantId)
-        .eq("activo", true);
-      if (e2) throw new Error(e2.message);
-      const esAdministrador = ((accesos ?? []) as unknown as { rol: { codigo: string } | null }[])
-        .some((a) => a.rol?.codigo && ROLES_ADMINISTRADORES.includes(a.rol.codigo));
-      return { usuarioId: data.user.id, tenantId, esAdministrador };
+      // El negocio sale del claim del token ya verificado. Que quien llama sea el DUEÑO de ese
+      // negocio lo decide `procesarBienvenida` contra `tenants.usuario_dueno_id`.
+      return { usuarioId: data.user.id, tenantId: tenantDelToken(token) };
     },
     async hayCupo(usuarioId) {
       const r = await consumirCupos(admin, [

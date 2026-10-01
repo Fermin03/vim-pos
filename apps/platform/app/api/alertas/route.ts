@@ -102,7 +102,7 @@ export async function GET(req: Request) {
     // Solo los que nadie ha tocado (0145): son los únicos que pueden ser una alerta.
     sb.from("prospectos").select("negocio, estado, creado_en").eq("estado", "NUEVO").order("creado_en", { ascending: true }).limit(500),
     // Lo que cada cliente paga aparte (0147): el cobro vencido dice el total, no solo el plan.
-    sb.from("tenant_addons").select("tenant_id, activo, precio_mensual_mxn, cantidad, fecha_inicio, fecha_fin").eq("activo", true).limit(5000),
+    sb.from("tenant_addons").select("tenant_id, activo, precio_mensual_mxn, cantidad, fecha_inicio, fecha_fin, incluido_en_plan").eq("activo", true).limit(5000),
   ]);
   const addonsDe = new Map<string, AddonCobro[]>();
   for (const a of (addonsRes.data ?? []) as (AddonCobro & { tenant_id: string })[]) {

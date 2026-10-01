@@ -108,9 +108,25 @@ BEGIN
   UPDATE cajas SET activa = false WHERE tenant_id = v_tenant AND numero = 2;
   PERFORM fijar_extra_tenant(v_tenant, 'CAJA_EXTRA', 0);
   IF (limites_efectivos(v_tenant)->>'max_cajas_por_sucursal')::int <> 1 THEN RAISE EXCEPTION 'quitar el extra no bajó el límite'; END IF;
-  PERFORM fijar_extra_tenant(v_tenant, 'CAJA_EXTRA', 1);
+  r := fijar_extra_tenant(v_tenant, 'CAJA_EXTRA', 1);
   SELECT count(*) INTO v_n FROM tenant_addons WHERE tenant_id = v_tenant AND addon_id = v_caja_x;
   IF v_n <> 2 THEN RAISE EXCEPTION 'quitar y volver a poner el mismo día insertó otra fila (hay %)', v_n; END IF;
+  -- Y vuelve con el precio que tenía PACTADO ($200), no con el de catálogo ($249).
+  IF (r->>'precio_unitario')::numeric <> 200 THEN
+    RAISE EXCEPTION 'al volver a contratar el extra debía conservar el precio pactado ($200), puso %', r->>'precio_unitario';
+  END IF;
+  -- También otro día: se quita (queda solo historia) y al volver sigue siendo $200…
+  PERFORM fijar_extra_tenant(v_tenant, 'CAJA_EXTRA', 0);
+  UPDATE tenant_addons SET fecha_inicio = fecha_inicio - 30, fecha_fin = v_hoy - 5 WHERE tenant_id = v_tenant AND addon_id = v_caja_x;
+  r := fijar_extra_tenant(v_tenant, 'CAJA_EXTRA', 1);
+  IF (r->>'precio_unitario')::numeric <> 200 THEN
+    RAISE EXCEPTION 'días después, volver a contratar debía conservar el último precio pactado ($200), puso %', r->>'precio_unitario';
+  END IF;
+  -- …salvo que se mande un precio nuevo.
+  r := fijar_extra_tenant(v_tenant, 'CAJA_EXTRA', 1, 249.00);
+  IF (r->>'precio_unitario')::numeric <> 249 THEN RAISE EXCEPTION 'un precio explícito debía mandar, puso %', r->>'precio_unitario'; END IF;
+  SELECT count(*) INTO v_n FROM tenant_addons WHERE tenant_id = v_tenant AND addon_id = v_caja_x AND activo;
+  IF v_n <> 1 THEN RAISE EXCEPTION 'debía quedar UNA fila vigente, hay %', v_n; END IF;
 
   -- ── 6) Precedencia: la excepción reemplaza al plan como BASE y el extra se suma encima ──
   INSERT INTO tenant_limites (tenant_id, max_cajas_por_sucursal, motivo) VALUES (v_tenant, 3, 'smoke: excepción previa');

@@ -10,6 +10,9 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 type Llamada = { tabla: string; op: string; args?: unknown; filtros: Record<string, unknown> };
 let llamadas: Llamada[] = [];
 let auditorias: Record<string, unknown>[] = [];
+/** El orden real de lo que pasó, para comprobar que la bitácora va ANTES del borrado. */
+let orden: string[] = [];
+let auditoriaFalla = false;
 let fila: Record<string, unknown> | null;
 
 const PROSPECTO = {
@@ -26,7 +29,7 @@ function tabla(nombre: string) {
     limit: () => q,
     eq: (c: string, v: unknown) => { ll.filtros[c] = v; return q; },
     update: (args: unknown) => { ll.op = "update"; ll.args = args; llamadas.push(ll); return q; },
-    delete: () => { ll.op = "delete"; llamadas.push(ll); return q; },
+    delete: () => { ll.op = "delete"; llamadas.push(ll); orden.push("delete"); return q; },
     maybeSingle: () => Promise.resolve({ data: fila, error: null }),
     then: (ok: (r: { data: unknown[]; error: null }) => unknown) => Promise.resolve(ok({ data: fila ? [fila] : [], error: null })),
   };
@@ -37,7 +40,11 @@ const sb = { from: (t: string) => tabla(t) };
 
 vi.mock("../server", () => ({
   autorizar: () => Promise.resolve({ sb, actor: { id: "op1", nombre: "Operador", via: "cuenta" } }),
-  auditar: (_sb: unknown, a: Record<string, unknown>) => { auditorias.push(a); return Promise.resolve(); },
+  auditar: (_sb: unknown, a: Record<string, unknown>) => {
+    if (auditoriaFalla) return Promise.resolve(false);
+    auditorias.push(a); orden.push(`auditar:${String(a.accion)}`);
+    return Promise.resolve(true);
+  },
 }));
 
 const { GET: listar } = await import("../../api/prospectos/route");
@@ -47,7 +54,7 @@ const ctx = { params: Promise.resolve({ id: "p1" }) };
 const pedir = (metodo: string, body?: unknown) =>
   new Request("http://x/api/prospectos/p1", { method: metodo, body: body === undefined ? undefined : JSON.stringify(body) });
 
-beforeEach(() => { llamadas = []; auditorias = []; fila = { ...PROSPECTO }; });
+beforeEach(() => { llamadas = []; auditorias = []; orden = []; auditoriaFalla = false; fila = { ...PROSPECTO }; });
 
 describe("GET /api/prospectos", () => {
   it("devuelve la lista, el conteo por estado y el enlace de WhatsApp ya armado", async () => {
@@ -124,6 +131,19 @@ describe("DELETE /api/prospectos/[id]", () => {
       payload: { prospecto_id: "p1", negocio: "Tacos El Güero", estado: "NUEVO" },
     });
     expect(JSON.stringify(auditorias[0])).not.toContain("4771234567");
+  });
+
+  it("la bitácora se asienta ANTES de borrar", async () => {
+    await DELETE(pedir("DELETE", { motivo: "Entrada de prueba del formulario" }), ctx);
+    expect(orden).toEqual(["auditar:prospecto.eliminar", "delete"]);
+  });
+
+  it("si la bitácora no se puede asentar, NO se borra: no hay borrados sin rastro", async () => {
+    auditoriaFalla = true;
+    const r = await DELETE(pedir("DELETE", { motivo: "Entrada de prueba del formulario" }), ctx);
+    expect(r.status).toBe(500);
+    expect((await r.json()).error).toBe("BITACORA_NO_DISPONIBLE");
+    expect(llamadas.some((l) => l.op === "delete")).toBe(false);
   });
 
   it("uno que ya no existe contesta 404", async () => {

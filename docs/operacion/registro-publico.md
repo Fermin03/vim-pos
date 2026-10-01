@@ -82,6 +82,8 @@ que hace falta, cómo se paga y el WhatsApp de soporte. Lo manda la Edge Functio
   **con** JWT (no lleva `verify_jwt = false` en `config.toml`): la llama un dueño con sesión.
 - **Secretos:** los mismos `VIM_SMTP_*` y `ADMIN_APP_URL` que ya existen. Sin `VIM_SMTP_*` no sale
   nada (y la marca se libera, así que saldrá el día que estén).
+- **Solo la dispara el dueño**, con su sesión: un administrador invitado que fija su contraseña
+  en `/establecer-acceso` no le manda la bienvenida al dueño.
 - **Una vez por negocio:** la marca es `tenant_onboarding_estado.bienvenida_enviada_at`. Para
   **volver a mandarla** a un cliente: ponerla en `NULL` y pedirle que abra otra vez el enlace de su
   correo o inicie sesión por `/establecer-acceso`.

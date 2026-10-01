@@ -139,7 +139,8 @@ GRANT EXECUTE ON FUNCTION limites_efectivos(uuid) TO authenticated, service_role
 
 -- ── C. Poner la cantidad de un extra ─────────────────────────────────────────
 --
--- p_cantidad = 0 lo quita. p_precio NULL = el que ya tenía pactado y, si no tenía, el de catálogo.
+-- p_cantidad = 0 lo quita. p_precio NULL = el último que se le pactó (aunque ya esté dado de baja)
+-- y, si nunca lo tuvo, el de catálogo.
 -- Errores (el mensaje es el código; el HINT, la frase para el operador):
 --   EXTRA_INVALIDO · CANTIDAD_INVALIDA · PRECIO_INVALIDO · TENANT_NO_EXISTE · SIN_CAMBIOS
 --   SIN_LIMITE  — el plan ya no tiene tope de eso: no hay nada que ampliar.
@@ -227,11 +228,13 @@ BEGIN
       END;
   END IF;
 
-  -- El precio unitario: el que se manda; si no, el que ya tenía pactado; si no, el de catálogo.
+  -- El precio unitario: el que se manda; si no, el ÚLTIMO que se le pactó a este negocio para
+  -- este extra —aunque ya se lo hayan quitado: quitarlo y volver a ponerlo no puede subirle el
+  -- precio en silencio—; si nunca lo tuvo, el de catálogo.
   SELECT ta.precio_mensual_mxn INTO v_precio_act
     FROM public.tenant_addons ta
-   WHERE ta.tenant_id = p_tenant_id AND ta.addon_id = v_addon.id AND ta.activo
-   ORDER BY ta.fecha_inicio DESC LIMIT 1;
+   WHERE ta.tenant_id = p_tenant_id AND ta.addon_id = v_addon.id
+   ORDER BY ta.activo DESC, ta.fecha_inicio DESC, ta.updated_at DESC LIMIT 1;
   v_precio := COALESCE(p_precio, v_precio_act, v_addon.precio_mensual_mxn);
 
   IF p_cantidad = 0 THEN

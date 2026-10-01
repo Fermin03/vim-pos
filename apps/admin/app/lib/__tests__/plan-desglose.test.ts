@@ -47,6 +47,13 @@ describe("desgloseMensual", () => {
     expect(d.hayExtras).toBe(false);
   });
 
+  it("lo incluido en el plan sale en $0 aunque su fila traiga un precio", () => {
+    const d = desgloseMensual({ nombre: "Negocio" }, { precio_mensual_mxn: 999 }, [addon({ incluido_en_plan: true, precio_mensual_mxn: 349 })], HOY);
+    expect(d.renglones[1]).toMatchObject({ detalle: "incluido en tu plan", importe: 0 });
+    expect(d.total).toBe(999);
+    expect(d.hayExtras).toBe(false);
+  });
+
   it("un $0 que no viene del plan es cortesía de VIM, no 'incluido'", () => {
     const d = desgloseMensual({ nombre: "Esencial" }, { precio_mensual_mxn: 699 }, [addon({ incluido_en_plan: false })], HOY);
     expect(d.renglones[1]).toMatchObject({ detalle: "sin costo", importe: 0 });

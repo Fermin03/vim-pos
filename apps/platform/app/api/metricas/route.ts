@@ -33,7 +33,7 @@ export async function GET(req: Request) {
       .select("tenant_id, estado, precio_mensual_mxn, precio_promocional_mxn, promocion_hasta")
       .limit(1000),
     sb.from("tenant_addons")
-      .select("tenant_id, activo, precio_mensual_mxn, cantidad, fecha_inicio, fecha_fin")
+      .select("tenant_id, activo, precio_mensual_mxn, cantidad, fecha_inicio, fecha_fin, incluido_en_plan")
       .eq("activo", true)
       .limit(5000),
   ]);

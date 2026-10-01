@@ -37,7 +37,9 @@
 
    Cambiar la cantidad **el mismo día** actualiza la fila de hoy (`addon_unico_activo` es una alta
    por día, no "uno activo"); otro día cierra la vigente y abre otra, y así la historia dice
-   cuántas tuvo y desde cuándo. El alta y la baja de los add-ons de siempre **no** aceptan estos
+   cuántas tuvo y desde cuándo. Sin precio nuevo se conserva el **último pactado** con ese
+   cliente, aunque el extra ya se le hubiera quitado: quitarlo y volver a ponerlo no le sube el
+   precio en silencio. El alta y la baja de los add-ons de siempre **no** aceptan estos
    dos códigos: ese camino no sabe de cantidades ni comprueba el uso.
 
 4. **Cambio de plan:** los extras se **conservan** — se pagan aparte. La única excepción es la que
@@ -46,7 +48,8 @@
    vista previa del panel lo dice antes de confirmar, con lo que deja de pagar.
 
 5. **Un solo total.** `totalMensual()` de `@vim/db/cobro` = precio vigente de la suscripción
-   (ADR 0021) + add-ons vigentes × cantidad. Lo usan el MRR, la alerta de cobro vencido, el monto
+   (ADR 0021) + add-ons vigentes × cantidad. Lo marcado `incluido_en_plan` vale cero siempre,
+   aunque su fila traiga un precio. Lo usan el MRR, la alerta de cobro vencido, el monto
    que propone "Registrar pago", la ficha y "Plan y pagos" del dueño. Sin cobro activo el total es
    cero: en prueba no se cobra nada, ni los extras.
 

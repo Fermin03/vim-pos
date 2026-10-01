@@ -30,10 +30,24 @@ COMMENT ON COLUMN public.prospectos.estado_cambiado_en IS
 COMMENT ON COLUMN public.prospectos.atendido_en IS
   'Primera vez que dejó de ser NUEVO: cuánto tardó VIM en contestar. Lo sella el trigger (0145) y no se pisa.';
 
-DO $$ BEGIN
-  ALTER TABLE public.prospectos
-    ADD CONSTRAINT prospectos_notas_largo CHECK (notas IS NULL OR length(notas) <= 500);
-EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+-- NOT VALID primero: la regla vale desde ya para lo que se escriba, y la migración no se cae si
+-- alguna nota vieja (capturada a mano en SQL) pasa del tope. Solo se valida si todo cabe; si no,
+-- queda sin validar y se avisa — recortar la nota de un prospecto no es decisión de una migración.
+DO $$
+DECLARE
+  v_largas integer;
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'prospectos_notas_largo' AND conrelid = 'public.prospectos'::regclass) THEN
+    ALTER TABLE public.prospectos
+      ADD CONSTRAINT prospectos_notas_largo CHECK (notas IS NULL OR length(notas) <= 500) NOT VALID;
+  END IF;
+  SELECT count(*) INTO v_largas FROM public.prospectos WHERE length(notas) > 500;
+  IF v_largas = 0 THEN
+    ALTER TABLE public.prospectos VALIDATE CONSTRAINT prospectos_notas_largo;
+  ELSE
+    RAISE NOTICE '0145: % prospecto(s) con nota de más de 500 caracteres: el tope queda SIN validar para ellos. Recórtalas y corre VALIDATE CONSTRAINT prospectos_notas_largo.', v_largas;
+  END IF;
+END $$;
 
 CREATE OR REPLACE FUNCTION public.prospectos_sellar_seguimiento()
 RETURNS trigger

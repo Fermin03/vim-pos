@@ -98,7 +98,7 @@ function deps(sobre: Partial<DepsBienvenida> = {}) {
   // La "base": una sola marca por negocio, como `tenant_onboarding_estado.bienvenida_enviada_at`.
   let marcada = false;
   const d: DepsBienvenida = {
-    quienLlama: async () => ({ usuarioId: "u-1", tenantId: "t-1", esAdministrador: true }),
+    quienLlama: async () => ({ usuarioId: "u-1", tenantId: "t-1" }),
     hayCupo: async () => true,
     leerNegocio: async () => ({ nombre: "Tacos El Güero", duenoId: "u-1" }),
     leerDueno: async () => ({ email: "ana@tacos.mx", nombre: "Ana López", confirmado: true }),
@@ -160,14 +160,55 @@ test("si el envío revienta tampoco se cae: se libera y se registra", async () =
   assert.equal(ll.liberar, 1);
 });
 
-test("sin sesión válida, 401; con sesión de quien no administra el negocio, 403; y no se reclama nada", async () => {
+test("sin sesión válida, 401; con sesión sin negocio, 403; y no se reclama nada", async () => {
   const a = deps({ quienLlama: async () => null });
   assert.equal((await procesarBienvenida(a.d)).status, 401);
-  const b = deps({ quienLlama: async () => ({ usuarioId: "u-9", tenantId: "t-1", esAdministrador: false }) });
-  assert.equal((await procesarBienvenida(b.d)).status, 403);
-  const c = deps({ quienLlama: async () => ({ usuarioId: "u-9", tenantId: null, esAdministrador: false }) });
+  const c = deps({ quienLlama: async () => ({ usuarioId: "u-9", tenantId: null }) });
   assert.equal((await procesarBienvenida(c.d)).status, 403);
-  assert.equal(a.ll.reclamar + b.ll.reclamar + c.ll.reclamar, 0);
+  assert.equal(a.ll.reclamar + c.ll.reclamar, 0);
+});
+
+test("solo el DUEÑO la dispara: un administrador invitado que fija su contraseña no le manda la bienvenida al dueño", async () => {
+  // /establecer-acceso también recibe a un ADMIN que el dueño invitó. El dueño del negocio es u-1.
+  const { d, ll } = deps({ quienLlama: async () => ({ usuarioId: "u-admin", tenantId: "t-1" }) });
+  const r = await procesarBienvenida(d);
+  await asentar();
+  assert.equal(r.status, 200);
+  assert.deepEqual(r.body, { ok: true, enviado: false, motivo: "NO_ES_DUENO" });
+  assert.equal(ll.reclamar, 0, "ni siquiera se reclama: la marca queda libre para cuando entre el dueño");
+  assert.equal(ll.enviar.length, 0);
+});
+
+test("si algo revienta ENTRE reclamar y enviar, la marca se libera (no queda reclamada sin correo)", async () => {
+  // Un nombre que no es texto en los metadatos de la cuenta hace reventar la plantilla, ya con la
+  // marca puesta. Antes la marca se quedaba y el correo no salía nunca.
+  const { d, ll } = deps({ leerDueno: async () => ({ email: "ana@tacos.mx", nombre: 123 as unknown as string, confirmado: true }) });
+  const r = await procesarBienvenida(d);
+  await asentar();
+  assert.equal(r.status, 200);
+  assert.deepEqual(r.body, { ok: false, enviado: false, motivo: "ERROR" });
+  assert.equal(ll.reclamar, 1);
+  assert.equal(ll.liberar, 1, "la marca se soltó");
+  assert.equal(ll.enviar.length, 0);
+});
+
+test("si dejar el envío en segundo plano falla, el correo ya va en camino: NO se libera (liberar mandaría dos)", async () => {
+  const { d, ll } = deps({ enSegundoPlano: () => { throw new Error("sin waitUntil"); } });
+  const r = await procesarBienvenida(d);
+  await asentar();
+  assert.deepEqual(r.body, { ok: true, enviado: true });
+  assert.equal(ll.enviar.length, 1);
+  assert.equal(ll.liberar, 0);
+});
+
+test("si liberar también falla no se cae: queda en el log", async () => {
+  const { d, ll } = deps({
+    leerDueno: async () => ({ email: "ana@tacos.mx", nombre: 123 as unknown as string, confirmado: true }),
+    liberar: async () => { throw new Error("base caída"); },
+  });
+  const r = await procesarBienvenida(d);
+  assert.equal(r.status, 200);
+  assert.ok(ll.logs.some((m) => /no se pudo liberar/.test(m)));
 });
 
 test("pasado el límite contesta 429 sin reclamar", async () => {

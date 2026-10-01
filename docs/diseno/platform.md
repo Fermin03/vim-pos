@@ -111,7 +111,8 @@ azul por tarjeta —**WhatsApp**, con el saludo ya escrito— porque aquí sí h
 contestarle. El seguimiento es un `<select>` (Nuevo → Contactado → Demo agendada → Ganado /
 Perdido) y una nota de una línea que solo se guarda al pulsar; el refresco de cada minuto no pisa
 lo que se está escribiendo. **Eliminar** es para entradas de prueba: enlace en `danger`, abajo y
-aparte, con motivo; a un prospecto real que no cerró se le marca Perdido. La bitácora guarda el
+aparte, con motivo; a un prospecto real que no cerró se le marca Perdido. El borrado se asienta
+en la bitácora **antes** de ocurrir: si el asiento falla, no se borra. La bitácora guarda el
 negocio y el estado, **nunca** el nombre ni el WhatsApp de la persona. En la barra lateral, el
 contador de Prospectos va en `warning`, no en rojo: nada está roto. En Atención, los que llevan
 más de 24 h como nuevos son **una sola** alerta (alta; crítica a los tres días). "Convertir en

@@ -116,6 +116,8 @@ export type AddonCobro = {
   cantidad?: number | null;
   fecha_inicio?: string | null;
   fecha_fin?: string | null;
+  /** Lo dio el plan (0141): ya va dentro de la mensualidad y NUNCA se cobra aparte. */
+  incluido_en_plan?: boolean | null;
 };
 
 /**
@@ -132,8 +134,13 @@ export function addonVigente(a: AddonCobro, fecha: string): boolean {
 
 const centavos = (n: number) => Math.round(n * 100) / 100;
 
-/** Lo que cuesta al mes una fila: precio unitario por cantidad. */
+/**
+ * Lo que cuesta al mes una fila: precio unitario por cantidad. Lo incluido en el plan vale CERO
+ * aunque su fila traiga un precio (un alta vieja, una corrección a mano): el cliente ya lo paga
+ * dentro de su plan, y contarlo lo cobraría dos veces e inflaría el MRR.
+ */
 export function importeAddon(a: AddonCobro): number {
+  if (a.incluido_en_plan) return 0;
   const cantidad = a.cantidad == null ? 1 : Math.max(0, Math.trunc(Number(a.cantidad)));
   return centavos(Number(a.precio_mensual_mxn) * cantidad);
 }

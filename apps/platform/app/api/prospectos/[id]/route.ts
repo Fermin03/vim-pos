@@ -87,14 +87,22 @@ export async function DELETE(req: Request, ctx: Ctx) {
   const antes = antesRaw as { id: string; negocio: string; estado: string; origen: string; creado_en: string } | null;
   if (!antes) return NextResponse.json({ error: "NO_EXISTE", detalle: "Ese prospecto ya no existe." }, { status: 404 });
 
-  const { error } = await sb.from("prospectos").delete().eq("id", id);
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  // LA BITÁCORA VA ANTES. Es un borrado de verdad: si se borrara primero y el asiento fallara,
+  // quedaría un prospecto desaparecido sin rastro de quién ni por qué. Al revés, lo peor que puede
+  // pasar es un asiento de un borrado que no ocurrió, y ese caso se anota justo abajo.
+  const payload = { prospecto_id: id, negocio: antes.negocio, estado: antes.estado, origen: antes.origen, creado_en: antes.creado_en };
+  const asentado = await auditar(sb, { accion: "prospecto.eliminar", tenantId: null, motivo, payload });
+  if (asentado === false) {
+    return NextResponse.json(
+      { error: "BITACORA_NO_DISPONIBLE", detalle: "No se pudo dejar constancia en la bitácora, así que no se borró. Intenta de nuevo en un momento." },
+      { status: 500 },
+    );
+  }
 
-  await auditar(sb, {
-    accion: "prospecto.eliminar",
-    tenantId: null,
-    motivo,
-    payload: { prospecto_id: id, negocio: antes.negocio, estado: antes.estado, origen: antes.origen, creado_en: antes.creado_en },
-  });
+  const { error } = await sb.from("prospectos").delete().eq("id", id);
+  if (error) {
+    await auditar(sb, { accion: "prospecto.eliminar_fallido", tenantId: null, motivo: `No se borró: ${error.message}`, payload });
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
   return NextResponse.json({ ok: true });
 }

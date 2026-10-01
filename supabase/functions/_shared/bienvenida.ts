@@ -12,9 +12,14 @@
 //
 // EXACTAMENTE UNA VEZ. La marca vive en la base (`tenant_onboarding_estado.bienvenida_enviada_at`)
 // y se RECLAMA antes de enviar, en una sola sentencia: dos pestañas, un doble clic o un reintento
-// no pueden reclamar dos veces. Si el envío falla, la marca se libera para que el siguiente
-// intento lo mande. El peor caso es que la instancia muera a medio envío: la marca queda puesta y
-// el correo no sale — se prefiere eso a mandar dos.
+// no pueden reclamar dos veces. Si CUALQUIER cosa falla después de reclamar y antes de que el
+// correo quede en camino —la plantilla, la lectura del soporte, el envío mismo— la marca se
+// libera para que el siguiente intento lo mande. El peor caso es que la instancia muera a medio
+// envío: la marca queda puesta y el correo no sale — se prefiere eso a mandar dos.
+//
+// SOLO EL DUEÑO LA DISPARA. /establecer-acceso también recibe a un administrador que el dueño
+// invitó: que ESA persona fije su contraseña no es motivo para mandarle "bienvenido" al dueño,
+// que quizá ya lleva semanas operando. La marca ni se reclama.
 import { esc, soloAscii } from "./correo.ts";
 
 export type SoporteBienvenida = { whatsapp: string; horario: string | null };
@@ -112,8 +117,8 @@ export function correoBienvenida(d: DatosBienvenida): { subject: string; html: s
 export type ReclamoBienvenida = "RECLAMADA" | "YA_ENVIADA" | "NO_APLICA";
 
 export type DepsBienvenida = {
-  /** Quién llama, con el token YA verificado. null = sin sesión válida. */
-  quienLlama(): Promise<{ usuarioId: string; tenantId: string | null; esAdministrador: boolean } | null>;
+  /** Quién llama, con el token YA verificado, y el negocio de su sesión. null = sin sesión válida. */
+  quienLlama(): Promise<{ usuarioId: string; tenantId: string | null } | null>;
   /** Límite de tasa por usuario y global (`consumir_cupo`). */
   hayCupo(usuarioId: string): Promise<boolean>;
   leerNegocio(tenantId: string): Promise<{ nombre: string; duenoId: string | null } | null>;
@@ -142,18 +147,28 @@ export async function procesarBienvenida(d: DepsBienvenida): Promise<RespuestaBi
   const no = (motivo: string, status = 200): RespuestaBienvenida => ({ status, body: { ok: status === 200, enviado: false, motivo } });
 
   let tenantId = "";
+  // true desde que la marca es nuestra y hasta que el correo queda en camino. Si se sale del
+  // bloque con ella en true —por lo que sea—, el `finally` la suelta.
+  let reclamada = false;
+  const soltar = async (por: string) => {
+    reclamada = false;
+    log("warn", `bienvenida de ${tenantId} NO enviada (${por}); se libera para reintentar.`);
+    await d.liberar(tenantId).catch((e) => log("error", `no se pudo liberar la bienvenida de ${tenantId}: ${e instanceof Error ? e.message : String(e)}`));
+  };
+
   try {
     const quien = await d.quienLlama();
     if (!quien) return no("NO_AUTH", 401);
-    // Solo el dueño o un administrador de ESE negocio: el correo va al dueño, y un cajero no tiene
-    // por qué poder dispararlo.
-    if (!quien.tenantId || !quien.esAdministrador) return no("SIN_PERMISO", 403);
+    if (!quien.tenantId) return no("SIN_PERMISO", 403);
     tenantId = quien.tenantId;
 
     if (!(await d.hayCupo(quien.usuarioId))) return no("DEMASIADOS_INTENTOS", 429);
 
     const negocio = await d.leerNegocio(tenantId);
     if (!negocio?.duenoId) return no("SIN_DUENO");
+    // Solo el dueño, con SU sesión: el correo es para él y lo dispara su llegada, no la de un
+    // administrador o un empleado que también pase por estas pantallas.
+    if (negocio.duenoId !== quien.usuarioId) return no("NO_ES_DUENO");
     const dueno = await d.leerDueno(negocio.duenoId);
     if (!dueno?.email) return no("SIN_CORREO");
     // Un dueño sin confirmar todavía no llegó: su correo de ahora es el de confirmación.
@@ -161,26 +176,31 @@ export async function procesarBienvenida(d: DepsBienvenida): Promise<RespuestaBi
 
     const reclamo = await d.reclamar(tenantId);
     if (reclamo !== "RECLAMADA") return no(reclamo);
+    reclamada = true;
 
-    // De aquí en adelante la marca está puesta: cualquier fallo tiene que soltarla.
     const soporte = soporteBienvenida(await d.leerSoporte().catch(() => null));
     const correo = correoBienvenida({ nombreDueno: dueno.nombre, negocio: negocio.nombre, adminUrl: d.adminUrl, soporte });
 
-    const soltar = async (por: string) => {
-      log("warn", `bienvenida de ${tenantId} NO enviada (${por}); se libera para reintentar.`);
-      await d.liberar(tenantId).catch((e) => log("error", `no se pudo liberar la bienvenida de ${tenantId}: ${e instanceof Error ? e.message : String(e)}`));
-    };
     // No se espera: el SMTP puede tardar (o no contestar nunca aunque ya haya entregado), y el
     // dueño está en la pantalla de "confirmando tu correo".
     const envio = Promise.resolve()
       .then(() => d.enviar({ to: dueno.email!, subject: correo.subject, html: correo.html }))
       .then((r) => (r.enviado ? log("info", `bienvenida de ${tenantId} enviada.`) : soltar(r.motivo)))
       .catch((e) => soltar(e instanceof Error ? e.message : String(e)));
-    d.enSegundoPlano?.(envio);
+    // El correo ya va en camino: desde aquí la marca es asunto del propio envío (que la suelta si
+    // falla), no del `finally`. Soltarla ahora, con el envío vivo, podría mandar dos.
+    reclamada = false;
+    try {
+      d.enSegundoPlano?.(envio);
+    } catch (e) {
+      log("warn", `bienvenida de ${tenantId}: no se pudo dejar en segundo plano (${e instanceof Error ? e.message : String(e)}); el envío sigue.`);
+    }
 
     return { status: 200, body: { ok: true, enviado: true } };
   } catch (e) {
     log("error", `bienvenida${tenantId ? ` de ${tenantId}` : ""}: ${e instanceof Error ? e.message : String(e)}`);
     return { status: 200, body: { ok: false, enviado: false, motivo: "ERROR" } };
+  } finally {
+    if (reclamada) await soltar("falló antes de enviar");
   }
 }
