@@ -244,6 +244,92 @@ test('el aviso de privacidad no remite al INAI ni mide clics en WhatsApp', () =>
   }
 });
 
+// Los datos del responsable van en el aviso COMO IMAGEN. Son los datos de una persona, se purgaron
+// del sitio y del historial en septiembre de 2026, y el repositorio es público: escritos como
+// texto los copiaría cualquier rastreador o modelo de lenguaje. Estas pruebas no conocen los
+// valores —a propósito, igual que «ningún dato personal vuelve al sitio»— y buscan por FORMA.
+const IMAGEN_RESPONSABLE = 'assets/img/aviso/responsable.png';
+
+test('el aviso identifica al responsable con una imagen, no con texto', () => {
+  const html = leer('aviso-privacidad.html');
+  const img = html.match(/<img\b[^>]*assets\/img\/aviso\/responsable\.png[^>]*>/);
+  assert.ok(img, 'el aviso no enseña la imagen del responsable');
+  assert.ok(fs.existsSync(path.join(RAIZ, IMAGEN_RESPONSABLE)), 'falta el archivo de la imagen (node _capturas/responsable.mjs)');
+
+  // El alt dice QUÉ es, nunca lo que dice: un alt con los datos los devuelve a texto.
+  const alt = img[0].match(/\balt="([^"]*)"/)?.[1] ?? '';
+  assert.equal(alt, 'Nombre y domicilio del responsable — imagen');
+  assert.ok(!/\btitle=|aria-label=|aria-description=/.test(img[0]), 'la imagen lleva un atributo de texto de más');
+  assert.match(img[0], /data-sin-markdown/, 'la imagen viajaría al gemelo en Markdown');
+  assert.match(html, /<div[^>]*data-nosnippet[^>]*>\s*<img\b[^>]*aviso\/responsable/, 'el bloque no lleva data-nosnippet');
+
+  // Quien no ve la imagen tiene cómo pedir los datos, y el RFC se ofrece a solicitud.
+  const texto = soloTexto(html);
+  assert.match(texto, /Por seguridad publicamos estos datos como imagen/);
+  assert.match(texto, /pídelos a hola@vimpos\.com\.mx/);
+  assert.match(texto, /RFC disponible a solicitud del titular/);
+});
+
+test('ni el aviso ni lo que se genera de él traen un RFC o una calle con número', () => {
+  const FORMAS = [
+    // RFC de persona física (13) o moral (12).
+    [/\b[A-ZÑ&]{3,4}\d{6}[A-Z0-9]{3}\b/, 'algo con forma de RFC'],
+    // «Av. Tal 101», «Calle Tal 12», «Col. Tal», «C.P. 37000», «Int. 3», «Local 3».
+    [/\b(av(enida)?|calle|blvd|boulevard|calz(ada)?|privada|prol(ongación)?)\.?\s+[^\n<]{0,40}?\d{1,5}\b/i, 'una calle con número'],
+    [/\b(col(onia)?|fracc(ionamiento)?)\.\s+\p{Lu}/u, 'una colonia'],
+    [/\bC\.?\s?P\.?\s*\d{5}\b/i, 'un código postal'],
+    [/\b(int(erior)?|local|depto|núm|no)\.?\s*\d{1,4}\b/i, 'un número interior'],
+  ];
+  // El HTML ENTERO, no solo su texto: alt, title, comentarios y JSON-LD también se leen.
+  for (const archivo of ['aviso-privacidad.html', 'aviso-privacidad.md', 'llms-full.txt', 'llms.txt', 'agents.md']) {
+    const contenido = leer(archivo);
+    for (const [forma, queEs] of FORMAS) {
+      assert.ok(!forma.test(contenido), `${archivo} trae ${queEs} como texto (${forma})`);
+    }
+  }
+});
+
+test('la imagen del responsable no llega a los archivos para agentes ni a los buscadores', () => {
+  // Ni el gemelo ni los índices para modelos de lenguaje la nombran.
+  for (const archivo of ['aviso-privacidad.md', 'llms.txt', 'llms-full.txt', 'agents.md', 'sitemap.xml']) {
+    assert.ok(!leer(archivo).includes('img/aviso'), `${archivo} nombra la imagen del responsable`);
+  }
+  // …pero el gemelo sí dice cómo pedir los datos.
+  assert.match(leer('aviso-privacidad.md'), /publicamos estos datos como imagen/);
+
+  // robots.txt cierra la carpeta para todos los rastreadores…
+  const robots = leer('robots.txt');
+  const bloqueTodos = robots.split(/^User-agent:/m).find((b) => b.trimStart().startsWith('*')) ?? '';
+  assert.match(bloqueTodos, /^Disallow: \/assets\/img\/aviso\/$/m, 'robots.txt no cierra /assets/img/aviso/');
+
+  // …y se sirve con X-Robots-Tag, en Vercel y en el .htaccess equivalente.
+  const res = resolver('/' + IMAGEN_RESPONSABLE);
+  assert.equal(res.estado, 200);
+  assert.match(res.cabeceras['X-Robots-Tag'] ?? '', /noindex/);
+  assert.match(res.cabeceras['X-Robots-Tag'] ?? '', /noimageindex/);
+  assert.match(res.cabeceras['Cache-Control'] ?? '', /max-age/, 'la regla nueva le quitó la caché a la imagen');
+  assert.match(leer('.htaccess'), /assets\/img\/aviso\/[^\n]*\n\s*Header always set X-Robots-Tag "noindex, noimageindex"/);
+  // Las demás imágenes siguen siendo indexables: la regla no se pasó de ancha.
+  assert.equal(resolver('/assets/img/capturas/kds.webp').cabeceras['X-Robots-Tag'], undefined);
+});
+
+test('la imagen del responsable no lleva metadatos ni texto dentro', () => {
+  const png = fs.readFileSync(path.join(RAIZ, IMAGEN_RESPONSABLE));
+  assert.equal(png.toString('latin1', 1, 4), 'PNG', 'no es un PNG');
+  const trozos = [];
+  for (let i = 8; i + 8 <= png.length;) {
+    trozos.push(png.toString('latin1', i + 4, i + 8));
+    i += 12 + png.readUInt32BE(i);
+  }
+  for (const t of ['tEXt', 'zTXt', 'iTXt', 'eXIf', 'tIME']) {
+    assert.ok(!trozos.includes(t), `el PNG lleva un trozo ${t}: puede traer texto o metadatos`);
+  }
+  // Y es una imagen de verdad (píxeles), no un SVG con <text> rebautizado.
+  assert.ok(!/<svg|<text/i.test(png.toString('latin1')), 'la imagen trae marcado de texto');
+  // Ningún otro archivo de esa carpeta: solo lo que el aviso enseña.
+  assert.deepEqual(fs.readdirSync(path.join(RAIZ, 'assets/img/aviso')), ['responsable.png']);
+});
+
 // ── El middleware del 404 ───────────────────────────────────────────────────
 
 test('el matcher del middleware no toca NINGUNA ruta real', () => {

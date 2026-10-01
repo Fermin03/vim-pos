@@ -28,9 +28,9 @@ _Las formas de pago. La tarjeta se registra para que el corte cuadre; el cobro v
 
 Si una hamburguesa necesita término, no se manda a cocina sin él. El error se evita antes de llegar a la plancha, no después.
 
-### Notas donde toca
+### Notas para la cocina
 
-Una nota para la cocina va en la comanda; una nota de la orden va en el ticket. Son campos distintos porque son lecturas distintas.
+Por producto —«sin cebolla»— o para toda la orden. Salen en la comanda, junto a lo que hay que preparar, no en un papel aparte.
 
 ### Descuentos con motivo
 
@@ -136,15 +136,15 @@ Cuentas el cajón, el sistema dice lo que debería haber, y la diferencia queda 
 
 Por producto, categoría, mesero, área, marca, tipo de servicio, tiempos de cocina, descuentos, reimpresiones, no-shows y el histórico de cortes.
 
-### Estado de resultados del día
+### Todas tus sucursales, sumadas
 
-Ventas, IVA, descuentos, devoluciones y comisiones de apps en una sola pantalla, por sucursal y por día.
+Tickets, venta, ticket promedio, propinas, descuentos y devoluciones de cada sucursal en una sola pantalla. Es el reporte del plan Cadena.
 
 _Apps de reparto_
 
 ## Revisa lo que la app te depositó
 
-Rappi, DiDi y Uber Eats te mandan un reporte de liquidación. Pegas ese reporte aquí y el sistema lo cruza pedido por pedido contra lo que vendiste, y te marca aquéllos en los que el depósito no coincide.
+Rappi, DiDi y Uber Eats te mandan un reporte de liquidación. Pegas aquí sus renglones —folio, monto y lo que te depositaron— y el sistema los cruza pedido por pedido contra lo que vendiste, y te marca aquéllos en los que el depósito no coincide.
 
 ![Pantalla de conciliación de apps con la diferencia por pedido.](https://vimpos.com.mx/assets/img/capturas/admin-conciliacion.webp?v=3)
 
@@ -160,7 +160,7 @@ Pedidos sin depósito, depósitos sin pedido y diferencias de monto, cada grupo 
 
 ### La comisión, en el reporte
 
-Entra en el estado de resultados del día, así que la venta por apps se ve neta y no bruta.
+El reporte de ventas por app trae la venta, la comisión y lo que queda, así que la venta por apps se ve neta y no bruta.
 
 _Si ya usas otro_
 
@@ -178,7 +178,7 @@ _Facturación_
 
 El comensal escanea el código del ticket, pone sus datos y recibe su **CFDI 4.0** por correo. Nadie en el mostrador captura un RFC ni abre otro programa. Va incluida desde el plan Negocio.
 
-El módulo cubre las tres cosas que un restaurante necesita ante el SAT: el **timbrado** de cada ticket que pida factura, la **factura global** con el resto de las ventas del día, y el portal de **autofacturación** por QR donde el cliente hace el trámite solo. Ya está disponible: cada comprobante se timbra con un proveedor autorizado por el SAT y se archiva con su XML y su PDF.
+El módulo cubre las tres cosas que un restaurante necesita ante el SAT: el **timbrado** de cada ticket que pida factura, la **factura global** con el resto de las ventas del periodo, que emites con un botón desde el panel, y el portal de **autofacturación** por QR donde el cliente hace el trámite solo. Ya está disponible: cada comprobante se timbra con un proveedor autorizado por el SAT y se archiva con su XML y su PDF.
 
 [Cómo funciona la facturación](https://vimpos.com.mx/facturacion-cfdi)
 

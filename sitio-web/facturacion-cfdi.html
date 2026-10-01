@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 
 <title>Facturación CFDI 4.0 para tu restaurante — VIM POS</title>
-<meta name="description" content="Autofactura por QR desde el ticket, factura global automática y el periodo lo eliges tú. Qué necesitas dar, qué cuestan los folios y cómo se enciende en tu negocio.">
+<meta name="description" content="Autofactura por QR desde el ticket, factura global del periodo con un botón, y el periodo lo eliges tú. Qué necesitas dar, qué cuestan los folios y cómo se enciende en tu negocio.">
 <link rel="canonical" href="https://vimpos.com.mx/facturacion-cfdi">
 <link rel="alternate" type="text/markdown" href="https://vimpos.com.mx/facturacion-cfdi.md" title="Esta página en Markdown">
 
@@ -13,7 +13,7 @@
 <meta property="og:locale" content="es_MX">
 <meta property="og:site_name" content="VIM POS">
 <meta property="og:title" content="Facturación CFDI 4.0 para tu restaurante">
-<meta property="og:description" content="Autofactura por QR desde el ticket, factura global automática, y el periodo lo eliges tú. Sin e.firma.">
+<meta property="og:description" content="Autofactura por QR desde el ticket, factura global con un botón, y el periodo lo eliges tú. Sin e.firma.">
 <meta property="og:url" content="https://vimpos.com.mx/facturacion-cfdi">
 <meta property="og:image" content="https://vimpos.com.mx/assets/img/og/facturacion-cfdi.png">
 <meta property="og:image:width" content="1200">
@@ -118,7 +118,7 @@
       <h1>Facturación CFDI 4.0, sin parar la fila</h1>
       <p class="entradilla">
         Tu comensal escanea el código del ticket, pone su RFC y recibe su factura por correo. Lo que
-        nadie facturó se junta solo en la factura global del periodo. Tu cajero no vuelve a capturar
+        nadie facturó se junta en la factura global del periodo, que emites con un botón desde tu panel. Tu cajero no vuelve a capturar
         datos fiscales y tú no vuelves a recibir el mensaje de «¿me pueden facturar lo del sábado?».
       </p>
       <p style="font-size:var(--t-15);color:var(--ink-2)">
@@ -166,7 +166,7 @@
     <div class="contenedor pila pila-8">
       <div class="pila pila-4">
         <p class="eyebrow">Lo que cubre</p>
-        <h2>Las tres cosas que el SAT te pide, y ninguna a mano</h2>
+        <h2>Las tres cosas que necesitas ante el SAT</h2>
       </div>
 
       <div class="pila pila-5">
@@ -179,11 +179,12 @@
         </div>
 
         <div class="pila pila-3">
-          <h3>La factura global, automática</h3>
+          <h3>La factura global, con un botón</h3>
           <p>
-            Lo que nadie facturó se junta en una sola factura al cerrar el periodo que tú elijas:
-            diario, semanal, quincenal o mensual. Es lo que el SAT te pide, y sale sin que hagas
-            nada.
+            Lo que nadie facturó se junta en una sola factura por cada periodo que tú elijas: diario,
+            semanal, quincenal o mensual. Cuando el periodo cierra, la emites tú con un botón desde tu
+            panel, en Facturación: el sistema ya sumó las ventas, y te avisa si se te queda un periodo
+            sin emitir.
           </p>
         </div>
 
@@ -206,8 +207,8 @@
         <p>
           En muchos sistemas el cliente tiene «el mes en curso» y se acabó: llega el día 1 y quien no
           facturó se queda sin factura, y quien reclama te lo reclama a ti. Aquí el plazo es tu
-          periodo, y el periodo lo configuras tú. Si cierras quincenal, tienen hasta que cierres la
-          quincena.
+          periodo, y el periodo lo configuras tú. Si cierras quincenal, tu cliente puede facturar su ticket hasta
+          que emitas la factura global de esa quincena.
         </p>
       </div>
     </div>
@@ -289,9 +290,10 @@
           emiten comprobantes reales ante el SAT a través de un proveedor autorizado.
         </p>
         <p>
-          Para encenderlo en tu negocio hacen falta tres cosas: tu Constancia de Situación Fiscal,
-          tu Certificado de Sello Digital (el archivo .cer, el .key y su contraseña) y un paquete de
-          folios. El sello se carga una sola vez desde el panel y a partir de ahí cada ticket que lo
+          Para encenderlo en tu negocio hacen falta dos cosas: tu Constancia de Situación Fiscal y
+          tu Certificado de Sello Digital (el archivo .cer, el .key y su contraseña). Los folios del
+          mes ya vienen con tu plan —en Esencial, con el extra de facturación—; solo compras un
+          paquete si se te acaban. El sello se carga una sola vez desde el panel y a partir de ahí cada ticket que lo
           pida sale timbrado.
         </p>
       </div>
@@ -327,8 +329,7 @@
             <div class="acordeon-panel" data-acordeon-panel><div>
               <p>
                 Para timbrar sí: el sello viaja al proveedor autorizado y éste responde. Para <em>cobrar</em> no —
-                eso sigue funcionando sin conexión, y el ticket sale con su código igual. Cuando
-                vuelve la señal, lo pendiente se timbra solo. Está explicado en
+                eso sigue funcionando sin conexión, y el ticket sale con su código igual. Cuando vuelve la señal, la venta sube sola y tu cliente ya puede facturarla con ese código. Está explicado en
                 <a href="/sin-internet">qué pasa sin internet</a>.
               </p>
             </div></div>
@@ -343,7 +344,7 @@
             </button>
             <div class="acordeon-panel" data-acordeon-panel><div>
               <p>
-                Te avisamos antes. De tu sello guardamos cuál es y cuándo vence precisamente para
+                Te avisamos antes: tu panel lo dice desde 30 días antes de que venza. De tu sello guardamos cuál es y cuándo vence precisamente para
                 eso: enterarte el día que deja de timbrar es enterarte tarde.
               </p>
             </div></div>
@@ -439,10 +440,10 @@
       "@id": "https://vimpos.com.mx/facturacion-cfdi#articulo",
       "url": "https://vimpos.com.mx/facturacion-cfdi",
       "headline": "Facturación CFDI 4.0 para tu restaurante",
-      "description": "Autofactura por QR desde el ticket, factura global automática y el periodo lo eliges tú. Qué necesitas dar y qué cuestan los folios.",
+      "description": "Autofactura por QR desde el ticket, factura global del periodo con un botón, y el periodo lo eliges tú. Qué necesitas dar y qué cuestan los folios.",
       "inLanguage": "es-MX",
       "datePublished": "2026-08-30",
-      "dateModified": "2026-08-30",
+      "dateModified": "2026-10-01",
       "author": { "@id": "https://vimpos.com.mx/#organizacion" },
       "publisher": { "@id": "https://vimpos.com.mx/#organizacion" },
       "image": "https://vimpos.com.mx/assets/img/og/funciones.png",
@@ -468,7 +469,7 @@
           "name": "¿Necesito internet para facturar?",
           "acceptedAnswer": {
             "@type": "Answer",
-            "text": "Para timbrar sí: el sello viaja al proveedor autorizado y éste responde. Para cobrar no — eso sigue funcionando sin conexión, y el ticket sale con su código igual. Cuando vuelve la señal, lo pendiente se timbra solo."
+            "text": "Para timbrar sí: el sello viaja al proveedor autorizado y éste responde. Para cobrar no — eso sigue funcionando sin conexión, y el ticket sale con su código igual. Cuando vuelve la señal, la venta sube sola y tu cliente ya puede facturarla con ese código."
           }
         },
         {
@@ -476,7 +477,7 @@
           "name": "¿Y si mi sello está por vencer?",
           "acceptedAnswer": {
             "@type": "Answer",
-            "text": "Te avisamos antes. De tu sello guardamos cuál es y cuándo vence precisamente para eso: enterarte el día que deja de timbrar es enterarte tarde."
+            "text": "Te avisamos antes: tu panel lo dice desde 30 días antes de que venza. De tu sello guardamos cuál es y cuándo vence precisamente para eso: enterarte el día que deja de timbrar es enterarte tarde."
           }
         }
       ]

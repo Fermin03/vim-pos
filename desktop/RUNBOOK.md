@@ -108,7 +108,7 @@ npm run dist                                        # build:ui + build:kds-ui + 
 **Bandeja (systray) — la caja no se apaga por accidente.** En rol caja, cerrar la ventana la **oculta
 a la bandeja** (no apaga el backend). Solo "Salir (apaga la caja)" desde el menú de la bandeja, o
 apagar la PC, la cierran de verdad. El menú de la bandeja muestra **la IP de la caja** (para teclear
-en la cocina) con "Copiar IP", "Abrir caja", "Respaldar ahora" y "Salir". Resuelve el incidente de
+en la cocina) con "Copiar IP", "Abrir caja", "Respaldar ahora", la fecha del último respaldo y "Salir". Resuelve el incidente de
 que cerrar la ventana tumbaba todo el servidor del local.
 
 **Watchdog — auto-recuperación.** `watchdog.mjs` hace ping a `GET /health/deep` (que toca Postgres
@@ -117,12 +117,43 @@ Verificado (`npm run verify:robustez3`): matando `postgrest.exe`, el backend rev
 
 **Respaldo local del pgdata.** El bin de Postgres embebido no trae `pg_dump`, así que el respaldo es
 **físico en frío**: se copia el `pgdata` con Postgres detenido → copia 100% consistente. Se dispara:
+- **una vez al día, sola** (`respaldo-diario.mjs`) — la caja vive en la bandeja y casi nunca se
+  cierra, así que el respaldo "al cerrar" no bastaba. Cada 15 minutos se mira si toca, y solo se
+  hace con la caja **quieta**: sin turno abierto, sin que nadie la haya operado en 10 minutos (una
+  escritura por el gateway; los sondeos del POS y del KDS no cuentan) y sin sincronización ni
+  actualización en curso. Como mucho uno cada 20 horas. Si el día se va con el turno abierto, se
+  hace en la primera ventana quieta que aparezca. **Nunca interrumpe un turno.**
 - **al cerrar la caja** ("Salir" / apagar la PC) — automático, sin costo (ya está cerrando);
 - **bajo demanda** — "Respaldar ahora" en la bandeja (pausa el watchdog, detiene el backend, copia,
-  lo vuelve a levantar; breve interrupción, pensado para el fin de turno).
+  lo vuelve a levantar; breve interrupción, a criterio del cajero).
 
-Los respaldos van a `<dataRoot>/backups/pgdata-<fecha>_<hora>/`, rotando los **últimos 7**. La nube
-(sync PUSH) sigue siendo el respaldo offsite de las ventas; esto protege el estado completo local.
+Los tres anotan su resultado en `<dataRoot>/backups/ultimo-respaldo.json` y cuentan igual como
+"último respaldo". La bandeja lo enseña: **"Último respaldo: hoy 03:12"**.
+
+**Cuando falla o se atrasa, VIM se entera.** Un respaldo fallido (disco lleno, permiso) se escribe
+en `vim-pos.log` y en `errores_app` —la bitácora que sube sola a la nube y se ve en el panel—
+con `contexto.origen = "respaldo-diario"`. Y una caja que lleva **3 días o más** sin respaldo
+(típico: un negocio que nunca cierra el turno) lo reporta una vez al día, diciendo por qué. Tras un
+fallo no se reintenta antes de una hora: cada intento detiene Postgres.
+
+**Quieta también es "nadie en el teclado".** Además del gateway se pide que el sistema lleve 10
+minutos sin teclado ni mouse (`powerMonitor.getSystemIdleTime()`): un cajero contando el fondo no
+escribe nada en la base. Y si aun así alguien toca la caja en los segundos que dura la copia, el
+puerto no queda cerrado: un gateway de espera contesta **503 "La caja está haciendo su respaldo
+diario; intenta en unos segundos."**, que es lo que el POS enseña en vez de un fallo de red.
+
+**Antes de detener la base se comprueba que el respaldo quepa** (tamaño del pgdata + holgura contra
+el espacio libre). Si no cabe se purgan respaldos del más viejo al más nuevo, dejando siempre al
+menos uno bueno; si ni así, **la base no se detiene** y se reporta (`causa: "sin-espacio"`). Cada
+causa de fallo se reporta una vez cada 24 h. La copia con la caja encendida es asíncrona (no congela
+la bandeja ni el servidor del POS); salir de la app espera al respaldo en curso.
+
+Los respaldos van a `<dataRoot>/backups/pgdata-<fecha>_<hora>/`, rotando los **últimos 7**. Una copia a medias (`.parcial`) no cuenta como respaldo y se borra al empezar el siguiente.
+
+**Qué protege y qué no.** Esto es una copia **en la misma computadora**: salva de una base dañada o
+de un error humano, no de que se robe o se queme el equipo. Fuera del local están **las ventas**,
+que el sync sube a la nube cuando hay internet (y el menú, que vive en la nube). No hay una copia
+de la base entera fuera del local; el sitio lo dice así y no promete más.
 
 ```bash
 # Con la caja CERRADA (respeta VIM_DATA_DIR si reubicaste los datos):

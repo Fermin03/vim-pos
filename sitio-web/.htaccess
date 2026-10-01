@@ -109,6 +109,13 @@ ErrorDocument 404 /404.html
   <FilesMatch "\.(html|md)$">
     Header always set Vary "Accept, Accept-Encoding"
   </FilesMatch>
+
+  # La imagen del Aviso de privacidad con los datos del responsable: ni se indexa
+  # ni sale en la búsqueda de imágenes. Lo mismo que dice vercel.json (se genera
+  # en _agentes/generar.mjs) y que robots.txt cierra por su lado.
+  <If "%{REQUEST_URI} =~ m#^/assets/img/aviso/#">
+    Header always set X-Robots-Tag "noindex, noimageindex"
+  </If>
 </IfModule>
 
 # ── Caché ───────────────────────────────────────────────────────────────────

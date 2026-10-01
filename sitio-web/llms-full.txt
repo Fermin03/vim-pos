@@ -198,7 +198,7 @@ Sí. Descargas tu menú del sistema que usas hoy y lo pegas tal cual. Si el form
 
 ### ¿Emite facturas?
 
-Sí. Factura global del periodo, timbrado individual de cualquier ticket y portal de autofacturación por QR, con CFDI 4.0 timbrado por un proveedor autorizado por el SAT. Cada plan trae folios al mes para tus facturas —10 en Esencial con el extra de facturación, 20 en Negocio y 40 en Cadena— y, si se acaban, compras un paquete. Los precios están en la página de precios.
+Sí. Factura global del periodo (la emites con un botón desde el panel), timbrado individual de cualquier ticket y portal de autofacturación por QR, con CFDI 4.0 timbrado por un proveedor autorizado por el SAT. Cada plan trae folios al mes para tus facturas —10 en Esencial con el extra de facturación, 20 en Negocio y 40 en Cadena— y, si se acaban, compras un paquete. Los precios están en la página de precios.
 
 ### ¿Cuánto tarda la implementación?
 
@@ -206,7 +206,7 @@ Alrededor de un día. Desde Negocio lo hacemos nosotros: cargamos tu menú, lo d
 
 ### ¿Y si se va la luz o alguien cierra el programa?
 
-El programa se queda junto al reloj de Windows y se vuelve a abrir solo si alguien lo cierra. Guarda copias de tus ventas por su cuenta, y las que no alcanzaron a subir suben en cuanto vuelve la señal.
+El programa se queda junto al reloj de Windows y sigue trabajando aunque alguien cierre la ventana. Guarda sola una copia diaria en la misma computadora, y las ventas que no alcanzaron a subir suben en cuanto vuelve la señal.
 
 ### ¿Funciona con varias sucursales?
 
@@ -258,9 +258,9 @@ _Las formas de pago. La tarjeta se registra para que el corte cuadre; el cobro v
 
 Si una hamburguesa necesita término, no se manda a cocina sin él. El error se evita antes de llegar a la plancha, no después.
 
-### Notas donde toca
+### Notas para la cocina
 
-Una nota para la cocina va en la comanda; una nota de la orden va en el ticket. Son campos distintos porque son lecturas distintas.
+Por producto —«sin cebolla»— o para toda la orden. Salen en la comanda, junto a lo que hay que preparar, no en un papel aparte.
 
 ### Descuentos con motivo
 
@@ -366,15 +366,15 @@ Cuentas el cajón, el sistema dice lo que debería haber, y la diferencia queda 
 
 Por producto, categoría, mesero, área, marca, tipo de servicio, tiempos de cocina, descuentos, reimpresiones, no-shows y el histórico de cortes.
 
-### Estado de resultados del día
+### Todas tus sucursales, sumadas
 
-Ventas, IVA, descuentos, devoluciones y comisiones de apps en una sola pantalla, por sucursal y por día.
+Tickets, venta, ticket promedio, propinas, descuentos y devoluciones de cada sucursal en una sola pantalla. Es el reporte del plan Cadena.
 
 _Apps de reparto_
 
 ## Revisa lo que la app te depositó
 
-Rappi, DiDi y Uber Eats te mandan un reporte de liquidación. Pegas ese reporte aquí y el sistema lo cruza pedido por pedido contra lo que vendiste, y te marca aquéllos en los que el depósito no coincide.
+Rappi, DiDi y Uber Eats te mandan un reporte de liquidación. Pegas aquí sus renglones —folio, monto y lo que te depositaron— y el sistema los cruza pedido por pedido contra lo que vendiste, y te marca aquéllos en los que el depósito no coincide.
 
 ![Pantalla de conciliación de apps con la diferencia por pedido.](https://vimpos.com.mx/assets/img/capturas/admin-conciliacion.webp?v=3)
 
@@ -390,7 +390,7 @@ Pedidos sin depósito, depósitos sin pedido y diferencias de monto, cada grupo 
 
 ### La comisión, en el reporte
 
-Entra en el estado de resultados del día, así que la venta por apps se ve neta y no bruta.
+El reporte de ventas por app trae la venta, la comisión y lo que queda, así que la venta por apps se ve neta y no bruta.
 
 _Si ya usas otro_
 
@@ -408,7 +408,7 @@ _Facturación_
 
 El comensal escanea el código del ticket, pone sus datos y recibe su **CFDI 4.0** por correo. Nadie en el mostrador captura un RFC ni abre otro programa. Va incluida desde el plan Negocio.
 
-El módulo cubre las tres cosas que un restaurante necesita ante el SAT: el **timbrado** de cada ticket que pida factura, la **factura global** con el resto de las ventas del día, y el portal de **autofacturación** por QR donde el cliente hace el trámite solo. Ya está disponible: cada comprobante se timbra con un proveedor autorizado por el SAT y se archiva con su XML y su PDF.
+El módulo cubre las tres cosas que un restaurante necesita ante el SAT: el **timbrado** de cada ticket que pida factura, la **factura global** con el resto de las ventas del periodo, que emites con un botón desde el panel, y el portal de **autofacturación** por QR donde el cliente hace el trámite solo. Ya está disponible: cada comprobante se timbra con un proveedor autorizado por el SAT y se archiva con su XML y su PDF.
 
 [Cómo funciona la facturación](https://vimpos.com.mx/facturacion-cfdi)
 
@@ -450,10 +450,10 @@ _Comparación entre un punto de venta que vive en internet, un sistema instalado
 | --- | --- | --- | --- |
 | Se cae el internet | Se detiene o pasa a apuntar en papel | Sigue vendiendo | Sigue vendiendo |
 | Ver cómo va el día sin estar ahí | Sí, desde el celular | No, hay que ir al local | Sí, desde el celular |
-| Si se muere la computadora | Tus datos están fuera | El respaldo que hayas hecho tú | Copia diaria en el local y fuera de él |
-| Actualizaciones | Solas | Visita del técnico | Solas, sin que nadie vaya |
+| Si se muere la computadora | Tus datos están fuera | El respaldo que hayas hecho tú | Copia diaria en la caja; tus ventas, también en la nube |
+| Actualizaciones | Solas | Visita del técnico | Con un clic, sin que nadie vaya |
 | Varias sucursales sumadas | Sí | Depende de la versión | Sí, un reporte con todo |
-| Dónde vive tu información | Solo fuera | Solo en tu local | En tu local, con copia fuera |
+| Dónde vive tu información | Solo fuera | Solo en tu local | En tu local; tus ventas, también en la nube |
 
 La columna de en medio existe porque es honesta: hay sistemas instalados que tampoco se detienen sin internet. Ahí no ganamos por seguir vendiendo — ganamos por el resto de la tabla.
 
@@ -520,7 +520,7 @@ La caja comprueba cada pocos segundos que todo responda. Si algo se cayó, lo le
 
 ### Siete copias, siempre
 
-Guarda una copia completa al cerrar el día y conserva las siete más recientes. Además de la copia fuera del local: si se muere la computadora, no se muere el negocio.
+Guarda sola una copia completa cada día —cuando la caja está quieta, sin turno abierto— y conserva las siete más recientes en la misma computadora. Tus ventas, además, suben a la nube cuando hay internet: si se muere la computadora, lo vendido y ya subido no se pierde.
 
 ### No se apaga por accidente
 
@@ -528,7 +528,7 @@ Si alguien cierra la ventana en plena hora pico, la caja sigue trabajando: se qu
 
 ### Se actualiza sin visita
 
-Las versiones nuevas llegan solas y se comprueban antes de instalarse, para que lo que entra a tu caja sea lo que mandamos y nada más. No tienes que agendar a un técnico.
+La caja te avisa cuando hay una versión nueva y la instalas con un clic. Se comprueba antes de instalarse, para que lo que entra a tu caja sea lo que mandamos y nada más. No tienes que agendar a un técnico.
 
 Todo lo de esta página lo hace el programa que se instala en la computadora de tu caja, con Windows. Si abres el punto de venta desde el navegador y se cae el internet, te avisa en pantalla, pero ahí no cobra sin conexión.
 
@@ -548,11 +548,11 @@ Es la demo que pedimos que nos hagas: desconecta el cable delante de nosotros y 
 
 # Facturación CFDI 4.0, sin parar la fila
 
-> Autofactura por QR desde el ticket, factura global automática y el periodo lo eliges tú. Qué necesitas dar, qué cuestan los folios y cómo se enciende en tu negocio.
+> Autofactura por QR desde el ticket, factura global del periodo con un botón, y el periodo lo eliges tú. Qué necesitas dar, qué cuestan los folios y cómo se enciende en tu negocio.
 
 **VIM POS** · punto de venta para restaurantes en México · versión en HTML: https://vimpos.com.mx/facturacion-cfdi
 
-Tu comensal escanea el código del ticket, pone su RFC y recibe su factura por correo. Lo que nadie facturó se junta solo en la factura global del periodo. Tu cajero no vuelve a capturar datos fiscales y tú no vuelves a recibir el mensaje de «¿me pueden facturar lo del sábado?».
+Tu comensal escanea el código del ticket, pone su RFC y recibe su factura por correo. Lo que nadie facturó se junta en la factura global del periodo, que emites con un botón desde tu panel. Tu cajero no vuelve a capturar datos fiscales y tú no vuelves a recibir el mensaje de «¿me pueden facturar lo del sábado?».
 
 Ya está disponible: timbra con un proveedor autorizado por el SAT y el comprobante que recibe tu cliente es un CFDI 4.0 válido. Abajo dice exactamente qué necesitas dar para encenderlo en tu negocio.
 
@@ -572,15 +572,15 @@ _El comensal escanea el código del ticket, pone su RFC y le llega la factura. T
 
 _Lo que cubre_
 
-## Las tres cosas que el SAT te pide, y ninguna a mano
+## Las tres cosas que necesitas ante el SAT
 
 ### Timbrado individual
 
 Cada ticket que pida factura se timbra con su CFDI 4.0 y llega por correo. Sin que nadie del mostrador abra otro programa ni teclee un RFC.
 
-### La factura global, automática
+### La factura global, con un botón
 
-Lo que nadie facturó se junta en una sola factura al cerrar el periodo que tú elijas: diario, semanal, quincenal o mensual. Es lo que el SAT te pide, y sale sin que hagas nada.
+Lo que nadie facturó se junta en una sola factura por cada periodo que tú elijas: diario, semanal, quincenal o mensual. Cuando el periodo cierra, la emites tú con un botón desde tu panel, en Facturación: el sistema ya sumó las ventas, y te avisa si se te queda un periodo sin emitir.
 
 ### Autofacturación por QR
 
@@ -590,7 +590,7 @@ _El detalle que cambia el mes_
 
 ## Hasta cuándo pueden facturar lo decides tú
 
-En muchos sistemas el cliente tiene «el mes en curso» y se acabó: llega el día 1 y quien no facturó se queda sin factura, y quien reclama te lo reclama a ti. Aquí el plazo es tu periodo, y el periodo lo configuras tú. Si cierras quincenal, tienen hasta que cierres la quincena.
+En muchos sistemas el cliente tiene «el mes en curso» y se acabó: llega el día 1 y quien no facturó se queda sin factura, y quien reclama te lo reclama a ti. Aquí el plazo es tu periodo, y el periodo lo configuras tú. Si cierras quincenal, tu cliente puede facturar su ticket hasta que emitas la factura global de esa quincena.
 
 _Lo que hay que darnos_
 
@@ -628,7 +628,7 @@ _Dónde está hoy_
 
 El módulo ya está disponible: timbrado, factura global y el portal de autofacturación emiten comprobantes reales ante el SAT a través de un proveedor autorizado.
 
-Para encenderlo en tu negocio hacen falta tres cosas: tu Constancia de Situación Fiscal, tu Certificado de Sello Digital (el archivo.cer, el.key y su contraseña) y un paquete de folios. El sello se carga una sola vez desde el panel y a partir de ahí cada ticket que lo pida sale timbrado.
+Para encenderlo en tu negocio hacen falta dos cosas: tu Constancia de Situación Fiscal y tu Certificado de Sello Digital (el archivo.cer, el.key y su contraseña). Los folios del mes ya vienen con tu plan —en Esencial, con el extra de facturación—; solo compras un paquete si se te acaban. El sello se carga una sola vez desde el panel y a partir de ahí cada ticket que lo pida sale timbrado.
 
 _Preguntas_
 
@@ -640,11 +640,11 @@ Sí. La caja, la cocina, las mesas y el inventario no dependen de ella, y hoy es
 
 #### ¿Necesito internet para facturar?
 
-Para timbrar sí: el sello viaja al proveedor autorizado y éste responde. Para _cobrar_ no — eso sigue funcionando sin conexión, y el ticket sale con su código igual. Cuando vuelve la señal, lo pendiente se timbra solo. Está explicado en [qué pasa sin internet](https://vimpos.com.mx/sin-internet).
+Para timbrar sí: el sello viaja al proveedor autorizado y éste responde. Para _cobrar_ no — eso sigue funcionando sin conexión, y el ticket sale con su código igual. Cuando vuelve la señal, la venta sube sola y tu cliente ya puede facturarla con ese código. Está explicado en [qué pasa sin internet](https://vimpos.com.mx/sin-internet).
 
 #### ¿Y si mi sello está por vencer?
 
-Te avisamos antes. De tu sello guardamos cuál es y cuándo vence precisamente para eso: enterarte el día que deja de timbrar es enterarte tarde.
+Te avisamos antes: tu panel lo dice desde 30 días antes de que venza. De tu sello guardamos cuál es y cuándo vence precisamente para eso: enterarte el día que deja de timbrar es enterarte tarde.
 
 ## Te lo enseñamos funcionando
 
@@ -730,7 +730,7 @@ o $19,990 al año, más IVA
 - Todo lo de Negocio
 - Un reporte que suma todas
 - Facturación incluida · 40 folios al mes
-- Menú compartido o propio por sucursal
+- El mismo menú en todas tus sucursales
 - Visita presencial el día del arranque
 
 [Pide una demo](https://vimpos.com.mx/demo)
@@ -767,7 +767,7 @@ _Comparación de los tres planes de VIM POS._
 | Folios de factura al mes | 10, con el extra de facturación | 20 | 40 |
 | Pedidos de Uber Eats en la caja | $100 al mes aparte | Incluido | Incluido |
 | Quién carga tu menú | Tú, con nuestra guía | Nosotros | Nosotros |
-| Capacitación | Videos y guía escrita | 3 horas con tu equipo | 3 horas con tu equipo |
+| Capacitación | Guía paso a paso en el panel | 3 horas con tu equipo | 3 horas con tu equipo |
 | Soporte | WhatsApp y correo | WhatsApp y correo | WhatsApp y correo |
 | El día del arranque | Te ayudamos por WhatsApp | Te acompañamos en línea | Vamos a tu local |
 
@@ -791,7 +791,7 @@ _Desde Negocio_
 
 ### Tu menú, cargado
 
-Con precios, categorías, extras y términos. Si vienes de otro sistema, lo traemos de ahí en lugar de teclearlo de nuevo. En Esencial lo pegas tú con la misma herramienta.
+Con sus categorías, precios y descripciones. Si vienes de otro sistema, lo traemos de ahí en lugar de teclearlo de nuevo; los extras y los términos se capturan después, ya en el panel. En Esencial lo pegas tú con la misma herramienta.
 
 _Los tres planes_
 
@@ -803,19 +803,19 @@ _Desde Negocio_
 
 ### Capacitación de tu equipo
 
-Tres horas con quien va a estar en la caja y en la cocina. En Esencial, videos y guía escrita, y dudas por WhatsApp.
+Tres horas con quien va a estar en la caja y en la cocina. En Esencial, el panel te lleva paso a paso hasta dejar todo listo, y las dudas se resuelven por WhatsApp, de 9:00 a 18:00.
 
 _Los tres planes_
 
 ### Actualizaciones
 
-Todas, siempre. Llegan solas a tu caja y no hay que agendar a nadie ni pagar la versión nueva.
+Todas, siempre. Tu caja te avisa cuando hay una versión nueva y la instalas con un clic («Descargar e instalar»). No hay que agendar a nadie ni pagar la versión nueva.
 
 _Los tres planes_
 
 ### Respaldos
 
-Copia diaria en tu local y copia fuera de él. Sin que tengas que acordarte.
+Tu caja guarda sola una copia diaria de todo en su propia computadora y conserva las siete más recientes. Además, tus ventas suben a la nube cada vez que hay internet. Sin que tengas que acordarte.
 
 ![Inventario con cada insumo, su existencia, su mínimo y el aviso cuando anda bajo.](https://vimpos.com.mx/assets/img/capturas/admin-inventario.webp?v=3)
 
@@ -837,7 +837,7 @@ Al mes, más IVA. Entra al reporte que suma todas.
 
 $249
 
-Al mes, más IVA. Comparte turno y comandas con la principal.
+Al mes, más IVA. Comparte cocina, comandas y cuentas abiertas con la principal; cada caja lleva su propio turno y su corte.
 
 ### Facturación
 
@@ -1087,7 +1087,7 @@ Tu menú, tus ventas y tu histórico son tuyos. Pregunta en qué formato te los 
 
 ### 5 · ¿La facturación va incluida o es aparte?
 
-En México esto casi nunca está incluido del todo. Pregunta si el timbrado se cobra por folio, si la factura global del periodo sale sola, y hasta cuándo puede facturar tu cliente. La diferencia entre «el mes en curso» y «hasta que tú cierres el periodo» son llamadas que acabas atendiendo tú.
+En México esto casi nunca está incluido del todo. Pregunta si el timbrado se cobra por folio, si la factura global del periodo sale sola o hay que emitirla, y hasta cuándo puede facturar tu cliente. La diferencia entre «el mes en curso» y «hasta que tú emitas la global del periodo» son llamadas que acabas atendiendo tú.
 
 ### 6 · ¿La implementación y la capacitación se cobran aparte?
 
@@ -1242,15 +1242,17 @@ Este sitio publica su contenido también en Markdown y describe qué es VIM POS 
 
 Qué datos te pedimos, para qué los usamos y cómo pedirnos que los borremos. En corto: te pedimos lo mínimo para poder contestarte, y no los vendemos ni los compartimos con nadie que quiera venderte algo.
 
-Última actualización: 30 de septiembre de 2026.
+Última actualización: 1 de octubre de 2026.
 
 ## Quién es responsable de tus datos
 
-**VIM POS**, persona física con actividad empresarial, en Guanajuato, México.
+**VIM POS** es el nombre comercial. Quien responde por tus datos es una persona física con actividad empresarial, en Guanajuato, México. Su nombre completo y la dirección donde atiende son éstos:
 
-El nombre, el RFC y el domicilio fiscal completos del responsable se entregan a quien los pida por el correo de abajo, y van en el contrato de cualquier cliente. No se publican aquí.
+Por seguridad publicamos estos datos como imagen. Si no puedes verla o usas lector de pantalla, pídelos a [hola@vimpos.com.mx](mailto:hola@vimpos.com.mx) y te los enviamos.
 
-Para cualquier cosa de este aviso: [hola@vimpos.com.mx](mailto:hola@vimpos.com.mx).
+RFC disponible a solicitud del titular.
+
+Para cualquier cosa de este aviso, y para ejercer tus derechos de acceso, rectificación, cancelación u oposición, escribe a [hola@vimpos.com.mx](mailto:hola@vimpos.com.mx). Más abajo, en [«Tus derechos ARCO»](#arco), dice qué poner en el mensaje y en cuánto tiempo contestamos.
 
 ## Qué datos recabamos
 
@@ -1333,26 +1335,26 @@ Si cambia, se publica aquí con la fecha nueva arriba. Si el cambio afecta a par
 
 Qué contratas, qué incluye, cómo se cobra y cómo cancelar. Escritos para que se entiendan de una lectura.
 
-Última actualización: 13 de septiembre de 2026.
+Última actualización: 1 de octubre de 2026.
 
 ## Quién presta el servicio
 
 **VIM POS**, persona física con actividad empresarial, en Guanajuato, México. En adelante, «nosotros».
 
-El nombre, el RFC y el domicilio fiscal completos de quien presta el servicio van en el contrato que se firma antes de contratar, y se entregan antes a quien los pida por correo. No se publican en el sitio.
+El nombre y la dirección de quien presta el servicio están en el [Aviso de privacidad](https://vimpos.com.mx/aviso-privacidad) —como imagen, por seguridad— y van, junto con el RFC, en el contrato que se firma antes de contratar. El RFC se entrega antes a quien lo pida por correo.
 
 Al contratar el servicio aceptas estos términos. Si algo no te cuadra, dínoslo antes de contratar y lo hablamos.
 
 ## Qué contratas
 
-Una suscripción de uso del sistema de punto de venta VIM POS, según el plan que elijas: el programa que se instala en la computadora de tu caja, el panel para ver tu negocio desde fuera, y el respaldo de tu información.
+Una suscripción de uso del sistema de punto de venta VIM POS, según el plan que elijas: el programa que se instala en la computadora de tu caja, el panel para ver tu negocio desde fuera, y la copia de tus ventas en la nube.
 
 Los límites de cada plan —cuántas cajas y cuántas sucursales— son los publicados en la [página de precios](https://vimpos.com.mx/precios). Si necesitas más, se agregan como extras con el precio de esa misma página.
 
 ## Qué NO incluye
 
 - **El equipo.** Computadora, impresora, cajón y el módem los compras tú. Te decimos qué buscar; no los vendemos ni los garantizamos.
-- **Tu internet.** El sistema cobra sin conexión, pero el panel desde fuera y el respaldo la necesitan.
+- **Tu internet.** El sistema cobra sin conexión, pero el panel desde fuera y la copia de tus ventas en la nube la necesitan.
 - **El cobro con tarjeta.** La tarjeta se cobra en tu terminal bancaria y en el sistema se registra como forma de pago. El dinero no pasa por nosotros y no cobramos comisión por venta.
 - **Tus obligaciones fiscales.** El sistema te ayuda a cumplirlas; quien responde ante el SAT eres tú.
 
@@ -1383,9 +1385,9 @@ Además, tu información también vive en tu propia caja: el día que dejes de s
 
 **El sistema que contratas es otra cosa.** Ni la caja ni el panel de administración llevan Google Analytics, ni cookies de publicidad, ni ninguna medición de terceros: ahí solo se guarda lo necesario para mantener tu sesión abierta y para que el punto de venta funcione. Lo que se mide en esta página web no toca en ningún momento las ventas, el menú ni los clientes de tu negocio.
 
-## Apps de reparto (Uber Eats, DiDi Food, Rappi)
+## Apps de reparto (hoy, Uber Eats)
 
-Si conectas la tienda que tienes en una app de reparto, los pedidos de esa app entran solos a tu caja y a tu cocina. Es opcional: lo activas tú desde el panel, tienda por tienda, y lo desconectas cuando quieras.
+Hoy la conexión es con **Uber Eats**: si conectas la tienda que tienes ahí, sus pedidos entran solos a tu caja y a tu cocina. Es opcional: lo activas tú desde el panel, tienda por tienda, y lo desconectas cuando quieras. Otras apps (DiDi Food, Rappi) se sumarán cuando estén disponibles, sin fecha comprometida; mientras tanto sus pedidos se capturan en la caja como cualquier otra venta. Lo que sigue aplica a cada app que conectes.
 
 **Al conectarla nos autorizas** a recibir en tu nombre los pedidos y los datos que la app manda con ellos (nombre corto y teléfono del cliente, dirección, ítems, instrucciones y alergias), y a usarlos **solo** para preparar y cobrar esos pedidos y para mostrarte tus ventas. No los usamos para nada más ni los cruzamos con tu lista de clientes. Esos datos son de la app y de su cliente; a los **30 días** de cerrado el pedido borramos el teléfono, la dirección y el resto de datos personales y solo dejamos importes e ítems para tus reportes.
 

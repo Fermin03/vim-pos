@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { autorizar } from "../../lib/server";
 import { fechaLegible, hoyMx } from "@vim/fecha";
 import { AVISO_PRUEBA_DIAS, diasEntre, estadoPrueba, precioVigente, promocionVigente, type PrecioSuscripcion } from "@vim/db/cobro";
+import { alertaDeSello } from "../../lib/alerta-sello";
 
 /**
  * Bandeja de "requiere tu atención": lo que hay que hacer HOY, no lo que pasó.
@@ -84,7 +85,7 @@ export async function GET(req: Request) {
   const nombreDe = new Map(tenants.map((t) => [t.id, t.nombre_comercial]));
   const activos = new Set(tenants.filter((t) => t.estado !== "CANCELADO" && t.estado !== "BAJA").map((t) => t.id));
 
-  const [cajasRes, subsRes, foliosRes, onbRes, ventasRes, syncRes] = await Promise.all([
+  const [cajasRes, subsRes, foliosRes, onbRes, ventasRes, syncRes, sellosRes] = await Promise.all([
     sb.from("cajas").select("id, nombre, tenant_id, activa, bloqueada, bloqueo_motivo, ultimo_latido, version_app").is("deleted_at", null).limit(2000),
     sb.from("suscripciones").select("tenant_id, estado, fecha_fin, proxima_fecha_cobro, precio_mensual_mxn, precio_promocional_mxn, promocion_hasta, promocion_nombre").limit(1000),
     sb.from("tenant_folios_saldo").select("tenant_id, folios_base_mensuales, folios_base_consumidos, saldo_paquetes, umbral_alerta").limit(1000),
@@ -94,6 +95,7 @@ export async function GET(req: Request) {
       .order("created_at", { ascending: false }).limit(5000),
     sb.from("sync_eventos").select("tenant_id, fecha_recepcion, operaciones_error")
       .order("fecha_recepcion", { ascending: false }).limit(2000),
+    sb.from("tenant_cfdi_emisor").select("tenant_id, csd_numero_certificado, csd_vigencia_hasta").limit(1000),
   ]);
 
   const ultimaVenta = new Map<string, string>();
@@ -303,6 +305,17 @@ export async function GET(req: Request) {
         orden: disponibles,
       });
     }
+  }
+
+  // ── Sello digital (CSD) por vencer ─────────────────────────────────────────────────────
+  // El dueño ya lo ve en su panel 30 días antes; aquí sale para que VIM le llame si no lo atiende.
+  // Un sello vencido es un cliente que no puede facturar y que casi siempre se entera por su
+  // propio cliente, en la caja.
+  for (const e of (sellosRes.data ?? []) as { tenant_id: string; csd_numero_certificado: string | null; csd_vigencia_hasta: string | null }[]) {
+    if (!activos.has(e.tenant_id) || !e.csd_numero_certificado) continue;
+    const a = alertaDeSello(e.csd_vigencia_hasta, hoy);
+    if (!a) continue;
+    alertas.push({ id: `sello-${e.tenant_id}`, tenantId: e.tenant_id, tenant: nombreDe.get(e.tenant_id) ?? "—", ...a });
   }
 
   // ── Onboarding estancado ───────────────────────────────────────────────────────────────

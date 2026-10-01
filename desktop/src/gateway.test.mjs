@@ -142,3 +142,44 @@ test("D5: delivery-accion ve el proveedor de nube aunque se asigne DESPUÉS de c
     await new Promise((r) => nube.close(r));
   }
 });
+
+test("respaldo diario: el gateway avisa cuando alguien OPERA la caja, no cuando el POS sondea", async () => {
+  let avisos = 0;
+  const vivo = { restPort: 1, secret: SECRET, pool: poolFalso() };
+  // Como en backend.mjs: llega por opcionesGateway, igual que kds y uiPorts.
+  const server = crearGateway(opcionesGateway(vivo, { alHaberActividad: () => { avisos++; } }));
+  await new Promise((r) => server.listen(0, "127.0.0.1", r));
+  const port = server.address().port;
+  try {
+    await pedir(port, { path: "/health" });
+    await pedir(port, { path: "/auth/v1/user" });
+    await pedir(port, { method: "POST", path: "/auth/v1/token?grant_type=refresh_token", headers: { "Content-Type": "application/json" }, body: "{}" });
+    assert.equal(avisos, 0, "sondeos y refresco de sesión no son actividad");
+    await pedir(port, { method: "POST", path: "/functions/v1/pin-login", headers: { "Content-Type": "application/json" }, body: "{}" });
+    assert.equal(avisos, 1, "un intento de entrar con PIN sí");
+    // Un host ajeno (DNS rebinding) se rechaza ANTES: no cuenta como actividad de la caja.
+    await pedir(port, { method: "POST", path: "/functions/v1/pin-login", headers: { Host: "malo.example", "Content-Type": "application/json" }, body: "{}" });
+    assert.equal(avisos, 1);
+  } finally {
+    await new Promise((r) => server.close(r));
+  }
+});
+
+test("durante el respaldo, el puerto del gateway contesta un 503 claro y reintentable, legible por el POS", async () => {
+  const { crearGatewayDeEspera, MENSAJE_RESPALDO } = await import("./gateway.mjs");
+  const server = crearGatewayDeEspera({ uiPorts: [54360] });
+  await new Promise((r) => server.listen(0, "127.0.0.1", r));
+  const port = server.address().port;
+  try {
+    const r = await pedir(port, { method: "POST", path: "/rest/v1/rpc/abrir_turno", headers: { Origin: "http://localhost:54360", "Content-Type": "application/json" }, body: "{}" });
+    assert.equal(r.status, 503);
+    assert.equal(r.headers["retry-after"], "5");
+    assert.equal(r.headers["access-control-allow-origin"], "http://localhost:54360", "sin CORS el navegador solo ve «Failed to fetch»");
+    const cuerpo = JSON.parse(r.text);
+    assert.equal(cuerpo.message, MENSAJE_RESPALDO); // supabase-js enseña `message`
+    assert.equal(cuerpo.error, "RESPALDO_EN_CURSO");
+    assert.match(MENSAJE_RESPALDO, /respaldo diario; intenta en unos segundos/);
+    assert.equal((await pedir(port, { method: "OPTIONS", path: "/rest/v1/tickets", headers: { Origin: "http://localhost:54360" } })).status, 204);
+    assert.equal((await pedir(port, { path: "/health", headers: { Host: "malo.example" } })).status, 403);
+  } finally { await new Promise((r) => server.close(r)); }
+});

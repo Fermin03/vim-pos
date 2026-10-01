@@ -1,9 +1,10 @@
 // Fase 1/2/3 · Proceso main de Electron. Una sola app, dos roles:
 //  • CAJA (por defecto): POS local-first — backend en la caja (Postgres embebido + PostgREST +
 //    gateway) + UI del POS. Hace de HUB en la LAN. Fase 3: bandeja (no se apaga por accidente) +
-//    watchdog (se auto-recupera) + respaldo del pgdata al cerrar y bajo demanda.
+//    watchdog (se auto-recupera) + respaldo del pgdata diario (con la caja quieta), al cerrar y
+//    bajo demanda.
 //  • COCINA (--role=cocina): pantalla de cocina como CLIENTE DELGADO del hub. SIN backend local.
-import { app, BrowserWindow, Tray, Menu, nativeImage, clipboard, Notification, dialog, shell, safeStorage, ipcMain, screen } from "electron";
+import { app, BrowserWindow, Tray, Menu, nativeImage, clipboard, Notification, dialog, shell, safeStorage, ipcMain, screen, powerMonitor } from "electron";
 import { existsSync, readFileSync, writeFileSync, mkdirSync, openSync, writeSync } from "node:fs";
 import { inspect } from "node:util";
 import path from "node:path";
@@ -14,9 +15,11 @@ import { startUiServer } from "./ui-server.mjs";
 import { pullFromCloud } from "./sync-pull.mjs";
 import { loginDispositivoNube } from "./dispositivo.mjs";
 import { pushToCloud } from "./sync-push.mjs";
-import { respaldar } from "./backup.mjs";
+import { respaldar, respaldarAsync, hacerSitio } from "./backup.mjs";
+import { crearGatewayDeEspera } from "./gateway.mjs";
+import { crearRespaldoDiario, guardarEstado as guardarEstadoRespaldo, leerEstado as leerEstadoRespaldo, textoUltimoRespaldo } from "./respaldo-diario.mjs";
 import { crearWatchdog } from "./watchdog.mjs";
-import { crearCicloSync } from "./sync-ciclo.mjs";
+import { crearCicloSync, OMITIDO } from "./sync-ciclo.mjs";
 import { crearSondeoCatalogo } from "./sondeo-catalogo.mjs";
 import { crearAlmacenDirectivas, estadoDeVersion } from "./directivas.mjs";
 import { pantallaDeLaCaja } from "./pantalla.mjs";
@@ -114,6 +117,12 @@ ipcMain.handle("vim:salir", () => {
 });
 let arrancado = false;        // ya terminó el boot: después, un rechazo suelto no debe matar la caja
 let respaldando = false;
+let respaldoEnCurso = null;   // la promesa del respaldo con la caja encendida: salir la espera
+let vinculando = false;       // hay un PULL de vinculación escribiendo en la base local
+let respaldoDiario = null;    // temporizador del respaldo diario (respaldo-diario.mjs)
+// Última vez que alguien OPERÓ la caja (una escritura por el gateway). Arranca en "ahora": recién
+// abierta la app, lo prudente es suponer que alguien está por usarla.
+let ultimaActividad = Date.now();
 let updateInfo = null;        // manifiesto de la actualización disponible (o null)
 let descargandoUpdate = false;
 
@@ -220,6 +229,7 @@ async function vincularConNube({ email, password } = {}) {
     return { ok: false, motivo: "RED", error: `No se pudo contactar la nube de VIM: ${e?.message ?? "sin conexión"}` };
   }
 
+  vinculando = true; // el respaldo diario no detiene la base a media bajada
   try {
     console.log("· [alta] credenciales válidas en la nube; bajando datos del negocio…");
     const r = await pullFromCloud(backend.pool, { cloudUrl: CLOUD_URL, anonKey: CLOUD_ANON, deviceToken: token }, (m) => console.log("· [alta]", m));
@@ -230,6 +240,8 @@ async function vincularConNube({ email, password } = {}) {
   } catch (e) {
     console.error("· [alta] falló la bajada de datos:", e.message);
     return { ok: false, motivo: "PULL", error: `Se validaron las credenciales, pero no se pudieron bajar los datos: ${e.message}` };
+  } finally {
+    vinculando = false;
   }
 }
 
@@ -278,6 +290,8 @@ async function bootCaja() {
   opcionesBackend = {
     log: (m) => console.log("· [backend]", m), resDir: RES_DIR ?? undefined, dataRoot,
     nube: (o) => tokenDeNubeCacheado(o),
+    // En las opciones para que también lo tenga el backend que levantan el watchdog y el respaldo.
+    alHaberActividad: () => { ultimaActividad = Date.now(); },
   };
   backend = await startBackend(opcionesBackend);
   backupsDir = path.join(backend.dataRoot, "backups");
@@ -334,6 +348,7 @@ async function bootCaja() {
   watchdog = crearWatchdog({ url: backend.url, alReiniciar: reiniciarBackend, log: (m) => console.log("· [watchdog]", m) });
 
   iniciarSync();
+  iniciarRespaldoDiario();
   revisarActualizacion().catch(() => {}); // best-effort, no bloquea
 }
 
@@ -370,28 +385,141 @@ async function reiniciarBackend() {
   backend.nube = tokenDeNubeCacheado; // redundante con opcionesBackend.nube; explícito por D5
 }
 
-/** Respaldo bajo demanda: pausa el watchdog, detiene el backend (para copiar en frío), respalda
- *  y lo vuelve a levantar. Breve interrupción (~segundos); pensado para el fin de turno. */
-async function respaldarAhora() {
-  if (respaldando || !backend) return;
+/** Anota el resultado de una copia en `ultimo-respaldo.json`. Así el respaldo diario, el manual y
+ *  el de salir cuentan igual como "último respaldo" y ninguno hace una copia de más. */
+function anotarRespaldo(bd, dest, ultimoMensaje) {
+  const ahora = new Date().toISOString();
+  if (dest) { guardarEstadoRespaldo(bd, { ultimoOk: ahora, ultimoError: null }); return { ok: true }; }
+  const error = ultimoMensaje || "no se pudo copiar el pgdata";
+  guardarEstadoRespaldo(bd, { ultimoFallo: ahora, ultimoError: error });
+  return { ok: false, error };
+}
+
+/** Copia en frío SÍNCRONA + anotar. Solo al salir: la app ya se cierra y no hay nada que atender.
+ *  Postgres DEBE estar detenido. */
+function copiarYAnotar(dd, bd) {
+  let ultimoMensaje = "";
+  const dest = respaldar(dd, bd, 7, (m) => { ultimoMensaje = m; console.log("· [backup]", m); });
+  return anotarRespaldo(bd, dest, ultimoMensaje);
+}
+
+/** Lo mismo sin bloquear el proceso: con la caja encendida, la bandeja, el IPC y el servidor del
+ *  POS tienen que seguir contestando mientras se copia. Postgres DEBE estar detenido. */
+async function copiarYAnotarAsync(dd, bd) {
+  let ultimoMensaje = "";
+  const dest = await respaldarAsync(dd, bd, 7, (m) => { ultimoMensaje = m; console.log("· [backup]", m); });
+  return anotarRespaldo(bd, dest, ultimoMensaje);
+}
+
+/** Respaldo con la caja encendida. Lo usan "Respaldar ahora" de la bandeja —a criterio del cajero—
+ *  y el respaldo diario, que solo lo llama con la caja quieta. Devuelve { ok, error?, causa? }.
+ *  La promesa en curso se guarda: salir de la app la espera (ver cerrarTodo). */
+function respaldarAhora() {
+  if (respaldoEnCurso || respaldando) return Promise.resolve({ ok: false, error: "ya hay un respaldo en curso" });
+  if (!backend || cerrando) return Promise.resolve({ ok: false, error: "la caja no está lista para respaldar" });
+  respaldoEnCurso = hacerRespaldo().finally(() => { respaldoEnCurso = null; });
+  return respaldoEnCurso;
+}
+
+/** Los pasos: ¿cabe? → pausar el watchdog → detener el backend → copiar en frío → levantarlo.
+ *  NUNCA deja la caja sin backend: si algo falla, lo vuelve a levantar (salvo que la app se esté
+ *  cerrando, que entonces ya no hace falta). */
+async function hacerRespaldo() {
   respaldando = true;
-  watchdog?.pausar();
   const dd = backend.dataDir;
   const bd = backupsDir || path.join(backend.dataRoot, "backups");
+  const puerto = backend.gatewayPort;
+  const log = (m) => console.log("· [backup]", m);
+  let resultado = { ok: false, error: "no se pudo detener la base para copiarla" };
+  let espera = null;
+  /** Cierra el gateway de espera y libera el puerto para el backend de verdad. */
+  const soltarPuerto = async () => {
+    const e = espera; espera = null;
+    if (e) await new Promise((r) => { try { e.close(() => r()); e.closeAllConnections?.(); } catch { r(); } });
+  };
   try {
+    // ANTES de tocar la base: si no cabe ni purgando respaldos viejos, no se detiene nada. Con el
+    // disco lleno la caja se interrumpía cada hora para fallar con ENOSPC y no liberar nada.
+    const sitio = await hacerSitio(dd, bd, { log });
+    if (!sitio.cabe) {
+      log(sitio.error);
+      guardarEstadoRespaldo(bd, { ultimoFallo: new Date().toISOString(), ultimoError: sitio.error });
+      return { ok: false, causa: "sin-espacio", error: sitio.error };
+    }
+    watchdog?.pausar();
     const prev = backend; backend = null;
     await prev.stop();
-    respaldar(dd, bd, 7, (m) => console.log("· [backup]", m));
-    backend = await startBackend(opcionesBackend);
-    backend.nube = tokenDeNubeCacheado; // D5
-    console.log("· [backup] respaldo terminado; la caja está de vuelta en línea");
+    // Mientras la base está detenida, el puerto contesta "estoy respaldando; intenta en unos
+    // segundos" en vez de quedar cerrado (que el POS lee como un fallo de red sin explicación).
+    try {
+      espera = crearGatewayDeEspera({ uiPorts: [UI_PORT, KDS_UI_PORT] });
+      espera.on("error", () => { /* si el puerto no se deja tomar, se respalda igual */ });
+      espera.listen(puerto, "0.0.0.0");
+    } catch { espera = null; }
+    resultado = await copiarYAnotarAsync(dd, bd);
   } catch (e) {
-    console.error("· [backup] error en respaldo bajo demanda:", e.message);
-    if (!backend) { try { backend = await startBackend(opcionesBackend); } catch { /* */ } }
+    console.error("· [backup] error en respaldo con la caja encendida:", e.message);
+    resultado = { ok: false, error: e.message };
+    guardarEstadoRespaldo(bd, { ultimoFallo: new Date().toISOString(), ultimoError: e.message });
   } finally {
+    await soltarPuerto();
+    // Salir a media copia: la base ya está detenida y cerrarTodo no tiene nada que apagar. Volver
+    // a levantarla aquí dejaría un Postgres huérfano si la app termina antes de que arranque.
+    if (!backend && !cerrando) {
+      try {
+        backend = await startBackend(opcionesBackend);
+        backend.nube = tokenDeNubeCacheado; // D5
+        log("la caja está de vuelta en línea");
+      } catch (e) {
+        console.error("· [backup] no se pudo levantar el backend tras el respaldo:", e.message);
+        try { backend = await startBackend(opcionesBackend); backend.nube = tokenDeNubeCacheado; } catch { /* el watchdog lo reintenta */ }
+      }
+    }
     watchdog?.reanudar();
     respaldando = false;
+    refrescarMenuTray();
   }
+  return resultado;
+}
+
+/** El respaldo diario (respaldo-diario.mjs): una vez al día como mucho, y solo con la caja quieta
+ *  —sin turno abierto, sin que nadie la haya operado en 10 minutos y sin teclado ni mouse en ese
+ *  tiempo—. Nunca interrumpe un turno. */
+function iniciarRespaldoDiario() {
+  if (respaldoDiario) return;
+  const bd = () => backupsDir || (backend ? path.join(backend.dataRoot, "backups") : null);
+  respaldoDiario = crearRespaldoDiario({
+    contexto: async () => {
+      let turnoAbierto = null; // null = no se pudo saber → no se respalda
+      try {
+        const { rows } = await backend.pool.query("SELECT EXISTS (SELECT 1 FROM turnos WHERE estado = 'ABIERTO') AS abierto");
+        turnoAbierto = rows[0]?.abierto === true;
+      } catch { /* la base no contestó: se queda en null */ }
+      // Teclado y mouse de ESTA computadora: el gateway solo ve escrituras, y un cajero puede
+      // estar contando el fondo sin escribir nada. null si el sistema no lo sabe decir.
+      let inactividadSistemaSeg = null;
+      try { inactividadSistemaSeg = powerMonitor.getSystemIdleTime(); } catch { /* */ }
+      return {
+        turnoAbierto,
+        ultimaActividad,
+        inactividadSistemaSeg,
+        // Todo lo que escribe en la base local: detenerla a media bajada dejaría el PULL a medias.
+        ocupado: respaldando || cerrando || descargandoUpdate || !backend || vinculando
+          || pullCatalogoEnCurso !== null || ciclo.estado().sincronizando === true,
+      };
+    },
+    respaldar: () => respaldarAhora(),
+    leerEstado: () => leerEstadoRespaldo(bd()),
+    guardarEstado: (c) => guardarEstadoRespaldo(bd(), c),
+    // A la bitácora que VIM sí ve (errores_app → sube sola en el siguiente ciclo de sync).
+    reportar: async (mensaje, contexto) => {
+      if (!backend?.pool) return;
+      await registrarErrorLocal(backend.pool, { mensaje, contexto: { ...contexto, rol: ROL }, version: app.getVersion() });
+    },
+    alCambiar: () => refrescarMenuTray(),
+    log: (m) => console.log("· [respaldo diario]", m),
+  });
+  respaldoDiario.iniciar();
 }
 
 /** Bandeja (solo caja): abrir, respaldar, salir. Evita que cerrar la ventana apague el servidor. */
@@ -402,6 +530,13 @@ function crearTray() {
   } catch { return; }
   tray.on("double-click", () => { if (win) { win.show(); win.focus(); } });
   refrescarMenuTray();
+}
+
+/** Cuándo fue el último respaldo que sí terminó (para el renglón de la bandeja). */
+function ultimoRespaldoOk() {
+  const bd = backupsDir || (backend ? path.join(backend.dataRoot, "backups") : null);
+  if (!bd) return null;
+  try { return leerEstadoRespaldo(bd).ultimoOk; } catch { return null; }
 }
 
 /** (Re)construye el menú de la bandeja — incluye el ítem de actualización si hay una disponible. */
@@ -416,7 +551,8 @@ function refrescarMenuTray() {
     { label: "Copiar IP", click: () => clipboard.writeText(ip) },
     { type: "separator" },
     { label: "Abrir caja", click: () => { if (win) { win.show(); win.focus(); } } },
-    { label: "Respaldar ahora", click: () => respaldarAhora() },
+    { label: "Respaldar ahora", click: () => { respaldarAhora().catch(() => {}); } },
+    { label: textoUltimoRespaldo(ultimoRespaldoOk()), enabled: false },
     { type: "separator" },
     { label: "Salir (apaga la caja)", click: () => { saliendoDeVerdad = true; app.quit(); } },
   );
@@ -656,6 +792,11 @@ async function syncBestEffort({ conPull = true } = {}) {
   if (!nube) { console.log("· [sync] omitido (esta caja aún no se ha vinculado con la nube)"); return false; }
   const { cloudUrl, anon, email, pass } = nube;
   if (!cloudUrl || !anon || !email || !pass) { console.log("· [sync] omitido (configuración de nube incompleta)"); return false; }
+  // El respaldo detiene el backend unos segundos y deja `backend` en null. Antes eso reventaba aquí
+  // con un TypeError, contaba como fallo de la nube y disparaba el backoff. No es un fallo: se
+  // omite y el ciclo vuelve a intentar en un minuto. El pool se toma UNA vez, para todo el ciclo.
+  const pool = backend?.pool;
+  if (!pool || respaldando) { console.log("· [sync] omitido (la base local está detenida por el respaldo)"); return OMITIDO; }
   try {
     const l = await loginDispositivoNube({ cloudUrl, anon, email, pass, timeoutMs: 30000 });
     if (!l.token) { console.log("· [sync] omitido (login de dispositivo en la nube falló)"); return false; }
@@ -665,12 +806,12 @@ async function syncBestEffort({ conPull = true } = {}) {
     let pushOk = false;
     try {
       console.log("· [sync] PUSH: subiendo ventas offline…");
-      const rs = await pushToCloud(backend.pool, opts, (m) => console.log("· [sync]", m));
+      const rs = await pushToCloud(pool, opts, (m) => console.log("· [sync]", m));
       console.log(`· [sync] PUSH OK: ${rs.subidos} ventas, ${rs.movimientos ?? 0} movimientos de inventario`);
       // La bitácora va DESPUÉS y en su propio try: si falla, las ventas ya se subieron y el
       // ciclo debe contarse como exitoso. Perder un reporte de error no justifica un reintento.
       try {
-        await subirErrores(backend.pool, opts, (m) => console.log("· [sync]", m));
+        await subirErrores(pool, opts, (m) => console.log("· [sync]", m));
       } catch (e) { console.log("· [sync] bitácora de errores omitida:", e.message); }
       pushOk = true;
     } catch (e) {
@@ -684,12 +825,12 @@ async function syncBestEffort({ conPull = true } = {}) {
       // este reporte sí llega aunque el push siga rechazado. Se intenta subirla en el acto: si el
       // problema persiste, esperar al próximo ciclo solo retrasa la noticia.
       try {
-        await registrarErrorLocal(backend.pool, {
+        await registrarErrorLocal(pool, {
           mensaje: `Sincronización rechazada: ${e.message}`,
           contexto: { fase: "push" },
           version: app.getVersion(),
         });
-        await subirErrores(backend.pool, opts, (m) => console.log("· [sync]", m));
+        await subirErrores(pool, opts, (m) => console.log("· [sync]", m));
       } catch (e2) { console.log("· [sync] no se pudo reportar el fallo:", e2.message); }
     }
     // PULL después del PUSH (ADR 0013): el agotado automático lo decide la nube al recibir los
@@ -702,7 +843,7 @@ async function syncBestEffort({ conPull = true } = {}) {
         // bajar en un minuto. El error cae del lado de bajar de más, nunca de quedarse corto.
         const version = await leerVersionCatalogo(opts);
         console.log("· [sync] PULL: bajando rebanada del tenant…");
-        const rp = await pullFromCloud(backend.pool, opts, (m) => console.log("· [sync]", m));
+        const rp = await pullFromCloud(pool, opts, (m) => console.log("· [sync]", m));
         console.log(`· [sync] PULL OK: ${Object.keys(rp).length} tablas`);
         sondeo.marcarVista(version);
         await avisarCatalogoNuevo("sync");
@@ -916,6 +1057,14 @@ let cerrando = false;
 async function cerrarTodo() {
   if (cerrando) return;
   cerrando = true;
+  try { respaldoDiario?.detener(); } catch { /* */ }
+  // Un respaldo a media marcha tiene el backend detenido (`backend` es null) y está por levantarlo:
+  // salir sin esperarlo dejaba un Postgres huérfano, vivo sin nadie que lo apague. Se espera; al
+  // ver `cerrando` ya no lo levanta.
+  let recienRespaldado = false;
+  if (respaldoEnCurso) {
+    try { recienRespaldado = (await respaldoEnCurso)?.ok === true; } catch { /* */ }
+  }
   try { detenerSync(); } catch { /* */ }
   try { watchdog?.stop(); } catch { /* */ }
   try { if (uiServer) uiServer.close(); } catch { /* */ }
@@ -924,7 +1073,7 @@ async function cerrarTodo() {
       const dd = backend.dataDir;
       const bd = backupsDir || path.join(backend.dataRoot, "backups");
       await backend.stop(); // Postgres detenido → el pgdata queda consistente para copiar en frío.
-      if (dd && bd) respaldar(dd, bd, 7, (m) => console.log("· [backup]", m));
+      if (dd && bd && !recienRespaldado) copiarYAnotar(dd, bd);
     }
   } catch (e) { console.error("· [backup] al cerrar:", e.message); }
   try { tray?.destroy(); } catch { /* */ }

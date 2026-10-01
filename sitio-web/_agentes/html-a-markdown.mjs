@@ -103,6 +103,16 @@ const saltar = (nodo) =>
 // El botón de un acordeón es la excepción a «los botones no dicen nada»: es la
 // pregunta del FAQ o el nombre del giro. Sin él, el Markdown eran ocho
 // respuestas seguidas que empezaban con «Sí.» sin decir a qué.
+/**
+ * Una imagen marcada con `data-sin-markdown` no viaja al gemelo en Markdown.
+ *
+ * Existe por una sola: la del Aviso de privacidad con los datos del responsable. Se publica como
+ * imagen justo para que nadie la lea como texto; ponerle al lado, en un archivo hecho para que lo
+ * lean los modelos de lenguaje, su dirección y su descripción sería invitarlos a ir por ella. El
+ * texto que la acompaña —"pídelos por correo"— sí viaja.
+ */
+const sinMarkdown = (nodo) => "data-sin-markdown" in (nodo.atributos ?? {});
+
 const esTituloDeAcordeon = (nodo) =>
   nodo.nombre === 'button' && /\bacordeon-boton\b/.test(nodo.atributos?.class || '');
 
@@ -142,6 +152,7 @@ export function convertir(html, { base = 'https://vimpos.com.mx' } = {}) {
       case 'br':
         return '\n';
       case 'img': {
+        if (sinMarkdown(nodo)) return '';
         const alt = desescapar(nodo.atributos.alt || '').trim();
         return alt ? `![${alt}](${absoluta(nodo.atributos.src)})` : '';
       }
@@ -258,7 +269,7 @@ export function convertir(html, { base = 'https://vimpos.com.mx' } = {}) {
     if (n === 'figure') {
       const salida = [];
       const img = buscar(nodo, 'img');
-      if (img) {
+      if (img && !sinMarkdown(img)) {
         const alt = desescapar(img.atributos.alt || '').trim();
         if (alt) salida.push(`![${alt}](${absoluta(img.atributos.src)})`);
       }
@@ -267,6 +278,7 @@ export function convertir(html, { base = 'https://vimpos.com.mx' } = {}) {
     }
 
     if (n === 'img') {
+      if (sinMarkdown(nodo)) return [];
       const alt = desescapar(nodo.atributos.alt || '').trim();
       return alt ? [`![${alt}](${absoluta(nodo.atributos.src)})`] : [];
     }

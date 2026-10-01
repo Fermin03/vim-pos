@@ -6,26 +6,26 @@
 
 Qué contratas, qué incluye, cómo se cobra y cómo cancelar. Escritos para que se entiendan de una lectura.
 
-Última actualización: 13 de septiembre de 2026.
+Última actualización: 1 de octubre de 2026.
 
 ## Quién presta el servicio
 
 **VIM POS**, persona física con actividad empresarial, en Guanajuato, México. En adelante, «nosotros».
 
-El nombre, el RFC y el domicilio fiscal completos de quien presta el servicio van en el contrato que se firma antes de contratar, y se entregan antes a quien los pida por correo. No se publican en el sitio.
+El nombre y la dirección de quien presta el servicio están en el [Aviso de privacidad](https://vimpos.com.mx/aviso-privacidad) —como imagen, por seguridad— y van, junto con el RFC, en el contrato que se firma antes de contratar. El RFC se entrega antes a quien lo pida por correo.
 
 Al contratar el servicio aceptas estos términos. Si algo no te cuadra, dínoslo antes de contratar y lo hablamos.
 
 ## Qué contratas
 
-Una suscripción de uso del sistema de punto de venta VIM POS, según el plan que elijas: el programa que se instala en la computadora de tu caja, el panel para ver tu negocio desde fuera, y el respaldo de tu información.
+Una suscripción de uso del sistema de punto de venta VIM POS, según el plan que elijas: el programa que se instala en la computadora de tu caja, el panel para ver tu negocio desde fuera, y la copia de tus ventas en la nube.
 
 Los límites de cada plan —cuántas cajas y cuántas sucursales— son los publicados en la [página de precios](https://vimpos.com.mx/precios). Si necesitas más, se agregan como extras con el precio de esa misma página.
 
 ## Qué NO incluye
 
 - **El equipo.** Computadora, impresora, cajón y el módem los compras tú. Te decimos qué buscar; no los vendemos ni los garantizamos.
-- **Tu internet.** El sistema cobra sin conexión, pero el panel desde fuera y el respaldo la necesitan.
+- **Tu internet.** El sistema cobra sin conexión, pero el panel desde fuera y la copia de tus ventas en la nube la necesitan.
 - **El cobro con tarjeta.** La tarjeta se cobra en tu terminal bancaria y en el sistema se registra como forma de pago. El dinero no pasa por nosotros y no cobramos comisión por venta.
 - **Tus obligaciones fiscales.** El sistema te ayuda a cumplirlas; quien responde ante el SAT eres tú.
 
@@ -56,9 +56,9 @@ Además, tu información también vive en tu propia caja: el día que dejes de s
 
 **El sistema que contratas es otra cosa.** Ni la caja ni el panel de administración llevan Google Analytics, ni cookies de publicidad, ni ninguna medición de terceros: ahí solo se guarda lo necesario para mantener tu sesión abierta y para que el punto de venta funcione. Lo que se mide en esta página web no toca en ningún momento las ventas, el menú ni los clientes de tu negocio.
 
-## Apps de reparto (Uber Eats, DiDi Food, Rappi)
+## Apps de reparto (hoy, Uber Eats)
 
-Si conectas la tienda que tienes en una app de reparto, los pedidos de esa app entran solos a tu caja y a tu cocina. Es opcional: lo activas tú desde el panel, tienda por tienda, y lo desconectas cuando quieras.
+Hoy la conexión es con **Uber Eats**: si conectas la tienda que tienes ahí, sus pedidos entran solos a tu caja y a tu cocina. Es opcional: lo activas tú desde el panel, tienda por tienda, y lo desconectas cuando quieras. Otras apps (DiDi Food, Rappi) se sumarán cuando estén disponibles, sin fecha comprometida; mientras tanto sus pedidos se capturan en la caja como cualquier otra venta. Lo que sigue aplica a cada app que conectes.
 
 **Al conectarla nos autorizas** a recibir en tu nombre los pedidos y los datos que la app manda con ellos (nombre corto y teléfono del cliente, dirección, ítems, instrucciones y alergias), y a usarlos **solo** para preparar y cobrar esos pedidos y para mostrarte tus ventas. No los usamos para nada más ni los cruzamos con tu lista de clientes. Esos datos son de la app y de su cliente; a los **30 días** de cerrado el pedido borramos el teléfono, la dirección y el resto de datos personales y solo dejamos importes e ítems para tus reportes.
 

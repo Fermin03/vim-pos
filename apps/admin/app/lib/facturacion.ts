@@ -1,5 +1,6 @@
 "use client";
 import { z } from "zod";
+import { hoyMx } from "@vim/fecha";
 import { leerSesion, supabase } from "./supabase";
 
 // Facturación de tickets (doc 13 §CFDI). El backend completo existía (cfdi_crear_borrador,
@@ -241,36 +242,28 @@ export async function listarPeriodosGlobales(limite = 12): Promise<PeriodoGlobal
   }));
 }
 
-/** El periodo anterior al vigente: el que toca cerrar. */
-export async function periodoPorCerrar(
-  periodicidad: string,
-): Promise<{ desde: string; hasta: string; nTickets: number; totalMxn: number } | null> {
+export type PeriodoPendiente = { desde: string; hasta: string; nTickets: number; totalMxn: number };
+
+/**
+ * Los periodos YA CERRADOS con ventas pagadas que ninguna factura global ampara todavía.
+ *
+ * La global se emite a mano (decisión del 30 sep 2026), así que esto es lo que evita que se le pase
+ * al dueño: de aquí salen el aviso del dashboard y un botón Emitir por periodo en Facturación.
+ * Antes solo se miraba EL periodo anterior al vigente; uno olvidado dos meses atrás era invisible.
+ *
+ * Las reglas —qué periodo es, qué venta cuenta— viven en la base (`periodos_globales_pendientes`,
+ * 0143, que reúne las mismas funciones que usa `timbrar-global`). "Hoy" va en hora de México.
+ */
+export async function listarPeriodosPendientes(): Promise<PeriodoPendiente[]> {
   const tid = await tenantId();
-  const hoy = new Date(Date.now() - 6 * 3600_000).toISOString().slice(0, 10);
-  const vig = await supabase.rpc("periodo_global_de", { p_periodicidad: periodicidad, p_fecha: hoy });
-  const vigente = (vig.data as { desde: string }[] | null)?.[0];
-  if (!vigente) return null;
-
-  const antes = new Date(`${vigente.desde}T12:00:00Z`);
-  antes.setUTCDate(antes.getUTCDate() - 1);
-  const prevQ = await supabase.rpc("periodo_global_de", {
-    p_periodicidad: periodicidad,
-    p_fecha: antes.toISOString().slice(0, 10),
-  });
-  const prev = (prevQ.data as { desde: string; hasta: string }[] | null)?.[0];
-  if (!prev) return null;
-
-  const { data, error } = await supabase.rpc("tickets_de_periodo_global", {
-    p_tenant_id: tid, p_desde: prev.desde, p_hasta: prev.hasta,
-  });
+  const { data, error } = await supabase.rpc("periodos_globales_pendientes", { p_tenant_id: tid, p_hoy: hoyMx() });
   if (error) throw new Error(error.message);
-  const filas = (data ?? []) as { total_mxn: number }[];
-  return {
-    desde: prev.desde,
-    hasta: prev.hasta,
-    nTickets: filas.length,
-    totalMxn: filas.reduce((a, f) => a + Number(f.total_mxn ?? 0), 0),
-  };
+  return ((data ?? []) as { desde: string; hasta: string; n_tickets: number; total_mxn: number }[]).map((f) => ({
+    desde: String(f.desde),
+    hasta: String(f.hasta),
+    nTickets: Number(f.n_tickets ?? 0),
+    totalMxn: Number(f.total_mxn ?? 0),
+  }));
 }
 
 export type ResultadoGlobal =

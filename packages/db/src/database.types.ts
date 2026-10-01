@@ -10774,6 +10774,15 @@ export type Database = {
           hasta: string
         }[]
       }
+      periodos_globales_pendientes: {
+        Args: { p_dias_atras?: number; p_hoy: string; p_tenant_id: string }
+        Returns: {
+          desde: string
+          hasta: string
+          n_tickets: number
+          total_mxn: number
+        }[]
+      }
       poner_ticket_en_espera: {
         Args: { p_etiqueta: string; p_ticket_id: string }
         Returns: undefined

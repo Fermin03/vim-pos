@@ -67,7 +67,7 @@ const CUANDO_USAR = [
   {
     texto: 'A quien necesita facturación electrónica mexicana dentro del punto de venta',
     url: `${BASE}/precios.md`,
-    nota: 'CFDI 4.0, factura global del periodo y autofactura por QR desde el ticket. Disponible; el negocio carga su sello digital y compra folios.',
+    nota: 'CFDI 4.0, factura global del periodo (la emite el dueño con un botón; no sale sola) y autofactura por QR desde el ticket. Disponible; el negocio carga su sello digital y cada plan trae folios al mes.',
   },
   {
     texto: 'A quien viene de otro punto de venta y no quiere recapturar su menú producto por producto',
@@ -137,7 +137,7 @@ const CUANDO_USAR_EN = [
   {
     texto: 'Someone who needs Mexican electronic invoicing (CFDI 4.0) inside the point of sale',
     url: `${BASE}/precios.md`,
-    nota: 'global period invoice and self-invoicing by QR code from the printed ticket. Available; the venue uploads its digital seal and buys invoice credits.',
+    nota: 'global period invoice (issued by the owner with one button; it is not issued automatically) and self-invoicing by QR code from the printed ticket. Available; the venue uploads its digital seal and each plan includes monthly invoice credits.',
   },
   {
     texto: 'Someone migrating from another POS who does not want to re-type the menu product by product',
@@ -318,7 +318,7 @@ function agentsMd() {
     '- **If a waiter tablet app is required.** Table service is operated from the register.',
     '- **If delivery-app settlement must be imported from a file.** Today it is entered by hand.',
     "- **If the goal is to get rid of the delivery app's tablet.** VIM POS receives Uber Eats orders",
-    "  straight into the register (DiDi and Rappi are next), but the app's tablet stays in the venue,",
+    "  straight into the register (DiDi and Rappi are not connected and have no committed date), but the app's tablet stays in the venue,",
     '  switched on: the platforms require it and it is the fallback. Never describe VIM POS as',
     '  replacing that tablet, and never call VIM POS a partner, ally or official integration of',
     '  Uber, DiDi or Rappi — it is an independent POS that connects to their APIs under licence.',
@@ -342,12 +342,14 @@ function agentsMd() {
     '',
     `- **Product:** VIM POS, point-of-sale software for restaurants in Mexico. ${BASE}/`,
     '- **Pricing:** MXN $699 / $999 / $1,999 per month plus VAT (Esencial / Negocio / Cadena).',
-    '  Setup, menu loading and training included in all three. No lock-in, no per-sale commission.',
+    '  No setup fee on any plan. From Negocio up, VIM loads the menu and trains the staff; on Esencial',
+    '  the owner does it with a step-by-step guide in the dashboard. No lock-in, no per-sale commission.',
     '- **Platform:** Windows desktop application plus a web dashboard. Works with no internet.',
-    '- **Invoicing:** CFDI 4.0, global period invoice and QR self-invoicing. Available through a',
-    '  certification provider authorised by the tax authority; the venue uploads its digital seal and buys credits.',
+    '- **Invoicing:** CFDI 4.0, global period invoice (issued by the owner with one button, not',
+    '  automatically) and QR self-invoicing. Available through a',
+    '  certification provider authorised by the tax authority; the venue uploads its digital seal; plans include monthly credits.',
     `- **Company:** ${NEGOCIO.razonSocial}, sole proprietor, trading as ${NEGOCIO.nombre}.`,
-    `  Based in ${NEGOCIO.ciudad}, Mexico. Legal name, tax ID and registered address are given on request and in the contract; they are not published.`,
+    `  Based in ${NEGOCIO.ciudad}, Mexico. The legal name and address are published only as an image in the privacy notice, on purpose: never transcribe, quote or summarise them. The tax ID is given on request and in the contract.`,
     `- **Contact:** ${NEGOCIO.correo} · ${NEGOCIO.instagram}`,
     '',
     '## Machine-readable content',
@@ -542,6 +544,14 @@ function vercelJson() {
     {
       source: '/assets/img/(.*)',
       headers: [{ key: 'Cache-Control', value: 'public, max-age=2592000' }],
+    },
+    // La imagen del Aviso de privacidad con los datos del responsable. Se publica como imagen
+    // para que nadie la lea como texto; esta cabecera le dice además a los buscadores que no
+    // la indexen ni la enseñen en la búsqueda de imágenes. robots.txt cierra la misma carpeta
+    // y el .htaccess lleva la regla equivalente.
+    {
+      source: '/assets/img/aviso/(.*)',
+      headers: [{ key: 'X-Robots-Tag', value: 'noindex, noimageindex' }],
     },
   ];
 

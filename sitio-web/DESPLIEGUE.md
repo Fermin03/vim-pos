@@ -209,6 +209,37 @@ existe. La prueba `los archivos generados coinciden con el HTML` falla si se olv
 comentarios, y una ruta mal escrita ahí no se ve en el navegador de quien la escribió — se ve
 cuando un prospecto abre `/precios` y encuentra un 404.
 
+## La imagen del responsable, en el Aviso de privacidad
+
+El aviso identifica al responsable con su nombre y su dirección, **pero como imagen**
+(`assets/img/aviso/responsable.png`), nunca como texto. Son los datos de una persona, se purgaron
+del sitio y de todo el historial en septiembre de 2026, y el repositorio es público: escritos, los
+copia cualquier rastreador o modelo de lenguaje y ya no se pueden retirar.
+
+**Regenerarla** (cuando cambie un dato). El script no trae los datos; se le pasan al correrlo:
+
+```powershell
+$env:VIM_RESPONSABLE_NOMBRE    = "<nombre completo>"
+$env:VIM_RESPONSABLE_DOMICILIO = "<renglón 1>|<renglón 2>|<renglón 3>"
+node sitio-web/_capturas/responsable.mjs
+```
+
+Dibuja con la tipografía y los colores del sitio, a 2×, y antes de guardar revisa los bytes del
+PNG: sin metadatos y sin ninguna de las cadenas legible. Después sube el `?v=` de la imagen en
+`aviso-privacidad.html`, ajusta `width`/`height` si cambió el alto y corre el generador.
+
+**Lo que la mantiene fuera de los índices**, y que las pruebas vigilan:
+
+- el `alt` dice qué es, no lo que dice; no hay `title`, ni JSON-LD, ni comentario con los datos;
+- `data-sin-markdown`: la imagen no viaja al gemelo `.md` ni a `llms-full.txt`;
+- `data-nosnippet` en el bloque; `Disallow: /assets/img/aviso/` en `robots.txt`;
+- `X-Robots-Tag: noindex, noimageindex` para esa carpeta (sale del generador a `vercel.json`, y
+  el `.htaccess` lleva la regla equivalente).
+
+**Nunca** se escriben esos datos en un archivo del repositorio —ni en un comentario, ni en una
+prueba, ni en un mensaje de commit—. Las pruebas buscan por *forma* (RFC, calle con número, código
+postal) precisamente para no tener que conocerlos. El RFC no se publica: se entrega a quien lo pida.
+
 ## El middleware del 404
 
 `sitio-web/middleware.ts` es la única pieza que ejecuta código en este sitio, y solo se despierta
