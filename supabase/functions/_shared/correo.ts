@@ -44,7 +44,7 @@ export async function enviarCorreo(payload: { to: string; subject: string; html:
      que envolver el bloque entero. */
   // `null as …` y no `: … = null`: con la anotación, TS estrecha a `null` y dentro del `finally`
   // (tras la asignación en el `try`) daba `never`, así que `cliente.close()` no tipaba.
-  let cliente = null as { send: (m: unknown) => Promise<unknown>; close: () => Promise<void> } | null;
+  let cliente = null as { send: (m: unknown) => Promise<unknown>; close: () => void | Promise<void> } | null;
 
   try {
     const { SMTPClient } = await import("https://deno.land/x/denomailer@1.6.0/mod.ts");
@@ -77,13 +77,26 @@ export async function enviarCorreo(payload: { to: string; subject: string; html:
 
        Dos segundos y seguimos. Dejar la conexión sin cerrar del todo es un mal
        menor —la instancia se recicla sola— comparado con tumbar la respuesta. */
-    if (cliente) {
-      await Promise.race([
-        cliente.close().catch(() => {}),
-        new Promise((r) => setTimeout(r, 2000)),
-      ]);
-    }
+    if (cliente) await cerrarConPrisa(cliente);
   }
+}
+
+/**
+ * Cierra el cliente SMTP sin que el cierre pueda tumbar ni colgar a quien envía.
+ *
+ * `close()` de denomailer 1.6.0 es `void | Promise<void>`: sin pool devuelve `undefined`, y el
+ * `close().catch(...)` de antes lanzaba "Cannot read properties of undefined (reading 'catch')"
+ * DENTRO del `finally` — eso pisaba el resultado del envío (el aviso de altas de 0142 se logueaba
+ * como "reventó" sin saber si había salido). `Promise.resolve().then` absorbe las tres formas
+ * (undefined, excepción síncrona, promesa rechazada); la carrera con el reloj, la que nunca termina.
+ */
+export async function cerrarConPrisa(cliente: { close: () => void | Promise<void> }, ms = 2000): Promise<void> {
+  let reloj: ReturnType<typeof setTimeout> | undefined;
+  await Promise.race([
+    Promise.resolve().then(() => cliente.close()).catch(() => {}),
+    new Promise<void>((r) => { reloj = setTimeout(r, ms); }),
+  ]);
+  clearTimeout(reloj);
 }
 
 
