@@ -11,7 +11,9 @@ import { listarSucursales } from "../../lib/configuracion";
 import { mensajeError } from "../../lib/errores";
 import { leerPrueba } from "../../lib/plan";
 import { AvisoPrueba } from "../../components/aviso-prueba";
+import { Aviso } from "@vim/ui/styles";
 import { AvisosFacturacion } from "../../components/avisos-facturacion";
+import { useAvisoCerrado } from "../../components/aviso-cerrado";
 
 // Accesos rápidos del P-177: son de Reportes, no navegación genérica.
 const REPORTES_RAPIDOS = [
@@ -403,7 +405,8 @@ export default function DashboardPage() {
         {error && <p className="mb-4 text-sm font-medium text-danger">{error}</p>}
 
         <AvisoPrueba estado={prueba?.estado} pruebaHasta={prueba?.prueba_hasta} conEnlace className="mb-6" />
-        {/* Sello por vencer y periodos sin factura global: lo que tiene fecha límite ante el SAT. */}
+        {/* Sello por vencer. La factura global ya NO se recuerda aquí (decisión del dueño, 1 oct
+            2026: no es forzosa ni debe insistir); su recordatorio vive solo en Facturación. */}
         <AvisosFacturacion className="mb-6" />
 
         {mostrarOnboarding && onb && (
@@ -435,11 +438,8 @@ export default function DashboardPage() {
             {/* Cuándo fue la última vez que sí hubo ventas. Un cero puede significar "todavía no
                 abrimos" o "la caja lleva días sin subir nada", y son cosas muy distintas: sin este
                 dato, la segunda pasa desapercibida hasta que las cuentas no cuadran. */}
-            {ultimaVenta && ultimaVenta !== data?.dia && (
-              <p className="mt-3 rounded border border-warning-line bg-warning-soft px-3 py-2 text-13 font-medium text-warning">
-                La última venta registrada es del {fmtDia(ultimaVenta)}. Si el negocio ha vendido
-                desde entonces, la caja no está enviando sus ventas.
-              </p>
+            {ultimaVenta && data?.dia && ultimaVenta !== data.dia && (
+              <AvisoUltimaVenta ultimaVenta={ultimaVenta} dia={data.dia} />
             )}
           </div>
         )}
@@ -576,5 +576,20 @@ export default function DashboardPage() {
         </div>
       </PageBody>
     </>
+  );
+}
+
+/**
+ * "La última venta es del …". Se cierra con la "×", pero la clave lleva el día que se está viendo:
+ * mañana vuelve a salir si la caja sigue sin subir ventas, que es justo lo que este aviso vigila.
+ */
+function AvisoUltimaVenta({ ultimaVenta, dia }: { ultimaVenta: string; dia: string }) {
+  const { cerrado, cerrar } = useAvisoCerrado(`ultima-venta:${ultimaVenta}:${dia}`);
+  if (cerrado) return null;
+  return (
+    <Aviso tono="warning" role="status" className="mt-3" onCerrar={cerrar}>
+      La última venta registrada es del {diaCorto(ultimaVenta)}. Si el negocio ha vendido desde entonces, la caja no
+      está enviando sus ventas.
+    </Aviso>
   );
 }
