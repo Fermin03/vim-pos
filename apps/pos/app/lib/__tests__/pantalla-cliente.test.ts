@@ -1,0 +1,113 @@
+import { describe, expect, it } from "vitest";
+import { estadoInicial, type EstadoCarrito, type LineaCarrito } from "../carrito";
+import type { Producto } from "../catalogo";
+import { construirVista, leerMensaje, type EntradaVista } from "../pantalla-cliente/vista";
+
+function producto(nombre: string, precio: number): Producto {
+  return {
+    id: `p-${nombre}`, nombre, descripcion: null, precio_base_mxn: precio, categoria_id: "c1", agotado: false,
+    esCombo: false, sku: null, tasaIva: 16, ivaIncluido: true, claveSat: null, unidadSat: null, categoriaNombre: null,
+  };
+}
+
+function linea(id: string, nombre: string, precio: number, cantidad = 1, extra: Partial<LineaCarrito> = {}): LineaCarrito {
+  return { clientId: id, producto: producto(nombre, precio), cantidad, modificadores: [], notaCocina: null, ...extra };
+}
+
+function entrada(carrito: Partial<EstadoCarrito>, resto: Partial<EntradaVista> = {}): EntradaVista {
+  return { carrito: { ...estadoInicial, ...carrito }, totalAutoritativo: null, cobro: null, pagado: null, ...resto };
+}
+
+describe("construirVista", () => {
+  it("sin líneas está en reposo", () => {
+    expect(construirVista(entrada({}))).toEqual({ fase: "reposo" });
+  });
+
+  it("con líneas muestra renglones e importe, y el total que ve el cajero", () => {
+    const v = construirVista(entrada({ lineas: [linea("a", "Hamburguesa", 120, 2), linea("b", "Refresco", 35)] }));
+    expect(v).toEqual({
+      fase: "cuenta",
+      renglones: [
+        { id: "a", cantidad: 2, nombre: "Hamburguesa", detalle: [], importe: 240 },
+        { id: "b", cantidad: 1, nombre: "Refresco", detalle: [], importe: 35 },
+      ],
+      envio: null,
+      total: 275,
+    });
+  });
+
+  it("los modificadores salen como texto, con su cantidad si es más de uno", () => {
+    const l = linea("a", "Hamburguesa", 100, 1, {
+      modificadores: [
+        { opcionId: "o1", grupoNombre: "Extras", opcionNombre: "Tocino", precioExtra: 15, cantidad: 2 },
+        { opcionId: "o2", grupoNombre: "Término", opcionNombre: "Tres cuartos", precioExtra: 0, cantidad: 1 },
+      ],
+    });
+    const v = construirVista(entrada({ lineas: [l] }));
+    expect(v.fase === "cuenta" && v.renglones[0]).toEqual({ id: "a", cantidad: 1, nombre: "Hamburguesa", detalle: ["2× Tocino", "Tres cuartos"], importe: 130 });
+  });
+
+  it("un combo lista sus componentes y usa su precio congelado", () => {
+    const papas = producto("Papas", 40);
+    const l = linea("a", "Combo Clásico", 0, 1, {
+      combo: {
+        def: { producto: producto("Combo Clásico", 0), slots: [] },
+        precioUnitario: 150,
+        componentes: [
+          { grupoId: "g1", grupoNombre: "Acompañamiento", producto: papas, cantidad: 1, modificadores: [{ opcionId: "o9", grupoNombre: "Tamaño", opcionNombre: "Grandes", precioExtra: 10, cantidad: 1 }], notaCocina: "bien doradas", clientId: "h1" },
+        ],
+      },
+    });
+    const v = construirVista(entrada({ lineas: [l] }));
+    expect(v.fase === "cuenta" && v.renglones[0]).toEqual({ id: "a", cantidad: 1, nombre: "Combo Clásico", detalle: ["Papas (Grandes)"], importe: 160 });
+  });
+
+  it("el envío va aparte y entra en el total", () => {
+    const v = construirVista(entrada({ modoServicio: "DELIVERY_PROPIO", lineas: [linea("a", "Pizza", 200)], envio: { zonaId: "z1", nombre: "Centro", costoMxn: 30 } }));
+    expect(v).toMatchObject({ fase: "cuenta", envio: { nombre: "Centro", importe: 30 }, total: 230 });
+  });
+
+  it("con cuenta guardada manda el total de la base, que ya trae descuentos", () => {
+    const v = construirVista(entrada({ lineas: [linea("a", "Pizza", 200)] }, { totalAutoritativo: 180 }));
+    expect(v).toMatchObject({ fase: "cuenta", total: 180 });
+  });
+
+  it("al cobrar muestra solo el total a pagar", () => {
+    const v = construirVista(entrada({ lineas: [linea("a", "Pizza", 200)] }, { cobro: { total: 200 } }));
+    expect(v).toEqual({ fase: "cobro", total: 200 });
+  });
+
+  it("cobrado manda sobre todo lo demás y lleva el cambio", () => {
+    const v = construirVista(entrada({}, { pagado: { total: 200, cambio: 300 }, cobro: { total: 200 } }));
+    expect(v).toEqual({ fase: "pagado", total: 200, cambio: 300 });
+  });
+
+  it("no deja pasar ningún dato privado", () => {
+    const carrito = {
+      ...estadoInicial,
+      modoServicio: "DELIVERY_PROPIO",
+      lineas: [linea("a", "Pizza", 200, 1, { notaCocina: "NOTA-COCINA-SECRETA" })],
+      notaOrden: "NOTA-ORDEN-SECRETA",
+      nombreCuenta: "NOMBRE-CUENTA-SECRETO",
+      clienteDomicilio: { clienteId: "c1", nombre: "CLIENTE-SECRETO", telefono: "4771234567", direccion: "CALLE-SECRETA 12" },
+      clienteCuenta: { clienteId: "c2", nombre: "OTRO-CLIENTE-SECRETO", telefono: "4777654321" },
+    } as unknown as EstadoCarrito;
+    const texto = JSON.stringify(construirVista({ carrito, totalAutoritativo: null, cobro: null, pagado: null }));
+    for (const secreto of ["SECRET", "4771234567", "4777654321"]) expect(texto).not.toContain(secreto);
+  });
+});
+
+describe("leerMensaje", () => {
+  it("acepta los tres mensajes del canal", () => {
+    expect(leerMensaje({ tipo: "hola", v: 1 })).toEqual({ tipo: "hola", v: 1 });
+    expect(leerMensaje({ tipo: "negocio", v: 1, nombre: "Knock-Out", logoUrl: null })).toEqual({ tipo: "negocio", v: 1, nombre: "Knock-Out", logoUrl: null });
+    expect(leerMensaje({ tipo: "estado", v: 1, vista: { fase: "cobro", total: 99.5 } })).toEqual({ tipo: "estado", v: 1, vista: { fase: "cobro", total: 99.5 } });
+  });
+
+  it("ignora lo que no entiende", () => {
+    expect(leerMensaje(null)).toBeNull();
+    expect(leerMensaje({ tipo: "estado", v: 2, vista: { fase: "reposo" } })).toBeNull();
+    expect(leerMensaje({ tipo: "estado", v: 1, vista: { fase: "cuenta", renglones: "x", envio: null, total: 1 } })).toBeNull();
+    expect(leerMensaje({ tipo: "estado", v: 1, vista: { fase: "cobro", total: Number.NaN } })).toBeNull();
+  });
+});
