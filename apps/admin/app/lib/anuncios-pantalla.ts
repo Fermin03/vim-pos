@@ -72,6 +72,20 @@ export function opcionesSegundos(actual: number | null): number[] {
   return [...SEGUNDOS_SUGERIDOS, actual].sort((a, b) => a - b);
 }
 
+/**
+ * Quita una imagen del almacén sin hacer fallar la acción del dueño: una imagen sin fila nadie la
+ * enseña. supabase-js NO lanza cuando el almacén rechaza (contesta `{ error }`), así que un
+ * `.catch` solo no se enteraba nunca; se lee `error` y se deja en la consola con contexto.
+ */
+async function quitarDelAlmacen(ruta: string, motivo: string): Promise<void> {
+  try {
+    const { error } = await supabase.storage.from(ALMACEN).remove([ruta]);
+    if (error) console.warn(`[anuncios] no se pudo quitar ${ruta} del almacén (${motivo}):`, error.message);
+  } catch (e) {
+    console.warn(`[anuncios] no se pudo quitar ${ruta} del almacén (${motivo}):`, e instanceof Error ? e.message : e);
+  }
+}
+
 const urlPublica = (ruta: string) => supabase.storage.from(ALMACEN).getPublicUrl(ruta).data.publicUrl;
 
 export async function listarAnuncios(): Promise<Anuncio[]> {
@@ -113,7 +127,7 @@ export async function subirAnuncio(archivo: File): Promise<void> {
   const { error } = await supabase.from("anuncios_pantalla").insert({ id, tenant_id: tid, ruta, orden, bytes: blob.size });
   if (error) {
     // La fila no entró (el tope de 10, por ejemplo): la imagen recién subida se quedaría huérfana.
-    await supabase.storage.from(ALMACEN).remove([ruta]).catch(() => {});
+    await quitarDelAlmacen(ruta, "la fila no entró");
     throw new Error(traducir(error.message));
   }
 }
@@ -161,7 +175,7 @@ export async function moverAnuncio(anuncios: Anuncio[], id: string, hacia: "arri
 export async function eliminarAnuncio(a: Anuncio): Promise<void> {
   await actualizar(a.id, { deleted_at: new Date().toISOString(), activo: false });
   // Si esto falla queda una imagen sin fila, que nadie enseña: no es motivo para decirle al dueño que falló.
-  await supabase.storage.from(ALMACEN).remove([a.ruta]).catch(() => {});
+  await quitarDelAlmacen(a.ruta, "baja del anuncio");
 }
 
 export async function leerSegundos(): Promise<number> {
