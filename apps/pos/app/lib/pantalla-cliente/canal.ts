@@ -22,13 +22,23 @@ export type Canal = {
 
 export function abrirCanal(): Canal | null {
   if (typeof BroadcastChannel === "undefined") return null;
-  return new BroadcastChannel(NOMBRE_CANAL) as unknown as Canal;
+  try {
+    return new BroadcastChannel(NOMBRE_CANAL) as unknown as Canal;
+  } catch {
+    // La pantalla del cliente es opcional: sin canal la caja sigue vendiendo igual.
+    return null;
+  }
 }
 
 export function crearPublicador(canal: Canal, negocio: () => Negocio) {
   let ultima: VistaCliente = { fase: "reposo" };
-  const enviarEstado = () => canal.postMessage({ tipo: "estado", v: 1, vista: ultima });
-  const anunciar = () => { const n = negocio(); canal.postMessage({ tipo: "negocio", v: 1, nombre: n.nombre, logoUrl: n.logoUrl }); };
+  // Todo envío pasa por aquí: la pantalla del cliente es opcional y un canal que falla
+  // (`InvalidStateError`, `SecurityError`) nunca debe romper la venta de la caja.
+  const enviar = (m: unknown) => {
+    try { canal.postMessage(m); } catch { /* sin pantalla del cliente la venta sigue igual */ }
+  };
+  const enviarEstado = () => enviar({ tipo: "estado", v: 1, vista: ultima });
+  const anunciar = () => { const n = negocio(); enviar({ tipo: "negocio", v: 1, nombre: n.nombre, logoUrl: n.logoUrl }); };
 
   // La pantalla saluda al abrirse (o al recargarse): se le pone al día.
   canal.onmessage = (e) => {
@@ -45,7 +55,7 @@ export function crearPublicador(canal: Canal, negocio: () => Negocio) {
       ultima = { fase: "reposo" };
       enviarEstado();
       canal.onmessage = null;
-      canal.close();
+      try { canal.close(); } catch { /* ya estaba cerrado */ }
     },
   };
 }

@@ -1000,10 +1000,17 @@ export function ModalCobro({
   atajo = null,
   onPagado,
   onCerrar,
+  onMontoACobrar,
 }: {
   token: string;
   sucursalId: string;
   totalesIniciales: TotalesTicket;
+  /**
+   * Avisa el monto que la cajera tiene a la vista como pendiente de cobrar (con propina y pagos
+   * parciales ya aplicados). La pantalla del cliente lo muestra para ver el mismo número que la
+   * cajera: el snapshot `totalesIniciales` del padre no se entera de la propina ni de los pagos.
+   */
+  onMontoACobrar?: (monto: number) => void;
   /**
    * "Efectivo exacto" desde el ticket: cobra el pendiente en efectivo sin pasar por el selector ni
    * el teclado. Si la sucursal pide propina, la pregunta primero; si el cobro falla, cae en la
@@ -1046,6 +1053,10 @@ export function ModalCobro({
     total: Math.round((totales.total + propina) * 100) / 100,
     pendiente: Math.round((totales.pendiente + propina) * 100) / 100,
   };
+
+  useEffect(() => {
+    onMontoACobrar?.(totalesEf.pendiente);
+  }, [totalesEf.pendiente, onMontoACobrar]);
 
   async function confirmarPropina(monto: number) {
     setError(null);

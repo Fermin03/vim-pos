@@ -205,7 +205,18 @@ describe("crearPublicador", () => {
     expect(enviados).toEqual([]);
     p.publicar({ fase: "cobro", total: 50 });
     p.latir();
-    expect(enviados).toHaveLength(2);
+    const estado = { tipo: "estado", v: 1, vista: { fase: "cobro", total: 50 } };
+    expect(enviados).toEqual([estado, estado]);
+  });
+
+  it("al volver a reposo deja de latir", () => {
+    const { canal, enviados } = canalFalso();
+    const p = crearPublicador(canal, () => NEGOCIO);
+    p.publicar({ fase: "cobro", total: 50 });
+    p.publicar({ fase: "reposo" });
+    enviados.length = 0;
+    p.latir();
+    expect(enviados).toEqual([]);
   });
 
   it("al cerrar deja la pantalla en reposo", () => {
@@ -215,5 +226,20 @@ describe("crearPublicador", () => {
     p.cerrar();
     expect(enviados.at(-1)).toEqual({ tipo: "estado", v: 1, vista: { fase: "reposo" } });
     expect(canal.cerrado).toBe(true);
+  });
+
+  it("si el canal falla, la caja no se entera: ninguna operación lanza", () => {
+    const canal: Canal = {
+      onmessage: null,
+      postMessage: () => { throw new Error("InvalidStateError"); },
+      close: () => { throw new Error("InvalidStateError"); },
+    };
+    const p = crearPublicador(canal, () => NEGOCIO);
+    expect(() => p.anunciar()).not.toThrow();
+    expect(() => p.publicar({ fase: "cobro", total: 50 })).not.toThrow();
+    expect(() => p.latir()).not.toThrow();
+    expect(() => canal.onmessage?.({ data: { tipo: "hola", v: 1 } })).not.toThrow();
+    expect(() => p.cerrar()).not.toThrow();
+    expect(canal.onmessage).toBeNull();
   });
 });
