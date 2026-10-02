@@ -42,6 +42,7 @@ import { IconoAsignarCliente, IconoClienteAsignado, ModalClienteCuenta } from ".
 import { asignarClienteTicket, type ClienteCuenta } from "../lib/clientes-cuenta";
 import { ModalZonaPedido } from "./modal-zona-pedido";
 import { ModalNombreCuenta } from "./modal-nombre-cuenta";
+import { usePublicarPantallaCliente } from "./use-publicar-pantalla-cliente";
 import { ModalCambiarPin } from "./modal-cambiar-pin";
 import { ModalMisPropinas } from "./modal-mis-propinas";
 import { leerAreasDeItems, leerTicketParaImpresion } from "../lib/print/ticket-datos";
@@ -293,6 +294,17 @@ export function HomePos({
   const [viendoReservaciones, setViendoReservaciones] = useState(false);
   // F6.1 — items persistidos del ticketBd (para mapear clientId ↔ ticket_item_id real al cancelar).
   const [itemsPersistidos, setItemsPersistidos] = useState<ItemTicket[]>([]);
+  // Pantalla del cliente (segundo monitor). `totalAutoritativo` es la MISMA condición que recibe
+  // SidebarTicket en `totalConDescuento`: el cliente tiene que ver el número que ve el cajero.
+  usePublicarPantallaCliente(
+    {
+      carrito,
+      totalAutoritativo: ticketBd && !ticketIncompleto ? ticketBd.total : null,
+      cobro: totalesCobro ? { total: totalesCobro.total } : null,
+      pagado: confirmacion ? { total: confirmacion.total, cambio: confirmacion.cambio } : null,
+    },
+    { nombre: caja.negocioNombre, logoUrl: caja.logoUrl },
+  );
   const [cancelandoItem, setCancelandoItem] = useState<ItemTicket | null>(null);
   // F6.5 — descuento/override por ítem.
   const [descuentoItem, setDescuentoItem] = useState<ItemTicket | null>(null);

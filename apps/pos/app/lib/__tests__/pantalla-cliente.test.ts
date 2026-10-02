@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { estadoInicial, type EstadoCarrito, type LineaCarrito } from "../carrito";
 import type { Producto } from "../catalogo";
 import { construirVista, leerMensaje, type EntradaVista } from "../pantalla-cliente/vista";
+import { crearPublicador, type Canal } from "../pantalla-cliente/canal";
 
 function producto(nombre: string, precio: number): Producto {
   return {
@@ -109,5 +110,59 @@ describe("leerMensaje", () => {
     expect(leerMensaje({ tipo: "estado", v: 2, vista: { fase: "reposo" } })).toBeNull();
     expect(leerMensaje({ tipo: "estado", v: 1, vista: { fase: "cuenta", renglones: "x", envio: null, total: 1 } })).toBeNull();
     expect(leerMensaje({ tipo: "estado", v: 1, vista: { fase: "cobro", total: Number.NaN } })).toBeNull();
+  });
+});
+
+function canalFalso() {
+  const enviados: unknown[] = [];
+  const canal: Canal & { cerrado: boolean } = {
+    cerrado: false,
+    onmessage: null,
+    postMessage: (m) => { enviados.push(m); },
+    close() { this.cerrado = true; },
+  };
+  return { canal, enviados };
+}
+
+const NEGOCIO = { nombre: "Knock-Out", logoUrl: null };
+
+describe("crearPublicador", () => {
+  it("al saludar la pantalla, le manda el negocio y el estado actual", () => {
+    const { canal, enviados } = canalFalso();
+    const p = crearPublicador(canal, () => NEGOCIO);
+    p.publicar({ fase: "cobro", total: 50 });
+    enviados.length = 0;
+    canal.onmessage?.({ data: { tipo: "hola", v: 1 } });
+    expect(enviados).toEqual([
+      { tipo: "negocio", v: 1, nombre: "Knock-Out", logoUrl: null },
+      { tipo: "estado", v: 1, vista: { fase: "cobro", total: 50 } },
+    ]);
+  });
+
+  it("ignora mensajes que no son un saludo", () => {
+    const { canal, enviados } = canalFalso();
+    crearPublicador(canal, () => NEGOCIO);
+    canal.onmessage?.({ data: { tipo: "estado", v: 1, vista: { fase: "reposo" } } });
+    canal.onmessage?.({ data: "basura" });
+    expect(enviados).toEqual([]);
+  });
+
+  it("late solo si hay algo en pantalla", () => {
+    const { canal, enviados } = canalFalso();
+    const p = crearPublicador(canal, () => NEGOCIO);
+    p.latir();
+    expect(enviados).toEqual([]);
+    p.publicar({ fase: "cobro", total: 50 });
+    p.latir();
+    expect(enviados).toHaveLength(2);
+  });
+
+  it("al cerrar deja la pantalla en reposo", () => {
+    const { canal, enviados } = canalFalso();
+    const p = crearPublicador(canal, () => NEGOCIO);
+    p.publicar({ fase: "cobro", total: 50 });
+    p.cerrar();
+    expect(enviados.at(-1)).toEqual({ tipo: "estado", v: 1, vista: { fase: "reposo" } });
+    expect(canal.cerrado).toBe(true);
   });
 });
