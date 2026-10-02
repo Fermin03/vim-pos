@@ -8,6 +8,7 @@
  */
 import { z } from "zod";
 import { calcularTotalesDisplay, totalLinea, type EstadoCarrito, type LineaCarrito, type ModificadorSel } from "../carrito";
+import { redondearCentavos } from "../dinero";
 
 const dinero = z.number().finite();
 
@@ -71,15 +72,15 @@ function detalleDe(l: LineaCarrito): string[] {
 }
 
 export function construirVista(e: EntradaVista): VistaCliente {
-  if (e.pagado) return { fase: "pagado", total: e.pagado.total, cambio: e.pagado.cambio };
-  if (e.cobro) return { fase: "cobro", total: e.cobro.total };
+  if (e.pagado) return { fase: "pagado", total: e.pagado.total !== null ? redondearCentavos(e.pagado.total) : null, cambio: redondearCentavos(e.pagado.cambio) };
+  if (e.cobro) return { fase: "cobro", total: redondearCentavos(e.cobro.total) };
   const { lineas, envio } = e.carrito;
   if (lineas.length === 0) return { fase: "reposo" };
   const envioMxn = envio?.costoMxn ?? 0;
   return {
     fase: "cuenta",
     renglones: lineas.map((l) => ({ id: l.clientId, cantidad: l.cantidad, nombre: l.producto.nombre, detalle: detalleDe(l), importe: totalLinea(l) })),
-    envio: envio ? { nombre: envio.nombre, importe: envio.costoMxn } : null,
+    envio: envio ? { nombre: envio.nombre, importe: redondearCentavos(envio.costoMxn) } : null,
     // El mismo número que el cajero ve en el costado (`SidebarTicket`: totalConDescuento ?? totales.total).
     total: e.totalAutoritativo ?? calcularTotalesDisplay(lineas, 16, envioMxn).total,
   };

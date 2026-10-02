@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { estadoInicial, type EstadoCarrito, type LineaCarrito } from "../carrito";
 import type { Producto } from "../catalogo";
+import type { ClienteDomicilio } from "../clientes-domicilio";
+import type { ClienteCuenta } from "../clientes-cuenta";
 import { construirVista, leerMensaje, type EntradaVista } from "../pantalla-cliente/vista";
 import { crearPublicador, type Canal } from "../pantalla-cliente/canal";
 
@@ -83,16 +85,47 @@ describe("construirVista", () => {
     expect(v).toEqual({ fase: "pagado", total: 200, cambio: 300 });
   });
 
+  it("redondea el cambio cuando hay errores de punto flotante", () => {
+    const v = construirVista(entrada({}, { pagado: { total: 100, cambio: 0.1 + 0.2 }, cobro: { total: 100 } }));
+    expect(v).toEqual({ fase: "pagado", total: 100, cambio: 0.3 });
+  });
+
   it("no deja pasar ningún dato privado", () => {
-    const carrito = {
+    const clienteDomicilio: ClienteDomicilio = {
+      clienteId: "ID-SECRETO-1",
+      nombre: "CLIENTE-SECRETO",
+      telefono: "4771234567",
+      direccionId: "d-SECRET-1",
+      direccionPreview: "Casa · CALLE-SECRETA 12, COL-SECRETA",
+      zona: { id: "z-SECRET", nombre: "ZONA-SECRETA", costoMxn: 50 },
+      direcciones: [],
+    };
+    const clienteCuenta: ClienteCuenta = {
+      clienteId: "ID-SECRETO-2",
+      nombre: "OTRO-CLIENTE-SECRETO",
+      telefono: "4777654321",
+    };
+    const carrito: EstadoCarrito = {
       ...estadoInicial,
-      modoServicio: "DELIVERY_PROPIO",
-      lineas: [linea("a", "Pizza", 200, 1, { notaCocina: "NOTA-COCINA-SECRETA" })],
+      modoServicio: "DELIVERY_PROPIO" as const,
+      lineas: [
+        linea("a", "Pizza", 200, 1, { notaCocina: "NOTA-COCINA-SECRETA" }),
+        linea("b", "Combo Secret", 150, 1, {
+          combo: {
+            def: { producto: producto("Combo Secret", 0), slots: [] },
+            precioUnitario: 150,
+            componentes: [
+              { grupoId: "g1", grupoNombre: "Base", producto: producto("Item", 50), cantidad: 1, modificadores: [], notaCocina: "NOTA-HIJO-SECRETA", clientId: "h-SECRET" },
+            ],
+          },
+        }),
+      ],
       notaOrden: "NOTA-ORDEN-SECRETA",
       nombreCuenta: "NOMBRE-CUENTA-SECRETO",
-      clienteDomicilio: { clienteId: "c1", nombre: "CLIENTE-SECRETO", telefono: "4771234567", direccion: "CALLE-SECRETA 12" },
-      clienteCuenta: { clienteId: "c2", nombre: "OTRO-CLIENTE-SECRETO", telefono: "4777654321" },
-    } as unknown as EstadoCarrito;
+      clienteDomicilio,
+      clienteCuenta,
+      envio: { zonaId: "z-SECRET", nombre: "Centro", costoMxn: 30 },
+    };
     const texto = JSON.stringify(construirVista({ carrito, totalAutoritativo: null, cobro: null, pagado: null }));
     for (const secreto of ["SECRET", "4771234567", "4777654321"]) expect(texto).not.toContain(secreto);
   });
@@ -110,6 +143,24 @@ describe("leerMensaje", () => {
     expect(leerMensaje({ tipo: "estado", v: 2, vista: { fase: "reposo" } })).toBeNull();
     expect(leerMensaje({ tipo: "estado", v: 1, vista: { fase: "cuenta", renglones: "x", envio: null, total: 1 } })).toBeNull();
     expect(leerMensaje({ tipo: "estado", v: 1, vista: { fase: "cobro", total: Number.NaN } })).toBeNull();
+  });
+
+  it("round trip: lo que construye la caja se valida igual", () => {
+    const v = construirVista(entrada({
+      lineas: [linea("a", "Hamburguesa", 100, 1, {
+        modificadores: [{ opcionId: "o1", grupoNombre: "Extras", opcionNombre: "Tocino", precioExtra: 15, cantidad: 1 }],
+      })],
+      envio: { zonaId: "z1", nombre: "Centro", costoMxn: 30 },
+    }));
+    if (v.fase !== "cuenta") throw new Error("Expected cuenta phase");
+    const msg = leerMensaje({ tipo: "estado", v: 1, vista: v });
+    expect(msg).not.toBeNull();
+    if (msg?.tipo !== "estado") throw new Error("Expected estado message");
+    expect(msg.vista).toEqual(v);
+  });
+
+  it("leerMensaje rechaza hola sin v", () => {
+    expect(leerMensaje({ tipo: "hola" })).toBeNull();
   });
 });
 
