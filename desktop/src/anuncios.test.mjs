@@ -25,9 +25,18 @@ const enTemporal = async (fn) => { const dir = mkdtempSync(path.join(os.tmpdir()
 
 test("el nombre en disco es el id con la extensión de la ruta", () => {
   assert.equal(nombreArchivo(fila(A, "png")), `${A}.png`);
-  assert.equal(nombreArchivo(fila(A, "JPEG")), `${A}.jpg`);
+  assert.equal(nombreArchivo(fila(A, "JPEG")), null, "la nube solo guarda minúsculas jpg|png|webp");
+  assert.equal(nombreArchivo(fila(A, "jpeg")), null);
   assert.equal(nombreArchivo({ id: A, ruta: `${T}/foto.gif` }), null, "una extensión que no es imagen permitida no entra");
   assert.equal(nombreArchivo({ id: "../../x", ruta: `${T}/a.jpg` }), null, "un id que no es uuid no entra");
+});
+
+test("una ruta que no es <uuid>/<uuid>.<ext> exacta no entra", () => {
+  for (const ruta of ["x/../../auth/v1/y.jpg", `${T}/${A}.jpg?x=1`, `${T}/${A}.jpg#f`, `${T}/sub/${A}.jpg`, `${T}/${A}.JPG`, `${A}.jpg`, `../${T}/${A}.jpg`, `x${T}/${A}.jpg`, `${T}/${A}xjpg`, `${T}/${A}/png`, null, 5]) assert.equal(nombreArchivo({ id: A, ruta }), null, String(ruta));
+});
+
+test("un archivo con casi la forma de anuncio (punto cambiado) ni cuenta ni se borra", () => {
+  assert.deepEqual(planAnuncios([], [`${A}xjpg`]), { descargar: [], borrar: [] });
 });
 
 test("el plan baja lo que falta y borra lo que sobra, sin tocar lo ajeno", () => {
@@ -86,6 +95,18 @@ test("lo que no es una imagen, o pesa de más, no se guarda", async () => {
   });
 });
 
+test("una fila con ruta hostil no provoca ninguna petición ni cuenta como fallida", async () => {
+  await enTemporal(async (dir) => {
+    const pedidas = [];
+    const r = await sincronizarAnuncios({
+      pool: poolFalso([{ id: A, ruta: "x/../../auth/v1/y.jpg" }, { id: B, ruta: `${T}/${B}.jpg?x=1` }]), dir, cloudUrl: "https://nube.example",
+      fetch: async (url) => { pedidas.push(url); return imagen(); },
+    });
+    assert.deepEqual(pedidas, []);
+    assert.deepEqual(r, { bajados: 0, borrados: 0, fallidos: 0 });
+  });
+});
+
 test("si la base falla, no lanza y no borra lo que hay en disco", async () => {
   await enTemporal(async (dir) => {
     writeFileSync(path.join(dir, `${A}.jpg`), "ya");
@@ -123,5 +144,5 @@ test("sin configuración usa 8 segundos; si algo falla, lista vacía", async () 
 test("la ruta de un archivo solo se resuelve para nombres con forma de anuncio", () => {
   const dir = path.join(os.tmpdir(), "anuncios");
   assert.equal(rutaDeAnuncio(dir, `${A}.jpg`), path.join(dir, `${A}.jpg`));
-  for (const malo of ["../secreto.jpg", `${A}.exe`, `..%2f${A}.jpg`, `${A}.jpg/..`, ""]) assert.equal(rutaDeAnuncio(dir, malo), null, malo);
+  for (const malo of ["../secreto.jpg", `${A}.exe`, `${A}/png`, `${A}xjpg`, `${A}\\png`, `..%2f${A}.jpg`, `${A}.jpg/..`, ""]) assert.equal(rutaDeAnuncio(dir, malo), null, malo);
 });

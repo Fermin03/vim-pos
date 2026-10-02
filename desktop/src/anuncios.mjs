@@ -12,18 +12,19 @@ import path from "node:path";
 
 const UUID = "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}";
 /** La única forma de nombre que se guarda y se sirve. */
-export const ARCHIVO_VALIDO = new RegExp(`^${UUID}\.(jpg|png|webp)$`);
+export const ARCHIVO_VALIDO = new RegExp(`^${UUID}\\.(jpg|png|webp)$`);
 const TIPOS = { "image/jpeg": "jpg", "image/png": "png", "image/webp": "webp" };
-const EXTENSIONES = { jpg: "jpg", jpeg: "jpg", png: "png", webp: "webp" };
+/** La forma exacta de `ruta` que exige la nube: <carpeta del negocio>/<id>.<ext>, todo en minúsculas. */
+const RUTA_VALIDA = new RegExp(`^${UUID}/${UUID}\\.(jpg|png|webp)$`);
 /** El almacén acepta hasta 1 MB; el doble de margen por si el tope cambia allá antes que aquí. */
 const MAX_BYTES = 2 * 1024 * 1024;
 const SEGUNDOS = 8;
 const valido = (n) => Number.isInteger(n) && n >= 3 && n <= 60;
 
 export function nombreArchivo(fila) {
-  const ext = EXTENSIONES[String(fila?.ruta ?? "").split(".").pop()?.toLowerCase() ?? ""];
-  const nombre = `${fila?.id}.${ext}`;
-  return ext && ARCHIVO_VALIDO.test(nombre) ? nombre : null;
+  const m = typeof fila?.ruta === "string" ? RUTA_VALIDA.exec(fila.ruta) : null;
+  const nombre = m ? `${fila.id}.${m[1]}` : null;
+  return nombre && ARCHIVO_VALIDO.test(nombre) ? nombre : null;
 }
 
 /** Qué bajar y qué borrar. PURA. Solo borra lo que tiene forma de anuncio (o un temporal suyo). */
