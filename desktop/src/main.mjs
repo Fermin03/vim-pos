@@ -19,6 +19,7 @@ import { respaldar, respaldarAsync, hacerSitio } from "./backup.mjs";
 import { crearGatewayDeEspera } from "./gateway.mjs";
 import { crearRespaldoDiario, guardarEstado as guardarEstadoRespaldo, leerEstado as leerEstadoRespaldo, textoUltimoRespaldo } from "./respaldo-diario.mjs";
 import { crearWatchdog } from "./watchdog.mjs";
+import { conTope } from "./tope.mjs";
 import { crearCicloSync, OMITIDO } from "./sync-ciclo.mjs";
 import { crearSondeoCatalogo } from "./sondeo-catalogo.mjs";
 import { crearAlmacenDirectivas, estadoDeVersion } from "./directivas.mjs";
@@ -121,6 +122,7 @@ ipcMain.handle("vim:salir", () => {
 let arrancado = false;        // ya terminó el boot: después, un rechazo suelto no debe matar la caja
 let respaldando = false;
 let respaldoEnCurso = null;   // la promesa del respaldo con la caja encendida: salir la espera
+let reinicioEnCurso = null;   // la promesa del reinicio del watchdog: salir la espera también
 let vinculando = false;       // hay un PULL de vinculación escribiendo en la base local
 let respaldoDiario = null;    // temporizador del respaldo diario (respaldo-diario.mjs)
 // Última vez que alguien OPERÓ la caja (una escritura por el gateway). Arranca en "ahora": recién
@@ -364,7 +366,22 @@ async function bootCaja() {
 
   crearTray();
   // Watchdog: si Postgres/PostgREST se caen, reinicia el backend solo (auto-recuperación).
-  watchdog = crearWatchdog({ url: backend.url, alReiniciar: reiniciarBackend, log: (m) => console.log("· [watchdog]", m) });
+  // Por 127.0.0.1 y no por «localhost»: el gateway escucha en IPv4 y así no depende de cómo
+  // resuelva esa PC el nombre. VIM_WATCHDOG=0 lo apaga sin publicar otra versión (soporte).
+  if (process.env.VIM_WATCHDOG === "0") {
+    console.log("· [watchdog] apagado por VIM_WATCHDOG=0: el backend no se reinicia solo");
+  } else {
+    watchdog = crearWatchdog({
+      url: `http://127.0.0.1:${backend.gatewayPort}`,
+      alReiniciar: reiniciarBackend,
+      log: (m) => console.log("· [watchdog]", m),
+      // A la bitácora que VIM sí ve (errores_app → sube sola en el siguiente ciclo de sync).
+      reportar: async (mensaje, contexto) => {
+        if (!backend?.pool) return;
+        await registrarErrorLocal(backend.pool, { mensaje, contexto: { ...contexto, rol: ROL }, version: app.getVersion() });
+      },
+    });
+  }
 
   iniciarSync();
   iniciarRespaldoDiario();
@@ -414,13 +431,28 @@ async function boot() {
   return bootCaja();
 }
 
-/** Reinicia el backend conservando puertos (lo llama el watchdog al detectar caída). */
-async function reiniciarBackend() {
-  const prev = backend;
-  backend = null;
-  try { if (prev) await prev.stop(); } catch { /* */ }
-  backend = await startBackend(opcionesBackend);
-  backend.nube = tokenDeNubeCacheado; // redundante con opcionesBackend.nube; explícito por D5
+/**
+ * Reinicia el backend conservando puertos (lo llama el watchdog al detectar caída).
+ *
+ * Uno a la vez, y nunca encima de un respaldo ni de la salida: los tres detienen y levantan el
+ * mismo Postgres sobre el mismo pgdata, y dos a la vez se matan el uno al otro. La promesa en curso
+ * se guarda para que salir de la app pueda esperarla (ver cerrarTodo).
+ */
+function reiniciarBackend() {
+  if (reinicioEnCurso) return reinicioEnCurso;
+  if (respaldando) return Promise.reject(new Error("hay un respaldo en curso; el respaldo vuelve a levantar el backend"));
+  if (cerrando) return Promise.reject(new Error("la caja se está cerrando"));
+  reinicioEnCurso = (async () => {
+    console.log("· [watchdog] reiniciando el backend…");
+    const prev = backend;
+    backend = null;
+    try { if (prev) await prev.stop(); } catch { /* */ }
+    // Salir a medio reinicio: no se levanta nada que luego nadie apague.
+    if (cerrando) throw new Error("la caja se está cerrando");
+    backend = await startBackend(opcionesBackend);
+    backend.nube = tokenDeNubeCacheado; // redundante con opcionesBackend.nube; explícito por D5
+  })().finally(() => { reinicioEnCurso = null; });
+  return reinicioEnCurso;
 }
 
 /** Anota el resultado de una copia en `ultimo-respaldo.json`. Así el respaldo diario, el manual y
@@ -475,6 +507,9 @@ async function hacerRespaldo() {
     const e = espera; espera = null;
     if (e) await new Promise((r) => { try { e.close(() => r()); e.closeAllConnections?.(); } catch { r(); } });
   };
+  // El watchdog se pausa YA, no después de medir el disco: en esa ventana podía dar su tercer
+  // fallo y lanzar un reinicio a la vez que este respaldo (dos arranques sobre el mismo pgdata).
+  watchdog?.pausar();
   try {
     // ANTES de tocar la base: si no cabe ni purgando respaldos viejos, no se detiene nada. Con el
     // disco lleno la caja se interrumpía cada hora para fallar con ENOSPC y no liberar nada.
@@ -484,9 +519,14 @@ async function hacerRespaldo() {
       guardarEstadoRespaldo(bd, { ultimoFallo: new Date().toISOString(), ultimoError: sitio.error });
       return { ok: false, causa: "sin-espacio", error: sitio.error };
     }
-    watchdog?.pausar();
+    // Un reinicio del watchdog que ya venía en marcha dejó `backend` en null: se le espera.
+    if (reinicioEnCurso) { try { await reinicioEnCurso; } catch { /* */ } }
+    if (!backend) throw new Error("la caja no tiene el backend levantado; no hay base que copiar");
+    log("deteniendo la base para copiarla…");
     const prev = backend; backend = null;
-    await prev.stop();
+    const parada = await prev.stop();
+    // La copia es EN FRÍO: con Postgres vivo saldría un respaldo inservible anotado como bueno.
+    if (!parada?.postgresDetenido) throw new Error("no se pudo confirmar que Postgres se detuvo; no se copia");
     // Mientras la base está detenida, el puerto contesta "estoy respaldando; intenta en unos
     // segundos" en vez de quedar cerrado (que el POS lee como un fallo de red sin explicación).
     try {
@@ -835,7 +875,15 @@ async function syncBestEffort({ conPull = true } = {}) {
   // con un TypeError, contaba como fallo de la nube y disparaba el backoff. No es un fallo: se
   // omite y el ciclo vuelve a intentar en un minuto. El pool se toma UNA vez, para todo el ciclo.
   const pool = backend?.pool;
-  if (!pool || respaldando) { console.log("· [sync] omitido (la base local está detenida por el respaldo)"); return OMITIDO; }
+  if (!pool || respaldando) {
+    // El motivo de VERDAD: durante horas este renglón culpó al respaldo de lo que era un reinicio
+    // del watchdog que no terminaba (Knock-Out Obregón, 2 oct 2026).
+    const porque = respaldando ? "la base local está detenida por el respaldo"
+      : reinicioEnCurso ? "el backend local se está reiniciando"
+      : "el backend local no está levantado";
+    console.log(`· [sync] omitido (${porque})`);
+    return OMITIDO;
+  }
   try {
     const l = await loginDispositivoNube({ cloudUrl, anon, email, pass, timeoutMs: 30000 });
     if (!l.token) { console.log("· [sync] omitido (login de dispositivo en la nube falló)"); return false; }
@@ -1101,19 +1149,28 @@ async function cerrarTodo() {
   // salir sin esperarlo dejaba un Postgres huérfano, vivo sin nadie que lo apague. Se espera; al
   // ver `cerrando` ya no lo levanta.
   let recienRespaldado = false;
+  try { watchdog?.stop(); } catch { /* */ } // antes que nada: que no arranque un reinicio ahora
   if (respaldoEnCurso) {
     try { recienRespaldado = (await respaldoEnCurso)?.ok === true; } catch { /* */ }
   }
+  // Lo mismo con un reinicio del watchdog a media marcha: si ya está levantando, se le deja
+  // terminar para poder apagar lo que levante; si aún no, al ver `cerrando` no levanta nada. Con
+  // tope: salir no puede depender de un arranque que no acaba.
+  if (reinicioEnCurso) {
+    try { await conTope(reinicioEnCurso, 90_000, () => console.error("· [backup] al cerrar: el reinicio del backend no terminó; se sale igual")); } catch { /* */ }
+  }
   try { pantallaCliente?.cerrar(); } catch { /* */ }
   try { detenerSync(); } catch { /* */ }
-  try { watchdog?.stop(); } catch { /* */ }
   try { if (uiServer) uiServer.close(); } catch { /* */ }
   try {
     if (backend) {
       const dd = backend.dataDir;
       const bd = backupsDir || path.join(backend.dataRoot, "backups");
-      await backend.stop(); // Postgres detenido → el pgdata queda consistente para copiar en frío.
-      if (dd && bd && !recienRespaldado) copiarYAnotar(dd, bd);
+      // Con Postgres detenido el pgdata queda consistente para copiar en frío. Si no se pudo
+      // confirmar que se detuvo, no se copia: un respaldo en caliente no sirve.
+      const parada = await backend.stop();
+      if (!parada?.postgresDetenido) console.error("· [backup] al cerrar: no se pudo confirmar que Postgres se detuvo; no se copia");
+      else if (dd && bd && !recienRespaldado) copiarYAnotar(dd, bd);
     }
   } catch (e) { console.error("· [backup] al cerrar:", e.message); }
   try { tray?.destroy(); } catch { /* */ }
@@ -1159,6 +1216,30 @@ process.on("unhandledRejection", (causa) => {
       mensaje: causa?.message ?? String(causa ?? "(sin detalle)"),
       stack: causa?.stack ?? null,
       contexto: { origen: "unhandledRejection", rol: ROL },
+      version: app.getVersion(),
+    }).catch(() => {});
+  }
+});
+
+// Lo mismo con las excepciones sin capturar. Sin este oyente Electron las enseña en un diálogo
+// modal ENCIMA de la caja y no dejan rastro en el log. El caso que lo pidió: cuando Postgres muere,
+// sus conexiones emiten 'error'; las conocidas ya tienen oyente (el pool y el LISTEN del KDS), pero
+// una que se escape no debe taparle la pantalla al cajero justo cuando el watchdog va a recuperar
+// la caja. El proceso sigue, igual que seguía tras el diálogo.
+//
+// Durante el ARRANQUE sí se avisa en pantalla, como hacía Electron: ahí una excepción suele dejar
+// la caja sin abrir (p. ej. el puerto del POS ocupado), y sin diálogo no habría nada que reportar.
+process.on("uncaughtException", (causa) => {
+  console.error("Excepción no capturada:", causa ?? "(sin detalle)");
+  if (!arrancado && esFalloDePermisos(causa)) falloElArranque(causa);
+  else if (!arrancado) {
+    try { dialog.showErrorBox("VIM POS: error al arrancar", `${causa?.message ?? causa}\n\nDetalle completo del arranque:\n${LOG_PATH}`); } catch { /* */ }
+  }
+  if (backend?.pool) {
+    registrarErrorLocal(backend.pool, {
+      mensaje: causa?.message ?? String(causa ?? "(sin detalle)"),
+      stack: causa?.stack ?? null,
+      contexto: { origen: "uncaughtException", rol: ROL },
       version: app.getVersion(),
     }).catch(() => {});
   }

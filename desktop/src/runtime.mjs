@@ -6,6 +6,7 @@ import EmbeddedPostgres from "embedded-postgres";
 import { arrancarConReintentos, crearCapturaDeLog } from "./arranque-reintentos.mjs";
 import { sembrarRepartidoresUnaVez, sembrarZonasUnaVez } from "./sync-push.mjs";
 import { blindarTablasInternas, repararRevokesUnaVez } from "./privilegios.mjs";
+import { conTope } from "./tope.mjs";
 import pg from "pg";
 import { spawn, execFileSync } from "node:child_process";
 import { randomBytes } from "node:crypto";
@@ -208,6 +209,47 @@ function matarQuienOcupaElPuerto(puerto, log = () => {}) {
       try { process.kill(pid, "SIGKILL"); log(`proceso ${pid} liberado del puerto ${puerto}`); } catch { /* */ }
     }
   } catch { /* netstat no disponible: seguimos */ }
+}
+
+/** ¿Sigue existiendo ese proceso? (La señal 0 no mata: solo pregunta.) */
+export function procesoVivo(pid) {
+  if (!Number.isInteger(pid) || pid <= 0) return false;
+  try { process.kill(pid, 0); return true; } catch (e) { return e?.code === "EPERM"; }
+}
+
+/**
+ * Detiene Postgres SIN quedarse esperando, y dice si de verdad quedó detenido.
+ *
+ * `detener` es el `stop()` de embedded-postgres: pide a taskkill que mate postgres.exe y espera su
+ * evento 'exit'. Si Postgres YA estaba muerto —justo el caso para el que existe el watchdog— ese
+ * evento ya pasó y la espera no termina nunca: el reinicio se quedaba colgado antes de empezar. Por
+ * eso primero se pregunta si el proceso vive, y si vive se le espera con tope.
+ *
+ * `barrer` mata lo que quede de esta instalación (hijos sin padre, o el propio Postgres si no
+ * obedeció). El resultado importa: el respaldo copia el pgdata EN FRÍO y solo puede hacerlo con
+ * Postgres detenido. Exportada para probarla sin Postgres.
+ */
+export async function detenerPostgres({ pid, detener, barrer = () => {}, desarmar = () => {}, vivo = procesoVivo, topeMs = 10_000, log = () => {} }) {
+  // `desarmar`: embedded-postgres guarda el proceso y, al salir la app, su gancho de salida vuelve a
+  // lanzar `taskkill /f /t` contra ese PID. Si Postgres murió por su cuenta, horas después ese PID
+  // puede ser de otro programa. Cuando se sabe muerto, se le quita la referencia.
+  if (pid && !vivo(pid)) {
+    log("parada: Postgres ya no estaba vivo");
+    try { barrer(); } catch { /* */ }
+    try { desarmar(); } catch { /* */ }
+    return true;
+  }
+  let vencio = false;
+  try {
+    ({ vencio } = await conTope(detener(), topeMs, () => log("parada: Postgres no avisó de su salida; se barre a mano")));
+  } catch { vencio = true; }
+  if (!vencio) return true;
+  try { barrer(); } catch { /* */ }
+  // Sin PID no hay forma de comprobarlo: se cuenta como NO detenido (nadie copia a ciegas).
+  const detenido = pid ? !vivo(pid) : false;
+  if (detenido) { try { desarmar(); } catch { /* */ } }
+  else log(pid ? `parada: Postgres (PID ${pid}) SIGUE VIVO tras el barrido` : "parada: no se pudo confirmar que Postgres se detuvo");
+  return detenido;
 }
 
 /**
@@ -524,12 +566,29 @@ export async function startLocalBackend(opts = {}) {
 
   // Pool para el auth local (device sign-in, pin-login) — service_role local.
   const pool = new pg.Pool({ host: "localhost", port: pgPort, user: "postgres", password, database: "vimpos", max: 4 });
+  // Una conexión ociosa del pool que pierde a Postgres emite 'error' en el pool. Sin oyente es una
+  // excepción sin capturar en el proceso principal — justo cuando el watchdog tiene que actuar.
+  pool.on("error", (e) => log(`pool local: se perdió una conexión a Postgres (${e?.message ?? e})`));
 
+  /** Devuelve `{ postgresDetenido }`: quien vaya a copiar el pgdata en frío tiene que saberlo. */
   const stop = async () => {
     try { rest.kill(); } catch { /* */ }
-    try { await pool.end(); } catch { /* */ }
-    try { await database.stop(); } catch { /* */ }
-    try { rmSync(pidfile, { force: true }); } catch { /* */ } // cierre limpio → sin huérfanos que limpiar
+    // pool.end() espera a que se devuelvan las conexiones prestadas: una consulta atorada lo retiene.
+    try { await conTope(pool.end(), 5000, () => log("parada: el pool local no cerró a tiempo; se sigue")); } catch { /* */ }
+    const postgresDetenido = await detenerPostgres({
+      pid: pgPid,
+      detener: () => database.stop(),
+      barrer: () => {
+        matarPostgresDeEstaInstalacion(pgBin, (m) => log(`limpieza: ${m}`));
+        matarQuienOcupaElPuerto(pgPort, (m) => log(`limpieza: ${m}`));
+      },
+      desarmar: () => { database.process = undefined; },
+      log,
+    });
+    // Cierre limpio → sin huérfanos que limpiar. Si no lo fue, el pidfile se queda: el próximo
+    // arranque repite la limpieza con él.
+    if (postgresDetenido) { try { rmSync(pidfile, { force: true }); } catch { /* */ } }
+    return { postgresDetenido };
   };
   return { pgPort, restPort, secret, pool, stop, dataDir, dataRoot, pgPassword: password };
 }
