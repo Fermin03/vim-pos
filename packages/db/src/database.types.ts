@@ -359,6 +359,59 @@ export type Database = {
           },
         ]
       }
+      anuncios_pantalla: {
+        Row: {
+          activo: boolean
+          alto: number | null
+          ancho: number | null
+          bytes: number | null
+          created_at: string
+          deleted_at: string | null
+          id: string
+          orden: number
+          ruta: string
+          segundos: number | null
+          tenant_id: string
+          updated_at: string
+        }
+        Insert: {
+          activo?: boolean
+          alto?: number | null
+          ancho?: number | null
+          bytes?: number | null
+          created_at?: string
+          deleted_at?: string | null
+          id?: string
+          orden?: number
+          ruta: string
+          segundos?: number | null
+          tenant_id: string
+          updated_at?: string
+        }
+        Update: {
+          activo?: boolean
+          alto?: number | null
+          ancho?: number | null
+          bytes?: number | null
+          created_at?: string
+          deleted_at?: string | null
+          id?: string
+          orden?: number
+          ruta?: string
+          segundos?: number | null
+          tenant_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "anuncios_pantalla_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       areas_cocina: {
         Row: {
           activa: boolean
@@ -2006,6 +2059,7 @@ export type Database = {
           mostrar_qr_factura_ticket: boolean
           pac_credenciales_encrypted: string | null
           pac_proveedor: string | null
+          pantalla_cliente_segundos: number
           pie_ticket: string | null
           politica_cobro_cocina: string
           propina_permite_otro_monto: boolean
@@ -2045,6 +2099,7 @@ export type Database = {
           mostrar_qr_factura_ticket?: boolean
           pac_credenciales_encrypted?: string | null
           pac_proveedor?: string | null
+          pantalla_cliente_segundos?: number
           pie_ticket?: string | null
           politica_cobro_cocina?: string
           propina_permite_otro_monto?: boolean
@@ -2084,6 +2139,7 @@ export type Database = {
           mostrar_qr_factura_ticket?: boolean
           pac_credenciales_encrypted?: string | null
           pac_proveedor?: string | null
+          pantalla_cliente_segundos?: number
           pie_ticket?: string | null
           politica_cobro_cocina?: string
           propina_permite_otro_monto?: boolean
