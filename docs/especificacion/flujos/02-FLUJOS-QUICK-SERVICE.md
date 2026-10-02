@@ -494,7 +494,7 @@ Decisiones de QS aún por definir:
 
 4. **Política de límite de modificadores por producto:** ¿hay un máximo razonable de modificadores que un cajero puede aplicar en un solo producto? (Performance + UX). Probable: no, dejarlo libre.
 
-5. **Display al cliente:** mencionado en `/core` sección 28 como Fase 2 general. En QS es especialmente útil — el cliente ve lo que se captura y reduce errores. Decidir cuándo se materializa.
+5. **Display al cliente:** mencionado en `/core` sección 28 como Fase 2 general. En QS es especialmente útil — el cliente ve lo que se captura y reduce errores. Decidir cuándo se materializa. ⚠️ *Superado: la pantalla del cliente ya existe y se enciende sola; ver `vim-pos/docs/decisiones/0026-la-pantalla-del-cliente-se-enciende-sola.md`.*
 
 6. **Notificación al cliente cuando esté listo:** SMS/WhatsApp o display físico de números. Decisión a tomar con cada cliente piloto.
 

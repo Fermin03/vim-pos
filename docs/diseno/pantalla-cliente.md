@@ -29,13 +29,21 @@ La ventana no recibe foco ni teclado; el cajero nunca la opera.
 
 | Fase | Qué muestra |
 |---|---|
-| Reposo | Logo y nombre del negocio. Con anuncios (entrega 2), el carrusel. |
+| Reposo | Logo y nombre del negocio. Sin ninguno de los dos (caja recién instalada, antes de la primera sesión), el isotipo de VIM POS. Con anuncios (entrega 2), el carrusel. |
 | Cuenta | Renglones (cantidad, nombre, detalle, importe), envío si aplica, total fijo abajo. |
 | Cobro | «Total a pagar» y el monto. |
-| Pagado | «¡Gracias!» y el cambio; sin cambio, «Vuelva pronto». |
+| Pagado | «¡Gracias!» y el cambio; sin cambio, «Vuelva pronto». Dura lo que el «Cobro completado» de la caja y **nunca más de 8 s**. |
 
 Si la caja deja de publicar 15 s (se colgó, se recargó), la pantalla vuelve sola a reposo: la
 cuenta de un cliente no se queda a la vista del siguiente.
+
+**Pagado tiene tope** porque el diálogo de la caja no siempre se cierra solo: sin impresora se
+queda abierto con el recibo, y «¡Gracias!» no puede recibir al siguiente cliente.
+
+**Reposo nunca está en blanco.** Si el logo no carga, queda el nombre; si tampoco hay nombre (o
+viene vacío), el isotipo de VIM POS, el mismo que la caja enseña en su inicio. El negocio se
+recuerda entre arranques y se olvida al desvincular la caja: el logo de un negocio no sale en el
+siguiente.
 
 ## Tema claro, y por qué
 
@@ -60,14 +68,19 @@ En `vmin`, pensados para leerse a un metro:
 |---|---|
 | Cifra que manda (total a pagar, cambio) | `16vmin`, Sora bold |
 | Total de la cuenta | `11vmin`, Sora bold |
-| Títulos («Total a pagar», «¡Gracias!», nombre del negocio) | `7vmin`; `10`–`12vmin` cuando no hay nada más grande en pantalla |
+| Títulos («Total a pagar», «¡Gracias!») | `7vmin`; `12vmin` cuando no hay nada más grande en pantalla |
+| Nombre del negocio | hasta `7vmin` con logo, hasta `10vmin` sin él; menos si no cabe (`tamanoNombre`) |
 | Renglón (cantidad, nombre, importe) | `4vmin` |
 | Detalle del renglón | `2.8vmin`, el piso de la pantalla |
-| Logo | `34vmin` de alto, sin importar el tamaño de la imagen |
+| Logo (o el isotipo de VIM POS, si no hay negocio) | `34vmin` de alto, sin importar el tamaño de la imagen |
 
 **Una cifra nunca se corta.** En un monitor vertical o cuadrado el ancho es `100vmin`, y
 `$1,234.50` a `16vmin` ya lo roza. Las cifras grandes miden su tope **o menos si no caben**
 (`tamanoCifra`): una cifra cortada por el borde es un total falso de cara al cliente.
+
+**Un nombre no se parte a media palabra.** «Knock-Out Burger» a `10vmin` no cabe en un monitor 4:3
+y se rompía en el guion. El nombre se encoge hasta caber en una línea (`tamanoNombre`); solo si es
+tan largo que quedaría ilegible se parte, y entonces únicamente por los espacios.
 
 **El dinero, como en la caja:** `font-display`, bold o semibold, `tabular-nums`. El total de la
 cuenta repite el bloque del costado de la caja —etiqueta en versalitas, cifra en Sora—.
