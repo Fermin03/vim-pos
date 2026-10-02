@@ -83,7 +83,7 @@ export default function AreasPage() {
         <p className="mb-5 rounded-lg border border-line bg-surface px-4 py-3 text-13 leading-relaxed text-ink-2">
           Después de crearlas, asigna cada categoría a su estación en <strong>Catálogo → Categorías</strong>
           {" "}(Bebidas → Barra) y, si algún producto es la excepción, cámbiaselo en su ficha. Por último,
-          en el POS entra a <strong>Configurar impresora</strong> y elige qué impresora usa cada estación:
+          en el POS entra a <strong>Configurar impresoras y pantallas</strong> y elige qué impresora usa cada estación:
           eso se define en cada caja, porque cada una tiene sus propias impresoras.
         </p>
 
