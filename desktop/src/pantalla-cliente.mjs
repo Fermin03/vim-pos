@@ -15,8 +15,9 @@ export const CONFIG_INICIAL = Object.freeze({ modo: "auto", displayId: null });
 export function normalizarConfig(crudo) {
   if (!crudo || typeof crudo !== "object") return { ...CONFIG_INICIAL };
   if (crudo.modo !== "auto" && crudo.modo !== "apagada") return { ...CONFIG_INICIAL };
+  // Un monitor mal escrito solo pierde el monitor. Tirar también el `modo` volvía a encender una
+  // pantalla que alguien había apagado a propósito.
   const displayId = Number.isFinite(crudo.displayId) ? crudo.displayId : null;
-  if (crudo.displayId != null && displayId === null) return { ...CONFIG_INICIAL };
   return { modo: crudo.modo, displayId };
 }
 
@@ -44,19 +45,38 @@ const EVENTOS = ["display-added", "display-removed", "display-metrics-changed"];
 
 const mismos = (a, b) => a.x === b.x && a.y === b.y && a.width === b.width && a.height === b.height;
 
+/** Reaperturas tras una muerte inesperada que se toleran dentro de `VENTANA_REAPERTURAS_MS`. */
+export const MAX_REAPERTURAS = 5;
+export const VENTANA_REAPERTURAS_MS = 60_000;
+
 /**
  * Abre, mueve y cierra la ventana del cliente según los monitores conectados.
  *
  * Electron entra inyectado (`screen`, `BrowserWindow`, `powerSaveBlocker`) para poder probar las
- * decisiones sin un monitor de verdad.
+ * decisiones sin un monitor de verdad; el reloj (`ahora`), para probar el tope de reaperturas sin
+ * esperar un minuto.
  */
-export function crearPantallaCliente({ screen, BrowserWindow, powerSaveBlocker, archivo, url, ventanaCaja, proteger, log = () => {}, esperaMs = 300 }) {
+export function crearPantallaCliente({ screen, BrowserWindow, powerSaveBlocker, archivo, url, ventanaCaja, proteger, log = () => {}, esperaMs = 300, ahora = () => Date.now() }) {
   let config = leerConfig(archivo);
   let ventana = null;
   let destino = null;      // el display donde está abierta
   let bloqueo = null;      // id de powerSaveBlocker
   let pendiente = null;    // temporizador del antirrebote
   let cerrada = false;
+  let reaperturas = [];    // cuándo se reabrió tras cada muerte inesperada (ver `trasMuerte`)
+
+  /**
+   * La caja está en la bandeja: su ventana existe pero no se ve. Minimizada cuenta como visible
+   * (Windows la sigue reportando así), y sin ventana no se puede saber, así que no se asume oculta.
+   *
+   * La caja casi nunca se cierra de verdad: vive en la bandeja. Sin esta regla la pantalla del
+   * cliente y su bloqueo de suspensión se quedaban arriba para siempre, y una cuenta abierta podía
+   * seguir a la vista con la caja escondida.
+   */
+  function cajaOculta() {
+    const caja = ventanaCaja?.();
+    try { return !!caja && !caja.isDestroyed() && caja.isVisible() === false; } catch { return false; }
+  }
 
   function idDeLaCaja() {
     const caja = ventanaCaja?.();
@@ -101,12 +121,20 @@ export function crearPantallaCliente({ screen, BrowserWindow, powerSaveBlocker, 
           ventana = null;
           destino = null;
           soltarBloqueo();
-          programar();
+          trasMuerte();
         }
       });
       // Si el renderer muere, se vuelve a abrir: una pantalla negra frente al cliente no se arregla sola.
-      v.webContents.on("render-process-gone", () => { if (ventana === v) { cerrarVentana(); programar(); } });
-      v.loadURL(url).catch((e) => log(`no cargó: ${e?.message ?? e}`));
+      v.webContents.on("render-process-gone", () => { if (ventana === v) { cerrarVentana(); trasMuerte(); } });
+      // Una ventana que no cargó no se queda «abierta» con el bloqueo tomado: se cierra y se
+      // reintenta con el mismo tope que cualquier otra muerte. Si ya no es la ventana vigente
+      // (la cerramos nosotros a media carga), el rechazo no dice nada y se ignora.
+      v.loadURL(url).catch((e) => {
+        if (ventana !== v) return;
+        log(`no cargó: ${e?.message ?? e}`);
+        cerrarVentana();
+        trasMuerte();
+      });
       ventana = v;
       destino = display;
       try { bloqueo = powerSaveBlocker.start("prevent-display-sleep"); } catch (e) { log(`no se pudo bloquear pantalla: ${e?.message ?? e}`); bloqueo = null; }
@@ -124,6 +152,7 @@ export function crearPantallaCliente({ screen, BrowserWindow, powerSaveBlocker, 
     if (cerrada) return;
     let elegido = null;
     try { elegido = elegirMonitor(screen.getAllDisplays(), idDeLaCaja(), config); } catch (e) { log(`no se pudieron leer los monitores: ${e?.message ?? e}`); }
+    if (cajaOculta()) { if (ventana) { cerrarVentana(); log("cerrada: la caja está en la bandeja"); } return; }
     if (!elegido) { if (ventana) { cerrarVentana(); log("cerrada: no hay segundo monitor o está apagada"); } return; }
     if (ventana && !ventana.isDestroyed() && destino?.id === elegido.id && mismos(destino.bounds, elegido.bounds)) return;
     cerrarVentana();
@@ -138,6 +167,28 @@ export function crearPantallaCliente({ screen, BrowserWindow, powerSaveBlocker, 
     pendiente = setTimeout(evaluar, esperaMs);
   }
 
+  /**
+   * La ventana murió sin que la cerráramos. Se reabre, pero no para siempre: una que muere nada más
+   * abrir se recreaba cada 300 ms sin fin y llenaba `vim-pos.log`. Pasado el tope se deja en paz
+   * hasta que algo cambie (`reevaluar`, `configurar`), que es cuando tiene sentido volver a probar.
+   */
+  function trasMuerte() {
+    const t = ahora();
+    reaperturas = reaperturas.filter((antes) => t - antes < VENTANA_REAPERTURAS_MS);
+    if (reaperturas.length >= MAX_REAPERTURAS) {
+      log(`se dejó de reabrir: murió ${MAX_REAPERTURAS + 1} veces en menos de un minuto. Se vuelve a intentar al cambiar los monitores, la caja o el ajuste.`);
+      return;
+    }
+    reaperturas.push(t);
+    programar();
+  }
+
+  /** Algo cambió afuera (monitores, la ventana de la caja): se evalúa de nuevo, con la cuenta de reaperturas en cero. */
+  function reevaluar() {
+    reaperturas = [];
+    programar();
+  }
+
   function estado() {
     let monitores = [];
     try {
@@ -150,10 +201,12 @@ export function crearPantallaCliente({ screen, BrowserWindow, powerSaveBlocker, 
   }
 
   return {
-    iniciar() { for (const e of EVENTOS) screen.on(e, programar); evaluar(); },
+    iniciar() { for (const e of EVENTOS) screen.on(e, reevaluar); evaluar(); },
     evaluar,
+    reevaluar,
     estado,
     configurar(cambio) {
+      reaperturas = [];
       config = normalizarConfig(cambio);
       try { guardarConfig(archivo, config); } catch (e) { log(`no se pudo guardar la configuración: ${e?.message ?? e}`); }
       evaluar();
@@ -162,7 +215,7 @@ export function crearPantallaCliente({ screen, BrowserWindow, powerSaveBlocker, 
     cerrar() {
       cerrada = true;
       clearTimeout(pendiente);
-      for (const e of EVENTOS) { try { screen.removeListener(e, programar); } catch { /* */ } }
+      for (const e of EVENTOS) { try { screen.removeListener(e, reevaluar); } catch { /* */ } }
       cerrarVentana();
     },
   };
