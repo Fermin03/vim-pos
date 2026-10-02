@@ -37,12 +37,37 @@ export function planAnuncios(filas, enDisco) {
   return { descargar, borrar };
 }
 
-const SQL_FILAS = `SELECT id, ruta, segundos FROM anuncios_pantalla WHERE activo AND deleted_at IS NULL ORDER BY orden, created_at`;
+const SQL_FILAS = `SELECT id, ruta, segundos FROM anuncios_pantalla WHERE tenant_id = $1 AND activo AND deleted_at IS NULL ORDER BY orden, created_at`;
+const ES_UUID = new RegExp(`^${UUID}$`, "i");
+
+/**
+ * El negocio al que está vinculada la caja hoy: el del último snapshot (sync-pull.mjs lo anota en
+ * `_vim_sync`). El pull solo hace upsert, así que una caja revinculada del negocio A al B conserva
+ * las filas de A en su base; sin este filtro la pantalla mezclaba los anuncios de los dos. Sin
+ * negocio anotado (la caja aún no hace un pull) devuelve null: sin anuncios, que es lo seguro.
+ * Lanza si la base falla: quien llama distingue "no hay negocio" de "no se pudo leer".
+ */
+async function tenantVinculado(pool) {
+  // `_vim_sync` la crea el primer pull; antes no existe y leerla directo sería un error, no un "sin negocio".
+  const hay = (await pool.query(`SELECT to_regclass('public._vim_sync') IS NOT NULL AS hay`)).rows[0]?.hay;
+  if (!hay) return null;
+  const valor = (await pool.query(`SELECT valor FROM _vim_sync WHERE clave = 'tenant'`)).rows[0]?.valor;
+  return typeof valor === "string" && ES_UUID.test(valor) ? valor : null;
+}
+
+/** Las filas de anuncios del negocio vinculado ([] si no hay ninguno anotado). Lanza si la base falla. */
+async function filasDelNegocio(pool) {
+  const tenant = await tenantVinculado(pool);
+  if (!tenant) return { tenant: null, filas: [] };
+  return { tenant, filas: (await pool.query(SQL_FILAS, [tenant])).rows };
+}
 
 export async function sincronizarAnuncios({ pool, dir, cloudUrl, fetch: pedir = fetch, log = () => {} }) {
   const r = { bajados: 0, borrados: 0, fallidos: 0 };
   let filas;
-  try { filas = (await pool.query(SQL_FILAS)).rows; } catch (e) { log(`no se pudo leer la lista: ${e?.message ?? e}`); return r; }
+  // Sin negocio anotado la lista queda vacía y la limpieza de abajo borra lo que hubiera en disco;
+  // con el negocio cambiado, borra por sí sola las imágenes del anterior.
+  try { ({ filas } = await filasDelNegocio(pool)); } catch (e) { log(`no se pudo leer la lista: ${e?.message ?? e}`); return r; }
   let plan;
   try { mkdirSync(dir, { recursive: true }); plan = planAnuncios(filas, readdirSync(dir)); } catch (e) { log(`no se pudo leer la carpeta: ${e?.message ?? e}`); return r; }
 
@@ -72,8 +97,10 @@ export async function sincronizarAnuncios({ pool, dir, cloudUrl, fetch: pedir = 
 
 export async function listarAnuncios({ pool, dir }) {
   try {
-    const filas = (await pool.query(SQL_FILAS)).rows;
-    const cfg = (await pool.query(`SELECT pantalla_cliente_segundos FROM configuracion_tenant LIMIT 1`)).rows[0];
+    const { tenant, filas } = await filasDelNegocio(pool);
+    if (!tenant) return { segundos: SEGUNDOS, anuncios: [] };
+    // Del negocio vinculado: la configuración del negocio anterior también se quedó en la base.
+    const cfg = (await pool.query(`SELECT pantalla_cliente_segundos FROM configuracion_tenant WHERE tenant_id = $1 LIMIT 1`, [tenant])).rows[0];
     const s = Number(cfg?.pantalla_cliente_segundos);
     const general = valido(s) ? s : SEGUNDOS;
     const anuncios = [];

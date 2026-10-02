@@ -30,8 +30,13 @@ async function sembrarAnuncios(pool) {
   await pool.query(`DELETE FROM anuncios_pantalla WHERE id = ANY($1::uuid[])`, [IDS_PRUEBA]);
   rmSync(ANUNCIOS_DIR, { recursive: true, force: true });
   mkdirSync(ANUNCIOS_DIR, { recursive: true });
-  const tenant = (await pool.query(`SELECT tenant_id FROM configuracion_tenant LIMIT 1`)).rows[0]?.tenant_id ?? (await pool.query(`SELECT id FROM tenants LIMIT 1`)).rows[0]?.id;
+  // La caja solo enseña los anuncios del negocio que el pull dejó anotado en _vim_sync (anuncios.mjs).
+  // Se siembra en ese; si la base nunca hizo un pull, se elige uno y se anota (sin pisar uno que ya hubiera).
+  await pool.query(`CREATE TABLE IF NOT EXISTS _vim_sync (clave text PRIMARY KEY, valor text, at timestamptz DEFAULT now())`);
+  const anotado = (await pool.query(`SELECT valor FROM _vim_sync WHERE clave = 'tenant'`)).rows[0]?.valor;
+  const tenant = anotado ?? (await pool.query(`SELECT tenant_id FROM configuracion_tenant LIMIT 1`)).rows[0]?.tenant_id ?? (await pool.query(`SELECT id FROM tenants LIMIT 1`)).rows[0]?.id;
   if (!tenant) return;
+  if (!anotado) await pool.query(`INSERT INTO _vim_sync (clave, valor) VALUES ('tenant', $1) ON CONFLICT (clave) DO NOTHING`, [tenant]);
   await pool.query(`INSERT INTO configuracion_tenant (tenant_id, pantalla_cliente_segundos) VALUES ($1, $2) ON CONFLICT (tenant_id) DO UPDATE SET pantalla_cliente_segundos = EXCLUDED.pantalla_cliente_segundos`, [tenant, imagenes.length ? 3 : 8]);
   for (const [i, origen] of imagenes.entries()) {
     const ext = path.extname(origen).toLowerCase().replace(".jpeg", ".jpg");

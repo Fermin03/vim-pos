@@ -8,14 +8,24 @@ import { nombreArchivo, planAnuncios, sincronizarAnuncios, listarAnuncios, rutaD
 const T = "99999999-0000-0000-0000-0000000000aa";
 const A = "11111111-1111-1111-1111-111111111111";
 const B = "22222222-2222-2222-2222-222222222222";
-const fila = (id, ext = "jpg", extra = {}) => ({ id, ruta: `${T}/${id}.${ext}`, orden: 0, ...extra });
+const fila = (id, ext = "jpg", extra = {}) => ({ id, tenant_id: T, ruta: `${T}/${id}.${ext}`, orden: 0, ...extra });
 
-/** Postgres de mentira: contesta las dos consultas del módulo. */
-function poolFalso(filas, segundos = 8) {
+/**
+ * Postgres de mentira: contesta las consultas del módulo como lo haría la base de la caja.
+ * `tenant` es el negocio que el pull dejó anotado en _vim_sync (null = nunca se anotó;
+ * `sinTabla` = la caja nunca ha hecho un pull). Las filas y la configuración se filtran por negocio
+ * solo si la consulta trae `tenant_id = $1`, igual que el WHERE de verdad: una consulta sin filtro
+ * devuelve las de todos los negocios.
+ */
+function poolFalso(filas, segundos = 8, { tenant = T, sinTabla = false, configuraciones } = {}) {
+  const cfgs = configuraciones ?? (segundos === null ? [] : [{ tenant_id: T, pantalla_cliente_segundos: segundos }]);
+  const delNegocio = (sql, params, lista) => (/tenant_id\s*=\s*\$1/.test(sql) ? lista.filter((x) => x.tenant_id === params[0]) : lista);
   return {
-    query: async (sql) => {
-      if (/FROM anuncios_pantalla/i.test(sql)) return { rows: filas };
-      if (/pantalla_cliente_segundos/i.test(sql)) return { rows: segundos === null ? [] : [{ pantalla_cliente_segundos: segundos }] };
+    query: async (sql, params = []) => {
+      if (/to_regclass/i.test(sql)) return { rows: [{ hay: !sinTabla }] };
+      if (/FROM _vim_sync/i.test(sql)) return { rows: tenant === null ? [] : [{ valor: tenant }] };
+      if (/FROM anuncios_pantalla/i.test(sql)) return { rows: delNegocio(sql, params, filas) };
+      if (/pantalla_cliente_segundos/i.test(sql)) return { rows: delNegocio(sql, params, cfgs) };
       throw new Error("consulta inesperada: " + sql);
     },
   };
@@ -99,7 +109,7 @@ test("una fila con ruta hostil no provoca ninguna petición ni cuenta como falli
   await enTemporal(async (dir) => {
     const pedidas = [];
     const r = await sincronizarAnuncios({
-      pool: poolFalso([{ id: A, ruta: "x/../../auth/v1/y.jpg" }, { id: B, ruta: `${T}/${B}.jpg?x=1` }]), dir, cloudUrl: "https://nube.example",
+      pool: poolFalso([{ id: A, tenant_id: T, ruta: "x/../../auth/v1/y.jpg" }, { id: B, tenant_id: T, ruta: `${T}/${B}.jpg?x=1` }]), dir, cloudUrl: "https://nube.example",
       fetch: async (url) => { pedidas.push(url); return imagen(); },
     });
     assert.deepEqual(pedidas, []);
@@ -139,6 +149,42 @@ test("sin configuración usa 8 segundos; si algo falla, lista vacía", async () 
     assert.deepEqual(await listarAnuncios({ pool: poolFalso([], null), dir }), { segundos: 8, anuncios: [] });
     assert.deepEqual(await listarAnuncios({ pool: { query: async () => { throw new Error("x"); } }, dir }), { segundos: 8, anuncios: [] });
   });
+});
+
+// Revisión final: el pull solo hace upsert, así que una caja revinculada del negocio A al B conserva
+// las filas de A. Sin filtrar por el negocio vinculado, la pantalla mezclaba los anuncios de los dos
+// (y la duración general de A podía ganar).
+const T2 = "88888888-0000-0000-0000-0000000000bb";
+const C = "33333333-3333-3333-3333-333333333333";
+const filaDe = (tenant, id) => ({ id, tenant_id: tenant, ruta: `${tenant}/${id}.jpg`, orden: 0 });
+
+test("con dos negocios en la base, solo baja y lista los del negocio vinculado; los del otro se borran", async () => {
+  await enTemporal(async (dir) => {
+    writeFileSync(path.join(dir, `${C}.jpg`), "de A"); // la imagen que había bajado el negocio anterior
+    const pool = poolFalso([filaDe(T, C), filaDe(T2, A)], 8, {
+      tenant: T2,
+      configuraciones: [{ tenant_id: T, pantalla_cliente_segundos: 30 }, { tenant_id: T2, pantalla_cliente_segundos: 12 }],
+    });
+    const pedidas = [];
+    const r = await sincronizarAnuncios({ pool, dir, cloudUrl: "https://nube.example", fetch: async (url) => { pedidas.push(url); return imagen(); } });
+    assert.deepEqual(pedidas, [`https://nube.example/storage/v1/object/public/anuncios/${T2}/${A}.jpg`]);
+    assert.deepEqual(r, { bajados: 1, borrados: 1, fallidos: 0 });
+    assert.deepEqual(readdirSync(dir), [`${A}.jpg`], "el archivo del negocio anterior se borró");
+    assert.deepEqual(await listarAnuncios({ pool, dir }), { segundos: 12, anuncios: [{ id: A, url: `/__anuncios/${A}.jpg`, segundos: 12 }] });
+  });
+});
+
+test("sin negocio anotado no hay anuncios ni descargas", async () => {
+  for (const opciones of [{ tenant: null }, { sinTabla: true }]) {
+    await enTemporal(async (dir) => {
+      writeFileSync(path.join(dir, `${A}.jpg`), "x");
+      const pool = poolFalso([fila(A), fila(B)], 8, opciones);
+      let pedidas = 0;
+      await sincronizarAnuncios({ pool, dir, cloudUrl: "https://nube.example", fetch: async () => { pedidas++; return imagen(); } });
+      assert.equal(pedidas, 0, JSON.stringify(opciones));
+      assert.deepEqual(await listarAnuncios({ pool, dir }), { segundos: 8, anuncios: [] }, JSON.stringify(opciones));
+    });
+  }
 });
 
 test("la ruta de un archivo solo se resuelve para nombres con forma de anuncio", () => {
