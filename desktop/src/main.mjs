@@ -317,6 +317,10 @@ async function bootCaja() {
   win.on("close", (e) => {
     if (!saliendoDeVerdad) { e.preventDefault(); win.hide(); }
   });
+  // La pantalla del cliente sigue a la ventana de la caja: a la bandeja se cierra (y suelta el
+  // bloqueo de suspensión), al volver reaparece, y si la caja se arrastra al otro monitor las dos
+  // pantallas se intercambian. Pasa por el antirrebote del controlador, que no abre dos ventanas.
+  for (const evento of ["hide", "show", "moved"]) win.on(evento, () => { try { pantallaCliente?.reevaluar(); } catch { /* */ } });
 
   let posUrl = process.env.VIM_POS_URL;
   if (!posUrl && existsSync(path.join(UI_DIR, "index.html"))) {
@@ -353,25 +357,31 @@ async function bootCaja() {
   posUrl = posUrl || "https://pos.vimpos.com.mx";
   await win.loadURL(posUrl);
 
-  // Pantalla del cliente: se abre sola si hay un segundo monitor. Va DESPUÉS de cargar la caja
-  // para que la ventana principal ya tenga su monitor decidido, y carga el mismo POS (mismo origen
-  // que la caja: es lo que deja a las dos ventanas hablarse por BroadcastChannel).
-  pantallaCliente = crearPantallaCliente({
-    screen, BrowserWindow, powerSaveBlocker,
-    archivo: path.join(CONFIG_DIR, "pantalla-cliente.json"),
-    url: `${posUrl.replace(/\/+$/, "")}/?cliente`,
-    ventanaCaja: () => win,
-    proteger: (w) => protegerNavegacion(w, origenesCaja),
-    log: (m) => console.log("· [pantalla-cliente]", m),
-  });
-  pantallaCliente.iniciar();
-
   crearTray();
   // Watchdog: si Postgres/PostgREST se caen, reinicia el backend solo (auto-recuperación).
   watchdog = crearWatchdog({ url: backend.url, alReiniciar: reiniciarBackend, log: (m) => console.log("· [watchdog]", m) });
 
   iniciarSync();
   iniciarRespaldoDiario();
+
+  // Pantalla del cliente: se abre sola si hay un segundo monitor. Va DESPUÉS de cargar la caja
+  // para que la ventana principal ya tenga su monitor decidido, y carga el mismo POS (mismo origen
+  // que la caja: es lo que deja a las dos ventanas hablarse por BroadcastChannel).
+  // Va también después de la bandeja, el watchdog, el sync y el respaldo, y dentro de un `try`: es
+  // opcional, y un fallo aquí nunca debe impedir que arranque lo que sostiene la venta.
+  try {
+    pantallaCliente = crearPantallaCliente({
+      screen, BrowserWindow, powerSaveBlocker,
+      archivo: path.join(CONFIG_DIR, "pantalla-cliente.json"),
+      url: `${posUrl.replace(/\/+$/, "")}/?cliente`,
+      ventanaCaja: () => win,
+      proteger: (w) => protegerNavegacion(w, origenesCaja),
+      log: (m) => console.log("· [pantalla-cliente]", m),
+    });
+    pantallaCliente.iniciar();
+  } catch (e) {
+    console.error("· [pantalla-cliente] no se pudo iniciar:", e?.message ?? e);
+  }
   revisarActualizacion().catch(() => {}); // best-effort, no bloquea
 }
 
