@@ -305,7 +305,7 @@ export function HomePos({
     {
       carrito,
       totalAutoritativo,
-      cobro: totalesCobro ? { total: montoCobro ?? totalesCobro.total } : null,
+      cobro: totalesCobro ? { total: montoCobro ?? totalesCobro.pendiente } : null,
       pagado: confirmacion ? { total: confirmacion.total, cambio: confirmacion.cambio } : null,
     },
     { nombre: caja.negocioNombre, logoUrl: caja.logoUrl },
