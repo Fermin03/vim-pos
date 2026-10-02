@@ -21,16 +21,51 @@ export type ListaAnuncios = z.infer<typeof esquema>;
 export type Anuncio = ListaAnuncios["anuncios"][number];
 export const LISTA_VACIA: ListaAnuncios = { segundos: 8, anuncios: [] };
 
-/** Nunca lanza: sin escritorio, sin anuncios o con una respuesta rara, la pantalla enseña el logo. */
-export async function leerAnuncios(pedir: typeof fetch = fetch): Promise<ListaAnuncios> {
+/**
+ * Nunca lanza. Devuelve la lista que da la caja (vacía = el negocio no tiene anuncios) o `null`
+ * si la lectura FALLÓ: sin escritorio, sin red, un error o una respuesta rara. No es lo mismo:
+ * con `null` la pantalla se queda con la lista que ya tenía, en vez de quitar un carrusel que
+ * funcionaba por una lectura que no salió.
+ */
+export async function leerAnuncios(pedir: typeof fetch = fetch): Promise<ListaAnuncios | null> {
   try {
     const r = await pedir("/__anuncios", { cache: "no-store" });
-    if (!r.ok) return LISTA_VACIA;
+    if (!r.ok) return null;
     const p = esquema.safeParse(await r.json());
-    return p.success ? p.data : LISTA_VACIA;
+    return p.success ? p.data : null;
   } catch {
-    return LISTA_VACIA;
+    return null;
   }
+}
+
+/**
+ * ¿Se le pide la lista a la caja ahora? PURA. Solo en reposo y solo con el negocio conocido.
+ *
+ * Al desvincular la caja el negocio se olvida, pero su servidor local puede seguir dando la lista
+ * del negocio ANTERIOR hasta que la base se reemplace: mientras no se sepa de quién es la caja
+ * (`null`, o `undefined` = todavía no se ha mirado), no se lee, o volverían sus anuncios.
+ */
+export function puedeLeerAnuncios(fase: string, negocio: object | null | undefined): boolean {
+  return fase === "reposo" && negocio != null;
+}
+
+/**
+ * ¿Reposo enseña el carrusel? PURA. Sin negocio conocido no hay anuncios aunque la lista siga en
+ * memoria: los anuncios de un negocio no salen en el siguiente, igual que su logo.
+ */
+export function seEnsenanAnuncios(lista: ListaAnuncios, sinImagenes: boolean, negocio: object | null | undefined): boolean {
+  return negocio != null && !sinImagenes && lista.anuncios.length > 0;
+}
+
+/**
+ * La lista con la que se queda la pantalla después de una lectura. PURA.
+ * - La lectura falló (`null`): la que tenía.
+ * - Vino lo mismo: la que tenía, EL MISMO objeto, para que el carrusel no se reinicie.
+ * - Vino otra, aunque sea vacía (el dueño quitó todos los anuncios): la nueva.
+ */
+export function listaTrasLeer(actual: ListaAnuncios, leida: ListaAnuncios | null): ListaAnuncios {
+  if (leida === null || mismaLista(actual, leida)) return actual;
+  return leida;
 }
 
 /**

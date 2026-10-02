@@ -1,7 +1,7 @@
 "use client";
 import { Fragment, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { LogoVim } from "@vim/ui/styles";
-import { leerAnuncios, LISTA_VACIA, mismaLista, type ListaAnuncios } from "../lib/pantalla-cliente/anuncios";
+import { leerAnuncios, LISTA_VACIA, listaTrasLeer, puedeLeerAnuncios, seEnsenanAnuncios, type ListaAnuncios } from "../lib/pantalla-cliente/anuncios";
 import { abrirCanal, crearReceptor } from "../lib/pantalla-cliente/canal";
 import { tamanoCifra, tamanoNombre } from "../lib/pantalla-cliente/medidas";
 import { CLAVE_NEGOCIO, negocioGuardado, recordarNegocio } from "../lib/pantalla-cliente/negocio";
@@ -18,6 +18,8 @@ import { CarruselAnuncios } from "./carrusel-anuncios";
  */
 const FUNDIDO_FASE = "animate-[vim-fade_200ms_var(--ease-out)] motion-reduce:animate-none";
 const ENTRADA_RENGLON = "animate-vim-pop motion-reduce:animate-none";
+/** Cada cuánto vuelve a pedir la lista de anuncios mientras está en reposo. */
+const RELEER_ANUNCIOS_MS = 5 * 60 * 1000;
 
 /**
  * Lo que ve el cliente en el segundo monitor. Solo dibuja lo que la caja le publica: no inicia
@@ -31,12 +33,24 @@ export function PantallaCliente() {
   // `undefined` = todavía no se ha mirado el almacenamiento (se lee en el efecto, no en el render).
   // Mientras tanto reposo no dibuja nada: así no parpadea la marca de VIM antes del logo del negocio.
   const [negocio, setNegocio] = useState<Negocio | null | undefined>(undefined);
+  // Los anuncios viven aquí y no en `Reposo`, por dos razones: `Reposo` se monta de nuevo entre
+  // cliente y cliente (con la lista aquí, el carrusel arranca sin enseñar antes el logo), y quien
+  // olvida el negocio tiene que poder olvidar sus anuncios en el mismo lugar.
+  const [lista, setLista] = useState<ListaAnuncios>(LISTA_VACIA);
+  // Ninguna imagen de la lista se pudo enseñar: queda el logo hasta la siguiente lectura buena.
+  const [sinImagenes, setSinImagenes] = useState(false);
 
   useEffect(() => {
     setNegocio(negocioGuardado());
     // La caja borra el negocio guardado al desvincularse. Esta ventana sigue abierta con el logo
     // en memoria: el aviso de `storage` (que llega a las OTRAS ventanas del mismo origen) lo quita.
-    const alOlvidar = (e: StorageEvent) => { if (e.key === CLAVE_NEGOCIO && e.newValue === null) setNegocio(null); };
+    // Con el negocio se van sus anuncios, en el acto: el carrusel no espera a la siguiente lectura.
+    const alOlvidar = (e: StorageEvent) => {
+      if (e.key !== CLAVE_NEGOCIO || e.newValue !== null) return;
+      setNegocio(null);
+      setLista(LISTA_VACIA);
+      setSinImagenes(false);
+    };
     window.addEventListener("storage", alOlvidar);
     const canal = abrirCanal();
     // Las reglas del canal (qué se ignora, el silencio de 15 s) están en `crearReceptor`. Aquí solo
@@ -48,12 +62,40 @@ export function PantallaCliente() {
     return () => { window.removeEventListener("storage", alOlvidar); receptor?.cerrar(); };
   }, []);
 
+  // La lista se pide al entrar a reposo y cada 5 minutos mientras siga ahí: así un anuncio nuevo
+  // aparece sin reiniciar la caja. Y solo con el negocio conocido (ver `puedeLeerAnuncios`): el
+  // efecto se apaga al olvidarlo, y una lectura que venía en camino se descarta.
+  const leer = puedeLeerAnuncios(vista.fase, negocio);
+  useEffect(() => {
+    if (!leer) return;
+    let vivo = true;
+    const pedir = () => {
+      void leerAnuncios().then((leida) => {
+        // Si la lectura falló, todo se queda como estaba: un tropiezo no quita el carrusel.
+        if (!vivo || leida === null) return;
+        setLista((actual) => listaTrasLeer(actual, leida));
+        // Cada lectura buena es otra oportunidad para las imágenes que no habían cargado.
+        setSinImagenes(false);
+      });
+    };
+    pedir();
+    const reloj = setInterval(pedir, RELEER_ANUNCIOS_MS);
+    return () => { vivo = false; clearInterval(reloj); };
+  }, [leer]);
+
   return (
     <main className="flex h-screen w-screen cursor-none select-none flex-col overflow-hidden bg-bg text-ink" data-fase={vista.fase}>
       {/* La `key` es la fase: al cambiar se monta de nuevo y vuelve a correr el fundido. Dentro de
           una misma fase nada se remonta, así que agregar un artículo no funde la pantalla. */}
       <div key={vista.fase} className={`flex min-h-0 flex-1 flex-col ${FUNDIDO_FASE}`}>
-        {vista.fase === "reposo" && <Reposo negocio={negocio} />}
+        {vista.fase === "reposo" && (
+          <Reposo
+            negocio={negocio}
+            lista={lista}
+            conAnuncios={seEnsenanAnuncios(lista, sinImagenes, negocio)}
+            alQuedarseSinImagenes={() => setSinImagenes(true)}
+          />
+        )}
         {vista.fase === "cuenta" && <Cuenta renglones={vista.renglones} envio={vista.envio} total={vista.total} />}
         {vista.fase === "cobro" && <Cobro total={vista.total} />}
         {vista.fase === "pagado" && <Pagado cambio={vista.cambio} />}
@@ -62,42 +104,18 @@ export function PantallaCliente() {
   );
 }
 
-/** Cada cuánto vuelve a pedir la lista de anuncios mientras está en reposo. */
-const RELEER_ANUNCIOS_MS = 5 * 60 * 1000;
-// La última lista leída, para toda la vida de la ventana. `Reposo` se monta de nuevo cada vez que
-// la pantalla vuelve a reposo: sin esto, entre cliente y cliente se vería el logo un instante
-// antes de que la lista llegue y arranque el carrusel.
-let ultimaLista: ListaAnuncios = LISTA_VACIA;
-
-function Reposo({ negocio }: { negocio: Negocio | null | undefined }) {
+function Reposo({ negocio, lista, conAnuncios, alQuedarseSinImagenes }: {
+  negocio: Negocio | null | undefined;
+  lista: ListaAnuncios;
+  /** Lo decide `seEnsenanAnuncios`, arriba: aquí solo se dibuja. */
+  conAnuncios: boolean;
+  alQuedarseSinImagenes: () => void;
+}) {
   // El logo que no cargó (un data URI dañado): se recuerda cuál fue, para que uno nuevo sí se intente.
   const [logoRoto, setLogoRoto] = useState<string | null>(null);
-  const [lista, setLista] = useState(() => ultimaLista);
-  // Ninguna imagen de la lista se pudo enseñar: se queda el logo hasta que la lista cambie.
-  const [sinImagenes, setSinImagenes] = useState(false);
-
-  // Al entrar a reposo y cada 5 minutos: así un anuncio nuevo aparece sin reiniciar la caja.
-  useEffect(() => {
-    let vivo = true;
-    const leer = () => {
-      void leerAnuncios().then((nueva) => {
-        if (!vivo) return;
-        // La misma lista conserva el mismo objeto: el carrusel no se entera y sigue donde iba.
-        if (mismaLista(ultimaLista, nueva)) return;
-        ultimaLista = nueva;
-        setLista(nueva);
-        setSinImagenes(false);
-      });
-    };
-    leer();
-    const reloj = setInterval(leer, RELEER_ANUNCIOS_MS);
-    return () => { vivo = false; clearInterval(reloj); };
-  }, []);
 
   // Con anuncios, solo anuncios: el logo y el nombre no se dibujan encima.
-  if (lista.anuncios.length > 0 && !sinImagenes) {
-    return <CarruselAnuncios lista={lista} alQuedarseSinImagenes={() => setSinImagenes(true)} />;
-  }
+  if (conAnuncios) return <CarruselAnuncios lista={lista} alQuedarseSinImagenes={alQuedarseSinImagenes} />;
   if (negocio === undefined) return <section className="flex-1" />;
 
   // Un nombre vacío o de puros espacios es no tener nombre.

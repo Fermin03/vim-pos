@@ -8,7 +8,7 @@ import { crearPublicador, crearReceptor, PAGADO_MAX_MS, SILENCIO_MS, type Canal 
 import { textoEstadoPantalla, type AjustePantalla } from "../pantalla-cliente/ajuste";
 import { CLAVE_NEGOCIO, negocioGuardado, olvidarNegocio, recordarNegocio } from "../pantalla-cliente/negocio";
 import { anchoEm, ANCHO_NOMBRE_VMIN, tamanoNombre } from "../pantalla-cliente/medidas";
-import { leerAnuncios, mismaLista, pasoSiguiente, siguienteAnuncio, LISTA_VACIA, type ListaAnuncios } from "../pantalla-cliente/anuncios";
+import { leerAnuncios, listaTrasLeer, mismaLista, pasoSiguiente, puedeLeerAnuncios, seEnsenanAnuncios, siguienteAnuncio, LISTA_VACIA, type ListaAnuncios } from "../pantalla-cliente/anuncios";
 
 function producto(nombre: string, precio: number): Producto {
   return {
@@ -579,16 +579,85 @@ describe("leerAnuncios", () => {
     const lista = { segundos: 12, anuncios: [{ id: "a", url: "/__anuncios/11111111-1111-1111-1111-111111111111.jpg", segundos: 20 }] };
     expect(await leerAnuncios(con(lista))).toEqual(lista);
   });
-  it("una respuesta rara, un error o la falta de red dan lista vacía", async () => {
-    expect(await leerAnuncios(con({ segundos: "x", anuncios: 1 }))).toEqual(LISTA_VACIA);
-    expect(await leerAnuncios(con({}, false))).toEqual(LISTA_VACIA);
-    expect(await leerAnuncios((async () => { throw new Error("sin red"); }) as unknown as typeof fetch)).toEqual(LISTA_VACIA);
+  const UUID = "11111111-1111-1111-1111-111111111111";
+  const conUrl = (url: string) => con({ segundos: 8, anuncios: [{ id: "a", url, segundos: 8 }] });
+
+  it("sin anuncios devuelve la lista vacía, que no es un fallo", async () => {
+    expect(await leerAnuncios(con({ segundos: 8, anuncios: [] }))).toEqual(LISTA_VACIA);
+  });
+  it("una respuesta rara es un fallo (null), no «sin anuncios»", async () => {
+    expect(await leerAnuncios(con({ segundos: "x", anuncios: 1 }))).toBeNull();
+  });
+  it("una respuesta de error es un fallo (null), aunque el cuerpo sea una lista válida", async () => {
+    expect(await leerAnuncios(con({ segundos: 8, anuncios: [] }, false))).toBeNull();
+  });
+  it("la falta de red es un fallo (null), y no lanza", async () => {
+    expect(await leerAnuncios((async () => { throw new Error("sin red"); }) as unknown as typeof fetch)).toBeNull();
   });
   it("no acepta direcciones fuera de la carpeta de anuncios de la caja", async () => {
-    expect(await leerAnuncios(con({ segundos: 8, anuncios: [{ id: "a", url: "https://otro.example/x.jpg", segundos: 8 }] }))).toEqual(LISTA_VACIA);
+    expect(await leerAnuncios(conUrl("https://otro.example/x.jpg"))).toBeNull();
+  });
+  it("acepta png y webp, además de jpg", async () => {
+    expect((await leerAnuncios(conUrl(`/__anuncios/${UUID}.png`)))?.anuncios[0]?.url).toBe(`/__anuncios/${UUID}.png`);
+    expect((await leerAnuncios(conUrl(`/__anuncios/${UUID}.webp`)))?.anuncios[0]?.url).toBe(`/__anuncios/${UUID}.webp`);
+  });
+  it("no acepta una dirección que se sale de la carpeta", async () => {
+    expect(await leerAnuncios(conUrl("/__anuncios/../../../../../../../../secretos/caja.jpg"))).toBeNull();
+    expect(await leerAnuncios(conUrl(`/__anuncios/../${UUID}.jpg`))).toBeNull();
+    expect(await leerAnuncios(conUrl(`/otra/__anuncios/${UUID}.jpg`))).toBeNull();
+  });
+  it("no acepta la extensión en mayúsculas ni otro tipo de archivo", async () => {
+    expect(await leerAnuncios(conUrl(`/__anuncios/${UUID}.JPG`))).toBeNull();
+    expect(await leerAnuncios(conUrl(`/__anuncios/${UUID}.svg`))).toBeNull();
+    expect(await leerAnuncios(conUrl(`/__anuncios/${UUID}.jpg.svg`))).toBeNull();
+    expect(await leerAnuncios(conUrl(`/__anuncios/${UUID}.jpg/../../secretos`))).toBeNull();
   });
   it("un tiempo por anuncio fuera de rango invalida la lista", async () => {
-    expect(await leerAnuncios(con({ segundos: 8, anuncios: [{ id: "a", url: "/__anuncios/11111111-1111-1111-1111-111111111111.jpg", segundos: 2 }] }))).toEqual(LISTA_VACIA);
+    expect(await leerAnuncios(con({ segundos: 8, anuncios: [{ id: "a", url: `/__anuncios/${UUID}.jpg`, segundos: 2 }] }))).toBeNull();
+  });
+});
+
+describe("los anuncios son del negocio de la caja", () => {
+  const NEG = { nombre: "Knock-Out", logoUrl: null };
+  const conUno: ListaAnuncios = { segundos: 8, anuncios: [{ id: "a", url: "/__anuncios/a.jpg", segundos: 8 }] };
+
+  it("la lista se lee solo en reposo", () => {
+    expect(puedeLeerAnuncios("reposo", NEG)).toBe(true);
+    for (const fase of ["cuenta", "cobro", "pagado"]) expect(puedeLeerAnuncios(fase, NEG)).toBe(false);
+  });
+  it("sin negocio conocido no se lee: la caja desvinculada aún puede dar la lista del negocio anterior", () => {
+    expect(puedeLeerAnuncios("reposo", null)).toBe(false);
+    expect(puedeLeerAnuncios("reposo", undefined)).toBe(false);
+  });
+  it("con negocio, lista e imágenes buenas se enseña el carrusel", () => {
+    expect(seEnsenanAnuncios(conUno, false, NEG)).toBe(true);
+  });
+  it("al olvidar el negocio se dejan de enseñar aunque la lista siga en memoria", () => {
+    expect(seEnsenanAnuncios(conUno, false, null)).toBe(false);
+    expect(seEnsenanAnuncios(conUno, false, undefined)).toBe(false);
+  });
+  it("sin anuncios, o si ninguna imagen cargó, queda el logo", () => {
+    expect(seEnsenanAnuncios(LISTA_VACIA, false, NEG)).toBe(false);
+    expect(seEnsenanAnuncios(conUno, true, NEG)).toBe(false);
+  });
+});
+
+describe("listaTrasLeer", () => {
+  const tenia: ListaAnuncios = { segundos: 8, anuncios: [{ id: "a", url: "/__anuncios/a.jpg", segundos: 8 }] };
+
+  it("una lectura fallida no quita el carrusel: se queda la lista que había", () => {
+    expect(listaTrasLeer(tenia, null)).toBe(tenia);
+  });
+  it("la misma lista vuelta a leer conserva EL MISMO objeto: el carrusel no se reinicia", () => {
+    const otraVez: ListaAnuncios = { segundos: 8, anuncios: [{ id: "a", url: "/__anuncios/a.jpg", segundos: 8 }] };
+    expect(listaTrasLeer(tenia, otraVez)).toBe(tenia);
+  });
+  it("una lista distinta la reemplaza", () => {
+    const nueva: ListaAnuncios = { segundos: 8, anuncios: [{ id: "b", url: "/__anuncios/b.jpg", segundos: 8 }] };
+    expect(listaTrasLeer(tenia, nueva)).toBe(nueva);
+  });
+  it("una lista vacía de verdad (el dueño quitó todo) sí quita el carrusel", () => {
+    expect(listaTrasLeer(tenia, { segundos: 8, anuncios: [] }).anuncios).toEqual([]);
   });
 });
 

@@ -63,8 +63,13 @@ su disco: el carrusel funciona sin internet.
 - **Una imagen que no carga se salta.** Si ninguna carga, la pantalla vuelve a logo y nombre: los
   anuncios no pueden dejar el monitor en blanco.
 - **La lista se vuelve a leer** al entrar a reposo y cada 5 minutos. Si no cambió, el carrusel
-  sigue donde iba, sin reiniciarse; si quitaron la imagen que está en pantalla, pasa a la que
-  sigue con el mismo fundido.
+  sigue donde iba, sin reiniciarse; si quitaron la imagen que está en pantalla, vuelve a la
+  primera de la lista nueva con el mismo fundido. Cada lectura buena vuelve a intentar las
+  imágenes que no habían cargado.
+- **Una lectura fallida no quita nada:** la pantalla se queda con la lista que tenía. Solo una
+  lista vacía de verdad (el dueño quitó todos los anuncios) regresa al logo.
+- **Al desvincular la caja los anuncios se van en el acto**, junto con el logo, y no se vuelven a
+  pedir hasta que la caja diga de qué negocio es: los anuncios de un negocio no salen en el siguiente.
 - **En cuanto hay cuenta, se va.** Al primer artículo la pantalla pasa a Cuenta: el anuncio nunca
   compite con lo que se está cobrando.
 
