@@ -10,6 +10,12 @@ import { hostsPropiosCacheados, hostPermitido } from "./hosts-propios.mjs";
 import { crearLimitador } from "./limitador.mjs";
 import { cajaIdDeEmail } from "./dispositivo.mjs";
 import { esActividadDeOperacion } from "./respaldo-diario.mjs";
+import { sondearPostgrest, explicarError } from "./sonda-postgrest.mjs";
+import { conTope } from "./tope.mjs";
+
+/** Lo que /health/deep espera al `SELECT 1`. La sonda de PostgREST lleva el suyo (4 s en total no
+ *  caben: el watchdog aborta a los 6 s, y el motivo tiene que llegarle antes). */
+const TOPE_SALUD_PG_MS = 1500;
 
 // SEC CN-004 — CORS con allowlist en vez de "*".
 //
@@ -82,6 +88,12 @@ export const TOPE_CLIENTES_KDS = 32;
 /** Lo que lee el cajero si toca la caja justo durante el respaldo. */
 export const MENSAJE_RESPALDO = "La caja está haciendo su respaldo diario; intenta en unos segundos.";
 
+/** Lo que lee si una operación llega en el segundo y medio en que el gateway se está cerrando. */
+export const MENSAJE_REINICIO = "La caja se está reiniciando; intenta en unos segundos.";
+
+/** Marca que `cerrarServidor` pone en el servidor y que el gateway consulta en cada petición. */
+export const CERRANDO = Symbol.for("vim.gateway.cerrando");
+
 /**
  * El gateway "de espera": ocupa el puerto MIENTRAS el backend está detenido por el respaldo.
  *
@@ -103,6 +115,56 @@ export function crearGatewayDeEspera({ uiPorts = [54360, 54361], mensaje = MENSA
     if (req.method === "OPTIONS") { res.writeHead(204, cors); return res.end(""); }
     res.writeHead(503, { "Content-Type": "application/json", "Retry-After": "5", ...cors });
     res.end(JSON.stringify({ error: "RESPALDO_EN_CURSO", code: "RESPALDO_EN_CURSO", message: mensaje, error_description: mensaje, ok: false }));
+  });
+}
+
+/**
+ * Cierra un servidor HTTP DE VERDAD y sin quedarse esperando.
+ *
+ * `server.close()` a secas deja de aceptar conexiones nuevas, pero no toca las que Node considera
+ * activas: las que tienen una petición en vuelo y las que el navegador abrió sin haber pedido nada
+ * todavía. Esas siguen vivas —y siguen atendiendo peticiones NUEVAS—, y `close()` no llama a su
+ * callback hasta que se van todas. En la caja eso era una trampa (Knock-Out Obregón, 2 oct 2026):
+ * el stream del POS reconectaba a los 3 s por una de esas conexiones, un stream no termina nunca, y
+ * el reinicio del backend se quedaba esperando para siempre con el puerto cerrado a conexiones
+ * nuevas. El POS veía «Failed to fetch» hasta que alguien reabría la aplicación.
+ *
+ * Aquí el cierre tiene tres tiempos:
+ *   1. deja de aceptar conexiones;
+ *   2. durante `graciaMs` deja terminar lo que ya estaba en vuelo (un cobro a medio contestar no se
+ *      corta), cerrando cada conexión en cuanto queda libre para que nadie la reutilice;
+ *   3. al acabar la gracia corta lo que quede, streams incluidos.
+ * Y por si el aviso de cierre no llegara, `topeMs`: quien detiene la caja no puede quedarse colgado.
+ */
+export function cerrarServidor(server, { graciaMs = 1500, topeMs = graciaMs + 2000 } = {}) {
+  return new Promise((resolve) => {
+    let barrido = null, corte = null, tope = null;
+    const fin = () => {
+      clearInterval(barrido); clearTimeout(corte); clearTimeout(tope);
+      resolve();
+    };
+    // El gateway lo mira: lo que empiece a partir de aquí se rechaza, y lo que conteste ya no deja
+    // la conexión para reutilizar (ver crearGateway).
+    try { server[CERRANDO] = true; } catch { /* un servidor congelado: da igual */ }
+    try {
+      server.close(fin); // si ya estaba cerrado, el callback llega con el error: cuenta como cerrado
+    } catch { return fin(); }
+    barrido = setInterval(() => { try { server.closeIdleConnections?.(); } catch { /* */ } }, 50);
+    corte = setTimeout(() => { try { server.closeAllConnections?.(); } catch { /* */ } }, graciaMs);
+    tope = setTimeout(fin, topeMs);
+  });
+}
+
+/**
+ * `server.listen` como promesa que TAMBIÉN rechaza. Con el callback a secas, un puerto ocupado
+ * (EADDRINUSE) sale como evento 'error' sin oyente —excepción sin capturar en el proceso principal—
+ * y la promesa del arranque no se resuelve nunca: otro modo de dejar la caja a medio levantar.
+ */
+export function escuchar(server, puerto, host) {
+  return new Promise((resolve, reject) => {
+    const alFallar = (e) => reject(Object.assign(new Error(`no se pudo abrir el puerto ${puerto} (${e?.code ?? e?.message ?? e})`), { code: e?.code }));
+    server.once("error", alFallar);
+    server.listen(puerto, host, () => { server.off("error", alFallar); resolve(); });
   });
 }
 
@@ -130,11 +192,14 @@ export function crearGateway(backend) {
     alHaberActividad = null,
   } = backend;
 
-  return http.createServer(async (req, res) => {
+  const server = http.createServer(async (req, res) => {
     const cors = corsPara(req, uiPorts);
+    // Mientras el gateway se cierra (cerrarServidor), ninguna respuesta deja la conexión lista para
+    // reutilizarse: si no, el navegador mete por ahí su siguiente petición y la gracia la corta a medias.
+    const alCerrar = () => (server[CERRANDO] ? { Connection: "close" } : {});
     const send = (status, body, extra = {}) => {
       const payload = typeof body === "string" || Buffer.isBuffer(body) ? body : JSON.stringify(body ?? {});
-      res.writeHead(status, { "Content-Type": "application/json", ...cors, ...extra });
+      res.writeHead(status, { "Content-Type": "application/json", ...cors, ...extra, ...alCerrar() });
       res.end(payload);
     };
 
@@ -142,6 +207,14 @@ export function crearGateway(backend) {
     // la LAN, nombre del equipo). Una web que haga resolver su dominio a 127.0.0.1 llega con SU
     // dominio en Host, y aquí se queda. Va antes que todo, OPTIONS incluido.
     if (!hostPermitido(req.headers.host)) return send(403, { error: "HOST_NO_PERMITIDO" });
+
+    // Una petición que EMPIEZA cuando el gateway ya se está cerrando (llegó por una conexión que
+    // sobrevivió al cierre) no se atiende: un cobro aceptado ahora se cortaría a la mitad al vencer
+    // la gracia y el POS no sabría si se hizo. Mejor un «intenta en unos segundos» limpio.
+    if (server[CERRANDO]) {
+      req.resume();
+      return send(503, { error: "GATEWAY_CERRANDO", code: "GATEWAY_CERRANDO", message: MENSAJE_REINICIO, error_description: MENSAJE_REINICIO, ok: false }, { "Retry-After": "5" });
+    }
 
     try {
       const url = new URL(req.url, "http://localhost");
@@ -158,16 +231,21 @@ export function crearGateway(backend) {
         return res.end("");
       }
       if (p === "/health") return send(200, { ok: true });
-      // Salud PROFUNDA (Fase 3, watchdog): toca Postgres (pool) y PostgREST. 503 si algo cayó.
+      // Salud PROFUNDA (Fase 3, watchdog): toca Postgres (pool) y PostgREST. 503 si algo cayó, y
+      // con el MOTIVO: el watchdog lo deja en el log. A PostgREST se le hace una lectura mínima,
+      // no «/» —que genera el OpenAPI de todo el esquema y tarda segundos— (sonda-postgrest.mjs).
       if (p === "/health/deep") {
+        // Con tope propio: el pool es de 4 y lo comparten el sync y el espejo. Sin tope, un pool
+        // ocupado se confundía con «el gateway no contesta» (el aborto de 6 s del watchdog).
         try {
-          await pool.query("SELECT 1");
-          const r = await fetch(`http://127.0.0.1:${restPort}/`, { signal: AbortSignal.timeout(4000) });
-          if (!r.ok) throw new Error(`postgrest ${r.status}`);
-          return send(200, { ok: true, pg: true, rest: true });
+          const pg = await conTope(pool.query("SELECT 1"), TOPE_SALUD_PG_MS);
+          if (pg.vencio) return send(503, { ok: false, error: `Postgres no contestó en ${TOPE_SALUD_PG_MS} ms` });
         } catch (e) {
-          return send(503, { ok: false, error: String(e?.message ?? e) });
+          return send(503, { ok: false, error: `Postgres no contestó (${explicarError(e)})` });
         }
+        const rest = await sondearPostgrest(restPort);
+        if (!rest.ok) return send(503, { ok: false, error: rest.error });
+        return send(200, { ok: true, pg: true, rest: true });
       }
 
       // ── Fase 2 · Hub — stream de cocina en tiempo real (SSE por LAN) ─────────
@@ -274,7 +352,7 @@ export function crearGateway(backend) {
           const v = upstream.headers.get(h);
           if (v) extra[h] = v;
         }
-        res.writeHead(upstream.status, { ...cors, ...extra });
+        res.writeHead(upstream.status, { ...cors, ...extra, ...alCerrar() });
         return res.end(buf);
       }
 
@@ -284,4 +362,5 @@ export function crearGateway(backend) {
       return send(500, { error: "GATEWAY_ERROR", detalle: String(e?.message ?? e) });
     }
   });
+  return server;
 }

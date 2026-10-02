@@ -3,8 +3,9 @@
 // escucha en la LAN para que la pantalla de cocina / 2ª caja se conecten a la caja-servidor.
 import os from "node:os";
 import { startLocalBackend } from "./runtime.mjs";
-import { crearGateway } from "./gateway.mjs";
+import { crearGateway, cerrarServidor, escuchar } from "./gateway.mjs";
 import { crearKdsStream } from "./kds-stream.mjs";
+import { conTope } from "./tope.mjs";
 
 /** IPv4 de la LAN real (para que el KDS sepa a qué caja-hub conectarse). Evita adaptadores
  *  virtuales (Hyper-V/WSL/VMware/Docker — típicamente 172.x host-only que otra PC NO alcanza) y
@@ -30,7 +31,13 @@ export async function startBackend(opts = {}) {
   const backend = await startLocalBackend({ ...opts, log });
 
   // Fase 2 — puente de tiempo real del KDS (LISTEN 'vim_kds' → SSE).
-  const kds = await crearKdsStream({ pgPort: backend.pgPort, pgPassword: backend.pgPassword, log });
+  let kds;
+  try {
+    kds = await crearKdsStream({ pgPort: backend.pgPort, pgPassword: backend.pgPassword, log });
+  } catch (e) {
+    try { await backend.stop(); } catch { /* */ } // que no quede un Postgres sin dueño
+    throw e;
+  }
 
   // SEC CN-004 — puertos desde los que se sirve el UI (POS 54360 / cocina 54361). Definen qué
   // orígenes reciben cabeceras CORS: cualquier otro puede llamar al gateway pero no leer la
@@ -47,17 +54,50 @@ export async function startBackend(opts = {}) {
     // Proveedor del token de nube del dispositivo (puente de delivery-accion). Puede venir en las
     // opciones o asignarse después (`backend.nube = …`): el gateway lo lee en cada petición.
     nube: opts.nube ?? null,
-    stop: async () => {
-      try { await kds.stop(); } catch { /* */ }
-      await new Promise((r) => gateway.close(r));
-      await backend.stop();
-    },
+    /** Devuelve `{ postgresDetenido }`. Ver `detenerBackend`. */
+    stop: () => detenerBackend({ kds, gateway, runtime: backend, log }),
   };
   const gateway = crearGateway(opcionesGateway(resultado, { kds, uiPorts, alHaberActividad: opts.alHaberActividad ?? null }));
-  await new Promise((resolve) => gateway.listen(gatewayPort, host, resolve));
+  try {
+    await escuchar(gateway, gatewayPort, host);
+  } catch (e) {
+    // Sin gateway no hay backend que devolver: que tampoco quede un Postgres sin dueño.
+    try { await detenerBackend({ kds, gateway: null, runtime: backend, log }); } catch { /* */ }
+    throw e;
+  }
   log(`Gateway Supabase-compat en http://localhost:${gatewayPort}`);
   if (host === "0.0.0.0" && lan !== "127.0.0.1") log(`Hub en la LAN: http://${lan}:${gatewayPort} (KDS/2ª caja se conectan aquí)`);
   return resultado;
+}
+
+/**
+ * Detiene el backend entero. NINGÚN paso puede quedarse esperando: quien llama (el watchdog, el
+ * respaldo, salir de la app) deja `backend` en null mientras tanto, y una parada colgada es una
+ * caja sin backend para siempre. Pasó en Knock-Out Obregón (2 oct 2026): el cierre del gateway
+ * esperaba a un stream que había reconectado y no terminaba nunca.
+ *
+ * El orden importa:
+ *   1. El puente del KDS deja de aceptar streams y termina los abiertos (lo hace en el acto; lo
+ *      que tarda es cerrar su conexión LISTEN, y eso se espera aparte y con tope).
+ *   2. El gateway deja de atender, con su gracia para lo que estaba en vuelo (`cerrarServidor`).
+ *   3. SOLO ENTONCES PostgREST y Postgres: mientras el gateway atienda, la base tiene que estar.
+ *      Un refresco de sesión que cayera sobre un Postgres ya detenido contestaría 500, y el POS
+ *      tomaría ese 500 como «sesión inválida» y pediría vincular la caja de nuevo.
+ *
+ * Devuelve `{ postgresDetenido }` (lo que diga el runtime): el respaldo copia el pgdata en frío y
+ * no puede hacerlo si Postgres sigue vivo. Exportada para probarla con dobles.
+ */
+export async function detenerBackend({ kds, gateway, runtime, log = () => {}, topeKdsMs = 3000, graciaMs }) {
+  let finKds = Promise.resolve();
+  try {
+    finKds = conTope(Promise.resolve(kds?.stop?.()), topeKdsMs, () => log("parada: el stream del KDS no cerró a tiempo; se sigue"));
+    finKds.catch(() => {}); // se espera más abajo; aquí solo se evita un rechazo sin dueño
+  } catch { /* un stop() que revienta al llamarlo no detiene la parada */ }
+  if (gateway) await cerrarServidor(gateway, graciaMs === undefined ? {} : { graciaMs });
+  try { await finKds; } catch { /* */ }
+  let resultado = null;
+  try { resultado = await runtime.stop(); } catch (e) { log(`parada: el runtime no se detuvo limpio (${e?.message ?? e})`); }
+  return { postgresDetenido: resultado?.postgresDetenido === true };
 }
 
 /**

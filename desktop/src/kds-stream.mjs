@@ -17,15 +17,23 @@ const CANALES = {
 };
 
 /** Crea el puente LISTEN→SSE. Devuelve { handleSse(req,res,url), stop() }. */
-export async function crearKdsStream({ pgPort, pgPassword = "postgres", log = () => {} }) {
+export async function crearKdsStream({
+  pgPort, pgPassword, log = () => {},
+  // Inyectable para probar el puente sin Postgres.
+  crearCliente = (opciones) => new pg.Client(opciones),
+}) {
   // Conexión dedicada: LISTEN retiene la conexión, no puede compartir el pool.
-  // pgPassword la genera runtime.mjs por instalación (SEC CN-018); el default solo cubre
-  // llamadas antiguas que no la pasen.
-  const client = new pg.Client({ host: "127.0.0.1", port: pgPort, user: "postgres", password: pgPassword, database: "vimpos" });
+  // pgPassword la genera runtime.mjs por instalación (SEC CN-018) y la pasa backend.mjs. Ya no hay
+  // valor por defecto: la clave de fábrica no tiene por qué seguir escrita en el código.
+  const client = crearCliente({ host: "127.0.0.1", port: pgPort, user: "postgres", password: pgPassword, database: "vimpos" });
+  // Si Postgres muere —el caso para el que existe el watchdog— esta conexión emite 'error'. Sin
+  // oyente es una excepción sin capturar en el proceso principal, justo cuando toca recuperarse.
+  client.on("error", (e) => log(`stream del KDS: se perdió la conexión a Postgres (${e?.message ?? e})`));
   await client.connect();
   for (const canal of Object.keys(CANALES)) await client.query(`LISTEN ${canal}`);
 
   const clientes = new Set(); // { res, sucursal }
+  let detenido = false;
 
   client.on("notification", (msg) => {
     const evento = CANALES[msg.channel];
@@ -53,6 +61,13 @@ export async function crearKdsStream({ pgPort, pgPassword = "postgres", log = ()
      * "Access-Control-Allow-Origin: *" propio que se saltaba cualquier control del gateway.
      */
     handleSse(req, res, url, cors = {}) {
+      // Un stream que llega cuando el puente ya se detuvo no tendría quién lo alimente ni quién lo
+      // cierre: se quedaría abierto para siempre, y con él el gateway que lo sirve (así se colgaba
+      // el reinicio del backend). Se rechaza, y sin dejar la conexión para reutilizar.
+      if (detenido) {
+        res.writeHead(503, { ...cors, "Content-Type": "application/json", "Retry-After": "5", Connection: "close" });
+        return res.end(JSON.stringify({ error: "KDS_STREAM_DETENIDO" }));
+      }
       const sucursal = url.searchParams.get("sucursal");
       res.writeHead(200, {
         ...cors,
@@ -69,6 +84,7 @@ export async function crearKdsStream({ pgPort, pgPassword = "postgres", log = ()
     },
     get nClientes() { return clientes.size; },
     async stop() {
+      detenido = true;
       clearInterval(ping);
       for (const c of clientes) { try { c.res.end(); } catch { /* */ } }
       try { await client.end(); } catch { /* */ }
