@@ -56,8 +56,14 @@ function electronFalso(lista, idCaja) {
   const creadas = [];
   const oyentes = {};
   class Ventana {
-    constructor(o) { this.o = o; this.destruida = false; this.ev = {}; this.webContentsHandlers = {}; creadas.push(this); }
-    webContents = { on: () => {} };
+    constructor(o) {
+      this.o = o;
+      this.destruida = false;
+      this.ev = {};
+      this.webContentsHandlers = {};
+      this.webContents = { on: (e, f) => { this.webContentsHandlers[e] = f; } };
+      creadas.push(this);
+    }
     once(e, f) { this.ev[e] = f; if (e === "ready-to-show") { f(); } }
     on(e, f) { this.ev[e] = f; }
     loadURL(u) { this.url = u; return Promise.resolve(); }
@@ -65,14 +71,6 @@ function electronFalso(lista, idCaja) {
     showInactive() { this.mostrada = true; }
     isDestroyed() { return this.destruida; }
     destroy() { this.destruida = true; this.ev.closed?.(); }
-  }
-  // Enganchar webContents.on para capturar handlers
-  const OriginalVentana = Ventana;
-  class VentanaConHandlers extends OriginalVentana {
-    constructor(o) {
-      super(o);
-      this.webContents = { on: (e, f) => { this.webContentsHandlers[e] = f; } };
-    }
   }
   const estado = { lista, idCaja, bloqueos: 0 };
   const screen = {
@@ -84,7 +82,7 @@ function electronFalso(lista, idCaja) {
   };
   const powerSaveBlocker = { start: () => { estado.bloqueos++; return estado.bloqueos; }, stop: () => { estado.bloqueos--; }, isStarted: () => true };
   const caja = { isDestroyed: () => false, getBounds: () => ({ x: 0, y: 0, width: 800, height: 600 }) };
-  return { creadas, oyentes, estado, screen, powerSaveBlocker, BrowserWindow: VentanaConHandlers, ventanaCaja: () => caja };
+  return { creadas, oyentes, estado, screen, powerSaveBlocker, BrowserWindow: Ventana, ventanaCaja: () => caja };
 }
 
 const D1 = { id: 1, label: "", bounds: { x: 0, y: 0, width: 1920, height: 1080 } };
@@ -220,6 +218,25 @@ test("cierre inesperado libera el bloqueador y reabre", () => {
   } finally { pc.cerrar(); rmSync(archivo, { force: true }); }
 });
 
+test("cierre inesperado con monitor desaparecido no reabre", () => {
+  const { pc, creadas, estado, archivo } = montar([D1, D2]);
+  try {
+    pc.iniciar();
+    assert.equal(creadas.length, 1);
+    const v1 = creadas[0];
+    assert.equal(estado.bloqueos, 1);
+    // Desaparece el monitor externo
+    estado.lista = [D1];
+    // Cierre inesperado (OS cerró la ventana)
+    v1.destroy();
+    // El bloqueador debe liberarse
+    assert.equal(estado.bloqueos, 0, "bloqueador liberado");
+    // No debe reabrir porque no hay segundo monitor
+    assert.equal(creadas.length, 1, "no reabierta (monitor desaparecido)");
+    assert.equal(pc.estado().abierta, false);
+  } finally { pc.cerrar(); rmSync(archivo, { force: true }); }
+});
+
 test("render-process-gone cierra y reabre la ventana", () => {
   const { pc, creadas, archivo } = montar([D1, D2]);
   try {
@@ -261,42 +278,50 @@ test("debounce de eventos de monitor", () => {
     const pc = crearPantallaCliente({ ...f, archivo, url: "http://localhost:54360/?cliente", esperaMs: 300 });
     try {
       pc.iniciar();
-      const countBefore = f.creadas.length; // 1 window abierta al iniciar
-      // Desconectar para que la siguiente evaluación no tenga nada que hacer
+      assert.equal(f.creadas.length, 1);
+      assert.equal(f.creadas[0].destruida, false);
+      // Desconectar el segundo monitor
       f.estado.lista = [D1];
-      pc.evaluar(); // esto cierra la ventana
-      // Disparar múltiples eventos sin esperar
-      f.oyentes["display-added"]?.();
-      f.oyentes["display-removed"]?.();
-      f.oyentes["display-added"]?.();
-      assert.equal(f.creadas.length, countBefore, "no se abrió aún (esperando debounce)");
-      // Avanzar el tiempo
+      // Disparar múltiples eventos sin esperar (el burst que Windows genera)
+      f.oyentes["display-removed"]();
+      f.oyentes["display-removed"]();
+      f.oyentes["display-removed"]();
+      // La ventana debe seguir abierta (esperando debounce)
+      assert.equal(f.creadas[0].destruida, false, "ventana aún abierta antes de debounce");
+      // Avanzar 299ms (aún no cierra)
+      mock.timers.tick(299);
+      assert.equal(f.creadas[0].destruida, false, "ventana aún abierta después de 299ms");
+      // Avanzar 1ms más (total 300ms)
+      mock.timers.tick(1);
+      assert.equal(f.creadas[0].destruida, true, "ventana destruida después de debounce");
+      assert.equal(pc.estado().abierta, false);
+      assert.equal(f.estado.bloqueos, 0, "bloqueador liberado");
+      // Reconectar el monitor
+      f.estado.lista = [D1, D2];
+      f.oyentes["display-added"]();
+      f.oyentes["display-added"]();
+      // Sin esperar, aún no se reabre (esperando debounce)
+      assert.equal(f.creadas.length, 1);
+      // Avanzar el debounce
       mock.timers.tick(300);
-      // Después del debounce, debería evaluar de nuevo, pero con un solo monitor no abre nada
-      assert.equal(f.creadas.length, countBefore, "sin segundo monitor, no abre");
+      assert.equal(f.creadas.length, 2, "exactamente una ventana nueva (burst coalesced)");
+      assert.equal(f.creadas[1].destruida, false);
     } finally { pc.cerrar(); rmSync(archivo, { force: true }); }
   } finally { mock.timers.reset(); }
 });
 
-test("error al crear BrowserWindow no tira excepción al iniciar", () => {
-  class VentanaError {
-    constructor() { throw new Error("no se pudo crear ventana"); }
-  }
-  const f = electronFalso([D1, D2], 1);
-  f.BrowserWindow = VentanaError;
-  const archivo = path.join(os.tmpdir(), `vim-pc-ctl-${process.pid}-${Math.random()}.json`);
-  const pc = crearPantallaCliente({ ...f, archivo, url: "http://localhost:54360/?cliente", esperaMs: 0 });
-  try {
-    pc.iniciar(); // no debe lanzar
-    assert.equal(pc.estado().abierta, false);
-    assert.equal(f.estado.bloqueos, 0, "sin bloqueadores");
-  } finally { pc.cerrar(); rmSync(archivo, { force: true }); }
-});
-
 test("error en loadURL no deja ventana huérfana", () => {
+  const f = electronFalso([D1, D2], 1);
+  const creadas = f.creadas;
   class VentanaConErrorEnLoad {
-    constructor(o) { this.o = o; this.ev = {}; this.webContentsHandlers = {}; }
-    webContents = { on: () => {} };
+    constructor(o) {
+      this.o = o;
+      this.destruida = false;
+      this.ev = {};
+      this.webContentsHandlers = {};
+      this.webContents = { on: (e, h) => { this.webContentsHandlers[e] = h; } };
+      creadas.push(this);
+    }
     once(e, f) { this.ev[e] = f; }
     on(e, f) { this.ev[e] = f; }
     loadURL() { throw new Error("no se pudo cargar URL"); }
@@ -305,12 +330,29 @@ test("error en loadURL no deja ventana huérfana", () => {
     isDestroyed() { return this.destruida; }
     destroy() { this.destruida = true; }
   }
-  const f = electronFalso([D1, D2], 1);
   f.BrowserWindow = VentanaConErrorEnLoad;
   const archivo = path.join(os.tmpdir(), `vim-pc-ctl-${process.pid}-${Math.random()}.json`);
   const pc = crearPantallaCliente({ ...f, archivo, url: "http://localhost:54360/?cliente", esperaMs: 0 });
   try {
     pc.iniciar(); // no debe lanzar
+    assert.equal(f.creadas.length, 1, "ventana fue creada");
+    assert.equal(f.creadas[0].destruida, true, "ventana huérfana fue destruida");
+    assert.equal(pc.estado().abierta, false);
+    assert.equal(f.estado.bloqueos, 0, "sin bloqueadores");
+  } finally { pc.cerrar(); rmSync(archivo, { force: true }); }
+});
+
+test("error en proteger no deja ventana huérfana", () => {
+  const f = electronFalso([D1, D2], 1);
+  const archivo = path.join(os.tmpdir(), `vim-pc-ctl-${process.pid}-${Math.random()}.json`);
+  const pc = crearPantallaCliente({
+    ...f, archivo, url: "http://localhost:54360/?cliente", esperaMs: 0,
+    proteger: () => { throw new Error("proteger falló"); }
+  });
+  try {
+    pc.iniciar(); // no debe lanzar
+    assert.equal(f.creadas.length, 1, "ventana fue creada");
+    assert.equal(f.creadas[0].destruida, true, "ventana huérfana fue destruida");
     assert.equal(pc.estado().abierta, false);
     assert.equal(f.estado.bloqueos, 0, "sin bloqueadores");
   } finally { pc.cerrar(); rmSync(archivo, { force: true }); }

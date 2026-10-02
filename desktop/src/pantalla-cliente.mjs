@@ -66,11 +66,15 @@ export function crearPantallaCliente({ screen, BrowserWindow, powerSaveBlocker, 
     return screen.getPrimaryDisplay().id;
   }
 
+  function soltarBloqueo() {
+    if (bloqueo !== null) { try { powerSaveBlocker.stop(bloqueo); } catch { /* */ } bloqueo = null; }
+  }
+
   function cerrarVentana() {
     const v = ventana;
     ventana = null;
     destino = null;
-    if (bloqueo !== null) { try { powerSaveBlocker.stop(bloqueo); } catch { /* */ } bloqueo = null; }
+    soltarBloqueo();
     if (v && !v.isDestroyed()) v.destroy();
   }
 
@@ -96,7 +100,7 @@ export function crearPantallaCliente({ screen, BrowserWindow, powerSaveBlocker, 
         if (ventana === v) {
           ventana = null;
           destino = null;
-          if (bloqueo !== null) { try { powerSaveBlocker.stop(bloqueo); } catch { /* */ } bloqueo = null; }
+          soltarBloqueo();
           programar();
         }
       });
@@ -112,7 +116,7 @@ export function crearPantallaCliente({ screen, BrowserWindow, powerSaveBlocker, 
       if (v && !v.isDestroyed()) v.destroy();
       ventana = null;
       destino = null;
-      bloqueo = null;
+      soltarBloqueo();
     }
   }
 
