@@ -184,9 +184,9 @@ Solo aparece en el escritorio (`__VIM_DESKTOP`).
   `PULL_ORDER` en `desktop/src/sync-pull.mjs`.
 - `pnpm db:types`.
 
-Por verificar en el plan: cómo trata el pull las filas borradas en la nube (un anuncio eliminado
-debe desaparecer de la caja). Si el pull no borra, el anuncio se da de baja con `activo = false` y
-una columna `eliminado_at`, en vez de `DELETE`.
+Decidido en el plan: el pull no trae lápidas, así que una fila borrada en la nube se quedaría viva
+en la caja. Por eso la baja es lógica, con `deleted_at` (no `DELETE`), y la caja borra su copia de
+lo que ya no está vivo. `activo` queda solo para pausar. Ver el ADR 0026.
 
 ### Admin
 

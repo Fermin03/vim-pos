@@ -447,6 +447,11 @@ la vista (`desktop/src/pantalla-cliente.mjs`, `desktop/src/main.mjs`, `desktop/s
 - [ ] Con un monitor vertical: nada se corta ni se encima.
 - [ ] Con un solo monitor: nada cambia respecto a la versión anterior.
 - [ ] El monitor del cliente no se apaga solo tras varios minutos sin uso.
+- [ ] Con anuncios subidos en /admin: tras uno o dos minutos, la pantalla en reposo los rota.
+- [ ] Sin internet: los anuncios ya bajados siguen saliendo.
+- [ ] Un anuncio eliminado o pausado en /admin deja de salir sin reiniciar la caja.
+- [ ] Sin anuncios: logo y nombre, como antes.
+- [ ] Una imagen con tiempo propio dura lo suyo; las demás, el tiempo general.
 
 **Si no aparece.** Windows tiene que estar en «Extender», no en «Duplicar»: duplicando reporta un
 solo monitor y no hay dónde abrirla (el ajuste lo dice). Y el monitor del cajero debe ser el
@@ -457,6 +462,20 @@ registro; vuelve a intentarlo al mostrar o mover la caja, al cambiar los monitor
 El registro queda en `vim-pos.log` con la etiqueta `[pantalla-cliente]`. La configuración local
 (`modo` y monitor elegido) es `pantalla-cliente.json`, en la misma carpeta que `vim-pos.log`; si se
 borra, vuelve al estado de fábrica (encendida, sin monitor elegido).
+
+**Anuncios.** Las imágenes viven en `anuncios/`, dentro de la carpeta de datos de la caja (la misma
+de `vim-pos.log`); la caja las baja tras cada pull y borra las que ya no están en la lista. El
+registro lleva la etiqueta `[anuncios]`; si no salen, ahí dice qué descarga falló. La lista se
+lee en la propia máquina en `/__anuncios`.
+
+### Orden de salida de los anuncios
+
+1. **Aplicar la migración 0150 a producción ANTES de mezclar** (crea la tabla y el almacén). Y
+   verificar ahí lo que en local no se puede: con una sesión que no es admin no se puede subir,
+   cambiar ni borrar ningún anuncio; la undécima subida se rechaza y no deja imagen huérfana;
+   eliminar un anuncio quita su objeto del almacén `anuncios`.
+2. **Mezclar:** el admin se despliega y ya se pueden subir anuncios.
+3. **Instalador nuevo de la caja.** Una caja sin actualizar no muestra anuncios, pero tampoco falla.
 
 ## Conectar a la nube (deploy del sync real) — #3
 

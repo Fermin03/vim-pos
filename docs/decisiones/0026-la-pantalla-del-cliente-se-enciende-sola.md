@@ -55,9 +55,27 @@ la decisión cerrada 22 de ese documento.
    sin recibir nada, vuelve a reposo. Pagado se muestra mientras la caja enseña su «Cobro completado»,
    con un tope de 8 s: pasado ese tiempo la caja publica reposo aunque su diálogo siga abierto.
 
-6. **Los anuncios (entrega 2, no construida) no irán dentro del snapshot del sync.** Vivirán en un
-   almacén de la nube, con una copia local en la caja que se refresca después de cada pull. Con
-   anuncios, el reposo mostrará el carrusel; sin ellos sigue siendo el logo y el nombre.
+6. **Los anuncios (entrega 2, construida) no van dentro del snapshot del sync.** Las imágenes
+   viven en un almacén público de la nube (`anuncios`, carpeta por negocio) y la lista, en la tabla
+   `anuncios_pantalla` (migración 0150): orden, pausa, tiempo propio opcional y baja lógica. Hasta
+   10 vivos por negocio, los mismos en todas las sucursales. El dueño o el admin los sube desde
+   `/admin` (configuración, pantalla del cliente): la imagen se reduce en el navegador a 1920 px y
+   800 KB, y puede reordenarla, pausarla, eliminarla y darle un tiempo propio; el tiempo general
+   (3 a 60 s, 8 por omisión) es `configuracion_tenant.pantalla_cliente_segundos`.
+
+   La caja baja las imágenes que le faltan a `anuncios/` dentro de su carpeta de datos tras cada
+   pull (también al arrancar y al vincularse) y borra las que ya no están en la lista. Nunca lanza
+   un error: una descarga que falla se reintenta en el siguiente pull. Resuelve el tiempo de cada
+   anuncio (el propio, si no el general, si no 8 s). El escritorio los sirve solo a la propia
+   máquina: `GET /__anuncios` (la lista) y `GET /__anuncios/<archivo>` (la imagen, con el nombre
+   validado como `<uuid>.<jpg|png|webp>`). Con anuncios, el reposo muestra un carrusel: cada imagen
+   entera (`object-contain`), por sus segundos, con fundido entre una y otra; la que no carga se
+   salta. La lista se lee al volver a reposo y cada 5 minutos. Sin anuncios sigue siendo el logo y
+   el nombre. Al desvincular la caja se olvidan los anuncios; si una lectura falla se conserva la
+   lista anterior.
+
+   El cambio llega a las cajas en cosa de un minuto: `anuncios_pantalla` entra en
+   `sync_pull_snapshot` y en `catalogo_version()`.
 
 ## Por qué
 
@@ -94,9 +112,21 @@ la decisión cerrada 22 de ese documento.
 - **Sin preload a propósito.** El preload expone `__VIM_SALIR`; la pantalla que mira el cliente no
   debe poder apagar la caja. Lo que necesita para hablar con el backend local se lo inyecta el
   ui-server en el HTML.
-- **Los anuncios, fuera del snapshot.** Son imágenes (el diseño prevé hasta unos 600 KB cada una) y
+- **Los anuncios, fuera del snapshot.** Son imágenes (hasta 800 KB cada una, diez por negocio) y
   el snapshot es la lista de tablas que baja en cada pull. Un almacén con copia local las lleva a
-  la caja una vez y sin tocar el sync. Queda escrito ahora para que no se meta dentro por comodidad.
+  la caja una vez y sin tocar el sync. En el snapshot va solo la lista. Queda escrito para que no
+  se meta la imagen dentro por comodidad.
+- **La baja es lógica (`deleted_at`) porque el pull no trae lápidas.** Una fila borrada en la nube
+  se quedaría viva en la caja para siempre; una baja lógica sí viaja, y la caja borra su copia.
+  Además `catalogo_version()` mira `updated_at` sin filtrar bajas, así que también las nota.
+- **Solo el dueño o el admin administran anuncios, y la caja no los edita.** Un anuncio es
+  publicidad del negocio frente al cliente, no algo que cualquier empleado con sesión deba poder
+  cambiar; lo exigen las políticas de la tabla y del almacén, no solo la página. La caja solo
+  lee, así que no hay push ni conflictos de edición entre cajas.
+- **La caja resuelve el tiempo de cada anuncio y la pantalla solo obedece.** La regla (propio,
+  general, 8) vive en un solo lugar, y la vista no necesita conocer la configuración del negocio.
+- **El tope de 10 está en la base, no solo en el contador de la página.** Un disparador con candado
+  por negocio rechaza el undécimo aunque dos subidas lleguen a la vez.
 
 ## Consecuencias
 
@@ -126,5 +156,9 @@ la decisión cerrada 22 de ese documento.
   privado salga) y las reglas del canal (el silencio de 15 s y el tope de pagado); lo demás está en
   la lista de «Pantalla del cliente» de `desktop/RUNBOOK.md`, que se pasa con cada instalador que
   toque la ventana o la vista.
-- **La entrega 2 (anuncios) necesita su propia migración, su propia pantalla en el admin y otro
-  instalador.** Nada de eso está hecho; este ADR solo fija dónde vivirán.
+- **La entrega 2 (anuncios) exige un orden de salida:** primero la migración 0150 a producción
+  (crea la tabla y el almacén), después mezclar (se despliega el admin) y al final un instalador
+  nuevo de la caja. Una caja sin actualizar no muestra anuncios, pero tampoco falla.
+- **Los anuncios necesitan internet una sola vez por imagen.** Ya bajadas, salen sin conexión. Una
+  imagen eliminada o pausada deja de salir en cuanto la caja hace su siguiente pull, sin
+  reiniciarla.
