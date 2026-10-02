@@ -71,6 +71,15 @@ function detalleDe(l: LineaCarrito): string[] {
   return [...hijos, ...propios];
 }
 
+/**
+ * `construirVista` para quien la llama DURANTE el render de la venta (`usePublicarPantallaCliente`
+ * corre en `HomePos`, en todas las cajas, tengan o no segundo monitor). La pantalla del cliente es
+ * opcional: si armar la vista falla, el cliente ve reposo y la venta sigue; nunca al revés.
+ */
+export function construirVistaSegura(e: EntradaVista): VistaCliente {
+  try { return construirVista(e); } catch { return { fase: "reposo" }; }
+}
+
 export function construirVista(e: EntradaVista): VistaCliente {
   if (e.pagado) return { fase: "pagado", total: e.pagado.total !== null ? redondearCentavos(e.pagado.total) : null, cambio: redondearCentavos(e.pagado.cambio) };
   if (e.cobro) return { fase: "cobro", total: redondearCentavos(e.cobro.total) };

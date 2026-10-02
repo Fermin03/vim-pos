@@ -12,6 +12,13 @@ export const NOMBRE_CANAL = "vim-pantalla-cliente";
 export const LATIDO_MS = 5000;
 /** Silencio tras el que la pantalla vuelve a reposo: una caja colgada no deja una cuenta vieja a la vista. */
 export const SILENCIO_MS = 15000;
+/**
+ * Lo más que dura «¡Gracias!» de cara al cliente. Con impresora, la caja cierra sola su «Cobro
+ * completado» a los 5 s y publica lo que sigue. Sin impresora ese diálogo se queda abierto con el
+ * recibo en pantalla (y también al imprimir una copia, con un aviso de reparto o con un recibo que
+ * falló): sin este tope la pantalla del cliente decía «¡Gracias!» hasta que el cajero lo cerrara.
+ */
+export const PAGADO_MAX_MS = 8000;
 
 /** Lo que se usa de `BroadcastChannel`, para poder probar sin navegador. */
 export type Canal = {
@@ -32,6 +39,7 @@ export function abrirCanal(): Canal | null {
 
 export function crearPublicador(canal: Canal, negocio: () => Negocio) {
   let ultima: VistaCliente = { fase: "reposo" };
+  let topePagado: ReturnType<typeof setTimeout> | undefined;
   // Todo envío pasa por aquí: la pantalla del cliente es opcional y un canal que falla
   // (`InvalidStateError`, `SecurityError`) nunca debe romper la venta de la caja.
   const enviar = (m: unknown) => {
@@ -49,11 +57,65 @@ export function crearPublicador(canal: Canal, negocio: () => Negocio) {
 
   return {
     anunciar,
-    publicar(vista: VistaCliente) { ultima = vista; enviarEstado(); },
+    publicar(vista: VistaCliente) {
+      clearTimeout(topePagado);
+      topePagado = undefined;
+      ultima = vista;
+      enviarEstado();
+      if (vista.fase !== "pagado") return;
+      // El tope vive aquí, junto a `ultima`: al vencer, el latido deja de repetir «pagado» y una
+      // pantalla que salude después recibe reposo. El latido no lo alarga; solo otro `publicar`.
+      topePagado = setTimeout(() => {
+        topePagado = undefined;
+        ultima = { fase: "reposo" };
+        enviarEstado();
+      }, PAGADO_MAX_MS);
+    },
     latir() { if (ultima.fase !== "reposo") enviarEstado(); },
     cerrar() {
+      clearTimeout(topePagado);
+      topePagado = undefined;
       ultima = { fase: "reposo" };
       enviarEstado();
+      canal.onmessage = null;
+      try { canal.close(); } catch { /* ya estaba cerrado */ }
+    },
+  };
+}
+
+/**
+ * El lado de la pantalla del cliente: escucha a la caja y avisa qué dibujar.
+ *
+ * Es el espejo de `crearPublicador` y vive aquí, fuera del componente, para poder probar con un
+ * canal y un reloj de mentira la regla que más importa: si la caja calla, la cuenta no se queda.
+ */
+export function crearReceptor(
+  canal: Canal,
+  { alCambiarVista, alNegocio }: { alCambiarVista: (vista: VistaCliente) => void; alNegocio: (negocio: Negocio) => void },
+) {
+  let silencio: ReturnType<typeof setTimeout> | undefined;
+
+  canal.onmessage = (e) => {
+    const m = leerMensaje(e.data);
+    if (!m) return; // lo que no se entiende se ignora; queda lo último válido
+    if (m.tipo === "negocio") { alNegocio({ nombre: m.nombre, logoUrl: m.logoUrl }); return; }
+    if (m.tipo !== "estado") return;
+    alCambiarVista(m.vista);
+    clearTimeout(silencio);
+    silencio = undefined;
+    // Si la caja se cuelga o se recarga a media cuenta, deja de latir: a los 15 s se vuelve a
+    // reposo para no dejarle la cuenta de un cliente al siguiente. En reposo no hay nada que quitar.
+    if (m.vista.fase !== "reposo") {
+      silencio = setTimeout(() => { silencio = undefined; alCambiarVista({ fase: "reposo" }); }, SILENCIO_MS);
+    }
+  };
+  // Saluda: la caja contesta con el negocio y con lo que tenga en la venta.
+  try { canal.postMessage({ tipo: "hola", v: 1 }); } catch { /* sin caja que conteste, se queda en reposo */ }
+
+  return {
+    cerrar() {
+      clearTimeout(silencio);
+      silencio = undefined;
       canal.onmessage = null;
       try { canal.close(); } catch { /* ya estaba cerrado */ }
     },
