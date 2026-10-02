@@ -18,6 +18,7 @@ import {
 } from "../lib/print/config";
 import type { PrintJob } from "../lib/print/tipos";
 import { listarAreasCocina, type AreaCocina } from "../lib/areas-cocina";
+import { AjustePantallaCliente } from "./ajuste-pantalla-cliente";
 
 const input = "h-11 w-full rounded border border-line-strong px-3 text-sm outline-none focus:border-ink focus:shadow-[0_0_0_3px_rgba(22,22,26,.06)]";
 
@@ -118,10 +119,12 @@ export function ModalConfigImpresora({ token, sucursalId, onCerrar }: { token: s
     <Modal
       open
       onClose={onCerrar}
-      title="Impresoras de esta caja"
+      title="Impresoras y pantallas de esta caja"
       className="flex max-h-[calc(100vh-2rem)] w-[880px] max-w-[calc(100vw-2rem)] flex-col rounded-lg border border-line bg-surface p-6 shadow-xl"
     >
       <p className="mb-4 flex-shrink-0 text-13 text-ink-3">Las impresoras son por dispositivo: se guardan solo en esta caja.</p>
+
+      <AjustePantallaCliente />
 
       <div className="grid flex-1 gap-x-6 gap-y-3 overflow-y-auto md:grid-cols-2">
       <div className="min-w-0">

@@ -322,6 +322,38 @@ export async function startUiServer(dir, port, gatewayPort = 54350, host = "0.0.
         }
       }
 
+      // CAJA: ajuste de la pantalla del cliente (el segundo monitor). Solo desde la propia caja,
+      // lectura incluida: la lista de monitores es de ESTA computadora y a la segunda caja de la
+      // LAN no le dice nada; y el POST mueve una ventana frente al cliente.
+      if (!kds && req.url.startsWith("/__pantalla-cliente") && (req.method === "GET" || req.method === "POST")) {
+        if (!LOCALES.has(req.socket.remoteAddress ?? "")) {
+          res.writeHead(403, { "Content-Type": "application/json" });
+          return res.end(JSON.stringify({ ok: false, error: "Solo desde la caja." }));
+        }
+        if (req.method === "GET") {
+          res.writeHead(200, { "Content-Type": "application/json", "Cache-Control": "no-store" });
+          return res.end(JSON.stringify(opts.pantallaCliente ? opts.pantallaCliente() : { disponible: false }));
+        }
+        if (!mismaProcedencia(req, port)) {
+          res.writeHead(403, { "Content-Type": "application/json" });
+          return res.end(JSON.stringify({ ok: false, error: "Origen no permitido." }));
+        }
+        const body = await leerCuerpo(req);
+        if (body === null) return responder413(res);
+        let cambio;
+        try { cambio = JSON.parse(body || "{}"); } catch {
+          res.writeHead(400, { "Content-Type": "application/json" });
+          return res.end(JSON.stringify({ ok: false, error: "Cuerpo inválido." }));
+        }
+        res.writeHead(200, { "Content-Type": "application/json", "Cache-Control": "no-store" });
+        try {
+          const estado = opts.onPantallaCliente?.(cambio);
+          return res.end(JSON.stringify(estado ? { ok: true, ...estado } : { ok: false, disponible: false }));
+        } catch (e) {
+          return res.end(JSON.stringify({ ok: false, error: e?.message ?? "No se pudo guardar" }));
+        }
+      }
+
       // CAJA: impresoras instaladas en Windows, para elegir una en vez de capturar una IP. Solo
       // desde la propia caja: la lista es de ESTA computadora y dice qué hay conectado en el local.
       if (!kds && req.method === "GET" && req.url.startsWith("/__impresoras")) {

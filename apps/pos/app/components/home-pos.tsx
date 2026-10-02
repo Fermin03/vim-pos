@@ -42,6 +42,7 @@ import { IconoAsignarCliente, IconoClienteAsignado, ModalClienteCuenta } from ".
 import { asignarClienteTicket, type ClienteCuenta } from "../lib/clientes-cuenta";
 import { ModalZonaPedido } from "./modal-zona-pedido";
 import { ModalNombreCuenta } from "./modal-nombre-cuenta";
+import { usePublicarPantallaCliente } from "./use-publicar-pantalla-cliente";
 import { ModalCambiarPin } from "./modal-cambiar-pin";
 import { ModalMisPropinas } from "./modal-mis-propinas";
 import { leerAreasDeItems, leerTicketParaImpresion } from "../lib/print/ticket-datos";
@@ -215,6 +216,10 @@ export function HomePos({
   const [upsellActivo, setUpsellActivo] = useState(true);
   const [hojaCombo, setHojaCombo] = useState<{ producto: Producto; mods: ModificadorSel[]; nota: string | null; combo: ComboDef } | null>(null);
   const [totalesCobro, setTotalesCobro] = useState<TotalesTicket | null>(null);
+  // Lo que ModalCobro tiene a la vista como pendiente (con propina y pagos parciales); la pantalla
+  // del cliente lo muestra en vez del snapshot `totalesCobro`, que no se entera de ninguno de los dos.
+  const [montoCobro, setMontoCobro] = useState<number | null>(null);
+  useEffect(() => { if (!totalesCobro) setMontoCobro(null); }, [totalesCobro]);
   // Al cobrar desde la lista ya no se navega, así que la lista no se remonta sola y seguiría
   // mostrando la cuenta recién pagada. Este contador la fuerza a releerse.
   const [cuentasVersion, setCuentasVersion] = useState(0);
@@ -293,6 +298,18 @@ export function HomePos({
   const [viendoReservaciones, setViendoReservaciones] = useState(false);
   // F6.1 — items persistidos del ticketBd (para mapear clientId ↔ ticket_item_id real al cancelar).
   const [itemsPersistidos, setItemsPersistidos] = useState<ItemTicket[]>([]);
+  // Pantalla del cliente (segundo monitor). `totalAutoritativo` es una sola constante que también
+  // recibe SidebarTicket en `totalConDescuento`: el cliente ve el número que ve el cajero.
+  const totalAutoritativo = ticketBd && !ticketIncompleto ? ticketBd.total : null;
+  usePublicarPantallaCliente(
+    {
+      carrito,
+      totalAutoritativo,
+      cobro: totalesCobro ? { total: montoCobro ?? totalesCobro.pendiente } : null,
+      pagado: confirmacion ? { total: confirmacion.total, cambio: confirmacion.cambio } : null,
+    },
+    { nombre: caja.negocioNombre, logoUrl: caja.logoUrl },
+  );
   const [cancelandoItem, setCancelandoItem] = useState<ItemTicket | null>(null);
   // F6.5 — descuento/override por ítem.
   const [descuentoItem, setDescuentoItem] = useState<ItemTicket | null>(null);
@@ -1417,6 +1434,7 @@ export function HomePos({
           sucursalId={caja.sucursal_id}
           totalesIniciales={totalesCobro}
           atajo={atajoCobro}
+          onMontoACobrar={setMontoCobro}
           onPagado={async (folio, cambio, total) => {
             const ticketId = totalesCobro.ticketId;
             setTotalesCobro(null);
@@ -2165,7 +2183,7 @@ export function HomePos({
           onAplicarDescuento={onAplicarDescuento}
           descuentoMxn={ticketBd?.descuentos ?? 0}
             promocionMxn={ticketBd?.promociones ?? 0}
-          totalConDescuento={ticketBd && !ticketIncompleto ? ticketBd.total : undefined}
+          totalConDescuento={totalAutoritativo ?? undefined}
           bloqueado={bloqueado}
           procesando={procesandoCobro}
         />

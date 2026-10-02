@@ -11,7 +11,7 @@ import { supabase, leerSesion } from "./supabase";
  *
  * Aquí NO se configura la impresora. Qué impresora física le toca a cada estación es propio de
  * cada caja —una segunda caja del mismo negocio tiene otras IPs— y se elige en el POS, en
- * Configurar impresora.
+ * Configurar impresoras y pantallas.
  */
 
 async function tenantId(): Promise<string> {

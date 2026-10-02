@@ -20,6 +20,8 @@ import { ModalSesionExpirada } from "./components/modal-sesion-expirada";
 import { PantallaTurno } from "./components/pantalla-turno";
 import { useAcceso } from "./components/banda-acceso";
 import { PantallaBloqueada } from "./components/pantalla-bloqueada";
+import { PantallaCliente } from "./components/pantalla-cliente";
+import { olvidarNegocio } from "./lib/pantalla-cliente/negocio";
 import { PantallaKds } from "@vim/kds-core";
 
 // Etiquetas de la sucursal/caja para vistas previas a la sesión real (selector,
@@ -40,7 +42,7 @@ type Estado =
  *  entra directo a Cocina con la sesión de DISPOSITIVO, sin PIN de empleado). */
 const MODO_KDS = typeof window !== "undefined" && new URLSearchParams(window.location.search).has("kds");
 
-export default function Page() {
+function PaginaPos() {
   const [estado, setEstado] = useState<Estado>({ paso: "boot" });
   const [cajaId, setCajaId] = useState<string | null>(null);
   // Lo que la nube dice que este negocio puede hacer (ADR 0014).
@@ -93,6 +95,8 @@ export default function Page() {
     olvidarCreds();
     // El menú cacheado era de ESTA vinculación (B2-6): la siguiente puede ser otro negocio.
     await cacheLimpiar();
+    // Lo mismo el negocio que recuerda la pantalla del cliente: su logo no debe salir en el siguiente.
+    olvidarNegocio();
     setCajaId(null);
     setEstado({ paso: "vincular" });
   }, []);
@@ -223,4 +227,21 @@ export default function Page() {
         />
       );
   }
+}
+
+/**
+ * Pantalla del cliente: el escritorio abre esta misma página con `?cliente` en el segundo monitor.
+ * Es otra página en todo menos en el archivo: no inicia sesión, no lee directivas y no puede quedar
+ * detrás de la puerta de acceso de la caja.
+ *
+ * El modo se decide tras montar y no al cargar el módulo: la página es un export estático, y el
+ * HTML generado no sabe de la URL; decidirlo antes daría un desajuste de hidratación.
+ */
+export default function Page() {
+  const [modo, setModo] = useState<"pos" | "cliente" | null>(null);
+  useEffect(() => {
+    setModo(new URLSearchParams(window.location.search).has("cliente") ? "cliente" : "pos");
+  }, []);
+  if (modo === null) return <main className="h-screen bg-bg" />;
+  return modo === "cliente" ? <PantallaCliente /> : <PaginaPos />;
 }

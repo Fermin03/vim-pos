@@ -2506,6 +2506,10 @@ VIM POS distingue funcionalidades **núcleo** (siempre activas) de funcionalidad
 | **Delivery propio** | Inactivo | Negocios con flotilla de repartidores propia |
 | **Apps externas (Rappi/Uber/Didi)** | Inactivo | Negocios dados de alta en plataformas |
 
+> ⚠️ **Superado en parte.** El «Display al cliente» ya no es un módulo que el negocio active en el
+> admin: la caja abre la pantalla sola cuando detecta un segundo monitor, y va incluida en todos los
+> planes. Ver `vim-pos/docs/decisiones/0026-la-pantalla-del-cliente-se-enciende-sola.md`.
+
 Cada módulo se documenta en su sección correspondiente y la arquitectura del software garantiza que **no estar activado no rompe nada**.
 
 ### 28.3 Configuración del catálogo
@@ -3272,7 +3276,7 @@ Las decisiones de diseño tomadas y aplicadas en este documento:
 
 21. ✅ **Múltiples impresoras térmicas: configurables desde el MVP.** Arquitectura lista para hardware flexible — desde una sola impresora hasta múltiples por áreas de cocina. La realidad operativa de cada negocio define la configuración.
 
-22. ✅ **Display al cliente: no se desarrolla hasta que un cliente lo solicite.** Arquitectura preparada pero sin UI de display en MVP.
+22. ✅ **Display al cliente: no se desarrolla hasta que un cliente lo solicite.** Arquitectura preparada pero sin UI de display en MVP. ⚠️ *Superado: la pantalla del cliente ya existe y se enciende sola; ver `vim-pos/docs/decisiones/0026-la-pantalla-del-cliente-se-enciende-sola.md`.*
 
 23. ✅ **Tiempo estimado al cliente: no se comunica.** El sistema no muestra al cliente cuándo estará listo su pedido.
 

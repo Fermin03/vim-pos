@@ -420,6 +420,44 @@ El cambio va sin corte, en este orden:
    Se niega a correr si queda alguna caja atrasada y dice cuál. Una caja anterior a 0.4.97 no sabe
    reintentar: se quedaría sin sincronizar hasta que alguien la vuelva a vincular.
 
+## Pantalla del cliente
+
+Un segundo monitor de cara al mostrador, que enseña la cuenta mientras el cajero captura (ADR 0026).
+La abre sola `desktop/src/pantalla-cliente.mjs` cuando detecta el monitor; la dibuja el mismo POS con
+`?cliente` (`apps/pos/app/components/pantalla-cliente.tsx`).
+
+Solo se puede probar de verdad con dos monitores y el instalador (o `npm start` en `desktop/`): la
+ventana, el foco, los monitores y la suspensión de pantalla son de Electron y de Windows, y ninguna
+prueba automática los ve. Esta lista se pasa completa con cada instalador que toque la ventana o
+la vista (`desktop/src/pantalla-cliente.mjs`, `desktop/src/main.mjs`, `desktop/src/ui-server.mjs`,
+`apps/pos/app/components/pantalla-cliente.tsx`, `apps/pos/app/lib/pantalla-cliente/vista.ts`,
+`apps/pos/app/lib/pantalla-cliente/canal.ts`).
+
+- [ ] Con dos monitores, al abrir la caja la pantalla del cliente aparece sola en el segundo.
+- [ ] Ocupa todo el monitor: sin marco, sin barra de título, sin barra de tareas encima.
+- [ ] No aparece en la barra de tareas ni en Alt+Tab.
+- [ ] Al escribir o escanear, el foco sigue en la caja.
+- [ ] Desconectar el segundo monitor: la caja sigue igual. Reconectar: la pantalla vuelve sola.
+- [ ] Capturar, cobrar y ver el cambio: las dos pantallas coinciden en el total y en el cambio.
+- [ ] En una sucursal con propina activada, cobrar con propina: al confirmar la propina, el monto de la pantalla del cliente coincide con el del cajero.
+- [ ] Cobro sin impresora configurada: la pantalla del cliente vuelve a reposo a los 8 s aunque el recibo siga abierto en la caja.
+- [ ] En «Impresoras y pantallas de esta caja» (desde «Configurar impresoras y pantallas»), apagarla la cierra; encenderla la reabre. Sigue apagada tras reiniciar.
+- [ ] Cerrar la caja a la bandeja: la pantalla del cliente se cierra. Al volver a abrir la caja, reaparece. «Salir» la cierra.
+- [ ] Arrastrar la caja al otro monitor: las pantallas se intercambian.
+- [ ] Con un monitor vertical: nada se corta ni se encima.
+- [ ] Con un solo monitor: nada cambia respecto a la versión anterior.
+- [ ] El monitor del cliente no se apaga solo tras varios minutos sin uso.
+
+**Si no aparece.** Windows tiene que estar en «Extender», no en «Duplicar»: duplicando reporta un
+solo monitor y no hay dónde abrirla (el ajuste lo dice). Y el monitor del cajero debe ser el
+principal de Windows; si el principal es el del mostrador, las dos pantallas arrancan
+intercambiadas. Si la ventana muere seis veces en un minuto, deja de reabrirse y lo anota en el
+registro; vuelve a intentarlo al mostrar o mover la caja, al cambiar los monitores o al tocar el ajuste.
+
+El registro queda en `vim-pos.log` con la etiqueta `[pantalla-cliente]`. La configuración local
+(`modo` y monitor elegido) es `pantalla-cliente.json`, en la misma carpeta que `vim-pos.log`; si se
+borra, vuelve al estado de fábrica (encendida, sin monitor elegido).
+
 ## Conectar a la nube (deploy del sync real) — #3
 
 Requiere: (a) **despausar** el proyecto Supabase (plan FREE se pausa) desde el dashboard;

@@ -29,6 +29,7 @@ Cada archivo dice **qué decía el plan, qué hacemos hoy y por qué**. Manda lo
 | [0023](0023-eliminar-un-cliente-es-el-segundo-paso-de-la-baja.md) | Eliminar un cliente es el segundo paso de la baja, y la base decide si se puede | 01/10/2026 |
 | [0024](0024-los-extras-suben-el-limite-y-se-suman-a-la-excepcion.md) | La sucursal y la caja adicional son extras por cantidad; la caja adicional es UNA caja, no una por sucursal | 01/10/2026 |
 | [0025](0025-el-inventario-se-cierra-por-plan-sin-tocar-la-venta.md) | El inventario se cierra por plan sin tocar la venta, y en la caja manda la nube | 01/10/2026 |
+| [0026](0026-la-pantalla-del-cliente-se-enciende-sola.md) | La pantalla del cliente se enciende sola y la caja le publica la cuenta | 02/10/2026 |
 
 ## Pendientes de escribir
 
