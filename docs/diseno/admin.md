@@ -139,6 +139,33 @@ Facturación, con la misma lectura (`useAvisosFacturacion`), sin poder cerrarse:
 
 Nada de correos ni tareas programadas: el aviso vive donde el dueño ya entra.
 
+## Pantalla del cliente (0150, ADR 0026)
+
+Configuración → **Pantalla del cliente**: las imágenes que el segundo monitor de la caja muestra
+cuando nadie está cobrando. Una sola página para todo —subir, ordenar, pausar, quitar **y el
+tiempo**—, porque el dueño decide cuánto dura una imagen viéndola, no en otra sección.
+
+- **Tiempo en pantalla**, arriba de la lista: un campo de 3 a 60 segundos con Guardar. Es el tiempo
+  general, el de toda imagen que no tenga uno propio. El error de validación sale junto al campo.
+- **Cada renglón**, en el orden en que salen: número, miniatura (entera, `object-contain`),
+  interruptor Activo / En pausa, selector de tiempo y Subir · Bajar · Eliminar. El selector empieza
+  en "Tiempo general (8 s)" —con el número vigente, para que se entienda qué es— y sigue con
+  tiempos fijos; cambiarlo guarda en el acto, sin botón.
+- **El orden se cambia con Subir y Bajar**, sin arrastrar: funciona igual con el dedo y con el
+  teclado, y son diez renglones como mucho.
+- **Tope de 10**, a la vista ("3 de 10 · 1 en pausa"). Al llegar, el botón azul dice "Ya hay 10
+  anuncios" y se apaga; la regla de verdad está en la base.
+- **Una escritura a la vez.** Mientras algo se guarda, los demás controles de la lista no
+  responden, y al terminar —bien o mal— se vuelve a leer la lista: lo que se ve es lo guardado. El
+  renglón que se guarda se atenúa; los demás no parpadean.
+- Eliminar pasa por `DialogoPeligro` y dice la consecuencia: deja de mostrarse en las cajas.
+- Un aviso fijo dice cuánto tardan los cambios en llegar a las cajas (uno o dos minutos), porque
+  el dueño va a voltear a ver el monitor en cuanto suba la imagen.
+- A quien no es dueño ni administrador se le dice eso mismo, no el rechazo de la base.
+
+Aquí los controles **sí miden 44 px**: es de las pocas páginas de Configuración que el dueño abre
+desde el celular, parado junto a la caja, con la foto de la promoción que acaba de recibir.
+
 ## Lo que NO se hereda del POS
 
 - Los objetivos de 44–56px. Con mouse, 36–40px es lo correcto; 44 se ve infantil.

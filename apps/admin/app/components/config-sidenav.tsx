@@ -15,6 +15,7 @@ const SECCIONES_BASE = [
     { label: "Estaciones de preparación", href: "/configuracion/areas" },
     { label: "Propinas", href: "/configuracion/propinas" },
     { label: "Zonas de envío", href: "/configuracion/envios" },
+    { label: "Pantalla del cliente", href: "/configuracion/pantalla-cliente" },
     { label: "Marcas virtuales", href: "/configuracion/marcas" },
     { label: "Apps de delivery", href: "/configuracion/integraciones" },
     { label: "Franquicias", href: "/configuracion/franquicias" },
