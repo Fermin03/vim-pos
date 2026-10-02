@@ -2,6 +2,7 @@ import type { PrintJob, PrintResult } from "./tipos";
 import { PreviewAdapter } from "./preview-adapter";
 import { EpsonEposAdapter } from "./epson-epos-adapter";
 import { RawSocketAdapter } from "./raw-socket-adapter";
+import { ColaWindowsAdapter } from "./cola-windows-adapter";
 import { leerConfigDeEstacion, leerConfigParaDestino, PUERTO_RAW, type ConfigImpresora, type Destino, type IdEstacion } from "./config";
 
 export interface PrinterAdapter {
@@ -18,6 +19,7 @@ export interface PrinterAdapter {
  * (C3, dos estaciones): cada destino está asignado a una estación con su propia config.
  *  - tipo 'epson' + IP → EpsonEposAdapter (imprime al hardware de red).
  *  - tipo 'generica' + IP → RawSocketAdapter (puerto 9100).
+ *  - tipo 'windows' + nombre → ColaWindowsAdapter (cola de Windows: USB, serial…).
  *  - en cualquier otro caso → PreviewAdapter (muestra el recibo en pantalla); `onMostrar` lo da la UI.
  * Sin config, sigue siendo Preview (comportamiento previo).
  */
@@ -32,6 +34,7 @@ export function obtenerImpresora(destino: Destino, opts: { onMostrar: (job: Prin
 
 function desdeConfig(cfg: ConfigImpresora, opts: { onMostrar: (job: PrintJob) => void }): PrinterAdapter {
   if (cfg.tipo === "generica" && cfg.ip) return new RawSocketAdapter(cfg.ip, cfg.puerto ?? PUERTO_RAW, cfg.ancho ?? 80);
+  if (cfg.tipo === "windows" && cfg.nombre) return new ColaWindowsAdapter(cfg.nombre, cfg.ancho ?? 80);
   if (cfg.tipo === "epson" && cfg.ip) return new EpsonEposAdapter(cfg.ip, cfg.ancho ?? 80);
   return new PreviewAdapter(opts.onMostrar);
 }
