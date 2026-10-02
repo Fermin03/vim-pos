@@ -1,8 +1,8 @@
 "use client";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { Producto } from "../lib/catalogo";
 import type { ComboDef, ComponenteSel, SlotCombo } from "../lib/combos";
-import { componentesPorDefecto, deltaDe, nuevoClientIdComponente, precioCombo, slotValido } from "../lib/combos";
+import { abreModificadores, componentesPorDefecto, deltaDe, nuevoClientIdComponente, precioCombo, slotValido } from "../lib/combos";
 import type { AlcanceEdicion, LineaCarrito, ModificadorSel } from "../lib/carrito";
 import { nuevoClientId } from "../lib/carrito";
 import { obtenerGruposDeProducto, type GrupoModificadores } from "../lib/modificadores";
@@ -15,10 +15,12 @@ import { Paginador } from "./paginador";
 /**
  * Modal de armado de combo (centrado, al 80% de la pantalla, igual que el de modificadores): un slot por paso (spec §6.2, validado en el prototipo). En un slot
  * `max = 1` tocar una tarjeta selecciona Y avanza — no hay "Siguiente" que buscar. Si el producto
- * elegido trae un grupo obligatorio (p. ej. término de la hamburguesa), `ModalModificadores` se
- * abre encima del paso y al confirmar avanza una sola vez. El último paso es el resumen, con
- * cantidad y nota para cocina. El precio se recalcula en cada cambio y se ve en vivo en la
- * cabecera y en el botón del pie.
+ * elegido tiene modificadores, `ModalModificadores` se abre encima del paso —igual que cuando ese
+ * producto se vende suelto, sean obligatorios u opcionales— y al confirmar avanza una sola vez.
+ * La opción por defecto ya viene seleccionada, así que se puede salir del paso con "Siguiente" sin
+ * tocarla: ahí solo detiene un obligatorio sin contestar (ver `abreModificadores`). El último paso
+ * es el resumen, con cantidad y nota para cocina. El precio se recalcula en cada cambio y se ve en
+ * vivo en la cabecera y en el botón del pie.
  *
  * Las opciones del paso **no scrollean**: la cuadrícula se mide contra el hueco del drawer y las
  * tarjetas lo llenan, todas del mismo tamaño, con el texto achicándose para caber. Un slot con
@@ -74,7 +76,18 @@ export function ModalCombo({ combo, token, linea, preset, onConfirmar, onCancela
   const [paso, setPaso] = useState<number>(() => (linea ? slots.length : preset ? 1 : 0));
   const [cantidad, setCantidad] = useState<number>(linea?.cantidad ?? 1);
   const [nota, setNota] = useState<string>(linea?.notaCocina ?? "");
-  const [personalizando, setPersonalizando] = useState<{ comp: ComponenteSel; grupos: GrupoModificadores[]; avanzar: boolean } | null>(null);
+  // `avanzar`: confirmar pasa al siguiente paso. `nuevo`: el componente lo acaba de seleccionar
+  // este toque, así que cancelar deshace la selección (ver `cerrarPersonalizando`).
+  const [personalizando, setPersonalizando] = useState<{ comp: ComponenteSel; grupos: GrupoModificadores[]; avanzar: boolean; nuevo: boolean } | null>(null);
+  // Componentes que ya pasaron por su modal de modificadores. Arrancan dentro los de un renglón que
+  // se edita y el producto que llega del aviso "¿Lo hacemos combo?" (sus modificadores se eligieron
+  // antes de abrir el combo). Los que pone `componentesPorDefecto` no: a esos nadie les ha
+  // preguntado nada todavía.
+  const [personalizados, setPersonalizados] = useState<Set<string>>(() => new Set(
+    (linea?.combo ? componentes : preset && slots[0] ? componentes.filter((c) => c.grupoId === slots[0]!.id) : []).map((c) => c.clientId),
+  ));
+  // La consulta de modificadores es asíncrona: sin esto, un doble toque avanzaba dos pasos.
+  const ocupado = useRef(false);
   const [error, setError] = useState<string | null>(null);
   // Editar un renglón de varias unidades: por omisión el cambio se lleva UNA, separada.
   const preguntaAlcance = (linea?.cantidad ?? 1) > 1;
@@ -108,10 +121,10 @@ export function ModalCombo({ combo, token, linea, preset, onConfirmar, onCancela
   async function elegir(s: SlotCombo, producto: Producto) {
     const ya = componentes.find((c) => c.grupoId === s.id && c.producto.id === producto.id);
     if (s.max === 1) {
-      if (ya) { avanzar(); return; }
+      if (ya) { await abrirModificadores(ya, "tocar", { avanzar: true, nuevo: false }); return; }
       const comp: ComponenteSel = { grupoId: s.id, grupoNombre: s.nombre, producto, cantidad: 1, modificadores: [], notaCocina: null, clientId: nuevoClientIdComponente() };
       setComponentes((prev) => [...prev.filter((c) => c.grupoId !== s.id), comp]);
-      await personalizar(comp, true, true);
+      await abrirModificadores(comp, "tocar", { avanzar: true, nuevo: true });
       return;
     }
     const enSlot = componentes.filter((c) => c.grupoId === s.id).reduce((n, c) => n + c.cantidad, 0);
@@ -119,29 +132,46 @@ export function ModalCombo({ combo, token, linea, preset, onConfirmar, onCancela
     else if (enSlot < s.max) setComponentes((prev) => [...prev, { grupoId: s.id, grupoNombre: s.nombre, producto, cantidad: 1, modificadores: [], notaCocina: null, clientId: nuevoClientIdComponente() }]);
   }
 
-  /** Abre los modificadores del componente. `soloObligatorios`: si no hay ninguno obligatorio, no abre y avanza. */
-  async function personalizar(comp: ComponenteSel, avanzarAlTerminar: boolean, soloObligatorios: boolean) {
+  /**
+   * Abre los modificadores del componente si la regla lo pide (`abreModificadores`); si no hay nada
+   * que abrir y `avanzar` viene encendido, pasa al siguiente paso.
+   */
+  async function abrirModificadores(comp: ComponenteSel, al: "tocar" | "siguiente", o: { avanzar: boolean; nuevo: boolean }) {
+    if (ocupado.current) return;
+    ocupado.current = true;
     try {
       const grupos = await obtenerGruposDeProducto(token, comp.producto.id);
-      const hayObligatorio = grupos.some((g) => g.tipoSeleccion === "UNICA_OBLIGATORIA" || g.tipoSeleccion === "MULTIPLE_OBLIGATORIA_RANGO");
-      if (grupos.length === 0 || (soloObligatorios && !hayObligatorio)) { if (avanzarAlTerminar) avanzar(); return; }
-      setPersonalizando({ comp, grupos, avanzar: avanzarAlTerminar });
+      if (!abreModificadores(grupos, al, personalizados.has(comp.clientId))) { if (o.avanzar) avanzar(); return; }
+      setPersonalizando({ comp, grupos, ...o });
     } catch (e) {
       setError(e instanceof Error ? e.message : "No se pudieron cargar los modificadores");
-      if (avanzarAlTerminar) avanzar();
+      if (o.avanzar) avanzar();
+    } finally {
+      ocupado.current = false;
     }
   }
 
   /**
+   * Botón "Siguiente": se sale del paso sin tocar la tarjeta. Es el camino de la opción por
+   * defecto, que ya viene seleccionada — si trae un obligatorio sin contestar, se pregunta aquí.
+   * Con `max = 1` (lo único que el admin deja configurar hoy) el slot tiene un solo componente.
+   */
+  async function siguiente(s: SlotCombo) {
+    const comp = componentes.find((c) => c.grupoId === s.id);
+    if (!comp) { avanzar(); return; }
+    await abrirModificadores(comp, "siguiente", { avanzar: true, nuevo: false });
+  }
+
+  /**
    * Cierra el modal de modificadores anidado con el mismo criterio que su botón Cancelar (ver
-   * comentario en `onCancelar` más abajo): si el grupo era obligatorio, deshace la selección para
-   * que el slot quede inválido en vez de dejarlo a medias. Se extrae como función propia porque la
-   * llaman tanto el botón como el manejador de Escape de abajo.
+   * comentario en `onCancelar` más abajo): si el componente se acababa de seleccionar, deshace la
+   * selección para que el slot quede inválido en vez de dejarlo a medias. Se extrae como función
+   * propia porque la llaman tanto el botón como el manejador de Escape de abajo.
    */
   function cerrarPersonalizando() {
     setPersonalizando((p) => {
       if (!p) return null;
-      if (p.avanzar) setComponentes((prev) => prev.filter((c) => c.clientId !== p.comp.clientId));
+      if (p.nuevo) setComponentes((prev) => prev.filter((c) => c.clientId !== p.comp.clientId));
       return null;
     });
   }
@@ -250,7 +280,7 @@ export function ModalCombo({ combo, token, linea, preset, onConfirmar, onCancela
                         </span>
                       </button>
                       {c && (
-                        <button type="button" onClick={(e) => { e.stopPropagation(); void personalizar(c, false, false); }}
+                        <button type="button" onClick={(e) => { e.stopPropagation(); void abrirModificadores(c, "tocar", { avanzar: false, nuevo: false }); }}
                           className="absolute bottom-1 right-1 z-10 flex h-11 min-w-[44px] items-center justify-center rounded px-2.5 text-13 font-semibold text-accent transition hover:bg-hover">
                           Personalizar
                         </button>
@@ -356,7 +386,7 @@ export function ModalCombo({ combo, token, linea, preset, onConfirmar, onCancela
                 <span>{linea ? "Guardar cambios" : "Agregar al ticket"}</span><span className="font-display tabular-nums">{fmtMxn(precio * cantidadEfectiva)}</span>
               </button>
             ) : (
-              <button type="button" disabled={!slotValido(slot!, componentes)} onClick={avanzar}
+              <button type="button" disabled={!slotValido(slot!, componentes)} onClick={() => void siguiente(slot!)}
                 className="ml-auto flex h-[52px] w-[min(340px,40%)] flex-shrink-0 items-center justify-between gap-2 rounded-lg bg-accent px-4 text-16 font-bold text-white shadow-[0_1px_3px_rgb(var(--accent)/0.3)] transition hover:bg-accent-hover active:scale-[.98] disabled:cursor-not-allowed disabled:bg-line-strong disabled:shadow-none">
                 <span>{paso === slots.length - 1 ? "Revisar" : "Siguiente"}</span><span className="font-display tabular-nums">{fmtMxn(precio)}</span>
               </button>
@@ -369,24 +399,27 @@ export function ModalCombo({ combo, token, linea, preset, onConfirmar, onCancela
         <ModalModificadores
           producto={personalizando.comp.producto}
           grupos={personalizando.grupos}
-          // Reabierto desde "Personalizar": arranca con lo que el componente ya tenía. Antes
-          // arrancaba de cero y al confirmar se perdían los modificadores ya elegidos.
-          inicial={personalizando.avanzar ? null : { modificadores: personalizando.comp.modificadores, nota: null }}
+          // Reabierto sobre un componente que ya pasó por aquí: arranca con lo que ya tenía. Antes
+          // arrancaba de cero y al confirmar se perdían los modificadores ya elegidos. La primera
+          // vez (`inicial` nulo) arranca con los defaults de cada grupo.
+          inicial={personalizados.has(personalizando.comp.clientId) ? { modificadores: personalizando.comp.modificadores, nota: null } : null}
           // La nota del componente no viaja: la nota va en el combo entero (resumen).
           sinNota
+          enCombo
           onConfirmar={(mods) => {
             const comp = personalizando.comp;
             setComponentes((prev) => prev.map((c) => (c.clientId === comp.clientId ? { ...c, modificadores: mods } : c)));
+            setPersonalizados((prev) => new Set(prev).add(comp.clientId));
             const avanzarDespues = personalizando.avanzar;
             setPersonalizando(null);
             if (avanzarDespues) avanzar();
           }}
-          // Este modal solo se abre con avanzar=true cuando el grupo era obligatorio (flujo de
-          // selección inicial en elegir()). Cancelarlo ahí NO debe avanzar el paso: hay que
-          // deshacer la selección del componente para que el slot quede inválido y el cajero
-          // tenga que volver a tocar la tarjeta. Cuando avanzar=false (reabierto desde
-          // "Personalizar" sobre un componente ya elegido) el cancelar sigue sin tocar nada.
-          // Mismo criterio en `cerrarPersonalizando`, que también dispara Escape (arriba).
+          // Cancelar nunca avanza el paso. Si el componente se acababa de seleccionar con este
+          // toque (nuevo=true), además se deshace la selección: el slot queda inválido y el cajero
+          // tiene que volver a tocar la tarjeta — lo mismo que cancelar los modificadores de un
+          // producto suelto, que no lo agrega. Sobre un componente que ya estaba elegido (tarjeta
+          // ya seleccionada, "Personalizar", o "Siguiente" con un obligatorio pendiente) cancelar
+          // no toca nada. Mismo criterio en `cerrarPersonalizando`, que también dispara Escape.
           onCancelar={cerrarPersonalizando}
         />
       )}

@@ -3,6 +3,7 @@ import { employeeClient } from "./supabase";
 import { cacheGet, cachePut } from "./outbox";
 import type { Producto } from "./catalogo";
 import { nuevoClientId, type ModificadorSel } from "./carrito";
+import type { GrupoModificadores } from "./modificadores";
 
 export type ModoPrecioSlot = "DELTA" | "SUMA_PRECIO_PRODUCTO";
 export type OpcionSlot = { producto: Producto; delta: number; esDefault: boolean };
@@ -85,6 +86,26 @@ export function precioCombo(combo: ComboDef, componentes: ComponenteSel[]): numb
 export function slotValido(slot: SlotCombo, componentes: ComponenteSel[]): boolean {
   const n = componentes.filter((c) => c.grupoId === slot.id).reduce((s, c) => s + c.cantidad, 0);
   return n >= slot.min && n <= slot.max;
+}
+
+/**
+ * ¿Se abre el modal de modificadores sobre un componente del combo?
+ *
+ * - `"tocar"`: el cajero tocó la tarjeta. Se abre siempre que el producto tenga grupos, obligatorios
+ *   o no — lo mismo que hace ese producto vendido suelto. Antes solo abría con un obligatorio, y a
+ *   un producto con puros opcionales (extras, "sin cebolla") no había cómo ponerle nada sin
+ *   regresar al paso a buscar "Personalizar".
+ * - `"siguiente"`: salió del paso sin tocar la tarjeta, que es lo normal con la opción por defecto
+ *   (ya viene seleccionada). Ahí los opcionales no estorban, pero un obligatorio que nadie ha
+ *   contestado sí detiene: si no, el producto llega a cocina sin su término o su sabor.
+ *
+ * `yaPersonalizado` es que el componente ya pasó por el modal, que no deja confirmar con un
+ * obligatorio pendiente.
+ */
+export function abreModificadores(grupos: GrupoModificadores[], al: "tocar" | "siguiente", yaPersonalizado: boolean): boolean {
+  if (al === "tocar") return grupos.length > 0;
+  if (yaPersonalizado) return false;
+  return grupos.some((g) => g.tipoSeleccion === "UNICA_OBLIGATORIA" || g.tipoSeleccion === "MULTIPLE_OBLIGATORIA_RANGO");
 }
 
 export function nuevoClientIdComponente(): string {
