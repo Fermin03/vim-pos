@@ -363,8 +363,19 @@ export async function startUiServer(dir, port, gatewayPort = 54350, host = "0.0.
         }
         const ruta = new URL(req.url, "http://x").pathname;
         if (ruta === "/__anuncios" || ruta === "/__anuncios/") {
-          let lista = { segundos: 8, anuncios: [] };
-          try { lista = (await opts.anuncios?.()) ?? lista; } catch { /* sin anuncios: la pantalla enseña el logo */ }
+          // Sin gancho (un POS sin escritorio detrás) de verdad no hay anuncios: lista vacía.
+          if (!opts.anuncios) {
+            res.writeHead(200, { "Content-Type": "application/json", "Cache-Control": "no-store" });
+            return res.end(JSON.stringify({ segundos: 8, anuncios: [] }));
+          }
+          // Con gancho, null o una excepción es una lectura FALLIDA, no "no hay anuncios": un 503 hace
+          // que la pantalla conserve la lista que ya tenía en vez de quitar el carrusel (ADR 0026).
+          let lista = null;
+          try { lista = await opts.anuncios(); } catch { /* se contesta 503 abajo */ }
+          if (!lista) {
+            res.writeHead(503, { "Content-Type": "application/json", "Cache-Control": "no-store" });
+            return res.end(JSON.stringify({ ok: false, error: "No se pudo leer la lista de anuncios." }));
+          }
           res.writeHead(200, { "Content-Type": "application/json", "Cache-Control": "no-store" });
           return res.end(JSON.stringify(lista));
         }

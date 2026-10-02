@@ -95,6 +95,11 @@ export async function sincronizarAnuncios({ pool, dir, cloudUrl, fetch: pedir = 
   return r;
 }
 
+/**
+ * La lista para la pantalla del cliente, o null si no se pudo leer. Null y no una lista vacía: la
+ * pantalla trata una lista vacía como "ya no hay anuncios" y quita el carrusel; una lectura fallida
+ * debe conservar la lista que ya tenía (ADR 0026). La ruta /__anuncios lo convierte en un 503.
+ */
 export async function listarAnuncios({ pool, dir }) {
   try {
     const { tenant, filas } = await filasDelNegocio(pool);
@@ -110,7 +115,7 @@ export async function listarAnuncios({ pool, dir }) {
     }
     return { segundos: general, anuncios };
   } catch {
-    return { segundos: SEGUNDOS, anuncios: [] };
+    return null;
   }
 }
 

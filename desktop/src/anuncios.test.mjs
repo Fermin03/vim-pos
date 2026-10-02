@@ -144,10 +144,21 @@ test("un anuncio con tiempo propio lo conserva; uno sin él, o con uno inválido
   });
 });
 
-test("sin configuración usa 8 segundos; si algo falla, lista vacía", async () => {
+test("sin configuración usa 8 segundos", async () => {
   await enTemporal(async (dir) => {
     assert.deepEqual(await listarAnuncios({ pool: poolFalso([], null), dir }), { segundos: 8, anuncios: [] });
-    assert.deepEqual(await listarAnuncios({ pool: { query: async () => { throw new Error("x"); } }, dir }), { segundos: 8, anuncios: [] });
+  });
+});
+
+// Una lectura fallida NO es "no hay anuncios": la pantalla la trataría como lista vacía y quitaría el
+// carrusel (ADR 0026 promete que conserva la lista anterior). Devuelve null, sin lanzar.
+test("si la base falla, devuelve null (no una lista vacía) y no lanza", async () => {
+  await enTemporal(async (dir) => {
+    assert.equal(await listarAnuncios({ pool: { query: async () => { throw new Error("x"); } }, dir }), null);
+    assert.equal(await listarAnuncios({ pool: undefined, dir }), null, "sin backend todavía también es una lectura fallida");
+    // Falla a la mitad: el negocio se leyó, la lista no.
+    const aMedias = { query: async (sql) => { if (/to_regclass/.test(sql)) return { rows: [{ hay: true }] }; if (/_vim_sync/.test(sql)) return { rows: [{ valor: T }] }; throw new Error("se cayó"); } };
+    assert.equal(await listarAnuncios({ pool: aMedias, dir }), null);
   });
 });
 

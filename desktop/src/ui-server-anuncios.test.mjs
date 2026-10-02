@@ -45,11 +45,24 @@ test("sin gancho devuelve una lista vacía, no un error", async () => {
   });
 });
 
-test("si el gancho lanza, la pantalla recibe una lista vacía", async () => {
+// Una lectura fallida no puede parecer "no hay anuncios": con un 200 vacío la pantalla quitaría el
+// carrusel. Con un 503 la pantalla (leerAnuncios → null) conserva la lista que ya tenía.
+test("si el gancho lanza, responde 503 y no una lista vacía", async () => {
   await conServidor({ anuncios: async () => { throw new Error("base caída"); } }, async ({ base }) => {
     const r = await fetch(`${base}/__anuncios`);
-    assert.equal(r.status, 200);
-    assert.deepEqual(await r.json(), { segundos: 8, anuncios: [] });
+    assert.equal(r.status, 503);
+    assert.equal(r.headers.get("cache-control"), "no-store");
+    const cuerpo = await r.json();
+    assert.equal(cuerpo.ok, false);
+    assert.equal(cuerpo.anuncios, undefined, "nada que la pantalla pueda tomar por una lista");
+  });
+});
+
+test("si el gancho devuelve null (lectura fallida), responde 503", async () => {
+  await conServidor({ anuncios: async () => null }, async ({ base }) => {
+    const r = await fetch(`${base}/__anuncios`);
+    assert.equal(r.status, 503);
+    assert.equal((await r.json()).ok, false);
   });
 });
 
