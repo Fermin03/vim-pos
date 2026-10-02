@@ -29,7 +29,7 @@ La ventana no recibe foco ni teclado; el cajero nunca la opera.
 
 | Fase | Qué muestra |
 |---|---|
-| Reposo | Logo y nombre del negocio. Sin ninguno de los dos (caja recién instalada, antes de la primera sesión), el isotipo de VIM POS. Con anuncios (entrega 2), el carrusel. |
+| Reposo | Carrusel de anuncios del negocio. Sin anuncios, logo y nombre; sin ninguno de los dos (caja recién instalada, antes de la primera sesión), el isotipo de VIM POS. |
 | Cuenta | Renglones (cantidad, nombre, detalle, importe), envío si aplica, total fijo abajo. |
 | Cobro | «Total a pagar» y el monto. |
 | Pagado | «¡Gracias!» y el cambio; sin cambio, «Vuelva pronto». Dura lo que el «Cobro completado» de la caja y **nunca más de 8 s**. |
@@ -44,6 +44,29 @@ queda abierto con el recibo, y «¡Gracias!» no puede recibir al siguiente clie
 viene vacío), el isotipo de VIM POS, el mismo que la caja enseña en su inicio. El negocio se
 recuerda entre arranques y se olvida al desvincular la caja: el logo de un negocio no sale en el
 siguiente.
+
+## Anuncios en reposo
+
+Mientras nadie está pidiendo, la pantalla enseña las imágenes que el negocio subió, de una en una
+y a pantalla completa (`CarruselAnuncios`). La lista y los archivos los sirve la propia caja desde
+su disco: el carrusel funciona sin internet.
+
+- **El anuncio se ve entero.** `object-contain` sobre el fondo de la página: nunca se recorta, sea
+  el monitor horizontal, vertical o casi cuadrado. Lo que sobra a los lados es fondo, no un zoom
+  que le corte el precio a una promoción.
+- **Solo el anuncio.** Ni logo, ni nombre, ni puntos indicadores, ni texto encima. La imagen es
+  del negocio y ya dice lo que quiere decir.
+- **Cada imagen dura lo suyo.** El tiempo (3 a 60 s) viene por anuncio. Con una sola imagen no hay
+  cambio ni temporizador: se queda.
+- **Nunca a medio pintar.** La siguiente se carga mientras la actual está en pantalla y solo entra
+  cuando ya cargó.
+- **Una imagen que no carga se salta.** Si ninguna carga, la pantalla vuelve a logo y nombre: los
+  anuncios no pueden dejar el monitor en blanco.
+- **La lista se vuelve a leer** al entrar a reposo y cada 5 minutos. Si no cambió, el carrusel
+  sigue donde iba, sin reiniciarse; si quitaron la imagen que está en pantalla, pasa a la que
+  sigue con el mismo fundido.
+- **En cuanto hay cuenta, se va.** Al primer artículo la pantalla pasa a Cuenta: el anuncio nunca
+  compite con lo que se está cobrando.
 
 ## Tema claro, y por qué
 
@@ -99,12 +122,20 @@ que alguien pudiera querer tocar: ni botones, ni barras de desplazamiento, ni fo
 
 ## Movimiento
 
-Solo dos cosas se mueven, las dos son entradas, y las dos usan `--ease-out` con 200 ms:
+Solo tres cosas se mueven, las tres son entradas y las tres usan `--ease-out`:
 
 | Qué | Cómo |
 |---|---|
-| Cambio de fase | Fundido de la fase que entra (`vim-fade`, solo opacidad). |
-| Renglón recién agregado | `animate-vim-pop`: opacidad y un desplazamiento corto. |
+| Cambio de fase | Fundido de la fase que entra (`vim-fade`, solo opacidad), 200 ms. |
+| Renglón recién agregado | `animate-vim-pop`: opacidad y un desplazamiento corto, 200 ms. |
+| Cambio de anuncio | Fundido cruzado, solo opacidad, 400 ms: la imagen que entra aparece (`vim-fade`) encima de la que sale. |
+
+- **El fundido de los anuncios es más lento a propósito.** Es una imagen a pantalla completa que
+  nadie pidió y que cambia cada varios segundos: a 200 ms se siente como un parpadeo. Lo demás
+  responde a un toque del cajero y sigue en 200 ms.
+- **La imagen que sale no se anima.** Se queda debajo, completa, y la que entra la tapa: cada
+  imagen lleva el fondo de la página detrás, así que dos anuncios de proporciones distintas no se
+  quedan encimados al terminar.
 
 - **Las cifras no se animan nunca.** Esta pantalla cambia con cada toque del cajero; el total
   nuevo tiene que estar ahí al instante, no llegando.
@@ -113,7 +144,7 @@ Solo dos cosas se mueven, las dos son entradas, y las dos usan `--ease-out` con 
 - **El desplazamiento de la lista es instantáneo.** Ocurre antes de pintar, junto con la entrada
   del renglón nuevo.
 - Con `prefers-reduced-motion`, **sin movimiento**: ni fundido ni entrada
-  (`motion-reduce:animate-none`).
+  (`motion-reduce:animate-none`). Los anuncios cambian con corte seco.
 
 ## Lo que NO se hereda
 

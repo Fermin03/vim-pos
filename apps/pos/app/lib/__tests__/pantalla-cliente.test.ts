@@ -8,6 +8,7 @@ import { crearPublicador, crearReceptor, PAGADO_MAX_MS, SILENCIO_MS, type Canal 
 import { textoEstadoPantalla, type AjustePantalla } from "../pantalla-cliente/ajuste";
 import { CLAVE_NEGOCIO, negocioGuardado, olvidarNegocio, recordarNegocio } from "../pantalla-cliente/negocio";
 import { anchoEm, ANCHO_NOMBRE_VMIN, tamanoNombre } from "../pantalla-cliente/medidas";
+import { leerAnuncios, mismaLista, pasoSiguiente, siguienteAnuncio, LISTA_VACIA, type ListaAnuncios } from "../pantalla-cliente/anuncios";
 
 function producto(nombre: string, precio: number): Producto {
   return {
@@ -546,5 +547,109 @@ describe("textoEstadoPantalla", () => {
   });
   it("apagada lo dice aunque haya monitor", () => {
     expect(textoEstadoPantalla({ ...base, modo: "apagada", monitores: [M1, M2] })).toBe("Apagada.");
+  });
+});
+
+describe("siguienteAnuncio", () => {
+  const ids = ["a", "b", "c"];
+  it("empieza por el primero y da la vuelta", () => {
+    expect(siguienteAnuncio(ids, null, new Set())).toBe("a");
+    expect(siguienteAnuncio(ids, "a", new Set())).toBe("b");
+    expect(siguienteAnuncio(ids, "c", new Set())).toBe("a");
+  });
+  it("se salta las imágenes que no cargaron", () => {
+    expect(siguienteAnuncio(ids, "a", new Set(["b"]))).toBe("c");
+    expect(siguienteAnuncio(ids, null, new Set(["a", "b"]))).toBe("c");
+  });
+  it("con una sola imagen buena se queda en ella", () => {
+    expect(siguienteAnuncio(ids, "c", new Set(["a", "b"]))).toBe("c");
+  });
+  it("si todas fallaron, o no hay, no hay nada que enseñar", () => {
+    expect(siguienteAnuncio(ids, "a", new Set(ids))).toBeNull();
+    expect(siguienteAnuncio([], null, new Set())).toBeNull();
+  });
+  it("si la actual ya no está en la lista, vuelve al principio", () => {
+    expect(siguienteAnuncio(ids, "z", new Set())).toBe("a");
+  });
+});
+
+describe("leerAnuncios", () => {
+  const con = (cuerpo: unknown, ok = true) => (async () => ({ ok, json: async () => cuerpo })) as unknown as typeof fetch;
+  it("devuelve la lista que da la caja", async () => {
+    const lista = { segundos: 12, anuncios: [{ id: "a", url: "/__anuncios/11111111-1111-1111-1111-111111111111.jpg", segundos: 20 }] };
+    expect(await leerAnuncios(con(lista))).toEqual(lista);
+  });
+  it("una respuesta rara, un error o la falta de red dan lista vacía", async () => {
+    expect(await leerAnuncios(con({ segundos: "x", anuncios: 1 }))).toEqual(LISTA_VACIA);
+    expect(await leerAnuncios(con({}, false))).toEqual(LISTA_VACIA);
+    expect(await leerAnuncios((async () => { throw new Error("sin red"); }) as unknown as typeof fetch)).toEqual(LISTA_VACIA);
+  });
+  it("no acepta direcciones fuera de la carpeta de anuncios de la caja", async () => {
+    expect(await leerAnuncios(con({ segundos: 8, anuncios: [{ id: "a", url: "https://otro.example/x.jpg", segundos: 8 }] }))).toEqual(LISTA_VACIA);
+  });
+  it("un tiempo por anuncio fuera de rango invalida la lista", async () => {
+    expect(await leerAnuncios(con({ segundos: 8, anuncios: [{ id: "a", url: "/__anuncios/11111111-1111-1111-1111-111111111111.jpg", segundos: 2 }] }))).toEqual(LISTA_VACIA);
+  });
+});
+
+const anuncio = (id: string, segundos = 8, url = `/__anuncios/${id}.jpg`) => ({ id, url, segundos });
+const listaDe = (...anuncios: ListaAnuncios["anuncios"]): ListaAnuncios => ({ segundos: 8, anuncios });
+
+describe("mismaLista", () => {
+  it("la misma lista vuelta a leer es la misma: el carrusel no se reinicia", () => {
+    expect(mismaLista(listaDe(anuncio("a"), anuncio("b", 20)), listaDe(anuncio("a"), anuncio("b", 20)))).toBe(true);
+    expect(mismaLista(LISTA_VACIA, { segundos: 8, anuncios: [] })).toBe(true);
+  });
+  it("cambia si cambia un id, una dirección, un tiempo, el orden o el número de anuncios", () => {
+    const a = listaDe(anuncio("a"), anuncio("b"));
+    expect(mismaLista(a, listaDe(anuncio("a"), anuncio("c")))).toBe(false);
+    expect(mismaLista(a, listaDe(anuncio("a"), anuncio("b", 8, "/__anuncios/b.png")))).toBe(false);
+    expect(mismaLista(a, listaDe(anuncio("a"), anuncio("b", 9)))).toBe(false);
+    expect(mismaLista(a, listaDe(anuncio("b"), anuncio("a")))).toBe(false);
+    expect(mismaLista(a, listaDe(anuncio("a")))).toBe(false);
+  });
+  it("el tiempo general no cuenta: cada anuncio ya trae el suyo", () => {
+    expect(mismaLista({ segundos: 8, anuncios: [anuncio("a")] }, { segundos: 30, anuncios: [anuncio("a")] })).toBe(true);
+  });
+});
+
+describe("pasoSiguiente", () => {
+  const A = anuncio("a", 5), B = anuncio("b", 20), C = anuncio("c", 8);
+  const lista = listaDe(A, B, C);
+  const nada = new Set<string>();
+
+  it("al empezar enseña la primera de inmediato", () => {
+    expect(pasoSiguiente(lista, null, nada)).toEqual({ hacer: "cambiar", anuncio: A, enMs: 0 });
+  });
+  it("cada imagen dura SUS segundos antes de pasar a la que sigue", () => {
+    expect(pasoSiguiente(lista, A, nada)).toEqual({ hacer: "cambiar", anuncio: B, enMs: 5000 });
+    expect(pasoSiguiente(lista, B, nada)).toEqual({ hacer: "cambiar", anuncio: C, enMs: 20_000 });
+    expect(pasoSiguiente(lista, C, nada)).toEqual({ hacer: "cambiar", anuncio: A, enMs: 8000 });
+  });
+  it("con una sola imagen no hay nada que esperar: se queda", () => {
+    expect(pasoSiguiente(listaDe(A), A, nada)).toEqual({ hacer: "quedarse" });
+    expect(pasoSiguiente(lista, A, new Set(["b", "c"]))).toEqual({ hacer: "quedarse" });
+  });
+  it("la candidata que no cargó se salta, sin cambiar lo que le falta a la que está", () => {
+    expect(pasoSiguiente(lista, A, new Set(["b"]))).toEqual({ hacer: "cambiar", anuncio: C, enMs: 5000 });
+  });
+  it("si la que está en pantalla ya no viene en la lista, se cambia ya", () => {
+    const quitada = anuncio("z", 30);
+    expect(pasoSiguiente(lista, quitada, nada)).toEqual({ hacer: "cambiar", anuncio: A, enMs: 0 });
+  });
+  it("si su tiempo cambió en la lista nueva, manda el nuevo", () => {
+    expect(pasoSiguiente(listaDe(anuncio("a", 40), B), A, nada)).toEqual({ hacer: "cambiar", anuncio: B, enMs: 40_000 });
+  });
+  it("mismo id con otra imagen: la de pantalla ya no vale", () => {
+    const nueva = anuncio("a", 5, "/__anuncios/a.webp");
+    expect(pasoSiguiente(listaDe(nueva), A, nada)).toEqual({ hacer: "cambiar", anuncio: nueva, enMs: 0 });
+  });
+  it("si la que está en pantalla se rompió, pasa ya a otra; y si no hay otra, nada", () => {
+    expect(pasoSiguiente(lista, A, new Set(["a"]))).toEqual({ hacer: "cambiar", anuncio: B, enMs: 0 });
+    expect(pasoSiguiente(listaDe(A), A, new Set(["a"]))).toEqual({ hacer: "nada" });
+  });
+  it("sin ninguna imagen que sirva, nada", () => {
+    expect(pasoSiguiente(lista, null, new Set(["a", "b", "c"]))).toEqual({ hacer: "nada" });
+    expect(pasoSiguiente(LISTA_VACIA, A, nada)).toEqual({ hacer: "nada" });
   });
 });
