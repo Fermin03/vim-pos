@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useRef } from "react";
 import { abrirCanal, crearPublicador, LATIDO_MS } from "../lib/pantalla-cliente/canal";
-import { construirVista, type EntradaVista, type Negocio, type VistaCliente } from "../lib/pantalla-cliente/vista";
+import { construirVistaSegura, type EntradaVista, type Negocio, type VistaCliente } from "../lib/pantalla-cliente/vista";
 
 /**
  * Publica a la pantalla del cliente lo que la caja tiene en la venta. Si no hay segunda pantalla
@@ -24,7 +24,9 @@ export function usePublicarPantallaCliente(entrada: EntradaVista, negocio: Negoc
 
   // La vista se compara por su texto: el carrito cambia de identidad en cada render aunque el
   // cliente no vaya a ver nada distinto, y no hay por qué mandar el mismo mensaje dos veces.
-  const clave = JSON.stringify(construirVista(entrada));
+  // `construirVistaSegura` y no `construirVista`: esto corre en el render de la venta, y la
+  // pantalla del cliente —opcional— nunca debe poder tirarla. Si falla, se publica reposo.
+  const clave = JSON.stringify(construirVistaSegura(entrada));
   useEffect(() => {
     publicador.current?.publicar(JSON.parse(clave) as VistaCliente);
   }, [clave]);

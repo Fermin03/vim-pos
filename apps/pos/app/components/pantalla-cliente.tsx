@@ -1,23 +1,11 @@
 "use client";
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
-import { abrirCanal, SILENCIO_MS } from "../lib/pantalla-cliente/canal";
-import { leerMensaje, type Negocio, type RenglonCliente, type VistaCliente } from "../lib/pantalla-cliente/vista";
+import { Fragment, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { LogoVim } from "@vim/ui/styles";
+import { abrirCanal, crearReceptor } from "../lib/pantalla-cliente/canal";
+import { tamanoCifra, tamanoNombre } from "../lib/pantalla-cliente/medidas";
+import { CLAVE_NEGOCIO, negocioGuardado, recordarNegocio } from "../lib/pantalla-cliente/negocio";
+import type { Negocio, RenglonCliente, VistaCliente } from "../lib/pantalla-cliente/vista";
 import { fmtMxn } from "../lib/turno";
-
-/** El negocio se recuerda entre arranques: por la mañana, antes de que entre el cajero, nadie
- *  publica nada y la pantalla igual tiene que enseñar el logo. */
-const CLAVE_NEGOCIO = "vim.pantalla-cliente.negocio";
-
-function negocioGuardado(): Negocio | null {
-  try {
-    const n: unknown = JSON.parse(localStorage.getItem(CLAVE_NEGOCIO) ?? "null");
-    if (n && typeof n === "object" && "nombre" in n && typeof n.nombre === "string") {
-      const logoUrl = "logoUrl" in n && typeof n.logoUrl === "string" ? n.logoUrl : null;
-      return { nombre: n.nombre, logoUrl };
-    }
-  } catch { /* sin almacenamiento o con basura: se espera al saludo de la caja */ }
-  return null;
-}
 
 /*
  * Movimiento. Solo dos cosas se mueven y las dos son entradas, con `--ease-out` y 200 ms:
@@ -28,24 +16,6 @@ function negocioGuardado(): Negocio | null {
 const FUNDIDO_FASE = "animate-[vim-fade_200ms_var(--ease-out)] motion-reduce:animate-none";
 const ENTRADA_RENGLON = "animate-vim-pop motion-reduce:animate-none";
 
-/** Ancho de una cifra en `em`, estimado por lo alto para Sora bold con cifras tabulares (el cero
- *  de Sora mide 0.74 em). Si la estimación falla, que sobre margen y no que se corte un dígito. */
-function anchoEm(texto: string): number {
-  let em = 0;
-  for (const c of texto) em += c >= "0" && c <= "9" ? 0.76 : c === "," || c === "." ? 0.3 : 0.7;
-  return em;
-}
-
-/**
- * Tamaño de letra de una cifra grande: `tope` en vmin, o menos si a ese tamaño no cabe en `ancho`.
- *
- * En un monitor vertical o casi cuadrado el ancho ES 100vmin, y "$1,234.50" a 16vmin ya lo roza.
- * Una cifra cortada por el borde no es un detalle feo: es un total falso de cara al cliente.
- */
-function tamanoCifra(texto: string, tope: number, ancho: string): string {
-  return `min(${tope}vmin, calc((${ancho}) / ${anchoEm(texto).toFixed(2)}))`;
-}
-
 /**
  * Lo que ve el cliente en el segundo monitor. Solo dibuja lo que la caja le publica: no inicia
  * sesión ni lee la base.
@@ -55,31 +25,24 @@ function tamanoCifra(texto: string, tope: number, ancho: string): string {
  */
 export function PantallaCliente() {
   const [vista, setVista] = useState<VistaCliente>({ fase: "reposo" });
-  const [negocio, setNegocio] = useState<Negocio | null>(null);
+  // `undefined` = todavía no se ha mirado el almacenamiento (se lee en el efecto, no en el render).
+  // Mientras tanto reposo no dibuja nada: así no parpadea la marca de VIM antes del logo del negocio.
+  const [negocio, setNegocio] = useState<Negocio | null | undefined>(undefined);
 
   useEffect(() => {
     setNegocio(negocioGuardado());
+    // La caja borra el negocio guardado al desvincularse. Esta ventana sigue abierta con el logo
+    // en memoria: el aviso de `storage` (que llega a las OTRAS ventanas del mismo origen) lo quita.
+    const alOlvidar = (e: StorageEvent) => { if (e.key === CLAVE_NEGOCIO && e.newValue === null) setNegocio(null); };
+    window.addEventListener("storage", alOlvidar);
     const canal = abrirCanal();
-    if (!canal) return;
-    let silencio: ReturnType<typeof setTimeout> | undefined;
-    canal.onmessage = (e) => {
-      const m = leerMensaje(e.data);
-      if (!m) return; // lo que no se entiende se ignora; queda lo último válido
-      if (m.tipo === "negocio") {
-        const n = { nombre: m.nombre, logoUrl: m.logoUrl };
-        setNegocio(n);
-        try { localStorage.setItem(CLAVE_NEGOCIO, JSON.stringify(n)); } catch { /* */ }
-        return;
-      }
-      if (m.tipo !== "estado") return;
-      setVista(m.vista);
-      clearTimeout(silencio);
-      // Si la caja se cuelga o se recarga a media cuenta, deja de latir: a los 15 s se vuelve a
-      // reposo para no dejarle la cuenta de un cliente al siguiente.
-      if (m.vista.fase !== "reposo") silencio = setTimeout(() => setVista({ fase: "reposo" }), SILENCIO_MS);
-    };
-    canal.postMessage({ tipo: "hola", v: 1 });
-    return () => { clearTimeout(silencio); canal.onmessage = null; canal.close(); };
+    // Las reglas del canal (qué se ignora, el silencio de 15 s) están en `crearReceptor`. Aquí solo
+    // queda lo que es del navegador: el estado de React y recordar el negocio para mañana.
+    const receptor = canal && crearReceptor(canal, {
+      alCambiarVista: setVista,
+      alNegocio: (n) => { setNegocio(n); recordarNegocio(n); },
+    });
+    return () => { window.removeEventListener("storage", alOlvidar); receptor?.cerrar(); };
   }, []);
 
   return (
@@ -96,22 +59,39 @@ export function PantallaCliente() {
   );
 }
 
-function Reposo({ negocio }: { negocio: Negocio | null }) {
-  const logoUrl = negocio?.logoUrl ?? null;
+function Reposo({ negocio }: { negocio: Negocio | null | undefined }) {
+  // El logo que no cargó (un data URI dañado): se recuerda cuál fue, para que uno nuevo sí se intente.
+  const [logoRoto, setLogoRoto] = useState<string | null>(null);
+  if (negocio === undefined) return <section className="flex-1" />;
+
+  // Un nombre vacío o de puros espacios es no tener nombre.
+  const nombre = negocio?.nombre.trim() || null;
+  const logoUrl = negocio?.logoUrl && negocio.logoUrl !== logoRoto ? negocio.logoUrl : null;
+
   return (
     <section className="flex flex-1 flex-col items-center justify-center gap-[4vmin] p-[6vmin] text-center">
       {logoUrl ? (
         // Alto fijo en vmin y no el tamaño natural de la imagen: un logo de 200 px se vería bien
         // en un monitor de 768 y como una estampilla en uno 4K.
         // eslint-disable-next-line @next/next/no-img-element -- data URI local: sin red, sin optimizador
-        <img src={logoUrl} alt="" draggable={false} className="h-[34vmin] w-auto max-w-[72vmin] object-contain" />
+        <img src={logoUrl} alt="" draggable={false} onError={() => setLogoRoto(logoUrl)} className="h-[34vmin] w-auto max-w-[72vmin] object-contain" />
       ) : null}
-      {negocio && (
+      {nombre && (
         // Sin logo, el nombre es lo único que hay en pantalla: crece para llenar ese papel.
-        <h1 className={`max-w-[88vmin] text-balance break-words font-display font-semibold leading-tight tracking-[-0.02em] ${logoUrl ? "text-[7vmin]" : "text-[10vmin]"}`}>
-          {negocio.nombre}
+        // El tamaño sale de `tamanoNombre`: en una línea si cabe, y si no, partido solo por los
+        // espacios (cada palabra va en su `nowrap`: «Knock-Out» no se corta en el guion).
+        <h1
+          className="max-w-[88vmin] text-balance font-display font-semibold leading-tight tracking-[-0.02em]"
+          style={{ fontSize: `${tamanoNombre(nombre, logoUrl !== null)}vmin` }}
+        >
+          {nombre.split(/\s+/).map((palabra, i) => (
+            <Fragment key={i}>{i > 0 && " "}<span className="whitespace-nowrap">{palabra}</span></Fragment>
+          ))}
         </h1>
       )}
+      {/* Caja recién instalada, antes de la primera sesión: nadie ha publicado el negocio y no hay
+          nada guardado. En vez de un monitor en blanco, la marca que la caja usa en su inicio. */}
+      {!logoUrl && !nombre && <LogoVim className="h-[34vmin] w-[34vmin]" />}
     </section>
   );
 }

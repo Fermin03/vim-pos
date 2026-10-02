@@ -21,6 +21,7 @@ import { PantallaTurno } from "./components/pantalla-turno";
 import { useAcceso } from "./components/banda-acceso";
 import { PantallaBloqueada } from "./components/pantalla-bloqueada";
 import { PantallaCliente } from "./components/pantalla-cliente";
+import { olvidarNegocio } from "./lib/pantalla-cliente/negocio";
 import { PantallaKds } from "@vim/kds-core";
 
 // Etiquetas de la sucursal/caja para vistas previas a la sesión real (selector,
@@ -94,6 +95,8 @@ function PaginaPos() {
     olvidarCreds();
     // El menú cacheado era de ESTA vinculación (B2-6): la siguiente puede ser otro negocio.
     await cacheLimpiar();
+    // Lo mismo el negocio que recuerda la pantalla del cliente: su logo no debe salir en el siguiente.
+    olvidarNegocio();
     setCajaId(null);
     setEstado({ paso: "vincular" });
   }, []);

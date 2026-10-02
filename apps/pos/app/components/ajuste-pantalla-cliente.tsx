@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
-import { guardarAjustePantalla, leerAjustePantalla, textoEstadoPantalla, type AjustePantalla } from "../lib/pantalla-cliente/ajuste";
+import { guardarAjustePantalla, leerAjustePantalla, textoEstadoPantalla, type AjustePantalla, type CambioPantalla } from "../lib/pantalla-cliente/ajuste";
 
 /**
  * Apartado «Pantalla del cliente» del modal de impresoras. La pantalla se abre sola al detectar
@@ -23,7 +23,7 @@ export function AjustePantallaCliente() {
   if (!ajuste) return null;
   const candidatos = ajuste.monitores.filter((m) => !m.esDeLaCaja);
 
-  async function cambiar(cambio: { modo: "auto" | "apagada"; displayId: number | null }) {
+  async function cambiar(cambio: CambioPantalla) {
     setFallo(false);
     const nuevo = await guardarAjustePantalla(cambio);
     if (nuevo) setAjuste(nuevo); else setFallo(true);
@@ -34,7 +34,9 @@ export function AjustePantallaCliente() {
       <div className="min-w-0 flex-1">
         <h3 className="text-13 font-semibold text-ink">Pantalla del cliente</h3>
         <p className="text-13 text-ink-3">{textoEstadoPantalla(ajuste)}</p>
-        {fallo && <p className="text-13 text-danger">No se pudo guardar el cambio.</p>}
+        {/* El modal que la aloja tiene su botón Guardar, para las impresoras. Esto no lo espera. */}
+        <p className="text-13 text-ink-3">Se aplica al momento.</p>
+        {fallo && <p className="text-13 text-danger" role="alert">No se pudo guardar el cambio.</p>}
       </div>
       {candidatos.length > 1 && ajuste.modo === "auto" && (
         <select
