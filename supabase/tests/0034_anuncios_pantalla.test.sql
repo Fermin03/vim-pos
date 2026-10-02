@@ -3,7 +3,7 @@
 -- admin los administra, hay un tope de 10 y bajan a la caja en el snapshot.
 -- ============================================================================
 begin;
-select plan(10);
+select plan(12);
 
 \set t      '99999999-0000-0000-0000-0000000000aa'
 \set cajero '99999999-0000-0000-0000-000000000001'
@@ -40,7 +40,7 @@ select is((select count(*)::int from anuncios_pantalla where id = :'ajeno'), 0, 
 
 -- 3) Pero no los administra.
 select throws_ok(
-  format($$ insert into anuncios_pantalla (tenant_id, ruta) values (%L, %L) $$, :'t', :'t' || '/x.jpg'),
+  format($$ insert into anuncios_pantalla (tenant_id, ruta) values (%L, %L) $$, :'t', :'t' || '/' || gen_random_uuid() || '.jpg'),
   '42501', null, 'un cajero no puede subir anuncios');
 
 -- Como el dueño.
@@ -48,17 +48,17 @@ select set_config('request.jwt.claims', json_build_object('sub', :'dueno', 'role
 
 -- 4) El dueño sí, pero nunca en otro negocio.
 select lives_ok(
-  format($$ insert into anuncios_pantalla (tenant_id, ruta, orden) values (%L, %L, 1) $$, :'t', :'t' || '/dos.jpg'),
+  format($$ insert into anuncios_pantalla (tenant_id, ruta, orden) values (%L, %L, 1) $$, :'t', :'t' || '/' || gen_random_uuid() || '.jpg'),
   'el dueño sube un anuncio');
 select throws_ok(
-  format($$ insert into anuncios_pantalla (tenant_id, ruta) values (%L, %L) $$, :'otro', :'otro' || '/y.jpg'),
+  format($$ insert into anuncios_pantalla (tenant_id, ruta) values (%L, %L) $$, :'otro', :'otro' || '/' || gen_random_uuid() || '.jpg'),
   '42501', null, 'el dueño no puede subir anuncios a otro negocio');
 
 -- 5) Tope de 10 vivos: ya hay 2; entran 8 más y el undécimo se rechaza.
 insert into anuncios_pantalla (tenant_id, ruta, orden)
-select :'t', :'t' || '/lote-' || g || '.jpg', 10 + g from generate_series(1, 8) g;
+select :'t', :'t' || '/' || gen_random_uuid() || '.jpg', 10 + g from generate_series(1, 8) g;
 select throws_ok(
-  format($$ insert into anuncios_pantalla (tenant_id, ruta) values (%L, %L) $$, :'t', :'t' || '/once.jpg'),
+  format($$ insert into anuncios_pantalla (tenant_id, ruta) values (%L, %L) $$, :'t', :'t' || '/' || gen_random_uuid() || '.jpg'),
   'P0001', null, 'el undécimo anuncio se rechaza');
 
 -- 6) El snapshot del pull los trae (lo llama service_role; aquí, el superusuario de la prueba).
@@ -66,6 +66,14 @@ reset role;
 select is(
   (select jsonb_array_length(sync_pull_snapshot(:'t') -> 'anuncios_pantalla')), 10,
   'el snapshot de la caja trae los 10 anuncios del negocio');
+
+-- 7) La ruta queda atada al negocio y al formato <uuid>.<ext> (la prueba corre como superusuario: el CHECK no depende de RLS).
+select throws_ok(
+  format($$ insert into anuncios_pantalla (tenant_id, ruta) values (%L, %L) $$, :'otro', :'t' || '/' || gen_random_uuid() || '.jpg'),
+  '23514', null, 'una ruta que apunta a la carpeta de otro negocio se rechaza');
+select throws_ok(
+  format($$ insert into anuncios_pantalla (tenant_id, ruta) values (%L, %L) $$, :'otro', :'otro' || '/../x.jpg'),
+  '23514', null, 'un nombre de archivo que no es <uuid>.<ext> se rechaza');
 
 select * from finish();
 rollback;

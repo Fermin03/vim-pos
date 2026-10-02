@@ -17,8 +17,8 @@
 CREATE TABLE IF NOT EXISTS anuncios_pantalla (
   id          uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   tenant_id   uuid NOT NULL REFERENCES tenants(id) ON DELETE RESTRICT,
-  -- Ruta dentro del almacén `anuncios`: <tenant_id>/<uuid>.<ext>.
-  ruta        text NOT NULL CHECK (ruta ~ '^[0-9a-f-]{36}/[0-9A-Za-z._-]{1,80}$'),
+  -- Ruta dentro del almacén `anuncios`: <tenant_id>/<uuid>.<ext> (la forma exacta la fija anuncios_pantalla_ruta_chk).
+  ruta        text NOT NULL,
   orden       integer NOT NULL DEFAULT 0,
   activo      boolean NOT NULL DEFAULT true,
   -- Tiempo propio de este anuncio. NULL = usa el general (configuracion_tenant.pantalla_cliente_segundos).
@@ -28,7 +28,12 @@ CREATE TABLE IF NOT EXISTS anuncios_pantalla (
   bytes       integer NULL CHECK (bytes > 0),
   created_at  timestamptz NOT NULL DEFAULT now(),
   updated_at  timestamptz NOT NULL DEFAULT now(),
-  deleted_at  timestamptz NULL
+  deleted_at  timestamptz NULL,
+  -- La ruta es exactamente lo que escribe la app: carpeta = SU negocio, archivo = <uuid>.<jpg|png|webp>.
+  -- Sin esto un admin podría apuntar una fila a la carpeta de otro negocio, o a `../x`.
+  CONSTRAINT anuncios_pantalla_ruta_chk CHECK (
+    ruta ~ ('^' || tenant_id::text || '/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}[.](jpg|png|webp)$')
+  )
 );
 
 COMMENT ON TABLE anuncios_pantalla IS 'Imágenes que la pantalla del cliente muestra en reposo. La imagen vive en el almacén `anuncios`; aquí va la lista. Por negocio, no por sucursal.';
@@ -110,6 +115,17 @@ BEGIN
     ON CONFLICT (id) DO NOTHING;
   END IF;
 END $$;
+
+-- Leer la carpeta propia. SIN ESTA POLÍTICA EL DELETE DE ABAJO NUNCA ENCUENTRA UNA FILA: borrar con
+-- WHERE solo alcanza lo que las políticas de SELECT dejan ver, y remove() del cliente falla en
+-- silencio. No abre nada: cada negocio solo ve su carpeta, y la lectura pública por URL no depende
+-- de esta política.
+DO $$ BEGIN
+  CREATE POLICY "anuncios_read_own_tenant" ON storage.objects
+    FOR SELECT TO authenticated
+    USING (bucket_id = 'anuncios'
+      AND (storage.foldername(name))[1] = current_tenant_id()::text);
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 -- Escribir y borrar: solo el dueño o el admin, y solo dentro de la carpeta de su negocio.
 DO $$ BEGIN
