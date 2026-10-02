@@ -203,15 +203,24 @@ Página `configuracion/pantalla-cliente` y entrada en `config-sidenav.tsx`:
 
 Después de cada pull, `desktop/src/anuncios.mjs`:
 
-- Lee `anuncios_pantalla` de la base local.
-- Descarga a `userData/anuncios/` los archivos que falten. Borra los que ya no estén en la lista.
+- Lee `anuncios_pantalla` de la base local, **solo del negocio al que está vinculada la caja**: el
+  del último snapshot, que el pull anota en `_vim_sync` (`clave = 'tenant'`). El pull solo hace
+  upsert, así que una caja revinculada conserva las filas del negocio anterior; sin este filtro la
+  pantalla los mezclaría. Sin negocio anotado no hay anuncios.
+- Descarga a `userData/anuncios/` los archivos que falten. Borra los que ya no estén en la lista
+  (con eso se van solas las imágenes de un negocio anterior).
 - Si una descarga falla, se salta y se reintenta en el siguiente pull.
 
 El ui-server los sirve:
 
-- `GET /__anuncios` → `{ segundos, anuncios: [{ id, url }] }`, solo activos y ya descargados, en
-  orden.
-- `GET /__anuncios/<archivo>` → la imagen, con nombre validado contra la lista (sin rutas libres).
+- `GET /__anuncios` → `{ segundos, anuncios: [{ id, url, segundos }] }`, solo activos y ya
+  descargados, en orden. `segundos` de cada anuncio es su tiempo propio o, si no tiene, el general.
+- Si la lista no se pudo leer (la base falló), responde **503** con un cuerpo de error, no una lista
+  vacía: la pantalla conserva la lista que ya tenía. Una lista vacía de verdad (`200`) sí quita el
+  carrusel. Un POS sin escritorio detrás (sin gancho) responde la lista vacía.
+- `GET /__anuncios/<archivo>` → la imagen. El nombre se valida **por forma** (`<uuid>.<ext>`, con
+  `ext` jpg, png o webp), no contra la lista: sin rutas libres, y un nombre que no está en disco da
+  404.
 
 La vista consulta `/__anuncios` al montar y cada vez que vuelve a reposo. Sin internet sigue
 mostrando lo que ya tiene en disco.

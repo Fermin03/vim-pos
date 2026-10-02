@@ -72,7 +72,11 @@ la decisión cerrada 22 de ese documento.
    entera (`object-contain`), por sus segundos, con fundido entre una y otra; la que no carga se
    salta. La lista se lee al volver a reposo y cada 5 minutos. Sin anuncios sigue siendo el logo y
    el nombre. Al desvincular la caja se olvidan los anuncios; si una lectura falla se conserva la
-   lista anterior.
+   lista anterior (`/__anuncios` responde 503, no una lista vacía).
+
+   La caja solo enseña los anuncios del negocio al que está vinculada hoy (el del último snapshot,
+   anotado en `_vim_sync`), porque el pull solo hace upsert y no borra las filas de un negocio
+   anterior: una caja revinculada mezclaría los anuncios de los dos.
 
    El cambio llega a las cajas en cosa de un minuto: `anuncios_pantalla` entra en
    `sync_pull_snapshot` y en `catalogo_version()`.
