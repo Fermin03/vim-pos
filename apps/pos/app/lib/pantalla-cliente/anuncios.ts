@@ -95,6 +95,25 @@ export function mismaLista(a: ListaAnuncios, b: ListaAnuncios): boolean {
   });
 }
 
+export type CapaCarrusel = { anuncio: Anuncio; fundiendo: boolean };
+
+/**
+ * Las imágenes que se dibujan, de abajo arriba, y cuál lleva la animación de entrada. PURA.
+ *
+ * `asentada` es la url de la imagen cuyo fundido ya tuvo su tiempo. Desde ahí la imagen en
+ * pantalla se dibuja SIN animación, es decir, opaca: su visibilidad no puede depender de que la
+ * animación avance. Con las animaciones detenidas (ventana tapada, pestaña en segundo plano), la
+ * que entraba se quedaba en opacidad 0 hasta que llegaba la siguiente, y cada anuncio parecía
+ * durar el tiempo de la que seguía.
+ */
+export function capasCarrusel(cuadro: { actual: Anuncio | null; anterior: Anuncio | null }, asentada: string | null): CapaCarrusel[] {
+  const { actual, anterior } = cuadro;
+  const capas: CapaCarrusel[] = [];
+  if (anterior && anterior.url !== actual?.url) capas.push({ anuncio: anterior, fundiendo: false });
+  if (actual) capas.push({ anuncio: actual, fundiendo: actual.url !== asentada });
+  return capas;
+}
+
 export type PasoCarrusel =
   /** Ninguna imagen se puede enseñar: la pantalla vuelve al logo. */
   | { hacer: "nada" }

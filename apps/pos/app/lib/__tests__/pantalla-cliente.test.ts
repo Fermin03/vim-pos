@@ -8,7 +8,7 @@ import { crearPublicador, crearReceptor, PAGADO_MAX_MS, SILENCIO_MS, type Canal 
 import { textoEstadoPantalla, type AjustePantalla } from "../pantalla-cliente/ajuste";
 import { CLAVE_NEGOCIO, negocioGuardado, olvidarNegocio, recordarNegocio } from "../pantalla-cliente/negocio";
 import { anchoEm, ANCHO_NOMBRE_VMIN, tamanoNombre } from "../pantalla-cliente/medidas";
-import { leerAnuncios, listaTrasLeer, mismaLista, pasoSiguiente, puedeLeerAnuncios, seEnsenanAnuncios, siguienteAnuncio, LISTA_VACIA, type ListaAnuncios } from "../pantalla-cliente/anuncios";
+import { capasCarrusel, leerAnuncios, listaTrasLeer, mismaLista, pasoSiguiente, puedeLeerAnuncios, seEnsenanAnuncios, siguienteAnuncio, LISTA_VACIA, type ListaAnuncios } from "../pantalla-cliente/anuncios";
 
 function producto(nombre: string, precio: number): Producto {
   return {
@@ -717,8 +717,56 @@ describe("pasoSiguiente", () => {
     expect(pasoSiguiente(lista, A, new Set(["a"]))).toEqual({ hacer: "cambiar", anuncio: B, enMs: 0 });
     expect(pasoSiguiente(listaDe(A), A, new Set(["a"]))).toEqual({ hacer: "nada" });
   });
+  it("una vuelta completa: cada espera es la de la imagen EN PANTALLA, no la de la que sigue", () => {
+    const L = listaDe(anuncio("0001", 3), anuncio("0002", 6), anuncio("0003", 3));
+    let enPantalla: ListaAnuncios["anuncios"][number] | null = null;
+    const vueltas: Array<[string | null, string, number]> = [];
+    for (let i = 0; i < 7; i++) {
+      const paso = pasoSiguiente(L, enPantalla, nada);
+      if (paso.hacer !== "cambiar") throw new Error(`se esperaba cambiar, vino ${paso.hacer}`);
+      vueltas.push([enPantalla?.id ?? null, paso.anuncio.id, paso.enMs]);
+      enPantalla = paso.anuncio;
+    }
+    expect(vueltas).toEqual([
+      [null, "0001", 0],
+      ["0001", "0002", 3000],
+      ["0002", "0003", 6000],
+      ["0003", "0001", 3000],
+      ["0001", "0002", 3000],
+      ["0002", "0003", 6000],
+      ["0003", "0001", 3000],
+    ]);
+  });
   it("sin ninguna imagen que sirva, nada", () => {
     expect(pasoSiguiente(lista, null, new Set(["a", "b", "c"]))).toEqual({ hacer: "nada" });
     expect(pasoSiguiente(LISTA_VACIA, A, nada)).toEqual({ hacer: "nada" });
+  });
+});
+
+describe("capasCarrusel", () => {
+  const A = anuncio("a", 3), B = anuncio("b", 6);
+
+  it("la imagen que acaba de entrar se funde encima de la anterior, que no se anima", () => {
+    expect(capasCarrusel({ actual: B, anterior: A }, null)).toEqual([
+      { anuncio: A, fundiendo: false },
+      { anuncio: B, fundiendo: true },
+    ]);
+  });
+  // El error que se vio en el navegador: la que entra dependía de la animación para llegar a
+  // opacidad 1. Con las animaciones detenidas (ventana tapada, pestaña en segundo plano) se quedaba
+  // invisible hasta que entraba la siguiente, y cada anuncio parecía durar lo de la que seguía.
+  it("cumplido el fundido, la imagen en pantalla queda opaca sin depender de la animación", () => {
+    expect(capasCarrusel({ actual: B, anterior: A }, B.url)).toEqual([
+      { anuncio: A, fundiendo: false },
+      { anuncio: B, fundiendo: false },
+    ]);
+  });
+  it("un fundido cumplido de otra imagen no cuenta para la nueva", () => {
+    expect(capasCarrusel({ actual: B, anterior: A }, A.url).at(-1)).toEqual({ anuncio: B, fundiendo: true });
+  });
+  it("la primera imagen entra sola; sin imagen no hay capas; la misma imagen no se dibuja dos veces", () => {
+    expect(capasCarrusel({ actual: A, anterior: null }, null)).toEqual([{ anuncio: A, fundiendo: true }]);
+    expect(capasCarrusel({ actual: null, anterior: null }, null)).toEqual([]);
+    expect(capasCarrusel({ actual: A, anterior: A }, A.url)).toEqual([{ anuncio: A, fundiendo: false }]);
   });
 });

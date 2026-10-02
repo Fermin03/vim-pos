@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
-import { pasoSiguiente, type Anuncio, type ListaAnuncios } from "../lib/pantalla-cliente/anuncios";
+import { capasCarrusel, pasoSiguiente, type Anuncio, type ListaAnuncios } from "../lib/pantalla-cliente/anuncios";
 
 /*
  * Fundido cruzado: la imagen que entra aparece ENCIMA de la que sale, solo con opacidad, 400 ms y
@@ -9,6 +9,8 @@ import { pasoSiguiente, type Anuncio, type ListaAnuncios } from "../lib/pantalla
  * no hay fundido: la que entra tapa a la otra de golpe (corte seco).
  */
 const FUNDIDO_ANUNCIO = "animate-[vim-fade_400ms_var(--ease-out)] motion-reduce:animate-none";
+/** Lo que dura el fundido de arriba; pasado esto la imagen se dibuja sin animación. */
+const FUNDIDO_MS = 400;
 // `object-contain`: el anuncio se ve entero en cualquier monitor; lo que sobra es fondo de página.
 const CAPA = "absolute inset-0 h-full w-full bg-bg object-contain";
 
@@ -73,20 +75,29 @@ export function CarruselAnuncios({ lista, alQuedarseSinImagenes }: { lista: List
     return () => { clearTimeout(reloj); soltar(); };
   }, [lista, cuadro.actual, fallas]);
 
-  const { actual, anterior } = cuadro;
+  // Cumplido el fundido de la que entra, se le quita la animación: queda opaca aunque el navegador
+  // no haya avanzado la animación (ventana tapada, pestaña en segundo plano). Ver `capasCarrusel`.
+  const [asentada, setAsentada] = useState<string | null>(null);
+  const { actual } = cuadro;
+  useEffect(() => {
+    if (!actual) return;
+    const reloj = setTimeout(() => setAsentada(actual.url), FUNDIDO_MS);
+    return () => clearTimeout(reloj);
+  }, [actual]);
+
   return (
     <section className="relative flex-1 overflow-hidden">
       {/* Una sola lista con `key`: al cambiar, la que estaba conserva su <img> (no se vuelve a montar
           ni a decodificar) y se queda debajo, ya sin animación, hasta el siguiente cambio. La nueva
           se agrega al final, o sea encima. */}
-      {[anterior?.url === actual?.url ? null : anterior, actual].map((a) => a && (
+      {capasCarrusel(cuadro, asentada).map(({ anuncio: a, fundiendo }) => (
         // eslint-disable-next-line @next/next/no-img-element -- archivo local de la caja: sin red, sin optimizador
         <img
           key={a.url}
           src={a.url}
           alt=""
           draggable={false}
-          className={a === actual ? `${CAPA} ${FUNDIDO_ANUNCIO}` : CAPA}
+          className={fundiendo ? `${CAPA} ${FUNDIDO_ANUNCIO}` : CAPA}
           // Ya había cargado en la precarga; si aun así falla al pintarse, se anota y se pasa a otra.
           onError={a === actual ? () => { memoria.current.rotos.add(a.id); setFallas((n) => n + 1); } : undefined}
         />
