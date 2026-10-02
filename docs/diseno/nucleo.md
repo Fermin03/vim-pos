@@ -15,6 +15,7 @@ es quién las usa y en qué condiciones.
 | POS | [`pos.md`](pos.md) | Cajero · táctil 15" · de pie, con prisa |
 | Admin | [`admin.md`](admin.md) | Dueño · laptop · sentado, analizando |
 | KDS | [`kds.md`](kds.md) | Cocinero · pantalla a 2 m · sin mouse |
+| Pantalla del cliente | [`pantalla-cliente.md`](pantalla-cliente.md) | Cliente en el mostrador · segundo monitor a 1 m o más · sin tocarla |
 | Factura | [`factura.md`](factura.md) | Cliente final · teléfono · una sola vez |
 | Platform | [`platform.md`](platform.md) | VIM interno · acciones peligrosas |
 | Sitio | [`sitio.md`](sitio.md) | Visitante · marketing · sin build |

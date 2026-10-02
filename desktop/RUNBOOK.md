@@ -420,6 +420,33 @@ El cambio va sin corte, en este orden:
    Se niega a correr si queda alguna caja atrasada y dice cuál. Una caja anterior a 0.4.97 no sabe
    reintentar: se quedaría sin sincronizar hasta que alguien la vuelva a vincular.
 
+## Pantalla del cliente
+
+Un segundo monitor de cara al mostrador, que enseña la cuenta mientras el cajero captura (ADR 0026).
+La abre sola `src/pantalla-cliente.mjs` cuando detecta el monitor; la dibuja el mismo POS con
+`?cliente` (`apps/pos/app/components/pantalla-cliente.tsx`).
+
+Solo se puede probar de verdad con dos monitores y el instalador (o `npm start` en `desktop/`): la
+ventana, el foco, los monitores y la suspensión de pantalla son de Electron y de Windows, y ninguna
+prueba automática los ve. Esta lista se pasa completa con cada instalador que toque
+`desktop/src/pantalla-cliente.mjs` o `pantalla-cliente.tsx`.
+
+- [ ] Con dos monitores, al abrir la caja la pantalla del cliente aparece sola en el segundo.
+- [ ] Ocupa todo el monitor: sin marco, sin barra de título, sin barra de tareas encima.
+- [ ] No aparece en la barra de tareas ni en Alt+Tab.
+- [ ] Al escribir o escanear, el foco sigue en la caja.
+- [ ] Desconectar el segundo monitor: la caja sigue igual. Reconectar: la pantalla vuelve sola.
+- [ ] Capturar, cobrar y ver el cambio: las dos pantallas coinciden en el total y en el cambio.
+- [ ] Cobrar con propina: al confirmar la propina, el monto de la pantalla del cliente coincide con el del cajero.
+- [ ] En el modal de impresoras, apagarla la cierra; encenderla la reabre. Sigue apagada tras reiniciar.
+- [ ] Cerrar la caja a la bandeja: la pantalla del cliente queda en reposo. «Salir» la cierra.
+- [ ] Con un solo monitor: nada cambia respecto a la versión anterior.
+- [ ] El monitor del cliente no se apaga solo tras varios minutos sin uso.
+
+El registro queda en `vim-pos.log` con la etiqueta `[pantalla-cliente]`. La configuración local
+(`modo` y monitor elegido) es `pantalla-cliente.json`, en la misma carpeta que `vim-pos.log`; si se
+borra, vuelve al estado de fábrica (encendida, sin monitor elegido).
+
 ## Conectar a la nube (deploy del sync real) — #3
 
 Requiere: (a) **despausar** el proyecto Supabase (plan FREE se pausa) desde el dashboard;

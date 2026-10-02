@@ -183,7 +183,7 @@ Lo hace el dueño (o tú con él por videollamada), **en la computadora donde va
       una **clave**, una sola vez. Se capturan en la caja. (Si se pierden, se genera otra; la
       anterior deja de servir.)
 - [ ] **Impresora**: conectada a la **misma red** que la computadora. En la caja, **menú →
-      Configurar impresora** pide su **IP** (sale del autotest de la impresora; puerto 9100).
+      Configurar impresoras y pantallas** pide la **IP** de la impresora (sale de su autotest; puerto 9100).
       Probar hasta que diga "Impresora lista". El cajón va conectado a la impresora.
 - [ ] ¿Pantalla en cocina? El mismo instalador deja **VIM POS Cocina**; se instala en esa
       computadora, en la misma red.
