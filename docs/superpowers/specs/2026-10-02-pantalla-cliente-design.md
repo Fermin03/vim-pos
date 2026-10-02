@@ -170,7 +170,7 @@ Solo aparece en el escritorio (`__VIM_DESKTOP`).
 ### Datos — migración `0150_anuncios_pantalla.sql`
 
 - Tabla `anuncios_pantalla`: `id uuid`, `tenant_id`, `ruta` (ruta en el almacén), `orden int`,
-  `activo bool default true`, `ancho int`, `alto int`, `bytes int`, `created_at`, `updated_at`.
+  `activo bool default true`, `segundos int null` (tiempo propio; null = el general), `ancho int`, `alto int`, `bytes int`, `created_at`, `updated_at`.
 - RLS por `tenant_id`, con el mismo patrón de `0116_zonas_envio.sql`: lectura para el negocio y sus
   dispositivos, escritura para quien administra la configuración.
 - Disparador que rechaza el anuncio número 11 por negocio.
@@ -195,7 +195,7 @@ Página `configuracion/pantalla-cliente` y entrada en `config-sidenav.tsx`:
 - Subir imagen: se reduce en el navegador con `reescalarImagen` (lado mayor 1920 px, tope ~600 KB)
   y se sube al almacén; luego se inserta la fila.
 - Lista con miniatura: reordenar, pausar/activar, eliminar (con `DialogoPeligro`).
-- Segundos por imagen.
+- Tiempo en pantalla: un tiempo general (3 a 60 s, 8 por omisión) y, en cada imagen, un tiempo propio opcional que le gana al general.
 - Estado vacío que explica qué es y qué medida conviene (1920×1080 horizontal).
 - Contador «3 de 10».
 
