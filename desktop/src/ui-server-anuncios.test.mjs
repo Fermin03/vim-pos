@@ -101,6 +101,8 @@ test("no se sale de la carpeta", async () => {
       assert.doesNotMatch(await r.text(), /"name"/, malo);
     }
     // El nombre llega al gancho decodificado y tal cual: quien conoce la carpeta lo rechaza.
+    // `every` sobre una lista vacía es true: sin contar, la prueba pasaría aunque el gancho nunca se llamara.
+    assert.equal(pedidos.length, 4, "cada nombre malo debe llegar al gancho");
     assert.ok(pedidos.every((n) => n.includes("..")), "el gancho debe recibir el nombre sin armar ruta");
   });
 });
