@@ -75,28 +75,45 @@ export function crearPantallaCliente({ screen, BrowserWindow, powerSaveBlocker, 
   }
 
   function abrir(display) {
-    const b = display.bounds;
-    const v = new BrowserWindow({
-      x: b.x, y: b.y, width: b.width, height: b.height,
-      frame: false, fullscreen: true, show: false, backgroundColor: "#16161a",
-      // El teclado y el lector de códigos son de la caja: esta ventana nunca recibe el foco, y por
-      // eso tampoco se puede cerrar con Alt+F4 ni perder con Alt+Tab.
-      focusable: false, skipTaskbar: true, autoHideMenuBar: true,
-      // Sin preload a propósito: el preload expone `__VIM_SALIR`, y la pantalla que mira el cliente
-      // no debe poder apagar la caja. La configuración la inyecta el ui-server en el HTML.
-      webPreferences: { contextIsolation: true, nodeIntegration: false, sandbox: true },
-    });
-    v.setMenuBarVisibility(false);
-    proteger?.(v);
-    v.once("ready-to-show", () => v.showInactive());
-    v.on("closed", () => { if (ventana === v) { ventana = null; destino = null; } });
-    // Si el renderer muere, se vuelve a abrir: una pantalla negra frente al cliente no se arregla sola.
-    v.webContents.on("render-process-gone", () => { if (ventana === v) { cerrarVentana(); programar(); } });
-    v.loadURL(url).catch((e) => log(`no cargó: ${e?.message ?? e}`));
-    ventana = v;
-    destino = display;
-    try { bloqueo = powerSaveBlocker.start("prevent-display-sleep"); } catch { bloqueo = null; }
-    log(`abierta en el monitor ${display.id} (${b.width}×${b.height})`);
+    let v = null;
+    try {
+      const b = display.bounds;
+      v = new BrowserWindow({
+        x: b.x, y: b.y, width: b.width, height: b.height,
+        frame: false, fullscreen: true, show: false, backgroundColor: "#16161a",
+        // El teclado y el lector de códigos son de la caja: esta ventana nunca recibe el foco, y por
+        // eso tampoco se puede cerrar con Alt+F4 ni perder con Alt+Tab.
+        focusable: false, skipTaskbar: true, autoHideMenuBar: true,
+        // Sin preload a propósito: el preload expone `__VIM_SALIR`, y la pantalla que mira el cliente
+        // no debe poder apagar la caja. La configuración la inyecta el ui-server en el HTML.
+        webPreferences: { contextIsolation: true, nodeIntegration: false, sandbox: true },
+      });
+      v.setMenuBarVisibility(false);
+      proteger?.(v);
+      v.once("ready-to-show", () => v.showInactive());
+      v.on("closed", () => {
+        // Un cierre inesperado: no fue nuestro cerrarVentana
+        if (ventana === v) {
+          ventana = null;
+          destino = null;
+          if (bloqueo !== null) { try { powerSaveBlocker.stop(bloqueo); } catch { /* */ } bloqueo = null; }
+          programar();
+        }
+      });
+      // Si el renderer muere, se vuelve a abrir: una pantalla negra frente al cliente no se arregla sola.
+      v.webContents.on("render-process-gone", () => { if (ventana === v) { cerrarVentana(); programar(); } });
+      v.loadURL(url).catch((e) => log(`no cargó: ${e?.message ?? e}`));
+      ventana = v;
+      destino = display;
+      try { bloqueo = powerSaveBlocker.start("prevent-display-sleep"); } catch (e) { log(`no se pudo bloquear pantalla: ${e?.message ?? e}`); bloqueo = null; }
+      log(`abierta en el monitor ${display.id} (${b.width}×${b.height})`);
+    } catch (e) {
+      log(`error al abrir ventana: ${e?.message ?? e}`);
+      if (v && !v.isDestroyed()) v.destroy();
+      ventana = null;
+      destino = null;
+      bloqueo = null;
+    }
   }
 
   function evaluar() {
