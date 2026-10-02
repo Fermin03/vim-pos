@@ -357,3 +357,57 @@ test("error en proteger no deja ventana huérfana", () => {
     assert.equal(f.estado.bloqueos, 0, "sin bloqueadores");
   } finally { pc.cerrar(); rmSync(archivo, { force: true }); }
 });
+
+test("una ráfaga de eventos se funde en una sola evaluación", () => {
+  mock.timers.enable({ apis: ["setTimeout"] });
+  try {
+    const f = electronFalso([D1, D2], 1);
+    const archivo = path.join(os.tmpdir(), `vim-pc-ctl-${process.pid}-${Math.random()}.json`);
+    const pc = crearPantallaCliente({ ...f, archivo, url: "http://localhost:54360/?cliente", esperaMs: 300 });
+    try {
+      pc.iniciar();
+      assert.equal(f.creadas.length, 1);
+      // Contar llamadas a getAllDisplays para probar que se evalúa una sola vez
+      let lecturas = 0;
+      const original = f.screen.getAllDisplays;
+      f.screen.getAllDisplays = () => { lecturas++; return original(); };
+      // Desconectar el monitor
+      f.estado.lista = [D1];
+      // Primera ráfaga de eventos
+      f.oyentes["display-removed"]();
+      mock.timers.tick(200);
+      // Segunda ráfaga mientras el temporizador aún está en marcha
+      f.oyentes["display-removed"]();
+      mock.timers.tick(200);
+      // La ventana aún debe estar abierta (el primer timer fue cancelado por el segundo)
+      assert.equal(f.creadas[0].destruida, false, "ventana aún abierta después de 400ms (debounce no expiró)");
+      assert.equal(lecturas, 0, "no se ha evaluado aún (temporizador pendiente)");
+      // Avanzar el resto del debounce (300ms total desde el último evento)
+      mock.timers.tick(100);
+      // Ahora debe estar destruida (100ms adicional = 300ms total)
+      assert.equal(f.creadas[0].destruida, true, "ventana destruida después del debounce");
+      assert.equal(lecturas, 1, "exactamente una evaluación para toda la ráfaga");
+    } finally { pc.cerrar(); rmSync(archivo, { force: true }); }
+  } finally { mock.timers.reset(); }
+});
+
+test("error al crear BrowserWindow no tira excepción al iniciar", () => {
+  const logs = [];
+  const f = electronFalso([D1, D2], 1);
+  class VentanaError {
+    constructor() { throw new Error("no se pudo crear ventana"); }
+  }
+  f.BrowserWindow = VentanaError;
+  const archivo = path.join(os.tmpdir(), `vim-pc-ctl-${process.pid}-${Math.random()}.json`);
+  const pc = crearPantallaCliente({
+    ...f, archivo, url: "http://localhost:54360/?cliente", esperaMs: 0,
+    log: (msg) => logs.push(msg)
+  });
+  try {
+    assert.doesNotThrow(() => pc.iniciar());
+    assert.equal(pc.estado().abierta, false);
+    assert.equal(f.estado.bloqueos, 0, "sin bloqueadores");
+    assert.equal(logs.length, 1, "exactamente un log de error");
+    assert.match(logs[0], /error al abrir ventana/, "el log menciona el error de ventana");
+  } finally { pc.cerrar(); rmSync(archivo, { force: true }); }
+});
