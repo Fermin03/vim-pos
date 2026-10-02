@@ -137,6 +137,7 @@ export function ModalModificadores({
   inicial,
   cantidadLinea = 1,
   sinNota = false,
+  enCombo = false,
   onConfirmar,
   onCancelar,
 }: {
@@ -148,6 +149,12 @@ export function ModalModificadores({
   cantidadLinea?: number;
   /** Oculta la nota: el componente de un combo no la usa (la nota va en el combo entero). */
   sinNota?: boolean;
+  /**
+   * Se abre sobre un componente de un combo. Ahí el producto no se cobra por su precio de carta ni
+   * se agrega al ticket (lo hace el combo entero), así que no se muestra el precio base y el botón
+   * dice "Listo" con solo lo que suman los extras.
+   */
+  enCombo?: boolean;
   onConfirmar: (mods: ModificadorSel[], nota: string | null, alcance: AlcanceEdicion) => void;
   onCancelar: () => void;
 }) {
@@ -189,6 +196,7 @@ export function ModalModificadores({
     }
     return producto.precio_base_mxn + extras;
   }, [grupos, sel, producto.precio_base_mxn]);
+  const extras = precioTotal - producto.precio_base_mxn;
 
   function confirmar() {
     const mods: ModificadorSel[] = [];
@@ -246,6 +254,7 @@ export function ModalModificadores({
           <span className="min-w-0 flex-1 font-display text-20 font-semibold leading-tight tracking-[-0.02em] text-ink">
             {producto.nombre}
           </span>
+          {!enCombo && (
           <span className="flex-shrink-0 text-right">
             <small className="mb-[-2px] block font-sans text-11 font-semibold uppercase tracking-[0.04em] text-ink-3">
               Precio base
@@ -254,6 +263,7 @@ export function ModalModificadores({
               {fmtMxn(producto.precio_base_mxn)}
             </span>
           </span>
+          )}
           <button
             type="button"
             onClick={onCancelar}
@@ -448,10 +458,14 @@ export function ModalModificadores({
               onClick={confirmar}
               className="flex h-[52px] w-[min(340px,40%)] flex-shrink-0 items-center justify-between gap-2 rounded-lg border-none bg-accent px-4 text-16 font-bold text-white shadow-[0_1px_3px_rgb(var(--accent)/0.3)] transition hover:bg-accent-hover active:scale-[.98] disabled:cursor-not-allowed disabled:bg-line-strong disabled:shadow-none"
             >
-              <span className="truncate">{editando ? "Guardar cambios" : "Agregar al ticket"}</span>
-              <span className="font-display tabular-nums">
-                {fmtMxn(preguntaAlcance && alcance === "todas" ? precioTotal * cantidadLinea : precioTotal)}
-              </span>
+              <span className="truncate">{editando ? "Guardar cambios" : enCombo ? "Listo" : "Agregar al ticket"}</span>
+              {enCombo ? (
+                extras > 0 && <span className="font-display tabular-nums">+{fmtMxn(extras)}</span>
+              ) : (
+                <span className="font-display tabular-nums">
+                  {fmtMxn(preguntaAlcance && alcance === "todas" ? precioTotal * cantidadLinea : precioTotal)}
+                </span>
+              )}
             </button>
           </div>
         </div>

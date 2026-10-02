@@ -1,7 +1,8 @@
 import { describe, it, expect } from "vitest";
 import { CASOS_PRECIO_COMBO, COMBO_BASE_MXN, opcionCombo, SLOTS_COMBO } from "@vim/db/fixtures-combos";
 import type { Producto } from "../catalogo";
-import { armarCombos, precioCombo, slotValido, componentesPorDefecto, combosQueAdmiten, diferencialCombo, type ComboDef, type ComponenteSel, type FilaComboGrupo } from "../combos";
+import { abreModificadores, armarCombos, precioCombo, slotValido, componentesPorDefecto, combosQueAdmiten, diferencialCombo, type ComboDef, type ComponenteSel, type FilaComboGrupo } from "../combos";
+import type { GrupoModificadores, TipoSeleccion } from "../modificadores";
 
 // Los precios salen de la fixture compartida `@vim/db/fixtures-combos`, la MISMA que lee
 // `apps/admin/app/lib/__tests__/combos.test.ts`. El precio del combo está implementado tres veces
@@ -125,5 +126,37 @@ describe("upsell", () => {
     // 175 (la Doble con los defaults) − 130 (la Doble suelta) = 45.
     const extra = CASOS_PRECIO_COMBO.dobleConDefaults.esperadoMxn - opcionCombo("h2").precioMxn;
     expect(diferencialCombo(combos[0]!, doble)).toEqual({ extra, resto: ["papas", "refresco"] });
+  });
+});
+
+// La regla que decide si el modal de modificadores se abre sobre un componente del combo. Antes
+// solo se abría con un grupo OBLIGATORIO y solo al tocar una tarjeta sin seleccionar: un producto
+// con puros opcionales (extras, "sin cebolla") brincaba al siguiente paso, y la opción por defecto
+// —que ya viene seleccionada— pasaba de largo hasta con un obligatorio pendiente.
+describe("abreModificadores", () => {
+  const grupo = (tipoSeleccion: TipoSeleccion): GrupoModificadores => ({ id: tipoSeleccion, nombre: tipoSeleccion, tipoSeleccion, min: null, max: null, opciones: [] });
+  const opcionales = [grupo("MULTIPLE_OPCIONAL"), grupo("UNICA_OPCIONAL")];
+  const conObligatorio = [grupo("MULTIPLE_OPCIONAL"), grupo("UNICA_OBLIGATORIA")];
+
+  it("al tocar la tarjeta se abren aunque todos los grupos sean opcionales, igual que el producto suelto", () => {
+    expect(abreModificadores(opcionales, "tocar", false)).toBe(true);
+    expect(abreModificadores(conObligatorio, "tocar", false)).toBe(true);
+  });
+  it("al tocar una tarjeta ya personalizada se vuelven a abrir, para corregir", () => {
+    expect(abreModificadores(opcionales, "tocar", true)).toBe(true);
+  });
+  it("un producto sin grupos no abre nada", () => {
+    expect(abreModificadores([], "tocar", false)).toBe(false);
+    expect(abreModificadores([], "siguiente", false)).toBe(false);
+  });
+  it("con Siguiente, la opción por defecto no pasa de largo si le falta un obligatorio", () => {
+    expect(abreModificadores(conObligatorio, "siguiente", false)).toBe(true);
+    expect(abreModificadores([grupo("MULTIPLE_OBLIGATORIA_RANGO")], "siguiente", false)).toBe(true);
+  });
+  it("con Siguiente, los opcionales no estorban: quedan en Personalizar", () => {
+    expect(abreModificadores(opcionales, "siguiente", false)).toBe(false);
+  });
+  it("con Siguiente, lo que ya pasó por el modal no se vuelve a preguntar", () => {
+    expect(abreModificadores(conObligatorio, "siguiente", true)).toBe(false);
   });
 });
