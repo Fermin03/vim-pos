@@ -5,6 +5,7 @@ import type { ClienteDomicilio } from "../clientes-domicilio";
 import type { ClienteCuenta } from "../clientes-cuenta";
 import { construirVista, leerMensaje, type EntradaVista } from "../pantalla-cliente/vista";
 import { crearPublicador, type Canal } from "../pantalla-cliente/canal";
+import { textoEstadoPantalla, type AjustePantalla } from "../pantalla-cliente/ajuste";
 
 function producto(nombre: string, precio: number): Producto {
   return {
@@ -241,5 +242,21 @@ describe("crearPublicador", () => {
     expect(() => canal.onmessage?.({ data: { tipo: "hola", v: 1 } })).not.toThrow();
     expect(() => p.cerrar()).not.toThrow();
     expect(canal.onmessage).toBeNull();
+  });
+});
+
+const M1 = { id: 1, etiqueta: "Monitor 1", ancho: 1920, alto: 1080, esDeLaCaja: true };
+const M2 = { id: 2, etiqueta: "HDMI", ancho: 1024, alto: 768, esDeLaCaja: false };
+const base: AjustePantalla = { disponible: true, modo: "auto", displayId: null, abierta: false, monitores: [M1] };
+
+describe("textoEstadoPantalla", () => {
+  it("sin segundo monitor lo dice", () => {
+    expect(textoEstadoPantalla(base)).toBe("No hay un segundo monitor conectado.");
+  });
+  it("abierta dice en cuál", () => {
+    expect(textoEstadoPantalla({ ...base, abierta: true, monitores: [M1, M2] })).toBe("Abierta en HDMI (1024×768).");
+  });
+  it("apagada lo dice aunque haya monitor", () => {
+    expect(textoEstadoPantalla({ ...base, modo: "apagada", monitores: [M1, M2] })).toBe("Apagada.");
   });
 });
