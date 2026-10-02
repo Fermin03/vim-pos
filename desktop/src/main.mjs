@@ -4,7 +4,7 @@
 //    watchdog (se auto-recupera) + respaldo del pgdata diario (con la caja quieta), al cerrar y
 //    bajo demanda.
 //  • COCINA (--role=cocina): pantalla de cocina como CLIENTE DELGADO del hub. SIN backend local.
-import { app, BrowserWindow, Tray, Menu, nativeImage, clipboard, Notification, dialog, shell, safeStorage, ipcMain, screen, powerMonitor } from "electron";
+import { app, BrowserWindow, Tray, Menu, nativeImage, clipboard, Notification, dialog, shell, safeStorage, ipcMain, screen, powerMonitor, powerSaveBlocker } from "electron";
 import { existsSync, readFileSync, writeFileSync, mkdirSync, openSync, writeSync } from "node:fs";
 import { inspect } from "node:util";
 import path from "node:path";
@@ -23,6 +23,7 @@ import { crearCicloSync, OMITIDO } from "./sync-ciclo.mjs";
 import { crearSondeoCatalogo } from "./sondeo-catalogo.mjs";
 import { crearAlmacenDirectivas, estadoDeVersion } from "./directivas.mjs";
 import { pantallaDeLaCaja } from "./pantalla.mjs";
+import { crearPantallaCliente } from "./pantalla-cliente.mjs";
 import { crearEspejo } from "./delivery-espejo.mjs";
 import { debeSondearApps } from "./delivery-espejo-modulo.mjs";
 import { registrarErrorLocal, subirErrores } from "./sync-errores.mjs";
@@ -102,6 +103,7 @@ let uiServer;
 let win;
 let tray;
 let watchdog;
+let pantallaCliente = null;   // segunda ventana, de cara al cliente (pantalla-cliente.mjs)
 let opcionesBackend = {};   // para poder re-arrancar el backend igual (watchdog / respaldo)
 let backupsDir = null;
 let saliendoDeVerdad = false; // distinguir "cerrar ventana" (→ bandeja) de "salir de verdad"
@@ -245,6 +247,22 @@ async function vincularConNube({ email, password } = {}) {
   }
 }
 
+/** Bloquea ventanas nuevas y limita adónde puede navegar `w` (D9). La usan la caja y la pantalla del cliente. */
+function protegerNavegacion(w, origenes = []) {
+  const permitidos = origenesDe(origenes);
+  w.webContents.setWindowOpenHandler(({ url }) => {
+    if (abrirFueraPermitido(url)) shell.openExternal(url).catch(() => {});
+    return { action: "deny" };
+  });
+  const frenar = (e, url) => {
+    if (navegacionPermitida(url, permitidos)) return;
+    e.preventDefault();
+    console.log(`· [ventana] navegación bloqueada a ${url}`);
+  };
+  w.webContents.on("will-navigate", frenar);
+  w.webContents.on("will-redirect", frenar);
+}
+
 /**
  * `origenes`: URLs a las que la ventana puede navegar (D9). Todo lo demás se bloquea; una ventana
  * nueva (window.open, target=_blank) nunca se abre dentro de la app: si es https se manda al
@@ -266,18 +284,7 @@ function crearVentana(preloadArgs, origenes = []) {
       additionalArguments: preloadArgs,
     },
   });
-  const permitidos = origenesDe(origenes);
-  w.webContents.setWindowOpenHandler(({ url }) => {
-    if (abrirFueraPermitido(url)) shell.openExternal(url).catch(() => {});
-    return { action: "deny" };
-  });
-  const frenar = (e, url) => {
-    if (navegacionPermitida(url, permitidos)) return;
-    e.preventDefault();
-    console.log(`· [ventana] navegación bloqueada a ${url}`);
-  };
-  w.webContents.on("will-navigate", frenar);
-  w.webContents.on("will-redirect", frenar);
+  protegerNavegacion(w, origenes);
   w.once("ready-to-show", () => w.show());
   return w;
 }
@@ -300,10 +307,11 @@ async function bootCaja() {
   // Adónde puede navegar la ventana de la caja: el POS local (por localhost o 127.0.0.1), el POS de
   // desarrollo si se pidió con VIM_POS_URL, y el POS desplegado, que es el respaldo cuando no hay
   // pos-ui/ empaquetado (ver más abajo).
-  win = crearVentana([`--vim-url=${backend.url}`], [
+  const origenesCaja = [
     `http://localhost:${UI_PORT}`, `http://127.0.0.1:${UI_PORT}`,
     process.env.VIM_POS_URL, "https://pos.vimpos.com.mx",
-  ]);
+  ];
+  win = crearVentana([`--vim-url=${backend.url}`], origenesCaja);
   // Cerrar la ventana la MANDA A LA BANDEJA (no apaga la caja). Solo "Salir" (bandeja) o apagar la
   // PC la cierran de verdad → así nadie tumba el servidor del local sin querer.
   win.on("close", (e) => {
@@ -320,6 +328,8 @@ async function bootCaja() {
       onFolios: () => consultarFolios(),
       onSincronizarCatalogo: () => bajarCatalogoAhora("botón"),
       avisoVisto: (id) => directivas.marcarVisto(id),
+      pantallaCliente: () => pantallaCliente?.estado() ?? { disponible: false },
+      onPantallaCliente: (cambio) => pantallaCliente?.configurar(cambio) ?? null,
       directivas: () => {
         const { directivas: d, recibidoIso } = directivas.leer();
         const ver = estadoDeVersion(d, app.getVersion());
@@ -342,6 +352,19 @@ async function bootCaja() {
   }
   posUrl = posUrl || "https://pos.vimpos.com.mx";
   await win.loadURL(posUrl);
+
+  // Pantalla del cliente: se abre sola si hay un segundo monitor. Va DESPUÉS de cargar la caja
+  // para que la ventana principal ya tenga su monitor decidido, y carga el mismo POS (mismo origen
+  // que la caja: es lo que deja a las dos ventanas hablarse por BroadcastChannel).
+  pantallaCliente = crearPantallaCliente({
+    screen, BrowserWindow, powerSaveBlocker,
+    archivo: path.join(CONFIG_DIR, "pantalla-cliente.json"),
+    url: `${posUrl.replace(/\/+$/, "")}/?cliente`,
+    ventanaCaja: () => win,
+    proteger: (w) => protegerNavegacion(w, origenesCaja),
+    log: (m) => console.log("· [pantalla-cliente]", m),
+  });
+  pantallaCliente.iniciar();
 
   crearTray();
   // Watchdog: si Postgres/PostgREST se caen, reinicia el backend solo (auto-recuperación).
@@ -1066,6 +1089,7 @@ async function cerrarTodo() {
   if (respaldoEnCurso) {
     try { recienRespaldado = (await respaldoEnCurso)?.ok === true; } catch { /* */ }
   }
+  try { pantallaCliente?.cerrar(); } catch { /* */ }
   try { detenerSync(); } catch { /* */ }
   try { watchdog?.stop(); } catch { /* */ }
   try { if (uiServer) uiServer.close(); } catch { /* */ }
