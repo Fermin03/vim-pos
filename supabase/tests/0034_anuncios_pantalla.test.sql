@@ -3,7 +3,7 @@
 -- admin los administra, hay un tope de 10 y bajan a la caja en el snapshot.
 -- ============================================================================
 begin;
-select plan(12);
+select plan(15);
 
 \set t      '99999999-0000-0000-0000-0000000000aa'
 \set cajero '99999999-0000-0000-0000-000000000001'
@@ -43,6 +43,13 @@ select throws_ok(
   format($$ insert into anuncios_pantalla (tenant_id, ruta) values (%L, %L) $$, :'t', :'t' || '/' || gen_random_uuid() || '.jpg'),
   '42501', null, 'un cajero no puede subir anuncios');
 
+-- 3b) Ni los pausa ni los borra. RLS no lanza: filtra la fila y el UPDATE/DELETE no toca nada, así
+-- que se comprueba que la fila sigue igual y sigue ahí.
+update anuncios_pantalla set activo = false where id = :'a1';
+select is((select activo from anuncios_pantalla where id = :'a1'), true, 'un cajero no puede pausar un anuncio');
+delete from anuncios_pantalla where id = :'a1';
+select is((select count(*)::int from anuncios_pantalla where id = :'a1'), 1, 'un cajero no puede borrar un anuncio');
+
 -- Como el dueño.
 select set_config('request.jwt.claims', json_build_object('sub', :'dueno', 'role', 'authenticated', 'tenant_id', :'t')::text, true);
 
@@ -66,6 +73,14 @@ reset role;
 select is(
   (select jsonb_array_length(sync_pull_snapshot(:'t') -> 'anuncios_pantalla')), 10,
   'el snapshot de la caja trae los 10 anuncios del negocio');
+
+-- 6b) La baja es lógica: una fila con deleted_at TIENE que seguir viajando, o la caja nunca se
+-- entera de que se borró (el pull solo hace upsert) y la sigue enseñando.
+update anuncios_pantalla set deleted_at = now(), activo = false where id = :'a1';
+select is(
+  (select count(*)::int from jsonb_array_elements(sync_pull_snapshot(:'t') -> 'anuncios_pantalla') e
+    where e ->> 'id' = :'a1' and e ->> 'deleted_at' is not null), 1,
+  'un anuncio dado de baja sigue viajando en el snapshot, con su deleted_at');
 
 -- 7) La ruta queda atada al negocio y al formato <uuid>.<ext> (la prueba corre como superusuario: el CHECK no depende de RLS).
 select throws_ok(
