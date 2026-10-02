@@ -29,6 +29,8 @@ export const PULL_ORDER = [
   { t: "combo_opciones" },
   { t: "subtipos_personal" },
   { t: "configuracion_tenant" },
+  // Anuncios de la pantalla del cliente (0150). Solo la lista; las imágenes las baja anuncios.mjs.
+  { t: "anuncios_pantalla" },
   // Inventario (ADR 0013): unidades antes que insumos; existencias, recetas y componentes después.
   // La caja lo necesita para descontar al vender; los movimientos que genera suben por el push.
   { t: "unidades_medida" },
