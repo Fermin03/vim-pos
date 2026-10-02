@@ -354,8 +354,25 @@ export async function startUiServer(dir, port, gatewayPort = 54350, host = "0.0.
         }
       }
 
-      // CAJA: relay de impresión RAW. El navegador no abre sockets TCP; el main sí. La UI arma los
-      // bytes ESC/POS y los manda aquí; el main los escribe a la impresora en ip:9100. Solo local.
+      // CAJA: impresoras instaladas en Windows, para elegir una en vez de capturar una IP. Solo
+      // desde la propia caja: la lista es de ESTA computadora y dice qué hay conectado en el local.
+      if (!kds && req.method === "GET" && req.url.startsWith("/__impresoras")) {
+        if (!LOCALES.has(req.socket.remoteAddress ?? "")) {
+          res.writeHead(403, { "Content-Type": "application/json" });
+          return res.end(JSON.stringify({ ok: false, error: "Solo desde la caja." }));
+        }
+        res.writeHead(200, { "Content-Type": "application/json", "Cache-Control": "no-store" });
+        try {
+          const impresoras = await opts.onListarImpresoras?.();
+          return res.end(JSON.stringify(impresoras ? { ok: true, impresoras } : { ok: false, error: "No disponible." }));
+        } catch (e) {
+          return res.end(JSON.stringify({ ok: false, error: e?.message ?? "No se pudo leer la lista." }));
+        }
+      }
+
+      // CAJA: relay de impresión RAW. El navegador no abre sockets TCP ni la cola de Windows; el
+      // main sí. La UI arma los bytes ESC/POS y los manda aquí; el main los escribe a la impresora
+      // en ip:9100, o a la cola de Windows si el cuerpo trae `impresoraWindows`. Solo local.
       if (!kds && req.method === "POST" && req.url.startsWith("/__imprimir")) {
         if (!LOCALES.has(req.socket.remoteAddress ?? "") || !mismaProcedencia(req, port)) {
           res.writeHead(403, { "Content-Type": "application/json" });

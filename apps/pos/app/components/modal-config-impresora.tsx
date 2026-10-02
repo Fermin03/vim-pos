@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { Button, Modal } from "@vim/ui/styles";
 import { EpsonEposAdapter } from "../lib/print/epson-epos-adapter";
 import { RawSocketAdapter } from "../lib/print/raw-socket-adapter";
+import { ColaWindowsAdapter, listarImpresorasWindows, type ImpresoraWindows } from "../lib/print/cola-windows-adapter";
 import {
   leerConfigImpresoras,
   guardarConfigImpresoras,
@@ -39,8 +40,8 @@ function jobPrueba(ancho: 58 | 80, estacion: string): PrintJob {
   };
 }
 
-/** C3 — Configura las 2 estaciones de impresión del dispositivo (Preview / Epson red / Genérica
- *  RAW 9100) + a qué estación va cada tipo de documento (caja o cocina) + prueba física. */
+/** C3 — Configura las 2 estaciones de impresión del dispositivo (Preview / instalada en Windows /
+ *  Genérica RAW 9100 / Epson red) + a qué estación va cada tipo de documento (caja o cocina) + prueba física. */
 export function ModalConfigImpresora({ token, sucursalId, onCerrar }: { token: string; sucursalId: string; onCerrar: () => void }) {
   const inicial = leerConfigImpresoras();
   const [areas, setAreas] = useState<AreaCocina[]>([]);
@@ -57,6 +58,19 @@ export function ModalConfigImpresora({ token, sucursalId, onCerrar }: { token: s
 
   const actual = cfg.estaciones[estacionActiva];
   const esRed = actual.tipo === "epson" || actual.tipo === "generica";
+  const esWindows = actual.tipo === "windows";
+
+  // Impresoras instaladas en esta computadora. `undefined` = todavía no se pide; `null` = no se
+  // pudo saber (fuera de la app de la caja no hay a quién preguntarle).
+  const [instaladas, setInstaladas] = useState<ImpresoraWindows[] | null | undefined>(undefined);
+  useEffect(() => {
+    if (!esWindows || instaladas !== undefined) return;
+    let vivo = true;
+    listarImpresorasWindows().then((l) => { if (vivo) setInstaladas(l); });
+    return () => { vivo = false; };
+  }, [esWindows, instaladas]);
+  // La que está guardada puede ya no existir en Windows: se muestra igual para que se note.
+  const guardadaAusente = esWindows && !!actual.nombre && !!instaladas && !instaladas.some((p) => p.nombre === actual.nombre);
 
   function actualizarEstacion(patch: Partial<ConfigImpresora>) {
     setCfg((c) => ({ ...c, estaciones: { ...c.estaciones, [estacionActiva]: { ...c.estaciones[estacionActiva], ...patch } } }));
@@ -76,9 +90,14 @@ export function ModalConfigImpresora({ token, sucursalId, onCerrar }: { token: s
     const ip = (actual.ip ?? "").trim();
     const ancho = actual.ancho ?? 80;
     if (esRed && !ip) { setPrueba("Indica la IP de la impresora."); return; }
+    if (esWindows && !actual.nombre) { setPrueba("Elige una impresora de la lista."); return; }
     setProbando(true); setPrueba(null);
     try {
-      if (actual.tipo === "generica") {
+      if (actual.tipo === "windows" && actual.nombre) {
+        // "Enviado" y no "impreso": Windows acepta el trabajo aunque la impresora esté apagada.
+        const r = await new ColaWindowsAdapter(actual.nombre, ancho).imprimir(jobPrueba(ancho, NOMBRE_ESTACION[estacionActiva]));
+        setPrueba(r.ok ? "✓ Enviado a Windows. Revisa que haya salido el ticket de prueba." : r.motivo === "OFFLINE" ? "✗ Windows no encontró esa impresora. Elígela de nuevo en la lista." : "✗ Windows no pudo imprimir. Revisa la impresora en el panel de Windows.");
+      } else if (actual.tipo === "generica") {
         // Prueba real: imprime un ticket. Es la única forma fiable de saber si el 9100 responde.
         const imp = new RawSocketAdapter(ip, actual.puerto ?? PUERTO_RAW, ancho);
         const r = await imp.imprimir(jobPrueba(ancho, NOMBRE_ESTACION[estacionActiva]));
@@ -119,13 +138,36 @@ export function ModalConfigImpresora({ token, sucursalId, onCerrar }: { token: s
       </div>
 
       <div className="flex flex-col gap-3">
-        <div className="flex gap-2">
-          {(["preview", "generica", "epson"] as const).map((t: TipoImpresora) => (
-            <button key={t} type="button" onClick={() => actualizarEstacion({ tipo: t })} className={["flex-1 rounded border px-2 py-2.5 text-13 font-semibold transition", actual.tipo === t ? "border-ink bg-ink text-white" : "border-line-strong text-ink-2 hover:border-ink"].join(" ")}>
-              {t === "preview" ? "En pantalla" : t === "generica" ? "Genérica (red)" : "Epson (red)"}
+        {/* Cuatro tipos en 2×2: en una fila los textos ya no caben en la media columna. */}
+        <div className="grid grid-cols-2 gap-2">
+          {(["preview", "windows", "generica", "epson"] as const).map((t: TipoImpresora) => (
+            <button key={t} type="button" onClick={() => actualizarEstacion({ tipo: t })} className={["rounded border px-2 py-2.5 text-13 font-semibold transition", actual.tipo === t ? "border-ink bg-ink text-white" : "border-line-strong text-ink-2 hover:border-ink"].join(" ")}>
+              {t === "preview" ? "En pantalla" : t === "windows" ? "Instalada en Windows" : t === "generica" ? "Genérica (red)" : "Epson (red)"}
             </button>
           ))}
         </div>
+
+        {esWindows && (
+          <>
+            <p className="rounded border border-line bg-hover px-3 py-2 text-12 text-ink-2">
+              Para una impresora que ya está dada de alta en esta computadora (por USB o con su propio driver). Tiene que ser de tickets (ESC/POS).
+            </p>
+            <div>
+              <label htmlFor="impresora-windows" className="mb-1.5 block text-13 font-medium text-ink-2">Impresora</label>
+              {instaladas === null ? (
+                <p className="text-13 text-danger">No se pudo leer la lista de impresoras. Esta opción solo funciona en la app de la caja.</p>
+              ) : (
+                <select id="impresora-windows" className={input} value={actual.nombre ?? ""} disabled={instaladas === undefined} onChange={(e) => actualizarEstacion({ nombre: e.target.value })}>
+                  <option value="">{instaladas === undefined ? "Buscando impresoras…" : instaladas.length === 0 ? "No hay impresoras instaladas" : "Elige una impresora"}</option>
+                  {guardadaAusente && <option value={actual.nombre}>{actual.nombre} (ya no está instalada)</option>}
+                  {(instaladas ?? []).map((p) => (
+                    <option key={p.nombre} value={p.nombre}>{p.nombre}{p.predeterminada ? " (predeterminada)" : ""}</option>
+                  ))}
+                </select>
+              )}
+            </div>
+          </>
+        )}
 
         {actual.tipo === "generica" && (
           <p className="rounded border border-line bg-hover px-3 py-2 text-12 text-ink-2">
@@ -145,6 +187,11 @@ export function ModalConfigImpresora({ token, sucursalId, onCerrar }: { token: s
                 <input className={input} value={String(actual.puerto ?? PUERTO_RAW)} inputMode="numeric" placeholder="9100" onChange={(e) => actualizarEstacion({ puerto: Number(e.target.value.replace(/[^0-9]/g, "")) || PUERTO_RAW })} />
               </div>
             )}
+          </>
+        )}
+
+        {(esRed || esWindows) && (
+          <>
             <div>
               <label className="mb-1.5 block text-13 font-medium text-ink-2">Ancho de papel</label>
               <div className="flex gap-2">
@@ -153,7 +200,7 @@ export function ModalConfigImpresora({ token, sucursalId, onCerrar }: { token: s
                 ))}
               </div>
             </div>
-            <Button variant="ghost" onClick={probar} disabled={probando}>{probando ? "Probando…" : actual.tipo === "generica" ? "Imprimir prueba" : "Probar conexión"}</Button>
+            <Button variant="ghost" onClick={probar} disabled={probando}>{probando ? "Probando…" : actual.tipo === "epson" ? "Probar conexión" : "Imprimir prueba"}</Button>
             {prueba && <p className={`text-13 font-medium ${prueba.startsWith("✓") ? "text-success" : "text-danger"}`}>{prueba}</p>}
           </>
         )}

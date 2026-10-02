@@ -266,9 +266,17 @@ el carrito se corrige al persistir (no debería pasar; se registra en consola).
 - Slot con `maximo = 1`: tocar una tarjeta selecciona y **avanza solo** al siguiente paso. Slot
   con `maximo > 1`: tarjetas con contador y botón Siguiente. Slot con `minimo = 0`: botón "Sin
   esto".
-- Si el producto elegido tiene grupos de modificadores obligatorios, se abre `ModalModificadores`
-  encima, con su selección inicial actual; al confirmar vuelve al paso. Los opcionales se
-  ofrecen con un botón "Personalizar" en la tarjeta seleccionada.
+- Si el producto elegido tiene grupos de modificadores —obligatorios **u opcionales**—, al tocar su
+  tarjeta se abre `ModalModificadores` encima, igual que cuando ese producto se vende suelto; al
+  confirmar avanza. Cancelar no avanza, y deshace la selección si se acababa de hacer. El botón
+  "Personalizar" de la tarjeta seleccionada sigue ahí para volver a abrirlos.
+  *(Corregido el 2 oct 2026. Esta línea decía que solo los obligatorios abrían y los opcionales
+  quedaban en "Personalizar"; en la práctica ese botón no se alcanzaba —la tarjeta avanza al
+  tocarla— y a un producto con puros opcionales no había cómo ponerle un extra.)*
+- La opción por defecto ya viene seleccionada, así que el cajero puede salir del paso con
+  "Siguiente" sin tocarla. Ahí los opcionales no detienen, pero un obligatorio sin contestar sí:
+  se abre el modal antes de avanzar. Sin esto el producto por defecto llegaba a cocina sin su
+  término o su sabor. La regla vive en `abreModificadores` (`apps/pos/app/lib/combos.ts`).
 - Último paso: resumen (hamburguesa · término · acompañamiento · bebida), nota a cocina del
   combo, cantidad, botón "Agregar $170". Atrás por paso. Escape cierra sin agregar.
 - Reusa tokens y estructura de `modal-modificadores.tsx`; nada de estilos nuevos (ADR 0008).

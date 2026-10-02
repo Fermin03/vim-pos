@@ -29,6 +29,7 @@ import { debeSondearApps } from "./delivery-espejo-modulo.mjs";
 import { registrarErrorLocal, subirErrores } from "./sync-errores.mjs";
 import { buscarActualizacion, descargarInstalador, nombreInstaladorTemporal } from "./updater.mjs";
 import { poolVigente } from "./pool-vigente.mjs";
+import { imprimirEnColaWindows, resumirImpresoras } from "./impresora-windows.mjs";
 import { crearCacheCorta } from "./cache-corta.mjs";
 import { origenesDe, navegacionPermitida, abrirFueraPermitido } from "./navegacion.mjs";
 
@@ -326,7 +327,11 @@ async function bootCaja() {
   if (!posUrl && existsSync(path.join(UI_DIR, "index.html"))) {
     uiServer = await startUiServer(UI_DIR, UI_PORT, backend.gatewayPort, "0.0.0.0", {
       onActualizar: () => buscarActualizacionManual(),
-      onImprimir: (p) => imprimirRaw(p),
+      // Con `impresoraWindows` el trabajo va a la cola del sistema (USB, serial…); si no, al 9100.
+      onImprimir: (p) => (p?.impresoraWindows
+        ? imprimirEnColaWindows({ nombre: p.impresoraWindows, datosB64: p.datosB64, soloConectar: p.soloConectar === true })
+        : imprimirRaw(p)),
+      onListarImpresoras: async () => resumirImpresoras(await win.webContents.getPrintersAsync()),
       onVincularNube: (p) => vincularConNube(p),
       estadoSync: () => ({ disponible: true, vinculada: leerNube() !== null, ...ciclo.estado() }),
       onFolios: () => consultarFolios(),

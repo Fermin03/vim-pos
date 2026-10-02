@@ -10,8 +10,18 @@
 // 'generica' → cualquier impresora ESC/POS por el puerto RAW 9100 (Soluciones MyPOS, Xprinter,
 //              3nStar, etc.). El navegador no abre sockets TCP, así que el envío lo hace el proceso
 //              de Electron vía el relay local (ui-server /__imprimir → main).
-export type TipoImpresora = "preview" | "epson" | "generica";
-export type ConfigImpresora = { tipo: TipoImpresora; ip?: string; puerto?: number; ancho?: 58 | 80 };
+// 'windows'  → impresora instalada en Windows (USB, serial, o de red con su driver). Se elige por
+//              nombre de la lista del sistema; los bytes ESC/POS van en crudo a su cola, por el
+//              mismo relay. Para el negocio que ya trae sus impresoras dadas de alta en la PC.
+export type TipoImpresora = "preview" | "epson" | "generica" | "windows";
+export type ConfigImpresora = {
+  tipo: TipoImpresora;
+  ip?: string;
+  puerto?: number;
+  ancho?: 58 | 80;
+  /** Nombre de la impresora en Windows (solo tipo 'windows'). */
+  nombre?: string;
+};
 
 export type IdEstacion = "estacion1" | "estacion2";
 export type Destino = "CAJA" | "COCINA";
@@ -50,9 +60,10 @@ const CONFIG_POR_DEFECTO: ConfigImpresoras = {
 function normalizar(c: unknown): ConfigImpresora {
   if (!c || typeof c !== "object") return { tipo: "preview" };
   const o = c as Record<string, unknown>;
-  const tipo = o.tipo === "epson" || o.tipo === "generica" || o.tipo === "preview" ? o.tipo : "preview";
+  const tipo = o.tipo === "epson" || o.tipo === "generica" || o.tipo === "windows" || o.tipo === "preview" ? o.tipo : "preview";
   const cfg: ConfigImpresora = { tipo };
   if (typeof o.ip === "string") cfg.ip = o.ip;
+  if (typeof o.nombre === "string") cfg.nombre = o.nombre;
   if (typeof o.puerto === "number") cfg.puerto = o.puerto;
   if (o.ancho === 58 || o.ancho === 80) cfg.ancho = o.ancho;
   return cfg;
