@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import os from "node:os";
 import path from "node:path";
 import { rmSync, writeFileSync } from "node:fs";
-import { CONFIG_INICIAL, normalizarConfig, leerConfig, guardarConfig, elegirMonitor } from "./pantalla-cliente.mjs";
+import { CONFIG_INICIAL, normalizarConfig, leerConfig, guardarConfig, elegirMonitor, crearPantallaCliente } from "./pantalla-cliente.mjs";
 
 const A = { id: 1 }, B = { id: 2 }, C = { id: 3 };
 
@@ -49,4 +49,115 @@ test("guarda y vuelve a leer; sin archivo o con basura da la inicial", () => {
   } finally {
     rmSync(archivo, { force: true });
   }
+});
+
+/** Electron de mentira: lo justo para ver qué ventana se abre, dónde y con qué opciones. */
+function electronFalso(lista, idCaja) {
+  const creadas = [];
+  const oyentes = {};
+  class Ventana {
+    constructor(o) { this.o = o; this.destruida = false; this.ev = {}; creadas.push(this); }
+    webContents = { on() {} };
+    once(e, f) { this.ev[e] = f; }
+    on(e, f) { this.ev[e] = f; }
+    loadURL(u) { this.url = u; return Promise.resolve(); }
+    setMenuBarVisibility() {}
+    showInactive() { this.mostrada = true; }
+    isDestroyed() { return this.destruida; }
+    destroy() { this.destruida = true; this.ev.closed?.(); }
+  }
+  const estado = { lista, idCaja, bloqueos: 0 };
+  const screen = {
+    getAllDisplays: () => estado.lista,
+    getDisplayMatching: () => estado.lista.find((d) => d.id === estado.idCaja),
+    getPrimaryDisplay: () => estado.lista[0],
+    on: (e, f) => { oyentes[e] = f; },
+    removeListener: (e) => { delete oyentes[e]; },
+  };
+  const powerSaveBlocker = { start: () => { estado.bloqueos++; return estado.bloqueos; }, stop: () => { estado.bloqueos--; }, isStarted: () => true };
+  const caja = { isDestroyed: () => false, getBounds: () => ({ x: 0, y: 0, width: 800, height: 600 }) };
+  return { creadas, oyentes, estado, screen, powerSaveBlocker, BrowserWindow: Ventana, ventanaCaja: () => caja };
+}
+
+const D1 = { id: 1, label: "", bounds: { x: 0, y: 0, width: 1920, height: 1080 } };
+const D2 = { id: 2, label: "HDMI", bounds: { x: 1920, y: 0, width: 1024, height: 768 } };
+
+function montar(lista, idCaja = 1) {
+  const f = electronFalso(lista, idCaja);
+  const archivo = path.join(os.tmpdir(), `vim-pc-ctl-${process.pid}-${Math.random()}.json`);
+  const pc = crearPantallaCliente({ ...f, archivo, url: "http://localhost:54360/?cliente", esperaMs: 0 });
+  return { ...f, pc, archivo };
+}
+
+test("con dos monitores abre sola, sin marco, a pantalla completa y sin robar el foco", () => {
+  const { pc, creadas, estado, archivo } = montar([D1, D2]);
+  try {
+    pc.iniciar();
+    assert.equal(creadas.length, 1);
+    const o = creadas[0].o;
+    assert.equal(o.frame, false);
+    assert.equal(o.fullscreen, true);
+    assert.equal(o.focusable, false);
+    assert.equal(o.skipTaskbar, true);
+    assert.deepEqual([o.x, o.y, o.width, o.height], [1920, 0, 1024, 768]);
+    assert.equal(o.webPreferences.preload, undefined, "sin preload: esta ventana no puede apagar la caja");
+    assert.equal(creadas[0].url, "http://localhost:54360/?cliente");
+    assert.equal(estado.bloqueos, 1, "el monitor no se duerme mientras esté abierta");
+    assert.equal(pc.estado().abierta, true);
+  } finally { pc.cerrar(); rmSync(archivo, { force: true }); }
+});
+
+test("con un monitor no abre nada", () => {
+  const { pc, creadas, archivo } = montar([D1]);
+  try {
+    pc.iniciar();
+    assert.equal(creadas.length, 0);
+    assert.equal(pc.estado().abierta, false);
+  } finally { pc.cerrar(); rmSync(archivo, { force: true }); }
+});
+
+test("desconectar el monitor la cierra; reconectarlo la reabre", () => {
+  const { pc, creadas, estado, archivo } = montar([D1, D2]);
+  try {
+    pc.iniciar();
+    estado.lista = [D1];
+    pc.evaluar();
+    assert.equal(creadas[0].destruida, true);
+    assert.equal(estado.bloqueos, 0);
+    estado.lista = [D1, D2];
+    pc.evaluar();
+    assert.equal(creadas.length, 2);
+    assert.equal(creadas[1].destruida, false);
+  } finally { pc.cerrar(); rmSync(archivo, { force: true }); }
+});
+
+test("evaluar dos veces sin cambios no abre una segunda ventana", () => {
+  const { pc, creadas, archivo } = montar([D1, D2]);
+  try {
+    pc.iniciar();
+    pc.evaluar();
+    assert.equal(creadas.length, 1);
+  } finally { pc.cerrar(); rmSync(archivo, { force: true }); }
+});
+
+test("apagarla desde el ajuste la cierra y se queda guardado", () => {
+  const { pc, creadas, archivo } = montar([D1, D2]);
+  try {
+    pc.iniciar();
+    const e = pc.configurar({ modo: "apagada", displayId: null });
+    assert.equal(e.abierta, false);
+    assert.equal(creadas[0].destruida, true);
+    assert.deepEqual(leerConfig(archivo), { modo: "apagada", displayId: null });
+  } finally { pc.cerrar(); rmSync(archivo, { force: true }); }
+});
+
+test("el estado lista los monitores y marca el de la caja", () => {
+  const { pc, archivo } = montar([D1, D2]);
+  try {
+    pc.iniciar();
+    assert.deepEqual(pc.estado().monitores, [
+      { id: 1, etiqueta: "Monitor 1", ancho: 1920, alto: 1080, esDeLaCaja: true },
+      { id: 2, etiqueta: "HDMI", ancho: 1024, alto: 768, esDeLaCaja: false },
+    ]);
+  } finally { pc.cerrar(); rmSync(archivo, { force: true }); }
 });
