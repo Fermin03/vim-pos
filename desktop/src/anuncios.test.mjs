@@ -2,8 +2,8 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import os from "node:os";
 import path from "node:path";
-import { mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
-import { nombreArchivo, planAnuncios, sincronizarAnuncios, listarAnuncios, rutaDeAnuncio } from "./anuncios.mjs";
+import { mkdirSync, existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { nombreArchivo, planAnuncios, sincronizarAnuncios, listarAnuncios, rutaDeAnuncio, olvidarRechazados } from "./anuncios.mjs";
 
 const T = "99999999-0000-0000-0000-0000000000aa";
 const A = "11111111-1111-1111-1111-111111111111";
@@ -202,4 +202,93 @@ test("la ruta de un archivo solo se resuelve para nombres con forma de anuncio",
   const dir = path.join(os.tmpdir(), "anuncios");
   assert.equal(rutaDeAnuncio(dir, `${A}.jpg`), path.join(dir, `${A}.jpg`));
   for (const malo of ["../secreto.jpg", `${A}.exe`, `${A}/png`, `${A}xjpg`, `${A}\\png`, `..%2f${A}.jpg`, `${A}.jpg/..`, ""]) assert.equal(rutaDeAnuncio(dir, malo), null, malo);
+});
+
+// Un rename que falla (aquí: el destino es una carpeta) no puede dejar el temporal en disco: el
+// siguiente pull lo borraría, pero mientras tanto estorbaría y se vería como un anuncio a medias.
+test("si falla el rename no queda el .tmp y cuenta como fallido", async () => {
+  await enTemporal(async (dir) => {
+    olvidarRechazados();
+    const destino = path.join(dir, `${A}.jpg`);
+    const r = await sincronizarAnuncios({
+      pool: poolFalso([fila(A)]), dir, cloudUrl: "https://nube.example",
+      // La carpeta aparece mientras se "descarga": el plan ya decidió bajar el archivo, y renameSync(archivo → carpeta) falla.
+      fetch: async () => { mkdirSync(destino); return imagen(); },
+    });
+    assert.deepEqual(r, { bajados: 0, borrados: 0, fallidos: 1 });
+    assert.equal(existsSync(destino + ".tmp"), false, "el temporal se limpió");
+    assert.deepEqual(readdirSync(dir), [`${A}.jpg`], "solo la carpeta que provocó el fallo");
+  });
+});
+
+// Un valor anotado que no es uuid no es "ningún negocio" (eso borra todo): es una anotación
+// dañada, es decir una lectura fallida. No se baja nada ni se borra nada del disco.
+test("un negocio anotado que no es uuid es una lectura fallida: ni descarga ni borra", async () => {
+  await enTemporal(async (dir) => {
+    olvidarRechazados();
+    writeFileSync(path.join(dir, `${A}.jpg`), "ya");
+    const pool = poolFalso([fila(A), fila(B)], 8, { tenant: "x" });
+    let pedidas = 0;
+    const r = await sincronizarAnuncios({ pool, dir, cloudUrl: "https://nube.example", fetch: async () => { pedidas++; return imagen(); } });
+    assert.deepEqual(r, { bajados: 0, borrados: 0, fallidos: 0 });
+    assert.equal(pedidas, 0);
+    assert.deepEqual(readdirSync(dir), [`${A}.jpg`], "no se borró nada");
+    assert.equal(await listarAnuncios({ pool, dir }), null);
+  });
+});
+
+// Rechazos que no se arreglan solos (no es imagen, tamaño absurdo, 4xx) no se reintentan en cada
+// pull durante 6 horas; los transitorios (red, timeout, 5xx) sí, como siempre.
+const HORA = 3600_000;
+const T0 = 1_700_000_000_000;
+const rechazos = {
+  "no es imagen": () => imagen("text/html"),
+  "tamaño fuera de rango": () => imagen("image/jpeg", 2 * 1024 * 1024 + 1),
+  "vacía": () => imagen("image/jpeg", 0),
+  "HTTP 404": () => new Response("no", { status: 404 }),
+};
+for (const [nombre, respuesta] of Object.entries(rechazos)) {
+  test(`un rechazo permanente (${nombre}) no se vuelve a bajar en 6 horas, y luego sí`, async () => {
+    await enTemporal(async (dir) => {
+      olvidarRechazados();
+      let pedidas = 0;
+      const correr = (t) => sincronizarAnuncios({ pool: poolFalso([fila(A)]), dir, cloudUrl: "https://nube.example", ahora: () => t, fetch: async () => { pedidas++; return respuesta(); } });
+      assert.equal((await correr(T0)).fallidos, 1);
+      assert.equal(pedidas, 1);
+      assert.deepEqual(await correr(T0 + 6 * HORA - 1), { bajados: 0, borrados: 0, fallidos: 0 });
+      assert.equal(pedidas, 1, "dentro de las 6 horas no se pide");
+      assert.equal((await correr(T0 + 6 * HORA)).fallidos, 1);
+      assert.equal(pedidas, 2, "pasadas las 6 horas se reintenta");
+    });
+  });
+}
+
+test("un fallo transitorio (red, timeout, 5xx) se reintenta en el siguiente pull", async () => {
+  await enTemporal(async (dir) => {
+    olvidarRechazados();
+    let pedidas = 0;
+    const fallos = [() => { throw new TypeError("fetch failed"); }, () => { const e = new Error("timeout"); e.name = "TimeoutError"; throw e; }, () => new Response("x", { status: 503 }), () => new Response("x", { status: 500 })];
+    for (const f of fallos) {
+      const r = await sincronizarAnuncios({ pool: poolFalso([fila(A)]), dir, cloudUrl: "https://nube.example", ahora: () => T0, fetch: async () => { pedidas++; return f(); } });
+      assert.equal(r.fallidos, 1);
+    }
+    assert.equal(pedidas, 4, "cada pull volvió a pedirla, aun con el mismo reloj");
+    const ok = await sincronizarAnuncios({ pool: poolFalso([fila(A)]), dir, cloudUrl: "https://nube.example", ahora: () => T0, fetch: async () => imagen() });
+    assert.equal(ok.bajados, 1);
+  });
+});
+
+test("un anuncio que sale de la lista se olvida: si vuelve se intenta de inmediato", async () => {
+  await enTemporal(async (dir) => {
+    olvidarRechazados();
+    let pedidas = 0;
+    const correr = (filas) => sincronizarAnuncios({ pool: poolFalso(filas), dir, cloudUrl: "https://nube.example", ahora: () => T0, fetch: async () => { pedidas++; return imagen("text/html"); } });
+    await correr([fila(A)]);
+    await correr([fila(A)]);
+    assert.equal(pedidas, 1, "recordado");
+    await correr([fila(B)]); // A ya no está en la lista
+    assert.equal(pedidas, 2);
+    await correr([fila(A)]); // vuelve (quizá con otra imagen): se intenta sin esperar
+    assert.equal(pedidas, 3);
+  });
 });
