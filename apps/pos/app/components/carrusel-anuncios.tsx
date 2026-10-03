@@ -32,6 +32,8 @@ export function CarruselAnuncios({ lista, alQuedarseSinImagenes }: { lista: List
   // El padre pasa una función nueva en cada render: se guarda aparte para no rearmar el temporizador.
   const avisar = useRef(alQuedarseSinImagenes);
   useEffect(() => { avisar.current = alQuedarseSinImagenes; });
+  // Desde cuándo está en pantalla la imagen actual: una lista nueva no le reinicia el tiempo.
+  const enPantallaDesde = useRef<{ anuncio: Anuncio | null; ms: number }>({ anuncio: null, ms: 0 });
 
   // Una vuelta por cada imagen que llega a la pantalla (o por cada lista nueva): precarga la que
   // sigue desde ya y la enseña cuando se cumple el tiempo de la que está. El tiempo es el de cada
@@ -39,6 +41,9 @@ export function CarruselAnuncios({ lista, alQuedarseSinImagenes }: { lista: List
   useEffect(() => {
     if (memoria.current.lista !== lista) memoria.current = { lista, rotos: new Set() };
     const { rotos } = memoria.current;
+    // La primera vuelta tras un cambio de imagen marca la hora en que entró; las que corren por una
+    // lista nueva (o una falla) con la misma imagen la conservan.
+    if (enPantallaDesde.current.anuncio !== cuadro.actual) enPantallaDesde.current = { anuncio: cuadro.actual, ms: Date.now() };
     let reloj: ReturnType<typeof setTimeout> | undefined;
     let precarga: HTMLImageElement | null = null;
     let cargada: Anuncio | null = null;
@@ -54,7 +59,7 @@ export function CarruselAnuncios({ lista, alQuedarseSinImagenes }: { lista: List
     };
     /** Empieza a precargar la que sigue. Devuelve cuánto esperar, o null si no hay a cuál cambiar. */
     const preparar = (): number | null => {
-      const paso = pasoSiguiente(lista, cuadro.actual, rotos);
+      const paso = pasoSiguiente(lista, cuadro.actual, rotos, Date.now() - enPantallaDesde.current.ms);
       if (paso.hacer === "nada") { avisar.current(); return null; }
       if (paso.hacer === "quedarse") return null;
       const img = new Image();
