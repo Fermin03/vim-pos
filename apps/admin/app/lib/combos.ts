@@ -2,6 +2,7 @@
 import { z } from "zod";
 import { supabase, leerSesion } from "./supabase";
 import type { EstadoProducto } from "./catalogo";
+import { estadoGeneral } from "./menu-sucursal";
 
 // Lo que lee el dueño; los valores (DELTA…) son los de la base. Antes decía "Solo el delta de
 // la opción": "delta" es jerga de quien lo programó.
@@ -168,12 +169,13 @@ export const opcionSchema = z.object({
   activa: z.boolean(),
 });
 export type OpcionInput = z.infer<typeof opcionSchema>;
-export type Opcion = OpcionInput & { id: string; producto_id: string; nombre: string; precio: number; estado: EstadoProducto; orden_visualizacion: number };
+/** agotado = «agotado en todas» (columnas agotado_* del producto, derivadas de las sucursales; 0152). */
+export type Opcion = OpcionInput & { id: string; producto_id: string; nombre: string; precio: number; estado: EstadoProducto; agotado: boolean; orden_visualizacion: number };
 
 export async function listarOpciones(slotId: string): Promise<Opcion[]> {
   const { data, error } = await supabase
     .from("combo_opciones")
-    .select("id, producto_id, precio_delta_mxn, es_default, activa, orden_visualizacion, producto:productos(nombre, precio_base_mxn, estado)")
+    .select("id, producto_id, precio_delta_mxn, es_default, activa, orden_visualizacion, producto:productos(nombre, precio_base_mxn, estado, agotado_manual, agotado_automatico)")
     .eq("grupo_id", slotId)
     .is("deleted_at", null)
     .order("orden_visualizacion", { ascending: true });
@@ -185,6 +187,12 @@ export async function listarOpciones(slotId: string): Promise<Opcion[]> {
     // Un producto agotado sigue siendo parte del combo (pantalla de configuración, no de venta):
     // se necesita el estado para mostrar el mismo aviso "Agotado" que ya usa la rama por categoría.
     estado: ((f.producto as { estado?: EstadoProducto } | null)?.estado) ?? "ACTIVO",
+    // El agotado ya no es un estado (0152): vive por sucursal, y el producto guarda «agotado en todas».
+    agotado: estadoGeneral({
+      estado: ((f.producto as { estado?: EstadoProducto } | null)?.estado) ?? "ACTIVO",
+      agotado_manual: (f.producto as { agotado_manual?: boolean } | null)?.agotado_manual === true,
+      agotado_automatico: (f.producto as { agotado_automatico?: boolean } | null)?.agotado_automatico === true,
+    }) === "AGOTADO",
   }));
 }
 

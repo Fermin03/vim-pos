@@ -20,6 +20,8 @@ export type ProductoCarta = {
   categoria_id?: string | null;
   agotado?: boolean;
   visible?: boolean;
+  /** false = la sucursal de esta carta no lo vende (productos_sucursal.disponible, 0152). */
+  se_vende?: boolean;
   /** true si es un combo (productos.es_combo). Un combo sin slots no se puede vender. */
   es_combo?: boolean;
   /** Nº de slots activos del combo. Solo se mira cuando `es_combo`. */
@@ -76,6 +78,36 @@ export function centavos(precio: number | string): number {
   return Number.isFinite(n) && n > 0 ? Math.round(n * 100) : 0;
 }
 
+/** Una fila de productos_sucursal (0152) de la sucursal de la conexión. */
+export type FilaSucursalCarta = {
+  producto_id: string;
+  disponible: boolean;
+  precio_mxn: number | string | null;
+  agotado_manual: boolean;
+  agotado_automatico: boolean;
+};
+
+/**
+ * La carta de una tienda de Uber es la de SU sucursal (delivery_conexiones.sucursal_id): precio,
+ * agotado y «se vende» de esa sucursal. Misma regla que precio_producto_en_sucursal /
+ * motivo_no_disponible_en_sucursal (0152) y que aplicarSucursal de la caja
+ * (apps/pos/app/lib/catalogo-sucursal.ts), con los mismos casos. Va ANTES de armarCombosCarta: así
+ * el importe de una opción SUMA ya sale con el precio de la sucursal.
+ */
+export function aplicarSucursalCarta(productos: ProductoCarta[], filas: FilaSucursalCarta[]): ProductoCarta[] {
+  const porProducto = new Map(filas.map((f) => [f.producto_id, f]));
+  return productos.map((p) => {
+    const f = porProducto.get(p.id);
+    if (!f) return p;
+    return {
+      ...p,
+      precio_base_mxn: f.precio_mxn === null ? p.precio_base_mxn : f.precio_mxn,
+      agotado: p.agotado === true || f.agotado_manual || f.agotado_automatico,
+      se_vende: f.disponible,
+    };
+  });
+}
+
 /**
  * Motivo de exclusión que no depende de combos ni de grupos: id inválido, oculto, agotado o sin
  * precio. Es el único criterio para decidir si un producto entra a `items[]`, y el mismo que usa
@@ -84,6 +116,7 @@ export function centavos(precio: number | string): number {
  */
 function motivoBase(p: ProductoCarta): string | null {
   return !idValidoUber(p.id) ? "id inválido para Uber"
+    : p.se_vende === false ? "no se vende en esta sucursal"
     : p.visible === false ? "oculto en el POS"
     : p.agotado ? "agotado"
     : centavos(p.precio_base_mxn) <= 0 ? "sin precio"
@@ -177,7 +210,7 @@ export function armarCombosCarta(
     const k = String(o.grupo_id);
     opcionesPorSlot.set(k, [...(opcionesPorSlot.get(k) ?? []), o]);
   }
-  const vendibles = new Map(productos.filter((p) => !p.es_combo && p.visible !== false && !p.agotado).map((p) => [p.id, p]));
+  const vendibles = new Map(productos.filter((p) => !p.es_combo && p.visible !== false && p.se_vende !== false && !p.agotado).map((p) => [p.id, p]));
   const slotsPorCombo = new Map<string, ComboCarta["slots"]>();
   for (const s of comboGrupos) {
     const explicitas = opcionesPorSlot.get(String(s.id)) ?? [];

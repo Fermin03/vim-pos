@@ -1,5 +1,6 @@
 "use client";
 import { employeeClient } from "./supabase";
+import { aplicarSucursal, type FilaProductoSucursal } from "./catalogo-sucursal";
 
 export type Categoria = {
   id: string;
@@ -17,6 +18,11 @@ export type Producto = {
   categoria_id: string;
   agotado: boolean;
   esCombo: boolean;
+  /**
+   * false = esta sucursal no lo vende (productos_sucursal, 0152). Se carga igual —la reapertura de
+   * cuentas lo necesita— pero no se pinta. `precio_base_mxn` y `agotado` ya son los de la sucursal.
+   */
+  seVendeAqui: boolean;
   /** Snapshots fiscales/cocina (Fase 3): el cobro offline los necesita para reconstruir el ítem al sincronizar. */
   sku: string | null;
   tasaIva: number;
@@ -44,17 +50,28 @@ export async function listarCategoriasPos(token: string): Promise<Categoria[]> {
   }));
 }
 
-/** Productos visibles en POS (ACTIVO/AGOTADO, no PAUSADO; visible_en_pos=true). */
-export async function listarProductosPos(token: string): Promise<Producto[]> {
-  const { data, error } = await employeeClient(token)
-    .from("productos")
-    .select("id, nombre, descripcion, precio_base_mxn, categoria_id, estado, agotado_manual, agotado_automatico, visible_en_pos, codigo_interno, tasa_iva, iva_incluido_en_precio, clave_sat, unidad_sat, es_combo, categoria:categorias(nombre)")
-    .is("deleted_at", null)
-    .eq("visible_en_pos", true)
-    .in("estado", ["ACTIVO", "AGOTADO"])
-    .order("orden_visualizacion", { ascending: true });
+/**
+ * Productos visibles en POS (ACTIVO/AGOTADO, no PAUSADO; visible_en_pos=true), ya ajustados a la
+ * sucursal de la caja (ADR 0027): su precio, su agotado y si se vende aquí. RLS por tenant.
+ */
+export async function listarProductosPos(token: string, sucursalId: string): Promise<Producto[]> {
+  const sb = employeeClient(token);
+  const [{ data, error }, { data: filas, error: errorFilas }] = await Promise.all([
+    sb
+      .from("productos")
+      .select("id, nombre, descripcion, precio_base_mxn, categoria_id, estado, visible_en_pos, codigo_interno, tasa_iva, iva_incluido_en_precio, clave_sat, unidad_sat, es_combo, categoria:categorias(nombre)")
+      .is("deleted_at", null)
+      .eq("visible_en_pos", true)
+      .in("estado", ["ACTIVO", "AGOTADO"])
+      .order("orden_visualizacion", { ascending: true }),
+    sb
+      .from("productos_sucursal")
+      .select("producto_id, disponible, precio_mxn, agotado_manual, agotado_automatico")
+      .eq("sucursal_id", sucursalId),
+  ]);
   if (error) throw new Error(error.message);
-  return (data ?? []).map((row) => {
+  if (errorFilas) throw new Error(errorFilas.message);
+  const base = (data ?? []).map((row): Producto => {
     const p = row as Record<string, unknown>;
     return {
       id: String(p.id),
@@ -62,8 +79,11 @@ export async function listarProductosPos(token: string): Promise<Producto[]> {
       descripcion: (p.descripcion as string) ?? null,
       precio_base_mxn: Number(p.precio_base_mxn),
       categoria_id: String(p.categoria_id),
-      agotado: p.estado === "AGOTADO" || Boolean(p.agotado_manual) || Boolean(p.agotado_automatico),
+      // Las columnas agotado_* del producto ahora son «agotado en todas» (0152): el agotado de esta
+      // sucursal sale de su fila. Aquí solo cuenta un estado AGOTADO heredado de antes de 0152.
+      agotado: p.estado === "AGOTADO",
       esCombo: Boolean(p.es_combo),
+      seVendeAqui: true,
       sku: (p.codigo_interno as string) ?? null,
       tasaIva: Number(p.tasa_iva ?? 16),
       ivaIncluido: Boolean(p.iva_incluido_en_precio),
@@ -72,6 +92,7 @@ export async function listarProductosPos(token: string): Promise<Producto[]> {
       categoriaNombre: ((p.categoria as { nombre?: string } | null)?.nombre) ?? null,
     };
   });
+  return aplicarSucursal(base, (filas ?? []) as FilaProductoSucursal[]);
 }
 
 /** "¿Lo hacemos combo?" por negocio. Sin fila o sin red se asume encendido: es el default de la columna. */

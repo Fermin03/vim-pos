@@ -1,24 +1,46 @@
 "use client";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button, DialogoPeligro } from "@vim/ui/styles";
 import { PageHeader, PageBody } from "../../../components/page-header";
 import { CatalogoTabs } from "../../../components/catalogo-tabs";
-import {
-  eliminarProducto,
-  listarProductos,
-  precioMxn,
-  type EstadoProducto,
-  type Producto,
-} from "../../../lib/catalogo";
+import { AvisoCajasMenu } from "../../../components/aviso-cajas-menu";
+import { eliminarProducto, listarProductos, precioMxn, type Producto } from "../../../lib/catalogo";
+import type { Caja } from "../../../lib/configuracion";
 import { mensajeError } from "../../../lib/errores";
+import { limpiarPrecio } from "../../../lib/numeros";
+import {
+  cajasQueNoRespetanMenu,
+  esPorDefecto,
+  estadoEnSucursal,
+  estadoGeneral,
+  filaPorDefecto,
+  guardarMenuSucursal,
+  leerMenuDeSucursal,
+  listarSucursalesMenu,
+  precioValido,
+  type EdicionMenuSucursal,
+  type EstadoEnSucursal,
+  type FilaMenuSucursal,
+  type SucursalMenu,
+} from "../../../lib/menu-sucursal";
 
-type Filtro = "all" | "ACTIVO" | "PAUSADO" | "AGOTADO";
+type Filtro = "all" | EstadoEnSucursal;
+const TODAS = "todas";
+const SIN_FILAS: Map<string, FilaMenuSucursal> = new Map();
 
-const BADGE: Record<EstadoProducto, { txt: string; cls: string; dot: string }> = {
+const BADGE: Record<EstadoEnSucursal, { txt: string; cls: string; dot: string }> = {
   ACTIVO: { txt: "Activo", cls: "bg-success-soft text-success", dot: "bg-success" },
   PAUSADO: { txt: "Pausado", cls: "bg-hover text-ink-3", dot: "bg-ink-3" },
   AGOTADO: { txt: "Agotado", cls: "bg-[#FBF1EF] text-danger", dot: "bg-danger" },
+  NO_SE_VENDE: { txt: "No se vende aquí", cls: "bg-hover text-ink-2", dot: "bg-ink-3" },
+};
+const NOMBRE_FILTRO: Record<Filtro, string> = {
+  all: "Todos",
+  ACTIVO: "Activos",
+  PAUSADO: "Pausados",
+  AGOTADO: "Agotados",
+  NO_SE_VENDE: "No se venden aquí",
 };
 
 export default function ProductosPage() {
@@ -29,6 +51,26 @@ export default function ProductosPage() {
   const [filtro, setFiltro] = useState<Filtro>("all");
   const [borrar, setBorrar] = useState<Producto | null>(null);
   const [borrando, setBorrando] = useState(false);
+  // Menú por sucursal (ADR 0027): con dos o más sucursales se elige una y se ajusta en línea.
+  const [sucursales, setSucursales] = useState<SucursalMenu[]>([]);
+  const [sucSel, setSucSel] = useState<string>(TODAS);
+  const [filas, setFilas] = useState<Map<string, FilaMenuSucursal>>(new Map());
+  // A qué sucursal pertenecen `filas`: mientras no coincida con la elegida, el menú no se muestra ni se edita.
+  const [filasDe, setFilasDe] = useState<string | null>(null);
+  // Renglones con una escritura en cola o en curso (un id por escritura).
+  const [guardando, setGuardando] = useState<string[]>([]);
+  // Se incrementa cuando un guardado falla: obliga a remontar los campos con lo que sí quedó guardado.
+  const [recarga, setRecarga] = useState(0);
+  const [cajasViejas, setCajasViejas] = useState<Caja[]>([]);
+  const porSucursal = sucSel !== TODAS;
+  // Las escrituras salen de estos refs, no del cierre del render: cada una ve lo último guardado.
+  const sucRef = useRef(sucSel);
+  sucRef.current = sucSel;
+  const filasRef = useRef<{ de: string | null; filas: Map<string, FilaMenuSucursal> }>({ de: null, filas: new Map() });
+  const colaRef = useRef<Promise<void>>(Promise.resolve());
+  const cargandoFilas = porSucursal && filasDe !== sucSel;
+  const filasVista = filasDe === sucSel ? filas : SIN_FILAS;
+  const nombreSuc = sucursales.find((s) => s.id === sucSel)?.nombre ?? "";
 
   async function recargar() {
     setError(null);
@@ -40,15 +82,103 @@ export default function ProductosPage() {
   }
   useEffect(() => {
     recargar();
+    listarSucursalesMenu().then(setSucursales).catch(() => setSucursales([]));
+    cajasQueNoRespetanMenu().then(setCajasViejas).catch(() => setCajasViejas([]));
   }, []);
+
+  function aplicarFilas(suc: string, fs: FilaMenuSucursal[]) {
+    const mapa = new Map(fs.map((f) => [f.producto_id, f]));
+    filasRef.current = { de: suc, filas: mapa };
+    setFilas(mapa);
+    setFilasDe(suc);
+  }
+
+  useEffect(() => {
+    // Al cambiar de sucursal se olvida el menú de la anterior antes de leer el nuevo.
+    filasRef.current = { de: null, filas: new Map() };
+    setFilas(new Map());
+    setFilasDe(null);
+    if (sucSel === TODAS) return;
+    let vivo = true;
+    leerMenuDeSucursal(sucSel)
+      .then((fs) => {
+        if (vivo) aplicarFilas(sucSel, fs);
+      })
+      .catch((e) => {
+        if (vivo) setError(mensajeError(e, "No se pudo leer el menú de la sucursal"));
+      });
+    return () => {
+      vivo = false;
+    };
+  }, [sucSel]);
 
   const visibles = useMemo(() => {
     return (prods ?? []).filter((p) => {
-      if (filtro !== "all" && p.estado !== filtro) return false;
+      const estado = porSucursal ? estadoEnSucursal(p.estado, filasVista.get(p.id)) : estadoGeneral(p);
+      if (filtro !== "all" && estado !== filtro) return false;
       if (query && !p.nombre.toLowerCase().includes(query.toLowerCase())) return false;
       return true;
     });
-  }, [prods, filtro, query]);
+  }, [prods, filtro, query, porSucursal, filasVista]);
+
+  /**
+   * Una escritura a la vez y ninguna se pierde: cada una se encadena a la anterior. Al empezar, la
+   * edición se arma con lo último leído (no con el render que la disparó), y al terminar se vuelve a
+   * leer: lo que se ve es lo guardado. Solo el renglón en cola se atenúa; el resto de la tabla sigue libre.
+   */
+  function guardarFila(p: Producto, cambio: Partial<Pick<EdicionMenuSucursal, "disponible" | "precio_mxn">>) {
+    const suc = sucSel;
+    if (suc === TODAS || filasRef.current.de !== suc) return;
+    setGuardando((g) => [...g, p.id]);
+    colaRef.current = colaRef.current.then(async () => {
+      try {
+        // Si mientras esperaba en la cola se cambió de sucursal, esta escritura ya no aplica.
+        if (sucRef.current !== suc || filasRef.current.de !== suc) return;
+        const existente = filasRef.current.filas.get(p.id);
+        const actual = existente ?? filaPorDefecto(p.id, suc);
+        const edicion: EdicionMenuSucursal = {
+          producto_id: p.id,
+          sucursal_id: suc,
+          disponible: actual.disponible,
+          precio_mxn: actual.precio_mxn,
+          agotado_manual: actual.agotado_manual,
+          ...cambio,
+        };
+        if (!existente && esPorDefecto(edicion)) return;
+        setError(null);
+        try {
+          await guardarMenuSucursal([edicion]);
+        } catch (e) {
+          if (sucRef.current === suc) {
+            setError(mensajeError(e, "No se pudo guardar el menú de la sucursal"));
+            // Lo que se ve debe ser lo guardado: se relee y los campos se remontan con ese valor.
+            try {
+              const fs = await leerMenuDeSucursal(suc);
+              if (sucRef.current === suc) {
+                aplicarFilas(suc, fs);
+                setRecarga((n) => n + 1);
+              }
+            } catch {
+              /* el error de guardado ya está a la vista */
+            }
+          }
+          return;
+        }
+        try {
+          const fs = await leerMenuDeSucursal(suc);
+          if (sucRef.current === suc) aplicarFilas(suc, fs);
+          setCajasViejas(await cajasQueNoRespetanMenu());
+        } catch (e) {
+          if (sucRef.current === suc) setError(mensajeError(e, "Se guardó, pero no se pudo releer el menú de la sucursal"));
+        }
+      } finally {
+        setGuardando((g) => {
+          const i = g.indexOf(p.id);
+          return i < 0 ? g : [...g.slice(0, i), ...g.slice(i + 1)];
+        });
+      }
+    });
+  }
 
   async function confirmarBorrado() {
     if (!borrar) return;
@@ -65,12 +195,18 @@ export default function ProductosPage() {
   }
 
   const sinNada = prods !== null && prods.length === 0;
+  const filtros: Filtro[] = porSucursal ? ["all", "ACTIVO", "PAUSADO", "AGOTADO", "NO_SE_VENDE"] : ["all", "ACTIVO", "PAUSADO", "AGOTADO"];
+  const th = "border-b border-line bg-sel px-4 py-[13px] text-12 font-bold uppercase tracking-wide text-ink-3";
 
   return (
     <>
       <PageHeader
         titulo="Productos"
-        subtitulo="El menú completo de tu negocio. Aquí sí se muestran los precios."
+        subtitulo={
+          sucursales.length >= 2
+            ? "El menú de tu negocio. Elige una sucursal para ver y ajustar lo que vende y a qué precio."
+            : "El menú completo de tu negocio. Aquí sí se muestran los precios."
+        }
         migas={[{ label: "Catálogo" }, { label: "Productos" }]}
         right={
           <div className="flex items-center gap-2">
@@ -89,7 +225,27 @@ export default function ProductosPage() {
       />
       <CatalogoTabs />
       <PageBody>
+        <AvisoCajasMenu cajas={cajasViejas} />
+
         <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center">
+          {sucursales.length >= 2 && (
+            <select
+              aria-label="Sucursal"
+              value={sucSel}
+              onChange={(e) => {
+                setSucSel(e.target.value);
+                setFiltro("all");
+              }}
+              className="h-10 rounded border border-line-strong px-3 text-sm outline-none focus:border-ink"
+            >
+              <option value={TODAS}>Todas las sucursales</option>
+              {sucursales.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.nombre}
+                </option>
+              ))}
+            </select>
+          )}
           <div className="relative w-full flex-1 sm:max-w-[340px]">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="pointer-events-none absolute left-[13px] top-1/2 h-[17px] w-[17px] -translate-y-1/2 text-ink-3">
               <circle cx="11" cy="11" r="7" />
@@ -104,7 +260,7 @@ export default function ProductosPage() {
             />
           </div>
           <div className="scroll-x-limpio inline-flex max-w-full gap-0.5 overflow-x-auto rounded border border-line bg-hover p-[3px] lg:max-w-none lg:overflow-x-visible">
-            {(["all", "ACTIVO", "PAUSADO", "AGOTADO"] as Filtro[]).map((f) => (
+            {filtros.map((f) => (
               <button
                 key={f}
                 type="button"
@@ -114,11 +270,17 @@ export default function ProductosPage() {
                   filtro === f ? "bg-surface text-ink shadow-sm" : "text-ink-2 hover:text-ink",
                 ].join(" ")}
               >
-                {f === "all" ? "Todos" : f === "ACTIVO" ? "Activos" : f === "PAUSADO" ? "Pausados" : "Agotados"}
+                {NOMBRE_FILTRO[f]}
               </button>
             ))}
           </div>
         </div>
+
+        {porSucursal && (
+          <p className="mb-3 text-13 text-ink-2">
+            Precio vacío = el general. Los cambios llegan a las cajas de {nombreSuc} en uno o dos minutos.
+          </p>
+        )}
 
         {error && (
           <p className="mb-4 text-sm font-medium text-danger" role="alert">
@@ -133,21 +295,29 @@ export default function ProductosPage() {
             <table className="w-full border-collapse">
               <thead>
                 <tr>
-                  <th className="border-b border-line bg-sel px-4 py-[13px] text-left text-12 font-bold uppercase tracking-wide text-ink-3">Producto</th>
-                  <th className="w-[180px] border-b border-line bg-sel px-4 py-[13px] text-left text-12 font-bold uppercase tracking-wide text-ink-3">Categoría</th>
-                  <th className="w-[120px] border-b border-line bg-sel px-4 py-[13px] text-right text-12 font-bold uppercase tracking-wide text-ink-3">Precio</th>
-                  <th className="w-[120px] border-b border-line bg-sel px-4 py-[13px] text-left text-12 font-bold uppercase tracking-wide text-ink-3">Estado</th>
-                  <th className="w-[104px] border-b border-line bg-sel px-4 py-[13px]"></th>
+                  <th className={`${th} text-left`}>Producto</th>
+                  <th className={`${th} w-[180px] text-left`}>Categoría</th>
+                  {porSucursal && <th className={`${th} w-[110px] text-left`}>Se vende aquí</th>}
+                  <th className={`${th} ${porSucursal ? "w-[150px]" : "w-[120px]"} text-right`}>{porSucursal ? "Precio aquí" : "Precio"}</th>
+                  <th className={`${th} w-[150px] text-left`}>Estado</th>
+                  <th className={`${th} w-[104px]`}></th>
                 </tr>
               </thead>
               <tbody>
                 {visibles.map((p) => {
-                  const b = BADGE[p.estado];
+                  const fila = filasVista.get(p.id);
+                  const b = BADGE[porSucursal ? estadoEnSucursal(p.estado, fila) : estadoGeneral(p)];
                   // Un combo se edita en su propia pantalla (slots, vista previa de precio):
                   // no tiene receta ni estación, así que el editor de producto no le sirve.
                   const editarHref = p.es_combo ? `/catalogo/combos/${p.id}` : `/catalogo/productos/${p.id}`;
+                  const enCola = guardando.includes(p.id);
+                  const bloqueado = cargandoFilas || enCola;
                   return (
-                    <tr key={p.id} className="group cursor-pointer border-b border-line last:border-none hover:bg-hover" onClick={() => router.push(editarHref)}>
+                    <tr
+                      key={p.id}
+                      className={["group cursor-pointer border-b border-line last:border-none hover:bg-hover", enCola ? "opacity-50" : ""].join(" ")}
+                      onClick={() => router.push(editarHref)}
+                    >
                       <td className="px-4 py-3.5">
                         <div className="flex items-center gap-2">
                           <span className="text-15 font-semibold">{p.nombre}</span>
@@ -156,12 +326,59 @@ export default function ProductosPage() {
                         {p.codigo_interno && <div className="mt-px text-13 text-ink-3">{p.codigo_interno}</div>}
                       </td>
                       <td className="px-4 py-3.5 text-14 text-ink-2">{p.categoriaNombre}</td>
-                      <td className="px-4 py-3.5 text-right font-display text-15 font-semibold tabular-nums">{precioMxn(p.precio_base_mxn)}</td>
+                      {porSucursal && (
+                        <td className="px-4 py-3.5" onClick={(e) => e.stopPropagation()}>
+                          <input
+                            type="checkbox"
+                            className="h-5 w-5 accent-ink"
+                            aria-label={`${p.nombre} se vende en ${nombreSuc}`}
+                            checked={fila?.disponible ?? true}
+                            disabled={bloqueado}
+                            onChange={(e) => guardarFila(p, { disponible: e.target.checked })}
+                          />
+                        </td>
+                      )}
+                      {porSucursal ? (
+                        <td className="px-4 py-3.5" onClick={(e) => e.stopPropagation()}>
+                          <div className="relative ml-auto w-[120px]">
+                            <span aria-hidden="true" className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-sm text-ink-2">$</span>
+                            <input
+                              key={`${p.id}:${fila?.precio_mxn ?? ""}:${recarga}`}
+                              defaultValue={fila?.precio_mxn ?? ""}
+                              placeholder={String(p.precio_base_mxn)}
+                              inputMode="decimal"
+                              aria-label={`Precio de ${p.nombre} en ${nombreSuc}`}
+                              disabled={bloqueado || fila?.disponible === false}
+                              className="h-9 w-full rounded border border-line-strong pl-6 pr-2 text-right text-sm tabular-nums outline-none focus:border-ink disabled:bg-hover disabled:text-ink-3"
+                              onChange={(e) => {
+                                e.target.value = limpiarPrecio(e.target.value);
+                              }}
+                              onKeyDown={(e) => {
+                                if (e.key === "Enter") e.currentTarget.blur();
+                              }}
+                              onBlur={(e) => {
+                                const nuevo = precioValido(e.target.value);
+                                if (nuevo === "invalido") {
+                                  // Un "." suelto (que limpiarPrecio deja en "0.") no es un precio: se deja lo guardado.
+                                  e.target.value = fila?.precio_mxn != null ? String(fila.precio_mxn) : "";
+                                  return;
+                                }
+                                if (nuevo !== (fila?.precio_mxn ?? null)) guardarFila(p, { precio_mxn: nuevo });
+                              }}
+                            />
+                          </div>
+                        </td>
+                      ) : (
+                        <td className="px-4 py-3.5 text-right font-display text-15 font-semibold tabular-nums">{precioMxn(p.precio_base_mxn)}</td>
+                      )}
                       <td className="px-4 py-3.5">
-                        <span className={["inline-flex items-center gap-1.5 rounded-full px-[11px] py-1 text-13 font-semibold", b.cls].join(" ")}>
+                        <span className={["inline-flex items-center gap-1.5 whitespace-nowrap rounded-full px-[11px] py-1 text-13 font-semibold", b.cls].join(" ")}>
                           <span className={["h-1.5 w-1.5 rounded-full", b.dot].join(" ")} />
                           {b.txt}
                         </span>
+                        {porSucursal && fila && fila.precio_mxn !== null && (
+                          <div className="mt-1 text-12 text-ink-3 tabular-nums">General {precioMxn(p.precio_base_mxn)}</div>
+                        )}
                       </td>
                       <td className="px-4 py-3.5 text-right" onClick={(e) => e.stopPropagation()}>
                         <span className="inline-flex gap-1">

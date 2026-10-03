@@ -85,14 +85,16 @@ BEGIN
       jsonb_build_object('grupo_id', v_g_acom, 'producto_id', v_papas, 'cantidad', 1)), '[]'::jsonb, NULL, 'smoke-combo-x2');
     RAISE EXCEPTION 'debió fallar: refresco fuera del slot Hamburguesa';
   EXCEPTION WHEN OTHERS THEN IF SQLERRM NOT LIKE '%no es opción del slot%' THEN RAISE; END IF; END;
-  UPDATE productos SET agotado_manual = true, estado = 'AGOTADO' WHERE id = v_papas;
+  -- 0152: el agotado es por sucursal.
+  INSERT INTO productos_sucursal (tenant_id, producto_id, sucursal_id, agotado_manual) VALUES (v_tenant, v_papas, v_suc, true)
+    ON CONFLICT (producto_id, sucursal_id) DO UPDATE SET agotado_manual = true;
   BEGIN
     PERFORM agregar_combo_a_ticket(v_ticket, v_combo, 1, jsonb_build_array(
       jsonb_build_object('grupo_id', v_g_hamb, 'producto_id', v_clas, 'cantidad', 1),
       jsonb_build_object('grupo_id', v_g_acom, 'producto_id', v_papas, 'cantidad', 1)), '[]'::jsonb, NULL, 'smoke-combo-x3');
     RAISE EXCEPTION 'debió fallar: papas agotadas';
   EXCEPTION WHEN OTHERS THEN IF SQLERRM NOT LIKE '%agotado o pausado%' THEN RAISE; END IF; END;
-  UPDATE productos SET agotado_manual = false, estado = 'ACTIVO' WHERE id = v_papas;
+  UPDATE productos_sucursal SET agotado_manual = false WHERE producto_id = v_papas AND sucursal_id = v_suc;
   BEGIN
     PERFORM agregar_item_a_ticket(v_ticket, v_combo, 1, NULL, '[]'::jsonb, 'smoke-combo-x4');
     RAISE EXCEPTION 'debió fallar: un combo no entra por agregar_item_a_ticket';
@@ -180,7 +182,9 @@ BEGIN
   -- La sección 5 dejó el insumo "Carne combo smoke" en 0 (sin fila en insumo_stock_sucursal) y el
   -- trigger de alertas ya auto-agotó la Clásica por insumo crítico agotado; para esta sección solo
   -- interesa el IVA, no el inventario, así que se reactiva igual que la sección 3 hace con las papas.
-  UPDATE productos SET agotado_automatico = false, estado = 'ACTIVO', motivo_agotado = NULL WHERE id = v_clas;
+  -- 0152: el agotado automático vive en la fila de la sucursal.
+  UPDATE productos_sucursal SET agotado_automatico = false, motivo_agotado = NULL
+   WHERE producto_id = v_clas AND sucursal_id = v_suc;
 
   v_ticket2 := abrir_ticket(v_suc, v_caja, v_turno, 'PARA_LLEVAR'::modo_servicio, NULL, NULL, 'smoke-combo-iva-1', v_maria);
   v_padre2 := agregar_combo_a_ticket(v_ticket2, v_combo, 1, jsonb_build_array(

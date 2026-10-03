@@ -355,7 +355,7 @@ export function HomePos({
    */
   const recargarCatalogo = useCallback(async (): Promise<void> => {
     try {
-      const [cs, ps] = await Promise.all([listarCategoriasPos(token), listarProductosPos(token)]);
+      const [cs, ps] = await Promise.all([listarCategoriasPos(token), listarProductosPos(token, caja.sucursal_id)]);
       setCategorias(cs);
       setProductos(ps);
       // Su propio .catch: si solo falla la consulta de combos, no debe tirar el catch exterior

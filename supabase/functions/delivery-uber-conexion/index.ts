@@ -8,7 +8,8 @@ import { corsHeaders } from "../_shared/cors.ts";
 import { registrarError } from "../_shared/errores.ts";
 import { tenantDelToken } from "../_shared/identidad.ts";
 import {
-  armarCombosCarta, armarGruposModificadorCarta, construirMenuUber, type CategoriaCarta, type ProductoCarta,
+  aplicarSucursalCarta, armarCombosCarta, armarGruposModificadorCarta, construirMenuUber, type CategoriaCarta,
+  type FilaSucursalCarta, type ProductoCarta,
 } from "../_shared/delivery/menu-uber.ts";
 import { crearClienteUber } from "../_shared/delivery/uber.ts";
 import { cuerpoPosData, normalizarTiendasUber, transicionConexion, type EstadoConexion } from "../_shared/delivery/uber-activacion.ts";
@@ -352,9 +353,10 @@ Deno.serve(async (req) => {
         const [
           { data: prods }, { data: cats }, { data: gruposModificador }, { data: opcionesModificador },
           { data: vinculosProductoGrupo }, { data: comboGrupos }, { data: comboOpciones },
+          { data: filasSucursal, error: errSucursal },
         ] = await Promise.all([
           admin.from("productos")
-            .select("id, nombre, descripcion, precio_base_mxn, tasa_iva, categoria_id, agotado_manual, agotado_automatico, visible_en_pos, es_combo")
+            .select("id, nombre, descripcion, precio_base_mxn, tasa_iva, categoria_id, visible_en_pos, es_combo")
             .eq("tenant_id", tenantId).eq("estado", "ACTIVO").is("deleted_at", null),
           admin.from("categorias").select("id, nombre, orden_visualizacion").eq("tenant_id", tenantId).eq("activa", true).is("deleted_at", null),
           admin.from("grupos_modificadores").select("id, nombre, tipo_seleccion, minimo_selecciones, maximo_selecciones")
@@ -367,7 +369,17 @@ Deno.serve(async (req) => {
             .eq("tenant_id", tenantId).eq("activo", true).is("deleted_at", null),
           admin.from("combo_opciones").select("grupo_id, producto_id, precio_delta_mxn, activa")
             .eq("tenant_id", tenantId).is("deleted_at", null),
+          // Menú por sucursal (0152): la carta de esta tienda es la de su sucursal.
+          admin.from("productos_sucursal").select("producto_id, disponible, precio_mxn, agotado_manual, agotado_automatico")
+            .eq("tenant_id", tenantId).eq("sucursal_id", cx.sucursal_id),
         ]);
+        // Sin el menú de la sucursal, la carta saldría a precios generales y con lo que esta sucursal
+        // no vende: mejor no publicar que publicar mal. Uber se queda con la carta anterior.
+        if (errSucursal) {
+          await registrar("menu", false, `productos_sucursal: ${errSucursal.message}`, cx.id, cx.tienda_id_externo);
+          registrarError("delivery-uber-conexion", "INTERNO", errSucursal);
+          return json({ error: "INTERNO" }, 500);
+        }
         // Un combo sin slots configurados no se puede vender: cuenta cuántos grupos tiene cada
         // combo para que construirMenuUber lo excluya (ver "combo sin slots").
         const slotsPorCombo = new Map<string, number>();
@@ -375,14 +387,16 @@ Deno.serve(async (req) => {
           const k = String(g.combo_producto_id);
           slotsPorCombo.set(k, (slotsPorCombo.get(k) ?? 0) + 1);
         }
-        const productos: ProductoCarta[] = ((prods ?? []) as Record<string, unknown>[]).map((p) => ({
+        const productosBase: ProductoCarta[] = ((prods ?? []) as Record<string, unknown>[]).map((p) => ({
           id: String(p.id), nombre: String(p.nombre ?? ""), descripcion: (p.descripcion as string | null) ?? null,
           precio_base_mxn: p.precio_base_mxn as number | string, tasa_iva: p.tasa_iva as number | null,
           categoria_id: (p.categoria_id as string | null) ?? null,
-          agotado: p.agotado_manual === true || p.agotado_automatico === true, visible: p.visible_en_pos !== false,
+          // El agotado es por sucursal (0152): lo pone aplicarSucursalCarta.
+          agotado: false, visible: p.visible_en_pos !== false,
           es_combo: p.es_combo === true,
           n_slots: slotsPorCombo.get(String(p.id)) ?? 0,
         }));
+        const productos = aplicarSucursalCarta(productosBase, (filasSucursal ?? []) as FilaSucursalCarta[]);
         const categorias: CategoriaCarta[] = ((cats ?? []) as Record<string, unknown>[]).map((c) => ({
           id: String(c.id), nombre: String(c.nombre ?? ""), orden: (c.orden_visualizacion as number | null) ?? 0,
         }));

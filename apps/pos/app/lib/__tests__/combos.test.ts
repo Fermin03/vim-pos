@@ -10,7 +10,7 @@ import type { GrupoModificadores, TipoSeleccion } from "../modificadores";
 // codificaban a mano los mismos 190 y 140: si una implementación se movía, el otro seguía verde.
 
 const prod = (id: string, nombre: string, precio: number, categoria_id: string, extra: Partial<Producto> = {}): Producto => ({
-  id, nombre, descripcion: null, precio_base_mxn: precio, categoria_id, agotado: false, esCombo: false,
+  id, nombre, descripcion: null, precio_base_mxn: precio, categoria_id, agotado: false, esCombo: false, seVendeAqui: true,
   sku: null, tasaIva: 16, ivaIncluido: true, claveSat: null, unidadSat: null, categoriaNombre: null, ...extra,
 });
 const combo = prod("c1", "Combo", COMBO_BASE_MXN, "cat-combos", { esCombo: true });
@@ -158,5 +158,24 @@ describe("abreModificadores", () => {
   });
   it("con Siguiente, lo que ya pasó por el modal no se vuelve a preguntar", () => {
     expect(abreModificadores(conObligatorio, "siguiente", true)).toBe(false);
+  });
+});
+
+describe("menú por sucursal (0152)", () => {
+  const opcionesDe = (defs: ComboDef[]): string[] => defs.flatMap((d) => d.slots.flatMap((s) => s.opciones.map((o) => o.producto.id)));
+
+  it("una opción que esta sucursal no vende no sale en ningún slot, por lista ni por categoría", () => {
+    for (const id of ["h1", "a1"]) {
+      expect(opcionesDe(armarCombos(filas, productos))).toContain(id);
+      const ajustados = productos.map((p) => (p.id === id ? { ...p, seVendeAqui: false } : p));
+      expect(opcionesDe(armarCombos(filas, ajustados))).not.toContain(id);
+    }
+  });
+
+  it("el combo se sigue armando aunque no se venda aquí (para reabrir cuentas), pero no se ofrece", () => {
+    const ajustados = productos.map((p) => (p.id === "c1" ? { ...p, seVendeAqui: false } : p));
+    const defs = armarCombos(filas, ajustados);
+    expect(defs.map((d) => d.producto.id)).toContain("c1");
+    expect(combosQueAdmiten(clasica, defs)).toEqual([]);
   });
 });
