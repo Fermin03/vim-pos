@@ -113,7 +113,39 @@ que cerrar la ventana tumbaba todo el servidor del local.
 
 **Watchdog — auto-recuperación.** `watchdog.mjs` hace ping a `GET /health/deep` (que toca Postgres
 *y* PostgREST, no un ok estático) cada 20s; si falla 3 veces seguidas, reinicia el backend solo.
-Verificado (`npm run verify:robustez3`): matando `postgrest.exe`, el backend revive en ~12s.
+
+- **Qué es "sano"** (`sonda-postgrest.mjs`): Postgres contesta `SELECT 1` en 1.5 s, y PostgREST
+  contesta a una lectura mínima (`/tenants?select=id&limit=1`) con cualquier estado por debajo de
+  500 en 4 s. Como `anon` no puede leer `tenants`, lo normal es un **401** — que ya demuestra que
+  PostgREST atiende, tiene el esquema cargado y habla con la base. **Nunca se le pide `/`**: es la
+  descripción OpenAPI de todo el esquema y tarda segundos (2.2 s en una laptop buena, más de 4 en
+  la PC de Obregón). El readiness del arranque (`runtime.mjs`) sí sigue pidiendo `/`, sin tope.
+- **Cada fallo dice por qué** en el log: `salud del backend FALLÓ (2/3): PostgREST contestó 503
+  (PGRST002)`, `Postgres no contestó en 1500 ms`, `gateway inalcanzable (ECONNREFUSED)`…
+- **Si reiniciar no cura, no insiste.** Tras un reinicio que terminó bien pero la salud sigue
+  fallando, el siguiente pide el doble de fallos (3 → 6 → 12… hasta 90, unos 30 min). Al segundo
+  reinicio seguido sin sanar se avisa a VIM en `errores_app` (`contexto.origen = "watchdog"`), una
+  vez por racha. Si el reinicio **no terminó** (la caja quedó sin backend), lo contrario: se
+  reintenta al siguiente fallo, luego a los 2, 4 y 6; y cuando por fin levanta tras dos o más
+  intentos fallidos, se avisa a VIM cuántos fueron y cuánto duró. La racha se olvida con **tres
+  revisiones buenas seguidas** (un minuto: un OK suelto justo tras reiniciar no prueba nada) o con
+  un respaldo. El aviso nunca se espera: con un Postgres que no contesta, no podría escribirse.
+- **Apagarlo en el campo**: `VIM_WATCHDOG=0` en el entorno de la caja (sin publicar otra versión).
+- **Detener el backend nunca se queda esperando** (`detenerBackend` en `backend.mjs`): el stream
+  del KDS deja de aceptar streams, el gateway da 1.5 s a lo que estaba en vuelo y corta el resto
+  (`cerrarServidor`); lo que EMPIECE en ese segundo y medio recibe **503 "La caja se está
+  reiniciando; intenta en unos segundos."** en vez de cortarse a medias. Solo entonces se detienen
+  PostgREST y Postgres — con tope, comprobando por
+  PID si Postgres de verdad murió. El respaldo y la salida **no copian** el pgdata si no se pudo
+  confirmar.
+
+Verificado (`npm run verify:parada`, con el backend de verdad): salud en milisegundos, parada con un
+stream y una consulta abiertos, y parada con Postgres ya muerto. Las reglas del watchdog están en
+`watchdog.test.mjs`. **Incidente que lo pidió:** Knock-Out Obregón, 2 oct 2026 — ver
+[`docs/bitacora/2026-10-02-obregon-reinicios-del-watchdog.md`](../docs/bitacora/2026-10-02-obregon-reinicios-del-watchdog.md).
+Su firma en el log, por si vuelve: `salud del backend FALLÓ` ~4 s después de cada tick y nunca
+`OK de nuevo` (falso positivo); o un `KDS desconectado` seguido de `KDS conectado` a los 3 s sin
+`limpieza:` ni `reiniciado ✓`, y luego `[sync] omitido` cada minuto (reinicio colgado, ≤ 0.4.106).
 
 **Respaldo local del pgdata.** El bin de Postgres embebido no trae `pg_dump`, así que el respaldo es
 **físico en frío**: se copia el `pgdata` con Postgres detenido → copia 100% consistente. Se dispara:
@@ -125,7 +157,8 @@ Verificado (`npm run verify:robustez3`): matando `postgrest.exe`, el backend rev
   hace en la primera ventana quieta que aparezca. **Nunca interrumpe un turno.**
 - **al cerrar la caja** ("Salir" / apagar la PC) — automático, sin costo (ya está cerrando);
 - **bajo demanda** — "Respaldar ahora" en la bandeja (pausa el watchdog, detiene el backend, copia,
-  lo vuelve a levantar; breve interrupción, a criterio del cajero).
+  lo vuelve a levantar; breve interrupción, a criterio del cajero). No corre mientras el watchdog
+  reinicia el backend, ni el watchdog mientras corre un respaldo.
 
 Los tres anotan su resultado en `<dataRoot>/backups/ultimo-respaldo.json` y cuentan igual como
 "último respaldo". La bandeja lo enseña: **"Último respaldo: hoy 03:12"**.
@@ -160,7 +193,7 @@ de la base entera fuera del local; el sitio lo dice así y no promete más.
 npm run backup                 # respaldo manual en frío
 npm run restore                # restaura el MÁS RECIENTE
 npm run restore -- pgdata-2026-07-11_14-30-05   # restaura uno específico
-npm run verify:robustez3       # prueba headless: respaldo restaurable + watchdog
+npm run verify:parada          # prueba headless: salud barata + parada que no se cuelga
 ```
 `restore` mueve el `pgdata` actual a `pgdata.pre-restauracion-<fecha>` por si acaso.
 
@@ -221,7 +254,7 @@ El manifiesto va **firmado**. La caja lleva la llave pública en `src/updater.mj
 mandarle a las cajas un instalador suyo: le falta la llave privada.
 
 - **La llave privada NO está en el repo ni en ningún servidor.** Vive en la máquina que publica:
-  `%USERPROFILE%.vim-pos-llavesim-actualizaciones.key` (o donde apunte
+  `%USERPROFILE%\.vim-pos-llaves\vim-actualizaciones.key` (o donde apunte
   `VIM_UPDATE_LLAVE_PRIVADA`). Hay que tener **un respaldo fuera de esa máquina** (USB o gestor de
   contraseñas). **Si se pierde, las cajas instaladas dejan de poder actualizarse** y habría que
   reinstalarlas a mano con un instalador que traiga otra llave.
@@ -321,7 +354,7 @@ rechaza sin motivo → el log decía `Boot falló: undefined`. Desde 0.4.56 el a
 escribe Postgres, reintenta hasta 3 veces con 3 s y limpieza entre intentos
 (`src/arranque-reintentos.mjs`), y si aun así falla el diálogo y el log dicen la causa
 (`arranque: Postgres no arrancó (intento 1/3): el puerto de Postgres sigue ocupado…`). Si a un
-cliente le vuelve a pasar, pedir `%APPDATA%im-pos-desktopim-pos.log` y buscar `arranque:`.
+cliente le vuelve a pasar, pedir `%APPDATA%\vim-pos-desktop\vim-pos.log` y buscar `arranque:`.
 
 ## Endurecimiento de la auditoría integral (30/09/2026)
 
