@@ -1,6 +1,7 @@
 "use client";
 import { rangoLegible } from "@vim/fecha";
 import { ReporteMarco, useConsulta, useRangoReporte, type Cifra } from "../../../components/reporte";
+import { useSucursalReporte } from "../../../components/selector-sucursal";
 import { leerVentasPorEvento, type FilaEvento } from "../../../lib/reportes";
 import type { Columna } from "../../../lib/reporte-tabla";
 
@@ -11,7 +12,8 @@ const TIPO: Record<string, string> = {
 /** ¿Valió la pena la feria? Venta, comisión del organizador y neto por evento. */
 export default function VentasPorEventoPage() {
   const { rango, cambiar } = useRangoReporte();
-  const consulta = useConsulta(() => leerVentasPorEvento(), rango);
+  const sucursal = useSucursalReporte();
+  const consulta = useConsulta(() => leerVentasPorEvento(sucursal.id), sucursal.listo ? rango : null, sucursal.clave);
   // Era el único reporte sin rango. La vista ya viene por evento; se filtran los que tocan el
   // periodo elegido.
   const filas = (consulta.datos ?? []).filter((f) => !rango || (f.ultimoDia >= rango.desde && f.primerDia <= rango.hasta));
@@ -50,6 +52,7 @@ export default function VentasPorEventoPage() {
 
   return (
     <ReporteMarco
+      sucursal={sucursal}
       titulo="Ventas por evento"
       subtitulo="Ferias, festivales y eventos privados: venta, comisión del organizador y lo que te quedó."
       rango={{ valor: rango, cambiar }}

@@ -98,12 +98,15 @@ export type CifraExportable = { etiqueta: string; valor: string | number | null;
 export function hojaDeReporte<T>(opts: {
   titulo: string;
   rango?: { desde: string; hasta: string } | null;
+  /** "Sucursal Centro" / "Todas las sucursales"; vacío con una sola sucursal. */
+  alcance?: string;
   cifras?: CifraExportable[];
   columnas: Columna<T>[];
   filas: T[];
 }): Hoja {
-  const { titulo, rango, cifras = [], columnas, filas } = opts;
+  const { titulo, rango, alcance, cifras = [], columnas, filas } = opts;
   const preambulo: Celda[][] = [[{ valor: titulo, negrita: true }]];
+  if (alcance) preambulo.push([{ valor: alcance }]);
   if (rango) preambulo.push([{ valor: `Del ${fechaLegible(rango.desde)} al ${fechaLegible(rango.hasta)}` }]);
   for (const c of cifras) preambulo.push([{ valor: c.etiqueta }, { valor: c.valor, tipo: c.tipo }]);
   const totales = tieneTotales(columnas)
@@ -122,8 +125,10 @@ export function hojaDeReporte<T>(opts: {
 }
 
 /** "Ventas por producto" + rango → "ventas-por-producto_2026-09-01_2026-09-25". */
-export function nombreArchivo(titulo: string, rango?: { desde: string; hasta: string } | null): string {
-  const base = titulo
+export function nombreArchivo(titulo: string, rango?: { desde: string; hasta: string } | null, alcance?: string): string {
+  const base = [titulo, alcance]
+    .filter(Boolean)
+    .join(" ")
     .normalize("NFD")
     .replace(/[̀-ͯ]/g, "")
     .toLowerCase()

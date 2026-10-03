@@ -1,12 +1,14 @@
 "use client";
 import { ReporteMarco, useConsulta, useRangoReporte, type Cifra } from "../../../components/reporte";
+import { useSucursalReporte } from "../../../components/selector-sucursal";
 import { leerNoShows, type FilaNoShow } from "../../../lib/reportes";
 import { formatear, type Columna } from "../../../lib/reporte-tabla";
 
 /** Reservaciones: cuánta gente reserva y no llega, por día. */
 export default function ReservasQueNoLlegaronPage() {
   const { rango, cambiar } = useRangoReporte();
-  const consulta = useConsulta((r) => leerNoShows(r.desde, r.hasta), rango);
+  const sucursal = useSucursalReporte();
+  const consulta = useConsulta((r) => leerNoShows(r.desde, r.hasta, sucursal.id), sucursal.listo ? rango : null, sucursal.clave);
   const filas = consulta.datos ?? [];
 
   const reservas = filas.reduce((s, f) => s + f.total, 0);
@@ -48,6 +50,7 @@ export default function ReservasQueNoLlegaronPage() {
 
   return (
     <ReporteMarco
+      sucursal={sucursal}
       titulo="Reservas que no llegaron"
       subtitulo="Cuántas reservas se quedaron esperando, día por día, y cuántos comensales se perdieron."
       rango={{ valor: rango, cambiar }}

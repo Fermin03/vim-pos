@@ -1,6 +1,7 @@
 "use client";
 import { useState } from "react";
 import { Nota, ReporteMarco, useConsulta, useRangoReporte, type Cifra } from "../../../components/reporte";
+import { useSucursalReporte } from "../../../components/selector-sucursal";
 import { leerZHistorico, type FilaZHistorico } from "../../../lib/reportes";
 import { formatear, type Columna } from "../../../lib/reporte-tabla";
 
@@ -10,7 +11,8 @@ const colorDif = (n: number) => (cuadra(n) ? "text-ink-2" : n < 0 ? "text-danger
 
 export default function CortesDeTurnoPage() {
   const { rango, cambiar } = useRangoReporte();
-  const consulta = useConsulta((r) => leerZHistorico(r.desde, r.hasta), rango);
+  const sucursal = useSucursalReporte();
+  const consulta = useConsulta((r) => leerZHistorico(r.desde, r.hasta, sucursal.id), sucursal.listo ? rango : null, sucursal.clave);
   const [soloDiferencia, setSoloDiferencia] = useState(false);
   const todas = consulta.datos ?? [];
   const filas = soloDiferencia ? todas.filter((f) => !cuadra(f.diferencia_efectivo)) : todas;
@@ -84,6 +86,7 @@ export default function CortesDeTurnoPage() {
 
   return (
     <ReporteMarco
+      sucursal={sucursal}
       titulo="Cortes de turno"
       subtitulo="Cada cierre de caja: lo vendido, el efectivo que debía haber contra el que se contó, y quién cerró."
       rango={{ valor: rango, cambiar }}

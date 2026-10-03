@@ -1,16 +1,22 @@
 "use client";
 import { Nota, ReporteMarco, useConsulta, useRangoReporte, type Cifra } from "../../../components/reporte";
+import { useSucursalReporte } from "../../../components/selector-sucursal";
 import { leerDescuentosPorUsuario, leerVentaDelPeriodo, type FilaDescuento } from "../../../lib/reportes";
 import { formatear, type Columna } from "../../../lib/reporte-tabla";
 
 export default function DescuentosPage() {
   const { rango, cambiar } = useRangoReporte();
+  const sucursal = useSucursalReporte();
   const consulta = useConsulta(
     async (r) => {
-      const [filas, venta] = await Promise.all([leerDescuentosPorUsuario(r.desde, r.hasta), leerVentaDelPeriodo(r.desde, r.hasta)]);
+      const [filas, venta] = await Promise.all([
+        leerDescuentosPorUsuario(r.desde, r.hasta, sucursal.id),
+        leerVentaDelPeriodo(r.desde, r.hasta, sucursal.id),
+      ]);
       return { filas, venta };
     },
-    rango,
+    sucursal.listo ? rango : null,
+    sucursal.clave,
   );
   const filas = consulta.datos?.filas ?? [];
   const venta = consulta.datos?.venta ?? 0;
@@ -38,6 +44,7 @@ export default function DescuentosPage() {
 
   return (
     <ReporteMarco
+      sucursal={sucursal}
       titulo="Descuentos por usuario"
       subtitulo="Quién da descuentos y cortesías, y cuánto suman frente a la venta."
       rango={{ valor: rango, cambiar }}

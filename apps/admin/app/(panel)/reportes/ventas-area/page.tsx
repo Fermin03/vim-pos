@@ -1,5 +1,6 @@
 "use client";
 import { Barra, ReporteMarco, useConsulta, useRangoReporte, type Cifra } from "../../../components/reporte";
+import { useSucursalReporte } from "../../../components/selector-sucursal";
 import { leerVentasPorArea, type FilaArea } from "../../../lib/reportes";
 import { formatear, type Columna } from "../../../lib/reporte-tabla";
 
@@ -8,7 +9,8 @@ const nombreEstacion = (a: string) => (a === "General" ? "Sin estación" : a);
 
 export default function VentasPorEstacionPage() {
   const { rango, cambiar } = useRangoReporte();
-  const consulta = useConsulta((r) => leerVentasPorArea(r.desde, r.hasta), rango);
+  const sucursal = useSucursalReporte();
+  const consulta = useConsulta((r) => leerVentasPorArea(r.desde, r.hasta, sucursal.id), sucursal.listo ? rango : null, sucursal.clave);
   const filas = consulta.datos ?? [];
 
   const venta = filas.reduce((s, f) => s + f.total, 0);
@@ -36,6 +38,7 @@ export default function VentasPorEstacionPage() {
 
   return (
     <ReporteMarco
+      sucursal={sucursal}
       titulo="Ventas por estación"
       subtitulo="Cuánto prepara y cuánto vende cada estación. Sirve para repartir el trabajo de la cocina."
       rango={{ valor: rango, cambiar }}

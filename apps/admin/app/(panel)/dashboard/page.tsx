@@ -7,13 +7,13 @@ import { usePerfil } from "../../components/admin-shell";
 import { leerDashboard, variacionPct, type Dashboard, type ResumenDia } from "../../lib/reportes";
 import { type ResumenCaja } from "../../lib/dashboard-calculos";
 import { leerEstadoOnboarding, type EstadoOnboarding } from "../../lib/onboarding";
-import { listarSucursales } from "../../lib/configuracion";
 import { mensajeError } from "../../lib/errores";
 import { leerPrueba } from "../../lib/plan";
 import { AvisoPrueba } from "../../components/aviso-prueba";
 import { Aviso } from "@vim/ui/styles";
 import { AvisosFacturacion } from "../../components/avisos-facturacion";
 import { useAvisoCerrado } from "../../components/aviso-cerrado";
+import { SelectorSucursal, useSucursalReporte } from "../../components/selector-sucursal";
 
 // Accesos rápidos del P-177: son de Reportes, no navegación genérica.
 const REPORTES_RAPIDOS = [
@@ -250,7 +250,10 @@ export default function DashboardPage() {
   const [data, setData] = useState<Dashboard | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [onb, setOnb] = useState<EstadoOnboarding | null>(null);
-  const [sucursal, setSucursal] = useState<string | null>(null);
+  /* De qué sucursal es el panel: una por defecto (la última que se eligió), "Todas" a elección.
+     Es el mismo selector de los reportes y recuerda lo mismo: elegir aquí se respeta allá. */
+  const suc = useSucursalReporte();
+  const sucursal = suc.nombre;
   const [prueba, setPrueba] = useState<{ estado: string; prueba_hasta: string | null } | null>(null);
 
   /* El día que se está mirando. `null` = hoy, que es lo que se ve al entrar.
@@ -261,12 +264,16 @@ export default function DashboardPage() {
   const [cargandoDia, setCargandoDia] = useState(false);
 
   useEffect(() => {
+    if (!suc.listo) return;
+    let vigente = true;
     setCargandoDia(true);
-    leerDashboard(dia ?? undefined)
-      .then((d) => { setData(d); setError(null); })
-      .catch((e) => setError(mensajeError(e, "No se pudo cargar")))
-      .finally(() => setCargandoDia(false));
-  }, [dia]);
+    leerDashboard(dia ?? undefined, suc.id)
+      .then((d) => { if (vigente) { setData(d); setError(null); } })
+      .catch((e) => { if (vigente) setError(mensajeError(e, "No se pudo cargar")); })
+      .finally(() => { if (vigente) setCargandoDia(false); });
+    // Cambiar de día o de sucursal rápido: la respuesta vieja que llega tarde no pisa a la nueva.
+    return () => { vigente = false; };
+  }, [dia, suc.listo, suc.id]);
 
   /* «En vivo» era un punto que parpadeaba sobre datos que nadie volvía a pedir. Ahora, mirando
      hoy, se vuelve a leer cada minuto y al regresar a la pestaña, sin borrar la pantalla, y el
@@ -279,7 +286,7 @@ export default function DashboardPage() {
   const refrescar = useCallback(async () => {
     setRefrescando(true);
     try {
-      const d = await leerDashboard(undefined);
+      const d = await leerDashboard(undefined, suc.id);
       setData(d);
       setError(null);
     } catch (e) {
@@ -287,7 +294,7 @@ export default function DashboardPage() {
     } finally {
       setRefrescando(false);
     }
-  }, []);
+  }, [suc.id]);
   const mirandoHoy = dia === null && (data?.esHoy ?? false);
   useEffect(() => {
     if (!mirandoHoy) return;
@@ -307,9 +314,6 @@ export default function DashboardPage() {
     leerEstadoOnboarding().then(setOnb).catch(() => {});
     // La prueba gratis (0141): un aviso que no bloquea; si la lectura falla, simplemente no sale.
     leerPrueba().then(setPrueba).catch(() => {});
-    listarSucursales()
-      .then((s) => setSucursal(s.length === 1 ? s[0]!.nombre : null))
-      .catch(() => {});
   }, []);
 
   // Hasta que el dueño termine la configuración; con todo listo, el aviso lo manda a terminarla.
@@ -338,7 +342,9 @@ export default function DashboardPage() {
             ? `Lo que pasó el ${fechaCorta}${sucursal ? ` en ${sucursal}` : ""}`
             : sucursal
               ? `Esto es lo que pasa hoy en ${sucursal}`
-              : "Esto es lo que pasa hoy en tu negocio"
+              : suc.sucursales.length > 1
+                ? "Esto es lo que pasa hoy en todas tus sucursales"
+                : "Esto es lo que pasa hoy en tu negocio"
         }
         right={
           /* ANTES ESTO ERA UN <span>. Tenía borde, icono de calendario y aire de
@@ -348,7 +354,8 @@ export default function DashboardPage() {
              Ahora es un `<input type="date">` de verdad. Nativo y no un
              calendario propio: en el teléfono abre el selector del sistema, que
              el dueño ya sabe usar, y no hay que mantener un widget. */
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
+            <SelectorSucursal sucursal={suc} />
             <label className="inline-flex items-center gap-2 rounded border border-line-strong bg-surface px-3 py-[7px] text-13 font-semibold focus-within:border-ink focus-within:shadow-[0_0_0_3px_rgba(22,22,26,.06)]">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-[15px] w-[15px] flex-shrink-0 text-ink-3" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2" /><path d="M16 3v4M8 3v4M3 10h18" /></svg>
               <span className="sr-only">Día que se muestra</span>

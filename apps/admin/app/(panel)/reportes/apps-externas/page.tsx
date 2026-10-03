@@ -1,6 +1,7 @@
 "use client";
 import Link from "next/link";
 import { Nota, ReporteMarco, useConsulta, useRangoReporte, type Cifra } from "../../../components/reporte";
+import { useSucursalReporte } from "../../../components/selector-sucursal";
 import { leerVentasAppsExternas, type FilaAppExterna } from "../../../lib/reportes";
 import { formatear, type Columna } from "../../../lib/reporte-tabla";
 
@@ -15,7 +16,8 @@ const POR_REVISAR = new Set(["CONCILIADO_CON_DIFERENCIA", "EN_LIQUIDACION_SIN_MA
 
 export default function AppsExternasPage() {
   const { rango, cambiar } = useRangoReporte();
-  const consulta = useConsulta((r) => leerVentasAppsExternas(r.desde, r.hasta), rango);
+  const sucursal = useSucursalReporte();
+  const consulta = useConsulta((r) => leerVentasAppsExternas(r.desde, r.hasta, sucursal.id), sucursal.listo ? rango : null, sucursal.clave);
   const filas = consulta.datos ?? [];
 
   const venta = filas.reduce((s, f) => s + f.totalPos, 0);
@@ -52,6 +54,7 @@ export default function AppsExternasPage() {
 
   return (
     <ReporteMarco
+      sucursal={sucursal}
       titulo="Ventas por apps de delivery"
       subtitulo="Pedidos de Uber Eats, Rappi y DiDi: lo que se cobró en la caja, la comisión y lo que la app depositó."
       rango={{ valor: rango, cambiar }}

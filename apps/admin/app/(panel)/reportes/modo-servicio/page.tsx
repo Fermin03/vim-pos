@@ -1,12 +1,14 @@
 "use client";
 import { Barra, ReporteMarco, useConsulta, useRangoReporte, type Cifra } from "../../../components/reporte";
+import { useSucursalReporte } from "../../../components/selector-sucursal";
 import { leerVentasPorModo, type FilaModo } from "../../../lib/reportes";
 import { etiquetaModo } from "../../../lib/modo-servicio";
 import { formatear, type Columna } from "../../../lib/reporte-tabla";
 
 export default function VentasPorModoServicioPage() {
   const { rango, cambiar } = useRangoReporte();
-  const consulta = useConsulta((r) => leerVentasPorModo(r.desde, r.hasta), rango);
+  const sucursal = useSucursalReporte();
+  const consulta = useConsulta((r) => leerVentasPorModo(r.desde, r.hasta, sucursal.id), sucursal.listo ? rango : null, sucursal.clave);
   const filas = consulta.datos ?? [];
 
   const venta = filas.reduce((s, f) => s + f.total_mxn, 0);
@@ -42,6 +44,7 @@ export default function VentasPorModoServicioPage() {
 
   return (
     <ReporteMarco
+      sucursal={sucursal}
       titulo="Ventas por tipo de servicio"
       subtitulo="Comer aquí, para llevar, a domicilio y apps de delivery: cuánto aporta cada uno."
       rango={{ valor: rango, cambiar }}

@@ -11,6 +11,7 @@ import { Button } from "@vim/ui/styles";
 import { hoyMx } from "@vim/fecha";
 import { PageBody, PageHeader, TablaScroll, type Miga } from "./page-header";
 import { RangoFechas } from "./rango-fechas";
+import { SelectorSucursal, type SucursalReporte } from "./selector-sucursal";
 import { mensajeError } from "../lib/errores";
 import { rangoUltimosDias } from "../lib/reportes";
 import { descargarXlsx } from "../lib/excel";
@@ -270,6 +271,7 @@ export function ReporteMarco<D, T>({
   titulo,
   subtitulo,
   rango,
+  sucursal,
   filtros,
   consulta,
   cifras,
@@ -283,6 +285,8 @@ export function ReporteMarco<D, T>({
   subtitulo: string;
   /** Sin rango (p. ej. eventos, que ya traen sus fechas) se pasa `null`. */
   rango: { valor: Rango | null; cambiar: (desde: string, hasta: string) => void } | null;
+  /** De qué sucursal son las cifras (useSucursalReporte). Sin él, el reporte no se filtra. */
+  sucursal?: SucursalReporte;
   filtros?: ReactNode;
   consulta: Consulta<D>;
   cifras?: Cifra[];
@@ -318,7 +322,8 @@ export function ReporteMarco<D, T>({
         setExportando(false);
       }
     }
-    descargarXlsx(hojaDeReporte({ titulo, rango: r, cifras, columnas: tabla.columnas, filas }), nombreArchivo(titulo, r));
+    const alcance = sucursal?.alcance;
+    descargarXlsx(hojaDeReporte({ titulo, rango: r, alcance, cifras, columnas: tabla.columnas, filas }), nombreArchivo(titulo, r, alcance));
   }
 
   return (
@@ -339,9 +344,10 @@ export function ReporteMarco<D, T>({
         }
       />
       <PageBody>
-        {(rango?.valor || filtros) && (
+        {(rango?.valor || filtros || (sucursal && sucursal.sucursales.length > 1)) && (
           <div className="mb-5 flex flex-wrap items-start gap-3">
-            {rango?.valor && <RangoFechas desde={rango.valor.desde} hasta={rango.valor.hasta} onCambio={rango.cambiar} />}
+            {sucursal && <SelectorSucursal sucursal={sucursal} className="w-full lg:w-auto lg:self-center" />}
+            {rango?.valor &&<RangoFechas desde={rango.valor.desde} hasta={rango.valor.hasta} onCambio={rango.cambiar} />}
             {filtros}
           </div>
         )}
