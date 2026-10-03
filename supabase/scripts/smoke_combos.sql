@@ -182,7 +182,9 @@ BEGIN
   -- La sección 5 dejó el insumo "Carne combo smoke" en 0 (sin fila en insumo_stock_sucursal) y el
   -- trigger de alertas ya auto-agotó la Clásica por insumo crítico agotado; para esta sección solo
   -- interesa el IVA, no el inventario, así que se reactiva igual que la sección 3 hace con las papas.
-  UPDATE productos SET agotado_automatico = false, estado = 'ACTIVO', motivo_agotado = NULL WHERE id = v_clas;
+  -- 0151: el agotado automático vive en la fila de la sucursal.
+  UPDATE productos_sucursal SET agotado_automatico = false, motivo_agotado = NULL
+   WHERE producto_id = v_clas AND sucursal_id = v_suc;
 
   v_ticket2 := abrir_ticket(v_suc, v_caja, v_turno, 'PARA_LLEVAR'::modo_servicio, NULL, NULL, 'smoke-combo-iva-1', v_maria);
   v_padre2 := agregar_combo_a_ticket(v_ticket2, v_combo, 1, jsonb_build_array(

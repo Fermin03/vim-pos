@@ -17,7 +17,7 @@ DECLARE
   v_caja_n  uuid := gen_random_uuid();
   v_turno_c uuid; v_turno_n uuid; v_t_c uuid; v_t_n uuid; v_item uuid;
   v_combo uuid; v_g_hamb uuid; v_g_acom uuid; v_padre uuid;
-  v_precio numeric; v_bool boolean;
+  v_precio numeric; v_bool boolean; v_pza uuid; v_pan uuid;
 BEGIN
   PERFORM set_config('request.jwt.claims',
     json_build_object('sub', v_maria::text, 'tenant_id', v_tenant::text)::text, true);
@@ -107,6 +107,37 @@ BEGIN
   IF v_bool THEN RAISE EXCEPTION 'agotar en una de dos sucursales no debe agotar el producto en todas'; END IF;
   RAISE NOTICE 'agotado manual por sucursal OK';
 
-  -- §5 (agotado automático) lo agrega la Tarea 3, aquí arriba de esta línea.
+  -- 5) Agotado automático por sucursal (el bug de 0007:1684-1723). Pan con receta crítica en la Clásica:
+  -- Centro sin pan, Norte con 5.
+  SELECT id INTO v_pza FROM unidades_medida WHERE tenant_id = v_tenant AND codigo = 'PZA' LIMIT 1;
+  INSERT INTO insumos (tenant_id, nombre, unidad_medida_id, categoria, costo_unitario_mxn)
+  VALUES (v_tenant, 'Pan smoke ms', v_pza, 'PANIFICACION', 4) RETURNING id INTO v_pan;
+  INSERT INTO insumo_stock_sucursal (tenant_id, insumo_id, sucursal_id, stock_actual)
+  VALUES (v_tenant, v_pan, v_centro, 0), (v_tenant, v_pan, v_norte, 5);
+  DELETE FROM recetas WHERE producto_id = v_clas;
+  PERFORM guardar_receta(v_clas, true, NULL, jsonb_build_array(jsonb_build_object(
+    'insumo_id', v_pan, 'cantidad', 1, 'cantidad_capturada', 1, 'unidad_capturada_id', v_pza,
+    'es_critico', true, 'notas', NULL, 'orden', 0)));
+
+  PERFORM evaluar_alertas_stock(v_pan, v_centro);
+  SELECT agotado_automatico INTO v_bool FROM productos_sucursal WHERE producto_id = v_clas AND sucursal_id = v_centro;
+  IF NOT coalesce(v_bool, false) THEN RAISE EXCEPTION 'sin pan en Centro, la Clásica debe quedar agotada en Centro'; END IF;
+  SELECT agotado_automatico INTO v_bool FROM productos_sucursal WHERE producto_id = v_clas AND sucursal_id = v_norte;
+  IF coalesce(v_bool, false) THEN RAISE EXCEPTION 'el pan que falta en Centro no debe agotar la Clásica en Norte'; END IF;
+  SELECT agotado_automatico INTO v_bool FROM productos WHERE id = v_clas;
+  IF v_bool THEN RAISE EXCEPTION 'agotada en una de dos sucursales: el producto no queda agotado en todas'; END IF;
+
+  -- Reabastecer Norte NO des-agota Centro (antes sí: el restablecimiento actualizaba el producto entero).
+  UPDATE insumo_stock_sucursal SET stock_actual = 10 WHERE insumo_id = v_pan AND sucursal_id = v_norte;
+  PERFORM evaluar_alertas_stock(v_pan, v_norte);
+  SELECT agotado_automatico INTO v_bool FROM productos_sucursal WHERE producto_id = v_clas AND sucursal_id = v_centro;
+  IF NOT v_bool THEN RAISE EXCEPTION 'reabastecer Norte des-agotó la Clásica en Centro (el bug)'; END IF;
+
+  -- Reabastecer Centro sí.
+  UPDATE insumo_stock_sucursal SET stock_actual = 3 WHERE insumo_id = v_pan AND sucursal_id = v_centro;
+  PERFORM evaluar_alertas_stock(v_pan, v_centro);
+  SELECT agotado_automatico INTO v_bool FROM productos_sucursal WHERE producto_id = v_clas AND sucursal_id = v_centro;
+  IF v_bool THEN RAISE EXCEPTION 'con pan otra vez en Centro, la Clásica debe volver'; END IF;
+  RAISE NOTICE 'agotado automático por sucursal OK';
 END $$;
 ROLLBACK;

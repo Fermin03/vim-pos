@@ -543,3 +543,124 @@ BEGIN
 END;
 $$;
 COMMENT ON FUNCTION agregar_combo_a_ticket IS 'Inserta un combo: padre (cobra el precio calculado aquí, con los precios de la sucursal del ticket) + hijos a precio 0 con prorrateo informativo. Valida slots, pertenencia y disponibilidad en la sucursal. Idempotente por client_id_local. Rechaza p_modificadores en la línea del padre. ADR 0015, ADR 0027.';
+
+-- ── §8 evaluar_alertas_stock agota y restablece en LA sucursal del movimiento ───────────────
+-- Copia íntegra de 0007_catalogo_inventario.sql §9.3 (nunca redefinida) salvo los dos UPDATE de
+-- productos, que pasan a productos_sucursal:
+--   · antes, un insumo crítico en 0 en Centro agotaba el producto en TODAS las sucursales;
+--   · y el restablecimiento miraba el stock de la sucursal que se movió, así que reabastecer Norte
+--     des-agotaba un producto que en Centro seguía sin insumo.
+-- productos.agotado_automatico lo deriva el trigger de §4 («agotado en todas»).
+-- Restablecer ya no exige agotado_manual = false: limpiar el automático cuando hay stock es
+-- correcto aunque el dueño lo tenga agotado a mano (el manual sigue mandando por su cuenta).
+CREATE OR REPLACE FUNCTION evaluar_alertas_stock(
+  p_insumo_id uuid,
+  p_sucursal_id uuid
+) RETURNS void
+LANGUAGE plpgsql
+SET search_path = public, extensions, pg_temp
+AS $$
+DECLARE
+  v_stock numeric;
+  v_minimo numeric;
+  v_critico numeric;
+  v_severidad alerta_severidad;
+  v_tenant_id uuid;
+  v_productos_afectados uuid[];
+BEGIN
+  -- Obtener stock y umbrales (override de sucursal o global del insumo)
+  SELECT
+    ss.tenant_id,
+    ss.stock_actual,
+    COALESCE(ss.stock_minimo, i.stock_minimo_global),
+    COALESCE(ss.stock_critico, i.stock_critico_global)
+  INTO v_tenant_id, v_stock, v_minimo, v_critico
+  FROM insumo_stock_sucursal ss
+  JOIN insumos i ON i.id = ss.insumo_id
+  WHERE ss.insumo_id = p_insumo_id AND ss.sucursal_id = p_sucursal_id;
+
+  -- Determinar severidad
+  IF v_stock <= 0 THEN
+    v_severidad := 'AGOTADO';
+  ELSIF v_critico IS NOT NULL AND v_stock <= v_critico THEN
+    v_severidad := 'ROJA';
+  ELSIF v_minimo IS NOT NULL AND v_stock <= v_minimo THEN
+    v_severidad := 'AMARILLA';
+  ELSE
+    v_severidad := NULL;
+  END IF;
+
+  -- Actualizar denormalizado en insumo_stock_sucursal
+  UPDATE insumo_stock_sucursal
+  SET alerta_actual = v_severidad
+  WHERE insumo_id = p_insumo_id AND sucursal_id = p_sucursal_id;
+
+  -- Cerrar alertas activas si ya no aplica
+  IF v_severidad IS NULL THEN
+    UPDATE alertas_inventario
+    SET activa = false, fecha_atendida = now()
+    WHERE insumo_id = p_insumo_id AND sucursal_id = p_sucursal_id AND activa = true;
+  ELSE
+    -- Buscar productos afectados (recetas críticas que usan este insumo)
+    SELECT array_agg(DISTINCT r.producto_id)
+    INTO v_productos_afectados
+    FROM receta_componentes rc
+    JOIN recetas r ON r.id = rc.receta_id
+    WHERE rc.insumo_id = p_insumo_id AND rc.es_critico = true;
+
+    -- Crear alerta si no existe activa para este nivel
+    INSERT INTO alertas_inventario (
+      tenant_id, sucursal_id, insumo_id, severidad,
+      stock_al_alertar, umbral_disparador, productos_afectados_ids
+    )
+    SELECT v_tenant_id, p_sucursal_id, p_insumo_id, v_severidad,
+           v_stock, COALESCE(v_critico, v_minimo, 0), COALESCE(v_productos_afectados, '{}')
+    WHERE NOT EXISTS (
+      SELECT 1 FROM alertas_inventario
+      WHERE insumo_id = p_insumo_id
+        AND sucursal_id = p_sucursal_id
+        AND severidad = v_severidad
+        AND activa = true
+    );
+
+    -- Auto-agotar EN ESTA SUCURSAL (§36.2 del /core, ADR 0027). No toca una fila agotada a mano.
+    IF v_severidad = 'AGOTADO' AND v_productos_afectados IS NOT NULL THEN
+      INSERT INTO productos_sucursal (tenant_id, producto_id, sucursal_id, agotado_automatico, motivo_agotado)
+      SELECT v_tenant_id, pid, p_sucursal_id, true,
+             'Insumo agotado: ' || (SELECT nombre FROM insumos WHERE id = p_insumo_id)
+        FROM unnest(v_productos_afectados) AS pid
+      ON CONFLICT (producto_id, sucursal_id) DO UPDATE
+        SET agotado_automatico = true,
+            motivo_agotado     = EXCLUDED.motivo_agotado
+        WHERE NOT productos_sucursal.agotado_manual;
+    END IF;
+  END IF;
+
+  -- Restablecer EN ESTA SUCURSAL los productos que ya tienen todos sus insumos críticos AQUÍ.
+  IF v_severidad IS DISTINCT FROM 'AGOTADO' THEN
+    UPDATE productos_sucursal ps
+       SET agotado_automatico = false,
+           motivo_agotado     = NULL
+     WHERE ps.sucursal_id = p_sucursal_id
+       AND ps.agotado_automatico = true
+       AND ps.producto_id IN (
+         SELECT DISTINCT r.producto_id
+           FROM receta_componentes rc
+           JOIN recetas r ON r.id = rc.receta_id
+          WHERE rc.insumo_id = p_insumo_id AND rc.es_critico = true
+       )
+       AND NOT EXISTS (
+         SELECT 1
+           FROM receta_componentes rc2
+           JOIN recetas r2 ON r2.id = rc2.receta_id
+           JOIN insumo_stock_sucursal ss2 ON ss2.insumo_id = rc2.insumo_id
+          WHERE r2.producto_id = ps.producto_id
+            AND rc2.es_critico = true
+            AND ss2.sucursal_id = p_sucursal_id
+            AND ss2.stock_actual <= 0
+       );
+  END IF;
+END;
+$$;
+
+COMMENT ON FUNCTION evaluar_alertas_stock IS 'Evalúa stock vs umbrales, dispara/cierra alertas y agota/restablece productos EN ESA sucursal (productos_sucursal). §36 del /core, ADR 0027.';
