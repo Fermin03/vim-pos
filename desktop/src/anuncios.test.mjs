@@ -1,9 +1,12 @@
-import { test } from "node:test";
+import { test, beforeEach } from "node:test";
 import assert from "node:assert/strict";
 import os from "node:os";
 import path from "node:path";
 import { mkdirSync, existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { nombreArchivo, planAnuncios, sincronizarAnuncios, listarAnuncios, rutaDeAnuncio, olvidarRechazados } from "./anuncios.mjs";
+
+// La memoria de rechazos es del módulo: sin esto una prueba heredaría la de la anterior y el orden importaría.
+beforeEach(() => olvidarRechazados());
 
 const T = "99999999-0000-0000-0000-0000000000aa";
 const A = "11111111-1111-1111-1111-111111111111";
@@ -263,16 +266,16 @@ for (const [nombre, respuesta] of Object.entries(rechazos)) {
   });
 }
 
-test("un fallo transitorio (red, timeout, 5xx) se reintenta en el siguiente pull", async () => {
+test("un fallo transitorio (red, timeout, 5xx, 408, 429) se reintenta en el siguiente pull", async () => {
   await enTemporal(async (dir) => {
     olvidarRechazados();
     let pedidas = 0;
-    const fallos = [() => { throw new TypeError("fetch failed"); }, () => { const e = new Error("timeout"); e.name = "TimeoutError"; throw e; }, () => new Response("x", { status: 503 }), () => new Response("x", { status: 500 })];
+    const fallos = [() => { throw new TypeError("fetch failed"); }, () => { const e = new Error("timeout"); e.name = "TimeoutError"; throw e; }, () => new Response("x", { status: 503 }), () => new Response("x", { status: 500 }), () => new Response("x", { status: 408 }), () => new Response("x", { status: 429 })];
     for (const f of fallos) {
       const r = await sincronizarAnuncios({ pool: poolFalso([fila(A)]), dir, cloudUrl: "https://nube.example", ahora: () => T0, fetch: async () => { pedidas++; return f(); } });
       assert.equal(r.fallidos, 1);
     }
-    assert.equal(pedidas, 4, "cada pull volviÃ³ a pedirla, aun con el mismo reloj");
+    assert.equal(pedidas, 6, "cada pull volviÃ³ a pedirla, aun con el mismo reloj");
     const ok = await sincronizarAnuncios({ pool: poolFalso([fila(A)]), dir, cloudUrl: "https://nube.example", ahora: () => T0, fetch: async () => imagen() });
     assert.equal(ok.bajados, 1);
   });
