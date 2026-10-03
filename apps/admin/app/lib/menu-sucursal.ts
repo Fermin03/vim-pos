@@ -65,15 +65,36 @@ export function filasFormIniciales(sucursales: SucursalMenu[], filas: FilaMenuSu
   });
 }
 
-/** Del formulario a lo que se guarda. Precio vacío = el general (null). */
+/**
+ * El precio por sucursal tal como lo teclea el dueño. Vacío = el general (null). Un número con hasta
+ * dos decimales es el precio. Lo demás no es precio: un «.» suelto (que limpiarPrecio deja en «0.»),
+ * «12.» o «1.234» — sin esta regla, Number("0.") guardaba $0.00. Lo usan la lista y el formulario.
+ */
+export function precioValido(texto: string): number | null | "invalido" {
+  const t = texto.trim();
+  if (t === "") return null;
+  return /^\d+(\.\d{1,2})?$/.test(t) ? Number(t) : "invalido";
+}
+
+/** El primer precio del formulario que no es precio, como mensaje para el dueño; null si todos sirven. */
+export function errorPreciosForm(filas: Pick<FilaFormMenu, "nombre" | "precio">[]): string | null {
+  const mala = filas.find((f) => precioValido(f.precio) === "invalido");
+  return mala ? `Precio inválido en ${mala.nombre}` : null;
+}
+
+/** Del formulario a lo que se guarda. Precio vacío = el general (null). Un precio inválido no se guarda: lanza. */
 export function edicionesDeForm(productoId: string, filas: FilaFormMenu[]): EdicionMenuSucursal[] {
-  return filas.map((f) => ({
-    producto_id: productoId,
-    sucursal_id: f.sucursalId,
-    disponible: f.disponible,
-    precio_mxn: f.precio.trim() === "" ? null : Number(f.precio),
-    agotado_manual: f.agotado,
-  }));
+  return filas.map((f) => {
+    const precio = precioValido(f.precio);
+    if (precio === "invalido") throw new Error(`Precio inválido en ${f.nombre}`);
+    return {
+      producto_id: productoId,
+      sucursal_id: f.sucursalId,
+      disponible: f.disponible,
+      precio_mxn: precio,
+      agotado_manual: f.agotado,
+    };
+  });
 }
 
 /** El estado en una sucursal, con el mismo orden que motivo_no_disponible_en_sucursal (0152). */
@@ -105,14 +126,17 @@ export function versionMenor(a: string, b: string): boolean {
 }
 
 /**
- * Cajas de escritorio (con latido) que todavía no respetan el menú por sucursal: versión vieja o
- * desconocida (NULL = anterior a 0.4.60, 0105). La caja web no cuenta: toma el código al desplegar.
+ * Cajas de escritorio activas (con latido) que todavía no respetan el menú por sucursal: versión
+ * vieja o desconocida (NULL = anterior a 0.4.60, 0105). La caja web no cuenta: toma el código al
+ * desplegar. Una caja desactivada tampoco: no vende, y mandar al dueño a actualizarla es ruido.
  */
-export function cajasSinMenuPorSucursal<C extends Pick<Caja, "ultimoLatido" | "versionApp">>(
+export function cajasSinMenuPorSucursal<C extends Pick<Caja, "ultimoLatido" | "versionApp" | "activa">>(
   cajas: C[],
   minima: string = VERSION_MINIMA_MENU_SUCURSAL,
 ): C[] {
-  return cajas.filter((c) => c.ultimoLatido !== null && (c.versionApp === null || versionMenor(c.versionApp, minima)));
+  return cajas.filter(
+    (c) => c.activa && c.ultimoLatido !== null && (c.versionApp === null || versionMenor(c.versionApp, minima)),
+  );
 }
 
 // ── Datos ────────────────────────────────────────────────────────────────────
@@ -165,12 +189,15 @@ export async function guardarMenuSucursal(filas: EdicionMenuSucursal[]): Promise
   if (error) throw new Error(error.message);
 }
 
-/** ¿Algún producto apagado o con otro precio en alguna sucursal? Solo entonces importa una caja vieja. */
+/**
+ * ¿Algún producto apagado, con otro precio o agotado a mano en alguna sucursal? Solo entonces importa
+ * una caja vieja: lee «agotado en todas» del producto, así que tampoco ve el agotado de una sola.
+ */
 export async function hayMenuPorSucursal(): Promise<boolean> {
   const { count, error } = await supabase
     .from("productos_sucursal")
     .select("producto_id", { count: "exact", head: true })
-    .or("disponible.eq.false,precio_mxn.not.is.null");
+    .or("disponible.eq.false,precio_mxn.not.is.null,agotado_manual.eq.true");
   if (error) throw new Error(error.message);
   return (count ?? 0) > 0;
 }

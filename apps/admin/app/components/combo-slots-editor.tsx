@@ -19,6 +19,7 @@ import {
 } from "../lib/combos";
 import { listarCategoriasOpciones, listarProductos, precioMxn, type CategoriaOpcion, type Producto } from "../lib/catalogo";
 import { mensajeError } from "../lib/errores";
+import { estadoGeneral } from "../lib/menu-sucursal";
 import { limpiarPrecio } from "../lib/numeros";
 
 // En pantalla, un "slot" es un PASO: lo que la caja va preguntando al vender el combo (qué
@@ -358,7 +359,7 @@ function PanelOpciones({ slot, productos, onCambio }: { slot: Slot; productos: P
             productoId: p.id,
             nombre: p.nombre,
             precio: p.precio_base_mxn,
-            agotado: p.estado === "AGOTADO",
+            agotado: estadoGeneral(p) === "AGOTADO",
             delta: String(o?.precio_delta_mxn ?? 0),
             esDefault: o?.es_default ?? false,
             activa: o?.activa ?? true,
@@ -369,7 +370,7 @@ function PanelOpciones({ slot, productos, onCambio }: { slot: Slot; productos: P
       productoId: o.producto_id,
       nombre: o.nombre,
       precio: o.precio,
-      agotado: o.estado === "AGOTADO",
+      agotado: o.agotado,
       delta: String(o.precio_delta_mxn),
       esDefault: o.es_default,
       activa: o.activa,

@@ -2,12 +2,14 @@ import { describe, it, expect } from "vitest";
 import {
   cajasSinMenuPorSucursal,
   edicionesDeForm,
+  errorPreciosForm,
   esPorDefecto,
   estadoEnSucursal,
   estadoGeneral,
   filaPorDefecto,
   filasFormIniciales,
   filasParaGuardar,
+  precioValido,
   versionMenor,
   VERSION_MINIMA_MENU_SUCURSAL,
   type FilaMenuSucursal,
@@ -56,6 +58,30 @@ describe("qué se guarda", () => {
     expect(a).toEqual({ producto_id: "p1", sucursal_id: "c", disponible: true, precio_mxn: null, agotado_manual: true });
     expect(b!.precio_mxn).toBe(135.5);
   });
+  it("un precio que no es número no se guarda: un «.» suelto no es $0.00", () => {
+    expect(precioValido("")).toBeNull();
+    expect(precioValido("  ")).toBeNull();
+    expect(precioValido("0")).toBe(0);
+    expect(precioValido("135")).toBe(135);
+    expect(precioValido("135.5")).toBe(135.5);
+    expect(precioValido(" 99.90 ")).toBe(99.9);
+    // limpiarPrecio(".") deja "0.": Number("0.") era 0 y se guardaba $0.00.
+    expect(precioValido(".")).toBe("invalido");
+    expect(precioValido("0.")).toBe("invalido");
+    expect(precioValido("12.")).toBe("invalido");
+    expect(precioValido("1.234")).toBe("invalido");
+    expect(precioValido("-5")).toBe("invalido");
+    expect(precioValido("abc")).toBe("invalido");
+  });
+  it("del formulario: un precio inválido bloquea el guardado y nombra la sucursal", () => {
+    const filas = [
+      { sucursalId: "c", nombre: "Centro", disponible: true, precio: "120", agotado: false, agotadoAuto: false },
+      { sucursalId: "n", nombre: "Norte", disponible: true, precio: "0.", agotado: false, agotadoAuto: false },
+    ];
+    expect(errorPreciosForm(filas)).toBe("Precio inválido en Norte");
+    expect(() => edicionesDeForm("p1", filas)).toThrow("Precio inválido en Norte");
+    expect(errorPreciosForm([filas[0]!])).toBeNull();
+  });
   it("las filas del formulario salen de las sucursales, con lo guardado encima", () => {
     const r = filasFormIniciales(
       [{ id: "c", nombre: "Centro" }, { id: "n", nombre: "Norte" }],
@@ -82,11 +108,19 @@ describe("cajas que todavía no respetan el menú por sucursal", () => {
   });
   it("solo cajas de escritorio (con latido) de versión vieja o desconocida", () => {
     const cajas = [
-      { id: "1", nombre: "Caja 01", sucursalNombre: "Centro", ultimoLatido: "2026-10-02T10:00:00Z", versionApp: "0.4.109" },
-      { id: "2", nombre: "Caja 02", sucursalNombre: "Norte", ultimoLatido: "2026-10-02T10:00:00Z", versionApp: "0.4.110" },
-      { id: "3", nombre: "Caja web", sucursalNombre: "Norte", ultimoLatido: null, versionApp: null },
-      { id: "4", nombre: "Caja vieja", sucursalNombre: "Sur", ultimoLatido: "2026-10-01T10:00:00Z", versionApp: null },
+      { id: "1", nombre: "Caja 01", sucursalNombre: "Centro", activa: true, ultimoLatido: "2026-10-02T10:00:00Z", versionApp: "0.4.109" },
+      { id: "2", nombre: "Caja 02", sucursalNombre: "Norte", activa: true, ultimoLatido: "2026-10-02T10:00:00Z", versionApp: "0.4.110" },
+      { id: "3", nombre: "Caja web", sucursalNombre: "Norte", activa: true, ultimoLatido: null, versionApp: null },
+      { id: "4", nombre: "Caja vieja", sucursalNombre: "Sur", activa: true, ultimoLatido: "2026-10-01T10:00:00Z", versionApp: null },
     ];
     expect(cajasSinMenuPorSucursal(cajas).map((c) => c.id)).toEqual(["1", "4"]);
+  });
+  it("una caja desactivada no se nombra aunque sea vieja", () => {
+    const cajas = [
+      { id: "1", nombre: "Caja 01", activa: false, ultimoLatido: "2026-10-02T10:00:00Z", versionApp: "0.4.100" },
+      { id: "2", nombre: "Caja 02", activa: false, ultimoLatido: "2026-10-02T10:00:00Z", versionApp: null },
+      { id: "3", nombre: "Caja 03", activa: true, ultimoLatido: "2026-10-02T10:00:00Z", versionApp: "0.4.100" },
+    ];
+    expect(cajasSinMenuPorSucursal(cajas).map((c) => c.id)).toEqual(["3"]);
   });
 });

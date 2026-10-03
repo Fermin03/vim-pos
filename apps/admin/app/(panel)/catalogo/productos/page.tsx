@@ -18,6 +18,7 @@ import {
   guardarMenuSucursal,
   leerMenuDeSucursal,
   listarSucursalesMenu,
+  precioValido,
   type EdicionMenuSucursal,
   type EstadoEnSucursal,
   type FilaMenuSucursal,
@@ -356,10 +357,9 @@ export default function ProductosPage() {
                                 if (e.key === "Enter") e.currentTarget.blur();
                               }}
                               onBlur={(e) => {
-                                const v = e.target.value.trim();
-                                const nuevo = v === "" ? null : Number(v);
-                                if (nuevo !== null && !Number.isFinite(nuevo)) {
-                                  // Un "." suelto no es un precio: se deja lo guardado.
+                                const nuevo = precioValido(e.target.value);
+                                if (nuevo === "invalido") {
+                                  // Un "." suelto (que limpiarPrecio deja en "0.") no es un precio: se deja lo guardado.
                                   e.target.value = fila?.precio_mxn != null ? String(fila.precio_mxn) : "";
                                   return;
                                 }

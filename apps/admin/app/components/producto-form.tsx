@@ -21,6 +21,7 @@ import { DisponibilidadSucursales } from "./disponibilidad-sucursales";
 import {
   cajasQueNoRespetanMenu,
   edicionesDeForm,
+  errorPreciosForm,
   filasFormIniciales,
   filasParaGuardar,
   guardarMenuSucursal,
@@ -163,6 +164,12 @@ export function ProductoForm({
     });
     if (!parsed.success) {
       setError(parsed.error.issues[0]?.message ?? "Revisa los datos del producto.");
+      return;
+    }
+    // Antes de tocar la base: un precio por sucursal que no es número (un «.» suelto) no se guarda.
+    const errorPrecio = errorPreciosForm(menu);
+    if (errorPrecio) {
+      setError(errorPrecio);
       return;
     }
     setGuardando(true);
