@@ -1,12 +1,12 @@
 import type { Categoria, Producto } from "./catalogo";
 
 /**
- * Menú por sucursal (ADR 0027, migración 0151). La caja lee el catálogo del negocio y lo ajusta a
+ * Menú por sucursal (ADR 0027, migración 0152). La caja lee el catálogo del negocio y lo ajusta a
  * SU sucursal con las filas de `productos_sucursal`: sin fila, el producto se vende al precio
  * general y sin agotar.
  *
  * La misma regla vive en tres lugares, con los mismos casos de prueba:
- *   - SQL: precio_producto_en_sucursal / motivo_no_disponible_en_sucursal (0151). Es la que cobra.
+ *   - SQL: precio_producto_en_sucursal / motivo_no_disponible_en_sucursal (0152). Es la que cobra.
  *   - Uber: aplicarSucursalCarta (supabase/functions/_shared/delivery/menu-uber.ts).
  *   - Aquí.
  */
@@ -42,7 +42,7 @@ export function aplicarSucursal(productos: Producto[], filas: FilaProductoSucurs
  * Lo que se pinta en la cuadrícula: sin lo que no se vende aquí, y sin las categorías que se
  * quedaron vacías POR eso. Una categoría vacía de verdad se queda como estaba: esconderla sería un
  * cambio para todos los negocios, no solo para los de varias sucursales. `seVendeAqui` ausente
- * (catálogo en caché de antes de 0151) cuenta como que se vende.
+ * (catálogo en caché de antes de 0152) cuenta como que se vende.
  */
 export function menuVisible(categorias: Categoria[], productos: Producto[]): { categorias: Categoria[]; productos: Producto[] } {
   const visibles = productos.filter((p) => p.seVendeAqui !== false);

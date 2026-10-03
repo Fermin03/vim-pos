@@ -369,7 +369,7 @@ Deno.serve(async (req) => {
             .eq("tenant_id", tenantId).eq("activo", true).is("deleted_at", null),
           admin.from("combo_opciones").select("grupo_id, producto_id, precio_delta_mxn, activa")
             .eq("tenant_id", tenantId).is("deleted_at", null),
-          // Menú por sucursal (0151): la carta de esta tienda es la de su sucursal.
+          // Menú por sucursal (0152): la carta de esta tienda es la de su sucursal.
           admin.from("productos_sucursal").select("producto_id, disponible, precio_mxn, agotado_manual, agotado_automatico")
             .eq("tenant_id", tenantId).eq("sucursal_id", cx.sucursal_id),
         ]);
@@ -384,7 +384,7 @@ Deno.serve(async (req) => {
           id: String(p.id), nombre: String(p.nombre ?? ""), descripcion: (p.descripcion as string | null) ?? null,
           precio_base_mxn: p.precio_base_mxn as number | string, tasa_iva: p.tasa_iva as number | null,
           categoria_id: (p.categoria_id as string | null) ?? null,
-          // El agotado es por sucursal (0151): lo pone aplicarSucursalCarta.
+          // El agotado es por sucursal (0152): lo pone aplicarSucursalCarta.
           agotado: false, visible: p.visible_en_pos !== false,
           es_combo: p.es_combo === true,
           n_slots: slotsPorCombo.get(String(p.id)) ?? 0,

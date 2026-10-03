@@ -206,7 +206,7 @@ test("una zona de la nube ya borrada no reconcilia nada (no choca con el índice
   assert.ok(!client.consultas.some((c) => c.sql.includes("lower(btrim(nombre))")));
 });
 
-test("PULL_ORDER baja el menú por sucursal después de productos y de sucursales (0151)", () => {
+test("PULL_ORDER baja el menú por sucursal después de productos y de sucursales (0152)", () => {
   const t = PULL_ORDER.map((x) => x.t);
   assert.ok(t.includes("productos_sucursal"), "productos_sucursal está en PULL_ORDER");
   assert.ok(t.indexOf("productos_sucursal") > t.indexOf("productos"), "va después de productos (FK)");

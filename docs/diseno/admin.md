@@ -166,7 +166,7 @@ tiempo**—, porque el dueño decide cuánto dura una imagen viéndola, no en ot
 Aquí los controles **sí miden 44 px**: es de las pocas páginas de Configuración que el dueño abre
 desde el celular, parado junto a la caja, con la foto de la promoción que acaba de recibir.
 
-## Menú por sucursal (0151, ADR 0027)
+## Menú por sucursal (0152, ADR 0027)
 
 Solo aparece con **dos o más sucursales**; con una, Catálogo se ve como siempre.
 

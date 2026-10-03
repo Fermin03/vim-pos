@@ -284,7 +284,7 @@ test("codigoDeError traduce los errores de combo (Task 7) y los que ya existían
   assert.equal(codigoDeError("SIN_TURNO_ABIERTO"), "SIN_TURNO_ABIERTO");
 });
 
-test("codigoDeError: un componente que la sucursal no vende (0151)", () => {
+test("codigoDeError: un componente que la sucursal no vende (0152)", () => {
   assert.equal(codigoDeError('El producto "Papas" no se vende en esta sucursal'), "PRODUCTO_NO_SE_VENDE");
   assert.equal(codigoDeError('El producto "Papas" está agotado o pausado'), "PRODUCTO_AGOTADO");
 });

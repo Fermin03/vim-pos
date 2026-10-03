@@ -19,7 +19,7 @@ export type Producto = {
   agotado: boolean;
   esCombo: boolean;
   /**
-   * false = esta sucursal no lo vende (productos_sucursal, 0151). Se carga igual —la reapertura de
+   * false = esta sucursal no lo vende (productos_sucursal, 0152). Se carga igual —la reapertura de
    * cuentas lo necesita— pero no se pinta. `precio_base_mxn` y `agotado` ya son los de la sucursal.
    */
   seVendeAqui: boolean;
@@ -79,8 +79,8 @@ export async function listarProductosPos(token: string, sucursalId: string): Pro
       descripcion: (p.descripcion as string) ?? null,
       precio_base_mxn: Number(p.precio_base_mxn),
       categoria_id: String(p.categoria_id),
-      // Las columnas agotado_* del producto ahora son «agotado en todas» (0151): el agotado de esta
-      // sucursal sale de su fila. Aquí solo cuenta un estado AGOTADO heredado de antes de 0151.
+      // Las columnas agotado_* del producto ahora son «agotado en todas» (0152): el agotado de esta
+      // sucursal sale de su fila. Aquí solo cuenta un estado AGOTADO heredado de antes de 0152.
       agotado: p.estado === "AGOTADO",
       esCombo: Boolean(p.es_combo),
       seVendeAqui: true,

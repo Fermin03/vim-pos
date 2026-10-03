@@ -9,6 +9,7 @@ import {
   filasFormIniciales,
   filasParaGuardar,
   versionMenor,
+  VERSION_MINIMA_MENU_SUCURSAL,
   type FilaMenuSucursal,
 } from "../menu-sucursal";
 
@@ -16,7 +17,7 @@ const fila = (sucursal_id: string, extra: Partial<FilaMenuSucursal> = {}): FilaM
   ...filaPorDefecto("p1", sucursal_id), ...extra,
 });
 
-describe("estado en una sucursal (misma regla que 0151 y que la caja)", () => {
+describe("estado en una sucursal (misma regla que 0152 y que la caja)", () => {
   it("sin fila, se vende", () => {
     expect(estadoEnSucursal("ACTIVO", undefined)).toBe("ACTIVO");
   });
@@ -70,17 +71,22 @@ describe("qué se guarda", () => {
 describe("cajas que todavía no respetan el menú por sucursal", () => {
   it("compara versiones por número, no por texto", () => {
     expect(versionMenor("0.4.9", "0.4.10")).toBe(true);
-    expect(versionMenor("0.4.109", "0.4.109")).toBe(false);
-    expect(versionMenor("0.5.0", "0.4.109")).toBe(false);
-    expect(versionMenor("basura", "0.4.109")).toBe(true);
+    expect(versionMenor("0.4.110", "0.4.110")).toBe(false);
+    expect(versionMenor("0.5.0", "0.4.110")).toBe(false);
+    expect(versionMenor("basura", "0.4.110")).toBe(true);
+  });
+  it("la mínima es la 0.4.110: la 0.4.109 (pantalla del cliente, sin menú por sucursal) ya es vieja", () => {
+    expect(VERSION_MINIMA_MENU_SUCURSAL).toBe("0.4.110");
+    expect(versionMenor("0.4.109", VERSION_MINIMA_MENU_SUCURSAL)).toBe(true);
+    expect(versionMenor("0.4.110", VERSION_MINIMA_MENU_SUCURSAL)).toBe(false);
   });
   it("solo cajas de escritorio (con latido) de versión vieja o desconocida", () => {
     const cajas = [
-      { id: "1", nombre: "Caja 01", sucursalNombre: "Centro", ultimoLatido: "2026-10-02T10:00:00Z", versionApp: "0.4.108" },
-      { id: "2", nombre: "Caja 02", sucursalNombre: "Norte", ultimoLatido: "2026-10-02T10:00:00Z", versionApp: "0.4.109" },
+      { id: "1", nombre: "Caja 01", sucursalNombre: "Centro", ultimoLatido: "2026-10-02T10:00:00Z", versionApp: "0.4.109" },
+      { id: "2", nombre: "Caja 02", sucursalNombre: "Norte", ultimoLatido: "2026-10-02T10:00:00Z", versionApp: "0.4.110" },
       { id: "3", nombre: "Caja web", sucursalNombre: "Norte", ultimoLatido: null, versionApp: null },
       { id: "4", nombre: "Caja vieja", sucursalNombre: "Sur", ultimoLatido: "2026-10-01T10:00:00Z", versionApp: null },
     ];
-    expect(cajasSinMenuPorSucursal(cajas, "0.4.109").map((c) => c.id)).toEqual(["1", "4"]);
+    expect(cajasSinMenuPorSucursal(cajas).map((c) => c.id)).toEqual(["1", "4"]);
   });
 });

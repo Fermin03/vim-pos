@@ -1,5 +1,5 @@
 -- ============================================================================
--- 0151 — Menú distinto por sucursal (ADR 0027).
+-- 0152 — Menú distinto por sucursal (ADR 0027).
 --
 -- Un negocio con varias sucursales tenía UN menú: productos y categorías cuelgan de tenant_id, el
 -- precio era uno (D16) y agotar era global. Aquí cada sucursal guarda solo lo que cambia —se vende
@@ -124,7 +124,7 @@ CREATE TRIGGER a00_guardia_escritura_directa
 
 -- ── §4 productos.agotado_* = «agotado en TODAS las sucursales» ─────────────────────────────
 -- Para las cajas sin actualizar, que leen esas columnas. Falta de fila = no agotado. Un estado
--- 'AGOTADO' heredado de antes de 0151 pasa a ACTIVO: el agotado ya vive en las filas, y sin esto
+-- 'AGOTADO' heredado de antes de 0152 pasa a ACTIVO: el agotado ya vive en las filas, y sin esto
 -- quitar el último agotado violaría el CHECK estado_consistente (0007).
 -- En la caja el pull aplica en modo réplica (sin triggers) y trae productos ya derivado de la nube.
 CREATE OR REPLACE FUNCTION productos_sucursal_agotado_global()
@@ -184,7 +184,7 @@ BEGIN
    WHERE p.deleted_at IS NULL AND (p.agotado_manual OR p.agotado_automatico)
   ON CONFLICT (producto_id, sucursal_id) DO NOTHING;
   GET DIAGNOSTICS v_filas = ROW_COUNT;
-  RAISE NOTICE '0151: % filas de agotado copiadas a productos_sucursal', v_filas;
+  RAISE NOTICE '0152: % filas de agotado copiadas a productos_sucursal', v_filas;
 
   -- estado queda en ACTIVO/PAUSADO: el agotado ya vive en las filas.
   UPDATE productos SET estado = 'ACTIVO' WHERE estado = 'AGOTADO';
@@ -414,7 +414,7 @@ BEGIN
     FROM productos p LEFT JOIN categorias c ON c.id = p.categoria_id
    WHERE p.id = p_combo_producto_id AND p.tenant_id = v_tenant_id AND p.deleted_at IS NULL AND p.es_combo = true;
   IF NOT FOUND THEN RAISE EXCEPTION 'El producto % no es un combo de este negocio', p_combo_producto_id; END IF;
-  -- 0151: pausado, apagado en esta sucursal o agotado en esta sucursal.
+  -- 0152: pausado, apagado en esta sucursal o agotado en esta sucursal.
   IF motivo_no_disponible_en_sucursal(v_combo.id, v_sucursal_id) IS NOT NULL THEN
     RAISE EXCEPTION 'El combo "%" no está disponible', v_combo.nombre;
   END IF;
@@ -448,7 +448,7 @@ BEGIN
     IF NOT FOUND OR v_prod.es_combo THEN
       RAISE EXCEPTION 'El producto % no es válido como componente', v_comp->>'producto_id';
     END IF;
-    -- 0151: "está agotado o pausado" lo traduce la caja a PRODUCTO_AGOTADO y "no se vende en esta
+    -- 0152: "está agotado o pausado" lo traduce la caja a PRODUCTO_AGOTADO y "no se vende en esta
     -- sucursal" a PRODUCTO_NO_SE_VENDE (desktop/src/delivery-espejo.mjs). No cambiar las frases.
     v_motivo := motivo_no_disponible_en_sucursal(v_prod.id, v_sucursal_id);
     IF v_motivo = 'NO_SE_VENDE' THEN
@@ -687,7 +687,7 @@ AS $$
     'categorias',                     coalesce((SELECT jsonb_agg(to_jsonb(x)) FROM categorias x WHERE x.tenant_id = p_tenant), '[]'::jsonb),
     'grupos_modificadores',           coalesce((SELECT jsonb_agg(to_jsonb(x)) FROM grupos_modificadores x WHERE x.tenant_id = p_tenant), '[]'::jsonb),
     'productos',                      coalesce((SELECT jsonb_agg(to_jsonb(x)) FROM productos x WHERE x.tenant_id = p_tenant), '[]'::jsonb),
-    -- Menú por sucursal (0151, ADR 0027).
+    -- Menú por sucursal (0152, ADR 0027).
     'productos_sucursal',             coalesce((SELECT jsonb_agg(to_jsonb(x)) FROM productos_sucursal x WHERE x.tenant_id = p_tenant), '[]'::jsonb),
     'opciones_modificador',           coalesce((SELECT jsonb_agg(to_jsonb(x)) FROM opciones_modificador x WHERE x.tenant_id = p_tenant), '[]'::jsonb),
     'productos_grupos_modificadores', coalesce((SELECT jsonb_agg(to_jsonb(x)) FROM productos_grupos_modificadores x WHERE x.tenant_id = p_tenant), '[]'::jsonb),

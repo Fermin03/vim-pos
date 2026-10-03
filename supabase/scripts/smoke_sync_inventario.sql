@@ -93,7 +93,7 @@ BEGIN
   SELECT stock_actual INTO v_stock FROM insumo_stock_sucursal WHERE insumo_id = v_insumo AND sucursal_id = v_s;
   IF v_stock <> 6 THEN RAISE EXCEPTION 'reenvío cambió la existencia a %', v_stock; END IF;
 
-  -- 3) Agotado: una salida de 6 deja 0 → alerta AGOTADO y producto agotado automático en esa sucursal (0151)
+  -- 3) Agotado: una salida de 6 deja 0 → alerta AGOTADO y producto agotado automático en esa sucursal (0152)
   v_res := sync_push_snapshot(v_t, jsonb_build_object('movimientos_inventario', jsonb_build_array(
     jsonb_build_object('id', gen_random_uuid(), 'tenant_id', v_t, 'sucursal_id', v_s, 'insumo_id', v_insumo, 'tipo', 'SALIDA_VENTA',
       'cantidad', 6, 'costo_unitario_mxn', 4, 'stock_antes', 6, 'stock_despues', 0, 'fecha', now(), 'dia_contable', CURRENT_DATE, 'usuario_id', v_m, 'created_at', now()))));

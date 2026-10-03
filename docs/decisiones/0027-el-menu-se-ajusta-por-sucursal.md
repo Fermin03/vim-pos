@@ -14,7 +14,7 @@
 - Uber publicaba una carta por sucursal (`delivery_conexiones.sucursal_id`) armada con el catálogo
   del negocio entero.
 
-## Qué hacemos ahora (migración 0151)
+## Qué hacemos ahora (migración 0152)
 
 - **`productos_sucursal`**, una fila por (producto, sucursal) con solo lo que cambia: `disponible`,
   `precio_mxn` (NULL = el general), `agotado_manual`, `agotado_automatico`. **Sin fila = lo general**:
@@ -29,7 +29,7 @@
 - **`productos.agotado_*` pasan a significar «agotado en todas»** y las mantiene un trigger. Existen
   para las cajas sin actualizar; con una sola sucursal se comportan igual que antes.
   `productos.estado` queda en ACTIVO/PAUSADO.
-- La regla vive en tres lugares con los mismos casos de prueba: SQL (0151), la caja
+- La regla vive en tres lugares con los mismos casos de prueba: SQL (0152), la caja
   (`aplicarSucursal`) y la carta de Uber (`aplicarSucursalCarta`).
 - Escribir la tabla por REST exige `config.productos`; el agotado por inventario no se escribe a mano.
 
@@ -42,7 +42,7 @@
 
 ## Consecuencias
 
-- Una caja de escritorio anterior a la versión que trae 0151 ignora la tabla: vende todo al precio
+- Una caja de escritorio anterior a la 0.4.110 (la que trae 0152) ignora la tabla: vende todo al precio
   general. El admin lo avisa nombrando la caja (`cajas.version_app`).
 - Extras y modificadores siguen globales. Menús por horario, precio por modo de servicio y
   promociones por sucursal quedan fuera.

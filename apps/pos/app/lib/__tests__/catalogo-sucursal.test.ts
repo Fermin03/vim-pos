@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import type { Categoria, Producto } from "../catalogo";
 import { aplicarSucursal, menuVisible, type FilaProductoSucursal } from "../catalogo-sucursal";
 
-// Mismos casos que 0035_menu_por_sucursal.test.sql y que menu-uber.test.ts: la regla vive en tres lugares.
+// Mismos casos que 0036_menu_por_sucursal.test.sql y que menu-uber.test.ts: la regla vive en tres lugares.
 const prod = (id: string, precio: number, categoria_id: string, extra: Partial<Producto> = {}): Producto => ({
   id, nombre: id, descripcion: null, precio_base_mxn: precio, categoria_id, agotado: false, esCombo: false, seVendeAqui: true,
   sku: null, tasaIva: 16, ivaIncluido: true, claveSat: null, unidadSat: null, categoriaNombre: null, ...extra,

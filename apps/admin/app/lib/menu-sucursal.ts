@@ -3,14 +3,14 @@ import { supabase, leerSesion } from "./supabase";
 import { listarCajas, type Caja } from "./configuracion";
 
 /**
- * Menú por sucursal (ADR 0027, migración 0151). Una fila por producto y sucursal guarda solo lo que
+ * Menú por sucursal (ADR 0027, migración 0152). Una fila por producto y sucursal guarda solo lo que
  * cambia ahí; sin fila, el producto se vende al precio general y sin agotar. La regla es la misma
- * que precio_producto_en_sucursal / motivo_no_disponible_en_sucursal (0151) y que aplicarSucursal
+ * que precio_producto_en_sucursal / motivo_no_disponible_en_sucursal (0152) y que aplicarSucursal
  * de la caja (apps/pos/app/lib/catalogo-sucursal.ts).
  */
 
 /** Primera versión del escritorio que respeta el menú por sucursal. Una caja anterior vende todo al precio general. */
-export const VERSION_MINIMA_MENU_SUCURSAL = "0.4.109";
+export const VERSION_MINIMA_MENU_SUCURSAL = "0.4.110";
 
 export type SucursalMenu = { id: string; nombre: string };
 
@@ -76,7 +76,7 @@ export function edicionesDeForm(productoId: string, filas: FilaFormMenu[]): Edic
   }));
 }
 
-/** El estado en una sucursal, con el mismo orden que motivo_no_disponible_en_sucursal (0151). */
+/** El estado en una sucursal, con el mismo orden que motivo_no_disponible_en_sucursal (0152). */
 export function estadoEnSucursal(estadoProducto: string, fila: FilaMenuSucursal | undefined): EstadoEnSucursal {
   if (estadoProducto === "PAUSADO") return "PAUSADO";
   if (fila && !fila.disponible) return "NO_SE_VENDE";
@@ -84,7 +84,7 @@ export function estadoEnSucursal(estadoProducto: string, fila: FilaMenuSucursal 
   return "ACTIVO";
 }
 
-/** El estado en «todas»: las columnas agotado_* del producto son «agotado en todas» (0151). */
+/** El estado en «todas»: las columnas agotado_* del producto son «agotado en todas» (0152). */
 export function estadoGeneral(p: { estado: string; agotado_manual: boolean; agotado_automatico: boolean }): EstadoEnSucursal {
   if (p.estado === "PAUSADO") return "PAUSADO";
   if (p.estado === "AGOTADO" || p.agotado_manual || p.agotado_automatico) return "AGOTADO";

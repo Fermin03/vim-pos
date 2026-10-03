@@ -20,7 +20,7 @@ export type ProductoCarta = {
   categoria_id?: string | null;
   agotado?: boolean;
   visible?: boolean;
-  /** false = la sucursal de esta carta no lo vende (productos_sucursal.disponible, 0151). */
+  /** false = la sucursal de esta carta no lo vende (productos_sucursal.disponible, 0152). */
   se_vende?: boolean;
   /** true si es un combo (productos.es_combo). Un combo sin slots no se puede vender. */
   es_combo?: boolean;
@@ -78,7 +78,7 @@ export function centavos(precio: number | string): number {
   return Number.isFinite(n) && n > 0 ? Math.round(n * 100) : 0;
 }
 
-/** Una fila de productos_sucursal (0151) de la sucursal de la conexión. */
+/** Una fila de productos_sucursal (0152) de la sucursal de la conexión. */
 export type FilaSucursalCarta = {
   producto_id: string;
   disponible: boolean;
@@ -90,7 +90,7 @@ export type FilaSucursalCarta = {
 /**
  * La carta de una tienda de Uber es la de SU sucursal (delivery_conexiones.sucursal_id): precio,
  * agotado y «se vende» de esa sucursal. Misma regla que precio_producto_en_sucursal /
- * motivo_no_disponible_en_sucursal (0151) y que aplicarSucursal de la caja
+ * motivo_no_disponible_en_sucursal (0152) y que aplicarSucursal de la caja
  * (apps/pos/app/lib/catalogo-sucursal.ts), con los mismos casos. Va ANTES de armarCombosCarta: así
  * el importe de una opción SUMA ya sale con el precio de la sucursal.
  */

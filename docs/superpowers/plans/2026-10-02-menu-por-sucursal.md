@@ -1,5 +1,10 @@
 # Menú distinto por sucursal — plan de implementación
 
+> **Renumerado tras rebasar sobre main (2 oct 2026):** main tomó la 0151 (anuncios), la prueba 0035 y
+> la versión 0.4.109 (#96). Esta rama quedó como migración `0152_menu_por_sucursal.sql`, prueba
+> `0036_menu_por_sucursal.test.sql` y escritorio 0.4.110 (`VERSION_MINIMA_MENU_SUCURSAL`). Abajo se
+> conservan los números originales del plan.
+
 > **Para agentes:** SUB-SKILL REQUERIDA: usa superpowers:subagent-driven-development (recomendada) o
 > superpowers:executing-plans para ejecutar este plan tarea por tarea. Los pasos usan casillas
 > (`- [ ]`) para el seguimiento.

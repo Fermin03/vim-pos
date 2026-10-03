@@ -62,7 +62,7 @@ Un negocio con dos sucursales tiene **un solo menú**: `productos` y `categorias
    rechaza un producto por no venderse en la sucursal (un pedido de Uber pagado no se pierde por una
    carta vieja). Los combos sí validan, como ya validan el agotado (§5.2).
 
-## 4. Datos — migración `0151_menu_por_sucursal.sql`
+## 4. Datos — migración `0152_menu_por_sucursal.sql`
 
 ### 4.1 La tabla
 
@@ -110,7 +110,7 @@ CREATE TABLE productos_sucursal (
 - `motivo_no_disponible_en_sucursal(p_producto, p_sucursal) RETURNS text` — NULL si se vende; si no,
   en este orden: `'PAUSADO'` (`estado = 'PAUSADO'`), `'NO_SE_VENDE'` (`NOT ps.disponible`),
   `'AGOTADO'` (`ps.agotado_manual OR ps.agotado_automatico`, o un `estado = 'AGOTADO'` heredado de
-  antes de 0151 que nadie ha vuelto a guardar).
+  antes de 0152 que nadie ha vuelto a guardar).
 
 ### 4.3 Agotado derivado en `productos` (compatibilidad)
 
@@ -250,7 +250,7 @@ Si el negocio tiene alguna fila con `disponible = false` o `precio_mxn` no nulo,
 escritorio (`ultimo_latido` no nulo) reporta `cajas.version_app` nula (anterior a 0.4.60) o menor a la
 versión que trae esta función, el formulario y la lista muestran: «La caja *X* (*Norte*) tiene la
 versión *v*: hasta que se actualice vende todo al precio general». La versión mínima es una constante
-en el admin. La caja web no cuenta: toma el código nuevo al desplegar.
+en el admin (`VERSION_MINIMA_MENU_SUCURSAL` = 0.4.110). La caja web no cuenta: toma el código nuevo al desplegar.
 
 ## 8. Uber
 
@@ -267,7 +267,7 @@ Los pedidos entrantes no cambian. El reenvío de la carta sigue siendo manual (�
 
 ## 9. Pruebas
 
-### 9.1 pgTAP — `supabase/tests/0035_menu_por_sucursal.test.sql`
+### 9.1 pgTAP — `supabase/tests/0036_menu_por_sucursal.test.sql`
 
 Estructura y seguridad:
 
@@ -303,7 +303,7 @@ sucursal) y `smoke_sync_inventario.sql` (el agotado automático ya no pone `esta
 
 ### 9.4 Escritorio
 
-`npm run verify:migraciones` (aplica 0151 en Postgres vacío) y `npm run verify:sync`.
+`npm run verify:migraciones` (aplica 0152 en Postgres vacío) y `npm run verify:sync`.
 
 ### 9.5 A mano
 
@@ -312,7 +312,7 @@ producto que luego se apaga (no pierde el renglón), y carta de Uber de cada suc
 
 ## 10. Despliegue
 
-1. Migración 0151 a producción **antes** de mezclar (regla del proyecto).
+1. Migración 0152 a producción **antes** de mezclar (regla del proyecto).
 2. Desplegar `delivery-uber-conexion`.
 3. Mezclar; Vercel publica admin y POS web.
 4. Instalador del escritorio con la lista «Antes de empaquetar» del RUNBOOK; lista de lo que incluye a

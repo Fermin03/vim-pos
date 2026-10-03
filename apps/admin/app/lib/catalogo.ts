@@ -215,7 +215,7 @@ export type Producto = {
   categoriaNombre: string;
   estado: EstadoProducto;
   agotado_manual: boolean;
-  /** «Agotado en todas» por inventario (derivada en la base, 0151). Solo para mostrar. */
+  /** «Agotado en todas» por inventario (derivada en la base, 0152). Solo para mostrar. */
   agotado_automatico: boolean;
   visible_en_pos: boolean;
   marca_virtual_id: string | null;
@@ -292,7 +292,7 @@ export async function obtenerProducto(id: string): Promise<Producto | null> {
   };
 }
 
-// El agotado vive por sucursal (0151, ADR 0027): el producto solo guarda ACTIVO o PAUSADO, y sus
+// El agotado vive por sucursal (0152, ADR 0027): el producto solo guarda ACTIVO o PAUSADO, y sus
 // columnas agotado_* las deriva la base («agotado en todas»). `input.agotado` lo guarda el
 // formulario en la fila de cada sucursal (menu-sucursal.ts).
 function resolverEstado(input: ProductoInput): EstadoProducto {

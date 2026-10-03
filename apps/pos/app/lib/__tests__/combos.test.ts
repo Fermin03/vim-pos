@@ -161,7 +161,7 @@ describe("abreModificadores", () => {
   });
 });
 
-describe("menú por sucursal (0151)", () => {
+describe("menú por sucursal (0152)", () => {
   const opcionesDe = (defs: ComboDef[]): string[] => defs.flatMap((d) => d.slots.flatMap((s) => s.opciones.map((o) => o.producto.id)));
 
   it("una opción que esta sucursal no vende no sale en ningún slot, por lista ni por categoría", () => {

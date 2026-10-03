@@ -22,7 +22,7 @@ export const PULL_ORDER = [
   { t: "categorias" },
   { t: "grupos_modificadores" },
   { t: "productos" },
-  // Menú por sucursal (0151): FK a productos y a sucursales, que ya bajaron. Llave compuesta
+  // Menú por sucursal (0152): FK a productos y a sucursales, que ya bajaron. Llave compuesta
   // (producto_id, sucursal_id): upsertTabla arma el ON CONFLICT con ella, sin CLAVES_NATURALES.
   { t: "productos_sucursal" },
   { t: "opciones_modificador" },

@@ -1,5 +1,5 @@
 -- ============================================================================
--- 0151 · menú por sucursal: la tabla, quién la escribe, la regla de precio y disponibilidad,
+-- 0152 · menú por sucursal: la tabla, quién la escribe, la regla de precio y disponibilidad,
 -- y el agotado del producto como «agotado en todas».
 -- ============================================================================
 begin;
@@ -22,7 +22,7 @@ insert into tenant_limites (tenant_id, max_sucursales) values (:'t', 5)
   on conflict (tenant_id) do update set max_sucursales = 5;
 insert into sucursales (id, tenant_id, codigo, nombre) values (:'norte', :'t', 'KN', 'León Norte');
 insert into tenants (id, codigo, nombre_comercial, estado, vertical_principal)
-  values (:'otro', 'tenant-0035', 'Otro negocio', 'INTERNO', 'QUICK_SERVICE');
+  values (:'otro', 'tenant-0036', 'Otro negocio', 'INTERNO', 'QUICK_SERVICE');
 insert into sucursales (id, tenant_id, codigo, nombre) values (:'suc_otro', :'otro', 'OT', 'Otra');
 insert into categorias (id, tenant_id, nombre) values (:'cat_otro', :'otro', 'Otra categoría');
 insert into productos (id, tenant_id, categoria_id, nombre, precio_base_mxn)

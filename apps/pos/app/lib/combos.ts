@@ -38,7 +38,7 @@ const r2 = (n: number): number => Math.round(n * 100) / 100;
  * Resuelve las opciones de cada slot (spec §4.3): por categoría son todos los productos visibles
  * de esa categoría que no sean combos, y una fila explícita solo aporta delta/default o excluye
  * (activa=false); sin categoría, las filas explícitas activas son las opciones.
- * Lo que esta sucursal no vende (seVendeAqui: false, 0151) no es opción.
+ * Lo que esta sucursal no vende (seVendeAqui: false, 0152) no es opción.
  */
 export function armarCombos(filas: FilaComboGrupo[], productos: Producto[]): ComboDef[] {
   const porId = new Map(productos.map((p) => [p.id, p]));

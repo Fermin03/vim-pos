@@ -61,7 +61,7 @@ export function codigoDeError(m) {
   // una frase estable de cada RAISE EXCEPTION.
   if (m.includes("requiere entre") && m.includes("selecciones")) return "COMBO_INCOMPLETO";
   if (m.includes("está agotado o pausado")) return "PRODUCTO_AGOTADO";
-  // 0151: el componente existe pero esta sucursal no lo vende (productos_sucursal.disponible = false).
+  // 0152: el componente existe pero esta sucursal no lo vende (productos_sucursal.disponible = false).
   if (m.includes("no se vende en esta sucursal")) return "PRODUCTO_NO_SE_VENDE";
   if (m.includes("no es opción del slot")) return "COMBO_OPCION_INVALIDA";
   // Se dispara cuando alguien desactiva una opción de un slot en el admin (combo_opciones.activa =
