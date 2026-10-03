@@ -3,7 +3,7 @@
 -- y el agotado del producto como «agotado en todas».
 -- ============================================================================
 begin;
-select plan(22);
+select plan(25);
 
 \set t         '99999999-0000-0000-0000-0000000000aa'
 \set centro    '99999999-0000-0000-0000-0000000000bb'
@@ -103,6 +103,18 @@ select throws_ok(
   '42501', null, 'las filas no se borran: el pull de la caja no trae bajas');
 
 reset role;
+
+-- 11) Baja a la caja: la llave viaja en el snapshot, solo con filas del negocio, y avisa por catalogo_version().
+select ok(
+  (select count(*) from jsonb_array_elements(sync_pull_snapshot(:'t') -> 'productos_sucursal') e
+    where e ->> 'sucursal_id' = :'norte') >= 1,
+  'el menú de Norte baja a la caja en el snapshot');
+select is(
+  (select count(*)::int from jsonb_array_elements(sync_pull_snapshot(:'t') -> 'productos_sucursal') e
+    where e ->> 'tenant_id' = :'otro'), 0,
+  'y solo el del negocio');
+select ok(pg_get_functiondef('catalogo_version()'::regprocedure) like '%productos_sucursal%',
+  'un cambio en el menú de una sucursal cuenta como cambio de catálogo');
 
 select * from finish();
 rollback;
