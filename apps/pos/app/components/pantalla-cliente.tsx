@@ -137,11 +137,17 @@ function Reposo({ negocio, lista, conAnuncios, alQuedarseSinImagenes }: {
   conAnuncios: boolean;
   alQuedarseSinImagenes: () => void;
 }) {
+  // Con anuncios, solo anuncios: el logo y el nombre no se dibujan encima. Mientras la primera
+  // imagen llega, el carrusel deja ver debajo el mismo reposo de abajo, para no enseñar un vacío.
+  if (conAnuncios) return <CarruselAnuncios lista={lista} alQuedarseSinImagenes={alQuedarseSinImagenes} fondo={<ReposoSinAnuncios negocio={negocio} />} />;
+  return <ReposoSinAnuncios negocio={negocio} />;
+}
+
+/** Lo que enseña el reposo cuando no hay anuncios: logo, nombre o la marca de VIM. */
+function ReposoSinAnuncios({ negocio }: { negocio: Negocio | null | undefined }) {
   // El logo que no cargó (un data URI dañado): se recuerda cuál fue, para que uno nuevo sí se intente.
   const [logoRoto, setLogoRoto] = useState<string | null>(null);
 
-  // Con anuncios, solo anuncios: el logo y el nombre no se dibujan encima.
-  if (conAnuncios) return <CarruselAnuncios lista={lista} alQuedarseSinImagenes={alQuedarseSinImagenes} />;
   if (negocio === undefined) return <section className="flex-1" />;
 
   // Logo, nombre o la marca de VIM: lo decide `queEnsenaReposo` (con pruebas).

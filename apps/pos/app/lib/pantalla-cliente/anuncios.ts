@@ -143,6 +143,20 @@ export function capasCarrusel(cuadro: { actual: Anuncio | null; anterior: Anunci
   return capas;
 }
 
+/**
+ * Si el carrusel debe tener debajo el reposo sin anuncios (logo, nombre o marca). PURA.
+ *
+ * El carrusel arranca sin imagen cada vez que se monta (al volver a reposo, al terminar la prueba
+ * de imágenes) y tarda en precargar la primera: sin esto, entre el logo de antes y el primer
+ * anuncio la pantalla se veía vacía. El reposo se queda hasta que la primera imagen termina su
+ * fundido (si se quitara al entrar, el fundido se haría sobre un fondo en blanco). Desde la
+ * segunda imagen ya no vuelve: cada una tapa por completo a la anterior.
+ */
+export function fondoDelCarrusel(cuadro: { actual: Anuncio | null; anterior: Anuncio | null }, asentada: string | null): boolean {
+  if (cuadro.anterior) return false;
+  return cuadro.actual === null || cuadro.actual.url !== asentada;
+}
+
 export type PasoCarrusel =
   /** Ninguna imagen se puede enseñar: la pantalla vuelve al logo. */
   | { hacer: "nada" }

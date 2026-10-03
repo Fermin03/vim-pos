@@ -8,7 +8,7 @@ import { crearPublicador, crearReceptor, PAGADO_MAX_MS, SILENCIO_MS, type Canal 
 import { textoEstadoPantalla, type AjustePantalla } from "../pantalla-cliente/ajuste";
 import { CLAVE_NEGOCIO, negocioAlAbrir, negocioGuardado, olvidarNegocio, queEnsenaReposo, recordarNegocio } from "../pantalla-cliente/negocio";
 import { anchoEm, ANCHO_NOMBRE_VMIN, tamanoNombre } from "../pantalla-cliente/medidas";
-import { capasCarrusel, imagenesTrasLeer, imagenesTrasProbar, leerAnuncios, listaTrasLeer, mismaLista, pasoSiguiente, puedeLeerAnuncios, seEnsenanAnuncios, siguienteAnuncio, LISTA_VACIA, type ListaAnuncios } from "../pantalla-cliente/anuncios";
+import { capasCarrusel, fondoDelCarrusel, imagenesTrasLeer, imagenesTrasProbar, leerAnuncios, listaTrasLeer, mismaLista, pasoSiguiente, puedeLeerAnuncios, seEnsenanAnuncios, siguienteAnuncio, LISTA_VACIA, type ListaAnuncios } from "../pantalla-cliente/anuncios";
 
 function producto(nombre: string, precio: number): Producto {
   return {
@@ -837,5 +837,21 @@ describe("capasCarrusel", () => {
     expect(capasCarrusel({ actual: A, anterior: null }, null)).toEqual([{ anuncio: A, fundiendo: true }]);
     expect(capasCarrusel({ actual: null, anterior: null }, null)).toEqual([]);
     expect(capasCarrusel({ actual: A, anterior: A }, A.url)).toEqual([{ anuncio: A, fundiendo: false }]);
+  });
+});
+
+describe("fondoDelCarrusel", () => {
+  const A = anuncio("a", 3), B = anuncio("b", 6);
+
+  it("mientras no hay imagen en pantalla se enseña el reposo sin anuncios, no un fondo vacío", () => {
+    expect(fondoDelCarrusel({ actual: null, anterior: null }, null)).toBe(true);
+  });
+  it("durante el fundido de la primera imagen sigue debajo; al asentarse se quita", () => {
+    expect(fondoDelCarrusel({ actual: A, anterior: null }, null)).toBe(true);
+    expect(fondoDelCarrusel({ actual: A, anterior: null }, A.url)).toBe(false);
+  });
+  it("desde la segunda imagen ya no vuelve: cada una tapa por completo a la anterior", () => {
+    expect(fondoDelCarrusel({ actual: B, anterior: A }, A.url)).toBe(false);
+    expect(fondoDelCarrusel({ actual: B, anterior: A }, null)).toBe(false);
   });
 });
