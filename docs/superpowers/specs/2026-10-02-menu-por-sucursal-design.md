@@ -77,9 +77,7 @@ CREATE TABLE productos_sucursal (
   agotado_automatico  boolean NOT NULL DEFAULT false,
   motivo_agotado      text NULL,
   created_at          timestamptz NOT NULL DEFAULT now(),
-  created_by          uuid REFERENCES auth.users(id),
   updated_at          timestamptz NOT NULL DEFAULT now(),
-  updated_by          uuid REFERENCES auth.users(id),
   PRIMARY KEY (producto_id, sucursal_id)
 );
 ```
@@ -89,6 +87,9 @@ CREATE TABLE productos_sucursal (
   la resuelve sin entrada en `CLAVES_NATURALES` (que solo existe para tablas con `id` + `UNIQUE`
   natural, como `insumo_stock_sucursal`). El admin hace upsert con
   `onConflict: 'producto_id,sucursal_id'`.
+- Sin `created_by`/`updated_by`: nadie los escribiría (el admin tampoco los llena en `productos`) y
+  agregarían una FK a `auth.users` en la base de la caja. Si se quiere bitácora de quién cambió un
+  precio, va en una migración aditiva con quien la escriba.
 - Índice `(tenant_id, sucursal_id)` para la lectura de la caja.
 - **RLS** igual que `productos`: `tenant_id = current_tenant_id()` en USING y WITH CHECK.
 - **Trigger de coherencia** (BEFORE INSERT/UPDATE): `tenant_id` se toma del producto y la sucursal
