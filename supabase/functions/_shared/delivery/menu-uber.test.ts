@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { armarCombosCarta, armarGruposModificadorCarta, centavos, construirMenuUber, idValidoUber, type ProductoCarta } from "./menu-uber.ts";
+import { aplicarSucursalCarta, armarCombosCarta, armarGruposModificadorCarta, centavos, construirMenuUber, idValidoUber, type ProductoCarta } from "./menu-uber.ts";
 
 const cats = [
   { id: "c-bebidas", nombre: "Bebidas", orden: 2 },
@@ -527,4 +527,39 @@ test("armarGruposModificadorCarta: agrupa opciones y productos por grupo_id, res
     { id: "o2", nombre: "Bien cocida", precio_extra_mxn: 0, agotada: true },
   ]);
   assert.deepEqual(r[0]!.producto_ids, ["p1", "p2"]); // ordenados por orden_visualizacion, no por llegada
+});
+
+test("la carta de una sucursal usa su precio, su agotado y lo que no se vende ahí (0151)", () => {
+  const ajustados = aplicarSucursalCarta(prods, [
+    { producto_id: "p-cheese", disponible: true, precio_mxn: "115.00", agotado_manual: false, agotado_automatico: false },
+    { producto_id: "p-agua", disponible: false, precio_mxn: null, agotado_manual: false, agotado_automatico: false },
+    { producto_id: "p-sin-cat", disponible: true, precio_mxn: null, agotado_manual: false, agotado_automatico: true },
+  ]);
+  const r = construirMenuUber(ajustados, cats);
+  assert.deepEqual((r.menu.items as { id: string }[]).map((i) => i.id), ["p-cheese"]);
+  assert.deepEqual((r.menu.items as Record<string, unknown>[])[0].price_info, { price: 11500 });
+  assert.ok(r.excluidos.some((e) => e.id === "p-agua" && e.motivo === "no se vende en esta sucursal"));
+  assert.ok(r.excluidos.some((e) => e.id === "p-sin-cat" && e.motivo === "agotado"));
+});
+
+test("sin filas, la carta es la general (0151)", () => {
+  assert.deepEqual(aplicarSucursalCarta(prods, []), prods);
+});
+
+test("en un combo, lo que la sucursal no vende no es opción y la SUMA usa su precio (0151)", () => {
+  const productos: ProductoCarta[] = [
+    { id: "combo", nombre: "Combo", precio_base_mxn: 45, categoria_id: "c-hamb", es_combo: true, n_slots: 1 },
+    { id: "h1", nombre: "Clásica", precio_base_mxn: 120, categoria_id: "c-hamb" },
+    { id: "h2", nombre: "Doble", precio_base_mxn: 150, categoria_id: "c-hamb" },
+  ];
+  const ajustados = aplicarSucursalCarta(productos, [
+    { producto_id: "h1", disponible: true, precio_mxn: 135, agotado_manual: false, agotado_automatico: false },
+    { producto_id: "h2", disponible: false, precio_mxn: null, agotado_manual: false, agotado_automatico: false },
+  ]);
+  const combos = armarCombosCarta(
+    ajustados,
+    [{ id: "s1", combo_producto_id: "combo", nombre: "Hamburguesa", orden_visualizacion: 1, minimo_selecciones: 1, maximo_selecciones: 1, modo_precio: "SUMA_PRECIO_PRODUCTO", categoria_id: "c-hamb" }],
+    [],
+  );
+  assert.deepEqual(combos[0].slots[0].opciones, [{ producto_id: "h1", importe_mxn: 135 }]);
 });
