@@ -38,6 +38,7 @@ const r2 = (n: number): number => Math.round(n * 100) / 100;
  * Resuelve las opciones de cada slot (spec §4.3): por categoría son todos los productos visibles
  * de esa categoría que no sean combos, y una fila explícita solo aporta delta/default o excluye
  * (activa=false); sin categoría, las filas explícitas activas son las opciones.
+ * Lo que esta sucursal no vende (seVendeAqui: false, 0151) no es opción.
  */
 export function armarCombos(filas: FilaComboGrupo[], productos: Producto[]): ComboDef[] {
   const porId = new Map(productos.map((p) => [p.id, p]));
@@ -50,7 +51,7 @@ export function armarCombos(filas: FilaComboGrupo[], productos: Producto[]): Com
     if (f.categoria_id) {
       const excluidos = new Set(explicitas.filter((o) => !o.activa).map((o) => o.producto_id));
       opciones = productos
-        .filter((p) => p.categoria_id === f.categoria_id && !p.esCombo && !excluidos.has(p.id))
+        .filter((p) => p.categoria_id === f.categoria_id && !p.esCombo && p.seVendeAqui !== false && !excluidos.has(p.id))
         .map((p) => {
           const o = explicitas.find((x) => x.producto_id === p.id);
           return { producto: p, delta: Number(o?.precio_delta_mxn ?? 0), esDefault: Boolean(o?.es_default) };
@@ -59,7 +60,7 @@ export function armarCombos(filas: FilaComboGrupo[], productos: Producto[]): Com
       opciones = explicitas
         .filter((o) => o.activa)
         .sort((a, b) => a.orden_visualizacion - b.orden_visualizacion)
-        .flatMap((o) => { const p = porId.get(o.producto_id); return p && !p.esCombo ? [{ producto: p, delta: Number(o.precio_delta_mxn), esDefault: o.es_default }] : []; });
+        .flatMap((o) => { const p = porId.get(o.producto_id); return p && !p.esCombo && p.seVendeAqui !== false ? [{ producto: p, delta: Number(o.precio_delta_mxn), esDefault: o.es_default }] : []; });
     }
     const slot: SlotCombo = { id: f.id, nombre: f.nombre, orden: f.orden_visualizacion, min: f.minimo_selecciones, max: f.maximo_selecciones, modo: f.modo_precio, opciones };
     porCombo.set(combo.id, [...(porCombo.get(combo.id) ?? []), slot]);
@@ -126,7 +127,7 @@ export function componentesPorDefecto(combo: ComboDef): ComponenteSel[] {
 
 /** Combos cuyo PRIMER slot admite el producto (spec §6.5). */
 export function combosQueAdmiten(producto: Producto, combos: ComboDef[]): ComboDef[] {
-  return combos.filter((c) => !c.producto.agotado && c.slots[0]?.opciones.some((o) => o.producto.id === producto.id));
+  return combos.filter((c) => !c.producto.agotado && c.producto.seVendeAqui !== false && c.slots[0]?.opciones.some((o) => o.producto.id === producto.id));
 }
 
 /** Cuánto cuesta "hacerlo combo" con defaults, y qué trae de más. */

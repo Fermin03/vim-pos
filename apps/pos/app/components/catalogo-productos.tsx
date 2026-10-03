@@ -1,6 +1,7 @@
 "use client";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { colorCategoria, ICONOS_POS, type Categoria, type Producto } from "../lib/catalogo";
+import { menuVisible } from "../lib/catalogo-sucursal";
 import { usePreciosVisibles } from "../lib/precios-visibles";
 import {
   calcularBarraCategorias,
@@ -55,8 +56,8 @@ const ALTO_PASTILLA = 56;
 const ANCHO_CON_ICONO = 170;
 
 export function CatalogoProductos({
-  categorias,
-  productos,
+  categorias: todasCategorias,
+  productos: todosProductos,
   bloqueado = false,
   onTapProducto,
 }: {
@@ -65,6 +66,16 @@ export function CatalogoProductos({
   bloqueado?: boolean;
   onTapProducto: (p: Producto) => void;
 }) {
+  // Menú por sucursal (ADR 0027): lo que esta sucursal no vende no se pinta, ni la categoría que se
+  // quedó vacía por eso. Las listas completas siguen en home-pos: reabrir una cuenta las necesita.
+  const categorias = useMemo(
+    () => (todasCategorias && todosProductos ? menuVisible(todasCategorias, todosProductos).categorias : todasCategorias),
+    [todasCategorias, todosProductos],
+  );
+  const productos = useMemo(
+    () => (todosProductos ? todosProductos.filter((p) => p.seVendeAqui !== false) : null),
+    [todosProductos],
+  );
   const [elegida, setElegida] = useState<string | null>(null);
   // La primera categoría queda activa sin necesidad de un efecto: las categorías llegan async
   // (red o cache) y un `useState` inicial se quedaría en null para siempre.

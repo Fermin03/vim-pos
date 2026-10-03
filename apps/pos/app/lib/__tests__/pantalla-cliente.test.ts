@@ -13,7 +13,7 @@ import { capasCarrusel, fondoDelCarrusel, imagenesTrasLeer, imagenesTrasProbar, 
 function producto(nombre: string, precio: number): Producto {
   return {
     id: `p-${nombre}`, nombre, descripcion: null, precio_base_mxn: precio, categoria_id: "c1", agotado: false,
-    esCombo: false, sku: null, tasaIva: 16, ivaIncluido: true, claveSat: null, unidadSat: null, categoriaNombre: null,
+    esCombo: false, seVendeAqui: true, sku: null, tasaIva: 16, ivaIncluido: true, claveSat: null, unidadSat: null, categoriaNombre: null,
   };
 }
 
