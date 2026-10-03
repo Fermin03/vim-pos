@@ -2,7 +2,7 @@
 -- 0151 · reordenar anuncios en una sola operación y tiempo general solo para dueño/admin.
 -- ============================================================================
 begin;
-select plan(10);
+select plan(13);
 
 \set t      '99999999-0000-0000-0000-0000000000aa'
 \set cajero '99999999-0000-0000-0000-000000000001'
@@ -22,7 +22,7 @@ insert into anuncios_pantalla (id, tenant_id, ruta, orden, deleted_at) values
   (:'a3',    :'t',    :'t'    || '/' || :'a3'    || '.jpg', 20, null),
   (:'baja',  :'t',    :'t'    || '/' || :'baja'  || '.jpg', 30, now()),
   (:'ajeno', :'otro', :'otro' || '/' || :'ajeno' || '.jpg', 0, null);
-insert into configuracion_tenant (tenant_id) values (:'t') on conflict (tenant_id) do nothing;
+-- (la fila de configuracion_tenant del negocio se crea más abajo: el primer caso necesita que no exista)
 
 -- Como el cajero.
 set local role authenticated;
@@ -33,12 +33,27 @@ select throws_ok(
   '42501', null, 'un cajero no puede reordenar anuncios');
 
 -- 5) Tiempo general: el cajero no lo cambia, pero sí otras columnas.
+-- Sin fila previa (el negocio aún no ha configurado nada): un INSERT que trae un tiempo distinto del 8 por omisión también es cambiarlo.
+select throws_ok(
+  format($$ insert into configuracion_tenant (tenant_id, pantalla_cliente_segundos) values (%L, 12) $$, :'t'),
+  '42501', null, 'un cajero no puede crear la fila con un tiempo distinto del de omisión');
+
+reset role;
+insert into configuracion_tenant (tenant_id) values (:'t') on conflict (tenant_id) do nothing;
+set local role authenticated;
+
 select throws_ok(
   format($$ update configuracion_tenant set pantalla_cliente_segundos = 12 where tenant_id = %L $$, :'t'),
   '42501', null, 'un cajero no puede cambiar el tiempo general de los anuncios');
+-- Otra columna de verdad (no la del tiempo): el UPDATE pasa.
 select lives_ok(
-  format($$ update configuracion_tenant set pantalla_cliente_segundos = pantalla_cliente_segundos where tenant_id = %L $$, :'t'),
-  'un UPDATE que deja el tiempo igual (otras columnas) no se bloquea');
+  format($$ update configuracion_tenant set combo_upsell_activo = not combo_upsell_activo where tenant_id = %L $$, :'t'),
+  'un cajero sí cambia otra columna de configuracion_tenant');
+-- El upsert exacto de apps/admin/app/lib/combos.ts (activarComboUpsell): INSERT ... ON CONFLICT DO UPDATE.
+select lives_ok(
+  format($$ insert into configuracion_tenant (tenant_id, combo_upsell_activo) values (%L, true)
+            on conflict (tenant_id) do update set combo_upsell_activo = excluded.combo_upsell_activo $$, :'t'),
+  'el upsert de combos de un cajero no se bloquea');
 
 -- Como el dueño.
 select set_config('request.jwt.claims', json_build_object('sub', :'dueno', 'role', 'authenticated', 'tenant_id', :'t')::text, true);
@@ -68,6 +83,11 @@ select throws_ok(
 select is(
   (select orden from anuncios_pantalla where id = :'baja'), 30,
   'el anuncio dado de baja conserva su orden');
+
+-- 5) Un id repetido: la lista no coincide con la de la base y se rechaza (cuenta DISTINTOS).
+select throws_ok(
+  format($$ select reordenar_anuncios(array[%L, %L, %L, %L]::uuid[]) $$, :'a1', :'a2', :'a3', :'a1'),
+  'P0002', null, 'un id repetido rechaza la llamada');
 
 -- 6) El dueño sí cambia el tiempo general.
 select lives_ok(
