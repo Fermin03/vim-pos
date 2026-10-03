@@ -4,21 +4,41 @@ import { useRouter } from "next/navigation";
 import { Button, DialogoPeligro } from "@vim/ui/styles";
 import { PageHeader, PageBody } from "../../../components/page-header";
 import { CatalogoTabs } from "../../../components/catalogo-tabs";
-import {
-  eliminarProducto,
-  listarProductos,
-  precioMxn,
-  type EstadoProducto,
-  type Producto,
-} from "../../../lib/catalogo";
+import { AvisoCajasMenu } from "../../../components/aviso-cajas-menu";
+import { eliminarProducto, listarProductos, precioMxn, type Producto } from "../../../lib/catalogo";
+import type { Caja } from "../../../lib/configuracion";
 import { mensajeError } from "../../../lib/errores";
+import { limpiarPrecio } from "../../../lib/numeros";
+import {
+  cajasQueNoRespetanMenu,
+  esPorDefecto,
+  estadoEnSucursal,
+  estadoGeneral,
+  filaPorDefecto,
+  guardarMenuSucursal,
+  leerMenuDeSucursal,
+  listarSucursalesMenu,
+  type EdicionMenuSucursal,
+  type EstadoEnSucursal,
+  type FilaMenuSucursal,
+  type SucursalMenu,
+} from "../../../lib/menu-sucursal";
 
-type Filtro = "all" | "ACTIVO" | "PAUSADO" | "AGOTADO";
+type Filtro = "all" | EstadoEnSucursal;
+const TODAS = "todas";
 
-const BADGE: Record<EstadoProducto, { txt: string; cls: string; dot: string }> = {
+const BADGE: Record<EstadoEnSucursal, { txt: string; cls: string; dot: string }> = {
   ACTIVO: { txt: "Activo", cls: "bg-success-soft text-success", dot: "bg-success" },
   PAUSADO: { txt: "Pausado", cls: "bg-hover text-ink-3", dot: "bg-ink-3" },
   AGOTADO: { txt: "Agotado", cls: "bg-[#FBF1EF] text-danger", dot: "bg-danger" },
+  NO_SE_VENDE: { txt: "No se vende aquí", cls: "bg-hover text-ink-2", dot: "bg-ink-3" },
+};
+const NOMBRE_FILTRO: Record<Filtro, string> = {
+  all: "Todos",
+  ACTIVO: "Activos",
+  PAUSADO: "Pausados",
+  AGOTADO: "Agotados",
+  NO_SE_VENDE: "No se venden aquí",
 };
 
 export default function ProductosPage() {
@@ -29,6 +49,14 @@ export default function ProductosPage() {
   const [filtro, setFiltro] = useState<Filtro>("all");
   const [borrar, setBorrar] = useState<Producto | null>(null);
   const [borrando, setBorrando] = useState(false);
+  // Menú por sucursal (ADR 0027): con dos o más sucursales se elige una y se ajusta en línea.
+  const [sucursales, setSucursales] = useState<SucursalMenu[]>([]);
+  const [sucSel, setSucSel] = useState<string>(TODAS);
+  const [filas, setFilas] = useState<Map<string, FilaMenuSucursal>>(new Map());
+  const [guardandoFila, setGuardandoFila] = useState<string | null>(null);
+  const [cajasViejas, setCajasViejas] = useState<Caja[]>([]);
+  const porSucursal = sucSel !== TODAS;
+  const nombreSuc = sucursales.find((s) => s.id === sucSel)?.nombre ?? "";
 
   async function recargar() {
     setError(null);
@@ -40,15 +68,60 @@ export default function ProductosPage() {
   }
   useEffect(() => {
     recargar();
+    listarSucursalesMenu().then(setSucursales).catch(() => setSucursales([]));
+    cajasQueNoRespetanMenu().then(setCajasViejas).catch(() => setCajasViejas([]));
   }, []);
+
+  useEffect(() => {
+    if (sucSel === TODAS) {
+      setFilas(new Map());
+      return;
+    }
+    let vivo = true;
+    leerMenuDeSucursal(sucSel)
+      .then((fs) => {
+        if (vivo) setFilas(new Map(fs.map((f) => [f.producto_id, f])));
+      })
+      .catch((e) => setError(mensajeError(e, "No se pudo leer el menú de la sucursal")));
+    return () => {
+      vivo = false;
+    };
+  }, [sucSel]);
 
   const visibles = useMemo(() => {
     return (prods ?? []).filter((p) => {
-      if (filtro !== "all" && p.estado !== filtro) return false;
+      const estado = porSucursal ? estadoEnSucursal(p.estado, filas.get(p.id)) : estadoGeneral(p);
+      if (filtro !== "all" && estado !== filtro) return false;
       if (query && !p.nombre.toLowerCase().includes(query.toLowerCase())) return false;
       return true;
     });
-  }, [prods, filtro, query]);
+  }, [prods, filtro, query, porSucursal, filas]);
+
+  /** Una escritura a la vez; al terminar se vuelve a leer: lo que se ve es lo guardado. */
+  async function guardarFila(p: Producto, cambio: Partial<Pick<EdicionMenuSucursal, "disponible" | "precio_mxn">>) {
+    if (!porSucursal || guardandoFila) return;
+    const actual = filas.get(p.id) ?? filaPorDefecto(p.id, sucSel);
+    const edicion: EdicionMenuSucursal = {
+      producto_id: p.id,
+      sucursal_id: sucSel,
+      disponible: actual.disponible,
+      precio_mxn: actual.precio_mxn,
+      agotado_manual: actual.agotado_manual,
+      ...cambio,
+    };
+    if (!filas.has(p.id) && esPorDefecto(edicion)) return;
+    setGuardandoFila(p.id);
+    setError(null);
+    try {
+      await guardarMenuSucursal([edicion]);
+      setFilas(new Map((await leerMenuDeSucursal(sucSel)).map((f) => [f.producto_id, f])));
+      setCajasViejas(await cajasQueNoRespetanMenu());
+    } catch (e) {
+      setError(mensajeError(e, "No se pudo guardar el menú de la sucursal"));
+    } finally {
+      setGuardandoFila(null);
+    }
+  }
 
   async function confirmarBorrado() {
     if (!borrar) return;
@@ -65,12 +138,18 @@ export default function ProductosPage() {
   }
 
   const sinNada = prods !== null && prods.length === 0;
+  const filtros: Filtro[] = porSucursal ? ["all", "ACTIVO", "PAUSADO", "AGOTADO", "NO_SE_VENDE"] : ["all", "ACTIVO", "PAUSADO", "AGOTADO"];
+  const th = "border-b border-line bg-sel px-4 py-[13px] text-12 font-bold uppercase tracking-wide text-ink-3";
 
   return (
     <>
       <PageHeader
         titulo="Productos"
-        subtitulo="El menú completo de tu negocio. Aquí sí se muestran los precios."
+        subtitulo={
+          sucursales.length >= 2
+            ? "El menú de tu negocio. Elige una sucursal para ver y ajustar lo que vende y a qué precio."
+            : "El menú completo de tu negocio. Aquí sí se muestran los precios."
+        }
         migas={[{ label: "Catálogo" }, { label: "Productos" }]}
         right={
           <div className="flex items-center gap-2">
@@ -89,7 +168,27 @@ export default function ProductosPage() {
       />
       <CatalogoTabs />
       <PageBody>
+        <AvisoCajasMenu cajas={cajasViejas} />
+
         <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center">
+          {sucursales.length >= 2 && (
+            <select
+              aria-label="Sucursal"
+              value={sucSel}
+              onChange={(e) => {
+                setSucSel(e.target.value);
+                setFiltro("all");
+              }}
+              className="h-10 rounded border border-line-strong px-3 text-sm outline-none focus:border-ink"
+            >
+              <option value={TODAS}>Todas las sucursales</option>
+              {sucursales.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.nombre}
+                </option>
+              ))}
+            </select>
+          )}
           <div className="relative w-full flex-1 sm:max-w-[340px]">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="pointer-events-none absolute left-[13px] top-1/2 h-[17px] w-[17px] -translate-y-1/2 text-ink-3">
               <circle cx="11" cy="11" r="7" />
@@ -104,7 +203,7 @@ export default function ProductosPage() {
             />
           </div>
           <div className="scroll-x-limpio inline-flex max-w-full gap-0.5 overflow-x-auto rounded border border-line bg-hover p-[3px] lg:max-w-none lg:overflow-x-visible">
-            {(["all", "ACTIVO", "PAUSADO", "AGOTADO"] as Filtro[]).map((f) => (
+            {filtros.map((f) => (
               <button
                 key={f}
                 type="button"
@@ -114,11 +213,17 @@ export default function ProductosPage() {
                   filtro === f ? "bg-surface text-ink shadow-sm" : "text-ink-2 hover:text-ink",
                 ].join(" ")}
               >
-                {f === "all" ? "Todos" : f === "ACTIVO" ? "Activos" : f === "PAUSADO" ? "Pausados" : "Agotados"}
+                {NOMBRE_FILTRO[f]}
               </button>
             ))}
           </div>
         </div>
+
+        {porSucursal && (
+          <p className="mb-3 text-13 text-ink-2">
+            Precio vacío = el general. Los cambios llegan a las cajas de {nombreSuc} en uno o dos minutos.
+          </p>
+        )}
 
         {error && (
           <p className="mb-4 text-sm font-medium text-danger" role="alert">
@@ -133,21 +238,28 @@ export default function ProductosPage() {
             <table className="w-full border-collapse">
               <thead>
                 <tr>
-                  <th className="border-b border-line bg-sel px-4 py-[13px] text-left text-12 font-bold uppercase tracking-wide text-ink-3">Producto</th>
-                  <th className="w-[180px] border-b border-line bg-sel px-4 py-[13px] text-left text-12 font-bold uppercase tracking-wide text-ink-3">Categoría</th>
-                  <th className="w-[120px] border-b border-line bg-sel px-4 py-[13px] text-right text-12 font-bold uppercase tracking-wide text-ink-3">Precio</th>
-                  <th className="w-[120px] border-b border-line bg-sel px-4 py-[13px] text-left text-12 font-bold uppercase tracking-wide text-ink-3">Estado</th>
-                  <th className="w-[104px] border-b border-line bg-sel px-4 py-[13px]"></th>
+                  <th className={`${th} text-left`}>Producto</th>
+                  <th className={`${th} w-[180px] text-left`}>Categoría</th>
+                  {porSucursal && <th className={`${th} w-[110px] text-left`}>Se vende aquí</th>}
+                  <th className={`${th} ${porSucursal ? "w-[150px]" : "w-[120px]"} text-right`}>{porSucursal ? "Precio aquí" : "Precio"}</th>
+                  <th className={`${th} w-[150px] text-left`}>Estado</th>
+                  <th className={`${th} w-[104px]`}></th>
                 </tr>
               </thead>
               <tbody>
                 {visibles.map((p) => {
-                  const b = BADGE[p.estado];
+                  const fila = filas.get(p.id);
+                  const b = BADGE[porSucursal ? estadoEnSucursal(p.estado, fila) : estadoGeneral(p)];
                   // Un combo se edita en su propia pantalla (slots, vista previa de precio):
                   // no tiene receta ni estación, así que el editor de producto no le sirve.
                   const editarHref = p.es_combo ? `/catalogo/combos/${p.id}` : `/catalogo/productos/${p.id}`;
+                  const ocupado = guardandoFila !== null;
                   return (
-                    <tr key={p.id} className="group cursor-pointer border-b border-line last:border-none hover:bg-hover" onClick={() => router.push(editarHref)}>
+                    <tr
+                      key={p.id}
+                      className={["group cursor-pointer border-b border-line last:border-none hover:bg-hover", guardandoFila === p.id ? "opacity-50" : ""].join(" ")}
+                      onClick={() => router.push(editarHref)}
+                    >
                       <td className="px-4 py-3.5">
                         <div className="flex items-center gap-2">
                           <span className="text-15 font-semibold">{p.nombre}</span>
@@ -156,12 +268,52 @@ export default function ProductosPage() {
                         {p.codigo_interno && <div className="mt-px text-13 text-ink-3">{p.codigo_interno}</div>}
                       </td>
                       <td className="px-4 py-3.5 text-14 text-ink-2">{p.categoriaNombre}</td>
-                      <td className="px-4 py-3.5 text-right font-display text-15 font-semibold tabular-nums">{precioMxn(p.precio_base_mxn)}</td>
+                      {porSucursal && (
+                        <td className="px-4 py-3.5" onClick={(e) => e.stopPropagation()}>
+                          <input
+                            type="checkbox"
+                            className="h-5 w-5 accent-ink"
+                            aria-label={`${p.nombre} se vende en ${nombreSuc}`}
+                            checked={fila?.disponible ?? true}
+                            disabled={ocupado}
+                            onChange={(e) => void guardarFila(p, { disponible: e.target.checked })}
+                          />
+                        </td>
+                      )}
+                      {porSucursal ? (
+                        <td className="px-4 py-3.5" onClick={(e) => e.stopPropagation()}>
+                          <div className="relative ml-auto w-[120px]">
+                            <span aria-hidden="true" className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-sm text-ink-2">$</span>
+                            <input
+                              key={`${p.id}:${fila?.precio_mxn ?? ""}`}
+                              defaultValue={fila?.precio_mxn ?? ""}
+                              placeholder={String(p.precio_base_mxn)}
+                              inputMode="decimal"
+                              aria-label={`Precio de ${p.nombre} en ${nombreSuc}`}
+                              disabled={ocupado || fila?.disponible === false}
+                              className="h-9 w-full rounded border border-line-strong pl-6 pr-2 text-right text-sm tabular-nums outline-none focus:border-ink disabled:bg-hover disabled:text-ink-3"
+                              onChange={(e) => {
+                                e.target.value = limpiarPrecio(e.target.value);
+                              }}
+                              onBlur={(e) => {
+                                const v = e.target.value.trim();
+                                const nuevo = v === "" ? null : Number(v);
+                                if (nuevo !== (fila?.precio_mxn ?? null)) void guardarFila(p, { precio_mxn: nuevo });
+                              }}
+                            />
+                          </div>
+                        </td>
+                      ) : (
+                        <td className="px-4 py-3.5 text-right font-display text-15 font-semibold tabular-nums">{precioMxn(p.precio_base_mxn)}</td>
+                      )}
                       <td className="px-4 py-3.5">
                         <span className={["inline-flex items-center gap-1.5 rounded-full px-[11px] py-1 text-13 font-semibold", b.cls].join(" ")}>
                           <span className={["h-1.5 w-1.5 rounded-full", b.dot].join(" ")} />
                           {b.txt}
                         </span>
+                        {porSucursal && fila && fila.precio_mxn !== null && (
+                          <div className="mt-1 text-12 text-ink-3 tabular-nums">General {precioMxn(p.precio_base_mxn)}</div>
+                        )}
                       </td>
                       <td className="px-4 py-3.5 text-right" onClick={(e) => e.stopPropagation()}>
                         <span className="inline-flex gap-1">
