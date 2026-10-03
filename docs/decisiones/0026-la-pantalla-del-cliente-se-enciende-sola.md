@@ -65,7 +65,9 @@ la decisión cerrada 22 de ese documento.
 
    La caja baja las imágenes que le faltan a `anuncios/` dentro de su carpeta de datos tras cada
    pull (también al arrancar y al vincularse) y borra las que ya no están en la lista. Nunca lanza
-   un error: una descarga que falla se reintenta en el siguiente pull. Resuelve el tiempo de cada
+   un error: una descarga que falla se reintenta en el siguiente pull, salvo un rechazo permanente (no es
+   imagen, tamaño fuera de rango, HTTP 4xx distinto de 408/429), que espera 6 horas o a que el
+   anuncio salga de la lista. Resuelve el tiempo de cada
    anuncio (el propio, si no el general, si no 8 s). El escritorio los sirve solo a la propia
    máquina: `GET /__anuncios` (la lista) y `GET /__anuncios/<archivo>` (la imagen, con el nombre
    validado como `<uuid>.<jpg|png|webp>`). Con anuncios, el reposo muestra un carrusel: cada imagen

@@ -124,7 +124,7 @@ export function imagenesTrasProbar(cargoAlguna: boolean): EstadoImagenes {
   return cargoAlguna ? "bien" : "rotas";
 }
 
-export type CapaCarrusel ={ anuncio: Anuncio; fundiendo: boolean };
+export type CapaCarrusel = { anuncio: Anuncio; fundiendo: boolean };
 
 /**
  * Las imágenes que se dibujan, de abajo arriba, y cuál lleva la animación de entrada. PURA.
