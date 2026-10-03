@@ -25,6 +25,7 @@ import { crearSondeoCatalogo } from "./sondeo-catalogo.mjs";
 import { crearAlmacenDirectivas, estadoDeVersion } from "./directivas.mjs";
 import { pantallaDeLaCaja } from "./pantalla.mjs";
 import { crearPantallaCliente } from "./pantalla-cliente.mjs";
+import { sincronizarAnuncios, listarAnuncios, rutaDeAnuncio } from "./anuncios.mjs";
 import { crearEspejo } from "./delivery-espejo.mjs";
 import { debeSondearApps } from "./delivery-espejo-modulo.mjs";
 import { registrarErrorLocal, subirErrores } from "./sync-errores.mjs";
@@ -56,6 +57,8 @@ const HUB_CFG = path.join(CONFIG_DIR, "kds-hub.json");
 // dar por variables de entorno, lo que hacía imposible dar de alta la caja de un cliente desde la
 // interfaz (un restaurantero no define env vars). Ahora la pantalla de vinculación las persiste.
 const NUBE_CFG = path.join(CONFIG_DIR, "nube.json");
+// Copia local de las imágenes de los anuncios de la pantalla del cliente (anuncios.mjs).
+const ANUNCIOS_DIR = path.join(CONFIG_DIR, "anuncios");
 const LOG_PATH = path.join(CONFIG_DIR, "vim-pos.log");
 // Lo que la nube dice que este negocio puede hacer (ADR 0014). En archivo y no en el Postgres
 // local a propósito: tiene que estar disponible aunque el backend tarde en arrancar.
@@ -239,6 +242,7 @@ async function vincularConNube({ email, password } = {}) {
     console.log("· [alta] credenciales válidas en la nube; bajando datos del negocio…");
     const r = await pullFromCloud(backend.pool, { cloudUrl: CLOUD_URL, anonKey: CLOUD_ANON, deviceToken: token }, (m) => console.log("· [alta]", m));
     guardarNube({ cloudUrl: CLOUD_URL, anon: CLOUD_ANON, email, pass: password });
+    bajarAnuncios().catch(() => {}); // las imágenes de los anuncios, sin esperar
     const tablas = Object.keys(r ?? {}).length;
     console.log(`· [alta] OK: ${tablas} tablas sincronizadas; la caja ya puede vincularse.`);
     return { ok: true, tablas };
@@ -341,6 +345,8 @@ async function bootCaja() {
       avisoVisto: (id) => directivas.marcarVisto(id),
       pantallaCliente: () => pantallaCliente?.estado() ?? { disponible: false },
       onPantallaCliente: (cambio) => pantallaCliente?.configurar(cambio) ?? null,
+      anuncios: () => listarAnuncios({ pool: backend?.pool, dir: ANUNCIOS_DIR }),
+      archivoAnuncio: (nombre) => rutaDeAnuncio(ANUNCIOS_DIR, nombre),
       directivas: () => {
         const { directivas: d, recibidoIso } = directivas.leer();
         const ver = estadoDeVersion(d, app.getVersion());
@@ -385,6 +391,8 @@ async function bootCaja() {
 
   iniciarSync();
   iniciarRespaldoDiario();
+  // Una caja que se apagó a media descarga de anuncios las completa sin esperar al siguiente pull.
+  bajarAnuncios().catch(() => {});
 
   // Pantalla del cliente: se abre sola si hay un segundo monitor. Va DESPUÉS de cargar la caja
   // para que la ventana principal ya tenga su monitor decidido, y carga el mismo POS (mismo origen
@@ -995,6 +1003,19 @@ async function avisarCatalogoNuevo(motivo) {
   } catch (e) {
     console.log("· [catálogo] no se pudo avisar a las pantallas:", e?.message ?? e);
   }
+  // Los anuncios bajaron como lista; aquí se traen las imágenes que falten. Sin esperar: son un
+  // adorno y no deben retrasar el aviso del menú.
+  bajarAnuncios().catch(() => {});
+}
+
+let anunciosEnCurso = null;
+/** Una sola pasada a la vez: dos pulls seguidos no deben bajar la misma imagen dos veces. */
+function bajarAnuncios() {
+  if (anunciosEnCurso || !backend?.pool) return anunciosEnCurso ?? Promise.resolve();
+  anunciosEnCurso = sincronizarAnuncios({ pool: backend.pool, dir: ANUNCIOS_DIR, cloudUrl: CLOUD_URL, log: (m) => console.log("· [anuncios]", m) })
+    .then((r) => { if (r.bajados || r.borrados || r.fallidos) console.log(`· [anuncios] ${r.bajados} bajados, ${r.borrados} borrados, ${r.fallidos} fallidos`); })
+    .finally(() => { anunciosEnCurso = null; });
+  return anunciosEnCurso;
 }
 
 /**

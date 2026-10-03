@@ -176,6 +176,30 @@ test("una zona local que choca por nombre con una de la nube se reapunta y se bo
   assert.ok(!client.consultas.some((c) => c.sql.startsWith("DELETE FROM tickets")), "nunca se borran ventas");
 });
 
+// Pantalla del cliente (revisión final): el pull solo hace upsert, así que al revincular una caja a
+// otro negocio las filas del anterior se quedan. La caja anota de qué negocio es el snapshot para que
+// los anuncios (anuncios.mjs) enseñen solo los del negocio vinculado ahora.
+const TEN = "12121212-0000-0000-0000-000000000001";
+
+test("el pull anota en _vim_sync el negocio del snapshot, dentro de la transacción", async () => {
+  const { client, pool } = clienteFalso();
+  await pullSnapshot(pool, { tenants: [{ id: TEN, nombre: "Knock-Out", activo: true }], __watermark: "w1" });
+  const marca = client.consultas.find((c) => c.sql.includes("INSERT INTO _vim_sync") && c.params.includes(TEN));
+  assert.ok(marca, "el pull debía anotar el negocio del snapshot");
+  assert.match(marca.sql, /'tenant'/);
+  assert.match(marca.sql, /ON CONFLICT \(clave\) DO UPDATE/);
+  const iMarca = client.consultas.indexOf(marca);
+  const iCommit = client.consultas.findIndex((c) => c.sql === "COMMIT");
+  assert.ok(iMarca < iCommit, "la marca va antes del COMMIT: si el pull revienta, se va con el ROLLBACK");
+});
+
+test("un snapshot viejo sin tenants no rompe el pull ni anota negocio", async () => {
+  const { client, pool } = clienteFalso();
+  await pullSnapshot(pool, { repartidores: [{ id: R1, nombre: "Luis", activo: true }] });
+  assert.ok(client.consultas.some((c) => c.sql === "COMMIT"));
+  assert.ok(!client.consultas.some((c) => c.sql.includes("INSERT INTO _vim_sync") && /'tenant'/.test(c.sql)));
+});
+
 test("una zona de la nube ya borrada no reconcilia nada (no choca con el índice parcial)", async () => {
   const { client, pool } = clienteFalso();
   await pullSnapshot(pool, { zonas_envio: [{ id: "ffffffff-0000-0000-0000-000000000003", sucursal_id: "s", nombre: "Vieja", deleted_at: "2026-09-01T00:00:00Z" }] });

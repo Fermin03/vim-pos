@@ -170,7 +170,7 @@ Solo aparece en el escritorio (`__VIM_DESKTOP`).
 ### Datos — migración `0150_anuncios_pantalla.sql`
 
 - Tabla `anuncios_pantalla`: `id uuid`, `tenant_id`, `ruta` (ruta en el almacén), `orden int`,
-  `activo bool default true`, `ancho int`, `alto int`, `bytes int`, `created_at`, `updated_at`.
+  `activo bool default true`, `segundos int null` (tiempo propio; null = el general), `ancho int`, `alto int`, `bytes int`, `created_at`, `updated_at`.
 - RLS por `tenant_id`, con el mismo patrón de `0116_zonas_envio.sql`: lectura para el negocio y sus
   dispositivos, escritura para quien administra la configuración.
 - Disparador que rechaza el anuncio número 11 por negocio.
@@ -184,9 +184,9 @@ Solo aparece en el escritorio (`__VIM_DESKTOP`).
   `PULL_ORDER` en `desktop/src/sync-pull.mjs`.
 - `pnpm db:types`.
 
-Por verificar en el plan: cómo trata el pull las filas borradas en la nube (un anuncio eliminado
-debe desaparecer de la caja). Si el pull no borra, el anuncio se da de baja con `activo = false` y
-una columna `eliminado_at`, en vez de `DELETE`.
+Decidido en el plan: el pull no trae lápidas, así que una fila borrada en la nube se quedaría viva
+en la caja. Por eso la baja es lógica, con `deleted_at` (no `DELETE`), y la caja borra su copia de
+lo que ya no está vivo. `activo` queda solo para pausar. Ver el ADR 0026.
 
 ### Admin
 
@@ -195,7 +195,7 @@ Página `configuracion/pantalla-cliente` y entrada en `config-sidenav.tsx`:
 - Subir imagen: se reduce en el navegador con `reescalarImagen` (lado mayor 1920 px, tope ~600 KB)
   y se sube al almacén; luego se inserta la fila.
 - Lista con miniatura: reordenar, pausar/activar, eliminar (con `DialogoPeligro`).
-- Segundos por imagen.
+- Tiempo en pantalla: un tiempo general (3 a 60 s, 8 por omisión) y, en cada imagen, un tiempo propio opcional que le gana al general.
 - Estado vacío que explica qué es y qué medida conviene (1920×1080 horizontal).
 - Contador «3 de 10».
 
@@ -203,15 +203,24 @@ Página `configuracion/pantalla-cliente` y entrada en `config-sidenav.tsx`:
 
 Después de cada pull, `desktop/src/anuncios.mjs`:
 
-- Lee `anuncios_pantalla` de la base local.
-- Descarga a `userData/anuncios/` los archivos que falten. Borra los que ya no estén en la lista.
+- Lee `anuncios_pantalla` de la base local, **solo del negocio al que está vinculada la caja**: el
+  del último snapshot, que el pull anota en `_vim_sync` (`clave = 'tenant'`). El pull solo hace
+  upsert, así que una caja revinculada conserva las filas del negocio anterior; sin este filtro la
+  pantalla los mezclaría. Sin negocio anotado no hay anuncios.
+- Descarga a `userData/anuncios/` los archivos que falten. Borra los que ya no estén en la lista
+  (con eso se van solas las imágenes de un negocio anterior).
 - Si una descarga falla, se salta y se reintenta en el siguiente pull.
 
 El ui-server los sirve:
 
-- `GET /__anuncios` → `{ segundos, anuncios: [{ id, url }] }`, solo activos y ya descargados, en
-  orden.
-- `GET /__anuncios/<archivo>` → la imagen, con nombre validado contra la lista (sin rutas libres).
+- `GET /__anuncios` → `{ segundos, anuncios: [{ id, url, segundos }] }`, solo activos y ya
+  descargados, en orden. `segundos` de cada anuncio es su tiempo propio o, si no tiene, el general.
+- Si la lista no se pudo leer (la base falló), responde **503** con un cuerpo de error, no una lista
+  vacía: la pantalla conserva la lista que ya tenía. Una lista vacía de verdad (`200`) sí quita el
+  carrusel. Un POS sin escritorio detrás (sin gancho) responde la lista vacía.
+- `GET /__anuncios/<archivo>` → la imagen. El nombre se valida **por forma** (`<uuid>.<ext>`, con
+  `ext` jpg, png o webp), no contra la lista: sin rutas libres, y un nombre que no está en disco da
+  404.
 
 La vista consulta `/__anuncios` al montar y cada vez que vuelve a reposo. Sin internet sigue
 mostrando lo que ya tiene en disco.

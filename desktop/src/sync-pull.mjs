@@ -29,6 +29,8 @@ export const PULL_ORDER = [
   { t: "combo_opciones" },
   { t: "subtipos_personal" },
   { t: "configuracion_tenant" },
+  // Anuncios de la pantalla del cliente (0150). Solo la lista; las imágenes las baja anuncios.mjs.
+  { t: "anuncios_pantalla" },
   // Inventario (ADR 0013): unidades antes que insumos; existencias, recetas y componentes después.
   // La caja lo necesita para descontar al vender; los movimientos que genera suben por el push.
   { t: "unidades_medida" },
@@ -414,6 +416,16 @@ export async function pullSnapshot(pool, snapshot, log = () => {}) {
     await client.query(
       `INSERT INTO _vim_sync(clave,valor,at) VALUES ('last_pull', $1, now())
        ON CONFLICT (clave) DO UPDATE SET valor=EXCLUDED.valor, at=now()`, [snapshot.__watermark ?? ""]);
+    // De qué negocio es este snapshot. El pull solo hace upsert: al revincular la caja a otro
+    // negocio, las filas del anterior se quedan en la base local. Quien no puede mezclar negocios
+    // (los anuncios de la pantalla del cliente, anuncios.mjs) filtra por este valor. Un snapshot
+    // viejo sin `tenants` no anota nada y deja el valor que hubiera.
+    const tenantDelSnapshot = snapshot.tenants?.[0]?.id;
+    if (tenantDelSnapshot) {
+      await client.query(
+        `INSERT INTO _vim_sync(clave,valor,at) VALUES ('tenant', $1, now())
+         ON CONFLICT (clave) DO UPDATE SET valor=EXCLUDED.valor, at=now()`, [String(tenantDelSnapshot)]);
+    }
     await client.query("COMMIT");
   } catch (e) {
     await client.query("ROLLBACK").catch(() => {});

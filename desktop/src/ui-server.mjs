@@ -354,6 +354,43 @@ export async function startUiServer(dir, port, gatewayPort = 54350, host = "0.0.
         }
       }
 
+      // CAJA: anuncios de la pantalla del cliente. La lista y las imágenes que la caja ya bajó a
+      // disco. Solo desde la propia caja: quien las pide es la ventana del segundo monitor.
+      if (!kds && req.method === "GET" && req.url.startsWith("/__anuncios")) {
+        if (!LOCALES.has(req.socket.remoteAddress ?? "")) {
+          res.writeHead(403, { "Content-Type": "application/json" });
+          return res.end(JSON.stringify({ ok: false, error: "Solo desde la caja." }));
+        }
+        const ruta = new URL(req.url, "http://x").pathname;
+        if (ruta === "/__anuncios" || ruta === "/__anuncios/") {
+          // Sin gancho (un POS sin escritorio detrás) de verdad no hay anuncios: lista vacía.
+          if (!opts.anuncios) {
+            res.writeHead(200, { "Content-Type": "application/json", "Cache-Control": "no-store" });
+            return res.end(JSON.stringify({ segundos: 8, anuncios: [] }));
+          }
+          // Con gancho, null o una excepción es una lectura FALLIDA, no "no hay anuncios": un 503 hace
+          // que la pantalla conserve la lista que ya tenía en vez de quitar el carrusel (ADR 0026).
+          let lista = null;
+          try { lista = await opts.anuncios(); } catch { /* se contesta 503 abajo */ }
+          if (!lista) {
+            res.writeHead(503, { "Content-Type": "application/json", "Cache-Control": "no-store" });
+            return res.end(JSON.stringify({ ok: false, error: "No se pudo leer la lista de anuncios." }));
+          }
+          res.writeHead(200, { "Content-Type": "application/json", "Cache-Control": "no-store" });
+          return res.end(JSON.stringify(lista));
+        }
+        // El nombre lo valida quien conoce la carpeta (rutaDeAnuncio): aquí no se arma ninguna ruta.
+        let nombre = "";
+        try { nombre = decodeURIComponent(ruta.slice("/__anuncios/".length)); } catch { /* nombre mal codificado: 404 */ }
+        const archivo = nombre ? opts.archivoAnuncio?.(nombre) ?? null : null;
+        let datos = null;
+        if (archivo) { try { datos = await readFile(archivo); } catch { /* ya no está en disco */ } }
+        if (!datos) { res.writeHead(404, { "Content-Type": "text/plain; charset=utf-8" }); return res.end("no existe"); }
+        // El nombre lleva el id del anuncio: una imagen nueva es otro nombre, así que se puede cachear para siempre.
+        res.writeHead(200, { "Content-Type": MIME[path.extname(archivo).toLowerCase()] || "application/octet-stream", "Cache-Control": "public, max-age=31536000, immutable" });
+        return res.end(datos);
+      }
+
       // CAJA: impresoras instaladas en Windows, para elegir una en vez de capturar una IP. Solo
       // desde la propia caja: la lista es de ESTA computadora y dice qué hay conectado en el local.
       if (!kds && req.method === "GET" && req.url.startsWith("/__impresoras")) {

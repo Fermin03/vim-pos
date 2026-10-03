@@ -480,6 +480,11 @@ la vista (`desktop/src/pantalla-cliente.mjs`, `desktop/src/main.mjs`, `desktop/s
 - [ ] Con un monitor vertical: nada se corta ni se encima.
 - [ ] Con un solo monitor: nada cambia respecto a la versión anterior.
 - [ ] El monitor del cliente no se apaga solo tras varios minutos sin uso.
+- [ ] Con anuncios subidos en /admin: tras uno o dos minutos, la pantalla en reposo los rota.
+- [ ] Sin internet: los anuncios ya bajados siguen saliendo.
+- [ ] Un anuncio eliminado o pausado en /admin deja de salir sin reiniciar la caja.
+- [ ] Sin anuncios: logo y nombre, como antes.
+- [ ] Una imagen con tiempo propio dura lo suyo; las demás, el tiempo general.
 
 **Si no aparece.** Windows tiene que estar en «Extender», no en «Duplicar»: duplicando reporta un
 solo monitor y no hay dónde abrirla (el ajuste lo dice). Y el monitor del cajero debe ser el
@@ -490,6 +495,38 @@ registro; vuelve a intentarlo al mostrar o mover la caja, al cambiar los monitor
 El registro queda en `vim-pos.log` con la etiqueta `[pantalla-cliente]`. La configuración local
 (`modo` y monitor elegido) es `pantalla-cliente.json`, en la misma carpeta que `vim-pos.log`; si se
 borra, vuelve al estado de fábrica (encendida, sin monitor elegido).
+
+**Anuncios.** Las imágenes viven en `anuncios/`, dentro de la carpeta de datos de la caja (la misma
+de `vim-pos.log`); la caja las baja tras cada pull y borra las que ya no están en la lista. El
+registro lleva la etiqueta `[anuncios]`; si no salen, ahí dice qué descarga falló. La lista se
+lee en la propia máquina en `/__anuncios`.
+
+### Orden de salida de los anuncios
+
+1. **Aplicar la migración 0150 a producción ANTES de mezclar** (crea la tabla y el almacén). Y
+   verificar ahí lo que en local no se puede: con una sesión que no es admin no se puede subir,
+   cambiar ni borrar ningún anuncio; la undécima subida se rechaza y no deja imagen huérfana;
+   eliminar un anuncio quita su objeto del almacén `anuncios`. Además:
+   - `select policyname from pg_policies where schemaname='storage' and tablename='objects' and
+     policyname like 'anuncios_%'` devuelve **3** renglones.
+   - `select public, file_size_limit, allowed_mime_types from storage.buckets where id='anuncios'`
+     devuelve `true`, `1048576` y los tres tipos (`image/jpeg`, `image/png`, `image/webp`).
+   - El camino bueno también: con el dueño o un admin **sí** se puede subir, pausar, reordenar y
+     eliminar. Eso prueba que las funciones de permisos se resuelven dentro de `storage`; si no, el
+     panel rechaza a todos y nadie lo nota hasta que un dueño intenta subir.
+   - `curl -I <url pública de un anuncio>`, sin sesión, devuelve `200` con `content-type`
+     `image/jpeg`, `image/png` o `image/webp`. La caja rechaza cualquier otro tipo: un tipo
+     equivocado significaría, en silencio, ningún anuncio en ninguna caja.
+   - `sync_pull_snapshot(<un negocio real>)` como `service_role` sigue trayendo `encrypted_password`
+     para la cuenta `caja-…@dispositivos` y `null` para las personas, e incluye los anuncios dados
+     de baja (con `deleted_at`): de eso depende que la caja se entere de una baja.
+   - Con el token de dispositivo de una caja, `rpc/catalogo_version` cambia después de editar un
+     anuncio y después de guardar el tiempo general.
+2. **Mezclar:** el admin se despliega y ya se pueden subir anuncios.
+3. **Instalador nuevo de la caja.** Una caja sin actualizar no muestra anuncios, pero tampoco falla.
+   Ya instalado, comprobar: pausar un anuncio quita su archivo de `anuncios/` (en el log, la línea
+   `[anuncios]`), y una caja de prueba revinculada a un segundo negocio enseña solo los anuncios del
+   negocio nuevo.
 
 ## Conectar a la nube (deploy del sync real) — #3
 
