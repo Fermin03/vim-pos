@@ -166,6 +166,23 @@ tiempo**—, porque el dueño decide cuánto dura una imagen viéndola, no en ot
 Aquí los controles **sí miden 44 px**: es de las pocas páginas de Configuración que el dueño abre
 desde el celular, parado junto a la caja, con la foto de la promoción que acaba de recibir.
 
+## Menú por sucursal (0151, ADR 0027)
+
+Solo aparece con **dos o más sucursales**; con una, Catálogo se ve como siempre.
+
+- **Formulario de producto:** en Disponibilidad, una fila por sucursal con «Se vende», precio y
+  «Agotado». El precio vacío enseña el general en gris: vacío no es $0, es «el de siempre». Apagar
+  una sucursal deshabilita su precio y su agotado. «Agotado por inventario» es una etiqueta, no un
+  control: lo pone y lo quita la base. El selector «En la caja» se queda con Se vende / Pausado
+  (pausar es para todas).
+- **Lista de productos:** un selector de sucursal. En «Todas», la tabla de siempre. Con una
+  sucursal elegida, cada renglón deja apagar «Se vende aquí» y escribir su precio en línea, sin
+  abrir el producto: armar el menú de una sucursal nueva con 80 productos no puede costar 80 visitas.
+  Una escritura a la vez; al terminar se relee, y la fila que se guarda se atenúa.
+- **Aviso de cajas viejas:** si el negocio ya usa precios o productos apagados por sucursal y una
+  caja de escritorio no se ha actualizado, se nombra la caja y su sucursal: el dueño tiene que saber
+  a cuál ir.
+
 ## Lo que NO se hereda del POS
 
 - Los objetivos de 44–56px. Con mouse, 36–40px es lo correcto; 44 se ve infantil.
