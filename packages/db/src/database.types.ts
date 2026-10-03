@@ -10015,6 +10015,7 @@ export type Database = {
           neto_mxn: number | null
           primer_dia: string | null
           propinas_mxn: number | null
+          sucursal_id: string | null
           tenant_id: string | null
           tickets: number | null
           total_vendido_mxn: number | null

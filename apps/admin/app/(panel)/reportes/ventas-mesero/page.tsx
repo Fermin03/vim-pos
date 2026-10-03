@@ -1,11 +1,13 @@
 "use client";
 import { Nota, ReporteMarco, useConsulta, useRangoReporte, type Cifra } from "../../../components/reporte";
+import { useSucursalReporte } from "../../../components/selector-sucursal";
 import { leerVentasPorMesero, type FilaMesero } from "../../../lib/reportes";
 import type { Columna } from "../../../lib/reporte-tabla";
 
 export default function VentasPorMeseroPage() {
   const { rango, cambiar } = useRangoReporte();
-  const consulta = useConsulta((r) => leerVentasPorMesero(r.desde, r.hasta), rango);
+  const sucursal = useSucursalReporte();
+  const consulta = useConsulta((r) => leerVentasPorMesero(r.desde, r.hasta, sucursal.id), sucursal.listo ? rango : null, sucursal.clave);
   const filas = consulta.datos ?? [];
 
   const venta = filas.reduce((s, f) => s + f.total, 0);
@@ -37,6 +39,7 @@ export default function VentasPorMeseroPage() {
 
   return (
     <ReporteMarco
+      sucursal={sucursal}
       titulo="Ventas por mesero"
       subtitulo="Tickets, venta y propinas de cada mesero."
       rango={{ valor: rango, cambiar }}

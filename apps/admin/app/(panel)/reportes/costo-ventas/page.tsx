@@ -4,7 +4,8 @@ import Link from "next/link";
 import { Aviso, StatusChip, type TonoEstado } from "@vim/ui/styles";
 import { Nota, ReporteMarco, useConsulta, useRangoReporte, type Cifra } from "../../../components/reporte";
 import { formatear, type Columna } from "../../../lib/reporte-tabla";
-import { leerModuloInventario, listarSucursalesOpciones, type SucursalOpcion } from "../../../lib/inventario";
+import { useSucursalReporte } from "../../../components/selector-sucursal";
+import { leerModuloInventario } from "../../../lib/inventario";
 import {
   agruparCostoVentas,
   estadoCosto,
@@ -15,7 +16,6 @@ import {
   type FilaCosto,
 } from "../../../lib/reportes-inventario";
 
-const campo = "h-11 min-w-0 rounded border border-line-strong bg-surface px-2.5 text-13 outline-none focus:border-ink lg:h-9";
 const mxn = (n: number) => formatear(n, "mxn");
 const pct = (n: number) => formatear(n, "pct");
 
@@ -52,17 +52,15 @@ function etiquetas(f: FilaCosto, por: AgruparPor): Etiqueta[] {
  */
 export default function CostoVentasPage() {
   const { rango, cambiar } = useRangoReporte();
-  const [sucursales, setSucursales] = useState<SucursalOpcion[]>([]);
-  const [sucursalId, setSucursalId] = useState<string | null>(null);
+  const sucursal = useSucursalReporte();
   const [agrupar, setAgrupar] = useState<AgruparPor>("producto");
   const [descuenta, setDescuenta] = useState<boolean | null>(null);
 
   useEffect(() => {
-    listarSucursalesOpciones().then(setSucursales).catch(() => {});
     leerModuloInventario().then(setDescuenta).catch(() => setDescuenta(null));
   }, []);
 
-  const consulta = useConsulta((r) => leerCostoVentas(r.desde, r.hasta, sucursalId), rango, sucursalId ?? "");
+  const consulta = useConsulta((r) => leerCostoVentas(r.desde, r.hasta, sucursal.id), sucursal.listo ? rango : null, sucursal.clave);
   const crudas = consulta.datos;
   const porProducto = useMemo(() => agruparCostoVentas(crudas ?? [], "producto"), [crudas]);
   const filas = useMemo(() => (agrupar === "producto" ? porProducto : agruparCostoVentas(crudas ?? [], "categoria")), [agrupar, porProducto, crudas]);
@@ -175,21 +173,12 @@ export default function CostoVentasPage() {
           </button>
         ))}
       </div>
-      {sucursales.length > 1 && (
-        <select className={campo} value={sucursalId ?? ""} onChange={(e) => setSucursalId(e.target.value || null)} aria-label="Sucursal">
-          <option value="">Todas las sucursales</option>
-          {sucursales.map((s) => (
-            <option key={s.id} value={s.id}>
-              {s.nombre}
-            </option>
-          ))}
-        </select>
-      )}
     </div>
   );
 
   return (
     <ReporteMarco
+      sucursal={sucursal}
       titulo="Costo de ventas y margen"
       subtitulo="Cuánto te costó lo que vendiste y cuánto te quedó, producto por producto."
       rango={{ valor: rango, cambiar }}

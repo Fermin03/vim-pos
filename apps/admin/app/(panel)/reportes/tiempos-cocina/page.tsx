@@ -1,5 +1,6 @@
 "use client";
 import { Nota, ReporteMarco, useConsulta, useRangoReporte, type Cifra } from "../../../components/reporte";
+import { useSucursalReporte } from "../../../components/selector-sucursal";
 import { leerTiemposCocina, type FilaTiempos } from "../../../lib/reportes";
 import { etiquetaModo } from "../../../lib/modo-servicio";
 import type { Columna } from "../../../lib/reporte-tabla";
@@ -13,7 +14,8 @@ const OBJETIVO_MIN = 15;
 
 export default function TiemposCocinaPage() {
   const { rango, cambiar } = useRangoReporte();
-  const consulta = useConsulta((r) => leerTiemposCocina(r.desde, r.hasta), rango);
+  const sucursal = useSucursalReporte();
+  const consulta = useConsulta((r) => leerTiemposCocina(r.desde, r.hasta, sucursal.id), sucursal.listo ? rango : null, sucursal.clave);
   const filas = consulta.datos ?? [];
 
   // Totales ponderados por comandas (no promedio de promedios).
@@ -44,6 +46,7 @@ export default function TiemposCocinaPage() {
 
   return (
     <ReporteMarco
+      sucursal={sucursal}
       titulo="Tiempos de cocina"
       subtitulo="Cuánto tarda en salir la comida contra tu objetivo, por tipo de servicio."
       rango={{ valor: rango, cambiar }}

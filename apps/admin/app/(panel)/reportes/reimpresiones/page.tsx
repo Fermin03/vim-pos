@@ -1,5 +1,6 @@
 "use client";
 import { Nota, ReporteMarco, useConsulta, useRangoReporte, type Cifra } from "../../../components/reporte";
+import { useSucursalReporte } from "../../../components/selector-sucursal";
 import { leerReimpresionesPorCajero, type FilaReimpresion } from "../../../lib/reportes";
 import { formatear, type Columna } from "../../../lib/reporte-tabla";
 
@@ -11,7 +12,8 @@ const razon = (f: FilaReimpresion) => (f.ticketsDistintos > 0 ? f.reimpresiones 
  *  reimpresiones del ticket del cliente (desde la 0126 las dos quedan registradas en la caja). */
 export default function ReimpresionesPage() {
   const { rango, cambiar } = useRangoReporte();
-  const consulta = useConsulta((r) => leerReimpresionesPorCajero(r.desde, r.hasta), rango);
+  const sucursal = useSucursalReporte();
+  const consulta = useConsulta((r) => leerReimpresionesPorCajero(r.desde, r.hasta, sucursal.id), sucursal.listo ? rango : null, sucursal.clave);
   const filas = consulta.datos ?? [];
 
   const reimpresiones = filas.reduce((s, f) => s + f.reimpresiones, 0);
@@ -53,6 +55,7 @@ export default function ReimpresionesPage() {
 
   return (
     <ReporteMarco
+      sucursal={sucursal}
       titulo="Reimpresiones por cajero"
       subtitulo="Reimprimir comandas con frecuencia puede esconder producto que salió sin cobrar. Cada reimpresión pide motivo y autorización."
       rango={{ valor: rango, cambiar }}

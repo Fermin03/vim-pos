@@ -1,11 +1,13 @@
 "use client";
 import { Barra, ReporteMarco, useConsulta, useRangoReporte, type Cifra } from "../../../components/reporte";
+import { useSucursalReporte } from "../../../components/selector-sucursal";
 import { leerVentasPorMarca, type FilaMarca } from "../../../lib/reportes";
 import type { Columna } from "../../../lib/reporte-tabla";
 
 export default function VentasPorMarcaPage() {
   const { rango, cambiar } = useRangoReporte();
-  const consulta = useConsulta((r) => leerVentasPorMarca(r.desde, r.hasta), rango);
+  const sucursal = useSucursalReporte();
+  const consulta = useConsulta((r) => leerVentasPorMarca(r.desde, r.hasta, sucursal.id), sucursal.listo ? rango : null, sucursal.clave);
   const filas = consulta.datos ?? [];
 
   const venta = filas.reduce((s, f) => s + f.total, 0);
@@ -40,6 +42,7 @@ export default function VentasPorMarcaPage() {
 
   return (
     <ReporteMarco
+      sucursal={sucursal}
       titulo="Ventas por marca virtual"
       subtitulo="Cómo le va a cada marca que opera desde tu cocina."
       rango={{ valor: rango, cambiar }}

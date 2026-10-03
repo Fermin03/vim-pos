@@ -1,11 +1,13 @@
 "use client";
 import { ReporteMarco, useConsulta, useRangoReporte, type Cifra } from "../../../components/reporte";
+import { useSucursalReporte } from "../../../components/selector-sucursal";
 import { leerVentasPorProducto, type FilaProducto } from "../../../lib/reportes";
 import { formatear, type Columna } from "../../../lib/reporte-tabla";
 
 export default function VentasPorProductoPage() {
   const { rango, cambiar } = useRangoReporte();
-  const consulta = useConsulta((r) => leerVentasPorProducto(r.desde, r.hasta), rango);
+  const sucursal = useSucursalReporte();
+  const consulta = useConsulta((r) => leerVentasPorProducto(r.desde, r.hasta, sucursal.id), sucursal.listo ? rango : null, sucursal.clave);
   const filas = consulta.datos ?? [];
 
   const venta = filas.reduce((s, f) => s + f.total_mxn, 0);
@@ -35,6 +37,7 @@ export default function VentasPorProductoPage() {
 
   return (
     <ReporteMarco
+      sucursal={sucursal}
       titulo="Ventas por producto"
       subtitulo="Qué se vende más: unidades, venta y la parte que aporta cada producto."
       rango={{ valor: rango, cambiar }}

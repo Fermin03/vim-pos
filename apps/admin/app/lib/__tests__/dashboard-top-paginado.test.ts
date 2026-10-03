@@ -20,7 +20,7 @@ function consulta(tabla: string) {
   let limite: number | null = null;
   let rango: [number, number] | null = null;
   const q = {
-    select: () => q, eq: () => q, in: () => q, is: () => q, not: () => q, gte: () => q, lte: () => q,
+    select: () => q, eq: () => q, match: () => q, in: () => q, is: () => q, not: () => q, gte: () => q, lte: () => q,
     order: (col: string) => { orden = [...orden, col]; return q; },
     limit: (n: number) => { limite = n; return q; },
     range: (a: number, b: number) => { rango = [a, b]; return q; },

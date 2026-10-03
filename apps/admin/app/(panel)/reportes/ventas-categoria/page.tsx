@@ -1,11 +1,13 @@
 "use client";
 import { Barra, ReporteMarco, useConsulta, useRangoReporte, type Cifra } from "../../../components/reporte";
+import { useSucursalReporte } from "../../../components/selector-sucursal";
 import { leerVentasPorCategoria, type FilaCategoria } from "../../../lib/reportes";
 import { formatear, type Columna } from "../../../lib/reporte-tabla";
 
 export default function VentasPorCategoriaPage() {
   const { rango, cambiar } = useRangoReporte();
-  const consulta = useConsulta((r) => leerVentasPorCategoria(r.desde, r.hasta), rango);
+  const sucursal = useSucursalReporte();
+  const consulta = useConsulta((r) => leerVentasPorCategoria(r.desde, r.hasta, sucursal.id), sucursal.listo ? rango : null, sucursal.clave);
   const filas = consulta.datos ?? [];
 
   const venta = filas.reduce((s, f) => s + f.total_mxn, 0);
@@ -40,6 +42,7 @@ export default function VentasPorCategoriaPage() {
 
   return (
     <ReporteMarco
+      sucursal={sucursal}
       titulo="Ventas por categoría"
       subtitulo="La venta repartida por las categorías de tu menú."
       rango={{ valor: rango, cambiar }}
