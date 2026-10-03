@@ -93,11 +93,11 @@ CREATE TABLE productos_sucursal (
 - **RLS** igual que `productos`: `tenant_id = current_tenant_id()` en USING y WITH CHECK.
 - **Trigger de coherencia** (BEFORE INSERT/UPDATE): `tenant_id` se toma del producto y la sucursal
   debe ser del mismo negocio; si no, excepción. Evita apuntar a la sucursal de otro negocio.
-- **Guardia de escritura directa** (0133): la tabla entra a la lista de catálogo — escribirla por REST
-  exige `config.productos`. Además, por REST **no** se puede cambiar `agotado_automatico` (lo escribe
-  solo `evaluar_alertas_stock`, que entra por RPC o por trigger y la guardia ya deja pasar). Se
-  redeclara `guardia_escritura_directa()` desde su única versión (0133; 0144 no la toca) y se le
-  cuelga el trigger `a00_guardia_escritura_directa`.
+- **Guardia de escritura directa**, con el mismo criterio que 0133 pero en una función propia
+  (`guardia_productos_sucursal`, trigger `a00_guardia_escritura_directa`) para no redeclarar el
+  guardián del dinero: escribirla por REST exige `config.productos`; por REST no se borra
+  (invariante 6) y **no** se cambian `agotado_automatico` ni `motivo_agotado` (los escribe solo
+  `evaluar_alertas_stock`, que entra por RPC o por trigger y la guardia deja pasar).
 - `set_updated_at` en UPDATE.
 - `eliminar_tenant` (0144) recorre toda tabla con `tenant_id`: entra sola.
 
@@ -106,9 +106,10 @@ CREATE TABLE productos_sucursal (
 - `precio_producto_en_sucursal(p_producto uuid, p_sucursal uuid) RETURNS numeric` —
   `COALESCE(ps.precio_mxn, p.precio_base_mxn)`. STABLE. Es la única regla de precio por sucursal en
   SQL; la de TS (§6.1) la replica y sus pruebas usan los mismos casos.
-- `producto_en_sucursal(p_producto, p_sucursal)` → `(se_vende boolean, agotado boolean, motivo text)`:
-  `se_vende = estado <> 'PAUSADO' AND COALESCE(ps.disponible, true)`;
-  `agotado = COALESCE(ps.agotado_manual OR ps.agotado_automatico, false)`.
+- `motivo_no_disponible_en_sucursal(p_producto, p_sucursal) RETURNS text` — NULL si se vende; si no,
+  en este orden: `'PAUSADO'` (`estado = 'PAUSADO'`), `'NO_SE_VENDE'` (`NOT ps.disponible`),
+  `'AGOTADO'` (`ps.agotado_manual OR ps.agotado_automatico`, o un `estado = 'AGOTADO'` heredado de
+  antes de 0151 que nadie ha vuelto a guardar).
 
 ### 4.3 Agotado derivado en `productos` (compatibilidad)
 
@@ -119,7 +120,8 @@ Trigger AFTER INSERT/UPDATE en `productos_sucursal` que recalcula, para ese prod
 - `productos.agotado_automatico` = lo mismo con `agotado_automatico`;
 - `productos.motivo_agotado` = el motivo si queda agotado, NULL si no.
 
-No toca `estado`. Para un negocio de una sola sucursal —hoy, todos— el resultado es idéntico a lo
+De `estado` solo toca un `'AGOTADO'` heredado, que pasa a `ACTIVO` (el agotado ya vive en las
+filas; sin esto, quitar el último agotado violaría el CHECK `estado_consistente`). Para un negocio de una sola sucursal —hoy, todos— el resultado es idéntico a lo
 actual, en cualquier versión de la caja. En el escritorio el pull aplica en modo réplica (sin
 triggers) y trae `productos` ya derivado desde la nube; el trigger local solo corre cuando la propia
 caja evalúa alertas (§4.5).
@@ -169,7 +171,10 @@ renglón lo heredan. `crear_ticket_desde_app` sigue sobrescribiendo con el preci
 - Precio del combo padre: `precio_producto_en_sucursal(combo, sucursal del ticket)`.
 - Componentes en modo SUMA: su precio por sucursal.
 - La validación que hoy rechaza combo o componente «agotado o pausado» pasa a usar
-  `producto_en_sucursal`: rechaza si no se vende en la sucursal o está agotado **ahí**.
+  `motivo_no_disponible_en_sucursal`: rechaza si no se vende en la sucursal o está agotado **ahí**.
+  El texto «está agotado o pausado» se conserva (la caja lo traduce a `PRODUCTO_AGOTADO`,
+  `desktop/src/delivery-espejo.mjs`); el nuevo «no se vende en esta sucursal» se traduce a
+  `PRODUCTO_NO_SE_VENDE`.
 
 ## 6. La caja (web y escritorio)
 
@@ -182,7 +187,8 @@ y además `productos_sucursal` de esa sucursal, y las junta con una función pur
 - `precio_base_mxn` del objeto `Producto` de la caja = precio de la sucursal. Así el carrito, los
   modales, `precioCombo`, la pantalla del cliente y la reapertura de cuentas lo usan sin cambios.
   El tipo lo documenta: en la caja es «el precio que cobra esta sucursal».
-- `agotado` = agotado de la sucursal (deja de leer `estado`/flags globales).
+- `agotado` = agotado de la sucursal, o un `estado = 'AGOTADO'` heredado (deja de leer las
+  columnas `agotado_*` del producto, que ahora son «agotado en todas»).
 - `seVendeAqui` (nuevo) = `COALESCE(disponible, true)`.
 
 `home-pos.tsx` pasa `caja.sucursal_id` (ya lo tiene).
@@ -197,8 +203,10 @@ y además `productos_sucursal` de esa sucursal, y las junta con una función pur
 
 ### 6.3 Caché
 
-La llave de combos (`"combos"`, `combos.ts:152/157`) pasa a `combos:${tenant}:${sucursal}`, porque
-sus opciones dependen de la sucursal. La de modificadores no cambia (siguen globales).
+No cambia. La de combos (`"combos"`, `combos.ts:152/157`) guarda las filas de `combo_grupos` del
+negocio, que no dependen de la sucursal: la sucursal se aplica al armarlos contra los productos ya
+ajustados. La del catálogo ya lleva negocio y sucursal (`claveCatalogo`) y guarda los productos ya
+ajustados. La de modificadores sigue global, como ellos.
 
 ### 6.4 Escritorio
 
@@ -260,22 +268,30 @@ Los pedidos entrantes no cambian. El reenvío de la carta sigue siendo manual (�
 
 ### 9.1 pgTAP — `supabase/tests/0035_menu_por_sucursal.test.sql`
 
-- RLS: un negocio no lee ni escribe filas de otro; no puede apuntar a la sucursal de otro.
-- Guardia: un rol sin `config.productos` no escribe; nadie cambia `agotado_automatico` por REST.
-- `precio_producto_en_sucursal`: sin fila, con fila sin precio, con precio.
-- `agregar_item_a_ticket` cobra el precio de la sucursal del ticket.
-- `agregar_combo_a_ticket`: precio por sucursal del padre y de componentes SUMA; rechaza un
-  componente que no se vende o está agotado en esa sucursal.
-- **El bug:** insumo crítico en 0 en Centro agota solo en Centro; reabastecer Norte no des-agota
-  Centro.
-- Derivado: con una sola sucursal, `productos.agotado_*` queda igual que antes; con dos, solo
-  «agotado en todas» marca el producto.
-- La llave `productos_sucursal` viaja en `sync_pull_snapshot`.
+Estructura y seguridad:
+
+- RLS: un negocio no lee filas de otro; no puede apuntar a la sucursal de otro.
+- Guardia: un rol sin `config.productos` no escribe; nadie cambia `agotado_automatico` por REST ni
+  borra filas.
+- `precio_producto_en_sucursal` y `motivo_no_disponible_en_sucursal`: sin fila, con precio propio,
+  apagado, agotado, pausado.
+- Derivado: con dos sucursales, solo «agotado en todas» marca el producto.
+- La llave `productos_sucursal` viaja en `sync_pull_snapshot`, solo con filas del negocio, y
+  `catalogo_version()` la ve.
 
 ### 9.2 Smoke — `supabase/scripts/smoke_menu_sucursal.sql`
 
-Recorrido de venta con dos sucursales: precio distinto, producto apagado en una, combo, agotado
-automático. Bloquea el merge (job `rls-tests`).
+Recorrido de venta con dos sucursales, como superusuario sobre la semilla:
+
+- `agregar_item_a_ticket` cobra el precio de la sucursal del ticket;
+- `agregar_combo_a_ticket`: precio por sucursal del padre y de los componentes SUMA, prorrateo que
+  cuadra; rechaza un componente que no se vende o está agotado en esa sucursal;
+- el agregado suelto no valida (invariante 7);
+- **el bug:** insumo crítico en 0 en Centro agota solo en Centro; reabastecer Norte no des-agota
+  Centro.
+
+Bloquea el merge (CI, paso «Smokes de negocio»). Se ajustan `smoke_combos.sql` (agotar por
+sucursal) y `smoke_sync_inventario.sql` (el agotado automático ya no pone `estado = 'AGOTADO'`).
 
 ### 9.3 Unitarias
 
