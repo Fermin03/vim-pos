@@ -10759,6 +10759,13 @@ export type Database = {
         }
         Relationships: [
           {
+            foreignKeyName: "turnos_sucursal_id_fkey"
+            columns: ["sucursal_id"]
+            isOneToOne: false
+            referencedRelation: "sucursales"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "turnos_tenant_id_fkey"
             columns: ["tenant_id"]
             isOneToOne: false
