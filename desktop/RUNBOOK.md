@@ -82,6 +82,10 @@ cajera **María G. PIN 1234**; dueño `dueno@knockout.dev` / `devadmin`.
 4. **`npm run dist` tiene que terminar con `✔ extraResources completos`.** `scripts/dist.mjs`
    comprueba los recursos antes de empaquetar y otra vez sobre `dist/win-unpacked/resources`; si
    aborta con *"faltan recursos"*, arregla el origen. No se fuerza ni se comenta el chequeo.
+   Desde la 0.4.109 también tiene que terminar con `✔ dependencias de la app completas`: revisa que
+   `pg`, `jsonwebtoken` y `embedded-postgres` lleguen a `resources/app/node_modules`, y se niega a
+   empaquetar si `desktop/node_modules` es un enlace. En un worktree, copia esa carpeta de verdad
+   (`robocopy … /E`); un junction da un instalador de 134 MB sin dependencias que no arranca.
 5. **Antes de publicar, tres comprobaciones sobre el resultado:**
    - `dist/win-unpacked/resources/bin/postgrest.exe` existe (69,366,272 bytes);
    - `dist/VIM POS Setup <ver>.exe` pesa **~156 MB** (los rotos pesaban 147 MB: esos 9 MB de
