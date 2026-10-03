@@ -485,6 +485,7 @@ la vista (`desktop/src/pantalla-cliente.mjs`, `desktop/src/main.mjs`, `desktop/s
 - [ ] Un anuncio eliminado o pausado en /admin deja de salir sin reiniciar la caja.
 - [ ] Sin anuncios: logo y nombre, como antes.
 - [ ] Una imagen con tiempo propio dura lo suyo; las demás, el tiempo general.
+- [ ] Si la ventana del cliente muere varias veces seguidas (matar su proceso de renderizado desde el Administrador de tareas), la caja sigue funcionando; tras 5 reaperturas en un minuto la ventana deja de reabrirse, y reconectar el monitor o apagar y encender «Encendida» en el menú la trae de vuelta. El registro muestra líneas `[pantalla-cliente]`.
 
 **Si no aparece.** Windows tiene que estar en «Extender», no en «Duplicar»: duplicando reporta un
 solo monitor y no hay dónde abrirla (el ajuste lo dice). Y el monitor del cajero debe ser el

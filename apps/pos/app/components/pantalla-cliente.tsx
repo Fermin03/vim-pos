@@ -1,10 +1,10 @@
 "use client";
 import { Fragment, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { LogoVim } from "@vim/ui/styles";
-import { leerAnuncios, LISTA_VACIA, listaTrasLeer, puedeLeerAnuncios, seEnsenanAnuncios, type ListaAnuncios } from "../lib/pantalla-cliente/anuncios";
+import { imagenesTrasLeer, imagenesTrasProbar, leerAnuncios, LISTA_VACIA, listaTrasLeer, puedeLeerAnuncios, seEnsenanAnuncios, type EstadoImagenes, type ListaAnuncios } from "../lib/pantalla-cliente/anuncios";
 import { abrirCanal, crearReceptor } from "../lib/pantalla-cliente/canal";
 import { tamanoCifra, tamanoNombre } from "../lib/pantalla-cliente/medidas";
-import { CLAVE_NEGOCIO, negocioGuardado, recordarNegocio } from "../lib/pantalla-cliente/negocio";
+import { CLAVE_NEGOCIO, negocioAlAbrir, queEnsenaReposo, recordarNegocio } from "../lib/pantalla-cliente/negocio";
 import type { Negocio, RenglonCliente, VistaCliente } from "../lib/pantalla-cliente/vista";
 import { fmtMxn } from "../lib/turno";
 import { CarruselAnuncios } from "./carrusel-anuncios";
@@ -30,18 +30,18 @@ const RELEER_ANUNCIOS_MS = 5 * 60 * 1000;
  */
 export function PantallaCliente() {
   const [vista, setVista] = useState<VistaCliente>({ fase: "reposo" });
-  // `undefined` = todavía no se ha mirado el almacenamiento (se lee en el efecto, no en el render).
-  // Mientras tanto reposo no dibuja nada: así no parpadea la marca de VIM antes del logo del negocio.
-  const [negocio, setNegocio] = useState<Negocio | null | undefined>(undefined);
+  // El negocio guardado se lee al crear el estado, no en un efecto: así el logo sale en el primer
+  // cuadro y la ventana del cliente no se abre en blanco. Seguro SOLO porque esta pantalla nunca
+  // se dibuja en el servidor (ver `negocioAlAbrir`). `undefined` = no se pudo mirar.
+  const [negocio, setNegocio] = useState<Negocio | null | undefined>(negocioAlAbrir);
   // Los anuncios viven aquí y no en `Reposo`, por dos razones: `Reposo` se monta de nuevo entre
   // cliente y cliente (con la lista aquí, el carrusel arranca sin enseñar antes el logo), y quien
   // olvida el negocio tiene que poder olvidar sus anuncios en el mismo lugar.
   const [lista, setLista] = useState<ListaAnuncios>(LISTA_VACIA);
-  // Ninguna imagen de la lista se pudo enseñar: queda el logo hasta la siguiente lectura buena.
-  const [sinImagenes, setSinImagenes] = useState(false);
+  // Si las imágenes de la lista se pueden enseñar; las reglas están en `imagenesTrasLeer`.
+  const [imagenes, setImagenes] = useState<EstadoImagenes>("bien");
 
   useEffect(() => {
-    setNegocio(negocioGuardado());
     // La caja borra el negocio guardado al desvincularse. Esta ventana sigue abierta con el logo
     // en memoria: el aviso de `storage` (que llega a las OTRAS ventanas del mismo origen) lo quita.
     // Con el negocio se van sus anuncios, en el acto: el carrusel no espera a la siguiente lectura.
@@ -49,7 +49,7 @@ export function PantallaCliente() {
       if (e.key !== CLAVE_NEGOCIO || e.newValue !== null) return;
       setNegocio(null);
       setLista(LISTA_VACIA);
-      setSinImagenes(false);
+      setImagenes("bien");
     };
     window.addEventListener("storage", alOlvidar);
     const canal = abrirCanal();
@@ -69,19 +69,45 @@ export function PantallaCliente() {
   useEffect(() => {
     if (!leer) return;
     let vivo = true;
-    const pedir = () => {
+    const pedir = (porReloj: boolean) => {
       void leerAnuncios().then((leida) => {
         // Si la lectura falló, todo se queda como estaba: un tropiezo no quita el carrusel.
         if (!vivo || leida === null) return;
         setLista((actual) => listaTrasLeer(actual, leida));
-        // Cada lectura buena es otra oportunidad para las imágenes que no habían cargado.
-        setSinImagenes(false);
+        // La relectura de cada 5 minutos es otra oportunidad para las imágenes que no cargaron; la
+        // de volver a reposo no (el cambio de lista se atiende en el efecto de abajo).
+        setImagenes((e) => imagenesTrasLeer(e, { cambioLista: false, porReloj }));
       });
     };
-    pedir();
-    const reloj = setInterval(pedir, RELEER_ANUNCIOS_MS);
+    pedir(false);
+    const reloj = setInterval(() => pedir(true), RELEER_ANUNCIOS_MS);
     return () => { vivo = false; clearInterval(reloj); };
   }, [leer]);
+
+  // Una lista distinta también es otra oportunidad (`listaTrasLeer` conserva el mismo objeto si
+  // no cambió, así que este efecto solo corre con una lista nueva de verdad).
+  useEffect(() => {
+    setImagenes((e) => imagenesTrasLeer(e, { cambioLista: true, porReloj: false }));
+  }, [lista]);
+
+  // Probar las imágenes FUERA de pantalla, mientras sigue el logo: el carrusel vuelve solo cuando
+  // una ya cargó. Montarlo para averiguarlo era enseñar un cuadro vacío y volver al logo.
+  const probando = imagenes === "probando";
+  useEffect(() => {
+    if (!probando) return;
+    const precargas = lista.anuncios.map((a) => { const img = new Image(); img.src = a.url; return img; });
+    let pendientes = precargas.length;
+    const terminar = (cargoAlguna: boolean) => {
+      for (const img of precargas) { img.onload = null; img.onerror = null; }
+      setImagenes(imagenesTrasProbar(cargoAlguna));
+    };
+    if (pendientes === 0) { terminar(false); return; }
+    for (const img of precargas) {
+      img.onload = () => terminar(true);
+      img.onerror = () => { pendientes -= 1; if (pendientes === 0) terminar(false); };
+    }
+    return () => { for (const img of precargas) { img.onload = null; img.onerror = null; } };
+  }, [probando, lista]);
 
   return (
     <main className="flex h-screen w-screen cursor-none select-none flex-col overflow-hidden bg-bg text-ink" data-fase={vista.fase}>
@@ -92,8 +118,8 @@ export function PantallaCliente() {
           <Reposo
             negocio={negocio}
             lista={lista}
-            conAnuncios={seEnsenanAnuncios(lista, sinImagenes, negocio)}
-            alQuedarseSinImagenes={() => setSinImagenes(true)}
+            conAnuncios={seEnsenanAnuncios(lista, imagenes !== "bien", negocio)}
+            alQuedarseSinImagenes={() => setImagenes("rotas")}
           />
         )}
         {vista.fase === "cuenta" && <Cuenta renglones={vista.renglones} envio={vista.envio} total={vista.total} />}
@@ -111,16 +137,23 @@ function Reposo({ negocio, lista, conAnuncios, alQuedarseSinImagenes }: {
   conAnuncios: boolean;
   alQuedarseSinImagenes: () => void;
 }) {
+  // Con anuncios, solo anuncios: el logo y el nombre no se dibujan encima. Mientras la primera
+  // imagen llega, el carrusel deja ver debajo el mismo reposo de abajo, para no enseñar un vacío.
+  if (conAnuncios) return <CarruselAnuncios lista={lista} alQuedarseSinImagenes={alQuedarseSinImagenes} fondo={<ReposoSinAnuncios negocio={negocio} />} />;
+  return <ReposoSinAnuncios negocio={negocio} />;
+}
+
+/** Lo que enseña el reposo cuando no hay anuncios: logo, nombre o la marca de VIM. */
+function ReposoSinAnuncios({ negocio }: { negocio: Negocio | null | undefined }) {
   // El logo que no cargó (un data URI dañado): se recuerda cuál fue, para que uno nuevo sí se intente.
   const [logoRoto, setLogoRoto] = useState<string | null>(null);
 
-  // Con anuncios, solo anuncios: el logo y el nombre no se dibujan encima.
-  if (conAnuncios) return <CarruselAnuncios lista={lista} alQuedarseSinImagenes={alQuedarseSinImagenes} />;
   if (negocio === undefined) return <section className="flex-1" />;
 
-  // Un nombre vacío o de puros espacios es no tener nombre.
-  const nombre = negocio?.nombre.trim() || null;
-  const logoUrl = negocio?.logoUrl && negocio.logoUrl !== logoRoto ? negocio.logoUrl : null;
+  // Logo, nombre o la marca de VIM: lo decide `queEnsenaReposo` (con pruebas).
+  const ve = queEnsenaReposo(negocio, logoRoto);
+  const logoUrl = ve.ve === "logo" ? ve.logoUrl : null;
+  const nombre = ve.ve === "vim" ? null : ve.nombre;
 
   return (
     <section className="flex flex-1 flex-col items-center justify-center gap-[4vmin] p-[6vmin] text-center">
@@ -145,7 +178,7 @@ function Reposo({ negocio, lista, conAnuncios, alQuedarseSinImagenes }: {
       )}
       {/* Caja recién instalada, antes de la primera sesión: nadie ha publicado el negocio y no hay
           nada guardado. En vez de un monitor en blanco, la marca que la caja usa en su inicio. */}
-      {!logoUrl && !nombre && <LogoVim className="h-[34vmin] w-[34vmin]" />}
+      {ve.ve === "vim" && <LogoVim className="h-[34vmin] w-[34vmin]" />}
     </section>
   );
 }

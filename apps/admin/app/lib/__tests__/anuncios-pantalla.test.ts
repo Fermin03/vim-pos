@@ -1,11 +1,59 @@
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+
+/**
+ * `supabase` es un singleton: el doble sustituye el módulo entero (mismo patrón que modulos.test.ts).
+ * Cada cadena (`select().is().order()...`) es "thenable": se puede encadenar lo que sea y al
+ * esperarla contesta lo que el caso dejó fijado en `doble`.
+ */
+const doble = vi.hoisted(() => ({
+  conteo: 0 as number | null,
+  filasUpdate: [] as unknown[] | null,
+  errUpdate: null as { message: string } | null,
+  errInsert: null as { message: string } | null,
+  errRpc: null as { code?: string; message: string } | null,
+  upload: vi.fn(async (..._a: unknown[]) => ({ error: null as { message: string } | null })),
+  remove: vi.fn(async (..._a: unknown[]) => ({ error: null as { message: string } | null })),
+  rpc: vi.fn(async (..._a: unknown[]) => ({ error: null as { code?: string; message: string } | null })),
+}));
+
+vi.mock("../supabase", () => {
+  type Cadena = { is: () => Cadena; order: () => Cadena; limit: () => Cadena; eq: () => Cadena; select: () => Cadena; then: PromiseLike<unknown>["then"] };
+  const cadena = (resolver: () => unknown): Cadena => {
+    const c: Cadena = {
+      is: () => c, order: () => c, limit: () => c, eq: () => c, select: () => c,
+      then: (ok, ko) => Promise.resolve(resolver()).then(ok, ko),
+    };
+    return c;
+  };
+  return {
+    supabase: {
+      from: () => ({
+        select: (_cols: string, opts?: { head?: boolean }) =>
+          cadena(() => (opts?.head ? { count: doble.conteo, error: null } : { data: [{ orden: 20 }], error: null })),
+        update: () => cadena(() => ({ data: doble.filasUpdate, error: doble.errUpdate })),
+        insert: async () => ({ error: doble.errInsert }),
+      }),
+      storage: { from: () => ({ upload: doble.upload, remove: doble.remove, getPublicUrl: () => ({ data: { publicUrl: "u" } }) }) },
+      rpc: (...a: unknown[]) => doble.rpc(...a).then((r) => ({ data: null, error: doble.errRpc ?? r.error })),
+    },
+    leerSesion: async () => ({ email: "d@d.com", userId: "u1", tenantId: "t1", tipoIdentidad: "ADMIN_WEB" }),
+  };
+});
+vi.mock("../imagen", () => ({ reescalarImagen: vi.fn(async () => "data:image/jpeg;base64,/9j/4AAQ") }));
+
 import {
   ANUNCIO_MAX_BYTES,
   dataUriAArchivo,
+  eliminarAnuncio,
+  moverAnuncio,
   opcionesSegundos,
   ordenTrasMover,
   segundosSchema,
+  setActivoAnuncio,
+  setSegundosAnuncio,
+  subirAnuncio,
   traducir,
+  type Anuncio,
 } from "../anuncios-pantalla";
 
 describe("dataUriAArchivo", () => {
@@ -69,8 +117,11 @@ describe("opcionesSegundos", () => {
 });
 
 describe("traducir", () => {
-  it("deja pasar el tope de 10, que ya viene dicho en español", () => {
-    expect(traducir("Ya hay 10 anuncios. Quita uno para subir otro.")).toBe("Ya hay 10 anuncios. Quita uno para subir otro.");
+  it("el tope de 10 sale siempre con el mismo texto, venga como venga redactado", () => {
+    const esperado = "Ya hay 10 anuncios. Quita uno para subir otro.";
+    expect(traducir(esperado)).toBe(esperado);
+    // Una redacción distinta: solo la rama del tope la convierte; sin ella saldría tal cual.
+    expect(traducir("P0001: Ya hay 10 anuncios activos en este negocio")).toBe(esperado);
   });
   it("un empleado sin permiso lee quién sí puede, no el rechazo de la base", () => {
     const esperado = "Solo el dueño o un administrador puede cambiar los anuncios.";
@@ -86,5 +137,84 @@ describe("traducir", () => {
   });
   it("lo que no reconoce lo devuelve tal cual, para que lo traduzca la página", () => {
     expect(traducir("Failed to fetch")).toBe("Failed to fetch");
+  });
+});
+
+const ESPERA_ADMIN = "Solo el dueño o un administrador puede cambiar los anuncios.";
+const anuncio = (id: string, orden: number): Anuncio => ({ id, ruta: `t1/${id}.jpg`, url: "u", orden, activo: true, segundos: null });
+const archivo = () => new File(["x"], "a.png", { type: "image/png" });
+
+beforeEach(() => {
+  doble.conteo = 0;
+  doble.filasUpdate = [{ id: "a" }];
+  doble.errUpdate = null;
+  doble.errInsert = null;
+  doble.errRpc = null;
+  doble.upload.mockClear();
+  doble.remove.mockClear();
+  doble.rpc.mockClear();
+});
+
+describe("subirAnuncio: tope antes de subir", () => {
+  it("con 10 anuncios vivos avisa y no toca el almacén", async () => {
+    doble.conteo = 10;
+    await expect(subirAnuncio(archivo())).rejects.toThrow("Ya hay 10 anuncios. Quita uno para subir otro.");
+    expect(doble.upload).not.toHaveBeenCalled();
+    expect(doble.remove).not.toHaveBeenCalled();
+  });
+  it("con 9 sube la imagen", async () => {
+    doble.conteo = 9;
+    await subirAnuncio(archivo());
+    expect(doble.upload).toHaveBeenCalledTimes(1);
+  });
+  it("si otra pestaña llenó la lista a mitad (la base rechaza la fila), la imagen subida se quita", async () => {
+    doble.conteo = 9;
+    doble.errInsert = { message: "Ya hay 10 anuncios" };
+    await expect(subirAnuncio(archivo())).rejects.toThrow("Ya hay 10 anuncios. Quita uno para subir otro.");
+    expect(doble.remove).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("cambios de un anuncio: el UPDATE que no encuentra fila (quien no es dueño ni admin)", () => {
+  const casos: [string, () => Promise<void>][] = [
+    ["setActivoAnuncio", () => setActivoAnuncio("a", false)],
+    ["setSegundosAnuncio", () => setSegundosAnuncio("a", 10)],
+    ["eliminarAnuncio", () => eliminarAnuncio(anuncio("a", 0))],
+  ];
+  for (const [nombre, llamar] of casos) {
+    it(`${nombre}: cero filas = mensaje de permiso, sin error de la base`, async () => {
+      doble.filasUpdate = [];
+      await expect(llamar()).rejects.toThrow(ESPERA_ADMIN);
+    });
+    it(`${nombre}: una fila = listo`, async () => {
+      doble.filasUpdate = [{ id: "a" }];
+      await expect(llamar()).resolves.toBeUndefined();
+    });
+  }
+  it("eliminarAnuncio con cero filas no toca el almacén", async () => {
+    doble.filasUpdate = [];
+    await expect(eliminarAnuncio(anuncio("a", 0))).rejects.toThrow();
+    expect(doble.remove).not.toHaveBeenCalled();
+  });
+});
+
+describe("moverAnuncio: un solo reordenar_anuncios", () => {
+  const lista = [anuncio("a", 0), anuncio("b", 10), anuncio("c", 20)];
+  it("manda la lista completa en el nuevo orden, en una llamada", async () => {
+    await moverAnuncio(lista, "b", "arriba");
+    expect(doble.rpc).toHaveBeenCalledTimes(1);
+    expect(doble.rpc).toHaveBeenCalledWith("reordenar_anuncios", { p_ids: ["b", "a", "c"] });
+  });
+  it("en un extremo no cambia nada y no llama", async () => {
+    await moverAnuncio(lista, "a", "arriba");
+    expect(doble.rpc).not.toHaveBeenCalled();
+  });
+  it("sin permiso (42501) dice quién sí puede", async () => {
+    doble.errRpc = { code: "42501", message: "lo que sea" };
+    await expect(moverAnuncio(lista, "b", "abajo")).rejects.toThrow(ESPERA_ADMIN);
+  });
+  it("lista cambiada (P0002) pide recargar", async () => {
+    doble.errRpc = { code: "P0002", message: "lo que sea" };
+    await expect(moverAnuncio(lista, "b", "abajo")).rejects.toThrow("La lista de anuncios cambió. Recarga la página.");
   });
 });

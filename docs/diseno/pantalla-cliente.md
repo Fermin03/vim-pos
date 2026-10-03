@@ -43,7 +43,8 @@ queda abierto con el recibo, y «¡Gracias!» no puede recibir al siguiente clie
 **Reposo nunca está en blanco.** Si el logo no carga, queda el nombre; si tampoco hay nombre (o
 viene vacío), el isotipo de VIM POS, el mismo que la caja enseña en su inicio. El negocio se
 recuerda entre arranques y se olvida al desvincular la caja: el logo de un negocio no sale en el
-siguiente.
+siguiente. El negocio recordado ya está en el primer cuadro al abrir la ventana: no hay un instante
+en blanco antes del logo.
 
 ## Anuncios en reposo
 
@@ -64,8 +65,11 @@ su disco: el carrusel funciona sin internet.
   anuncios no pueden dejar el monitor en blanco.
 - **La lista se vuelve a leer** al entrar a reposo y cada 5 minutos. Si no cambió, el carrusel
   sigue donde iba, sin reiniciarse; si quitaron la imagen que está en pantalla, vuelve a la
-  primera de la lista nueva con el mismo fundido. Cada lectura buena vuelve a intentar las
-  imágenes que no habían cargado.
+  primera de la lista nueva con el mismo fundido. Si la de pantalla sigue en la lista nueva, le
+  queda solo lo que le faltaba de su tiempo (el nuevo, si cambió; si ya se pasó, cambia en el acto).
+- **Si ninguna imagen cargó, el logo se queda quieto.** Se reintentan solo si cambia la lista o en
+  la relectura de cada 5 minutos, nunca al volver a reposo, y se prueban fuera de pantalla: el
+  carrusel vuelve solo cuando una ya cargó, sin un cuadro vacío antes del logo.
 - **Una lectura fallida no quita nada:** la pantalla se queda con la lista que tenía. Solo una
   lista vacía de verdad (el dueño quitó todos los anuncios) regresa al logo.
 - **Al desvincular la caja los anuncios se van en el acto**, junto con el logo, y no se vuelven a

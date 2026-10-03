@@ -10912,6 +10912,7 @@ export type Database = {
         }
         Returns: undefined
       }
+      reordenar_anuncios: { Args: { p_ids: string[] }; Returns: undefined }
       reporte_cancelaciones_periodo: {
         Args: {
           p_fecha_desde: string

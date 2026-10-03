@@ -235,7 +235,10 @@ export default function PantallaClientePage() {
         titulo="Pantalla del cliente"
         subtitulo="Las imágenes que muestra el segundo monitor de la caja cuando no se está cobrando."
         migas={[{ label: "Configuración" }, { label: "Pantalla del cliente" }]}
-        right={botonSubir()}
+        // Con la lista vacía el botón vive en el recuadro de «Aún no hay imágenes»: dos «Subir imagen»
+        // seguidos, el lector de pantalla los anunciaba dos veces. Se quita el del encabezado porque
+        // el del recuadro es el que va junto a la explicación; con imágenes, el del encabezado es el único.
+        right={anuncios !== null && total === 0 ? undefined : botonSubir()}
       />
       <PageBody>
         {error && !borrar && (

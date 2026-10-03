@@ -95,6 +95,35 @@ export function mismaLista(a: ListaAnuncios, b: ListaAnuncios): boolean {
   });
 }
 
+/**
+ * Si las imágenes de la lista se pueden enseñar.
+ * - `bien`: manda el carrusel (y él salta las que no carguen).
+ * - `rotas`: ninguna cargó; reposo enseña el logo.
+ * - `probando`: se están precargando FUERA de pantalla; mientras, sigue el logo.
+ */
+export type EstadoImagenes = "bien" | "rotas" | "probando";
+
+/**
+ * Qué pasa con las imágenes rotas tras una lectura de la lista. PURA.
+ *
+ * Se reintentan solo si la lista cambió o en la relectura de cada 5 minutos (`porReloj`); la
+ * lectura de volver a reposo, con la misma lista, NO. Antes cada lectura buena las daba por
+ * buenas: entre cliente y cliente se montaba un carrusel vacío un instante y volvía el logo,
+ * un parpadeo en cada vuelta a reposo.
+ */
+export function imagenesTrasLeer(estado: EstadoImagenes, s: { cambioLista: boolean; porReloj: boolean }): EstadoImagenes {
+  if (estado === "rotas" && (s.cambioLista || s.porReloj)) return "probando";
+  return estado;
+}
+
+/**
+ * El resultado de la precarga fuera de pantalla. PURA. El carrusel vuelve solo cuando al menos
+ * una imagen ya cargó: montarlo antes para ver si alguna sirve es enseñar un cuadro vacío.
+ */
+export function imagenesTrasProbar(cargoAlguna: boolean): EstadoImagenes {
+  return cargoAlguna ? "bien" : "rotas";
+}
+
 export type CapaCarrusel = { anuncio: Anuncio; fundiendo: boolean };
 
 /**
@@ -114,6 +143,20 @@ export function capasCarrusel(cuadro: { actual: Anuncio | null; anterior: Anunci
   return capas;
 }
 
+/**
+ * Si el carrusel debe tener debajo el reposo sin anuncios (logo, nombre o marca). PURA.
+ *
+ * El carrusel arranca sin imagen cada vez que se monta (al volver a reposo, al terminar la prueba
+ * de imágenes) y tarda en precargar la primera: sin esto, entre el logo de antes y el primer
+ * anuncio la pantalla se veía vacía. El reposo se queda hasta que la primera imagen termina su
+ * fundido (si se quitara al entrar, el fundido se haría sobre un fondo en blanco). Desde la
+ * segunda imagen ya no vuelve: cada una tapa por completo a la anterior.
+ */
+export function fondoDelCarrusel(cuadro: { actual: Anuncio | null; anterior: Anuncio | null }, asentada: string | null): boolean {
+  if (cuadro.anterior) return false;
+  return cuadro.actual === null || cuadro.actual.url !== asentada;
+}
+
 export type PasoCarrusel =
   /** Ninguna imagen se puede enseñar: la pantalla vuelve al logo. */
   | { hacer: "nada" }
@@ -128,8 +171,12 @@ export type PasoCarrusel =
  *
  * `enPantalla` es la imagen que se ve (null al empezar). Si ya no viene en la lista —la quitaron,
  * o cambió su archivo— o si se rompió, no se le espera: se pasa a otra en cuanto cargue.
+ *
+ * `transcurridoMs` es lo que lleva en pantalla. Al llegar una lista nueva el carrusel vuelve a
+ * preguntar, y sin esto la imagen que se veía empezaba su tiempo de cero: le queda solo lo que le
+ * falta de su tiempo (el de la lista nueva, si el dueño lo cambió), y si ya se pasó, cambia ya.
  */
-export function pasoSiguiente(lista: ListaAnuncios, enPantalla: Anuncio | null, rotos: ReadonlySet<string>): PasoCarrusel {
+export function pasoSiguiente(lista: ListaAnuncios, enPantalla: Anuncio | null, rotos: ReadonlySet<string>, transcurridoMs = 0): PasoCarrusel {
   const vigente = enPantalla && !rotos.has(enPantalla.id)
     ? lista.anuncios.find((a) => a.id === enPantalla.id && a.url === enPantalla.url) ?? null
     : null;
@@ -138,5 +185,5 @@ export function pasoSiguiente(lista: ListaAnuncios, enPantalla: Anuncio | null, 
   if (!anuncio) return { hacer: "nada" };
   if (vigente && anuncio.id === vigente.id) return { hacer: "quedarse" };
   // Los segundos son los de la lista vigente: si el dueño cambió el tiempo, manda el nuevo.
-  return { hacer: "cambiar", anuncio, enMs: vigente ? vigente.segundos * 1000 : 0 };
+  return { hacer: "cambiar", anuncio, enMs: vigente ? Math.max(0, vigente.segundos * 1000 - transcurridoMs) : 0 };
 }

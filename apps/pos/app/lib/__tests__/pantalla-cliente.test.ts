@@ -6,9 +6,9 @@ import type { ClienteCuenta } from "../clientes-cuenta";
 import { construirVista, construirVistaSegura, leerMensaje, type EntradaVista, type Negocio, type VistaCliente } from "../pantalla-cliente/vista";
 import { crearPublicador, crearReceptor, PAGADO_MAX_MS, SILENCIO_MS, type Canal } from "../pantalla-cliente/canal";
 import { textoEstadoPantalla, type AjustePantalla } from "../pantalla-cliente/ajuste";
-import { CLAVE_NEGOCIO, negocioGuardado, olvidarNegocio, recordarNegocio } from "../pantalla-cliente/negocio";
+import { CLAVE_NEGOCIO, negocioAlAbrir, negocioGuardado, olvidarNegocio, queEnsenaReposo, recordarNegocio } from "../pantalla-cliente/negocio";
 import { anchoEm, ANCHO_NOMBRE_VMIN, tamanoNombre } from "../pantalla-cliente/medidas";
-import { capasCarrusel, leerAnuncios, listaTrasLeer, mismaLista, pasoSiguiente, puedeLeerAnuncios, seEnsenanAnuncios, siguienteAnuncio, LISTA_VACIA, type ListaAnuncios } from "../pantalla-cliente/anuncios";
+import { capasCarrusel, fondoDelCarrusel, imagenesTrasLeer, imagenesTrasProbar, leerAnuncios, listaTrasLeer, mismaLista, pasoSiguiente, puedeLeerAnuncios, seEnsenanAnuncios, siguienteAnuncio, LISTA_VACIA, type ListaAnuncios } from "../pantalla-cliente/anuncios";
 
 function producto(nombre: string, precio: number): Producto {
   return {
@@ -494,6 +494,43 @@ describe("el negocio que recuerda la pantalla", () => {
     expect(() => { olvidarNegocio(); recordarNegocio(NEGOCIO); }).not.toThrow();
     expect(negocioGuardado()).toBeNull();
   });
+
+  // La ventana del cliente se abre en blanco si el negocio espera a un efecto: se lee al crear el estado.
+  it("al abrir la ventana el negocio guardado ya está, sin esperar a un efecto", () => {
+    almacenFalso();
+    vi.stubGlobal("window", {});
+    recordarNegocio({ nombre: "Knock-Out Burger", logoUrl: null });
+    expect(negocioAlAbrir()).toEqual({ nombre: "Knock-Out Burger", logoUrl: null });
+    olvidarNegocio();
+    expect(negocioAlAbrir()).toBeNull();
+  });
+  it("sin navegador (render en servidor) no se ha mirado: undefined", () => {
+    almacenFalso();
+    recordarNegocio({ nombre: "Knock-Out Burger", logoUrl: null });
+    expect(negocioAlAbrir()).toBeUndefined();
+  });
+});
+
+describe("queEnsenaReposo", () => {
+  const LOGO = "data:image/png;base64,AAAA";
+
+  it("con logo y nombre, los dos", () => {
+    expect(queEnsenaReposo({ nombre: "Knock-Out", logoUrl: LOGO }, null)).toEqual({ ve: "logo", logoUrl: LOGO, nombre: "Knock-Out" });
+  });
+  it("el logo que no cargó deja el nombre", () => {
+    expect(queEnsenaReposo({ nombre: "Knock-Out", logoUrl: LOGO }, LOGO)).toEqual({ ve: "nombre", nombre: "Knock-Out" });
+  });
+  it("un logo roto de antes no tapa uno nuevo", () => {
+    expect(queEnsenaReposo({ nombre: "Knock-Out", logoUrl: LOGO }, "data:image/png;base64,VIEJO")).toEqual({ ve: "logo", logoUrl: LOGO, nombre: "Knock-Out" });
+  });
+  it("logo roto y sin nombre (o de puros espacios): la marca de VIM, nunca un monitor en blanco", () => {
+    expect(queEnsenaReposo({ nombre: "  ", logoUrl: LOGO }, LOGO)).toEqual({ ve: "vim" });
+    expect(queEnsenaReposo({ nombre: "", logoUrl: null }, null)).toEqual({ ve: "vim" });
+    expect(queEnsenaReposo(null, null)).toEqual({ ve: "vim" });
+  });
+  it("logo sin nombre: solo el logo", () => {
+    expect(queEnsenaReposo({ nombre: " ", logoUrl: LOGO }, null)).toEqual({ ve: "logo", logoUrl: LOGO, nombre: null });
+  });
 });
 
 describe("tamanoNombre", () => {
@@ -741,6 +778,38 @@ describe("pasoSiguiente", () => {
     expect(pasoSiguiente(lista, null, new Set(["a", "b", "c"]))).toEqual({ hacer: "nada" });
     expect(pasoSiguiente(LISTA_VACIA, A, nada)).toEqual({ hacer: "nada" });
   });
+
+  // Una lista nueva (cada 5 minutos, si el dueño cambió algo) no reinicia el tiempo de la que se ve.
+  it("lista nueva con la de pantalla igual: le queda solo lo que le faltaba", () => {
+    expect(pasoSiguiente(listaDe(A, B, anuncio("d")), A, nada, 2000)).toEqual({ hacer: "cambiar", anuncio: B, enMs: 3000 });
+  });
+  it("lista nueva con otro tiempo para la de pantalla: el nuevo cuenta desde que se enseñó", () => {
+    expect(pasoSiguiente(listaDe(anuncio("a", 40), B), A, nada, 10_000)).toEqual({ hacer: "cambiar", anuncio: B, enMs: 30_000 });
+  });
+  it("si ya pasó de su tiempo nuevo, cambia en el acto", () => {
+    expect(pasoSiguiente(listaDe(anuncio("a", 3), B), A, nada, 4000)).toEqual({ hacer: "cambiar", anuncio: B, enMs: 0 });
+  });
+  it("si salió de la lista, el tiempo que llevaba no cuenta: se cambia ya", () => {
+    expect(pasoSiguiente(listaDe(B, C), A, nada, 1000)).toEqual({ hacer: "cambiar", anuncio: B, enMs: 0 });
+  });
+});
+
+describe("reintentar las imágenes cuando ninguna cargó", () => {
+  it("volver a reposo con la misma lista NO reintenta: el logo no parpadea con un carrusel vacío", () => {
+    expect(imagenesTrasLeer("rotas", { cambioLista: false, porReloj: false })).toBe("rotas");
+  });
+  it("reintenta si cambió la lista o en la relectura de cada 5 minutos", () => {
+    expect(imagenesTrasLeer("rotas", { cambioLista: true, porReloj: false })).toBe("probando");
+    expect(imagenesTrasLeer("rotas", { cambioLista: false, porReloj: true })).toBe("probando");
+  });
+  it("con las imágenes bien, o ya probando, una lectura no cambia nada", () => {
+    expect(imagenesTrasLeer("bien", { cambioLista: true, porReloj: true })).toBe("bien");
+    expect(imagenesTrasLeer("probando", { cambioLista: true, porReloj: true })).toBe("probando");
+  });
+  it("el carrusel vuelve solo cuando una imagen ya cargó fuera de pantalla", () => {
+    expect(imagenesTrasProbar(true)).toBe("bien");
+    expect(imagenesTrasProbar(false)).toBe("rotas");
+  });
 });
 
 describe("capasCarrusel", () => {
@@ -768,5 +837,21 @@ describe("capasCarrusel", () => {
     expect(capasCarrusel({ actual: A, anterior: null }, null)).toEqual([{ anuncio: A, fundiendo: true }]);
     expect(capasCarrusel({ actual: null, anterior: null }, null)).toEqual([]);
     expect(capasCarrusel({ actual: A, anterior: A }, A.url)).toEqual([{ anuncio: A, fundiendo: false }]);
+  });
+});
+
+describe("fondoDelCarrusel", () => {
+  const A = anuncio("a", 3), B = anuncio("b", 6);
+
+  it("mientras no hay imagen en pantalla se enseña el reposo sin anuncios, no un fondo vacío", () => {
+    expect(fondoDelCarrusel({ actual: null, anterior: null }, null)).toBe(true);
+  });
+  it("durante el fundido de la primera imagen sigue debajo; al asentarse se quita", () => {
+    expect(fondoDelCarrusel({ actual: A, anterior: null }, null)).toBe(true);
+    expect(fondoDelCarrusel({ actual: A, anterior: null }, A.url)).toBe(false);
+  });
+  it("desde la segunda imagen ya no vuelve: cada una tapa por completo a la anterior", () => {
+    expect(fondoDelCarrusel({ actual: B, anterior: A }, A.url)).toBe(false);
+    expect(fondoDelCarrusel({ actual: B, anterior: A }, null)).toBe(false);
   });
 });

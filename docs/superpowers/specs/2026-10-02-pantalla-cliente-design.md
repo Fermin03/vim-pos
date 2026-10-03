@@ -209,7 +209,9 @@ Después de cada pull, `desktop/src/anuncios.mjs`:
   pantalla los mezclaría. Sin negocio anotado no hay anuncios.
 - Descarga a `userData/anuncios/` los archivos que falten. Borra los que ya no estén en la lista
   (con eso se van solas las imágenes de un negocio anterior).
-- Si una descarga falla, se salta y se reintenta en el siguiente pull.
+- Si una descarga falla, se salta y se reintenta en el siguiente pull. Excepción: un rechazo
+  permanente (no es imagen, tamaño fuera de rango, HTTP 4xx distinto de 408/429) espera 6 horas o
+  a que el anuncio salga de la lista antes de volver a intentarse.
 
 El ui-server los sirve:
 
@@ -217,7 +219,10 @@ El ui-server los sirve:
   descargados, en orden. `segundos` de cada anuncio es su tiempo propio o, si no tiene, el general.
 - Si la lista no se pudo leer (la base falló), responde **503** con un cuerpo de error, no una lista
   vacía: la pantalla conserva la lista que ya tenía. Una lista vacía de verdad (`200`) sí quita el
-  carrusel. Un POS sin escritorio detrás (sin gancho) responde la lista vacía.
+  carrusel. El ui-server
+  responde la lista vacía cuando arrancó sin el gancho `anuncios`; un POS sin escritorio
+  detrás no tiene la ruta `/__anuncios`, así que `leerAnuncios` recibe una respuesta fallida (`null`)
+  y conserva su lista.
 - `GET /__anuncios/<archivo>` → la imagen. El nombre se valida **por forma** (`<uuid>.<ext>`, con
   `ext` jpg, png o webp), no contra la lista: sin rutas libres, y un nombre que no está en disco da
   404.

@@ -6,7 +6,8 @@
 // pinta una imagen a medias.
 //
 // Nada de aquí lanza. Los anuncios son un adorno: una descarga fallida se reintenta en el
-// siguiente pull, y un fallo no puede tocar la venta, el sync ni el arranque.
+// siguiente pull (salvo un rechazo permanente: no es imagen, tamaño fuera de rango o HTTP 4xx
+// distinto de 408/429, que espera 6 horas o a que el anuncio salga de la lista), y un fallo no puede tocar la venta, el sync ni el arranque.
 import { mkdirSync, readdirSync, renameSync, rmSync, writeFileSync, existsSync } from "node:fs";
 import path from "node:path";
 
@@ -52,7 +53,11 @@ async function tenantVinculado(pool) {
   const hay = (await pool.query(`SELECT to_regclass('public._vim_sync') IS NOT NULL AS hay`)).rows[0]?.hay;
   if (!hay) return null;
   const valor = (await pool.query(`SELECT valor FROM _vim_sync WHERE clave = 'tenant'`)).rows[0]?.valor;
-  return typeof valor === "string" && ES_UUID.test(valor) ? valor : null;
+  if (valor === undefined || valor === null) return null;
+  // Una anotación que no es uuid está dañada: no es "ningún negocio" (eso borraría todas las
+  // imágenes), es una lectura que no se pudo hacer. Se lanza para conservar lo que hay en disco.
+  if (typeof valor !== "string" || !ES_UUID.test(valor)) throw new Error("el negocio anotado en _vim_sync no es un uuid");
+  return valor;
 }
 
 /** Las filas de anuncios del negocio vinculado ([] si no hay ninguno anotado). Lanza si la base falla. */
@@ -62,7 +67,20 @@ async function filasDelNegocio(pool) {
   return { tenant, filas: (await pool.query(SQL_FILAS, [tenant])).rows };
 }
 
-export async function sincronizarAnuncios({ pool, dir, cloudUrl, fetch: pedir = fetch, log = () => {} }) {
+/**
+ * Imágenes rechazadas por una causa que no se arregla sola (no es imagen, tamaño fuera de rango,
+ * HTTP 4xx salvo 408 y 429, que piden esperar un poco): archivo → cuándo. Sin esto, cada pull (cada pocos minutos) volvía a bajar el mismo
+ * archivo malo. Vive en memoria: reiniciar la caja reintenta todo, que es justo lo que se quiere
+ * tras una actualización.
+ */
+const rechazados = new Map();
+const OLVIDO_MS = 6 * 3600_000;
+/** Vacía la memoria de rechazos (para las pruebas). */
+export function olvidarRechazados() { rechazados.clear(); }
+/** Un error que no vale la pena reintentar pronto. Red, timeout, 5xx, 408 y 429 NO lo son. */
+const permanente = (msg) => Object.assign(new Error(msg), { permanente: true });
+
+export async function sincronizarAnuncios({ pool, dir, cloudUrl, fetch: pedir = fetch, log = () => {}, ahora = Date.now }) {
   const r = { bajados: 0, borrados: 0, fallidos: 0 };
   let filas;
   // Sin negocio anotado la lista queda vacía y la limpieza de abajo borra lo que hubiera en disco;
@@ -71,23 +89,30 @@ export async function sincronizarAnuncios({ pool, dir, cloudUrl, fetch: pedir = 
   let plan;
   try { mkdirSync(dir, { recursive: true }); plan = planAnuncios(filas, readdirSync(dir)); } catch (e) { log(`no se pudo leer la carpeta: ${e?.message ?? e}`); return r; }
 
+  // Lo que salió de la lista se olvida: si vuelve (quizá con otra imagen) se intenta de inmediato.
+  const enLista = new Set(filas.map(nombreArchivo));
+  for (const a of rechazados.keys()) if (!enLista.has(a)) rechazados.delete(a);
+
   for (const a of plan.borrar) { try { rmSync(path.join(dir, a), { force: true }); if (!a.endsWith(".tmp")) r.borrados++; } catch { /* se reintenta en el siguiente pull */ } }
 
   for (const { archivo, ruta } of plan.descargar) {
+    const desde = rechazados.get(archivo);
+    if (desde !== undefined && ahora() - desde < OLVIDO_MS) continue;
     const destino = path.join(dir, archivo);
     try {
       const res = await pedir(`${String(cloudUrl).replace(/\/+$/, "")}/storage/v1/object/public/anuncios/${ruta}`, { signal: AbortSignal.timeout(20000) });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      if (!res.ok) { const msg = `HTTP ${res.status}`; throw res.status >= 400 && res.status < 500 && res.status !== 408 && res.status !== 429 ? permanente(msg) : new Error(msg); }
       const tipo = String(res.headers.get("content-type") ?? "").split(";")[0].trim().toLowerCase();
-      if (!TIPOS[tipo]) throw new Error(`no es una imagen (${tipo || "sin tipo"})`);
+      if (!TIPOS[tipo]) throw permanente(`no es una imagen (${tipo || "sin tipo"})`);
       const datos = Buffer.from(await res.arrayBuffer());
-      if (datos.length === 0 || datos.length > MAX_BYTES) throw new Error(`tamaño fuera de rango (${datos.length} bytes)`);
+      if (datos.length === 0 || datos.length > MAX_BYTES) throw permanente(`tamaño fuera de rango (${datos.length} bytes)`);
       // A un temporal y luego rename: la pantalla nunca ve un archivo a medio escribir.
       writeFileSync(destino + ".tmp", datos);
       renameSync(destino + ".tmp", destino);
       r.bajados++;
     } catch (e) {
       r.fallidos++;
+      if (e?.permanente) rechazados.set(archivo, ahora());
       try { rmSync(destino + ".tmp", { force: true }); } catch { /* */ }
       log(`no se pudo bajar ${archivo}: ${e?.message ?? e}`);
     }

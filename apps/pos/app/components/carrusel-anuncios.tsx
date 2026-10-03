@@ -1,6 +1,6 @@
 "use client";
-import { useEffect, useRef, useState } from "react";
-import { capasCarrusel, pasoSiguiente, type Anuncio, type ListaAnuncios } from "../lib/pantalla-cliente/anuncios";
+import { useEffect, useRef, useState, type ReactNode } from "react";
+import { capasCarrusel, fondoDelCarrusel, pasoSiguiente, type Anuncio, type ListaAnuncios } from "../lib/pantalla-cliente/anuncios";
 
 /*
  * Fundido cruzado: la imagen que entra aparece ENCIMA de la que sale, solo con opacidad, 400 ms y
@@ -23,7 +23,12 @@ type Cuadro = { actual: Anuncio | null; anterior: Anuncio | null };
  * Qué imagen sigue, cuánto espera y qué pasa cuando una no carga lo decide `pasoSiguiente`
  * (con pruebas). Aquí solo queda lo del navegador: precargar, el temporizador y pintar.
  */
-export function CarruselAnuncios({ lista, alQuedarseSinImagenes }: { lista: ListaAnuncios; alQuedarseSinImagenes: () => void }) {
+export function CarruselAnuncios({ lista, alQuedarseSinImagenes, fondo }: {
+  lista: ListaAnuncios;
+  alQuedarseSinImagenes: () => void;
+  /** Lo que se ve mientras la primera imagen carga y se funde (el reposo sin anuncios). Ver `fondoDelCarrusel`. */
+  fondo: ReactNode;
+}) {
   const [cuadro, setCuadro] = useState<Cuadro>({ actual: null, anterior: null });
   // Sube cuando la imagen que está en pantalla resulta rota: vuelve a correr el efecto de abajo.
   const [fallas, setFallas] = useState(0);
@@ -32,6 +37,8 @@ export function CarruselAnuncios({ lista, alQuedarseSinImagenes }: { lista: List
   // El padre pasa una función nueva en cada render: se guarda aparte para no rearmar el temporizador.
   const avisar = useRef(alQuedarseSinImagenes);
   useEffect(() => { avisar.current = alQuedarseSinImagenes; });
+  // Desde cuándo está en pantalla la imagen actual: una lista nueva no le reinicia el tiempo.
+  const enPantallaDesde = useRef<{ anuncio: Anuncio | null; ms: number }>({ anuncio: null, ms: 0 });
 
   // Una vuelta por cada imagen que llega a la pantalla (o por cada lista nueva): precarga la que
   // sigue desde ya y la enseña cuando se cumple el tiempo de la que está. El tiempo es el de cada
@@ -39,6 +46,9 @@ export function CarruselAnuncios({ lista, alQuedarseSinImagenes }: { lista: List
   useEffect(() => {
     if (memoria.current.lista !== lista) memoria.current = { lista, rotos: new Set() };
     const { rotos } = memoria.current;
+    // La primera vuelta tras un cambio de imagen marca la hora en que entró; las que corren por una
+    // lista nueva (o una falla) con la misma imagen la conservan.
+    if (enPantallaDesde.current.anuncio !== cuadro.actual) enPantallaDesde.current = { anuncio: cuadro.actual, ms: Date.now() };
     let reloj: ReturnType<typeof setTimeout> | undefined;
     let precarga: HTMLImageElement | null = null;
     let cargada: Anuncio | null = null;
@@ -54,7 +64,7 @@ export function CarruselAnuncios({ lista, alQuedarseSinImagenes }: { lista: List
     };
     /** Empieza a precargar la que sigue. Devuelve cuánto esperar, o null si no hay a cuál cambiar. */
     const preparar = (): number | null => {
-      const paso = pasoSiguiente(lista, cuadro.actual, rotos);
+      const paso = pasoSiguiente(lista, cuadro.actual, rotos, Date.now() - enPantallaDesde.current.ms);
       if (paso.hacer === "nada") { avisar.current(); return null; }
       if (paso.hacer === "quedarse") return null;
       const img = new Image();
@@ -87,6 +97,8 @@ export function CarruselAnuncios({ lista, alQuedarseSinImagenes }: { lista: List
 
   return (
     <section className="relative flex-1 overflow-hidden">
+      {/* Debajo de las imágenes (van después, absolutas): la primera lo tapa al terminar su fundido. */}
+      {fondoDelCarrusel(cuadro, asentada) && <div className="absolute inset-0 flex flex-col">{fondo}</div>}
       {/* Una sola lista con `key`: al cambiar, la que estaba conserva su <img> (no se vuelve a montar
           ni a decodificar) y se queda debajo, ya sin animación, hasta el siguiente cambio. La nueva
           se agrega al final, o sea encima. */}
