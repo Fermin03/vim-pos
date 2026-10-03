@@ -53,8 +53,10 @@ GRANT EXECUTE ON FUNCTION reordenar_anuncios(uuid[]) TO authenticated, service_r
 -- esas pantallas. El trigger mira solo pantalla_cliente_segundos y deja pasar todo lo demás.
 --
 -- Solo se aplica a quien llega con sesión de usuario (auth.role() = 'authenticated'). No afecta a
--- service_role (funciones del servidor) ni a la caja: sus escrituras locales corren como postgres,
--- sin claims, y el pull del sync va en modo réplica, donde los triggers ni se disparan.
+-- service_role (funciones del servidor). En la caja la sesión del POS SÍ es 'authenticated' (el
+-- escritorio firma JWT con ese rol y el POS escribe por el PostgREST local), así que el trigger
+-- también se dispara ahí; no estorba porque el POS nunca escribe pantalla_cliente_segundos. El
+-- pull del sync va en modo réplica, donde los triggers ni se disparan.
 CREATE OR REPLACE FUNCTION configuracion_tenant_segundos_solo_admin()
 RETURNS trigger
 LANGUAGE plpgsql
