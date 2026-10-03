@@ -26,6 +26,7 @@ import { crearAlmacenDirectivas, estadoDeVersion } from "./directivas.mjs";
 import { pantallaDeLaCaja } from "./pantalla.mjs";
 import { crearPantallaCliente } from "./pantalla-cliente.mjs";
 import { sincronizarAnuncios, listarAnuncios, rutaDeAnuncio } from "./anuncios.mjs";
+import { crearCoordinadorDePasadas } from "./pasada-unica.mjs";
 import { crearEspejo } from "./delivery-espejo.mjs";
 import { debeSondearApps } from "./delivery-espejo-modulo.mjs";
 import { registrarErrorLocal, subirErrores } from "./sync-errores.mjs";
@@ -1008,15 +1009,17 @@ async function avisarCatalogoNuevo(motivo) {
   bajarAnuncios().catch(() => {});
 }
 
-let anunciosEnCurso = null;
-/** Una sola pasada a la vez: dos pulls seguidos no deben bajar la misma imagen dos veces. */
-function bajarAnuncios() {
-  if (anunciosEnCurso || !backend?.pool) return anunciosEnCurso ?? Promise.resolve();
-  anunciosEnCurso = sincronizarAnuncios({ pool: backend.pool, dir: ANUNCIOS_DIR, cloudUrl: CLOUD_URL, log: (m) => console.log("· [anuncios]", m) })
-    .then((r) => { if (r.bajados || r.borrados || r.fallidos) console.log(`· [anuncios] ${r.bajados} bajados, ${r.borrados} borrados, ${r.fallidos} fallidos`); })
-    .finally(() => { anunciosEnCurso = null; });
-  return anunciosEnCurso;
-}
+/**
+ * Una sola pasada a la vez: dos pulls seguidos no deben bajar la misma imagen dos veces. Pero un
+ * pull que llega con una pasada en curso NO se descarta: pide una pasada más al terminar la actual
+ * (pasada-unica.mjs), porque ese pull pudo traer anuncios que la pasada en curso ya no verá y,
+ * descartado, esperarían un ciclo entero. Nunca lanza; quien llama no la espera.
+ */
+const bajarAnuncios = crearCoordinadorDePasadas(async () => {
+  if (!backend?.pool) return;
+  const r = await sincronizarAnuncios({ pool: backend.pool, dir: ANUNCIOS_DIR, cloudUrl: CLOUD_URL, log: (m) => console.log("· [anuncios]", m) });
+  if (r.bajados || r.borrados || r.fallidos) console.log(`· [anuncios] ${r.bajados} bajados, ${r.borrados} borrados, ${r.fallidos} fallidos`);
+});
 
 /**
  * Baja el catálogo YA, sin esperar al ciclo. Lo usan el sondeo y el botón "Actualizar menú".
