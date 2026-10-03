@@ -122,3 +122,23 @@ test("en modo cocina la lista no se sirve (cae al estático)", async () => {
     assert.equal(llamadas, 0);
   } finally { await new Promise((res) => server.close(res)); rmSync(dir, { recursive: true, force: true }); }
 });
+
+// Otra computadora de la red (la 2ª caja, un celular) llega con su IP de LAN, no con la de loopback:
+// la lista del local y sus imágenes son solo de la ventana del segundo monitor, que vive en la caja.
+// Se simula pidiendo por la IP de LAN de ESTA máquina: la conexión entra con esa dirección como
+// origen, que no es de loopback, igual que entraría desde fuera.
+test("una petición desde otra dirección de la red recibe 403 y no llega al gancho", async (t) => {
+  const lan = Object.values(os.networkInterfaces()).flat().find((i) => i && (i.family === "IPv4" || i.family === 4) && !i.internal);
+  if (!lan) return t.skip("esta máquina no tiene una IPv4 que no sea de loopback: no hay forma de simular a otra computadora");
+  let llamadas = 0;
+  const port = 55100 + Math.floor(Math.random() * 41);
+  const server = await startUiServer(UI_DIR, port, 54350, "0.0.0.0", { anuncios: async () => { llamadas++; return LISTA; }, archivoAnuncio: () => { llamadas++; return null; } });
+  try {
+    for (const ruta of ["/__anuncios", `/__anuncios/${ARCHIVO}`]) {
+      const r = await fetch(`http://${lan.address}:${port}${ruta}`);
+      assert.equal(r.status, 403, ruta);
+      assert.equal((await r.json()).ok, false);
+    }
+    assert.equal(llamadas, 0, "el gancho no debe ni llamarse");
+  } finally { await new Promise((res) => server.close(res)); }
+});
