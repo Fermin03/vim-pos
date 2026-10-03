@@ -353,7 +353,7 @@ Deno.serve(async (req) => {
         const [
           { data: prods }, { data: cats }, { data: gruposModificador }, { data: opcionesModificador },
           { data: vinculosProductoGrupo }, { data: comboGrupos }, { data: comboOpciones },
-          { data: filasSucursal },
+          { data: filasSucursal, error: errSucursal },
         ] = await Promise.all([
           admin.from("productos")
             .select("id, nombre, descripcion, precio_base_mxn, tasa_iva, categoria_id, visible_en_pos, es_combo")
@@ -373,6 +373,13 @@ Deno.serve(async (req) => {
           admin.from("productos_sucursal").select("producto_id, disponible, precio_mxn, agotado_manual, agotado_automatico")
             .eq("tenant_id", tenantId).eq("sucursal_id", cx.sucursal_id),
         ]);
+        // Sin el menú de la sucursal, la carta saldría a precios generales y con lo que esta sucursal
+        // no vende: mejor no publicar que publicar mal. Uber se queda con la carta anterior.
+        if (errSucursal) {
+          await registrar("menu", false, `productos_sucursal: ${errSucursal.message}`, cx.id, cx.tienda_id_externo);
+          registrarError("delivery-uber-conexion", "INTERNO", errSucursal);
+          return json({ error: "INTERNO" }, 500);
+        }
         // Un combo sin slots configurados no se puede vender: cuenta cuántos grupos tiene cada
         // combo para que construirMenuUber lo excluya (ver "combo sin slots").
         const slotsPorCombo = new Map<string, number>();

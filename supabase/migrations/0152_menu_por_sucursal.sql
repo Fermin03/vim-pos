@@ -545,8 +545,8 @@ $$;
 COMMENT ON FUNCTION agregar_combo_a_ticket IS 'Inserta un combo: padre (cobra el precio calculado aquí, con los precios de la sucursal del ticket) + hijos a precio 0 con prorrateo informativo. Valida slots, pertenencia y disponibilidad en la sucursal. Idempotente por client_id_local. Rechaza p_modificadores en la línea del padre. ADR 0015, ADR 0027.';
 
 -- ── §8 evaluar_alertas_stock agota y restablece en LA sucursal del movimiento ───────────────
--- Copia íntegra de 0007_catalogo_inventario.sql §9.3 (nunca redefinida) salvo los dos UPDATE de
--- productos, que pasan a productos_sucursal:
+-- Copia íntegra de 0007_catalogo_inventario.sql §9.3 (nunca redefinida) salvo un RETURN temprano
+-- cuando no hay fila de existencias y los dos UPDATE de productos, que pasan a productos_sucursal:
 --   · antes, un insumo crítico en 0 en Centro agotaba el producto en TODAS las sucursales;
 --   · y el restablecimiento miraba el stock de la sucursal que se movió, así que reabastecer Norte
 --     des-agotaba un producto que en Centro seguía sin insumo.
@@ -578,6 +578,13 @@ BEGIN
   FROM insumo_stock_sucursal ss
   JOIN insumos i ON i.id = ss.insumo_id
   WHERE ss.insumo_id = p_insumo_id AND ss.sucursal_id = p_sucursal_id;
+
+  -- Sin fila de existencias del insumo en esta sucursal no hay nada que evaluar: se sale antes de
+  -- escribir nada. Sin esto, la severidad NULL cerraría alertas y el restablecimiento (que ya no
+  -- pasa por productos) limpiaría agotados de la sucursal sin saber su stock.
+  IF v_stock IS NULL THEN
+    RETURN;
+  END IF;
 
   -- Determinar severidad
   IF v_stock <= 0 THEN
@@ -641,7 +648,8 @@ BEGIN
     UPDATE productos_sucursal ps
        SET agotado_automatico = false,
            motivo_agotado     = NULL
-     WHERE ps.sucursal_id = p_sucursal_id
+     WHERE ps.tenant_id = v_tenant_id
+       AND ps.sucursal_id = p_sucursal_id
        AND ps.agotado_automatico = true
        AND ps.producto_id IN (
          SELECT DISTINCT r.producto_id

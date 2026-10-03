@@ -78,8 +78,11 @@ export function CatalogoProductos({
   );
   const [elegida, setElegida] = useState<string | null>(null);
   // La primera categoría queda activa sin necesidad de un efecto: las categorías llegan async
-  // (red o cache) y un `useState` inicial se quedaría en null para siempre.
-  const catSel = elegida ?? categorias?.[0]?.id ?? null;
+  // (red o cache) y un `useState` inicial se quedaría en null para siempre. Si la elegida dejó de
+  // verse (al recargar, la sucursal apagó todo lo que tenía), se toma la primera visible: si no, la
+  // cuadrícula quedaría vacía con ninguna pastilla activa.
+  const catSel =
+    (elegida !== null && categorias?.some((c) => c.id === elegida) ? elegida : null) ?? categorias?.[0]?.id ?? null;
   const visibles = useMemo(
     () => (productos ?? []).filter((p) => !catSel || p.categoria_id === catSel),
     [productos, catSel],
