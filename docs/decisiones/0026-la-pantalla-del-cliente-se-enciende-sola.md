@@ -166,3 +166,5 @@ la decisión cerrada 22 de ese documento.
 - **Los anuncios necesitan internet una sola vez por imagen.** Ya bajadas, salen sin conexión. Una
   imagen eliminada o pausada deja de salir en cuanto la caja hace su siguiente pull, sin
   reiniciarla.
+- **Reordenar los anuncios es una sola operación de base de datos** (`reordenar_anuncios`, mig. 0151): un reorden interrumpido no puede dejar el orden escrito a medias; o se aplica entero o no cambia nada.
+- **Solo el dueño o el admin cambian el tiempo general** de los anuncios. Lo impone un trigger sobre `pantalla_cliente_segundos` y no la política de `configuracion_tenant`, que es de todo el negocio y la usan otras pantallas; estrecharla podría romperlas.

@@ -217,7 +217,10 @@ El ui-server los sirve:
   descargados, en orden. `segundos` de cada anuncio es su tiempo propio o, si no tiene, el general.
 - Si la lista no se pudo leer (la base falló), responde **503** con un cuerpo de error, no una lista
   vacía: la pantalla conserva la lista que ya tenía. Una lista vacía de verdad (`200`) sí quita el
-  carrusel. Un POS sin escritorio detrás (sin gancho) responde la lista vacía.
+  carrusel. El
+  ui-server responde la lista vacía cuando arrancó sin el gancho `anuncios`; un POS sin escritorio
+  detrás no tiene la ruta `/__anuncios`, así que `leerAnuncios` recibe una respuesta fallida (`null`)
+  y conserva su lista.
 - `GET /__anuncios/<archivo>` → la imagen. El nombre se valida **por forma** (`<uuid>.<ext>`, con
   `ext` jpg, png o webp), no contra la lista: sin rutas libres, y un nombre que no está en disco da
   404.
