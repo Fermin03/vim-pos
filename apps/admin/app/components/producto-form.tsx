@@ -98,6 +98,8 @@ export function ProductoForm({
   const [menuExistente, setMenuExistente] = useState<FilaMenuSucursal[]>([]);
   const [menuListo, setMenuListo] = useState(false);
   const [cajasViejas, setCajasViejas] = useState<Caja[]>([]);
+  // Id del producto recién creado: si luego falla el menú, el siguiente «Guardar» lo actualiza.
+  const [idCreado, setIdCreado] = useState<string | null>(null);
   const multi = menu.length >= 2;
   const [error, setError] = useState<string | null>(null);
   const [guardando, setGuardando] = useState(false);
@@ -165,18 +167,34 @@ export function ProductoForm({
     }
     setGuardando(true);
     try {
-      if (editar) await actualizarProducto(producto!.id, parsed.data);
-      const id = editar ? producto!.id : await crearProducto(parsed.data);
-      // Con una sola sucursal, el agotado del selector va a la fila de esa sucursal.
-      const filasForm = multi ? menu : menu.map((f) => ({ ...f, agotado }));
-      await guardarMenuSucursal(filasParaGuardar(edicionesDeForm(id, filasForm), menuExistente));
-      setMenuExistente((prev) => [
-        ...prev,
-        ...filasForm.filter((f) => !prev.some((p) => p.sucursal_id === f.sucursalId)).map((f) => ({
-          producto_id: id, sucursal_id: f.sucursalId, disponible: f.disponible,
-          precio_mxn: f.precio.trim() === "" ? null : Number(f.precio), agotado_manual: f.agotado, agotado_automatico: f.agotadoAuto,
-        })),
-      ]);
+      // Si el producto ya se creó en un intento anterior (y falló el menú), se actualiza: no se duplica.
+      const idPrevio = producto?.id ?? idCreado;
+      let id: string;
+      if (idPrevio) {
+        await actualizarProducto(idPrevio, parsed.data);
+        id = idPrevio;
+      } else {
+        id = await crearProducto(parsed.data);
+        setIdCreado(id);
+      }
+      try {
+        // Con una sola sucursal, el agotado del selector va a la fila de esa sucursal.
+        const filasForm = multi ? menu : menu.map((f) => ({ ...f, agotado }));
+        const enviadas = filasParaGuardar(edicionesDeForm(id, filasForm), menuExistente);
+        await guardarMenuSucursal(enviadas);
+        // Solo las filas que de verdad se mandaron cuentan como existentes: una sucursal en valores
+        // por defecto sin fila no debe crearse en un segundo «Guardar».
+        setMenuExistente((prev) => [
+          ...prev,
+          ...enviadas
+            .filter((e) => !prev.some((p) => p.sucursal_id === e.sucursal_id))
+            .map((e) => ({ ...e, agotado_automatico: filasForm.find((f) => f.sucursalId === e.sucursal_id)?.agotadoAuto ?? false })),
+        ]);
+      } catch {
+        setError("El producto se guardó, pero no el menú por sucursal. Vuelve a intentar.");
+        setGuardando(false);
+        return;
+      }
       if (guardarTambien) await guardarTambien();
       guardado.current = valores;
       if (alGuardar) {
