@@ -24,6 +24,8 @@ export type Anuncio = { id: string; ruta: string; url: string; orden: number; ac
 export const segundosSchema = z.coerce.number().int("Usa un número entero").min(3, "Mínimo 3 segundos").max(60, "Máximo 60 segundos");
 
 const SOLO_ADMIN = "Solo el dueño o un administrador puede cambiar los anuncios.";
+const TOPE_ANUNCIOS = "Ya hay 10 anuncios. Quita uno para subir otro.";
+const LISTA_CAMBIO = "La lista de anuncios cambió. Recarga la página.";
 
 async function tenantId(): Promise<string> {
   const s = await leerSesion();
@@ -105,6 +107,12 @@ export async function listarAnuncios(): Promise<Anuncio[]> {
 /** Reduce la imagen en el navegador, la sube al almacén y la da de alta al final de la lista. */
 export async function subirAnuncio(archivo: File): Promise<void> {
   const tid = await tenantId();
+  // Antes de reducir y subir nada: con dos pestañas abiertas la segunda llenaba el almacén para que
+  // la base rechazara la fila después. La regla de verdad sigue siendo el disparador de la base
+  // (más abajo se limpia si aun así rechaza); esto solo evita el trabajo y la subida en balde.
+  const { count, error: errConteo } = await supabase.from("anuncios_pantalla").select("id", { count: "exact", head: true }).is("deleted_at", null);
+  if (errConteo) throw new Error(traducir(errConteo.message));
+  if ((count ?? 0) >= MAX_ANUNCIOS) throw new Error(TOPE_ANUNCIOS);
   let dataUri: string;
   try {
     // `maxBytes` es el largo del data URI (base64): 4 caracteres por cada 3 bytes del archivo.
@@ -156,18 +164,23 @@ export async function setSegundosAnuncio(id: string, segundos: number | null): P
 }
 
 /**
- * Mueve un anuncio un lugar y reescribe el orden de los que cambiaron.
+ * Mueve un anuncio un lugar.
  *
- * Escribe la posición de TODO renglón cuyo `orden` no sea ya el que le toca, así que si un intento
- * anterior se quedó a medias (se cayó el internet entre dos escrituras), el siguiente lo endereza.
+ * Manda la lista completa en el orden nuevo a `reordenar_anuncios` (0151), que la reescribe en UNA
+ * sola sentencia: antes eran varias escrituras sueltas y un corte de internet entre dos dejaba el
+ * orden a medias, o dos pestañas lo mezclaban. Si el id no se movió (extremo de la lista) no hay
+ * nada que escribir.
  */
 export async function moverAnuncio(anuncios: Anuncio[], id: string, hacia: "arriba" | "abajo"): Promise<void> {
   const antes = anuncios.map((a) => a.id);
   const despues = ordenTrasMover(antes, id, hacia);
-  const ordenDe = new Map(anuncios.map((a) => [a.id, a.orden]));
-  for (const [i, aid] of despues.entries()) {
-    if (ordenDe.get(aid) === i * 10) continue;
-    await actualizar(aid, { orden: i * 10 });
+  if (despues.every((x, i) => x === antes[i])) return;
+  const { error } = await supabase.rpc("reordenar_anuncios", { p_ids: despues });
+  if (error) {
+    // El código manda sobre el texto: la base puede cambiar su redacción, no su SQLSTATE.
+    if (error.code === "P0002") throw new Error(LISTA_CAMBIO);
+    if (error.code === "42501") throw new Error(SOLO_ADMIN);
+    throw new Error(traducir(error.message));
   }
 }
 
@@ -198,8 +211,9 @@ export async function guardarSegundos(n: number): Promise<void> {
  * sesión vencida). PURA.
  */
 export function traducir(mensaje: string): string {
-  if (mensaje.includes("Ya hay 10 anuncios")) return "Ya hay 10 anuncios. Quita uno para subir otro.";
-  if (/row-level security|permission denied|unauthorized|not authorized|42501/i.test(mensaje)) return SOLO_ADMIN;
+  if (mensaje.includes("Ya hay 10 anuncios")) return TOPE_ANUNCIOS;
+  if (mensaje.includes("La lista de anuncios cambió")) return LISTA_CAMBIO;
+  if (/row-level security|permission denied|unauthorized|not authorized|42501|solo el dueño/i.test(mensaje)) return SOLO_ADMIN;
   if (/exceeded the maximum allowed size|payload too large|entity too large|demasiado pesada/i.test(mensaje)) return MUY_PESADA;
   if (/mime type|invalid_mime_type|no es una imagen/i.test(mensaje)) return "Ese archivo no se puede usar. Sube una imagen JPG, PNG o WebP.";
   if (/no se pudo leer la imagen/i.test(mensaje)) return "No se pudo leer la imagen. Prueba con otro archivo JPG, PNG o WebP.";
