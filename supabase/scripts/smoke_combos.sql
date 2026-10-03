@@ -85,14 +85,16 @@ BEGIN
       jsonb_build_object('grupo_id', v_g_acom, 'producto_id', v_papas, 'cantidad', 1)), '[]'::jsonb, NULL, 'smoke-combo-x2');
     RAISE EXCEPTION 'debió fallar: refresco fuera del slot Hamburguesa';
   EXCEPTION WHEN OTHERS THEN IF SQLERRM NOT LIKE '%no es opción del slot%' THEN RAISE; END IF; END;
-  UPDATE productos SET agotado_manual = true, estado = 'AGOTADO' WHERE id = v_papas;
+  -- 0151: el agotado es por sucursal.
+  INSERT INTO productos_sucursal (tenant_id, producto_id, sucursal_id, agotado_manual) VALUES (v_tenant, v_papas, v_suc, true)
+    ON CONFLICT (producto_id, sucursal_id) DO UPDATE SET agotado_manual = true;
   BEGIN
     PERFORM agregar_combo_a_ticket(v_ticket, v_combo, 1, jsonb_build_array(
       jsonb_build_object('grupo_id', v_g_hamb, 'producto_id', v_clas, 'cantidad', 1),
       jsonb_build_object('grupo_id', v_g_acom, 'producto_id', v_papas, 'cantidad', 1)), '[]'::jsonb, NULL, 'smoke-combo-x3');
     RAISE EXCEPTION 'debió fallar: papas agotadas';
   EXCEPTION WHEN OTHERS THEN IF SQLERRM NOT LIKE '%agotado o pausado%' THEN RAISE; END IF; END;
-  UPDATE productos SET agotado_manual = false, estado = 'ACTIVO' WHERE id = v_papas;
+  UPDATE productos_sucursal SET agotado_manual = false WHERE producto_id = v_papas AND sucursal_id = v_suc;
   BEGIN
     PERFORM agregar_item_a_ticket(v_ticket, v_combo, 1, NULL, '[]'::jsonb, 'smoke-combo-x4');
     RAISE EXCEPTION 'debió fallar: un combo no entra por agregar_item_a_ticket';

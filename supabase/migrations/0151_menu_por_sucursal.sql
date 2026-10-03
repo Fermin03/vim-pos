@@ -234,3 +234,312 @@ REVOKE EXECUTE ON FUNCTION precio_producto_en_sucursal(uuid, uuid)      FROM pub
 REVOKE EXECUTE ON FUNCTION motivo_no_disponible_en_sucursal(uuid, uuid) FROM public, anon;
 GRANT  EXECUTE ON FUNCTION precio_producto_en_sucursal(uuid, uuid)      TO authenticated, service_role;
 GRANT  EXECUTE ON FUNCTION motivo_no_disponible_en_sucursal(uuid, uuid) TO authenticated, service_role;
+
+-- ── §7 Las RPCs de venta cobran el precio de la sucursal del ticket ─────────────────────────
+-- Copias íntegras de 0111_combos.sql §2.2 y §2.3 con estos cambios:
+--   · leen tickets.sucursal_id;
+--   · el precio sale de precio_producto_en_sucursal (padre, componentes SUMA y la carta del prorrateo);
+--   · el combo valida con motivo_no_disponible_en_sucursal (antes: estado/agotado globales);
+--   · search_path fijo (0111 lo perdió al redefinirlas; 0044 se lo había puesto a todas).
+-- agregar_item_a_ticket NO valida si se vende en la sucursal (invariante 7 del spec): la caja
+-- filtra, y un pedido de Uber pagado no se pierde por una carta vieja.
+CREATE OR REPLACE FUNCTION agregar_item_a_ticket(
+  p_ticket_id      uuid,
+  p_producto_id    uuid,
+  p_cantidad       numeric(12,3),
+  p_nota_cocina    text DEFAULT NULL,
+  p_modificadores  jsonb DEFAULT '[]'::jsonb,
+  p_client_id_local varchar DEFAULT NULL
+) RETURNS uuid
+LANGUAGE plpgsql
+SET search_path = public, extensions, pg_temp
+AS $$
+DECLARE
+  v_tenant_id     uuid;
+  v_sucursal_id   uuid;
+  v_ticket_estado ticket_estado_fiscal;
+  v_producto      record;
+  v_item_id       uuid;
+  v_modif         jsonb;
+  v_opcion        record;
+  v_next_orden    integer;
+BEGIN
+  SELECT tenant_id, sucursal_id, estado_fiscal INTO v_tenant_id, v_sucursal_id, v_ticket_estado
+  FROM tickets WHERE id = p_ticket_id;
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'Ticket % no existe', p_ticket_id;
+  END IF;
+  IF v_ticket_estado NOT IN ('BORRADOR', 'ABIERTO') THEN
+    RAISE EXCEPTION 'Solo se pueden agregar items a tickets BORRADOR o ABIERTO (estado actual: %)', v_ticket_estado;
+  END IF;
+
+  IF p_client_id_local IS NOT NULL THEN
+    SELECT id INTO v_item_id
+    FROM ticket_items
+    WHERE tenant_id = v_tenant_id AND client_id_local = p_client_id_local;
+    IF FOUND THEN RETURN v_item_id; END IF;
+  END IF;
+
+  SELECT p.id, p.nombre, p.codigo_interno AS sku,
+         precio_producto_en_sucursal(p.id, v_sucursal_id) AS precio_mxn,
+         p.tasa_iva, p.iva_incluido_en_precio, p.clave_sat, p.unidad_sat,
+         p.modos_servicio_disponibles AS modos_servicio_aplicables,
+         p.es_combo,
+         c.nombre AS categoria_nombre,
+         ac.nombre AS area_cocina_nombre
+  INTO v_producto
+  FROM productos p
+  LEFT JOIN categorias c ON c.id = p.categoria_id
+  LEFT JOIN areas_cocina ac ON ac.id = p.area_cocina_id
+  WHERE p.id = p_producto_id
+    AND p.deleted_at IS NULL;
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'Producto % no existe o está eliminado', p_producto_id;
+  END IF;
+  -- 0111: un combo sin hijos sería un renglón que cobra y no cocina. Tiene su propia RPC.
+  IF v_producto.es_combo THEN
+    RAISE EXCEPTION 'El producto "%" es un combo: usa agregar_combo_a_ticket', v_producto.nombre;
+  END IF;
+
+  SELECT COALESCE(MAX(orden_visualizacion), 0) + 1
+  INTO v_next_orden
+  FROM ticket_items
+  WHERE ticket_id = p_ticket_id;
+
+  INSERT INTO ticket_items (
+    tenant_id, ticket_id, producto_id, cantidad, orden_visualizacion,
+    producto_nombre_snapshot, producto_sku_snapshot,
+    precio_unitario_snapshot, tasa_iva_snapshot, iva_incluido_en_precio_snapshot,
+    clave_sat_snapshot, unidad_sat_snapshot,
+    categoria_nombre_snapshot, modos_servicio_snapshot, area_cocina_nombre_snapshot,
+    nota_cocina, client_id_local, created_by
+  ) VALUES (
+    v_tenant_id, p_ticket_id, v_producto.id, p_cantidad, v_next_orden,
+    v_producto.nombre, v_producto.sku,
+    v_producto.precio_mxn, v_producto.tasa_iva, v_producto.iva_incluido_en_precio,
+    v_producto.clave_sat, v_producto.unidad_sat,
+    v_producto.categoria_nombre, v_producto.modos_servicio_aplicables, v_producto.area_cocina_nombre,
+    p_nota_cocina, p_client_id_local, auth.uid()
+  ) RETURNING id INTO v_item_id;
+
+  IF p_modificadores IS NOT NULL AND jsonb_array_length(p_modificadores) > 0 THEN
+    FOR v_modif IN SELECT * FROM jsonb_array_elements(p_modificadores)
+    LOOP
+      SELECT om.id, om.nombre, om.precio_extra_mxn AS precio_extra,
+             gm.id AS grupo_id, gm.nombre AS grupo_nombre, gm.naturaleza
+      INTO v_opcion
+      FROM opciones_modificador om
+      JOIN grupos_modificadores gm ON gm.id = om.grupo_id
+      WHERE om.id = (v_modif->>'opcion_modificador_id')::uuid
+        AND om.deleted_at IS NULL;
+      IF NOT FOUND THEN
+        RAISE EXCEPTION 'Opción de modificador % no existe', v_modif->>'opcion_modificador_id';
+      END IF;
+      INSERT INTO ticket_item_modificadores (
+        tenant_id, ticket_item_id, opcion_modificador_id, grupo_id,
+        grupo_nombre_snapshot, opcion_nombre_snapshot,
+        precio_extra_snapshot, naturaleza_snapshot,
+        cantidad, monto_total_mxn, created_by
+      ) VALUES (
+        v_tenant_id, v_item_id, v_opcion.id, v_opcion.grupo_id,
+        v_opcion.grupo_nombre, v_opcion.nombre,
+        v_opcion.precio_extra, v_opcion.naturaleza,
+        COALESCE((v_modif->>'cantidad')::integer, 1),
+        v_opcion.precio_extra * COALESCE((v_modif->>'cantidad')::integer, 1) * p_cantidad,
+        auth.uid()
+      );
+    END LOOP;
+  END IF;
+
+  RETURN v_item_id;
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION agregar_combo_a_ticket(
+  p_ticket_id         uuid,
+  p_combo_producto_id uuid,
+  p_cantidad          numeric(12,3) DEFAULT 1,
+  p_componentes       jsonb DEFAULT '[]'::jsonb,
+  p_modificadores     jsonb DEFAULT '[]'::jsonb,
+  p_nota_cocina       text DEFAULT NULL,
+  p_client_id_local   varchar DEFAULT NULL
+) RETURNS uuid
+LANGUAGE plpgsql
+SET search_path = public, extensions, pg_temp
+AS $$
+DECLARE
+  v_tenant_id   uuid;
+  v_sucursal_id uuid;
+  v_estado      ticket_estado_fiscal;
+  v_combo       record;
+  v_grupo       record;
+  v_prod        record;
+  v_opcion      record;
+  v_comp        jsonb;
+  v_n           numeric;
+  v_delta       numeric(12,2);
+  v_precio      numeric(12,2);
+  v_carta       numeric(12,2) := 0;
+  v_carta_hijo  numeric(12,2);
+  v_total_padre numeric(12,2);
+  v_acum        numeric(12,2) := 0;
+  v_asignado    numeric(12,2);
+  v_padre_id    uuid;
+  v_hijo_id     uuid;
+  v_i           integer := 0;
+  v_n_comp      integer;
+  v_next_orden  integer;
+  v_cat_nombre  text;
+  v_hijo_parent_id uuid;
+  v_hijo_combo_rol text;
+  v_motivo      text;
+BEGIN
+  SELECT tenant_id, sucursal_id, estado_fiscal INTO v_tenant_id, v_sucursal_id, v_estado FROM tickets WHERE id = p_ticket_id;
+  IF NOT FOUND THEN RAISE EXCEPTION 'Ticket % no existe', p_ticket_id; END IF;
+  IF v_estado NOT IN ('BORRADOR', 'ABIERTO') THEN
+    RAISE EXCEPTION 'Solo se pueden agregar combos a tickets BORRADOR o ABIERTO (estado actual: %)', v_estado;
+  END IF;
+  IF p_cantidad IS NULL OR p_cantidad <= 0 THEN RAISE EXCEPTION 'Cantidad inválida'; END IF;
+
+  IF p_client_id_local IS NOT NULL THEN
+    SELECT id INTO v_padre_id FROM ticket_items WHERE tenant_id = v_tenant_id AND client_id_local = p_client_id_local;
+    IF FOUND THEN RETURN v_padre_id; END IF;
+  END IF;
+
+  SELECT p.id, p.nombre, p.codigo_interno, p.tasa_iva, p.iva_incluido_en_precio,
+         p.clave_sat, p.unidad_sat, p.modos_servicio_disponibles,
+         precio_producto_en_sucursal(p.id, v_sucursal_id) AS precio_mxn,
+         c.nombre AS categoria_nombre
+    INTO v_combo
+    FROM productos p LEFT JOIN categorias c ON c.id = p.categoria_id
+   WHERE p.id = p_combo_producto_id AND p.tenant_id = v_tenant_id AND p.deleted_at IS NULL AND p.es_combo = true;
+  IF NOT FOUND THEN RAISE EXCEPTION 'El producto % no es un combo de este negocio', p_combo_producto_id; END IF;
+  -- 0151: pausado, apagado en esta sucursal o agotado en esta sucursal.
+  IF motivo_no_disponible_en_sucursal(v_combo.id, v_sucursal_id) IS NOT NULL THEN
+    RAISE EXCEPTION 'El combo "%" no está disponible', v_combo.nombre;
+  END IF;
+
+  v_precio := v_combo.precio_mxn;
+
+  -- 1) Cada slot activo cumple mínimo y máximo (contando cantidades)
+  FOR v_grupo IN
+    SELECT id, nombre, minimo_selecciones, maximo_selecciones FROM combo_grupos
+     WHERE combo_producto_id = v_combo.id AND activo = true AND deleted_at IS NULL
+  LOOP
+    SELECT COALESCE(SUM(COALESCE((c->>'cantidad')::numeric, 1)), 0) INTO v_n
+      FROM jsonb_array_elements(p_componentes) c WHERE (c->>'grupo_id')::uuid = v_grupo.id;
+    IF v_n < v_grupo.minimo_selecciones OR v_n > v_grupo.maximo_selecciones THEN
+      RAISE EXCEPTION 'El slot "%" requiere entre % y % selecciones (recibió %)',
+        v_grupo.nombre, v_grupo.minimo_selecciones, v_grupo.maximo_selecciones, v_n;
+    END IF;
+  END LOOP;
+
+  -- 2) Cada componente es opción válida de su slot; se acumula el precio (spec combos §4.3 y §4.5 paso 4)
+  FOR v_comp IN SELECT * FROM jsonb_array_elements(p_componentes) LOOP
+    SELECT g.id, g.nombre, g.modo_precio, g.categoria_id INTO v_grupo FROM combo_grupos g
+     WHERE g.id = (v_comp->>'grupo_id')::uuid AND g.combo_producto_id = v_combo.id
+       AND g.activo = true AND g.deleted_at IS NULL;
+    IF NOT FOUND THEN RAISE EXCEPTION 'El grupo % no pertenece al combo', v_comp->>'grupo_id'; END IF;
+
+    SELECT p.id, p.nombre, precio_producto_en_sucursal(p.id, v_sucursal_id) AS precio_mxn,
+           p.es_combo, p.categoria_id, p.visible_en_pos
+      INTO v_prod FROM productos p
+     WHERE p.id = (v_comp->>'producto_id')::uuid AND p.tenant_id = v_tenant_id AND p.deleted_at IS NULL;
+    IF NOT FOUND OR v_prod.es_combo THEN
+      RAISE EXCEPTION 'El producto % no es válido como componente', v_comp->>'producto_id';
+    END IF;
+    -- 0151: "está agotado o pausado" lo traduce la caja a PRODUCTO_AGOTADO y "no se vende en esta
+    -- sucursal" a PRODUCTO_NO_SE_VENDE (desktop/src/delivery-espejo.mjs). No cambiar las frases.
+    v_motivo := motivo_no_disponible_en_sucursal(v_prod.id, v_sucursal_id);
+    IF v_motivo = 'NO_SE_VENDE' THEN
+      RAISE EXCEPTION 'El producto "%" no se vende en esta sucursal', v_prod.nombre;
+    ELSIF v_motivo IS NOT NULL THEN
+      RAISE EXCEPTION 'El producto "%" está agotado o pausado', v_prod.nombre;
+    END IF;
+
+    SELECT o.precio_delta_mxn, o.activa INTO v_opcion FROM combo_opciones o
+     WHERE o.grupo_id = v_grupo.id AND o.producto_id = v_prod.id AND o.deleted_at IS NULL;
+    IF FOUND THEN
+      IF NOT v_opcion.activa THEN
+        RAISE EXCEPTION 'El producto "%" está excluido del slot "%"', v_prod.nombre, v_grupo.nombre;
+      END IF;
+      v_delta := v_opcion.precio_delta_mxn;
+    ELSIF v_grupo.categoria_id IS NOT NULL AND v_prod.categoria_id = v_grupo.categoria_id AND v_prod.visible_en_pos THEN
+      v_delta := 0;
+    ELSE
+      RAISE EXCEPTION 'El producto "%" no es opción del slot "%"', v_prod.nombre, v_grupo.nombre;
+    END IF;
+
+    v_n := COALESCE((v_comp->>'cantidad')::numeric, 1);
+    v_precio := v_precio + ((CASE WHEN v_grupo.modo_precio = 'SUMA_PRECIO_PRODUCTO' THEN v_prod.precio_mxn ELSE 0 END) + v_delta) * v_n;
+    v_carta  := v_carta + v_prod.precio_mxn * v_n * p_cantidad;
+  END LOOP;
+
+  v_total_padre := ROUND(v_precio * p_cantidad, 2);
+
+  -- 3) El padre: snapshot igual al de agregar_item_a_ticket, precio = el del combo, sin área
+  SELECT COALESCE(MAX(orden_visualizacion), 0) + 1 INTO v_next_orden FROM ticket_items WHERE ticket_id = p_ticket_id;
+  INSERT INTO ticket_items (
+    tenant_id, ticket_id, producto_id, cantidad, orden_visualizacion,
+    producto_nombre_snapshot, producto_sku_snapshot,
+    precio_unitario_snapshot, tasa_iva_snapshot, iva_incluido_en_precio_snapshot,
+    clave_sat_snapshot, unidad_sat_snapshot,
+    categoria_nombre_snapshot, modos_servicio_snapshot, area_cocina_nombre_snapshot,
+    nota_cocina, client_id_local, created_by, combo_rol
+  ) VALUES (
+    v_tenant_id, p_ticket_id, v_combo.id, p_cantidad, v_next_orden,
+    v_combo.nombre, v_combo.codigo_interno,
+    v_precio, v_combo.tasa_iva, v_combo.iva_incluido_en_precio,
+    v_combo.clave_sat, v_combo.unidad_sat,
+    v_combo.categoria_nombre, v_combo.modos_servicio_disponibles, NULL,
+    p_nota_cocina, p_client_id_local, auth.uid(), 'PADRE'
+  ) RETURNING id INTO v_padre_id;
+
+  -- Un modificador PAGADO en la línea del padre se cobraría sin aparecer en ningún reporte (las
+  -- tres vistas de ventas excluyen combo_rol = 'PADRE'). Ver la explicación completa en 0111 §2.3.
+  IF p_modificadores IS NOT NULL AND jsonb_array_length(p_modificadores) > 0 THEN
+    RAISE EXCEPTION 'Los modificadores en la línea del combo no se soportan todavía: se cobrarían sin llegar a los reportes de ventas. Ponlos en el componente que corresponda.';
+  END IF;
+
+  -- 4) Los hijos: por la RPC de siempre (snapshot + modificadores) y luego a precio 0 con prorrateo.
+  -- agregar_item_a_ticket guarda el precio de la sucursal, el mismo que sumó v_carta.
+  v_n_comp := jsonb_array_length(p_componentes);
+  FOR v_comp IN SELECT * FROM jsonb_array_elements(p_componentes) LOOP
+    v_i := v_i + 1;
+    v_n := COALESCE((v_comp->>'cantidad')::numeric, 1);
+    SELECT nombre INTO v_cat_nombre FROM combo_grupos WHERE id = (v_comp->>'grupo_id')::uuid;
+    v_hijo_id := agregar_item_a_ticket(
+      p_ticket_id, (v_comp->>'producto_id')::uuid, v_n * p_cantidad,
+      NULLIF(v_comp->>'nota_cocina', ''),
+      COALESCE(v_comp->'modificadores', '[]'::jsonb),
+      NULLIF(v_comp->>'client_id_local', ''));
+
+    SELECT precio_unitario_snapshot * cantidad, parent_item_id, combo_rol
+      INTO v_carta_hijo, v_hijo_parent_id, v_hijo_combo_rol
+      FROM ticket_items WHERE id = v_hijo_id;
+    -- 0111 hallazgos 1 y 7: una fila EXISTENTE (idempotencia por client_id_local) que ya es parte
+    -- de un combo —de otro o de este mismo— no se re-apadrina. Ver 0111 §2.3.
+    IF v_hijo_combo_rol IS NOT NULL OR v_hijo_parent_id IS NOT NULL THEN
+      RAISE EXCEPTION 'El componente ya pertenece a otro renglón del ticket (client_id_local reusado)';
+    END IF;
+    IF v_carta > 0 THEN
+      v_asignado := ROUND(v_total_padre * v_carta_hijo / v_carta, 2);
+    ELSE
+      v_asignado := ROUND(v_total_padre / v_n_comp, 2);
+    END IF;
+    IF v_i = v_n_comp THEN v_asignado := v_total_padre - v_acum; ELSE v_acum := v_acum + v_asignado; END IF;
+
+    UPDATE ticket_items
+       SET precio_unitario_original_snapshot = precio_unitario_snapshot,
+           precio_unitario_snapshot = 0,
+           parent_item_id = v_padre_id,
+           combo_rol = 'HIJO',
+           combo_grupo_nombre_snapshot = v_cat_nombre,
+           precio_asignado_mxn = v_asignado
+     WHERE id = v_hijo_id;
+  END LOOP;
+
+  RETURN v_padre_id;
+END;
+$$;
+COMMENT ON FUNCTION agregar_combo_a_ticket IS 'Inserta un combo: padre (cobra el precio calculado aquí, con los precios de la sucursal del ticket) + hijos a precio 0 con prorrateo informativo. Valida slots, pertenencia y disponibilidad en la sucursal. Idempotente por client_id_local. Rechaza p_modificadores en la línea del padre. ADR 0015, ADR 0027.';
