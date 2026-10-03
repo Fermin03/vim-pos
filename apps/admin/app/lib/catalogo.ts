@@ -215,6 +215,8 @@ export type Producto = {
   categoriaNombre: string;
   estado: EstadoProducto;
   agotado_manual: boolean;
+  /** «Agotado en todas» por inventario (derivada en la base, 0151). Solo para mostrar. */
+  agotado_automatico: boolean;
   visible_en_pos: boolean;
   marca_virtual_id: string | null;
   area_cocina_id: string | null;
@@ -231,7 +233,7 @@ export async function listarProductos(): Promise<Producto[]> {
   const { data, error } = await supabase
     .from("productos")
     .select(
-      "id, nombre, descripcion, codigo_interno, precio_base_mxn, categoria_id, estado, agotado_manual, visible_en_pos, marca_virtual_id, area_cocina_id, clave_sat, tasa_iva, iva_incluido_en_precio, es_combo, categoria:categorias(nombre)",
+      "id, nombre, descripcion, codigo_interno, precio_base_mxn, categoria_id, estado, agotado_manual, agotado_automatico, visible_en_pos, marca_virtual_id, area_cocina_id, clave_sat, tasa_iva, iva_incluido_en_precio, es_combo, categoria:categorias(nombre)",
     )
     .is("deleted_at", null)
     .order("orden_visualizacion", { ascending: true });
@@ -246,6 +248,7 @@ export async function listarProductos(): Promise<Producto[]> {
     categoriaNombre: f.categoria?.nombre ?? "—",
     estado: f.estado,
     agotado_manual: f.agotado_manual,
+    agotado_automatico: f.agotado_automatico,
     visible_en_pos: f.visible_en_pos,
     marca_virtual_id: f.marca_virtual_id ?? null,
     area_cocina_id: f.area_cocina_id ?? null,
@@ -260,7 +263,7 @@ export async function obtenerProducto(id: string): Promise<Producto | null> {
   const { data, error } = await supabase
     .from("productos")
     .select(
-      "id, nombre, descripcion, codigo_interno, precio_base_mxn, categoria_id, estado, agotado_manual, visible_en_pos, marca_virtual_id, area_cocina_id, clave_sat, tasa_iva, iva_incluido_en_precio, es_combo, categoria:categorias(nombre)",
+      "id, nombre, descripcion, codigo_interno, precio_base_mxn, categoria_id, estado, agotado_manual, agotado_automatico, visible_en_pos, marca_virtual_id, area_cocina_id, clave_sat, tasa_iva, iva_incluido_en_precio, es_combo, categoria:categorias(nombre)",
     )
     .eq("id", id)
     .is("deleted_at", null)
@@ -278,6 +281,7 @@ export async function obtenerProducto(id: string): Promise<Producto | null> {
     categoriaNombre: f.categoria?.nombre ?? "—",
     estado: f.estado,
     agotado_manual: f.agotado_manual,
+    agotado_automatico: f.agotado_automatico,
     visible_en_pos: f.visible_en_pos,
     marca_virtual_id: f.marca_virtual_id ?? null,
     area_cocina_id: f.area_cocina_id ?? null,
@@ -288,16 +292,17 @@ export async function obtenerProducto(id: string): Promise<Producto | null> {
   };
 }
 
-// Resuelve estado final + agotado_manual respetando el CHECK estado_consistente.
-function resolverEstado(input: ProductoInput): { estado: EstadoProducto; agotado_manual: boolean } {
-  if (input.agotado) return { estado: "AGOTADO", agotado_manual: true };
-  return { estado: input.estado, agotado_manual: false };
+// El agotado vive por sucursal (0151, ADR 0027): el producto solo guarda ACTIVO o PAUSADO, y sus
+// columnas agotado_* las deriva la base («agotado en todas»). `input.agotado` lo guarda el
+// formulario en la fila de cada sucursal (menu-sucursal.ts).
+function resolverEstado(input: ProductoInput): EstadoProducto {
+  return input.estado;
 }
 
-export async function crearProducto(input: ProductoInput): Promise<void> {
+export async function crearProducto(input: ProductoInput): Promise<string> {
   const datos = productoSchema.parse(input);
   const tid = await tenantId();
-  const { estado, agotado_manual } = resolverEstado(datos);
+  const estado = resolverEstado(datos);
   const { data: maxRow } = await supabase
     .from("productos")
     .select("orden_visualizacion")
@@ -306,29 +311,33 @@ export async function crearProducto(input: ProductoInput): Promise<void> {
     .limit(1)
     .maybeSingle();
   const orden = (maxRow?.orden_visualizacion ?? 0) + 1;
-  const { error } = await supabase.from("productos").insert({
-    tenant_id: tid,
-    nombre: datos.nombre,
-    categoria_id: datos.categoria_id,
-    precio_base_mxn: datos.precio_base_mxn,
-    descripcion: datos.descripcion || null,
-    codigo_interno: datos.codigo_interno || null,
-    estado,
-    agotado_manual,
-    visible_en_pos: datos.visible_en_pos,
-    marca_virtual_id: datos.marca_virtual_id || null,
-    area_cocina_id: datos.area_cocina_id || null,
-    clave_sat: datos.clave_sat || null,
-    tasa_iva: datos.tasa_iva,
-    iva_incluido_en_precio: datos.iva_incluido_en_precio,
-    orden_visualizacion: orden,
-  });
+  const { data: creado, error } = await supabase
+    .from("productos")
+    .insert({
+      tenant_id: tid,
+      nombre: datos.nombre,
+      categoria_id: datos.categoria_id,
+      precio_base_mxn: datos.precio_base_mxn,
+      descripcion: datos.descripcion || null,
+      codigo_interno: datos.codigo_interno || null,
+      estado,
+      visible_en_pos: datos.visible_en_pos,
+      marca_virtual_id: datos.marca_virtual_id || null,
+      area_cocina_id: datos.area_cocina_id || null,
+      clave_sat: datos.clave_sat || null,
+      tasa_iva: datos.tasa_iva,
+      iva_incluido_en_precio: datos.iva_incluido_en_precio,
+      orden_visualizacion: orden,
+    })
+    .select("id")
+    .single();
   if (error) throw new Error(error.message);
+  return String((creado as { id: string }).id);
 }
 
 export async function actualizarProducto(id: string, input: ProductoInput): Promise<void> {
   const datos = productoSchema.parse(input);
-  const { estado, agotado_manual } = resolverEstado(datos);
+  const estado = resolverEstado(datos);
   const { error } = await supabase
     .from("productos")
     .update({
@@ -338,7 +347,6 @@ export async function actualizarProducto(id: string, input: ProductoInput): Prom
       descripcion: datos.descripcion || null,
       codigo_interno: datos.codigo_interno || null,
       estado,
-      agotado_manual,
       visible_en_pos: datos.visible_en_pos,
       marca_virtual_id: datos.marca_virtual_id || null,
       area_cocina_id: datos.area_cocina_id || null,
