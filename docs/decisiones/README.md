@@ -31,6 +31,7 @@ Cada archivo dice **qué decía el plan, qué hacemos hoy y por qué**. Manda lo
 | [0025](0025-el-inventario-se-cierra-por-plan-sin-tocar-la-venta.md) | El inventario se cierra por plan sin tocar la venta, y en la caja manda la nube | 01/10/2026 |
 | [0026](0026-la-pantalla-del-cliente-se-enciende-sola.md) | La pantalla del cliente se enciende sola y la caja le publica la cuenta | 02/10/2026 |
 | [0027](0027-el-menu-se-ajusta-por-sucursal.md) | El menú se ajusta por sucursal: una fila guarda solo lo que cambia | 02/10/2026 |
+| [0028](0028-eliminar-a-un-empleado-libera-el-correo-y-conserva-el-historial.md) | Eliminar a un empleado libera su correo y conserva el historial: la cuenta se vacía, no se borra | 04/10/2026 |
 
 ## Pendientes de escribir
 
