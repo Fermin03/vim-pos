@@ -60,12 +60,13 @@ export async function listarUsuarios(): Promise<Usuario[]> {
 
   const { data: perfiles, error: e2 } = await supabase
     .from("usuarios_perfil")
-    .select("id, nombre, estado, fecha_ultimo_login_pin")
+    .select("id, nombre, estado, fecha_ultimo_login_pin, deleted_at")
     .in("id", ids);
   if (e2) throw new Error(e2.message);
 
-  type Perfil = { id: string; nombre: string; estado: EstadoUsuario; fecha_ultimo_login_pin: string | null };
-  const perfilPorId = new Map(((perfiles ?? []) as Perfil[]).map((p) => [p.id, p]));
+  type Perfil = { id: string; nombre: string; estado: EstadoUsuario; fecha_ultimo_login_pin: string | null; deleted_at: string | null };
+  // Los eliminados (0154) conservan su ficha para el historial, pero ya no son usuarios del negocio.
+  const perfilPorId = new Map(((perfiles ?? []) as Perfil[]).filter((p) => !p.deleted_at).map((p) => [p.id, p]));
 
   // Agrupamos por usuario, tomamos el rol más alto (jerarquía implícita por ROLES_LABEL_ORDER)
   const ROL_RANK: Record<string, number> = { DUENO: 5, ADMIN: 4, SUPERVISOR: 3, CAJERO: 2, PERSONAL: 1 };
@@ -108,7 +109,7 @@ export const resetPinSchema = z.object({
 export type ResetPinInput = z.infer<typeof resetPinSchema>;
 
 // ── Mutaciones (Edge Functions + client-side) ────────────────────────────────
-async function callEdge(endpoint: string, body: object): Promise<unknown> {
+async function callEdge(endpoint: string, body: object, conDetalle = false): Promise<unknown> {
   const { data: sess } = await supabase.auth.getSession();
   const token = sess.session?.access_token ?? ANON;
   const res = await fetch(`${URL}/functions/v1/${endpoint}`, {
@@ -121,7 +122,10 @@ async function callEdge(endpoint: string, body: object): Promise<unknown> {
     body: JSON.stringify(body),
   });
   const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error((data as { error?: string })?.error ?? `HTTP ${res.status}`);
+  if (!res.ok) {
+    const d = data as { error?: string; detalle?: string };
+    throw new Error((conDetalle && d.detalle) || d.error || `HTTP ${res.status}`);
+  }
   return data;
 }
 
@@ -145,6 +149,14 @@ export async function setActivo(usuario_id: string, activo: boolean): Promise<vo
     .update({ estado: activo ? "ACTIVO" : "DESACTIVADO" })
     .eq("id", usuario_id);
   if (e2) throw new Error(e2.message);
+}
+
+/**
+ * Elimina definitivamente a un empleado ya desactivado (0154): su correo queda libre y el
+ * historial del negocio conserva su nombre. No se puede deshacer.
+ */
+export async function eliminarEmpleado(usuario_id: string): Promise<void> {
+  await callEdge("eliminar-empleado", { usuario_id }, true);
 }
 
 /** Cambia el rol del usuario (UPDATE en usuarios_acceso). RLS por tenant del admin. */

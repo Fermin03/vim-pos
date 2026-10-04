@@ -9,6 +9,7 @@ import {
   ROL_LABEL,
   ROLES_ASIGNABLES,
   cambiarRol,
+  eliminarEmpleado,
   fechaCorta,
   listarUsuarios,
   setActivo,
@@ -38,6 +39,8 @@ export default function UsuariosPage() {
   const [reset, setReset] = useState<Usuario | null>(null);
   const [confirmar, setConfirmar] = useState<{ u: Usuario; activar: boolean } | null>(null);
   const [cambiarRolModal, setCambiarRolModal] = useState<Usuario | null>(null);
+  const [eliminar, setEliminar] = useState<Usuario | null>(null);
+  const [eliminando, setEliminando] = useState(false);
 
   async function recargar() {
     setError(null);
@@ -76,6 +79,19 @@ export default function UsuariosPage() {
     } catch (e) {
       setError(mensajeError(e, "No se pudo cambiar el estado"));
       setConfirmar(null);
+    }
+  }
+
+  async function aplicarEliminar(u: Usuario) {
+    setEliminando(true);
+    try {
+      await eliminarEmpleado(u.id);
+      await recargar();
+    } catch (e) {
+      setError(mensajeError(e, "No se pudo eliminar al usuario"));
+    } finally {
+      setEliminando(false);
+      setEliminar(null);
     }
   }
 
@@ -252,6 +268,17 @@ export default function UsuariosPage() {
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-4 w-4"><polyline points="20 6 9 17 4 12" /></svg>
                           )}
                         </button>
+                        {/* Solo sobre quien ya está desactivado: eliminar es el segundo paso de la baja. */}
+                        {!u.activo && u.rolCodigo !== "DUENO" && (
+                          <button
+                            type="button"
+                            title="Eliminar definitivamente"
+                            onClick={() => setEliminar(u)}
+                            className="flex h-10 w-10 items-center justify-center rounded border border-transparent lg:h-8 lg:w-8 text-ink-3 transition hover:border-line-strong hover:bg-surface hover:text-danger"
+                          >
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-4 w-4"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 12a1.5 1.5 0 0 0 1.5 1.5h7A1.5 1.5 0 0 0 17 19l1-12M9 7V4.5h6V7" /></svg>
+                          </button>
+                        )}
                       </span>
                     </td>
                   </tr>
@@ -313,6 +340,20 @@ export default function UsuariosPage() {
           ancho="sm"
           onConfirmar={() => aplicarActivar(confirmar.u, confirmar.activar)}
           onCerrar={() => setConfirmar(null)}
+        />
+      )}
+
+      {eliminar && (
+        <DialogoPeligro
+          titulo="¿Eliminar definitivamente a este usuario?"
+          contexto={eliminar.nombre}
+          consecuencia="Su correo queda libre para usarse en otra cuenta y se borran su PIN y sus datos de contacto. Los cortes y ventas que hizo se conservan con su nombre. No se puede deshacer."
+          boton="Eliminar"
+          ocupado={eliminando}
+          textoOcupado="Eliminando…"
+          ancho="sm"
+          onConfirmar={() => aplicarEliminar(eliminar)}
+          onCerrar={() => setEliminar(null)}
         />
       )}
 

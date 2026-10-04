@@ -11599,6 +11599,17 @@ export type Database = {
         Args: { p_tenant_id: string }
         Returns: Json
       }
+      eliminar_usuario: {
+        Args: {
+          p_actor: string
+          p_ip?: unknown
+          p_motivo?: string
+          p_origen: string
+          p_tenant_id: string
+          p_usuario_id: string
+        }
+        Returns: Json
+      }
       entregar_propina: {
         Args: { p_distribucion_id: string }
         Returns: undefined
@@ -12035,6 +12046,10 @@ export type Database = {
       usuario_actual_tiene_permiso: {
         Args: { p_permiso_codigo: string }
         Returns: boolean
+      }
+      usuario_por_correo: {
+        Args: { p_actor: string; p_email: string }
+        Returns: Json
       }
       usuario_tiene_permiso: {
         Args: { p_permiso_codigo: string; p_usuario_id: string }

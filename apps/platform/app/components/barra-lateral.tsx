@@ -13,6 +13,7 @@ const NAV: { href: string; label: string }[] = [
   { href: "/versiones", label: "Versiones" },
   { href: "/cfdi", label: "Facturación" },
   { href: "/datos-pago", label: "Pagos y soporte" },
+  { href: "/correos", label: "Liberar correo" },
   { href: "/errores", label: "Errores" },
   { href: "/bitacora", label: "Bitácora" },
   { href: "/operadores", label: "Operadores" },
