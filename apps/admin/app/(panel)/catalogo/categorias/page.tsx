@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Button, DialogoPeligro } from "@vim/ui/styles";
 import { PageHeader, PageBody } from "../../../components/page-header";
 import { CatalogoTabs } from "../../../components/catalogo-tabs";
+import { FranjaMenus, useMenuCatalogo } from "../../../components/selector-menu";
 import { ModalCategoria } from "../../../components/modal-categoria";
 import {
   reordenarCategorias,
@@ -30,6 +31,7 @@ function Dot({ cat }: { cat: Categoria }) {
 }
 
 export default function CategoriasPage() {
+  const menu = useMenuCatalogo();
   const [cats, setCats] = useState<Categoria[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [query, setQuery] = useState("");
@@ -113,6 +115,7 @@ export default function CategoriasPage() {
           </Button>
         }
       />
+      <FranjaMenus menu={menu} />
       <CatalogoTabs />
       <PageBody>
         {/* Toolbar */}

@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { Button, DialogoPeligro } from "@vim/ui/styles";
 import { PageHeader, PageBody } from "../../../components/page-header";
 import { CatalogoTabs } from "../../../components/catalogo-tabs";
+import { FranjaMenus, useMenuCatalogo } from "../../../components/selector-menu";
 import { AvisoCajasMenu } from "../../../components/aviso-cajas-menu";
 import { eliminarProducto, listarProductos, precioMxn, type Producto } from "../../../lib/catalogo";
 import type { Caja } from "../../../lib/configuracion";
@@ -44,6 +45,7 @@ const NOMBRE_FILTRO: Record<Filtro, string> = {
 };
 
 export default function ProductosPage() {
+  const menu = useMenuCatalogo();
   const router = useRouter();
   const [prods, setProds] = useState<Producto[] | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -223,6 +225,7 @@ export default function ProductosPage() {
           </div>
         }
       />
+      <FranjaMenus menu={menu} />
       <CatalogoTabs />
       <PageBody>
         <AvisoCajasMenu cajas={cajasViejas} />

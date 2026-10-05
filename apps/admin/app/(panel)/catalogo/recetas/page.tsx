@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { PageBody, PageHeader, TablaScroll } from "../../../components/page-header";
 import { CatalogoTabs } from "../../../components/catalogo-tabs";
+import { FranjaMenus, useMenuCatalogo } from "../../../components/selector-menu";
 import { listarRecetasResumen, margen, type RecetaResumen } from "../../../lib/recetas";
 import { mensajeError } from "../../../lib/errores";
 
@@ -31,6 +32,7 @@ export default function RecetasPage() {
 }
 
 function Recetas() {
+  const menu = useMenuCatalogo();
   const params = useSearchParams();
   const [filas, setFilas] = useState<RecetaResumen[] | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -55,6 +57,7 @@ function Recetas() {
         subtitulo="Qué insumos lleva cada producto y cuánto te cuesta. El margen se calcula contra el precio sin IVA."
         migas={[{ label: "Catálogo" }, { label: "Recetas" }]}
       />
+      <FranjaMenus menu={menu} nota={menu.esGeneral ? undefined : "Las recetas son las mismas en todos los menús."} />
       <CatalogoTabs />
       <PageBody>
         {error && <p role="alert" className="mb-3 text-sm font-medium text-danger">{error}</p>}
