@@ -93,11 +93,11 @@ select set_config('request.jwt.claims', json_build_object('sub', :'dueno', 'role
 -- 10) El dueño sí, salvo el agotado por inventario, y no borra.
 select lives_ok(
   format($$ update productos_sucursal set precio_mxn = 140, agotado_automatico = true where producto_id = %L and sucursal_id = %L $$, :'clas', :'norte'),
-  'el dueño cambia el precio de Norte desde el panel');
+  'el dueño escribe la fila de Norte desde el panel');
 select is((select agotado_automatico from productos_sucursal where producto_id = :'clas' and sucursal_id = :'norte'), false,
   'pero el agotado por inventario no se escribe a mano');
-select is((select precio_mxn from productos_sucursal where producto_id = :'clas' and sucursal_id = :'norte'), 140.00::numeric,
-  'y el precio sí quedó');
+select is((select precio_mxn from productos_sucursal where producto_id = :'clas' and sucursal_id = :'norte'), 135.00::numeric,
+  'por REST el precio lo decide el menú (0155)');
 select throws_ok(
   format($$ delete from productos_sucursal where producto_id = %L and sucursal_id = %L $$, :'clas', :'norte'),
   '42501', null, 'las filas no se borran: el pull de la caja no trae bajas');
