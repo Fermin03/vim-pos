@@ -3,6 +3,7 @@ import { z } from "zod";
 import { supabase, leerSesion } from "./supabase";
 import type { EstadoProducto } from "./catalogo";
 import { estadoGeneral } from "./menu-sucursal";
+import type { FilaDeMenu } from "./menus";
 
 // Lo que lee el dueño; los valores (DELTA…) son los de la base. Antes decía "Solo el delta de
 // la opción": "delta" es jerga de quien lo programó.
@@ -90,8 +91,12 @@ export async function activarComboUpsell(activo: boolean): Promise<void> {
  * nada. Nacer pausado cierra esa ventana y además es mejor experiencia por sí solo.
  *
  * El dueño lo publica desde la ficha del combo (`ProductoForm`) cuando ya tiene sus slots.
+ *
+ * `enMenuGeneral: false` = el combo se está creando dentro de un menú propio (ADR 0029): nace
+ * apagado en el General y en todos los menús, y quien llama enciende su fila en el menú elegido
+ * (`guardarFilaDeMenu`), igual que el formulario de producto.
  */
-export async function crearCombo(input: ComboInput): Promise<string> {
+export async function crearCombo(input: ComboInput, opciones: { enMenuGeneral?: boolean } = {}): Promise<string> {
   const d = comboSchema.parse(input);
   const tid = await tenantId();
   const { data: maxRow } = await supabase.from("productos").select("orden_visualizacion").is("deleted_at", null).order("orden_visualizacion", { ascending: false }).limit(1).maybeSingle();
@@ -99,6 +104,7 @@ export async function crearCombo(input: ComboInput): Promise<string> {
     tenant_id: tid, es_combo: true, nombre: d.nombre, categoria_id: d.categoria_id, precio_base_mxn: d.precio_base_mxn,
     descripcion: d.descripcion || null, clave_sat: d.clave_sat || null, tasa_iva: d.tasa_iva, iva_incluido_en_precio: d.iva_incluido_en_precio,
     estado: "PAUSADO", orden_visualizacion: (maxRow?.orden_visualizacion ?? 0) + 1,
+    ...(opciones.enMenuGeneral === false ? { en_menu_general: false } : {}),
   }).select("id").single();
   if (error) throw new Error(error.message);
   return (data as { id: string }).id;
@@ -242,6 +248,22 @@ export function vistaPrevia(base: number, slots: SlotConOpciones[]): { principal
     principales: primero.opciones.map((o) => ({ nombre: o.nombre, precio: precioCombo(base, slots, { ...defaults, [primero.id]: o.producto_id }) })),
     deltas: resto.flatMap((s) => s.opciones.filter((o) => o.delta !== 0).map((o) => ({ slot: s.nombre, nombre: o.nombre, delta: o.delta }))),
   };
+}
+
+/**
+ * Los mismos pasos, vistos desde un menú PROPIO (ADR 0029): cada opción vale lo que dice ese menú
+ * —la venta cobra el precio de la sucursal también a los componentes— y la que ese menú no vende
+ * (apagada, o sin fila) no se ofrece. El «cuesta de más» (delta) es del combo y no cambia por menú.
+ * En el General no se llama: `slotsConOpciones` ya trae los precios base.
+ */
+export function slotsEnMenu(slots: SlotConOpciones[], filas: Map<string, FilaDeMenu>): SlotConOpciones[] {
+  return slots.map((s) => ({
+    ...s,
+    opciones: s.opciones.flatMap((o) => {
+      const f = filas.get(o.producto_id);
+      return f && f.disponible ? [{ ...o, precio: f.precio_mxn }] : [];
+    }),
+  }));
 }
 
 /**

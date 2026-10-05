@@ -7,6 +7,8 @@ import { listarCategoriasOpciones, type CategoriaOpcion } from "../lib/catalogo"
 import { limpiarPrecio } from "../lib/numeros";
 import { AYUDA_IVA, OPCIONES_IVA } from "./producto-form";
 import { mensajeError } from "../lib/errores";
+import { guardarFilaDeMenu, hrefConMenu } from "../lib/menus";
+import { useMenuCatalogo } from "./selector-menu";
 
 // Mismas clases que producto-form.tsx: misma app, mismo look.
 const input =
@@ -30,6 +32,14 @@ export function ComboForm() {
   const [ivaIncluido, setIvaIncluido] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [guardando, setGuardando] = useState(false);
+  // Menú del catálogo (ADR 0029): dentro de un menú propio el combo se crea SOLO en ese menú, igual
+  // que un producto (nace apagado en todos y se enciende su fila aquí).
+  const menuCat = useMenuCatalogo();
+  const enMenu = menuCat.visible && menuCat.listo;
+  const enPropio = enMenu && !menuCat.esGeneral;
+  // Id del combo ya creado: si luego falla encenderlo en el menú, el siguiente intento no lo duplica.
+  const [idCreado, setIdCreado] = useState<string | null>(null);
+  const sinMenus = !menuCat.listo || !!menuCat.error;
 
   useEffect(() => {
     listarCategoriasOpciones()
@@ -38,6 +48,7 @@ export function ComboForm() {
   }, []);
 
   async function guardar() {
+    if (sinMenus) return;
     setError(null);
     const parsed = comboSchema.safeParse({
       nombre,
@@ -54,9 +65,19 @@ export function ComboForm() {
     }
     setGuardando(true);
     try {
-      const id = await crearCombo(parsed.data);
+      const id = idCreado ?? (await crearCombo(parsed.data, enPropio ? { enMenuGeneral: false } : {}));
+      setIdCreado(id);
+      if (enPropio) {
+        try {
+          await guardarFilaDeMenu(menuCat.id, id, { disponible: true, precio_mxn: parsed.data.precio_base_mxn });
+        } catch {
+          setError(`El combo se creó, pero no se pudo encender en ${menuCat.nombre}. Vuelve a intentar.`);
+          setGuardando(false);
+          return;
+        }
+      }
       // Después de crear, a agregarle pasos: sin ellos la caja no puede venderlo.
-      router.replace(`/catalogo/combos/${id}`);
+      router.replace(hrefConMenu(`/catalogo/combos/${id}`, enMenu ? menuCat.id : null));
     } catch (e) {
       setError(mensajeError(e, "No se pudo guardar"));
       setGuardando(false);
@@ -96,9 +117,12 @@ export function ComboForm() {
             </select>
           </div>
           <div>
-            <label className={label} htmlFor="precio">
-              Precio base (MXN)
-            </label>
+            <div className="flex items-baseline justify-between gap-2">
+              <label className={label} htmlFor="precio">
+                Precio base (MXN)
+              </label>
+              {enMenu && <span className="mb-1.5 truncate text-13 text-ink-2">en {menuCat.nombre}</span>}
+            </div>
             <input
               id="precio"
               className={input}
@@ -182,7 +206,18 @@ export function ComboForm() {
             agregas sus pasos (qué hamburguesa, qué acompañamiento, qué bebida) y ahí mismo lo
             publicas eligiendo <b className="text-ink">Se vende</b>.
           </p>
+          {enPropio && (
+            <p className="mt-2 text-13 text-ink-2">
+              <b className="font-semibold text-ink">Solo se venderá en {menuCat.nombre}.</b> En los demás menús queda apagado.
+            </p>
+          )}
         </div>
+
+        {menuCat.error && (
+          <p className="text-sm font-medium text-danger" role="alert">
+            {menuCat.error}
+          </p>
+        )}
 
         {error && (
           <p className="text-sm font-medium text-danger" role="alert">
@@ -191,10 +226,10 @@ export function ComboForm() {
         )}
 
         <div className="flex items-center justify-end gap-2 border-t border-line pt-5">
-          <Button variant="ghost" onClick={() => router.push("/catalogo/combos")} disabled={guardando}>
+          <Button variant="ghost" onClick={() => router.push(hrefConMenu("/catalogo/combos", enMenu ? menuCat.id : null))} disabled={guardando}>
             Cancelar
           </Button>
-          <Button onClick={guardar} disabled={guardando}>
+          <Button onClick={guardar} disabled={guardando || sinMenus}>
             {guardando ? "Guardando…" : "Crear combo"}
           </Button>
         </div>
