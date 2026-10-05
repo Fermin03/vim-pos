@@ -3,7 +3,7 @@
 -- (lo que lee la caja). Las RPCs crear/actualizar/eliminar se prueban al final (tarea 2).
 -- ============================================================================
 begin;
-select plan(37);
+select plan(41);
 
 \set t         '99999999-0000-0000-0000-0000000000aa'
 \set centro    '99999999-0000-0000-0000-0000000000bb'
@@ -15,6 +15,7 @@ select plan(37);
 \set menu      '37373737-0000-0000-0000-0000000000a1'
 \set otro      '37373737-0000-0000-0000-0000000000aa'
 \set menu_otro '37373737-0000-0000-0000-0000000000a9'
+\set suc_otro  '37373737-0000-0000-0000-0000000000b9'
 
 -- SETUP (superusuario, sin request.path: las guardias no actúan)
 insert into tenant_limites (tenant_id, max_sucursales) values (:'t', 5)
@@ -22,6 +23,7 @@ insert into tenant_limites (tenant_id, max_sucursales) values (:'t', 5)
 insert into sucursales (id, tenant_id, codigo, nombre) values (:'norte', :'t', 'KN', 'León Norte');
 insert into tenants (id, codigo, nombre_comercial, estado, vertical_principal)
   values (:'otro', 'tenant-0037', 'Otro negocio', 'INTERNO', 'QUICK_SERVICE');
+insert into sucursales (id, tenant_id, codigo, nombre) values (:'suc_otro', :'otro', 'KO', 'Sucursal ajena');
 insert into menus (id, tenant_id, nombre) values (:'menu', :'t', 'Menú Norte'), (:'menu_otro', :'otro', 'Ajeno');
 insert into menu_productos (menu_id, producto_id, tenant_id, disponible, precio_mxn) values
   (:'menu', :'clas', :'t', true, 135), (:'menu', :'papas', :'t', false, 55);
@@ -101,6 +103,9 @@ select set_config('request.path', '/rpc/crear_menu', true);
 select lives_ok(
   format($$ select crear_menu('Menú del dueño', array[%L]::uuid[]) $$, :'norte'),
   'el dueño crea un menú por RPC');
+select throws_ok(
+  format($$ select crear_menu('Con sucursal ajena', array[%L]::uuid[]) $$, :'suc_otro'),
+  '22023', null, 'el dueño no asigna una sucursal de otro negocio');
 select is((select count(*)::int from menus where tenant_id = :'otro'), 0, 'no ve los menús de otro negocio');
 select throws_ok(
   format($$ select actualizar_menu(%L, 'Robado', array[]::uuid[]) $$, :'menu_otro'),
@@ -114,6 +119,14 @@ select set_config('request.path', '/rpc/crear_menu', true);
 select throws_ok(
   format($$ select crear_menu('De la cajera', array[%L]::uuid[]) $$, :'centro'),
   '42501', null, 'una cajera no crea menús');
+select set_config('request.path', '/rpc/actualizar_menu', true);
+select throws_ok(
+  format($$ select actualizar_menu(%L, 'De la cajera', array[]::uuid[]) $$, :'menu'),
+  '42501', null, 'una cajera no edita menús');
+select set_config('request.path', '/rpc/eliminar_menu', true);
+select throws_ok(
+  format($$ select eliminar_menu(%L) $$, :'menu'),
+  '42501', null, 'una cajera no elimina menús');
 
 -- 12) Las filas de un menú por REST: la cajera no las toca.
 select set_config('request.path', '/menu_productos', true);
@@ -175,11 +188,14 @@ select is((select disponible from productos_sucursal where producto_id = :'papas
 select is((select precio_mxn from productos_sucursal where producto_id = :'papas' and sucursal_id = :'centro'), null::numeric,
   'fila nueva en una sucursal del General: el precio queda nulo (se cobra el base)');
 
--- 16) Un update normal de la sucursal (sin tocar menu_id) no se bloquea.
+-- 16) Un update por REST que lleva menu_id SIN cambio (como lo manda el panel al guardar la sucursal)
+-- no se bloquea y sí guarda el resto de los campos.
 select set_config('request.path', '/sucursales', true);
 select lives_ok(
-  format($$ update sucursales set nombre = nombre where id = %L $$, :'norte'),
-  'actualizar una sucursal sin tocar su menú sigue funcionando por REST');
+  format($$ update sucursales set nombre = 'León Norte (editada)', menu_id = menu_id where id = %L $$, :'norte'),
+  'actualizar una sucursal mandando su menu_id sin cambio sigue funcionando por REST');
+select is((select nombre from sucursales where id = :'norte'), 'León Norte (editada)',
+  'y el cambio de nombre sí se guardó');
 
 reset role;
 select * from finish();

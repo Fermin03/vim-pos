@@ -381,6 +381,9 @@ BEGIN
   IF v_nombre = '' THEN
     RAISE EXCEPTION 'Ponle nombre al menú.' USING ERRCODE = '22023';
   END IF;
+  IF char_length(v_nombre) > 80 THEN
+    RAISE EXCEPTION 'El nombre del menú no puede pasar de 80 letras.' USING ERRCODE = '22023';
+  END IF;
   IF coalesce(cardinality(p_sucursales), 0) = 0 THEN
     RAISE EXCEPTION 'Elige al menos una sucursal para el menú.' USING ERRCODE = '22023';
   END IF;
@@ -417,6 +420,9 @@ BEGIN
   END IF;
   IF v_nombre = '' THEN
     RAISE EXCEPTION 'Ponle nombre al menú.' USING ERRCODE = '22023';
+  END IF;
+  IF char_length(v_nombre) > 80 THEN
+    RAISE EXCEPTION 'El nombre del menú no puede pasar de 80 letras.' USING ERRCODE = '22023';
   END IF;
   PERFORM _menu_validar_sucursales(v_tenant, v_sucursales);
 
