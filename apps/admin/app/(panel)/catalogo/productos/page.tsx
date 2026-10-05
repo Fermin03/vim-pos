@@ -10,25 +10,19 @@ import { eliminarProducto, listarProductos, precioMxn, type Producto } from "../
 import type { Caja } from "../../../lib/configuracion";
 import { mensajeError } from "../../../lib/errores";
 import { limpiarPrecio } from "../../../lib/numeros";
+import { cajasQueNoRespetanMenu, estadoGeneral, precioValido, type EstadoEnSucursal } from "../../../lib/menu-sucursal";
 import {
-  cajasQueNoRespetanMenu,
-  esPorDefecto,
-  estadoEnSucursal,
-  estadoGeneral,
-  filaPorDefecto,
-  guardarMenuSucursal,
-  leerMenuDeSucursal,
-  listarSucursalesMenu,
-  precioValido,
-  type EdicionMenuSucursal,
-  type EstadoEnSucursal,
-  type FilaMenuSucursal,
-  type SucursalMenu,
-} from "../../../lib/menu-sucursal";
+  MENU_GENERAL,
+  estadoEnMenu,
+  filasDelGeneral,
+  guardarFilaDeMenu,
+  leerFilasDeMenu,
+  type FilaDeMenu,
+  type MenuId,
+} from "../../../lib/menus";
 
 type Filtro = "all" | EstadoEnSucursal;
-const TODAS = "todas";
-const SIN_FILAS: Map<string, FilaMenuSucursal> = new Map();
+const SIN_FILAS: Map<string, FilaDeMenu> = new Map();
 
 const BADGE: Record<EstadoEnSucursal, { txt: string; cls: string; dot: string }> = {
   ACTIVO: { txt: "Activo", cls: "bg-success-soft text-success", dot: "bg-success" },
@@ -53,26 +47,24 @@ export default function ProductosPage() {
   const [filtro, setFiltro] = useState<Filtro>("all");
   const [borrar, setBorrar] = useState<Producto | null>(null);
   const [borrando, setBorrando] = useState(false);
-  // Menú por sucursal (ADR 0027): con dos o más sucursales se elige una y se ajusta en línea.
-  const [sucursales, setSucursales] = useState<SucursalMenu[]>([]);
-  const [sucSel, setSucSel] = useState<string>(TODAS);
-  const [filas, setFilas] = useState<Map<string, FilaMenuSucursal>>(new Map());
-  // A qué sucursal pertenecen `filas`: mientras no coincida con la elegida, el menú no se muestra ni se edita.
-  const [filasDe, setFilasDe] = useState<string | null>(null);
+  // Menús del catálogo (ADR 0029): con dos o más sucursales o algún menú propio se elige un menú y se ajusta en línea.
+  const [filas, setFilas] = useState<Map<string, FilaDeMenu>>(new Map());
+  // A qué menú pertenecen `filas`: mientras no coincida con el elegido, el menú no se muestra ni se edita.
+  const [filasDe, setFilasDe] = useState<MenuId | null>(null);
   // Renglones con una escritura en cola o en curso (un id por escritura).
   const [guardando, setGuardando] = useState<string[]>([]);
   // Se incrementa cuando un guardado falla: obliga a remontar los campos con lo que sí quedó guardado.
   const [recarga, setRecarga] = useState(0);
   const [cajasViejas, setCajasViejas] = useState<Caja[]>([]);
-  const porSucursal = sucSel !== TODAS;
+  // Sin menús que elegir (una sola sucursal y ninguno propio) la tabla es la de siempre.
+  const modoMenu = menu.visible && menu.listo;
   // Las escrituras salen de estos refs, no del cierre del render: cada una ve lo último guardado.
-  const sucRef = useRef(sucSel);
-  sucRef.current = sucSel;
-  const filasRef = useRef<{ de: string | null; filas: Map<string, FilaMenuSucursal> }>({ de: null, filas: new Map() });
+  const menuRef = useRef<MenuId>(menu.id);
+  menuRef.current = menu.id;
+  const filasRef = useRef<{ de: MenuId | null; filas: Map<string, FilaDeMenu> }>({ de: null, filas: new Map() });
   const colaRef = useRef<Promise<void>>(Promise.resolve());
-  const cargandoFilas = porSucursal && filasDe !== sucSel;
-  const filasVista = filasDe === sucSel ? filas : SIN_FILAS;
-  const nombreSuc = sucursales.find((s) => s.id === sucSel)?.nombre ?? "";
+  const cargandoFilas = modoMenu && filasDe !== menu.id;
+  const filasVista = filasDe === menu.id ? filas : SIN_FILAS;
 
   async function recargar() {
     setError(null);
@@ -84,82 +76,98 @@ export default function ProductosPage() {
   }
   useEffect(() => {
     recargar();
-    listarSucursalesMenu().then(setSucursales).catch(() => setSucursales([]));
     cajasQueNoRespetanMenu().then(setCajasViejas).catch(() => setCajasViejas([]));
   }, []);
 
-  function aplicarFilas(suc: string, fs: FilaMenuSucursal[]) {
-    const mapa = new Map(fs.map((f) => [f.producto_id, f]));
-    filasRef.current = { de: suc, filas: mapa };
+  function aplicarFilas(de: MenuId, mapa: Map<string, FilaDeMenu>) {
+    filasRef.current = { de, filas: mapa };
     setFilas(mapa);
-    setFilasDe(suc);
+    setFilasDe(de);
   }
 
   useEffect(() => {
-    // Al cambiar de sucursal se olvida el menú de la anterior antes de leer el nuevo.
+    // Al cambiar de menú se olvida el anterior antes de leer el nuevo.
     filasRef.current = { de: null, filas: new Map() };
     setFilas(new Map());
     setFilasDe(null);
-    if (sucSel === TODAS) return;
+    if (!modoMenu || prods === null) return;
+    if (menu.esGeneral) {
+      aplicarFilas(MENU_GENERAL, filasDelGeneral(prods));
+      return;
+    }
     let vivo = true;
-    leerMenuDeSucursal(sucSel)
+    const id = menu.id;
+    leerFilasDeMenu(id)
       .then((fs) => {
-        if (vivo) aplicarFilas(sucSel, fs);
+        if (vivo) aplicarFilas(id, fs);
       })
       .catch((e) => {
-        if (vivo) setError(mensajeError(e, "No se pudo leer el menú de la sucursal"));
+        if (vivo) setError(mensajeError(e, "No se pudo leer el menú"));
       });
     return () => {
       vivo = false;
     };
-  }, [sucSel]);
+  }, [menu.id, menu.esGeneral, modoMenu, prods]);
+
+  // Un filtro de un menú (p. ej. «No se venden aquí») no tiene sentido en otro.
+  useEffect(() => {
+    setFiltro("all");
+  }, [menu.id, modoMenu]);
+
+  function estadoDe(p: Producto, fila: FilaDeMenu | undefined): EstadoEnSucursal {
+    return modoMenu ? estadoEnMenu(p.estado, fila?.disponible ?? true) : estadoGeneral(p);
+  }
 
   const visibles = useMemo(() => {
     return (prods ?? []).filter((p) => {
-      const estado = porSucursal ? estadoEnSucursal(p.estado, filasVista.get(p.id)) : estadoGeneral(p);
+      const estado = estadoDe(p, filasVista.get(p.id));
       if (filtro !== "all" && estado !== filtro) return false;
       if (query && !p.nombre.toLowerCase().includes(query.toLowerCase())) return false;
       return true;
     });
-  }, [prods, filtro, query, porSucursal, filasVista]);
+  }, [prods, filtro, query, modoMenu, filasVista]);
 
   /**
    * Una escritura a la vez y ninguna se pierde: cada una se encadena a la anterior. Al empezar, la
    * edición se arma con lo último leído (no con el render que la disparó), y al terminar se vuelve a
    * leer: lo que se ve es lo guardado. Solo el renglón en cola se atenúa; el resto de la tabla sigue libre.
    */
-  function guardarFila(p: Producto, cambio: Partial<Pick<EdicionMenuSucursal, "disponible" | "precio_mxn">>) {
-    const suc = sucSel;
-    if (suc === TODAS || filasRef.current.de !== suc) return;
+  function guardarFila(p: Producto, cambio: Partial<FilaDeMenu>) {
+    const m = menu.id;
+    if (!modoMenu || filasRef.current.de !== m) return;
     setGuardando((g) => [...g, p.id]);
     colaRef.current = colaRef.current.then(async () => {
       try {
-        // Si mientras esperaba en la cola se cambió de sucursal, esta escritura ya no aplica.
-        if (sucRef.current !== suc || filasRef.current.de !== suc) return;
-        const existente = filasRef.current.filas.get(p.id);
-        const actual = existente ?? filaPorDefecto(p.id, suc);
-        const edicion: EdicionMenuSucursal = {
-          producto_id: p.id,
-          sucursal_id: suc,
-          disponible: actual.disponible,
-          precio_mxn: actual.precio_mxn,
-          agotado_manual: actual.agotado_manual,
-          ...cambio,
-        };
-        if (!existente && esPorDefecto(edicion)) return;
+        // Si mientras esperaba en la cola se cambió de menú, esta escritura ya no aplica.
+        if (menuRef.current !== m || filasRef.current.de !== m) return;
         setError(null);
+        // Lo que se ve debe ser lo guardado: en el General se releen los productos, en un menú propio sus filas.
+        const releer = async () => {
+          if (m === MENU_GENERAL) {
+            const nuevos = await listarProductos();
+            if (menuRef.current === m) {
+              // Los renglones conservan su lugar: con el mismo orden_visualizacion la base puede devolverlos en otro orden.
+              setProds((previos) => {
+                if (!previos) return nuevos;
+                const lugar = new Map(previos.map((x, i) => [x.id, i]));
+                return [...nuevos].sort((a, b) => (lugar.get(a.id) ?? 1e9) - (lugar.get(b.id) ?? 1e9));
+              });
+              aplicarFilas(m, filasDelGeneral(nuevos));
+            }
+          } else {
+            const fs = await leerFilasDeMenu(m);
+            if (menuRef.current === m) aplicarFilas(m, fs);
+          }
+        };
         try {
-          await guardarMenuSucursal([edicion]);
+          await guardarFilaDeMenu(m, p.id, cambio);
         } catch (e) {
-          if (sucRef.current === suc) {
-            setError(mensajeError(e, "No se pudo guardar el menú de la sucursal"));
-            // Lo que se ve debe ser lo guardado: se relee y los campos se remontan con ese valor.
+          if (menuRef.current === m) {
+            setError(mensajeError(e, "No se pudo guardar el menú"));
+            // Los campos se remontan con lo que sí quedó guardado.
             try {
-              const fs = await leerMenuDeSucursal(suc);
-              if (sucRef.current === suc) {
-                aplicarFilas(suc, fs);
-                setRecarga((n) => n + 1);
-              }
+              await releer();
+              if (menuRef.current === m) setRecarga((n) => n + 1);
             } catch {
               /* el error de guardado ya está a la vista */
             }
@@ -167,11 +175,10 @@ export default function ProductosPage() {
           return;
         }
         try {
-          const fs = await leerMenuDeSucursal(suc);
-          if (sucRef.current === suc) aplicarFilas(suc, fs);
+          await releer();
           setCajasViejas(await cajasQueNoRespetanMenu());
         } catch (e) {
-          if (sucRef.current === suc) setError(mensajeError(e, "Se guardó, pero no se pudo releer el menú de la sucursal"));
+          if (menuRef.current === m) setError(mensajeError(e, "Se guardó, pero no se pudo releer el menú"));
         }
       } finally {
         setGuardando((g) => {
@@ -197,7 +204,7 @@ export default function ProductosPage() {
   }
 
   const sinNada = prods !== null && prods.length === 0;
-  const filtros: Filtro[] = porSucursal ? ["all", "ACTIVO", "PAUSADO", "AGOTADO", "NO_SE_VENDE"] : ["all", "ACTIVO", "PAUSADO", "AGOTADO"];
+  const filtros: Filtro[] = modoMenu ? ["all", "ACTIVO", "PAUSADO", "NO_SE_VENDE"] : ["all", "ACTIVO", "PAUSADO", "AGOTADO"];
   const th = "border-b border-line bg-sel px-4 py-[13px] text-12 font-bold uppercase tracking-wide text-ink-3";
 
   return (
@@ -205,8 +212,8 @@ export default function ProductosPage() {
       <PageHeader
         titulo="Productos"
         subtitulo={
-          sucursales.length >= 2
-            ? "El menú de tu negocio. Elige una sucursal para ver y ajustar lo que vende y a qué precio."
+          modoMenu
+            ? "El menú de tu negocio. Elige un menú para ver y ajustar lo que vende y a qué precio."
             : "El menú completo de tu negocio. Aquí sí se muestran los precios."
         }
         migas={[{ label: "Catálogo" }, { label: "Productos" }]}
@@ -231,24 +238,6 @@ export default function ProductosPage() {
         <AvisoCajasMenu cajas={cajasViejas} />
 
         <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center">
-          {sucursales.length >= 2 && (
-            <select
-              aria-label="Sucursal"
-              value={sucSel}
-              onChange={(e) => {
-                setSucSel(e.target.value);
-                setFiltro("all");
-              }}
-              className="h-10 rounded border border-line-strong px-3 text-sm outline-none focus:border-ink"
-            >
-              <option value={TODAS}>Todas las sucursales</option>
-              {sucursales.map((s) => (
-                <option key={s.id} value={s.id}>
-                  {s.nombre}
-                </option>
-              ))}
-            </select>
-          )}
           <div className="relative w-full flex-1 sm:max-w-[340px]">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="pointer-events-none absolute left-[13px] top-1/2 h-[17px] w-[17px] -translate-y-1/2 text-ink-3">
               <circle cx="11" cy="11" r="7" />
@@ -279,9 +268,9 @@ export default function ProductosPage() {
           </div>
         </div>
 
-        {porSucursal && (
+        {modoMenu && (
           <p className="mb-3 text-13 text-ink-2">
-            Precio vacío = el general. Los cambios llegan a las cajas de {nombreSuc} en uno o dos minutos.
+            Estás viendo {menu.nombre}. Los cambios llegan a sus cajas en uno o dos minutos.
           </p>
         )}
 
@@ -300,8 +289,8 @@ export default function ProductosPage() {
                 <tr>
                   <th className={`${th} text-left`}>Producto</th>
                   <th className={`${th} w-[180px] text-left`}>Categoría</th>
-                  {porSucursal && <th className={`${th} w-[110px] text-left`}>Se vende aquí</th>}
-                  <th className={`${th} ${porSucursal ? "w-[150px]" : "w-[120px]"} text-right`}>{porSucursal ? "Precio aquí" : "Precio"}</th>
+                  {modoMenu && <th className={`${th} w-[110px] text-left`}>{menu.esGeneral ? "Se vende" : "En este menú"}</th>}
+                  <th className={`${th} ${modoMenu ? "w-[150px]" : "w-[120px]"} text-right`}>Precio</th>
                   <th className={`${th} w-[150px] text-left`}>Estado</th>
                   <th className={`${th} w-[104px]`}></th>
                 </tr>
@@ -309,7 +298,7 @@ export default function ProductosPage() {
               <tbody>
                 {visibles.map((p) => {
                   const fila = filasVista.get(p.id);
-                  const b = BADGE[porSucursal ? estadoEnSucursal(p.estado, fila) : estadoGeneral(p)];
+                  const b = BADGE[estadoDe(p, fila)];
                   // Un combo se edita en su propia pantalla (slots, vista previa de precio):
                   // no tiene receta ni estación, así que el editor de producto no le sirve.
                   const editarHref = p.es_combo ? `/catalogo/combos/${p.id}` : `/catalogo/productos/${p.id}`;
@@ -329,28 +318,27 @@ export default function ProductosPage() {
                         {p.codigo_interno && <div className="mt-px text-13 text-ink-3">{p.codigo_interno}</div>}
                       </td>
                       <td className="px-4 py-3.5 text-14 text-ink-2">{p.categoriaNombre}</td>
-                      {porSucursal && (
+                      {modoMenu && (
                         <td className="px-4 py-3.5" onClick={(e) => e.stopPropagation()}>
                           <input
                             type="checkbox"
                             className="h-5 w-5 accent-ink"
-                            aria-label={`${p.nombre} se vende en ${nombreSuc}`}
+                            aria-label={`${p.nombre} se vende en ${menu.nombre}`}
                             checked={fila?.disponible ?? true}
                             disabled={bloqueado}
                             onChange={(e) => guardarFila(p, { disponible: e.target.checked })}
                           />
                         </td>
                       )}
-                      {porSucursal ? (
+                      {modoMenu ? (
                         <td className="px-4 py-3.5" onClick={(e) => e.stopPropagation()}>
                           <div className="relative ml-auto w-[120px]">
                             <span aria-hidden="true" className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-sm text-ink-2">$</span>
                             <input
                               key={`${p.id}:${fila?.precio_mxn ?? ""}:${recarga}`}
-                              defaultValue={fila?.precio_mxn ?? ""}
-                              placeholder={String(p.precio_base_mxn)}
+                              defaultValue={fila ? String(fila.precio_mxn) : ""}
                               inputMode="decimal"
-                              aria-label={`Precio de ${p.nombre} en ${nombreSuc}`}
+                              aria-label={`Precio de ${p.nombre} en ${menu.nombre}`}
                               disabled={bloqueado || fila?.disponible === false}
                               className="h-9 w-full rounded border border-line-strong pl-6 pr-2 text-right text-sm tabular-nums outline-none focus:border-ink disabled:bg-hover disabled:text-ink-3"
                               onChange={(e) => {
@@ -361,12 +349,12 @@ export default function ProductosPage() {
                               }}
                               onBlur={(e) => {
                                 const nuevo = precioValido(e.target.value);
-                                if (nuevo === "invalido") {
-                                  // Un "." suelto (que limpiarPrecio deja en "0.") no es un precio: se deja lo guardado.
-                                  e.target.value = fila?.precio_mxn != null ? String(fila.precio_mxn) : "";
+                                if (nuevo === "invalido" || nuevo === null) {
+                                  // Un "." suelto o un campo vacío no son un precio: en un menú el precio no puede quedar vacío.
+                                  e.target.value = fila ? String(fila.precio_mxn) : "";
                                   return;
                                 }
-                                if (nuevo !== (fila?.precio_mxn ?? null)) guardarFila(p, { precio_mxn: nuevo });
+                                if (nuevo !== fila?.precio_mxn) guardarFila(p, { precio_mxn: nuevo });
                               }}
                             />
                           </div>
@@ -379,9 +367,6 @@ export default function ProductosPage() {
                           <span className={["h-1.5 w-1.5 rounded-full", b.dot].join(" ")} />
                           {b.txt}
                         </span>
-                        {porSucursal && fila && fila.precio_mxn !== null && (
-                          <div className="mt-1 text-12 text-ink-3 tabular-nums">General {precioMxn(p.precio_base_mxn)}</div>
-                        )}
                       </td>
                       <td className="px-4 py-3.5 text-right" onClick={(e) => e.stopPropagation()}>
                         <span className="inline-flex gap-1">
