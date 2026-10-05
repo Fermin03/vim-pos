@@ -306,3 +306,161 @@ CREATE TRIGGER trg_productos_menu_general_proyectar
   AFTER UPDATE OF en_menu_general ON productos
   FOR EACH ROW WHEN (OLD.en_menu_general IS DISTINCT FROM NEW.en_menu_general)
   EXECUTE FUNCTION productos_menu_general_proyectar();
+
+-- ── §6 Producto nuevo: entra a cada menú vivo ────────────────────────────────
+-- Nace con disponible = en_menu_general y al precio con que nació. Un producto «solo de Menú
+-- Norte» se inserta con en_menu_general = false (apagado en todos) y el panel enciende su fila en
+-- ese menú. Además, apagado en el General se proyecta a las sucursales del General.
+CREATE OR REPLACE FUNCTION productos_nuevo_en_menus()
+RETURNS trigger
+LANGUAGE plpgsql
+SET search_path = public, pg_temp
+AS $$
+BEGIN
+  INSERT INTO menu_productos (menu_id, producto_id, tenant_id, disponible, precio_mxn)
+  SELECT m.id, NEW.id, NEW.tenant_id, NEW.en_menu_general, NEW.precio_base_mxn
+    FROM menus m WHERE m.tenant_id = NEW.tenant_id AND m.deleted_at IS NULL
+  ON CONFLICT (menu_id, producto_id) DO NOTHING;
+  IF NOT NEW.en_menu_general THEN
+    PERFORM proyectar_menu(s.id, NEW.id)
+       FROM sucursales s WHERE s.tenant_id = NEW.tenant_id AND s.menu_id IS NULL AND s.deleted_at IS NULL;
+  END IF;
+  RETURN NULL;
+END $$;
+DROP TRIGGER IF EXISTS trg_productos_nuevo_en_menus ON productos;
+CREATE TRIGGER trg_productos_nuevo_en_menus
+  AFTER INSERT ON productos
+  FOR EACH ROW EXECUTE FUNCTION productos_nuevo_en_menus();
+
+-- ── §7 Crear, editar y eliminar un menú ──────────────────────────────────────
+-- Por RPC porque cada una toca varias tablas y tiene que ser una sola transacción. Corren bajo RLS
+-- (INVOKER): el negocio lo acota la política; el permiso se comprueba aquí porque la guardia de
+-- REST no ve las RPCs.
+CREATE OR REPLACE FUNCTION _menu_exigir_permiso()
+RETURNS uuid
+LANGUAGE plpgsql
+STABLE
+SET search_path = public, pg_temp
+AS $$
+DECLARE v_tenant uuid := current_tenant_id();
+BEGIN
+  IF v_tenant IS NULL OR NOT usuario_actual_tiene_permiso('config.productos') THEN
+    RAISE EXCEPTION 'Tu rol no puede modificar el catálogo (menús).'
+      USING ERRCODE = 'insufficient_privilege',
+            HINT = 'Lo administran el dueño y el administrador desde el panel.';
+  END IF;
+  RETURN v_tenant;
+END $$;
+
+-- Todas las sucursales pedidas tienen que ser del negocio, activas y vivas.
+CREATE OR REPLACE FUNCTION _menu_validar_sucursales(p_tenant uuid, p_sucursales uuid[])
+RETURNS void
+LANGUAGE plpgsql
+STABLE
+SET search_path = public, pg_temp
+AS $$
+BEGIN
+  IF EXISTS (
+       SELECT 1 FROM unnest(coalesce(p_sucursales, ARRAY[]::uuid[])) AS x(id)
+        WHERE NOT EXISTS (SELECT 1 FROM sucursales s
+                           WHERE s.id = x.id AND s.tenant_id = p_tenant AND s.activa AND s.deleted_at IS NULL)) THEN
+    RAISE EXCEPTION 'Alguna sucursal no existe o no está activa.' USING ERRCODE = '22023';
+  END IF;
+END $$;
+
+CREATE OR REPLACE FUNCTION crear_menu(p_nombre text, p_sucursales uuid[])
+RETURNS uuid
+LANGUAGE plpgsql
+SET search_path = public, pg_temp
+AS $$
+DECLARE
+  v_tenant uuid := _menu_exigir_permiso();
+  v_nombre text := btrim(coalesce(p_nombre, ''));
+  v_menu   uuid;
+BEGIN
+  IF v_nombre = '' THEN
+    RAISE EXCEPTION 'Ponle nombre al menú.' USING ERRCODE = '22023';
+  END IF;
+  IF coalesce(cardinality(p_sucursales), 0) = 0 THEN
+    RAISE EXCEPTION 'Elige al menos una sucursal para el menú.' USING ERRCODE = '22023';
+  END IF;
+  PERFORM _menu_validar_sucursales(v_tenant, p_sucursales);
+
+  BEGIN
+    INSERT INTO menus (tenant_id, nombre) VALUES (v_tenant, v_nombre) RETURNING id INTO v_menu;
+  EXCEPTION WHEN unique_violation THEN
+    RAISE EXCEPTION 'Ya hay un menú con ese nombre.' USING ERRCODE = '23505';
+  END;
+
+  -- Arranca como copia del General. Aún no tiene sucursales: nada se proyecta todavía.
+  INSERT INTO menu_productos (menu_id, producto_id, tenant_id, disponible, precio_mxn)
+  SELECT v_menu, p.id, v_tenant, p.en_menu_general, p.precio_base_mxn
+    FROM productos p WHERE p.tenant_id = v_tenant AND p.deleted_at IS NULL;
+
+  -- Al asignar las sucursales, su trigger proyecta el menú completo a cada una.
+  UPDATE sucursales SET menu_id = v_menu WHERE tenant_id = v_tenant AND id = ANY (p_sucursales);
+  RETURN v_menu;
+END $$;
+
+CREATE OR REPLACE FUNCTION actualizar_menu(p_menu uuid, p_nombre text, p_sucursales uuid[])
+RETURNS void
+LANGUAGE plpgsql
+SET search_path = public, pg_temp
+AS $$
+DECLARE
+  v_tenant     uuid := _menu_exigir_permiso();
+  v_nombre     text := btrim(coalesce(p_nombre, ''));
+  v_sucursales uuid[] := coalesce(p_sucursales, ARRAY[]::uuid[]);
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM menus WHERE id = p_menu AND tenant_id = v_tenant AND deleted_at IS NULL) THEN
+    RAISE EXCEPTION 'Ese menú ya no existe.' USING ERRCODE = '22023';
+  END IF;
+  IF v_nombre = '' THEN
+    RAISE EXCEPTION 'Ponle nombre al menú.' USING ERRCODE = '22023';
+  END IF;
+  PERFORM _menu_validar_sucursales(v_tenant, v_sucursales);
+
+  BEGIN
+    UPDATE menus SET nombre = v_nombre WHERE id = p_menu AND nombre IS DISTINCT FROM v_nombre;
+  EXCEPTION WHEN unique_violation THEN
+    RAISE EXCEPTION 'Ya hay un menú con ese nombre.' USING ERRCODE = '23505';
+  END;
+
+  -- El menú queda aplicando EXACTAMENTE a esas sucursales: las que sobran vuelven al General.
+  UPDATE sucursales SET menu_id = NULL
+   WHERE tenant_id = v_tenant AND menu_id = p_menu AND NOT (id = ANY (v_sucursales));
+  UPDATE sucursales SET menu_id = p_menu
+   WHERE tenant_id = v_tenant AND id = ANY (v_sucursales) AND menu_id IS DISTINCT FROM p_menu;
+END $$;
+
+CREATE OR REPLACE FUNCTION eliminar_menu(p_menu uuid)
+RETURNS void
+LANGUAGE plpgsql
+SET search_path = public, pg_temp
+AS $$
+DECLARE
+  v_tenant uuid := _menu_exigir_permiso();
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM menus WHERE id = p_menu AND tenant_id = v_tenant AND deleted_at IS NULL) THEN
+    RAISE EXCEPTION 'Ese menú ya no existe.' USING ERRCODE = '22023';
+  END IF;
+  -- Primero las sucursales vuelven al General (su trigger revierte lo proyectado); luego la baja.
+  UPDATE sucursales SET menu_id = NULL WHERE tenant_id = v_tenant AND menu_id = p_menu;
+  UPDATE menus SET deleted_at = now() WHERE id = p_menu;
+END $$;
+
+COMMENT ON FUNCTION crear_menu(text, uuid[]) IS 'Crea un menú propio como copia del General y lo asigna a las sucursales. Exige config.productos. ADR 0029.';
+COMMENT ON FUNCTION actualizar_menu(uuid, text, uuid[]) IS 'Renombra el menú y lo deja aplicando exactamente a esas sucursales (las demás vuelven al General). ADR 0029.';
+COMMENT ON FUNCTION eliminar_menu(uuid) IS 'Baja lógica del menú; sus sucursales vuelven al General. ADR 0029.';
+
+-- ── §8 Permisos de ejecución ─────────────────────────────────────────────────
+REVOKE EXECUTE ON FUNCTION crear_menu(text, uuid[])            FROM public, anon;
+REVOKE EXECUTE ON FUNCTION actualizar_menu(uuid, text, uuid[]) FROM public, anon;
+REVOKE EXECUTE ON FUNCTION eliminar_menu(uuid)                 FROM public, anon;
+REVOKE EXECUTE ON FUNCTION _menu_exigir_permiso()              FROM public, anon;
+REVOKE EXECUTE ON FUNCTION _menu_validar_sucursales(uuid, uuid[]) FROM public, anon;
+GRANT  EXECUTE ON FUNCTION crear_menu(text, uuid[])            TO authenticated, service_role;
+GRANT  EXECUTE ON FUNCTION actualizar_menu(uuid, text, uuid[]) TO authenticated, service_role;
+GRANT  EXECUTE ON FUNCTION eliminar_menu(uuid)                 TO authenticated, service_role;
+GRANT  EXECUTE ON FUNCTION _menu_exigir_permiso()              TO authenticated, service_role;
+GRANT  EXECUTE ON FUNCTION _menu_validar_sucursales(uuid, uuid[]) TO authenticated, service_role;

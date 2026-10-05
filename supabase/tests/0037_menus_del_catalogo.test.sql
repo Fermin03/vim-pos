@@ -3,7 +3,7 @@
 -- (lo que lee la caja). Las RPCs crear/actualizar/eliminar se prueban al final (tarea 2).
 -- ============================================================================
 begin;
-select plan(19);
+select plan(37);
 
 \set t         '99999999-0000-0000-0000-0000000000aa'
 \set centro    '99999999-0000-0000-0000-0000000000bb'
@@ -92,6 +92,94 @@ select set_config('request.path', '/productos_sucursal', true);
 update productos_sucursal set precio_mxn = 1, disponible = false where producto_id = :'clas' and sucursal_id = :'norte';
 select is((select precio_mxn from productos_sucursal where producto_id = :'clas' and sucursal_id = :'norte'), null::numeric,
   'por REST no se escribe el precio proyectado');
+select is((select disponible from productos_sucursal where producto_id = :'clas' and sucursal_id = :'norte'), true,
+  'por REST tampoco se escribe el disponible proyectado: conserva el anterior');
+
+-- 11) Las RPCs bajo RLS: el dueño crea; la cajera no; nadie toca el menú de otro negocio.
+select set_config('request.jwt.claims', json_build_object('sub', :'dueno', 'role', 'authenticated', 'tenant_id', :'t')::text, true);
+select set_config('request.path', '/rpc/crear_menu', true);
+select lives_ok(
+  format($$ select crear_menu('Menú del dueño', array[%L]::uuid[]) $$, :'norte'),
+  'el dueño crea un menú por RPC');
+select is((select count(*)::int from menus where tenant_id = :'otro'), 0, 'no ve los menús de otro negocio');
+select throws_ok(
+  format($$ select actualizar_menu(%L, 'Robado', array[]::uuid[]) $$, :'menu_otro'),
+  '22023', null, 'no edita el menú de otro negocio');
+select set_config('request.path', '/menus', true);
+select throws_ok(
+  format($$ insert into menus (tenant_id, nombre) values (%L, 'Por REST') $$, :'t'),
+  '42501', null, 'los menús no se crean por REST directo');
+select set_config('request.jwt.claims', json_build_object('sub', :'cajero', 'role', 'authenticated', 'tenant_id', :'t')::text, true);
+select set_config('request.path', '/rpc/crear_menu', true);
+select throws_ok(
+  format($$ select crear_menu('De la cajera', array[%L]::uuid[]) $$, :'centro'),
+  '42501', null, 'una cajera no crea menús');
+
+-- 12) Las filas de un menú por REST: la cajera no las toca.
+select set_config('request.path', '/menu_productos', true);
+select throws_ok(
+  format($$ update menu_productos set precio_mxn = 1, disponible = false
+             where producto_id = %L and menu_id = (select id from menus where tenant_id = %L and nombre = 'Menú del dueño') $$,
+         :'clas', :'t'),
+  '42501', null, 'una cajera no edita las filas de un menú por REST');
+reset role;
+
+-- 13) El dueño edita precio y disponible de su menú por REST, y se proyecta a la sucursal que lo usa.
+set local role authenticated;
+select set_config('request.jwt.claims', json_build_object('sub', :'dueno', 'role', 'authenticated', 'tenant_id', :'t')::text, true);
+select set_config('request.path', '/menu_productos', true);
+select lives_ok(
+  format($$ update menu_productos set precio_mxn = 160, disponible = false
+             where producto_id = %L and menu_id = (select id from menus where tenant_id = %L and nombre = 'Menú del dueño') $$,
+         :'clas', :'t'),
+  'el dueño edita precio y disponible de una fila de su menú por REST');
+select is((select precio_mxn from productos_sucursal where producto_id = :'clas' and sucursal_id = :'norte'), 160.00::numeric,
+  'y el precio llega a la sucursal que usa el menú');
+select is((select disponible from productos_sucursal where producto_id = :'clas' and sucursal_id = :'norte'), false,
+  'y el disponible también');
+
+-- 14) Las filas de un menú las crean la RPC y el trigger, no el cliente: ni insert ni delete por REST.
+select throws_ok(
+  format($$ insert into menu_productos (menu_id, producto_id, tenant_id, disponible, precio_mxn)
+             values ((select id from menus where tenant_id = %L and nombre = 'Menú del dueño'), %L, %L, true, 1) $$,
+         :'t', :'papas', :'t'),
+  '42501', null, 'las filas de un menú no se insertan por REST');
+select throws_ok(
+  format($$ delete from menu_productos
+             where producto_id = %L and menu_id = (select id from menus where tenant_id = %L and nombre = 'Menú del dueño') $$,
+         :'papas', :'t'),
+  '42501', null, 'las filas de un menú no se borran por REST');
+
+-- 15) Una fila nueva de productos_sucursal por REST toma disponible y precio del menú, no del cliente.
+-- Preparación (superusuario): papas con precio y estado propios en el menú, y sin fila en Norte.
+reset role;
+update menu_productos set precio_mxn = 77, disponible = false
+ where producto_id = :'papas' and menu_id = (select id from menus where tenant_id = :'t' and nombre = 'Menú del dueño');
+delete from productos_sucursal where producto_id = :'papas' and sucursal_id = :'norte';
+set local role authenticated;
+select set_config('request.jwt.claims', json_build_object('sub', :'dueno', 'role', 'authenticated', 'tenant_id', :'t')::text, true);
+select set_config('request.path', '/productos_sucursal', true);
+insert into productos_sucursal (tenant_id, producto_id, sucursal_id, disponible, precio_mxn, agotado_manual)
+  values (:'t', :'papas', :'norte', true, 1, true);
+select is((select precio_mxn from productos_sucursal where producto_id = :'papas' and sucursal_id = :'norte'), 77.00::numeric,
+  'fila nueva en una sucursal con menú: el precio sale del menú, no del cliente');
+select is((select disponible from productos_sucursal where producto_id = :'papas' and sucursal_id = :'norte'), false,
+  'fila nueva en una sucursal con menú: el disponible sale del menú, no del cliente');
+select is((select agotado_manual from productos_sucursal where producto_id = :'papas' and sucursal_id = :'norte'), true,
+  'fila nueva: el agotado_manual sí lo escribe el cliente');
+-- Y en una sucursal del General (Centro): disponible = en_menu_general, precio nulo.
+insert into productos_sucursal (tenant_id, producto_id, sucursal_id, disponible, precio_mxn, agotado_manual)
+  values (:'t', :'papas', :'centro', false, 1, true);
+select is((select disponible from productos_sucursal where producto_id = :'papas' and sucursal_id = :'centro'), true,
+  'fila nueva en una sucursal del General: el disponible sale de en_menu_general');
+select is((select precio_mxn from productos_sucursal where producto_id = :'papas' and sucursal_id = :'centro'), null::numeric,
+  'fila nueva en una sucursal del General: el precio queda nulo (se cobra el base)');
+
+-- 16) Un update normal de la sucursal (sin tocar menu_id) no se bloquea.
+select set_config('request.path', '/sucursales', true);
+select lives_ok(
+  format($$ update sucursales set nombre = nombre where id = %L $$, :'norte'),
+  'actualizar una sucursal sin tocar su menú sigue funcionando por REST');
 
 reset role;
 select * from finish();
