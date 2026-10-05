@@ -102,6 +102,9 @@ export function ProductoForm({
   const [seVende, setSeVende] = useState(producto?.en_menu_general ?? true);
   // ¿Ya se cargó el precio y el «se vende» del menú elegido? Hasta entonces no se puede guardar.
   const [filaMenuLista, setFilaMenuLista] = useState(false);
+  // Sube cada vez que termina de cargarse el precio del menú (también al recargar el producto): la
+  // línea base de «cambios sin guardar» se vuelve a fijar, p. ej. «160.50» que vuelve como «160.5».
+  const [cargaN, setCargaN] = useState(0);
   // «Agotado hoy» (0155): una fila por sucursal activa; con dos o más, Disponibilidad muestra la
   // tabla y el agotado deja de estar en el selector.
   const [agotados, setAgotados] = useState<FilaFormMenu[]>([]);
@@ -125,7 +128,7 @@ export function ProductoForm({
   useEffect(() => {
     if (menuListo && filaMenuLista) setBase(valores);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- solo al terminar de cargar
-  }, [menuListo, filaMenuLista]);
+  }, [menuListo, filaMenuLista, cargaN]);
 
   // El precio y «se vende» de este producto en el menú elegido. En el General salen del producto;
   // en un menú propio, de su fila de menu_productos.
@@ -133,12 +136,14 @@ export function ProductoForm({
     if (!menuCat.listo) return;
     if (!producto || !enMenu) {
       setFilaMenuLista(true);
+      setCargaN((n) => n + 1);
       return;
     }
     if (menuCat.esGeneral) {
       setPrecio(String(producto.precio_base_mxn));
       setSeVende(producto.en_menu_general);
       setFilaMenuLista(true);
+      setCargaN((n) => n + 1);
       return;
     }
     let vivo = true;
@@ -154,6 +159,7 @@ export function ProductoForm({
         setPrecio(String(f.precio_mxn));
         setSeVende(f.disponible);
         setFilaMenuLista(true);
+        setCargaN((n) => n + 1);
       })
       .catch(() => {
         if (vivo) setError("No se pudo leer el precio de este menú");
@@ -195,6 +201,7 @@ export function ProductoForm({
 
   async function guardar(e?: FormEvent) {
     e?.preventDefault();
+    if (cargando) return;
     setError(null);
     const parsed = productoSchema.safeParse({
       nombre,
@@ -249,7 +256,11 @@ export function ProductoForm({
           try {
             await guardarFilaDeMenu(menuCat.id, id, ajuste);
           } catch {
-            setError("El producto se creó, pero no se pudo encender en este menú. Vuelve a intentar.");
+            setError(
+              enPropio
+                ? "El producto se creó, pero no se pudo encender en este menú. Vuelve a intentar."
+                : `El producto se creó, pero no se pudo aplicar «se vende» en ${menuCat.nombre}. Vuelve a intentar.`,
+            );
             setGuardando(false);
             return;
           }
@@ -345,7 +356,7 @@ export function ProductoForm({
                 value={precio}
                 inputMode="decimal"
                 onChange={(e) => setPrecio(limpiarPrecio(e.target.value))}
-                disabled={editar && enMenu && !filaMenuLista}
+                disabled={cargando}
                 placeholder="0.00"
                 aria-describedby="precio-ayuda"
               />
@@ -378,11 +389,15 @@ export function ProductoForm({
             <select
               id="estado"
               className={input}
+              disabled={cargando}
               value={!multi && agotado ? "AGOTADO" : enMenu && estado === "ACTIVO" && !seVende ? "NO_SE_VENDE" : estado}
               onChange={(e) => {
                 const v = e.target.value;
                 setAgotado(v === "AGOTADO");
-                if (v === "AGOTADO") return;
+                if (v === "AGOTADO") {
+                  setSeVende(true);
+                  return;
+                }
                 setEstado(v === "PAUSADO" ? "PAUSADO" : "ACTIVO");
                 if (enMenu) setSeVende(v !== "NO_SE_VENDE");
               }}
