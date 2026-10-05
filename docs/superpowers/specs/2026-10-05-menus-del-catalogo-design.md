@@ -35,7 +35,9 @@ sucursales activas: no hay datos que convertir.
   categoría entera**.
 - **Precios independientes por menú**: cambiar un precio en el General no toca los demás menús.
 - Producto nuevo: creado en el General sale en todos los menús; creado dentro de un menú, solo
-  existe en ese.
+  existe en ese. Lo mismo un combo nuevo.
+- **Importar menú** sigue creando en el General (= en todos los menús, al mismo precio), también
+  con un menú propio elegido; la página lo avisa. No hay importación «solo a este menú».
 - El agotado sigue **por sucursal**, fuera del menú.
 - Se retira la UI por sucursal de 0152 (selector de sucursal en Productos, columnas «Se vende» y
   «Precio» de la tabla por sucursal del formulario) y la línea que compara con el precio general.
@@ -119,7 +121,11 @@ toca varias tablas y tiene que ser una sola transacción:
   `precio_mxn = precio_base_mxn`) y asigna las sucursales. Exige al menos una sucursal.
 - `actualizar_menu(p_menu uuid, p_nombre text, p_sucursales uuid[])` — renombra y deja el menú
   aplicando **exactamente** a esas sucursales: las que sobran vuelven al General. Puede quedar sin
-  sucursales (el menú se conserva con su contenido).
+  sucursales (el menú se conserva con su contenido). «Las que sobran» son solo sucursales activas:
+  una desactivada no aparece en el modal y conserva su menú.
+
+Un menú no puede llamarse «General» ni «Menú General» (sin distinguir mayúsculas, acentos ni
+espacios): `crear_menu` y `actualizar_menu` lo rechazan con 22023.
 - `eliminar_menu(p_menu uuid)` — baja lógica (`deleted_at`); sus sucursales vuelven al General.
 
 Una sucursal que ya estaba en otro menú se mueve al nuevo (invariante 1); la pantalla lo dice antes
@@ -144,8 +150,13 @@ La disparan triggers `AFTER`:
 |---|---|
 | INSERT/UPDATE en `menu_productos` | ese producto en las sucursales de ese menú |
 | UPDATE de `sucursales.menu_id` | todos los productos de esa sucursal |
+| INSERT de una sucursal | todos los productos de esa sucursal (sin esto, «sin fila» = se vende: vendería lo apagado en el General) |
 | UPDATE de `productos.en_menu_general` | ese producto en las sucursales del General |
 | INSERT de un producto | ver §4.4 |
+
+Las dos proyecciones del General (la de `en_menu_general` y la de producto nuevo) alcanzan a
+**todas** las sucursales sin menú propio, también a las inactivas y a las dadas de baja: una
+sucursal que se restaura o se reactiva ya está al día y no hace falta proyectar «al volver».
 
 `productos.precio_base_mxn` no dispara nada: las sucursales del General ya lo leen (precio nulo) y
 los menús propios no lo siguen (invariante 3).
@@ -212,7 +223,13 @@ vende» en el General), precio editable en línea y estado. **Sin** la línea «
   pierde), Enter confirma, un precio inválido no guarda (`precioValido`), nada de mezclar datos al
   cambiar de menú.
 - Estados: «Activo», «No se vende aquí», «Pausado». El filtro «No se venden aquí» se conserva.
-- Combos: son productos; su pestaña recibe la misma casilla y precio.
+- Combos: son productos; su pestaña recibe la misma casilla y precio. «Nuevo combo» dentro de un
+  menú propio lo crea solo en ese menú (como §4.4) y lo avisa. La vista previa de un combo se
+  calcula con el menú elegido —precio del combo y de cada componente, sin lo que ese menú no
+  vende— y lo rotula con su nombre; nunca con los precios de otro menú (invariante 7).
+- Los enlaces de las listas (editar, nuevo, importar) llevan `?menu=`.
+- **Importar menú** (`/catalogo/importar`): con un menú propio elegido muestra «La importación
+  crea los productos en el menú General y en todos tus menús, al mismo precio.»
 
 ### 5.4 Categorías
 
@@ -230,7 +247,8 @@ La caja ya esconde una categoría que no tiene nada que vender en su sucursal (0
 ### 5.5 Modificadores y Recetas
 
 Sin cambios, con una línea bajo la franja del selector cuando hay un menú propio elegido: «Los
-modificadores son los mismos en todos los menús.» (igual para recetas).
+modificadores son los mismos en todos los menús.» En Recetas: «Las recetas son las mismas en todos
+los menús. El margen se calcula con el precio del menú General.»
 
 ### 5.6 Formulario de producto
 

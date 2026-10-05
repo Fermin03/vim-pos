@@ -17,7 +17,8 @@ comparaba cada precio con el general. En producción nadie lo había usado.
   `productos.en_menu_general`.
 - **Un menú propio es una copia independiente.** `crear_menu` copia el General; desde ahí tiene su
   propio precio y su propio «se vende» por producto. Cambiar el General no lo toca. Un producto
-  nuevo entra a cada menú al precio con que nació. El nombre de un menú admite hasta 80 caracteres.
+  nuevo entra a cada menú al precio con que nació. El nombre de un menú admite hasta 80 caracteres
+  y no puede ser «General» (ni «Menú General»): es el nombre del catálogo base.
 - **`productos_sucursal` pasa a ser lo proyectado.** `proyectar_menu()` y sus triggers copian ahí
   (`disponible`, `precio_mxn`) lo que dice el menú de la sucursal. La caja, las RPCs de venta, el
   sync y Uber siguen leyendo esa tabla, sin cambios y sin instalador nuevo. Por REST ya no se
@@ -45,3 +46,23 @@ comparaba cada precio con el general. En producción nadie lo había usado.
 - Apagar una categoría es una acción sobre sus productos, no un estado: un producto nuevo en una
   categoría apagada nace encendido.
 - `menus` y `menu_productos` no bajan a la caja; `sucursales.menu_id` sí viaja y la caja lo ignora.
+- **Una sucursal nueva se proyecta al nacer.** 0152 lee «sin fila» como «se vende al precio base»,
+  así que sin esto una sucursal recién creada vendería lo que el General tiene apagado (incluido lo
+  exclusivo de un menú propio). Y la proyección del General no distingue sucursales activas de
+  inactivas o dadas de baja: una que se restaura o se reactiva ya viene al día, sin un trigger
+  aparte para «volvió».
+- **Editar un menú no toca a las sucursales desactivadas.** El panel solo lista las activas;
+  `actualizar_menu` devuelve al General únicamente a las activas que salen de la lista. Una
+  desactivada conserva su menú hasta que se reactive y alguien la mueva.
+- **Combos por menú.** Un combo es un producto: se apaga y se le pone precio por menú igual que
+  los demás, y creado dentro de un menú propio solo existe en ese. Su vista previa («cuánto va a
+  pagar el cliente») se calcula con el menú elegido —el precio del combo y el de cada componente—
+  y no ofrece lo que ese menú tiene apagado: es lo que cobra la caja de sus sucursales. Los pasos y
+  el «cuesta de más» de cada opción son del combo y valen para todos los menús.
+- **El importador va al General.** Importar un menú crea los productos en el General y, por el
+  trigger de producto nuevo, en todos los menús al mismo precio, aunque el dueño venga de un menú
+  propio; la página lo dice antes de importar. No se importa «solo a este menú»: un archivo del
+  POS anterior es el catálogo completo, y repartirlo por menú se hace después, apagando.
+- **Si los menús no se pueden leer, no se guarda.** El Catálogo ya no cae en silencio al General:
+  la franja muestra el error con «Reintentar» y ni las listas ni los formularios guardan precio o
+  «se vende» mientras tanto.

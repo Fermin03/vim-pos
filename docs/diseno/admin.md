@@ -173,13 +173,27 @@ sucursales, o algún menú propio; con una sola sucursal, el Catálogo se ve com
 
 - **Una pastilla por menú**, con las sucursales que lo usan en gris. «General» siempre va primero.
   El menú elegido se recuerda entre pestañas y entre visitas.
+- **La pastilla activa va en tinta sólida** (`bg-ink`, texto blanco; sus sucursales en blanco al
+  75 %), como el atajo activo del rango de fechas. Las demás, superficie blanca con borde. Solo
+  borde y negrita no bastaba para saber qué menú se está editando.
+- **Los enlaces llevan el menú** (`?menu=`): editar, «Nuevo producto», «Nuevo combo» e «Importar»
+  abren en el menú de la lista, no en «el último usado» (que con dos pestañas puede ser otro).
+- **Si los menús no cargan**, la franja lo dice en rojo con «Reintentar» y nada guarda precio ni
+  «se vende» hasta que carguen. No se degrada en silencio al General.
 - **«Nuevo menú»** pide nombre (hasta 80 caracteres) y sucursales. Arranca igual que el General; si
   una sucursal viene de otro menú propio, se dice antes de guardar. Eliminar nombra la
   consecuencia: sus sucursales vuelven al General.
 - **Cada pestaña trabaja sobre el menú elegido.** Productos y Combos: casilla «En este menú» y
   precio en línea. Categorías: «N de M productos» y un interruptor que apaga o enciende la
   categoría entera (con parte encendida se ve «parcial», con la casilla en estado indeterminado).
-  Modificadores y Recetas dicen que son los mismos en todos los menús.
+  Modificadores y Recetas dicen que son los mismos en todos los menús; Recetas aclara además que
+  el margen se calcula con el precio del menú General.
+- **Combos:** «Nuevo combo» dentro de un menú propio lo crea solo ahí y lo avisa antes de guardar
+  («Solo se venderá en Menú Norte»). La vista previa del combo dice de qué menú es («En Menú
+  Norte, tal como lo calcula la caja») y cuenta con los precios de ese menú; si el menú no vende
+  alguna opción, lo dice en una línea en vez de sumarla.
+- **Importar menú:** con un menú propio elegido, una nota arriba de la página: «La importación
+  crea los productos en el menú General y en todos tus menús, al mismo precio.»
 - **No se comparan precios.** En un menú se ve solo su precio; nunca el de otro menú al lado.
 - **Formulario de producto:** el precio y «se vende» son del menú elegido, y lo dice junto al
   campo; el resto es del producto. Un producto creado dentro de un menú propio solo se vende ahí, y
@@ -189,7 +203,8 @@ sucursales, o algún menú propio; con una sola sucursal, el Catálogo se ve com
   con una casilla por sucursal.
 - **Escrituras en línea:** entran en una cola, una a la vez, y ninguna se pierde (la cola está
   duplicada en las páginas de Productos y de Combos); solo se atenúa el renglón que se está
-  guardando.
+  guardando. La casilla «se vende» es la misma en las dos (`casilla-menu.tsx`): área de toque de
+  44 px en táctil y 40 en escritorio, y `aria-disabled` mientras guarda para no perder el foco.
 - **Aviso de cajas viejas** (anteriores a la 0.4.110): se conserva; una caja así no respeta ningún menú.
 
 ## Lo que NO se hereda del POS
