@@ -218,6 +218,8 @@ export type Producto = {
   /** «Agotado en todas» por inventario (derivada en la base, 0152). Solo para mostrar. */
   agotado_automatico: boolean;
   visible_en_pos: boolean;
+  /** «Se vende» en el menú General (0155). false = solo existe en los menús propios que lo enciendan. */
+  en_menu_general: boolean;
   marca_virtual_id: string | null;
   area_cocina_id: string | null;
   clave_sat: string | null;
@@ -233,7 +235,7 @@ export async function listarProductos(): Promise<Producto[]> {
   const { data, error } = await supabase
     .from("productos")
     .select(
-      "id, nombre, descripcion, codigo_interno, precio_base_mxn, categoria_id, estado, agotado_manual, agotado_automatico, visible_en_pos, marca_virtual_id, area_cocina_id, clave_sat, tasa_iva, iva_incluido_en_precio, es_combo, categoria:categorias(nombre)",
+      "id, nombre, descripcion, codigo_interno, precio_base_mxn, categoria_id, estado, agotado_manual, agotado_automatico, visible_en_pos, en_menu_general, marca_virtual_id, area_cocina_id, clave_sat, tasa_iva, iva_incluido_en_precio, es_combo, categoria:categorias(nombre)",
     )
     .is("deleted_at", null)
     .order("orden_visualizacion", { ascending: true });
@@ -250,6 +252,7 @@ export async function listarProductos(): Promise<Producto[]> {
     agotado_manual: f.agotado_manual,
     agotado_automatico: f.agotado_automatico,
     visible_en_pos: f.visible_en_pos,
+    en_menu_general: f.en_menu_general !== false,
     marca_virtual_id: f.marca_virtual_id ?? null,
     area_cocina_id: f.area_cocina_id ?? null,
     clave_sat: f.clave_sat ?? null,
@@ -263,7 +266,7 @@ export async function obtenerProducto(id: string): Promise<Producto | null> {
   const { data, error } = await supabase
     .from("productos")
     .select(
-      "id, nombre, descripcion, codigo_interno, precio_base_mxn, categoria_id, estado, agotado_manual, agotado_automatico, visible_en_pos, marca_virtual_id, area_cocina_id, clave_sat, tasa_iva, iva_incluido_en_precio, es_combo, categoria:categorias(nombre)",
+      "id, nombre, descripcion, codigo_interno, precio_base_mxn, categoria_id, estado, agotado_manual, agotado_automatico, visible_en_pos, en_menu_general, marca_virtual_id, area_cocina_id, clave_sat, tasa_iva, iva_incluido_en_precio, es_combo, categoria:categorias(nombre)",
     )
     .eq("id", id)
     .is("deleted_at", null)
@@ -283,6 +286,7 @@ export async function obtenerProducto(id: string): Promise<Producto | null> {
     agotado_manual: f.agotado_manual,
     agotado_automatico: f.agotado_automatico,
     visible_en_pos: f.visible_en_pos,
+    en_menu_general: f.en_menu_general !== false,
     marca_virtual_id: f.marca_virtual_id ?? null,
     area_cocina_id: f.area_cocina_id ?? null,
     clave_sat: f.clave_sat ?? null,
@@ -299,7 +303,7 @@ function resolverEstado(input: ProductoInput): EstadoProducto {
   return input.estado;
 }
 
-export async function crearProducto(input: ProductoInput): Promise<string> {
+export async function crearProducto(input: ProductoInput, opciones: { enMenuGeneral?: boolean } = {}): Promise<string> {
   const datos = productoSchema.parse(input);
   const tid = await tenantId();
   const estado = resolverEstado(datos);
@@ -322,6 +326,7 @@ export async function crearProducto(input: ProductoInput): Promise<string> {
       codigo_interno: datos.codigo_interno || null,
       estado,
       visible_en_pos: datos.visible_en_pos,
+      en_menu_general: opciones.enMenuGeneral ?? true,
       marca_virtual_id: datos.marca_virtual_id || null,
       area_cocina_id: datos.area_cocina_id || null,
       clave_sat: datos.clave_sat || null,
