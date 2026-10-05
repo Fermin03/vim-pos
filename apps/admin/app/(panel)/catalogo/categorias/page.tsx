@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Button, DialogoPeligro } from "@vim/ui/styles";
 import { PageHeader, PageBody } from "../../../components/page-header";
 import { CatalogoTabs } from "../../../components/catalogo-tabs";
@@ -11,11 +11,55 @@ import {
   bgDe,
   eliminarCategoria,
   listarCategorias,
+  listarProductos,
   type Categoria,
+  type Producto,
 } from "../../../lib/catalogo";
 import { mensajeError } from "../../../lib/errores";
+import {
+  MENU_GENERAL,
+  conteoPorCategoria,
+  encenderCategoria,
+  estadoCategoria,
+  filasDelGeneral,
+  leerFilasDeMenu,
+  type FilaDeMenu,
+  type MenuId,
+} from "../../../lib/menus";
 
 type Filtro = "all" | "on" | "off";
+
+/** Casilla que admite el estado indeterminado (una categoría con parte de sus productos apagados). */
+function Interruptor({
+  marcada,
+  parcial,
+  deshabilitada,
+  etiqueta,
+  onCambiar,
+}: {
+  marcada: boolean;
+  parcial: boolean;
+  deshabilitada: boolean;
+  etiqueta: string;
+  onCambiar: (encender: boolean) => void;
+}) {
+  const ref = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    if (ref.current) ref.current.indeterminate = parcial;
+  }, [parcial, marcada]);
+  return (
+    <input
+      ref={ref}
+      type="checkbox"
+      className="h-5 w-5 accent-ink"
+      aria-label={etiqueta}
+      checked={marcada}
+      disabled={deshabilitada}
+      // Parcial: un clic enciende el resto. Encendida se apaga; apagada se enciende.
+      onChange={() => onCambiar(parcial ? true : !marcada)}
+    />
+  );
+}
 
 function Dot({ cat }: { cat: Categoria }) {
   return (
@@ -39,6 +83,13 @@ export default function CategoriasPage() {
   const [modal, setModal] = useState<{ cat: Categoria | null } | null>(null);
   const [borrar, setBorrar] = useState<Categoria | null>(null);
   const [borrando, setBorrando] = useState(false);
+  // Menús del catálogo (ADR 0029): en modo menú cada categoría muestra cuántos de sus productos se venden en el menú elegido.
+  const modoMenu = menu.visible && menu.listo;
+  const [prods, setProds] = useState<Producto[] | null>(null);
+  const [filas, setFilas] = useState<Map<string, FilaDeMenu>>(new Map());
+  // A qué menú pertenecen `filas`: mientras no coincida con el elegido no se pinta ningún conteo.
+  const [filasDe, setFilasDe] = useState<MenuId | null>(null);
+  const [guardandoCat, setGuardandoCat] = useState<string[]>([]);
 
   // Mover solo tiene sentido viendo la lista completa: con un filtro o una búsqueda, "subir"
   // saltaría sobre categorías que no se ven.
@@ -74,6 +125,63 @@ export default function CategoriasPage() {
   useEffect(() => {
     recargar();
   }, []);
+
+  async function recargarProductos() {
+    try {
+      setProds(await listarProductos());
+    } catch (e) {
+      setError(mensajeError(e, "No se pudieron cargar los productos"));
+    }
+  }
+  useEffect(() => {
+    if (modoMenu) void recargarProductos();
+  }, [modoMenu]);
+
+  useEffect(() => {
+    // Al cambiar de menú se olvida el anterior antes de leer el nuevo.
+    setFilas(new Map());
+    setFilasDe(null);
+    if (!modoMenu || prods === null) return;
+    if (menu.esGeneral) {
+      setFilas(filasDelGeneral(prods));
+      setFilasDe(MENU_GENERAL);
+      return;
+    }
+    let vivo = true;
+    const id = menu.id;
+    leerFilasDeMenu(id)
+      .then((fs) => {
+        if (!vivo) return;
+        setFilas(fs);
+        setFilasDe(id);
+      })
+      .catch((e) => {
+        if (vivo) setError(mensajeError(e, "No se pudo leer el menú"));
+      });
+    return () => {
+      vivo = false;
+    };
+  }, [menu.id, menu.esGeneral, modoMenu, prods]);
+
+  const cargandoFilas = modoMenu && filasDe !== menu.id;
+  const conteo = useMemo(
+    () => (modoMenu && prods && filasDe === menu.id ? conteoPorCategoria(prods, filas) : null),
+    [modoMenu, prods, filas, filasDe, menu.id],
+  );
+
+  async function alternarCategoria(c: Categoria, encender: boolean) {
+    const m = menu.id;
+    setGuardandoCat((g) => [...g, c.id]);
+    setError(null);
+    try {
+      await encenderCategoria(m, c.id, encender);
+    } catch (e) {
+      setError(mensajeError(e, "No se pudo cambiar la categoría"));
+    }
+    // Lo que se ve es lo guardado: se releen productos (y con ellos las filas del menú).
+    await recargarProductos();
+    setGuardandoCat((g) => g.filter((x) => x !== c.id));
+  }
 
   const visibles = useMemo(() => {
     return (cats ?? []).filter((c) => {
@@ -150,6 +258,13 @@ export default function CategoriasPage() {
           </div>
         </div>
 
+        {modoMenu && (
+          <div className="mb-3 space-y-1 text-13 text-ink-2">
+            <p>Estás viendo {menu.nombre}. Apagar una categoría apaga todos sus productos en este menú.</p>
+            <p>El nombre, el orden y el color de las categorías son los mismos en todos los menús.</p>
+          </div>
+        )}
+
         {error && (
           <p className="mb-4 text-sm font-medium text-danger" role="alert">
             {error}
@@ -165,14 +280,23 @@ export default function CategoriasPage() {
                 <tr>
                   <th className="border-b border-line bg-sel px-4 py-[13px] text-left text-12 font-bold uppercase tracking-wide text-ink-3">Categoría</th>
                   <th className="w-[130px] border-b border-line bg-sel px-4 py-[13px] text-left text-12 font-bold uppercase tracking-wide text-ink-3">Productos</th>
+                  {modoMenu && (
+                    <th className="w-[130px] border-b border-line bg-sel px-4 py-[13px] text-left text-12 font-bold uppercase tracking-wide text-ink-3">
+                      {menu.esGeneral ? "Se vende" : "En este menú"}
+                    </th>
+                  )}
                   <th className="w-[130px] border-b border-line bg-sel px-4 py-[13px] text-center text-12 font-bold uppercase tracking-wide text-ink-3">Orden</th>
                   <th className="w-[120px] border-b border-line bg-sel px-4 py-[13px] text-left text-12 font-bold uppercase tracking-wide text-ink-3">Estado</th>
                   <th className="w-[104px] border-b border-line bg-sel px-4 py-[13px]"></th>
                 </tr>
               </thead>
               <tbody>
-                {visibles.map((c) => (
-                  <tr key={c.id} className="group border-b border-line last:border-none hover:bg-hover">
+                {visibles.map((c) => {
+                  const n = conteo?.get(c.id) ?? { seVenden: 0, total: 0 };
+                  const estado = estadoCategoria(n.seVenden, n.total);
+                  const ocupada = guardandoCat.includes(c.id);
+                  return (
+                  <tr key={c.id} className={["group border-b border-line last:border-none hover:bg-hover", ocupada ? "opacity-50" : ""].join(" ")}>
                     <td className="px-4 py-3.5">
                       <div className="flex items-center gap-3">
                         <Dot cat={c} />
@@ -183,9 +307,42 @@ export default function CategoriasPage() {
                       </div>
                     </td>
                     <td className="px-4 py-3.5">
-                      <span className="font-display text-15 font-semibold tabular-nums">{c.nProductos}</span>{" "}
-                      <span className="text-xs text-ink-3">productos</span>
+                      {modoMenu ? (
+                        conteo ? (
+                          <>
+                            <span className="font-display text-15 font-semibold tabular-nums">
+                              {n.total === 0 ? 0 : `${n.seVenden} de ${n.total}`}
+                            </span>{" "}
+                            <span className="text-xs text-ink-3">productos</span>
+                          </>
+                        ) : (
+                          <span className="text-13 text-ink-3">…</span>
+                        )
+                      ) : (
+                        <>
+                          <span className="font-display text-15 font-semibold tabular-nums">{c.nProductos}</span>{" "}
+                          <span className="text-xs text-ink-3">productos</span>
+                        </>
+                      )}
                     </td>
+                    {modoMenu && (
+                      <td className="px-4 py-3.5">
+                        {!conteo || estado === "vacia" ? (
+                          <span className="text-ink-3" aria-label="Sin productos">–</span>
+                        ) : (
+                          <span className="inline-flex items-center gap-2">
+                            <Interruptor
+                              marcada={estado === "encendida"}
+                              parcial={estado === "parcial"}
+                              deshabilitada={cargandoFilas || ocupada}
+                              etiqueta={`${c.nombre} se vende en ${menu.nombre}`}
+                              onCambiar={(encender) => void alternarCategoria(c, encender)}
+                            />
+                            {estado === "parcial" && <span className="text-13 text-ink-3">parcial</span>}
+                          </span>
+                        )}
+                      </td>
+                    )}
                     <td className="px-2 py-3.5">
                       <span className="flex items-center justify-center gap-0.5">
                         <button
@@ -245,7 +402,8 @@ export default function CategoriasPage() {
                       </span>
                     </td>
                   </tr>
-                ))}
+                  );
+                })}
               </tbody>
             </table>
 

@@ -3,6 +3,7 @@ import {
   MENU_GENERAL,
   armarMenus,
   avisoAlMover,
+  conteoPorCategoria,
   elegirMenuInicial,
   estadoCategoria,
   estadoEnMenu,
@@ -77,5 +78,28 @@ describe("avisos del modal al mover sucursales", () => {
   });
   it("no avisa de las que ya eran de este menú", () => {
     expect(avisoAlMover(["norte", "sur"], "m1", sucursales, menus)).toEqual([]);
+  });
+});
+
+describe("conteo de una categoría en un menú", () => {
+  it("cuenta cuántos de sus productos se venden en ese menú", () => {
+    const productos = [
+      { id: "h1", categoria_id: "hamb" },
+      { id: "h2", categoria_id: "hamb" },
+      { id: "p1", categoria_id: "papas" },
+    ];
+    const filas = new Map([
+      ["h1", { disponible: true, precio_mxn: 120 }],
+      ["h2", { disponible: false, precio_mxn: 150 }],
+      ["p1", { disponible: false, precio_mxn: 55 }],
+    ]);
+    const c = conteoPorCategoria(productos, filas);
+    expect(c.get("hamb")).toEqual({ seVenden: 1, total: 2 });
+    expect(c.get("papas")).toEqual({ seVenden: 0, total: 1 });
+    expect(c.get("vacia")).toBeUndefined();
+  });
+  it("un producto sin fila todavía cuenta como que se vende", () => {
+    const c = conteoPorCategoria([{ id: "x", categoria_id: "c" }], new Map());
+    expect(c.get("c")).toEqual({ seVenden: 1, total: 1 });
   });
 });

@@ -63,6 +63,21 @@ export function estadoCategoria(seVenden: number, total: number): EstadoCategori
   return seVenden === total ? "encendida" : "parcial";
 }
 
+/** Por categoría: cuántos productos tiene y cuántos se venden en el menú. Sin fila = se vende. */
+export function conteoPorCategoria(
+  productos: { id: string; categoria_id: string }[],
+  filas: Map<string, FilaDeMenu>,
+): Map<string, { seVenden: number; total: number }> {
+  const conteo = new Map<string, { seVenden: number; total: number }>();
+  for (const p of productos) {
+    const c = conteo.get(p.categoria_id) ?? { seVenden: 0, total: 0 };
+    c.total += 1;
+    if (filas.get(p.id)?.disponible ?? true) c.seVenden += 1;
+    conteo.set(p.categoria_id, c);
+  }
+  return conteo;
+}
+
 export function filasDelGeneral(
   productos: { id: string; precio_base_mxn: number; en_menu_general: boolean }[],
 ): Map<string, FilaDeMenu> {
