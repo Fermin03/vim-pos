@@ -9,6 +9,7 @@ import {
   estadoEnMenu,
   filasDelGeneral,
   hayMenus,
+  hrefConMenu,
   sucursalesDe,
   type SucursalDeMenu,
 } from "../menus";
@@ -101,5 +102,18 @@ describe("conteo de una categoría en un menú", () => {
   it("un producto sin fila todavía cuenta como que se vende", () => {
     const c = conteoPorCategoria([{ id: "x", categoria_id: "c" }], new Map());
     expect(c.get("c")).toEqual({ seVenden: 1, total: 1 });
+  });
+});
+
+describe("enlaces que llevan el menú", () => {
+  it("agrega ?menu= con el menú que se está viendo", () => {
+    expect(hrefConMenu("/catalogo/productos/p1", "m-norte")).toBe("/catalogo/productos/p1?menu=m-norte");
+    expect(hrefConMenu("/catalogo/combos/nuevo", MENU_GENERAL)).toBe("/catalogo/combos/nuevo?menu=general");
+  });
+  it("respeta una consulta que ya traía el enlace", () => {
+    expect(hrefConMenu("/catalogo/recetas?sin=1", "m-norte")).toBe("/catalogo/recetas?sin=1&menu=m-norte");
+  });
+  it("sin menús que elegir, el enlace queda como siempre", () => {
+    expect(hrefConMenu("/catalogo/productos/p1", null)).toBe("/catalogo/productos/p1");
   });
 });

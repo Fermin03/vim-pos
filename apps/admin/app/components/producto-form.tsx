@@ -29,7 +29,7 @@ import {
   type FilaFormMenu,
   type FilaMenuSucursal,
 } from "../lib/menu-sucursal";
-import { guardarFilaDeMenu, leerFilasDeMenu } from "../lib/menus";
+import { guardarFilaDeMenu, hrefConMenu, leerFilaDeMenu } from "../lib/menus";
 import { useMenuCatalogo } from "./selector-menu";
 import type { Caja } from "../lib/configuracion";
 
@@ -114,7 +114,11 @@ export function ProductoForm({
   // Id del producto recién creado: si luego falla el menú, el siguiente «Guardar» lo actualiza.
   const [idCreado, setIdCreado] = useState<string | null>(null);
   const multi = agotados.length >= 2;
-  const cargando = !menuCat.listo || (editar && enMenu && !filaMenuLista);
+  // Sin poder leer los menús no se guarda nada: el formulario se vería como el General y el precio
+  // de un menú propio caería ahí.
+  const cargando = !menuCat.listo || !!menuCat.error || (editar && enMenu && !filaMenuLista);
+  // De vuelta a la lista, en el menú que se estaba editando.
+  const destino = hrefConMenu(volverA, enMenu ? menuCat.id : null);
   const [error, setError] = useState<string | null>(null);
   const [guardando, setGuardando] = useState(false);
 
@@ -148,10 +152,9 @@ export function ProductoForm({
     }
     let vivo = true;
     setFilaMenuLista(false);
-    leerFilasDeMenu(menuCat.id)
-      .then((filas) => {
+    leerFilaDeMenu(menuCat.id, producto.id)
+      .then((f) => {
         if (!vivo) return;
-        const f = filas.get(producto.id);
         if (!f) {
           setError("Este producto no está en este menú. Recarga la página.");
           return;
@@ -300,7 +303,7 @@ export function ProductoForm({
         setGuardando(false);
         alGuardar();
       } else {
-        router.push(volverA);
+        router.push(destino);
       }
     } catch (err) {
       setError(mensajeError(err, "No se pudo guardar"));
@@ -314,7 +317,7 @@ export function ProductoForm({
       !(await confirmar({ titulo: "¿Salir sin guardar?", mensaje: "Los cambios que hiciste en este producto se van a perder.", boton: "Salir sin guardar" }))
     )
       return;
-    router.push(volverA);
+    router.push(destino);
   }
 
   const masDatos = [descripcion && "descripción", codigo && "código", marcaId && "marca", areaId && "estación"].filter(Boolean) as string[];
@@ -547,6 +550,11 @@ export function ProductoForm({
 
         {extra}
 
+        {menuCat.error && (
+          <p className="text-sm font-medium text-danger" role="alert">
+            {menuCat.error}
+          </p>
+        )}
         {error && (
           <p className="text-sm font-medium text-danger" role="alert">
             {error}

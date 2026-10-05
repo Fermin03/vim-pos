@@ -57,7 +57,7 @@ function Recetas() {
         subtitulo="Qué insumos lleva cada producto y cuánto te cuesta. El margen se calcula contra el precio sin IVA."
         migas={[{ label: "Catálogo" }, { label: "Recetas" }]}
       />
-      <FranjaMenus menu={menu} nota={menu.esGeneral ? undefined : "Las recetas son las mismas en todos los menús."} />
+      <FranjaMenus menu={menu} nota={menu.esGeneral ? undefined : "Las recetas son las mismas en todos los menús. El margen se calcula con el precio del menú General."} />
       <CatalogoTabs />
       <PageBody>
         {error && <p role="alert" className="mb-3 text-sm font-medium text-danger">{error}</p>}

@@ -6,6 +6,7 @@ import { Button } from "@vim/ui/styles";
 import { PageHeader, PageBody } from "../../../components/page-header";
 import { CatalogoTabs } from "../../../components/catalogo-tabs";
 import { FranjaMenus, useMenuCatalogo } from "../../../components/selector-menu";
+import { CasillaMenu } from "../../../components/casilla-menu";
 import { activarComboUpsell, leerComboUpsellActivo, listarCombos, type ComboResumen } from "../../../lib/combos";
 import { precioMxn } from "../../../lib/catalogo";
 import { mensajeError } from "../../../lib/errores";
@@ -15,6 +16,7 @@ import {
   MENU_GENERAL,
   estadoEnMenu,
   guardarFilaDeMenu,
+  hrefConMenu,
   leerFilasDeMenu,
   type FilaDeMenu,
   type MenuId,
@@ -33,28 +35,6 @@ const SIN_FILAS: Map<string, FilaDeMenu> = new Map();
 /** Los combos del General: lo que dicen los propios productos. */
 function filasDeCombos(combos: ComboResumen[]): Map<string, FilaDeMenu> {
   return new Map(combos.map((c) => [c.id, { disponible: c.en_menu_general, precio_mxn: c.precio_base_mxn }]));
-}
-
-/**
- * Casilla «se vende en este menú». El área de toque es la etiqueta (44 px en táctil, 40 en escritorio);
- * la casilla visible sigue en 20 px. Mientras guarda no se usa `disabled`: deshabilitar el elemento
- * enfocado le quita el foco al teclado.
- */
-function CasillaMenu({ marcada, ocupada, etiqueta, onCambiar }: { marcada: boolean; ocupada: boolean; etiqueta: string; onCambiar: (v: boolean) => void }) {
-  return (
-    <label className={["flex h-11 w-11 items-center justify-center lg:h-10 lg:w-10", ocupada ? "cursor-wait" : "cursor-pointer"].join(" ")}>
-      <input
-        type="checkbox"
-        className="h-5 w-5 accent-ink"
-        aria-label={etiqueta}
-        aria-disabled={ocupada}
-        checked={marcada}
-        onChange={(e) => {
-          if (!ocupada) onCambiar(e.target.checked);
-        }}
-      />
-    </label>
-  );
 }
 
 function Pasos({ n }: { n: number }) {
@@ -94,6 +74,8 @@ export default function CombosPage() {
   const colaRef = useRef<Promise<void>>(Promise.resolve());
   const cargandoFilas = modoMenu && filasDe !== menu.id;
   const filasVista = filasDe === menu.id ? filas : SIN_FILAS;
+  // Los enlaces llevan el menú que se está viendo: el combo abre en ese, no en «el último usado».
+  const menuHref = modoMenu ? menu.id : null;
 
   async function recargar() {
     setError(null);
@@ -173,7 +155,7 @@ export default function CombosPage() {
    */
   function guardarFila(c: ComboResumen, cambio: Partial<FilaDeMenu>) {
     const m = menu.id;
-    if (!modoMenu || filasRef.current.de !== m) return;
+    if (!modoMenu || menu.error || filasRef.current.de !== m) return;
     setGuardando((g) => [...g, c.id]);
     colaRef.current = colaRef.current.then(async () => {
       try {
@@ -235,7 +217,7 @@ export default function CombosPage() {
         subtitulo="Un producto por pasos: la caja va preguntando qué elige el cliente en cada uno."
         migas={[{ label: "Catálogo" }, { label: "Combos" }]}
         right={
-          <Button onClick={() => router.push("/catalogo/combos/nuevo")}>
+          <Button onClick={() => router.push(hrefConMenu("/catalogo/combos/nuevo", menuHref))}>
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" className="h-[17px] w-[17px]">
               <path d="M12 5v14M5 12h14" />
             </svg>
@@ -285,7 +267,7 @@ export default function CombosPage() {
               const e = ESTADO[claveEstado(c, fila)] ?? ESTADO.PAUSADO!;
               return (
                 <li key={c.id}>
-                  <Link href={`/catalogo/combos/${c.id}`} className="flex flex-col gap-2 rounded-lg border border-line bg-surface p-4 transition-[border-color,transform] duration-150 ease-vim hover:border-ink active:scale-[.99]">
+                  <Link href={hrefConMenu(`/catalogo/combos/${c.id}`, menuHref)} className="flex flex-col gap-2 rounded-lg border border-line bg-surface p-4 transition-[border-color,transform] duration-150 ease-vim hover:border-ink active:scale-[.99]">
                     <span className="flex items-start justify-between gap-3">
                       <span className="text-15 font-semibold">{c.nombre}</span>
                       <span className="flex-shrink-0 font-display text-15 font-semibold tabular-nums">
@@ -317,7 +299,7 @@ export default function CombosPage() {
                   <th className="border-b border-line bg-sel px-4 py-[13px] text-left text-12 font-semibold uppercase tracking-wide text-ink-2">Combo</th>
                   <th className="w-[180px] border-b border-line bg-sel px-4 py-[13px] text-left text-12 font-semibold uppercase tracking-wide text-ink-2">Categoría</th>
                   {modoMenu && <th className="w-[120px] border-b border-line bg-sel px-4 py-[13px] text-left text-12 font-semibold uppercase tracking-wide text-ink-2">{menu.esGeneral ? "Se vende" : "En este menú"}</th>}
-                  <th className={`${modoMenu ? "w-[150px]" : "w-[120px]"} border-b border-line bg-sel px-4 py-[13px] text-right text-12 font-semibold uppercase tracking-wide text-ink-2`}>Precio base</th>
+                  <th className={`${modoMenu ? "w-[150px]" : "w-[120px]"} border-b border-line bg-sel px-4 py-[13px] text-right text-12 font-semibold uppercase tracking-wide text-ink-2`}>{modoMenu ? "Precio" : "Precio base"}</th>
                   <th className="w-[240px] border-b border-line bg-sel px-4 py-[13px] text-left text-12 font-semibold uppercase tracking-wide text-ink-2">Pasos</th>
                   <th className={`${modoMenu ? "w-[160px]" : "w-[110px]"} border-b border-line bg-sel px-4 py-[13px] text-left text-12 font-semibold uppercase tracking-wide text-ink-2`}>Estado</th>
                 </tr>
@@ -327,11 +309,11 @@ export default function CombosPage() {
                   const fila = filasVista.get(c.id);
                   const e = ESTADO[claveEstado(c, fila)] ?? ESTADO.PAUSADO!;
                   const enCola = guardando.includes(c.id);
-                  const bloqueado = cargandoFilas || enCola;
+                  const bloqueado = cargandoFilas || enCola || !!menu.error;
                   return (
-                    <tr key={c.id} className={["cursor-pointer border-b border-line last:border-none hover:bg-hover", enCola ? "opacity-50" : ""].join(" ")} onClick={() => router.push(`/catalogo/combos/${c.id}`)}>
+                    <tr key={c.id} className={["cursor-pointer border-b border-line last:border-none hover:bg-hover", enCola ? "opacity-50" : ""].join(" ")} onClick={() => router.push(hrefConMenu(`/catalogo/combos/${c.id}`, menuHref))}>
                       <td className="px-4 py-3.5 text-15 font-semibold">
-                        <Link href={`/catalogo/combos/${c.id}`} className="rounded-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink" onClick={(ev) => ev.stopPropagation()}>
+                        <Link href={hrefConMenu(`/catalogo/combos/${c.id}`, menuHref)} className="rounded-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink" onClick={(ev) => ev.stopPropagation()}>
                           {c.nombre}
                         </Link>
                       </td>
@@ -354,7 +336,7 @@ export default function CombosPage() {
                               key={`${c.id}:${fila?.precio_mxn ?? ""}:${recarga}`}
                               defaultValue={fila ? String(fila.precio_mxn) : ""}
                               inputMode="decimal"
-                              aria-label={`Precio base de ${c.nombre} en ${menu.nombre}`}
+                              aria-label={`Precio de ${c.nombre} en ${menu.nombre}`}
                               disabled={bloqueado || fila?.disponible === false}
                               className="h-9 w-full rounded border border-line-strong pl-6 pr-2 text-right text-sm tabular-nums outline-none focus:border-ink disabled:bg-hover disabled:text-ink-3"
                               onChange={(ev) => {
@@ -401,7 +383,7 @@ export default function CombosPage() {
                 <p className="max-w-sm text-sm text-ink-2">
                   Un combo es un producto por pasos: la caja pregunta qué hamburguesa, qué acompañamiento y qué bebida.
                 </p>
-                <Button onClick={() => router.push("/catalogo/combos/nuevo")}>Crear el primer combo</Button>
+                <Button onClick={() => router.push(hrefConMenu("/catalogo/combos/nuevo", menuHref))}>Crear el primer combo</Button>
               </div>
             )}
           </div>

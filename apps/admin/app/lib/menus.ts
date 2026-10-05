@@ -50,6 +50,16 @@ export function elegirMenuInicial(menus: Menu[], url: string | null, guardado: s
   return MENU_GENERAL;
 }
 
+/**
+ * El enlace a otra pantalla del Catálogo, con el menú que se está viendo (`?menu=`). Sin esto la
+ * pantalla siguiente abriría con «lo último que se usó», que con dos pestañas en menús distintos
+ * puede ser el menú de la otra. `null` = no hay menús que elegir: el enlace queda como siempre.
+ */
+export function hrefConMenu(href: string, menu: MenuId | null): string {
+  if (!menu) return href;
+  return `${href}${href.includes("?") ? "&" : "?"}menu=${encodeURIComponent(menu)}`;
+}
+
 /** Pausar es global y gana; apagado en el menú es «no se vende aquí». El agotado no es del menú. */
 export function estadoEnMenu(estadoProducto: string, disponible: boolean): EstadoEnMenu {
   if (estadoProducto === "PAUSADO") return "PAUSADO";
@@ -141,6 +151,20 @@ export async function leerFilasDeMenu(menuId: string): Promise<Map<string, FilaD
       { disponible: f.disponible !== false, precio_mxn: Number(f.precio_mxn) },
     ]),
   );
+}
+
+/** La fila de UN producto en un menú propio (el formulario no necesita las demás). `null` = no está en ese menú. */
+export async function leerFilaDeMenu(menuId: string, productoId: string): Promise<FilaDeMenu | null> {
+  const { data, error } = await supabase
+    .from("menu_productos")
+    .select("disponible, precio_mxn")
+    .eq("menu_id", menuId)
+    .eq("producto_id", productoId)
+    .maybeSingle();
+  if (error) throw new Error(error.message);
+  if (!data) return null;
+  const f = data as { disponible: boolean; precio_mxn: number | string };
+  return { disponible: f.disponible !== false, precio_mxn: Number(f.precio_mxn) };
 }
 
 /**

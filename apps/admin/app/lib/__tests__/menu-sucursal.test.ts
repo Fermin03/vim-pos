@@ -50,8 +50,8 @@ describe("qué se guarda", () => {
       [fila("n", { precio_mxn: 135, agotado_automatico: true })],
     );
     expect(r).toEqual([
-      { sucursalId: "c", nombre: "Centro", disponible: true, precio: "", agotado: false, agotadoAuto: false },
-      { sucursalId: "n", nombre: "Norte", disponible: true, precio: "135", agotado: false, agotadoAuto: true },
+      { sucursalId: "c", nombre: "Centro", agotado: false, agotadoAuto: false },
+      { sucursalId: "n", nombre: "Norte", agotado: false, agotadoAuto: true },
     ]);
   });
 });

@@ -25,8 +25,8 @@ export type FilaMenuSucursal = {
 
 export type EstadoEnSucursal = "ACTIVO" | "PAUSADO" | "AGOTADO" | "NO_SE_VENDE";
 
-/** Una fila del formulario de producto. El precio va como texto: es lo que el dueño teclea. */
-export type FilaFormMenu = { sucursalId: string; nombre: string; disponible: boolean; precio: string; agotado: boolean; agotadoAuto: boolean };
+/** Una fila de «Agotado hoy» del formulario de producto: una por sucursal activa. */
+export type FilaFormMenu = { sucursalId: string; nombre: string; agotado: boolean; agotadoAuto: boolean };
 
 export function filasFormIniciales(sucursales: SucursalMenu[], filas: FilaMenuSucursal[]): FilaFormMenu[] {
   const porSucursal = new Map(filas.map((f) => [f.sucursal_id, f]));
@@ -35,8 +35,6 @@ export function filasFormIniciales(sucursales: SucursalMenu[], filas: FilaMenuSu
     return {
       sucursalId: s.id,
       nombre: s.nombre,
-      disponible: f?.disponible ?? true,
-      precio: f?.precio_mxn === null || f?.precio_mxn === undefined ? "" : String(f.precio_mxn),
       agotado: f?.agotado_manual ?? false,
       agotadoAuto: f?.agotado_automatico ?? false,
     };

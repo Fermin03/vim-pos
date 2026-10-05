@@ -6,6 +6,7 @@ import { PageHeader, PageBody } from "../../../components/page-header";
 import { CatalogoTabs } from "../../../components/catalogo-tabs";
 import { FranjaMenus, useMenuCatalogo } from "../../../components/selector-menu";
 import { AvisoCajasMenu } from "../../../components/aviso-cajas-menu";
+import { CasillaMenu } from "../../../components/casilla-menu";
 import { eliminarProducto, listarProductos, precioMxn, type Producto } from "../../../lib/catalogo";
 import type { Caja } from "../../../lib/configuracion";
 import { mensajeError } from "../../../lib/errores";
@@ -16,6 +17,7 @@ import {
   estadoEnMenu,
   filasDelGeneral,
   guardarFilaDeMenu,
+  hrefConMenu,
   leerFilasDeMenu,
   type FilaDeMenu,
   type MenuId,
@@ -65,6 +67,8 @@ export default function ProductosPage() {
   const colaRef = useRef<Promise<void>>(Promise.resolve());
   const cargandoFilas = modoMenu && filasDe !== menu.id;
   const filasVista = filasDe === menu.id ? filas : SIN_FILAS;
+  // Los enlaces llevan el menú que se está viendo: el formulario abre en ese, no en «el último usado».
+  const menuHref = modoMenu ? menu.id : null;
 
   async function recargar() {
     setError(null);
@@ -134,7 +138,7 @@ export default function ProductosPage() {
    */
   function guardarFila(p: Producto, cambio: Partial<FilaDeMenu>) {
     const m = menu.id;
-    if (!modoMenu || filasRef.current.de !== m) return;
+    if (!modoMenu || menu.error || filasRef.current.de !== m) return;
     setGuardando((g) => [...g, p.id]);
     colaRef.current = colaRef.current.then(async () => {
       try {
@@ -219,11 +223,11 @@ export default function ProductosPage() {
         migas={[{ label: "Catálogo" }, { label: "Productos" }]}
         right={
           <div className="flex items-center gap-2">
-            <Button variant="ghost" onClick={() => router.push("/catalogo/importar")}>
+            <Button variant="ghost" onClick={() => router.push(hrefConMenu("/catalogo/importar", menuHref))}>
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-[16px] w-[16px]"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3" /></svg>
               Importar menú
             </Button>
-            <Button onClick={() => router.push("/catalogo/productos/nuevo")}>
+            <Button onClick={() => router.push(hrefConMenu("/catalogo/productos/nuevo", menuHref))}>
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" className="h-[17px] w-[17px]">
                 <path d="M12 5v14M5 12h14" />
               </svg>
@@ -301,9 +305,9 @@ export default function ProductosPage() {
                   const b = BADGE[estadoDe(p, fila)];
                   // Un combo se edita en su propia pantalla (slots, vista previa de precio):
                   // no tiene receta ni estación, así que el editor de producto no le sirve.
-                  const editarHref = p.es_combo ? `/catalogo/combos/${p.id}` : `/catalogo/productos/${p.id}`;
+                  const editarHref = hrefConMenu(p.es_combo ? `/catalogo/combos/${p.id}` : `/catalogo/productos/${p.id}`, menuHref);
                   const enCola = guardando.includes(p.id);
-                  const bloqueado = cargandoFilas || enCola;
+                  const bloqueado = cargandoFilas || enCola || !!menu.error;
                   return (
                     <tr
                       key={p.id}
@@ -319,14 +323,12 @@ export default function ProductosPage() {
                       </td>
                       <td className="px-4 py-3.5 text-14 text-ink-2">{p.categoriaNombre}</td>
                       {modoMenu && (
-                        <td className="px-4 py-3.5" onClick={(e) => e.stopPropagation()}>
-                          <input
-                            type="checkbox"
-                            className="h-5 w-5 accent-ink"
-                            aria-label={`${p.nombre} se vende en ${menu.nombre}`}
-                            checked={fila?.disponible ?? true}
-                            disabled={bloqueado}
-                            onChange={(e) => guardarFila(p, { disponible: e.target.checked })}
+                        <td className="px-4 py-1" onClick={(e) => e.stopPropagation()}>
+                          <CasillaMenu
+                            marcada={fila?.disponible ?? true}
+                            ocupada={bloqueado}
+                            etiqueta={`${p.nombre} se vende en ${menu.nombre}`}
+                            onCambiar={(v) => guardarFila(p, { disponible: v })}
                           />
                         </td>
                       )}
@@ -404,7 +406,7 @@ export default function ProductosPage() {
                     ? "Crea tu primer producto. Necesitas al menos una categoría."
                     : "No hay productos que coincidan con tu búsqueda o filtro."}
                 </p>
-                {sinNada && <Button onClick={() => router.push("/catalogo/productos/nuevo")}>Crear el primer producto</Button>}
+                {sinNada && <Button onClick={() => router.push(hrefConMenu("/catalogo/productos/nuevo", menuHref))}>Crear el primer producto</Button>}
               </div>
             )}
           </div>

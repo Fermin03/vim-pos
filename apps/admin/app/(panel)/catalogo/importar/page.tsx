@@ -6,6 +6,7 @@ import { PageBody, PageHeader } from "../../../components/page-header";
 import { FORMATOS_ORIGEN, importarMenu, parsearConFormato, type FormatoOrigen, type ResultadoImport, type ResultadoParse } from "../../../lib/importar-menu";
 import { mensajeError } from "../../../lib/errores";
 import { textoDeArchivo } from "../../../lib/leer-archivo";
+import { useMenuCatalogo } from "../../../components/selector-menu";
 
 const EJEMPLO = `Categoría,Producto,Precio,Descripción
 Hamburguesas,Clásica,120,Carne 150g con queso
@@ -16,6 +17,10 @@ Bebidas,Refresco,35,Lata 355ml`;
 const fmt = (n: number) => new Intl.NumberFormat("es-MX", { style: "currency", currency: "MXN" }).format(n);
 
 export default function ImportarMenuPage() {
+  // La importación siempre va al General (= a todos los menús, ADR 0029). Si el dueño venía
+  // trabajando en un menú propio, se le dice antes de importar: no es «solo en este menú».
+  const menu = useMenuCatalogo();
+  const enMenuPropio = menu.visible && menu.listo && !menu.esGeneral;
   const [texto, setTexto] = useState("");
   const [formato, setFormato] = useState<FormatoOrigen>("AUTO");
   const [formatoUsado, setFormatoUsado] = useState<string | null>(null);
@@ -72,6 +77,11 @@ export default function ImportarMenuPage() {
         migas={[{ label: "Catálogo", href: "/catalogo" }, { label: "Importar" }]}
       />
       <PageBody>
+        {enMenuPropio && !resultado && (
+          <p role="note" className="mb-4 rounded-lg border border-line bg-surface px-4 py-3 text-sm text-ink-2">
+            La importación crea los productos en el menú General y en todos tus menús, al mismo precio.
+          </p>
+        )}
         {!resultado && (
           <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
             <div>

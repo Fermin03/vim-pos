@@ -350,7 +350,7 @@ export default function CategoriasPage() {
                             <Interruptor
                               marcada={estado === "encendida"}
                               parcial={estado === "parcial"}
-                              ocupada={cargandoFilas || ocupada}
+                              ocupada={cargandoFilas || ocupada || !!menu.error}
                               etiqueta={`${c.nombre} se vende en ${menu.nombre}`}
                               onCambiar={(encender) => void alternarCategoria(c, encender)}
                             />

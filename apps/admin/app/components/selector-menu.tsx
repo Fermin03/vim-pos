@@ -8,7 +8,7 @@
  * (`?menu=`) y entre pantallas (localStorage). Con una sola sucursal y sin menús propios no hay
  * nada que elegir y la franja no se pinta.
  */
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Button, DialogoPeligro } from "@vim/ui/styles";
 import { mensajeError } from "../lib/errores";
 import {
@@ -38,6 +38,11 @@ export type MenuCatalogo = {
   visible: boolean;
   /** `false` hasta saber qué menú mirar: antes de eso no se consulta nada por menú. */
   listo: boolean;
+  /**
+   * No se pudieron leer los menús. Mientras esté, NADIE guarda precio ni «se vende»: sin saber qué
+   * menús hay, todo se vería como el General y un cambio pensado para un menú propio caería ahí.
+   */
+  error: string | null;
   cambiar: (id: MenuId) => void;
   recargar: () => Promise<void>;
 };
@@ -66,35 +71,42 @@ export function useMenuCatalogo(): MenuCatalogo {
   const [sucursales, setSucursales] = useState<SucursalDeMenu[]>([]);
   const [id, setId] = useState<MenuId>(MENU_GENERAL);
   const [listo, setListo] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const vivo = useRef(true);
+  // ¿Falta elegir el menú inicial? Sí hasta la primera lectura buena (también si llega al reintentar).
+  const faltaElegir = useRef(true);
 
+  /** Lee los menús. No lanza: si falla, deja el motivo en `error` y la franja ofrece reintentar. */
   const recargar = useCallback(async () => {
-    const r = await listarMenus();
-    setMenus(r.menus);
-    setSucursales(r.sucursales);
-    // Si el menú elegido ya no existe (lo borraron en otra pestaña), se vuelve al General.
-    setId((actual) => (actual === MENU_GENERAL || r.menus.some((m) => m.id === actual) ? actual : MENU_GENERAL));
+    try {
+      const r = await listarMenus();
+      if (!vivo.current) return;
+      setMenus(r.menus);
+      setSucursales(r.sucursales);
+      setError(null);
+      if (faltaElegir.current) {
+        faltaElegir.current = false;
+        const inicial = elegirMenuInicial(r.menus, new URLSearchParams(window.location.search).get("menu"), leerGuardado());
+        setId(inicial);
+        if (hayMenus(r.menus, r.sucursales)) recordar(inicial);
+      } else {
+        // Si el menú elegido ya no existe (lo borraron en otra pestaña), se vuelve al General.
+        setId((actual) => (actual === MENU_GENERAL || r.menus.some((m) => m.id === actual) ? actual : MENU_GENERAL));
+      }
+    } catch (e) {
+      if (vivo.current) setError(mensajeError(e, "No se pudieron cargar los menús. Mientras tanto no se guardan precios ni lo que se vende."));
+    }
   }, []);
 
   useEffect(() => {
-    let vivo = true;
-    listarMenus()
-      .then((r) => {
-        if (!vivo) return;
-        const inicial = elegirMenuInicial(r.menus, new URLSearchParams(window.location.search).get("menu"), leerGuardado());
-        setMenus(r.menus);
-        setSucursales(r.sucursales);
-        setId(inicial);
-        if (hayMenus(r.menus, r.sucursales)) recordar(inicial);
-      })
-      // Si no se pueden leer los menús, el Catálogo se ve como siempre (el General) en vez de nada.
-      .catch(() => {})
-      .finally(() => {
-        if (vivo) setListo(true);
-      });
+    vivo.current = true;
+    void recargar().finally(() => {
+      if (vivo.current) setListo(true);
+    });
     return () => {
-      vivo = false;
+      vivo.current = false;
     };
-  }, []);
+  }, [recargar]);
 
   const cambiar = useCallback((nuevo: MenuId) => {
     setId(nuevo);
@@ -110,12 +122,18 @@ export function useMenuCatalogo(): MenuCatalogo {
     esGeneral,
     visible: hayMenus(menus, sucursales),
     listo,
+    error,
     cambiar,
     recargar,
   };
 }
 
-const pastilla = "inline-flex min-h-[44px] flex-shrink-0 items-center gap-1.5 whitespace-nowrap rounded border px-3 text-13 transition-colors lg:min-h-0 lg:py-1.5";
+const pastilla =
+  "inline-flex min-h-[44px] flex-shrink-0 items-center gap-1.5 whitespace-nowrap rounded border px-3 text-13 transition-[color,background-color,border-color,transform] duration-150 ease-vim active:scale-[.97] lg:min-h-0 lg:py-1.5";
+// El menú elegido va en tinta sólida, como el atajo activo de `rango-fechas.tsx`: antes solo cambiaban
+// el borde y el peso de la letra, y entre tres pastillas no se distinguía cuál se estaba editando.
+const pastillaActiva = "border-ink bg-ink font-semibold text-white";
+const pastillaInactiva = "border-line-strong bg-surface text-ink-2 hover:border-ink hover:text-ink";
 
 /**
  * La franja de menús: una pastilla por menú con las sucursales que lo usan, «Nuevo menú», y
@@ -127,6 +145,14 @@ export function FranjaMenus({ menu, nota }: { menu: MenuCatalogo; nota?: string 
   const [borrar, setBorrar] = useState(false);
   const [borrando, setBorrando] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  if (menu.error) {
+    return (
+      <div className="flex flex-shrink-0 flex-wrap items-center gap-x-3 gap-y-1 border-b border-line bg-sel px-4 py-2.5 lg:px-8">
+        <p className="text-13 font-medium text-danger" role="alert">{menu.error}</p>
+        <Button variant="ghost" onClick={() => void menu.recargar()}>Reintentar</Button>
+      </div>
+    );
+  }
   if (!menu.visible) return null;
 
   const elegido = menu.menus.find((m) => m.id === menu.id) ?? null;
@@ -163,10 +189,10 @@ export function FranjaMenus({ menu, nota }: { menu: MenuCatalogo; nota?: string 
               type="button"
               aria-pressed={activo}
               onClick={() => menu.cambiar(m.id)}
-              className={[pastilla, activo ? "border-ink bg-surface font-semibold text-ink" : "border-line-strong text-ink-2 hover:border-ink hover:text-ink"].join(" ")}
+              className={[pastilla, activo ? pastillaActiva : pastillaInactiva].join(" ")}
             >
               {m.nombre}
-              <span className="font-normal text-ink-3">· {nombresDe(m.id)}</span>
+              <span className={["font-normal", activo ? "text-white/75" : "text-ink-3"].join(" ")}>· {nombresDe(m.id)}</span>
             </button>
           );
         })}
