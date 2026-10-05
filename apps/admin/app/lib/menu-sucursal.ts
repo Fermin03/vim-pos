@@ -3,10 +3,10 @@ import { supabase, leerSesion } from "./supabase";
 import { listarCajas, type Caja } from "./configuracion";
 
 /**
- * Menú por sucursal (ADR 0027, migración 0152). Una fila por producto y sucursal guarda solo lo que
- * cambia ahí; sin fila, el producto se vende al precio general y sin agotar. La regla es la misma
- * que precio_producto_en_sucursal / motivo_no_disponible_en_sucursal (0152) y que aplicarSucursal
- * de la caja (apps/pos/app/lib/catalogo-sucursal.ts).
+ * Lo que una sucursal tiene propio dentro de su menú (ADR 0027, migración 0152): el «Agotado hoy»
+ * y las cajas que aún no respetan el menú. La captura de precio y de «se vende» vive ahora en
+ * `menus.ts` (ADR 0029, migración 0155): ahí el dueño edita el menú, y la base lo proyecta a
+ * `productos_sucursal`. Desde 0155 el panel solo escribe `agotado_manual` en esa tabla.
  */
 
 /** Primera versión del escritorio que respeta el menú por sucursal. Una caja anterior vende todo al precio general. */
@@ -23,32 +23,10 @@ export type FilaMenuSucursal = {
   agotado_automatico: boolean;
 };
 
-/** Lo que el dueño edita de una fila. El agotado por inventario no: lo escribe la base. */
-export type EdicionMenuSucursal = Pick<FilaMenuSucursal, "producto_id" | "sucursal_id" | "disponible" | "precio_mxn" | "agotado_manual">;
-
 export type EstadoEnSucursal = "ACTIVO" | "PAUSADO" | "AGOTADO" | "NO_SE_VENDE";
 
 /** Una fila del formulario de producto. El precio va como texto: es lo que el dueño teclea. */
 export type FilaFormMenu = { sucursalId: string; nombre: string; disponible: boolean; precio: string; agotado: boolean; agotadoAuto: boolean };
-
-export function filaPorDefecto(producto_id: string, sucursal_id: string): FilaMenuSucursal {
-  return { producto_id, sucursal_id, disponible: true, precio_mxn: null, agotado_manual: false, agotado_automatico: false };
-}
-
-/** ¿Deja la fila igual que no tenerla? */
-export function esPorDefecto(e: Pick<EdicionMenuSucursal, "disponible" | "precio_mxn" | "agotado_manual">): boolean {
-  return e.disponible && e.precio_mxn === null && !e.agotado_manual;
-}
-
-/**
- * Qué mandar al guardar. Una sucursal sin fila y en los valores por defecto no se manda (el menú
- * queda escaso). Una que ya tenía fila se manda siempre, aunque vuelva a lo general: las filas no
- * se borran, porque el pull de la caja no trae bajas.
- */
-export function filasParaGuardar(ediciones: EdicionMenuSucursal[], existentes: Pick<FilaMenuSucursal, "sucursal_id">[]): EdicionMenuSucursal[] {
-  const conFila = new Set(existentes.map((f) => f.sucursal_id));
-  return ediciones.filter((e) => conFila.has(e.sucursal_id) || !esPorDefecto(e));
-}
 
 export function filasFormIniciales(sucursales: SucursalMenu[], filas: FilaMenuSucursal[]): FilaFormMenu[] {
   const porSucursal = new Map(filas.map((f) => [f.sucursal_id, f]));
@@ -66,43 +44,14 @@ export function filasFormIniciales(sucursales: SucursalMenu[], filas: FilaMenuSu
 }
 
 /**
- * El precio por sucursal tal como lo teclea el dueño. Vacío = el general (null). Un número con hasta
+ * El precio tal como lo teclea el dueño. Vacío = null. Un número con hasta
  * dos decimales es el precio. Lo demás no es precio: un «.» suelto (que limpiarPrecio deja en «0.»),
- * «12.» o «1.234» — sin esta regla, Number("0.") guardaba $0.00. Lo usan la lista y el formulario.
+ * «12.» o «1.234» — sin esta regla, Number("0.") guardaba $0.00. Lo usan la lista, los combos y el formulario.
  */
 export function precioValido(texto: string): number | null | "invalido" {
   const t = texto.trim();
   if (t === "") return null;
   return /^\d+(\.\d{1,2})?$/.test(t) ? Number(t) : "invalido";
-}
-
-/** El primer precio del formulario que no es precio, como mensaje para el dueño; null si todos sirven. */
-export function errorPreciosForm(filas: Pick<FilaFormMenu, "nombre" | "precio">[]): string | null {
-  const mala = filas.find((f) => precioValido(f.precio) === "invalido");
-  return mala ? `Precio inválido en ${mala.nombre}` : null;
-}
-
-/** Del formulario a lo que se guarda. Precio vacío = el general (null). Un precio inválido no se guarda: lanza. */
-export function edicionesDeForm(productoId: string, filas: FilaFormMenu[]): EdicionMenuSucursal[] {
-  return filas.map((f) => {
-    const precio = precioValido(f.precio);
-    if (precio === "invalido") throw new Error(`Precio inválido en ${f.nombre}`);
-    return {
-      producto_id: productoId,
-      sucursal_id: f.sucursalId,
-      disponible: f.disponible,
-      precio_mxn: precio,
-      agotado_manual: f.agotado,
-    };
-  });
-}
-
-/** El estado en una sucursal, con el mismo orden que motivo_no_disponible_en_sucursal (0152). */
-export function estadoEnSucursal(estadoProducto: string, fila: FilaMenuSucursal | undefined): EstadoEnSucursal {
-  if (estadoProducto === "PAUSADO") return "PAUSADO";
-  if (fila && !fila.disponible) return "NO_SE_VENDE";
-  if (estadoProducto === "AGOTADO" || fila?.agotado_manual || fila?.agotado_automatico) return "AGOTADO";
-  return "ACTIVO";
 }
 
 /** El estado en «todas»: las columnas agotado_* del producto son «agotado en todas» (0152). */
@@ -139,6 +88,18 @@ export function cajasSinMenuPorSucursal<C extends Pick<Caja, "ultimoLatido" | "v
   );
 }
 
+/** Qué sucursales mandar: las que ya tenían fila (aunque se des-agoten) y las que se agotan ahora. */
+export function agotadosParaGuardar(
+  productoId: string,
+  filas: { sucursalId: string; agotado: boolean }[],
+  existentes: Pick<FilaMenuSucursal, "sucursal_id">[],
+): { producto_id: string; sucursal_id: string; agotado_manual: boolean }[] {
+  const conFila = new Set(existentes.map((f) => f.sucursal_id));
+  return filas
+    .filter((f) => conFila.has(f.sucursalId) || f.agotado)
+    .map((f) => ({ producto_id: productoId, sucursal_id: f.sucursalId, agotado_manual: f.agotado }));
+}
+
 // ── Datos ────────────────────────────────────────────────────────────────────
 const COLUMNAS = "producto_id, sucursal_id, disponible, precio_mxn, agotado_manual, agotado_automatico";
 
@@ -171,14 +132,12 @@ export async function leerMenuDeProducto(productoId: string): Promise<FilaMenuSu
   return ((data ?? []) as Record<string, unknown>[]).map(aFila);
 }
 
-export async function leerMenuDeSucursal(sucursalId: string): Promise<FilaMenuSucursal[]> {
-  const { data, error } = await supabase.from("productos_sucursal").select(COLUMNAS).eq("sucursal_id", sucursalId);
-  if (error) throw new Error(error.message);
-  return ((data ?? []) as Record<string, unknown>[]).map(aFila);
-}
-
-/** Upsert por (producto, sucursal). No manda agotado_automatico: lo escribe la base y la guardia lo protege. */
-export async function guardarMenuSucursal(filas: EdicionMenuSucursal[]): Promise<void> {
+/**
+ * Guarda el «Agotado hoy» de un producto en cada sucursal. Es lo único de productos_sucursal que el
+ * panel escribe desde 0155: «se vende» y el precio los pone la base a partir del menú de la sucursal
+ * (la guardia los ignora si llegan por aquí).
+ */
+export async function guardarAgotado(filas: { producto_id: string; sucursal_id: string; agotado_manual: boolean }[]): Promise<void> {
   if (filas.length === 0) return;
   const s = await leerSesion();
   if (!s?.tenantId) throw new Error("Sesión sin tenant");

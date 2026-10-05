@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
+import { useEffect, useState, type FormEvent, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { Button, useConfirmar } from "@vim/ui/styles";
 import {
@@ -19,17 +19,18 @@ import { Plegable } from "./plegable";
 import { AvisoCajasMenu } from "./aviso-cajas-menu";
 import { DisponibilidadSucursales } from "./disponibilidad-sucursales";
 import {
+  agotadosParaGuardar,
   cajasQueNoRespetanMenu,
-  edicionesDeForm,
-  errorPreciosForm,
   filasFormIniciales,
-  filasParaGuardar,
-  guardarMenuSucursal,
+  guardarAgotado,
   leerMenuDeProducto,
   listarSucursalesMenu,
+  precioValido,
   type FilaFormMenu,
   type FilaMenuSucursal,
 } from "../lib/menu-sucursal";
+import { guardarFilaDeMenu, leerFilasDeMenu } from "../lib/menus";
+import { useMenuCatalogo } from "./selector-menu";
 import type { Caja } from "../lib/configuracion";
 
 const input =
@@ -93,27 +94,75 @@ export function ProductoForm({
   const [claveSat, setClaveSat] = useState(producto?.clave_sat ?? "");
   const [tasaIva, setTasaIva] = useState(producto ? String(producto.tasa_iva) : "16");
   const [ivaIncluido, setIvaIncluido] = useState(producto?.iva_incluido_en_precio ?? true);
-  // Menú por sucursal (ADR 0027). `menu` tiene una fila por sucursal activa; con dos o más, la
-  // sección Disponibilidad muestra la tabla y el agotado deja de estar en el selector.
-  const [menu, setMenu] = useState<FilaFormMenu[]>([]);
+  // Menú del catálogo (ADR 0029). `menuCat` es el menú que se está administrando: el precio y «se
+  // vende» que se editan aquí son los de ese menú. Sin franja de menús (una sola sucursal y ningún
+  // menú propio) el formulario se ve y guarda como siempre.
+  const menuCat = useMenuCatalogo();
+  const enMenu = menuCat.visible && menuCat.listo;
+  const [seVende, setSeVende] = useState(producto?.en_menu_general ?? true);
+  // ¿Ya se cargó el precio y el «se vende» del menú elegido? Hasta entonces no se puede guardar.
+  const [filaMenuLista, setFilaMenuLista] = useState(false);
+  // «Agotado hoy» (0155): una fila por sucursal activa; con dos o más, Disponibilidad muestra la
+  // tabla y el agotado deja de estar en el selector.
+  const [agotados, setAgotados] = useState<FilaFormMenu[]>([]);
   const [menuExistente, setMenuExistente] = useState<FilaMenuSucursal[]>([]);
   const [menuListo, setMenuListo] = useState(false);
   const [cajasViejas, setCajasViejas] = useState<Caja[]>([]);
   // Id del producto recién creado: si luego falla el menú, el siguiente «Guardar» lo actualiza.
   const [idCreado, setIdCreado] = useState<string | null>(null);
-  const multi = menu.length >= 2;
+  const multi = agotados.length >= 2;
+  const cargando = !menuCat.listo || (editar && enMenu && !filaMenuLista);
   const [error, setError] = useState<string | null>(null);
   const [guardando, setGuardando] = useState(false);
 
-  // ¿Hay cambios sin guardar? Se compara contra lo que había al abrir (o al último guardado).
-  const valores = JSON.stringify([nombre, categoriaId, marcaId, areaId, precio, descripcion, codigo, estado, agotado, visible, claveSat, tasaIva, ivaIncluido, menu]);
-  const guardado = useRef(valores);
-  const sucio = valores !== guardado.current;
+  // ¿Hay cambios sin guardar? Se compara contra lo que había al abrir (o al último guardado). De las
+  // sucursales solo cuenta el agotado: su precio y «se vende» los proyecta la base y cambian solos.
+  const valores = JSON.stringify([nombre, categoriaId, marcaId, areaId, precio, descripcion, codigo, estado, agotado, visible, claveSat, tasaIva, ivaIncluido, seVende, agotados.map((f) => [f.sucursalId, f.agotado])]);
+  const [base, setBase] = useState(valores);
+  const sucio = valores !== base;
+
   // El menú llega después del primer render: al llegar, lo cargado es el punto de partida, no un cambio.
   useEffect(() => {
-    if (menuListo) guardado.current = valores;
+    if (menuListo && filaMenuLista) setBase(valores);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- solo al terminar de cargar
-  }, [menuListo]);
+  }, [menuListo, filaMenuLista]);
+
+  // El precio y «se vende» de este producto en el menú elegido. En el General salen del producto;
+  // en un menú propio, de su fila de menu_productos.
+  useEffect(() => {
+    if (!menuCat.listo) return;
+    if (!producto || !enMenu) {
+      setFilaMenuLista(true);
+      return;
+    }
+    if (menuCat.esGeneral) {
+      setPrecio(String(producto.precio_base_mxn));
+      setSeVende(producto.en_menu_general);
+      setFilaMenuLista(true);
+      return;
+    }
+    let vivo = true;
+    setFilaMenuLista(false);
+    leerFilasDeMenu(menuCat.id)
+      .then((filas) => {
+        if (!vivo) return;
+        const f = filas.get(producto.id);
+        if (!f) {
+          setError("Este producto no está en este menú. Recarga la página.");
+          return;
+        }
+        setPrecio(String(f.precio_mxn));
+        setSeVende(f.disponible);
+        setFilaMenuLista(true);
+      })
+      .catch(() => {
+        if (vivo) setError("No se pudo leer el precio de este menú");
+      });
+    return () => {
+      vivo = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- `producto` no cambia mientras el formulario vive
+  }, [producto, menuCat.listo, menuCat.id, enMenu]);
   useEffect(() => {
     if (!sucio) return;
     const avisar = (e: BeforeUnloadEvent) => e.preventDefault();
@@ -134,12 +183,12 @@ export function ProductoForm({
       .then(([sucursales, filas]) => {
         const iniciales = filasFormIniciales(sucursales, filas);
         setMenuExistente(filas);
-        setMenu(iniciales);
+        setAgotados(iniciales);
         // Con una sola sucursal, «Agotado» del selector es el de esa sucursal.
         if (iniciales.length === 1 && iniciales[0]!.agotado) setAgotado(true);
         setMenuListo(true);
       })
-      .catch(() => setError("No se pudo leer el menú por sucursal"));
+      .catch(() => setError("No se pudo leer el agotado por sucursal"));
     cajasQueNoRespetanMenu().then(setCajasViejas).catch(() => setCajasViejas([]));
     // eslint-disable-next-line react-hooks/exhaustive-deps -- `producto` no cambia mientras el formulario vive
   }, [producto]);
@@ -166,44 +215,75 @@ export function ProductoForm({
       setError(parsed.error.issues[0]?.message ?? "Revisa los datos del producto.");
       return;
     }
-    // Antes de tocar la base: un precio por sucursal que no es número (un «.» suelto) no se guarda.
-    const errorPrecio = errorPreciosForm(menu);
-    if (errorPrecio) {
-      setError(errorPrecio);
+    // Antes de tocar la base: un «.» suelto (que limpiarPrecio deja en «0.») no es precio.
+    const precioMenu = precioValido(precio);
+    if (precioMenu === null || precioMenu === "invalido") {
+      setError("Escribe un precio válido.");
       return;
     }
     setGuardando(true);
     try {
-      // Si el producto ya se creó en un intento anterior (y falló el menú), se actualiza: no se duplica.
+      // Si el producto ya se creó en un intento anterior (y falló lo que sigue), se actualiza: no se duplica.
       const idPrevio = producto?.id ?? idCreado;
+      const enPropio = enMenu && !menuCat.esGeneral;
       let id: string;
       if (idPrevio) {
-        await actualizarProducto(idPrevio, parsed.data);
+        // En un menú propio el precio tecleado es el del menú, no el del General: al producto se le
+        // manda el suyo de siempre (solo si ya existía antes de abrir el formulario).
+        const datos = enPropio && producto ? { ...parsed.data, precio_base_mxn: producto.precio_base_mxn } : parsed.data;
+        await actualizarProducto(idPrevio, datos);
         id = idPrevio;
+        if (enMenu) {
+          await guardarFilaDeMenu(
+            menuCat.id,
+            id,
+            enPropio ? { precio_mxn: precioMenu, disponible: seVende } : { disponible: seVende },
+          );
+        }
       } else {
-        id = await crearProducto(parsed.data);
+        id = await crearProducto(parsed.data, enPropio ? { enMenuGeneral: false } : {});
         setIdCreado(id);
+        // Nace en todos los menús al precio tecleado; aquí se ajusta el menú elegido.
+        const ajuste = enPropio ? { disponible: seVende, precio_mxn: precioMenu } : !seVende ? { disponible: false } : null;
+        if (enMenu && ajuste) {
+          try {
+            await guardarFilaDeMenu(menuCat.id, id, ajuste);
+          } catch {
+            setError("El producto se creó, pero no se pudo encender en este menú. Vuelve a intentar.");
+            setGuardando(false);
+            return;
+          }
+        }
       }
       try {
         // Con una sola sucursal, el agotado del selector va a la fila de esa sucursal.
-        const filasForm = multi ? menu : menu.map((f) => ({ ...f, agotado }));
-        const enviadas = filasParaGuardar(edicionesDeForm(id, filasForm), menuExistente);
-        await guardarMenuSucursal(enviadas);
-        // Solo las filas que de verdad se mandaron cuentan como existentes: una sucursal en valores
-        // por defecto sin fila no debe crearse en un segundo «Guardar».
+        const filasForm = multi ? agotados : agotados.map((f) => ({ ...f, agotado }));
+        const enviadas = agotadosParaGuardar(
+          id,
+          filasForm.map((f) => ({ sucursalId: f.sucursalId, agotado: f.agotado })),
+          menuExistente,
+        );
+        await guardarAgotado(enviadas);
+        // Solo las filas que de verdad se mandaron cuentan como existentes: una sucursal sin agotar
+        // y sin fila no debe crearse en un segundo «Guardar».
         setMenuExistente((prev) => [
           ...prev,
           ...enviadas
             .filter((e) => !prev.some((p) => p.sucursal_id === e.sucursal_id))
-            .map((e) => ({ ...e, agotado_automatico: filasForm.find((f) => f.sucursalId === e.sucursal_id)?.agotadoAuto ?? false })),
+            .map((e) => ({
+              ...e,
+              disponible: true,
+              precio_mxn: null,
+              agotado_automatico: filasForm.find((f) => f.sucursalId === e.sucursal_id)?.agotadoAuto ?? false,
+            })),
         ]);
       } catch {
-        setError("El producto se guardó, pero no el menú por sucursal. Vuelve a intentar.");
+        setError("El producto se guardó, pero no el agotado por sucursal. Vuelve a intentar.");
         setGuardando(false);
         return;
       }
       if (guardarTambien) await guardarTambien();
-      guardado.current = valores;
+      setBase(valores);
       if (alGuardar) {
         // Aquí no se navega: el componente sigue montado, así que el botón vuelve a habilitarse.
         setGuardando(false);
@@ -251,9 +331,12 @@ export function ProductoForm({
 
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <div>
-            <label className={label} htmlFor="precio">
-              Precio
-            </label>
+            <div className="flex items-baseline justify-between gap-2">
+              <label className={label} htmlFor="precio">
+                Precio
+              </label>
+              {enMenu && <span className="mb-1.5 truncate text-13 text-ink-2">en {menuCat.nombre}</span>}
+            </div>
             <div className="relative">
               <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-ink-2" aria-hidden="true">$</span>
               <input
@@ -262,6 +345,7 @@ export function ProductoForm({
                 value={precio}
                 inputMode="decimal"
                 onChange={(e) => setPrecio(limpiarPrecio(e.target.value))}
+                disabled={editar && enMenu && !filaMenuLista}
                 placeholder="0.00"
                 aria-describedby="precio-ayuda"
               />
@@ -294,16 +378,21 @@ export function ProductoForm({
             <select
               id="estado"
               className={input}
-              value={!multi && agotado ? "AGOTADO" : estado}
+              value={!multi && agotado ? "AGOTADO" : enMenu && estado === "ACTIVO" && !seVende ? "NO_SE_VENDE" : estado}
               onChange={(e) => {
                 const v = e.target.value;
                 setAgotado(v === "AGOTADO");
-                if (v !== "AGOTADO") setEstado(v as "ACTIVO" | "PAUSADO");
+                if (v === "AGOTADO") return;
+                setEstado(v === "PAUSADO" ? "PAUSADO" : "ACTIVO");
+                if (enMenu) setSeVende(v !== "NO_SE_VENDE");
               }}
             >
               <option value="ACTIVO">Se vende</option>
+              {enMenu && <option value="NO_SE_VENDE">No se vende en este menú</option>}
               {!multi && <option value="AGOTADO">Agotado · se ve en gris y no se puede vender</option>}
-              <option value="PAUSADO">{multi ? "Pausado · no aparece en ninguna sucursal" : "Pausado · no aparece"}</option>
+              <option value="PAUSADO">
+                {enMenu ? "Pausado · no aparece en ningún menú" : multi ? "Pausado · no aparece en ninguna sucursal" : "Pausado · no aparece"}
+              </option>
             </select>
           </div>
           <label className="flex min-h-[44px] items-center gap-2.5">
@@ -316,13 +405,23 @@ export function ProductoForm({
             <>
               <AvisoCajasMenu cajas={cajasViejas} />
               <DisponibilidadSucursales
-                filas={menu}
-                precioGeneral={precio.trim() === "" ? null : Number(precio)}
+                filas={agotados}
                 onCambio={(sucursalId, cambio) =>
-                  setMenu((prev) => prev.map((f) => (f.sucursalId === sucursalId ? { ...f, ...cambio } : f)))
+                  setAgotados((prev) => prev.map((f) => (f.sucursalId === sucursalId ? { ...f, ...cambio } : f)))
                 }
               />
             </>
+          )}
+          {enMenu && (
+            <p className="text-13 text-ink-2">
+              {!editar && !menuCat.esGeneral && (
+                <>
+                  <b className="font-semibold text-ink">Solo se venderá en {menuCat.nombre}.</b>{" "}
+                </>
+              )}
+              El precio y si se vende son de {menuCat.nombre}. El nombre, la categoría y los datos fiscales son del producto y valen
+              para todos los menús.
+            </p>
           )}
         </fieldset>
 
@@ -445,7 +544,7 @@ export function ProductoForm({
           <Button variant="ghost" onClick={() => void volver()} disabled={guardando}>
             {editar ? "Volver" : "Cancelar"}
           </Button>
-          <Button type="submit" disabled={guardando}>
+          <Button type="submit" disabled={guardando || cargando}>
             {guardando ? "Guardando…" : editar ? "Guardar cambios" : "Crear producto"}
           </Button>
         </div>

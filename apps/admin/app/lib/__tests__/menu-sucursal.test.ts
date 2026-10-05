@@ -1,14 +1,9 @@
 import { describe, it, expect } from "vitest";
 import {
+  agotadosParaGuardar,
   cajasSinMenuPorSucursal,
-  edicionesDeForm,
-  errorPreciosForm,
-  esPorDefecto,
-  estadoEnSucursal,
   estadoGeneral,
-  filaPorDefecto,
   filasFormIniciales,
-  filasParaGuardar,
   precioValido,
   versionMenor,
   VERSION_MINIMA_MENU_SUCURSAL,
@@ -16,20 +11,17 @@ import {
 } from "../menu-sucursal";
 
 const fila = (sucursal_id: string, extra: Partial<FilaMenuSucursal> = {}): FilaMenuSucursal => ({
-  ...filaPorDefecto("p1", sucursal_id), ...extra,
+  producto_id: "p1",
+  sucursal_id,
+  disponible: true,
+  precio_mxn: null,
+  agotado_manual: false,
+  agotado_automatico: false,
+  ...extra,
 });
 
-describe("estado en una sucursal (misma regla que 0152 y que la caja)", () => {
-  it("sin fila, se vende", () => {
-    expect(estadoEnSucursal("ACTIVO", undefined)).toBe("ACTIVO");
-  });
-  it("orden: pausado gana, luego no se vende, luego agotado", () => {
-    expect(estadoEnSucursal("PAUSADO", fila("n", { disponible: false }))).toBe("PAUSADO");
-    expect(estadoEnSucursal("ACTIVO", fila("n", { disponible: false, agotado_manual: true }))).toBe("NO_SE_VENDE");
-    expect(estadoEnSucursal("ACTIVO", fila("n", { agotado_automatico: true }))).toBe("AGOTADO");
-    expect(estadoEnSucursal("AGOTADO", undefined)).toBe("AGOTADO");
-  });
-  it("en «todas», agotado es «agotado en todas» (las columnas derivadas)", () => {
+describe("estado en «todas»", () => {
+  it("agotado es «agotado en todas» (las columnas derivadas)", () => {
     expect(estadoGeneral({ estado: "ACTIVO", agotado_manual: false, agotado_automatico: true })).toBe("AGOTADO");
     expect(estadoGeneral({ estado: "PAUSADO", agotado_manual: true, agotado_automatico: false })).toBe("PAUSADO");
     expect(estadoGeneral({ estado: "ACTIVO", agotado_manual: false, agotado_automatico: false })).toBe("ACTIVO");
@@ -37,28 +29,7 @@ describe("estado en una sucursal (misma regla que 0152 y que la caja)", () => {
 });
 
 describe("qué se guarda", () => {
-  it("una fila en los valores por defecto es igual que no tenerla", () => {
-    expect(esPorDefecto({ disponible: true, precio_mxn: null, agotado_manual: false })).toBe(true);
-    expect(esPorDefecto({ disponible: true, precio_mxn: 0, agotado_manual: false })).toBe(false);
-  });
-  it("no crea filas por defecto, pero sí regresa a lo general una que ya existía", () => {
-    const ediciones = edicionesDeForm("p1", [
-      { sucursalId: "centro", nombre: "Centro", disponible: true, precio: "", agotado: false, agotadoAuto: false },
-      { sucursalId: "norte", nombre: "Norte", disponible: true, precio: "", agotado: false, agotadoAuto: false },
-      { sucursalId: "sur", nombre: "Sur", disponible: false, precio: "", agotado: false, agotadoAuto: false },
-    ]);
-    const r = filasParaGuardar(ediciones, [{ sucursal_id: "norte" }]);
-    expect(r.map((e) => e.sucursal_id)).toEqual(["norte", "sur"]);
-  });
-  it("del formulario: precio vacío = general (null), con texto = número", () => {
-    const [a, b] = edicionesDeForm("p1", [
-      { sucursalId: "c", nombre: "C", disponible: true, precio: "", agotado: true, agotadoAuto: false },
-      { sucursalId: "n", nombre: "N", disponible: true, precio: "135.5", agotado: false, agotadoAuto: false },
-    ]);
-    expect(a).toEqual({ producto_id: "p1", sucursal_id: "c", disponible: true, precio_mxn: null, agotado_manual: true });
-    expect(b!.precio_mxn).toBe(135.5);
-  });
-  it("un precio que no es número no se guarda: un «.» suelto no es $0.00", () => {
+  it("un precio que no es número no es precio: un «.» suelto no es $0.00", () => {
     expect(precioValido("")).toBeNull();
     expect(precioValido("  ")).toBeNull();
     expect(precioValido("0")).toBe(0);
@@ -73,15 +44,6 @@ describe("qué se guarda", () => {
     expect(precioValido("-5")).toBe("invalido");
     expect(precioValido("abc")).toBe("invalido");
   });
-  it("del formulario: un precio inválido bloquea el guardado y nombra la sucursal", () => {
-    const filas = [
-      { sucursalId: "c", nombre: "Centro", disponible: true, precio: "120", agotado: false, agotadoAuto: false },
-      { sucursalId: "n", nombre: "Norte", disponible: true, precio: "0.", agotado: false, agotadoAuto: false },
-    ];
-    expect(errorPreciosForm(filas)).toBe("Precio inválido en Norte");
-    expect(() => edicionesDeForm("p1", filas)).toThrow("Precio inválido en Norte");
-    expect(errorPreciosForm([filas[0]!])).toBeNull();
-  });
   it("las filas del formulario salen de las sucursales, con lo guardado encima", () => {
     const r = filasFormIniciales(
       [{ id: "c", nombre: "Centro" }, { id: "n", nombre: "Norte" }],
@@ -90,6 +52,24 @@ describe("qué se guarda", () => {
     expect(r).toEqual([
       { sucursalId: "c", nombre: "Centro", disponible: true, precio: "", agotado: false, agotadoAuto: false },
       { sucursalId: "n", nombre: "Norte", disponible: true, precio: "135", agotado: false, agotadoAuto: true },
+    ]);
+  });
+});
+
+describe("agotado hoy por sucursal (0155)", () => {
+  it("manda las que se agotan y las que ya tenían fila; no crea filas para lo que no cambia", () => {
+    const r = agotadosParaGuardar(
+      "p1",
+      [
+        { sucursalId: "centro", agotado: true },
+        { sucursalId: "norte", agotado: false },
+        { sucursalId: "sur", agotado: false },
+      ],
+      [{ sucursal_id: "norte" }],
+    );
+    expect(r).toEqual([
+      { producto_id: "p1", sucursal_id: "centro", agotado_manual: true },
+      { producto_id: "p1", sucursal_id: "norte", agotado_manual: false },
     ]);
   });
 });
