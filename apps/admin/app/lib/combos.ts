@@ -33,12 +33,12 @@ export type ComboInput = z.infer<typeof comboSchema>;
 /** Clave sugerida al crear: comida rápida (spec §5). */
 export const CLAVE_SAT_COMBO = "90101503";
 
-export type ComboResumen = { id: string; nombre: string; categoriaNombre: string; precio_base_mxn: number; estado: string; nSlots: number };
+export type ComboResumen = { id: string; nombre: string; categoriaNombre: string; precio_base_mxn: number; estado: string; nSlots: number; en_menu_general: boolean };
 
 export async function listarCombos(): Promise<ComboResumen[]> {
   const { data, error } = await supabase
     .from("productos")
-    .select("id, nombre, precio_base_mxn, estado, categoria:categorias(nombre), slots:combo_grupos(count)")
+    .select("id, nombre, precio_base_mxn, estado, en_menu_general, categoria:categorias(nombre), slots:combo_grupos(count)")
     .eq("es_combo", true)
     .is("deleted_at", null)
     .order("orden_visualizacion", { ascending: true });
@@ -50,6 +50,7 @@ export async function listarCombos(): Promise<ComboResumen[]> {
     precio_base_mxn: Number(f.precio_base_mxn),
     estado: String(f.estado),
     nSlots: ((f.slots as { count: number }[] | null)?.[0]?.count) ?? 0,
+    en_menu_general: f.en_menu_general !== false,
   }));
 }
 

@@ -1,6 +1,6 @@
 "use client";
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@vim/ui/styles";
 import { PageHeader, PageBody } from "../../../components/page-header";
@@ -9,6 +9,16 @@ import { FranjaMenus, useMenuCatalogo } from "../../../components/selector-menu"
 import { activarComboUpsell, leerComboUpsellActivo, listarCombos, type ComboResumen } from "../../../lib/combos";
 import { precioMxn } from "../../../lib/catalogo";
 import { mensajeError } from "../../../lib/errores";
+import { limpiarPrecio } from "../../../lib/numeros";
+import { precioValido } from "../../../lib/menu-sucursal";
+import {
+  MENU_GENERAL,
+  estadoEnMenu,
+  guardarFilaDeMenu,
+  leerFilasDeMenu,
+  type FilaDeMenu,
+  type MenuId,
+} from "../../../lib/menus";
 
 // Mismo estilo que BADGE en catalogo/productos/page.tsx: un combo también puede quedar AGOTADO
 // (el formulario de producto lo permite), y sin esta entrada el fallback lo mostraba como "Pausado".
@@ -16,7 +26,36 @@ const ESTADO: Record<string, { txt: string; cls: string; dot: string }> = {
   ACTIVO: { txt: "Activo", cls: "bg-success-soft text-success", dot: "bg-success" },
   PAUSADO: { txt: "Pausado", cls: "bg-hover text-ink-3", dot: "bg-ink-3" },
   AGOTADO: { txt: "Agotado", cls: "bg-[#FBF1EF] text-danger", dot: "bg-danger" },
+  NO_SE_VENDE: { txt: "No se vende aquí", cls: "bg-hover text-ink-2", dot: "bg-ink-3" },
 };
+const SIN_FILAS: Map<string, FilaDeMenu> = new Map();
+
+/** Los combos del General: lo que dicen los propios productos. */
+function filasDeCombos(combos: ComboResumen[]): Map<string, FilaDeMenu> {
+  return new Map(combos.map((c) => [c.id, { disponible: c.en_menu_general, precio_mxn: c.precio_base_mxn }]));
+}
+
+/**
+ * Casilla «se vende en este menú». El área de toque es la etiqueta (44 px en táctil, 40 en escritorio);
+ * la casilla visible sigue en 20 px. Mientras guarda no se usa `disabled`: deshabilitar el elemento
+ * enfocado le quita el foco al teclado.
+ */
+function CasillaMenu({ marcada, ocupada, etiqueta, onCambiar }: { marcada: boolean; ocupada: boolean; etiqueta: string; onCambiar: (v: boolean) => void }) {
+  return (
+    <label className={["flex h-11 w-11 items-center justify-center lg:h-10 lg:w-10", ocupada ? "cursor-wait" : "cursor-pointer"].join(" ")}>
+      <input
+        type="checkbox"
+        className="h-5 w-5 accent-ink"
+        aria-label={etiqueta}
+        aria-disabled={ocupada}
+        checked={marcada}
+        onChange={(e) => {
+          if (!ocupada) onCambiar(e.target.checked);
+        }}
+      />
+    </label>
+  );
+}
 
 function Pasos({ n }: { n: number }) {
   return n === 0 ? (
@@ -39,6 +78,22 @@ export default function CombosPage() {
   const [okMsg, setOkMsg] = useState<string | null>(null);
   const [ofrecer, setOfrecer] = useState<boolean | null>(null);
   const [cambiando, setCambiando] = useState(false);
+  // Menús del catálogo (ADR 0029): con dos o más sucursales o algún menú propio, cada combo se ajusta por menú.
+  const modoMenu = menu.visible && menu.listo;
+  const [filas, setFilas] = useState<Map<string, FilaDeMenu>>(new Map());
+  // A qué menú pertenecen `filas`: mientras no coincida con el elegido, el menú no se muestra ni se edita.
+  const [filasDe, setFilasDe] = useState<MenuId | null>(null);
+  // Renglones con una escritura en cola o en curso (un id por escritura).
+  const [guardando, setGuardando] = useState<string[]>([]);
+  // Se incrementa cuando un guardado falla: obliga a remontar los campos con lo que sí quedó guardado.
+  const [recarga, setRecarga] = useState(0);
+  // Las escrituras salen de estos refs, no del cierre del render: cada una ve lo último guardado.
+  const menuRef = useRef<MenuId>(menu.id);
+  menuRef.current = menu.id;
+  const filasRef = useRef<{ de: MenuId | null; filas: Map<string, FilaDeMenu> }>({ de: null, filas: new Map() });
+  const colaRef = useRef<Promise<void>>(Promise.resolve());
+  const cargandoFilas = modoMenu && filasDe !== menu.id;
+  const filasVista = filasDe === menu.id ? filas : SIN_FILAS;
 
   async function recargar() {
     setError(null);
@@ -71,6 +126,104 @@ export default function CombosPage() {
     } finally {
       setCambiando(false);
     }
+  }
+
+  function aplicarFilas(de: MenuId, mapa: Map<string, FilaDeMenu>) {
+    filasRef.current = { de, filas: mapa };
+    setFilas(mapa);
+    setFilasDe(de);
+  }
+
+  useEffect(() => {
+    // Al cambiar de menú se olvida el anterior antes de leer el nuevo.
+    filasRef.current = { de: null, filas: new Map() };
+    setFilas(new Map());
+    setFilasDe(null);
+    if (!modoMenu || combos === null) return;
+    if (menu.esGeneral) {
+      aplicarFilas(MENU_GENERAL, filasDeCombos(combos));
+      return;
+    }
+    let vivo = true;
+    const id = menu.id;
+    leerFilasDeMenu(id)
+      .then((fs) => {
+        if (vivo) aplicarFilas(id, fs);
+      })
+      .catch((e) => {
+        if (vivo) setError(mensajeError(e, "No se pudo leer el menú"));
+      });
+    return () => {
+      vivo = false;
+    };
+  }, [menu.id, menu.esGeneral, modoMenu, combos]);
+
+  /** Lo que se ve de un combo en el menú elegido; en el modo de siempre, su estado global. */
+  function claveEstado(c: ComboResumen, fila: FilaDeMenu | undefined): string {
+    if (!modoMenu) return c.estado;
+    const e = estadoEnMenu(c.estado, fila?.disponible ?? true);
+    // Un combo AGOTADO heredado se sigue viendo como hoy.
+    return e === "ACTIVO" && c.estado === "AGOTADO" ? "AGOTADO" : e;
+  }
+
+  /**
+   * Una escritura a la vez y ninguna se pierde: cada una se encadena a la anterior (mismo patrón que
+   * Productos). Al terminar se vuelve a leer: lo que se ve es lo guardado. Solo el renglón en cola se
+   * atenúa; el resto de la tabla sigue libre.
+   */
+  function guardarFila(c: ComboResumen, cambio: Partial<FilaDeMenu>) {
+    const m = menu.id;
+    if (!modoMenu || filasRef.current.de !== m) return;
+    setGuardando((g) => [...g, c.id]);
+    colaRef.current = colaRef.current.then(async () => {
+      try {
+        // Si mientras esperaba en la cola se cambió de menú, esta escritura ya no aplica.
+        if (menuRef.current !== m || filasRef.current.de !== m) return;
+        setError(null);
+        const releer = async () => {
+          if (m === MENU_GENERAL) {
+            const nuevos = await listarCombos();
+            if (menuRef.current === m) {
+              // Los renglones conservan su lugar: con el mismo orden_visualizacion la base puede devolverlos en otro orden.
+              setCombos((previos) => {
+                if (!previos) return nuevos;
+                const lugar = new Map(previos.map((x, i) => [x.id, i]));
+                return [...nuevos].sort((a, b) => (lugar.get(a.id) ?? 1e9) - (lugar.get(b.id) ?? 1e9));
+              });
+              aplicarFilas(m, filasDeCombos(nuevos));
+            }
+          } else {
+            const fs = await leerFilasDeMenu(m);
+            if (menuRef.current === m) aplicarFilas(m, fs);
+          }
+        };
+        try {
+          await guardarFilaDeMenu(m, c.id, cambio);
+        } catch (e) {
+          if (menuRef.current === m) {
+            setError(mensajeError(e, "No se pudo guardar el menú"));
+            // Los campos se remontan con lo que sí quedó guardado.
+            try {
+              await releer();
+              if (menuRef.current === m) setRecarga((n) => n + 1);
+            } catch {
+              /* el error de guardado ya está a la vista */
+            }
+          }
+          return;
+        }
+        try {
+          await releer();
+        } catch (e) {
+          if (menuRef.current === m) setError(mensajeError(e, "Se guardó, pero no se pudo releer el menú"));
+        }
+      } finally {
+        setGuardando((g) => {
+          const i = g.indexOf(c.id);
+          return i < 0 ? g : [...g.slice(0, i), ...g.slice(i + 1)];
+        });
+      }
+    });
   }
 
   const sinNada = combos !== null && combos.length === 0;
@@ -128,21 +281,26 @@ export default function CombosPage() {
         {combos !== null && combos.length > 0 && (
           <ul className="flex flex-col gap-2.5 lg:hidden">
             {combos.map((c) => {
-              const e = ESTADO[c.estado] ?? ESTADO.PAUSADO!;
+              const fila = filasVista.get(c.id);
+              const e = ESTADO[claveEstado(c, fila)] ?? ESTADO.PAUSADO!;
               return (
                 <li key={c.id}>
                   <Link href={`/catalogo/combos/${c.id}`} className="flex flex-col gap-2 rounded-lg border border-line bg-surface p-4 transition-[border-color,transform] duration-150 ease-vim hover:border-ink active:scale-[.99]">
                     <span className="flex items-start justify-between gap-3">
                       <span className="text-15 font-semibold">{c.nombre}</span>
-                      <span className="flex-shrink-0 font-display text-15 font-semibold tabular-nums">{precioMxn(c.precio_base_mxn)}</span>
+                      <span className="flex-shrink-0 font-display text-15 font-semibold tabular-nums">
+                        {!modoMenu ? precioMxn(c.precio_base_mxn) : fila ? precioMxn(fila.precio_mxn) : "…"}
+                      </span>
                     </span>
                     <span className="text-13 text-ink-2">{c.categoriaNombre}</span>
                     <span className="flex flex-wrap items-center gap-2">
                       <Pasos n={c.nSlots} />
-                      <span className={["inline-flex items-center gap-1.5 rounded-full px-[11px] py-1 text-13 font-semibold", e.cls].join(" ")}>
-                        <span className={["h-1.5 w-1.5 rounded-full", e.dot].join(" ")} />
-                        {e.txt}
-                      </span>
+                      {!cargandoFilas && (
+                        <span className={["inline-flex items-center gap-1.5 whitespace-nowrap rounded-full px-[11px] py-1 text-13 font-semibold", e.cls].join(" ")}>
+                          <span className={["h-1.5 w-1.5 rounded-full", e.dot].join(" ")} />
+                          {e.txt}
+                        </span>
+                      )}
                     </span>
                   </Link>
                 </li>
@@ -158,31 +316,78 @@ export default function CombosPage() {
                 <tr>
                   <th className="border-b border-line bg-sel px-4 py-[13px] text-left text-12 font-semibold uppercase tracking-wide text-ink-2">Combo</th>
                   <th className="w-[180px] border-b border-line bg-sel px-4 py-[13px] text-left text-12 font-semibold uppercase tracking-wide text-ink-2">Categoría</th>
-                  <th className="w-[120px] border-b border-line bg-sel px-4 py-[13px] text-right text-12 font-semibold uppercase tracking-wide text-ink-2">Precio base</th>
+                  {modoMenu && <th className="w-[120px] border-b border-line bg-sel px-4 py-[13px] text-left text-12 font-semibold uppercase tracking-wide text-ink-2">{menu.esGeneral ? "Se vende" : "En este menú"}</th>}
+                  <th className={`${modoMenu ? "w-[150px]" : "w-[120px]"} border-b border-line bg-sel px-4 py-[13px] text-right text-12 font-semibold uppercase tracking-wide text-ink-2`}>Precio base</th>
                   <th className="w-[240px] border-b border-line bg-sel px-4 py-[13px] text-left text-12 font-semibold uppercase tracking-wide text-ink-2">Pasos</th>
-                  <th className="w-[110px] border-b border-line bg-sel px-4 py-[13px] text-left text-12 font-semibold uppercase tracking-wide text-ink-2">Estado</th>
+                  <th className={`${modoMenu ? "w-[160px]" : "w-[110px]"} border-b border-line bg-sel px-4 py-[13px] text-left text-12 font-semibold uppercase tracking-wide text-ink-2`}>Estado</th>
                 </tr>
               </thead>
               <tbody>
                 {combos.map((c) => {
-                  const e = ESTADO[c.estado] ?? ESTADO.PAUSADO!;
+                  const fila = filasVista.get(c.id);
+                  const e = ESTADO[claveEstado(c, fila)] ?? ESTADO.PAUSADO!;
+                  const enCola = guardando.includes(c.id);
+                  const bloqueado = cargandoFilas || enCola;
                   return (
-                    <tr key={c.id} className="cursor-pointer border-b border-line last:border-none hover:bg-hover" onClick={() => router.push(`/catalogo/combos/${c.id}`)}>
+                    <tr key={c.id} className={["cursor-pointer border-b border-line last:border-none hover:bg-hover", enCola ? "opacity-50" : ""].join(" ")} onClick={() => router.push(`/catalogo/combos/${c.id}`)}>
                       <td className="px-4 py-3.5 text-15 font-semibold">
                         <Link href={`/catalogo/combos/${c.id}`} className="rounded-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink" onClick={(ev) => ev.stopPropagation()}>
                           {c.nombre}
                         </Link>
                       </td>
                       <td className="px-4 py-3.5 text-14 text-ink-2">{c.categoriaNombre}</td>
-                      <td className="px-4 py-3.5 text-right font-display text-15 font-semibold tabular-nums">{precioMxn(c.precio_base_mxn)}</td>
+                      {modoMenu && (
+                        <td className="px-4 py-1" onClick={(ev) => ev.stopPropagation()}>
+                          <CasillaMenu
+                            marcada={fila?.disponible ?? true}
+                            ocupada={bloqueado}
+                            etiqueta={`${c.nombre} se vende en ${menu.nombre}`}
+                            onCambiar={(v) => guardarFila(c, { disponible: v })}
+                          />
+                        </td>
+                      )}
+                      {modoMenu ? (
+                        <td className="px-4 py-3.5" onClick={(ev) => ev.stopPropagation()}>
+                          <div className="relative ml-auto w-[120px]">
+                            <span aria-hidden="true" className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-sm text-ink-2">$</span>
+                            <input
+                              key={`${c.id}:${fila?.precio_mxn ?? ""}:${recarga}`}
+                              defaultValue={fila ? String(fila.precio_mxn) : ""}
+                              inputMode="decimal"
+                              aria-label={`Precio base de ${c.nombre} en ${menu.nombre}`}
+                              disabled={bloqueado || fila?.disponible === false}
+                              className="h-9 w-full rounded border border-line-strong pl-6 pr-2 text-right text-sm tabular-nums outline-none focus:border-ink disabled:bg-hover disabled:text-ink-3"
+                              onChange={(ev) => {
+                                ev.target.value = limpiarPrecio(ev.target.value);
+                              }}
+                              onKeyDown={(ev) => {
+                                if (ev.key === "Enter") ev.currentTarget.blur();
+                              }}
+                              onBlur={(ev) => {
+                                const nuevo = precioValido(ev.target.value);
+                                if (nuevo === "invalido" || nuevo === null) {
+                                  // Un "." suelto o un campo vacío no son un precio: en un menú el precio no puede quedar vacío.
+                                  ev.target.value = fila ? String(fila.precio_mxn) : "";
+                                  return;
+                                }
+                                if (nuevo !== fila?.precio_mxn) guardarFila(c, { precio_mxn: nuevo });
+                              }}
+                            />
+                          </div>
+                        </td>
+                      ) : (
+                        <td className="px-4 py-3.5 text-right font-display text-15 font-semibold tabular-nums">{precioMxn(c.precio_base_mxn)}</td>
+                      )}
                       <td className="px-4 py-3.5">
                         <Pasos n={c.nSlots} />
                       </td>
                       <td className="px-4 py-3.5">
-                        <span className={["inline-flex items-center gap-1.5 rounded-full px-[11px] py-1 text-13 font-semibold", e.cls].join(" ")}>
-                          <span className={["h-1.5 w-1.5 rounded-full", e.dot].join(" ")} />
-                          {e.txt}
-                        </span>
+                        {!cargandoFilas && (
+                          <span className={["inline-flex items-center gap-1.5 whitespace-nowrap rounded-full px-[11px] py-1 text-13 font-semibold", e.cls].join(" ")}>
+                            <span className={["h-1.5 w-1.5 rounded-full", e.dot].join(" ")} />
+                            {e.txt}
+                          </span>
+                        )}
                       </td>
                     </tr>
                   );
