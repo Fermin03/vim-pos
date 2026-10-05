@@ -29,35 +29,45 @@ import {
 
 type Filtro = "all" | "on" | "off";
 
-/** Casilla que admite el estado indeterminado (una categoría con parte de sus productos apagados). */
+/**
+ * Casilla que admite el estado indeterminado (una categoría con parte de sus productos apagados).
+ * El área de toque es la etiqueta (44 px en táctil, 40 en escritorio); la casilla visible sigue en 20 px.
+ * Mientras guarda no se usa `disabled`: deshabilitar el elemento enfocado le quita el foco al teclado.
+ */
 function Interruptor({
   marcada,
   parcial,
-  deshabilitada,
+  ocupada,
   etiqueta,
   onCambiar,
 }: {
   marcada: boolean;
   parcial: boolean;
-  deshabilitada: boolean;
+  ocupada: boolean;
   etiqueta: string;
   onCambiar: (encender: boolean) => void;
 }) {
   const ref = useRef<HTMLInputElement>(null);
+  // Sin lista de dependencias: React reescribe `checked` en cada clic y el estado indeterminado se perdería.
   useEffect(() => {
     if (ref.current) ref.current.indeterminate = parcial;
-  }, [parcial, marcada]);
+  });
   return (
-    <input
-      ref={ref}
-      type="checkbox"
-      className="h-5 w-5 accent-ink"
-      aria-label={etiqueta}
-      checked={marcada}
-      disabled={deshabilitada}
-      // Parcial: un clic enciende el resto. Encendida se apaga; apagada se enciende.
-      onChange={() => onCambiar(parcial ? true : !marcada)}
-    />
+    <label className={["flex h-11 w-11 items-center justify-center lg:h-10 lg:w-10", ocupada ? "cursor-wait" : "cursor-pointer"].join(" ")}>
+      <input
+        ref={ref}
+        type="checkbox"
+        className="h-5 w-5 accent-ink"
+        aria-label={etiqueta}
+        aria-checked={parcial ? "mixed" : marcada}
+        aria-disabled={ocupada}
+        checked={marcada}
+        // Parcial: un clic enciende el resto. Encendida se apaga; apagada se enciende.
+        onChange={() => {
+          if (!ocupada) onCambiar(parcial ? true : !marcada);
+        }}
+      />
+    </label>
   );
 }
 
@@ -137,10 +147,13 @@ export default function CategoriasPage() {
     if (modoMenu) void recargarProductos();
   }, [modoMenu]);
 
+  // Al cambiar de menú se olvida el anterior; al recargar el mismo menú se conserva lo que ya se ve hasta que llegue lo nuevo.
   useEffect(() => {
-    // Al cambiar de menú se olvida el anterior antes de leer el nuevo.
     setFilas(new Map());
     setFilasDe(null);
+  }, [menu.id, modoMenu]);
+
+  useEffect(() => {
     if (!modoMenu || prods === null) return;
     if (menu.esGeneral) {
       setFilas(filasDelGeneral(prods));
@@ -316,7 +329,7 @@ export default function CategoriasPage() {
                             <span className="text-xs text-ink-3">productos</span>
                           </>
                         ) : (
-                          <span className="text-13 text-ink-3">…</span>
+                          <span className="text-13 tabular-nums text-ink-3">…</span>
                         )
                       ) : (
                         <>
@@ -328,13 +341,16 @@ export default function CategoriasPage() {
                     {modoMenu && (
                       <td className="px-4 py-3.5">
                         {!conteo || estado === "vacia" ? (
-                          <span className="text-ink-3" aria-label="Sin productos">–</span>
+                          <>
+                            <span aria-hidden="true" className="text-ink-3">–</span>
+                            <span className="sr-only">{conteo ? "Sin productos" : "Cargando"}</span>
+                          </>
                         ) : (
                           <span className="inline-flex items-center gap-2">
                             <Interruptor
                               marcada={estado === "encendida"}
                               parcial={estado === "parcial"}
-                              deshabilitada={cargandoFilas || ocupada}
+                              ocupada={cargandoFilas || ocupada}
                               etiqueta={`${c.nombre} se vende en ${menu.nombre}`}
                               onCambiar={(encender) => void alternarCategoria(c, encender)}
                             />
