@@ -3,7 +3,7 @@
 -- (lo que lee la caja). Las RPCs crear/actualizar/eliminar se prueban al final (tarea 2).
 -- ============================================================================
 begin;
-select plan(41);
+select plan(53);
 
 \set t         '99999999-0000-0000-0000-0000000000aa'
 \set centro    '99999999-0000-0000-0000-0000000000bb'
@@ -16,6 +16,7 @@ select plan(41);
 \set otro      '37373737-0000-0000-0000-0000000000aa'
 \set menu_otro '37373737-0000-0000-0000-0000000000a9'
 \set suc_otro  '37373737-0000-0000-0000-0000000000b9'
+\set nueva     '37373737-0000-0000-0000-0000000000b3'
 
 -- SETUP (superusuario, sin request.path: las guardias no actúan)
 insert into tenant_limites (tenant_id, max_sucursales) values (:'t', 5)
@@ -196,6 +197,78 @@ select lives_ok(
   'actualizar una sucursal mandando su menu_id sin cambio sigue funcionando por REST');
 select is((select nombre from sucursales where id = :'norte'), 'León Norte (editada)',
   'y el cambio de nombre sí se guardó');
+
+reset role;
+
+-- 17) Una sucursal NUEVA nace proyectada: lo apagado en el General no se vende en ella. Sin esto,
+-- «sin fila» se leería como «se vende al precio base» (0152).
+update productos set en_menu_general = false where id = :'papas';
+insert into sucursales (id, tenant_id, codigo, nombre) values (:'nueva', :'t', 'KS', 'León Sur');
+select is(motivo_no_disponible_en_sucursal(:'papas', :'nueva'), 'NO_SE_VENDE',
+  'una sucursal nueva no vende lo que el General tiene apagado');
+select is(motivo_no_disponible_en_sucursal(:'clas', :'nueva'), null::text,
+  'y sí vende lo que el General vende');
+
+-- 18) Una sucursal que vuelve (restaurada o reactivada) trae al día lo que cambió mientras no estaba.
+update sucursales set deleted_at = now() where id = :'nueva';
+update productos set en_menu_general = false where id = :'clas';
+update sucursales set deleted_at = null where id = :'nueva';
+select is(motivo_no_disponible_en_sucursal(:'clas', :'nueva'), 'NO_SE_VENDE',
+  'una sucursal restaurada no vende lo que el General apagó mientras estaba dada de baja');
+update sucursales set activa = false where id = :'nueva';
+update productos set en_menu_general = true where id = :'papas';
+update sucursales set activa = true where id = :'nueva';
+select is(motivo_no_disponible_en_sucursal(:'papas', :'nueva'), null::text,
+  'una sucursal reactivada vende lo que el General encendió mientras estaba desactivada');
+update productos set en_menu_general = true where id = :'clas';
+
+-- 19) Renombrar un menú no le quita el suyo a una sucursal desactivada (el panel solo lista las activas).
+update sucursales set activa = false where id = :'norte';
+set local role authenticated;
+select set_config('request.jwt.claims', json_build_object('sub', :'dueno', 'role', 'authenticated', 'tenant_id', :'t')::text, true);
+select set_config('request.path', '/rpc/actualizar_menu', true);
+select lives_ok(
+  format($$ select actualizar_menu((select id from menus where tenant_id = %L and nombre = 'Menú del dueño'), 'Menú renombrado', array[]::uuid[]) $$, :'t'),
+  'el dueño renombra un menú cuya única sucursal está desactivada');
+reset role;
+select is((select m.nombre::text from sucursales s join menus m on m.id = s.menu_id where s.id = :'norte'), 'Menú renombrado',
+  'la sucursal desactivada conserva su menú');
+update sucursales set activa = true where id = :'norte';
+
+-- 20) «General» es el nombre del catálogo base: ningún menú propio se llama así.
+set local role authenticated;
+select set_config('request.jwt.claims', json_build_object('sub', :'dueno', 'role', 'authenticated', 'tenant_id', :'t')::text, true);
+select set_config('request.path', '/rpc/crear_menu', true);
+select throws_ok(
+  format($$ select crear_menu('  GENERAL ', array[%L]::uuid[]) $$, :'centro'),
+  '22023', 'Ese nombre es el del menú General. Elige otro.', 'no se crea un menú llamado General');
+select throws_ok(
+  format($$ select crear_menu('Menú   general', array[%L]::uuid[]) $$, :'centro'),
+  '22023', 'Ese nombre es el del menú General. Elige otro.', 'ni «Menú General», con los espacios que sean');
+select set_config('request.path', '/rpc/actualizar_menu', true);
+select throws_ok(
+  format($$ select actualizar_menu(%L, 'general', array[]::uuid[]) $$, :'menu'),
+  '22023', 'Ese nombre es el del menú General. Elige otro.', 'ni se renombra un menú a General');
+reset role;
+
+-- 21) Un menú eliminado no se asigna: ni por la RPC ni escribiendo la sucursal.
+update menus set deleted_at = now() where id = :'menu';
+set local role authenticated;
+select set_config('request.jwt.claims', json_build_object('sub', :'dueno', 'role', 'authenticated', 'tenant_id', :'t')::text, true);
+select set_config('request.path', '/rpc/actualizar_menu', true);
+select throws_ok(
+  format($$ select actualizar_menu(%L, 'Revivido', array[%L]::uuid[]) $$, :'menu', :'norte'),
+  '22023', null, 'un menú eliminado no se edita ni se asigna por RPC');
+reset role;
+select throws_ok(
+  format($$ update sucursales set menu_id = %L where id = %L $$, :'menu', :'centro'),
+  '23514', null, 'un menú eliminado no se asigna a una sucursal');
+
+-- 22) Alguien de otro negocio no lee las filas de los menús de este.
+set local role authenticated;
+select set_config('request.jwt.claims', json_build_object('sub', :'dueno', 'role', 'authenticated', 'tenant_id', :'otro')::text, true);
+select set_config('request.path', '/menu_productos', true);
+select is((select count(*)::int from menu_productos), 0, 'otro negocio no ve las filas de menu_productos');
 
 reset role;
 select * from finish();

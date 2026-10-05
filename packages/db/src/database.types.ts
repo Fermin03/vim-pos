@@ -11073,6 +11073,7 @@ export type Database = {
         Returns: undefined
       }
       _menu_exigir_permiso: { Args: never; Returns: string }
+      _menu_nombre_limpio: { Args: { p_nombre: string }; Returns: string }
       _menu_validar_sucursales: {
         Args: { p_sucursales: string[]; p_tenant: string }
         Returns: undefined

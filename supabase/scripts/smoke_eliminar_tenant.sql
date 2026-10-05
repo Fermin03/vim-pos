@@ -175,6 +175,14 @@ BEGIN
   VALUES (v_op, v_tenant, 'tenant.cancelado', 'Dejó de pagar hace tres meses', '{"estado":"CANCELADO"}'::jsonb);
   SELECT count(*) INTO v_bitacora FROM super_admin_accesos WHERE tenant_id = v_tenant;
 
+  -- Menús del catálogo (0155): un menú propio asignado a la sucursal y un producto apagado en el
+  -- General. Borrar `menus` pone sucursales.menu_id en NULL (FK) y eso dispara la proyección a
+  -- productos_sucursal: no puede dejar filas ni frenar el borrado.
+  PERFORM set_config('request.jwt.claims', json_build_object('sub', v_dueno::text, 'tenant_id', v_tenant::text)::text, true);
+  PERFORM crear_menu('Menú smoke eliminar', ARRAY[v_suc]);
+  UPDATE productos SET en_menu_general = false
+   WHERE id = (SELECT id FROM productos WHERE tenant_id = v_tenant AND deleted_at IS NULL ORDER BY id LIMIT 1);
+
   PERFORM set_config('request.jwt.claims', '', true);
 
   -- Que el fixture sea de verdad "realista": estas tablas tienen que traer filas.
@@ -186,7 +194,7 @@ BEGIN
       'clientes', 'direcciones_cliente', 'mesas', 'tickets_mesas', 'repartidores', 'delivery_asignaciones',
       'delivery_conexiones', 'delivery_pedidos', 'insumos', 'insumo_stock_sucursal', 'movimientos_inventario',
       'proveedores', 'compras', 'compra_lineas', 'tenant_addons', 'suscripciones', 'pagos_suscripcion',
-      'tickets_cfdi']) AS t
+      'tickets_cfdi', 'menus', 'menu_productos', 'productos_sucursal']) AS t
   LOOP
     IF NOT v_antes ? v_tabla.t THEN RAISE EXCEPTION 'el fixture no dejó filas en %', v_tabla.t; END IF;
   END LOOP;

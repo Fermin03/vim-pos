@@ -289,8 +289,22 @@ CREATE TRIGGER trg_sucursales_menu_proyectar
   FOR EACH ROW WHEN (OLD.menu_id IS DISTINCT FROM NEW.menu_id)
   EXECUTE FUNCTION sucursales_menu_proyectar();
 
+-- Una sucursal NUEVA también se proyecta. 0152 lee «sin fila» como «se vende al precio base», así
+-- que una sucursal recién creada en el General vendería lo que el General tiene apagado (incluido
+-- lo que es exclusivo de un menú propio). Al nacer recibe las filas de lo apagado; si nace ya con
+-- menú propio, el menú completo.
+DROP TRIGGER IF EXISTS trg_sucursales_nueva_proyectar ON sucursales;
+CREATE TRIGGER trg_sucursales_nueva_proyectar
+  AFTER INSERT ON sucursales
+  FOR EACH ROW EXECUTE FUNCTION sucursales_menu_proyectar();
+
 -- productos.precio_base_mxn NO dispara nada: las sucursales del General ya lo leen (precio nulo) y
 -- los menús propios no lo siguen. Solo en_menu_general se proyecta.
+--
+-- Se proyecta a TODAS las sucursales del General, también a las inactivas y a las dadas de baja
+-- (aquí y en §6 no se filtra por deleted_at ni por activa): así una sucursal que se restaura o se
+-- reactiva ya trae al día lo que el General apagó mientras no estaba, sin un trigger aparte para
+-- «volvió». Las de menú propio ya se mantenían igual (menu_productos_proyectar tampoco filtra).
 CREATE OR REPLACE FUNCTION productos_menu_general_proyectar()
 RETURNS trigger
 LANGUAGE plpgsql
@@ -298,7 +312,7 @@ SET search_path = public, pg_temp
 AS $$
 BEGIN
   PERFORM proyectar_menu(s.id, NEW.id)
-     FROM sucursales s WHERE s.tenant_id = NEW.tenant_id AND s.menu_id IS NULL AND s.deleted_at IS NULL;
+     FROM sucursales s WHERE s.tenant_id = NEW.tenant_id AND s.menu_id IS NULL;
   RETURN NULL;
 END $$;
 DROP TRIGGER IF EXISTS trg_productos_menu_general_proyectar ON productos;
@@ -323,7 +337,7 @@ BEGIN
   ON CONFLICT (menu_id, producto_id) DO NOTHING;
   IF NOT NEW.en_menu_general THEN
     PERFORM proyectar_menu(s.id, NEW.id)
-       FROM sucursales s WHERE s.tenant_id = NEW.tenant_id AND s.menu_id IS NULL AND s.deleted_at IS NULL;
+       FROM sucursales s WHERE s.tenant_id = NEW.tenant_id AND s.menu_id IS NULL;
   END IF;
   RETURN NULL;
 END $$;
@@ -368,15 +382,17 @@ BEGIN
   END IF;
 END $$;
 
-CREATE OR REPLACE FUNCTION crear_menu(p_nombre text, p_sucursales uuid[])
-RETURNS uuid
+-- El nombre ya limpio, o el motivo por el que no sirve. «General» (con cualquier mayúscula, acento
+-- o espacio, y también «Menú General») es el nombre del catálogo base: un menú propio que se llame
+-- igual haría dos pastillas indistinguibles en el panel.
+CREATE OR REPLACE FUNCTION _menu_nombre_limpio(p_nombre text)
+RETURNS text
 LANGUAGE plpgsql
+IMMUTABLE
 SET search_path = public, pg_temp
 AS $$
 DECLARE
-  v_tenant uuid := _menu_exigir_permiso();
-  v_nombre text := btrim(coalesce(p_nombre, ''));
-  v_menu   uuid;
+  v_nombre text := btrim(regexp_replace(coalesce(p_nombre, ''), '\s+', ' ', 'g'));
 BEGIN
   IF v_nombre = '' THEN
     RAISE EXCEPTION 'Ponle nombre al menú.' USING ERRCODE = '22023';
@@ -384,6 +400,22 @@ BEGIN
   IF char_length(v_nombre) > 80 THEN
     RAISE EXCEPTION 'El nombre del menú no puede pasar de 80 letras.' USING ERRCODE = '22023';
   END IF;
+  IF translate(lower(v_nombre), 'áéíóú', 'aeiou') IN ('general', 'menu general') THEN
+    RAISE EXCEPTION 'Ese nombre es el del menú General. Elige otro.' USING ERRCODE = '22023';
+  END IF;
+  RETURN v_nombre;
+END $$;
+
+CREATE OR REPLACE FUNCTION crear_menu(p_nombre text, p_sucursales uuid[])
+RETURNS uuid
+LANGUAGE plpgsql
+SET search_path = public, pg_temp
+AS $$
+DECLARE
+  v_tenant uuid := _menu_exigir_permiso();
+  v_nombre text := _menu_nombre_limpio(p_nombre);
+  v_menu   uuid;
+BEGIN
   IF coalesce(cardinality(p_sucursales), 0) = 0 THEN
     RAISE EXCEPTION 'Elige al menos una sucursal para el menú.' USING ERRCODE = '22023';
   END IF;
@@ -412,18 +444,13 @@ SET search_path = public, pg_temp
 AS $$
 DECLARE
   v_tenant     uuid := _menu_exigir_permiso();
-  v_nombre     text := btrim(coalesce(p_nombre, ''));
+  v_nombre     text;
   v_sucursales uuid[] := coalesce(p_sucursales, ARRAY[]::uuid[]);
 BEGIN
   IF NOT EXISTS (SELECT 1 FROM menus WHERE id = p_menu AND tenant_id = v_tenant AND deleted_at IS NULL) THEN
     RAISE EXCEPTION 'Ese menú ya no existe.' USING ERRCODE = '22023';
   END IF;
-  IF v_nombre = '' THEN
-    RAISE EXCEPTION 'Ponle nombre al menú.' USING ERRCODE = '22023';
-  END IF;
-  IF char_length(v_nombre) > 80 THEN
-    RAISE EXCEPTION 'El nombre del menú no puede pasar de 80 letras.' USING ERRCODE = '22023';
-  END IF;
+  v_nombre := _menu_nombre_limpio(p_nombre);
   PERFORM _menu_validar_sucursales(v_tenant, v_sucursales);
 
   BEGIN
@@ -433,8 +460,11 @@ BEGIN
   END;
 
   -- El menú queda aplicando EXACTAMENTE a esas sucursales: las que sobran vuelven al General.
+  -- Solo entre las ACTIVAS y vivas: el panel no lista las demás, así que no vienen en p_sucursales
+  -- y renombrar el menú le quitaría el suyo a una sucursal desactivada. Esas lo conservan.
   UPDATE sucursales SET menu_id = NULL
-   WHERE tenant_id = v_tenant AND menu_id = p_menu AND NOT (id = ANY (v_sucursales));
+   WHERE tenant_id = v_tenant AND menu_id = p_menu AND activa AND deleted_at IS NULL
+     AND NOT (id = ANY (v_sucursales));
   UPDATE sucursales SET menu_id = p_menu
    WHERE tenant_id = v_tenant AND id = ANY (v_sucursales) AND menu_id IS DISTINCT FROM p_menu;
 END $$;
@@ -456,7 +486,7 @@ BEGIN
 END $$;
 
 COMMENT ON FUNCTION crear_menu(text, uuid[]) IS 'Crea un menú propio como copia del General y lo asigna a las sucursales. Exige config.productos. ADR 0029.';
-COMMENT ON FUNCTION actualizar_menu(uuid, text, uuid[]) IS 'Renombra el menú y lo deja aplicando exactamente a esas sucursales (las demás vuelven al General). ADR 0029.';
+COMMENT ON FUNCTION actualizar_menu(uuid, text, uuid[]) IS 'Renombra el menú y lo deja aplicando exactamente a esas sucursales (las demás activas vuelven al General; una desactivada conserva el suyo). ADR 0029.';
 COMMENT ON FUNCTION eliminar_menu(uuid) IS 'Baja lógica del menú; sus sucursales vuelven al General. ADR 0029.';
 
 -- ── §8 Permisos de ejecución ─────────────────────────────────────────────────
@@ -465,8 +495,10 @@ REVOKE EXECUTE ON FUNCTION actualizar_menu(uuid, text, uuid[]) FROM public, anon
 REVOKE EXECUTE ON FUNCTION eliminar_menu(uuid)                 FROM public, anon;
 REVOKE EXECUTE ON FUNCTION _menu_exigir_permiso()              FROM public, anon;
 REVOKE EXECUTE ON FUNCTION _menu_validar_sucursales(uuid, uuid[]) FROM public, anon;
+REVOKE EXECUTE ON FUNCTION _menu_nombre_limpio(text)           FROM public, anon;
 GRANT  EXECUTE ON FUNCTION crear_menu(text, uuid[])            TO authenticated, service_role;
 GRANT  EXECUTE ON FUNCTION actualizar_menu(uuid, text, uuid[]) TO authenticated, service_role;
 GRANT  EXECUTE ON FUNCTION eliminar_menu(uuid)                 TO authenticated, service_role;
 GRANT  EXECUTE ON FUNCTION _menu_exigir_permiso()              TO authenticated, service_role;
 GRANT  EXECUTE ON FUNCTION _menu_validar_sucursales(uuid, uuid[]) TO authenticated, service_role;
+GRANT  EXECUTE ON FUNCTION _menu_nombre_limpio(text)           TO authenticated, service_role;

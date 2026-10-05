@@ -48,6 +48,10 @@ BEGIN
     PERFORM crear_menu(repeat('x', 81), ARRAY[v_norte]);
     RAISE EXCEPTION 'debió fallar: nombre de más de 80 letras';
   EXCEPTION WHEN OTHERS THEN IF SQLERRM NOT LIKE '%80 letras%' THEN RAISE; END IF; END;
+  BEGIN
+    PERFORM crear_menu(' general ', ARRAY[v_norte]);
+    RAISE EXCEPTION 'debió fallar: General es el nombre del catálogo base';
+  EXCEPTION WHEN OTHERS THEN IF SQLERRM NOT LIKE '%Ese nombre es el del menú General%' THEN RAISE; END IF; END;
   RAISE NOTICE 'crear_menu OK';
 
   -- 2) Precio propio y un producto apagado en el menú; la venta los respeta.
