@@ -3,6 +3,10 @@
 **Fecha:** 2026-10-02 · **Estado:** vigente · **Supera:** D16 (un solo precio base) y la nota de
 `10-SETUP-INICIAL.md` §15.2 («precios pueden variar por sucursal», que nunca se construyó).
 
+> **Ajustado por [ADR 0029](0029-el-menu-es-de-quien-administra.md) (5 oct 2026):** el precio y el
+> «se vende» por sucursal ya no se capturan como excepciones; los proyecta la base desde el menú de
+> la sucursal. La regla de venta, el agotado por sucursal y lo que lee la caja siguen como aquí.
+
 ## Qué había
 
 - `productos` y `categorias` colgaban de `tenant_id`: un negocio con dos sucursales tenía un menú.

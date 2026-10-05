@@ -166,24 +166,31 @@ tiempo**—, porque el dueño decide cuánto dura una imagen viéndola, no en ot
 Aquí los controles **sí miden 44 px**: es de las pocas páginas de Configuración que el dueño abre
 desde el celular, parado junto a la caja, con la foto de la promoción que acaba de recibir.
 
-## Menú por sucursal (0152, ADR 0027)
+## Menús del catálogo (0155, ADR 0029)
 
-Solo aparece con **dos o más sucursales**; con una, Catálogo se ve como siempre.
+La franja de menús aparece arriba de las pestañas del Catálogo cuando el negocio tiene dos o más
+sucursales, o algún menú propio; con una sola sucursal, el Catálogo se ve como siempre.
 
-- **Formulario de producto:** en Disponibilidad, una fila por sucursal con «Se vende», precio y
-  «Agotado». El precio vacío enseña el general en gris: vacío no es $0, es «el de siempre»; uno que
-  no es número no deja guardar («Precio inválido en Norte»). Apagar
-  una sucursal deshabilita su precio y su agotado. «Agotado por inventario» es una etiqueta, no un
-  control: lo pone y lo quita la base. El selector «En la caja» se queda con Se vende / Pausado
-  (pausar es para todas).
-- **Lista de productos:** un selector de sucursal. En «Todas», la tabla de siempre. Con una
-  sucursal elegida, cada renglón deja apagar «Se vende aquí» y escribir su precio en línea, sin
-  abrir el producto: armar el menú de una sucursal nueva con 80 productos no puede costar 80 visitas.
-  Las escrituras entran en cola y van una a la vez (ninguna se pierde); al terminar se relee, y la
-  fila que se guarda se atenúa. Un precio que no es número (un «.» suelto) no se guarda: vuelve al anterior.
-- **Aviso de cajas viejas:** si el negocio ya usa precios, productos apagados o agotados por sucursal y una
-  caja de escritorio activa no tiene la 0.4.110, se nombra la caja y su sucursal: el dueño tiene que saber
-  a cuál ir.
+- **Una pastilla por menú**, con las sucursales que lo usan en gris. «General» siempre va primero.
+  El menú elegido se recuerda entre pestañas y entre visitas.
+- **«Nuevo menú»** pide nombre (hasta 80 caracteres) y sucursales. Arranca igual que el General; si
+  una sucursal viene de otro menú propio, se dice antes de guardar. Eliminar nombra la
+  consecuencia: sus sucursales vuelven al General.
+- **Cada pestaña trabaja sobre el menú elegido.** Productos y Combos: casilla «En este menú» y
+  precio en línea. Categorías: «N de M productos» y un interruptor que apaga o enciende la
+  categoría entera (con parte encendida se ve «parcial», con la casilla en estado indeterminado).
+  Modificadores y Recetas dicen que son los mismos en todos los menús.
+- **No se comparan precios.** En un menú se ve solo su precio; nunca el de otro menú al lado.
+- **Formulario de producto:** el precio y «se vende» son del menú elegido, y lo dice junto al
+  campo; el resto es del producto. Un producto creado dentro de un menú propio solo se vende ahí, y
+  el formulario lo avisa antes de guardar. Con una sola sucursal y un menú propio, el selector «En
+  la caja» conserva «Agotado».
+- **El agotado no es del menú.** Es de la sucursal y del día: en el formulario queda «Agotado hoy»
+  con una casilla por sucursal.
+- **Escrituras en línea:** entran en una cola, una a la vez, y ninguna se pierde (la cola está
+  duplicada en las páginas de Productos y de Combos); solo se atenúa el renglón que se está
+  guardando.
+- **Aviso de cajas viejas** (anteriores a la 0.4.110): se conserva; una caja así no respeta ningún menú.
 
 ## Lo que NO se hereda del POS
 

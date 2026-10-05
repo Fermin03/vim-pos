@@ -4483,6 +4483,93 @@ export type Database = {
           },
         ]
       }
+      menu_productos: {
+        Row: {
+          created_at: string
+          disponible: boolean
+          menu_id: string
+          precio_mxn: number
+          producto_id: string
+          tenant_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          disponible?: boolean
+          menu_id: string
+          precio_mxn: number
+          producto_id: string
+          tenant_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          disponible?: boolean
+          menu_id?: string
+          precio_mxn?: number
+          producto_id?: string
+          tenant_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "menu_productos_menu_id_fkey"
+            columns: ["menu_id"]
+            isOneToOne: false
+            referencedRelation: "menus"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "menu_productos_producto_id_fkey"
+            columns: ["producto_id"]
+            isOneToOne: false
+            referencedRelation: "productos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "menu_productos_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      menus: {
+        Row: {
+          created_at: string
+          deleted_at: string | null
+          id: string
+          nombre: string
+          tenant_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          deleted_at?: string | null
+          id?: string
+          nombre: string
+          tenant_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          deleted_at?: string | null
+          id?: string
+          nombre?: string
+          tenant_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "menus_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       mesas: {
         Row: {
           activa: boolean
@@ -5553,6 +5640,7 @@ export type Database = {
           deleted_at: string | null
           deleted_by: string | null
           descripcion: string | null
+          en_menu_general: boolean
           es_combo: boolean
           estado: Database["public"]["Enums"]["producto_estado"]
           id: string
@@ -5588,6 +5676,7 @@ export type Database = {
           deleted_at?: string | null
           deleted_by?: string | null
           descripcion?: string | null
+          en_menu_general?: boolean
           es_combo?: boolean
           estado?: Database["public"]["Enums"]["producto_estado"]
           id?: string
@@ -5623,6 +5712,7 @@ export type Database = {
           deleted_at?: string | null
           deleted_by?: string | null
           descripcion?: string | null
+          en_menu_general?: boolean
           es_combo?: boolean
           estado?: Database["public"]["Enums"]["producto_estado"]
           id?: string
@@ -7257,6 +7347,7 @@ export type Database = {
           horario_apertura: string | null
           horario_cierre: string | null
           id: string
+          menu_id: string | null
           nombre: string
           pais: string
           telefono: string | null
@@ -7288,6 +7379,7 @@ export type Database = {
           horario_apertura?: string | null
           horario_cierre?: string | null
           id?: string
+          menu_id?: string | null
           nombre: string
           pais?: string
           telefono?: string | null
@@ -7319,6 +7411,7 @@ export type Database = {
           horario_apertura?: string | null
           horario_cierre?: string | null
           id?: string
+          menu_id?: string | null
           nombre?: string
           pais?: string
           telefono?: string | null
@@ -7333,6 +7426,13 @@ export type Database = {
             columns: ["franquicia_id"]
             isOneToOne: false
             referencedRelation: "franquicias"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sucursales_menu_id_fkey"
+            columns: ["menu_id"]
+            isOneToOne: false
+            referencedRelation: "menus"
             referencedColumns: ["id"]
           },
           {
@@ -10953,6 +11053,11 @@ export type Database = {
         }
         Returns: Json
       }
+      _eliminar_usuario_bloqueos: {
+        Args: { p_actor: string; p_tenant_id: string; p_usuario_id: string }
+        Returns: Json
+      }
+      _eliminar_usuario_marca: { Args: never; Returns: string }
       _es_escritura_rest_directa: { Args: never; Returns: boolean }
       _es_llamada_de_confianza: { Args: never; Returns: boolean }
       _extras_vigentes: {
@@ -10965,6 +11070,11 @@ export type Database = {
       }
       _inventario_apagar_si_no_permitido: {
         Args: { p_tenant: string }
+        Returns: undefined
+      }
+      _menu_exigir_permiso: { Args: never; Returns: string }
+      _menu_validar_sucursales: {
+        Args: { p_sucursales: string[]; p_tenant: string }
         Returns: undefined
       }
       _retirar_extras_sin_limite: {
@@ -11066,6 +11176,10 @@ export type Database = {
           p_tenant_id: string
         }
         Returns: Json
+      }
+      actualizar_menu: {
+        Args: { p_menu: string; p_nombre: string; p_sucursales: string[] }
+        Returns: undefined
       }
       agregar_combo_a_ticket: {
         Args: {
@@ -11483,6 +11597,10 @@ export type Database = {
         }
         Returns: string
       }
+      crear_menu: {
+        Args: { p_nombre: string; p_sucursales: string[] }
+        Returns: string
+      }
       crear_perfil_con_pin: {
         Args: { p_nombre: string; p_pin: string; p_usuario_id: string }
         Returns: undefined
@@ -11585,6 +11703,7 @@ export type Database = {
         }
         Returns: Json
       }
+      eliminar_menu: { Args: { p_menu: string }; Returns: undefined }
       eliminar_tenant: {
         Args: {
           p_confirmacion: string
@@ -11790,6 +11909,10 @@ export type Database = {
           p_promo_hasta: string
         }
         Returns: number
+      }
+      proyectar_menu: {
+        Args: { p_producto?: string; p_sucursal: string }
+        Returns: undefined
       }
       puede_administrar_permisos_de_rol: {
         Args: { p_rol_id: string; p_tenant_id: string }
