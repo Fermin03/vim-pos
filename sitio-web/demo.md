@@ -17,7 +17,7 @@ Montamos un par de productos tuyos y cobras una venta de prueba en el sistema de
    El mismo día hábil. No un correo automático a las tres semanas.
 2. ### Media hora, cuando puedas
 
-   En videollamada o en tu local si estás por León. La agendamos a tu hora floja, no a la nuestra.
+   En tu local, si estás en León y alrededores. La agendamos a tu hora floja, no a la nuestra. Si estás fuera, [pruébalo 30 días gratis](https://admin.vimpos.com.mx/registro).
 3. ### Lo usas tú
 
    Con tus productos y tus precios, no con una demostración de juguete. Ahí es donde se ve si te sirve.

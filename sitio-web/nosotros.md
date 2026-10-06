@@ -10,7 +10,7 @@ VIM POS es un sistema de punto de venta para restaurantes hecho en [León, Guana
 
 **VIM POS**, persona física con actividad empresarial, en Guanajuato, México. Es la misma que aparece en el [aviso de privacidad](https://vimpos.com.mx/aviso-privacidad) y en los [términos del servicio](https://vimpos.com.mx/terminos): no hay una razón social distinta escondida en la letra chica. Los datos fiscales completos van en el contrato.
 
-Atendemos restaurantes de toda la República. La demostración es por videollamada; si tu local queda cerca, la hacemos en tu propio mostrador.
+Atendemos restaurantes de toda la República. La demostración es en persona, en tu propio mostrador, en León y alrededores; si estás fuera, puedes [probarlo 30 días gratis](https://admin.vimpos.com.mx/registro).
 
 ## Por qué existe
 

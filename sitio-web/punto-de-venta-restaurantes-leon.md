@@ -4,7 +4,7 @@
 
 **VIM POS** · punto de venta para restaurantes en México · versión en HTML: https://vimpos.com.mx/punto-de-venta-restaurantes-leon
 
-VIM POS se hace aquí. Si tu restaurante está en León o cerca, la demo puede ser en tu mostrador y con tu menú.
+VIM POS se hace aquí. Si tu restaurante está en León o cerca, la demo es en tu mostrador y con tu menú.
 
 [Pide una demo](https://vimpos.com.mx/demo)
 
@@ -16,7 +16,7 @@ _Estar cerca_
 
 ### La demo, en tu local
 
-En la zona de León podemos ir a enseñártelo donde vas a usarlo. Fuera de la zona, la demo es por videollamada.
+Vamos a enseñártelo donde vas a usarlo, en León y alrededores. Fuera de la zona, puedes [probarlo 30 días gratis](https://admin.vimpos.com.mx/registro).
 
 ### Contesta quien lo hace
 
@@ -58,7 +58,7 @@ Sí. VIM POS está en operación diaria en un restaurante de León. Es un produc
 
 ### ¿Atienden fuera de León?
 
-Sí, en toda la República. La demo es por videollamada y el arranque se hace a distancia.
+Sí, atendemos restaurantes de toda la República. La demo es en persona y solo en León y alrededores; fuera de ahí puedes [probarlo 30 días gratis](https://admin.vimpos.com.mx/registro).
 
 ### ¿Venden la computadora y la impresora?
 
