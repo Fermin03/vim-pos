@@ -463,13 +463,15 @@ BEGIN
   -- Idempotente: un ticket con ganado vivo no vuelve a ganar (FACTURADO→PAGADO, reintentos).
   IF lealtad_neto_ganado(p_ticket_id) > 0 THEN RETURN 0; END IF;
 
-  -- Tope diario: compras de HOY (hora de México) de este cliente que siguen contando.
-  SELECT count(*) INTO v_compras
+  -- Tope diario: tickets de HOY (hora de México) de este cliente que todavía tienen puntos vivos.
+  -- Cuenta por neto, no por "sin reversa": un ticket con devolución parcial, o reabierto y vuelto a
+  -- pagar, sigue reteniendo puntos y por eso sigue contando. Filtra por tenant para usar
+  -- idx_lealtad_mov_cliente.
+  SELECT count(DISTINCT m.ticket_id) INTO v_compras
     FROM lealtad_movimientos m
-   WHERE m.cliente_id = v_t.cliente_id AND m.tipo = 'GANADO'
+   WHERE m.tenant_id = v_t.tenant_id AND m.cliente_id = v_t.cliente_id AND m.tipo = 'GANADO'
      AND (m.fecha AT TIME ZONE 'America/Mexico_City')::date = v_hoy
-     AND NOT EXISTS (SELECT 1 FROM lealtad_movimientos r
-                      WHERE r.ticket_id = m.ticket_id AND r.tipo = 'REVERSA_GANADO');
+     AND lealtad_neto_ganado(m.ticket_id) > 0;
   IF v_compras >= v_p.tope_compras_dia THEN RETURN 0; END IF;
 
   SELECT COALESCE(SUM(total_item_mxn), 0) INTO v_cargos
@@ -489,6 +491,10 @@ GRANT EXECUTE ON FUNCTION lealtad_acumular_por_ticket(uuid) TO service_role;
 
 -- Deshace lo ganado por un ticket, entero o en proporción (devolución parcial). Idempotente: solo
 -- revierte lo que siga vivo. Devuelve los puntos revertidos.
+-- p_fraccion es relativa al ticket ORIGINAL, así que se aplica a lo que el ticket ganó en su ciclo
+-- actual (los puntos del último GANADO) y no a lo que queda tras reversas anteriores: dos
+-- devoluciones de 50% suman el 100%. Una fracción >= 1 (cancelación, devolución total) revierte
+-- todo lo que siga vivo.
 CREATE OR REPLACE FUNCTION lealtad_revertir_ganado_ticket(p_ticket_id uuid, p_fraccion numeric DEFAULT 1)
 RETURNS integer
 LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp
@@ -501,7 +507,10 @@ BEGIN
   IF v_neto <= 0 THEN RETURN 0; END IF;
   SELECT * INTO v_m FROM lealtad_movimientos
    WHERE ticket_id = p_ticket_id AND tipo = 'GANADO' ORDER BY fecha DESC LIMIT 1;
-  v_rev := LEAST(v_neto, ceil(v_neto * LEAST(GREATEST(COALESCE(p_fraccion, 1), 0), 1))::integer);
+  v_rev := CASE
+    WHEN COALESCE(p_fraccion, 1) >= 1 THEN v_neto
+    ELSE LEAST(v_neto, ceil(v_m.puntos * GREATEST(p_fraccion, 0))::integer)
+  END;
   IF v_rev <= 0 THEN RETURN 0; END IF;
   PERFORM lealtad_registrar_movimiento(
     NULL, v_m.tenant_id, v_m.cliente_id, 'REVERSA_GANADO', -v_rev, v_m.programa_version,
@@ -516,17 +525,24 @@ GRANT EXECUTE ON FUNCTION lealtad_revertir_ganado_ticket(uuid, numeric) TO servi
 -- OJO: en la nube los tickets que suben de una caja entran en modo réplica y este trigger NO
 -- corre; lo ganado en la caja llega como movimiento por el push (§8). Solo corre aquí para el
 -- POS web, que cobra directo contra la nube.
+-- Una venta no se cae por la lealtad: es un AFTER trigger, así que un error aquí revertiría el cobro
+-- o la cancelación en una caja con clientes delante. Cualquier fallo se traga y queda como aviso
+-- en el log.
 CREATE OR REPLACE FUNCTION trg_ticket_lealtad()
 RETURNS trigger
 LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp
 AS $$
 BEGIN
-  IF NEW.estado_fiscal = 'PAGADO' AND OLD.estado_fiscal <> 'PAGADO' THEN
-    PERFORM lealtad_acumular_por_ticket(NEW.id);
-  ELSIF NEW.estado_fiscal IN ('CANCELADO', 'ABIERTO') AND OLD.estado_fiscal IN ('PAGADO', 'FACTURADO') THEN
-    -- Cancelar o reabrir una cuenta cobrada deshace lo que ganó.
-    PERFORM lealtad_revertir_ganado_ticket(NEW.id);
-  END IF;
+  BEGIN
+    IF NEW.estado_fiscal = 'PAGADO' AND OLD.estado_fiscal <> 'PAGADO' THEN
+      PERFORM lealtad_acumular_por_ticket(NEW.id);
+    ELSIF NEW.estado_fiscal IN ('CANCELADO', 'ABIERTO') AND OLD.estado_fiscal IN ('PAGADO', 'FACTURADO') THEN
+      -- Cancelar o reabrir una cuenta cobrada deshace lo que ganó.
+      PERFORM lealtad_revertir_ganado_ticket(NEW.id);
+    END IF;
+  EXCEPTION WHEN OTHERS THEN
+    RAISE WARNING 'lealtad: no se pudo procesar el ticket %: %', NEW.id, SQLERRM;
+  END;
   RETURN NEW;
 END $$;
 
@@ -536,7 +552,8 @@ CREATE TRIGGER trg_tickets_lealtad
   FOR EACH ROW EXECUTE FUNCTION trg_ticket_lealtad();
 
 -- Devolución confirmada: revierte en proporción a lo devuelto. Misma condición de transición que
--- trg_devolucion_inventario (0009:314).
+-- trg_devolucion_inventario (0009:314). Mismo criterio que trg_ticket_lealtad: una devolución no se
+-- cae por la lealtad; el aviso queda en el log.
 CREATE OR REPLACE FUNCTION trg_devolucion_lealtad()
 RETURNS trigger
 LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp
@@ -544,12 +561,16 @@ AS $$
 DECLARE
   v_total numeric(12,2);
 BEGIN
-  IF TG_OP = 'UPDATE' AND OLD.estado <> 'CONFIRMADA' AND NEW.estado = 'CONFIRMADA' THEN
-    SELECT total_mxn INTO v_total FROM tickets WHERE id = NEW.ticket_original_id;
-    PERFORM lealtad_revertir_ganado_ticket(
-      NEW.ticket_original_id,
-      CASE WHEN COALESCE(v_total, 0) <= 0 THEN 1 ELSE LEAST(NEW.total_devuelto_mxn / v_total, 1) END);
-  END IF;
+  BEGIN
+    IF TG_OP = 'UPDATE' AND OLD.estado <> 'CONFIRMADA' AND NEW.estado = 'CONFIRMADA' THEN
+      SELECT total_mxn INTO v_total FROM tickets WHERE id = NEW.ticket_original_id;
+      PERFORM lealtad_revertir_ganado_ticket(
+        NEW.ticket_original_id,
+        CASE WHEN COALESCE(v_total, 0) <= 0 THEN 1 ELSE LEAST(NEW.total_devuelto_mxn / v_total, 1) END);
+    END IF;
+  EXCEPTION WHEN OTHERS THEN
+    RAISE WARNING 'lealtad: no se pudo revertir lo ganado del ticket %: %', NEW.ticket_original_id, SQLERRM;
+  END;
   RETURN NEW;
 END $$;
 
