@@ -4,10 +4,6 @@
 
 **VIM POS** · punto de venta para restaurantes en México · versión en HTML: https://vimpos.com.mx/novedades
 
-Cada actualización de la caja y del panel, con su fecha: qué puedes hacer ahora, qué mejoró y qué se corrigió.
-
-La caja se actualiza los martes. Cuando hay una versión nueva te avisa en su pantalla de inicio y la instalas con un botón; tus ventas y tu menú se quedan donde están. El panel se actualiza solo.
-
 ## Octubre de 2026
 
 4 y 5 de octubre Panel de administración
