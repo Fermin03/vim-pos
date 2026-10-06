@@ -1,6 +1,6 @@
 # Todo lo que tu restaurante necesita, sin letra chica.
 
-> Caja, cocina, mesas, inventario y facturación CFDI en un solo sistema. Precio publicado desde $699 al mes, sin pago inicial y cobra sin internet. Hecho en León, Gto.
+> Caja, cocina, mesas, inventario y facturación CFDI en un solo sistema. Desde $699 al mes más IVA, sin pago inicial y cobra sin internet. Hecho en León, Gto.
 
 **VIM POS** · punto de venta para restaurantes en México · versión en HTML: https://vimpos.com.mx/
 
@@ -16,7 +16,7 @@ Desde **$699 al mes**, más IVA · sin contrato forzoso · [ver los tres planes]
 
 Todo tu sistema vive en tu caja, no en internet
 
-Imprime en impresoras térmicas de tickets conectadas a tu red
+Imprime en impresoras térmicas de tickets, de red o de USB
 
 El corte de caja cuadra contra lo que hay en el cajón
 
@@ -136,7 +136,7 @@ Bebidas en la barra, comida en cocina, cada una en su impresora. Es lo mismo que
 
 _Precios_
 
-## Precio de lista, publicado
+## Precio de lista, sin cotización
 
 Mensual, en pesos, más IVA. Sin cotización ni «contáctanos para conocer el precio».
 
@@ -178,7 +178,7 @@ Sí. El programa se instala en la computadora de tu caja y trabaja ahí, así qu
 
 ### ¿Qué necesito comprar?
 
-Una computadora con Windows 10 u 11, una impresora térmica de tickets de 80 mm con puerto de red (cable Ethernet o Wi-Fi) y compatible con ESC/POS —por ejemplo, una Epson TM-T20III o TM-m30 en su versión de red; las de USB hoy no funcionan con la caja—, un cajón de dinero y el módem que ya tienes. VIM no vende equipo: te decimos qué buscar y lo compras donde te salga mejor.
+Una computadora con Windows 10 u 11, una impresora térmica de tickets de 80 mm compatible con ESC/POS, de red (cable Ethernet o Wi-Fi) o de USB —por ejemplo, una Epson TM-T20III o TM-m30; las de USB se instalan primero en Windows—, un cajón de dinero y el módem que ya tienes. VIM no vende equipo: te decimos qué buscar y lo compras donde te salga mejor.
 
 ### ¿Puedo traer mi menú de otro sistema?
 

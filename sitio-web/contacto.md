@@ -16,7 +16,7 @@ El mismo día hábil, por el canal que prefieras. No hay centro de llamadas, no 
 - **WhatsApp, en cuanto nos escribas.** Si prefieres seguir la conversación por ahí, dilo en el correo y te pasamos el número. Ya no lo publicamos en el sitio.
 - **El [formulario de demostración](https://vimpos.com.mx/demo).** Si prefieres que te busquemos nosotros. Pide cuántas cajas y cuántas sucursales tienes, que es lo que decide qué plan te toca y qué te enseñamos.
 
-Contestamos **el mismo día hábil**, en horario hábil y en español. No hay número 800 ni menú de opciones: escribes y contesta una persona.
+Contestamos **el mismo día hábil** y en español. Por WhatsApp atendemos de lunes a sábado, de 9:00 a 18:00; domingo no hay servicio. No hay número 800 ni menú de opciones: escribes y contesta una persona.
 
 ![Panel del dueño con las ventas del día, el ticket promedio y el top de productos.](https://vimpos.com.mx/assets/img/capturas/admin-dashboard.webp?v=3)
 
@@ -32,10 +32,10 @@ _El panel que te enseñamos en la demostración: cómo va el día, la venta por 
 
 ## Qué te sirve más según lo que busques
 
-- **Saber cuánto cuesta.** No hace falta escribirnos: los tres planes, los extras y los paquetes de folios están publicados en la [página de precios](https://vimpos.com.mx/precios).
+- **Saber cuánto cuesta.** No hace falta escribirnos: los tres planes, los extras y los paquetes de folios están en la [página de precios](https://vimpos.com.mx/precios).
 - **Saber si hace lo que necesitas.** Lo que hace el sistema y lo que no, módulo por módulo, está en [funciones](https://vimpos.com.mx/funciones).
 - **Verlo funcionando.** [Pide una demo](https://vimpos.com.mx/demo): media hora, con tus productos y tus precios cargados, sin presentación y sin compromiso.
-- **Soporte, si ya eres cliente.** Al mismo correo, en horario hábil, y también el día del arranque en los planes con acompañamiento.
+- **Soporte, si ya eres cliente.** Al mismo correo y por WhatsApp, de lunes a sábado, de 9:00 a 18:00; domingo no hay servicio. También el día del arranque en los planes con acompañamiento.
 - **Derechos ARCO o privacidad.** Por correo, con lo que pide el [aviso de privacidad](https://vimpos.com.mx/aviso-privacidad). Se contesta en un máximo de 20 días hábiles y no cuesta nada.
 
 Para agentes y herramientas automáticas

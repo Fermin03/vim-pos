@@ -74,7 +74,7 @@ Hacemos nuestro mejor esfuerzo por tenerlo todo funcionando, y por diseño el si
 
 **No prometemos un porcentaje de disponibilidad**, porque hoy no lo medimos y publicar un número que no se mide no le sirve a nadie. Lo que sí prometemos: si algo se cae, te contestamos y lo atendemos.
 
-Soporte por WhatsApp y correo en horario hábil. En los planes con acompañamiento, también el día del arranque.
+Soporte por WhatsApp y correo, de lunes a sábado, de 9:00 a 18:00; domingo no hay servicio. En los planes con acompañamiento, también el día del arranque.
 
 ## Límite de responsabilidad
 

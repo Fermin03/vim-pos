@@ -59,7 +59,7 @@ _Dónde queda VIM POS_
 
 ## Licencia fija, cero comisión, y lo que no incluye
 
-Somos el primer modelo. El precio está [publicado](https://vimpos.com.mx/precios); no hay pago inicial, y desde Negocio la carga de tu menú y la capacitación van incluidas; y no nos llevamos ni un peso de tus ventas: la tarjeta se cobra en tu terminal de siempre y en el sistema se registra como forma de pago para que el corte cuadre.
+Somos el primer modelo. El precio está [a la vista](https://vimpos.com.mx/precios); no hay pago inicial, y desde Negocio la carga de tu menú y la capacitación van incluidas; y no nos llevamos ni un peso de tus ventas: la tarjeta se cobra en tu terminal de siempre y en el sistema se registra como forma de pago para que el corte cuadre.
 
 **Y dónde no conviene.** Si tienes una sola caja, sin inventario y sin empleados que controlar, el modelo gratuito te sale más barato y no vamos a fingir lo contrario. Tampoco somos la opción si necesitas que el mesero capture en tableta o que la tarjeta se cobre desde el mismo sistema: eso y el resto de los límites están en [la guía de compra](https://vimpos.com.mx/como-elegir-sistema-restaurante).
 
@@ -69,7 +69,7 @@ Trae tu venta con tarjeta de un mes bueno y la calculamos juntos en la demo, sin
 
 [Pide una demo](https://vimpos.com.mx/demo)
 
-[Ver los precios publicados](https://vimpos.com.mx/precios)
+[Ver los precios](https://vimpos.com.mx/precios)
 
 ---
 

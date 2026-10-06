@@ -49,7 +49,7 @@ export const PAGINAS = [
     archivo: 'precios.html',
     markdown: 'precios.md',
     nombre: 'Precios',
-    resumen: 'Los tres planes con su precio publicado en pesos, la tabla comparativa, los extras y los paquetes de folios de factura.',
+    resumen: 'Los tres planes con su precio en pesos, la tabla comparativa, los extras y los paquetes de folios de factura.',
     enSitemap: true,
   },
   {
@@ -84,7 +84,7 @@ export const PAGINAS = [
     markdown: 'como-elegir-sistema-restaurante.md',
     nombre: 'Cómo elegir sistema',
     resumen:
-      'Guía de compra: nueve preguntas que hacerle a cualquier software para restaurantes antes de firmar —internet, precio publicado, comisiones, datos, facturación, implementación, permanencia, soporte y equipo— y en qué casos VIM POS no es la respuesta.',
+      'Guía de compra: nueve preguntas que hacerle a cualquier software para restaurantes antes de firmar —internet, precio de frente, comisiones, datos, facturación, implementación, permanencia, soporte y equipo— y en qué casos VIM POS no es la respuesta.',
     enSitemap: true,
   },
   {
