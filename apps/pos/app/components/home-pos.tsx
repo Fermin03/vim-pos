@@ -174,6 +174,9 @@ export function HomePos({
   const [saldoCliente, setSaldoCliente] = useState<SaldoCliente | null>(null);
   const [comprasHoy, setComprasHoy] = useState(0);
   const [canjeVivo, setCanjeVivo] = useState<CanjeVivo | null>(null);
+  // Sube con cada cambio hecho desde el modal de canje. Un premio cuyo producto vale $0 cambia el
+  // canje sin mover `lealtad_mxn`, y sin esto el saldo y el canje vivo se quedarían con lo de antes.
+  const [canjeVersion, setCanjeVersion] = useState(0);
   /** Cuenta sobre la que está abierto el modal de lealtad, y desde dónde se abrió. */
   const [canjeDe, setCanjeDe] = useState<{ ticketId: string; clienteId: string; origen: "captura" | "lista" } | null>(null);
   // F16 — estado de conexión (avisa al cajero si se cae la red).
@@ -341,15 +344,19 @@ export function HomePos({
   const lealtadTicket = ticketBd?.lealtad ?? 0;
 
   // Saldo que esta base conoce y compras de hoy: para MOSTRAR. Se relee al cambiar de cliente y cada
-  // vez que el canje de la cuenta cambia (lo movió un canje o una reversa).
+  // vez que el canje de la cuenta cambia (lo movió un canje o una reversa; `canjeVersion` cubre el
+  // cambio que no mueve el monto).
   useEffect(() => {
     if (!lealtadActiva || versionPrograma === null || !clienteLealtadId) { setSaldoCliente(null); setComprasHoy(0); return; }
     let vivo = true;
+    // Se limpia antes de leer: mientras llega la respuesta la franja dice «0 puntos», no el saldo
+    // del cliente anterior.
+    setSaldoCliente(null);
     Promise.all([leerSaldoLocal(token, clienteLealtadId, versionPrograma), comprasQueSumanHoy(token, clienteLealtadId)])
       .then(([s, n]) => { if (vivo) { setSaldoCliente(s); setComprasHoy(n); } })
       .catch(() => { if (vivo) { setSaldoCliente(null); setComprasHoy(0); } });
     return () => { vivo = false; };
-  }, [lealtadActiva, versionPrograma, clienteLealtadId, token, lealtadTicket]);
+  }, [lealtadActiva, versionPrograma, clienteLealtadId, token, lealtadTicket, canjeVersion]);
 
   // El canje vivo de la cuenta guardada.
   const ticketBdId = ticketBd?.ticketId ?? null;
@@ -358,7 +365,7 @@ export function HomePos({
     let vivo = true;
     leerCanjeDelTicket(token, ticketBdId).then((c) => { if (vivo) setCanjeVivo(c); }).catch(() => { if (vivo) setCanjeVivo(null); });
     return () => { vivo = false; };
-  }, [lealtadActiva, ticketBdId, lealtadTicket, token]);
+  }, [lealtadActiva, ticketBdId, lealtadTicket, token, canjeVersion]);
 
   const envioCarrito = carrito.envio?.costoMxn ?? 0;
   const franja = lealtadActiva && programa && clienteLealtad
@@ -1081,7 +1088,8 @@ export function HomePos({
     // Lealtad: si después de canjear dinero la cuenta bajó (se canceló un platillo), el canje ya no
     // cabe completo. Se quita, se avisa y NO se abre el cobro: el total cambió y hay que mirarlo.
     // Si esta revisión falla, se cobra igual: una venta no se cae por la lealtad.
-    if (lealtadActiva && programa && ticketBd && !ticketIncompleto) {
+    // Solo se revisa si la cuenta trae un canje: sin canje no hay nada que pueda quedar recortado.
+    if (lealtadActiva && programa && canjeVivo != null && ticketBd && !ticketIncompleto) {
       try {
         const r = await quitarCanjeSiQuedoRecortado(token, ticketBd, programa.mecanica);
         if (r.aviso) {
@@ -1089,7 +1097,19 @@ export function HomePos({
           setAvisoReparto({ titulo: "Se quitó el canje de lealtad", texto: r.aviso });
           return;
         }
-      } catch { /* se cobra con lo que hay */ }
+      } catch {
+        // Pudo fallar DESPUÉS de quitar el canje (al releer los totales). Entonces `ticketBd` trae
+        // todavía el descuento que ya no existe y el cobro abriría con un total viejo. Se relee: si
+        // el total cambió, se muestra el bueno y no se abre el cobro; quien cobra lo ve y vuelve a
+        // tocar Cobrar. Si tampoco se puede leer, se cobra con lo que hay.
+        try {
+          const nuevo = await leerTotales(token, ticketBd.ticketId);
+          if (nuevo.total !== ticketBd.total) {
+            setTicketBd(nuevo);
+            return;
+          }
+        } catch { /* se cobra con lo que hay */ }
+      }
     }
     abrirCajonParaCobrar();
     setAtajoCobro(atajo);
@@ -1132,7 +1152,7 @@ export function HomePos({
     } finally {
       setProcesandoCobro(false);
     }
-  }, [carrito, ticketBd, ticketIncompleto, token, caja.sucursal_id, turno.caja_id, turno.id, online, adoptarTicketSiQuedoAbierto, lealtadActiva, programa]);
+  }, [carrito, ticketBd, ticketIncompleto, token, caja.sucursal_id, turno.caja_id, turno.id, online, adoptarTicketSiQuedoAbierto, lealtadActiva, programa, canjeVivo]);
 
   /**
    * Ronda de arreglos 1/5 (Task 7) — cambiar la zona de ESTE pedido desde el renglón de envío.
@@ -1549,6 +1569,8 @@ export function HomePos({
       clienteId={canjeDe.clienteId}
       sucursalId={caja.sucursal_id}
       onCambio={async ({ premioAplicado }) => {
+        // Fuerza a releer saldo y canje vivo aunque el monto de lealtad de la cuenta no se mueva.
+        setCanjeVersion((v) => v + 1);
         if (canjeDe.origen === "captura") {
           // Relee carrito, totales y renglones: el premio es un renglón nuevo y el total cambió.
           await recargarCuenta();
@@ -2007,13 +2029,32 @@ export function HomePos({
           if (modo === "DELIVERY_PROPIO") setClienteDomAbierto(true);
         }}
         onAgregarProductos={(ticketId: string) => setAgregandoA(ticketId)}
+        onCanjear={lealtadActiva ? (c) => { if (c.clienteId) setCanjeDe({ ticketId: c.ticketId, clienteId: c.clienteId, origen: "lista" }); } : undefined}
         onCobrar={async (ticketId) => {
-          abrirCajonParaCobrar();
           // El cobro se abre ENCIMA de la lista, sin cargar la cuenta ni saltar al catálogo:
           // el cajero pidió cobrar, no capturar productos. El modal solo necesita los totales.
           try {
             setAtajoCobro(null);
-            setTotalesCobro(await leerTotales(token, ticketId));
+            let totales = await leerTotales(token, ticketId);
+            // Lealtad: mismo cuidado que en la captura (ver iniciarCobro). Aquí no se sabe de antemano
+            // si esta cuenta trae canje (`canjeVivo` es el de la captura), así que se revisa siempre.
+            if (lealtadActiva && programa) {
+              try {
+                const r = await quitarCanjeSiQuedoRecortado(token, totales, programa.mecanica);
+                if (r.aviso) {
+                  setAvisoReparto({ titulo: "Se quitó el canje de lealtad", texto: r.aviso });
+                  setCuentasVersion((v) => v + 1);
+                  return;
+                }
+              } catch {
+                // Pudo fallar después de quitar el canje: se relee para no cobrar con un total que
+                // todavía trae ese descuento. Si tampoco se puede leer, se cobra con lo que hay.
+                try { totales = await leerTotales(token, ticketId); } catch { /* se cobra con lo que hay */ }
+              }
+            }
+            // El cajón se abre hasta aquí, cuando ya se sabe que la cuenta sí se va a cobrar.
+            abrirCajonParaCobrar();
+            setTotalesCobro(totales);
           } catch (e) {
             setError(e instanceof Error ? e.message : "No se pudo abrir el cobro");
           }
@@ -2049,6 +2090,7 @@ export function HomePos({
         {/* El cobro va aquí también: sin esto, abrirlo desde la lista no mostraría nada, porque
             el componente tiene un return por pantalla. */}
         {modalesCobro}
+        {modalCanje}
         {pidiendoMesa && (
           <ModalNumeroMesa
             token={token}
