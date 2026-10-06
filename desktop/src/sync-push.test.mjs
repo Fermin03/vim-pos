@@ -19,7 +19,7 @@
 // difícil de montar. El SQL real lo cubre `npm run verify:push`.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { HUELLA_FILA, HUELLA_TICKET, construirSnapshotPush, listarPendientes, marcarLealtadSubidos, pushToCloud, sembrarRepartidoresUnaVez, sembrarZonasUnaVez } from "./sync-push.mjs";
+import { HUELLA_FILA, HUELLA_TICKET, construirSnapshotPush, listarPendientes, marcarLealtadSubidos, pushToCloud, reanotarHuellasClientes0156UnaVez, sembrarRepartidoresUnaVez, sembrarZonasUnaVez } from "./sync-push.mjs";
 
 /**
  * Un pool que sabe lo justo para este archivo: sin ventas, sin turnos, sin movimientos, y los
@@ -924,4 +924,83 @@ test("lealtad: solo movimientos pendientes (sin ventas) bastan para pasar la gua
     assert.equal(r.lotes, 1);
     assert.deepEqual(anotado, [M]);
   } finally { nube.restaurar(); }
+});
+
+// ── Lealtad (0156): nube sin la migración; re-anotar huellas de clientes (I1) ──────────────────
+
+test("lealtad: si la nube IGNORÓ lealtad_movimientos (aún sin la 0156) no se marcan como subidos", async () => {
+  const pool = poolConLealtad();
+  const lineas = [];
+  const nube = nubeFalsa({ resultado: { _ignoradas: ["lealtad_movimientos"] } });
+  try {
+    await pushToCloud(pool, OPTS, (m) => lineas.push(m));
+    assert.deepEqual(pool.anotado.lealtad, [], "marcarlos los perdería: la nube no los guardó");
+    assert.deepEqual(pool.anotado.tickets, [pool.T], "la venta sí entró");
+    assert.equal(lineas.filter((l) => /lealtad/i.test(l) && /ignor/i.test(l)).length, 1, "una sola línea de log");
+  } finally { nube.restaurar(); }
+  // Ignorar OTRA tabla no retiene los movimientos.
+  const pool2 = poolConLealtad();
+  const nube2 = nubeFalsa({ resultado: { _ignoradas: ["tabla_rara"] } });
+  try {
+    await pushToCloud(pool2, OPTS, () => {});
+    assert.deepEqual(pool2.anotado.lealtad, [pool2.M]);
+  } finally { nube2.restaurar(); }
+});
+
+/** Pool mínimo para `reanotarHuellasClientes0156UnaVez`: guarda marcadores y cuenta los UPDATE. */
+function poolReanotado({ marcado = false, libreta = true, columna = true, afectadas = 3, falla = false } = {}) {
+  const p = { marcadores: new Set(marcado ? ["reanotar_huellas_clientes_0156"] : []), updates: 0, sqls: [] };
+  p.query = async (sql) => {
+    p.sqls.push(sql);
+    if (sql.startsWith("CREATE TABLE")) return { rows: [], rowCount: 0 };
+    if (sql.includes("_vim_migraciones_sync")) {
+      if (sql.trimStart().toUpperCase().startsWith("SELECT")) return { rows: [], rowCount: p.marcadores.has("reanotar_huellas_clientes_0156") ? 1 : 0 };
+      p.marcadores.add("reanotar_huellas_clientes_0156");
+      return { rows: [], rowCount: 1 };
+    }
+    if (sql.includes("to_regclass")) return { rows: [{ libreta, columna }], rowCount: 1 };
+    if (sql.startsWith("UPDATE _vim_clientes_ok")) {
+      if (falla) throw new Error("update roto a propósito");
+      p.updates++;
+      return { rows: [], rowCount: afectadas };
+    }
+    throw new Error(`consulta no prevista: ${sql.slice(0, 80)}`);
+  };
+  return p;
+}
+
+test("lealtad: re-anotar huellas de clientes se salta si el marcador ya está puesto", async () => {
+  const pool = poolReanotado({ marcado: true });
+  assert.equal(await reanotarHuellasClientes0156UnaVez(pool), 0);
+  assert.equal(pool.updates, 0, "con el marcador puesto no toca la libreta");
+  assert.ok(!pool.sqls.some((q) => q.startsWith("UPDATE")));
+});
+
+test("lealtad: re-anotar huellas corre una vez, marca DESPUÉS de lograrlo y usa la huella sin la columna nueva", async () => {
+  const pool = poolReanotado({ afectadas: 3 });
+  assert.equal(await reanotarHuellasClientes0156UnaVez(pool), 3);
+  assert.equal(pool.updates, 1);
+  assert.ok(pool.marcadores.has("reanotar_huellas_clientes_0156"));
+  const upd = pool.sqls.find((q) => q.startsWith("UPDATE _vim_clientes_ok"));
+  assert.match(upd, /o\.huella = md5\(\(to_jsonb\(x\) - 'codigo_publico'\)::text\)/);
+  assert.equal(await reanotarHuellasClientes0156UnaVez(pool), 0, "la segunda vez no hace nada");
+  assert.equal(pool.updates, 1);
+});
+
+test("lealtad: re-anotar huellas es seguro sin libreta (instalación nueva) o sin la columna (migración fallida)", async () => {
+  const nueva = poolReanotado({ libreta: false });
+  assert.equal(await reanotarHuellasClientes0156UnaVez(nueva), 0);
+  assert.equal(nueva.updates, 0);
+  assert.ok(nueva.marcadores.has("reanotar_huellas_clientes_0156"), "sin libreta no hay nada que re-anotar: queda hecho");
+  const sinColumna = poolReanotado({ columna: false });
+  assert.equal(await reanotarHuellasClientes0156UnaVez(sinColumna), 0);
+  assert.ok(!sinColumna.marcadores.has("reanotar_huellas_clientes_0156"), "sin la columna no se marca: se reintenta cuando exista");
+});
+
+test("lealtad: un fallo al re-anotar no tumba el arranque y no deja el marcador puesto", async () => {
+  const pool = poolReanotado({ falla: true });
+  const lineas = [];
+  assert.equal(await reanotarHuellasClientes0156UnaVez(pool, (m) => lineas.push(m)), 0);
+  assert.ok(!pool.marcadores.has("reanotar_huellas_clientes_0156"));
+  assert.ok(lineas.length >= 1);
 });

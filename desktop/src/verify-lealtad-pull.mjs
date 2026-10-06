@@ -9,6 +9,7 @@ import fs from "node:fs";
 import assert from "node:assert/strict";
 import { startLocalBackend } from "./runtime.mjs";
 import { pullSnapshot } from "./sync-pull.mjs";
+import { listarPendientes, reanotarHuellasClientes0156UnaVez } from "./sync-push.mjs";
 
 const dataRoot = fs.mkdtempSync(path.join(os.tmpdir(), "vim-lealtad-pull-"));
 let backend;
@@ -257,6 +258,58 @@ try {
     console.log(`N3: 2000 clientes — 1.er pull ${ms1} ms, 2.º pull ${ms2} ms`);
     assert.equal((await q("SELECT count(*)::int AS n FROM clientes WHERE nombre LIKE 'Masivo %'"))[0].n, 2000, "(N3) los 2,000 bajaron");
     assert.ok(ms2 < 10000, `(N3) el segundo pull de 2,000 clientes tardó ${ms2} ms (tope 10,000)`);
+  }
+
+  // (I1) La 0156 añadió clientes.codigo_publico: la huella de cada cliente ya anotado en la libreta
+  // del push cambia sin que nadie lo toque. El paso de arranque `reanotarHuellasClientes0156UnaVez`
+  // la re-anota; uno realmente editado en la caja se queda pendiente.
+  {
+    // (I1-a) El experimento: la huella que se guardó ANTES de la migración (md5 del texto de la fila sin
+    // la columna) es igual a md5((to_jsonb(x) - 'codigo_publico')::text) de la fila de AHORA. Se copia
+    // `clientes` sin la columna a una tabla sin ella, se toma la huella vieja, se añade la columna y se compara.
+    const cols = (await q(`SELECT column_name FROM information_schema.columns
+                            WHERE table_schema = 'public' AND table_name = 'clientes' AND column_name <> 'codigo_publico'
+                            ORDER BY ordinal_position`)).map((r) => `"${r.column_name}"`).join(", ");
+    await pool.query(`CREATE TABLE _exp_clientes_sin_columna AS SELECT ${cols} FROM clientes`);
+    const antes = await q("SELECT id, md5(to_jsonb(x)::text) AS h FROM _exp_clientes_sin_columna x ORDER BY id");
+    assert.ok(antes.length > 10, "(I1-a) hay clientes con qué experimentar");
+    await pool.query("ALTER TABLE _exp_clientes_sin_columna ADD COLUMN codigo_publico text NULL");
+    const despues = await q("SELECT id, md5(to_jsonb(x)::text) AS h_nueva, md5((to_jsonb(x) - 'codigo_publico')::text) AS h_sin FROM _exp_clientes_sin_columna x ORDER BY id");
+    assert.deepEqual(despues.map((r) => r.h_sin), antes.map((r) => r.h), "(I1-a) to_jsonb(x) - 'codigo_publico' reproduce EXACTAMENTE la huella de antes de la columna");
+    assert.ok(despues.every((r, i) => r.h_nueva !== antes[i].h), "(I1-a) y la huella con la columna sí cambia (ese es el problema)");
+    await pool.query("DROP TABLE _exp_clientes_sin_columna");
+    console.log(`I1: experimento de huella sobre ${antes.length} clientes: la huella vieja se reproduce al byte`);
+
+    // (I1-b) La situación: dos clientes intactos y uno editado en la caja, todos anotados con la huella de antes.
+    const nuevo = async (nombre, tel) => (await q("INSERT INTO clientes (tenant_id, nombre, telefono) VALUES ($1, $2, $3) RETURNING id", [T, nombre, tel]))[0].id;
+    const U1 = await nuevo("Intacta Uno", "4779990001"), U2 = await nuevo("Intacta Dos", "4779990002"), E = await nuevo("Editada Tres", "4779990003");
+    await pool.query("DELETE FROM _vim_clientes_ok WHERE cliente_id = ANY($1::uuid[])", [[U1, U2, E]]);
+    await pool.query(`INSERT INTO _vim_clientes_ok (cliente_id, huella)
+                        SELECT x.id, md5((to_jsonb(x) - 'codigo_publico')::text) FROM clientes x WHERE x.id = ANY($1::uuid[])`, [[U1, U2, E]]);
+    await pool.query("UPDATE clientes SET nombre = 'Editada Tres EN CAJA' WHERE id = $1", [E]); // edición local sin subir
+    // Esto es lo que arrancaría sin el paso: los tres "cambiaron".
+    const sinPaso = (await listarPendientes(pool)).clienteIds;
+    assert.ok(sinPaso.includes(U1) && sinPaso.includes(U2), "(I1-b) sin el paso, los clientes intactos aparecen como pendientes (el defecto)");
+
+    const huellaE = (await q("SELECT huella FROM _vim_clientes_ok WHERE cliente_id = $1", [E]))[0].huella;
+    await pool.query("DELETE FROM _vim_migraciones_sync WHERE clave = 'reanotar_huellas_clientes_0156'");
+    const n = await reanotarHuellasClientes0156UnaVez(pool, () => {});
+    assert.ok(n >= 2, `(I1-b) el paso re-anotó al menos a los dos intactos (re-anotó ${n})`);
+    const pend = (await listarPendientes(pool)).clienteIds;
+    assert.ok(!pend.includes(U1) && !pend.includes(U2), "(I1-b) los clientes intactos ya NO son pendientes");
+    assert.ok(pend.includes(E), "(I1-b) el cliente editado en la caja SIGUE pendiente");
+    assert.equal((await q("SELECT huella FROM _vim_clientes_ok WHERE cliente_id = $1", [E]))[0].huella, huellaE, "(I1-b) la huella del editado no se tocó");
+    assert.equal((await q("SELECT 1 FROM _vim_migraciones_sync WHERE clave = 'reanotar_huellas_clientes_0156'")).length, 1, "(I1-b) marcado como hecho");
+
+    // (I1-c) Idempotente: correrlo otra vez (aun sin el marcador) no cambia nada.
+    const foto = async () => JSON.stringify(await q("SELECT cliente_id, huella FROM _vim_clientes_ok ORDER BY cliente_id"));
+    const f1 = await foto();
+    assert.equal(await reanotarHuellasClientes0156UnaVez(pool, () => {}), 0, "(I1-c) con el marcador puesto no hace nada");
+    await pool.query("DELETE FROM _vim_migraciones_sync WHERE clave = 'reanotar_huellas_clientes_0156'");
+    assert.equal(await reanotarHuellasClientes0156UnaVez(pool, () => {}), 0, "(I1-c) sin marcador, lo ya re-anotado no vuelve a coincidir");
+    assert.equal(await foto(), f1, "(I1-c) la libreta quedó idéntica");
+    const pend2 = (await listarPendientes(pool)).clienteIds;
+    assert.ok(!pend2.includes(U1) && !pend2.includes(U2) && pend2.includes(E), "(I1-c) los pendientes siguen igual");
   }
 
   // (f) una nube vieja: trae otras tablas y ninguna de las cuatro llaves nuevas.

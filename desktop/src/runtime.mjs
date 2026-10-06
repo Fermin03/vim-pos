@@ -4,7 +4,7 @@
 // reusable que arranca el proceso main de Electron (o el verify headless).
 import EmbeddedPostgres from "embedded-postgres";
 import { arrancarConReintentos, crearCapturaDeLog } from "./arranque-reintentos.mjs";
-import { sembrarRepartidoresUnaVez, sembrarZonasUnaVez } from "./sync-push.mjs";
+import { reanotarHuellasClientes0156UnaVez, sembrarRepartidoresUnaVez, sembrarZonasUnaVez } from "./sync-push.mjs";
 import { blindarTablasInternas, repararRevokesUnaVez } from "./privilegios.mjs";
 import { conTope } from "./tope.mjs";
 import pg from "pg";
@@ -471,6 +471,11 @@ export async function startLocalBackend(opts = {}) {
   // 3c) Misma libreta, mismo motivo, para zonas de envío (0116/Task 4): ver `sembrarZonasUnaVez`
   // en sync-push.mjs, que reusa el razonamiento completo de `sembrarRepartidoresUnaVez` de arriba.
   await sembrarZonasUnaVez(db, log);
+
+  // 3d) La 0156 añadió clientes.codigo_publico y con eso cambió la huella de cada cliente de la
+  // libreta del push: sin esto el primer ciclo re-subiría todo el padrón y pisaría en la nube lo que
+  // se editó o se dio de baja en el panel. Ver `reanotarHuellasClientes0156UnaVez` (sync-push.mjs).
+  await reanotarHuellasClientes0156UnaVez(db, log);
 
   // 4) Privilegios de los roles API. Aquí había un GRANT … ON ALL TABLES a authenticated/anon en
   //    cada arranque: dejaba las libretas _vim_* escribibles desde la LAN y deshacía los REVOKE de

@@ -106,8 +106,12 @@ export const HUELLA_TICKET = `md5(to_jsonb(x)::text
   || COALESCE((SELECT string_agg(md5(to_jsonb(h)::text), '' ORDER BY h.id) FROM cancelaciones_ticket h WHERE h.ticket_id = x.id), '')
   || COALESCE((SELECT string_agg(md5(to_jsonb(h)::text), '' ORDER BY h.id) FROM devoluciones h WHERE h.ticket_original_id = x.id), '')
   || COALESCE((SELECT string_agg(md5(to_jsonb(h)::text), '' ORDER BY h.id) FROM delivery_asignaciones h WHERE h.ticket_id = x.id), '')
-  -- 0156: el canje de lealtad del ticket, solo si hay (COALESCE a ''): los tickets sin canje
-  -- conservan su huella y actualizar no re-sube 60 días de ventas.
+  -- 0156: el canje de lealtad del ticket, solo si hay (COALESCE a ''): esta cláusula, por sí sola, no
+  -- mueve la huella de los tickets sin canje. Lo que SÍ la mueve, una vez, es la columna nueva
+  -- tickets.lealtad_mxn (0156), que entra en to_jsonb(x) de TODOS los tickets: al actualizar, los
+  -- 60 días de ventas vuelven a subir una sola vez. Es inofensivo: la caja reenvía su propia verdad,
+  -- nadie edita tickets en el panel y la nube conserva lo suyo (guarda de FACTURADO, 0122). A
+  -- diferencia de los clientes, aquí NO se re-anotan las huellas (ver reanotarHuellasClientes0156UnaVez).
   || COALESCE((SELECT string_agg(md5(to_jsonb(h)::text), '' ORDER BY h.id) FROM ticket_canjes_lealtad h WHERE h.ticket_id = x.id), '')
   || (SELECT count(*)::text FROM comanda_impresiones h WHERE h.ticket_id = x.id)
   -- 0126: las reimpresiones del ticket, solo si hay. Sin ellas la huella queda idéntica a la de
@@ -449,6 +453,74 @@ export async function sembrarZonasUnaVez(db, log = () => {}) {
     // Ruidoso pero no fatal: la caja abre. El siguiente push subirá el catálogo entero una vez.
     const aviso = `no se pudo sembrar la libreta de zonas (${e.message}). La caja abre igual;`
       + " el próximo push subirá el catálogo completo una vez y puede pisar ediciones recientes del panel.";
+    log(`⚠ ${aviso}`);
+    console.error("· [sync]", aviso);
+    return 0;
+  }
+}
+
+/**
+ * Re-anota en `_vim_clientes_ok` la huella de los clientes que la 0156 dejó "cambiados" sin que nadie
+ * los tocara. UNA sola vez por caja, EN EL ARRANQUE (`startLocalBackend`, runtime.mjs, junto a las
+ * siembras de arriba y antes del primer sync).
+ *
+ * EL PROBLEMA. La 0156 añade `clientes.codigo_publico`. La libreta guarda `md5(to_jsonb(x)::text)` de
+ * cada cliente (HUELLA_FILA) y esa fila ahora trae una llave más: la huella de TODOS los clientes ya
+ * anotados deja de coincidir. Consecuencias en cadena, en el primer ciclo tras actualizar y para todo
+ * negocio, use lealtad o no: (1) el pull los toma a todos por "edición local pendiente" y no aplica la
+ * copia de la nube; (2) el push re-sube el padrón entero y el aplicador de la nube pisa todas las
+ * columnas con la copia vieja de la caja: se revierten las ediciones hechas en el panel y los clientes
+ * dados de baja allí reviven.
+ *
+ * EL ARREGLO. Un cliente cuya huella guardada es igual a la de su fila SIN `codigo_publico` no cambió:
+ * solo cambió la forma de la fila. Se le anota la huella de ahora. (`to_jsonb(x) - 'codigo_publico'`
+ * reproduce el texto de antes al byte: jsonb ordena sus llaves por longitud y luego por bytes, no por
+ * el orden de las columnas; lo comprueba `verify-lealtad-pull.mjs`.) Uno cuya huella no coincide con
+ * ninguna de las dos SÍ se editó en la caja sin subir: se queda pendiente, y es lo correcto.
+ *
+ * Es idempotente aunque se repita (una huella ya re-anotada no coincide con la de "sin la columna").
+ * A diferencia de las siembras de arriba, el marcador se escribe DESPUÉS de lograrlo: aquí un fallo
+ * a medias no pierde nada (re-anotar es seguro de repetir), y marcarlo antes dejaría sin arreglar a
+ * una caja cuyo UPDATE falló. Un fallo no tumba el arranque: la caja nunca deja de cobrar por una
+ * libreta de sincronización. Sin libreta (instalación nueva) no hay nada que re-anotar y queda hecho;
+ * sin la columna (migración fallida) no se marca, para que corra cuando exista.
+ *
+ * Los tickets tienen el mismo efecto (`tickets.lealtad_mxn`) y ese se acepta: ver HUELLA_TICKET.
+ */
+export async function reanotarHuellasClientes0156UnaVez(db, log = () => {}) {
+  await db.query(
+    "CREATE TABLE IF NOT EXISTS _vim_migraciones_sync (clave text PRIMARY KEY, aplicada_at timestamptz DEFAULT now())",
+  );
+  const { rowCount: yaCorrio } = await db.query(
+    "SELECT 1 FROM _vim_migraciones_sync WHERE clave = 'reanotar_huellas_clientes_0156'",
+  );
+  if (yaCorrio) return 0;
+  try {
+    const { rows: [estado] } = await db.query(
+      `SELECT to_regclass('public._vim_clientes_ok') IS NOT NULL AS libreta,
+              EXISTS (SELECT 1 FROM information_schema.columns
+                       WHERE table_schema = 'public' AND table_name = 'clientes' AND column_name = 'codigo_publico') AS columna`,
+    );
+    if (!estado.columna) {
+      log("re-anotar huellas de clientes: clientes aún no tiene codigo_publico; se reintenta en el próximo arranque");
+      return 0;
+    }
+    let n = 0;
+    if (estado.libreta) {
+      ({ rowCount: n } = await db.query(
+        `UPDATE _vim_clientes_ok o SET huella = ${HUELLA_FILA}
+           FROM clientes x
+          WHERE x.id = o.cliente_id AND o.huella = md5((to_jsonb(x) - 'codigo_publico')::text)`,
+      ));
+    }
+    await db.query(
+      "INSERT INTO _vim_migraciones_sync(clave) VALUES ('reanotar_huellas_clientes_0156') ON CONFLICT DO NOTHING",
+    );
+    if (n > 0) log(`huellas de ${n} cliente(s) re-anotadas tras la 0156 (no cambiaron: no se re-suben)`);
+    return n;
+  } catch (e) {
+    const aviso = `no se pudieron re-anotar las huellas de clientes (${e.message}). La caja abre igual;`
+      + " se reintenta en el próximo arranque.";
     log(`⚠ ${aviso}`);
     console.error("· [sync]", aviso);
     return 0;
@@ -968,7 +1040,13 @@ async function enviarLote(pool, { cloudUrl, anonKey, deviceToken }, { ticketIds,
   const dirFuera = filasRechazadas(errores, "direcciones_cliente");
   await marcarClientesSubidos(pool, clientes.filter((c) => !cliFuera.has(c.id)), direcciones.filter((d) => !dirFuera.has(d.id)));
   const leaFuera = filasRechazadas(errores, "lealtad_movimientos");
-  await marcarLealtadSubidos(pool, lealtad.filter((id) => !leaFuera.has(id)));
+  // Una nube sin la 0156 devuelve la tabla en `_ignoradas` y NO guarda los movimientos: marcarlos como
+  // subidos los perdería. Se dejan pendientes y se reintentan cuando la nube los acepte.
+  if (lealtad.length && (respuesta?.resultado?._ignoradas ?? []).includes("lealtad_movimientos")) {
+    log(`la nube ignoró lealtad_movimientos (aún sin la migración 0156): ${lealtad.length} movimiento(s) se reintentarán`);
+  } else {
+    await marcarLealtadSubidos(pool, lealtad.filter((id) => !leaFuera.has(id)));
+  }
   if (errores.length) {
     const muestra = errores.slice(0, 3).map((e) => `${e.tabla}/${String(e.id).slice(0, 8)}: ${e.error}`).join(" · ");
     log(`la nube rechazó ${errores.length} fila(s), se reintentarán: ${muestra}`);
