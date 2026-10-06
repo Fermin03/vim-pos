@@ -582,11 +582,17 @@ CREATE TRIGGER trg_devoluciones_lealtad
 -- ── §5 El canje en los totales del ticket ───────────────────────────────────
 -- El canje es un descuento más. Dinero (ticket_item_id NULL): baja el total de la cuenta con el
 -- mismo piso que descuentos y promociones (el envío no se come). Premio de producto: se descuenta
--- en el renglón, sumado a promocion_item_mxn, porque timbrar-cfdi, timbrar-global y autofacturar
--- leen descuento_item_mxn + promocion_item_mxn como el descuento del concepto y así el CFDI cuadra
--- sin tocarlas. A nivel de ticket ambos se reportan en lealtad_mxn (nunca en promociones_mxn), y
--- solo lo que de verdad se aplicó. La invariante del CFDI pasa a ser:
+-- en el renglón, sumado a promocion_item_mxn. Se guarda ahí porque es la columna que ya existe por
+-- renglón para un descuento automático (el que no pide PIN), y agregar una columna NOT NULL nueva a
+-- ticket_items rompería el push de las cajas que todavía no se han actualizado. El timbrado NO lee
+-- esa columna para el descuento: _shared/pac/conceptos.ts lo deduce de total_item_mxn e
+-- iva_item_mxn, que ya salen con el premio descontado. Consecuencia: la suma de promocion_item_mxn
+-- por renglón deja de cuadrar con tickets.promociones_mxn; la parte de lealtad se reporta en
+-- tickets.lealtad_mxn (a nivel de ticket, el canje de dinero y el premio van ahí, nunca en
+-- promociones_mxn), y solo lo que de verdad se aplicó. La invariante pasa a ser:
 --     renglones vivos − (descuentos_manuales_mxn + promociones_mxn + lealtad_mxn) = total_mxn
+-- Tal cual solo cuando el IVA va incluido en el precio; con IVA por fuera, el lado izquierdo es
+-- antes de impuestos.
 -- Sin un canje vivo todo se calcula EXACTAMENTE como en la 0116: el cuerpo de abajo es esa función
 -- con solo los cambios marcados con "0156". Conserva el SET search_path de la 0116 (la 0044 se lo
 -- puso con ALTER FUNCTION y un CREATE OR REPLACE sin la cláusula lo quita) y, como CREATE OR
@@ -681,8 +687,10 @@ BEGIN
     SET subtotal_bruto_mxn      = v_item_bruto,
         monto_modificadores_mxn = v_item_modif,
         descuento_item_mxn      = v_item_desc,
-        -- 0156: el premio de lealtad va aquí porque el timbrado lee esta columna como descuento
-        -- del concepto. A nivel de ticket se reporta en lealtad_mxn, no en promociones_mxn.
+        -- 0156: el premio de lealtad va aquí porque es la columna por renglón de un descuento
+        -- automático, y una columna nueva NOT NULL rompería el push de las cajas sin actualizar.
+        -- Por eso la suma de esta columna ya no cuadra con tickets.promociones_mxn: la parte de
+        -- lealtad se reporta a nivel de ticket en lealtad_mxn.
         promocion_item_mxn      = v_item_promo + v_item_lea,
         iva_item_mxn            = v_item_iva,
         total_item_mxn          = v_item_total
@@ -789,19 +797,28 @@ BEGIN
 END;
 $$;
 
--- Cuando cambia un canje (se aplica, se revierte o se borra con su ticket) los totales se recalculan.
+-- Cuando cambia un canje (se aplica, se revierte o se borra) los totales se recalculan, pero SOLO
+-- si el ticket sigue abierto. Un ticket cerrado conserva los totales con los que se vendió: si al
+-- cancelar o devolver una cuenta cobrada se revierte su canje, recalcular subiría total_mxn de un
+-- ticket que ya se cobró. La reversa la registra el libro de movimientos de lealtad, no el ticket.
 CREATE OR REPLACE FUNCTION trg_ticket_canje_lealtad_recalcular()
 RETURNS trigger
 LANGUAGE plpgsql SET search_path = public, pg_temp
 AS $$
+DECLARE
+  v_ticket_id uuid := COALESCE(NEW.ticket_id, OLD.ticket_id);
+  v_estado    ticket_estado_fiscal;
 BEGIN
-  PERFORM recalcular_totales_ticket(COALESCE(NEW.ticket_id, OLD.ticket_id));
+  SELECT estado_fiscal INTO v_estado FROM tickets WHERE id = v_ticket_id;
+  IF v_estado IN ('BORRADOR', 'ABIERTO') THEN
+    PERFORM recalcular_totales_ticket(v_ticket_id);
+  END IF;
   RETURN COALESCE(NEW, OLD);
 END $$;
 
 DROP TRIGGER IF EXISTS trg_ticket_canjes_lealtad_recalcular ON ticket_canjes_lealtad;
 CREATE TRIGGER trg_ticket_canjes_lealtad_recalcular
-  AFTER INSERT OR UPDATE OR DELETE ON ticket_canjes_lealtad
+  AFTER INSERT OR DELETE OR UPDATE OF revertido, monto_descontado_mxn, ticket_item_id ON ticket_canjes_lealtad
   FOR EACH ROW EXECUTE FUNCTION trg_ticket_canje_lealtad_recalcular();
 
 -- El borrador del CFDI deduce su descuento de los totales del ticket: el canje cuenta como descuento.
