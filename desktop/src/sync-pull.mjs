@@ -6,7 +6,7 @@
 // generadas, y hace INSERT ... ON CONFLICT (pk) DO UPDATE. Corre en modo réplica para no
 // disparar triggers (misma semántica que la replicación lógica). Reusable con cualquier fuente.
 
-import { asegurarLibretaZonas, ZONA_EDITADA_LOCAL } from "./sync-push.mjs";
+import { asegurarLibretaZonas, ZONA_EDITADA_LOCAL, HUELLA_FILA } from "./sync-push.mjs";
 
 // Orden de FKs: padres antes que hijos. Solo se procesan las tablas presentes en el snapshot.
 export const PULL_ORDER = [
@@ -34,6 +34,12 @@ export const PULL_ORDER = [
   { t: "configuracion_tenant" },
   // Anuncios de la pantalla del cliente (0150). Solo la lista; las imágenes las baja anuncios.mjs.
   { t: "anuncios_pantalla" },
+  // Lealtad (0156, ADR 0030). Clientes: FK solo a tenants. El programa antes que los saldos, que se
+  // corrigen con su versión. Los premios apuntan a productos, que ya bajaron arriba.
+  { t: "clientes" },
+  { t: "lealtad_programa" },
+  { t: "lealtad_premios" },
+  { t: "lealtad_saldos" },
   // Inventario (ADR 0013): unidades antes que insumos; existencias, recetas y componentes después.
   // La caja lo necesita para descontar al vender; los movimientos que genera suben por el push.
   { t: "unidades_medida" },
@@ -136,6 +142,31 @@ async function upsertTabla(client, schema, tabla, filas) {
  * que el upsert inserte lo que mandó la nube. También limpia lo que el dueño borró en la nube (el
  * pull no trae tombstones), y es seguro porque el padre completo vuelve en el mismo snapshot.
  */
+const soloDigitos = (v) => String(v ?? "").replace(/\D/g, "");
+
+/**
+ * Gancho de la fusión de clientes: `direcciones_cliente` tiene un índice único parcial
+ * (idx_direcciones_principal_unica: UNIQUE (cliente_id) WHERE es_principal AND deleted_at IS NULL,
+ * 0007). El pull corre en modo réplica, que apaga FK y triggers pero NO los índices únicos: si la
+ * dirección principal del duplicado se mudara al cliente real que ya tiene la suya, el UPDATE
+ * lanzaría unique_violation, pullSnapshot haría ROLLBACK y la caja no volvería a recibir su
+ * catálogo en ningún ciclo. Por eso, ANTES de mudar las direcciones, el duplicado deja de tener
+ * principal si el real ya tiene una (la dirección se conserva, solo pierde la marca); y si el real
+ * no tiene, el duplicado se queda a lo más con una.
+ */
+async function dejarUnaDireccionPrincipal(client, viejoId, nuevoId) {
+  const { rows } = await client.query(
+    "SELECT 1 FROM direcciones_cliente WHERE cliente_id = $1 AND es_principal AND deleted_at IS NULL LIMIT 1", [nuevoId]);
+  const realYaTiene = rows.length > 0;
+  await client.query(
+    `UPDATE direcciones_cliente SET es_principal = false
+      WHERE cliente_id = $1 AND es_principal AND deleted_at IS NULL
+        AND ($2::boolean OR id <> (SELECT id FROM direcciones_cliente
+                                    WHERE cliente_id = $1 AND es_principal AND deleted_at IS NULL
+                                    ORDER BY created_at, id LIMIT 1))`,
+    [viejoId, realYaTiene]);
+}
+
 const CLAVES_NATURALES = {
   roles: { claves: ["codigo", "tenant_id"], dependientes: [{ tabla: "rol_permisos", col: "rol_id" }] },
   permisos: { claves: ["codigo"], dependientes: [{ tabla: "rol_permisos", col: "permiso_id" }] },
@@ -169,7 +200,54 @@ const CLAVES_NATURALES = {
     dependientes: [],
     reapuntar: [{ tabla: "tickets", col: "zona_envio_id" }, { tabla: "direcciones_cliente", col: "zona_envio_id" }],
   },
+  // El mismo teléfono registrado en esta caja y en otra sucursal (spec lealtad §8.4): la nube ya
+  // los fundió en uno y aquí baja el cliente real, con otro id. Igual que una zona, el cliente
+  // local tiene datos que no se pueden tirar (ventas, direcciones, movimientos), así que se mudan
+  // al id de la nube. `reapuntarFk` los busca en el catálogo de Postgres en vez de listarlos a
+  // mano: una tabla nueva que apunte a clientes queda cubierta sola.
+  // lealtad_saldos NO se muda (su llave ES el cliente y mudarla chocaría si el real ya tuviera
+  // saldo): se borra y entra la de la nube unas filas más abajo, en este mismo pull.
+  // El teléfono se compara por DÍGITOS en los dos lados, igual que la fusión de la nube: el POS lo
+  // guarda como se tecleó ("(477) 000-1567"). La barra de \D va doble en el literal de JS para que
+  // el SQL lleve una sola. _vim_clientes_ok: la fila de la libreta del duplicado quedaría con un id
+  // que ya no existe; se borra en el mismo paso.
+  clientes: {
+    claveSql: {
+      where: "tenant_id = $1 AND regexp_replace(telefono, '\\D', '', 'g') = $2 AND deleted_at IS NULL",
+      params: (f) => [f.tenant_id ?? null, soloDigitos(f.telefono)],
+      aplica: (f) => f.deleted_at == null && soloDigitos(f.telefono) !== "",
+    },
+    dependientes: [
+      { tabla: "lealtad_saldos", col: "cliente_id" },
+      { tabla: "_vim_clientes_ok", col: "cliente_id" },
+    ],
+    reapuntarFk: { tabla: "clientes", excepto: ["lealtad_saldos"] },
+    antesDeReapuntar: dejarUnaDireccionPrincipal,
+  },
 };
+
+const fkCache = new Map();
+/**
+ * Columnas de otras tablas de `public` con llave foránea SIMPLE (una sola columna) hacia
+ * `public.<tabla>(id)`, sin contar la propia tabla. Se cachea por proceso: el esquema solo cambia
+ * al reiniciar (las migraciones corren al arrancar), así que no hace falta volver a preguntar.
+ */
+async function columnasQueApuntanA(client, tabla, excepto = []) {
+  if (!fkCache.has(tabla)) {
+    const { rows } = await client.query(
+      `SELECT cl.relname AS tabla, a.attname AS col
+         FROM pg_constraint c
+         JOIN pg_class cl ON cl.oid = c.conrelid
+         JOIN pg_namespace n ON n.oid = cl.relnamespace AND n.nspname = 'public'
+         JOIN pg_attribute a ON a.attrelid = c.conrelid AND a.attnum = c.conkey[1]
+         JOIN pg_attribute ra ON ra.attrelid = c.confrelid AND ra.attnum = c.confkey[1]
+        WHERE c.contype = 'f' AND array_length(c.conkey, 1) = 1
+          AND c.confrelid = ('public.' || $1)::regclass AND ra.attname = 'id'
+          AND c.conrelid <> c.confrelid`, [tabla]);
+    fkCache.set(tabla, rows);
+  }
+  return fkCache.get(tabla).filter((r) => !excepto.includes(r.tabla));
+}
 
 /**
  * Alinea un catálogo local con el de la nube ANTES de insertarlo: borra la fila local que colisiona
@@ -191,6 +269,10 @@ async function reconciliarCatalogo(client, tabla, filas, log = () => {}) {
     return;
   }
 
+  const reapuntar = cfg.reapuntarFk
+    ? await columnasQueApuntanA(client, cfg.reapuntarFk.tabla, cfg.reapuntarFk.excepto)
+    : (cfg.reapuntar ?? []);
+
   let borradas = 0;
   for (const f of filas) {
     if (!f?.id) continue;
@@ -211,7 +293,8 @@ async function reconciliarCatalogo(client, tabla, filas, log = () => {}) {
     );
     for (const vieja of rows) {
       // Primero se mudan los que tienen datos propios al id de la nube; luego se borra lo demás.
-      for (const r of cfg.reapuntar ?? []) {
+      await cfg.antesDeReapuntar?.(client, vieja.id, f.id);
+      for (const r of reapuntar) {
         await client.query(`UPDATE ${r.tabla} SET "${r.col}" = $1 WHERE "${r.col}" = $2`, [f.id, vieja.id]);
       }
       for (const d of cfg.dependientes) {
@@ -389,6 +472,91 @@ async function separarZonasPendientes(client, filas) {
   };
 }
 
+/**
+ * Clientes: mismo contrato que las zonas. Un cliente que la caja editó y aún no sube (está en la
+ * libreta `_vim_clientes_ok` con una huella distinta a la de su fila) no se pisa con la copia de la
+ * nube; el siguiente push lo sube y el pull siguiente ya es inocuo.
+ */
+async function separarClientesPendientes(client, filas) {
+  const ids = [...new Set((filas ?? []).map((f) => f?.id).filter((id) => id != null))];
+  if (!ids.length) return { aplicar: filas ?? [], descartadas: [] };
+  await client.query("CREATE TABLE IF NOT EXISTS _vim_clientes_ok (cliente_id uuid PRIMARY KEY, huella text NOT NULL, subido_at timestamptz DEFAULT now())");
+  // FOR NO KEY UPDATE: espera a una edición en vuelo sin chocar con las FK de tickets (ver
+  // separarZonasPendientes para el porqué del candado y de su tipo).
+  await client.query("SELECT 1 FROM clientes WHERE id = ANY($1::uuid[]) FOR NO KEY UPDATE", [ids]);
+  const { rows } = await client.query(
+    `SELECT o.cliente_id FROM _vim_clientes_ok o
+       JOIN clientes x ON x.id = o.cliente_id
+      WHERE o.cliente_id = ANY($1::uuid[]) AND o.huella IS DISTINCT FROM ${HUELLA_FILA}`, [ids]);
+  const pendientes = new Set(rows.map((r) => r.cliente_id));
+  if (!pendientes.size) return { aplicar: filas, descartadas: [] };
+  return {
+    aplicar: filas.filter((f) => !pendientes.has(f.id)),
+    descartadas: filas.filter((f) => pendientes.has(f.id)),
+  };
+}
+
+/**
+ * Anota en la libreta del PUSH los clientes que acaban de bajar, con la huella de la fila LOCAL
+ * recién escrita. Sin esto el push los volvería a mandar y la caja pisaría con su copia lo que se
+ * editó en el panel o en otra sucursal (misma razón que marcarZonasDelPull).
+ */
+export async function marcarClientesDelPull(client, filas, log = () => {}) {
+  const ids = [...new Set((filas ?? []).map((f) => f?.id).filter((id) => id != null))];
+  if (!ids.length) return 0;
+  await client.query("CREATE TABLE IF NOT EXISTS _vim_clientes_ok (cliente_id uuid PRIMARY KEY, huella text NOT NULL, subido_at timestamptz DEFAULT now())");
+  await client.query(
+    `INSERT INTO _vim_clientes_ok (cliente_id, huella)
+     SELECT x.id, ${HUELLA_FILA} FROM clientes x WHERE x.id = ANY($1::uuid[])
+     ON CONFLICT (cliente_id) DO UPDATE SET huella = EXCLUDED.huella`, [ids]);
+  log(`  clientes: ${ids.length} anotado(s) como de la nube (no vuelven a subir)`);
+  return ids.length;
+}
+
+/**
+ * Lo que la nube todavía NO sabe de lealtad: suma de puntos, por cliente, de los movimientos
+ * locales pendientes de subir que son de la versión vigente del programa (los de una versión
+ * anterior se registran y no suman, igual que en la nube). Pura, para poder probarla.
+ */
+export function deltaLealtadPendiente(movimientos, versionActual) {
+  const acumulado = new Map();
+  if (versionActual == null) return acumulado;
+  for (const m of movimientos ?? []) {
+    if (Number(m.programa_version) !== Number(versionActual)) continue;
+    acumulado.set(m.cliente_id, (acumulado.get(m.cliente_id) ?? 0) + Number(m.puntos));
+  }
+  return acumulado;
+}
+
+/**
+ * Después de bajar `lealtad_saldos` (la nube manda), suma lo que la caja generó y aún no subió.
+ * Sin esto, un pull entre dos pushes le "quitaría" al cliente lo que acaba de ganar. Solo sobre
+ * los clientes que trajo ESTE pull (misma regla I1 que corregirExistenciasPorPendientes): si la
+ * nube no mandó su fila, la local ya incluye lo pendiente y no se toca.
+ */
+export async function corregirSaldosLealtadPorPendientes(client, log = () => {}, filasAplicadas = []) {
+  const permitidos = new Set(filasAplicadas.map((f) => f.cliente_id));
+  if (!permitidos.size) return 0;
+  await client.query("CREATE TABLE IF NOT EXISTS _vim_lealtad_mov_ok (movimiento_id uuid PRIMARY KEY, subido_at timestamptz DEFAULT now())");
+  const tenantId = filasAplicadas[0].tenant_id;
+  const prog = await client.query("SELECT version FROM lealtad_programa WHERE tenant_id = $1", [tenantId]);
+  const { rows } = await client.query(`
+    SELECT m.cliente_id, m.puntos, m.programa_version
+      FROM lealtad_movimientos m
+      LEFT JOIN _vim_lealtad_mov_ok ok ON ok.movimiento_id = m.id
+     WHERE ok.movimiento_id IS NULL AND m.tenant_id = $1`, [tenantId]);
+  const deltas = deltaLealtadPendiente(rows, prog.rows[0]?.version ?? null);
+  let n = 0;
+  for (const [clienteId, delta] of deltas) {
+    if (!delta || !permitidos.has(clienteId)) continue;
+    const r = await client.query(
+      "UPDATE lealtad_saldos SET saldo = saldo + $2 WHERE cliente_id = $1", [clienteId, delta]);
+    n += r.rowCount;
+  }
+  if (n) log(`  lealtad_saldos: ${n} saldo(s) corregido(s) por movimientos pendientes`);
+  return n;
+}
+
 export async function pullSnapshot(pool, snapshot, log = () => {}) {
   const client = await pool.connect();
   const resumen = {};
@@ -406,6 +574,14 @@ export async function pullSnapshot(pool, snapshot, log = () => {}) {
         filas = aplicar;
         if (!filas.length) continue;
       }
+      if (t === "clientes") {
+        const { aplicar, descartadas } = await separarClientesPendientes(client, filas);
+        if (descartadas.length) {
+          log(`  clientes: ${descartadas.length} con edición local pendiente, no se pisan`);
+        }
+        filas = aplicar;
+        if (!filas.length) continue;
+      }
       await reconciliarCatalogo(client, t, filas, log);
       const n = await upsertTabla(client, schema, t, filas);
       resumen[t] = n;
@@ -413,6 +589,8 @@ export async function pullSnapshot(pool, snapshot, log = () => {}) {
       if (t === "insumo_stock_sucursal") await corregirExistenciasPorPendientes(client, log, filas);
       if (t === "repartidores") await marcarRepartidoresDelPull(client, filas, log);
       if (t === "zonas_envio") await marcarZonasDelPull(client, filas, log);
+      if (t === "clientes") await marcarClientesDelPull(client, filas, log);
+      if (t === "lealtad_saldos" && n) await corregirSaldosLealtadPorPendientes(client, log, filas);
     }
     await client.query(
       `CREATE TABLE IF NOT EXISTS _vim_sync (clave text PRIMARY KEY, valor text, at timestamptz DEFAULT now())`);

@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { deltaPendiente, SIGNO_MOVIMIENTO } from "./sync-pull.mjs";
+import { deltaPendiente, SIGNO_MOVIMIENTO, deltaLealtadPendiente } from "./sync-pull.mjs";
 
 const I = "11111111-1111-1111-1111-111111111111";
 const S = "22222222-2222-2222-2222-222222222222";
@@ -211,4 +211,98 @@ test("PULL_ORDER baja el menú por sucursal después de productos y de sucursale
   assert.ok(t.includes("productos_sucursal"), "productos_sucursal está en PULL_ORDER");
   assert.ok(t.indexOf("productos_sucursal") > t.indexOf("productos"), "va después de productos (FK)");
   assert.ok(t.indexOf("productos_sucursal") > t.indexOf("sucursales"), "va después de sucursales (FK)");
+});
+
+// Lealtad (0156, ADR 0030, tarea 8).
+test("lealtad: deltaLealtadPendiente suma por cliente solo lo de la versión vigente", () => {
+  const d = deltaLealtadPendiente([
+    { cliente_id: "ana", puntos: 12, programa_version: 2 },
+    { cliente_id: "ana", puntos: -5, programa_version: 2 },
+    { cliente_id: "ana", puntos: 40, programa_version: 1 }, // versión vieja: registrado, no suma
+    { cliente_id: "beto", puntos: 3, programa_version: 2 },
+  ], 2);
+  assert.equal(d.get("ana"), 7);
+  assert.equal(d.get("beto"), 3);
+  assert.equal(d.size, 2);
+});
+
+test("lealtad: deltaLealtadPendiente aguanta vacío y sin versión", () => {
+  assert.equal(deltaLealtadPendiente([], 1).size, 0);
+  assert.equal(deltaLealtadPendiente(null, 1).size, 0);
+  assert.equal(deltaLealtadPendiente([{ cliente_id: "ana", puntos: 5, programa_version: 1 }], null).size, 0);
+});
+
+test("lealtad: el pull respeta las llaves foráneas en el orden", () => {
+  const pos = (t) => PULL_ORDER.findIndex((x) => x.t === t);
+  assert.ok(pos("clientes") > pos("tenants"), "clientes después de tenants");
+  assert.ok(pos("lealtad_saldos") > pos("clientes"), "saldos después de clientes");
+  assert.ok(pos("lealtad_saldos") > pos("lealtad_programa"), "saldos después del programa (se corrigen con su versión)");
+  assert.ok(pos("lealtad_premios") > pos("productos"), "premios después de productos");
+});
+
+const CLI_LOCAL = "c1c1c1c1-0000-0000-0000-000000000001";
+const CLI_NUBE = "c2c2c2c2-0000-0000-0000-000000000002";
+
+/** Cliente falso que simula un cliente local duplicado (mismo teléfono) y las FK que apuntan a clientes. */
+function clienteFalsoConDuplicado() {
+  const { client, pool } = clienteFalso();
+  const query = client.query.bind(client);
+  client.query = async (sql, params = []) => {
+    if (sql.includes("pg_constraint")) {
+      await query(sql, params);
+      return { rows: [
+        { tabla: "tickets", col: "cliente_id" },
+        { tabla: "direcciones_cliente", col: "cliente_id" },
+        { tabla: "lealtad_saldos", col: "cliente_id" },
+        { tabla: "clientes_alias", col: "cliente_id" },
+      ] };
+    }
+    if (sql.includes("regexp_replace(telefono") && sql.trimStart().startsWith("SELECT")) {
+      await query(sql, params);
+      return { rows: [{ id: CLI_LOCAL }], rowCount: 1 };
+    }
+    return query(sql, params);
+  };
+  return { client, pool };
+}
+
+test("lealtad: el cliente local con el mismo teléfono (formateado distinto) se busca por dígitos", async () => {
+  const { client, pool } = clienteFalsoConDuplicado();
+  await pullSnapshot(pool, { clientes: [{ id: CLI_NUBE, tenant_id: TEN, nombre: "Ana", telefono: "(477) 000-1567", deleted_at: null }] });
+  const busca = client.consultas.find((c) => c.sql.includes("regexp_replace(telefono"));
+  assert.ok(busca, "debía buscar el duplicado local por teléfono");
+  // Barra invertida literal en el SQL: lo que Postgres lee como la clase \D (no dígito).
+  assert.ok(busca.sql.includes(String.raw`regexp_replace(telefono, '\D', '', 'g') = $2`), busca.sql);
+  assert.deepEqual(busca.params.slice(0, 2), [TEN, "4770001567"], "el teléfono entrante se reduce a dígitos");
+});
+
+test("lealtad: un teléfono sin dígitos no busca duplicado", async () => {
+  const { client, pool } = clienteFalsoConDuplicado();
+  await pullSnapshot(pool, { clientes: [{ id: CLI_NUBE, tenant_id: TEN, nombre: "Ana", telefono: "--", deleted_at: null }] });
+  assert.ok(!client.consultas.some((c) => c.sql.includes("regexp_replace(telefono")), "sin dígitos no hay clave natural");
+});
+
+test("lealtad: al fundir, las direcciones se arreglan antes de mudarse, el saldo no se muda y la libreta se limpia", async () => {
+  const { client, pool } = clienteFalsoConDuplicado();
+  await pullSnapshot(pool, { clientes: [{ id: CLI_NUBE, tenant_id: TEN, nombre: "Ana", telefono: "4770001567", deleted_at: null }] });
+  const i = (pred) => client.consultas.findIndex(pred);
+  const iPrincipal = i((c) => /UPDATE direcciones_cliente SET es_principal = false/.test(c.sql));
+  const iDirs = i((c) => /UPDATE direcciones_cliente SET "cliente_id"/.test(c.sql));
+  const iTickets = i((c) => /UPDATE tickets SET "cliente_id"/.test(c.sql));
+  const iBorra = i((c) => c.sql.startsWith("DELETE FROM clientes WHERE id"));
+  const iUpsert = i((c) => c.sql.includes('INSERT INTO public."clientes"'));
+  assert.ok(iPrincipal >= 0, "debía quitar la marca de principal del duplicado si hace falta");
+  assert.ok(iPrincipal < iDirs, "la marca de principal se arregla ANTES de mudar las direcciones");
+  assert.ok(iDirs >= 0 && iTickets >= 0);
+  assert.deepEqual(client.consultas[iDirs].params, [CLI_NUBE, CLI_LOCAL]);
+  assert.ok(!client.consultas.some((c) => /UPDATE lealtad_saldos SET "cliente_id"/.test(c.sql)), "el saldo no se muda");
+  assert.ok(client.consultas.some((c) => /DELETE FROM lealtad_saldos WHERE "cliente_id"/.test(c.sql)), "el saldo del duplicado se borra");
+  assert.ok(client.consultas.some((c) => /DELETE FROM _vim_clientes_ok WHERE "cliente_id"/.test(c.sql)), "la libreta no guarda un id que ya no existe");
+  assert.ok(iDirs < iBorra && iBorra < iUpsert, "se muda, se borra al duplicado y entra el de la nube");
+});
+
+test("lealtad: sin llaves de lealtad en el snapshot (nube vieja) el pull no toca nada de eso", async () => {
+  const { client, pool } = clienteFalso();
+  await pullSnapshot(pool, { repartidores: [{ id: R1, nombre: "Luis", activo: true }] });
+  assert.ok(!client.consultas.some((c) => /clientes|lealtad/.test(c.sql)), "ninguna consulta menciona clientes ni lealtad");
 });
