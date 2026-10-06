@@ -1,6 +1,7 @@
 "use client";
 import { employeeClient } from "./supabase";
 import { agregarDireccionCliente, type DireccionInput } from "./clientes-domicilio";
+import { normalizarTelefono } from "./telefono";
 
 // Cliente registrado de una cuenta de Comedor, Para llevar o Pick-up. Es opcional: una cuenta sin
 // cliente se vende igual que siempre. Sirve para que las compras le cuenten al cliente (panel de
@@ -28,9 +29,8 @@ export type DatosRegistro = {
  * El mismo teléfono escrito de dos formas ("477 123 4567" y "4771234567") no debe dar dos clientes:
  * el índice único es por texto exacto. Se guarda solo con dígitos.
  */
-export function normalizarTelefono(t: string): string {
-  return t.replace(/\D/g, "");
-}
+// Se reexporta: es parte de la interfaz de este módulo desde antes de que existiera telefono.ts.
+export { normalizarTelefono };
 
 /** Nombre y teléfono obligatorios (10 dígitos); correo opcional pero válido. `null` si está bien. */
 export function validarRegistro(d: DatosRegistro): string | null {
