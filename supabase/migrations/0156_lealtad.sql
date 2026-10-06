@@ -1055,6 +1055,7 @@ BEGIN
     'ok', true, 'canje_id', v_m.id, 'cliente_id', v_m.cliente_id, 'puntos', -v_m.puntos,
     'monto_mxn', v_m.monto_mxn, 'premio_id', v_m.premio_id,
     'producto_id', (SELECT producto_id FROM lealtad_premios WHERE id = v_m.premio_id),
+    'telefono', (SELECT telefono FROM clientes WHERE id = v_m.cliente_id),
     'saldo', COALESCE(v_s.saldo, 0), 'vence_el', v_s.vence_el, 'programa_version', v_m.programa_version);
 END $$;
 
@@ -1065,10 +1066,13 @@ END $$;
 -- que aquí se valida todo lo que ata el canje a lo que de verdad se está descontando. Rechaza con:
 --   PUNTOS_INVALIDOS      los puntos no son un entero positivo
 --   CANJE_REVERTIDO       ese canje ya tiene su reversa: ya no se puede asentar
---   CANJE_NO_COINCIDE     ya hay un movimiento con ese id y no es un CANJE de este negocio por esos puntos
+--   CANJE_NO_COINCIDE     ya hay un movimiento con ese id y no es un CANJE de este negocio, por esos
+--                         puntos y de ese cliente
 --   CANJE_YA_ASENTADO     ese canje ya está pegado a OTRA cuenta (a la misma es idempotente)
 --   TICKET_YA_TIENE_CANJE la cuenta ya lleva otro canje vivo (solo cabe uno)
 --   TICKET_SIN_CLIENTE    el cliente del canje no existe aquí y la cuenta no tiene cliente
+--   CLIENTE_NO_COINCIDE   el cliente del canje no existe aquí y el de la cuenta no es la misma persona
+--                         (otro teléfono, o falta alguno de los dos)
 --   PREMIO_INVALIDO       el premio no existe en este negocio
 --   RENGLON_NO_EXISTE     el renglón no es de esta cuenta
 --   RENGLON_NO_ES_PREMIO  un premio solo se pega a UN renglón de producto vivo (no de cargo, ni cancelado,
@@ -1077,6 +1081,12 @@ END $$;
 --   MONTO_INVALIDO        el descuento de un premio es lo que vale el renglón (y debe ser > 0); el de
 --                         dinero es 1 punto = $1, exacto
 -- En un premio el descuento sale del renglón, nunca del payload.
+-- El cliente del canje es el que autorizó la nube: si el movimiento ya existe aquí (la nube), es el de
+-- ese movimiento y el payload no puede decir otro. Si no existe (la caja), es el del payload si lo
+-- conoce esta base; si no, la caja puede tenerlo con otro id (un duplicado por teléfono que su
+-- siguiente pull y la fusión de la nube resolverán), y SOLO en ese caso se usa el de la cuenta: cuando
+-- su teléfono, reducido a dígitos, es el mismo que manda la nube. Cualquier otra cosa sería mover
+-- puntos de una persona a otra.
 CREATE OR REPLACE FUNCTION lealtad_asentar_canje(p jsonb)
 RETURNS uuid
 LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp
@@ -1090,6 +1100,9 @@ DECLARE
   v_puntos integer := (p->>'puntos')::integer;
   v_monto  numeric(12,2) := NULLIF(p->>'monto_mxn', '')::numeric;
   v_cli    uuid := NULLIF(p->>'cliente_id', '')::uuid;
+  v_tel    text := NULLIF(regexp_replace(COALESCE(p->>'telefono', ''), '\D', '', 'g'), '');
+  v_tel_t  text;
+  v_filas  integer;
   v_t      tickets%ROWTYPE;
   v_m      lealtad_movimientos%ROWTYPE;
   v_c      ticket_canjes_lealtad%ROWTYPE;
@@ -1110,6 +1123,11 @@ BEGIN
   IF FOUND AND (v_m.tenant_id <> v_tenant OR v_m.tipo <> 'CANJE' OR v_m.puntos <> -v_puntos) THEN
     RAISE EXCEPTION 'CANJE_NO_COINCIDE' USING ERRCODE = '22023';
   END IF;
+  IF FOUND THEN
+    -- La nube: el cliente es el del movimiento. La cuenta no se consulta.
+    IF v_cli IS NOT NULL AND v_cli <> v_m.cliente_id THEN RAISE EXCEPTION 'CANJE_NO_COINCIDE' USING ERRCODE = '22023'; END IF;
+    v_cli := v_m.cliente_id;
+  END IF;
   -- Asentar dos veces el mismo canje en la misma cuenta es un reintento; en otra, no.
   SELECT * INTO v_c FROM ticket_canjes_lealtad WHERE id = v_canje;
   IF FOUND THEN
@@ -1120,12 +1138,13 @@ BEGIN
     RAISE EXCEPTION 'TICKET_YA_TIENE_CANJE' USING ERRCODE = '22023';
   END IF;
 
-  -- El cliente: la nube devuelve el canónico, pero una caja puede conocerlo con otro id (un duplicado
-  -- por teléfono) hasta su siguiente pull; la fusión de la nube redirige ese alias al subir. Si el id
-  -- que llega no existe aquí, el canje se queda con el cliente de la propia cuenta.
-  IF v_cli IS NULL OR NOT EXISTS (SELECT 1 FROM clientes WHERE id = v_cli AND tenant_id = v_tenant) THEN
+  -- El cliente (ver la cabecera). Con el movimiento ya aquí, v_cli es el del movimiento.
+  IF v_m.id IS NULL AND (v_cli IS NULL OR NOT EXISTS (SELECT 1 FROM clientes WHERE id = v_cli AND tenant_id = v_tenant)) THEN
+    IF v_t.cliente_id IS NULL THEN RAISE EXCEPTION 'TICKET_SIN_CLIENTE' USING ERRCODE = '22023'; END IF;
+    SELECT NULLIF(regexp_replace(COALESCE(telefono, ''), '\D', '', 'g'), '') INTO v_tel_t
+      FROM clientes WHERE id = v_t.cliente_id;
+    IF v_tel IS NULL OR v_tel_t IS NULL OR v_tel <> v_tel_t THEN RAISE EXCEPTION 'CLIENTE_NO_COINCIDE' USING ERRCODE = '22023'; END IF;
     v_cli := v_t.cliente_id;
-    IF v_cli IS NULL THEN RAISE EXCEPTION 'TICKET_SIN_CLIENTE' USING ERRCODE = '22023'; END IF;
   END IF;
 
   IF v_premio IS NOT NULL THEN
@@ -1154,6 +1173,13 @@ BEGIN
   INSERT INTO ticket_canjes_lealtad (id, tenant_id, ticket_id, cliente_id, premio_id, ticket_item_id, puntos, monto_descontado_mxn, created_by)
   VALUES (v_canje, v_tenant, v_ticket, v_cli, v_premio, v_item, v_puntos, v_monto, NULLIF(p->>'usuario_id', '')::uuid)
   ON CONFLICT (id) DO NOTHING;
+  GET DIAGNOSTICS v_filas = ROW_COUNT;
+  IF v_filas = 0 THEN
+    -- Otra transacción asentó este mismo canje mientras esta corría: si fue en otra cuenta, esta perdió.
+    IF (SELECT ticket_id FROM ticket_canjes_lealtad WHERE id = v_canje) <> v_ticket THEN
+      RAISE EXCEPTION 'CANJE_YA_ASENTADO' USING ERRCODE = '22023';
+    END IF;
+  END IF;
   RETURN v_canje;
 END $$;
 

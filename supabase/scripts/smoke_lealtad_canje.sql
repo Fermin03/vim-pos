@@ -43,6 +43,7 @@ DECLARE
   v_ta uuid; v_tb uuid; v_tc uuid; v_td uuid; v_tm uuid; v_tn uuid; v_ts uuid; v_tp uuid; v_tq uuid; v_tr uuid; v_tg uuid;
   v_ia uuid; v_ib uuid; v_ic uuid; v_im uuid; v_cx uuid; v_zona uuid; v_envio uuid; v_ca uuid; v_cb uuid;
   v_l1 uuid; v_l2 uuid; v_l3 uuid; v_l4 uuid; v_l5 uuid;
+  v_cli3 uuid; v_cli4 uuid; v_pay jsonb; v_tw uuid; v_ty uuid; v_tz uuid; v_tk uuid; v_sa integer; v_sb integer;
 BEGIN
   -- aplicar_pago y compañía leen al empleado y el tenant del JWT.
   PERFORM set_config('request.jwt.claims',
@@ -150,19 +151,95 @@ BEGIN
   -- Un canje ya revertido no se asienta.
   IF lealtad_revertir_canje_ticket(v_tm, 'smoke') <> 1 THEN RAISE EXCEPTION 'M: no revirtió'; END IF;
   PERFORM pg_temp.asentar_falla(v_base, 'CANJE_REVERTIDO');
-  -- El cliente que manda la nube puede no existir en esta base (una caja que lo conoce con otro id
-  -- hasta su siguiente pull): el canje se queda con el cliente de la propia cuenta.
+  -- Con el movimiento ya en esta base (la nube), el cliente es el del movimiento: el payload no puede
+  -- decir otro, y por eso un cliente desconocido tampoco vale.
+  PERFORM pg_temp.asentar_falla(jb || jsonb_build_object('tenant_id', v_tenant, 'ticket_id', v_tm, 'cliente_id', gen_random_uuid()), 'CANJE_NO_COINCIDE');
   SELECT saldo INTO v_s0 FROM lealtad_saldos WHERE cliente_id = v_cli;
-  PERFORM lealtad_asentar_canje(jb || jsonb_build_object('tenant_id', v_tenant, 'ticket_id', v_tm, 'cliente_id', gen_random_uuid()));
-  IF (SELECT cliente_id FROM ticket_canjes_lealtad WHERE id = v_cb) <> v_cli THEN RAISE EXCEPTION 'con cliente desconocido no usó el de la cuenta'; END IF;
+  PERFORM lealtad_asentar_canje(jb || jsonb_build_object('tenant_id', v_tenant, 'ticket_id', v_tm));
+  IF (SELECT cliente_id FROM ticket_canjes_lealtad WHERE id = v_cb) <> v_cli THEN RAISE EXCEPTION 'M: el canje no quedó con el cliente del movimiento'; END IF;
   IF (SELECT total_mxn FROM tickets WHERE id = v_tm) <> 110 THEN RAISE EXCEPTION 'M con el canje de 10: total % (esperado 110)', (SELECT total_mxn FROM tickets WHERE id = v_tm); END IF;
   IF (SELECT saldo FROM lealtad_saldos WHERE cliente_id = v_cli) <> v_s0 THEN RAISE EXCEPTION 'asentar movió el saldo'; END IF;
-  -- Sin cliente conocido y sin cliente en la cuenta no hay a quién cargárselo.
+  -- lealtad_canje_datos entrega el teléfono del cliente (el puente de la caja lo pasa a asentar).
+  IF (lealtad_canje_datos(v_cb, v_tenant))->>'telefono' IS DISTINCT FROM '4770001563' THEN
+    RAISE EXCEPTION 'lealtad_canje_datos no trae el teléfono: %', lealtad_canje_datos(v_cb, v_tenant);
+  END IF;
+
+  -- 8b) Lo que hace la caja: el movimiento del canje NO existe en su base (la nube lo autorizó), y el
+  --     puente arma el payload con lo que contestó la nube, sin llamar a lealtad_canjear. Va a mano.
+  INSERT INTO clientes (tenant_id, nombre, telefono) VALUES (v_tenant, 'Carla Canje', '4770001565') RETURNING id INTO v_cli3;
+  INSERT INTO clientes (tenant_id, nombre) VALUES (v_tenant, 'Sin Telefono Canje') RETURNING id INTO v_cli4;
+  SELECT saldo INTO v_s0 FROM lealtad_saldos WHERE cliente_id = v_cli;
+
+  -- (a) Dinero, cliente conocido aquí: se pega, la cuenta baja, y aparece el movimiento local.
+  v_tw := abrir_ticket(v_suc, v_caja, v_turno, 'PARA_LLEVAR'::modo_servicio, v_cli, NULL, 'smoke-lcan-w', v_maria);
+  PERFORM agregar_item_a_ticket(v_tw, v_prod, 1, NULL, '[]'::jsonb, 'smoke-lcan-w1');
+  v_cx := gen_random_uuid();
+  v_pay := jsonb_build_object('canje_id', v_cx, 'tenant_id', v_tenant, 'ticket_id', v_tw, 'cliente_id', v_cli,
+    'telefono', '4770001563', 'puntos', 25, 'monto_mxn', 25, 'programa_version', v_ver);
+  IF EXISTS (SELECT 1 FROM lealtad_movimientos WHERE id = v_cx) THEN RAISE EXCEPTION '8b: el movimiento no debía existir todavía'; END IF;
+  PERFORM lealtad_asentar_canje(v_pay);
+  IF (SELECT total_mxn FROM tickets WHERE id = v_tw) <> 95 THEN RAISE EXCEPTION '8b(a): total % (esperado 95)', (SELECT total_mxn FROM tickets WHERE id = v_tw); END IF;
+  IF NOT EXISTS (SELECT 1 FROM lealtad_movimientos WHERE id = v_cx AND tipo = 'CANJE' AND puntos = -25 AND cliente_id = v_cli) THEN
+    RAISE EXCEPTION '8b(a): no se escribió el movimiento local del canje';
+  END IF;
+  IF (SELECT saldo FROM lealtad_saldos WHERE cliente_id = v_cli) <> v_s0 - 25 THEN RAISE EXCEPTION '8b(a): el saldo no bajó 25'; END IF;
+  IF (SELECT cliente_id FROM ticket_canjes_lealtad WHERE id = v_cx) <> v_cli THEN RAISE EXCEPTION '8b(a): cliente del canje'; END IF;
+
+  -- (b) Cliente que esta base no conoce, y el de la cuenta tiene el MISMO teléfono (con otro formato
+  --     en el payload): es el duplicado de la misma persona; se pega con el cliente de la cuenta.
+  v_ty := abrir_ticket(v_suc, v_caja, v_turno, 'PARA_LLEVAR'::modo_servicio, v_cli, NULL, 'smoke-lcan-y', v_maria);
+  PERFORM agregar_item_a_ticket(v_ty, v_prod, 1, NULL, '[]'::jsonb, 'smoke-lcan-y1');
+  v_cx := gen_random_uuid();
+  v_pay := jsonb_build_object('canje_id', v_cx, 'tenant_id', v_tenant, 'ticket_id', v_ty, 'cliente_id', gen_random_uuid(),
+    'telefono', '(477) 000-1563', 'puntos', 10, 'monto_mxn', 10, 'programa_version', v_ver);
+  PERFORM lealtad_asentar_canje(v_pay);
+  IF (SELECT cliente_id FROM ticket_canjes_lealtad WHERE id = v_cx) <> v_cli THEN RAISE EXCEPTION '8b(b): no usó el cliente de la cuenta'; END IF;
+  IF NOT EXISTS (SELECT 1 FROM lealtad_movimientos WHERE id = v_cx AND tipo = 'CANJE' AND cliente_id = v_cli) THEN RAISE EXCEPTION '8b(b): movimiento local'; END IF;
+  IF (SELECT total_mxn FROM tickets WHERE id = v_ty) <> 110 THEN RAISE EXCEPTION '8b(b): total % (esperado 110)', (SELECT total_mxn FROM tickets WHERE id = v_ty); END IF;
+  IF (SELECT saldo FROM lealtad_saldos WHERE cliente_id = v_cli) <> v_s0 - 35 THEN RAISE EXCEPTION '8b(b): el saldo no bajó 10 más'; END IF;
+
+  -- (c) Cliente desconocido y OTRO teléfono: no es la misma persona; no se mueve nada.
+  v_tz := abrir_ticket(v_suc, v_caja, v_turno, 'PARA_LLEVAR'::modo_servicio, v_cli, NULL, 'smoke-lcan-z', v_maria);
+  PERFORM agregar_item_a_ticket(v_tz, v_prod, 1, NULL, '[]'::jsonb, 'smoke-lcan-z1');
+  v_cx := gen_random_uuid();
+  v_pay := jsonb_build_object('canje_id', v_cx, 'tenant_id', v_tenant, 'ticket_id', v_tz, 'cliente_id', gen_random_uuid(),
+    'telefono', '477 999 9999', 'puntos', 10, 'monto_mxn', 10, 'programa_version', v_ver);
+  PERFORM pg_temp.asentar_falla(v_pay, 'CLIENTE_NO_COINCIDE');
+  IF EXISTS (SELECT 1 FROM ticket_canjes_lealtad WHERE id = v_cx) OR EXISTS (SELECT 1 FROM lealtad_movimientos WHERE id = v_cx) THEN
+    RAISE EXCEPTION '8b(c): un rechazo dejó canje o movimiento';
+  END IF;
+  IF (SELECT saldo FROM lealtad_saldos WHERE cliente_id = v_cli) <> v_s0 - 35 THEN RAISE EXCEPTION '8b(c): el saldo se movió'; END IF;
+  IF (SELECT total_mxn FROM tickets WHERE id = v_tz) <> 120 THEN RAISE EXCEPTION '8b(c): el total se movió'; END IF;
+
+  -- (d) Cliente desconocido y el payload sin teléfono (o sin dígitos): tampoco.
+  PERFORM pg_temp.asentar_falla(v_pay - 'telefono', 'CLIENTE_NO_COINCIDE');
+  PERFORM pg_temp.asentar_falla(v_pay || jsonb_build_object('telefono', '---'), 'CLIENTE_NO_COINCIDE');
+  -- (e) Cliente desconocido y el cliente de la cuenta sin teléfono.
+  v_tk := abrir_ticket(v_suc, v_caja, v_turno, 'PARA_LLEVAR'::modo_servicio, v_cli4, NULL, 'smoke-lcan-k', v_maria);
+  PERFORM agregar_item_a_ticket(v_tk, v_prod, 1, NULL, '[]'::jsonb, 'smoke-lcan-k1');
+  PERFORM pg_temp.asentar_falla(v_pay || jsonb_build_object('ticket_id', v_tk), 'CLIENTE_NO_COINCIDE');
+  -- Sin teléfono en ninguno de los dos tampoco es la misma persona (vacío no es igual a vacío).
+  PERFORM pg_temp.asentar_falla((v_pay - 'telefono') || jsonb_build_object('ticket_id', v_tk), 'CLIENTE_NO_COINCIDE');
+  -- (f) Cliente desconocido y la cuenta sin cliente: no hay a quién cargárselo.
   v_ts := abrir_ticket(v_suc, v_caja, v_turno, 'PARA_LLEVAR'::modo_servicio, NULL, NULL, 'smoke-lcan-s', v_maria);
   PERFORM agregar_item_a_ticket(v_ts, v_prod, 1, NULL, '[]'::jsonb, 'smoke-lcan-s1');
+  PERFORM pg_temp.asentar_falla(v_pay || jsonb_build_object('ticket_id', v_ts, 'telefono', '4770001563'), 'TICKET_SIN_CLIENTE');
+
+  -- (g) El caso de la nube: el movimiento es de la clienta A y el payload dice B (otra persona que
+  --     SÍ existe aquí, dueña de la cuenta). No se mueven puntos de A a B.
   v_cx := gen_random_uuid();
-  jb := lealtad_canjear(v_cx, v_tenant, v_cli, NULL, 5, NULL, NULL, v_suc, v_caja, v_maria);
-  PERFORM pg_temp.asentar_falla(jb || jsonb_build_object('tenant_id', v_tenant, 'ticket_id', v_ts, 'cliente_id', gen_random_uuid()), 'TICKET_SIN_CLIENTE');
+  j := lealtad_canjear(v_cx, v_tenant, v_cli, NULL, 5, NULL, NULL, v_suc, v_caja, v_maria);
+  v_tz := abrir_ticket(v_suc, v_caja, v_turno, 'PARA_LLEVAR'::modo_servicio, v_cli3, NULL, 'smoke-lcan-z3', v_maria);
+  PERFORM agregar_item_a_ticket(v_tz, v_prod, 1, NULL, '[]'::jsonb, 'smoke-lcan-z31');
+  SELECT saldo INTO v_sa FROM lealtad_saldos WHERE cliente_id = v_cli;
+  SELECT COALESCE((SELECT saldo FROM lealtad_saldos WHERE cliente_id = v_cli3), 0) INTO v_sb;
+  PERFORM pg_temp.asentar_falla(j || jsonb_build_object('tenant_id', v_tenant, 'ticket_id', v_tz, 'cliente_id', v_cli3, 'telefono', '4770001565'), 'CANJE_NO_COINCIDE');
+  IF (SELECT saldo FROM lealtad_saldos WHERE cliente_id = v_cli) <> v_sa
+     OR COALESCE((SELECT saldo FROM lealtad_saldos WHERE cliente_id = v_cli3), 0) <> v_sb THEN
+    RAISE EXCEPTION '8b(g): se movieron puntos entre clientes';
+  END IF;
+  IF EXISTS (SELECT 1 FROM ticket_canjes_lealtad WHERE id = v_cx) THEN RAISE EXCEPTION '8b(g): quedó el canje pegado a la cuenta de otra persona'; END IF;
+  IF (SELECT total_mxn FROM tickets WHERE id = v_tz) <> 120 THEN RAISE EXCEPTION '8b(g): el total de la otra persona se movió'; END IF;
 
   -- 9) Cancelar o borrar un renglón SIN premio no escribe nada en el libro, y un canje de cuenta
   --    (sin renglón) no se toca. Cuenta C: tres renglones; canje de $30 sobre la cuenta.
@@ -196,6 +273,27 @@ BEGIN
   IF NOT (j->>'ok')::boolean OR (j->>'puntos')::int <> 6 OR (j->>'producto_id')::uuid <> v_prod THEN RAISE EXCEPTION 'premio: %', j; END IF;
   j := lealtad_canjear(gen_random_uuid(), v_tenant, v_cli2, NULL, 10, NULL, NULL, v_suc, v_caja, v_maria);
   IF j->>'error' <> 'PREMIO_INVALIDO' THEN RAISE EXCEPTION 'sellos sin premio debió rechazar: %', j; END IF;
+
+  -- 10b) La caja asienta un premio cuyo movimiento no existe en su base: se pega al renglón correcto
+  --      y el renglón queda en cero. Cuenta X: dos hamburguesas; el premio cae sobre la segunda.
+  SELECT saldo INTO v_sa FROM lealtad_saldos WHERE cliente_id = v_cli2;
+  v_tw := abrir_ticket(v_suc, v_caja, v_turno, 'PARA_LLEVAR'::modo_servicio, v_cli2, NULL, 'smoke-lcan-x', v_maria);
+  v_ia := agregar_item_a_ticket(v_tw, v_prod, 1, NULL, '[]'::jsonb, 'smoke-lcan-x1');
+  v_ib := agregar_item_a_ticket(v_tw, v_prod, 1, NULL, '[]'::jsonb, 'smoke-lcan-x2');
+  v_cx := gen_random_uuid();
+  v_pay := jsonb_build_object('canje_id', v_cx, 'tenant_id', v_tenant, 'ticket_id', v_tw, 'cliente_id', v_cli2,
+    'telefono', '4770001564', 'puntos', 6, 'premio_id', v_premio, 'ticket_item_id', v_ib, 'programa_version', v_ver);
+  PERFORM lealtad_asentar_canje(v_pay);
+  SELECT * INTO r FROM tickets WHERE id = v_tw;
+  IF r.total_mxn <> 120 OR r.lealtad_mxn <> 120 THEN RAISE EXCEPTION '10b: total % lealtad % (esperado 120 y 120)', r.total_mxn, r.lealtad_mxn; END IF;
+  IF (SELECT total_item_mxn FROM ticket_items WHERE id = v_ib) <> 0 OR (SELECT total_item_mxn FROM ticket_items WHERE id = v_ia) <> 120 THEN
+    RAISE EXCEPTION '10b: el premio no quedó en el renglón correcto';
+  END IF;
+  IF (SELECT ticket_item_id FROM ticket_canjes_lealtad WHERE id = v_cx) <> v_ib THEN RAISE EXCEPTION '10b: el canje no quedó en el renglón'; END IF;
+  IF NOT EXISTS (SELECT 1 FROM lealtad_movimientos WHERE id = v_cx AND tipo = 'CANJE' AND puntos = -6 AND premio_id = v_premio AND monto_mxn = 120) THEN
+    RAISE EXCEPTION '10b: no se escribió el movimiento local del premio';
+  END IF;
+  IF (SELECT saldo FROM lealtad_saldos WHERE cliente_id = v_cli2) <> v_sa - 6 THEN RAISE EXCEPTION '10b: el saldo no bajó 6'; END IF;
 
   -- 11) Cancelar el renglón premiado devuelve los puntos y la cuenta vale lo que queda.
   --     Cuenta A: dos hamburguesas (240); el premio cae sobre la segunda.
