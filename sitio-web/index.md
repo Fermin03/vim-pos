@@ -1,10 +1,10 @@
-# Todo lo que tu restaurante necesita, sin letra chica.
+# El punto de venta para restaurantes que sigue cobrando sin internet
 
 > Caja, cocina, mesas, inventario y facturación CFDI en un solo sistema. Precio publicado desde $699 al mes, sin pago inicial y cobra sin internet. Hecho en León, Gto.
 
 **VIM POS** · punto de venta para restaurantes en México · versión en HTML: https://vimpos.com.mx/
 
-Caja, cocina, mesas, inventario y facturación en un solo sistema. Sin pago inicial: desde Negocio cargamos tu menú y capacitamos a tu equipo, y en Esencial arrancas con nuestra guía.
+VIM POS es un sistema de punto de venta para restaurantes en México: caja, cocina, mesas, inventario y facturación CFDI en un solo sistema, sin letra chica. Sin pago inicial: desde Negocio cargamos tu menú y capacitamos a tu equipo, y en Esencial arrancas con nuestra guía.
 
 [Pide una demo](https://vimpos.com.mx/demo)
 
@@ -88,7 +88,7 @@ El sistema se configura según tu giro: cambian los modos de servicio, las panta
 
 ### Comida rápida o de mostrador
 
-Mostrador y pickup. Cola rápida, comanda directa a cocina y modos de servicio para separar lo que se come aquí de lo que se lleva — que además cambia el IVA.
+Mostrador y pickup. Cola rápida, comanda directa a cocina y modos de servicio para separar lo que se come aquí de lo que se lleva.
 
 ### Food truck
 
@@ -178,7 +178,7 @@ Sí. El programa se instala en la computadora de tu caja y trabaja ahí, así qu
 
 ### ¿Qué necesito comprar?
 
-Una computadora con Windows 10 u 11, una impresora térmica de tickets de 80 mm con puerto de red (cable Ethernet o Wi-Fi) y compatible con ESC/POS —por ejemplo, una Epson TM-T20III o TM-m30 en su versión de red; las de USB hoy no funcionan con la caja—, un cajón de dinero y el módem que ya tienes. VIM no vende equipo: te decimos qué buscar y lo compras donde te salga mejor.
+Una computadora con Windows 10 u 11, una impresora térmica de tickets de 80 mm compatible con ESC/POS —por ejemplo, una Epson TM-T20III o TM-m30; puede ir conectada a tu red (cable Ethernet o Wi-Fi) o por USB, instalada en Windows—, un cajón de dinero y el módem que ya tienes. VIM no vende equipo: te decimos qué buscar y lo compras donde te salga mejor.
 
 ### ¿Puedo traer mi menú de otro sistema?
 

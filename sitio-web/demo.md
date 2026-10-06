@@ -1,4 +1,4 @@
-# Te lo enseñamos funcionando
+# Pide una demo de VIM POS: media hora, con tu menú
 
 > Dinos cuántas cajas y cuántas sucursales tienes y te enseñamos el sistema funcionando, con tus productos y tus precios. Contestamos el mismo día hábil.
 
