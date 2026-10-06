@@ -1706,14 +1706,38 @@ BEGIN
     -- IS DISTINCT FROM: con la tabla ausente typeof es NULL y un <> la dejaría pasar, creando una
     -- clave vacía que taparía a otra (tickets sobre turnos al buscar caja y sucursal del envío).
     CONTINUE WHEN jsonb_typeof(p_snapshot->v_clave) IS DISTINCT FROM 'array';
-    SELECT COALESCE(jsonb_agg(
-             CASE WHEN a.cliente_id IS NOT NULL
-                  THEN r || jsonb_build_object('cliente_id', a.cliente_id)
-                  ELSE r END), '[]'::jsonb)
-      INTO v_filas
-      FROM jsonb_array_elements(p_snapshot->v_clave) r
-      LEFT JOIN clientes_alias a
-        ON a.tenant_id = p_tenant AND a.alias_id::text = lower(r->>'cliente_id');
+    IF v_clave = 'direcciones_cliente' THEN
+      -- Una dirección principal redirigida al cliente real chocaría con idx_direcciones_principal_unica
+      -- (una principal viva por cliente) y el aplicador la rechazaría en cada ciclo. Si el real ya
+      -- tiene una principal viva (otra fila), la redirigida entra como no principal; y de varias
+      -- redirigidas al mismo cliente solo la primera puede quedarse. Solo comparaciones de texto.
+      SELECT COALESCE(jsonb_agg(
+               CASE WHEN q.real IS NULL THEN q.v
+                    WHEN q.pri AND (q.rk > 1 OR EXISTS (SELECT 1 FROM direcciones_cliente x
+                                                         WHERE x.cliente_id = q.real AND x.es_principal AND x.deleted_at IS NULL
+                                                           AND x.id::text <> lower(q.v->>'id')))
+                         THEN q.v || jsonb_build_object('cliente_id', q.real, 'es_principal', false)
+                    ELSE q.v || jsonb_build_object('cliente_id', q.real) END
+               ORDER BY q.n), '[]'::jsonb)
+        INTO v_filas
+        FROM (SELECT z.v, z.n, z.real, z.pri,
+                     CASE WHEN z.pri THEN row_number() OVER (PARTITION BY z.real, z.pri ORDER BY z.n) END AS rk
+                FROM (SELECT r.value AS v, r.ordinality AS n, a.cliente_id AS real,
+                             (a.cliente_id IS NOT NULL
+                              AND lower(COALESCE(r.value->>'es_principal', '')) IN ('true', 't', 'yes', 'y', 'on', '1')) AS pri
+                        FROM jsonb_array_elements(p_snapshot->v_clave) WITH ORDINALITY r
+                        LEFT JOIN clientes_alias a
+                          ON a.tenant_id = p_tenant AND a.alias_id::text = lower(r.value->>'cliente_id')) z) q;
+    ELSE
+      SELECT COALESCE(jsonb_agg(
+               CASE WHEN a.cliente_id IS NOT NULL
+                    THEN r || jsonb_build_object('cliente_id', a.cliente_id)
+                    ELSE r END), '[]'::jsonb)
+        INTO v_filas
+        FROM jsonb_array_elements(p_snapshot->v_clave) r
+        LEFT JOIN clientes_alias a
+          ON a.tenant_id = p_tenant AND a.alias_id::text = lower(r->>'cliente_id');
+    END IF;
     p_snapshot := jsonb_set(p_snapshot, ARRAY[v_clave], v_filas);
   END LOOP;
   IF jsonb_array_length(v_errs) > 0 THEN p_snapshot := jsonb_set(p_snapshot, '{_fusion_errores}', v_errs); END IF;
@@ -1884,9 +1908,11 @@ RETURNS jsonb
 LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp
 AS $$
 DECLARE
-  v_uuid    CONSTANT text := '^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$';
   v_fila    jsonb;
   v_id      uuid;
+  v_tenant  uuid;
+  v_ticket  uuid;
+  v_vivo    boolean;
   v_rev     lealtad_movimientos%ROWTYPE;
   v_canje   lealtad_movimientos%ROWTYPE;
   v_n       integer := 0;
@@ -1898,18 +1924,20 @@ BEGIN
 
   FOR v_fila IN SELECT value FROM jsonb_array_elements(p_rows) LOOP
     BEGIN
-      -- Una fila mal formada (id, tenant, ticket o revertido) ya la rechazó y reportó el aplicador
-      -- genérico: aquí se salta para no contarla dos veces en _errores.
-      IF v_fila->>'id' IS NULL OR v_fila->>'id' !~ v_uuid
-         OR v_fila->>'tenant_id' IS NULL OR v_fila->>'tenant_id' !~ v_uuid
-         OR COALESCE(v_fila->>'ticket_id', '') NOT IN ('') AND v_fila->>'ticket_id' !~ v_uuid
-         OR lower(COALESCE(v_fila->>'revertido', 'false')) NOT IN
-            ('true', 'false', 't', 'f', 'yes', 'no', 'y', 'n', 'on', 'off', '1', '0') THEN
+      -- Se castea con los MISMOS tipos que el aplicador genérico (jsonb_populate_recordset acepta un
+      -- uuid sin guiones o con llaves y booleanos como 'fal'): lo que él no pudo castear no lo aplicó
+      -- y ya lo reportó, y aquí se salta sin repetirlo; todo lo que SÍ aplicó se concilia. Una
+      -- lista blanca propia, más estricta, dejaría pasar con revertido = false un canje devuelto.
+      BEGIN
+        v_id     := (v_fila->>'id')::uuid;
+        v_tenant := (v_fila->>'tenant_id')::uuid;
+        v_ticket := (v_fila->>'ticket_id')::uuid;
+        v_vivo   := NOT COALESCE((v_fila->>'revertido')::boolean, false);
+      EXCEPTION WHEN OTHERS THEN
         CONTINUE;
-      END IF;
-      IF (v_fila->>'tenant_id')::uuid IS DISTINCT FROM p_tenant THEN CONTINUE; END IF;   -- ya lo rechazó el aplicador
-      IF COALESCE((v_fila->>'revertido')::boolean, false) THEN CONTINUE; END IF;
-      v_id := (v_fila->>'id')::uuid;
+      END;
+      IF v_tenant IS DISTINCT FROM p_tenant THEN CONTINUE; END IF;   -- ya lo rechazó el aplicador
+      IF NOT v_vivo THEN CONTINUE; END IF;
 
       SELECT * INTO v_rev FROM lealtad_movimientos
        WHERE tenant_id = p_tenant AND tipo = 'REVERSA_CANJE' AND canje_movimiento_id = v_id;
@@ -1917,7 +1945,7 @@ BEGIN
 
       IF v_rev.motivo IS NOT DISTINCT FROM lealtad_motivo_red_48h()
          AND EXISTS (SELECT 1 FROM tickets t
-                      WHERE t.id = NULLIF(v_fila->>'ticket_id', '')::uuid AND t.tenant_id = p_tenant
+                      WHERE t.id = v_ticket AND t.tenant_id = p_tenant
                         AND t.estado_fiscal IN ('PAGADO', 'FACTURADO')) THEN
         SELECT * INTO v_canje FROM lealtad_movimientos
          WHERE id = v_id AND tenant_id = p_tenant AND tipo = 'CANJE';

@@ -24,6 +24,7 @@ DECLARE
   v_vec uuid := gen_random_uuid(); v_vsuc uuid; v_vcaja uuid; v_vturno uuid; v_tvec uuid;
   v_dir1 uuid; v_dir2 uuid := gen_random_uuid(); v_d5 uuid := gen_random_uuid(); v_d6 uuid := gen_random_uuid();
   v_sano uuid := gen_random_uuid(); v_sano2 uuid := gen_random_uuid();
+  v_cc uuid; v_d7 uuid := gen_random_uuid(); v_d8 uuid := gen_random_uuid(); v_dir3 uuid := gen_random_uuid();
 BEGIN
   PERFORM set_config('request.jwt.claims',
     json_build_object('sub', v_maria::text, 'tenant_id', v_t::text)::text, true);
@@ -406,6 +407,64 @@ BEGIN
   -- Y una caja no puede colar la clave reservada para llenar _errores.
   v_res := sync_push_snapshot(v_t, jsonb_build_object('_fusion_errores', jsonb_build_array(jsonb_build_object('x', 1))));
   IF v_res ? '_errores' OR v_res ? '_ignoradas' THEN RAISE EXCEPTION '19: la clave reservada de la caja no se descartó: %', v_res; END IF;
+
+  -- 20) N1: la conciliación cubre TODO lo que el aplicador genérico aceptó, aunque venga con un uuid
+  --     sin guiones o un booleano que solo Postgres entiende ('fal'): un canje que la caja ya
+  --     devolvió no revive. Una fila de verdad mal formada se reporta una sola vez.
+  FOR v_n IN 1..3 LOOP
+    v_ta := abrir_ticket(v_suc, v_caja, v_turno, 'PARA_LLEVAR'::modo_servicio, NULL, NULL, 'sl-tn-' || v_n::text, v_maria);
+    v_cc := gen_random_uuid();
+    INSERT INTO clientes (tenant_id, nombre, telefono) VALUES (v_t, 'Zn' || v_n::text, '47700088' || (10 + v_n)::text) RETURNING id INTO v_zb;
+    PERFORM lealtad_registrar_movimiento(NULL, v_t, v_zb, 'GANADO', 30, v_ver);
+    PERFORM lealtad_registrar_movimiento(v_cc, v_t, v_zb, 'CANJE', -10, v_ver, v_ta);
+    PERFORM lealtad_revertir_canje(v_cc, v_t, 'cuenta cancelada');
+    v_res := sync_push_snapshot(v_t, jsonb_build_object(
+      'tickets', jsonb_build_array((SELECT to_jsonb(t) - 'lealtad_mxn' || jsonb_build_object('estado_fiscal', 'PAGADO', 'folio_completo', 'SL-N' || v_n::text) FROM tickets t WHERE id = v_ta)),
+      'ticket_canjes_lealtad', jsonb_build_array(jsonb_build_object(
+        'id', CASE v_n WHEN 1 THEN replace(v_cc::text, '-', '') WHEN 2 THEN v_cc::text ELSE '{' || v_cc::text || '}' END,
+        'tenant_id', v_t, 'ticket_id', v_ta, 'cliente_id', v_zb, 'puntos', 10, 'monto_descontado_mxn', 5,
+        'revertido', CASE v_n WHEN 2 THEN 'fal' WHEN 3 THEN 'false ' ELSE 'false' END, 'created_at', now()))));
+    IF v_res ? '_errores' THEN RAISE EXCEPTION '20.%: %', v_n, v_res->'_errores'; END IF;
+    IF NOT (SELECT revertido FROM ticket_canjes_lealtad WHERE id = v_cc) THEN RAISE EXCEPTION '20.%: un canje devuelto revivió', v_n; END IF;
+    IF EXISTS (SELECT 1 FROM lealtad_movimientos WHERE cliente_id = v_zb AND tipo = 'AJUSTE') THEN RAISE EXCEPTION '20.%: se cobró un canje devuelto por la caja', v_n; END IF;
+    IF (SELECT saldo FROM lealtad_saldos WHERE cliente_id = v_zb) <> 30 THEN RAISE EXCEPTION '20.%: el saldo cambió', v_n; END IF;
+  END LOOP;
+  -- Una fila de verdad mal formada la reporta el aplicador y la conciliación no la repite.
+  v_res := sync_push_snapshot(v_t, jsonb_build_object('ticket_canjes_lealtad', jsonb_build_array(jsonb_build_object(
+    'id', 'no-es-uuid', 'tenant_id', v_t, 'ticket_id', v_ta, 'cliente_id', v_zb, 'puntos', 10,
+    'monto_descontado_mxn', 5, 'revertido', false, 'created_at', now()))));
+  IF jsonb_array_length(v_res->'_errores') <> 1 THEN RAISE EXCEPTION '20: la fila mal formada debía reportarse una sola vez: %', v_res->'_errores'; END IF;
+
+  -- 21) N2: el duplicado y su dirección PRINCIPAL en el mismo push, con el real ya con principal: la
+  --     dirección entra bajo el cliente real como no principal y sigue habiendo una sola principal.
+  INSERT INTO clientes (tenant_id, nombre, telefono) VALUES (v_t, 'Real 21', '4770009994') RETURNING id INTO v_r3;
+  INSERT INTO direcciones_cliente (tenant_id, cliente_id, calle, numero_exterior, colonia, codigo_postal, ciudad, estado_geo, es_principal)
+  VALUES (v_t, v_r3, 'Madero', '21', 'Centro', '37000', 'León', 'Guanajuato', true) RETURNING id INTO v_dir1;
+  v_res := sync_push_snapshot(v_t, jsonb_build_object(
+    'clientes', jsonb_build_array(v_base || jsonb_build_object('id', v_d7, 'nombre', 'Caja 21', 'telefono', '4770009994')),
+    'direcciones_cliente', jsonb_build_array(
+      jsonb_build_object('id', v_dir3, 'tenant_id', v_t, 'cliente_id', v_d7, 'etiqueta', 'Casa', 'calle', 'Hidalgo', 'numero_exterior', '3',
+        'colonia', 'Centro', 'codigo_postal', '37000', 'ciudad', 'León', 'estado_geo', 'Guanajuato', 'pais', 'México',
+        'es_principal', true, 'activa', true, 'created_at', now(), 'updated_at', now()))));
+  IF v_res ? '_errores' THEN RAISE EXCEPTION '21: %', v_res->'_errores'; END IF;
+  IF (v_res->>'direcciones_cliente')::int <> 1 THEN RAISE EXCEPTION '21: la dirección no entró: %', v_res; END IF;
+  IF (SELECT cliente_id FROM direcciones_cliente WHERE id = v_dir3) <> v_r3 THEN RAISE EXCEPTION '21: la dirección no quedó con el cliente real'; END IF;
+  IF (SELECT es_principal FROM direcciones_cliente WHERE id = v_dir3) THEN RAISE EXCEPTION '21: la dirección redirigida debía entrar como no principal'; END IF;
+  IF (SELECT count(*) FROM direcciones_cliente WHERE cliente_id = v_r3 AND es_principal AND deleted_at IS NULL) <> 1 THEN RAISE EXCEPTION '21: debía quedar una sola principal'; END IF;
+  -- Real SIN principal y dos principales redirigidas del mismo alias: se queda una.
+  INSERT INTO clientes (tenant_id, nombre, telefono) VALUES (v_t, 'Real 21b', '4770009995') RETURNING id INTO v_r4;
+  v_res := sync_push_snapshot(v_t, jsonb_build_object(
+    'clientes', jsonb_build_array(v_base || jsonb_build_object('id', v_d8, 'nombre', 'Caja 21b', 'telefono', '4770009995')),
+    'direcciones_cliente', jsonb_build_array(
+      jsonb_build_object('id', gen_random_uuid(), 'tenant_id', v_t, 'cliente_id', v_d8, 'etiqueta', 'Casa', 'calle', 'A', 'numero_exterior', '1',
+        'colonia', 'Centro', 'codigo_postal', '37000', 'ciudad', 'León', 'estado_geo', 'Guanajuato', 'pais', 'México',
+        'es_principal', true, 'activa', true, 'created_at', now(), 'updated_at', now()),
+      jsonb_build_object('id', gen_random_uuid(), 'tenant_id', v_t, 'cliente_id', v_d8, 'etiqueta', 'Oficina', 'calle', 'B', 'numero_exterior', '2',
+        'colonia', 'Centro', 'codigo_postal', '37000', 'ciudad', 'León', 'estado_geo', 'Guanajuato', 'pais', 'México',
+        'es_principal', true, 'activa', true, 'created_at', now(), 'updated_at', now()))));
+  IF v_res ? '_errores' THEN RAISE EXCEPTION '21b: %', v_res->'_errores'; END IF;
+  IF (SELECT count(*) FROM direcciones_cliente WHERE cliente_id = v_r4) <> 2 THEN RAISE EXCEPTION '21b: debían entrar las dos direcciones'; END IF;
+  IF (SELECT count(*) FROM direcciones_cliente WHERE cliente_id = v_r4 AND es_principal) <> 1 THEN RAISE EXCEPTION '21b: debía quedar exactamente una principal'; END IF;
 
   RAISE NOTICE 'SMOKE SYNC LEALTAD OK';
 END $$;
