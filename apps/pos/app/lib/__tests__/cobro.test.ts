@@ -32,6 +32,7 @@ const TOTALES_ROW = {
   iva_mxn: "16.00",
   descuentos_manuales_mxn: "0",
   promociones_mxn: "0",
+  lealtad_mxn: "0",
   total_mxn: "116.00",
   monto_pagado_mxn: "0",
   cambio_mxn: "0",
