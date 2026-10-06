@@ -136,8 +136,8 @@ del panel que salieron esa semana van en la misma entrada o en una propia.
   Un mes nuevo abre su `<section class="novedades-mes">`.
 - No van las correcciones de algo que se rompió y se arregló en la misma semana: el cliente que no
   lo vio no gana nada con leerlo.
-- Después: `pnpm sitio:generar`, `pnpm test:sitio`, y el `lastmod` de `/novedades` en `sitemap.xml`
-  y `dateModified` en el JSON-LD de la página.
+- Después: `pnpm sitio:generar`, `pnpm test:sitio`. La página lleva `noindex` y no va en el sitemap; solo se
+  actualiza `dateModified` en el JSON-LD de la página.
 
 ## Pendiente de decidir
 

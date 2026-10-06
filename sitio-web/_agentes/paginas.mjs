@@ -58,7 +58,8 @@ export const PAGINAS = [
     markdown: 'novedades.md',
     nombre: 'Novedades',
     resumen: 'Qué cambió en VIM POS y cuándo: funciones nuevas, mejoras y correcciones de la caja y del panel, por fecha y por versión.',
-    enSitemap: true,
+    // Lleva `noindex`: es para clientes, no para buscadores.
+    enSitemap: false,
   },
   {
     ruta: '/demo',
