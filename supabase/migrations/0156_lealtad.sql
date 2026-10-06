@@ -115,6 +115,11 @@ CREATE TABLE IF NOT EXISTS ticket_canjes_lealtad (
   created_by            uuid NULL
 );
 CREATE UNIQUE INDEX IF NOT EXISTS ticket_canje_uno_vivo ON ticket_canjes_lealtad (ticket_id) WHERE NOT revertido;
+-- recalcular_totales_ticket busca el premio de cada renglón en cada venta, y el trigger de §6 busca el
+-- canje de cada renglón que se cancela o se borra. La FK ON DELETE CASCADE de ticket_item_id también
+-- lo usa. Sin índice, cada una de esas búsquedas recorre la tabla entera.
+CREATE INDEX IF NOT EXISTS idx_ticket_canjes_item ON ticket_canjes_lealtad (ticket_item_id) WHERE ticket_item_id IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_ticket_canjes_ticket ON ticket_canjes_lealtad (ticket_id);
 COMMENT ON TABLE ticket_canjes_lealtad IS 'El canje aplicado a un ticket. Un canje vivo por ticket. Sube con su ticket.';
 
 CREATE TABLE IF NOT EXISTS clientes_alias (
@@ -540,14 +545,20 @@ BEGIN
       -- Cancelar o reabrir una cuenta cobrada deshace lo que ganó.
       PERFORM lealtad_revertir_ganado_ticket(NEW.id);
     END IF;
-    -- Cancelar una cuenta con un canje vivo lo devuelve. Reabrirla no: el canje sigue en la cuenta.
-    -- Corre porque este trigger es AFTER: la cuenta ya está CANCELADO, así que revertir el canje no
-    -- recalcula sus totales (§5) y la cuenta conserva lo que se vendió.
+  EXCEPTION WHEN OTHERS THEN
+    RAISE WARNING 'lealtad: no se pudo procesar el ticket %: %', NEW.id, SQLERRM;
+  END;
+  -- Cancelar una cuenta con un canje vivo lo devuelve. Reabrirla no: el canje sigue en la cuenta.
+  -- Corre porque este trigger es AFTER: la cuenta ya está CANCELADO, así que revertir el canje no
+  -- recalcula sus totales (§5) y la cuenta conserva lo que se vendió.
+  -- Bloque propio: si devolver el canje falla, lo que se revirtió de lo ganado arriba no se deshace
+  -- con él (un error dentro de un BEGIN…EXCEPTION revierte solo ese bloque).
+  BEGIN
     IF NEW.estado_fiscal = 'CANCELADO' AND OLD.estado_fiscal <> 'CANCELADO' THEN
       PERFORM lealtad_revertir_canje_ticket(NEW.id, 'Cuenta cancelada');
     END IF;
   EXCEPTION WHEN OTHERS THEN
-    RAISE WARNING 'lealtad: no se pudo procesar el ticket %: %', NEW.id, SQLERRM;
+    RAISE WARNING 'lealtad: no se pudo devolver el canje del ticket %: %', NEW.id, SQLERRM;
   END;
   RETURN NEW;
 END $$;
@@ -1005,6 +1016,14 @@ BEGIN
   SELECT CASE WHEN programa_version = v_p.version THEN saldo ELSE 0 END INTO v_saldo
     FROM lealtad_saldos WHERE cliente_id = v_cli FOR UPDATE;
 
+  -- Un reintento con el mismo id que llegó mientras el original seguía en curso esperó aquí el
+  -- bloqueo: ya con el saldo descontado, no debe contestar SALDO_INSUFICIENTE sino lo mismo que el
+  -- original. Por eso la búsqueda del principio se repite ya con la fila bloqueada.
+  SELECT * INTO v_m FROM lealtad_movimientos WHERE id = p_canje_id AND tenant_id = p_tenant AND tipo = 'CANJE';
+  IF FOUND THEN
+    RETURN lealtad_canje_datos(p_canje_id, p_tenant) || jsonb_build_object('repetido', true);
+  END IF;
+
   IF v_saldo < v_puntos THEN
     RETURN jsonb_build_object('ok', false, 'error', 'SALDO_INSUFICIENTE', 'saldo', v_saldo);
   END IF;
@@ -1042,8 +1061,22 @@ END $$;
 -- Pega un canje YA AUTORIZADO a un ticket, en la base donde vive el ticket (la caja o la nube).
 -- En la caja además escribe la copia local del movimiento (mismo id) para que el saldo local baje;
 -- en la nube ese id ya existe y el registro es un no-op.
--- Para un premio, ticket_item_id es obligatorio y el descuento es lo que valga ese renglón.
--- El renglón tiene que ser de producto: un renglón de cargo (el envío) no admite descuentos.
+-- Es la ÚLTIMA barrera: el id del renglón (ticket_item_id) es lo único que no sale de la nube, así
+-- que aquí se valida todo lo que ata el canje a lo que de verdad se está descontando. Rechaza con:
+--   PUNTOS_INVALIDOS      los puntos no son un entero positivo
+--   CANJE_REVERTIDO       ese canje ya tiene su reversa: ya no se puede asentar
+--   CANJE_NO_COINCIDE     ya hay un movimiento con ese id y no es un CANJE de este negocio por esos puntos
+--   CANJE_YA_ASENTADO     ese canje ya está pegado a OTRA cuenta (a la misma es idempotente)
+--   TICKET_YA_TIENE_CANJE la cuenta ya lleva otro canje vivo (solo cabe uno)
+--   TICKET_SIN_CLIENTE    el cliente del canje no existe aquí y la cuenta no tiene cliente
+--   PREMIO_INVALIDO       el premio no existe en este negocio
+--   RENGLON_NO_EXISTE     el renglón no es de esta cuenta
+--   RENGLON_NO_ES_PREMIO  un premio solo se pega a UN renglón de producto vivo (no de cargo, ni cancelado,
+--                         ni parte de un combo) de ese mismo producto y de cantidad 1
+--   RENGLON_NO_APLICA     un canje de dinero no lleva renglón
+--   MONTO_INVALIDO        el descuento de un premio es lo que vale el renglón (y debe ser > 0); el de
+--                         dinero es 1 punto = $1, exacto
+-- En un premio el descuento sale del renglón, nunca del payload.
 CREATE OR REPLACE FUNCTION lealtad_asentar_canje(p jsonb)
 RETURNS uuid
 LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp
@@ -1056,30 +1089,70 @@ DECLARE
   v_premio uuid := NULLIF(p->>'premio_id', '')::uuid;
   v_puntos integer := (p->>'puntos')::integer;
   v_monto  numeric(12,2) := NULLIF(p->>'monto_mxn', '')::numeric;
+  v_cli    uuid := NULLIF(p->>'cliente_id', '')::uuid;
   v_t      tickets%ROWTYPE;
+  v_m      lealtad_movimientos%ROWTYPE;
+  v_c      ticket_canjes_lealtad%ROWTYPE;
+  v_pr     lealtad_premios%ROWTYPE;
+  v_it     ticket_items%ROWTYPE;
 BEGIN
   SELECT * INTO v_t FROM tickets WHERE id = v_ticket AND tenant_id = v_tenant FOR UPDATE;
   IF NOT FOUND THEN RAISE EXCEPTION 'TICKET_NO_EXISTE' USING ERRCODE = 'P0002'; END IF;
   IF v_t.estado_fiscal NOT IN ('BORRADOR', 'ABIERTO') THEN RAISE EXCEPTION 'TICKET_NO_ABIERTO' USING ERRCODE = '22023'; END IF;
+  IF v_canje IS NULL OR v_puntos IS NULL OR v_puntos <= 0 THEN RAISE EXCEPTION 'PUNTOS_INVALIDOS' USING ERRCODE = '22023'; END IF;
+
+  IF EXISTS (SELECT 1 FROM lealtad_movimientos WHERE canje_movimiento_id = v_canje AND tipo = 'REVERSA_CANJE') THEN
+    RAISE EXCEPTION 'CANJE_REVERTIDO' USING ERRCODE = '22023';
+  END IF;
+  -- En la nube el movimiento ya existe (la autorización lo escribió) y tiene que ser este canje; en la
+  -- caja todavía no existe, y eso es lo normal.
+  SELECT * INTO v_m FROM lealtad_movimientos WHERE id = v_canje;
+  IF FOUND AND (v_m.tenant_id <> v_tenant OR v_m.tipo <> 'CANJE' OR v_m.puntos <> -v_puntos) THEN
+    RAISE EXCEPTION 'CANJE_NO_COINCIDE' USING ERRCODE = '22023';
+  END IF;
+  -- Asentar dos veces el mismo canje en la misma cuenta es un reintento; en otra, no.
+  SELECT * INTO v_c FROM ticket_canjes_lealtad WHERE id = v_canje;
+  IF FOUND THEN
+    IF v_c.ticket_id <> v_ticket THEN RAISE EXCEPTION 'CANJE_YA_ASENTADO' USING ERRCODE = '22023'; END IF;
+    RETURN v_canje;
+  END IF;
+  IF EXISTS (SELECT 1 FROM ticket_canjes_lealtad WHERE ticket_id = v_ticket AND NOT revertido) THEN
+    RAISE EXCEPTION 'TICKET_YA_TIENE_CANJE' USING ERRCODE = '22023';
+  END IF;
+
+  -- El cliente: la nube devuelve el canónico, pero una caja puede conocerlo con otro id (un duplicado
+  -- por teléfono) hasta su siguiente pull; la fusión de la nube redirige ese alias al subir. Si el id
+  -- que llega no existe aquí, el canje se queda con el cliente de la propia cuenta.
+  IF v_cli IS NULL OR NOT EXISTS (SELECT 1 FROM clientes WHERE id = v_cli AND tenant_id = v_tenant) THEN
+    v_cli := v_t.cliente_id;
+    IF v_cli IS NULL THEN RAISE EXCEPTION 'TICKET_SIN_CLIENTE' USING ERRCODE = '22023'; END IF;
+  END IF;
 
   IF v_premio IS NOT NULL THEN
+    SELECT * INTO v_pr FROM lealtad_premios WHERE id = v_premio AND tenant_id = v_tenant;
+    IF NOT FOUND THEN RAISE EXCEPTION 'PREMIO_INVALIDO' USING ERRCODE = '22023'; END IF;
     IF v_item IS NULL THEN RAISE EXCEPTION 'PREMIO_SIN_RENGLON' USING ERRCODE = '22023'; END IF;
-    SELECT GREATEST(subtotal_bruto_mxn + monto_modificadores_mxn - descuento_item_mxn - promocion_item_mxn, 0)
-      INTO v_monto FROM ticket_items
-     WHERE id = v_item AND ticket_id = v_ticket AND cancelado = false AND cargo_tipo IS NULL;
-    IF v_monto IS NULL THEN RAISE EXCEPTION 'RENGLON_NO_EXISTE' USING ERRCODE = 'P0002'; END IF;
-  ELSIF v_monto IS NULL OR v_monto <= 0 THEN
-    RAISE EXCEPTION 'MONTO_INVALIDO' USING ERRCODE = '22023';
+    SELECT * INTO v_it FROM ticket_items WHERE id = v_item AND ticket_id = v_ticket;
+    IF NOT FOUND THEN RAISE EXCEPTION 'RENGLON_NO_EXISTE' USING ERRCODE = 'P0002'; END IF;
+    IF v_it.producto_id IS DISTINCT FROM v_pr.producto_id OR v_it.cantidad <> 1 OR v_it.cancelado
+       OR v_it.cargo_tipo IS NOT NULL OR v_it.combo_rol IS NOT NULL OR v_it.parent_item_id IS NOT NULL THEN
+      RAISE EXCEPTION 'RENGLON_NO_ES_PREMIO' USING ERRCODE = '22023';
+    END IF;
+    v_monto := GREATEST(v_it.subtotal_bruto_mxn + v_it.monto_modificadores_mxn - v_it.descuento_item_mxn - v_it.promocion_item_mxn, 0);
+    IF v_monto <= 0 THEN RAISE EXCEPTION 'MONTO_INVALIDO' USING ERRCODE = '22023'; END IF;
+  ELSE
+    IF v_item IS NOT NULL THEN RAISE EXCEPTION 'RENGLON_NO_APLICA' USING ERRCODE = '22023'; END IF;
+    IF v_monto IS DISTINCT FROM v_puntos::numeric THEN RAISE EXCEPTION 'MONTO_INVALIDO' USING ERRCODE = '22023'; END IF;   -- 1 punto = $1
   END IF;
 
   PERFORM lealtad_registrar_movimiento(
-    v_canje, v_tenant, (p->>'cliente_id')::uuid, 'CANJE', -v_puntos, (p->>'programa_version')::integer,
+    v_canje, v_tenant, v_cli, 'CANJE', -v_puntos, (p->>'programa_version')::integer,
     v_ticket, COALESCE(NULLIF(p->>'sucursal_id', '')::uuid, v_t.sucursal_id),
     COALESCE(NULLIF(p->>'caja_id', '')::uuid, v_t.caja_id),
     NULLIF(p->>'usuario_id', '')::uuid, v_premio, v_monto);
 
   INSERT INTO ticket_canjes_lealtad (id, tenant_id, ticket_id, cliente_id, premio_id, ticket_item_id, puntos, monto_descontado_mxn, created_by)
-  VALUES (v_canje, v_tenant, v_ticket, (p->>'cliente_id')::uuid, v_premio, v_item, v_puntos, v_monto, NULLIF(p->>'usuario_id', '')::uuid)
+  VALUES (v_canje, v_tenant, v_ticket, v_cli, v_premio, v_item, v_puntos, v_monto, NULLIF(p->>'usuario_id', '')::uuid)
   ON CONFLICT (id) DO NOTHING;
   RETURN v_canje;
 END $$;
@@ -1144,6 +1217,9 @@ END $$;
 -- total deja de contar el premio (§5) pero nadie devuelve los puntos, y al borrar el renglón el
 -- canje desaparece por ON DELETE CASCADE sin dejar reversa en el libro. Mismo criterio que
 -- trg_ticket_lealtad: una venta no se cae por la lealtad; el aviso queda en el log.
+-- Solo en una cuenta abierta (BORRADOR o ABIERTO). En una ya cobrada o facturada el renglón premiado
+-- puede cancelarse o borrarse y los puntos NO vuelven: el cliente ya recibió el producto, y devolverlos
+-- sería dinero gratis. Es la misma regla de §5: un ticket cerrado conserva lo que se vendió.
 -- Son DOS triggers porque los dos casos corren en momentos distintos:
 --   · Cancelar es AFTER UPDATE. Revertir recalcula la cuenta, y recalcular_totales_ticket actualiza
 --     cada renglón vivo; en un BEFORE tocaría la fila que se está actualizando y Postgres lanzaría
@@ -1157,10 +1233,18 @@ RETURNS trigger
 LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp
 AS $$
 DECLARE
-  c     ticket_canjes_lealtad%ROWTYPE;
-  v_ver integer;
+  c        ticket_canjes_lealtad%ROWTYPE;
+  v_ver    integer;
+  v_estado ticket_estado_fiscal;
 BEGIN
   BEGIN
+    SELECT estado_fiscal INTO v_estado FROM tickets
+     WHERE id = CASE WHEN TG_OP = 'DELETE' THEN OLD.ticket_id ELSE NEW.ticket_id END;
+    -- Sin cuenta (se está borrando entera por cascada) tampoco hay a quién devolver nada.
+    IF v_estado IS NULL OR v_estado NOT IN ('BORRADOR', 'ABIERTO') THEN
+      RETURN CASE WHEN TG_OP = 'DELETE' THEN OLD ELSE NEW END;
+    END IF;
+
     IF TG_OP = 'UPDATE' THEN
       IF NEW.cancelado AND NOT OLD.cancelado
          AND EXISTS (SELECT 1 FROM ticket_canjes_lealtad WHERE ticket_item_id = NEW.id AND NOT revertido) THEN
