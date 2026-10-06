@@ -52,9 +52,9 @@ export default async function DescargarCajaPage() {
               <li><b className="text-ink">Una computadora con Windows 10 u 11 de 64 bits.</b> No hace falta que sea nueva.</li>
               <li><b className="text-ink">Internet para conectarla la primera vez.</b> Después sigue cobrando aunque se vaya el internet, y sube las ventas cuando regresa.</li>
               <li>
-                <b className="text-ink">Una impresora térmica de tickets de 80 mm con puerto de red</b> (cable Ethernet o Wi-Fi) y compatible
-                con ESC/POS. <b className="text-ink">Las impresoras USB hoy no funcionan.</b> Por ejemplo, de ese tipo son la Epson TM-T20III
-                o la TM-m30 en su versión de red; al comprar, pide que diga «Ethernet» o «LAN».
+                <b className="text-ink">Una impresora térmica de tickets de 80 mm</b> compatible con ESC/POS, de red (cable Ethernet o Wi-Fi)
+                o de USB. <b className="text-ink">Funcionan las dos.</b> Por ejemplo, la Epson TM-T20III o la TM-m30. Si es de red, al comprar
+                pide que diga «Ethernet» o «LAN»; si es de USB, se instala primero en Windows.
               </li>
               <li><b className="text-ink">Un cajón de dinero conectado a la impresora</b>, que se abre solo al cobrar.</li>
             </ul>

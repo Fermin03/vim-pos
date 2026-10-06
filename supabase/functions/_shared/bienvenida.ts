@@ -91,7 +91,7 @@ export function correoBienvenida(d: DatosBienvenida): { subject: string; html: s
   <p style="margin:22px 0 6px"><b>Qué necesitas para la caja</b></p>
   <ul style="margin:0 0 14px;padding-left:22px">
     <li>Una computadora con Windows 10 u 11.</li>
-    <li>Una impresora de tickets <b>de red</b> (con cable de red o Wi-Fi). Las impresoras USB no funcionan con VIM POS; si vas a comprar una, pide que diga «Ethernet» o «LAN».</li>
+    <li>Una impresora de tickets, <b>de red</b> (con cable de red o Wi-Fi) <b>o de USB</b>. Funcionan las dos. Si es de red y vas a comprarla, pide que diga «Ethernet» o «LAN»; si es de USB, se instala primero en Windows.</li>
     <li>Internet para conectarla la primera vez. Después la caja sigue cobrando aunque se vaya el internet.</li>
   </ul>
   <p ${p}>El programa de la caja se descarga aquí, desde la computadora donde vas a cobrar:<br>${enlace(descargar)}</p>
