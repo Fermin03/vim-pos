@@ -4,7 +4,7 @@
 
 **VIM POS** · punto de venta para restaurantes en México · versión en HTML: https://vimpos.com.mx/funciones
 
-El punto de venta para restaurantes, sección por sección. Todo lo que ves aquí son capturas del sistema funcionando, no dibujos. Y si algo todavía no está, lo dice.
+El punto de venta para restaurantes, sección por sección y con capturas del sistema real.
 
 [Pide una demo](https://vimpos.com.mx/demo)
 

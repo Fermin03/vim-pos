@@ -4,7 +4,7 @@
 
 **VIM POS** · punto de venta para restaurantes en México · versión en HTML: https://vimpos.com.mx/sin-internet
 
-No es una promesa de folleto: es la diferencia entre que el sistema viva en tu caja o viva en internet. Esta página cuenta qué pasa exactamente cuando se va la señal, qué pasa cuando vuelve y qué hace el sistema si algo se rompe.
+El sistema vive en tu caja, no en internet. Aquí está qué pasa cuando se va la señal y cuando vuelve.
 
 [Pide una demo](https://vimpos.com.mx/demo)
 

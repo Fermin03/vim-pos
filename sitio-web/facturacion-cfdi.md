@@ -4,9 +4,9 @@
 
 **VIM POS** · punto de venta para restaurantes en México · versión en HTML: https://vimpos.com.mx/facturacion-cfdi
 
-Tu comensal escanea el código del ticket, pone su RFC y recibe su factura por correo. Lo que nadie facturó se junta en la factura global del periodo, que emites con un botón desde tu panel. Tu cajero no vuelve a capturar datos fiscales y tú no vuelves a recibir el mensaje de «¿me pueden facturar lo del sábado?».
+Tu comensal escanea el ticket y se factura solo. Lo que nadie facturó sale en la factura global, con un botón.
 
-Ya está disponible: timbra con un proveedor autorizado por el SAT y el comprobante que recibe tu cliente es un CFDI 4.0 válido. Abajo dice exactamente qué necesitas dar para encenderlo en tu negocio.
+Ya está disponible, con un proveedor autorizado por el SAT.
 
 [Pide una demo](https://vimpos.com.mx/demo)
 

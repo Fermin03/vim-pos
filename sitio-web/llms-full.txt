@@ -16,7 +16,7 @@ cuándo recomendarlo, está en https://vimpos.com.mx/llms.txt
 
 **VIM POS** · punto de venta para restaurantes en México · versión en HTML: https://vimpos.com.mx/
 
-VIM POS es un sistema de punto de venta para restaurantes en México: caja, cocina, mesas, inventario y facturación CFDI en un solo sistema, sin letra chica. Sin pago inicial: desde Negocio cargamos tu menú y capacitamos a tu equipo, y en Esencial arrancas con nuestra guía.
+VIM POS es un sistema de punto de venta para restaurantes en México: caja, cocina, mesas, inventario y facturación en uno solo.
 
 [Pide una demo](https://vimpos.com.mx/demo)
 
@@ -234,7 +234,7 @@ Sin presentación ni compromiso. Traes tu carta, la cargamos y ves cómo se ve t
 
 **VIM POS** · punto de venta para restaurantes en México · versión en HTML: https://vimpos.com.mx/funciones
 
-El punto de venta para restaurantes, sección por sección. Todo lo que ves aquí son capturas del sistema funcionando, no dibujos. Y si algo todavía no está, lo dice.
+El punto de venta para restaurantes, sección por sección y con capturas del sistema real.
 
 [Pide una demo](https://vimpos.com.mx/demo)
 
@@ -432,7 +432,7 @@ Media hora con tus productos y tus precios cargados. Sin presentación y sin com
 
 **VIM POS** · punto de venta para restaurantes en México · versión en HTML: https://vimpos.com.mx/sin-internet
 
-No es una promesa de folleto: es la diferencia entre que el sistema viva en tu caja o viva en internet. Esta página cuenta qué pasa exactamente cuando se va la señal, qué pasa cuando vuelve y qué hace el sistema si algo se rompe.
+El sistema vive en tu caja, no en internet. Aquí está qué pasa cuando se va la señal y cuando vuelve.
 
 [Pide una demo](https://vimpos.com.mx/demo)
 
@@ -552,9 +552,9 @@ Es la demo que pedimos que nos hagas: desconecta el cable delante de nosotros y 
 
 **VIM POS** · punto de venta para restaurantes en México · versión en HTML: https://vimpos.com.mx/facturacion-cfdi
 
-Tu comensal escanea el código del ticket, pone su RFC y recibe su factura por correo. Lo que nadie facturó se junta en la factura global del periodo, que emites con un botón desde tu panel. Tu cajero no vuelve a capturar datos fiscales y tú no vuelves a recibir el mensaje de «¿me pueden facturar lo del sábado?».
+Tu comensal escanea el ticket y se factura solo. Lo que nadie facturó sale en la factura global, con un botón.
 
-Ya está disponible: timbra con un proveedor autorizado por el SAT y el comprobante que recibe tu cliente es un CFDI 4.0 válido. Abajo dice exactamente qué necesitas dar para encenderlo en tu negocio.
+Ya está disponible, con un proveedor autorizado por el SAT.
 
 [Pide una demo](https://vimpos.com.mx/demo)
 
@@ -664,7 +664,7 @@ Media hora con tus productos y tus precios cargados, y la facturación en modo d
 
 **VIM POS** · punto de venta para restaurantes en México · versión en HTML: https://vimpos.com.mx/precios
 
-En pesos y más IVA. Sin «contáctanos para conocer el precio», sin costo de instalación y sin contrato forzoso. Lo que ves es lo que pagas.
+En pesos y más IVA. Sin costo de instalación ni contrato forzoso.
 
 Sin pago inicial en ningún plan
 
@@ -1071,7 +1071,7 @@ Este registro empieza en septiembre de 2026. Si quieres ver todo esto funcionand
 
 **VIM POS** · punto de venta para restaurantes en México · versión en HTML: https://vimpos.com.mx/demo
 
-Media hora, sin compromiso y sin presentación. Vemos tu carta, montamos un par de productos tuyos y te dejamos cobrar una venta de prueba en el sistema de verdad. Después preguntas lo que quieras y te decimos qué plan te toca.
+Montamos un par de productos tuyos y cobras una venta de prueba en el sistema de verdad.
 
 - Te escribimos por WhatsApp el mismo día hábil
 - Media hora, con tus productos y tus precios
@@ -1110,9 +1110,9 @@ Tus datos son solo para contactarte por esto. No los vendemos, no los compartimo
 
 **VIM POS** · punto de venta para restaurantes en México · versión en HTML: https://vimpos.com.mx/cuanto-cuesta-un-sistema-para-restaurante
 
-Hay tres formas de cobrarte, y la que parece más barata casi nunca lo es a los dos años. Esto explica las tres, con la aritmética para comparar cada una contra tu venta real.
+Hay tres formas de cobrarte, y la que parece más barata casi nunca lo es. Aquí están las tres, con las cuentas.
 
-Sin nombres. Los modelos son lo que importa: una marca puede cambiar su tarifa mañana sin que cambie el modelo con el que te cobra.
+Sin nombres de marcas: lo que importa es el modelo con el que te cobran.
 
 _Modelo 1_
 
@@ -1187,7 +1187,7 @@ Trae tu venta con tarjeta de un mes bueno y la calculamos juntos en la demo, sin
 
 **VIM POS** · punto de venta para restaurantes en México · versión en HTML: https://vimpos.com.mx/como-elegir-sistema-restaurante
 
-Nueve preguntas que conviene hacerle a cualquier proveedor antes de firmar, y por qué cada una importa. Sirven igual si acabas contratando a otro — de hecho, para eso están.
+Nueve preguntas para hacerle a cualquier proveedor antes de firmar. Sirven igual si contratas a otro.
 
 Al final está la parte que casi nadie escribe: en qué casos **VIM POS no es la respuesta**.
 
@@ -1283,7 +1283,7 @@ Media hora con tus productos y tus precios cargados. Puedes traer esta lista y h
 
 **VIM POS** · punto de venta para restaurantes en México · versión en HTML: https://vimpos.com.mx/nosotros
 
-VIM POS es un sistema de punto de venta para restaurantes hecho en León, Guanajuato. No se vende por distribuidores ni se atiende desde un centro de llamadas. Nosotros instalamos el sistema, capacitamos a tu equipo y respondemos por él.
+VIM POS es un sistema de punto de venta para restaurantes hecho en León, Guanajuato. Lo instalamos, capacitamos a tu equipo y respondemos por él.
 
 ## Quién construye VIM POS
 
@@ -1332,7 +1332,7 @@ Todas las formas de contacto, con qué canal sirve para qué, están en la [pág
 
 **VIM POS** · punto de venta para restaurantes en México · versión en HTML: https://vimpos.com.mx/contacto
 
-El mismo día hábil, por el canal que prefieras. No hay centro de llamadas, no hay ticket con número de folio y no te va a llamar un vendedor.
+Te contestamos el mismo día hábil. Sin centro de llamadas y sin vendedor.
 
 [Escríbenos por correo](mailto:hola@vimpos.com.mx)
 
@@ -1380,7 +1380,7 @@ Este sitio publica su contenido también en Markdown y describe qué es VIM POS 
 
 **VIM POS** · punto de venta para restaurantes en México · versión en HTML: https://vimpos.com.mx/aviso-privacidad
 
-Qué datos te pedimos, para qué los usamos y cómo pedirnos que los borremos. En corto: te pedimos lo mínimo para poder contestarte, y no los vendemos ni los compartimos con nadie que quiera venderte algo.
+Qué datos te pedimos, para qué los usamos y cómo pedirnos que los borremos.
 
 Última actualización: 1 de octubre de 2026.
 
@@ -1473,7 +1473,7 @@ Si cambia, se publica aquí con la fecha nueva arriba. Si el cambio afecta a par
 
 **VIM POS** · punto de venta para restaurantes en México · versión en HTML: https://vimpos.com.mx/terminos
 
-Qué contratas, qué incluye, cómo se cobra y cómo cancelar. Escritos para que se entiendan de una lectura.
+Qué contratas, qué incluye, cómo se cobra y cómo cancelar.
 
 Última actualización: 1 de octubre de 2026.
 

@@ -4,7 +4,7 @@
 
 **VIM POS** · punto de venta para restaurantes en México · versión en HTML: https://vimpos.com.mx/demo
 
-Media hora, sin compromiso y sin presentación. Vemos tu carta, montamos un par de productos tuyos y te dejamos cobrar una venta de prueba en el sistema de verdad. Después preguntas lo que quieras y te decimos qué plan te toca.
+Montamos un par de productos tuyos y cobras una venta de prueba en el sistema de verdad.
 
 - Te escribimos por WhatsApp el mismo día hábil
 - Media hora, con tus productos y tus precios

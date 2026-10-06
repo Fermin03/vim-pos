@@ -4,7 +4,7 @@
 
 **VIM POS** · punto de venta para restaurantes en México · versión en HTML: https://vimpos.com.mx/como-elegir-sistema-restaurante
 
-Nueve preguntas que conviene hacerle a cualquier proveedor antes de firmar, y por qué cada una importa. Sirven igual si acabas contratando a otro — de hecho, para eso están.
+Nueve preguntas para hacerle a cualquier proveedor antes de firmar. Sirven igual si contratas a otro.
 
 Al final está la parte que casi nadie escribe: en qué casos **VIM POS no es la respuesta**.
 
