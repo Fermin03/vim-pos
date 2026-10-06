@@ -125,9 +125,22 @@ la primera impresión ya no pide PIN de supervisor.»
 | 0.x.0 | La nota en la caja y un mensaje por WhatsApp o correo. |
 | x.0.0 | Lo anterior, con aviso previo y fecha. |
 
+### La página de novedades
+
+`sitio-web/novedades.html` (vimpos.com.mx/novedades) es el registro público. **Cada martes que se
+publica, se le añade una entrada arriba**, con las mismas reglas de la nota: fecha, «Caja · versión»
+o «Panel de administración», un título y las listas Nuevo / Mejoras / Correcciones. Las funciones
+del panel que salieron esa semana van en la misma entrada o en una propia.
+
+- Una entrada es un `<article class="novedad">`; se copia la de arriba y se cambia el contenido.
+  Un mes nuevo abre su `<section class="novedades-mes">`.
+- No van las correcciones de algo que se rompió y se arregló en la misma semana: el cliente que no
+  lo vio no gana nada con leerlo.
+- Después: `pnpm sitio:generar`, `pnpm test:sitio`, y el `lastmod` de `/novedades` en `sitemap.xml`
+  y `dateModified` en el JSON-LD de la página.
+
 ## Pendiente de decidir
 
 - **Canal piloto:** que una caja reciba la versión antes que el resto. Hoy hay un solo
   `latest.json` para todas; haría falta desarrollo.
 - **Versión mínima soportada:** cuánto puede atrasarse una caja antes de obligarla a actualizar.
-- **Página de novedades** en el sitio.

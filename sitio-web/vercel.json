@@ -45,6 +45,11 @@
       "permanent": true
     },
     {
+      "source": "/novedades.html",
+      "destination": "/novedades",
+      "permanent": true
+    },
+    {
       "source": "/demo.html",
       "destination": "/demo",
       "permanent": true
@@ -129,6 +134,17 @@
         }
       ],
       "destination": "/precios.md"
+    },
+    {
+      "source": "/novedades",
+      "has": [
+        {
+          "type": "header",
+          "key": "accept",
+          "value": ".*(text/markdown|text/x-markdown).*"
+        }
+      ],
+      "destination": "/novedades.md"
     },
     {
       "source": "/demo",
@@ -277,6 +293,10 @@
     {
       "source": "/precios",
       "destination": "/precios.html"
+    },
+    {
+      "source": "/novedades",
+      "destination": "/novedades.html"
     },
     {
       "source": "/demo",
@@ -439,6 +459,23 @@
         {
           "key": "Link",
           "value": "<https://vimpos.com.mx/precios.md>; rel=\"alternate\"; type=\"text/markdown\""
+        }
+      ]
+    },
+    {
+      "source": "/novedades",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=3600, must-revalidate"
+        },
+        {
+          "key": "Vary",
+          "value": "Accept, Accept-Encoding"
+        },
+        {
+          "key": "Link",
+          "value": "<https://vimpos.com.mx/novedades.md>; rel=\"alternate\"; type=\"text/markdown\""
         }
       ]
     },
@@ -700,6 +737,19 @@
     },
     {
       "source": "/precios.md",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=3600, must-revalidate"
+        },
+        {
+          "key": "Vary",
+          "value": "Accept, Accept-Encoding"
+        }
+      ]
+    },
+    {
+      "source": "/novedades.md",
       "headers": [
         {
           "key": "Cache-Control",

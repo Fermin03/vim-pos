@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!--
-  Doce URLs. Sin `changefreq` ni `priority`: Google lleva años diciendo que los
+  Trece URLs. Sin `changefreq` ni `priority`: Google lleva años diciendo que los
   ignora, y publicarlos solo añade dos campos que se quedan desactualizados.
 
   `lastmod` sí se respeta, así que hay que tocarlo cuando la página cambie de
@@ -32,6 +32,10 @@
   <url>
     <loc>https://vimpos.com.mx/precios</loc>
     <lastmod>2026-10-01</lastmod>
+  </url>
+  <url>
+    <loc>https://vimpos.com.mx/novedades</loc>
+    <lastmod>2026-10-05</lastmod>
   </url>
   <url>
     <loc>https://vimpos.com.mx/demo</loc>
