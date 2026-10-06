@@ -212,6 +212,10 @@ notificación + (en la caja) ítem en la bandeja "⬇ Actualización vX — inst
 
 **Publicar una versión nueva:**
 
+> Antes de tocar el número: [`docs/operacion/actualizaciones.md`](../docs/operacion/actualizaciones.md)
+> dice cuál sube (0.0.x, 0.x.0 o x.0.0), que se publica los **martes** salvo urgencia y cómo se
+> escribe la nota que lee el cliente.
+
 > El instalador pesa ~150 MB y **Supabase Free rechaza archivos de más de 50 MB**, así que el `.exe`
 > va a **GitHub Releases** y solo el `latest.json` al bucket. (El script te lo recuerda al final.)
 
