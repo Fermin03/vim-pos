@@ -53,6 +53,15 @@ export const PAGINAS = [
     enSitemap: true,
   },
   {
+    ruta: '/novedades',
+    archivo: 'novedades.html',
+    markdown: 'novedades.md',
+    nombre: 'Novedades',
+    resumen: 'Qué cambió en VIM POS y cuándo: funciones nuevas, mejoras y correcciones de la caja y del panel, por fecha y por versión.',
+    // Lleva `noindex`: es para clientes, no para buscadores.
+    enSitemap: false,
+  },
+  {
     ruta: '/demo',
     archivo: 'demo.html',
     markdown: 'demo.md',
@@ -76,6 +85,31 @@ export const PAGINAS = [
     nombre: 'Cómo elegir sistema',
     resumen:
       'Guía de compra: nueve preguntas que hacerle a cualquier software para restaurantes antes de firmar —internet, precio publicado, comisiones, datos, facturación, implementación, permanencia, soporte y equipo— y en qué casos VIM POS no es la respuesta.',
+    enSitemap: true,
+  },
+  {
+    ruta: '/factura-global-restaurantes',
+    archivo: 'factura-global-restaurantes.html',
+    markdown: 'factura-global-restaurantes.md',
+    nombre: 'Factura global',
+    resumen:
+      'Guía fiscal: qué es la factura global, cada cuándo se emite, qué datos lleva en CFDI 4.0 (RFC genérico, uso S01, periodo) y los errores más comunes en un restaurante. No es asesoría fiscal.',
+    enSitemap: true,
+  },
+  {
+    ruta: '/punto-de-venta-hamburgueserias',
+    archivo: 'punto-de-venta-hamburgueserias.html',
+    markdown: 'punto-de-venta-hamburgueserias.md',
+    nombre: 'Hamburgueserías',
+    resumen: 'VIM POS para una hamburguesería: término obligatorio, extras con precio, combos, para llevar y a domicilio, cocina por estación e inventario por receta.',
+    enSitemap: true,
+  },
+  {
+    ruta: '/punto-de-venta-restaurantes-leon',
+    archivo: 'punto-de-venta-restaurantes-leon.html',
+    markdown: 'punto-de-venta-restaurantes-leon.md',
+    nombre: 'León, Guanajuato',
+    resumen: 'VIM POS para restaurantes de León, Guanajuato, donde se hace el producto: en la zona, la demostración puede ser en el local.',
     enSitemap: true,
   },
   {

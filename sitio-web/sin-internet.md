@@ -4,7 +4,7 @@
 
 **VIM POS** · punto de venta para restaurantes en México · versión en HTML: https://vimpos.com.mx/sin-internet
 
-No es una promesa de folleto: es la diferencia entre que el sistema viva en tu caja o viva en internet. Esta página cuenta qué pasa exactamente cuando se va la señal, qué pasa cuando vuelve y qué hace el sistema si algo se rompe.
+El sistema vive en tu caja, no en internet. Aquí está qué pasa cuando se va la señal y cuando vuelve.
 
 [Pide una demo](https://vimpos.com.mx/demo)
 
@@ -49,13 +49,13 @@ El ticket se cierra, se cobra y se imprime completo en el momento. No queda una 
 
 ### La cocina tampoco se entera
 
-Las comandas van de la caja a la impresora y a la pantalla de cocina por la red de tu local. Nunca salen a internet, ni siquiera cuando lo hay.
+Las comandas van de la caja a la impresora y a la [pantalla de cocina](https://vimpos.com.mx/funciones#cocina) por la red de tu local. Nunca salen a internet, ni siquiera cuando lo hay.
 
 _Cómo se acomoda en tu local_
 
 ## Una computadora manda, las demás cuelgan de ella
 
-La caja principal hace de centro. La pantalla de cocina, las impresoras de las distintas áreas y la segunda caja se conectan a ella por la red del local — el mismo módem que ya tienes, sin salir a internet. Por eso todo el conjunto sigue trabajando cuando la señal se va: nunca dependía de ella.
+La caja principal hace de centro. La pantalla de cocina, las impresoras de las distintas áreas y la segunda caja se conectan a ella por la red del local (cuántas cajas trae cada plan está en [precios](https://vimpos.com.mx/precios)) — el mismo módem que ya tienes, sin salir a internet. Por eso todo el conjunto sigue trabajando cuando la señal se va: nunca dependía de ella.
 
 _Cuando vuelve la señal_
 
@@ -116,7 +116,7 @@ Es la demo que pedimos que nos hagas: desconecta el cable delante de nosotros y 
 
 ---
 
-**Otras páginas en Markdown:** [Inicio](https://vimpos.com.mx/index.md) · [Funciones](https://vimpos.com.mx/funciones.md) · [Facturación CFDI](https://vimpos.com.mx/facturacion-cfdi.md) · [Precios](https://vimpos.com.mx/precios.md) · [Pide una demo](https://vimpos.com.mx/demo.md) · [Cuánto cuesta](https://vimpos.com.mx/cuanto-cuesta-un-sistema-para-restaurante.md) · [Cómo elegir sistema](https://vimpos.com.mx/como-elegir-sistema-restaurante.md) · [Nosotros](https://vimpos.com.mx/nosotros.md) · [Contacto](https://vimpos.com.mx/contacto.md) · [Aviso de privacidad](https://vimpos.com.mx/aviso-privacidad.md) · [Términos del servicio](https://vimpos.com.mx/terminos.md)
+**Otras páginas en Markdown:** [Inicio](https://vimpos.com.mx/index.md) · [Funciones](https://vimpos.com.mx/funciones.md) · [Facturación CFDI](https://vimpos.com.mx/facturacion-cfdi.md) · [Precios](https://vimpos.com.mx/precios.md) · [Novedades](https://vimpos.com.mx/novedades.md) · [Pide una demo](https://vimpos.com.mx/demo.md) · [Cuánto cuesta](https://vimpos.com.mx/cuanto-cuesta-un-sistema-para-restaurante.md) · [Cómo elegir sistema](https://vimpos.com.mx/como-elegir-sistema-restaurante.md) · [Factura global](https://vimpos.com.mx/factura-global-restaurantes.md) · [Hamburgueserías](https://vimpos.com.mx/punto-de-venta-hamburgueserias.md) · [León, Guanajuato](https://vimpos.com.mx/punto-de-venta-restaurantes-leon.md) · [Nosotros](https://vimpos.com.mx/nosotros.md) · [Contacto](https://vimpos.com.mx/contacto.md) · [Aviso de privacidad](https://vimpos.com.mx/aviso-privacidad.md) · [Términos del servicio](https://vimpos.com.mx/terminos.md)
 
 **Contacto:** hola@vimpos.com.mx · https://vimpos.com.mx/contacto
 

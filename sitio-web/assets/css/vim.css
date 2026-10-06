@@ -499,6 +499,12 @@ body[data-menu-abierto="true"] { overflow: hidden; }
 .pie-lista { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--sp-2); }
 .pie-lista a { color: var(--ink-2); text-decoration: none; font-size: var(--t-15); transition: color var(--v-corta) ease; }
 @media (hover: hover) and (pointer: fine) { .pie-lista a:hover { color: var(--ink); } }
+/* Con el dedo, 19 px de alto no se atinan: en pantallas táctiles cada enlace del
+   pie ocupa 44 px y el hueco entre ellos lo pone el propio enlace. */
+@media (pointer: coarse) {
+  .pie-lista { gap: 0; }
+  .pie-lista a, .pie-legal a, .pie-cookies { display: inline-flex; align-items: center; min-height: 44px; }
+}
 
 .pie-legal {
   margin-top: var(--sp-8);
@@ -1394,3 +1400,43 @@ body[data-menu-abierto="true"] { overflow: hidden; }
 }
 .oferta-titulo { font-size: var(--t-24); }
 .oferta-piloto p { max-width: 64ch; }
+
+/* ==========================================================================
+   Novedades
+
+   Una lista con fecha, no una línea de tiempo con puntos y rayas: quien llega
+   aquí busca «qué cambió y cuándo», y el adorno le estorba la lectura. La
+   fecha y la versión van en una columna aparte para que se puedan recorrer de
+   arriba abajo sin leer el contenido; en teléfono suben encima de la entrada.
+
+   «Nuevo» lleva el color de marca y las otras dos etiquetas no: es lo único
+   que alguien que todavía no es cliente viene a buscar.
+   ========================================================================== */
+
+.novedades-mes > h2 {
+  font-size: clamp(var(--t-24), 4vw, var(--t-32));
+  padding-bottom: var(--sp-5);
+}
+
+.novedad {
+  display: grid; gap: var(--sp-4);
+  padding-block: var(--sp-6);
+  border-top: 1px solid var(--line);
+}
+@media (min-width: 860px) {
+  .novedad { grid-template-columns: 220px minmax(0, 1fr); gap: var(--sp-8); }
+}
+
+.novedad-meta {
+  display: flex; flex-direction: column; gap: var(--sp-1);
+  font-family: var(--font-mono); font-size: var(--t-13); color: var(--ink-2);
+  font-variant-numeric: tabular-nums;
+}
+.novedad-meta time { color: var(--ink); font-weight: 600; }
+
+.novedad-cuerpo { max-width: 72ch; }
+.novedad-cuerpo h3 { font-size: var(--t-24); }
+.novedad-cuerpo li { max-width: none; }
+.novedad-cuerpo a { color: var(--accent); }
+.novedad-cuerpo h4 { margin: 0; }
+.novedad-cuerpo h4[data-tipo="nuevo"] { color: var(--accent); }

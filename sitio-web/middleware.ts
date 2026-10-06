@@ -72,7 +72,7 @@ export const config = {
   // de septiembre esto llegó a decir `matcher: MATCHER_404`, y era un riesgo
   // tonto de correr con la única pieza que decide si el sitio se sirve o no.
   matcher: [
-    '/((?!assets|_|404|about|agents|AGENTS|apple-touch|aviso-privacidad|como-elegir-sistema-restaurante|cuanto-cuesta-un-sistema-para-restaurante|contact|demo|facturacion-cfdi|favicon|funciones|index|llms|nosotros|precios|privacy|robots|sin-internet|site|terminos|terms)(?!(?!vercel[.]json$|middleware[.]ts$)[^/]*[.](?!md$)[A-Za-z0-9]+$).+)',
+    '/((?!assets|_|404|about|agents|AGENTS|apple-touch|aviso-privacidad|como-elegir-sistema-restaurante|cuanto-cuesta-un-sistema-para-restaurante|contact|demo|factura-global-restaurantes|facturacion-cfdi|favicon|funciones|index|llms|nosotros|novedades|precios|punto-de-venta-hamburgueserias|punto-de-venta-restaurantes-leon|privacy|robots|sin-internet|site|terminos|terms)(?!(?!vercel[.]json$|middleware[.]ts$)[^/]*[.](?!md$)[A-Za-z0-9]+$).+)',
   ],
 };
 

@@ -1,0 +1,435 @@
+<!doctype html>
+<html lang="es-MX">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+
+<title>Novedades de VIM POS — qué cambió en cada actualización</title>
+<meta name="description" content="Qué cambió en VIM POS y cuándo: funciones nuevas, mejoras y correcciones de la caja y del panel, con fecha.">
+<!-- Fuera de los buscadores a propósito (decisión del 5-oct-2026): es un registro
+     para clientes, no una página de entrada. Tampoco va en el sitemap. NO se
+     bloquea en robots.txt: un rastreador que no puede entrar no ve este noindex. -->
+<meta name="robots" content="noindex">
+<link rel="canonical" href="https://vimpos.com.mx/novedades">
+<link rel="alternate" type="text/markdown" href="https://vimpos.com.mx/novedades.md" title="Esta página en Markdown">
+
+<meta property="og:type" content="website">
+<meta property="og:locale" content="es_MX">
+<meta property="og:site_name" content="VIM POS">
+<meta property="og:title" content="Novedades de VIM POS">
+<meta property="og:description" content="Funciones nuevas, mejoras y correcciones de la caja y del panel, con fecha.">
+<meta property="og:url" content="https://vimpos.com.mx/novedades">
+<meta property="og:image" content="https://vimpos.com.mx/assets/img/og/funciones.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="VIM POS, punto de venta para restaurantes en Mexico">
+<meta name="twitter:card" content="summary_large_image">
+
+<!-- Se precargan SOLO las dos familias que se ven en el primer pantallazo: el
+     titular (Sora) y el texto corrido (Inter Tight). JetBrains Mono aparece más
+     abajo y puede esperar; precargar las tres haría lo contrario de lo que se
+     busca — competirían entre ellas por el ancho de banda y ninguna llegaría
+     antes. Cada archivo es una fuente VARIABLE, así que precargarlo cubre todos
+     los pesos de su familia: no hay un archivo por peso que precargar. -->
+<link rel="preload" href="/assets/fonts/sora-var-latin.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="/assets/fonts/inter-tight-var-latin.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="/assets/css/fuentes.css?v=11">
+
+<link rel="icon" href="/favicon.ico" sizes="48x48">
+<link rel="icon" href="/assets/img/logo.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="/assets/img/apple-touch-icon-1024.png">
+<link rel="manifest" href="/site.webmanifest">
+<meta name="theme-color" content="#0078C9">
+
+<link rel="stylesheet" href="/assets/css/vim.css?v=22">
+<!-- Consentimiento de cookies. Va ANTES que gtm.js y el orden NO es
+     cosmético: los dos llevan `defer`, que respeta el orden del documento, y
+     Consent Mode descarta un estado por defecto que llegue después de que el
+     contenedor haya cargado. Invertir estas dos líneas hace que Google
+     Analytics mida la primera visita con los ajustes de fábrica. -->
+<script src="/assets/js/consentimiento.js?v=1" defer></script>
+<!-- Google Tag Manager (contenedor GTM-PRTJDNQ2). El fragmento en línea que da
+     Google no cabe aquí: la política de seguridad del sitio prohíbe los scripts
+     en línea, y uno bloqueado no avisa — la analítica parecería instalada y no
+     mediría nada. Por eso vive en un archivo propio, servido desde este mismo
+     dominio. El razonamiento entero está dentro de ese archivo. -->
+<script src="/assets/js/gtm.js?v=1" defer></script>
+</head>
+<body>
+
+<a href="#contenido" class="solo-lectores">Saltar al contenido</a>
+
+<header class="nav">
+  <div class="contenedor">
+    <div class="nav-fila">
+      <a href="/" class="nav-logo" aria-label="VIM POS, inicio">
+        <img src="/assets/img/logo.svg" alt="" width="30" height="30" aria-hidden="true">
+        <span>VIM POS</span>
+      </a>
+      <nav class="nav-enlaces" aria-label="Principal">
+        <a class="nav-enlace" href="/funciones">Funciones</a>
+        <a class="nav-enlace" href="/facturacion-cfdi">Facturación</a>
+        <a class="nav-enlace" href="/precios">Precios</a>
+      </nav>
+      <div class="nav-acciones">
+        <a class="btn btn-fantasma nav-prueba" href="https://admin.vimpos.com.mx/registro">Pruébalo 30 días gratis</a>
+        <a class="btn btn-primario" href="/demo">Pide una demo</a>
+        <button class="nav-hamburguesa" data-menu-boton type="button"
+                aria-expanded="false" aria-controls="menu-movil" aria-label="Abrir menú">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+               stroke-width="2" stroke-linecap="round" aria-hidden="true">
+            <path d="M4 7h16M4 12h16M4 17h16"/>
+          </svg>
+        </button>
+      </div>
+    </div>
+  </div>
+</header>
+
+  <div class="nav-movil" id="menu-movil" data-menu data-abierto="false" inert>
+    <button class="nav-cerrar" data-menu-cerrar type="button" aria-label="Cerrar menú">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+           stroke-width="2" stroke-linecap="round" aria-hidden="true">
+        <path d="M6 6l12 12M18 6L6 18"/>
+      </svg>
+    </button>
+    <nav aria-label="Menú">
+      <div class="nav-movil-lista">
+          <a href="/funciones">Funciones</a>
+          <a href="/facturacion-cfdi">Facturación</a>
+          <a href="/precios">Precios</a>
+          <a href="/demo">Pide una demo</a>
+          <a href="https://admin.vimpos.com.mx/registro">Pruébalo 30 días gratis</a>
+      </div>
+    </nav>
+  </div>
+
+<main id="contenido">
+  <section class="hero">
+    <div class="contenedor pila pila-5">
+      <p class="eyebrow">Novedades</p>
+      <h1>Qué cambió y cuándo</h1>
+    </div>
+  </section>
+
+  <section class="seccion" style="padding-top:0">
+    <div class="contenedor pila pila-10">
+
+    <section class="novedades-mes" aria-labelledby="octubre-2026">
+      <h2 id="octubre-2026">Octubre de 2026</h2>
+      <article class="novedad">
+        <p class="novedad-meta">
+          <time datetime="2026-10-05">4 y 5 de octubre</time>
+          <span>Panel de administración</span>
+        </p>
+        <div class="novedad-cuerpo pila pila-5">
+          <h3>Menús del catálogo</h3>
+          <div class="pila pila-3">
+            <h4 class="eyebrow" data-tipo="nuevo">Nuevo</h4>
+            <ul class="lista-legal">
+              <li>Arma menús con nombre desde <strong>Catálogo → Nuevo menú</strong>. Cada menú tiene sus productos, sus combos, sus categorías y sus precios, y cada sucursal vende el que le asignes.</li>
+              <li>Apaga una categoría entera en un menú sin tocar los demás.</li>
+              <li>Eliminar a un empleado que ya no trabaja contigo libera su correo. Su nombre se conserva en el historial de ventas.</li>
+            </ul>
+          </div>
+        </div>
+      </article>
+      <article class="novedad">
+        <p class="novedad-meta">
+          <time datetime="2026-10-02">2 de octubre</time>
+          <span>Caja · 0.4.105 a 0.4.110</span>
+        </p>
+        <div class="novedad-cuerpo pila pila-5">
+          <h3>Pantalla del cliente y menú por sucursal</h3>
+          <div class="pila pila-3">
+            <h4 class="eyebrow" data-tipo="nuevo">Nuevo</h4>
+            <ul class="lista-legal">
+              <li><strong>Pantalla del cliente.</strong> Si la caja tiene un segundo monitor, muestra ahí la cuenta, el total y el cambio. Se enciende en Menú → Configurar impresoras y pantallas.</li>
+              <li>Las imágenes que subas en Configuración → Pantalla del cliente salen en ese monitor cuando no se está cobrando, cada una con su tiempo.</li>
+              <li>Cada sucursal puede vender productos distintos, a su propio precio, y agotarlos por su cuenta.</li>
+              <li>Puedes imprimir en una impresora USB instalada en Windows.</li>
+              <li>Los productos de un combo ya aceptan modificadores.</li>
+              <li>En el panel, las estadísticas y los reportes se ven por sucursal o de todas juntas.</li>
+            </ul>
+          </div>
+          <div class="pila pila-3">
+            <h4 class="eyebrow" data-tipo="correcciones">Correcciones</h4>
+            <ul class="lista-legal">
+              <li>La caja ya no se queda en «Sin internet» ni se desconecta sola en computadoras lentas.</li>
+              <li>Cuando un insumo se termina, el producto se agota solo en la sucursal que se quedó sin él, no en todas.</li>
+            </ul>
+          </div>
+        </div>
+      </article>
+      <article class="novedad">
+        <p class="novedad-meta">
+          <time datetime="2026-10-01">1 de octubre</time>
+          <span>Caja · 0.4.100 a 0.4.104</span>
+        </p>
+        <div class="novedad-cuerpo pila pila-5">
+          <h3>Respaldo diario y ayuda por WhatsApp</h3>
+          <div class="pila pila-3">
+            <h4 class="eyebrow" data-tipo="nuevo">Nuevo</h4>
+            <ul class="lista-legal">
+              <li>La caja se respalda sola una vez al día, cuando está en reposo.</li>
+              <li>Puedes pedir ayuda por WhatsApp desde Ajustes y desde la pantalla de bloqueo.</li>
+            </ul>
+          </div>
+          <div class="pila pila-3">
+            <h4 class="eyebrow" data-tipo="mejoras">Mejoras</h4>
+            <ul class="lista-legal">
+              <li>Las actualizaciones llegan firmadas por VIM: la caja no instala nada que no venga de nosotros.</li>
+            </ul>
+          </div>
+          <div class="pila pila-3">
+            <h4 class="eyebrow" data-tipo="correcciones">Correcciones</h4>
+            <ul class="lista-legal">
+              <li>La primera impresión del ticket ya no pide PIN de supervisor.</li>
+            </ul>
+          </div>
+        </div>
+      </article>
+    </section>
+
+    <section class="novedades-mes" aria-labelledby="septiembre-2026">
+      <h2 id="septiembre-2026">Septiembre de 2026</h2>
+      <article class="novedad">
+        <p class="novedad-meta">
+          <time datetime="2026-09-30">29 y 30 de septiembre</time>
+          <span>Caja · 0.4.92 a 0.4.99</span>
+        </p>
+        <div class="novedad-cuerpo pila pila-5">
+          <h3>Corte ciego y registro de reimpresiones</h3>
+          <div class="pila pila-3">
+            <h4 class="eyebrow" data-tipo="nuevo">Nuevo</h4>
+            <ul class="lista-legal">
+              <li><strong>Corte ciego.</strong> Al cerrar el turno, el cajero cuenta el efectivo sin ver cuánto debería haber; la diferencia aparece al generar el corte. Volver a contar pide la autorización de un supervisor.</li>
+              <li>Reimprimir una comanda pide motivo y autorización, y cada reimpresión queda registrada. Las ves en Reportes → Reimpresiones por cajero.</li>
+              <li>La caja avisa en su pantalla de inicio cuando hay una versión nueva, con un botón para instalarla.</li>
+            </ul>
+          </div>
+          <div class="pila pila-3">
+            <h4 class="eyebrow" data-tipo="mejoras">Mejoras</h4>
+            <ul class="lista-legal">
+              <li>Cancelar, devolver y reimprimir se confirman igual en toda la caja: dicen qué va a pasar y piden el motivo.</li>
+              <li>Las pantallas de cuentas caben completas en monitores de 1024×768.</li>
+            </ul>
+          </div>
+        </div>
+      </article>
+      <article class="novedad">
+        <p class="novedad-meta">
+          <time datetime="2026-09-26">22 al 26 de septiembre</time>
+          <span>Caja · 0.4.75 a 0.4.91</span>
+        </p>
+        <div class="novedad-cuerpo pila pila-5">
+          <h3>Repartidores, zonas de envío y cocina por estación</h3>
+          <div class="pila pila-3">
+            <h4 class="eyebrow" data-tipo="nuevo">Nuevo</h4>
+            <ul class="lista-legal">
+              <li><strong>Repartidores.</strong> Asignas el pedido a domicilio a un repartidor y con eso sale. Puedes mandar varios pedidos en un mismo viaje.</li>
+              <li><strong>Zonas de envío.</strong> El domicilio se cobra según la zona del cliente. Cada sucursal define las suyas y se eligen al capturar el pedido.</li>
+              <li>Para llevar tiene su lista de «Cuentas abiertas», junto a «Cuentas en espera».</li>
+              <li>Botón «Asignar cliente» en Comedor, Para llevar y Pick-up.</li>
+              <li>Tocar un producto del ticket vuelve a abrir sus modificadores o su combo para cambiarlo, mientras no se haya mandado a cocina.</li>
+              <li>En cocina, cada estación marca como listo solo lo suyo y la orden se cierra cuando termina la última.</li>
+            </ul>
+          </div>
+          <div class="pila pila-3">
+            <h4 class="eyebrow" data-tipo="mejoras">Mejoras</h4>
+            <ul class="lista-legal">
+              <li>La caja y la pantalla de cocina tienen diseño nuevo: botones más grandes, color por categoría y «Efectivo exacto» al cobrar.</li>
+              <li>Los clientes y las direcciones que registras en la caja aparecen en el panel, en Clientes.</li>
+              <li>Desvincular una caja pide el PIN de un administrador.</li>
+            </ul>
+          </div>
+          <div class="pila pila-3">
+            <h4 class="eyebrow" data-tipo="correcciones">Correcciones</h4>
+            <ul class="lista-legal">
+              <li>Al retomar un pedido en espera aparece «Cobrar».</li>
+            </ul>
+          </div>
+          <figure class="figura" data-captura="kds">
+            <div class="monitor">
+              <div class="monitor-barra" aria-hidden="true">
+                <span class="monitor-punto"></span><span class="monitor-punto"></span><span class="monitor-punto"></span>
+              </div>
+              <picture>
+                <source media="(max-width: 619px)" srcset="/assets/img/capturas/kds-movil.webp?v=3" width="1400" height="920">
+                <img src="/assets/img/capturas/kds.webp?v=3" alt="Pantalla de cocina con las comandas activas, cada una con su tiempo, el término de la carne, los extras y las notas." width="1600" height="1000" loading="lazy" decoding="async">
+              </picture>
+            </div>
+            <figcaption>La pantalla de cocina con su diseño nuevo: cada comanda con su tiempo a la vista.</figcaption>
+          </figure>
+        </div>
+      </article>
+      <article class="novedad">
+        <p class="novedad-meta">
+          <time datetime="2026-09-13">10 al 13 de septiembre</time>
+          <span>Caja · 0.4.67 a 0.4.70</span>
+        </p>
+        <div class="novedad-cuerpo pila pila-5">
+          <h3>Combos</h3>
+          <div class="pila pila-3">
+            <h4 class="eyebrow" data-tipo="nuevo">Nuevo</h4>
+            <ul class="lista-legal">
+              <li><strong>Combos.</strong> Vende un paquete con sus opciones a un solo precio. Cada producto del combo llega a cocina, descuenta inventario y cuenta en los reportes.</li>
+              <li>Los combos y los modificadores se publican en tu carta de Uber Eats, y esos pedidos entran a la caja con el total que cobró la app.</li>
+            </ul>
+          </div>
+          <div class="pila pila-3">
+            <h4 class="eyebrow" data-tipo="mejoras">Mejoras</h4>
+            <ul class="lista-legal">
+              <li>El catálogo se acomoda en cuadrícula y llena la pantalla. Lo que no cabe pasa a otra página con flechas, sin arrastrar.</li>
+            </ul>
+          </div>
+          <figure class="figura" data-captura="pos-home">
+            <div class="monitor">
+              <div class="monitor-barra" aria-hidden="true">
+                <span class="monitor-punto"></span><span class="monitor-punto"></span><span class="monitor-punto"></span>
+              </div>
+              <picture>
+                <source media="(max-width: 619px)" srcset="/assets/img/capturas/pos-home-movil.webp?v=3" width="816" height="1640">
+                <img src="/assets/img/capturas/pos-home.webp?v=3" alt="La caja en plena venta: el catálogo por categorías y un ticket en curso con una hamburguesa, papas y refresco." width="1600" height="1000" loading="lazy" decoding="async">
+              </picture>
+            </div>
+            <figcaption>El catálogo en cuadrícula: todos los productos del mismo tamaño, sin arrastrar la pantalla.</figcaption>
+          </figure>
+        </div>
+      </article>
+      <article class="novedad">
+        <p class="novedad-meta">
+          <time datetime="2026-09-06">2 al 6 de septiembre</time>
+          <span>Caja · 0.4.53 a 0.4.64</span>
+        </p>
+        <div class="novedad-cuerpo pila pila-5">
+          <h3>Facturación y pedidos de Uber Eats</h3>
+          <div class="pila pila-3">
+            <h4 class="eyebrow" data-tipo="nuevo">Nuevo</h4>
+            <ul class="lista-legal">
+              <li><strong>Facturación electrónica.</strong> Factura global, timbrado individual y portal de autofacturación por QR. El detalle está en <a href="/facturacion-cfdi">Facturación CFDI</a>.</li>
+              <li>Los pedidos de Uber Eats entran directo a la caja y a la cocina. Desde la caja pausas la tienda, la reanudas y ajustas el tiempo de preparación.</li>
+              <li>El inventario se descuenta al vender en la caja. Se enciende desde Inventario, en el panel.</li>
+            </ul>
+          </div>
+          <div class="pila pila-3">
+            <h4 class="eyebrow" data-tipo="mejoras">Mejoras</h4>
+            <ul class="lista-legal">
+              <li>Un cambio de menú hecho en el panel llega a la caja en un minuto.</li>
+              <li>Si la caja no arranca a la primera después de un apagado forzado, lo reintenta sola.</li>
+            </ul>
+          </div>
+          <div class="pila pila-3">
+            <h4 class="eyebrow" data-tipo="correcciones">Correcciones</h4>
+            <ul class="lista-legal">
+              <li>Cancelar una cuenta de mesa libera la mesa.</li>
+              <li>Una cuenta que se abre y no se cobra ya no se pierde de vista: al salir, la caja pregunta qué hacer con ella.</li>
+            </ul>
+          </div>
+        </div>
+      </article>
+    </section>
+
+      <p>
+        Este registro empieza en septiembre de 2026. Si quieres ver todo esto funcionando,
+        <a href="/demo">pide una demo</a> o revisa las <a href="/funciones">funciones</a> una por una.
+      </p>
+    </div>
+  </section>
+</main>
+
+<footer class="pie">
+  <div class="contenedor">
+    <div class="pie-rejilla">
+      <div class="pila pila-3">
+        <span class="nav-logo" style="pointer-events:none">
+          <img src="/assets/img/logo.svg" alt="" width="30" height="30" aria-hidden="true">
+          <span>VIM POS</span>
+        </span>
+        <p style="font-size:var(--t-15)">
+          El sistema completo para tu restaurante: caja, cocina, mesas, inventario y
+          facturación. Hecho en León, Guanajuato.
+        </p>
+      </div>
+      <div>
+        <h2 class="pie-titulo">Producto</h2>
+        <ul class="pie-lista">
+          <li><a href="/funciones">Funciones</a></li>
+          <li><a href="/sin-internet">Sin internet</a></li>
+          <li><a href="/facturacion-cfdi">Facturación CFDI</a></li>
+          <li><a href="/precios">Precios</a></li>
+          <li><a href="/novedades">Novedades</a></li>
+          <li><a href="/demo">Pide una demo</a></li>
+        </ul>
+      </div>
+      <div>
+        <h2 class="pie-titulo">Guías</h2>
+        <ul class="pie-lista">
+          <li><a href="/como-elegir-sistema-restaurante">Cómo elegir sistema</a></li>
+          <li><a href="/cuanto-cuesta-un-sistema-para-restaurante">Cuánto cuesta</a></li>
+          <li><a href="/factura-global-restaurantes">Factura global</a></li>
+          <li><a href="/nosotros">Nosotros</a></li>
+        </ul>
+      </div>
+      <div>
+        <h2 class="pie-titulo">Contacto</h2>
+        <ul class="pie-lista">
+          <li><a href="/contacto">Contacto</a></li>
+          <li><a href="mailto:hola@vimpos.com.mx">hola@vimpos.com.mx</a></li>
+        </ul>
+      </div>
+    </div>
+    <div class="pie-legal">
+      <span>© 2026 VIM POS</span>
+      <span class="fila" style="gap:var(--sp-5)">
+        <a href="/aviso-privacidad" style="color:inherit">Aviso de privacidad</a>
+        <a href="/terminos" style="color:inherit">Términos</a>
+        <button type="button" class="pie-cookies" data-cookies-abrir hidden>Cookies</button>
+      </span>
+    </div>
+  </div>
+</footer>
+
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "WebPage",
+  "@id": "https://vimpos.com.mx/novedades#pagina",
+  "url": "https://vimpos.com.mx/novedades",
+  "name": "Novedades de VIM POS",
+  "description": "Qué cambió en VIM POS y cuándo: funciones nuevas, mejoras y correcciones de la caja y del panel, con fecha.",
+  "inLanguage": "es-MX",
+  "dateModified": "2026-10-05",
+  "isPartOf": { "@id": "https://vimpos.com.mx/#sitio" },
+  "about": { "@id": "https://vimpos.com.mx/#organizacion" }
+}
+</script>
+
+<script src="/assets/js/vim.js?v=15" defer></script>
+<!-- Medición sin cookies (Vercel Web Analytics). Se sirve desde este dominio y
+     solo existe si está encendida en el proyecto de Vercel; si no, es un 404
+     inofensivo. Los eventos se mandan desde vim.js. -->
+<script defer src="/_vercel/insights/script.js"></script>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "BreadcrumbList",
+  "@id": "https://vimpos.com.mx/novedades#miga",
+  "itemListElement": [
+    {
+      "@type": "ListItem",
+      "position": 1,
+      "name": "Inicio",
+      "item": "https://vimpos.com.mx/"
+    },
+    {
+      "@type": "ListItem",
+      "position": 2,
+      "name": "Novedades",
+      "item": "https://vimpos.com.mx/novedades"
+    }
+  ]
+}
+</script>
+</body>
+</html>

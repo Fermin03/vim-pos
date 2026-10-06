@@ -27,28 +27,29 @@
      busca — competirían entre ellas por el ancho de banda y ninguna llegaría
      antes. Cada archivo es una fuente VARIABLE, así que precargarlo cubre todos
      los pesos de su familia: no hay un archivo por peso que precargar. -->
-<link rel="preload" href="assets/fonts/sora-var-latin.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="preload" href="assets/fonts/inter-tight-var-latin.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="stylesheet" href="assets/css/fuentes.css?v=11">
+<link rel="preload" href="/assets/fonts/sora-var-latin.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="/assets/fonts/inter-tight-var-latin.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="/assets/css/fuentes.css?v=11">
 
-<link rel="icon" href="assets/img/logo.svg" type="image/svg+xml">
-<link rel="apple-touch-icon" href="assets/img/apple-touch-icon-1024.png">
-<link rel="manifest" href="site.webmanifest">
+<link rel="icon" href="/favicon.ico" sizes="48x48">
+<link rel="icon" href="/assets/img/logo.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="/assets/img/apple-touch-icon-1024.png">
+<link rel="manifest" href="/site.webmanifest">
 <meta name="theme-color" content="#0078C9">
 
-<link rel="stylesheet" href="assets/css/vim.css?v=20">
+<link rel="stylesheet" href="/assets/css/vim.css?v=22">
 <!-- Consentimiento de cookies. Va ANTES que gtm.js y el orden NO es
      cosmético: los dos llevan `defer`, que respeta el orden del documento, y
      Consent Mode descarta un estado por defecto que llegue después de que el
      contenedor haya cargado. Invertir estas dos líneas hace que Google
      Analytics mida la primera visita con los ajustes de fábrica. -->
-<script src="assets/js/consentimiento.js?v=1" defer></script>
+<script src="/assets/js/consentimiento.js?v=1" defer></script>
 <!-- Google Tag Manager (contenedor GTM-PRTJDNQ2). El fragmento en línea que da
      Google no cabe aquí: la política de seguridad del sitio prohíbe los scripts
      en línea, y uno bloqueado no avisa — la analítica parecería instalada y no
      mediría nada. Por eso vive en un archivo propio, servido desde este mismo
      dominio. El razonamiento entero está dentro de ese archivo. -->
-<script src="assets/js/gtm.js?v=1" defer></script>
+<script src="/assets/js/gtm.js?v=1" defer></script>
 </head>
 <body>
 
@@ -58,7 +59,7 @@
   <div class="contenedor">
     <div class="nav-fila">
       <a href="/" class="nav-logo" aria-label="VIM POS, inicio">
-        <img src="assets/img/logo.svg" alt="" width="30" height="30" aria-hidden="true">
+        <img src="/assets/img/logo.svg" alt="" width="30" height="30" aria-hidden="true">
         <span>VIM POS</span>
       </a>
       <nav class="nav-enlaces" aria-label="Principal">
@@ -118,10 +119,9 @@
   <section class="hero">
     <div class="contenedor pila pila-5">
       <p class="eyebrow">Funciones</p>
-      <h1>Qué hace, sección por sección</h1>
+      <h1>Qué hace VIM POS: caja, cocina, mesas, inventario y reportes</h1>
       <p class="entradilla">
-        Todo lo que ves aquí son capturas del sistema funcionando, no dibujos. Y si algo todavía
-        no está, lo dice.
+        El punto de venta para restaurantes, sección por sección y con capturas del sistema real.
       </p>
       <div class="fila">
         <a class="btn btn-primario btn-hero" href="/demo">Pide una demo</a>
@@ -148,7 +148,7 @@
           <div class="monitor-barra" aria-hidden="true">
             <span class="monitor-punto"></span><span class="monitor-punto"></span><span class="monitor-punto"></span>
           </div>
-          <img src="assets/img/capturas/pos-catalogo.webp?v=3"
+          <img src="/assets/img/capturas/pos-catalogo.webp?v=3"
                alt="Un producto abierto con sus opciones: el término de la carne y los extras con su precio."
                width="1600" height="1000" fetchpriority="high" decoding="async">
         </div>
@@ -163,7 +163,7 @@
           <div class="monitor-barra" aria-hidden="true">
             <span class="monitor-punto"></span><span class="monitor-punto"></span><span class="monitor-punto"></span>
           </div>
-          <img src="assets/img/capturas/pos-pago.webp?v=3"
+          <img src="/assets/img/capturas/pos-pago.webp?v=3"
                alt="Pantalla de cobro con las formas de pago: efectivo, débito, crédito, transferencia, app externa y pago dividido."
                width="1600" height="1000" loading="lazy" decoding="async">
         </div>
@@ -216,6 +216,26 @@
             ventas para que cuadre.
           </p>
         </div>
+        <div class="tarjeta pila pila-3">
+          <h3>Combos</h3>
+          <p>
+            Un paquete con sus opciones a un solo precio. Cada producto del combo llega a cocina,
+            descuenta inventario, cuenta en los reportes y acepta sus propios modificadores.
+          </p>
+        </div>
+        <div class="tarjeta pila pila-3">
+          <h3>Pantalla del cliente</h3>
+          <p>
+            Con un segundo monitor en la caja, tu cliente ve la cuenta, el total y el cambio. Cuando
+            no se está cobrando, muestra las imágenes que tú subas.
+          </p>
+        </div>
+        <div class="tarjeta pila pila-3">
+          <h3>Un menú por sucursal</h3>
+          <p>
+            Cada sucursal vende sus productos, a su precio, y agota lo suyo sin afectar a las demás.
+          </p>
+        </div>
       </div>
     </div>
   </section>
@@ -238,8 +258,8 @@
             <span class="monitor-punto"></span><span class="monitor-punto"></span><span class="monitor-punto"></span>
           </div>
           <picture>
-            <source media="(max-width: 619px)" srcset="assets/img/capturas/kds-movil.webp?v=3" width="1400" height="920">
-            <img src="assets/img/capturas/kds.webp?v=3" alt="Pantalla de cocina con las comandas activas, cada una con su tiempo, el término de la carne, los extras y las notas." width="1600" height="1000" loading="lazy" decoding="async">
+            <source media="(max-width: 619px)" srcset="/assets/img/capturas/kds-movil.webp?v=3" width="1400" height="920">
+            <img src="/assets/img/capturas/kds.webp?v=3" alt="Pantalla de cocina con las comandas activas, cada una con su tiempo, el término de la carne, los extras y las notas." width="1600" height="1000" loading="lazy" decoding="async">
           </picture>
         </div>
         <figcaption>
@@ -267,7 +287,7 @@
         <div class="tarjeta pila pila-3">
           <h3>Sin pasar por internet</h3>
           <p>
-            La comanda viaja de la caja a la cocina por la red de tu local. No sale afuera ni
+            La comanda viaja de la caja a la cocina por la red de tu local, igual que <a href="/sin-internet">todo lo demás cuando se cae el internet</a>. No sale afuera ni
             siquiera cuando hay señal.
           </p>
         </div>
@@ -292,7 +312,7 @@
           <div class="monitor-barra" aria-hidden="true">
             <span class="monitor-punto"></span><span class="monitor-punto"></span><span class="monitor-punto"></span>
           </div>
-          <img src="assets/img/capturas/pos-mesas.webp?v=3"
+          <img src="/assets/img/capturas/pos-mesas.webp?v=3"
                alt="Las mesas abiertas del comedor con su consumo y su tiempo, y la cuenta de la mesa elegida con todo lo que pidió."
                width="1600" height="1000" loading="lazy" decoding="async">
         </div>
@@ -347,8 +367,8 @@
             <span class="monitor-punto"></span><span class="monitor-punto"></span><span class="monitor-punto"></span>
           </div>
           <picture>
-            <source media="(max-width: 619px)" srcset="assets/img/capturas/admin-inventario-movil.webp?v=3" width="780" height="1688">
-            <img src="assets/img/capturas/admin-inventario.webp?v=3" alt="Listado de insumos con sus existencias." width="1600" height="1000" loading="lazy" decoding="async">
+            <source media="(max-width: 619px)" srcset="/assets/img/capturas/admin-inventario-movil.webp?v=3" width="780" height="1688">
+            <img src="/assets/img/capturas/admin-inventario.webp?v=3" alt="Listado de insumos con sus existencias." width="1600" height="1000" loading="lazy" decoding="async">
           </picture>
         </div>
         <figcaption>
@@ -400,7 +420,7 @@
           <div class="monitor-barra" aria-hidden="true">
             <span class="monitor-punto"></span><span class="monitor-punto"></span><span class="monitor-punto"></span>
           </div>
-          <img src="assets/img/capturas/pos-arqueo.webp?v=3"
+          <img src="/assets/img/capturas/pos-arqueo.webp?v=3"
                alt="Arqueo del cierre de turno: efectivo esperado, efectivo contado y la diferencia, con cada forma de pago en su renglón."
                width="1600" height="1000" loading="lazy" decoding="async">
         </div>
@@ -417,8 +437,8 @@
             <span class="monitor-punto"></span><span class="monitor-punto"></span><span class="monitor-punto"></span>
           </div>
           <picture>
-            <source media="(max-width: 619px)" srcset="assets/img/capturas/admin-dashboard-movil.webp?v=3" width="780" height="1688">
-            <img src="assets/img/capturas/admin-dashboard.webp?v=3" alt="Panel del dueño con las ventas del día, el ticket promedio y el top de productos." width="1600" height="1000" loading="lazy" decoding="async">
+            <source media="(max-width: 619px)" srcset="/assets/img/capturas/admin-dashboard-movil.webp?v=3" width="780" height="1688">
+            <img src="/assets/img/capturas/admin-dashboard.webp?v=3" alt="Panel del dueño con las ventas del día, el ticket promedio y el top de productos." width="1600" height="1000" loading="lazy" decoding="async">
           </picture>
         </div>
         <figcaption>
@@ -432,14 +452,16 @@
           <h3>Arqueo con sobrante y faltante</h3>
           <p>
             Cuentas el cajón, el sistema dice lo que debería haber, y la diferencia queda
-            registrada junto con quién cerró el turno.
+            registrada junto con quién cerró el turno. Con el corte ciego, el cajero cuenta sin
+            ver cuánto debería haber.
           </p>
         </div>
         <div class="tarjeta pila pila-3">
           <h3>Quince reportes</h3>
           <p>
-            Por producto, categoría, mesero, área, marca, tipo de servicio, tiempos de cocina,
-            descuentos, reimpresiones, no-shows y el histórico de cortes.
+            Ventas por producto, categoría, mesero, área, marca, tipo de servicio y app de reparto;
+            costo de ventas, tiempos de cocina, descuentos, reimpresiones, eventos, no-shows, el
+            histórico de cortes y el consolidado de sucursales.
           </p>
         </div>
         <div class="tarjeta pila pila-3">
@@ -471,7 +493,7 @@
           <div class="monitor-barra" aria-hidden="true">
             <span class="monitor-punto"></span><span class="monitor-punto"></span><span class="monitor-punto"></span>
           </div>
-          <img src="assets/img/capturas/admin-conciliacion.webp?v=3"
+          <img src="/assets/img/capturas/admin-conciliacion.webp?v=3"
                alt="Pantalla de conciliación de apps con la diferencia por pedido."
                width="1600" height="1000" loading="lazy" decoding="async">
         </div>
@@ -507,6 +529,48 @@
     </div>
   </section>
 
+  <!-- ═══ 6b · A domicilio ═══════════════════════════════════════════════
+       Sin captura todavía: repartidores, zonas y Uber Eats salieron en septiembre
+       de 2026 y están en /novedades. Lo de Uber dice lo mismo que /precios y que
+       agents.md: solo Uber Eats, y la tableta de la app se queda en el local. -->
+  <section class="seccion" id="domicilio">
+    <div class="contenedor pila pila-8">
+      <div class="pila pila-4">
+        <p class="eyebrow">A domicilio</p>
+        <h2>Pedidos a domicilio, con repartidor y zona de envío</h2>
+        <p>
+          El pedido se captura en la caja con su cliente y su dirección, y sale con repartidor
+          asignado. Los de Uber Eats entran solos.
+        </p>
+      </div>
+
+      <div class="tres">
+        <div class="tarjeta pila pila-3">
+          <h3>Repartidores</h3>
+          <p>
+            Asignas el pedido a un repartidor y con eso sale. Puedes mandar varios pedidos en un
+            mismo viaje.
+          </p>
+        </div>
+        <div class="tarjeta pila pila-3">
+          <h3>Zonas de envío</h3>
+          <p>
+            El envío se cobra según la zona del cliente. Cada sucursal define las suyas y se eligen
+            al capturar el pedido.
+          </p>
+        </div>
+        <div class="tarjeta pila pila-3">
+          <h3>Uber Eats, directo a la caja</h3>
+          <p>
+            Cada pedido entra como un ticket y su comanda sale a cocina. Incluido desde Negocio; en
+            Esencial, $100 al mes (<a href="/precios">precios</a>). La tableta de Uber se queda en tu
+            local, y DiDi y Rappi aún no están conectados.
+          </p>
+        </div>
+      </div>
+    </div>
+  </section>
+
   <!-- ═══ 7 · Traer tu menú ══════════════════════════════════════════════ -->
   <section class="seccion" id="migracion">
     <div class="contenedor pila pila-8">
@@ -525,7 +589,7 @@
           <div class="monitor-barra" aria-hidden="true">
             <span class="monitor-punto"></span><span class="monitor-punto"></span><span class="monitor-punto"></span>
           </div>
-          <img src="assets/img/capturas/admin-importador.webp?v=3"
+          <img src="/assets/img/capturas/admin-importador.webp?v=3"
                alt="Importador de menú mostrando lo que se va a dar de alta antes de confirmar."
                width="1600" height="1000" loading="lazy" decoding="async">
         </div>
@@ -568,6 +632,24 @@
   </section>
 
   <!-- ═══ 9 · Cierre ═════════════════════════════════════════════════════ -->
+  <!-- ═══ Lo que no hace ═════════════════════════════════════════════════
+       /nosotros dice que los límites están escritos en esta página. Aquí están. -->
+  <section class="seccion destacada-suave" id="limites">
+    <div class="contenedor pila pila-6">
+      <div class="pila pila-4">
+        <p class="eyebrow">Los límites</p>
+        <h2>Lo que VIM POS no hace</h2>
+      </div>
+      <ul class="lista-legal">
+        <li><strong>No hay app de mesero en tableta.</strong> El comedor se opera desde la caja.</li>
+        <li><strong>No cobra tarjetas.</strong> La tarjeta se cobra en tu terminal bancaria y en la caja se registra como forma de pago.</li>
+        <li><strong>La liquidación de las apps se pega a mano.</strong> Todavía no se sube el archivo.</li>
+        <li><strong>DiDi y Rappi no entran solos a la caja.</strong> Hoy solo Uber Eats.</li>
+        <li><strong>No vendemos equipo.</strong> Te decimos qué comprar y lo compras donde te salga mejor.</li>
+      </ul>
+    </div>
+  </section>
+
   <section class="seccion">
     <div class="contenedor">
       <div class="cierre pila pila-5" style="align-items:center">
@@ -590,7 +672,7 @@
     <div class="pie-rejilla">
       <div class="pila pila-3">
         <span class="nav-logo" style="pointer-events:none">
-          <img src="assets/img/logo.svg" alt="" width="30" height="30" aria-hidden="true">
+          <img src="/assets/img/logo.svg" alt="" width="30" height="30" aria-hidden="true">
           <span>VIM POS</span>
         </span>
         <p style="font-size:var(--t-15)">
@@ -605,6 +687,7 @@
           <li><a href="/sin-internet">Sin internet</a></li>
           <li><a href="/facturacion-cfdi">Facturación CFDI</a></li>
           <li><a href="/precios">Precios</a></li>
+          <li><a href="/novedades">Novedades</a></li>
           <li><a href="/demo">Pide una demo</a></li>
         </ul>
       </div>
@@ -613,6 +696,7 @@
         <ul class="pie-lista">
           <li><a href="/como-elegir-sistema-restaurante">Cómo elegir sistema</a></li>
           <li><a href="/cuanto-cuesta-un-sistema-para-restaurante">Cuánto cuesta</a></li>
+          <li><a href="/factura-global-restaurantes">Factura global</a></li>
           <li><a href="/nosotros">Nosotros</a></li>
         </ul>
       </div>
@@ -635,7 +719,7 @@
   </div>
 </footer>
 
-<script src="assets/js/vim.js?v=15" defer></script>
+<script src="/assets/js/vim.js?v=15" defer></script>
 <!-- Medición sin cookies (Vercel Web Analytics). Se sirve desde este dominio y
      solo existe si está encendida en el proyecto de Vercel; si no, es un 404
      inofensivo. Los eventos se mandan desde vim.js. -->

@@ -27,28 +27,29 @@
      busca — competirían entre ellas por el ancho de banda y ninguna llegaría
      antes. Cada archivo es una fuente VARIABLE, así que precargarlo cubre todos
      los pesos de su familia: no hay un archivo por peso que precargar. -->
-<link rel="preload" href="assets/fonts/sora-var-latin.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="preload" href="assets/fonts/inter-tight-var-latin.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="stylesheet" href="assets/css/fuentes.css?v=11">
+<link rel="preload" href="/assets/fonts/sora-var-latin.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="/assets/fonts/inter-tight-var-latin.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="/assets/css/fuentes.css?v=11">
 
-<link rel="icon" href="assets/img/logo.svg" type="image/svg+xml">
-<link rel="apple-touch-icon" href="assets/img/apple-touch-icon-1024.png">
-<link rel="manifest" href="site.webmanifest">
+<link rel="icon" href="/favicon.ico" sizes="48x48">
+<link rel="icon" href="/assets/img/logo.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="/assets/img/apple-touch-icon-1024.png">
+<link rel="manifest" href="/site.webmanifest">
 <meta name="theme-color" content="#0078C9">
 
-<link rel="stylesheet" href="assets/css/vim.css?v=20">
+<link rel="stylesheet" href="/assets/css/vim.css?v=22">
 <!-- Consentimiento de cookies. Va ANTES que gtm.js y el orden NO es
      cosmético: los dos llevan `defer`, que respeta el orden del documento, y
      Consent Mode descarta un estado por defecto que llegue después de que el
      contenedor haya cargado. Invertir estas dos líneas hace que Google
      Analytics mida la primera visita con los ajustes de fábrica. -->
-<script src="assets/js/consentimiento.js?v=1" defer></script>
+<script src="/assets/js/consentimiento.js?v=1" defer></script>
 <!-- Google Tag Manager (contenedor GTM-PRTJDNQ2). El fragmento en línea que da
      Google no cabe aquí: la política de seguridad del sitio prohíbe los scripts
      en línea, y uno bloqueado no avisa — la analítica parecería instalada y no
      mediría nada. Por eso vive en un archivo propio, servido desde este mismo
      dominio. El razonamiento entero está dentro de ese archivo. -->
-<script src="assets/js/gtm.js?v=1" defer></script>
+<script src="/assets/js/gtm.js?v=1" defer></script>
 </head>
 <body>
 
@@ -58,7 +59,7 @@
   <div class="contenedor">
     <div class="nav-fila">
       <a href="/" class="nav-logo" aria-label="VIM POS, inicio">
-        <img src="assets/img/logo.svg" alt="" width="30" height="30" aria-hidden="true">
+        <img src="/assets/img/logo.svg" alt="" width="30" height="30" aria-hidden="true">
         <span>VIM POS</span>
       </a>
       <nav class="nav-enlaces" aria-label="Principal">
@@ -123,8 +124,7 @@
       <p class="eyebrow">Guía de compra</p>
       <h1>Cómo elegir el sistema para tu restaurante</h1>
       <p class="entradilla">
-        Nueve preguntas que conviene hacerle a cualquier proveedor antes de firmar, y por qué cada
-        una importa. Sirven igual si acabas contratando a otro — de hecho, para eso están.
+        Nueve preguntas para hacerle a cualquier proveedor antes de firmar. Sirven igual si contratas a otro.
       </p>
       <p style="font-size:var(--t-15);color:var(--ink-2)">
         Al final está la parte que casi nadie escribe: en qué casos <strong>VIM POS no es la
@@ -179,7 +179,7 @@
           <div class="monitor-barra" aria-hidden="true">
             <span class="monitor-punto"></span><span class="monitor-punto"></span><span class="monitor-punto"></span>
           </div>
-          <img src="assets/img/capturas/pos-sin-conexion.webp?v=3"
+          <img src="/assets/img/capturas/pos-sin-conexion.webp?v=3"
                alt="La caja con el aviso de que no hay conexión, con el ticket y el catálogo funcionando igual."
                width="1600" height="1000" loading="lazy" decoding="async">
         </div>
@@ -190,7 +190,8 @@
           <h3>2 · ¿El precio está publicado?</h3>
           <p>
             Si hay que pedir cotización, el precio depende de lo que el vendedor calcule que puedes
-            pagar. No es ilegal ni raro, pero conviene saberlo. Un precio publicado también es un
+            pagar. No es ilegal ni raro, pero conviene saberlo: las tres formas de cobrar están en
+            <a href="/cuanto-cuesta-un-sistema-para-restaurante">cuánto cuesta un sistema para restaurante</a>. Un precio publicado también es un
             precio que no te pueden subir en la renovación sin que te enteres.
           </p>
         </div>
@@ -333,7 +334,7 @@
     <div class="pie-rejilla">
       <div class="pila pila-3">
         <span class="nav-logo" style="pointer-events:none">
-          <img src="assets/img/logo.svg" alt="" width="30" height="30" aria-hidden="true">
+          <img src="/assets/img/logo.svg" alt="" width="30" height="30" aria-hidden="true">
           <span>VIM POS</span>
         </span>
         <p style="font-size:var(--t-15)">
@@ -349,6 +350,7 @@
           <li><a href="/sin-internet">Sin internet</a></li>
           <li><a href="/facturacion-cfdi">Facturación CFDI</a></li>
           <li><a href="/precios">Precios</a></li>
+          <li><a href="/novedades">Novedades</a></li>
           <li><a href="/demo">Pide una demo</a></li>
         </ul>
       </div>
@@ -358,6 +360,7 @@
         <ul class="pie-lista">
           <li><a href="/como-elegir-sistema-restaurante">Cómo elegir sistema</a></li>
           <li><a href="/cuanto-cuesta-un-sistema-para-restaurante">Cuánto cuesta</a></li>
+          <li><a href="/factura-global-restaurantes">Factura global</a></li>
           <li><a href="/nosotros">Nosotros</a></li>
         </ul>
       </div>
@@ -381,7 +384,7 @@
   </div>
 </footer>
 
-<script src="assets/js/vim.js?v=15" defer></script>
+<script src="/assets/js/vim.js?v=15" defer></script>
 <!-- Medición sin cookies (Vercel Web Analytics). Se sirve desde este dominio y
      solo existe si está encendida en el proyecto de Vercel; si no, es un 404
      inofensivo. Los eventos se mandan desde vim.js. -->

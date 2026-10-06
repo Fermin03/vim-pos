@@ -33,7 +33,8 @@ por vertical, la matriz de permisos, CFDI, impresión. Lo que envejeció está l
 - **Vas a dar de alta a un cliente** (de "dijo que sí" a la primera venta, cobro, add-ons,
   suspender, dar de baja): [`operacion/alta-de-cliente.md`](operacion/alta-de-cliente.md).
   `operacion/go-live.md` es histórico.
-- **Vas a publicar:** `operacion/` y `../desktop/RUNBOOK.md`.
+- **Vas a publicar:** `operacion/` y `../desktop/RUNBOOK.md`. Qué número lleva la versión, qué día
+  sale y cómo se escribe su nota: [`operacion/actualizaciones.md`](operacion/actualizaciones.md).
 - **Algo no cuadra con la especificación:** `decisiones/`. Probablemente ya está explicado.
 
 ## Escribir un ADR
