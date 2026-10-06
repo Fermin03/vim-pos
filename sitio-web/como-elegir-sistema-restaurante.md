@@ -30,9 +30,9 @@ Cómo comprobarlo: en la demo, pide que le quiten el internet a la computadora y
 
 _Así se ve la pregunta 1 respondida en la caja de VIM POS: el aviso de que no hay internet, y el ticket y el catálogo funcionando igual. Pide esta misma pantalla en cualquier demo._
 
-### 2 · ¿El precio está publicado?
+### 2 · ¿Te dicen el precio de frente?
 
-Si hay que pedir cotización, el precio depende de lo que el vendedor calcule que puedes pagar. No es ilegal ni raro, pero conviene saberlo: las tres formas de cobrar están en [cuánto cuesta un sistema para restaurante](https://vimpos.com.mx/cuanto-cuesta-un-sistema-para-restaurante). Un precio publicado también es un precio que no te pueden subir en la renovación sin que te enteres.
+Si hay que pedir cotización, el precio depende de lo que el vendedor calcule que puedes pagar. No es ilegal ni raro, pero conviene saberlo: las tres formas de cobrar están en [cuánto cuesta un sistema para restaurante](https://vimpos.com.mx/cuanto-cuesta-un-sistema-para-restaurante). Un precio a la vista también es un precio que no te pueden subir en la renovación sin que te enteres.
 
 ### 3 · ¿Me cobran comisión por cada venta?
 
@@ -88,7 +88,7 @@ Media hora con tus productos y tus precios cargados. Puedes traer esta lista y h
 
 [Pide una demo](https://vimpos.com.mx/demo)
 
-[Ver los precios publicados](https://vimpos.com.mx/precios)
+[Ver los precios](https://vimpos.com.mx/precios)
 
 ---
 

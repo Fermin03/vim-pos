@@ -16,7 +16,7 @@ Desde **$699 al mes**, más IVA · sin contrato forzoso · [ver los tres planes]
 
 Todo tu sistema vive en tu caja, no en internet
 
-Imprime en impresoras térmicas de tickets conectadas a tu red
+Imprime en impresoras térmicas de tickets, de red o de USB
 
 El corte de caja cuadra contra lo que hay en el cajón
 
@@ -136,7 +136,7 @@ Bebidas en la barra, comida en cocina, cada una en su impresora. Es lo mismo que
 
 _Precios_
 
-## Precio de lista, publicado
+## Precio de lista, sin cotización
 
 Mensual, en pesos, más IVA. Sin cotización ni «contáctanos para conocer el precio».
 
