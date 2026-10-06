@@ -8,14 +8,17 @@ ADR 0013.
 
 - **D20:** `clientes` es una tabla simple, sin lealtad ni puntos; "CRM Pro" sería un add-on de $399
   que extendería el esquema cuando se contratara.
-- **ADR 0004:** la sincronización replica una lista explícita de tablas, disjunta: la operación
-  sube, el catálogo baja. `clientes` solo subía (0117).
+- **ADR 0004:** la sincronización replica una lista **explícita** de tablas; ampliarla cuesta una
+  migración a propósito. **ADR 0013** describe esa lista como disjunta hasta entonces: la operación
+  sube, el catálogo baja. Que `clientes` solo subía viene de la migración 0117.
 
 ## Qué hacemos ahora (migración 0156)
 
 1. **Un libro que solo se agrega.** `lealtad_movimientos` registra lo ganado, lo canjeado, las
-   reversas, los ajustes y los vencimientos. El saldo (`lealtad_saldos`) se deriva de él y lo
-   escribe una sola función, `lealtad_registrar_movimiento`, idempotente por id.
+   reversas, los ajustes y los vencimientos. El saldo (`lealtad_saldos`) se deriva de él. Los puntos
+   solo se mueven a través de una función, `lealtad_registrar_movimiento`, idempotente por id; el
+   reinicio por cambio de mecánica y el recálculo de la fecha de vencimiento escriben el saldo
+   directamente.
 2. **Ganar corre donde se cobra.** Un trigger en `tickets` escribe el movimiento al quedar pagado:
    en la caja para la caja, en la nube para el POS web. Los tickets de una caja entran a la nube en
    modo réplica, así que allá el trigger no corre y lo ganado llega como movimiento por el push.
@@ -25,7 +28,7 @@ ADR 0013.
 3. **Canjear lo autoriza solo la nube.** La Edge Function `lealtad-canje` bloquea el saldo, valida y
    descuenta. Sin internet no hay canje. El POS llama igual en web y en caja; en la caja el gateway
    reenvía con el token del dispositivo y asienta el canje en el ticket local con los datos que
-   devuelve la nube, nunca con los del navegador. En la caja solo canjea una sesión de **empleado**,
+   devuelve la nube; del navegador solo se toman el ticket y el renglón. En la caja solo canjea una sesión de **empleado**,
    no la cuenta del dispositivo.
 4. **Un canje nace atado a UNA cuenta y a UNA caja.** `canjear` exige el id del ticket y la nube lo
    guarda en el movimiento junto con la caja. Al asentar, la nube se niega a pegarlo a otra cuenta,
@@ -33,19 +36,19 @@ ADR 0013.
 5. **El canje es un descuento, no una forma de pago.** Vive en `ticket_canjes_lealtad` y en
    `tickets.lealtad_mxn`. Un premio de producto entra como renglón propio, de una pieza, a su precio
    y con el descuento completo. El renglón debe ser del mismo producto que el premio, no ser parte
-   de un combo, no ser un cargo y valer más de cero; en esta entrega un combo no puede ser premio.
-   Cancelar o borrar el renglón premiado devuelve los puntos, y solo mientras la cuenta sigue abierta.
+   de un combo, no ser un cargo y valer más de cero. Hoy un premio que sea combo no se puede canjear (`RENGLON_NO_ES_PREMIO`), pero
+   nada impide darlo de alta: el admin (1C) no debe ofrecerlo. Cancelar o borrar el renglón premiado devuelve los puntos, y solo mientras la cuenta sigue abierta.
 6. **Los totales solo se recalculan en una cuenta abierta.** Cuando un canje cambia, se recalcula el
    ticket únicamente si está en `BORRADOR` o `ABIERTO`. Un ticket cancelado conserva los totales con
    los que se vendió; la reversa queda en el libro de movimientos, no en el ticket.
 7. **Los clientes bajan a la caja** junto con el programa, los premios y los saldos. La caja
    muestra saldo de la nube + lo suyo que aún no sube.
-8. **El teléfono es la identidad y la nube decide.** Se compara por dígitos en todas partes (la
-   fusión de la nube, la resolución del cliente al canjear y la fusión de la caja). Cuando una caja
+8. **El teléfono es la identidad y la nube decide.** Se compara por dígitos en la fusión de la
+   nube, en la resolución del cliente al canjear y en la fusión de la caja. Cuando una caja
    sube un cliente cuyo id la nube no conoce y cuyo teléfono ya existe en un cliente vivo del mismo
    negocio, se anota en `clientes_alias` y la nube redirige a ese cliente real lo que ya tenía
    guardado bajo el id viejo (tickets, direcciones, devoluciones, promociones aplicadas y canjes),
-   aislado para que un fallo nunca aborte el push. Si el cliente real se borra, el alias se elimina.
+   aislado para que un fallo no aborte el push. Si el cliente real se borra, el alias se elimina.
    En la caja, un duplicado local es por definición un id que la nube NO manda; la fusión y el
    upsert de cada cliente ocurren en un solo savepoint, cada cliente se aplica aislado para que una
    fila mala no deshaga el pull, y la dirección principal se degrada si el cliente real ya tiene una.
@@ -56,11 +59,15 @@ ADR 0013.
     los saldos en cero (con un ajuste en el libro por cada saldo); un movimiento de una versión
     anterior se registra y no suma.
 11. **Dos capas, como delivery:** add-on `LEALTAD` ($100) e interruptor
-    `configuracion_tenant.modulo_lealtad_activo`, que enciende el dueño. Retirar el add-on apaga el
-    interruptor. La migración marca los planes con `lealtad_incluido` (todos menos Esencial); quien
+    `configuracion_tenant.modulo_lealtad_activo`, que enciende el dueño o un administrador. El
+    interruptor se apaga por sí solo únicamente cuando un `UPDATE` desactiva el add-on y el negocio se queda sin
+    ningún add-on `LEALTAD` vigente; no se apaga si se borra la fila ni cuando un add-on simplemente
+    llega a su fecha de fin. Mientras el add-on no esté vigente el módulo no es efectivo de todos
+    modos, porque `modulos_efectivos` exige las dos capas. La migración marca los planes con `lealtad_incluido` (todos menos Esencial); quien
     concede el add-on a los planes que lo incluyen es `_sincronizar_addons_del_plan`, que es del
     plan 1C.
-12. **El proceso diario** vence saldos y devuelve canjes que nunca llegaron a una cuenta pagada. Cada
+12. **El proceso diario** vence saldos y devuelve todo canje de más de 48 horas cuyo ticket no esté `PAGADO` ni `FACTURADO` en la
+    nube (incluida una cuenta que sigue abierta). Cada
     fila va aislada (un fallo se cuenta y se avisa, el resto sigue), vence en hora de la Ciudad de
     México y no vence nada mientras el módulo está apagado.
 
@@ -69,8 +76,9 @@ ADR 0013.
 - Replicar saldos entre cajas los pisaría; los movimientos suman en cualquier orden y reintentar
   no duplica. Es el mismo argumento del ADR 0013 y ya está probado en producción con inventario.
 - Con saldo único por negocio, canjear sin conexión permite gastar el mismo saldo en dos
-  sucursales. Una sola autoridad lo impide sin saldos negativos. Fermín eligió esto sobre el canje
-  sin conexión el 5 oct 2026.
+  sucursales. Una sola autoridad lo impide: un canje nunca deja el saldo en negativo. El saldo
+  negativo solo puede aparecer por una reversa automática o por el cobro de un canje tardío (ver
+  Consecuencias). Fermín eligió esto sobre el canje sin conexión el 5 oct 2026 (spec de diseño, §3).
 - "Monedero electrónico" como forma de pago en el CFDI exige ser emisor autorizado por el SAT;
   como descuento no cambia nada de lo que ya se timbra.
 - **Por qué el premio de producto vive en `ticket_items.promocion_item_mxn`.** No porque el timbrado
@@ -79,7 +87,7 @@ ADR 0013.
   una columna `NOT NULL` nueva a `ticket_items` rompería el push de las cajas que todavía no se han
   actualizado.
 - La caja solo puede saber si el módulo está encendido por `configuracion_tenant`, porque
-  `tenant_addons` no baja. Por eso retirar el add-on apaga el interruptor en vez de dejar dos
+  `tenant_addons` no baja. Por eso apagar el interruptor al desactivar el add-on (en los casos de arriba) evita dejar dos
   hechos que podrían contradecirse.
 - No se reutilizó el código `CRM_PRO`: nunca se sembró, y ese nombre prometía segmentación.
 - Una venta, una cancelación o una devolución no se caen por la lealtad: los triggers atrapan el
@@ -136,7 +144,7 @@ ADR 0013.
   pueden existir dos clientes escritos con distinto formato.
 - «Editar renglón» (0119) cancela el renglón viejo: sobre un renglón premiado quita el premio y
   devuelve los puntos sin avisar.
-- El admin no debe ofrecer combos como premio.
+- El admin no debe ofrecer combos como premio (el alta no lo impide; solo falla al canjear).
 - `_sincronizar_addons_del_plan` y su espejo en TS (ver arriba, punto 11).
 - Los consumidores de solo lectura de los descuentos del ticket: corte, ticket impreso y reportes.
 
@@ -144,7 +152,9 @@ ADR 0013.
 
 - La Edge Function `lealtad-canje` y el manejador del gateway **no se han ejecutado de punta a
   punta**: solo se probaron sus módulos de lógica. Las pruebas pgTAP y el horario de `pg_cron` tampoco
-  se han corrido. Los cuatro se ejercitan en el CI y al desplegar.
+  se han corrido. Solo pgTAP corre en el CI, al abrir el PR; la Edge Function, el manejador del gateway y la
+  programación diaria se ejercitan por primera vez al desplegar y en la prueba manual de la entrega,
+  antes de usarlos con un negocio real.
 - Dos casos de concurrencia no tienen prueba porque piden dos transacciones reales: un reintento
   simultáneo del mismo canje, y dos cuentas disputándose un mismo canje.
 - Un token de dispositivo robado puede atribuir canjes a cualquier empleado activo de ese negocio.
