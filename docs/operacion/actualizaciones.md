@@ -139,6 +139,24 @@ del panel que salieron esa semana van en la misma entrada o en una propia.
 - Después: `pnpm sitio:generar`, `pnpm test:sitio`. La página lleva `noindex` y no va en el sitemap; solo se
   actualiza `dateModified` en el JSON-LD de la página.
 
+### Una función nueva también va en `/funciones`
+
+`/novedades` lleva `noindex`: los buscadores y los asistentes no la leen. Si la versión trae una
+**función nueva** (lo que va bajo «Nuevo»), se añade además a `sitio-web/funciones.html`, que es la
+página que sí se indexa, y se revisa que la portada y `/precios` no digan lo contrario.
+
+El 5 de octubre de 2026 la portada y `/precios` seguían diciendo que las impresoras de USB no
+funcionaban con la caja, tres días después de publicarse la 0.4.105, y `/funciones` no mencionaba
+combos, repartidores, zonas de envío, Uber Eats ni la pantalla del cliente. Lo encontró una
+auditoría, no nosotros.
+
+- Si la función cambia un límite escrito (lo que el sistema «no hace»), se quita de la sección
+  «Lo que VIM POS no hace» de `/funciones` y de las notas de `_agentes/generar.mjs`, que es de
+  donde salen `llms.txt` y `agents.md`.
+- Se sube el `lastmod` de la página en `sitemap.xml`.
+- Tras desplegar: `pnpm sitio:indexnow`, que avisa a Bing y a los que comparten su índice. Google
+  no participa; para Google, Search Console.
+
 ## Pendiente de decidir
 
 - **Canal piloto:** que una caja reciba la versión antes que el resto. Hoy hay un solo
