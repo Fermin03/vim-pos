@@ -65,6 +65,21 @@
       "permanent": true
     },
     {
+      "source": "/factura-global-restaurantes.html",
+      "destination": "/factura-global-restaurantes",
+      "permanent": true
+    },
+    {
+      "source": "/punto-de-venta-hamburgueserias.html",
+      "destination": "/punto-de-venta-hamburgueserias",
+      "permanent": true
+    },
+    {
+      "source": "/punto-de-venta-restaurantes-leon.html",
+      "destination": "/punto-de-venta-restaurantes-leon",
+      "permanent": true
+    },
+    {
       "source": "/nosotros.html",
       "destination": "/nosotros",
       "permanent": true
@@ -178,6 +193,39 @@
         }
       ],
       "destination": "/como-elegir-sistema-restaurante.md"
+    },
+    {
+      "source": "/factura-global-restaurantes",
+      "has": [
+        {
+          "type": "header",
+          "key": "accept",
+          "value": ".*(text/markdown|text/x-markdown).*"
+        }
+      ],
+      "destination": "/factura-global-restaurantes.md"
+    },
+    {
+      "source": "/punto-de-venta-hamburgueserias",
+      "has": [
+        {
+          "type": "header",
+          "key": "accept",
+          "value": ".*(text/markdown|text/x-markdown).*"
+        }
+      ],
+      "destination": "/punto-de-venta-hamburgueserias.md"
+    },
+    {
+      "source": "/punto-de-venta-restaurantes-leon",
+      "has": [
+        {
+          "type": "header",
+          "key": "accept",
+          "value": ".*(text/markdown|text/x-markdown).*"
+        }
+      ],
+      "destination": "/punto-de-venta-restaurantes-leon.md"
     },
     {
       "source": "/nosotros",
@@ -309,6 +357,18 @@
     {
       "source": "/como-elegir-sistema-restaurante",
       "destination": "/como-elegir-sistema-restaurante.html"
+    },
+    {
+      "source": "/factura-global-restaurantes",
+      "destination": "/factura-global-restaurantes.html"
+    },
+    {
+      "source": "/punto-de-venta-hamburgueserias",
+      "destination": "/punto-de-venta-hamburgueserias.html"
+    },
+    {
+      "source": "/punto-de-venta-restaurantes-leon",
+      "destination": "/punto-de-venta-restaurantes-leon.html"
     },
     {
       "source": "/nosotros",
@@ -527,6 +587,57 @@
         {
           "key": "Link",
           "value": "<https://vimpos.com.mx/como-elegir-sistema-restaurante.md>; rel=\"alternate\"; type=\"text/markdown\""
+        }
+      ]
+    },
+    {
+      "source": "/factura-global-restaurantes",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=3600, must-revalidate"
+        },
+        {
+          "key": "Vary",
+          "value": "Accept, Accept-Encoding"
+        },
+        {
+          "key": "Link",
+          "value": "<https://vimpos.com.mx/factura-global-restaurantes.md>; rel=\"alternate\"; type=\"text/markdown\""
+        }
+      ]
+    },
+    {
+      "source": "/punto-de-venta-hamburgueserias",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=3600, must-revalidate"
+        },
+        {
+          "key": "Vary",
+          "value": "Accept, Accept-Encoding"
+        },
+        {
+          "key": "Link",
+          "value": "<https://vimpos.com.mx/punto-de-venta-hamburgueserias.md>; rel=\"alternate\"; type=\"text/markdown\""
+        }
+      ]
+    },
+    {
+      "source": "/punto-de-venta-restaurantes-leon",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=3600, must-revalidate"
+        },
+        {
+          "key": "Vary",
+          "value": "Accept, Accept-Encoding"
+        },
+        {
+          "key": "Link",
+          "value": "<https://vimpos.com.mx/punto-de-venta-restaurantes-leon.md>; rel=\"alternate\"; type=\"text/markdown\""
         }
       ]
     },
@@ -833,6 +944,57 @@
         {
           "key": "Link",
           "value": "<https://vimpos.com.mx/como-elegir-sistema-restaurante>; rel=\"canonical\""
+        }
+      ]
+    },
+    {
+      "source": "/factura-global-restaurantes.md",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=3600, must-revalidate"
+        },
+        {
+          "key": "Vary",
+          "value": "Accept, Accept-Encoding"
+        },
+        {
+          "key": "Link",
+          "value": "<https://vimpos.com.mx/factura-global-restaurantes>; rel=\"canonical\""
+        }
+      ]
+    },
+    {
+      "source": "/punto-de-venta-hamburgueserias.md",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=3600, must-revalidate"
+        },
+        {
+          "key": "Vary",
+          "value": "Accept, Accept-Encoding"
+        },
+        {
+          "key": "Link",
+          "value": "<https://vimpos.com.mx/punto-de-venta-hamburgueserias>; rel=\"canonical\""
+        }
+      ]
+    },
+    {
+      "source": "/punto-de-venta-restaurantes-leon.md",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=3600, must-revalidate"
+        },
+        {
+          "key": "Vary",
+          "value": "Accept, Accept-Encoding"
+        },
+        {
+          "key": "Link",
+          "value": "<https://vimpos.com.mx/punto-de-venta-restaurantes-leon>; rel=\"canonical\""
         }
       ]
     },

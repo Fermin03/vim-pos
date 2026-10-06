@@ -2,7 +2,7 @@
 
 > VIM POS es un sistema de punto de venta para restaurantes en México. El programa completo se instala en la computadora de la caja, así que cobrar, imprimir tickets y mandar comandas a cocina funcionan sin conexión a internet; la nube sirve de respaldo y de panel para el dueño. Incluye caja, pantalla de cocina, mapa de mesas, inventario, reportes y facturación electrónica CFDI 4.0. Precio publicado desde $699 MXN al mes más IVA, sin pago inicial; desde el plan Negocio, VIM carga el menú y capacita al equipo, y en Esencial el dueño arranca con una guía paso a paso.
 
-Este archivo concatena las 13 páginas de https://vimpos.com.mx en Markdown. Es el
+Este archivo concatena las 16 páginas de https://vimpos.com.mx en Markdown. Es el
 contexto completo del producto en una sola descarga. El índice corto, con la guía de
 cuándo recomendarlo, está en https://vimpos.com.mx/llms.txt
 
@@ -10,7 +10,7 @@ cuándo recomendarlo, está en https://vimpos.com.mx/llms.txt
 
 <!-- https://vimpos.com.mx/ -->
 
-# El punto de venta para restaurantes que sigue cobrando sin internet
+# Punto de venta para restaurantes, sin letra chica
 
 > Caja, cocina, mesas, inventario y facturación CFDI en un solo sistema. Desde $699 al mes, sin pago inicial, y cobra sin internet. Hecho en León, Gto.
 
@@ -100,7 +100,7 @@ El sistema se configura según tu giro: cambian los modos de servicio, las panta
 
 ### Comida rápida o de mostrador
 
-Mostrador y pickup. Cola rápida, comanda directa a cocina y modos de servicio para separar lo que se come aquí de lo que se lleva.
+Mostrador y pickup. Cola rápida, comanda directa a cocina y modos de servicio para separar lo que se come aquí de lo que se lleva. Así se ve en una [hamburguesería](https://vimpos.com.mx/punto-de-venta-hamburgueserias).
 
 ### Food truck
 
@@ -620,7 +620,7 @@ Cada ticket que pida factura se timbra con su CFDI 4.0 y llega por correo. Sin q
 
 ### La factura global, con un botón
 
-Lo que nadie facturó se junta en una sola factura por cada periodo que tú elijas: diario, semanal, quincenal o mensual. Cuando el periodo cierra, la emites tú con un botón desde tu panel, en Facturación: el sistema ya sumó las ventas, y te avisa si se te queda un periodo sin emitir.
+Lo que nadie facturó se junta en una sola factura por cada periodo que tú elijas (qué es y qué lleva está en la [guía de la factura global](https://vimpos.com.mx/factura-global-restaurantes)): diario, semanal, quincenal o mensual. Cuando el periodo cierra, la emites tú con un botón desde tu panel, en Facturación: el sistema ya sumó las ventas, y te avisa si se te queda un periodo sin emitir.
 
 ### Autofacturación por QR
 
@@ -1315,6 +1315,268 @@ Media hora con tus productos y tus precios cargados. Puedes traer esta lista y h
 
 ---
 
+<!-- https://vimpos.com.mx/factura-global-restaurantes -->
+
+# Factura global para restaurantes: qué es y cómo se emite
+
+> Qué es la factura global, cada cuándo se emite, qué datos lleva en CFDI 4.0 y los errores más comunes en un restaurante. Guía en lenguaje llano.
+
+**VIM POS** · punto de venta para restaurantes en México · versión en HTML: https://vimpos.com.mx/factura-global-restaurantes
+
+El comprobante que ampara las ventas por las que nadie pidió factura. Qué lleva, cada cuándo se emite y en qué se equivoca la mayoría.
+
+Actualizado el 5 de octubre de 2026. Es una guía, no asesoría fiscal: confirma tu caso con tu contador.
+
+[Pide una demo](https://vimpos.com.mx/demo)
+
+[Ver precios](https://vimpos.com.mx/precios)
+
+_Lo básico_
+
+## Qué es la factura global
+
+La mayoría de tus clientes paga y se va sin pedir factura. Esas ventas también se declaran, y el SAT pide ampararlas con un solo CFDI a nombre del público en general: la factura global.
+
+No sustituye a las facturas que sí te piden. Cada ticket va en una de las dos: o lo facturó el cliente, o entra en la global. Nunca en ambas.
+
+_El comprobante_
+
+## Qué datos lleva en CFDI 4.0
+
+- **RFC del receptor:** el genérico de público en general, no el de un cliente.
+- **Nombre:** PUBLICO EN GENERAL.
+- **Régimen fiscal del receptor:** 616, «Sin obligaciones fiscales».
+- **Uso del CFDI:** S01, «Sin efectos fiscales».
+- **Código postal del receptor:** el mismo del lugar de expedición.
+- **El periodo:** la periodicidad, el mes y el año que ampara.
+- **Los tickets:** un concepto por cada venta, con su folio y su importe.
+
+Tú no tecleas nada de esto si tu sistema lo arma solo. Sirve conocerlo para revisar que salió bien.
+
+_El periodo_
+
+## Cada cuándo se emite
+
+Puede ser diaria, semanal, quincenal o mensual: lo eliges tú. Mientras más corto el periodo, más facturas emites y menos tiempo tiene tu cliente para pedir la suya.
+
+La regla del SAT pide emitirla poco después de cerrar el periodo —la referencia habitual es dentro de las 24 horas siguientes—. Las reglas se publican cada año: confirma el plazo vigente con tu contador.
+
+_Los errores_
+
+## En qué se equivoca la mayoría
+
+### Facturar dos veces
+
+Meter en la global un ticket que el cliente ya facturó. La misma venta queda declarada dos veces.
+
+### Dejar el plazo abierto
+
+Si el cliente puede pedir factura después de emitida la global, hay que cancelar y rehacer. El plazo para pedirla debe cerrar con el periodo.
+
+### Olvidarla
+
+El periodo cerró, nadie la emitió y se nota hasta la declaración.
+
+_En VIM POS_
+
+## Cómo se emite desde el sistema
+
+El ticket trae un código: el cliente que quiere factura lo escanea y se factura solo. Al cerrar el periodo, el sistema ya sumó lo que nadie facturó y tú emites la global con un botón. Si se te queda un periodo sin emitir, te avisa.
+
+El detalle, con lo que hay que dar para encenderla, está en [facturación CFDI 4.0](https://vimpos.com.mx/facturacion-cfdi); lo que cuesta, en [precios](https://vimpos.com.mx/precios).
+
+![Ticket impreso de una venta con el código QR para facturar al pie: negocio, folio, cajero, el producto con su modificador, subtotal, IVA, total y cambio.](https://vimpos.com.mx/assets/img/capturas/ticket-venta.webp?v=3)
+
+_El código del ticket: quien quiere factura la saca solo, y lo demás entra en la global._
+
+_Preguntas_
+
+## Preguntas frecuentes sobre la factura global
+
+### ¿Tengo que emitirla aunque nadie me pida factura?
+
+Sí. Justamente ampara las ventas por las que nadie la pidió.
+
+### ¿Puedo hacerla mensual?
+
+Sí, es una de las periodicidades permitidas. Tu contador te dirá cuál conviene a tu régimen.
+
+### ¿Qué pasa si un cliente pide factura de un ticket que ya entró en la global?
+
+Ese ticket ya está facturado. Por eso conviene que el plazo para pedir factura termine cuando cierras el periodo.
+
+### ¿Gasta un folio?
+
+En VIM POS, sí: la global usa un folio, igual que la factura de un cliente. Cada plan trae folios al mes.
+
+## Mírala emitirse
+
+En la demo cerramos un periodo y emitimos la global con tus datos de prueba.
+
+[Pide una demo](https://vimpos.com.mx/demo)
+
+[Cómo funciona la facturación](https://vimpos.com.mx/facturacion-cfdi)
+
+---
+
+<!-- https://vimpos.com.mx/punto-de-venta-hamburgueserias -->
+
+# Punto de venta para hamburgueserías
+
+> El término de la carne, los extras, los combos y el pedido para llevar en una sola caja. Para hamburgueserías, desde $699 al mes más IVA.
+
+**VIM POS** · punto de venta para restaurantes en México · versión en HTML: https://vimpos.com.mx/punto-de-venta-hamburgueserias
+
+El término, los extras, el combo y el pedido para llevar, sin que la fila se detenga.
+
+[Pide una demo](https://vimpos.com.mx/demo)
+
+[Ver precios](https://vimpos.com.mx/precios)
+
+_En la caja_
+
+## La orden sale completa a la primera
+
+![Un producto abierto con sus opciones: el término de la carne y los extras con su precio.](https://vimpos.com.mx/assets/img/capturas/pos-catalogo.webp?v=3)
+
+_Una hamburguesa con su término y sus extras. Sin término elegido, no entra al ticket._
+
+### El término no se olvida
+
+Si la hamburguesa lleva término, la caja no la manda a cocina sin él.
+
+### Extras que se cobran solos
+
+Queso, tocino o aguacate suman su precio a la vista. Y «sin cebolla» llega escrito a la plancha.
+
+### Combos
+
+Hamburguesa, papas y refresco a un solo precio. Cada producto del combo llega a cocina y descuenta su inventario.
+
+_En la cocina_
+
+## La plancha ve lo suyo y la barra lo suyo
+
+![Pantalla de cocina con las comandas activas, cada una con su tiempo, el término de la carne, los extras y las notas.](https://vimpos.com.mx/assets/img/capturas/kds.webp?v=3)
+
+_La pantalla de cocina: cada comanda con su tiempo, el término y los extras. Si prefieres papel, sale por la impresora de cada área._
+
+### Aquí, para llevar o a domicilio
+
+Eliges cómo se va el pedido al empezar. A domicilio sale con repartidor y zona de envío.
+
+### Uber Eats entra a la caja
+
+El pedido llega como un ticket y su comanda sale a cocina. Incluido desde Negocio; el detalle está en [precios](https://vimpos.com.mx/precios).
+
+### Cuánta carne se fue
+
+Con la receta de cada producto, al vender una hamburguesa bajan la carne, el pan y el queso. Desde el plan Negocio.
+
+_Preguntas_
+
+## Lo que pregunta una hamburguesería
+
+### ¿Sirve si solo tengo una caja?
+
+Sí. El plan Esencial es una sucursal y una caja, por $699 al mes más IVA. Los tres planes están en [precios](https://vimpos.com.mx/precios).
+
+### ¿Qué pasa si se cae el internet en hora pico?
+
+Nada: el sistema vive en la computadora de tu caja y sigues cobrando y mandando a cocina. [Así funciona](https://vimpos.com.mx/sin-internet).
+
+### ¿Tengo que capturar todo mi menú?
+
+No. Lo descargas del sistema que usas hoy o de una hoja de cálculo y lo pegas. Desde Negocio lo cargamos nosotros.
+
+## Míralo con tus hamburguesas
+
+Media hora con tus productos, tus extras y tus precios cargados.
+
+[Pide una demo](https://vimpos.com.mx/demo)
+
+[Ver todas las funciones](https://vimpos.com.mx/funciones)
+
+---
+
+<!-- https://vimpos.com.mx/punto-de-venta-restaurantes-leon -->
+
+# Punto de venta para restaurantes en León, Guanajuato
+
+> VIM POS se hace en León. Si tu restaurante está en la zona, la demo es en tu mostrador y con tu menú. Precio publicado desde $699 al mes.
+
+**VIM POS** · punto de venta para restaurantes en México · versión en HTML: https://vimpos.com.mx/punto-de-venta-restaurantes-leon
+
+VIM POS se hace aquí. Si tu restaurante está en León o cerca, la demo puede ser en tu mostrador y con tu menú.
+
+[Pide una demo](https://vimpos.com.mx/demo)
+
+[Ver precios](https://vimpos.com.mx/precios)
+
+_Estar cerca_
+
+## Qué cambia cuando tu proveedor está en tu ciudad
+
+### La demo, en tu local
+
+En la zona de León podemos ir a enseñártelo donde vas a usarlo. Fuera de la zona, la demo es por videollamada.
+
+### Contesta quien lo hace
+
+No hay distribuidores ni centro de llamadas. Escribes y te contestamos el mismo día hábil.
+
+### Arranque acompañado
+
+Desde el plan Negocio cargamos tu menú y capacitamos a tu equipo. En Cadena vamos a tu local el día del arranque.
+
+_El sistema_
+
+## Caja, cocina, mesas, inventario y facturación
+
+Es el mismo sistema para cualquier restaurante de México: lo que cambia en León es que nos tienes a la mano. Todo lo que hace está en [funciones](https://vimpos.com.mx/funciones).
+
+![La caja en plena venta: el catálogo por categorías y un ticket en curso con una hamburguesa, papas y refresco.](https://vimpos.com.mx/assets/img/capturas/pos-home.webp?v=3)
+
+_La caja, tal como la ve quien cobra._
+
+### Cobra sin internet
+
+El sistema vive en la computadora de tu caja. Si se va la señal, sigues cobrando, imprimiendo y mandando a cocina. [Cómo funciona](https://vimpos.com.mx/sin-internet).
+
+### Factura sin parar la fila
+
+Tu cliente escanea el ticket y se factura solo; la factura global sale con un botón. [Facturación CFDI 4.0](https://vimpos.com.mx/facturacion-cfdi).
+
+### Precio publicado
+
+Desde $699 al mes más IVA, sin pago inicial ni contrato forzoso. [Los tres planes](https://vimpos.com.mx/precios).
+
+_Preguntas_
+
+## Lo que nos preguntan en León
+
+### ¿Ya hay restaurantes de León usándolo?
+
+Sí. VIM POS está en operación diaria en un restaurante de León. Es un producto joven y lo decimos tal cual en [quién está detrás](https://vimpos.com.mx/nosotros).
+
+### ¿Atienden fuera de León?
+
+Sí, en toda la República. La demo es por videollamada y el arranque se hace a distancia.
+
+### ¿Venden la computadora y la impresora?
+
+No. Te decimos qué buscar y lo compras donde te salga mejor.
+
+## Te lo enseñamos en tu mostrador
+
+Media hora, con tus productos y tus precios cargados.
+
+[Pide una demo](https://vimpos.com.mx/demo)
+
+[Escríbenos](https://vimpos.com.mx/contacto)
+
+---
+
 <!-- https://vimpos.com.mx/nosotros -->
 
 # Quién está detrás de VIM POS
@@ -1323,7 +1585,7 @@ Media hora con tus productos y tus precios cargados. Puedes traer esta lista y h
 
 **VIM POS** · punto de venta para restaurantes en México · versión en HTML: https://vimpos.com.mx/nosotros
 
-VIM POS es un sistema de punto de venta para restaurantes hecho en León, Guanajuato. Lo instalamos, capacitamos a tu equipo y respondemos por él.
+VIM POS es un sistema de punto de venta para restaurantes hecho en [León, Guanajuato](https://vimpos.com.mx/punto-de-venta-restaurantes-leon). Lo instalamos, capacitamos a tu equipo y respondemos por él.
 
 ## Quién construye VIM POS
 
@@ -1396,7 +1658,7 @@ _El panel que te enseñamos en la demostración: cómo va el día, la venta por 
 
 **Dónde estamos:** Guanajuato, México. No hay tienda ni mostrador al público, así que no publicamos la dirección: si quieres que nos veamos en persona, se agenda antes por correo. El domicilio fiscal completo va en el contrato y se entrega a quien lo pida.
 
-**Zona de servicio:** toda la República Mexicana. La visita presencial el día del arranque va incluida en el plan Cadena; en la zona de León también podemos ir a la demostración.
+**Zona de servicio:** toda la República Mexicana. La visita presencial el día del arranque va incluida en el plan Cadena; en la [zona de León](https://vimpos.com.mx/punto-de-venta-restaurantes-leon) también podemos ir a la demostración.
 
 ## Qué te sirve más según lo que busques
 
