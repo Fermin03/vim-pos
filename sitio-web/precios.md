@@ -1,4 +1,4 @@
-# Precio de lista, publicado
+# Precios de VIM POS: tres planes, publicados
 
 > Tres planes en pesos más IVA: Esencial $699, Negocio $999 y Cadena $1,999 al mes. Sin pago inicial ni contrato forzoso; desde Negocio cargamos tu menú y capacitamos a tu equipo.
 
@@ -223,7 +223,7 @@ _Para que no haya sorpresas_
 
 ### El equipo
 
-Necesitas una computadora con Windows 10 u 11, una impresora térmica de tickets de 80 mm con puerto de red (cable Ethernet o Wi-Fi) y compatible con ESC/POS —por ejemplo, una Epson TM-T20III o TM-m30 en su versión de red; las de USB hoy no funcionan con la caja—, un cajón de dinero y el módem que ya tienes. No vendemos equipo: te decimos exactamente qué buscar y lo compras donde te salga mejor.
+Necesitas una computadora con Windows 10 u 11, una impresora térmica de tickets de 80 mm compatible con ESC/POS —por ejemplo, una Epson TM-T20III o TM-m30; puede ir conectada a tu red (cable Ethernet o Wi-Fi) o por USB, instalada en Windows—, un cajón de dinero y el módem que ya tienes. No vendemos equipo: te decimos exactamente qué buscar y lo compras donde te salga mejor.
 
 ### La terminal del banco
 

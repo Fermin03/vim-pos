@@ -1,10 +1,10 @@
-# Qué hace, sección por sección
+# Qué hace VIM POS: caja, cocina, mesas, inventario y reportes
 
 > Caja, cocina, mesas, inventario, reportes, facturación CFDI y conciliación de apps de reparto. Lo que hace el sistema, sección por sección, con capturas reales.
 
 **VIM POS** · punto de venta para restaurantes en México · versión en HTML: https://vimpos.com.mx/funciones
 
-Todo lo que ves aquí son capturas del sistema funcionando, no dibujos. Y si algo todavía no está, lo dice.
+El punto de venta para restaurantes, sección por sección. Todo lo que ves aquí son capturas del sistema funcionando, no dibujos. Y si algo todavía no está, lo dice.
 
 [Pide una demo](https://vimpos.com.mx/demo)
 
