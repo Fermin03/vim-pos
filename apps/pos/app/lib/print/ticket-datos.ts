@@ -271,6 +271,18 @@ export async function leerTicketParaImpresion(ticketId: string, ctx: Ctx): Promi
     }
   }
 
+  // Lealtad (0158): una cuenta con un premio de producto no admite factura individual, así que su
+  // ticket no invita a pedirla. Si la consulta falla, el QR sale como siempre: el portal lo dirá.
+  let conPremio = false;
+  if (qrActivo) {
+    try {
+      const { data } = await sb.rpc("ticket_lleva_premio", { p_ticket_id: ticketId });
+      conPremio = data === true;
+    } catch {
+      conPremio = false;
+    }
+  }
+
   const { data: ten } = await sb
     .from("tenants")
     .select("codigo, nombre_comercial, razon_social, rfc, logo_url")
@@ -315,7 +327,7 @@ export async function leerTicketParaImpresion(ticketId: string, ctx: Ctx): Promi
     // Dominio .com.mx: el que VIM tiene registrado. Antes decía `factura.vimpos.mx`, sin el
     // `.com`, que es de alguien más — cada ticket impreso habría mandado a los clientes del
     // restaurante a una dirección ajena en cuanto se encendiera el QR.
-    qrUrl: qrActivo ? urlAutofactura(tn.codigo ?? null, (tk.folio_completo as string | null) ?? null, tokenQr) : null,
+    qrUrl: qrActivo && !conPremio ? urlAutofactura(tn.codigo ?? null, (tk.folio_completo as string | null) ?? null, tokenQr) : null,
     lealtad,
     ancho: 80,
   };
