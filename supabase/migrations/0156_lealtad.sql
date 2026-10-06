@@ -128,6 +128,12 @@ CREATE TABLE IF NOT EXISTS clientes_alias (
   tenant_id   uuid NOT NULL REFERENCES tenants(id) ON DELETE RESTRICT,
   created_at  timestamptz NOT NULL DEFAULT now()
 );
+CREATE INDEX IF NOT EXISTS idx_clientes_alias_tenant ON clientes_alias (tenant_id);
+-- La fusión por teléfono y la búsqueda de lealtad comparan por dígitos (el POS guarda el teléfono
+-- solo con trim()): este índice sirve a ambas. No es único a propósito: datos anteriores pueden repetirse.
+CREATE INDEX IF NOT EXISTS idx_clientes_telefono_digitos
+  ON clientes (tenant_id, (regexp_replace(telefono, '\D', '', 'g')))
+  WHERE telefono IS NOT NULL AND deleted_at IS NULL;
 COMMENT ON TABLE clientes_alias IS 'Id que una caja le dio a un cliente cuyo teléfono ya existía en la nube con otro id. La nube redirige a cliente_id todo lo que llegue con alias_id.';
 
 ALTER TABLE tickets ADD COLUMN IF NOT EXISTS lealtad_mxn numeric(12,2) NOT NULL DEFAULT 0 CHECK (lealtad_mxn >= 0);
@@ -436,7 +442,10 @@ RETURNS integer
 LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public, pg_temp
 AS $$
   SELECT COALESCE(SUM(puntos), 0)::integer FROM lealtad_movimientos
-   WHERE ticket_id = p_ticket AND tipo IN ('GANADO', 'REVERSA_GANADO');
+   WHERE ticket_id = p_ticket AND tipo IN ('GANADO', 'REVERSA_GANADO')
+     -- Del negocio del ticket: un movimiento que otro negocio dejó apuntando a este id no cuenta.
+     -- Si el ticket aún no existe aquí, como siempre.
+     AND tenant_id = COALESCE((SELECT t.tenant_id FROM tickets t WHERE t.id = p_ticket), tenant_id);
 $$;
 REVOKE ALL ON FUNCTION lealtad_neto_ganado(uuid) FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION lealtad_neto_ganado(uuid) TO service_role;
@@ -511,7 +520,9 @@ DECLARE
 BEGIN
   IF v_neto <= 0 THEN RETURN 0; END IF;
   SELECT * INTO v_m FROM lealtad_movimientos
-   WHERE ticket_id = p_ticket_id AND tipo = 'GANADO' ORDER BY fecha DESC LIMIT 1;
+   WHERE ticket_id = p_ticket_id AND tipo = 'GANADO'
+     AND tenant_id = COALESCE((SELECT t.tenant_id FROM tickets t WHERE t.id = p_ticket_id), tenant_id)
+   ORDER BY fecha DESC LIMIT 1;
   v_rev := CASE
     WHEN COALESCE(p_fraccion, 1) >= 1 THEN v_neto
     ELSE LEAST(v_neto, ceil(v_m.puntos * GREATEST(p_fraccion, 0))::integer)
@@ -938,7 +949,9 @@ AS $$
     (SELECT a.cliente_id FROM clientes_alias a WHERE a.alias_id = p_cliente_id AND a.tenant_id = p_tenant),
     (SELECT c.id FROM clientes c
       WHERE c.tenant_id = p_tenant AND c.deleted_at IS NULL
-        AND c.telefono = NULLIF(regexp_replace(COALESCE(p_telefono, ''), '\D', '', 'g'), '')
+        AND c.telefono IS NOT NULL
+        AND regexp_replace(c.telefono, '\D', '', 'g') = NULLIF(regexp_replace(COALESCE(p_telefono, ''), '\D', '', 'g'), '')
+      ORDER BY c.created_at, c.id
       LIMIT 1));
 $$;
 
@@ -1452,6 +1465,14 @@ END $$;
 REVOKE ALL ON FUNCTION lealtad_ajustar_saldo(uuid, integer, text) FROM PUBLIC, anon;
 GRANT EXECUTE ON FUNCTION lealtad_ajustar_saldo(uuid, integer, text) TO authenticated, service_role;
 
+-- El motivo con el que la red de seguridad deja escrita su reversa. Vive aquí, en un solo lugar:
+-- el push (_vim_conciliar_canjes) reconoce por él una devolución de la red sin leer texto libre.
+CREATE OR REPLACE FUNCTION lealtad_motivo_red_48h()
+RETURNS text
+LANGUAGE sql IMMUTABLE
+AS $$ SELECT 'El canje no llegó a una cuenta pagada en 48 horas'::text $$;
+GRANT EXECUTE ON FUNCTION lealtad_motivo_red_48h() TO authenticated, service_role;
+
 -- El proceso diario de la nube. Dos trabajos:
 --   1) Vencer los saldos cuya fecha ya pasó, en hora de México. Solo en negocios con el módulo
 --      encendido: mientras está apagado nada vence (spec §5, regla 9).
@@ -1515,7 +1536,7 @@ BEGIN
                         WHERE tc.id = c.id AND t.estado_fiscal IN ('PAGADO', 'FACTURADO'))
   LOOP
     BEGIN
-      IF lealtad_revertir_canje(m.id, m.tenant_id, 'El canje no llegó a una cuenta pagada en 48 horas') THEN
+      IF lealtad_revertir_canje(m.id, m.tenant_id, lealtad_motivo_red_48h()) THEN
         v_rev := v_rev + 1;
       END IF;
     EXCEPTION WHEN OTHERS THEN
@@ -1554,10 +1575,18 @@ END $$;
 -- da por subido) y se redirige al cliente real todo lo que venga con el id viejo, en este push y en
 -- los siguientes hasta que la caja haga pull.
 --
+-- El teléfono se compara por DÍGITOS, como en el resto de la lealtad: el POS lo guarda solo con
+-- trim(), así que "477 000 9901" y "4770009901" son el mismo cliente. Si varios clientes vivos del
+-- negocio comparten dígitos (datos anteriores a la 0156), gana el más antiguo.
+--
 -- Solo se anota alias cuando el id entrante NO lo conoce la nube. Si ya existe como cliente y su
 -- fila editada ahora trae el teléfono de otro, no es un duplicado de otra caja sino una edición que
 -- choca: la fila sigue al aplicador genérico y la restricción única la reporta en _errores, como
 -- siempre. Anotar ahí un alias haría desaparecer a un cliente vivo.
+--
+-- Un alias no sobrevive a su cliente real: si este se borra, el alias se elimina y la fila viva de
+-- la caja entra como un cliente normal (si no, sus puntos irían a un cliente borrado y ella nunca
+-- podría subir el suyo).
 --
 -- Este paso corre ANTES de aplicar nada y lo que lance aborta el push entero, no una fila: por eso
 -- no castea nada que venga de la caja (un id mal formado lo rechaza después el aplicador, aislado).
@@ -1566,26 +1595,59 @@ RETURNS jsonb
 LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp
 AS $$
 DECLARE
-  v_uuid  CONSTANT text := '^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$';
-  v_clave text;
-  v_filas jsonb;
+  v_uuid   CONSTANT text := '^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$';
+  v_clave  text;
+  v_filas  jsonb;
+  v_nuevos jsonb := '[]'::jsonb;
+  v_par    jsonb;
+  v_rol    text;
 BEGIN
+  DELETE FROM clientes_alias a
+   WHERE a.tenant_id = p_tenant
+     AND NOT EXISTS (SELECT 1 FROM clientes c
+                      WHERE c.id = a.cliente_id AND c.tenant_id = p_tenant AND c.deleted_at IS NULL);
+
   IF jsonb_typeof(p_snapshot->'clientes') = 'array' THEN
-    INSERT INTO clientes_alias (alias_id, cliente_id, tenant_id)
-    SELECT DISTINCT ON (f.id) f.id, c.id, p_tenant
-      FROM (SELECT CASE WHEN r->>'id' ~ v_uuid THEN (r->>'id')::uuid END AS id,
-                   NULLIF(r->>'telefono', '') AS telefono
-              FROM jsonb_array_elements(p_snapshot->'clientes') r
-             WHERE lower(r->>'tenant_id') = p_tenant::text
-               AND NULLIF(r->>'deleted_at', '') IS NULL) f
-      JOIN clientes c
-        ON c.tenant_id = p_tenant AND c.deleted_at IS NULL
-       AND c.telefono = f.telefono
-       AND c.id <> f.id
-     WHERE f.id IS NOT NULL
-       AND NOT EXISTS (SELECT 1 FROM clientes x WHERE x.id = f.id)
-     ORDER BY f.id
-    ON CONFLICT (alias_id) DO NOTHING;
+    WITH ins AS (
+      INSERT INTO clientes_alias (alias_id, cliente_id, tenant_id)
+      SELECT DISTINCT ON (f.id) f.id, c.id, p_tenant
+        FROM (SELECT CASE WHEN r->>'id' ~ v_uuid THEN (r->>'id')::uuid END AS id,
+                     NULLIF(regexp_replace(COALESCE(r->>'telefono', ''), '\D', '', 'g'), '') AS digitos
+                FROM jsonb_array_elements(p_snapshot->'clientes') r
+               WHERE lower(r->>'tenant_id') = p_tenant::text
+                 AND NULLIF(r->>'deleted_at', '') IS NULL) f
+        JOIN clientes c
+          ON c.tenant_id = p_tenant AND c.deleted_at IS NULL AND c.telefono IS NOT NULL
+         AND regexp_replace(c.telefono, '\D', '', 'g') = f.digitos
+         AND c.id <> f.id
+       WHERE f.id IS NOT NULL AND f.digitos IS NOT NULL
+         AND NOT EXISTS (SELECT 1 FROM clientes x WHERE x.id = f.id)
+       ORDER BY f.id, c.created_at, c.id
+      ON CONFLICT (alias_id) DO NOTHING
+      RETURNING alias_id, cliente_id)
+    SELECT COALESCE(jsonb_agg(jsonb_build_object('alias', alias_id, 'cliente', cliente_id)), '[]'::jsonb)
+      INTO v_nuevos FROM ins;
+
+    -- Lo que la nube YA tenía guardado con el id del alias (un push anterior lo subió antes de que
+    -- el cliente existiera) pasa al cliente real. En modo réplica: es una corrección de identidad,
+    -- no una operación; no debe disparar los triggers de la venta.
+    IF jsonb_array_length(v_nuevos) > 0 THEN
+      v_rol := current_setting('session_replication_role');
+      PERFORM set_config('session_replication_role', 'replica', true);
+      FOR v_par IN SELECT value FROM jsonb_array_elements(v_nuevos) LOOP
+        UPDATE tickets SET cliente_id = (v_par->>'cliente')::uuid
+         WHERE tenant_id = p_tenant AND cliente_id = (v_par->>'alias')::uuid;
+        UPDATE direcciones_cliente SET cliente_id = (v_par->>'cliente')::uuid
+         WHERE tenant_id = p_tenant AND cliente_id = (v_par->>'alias')::uuid;
+        UPDATE devoluciones SET cliente_id = (v_par->>'cliente')::uuid
+         WHERE tenant_id = p_tenant AND cliente_id = (v_par->>'alias')::uuid;
+        UPDATE ticket_promociones_aplicadas SET cliente_id = (v_par->>'cliente')::uuid
+         WHERE tenant_id = p_tenant AND cliente_id = (v_par->>'alias')::uuid;
+        UPDATE ticket_canjes_lealtad SET cliente_id = (v_par->>'cliente')::uuid
+         WHERE tenant_id = p_tenant AND cliente_id = (v_par->>'alias')::uuid;
+      END LOOP;
+      PERFORM set_config('session_replication_role', v_rol, true);
+    END IF;
 
     SELECT COALESCE(jsonb_agg(r), '[]'::jsonb) INTO v_filas
       FROM jsonb_array_elements(p_snapshot->'clientes') r
@@ -1598,7 +1660,7 @@ BEGIN
     RETURN p_snapshot;
   END IF;
 
-  FOREACH v_clave IN ARRAY ARRAY['tickets', 'direcciones_cliente', 'lealtad_movimientos',
+  FOREACH v_clave IN ARRAY ARRAY['tickets', 'direcciones_cliente', 'devoluciones', 'lealtad_movimientos',
                                  'ticket_canjes_lealtad', 'ticket_promociones_aplicadas'] LOOP
     -- IS DISTINCT FROM: con la tabla ausente typeof es NULL y un <> la dejaría pasar, creando una
     -- clave vacía que taparía a otra (tickets sobre turnos al buscar caja y sucursal del envío).
@@ -1617,16 +1679,21 @@ BEGIN
 END $$;
 REVOKE ALL ON FUNCTION _vim_fusionar_clientes(jsonb, uuid) FROM PUBLIC, anon, authenticated;
 
--- CAJAS SIN ACTUALIZAR. _vim_apply_rows_detalle (0131) inserta TODAS las columnas del destino y
--- deja en NULL las que el JSON no trae. tickets.lealtad_mxn y clientes.codigo_publico son NOT NULL:
--- sin este relleno, en cuanto la 0156 esté en producción cada venta y cada cliente que suba una
--- caja que aún no se actualizó se rechazaría, y esa caja dejaría de subir. Un cliente que ya existe
--- conserva su código (el upsert pisa todas las columnas).
+-- CAJAS SIN ACTUALIZAR, y el código público. _vim_apply_rows_detalle (0131) inserta TODAS las
+-- columnas del destino y deja en NULL las que el JSON no trae. tickets.lealtad_mxn y
+-- clientes.codigo_publico son NOT NULL: sin este relleno, en cuanto la 0156 esté en producción cada
+-- venta y cada cliente que suba una caja que aún no se actualizó se rechazaría, y esa caja dejaría
+-- de subir.
+-- El código público es el enlace/QR del cliente y lo manda la NUBE: la migración también corre en
+-- cada caja, cuyo DEFAULT le da a cada cliente local un código distinto, y el upsert pisa todas las
+-- columnas. Por eso, de un cliente que la nube ya tiene SIEMPRE se impone el código de la nube,
+-- diga lo que diga la caja; solo uno nuevo conserva el que traía (o se le genera uno).
 CREATE OR REPLACE FUNCTION _vim_compat_0156(p_snapshot jsonb, p_tenant uuid)
 RETURNS jsonb
 LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp
 AS $$
 DECLARE
+  v_uuid  CONSTANT text := '^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$';
   v_filas jsonb;
 BEGIN
   IF jsonb_typeof(p_snapshot->'tickets') = 'array' THEN
@@ -1639,13 +1706,16 @@ BEGIN
 
   IF jsonb_typeof(p_snapshot->'clientes') = 'array' THEN
     SELECT COALESCE(jsonb_agg(
-             CASE WHEN r->>'codigo_publico' IS NOT NULL THEN r
-                  ELSE r || jsonb_build_object('codigo_publico', COALESCE(
-                         (SELECT c.codigo_publico FROM clientes c
-                           WHERE c.id::text = lower(r->>'id') AND c.tenant_id = p_tenant),
-                         replace(gen_random_uuid()::text, '-', '') || replace(gen_random_uuid()::text, '-', '')))
+             CASE WHEN e.codigo IS NOT NULL THEN r || jsonb_build_object('codigo_publico', e.codigo)
+                  WHEN r->>'codigo_publico' IS NOT NULL THEN r
+                  ELSE r || jsonb_build_object('codigo_publico',
+                         replace(gen_random_uuid()::text, '-', '') || replace(gen_random_uuid()::text, '-', ''))
              END), '[]'::jsonb)
-      INTO v_filas FROM jsonb_array_elements(p_snapshot->'clientes') r;
+      INTO v_filas
+      FROM jsonb_array_elements(p_snapshot->'clientes') r
+      LEFT JOIN LATERAL (SELECT c.codigo_publico AS codigo FROM clientes c
+                          WHERE c.tenant_id = p_tenant
+                            AND c.id = CASE WHEN r->>'id' ~ v_uuid THEN (r->>'id')::uuid END) e ON true;
     p_snapshot := jsonb_set(p_snapshot, '{clientes}', v_filas);
   END IF;
   RETURN p_snapshot;
@@ -1660,6 +1730,9 @@ REVOKE ALL ON FUNCTION _vim_compat_0156(jsonb, uuid) FROM PUBLIC, anon, authenti
 -- Una REVERSA_CANJE devuelve puntos, así que no se cree lo que dice la caja: tiene que apuntar a un
 -- CANJE de este negocio y se registra con el cliente, los puntos y la versión de ESE canje. Una caja
 -- confundida o manipulada no puede devolver más de lo canjeado ni devolverlo a otro cliente.
+-- Las referencias (ticket, sucursal, caja, premio) no pueden ser de otro negocio: un GANADO con el
+-- ticket de otro haría que ese ticket no ganara nada y que su cancelación revirtiera contra un
+-- movimiento ajeno. Un id que la nube aún no tiene sí pasa: el ticket puede llegar en otro lote.
 CREATE OR REPLACE FUNCTION _vim_aplicar_movimientos_lealtad(p_rows jsonb, p_tenant uuid)
 RETURNS jsonb
 LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp
@@ -1671,6 +1744,10 @@ DECLARE
   v_cliente uuid;
   v_puntos  integer;
   v_version integer;
+  v_ticket  uuid;
+  v_sucursal uuid;
+  v_caja    uuid;
+  v_premio  uuid;
   v_n       integer := 0;
   v_errores jsonb := '[]'::jsonb;
 BEGIN
@@ -1696,6 +1773,23 @@ BEGIN
         RAISE EXCEPTION 'un movimiento % no puede subir desde una caja', v_tipo;
       END IF;
 
+      v_ticket   := NULLIF(v_fila->>'ticket_id', '')::uuid;
+      v_sucursal := NULLIF(v_fila->>'sucursal_id', '')::uuid;
+      v_caja     := NULLIF(v_fila->>'caja_id', '')::uuid;
+      v_premio   := NULLIF(v_fila->>'premio_id', '')::uuid;
+      IF EXISTS (SELECT 1 FROM tickets WHERE id = v_ticket AND tenant_id IS DISTINCT FROM p_tenant) THEN
+        RAISE EXCEPTION 'el ticket es de otro negocio';
+      END IF;
+      IF EXISTS (SELECT 1 FROM sucursales WHERE id = v_sucursal AND tenant_id IS DISTINCT FROM p_tenant) THEN
+        RAISE EXCEPTION 'la sucursal es de otro negocio';
+      END IF;
+      IF EXISTS (SELECT 1 FROM cajas WHERE id = v_caja AND tenant_id IS DISTINCT FROM p_tenant) THEN
+        RAISE EXCEPTION 'la caja es de otro negocio';
+      END IF;
+      IF EXISTS (SELECT 1 FROM lealtad_premios WHERE id = v_premio AND tenant_id IS DISTINCT FROM p_tenant) THEN
+        RAISE EXCEPTION 'el premio es de otro negocio';
+      END IF;
+
       IF v_tipo = 'REVERSA_CANJE' THEN
         SELECT * INTO v_canje FROM lealtad_movimientos
          WHERE id = NULLIF(v_fila->>'canje_movimiento_id', '')::uuid AND tenant_id = p_tenant AND tipo = 'CANJE';
@@ -1717,9 +1811,8 @@ BEGIN
 
       IF lealtad_registrar_movimiento(
            (v_fila->>'id')::uuid, p_tenant, v_cliente, v_tipo, v_puntos, v_version,
-           NULLIF(v_fila->>'ticket_id', '')::uuid, NULLIF(v_fila->>'sucursal_id', '')::uuid,
-           NULLIF(v_fila->>'caja_id', '')::uuid, NULLIF(v_fila->>'usuario_id', '')::uuid,
-           NULLIF(v_fila->>'premio_id', '')::uuid, NULLIF(v_fila->>'monto_mxn', '')::numeric,
+           v_ticket, v_sucursal, v_caja, NULLIF(v_fila->>'usuario_id', '')::uuid,
+           v_premio, NULLIF(v_fila->>'monto_mxn', '')::numeric,
            v_fila->>'motivo', NULLIF(v_fila->>'canje_movimiento_id', '')::uuid,
            COALESCE(NULLIF(v_fila->>'fecha', '')::timestamptz, now()),
            NULLIF(v_fila->>'saldo_visto', '')::integer) THEN
@@ -1734,7 +1827,70 @@ BEGIN
 END $$;
 REVOKE ALL ON FUNCTION _vim_aplicar_movimientos_lealtad(jsonb, uuid) FROM PUBLIC, anon, authenticated;
 
--- ── sync_push_snapshot: la de la 0126 (vigente) con cuatro cambios, marcados "0156" ──
+-- El canje que sube con su ticket pasa por el aplicador genérico, que pisa TODAS las columnas: una
+-- copia tardía de la caja con revertido = false podría revivir un canje que el libro ya devolvió, y
+-- el cliente se quedaría con el descuento Y con los puntos. Esta conciliación corre justo después
+-- del aplicador, con el libro como autoridad:
+--   · la nube ya devolvió el canje y la caja lo manda vivo:
+--       - la devolvió la red de 48 h y la cuenta resultó pagada (llegó tarde): el canje sí se usó,
+--         se cobran los puntos otra vez con un AJUSTE de id determinista (reenviar no cobra dos
+--         veces) y la fila queda viva;
+--       - cualquier otro caso: la fila vuelve a revertido = true. Lo devuelto no revive.
+-- Corre en modo réplica (triggers apagados), igual que el aplicador de arriba.
+CREATE OR REPLACE FUNCTION _vim_conciliar_canjes(p_rows jsonb, p_tenant uuid)
+RETURNS jsonb
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp
+AS $$
+DECLARE
+  v_fila    jsonb;
+  v_id      uuid;
+  v_rev     lealtad_movimientos%ROWTYPE;
+  v_canje   lealtad_movimientos%ROWTYPE;
+  v_n       integer := 0;
+  v_errores jsonb := '[]'::jsonb;
+BEGIN
+  IF p_rows IS NULL OR jsonb_typeof(p_rows) <> 'array' THEN
+    RETURN jsonb_build_object('aplicadas', 0, 'errores', v_errores);
+  END IF;
+
+  FOR v_fila IN SELECT value FROM jsonb_array_elements(p_rows) LOOP
+    BEGIN
+      IF (v_fila->>'tenant_id')::uuid IS DISTINCT FROM p_tenant THEN CONTINUE; END IF;   -- ya lo rechazó el aplicador
+      IF COALESCE((v_fila->>'revertido')::boolean, false) THEN CONTINUE; END IF;
+      v_id := (v_fila->>'id')::uuid;
+
+      SELECT * INTO v_rev FROM lealtad_movimientos
+       WHERE tenant_id = p_tenant AND tipo = 'REVERSA_CANJE' AND canje_movimiento_id = v_id;
+      IF NOT FOUND THEN CONTINUE; END IF;
+
+      IF v_rev.motivo IS NOT DISTINCT FROM lealtad_motivo_red_48h()
+         AND EXISTS (SELECT 1 FROM tickets t
+                      WHERE t.id = NULLIF(v_fila->>'ticket_id', '')::uuid AND t.tenant_id = p_tenant
+                        AND t.estado_fiscal IN ('PAGADO', 'FACTURADO')) THEN
+        SELECT * INTO v_canje FROM lealtad_movimientos
+         WHERE id = v_id AND tenant_id = p_tenant AND tipo = 'CANJE';
+        IF FOUND AND lealtad_registrar_movimiento(
+             md5(v_id::text || ':recarga')::uuid, p_tenant, v_canje.cliente_id, 'AJUSTE',
+             v_canje.puntos, v_canje.programa_version, v_canje.ticket_id,
+             p_motivo => 'Canje confirmado tarde: la cuenta llegó pagada después de la red de 48 horas') THEN
+          v_n := v_n + 1;
+        END IF;
+      ELSE
+        UPDATE ticket_canjes_lealtad
+           SET revertido = true, revertido_at = COALESCE(revertido_at, now())
+         WHERE id = v_id AND tenant_id = p_tenant AND NOT revertido;
+        IF FOUND THEN v_n := v_n + 1; END IF;
+      END IF;
+    EXCEPTION WHEN OTHERS THEN
+      v_errores := v_errores || jsonb_build_object(
+        'tabla', 'ticket_canjes_lealtad', 'id', v_fila->>'id', 'error', SQLERRM);
+    END;
+  END LOOP;
+  RETURN jsonb_build_object('aplicadas', v_n, 'errores', v_errores);
+END $$;
+REVOKE ALL ON FUNCTION _vim_conciliar_canjes(jsonb, uuid) FROM PUBLIC, anon, authenticated;
+
+-- ── sync_push_snapshot: la de la 0126 (vigente) con cinco cambios, marcados "0156" ──
 CREATE OR REPLACE FUNCTION sync_push_snapshot(p_tenant uuid, p_snapshot jsonb)
 RETURNS jsonb
 LANGUAGE plpgsql
@@ -1801,6 +1957,11 @@ BEGIN
     v_res := v_res || jsonb_build_object(v_tabla, (v_det->>'aplicadas')::integer);
     v_errores := v_errores || COALESCE(v_det->'errores', '[]'::jsonb);
   END LOOP;
+
+  -- 0156: un canje que el libro ya devolvió no revive con la copia tardía de la caja. Ver
+  -- _vim_conciliar_canjes. Sigue en modo réplica, que es lo que se quiere para su UPDATE.
+  v_det := _vim_conciliar_canjes(p_snapshot->'ticket_canjes_lealtad', p_tenant);
+  v_errores := v_errores || COALESCE(v_det->'errores', '[]'::jsonb);
 
   -- El estado del piso (punto 3). En réplica: el trigger de updated_at no hace falta aquí.
   v_det := _vim_aplicar_estado_mesas(p_snapshot->'mesas_estado', p_tenant);

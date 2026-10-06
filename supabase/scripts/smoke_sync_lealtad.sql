@@ -17,6 +17,11 @@ DECLARE
   v_x uuid; v_y uuid; v_canje uuid := gen_random_uuid(); v_rev uuid := gen_random_uuid(); v_rev2 uuid := gen_random_uuid();
   v_turno uuid; v_prod uuid; v_ticket uuid; v_cli_a uuid; v_cli_b uuid; v_nuevo uuid := gen_random_uuid();
   v_ver integer; v_n integer; v_llaves text[]; v_esperadas text[];
+  v_codigo text; v_base jsonb; v_esp uuid; v_ant uuid; v_r3 uuid; v_r4 uuid;
+  v_e1 uuid := gen_random_uuid(); v_e2 uuid := gen_random_uuid(); v_e3 uuid := gen_random_uuid();
+  v_d3 uuid := gen_random_uuid(); v_d4 uuid := gen_random_uuid();
+  v_ta uuid; v_tb uuid; v_za uuid; v_zb uuid; v_ca uuid := gen_random_uuid(); v_cb uuid := gen_random_uuid();
+  v_vec uuid := gen_random_uuid(); v_vsuc uuid; v_vcaja uuid; v_vturno uuid; v_tvec uuid;
 BEGIN
   PERFORM set_config('request.jwt.claims',
     json_build_object('sub', v_maria::text, 'tenant_id', v_t::text)::text, true);
@@ -54,6 +59,22 @@ BEGIN
       'programa_version', v_ver, 'sucursal_id', v_suc, 'fecha', now())));
   PERFORM sync_push_snapshot(v_t, v_snap);
   IF (SELECT saldo FROM lealtad_saldos WHERE cliente_id = v_real) <> 17 THEN RAISE EXCEPTION 'el segundo movimiento no llegó al cliente real'; END IF;
+
+  -- 3b) La redirección del alias alcanza a todo lo que cuelga del cliente dentro del lote.
+  v_snap := _vim_fusionar_clientes(jsonb_build_object(
+    'tickets',              jsonb_build_array(jsonb_build_object('id', gen_random_uuid(), 'cliente_id', v_dup)),
+    'direcciones_cliente',  jsonb_build_array(jsonb_build_object('id', gen_random_uuid(), 'cliente_id', v_dup)),
+    'devoluciones',         jsonb_build_array(jsonb_build_object('id', gen_random_uuid(), 'cliente_id', v_dup)),
+    'ticket_promociones_aplicadas', jsonb_build_array(jsonb_build_object('id', gen_random_uuid(), 'cliente_id', v_dup)),
+    'ticket_canjes_lealtad', jsonb_build_array(jsonb_build_object('id', gen_random_uuid(), 'cliente_id', v_dup))), v_t);
+  IF (v_snap->'tickets'->0->>'cliente_id')::uuid <> v_real THEN RAISE EXCEPTION '3b: tickets no se redirigió'; END IF;
+  IF (v_snap->'direcciones_cliente'->0->>'cliente_id')::uuid <> v_real THEN RAISE EXCEPTION '3b: direcciones_cliente no se redirigió'; END IF;
+  IF (v_snap->'devoluciones'->0->>'cliente_id')::uuid <> v_real THEN RAISE EXCEPTION '3b: devoluciones no se redirigió'; END IF;
+  IF (v_snap->'ticket_promociones_aplicadas'->0->>'cliente_id')::uuid <> v_real THEN RAISE EXCEPTION '3b: promociones no se redirigió'; END IF;
+  IF (v_snap->'ticket_canjes_lealtad'->0->>'cliente_id')::uuid <> v_real THEN RAISE EXCEPTION '3b: canjes no se redirigió'; END IF;
+  -- Y un lote sin esas tablas no las inventa vacías.
+  v_snap := _vim_fusionar_clientes(jsonb_build_object('lealtad_movimientos', '[]'::jsonb), v_t);
+  IF v_snap ? 'tickets' THEN RAISE EXCEPTION '3b: la fusión creó una clave de tickets'; END IF;
 
   -- 4) La caja no puede inventar un canje: un CANJE que la nube no autorizó se rechaza.
   v_snap := jsonb_build_object('lealtad_movimientos', jsonb_build_array(jsonb_build_object(
@@ -204,6 +225,132 @@ BEGIN
   IF (SELECT lealtad_mxn FROM tickets WHERE id = v_ticket) <> 0 THEN RAISE EXCEPTION '11: el ticket de caja vieja quedó sin lealtad_mxn'; END IF;
   IF length((SELECT codigo_publico FROM clientes WHERE id = v_nuevo)) <> 64 THEN RAISE EXCEPTION '11: el cliente de caja vieja quedó sin código'; END IF;
   IF (SELECT saldo FROM lealtad_saldos WHERE cliente_id = v_real) <> 17 THEN RAISE EXCEPTION '11: una fila mala movió el saldo'; END IF;
+
+  -- 12) F1: el código público lo manda la NUBE. Un cliente que ya existe conserva el suyo aunque la
+  --     caja (cuyo DEFAULT local le dio otro) mande uno distinto; uno nuevo conserva el que traía.
+  SELECT codigo_publico INTO v_codigo FROM clientes WHERE id = v_real;
+  SELECT to_jsonb(c) INTO v_base FROM clientes c WHERE id = v_real;
+  v_res := sync_push_snapshot(v_t, jsonb_build_object('clientes', jsonb_build_array(
+    v_base || jsonb_build_object('codigo_publico', repeat('a', 64), 'nombre', 'Ana editada en caja'))));
+  IF v_res ? '_errores' THEN RAISE EXCEPTION '12: %', v_res->'_errores'; END IF;
+  IF (SELECT codigo_publico FROM clientes WHERE id = v_real) <> v_codigo THEN RAISE EXCEPTION '12: la caja le cambió el código público a un cliente de la nube'; END IF;
+  IF (SELECT nombre FROM clientes WHERE id = v_real) <> 'Ana editada en caja' THEN RAISE EXCEPTION '12: el resto de la fila no entró'; END IF;
+  v_res := sync_push_snapshot(v_t, jsonb_build_object('clientes', jsonb_build_array(
+    v_base || jsonb_build_object('id', v_e3, 'nombre', 'Nuevo con código', 'telefono', '4770009950', 'codigo_publico', repeat('b', 64)))));
+  IF v_res ? '_errores' THEN RAISE EXCEPTION '12: %', v_res->'_errores'; END IF;
+  IF (SELECT codigo_publico FROM clientes WHERE id = v_e3) <> repeat('b', 64) THEN RAISE EXCEPTION '12: un cliente nuevo debe conservar el código de la caja'; END IF;
+
+  -- 13) F2: el teléfono se compara por dígitos, en los dos sentidos.
+  INSERT INTO clientes (tenant_id, nombre, telefono) VALUES (v_t, 'Con espacios', '477 000 9901') RETURNING id INTO v_esp;
+  v_base := v_base - 'codigo_publico';
+  v_res := sync_push_snapshot(v_t, jsonb_build_object('clientes', jsonb_build_array(
+    v_base || jsonb_build_object('id', v_e1, 'nombre', 'Sin espacios', 'telefono', '4770009901'))));
+  IF v_res ? '_errores' THEN RAISE EXCEPTION '13: %', v_res->'_errores'; END IF;
+  IF NOT EXISTS (SELECT 1 FROM clientes_alias WHERE alias_id = v_e1 AND cliente_id = v_esp) THEN RAISE EXCEPTION '13: "4770009901" no se fundió con "477 000 9901"'; END IF;
+  IF EXISTS (SELECT 1 FROM clientes WHERE id = v_e1) THEN RAISE EXCEPTION '13: entró un segundo cliente vivo'; END IF;
+  INSERT INTO clientes (tenant_id, nombre, telefono) VALUES (v_t, 'Pegado', '4770009902') RETURNING id INTO v_ant;
+  v_res := sync_push_snapshot(v_t, jsonb_build_object('clientes', jsonb_build_array(
+    v_base || jsonb_build_object('id', v_e2, 'nombre', 'Con espacios caja', 'telefono', '477 000 9902'))));
+  IF NOT EXISTS (SELECT 1 FROM clientes_alias WHERE alias_id = v_e2 AND cliente_id = v_ant) THEN RAISE EXCEPTION '13: el caso inverso no se fundió'; END IF;
+  -- La búsqueda de lealtad encuentra por dígitos a un cliente guardado con espacios.
+  IF lealtad_resolver_cliente(v_t, NULL, '4770009901') IS DISTINCT FROM v_esp THEN RAISE EXCEPTION '13: resolver no encontró al cliente guardado con espacios'; END IF;
+  IF lealtad_resolver_cliente(v_t, NULL, '(477) 000-9901') IS DISTINCT FROM v_esp THEN RAISE EXCEPTION '13: resolver no limpia lo que escribe el cajero'; END IF;
+  IF (lealtad_saldo(v_t, NULL, '4770009901')->>'cliente_id')::uuid IS DISTINCT FROM v_esp THEN RAISE EXCEPTION '13: lealtad_saldo no encontró al cliente'; END IF;
+  -- Con varios vivos de los mismos dígitos (datos anteriores) gana el más antiguo.
+  INSERT INTO clientes (tenant_id, nombre, telefono, created_at) VALUES (v_t, 'Nuevo 9903', '4770009903', now()) RETURNING id INTO v_r3;
+  INSERT INTO clientes (tenant_id, nombre, telefono, created_at) VALUES (v_t, 'Viejo 9903', '477 000 9903', now() - interval '2 days') RETURNING id INTO v_ant;
+  IF lealtad_resolver_cliente(v_t, NULL, '4770009903') <> v_ant THEN RAISE EXCEPTION '13: no eligió al más antiguo'; END IF;
+  v_res := sync_push_snapshot(v_t, jsonb_build_object('clientes', jsonb_build_array(
+    v_base || jsonb_build_object('id', v_d4, 'nombre', 'Caja 9903', 'telefono', '(477)0009903'))));
+  IF (SELECT cliente_id FROM clientes_alias WHERE alias_id = v_d4) IS DISTINCT FROM v_ant THEN RAISE EXCEPTION '13: el alias no apunta al más antiguo'; END IF;
+  DELETE FROM clientes_alias WHERE alias_id = v_d4;
+
+  -- 14) F3: un alias no sobrevive a su cliente real. Borrado el real, la fila viva de la caja entra.
+  INSERT INTO clientes (tenant_id, nombre, telefono) VALUES (v_t, 'Real 14', '4770009960') RETURNING id INTO v_r3;
+  PERFORM sync_push_snapshot(v_t, jsonb_build_object('clientes', jsonb_build_array(
+    v_base || jsonb_build_object('id', v_d3, 'nombre', 'Caja 14', 'telefono', '4770009960'))));
+  IF NOT EXISTS (SELECT 1 FROM clientes_alias WHERE alias_id = v_d3 AND cliente_id = v_r3) THEN RAISE EXCEPTION '14: preparación, sin alias'; END IF;
+  UPDATE clientes SET deleted_at = now() WHERE id = v_r3;
+  v_res := sync_push_snapshot(v_t, jsonb_build_object(
+    'clientes', jsonb_build_array(v_base || jsonb_build_object('id', v_d3, 'nombre', 'Caja 14', 'telefono', '4770009960')),
+    'lealtad_movimientos', jsonb_build_array(jsonb_build_object(
+      'id', gen_random_uuid(), 'tenant_id', v_t, 'cliente_id', v_d3, 'tipo', 'GANADO', 'puntos', 4,
+      'programa_version', v_ver, 'fecha', now()))));
+  IF v_res ? '_errores' THEN RAISE EXCEPTION '14: %', v_res->'_errores'; END IF;
+  IF NOT EXISTS (SELECT 1 FROM clientes WHERE id = v_d3 AND deleted_at IS NULL) THEN RAISE EXCEPTION '14: el cliente vivo de la caja no llegó a la nube'; END IF;
+  IF EXISTS (SELECT 1 FROM clientes_alias WHERE alias_id = v_d3) THEN RAISE EXCEPTION '14: el alias de un cliente borrado sigue vivo'; END IF;
+  IF COALESCE((SELECT saldo FROM lealtad_saldos WHERE cliente_id = v_d3), 0) <> 4 THEN RAISE EXCEPTION '14: los puntos no fueron al cliente vivo'; END IF;
+  IF COALESCE((SELECT saldo FROM lealtad_saldos WHERE cliente_id = v_r3), 0) <> 0 THEN RAISE EXCEPTION '14: los puntos fueron al cliente borrado'; END IF;
+
+  -- 15) Lo que la nube YA tenía bajo el id del alias pasa al cliente real cuando el alias nace.
+  INSERT INTO clientes (tenant_id, nombre, telefono) VALUES (v_t, 'Real 15', '4770009970') RETURNING id INTO v_r4;
+  PERFORM sync_push_snapshot(v_t, jsonb_build_object('tickets', jsonb_build_array(
+    (SELECT to_jsonb(t) - 'lealtad_mxn' || jsonb_build_object('cliente_id', v_d4) FROM tickets t WHERE id = v_ticket))));
+  IF (SELECT cliente_id FROM tickets WHERE id = v_ticket) IS DISTINCT FROM v_d4 THEN RAISE EXCEPTION '15: preparación, el ticket no quedó con el id de la caja'; END IF;
+  PERFORM sync_push_snapshot(v_t, jsonb_build_object('clientes', jsonb_build_array(
+    v_base || jsonb_build_object('id', v_d4, 'nombre', 'Caja 15', 'telefono', '4770009970'))));
+  IF (SELECT cliente_id FROM tickets WHERE id = v_ticket) IS DISTINCT FROM v_r4 THEN RAISE EXCEPTION '15: el ticket ya guardado no pasó al cliente real'; END IF;
+
+  -- 16) F4: un canje tardío no deja el descuento vivo Y los puntos devueltos.
+  v_ta := abrir_ticket(v_suc, v_caja, v_turno, 'PARA_LLEVAR'::modo_servicio, NULL, NULL, 'sl-ta', v_maria);
+  v_tb := abrir_ticket(v_suc, v_caja, v_turno, 'PARA_LLEVAR'::modo_servicio, NULL, NULL, 'sl-tb', v_maria);
+  INSERT INTO clientes (tenant_id, nombre, telefono) VALUES (v_t, 'Za', '4770009980') RETURNING id INTO v_za;
+  INSERT INTO clientes (tenant_id, nombre, telefono) VALUES (v_t, 'Zb', '4770009981') RETURNING id INTO v_zb;
+  -- (a) la red de 48 h devolvió el canje; después llega la cuenta, pagada, con el canje vivo.
+  PERFORM lealtad_registrar_movimiento(NULL, v_t, v_za, 'GANADO', 30, v_ver);
+  PERFORM lealtad_registrar_movimiento(v_ca, v_t, v_za, 'CANJE', -10, v_ver, v_ta);
+  PERFORM lealtad_revertir_canje(v_ca, v_t, lealtad_motivo_red_48h());
+  IF (SELECT saldo FROM lealtad_saldos WHERE cliente_id = v_za) <> 30 THEN RAISE EXCEPTION '16a: preparación, la red no devolvió'; END IF;
+  v_snap := jsonb_build_object(
+    'tickets', jsonb_build_array((SELECT to_jsonb(t) - 'lealtad_mxn' || jsonb_build_object('estado_fiscal', 'PAGADO', 'folio_completo', 'SL-A') FROM tickets t WHERE id = v_ta)),
+    'ticket_canjes_lealtad', jsonb_build_array(jsonb_build_object(
+      'id', v_ca, 'tenant_id', v_t, 'ticket_id', v_ta, 'cliente_id', v_za, 'puntos', 10, 'monto_descontado_mxn', 5,
+      'revertido', false, 'created_at', now())));
+  v_res := sync_push_snapshot(v_t, v_snap);
+  IF v_res ? '_errores' THEN RAISE EXCEPTION '16a: %', v_res->'_errores'; END IF;
+  IF (SELECT saldo FROM lealtad_saldos WHERE cliente_id = v_za) <> 20 THEN RAISE EXCEPTION '16a: el canje confirmado tarde no cobró los puntos (saldo %)', (SELECT saldo FROM lealtad_saldos WHERE cliente_id = v_za); END IF;
+  IF (SELECT count(*) FROM lealtad_movimientos WHERE cliente_id = v_za AND tipo = 'AJUSTE' AND puntos = -10
+        AND motivo = 'Canje confirmado tarde: la cuenta llegó pagada después de la red de 48 horas') <> 1 THEN RAISE EXCEPTION '16a: debía haber exactamente un AJUSTE'; END IF;
+  IF (SELECT revertido FROM ticket_canjes_lealtad WHERE id = v_ca) THEN RAISE EXCEPTION '16a: el canje usado debe quedar vivo'; END IF;
+  v_res := sync_push_snapshot(v_t, v_snap);
+  IF (SELECT saldo FROM lealtad_saldos WHERE cliente_id = v_za) <> 20 THEN RAISE EXCEPTION '16a: reenviar cobró dos veces'; END IF;
+  IF (SELECT count(*) FROM lealtad_movimientos WHERE cliente_id = v_za AND tipo = 'AJUSTE') <> 1 THEN RAISE EXCEPTION '16a: reenviar duplicó el AJUSTE'; END IF;
+  IF (SELECT revertido FROM ticket_canjes_lealtad WHERE id = v_ca) THEN RAISE EXCEPTION '16a: reenviar revirtió el canje'; END IF;
+  -- (b) la propia caja devolvió el canje; una copia vieja con revertido = false NO lo revive.
+  PERFORM lealtad_registrar_movimiento(NULL, v_t, v_zb, 'GANADO', 30, v_ver);
+  PERFORM lealtad_registrar_movimiento(v_cb, v_t, v_zb, 'CANJE', -10, v_ver, v_tb);
+  PERFORM lealtad_revertir_canje(v_cb, v_t, 'cuenta cancelada');
+  IF (SELECT saldo FROM lealtad_saldos WHERE cliente_id = v_zb) <> 30 THEN RAISE EXCEPTION '16b: preparación'; END IF;
+  v_res := sync_push_snapshot(v_t, jsonb_build_object(
+    'tickets', jsonb_build_array((SELECT to_jsonb(t) - 'lealtad_mxn' || jsonb_build_object('estado_fiscal', 'PAGADO', 'folio_completo', 'SL-B') FROM tickets t WHERE id = v_tb)),
+    'ticket_canjes_lealtad', jsonb_build_array(jsonb_build_object(
+      'id', v_cb, 'tenant_id', v_t, 'ticket_id', v_tb, 'cliente_id', v_zb, 'puntos', 10, 'monto_descontado_mxn', 5,
+      'revertido', false, 'created_at', now()))));
+  IF v_res ? '_errores' THEN RAISE EXCEPTION '16b: %', v_res->'_errores'; END IF;
+  IF NOT (SELECT revertido FROM ticket_canjes_lealtad WHERE id = v_cb) THEN RAISE EXCEPTION '16b: un canje devuelto revivió'; END IF;
+  IF EXISTS (SELECT 1 FROM lealtad_movimientos WHERE cliente_id = v_zb AND tipo = 'AJUSTE') THEN RAISE EXCEPTION '16b: se cobró un canje que la caja había devuelto'; END IF;
+  IF (SELECT saldo FROM lealtad_saldos WHERE cliente_id = v_zb) <> 30 THEN RAISE EXCEPTION '16b: el saldo cambió'; END IF;
+
+  -- 17) F5: las referencias de un movimiento no pueden ser de otro negocio.
+  INSERT INTO tenants (id, codigo, nombre_comercial, vertical_principal) VALUES (v_vec, 'smoke-sl-vecino', 'Vecino SL', 'QUICK_SERVICE');
+  INSERT INTO sucursales (tenant_id, codigo, nombre) VALUES (v_vec, 'VE', 'Sucursal vecina') RETURNING id INTO v_vsuc;
+  INSERT INTO cajas (tenant_id, sucursal_id, numero, nombre) VALUES (v_vec, v_vsuc, 1, 'Caja vecina') RETURNING id INTO v_vcaja;
+  INSERT INTO usuarios_acceso (usuario_id, tenant_id, rol_id) SELECT v_maria, v_vec, id FROM roles WHERE tenant_id IS NULL AND codigo = 'CAJERO';
+  INSERT INTO turnos (tenant_id, sucursal_id, caja_id, codigo_turno, dia_contable, usuario_apertura_id, fondo_inicial_mxn, fondo_modo)
+  VALUES (v_vec, v_vsuc, v_vcaja, 'VEC-SL', (now() AT TIME ZONE 'America/Mexico_City')::date, v_maria, 0, 'TOTAL') RETURNING id INTO v_vturno;
+  v_tvec := abrir_ticket(v_vsuc, v_vcaja, v_vturno, 'PARA_LLEVAR'::modo_servicio, NULL, NULL, 'sl-vec', v_maria);
+  FOREACH v_fila IN ARRAY ARRAY[
+    jsonb_build_object('ticket_id', v_tvec), jsonb_build_object('sucursal_id', v_vsuc), jsonb_build_object('caja_id', v_vcaja)] LOOP
+    v_res := sync_push_snapshot(v_t, jsonb_build_object('lealtad_movimientos', jsonb_build_array(
+      jsonb_build_object('id', gen_random_uuid(), 'tenant_id', v_t, 'cliente_id', v_real, 'tipo', 'GANADO', 'puntos', 50,
+        'programa_version', v_ver, 'fecha', now()) || v_fila)));
+    IF NOT (v_res ? '_errores') OR (v_res->>'lealtad_movimientos')::int <> 0 THEN RAISE EXCEPTION '17: aceptó una referencia de otro negocio: %', v_fila; END IF;
+  END LOOP;
+  IF (SELECT saldo FROM lealtad_saldos WHERE cliente_id = v_real) <> 17 THEN RAISE EXCEPTION '17: la referencia ajena movió el saldo'; END IF;
+  -- Y lo que ya quedó apuntando a un ticket ajeno no cuenta para ese ticket.
+  PERFORM lealtad_registrar_movimiento(NULL, v_t, v_real, 'GANADO', 8, v_ver, v_tvec);
+  IF lealtad_neto_ganado(v_tvec) <> 0 THEN RAISE EXCEPTION '17: lealtad_neto_ganado contó un movimiento de otro negocio'; END IF;
+  IF lealtad_revertir_ganado_ticket(v_tvec) <> 0 THEN RAISE EXCEPTION '17: la reversa tocó un movimiento de otro negocio'; END IF;
 
   RAISE NOTICE 'SMOKE SYNC LEALTAD OK';
 END $$;
