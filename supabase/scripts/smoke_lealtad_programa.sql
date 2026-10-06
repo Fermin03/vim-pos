@@ -1,7 +1,9 @@
 -- Smoke lealtad · programa (0156 §7). Cambiar de mecánica reinicia saldos solo con confirmación;
--- el ajuste manual exige motivo; los parámetros se validan con mensajes claros; los saldos vencen en
--- hora de México; nada vence con el módulo apagado; un canje sin ticket pagado a las 48 h se
--- devuelve y uno que cuelga de un ticket pagado, no. Hace ROLLBACK.
+-- el ajuste manual exige motivo y no deja el saldo en negativo; los parámetros se validan con
+-- mensajes claros; el vencimiento se calcula y se aplica en hora de México (un saldo que vence el
+-- 31 de marzo sigue vivo a las 23:30 de México de ese día, aunque en UTC ya sea abril); nada vence
+-- con el módulo apagado; una fila que falla no tumba el proceso de las demás; un canje sin ticket
+-- pagado a las 48 h se devuelve y uno que cuelga de un ticket pagado, no. Hace ROLLBACK.
 -- Ejecutar: cd desktop && node scripts/smokes.mjs smoke_lealtad_programa.sql
 \set ON_ERROR_STOP on
 BEGIN;
@@ -12,7 +14,7 @@ DECLARE
   v_caja   uuid := '99999999-0000-0000-0000-0000000000cc';
   v_maria  uuid := '99999999-0000-0000-0000-000000000001';
   v_dueno  uuid := '99999999-0000-0000-0000-0000000000e1';
-  v_cli uuid; v_cli2 uuid; v_cli3 uuid; v_ver integer; j jsonb; v_canje uuid := gen_random_uuid();
+  v_cli uuid; v_cli2 uuid; v_cli3 uuid; v_dani uuid; v_fabi uuid; v_fran uuid; v_gus uuid; v_eli uuid; v_ver integer; j jsonb; v_canje uuid := gen_random_uuid();
   v_canje_pagado uuid := gen_random_uuid(); v_turno uuid; v_prod uuid; v_t uuid; v_total numeric; v_saldo3 integer;
   p lealtad_programa%ROWTYPE;
   -- Una hora fija: 31 de marzo de 2027, 23:30 en México (ya es 1 de abril en UTC).
@@ -23,6 +25,11 @@ BEGIN
   INSERT INTO clientes (tenant_id, nombre, telefono) VALUES (v_tenant, 'Ana Programa', '4770001564') RETURNING id INTO v_cli;
   INSERT INTO clientes (tenant_id, nombre, telefono) VALUES (v_tenant, 'Beto Programa', '4770001565') RETURNING id INTO v_cli2;
   INSERT INTO clientes (tenant_id, nombre, telefono) VALUES (v_tenant, 'Caro Programa', '4770001566') RETURNING id INTO v_cli3;
+  INSERT INTO clientes (tenant_id, nombre, telefono) VALUES (v_tenant, 'Dani Programa', '4770001567') RETURNING id INTO v_dani;
+  INSERT INTO clientes (tenant_id, nombre, telefono) VALUES (v_tenant, 'Fabi Programa', '4770001568') RETURNING id INTO v_fabi;
+  INSERT INTO clientes (tenant_id, nombre, telefono) VALUES (v_tenant, 'Fran Programa', '4770001569') RETURNING id INTO v_fran;
+  INSERT INTO clientes (tenant_id, nombre, telefono) VALUES (v_tenant, 'Gus Programa', '4770001570') RETURNING id INTO v_gus;
+  INSERT INTO clientes (tenant_id, nombre, telefono) VALUES (v_tenant, 'Eli Programa', '4770001571') RETURNING id INTO v_eli;
 
   -- Como el dueño (las RPC del admin leen current_tenant_id() y auth.uid()).
   PERFORM set_config('request.jwt.claims', json_build_object('sub', v_dueno, 'role', 'authenticated', 'tenant_id', v_tenant)::text, true);
@@ -48,6 +55,18 @@ BEGIN
   EXCEPTION WHEN sqlstate '22023' THEN
     IF SQLERRM NOT LIKE '%vencimiento%' THEN RAISE EXCEPTION 'el mensaje no habla del vencimiento: %', SQLERRM; END IF;
   END;
+  BEGIN
+    PERFORM lealtad_guardar_programa('PUNTOS_DINERO', 0.004, NULL, 0, 6, 3);
+    RAISE EXCEPTION 'aceptó un porcentaje de 0.004 (que la columna redondea a 0)';
+  EXCEPTION WHEN sqlstate '22023' THEN
+    IF SQLERRM NOT LIKE '%porcentaje%' THEN RAISE EXCEPTION 'el mensaje de 0.004 no habla del porcentaje: %', SQLERRM; END IF;
+  END;
+  BEGIN
+    PERFORM lealtad_guardar_programa('PUNTOS_DINERO', 5, NULL, 99999999999, 6, 3);
+    RAISE EXCEPTION 'aceptó una compra mínima que no cabe en la columna';
+  EXCEPTION WHEN sqlstate '22023' THEN
+    IF SQLERRM NOT LIKE '%compra mínima%' THEN RAISE EXCEPTION 'el mensaje no habla de la compra mínima: %', SQLERRM; END IF;
+  END;
   SELECT * INTO p FROM lealtad_programa WHERE tenant_id = v_tenant;
   IF p.version <> 1 OR p.porcentaje <> 5 OR p.vencimiento_meses <> 6 THEN RAISE EXCEPTION 'un rechazo tocó el programa'; END IF;
 
@@ -59,6 +78,26 @@ BEGIN
   IF lealtad_ajustar_saldo(v_cli, 50, 'Compensación por un error') <> 50 THEN RAISE EXCEPTION 'ajuste no dejó 50'; END IF;
   IF (SELECT usuario_id FROM lealtad_movimientos WHERE cliente_id = v_cli AND tipo = 'AJUSTE') <> v_dueno THEN RAISE EXCEPTION 'el ajuste no quedó firmado'; END IF;
   PERFORM lealtad_ajustar_saldo(v_cli2, 20, 'Bienvenida');
+
+  -- 2b) Cota del ajuste: ni negativo (Fabi no tiene saldo), ni descomunal; bajar justo a cero sí.
+  BEGIN
+    PERFORM lealtad_ajustar_saldo(v_fabi, -1, 'Prueba');
+    RAISE EXCEPTION 'aceptó dejar un saldo de 0 en -1';
+  EXCEPTION WHEN sqlstate '22023' THEN
+    IF SQLERRM NOT LIKE '%negativo%' THEN RAISE EXCEPTION 'mensaje del negativo: %', SQLERRM; END IF;
+  END;
+  BEGIN
+    PERFORM lealtad_ajustar_saldo(v_fabi, 100001, 'Prueba');
+    RAISE EXCEPTION 'aceptó un ajuste de 100001 puntos';
+  EXCEPTION WHEN sqlstate '22023' THEN
+    IF SQLERRM NOT LIKE '%100,000%' THEN RAISE EXCEPTION 'mensaje del tope: %', SQLERRM; END IF;
+  END;
+  IF lealtad_ajustar_saldo(v_fabi, 10, 'Bienvenida') <> 10 THEN RAISE EXCEPTION 'ajuste a 10'; END IF;
+  BEGIN
+    PERFORM lealtad_ajustar_saldo(v_fabi, -11, 'Prueba');
+    RAISE EXCEPTION 'aceptó dejar un saldo de 10 en -1';
+  EXCEPTION WHEN sqlstate '22023' THEN NULL; END;
+  IF lealtad_ajustar_saldo(v_fabi, -10, 'Corrección') <> 0 THEN RAISE EXCEPTION 'bajar justo a cero debe aceptarse'; END IF;
 
   -- 3) Cambiar parámetros sin cambiar de mecánica no reinicia nada. Lo que no aplica a la mecánica
   --    (aquí pesos_por_punto) se guarda como NULL.
@@ -92,6 +131,7 @@ BEGIN
   UPDATE lealtad_programa SET encendido_desde = NULL WHERE tenant_id = v_tenant;
   PERFORM lealtad_registrar_movimiento(NULL, v_tenant, v_cli,  'GANADO', 4, v_ver, p_fecha => timestamptz '2026-09-30 18:00:00+00');
   PERFORM lealtad_registrar_movimiento(NULL, v_tenant, v_cli2, 'GANADO', 3, v_ver, p_fecha => timestamptz '2026-11-01 18:00:00+00');
+  PERFORM lealtad_registrar_movimiento(NULL, v_tenant, v_dani, 'GANADO', 5, v_ver, p_fecha => timestamptz '2026-09-30 18:00:00+00');
   IF (SELECT vence_el FROM lealtad_saldos WHERE cliente_id = v_cli) <> date '2027-03-30' THEN RAISE EXCEPTION 'vence_el mal calculado: %', (SELECT vence_el FROM lealtad_saldos WHERE cliente_id = v_cli); END IF;
 
   -- 7a) Con el módulo apagado nada vence.
@@ -105,12 +145,19 @@ BEGIN
   UPDATE configuracion_tenant SET modulo_lealtad_activo = true WHERE tenant_id = v_tenant;
   UPDATE lealtad_programa SET encendido_desde = NULL WHERE tenant_id = v_tenant;
   UPDATE lealtad_saldos SET vence_el = lealtad_vence_el(tenant_id, ultima_actividad) WHERE tenant_id = v_tenant;
+  -- Dani vence EXACTAMENTE el 31 de marzo: a las 23:30 de México de ese día aún no vence (en UTC ya
+  -- es 1 de abril y vencería). Ana (30 de marzo) sí; Beto (1 de mayo) no.
+  UPDATE lealtad_saldos SET vence_el = date '2027-03-31' WHERE cliente_id = v_dani;
   j := lealtad_proceso_diario(v_ahora);
-  IF (j->>'vencidos')::int <> 1 THEN RAISE EXCEPTION 'vencidos: %', j; END IF;
+  IF (j->>'vencidos')::int <> 1 OR (j->>'errores')::int <> 0 THEN RAISE EXCEPTION 'vencidos: %', j; END IF;
   IF (SELECT saldo FROM lealtad_saldos WHERE cliente_id = v_cli) <> 0 THEN RAISE EXCEPTION 'Ana no venció'; END IF;
   IF (SELECT saldo FROM lealtad_saldos WHERE cliente_id = v_cli2) <> 3 THEN RAISE EXCEPTION 'Beto venció antes de tiempo'; END IF;
+  IF (SELECT saldo FROM lealtad_saldos WHERE cliente_id = v_dani) <> 5 THEN RAISE EXCEPTION 'Dani venció el mismo día de su fecha (¿se usó UTC?)'; END IF;
   j := lealtad_proceso_diario(v_ahora);
   IF (j->>'vencidos')::int <> 0 THEN RAISE EXCEPTION 'venció dos veces'; END IF;
+  -- 24 horas después ya es 1 de abril en México: Dani vence.
+  j := lealtad_proceso_diario(v_ahora + interval '24 hours');
+  IF (j->>'vencidos')::int <> 1 OR (SELECT saldo FROM lealtad_saldos WHERE cliente_id = v_dani) <> 0 THEN RAISE EXCEPTION 'Dani no venció al día siguiente: %', j; END IF;
 
   -- 8) Red de seguridad: un canje de hace 49 h sin ticket pagado se devuelve; uno de 47 h, no.
   PERFORM lealtad_registrar_movimiento(v_canje, v_tenant, v_cli2, 'CANJE', -2, v_ver, p_fecha => v_ahora - interval '49 hours');
@@ -146,6 +193,27 @@ BEGIN
   IF (SELECT saldo FROM lealtad_saldos WHERE cliente_id = v_cli2) <> 2 THEN RAISE EXCEPTION 'saldo de Beto tras la red: %', (SELECT saldo FROM lealtad_saldos WHERE cliente_id = v_cli2); END IF;
   j := lealtad_proceso_diario(v_ahora);
   IF (j->>'canjes_revertidos')::int <> 0 THEN RAISE EXCEPTION 'la red revirtió dos veces: %', j; END IF;
+
+  -- 8c) Una fila que falla no tumba a las demás. Fran y Gus vencieron hace meses; una restricción
+  --     (solo dentro de esta transacción) impide el VENCIMIENTO de Fran. El proceso cuenta el error,
+  --     vence a Gus y deja a Fran con su saldo; sin la restricción, la corrida siguiente lo vence.
+  PERFORM lealtad_registrar_movimiento(NULL, v_tenant, v_fran, 'GANADO', 7, v_ver, p_fecha => timestamptz '2026-06-01 18:00:00+00');
+  PERFORM lealtad_registrar_movimiento(NULL, v_tenant, v_gus,  'GANADO', 8, v_ver, p_fecha => timestamptz '2026-06-01 18:00:00+00');
+  EXECUTE format('ALTER TABLE lealtad_movimientos ADD CONSTRAINT smoke_rompe CHECK (tipo <> ''VENCIMIENTO'' OR cliente_id <> %L) NOT VALID', v_fran);
+  j := lealtad_proceso_diario(v_ahora);
+  ALTER TABLE lealtad_movimientos DROP CONSTRAINT smoke_rompe;
+  IF (j->>'errores')::int <> 1 OR (j->>'vencidos')::int <> 1 THEN RAISE EXCEPTION 'una fila rota debía dar errores=1 y vencidos=1: %', j; END IF;
+  IF (SELECT saldo FROM lealtad_saldos WHERE cliente_id = v_gus) <> 0 THEN RAISE EXCEPTION 'Gus no venció por la falla de Fran'; END IF;
+  IF (SELECT saldo FROM lealtad_saldos WHERE cliente_id = v_fran) <> 7 THEN RAISE EXCEPTION 'Fran perdió su saldo a pesar de la falla'; END IF;
+  j := lealtad_proceso_diario(v_ahora);
+  IF (j->>'errores')::int <> 0 OR (j->>'vencidos')::int <> 1 OR (SELECT saldo FROM lealtad_saldos WHERE cliente_id = v_fran) <> 0 THEN RAISE EXCEPTION 'Fran debía vencer en la corrida siguiente: %', j; END IF;
+
+  -- 9) El cálculo de vence_el cruza la medianoche en hora de México: 3:00 UTC del 1 de octubre es
+  --    todavía el 30 de septiembre en México, y seis meses después es el 30 de marzo (no el 1 de abril).
+  PERFORM lealtad_registrar_movimiento(NULL, v_tenant, v_eli, 'GANADO', 1, v_ver, p_fecha => timestamptz '2026-10-01 03:00:00+00');
+  IF (SELECT vence_el FROM lealtad_saldos WHERE cliente_id = v_eli) <> date '2027-03-30' THEN
+    RAISE EXCEPTION 'vence_el de una compra a las 3:00 UTC: % (esperado 2027-03-30, hora de México)', (SELECT vence_el FROM lealtad_saldos WHERE cliente_id = v_eli);
+  END IF;
 
   RAISE NOTICE 'SMOKE LEALTAD PROGRAMA OK';
 END $$;

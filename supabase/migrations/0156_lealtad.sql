@@ -1347,11 +1347,13 @@ BEGIN
   IF p_mecanica IS NULL THEN
     RAISE EXCEPTION 'Elige cómo ganan tus clientes: puntos por dinero, sellos o puntos con premios.' USING ERRCODE = '22023';
   END IF;
-  IF p_mecanica = 'PUNTOS_DINERO' AND (p_porcentaje IS NULL OR p_porcentaje <= 0 OR p_porcentaje > 50) THEN
+  -- Se valida lo que de verdad se guardaría: la columna redondea a 2 decimales, así que 0.004
+  -- sería 0.00 y llegaría como violación de CHECK.
+  IF p_mecanica = 'PUNTOS_DINERO' AND (p_porcentaje IS NULL OR round(p_porcentaje, 2) <= 0 OR round(p_porcentaje, 2) > 50) THEN
     RAISE EXCEPTION 'El porcentaje de puntos debe ser mayor que 0 y de máximo 50.' USING ERRCODE = '22023';
   END IF;
-  IF p_mecanica = 'PUNTOS_PREMIOS' AND (p_pesos_por_punto IS NULL OR p_pesos_por_punto <= 0) THEN
-    RAISE EXCEPTION 'Indica cuántos pesos de compra valen un punto (debe ser mayor que 0).' USING ERRCODE = '22023';
+  IF p_mecanica = 'PUNTOS_PREMIOS' AND (p_pesos_por_punto IS NULL OR round(p_pesos_por_punto, 2) <= 0 OR round(p_pesos_por_punto, 2) > 99999999.99) THEN
+    RAISE EXCEPTION 'Indica cuántos pesos de compra valen un punto (mayor que 0 y menor de 100 millones).' USING ERRCODE = '22023';
   END IF;
   IF p_vencimiento_meses IS NOT NULL AND (p_vencimiento_meses < 1 OR p_vencimiento_meses > 60) THEN
     RAISE EXCEPTION 'El vencimiento debe ser de 1 a 60 meses, o sin vencimiento.' USING ERRCODE = '22023';
@@ -1359,8 +1361,8 @@ BEGIN
   IF p_tope_compras_dia IS NOT NULL AND (p_tope_compras_dia < 1 OR p_tope_compras_dia > 50) THEN
     RAISE EXCEPTION 'El tope de compras por día debe estar entre 1 y 50.' USING ERRCODE = '22023';
   END IF;
-  IF p_compra_minima_mxn IS NOT NULL AND p_compra_minima_mxn < 0 THEN
-    RAISE EXCEPTION 'La compra mínima no puede ser negativa.' USING ERRCODE = '22023';
+  IF p_compra_minima_mxn IS NOT NULL AND (round(p_compra_minima_mxn, 2) < 0 OR round(p_compra_minima_mxn, 2) > 9999999999.99) THEN
+    RAISE EXCEPTION 'La compra mínima debe ser de 0 pesos en adelante y menor de 10 mil millones.' USING ERRCODE = '22023';
   END IF;
   v_pct   := CASE WHEN p_mecanica = 'PUNTOS_DINERO'  THEN p_porcentaje      END;
   v_pesos := CASE WHEN p_mecanica = 'PUNTOS_PREMIOS' THEN p_pesos_por_punto END;
@@ -1368,8 +1370,13 @@ BEGIN
   SELECT * INTO v_p FROM lealtad_programa WHERE tenant_id = v_tenant FOR UPDATE;
   IF NOT FOUND THEN
     INSERT INTO lealtad_programa (tenant_id, mecanica, porcentaje, pesos_por_punto, compra_minima_mxn, vencimiento_meses, tope_compras_dia)
-    VALUES (v_tenant, p_mecanica, v_pct, v_pesos, COALESCE(p_compra_minima_mxn, 0), p_vencimiento_meses, COALESCE(p_tope_compras_dia, 3));
-    RETURN jsonb_build_object('ok', true, 'version', 1, 'clientes_reiniciados', 0);
+    VALUES (v_tenant, p_mecanica, v_pct, v_pesos, COALESCE(p_compra_minima_mxn, 0), p_vencimiento_meses, COALESCE(p_tope_compras_dia, 3))
+    ON CONFLICT (tenant_id) DO NOTHING;
+    IF FOUND THEN
+      RETURN jsonb_build_object('ok', true, 'version', 1, 'clientes_reiniciados', 0);
+    END IF;
+    -- Otro administrador la creó un instante antes: se sigue por la ruta normal de edición.
+    SELECT * INTO v_p FROM lealtad_programa WHERE tenant_id = v_tenant FOR UPDATE;
   END IF;
 
   IF v_p.mecanica <> p_mecanica THEN
@@ -1415,17 +1422,27 @@ AS $$
 DECLARE
   v_tenant uuid := current_tenant_id();
   v_ver    integer;
+  v_saldo  integer;
 BEGIN
   IF v_tenant IS NULL OR NOT es_admin_del_tenant(v_tenant) THEN
     RAISE EXCEPTION 'Solo el dueño o un administrador puede ajustar un saldo.' USING ERRCODE = '42501';
   END IF;
   IF COALESCE(p_puntos, 0) = 0 THEN RAISE EXCEPTION 'El ajuste no puede ser cero.' USING ERRCODE = '22023'; END IF;
+  IF abs(p_puntos) > 100000 THEN RAISE EXCEPTION 'Un ajuste no puede pasar de 100,000 puntos.' USING ERRCODE = '22023'; END IF;
   IF btrim(COALESCE(p_motivo, '')) = '' THEN RAISE EXCEPTION 'El ajuste necesita un motivo.' USING ERRCODE = '22023'; END IF;
   IF NOT EXISTS (SELECT 1 FROM clientes WHERE id = p_cliente_id AND tenant_id = v_tenant) THEN
     RAISE EXCEPTION 'El cliente no existe.' USING ERRCODE = 'P0002';
   END IF;
   SELECT version INTO v_ver FROM lealtad_programa WHERE tenant_id = v_tenant;
   IF v_ver IS NULL THEN RAISE EXCEPTION 'Primero configura el programa.' USING ERRCODE = '22023'; END IF;
+
+  -- Un ajuste a mano no deja el saldo en negativo (solo las reversas automáticas pueden, por
+  -- diseño). Sin fila de saldo, el cliente tiene 0.
+  SELECT saldo INTO v_saldo FROM lealtad_saldos
+   WHERE cliente_id = p_cliente_id AND programa_version = v_ver FOR UPDATE;
+  IF COALESCE(v_saldo, 0) + p_puntos < 0 THEN
+    RAISE EXCEPTION 'El ajuste dejaría el saldo en negativo.' USING ERRCODE = '22023';
+  END IF;
 
   PERFORM lealtad_registrar_movimiento(
     NULL, v_tenant, p_cliente_id, 'AJUSTE', p_puntos, v_ver,
@@ -1448,23 +1465,43 @@ RETURNS jsonb
 LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp
 AS $$
 DECLARE
-  v_hoy  date := (p_ahora AT TIME ZONE 'America/Mexico_City')::date;
-  s      record;
-  m      record;
-  v_venc integer := 0;
-  v_rev  integer := 0;
+  v_hoy   date := (p_ahora AT TIME ZONE 'America/Mexico_City')::date;
+  s       record;
+  m       record;
+  v_saldo integer;
+  v_vence date;
+  v_ver   integer;
+  v_venc  integer := 0;
+  v_rev   integer := 0;
+  v_err   integer := 0;
 BEGIN
+  -- Cada fila va en su propio bloque: una fila que falle se cuenta y se avisa en el log, pero no
+  -- tumba el proceso de los demás negocios (ni se repite igual cada noche sin que nadie lo vea).
   FOR s IN
-    SELECT sa.cliente_id, sa.tenant_id, sa.saldo, sa.programa_version
+    SELECT sa.cliente_id, sa.tenant_id, sa.programa_version
       FROM lealtad_saldos sa
       JOIN lealtad_programa p ON p.tenant_id = sa.tenant_id AND p.version = sa.programa_version
       JOIN configuracion_tenant c ON c.tenant_id = sa.tenant_id AND c.modulo_lealtad_activo
      WHERE sa.saldo > 0 AND sa.vence_el IS NOT NULL AND sa.vence_el < v_hoy
   LOOP
-    PERFORM lealtad_registrar_movimiento(
-      NULL, s.tenant_id, s.cliente_id, 'VENCIMIENTO', -s.saldo, s.programa_version,
-      p_motivo => 'Venció por inactividad', p_fecha => p_ahora);
-    v_venc := v_venc + 1;
+    BEGIN
+      -- Se vuelve a leer con bloqueo: desde la foto del ciclo pudo entrar una compra o un canje.
+      -- Se vence el saldo de ahora, no el de la foto.
+      SELECT saldo, vence_el, programa_version INTO v_saldo, v_vence, v_ver
+        FROM lealtad_saldos WHERE cliente_id = s.cliente_id FOR UPDATE;
+      IF NOT FOUND OR v_saldo <= 0 OR v_vence IS NULL OR v_vence >= v_hoy
+         OR v_ver IS DISTINCT FROM s.programa_version THEN
+        CONTINUE;
+      END IF;
+      PERFORM lealtad_registrar_movimiento(
+        NULL, s.tenant_id, s.cliente_id, 'VENCIMIENTO', -v_saldo, v_ver,
+        p_motivo => 'Venció por inactividad', p_fecha => p_ahora);
+      v_venc := v_venc + 1;
+    EXCEPTION WHEN OTHERS THEN
+      RAISE WARNING 'lealtad_proceso_diario: no se pudo vencer el saldo del cliente % (negocio %): %',
+        s.cliente_id, s.tenant_id, SQLERRM;
+      v_err := v_err + 1;
+    END;
   END LOOP;
 
   FOR m IN
@@ -1477,12 +1514,18 @@ BEGIN
                          JOIN tickets t ON t.id = tc.ticket_id
                         WHERE tc.id = c.id AND t.estado_fiscal IN ('PAGADO', 'FACTURADO'))
   LOOP
-    IF lealtad_revertir_canje(m.id, m.tenant_id, 'El canje no llegó a una cuenta pagada en 48 horas') THEN
-      v_rev := v_rev + 1;
-    END IF;
+    BEGIN
+      IF lealtad_revertir_canje(m.id, m.tenant_id, 'El canje no llegó a una cuenta pagada en 48 horas') THEN
+        v_rev := v_rev + 1;
+      END IF;
+    EXCEPTION WHEN OTHERS THEN
+      RAISE WARNING 'lealtad_proceso_diario: no se pudo revertir el canje % (negocio %): %',
+        m.id, m.tenant_id, SQLERRM;
+      v_err := v_err + 1;
+    END;
   END LOOP;
 
-  RETURN jsonb_build_object('vencidos', v_venc, 'canjes_revertidos', v_rev);
+  RETURN jsonb_build_object('vencidos', v_venc, 'canjes_revertidos', v_rev, 'errores', v_err);
 END $$;
 REVOKE ALL ON FUNCTION lealtad_proceso_diario(timestamptz) FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION lealtad_proceso_diario(timestamptz) TO service_role;
