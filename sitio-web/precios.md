@@ -1,10 +1,10 @@
 # Precios de VIM POS: tres planes, publicados
 
-> Tres planes en pesos más IVA: Esencial $699, Negocio $999 y Cadena $1,999 al mes. Sin pago inicial ni contrato forzoso; desde Negocio cargamos tu menú y capacitamos a tu equipo.
+> Tres planes en pesos más IVA: Esencial $699, Negocio $999 y Cadena $1,999 al mes. Sin pago inicial ni contrato forzoso.
 
 **VIM POS** · punto de venta para restaurantes en México · versión en HTML: https://vimpos.com.mx/precios
 
-En pesos y más IVA. Sin costo de instalación ni contrato forzoso.
+Desde $699 al mes, en pesos y más IVA. Sin costo de instalación ni contrato forzoso.
 
 Sin pago inicial en ningún plan
 

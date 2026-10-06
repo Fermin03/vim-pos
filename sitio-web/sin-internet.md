@@ -49,13 +49,13 @@ El ticket se cierra, se cobra y se imprime completo en el momento. No queda una 
 
 ### La cocina tampoco se entera
 
-Las comandas van de la caja a la impresora y a la pantalla de cocina por la red de tu local. Nunca salen a internet, ni siquiera cuando lo hay.
+Las comandas van de la caja a la impresora y a la [pantalla de cocina](https://vimpos.com.mx/funciones#cocina) por la red de tu local. Nunca salen a internet, ni siquiera cuando lo hay.
 
 _Cómo se acomoda en tu local_
 
 ## Una computadora manda, las demás cuelgan de ella
 
-La caja principal hace de centro. La pantalla de cocina, las impresoras de las distintas áreas y la segunda caja se conectan a ella por la red del local — el mismo módem que ya tienes, sin salir a internet. Por eso todo el conjunto sigue trabajando cuando la señal se va: nunca dependía de ella.
+La caja principal hace de centro. La pantalla de cocina, las impresoras de las distintas áreas y la segunda caja se conectan a ella por la red del local (cuántas cajas trae cada plan está en [precios](https://vimpos.com.mx/precios)) — el mismo módem que ya tienes, sin salir a internet. Por eso todo el conjunto sigue trabajando cuando la señal se va: nunca dependía de ella.
 
 _Cuando vuelve la señal_
 

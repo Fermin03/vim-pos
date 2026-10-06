@@ -32,7 +32,7 @@ _Así se ve la pregunta 1 respondida en la caja de VIM POS: el aviso de que no h
 
 ### 2 · ¿El precio está publicado?
 
-Si hay que pedir cotización, el precio depende de lo que el vendedor calcule que puedes pagar. No es ilegal ni raro, pero conviene saberlo. Un precio publicado también es un precio que no te pueden subir en la renovación sin que te enteres.
+Si hay que pedir cotización, el precio depende de lo que el vendedor calcule que puedes pagar. No es ilegal ni raro, pero conviene saberlo: las tres formas de cobrar están en [cuánto cuesta un sistema para restaurante](https://vimpos.com.mx/cuanto-cuesta-un-sistema-para-restaurante). Un precio publicado también es un precio que no te pueden subir en la renovación sin que te enteres.
 
 ### 3 · ¿Me cobran comisión por cada venta?
 

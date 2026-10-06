@@ -693,6 +693,10 @@
         {
           "key": "Vary",
           "value": "Accept, Accept-Encoding"
+        },
+        {
+          "key": "Link",
+          "value": "<https://vimpos.com.mx/>; rel=\"canonical\""
         }
       ]
     },
@@ -706,6 +710,10 @@
         {
           "key": "Vary",
           "value": "Accept, Accept-Encoding"
+        },
+        {
+          "key": "Link",
+          "value": "<https://vimpos.com.mx/funciones>; rel=\"canonical\""
         }
       ]
     },
@@ -719,6 +727,10 @@
         {
           "key": "Vary",
           "value": "Accept, Accept-Encoding"
+        },
+        {
+          "key": "Link",
+          "value": "<https://vimpos.com.mx/sin-internet>; rel=\"canonical\""
         }
       ]
     },
@@ -732,6 +744,10 @@
         {
           "key": "Vary",
           "value": "Accept, Accept-Encoding"
+        },
+        {
+          "key": "Link",
+          "value": "<https://vimpos.com.mx/facturacion-cfdi>; rel=\"canonical\""
         }
       ]
     },
@@ -745,6 +761,10 @@
         {
           "key": "Vary",
           "value": "Accept, Accept-Encoding"
+        },
+        {
+          "key": "Link",
+          "value": "<https://vimpos.com.mx/precios>; rel=\"canonical\""
         }
       ]
     },
@@ -758,6 +778,10 @@
         {
           "key": "Vary",
           "value": "Accept, Accept-Encoding"
+        },
+        {
+          "key": "Link",
+          "value": "<https://vimpos.com.mx/novedades>; rel=\"canonical\""
         }
       ]
     },
@@ -771,6 +795,10 @@
         {
           "key": "Vary",
           "value": "Accept, Accept-Encoding"
+        },
+        {
+          "key": "Link",
+          "value": "<https://vimpos.com.mx/demo>; rel=\"canonical\""
         }
       ]
     },
@@ -784,6 +812,10 @@
         {
           "key": "Vary",
           "value": "Accept, Accept-Encoding"
+        },
+        {
+          "key": "Link",
+          "value": "<https://vimpos.com.mx/cuanto-cuesta-un-sistema-para-restaurante>; rel=\"canonical\""
         }
       ]
     },
@@ -797,6 +829,10 @@
         {
           "key": "Vary",
           "value": "Accept, Accept-Encoding"
+        },
+        {
+          "key": "Link",
+          "value": "<https://vimpos.com.mx/como-elegir-sistema-restaurante>; rel=\"canonical\""
         }
       ]
     },
@@ -810,6 +846,10 @@
         {
           "key": "Vary",
           "value": "Accept, Accept-Encoding"
+        },
+        {
+          "key": "Link",
+          "value": "<https://vimpos.com.mx/nosotros>; rel=\"canonical\""
         }
       ]
     },
@@ -823,6 +863,10 @@
         {
           "key": "Vary",
           "value": "Accept, Accept-Encoding"
+        },
+        {
+          "key": "Link",
+          "value": "<https://vimpos.com.mx/contacto>; rel=\"canonical\""
         }
       ]
     },
@@ -836,6 +880,10 @@
         {
           "key": "Vary",
           "value": "Accept, Accept-Encoding"
+        },
+        {
+          "key": "Link",
+          "value": "<https://vimpos.com.mx/aviso-privacidad>; rel=\"canonical\""
         }
       ]
     },
@@ -849,6 +897,10 @@
         {
           "key": "Vary",
           "value": "Accept, Accept-Encoding"
+        },
+        {
+          "key": "Link",
+          "value": "<https://vimpos.com.mx/terminos>; rel=\"canonical\""
         }
       ]
     },
@@ -862,6 +914,10 @@
         {
           "key": "Vary",
           "value": "Accept, Accept-Encoding"
+        },
+        {
+          "key": "Link",
+          "value": "<https://vimpos.com.mx/404>; rel=\"canonical\""
         }
       ]
     },

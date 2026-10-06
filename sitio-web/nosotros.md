@@ -1,6 +1,6 @@
 # Quién está detrás de VIM POS
 
-> Quién construye VIM POS, desde dónde, por qué existe y en qué punto está el producto hoy.
+> Quién construye VIM POS, el punto de venta para restaurantes hecho en León, Guanajuato: por qué existe y en qué punto está el producto hoy.
 
 **VIM POS** · punto de venta para restaurantes en México · versión en HTML: https://vimpos.com.mx/nosotros
 

@@ -48,6 +48,18 @@ Efectivo, débito, crédito, transferencia, vales y las apps de reparto. La tarj
 
 Una parte en efectivo y otra con tarjeta en el mismo ticket, sin tener que inventar dos ventas para que cuadre.
 
+### Combos
+
+Un paquete con sus opciones a un solo precio. Cada producto del combo llega a cocina, descuenta inventario, cuenta en los reportes y acepta sus propios modificadores.
+
+### Pantalla del cliente
+
+Con un segundo monitor en la caja, tu cliente ve la cuenta, el total y el cambio. Cuando no se está cobrando, muestra las imágenes que tú subas.
+
+### Un menú por sucursal
+
+Cada sucursal vende sus productos, a su precio, y agota lo suyo sin afectar a las demás.
+
 _La cocina_
 
 ## La comanda llega sola, y a la estación correcta
@@ -68,7 +80,7 @@ La categoría decide a dónde va cada cosa por omisión, y un producto puede lle
 
 ### Sin pasar por internet
 
-La comanda viaja de la caja a la cocina por la red de tu local. No sale afuera ni siquiera cuando hay señal.
+La comanda viaja de la caja a la cocina por la red de tu local, igual que [todo lo demás cuando se cae el internet](https://vimpos.com.mx/sin-internet). No sale afuera ni siquiera cuando hay señal.
 
 _Comedor_
 
@@ -130,11 +142,11 @@ _El panel, desde el celular o la computadora. Sin tener que ir al local a pregun
 
 ### Arqueo con sobrante y faltante
 
-Cuentas el cajón, el sistema dice lo que debería haber, y la diferencia queda registrada junto con quién cerró el turno.
+Cuentas el cajón, el sistema dice lo que debería haber, y la diferencia queda registrada junto con quién cerró el turno. Con el corte ciego, el cajero cuenta sin ver cuánto debería haber.
 
 ### Quince reportes
 
-Por producto, categoría, mesero, área, marca, tipo de servicio, tiempos de cocina, descuentos, reimpresiones, no-shows y el histórico de cortes.
+Ventas por producto, categoría, mesero, área, marca, tipo de servicio y app de reparto; costo de ventas, tiempos de cocina, descuentos, reimpresiones, eventos, no-shows, el histórico de cortes y el consolidado de sucursales.
 
 ### Todas tus sucursales, sumadas
 
@@ -162,6 +174,24 @@ Pedidos sin depósito, depósitos sin pedido y diferencias de monto, cada grupo 
 
 El reporte de ventas por app trae la venta, la comisión y lo que queda, así que la venta por apps se ve neta y no bruta.
 
+_A domicilio_
+
+## Pedidos a domicilio, con repartidor y zona de envío
+
+El pedido se captura en la caja con su cliente y su dirección, y sale con repartidor asignado. Los de Uber Eats entran solos.
+
+### Repartidores
+
+Asignas el pedido a un repartidor y con eso sale. Puedes mandar varios pedidos en un mismo viaje.
+
+### Zonas de envío
+
+El envío se cobra según la zona del cliente. Cada sucursal define las suyas y se eligen al capturar el pedido.
+
+### Uber Eats, directo a la caja
+
+Cada pedido entra como un ticket y su comanda sale a cocina. Incluido desde Negocio; en Esencial, $100 al mes ([precios](https://vimpos.com.mx/precios)). La tableta de Uber se queda en tu local, y DiDi y Rappi aún no están conectados.
+
 _Si ya usas otro_
 
 ## Tu menú se pega y ya
@@ -183,6 +213,16 @@ El módulo cubre las tres cosas que un restaurante necesita ante el SAT: el **ti
 [Cómo funciona la facturación](https://vimpos.com.mx/facturacion-cfdi)
 
 [Qué cuesta](https://vimpos.com.mx/precios)
+
+_Los límites_
+
+## Lo que VIM POS no hace
+
+- **No hay app de mesero en tableta.** El comedor se opera desde la caja.
+- **No cobra tarjetas.** La tarjeta se cobra en tu terminal bancaria y en la caja se registra como forma de pago.
+- **La liquidación de las apps se pega a mano.** Todavía no se sube el archivo.
+- **DiDi y Rappi no entran solos a la caja.** Hoy solo Uber Eats.
+- **No vendemos equipo.** Te decimos qué comprar y lo compras donde te salga mejor.
 
 ## Míralo funcionando
 

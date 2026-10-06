@@ -527,9 +527,12 @@ function vercelJson() {
         headers: [CACHE_HTML, varias, enlaceMarkdown(p)],
       })),
     ),
+    // El gemelo en Markdown dice lo mismo que su página. Sin esta cabecera un
+    // buscador puede indexar los dos y repartir entre ellos lo que debería ir al
+    // HTML. No lleva `noindex`: los agentes sí deben poder leerlo y citarlo.
     ...TODAS.map((p) => ({
       source: '/' + p.markdown,
-      headers: [CACHE_HTML, varias],
+      headers: [CACHE_HTML, varias, { key: 'Link', value: `<${BASE}${p.ruta}>; rel="canonical"` }],
     })),
     ...['/llms.txt', '/llms-full.txt', '/agents.md', '/AGENTS.md'].map((ruta) => ({
       source: ruta,
