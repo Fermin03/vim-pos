@@ -27,13 +27,13 @@ export const EsquemaDuenoRegistro = z.object({
     .string()
     .transform((v, ctx) => {
       const t = telefonoMx10(v);
-      if (!t) ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Tu WhatsApp va en 10 dígitos, p. ej. 477 123 4567." });
+      if (!t) ctx.addIssue({ code: "custom", message: "Tu WhatsApp va en 10 dígitos, p. ej. 477 123 4567." });
       return t ?? "";
     }),
   email_owner: z.string().trim().toLowerCase().email("Revisa tu correo: parece que le falta algo.").max(254),
   ciudad: z.string().trim().min(2, "Escribe tu ciudad.").max(80, "La ciudad es muy larga."),
   password: z.string().min(8, "La contraseña debe tener al menos 8 caracteres.").max(72, "La contraseña es muy larga."),
-  acepta_terminos: z.literal(true, { errorMap: () => ({ message: "Para crear tu cuenta, acepta los términos y el aviso de privacidad." }) }),
+  acepta_terminos: z.literal(true, { error: "Para crear tu cuenta, acepta los términos y el aviso de privacidad." }),
 });
 
 export type DuenoRegistro = z.infer<typeof EsquemaDuenoRegistro>;

@@ -162,7 +162,7 @@ export async function eliminarGrupo(id: string): Promise<void> {
 // ── Opciones ─────────────────────────────────────────────────────────────────
 export const opcionSchema = z.object({
   nombre: z.string().trim().min(1, "El nombre es obligatorio").max(150),
-  precio_extra_mxn: z.number({ invalid_type_error: "Precio inválido" }),
+  precio_extra_mxn: z.number({ error: "Precio inválido" }),
   es_default: z.boolean(),
   activa: z.boolean(),
 });

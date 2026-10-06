@@ -39,7 +39,7 @@ export const VistaPrevia = z.object({
   puede_eliminar: z.boolean(),
   bloqueos: z.array(Bloqueo),
   resumen: Resumen,
-  tablas: z.record(z.number()),
+  tablas: z.record(z.string(), z.number()),
 });
 export type VistaPreviaEliminacion = z.infer<typeof VistaPrevia>;
 

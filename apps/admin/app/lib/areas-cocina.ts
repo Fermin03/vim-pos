@@ -42,7 +42,7 @@ export const TIPOS_AREA = [
 ] as const;
 
 export const areaSchema = z.object({
-  sucursal_id: z.string().uuid("Elige una sucursal"),
+  sucursal_id: z.string().guid("Elige una sucursal"),
   nombre: z.string().trim().min(2, "Escribe el nombre").max(100),
   tipo: z.enum(["COCINA_CALIENTE", "COCINA_FRIA", "BARRA", "PIZZAS", "POSTRES", "CAFE", "OTRO"]),
 });
