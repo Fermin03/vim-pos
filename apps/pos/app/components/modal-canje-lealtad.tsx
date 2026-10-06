@@ -61,9 +61,12 @@ export function ModalCanjeLealtad({
   const [puntos, setPuntos] = useState("");
   const [pendiente, setPendiente] = useState<Pendiente | null>(null);
   const [confirmandoQuitar, setConfirmandoQuitar] = useState(false);
+  const [confirmandoDescartar, setConfirmandoDescartar] = useState(false);
   const almacen = useMemo(() => almacenLocal(), []);
   const vivo = useRef(true);
-  useEffect(() => () => { vivo.current = false; }, []);
+  // Se vuelve a marcar vivo al montar: en modo estricto React monta, desmonta y remonta, y sin esto
+  // `vivo` se quedaba en false para siempre y el modal nunca salía de «Cargando…».
+  useEffect(() => { vivo.current = true; return () => { vivo.current = false; }; }, []);
 
   const cargar = useCallback(async () => {
     try {
@@ -80,6 +83,7 @@ export function ModalCanjeLealtad({
       if (!cliente) { setError("La cuenta ya no tiene a ese cliente."); return; }
       setDatos({ programa, premios, cliente, canje, total: tot.total, envio });
       setPendiente(leerPendiente(almacen, ticketId));
+      setConfirmandoDescartar(false);
       // El saldo de la nube es también la prueba de conexión: en la caja, `online` solo dice que el
       // gateway local responde, no que haya internet.
       const s = await consultarSaldo(token, { clienteId, telefono: cliente.telefono });
@@ -99,21 +103,27 @@ export function ModalCanjeLealtad({
 
   useEffect(() => { void cargar(); }, [cargar]);
 
+  /** La operación ya ocurrió: que falle el refresco de la pantalla de atrás no se reporta como canje fallido. */
+  async function avisarCambio(r: { premioAplicado: boolean }) {
+    try { await onCambio(r); } catch { /* ya pasó; el padre se releerá en su próximo ciclo */ }
+  }
+
   async function ejecutar(p: Pendiente) {
     setOcupado(true);
+    setConfirmandoDescartar(false);
     setError(null);
     setAviso(null);
     try {
       const r = await avanzarCanje(opsReales(token), almacen, p);
       if (r.estado === "APLICADO") {
-        await onCambio({ premioAplicado: p.premio !== null });
+        await avisarCambio({ premioAplicado: p.premio !== null });
         onCerrar();
         return;
       }
       if (r.estado === "RECHAZADO") setError(r.mensaje);
       else setAviso(r.mensaje);
       // El renglón del premio pudo quedarse en la cuenta aunque el canje no entrara: la cuenta cambió.
-      if (p.premio) await onCambio({ premioAplicado: false });
+      if (p.premio) await avisarCambio({ premioAplicado: false });
       await cargar();
     } catch (e) {
       setError(e instanceof Error ? e.message : "No se pudo completar el canje");
@@ -127,18 +137,20 @@ export function ModalCanjeLealtad({
     setError(null);
     try {
       await quitarCanje(token, ticketId);
-      await onCambio({ premioAplicado: false });
-      onCerrar();
     } catch (e) {
       setError(e instanceof Error ? e.message : "No se pudo quitar el canje");
       setOcupado(false);
+      return;
     }
+    await avisarCambio({ premioAplicado: false });
+    onCerrar();
   }
 
   function descartarPendiente() {
     borrarPendiente(almacen, ticketId);
     setPendiente(null);
-    setAviso("Canje descartado. Si la nube alcanzó a descontar los puntos, vuelven solos al cliente en un máximo de 48 horas.");
+    setConfirmandoDescartar(false);
+    setAviso("Canje descartado.");
   }
 
   const m = datos?.programa.mecanica ?? "PUNTOS_DINERO";
@@ -174,10 +186,27 @@ export function ModalCanjeLealtad({
             Hay un canje a medias de {cantidad(pendiente.mecanica, pendiente.puntos)}
             {pendiente.premio ? ` (${pendiente.premio.nombre})` : ""} en esta cuenta.
           </div>
-          <div className="mt-2 flex gap-2">
-            <Button onClick={() => void ejecutar(pendiente)} disabled={ocupado}>{ocupado ? "Reintentando…" : "Reintentar"}</Button>
-            <Button variant="ghost" onClick={descartarPendiente} disabled={ocupado}>Descartar</Button>
-          </div>
+          {confirmandoDescartar ? (
+            <>
+              <p className="mt-2">
+                {pendiente.paso === "ASENTAR"
+                  ? `La nube ya descontó ${cantidad(pendiente.mecanica, pendiente.puntos)}. Si descartas, vuelven solos al cliente en un máximo de 48 horas; desde la caja no se pueden devolver antes.`
+                  : `Si la nube alcanzó a descontar ${cantidad(pendiente.mecanica, pendiente.puntos)}, vuelven solos al cliente en un máximo de 48 horas.`}
+                {pendiente.premio?.ticketItemId
+                  ? ` ${pendiente.premio.nombre} se queda en la cuenta a su precio: cancélalo desde la cuenta si el cliente no lo quiere.`
+                  : ""}
+              </p>
+              <div className="mt-2 flex gap-2">
+                <Button variant="ghost" onClick={() => setConfirmandoDescartar(false)} disabled={ocupado}>Volver</Button>
+                <Button variant="danger" onClick={descartarPendiente} disabled={ocupado}>Descartar canje</Button>
+              </div>
+            </>
+          ) : (
+            <div className="mt-2 flex gap-2">
+              <Button onClick={() => void ejecutar(pendiente)} disabled={ocupado}>{ocupado ? "Reintentando…" : "Reintentar"}</Button>
+              <Button variant="ghost" onClick={() => setConfirmandoDescartar(true)} disabled={ocupado}>Descartar</Button>
+            </div>
+          )}
         </Aviso>
       )}
 
