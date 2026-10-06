@@ -57,6 +57,9 @@ extension, and the normal address answers with `text/markdown` when asked with a
 - [Pide una demo](https://vimpos.com.mx/demo.md): Cómo se agenda una demostración y qué pasa después de enviar el formulario.
 - [Cuánto cuesta](https://vimpos.com.mx/cuanto-cuesta-un-sistema-para-restaurante.md): Los tres modelos con los que cobra un sistema para restaurante —licencia fija, gratuito con planes de pago, y porcentaje de cada venta—, la aritmética para comparar cada uno contra la venta real del negocio, y cuándo cada modelo deja de convenir. No nombra marcas: compara modelos.
 - [Cómo elegir sistema](https://vimpos.com.mx/como-elegir-sistema-restaurante.md): Guía de compra: nueve preguntas que hacerle a cualquier software para restaurantes antes de firmar —internet, precio publicado, comisiones, datos, facturación, implementación, permanencia, soporte y equipo— y en qué casos VIM POS no es la respuesta.
+- [Factura global](https://vimpos.com.mx/factura-global-restaurantes.md): Guía fiscal: qué es la factura global, cada cuándo se emite, qué datos lleva en CFDI 4.0 (RFC genérico, uso S01, periodo) y los errores más comunes en un restaurante. No es asesoría fiscal.
+- [Hamburgueserías](https://vimpos.com.mx/punto-de-venta-hamburgueserias.md): VIM POS para una hamburguesería: término obligatorio, extras con precio, combos, para llevar y a domicilio, cocina por estación e inventario por receta.
+- [León, Guanajuato](https://vimpos.com.mx/punto-de-venta-restaurantes-leon.md): VIM POS para restaurantes de León, Guanajuato, donde se hace el producto: en la zona, la demostración puede ser en el local.
 - [Nosotros](https://vimpos.com.mx/nosotros.md): Quién construye VIM POS, desde dónde, por qué existe y en qué punto está el producto hoy.
 - [Contacto](https://vimpos.com.mx/contacto.md): Cómo contactar a VIM POS: WhatsApp, correo, domicilio fiscal, horario y en cuánto contestamos.
 
@@ -72,5 +75,5 @@ extension, and the normal address answers with `text/markdown` when asked with a
 - [Aviso de privacidad](https://vimpos.com.mx/aviso-privacidad.md): Qué datos se recaban, para qué, cuánto se guardan y cómo ejercer los derechos ARCO.
 - [Términos del servicio](https://vimpos.com.mx/terminos.md): Qué se contrata, qué no incluye, cómo se cobra y cómo se cancela.
 - [Agent instructions / Instrucciones para agentes](https://vimpos.com.mx/agents.md): when to use VIM POS, when not to, and how to act on it. Bilingual.
-- [Todo el sitio en un solo archivo](https://vimpos.com.mx/llms-full.txt): las 13 páginas concatenadas, para cargar el contexto completo de una vez.
+- [Todo el sitio en un solo archivo](https://vimpos.com.mx/llms-full.txt): las 16 páginas concatenadas, para cargar el contexto completo de una vez.
 - [Índice de direcciones](https://vimpos.com.mx/sitemap.xml): el sitemap en XML.
