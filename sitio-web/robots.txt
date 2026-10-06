@@ -1,6 +1,6 @@
 # vimpos.com.mx
 #
-# Todo abierto salvo el 404 y una carpeta de imágenes (ver abajo). No hay panel ni zona privada en este dominio: el
+# Todo abierto salvo una carpeta de imágenes (ver abajo). No hay panel ni zona privada en este dominio: el
 # producto vive en otros subdominios y esos no se listan aquí — que un archivo
 # público enumere dónde está lo interesante es un favor que no hace falta.
 #
@@ -10,7 +10,6 @@
 
 User-agent: *
 Allow: /
-Disallow: /404
 # La imagen del Aviso de privacidad con los datos del responsable. Se publica como
 # imagen justo para que no acabe indexada ni transcrita: aquí se le cierra el paso a
 # todos los rastreadores, de buscador y de modelo de lenguaje por igual, y además se

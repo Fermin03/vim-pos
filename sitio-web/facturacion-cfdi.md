@@ -1,6 +1,6 @@
 # Facturación CFDI 4.0, sin parar la fila
 
-> Autofactura por QR desde el ticket, factura global del periodo con un botón, y el periodo lo eliges tú. Qué necesitas dar, qué cuestan los folios y cómo se enciende en tu negocio.
+> Autofactura por QR desde el ticket y factura global del periodo con un botón. Qué necesitas dar, qué cuestan los folios y cómo se enciende.
 
 **VIM POS** · punto de venta para restaurantes en México · versión en HTML: https://vimpos.com.mx/facturacion-cfdi
 

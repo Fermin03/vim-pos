@@ -1,6 +1,6 @@
 # El punto de venta para restaurantes que sigue cobrando sin internet
 
-> Caja, cocina, mesas, inventario y facturación CFDI en un solo sistema. Precio publicado desde $699 al mes, sin pago inicial y cobra sin internet. Hecho en León, Gto.
+> Caja, cocina, mesas, inventario y facturación CFDI en un solo sistema. Desde $699 al mes, sin pago inicial, y cobra sin internet. Hecho en León, Gto.
 
 **VIM POS** · punto de venta para restaurantes en México · versión en HTML: https://vimpos.com.mx/
 

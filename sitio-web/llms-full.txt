@@ -12,7 +12,7 @@ cuándo recomendarlo, está en https://vimpos.com.mx/llms.txt
 
 # El punto de venta para restaurantes que sigue cobrando sin internet
 
-> Caja, cocina, mesas, inventario y facturación CFDI en un solo sistema. Precio publicado desde $699 al mes, sin pago inicial y cobra sin internet. Hecho en León, Gto.
+> Caja, cocina, mesas, inventario y facturación CFDI en un solo sistema. Desde $699 al mes, sin pago inicial, y cobra sin internet. Hecho en León, Gto.
 
 **VIM POS** · punto de venta para restaurantes en México · versión en HTML: https://vimpos.com.mx/
 
@@ -278,6 +278,18 @@ Efectivo, débito, crédito, transferencia, vales y las apps de reparto. La tarj
 
 Una parte en efectivo y otra con tarjeta en el mismo ticket, sin tener que inventar dos ventas para que cuadre.
 
+### Combos
+
+Un paquete con sus opciones a un solo precio. Cada producto del combo llega a cocina, descuenta inventario, cuenta en los reportes y acepta sus propios modificadores.
+
+### Pantalla del cliente
+
+Con un segundo monitor en la caja, tu cliente ve la cuenta, el total y el cambio. Cuando no se está cobrando, muestra las imágenes que tú subas.
+
+### Un menú por sucursal
+
+Cada sucursal vende sus productos, a su precio, y agota lo suyo sin afectar a las demás.
+
 _La cocina_
 
 ## La comanda llega sola, y a la estación correcta
@@ -298,7 +310,7 @@ La categoría decide a dónde va cada cosa por omisión, y un producto puede lle
 
 ### Sin pasar por internet
 
-La comanda viaja de la caja a la cocina por la red de tu local. No sale afuera ni siquiera cuando hay señal.
+La comanda viaja de la caja a la cocina por la red de tu local, igual que [todo lo demás cuando se cae el internet](https://vimpos.com.mx/sin-internet). No sale afuera ni siquiera cuando hay señal.
 
 _Comedor_
 
@@ -360,11 +372,11 @@ _El panel, desde el celular o la computadora. Sin tener que ir al local a pregun
 
 ### Arqueo con sobrante y faltante
 
-Cuentas el cajón, el sistema dice lo que debería haber, y la diferencia queda registrada junto con quién cerró el turno.
+Cuentas el cajón, el sistema dice lo que debería haber, y la diferencia queda registrada junto con quién cerró el turno. Con el corte ciego, el cajero cuenta sin ver cuánto debería haber.
 
 ### Quince reportes
 
-Por producto, categoría, mesero, área, marca, tipo de servicio, tiempos de cocina, descuentos, reimpresiones, no-shows y el histórico de cortes.
+Ventas por producto, categoría, mesero, área, marca, tipo de servicio y app de reparto; costo de ventas, tiempos de cocina, descuentos, reimpresiones, eventos, no-shows, el histórico de cortes y el consolidado de sucursales.
 
 ### Todas tus sucursales, sumadas
 
@@ -392,6 +404,24 @@ Pedidos sin depósito, depósitos sin pedido y diferencias de monto, cada grupo 
 
 El reporte de ventas por app trae la venta, la comisión y lo que queda, así que la venta por apps se ve neta y no bruta.
 
+_A domicilio_
+
+## Pedidos a domicilio, con repartidor y zona de envío
+
+El pedido se captura en la caja con su cliente y su dirección, y sale con repartidor asignado. Los de Uber Eats entran solos.
+
+### Repartidores
+
+Asignas el pedido a un repartidor y con eso sale. Puedes mandar varios pedidos en un mismo viaje.
+
+### Zonas de envío
+
+El envío se cobra según la zona del cliente. Cada sucursal define las suyas y se eligen al capturar el pedido.
+
+### Uber Eats, directo a la caja
+
+Cada pedido entra como un ticket y su comanda sale a cocina. Incluido desde Negocio; en Esencial, $100 al mes ([precios](https://vimpos.com.mx/precios)). La tableta de Uber se queda en tu local, y DiDi y Rappi aún no están conectados.
+
 _Si ya usas otro_
 
 ## Tu menú se pega y ya
@@ -413,6 +443,16 @@ El módulo cubre las tres cosas que un restaurante necesita ante el SAT: el **ti
 [Cómo funciona la facturación](https://vimpos.com.mx/facturacion-cfdi)
 
 [Qué cuesta](https://vimpos.com.mx/precios)
+
+_Los límites_
+
+## Lo que VIM POS no hace
+
+- **No hay app de mesero en tableta.** El comedor se opera desde la caja.
+- **No cobra tarjetas.** La tarjeta se cobra en tu terminal bancaria y en la caja se registra como forma de pago.
+- **La liquidación de las apps se pega a mano.** Todavía no se sube el archivo.
+- **DiDi y Rappi no entran solos a la caja.** Hoy solo Uber Eats.
+- **No vendemos equipo.** Te decimos qué comprar y lo compras donde te salga mejor.
 
 ## Míralo funcionando
 
@@ -477,13 +517,13 @@ El ticket se cierra, se cobra y se imprime completo en el momento. No queda una 
 
 ### La cocina tampoco se entera
 
-Las comandas van de la caja a la impresora y a la pantalla de cocina por la red de tu local. Nunca salen a internet, ni siquiera cuando lo hay.
+Las comandas van de la caja a la impresora y a la [pantalla de cocina](https://vimpos.com.mx/funciones#cocina) por la red de tu local. Nunca salen a internet, ni siquiera cuando lo hay.
 
 _Cómo se acomoda en tu local_
 
 ## Una computadora manda, las demás cuelgan de ella
 
-La caja principal hace de centro. La pantalla de cocina, las impresoras de las distintas áreas y la segunda caja se conectan a ella por la red del local — el mismo módem que ya tienes, sin salir a internet. Por eso todo el conjunto sigue trabajando cuando la señal se va: nunca dependía de ella.
+La caja principal hace de centro. La pantalla de cocina, las impresoras de las distintas áreas y la segunda caja se conectan a ella por la red del local (cuántas cajas trae cada plan está en [precios](https://vimpos.com.mx/precios)) — el mismo módem que ya tienes, sin salir a internet. Por eso todo el conjunto sigue trabajando cuando la señal se va: nunca dependía de ella.
 
 _Cuando vuelve la señal_
 
@@ -548,7 +588,7 @@ Es la demo que pedimos que nos hagas: desconecta el cable delante de nosotros y 
 
 # Facturación CFDI 4.0, sin parar la fila
 
-> Autofactura por QR desde el ticket, factura global del periodo con un botón, y el periodo lo eliges tú. Qué necesitas dar, qué cuestan los folios y cómo se enciende en tu negocio.
+> Autofactura por QR desde el ticket y factura global del periodo con un botón. Qué necesitas dar, qué cuestan los folios y cómo se enciende.
 
 **VIM POS** · punto de venta para restaurantes en México · versión en HTML: https://vimpos.com.mx/facturacion-cfdi
 
@@ -660,11 +700,11 @@ Media hora con tus productos y tus precios cargados, y la facturación en modo d
 
 # Precios de VIM POS: tres planes, publicados
 
-> Tres planes en pesos más IVA: Esencial $699, Negocio $999 y Cadena $1,999 al mes. Sin pago inicial ni contrato forzoso; desde Negocio cargamos tu menú y capacitamos a tu equipo.
+> Tres planes en pesos más IVA: Esencial $699, Negocio $999 y Cadena $1,999 al mes. Sin pago inicial ni contrato forzoso.
 
 **VIM POS** · punto de venta para restaurantes en México · versión en HTML: https://vimpos.com.mx/precios
 
-En pesos y más IVA. Sin costo de instalación ni contrato forzoso.
+Desde $699 al mes, en pesos y más IVA. Sin costo de instalación ni contrato forzoso.
 
 Sin pago inicial en ningún plan
 
@@ -1215,7 +1255,7 @@ _Así se ve la pregunta 1 respondida en la caja de VIM POS: el aviso de que no h
 
 ### 2 · ¿El precio está publicado?
 
-Si hay que pedir cotización, el precio depende de lo que el vendedor calcule que puedes pagar. No es ilegal ni raro, pero conviene saberlo. Un precio publicado también es un precio que no te pueden subir en la renovación sin que te enteres.
+Si hay que pedir cotización, el precio depende de lo que el vendedor calcule que puedes pagar. No es ilegal ni raro, pero conviene saberlo: las tres formas de cobrar están en [cuánto cuesta un sistema para restaurante](https://vimpos.com.mx/cuanto-cuesta-un-sistema-para-restaurante). Un precio publicado también es un precio que no te pueden subir en la renovación sin que te enteres.
 
 ### 3 · ¿Me cobran comisión por cada venta?
 
@@ -1279,7 +1319,7 @@ Media hora con tus productos y tus precios cargados. Puedes traer esta lista y h
 
 # Quién está detrás de VIM POS
 
-> Quién construye VIM POS, desde dónde, por qué existe y en qué punto está el producto hoy.
+> Quién construye VIM POS, el punto de venta para restaurantes hecho en León, Guanajuato: por qué existe y en qué punto está el producto hoy.
 
 **VIM POS** · punto de venta para restaurantes en México · versión en HTML: https://vimpos.com.mx/nosotros
 
