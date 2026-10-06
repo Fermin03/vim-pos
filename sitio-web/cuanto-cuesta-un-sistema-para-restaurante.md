@@ -4,9 +4,9 @@
 
 **VIM POS** · punto de venta para restaurantes en México · versión en HTML: https://vimpos.com.mx/cuanto-cuesta-un-sistema-para-restaurante
 
-Hay tres formas de cobrarte, y la que parece más barata casi nunca lo es a los dos años. Esto explica las tres, con la aritmética para comparar cada una contra tu venta real.
+Hay tres formas de cobrarte, y la que parece más barata casi nunca lo es. Aquí están las tres, con las cuentas.
 
-Sin nombres. Los modelos son lo que importa: una marca puede cambiar su tarifa mañana sin que cambie el modelo con el que te cobra.
+Sin nombres de marcas: lo que importa es el modelo con el que te cobran.
 
 _Modelo 1_
 

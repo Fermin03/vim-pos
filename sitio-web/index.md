@@ -4,7 +4,7 @@
 
 **VIM POS** · punto de venta para restaurantes en México · versión en HTML: https://vimpos.com.mx/
 
-VIM POS es un sistema de punto de venta para restaurantes en México: caja, cocina, mesas, inventario y facturación CFDI en un solo sistema, sin letra chica. Sin pago inicial: desde Negocio cargamos tu menú y capacitamos a tu equipo, y en Esencial arrancas con nuestra guía.
+VIM POS es un sistema de punto de venta para restaurantes en México: caja, cocina, mesas, inventario y facturación en uno solo.
 
 [Pide una demo](https://vimpos.com.mx/demo)
 

@@ -4,7 +4,7 @@
 
 **VIM POS** · punto de venta para restaurantes en México · versión en HTML: https://vimpos.com.mx/terminos
 
-Qué contratas, qué incluye, cómo se cobra y cómo cancelar. Escritos para que se entiendan de una lectura.
+Qué contratas, qué incluye, cómo se cobra y cómo cancelar.
 
 Última actualización: 1 de octubre de 2026.
 

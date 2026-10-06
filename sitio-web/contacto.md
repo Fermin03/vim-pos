@@ -4,7 +4,7 @@
 
 **VIM POS** · punto de venta para restaurantes en México · versión en HTML: https://vimpos.com.mx/contacto
 
-El mismo día hábil, por el canal que prefieras. No hay centro de llamadas, no hay ticket con número de folio y no te va a llamar un vendedor.
+Te contestamos el mismo día hábil. Sin centro de llamadas y sin vendedor.
 
 [Escríbenos por correo](mailto:hola@vimpos.com.mx)
 
