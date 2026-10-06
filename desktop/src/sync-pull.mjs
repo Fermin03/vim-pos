@@ -119,13 +119,18 @@ async function upsertTabla(client, schema, tabla, filas, opts = {}) {
     // Una fila a la vez dentro de su SAVEPOINT: si choca (índice único, CHECK) se deshace SOLO esa
     // fila, se anota y el pull sigue. Se reintenta en el siguiente pull. Nada de `clientes` debe
     // poder revertir la transacción entera: eso deja a la caja sin catálogo en cada ciclo.
+    // `antesDeFila` (la fusión de duplicados de esa fila) corre DENTRO del mismo savepoint: si el
+    // upsert falla, el rollback deshace también la fusión y el duplicado queda intacto.
     await client.query("SAVEPOINT fila_pull");
     try {
+      await opts.antesDeFila?.(fila);
       await client.query(sql, params);
       await client.query("RELEASE SAVEPOINT fila_pull");
       aplicadas++;
+      opts.alAplicar?.(fila);
     } catch (e) {
       await client.query("ROLLBACK TO SAVEPOINT fila_pull");
+      await client.query("RELEASE SAVEPOINT fila_pull"); // sin esto quedan savepoints anidados por cada fila fallida
       opts.fallidas?.push({ fila, error: e });
       (opts.log ?? (() => {}))(`  ${tabla}: no se pudo aplicar ${fila.id ?? "?"} (se reintenta en el próximo pull): ${e.message}`);
     }
@@ -223,16 +228,11 @@ const CLAVES_NATURALES = {
   // `antesDeReapuntar` propio, porque en modo réplica los índices únicos sí se revisan.
   // lealtad_saldos NO se muda (su llave ES el cliente y mudarla chocaría si el real ya tuviera
   // saldo): se borra y entra la de la nube unas filas más abajo, en este mismo pull.
-  // El teléfono se compara por DÍGITOS en los dos lados, igual que la fusión de la nube: el POS lo
-  // guarda como se tecleó ("(477) 000-1567"). La barra de \D va doble en el literal de JS para que
-  // el SQL lleve una sola. _vim_clientes_ok: la fila de la libreta del duplicado quedaría con un id
+  // Los candidatos a duplicado NO se buscan aquí sino en memoria (`construirCandidatosClientes`, por
+  // DÍGITOS del teléfono como la fusión de la nube: el POS lo guarda como se tecleó). La fusión
+  // entera corre dentro del savepoint de la fila. _vim_clientes_ok: la fila de la libreta del duplicado quedaría con un id
   // que ya no existe; se borra en el mismo paso.
   clientes: {
-    claveSql: {
-      where: "tenant_id = $1 AND regexp_replace(telefono, '\\D', '', 'g') = $2 AND deleted_at IS NULL",
-      params: (f) => [f.tenant_id ?? null, soloDigitos(f.telefono)],
-      aplica: (f) => f.deleted_at == null && soloDigitos(f.telefono) !== "",
-    },
     dependientes: [
       { tabla: "lealtad_saldos", col: "cliente_id" },
       { tabla: "_vim_clientes_ok", col: "cliente_id" },
@@ -276,17 +276,26 @@ async function columnasQueApuntanA(client, tabla, excepto = []) {
   return fkCache.get(tabla).filter((r) => !excepto.includes(r.tabla));
 }
 
+/** Muda lo que cuelga del duplicado `viejoId` al `nuevoId` de la nube y borra al duplicado. */
+async function fundirDuplicado(client, tabla, cfg, reapuntar, viejoId, nuevoId) {
+  // Primero se mudan los que tienen datos propios al id de la nube; luego se borra lo demás.
+  if (cfg.bloquearViejo) await client.query(`SELECT 1 FROM ${tabla} WHERE id = $1 FOR UPDATE`, [viejoId]);
+  await cfg.antesDeReapuntar?.(client, viejoId, nuevoId);
+  for (const r of reapuntar) {
+    await client.query(`UPDATE ${r.tabla} SET "${r.col}" = $1 WHERE "${r.col}" = $2`, [nuevoId, viejoId]);
+  }
+  for (const d of cfg.dependientes) {
+    await client.query(`DELETE FROM ${d.tabla} WHERE "${d.col}" = $1`, [viejoId]);
+  }
+  await client.query(`DELETE FROM ${tabla} WHERE id = $1`, [viejoId]);
+}
+
 /**
  * Alinea un catálogo local con el de la nube ANTES de insertarlo: borra la fila local que colisiona
  * por clave natural con una entrante de distinto id, para que entre la de la nube con su id.
  * La nube manda. Es seguro porque una caja real no tiene datos propios: todo viene de allá.
  */
-/**
- * `opts.excluirIds`: ids que la nube manda en este snapshot; NUNCA son "el duplicado local" de otra
- * fila (un cliente que cambió de teléfono en el panel no es duplicado de quien recibió el suyo).
- * `opts.fusionados`: Map id→tenant que se llena con los destinos de una fusión.
- */
-async function reconciliarCatalogo(client, tabla, filas, log = () => {}, opts = {}) {
+async function reconciliarCatalogo(client, tabla, filas, log = () => {}) {
   const cfg = CLAVES_NATURALES[tabla];
   if (!cfg) return;
 
@@ -319,27 +328,12 @@ async function reconciliarCatalogo(client, tabla, filas, log = () => {}, opts = 
       cond = cfg.claves.map((c, i) => `"${c}" IS NOT DISTINCT FROM $${i + 1}`).join(" AND ");
       params = cfg.claves.map((c) => f[c] ?? null);
     }
-    const excluir = opts.excluirIds?.length ? [...opts.excluirIds, f.id] : null;
-    const { rows } = excluir
-      ? await client.query(
-        `SELECT id FROM ${tabla} WHERE ${cond} AND id <> $${params.length + 1} AND id <> ALL($${params.length + 2}::uuid[])`,
-        [...params, f.id, excluir])
-      : await client.query(
-        `SELECT id FROM ${tabla} WHERE ${cond} AND id <> $${params.length + 1}`,
-        [...params, f.id],
-      );
+    const { rows } = await client.query(
+      `SELECT id FROM ${tabla} WHERE ${cond} AND id <> $${params.length + 1}`,
+      [...params, f.id],
+    );
     for (const vieja of rows) {
-      // Primero se mudan los que tienen datos propios al id de la nube; luego se borra lo demás.
-      if (cfg.bloquearViejo) await client.query(`SELECT 1 FROM ${tabla} WHERE id = $1 FOR UPDATE`, [vieja.id]);
-      await cfg.antesDeReapuntar?.(client, vieja.id, f.id);
-      for (const r of reapuntar) {
-        await client.query(`UPDATE ${r.tabla} SET "${r.col}" = $1 WHERE "${r.col}" = $2`, [f.id, vieja.id]);
-      }
-      for (const d of cfg.dependientes) {
-        await client.query(`DELETE FROM ${d.tabla} WHERE "${d.col}" = $1`, [vieja.id]);
-      }
-      await client.query(`DELETE FROM ${tabla} WHERE id = $1`, [vieja.id]);
-      opts.fusionados?.set(f.id, f.tenant_id);
+      await fundirDuplicado(client, tabla, cfg, reapuntar, vieja.id, f.id);
       borradas++;
     }
   }
@@ -517,35 +511,97 @@ async function separarZonasPendientes(client, filas) {
  * teléfono de un cliente a otro, y el snapshot trae a los dos sin orden: si el que lo recibe entra
  * antes que el que lo suelta, el índice choca y el ROLLBACK se llevaba todo el pull.
  * Antes del upsert se sueltan teléfono y RFC de las filas locales que se van a reescribir (el upsert
- * los restaura en la misma transacción; solo se sueltan si la fila entrante trae ambas llaves, para
- * no perderlos si no las trae). codigo_publico es NOT NULL y lo genera la nube una sola vez por
+ * los restaura en la misma transacción; solo se suelta cada llave que CAMBIA y que la fila entrante
+ * trae, para no perderla). codigo_publico es NOT NULL y lo genera la nube una sola vez por
  * cliente, no se intercambia entre clientes: no se suelta, y si algún día chocara lo absorbe el
  * SAVEPOINT por fila. Devuelve lo soltado para poder restaurarlo si la fila no se aplica.
  */
 async function liberarClavesUnicasClientes(client, filas) {
-  const ids = filas.filter((f) => f?.id && "telefono" in f && "rfc" in f).map((f) => f.id);
-  if (!ids.length) return new Map();
+  const entrantes = new Map(filas.filter((f) => f?.id).map((f) => [f.id, f]));
+  if (!entrantes.size) return new Map();
   const { rows } = await client.query(
-    "SELECT id, telefono, rfc FROM clientes WHERE id = ANY($1::uuid[]) AND (telefono IS NOT NULL OR rfc IS NOT NULL)", [ids]);
-  if (!rows.length) return new Map();
-  await client.query("UPDATE clientes SET telefono = NULL, rfc = NULL WHERE id = ANY($1::uuid[])", [rows.map((r) => r.id)]);
-  return new Map(rows.map((r) => [r.id, r]));
+    "SELECT id, telefono, rfc FROM clientes WHERE id = ANY($1::uuid[]) AND (telefono IS NOT NULL OR rfc IS NOT NULL)", [[...entrantes.keys()]]);
+  // Solo lo que CAMBIA: si el valor entrante es el mismo que el local no hay nada que soltar (antes
+  // se escribía dos veces cada cliente en cada pull).
+  const soltadas = new Map();
+  for (const r of rows) {
+    const e = entrantes.get(r.id);
+    const relTel = r.telefono != null && "telefono" in e && (e.telefono ?? null) !== r.telefono;
+    const relRfc = r.rfc != null && "rfc" in e && (e.rfc ?? null) !== r.rfc;
+    if (relTel || relRfc) soltadas.set(r.id, { id: r.id, telefono: r.telefono, rfc: r.rfc, relTel, relRfc });
+  }
+  const soltar = async (col, ids) => ids.length
+    && client.query(`UPDATE clientes SET "${col}" = NULL WHERE id = ANY($1::uuid[])`, [ids]);
+  await soltar("telefono", [...soltadas.values()].filter((g) => g.relTel).map((g) => g.id));
+  await soltar("rfc", [...soltadas.values()].filter((g) => g.relRfc).map((g) => g.id));
+  return soltadas;
 }
 
-/** Devuelve teléfono y RFC a las filas que NO se pudieron aplicar (su copia local no debe perderlos). */
+/**
+ * Devuelve teléfono y RFC a las filas que NO se pudieron aplicar, CADA llave en su propio savepoint
+ * (que una choque no impide que la otra vuelva). Si alguna no se pudo devolver, la fila queda con
+ * un estado local distinto al de la nube: se anota su huella ACTUAL en la libreta del push para que
+ * no se tome por una edición local pendiente (el push subiría el cliente con la llave en NULL); el
+ * siguiente pull la reescribe desde la nube. Toda fila de aquí viene en el snapshot, o sea que la
+ * nube la conoce: no es un cliente nuevo de la caja.
+ */
 async function restaurarClavesClientes(client, fallidas, soltadas, log) {
   for (const { fila } of fallidas) {
     const g = soltadas.get(fila.id);
     if (!g) continue;
-    await client.query("SAVEPOINT restaura_cliente");
-    try {
-      await client.query("UPDATE clientes SET telefono = $2, rfc = $3 WHERE id = $1", [g.id, g.telefono, g.rfc]);
-      await client.query("RELEASE SAVEPOINT restaura_cliente");
-    } catch (e) {
-      await client.query("ROLLBACK TO SAVEPOINT restaura_cliente");
-      log(`  clientes: no se pudo devolver teléfono/RFC a ${g.id}: ${e.message}`);
+    const faltan = [];
+    for (const [col, rel] of [["telefono", g.relTel], ["rfc", g.relRfc]]) {
+      if (!rel) continue;
+      await client.query("SAVEPOINT restaura_cliente");
+      try {
+        await client.query(`UPDATE clientes SET "${col}" = $2 WHERE id = $1`, [g.id, g[col]]);
+        await client.query("RELEASE SAVEPOINT restaura_cliente");
+      } catch (e) {
+        await client.query("ROLLBACK TO SAVEPOINT restaura_cliente");
+        await client.query("RELEASE SAVEPOINT restaura_cliente");
+        faltan.push(col);
+        log(`  clientes: no se pudo devolver ${col} a ${g.id} (la nube la reescribe en el próximo pull): ${e.message}`);
+      }
+    }
+    if (faltan.length) {
+      await client.query(
+        `INSERT INTO _vim_clientes_ok (cliente_id, huella)
+         SELECT x.id, ${HUELLA_FILA} FROM clientes x WHERE x.id = $1
+         ON CONFLICT (cliente_id) DO UPDATE SET huella = EXCLUDED.huella`, [g.id]);
     }
   }
+}
+
+/**
+ * Candidatos a "duplicado local" de un cliente entrante, en memoria (parte pura). `locales` son los
+ * clientes vivos de la caja (`{id, tenant_id, telefono}`); `idsNube` los ids que la nube manda en
+ * este snapshot: un cliente que la nube manda NUNCA es duplicado de otro (cambió de teléfono en el
+ * panel). Se agrupan por negocio y dígitos del teléfono; sin dígitos no hay candidato.
+ * Una sola consulta y un Map en vez de una consulta por cliente entrante con la lista completa de
+ * ids (cuadrático: 35 s con 4,000 clientes).
+ */
+export function construirCandidatosClientes(locales, idsNube) {
+  const nube = new Set(idsNube ?? []);
+  const mapa = new Map();
+  for (const l of locales ?? []) {
+    if (!l?.id || nube.has(l.id)) continue;
+    const dig = soloDigitos(l.telefono);
+    if (!dig) continue;
+    const k = `${l.tenant_id}|${dig}`;
+    (mapa.get(k) ?? mapa.set(k, []).get(k)).push(l.id);
+  }
+  return mapa;
+}
+const claveCandidatos = (fila) => `${fila.tenant_id}|${soloDigitos(fila.telefono)}`;
+/** Ids de los duplicados locales de una fila entrante (viva y con dígitos); nunca ella misma. */
+export function buscarCandidatosCliente(mapa, fila) {
+  if (!fila?.id || fila.deleted_at != null || !soloDigitos(fila.telefono)) return [];
+  return (mapa.get(claveCandidatos(fila)) ?? []).filter((id) => id !== fila.id);
+}
+/** Tras fundir con éxito: esos ids ya no existen, que no vuelvan a salir como candidatos. */
+export function retirarCandidatosCliente(mapa, fila, ids) {
+  const k = claveCandidatos(fila);
+  mapa.set(k, (mapa.get(k) ?? []).filter((id) => !ids.includes(id)));
 }
 
 /**
@@ -676,10 +732,39 @@ export async function pullSnapshot(pool, snapshot, log = () => {}) {
         filas = aplicar;
         if (!filas.length) continue;
       }
-      await reconciliarCatalogo(client, t, filas, log, t === "clientes" ? { excluirIds: idsNube, fusionados } : {});
       const fallidas = [];
-      const soltadas = t === "clientes" ? await liberarClavesUnicasClientes(client, filas) : null;
-      const n = await upsertTabla(client, schema, t, filas, t === "clientes" ? { aislarFilas: true, fallidas, log } : {});
+      let soltadas = null;
+      let opcionesFila = {};
+      if (t === "clientes") {
+        // Duplicados locales: UNA consulta antes del bucle, candidatos en memoria. Se arma ANTES de
+        // soltar llaves. Cada fila entrante hace su fusión y su upsert en el mismo savepoint.
+        const cfg = CLAVES_NATURALES.clientes;
+        const reapuntar = await columnasQueApuntanA(client, "clientes", cfg.reapuntarFk.excepto);
+        const tenants = [...new Set(filas.map((x) => x?.tenant_id).filter((v) => v != null))];
+        const { rows: locales } = await client.query(
+          "SELECT id, tenant_id, telefono FROM clientes WHERE tenant_id = ANY($1::uuid[]) AND deleted_at IS NULL AND telefono IS NOT NULL", [tenants]);
+        const mapa = construirCandidatosClientes(locales, idsNube);
+        soltadas = await liberarClavesUnicasClientes(client, filas);
+        const fundidos = new Map();
+        opcionesFila = {
+          aislarFilas: true, fallidas, log,
+          antesDeFila: async (fila) => {
+            const viejos = buscarCandidatosCliente(mapa, fila);
+            for (const v of viejos) await fundirDuplicado(client, "clientes", cfg, reapuntar, v, fila.id);
+            if (viejos.length) fundidos.set(fila.id, viejos);
+          },
+          alAplicar: (fila) => {
+            const viejos = fundidos.get(fila.id);
+            if (!viejos) return;
+            retirarCandidatosCliente(mapa, fila, viejos);
+            fusionados.set(fila.id, fila.tenant_id);
+            log(`  clientes: ${viejos.length} duplicado(s) local(es) fundido(s) en ${fila.id}`);
+          },
+        };
+      } else {
+        await reconciliarCatalogo(client, t, filas, log);
+      }
+      const n = await upsertTabla(client, schema, t, filas, opcionesFila);
       if (fallidas.length) {
         await restaurarClavesClientes(client, fallidas, soltadas, log);
         const malas = new Set(fallidas.map((x) => x.fila.id));

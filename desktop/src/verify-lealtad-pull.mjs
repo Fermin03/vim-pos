@@ -192,6 +192,73 @@ try {
     assert.equal((await q("SELECT saldo FROM lealtad_saldos WHERE cliente_id = $1", [real]))[0]?.saldo, 12, "(saldo) el real muestra los 12 pendientes");
   }
 
+  // ¿Cambió el cliente en la caja desde la última vez que se anotó en la libreta? (misma huella que usa el push)
+  const pendientePush = async (id) => (await q(
+    `SELECT count(*)::int AS n FROM _vim_clientes_ok o JOIN clientes x ON x.id = o.cliente_id
+      WHERE o.cliente_id = $1 AND o.huella IS DISTINCT FROM md5(to_jsonb(x)::text)`, [id]))[0].n === 1;
+
+  // (N1) la fila falla Y su restauración también: X (teléfono A, RFC R1) pasa a D con RFC R2, D lo tiene L
+  // (edición local pendiente) y A lo recibe W. El teléfono no puede volver (choca con W); el RFC sí, y X
+  // no debe quedar como "edición local" que el push subiría con NULL.
+  {
+    const X = "99999999-5555-0000-0000-000000000001", W = "99999999-5555-0000-0000-000000000002", L = "99999999-5555-0000-0000-000000000003";
+    const R1 = "BBBB010101BBB", R2 = "CCCC010101CCC";
+    await pullSnapshot(pool, { clientes: [clienteNube(X, "4776660001", "Xenia", { rfc: R1 }), clienteNube(W, "4776660002", "Walter"), clienteNube(L, "4776660003", "Lalo")] }, () => {});
+    await pool.query("UPDATE clientes SET telefono = '4776660009' WHERE id = $1", [L]); // edición pendiente: tiene D
+    const lineas = [];
+    await pullSnapshot(pool, { clientes: [clienteNube(W, "4776660001", "Walter"), clienteNube(X, "4776660009", "Xenia", { rfc: R2 }), clienteNube(L, "4776660003", "Lalo")] }, (m) => lineas.push(m));
+    assert.equal(await rfcDe(X), R1, "(N1) el RFC, que no chocó con nada, volvió");
+    assert.equal(await telDe(X), null, "(N1) el teléfono no pudo volver (lo tiene W)");
+    assert.ok(lineas.some((l) => l.includes("no se pudo devolver telefono") && l.includes(X)), "(N1) una línea dice qué llave no volvió");
+    assert.equal(await pendientePush(X), false, "(N1) X NO queda pendiente de subir con la llave en NULL");
+    // Sin la colisión, el siguiente pull deja a X exactamente como dice la nube.
+    await pool.query("UPDATE clientes SET telefono = '4776660003' WHERE id = $1", [L]); // L vuelve a su valor: nada choca
+    await pullSnapshot(pool, { clientes: [clienteNube(W, "4776660001", "Walter"), clienteNube(X, "4776660007", "Xenia", { rfc: R2 }), clienteNube(L, "4776660003", "Lalo")] }, () => {});
+    assert.equal(await telDe(X), "4776660007", "(N1) 2.º pull: teléfono como dice la nube");
+    assert.equal(await rfcDe(X), R2, "(N1) 2.º pull: RFC como dice la nube");
+  }
+
+  // (N2) la fusión y el upsert van en el MISMO savepoint: V (solo local, con dirección y 12 puntos) es duplicado
+  // de N, pero N no puede entrar (L, con edición pendiente, tiene su teléfono crudo). Todo de V sigue en V.
+  {
+    const V = (await q("INSERT INTO clientes (tenant_id, nombre, telefono) VALUES ($1, 'Vera Caja', '(477) 555-0001') RETURNING id", [T]))[0].id;
+    const dv = (await dir(V, true, "Calle de Vera"))[0].id;
+    await pool.query("SELECT lealtad_registrar_movimiento(NULL, $1, $2, 'GANADO', 12, 1)", [T, V]);
+    const L = "99999999-6666-0000-0000-000000000001", N = "99999999-6666-0000-0000-000000000002";
+    await pullSnapshot(pool, { clientes: [clienteNube(L, "4775550002", "Lola")] }, () => {});
+    await pool.query("UPDATE clientes SET telefono = '4775550001' WHERE id = $1", [L]); // edición pendiente con el teléfono de N
+    const snap = { clientes: [clienteNube(L, "4775550002", "Lola"), clienteNube(N, "4775550001", "Nando")] };
+    await pullSnapshot(pool, snap, () => {});
+    assert.equal((await q("SELECT count(*)::int AS n FROM clientes WHERE id = $1", [V]))[0].n, 1, "(N2) V sigue existiendo");
+    assert.equal((await q("SELECT cliente_id FROM direcciones_cliente WHERE id = $1", [dv]))[0].cliente_id, V, "(N2) su dirección sigue con V");
+    assert.equal((await q("SELECT count(*)::int AS n FROM lealtad_movimientos WHERE cliente_id = $1 AND puntos = 12", [V]))[0].n, 1, "(N2) su movimiento sigue con V");
+    assert.equal((await q("SELECT saldo FROM lealtad_saldos WHERE cliente_id = $1", [V]))[0].saldo, 12, "(N2) sus puntos siguen con V");
+    assert.equal((await q("SELECT count(*)::int AS n FROM clientes WHERE id = $1", [N]))[0].n, 0, "(N2) N no se insertó");
+    for (const tabla of ["direcciones_cliente", "lealtad_movimientos", "lealtad_saldos"]) {
+      assert.equal((await q(`SELECT count(*)::int AS n FROM ${tabla} WHERE cliente_id = $1`, [N]))[0].n, 0, `(N2) nada de ${tabla} cuelga de N`);
+    }
+    // Quitada la colisión, la fusión ocurre normal en el siguiente pull.
+    await pool.query("UPDATE clientes SET telefono = '4775550003' WHERE id = $1", [L]);
+    await pullSnapshot(pool, snap, () => {});
+    assert.equal((await q("SELECT count(*)::int AS n FROM clientes WHERE id = $1", [V]))[0].n, 0, "(N2) ahora V se fundió");
+    assert.equal((await q("SELECT cliente_id FROM direcciones_cliente WHERE id = $1", [dv]))[0].cliente_id, N, "(N2) su dirección ya es de N");
+    assert.equal((await q("SELECT saldo FROM lealtad_saldos WHERE cliente_id = $1", [N]))[0]?.saldo, 12, "(N2) y N muestra los 12 puntos");
+  }
+
+  // (N3) escala: 2,000 clientes en el snapshot, dos pulls; el segundo (todo ya existe) no debe ser cuadrático.
+  {
+    const clientes = Array.from({ length: 2000 }, (_, i) => clienteNube(`aaaaaaaa-7777-0000-0000-${String(i).padStart(12, "0")}`, `477${String(8000000 + i)}`, `Masivo ${i}`));
+    const t1 = Date.now();
+    await pullSnapshot(pool, { clientes }, () => {});
+    const ms1 = Date.now() - t1;
+    const t2 = Date.now();
+    await pullSnapshot(pool, { clientes }, () => {});
+    const ms2 = Date.now() - t2;
+    console.log(`N3: 2000 clientes — 1.er pull ${ms1} ms, 2.º pull ${ms2} ms`);
+    assert.equal((await q("SELECT count(*)::int AS n FROM clientes WHERE nombre LIKE 'Masivo %'"))[0].n, 2000, "(N3) los 2,000 bajaron");
+    assert.ok(ms2 < 10000, `(N3) el segundo pull de 2,000 clientes tardó ${ms2} ms (tope 10,000)`);
+  }
+
   // (f) una nube vieja: trae otras tablas y ninguna de las cuatro llaves nuevas.
   {
     const fila = async (tabla, donde = "true") => (await q(`SELECT to_jsonb(x) AS r FROM ${tabla} x WHERE ${donde} LIMIT 2`)).map((r) => r.r);
