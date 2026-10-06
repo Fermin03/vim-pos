@@ -19,7 +19,7 @@
 // difícil de montar. El SQL real lo cubre `npm run verify:push`.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { HUELLA_TICKET, listarPendientes, pushToCloud, sembrarRepartidoresUnaVez, sembrarZonasUnaVez } from "./sync-push.mjs";
+import { HUELLA_FILA, HUELLA_TICKET, construirSnapshotPush, listarPendientes, marcarLealtadSubidos, pushToCloud, sembrarRepartidoresUnaVez, sembrarZonasUnaVez } from "./sync-push.mjs";
 
 /**
  * Un pool que sabe lo justo para este archivo: sin ventas, sin turnos, sin movimientos, y los
@@ -782,4 +782,146 @@ describe("ventas que cambian después de subir, y el piso de las mesas (Postgres
     const { rows: [n] } = await db.query("SELECT estado::text FROM mesas WHERE id = $1", [nueva.id]);
     assert.equal(n?.estado, "RESERVADA", "una mesa que no existía entra completa");
   });
+});
+
+// ── Lealtad (0156, ADR 0030): movimientos y canjes viajan en el push ──────────────────────────
+
+test("lealtad: el canje entra en la huella del ticket sin mover la de los tickets que no tienen", () => {
+  // COALESCE(..., '') es lo que importa: sin canjes el fragmento vale cadena vacía y la huella de
+  // 60 días de ventas ya subidas no cambia. Un count(*) incondicional las re-subiría todas.
+  assert.match(
+    HUELLA_TICKET,
+    /COALESCE\(\(SELECT string_agg\(md5\(to_jsonb\(h\)::text\), '' ORDER BY h\.id\) FROM ticket_canjes_lealtad h WHERE h\.ticket_id = x\.id\), ''\)/,
+  );
+});
+
+test("lealtad: HUELLA_FILA se exporta para que el pull anote clientes con la misma huella", () => {
+  assert.equal(HUELLA_FILA, "md5(to_jsonb(x)::text)");
+});
+
+test("lealtad: marcarLealtadSubidos crea su libreta, anota por id y no hace nada con una lista vacía", async () => {
+  const consultas = [];
+  const pool = { query: async (sql, params) => { consultas.push({ sql, params }); return { rows: [], rowCount: 0 }; } };
+  await marcarLealtadSubidos(pool, []);
+  assert.equal(consultas.length, 0);
+  // La libreta se crea aquí mismo porque el gateway la llama antes de que corra ningún push.
+  await marcarLealtadSubidos(pool, ["a", "b"]);
+  assert.equal(consultas.length, 2);
+  assert.match(consultas[0].sql, /CREATE TABLE IF NOT EXISTS _vim_lealtad_mov_ok/);
+  assert.match(consultas[1].sql, /INSERT INTO _vim_lealtad_mov_ok/);
+  assert.deepEqual(consultas[1].params, [["a", "b"]]);
+});
+
+test("lealtad: el snapshot lleva el canje de TODO ticket del lote, atado a los tickets del lote", async () => {
+  const consultas = [];
+  const base = crearPoolFalso();
+  const pool = { query: async (sql, params) => { consultas.push({ sql, params }); return base.query(sql, params); } };
+  await construirSnapshotPush(pool, { ticketIds: [A], lealtadIds: [B] });
+  const snap = consultas.find((c) => c.sql.includes("WITH tk AS"));
+  assert.match(snap.sql, /'ticket_canjes_lealtad',\s+\(SELECT jsonb_agg\(to_jsonb\(x\)\) FROM ticket_canjes_lealtad x WHERE x\.ticket_id IN \(SELECT id FROM tk\)\)/);
+  assert.match(snap.sql, /'lealtad_movimientos'/);
+  assert.equal(snap.params.length, 8, "$8 son los movimientos de lealtad");
+  assert.deepEqual(snap.params[7], [B]);
+});
+
+/**
+ * Un pool con UNA venta (T) y UN movimiento de lealtad (M) pendientes, apoyado en el pool falso.
+ * Registra qué se anotó como subido: `tickets` en _vim_push_ok y `lealtad` en _vim_lealtad_mov_ok.
+ */
+function poolConLealtad() {
+  const T = "dddddddd-0000-0000-0000-000000000004";
+  const M = "eeeeeeee-0000-0000-0000-000000000005";
+  const C = "ffffffff-0000-0000-0000-000000000006";
+  const base = crearPoolFalso();
+  const anotado = { tickets: [], lealtad: [], parametrosSnapshot: null };
+  const pool = {
+    T, M, C, anotado,
+    async query(sql, params = []) {
+      if (sql.includes("ORDER BY x.fecha_apertura")) {
+        return { rows: [{ ids: [T], turnos: null, movimientos: null, repartidores: null, zonas: null, lealtad: [M] }] };
+      }
+      if (sql.includes("WITH tk AS")) {
+        anotado.parametrosSnapshot = params;
+        return { rows: [{
+          ids: [T], tickets_huella: [{ id: T, huella: "h" }], turnos: null, movimientos: null,
+          repartidores: null, zonas: null, lealtad: [M],
+          snapshot: { tickets: [{ id: T }], ticket_canjes_lealtad: [{ id: C, ticket_id: T }], lealtad_movimientos: [{ id: M }] },
+        }] };
+      }
+      if (sql.includes("INSERT INTO _vim_push_ok")) {
+        for (const f of JSON.parse(params[0])) anotado.tickets.push(f.id);
+        return { rows: [], rowCount: 1 };
+      }
+      if (sql.includes("INSERT INTO _vim_lealtad_mov_ok")) {
+        anotado.lealtad.push(...params[0]);
+        return { rows: [], rowCount: params[0].length };
+      }
+      return base.query(sql, params);
+    },
+  };
+  return pool;
+}
+
+test("lealtad: una venta con movimiento sube y ambos quedan anotados; el movimiento viaja por $8", async () => {
+  const pool = poolConLealtad();
+  const nube = nubeFalsa({ resultado: {} });
+  try {
+    await pushToCloud(pool, OPTS, () => {});
+    assert.deepEqual(pool.anotado.tickets, [pool.T]);
+    assert.deepEqual(pool.anotado.lealtad, [pool.M]);
+    assert.deepEqual(pool.anotado.parametrosSnapshot[7], [pool.M]);
+  } finally { nube.restaurar(); }
+});
+
+test("lealtad: un aviso de clientes_alias (fusión que falló en la nube) no retiene ningún ticket", async () => {
+  const pool = poolConLealtad();
+  // No corresponde a ninguna fila que la caja mandara: es un aviso de la nube, sin nada que reintentar.
+  const nube = nubeFalsa({ resultado: { _errores: [{ tabla: "clientes_alias", id: "cualquiera", error: "fusion" }] } });
+  try {
+    const r = await pushToCloud(pool, OPTS, () => {});
+    assert.deepEqual(pool.anotado.tickets, [pool.T], "el ticket debía quedar marcado como subido");
+    // Sin la rama de clientes_alias su id caería en el `else` de rechazadosPorTicket y restaría una venta.
+    assert.equal(r.subidos, 1, "el aviso de la nube no cuenta como venta rechazada");
+    assert.deepEqual(pool.anotado.lealtad, [pool.M]);
+  } finally { nube.restaurar(); }
+});
+
+test("lealtad: un canje rechazado SÍ retiene su ticket (se reintenta con todo lo suyo)", async () => {
+  const pool = poolConLealtad();
+  const nube = nubeFalsa({ resultado: { _errores: [{ tabla: "ticket_canjes_lealtad", id: pool.C, error: "x" }] } });
+  try {
+    await pushToCloud(pool, OPTS, () => {});
+    assert.deepEqual(pool.anotado.tickets, [], "sin su canje el total no cuadra en la nube: no se marca");
+  } finally { nube.restaurar(); }
+});
+
+test("lealtad: un movimiento rechazado no se anota pero tampoco retiene la venta", async () => {
+  const pool = poolConLealtad();
+  const nube = nubeFalsa({ resultado: { _errores: [{ tabla: "lealtad_movimientos", id: pool.M, error: "x" }] } });
+  try {
+    await pushToCloud(pool, OPTS, () => {});
+    assert.deepEqual(pool.anotado.lealtad, [], "marcarlo lo perdería: se reintenta solo");
+    assert.deepEqual(pool.anotado.tickets, [pool.T], "la venta no depende del movimiento");
+  } finally { nube.restaurar(); }
+});
+
+test("lealtad: solo movimientos pendientes (sin ventas) bastan para pasar la guarda de 'nada pendiente'", async () => {
+  const base = crearPoolFalso();
+  const M = "eeeeeeee-0000-0000-0000-000000000005";
+  const anotado = [];
+  const pool = {
+    async query(sql, params = []) {
+      if (sql.includes("ORDER BY x.fecha_apertura")) return { rows: [{ ids: null, turnos: null, movimientos: null, repartidores: null, zonas: null, lealtad: [M] }] };
+      if (sql.includes("WITH tk AS")) return { rows: [{ ids: null, lealtad: [M], snapshot: { lealtad_movimientos: [{ id: M }] } }] };
+      if (sql.includes("INSERT INTO _vim_lealtad_mov_ok")) { anotado.push(...params[0]); return { rows: [], rowCount: 1 }; }
+      return base.query(sql, params);
+    },
+  };
+  const nube = nubeFalsa({ resultado: {} });
+  try {
+    const r = await pushToCloud(pool, OPTS, () => {});
+    assert.equal(nube.peticiones.length, 1, "debía haber subido");
+    assert.equal(r.lotes, 1);
+    assert.deepEqual(anotado, [M]);
+  } finally { nube.restaurar(); }
 });
