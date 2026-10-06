@@ -14,6 +14,7 @@ import { spawnSync } from "node:child_process";
 import { mkdirSync, existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { dependenciasFaltantes, nodeModulesEsEnlace } from "../src/revisar-dependencias.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const pkg = JSON.parse(readFileSync(path.join(root, "package.json"), "utf8"));
@@ -50,6 +51,29 @@ function revisar(etapa, base, campo) {
 
 revisar("antes de empaquetar", root, "from");
 
+// Guardarraíl (0.4.109) — las dependencias de la app (`pg`, `jsonwebtoken`, `embedded-postgres`)
+// no son extraResources: viajan en `resources/app/node_modules`, y el chequeo de arriba no las ve.
+// La 0.4.109 salió primero sin ellas porque `node_modules` era un junction que electron-builder
+// no siguió. Ver src/revisar-dependencias.mjs.
+function revisarDependencias(etapa, base, consejo) {
+  const faltan = dependenciasFaltantes(pkg, base);
+  if (!faltan.length) return;
+  console.error(`\n✖ ${etapa}: faltan dependencias de la app:\n`);
+  for (const d of faltan) console.error(`   · ${d}`);
+  console.error(`\n${consejo}\n`);
+  process.exit(1);
+}
+
+if (nodeModulesEsEnlace(root)) {
+  console.error(
+    "\n✖ antes de empaquetar: desktop/node_modules es un enlace (symlink o junction).\n" +
+    "electron-builder no lo sigue y el instalador sale sin dependencias: la caja no arranca.\n" +
+    "Copia la carpeta de verdad (robocopy <origen> desktop\\node_modules /E) o corre `npm install`.\n",
+  );
+  process.exit(1);
+}
+revisarDependencias("antes de empaquetar", root, "Corre `npm install` dentro de desktop/ y repite el build.");
+
 const cache = process.env.VIM_BUILD_CACHE || "D:/vim-build-cache";
 const builder = path.join(cache, "builder");
 const electron = path.join(cache, "electron");
@@ -68,3 +92,9 @@ if (r.status !== 0) process.exit(r.status ?? 1);
 // Y comprobar el resultado: que estuviera en el origen no prueba que llegara al paquete.
 revisar("el paquete quedó incompleto", path.join(root, "dist", "win-unpacked", "resources"), "to");
 console.log("✔ extraResources completos en dist/win-unpacked/resources");
+revisarDependencias(
+  "el paquete quedó sin dependencias",
+  path.join(root, "dist", "win-unpacked", "resources", "app"),
+  "No se publica este instalador: la caja no arrancaría. Revisa desktop/node_modules y repite el build.",
+);
+console.log("✔ dependencias de la app completas en dist/win-unpacked/resources/app");
