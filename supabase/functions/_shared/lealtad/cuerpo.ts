@@ -85,7 +85,8 @@ export function validarCuerpo(entrada: unknown): Validado {
   const hayCliente = cuerpo.cliente_id != null || cuerpo.telefono != null;
   if (cuerpo.accion === "saldo" && !hayCliente) return falta;
   if (cuerpo.accion === "canjear") {
-    if (!cuerpo.canje_id || !hayCliente) return falta;
+    // Un canje nace atado a una cuenta (ticket_id): asentar comprueba después que sea esa y no otra.
+    if (!cuerpo.canje_id || !cuerpo.ticket_id || !hayCliente) return falta;
     const conPuntos = cuerpo.puntos != null;
     const conPremio = cuerpo.premio_id != null;
     if (conPuntos === conPremio) return falta; // ni ninguno ni ambos
@@ -123,4 +124,22 @@ export function payloadAsentar(
     tenant_id: a.tenantId, usuario_id: a.usuarioId,
     ticket_id: a.ticketId, ticket_item_id: a.ticketItemId ?? null,
   };
+}
+
+/**
+ * Un canje queda atado a UNA cuenta y a UNA caja desde que se autoriza (el movimiento guarda ticket_id y
+ * caja_id; lealtad_canje_datos los devuelve). Sin esto, el canje de la caja A podía asentarse también en la
+ * caja B contra otra cuenta del mismo cliente: dos descuentos por un solo cobro de puntos. Aquí se decide;
+ * los códigos son de la Edge Function, no de lealtad_asentar_canje (no van en ERRORES_DE_ASENTAR).
+ *   · la cuenta pedida debe ser la del movimiento (uno sin ticket_id no sirve),
+ *   · desde una caja, el canje debe ser de esa caja; desde la web (sin caja), no debe ser de ninguna.
+ */
+export function validarVinculoDelCanje(
+  a: { canje: Record<string, unknown>; ticketIdPedido: string; cajaDispositivoId: string | null },
+): { ok: true } | { ok: false; error: "CANJE_DE_OTRA_CUENTA" | "CANJE_DE_OTRA_CAJA" } {
+  const norm = (v: unknown) => (typeof v === "string" && v !== "" ? v.toLowerCase() : null);
+  const ticketCanje = norm(a.canje.ticket_id);
+  if (ticketCanje === null || ticketCanje !== norm(a.ticketIdPedido)) return { ok: false, error: "CANJE_DE_OTRA_CUENTA" };
+  if (norm(a.canje.caja_id) !== norm(a.cajaDispositivoId)) return { ok: false, error: "CANJE_DE_OTRA_CAJA" };
+  return { ok: true };
 }

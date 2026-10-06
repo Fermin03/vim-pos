@@ -13,7 +13,7 @@ import { cajaIdDeEmail } from "../_shared/dispositivo.ts";
 import { registrarError, textoDeError } from "../_shared/errores.ts";
 import { claimsDe, tenantDeClaims } from "../_shared/identidad.ts";
 import {
-  codigoDeAsentar, moduloLealtadActivo, payloadAsentar, usuarioDelCanje, validarCuerpo,
+  codigoDeAsentar, moduloLealtadActivo, payloadAsentar, usuarioDelCanje, validarCuerpo, validarVinculoDelCanje,
 } from "../_shared/lealtad/cuerpo.ts";
 
 const admin = createClient(
@@ -114,6 +114,9 @@ Deno.serve(async (req) => {
     if (e1) throw e1;
     const canje = datos as Resultado;
     if (!canje?.ok) return responder(canje);
+    // El canje es de ESTA cuenta y de ESTA caja (o de la web, sin caja); si no, no se entrega ni se asienta.
+    const vinculo = validarVinculoDelCanje({ canje, ticketIdPedido: b.ticket_id!, cajaDispositivoId: caja?.id ?? null });
+    if (!vinculo.ok) return json({ ok: false, error: vinculo.error }, 409);
     if (esDispositivo) return json(canje);
 
     const { error: e2 } = await admin.rpc("lealtad_asentar_canje", {

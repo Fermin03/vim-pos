@@ -24,17 +24,25 @@ function nubeFalsa(respuestas) {
   };
   return { llamadas, fetchFalso };
 }
-const args = (extra) => ({ nube: NUBE, usuarioId: EMPLEADO, tenantId: TENANT, log: sinLog, ...extra });
+const args = (extra) => ({ nube: NUBE, usuarioId: EMPLEADO, tenantId: TENANT, tipoIdentidad: "EMPLEADO", log: sinLog, ...extra });
 
-test("saldo y canjear se reenvían con el token del dispositivo y el empleado de la sesión local", async () => {
+test("canjear se reenvía con el token del dispositivo y el empleado de la sesión local", async () => {
   const pool = poolFalso();
   const { llamadas, fetchFalso } = nubeFalsa({ canjear: { status: 200, json: { ok: true, canje_id: "c1", saldo: 60 } } });
-  const r = await atenderLealtad(args({ pool, fetchFn: fetchFalso, cuerpo: { accion: "canjear", canje_id: "c1", puntos: 40, usuario_id: "suplantado" } }));
+  const r = await atenderLealtad(args({ pool, fetchFn: fetchFalso, cuerpo: { accion: "canjear", canje_id: "c1", puntos: 40, ticket_id: "t1", usuario_id: "suplantado" } }));
   assert.equal(r.status, 200);
   assert.equal(llamadas[0].url, "https://nube.test/functions/v1/lealtad-canje");
   assert.equal(llamadas[0].auth, "Bearer disp");
   assert.equal(llamadas[0].cuerpo.usuario_id, EMPLEADO, "el empleado sale de la sesión local, no del navegador");
   assert.equal(pool.consultas.length, 0, "canjear no toca la base local");
+});
+
+test("saldo también se reenvía con el token del dispositivo y el empleado de la sesión local", async () => {
+  const { llamadas, fetchFalso } = nubeFalsa({ saldo: { status: 200, json: { ok: true, saldo: 60 } } });
+  const r = await atenderLealtad(args({ pool: poolFalso(), fetchFn: fetchFalso, cuerpo: { accion: "saldo", telefono: "4770001234", usuario_id: "suplantado" } }));
+  assert.equal(r.status, 200);
+  assert.equal(llamadas[0].auth, "Bearer disp");
+  assert.deepEqual(llamadas[0].cuerpo, { accion: "saldo", telefono: "4770001234", usuario_id: EMPLEADO });
 });
 
 test("a la nube no viaja sucursal, caja ni tenant del navegador: los pone la identidad del dispositivo", async () => {
@@ -49,7 +57,7 @@ test("a la nube no viaja sucursal, caja ni tenant del navegador: los pone la ide
 
 test("asentar pregunta a la nube y asienta en local CON SUS DATOS, no con los del navegador", async () => {
   const pool = poolFalso();
-  const deLaNube = { ok: true, canje_id: "c1", cliente_id: "cli-real", telefono: "4771112233", puntos: 40, monto_mxn: 40, premio_id: null, programa_version: 3 };
+  const deLaNube = { ok: true, canje_id: "c1", ticket_id: "t1", caja_id: "cj1", cliente_id: "cli-real", telefono: "4771112233", puntos: 40, monto_mxn: 40, premio_id: null, programa_version: 3 };
   const { llamadas, fetchFalso } = nubeFalsa({ asentar: { status: 200, json: deLaNube } });
   const r = await atenderLealtad(args({
     pool, fetchFn: fetchFalso,
@@ -86,7 +94,7 @@ test("si la nube no reconoce el canje, no se asienta nada", async () => {
 
 test("si la nube contesta otro canje distinto al pedido, no se asienta nada", async () => {
   const pool = poolFalso();
-  const { fetchFalso } = nubeFalsa({ asentar: { status: 200, json: { ok: true, canje_id: "otro", cliente_id: "c", puntos: 5, monto_mxn: 5, programa_version: 1 } } });
+  const { fetchFalso } = nubeFalsa({ asentar: { status: 200, json: { ok: true, canje_id: "otro", ticket_id: "t1", cliente_id: "c", puntos: 5, monto_mxn: 5, programa_version: 1 } } });
   const r = await atenderLealtad(args({ pool, fetchFn: fetchFalso, cuerpo: { accion: "asentar", canje_id: "c1", ticket_id: "t1" } }));
   assert.equal(r.status, 502);
   assert.equal(pool.consultas.length, 0);
@@ -109,7 +117,7 @@ test("sin nube o sin red responde 503 con el vocabulario del gateway", async () 
   assert.equal(JSON.stringify(sinRed.body).includes("ECONNRESET"), false, "el detalle técnico no llega al navegador");
 });
 
-const respuestaDeLaNube = { asentar: { status: 200, json: { ok: true, canje_id: "c1", cliente_id: "cli", puntos: 5, monto_mxn: 5, programa_version: 1 } } };
+const respuestaDeLaNube = { asentar: { status: 200, json: { ok: true, canje_id: "c1", ticket_id: "t1", cliente_id: "cli", puntos: 5, monto_mxn: 5, programa_version: 1 } } };
 
 test("un código de negocio al asentar en local da 409 y no se anota la libreta", async () => {
   const consultas = [];
@@ -164,4 +172,53 @@ test("ERRORES_DE_ASENTAR contiene exactamente los códigos que lealtad_asentar_c
   const delSql = new Set([...cuerpo.matchAll(/RAISE EXCEPTION '([A-Z_]+)'/g)].map((m) => m[1]));
   assert.ok(delSql.size >= 10, "la extracción no encontró los códigos");
   assert.deepEqual([...ERRORES_DE_ASENTAR].sort(), [...delSql].sort());
+});
+
+test("una sesión de DISPOSITIVO no canjea: 403 en cada acción, sin tocar la nube ni la base", async () => {
+  for (const accion of ["saldo", "canjear", "asentar"]) {
+    const pool = poolFalso();
+    let fetches = 0;
+    const r = await atenderLealtad(args({
+      pool, tipoIdentidad: "DISPOSITIVO", fetchFn: async () => { fetches++; throw new Error("no debe llamarse"); },
+      cuerpo: { accion, canje_id: "c1", ticket_id: "t1", telefono: "4770001234", puntos: 5 },
+    }));
+    assert.deepEqual([r.status, r.body], [403, { error: "SOLO_EMPLEADO" }], accion);
+    assert.equal(fetches, 0, accion);
+    assert.equal(pool.consultas.length, 0, accion);
+  }
+  for (const t of [undefined, null, "", "empleado"]) {
+    const r = await atenderLealtad(args({ pool: poolFalso(), tipoIdentidad: t, cuerpo: { accion: "saldo" }, fetchFn: async () => { throw new Error("no"); } }));
+    assert.equal(r.status, 403, String(t));
+  }
+});
+
+test("asentar: si la cuenta de la nube no es la que se está asentando en local, no se asienta nada", async () => {
+  const pool = poolFalso();
+  const { fetchFalso } = nubeFalsa({ asentar: { status: 200, json: { ok: true, canje_id: "c1", ticket_id: "otra", cliente_id: "c", puntos: 5, monto_mxn: 5, programa_version: 1 } } });
+  const r = await atenderLealtad(args({ pool, fetchFn: fetchFalso, cuerpo: { accion: "asentar", canje_id: "c1", ticket_id: "t1" } }));
+  assert.equal(r.status, 502);
+  assert.equal(pool.consultas.length, 0);
+  const sin = nubeFalsa({ asentar: { status: 200, json: { ok: true, canje_id: "c1", cliente_id: "c", puntos: 5, monto_mxn: 5, programa_version: 1 } } });
+  const r2 = await atenderLealtad(args({ pool, fetchFn: sin.fetchFalso, cuerpo: { accion: "asentar", canje_id: "c1", ticket_id: "t1" } }));
+  assert.equal(r2.status, 502, "una respuesta sin ticket_id tampoco");
+  assert.equal(pool.consultas.length, 0);
+});
+
+test("asentar: los ids se comparan sin distinguir mayúsculas", async () => {
+  const pool = poolFalso();
+  const { fetchFalso } = nubeFalsa({ asentar: { status: 200, json: { ok: true, canje_id: "abc-1", ticket_id: "abc-2", cliente_id: "c", puntos: 5, monto_mxn: 5, programa_version: 1 } } });
+  const r = await atenderLealtad(args({ pool, fetchFn: fetchFalso, cuerpo: { accion: "asentar", canje_id: "ABC-1", ticket_id: "ABC-2" } }));
+  assert.equal(r.status, 200);
+  const asentado = JSON.parse(pool.consultas.find((c) => /lealtad_asentar_canje/.test(c.sql)).params[0]);
+  assert.equal(asentado.ticket_id, "abc-2");
+  assert.equal(asentado.canje_id, "abc-1");
+});
+
+test("un corte a media respuesta es SIN_RED; un 200 que no es JSON es RESPUESTA_INVALIDA", async () => {
+  const cortada = async () => ({ status: 200, text: async () => { throw new Error("socket hang up"); } });
+  const r1 = await atenderLealtad(args({ pool: poolFalso(), fetchFn: cortada, cuerpo: { accion: "saldo" } }));
+  assert.deepEqual([r1.status, r1.body], [503, { error: "SIN_RED" }]);
+  const html = async () => ({ status: 200, text: async () => "<html>proxy</html>" });
+  const r2 = await atenderLealtad(args({ pool: poolFalso(), fetchFn: html, cuerpo: { accion: "saldo" } }));
+  assert.deepEqual([r2.status, r2.body], [502, { error: "RESPUESTA_INVALIDA" }]);
 });

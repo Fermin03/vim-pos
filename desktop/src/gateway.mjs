@@ -340,10 +340,16 @@ export function crearGateway(backend) {
         if (u.error) return send(u.error, u.body);
         const tenantId = u.body.app_metadata?.tenant_id;
         if (!tenantId) return send(403, { error: "SIN_TENANT" });
+        // Un cuerpo demasiado grande lo contesta el manejo general (413): solo el JSON malo es BAD_JSON.
+        const crudo = (await readBody(req)).toString() || "{}";
         let cuerpo;
-        try { cuerpo = JSON.parse((await readBody(req)).toString() || "{}"); } catch { return send(400, { error: "BAD_JSON" }); }
+        try { cuerpo = JSON.parse(crudo); } catch { return send(400, { error: "BAD_JSON" }); }
         const nube = typeof backend.nube === "function" ? await backend.nube().catch(() => null) : null;
-        const r = await atenderLealtad({ pool, nube, usuarioId: u.body.id, tenantId, cuerpo });
+        // Solo un empleado canjea: atenderLealtad contesta 403 SOLO_EMPLEADO a la cuenta de la caja.
+        const r = await atenderLealtad({
+          pool, nube, usuarioId: u.body.id, tenantId, cuerpo,
+          tipoIdentidad: u.body.app_metadata?.tipo_identidad,
+        });
         return send(r.status, r.body);
       }
       if (p.startsWith("/functions/v1/")) {

@@ -1069,7 +1069,9 @@ BEGIN
     'monto_mxn', v_m.monto_mxn, 'premio_id', v_m.premio_id,
     'producto_id', (SELECT producto_id FROM lealtad_premios WHERE id = v_m.premio_id),
     'telefono', (SELECT telefono FROM clientes WHERE id = v_m.cliente_id),
-    'saldo', COALESCE(v_s.saldo, 0), 'vence_el', v_s.vence_el, 'programa_version', v_m.programa_version);
+    'saldo', COALESCE(v_s.saldo, 0), 'vence_el', v_s.vence_el, 'programa_version', v_m.programa_version,
+    -- La cuenta y la caja que lo autorizaron: la Edge Function ata el asiento a ellas (un canje, un ticket, una caja).
+    'ticket_id', v_m.ticket_id, 'caja_id', v_m.caja_id);
 END $$;
 
 -- Pega un canje YA AUTORIZADO a un ticket, en la base donde vive el ticket (la caja o la nube).

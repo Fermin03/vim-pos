@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import {
   codigoDeAsentar, ERRORES_DE_ASENTAR, moduloLealtadActivo, payloadAsentar, usuarioDelCanje, validarCuerpo,
+  validarVinculoDelCanje,
 } from "./cuerpo.ts";
 
 const UUID = "11111111-1111-4111-8111-111111111111";
@@ -22,15 +23,20 @@ test("saldo exige cliente o teléfono", () => {
   assert.equal(validarCuerpo({ accion: "saldo", cliente_id: UUID }).ok, true);
 });
 
-test("canjear exige id del canje, a quién, y puntos o premio (no ambos)", () => {
-  assert.equal(validarCuerpo({ accion: "canjear", cliente_id: UUID, puntos: 10 }).ok, false, "sin canje_id");
-  assert.equal(validarCuerpo({ accion: "canjear", canje_id: UUID, puntos: 10 }).ok, false, "sin cliente ni teléfono");
-  assert.equal(validarCuerpo({ accion: "canjear", canje_id: UUID, cliente_id: UUID }).ok, false, "sin puntos ni premio");
-  assert.equal(validarCuerpo({ accion: "canjear", canje_id: UUID, cliente_id: UUID, puntos: 10, premio_id: UUID }).ok, false, "ambos");
-  assert.equal(validarCuerpo({ accion: "canjear", canje_id: UUID, cliente_id: UUID, puntos: 0 }).ok, false, "cero");
-  assert.equal(validarCuerpo({ accion: "canjear", canje_id: UUID, cliente_id: UUID, puntos: 1.5 }).ok, false, "fracción");
-  assert.equal(validarCuerpo({ accion: "canjear", canje_id: UUID, cliente_id: UUID, puntos: 10 }).ok, true);
-  assert.equal(validarCuerpo({ accion: "canjear", canje_id: UUID, telefono: "4770001234", premio_id: UUID }).ok, true);
+test("canjear exige id del canje, ticket, a quién, y puntos o premio (no ambos)", () => {
+  const base = { accion: "canjear", ticket_id: OTRO };
+  assert.equal(validarCuerpo({ ...base, cliente_id: UUID, puntos: 10 }).ok, false, "sin canje_id");
+  assert.equal(validarCuerpo({ ...base, canje_id: UUID, puntos: 10 }).ok, false, "sin cliente ni teléfono");
+  assert.equal(validarCuerpo({ ...base, canje_id: UUID, cliente_id: UUID }).ok, false, "sin puntos ni premio");
+  assert.equal(validarCuerpo({ ...base, canje_id: UUID, cliente_id: UUID, puntos: 10, premio_id: UUID }).ok, false, "ambos");
+  assert.equal(validarCuerpo({ ...base, canje_id: UUID, cliente_id: UUID, puntos: 0 }).ok, false, "cero");
+  assert.equal(validarCuerpo({ ...base, canje_id: UUID, cliente_id: UUID, puntos: 1.5 }).ok, false, "fracción");
+  assert.equal(validarCuerpo({ ...base, canje_id: UUID, cliente_id: UUID, puntos: 10 }).ok, true);
+  assert.equal(validarCuerpo({ ...base, canje_id: UUID, telefono: "4770001234", premio_id: UUID }).ok, true);
+});
+
+test("canjear sin ticket_id es FALTAN_CAMPOS: un canje nace atado a su cuenta", () => {
+  assert.deepEqual(validarCuerpo({ accion: "canjear", canje_id: UUID, cliente_id: UUID, puntos: 10 }), { ok: false, error: "FALTAN_CAMPOS" });
 });
 
 test("asentar exige canje y ticket", () => {
@@ -73,6 +79,25 @@ test("payloadAsentar usa los datos y el teléfono de la nube; tenant y usuario, 
     canje_id: UUID, cliente_id: "cli-real", telefono: "4770001234", puntos: 40, monto_mxn: 40, premio_id: null,
     programa_version: 3, tenant_id: "T", usuario_id: "U", ticket_id: "t1", ticket_item_id: "i1",
   });
+});
+
+test("validarVinculoDelCanje: cada rama", () => {
+  const T = UUID, C = OTRO, X = "33333333-3333-4333-8333-333333333333";
+  const canje = (o: Record<string, unknown>) => ({ ticket_id: T, caja_id: C, ...o });
+  // Desde una caja
+  assert.deepEqual(validarVinculoDelCanje({ canje: canje({}), ticketIdPedido: T, cajaDispositivoId: C }), { ok: true });
+  assert.deepEqual(validarVinculoDelCanje({ canje: canje({}), ticketIdPedido: X, cajaDispositivoId: C }), { ok: false, error: "CANJE_DE_OTRA_CUENTA" });
+  assert.deepEqual(validarVinculoDelCanje({ canje: canje({}), ticketIdPedido: T, cajaDispositivoId: X }), { ok: false, error: "CANJE_DE_OTRA_CAJA" });
+  assert.deepEqual(validarVinculoDelCanje({ canje: canje({ caja_id: null }), ticketIdPedido: T, cajaDispositivoId: C }), { ok: false, error: "CANJE_DE_OTRA_CAJA" }, "una caja no asienta un canje de la web");
+  // Desde la web (sin caja)
+  assert.deepEqual(validarVinculoDelCanje({ canje: canje({ caja_id: null }), ticketIdPedido: T, cajaDispositivoId: null }), { ok: true });
+  assert.deepEqual(validarVinculoDelCanje({ canje: canje({}), ticketIdPedido: T, cajaDispositivoId: null }), { ok: false, error: "CANJE_DE_OTRA_CAJA" }, "la web no asienta el de una caja");
+  assert.deepEqual(validarVinculoDelCanje({ canje: canje({ caja_id: null }), ticketIdPedido: X, cajaDispositivoId: null }), { ok: false, error: "CANJE_DE_OTRA_CUENTA" });
+  // Sin ticket en el movimiento: se rechaza
+  assert.deepEqual(validarVinculoDelCanje({ canje: canje({ ticket_id: null }), ticketIdPedido: T, cajaDispositivoId: C }), { ok: false, error: "CANJE_DE_OTRA_CUENTA" });
+  assert.deepEqual(validarVinculoDelCanje({ canje: { caja_id: C }, ticketIdPedido: T, cajaDispositivoId: C }), { ok: false, error: "CANJE_DE_OTRA_CUENTA" });
+  // Mayúsculas no son otra cuenta
+  assert.deepEqual(validarVinculoDelCanje({ canje: canje({ ticket_id: T.toUpperCase() }), ticketIdPedido: T, cajaDispositivoId: C.toUpperCase() }), { ok: true });
 });
 
 test("codigoDeAsentar reconoce solo mensajes que SON un código", () => {

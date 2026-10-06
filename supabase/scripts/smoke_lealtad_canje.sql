@@ -95,6 +95,9 @@ BEGIN
 
   -- 5) Asentar con los datos que devolvió la nube baja el total.
   j := lealtad_canje_datos(v_c1, v_tenant);
+  -- El canje queda atado a la cuenta y a la caja que lo autorizaron (la Edge Function lo comprueba al asentar).
+  IF j->>'ticket_id' IS DISTINCT FROM v_t::text THEN RAISE EXCEPTION 'canje_datos no trae el ticket: %', j; END IF;
+  IF j->>'caja_id' IS DISTINCT FROM v_caja::text THEN RAISE EXCEPTION 'canje_datos no trae la caja: %', j; END IF;
   PERFORM lealtad_asentar_canje(j || jsonb_build_object('tenant_id', v_tenant, 'ticket_id', v_t, 'sucursal_id', v_suc, 'caja_id', v_caja, 'usuario_id', v_maria));
   IF (SELECT total_mxn FROM tickets WHERE id = v_t) <> 80 THEN RAISE EXCEPTION 'asentar no bajó el total'; END IF;
   IF (SELECT saldo FROM lealtad_saldos WHERE cliente_id = v_cli) <> 60 THEN RAISE EXCEPTION 'asentar movió el saldo otra vez'; END IF;

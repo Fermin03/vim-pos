@@ -45,7 +45,7 @@ const CAMPOS_POR_ACCION = {
 };
 
 async function llamarNube(nube, cuerpo, fetchFn, log) {
-  let up;
+  let up, texto;
   try {
     up = await fetchFn(`${nube.cloudUrl}/functions/v1/lealtad-canje`, {
       method: "POST",
@@ -53,23 +53,30 @@ async function llamarNube(nube, cuerpo, fetchFn, log) {
       headers: { apikey: nube.anonKey, Authorization: `Bearer ${nube.deviceToken}`, "Content-Type": "application/json" },
       signal: AbortSignal.timeout(15000),
     });
+    texto = await up.text(); // un corte a media respuesta también es "sin red"
   } catch (e) {
     log(`[lealtad] sin red hacia la nube: ${String(e?.message ?? e)}`);
     return { status: 503, body: { error: "SIN_RED" } };
   }
-  const texto = await up.text();
   let body;
-  try { body = JSON.parse(texto); } catch { body = { error: "RESPUESTA_INVALIDA" }; }
+  try { body = JSON.parse(texto); } catch { body = null; }
+  if (body === null || typeof body !== "object") {
+    log(`[lealtad] la nube contestó ${up.status} con un cuerpo que no es JSON`);
+    return { status: up.status >= 400 ? up.status : 502, body: { error: "RESPUESTA_INVALIDA" } };
+  }
   return { status: up.status, body };
 }
 
 /**
  * @param {{ pool: { query: Function }, nube: { cloudUrl: string, anonKey: string, deviceToken: string } | null,
- *           usuarioId: string, tenantId: string, cuerpo: Record<string, unknown>,
+ *           usuarioId: string, tenantId: string, tipoIdentidad: string, cuerpo: Record<string, unknown>,
  *           fetchFn?: typeof fetch, log?: (msg: string) => void }} args
  * @returns {Promise<{ status: number, body: Record<string, unknown> }>}
  */
-export async function atenderLealtad({ pool, nube, usuarioId, tenantId, cuerpo, fetchFn = fetch, log = console.error }) {
+export async function atenderLealtad({ pool, nube, usuarioId, tenantId, tipoIdentidad, cuerpo, fetchFn = fetch, log = console.error }) {
+  // Solo un EMPLEADO canjea. La cuenta de la propia caja (caja-<id>@...) vive en el navegador del POS
+  // antes del PIN y en la cocina: con ella el canje quedaría a nombre de la caja, sin persona.
+  if (tipoIdentidad !== "EMPLEADO") return { status: 403, body: { error: "SOLO_EMPLEADO" } };
   const accion = cuerpo?.accion;
   const campos = typeof accion === "string" && Object.hasOwn(CAMPOS_POR_ACCION, accion) ? CAMPOS_POR_ACCION[accion] : null;
   if (!campos) return { status: 400, body: { error: "ACCION_INVALIDA" } };
@@ -85,16 +92,24 @@ export async function atenderLealtad({ pool, nube, usuarioId, tenantId, cuerpo, 
 
   // Desde aquí la nube ya confirmó ESTE canje (lo validó contra su libro). Se asienta con SUS datos.
   const canje = consulta.body;
-  if (canje.canje_id !== saliente.canje_id) {
+  const id = (v) => (typeof v === "string" ? v.toLowerCase() : null);
+  if (id(canje.canje_id) === null || id(canje.canje_id) !== id(saliente.canje_id)) {
     log(`[lealtad] la nube contestó otro canje (${canje.canje_id}) al pedido ${saliente.canje_id}`);
     return { status: 502, body: { error: "RESPUESTA_INVALIDA" } };
   }
+  // Defensa en profundidad: la nube ata el canje a su cuenta y la Edge Function lo comprueba; aquí se
+  // vuelve a exigir que sea la cuenta que se va a tocar en local.
+  if (id(canje.ticket_id) === null || id(canje.ticket_id) !== id(saliente.ticket_id)) {
+    log(`[lealtad] el canje ${canje.canje_id} es de la cuenta ${canje.ticket_id}, no de ${saliente.ticket_id}`);
+    return { status: 502, body: { error: "RESPUESTA_INVALIDA" } };
+  }
+  canje.canje_id = id(canje.canje_id);
   const paraAsentar = {
     canje_id: canje.canje_id, cliente_id: canje.cliente_id, telefono: canje.telefono ?? null,
     puntos: canje.puntos, monto_mxn: canje.monto_mxn, premio_id: canje.premio_id ?? null,
     programa_version: canje.programa_version,
     tenant_id: tenantId, usuario_id: usuarioId,
-    ticket_id: saliente.ticket_id, ticket_item_id: saliente.ticket_item_id ?? null,
+    ticket_id: id(saliente.ticket_id), ticket_item_id: saliente.ticket_item_id ?? null,
   };
   try {
     await pool.query("SELECT lealtad_asentar_canje($1::jsonb) AS r", [JSON.stringify(paraAsentar)]);
