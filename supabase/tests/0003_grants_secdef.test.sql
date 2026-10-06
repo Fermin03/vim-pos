@@ -51,7 +51,10 @@ insert into _secdef_solo_service (fn, motivo) values
   ('_retirar_extras_sin_limite', 'cierra extras contratados de cualquier negocio (0147)'),
   ('_cajas_excedente',           'cuenta las cajas abiertas de cualquier negocio (0147)'),
   ('_inventario_apagar_si_no_permitido', 'apaga el descuento de inventario de cualquier negocio (0148)'),
-  ('inventario_respetar_uso_previo', 'concede el módulo de inventario por excepción a negocios enteros (0148)');
+  ('inventario_respetar_uso_previo', 'concede el módulo de inventario por excepción a negocios enteros (0148)'),
+  ('lealtad_registrar_movimiento',  'escribe el libro y el saldo de lealtad de cualquier cliente (0156)'),
+  ('lealtad_acumular_por_ticket',   'otorga puntos; solo la dispara el trigger de tickets (0156)'),
+  ('lealtad_revertir_ganado_ticket','quita puntos; solo la disparan los triggers (0156)');
 
 -- #2 — CRÍTICA: ninguna de ellas es ejecutable por `authenticated`.
 select is_empty($$

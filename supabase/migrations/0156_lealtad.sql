@@ -358,3 +358,202 @@ COMMENT ON FUNCTION modulos_efectivos(uuid) IS
   'Módulos por cliente: permitidos (plan + flags) y efectivos (AND encendido por el dueño). Única lectura autorizada (ADR 0014).';
 REVOKE EXECUTE ON FUNCTION modulos_efectivos(uuid) FROM public, anon;
 GRANT EXECUTE ON FUNCTION modulos_efectivos(uuid) TO authenticated, service_role;
+
+-- ── §4 Ganar y revertir lo ganado ───────────────────────────────────────────
+
+-- Cuánto gana una compra. PURA: tiene un espejo en TS (apps/pos, plan 1B) con los mismos casos
+-- de smoke_lealtad_ganar.sql. Si cambias una, cambia la otra.
+CREATE OR REPLACE FUNCTION lealtad_puntos_por_compra(
+  p_mecanica lealtad_mecanica, p_base numeric, p_porcentaje numeric,
+  p_pesos_por_punto numeric, p_compra_minima numeric)
+RETURNS integer
+LANGUAGE sql IMMUTABLE
+AS $$
+  SELECT CASE
+    WHEN p_base IS NULL OR p_base <= 0 OR p_base < COALESCE(p_compra_minima, 0) THEN 0
+    WHEN p_mecanica = 'SELLOS' THEN 1
+    WHEN p_mecanica = 'PUNTOS_DINERO' THEN floor(p_base * COALESCE(p_porcentaje, 0) / 100)::integer
+    WHEN p_mecanica = 'PUNTOS_PREMIOS' AND COALESCE(p_pesos_por_punto, 0) > 0 THEN floor(p_base / p_pesos_por_punto)::integer
+    ELSE 0
+  END;
+$$;
+GRANT EXECUTE ON FUNCTION lealtad_puntos_por_compra(lealtad_mecanica, numeric, numeric, numeric, numeric) TO authenticated, service_role;
+
+-- EL ÚNICO punto que escribe el libro y el saldo. Idempotente por id (y por "una reversa por
+-- canje"): devuelve false si el movimiento ya existía y entonces no toca el saldo.
+-- Un movimiento de una versión anterior del programa se registra y no suma.
+CREATE OR REPLACE FUNCTION lealtad_registrar_movimiento(
+  p_id uuid, p_tenant uuid, p_cliente uuid, p_tipo lealtad_movimiento_tipo, p_puntos integer, p_version integer,
+  p_ticket uuid DEFAULT NULL, p_sucursal uuid DEFAULT NULL, p_caja uuid DEFAULT NULL, p_usuario uuid DEFAULT NULL,
+  p_premio uuid DEFAULT NULL, p_monto numeric DEFAULT NULL, p_motivo text DEFAULT NULL,
+  p_canje_mov uuid DEFAULT NULL, p_fecha timestamptz DEFAULT now(), p_saldo_visto integer DEFAULT NULL)
+RETURNS boolean
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp
+AS $$
+DECLARE
+  v_id    uuid;
+  v_ver   integer;
+  v_saldo integer;
+BEGIN
+  INSERT INTO lealtad_movimientos (
+    id, tenant_id, cliente_id, tipo, puntos, programa_version, ticket_id, sucursal_id, caja_id,
+    usuario_id, premio_id, monto_mxn, motivo, canje_movimiento_id, fecha, saldo_visto)
+  VALUES (
+    COALESCE(p_id, gen_random_uuid()), p_tenant, p_cliente, p_tipo, p_puntos, p_version, p_ticket, p_sucursal, p_caja,
+    p_usuario, p_premio, p_monto, p_motivo, p_canje_mov, COALESCE(p_fecha, now()), p_saldo_visto)
+  ON CONFLICT DO NOTHING
+  RETURNING id INTO v_id;
+  IF v_id IS NULL THEN RETURN false; END IF;
+
+  SELECT version INTO v_ver FROM lealtad_programa WHERE tenant_id = p_tenant;
+  IF v_ver IS DISTINCT FROM p_version THEN RETURN true; END IF;
+
+  INSERT INTO lealtad_saldos (cliente_id, tenant_id, saldo, ultima_actividad, programa_version)
+  VALUES (p_cliente, p_tenant, p_puntos,
+          CASE WHEN p_tipo IN ('GANADO', 'CANJE') THEN COALESCE(p_fecha, now()) END, p_version)
+  ON CONFLICT (cliente_id) DO UPDATE
+    SET saldo = lealtad_saldos.saldo + EXCLUDED.saldo,
+        -- GREATEST ignora NULL: una reversa o un ajuste no cuentan como actividad.
+        ultima_actividad = GREATEST(lealtad_saldos.ultima_actividad, EXCLUDED.ultima_actividad),
+        programa_version = EXCLUDED.programa_version,
+        updated_at = now()
+  RETURNING saldo INTO v_saldo;
+
+  UPDATE lealtad_saldos SET vence_el = lealtad_vence_el(p_tenant, ultima_actividad) WHERE cliente_id = p_cliente;
+  UPDATE lealtad_movimientos SET saldo_visto = COALESCE(saldo_visto, v_saldo) WHERE id = v_id;
+  RETURN true;
+END $$;
+REVOKE ALL ON FUNCTION lealtad_registrar_movimiento(uuid, uuid, uuid, lealtad_movimiento_tipo, integer, integer, uuid, uuid, uuid, uuid, uuid, numeric, text, uuid, timestamptz, integer) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION lealtad_registrar_movimiento(uuid, uuid, uuid, lealtad_movimiento_tipo, integer, integer, uuid, uuid, uuid, uuid, uuid, numeric, text, uuid, timestamptz, integer) TO service_role;
+
+CREATE OR REPLACE FUNCTION lealtad_neto_ganado(p_ticket uuid)
+RETURNS integer
+LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public, pg_temp
+AS $$
+  SELECT COALESCE(SUM(puntos), 0)::integer FROM lealtad_movimientos
+   WHERE ticket_id = p_ticket AND tipo IN ('GANADO', 'REVERSA_GANADO');
+$$;
+REVOKE ALL ON FUNCTION lealtad_neto_ganado(uuid) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION lealtad_neto_ganado(uuid) TO service_role;
+
+-- Lo que gana un ticket al quedar pagado. Devuelve los puntos escritos (0 si no aplica).
+-- Base: lo que el cliente pagó por comida. total_mxn ya viene neto de descuentos, promociones y
+-- canje; se le quitan los renglones de cargo (el envío). La propina nunca entra en total_mxn.
+CREATE OR REPLACE FUNCTION lealtad_acumular_por_ticket(p_ticket_id uuid)
+RETURNS integer
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp
+AS $$
+DECLARE
+  v_t       tickets%ROWTYPE;
+  v_p       lealtad_programa%ROWTYPE;
+  v_cargos  numeric(12,2);
+  v_puntos  integer;
+  v_hoy     date := (now() AT TIME ZONE 'America/Mexico_City')::date;
+  v_compras integer;
+BEGIN
+  SELECT * INTO v_t FROM tickets WHERE id = p_ticket_id;
+  IF NOT FOUND OR v_t.cliente_id IS NULL THEN RETURN 0; END IF;
+  -- Los pedidos de apps de delivery no ganan.
+  IF v_t.modo_servicio::text LIKE 'APP\_%' THEN RETURN 0; END IF;
+  IF NOT COALESCE((SELECT modulo_lealtad_activo FROM configuracion_tenant WHERE tenant_id = v_t.tenant_id), false) THEN
+    RETURN 0;
+  END IF;
+  SELECT * INTO v_p FROM lealtad_programa WHERE tenant_id = v_t.tenant_id;
+  IF NOT FOUND THEN RETURN 0; END IF;
+  -- Idempotente: un ticket con ganado vivo no vuelve a ganar (FACTURADO→PAGADO, reintentos).
+  IF lealtad_neto_ganado(p_ticket_id) > 0 THEN RETURN 0; END IF;
+
+  -- Tope diario: compras de HOY (hora de México) de este cliente que siguen contando.
+  SELECT count(*) INTO v_compras
+    FROM lealtad_movimientos m
+   WHERE m.cliente_id = v_t.cliente_id AND m.tipo = 'GANADO'
+     AND (m.fecha AT TIME ZONE 'America/Mexico_City')::date = v_hoy
+     AND NOT EXISTS (SELECT 1 FROM lealtad_movimientos r
+                      WHERE r.ticket_id = m.ticket_id AND r.tipo = 'REVERSA_GANADO');
+  IF v_compras >= v_p.tope_compras_dia THEN RETURN 0; END IF;
+
+  SELECT COALESCE(SUM(total_item_mxn), 0) INTO v_cargos
+    FROM ticket_items WHERE ticket_id = p_ticket_id AND cancelado = false AND cargo_tipo IS NOT NULL;
+
+  v_puntos := lealtad_puntos_por_compra(
+    v_p.mecanica, GREATEST(v_t.total_mxn - v_cargos, 0), v_p.porcentaje, v_p.pesos_por_punto, v_p.compra_minima_mxn);
+  IF v_puntos <= 0 THEN RETURN 0; END IF;
+
+  PERFORM lealtad_registrar_movimiento(
+    NULL, v_t.tenant_id, v_t.cliente_id, 'GANADO', v_puntos, v_p.version,
+    p_ticket_id, v_t.sucursal_id, v_t.caja_id, auth.uid());
+  RETURN v_puntos;
+END $$;
+REVOKE ALL ON FUNCTION lealtad_acumular_por_ticket(uuid) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION lealtad_acumular_por_ticket(uuid) TO service_role;
+
+-- Deshace lo ganado por un ticket, entero o en proporción (devolución parcial). Idempotente: solo
+-- revierte lo que siga vivo. Devuelve los puntos revertidos.
+CREATE OR REPLACE FUNCTION lealtad_revertir_ganado_ticket(p_ticket_id uuid, p_fraccion numeric DEFAULT 1)
+RETURNS integer
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp
+AS $$
+DECLARE
+  v_neto integer := lealtad_neto_ganado(p_ticket_id);
+  v_m    lealtad_movimientos%ROWTYPE;
+  v_rev  integer;
+BEGIN
+  IF v_neto <= 0 THEN RETURN 0; END IF;
+  SELECT * INTO v_m FROM lealtad_movimientos
+   WHERE ticket_id = p_ticket_id AND tipo = 'GANADO' ORDER BY fecha DESC LIMIT 1;
+  v_rev := LEAST(v_neto, ceil(v_neto * LEAST(GREATEST(COALESCE(p_fraccion, 1), 0), 1))::integer);
+  IF v_rev <= 0 THEN RETURN 0; END IF;
+  PERFORM lealtad_registrar_movimiento(
+    NULL, v_m.tenant_id, v_m.cliente_id, 'REVERSA_GANADO', -v_rev, v_m.programa_version,
+    p_ticket_id, v_m.sucursal_id, v_m.caja_id, auth.uid());
+  RETURN v_rev;
+END $$;
+REVOKE ALL ON FUNCTION lealtad_revertir_ganado_ticket(uuid, numeric) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION lealtad_revertir_ganado_ticket(uuid, numeric) TO service_role;
+
+-- El gancho en tickets. SECURITY DEFINER: lo dispara el cajero al cobrar y las funciones de
+-- adentro no son ejecutables por authenticated.
+-- OJO: en la nube los tickets que suben de una caja entran en modo réplica y este trigger NO
+-- corre; lo ganado en la caja llega como movimiento por el push (§8). Solo corre aquí para el
+-- POS web, que cobra directo contra la nube.
+CREATE OR REPLACE FUNCTION trg_ticket_lealtad()
+RETURNS trigger
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp
+AS $$
+BEGIN
+  IF NEW.estado_fiscal = 'PAGADO' AND OLD.estado_fiscal <> 'PAGADO' THEN
+    PERFORM lealtad_acumular_por_ticket(NEW.id);
+  ELSIF NEW.estado_fiscal IN ('CANCELADO', 'ABIERTO') AND OLD.estado_fiscal IN ('PAGADO', 'FACTURADO') THEN
+    -- Cancelar o reabrir una cuenta cobrada deshace lo que ganó.
+    PERFORM lealtad_revertir_ganado_ticket(NEW.id);
+  END IF;
+  RETURN NEW;
+END $$;
+
+DROP TRIGGER IF EXISTS trg_tickets_lealtad ON tickets;
+CREATE TRIGGER trg_tickets_lealtad
+  AFTER UPDATE OF estado_fiscal ON tickets
+  FOR EACH ROW EXECUTE FUNCTION trg_ticket_lealtad();
+
+-- Devolución confirmada: revierte en proporción a lo devuelto. Misma condición de transición que
+-- trg_devolucion_inventario (0009:314).
+CREATE OR REPLACE FUNCTION trg_devolucion_lealtad()
+RETURNS trigger
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp
+AS $$
+DECLARE
+  v_total numeric(12,2);
+BEGIN
+  IF TG_OP = 'UPDATE' AND OLD.estado <> 'CONFIRMADA' AND NEW.estado = 'CONFIRMADA' THEN
+    SELECT total_mxn INTO v_total FROM tickets WHERE id = NEW.ticket_original_id;
+    PERFORM lealtad_revertir_ganado_ticket(
+      NEW.ticket_original_id,
+      CASE WHEN COALESCE(v_total, 0) <= 0 THEN 1 ELSE LEAST(NEW.total_devuelto_mxn / v_total, 1) END);
+  END IF;
+  RETURN NEW;
+END $$;
+
+DROP TRIGGER IF EXISTS trg_devoluciones_lealtad ON devoluciones;
+CREATE TRIGGER trg_devoluciones_lealtad
+  AFTER UPDATE ON devoluciones
+  FOR EACH ROW EXECUTE FUNCTION trg_devolucion_lealtad();
