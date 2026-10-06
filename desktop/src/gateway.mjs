@@ -12,6 +12,7 @@ import { cajaIdDeEmail } from "./dispositivo.mjs";
 import { esActividadDeOperacion } from "./respaldo-diario.mjs";
 import { sondearPostgrest, explicarError } from "./sonda-postgrest.mjs";
 import { conTope } from "./tope.mjs";
+import { atenderLealtad } from "./lealtad-puente.mjs";
 
 /** Lo que /health/deep espera al `SELECT 1`. La sonda de PostgREST lleva el suyo (4 s en total no
  *  caben: el watchdog aborta a los 6 s, y el motivo tiene que llegarle antes). */
@@ -330,6 +331,20 @@ export function crearGateway(backend) {
           return send(503, { error: "SIN_RED", detalle: String(e?.message ?? e) });
         }
         return send(up.status, await up.text());
+      }
+      if (p === "/functions/v1/lealtad-canje") {
+        // Lealtad (ADR 0030): la nube autoriza el canje; la caja lo asienta en su ticket. Ver
+        // lealtad-puente.mjs. Se valida la sesión LOCAL del empleado (getUser ya exige su acceso
+        // activo); a la nube va el dispositivo. El negocio sale de la sesión, nunca del cuerpo.
+        const u = await getUser(pool, secret, bearer(req));
+        if (u.error) return send(u.error, u.body);
+        const tenantId = u.body.app_metadata?.tenant_id;
+        if (!tenantId) return send(403, { error: "SIN_TENANT" });
+        let cuerpo;
+        try { cuerpo = JSON.parse((await readBody(req)).toString() || "{}"); } catch { return send(400, { error: "BAD_JSON" }); }
+        const nube = typeof backend.nube === "function" ? await backend.nube().catch(() => null) : null;
+        const r = await atenderLealtad({ pool, nube, usuarioId: u.body.id, tenantId, cuerpo });
+        return send(r.status, r.body);
       }
       if (p.startsWith("/functions/v1/")) {
         // Otras Edge Functions (timbrar-cfdi, enviar-push…) requieren nube: fallan claro offline.
