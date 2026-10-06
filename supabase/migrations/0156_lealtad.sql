@@ -578,3 +578,315 @@ DROP TRIGGER IF EXISTS trg_devoluciones_lealtad ON devoluciones;
 CREATE TRIGGER trg_devoluciones_lealtad
   AFTER UPDATE ON devoluciones
   FOR EACH ROW EXECUTE FUNCTION trg_devolucion_lealtad();
+
+-- ── §5 El canje en los totales del ticket ───────────────────────────────────
+-- El canje es un descuento más. Dinero (ticket_item_id NULL): baja el total de la cuenta con el
+-- mismo piso que descuentos y promociones (el envío no se come). Premio de producto: se descuenta
+-- en el renglón, sumado a promocion_item_mxn, porque timbrar-cfdi, timbrar-global y autofacturar
+-- leen descuento_item_mxn + promocion_item_mxn como el descuento del concepto y así el CFDI cuadra
+-- sin tocarlas. A nivel de ticket ambos se reportan en lealtad_mxn (nunca en promociones_mxn), y
+-- solo lo que de verdad se aplicó. La invariante del CFDI pasa a ser:
+--     renglones vivos − (descuentos_manuales_mxn + promociones_mxn + lealtad_mxn) = total_mxn
+-- Sin un canje vivo todo se calcula EXACTAMENTE como en la 0116: el cuerpo de abajo es esa función
+-- con solo los cambios marcados con "0156". Conserva el SET search_path de la 0116 (la 0044 se lo
+-- puso con ALTER FUNCTION y un CREATE OR REPLACE sin la cláusula lo quita) y, como CREATE OR
+-- REPLACE, el COMMENT y los privilegios de la 0008.
+CREATE OR REPLACE FUNCTION recalcular_totales_ticket(p_ticket_id uuid)
+RETURNS void
+LANGUAGE plpgsql
+SET search_path = public, extensions, pg_temp
+AS $$
+DECLARE
+  v_subtotal_bruto          numeric(12,2) := 0;
+  v_modificadores           numeric(12,2) := 0;
+  v_descuentos_manuales     numeric(12,2) := 0;
+  v_promociones             numeric(12,2) := 0;
+  v_iva                     numeric(12,2) := 0;
+  v_subtotal_final          numeric(12,2) := 0;
+  v_total                   numeric(12,2) := 0;
+  v_monto_pagado            numeric(12,2) := 0;
+  v_cambio                  numeric(12,2) := 0;
+  v_item                    record;
+  v_item_bruto              numeric(12,2);
+  v_item_modif              numeric(12,2);
+  v_item_desc               numeric(12,2);
+  v_item_promo              numeric(12,2);
+  v_item_neto               numeric(12,2);
+  v_item_iva                numeric(12,2);
+  v_item_total              numeric(12,2);
+  v_piso                    numeric(12,2) := 0;  -- 0116: renglones de cargo vivos (el envío)
+  v_lealtad                 numeric(12,2) := 0;  -- 0156: canjes de lealtad vivos
+  v_item_lea                numeric(12,2);
+BEGIN
+  -- Iterar items no cancelados y calcular su subtotal e IVA
+  FOR v_item IN
+    SELECT
+      ti.id,
+      ti.cantidad,
+      ti.precio_unitario_snapshot,
+      ti.tasa_iva_snapshot,
+      ti.iva_incluido_en_precio_snapshot,
+      COALESCE(SUM(tim.monto_total_mxn), 0) AS monto_modif
+    FROM ticket_items ti
+    LEFT JOIN ticket_item_modificadores tim ON tim.ticket_item_id = ti.id
+    WHERE ti.ticket_id = p_ticket_id
+      AND ti.cancelado = false
+    GROUP BY ti.id, ti.cantidad, ti.precio_unitario_snapshot,
+             ti.tasa_iva_snapshot, ti.iva_incluido_en_precio_snapshot
+  LOOP
+    -- Bruto del ítem: precio * cantidad + modificadores
+    v_item_bruto := (v_item.cantidad * v_item.precio_unitario_snapshot);
+    v_item_modif := v_item.monto_modif;
+
+    -- Descuentos manuales aplicables a este item (los del ticket completo se distribuyen abajo)
+    SELECT COALESCE(SUM(monto_descontado_mxn), 0)
+    INTO v_item_desc
+    FROM ticket_descuentos_manuales
+    WHERE ticket_item_id = v_item.id
+      AND reversado = false;
+
+    -- Promociones aplicables a este item (las del ticket completo se distribuyen abajo)
+    SELECT COALESCE(SUM(monto_descontado_mxn), 0)
+    INTO v_item_promo
+    FROM ticket_promociones_aplicadas
+    WHERE ticket_id = p_ticket_id
+      AND cancelada_por_cajero = false
+      AND v_item.id = ANY(items_afectados);
+
+    -- 0156: premio de producto canjeado sobre este renglón. Acotado a lo que queda del renglón.
+    SELECT COALESCE(SUM(monto_descontado_mxn), 0)
+    INTO v_item_lea
+    FROM ticket_canjes_lealtad
+    WHERE ticket_item_id = v_item.id
+      AND revertido = false;
+    v_item_lea := LEAST(v_item_lea, GREATEST((v_item_bruto + v_item_modif) - v_item_desc - v_item_promo, 0));
+
+    -- Neto del ítem (después de descuentos a nivel item, no a nivel ticket)
+    v_item_neto := (v_item_bruto + v_item_modif) - v_item_desc - v_item_promo - v_item_lea;
+    IF v_item_neto < 0 THEN v_item_neto := 0; END IF;
+
+    -- IVA del ítem según política iva_incluido
+    IF v_item.iva_incluido_en_precio_snapshot THEN
+      -- El precio ya trae IVA: subtotal_sin_iva = neto / (1 + tasa/100), iva = neto - subtotal
+      v_item_iva := ROUND(v_item_neto - (v_item_neto / (1 + v_item.tasa_iva_snapshot/100)), 2);
+      v_item_total := v_item_neto;
+    ELSE
+      -- IVA por afuera: subtotal_sin_iva = neto, iva = neto * tasa/100, total = neto + iva
+      v_item_iva := ROUND(v_item_neto * v_item.tasa_iva_snapshot/100, 2);
+      v_item_total := v_item_neto + v_item_iva;
+    END IF;
+
+    -- Persistir el cálculo en ticket_items
+    UPDATE ticket_items
+    SET subtotal_bruto_mxn      = v_item_bruto,
+        monto_modificadores_mxn = v_item_modif,
+        descuento_item_mxn      = v_item_desc,
+        -- 0156: el premio de lealtad va aquí porque el timbrado lee esta columna como descuento
+        -- del concepto. A nivel de ticket se reporta en lealtad_mxn, no en promociones_mxn.
+        promocion_item_mxn      = v_item_promo + v_item_lea,
+        iva_item_mxn            = v_item_iva,
+        total_item_mxn          = v_item_total
+    WHERE id = v_item.id;
+
+    -- Acumular al ticket
+    v_subtotal_bruto      := v_subtotal_bruto + v_item_bruto;
+    v_modificadores       := v_modificadores  + v_item_modif;
+    v_descuentos_manuales := v_descuentos_manuales + v_item_desc;
+    v_promociones         := v_promociones    + v_item_promo;
+    v_iva                 := v_iva            + v_item_iva;
+    v_total               := v_total          + v_item_total;
+    v_lealtad             := v_lealtad        + v_item_lea;
+  END LOOP;
+
+  -- 0116: el piso del total. Los descuentos de ticket no pueden comerse los renglones de cargo
+  -- (el envío no admite descuentos, spec zonas de envío §3, ADR 0017). Se lee DESPUÉS del bucle,
+  -- que acaba de persistir total_item_mxn. Acotado a v_total por defensa: el piso nunca puede
+  -- subir el total por encima de la suma de sus renglones (eso descuadraría el CFDI).
+  SELECT COALESCE(SUM(total_item_mxn), 0)
+  INTO v_piso
+  FROM ticket_items
+  WHERE ticket_id = p_ticket_id
+    AND cancelado = false
+    AND cargo_tipo IS NOT NULL;
+  v_piso := LEAST(v_piso, GREATEST(v_total, 0));
+
+  -- Descuentos manuales a nivel ticket (sin ticket_item_id) — se restan del total
+  SELECT COALESCE(SUM(monto_descontado_mxn), 0)
+  INTO v_item_desc
+  FROM ticket_descuentos_manuales
+  WHERE ticket_id = p_ticket_id
+    AND ticket_item_id IS NULL
+    AND reversado = false;
+  v_total := v_total - v_item_desc;
+  -- 0116: el excedente no se come el cargo; se reporta solo lo que se aplicó.
+  IF v_piso > 0 AND v_total < v_piso THEN
+    v_item_desc := v_item_desc - (v_piso - v_total);
+    v_total := v_piso;
+  END IF;
+  v_descuentos_manuales := v_descuentos_manuales + v_item_desc;
+  IF v_total < 0 THEN v_total := 0; END IF;
+
+  -- Promociones a nivel ticket (items_afectados vacío y alcance TICKET_COMPLETO)
+  SELECT COALESCE(SUM(monto_descontado_mxn), 0)
+  INTO v_item_promo
+  FROM ticket_promociones_aplicadas
+  WHERE ticket_id = p_ticket_id
+    AND cancelada_por_cajero = false
+    AND promocion_alcance_snapshot = 'TICKET_COMPLETO';
+  v_total := v_total - v_item_promo;
+  -- 0116: ídem para las promociones.
+  IF v_piso > 0 AND v_total < v_piso THEN
+    v_item_promo := v_item_promo - (v_piso - v_total);
+    v_total := v_piso;
+  END IF;
+  v_promociones := v_promociones + v_item_promo;
+  IF v_total < 0 THEN v_total := 0; END IF;
+
+  -- 0156: canje de lealtad a nivel ticket (puntos por dinero). Mismo piso que descuentos y
+  -- promociones, y se reporta solo lo que de verdad se aplicó.
+  SELECT COALESCE(SUM(monto_descontado_mxn), 0)
+  INTO v_item_lea
+  FROM ticket_canjes_lealtad
+  WHERE ticket_id = p_ticket_id
+    AND ticket_item_id IS NULL
+    AND revertido = false;
+  v_total := v_total - v_item_lea;
+  IF v_piso > 0 AND v_total < v_piso THEN
+    v_item_lea := v_item_lea - (v_piso - v_total);
+    v_total := v_piso;
+  END IF;
+  IF v_total < 0 THEN
+    v_item_lea := v_item_lea + v_total;
+    v_total := 0;
+  END IF;
+  v_lealtad := v_lealtad + GREATEST(v_item_lea, 0);
+
+  -- Subtotal final (sin IVA) — útil para reportes
+  v_subtotal_final := v_total - v_iva;
+  IF v_subtotal_final < 0 THEN v_subtotal_final := 0; END IF;
+
+  -- Pagos
+  SELECT
+    COALESCE(SUM(monto_mxn) FILTER (WHERE estado IN ('APLICADO', 'CONCILIADO')), 0),
+    COALESCE(SUM(cambio_mxn) FILTER (WHERE estado IN ('APLICADO', 'CONCILIADO')), 0)
+  INTO v_monto_pagado, v_cambio
+  FROM pagos
+  WHERE ticket_id = p_ticket_id
+    AND deleted_at IS NULL;
+
+  -- Persistir totales en el ticket
+  UPDATE tickets
+  SET subtotal_mxn            = v_subtotal_final,
+      descuentos_manuales_mxn = v_descuentos_manuales,
+      promociones_mxn         = v_promociones,
+      lealtad_mxn             = v_lealtad,
+      iva_mxn                 = v_iva,
+      total_mxn               = v_total,
+      monto_pagado_mxn        = v_monto_pagado,
+      cambio_mxn              = v_cambio,
+      updated_at              = now()
+  WHERE id = p_ticket_id;
+END;
+$$;
+
+-- Cuando cambia un canje (se aplica, se revierte o se borra con su ticket) los totales se recalculan.
+CREATE OR REPLACE FUNCTION trg_ticket_canje_lealtad_recalcular()
+RETURNS trigger
+LANGUAGE plpgsql SET search_path = public, pg_temp
+AS $$
+BEGIN
+  PERFORM recalcular_totales_ticket(COALESCE(NEW.ticket_id, OLD.ticket_id));
+  RETURN COALESCE(NEW, OLD);
+END $$;
+
+DROP TRIGGER IF EXISTS trg_ticket_canjes_lealtad_recalcular ON ticket_canjes_lealtad;
+CREATE TRIGGER trg_ticket_canjes_lealtad_recalcular
+  AFTER INSERT OR UPDATE OR DELETE ON ticket_canjes_lealtad
+  FOR EACH ROW EXECUTE FUNCTION trg_ticket_canje_lealtad_recalcular();
+
+-- El borrador del CFDI deduce su descuento de los totales del ticket: el canje cuenta como descuento.
+-- Misma firma y mismos REVOKE/GRANT que la 0135 (SECURITY DEFINER).
+CREATE OR REPLACE FUNCTION cfdi_crear_borrador(
+  p_ticket_id              uuid,
+  p_tipo_comprobante       cfdi_tipo_comprobante,
+  p_receptor_rfc           varchar,
+  p_receptor_razon_social  varchar,
+  p_receptor_uso_cfdi      varchar,
+  p_receptor_codigo_postal varchar,
+  p_receptor_regimen_fiscal varchar,
+  p_receptor_email         varchar,
+  p_emisor_rfc             varchar,
+  p_emisor_razon_social    varchar,
+  p_emisor_regimen_fiscal  varchar,
+  p_emisor_lugar_expedicion varchar,
+  p_metodo_pago_sat        varchar,
+  p_forma_pago_sat         varchar,
+  p_pac_proveedor          cfdi_proveedor_pac,
+  p_devolucion_id          uuid DEFAULT NULL,
+  p_cfdi_sustituye_id      uuid DEFAULT NULL
+) RETURNS uuid
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
+DECLARE
+  v_tenant_id uuid := current_tenant_id();
+  v_ticket    tickets%ROWTYPE;
+  v_cfdi_id   uuid;
+BEGIN
+  IF v_tenant_id IS NULL THEN
+    RAISE EXCEPTION 'Sin tenant en la sesión' USING ERRCODE = '42501';
+  END IF;
+
+  SELECT * INTO v_ticket FROM tickets WHERE id = p_ticket_id AND tenant_id = v_tenant_id;
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'Ticket % no existe', p_ticket_id;
+  END IF;
+
+  IF p_tipo_comprobante = 'INGRESO' AND v_ticket.estado_fiscal <> 'PAGADO' THEN
+    RAISE EXCEPTION 'Solo tickets PAGADOS se pueden facturar (estado actual: %)', v_ticket.estado_fiscal;
+  END IF;
+
+  IF p_tipo_comprobante = 'EGRESO' AND p_devolucion_id IS NULL THEN
+    RAISE EXCEPTION 'Nota de crédito requiere devolucion_id';
+  END IF;
+  IF p_devolucion_id IS NOT NULL
+     AND NOT EXISTS (SELECT 1 FROM devoluciones WHERE id = p_devolucion_id AND tenant_id = v_tenant_id) THEN
+    RAISE EXCEPTION 'Devolución % no existe', p_devolucion_id;
+  END IF;
+  IF p_cfdi_sustituye_id IS NOT NULL
+     AND NOT EXISTS (SELECT 1 FROM tickets_cfdi WHERE id = p_cfdi_sustituye_id AND tenant_id = v_tenant_id) THEN
+    RAISE EXCEPTION 'CFDI % no existe', p_cfdi_sustituye_id;
+  END IF;
+
+  INSERT INTO tickets_cfdi (
+    tenant_id, ticket_id, tipo_comprobante,
+    receptor_rfc, receptor_razon_social, receptor_uso_cfdi,
+    receptor_codigo_postal, receptor_regimen_fiscal, receptor_email,
+    emisor_rfc, emisor_razon_social, emisor_regimen_fiscal, emisor_lugar_expedicion,
+    subtotal_mxn, descuento_mxn, iva_mxn, total_mxn,
+    metodo_pago_sat, forma_pago_sat,
+    estado_sat, pac_proveedor,
+    cfdi_sustituye_id, devolucion_id,
+    created_by, updated_by
+  ) VALUES (
+    v_tenant_id, p_ticket_id, p_tipo_comprobante,
+    p_receptor_rfc, p_receptor_razon_social, p_receptor_uso_cfdi,
+    p_receptor_codigo_postal, p_receptor_regimen_fiscal, p_receptor_email,
+    p_emisor_rfc, p_emisor_razon_social, p_emisor_regimen_fiscal, p_emisor_lugar_expedicion,
+    v_ticket.subtotal_mxn,
+    -- 0156: el canje de lealtad es descuento, no forma de pago.
+    v_ticket.descuentos_manuales_mxn + v_ticket.promociones_mxn + v_ticket.lealtad_mxn,
+    v_ticket.iva_mxn,
+    v_ticket.total_mxn,
+    p_metodo_pago_sat, p_forma_pago_sat,
+    'BORRADOR', p_pac_proveedor,
+    p_cfdi_sustituye_id, p_devolucion_id,
+    auth.uid(), auth.uid()
+  ) RETURNING id INTO v_cfdi_id;
+
+  RETURN v_cfdi_id;
+END;
+$$;
+REVOKE EXECUTE ON FUNCTION cfdi_crear_borrador(uuid, cfdi_tipo_comprobante, varchar, varchar, varchar, varchar, varchar, varchar, varchar, varchar, varchar, varchar, varchar, varchar, cfdi_proveedor_pac, uuid, uuid) FROM public, anon;
+GRANT EXECUTE ON FUNCTION cfdi_crear_borrador(uuid, cfdi_tipo_comprobante, varchar, varchar, varchar, varchar, varchar, varchar, varchar, varchar, varchar, varchar, varchar, varchar, cfdi_proveedor_pac, uuid, uuid) TO authenticated, service_role;
