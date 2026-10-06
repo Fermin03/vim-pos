@@ -24,6 +24,7 @@ DECLARE
   v_vec uuid := gen_random_uuid(); v_vsuc uuid; v_vcaja uuid; v_vturno uuid; v_tvec uuid;
   v_dir1 uuid; v_dir2 uuid := gen_random_uuid(); v_d5 uuid := gen_random_uuid(); v_d6 uuid := gen_random_uuid();
   v_sano uuid := gen_random_uuid(); v_sano2 uuid := gen_random_uuid();
+  v_cv0 timestamptz; v_cv1 timestamptz; v_cv2 timestamptz; v_cv3 timestamptz; v_pr22 uuid; v_cli22 uuid;
   v_cc uuid; v_d7 uuid := gen_random_uuid(); v_d8 uuid := gen_random_uuid(); v_dir3 uuid := gen_random_uuid();
 BEGIN
   PERFORM set_config('request.jwt.claims',
@@ -465,6 +466,37 @@ BEGIN
   IF v_res ? '_errores' THEN RAISE EXCEPTION '21b: %', v_res->'_errores'; END IF;
   IF (SELECT count(*) FROM direcciones_cliente WHERE cliente_id = v_r4) <> 2 THEN RAISE EXCEPTION '21b: debían entrar las dos direcciones'; END IF;
   IF (SELECT count(*) FROM direcciones_cliente WHERE cliente_id = v_r4 AND es_principal) <> 1 THEN RAISE EXCEPTION '21b: debía quedar exactamente una principal'; END IF;
+
+  -- 22) catalogo_version() mira el programa y los premios (un premio nuevo llega a la caja en un
+  -- minuto, no en una hora) pero NO los clientes ni los saldos (cada venta dispararía un pull completo
+  -- en todas las cajas). now() es fijo dentro de la transacción: los cambios llevan un updated_at
+  -- explícito hacia adelante y los disparadores de updated_at se apagan mientras se prueba.
+  ALTER TABLE lealtad_programa DISABLE TRIGGER trg_lealtad_programa_updated_at;
+  ALTER TABLE lealtad_premios DISABLE TRIGGER trg_lealtad_premios_updated_at;
+  v_cv0 := catalogo_version();
+  -- Un premio nuevo adelanta la versión.
+  INSERT INTO lealtad_premios (tenant_id, producto_id, costo, updated_at)
+  SELECT v_t, p.id, 50, v_cv0 + interval '1 hour' FROM productos p
+   WHERE p.tenant_id = v_t AND NOT EXISTS (SELECT 1 FROM lealtad_premios x WHERE x.tenant_id = v_t AND x.producto_id = p.id AND x.deleted_at IS NULL)
+   LIMIT 1 RETURNING id INTO v_pr22;
+  v_cv1 := catalogo_version();
+  IF v_cv1 IS NOT DISTINCT FROM v_cv0 OR v_cv1 <= v_cv0 THEN RAISE EXCEPTION '22: un premio nuevo no adelantó catalogo_version()'; END IF;
+  -- Cambiar un premio existente también.
+  UPDATE lealtad_premios SET costo = 60, updated_at = v_cv1 + interval '1 hour' WHERE id = v_pr22;
+  v_cv2 := catalogo_version();
+  IF v_cv2 <= v_cv1 THEN RAISE EXCEPTION '22: editar un premio no adelantó catalogo_version()'; END IF;
+  -- Y el programa.
+  UPDATE lealtad_programa SET porcentaje = 11, updated_at = v_cv2 + interval '1 hour' WHERE tenant_id = v_t;
+  v_cv3 := catalogo_version();
+  IF v_cv3 <= v_cv2 THEN RAISE EXCEPTION '22: editar el programa no adelantó catalogo_version()'; END IF;
+  -- Un cliente nuevo, un saldo y un movimiento NO la mueven (aunque lleven una fecha posterior).
+  INSERT INTO clientes (tenant_id, nombre, telefono, updated_at) VALUES (v_t, 'Cliente smoke 22', '4770002201', v_cv3 + interval '1 hour') RETURNING id INTO v_cli22;
+  INSERT INTO lealtad_saldos (tenant_id, cliente_id, saldo, programa_version, updated_at) VALUES (v_t, v_cli22, 5, v_ver, v_cv3 + interval '1 hour');
+  INSERT INTO lealtad_movimientos (id, tenant_id, cliente_id, tipo, puntos, programa_version, sucursal_id, fecha, saldo_visto)
+  VALUES (gen_random_uuid(), v_t, v_cli22, 'GANADO', 5, v_ver, v_suc, v_cv3 + interval '1 hour', 5);
+  IF catalogo_version() <> v_cv3 THEN RAISE EXCEPTION '22: un cliente, un saldo o un movimiento movieron catalogo_version()'; END IF;
+  ALTER TABLE lealtad_programa ENABLE TRIGGER trg_lealtad_programa_updated_at;
+  ALTER TABLE lealtad_premios ENABLE TRIGGER trg_lealtad_premios_updated_at;
 
   RAISE NOTICE 'SMOKE SYNC LEALTAD OK';
 END $$;

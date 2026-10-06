@@ -3,7 +3,7 @@
 -- libro ni los saldos a mano, y el interruptor exige add-on y programa.
 -- ============================================================================
 begin;
-select plan(14);
+select plan(15);
 
 \set t      '99999999-0000-0000-0000-0000000000aa'
 \set cajero '99999999-0000-0000-0000-000000000001'
@@ -30,6 +30,9 @@ select isnt((select codigo_publico from clientes where id = :'cli'), null, 'todo
 
 -- 3) El módulo aparece en modulos_efectivos, apagado por omisión.
 select is((select (modulos_efectivos(:'t') -> 'efectivos' ->> 'lealtad')::boolean), false, 'lealtad nace apagada');
+
+-- 3b) El add-on existe en el catálogo y nace INACTIVO: se enciende en el plan 1C, con las pantallas.
+select is((select activo from addons where codigo = 'LEALTAD'), false, 'el add-on LEALTAD existe y nace inactivo en el catálogo');
 
 -- Como el cajero.
 set local role authenticated;

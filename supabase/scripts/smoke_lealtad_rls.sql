@@ -49,6 +49,13 @@ BEGIN
   v_b := (modulos_efectivos(v_t) -> 'efectivos' ->> 'lealtad')::boolean;
   IF v_b IS DISTINCT FROM false THEN RAISE EXCEPTION '3: lealtad debía nacer apagada, vino %', v_b; END IF;
 
+  -- 3b) El add-on existe en el catálogo pero nace INACTIVO: /platform lista los activos con un botón
+  -- de activar, y sin pantallas (plan 1C) no debe estar a un clic.
+  IF NOT EXISTS (SELECT 1 FROM addons WHERE codigo = 'LEALTAD') THEN RAISE EXCEPTION '3b: no existe el add-on LEALTAD'; END IF;
+  IF (SELECT activo FROM addons WHERE codigo = 'LEALTAD') IS DISTINCT FROM false THEN
+    RAISE EXCEPTION '3b: el add-on LEALTAD debía nacer inactivo en el catálogo';
+  END IF;
+
   -- Como el cajero.
   EXECUTE 'SET LOCAL ROLE authenticated';
   PERFORM set_config('request.jwt.claims', json_build_object('sub', v_cajero, 'role', 'authenticated', 'tenant_id', v_t)::text, true);
@@ -167,6 +174,13 @@ BEGIN
   BEGIN
     PERFORM lealtad_saldo(v_t, v_cli, NULL);
     RAISE EXCEPTION '19: el cajero llamó lealtad_saldo';
+  EXCEPTION WHEN insufficient_privilege THEN NULL; END;
+
+  -- 19b) lealtad_vence_el recibe el negocio como parámetro: un autenticado leería los meses de
+  -- vencimiento de otro. Solo la llaman funciones definer y triggers.
+  BEGIN
+    PERFORM lealtad_vence_el(v_otro, now());
+    RAISE EXCEPTION '19b: el cajero llamó lealtad_vence_el';
   EXCEPTION WHEN insufficient_privilege THEN NULL; END;
 
   EXECUTE 'RESET ROLE';

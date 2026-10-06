@@ -196,7 +196,11 @@ CREATE TRIGGER trg_lealtad_premios_updated_at BEFORE UPDATE ON lealtad_premios
   FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 
 -- ── §3 Add-on, módulo e interruptor ─────────────────────────────────────────
-INSERT INTO addons (codigo, nombre, descripcion, precio_mensual_mxn, features_activadas, orden_visualizacion)
+-- Nace INACTIVO (addons.activo = false): el panel de plataforma lista todo add-on activo con un botón
+-- de activar, y todavía no hay pantallas detrás. Se enciende en el plan 1C, cuando existan las
+-- pantallas y se haya timbrado en sandbox un premio de producto. tenant_addon_activo (0081) no mira
+-- addons.activo, así que conceder el add-on a mano a un negocio sigue funcionando.
+INSERT INTO addons (codigo, nombre, descripcion, precio_mensual_mxn, features_activadas, activo, orden_visualizacion)
 VALUES (
   'LEALTAD',
   'Programa de lealtad',
@@ -204,6 +208,7 @@ VALUES (
     || 'Incluido sin cargo desde el plan Negocio; en Esencial se contrata aparte.',
   100.00,
   jsonb_build_object('lealtad', true),
+  false,
   25
 )
 ON CONFLICT (codigo) DO NOTHING;
@@ -226,8 +231,10 @@ AS $$
   END
   FROM lealtad_programa p WHERE p.tenant_id = p_tenant;
 $$;
-REVOKE ALL ON FUNCTION lealtad_vence_el(uuid, timestamptz) FROM PUBLIC, anon;
-GRANT EXECUTE ON FUNCTION lealtad_vence_el(uuid, timestamptz) TO authenticated, service_role;
+-- Solo la llaman otras funciones definer y triggers: recibe el negocio como parámetro, así que un
+-- authenticated con ella leería los meses de vencimiento de otro negocio.
+REVOKE ALL ON FUNCTION lealtad_vence_el(uuid, timestamptz) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION lealtad_vence_el(uuid, timestamptz) TO service_role;
 
 -- El interruptor: solo dueño o admin, solo con add-on y programa. Al encender, el reloj de
 -- vencimiento arranca de ese momento (spec §5, regla 9). SECURITY DEFINER porque
@@ -550,7 +557,11 @@ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp
 AS $$
 BEGIN
   BEGIN
-    IF NEW.estado_fiscal = 'PAGADO' AND OLD.estado_fiscal <> 'PAGADO' THEN
+    -- Solo se gana al cobrar una cuenta abierta. FACTURADO → PAGADO (cancelar un CFDI, 0083) NO es un
+    -- cobro: la venta ya se cobró y, si no ganó entonces (módulo apagado, tope diario, o ganó y se
+    -- devolvió todo, neto 0), no gana ahora. Reabrir y volver a cobrar (PAGADO → ABIERTO → PAGADO) sí
+    -- gana en el segundo cobro, porque reabrir deshizo lo ganado.
+    IF NEW.estado_fiscal = 'PAGADO' AND OLD.estado_fiscal IN ('BORRADOR', 'ABIERTO') THEN
       PERFORM lealtad_acumular_por_ticket(NEW.id);
     ELSIF NEW.estado_fiscal IN ('CANCELADO', 'ABIERTO') AND OLD.estado_fiscal IN ('PAGADO', 'FACTURADO') THEN
       -- Cancelar o reabrir una cuenta cobrada deshace lo que ganó.
@@ -1079,6 +1090,8 @@ END $$;
 -- en la nube ese id ya existe y el registro es un no-op.
 -- Es la ÚLTIMA barrera: el id del renglón (ticket_item_id) es lo único que no sale de la nube, así
 -- que aquí se valida todo lo que ata el canje a lo que de verdad se está descontando. Rechaza con:
+--   TICKET_NO_EXISTE      la cuenta no existe en este negocio
+--   TICKET_NO_ABIERTO     la cuenta ya no está abierta (solo BORRADOR o ABIERTO admiten un canje)
 --   PUNTOS_INVALIDOS      los puntos no son un entero positivo
 --   CANJE_REVERTIDO       ese canje ya tiene su reversa: ya no se puede asentar
 --   CANJE_NO_COINCIDE     ya hay un movimiento con ese id y no es un CANJE de este negocio, por esos
@@ -1089,6 +1102,7 @@ END $$;
 --   CLIENTE_NO_COINCIDE   el cliente del canje no existe aquí y el de la cuenta no es la misma persona
 --                         (otro teléfono, o falta alguno de los dos)
 --   PREMIO_INVALIDO       el premio no existe en este negocio
+--   PREMIO_SIN_RENGLON    un canje de premio llega sin el id del renglón al que se pega
 --   RENGLON_NO_EXISTE     el renglón no es de esta cuenta
 --   RENGLON_NO_ES_PREMIO  un premio solo se pega a UN renglón de producto vivo (no de cargo, ni cancelado,
 --                         ni parte de un combo) de ese mismo producto y de cantidad 1
@@ -2212,3 +2226,32 @@ AS $$
 $$;
 REVOKE EXECUTE ON FUNCTION sync_pull_snapshot(uuid) FROM public, anon, authenticated;
 GRANT EXECUTE ON FUNCTION sync_pull_snapshot(uuid) TO service_role;
+
+-- ── catalogo_version(): el programa y los premios también son "el catálogo cambió" ──
+-- Sin esto un premio creado en el panel tardaría hasta una hora en llegar a la caja (el sondeo de
+-- cada minuto solo mira estas tablas). Copia íntegra de la vigente (0152) con dos líneas más.
+-- NO mira clientes ni lealtad_saldos: cambian con cada venta y cada caja haría un pull completo cada vez.
+CREATE OR REPLACE FUNCTION catalogo_version()
+RETURNS timestamptz
+LANGUAGE sql
+STABLE
+SET search_path = public, pg_temp
+AS $$
+  SELECT GREATEST(
+    (SELECT max(updated_at) FROM categorias),
+    (SELECT max(updated_at) FROM productos),
+    (SELECT max(updated_at) FROM productos_sucursal),
+    (SELECT max(updated_at) FROM grupos_modificadores),
+    (SELECT max(updated_at) FROM opciones_modificador),
+    (SELECT max(created_at) FROM productos_grupos_modificadores),
+    (SELECT max(updated_at) FROM combo_grupos),
+    (SELECT max(updated_at) FROM combo_opciones),
+    (SELECT max(updated_at) FROM zonas_envio),
+    (SELECT max(updated_at) FROM anuncios_pantalla),
+    (SELECT max(updated_at) FROM lealtad_programa),
+    (SELECT max(updated_at) FROM lealtad_premios),
+    (SELECT max(updated_at) FROM configuracion_tenant)
+  );
+$$;
+REVOKE EXECUTE ON FUNCTION catalogo_version() FROM public, anon;
+GRANT EXECUTE ON FUNCTION catalogo_version() TO authenticated, service_role;

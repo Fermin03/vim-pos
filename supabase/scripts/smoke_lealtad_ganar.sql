@@ -164,6 +164,53 @@ BEGIN
   IF (SELECT estado_fiscal FROM tickets WHERE id = v_t1) <> 'PAGADO' THEN RAISE EXCEPTION 'la falla de la lealtad tumbó el cobro'; END IF;
   IF lealtad_neto_ganado(v_t1) <> 0 THEN RAISE EXCEPTION 'la falla forzada no impidió el registro: la prueba no prueba nada'; END IF;
 
+  -- 10) Cancelar una factura (FACTURADO → PAGADO, 0083) NO vuelve a dar puntos: solo se gana al pasar
+  -- a PAGADO desde BORRADOR o ABIERTO. Reabrir y volver a cobrar sí gana en el segundo cobro.
+  UPDATE configuracion_tenant SET modulo_lealtad_activo = true WHERE tenant_id = v_tenant;
+  UPDATE lealtad_programa SET tope_compras_dia = 50 WHERE tenant_id = v_tenant;
+  -- (a) cobrada, ganó 12; PAGADO → FACTURADO → PAGADO sigue en 12 y con un solo GANADO.
+  v_t1 := abrir_ticket(v_suc, v_caja, v_turno, 'PARA_LLEVAR'::modo_servicio, v_cli, NULL, 'smoke-lea-10a', v_maria);
+  PERFORM agregar_item_a_ticket(v_t1, v_prod, 1, NULL, '[]'::jsonb, 'smoke-lea-10a-i');
+  PERFORM aplicar_pago(v_t1, 'EFECTIVO'::metodo_pago, 120, 120);
+  IF lealtad_neto_ganado(v_t1) <> 12 THEN RAISE EXCEPTION '10a: debía ganar 12, ganó %', lealtad_neto_ganado(v_t1); END IF;
+  UPDATE tickets SET estado_fiscal = 'FACTURADO' WHERE id = v_t1;
+  UPDATE tickets SET estado_fiscal = 'PAGADO' WHERE id = v_t1;
+  IF lealtad_neto_ganado(v_t1) <> 12 THEN RAISE EXCEPTION '10a: cancelar la factura dio puntos otra vez (neto %)', lealtad_neto_ganado(v_t1); END IF;
+  IF (SELECT count(*) FROM lealtad_movimientos WHERE ticket_id = v_t1 AND tipo = 'GANADO') <> 1 THEN
+    RAISE EXCEPTION '10a: debía haber un solo GANADO';
+  END IF;
+  -- (b) ganó 12, se revirtió todo (neto 0); cancelar la factura no lo vuelve a dar ni mueve el saldo.
+  v_t2 := abrir_ticket(v_suc, v_caja, v_turno, 'PARA_LLEVAR'::modo_servicio, v_cli, NULL, 'smoke-lea-10b', v_maria);
+  PERFORM agregar_item_a_ticket(v_t2, v_prod, 1, NULL, '[]'::jsonb, 'smoke-lea-10b-i');
+  PERFORM aplicar_pago(v_t2, 'EFECTIVO'::metodo_pago, 120, 120);
+  PERFORM lealtad_revertir_ganado_ticket(v_t2);
+  IF lealtad_neto_ganado(v_t2) <> 0 THEN RAISE EXCEPTION '10b: la reversa no dejó el neto en 0'; END IF;
+  SELECT saldo INTO v_saldo_antes FROM lealtad_saldos WHERE cliente_id = v_cli;
+  UPDATE tickets SET estado_fiscal = 'FACTURADO' WHERE id = v_t2;
+  UPDATE tickets SET estado_fiscal = 'PAGADO' WHERE id = v_t2;
+  IF lealtad_neto_ganado(v_t2) <> 0 THEN RAISE EXCEPTION '10b: un ticket revertido volvió a ganar al cancelar su factura (neto %)', lealtad_neto_ganado(v_t2); END IF;
+  IF (SELECT saldo FROM lealtad_saldos WHERE cliente_id = v_cli) <> v_saldo_antes THEN RAISE EXCEPTION '10b: el saldo se movió'; END IF;
+  -- (c) cobrada con el módulo apagado; encendido después, cancelar su factura no le da nada.
+  UPDATE configuracion_tenant SET modulo_lealtad_activo = false WHERE tenant_id = v_tenant;
+  v_t3 := abrir_ticket(v_suc, v_caja, v_turno, 'PARA_LLEVAR'::modo_servicio, v_cli, NULL, 'smoke-lea-10c', v_maria);
+  PERFORM agregar_item_a_ticket(v_t3, v_prod, 1, NULL, '[]'::jsonb, 'smoke-lea-10c-i');
+  PERFORM aplicar_pago(v_t3, 'EFECTIVO'::metodo_pago, 120, 120);
+  UPDATE configuracion_tenant SET modulo_lealtad_activo = true WHERE tenant_id = v_tenant;
+  SELECT saldo INTO v_saldo_antes FROM lealtad_saldos WHERE cliente_id = v_cli;
+  UPDATE tickets SET estado_fiscal = 'FACTURADO' WHERE id = v_t3;
+  UPDATE tickets SET estado_fiscal = 'PAGADO' WHERE id = v_t3;
+  IF lealtad_neto_ganado(v_t3) <> 0 THEN RAISE EXCEPTION '10c: una venta anterior al módulo ganó al cancelar su factura'; END IF;
+  IF (SELECT saldo FROM lealtad_saldos WHERE cliente_id = v_cli) <> v_saldo_antes THEN RAISE EXCEPTION '10c: el saldo se movió'; END IF;
+  -- (d) reabrir y volver a cobrar sí gana en el segundo cobro.
+  v_ta := abrir_ticket(v_suc, v_caja, v_turno, 'PARA_LLEVAR'::modo_servicio, v_cli, NULL, 'smoke-lea-10d', v_maria);
+  PERFORM agregar_item_a_ticket(v_ta, v_prod, 1, NULL, '[]'::jsonb, 'smoke-lea-10d-i');
+  PERFORM aplicar_pago(v_ta, 'EFECTIVO'::metodo_pago, 120, 120);
+  IF lealtad_neto_ganado(v_ta) <> 12 THEN RAISE EXCEPTION '10d: el primer cobro debía ganar 12'; END IF;
+  UPDATE tickets SET estado_fiscal = 'ABIERTO' WHERE id = v_ta;
+  IF lealtad_neto_ganado(v_ta) <> 0 THEN RAISE EXCEPTION '10d: reabrir debía deshacer lo ganado'; END IF;
+  UPDATE tickets SET estado_fiscal = 'PAGADO' WHERE id = v_ta;
+  IF lealtad_neto_ganado(v_ta) <> 12 THEN RAISE EXCEPTION '10d: el segundo cobro debía volver a ganar 12, ganó %', lealtad_neto_ganado(v_ta); END IF;
+
   RAISE NOTICE 'SMOKE LEALTAD GANAR OK';
 END $$;
 ROLLBACK;
