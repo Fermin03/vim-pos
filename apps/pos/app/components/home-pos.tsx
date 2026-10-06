@@ -19,6 +19,7 @@ import {
   lineasDeEdicion,
   admiteClienteCuenta,
   clienteIdParaTicket,
+  calcularTotalesDisplay,
   type LineaCarrito,
   type ModificadorSel,
   type EnvioCarrito,
@@ -92,6 +93,9 @@ import type { LineaCancelada } from "./modal-cancelar-items";
 import { cerrarRepartoAlCobrar } from "../lib/delivery";
 import { registrarImpresionComanda, registrarReimpresionTicket, type OrigenReimpresionTicket, type RegistroComanda } from "../lib/impresiones";
 import { ModalReimprimirComanda } from "./modal-reimprimir-comanda";
+import { baseDeLealtad, franjaLealtad, type Programa } from "../lib/lealtad-reglas";
+import { comprasQueSumanHoy, leerCanjeDelTicket, leerPrograma, leerSaldoLocal, quitarCanjeSiQuedoRecortado, type CanjeVivo, type SaldoCliente } from "../lib/lealtad";
+import { ModalCanjeLealtad } from "./modal-canje-lealtad";
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
 
@@ -164,6 +168,14 @@ export function HomePos({
   // vez de abrir una consulta nueva solo para saber si el módulo está prendido.
   const { modulos } = useAcceso();
   const hayDelivery = modulos?.delivery_apps === true;
+  // Lealtad (ADR 0030). Todo lo de abajo queda apagado si el módulo no está efectivo.
+  const lealtadActiva = modulos?.lealtad === true;
+  const [programa, setPrograma] = useState<Programa | null>(null);
+  const [saldoCliente, setSaldoCliente] = useState<SaldoCliente | null>(null);
+  const [comprasHoy, setComprasHoy] = useState(0);
+  const [canjeVivo, setCanjeVivo] = useState<CanjeVivo | null>(null);
+  /** Cuenta sobre la que está abierto el modal de lealtad, y desde dónde se abrió. */
+  const [canjeDe, setCanjeDe] = useState<{ ticketId: string; clienteId: string; origen: "captura" | "lista" } | null>(null);
   // F16 — estado de conexión (avisa al cajero si se cae la red).
   const { online } = useConexion(SUPABASE_URL ? `${SUPABASE_URL}/auth/v1/health` : undefined);
   // En ref para que `recargarCatalogo` lo consulte sin recrearse (y recargar el menú) cada vez
@@ -310,6 +322,55 @@ export function HomePos({
     },
     { nombre: caja.negocioNombre, logoUrl: caja.logoUrl },
   );
+
+  // El programa del negocio. Se relee cuando el módulo se enciende; un cambio del dueño llega con el
+  // siguiente arranque del POS (el modal siempre lo lee fresco antes de canjear).
+  useEffect(() => {
+    if (!lealtadActiva) { setPrograma(null); return; }
+    let vivo = true;
+    leerPrograma(token).then((p) => { if (vivo) setPrograma(p); }).catch(() => { if (vivo) setPrograma(null); });
+    return () => { vivo = false; };
+  }, [lealtadActiva, token]);
+
+  // El cliente al que le cuenta la compra: el de la cuenta, o el de domicilio.
+  const clienteLealtad = carrito.modoServicio === "DELIVERY_PROPIO"
+    ? (carrito.clienteDomicilio ? { clienteId: carrito.clienteDomicilio.clienteId, nombre: carrito.clienteDomicilio.nombre } : null)
+    : (carrito.clienteCuenta ? { clienteId: carrito.clienteCuenta.clienteId, nombre: carrito.clienteCuenta.nombre } : null);
+  const clienteLealtadId = clienteLealtad?.clienteId ?? null;
+  const versionPrograma = programa?.version ?? null;
+  const lealtadTicket = ticketBd?.lealtad ?? 0;
+
+  // Saldo que esta base conoce y compras de hoy: para MOSTRAR. Se relee al cambiar de cliente y cada
+  // vez que el canje de la cuenta cambia (lo movió un canje o una reversa).
+  useEffect(() => {
+    if (!lealtadActiva || versionPrograma === null || !clienteLealtadId) { setSaldoCliente(null); setComprasHoy(0); return; }
+    let vivo = true;
+    Promise.all([leerSaldoLocal(token, clienteLealtadId, versionPrograma), comprasQueSumanHoy(token, clienteLealtadId)])
+      .then(([s, n]) => { if (vivo) { setSaldoCliente(s); setComprasHoy(n); } })
+      .catch(() => { if (vivo) { setSaldoCliente(null); setComprasHoy(0); } });
+    return () => { vivo = false; };
+  }, [lealtadActiva, versionPrograma, clienteLealtadId, token, lealtadTicket]);
+
+  // El canje vivo de la cuenta guardada.
+  const ticketBdId = ticketBd?.ticketId ?? null;
+  useEffect(() => {
+    if (!lealtadActiva || !ticketBdId) { setCanjeVivo(null); return; }
+    let vivo = true;
+    leerCanjeDelTicket(token, ticketBdId).then((c) => { if (vivo) setCanjeVivo(c); }).catch(() => { if (vivo) setCanjeVivo(null); });
+    return () => { vivo = false; };
+  }, [lealtadActiva, ticketBdId, lealtadTicket, token]);
+
+  const envioCarrito = carrito.envio?.costoMxn ?? 0;
+  const franja = lealtadActiva && programa && clienteLealtad
+    ? franjaLealtad({
+        programa,
+        saldo: saldoCliente?.saldo ?? 0,
+        comprasHoy,
+        base: baseDeLealtad(totalAutoritativo ?? calcularTotalesDisplay(carrito.lineas, 16, envioCarrito).total, envioCarrito),
+        canje: canjeVivo,
+        online,
+      })
+    : null;
   const [cancelandoItem, setCancelandoItem] = useState<ItemTicket | null>(null);
   // F6.5 — descuento/override por ítem.
   const [descuentoItem, setDescuentoItem] = useState<ItemTicket | null>(null);
@@ -682,6 +743,10 @@ export function HomePos({
     if (ticketBd) {
       const it = itemsPersistidos.find((x) => x.clientId === clientId);
       if (!it) return;
+      if (canjeVivo?.ticketItemId && it.id === canjeVivo.ticketItemId) {
+        setError(`${l.producto.nombre} es un premio de lealtad. Para cambiarlo, quita el canje desde Lealtad.`);
+        return;
+      }
       if (it.enviadoCocina) { setError(`${l.producto.nombre} ya se mandó a cocina: ya no se puede modificar.`); return; }
     }
     if (l.combo) { setComboAbierto({ combo: l.combo.def, linea: l }); return; }
@@ -691,7 +756,7 @@ export function HomePos({
     } catch (e) {
       setError(e instanceof Error ? e.message : "Error al cargar modificadores");
     }
-  }, [carrito.lineas, token, ticketBd, itemsPersistidos]);
+  }, [carrito.lineas, token, ticketBd, itemsPersistidos, canjeVivo]);
 
   /** Entra en modo cuenta de mesa: carga el ticket persistido al carrito para seguir editando. */
   const entrarCuenta = useCallback(async (ticketId: string, origen: Origen = "inicio") => {
@@ -962,6 +1027,40 @@ export function HomePos({
     }
   }, [carrito, ticketBd, ticketIncompleto, token, caja.sucursal_id, turno.caja_id, turno.id, imprimirComandaCocina, adoptarTicketSiQuedoAbierto]);
 
+  // Lealtad: el canje nace atado a un ticket, así que la cuenta se guarda ANTES de abrir el modal
+  // (igual que con el descuento). Solo cuentas con cliente de cuenta: en Domicilio el carrito pierde
+  // al cliente al releer la cuenta, y ahí se canjea desde la lista de Domicilio.
+  const onAbrirLealtad = useCallback(async () => {
+    const clienteId = carrito.clienteCuenta?.clienteId;
+    if (!clienteId || carrito.lineas.length === 0) return;
+    setProcesandoCobro(true);
+    setError(null);
+    try {
+      let bd = ticketBd;
+      if (!bd || ticketIncompleto) {
+        bd = await persistirTicket(
+          { token, sucursalId: caja.sucursal_id, cajaId: turno.caja_id, turnoId: turno.id },
+          carrito.modoServicio,
+          carrito.lineas,
+          idTicketDelCarrito(),
+          clienteIdParaTicket(carrito),
+          carrito.clienteDomicilio?.direccionId ?? null,
+          carrito.notaOrden ?? null,
+          carrito.nombreCuenta ?? null,
+          carrito.envio?.zonaId ?? null,
+        );
+        setTicketBd(bd);
+        setTicketIncompleto(false);
+      }
+      try { setItemsPersistidos(await leerItemsPersistidos(token, bd.ticketId)); } catch { /* no bloquear */ }
+      setCanjeDe({ ticketId: bd.ticketId, clienteId, origen: "captura" });
+    } catch (e) {
+      setError(await adoptarTicketSiQuedoAbierto(e, "Error al preparar el canje"));
+    } finally {
+      setProcesandoCobro(false);
+    }
+  }, [carrito, ticketBd, ticketIncompleto, token, caja.sucursal_id, turno.caja_id, turno.id, adoptarTicketSiQuedoAbierto]);
+
   /**
    * Abre el cajón al empezar el cobro.
    *
@@ -979,6 +1078,19 @@ export function HomePos({
 
   const iniciarCobro = useCallback(async (atajo: "EFECTIVO_EXACTO" | null = null) => {
     if (carrito.lineas.length === 0) return;
+    // Lealtad: si después de canjear dinero la cuenta bajó (se canceló un platillo), el canje ya no
+    // cabe completo. Se quita, se avisa y NO se abre el cobro: el total cambió y hay que mirarlo.
+    // Si esta revisión falla, se cobra igual: una venta no se cae por la lealtad.
+    if (lealtadActiva && programa && ticketBd && !ticketIncompleto) {
+      try {
+        const r = await quitarCanjeSiQuedoRecortado(token, ticketBd, programa.mecanica);
+        if (r.aviso) {
+          setTicketBd(r.totales);
+          setAvisoReparto({ titulo: "Se quitó el canje de lealtad", texto: r.aviso });
+          return;
+        }
+      } catch { /* se cobra con lo que hay */ }
+    }
     abrirCajonParaCobrar();
     setAtajoCobro(atajo);
     // Si el ticket ya se persistió (flujo de descuento), reusarlo: nada de re-abrir. Uno incompleto
@@ -1020,7 +1132,7 @@ export function HomePos({
     } finally {
       setProcesandoCobro(false);
     }
-  }, [carrito, ticketBd, ticketIncompleto, token, caja.sucursal_id, turno.caja_id, turno.id, online, adoptarTicketSiQuedoAbierto]);
+  }, [carrito, ticketBd, ticketIncompleto, token, caja.sucursal_id, turno.caja_id, turno.id, online, adoptarTicketSiQuedoAbierto, lealtadActiva, programa]);
 
   /**
    * Ronda de arreglos 1/5 (Task 7) — cambiar la zona de ESTE pedido desde el renglón de envío.
@@ -1355,6 +1467,8 @@ export function HomePos({
         setHojaCombo(null);
         void agregarSuelto(h.producto, h.mods, h.nota).catch((e) => setError(e instanceof Error ? e.message : "Error"));
       }],
+      // Lealtad: el modal de canje se abre sobre la cuenta, en la captura y en la lista.
+      [canjeDe != null, () => setCanjeDe(null)],
       [cancelandoItem != null, () => setCancelandoItem(null)],
       [descuentoItem != null, () => setDescuentoItem(null)],
       [cancelandoTicket, () => setCancelandoTicket(false)],
@@ -1389,7 +1503,7 @@ export function HomePos({
         && !enDelivery && !enPickup && !enMesas, () => intentarSalirDeCaptura("atras")],
     ];
     return capaVisible(capas);
-  }, [modGrupos, comboAbierto, hojaCombo, agregarSuelto, cancelandoItem, descuentoItem, cancelandoTicket, reimprimiendoComanda, avisoReparto, mostrarRecibo, confirmacion, totalesCobro,
+  }, [modGrupos, comboAbierto, hojaCombo, agregarSuelto, canjeDe, cancelandoItem, descuentoItem, cancelandoTicket, reimprimiendoComanda, avisoReparto, mostrarRecibo, confirmacion, totalesCobro,
       procesandoCobro, agregandoA, viendoMapaMesas, pidiendoMesa, nombreCuentaAbierto,
       clienteDomAbierto, clienteCuentaAbierto, zonaPedidoAbierto, esperaPidiendoEtiqueta, esperaListaAbierta, movimientoAbierto,
       abrirCajaAbierto, cambiarPinAbierto, misPropinasAbierto, configImpresoraAbierto,
@@ -1426,6 +1540,37 @@ export function HomePos({
    * —el cajero terminaba en la pantalla de tomar productos sin haberla pedido—. El modal no
    * necesita el carrito: le basta el ticket y sus totales.
    */
+  // Lealtad: el mismo modal sirve a la captura y a la lista de cuentas. Va en su propia constante
+  // porque el componente tiene un return por pantalla (igual que `modalesCobro`).
+  const modalCanje = canjeDe && (
+    <ModalCanjeLealtad
+      token={token}
+      ticketId={canjeDe.ticketId}
+      clienteId={canjeDe.clienteId}
+      sucursalId={caja.sucursal_id}
+      onCambio={async ({ premioAplicado }) => {
+        if (canjeDe.origen === "captura") {
+          // Relee carrito, totales y renglones: el premio es un renglón nuevo y el total cambió.
+          await recargarCuenta();
+          return;
+        }
+        // Desde la lista no hay pantalla de captura donde tocar «Enviar a cocina»: el premio se
+        // manda aquí, con la misma secuencia que usa «Agregar producto» en la lista.
+        if (premioAplicado) {
+          try {
+            const esAgregado = await yaEnviadoACocina(token, canjeDe.ticketId);
+            const enviados = await enviarACocina(token, canjeDe.ticketId);
+            await imprimirComandaCocina(canjeDe.ticketId, enviados, esAgregado);
+          } catch (e) {
+            setError(e instanceof Error ? `El premio entró a la cuenta, pero no se pudo mandar a cocina: ${e.message}` : "El premio no se pudo mandar a cocina");
+          }
+        }
+        setCuentasVersion((v) => v + 1);
+      }}
+      onCerrar={() => setCanjeDe(null)}
+    />
+  );
+
   const modalesCobro = (
     <>
       {totalesCobro && (
@@ -2183,6 +2328,14 @@ export function HomePos({
           onAplicarDescuento={onAplicarDescuento}
           descuentoMxn={ticketBd?.descuentos ?? 0}
             promocionMxn={ticketBd?.promociones ?? 0}
+          lealtadMxn={ticketBd?.lealtad ?? 0}
+          lealtad={franja && clienteLealtad
+            ? {
+                nombre: clienteLealtad.nombre.split(" ")[0] ?? clienteLealtad.nombre,
+                franja,
+                onAbrir: admiteClienteCuenta(carrito.modoServicio) && carrito.lineas.length > 0 ? () => void onAbrirLealtad() : undefined,
+              }
+            : null}
           totalConDescuento={totalAutoritativo ?? undefined}
           bloqueado={bloqueado}
           procesando={procesandoCobro}
@@ -2199,6 +2352,7 @@ export function HomePos({
       )}
       {modalesCompartidos}
       {modalesCobro}
+      {modalCanje}
       {modGrupos && (
         <ModalModificadores
           producto={modGrupos.producto}
