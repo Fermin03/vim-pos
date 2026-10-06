@@ -164,6 +164,26 @@ describe("canje de premio", () => {
   });
 });
 
+describe("un canje a medias no se pisa", () => {
+  it("un canje nuevo en la misma cuenta no toca al pendiente ni llama a nadie", async () => {
+    guardarPendiente(alm, { ...dinero, paso: "ASENTAR" });
+    const nuevo = nuevoCanjeDinero({ ticketId: "tk-1", sucursalId: "s-1", cliente: ANA, mecanica: "PUNTOS_DINERO", puntos: 20 });
+    const t = ops({ canjear: () => ({ ok: false, error: "SALDO_INSUFICIENTE" }) });
+    const r = await avanzarCanje(t.o, alm, nuevo);
+    expect(r.estado).toBe("A_MEDIAS");
+    expect(r.estado === "A_MEDIAS" && r.pendiente.canjeId).toBe(dinero.canjeId);
+    expect(t.nombres()).toEqual([]);
+    expect(leerPendiente(alm, "tk-1")).toMatchObject({ canjeId: dinero.canjeId, paso: "ASENTAR" });
+  });
+
+  it("reanudar el MISMO canje sí avanza", async () => {
+    guardarPendiente(alm, { ...dinero, paso: "ASENTAR" });
+    const t = ops();
+    expect(await avanzarCanje(t.o, alm, { ...dinero, paso: "ASENTAR" })).toEqual({ estado: "APLICADO" });
+    expect(t.nombres()).toEqual(["asentar"]);
+  });
+});
+
 describe("el canje pendiente guardado", () => {
   it("se guarda por cuenta y no se mezcla con el de otra", () => {
     guardarPendiente(alm, dinero);

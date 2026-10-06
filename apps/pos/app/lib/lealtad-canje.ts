@@ -141,6 +141,16 @@ function asentarSePuedeReintentar(codigo: string): boolean {
  * reanudarlo: lo que ya se hizo va anotado en `inicial` y no se repite.
  */
 export async function avanzarCanje(ops: OpsCanje, almacen: Almacen, inicial: Pendiente): Promise<ResultadoCanje> {
+  // Última barrera: un canje nuevo nunca pisa ni borra a otro de la misma cuenta que quedó a medias
+  // (puede tener ya los puntos descontados). Solo se reanuda el mismo canje.
+  const guardado = leerPendiente(almacen, inicial.ticketId);
+  if (guardado && guardado.canjeId !== inicial.canjeId) {
+    return {
+      estado: "A_MEDIAS", pendiente: guardado,
+      mensaje: "Esta cuenta ya tiene un canje a medias. Termínalo con Reintentar o descártalo antes de empezar otro.",
+    };
+  }
+
   let p = inicial;
   const cuanto = cantidad(p.mecanica, p.puntos);
   const renglonSeQueda = p.premio
