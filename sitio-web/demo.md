@@ -1,10 +1,10 @@
-# Te lo enseñamos funcionando
+# Pide una demo de VIM POS: media hora, con tu menú
 
 > Dinos cuántas cajas y cuántas sucursales tienes y te enseñamos el sistema funcionando, con tus productos y tus precios. Contestamos el mismo día hábil.
 
 **VIM POS** · punto de venta para restaurantes en México · versión en HTML: https://vimpos.com.mx/demo
 
-Media hora, sin compromiso y sin presentación. Vemos tu carta, montamos un par de productos tuyos y te dejamos cobrar una venta de prueba en el sistema de verdad. Después preguntas lo que quieras y te decimos qué plan te toca.
+Montamos un par de productos tuyos y cobras una venta de prueba en el sistema de verdad.
 
 - Te escribimos por WhatsApp el mismo día hábil
 - Media hora, con tus productos y tus precios
@@ -17,7 +17,7 @@ Media hora, sin compromiso y sin presentación. Vemos tu carta, montamos un par 
    El mismo día hábil. No un correo automático a las tres semanas.
 2. ### Media hora, cuando puedas
 
-   En videollamada o en tu local si estás por León. La agendamos a tu hora floja, no a la nuestra.
+   En tu local, si estás en León y alrededores. La agendamos a tu hora floja, no a la nuestra. Si estás fuera, [pruébalo 30 días gratis](https://admin.vimpos.com.mx/registro).
 3. ### Lo usas tú
 
    Con tus productos y tus precios, no con una demostración de juguete. Ahí es donde se ve si te sirve.
@@ -35,7 +35,7 @@ Tus datos son solo para contactarte por esto. No los vendemos, no los compartimo
 
 ---
 
-**Otras páginas en Markdown:** [Inicio](https://vimpos.com.mx/index.md) · [Funciones](https://vimpos.com.mx/funciones.md) · [Sin internet](https://vimpos.com.mx/sin-internet.md) · [Facturación CFDI](https://vimpos.com.mx/facturacion-cfdi.md) · [Precios](https://vimpos.com.mx/precios.md) · [Novedades](https://vimpos.com.mx/novedades.md) · [Cuánto cuesta](https://vimpos.com.mx/cuanto-cuesta-un-sistema-para-restaurante.md) · [Cómo elegir sistema](https://vimpos.com.mx/como-elegir-sistema-restaurante.md) · [Nosotros](https://vimpos.com.mx/nosotros.md) · [Contacto](https://vimpos.com.mx/contacto.md) · [Aviso de privacidad](https://vimpos.com.mx/aviso-privacidad.md) · [Términos del servicio](https://vimpos.com.mx/terminos.md)
+**Otras páginas en Markdown:** [Inicio](https://vimpos.com.mx/index.md) · [Funciones](https://vimpos.com.mx/funciones.md) · [Sin internet](https://vimpos.com.mx/sin-internet.md) · [Facturación CFDI](https://vimpos.com.mx/facturacion-cfdi.md) · [Precios](https://vimpos.com.mx/precios.md) · [Novedades](https://vimpos.com.mx/novedades.md) · [Cuánto cuesta](https://vimpos.com.mx/cuanto-cuesta-un-sistema-para-restaurante.md) · [Cómo elegir sistema](https://vimpos.com.mx/como-elegir-sistema-restaurante.md) · [Factura global](https://vimpos.com.mx/factura-global-restaurantes.md) · [Hamburgueserías](https://vimpos.com.mx/punto-de-venta-hamburgueserias.md) · [León, Guanajuato](https://vimpos.com.mx/punto-de-venta-restaurantes-leon.md) · [Nosotros](https://vimpos.com.mx/nosotros.md) · [Contacto](https://vimpos.com.mx/contacto.md) · [Aviso de privacidad](https://vimpos.com.mx/aviso-privacidad.md) · [Términos del servicio](https://vimpos.com.mx/terminos.md)
 
 **Contacto:** hola@vimpos.com.mx · https://vimpos.com.mx/contacto
 

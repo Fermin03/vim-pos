@@ -1,10 +1,10 @@
-# Todo lo que tu restaurante necesita, sin letra chica.
+# Punto de venta para restaurantes, sin letra chica
 
-> Caja, cocina, mesas, inventario y facturación CFDI en un solo sistema. Desde $699 al mes más IVA, sin pago inicial y cobra sin internet. Hecho en León, Gto.
+> Caja, cocina, mesas, inventario y facturación CFDI en un solo sistema. Desde $699 al mes, sin pago inicial, y cobra sin internet. Hecho en León, Gto.
 
 **VIM POS** · punto de venta para restaurantes en México · versión en HTML: https://vimpos.com.mx/
 
-Caja, cocina, mesas, inventario y facturación en un solo sistema. Sin pago inicial: desde Negocio cargamos tu menú y capacitamos a tu equipo, y en Esencial arrancas con nuestra guía.
+VIM POS es un sistema de punto de venta para restaurantes en México: caja, cocina, mesas, inventario y facturación en uno solo.
 
 [Pide una demo](https://vimpos.com.mx/demo)
 
@@ -88,7 +88,7 @@ El sistema se configura según tu giro: cambian los modos de servicio, las panta
 
 ### Comida rápida o de mostrador
 
-Mostrador y pickup. Cola rápida, comanda directa a cocina y modos de servicio para separar lo que se come aquí de lo que se lleva — que además cambia el IVA.
+Mostrador y pickup. Cola rápida, comanda directa a cocina y modos de servicio para separar lo que se come aquí de lo que se lleva. Así se ve en una [hamburguesería](https://vimpos.com.mx/punto-de-venta-hamburgueserias).
 
 ### Food truck
 
@@ -178,7 +178,7 @@ Sí. El programa se instala en la computadora de tu caja y trabaja ahí, así qu
 
 ### ¿Qué necesito comprar?
 
-Una computadora con Windows 10 u 11, una impresora térmica de tickets de 80 mm compatible con ESC/POS, de red (cable Ethernet o Wi-Fi) o de USB —por ejemplo, una Epson TM-T20III o TM-m30; las de USB se instalan primero en Windows—, un cajón de dinero y el módem que ya tienes. VIM no vende equipo: te decimos qué buscar y lo compras donde te salga mejor.
+Una computadora con Windows 10 u 11, una impresora térmica de tickets de 80 mm compatible con ESC/POS —por ejemplo, una Epson TM-T20III o TM-m30; puede ir conectada a tu red (cable Ethernet o Wi-Fi) o por USB, instalada en Windows—, un cajón de dinero y el módem que ya tienes. VIM no vende equipo: te decimos qué buscar y lo compras donde te salga mejor.
 
 ### ¿Puedo traer mi menú de otro sistema?
 
@@ -214,7 +214,7 @@ Sin presentación ni compromiso. Traes tu carta, la cargamos y ves cómo se ve t
 
 ---
 
-**Otras páginas en Markdown:** [Funciones](https://vimpos.com.mx/funciones.md) · [Sin internet](https://vimpos.com.mx/sin-internet.md) · [Facturación CFDI](https://vimpos.com.mx/facturacion-cfdi.md) · [Precios](https://vimpos.com.mx/precios.md) · [Novedades](https://vimpos.com.mx/novedades.md) · [Pide una demo](https://vimpos.com.mx/demo.md) · [Cuánto cuesta](https://vimpos.com.mx/cuanto-cuesta-un-sistema-para-restaurante.md) · [Cómo elegir sistema](https://vimpos.com.mx/como-elegir-sistema-restaurante.md) · [Nosotros](https://vimpos.com.mx/nosotros.md) · [Contacto](https://vimpos.com.mx/contacto.md) · [Aviso de privacidad](https://vimpos.com.mx/aviso-privacidad.md) · [Términos del servicio](https://vimpos.com.mx/terminos.md)
+**Otras páginas en Markdown:** [Funciones](https://vimpos.com.mx/funciones.md) · [Sin internet](https://vimpos.com.mx/sin-internet.md) · [Facturación CFDI](https://vimpos.com.mx/facturacion-cfdi.md) · [Precios](https://vimpos.com.mx/precios.md) · [Novedades](https://vimpos.com.mx/novedades.md) · [Pide una demo](https://vimpos.com.mx/demo.md) · [Cuánto cuesta](https://vimpos.com.mx/cuanto-cuesta-un-sistema-para-restaurante.md) · [Cómo elegir sistema](https://vimpos.com.mx/como-elegir-sistema-restaurante.md) · [Factura global](https://vimpos.com.mx/factura-global-restaurantes.md) · [Hamburgueserías](https://vimpos.com.mx/punto-de-venta-hamburgueserias.md) · [León, Guanajuato](https://vimpos.com.mx/punto-de-venta-restaurantes-leon.md) · [Nosotros](https://vimpos.com.mx/nosotros.md) · [Contacto](https://vimpos.com.mx/contacto.md) · [Aviso de privacidad](https://vimpos.com.mx/aviso-privacidad.md) · [Términos del servicio](https://vimpos.com.mx/terminos.md)
 
 **Contacto:** hola@vimpos.com.mx · https://vimpos.com.mx/contacto
 

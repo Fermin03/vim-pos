@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 
 <title>Facturación CFDI 4.0 para tu restaurante — VIM POS</title>
-<meta name="description" content="Autofactura por QR desde el ticket, factura global del periodo con un botón, y el periodo lo eliges tú. Qué necesitas dar, qué cuestan los folios y cómo se enciende en tu negocio.">
+<meta name="description" content="Autofactura por QR desde el ticket y factura global del periodo con un botón. Qué necesitas dar, qué cuestan los folios y cómo se enciende.">
 <link rel="canonical" href="https://vimpos.com.mx/facturacion-cfdi">
 <link rel="alternate" type="text/markdown" href="https://vimpos.com.mx/facturacion-cfdi.md" title="Esta página en Markdown">
 
@@ -27,28 +27,29 @@
      busca — competirían entre ellas por el ancho de banda y ninguna llegaría
      antes. Cada archivo es una fuente VARIABLE, así que precargarlo cubre todos
      los pesos de su familia: no hay un archivo por peso que precargar. -->
-<link rel="preload" href="assets/fonts/sora-var-latin.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="preload" href="assets/fonts/inter-tight-var-latin.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="stylesheet" href="assets/css/fuentes.css?v=11">
+<link rel="preload" href="/assets/fonts/sora-var-latin.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="/assets/fonts/inter-tight-var-latin.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="/assets/css/fuentes.css?v=11">
 
-<link rel="icon" href="assets/img/logo.svg" type="image/svg+xml">
-<link rel="apple-touch-icon" href="assets/img/apple-touch-icon-1024.png">
-<link rel="manifest" href="site.webmanifest">
+<link rel="icon" href="/favicon.ico" sizes="48x48">
+<link rel="icon" href="/assets/img/logo.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="/assets/img/apple-touch-icon-1024.png">
+<link rel="manifest" href="/site.webmanifest">
 <meta name="theme-color" content="#0078C9">
 
-<link rel="stylesheet" href="assets/css/vim.css?v=21">
+<link rel="stylesheet" href="/assets/css/vim.css?v=22">
 <!-- Consentimiento de cookies. Va ANTES que gtm.js y el orden NO es
      cosmético: los dos llevan `defer`, que respeta el orden del documento, y
      Consent Mode descarta un estado por defecto que llegue después de que el
      contenedor haya cargado. Invertir estas dos líneas hace que Google
      Analytics mida la primera visita con los ajustes de fábrica. -->
-<script src="assets/js/consentimiento.js?v=1" defer></script>
+<script src="/assets/js/consentimiento.js?v=1" defer></script>
 <!-- Google Tag Manager (contenedor GTM-PRTJDNQ2). El fragmento en línea que da
      Google no cabe aquí: la política de seguridad del sitio prohíbe los scripts
      en línea, y uno bloqueado no avisa — la analítica parecería instalada y no
      mediría nada. Por eso vive en un archivo propio, servido desde este mismo
      dominio. El razonamiento entero está dentro de ese archivo. -->
-<script src="assets/js/gtm.js?v=1" defer></script>
+<script src="/assets/js/gtm.js?v=1" defer></script>
 </head>
 <body>
 
@@ -58,7 +59,7 @@
   <div class="contenedor">
     <div class="nav-fila">
       <a href="/" class="nav-logo" aria-label="VIM POS, inicio">
-        <img src="assets/img/logo.svg" alt="" width="30" height="30" aria-hidden="true">
+        <img src="/assets/img/logo.svg" alt="" width="30" height="30" aria-hidden="true">
         <span>VIM POS</span>
       </a>
       <nav class="nav-enlaces" aria-label="Principal">
@@ -117,14 +118,10 @@
       <p class="eyebrow">Facturación</p>
       <h1>Facturación CFDI 4.0, sin parar la fila</h1>
       <p class="entradilla">
-        Tu comensal escanea el código del ticket, pone su RFC y recibe su factura por correo. Lo que
-        nadie facturó se junta en la factura global del periodo, que emites con un botón desde tu panel. Tu cajero no vuelve a capturar
-        datos fiscales y tú no vuelves a recibir el mensaje de «¿me pueden facturar lo del sábado?».
+        Tu comensal escanea el ticket y se factura solo. Lo que nadie facturó sale en la factura global, con un botón.
       </p>
       <p style="font-size:var(--t-15);color:var(--ink-2)">
-        Ya está disponible: timbra con un proveedor autorizado por el SAT y el comprobante que
-        recibe tu cliente es un CFDI 4.0 válido. Abajo dice exactamente qué necesitas dar para
-        encenderlo en tu negocio.
+        Ya está disponible, con un proveedor autorizado por el SAT.
       </p>
       <div class="fila">
         <a class="btn btn-primario btn-hero" href="/demo">Pide una demo</a>
@@ -150,7 +147,7 @@
             <div class="monitor-barra" aria-hidden="true">
               <span class="monitor-punto"></span><span class="monitor-punto"></span><span class="monitor-punto"></span>
             </div>
-            <img src="assets/img/capturas/ticket-venta.webp?v=3"
+            <img src="/assets/img/capturas/ticket-venta.webp?v=3"
                  alt="Ticket impreso de una venta con el código QR para facturar al pie: negocio, folio, cajero, el producto con su modificador, subtotal, IVA, total y cambio."
                  width="604" height="1568" loading="lazy" decoding="async">
           </div>
@@ -181,7 +178,7 @@
         <div class="pila pila-3">
           <h3>La factura global, con un botón</h3>
           <p>
-            Lo que nadie facturó se junta en una sola factura por cada periodo que tú elijas: diario,
+            Lo que nadie facturó se junta en una sola factura por cada periodo que tú elijas (qué es y qué lleva está en la <a href="/factura-global-restaurantes">guía de la factura global</a>): diario,
             semanal, quincenal o mensual. Cuando el periodo cierra, la emites tú con un botón desde tu
             panel, en Facturación: el sistema ya sumó las ventas, y te avisa si se te queda un periodo
             sin emitir.
@@ -377,7 +374,7 @@
     <div class="pie-rejilla">
       <div class="pila pila-3">
         <span class="nav-logo" style="pointer-events:none">
-          <img src="assets/img/logo.svg" alt="" width="30" height="30" aria-hidden="true">
+          <img src="/assets/img/logo.svg" alt="" width="30" height="30" aria-hidden="true">
           <span>VIM POS</span>
         </span>
         <p style="font-size:var(--t-15)">
@@ -403,6 +400,7 @@
         <ul class="pie-lista">
           <li><a href="/como-elegir-sistema-restaurante">Cómo elegir sistema</a></li>
           <li><a href="/cuanto-cuesta-un-sistema-para-restaurante">Cuánto cuesta</a></li>
+          <li><a href="/factura-global-restaurantes">Factura global</a></li>
           <li><a href="/nosotros">Nosotros</a></li>
         </ul>
       </div>
@@ -426,7 +424,7 @@
   </div>
 </footer>
 
-<script src="assets/js/vim.js?v=15" defer></script>
+<script src="/assets/js/vim.js?v=15" defer></script>
 <!-- Medición sin cookies (Vercel Web Analytics). Se sirve desde este dominio y
      solo existe si está encendida en el proyecto de Vercel; si no, es un 404
      inofensivo. Los eventos se mandan desde vim.js. -->

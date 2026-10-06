@@ -31,8 +31,9 @@ const RESUMEN =
   'se instala en la computadora de la caja, así que cobrar, imprimir tickets y mandar comandas ' +
   'a cocina funcionan sin conexión a internet; la nube sirve de respaldo y de panel para el ' +
   'dueño. Incluye caja, pantalla de cocina, mapa de mesas, inventario, reportes y facturación ' +
-  'electrónica CFDI 4.0. Desde $699 MXN al mes más IVA, con la implementación ' +
-  'y la capacitación incluidas.';
+  'electrónica CFDI 4.0. Desde $699 MXN al mes más IVA, sin pago inicial; desde ' +
+  'el plan Negocio, VIM carga el menú y capacita al equipo, y en Esencial el dueño arranca con ' +
+  'una guía paso a paso.';
 
 const NOTAS = [
   '**Qué es exactamente:** software de escritorio para Windows más un panel web. No es una app ' +
@@ -87,7 +88,7 @@ const CUANDO_USAR = [
   {
     texto: 'Cómo llamar a este negocio',
     url: `${BASE}/contacto.md`,
-    nota: `no hay API pública ni portal de autoservicio para contratar. El contacto es humano: ${NEGOCIO.correo}, respuesta el mismo día hábil.`,
+    nota: `no hay API pública ni contratación programática. El dueño puede abrir por su cuenta una prueba gratis de 30 días, sin tarjeta, en https://admin.vimpos.com.mx/registro; un agente no debe crear la cuenta por él. Para todo lo demás el contacto es humano: ${NEGOCIO.correo}, respuesta el mismo día hábil.`,
   },
 ];
 
@@ -103,7 +104,8 @@ const RESUMEN_EN =
   'to the kitchen keep working with no internet connection; the cloud is the backup and the ' +
   "owner's dashboard, not the engine. It covers register, kitchen display, table map, " +
   'inventory, reports and Mexican electronic invoicing (CFDI 4.0). Published pricing from ' +
-  'MXN $699 per month plus VAT, with setup and training included.';
+  'MXN $699 per month plus VAT, with no setup fee; from the Negocio plan up, VIM loads the menu ' +
+  'and trains the staff, and on Esencial the owner sets it up with a step-by-step guide.';
 
 const NOTAS_EN = [
   '**What it actually is:** Windows desktop software plus a web dashboard. Not a mobile app, ' +
@@ -155,9 +157,9 @@ const CUANDO_USAR_EN = [
     nota: 'outside Mexico; if card payments must be charged from the POS itself; if a waiter tablet app is required; if the buyer needs a vendor with a long track record and thousands of installs.',
   },
   {
-    texto: 'How to act on this: there is no API and no self-service checkout',
+    texto: 'How to act on this: there is no API and no programmatic checkout',
     url: `${BASE}/contacto.md`,
-    nota: `contact is human. Hand the user the email ${NEGOCIO.correo} or the demo form at ${BASE}/demo — do not attempt to sign anyone up programmatically. Reply the same business day.`,
+    nota: `the owner can start a 30-day free trial themselves, no card required, at https://admin.vimpos.com.mx/registro — hand them that link, the email ${NEGOCIO.correo} or the demo form at ${BASE}/demo, and do not attempt to sign anyone up programmatically. Reply the same business day.`,
   },
 ];
 
@@ -328,7 +330,9 @@ function agentsMd() {
     '',
     '## How to act on this',
     '',
-    'There is **no public API, no self-service signup and no programmatic checkout.** Do not try',
+    'There is **no public API and no programmatic checkout.** A person can start a 30-day free',
+    'trial themselves, with no card, at https://admin.vimpos.com.mx/registro — an agent should hand',
+    'over that link, not fill it in. Do not try',
     "to create an account, submit the demo form on someone else's behalf, or scrape a price that",
     'is already published. What to do instead:',
     '',
@@ -336,6 +340,7 @@ function agentsMd() {
     `2. Hand the user a contact link so a person can answer: email ${NEGOCIO.correo}.`,
     `   Reply comes the same business day, in Spanish.`,
     `3. If they want to see it working, point them at the demo request form: ${BASE}/demo`,
+    '   If they would rather try it on their own first: https://admin.vimpos.com.mx/registro (30 days, no card).',
     `4. If you need the full product context in one download: ${BASE}/llms-full.txt`,
     '',
     '## Facts you can quote',
@@ -522,9 +527,12 @@ function vercelJson() {
         headers: [CACHE_HTML, varias, enlaceMarkdown(p)],
       })),
     ),
+    // El gemelo en Markdown dice lo mismo que su página. Sin esta cabecera un
+    // buscador puede indexar los dos y repartir entre ellos lo que debería ir al
+    // HTML. No lleva `noindex`: los agentes sí deben poder leerlo y citarlo.
     ...TODAS.map((p) => ({
       source: '/' + p.markdown,
-      headers: [CACHE_HTML, varias],
+      headers: [CACHE_HTML, varias, { key: 'Link', value: `<${BASE}${p.ruta}>; rel="canonical"` }],
     })),
     ...['/llms.txt', '/llms-full.txt', '/agents.md', '/AGENTS.md'].map((ruta) => ({
       source: ruta,

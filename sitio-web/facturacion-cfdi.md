@@ -1,12 +1,12 @@
 # Facturación CFDI 4.0, sin parar la fila
 
-> Autofactura por QR desde el ticket, factura global del periodo con un botón, y el periodo lo eliges tú. Qué necesitas dar, qué cuestan los folios y cómo se enciende en tu negocio.
+> Autofactura por QR desde el ticket y factura global del periodo con un botón. Qué necesitas dar, qué cuestan los folios y cómo se enciende.
 
 **VIM POS** · punto de venta para restaurantes en México · versión en HTML: https://vimpos.com.mx/facturacion-cfdi
 
-Tu comensal escanea el código del ticket, pone su RFC y recibe su factura por correo. Lo que nadie facturó se junta en la factura global del periodo, que emites con un botón desde tu panel. Tu cajero no vuelve a capturar datos fiscales y tú no vuelves a recibir el mensaje de «¿me pueden facturar lo del sábado?».
+Tu comensal escanea el ticket y se factura solo. Lo que nadie facturó sale en la factura global, con un botón.
 
-Ya está disponible: timbra con un proveedor autorizado por el SAT y el comprobante que recibe tu cliente es un CFDI 4.0 válido. Abajo dice exactamente qué necesitas dar para encenderlo en tu negocio.
+Ya está disponible, con un proveedor autorizado por el SAT.
 
 [Pide una demo](https://vimpos.com.mx/demo)
 
@@ -32,7 +32,7 @@ Cada ticket que pida factura se timbra con su CFDI 4.0 y llega por correo. Sin q
 
 ### La factura global, con un botón
 
-Lo que nadie facturó se junta en una sola factura por cada periodo que tú elijas: diario, semanal, quincenal o mensual. Cuando el periodo cierra, la emites tú con un botón desde tu panel, en Facturación: el sistema ya sumó las ventas, y te avisa si se te queda un periodo sin emitir.
+Lo que nadie facturó se junta en una sola factura por cada periodo que tú elijas (qué es y qué lleva está en la [guía de la factura global](https://vimpos.com.mx/factura-global-restaurantes)): diario, semanal, quincenal o mensual. Cuando el periodo cierra, la emites tú con un botón desde tu panel, en Facturación: el sistema ya sumó las ventas, y te avisa si se te queda un periodo sin emitir.
 
 ### Autofacturación por QR
 
@@ -108,7 +108,7 @@ Media hora con tus productos y tus precios cargados, y la facturación en modo d
 
 ---
 
-**Otras páginas en Markdown:** [Inicio](https://vimpos.com.mx/index.md) · [Funciones](https://vimpos.com.mx/funciones.md) · [Sin internet](https://vimpos.com.mx/sin-internet.md) · [Precios](https://vimpos.com.mx/precios.md) · [Novedades](https://vimpos.com.mx/novedades.md) · [Pide una demo](https://vimpos.com.mx/demo.md) · [Cuánto cuesta](https://vimpos.com.mx/cuanto-cuesta-un-sistema-para-restaurante.md) · [Cómo elegir sistema](https://vimpos.com.mx/como-elegir-sistema-restaurante.md) · [Nosotros](https://vimpos.com.mx/nosotros.md) · [Contacto](https://vimpos.com.mx/contacto.md) · [Aviso de privacidad](https://vimpos.com.mx/aviso-privacidad.md) · [Términos del servicio](https://vimpos.com.mx/terminos.md)
+**Otras páginas en Markdown:** [Inicio](https://vimpos.com.mx/index.md) · [Funciones](https://vimpos.com.mx/funciones.md) · [Sin internet](https://vimpos.com.mx/sin-internet.md) · [Precios](https://vimpos.com.mx/precios.md) · [Novedades](https://vimpos.com.mx/novedades.md) · [Pide una demo](https://vimpos.com.mx/demo.md) · [Cuánto cuesta](https://vimpos.com.mx/cuanto-cuesta-un-sistema-para-restaurante.md) · [Cómo elegir sistema](https://vimpos.com.mx/como-elegir-sistema-restaurante.md) · [Factura global](https://vimpos.com.mx/factura-global-restaurantes.md) · [Hamburgueserías](https://vimpos.com.mx/punto-de-venta-hamburgueserias.md) · [León, Guanajuato](https://vimpos.com.mx/punto-de-venta-restaurantes-leon.md) · [Nosotros](https://vimpos.com.mx/nosotros.md) · [Contacto](https://vimpos.com.mx/contacto.md) · [Aviso de privacidad](https://vimpos.com.mx/aviso-privacidad.md) · [Términos del servicio](https://vimpos.com.mx/terminos.md)
 
 **Contacto:** hola@vimpos.com.mx · https://vimpos.com.mx/contacto
 

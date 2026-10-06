@@ -4,7 +4,7 @@
 
 **VIM POS** · punto de venta para restaurantes en México · versión en HTML: https://vimpos.com.mx/aviso-privacidad
 
-Qué datos te pedimos, para qué los usamos y cómo pedirnos que los borremos. En corto: te pedimos lo mínimo para poder contestarte, y no los vendemos ni los compartimos con nadie que quiera venderte algo.
+Qué datos te pedimos, para qué los usamos y cómo pedirnos que los borremos.
 
 Última actualización: 1 de octubre de 2026.
 
@@ -89,7 +89,7 @@ Si cambia, se publica aquí con la fecha nueva arriba. Si el cambio afecta a par
 
 ---
 
-**Otras páginas en Markdown:** [Inicio](https://vimpos.com.mx/index.md) · [Funciones](https://vimpos.com.mx/funciones.md) · [Sin internet](https://vimpos.com.mx/sin-internet.md) · [Facturación CFDI](https://vimpos.com.mx/facturacion-cfdi.md) · [Precios](https://vimpos.com.mx/precios.md) · [Novedades](https://vimpos.com.mx/novedades.md) · [Pide una demo](https://vimpos.com.mx/demo.md) · [Cuánto cuesta](https://vimpos.com.mx/cuanto-cuesta-un-sistema-para-restaurante.md) · [Cómo elegir sistema](https://vimpos.com.mx/como-elegir-sistema-restaurante.md) · [Nosotros](https://vimpos.com.mx/nosotros.md) · [Contacto](https://vimpos.com.mx/contacto.md) · [Términos del servicio](https://vimpos.com.mx/terminos.md)
+**Otras páginas en Markdown:** [Inicio](https://vimpos.com.mx/index.md) · [Funciones](https://vimpos.com.mx/funciones.md) · [Sin internet](https://vimpos.com.mx/sin-internet.md) · [Facturación CFDI](https://vimpos.com.mx/facturacion-cfdi.md) · [Precios](https://vimpos.com.mx/precios.md) · [Novedades](https://vimpos.com.mx/novedades.md) · [Pide una demo](https://vimpos.com.mx/demo.md) · [Cuánto cuesta](https://vimpos.com.mx/cuanto-cuesta-un-sistema-para-restaurante.md) · [Cómo elegir sistema](https://vimpos.com.mx/como-elegir-sistema-restaurante.md) · [Factura global](https://vimpos.com.mx/factura-global-restaurantes.md) · [Hamburgueserías](https://vimpos.com.mx/punto-de-venta-hamburgueserias.md) · [León, Guanajuato](https://vimpos.com.mx/punto-de-venta-restaurantes-leon.md) · [Nosotros](https://vimpos.com.mx/nosotros.md) · [Contacto](https://vimpos.com.mx/contacto.md) · [Términos del servicio](https://vimpos.com.mx/terminos.md)
 
 **Contacto:** hola@vimpos.com.mx · https://vimpos.com.mx/contacto
 

@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!--
-  Doce URLs. Sin `changefreq` ni `priority`: Google lleva años diciendo que los
+  Quince URLs. Sin `changefreq` ni `priority`: Google lleva años diciendo que los
   ignora, y publicarlos solo añade dos campos que se quedan desactualizados.
 
   `lastmod` sí se respeta, así que hay que tocarlo cuando la página cambie de
@@ -15,11 +15,11 @@
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url>
     <loc>https://vimpos.com.mx/</loc>
-    <lastmod>2026-10-01</lastmod>
+    <lastmod>2026-10-05</lastmod>
   </url>
   <url>
     <loc>https://vimpos.com.mx/funciones</loc>
-    <lastmod>2026-10-01</lastmod>
+    <lastmod>2026-10-05</lastmod>
   </url>
   <url>
     <loc>https://vimpos.com.mx/sin-internet</loc>
@@ -31,7 +31,7 @@
   </url>
   <url>
     <loc>https://vimpos.com.mx/precios</loc>
-    <lastmod>2026-10-01</lastmod>
+    <lastmod>2026-10-05</lastmod>
   </url>
   <url>
     <loc>https://vimpos.com.mx/demo</loc>
@@ -46,12 +46,24 @@
     <lastmod>2026-10-01</lastmod>
   </url>
   <url>
+    <loc>https://vimpos.com.mx/factura-global-restaurantes</loc>
+    <lastmod>2026-10-05</lastmod>
+  </url>
+  <url>
+    <loc>https://vimpos.com.mx/punto-de-venta-hamburgueserias</loc>
+    <lastmod>2026-10-05</lastmod>
+  </url>
+  <url>
+    <loc>https://vimpos.com.mx/punto-de-venta-restaurantes-leon</loc>
+    <lastmod>2026-10-05</lastmod>
+  </url>
+  <url>
     <loc>https://vimpos.com.mx/nosotros</loc>
-    <lastmod>2026-09-03</lastmod>
+    <lastmod>2026-10-05</lastmod>
   </url>
   <url>
     <loc>https://vimpos.com.mx/contacto</loc>
-    <lastmod>2026-09-03</lastmod>
+    <lastmod>2026-10-05</lastmod>
   </url>
   <url>
     <loc>https://vimpos.com.mx/aviso-privacidad</loc>

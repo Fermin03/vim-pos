@@ -88,6 +88,31 @@ export const PAGINAS = [
     enSitemap: true,
   },
   {
+    ruta: '/factura-global-restaurantes',
+    archivo: 'factura-global-restaurantes.html',
+    markdown: 'factura-global-restaurantes.md',
+    nombre: 'Factura global',
+    resumen:
+      'Guía fiscal: qué es la factura global, cada cuándo se emite, qué datos lleva en CFDI 4.0 (RFC genérico, uso S01, periodo) y los errores más comunes en un restaurante. No es asesoría fiscal.',
+    enSitemap: true,
+  },
+  {
+    ruta: '/punto-de-venta-hamburgueserias',
+    archivo: 'punto-de-venta-hamburgueserias.html',
+    markdown: 'punto-de-venta-hamburgueserias.md',
+    nombre: 'Hamburgueserías',
+    resumen: 'VIM POS para una hamburguesería: término obligatorio, extras con precio, combos, para llevar y a domicilio, cocina por estación e inventario por receta.',
+    enSitemap: true,
+  },
+  {
+    ruta: '/punto-de-venta-restaurantes-leon',
+    archivo: 'punto-de-venta-restaurantes-leon.html',
+    markdown: 'punto-de-venta-restaurantes-leon.md',
+    nombre: 'León, Guanajuato',
+    resumen: 'VIM POS para restaurantes de León, Guanajuato, donde se hace el producto: en la zona, la demostración puede ser en el local.',
+    enSitemap: true,
+  },
+  {
     ruta: '/nosotros',
     archivo: 'nosotros.html',
     markdown: 'nosotros.md',

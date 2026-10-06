@@ -3,6 +3,9 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<!-- Verificación de propiedad en Bing Webmaster Tools. Bing la lee solo en la
+     portada; si se quita, la propiedad se desverifica. -->
+<meta name="msvalidate.01" content="0D0467F0D6DE7BAED05B8E43260C9C90">
 
 <!-- El título NO empieza por «VIM POS» a propósito: Google ya pinta el nombre
      del sitio encima del titular, así que repetirlo ahí gasta los caracteres que
@@ -20,7 +23,7 @@
      búsqueda POR NOMBRE. Cuando el sitio esté indexado y Google muestre el
      nombre solo, se puede quitar. -->
 <title>Punto de venta para restaurantes, desde $699 al mes — VIM POS</title>
-<meta name="description" content="Caja, cocina, mesas, inventario y facturación CFDI en un solo sistema. Desde $699 al mes más IVA, sin pago inicial y cobra sin internet. Hecho en León, Gto.">
+<meta name="description" content="Caja, cocina, mesas, inventario y facturación CFDI en un solo sistema. Desde $699 al mes, sin pago inicial, y cobra sin internet. Hecho en León, Gto.">
 <link rel="canonical" href="https://vimpos.com.mx/">
 <link rel="alternate" type="text/markdown" href="https://vimpos.com.mx/index.md" title="Esta página en Markdown">
 
@@ -42,28 +45,29 @@
      busca — competirían entre ellas por el ancho de banda y ninguna llegaría
      antes. Cada archivo es una fuente VARIABLE, así que precargarlo cubre todos
      los pesos de su familia: no hay un archivo por peso que precargar. -->
-<link rel="preload" href="assets/fonts/sora-var-latin.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="preload" href="assets/fonts/inter-tight-var-latin.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="stylesheet" href="assets/css/fuentes.css?v=11">
+<link rel="preload" href="/assets/fonts/sora-var-latin.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="/assets/fonts/inter-tight-var-latin.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="/assets/css/fuentes.css?v=11">
 
-<link rel="icon" href="assets/img/logo.svg" type="image/svg+xml">
-<link rel="apple-touch-icon" href="assets/img/apple-touch-icon-1024.png">
-<link rel="manifest" href="site.webmanifest">
+<link rel="icon" href="/favicon.ico" sizes="48x48">
+<link rel="icon" href="/assets/img/logo.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="/assets/img/apple-touch-icon-1024.png">
+<link rel="manifest" href="/site.webmanifest">
 <meta name="theme-color" content="#0078C9">
 
-<link rel="stylesheet" href="assets/css/vim.css?v=21">
+<link rel="stylesheet" href="/assets/css/vim.css?v=22">
 <!-- Consentimiento de cookies. Va ANTES que gtm.js y el orden NO es
      cosmético: los dos llevan `defer`, que respeta el orden del documento, y
      Consent Mode descarta un estado por defecto que llegue después de que el
      contenedor haya cargado. Invertir estas dos líneas hace que Google
      Analytics mida la primera visita con los ajustes de fábrica. -->
-<script src="assets/js/consentimiento.js?v=1" defer></script>
+<script src="/assets/js/consentimiento.js?v=1" defer></script>
 <!-- Google Tag Manager (contenedor GTM-PRTJDNQ2). El fragmento en línea que da
      Google no cabe aquí: la política de seguridad del sitio prohíbe los scripts
      en línea, y uno bloqueado no avisa — la analítica parecería instalada y no
      mediría nada. Por eso vive en un archivo propio, servido desde este mismo
      dominio. El razonamiento entero está dentro de ese archivo. -->
-<script src="assets/js/gtm.js?v=1" defer></script>
+<script src="/assets/js/gtm.js?v=1" defer></script>
 </head>
 <body>
 
@@ -73,7 +77,7 @@
   <div class="contenedor">
     <div class="nav-fila">
       <a href="/" class="nav-logo" aria-label="VIM POS, inicio">
-        <img src="assets/img/logo.svg" alt="" width="30" height="30" aria-hidden="true">
+        <img src="/assets/img/logo.svg" alt="" width="30" height="30" aria-hidden="true">
         <span>VIM POS</span>
       </a>
       <nav class="nav-enlaces" aria-label="Principal">
@@ -135,11 +139,9 @@
     <div class="contenedor">
       <div class="hero-rejilla">
         <div class="pila pila-5">
-          <h1>Todo lo que tu restaurante necesita, sin letra chica.</h1>
+          <h1>Punto de venta para restaurantes, sin letra chica</h1>
           <p class="entradilla">
-            Caja, cocina, mesas, inventario y facturación en un solo sistema. Sin pago inicial:
-            desde Negocio cargamos tu menú y capacitamos a tu equipo, y en Esencial arrancas con
-            nuestra guía.
+            VIM POS es un sistema de punto de venta para restaurantes en México: caja, cocina, mesas, inventario y facturación en uno solo.
           </p>
           <div class="fila">
             <a class="btn btn-primario btn-hero" href="/demo">Pide una demo</a>
@@ -156,8 +158,8 @@
               <span class="monitor-punto"></span><span class="monitor-punto"></span><span class="monitor-punto"></span>
             </div>
             <picture>
-              <source media="(max-width: 619px)" srcset="assets/img/capturas/pos-home-movil.webp?v=3" width="816" height="1640">
-              <img src="assets/img/capturas/pos-home.webp?v=3" alt="La caja en plena venta: el catálogo por categorías y un ticket en curso con una hamburguesa, papas y refresco." width="1600" height="1000" fetchpriority="high" decoding="async">
+              <source media="(max-width: 619px)" srcset="/assets/img/capturas/pos-home-movil.webp?v=3" width="816" height="1640">
+              <img src="/assets/img/capturas/pos-home.webp?v=3" alt="La caja en plena venta: el catálogo por categorías y un ticket en curso con una hamburguesa, papas y refresco." width="1600" height="1000" fetchpriority="high" decoding="async">
             </picture>
           </div>
         </div>
@@ -406,7 +408,7 @@
         </div>
         <div class="monitor">
           <div class="monitor-barra" aria-hidden="true"><span class="monitor-punto"></span><span class="monitor-punto"></span><span class="monitor-punto"></span></div>
-          <img src="assets/img/capturas/pos-catalogo.webp?v=3" alt="Un producto abierto con sus opciones: término de la carne y extras con su precio."
+          <img src="/assets/img/capturas/pos-catalogo.webp?v=3" alt="Un producto abierto con sus opciones: término de la carne y extras con su precio."
                  width="1600" height="1000" loading="lazy" decoding="async">
         </div>
       </div>
@@ -423,8 +425,8 @@
         <div class="monitor">
           <div class="monitor-barra" aria-hidden="true"><span class="monitor-punto"></span><span class="monitor-punto"></span><span class="monitor-punto"></span></div>
           <picture>
-            <source media="(max-width: 619px)" srcset="assets/img/capturas/kds-movil.webp?v=3" width="1400" height="920">
-            <img src="assets/img/capturas/kds.webp?v=3" alt="Pantalla de cocina con las comandas activas, cada una con su tiempo, el término de la carne, los extras y las notas." width="1600" height="1000" loading="lazy" decoding="async">
+            <source media="(max-width: 619px)" srcset="/assets/img/capturas/kds-movil.webp?v=3" width="1400" height="920">
+            <img src="/assets/img/capturas/kds.webp?v=3" alt="Pantalla de cocina con las comandas activas, cada una con su tiempo, el término de la carne, los extras y las notas." width="1600" height="1000" loading="lazy" decoding="async">
           </picture>
         </div>
       </div>
@@ -439,7 +441,7 @@
         </div>
         <div class="monitor">
           <div class="monitor-barra" aria-hidden="true"><span class="monitor-punto"></span><span class="monitor-punto"></span><span class="monitor-punto"></span></div>
-          <img src="assets/img/capturas/pos-arqueo.webp?v=3" alt="Arqueo del cierre de turno: efectivo esperado, efectivo contado y la diferencia, con cada forma de pago en su renglón."
+          <img src="/assets/img/capturas/pos-arqueo.webp?v=3" alt="Arqueo del cierre de turno: efectivo esperado, efectivo contado y la diferencia, con cada forma de pago en su renglón."
                  width="1600" height="1000" loading="lazy" decoding="async">
         </div>
       </div>
@@ -455,8 +457,8 @@
         <div class="monitor">
           <div class="monitor-barra" aria-hidden="true"><span class="monitor-punto"></span><span class="monitor-punto"></span><span class="monitor-punto"></span></div>
           <picture>
-            <source media="(max-width: 619px)" srcset="assets/img/capturas/admin-dashboard-movil.webp?v=3" width="780" height="1688">
-            <img src="assets/img/capturas/admin-dashboard.webp?v=3" alt="Panel del dueño con las ventas del día y el estado de las cajas." width="1600" height="1000" loading="lazy" decoding="async">
+            <source media="(max-width: 619px)" srcset="/assets/img/capturas/admin-dashboard-movil.webp?v=3" width="780" height="1688">
+            <img src="/assets/img/capturas/admin-dashboard.webp?v=3" alt="Panel del dueño con las ventas del día y el estado de las cajas." width="1600" height="1000" loading="lazy" decoding="async">
           </picture>
         </div>
       </div>
@@ -482,7 +484,7 @@
             <svg class="acordeon-signo" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
           </button>
           <div class="acordeon-panel" data-acordeon-panel><div>
-            <p>Mostrador y pickup. Cola rápida, comanda directa a cocina y modos de servicio para separar lo que se come aquí de lo que se lleva — que además cambia el IVA.</p>
+            <p>Mostrador y pickup. Cola rápida, comanda directa a cocina y modos de servicio para separar lo que se come aquí de lo que se lleva. Así se ve en una <a href="/punto-de-venta-hamburgueserias">hamburguesería</a>.</p>
           </div></div>
         </div>
 
@@ -565,7 +567,7 @@
           <div class="monitor-barra" aria-hidden="true">
             <span class="monitor-punto"></span><span class="monitor-punto"></span><span class="monitor-punto"></span>
           </div>
-          <img src="assets/img/capturas/admin-importador.webp?v=3" alt="Importador de menú mostrando lo que se va a dar de alta antes de confirmar."
+          <img src="/assets/img/capturas/admin-importador.webp?v=3" alt="Importador de menú mostrando lo que se va a dar de alta antes de confirmar."
                  width="1600" height="1000" loading="lazy" decoding="async">
         </div>
         <figcaption>
@@ -680,7 +682,7 @@
             <svg class="acordeon-signo" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
           </button>
           <div class="acordeon-panel" data-acordeon-panel><div>
-            <p>Una computadora con Windows 10 u 11, una impresora térmica de tickets de 80 mm compatible con ESC/POS, de red (cable Ethernet o Wi-Fi) o de USB —por ejemplo, una Epson TM-T20III o TM-m30; las de USB se instalan primero en Windows—, un cajón de dinero y el módem que ya tienes. VIM no vende equipo: te decimos qué buscar y lo compras donde te salga mejor.</p>
+            <p>Una computadora con Windows 10 u 11, una impresora térmica de tickets de 80 mm compatible con ESC/POS —por ejemplo, una Epson TM-T20III o TM-m30; puede ir conectada a tu red (cable Ethernet o Wi-Fi) o por USB, instalada en Windows—, un cajón de dinero y el módem que ya tienes. VIM no vende equipo: te decimos qué buscar y lo compras donde te salga mejor.</p>
           </div></div>
         </div>
 
@@ -771,7 +773,7 @@
     <div class="pie-rejilla">
       <div class="pila pila-3">
         <span class="nav-logo" style="pointer-events:none">
-          <img src="assets/img/logo.svg" alt="" width="30" height="30" aria-hidden="true">
+          <img src="/assets/img/logo.svg" alt="" width="30" height="30" aria-hidden="true">
           <span>VIM POS</span>
         </span>
         <p style="font-size:var(--t-15)">
@@ -795,6 +797,7 @@
         <ul class="pie-lista">
           <li><a href="/como-elegir-sistema-restaurante">Cómo elegir sistema</a></li>
           <li><a href="/cuanto-cuesta-un-sistema-para-restaurante">Cuánto cuesta</a></li>
+          <li><a href="/factura-global-restaurantes">Factura global</a></li>
           <li><a href="/nosotros">Nosotros</a></li>
         </ul>
       </div>
@@ -885,7 +888,7 @@
       "applicationSubCategory": "Punto de venta para restaurantes",
       "operatingSystem": "Windows 10, Windows 11",
       "inLanguage": "es-MX",
-      "softwareRequirements": "Computadora con Windows 10 u 11, impresora térmica de tickets de 80 mm compatible con ESC/POS (de red o de USB), y cajón de dinero. El cobro no depende de la conexión a internet.",
+      "softwareRequirements": "Computadora con Windows 10 u 11, impresora térmica de tickets de 80 mm compatible con ESC/POS (de red o USB), y cajón de dinero. El cobro no depende de la conexión a internet.",
       "countriesSupported": "MX",
       "publisher": { "@id": "https://vimpos.com.mx/#organizacion" },
       "screenshot": "https://vimpos.com.mx/assets/img/capturas/pos-home.png",
@@ -897,8 +900,11 @@
         "Mapa de mesas, cuentas abiertas y propinas",
         "Arqueo y corte Z sellado",
         "Inventario con costo y control de mermas",
-        "Panel del dueño con 14 reportes y consolidado por sucursal",
+        "Panel del dueño con 15 reportes y consolidado por sucursal",
         "Conciliación de Rappi, Uber Eats y DiDi Food",
+        "Pedidos de Uber Eats directo a la caja",
+        "Combos, repartidores y zonas de envío",
+        "Pantalla del cliente en un segundo monitor",
         "Importación del menú desde el sistema anterior, en cuatro formatos",
         "Facturación electrónica CFDI 4.0 con autofactura por QR"
       ],
@@ -993,9 +999,11 @@
       "about": { "@id": "https://vimpos.com.mx/#producto" },
       "mainEntity": [
         { "@type": "Question", "name": "¿De verdad funciona sin internet?", "acceptedAnswer": { "@type": "Answer", "text": "Sí. El programa se instala en la computadora de tu caja y trabaja ahí, así que cobrar, imprimir y mandar a cocina no pasan por internet en ningún momento." } },
-        { "@type": "Question", "name": "¿Qué necesito comprar?", "acceptedAnswer": { "@type": "Answer", "text": "Una computadora con Windows 10 u 11, una impresora térmica de tickets de 80 mm compatible con ESC/POS, de red (cable Ethernet o Wi-Fi) o de USB, un cajón de dinero y el módem que ya tienes. Las de USB se instalan primero en Windows. VIM no vende equipo." } },
+        { "@type": "Question", "name": "¿Qué necesito comprar?", "acceptedAnswer": { "@type": "Answer", "text": "Una computadora con Windows 10 u 11, una impresora térmica de tickets de 80 mm compatible con ESC/POS, conectada a tu red (cable Ethernet o Wi-Fi) o por USB e instalada en Windows, un cajón de dinero y el módem que ya tienes. VIM no vende equipo." } },
         { "@type": "Question", "name": "¿Puedo traer mi menú de otro sistema?", "acceptedAnswer": { "@type": "Answer", "text": "Sí. Descargas tu menú del sistema que usas hoy y lo pegas tal cual." } },
+        { "@type": "Question", "name": "¿Emite facturas?", "acceptedAnswer": { "@type": "Answer", "text": "Sí. Factura global del periodo (la emites con un botón desde el panel), timbrado individual de cualquier ticket y portal de autofacturación por QR, con CFDI 4.0 timbrado por un proveedor autorizado por el SAT. Cada plan trae folios al mes para tus facturas: 10 en Esencial con el extra de facturación, 20 en Negocio y 40 en Cadena." } },
         { "@type": "Question", "name": "¿Cuánto tarda la implementación?", "acceptedAnswer": { "@type": "Answer", "text": "Alrededor de un día. Desde Negocio cargamos el menú, lo configuramos y capacitamos al equipo tres horas; en Esencial se hace con una guía y ayuda por WhatsApp." } },
+        { "@type": "Question", "name": "¿Y si se va la luz o alguien cierra el programa?", "acceptedAnswer": { "@type": "Answer", "text": "El programa se queda junto al reloj de Windows y sigue trabajando aunque alguien cierre la ventana. Guarda sola una copia diaria en la misma computadora, y las ventas que no alcanzaron a subir suben en cuanto vuelve la señal." } },
         { "@type": "Question", "name": "¿Funciona con varias sucursales?", "acceptedAnswer": { "@type": "Answer", "text": "Sí. Cada sucursal opera con su propia caja y su propio turno, y el panel suma todo en un reporte consolidado." } },
         { "@type": "Question", "name": "¿Puedo cobrar con tarjeta desde el sistema?", "acceptedAnswer": { "@type": "Answer", "text": "No. La tarjeta se registra como forma de pago para que el corte cuadre, pero el cobro se hace con la terminal bancaria del negocio." } }
       ]
@@ -1004,7 +1012,7 @@
 }
 </script>
 
-<script src="assets/js/vim.js?v=15" defer></script>
+<script src="/assets/js/vim.js?v=15" defer></script>
 <!-- Medición sin cookies (Vercel Web Analytics). Se sirve desde este dominio y
      solo existe si está encendida en el proyecto de Vercel; si no, es un 404
      inofensivo. Los eventos se mandan desde vim.js. -->

@@ -1,6 +1,6 @@
 # VIM POS
 
-> VIM POS es un sistema de punto de venta para restaurantes en México. El programa completo se instala en la computadora de la caja, así que cobrar, imprimir tickets y mandar comandas a cocina funcionan sin conexión a internet; la nube sirve de respaldo y de panel para el dueño. Incluye caja, pantalla de cocina, mapa de mesas, inventario, reportes y facturación electrónica CFDI 4.0. Desde $699 MXN al mes más IVA, con la implementación y la capacitación incluidas.
+> VIM POS es un sistema de punto de venta para restaurantes en México. El programa completo se instala en la computadora de la caja, así que cobrar, imprimir tickets y mandar comandas a cocina funcionan sin conexión a internet; la nube sirve de respaldo y de panel para el dueño. Incluye caja, pantalla de cocina, mapa de mesas, inventario, reportes y facturación electrónica CFDI 4.0. Desde $699 MXN al mes más IVA, sin pago inicial; desde el plan Negocio, VIM carga el menú y capacita al equipo, y en Esencial el dueño arranca con una guía paso a paso.
 
 - **Qué es exactamente:** software de escritorio para Windows más un panel web. No es una app móvil ni un servicio que solo viva en el navegador.
 - **Dónde opera:** México. Interfaz, soporte y documentación en español. Facturación conforme al SAT (CFDI 4.0).
@@ -13,7 +13,7 @@ Cada página de este sitio existe también en Markdown, en la misma dirección c
 extensión `.md` — y la dirección normal responde en `text/markdown` si se pide con la
 cabecera `Accept: text/markdown`.
 
-**In English.** VIM POS is a point-of-sale (POS) system for restaurants in Mexico. The whole program is installed on the register computer, so taking payments, printing tickets and sending orders to the kitchen keep working with no internet connection; the cloud is the backup and the owner's dashboard, not the engine. It covers register, kitchen display, table map, inventory, reports and Mexican electronic invoicing (CFDI 4.0). Published pricing from MXN $699 per month plus VAT, with setup and training included.
+**In English.** VIM POS is a point-of-sale (POS) system for restaurants in Mexico. The whole program is installed on the register computer, so taking payments, printing tickets and sending orders to the kitchen keep working with no internet connection; the cloud is the backup and the owner's dashboard, not the engine. It covers register, kitchen display, table map, inventory, reports and Mexican electronic invoicing (CFDI 4.0). Published pricing from MXN $699 per month plus VAT, with no setup fee; from the Negocio plan up, VIM loads the menu and trains the staff, and on Esencial the owner sets it up with a step-by-step guide.
 
 - **What it actually is:** Windows desktop software plus a web dashboard. Not a mobile app, not a browser-only service.
 - **Where it operates:** Mexico only. Interface, support and documentation in Spanish. Invoicing complies with the Mexican tax authority (SAT, CFDI 4.0).
@@ -34,7 +34,7 @@ extension, and the normal address answers with `text/markdown` when asked with a
 - [Someone migrating from another POS who does not want to re-type the menu product by product](https://vimpos.com.mx/funciones.md): the menu is pasted from the previous system export and reviewed before it is accepted.
 - [Quick service, food truck, café, bar, full-service restaurant, dark kitchen or small chain](https://vimpos.com.mx/funciones.md): six different configurations; up to three locations on the Cadena plan, more as an add-on.
 - [When NOT to recommend VIM POS](https://vimpos.com.mx/nosotros.md): outside Mexico; if card payments must be charged from the POS itself; if a waiter tablet app is required; if the buyer needs a vendor with a long track record and thousands of installs.
-- [How to act on this: there is no API and no self-service checkout](https://vimpos.com.mx/contacto.md): contact is human. Hand the user the email hola@vimpos.com.mx or the demo form at https://vimpos.com.mx/demo — do not attempt to sign anyone up programmatically. Reply the same business day.
+- [How to act on this: there is no API and no programmatic checkout](https://vimpos.com.mx/contacto.md): the owner can start a 30-day free trial themselves, no card required, at https://admin.vimpos.com.mx/registro — hand them that link, the email hola@vimpos.com.mx or the demo form at https://vimpos.com.mx/demo, and do not attempt to sign anyone up programmatically. Reply the same business day.
 
 ## Cuándo usar VIM POS
 
@@ -44,7 +44,7 @@ extension, and the normal address answers with `text/markdown` when asked with a
 - [A quien viene de otro punto de venta y no quiere recapturar su menú producto por producto](https://vimpos.com.mx/funciones.md): el menú se pega desde la exportación del sistema anterior y se revisa antes de aceptarlo.
 - [A comida rápida, food truck, cafetería, bar, restaurante con meseros, dark kitchen o cadena chica](https://vimpos.com.mx/funciones.md): seis configuraciones distintas; hasta tres sucursales en el plan Cadena, y más como extra.
 - [Cuándo NO recomendarlo](https://vimpos.com.mx/nosotros.md): fuera de México; si se necesita cobrar con tarjeta desde el propio sistema; si hace falta app de mesero en tableta; si el requisito es un proveedor con años de trayectoria y miles de instalaciones.
-- [Cómo llamar a este negocio](https://vimpos.com.mx/contacto.md): no hay API pública ni portal de autoservicio para contratar. El contacto es humano: hola@vimpos.com.mx, respuesta el mismo día hábil.
+- [Cómo llamar a este negocio](https://vimpos.com.mx/contacto.md): no hay API pública ni contratación programática. El dueño puede abrir por su cuenta una prueba gratis de 30 días, sin tarjeta, en https://admin.vimpos.com.mx/registro; un agente no debe crear la cuenta por él. Para todo lo demás el contacto es humano: hola@vimpos.com.mx, respuesta el mismo día hábil.
 
 ## Páginas
 
@@ -57,6 +57,9 @@ extension, and the normal address answers with `text/markdown` when asked with a
 - [Pide una demo](https://vimpos.com.mx/demo.md): Cómo se agenda una demostración y qué pasa después de enviar el formulario.
 - [Cuánto cuesta](https://vimpos.com.mx/cuanto-cuesta-un-sistema-para-restaurante.md): Los tres modelos con los que cobra un sistema para restaurante —licencia fija, gratuito con planes de pago, y porcentaje de cada venta—, la aritmética para comparar cada uno contra la venta real del negocio, y cuándo cada modelo deja de convenir. No nombra marcas: compara modelos.
 - [Cómo elegir sistema](https://vimpos.com.mx/como-elegir-sistema-restaurante.md): Guía de compra: nueve preguntas que hacerle a cualquier software para restaurantes antes de firmar —internet, precio de frente, comisiones, datos, facturación, implementación, permanencia, soporte y equipo— y en qué casos VIM POS no es la respuesta.
+- [Factura global](https://vimpos.com.mx/factura-global-restaurantes.md): Guía fiscal: qué es la factura global, cada cuándo se emite, qué datos lleva en CFDI 4.0 (RFC genérico, uso S01, periodo) y los errores más comunes en un restaurante. No es asesoría fiscal.
+- [Hamburgueserías](https://vimpos.com.mx/punto-de-venta-hamburgueserias.md): VIM POS para una hamburguesería: término obligatorio, extras con precio, combos, para llevar y a domicilio, cocina por estación e inventario por receta.
+- [León, Guanajuato](https://vimpos.com.mx/punto-de-venta-restaurantes-leon.md): VIM POS para restaurantes de León, Guanajuato, donde se hace el producto: en la zona, la demostración puede ser en el local.
 - [Nosotros](https://vimpos.com.mx/nosotros.md): Quién construye VIM POS, desde dónde, por qué existe y en qué punto está el producto hoy.
 - [Contacto](https://vimpos.com.mx/contacto.md): Cómo contactar a VIM POS: WhatsApp, correo, domicilio fiscal, horario y en cuánto contestamos.
 
@@ -72,5 +75,5 @@ extension, and the normal address answers with `text/markdown` when asked with a
 - [Aviso de privacidad](https://vimpos.com.mx/aviso-privacidad.md): Qué datos se recaban, para qué, cuánto se guardan y cómo ejercer los derechos ARCO.
 - [Términos del servicio](https://vimpos.com.mx/terminos.md): Qué se contrata, qué no incluye, cómo se cobra y cómo se cancela.
 - [Agent instructions / Instrucciones para agentes](https://vimpos.com.mx/agents.md): when to use VIM POS, when not to, and how to act on it. Bilingual.
-- [Todo el sitio en un solo archivo](https://vimpos.com.mx/llms-full.txt): las 13 páginas concatenadas, para cargar el contexto completo de una vez.
+- [Todo el sitio en un solo archivo](https://vimpos.com.mx/llms-full.txt): las 16 páginas concatenadas, para cargar el contexto completo de una vez.
 - [Índice de direcciones](https://vimpos.com.mx/sitemap.xml): el sitemap en XML.
