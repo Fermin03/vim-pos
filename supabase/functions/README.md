@@ -99,6 +99,16 @@ tiene estrategia de estado "external": solo se pausa desde Uber Eats Manager),
 `PREP_FUERA_DE_RANGO` 400, `UBER_ERROR` 502. Los expirados los marca `delivery_marcar_expirados()`
 por pg_cron cada minuto (migración 0093).
 
+### `lealtad-canje` — saldo y canje del programa de lealtad (ADR 0030, 0156)
+
+Entrada única del saldo y del canje; la nube es la única que autoriza un canje. La llaman el POS web
+(JWT del empleado) y el puente de la caja (token de dispositivo). Acciones por `POST`: `saldo`
+(`lealtad_saldo`), `canjear` (`lealtad_canjear`: bloquea el saldo, valida y descuenta) y `asentar`
+(`lealtad_asentar_canje`: pega el canje ya autorizado a una cuenta; desde una caja es solo una
+consulta, porque el ticket vive en su Postgres y lo asienta el puente). El negocio sale del token; el
+navegador solo aporta el canje, el ticket y el renglón. Sin `config.toml` propio (usa `verify_jwt` por
+omisión, igual que `delivery-accion`). Los errores de SQL van al log y el cliente recibe `ERROR_INTERNO`.
+
 ### Archivo de comprobantes y `descargar-cfdi` (0098)
 
 Al timbrar (`timbrar-cfdi`, `timbrar-global`, `autofacturar`) se bajan del PAC el XML y el PDF y se

@@ -18,17 +18,22 @@ ADR 0013.
    reversas, los ajustes y los vencimientos. El saldo (`lealtad_saldos`) se deriva de él. Los puntos
    solo se mueven a través de una función, `lealtad_registrar_movimiento`, idempotente por id; el
    reinicio por cambio de mecánica y el recálculo de la fecha de vencimiento escriben el saldo
-   directamente.
+   directamente. Eso describe la nube y el libro de cada base: en la caja el pull también escribe
+   saldos (una copia de los de la nube más lo que aún está pendiente de subir).
 2. **Ganar corre donde se cobra.** Un trigger en `tickets` escribe el movimiento al quedar pagado:
-   en la caja para la caja, en la nube para el POS web. Los tickets de una caja entran a la nube en
-   modo réplica, así que allá el trigger no corre y lo ganado llega como movimiento por el push.
+   en la caja para la caja, en la nube para el POS web. Solo gana al pasar a pagado desde abierto
+   (`BORRADOR` o `ABIERTO`): cancelar una factura (`FACTURADO` → `PAGADO`) no da puntos, ni a una
+   venta que no los ganó entonces (módulo apagado, tope diario, devolución total) ni a una que ya los
+   tenía. Reabrir una cuenta y volver a cobrarla sí gana en el segundo cobro. Los tickets de una caja
+   entran a la nube en modo réplica, así que allá el trigger no corre y lo ganado llega como
+   movimiento por el push.
    Un ticket cancelado o reabierto deshace lo que ganó. Una devolución lo deshace **en proporción a
    lo que el ticket ganó**, no a lo que queda, de modo que devoluciones parciales sucesivas suman
    el total.
 3. **Canjear lo autoriza solo la nube.** La Edge Function `lealtad-canje` bloquea el saldo, valida y
    descuenta. Sin internet no hay canje. El POS llama igual en web y en caja; en la caja el gateway
    reenvía con el token del dispositivo y asienta el canje en el ticket local con los datos que
-   devuelve la nube; del navegador solo se toman el ticket y el renglón. En la caja solo canjea una sesión de **empleado**,
+   devuelve la nube; del navegador solo se toman el ticket, el renglón y el id del canje. En la caja solo canjea una sesión de **empleado**,
    no la cuenta del dispositivo.
 4. **Un canje nace atado a UNA cuenta y a UNA caja.** `canjear` exige el id del ticket y la nube lo
    guarda en el movimiento junto con la caja. Al asentar, la nube se niega a pegarlo a otra cuenta,
@@ -66,7 +71,8 @@ ADR 0013.
     modos, porque `modulos_efectivos` exige las dos capas. La migración marca los planes con `lealtad_incluido` (todos menos Esencial); quien
     concede el add-on a los planes que lo incluyen es `_sincronizar_addons_del_plan`, que es del
     plan 1C.
-12. **El proceso diario** vence saldos y devuelve todo canje de más de 48 horas cuyo ticket no esté `PAGADO` ni `FACTURADO` en la
+12. **El proceso diario** vence saldos y devuelve todo canje de más de 48 horas, que no tenga ya su
+    reversa, cuyo ticket no esté `PAGADO` ni `FACTURADO` en la
     nube (incluida una cuenta que sigue abierta). Cada
     fila va aislada (un fallo se cuenta y se avisa, el resto sigue), vence en hora de la Ciudad de
     México y no vence nada mientras el módulo está apagado.
@@ -103,13 +109,24 @@ ADR 0013.
   futuro a una tabla que sube necesita lo mismo, porque `_vim_apply_rows_detalle` inserta NULL en
   lo que el JSON no trae. De un cliente que la nube ya tiene, la nube SIEMPRE conserva su propio
   `codigo_publico`: una caja que se actualiza tarde no debe cambiar el enlace público.
-- **Al actualizar, cada caja vuelve a subir 60 días de ventas y todos sus clientes**, una vez:
-  `tickets` y `clientes` ganaron una columna y eso mueve su huella. Es el mismo efecto de la 0122.
+- **Al actualizar, cada caja vuelve a subir 60 días de ventas, pero no sus clientes**, una vez:
+  `tickets` y `clientes` ganaron una columna y eso mueve su huella. En los clientes el primer arranque
+  tras actualizar re-anota las huellas (`reanotarHuellasClientes0156UnaVez`: las que solo cambiaron por
+  la columna nueva) y el padrón NO se re-sube; sin eso la caja pisaría en la nube lo editado o dado de
+  baja en el panel. Un cliente realmente editado en la caja sigue pendiente. Los tickets sí re-suben
+  una vez, y es inofensivo: la caja reenvía su propia verdad, nadie edita tickets en el panel y la
+  nube conserva lo suyo (la guarda de `FACTURADO`, 0122).
+- **El add-on `LEALTAD` nace INACTIVO en el catálogo** (`addons.activo = false`): el panel de
+  plataforma lista los add-ons activos con un botón de activar y todavía no hay pantallas detrás. El
+  plan 1C lo enciende cuando existan las pantallas y se haya timbrado en sandbox un premio de
+  producto. `tenant_addon_activo` no mira `addons.activo`, así que concederlo a mano sigue funcionando.
 - **El pull sigue siendo completo y por hora.** Un cliente o un saldo de otra sucursal tarda hasta
   una hora en verse en la caja. El canje no depende de eso: pregunta a la nube en el momento y
   resuelve al cliente por teléfono.
-- **`catalogo_version()` no mira lealtad** a propósito: si lo hiciera, cada venta con cliente
-  dispararía un pull completo en todas las cajas del negocio.
+- **`catalogo_version()` mira el programa y los premios, pero no los clientes ni los saldos.** Un
+  premio creado en el panel llega a la caja en un minuto y no en una hora. Los clientes y los saldos
+  cambian con cada venta: si los mirara, cada venta con cliente dispararía un pull completo en todas
+  las cajas del negocio.
 - **El tope diario es por caja.** Un cliente que compra en dos sucursales el mismo día puede
   pasarse; la nube acepta esos puntos porque el ticket ya los imprimió.
 - **El permiso es por negocio, no por sucursal.** No existe RLS por sucursal en el proyecto; que el
