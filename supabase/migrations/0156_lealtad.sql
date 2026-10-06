@@ -1677,7 +1677,10 @@ BEGIN
         v_ali  := (v_par->>'alias')::uuid;
         v_real := (v_par->>'cliente')::uuid;
         v_rol  := current_setting('session_replication_role');
-        PERFORM set_config('session_replication_role', 'replica', true);
+        -- Con SET, no con set_config(): en Supabase el rol dueño no es superusuario y solo la
+        -- sentencia SET tiene permiso para este parámetro (lo concede supautils); set_config() da
+        -- "permission denied to set parameter". Es lo mismo que hace sync_push_snapshot.
+        SET LOCAL session_replication_role = replica;
 
         -- idx_direcciones_principal_unica: UNA principal viva (es_principal AND deleted_at IS NULL)
         -- por cliente. La del alias deja de serlo si el real ya tiene una; y si trae varias, solo
@@ -1697,7 +1700,9 @@ BEGIN
         UPDATE ticket_promociones_aplicadas SET cliente_id = v_real WHERE tenant_id = p_tenant AND cliente_id = v_ali;
         UPDATE ticket_canjes_lealtad SET cliente_id = v_real WHERE tenant_id = p_tenant AND cliente_id = v_ali;
 
-        PERFORM set_config('session_replication_role', v_rol, true);
+        IF v_rol IS DISTINCT FROM 'replica' THEN
+          SET LOCAL session_replication_role = origin;
+        END IF;
       EXCEPTION WHEN OTHERS THEN
         RAISE WARNING '_vim_fusionar_clientes: no se pudo repuntar lo guardado bajo el alias % (negocio %): %',
           v_par->>'alias', p_tenant, SQLERRM;
