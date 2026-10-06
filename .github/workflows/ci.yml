@@ -34,15 +34,15 @@ jobs:
   build-and-test:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Setup pnpm
-        uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
+        uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
         with:
           version: 9.12.0
 
       - name: Setup Node
-        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           # 22, no 20: @supabase/realtime-js exige WebSocket NATIVO, que llega en Node 22. Con 20
           # los tests de admin fallan al importar app/lib/supabase.ts ("Node.js 20 detected without
@@ -114,10 +114,10 @@ jobs:
     # necesitan el Postgres embebido de Windows y quedan fuera de este job a propósito.
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Setup Node
-        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           # El Node que empaqueta Electron, a propósito: `node --check` y `node --test` comprueban
           # las fuentes contra la versión que de verdad las va a ejecutar en la caja del cliente.
@@ -182,10 +182,10 @@ jobs:
     # Solo gastaba arranque y ocupaba el 5432 del runner. Auditoría integral 30/09/2026, E-5d.
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Setup Supabase CLI
-        uses: supabase/setup-cli@ab058987d8d6c725971f6cf9d0b5c98467e30bd1 # v1.7.1
+        uses: supabase/setup-cli@45a513f8c64c0bc8e0e3dfe572b5c95be85f6359 # v3.0.1
         with:
           # Versión fija en vez de `latest`: un CI reproducible no debe cambiar de herramienta
           # sola. Súbela a conciencia cuando haga falta.
