@@ -19,9 +19,9 @@ try {
   // Un negocio del fixture de desarrollo (la base temporal se siembra sola).
   const T = (await q("SELECT tenant_id FROM cajas WHERE id = '99999999-0000-0000-0000-0000000000cc'"))[0].tenant_id;
   const ahora = new Date().toISOString();
-  const clienteNube = (id, telefono, nombre = "Cliente Nube") => ({
-    id, tenant_id: T, nombre, telefono, tipo_fiscal: "EVENTUAL", estado: "ACTIVO",
-    codigo_publico: id.replace(/-/g, "").padEnd(64, "a"), created_at: ahora, updated_at: ahora });
+  const clienteNube = (id, telefono, nombre = "Cliente Nube", extra = {}) => ({
+    id, tenant_id: T, nombre, telefono, rfc: null, tipo_fiscal: "EVENTUAL", estado: "ACTIVO",
+    codigo_publico: id.replace(/-/g, "").padEnd(64, "a"), created_at: ahora, updated_at: ahora, ...extra });
   const saldoNube = (id, saldo) => ({ cliente_id: id, tenant_id: T, saldo, programa_version: 1, updated_at: ahora });
   const dir = (cliente, principal, calle) => q(
     `INSERT INTO direcciones_cliente (tenant_id, cliente_id, etiqueta, calle, numero_exterior, colonia, codigo_postal, ciudad, estado_geo, es_principal)
@@ -108,11 +108,99 @@ try {
     assert.equal((await q("SELECT nombre FROM clientes WHERE id = $1", [real]))[0].nombre, "Dora Editada en caja", "(d) la edición local pendiente sobrevive al pull");
   }
 
-  // (f) una nube vieja, sin ninguna de las cuatro llaves, se aplica limpio.
+  const nombreDe = async (id) => (await q("SELECT nombre FROM clientes WHERE id = $1", [id]))[0]?.nombre;
+  const telDe = async (id) => (await q("SELECT telefono FROM clientes WHERE id = $1", [id]))[0]?.telefono;
+  const rfcDe = async (id) => (await q("SELECT rfc FROM clientes WHERE id = $1", [id]))[0]?.rfc;
+
+  // (F1) premios: el dueño borra un premio y lo recrea para el mismo producto; el snapshot trae la fila
+  // viva NUEVA antes que la borrada vieja (orden que antes daba unique_violation y ROLLBACK).
   {
-    const resumen = await pullSnapshot(pool, { __watermark: "viejo" }, () => {});
-    assert.deepEqual(resumen, {}, "(f) un snapshot sin llaves de lealtad ni de clientes no hace nada");
+    const prod = (await q("SELECT id FROM productos WHERE tenant_id = $1 LIMIT 1", [T]))[0].id;
+    const premio = (id, borrado) => ({ id, tenant_id: T, producto_id: prod, costo: 50, activo: true, created_at: ahora, updated_at: ahora, deleted_at: borrado ? ahora : null });
+    const P1 = "88888888-0000-0000-0000-000000000001", P2 = "88888888-0000-0000-0000-000000000002";
+    await pullSnapshot(pool, { lealtad_premios: [premio(P1, false)] }, () => {});
+    await pullSnapshot(pool, { lealtad_premios: [premio(P2, false), premio(P1, true)] }, () => {});
+    const vivos = await q("SELECT id FROM lealtad_premios WHERE tenant_id = $1 AND deleted_at IS NULL", [T]);
+    assert.deepEqual(vivos.map((r) => r.id), [P2], "(F1) un solo premio vivo para el producto y es el nuevo");
+    assert.equal((await q("SELECT count(*)::int AS n FROM lealtad_premios WHERE tenant_id = $1", [T]))[0].n, 2, "(F1) y la fila borrada también bajó");
+    // El programa llega con otro id para el mismo negocio (UNIQUE tenant_id).
+    const G2 = "88888888-0000-0000-0000-0000000000a2";
+    await pullSnapshot(pool, { lealtad_programa: [{ id: G2, tenant_id: T, mecanica: "PUNTOS_DINERO", version: 1, porcentaje: 12, compra_minima_mxn: 0, tope_compras_dia: 3, created_at: ahora, updated_at: ahora }] }, () => {});
+    const prog = await q("SELECT id, porcentaje FROM lealtad_programa WHERE tenant_id = $1", [T]);
+    assert.deepEqual(prog.map((r) => r.id), [G2], "(F1) el programa con otro id reemplaza al local");
+    assert.equal(Number(prog[0].porcentaje), 12);
   }
+
+  // (F2) un RFC pasa de un cliente a otro: el snapshot trae primero al que lo recibe.
+  {
+    const X = "99999999-1111-0000-0000-000000000001", W = "99999999-1111-0000-0000-000000000002";
+    const RFC = "XAXX010101000";
+    await pullSnapshot(pool, { clientes: [clienteNube(X, "4771110001", "Xavier", { rfc: RFC }), clienteNube(W, "4771110002", "Wendy")] }, () => {});
+    await pullSnapshot(pool, { clientes: [clienteNube(W, "4771110002", "Wendy", { rfc: RFC }), clienteNube(X, "4771110001", "Xavier")] }, () => {});
+    assert.equal(await rfcDe(W), RFC, "(F2) Wendy recibió el RFC");
+    assert.equal(await rfcDe(X), null, "(F2) Xavier lo soltó");
+    // Un teléfono que pasa de un cliente a otro, en el mismo orden.
+    await pullSnapshot(pool, { clientes: [clienteNube(W, "4771110001", "Wendy", { rfc: RFC }), clienteNube(X, "4771110003", "Xavier")] }, () => {});
+    assert.equal(await telDe(W), "4771110001", "(F2) Wendy recibió el teléfono");
+    assert.equal(await telDe(X), "4771110003", "(F2) Xavier tiene el nuevo");
+    assert.equal((await q("SELECT count(*)::int AS n FROM _vim_clientes_ok WHERE cliente_id IN ($1, $2)", [X, W]))[0].n, 2, "(F2) ambos anotados");
+  }
+
+  // (F3) Z (ya bajado, con dirección) pasa del teléfono B al C y X recibe B: ninguno es duplicado del otro.
+  {
+    const X = "99999999-3333-0000-0000-000000000001", Z = "99999999-3333-0000-0000-000000000002";
+    await pullSnapshot(pool, { clientes: [clienteNube(Z, "4773330001", "Zoe")] }, () => {});
+    const dz = (await dir(Z, true, "Calle de Zoe"))[0].id;
+    await pullSnapshot(pool, { clientes: [clienteNube(X, "4773330001", "Xime"), clienteNube(Z, "4773330002", "Zoe")] }, () => {});
+    const d = (await q("SELECT cliente_id FROM direcciones_cliente WHERE id = $1", [dz]))[0];
+    assert.equal(d.cliente_id, Z, "(F3) la dirección sigue con Zoe");
+    assert.equal((await q("SELECT count(*)::int AS n FROM direcciones_cliente WHERE cliente_id = $1", [X]))[0].n, 0, "(F3) Xime no recibió nada");
+    assert.equal(await telDe(Z), "4773330002");
+    assert.equal(await telDe(X), "4773330001");
+    // Dos clientes vivos de la nube con los mismos dígitos y distinto formato: ninguno absorbe al otro (1.ª y 2.ª vez).
+    const A = "99999999-3333-0000-0000-000000000003", B = "99999999-3333-0000-0000-000000000004";
+    const snap = { clientes: [clienteNube(A, "4773330777", "Ana 1"), clienteNube(B, "(477) 333-0777", "Ana 2")] };
+    for (const vez of [1, 2]) {
+      await pullSnapshot(pool, snap, () => {});
+      assert.equal((await q("SELECT count(*)::int AS n FROM clientes WHERE id IN ($1, $2)", [A, B]))[0].n, 2, `(F3) los dos siguen vivos en el pull ${vez}`);
+    }
+  }
+
+  // (F2, capa 2) colisión que no se puede arreglar: L tiene una edición local pendiente (no se reescribe)
+  // y conserva el teléfono crudo que trae otro cliente entrante. Se salta ESE cliente y el pull termina.
+  {
+    const L = "99999999-2222-0000-0000-000000000001", N = "99999999-2222-0000-0000-000000000002", M = "99999999-2222-0000-0000-000000000003";
+    await pullSnapshot(pool, { clientes: [clienteNube(L, "4772220001", "Luis")] }, () => {});
+    await pool.query("UPDATE clientes SET telefono = '4772220009' WHERE id = $1", [L]); // edición local pendiente
+    const lineas = [];
+    const resumen = await pullSnapshot(pool, { clientes: [clienteNube(L, "4772220001", "Luis"), clienteNube(N, "4772220009", "Nora"), clienteNube(M, "4772220003", "Mario")] }, (m) => lineas.push(m));
+    assert.equal(await nombreDe(M), "Mario", "(F2b) el resto de los clientes se aplicó");
+    assert.equal(await nombreDe(N), undefined, "(F2b) el cliente que choca no se insertó");
+    assert.equal(await telDe(L), "4772220009", "(F2b) la edición pendiente sigue");
+    assert.ok(lineas.some((l) => l.includes(N) && l.includes("idx_clientes_telefono_unico")), "(F2b) una línea de log con el id y el error");
+    assert.equal((await q("SELECT count(*)::int AS n FROM _vim_clientes_ok WHERE cliente_id = $1", [N]))[0].n, 0, "(F2b) el fallido no está en la libreta");
+    assert.equal((await q("SELECT count(*)::int AS n FROM _vim_clientes_ok WHERE cliente_id = $1", [M]))[0].n, 1, "(F2b) el aplicado sí");
+    assert.equal(resumen.clientes, 1);
+  }
+
+  // (saldo) duplicado con 12 puntos pendientes y la nube sin ningún saldo: el real muestra 12.
+  {
+    const local = (await q("INSERT INTO clientes (tenant_id, nombre, telefono) VALUES ($1, 'Sara Caja', '4774440001') RETURNING id", [T]))[0].id;
+    await pool.query("SELECT lealtad_registrar_movimiento(NULL, $1, $2, 'GANADO', 12, 1)", [T, local]);
+    const real = "99999999-4444-0000-0000-000000000001";
+    await pullSnapshot(pool, { clientes: [clienteNube(real, "(477) 444-0001", "Sara Nube")], lealtad_saldos: [] }, () => {});
+    assert.equal((await q("SELECT saldo FROM lealtad_saldos WHERE cliente_id = $1", [real]))[0]?.saldo, 12, "(saldo) el real muestra los 12 pendientes");
+  }
+
+  // (f) una nube vieja: trae otras tablas y ninguna de las cuatro llaves nuevas.
+  {
+    const fila = async (tabla, donde = "true") => (await q(`SELECT to_jsonb(x) AS r FROM ${tabla} x WHERE ${donde} LIMIT 2`)).map((r) => r.r);
+    const snapshot = { __watermark: "viejo", tenants: await fila("tenants", `id = '${T}'`), sucursales: await fila("sucursales", `tenant_id = '${T}'`), productos: await fila("productos", `tenant_id = '${T}'`) };
+    assert.ok(snapshot.tenants.length && snapshot.sucursales.length && snapshot.productos.length, "(f) hay datos reales que aplicar");
+    const resumen = await pullSnapshot(pool, snapshot, () => {});
+    assert.deepEqual(Object.keys(resumen).sort(), ["productos", "sucursales", "tenants"], "(f) se aplican esas tablas y nada de clientes ni lealtad");
+  }
+
   console.log("VERIFY LEALTAD PULL OK");
 } finally {
   if (backend) await backend.stop();

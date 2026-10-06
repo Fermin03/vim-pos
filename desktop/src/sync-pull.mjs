@@ -92,11 +92,12 @@ async function tablaMeta(client, schema, tabla) {
 }
 
 /** Upsert de un lote de filas en una tabla (esquema-agnóstico). Devuelve nº de filas. */
-async function upsertTabla(client, schema, tabla, filas) {
+async function upsertTabla(client, schema, tabla, filas, opts = {}) {
   if (!filas?.length) return 0;
   const meta = await tablaMeta(client, schema, tabla);
   if (!meta || meta.pk.length === 0) return 0;
   const ref = `${schema}."${tabla}"`;
+  let aplicadas = 0;
   for (const fila of filas) {
     const cols = Object.keys(fila).filter((c) => meta.cols.has(c));
     if (cols.length === 0) continue;
@@ -112,11 +113,24 @@ async function upsertTabla(client, schema, tabla, filas) {
     const setCols = cols.filter((c) => !meta.pk.includes(c) && !soloAlInsertar?.has(c));
     const conflict = meta.pk.map((c) => `"${c}"`).join(", ");
     const setSql = setCols.length ? setCols.map((c) => `"${c}"=EXCLUDED."${c}"`).join(", ") : `"${meta.pk[0]}"=EXCLUDED."${meta.pk[0]}"`;
-    await client.query(
-      `INSERT INTO ${ref} (${cols.map((c) => `"${c}"`).join(", ")}) VALUES (${placeholders.join(", ")})
-       ON CONFLICT (${conflict}) DO UPDATE SET ${setSql}`, params);
+    const sql = `INSERT INTO ${ref} (${cols.map((c) => `"${c}"`).join(", ")}) VALUES (${placeholders.join(", ")})
+       ON CONFLICT (${conflict}) DO UPDATE SET ${setSql}`;
+    if (!opts.aislarFilas) { await client.query(sql, params); aplicadas++; continue; }
+    // Una fila a la vez dentro de su SAVEPOINT: si choca (índice único, CHECK) se deshace SOLO esa
+    // fila, se anota y el pull sigue. Se reintenta en el siguiente pull. Nada de `clientes` debe
+    // poder revertir la transacción entera: eso deja a la caja sin catálogo en cada ciclo.
+    await client.query("SAVEPOINT fila_pull");
+    try {
+      await client.query(sql, params);
+      await client.query("RELEASE SAVEPOINT fila_pull");
+      aplicadas++;
+    } catch (e) {
+      await client.query("ROLLBACK TO SAVEPOINT fila_pull");
+      opts.fallidas?.push({ fila, error: e });
+      (opts.log ?? (() => {}))(`  ${tabla}: no se pudo aplicar ${fila.id ?? "?"} (se reintenta en el próximo pull): ${e.message}`);
+    }
   }
-  return filas.length;
+  return opts.aislarFilas ? aplicadas : filas.length;
 }
 
 /**
@@ -204,7 +218,9 @@ const CLAVES_NATURALES = {
   // los fundió en uno y aquí baja el cliente real, con otro id. Igual que una zona, el cliente
   // local tiene datos que no se pueden tirar (ventas, direcciones, movimientos), así que se mudan
   // al id de la nube. `reapuntarFk` los busca en el catálogo de Postgres en vez de listarlos a
-  // mano: una tabla nueva que apunte a clientes queda cubierta sola.
+  // mano: una tabla nueva que apunte a clientes queda cubierta sola, SALVO que tenga un índice único
+  // sobre la columna del cliente (como el de la dirección principal): ese caso exige un
+  // `antesDeReapuntar` propio, porque en modo réplica los índices únicos sí se revisan.
   // lealtad_saldos NO se muda (su llave ES el cliente y mudarla chocaría si el real ya tuviera
   // saldo): se borra y entra la de la nube unas filas más abajo, en este mismo pull.
   // El teléfono se compara por DÍGITOS en los dos lados, igual que la fusión de la nube: el POS lo
@@ -223,7 +239,18 @@ const CLAVES_NATURALES = {
     ],
     reapuntarFk: { tabla: "clientes", excepto: ["lealtad_saldos"] },
     antesDeReapuntar: dejarUnaDireccionPrincipal,
+    // El duplicado se bloquea antes de mudarlo: una venta en vuelo que le asigna ese cliente a un
+    // ticket no puede quedar apuntando a un id que se borra.
+    bloquearViejo: true,
   },
+  // Premios (0156): UNIQUE (tenant_id, producto_id) WHERE deleted_at IS NULL. El snapshot trae TAMBIÉN
+  // los premios borrados, sin orden garantizado: el dueño borra un premio y lo recrea para el mismo
+  // producto, y si la fila viva nueva entra antes que la borrada vieja, el índice choca y el ROLLBACK
+  // se lleva todo el pull. El snapshot trae el catálogo completo de premios del negocio y nada tiene
+  // llave foránea a un premio, así que se borra lo del negocio y entra lo de la nube.
+  lealtad_premios: { porPadre: "tenant_id" },
+  // Un programa por negocio (UNIQUE tenant_id): si llega con otro id, choca con lealtad_programa_tenant_id_key.
+  lealtad_programa: { claves: ["tenant_id"], dependientes: [] },
 };
 
 const fkCache = new Map();
@@ -254,7 +281,12 @@ async function columnasQueApuntanA(client, tabla, excepto = []) {
  * por clave natural con una entrante de distinto id, para que entre la de la nube con su id.
  * La nube manda. Es seguro porque una caja real no tiene datos propios: todo viene de allá.
  */
-async function reconciliarCatalogo(client, tabla, filas, log = () => {}) {
+/**
+ * `opts.excluirIds`: ids que la nube manda en este snapshot; NUNCA son "el duplicado local" de otra
+ * fila (un cliente que cambió de teléfono en el panel no es duplicado de quien recibió el suyo).
+ * `opts.fusionados`: Map id→tenant que se llena con los destinos de una fusión.
+ */
+async function reconciliarCatalogo(client, tabla, filas, log = () => {}, opts = {}) {
   const cfg = CLAVES_NATURALES[tabla];
   if (!cfg) return;
 
@@ -287,12 +319,18 @@ async function reconciliarCatalogo(client, tabla, filas, log = () => {}) {
       cond = cfg.claves.map((c, i) => `"${c}" IS NOT DISTINCT FROM $${i + 1}`).join(" AND ");
       params = cfg.claves.map((c) => f[c] ?? null);
     }
-    const { rows } = await client.query(
-      `SELECT id FROM ${tabla} WHERE ${cond} AND id <> $${params.length + 1}`,
-      [...params, f.id],
-    );
+    const excluir = opts.excluirIds?.length ? [...opts.excluirIds, f.id] : null;
+    const { rows } = excluir
+      ? await client.query(
+        `SELECT id FROM ${tabla} WHERE ${cond} AND id <> $${params.length + 1} AND id <> ALL($${params.length + 2}::uuid[])`,
+        [...params, f.id, excluir])
+      : await client.query(
+        `SELECT id FROM ${tabla} WHERE ${cond} AND id <> $${params.length + 1}`,
+        [...params, f.id],
+      );
     for (const vieja of rows) {
       // Primero se mudan los que tienen datos propios al id de la nube; luego se borra lo demás.
+      if (cfg.bloquearViejo) await client.query(`SELECT 1 FROM ${tabla} WHERE id = $1 FOR UPDATE`, [vieja.id]);
       await cfg.antesDeReapuntar?.(client, vieja.id, f.id);
       for (const r of reapuntar) {
         await client.query(`UPDATE ${r.tabla} SET "${r.col}" = $1 WHERE "${r.col}" = $2`, [f.id, vieja.id]);
@@ -301,6 +339,7 @@ async function reconciliarCatalogo(client, tabla, filas, log = () => {}) {
         await client.query(`DELETE FROM ${d.tabla} WHERE "${d.col}" = $1`, [vieja.id]);
       }
       await client.query(`DELETE FROM ${tabla} WHERE id = $1`, [vieja.id]);
+      opts.fusionados?.set(f.id, f.tenant_id);
       borradas++;
     }
   }
@@ -473,6 +512,43 @@ async function separarZonasPendientes(client, filas) {
 }
 
 /**
+ * Índices únicos de `clientes` (0007 y 0156): (tenant_id, telefono) y (tenant_id, rfc), parciales
+ * sobre filas vivas y con el valor CRUDO, y codigo_publico (global). El panel mueve un RFC o un
+ * teléfono de un cliente a otro, y el snapshot trae a los dos sin orden: si el que lo recibe entra
+ * antes que el que lo suelta, el índice choca y el ROLLBACK se llevaba todo el pull.
+ * Antes del upsert se sueltan teléfono y RFC de las filas locales que se van a reescribir (el upsert
+ * los restaura en la misma transacción; solo se sueltan si la fila entrante trae ambas llaves, para
+ * no perderlos si no las trae). codigo_publico es NOT NULL y lo genera la nube una sola vez por
+ * cliente, no se intercambia entre clientes: no se suelta, y si algún día chocara lo absorbe el
+ * SAVEPOINT por fila. Devuelve lo soltado para poder restaurarlo si la fila no se aplica.
+ */
+async function liberarClavesUnicasClientes(client, filas) {
+  const ids = filas.filter((f) => f?.id && "telefono" in f && "rfc" in f).map((f) => f.id);
+  if (!ids.length) return new Map();
+  const { rows } = await client.query(
+    "SELECT id, telefono, rfc FROM clientes WHERE id = ANY($1::uuid[]) AND (telefono IS NOT NULL OR rfc IS NOT NULL)", [ids]);
+  if (!rows.length) return new Map();
+  await client.query("UPDATE clientes SET telefono = NULL, rfc = NULL WHERE id = ANY($1::uuid[])", [rows.map((r) => r.id)]);
+  return new Map(rows.map((r) => [r.id, r]));
+}
+
+/** Devuelve teléfono y RFC a las filas que NO se pudieron aplicar (su copia local no debe perderlos). */
+async function restaurarClavesClientes(client, fallidas, soltadas, log) {
+  for (const { fila } of fallidas) {
+    const g = soltadas.get(fila.id);
+    if (!g) continue;
+    await client.query("SAVEPOINT restaura_cliente");
+    try {
+      await client.query("UPDATE clientes SET telefono = $2, rfc = $3 WHERE id = $1", [g.id, g.telefono, g.rfc]);
+      await client.query("RELEASE SAVEPOINT restaura_cliente");
+    } catch (e) {
+      await client.query("ROLLBACK TO SAVEPOINT restaura_cliente");
+      log(`  clientes: no se pudo devolver teléfono/RFC a ${g.id}: ${e.message}`);
+    }
+  }
+}
+
+/**
  * Clientes: mismo contrato que las zonas. Un cliente que la caja editó y aún no sube (está en la
  * libreta `_vim_clientes_ok` con una huella distinta a la de su fila) no se pisa con la copia de la
  * nube; el siguiente push lo sube y el pull siguiente ya es inocuo.
@@ -534,11 +610,14 @@ export function deltaLealtadPendiente(movimientos, versionActual) {
  * los clientes que trajo ESTE pull (misma regla I1 que corregirExistenciasPorPendientes): si la
  * nube no mandó su fila, la local ya incluye lo pendiente y no se toca.
  */
-export async function corregirSaldosLealtadPorPendientes(client, log = () => {}, filasAplicadas = []) {
+export async function corregirSaldosLealtadPorPendientes(client, log = () => {}, filasAplicadas = [], fusionados = new Map()) {
   const permitidos = new Set(filasAplicadas.map((f) => f.cliente_id));
-  if (!permitidos.size) return 0;
+  // Destinos de una fusión en ESTE pull a los que la nube no mandó saldo: el duplicado se llevó su
+  // fila y los puntos pendientes se mudaron al real, que quedaría en 0. Se les crea la fila.
+  const soloFusion = new Set([...fusionados.keys()].filter((id) => !permitidos.has(id)));
+  if (!permitidos.size && !soloFusion.size) return 0;
   await client.query("CREATE TABLE IF NOT EXISTS _vim_lealtad_mov_ok (movimiento_id uuid PRIMARY KEY, subido_at timestamptz DEFAULT now())");
-  const tenantId = filasAplicadas[0].tenant_id;
+  const tenantId = filasAplicadas[0]?.tenant_id ?? [...fusionados.values()][0];
   const prog = await client.query("SELECT version FROM lealtad_programa WHERE tenant_id = $1", [tenantId]);
   const { rows } = await client.query(`
     SELECT m.cliente_id, m.puntos, m.programa_version
@@ -548,10 +627,20 @@ export async function corregirSaldosLealtadPorPendientes(client, log = () => {},
   const deltas = deltaLealtadPendiente(rows, prog.rows[0]?.version ?? null);
   let n = 0;
   for (const [clienteId, delta] of deltas) {
-    if (!delta || !permitidos.has(clienteId)) continue;
-    const r = await client.query(
-      "UPDATE lealtad_saldos SET saldo = saldo + $2 WHERE cliente_id = $1", [clienteId, delta]);
-    n += r.rowCount;
+    if (!delta) continue;
+    if (permitidos.has(clienteId)) {
+      const r = await client.query(
+        "UPDATE lealtad_saldos SET saldo = saldo + $2 WHERE cliente_id = $1", [clienteId, delta]);
+      n += r.rowCount;
+    } else if (soloFusion.has(clienteId)) {
+      // Sin fila local no hay nada contado todavía: nace con el delta. Si ya existe, no se toca (su
+      // saldo ya incluye lo suyo y sumar el delta completo lo contaría dos veces).
+      const r = await client.query(
+        `INSERT INTO lealtad_saldos (cliente_id, tenant_id, saldo, programa_version)
+         VALUES ($1, $2, $3, $4) ON CONFLICT (cliente_id) DO NOTHING`,
+        [clienteId, tenantId, delta, prog.rows[0].version]);
+      n += r.rowCount;
+    }
   }
   if (n) log(`  lealtad_saldos: ${n} saldo(s) corregido(s) por movimientos pendientes`);
   return n;
@@ -560,6 +649,8 @@ export async function corregirSaldosLealtadPorPendientes(client, log = () => {},
 export async function pullSnapshot(pool, snapshot, log = () => {}) {
   const client = await pool.connect();
   const resumen = {};
+  const fusionados = new Map(); // clientes destino de una fusión en este pull (id → tenant)
+  let saldosCorregidos = false;
   try {
     await client.query("BEGIN");
     await client.query("SET LOCAL session_replication_role = replica"); // no disparar triggers/audit
@@ -574,6 +665,9 @@ export async function pullSnapshot(pool, snapshot, log = () => {}) {
         filas = aplicar;
         if (!filas.length) continue;
       }
+      // Ids que la nube manda de clientes (incluidos los que se apartan por edición pendiente): ninguno
+      // es "duplicado local" de otro.
+      const idsNube = t === "clientes" ? filas.map((f) => f?.id).filter((id) => id != null) : [];
       if (t === "clientes") {
         const { aplicar, descartadas } = await separarClientesPendientes(client, filas);
         if (descartadas.length) {
@@ -582,16 +676,26 @@ export async function pullSnapshot(pool, snapshot, log = () => {}) {
         filas = aplicar;
         if (!filas.length) continue;
       }
-      await reconciliarCatalogo(client, t, filas, log);
-      const n = await upsertTabla(client, schema, t, filas);
+      await reconciliarCatalogo(client, t, filas, log, t === "clientes" ? { excluirIds: idsNube, fusionados } : {});
+      const fallidas = [];
+      const soltadas = t === "clientes" ? await liberarClavesUnicasClientes(client, filas) : null;
+      const n = await upsertTabla(client, schema, t, filas, t === "clientes" ? { aislarFilas: true, fallidas, log } : {});
+      if (fallidas.length) {
+        await restaurarClavesClientes(client, fallidas, soltadas, log);
+        const malas = new Set(fallidas.map((x) => x.fila.id));
+        filas = filas.filter((x) => !malas.has(x.id)); // no se anotan en la libreta del push
+      }
       resumen[t] = n;
       if (n) log(`  ${schema}.${t}: ${n}`);
       if (t === "insumo_stock_sucursal") await corregirExistenciasPorPendientes(client, log, filas);
       if (t === "repartidores") await marcarRepartidoresDelPull(client, filas, log);
       if (t === "zonas_envio") await marcarZonasDelPull(client, filas, log);
       if (t === "clientes") await marcarClientesDelPull(client, filas, log);
-      if (t === "lealtad_saldos" && n) await corregirSaldosLealtadPorPendientes(client, log, filas);
+      if (t === "lealtad_saldos" && n) { await corregirSaldosLealtadPorPendientes(client, log, filas, fusionados); saldosCorregidos = true; }
     }
+    // La nube no mandó saldo (o ningún saldo) para el cliente al que se fundió un duplicado con puntos
+    // pendientes: la corrección corre igual para no dejarlo en 0.
+    if (fusionados.size && !saldosCorregidos) await corregirSaldosLealtadPorPendientes(client, log, [], fusionados);
     await client.query(
       `CREATE TABLE IF NOT EXISTS _vim_sync (clave text PRIMARY KEY, valor text, at timestamptz DEFAULT now())`);
     await client.query(
