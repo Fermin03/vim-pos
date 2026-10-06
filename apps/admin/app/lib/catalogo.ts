@@ -34,7 +34,7 @@ export const categoriaSchema = z.object({
   icono: z.string().max(50).nullable().optional(),
   activa: z.boolean(),
   /** Estación de preparación por defecto de la categoría. "" = ninguna (va a cocina). */
-  area_cocina_id: z.string().uuid().optional().or(z.literal("")),
+  area_cocina_id: z.string().guid().optional().or(z.literal("")),
 });
 export type CategoriaInput = z.infer<typeof categoriaSchema>;
 
@@ -176,20 +176,20 @@ export async function listarCategoriasOpciones(): Promise<CategoriaOpcion[]> {
 // ── Productos ────────────────────────────────────────────────────────────────
 export const productoSchema = z.object({
   nombre: z.string().trim().min(1, "El nombre es obligatorio").max(200, "Máximo 200 caracteres"),
-  categoria_id: z.string().uuid("Elige una categoría"),
-  precio_base_mxn: z.number({ invalid_type_error: "Precio inválido" }).min(0, "El precio no puede ser negativo"),
+  categoria_id: z.string().guid("Elige una categoría"),
+  precio_base_mxn: z.number({ error: "Precio inválido" }).min(0, "El precio no puede ser negativo"),
   descripcion: z.string().trim().max(500).optional().or(z.literal("")),
   codigo_interno: z.string().trim().max(50).optional().or(z.literal("")),
   estado: z.enum(["ACTIVO", "PAUSADO"]),
   agotado: z.boolean(),
   visible_en_pos: z.boolean(),
   // F17.2 — marca virtual a la que pertenece el producto (multi-marca). "" = sin marca.
-  marca_virtual_id: z.string().uuid().optional().or(z.literal("")),
+  marca_virtual_id: z.string().guid().optional().or(z.literal("")),
   /**
    * Estación de preparación. "" = hereda la de su categoría, que es lo normal; solo se fija aquí
    * cuando el producto es la excepción (una limonada preparada en cocina dentro de Bebidas).
    */
-  area_cocina_id: z.string().uuid().optional().or(z.literal("")),
+  area_cocina_id: z.string().guid().optional().or(z.literal("")),
   /**
    * Clave del catálogo c_ClaveProdServ del SAT. Vacía = el CFDI usa la genérica del giro
    * (90101500, servicios de restaurantes), que es lo que un contador pondría de todos modos.
@@ -199,7 +199,7 @@ export const productoSchema = z.object({
    * Tasa de IVA del producto. No es siempre 16: la comida para llevar va a tasa 0, y hasta que
    * esto se pudo capturar el CFDI declaraba 16 % de todo.
    */
-  tasa_iva: z.number({ invalid_type_error: "Tasa inválida" }).min(0).max(100),
+  tasa_iva: z.number({ error: "Tasa inválida" }).min(0).max(100),
   iva_incluido_en_precio: z.boolean(),
 });
 export type ProductoInput = z.infer<typeof productoSchema>;

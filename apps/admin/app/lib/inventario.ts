@@ -44,7 +44,7 @@ export const LABEL_CATEGORIA: Record<CategoriaInsumo, string> = {
 
 export const insumoSchema = z.object({
   nombre: z.string().trim().min(1, "Obligatorio").max(150),
-  unidad_medida_id: z.string().uuid("Elige una unidad"),
+  unidad_medida_id: z.string().guid("Elige una unidad"),
   categoria: z.enum(CATEGORIAS_INSUMO),
   costo_unitario_mxn: z.number().nonnegative("No puede ser negativo"),
   stock_minimo_global: z.number().nonnegative().optional(),

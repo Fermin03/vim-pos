@@ -23,8 +23,8 @@ const r2 = (n: number): number => Math.round(n * 100) / 100;
 // ── Combos (productos con es_combo) ──────────────────────────────────────────
 export const comboSchema = z.object({
   nombre: z.string().trim().min(1, "El nombre es obligatorio").max(200),
-  categoria_id: z.string().uuid("Elige una categoría"),
-  precio_base_mxn: z.number({ invalid_type_error: "Precio inválido" }).min(0, "El precio no puede ser negativo"),
+  categoria_id: z.string().guid("Elige una categoría"),
+  precio_base_mxn: z.number({ error: "Precio inválido" }).min(0, "El precio no puede ser negativo"),
   descripcion: z.string().trim().max(500).optional().or(z.literal("")),
   clave_sat: z.string().trim().regex(/^\d{8}$/, "La clave del SAT son 8 dígitos").optional().or(z.literal("")),
   tasa_iva: z.number().min(0).max(100),
@@ -123,7 +123,7 @@ export const slotSchema = z.object({
   // dueño podría crear uno mañana— así que se limita aquí hasta que la caja sepa atenderlo.
   maximo_selecciones: z.number().int().min(1).max(1, "Por ahora cada paso deja elegir una sola opción"),
   modo_precio: z.enum(["DELTA", "SUMA_PRECIO_PRODUCTO"]),
-  categoria_id: z.string().uuid().nullable(),
+  categoria_id: z.string().guid().nullable(),
   activo: z.boolean(),
 }).refine((d) => d.maximo_selecciones >= d.minimo_selecciones, { message: "El máximo debe ser ≥ el mínimo", path: ["maximo_selecciones"] });
 export type SlotInput = z.infer<typeof slotSchema>;
@@ -171,7 +171,7 @@ export async function eliminarSlot(id: string): Promise<void> {
 
 // ── Opciones ─────────────────────────────────────────────────────────────────
 export const opcionSchema = z.object({
-  precio_delta_mxn: z.number({ invalid_type_error: "Revisa cuánto cuesta de más" }),
+  precio_delta_mxn: z.number({ error: "Revisa cuánto cuesta de más" }),
   es_default: z.boolean(),
   activa: z.boolean(),
 });

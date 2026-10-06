@@ -14,7 +14,7 @@ export const CuerpoCorreo = z.discriminatedUnion("accion", [
   z.object({
     accion: z.literal("liberar"),
     email: z.string().trim().email().max(255),
-    usuario_id: z.string().uuid(),
+    usuario_id: z.string().guid(),
     motivo: z.string().trim().min(10),
   }),
 ]);

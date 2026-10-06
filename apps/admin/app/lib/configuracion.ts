@@ -510,7 +510,7 @@ export async function eliminarSucursal(id: string): Promise<void> {
 
 // ── Cajas (P-167/168) ─────────────────────────────────────────────────────────
 export const cajaSchema = z.object({
-  sucursal_id: z.string().uuid("Elige una sucursal"),
+  sucursal_id: z.string().guid("Elige una sucursal"),
   numero: z.number().int().min(1, "Mínimo 1"),
   nombre: z.string().trim().min(1, "Obligatorio").max(100),
   activa: z.boolean(),

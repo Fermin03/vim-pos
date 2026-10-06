@@ -44,7 +44,7 @@ export type Mesa = {
 };
 
 export const mesaSchema = z.object({
-  sucursal_id: z.string().uuid("Elige una sucursal"),
+  sucursal_id: z.string().guid("Elige una sucursal"),
   numero: z.string().trim().min(1, "Indica el número").max(20),
   nombre: z.string().trim().max(60).optional().or(z.literal("")),
   capacidad: z.number().int().min(1, "Mínimo 1").max(50, "Máximo 50"),
