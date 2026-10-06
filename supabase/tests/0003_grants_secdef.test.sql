@@ -61,7 +61,8 @@ insert into _secdef_solo_service (fn, motivo) values
   ('lealtad_asentar_canje',         'pega un descuento a un ticket; solo el puente o la Edge Function (0156)'),
   ('lealtad_revertir_canje_ticket', 'devuelve saldo; el POS usa quitar_canje_lealtad (0156)'),
   ('lealtad_revertir_canje',        'devuelve saldo sin ticket; solo la red de seguridad (0156)'),
-  ('lealtad_resolver_cliente',      'busca clientes por teléfono sin RLS (0156)');
+  ('lealtad_resolver_cliente',      'busca clientes por teléfono sin RLS (0156)'),
+  ('lealtad_proceso_diario',        'vence saldos y revierte canjes de todos los negocios (0156)');
 
 -- #2 — CRÍTICA: ninguna de ellas es ejecutable por `authenticated`.
 select is_empty($$

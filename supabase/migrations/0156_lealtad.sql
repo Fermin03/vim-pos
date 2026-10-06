@@ -1317,3 +1317,185 @@ GRANT EXECUTE ON FUNCTION lealtad_resolver_cliente(uuid, uuid, text), lealtad_sa
   lealtad_asentar_canje(jsonb), lealtad_revertir_canje_ticket(uuid, text), lealtad_revertir_canje(uuid, uuid, text)
   TO service_role;
 GRANT EXECUTE ON FUNCTION quitar_canje_lealtad(uuid) TO authenticated, service_role;
+
+-- ── §7 Programa, ajuste manual, vencimiento y red de seguridad ──────────────
+
+-- Alta o edición del programa. Cambiar de mecánica pone TODOS los saldos en cero (no son
+-- convertibles) y por eso exige p_confirmar_reinicio; sin él, devuelve a cuántos clientes afecta.
+-- Los parámetros se validan aquí con mensajes para el dueño (los CHECK de la tabla quedan de
+-- red, pero un dueño no debe ver "violates check constraint"). Lo que no aplica a la mecánica
+-- elegida se guarda como NULL, para que el programa no arrastre valores de una mecánica anterior.
+CREATE OR REPLACE FUNCTION lealtad_guardar_programa(
+  p_mecanica lealtad_mecanica, p_porcentaje numeric, p_pesos_por_punto numeric,
+  p_compra_minima_mxn numeric, p_vencimiento_meses integer, p_tope_compras_dia integer,
+  p_confirmar_reinicio boolean DEFAULT false)
+RETURNS jsonb
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp
+AS $$
+DECLARE
+  v_tenant uuid := current_tenant_id();
+  v_p      lealtad_programa%ROWTYPE;
+  v_con    integer := 0;
+  s        lealtad_saldos%ROWTYPE;
+  v_pct    numeric;
+  v_pesos  numeric;
+BEGIN
+  IF v_tenant IS NULL OR NOT es_admin_del_tenant(v_tenant) THEN
+    RAISE EXCEPTION 'Solo el dueño o un administrador puede configurar la lealtad.' USING ERRCODE = '42501';
+  END IF;
+
+  IF p_mecanica IS NULL THEN
+    RAISE EXCEPTION 'Elige cómo ganan tus clientes: puntos por dinero, sellos o puntos con premios.' USING ERRCODE = '22023';
+  END IF;
+  IF p_mecanica = 'PUNTOS_DINERO' AND (p_porcentaje IS NULL OR p_porcentaje <= 0 OR p_porcentaje > 50) THEN
+    RAISE EXCEPTION 'El porcentaje de puntos debe ser mayor que 0 y de máximo 50.' USING ERRCODE = '22023';
+  END IF;
+  IF p_mecanica = 'PUNTOS_PREMIOS' AND (p_pesos_por_punto IS NULL OR p_pesos_por_punto <= 0) THEN
+    RAISE EXCEPTION 'Indica cuántos pesos de compra valen un punto (debe ser mayor que 0).' USING ERRCODE = '22023';
+  END IF;
+  IF p_vencimiento_meses IS NOT NULL AND (p_vencimiento_meses < 1 OR p_vencimiento_meses > 60) THEN
+    RAISE EXCEPTION 'El vencimiento debe ser de 1 a 60 meses, o sin vencimiento.' USING ERRCODE = '22023';
+  END IF;
+  IF p_tope_compras_dia IS NOT NULL AND (p_tope_compras_dia < 1 OR p_tope_compras_dia > 50) THEN
+    RAISE EXCEPTION 'El tope de compras por día debe estar entre 1 y 50.' USING ERRCODE = '22023';
+  END IF;
+  IF p_compra_minima_mxn IS NOT NULL AND p_compra_minima_mxn < 0 THEN
+    RAISE EXCEPTION 'La compra mínima no puede ser negativa.' USING ERRCODE = '22023';
+  END IF;
+  v_pct   := CASE WHEN p_mecanica = 'PUNTOS_DINERO'  THEN p_porcentaje      END;
+  v_pesos := CASE WHEN p_mecanica = 'PUNTOS_PREMIOS' THEN p_pesos_por_punto END;
+
+  SELECT * INTO v_p FROM lealtad_programa WHERE tenant_id = v_tenant FOR UPDATE;
+  IF NOT FOUND THEN
+    INSERT INTO lealtad_programa (tenant_id, mecanica, porcentaje, pesos_por_punto, compra_minima_mxn, vencimiento_meses, tope_compras_dia)
+    VALUES (v_tenant, p_mecanica, v_pct, v_pesos, COALESCE(p_compra_minima_mxn, 0), p_vencimiento_meses, COALESCE(p_tope_compras_dia, 3));
+    RETURN jsonb_build_object('ok', true, 'version', 1, 'clientes_reiniciados', 0);
+  END IF;
+
+  IF v_p.mecanica <> p_mecanica THEN
+    SELECT count(*) INTO v_con FROM lealtad_saldos
+     WHERE tenant_id = v_tenant AND saldo <> 0 AND programa_version = v_p.version;
+    IF v_con > 0 AND NOT COALESCE(p_confirmar_reinicio, false) THEN
+      RETURN jsonb_build_object('ok', false, 'error', 'REQUIERE_CONFIRMAR_REINICIO', 'clientes_con_saldo', v_con);
+    END IF;
+    -- Primero se anula cada saldo CON LA VERSIÓN VIEJA (para que el movimiento sume), después se
+    -- sube la versión.
+    FOR s IN SELECT * FROM lealtad_saldos
+              WHERE tenant_id = v_tenant AND saldo <> 0 AND programa_version = v_p.version LOOP
+      PERFORM lealtad_registrar_movimiento(
+        NULL, v_tenant, s.cliente_id, 'AJUSTE', -s.saldo, v_p.version,
+        p_motivo => 'Cambio de mecánica: ' || v_p.mecanica || ' → ' || p_mecanica, p_usuario => auth.uid());
+    END LOOP;
+    v_p.version := v_p.version + 1;
+    UPDATE lealtad_saldos SET saldo = 0, programa_version = v_p.version, vence_el = NULL, updated_at = now()
+     WHERE tenant_id = v_tenant;
+  END IF;
+
+  UPDATE lealtad_programa
+     SET mecanica = p_mecanica, version = v_p.version, porcentaje = v_pct, pesos_por_punto = v_pesos,
+         compra_minima_mxn = COALESCE(p_compra_minima_mxn, 0), vencimiento_meses = p_vencimiento_meses,
+         tope_compras_dia = COALESCE(p_tope_compras_dia, 3)
+   WHERE tenant_id = v_tenant;
+
+  -- Cambiar los meses de vencimiento mueve la fecha de todos.
+  UPDATE lealtad_saldos SET vence_el = lealtad_vence_el(v_tenant, ultima_actividad), updated_at = now()
+   WHERE tenant_id = v_tenant AND vence_el IS DISTINCT FROM lealtad_vence_el(v_tenant, ultima_actividad);
+
+  RETURN jsonb_build_object('ok', true, 'version', v_p.version, 'clientes_reiniciados', v_con);
+END $$;
+REVOKE ALL ON FUNCTION lealtad_guardar_programa(lealtad_mecanica, numeric, numeric, numeric, integer, integer, boolean) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION lealtad_guardar_programa(lealtad_mecanica, numeric, numeric, numeric, integer, integer, boolean) TO authenticated, service_role;
+
+-- Ajuste manual del dueño o admin. Motivo obligatorio; queda en el libro con quien lo hizo.
+-- Devuelve el saldo nuevo.
+CREATE OR REPLACE FUNCTION lealtad_ajustar_saldo(p_cliente_id uuid, p_puntos integer, p_motivo text)
+RETURNS integer
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp
+AS $$
+DECLARE
+  v_tenant uuid := current_tenant_id();
+  v_ver    integer;
+BEGIN
+  IF v_tenant IS NULL OR NOT es_admin_del_tenant(v_tenant) THEN
+    RAISE EXCEPTION 'Solo el dueño o un administrador puede ajustar un saldo.' USING ERRCODE = '42501';
+  END IF;
+  IF COALESCE(p_puntos, 0) = 0 THEN RAISE EXCEPTION 'El ajuste no puede ser cero.' USING ERRCODE = '22023'; END IF;
+  IF btrim(COALESCE(p_motivo, '')) = '' THEN RAISE EXCEPTION 'El ajuste necesita un motivo.' USING ERRCODE = '22023'; END IF;
+  IF NOT EXISTS (SELECT 1 FROM clientes WHERE id = p_cliente_id AND tenant_id = v_tenant) THEN
+    RAISE EXCEPTION 'El cliente no existe.' USING ERRCODE = 'P0002';
+  END IF;
+  SELECT version INTO v_ver FROM lealtad_programa WHERE tenant_id = v_tenant;
+  IF v_ver IS NULL THEN RAISE EXCEPTION 'Primero configura el programa.' USING ERRCODE = '22023'; END IF;
+
+  PERFORM lealtad_registrar_movimiento(
+    NULL, v_tenant, p_cliente_id, 'AJUSTE', p_puntos, v_ver,
+    p_motivo => btrim(p_motivo), p_usuario => auth.uid());
+  RETURN (SELECT saldo FROM lealtad_saldos WHERE cliente_id = p_cliente_id);
+END $$;
+REVOKE ALL ON FUNCTION lealtad_ajustar_saldo(uuid, integer, text) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION lealtad_ajustar_saldo(uuid, integer, text) TO authenticated, service_role;
+
+-- El proceso diario de la nube. Dos trabajos:
+--   1) Vencer los saldos cuya fecha ya pasó, en hora de México. Solo en negocios con el módulo
+--      encendido: mientras está apagado nada vence (spec §5, regla 9).
+--   2) Red de seguridad del canje (spec §6): un canje de hace más de 48 h que no cuelga de un
+--      ticket pagado se devuelve. Cubre la llamada que la caja nunca supo que se completó.
+--      Un canje que SÍ cuelga de un ticket pagado o facturado nunca se toca: el cliente ya se
+--      llevó el descuento.
+-- p_ahora existe para poder probarlo sin depender del reloj.
+CREATE OR REPLACE FUNCTION lealtad_proceso_diario(p_ahora timestamptz DEFAULT now())
+RETURNS jsonb
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp
+AS $$
+DECLARE
+  v_hoy  date := (p_ahora AT TIME ZONE 'America/Mexico_City')::date;
+  s      record;
+  m      record;
+  v_venc integer := 0;
+  v_rev  integer := 0;
+BEGIN
+  FOR s IN
+    SELECT sa.cliente_id, sa.tenant_id, sa.saldo, sa.programa_version
+      FROM lealtad_saldos sa
+      JOIN lealtad_programa p ON p.tenant_id = sa.tenant_id AND p.version = sa.programa_version
+      JOIN configuracion_tenant c ON c.tenant_id = sa.tenant_id AND c.modulo_lealtad_activo
+     WHERE sa.saldo > 0 AND sa.vence_el IS NOT NULL AND sa.vence_el < v_hoy
+  LOOP
+    PERFORM lealtad_registrar_movimiento(
+      NULL, s.tenant_id, s.cliente_id, 'VENCIMIENTO', -s.saldo, s.programa_version,
+      p_motivo => 'Venció por inactividad', p_fecha => p_ahora);
+    v_venc := v_venc + 1;
+  END LOOP;
+
+  FOR m IN
+    SELECT c.id, c.tenant_id
+      FROM lealtad_movimientos c
+     WHERE c.tipo = 'CANJE' AND c.fecha < p_ahora - interval '48 hours'
+       AND NOT EXISTS (SELECT 1 FROM lealtad_movimientos r
+                        WHERE r.canje_movimiento_id = c.id AND r.tipo = 'REVERSA_CANJE')
+       AND NOT EXISTS (SELECT 1 FROM ticket_canjes_lealtad tc
+                         JOIN tickets t ON t.id = tc.ticket_id
+                        WHERE tc.id = c.id AND t.estado_fiscal IN ('PAGADO', 'FACTURADO'))
+  LOOP
+    IF lealtad_revertir_canje(m.id, m.tenant_id, 'El canje no llegó a una cuenta pagada en 48 horas') THEN
+      v_rev := v_rev + 1;
+    END IF;
+  END LOOP;
+
+  RETURN jsonb_build_object('vencidos', v_venc, 'canjes_revertidos', v_rev);
+END $$;
+REVOKE ALL ON FUNCTION lealtad_proceso_diario(timestamptz) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION lealtad_proceso_diario(timestamptz) TO service_role;
+
+-- Solo en la nube: el Postgres de la caja no tiene pg_cron y este bloque no hace nada ahí.
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM pg_available_extensions WHERE name = 'pg_cron') THEN
+    CREATE EXTENSION IF NOT EXISTS pg_cron;
+    IF EXISTS (SELECT 1 FROM cron.job WHERE jobname = 'lealtad-diario') THEN
+      PERFORM cron.unschedule('lealtad-diario');
+    END IF;
+    -- 09:20 UTC = 03:20 hora del centro de México: fuera de servicio y ya dentro del día nuevo.
+    PERFORM cron.schedule('lealtad-diario', '20 9 * * *', 'SELECT public.lealtad_proceso_diario()');
+  END IF;
+END $$;
