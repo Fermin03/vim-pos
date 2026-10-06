@@ -28,7 +28,7 @@ _El panel que te enseñamos en la demostración: cómo va el día, la venta por 
 
 **Dónde estamos:** Guanajuato, México. No hay tienda ni mostrador al público, así que no publicamos la dirección: si quieres que nos veamos en persona, se agenda antes por correo. El domicilio fiscal completo va en el contrato y se entrega a quien lo pida.
 
-**Zona de servicio:** toda la República Mexicana. La visita presencial el día del arranque va incluida en el plan Cadena; en la [zona de León](https://vimpos.com.mx/punto-de-venta-restaurantes-leon) también podemos ir a la demostración.
+**Zona de servicio:** atendemos restaurantes de toda la República Mexicana. La demostración es en persona, en tu local, en la [zona de León](https://vimpos.com.mx/punto-de-venta-restaurantes-leon) y alrededores; si estás fuera, puedes [probarlo 30 días gratis](https://admin.vimpos.com.mx/registro). La visita presencial el día del arranque va incluida en el plan Cadena.
 
 ## Qué te sirve más según lo que busques
 
