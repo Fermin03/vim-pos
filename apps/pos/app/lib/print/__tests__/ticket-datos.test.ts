@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { foldearHijosEnPadre, SELECCION_TICKET_ITEMS_IMPRESION, urlAutofactura } from "../ticket-datos";
+import { foldearHijosEnPadre, SELECCION_TICKET_ITEMS_IMPRESION, urlAutofactura, resumenLealtadTicket } from "../ticket-datos";
 import type { LineaImpresion } from "../tipos";
 
 /** Fixture mínima: solo llena lo que cada caso necesita, el resto son valores neutros. */
@@ -113,5 +113,62 @@ describe("urlAutofactura — el QR lleva el token del ticket (auditoría 30/09/2
   });
   it("escapa el código y el folio", () => {
     expect(urlAutofactura(null, "A&B", null)).toBe("https://factura.vimpos.com.mx/negocio?folio=A%26B");
+  });
+});
+
+describe("resumenLealtadTicket — el pie de lealtad del ticket", () => {
+  const programa = { mecanica: "PUNTOS_DINERO" as const, version: 2, porcentaje: 5, pesosPorPunto: null, compraMinima: 0, topeComprasDia: 3 };
+  const base = {
+    programa, clienteNombre: "Ana Gómez", cobrada: true, baseComida: 200, esApp: false,
+    movimientos: [{ tipo: "GANADO", puntos: 10, saldo_visto: 130, programa_version: 2, fecha: "2026-10-06T18:00:00+00:00" }],
+    saldo: { saldo: 500, vence_el: "2027-04-05", programa_version: 2 },
+  };
+
+  it("cuenta cobrada: lo ganado y el saldo que quedó ESE día, para que la reimpresión salga idéntica", () => {
+    expect(resumenLealtadTicket(base)).toEqual({ cliente: "Ana", unidad: "puntos", ganado: 10, porGanar: 0, saldo: 130, venceEl: "2027-04-05" });
+  });
+
+  it("una devolución parcial baja lo ganado; nunca sale negativo", () => {
+    const movimientos = [
+      ...base.movimientos,
+      { tipo: "REVERSA_GANADO", puntos: -4, saldo_visto: 126, programa_version: 2, fecha: "2026-10-06T19:00:00+00:00" },
+    ];
+    expect(resumenLealtadTicket({ ...base, movimientos })).toMatchObject({ ganado: 6, saldo: 126 });
+    expect(resumenLealtadTicket({ ...base, movimientos: [{ ...movimientos[1] }] })).toMatchObject({ ganado: 0 });
+  });
+
+  it("cuenta sin cobrar: dice lo que ganará al pagar y el saldo de hoy", () => {
+    expect(resumenLealtadTicket({ ...base, cobrada: false, movimientos: [] }))
+      .toEqual({ cliente: "Ana", unidad: "puntos", ganado: 0, porGanar: 10, saldo: 500, venceEl: "2027-04-05" });
+  });
+
+  it("un canje sin cobrar no cuenta como ganado, pero el saldo ya lo refleja", () => {
+    const movimientos = [{ tipo: "CANJE", puntos: -50, saldo_visto: 450, programa_version: 2, fecha: "2026-10-06T18:00:00+00:00" }];
+    expect(resumenLealtadTicket({ ...base, cobrada: false, movimientos, saldo: { ...base.saldo, saldo: 450 } }))
+      .toMatchObject({ ganado: 0, saldo: 450 });
+  });
+
+  it("los movimientos y el saldo de otra versión del programa no valen", () => {
+    const r = resumenLealtadTicket({
+      ...base,
+      movimientos: [{ ...base.movimientos[0], programa_version: 1 }],
+      saldo: { saldo: 500, vence_el: "2027-04-05", programa_version: 1 },
+    });
+    expect(r).toMatchObject({ ganado: 0, saldo: 0, venceEl: null });
+  });
+
+  it("cliente nuevo, sin fila de saldo: saldo 0, no null", () => {
+    expect(resumenLealtadTicket({ ...base, cobrada: false, movimientos: [], saldo: null })).toMatchObject({ saldo: 0, venceEl: null });
+  });
+
+  it("los sellos se llaman sellos, y un pedido de app no promete ganar", () => {
+    const sellos = { ...programa, mecanica: "SELLOS" as const };
+    expect(resumenLealtadTicket({ ...base, programa: sellos, cobrada: false, movimientos: [] })).toMatchObject({ unidad: "sellos", porGanar: 1 });
+    expect(resumenLealtadTicket({ ...base, cobrada: false, movimientos: [], esApp: true })).toMatchObject({ porGanar: 0 });
+  });
+
+  it("del cliente solo sale el nombre de pila", () => {
+    expect(resumenLealtadTicket({ ...base, clienteNombre: "  María José Pérez " }).cliente).toBe("María");
+    expect(resumenLealtadTicket({ ...base, clienteNombre: null }).cliente).toBeNull();
   });
 });

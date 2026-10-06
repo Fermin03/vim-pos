@@ -1,8 +1,14 @@
+import { fechaCorta } from "../lealtad-reglas";
 import type { Bloque, DatosTicketImpresion, PrintJob } from "./tipos";
 
 /** Formatea pesos sin depender de módulos cliente (testeable en node). */
 export function pesos(n: number): string {
   return new Intl.NumberFormat("es-MX", { style: "currency", currency: "MXN" }).format(n);
+}
+
+/** "12 puntos", "1 sello". Solo ASCII: la impresora cambia por '?' todo lo demás. */
+export function cantidadLealtad(n: number, unidad: "puntos" | "sellos"): string {
+  return `${n} ${n === 1 ? unidad.slice(0, -1) : unidad}`;
 }
 
 /** Folio corto: quita el prefijo "XX-" y los ceros a la izquierda. Igual que ReciboTicket en pantalla. */
@@ -96,6 +102,8 @@ export function construirTicketJob(d: DatosTicketImpresion, logo?: Bloque | null
   // 4. Totales
   b.push({ t: "fila", izq: "Subtotal", der: pesos(d.totales.subtotal) });
   if (d.totales.descuentos > 0) b.push({ t: "fila", izq: "Descuento", der: `-${pesos(d.totales.descuentos)}` });
+  // Canje de lealtad: tercer carril, aparte del descuento manual (igual que en la pantalla).
+  if ((d.totales.lealtad ?? 0) > 0) b.push({ t: "fila", izq: "Lealtad", der: `-${pesos(d.totales.lealtad ?? 0)}` });
   b.push({ t: "fila", izq: "IVA (16%)", der: pesos(d.totales.iva) });
   b.push({ t: "fila", izq: "TOTAL", der: pesos(d.totales.total), bold: true });
 
@@ -112,6 +120,18 @@ export function construirTicketJob(d: DatosTicketImpresion, logo?: Bloque | null
   if (d.totales.propina > 0) b.push({ t: "fila", izq: "Propina", der: pesos(d.totales.propina) });
 
   b.push({ t: "separador", estilo: "solido" });
+
+  // 5.b Lealtad (ADR 0030): lo ganado, el saldo y el vencimiento. Antes del agradecimiento: es lo
+  //      último que el cliente lee de su cuenta. Sin cliente o con el módulo apagado no se imprime.
+  if (d.lealtad) {
+    const u = d.lealtad.unidad;
+    b.push({ t: "texto", valor: d.lealtad.cliente ? `LEALTAD - ${d.lealtad.cliente}` : "LEALTAD", align: "centro", bold: true });
+    if (d.lealtad.ganado > 0) b.push({ t: "fila", izq: "Ganaste", der: cantidadLealtad(d.lealtad.ganado, u) });
+    if (d.lealtad.porGanar > 0) b.push({ t: "fila", izq: "Ganas al pagar", der: cantidadLealtad(d.lealtad.porGanar, u) });
+    if (d.lealtad.saldo != null) b.push({ t: "fila", izq: "Tu saldo", der: cantidadLealtad(d.lealtad.saldo, u), bold: true });
+    if (d.lealtad.venceEl) b.push({ t: "fila", izq: "Vence", der: fechaCorta(d.lealtad.venceEl) });
+    b.push({ t: "separador", estilo: "punteado" });
+  }
 
   // 6. Pie fiscal
   b.push({ t: "texto", valor: "¡Gracias por su compra!", align: "centro" });

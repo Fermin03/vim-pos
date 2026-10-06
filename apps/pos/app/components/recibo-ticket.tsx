@@ -2,6 +2,8 @@
 import { LogoVim } from "@vim/ui/styles";
 import { QRCodeSVG } from "qrcode.react";
 import type { DatosTicketImpresion } from "../lib/print/tipos";
+import { cantidadLealtad } from "../lib/print/ticket-builder";
+import { fechaCorta } from "../lib/lealtad-reglas";
 
 /**
  * Render fiel del ticket de venta P-222 desde los datos crudos del ticket.
@@ -138,6 +140,9 @@ export function ReciboTicket({ datos }: { datos: DatosTicketImpresion }) {
         {datos.totales.descuentos > 0 && (
           <TotRow label="Descuento" value={`−${fmt(datos.totales.descuentos)}`} className="text-[#C0392B]" />
         )}
+        {(datos.totales.lealtad ?? 0) > 0 && (
+          <TotRow label="Lealtad" value={`−${fmt(datos.totales.lealtad ?? 0)}`} className="text-[#2E7D52]" />
+        )}
         <TotRow label="IVA (16%)" value={fmt(datos.totales.iva)} />
         <div className="mt-1 flex items-baseline justify-between border-t border-[#888] pt-2 pb-1.5">
           <span className="font-sans text-[15px] font-bold">TOTAL</span>
@@ -164,6 +169,20 @@ export function ReciboTicket({ datos }: { datos: DatosTicketImpresion }) {
       </div>
 
       <hr className="my-3.5 border-0 border-t border-[#888]" />
+
+      {/* Lealtad. Espejo MANUAL de construirTicketJob: mismo contenido, mismo orden. */}
+      {datos.lealtad && (
+        <>
+          <div className="text-[10.5px] leading-[1.7]">
+            <div className="text-center font-bold">LEALTAD{datos.lealtad.cliente ? ` - ${datos.lealtad.cliente}` : ""}</div>
+            {datos.lealtad.ganado > 0 && <PayRow label="Ganaste:" value={cantidadLealtad(datos.lealtad.ganado, datos.lealtad.unidad)} />}
+            {datos.lealtad.porGanar > 0 && <PayRow label="Ganas al pagar:" value={cantidadLealtad(datos.lealtad.porGanar, datos.lealtad.unidad)} />}
+            {datos.lealtad.saldo != null && <PayRow label="Tu saldo:" value={cantidadLealtad(datos.lealtad.saldo, datos.lealtad.unidad)} />}
+            {datos.lealtad.venceEl && <PayRow label="Vence:" value={fechaCorta(datos.lealtad.venceEl)} />}
+          </div>
+          <DividerDashed />
+        </>
+      )}
 
       {/* Pie + QR fiscal */}
       <div className="text-center">

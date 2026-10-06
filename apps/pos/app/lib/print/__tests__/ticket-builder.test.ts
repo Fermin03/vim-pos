@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { debeImprimirTicketAlCobrar, construirTicketJob } from "../ticket-builder";
+import { debeImprimirTicketAlCobrar, construirTicketJob, cantidadLealtad } from "../ticket-builder";
 import type { DatosTicketImpresion } from "../tipos";
 
 const DATOS: DatosTicketImpresion = {
@@ -281,5 +281,58 @@ describe("debeImprimirTicketAlCobrar — qué modo saca papel al cobrar", () => 
   it("un modo desconocido no imprime: ante la duda, no se gasta papel de más", () => {
     expect(debeImprimirTicketAlCobrar("")).toBe(false);
     expect(debeImprimirTicketAlCobrar("MODO_NUEVO")).toBe(false);
+  });
+});
+
+describe("construirTicketJob — lealtad", () => {
+  const LEALTAD = { cliente: "Ana", unidad: "puntos" as const, ganado: 10, porGanar: 0, saldo: 130, venceEl: "2027-04-05" };
+
+  it("sin lealtad el ticket sale exactamente como antes", () => {
+    const job = construirTicketJob(DATOS);
+    expect(job.bloques.find((b) => b.t === "texto" && b.valor.startsWith("LEALTAD"))).toBeUndefined();
+    expect(job.bloques.find((b) => b.t === "fila" && b.izq === "Lealtad")).toBeUndefined();
+  });
+
+  it("el canje sale en los totales, aparte del descuento", () => {
+    const job = construirTicketJob({ ...DATOS, totales: { ...DATOS.totales, lealtad: 50 } });
+    expect(job.bloques).toContainEqual({ t: "fila", izq: "Lealtad", der: "-$50.00" });
+    expect(job.bloques).toContainEqual({ t: "fila", izq: "Descuento", der: "-$12.00" });
+  });
+
+  it("el pie dice lo ganado, el saldo y cuándo vence, antes del agradecimiento", () => {
+    const job = construirTicketJob({ ...DATOS, lealtad: LEALTAD });
+    const i = job.bloques.findIndex((b) => b.t === "texto" && b.valor === "LEALTAD - Ana");
+    const gracias = job.bloques.findIndex((b) => b.t === "texto" && b.valor.includes("Gracias"));
+    expect(i).toBeGreaterThan(-1);
+    expect(i).toBeLessThan(gracias);
+    expect(job.bloques.slice(i, i + 5)).toEqual([
+      { t: "texto", valor: "LEALTAD - Ana", align: "centro", bold: true },
+      { t: "fila", izq: "Ganaste", der: "10 puntos" },
+      { t: "fila", izq: "Tu saldo", der: "130 puntos", bold: true },
+      { t: "fila", izq: "Vence", der: "05/04/2027" },
+      { t: "separador", estilo: "punteado" },
+    ]);
+  });
+
+  it("en una cuenta sin cobrar dice lo que ganará al pagar, no lo que ganó", () => {
+    const job = construirTicketJob({ ...DATOS, lealtad: { ...LEALTAD, ganado: 0, porGanar: 10, venceEl: null } });
+    expect(job.bloques).toContainEqual({ t: "fila", izq: "Ganas al pagar", der: "10 puntos" });
+    expect(job.bloques.find((b) => b.t === "fila" && b.izq === "Ganaste")).toBeUndefined();
+    expect(job.bloques.find((b) => b.t === "fila" && b.izq === "Vence")).toBeUndefined();
+  });
+
+  it("uno solo va en singular, y sin nombre el encabezado no deja un guion colgando", () => {
+    expect(cantidadLealtad(1, "sellos")).toBe("1 sello");
+    expect(cantidadLealtad(1, "puntos")).toBe("1 punto");
+    expect(cantidadLealtad(4, "sellos")).toBe("4 sellos");
+    const job = construirTicketJob({ ...DATOS, lealtad: { ...LEALTAD, cliente: null } });
+    expect(job.bloques).toContainEqual({ t: "texto", valor: "LEALTAD", align: "centro", bold: true });
+  });
+
+  it("nada del pie trae caracteres que la impresora cambie por '?'", () => {
+    const job = construirTicketJob({ ...DATOS, lealtad: { ...LEALTAD, porGanar: 3 }, totales: { ...DATOS.totales, lealtad: 50 } });
+    const i = job.bloques.findIndex((b) => b.t === "texto" && b.valor.startsWith("LEALTAD"));
+    const textos = job.bloques.slice(i, i + 6).flatMap((b) => (b.t === "texto" ? [b.valor] : b.t === "fila" ? [b.izq, b.der] : []));
+    for (const s of textos) expect(s).toMatch(/^[\x20-\x7e]*$/);
   });
 });

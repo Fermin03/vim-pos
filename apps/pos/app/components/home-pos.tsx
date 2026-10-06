@@ -862,7 +862,7 @@ export function HomePos({
     if (soloItems.length === 0) return; // nada nuevo que mandar: no se gasta papel
     try {
       const datos = await leerTicketParaImpresion(ticketId, {
-        token, cajeroNombre: empleado.nombre, cajaNombre: caja.nombre,
+        token, cajeroNombre: empleado.nombre, cajaNombre: caja.nombre, conLealtad: false,
       });
       // Combos (ADR 0015): `soloItems` trae los ids recién enviados a cocina, pero un combo se
       // envía completo. Si solo llegó el id del padre (o el de un hijo suelto), se completa con
@@ -909,7 +909,7 @@ export function HomePos({
     if (lineas.length === 0) return;
     try {
       const datos = await leerTicketParaImpresion(ticketId, {
-        token, cajeroNombre: empleado.nombre, cajaNombre: caja.nombre,
+        token, cajeroNombre: empleado.nombre, cajaNombre: caja.nombre, conLealtad: false,
       });
       const dc: DatosComanda = {
         folio: datos.meta.folio,
@@ -1274,7 +1274,7 @@ export function HomePos({
    */
   const reimprimirComanda = useCallback(async (ticketId: string, motivo: string, autorizacionPinId: string) => {
     try {
-      const datos = await leerTicketParaImpresion(ticketId, { token, cajeroNombre: empleado.nombre, cajaNombre: caja.nombre });
+      const datos = await leerTicketParaImpresion(ticketId, { token, cajeroNombre: empleado.nombre, cajaNombre: caja.nombre, conLealtad: false });
       const lineas = lineasParaComanda(datos.lineas);
       if (lineas.length === 0) return;
       const dc: DatosComanda = {
