@@ -43,6 +43,8 @@ export type DatosReporteZ = {
   ventaNeta: number;
   iva: number;
   descuentos: number;
+  /** Canjes de lealtad del turno. Opcional: un corte anterior a la 0157 no lo trae. */
+  lealtad?: number;
   propinaTotal: number;
   // ── Operación: estadísticas ──
   ticketsPagados: number;
@@ -168,6 +170,7 @@ export function construirReporteZJob(d: DatosReporteZ): PrintJob {
   }
   b.push({ t: "fila", izq: "SUBTOTAL    :", der: pesos(subtotalSinIva) });
   b.push({ t: "fila", izq: "-DESCUENTOS :", der: pesos(d.descuentos) });
+  if ((d.lealtad ?? 0) > 0) b.push({ t: "fila", izq: "-LEALTAD    :", der: pesos(d.lealtad ?? 0) });
   b.push({ t: "fila", izq: "VENTA NETA  :", der: pesos(ventaConImp), bold: true });
   b.push({ t: "fila", izq: "VENTA 16%   :", der: pesos(subtotalSinIva) });
   b.push({ t: "fila", izq: "IMPUESTO 16%:", der: pesos(d.iva) });

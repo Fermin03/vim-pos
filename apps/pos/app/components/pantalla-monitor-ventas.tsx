@@ -98,7 +98,7 @@ export function PantallaMonitorVentas({
             <div className="mb-5 grid grid-cols-2 gap-3 lg:grid-cols-4">
               <Tarjeta titulo="Efectivo esperado" valor={fmtMxn(x.efectivoEsperado)} pie={`fondo ${fmtMxn(x.fondoApertura)}`} destacar />
               <Tarjeta titulo="IVA" valor={fmtMxn(x.iva)} pie="incluido en la venta" />
-              <Tarjeta titulo="Descuentos" valor={fmtMxn(x.descuentos)} pie={`${stats.cuentasConDescuento} cuenta(s)`} alerta={x.descuentos > 0} />
+              <Tarjeta titulo="Descuentos" valor={fmtMxn(x.descuentos)} pie={`${stats.cuentasConDescuento} cuenta(s)${x.lealtad > 0 ? ` · lealtad ${fmtMxn(x.lealtad)}` : ""}`} alerta={x.descuentos > 0} />
               <Tarjeta titulo="Devoluciones" valor={fmtMxn(x.devoluciones)} pie={`${stats.cuentasCanceladas} cancelada(s)`} alerta={x.devoluciones > 0 || stats.cuentasCanceladas > 0} />
             </div>
 

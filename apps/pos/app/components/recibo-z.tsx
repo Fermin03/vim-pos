@@ -123,6 +123,7 @@ export function ReciboZ({ datos }: { datos: DatosReporteZ }) {
       <div className="mt-2" />
       <FlujoRow label="SUBTOTAL    :" value={fmt(subtotalSinIva)} />
       <FlujoRow label="-DESCUENTOS :" value={fmt(datos.descuentos)} />
+      {(datos.lealtad ?? 0) > 0 && <FlujoRow label="-LEALTAD    :" value={fmt(datos.lealtad ?? 0)} />}
       <FlujoRow label="VENTA NETA  :" value={fmt(ventaConImp)} bold />
 
       <div className="mt-2" />
