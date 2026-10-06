@@ -1471,6 +1471,7 @@ CREATE OR REPLACE FUNCTION lealtad_motivo_red_48h()
 RETURNS text
 LANGUAGE sql IMMUTABLE
 AS $$ SELECT 'El canje no llegó a una cuenta pagada en 48 horas'::text $$;
+REVOKE ALL ON FUNCTION lealtad_motivo_red_48h() FROM PUBLIC, anon;
 GRANT EXECUTE ON FUNCTION lealtad_motivo_red_48h() TO authenticated, service_role;
 
 -- El proceso diario de la nube. Dos trabajos:
@@ -1601,53 +1602,92 @@ DECLARE
   v_nuevos jsonb := '[]'::jsonb;
   v_par    jsonb;
   v_rol    text;
+  v_ali    uuid;
+  v_real   uuid;
+  v_errs   jsonb := '[]'::jsonb;
 BEGIN
-  DELETE FROM clientes_alias a
-   WHERE a.tenant_id = p_tenant
-     AND NOT EXISTS (SELECT 1 FROM clientes c
-                      WHERE c.id = a.cliente_id AND c.tenant_id = p_tenant AND c.deleted_at IS NULL);
+  -- _fusion_errores es una clave RESERVADA: solo la escribe esta función (al final) y
+  -- sync_push_snapshot la saca del lote antes de aplicar nada. Una que venga de la caja se descarta.
+  p_snapshot := p_snapshot - '_fusion_errores';
+
+  -- Todo lo que sigue corre fuera del aislamiento por fila del aplicador, y una excepción aquí
+  -- abortaría el push entero en cada ciclo (la caja dejaría de subir ventas). Por eso cada paso va
+  -- en su propio bloque: si falla, avisa y el lote sigue; el rechazo se devuelve en _fusion_errores.
+  BEGIN
+    DELETE FROM clientes_alias a
+     WHERE a.tenant_id = p_tenant
+       AND NOT EXISTS (SELECT 1 FROM clientes c
+                        WHERE c.id = a.cliente_id AND c.tenant_id = p_tenant AND c.deleted_at IS NULL);
+  EXCEPTION WHEN OTHERS THEN
+    RAISE WARNING '_vim_fusionar_clientes: no se pudieron limpiar los alias del negocio %: %', p_tenant, SQLERRM;
+    v_errs := v_errs || jsonb_build_object('tabla', 'clientes_alias', 'id', NULL, 'error', SQLERRM);
+  END;
 
   IF jsonb_typeof(p_snapshot->'clientes') = 'array' THEN
-    WITH ins AS (
-      INSERT INTO clientes_alias (alias_id, cliente_id, tenant_id)
-      SELECT DISTINCT ON (f.id) f.id, c.id, p_tenant
-        FROM (SELECT CASE WHEN r->>'id' ~ v_uuid THEN (r->>'id')::uuid END AS id,
-                     NULLIF(regexp_replace(COALESCE(r->>'telefono', ''), '\D', '', 'g'), '') AS digitos
-                FROM jsonb_array_elements(p_snapshot->'clientes') r
-               WHERE lower(r->>'tenant_id') = p_tenant::text
-                 AND NULLIF(r->>'deleted_at', '') IS NULL) f
-        JOIN clientes c
-          ON c.tenant_id = p_tenant AND c.deleted_at IS NULL AND c.telefono IS NOT NULL
-         AND regexp_replace(c.telefono, '\D', '', 'g') = f.digitos
-         AND c.id <> f.id
-       WHERE f.id IS NOT NULL AND f.digitos IS NOT NULL
-         AND NOT EXISTS (SELECT 1 FROM clientes x WHERE x.id = f.id)
-       ORDER BY f.id, c.created_at, c.id
-      ON CONFLICT (alias_id) DO NOTHING
-      RETURNING alias_id, cliente_id)
-    SELECT COALESCE(jsonb_agg(jsonb_build_object('alias', alias_id, 'cliente', cliente_id)), '[]'::jsonb)
-      INTO v_nuevos FROM ins;
+    BEGIN
+      WITH ins AS (
+        INSERT INTO clientes_alias (alias_id, cliente_id, tenant_id)
+        SELECT DISTINCT ON (f.id) f.id, c.id, p_tenant
+          FROM (SELECT CASE WHEN r->>'id' ~ v_uuid THEN (r->>'id')::uuid END AS id,
+                       NULLIF(regexp_replace(COALESCE(r->>'telefono', ''), '\D', '', 'g'), '') AS digitos
+                  FROM jsonb_array_elements(p_snapshot->'clientes') r
+                 WHERE lower(r->>'tenant_id') = p_tenant::text
+                   AND NULLIF(r->>'deleted_at', '') IS NULL) f
+          JOIN clientes c
+            ON c.tenant_id = p_tenant AND c.deleted_at IS NULL AND c.telefono IS NOT NULL
+           AND regexp_replace(c.telefono, '\D', '', 'g') = f.digitos
+           AND c.id <> f.id
+         WHERE f.id IS NOT NULL AND f.digitos IS NOT NULL
+           AND NOT EXISTS (SELECT 1 FROM clientes x WHERE x.id = f.id)
+         ORDER BY f.id, c.created_at, c.id
+        ON CONFLICT (alias_id) DO NOTHING
+        RETURNING alias_id, cliente_id)
+      SELECT COALESCE(jsonb_agg(jsonb_build_object('alias', alias_id, 'cliente', cliente_id)), '[]'::jsonb)
+        INTO v_nuevos FROM ins;
+    EXCEPTION WHEN OTHERS THEN
+      v_nuevos := '[]'::jsonb;
+      RAISE WARNING '_vim_fusionar_clientes: no se pudieron anotar los alias del negocio %: %', p_tenant, SQLERRM;
+      v_errs := v_errs || jsonb_build_object('tabla', 'clientes_alias', 'id', NULL, 'error', SQLERRM);
+    END;
 
     -- Lo que la nube YA tenía guardado con el id del alias (un push anterior lo subió antes de que
-    -- el cliente existiera) pasa al cliente real. En modo réplica: es una corrección de identidad,
-    -- no una operación; no debe disparar los triggers de la venta.
-    IF jsonb_array_length(v_nuevos) > 0 THEN
-      v_rol := current_setting('session_replication_role');
-      PERFORM set_config('session_replication_role', 'replica', true);
-      FOR v_par IN SELECT value FROM jsonb_array_elements(v_nuevos) LOOP
-        UPDATE tickets SET cliente_id = (v_par->>'cliente')::uuid
-         WHERE tenant_id = p_tenant AND cliente_id = (v_par->>'alias')::uuid;
-        UPDATE direcciones_cliente SET cliente_id = (v_par->>'cliente')::uuid
-         WHERE tenant_id = p_tenant AND cliente_id = (v_par->>'alias')::uuid;
-        UPDATE devoluciones SET cliente_id = (v_par->>'cliente')::uuid
-         WHERE tenant_id = p_tenant AND cliente_id = (v_par->>'alias')::uuid;
-        UPDATE ticket_promociones_aplicadas SET cliente_id = (v_par->>'cliente')::uuid
-         WHERE tenant_id = p_tenant AND cliente_id = (v_par->>'alias')::uuid;
-        UPDATE ticket_canjes_lealtad SET cliente_id = (v_par->>'cliente')::uuid
-         WHERE tenant_id = p_tenant AND cliente_id = (v_par->>'alias')::uuid;
-      END LOOP;
-      PERFORM set_config('session_replication_role', v_rol, true);
-    END IF;
+    -- el cliente existiera) pasa al cliente real, alias por alias y cada uno aislado: si no se puede
+    -- mover (p. ej. un índice único), el alias ya anotado se queda, el lote se redirige igual y solo
+    -- se salta este repunte. En modo réplica: es una corrección de identidad, no una operación; no
+    -- debe disparar los triggers de la venta (el modo vuelve solo si el bloque falla: es un SET LOCAL
+    -- dentro de la subtransacción).
+    FOR v_par IN SELECT value FROM jsonb_array_elements(v_nuevos) LOOP
+      BEGIN
+        v_ali  := (v_par->>'alias')::uuid;
+        v_real := (v_par->>'cliente')::uuid;
+        v_rol  := current_setting('session_replication_role');
+        PERFORM set_config('session_replication_role', 'replica', true);
+
+        -- idx_direcciones_principal_unica: UNA principal viva (es_principal AND deleted_at IS NULL)
+        -- por cliente. La del alias deja de serlo si el real ya tiene una; y si trae varias, solo
+        -- la más antigua puede quedarse.
+        UPDATE direcciones_cliente d SET es_principal = false
+         WHERE d.tenant_id = p_tenant AND d.cliente_id = v_ali AND d.es_principal AND d.deleted_at IS NULL
+           AND (EXISTS (SELECT 1 FROM direcciones_cliente x
+                         WHERE x.cliente_id = v_real AND x.es_principal AND x.deleted_at IS NULL)
+                OR d.id <> (SELECT y.id FROM direcciones_cliente y
+                             WHERE y.tenant_id = p_tenant AND y.cliente_id = v_ali
+                               AND y.es_principal AND y.deleted_at IS NULL
+                             ORDER BY y.created_at, y.id LIMIT 1));
+        UPDATE direcciones_cliente SET cliente_id = v_real WHERE tenant_id = p_tenant AND cliente_id = v_ali;
+        -- Estas cuatro no tienen índice único por cliente_id.
+        UPDATE tickets SET cliente_id = v_real WHERE tenant_id = p_tenant AND cliente_id = v_ali;
+        UPDATE devoluciones SET cliente_id = v_real WHERE tenant_id = p_tenant AND cliente_id = v_ali;
+        UPDATE ticket_promociones_aplicadas SET cliente_id = v_real WHERE tenant_id = p_tenant AND cliente_id = v_ali;
+        UPDATE ticket_canjes_lealtad SET cliente_id = v_real WHERE tenant_id = p_tenant AND cliente_id = v_ali;
+
+        PERFORM set_config('session_replication_role', v_rol, true);
+      EXCEPTION WHEN OTHERS THEN
+        RAISE WARNING '_vim_fusionar_clientes: no se pudo repuntar lo guardado bajo el alias % (negocio %): %',
+          v_par->>'alias', p_tenant, SQLERRM;
+        v_errs := v_errs || jsonb_build_object('tabla', 'clientes_alias', 'id', v_par->>'alias', 'error', SQLERRM);
+      END;
+    END LOOP;
 
     SELECT COALESCE(jsonb_agg(r), '[]'::jsonb) INTO v_filas
       FROM jsonb_array_elements(p_snapshot->'clientes') r
@@ -1657,6 +1697,7 @@ BEGIN
   END IF;
 
   IF NOT EXISTS (SELECT 1 FROM clientes_alias WHERE tenant_id = p_tenant) THEN
+    IF jsonb_array_length(v_errs) > 0 THEN p_snapshot := jsonb_set(p_snapshot, '{_fusion_errores}', v_errs); END IF;
     RETURN p_snapshot;
   END IF;
 
@@ -1675,6 +1716,7 @@ BEGIN
         ON a.tenant_id = p_tenant AND a.alias_id::text = lower(r->>'cliente_id');
     p_snapshot := jsonb_set(p_snapshot, ARRAY[v_clave], v_filas);
   END LOOP;
+  IF jsonb_array_length(v_errs) > 0 THEN p_snapshot := jsonb_set(p_snapshot, '{_fusion_errores}', v_errs); END IF;
   RETURN p_snapshot;
 END $$;
 REVOKE ALL ON FUNCTION _vim_fusionar_clientes(jsonb, uuid) FROM PUBLIC, anon, authenticated;
@@ -1842,6 +1884,7 @@ RETURNS jsonb
 LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp
 AS $$
 DECLARE
+  v_uuid    CONSTANT text := '^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$';
   v_fila    jsonb;
   v_id      uuid;
   v_rev     lealtad_movimientos%ROWTYPE;
@@ -1855,6 +1898,15 @@ BEGIN
 
   FOR v_fila IN SELECT value FROM jsonb_array_elements(p_rows) LOOP
     BEGIN
+      -- Una fila mal formada (id, tenant, ticket o revertido) ya la rechazó y reportó el aplicador
+      -- genérico: aquí se salta para no contarla dos veces en _errores.
+      IF v_fila->>'id' IS NULL OR v_fila->>'id' !~ v_uuid
+         OR v_fila->>'tenant_id' IS NULL OR v_fila->>'tenant_id' !~ v_uuid
+         OR COALESCE(v_fila->>'ticket_id', '') NOT IN ('') AND v_fila->>'ticket_id' !~ v_uuid
+         OR lower(COALESCE(v_fila->>'revertido', 'false')) NOT IN
+            ('true', 'false', 't', 'f', 'yes', 'no', 'y', 'n', 'on', 'off', '1', '0') THEN
+        CONTINUE;
+      END IF;
       IF (v_fila->>'tenant_id')::uuid IS DISTINCT FROM p_tenant THEN CONTINUE; END IF;   -- ya lo rechazó el aplicador
       IF COALESCE((v_fila->>'revertido')::boolean, false) THEN CONTINUE; END IF;
       v_id := (v_fila->>'id')::uuid;
@@ -1931,6 +1983,8 @@ BEGIN
   -- 0156: el teléfono es la identidad. Antes de aplicar nada, los clientes cuyo teléfono ya existe
   -- con otro id se anotan como alias y lo suyo se redirige. Ver _vim_fusionar_clientes.
   p_snapshot := _vim_fusionar_clientes(p_snapshot, p_tenant);
+  IF jsonb_typeof(p_snapshot->'_fusion_errores') = 'array' THEN v_errores := v_errores || (p_snapshot->'_fusion_errores'); END IF;
+  p_snapshot := p_snapshot - '_fusion_errores';
   -- 0156: una caja sin actualizar no manda las columnas nuevas. Ver _vim_compat_0156.
   p_snapshot := _vim_compat_0156(p_snapshot, p_tenant);
 

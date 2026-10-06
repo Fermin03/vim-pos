@@ -22,6 +22,8 @@ DECLARE
   v_d3 uuid := gen_random_uuid(); v_d4 uuid := gen_random_uuid();
   v_ta uuid; v_tb uuid; v_za uuid; v_zb uuid; v_ca uuid := gen_random_uuid(); v_cb uuid := gen_random_uuid();
   v_vec uuid := gen_random_uuid(); v_vsuc uuid; v_vcaja uuid; v_vturno uuid; v_tvec uuid;
+  v_dir1 uuid; v_dir2 uuid := gen_random_uuid(); v_d5 uuid := gen_random_uuid(); v_d6 uuid := gen_random_uuid();
+  v_sano uuid := gen_random_uuid(); v_sano2 uuid := gen_random_uuid();
 BEGIN
   PERFORM set_config('request.jwt.claims',
     json_build_object('sub', v_maria::text, 'tenant_id', v_t::text)::text, true);
@@ -351,6 +353,59 @@ BEGIN
   PERFORM lealtad_registrar_movimiento(NULL, v_t, v_real, 'GANADO', 8, v_ver, v_tvec);
   IF lealtad_neto_ganado(v_tvec) <> 0 THEN RAISE EXCEPTION '17: lealtad_neto_ganado contó un movimiento de otro negocio'; END IF;
   IF lealtad_revertir_ganado_ticket(v_tvec) <> 0 THEN RAISE EXCEPTION '17: la reversa tocó un movimiento de otro negocio'; END IF;
+
+  -- 18) C1: fundir clientes NUNCA aborta el push. El real y el alias tienen cada uno una dirección
+  --     principal viva (idx_direcciones_principal_unica); el repunte deja UNA principal y el lote
+  --     completo entra, incluido un cliente sano que no tiene nada que ver.
+  INSERT INTO clientes (tenant_id, nombre, telefono) VALUES (v_t, 'Real 18', '4770009990') RETURNING id INTO v_r3;
+  INSERT INTO direcciones_cliente (tenant_id, cliente_id, calle, numero_exterior, colonia, codigo_postal, ciudad, estado_geo, es_principal)
+  VALUES (v_t, v_r3, 'Madero', '1', 'Centro', '37000', 'León', 'Guanajuato', true) RETURNING id INTO v_dir1;
+  -- Una subida anterior dejó en la nube una dirección principal bajo el id de la caja (aún sin cliente).
+  v_res := sync_push_snapshot(v_t, jsonb_build_object('direcciones_cliente', jsonb_build_array(jsonb_build_object(
+    'id', v_dir2, 'tenant_id', v_t, 'cliente_id', v_d5, 'etiqueta', 'Casa', 'calle', 'Hidalgo', 'numero_exterior', '2',
+    'colonia', 'Centro', 'codigo_postal', '37000', 'ciudad', 'León', 'estado_geo', 'Guanajuato', 'pais', 'México',
+    'es_principal', true, 'activa', true, 'created_at', now(), 'updated_at', now()))));
+  IF v_res ? '_errores' OR (v_res->>'direcciones_cliente')::int <> 1 THEN RAISE EXCEPTION '18: preparación, la dirección de la caja no entró: %', v_res; END IF;
+  v_res := sync_push_snapshot(v_t, jsonb_build_object('clientes', jsonb_build_array(
+    v_base || jsonb_build_object('id', v_d5, 'nombre', 'Caja 18', 'telefono', '4770009990'),
+    v_base || jsonb_build_object('id', v_sano, 'nombre', 'Sano 18', 'telefono', '4770009991'))));
+  IF v_res ? '_errores' THEN RAISE EXCEPTION '18: el push dio errores: %', v_res->'_errores'; END IF;
+  IF (v_res->>'clientes')::int <> 1 THEN RAISE EXCEPTION '18: el cliente sano no entró: %', v_res; END IF;
+  IF NOT EXISTS (SELECT 1 FROM clientes WHERE id = v_sano AND deleted_at IS NULL) THEN RAISE EXCEPTION '18: el cliente sano no está en la nube'; END IF;
+  IF NOT EXISTS (SELECT 1 FROM clientes_alias WHERE alias_id = v_d5 AND cliente_id = v_r3) THEN RAISE EXCEPTION '18: no se anotó el alias'; END IF;
+  IF (SELECT count(*) FROM direcciones_cliente WHERE id IN (v_dir1, v_dir2) AND cliente_id = v_r3) <> 2 THEN RAISE EXCEPTION '18: las dos direcciones debían ser del cliente real'; END IF;
+  IF (SELECT count(*) FROM direcciones_cliente WHERE cliente_id = v_r3 AND es_principal AND deleted_at IS NULL) <> 1 THEN RAISE EXCEPTION '18: debía quedar exactamente una principal'; END IF;
+  IF NOT (SELECT es_principal FROM direcciones_cliente WHERE id = v_dir1) THEN RAISE EXCEPTION '18: la principal del cliente real debía conservarse'; END IF;
+
+  -- 19) El aislamiento mismo: si el repunte falla por lo que sea, el push igual termina, el alias
+  --     queda anotado, el lote se redirige y el cliente sano entra; el fallo se reporta.
+  INSERT INTO clientes (tenant_id, nombre, telefono) VALUES (v_t, 'Real 19', '4770009992') RETURNING id INTO v_r4;
+  PERFORM sync_push_snapshot(v_t, jsonb_build_object('tickets', jsonb_build_array(
+    (SELECT to_jsonb(t) - 'lealtad_mxn' || jsonb_build_object('cliente_id', v_d6) FROM tickets t WHERE id = v_ticket))));
+  IF (SELECT cliente_id FROM tickets WHERE id = v_ticket) IS DISTINCT FROM v_d6 THEN RAISE EXCEPTION '19: preparación'; END IF;
+  EXECUTE format('ALTER TABLE tickets ADD CONSTRAINT smoke_sl_sin_repunte CHECK (cliente_id IS DISTINCT FROM %L::uuid) NOT VALID', v_r4);
+  v_res := sync_push_snapshot(v_t, jsonb_build_object(
+    'clientes', jsonb_build_array(
+      v_base || jsonb_build_object('id', v_d6, 'nombre', 'Caja 19', 'telefono', '4770009992'),
+      v_base || jsonb_build_object('id', v_sano2, 'nombre', 'Sano 19', 'telefono', '4770009993')),
+    'lealtad_movimientos', jsonb_build_array(jsonb_build_object(
+      'id', gen_random_uuid(), 'tenant_id', v_t, 'cliente_id', v_d6, 'tipo', 'GANADO', 'puntos', 6,
+      'programa_version', v_ver, 'fecha', now()))));
+  ALTER TABLE tickets DROP CONSTRAINT smoke_sl_sin_repunte;
+  IF (v_res->>'clientes')::int <> 1 THEN RAISE EXCEPTION '19: el cliente sano no entró: %', v_res; END IF;
+  IF NOT EXISTS (SELECT 1 FROM clientes WHERE id = v_sano2) THEN RAISE EXCEPTION '19: el cliente sano no está'; END IF;
+  IF NOT EXISTS (SELECT 1 FROM clientes_alias WHERE alias_id = v_d6 AND cliente_id = v_r4) THEN RAISE EXCEPTION '19: el alias no quedó anotado'; END IF;
+  IF (SELECT saldo FROM lealtad_saldos WHERE cliente_id = v_r4) <> 6 THEN RAISE EXCEPTION '19: el lote no se redirigió'; END IF;
+  IF jsonb_array_length(v_res->'_errores') <> 1 OR v_res->'_errores'->0->>'tabla' <> 'clientes_alias' OR v_res->'_errores'->0->>'id' <> v_d6::text THEN
+    RAISE EXCEPTION '19: el fallo del repunte debía reportarse una vez: %', v_res->'_errores';
+  END IF;
+  IF (SELECT cliente_id FROM tickets WHERE id = v_ticket) IS DISTINCT FROM v_d6 THEN RAISE EXCEPTION '19: el repunte fallido dejó un cambio a medias'; END IF;
+  IF current_setting('session_replication_role') = 'replica' THEN RAISE EXCEPTION '19: el modo réplica se filtró'; END IF;
+  -- La clave reservada nunca sale: ni como tabla ignorada ni en el resultado.
+  IF v_res ? '_ignoradas' OR v_res ? '_fusion_errores' THEN RAISE EXCEPTION '19: la clave reservada se filtró: %', v_res; END IF;
+  -- Y una caja no puede colar la clave reservada para llenar _errores.
+  v_res := sync_push_snapshot(v_t, jsonb_build_object('_fusion_errores', jsonb_build_array(jsonb_build_object('x', 1))));
+  IF v_res ? '_errores' OR v_res ? '_ignoradas' THEN RAISE EXCEPTION '19: la clave reservada de la caja no se descartó: %', v_res; END IF;
 
   RAISE NOTICE 'SMOKE SYNC LEALTAD OK';
 END $$;
