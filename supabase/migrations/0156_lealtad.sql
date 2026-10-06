@@ -540,6 +540,12 @@ BEGIN
       -- Cancelar o reabrir una cuenta cobrada deshace lo que ganó.
       PERFORM lealtad_revertir_ganado_ticket(NEW.id);
     END IF;
+    -- Cancelar una cuenta con un canje vivo lo devuelve. Reabrirla no: el canje sigue en la cuenta.
+    -- Corre porque este trigger es AFTER: la cuenta ya está CANCELADO, así que revertir el canje no
+    -- recalcula sus totales (§5) y la cuenta conserva lo que se vendió.
+    IF NEW.estado_fiscal = 'CANCELADO' AND OLD.estado_fiscal <> 'CANCELADO' THEN
+      PERFORM lealtad_revertir_canje_ticket(NEW.id, 'Cuenta cancelada');
+    END IF;
   EXCEPTION WHEN OTHERS THEN
     RAISE WARNING 'lealtad: no se pudo procesar el ticket %: %', NEW.id, SQLERRM;
   END;
@@ -907,3 +913,297 @@ END;
 $$;
 REVOKE EXECUTE ON FUNCTION cfdi_crear_borrador(uuid, cfdi_tipo_comprobante, varchar, varchar, varchar, varchar, varchar, varchar, varchar, varchar, varchar, varchar, varchar, varchar, cfdi_proveedor_pac, uuid, uuid) FROM public, anon;
 GRANT EXECUTE ON FUNCTION cfdi_crear_borrador(uuid, cfdi_tipo_comprobante, varchar, varchar, varchar, varchar, varchar, varchar, varchar, varchar, varchar, varchar, varchar, varchar, cfdi_proveedor_pac, uuid, uuid) TO authenticated, service_role;
+
+-- ── §6 Canje, saldo y asentado ──────────────────────────────────────────────
+
+-- El cliente canónico: por id; si ese id es un alias, su cliente real; si no, por teléfono.
+-- El teléfono es la identidad (spec §8.4): una caja puede conocer al cliente con otro id.
+CREATE OR REPLACE FUNCTION lealtad_resolver_cliente(p_tenant uuid, p_cliente_id uuid, p_telefono text)
+RETURNS uuid
+LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public, pg_temp
+AS $$
+  SELECT COALESCE(
+    (SELECT c.id FROM clientes c WHERE c.id = p_cliente_id AND c.tenant_id = p_tenant AND c.deleted_at IS NULL),
+    (SELECT a.cliente_id FROM clientes_alias a WHERE a.alias_id = p_cliente_id AND a.tenant_id = p_tenant),
+    (SELECT c.id FROM clientes c
+      WHERE c.tenant_id = p_tenant AND c.deleted_at IS NULL
+        AND c.telefono = NULLIF(regexp_replace(COALESCE(p_telefono, ''), '\D', '', 'g'), '')
+      LIMIT 1));
+$$;
+
+CREATE OR REPLACE FUNCTION lealtad_saldo(p_tenant uuid, p_cliente_id uuid, p_telefono text)
+RETURNS jsonb
+LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path = public, pg_temp
+AS $$
+DECLARE
+  v_cli uuid := lealtad_resolver_cliente(p_tenant, p_cliente_id, p_telefono);
+  v_p   lealtad_programa%ROWTYPE;
+  v_s   lealtad_saldos%ROWTYPE;
+BEGIN
+  SELECT * INTO v_p FROM lealtad_programa WHERE tenant_id = p_tenant;
+  IF NOT FOUND THEN RETURN jsonb_build_object('ok', false, 'error', 'SIN_PROGRAMA'); END IF;
+  IF v_cli IS NULL THEN RETURN jsonb_build_object('ok', false, 'error', 'CLIENTE_NO_EXISTE'); END IF;
+  SELECT * INTO v_s FROM lealtad_saldos WHERE cliente_id = v_cli;
+  RETURN jsonb_build_object(
+    'ok', true, 'cliente_id', v_cli,
+    -- Un saldo de otra versión del programa ya no vale.
+    'saldo', CASE WHEN v_s.programa_version = v_p.version THEN COALESCE(v_s.saldo, 0) ELSE 0 END,
+    'vence_el', v_s.vence_el, 'mecanica', v_p.mecanica, 'programa_version', v_p.version);
+END $$;
+
+-- LA AUTORIDAD DEL CANJE. Solo tiene sentido en la nube. Bloquea la fila del saldo, valida y
+-- escribe el movimiento en una transacción. Reintentar con el mismo p_canje_id devuelve lo mismo.
+CREATE OR REPLACE FUNCTION lealtad_canjear(
+  p_canje_id uuid, p_tenant uuid, p_cliente_id uuid, p_telefono text,
+  p_puntos integer, p_premio_id uuid, p_ticket_id uuid,
+  p_sucursal_id uuid, p_caja_id uuid, p_usuario_id uuid)
+RETURNS jsonb
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp
+AS $$
+DECLARE
+  v_p       lealtad_programa%ROWTYPE;
+  v_cli     uuid;
+  v_m       lealtad_movimientos%ROWTYPE;
+  v_premio  lealtad_premios%ROWTYPE;
+  v_puntos  integer;
+  v_monto   numeric(12,2);
+  v_saldo   integer;
+BEGIN
+  IF p_canje_id IS NULL THEN RAISE EXCEPTION 'el canje necesita id' USING ERRCODE = '22023'; END IF;
+
+  SELECT * INTO v_m FROM lealtad_movimientos WHERE id = p_canje_id AND tenant_id = p_tenant AND tipo = 'CANJE';
+  IF FOUND THEN
+    RETURN lealtad_canje_datos(p_canje_id, p_tenant) || jsonb_build_object('repetido', true);
+  END IF;
+
+  IF NOT COALESCE((SELECT modulo_lealtad_activo FROM configuracion_tenant WHERE tenant_id = p_tenant), false) THEN
+    RETURN jsonb_build_object('ok', false, 'error', 'MODULO_APAGADO');
+  END IF;
+  SELECT * INTO v_p FROM lealtad_programa WHERE tenant_id = p_tenant;
+  IF NOT FOUND THEN RETURN jsonb_build_object('ok', false, 'error', 'SIN_PROGRAMA'); END IF;
+
+  v_cli := lealtad_resolver_cliente(p_tenant, p_cliente_id, p_telefono);
+  IF v_cli IS NULL THEN RETURN jsonb_build_object('ok', false, 'error', 'CLIENTE_NO_EXISTE'); END IF;
+
+  IF v_p.mecanica = 'PUNTOS_DINERO' THEN
+    IF p_premio_id IS NOT NULL OR COALESCE(p_puntos, 0) <= 0 THEN
+      RETURN jsonb_build_object('ok', false, 'error', 'PUNTOS_INVALIDOS');
+    END IF;
+    v_puntos := p_puntos;
+    v_monto  := p_puntos;                      -- 1 punto = $1
+  ELSE
+    SELECT * INTO v_premio FROM lealtad_premios
+     WHERE id = p_premio_id AND tenant_id = p_tenant AND activo AND deleted_at IS NULL;
+    IF NOT FOUND THEN RETURN jsonb_build_object('ok', false, 'error', 'PREMIO_INVALIDO'); END IF;
+    v_puntos := v_premio.costo;
+    v_monto  := NULL;                          -- lo fija el renglón al asentar
+  END IF;
+
+  -- La fila del saldo, bloqueada: dos canjes simultáneos del mismo cliente van en fila.
+  INSERT INTO lealtad_saldos (cliente_id, tenant_id, saldo, programa_version)
+  VALUES (v_cli, p_tenant, 0, v_p.version) ON CONFLICT (cliente_id) DO NOTHING;
+  SELECT CASE WHEN programa_version = v_p.version THEN saldo ELSE 0 END INTO v_saldo
+    FROM lealtad_saldos WHERE cliente_id = v_cli FOR UPDATE;
+
+  IF v_saldo < v_puntos THEN
+    RETURN jsonb_build_object('ok', false, 'error', 'SALDO_INSUFICIENTE', 'saldo', v_saldo);
+  END IF;
+
+  PERFORM lealtad_registrar_movimiento(
+    p_canje_id, p_tenant, v_cli, 'CANJE', -v_puntos, v_p.version,
+    p_ticket_id, p_sucursal_id, p_caja_id, p_usuario_id, v_premio.id, v_monto);
+
+  RETURN lealtad_canje_datos(p_canje_id, p_tenant) || jsonb_build_object('repetido', false);
+END $$;
+
+-- Los datos de un canje ya autorizado. Es lo que el puente de la caja consulta antes de asentar:
+-- la caja asienta con lo que diga la nube, nunca con lo que mande el navegador.
+CREATE OR REPLACE FUNCTION lealtad_canje_datos(p_canje_id uuid, p_tenant uuid)
+RETURNS jsonb
+LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path = public, pg_temp
+AS $$
+DECLARE
+  v_m lealtad_movimientos%ROWTYPE;
+  v_s lealtad_saldos%ROWTYPE;
+BEGIN
+  SELECT * INTO v_m FROM lealtad_movimientos WHERE id = p_canje_id AND tenant_id = p_tenant AND tipo = 'CANJE';
+  IF NOT FOUND THEN RETURN jsonb_build_object('ok', false, 'error', 'CANJE_NO_EXISTE'); END IF;
+  IF EXISTS (SELECT 1 FROM lealtad_movimientos WHERE canje_movimiento_id = p_canje_id AND tipo = 'REVERSA_CANJE') THEN
+    RETURN jsonb_build_object('ok', false, 'error', 'CANJE_REVERTIDO');
+  END IF;
+  SELECT * INTO v_s FROM lealtad_saldos WHERE cliente_id = v_m.cliente_id;
+  RETURN jsonb_build_object(
+    'ok', true, 'canje_id', v_m.id, 'cliente_id', v_m.cliente_id, 'puntos', -v_m.puntos,
+    'monto_mxn', v_m.monto_mxn, 'premio_id', v_m.premio_id,
+    'producto_id', (SELECT producto_id FROM lealtad_premios WHERE id = v_m.premio_id),
+    'saldo', COALESCE(v_s.saldo, 0), 'vence_el', v_s.vence_el, 'programa_version', v_m.programa_version);
+END $$;
+
+-- Pega un canje YA AUTORIZADO a un ticket, en la base donde vive el ticket (la caja o la nube).
+-- En la caja además escribe la copia local del movimiento (mismo id) para que el saldo local baje;
+-- en la nube ese id ya existe y el registro es un no-op.
+-- Para un premio, ticket_item_id es obligatorio y el descuento es lo que valga ese renglón.
+-- El renglón tiene que ser de producto: un renglón de cargo (el envío) no admite descuentos.
+CREATE OR REPLACE FUNCTION lealtad_asentar_canje(p jsonb)
+RETURNS uuid
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp
+AS $$
+DECLARE
+  v_canje  uuid := (p->>'canje_id')::uuid;
+  v_tenant uuid := (p->>'tenant_id')::uuid;
+  v_ticket uuid := (p->>'ticket_id')::uuid;
+  v_item   uuid := NULLIF(p->>'ticket_item_id', '')::uuid;
+  v_premio uuid := NULLIF(p->>'premio_id', '')::uuid;
+  v_puntos integer := (p->>'puntos')::integer;
+  v_monto  numeric(12,2) := NULLIF(p->>'monto_mxn', '')::numeric;
+  v_t      tickets%ROWTYPE;
+BEGIN
+  SELECT * INTO v_t FROM tickets WHERE id = v_ticket AND tenant_id = v_tenant FOR UPDATE;
+  IF NOT FOUND THEN RAISE EXCEPTION 'TICKET_NO_EXISTE' USING ERRCODE = 'P0002'; END IF;
+  IF v_t.estado_fiscal NOT IN ('BORRADOR', 'ABIERTO') THEN RAISE EXCEPTION 'TICKET_NO_ABIERTO' USING ERRCODE = '22023'; END IF;
+
+  IF v_premio IS NOT NULL THEN
+    IF v_item IS NULL THEN RAISE EXCEPTION 'PREMIO_SIN_RENGLON' USING ERRCODE = '22023'; END IF;
+    SELECT GREATEST(subtotal_bruto_mxn + monto_modificadores_mxn - descuento_item_mxn - promocion_item_mxn, 0)
+      INTO v_monto FROM ticket_items
+     WHERE id = v_item AND ticket_id = v_ticket AND cancelado = false AND cargo_tipo IS NULL;
+    IF v_monto IS NULL THEN RAISE EXCEPTION 'RENGLON_NO_EXISTE' USING ERRCODE = 'P0002'; END IF;
+  ELSIF v_monto IS NULL OR v_monto <= 0 THEN
+    RAISE EXCEPTION 'MONTO_INVALIDO' USING ERRCODE = '22023';
+  END IF;
+
+  PERFORM lealtad_registrar_movimiento(
+    v_canje, v_tenant, (p->>'cliente_id')::uuid, 'CANJE', -v_puntos, (p->>'programa_version')::integer,
+    v_ticket, COALESCE(NULLIF(p->>'sucursal_id', '')::uuid, v_t.sucursal_id),
+    COALESCE(NULLIF(p->>'caja_id', '')::uuid, v_t.caja_id),
+    NULLIF(p->>'usuario_id', '')::uuid, v_premio, v_monto);
+
+  INSERT INTO ticket_canjes_lealtad (id, tenant_id, ticket_id, cliente_id, premio_id, ticket_item_id, puntos, monto_descontado_mxn, created_by)
+  VALUES (v_canje, v_tenant, v_ticket, (p->>'cliente_id')::uuid, v_premio, v_item, v_puntos, v_monto, NULLIF(p->>'usuario_id', '')::uuid)
+  ON CONFLICT (id) DO NOTHING;
+  RETURN v_canje;
+END $$;
+
+-- Deshace el canje vivo de un ticket, en la base donde vive el ticket. Solo devuelve saldo, así
+-- que es seguro sin internet: en la caja la reversa sube en el siguiente push.
+CREATE OR REPLACE FUNCTION lealtad_revertir_canje_ticket(p_ticket_id uuid, p_motivo text)
+RETURNS integer
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp
+AS $$
+DECLARE
+  c     ticket_canjes_lealtad%ROWTYPE;
+  v_ver integer;
+  v_n   integer := 0;
+BEGIN
+  FOR c IN SELECT * FROM ticket_canjes_lealtad WHERE ticket_id = p_ticket_id AND NOT revertido FOR UPDATE LOOP
+    UPDATE ticket_canjes_lealtad SET revertido = true, revertido_at = now() WHERE id = c.id;
+    SELECT COALESCE((SELECT programa_version FROM lealtad_movimientos WHERE id = c.id),
+                    (SELECT version FROM lealtad_programa WHERE tenant_id = c.tenant_id)) INTO v_ver;
+    PERFORM lealtad_registrar_movimiento(
+      NULL, c.tenant_id, c.cliente_id, 'REVERSA_CANJE', c.puntos, v_ver,
+      p_ticket_id, p_motivo => p_motivo, p_canje_mov => c.id, p_usuario => auth.uid());
+    v_n := v_n + 1;
+  END LOOP;
+  RETURN v_n;
+END $$;
+
+-- Deshace un canje por su id, sin necesitar el ticket. Es la que usa la red de seguridad de la
+-- nube (§7). true si lo revirtió; false si ya estaba revertido o no existe.
+CREATE OR REPLACE FUNCTION lealtad_revertir_canje(p_canje_id uuid, p_tenant uuid, p_motivo text)
+RETURNS boolean
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp
+AS $$
+DECLARE
+  v_m lealtad_movimientos%ROWTYPE;
+  v_ok boolean;
+BEGIN
+  SELECT * INTO v_m FROM lealtad_movimientos WHERE id = p_canje_id AND tenant_id = p_tenant AND tipo = 'CANJE';
+  IF NOT FOUND THEN RETURN false; END IF;
+  v_ok := lealtad_registrar_movimiento(
+    NULL, p_tenant, v_m.cliente_id, 'REVERSA_CANJE', -v_m.puntos, v_m.programa_version,
+    v_m.ticket_id, p_motivo => p_motivo, p_canje_mov => p_canje_id);
+  UPDATE ticket_canjes_lealtad SET revertido = true, revertido_at = now() WHERE id = p_canje_id AND NOT revertido;
+  RETURN v_ok;
+END $$;
+
+-- Lo único que el POS llama directo: quitar el canje de una cuenta que sigue abierta.
+CREATE OR REPLACE FUNCTION quitar_canje_lealtad(p_ticket_id uuid)
+RETURNS integer
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp
+AS $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM tickets
+                  WHERE id = p_ticket_id AND tenant_id = current_tenant_id()
+                    AND estado_fiscal IN ('BORRADOR', 'ABIERTO')) THEN
+    RAISE EXCEPTION 'Esta cuenta ya se cobró o no existe.' USING ERRCODE = '22023';
+  END IF;
+  RETURN lealtad_revertir_canje_ticket(p_ticket_id, 'Canje quitado en caja');
+END $$;
+
+-- El renglón que lleva un premio de producto se cancela o se borra: los puntos vuelven. Sin esto el
+-- total deja de contar el premio (§5) pero nadie devuelve los puntos, y al borrar el renglón el
+-- canje desaparece por ON DELETE CASCADE sin dejar reversa en el libro. Mismo criterio que
+-- trg_ticket_lealtad: una venta no se cae por la lealtad; el aviso queda en el log.
+-- Son DOS triggers porque los dos casos corren en momentos distintos:
+--   · Cancelar es AFTER UPDATE. Revertir recalcula la cuenta, y recalcular_totales_ticket actualiza
+--     cada renglón vivo; en un BEFORE tocaría la fila que se está actualizando y Postgres lanzaría
+--     "tuple to be updated was already modified by an operation triggered by the current command".
+--   · Borrar es BEFORE DELETE porque después la cascada ya se llevó el canje y no habría a quién
+--     devolverle los puntos. Aquí SOLO se escribe la reversa en el libro: el canje se va por la
+--     cascada, que recalcula una cuenta abierta con su propio trigger, y tocar desde aquí el renglón
+--     que se borra lanzaría el mismo error.
+CREATE OR REPLACE FUNCTION trg_item_premio_lealtad()
+RETURNS trigger
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp
+AS $$
+DECLARE
+  c     ticket_canjes_lealtad%ROWTYPE;
+  v_ver integer;
+BEGIN
+  BEGIN
+    IF TG_OP = 'UPDATE' THEN
+      IF NEW.cancelado AND NOT OLD.cancelado
+         AND EXISTS (SELECT 1 FROM ticket_canjes_lealtad WHERE ticket_item_id = NEW.id AND NOT revertido) THEN
+        PERFORM lealtad_revertir_canje_ticket(NEW.ticket_id, 'Renglón premiado cancelado');
+      END IF;
+    ELSE
+      FOR c IN SELECT * FROM ticket_canjes_lealtad WHERE ticket_item_id = OLD.id AND NOT revertido LOOP
+        -- La versión del programa con la que se descontó, igual que lealtad_revertir_canje_ticket.
+        SELECT COALESCE((SELECT programa_version FROM lealtad_movimientos WHERE id = c.id),
+                        (SELECT version FROM lealtad_programa WHERE tenant_id = c.tenant_id)) INTO v_ver;
+        PERFORM lealtad_registrar_movimiento(
+          NULL, c.tenant_id, c.cliente_id, 'REVERSA_CANJE', c.puntos, v_ver,
+          c.ticket_id, p_motivo => 'Renglón premiado eliminado', p_canje_mov => c.id, p_usuario => auth.uid());
+      END LOOP;
+    END IF;
+  EXCEPTION WHEN OTHERS THEN
+    RAISE WARNING 'lealtad: no se pudo devolver el premio del renglón %: %',
+      CASE WHEN TG_OP = 'DELETE' THEN OLD.id ELSE NEW.id END, SQLERRM;
+  END;
+  RETURN CASE WHEN TG_OP = 'DELETE' THEN OLD ELSE NEW END;
+END $$;
+
+DROP TRIGGER IF EXISTS trg_ticket_items_premio_lealtad_cancelado ON ticket_items;
+CREATE TRIGGER trg_ticket_items_premio_lealtad_cancelado
+  AFTER UPDATE OF cancelado ON ticket_items
+  FOR EACH ROW EXECUTE FUNCTION trg_item_premio_lealtad();
+
+DROP TRIGGER IF EXISTS trg_ticket_items_premio_lealtad_borrado ON ticket_items;
+CREATE TRIGGER trg_ticket_items_premio_lealtad_borrado
+  BEFORE DELETE ON ticket_items
+  FOR EACH ROW EXECUTE FUNCTION trg_item_premio_lealtad();
+
+REVOKE ALL ON FUNCTION lealtad_resolver_cliente(uuid, uuid, text) FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON FUNCTION lealtad_saldo(uuid, uuid, text) FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON FUNCTION lealtad_canjear(uuid, uuid, uuid, text, integer, uuid, uuid, uuid, uuid, uuid) FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON FUNCTION lealtad_canje_datos(uuid, uuid) FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON FUNCTION lealtad_asentar_canje(jsonb) FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON FUNCTION lealtad_revertir_canje_ticket(uuid, text) FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON FUNCTION lealtad_revertir_canje(uuid, uuid, text) FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON FUNCTION quitar_canje_lealtad(uuid) FROM PUBLIC, anon;
+REVOKE ALL ON FUNCTION trg_item_premio_lealtad() FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION lealtad_resolver_cliente(uuid, uuid, text), lealtad_saldo(uuid, uuid, text),
+  lealtad_canjear(uuid, uuid, uuid, text, integer, uuid, uuid, uuid, uuid, uuid), lealtad_canje_datos(uuid, uuid),
+  lealtad_asentar_canje(jsonb), lealtad_revertir_canje_ticket(uuid, text), lealtad_revertir_canje(uuid, uuid, text)
+  TO service_role;
+GRANT EXECUTE ON FUNCTION quitar_canje_lealtad(uuid) TO authenticated, service_role;
