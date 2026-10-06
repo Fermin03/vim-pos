@@ -120,6 +120,16 @@ export function resumenLealtadTicket(e: {
  * Lee lo que el pie de lealtad necesita. Nunca lanza: si algo falla, el ticket sale sin pie. Un
  * ticket que no se imprime por culpa de la lealtad es peor que uno sin saldo.
  */
+/**
+ * ¿Se puede imprimir el pie con lo que se leyó? PURA, con pruebas. Supabase-js no lanza cuando una
+ * lectura falla: devuelve `{ data: null, error }`. Sin movimientos o sin saldo el pie diría un saldo
+ * falso ("0 puntos", o el de hoy en vez del del papel original), así que se omite. El nombre del
+ * cliente es adorno: si esa lectura falla, el pie sale sin él.
+ */
+export function datosLealtadFiables(r: { movimientos: { error: unknown }; saldo: { error: unknown } }): boolean {
+  return !r.movimientos.error && !r.saldo.error;
+}
+
 async function leerLealtadDelTicket(
   sb: ReturnType<typeof employeeClient>,
   token: string,
@@ -127,7 +137,8 @@ async function leerLealtadDelTicket(
 ): Promise<LealtadImpresion | null> {
   if (!t.clienteId) return null;
   try {
-    const { data: mod } = await sb.rpc("modulos_efectivos", { p_tenant: t.tenantId });
+    const { data: mod, error: errMod } = await sb.rpc("modulos_efectivos", { p_tenant: t.tenantId });
+    if (errMod) return null;
     if ((mod as { efectivos?: Record<string, boolean> } | null)?.efectivos?.lealtad !== true) return null;
     const programa = await leerPrograma(token);
     if (!programa) return null;
@@ -136,6 +147,7 @@ async function leerLealtadDelTicket(
       sb.from("lealtad_saldos").select("saldo, vence_el, programa_version").eq("cliente_id", t.clienteId).maybeSingle(),
       sb.from("clientes").select("nombre").eq("id", t.clienteId).maybeSingle(),
     ]);
+    if (!datosLealtadFiables({ movimientos: movs, saldo })) return null;
     return resumenLealtadTicket({
       programa,
       movimientos: (movs.data ?? []) as MovimientoLealtad[],

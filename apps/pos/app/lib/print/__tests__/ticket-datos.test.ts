@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { foldearHijosEnPadre, SELECCION_TICKET_ITEMS_IMPRESION, urlAutofactura, resumenLealtadTicket } from "../ticket-datos";
+import { foldearHijosEnPadre, SELECCION_TICKET_ITEMS_IMPRESION, urlAutofactura, resumenLealtadTicket, datosLealtadFiables } from "../ticket-datos";
 import type { LineaImpresion } from "../tipos";
 
 /** Fixture mínima: solo llena lo que cada caso necesita, el resto son valores neutros. */
@@ -170,5 +170,20 @@ describe("resumenLealtadTicket — el pie de lealtad del ticket", () => {
   it("del cliente solo sale el nombre de pila", () => {
     expect(resumenLealtadTicket({ ...base, clienteNombre: "  María José Pérez " }).cliente).toBe("María");
     expect(resumenLealtadTicket({ ...base, clienteNombre: null }).cliente).toBeNull();
+  });
+});
+
+describe("datosLealtadFiables — con una lectura fallida no hay pie", () => {
+  const ok = { error: null };
+  const falla = { error: { message: "boom" } };
+
+  it("movimientos fallidos: no es fiable", () => {
+    expect(datosLealtadFiables({ movimientos: falla, saldo: ok })).toBe(false);
+  });
+  it("saldo fallido: no es fiable", () => {
+    expect(datosLealtadFiables({ movimientos: ok, saldo: falla })).toBe(false);
+  });
+  it("ambas bien: es fiable", () => {
+    expect(datosLealtadFiables({ movimientos: ok, saldo: ok })).toBe(true);
   });
 });

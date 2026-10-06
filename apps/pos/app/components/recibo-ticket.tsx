@@ -177,7 +177,7 @@ export function ReciboTicket({ datos }: { datos: DatosTicketImpresion }) {
             <div className="text-center font-bold">LEALTAD{datos.lealtad.cliente ? ` - ${datos.lealtad.cliente}` : ""}</div>
             {datos.lealtad.ganado > 0 && <PayRow label="Ganaste:" value={cantidadLealtad(datos.lealtad.ganado, datos.lealtad.unidad)} />}
             {datos.lealtad.porGanar > 0 && <PayRow label="Ganas al pagar:" value={cantidadLealtad(datos.lealtad.porGanar, datos.lealtad.unidad)} />}
-            {datos.lealtad.saldo != null && <PayRow label="Tu saldo:" value={cantidadLealtad(datos.lealtad.saldo, datos.lealtad.unidad)} />}
+            {datos.lealtad.saldo != null && <PayRow label="Tu saldo:" value={cantidadLealtad(datos.lealtad.saldo, datos.lealtad.unidad)} bold />}
             {datos.lealtad.venceEl && <PayRow label="Vence:" value={fechaCorta(datos.lealtad.venceEl)} />}
           </div>
           <DividerDashed />
@@ -257,9 +257,9 @@ function TotRow({ label, value, className }: { label: string; value: string; cla
   );
 }
 
-function PayRow({ label, value }: { label: string; value: string }) {
+function PayRow({ label, value, bold }: { label: string; value: string; bold?: boolean }) {
   return (
-    <div className="flex justify-between">
+    <div className={`flex justify-between${bold ? " font-bold" : ""}`}>
       <span className="text-[#555]">{label}</span>
       <span className="tabular-nums">{value}</span>
     </div>
