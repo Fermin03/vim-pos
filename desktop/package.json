@@ -15,7 +15,6 @@
     "verify:sync-ciclo": "node src/verify-sync-ciclo.mjs",
     "verify:push": "node src/verify-push.mjs",
     "verify:dia": "node src/verify-dia.mjs",
-    "verify:robustez": "node src/verify-robustez.mjs",
     "verify:cloud": "node src/verify-cloud.mjs",
     "verify:hub": "node src/verify-hub.mjs",
     "backend": "node src/backend.mjs",

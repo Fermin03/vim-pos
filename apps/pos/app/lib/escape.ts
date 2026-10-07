@@ -64,8 +64,4 @@ export class PilaEscape {
     arriba.accion();
     return true;
   }
-
-  get vacia(): boolean {
-    return this.#pila.length === 0;
-  }
 }

@@ -106,7 +106,6 @@ export const resetPinSchema = z.object({
   pin: z.string().regex(/^\d{4,6}$/, "El PIN debe tener 4 a 6 dígitos"),
   confirmar: z.string(),
 }).refine((d) => d.pin === d.confirmar, { message: "Los PIN no coinciden", path: ["confirmar"] });
-export type ResetPinInput = z.infer<typeof resetPinSchema>;
 
 // ── Mutaciones (Edge Functions + client-side) ────────────────────────────────
 async function callEdge(endpoint: string, body: object, conDetalle = false): Promise<unknown> {

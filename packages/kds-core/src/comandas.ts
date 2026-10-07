@@ -2,7 +2,7 @@
 import { clienteConToken } from "./cliente";
 import { type EstadoCocina } from "./estado";
 
-export { labelModo, siguienteEstado, minutosEnCocina, type EstadoCocina } from "./estado";
+export { labelModo, minutosEnCocina, type EstadoCocina } from "./estado";
 
 export type ItemComanda = {
   id: string;
@@ -205,19 +205,6 @@ async function mesasDeTickets(token: string, ticketIds: string[]): Promise<Map<s
   return mapa;
 }
 
-/**
- * Avanza el estado de cocina de un ticket (UPDATE normal — el validador permite avances hacia
- * adelante sin PIN y pone los timestamps; las reversas exigen autorización).
- *   EN_COCINA → LISTO → ENTREGADO
- */
-export async function avanzarCocina(token: string, ticketId: string, nuevoEstado: EstadoCocina): Promise<void> {
-  const { error } = await clienteConToken(token)
-    .from("tickets")
-    .update({ estado_cocina: nuevoEstado })
-    .eq("id", ticketId);
-  if (error) throw new Error(error.message);
-}
-
 export type ResultadoListo = { cerrada: boolean; pendientes: string[] };
 
 /**
@@ -241,16 +228,4 @@ export async function marcarListoCocina(
   const r = data as { ok: boolean; motivo?: string; cerrada?: boolean; pendientes?: string[] } | null;
   if (!r?.ok) throw new Error(r?.motivo ?? "No se pudo marcar la comanda");
   return { cerrada: Boolean(r.cerrada), pendientes: r.pendientes ?? [] };
-}
-
-/**
- * Cierra la orden entera con dos UPDATE. Es lo que hacía LISTO antes de 0120; lo reemplaza
- * {@link marcarListoCocina}, que además respeta las estaciones. Se conserva exportado para quien
- * aún lo importe.
- */
-export async function cerrarComanda(token: string, ticketId: string, estadoActual: EstadoCocina): Promise<void> {
-  if (estadoActual === "EN_COCINA") {
-    await avanzarCocina(token, ticketId, "LISTO");
-  }
-  await avanzarCocina(token, ticketId, "ENTREGADO");
 }

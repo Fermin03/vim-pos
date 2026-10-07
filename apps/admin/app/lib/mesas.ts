@@ -105,12 +105,6 @@ export async function actualizarMesa(id: string, input: MesaInput): Promise<void
   if (error) throw new Error(error.message);
 }
 
-/** Pone/quita la mesa fuera de servicio. No tocar si está OCUPADA (cuenta viva). */
-export async function alternarFueraDeServicio(id: string, fuera: boolean): Promise<void> {
-  const { error } = await supabase.from("mesas").update({ estado: fuera ? "FUERA_DE_SERVICIO" : "LIBRE" }).eq("id", id);
-  if (error) throw new Error(error.message);
-}
-
 export async function eliminarMesa(id: string): Promise<void> {
   const { error } = await supabase.from("mesas").update({ deleted_at: new Date().toISOString(), activa: false }).eq("id", id);
   if (error) throw new Error(error.message);

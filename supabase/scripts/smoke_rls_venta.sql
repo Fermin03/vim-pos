@@ -2,7 +2,7 @@
 -- Complementa smoke_venta.sql (que corre como postgres y bypassa RLS). Aquí probamos
 -- que las RPC SECURITY INVOKER funcionan con el JWT del empleado: grants + políticas RLS
 -- en tickets/ticket_items/ticket_item_modificadores/pagos + asignación de folio.
--- Uso: docker exec -i <db> psql -U postgres -d postgres < supabase/scripts/rls_venta.sql
+-- Uso: docker exec -i <db> psql -U postgres -d postgres < supabase/scripts/smoke_rls_venta.sql
 BEGIN;
 
 -- Precondición: abrir un turno como postgres (el seed no abre turno). id fijo.

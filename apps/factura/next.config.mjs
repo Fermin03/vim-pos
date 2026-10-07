@@ -30,7 +30,7 @@ const securityHeaders = [
 
 const nextConfig = {
   reactStrictMode: true,
-  transpilePackages: ["@vim/ui", "@vim/db", "@vim/config"],
+  transpilePackages: ["@vim/ui", "@vim/config"],
   async headers() {
     return [{ source: "/:path*", headers: securityHeaders }];
   },

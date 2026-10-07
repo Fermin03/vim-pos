@@ -22,14 +22,12 @@ export function PantallaTurno({
   cajaId,
   onBloquear,
   onCambiarCajero,
-  onSimularExpiracion: _onSimularExpiracion,
 }: {
   empleado: Empleado;
   token: string;
   cajaId: string;
   onBloquear: () => void;
   onCambiarCajero: () => void;
-  onSimularExpiracion: () => void;
 }) {
   const [caja, setCaja] = useState<DatosCaja | null | undefined>(undefined);
   const [turno, setTurno] = useState<Turno | null | undefined>(undefined);

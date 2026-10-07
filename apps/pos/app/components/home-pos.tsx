@@ -1,5 +1,5 @@
 "use client";
-import { useCallback, useEffect, useMemo, useReducer, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
 import { Button } from "@vim/ui/styles";
 import {
   listarCategoriasPos,
@@ -10,7 +10,6 @@ import {
 } from "../lib/catalogo";
 import { alCambiarCatalogo } from "../lib/catalogo-eventos";
 import { fmtMxn, contarCuentasAbiertasPorModo, type CuentasAbiertasPorModo, type DatosCaja, type Turno } from "../lib/turno";
-import { useReloj } from "./topbar-pos";
 import { type Empleado } from "../lib/supabase";
 import {
   reducerCarrito,
@@ -322,7 +321,6 @@ export function HomePos({
   const [nombreCuentaAbierto, setNombreCuentaAbierto] = useState(false);
   const [cambiarPinAbierto, setCambiarPinAbierto] = useState(false);
   const [cocinaEnviada, setCocinaEnviada] = useState(false);
-  const [enviandoCocina, setEnviandoCocina] = useState(false);
   const [misPropinasAbierto, setMisPropinasAbierto] = useState(false);
   const [descuentoAbierto, setDescuentoAbierto] = useState(false);
   // Agenda de reservaciones, abierta desde el mapa de Comedor.
@@ -971,7 +969,6 @@ export function HomePos({
   /** B1 — envía la mesa a cocina (KDS) antes de cobrar. */
   const onEnviarCocina = useCallback(async () => {
     if (!ticketBd) return;
-    setEnviandoCocina(true);
     setError(null);
     try {
       const yaEstaba = cocinaEnviada;
@@ -984,8 +981,6 @@ export function HomePos({
       volverAtras();
     } catch (e) {
       setError(e instanceof Error ? e.message : "No se pudo enviar a cocina");
-    } finally {
-      setEnviandoCocina(false);
     }
   }, [token, ticketBd, cocinaEnviada, imprimirComandaCocina, volverAtras]);
 
@@ -2070,16 +2065,6 @@ export function HomePos({
         )}
         {configImpresoraAbierto && <ModalConfigImpresora token={token} sucursalId={caja.sucursal_id} onCerrar={() => setConfigImpresoraAbierto(false)} />}
         {modalesCompartidos}
-        {cerrando && (
-          <PantallaCierre
-            token={token}
-            empleado={empleado}
-            caja={caja}
-            turno={turno}
-            onCancelar={() => setCerrando(false)}
-            onCerrado={onCerrarTurno}
-          />
-        )}
       </>
     );
   }
@@ -2454,7 +2439,6 @@ export function HomePos({
           // abierta y se cobra después desde la lista. Antes entraba por la otra, que pinta
           // "Cobrar" como acción principal y "Enviar a cocina" debajo — invitando a cobrar una
           // mesa que apenas está ordenando, que es justo lo que no se quiere en comedor.
-          onEnviarCocina={undefined}
           onEnviarCocinaAbierto={
             // Un pedido retomado de espera es de mostrador: su acción es Cobrar, no Enviar.
             // Para llevar tampoco: su cuenta abierta se cobra en mostrador, no se manda a cocina.
@@ -2465,8 +2449,6 @@ export function HomePos({
                 : undefined
           }
           folioCuenta={ticketBd?.folio ?? null}
-          cocinaEnviada={cocinaEnviada}
-          enviandoCocina={enviandoCocina}
           onAplicarDescuento={cuentaImpresa ? undefined : onAplicarDescuento}
           descuentoMxn={ticketBd?.descuentos ?? 0}
             promocionMxn={ticketBd?.promociones ?? 0}

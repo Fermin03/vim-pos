@@ -44,17 +44,6 @@ export function objetoArchivoCfdi(cfdiId: string, tipo: TipoArchivoCfdi): { buck
   return { bucket: r.bucket, nombre: r.nombre };
 }
 
-/**
- * "cfdi/<id>.xml" (lo que hay en `tickets_cfdi.*_storage_path`) → bucket y nombre de objeto.
- * Solo para mostrar/diagnosticar: para LEER un archivo usa `objetoArchivoCfdi`.
- */
-export function partirRutaLogica(ruta: string | null | undefined): { bucket: string; nombre: string } | null {
-  const t = (ruta ?? "").trim();
-  const i = t.indexOf("/");
-  if (i <= 0 || i === t.length - 1) return null;
-  return { bucket: t.slice(0, i), nombre: t.slice(i + 1) };
-}
-
 export function base64ABytes(b64: string): Uint8Array {
   const bin = atob(b64.replace(/\s+/g, ""));
   const out = new Uint8Array(bin.length);
