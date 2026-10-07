@@ -9,7 +9,8 @@ DECLARE
   v_suc    uuid := '99999999-0000-0000-0000-0000000000bb';
   v_caja   uuid := '99999999-0000-0000-0000-0000000000cc';
   v_maria  uuid := '99999999-0000-0000-0000-000000000001';
-  v_negocio uuid; v_esencial uuid; v_r jsonb;
+  v_hoy    date := (now() AT TIME ZONE 'America/Mexico_City')::date;
+  v_negocio uuid; v_esencial uuid; v_r jsonb; v_camino int;
 BEGIN
   PERFORM set_config('request.jwt.claims',
     json_build_object('sub', v_maria::text, 'tenant_id', v_tenant::text)::text, true);
@@ -48,6 +49,46 @@ BEGIN
   IF (SELECT modulo_lealtad_activo FROM configuracion_tenant WHERE tenant_id = v_tenant) THEN
     RAISE EXCEPTION 'al retirar la lealtad el interruptor del dueño debió apagarse';
   END IF;
+
+  -- Quien PAGABA la lealtad aparte (en Esencial) y la tiene encendida sube a un plan que la incluye:
+  -- el programa sigue encendido. La fila pagada se cierra y queda UNA activa, a $0 e incluida.
+  -- Se prueban los dos caminos de la función: sin fila de hoy (INSERT) y con una baja de hoy (reactivar).
+  FOR v_camino IN 1..2 LOOP
+    IF v_camino = 1 THEN
+      DELETE FROM tenant_addons ta USING addons a
+       WHERE a.id = ta.addon_id AND a.codigo = 'LEALTAD' AND ta.tenant_id = v_tenant;
+    ELSE
+      PERFORM _sincronizar_addons_del_plan(v_tenant, v_esencial, true);   -- deja una baja con fecha de hoy
+      DELETE FROM tenant_addons ta USING addons a
+       WHERE a.id = ta.addon_id AND a.codigo = 'LEALTAD' AND ta.tenant_id = v_tenant AND ta.fecha_inicio < v_hoy;
+    END IF;
+    INSERT INTO tenant_addons (tenant_id, addon_id, fecha_inicio, activo, precio_mensual_mxn, notas, incluido_en_plan)
+    SELECT v_tenant, a.id, v_hoy - 30, true, 100, 'De pago', false FROM addons a WHERE a.codigo = 'LEALTAD';
+    UPDATE configuracion_tenant SET modulo_lealtad_activo = true WHERE tenant_id = v_tenant;
+    IF NOT (modulos_efectivos(v_tenant)->'efectivos'->>'lealtad')::boolean THEN
+      RAISE EXCEPTION 'camino %: la lealtad de pago no quedó efectiva', v_camino;
+    END IF;
+
+    v_r := _sincronizar_addons_del_plan(v_tenant, v_negocio, true);
+    IF NOT (v_r->'concedidos') ? 'LEALTAD' THEN RAISE EXCEPTION 'camino %: pasar de pago a incluida no la concedió: %', v_camino, v_r; END IF;
+    IF NOT (SELECT modulo_lealtad_activo FROM configuracion_tenant WHERE tenant_id = v_tenant) THEN
+      RAISE EXCEPTION 'camino %: subir de plan pagando la lealtad aparte apagó el programa del dueño', v_camino;
+    END IF;
+    IF NOT (modulos_efectivos(v_tenant)->'efectivos'->>'lealtad')::boolean THEN
+      RAISE EXCEPTION 'camino %: la lealtad dejó de estar efectiva al subir de plan', v_camino;
+    END IF;
+    IF (SELECT COUNT(*) FILTER (WHERE ta.activo) <> 1
+            OR bool_or(ta.activo AND (ta.precio_mensual_mxn <> 0 OR NOT ta.incluido_en_plan))
+          FROM tenant_addons ta JOIN addons a ON a.id = ta.addon_id
+         WHERE ta.tenant_id = v_tenant AND a.codigo = 'LEALTAD') THEN
+      RAISE EXCEPTION 'camino %: debe quedar UNA fila activa, a $0 e incluida en el plan', v_camino;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM tenant_addons ta JOIN addons a ON a.id = ta.addon_id
+                    WHERE ta.tenant_id = v_tenant AND a.codigo = 'LEALTAD' AND ta.fecha_inicio = v_hoy - 30
+                      AND NOT ta.activo AND ta.fecha_fin = v_hoy AND ta.precio_mensual_mxn = 100) THEN
+      RAISE EXCEPTION 'camino %: la fila pagada debió cerrarse hoy conservando lo que costaba', v_camino;
+    END IF;
+  END LOOP;
 
   RAISE NOTICE 'SMOKE LEALTAD ADMIN §2 OK';
 END $$;

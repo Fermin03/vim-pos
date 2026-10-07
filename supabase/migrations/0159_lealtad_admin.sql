@@ -43,8 +43,10 @@ COMMENT ON FUNCTION ticket_lleva_premio(uuid) IS
 UPDATE addons SET activo = true, updated_at = now() WHERE codigo = 'LEALTAD' AND NOT activo;
 
 -- El cambio de plan también concede y retira la lealtad. Cuerpo copiado ÍNTEGRO de
--- 0141_cobro_promocion_prueba_plan.sql:277-353 (única definición vigente); el único cambio es que la
--- lista de add-ons gana ('LEALTAD', 'lealtad_incluido'), la bandera que la 0156 ya dejó en los planes.
+-- 0141_cobro_promocion_prueba_plan.sql:277-353 (única definición vigente). Dos cambios: la lista de
+-- add-ons gana ('LEALTAD', 'lealtad_incluido'), la bandera que la 0156 ya dejó en los planes; y cuando
+-- se pasa de pagarlo aparte a tenerlo incluido, primero queda activa la fila incluida y DESPUÉS se
+-- cierra la pagada (el porqué está junto a ese UPDATE).
 -- Retirarla dispara trg_tenant_addons_apaga_lealtad (0156), que apaga el interruptor del dueño.
 -- Su espejo en TS es ADDONS_DEL_PLAN (apps/platform/app/lib/cambio-plan.ts): si cambias uno, cambia el otro.
 CREATE OR REPLACE FUNCTION public._sincronizar_addons_del_plan(p_tenant uuid, p_plan uuid, p_retirar boolean DEFAULT true)
@@ -86,14 +88,6 @@ BEGIN
            SET precio_mensual_mxn = 0, incluido_en_plan = true, notas = v_nota, updated_at = now()
          WHERE id = v_fila.id;
       ELSE
-        IF FOUND THEN
-          -- Lo pagaba aparte: esa fila se cierra hoy (la historia de lo que pagó se queda) y entra
-          -- una nueva a $0. Cobrarle aparte lo que su plan ya incluye sería cobrarlo dos veces.
-          UPDATE public.tenant_addons
-             SET activo = false, fecha_fin = v_hoy, updated_at = now(),
-                 notas = concat_ws(' · ', notas, 'Pasa a incluido en el plan ' || COALESCE(v_plan_nom, ''))
-           WHERE id = v_fila.id;
-        END IF;
         -- ¿Una baja de HOY? Se reactiva esa fila: un INSERT chocaría con addon_unico_activo.
         UPDATE public.tenant_addons
            SET activo = true, fecha_fin = NULL, precio_mensual_mxn = 0, incluido_en_plan = true, notas = v_nota, updated_at = now()
@@ -102,6 +96,21 @@ BEGIN
         IF v_n = 0 THEN
           INSERT INTO public.tenant_addons (tenant_id, addon_id, fecha_inicio, activo, precio_mensual_mxn, notas, incluido_en_plan)
           VALUES (p_tenant, v_addon, v_hoy, true, 0, v_nota, true);
+        END IF;
+        IF v_fila.id IS NOT NULL THEN
+          -- Lo pagaba aparte: esa fila se cierra hoy (la historia de lo que pagó se queda) y ya entró
+          -- la nueva a $0. Cobrarle aparte lo que su plan ya incluye sería cobrarlo dos veces.
+          -- DIFERENCIA CON 0141: allá la pagada se cerraba ANTES de dejar activa la incluida. Para CFDI
+          -- y DELIVERY el orden da igual, pero al cerrar una fila de LEALTAD se dispara
+          -- trg_tenant_addons_apaga_lealtad (0156), que si en ese instante no ve ninguna fila vigente
+          -- apaga el interruptor del dueño: quien subía de plan perdía su programa encendido. Con la
+          -- incluida ya activa el trigger la ve y no apaga nada. Las dos filas no chocan con
+          -- addon_unico_activo: a esta rama solo llega una pagada con fecha_inicio distinta de hoy.
+          -- (Se pregunta por v_fila.id y no por FOUND, que el UPDATE y el INSERT de arriba ya pisaron.)
+          UPDATE public.tenant_addons
+             SET activo = false, fecha_fin = v_hoy, updated_at = now(),
+                 notas = concat_ws(' · ', notas, 'Pasa a incluido en el plan ' || COALESCE(v_plan_nom, ''))
+           WHERE id = v_fila.id;
         END IF;
       END IF;
       v_conc := v_conc || r.codigo;
@@ -122,7 +131,7 @@ $$;
 REVOKE ALL ON FUNCTION public._sincronizar_addons_del_plan(uuid, uuid, boolean) FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION public._sincronizar_addons_del_plan(uuid, uuid, boolean) TO service_role;
 COMMENT ON FUNCTION public._sincronizar_addons_del_plan(uuid, uuid, boolean) IS
-  'Interna (0141): concede a $0 los add-ons que el plan incluye (CFDI, DELIVERY) y, si p_retirar, quita los que se dieron por el plan anterior. Respeta addon_unico_activo reactivando la fila del día.';
+  'Interna (0141, 0159): concede a $0 los add-ons que el plan incluye (CFDI, DELIVERY, LEALTAD) y, si p_retirar, quita los que se dieron por el plan anterior. Respeta addon_unico_activo reactivando la fila del día.';
 
 
 -- Los negocios que YA están en un plan que incluye la lealtad no pasarán por un cambio de plan: se
@@ -358,21 +367,21 @@ AS $$
       FROM par GROUP BY usuario_id HAVING SUM(n) >= 3)
   SELECT jsonb_build_object(
     'clientes_al_tope', COALESCE((
-      SELECT jsonb_agg(x ORDER BY (x->>'dias_al_tope')::int DESC, x->>'cliente_nombre')
+      SELECT jsonb_agg(x ORDER BY (x->>'dias_al_tope')::int DESC, x->>'cliente_nombre', x->>'cliente_id')
         FROM (SELECT jsonb_build_object(
                 'cliente_id', t.cliente_id,
                 'cliente_nombre', btrim(concat_ws(' ', c.nombre, c.apellido_paterno)),
                 'dias_al_tope', t.dias_al_tope) AS x
                 FROM tope t JOIN clientes c ON c.id = t.cliente_id
-               ORDER BY t.dias_al_tope DESC LIMIT 20) q), '[]'::jsonb),
+               ORDER BY t.dias_al_tope DESC, t.cliente_id LIMIT 20) q), '[]'::jsonb),
     'cajeros', COALESCE((
-      SELECT jsonb_agg(x ORDER BY ((x->>'del_cliente_top')::numeric / (x->>'canjes')::numeric) DESC, (x->>'canjes')::int DESC)
+      SELECT jsonb_agg(x ORDER BY ((x->>'del_cliente_top')::numeric / (x->>'canjes')::numeric) DESC, (x->>'canjes')::int DESC, x->>'usuario_id')
         FROM (SELECT jsonb_build_object(
                 'usuario_id', k.usuario_id,
                 'usuario_nombre', btrim(concat_ws(' ', u.nombre, u.apellido_paterno)),
                 'canjes', k.canjes, 'clientes', k.clientes, 'puntos', k.puntos, 'del_cliente_top', k.del_cliente_top) AS x
                 FROM caj k LEFT JOIN usuarios_perfil u ON u.id = k.usuario_id
-               ORDER BY (k.del_cliente_top::numeric / k.canjes) DESC, k.canjes DESC LIMIT 20) q), '[]'::jsonb));
+               ORDER BY (k.del_cliente_top::numeric / k.canjes) DESC, k.canjes DESC, k.usuario_id LIMIT 20) q), '[]'::jsonb));
 $$;
 REVOKE ALL ON FUNCTION lealtad_control(date, date) FROM PUBLIC, anon;
 GRANT EXECUTE ON FUNCTION lealtad_control(date, date) TO authenticated, service_role;
