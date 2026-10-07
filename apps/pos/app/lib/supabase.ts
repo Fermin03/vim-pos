@@ -25,11 +25,6 @@ export const deviceClient: SupabaseClient = createClient(URL, ANON, {
   },
 });
 
-export type SesionDispositivo = {
-  cajaId: string;
-  sucursalNombre: string | null;
-};
-
 /** Inicia la sesión de dispositivo. Lanza Error si las credenciales fallan. Devuelve el correo
  *  con el que entró: si el apuntado es de una cuenta que ya cambió de dominio (vimpos.mx →
  *  vimpos.com.mx), se prueba el otro y se devuelve ése (ver @vim/db/dispositivo). */

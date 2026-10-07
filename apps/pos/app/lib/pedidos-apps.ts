@@ -171,11 +171,6 @@ export function ordenarPedidos(pedidos: PedidoApp[]): PedidoApp[] {
   });
 }
 
-export function idsNuevos(antes: PedidoApp[], ahora: PedidoApp[]): string[] {
-  const vistos = new Set(antes.map((p) => p.id));
-  return ahora.filter((p) => !vistos.has(p.id)).map((p) => p.id);
-}
-
 // ── Tienda de Uber (spec A6): estado, pausa, reanudar y tiempo de preparación, vía delivery-accion ──
 
 export type EstadoTiendaApp = { estado: "EN_LINEA" | "PAUSADA" | "DESCONOCIDO"; hasta: string | null; motivo: string | null; consultado_at: string };

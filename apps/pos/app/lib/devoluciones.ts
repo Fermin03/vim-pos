@@ -132,7 +132,3 @@ export async function devolverVenta(
   });
   if (e2) throw new Error(e2.message);
 }
-
-export function labelMotivoDev(m: MotivoDevolucion): string {
-  return MOTIVOS_DEV.find((x) => x.codigo === m)?.label ?? m;
-}

@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import {
-  segundosRestantes, etiquetaApp, etiquetaEstado, ordenarPedidos, idsNuevos, etiquetaAlergia, pedidoConAlergia,
+  segundosRestantes, etiquetaApp, etiquetaEstado, ordenarPedidos, etiquetaAlergia, pedidoConAlergia,
   etiquetaModificadores, itemsDesdeJson, type PedidoApp, type PedidoAppItem,
 } from "../pedidos-apps";
 
@@ -40,11 +40,6 @@ describe("pedidos de apps · helpers", () => {
       base({ id: "e", estado: "CANCELADO" }),
     ];
     expect(ordenarPedidos(p).map((x) => x.id)).toEqual(["c", "b", "d", "a", "e"]);
-  });
-
-  it("idsNuevos detecta pedidos que no estaban", () => {
-    expect(idsNuevos([base({ id: "a" })], [base({ id: "a" }), base({ id: "b" })])).toEqual(["b"]);
-    expect(idsNuevos([], [])).toEqual([]);
   });
 });
 
