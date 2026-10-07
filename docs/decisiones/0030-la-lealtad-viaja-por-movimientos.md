@@ -204,7 +204,7 @@ Sigue abierto:
 - **El anuncio «gana X» no descuenta las compras revertidas del día** al calcular el tope; es un
   texto, quien otorga los puntos es la base.
 - ~~El admin no debe ofrecer combos como premio~~ **Hecho (plan 1C):** el alta de premios del admin (`/lealtad`, pestaña Premios) no lista combos.
-- ~~`_sincronizar_addons_del_plan` y su espejo en TS~~ **Hecho (0159 y plan 1C):** la base concede la lealtad a los planes que la incluyen; su espejo en TS está en `apps/platform/app/lib/addons.ts`.
+- ~~`_sincronizar_addons_del_plan` y su espejo en TS~~ **Hecho (0159 y plan 1C):** la base concede la lealtad a los planes que la incluyen; su espejo en TS es `ADDONS_DEL_PLAN`, en `apps/platform/app/lib/cambio-plan.ts`.
 - ~~Los reportes del admin que leen los descuentos del ticket~~ **Hecho (0159 y plan 1C):** las vistas de reportes traen `lealtad_mxn` y el panel del día y el consolidado lo separan de las promociones.
 
 ## Límites conocidos
@@ -230,11 +230,12 @@ Sigue abierto:
 - **Las lecturas** son `vw_lealtad_movimientos`, `lealtad_resumen` y `lealtad_control`, todas `security_invoker`: respetan RLS del negocio. Las cifras salen de la 0159.
 - **Facturas (decisión del 6 de octubre):** el premio sale en $0, no admite factura individual y sí entra en la global; `timbrar-cfdi` falla cerrado ante una cuenta con premio. Un canje revertido después del pago sigue contando como premio para efectos de factura (`ticket_lleva_premio`).
 - **El admin no ofrece combos como premio**, y los reportes separan `lealtad_mxn` de las promociones.
-- **La 0159 también redefine** `_sincronizar_addons_del_plan`: concede el extra a Negocio y Cadena, y el interruptor sigue siendo del dueño.
+- **La 0159 también redefine** `_sincronizar_addons_del_plan`: concede el extra a los planes que lo incluyen (Negocio, Cadena y los planes por giro) y lo retira al bajar a uno que no; el interruptor sigue siendo del dueño. A diferencia de la 0141, cuando un negocio que lo pagaba aparte sube a un plan que lo incluye, primero queda activa la fila incluida y después se cierra la pagada: al revés, el trigger que apaga el interruptor al retirar el extra apagaba el programa de quien solo estaba subiendo de plan.
 
 ### Límites conocidos del admin
 
-- La lista de planes que traen la lealtad sin cargo al concederla a mano en el panel de VIM (`PLANES_QUE_LO_INCLUYEN`, `apps/platform/app/lib/addons.ts`) es explícita; la base la da a todo plan distinto de Esencial. Un plan fuera de esa lista (personalizados) se cobraría a $100 en el alta manual: quien la conceda debe revisar el precio.
+- Los planes que traen la lealtad sin cargo son una lista explícita de códigos —`NEGOCIO`, `CADENA`, `FT`, `QS`, `CB`, `FS`, `DK`, `ENT`— y es la misma en la base (`lealtad_incluido`, 0156) y en el panel de VIM (`PLANES_QUE_LO_INCLUYEN`, `apps/platform/app/lib/addons.ts`). Esencial y cualquier plan fuera de esa lista (uno personalizado o uno nuevo) la pagan aparte, a $100, tanto en el cambio de plan como en el alta manual. Incluirla en un plan nuevo es un gesto deliberado en los dos sitios.
+- El relleno de la 0159 concede el extra solo a negocios con suscripción ACTIVA: a uno con la suscripción pausada o sin fila se le concede a mano (lista de salida, §1).
 - Las cifras de Lealtad → Movimientos (repartido, canjeado, saldo vivo) cuentan solo la forma de ganar vigente; el libro de abajo muestra todos los movimientos, también los de una forma anterior. Tras cambiar de forma de ganar no cuadran entre sí, a propósito.
 - El bloqueo «no cambiar al cliente con un canje a medias» vive en el almacenamiento local de esa caja: desde otra terminal no se ve.
 - Los reportes del admin piden `lealtad_mxn`: la 0159 debe estar en producción **antes** de mezclar. Sin ella, el panel del día y el consolidado fallan.

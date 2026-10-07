@@ -12,11 +12,6 @@ El orden importa: **base y funciones primero, mezclar después, instalador al fi
       `recalcular_totales_ticket` y `reporte_x`).
 - [ ] CI de los tres PR en verde. El de pruebas (pgTAP) solo corre contra `main`: cambia la base
       del PR #110 a `main` (o ábrelo ya contra `main`) y espera a que pase antes de seguir.
-- [ ] **A confirmar con Fermín: planes personalizados.** En el panel de VIM, la lista de planes que
-      traen la lealtad sin cargo al concederla a mano (`PLANES_QUE_LO_INCLUYEN` en
-      `apps/platform/app/lib/addons.ts`) es explícita; la base, en cambio, la da a todo plan
-      distinto de Esencial. Un plan fuera de esa lista (los personalizados) se cobraría a $100 en el
-      alta manual: quien la conceda debe revisar el precio, o se añade el plan a la lista.
 
 ## 1. Base de datos (producción)
 
@@ -28,8 +23,16 @@ El orden importa: **base y funciones primero, mezclar después, instalador al fi
 - [ ] Comprobar: `select lealtad_mxn from tickets limit 1;` responde sin error.
 - [ ] Comprobar: `select codigo, activo, precio_mensual_mxn from addons where codigo = 'LEALTAD';` → activo, 100.
 - [ ] Comprobar a quién se le concedió:
-      `select t.nombre from tenant_addons ta join tenants t on t.id = ta.tenant_id join addons a on a.id = ta.addon_id where a.codigo = 'LEALTAD';`
-      Deben ser solo los negocios en Negocio y Cadena. Ninguno queda encendido: el interruptor es del dueño.
+      `select t.nombre_comercial, ta.precio_mensual_mxn, ta.incluido_en_plan from tenant_addons ta join tenants t on t.id = ta.tenant_id join addons a on a.id = ta.addon_id where a.codigo = 'LEALTAD' and ta.activo;`
+      Deben ser solo negocios cuyo plan la incluye: Negocio, Cadena y los planes por giro (`FT`,
+      `QS`, `CB`, `FS`, `DK`, `ENT`). Es la misma lista en la base (`lealtad_incluido`, 0156) y en el
+      panel (`PLANES_QUE_LO_INCLUYEN`); Esencial y cualquier plan fuera de ella (uno personalizado)
+      la pagan aparte. Ninguno queda encendido: el interruptor es del dueño.
+- [ ] **El relleno se guía por suscripciones ACTIVAS.** Un negocio con la suscripción pausada o sin
+      fila de suscripción no la recibe aunque su plan la incluya. Contrastar contra el plan del negocio:
+      `select t.nombre_comercial, p.codigo from tenants t join planes p on p.id = t.plan_actual_id where coalesce((p.features_incluidos->>'lealtad_incluido')::boolean, false) and not exists (select 1 from tenant_addons ta join addons a on a.id = ta.addon_id where ta.tenant_id = t.id and a.codigo = 'LEALTAD' and ta.activo);`
+      A los que salgan y sigan siendo clientes se les concede a mano desde el panel (ficha del
+      cliente → Extras → Programa de lealtad; el precio se pre-llena en $0).
 - [ ] Comprobar que el proceso diario quedó programado: `select jobname, schedule from cron.job where jobname ilike '%lealtad%';`
 
 ## 2. Funciones (producción)
@@ -38,6 +41,9 @@ El orden importa: **base y funciones primero, mezclar después, instalador al fi
 - [ ] Redesplegar `autofacturar` (pública: con `verify_jwt = false`, ver
       `reference_deploy_funciones_publicas`) y `timbrar-cfdi`.
 - [ ] Probar el portal de autofactura con un ticket normal de producción: debe seguir facturando.
+- [ ] Probar también una factura de un ticket normal **desde el admin** (no solo el portal):
+      `timbrar-cfdi` ahora falla cerrado —si no puede comprobar que la cuenta no lleva un premio, no
+      timbra—, así que un error ahí detendría toda la facturación del admin, no solo la de premios.
 
 ## 3. Mezclar
 
@@ -59,6 +65,10 @@ El orden importa: **base y funciones primero, mezclar después, instalador al fi
   - [ ] Cambiar el programa a puntos = dinero (confirma el reinicio) → canjear $ en una cuenta → el total baja.
   - [ ] Sin internet: la venta suma puntos al volver la red; el botón de canjear avisa que necesita internet.
   - [ ] Lealtad → Movimientos muestra todo lo anterior con el nombre del cajero.
+  - [ ] Subir de plan sin perder el programa: con el negocio en Esencial, la lealtad concedida de
+        pago ($100) y el programa encendido, cambiarlo desde el panel a un plan que la incluye →
+        el programa **sigue encendido**, el extra queda a $0 «incluido en el plan» y la fila de
+        pago queda cerrada. (Al terminar, regresar el negocio a su plan.)
 - [ ] Apagar el programa en VIM Pruebas al terminar, o dejarlo como demo: decisión de Fermín.
 
 ## 5. Publicar

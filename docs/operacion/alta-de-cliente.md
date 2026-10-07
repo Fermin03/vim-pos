@@ -171,8 +171,9 @@ cajas en total (la tercera, en la sucursal que quiera); la cuarta se rechaza has
 
 ### Lealtad
 
-- En Negocio y Cadena viene concedida con el plan. En Esencial se concede desde el panel
-  (ficha del cliente → Extras → Programa de lealtad, $100 al mes).
+- En Negocio, Cadena y los planes por giro (`FT`, `QS`, `CB`, `FS`, `DK`, `ENT`) viene concedida
+  con el plan. En Esencial se concede desde el panel (ficha del cliente → Extras → Programa de
+  lealtad, $100 al mes).
 - Concederla no la enciende: el dueño entra a **Lealtad** en su panel, guarda su programa y lo
   enciende ahí mismo. Sin programa guardado el interruptor no se deja encender.
 - Las cajas necesitan la 0.5.0 o posterior. Una caja más vieja sigue vendiendo, pero no muestra la
@@ -181,8 +182,11 @@ cajas en total (la tercera, en la sucursal que quiera); la cuarta se rechaza has
 - Si el cliente pregunta por facturas: una cuenta con un premio de regalo no se factura por
   separado; entra en la factura global. El canje de puntos por dinero se factura normal.
 - Dar de baja el extra apaga el programa en sus cajas; los saldos se conservan.
-- Un plan fuera de Esencial, Negocio y Cadena (uno personalizado) no trae la lealtad sin cargo al
-  concederla a mano desde el panel: se cobraría a $100. Quien la conceda revisa el precio antes de guardar.
+- Un plan fuera de esa lista (uno personalizado) no la incluye: la paga aparte, a $100, igual que
+  Esencial. La base y el panel usan la misma lista, así que el precio que el panel pre-llena es el
+  correcto; si se la quieres regalar, cambia el precio a $0 antes de guardar.
+- Si un cliente que la pagaba aparte sube a un plan que la incluye, pasa sola a $0 y su programa
+  sigue encendido.
 
 ---
 
