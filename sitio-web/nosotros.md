@@ -26,7 +26,7 @@ _La caja, tal como la ve quien cobra. Todo lo que hay en este sitio son capturas
 
 Competimos contra marcas con veinticinco años encima, y ahí no se gana con promesas. Somos concretos donde el resto es vago:
 
-- **El precio está publicado.** Los tres planes, los extras y los paquetes de folios están en la [página de precios](https://vimpos.com.mx/precios). No hay «contáctanos para conocer el precio».
+- **El precio va de frente.** Los tres planes, los extras y los paquetes de folios están en la [página de precios](https://vimpos.com.mx/precios). No hay «contáctanos para conocer el precio».
 - **No hay pago inicial.** En ningún plan. Desde Negocio cargamos tu menú, dejamos lo fiscal configurado y capacitamos a tu equipo; en Esencial lo haces tú con nuestra guía.
 - **No vendemos equipo.** Te decimos qué computadora, qué impresora y qué cajón buscar, y los compras donde te salga mejor.
 - **No cobramos comisión por venta.** El cobro con tarjeta se hace en tu terminal bancaria de siempre; el dinero no pasa por nosotros.

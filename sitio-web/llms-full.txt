@@ -1,6 +1,6 @@
 # VIM POS — el sitio completo
 
-> VIM POS es un sistema de punto de venta para restaurantes en México. El programa completo se instala en la computadora de la caja, así que cobrar, imprimir tickets y mandar comandas a cocina funcionan sin conexión a internet; la nube sirve de respaldo y de panel para el dueño. Incluye caja, pantalla de cocina, mapa de mesas, inventario, reportes y facturación electrónica CFDI 4.0. Precio publicado desde $699 MXN al mes más IVA, sin pago inicial; desde el plan Negocio, VIM carga el menú y capacita al equipo, y en Esencial el dueño arranca con una guía paso a paso.
+> VIM POS es un sistema de punto de venta para restaurantes en México. El programa completo se instala en la computadora de la caja, así que cobrar, imprimir tickets y mandar comandas a cocina funcionan sin conexión a internet; la nube sirve de respaldo y de panel para el dueño. Incluye caja, pantalla de cocina, mapa de mesas, inventario, reportes y facturación electrónica CFDI 4.0. Desde $699 MXN al mes más IVA, sin pago inicial; desde el plan Negocio, VIM carga el menú y capacita al equipo, y en Esencial el dueño arranca con una guía paso a paso.
 
 Este archivo concatena las 16 páginas de https://vimpos.com.mx en Markdown. Es el
 contexto completo del producto en una sola descarga. El índice corto, con la guía de
@@ -28,7 +28,7 @@ Desde **$699 al mes**, más IVA · sin contrato forzoso · [ver los tres planes]
 
 Todo tu sistema vive en tu caja, no en internet
 
-Imprime en impresoras térmicas de tickets conectadas a tu red
+Imprime en impresoras térmicas de tickets, de red o de USB
 
 El corte de caja cuadra contra lo que hay en el cajón
 
@@ -148,7 +148,7 @@ Bebidas en la barra, comida en cocina, cada una en su impresora. Es lo mismo que
 
 _Precios_
 
-## Precio de lista, publicado
+## Precio de lista, sin cotización
 
 Mensual, en pesos, más IVA. Sin cotización ni «contáctanos para conocer el precio».
 
@@ -706,7 +706,7 @@ Media hora con tus productos y tus precios cargados, y la facturación en modo d
 
 <!-- https://vimpos.com.mx/precios -->
 
-# Precios de VIM POS: tres planes, publicados
+# Precio de lista, sin cotización
 
 > Tres planes en pesos más IVA: Esencial $699, Negocio $999 y Cadena $1,999 al mes. Sin pago inicial ni contrato forzoso.
 
@@ -852,7 +852,7 @@ _Desde Negocio_
 
 ### Capacitación de tu equipo
 
-Tres horas con quien va a estar en la caja y en la cocina. En Esencial, el panel te lleva paso a paso hasta dejar todo listo, y las dudas se resuelven por WhatsApp, de 9:00 a 18:00.
+Tres horas con quien va a estar en la caja y en la cocina. En Esencial, el panel te lleva paso a paso hasta dejar todo listo, y las dudas se resuelven por WhatsApp, de lunes a sábado, de 9:00 a 18:00; domingo no hay servicio.
 
 _Los tres planes_
 
@@ -1238,7 +1238,7 @@ _Dónde queda VIM POS_
 
 ## Licencia fija, cero comisión, y lo que no incluye
 
-Somos el primer modelo. El precio está [publicado](https://vimpos.com.mx/precios); no hay pago inicial, y desde Negocio la carga de tu menú y la capacitación van incluidas; y no nos llevamos ni un peso de tus ventas: la tarjeta se cobra en tu terminal de siempre y en el sistema se registra como forma de pago para que el corte cuadre.
+Somos el primer modelo. El precio está [a la vista](https://vimpos.com.mx/precios); no hay pago inicial, y desde Negocio la carga de tu menú y la capacitación van incluidas; y no nos llevamos ni un peso de tus ventas: la tarjeta se cobra en tu terminal de siempre y en el sistema se registra como forma de pago para que el corte cuadre.
 
 **Y dónde no conviene.** Si tienes una sola caja, sin inventario y sin empleados que controlar, el modelo gratuito te sale más barato y no vamos a fingir lo contrario. Tampoco somos la opción si necesitas que el mesero capture en tableta o que la tarjeta se cobre desde el mismo sistema: eso y el resto de los límites están en [la guía de compra](https://vimpos.com.mx/como-elegir-sistema-restaurante).
 
@@ -1248,7 +1248,7 @@ Trae tu venta con tarjeta de un mes bueno y la calculamos juntos en la demo, sin
 
 [Pide una demo](https://vimpos.com.mx/demo)
 
-[Ver los precios publicados](https://vimpos.com.mx/precios)
+[Ver los precios](https://vimpos.com.mx/precios)
 
 ---
 
@@ -1286,9 +1286,9 @@ Cómo comprobarlo: en la demo, pide que le quiten el internet a la computadora y
 
 _Así se ve la pregunta 1 respondida en la caja de VIM POS: el aviso de que no hay internet, y el ticket y el catálogo funcionando igual. Pide esta misma pantalla en cualquier demo._
 
-### 2 · ¿El precio está publicado?
+### 2 · ¿Te dicen el precio de frente?
 
-Si hay que pedir cotización, el precio depende de lo que el vendedor calcule que puedes pagar. No es ilegal ni raro, pero conviene saberlo: las tres formas de cobrar están en [cuánto cuesta un sistema para restaurante](https://vimpos.com.mx/cuanto-cuesta-un-sistema-para-restaurante). Un precio publicado también es un precio que no te pueden subir en la renovación sin que te enteres.
+Si hay que pedir cotización, el precio depende de lo que el vendedor calcule que puedes pagar. No es ilegal ni raro, pero conviene saberlo: las tres formas de cobrar están en [cuánto cuesta un sistema para restaurante](https://vimpos.com.mx/cuanto-cuesta-un-sistema-para-restaurante). Un precio a la vista también es un precio que no te pueden subir en la renovación sin que te enteres.
 
 ### 3 · ¿Me cobran comisión por cada venta?
 
@@ -1344,7 +1344,7 @@ Media hora con tus productos y tus precios cargados. Puedes traer esta lista y h
 
 [Pide una demo](https://vimpos.com.mx/demo)
 
-[Ver los precios publicados](https://vimpos.com.mx/precios)
+[Ver los precios](https://vimpos.com.mx/precios)
 
 ---
 
@@ -1536,7 +1536,7 @@ Media hora con tus productos, tus extras y tus precios cargados.
 
 # Punto de venta para restaurantes en León, Guanajuato
 
-> VIM POS se hace en León. Si tu restaurante está en la zona, la demo es en tu mostrador y con tu menú. Precio publicado desde $699 al mes.
+> VIM POS se hace en León. Si tu restaurante está en la zona, la demo es en tu mostrador y con tu menú. Desde $699 al mes más IVA, sin letra chica.
 
 **VIM POS** · punto de venta para restaurantes en México · versión en HTML: https://vimpos.com.mx/punto-de-venta-restaurantes-leon
 
@@ -1580,7 +1580,7 @@ El sistema vive en la computadora de tu caja. Si se va la señal, sigues cobrand
 
 Tu cliente escanea el ticket y se factura solo; la factura global sale con un botón. [Facturación CFDI 4.0](https://vimpos.com.mx/facturacion-cfdi).
 
-### Precio publicado
+### Precio de frente
 
 Desde $699 al mes más IVA, sin pago inicial ni contrato forzoso. [Los tres planes](https://vimpos.com.mx/precios).
 
@@ -1640,7 +1640,7 @@ _La caja, tal como la ve quien cobra. Todo lo que hay en este sitio son capturas
 
 Competimos contra marcas con veinticinco años encima, y ahí no se gana con promesas. Somos concretos donde el resto es vago:
 
-- **El precio está publicado.** Los tres planes, los extras y los paquetes de folios están en la [página de precios](https://vimpos.com.mx/precios). No hay «contáctanos para conocer el precio».
+- **El precio va de frente.** Los tres planes, los extras y los paquetes de folios están en la [página de precios](https://vimpos.com.mx/precios). No hay «contáctanos para conocer el precio».
 - **No hay pago inicial.** En ningún plan. Desde Negocio cargamos tu menú, dejamos lo fiscal configurado y capacitamos a tu equipo; en Esencial lo haces tú con nuestra guía.
 - **No vendemos equipo.** Te decimos qué computadora, qué impresora y qué cajón buscar, y los compras donde te salga mejor.
 - **No cobramos comisión por venta.** El cobro con tarjeta se hace en tu terminal bancaria de siempre; el dinero no pasa por nosotros.
@@ -1679,7 +1679,7 @@ Te contestamos el mismo día hábil. Sin centro de llamadas y sin vendedor.
 - **WhatsApp, en cuanto nos escribas.** Si prefieres seguir la conversación por ahí, dilo en el correo y te pasamos el número. Ya no lo publicamos en el sitio.
 - **El [formulario de demostración](https://vimpos.com.mx/demo).** Si prefieres que te busquemos nosotros. Pide cuántas cajas y cuántas sucursales tienes, que es lo que decide qué plan te toca y qué te enseñamos.
 
-Contestamos **el mismo día hábil**, en horario hábil y en español. No hay número 800 ni menú de opciones: escribes y contesta una persona.
+Contestamos **el mismo día hábil** y en español. Por WhatsApp atendemos de lunes a sábado, de 9:00 a 18:00; domingo no hay servicio. No hay número 800 ni menú de opciones: escribes y contesta una persona.
 
 ![Panel del dueño con las ventas del día, el ticket promedio y el top de productos.](https://vimpos.com.mx/assets/img/capturas/admin-dashboard.webp?v=3)
 
@@ -1695,10 +1695,10 @@ _El panel que te enseñamos en la demostración: cómo va el día, la venta por 
 
 ## Qué te sirve más según lo que busques
 
-- **Saber cuánto cuesta.** No hace falta escribirnos: los tres planes, los extras y los paquetes de folios están publicados en la [página de precios](https://vimpos.com.mx/precios).
+- **Saber cuánto cuesta.** No hace falta escribirnos: los tres planes, los extras y los paquetes de folios están en la [página de precios](https://vimpos.com.mx/precios).
 - **Saber si hace lo que necesitas.** Lo que hace el sistema y lo que no, módulo por módulo, está en [funciones](https://vimpos.com.mx/funciones).
 - **Verlo funcionando.** [Pide una demo](https://vimpos.com.mx/demo): media hora, con tus productos y tus precios cargados, sin presentación y sin compromiso.
-- **Soporte, si ya eres cliente.** Al mismo correo, en horario hábil, y también el día del arranque en los planes con acompañamiento.
+- **Soporte, si ya eres cliente.** Al mismo correo y por WhatsApp, de lunes a sábado, de 9:00 a 18:00; domingo no hay servicio. También el día del arranque en los planes con acompañamiento.
 - **Derechos ARCO o privacidad.** Por correo, con lo que pide el [aviso de privacidad](https://vimpos.com.mx/aviso-privacidad). Se contesta en un máximo de 20 días hábiles y no cuesta nada.
 
 Para agentes y herramientas automáticas
@@ -1878,7 +1878,7 @@ Hacemos nuestro mejor esfuerzo por tenerlo todo funcionando, y por diseño el si
 
 **No prometemos un porcentaje de disponibilidad**, porque hoy no lo medimos y publicar un número que no se mide no le sirve a nadie. Lo que sí prometemos: si algo se cae, te contestamos y lo atendemos.
 
-Soporte por WhatsApp y correo en horario hábil. En los planes con acompañamiento, también el día del arranque.
+Soporte por WhatsApp y correo, de lunes a sábado, de 9:00 a 18:00; domingo no hay servicio. En los planes con acompañamiento, también el día del arranque.
 
 ## Límite de responsabilidad
 

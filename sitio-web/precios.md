@@ -1,4 +1,4 @@
-# Precios de VIM POS: tres planes, publicados
+# Precio de lista, sin cotización
 
 > Tres planes en pesos más IVA: Esencial $699, Negocio $999 y Cadena $1,999 al mes. Sin pago inicial ni contrato forzoso.
 
@@ -144,7 +144,7 @@ _Desde Negocio_
 
 ### Capacitación de tu equipo
 
-Tres horas con quien va a estar en la caja y en la cocina. En Esencial, el panel te lleva paso a paso hasta dejar todo listo, y las dudas se resuelven por WhatsApp, de 9:00 a 18:00.
+Tres horas con quien va a estar en la caja y en la cocina. En Esencial, el panel te lleva paso a paso hasta dejar todo listo, y las dudas se resuelven por WhatsApp, de lunes a sábado, de 9:00 a 18:00; domingo no hay servicio.
 
 _Los tres planes_
 

@@ -31,7 +31,7 @@ const TARJETAS = [
   { id: "home",         eyebrow: "Punto de venta para restaurantes", titulo: "Todo lo que tu restaurante necesita, sin letra chica." },
   { id: "funciones",    eyebrow: "Funciones",     titulo: "Qué hace, sección por sección." },
   { id: "sin-internet", eyebrow: "El diferenciador", titulo: "Se cae el internet y tú sigues cobrando." },
-  { id: "precios",      eyebrow: "Precios",       titulo: "Precio de lista, publicado. Desde $699 al mes." },
+  { id: "precios",      eyebrow: "Precios",       titulo: "Precio de lista, sin cotización. Desde $699 al mes." },
   { id: "demo",         eyebrow: "Pide una demo", titulo: "Te lo enseñamos funcionando, con tus productos." },
   { id: "legal",        eyebrow: "VIM POS",       titulo: "Punto de venta para restaurantes en México." },
   { id: "facturacion-cfdi", eyebrow: "Facturación",   titulo: "Facturación CFDI 4.0, sin parar la fila." },
