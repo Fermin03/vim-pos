@@ -1,6 +1,7 @@
 "use client";
 import { useCallback, useEffect, useState } from "react";
 import { BotonVolver } from "./boton-volver";
+import { useEscape } from "../lib/use-escape";
 import { Button } from "@vim/ui/styles";
 import { etiquetaModo } from "@vim/db/modos-servicio";
 import { etiquetaMetodoPago } from "@vim/db/metodos-pago";
@@ -40,6 +41,7 @@ export function PantallaMonitorVentas({
   const [error, setError] = useState<string | null>(null);
   const [filtro, setFiltro] = useState<Filtro>("TODO");
   const [cargando, setCargando] = useState(true);
+  useEscape(onSalir);
 
   const cargar = useCallback(async () => {
     setError(null);

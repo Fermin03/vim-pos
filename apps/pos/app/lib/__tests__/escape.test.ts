@@ -24,6 +24,14 @@ describe("capaVisible", () => {
     expect(salir).not.toHaveBeenCalled();
   });
 
+  it("una capa visible que CEDE (acción null) no deja pasar a las de abajo", () => {
+    // El cobro abierto sobre la captura: lo atiende ModalCobro. Si la lista siguiera bajando,
+    // Escape en el cobro ejecutaría «Volver» de la captura.
+    const volver = vi.fn();
+    expect(capaVisible([[false, vi.fn()], [true, null], [true, volver]])).toBeNull();
+    expect(volver).not.toHaveBeenCalled();
+  });
+
   it("sin ninguna capa visible no devuelve acción (la pantalla de abajo decide)", () => {
     expect(capaVisible([[false, vi.fn()]])).toBeNull();
     expect(capaVisible([])).toBeNull();

@@ -88,6 +88,27 @@ export async function marcarTicketImpreso(token: string, ticketId: string): Prom
   if (error) throw new Error(error.message);
 }
 
+/** ¿El ticket del cliente de esta cuenta ya se imprimió? Para quien entra a la cuenta sin pasar
+ *  por la lista (el mapa de mesas, el cierre de turno). */
+export async function leerTicketImpreso(token: string, ticketId: string): Promise<boolean> {
+  const { data, error } = await employeeClient(token)
+    .from("tickets").select("ticket_impreso_at").eq("id", ticketId).maybeSingle();
+  if (error) throw new Error(error.message);
+  return data?.ticket_impreso_at != null;
+}
+
+/**
+ * Reabre una cuenta cuyo ticket ya se imprimió (0160): le quita el sello para que se le puedan
+ * agregar o quitar productos. Pide la autorización de un supervisor, la misma de «Reimprimir».
+ */
+export async function reabrirCuentaImpresa(token: string, ticketId: string, autorizacionPinId: string): Promise<void> {
+  const { error } = await employeeClient(token).rpc("reabrir_cuenta_impresa", {
+    p_ticket_id: ticketId,
+    p_autorizacion_pin_id: autorizacionPinId,
+  });
+  if (error) throw new Error(error.message);
+}
+
 /** Minutos desde que se abrió la cuenta (para la lista). Puro. */
 export function minutosAbierta(desdeIso: string | null, ahora: Date = new Date()): number {
   if (!desdeIso) return 0;

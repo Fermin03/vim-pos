@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
+import { useEscape } from "../lib/use-escape";
 import { obtenerImpresora } from "../lib/print/adapter";
 import { Button } from "@vim/ui/styles";
 import { TopbarPos } from "./topbar-pos";
@@ -39,6 +40,8 @@ export function AbrirTurno({
   const [notas, setNotas] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [abriendo, setAbriendo] = useState(false);
+  // Con el turno a medio abrir no se sale: la tecla se atiende y no hace nada.
+  useEscape(() => { if (!abriendo) onVolver(); });
   // B3 Foodtruck — evento como contexto del turno (Flujos §4)
   const [esEvento, setEsEvento] = useState(false);
   const [eventoNombre, setEventoNombre] = useState("");

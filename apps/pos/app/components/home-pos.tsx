@@ -86,7 +86,8 @@ import { claveCatalogo, esErrorDeRed } from "../lib/catalogo-cache";
 import { sincronizar } from "../lib/sync";
 import { notificarEventoCritico } from "../lib/push-eventos";
 import type { DatosTicketImpresion } from "../lib/print/tipos";
-import { capaVisible } from "../lib/escape";
+import { capaVisible, type CapaEscape } from "../lib/escape";
+import { leerTicketImpreso } from "../lib/cuentas-abiertas";
 import { useEscape } from "../lib/use-escape";
 import { ModalAsignarRepartidor } from "./modal-asignar-repartidor";
 import type { LineaCancelada } from "./modal-cancelar-items";
@@ -295,6 +296,15 @@ export function HomePos({
    * `persistirTicket` (idempotente) en vez de reusar el ticket incompleto.
    */
   const [ticketIncompleto, setTicketIncompleto] = useState(false);
+  /** El ticket se guardó pero su envío no (`ErrorEnvioNoFijado`): el carrito conserva el renglón
+   *  de envío para que el cajero elija otra zona. Se apaga al fijarla o al soltar el ticket. */
+  const [envioSinFijar, setEnvioSinFijar] = useState(false);
+  /** La cuenta cargada ya tiene impreso el ticket del cliente: no se le agrega ni se le quita
+   *  nada hasta reabrirla desde su lista (con PIN). */
+  const [cuentaImpresa, setCuentaImpresa] = useState(false);
+  useEffect(() => {
+    if (ticketBd === null) { setEnvioSinFijar(false); setCuentaImpresa(false); }
+  }, [ticketBd]);
   // T2 — modo "cuenta por mesa": el carrito refleja un ticket persistido y los taps agregan
   // incrementalmente. Sólo se activa al abrir/retomar una mesa; QS no cambia.
   const [enModoMesa, setEnModoMesa] = useState(false);
@@ -804,6 +814,9 @@ export function HomePos({
       setEnMesas(false);
       setEnPickup(false);
       setEnDelivery(false);
+      // Si la lectura falla se queda en "no impresa": no se le niega la captura a una cuenta por
+      // un dato que no se pudo leer.
+      leerTicketImpreso(token, ticketId).then(setCuentaImpresa).catch(() => {});
       // B1 — saber si la mesa ya fue enviada a cocina (para el botón).
       contarPendientesCocina(token, ticketId).then((n) => setCocinaEnviada(n === 0)).catch(() => {});
       return true;
@@ -995,6 +1008,7 @@ export function HomePos({
     if (e instanceof ErrorEnvioNoFijado) {
       // Los renglones sí entraron: si venía de un intento incompleto, ya no lo está.
       setTicketIncompleto(false);
+      setEnvioSinFijar(true);
       return `El pedido se guardó, pero sin envío: ${e.message}. Toca el renglón de envío para elegir otra zona.`;
     }
     setTicketIncompleto(true);
@@ -1199,13 +1213,28 @@ export function HomePos({
   const cambiarZonaPedido = useCallback(async (envio: EnvioCarrito | null) => {
     const totales = await cambiarZonaDePedido(token, ticketBd?.ticketId ?? null, envio?.zonaId ?? null);
     if (totales) setTicketBd(totales);
+    setEnvioSinFijar(false);
     dispatch({ tipo: "zona", envio });
   }, [ticketBd, token]);
 
   const bloqueado = ticketBd !== null;
-  // En modo cuenta de mesa el ticket está persistido (ticketBd) PERO el menú debe seguir activo
-  // para agregar ítems incrementalmente. Solo se bloquea el menú en el flujo QS post-cobro/descuento.
-  const menuBloqueado = bloqueado && !enModoMesa;
+  /**
+   * Cuándo se apaga el catálogo.
+   *
+   * Antes se apagaba en cuanto la venta de mostrador tenía ticket guardado (`bloqueado &&
+   * !enModoMesa`). Y el ticket se guarda al abrir el cobro o un descuento: bastaba tocar «Cobrar»,
+   * arrepentirse y volver por el refresco que faltaba para encontrar todos los productos en gris,
+   * sin más salida que cancelar la cuenta y capturarla otra vez.
+   *
+   * No hacía falta: con ticket guardado, un toque en el catálogo ya agrega el renglón EN la base y
+   * relee la cuenta (`agregarSuelto`, `confirmarCombo`), que es como trabaja una mesa. Solo quedan
+   * los tres casos donde agregar sí rompería algo:
+   *  - ticket INCOMPLETO: el reintento tiene que mandar las mismas líneas, y releer la cuenta
+   *    borraría del carrito las que no alcanzaron a entrar;
+   *  - envío sin fijar: releer se llevaría el renglón de envío que el aviso manda tocar;
+   *  - cuenta con el ticket ya impreso: se reabre desde su lista antes de agregarle nada.
+   */
+  const menuBloqueado = ticketIncompleto || envioSinFijar || cuentaImpresa;
 
   // ── D45 §12 — Pedidos en espera ───────────────────────────────────────────
   const refrescarEspera = useCallback(() => {
@@ -1494,6 +1523,13 @@ export function HomePos({
     if (it) setDescuentoItem(it);
   }, [itemsPersistidos]);
 
+  /** Cierra la vista del recibo: lo mismo con su botón que con Escape. */
+  const cerrarVistaRecibo = useCallback(() => {
+    setMostrarRecibo(false);
+    setImprimirCopia(false);
+    impresionesPreview.current = 0;
+  }, []);
+
   /**
    * Escape = cerrar lo que esté encima, o volver si no hay nada abierto.
    *
@@ -1505,7 +1541,7 @@ export function HomePos({
    * justo lo que no debe poder hacerse por reflejo.
    */
   const alEscapar = useMemo(() => {
-    const capas: [boolean, () => void][] = [
+    const capas: CapaEscape[] = [
       // Modificadores y combo: overlays sobre la rejilla de captura, por encima de todo lo demás.
       // El de modificadores va primero porque se pinta encima del de combo cuando ambos aplican.
       [modGrupos != null, () => setModGrupos(null)],
@@ -1526,10 +1562,14 @@ export function HomePos({
       // El aviso del reparto se pinta encima del recibo y de la confirmación de cobro, así que
       // Escape tiene que cerrarlo a él primero.
       [avisoReparto != null, () => setAvisoReparto(null)],
-      [mostrarRecibo, () => setMostrarRecibo(false)],
+      [mostrarRecibo, cerrarVistaRecibo],
       [confirmacion != null, nuevoTicket],
-      [totalesCobro != null && !procesandoCobro, () => setTotalesCobro(null)],
-      [agregandoA != null, () => setAgregandoA(null)],
+      // El cobro y «Agregar productos» CEDEN: tienen pasos internos (efectivo → selector, un
+      // modificador abierto sobre la tanda) y cada uno atiende su Escape. Antes los cerraba esta
+      // lista de un golpe: Escape en el teclado de efectivo tiraba el cobro entero, y con un
+      // modificador abierto se llevaba la tanda completa sin guardar.
+      [totalesCobro != null, null],
+      [agregandoA != null, null],
       [viendoMapaMesas, () => { setViendoMapaMesas(false); setPidiendoMesa(true); }],
       [pidiendoMesa, () => setPidiendoMesa(false)],
       [nombreCuentaAbierto, () => setNombreCuentaAbierto(false)],
@@ -1547,13 +1587,15 @@ export function HomePos({
       [confirmandoCierre, () => setConfirmandoCierre(false)],
       [menuGeneralAbierto, () => setMenuGeneralAbierto(false)],
       [cerrando, () => setCerrando(false)],
+      // La pantalla de cocina no conoce la pila del POS (vive en su propio paquete).
+      [enKds, () => setEnKds(false)],
       // Nada abierto: Escape equivale al botón Volver de la pantalla de captura.
       [!enInicio && !enKds && !enMonitor && !enConsultaCuentas && !enDevoluciones && !enPedidosApps
         && !enDelivery && !enPickup && !enMesas, () => intentarSalirDeCaptura("atras")],
     ];
     return capaVisible(capas);
-  }, [modGrupos, comboAbierto, hojaCombo, agregarSuelto, canjeDe, cancelandoItem, descuentoItem, cancelandoTicket, reimprimiendoComanda, avisoReparto, mostrarRecibo, confirmacion, totalesCobro,
-      procesandoCobro, agregandoA, viendoMapaMesas, pidiendoMesa, nombreCuentaAbierto,
+  }, [modGrupos, comboAbierto, hojaCombo, agregarSuelto, canjeDe, cancelandoItem, descuentoItem, cancelandoTicket, reimprimiendoComanda, avisoReparto, mostrarRecibo, cerrarVistaRecibo, confirmacion, totalesCobro,
+      agregandoA, viendoMapaMesas, pidiendoMesa, nombreCuentaAbierto,
       clienteDomAbierto, clienteCuentaAbierto, zonaPedidoAbierto, esperaPidiendoEtiqueta, esperaListaAbierta, movimientoAbierto,
       abrirCajaAbierto, cambiarPinAbierto, misPropinasAbierto, configImpresoraAbierto,
       salidaPendiente, confirmandoCierre, menuGeneralAbierto, cerrando, enInicio, enKds, enMonitor,
@@ -1803,7 +1845,7 @@ export function HomePos({
                 .catch(() => {});
             }
           }}
-          onCerrar={() => { setMostrarRecibo(false); setImprimirCopia(false); impresionesPreview.current = 0; }}
+          onCerrar={cerrarVistaRecibo}
           onNuevoTicket={nuevoTicket}
           autoImprimir={imprimirCopia}
         />
@@ -2373,6 +2415,12 @@ export function HomePos({
         </div>
       )}
 
+      {cuentaImpresa && (
+        <p className="flex-shrink-0 bg-warning-soft px-4 py-2 text-13 font-medium text-ink" role="status">
+          El ticket de esta cuenta ya se imprimió. Para agregarle o quitarle algo, reábrela desde su lista con «Reabrir cuenta».
+        </p>
+      )}
+
       <div className="flex min-h-0 flex-1">
           <CatalogoProductos
             categorias={categorias}
@@ -2384,10 +2432,11 @@ export function HomePos({
           estado={carrito}
           onCantidad={(id, c) => dispatch({ tipo: "cantidad", clientId: id, cantidad: c })}
           onQuitar={(id) => dispatch({ tipo: "quitar", clientId: id })}
-          onCancelarItemPersistido={ticketBd ? onCancelarItemPersistido : undefined}
-          onDescuentoItem={ticketBd ? onDescuentoItemSolicitado : undefined}
+          // Cuenta con el ticket impreso: nada que cambie el total hasta reabrirla desde su lista.
+          onCancelarItemPersistido={ticketBd && !cuentaImpresa ? onCancelarItemPersistido : undefined}
+          onDescuentoItem={ticketBd && !cuentaImpresa ? onDescuentoItemSolicitado : undefined}
           onLimpiar={!ticketBd ? () => dispatch({ tipo: "limpiar" }) : undefined}
-          onCancelarTicket={ticketBd ? () => setCancelandoTicket(true) : undefined}
+          onCancelarTicket={ticketBd && !cuentaImpresa ? () => setCancelandoTicket(true) : undefined}
           onEditarCliente={() => setClienteDomAbierto(true)}
           onCambiarZona={() => setZonaPedidoAbierto(true)}
           onNotaLinea={(id, nota) => dispatch({ tipo: "nota_linea", clientId: id, nota })}
@@ -2396,7 +2445,7 @@ export function HomePos({
           onEfectivoExacto={() => void iniciarCobro("EFECTIVO_EXACTO")}
           cambioAnterior={cambioAnterior}
           // También en cuenta de mesa: lo que no ha salido a cocina se edita en la base (0119).
-          onEditar={(id) => void editarLinea(id)}
+          onEditar={cuentaImpresa ? undefined : (id) => void editarLinea(id)}
           onPonerEnEspera={online ? () => { setEsperaError(null); setEsperaPidiendoEtiqueta(true); } : undefined}
           // Comedor va por la MISMA rama que Pick-up y domicilio: su cuenta también queda
           // abierta y se cobra después desde la lista. Antes entraba por la otra, que pinta
@@ -2415,7 +2464,7 @@ export function HomePos({
           folioCuenta={ticketBd?.folio ?? null}
           cocinaEnviada={cocinaEnviada}
           enviandoCocina={enviandoCocina}
-          onAplicarDescuento={onAplicarDescuento}
+          onAplicarDescuento={cuentaImpresa ? undefined : onAplicarDescuento}
           descuentoMxn={ticketBd?.descuentos ?? 0}
             promocionMxn={ticketBd?.promociones ?? 0}
           lealtadMxn={ticketBd?.lealtad ?? 0}
@@ -2424,7 +2473,7 @@ export function HomePos({
             ? {
                 nombre: clienteLealtad.nombre.split(" ")[0] ?? clienteLealtad.nombre,
                 franja,
-                onAbrir: admiteClienteCuenta(carrito.modoServicio) && carrito.lineas.length > 0 ? () => void onAbrirLealtad() : undefined,
+                onAbrir: admiteClienteCuenta(carrito.modoServicio) && carrito.lineas.length > 0 && !cuentaImpresa ? () => void onAbrirLealtad() : undefined,
               }
             : null}
           totalConDescuento={totalAutoritativo ?? undefined}

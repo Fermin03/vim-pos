@@ -1,5 +1,7 @@
 "use client";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { capaVisible } from "../lib/escape";
+import { useEscape } from "../lib/use-escape";
 import { Button } from "@vim/ui/styles";
 import { fmtMxn } from "../lib/turno";
 import {
@@ -593,6 +595,8 @@ function ModalAgregarPago({
 }) {
   const [metodo, setMetodo] = useState<MetodoPago>("EFECTIVO");
   const [buffer, setBuffer] = useState<string>("");
+  // Se monta encima del cobro, así que queda arriba en la pila: Escape cierra solo este diálogo.
+  useEscape(onCerrar);
 
   const monto = aMonto(buffer);
 
@@ -1172,6 +1176,22 @@ export function ModalCobro({
       setVista("otro");
     }
   }
+
+  /* Escape hace lo que el botón de salida de la vista que está en pantalla: «Volver» en efectivo,
+     tarjeta o dividido regresa al selector; en la propina y el selector cierra el cobro. Con un
+     pago aplicándose (o el atajo de efectivo exacto corriendo) no hace nada: interrumpir a media
+     aplicación de pago es justo lo que no debe poder hacerse por reflejo. */
+  const cerrarRef = useRef(onCerrar);
+  cerrarRef.current = onCerrar;
+  const alEscapar = useMemo(
+    () => capaVisible([
+      [procesando || vista === "atajo", () => {}],
+      [vista === "efectivo" || vista === "otro" || vista === "dividido", () => { setError(null); setVista("selector"); }],
+      [true, () => cerrarRef.current()],
+    ]),
+    [procesando, vista],
+  );
+  useEscape(alEscapar);
 
   // Tamaño del modal según la vista activa. El efectivo mide lo que su contenido (80 % de la
   // pantalla con tope de 960px): al 80 % de 1920 mediría 1536 y los números quedarían perdidos.

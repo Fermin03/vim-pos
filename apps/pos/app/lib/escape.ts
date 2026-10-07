@@ -18,8 +18,16 @@
  *  - `PilaEscape`: la precedencia ENTRE pantallas.
  */
 
-/** Una capa de Escape: si está a la vista, y qué hacer si Escape le toca a ella. */
-export type CapaEscape = [visible: boolean, accion: () => void];
+/**
+ * Una capa de Escape: si está a la vista, y qué hacer si Escape le toca a ella.
+ *
+ * `accion: null` es CEDER: la capa está a la vista, pero la atiende su propio componente (que
+ * llama a `useEscape` por su cuenta, porque tiene pasos internos que esta pantalla no conoce).
+ * Quien cede se sale de la pila mientras la capa esté abierta, y por eso las capas de más abajo
+ * en la lista no se ejecutan: sin esto, la pantalla madre —que se registra DESPUÉS que sus hijos—
+ * le ganaría la tecla al modal que acaba de abrir.
+ */
+export type CapaEscape = [visible: boolean, accion: (() => void) | null];
 
 /**
  * La acción de la primera capa visible, o `null` si no hay ninguna.

@@ -11,6 +11,7 @@ import {
   reanudarTiendaUber, segundosRestantes, type DuracionPausa, type EstadoTiendaApp, type PedidoApp,
 } from "../lib/pedidos-apps";
 import { BotonVolver } from "./boton-volver";
+import { useEscape } from "../lib/use-escape";
 
 const REFRESCO_MS = 10_000;
 const REFRESCO_TIENDA_MS = 60_000;
@@ -49,6 +50,8 @@ export function PantallaPedidosApps({ token, caja, onSalir }: { token: string; c
   const [sinConexion, setSinConexion] = useState(false);
   const [ocupadoTienda, setOcupadoTienda] = useState(false);
   const [menuPausa, setMenuPausa] = useState(false);
+  // Los dos diálogos (motivo del rechazo, pausar la tienda) se cierran antes de salir.
+  useEscape(rechazando ? () => setRechazando(null) : menuPausa ? () => setMenuPausa(false) : onSalir);
   const montado = useRef(true);
 
   const recargarTienda = useCallback(async (forzar = false) => {
