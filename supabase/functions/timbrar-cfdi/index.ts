@@ -176,13 +176,23 @@ Deno.serve(async (req) => {
   // aquí, antes de leer los renglones y de gastar un folio. Las notas de crédito (EGRESO) pasan.
   //
   // Con service_role, como las demás lecturas privilegiadas: el tenant ya se validó arriba. Si la
-  // consulta falla (la 0158 todavía no está aplicada: sin ella no existen ni esta función ni el
-  // candado), se sigue de largo igual que `autofacturar`. Ojo: los premios existen desde la 0156,
-  // así que en esa ventana una cuenta con premio no tiene quien la frene; por eso la 0158 va antes
-  // de encender premios.
+  // consulta falla NO se timbra a ciegas (ver abajo). Solo se sigue de largo si la función todavía no
+  // existe (la 0158 sin aplicar): ahí no hay candado. Ojo: los premios existen desde la 0156, así que
+  // en esa ventana una cuenta con premio no tiene quien la frene; por eso la 0158 va antes de encender
+  // premios.
   if (String(c.tipo_comprobante) === "INGRESO") {
     const { data: llevaPremio, error: pErr } = await admin.rpc("ticket_lleva_premio", { p_ticket_id: ticketId });
-    if (pErr) console.warn(`[lealtad] no se pudo revisar el premio del ticket ${ticketId}: ${pErr.message}`);
+    // Si la lectura falla, NO se timbra a ciegas: timbrar una cuenta con premio deja un concepto en
+    // cero ante el SAT, y eso no se deshace con un clic. La única excepción es que la función todavía
+    // no exista (la 0158 sin aplicar): ahí no hay candado ni premios que facturar mal, y bloquear
+    // tumbaría toda la facturación individual durante el despliegue.
+    if (pErr) {
+      const noExiste = pErr.code === "PGRST202" || pErr.code === "42883";
+      console.warn(`[lealtad] no se pudo revisar el premio del ticket ${ticketId}: ${pErr.message}`);
+      if (!noExiste) {
+        return json({ error: "NO_SE_PUDO_REVISAR_PREMIO", detalle: "No se pudo comprobar la cuenta antes de facturar. Inténtalo de nuevo en un momento." }, 503);
+      }
+    }
     if (llevaPremio === true) {
       return json({ error: "CON_PREMIO", detalle: "Esta venta incluye un premio de lealtad y no se factura de forma individual." }, 409);
     }
