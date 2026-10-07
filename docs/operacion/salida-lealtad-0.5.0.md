@@ -77,7 +77,7 @@ El orden importa: **base y funciones primero, mezclar después, instalador al fi
 - [ ] Subir el instalador a `Fermin03/vim-pos-descargas`, firmar, y publicar `latest.json` desde
       `/versiones` escribiendo TODOS los campos (`reference_publicar_latest_json`).
 - [ ] Tag `v0.5.0`.
-- [ ] Corregir la fecha de `sitio-web/novedades.html` si no se publicó el 13 de octubre.
+- [x] Fecha de `sitio-web/novedades.html` corregida: se publicó el 7 de octubre.
 - [ ] Actualizar primero el hub de cada negocio y después sus cajas.
 
 ## Cosas que conviene saber (no bloquean la salida)

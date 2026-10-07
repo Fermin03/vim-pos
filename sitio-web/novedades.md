@@ -6,7 +6,7 @@
 
 ## Octubre de 2026
 
-13 de octubre Caja · 0.5.0
+7 de octubre Caja · 0.5.0
 
 ### Programa de lealtad
 
