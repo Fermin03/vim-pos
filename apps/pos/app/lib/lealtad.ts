@@ -169,6 +169,9 @@ async function llamar<T>(token: string, cuerpo: Record<string, unknown>): Promis
   }
   const j = (await r.json().catch(() => null)) as Record<string, unknown> | null;
   if (r.ok && j?.ok === true) return j as unknown as { ok: true } & T;
+  // Un 2xx sin `ok: true` no es un rechazo: no se sabe qué hizo la nube. Va como respuesta inválida
+  // —ambigua, igual que en el puente de la caja— para que un canje no se dé por «no descontado».
+  if (r.ok) return { ok: false, error: "RESPUESTA_INVALIDA" };
   const error = typeof j?.error === "string" ? j.error : `HTTP_${r.status}`;
   return { ok: false, error, ...(typeof j?.saldo === "number" ? { saldo: j.saldo } : {}) };
 }

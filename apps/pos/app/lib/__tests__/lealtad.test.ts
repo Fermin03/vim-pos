@@ -183,9 +183,14 @@ describe("llamadas a lealtad-canje", () => {
     expect(await consultarSaldo("tk", { clienteId: "c-1", telefono: null })).toEqual({ ok: false, error: "HTTP_502" });
   });
 
-  it("un 200 sin ok:true no se da por bueno", async () => {
+  it("un 200 sin ok:true no se da por bueno ni por rechazo: es una respuesta inválida (ambigua)", async () => {
     vi.stubGlobal("fetch", responder(200, { cliente_id: "c-1" }));
-    expect(await consultarSaldo("tk", { clienteId: "c-1", telefono: null })).toEqual({ ok: false, error: "HTTP_200" });
+    expect(await consultarSaldo("tk", { clienteId: "c-1", telefono: null })).toEqual({ ok: false, error: "RESPUESTA_INVALIDA" });
+    // Aunque el cuerpo traiga un `error`, con 2xx no se le cree como rechazo limpio.
+    vi.stubGlobal("fetch", responder(200, { ok: false, error: "SALDO_INSUFICIENTE" }));
+    expect(await consultarSaldo("tk", { clienteId: "c-1", telefono: null })).toEqual({ ok: false, error: "RESPUESTA_INVALIDA" });
+    vi.stubGlobal("fetch", vi.fn(async () => new Response("<html>", { status: 200 })));
+    expect(await consultarSaldo("tk", { clienteId: "c-1", telefono: null })).toEqual({ ok: false, error: "RESPUESTA_INVALIDA" });
   });
 });
 
