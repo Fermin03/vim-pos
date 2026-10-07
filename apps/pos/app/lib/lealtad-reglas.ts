@@ -112,7 +112,7 @@ export function franjaLealtad(e: {
   const tope = e.programa.topeComprasDia;
   const gana = puntosPorCompra(e.programa, e.base);
   const detalle = e.comprasHoy >= tope
-    ? `Hoy ya no suma: tope de ${tope} compras al día`
+    ? `Hoy ya no suma: tope de ${tope} ${tope === 1 ? "compra" : "compras"} al día`
     : gana > 0 ? `Gana ${cantidad(m, gana)} con esta compra` : null;
   return { saldoTexto, detalle, boton: "Canjear", puedeAbrir: e.saldo > 0 };
 }

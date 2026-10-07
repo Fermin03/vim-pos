@@ -115,6 +115,11 @@ describe("franja de lealtad de la cuenta", () => {
     expect(franjaLealtad({ ...base, comprasHoy: 3 }).detalle).toBe("Hoy ya no suma: tope de 3 compras al día");
   });
 
+  it("con tope de una compra al día lo dice en singular", () => {
+    const uno = { ...base, programa: P({ porcentaje: 5, topeComprasDia: 1 }), comprasHoy: 1 };
+    expect(franjaLealtad(uno).detalle).toBe("Hoy ya no suma: tope de 1 compra al día");
+  });
+
   it("si la compra no gana nada, no promete nada", () => {
     expect(franjaLealtad({ ...base, base: 10 }).detalle).toBeNull();
   });
