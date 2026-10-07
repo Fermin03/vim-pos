@@ -3700,6 +3700,7 @@ Con el camino elegido, concede el add-on a mano al negocio de pruebas (`tenant_a
 | 20 | Canjeas desde un segundo dispositivo sobre la misma mesa y cobras en el primero, sin recargar | Cobra con el total correcto (el de la base, con el canje) y NO quita el canje |
 | 21 | Venta rápida de Para llevar (sin mesa): con cliente asignado, canjeas un premio desde la captura | El carrito se reconstruye con el premio dentro; la cuenta sigue siendo la misma |
 | 22 | Canjeas un premio desde la lista de cuentas | Cocina recibe la comanda del producto de premio |
+| 23 | En Para llevar, canjeas TODO el saldo y lo dejas a medias (sin red al asentar), cierras el modal y tocas Cobrar | Aviso «Hay un canje a medias»; la franja dice «Canje a medias» y su botón «Ver canje» abre el modal para reintentar o descartar; después se puede cobrar |
 
 Anota cada desviación. Lo que no coincida se arregla antes de pedir revisión.
 
