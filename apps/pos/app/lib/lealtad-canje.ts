@@ -211,6 +211,11 @@ export async function avanzarCanje(ops: OpsCanje, almacen: Almacen, inicial: Pen
     };
   }
   borrarPendiente(almacen, p.ticketId);
+  // La nube dice que ese canje nunca existió: entonces tampoco descontó nada. Decir «ya descontó»
+  // aquí sería mentira (visto en la prueba manual con un pendiente que la nube no conocía).
+  if (a.error === "CANJE_NO_EXISTE") {
+    return { estado: "RECHAZADO", mensaje: `La nube no tiene registrado ese canje: no se descontó nada. Si el cliente quiere canjear, empieza de nuevo.${renglonSeQueda}` };
+  }
   return {
     estado: "PUNTOS_GASTADOS",
     mensaje: `La nube ya descontó ${cuanto} y esta cuenta no los aceptó. ${mensajeErrorLealtad(a.error)} Vuelven solos al cliente en un máximo de 48 horas; desde la caja no se pueden devolver antes. Cobra la cuenta sin el canje.${renglonSeQueda}`,

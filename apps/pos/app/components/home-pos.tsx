@@ -2416,6 +2416,7 @@ export function HomePos({
           descuentoMxn={ticketBd?.descuentos ?? 0}
             promocionMxn={ticketBd?.promociones ?? 0}
           lealtadMxn={ticketBd?.lealtad ?? 0}
+          premioClientId={canjeVivo?.ticketItemId ? (itemsPersistidos.find((x) => x.id === canjeVivo.ticketItemId)?.clientId ?? null) : null}
           lealtad={franja && clienteLealtad
             ? {
                 nombre: clienteLealtad.nombre.split(" ")[0] ?? clienteLealtad.nombre,

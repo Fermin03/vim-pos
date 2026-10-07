@@ -104,6 +104,14 @@ describe("canje de dinero", () => {
     expect(leerPendiente(alm, "tk-1")).toBeNull();
   });
 
+  it("si al asentar la nube dice que el canje no existe, no se descontó nada: no se habla de puntos gastados", async () => {
+    const t = ops({ asentar: () => ({ ok: false, error: "CANJE_NO_EXISTE" }) });
+    const r = await avanzarCanje(t.o, alm, { ...dinero, paso: "ASENTAR" });
+    expect(r.estado).toBe("RECHAZADO");
+    expect(r.estado === "RECHAZADO" && r.mensaje).toMatch(/no se descontó nada/);
+    expect(leerPendiente(alm, "tk-1")).toBeNull();
+  });
+
   it("FUNCION_REQUIERE_NUBE al canjear es un rechazo limpio: la caja ni lo mandó", async () => {
     const t = ops({ canjear: () => ({ ok: false, error: "FUNCION_REQUIERE_NUBE" }) });
     expect((await avanzarCanje(t.o, alm, dinero)).estado).toBe("RECHAZADO");

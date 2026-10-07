@@ -77,6 +77,7 @@ export function SidebarTicket({
   promocionMxn = 0,
   lealtad = null,
   lealtadMxn = 0,
+  premioClientId = null,
   bloqueado = false,
   procesando,
   onEditar,
@@ -139,6 +140,9 @@ export function SidebarTicket({
   promocionMxn?: number;
   /** Canje de lealtad ya aplicado en BD (autoritativo). 0 = sin canje. */
   lealtadMxn?: number;
+  /** Renglón que es un premio de lealtad: se muestra en $0.00, que es lo que el cliente paga por
+   *  él (el descuento va en el renglón «Lealtad» de los totales). null = no hay premio. */
+  premioClientId?: string | null;
   /** Lealtad del cliente de la cuenta (ADR 0030). null = módulo apagado, sin programa o cuenta sin
    *  cliente: no se pinta nada. Sin `onAbrir` la franja informa, pero no canjea. */
   lealtad?: { nombre: string; franja: FranjaLealtad; onAbrir?: () => void } | null;
@@ -322,7 +326,7 @@ export function SidebarTicket({
                     nombre={l.producto.nombre}
                     modificadores={l.modificadores.map((m) => m.opcionNombre)}
                     notaCocina={l.notaCocina}
-                    totalMxn={totalLinea(l)}
+                    totalMxn={l.clientId === premioClientId ? 0 : totalLinea(l)}
                     hijos={l.combo?.componentes.map((c) => ({
                       slot: c.grupoNombre,
                       nombre: c.producto.nombre,
