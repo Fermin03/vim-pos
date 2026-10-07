@@ -80,10 +80,8 @@ import { leerItemsPersistidos, type ItemTicket } from "../lib/cancelacion";
 import { abrirCuentaEnMesa, agregarComboAlTicket, agregarItemAlTicket, reconstruirCarrito, reemplazarItemTicket } from "../lib/cuenta-mesa";
 import { atribuirMesero, contarPendientesCocina, enviarACocina, yaEnviadoACocina } from "../lib/mesero";
 import { useConexion } from "../lib/conexion";
-import { cacheGet, cachePut, contarPendientes } from "../lib/outbox";
+import { cacheGet, cachePut } from "../lib/outbox";
 import { claveCatalogo, esErrorDeRed } from "../lib/catalogo-cache";
-import { sincronizar } from "../lib/sync";
-import { notificarEventoCritico } from "../lib/push-eventos";
 import type { DatosTicketImpresion } from "../lib/print/tipos";
 import { capaVisible, type CapaEscape } from "../lib/escape";
 import { leerTicketImpreso } from "../lib/cuentas-abiertas";
@@ -187,39 +185,6 @@ export function HomePos({
   // que la conexión parpadea.
   const onlineRef = useRef(online);
   onlineRef.current = online;
-  // Fase 3 — outbox offline: pendientes por sincronizar + auto-sync al reconectar.
-  const [pendientesSync, setPendientesSync] = useState(0);
-  const sincronizando = useRef(false);
-
-  // Empuja el outbox cuando hay red. Idempotente; se reintenta al volver online.
-  useEffect(() => {
-    let vivo = true;
-    async function tick() {
-      if (!vivo) return;
-      const n = await contarPendientes();
-      if (vivo) setPendientesSync(n);
-      if (online && n > 0 && !sincronizando.current) {
-        sincronizando.current = true;
-        try {
-          const r = await sincronizar(token, `caja-${turno.caja_id}`, caja.nombre);
-          if (vivo) setPendientesSync(await contarPendientes());
-          // Evento crítico: el sync detectó conflictos → avisar a los dispositivos del dueño.
-          if (r.conflictos > 0) {
-            notificarEventoCritico(
-              token,
-              "⚠️ Conflictos de sincronización",
-              `${r.conflictos} operación${r.conflictos === 1 ? "" : "es"} de ${caja.nombre} chocaron con el servidor. Resuélvelo en Configuración → Sincronización.`,
-              "/configuracion/sincronizacion",
-            );
-          }
-        } catch { /* se reintenta en el próximo tick / reconexión */ }
-        finally { sincronizando.current = false; }
-      }
-    }
-    tick();
-    const id = setInterval(tick, 10000);
-    return () => { vivo = false; clearInterval(id); };
-  }, [online, token, turno.caja_id, caja.nombre]);
   const [categorias, setCategorias] = useState<Categoria[] | null>(null);
   const [productos, setProductos] = useState<Producto[] | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -1157,9 +1122,9 @@ export function HomePos({
       setTotalesCobro(cuenta);
       return;
     }
-    // Remediación Fase 3 — el cobro offline por outbox web quedó CONGELADO: el escritorio es el
-    // único camino de operación y siempre habla con su gateway local. El cobro usa siempre la ruta
-    // online (persistirTicket + aplicarPago). Ver cobro-offline.ts / modal-cobro-offline.tsx (@deprecated).
+    // El cobro usa siempre la ruta online (persistirTicket + aplicarPago). El offline lo da el
+    // escritorio, que siempre habla con su gateway local (ADR 0004); el cobro offline por outbox
+    // web se retiró.
     setProcesandoCobro(true);
     setError(null);
     try {
@@ -2255,12 +2220,6 @@ export function HomePos({
         <div className="flex flex-shrink-0 items-center justify-center gap-2 bg-[#9A6B12] px-4 py-1.5 text-13 font-semibold text-white" role="status">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4"><path d="M1 1l22 22M16.72 11.06A10.94 10.94 0 0 1 19 12.55M5 12.55a10.94 10.94 0 0 1 5.17-2.39M10.71 5.05A16 16 0 0 1 22.58 9M1.42 9a15.91 15.91 0 0 1 4.7-2.88M8.53 16.11a6 6 0 0 1 6.95 0M12 20h.01" /></svg>
           Sin internet: la caja sigue cobrando igual. Las ventas suben solas cuando vuelva la señal.
-        </div>
-      )}
-      {online && pendientesSync > 0 && (
-        <div className="flex flex-shrink-0 items-center justify-center gap-2 bg-[#2C5AA0] px-4 py-1.5 text-13 font-semibold text-white" role="status">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-4 w-4 animate-spin"><path d="M21 12a9 9 0 1 1-6.219-8.56" /></svg>
-          Sincronizando {pendientesSync} operación{pendientesSync === 1 ? "" : "es"} pendiente{pendientesSync === 1 ? "" : "s"}…
         </div>
       )}
       {/* Barra de captura: aquí no van menú, KDS ni cuentas. El cajero está anotando un pedido y

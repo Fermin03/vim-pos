@@ -11,7 +11,7 @@ import type { GrupoModificadores, TipoSeleccion } from "../modificadores";
 
 const prod = (id: string, nombre: string, precio: number, categoria_id: string, extra: Partial<Producto> = {}): Producto => ({
   id, nombre, descripcion: null, precio_base_mxn: precio, categoria_id, agotado: false, esCombo: false, seVendeAqui: true,
-  sku: null, tasaIva: 16, ivaIncluido: true, claveSat: null, unidadSat: null, categoriaNombre: null, ...extra,
+  ...extra,
 });
 const combo = prod("c1", "Combo", COMBO_BASE_MXN, "cat-combos", { esCombo: true });
 // Fuera de la fixture: no participan en ningún precio, solo en la elegibilidad y el agotado.
