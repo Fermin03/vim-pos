@@ -1,6 +1,7 @@
 -- Smoke Fase 3 · sincronización offline: sync_procesar_push crea un sync_evento, un conflicto
 -- (choque de dos dispositivos) se lista pendiente y el admin lo resuelve (RESUELTO_OPERADOR).
--- Valida el contrato que usan lib/sync (POS) y la pantalla de conflictos (admin). ROLLBACK.
+-- Valida el contrato de la RPC y de la pantalla de conflictos (admin). El POS web dejó de
+-- llamarla el 7 oct 2026 (se retiró su cola offline); solo una tablet vieja podría. ROLLBACK.
 \set ON_ERROR_STOP on
 BEGIN;
 SET LOCAL ROLE authenticated;
