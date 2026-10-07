@@ -17,6 +17,8 @@ import {
 } from "../../lib/clientes";
 import { CLIENTES_POR_PAGINA, paginasTotales, textoRango } from "../../lib/clientes-paginacion";
 import { mensajeError } from "../../lib/errores";
+import { useModulos } from "../../components/admin-shell";
+import { ClienteLealtad } from "../../components/cliente-lealtad";
 
 const input =
   "h-11 w-full rounded border border-line-strong px-3 text-sm outline-none focus:border-ink focus:shadow-[0_0_0_3px_rgba(22,22,26,.06)]";
@@ -62,6 +64,10 @@ export default function ClientesPage() {
   // Solo la respuesta de la ÚLTIMA consulta pinta la tabla: al teclear rápido, una búsqueda vieja
   // que tarda más podía llegar después y dejar en pantalla resultados que ya no corresponden.
   const ultimaConsulta = useRef(0);
+  // Lealtad (0159): la columna y el ajuste solo existen si el negocio tiene el programa concedido.
+  const modulos = useModulos();
+  const conLealtad = modulos !== null && modulos !== "error" && modulos.permitidos.lealtad === true;
+  const [lealtadDe, setLealtadDe] = useState<{ id: string; nombre: string; saldo: number; venceEl: string | null } | null>(null);
 
   // Cualquier cambio de búsqueda o filtro vuelve a la página 1: quedarse en la 4 de un filtro que
   // ahora solo tiene una página enseñaría una tabla vacía.
@@ -80,11 +86,12 @@ export default function ClientesPage() {
         if (filas.length === 0 && pagina > 1) { setPagina(paginasTotales(t, CLIENTES_POR_PAGINA)); return; }
         setClientes(filas);
         setTotal(t);
+        setError(null);
       } catch (e) {
         if (n !== ultimaConsulta.current) return;
+        // Una recarga fallida deja en pantalla lo que ya se veía: vaciar la tabla diría «sin
+        // resultados» cuando lo que pasó es que no se pudo leer.
         setError(mensajeError(e, "No se pudo cargar"));
-        setClientes([]);
-        setTotal(0);
       }
     }, busqueda ? 250 : 0);
     return () => clearTimeout(t);
@@ -238,6 +245,7 @@ export default function ClientesPage() {
                   <th className="px-4 py-2.5 font-semibold">Contacto</th>
                   <th className="px-4 py-2.5 text-right font-semibold">Compras</th>
                   <th className="px-4 py-2.5 text-right font-semibold">Gasto total</th>
+                  {conLealtad && <th className="px-4 py-2.5 text-right font-semibold">Lealtad</th>}
                   <th className="px-4 py-2.5 font-semibold">Última visita</th>
                   <th className="px-4 py-2.5"></th>
                 </tr>
@@ -261,8 +269,13 @@ export default function ClientesPage() {
                     <td className="px-4 py-2.5 text-right font-medium tabular-nums">
                       {c.compras > 0 ? fmt(c.gastoTotal) : <span className="font-normal text-ink-3">—</span>}
                     </td>
+                    {conLealtad && <td className="px-4 py-2.5 text-right tabular-nums text-ink-2">{c.lealtadSaldo}</td>}
                     <td className="px-4 py-2.5 text-ink-2">{fmtVisita(c.ultimaVisita)}</td>
                     <td className="px-4 py-2.5 text-right whitespace-nowrap">
+                      {conLealtad && (
+                        <button type="button" onClick={() => setLealtadDe({ id: c.id, nombre: [c.nombre, c.apellido_paterno].filter(Boolean).join(" "), saldo: c.lealtadSaldo, venceEl: c.lealtadVenceEl })}
+                          className="mr-3 text-13 font-semibold text-ink-2 hover:text-ink">Lealtad</button>
+                      )}
                       <button type="button" onClick={() => editar(c)} className="text-13 font-semibold text-ink-2 hover:text-ink">Editar</button>
                       <button type="button" onClick={() => alternarBloqueo(c)} className="ml-3 text-13 font-semibold text-ink-3 hover:text-ink">{c.estado === "ACTIVO" ? "Bloquear" : "Activar"}</button>
                       <button type="button" onClick={() => borrar(c)} className="ml-3 text-13 font-semibold text-ink-3 hover:text-danger">Eliminar</button>
@@ -271,7 +284,7 @@ export default function ClientesPage() {
                 ))}
                 {clientes.length === 0 && (
                   <tr>
-                    <td colSpan={6} className="px-4 py-10 text-center">
+                    <td colSpan={conLealtad ? 7 : 6} className="px-4 py-10 text-center">
                       <p className="text-14 font-semibold text-ink-2">Sin resultados</p>
                       <p className="mt-1 text-13 text-ink-3">No hay clientes que coincidan con tu búsqueda o filtro.</p>
                     </td>
@@ -368,6 +381,13 @@ export default function ClientesPage() {
           </div>
         )}
       </PageBody>
+      {lealtadDe && (
+        <ClienteLealtad
+          cliente={lealtadDe}
+          onCerrar={() => setLealtadDe(null)}
+          onCambio={recargar}
+        />
+      )}
     </>
   );
 }
