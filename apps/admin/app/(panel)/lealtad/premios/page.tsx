@@ -28,31 +28,42 @@ export default function PremiosLealtadPage() {
   /** Una escritura a la vez: mientras algo se guarda, lo demás no responde. */
   const [ocupado, setOcupado] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  /** Mensaje si no se pudo leer el programa (distinto de «todavía no hay programa»). */
+  const [falloPrograma, setFalloPrograma] = useState<string | null>(null);
 
   async function recargar() {
     try {
       setPremios(await listarPremios());
     } catch (e) {
       setError(mensajeLealtad(e, "No se pudieron leer los premios"));
-      setPremios([]);
+      setPremios((prev) => prev ?? []);
     }
   }
 
   useEffect(() => {
     let vivo = true;
-    leerProgramaAdmin().then((p) => { if (vivo) setMecanica(p?.mecanica ?? null); }).catch(() => { if (vivo) setMecanica(null); });
+    leerProgramaAdmin().then((p) => { if (vivo) setMecanica(p?.mecanica ?? null); })
+      .catch((e) => {
+        if (!vivo) return;
+        setFalloPrograma(mensajeLealtad(e, "No se pudo leer el programa"));
+        setMecanica(null);
+      });
     void recargar();
     return () => { vivo = false; };
   }, []);
 
   async function nuevo() {
+    if (ocupado !== null) return;
     setError(null);
+    setOcupado("nuevo");
     try {
       const ops = await productosParaPremio();
       setOpciones(ops);
       setEditando({ id: null, productoId: ops[0]?.id ?? "", nombre: "", costo: "" });
     } catch (e) {
       setError(mensajeLealtad(e, "No se pudieron leer los productos"));
+    } finally {
+      setOcupado(null);
     }
   }
 
@@ -116,9 +127,10 @@ export default function PremiosLealtadPage() {
         <LealtadPestanas />
 
         {error && !editando && !borrar && <p className="mb-4 text-sm font-medium text-danger" role="alert">{error}</p>}
+        {falloPrograma && <p className="mb-4 text-sm font-medium text-danger" role="alert">{falloPrograma}</p>}
         {(premios === null || mecanica === undefined) && <p className="text-sm text-ink-3">Cargando…</p>}
 
-        {mecanica === null && premios !== null && (
+        {mecanica === null && !falloPrograma && premios !== null && (
           <p className="max-w-[640px] rounded-lg border border-line bg-surface px-4 py-3 text-14 text-ink-2">
             Primero guarda tu programa en la pestaña Programa. Los premios se usan con sellos o con puntos por premios.
           </p>
@@ -135,7 +147,7 @@ export default function PremiosLealtadPage() {
           <div className="rounded-lg border border-dashed border-line-strong p-12 text-center">
             <p className="font-display text-lg font-semibold">Aún no hay premios</p>
             <p className="mt-1 text-sm text-ink-2">Elige un producto de tu catálogo y di cuánto cuesta. Sin premios, tus clientes juntan pero no tienen qué canjear.</p>
-            <div className="mt-4"><Button onClick={() => void nuevo()}>Nuevo premio</Button></div>
+            <div className="mt-4"><Button onClick={() => void nuevo()} disabled={ocupado !== null}>Nuevo premio</Button></div>
           </div>
         )}
 
@@ -198,7 +210,7 @@ export default function PremiosLealtadPage() {
       {editando && (
         <Modal
           open
-          onClose={() => { if (ocupado === null) setEditando(null); }}
+          onClose={() => { if (ocupado === null) { setEditando(null); setError(null); } }}
           title={editando.id ? "Cambiar el costo" : "Nuevo premio"}
           className="w-[440px] rounded-lg border border-line bg-surface p-6 shadow-[0_18px_44px_rgba(22,22,26,.18)]"
         >
@@ -227,7 +239,7 @@ export default function PremiosLealtadPage() {
           {error && <p className="mt-3 text-13 font-medium text-danger" role="alert">{error}</p>}
 
           <div className="mt-5 flex gap-2">
-            <button type="button" onClick={() => setEditando(null)} disabled={ocupado !== null}
+            <button type="button" onClick={() => { setEditando(null); setError(null); }} disabled={ocupado !== null}
               className="h-11 flex-1 rounded border border-line-strong text-14 font-semibold text-ink-2 transition hover:border-ink hover:text-ink disabled:opacity-50">
               Cancelar
             </button>
@@ -253,7 +265,7 @@ export default function PremiosLealtadPage() {
           textoOcupado="Eliminando…"
           ancho="sm"
           onConfirmar={() => void confirmarBorrado()}
-          onCerrar={() => setBorrar(null)}
+          onCerrar={() => { setBorrar(null); setError(null); }}
         />
       )}
     </>
