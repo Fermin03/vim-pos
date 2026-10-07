@@ -16,6 +16,7 @@ import type { Empleado } from "../lib/supabase";
 import type { ModoServicio } from "../lib/carrito";
 import { capaVisible } from "../lib/escape";
 import { asignarClienteTicket } from "../lib/clientes-cuenta";
+import { almacenLocal, motivoNoCambiarCliente } from "../lib/lealtad-canje";
 import { IconoAsignarCliente, IconoClienteAsignado, ModalClienteCuenta } from "./modal-cliente-cuenta";
 import { useEscape } from "../lib/use-escape";
 
@@ -647,6 +648,9 @@ export function PantallaCuentasModo({
           empleadoNombre={empleado.nombre}
           actual={clienteDe.clienteId ? { clienteId: clienteDe.clienteId, nombre: clienteDe.cliente ?? "", telefono: null } : null}
           onAsignar={async (cli) => {
+            // Lealtad: con un canje a medias el cliente no se mueve (el modal muestra el porqué).
+            const motivo = motivoNoCambiarCliente(almacenLocal(), clienteDe.ticketId, clienteDe.clienteId ?? null, cli?.clienteId ?? null);
+            if (motivo) throw new Error(motivo);
             await asignarClienteTicket(token, clienteDe.ticketId, cli?.clienteId ?? null);
             setClienteDe(null);
             void recargar();
