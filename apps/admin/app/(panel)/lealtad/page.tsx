@@ -3,10 +3,9 @@ import { useEffect, useState } from "react";
 import { Button, DialogoPeligro } from "@vim/ui/styles";
 import type { Mecanica } from "@vim/db/lealtad";
 import { PageBody, PageHeader } from "../../components/page-header";
-import { useModulos } from "../../components/admin-shell";
 import { LealtadPestanas } from "../../components/lealtad-pestanas";
 import {
-  FORM_PROGRAMA_INICIAL, activarModuloLealtad, ejemploPrograma, formDePrograma, guardarPrograma, leerProgramaAdmin, mensajeLealtad,
+  FORM_PROGRAMA_INICIAL, activarModuloLealtad, ejemploPrograma, formDePrograma, guardarPrograma, leerLealtadEncendida, leerProgramaAdmin, mensajeLealtad,
   type FormPrograma,
 } from "../../lib/lealtad";
 
@@ -22,7 +21,6 @@ const MECANICAS: { codigo: Mecanica; titulo: string; detalle: string }[] = [
 ];
 
 export default function ProgramaLealtadPage() {
-  const modulos = useModulos();
   /** undefined = leyendo; false = todavía no hay programa guardado; true = ya existe. */
   const [existe, setExiste] = useState<boolean | undefined>(undefined);
   const [mecanicaGuardada, setMecanicaGuardada] = useState<Mecanica | null>(null);
@@ -36,22 +34,21 @@ export default function ProgramaLealtadPage() {
   const [reinicio, setReinicio] = useState<number | null>(null);
   const [apagando, setApagando] = useState(false);
 
+  // El programa y el interruptor se leen de la base cada vez que se entra: el shell solo lee los
+  // módulos una vez por sesión y el valor se desfasaría al volver de otra pestaña. El layout ya
+  // garantiza que el negocio tiene el permiso, así que la bandera del dueño es el estado efectivo.
   useEffect(() => {
     let vivo = true;
-    leerProgramaAdmin()
-      .then((p) => {
+    Promise.all([leerProgramaAdmin(), leerLealtadEncendida()])
+      .then(([p, enc]) => {
         if (!vivo) return;
         setExiste(p !== null);
+        setEncendido(enc);
         if (p) { setForm(formDePrograma(p)); setMecanicaGuardada(p.mecanica); }
       })
       .catch((e) => { if (vivo) { setExiste(false); setError(mensajeLealtad(e, "No se pudo leer el programa")); } });
     return () => { vivo = false; };
   }, []);
-
-  // El interruptor arranca con lo que la base dice que está efectivo.
-  useEffect(() => {
-    if (modulos && modulos !== "error") setEncendido(modulos.efectivos.lealtad === true);
-  }, [modulos]);
 
   const set = <K extends keyof FormPrograma>(k: K, v: FormPrograma[K]) => { setForm((f) => ({ ...f, [k]: v })); setError(null); setOk(null); };
   const ejemplo = ejemploPrograma(form);
@@ -68,7 +65,8 @@ export default function ProgramaLealtadPage() {
       setMecanicaGuardada(form.mecanica);
       setOk(r.clientesReiniciados > 0 ? `Programa guardado. Se puso en cero el saldo de ${r.clientesReiniciados} cliente(s).` : "Programa guardado.");
     } catch (e) {
-      setReinicio(null);
+      // Con el diálogo abierto el error se muestra dentro de él; si no, arriba.
+      if (!confirmarReinicio) setReinicio(null);
       setError(mensajeLealtad(e, "No se pudo guardar el programa"));
     } finally {
       setGuardando(false);
@@ -97,7 +95,7 @@ export default function ProgramaLealtadPage() {
       <PageBody>
         <LealtadPestanas />
 
-        {error && !reinicio && <p className="mb-4 text-sm font-medium text-danger" role="alert">{error}</p>}
+        {error && reinicio === null && <p className="mb-4 text-sm font-medium text-danger" role="alert">{error}</p>}
         {ok && <p className="mb-4 text-sm font-medium text-success" role="status">{ok}</p>}
 
         {existe === undefined ? (

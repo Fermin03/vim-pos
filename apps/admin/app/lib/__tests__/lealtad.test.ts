@@ -7,6 +7,7 @@ const doble = vi.hoisted(() => ({
   rpcRespuesta: {} as Record<string, { data: unknown; error: { message: string; code?: string } | null }>,
   escrituras: [] as { tabla: string; op: string; valores: Fila; filtros: Fila }[],
   errorEscritura: null as { message: string; code?: string } | null,
+  errorLectura: null as { message: string; code?: string } | null,
 }));
 
 // Doble de PostgREST sobre filas en memoria: filtra de verdad y anota cada escritura.
@@ -20,6 +21,7 @@ function consulta(tabla: string) {
       doble.escrituras.push({ tabla, op, valores, filtros: { ...eqs } });
       return { data: null, error: doble.errorEscritura };
     }
+    if (doble.errorLectura) return { data: null, error: doble.errorLectura };
     return { data: (doble.tablas[tabla] ?? []).filter((f) => filtros.every((p) => p(f))), error: null };
   };
   const q = {
@@ -48,7 +50,7 @@ vi.mock("../supabase", () => ({
 }));
 
 import {
-  FORM_PROGRAMA_INICIAL, activarModuloLealtad, cambiarCostoPremio, costoPremioSchema, crearPremio, ejemploPrograma,
+  FORM_PROGRAMA_INICIAL, activarModuloLealtad, leerLealtadEncendida, cambiarCostoPremio, costoPremioSchema, crearPremio, ejemploPrograma,
   eliminarPremio, formDePrograma, guardarPrograma, leerProgramaAdmin, listarPremios, mensajeLealtad, productosParaPremio,
   programaSchema, setActivoPremio,
 } from "../lealtad";
@@ -60,6 +62,7 @@ beforeEach(() => {
   doble.rpcRespuesta = {};
   doble.escrituras = [];
   doble.errorEscritura = null;
+  doble.errorLectura = null;
 });
 
 const DINERO = { ...FORM_PROGRAMA_INICIAL, mecanica: "PUNTOS_DINERO" as const, porcentaje: "5" };
@@ -157,6 +160,25 @@ describe("el interruptor", () => {
     await expect(activarModuloLealtad(true)).rejects.toThrow("Primero guarda tu programa: elige cómo ganan tus clientes.");
     doble.errorEscritura = { message: "SIN_ADDON_LEALTAD", code: "42501" };
     await expect(activarModuloLealtad(true)).rejects.toThrow(/no está incluido/i);
+  });
+});
+
+describe("leer el interruptor", () => {
+  it("devuelve lo que dice la base para el negocio de la sesión", async () => {
+    doble.tablas.configuracion_tenant = [{ tenant_id: "t1", modulo_lealtad_activo: true }, { tenant_id: "t2", modulo_lealtad_activo: false }];
+    expect(await leerLealtadEncendida()).toBe(true);
+    doble.tablas.configuracion_tenant = [{ tenant_id: "t1", modulo_lealtad_activo: false }];
+    expect(await leerLealtadEncendida()).toBe(false);
+  });
+
+  it("sin fila de configuración está apagado", async () => {
+    doble.tablas.configuracion_tenant = [];
+    expect(await leerLealtadEncendida()).toBe(false);
+  });
+
+  it("si la lectura falla, lanza el error en palabras del dueño", async () => {
+    doble.errorLectura = { message: "permission denied for table configuracion_tenant" };
+    await expect(leerLealtadEncendida()).rejects.toThrow(/dueño o un administrador/i);
   });
 });
 

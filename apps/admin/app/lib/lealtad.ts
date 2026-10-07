@@ -190,6 +190,22 @@ export async function activarModuloLealtad(activo: boolean): Promise<void> {
   if (error) throw fallo(error, "No se pudo cambiar");
 }
 
+/**
+ * Lo que la base dice hoy del interruptor. El shell lee los módulos una sola vez por sesión, así que
+ * la página no puede fiarse de eso: al volver de otra pestaña mostraría el valor de cuando entró.
+ * Sin fila en `configuracion_tenant` (el negocio nunca ajustó nada) la lealtad está apagada.
+ */
+export async function leerLealtadEncendida(): Promise<boolean> {
+  const tid = await tenantId();
+  const { data, error } = await supabase
+    .from("configuracion_tenant")
+    .select("modulo_lealtad_activo")
+    .eq("tenant_id", tid)
+    .maybeSingle();
+  if (error) throw fallo(error, "No se pudo leer si el programa está encendido");
+  return (data as { modulo_lealtad_activo?: boolean } | null)?.modulo_lealtad_activo === true;
+}
+
 // ── Premios ───────────────────────────────────────────────────────────────────
 
 export type PremioAdmin = {
