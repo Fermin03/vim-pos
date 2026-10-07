@@ -33,6 +33,7 @@ Cada archivo dice **qué decía el plan, qué hacemos hoy y por qué**. Manda lo
 | [0027](0027-el-menu-se-ajusta-por-sucursal.md) | El menú se ajusta por sucursal: una fila guarda solo lo que cambia | 02/10/2026 |
 | [0028](0028-eliminar-a-un-empleado-libera-el-correo-y-conserva-el-historial.md) | Eliminar a un empleado libera su correo y conserva el historial: la cuenta se vacía, no se borra | 04/10/2026 |
 | [0029](0029-el-menu-es-de-quien-administra.md) | El menú es de quien administra; la caja lee lo proyectado | 05/10/2026 |
+| [0030](0030-la-lealtad-viaja-por-movimientos.md) | La lealtad viaja por movimientos y el canje lo autoriza la nube | 05/10/2026 |
 
 ## Pendientes de escribir
 

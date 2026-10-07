@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { deltaPendiente, SIGNO_MOVIMIENTO } from "./sync-pull.mjs";
+import { deltaPendiente, SIGNO_MOVIMIENTO, deltaLealtadPendiente, construirCandidatosClientes, buscarCandidatosCliente, retirarCandidatosCliente } from "./sync-pull.mjs";
 
 const I = "11111111-1111-1111-1111-111111111111";
 const S = "22222222-2222-2222-2222-222222222222";
@@ -211,4 +211,241 @@ test("PULL_ORDER baja el menú por sucursal después de productos y de sucursale
   assert.ok(t.includes("productos_sucursal"), "productos_sucursal está en PULL_ORDER");
   assert.ok(t.indexOf("productos_sucursal") > t.indexOf("productos"), "va después de productos (FK)");
   assert.ok(t.indexOf("productos_sucursal") > t.indexOf("sucursales"), "va después de sucursales (FK)");
+});
+
+// Lealtad (0156, ADR 0030, tarea 8).
+test("lealtad: deltaLealtadPendiente suma por cliente solo lo de la versión vigente", () => {
+  const d = deltaLealtadPendiente([
+    { cliente_id: "ana", puntos: 12, programa_version: 2 },
+    { cliente_id: "ana", puntos: -5, programa_version: 2 },
+    { cliente_id: "ana", puntos: 40, programa_version: 1 }, // versión vieja: registrado, no suma
+    { cliente_id: "beto", puntos: 3, programa_version: 2 },
+  ], 2);
+  assert.equal(d.get("ana"), 7);
+  assert.equal(d.get("beto"), 3);
+  assert.equal(d.size, 2);
+});
+
+test("lealtad: deltaLealtadPendiente aguanta vacío y sin versión", () => {
+  assert.equal(deltaLealtadPendiente([], 1).size, 0);
+  assert.equal(deltaLealtadPendiente(null, 1).size, 0);
+  assert.equal(deltaLealtadPendiente([{ cliente_id: "ana", puntos: 5, programa_version: 1 }], null).size, 0);
+});
+
+test("lealtad: el pull respeta las llaves foráneas en el orden", () => {
+  const pos = (t) => PULL_ORDER.findIndex((x) => x.t === t);
+  assert.ok(pos("clientes") > pos("tenants"), "clientes después de tenants");
+  assert.ok(pos("lealtad_saldos") > pos("clientes"), "saldos después de clientes");
+  assert.ok(pos("lealtad_saldos") > pos("lealtad_programa"), "saldos después del programa (se corrigen con su versión)");
+  assert.ok(pos("lealtad_premios") > pos("productos"), "premios después de productos");
+});
+
+const CLI_LOCAL = "c1c1c1c1-0000-0000-0000-000000000001";
+const CLI_NUBE = "c2c2c2c2-0000-0000-0000-000000000002";
+
+/** Cliente falso que simula un cliente local duplicado (mismo teléfono) y las FK que apuntan a clientes. */
+function clienteFalsoConDuplicado() {
+  const { client, pool } = clienteFalso();
+  const query = client.query.bind(client);
+  client.query = async (sql, params = []) => {
+    if (sql.includes("pg_constraint")) {
+      await query(sql, params);
+      return { rows: [
+        { tabla: "tickets", col: "cliente_id" },
+        { tabla: "direcciones_cliente", col: "cliente_id" },
+        { tabla: "lealtad_saldos", col: "cliente_id" },
+        { tabla: "clientes_alias", col: "cliente_id" },
+      ] };
+    }
+    // La única consulta de candidatos a duplicado (antes del bucle): clientes vivos de la caja.
+    if (sql.includes("FROM clientes WHERE tenant_id = ANY")) {
+      await query(sql, params);
+      return { rows: [{ id: CLI_LOCAL, tenant_id: TEN, telefono: "(477) 000-1567" }], rowCount: 1 };
+    }
+    return query(sql, params);
+  };
+  return { client, pool };
+}
+
+test("lealtad: el cliente local con el mismo teléfono (formateado distinto) se funde por dígitos, con UNA consulta", async () => {
+  const { client, pool } = clienteFalsoConDuplicado();
+  await pullSnapshot(pool, { clientes: [{ id: CLI_NUBE, tenant_id: TEN, nombre: "Ana", telefono: "477-000.1567", deleted_at: null }] });
+  const busca = client.consultas.filter((c) => c.sql.includes("FROM clientes WHERE tenant_id = ANY"));
+  assert.equal(busca.length, 1, "una sola consulta de candidatos, no una por cliente");
+  assert.deepEqual(busca[0].params, [[TEN]]);
+  const mueve = client.consultas.find((c) => /UPDATE direcciones_cliente SET "cliente_id"/.test(c.sql));
+  assert.deepEqual(mueve.params, [CLI_NUBE, CLI_LOCAL]);
+});
+
+test("lealtad: un teléfono sin dígitos no funde nada", async () => {
+  const { client, pool } = clienteFalsoConDuplicado();
+  await pullSnapshot(pool, { clientes: [{ id: CLI_NUBE, tenant_id: TEN, nombre: "Ana", telefono: "--", deleted_at: null }] });
+  assert.ok(!client.consultas.some((c) => c.sql.startsWith("DELETE FROM clientes WHERE id")), "sin dígitos no hay clave natural");
+});
+
+test("lealtad: al fundir, las direcciones se arreglan antes de mudarse, el saldo no se muda y la libreta se limpia", async () => {
+  const { client, pool } = clienteFalsoConDuplicado();
+  await pullSnapshot(pool, { clientes: [{ id: CLI_NUBE, tenant_id: TEN, nombre: "Ana", telefono: "4770001567", deleted_at: null }] });
+  const i = (pred) => client.consultas.findIndex(pred);
+  const iPrincipal = i((c) => /UPDATE direcciones_cliente SET es_principal = false/.test(c.sql));
+  const iDirs = i((c) => /UPDATE direcciones_cliente SET "cliente_id"/.test(c.sql));
+  const iTickets = i((c) => /UPDATE tickets SET "cliente_id"/.test(c.sql));
+  const iBorra = i((c) => c.sql.startsWith("DELETE FROM clientes WHERE id"));
+  const iUpsert = i((c) => c.sql.includes('INSERT INTO public."clientes"'));
+  assert.ok(iPrincipal >= 0, "debía quitar la marca de principal del duplicado si hace falta");
+  assert.ok(iPrincipal < iDirs, "la marca de principal se arregla ANTES de mudar las direcciones");
+  assert.ok(iDirs >= 0 && iTickets >= 0);
+  assert.deepEqual(client.consultas[iDirs].params, [CLI_NUBE, CLI_LOCAL]);
+  assert.ok(!client.consultas.some((c) => /UPDATE lealtad_saldos SET "cliente_id"/.test(c.sql)), "el saldo no se muda");
+  assert.ok(client.consultas.some((c) => /DELETE FROM lealtad_saldos WHERE "cliente_id"/.test(c.sql)), "el saldo del duplicado se borra");
+  assert.ok(client.consultas.some((c) => /DELETE FROM _vim_clientes_ok WHERE "cliente_id"/.test(c.sql)), "la libreta no guarda un id que ya no existe");
+  assert.ok(iDirs < iBorra && iBorra < iUpsert, "se muda, se borra al duplicado y entra el de la nube");
+});
+
+test("lealtad: sin llaves de lealtad en el snapshot (nube vieja) el pull no toca nada de eso", async () => {
+  const { client, pool } = clienteFalso();
+  await pullSnapshot(pool, { repartidores: [{ id: R1, nombre: "Luis", activo: true }] });
+  assert.ok(!client.consultas.some((c) => /clientes|lealtad/.test(c.sql)), "ninguna consulta menciona clientes ni lealtad");
+});
+
+// Fix round 1 (revisión de la tarea 8).
+test("lealtad F1: los premios del negocio se borran antes del upsert (índice único parcial por producto)", async () => {
+  const { client, pool } = clienteFalso();
+  await pullSnapshot(pool, { lealtad_premios: [
+    { id: "p2", tenant_id: TEN, producto_id: "pr1", deleted_at: null },
+    { id: "p1", tenant_id: TEN, producto_id: "pr1", deleted_at: "2026-10-01" }] });
+  const iBorra = client.consultas.findIndex((c) => /DELETE FROM lealtad_premios WHERE "tenant_id" = ANY/.test(c.sql));
+  const iUpsert = client.consultas.findIndex((c) => c.sql.includes('INSERT INTO public."lealtad_premios"'));
+  assert.ok(iBorra >= 0 && iBorra < iUpsert);
+  assert.deepEqual(client.consultas[iBorra].params, [[TEN]]);
+});
+
+test("lealtad F1: un programa que llega con otro id para el mismo negocio reemplaza al local", async () => {
+  const { client, pool } = clienteFalso();
+  await pullSnapshot(pool, { lealtad_programa: [{ id: "g2", tenant_id: TEN, mecanica: "SELLOS" }] });
+  const busca = client.consultas.find((c) => c.sql.includes("FROM lealtad_programa WHERE") && c.sql.includes('"tenant_id" IS NOT DISTINCT FROM'));
+  assert.ok(busca, "debía buscar el programa local del mismo negocio");
+});
+
+test("lealtad F2: una fila de clientes que falla se deshace sola, se avisa, no se anota y el pull sigue", async () => {
+  const MALO = "d1d1d1d1-0000-0000-0000-000000000001";
+  const BUENO = "d2d2d2d2-0000-0000-0000-000000000002";
+  const { client, pool } = clienteFalso();
+  const query = client.query.bind(client);
+  client.query = async (sql, params = []) => {
+    if (sql.includes('INSERT INTO public."clientes"') && params.includes(MALO)) {
+      await query(sql, params);
+      throw new Error("duplicate key value violates unique constraint");
+    }
+    return query(sql, params);
+  };
+  const lineas = [];
+  const resumen = await pullSnapshot(pool, { clientes: [
+    { id: MALO, tenant_id: TEN, nombre: "Malo", deleted_at: null },
+    { id: BUENO, tenant_id: TEN, nombre: "Bueno", deleted_at: null }] }, (m) => lineas.push(m));
+  assert.equal(resumen.clientes, 1);
+  assert.ok(client.consultas.some((c) => c.sql === "ROLLBACK TO SAVEPOINT fila_pull"));
+  assert.ok(lineas.some((l) => l.includes(MALO) && l.includes("duplicate key")), "una línea con el id y el error");
+  const marca = client.consultas.find((c) => c.sql.includes("INSERT INTO _vim_clientes_ok"));
+  assert.deepEqual(marca.params, [[BUENO]], "solo el que sí se aplicó entra a la libreta");
+  assert.ok(client.consultas.some((c) => c.sql === "COMMIT"), "el pull termina");
+  assert.ok(!client.consultas.some((c) => c.sql === "ROLLBACK"));
+});
+
+test("lealtad F3: un id que la nube manda en este snapshot nunca se funde como duplicado", async () => {
+  const { client, pool } = clienteFalsoConDuplicado();
+  await pullSnapshot(pool, { clientes: [
+    { id: CLI_NUBE, tenant_id: TEN, nombre: "X", telefono: "4770001567", deleted_at: null },
+    { id: CLI_LOCAL, tenant_id: TEN, nombre: "Z", telefono: "4779990000", deleted_at: null }] });
+  assert.ok(!client.consultas.some((c) => c.sql.startsWith("DELETE FROM clientes WHERE id")), "nadie se borra");
+  assert.ok(!client.consultas.some((c) => /UPDATE direcciones_cliente SET "cliente_id"/.test(c.sql)), "nada se muda");
+});
+
+test("lealtad: el duplicado se bloquea antes de mudarlo y las llaves únicas se sueltan antes del upsert", async () => {
+  const { client, pool } = clienteFalsoConDuplicado();
+  await pullSnapshot(pool, { clientes: [{ id: CLI_NUBE, tenant_id: TEN, nombre: "Ana", telefono: "4770001567", rfc: null, deleted_at: null }] });
+  const i = (pred) => client.consultas.findIndex(pred);
+  const iLock = i((c) => /SELECT 1 FROM clientes WHERE id = \$1 FOR UPDATE/.test(c.sql));
+  const iPrincipal = i((c) => /UPDATE direcciones_cliente SET es_principal = false/.test(c.sql));
+  assert.ok(iLock >= 0 && iLock < iPrincipal, "FOR UPDATE antes del gancho y del repunte");
+  assert.deepEqual(client.consultas[iLock].params, [CLI_LOCAL]);
+});
+
+test("lealtad: el destino de una fusión sin saldo en la nube recibe su fila con los puntos pendientes", async () => {
+  const { client, pool } = clienteFalsoConDuplicado();
+  const query = client.query.bind(client);
+  client.query = async (sql, params = []) => {
+    if (sql.includes("SELECT version FROM lealtad_programa")) return { rows: [{ version: 1 }] };
+    if (sql.includes("FROM lealtad_movimientos m")) return { rows: [{ cliente_id: CLI_NUBE, puntos: 12, programa_version: 1 }] };
+    return query(sql, params);
+  };
+  await pullSnapshot(pool, { clientes: [{ id: CLI_NUBE, tenant_id: TEN, nombre: "Ana", telefono: "4770001567", deleted_at: null }], lealtad_saldos: [] });
+  const ins = client.consultas.find((c) => c.sql.includes("INSERT INTO lealtad_saldos"));
+  assert.ok(ins, "debía crear el saldo");
+  assert.deepEqual(ins.params, [CLI_NUBE, TEN, 12, 1]);
+});
+
+// Fix round 2.
+test("lealtad N3: candidatos en memoria — formato distinto, sin dígitos, dos candidatos, ya en el snapshot, otro negocio", () => {
+  const locales = [
+    { id: "l1", tenant_id: "T1", telefono: "(477) 000-1567" },
+    { id: "l2", tenant_id: "T1", telefono: "477 0001567" },
+    { id: "l3", tenant_id: "T1", telefono: "--" },
+    { id: "l4", tenant_id: "T1", telefono: "4770001567" }, // también lo manda la nube
+    { id: "l5", tenant_id: "T2", telefono: "4770001567" }, // otro negocio
+    { id: "l6", tenant_id: "T1", telefono: null },
+  ];
+  const mapa = construirCandidatosClientes(locales, ["l4"]);
+  assert.deepEqual(buscarCandidatosCliente(mapa, { id: "n1", tenant_id: "T1", telefono: "4770001567", deleted_at: null }).sort(), ["l1", "l2"]);
+  assert.deepEqual(buscarCandidatosCliente(mapa, { id: "n1", tenant_id: "T1", telefono: "--", deleted_at: null }), []);
+  assert.deepEqual(buscarCandidatosCliente(mapa, { id: "n1", tenant_id: "T1", telefono: "4770001567", deleted_at: "2026-01-01" }), []);
+  assert.deepEqual(buscarCandidatosCliente(mapa, { id: "n2", tenant_id: "T2", telefono: "477-000-1567", deleted_at: null }), ["l5"]);
+  retirarCandidatosCliente(mapa, { tenant_id: "T1", telefono: "4770001567" }, ["l1"]);
+  assert.deepEqual(buscarCandidatosCliente(mapa, { id: "n3", tenant_id: "T1", telefono: "4770001567", deleted_at: null }), ["l2"]);
+});
+
+test("lealtad N2: la fusión corre dentro del savepoint de la fila y, si el upsert falla, no queda marcada como fusionada", async () => {
+  const { client, pool } = clienteFalsoConDuplicado();
+  const query = client.query.bind(client);
+  client.query = async (sql, params = []) => {
+    if (sql.includes('INSERT INTO public."clientes"')) { await query(sql, params); throw new Error("choque"); }
+    return query(sql, params);
+  };
+  await pullSnapshot(pool, { clientes: [{ id: CLI_NUBE, tenant_id: TEN, nombre: "Ana", telefono: "4770001567", deleted_at: null }], lealtad_saldos: [] });
+  const i = (pred) => client.consultas.findIndex(pred);
+  const iSave = i((c) => c.sql === "SAVEPOINT fila_pull");
+  const iBorra = i((c) => c.sql.startsWith("DELETE FROM clientes WHERE id"));
+  const iBack = i((c) => c.sql === "ROLLBACK TO SAVEPOINT fila_pull");
+  assert.ok(iSave >= 0 && iSave < iBorra && iBorra < iBack, "borrar al duplicado ocurre entre el SAVEPOINT y su rollback");
+  assert.ok(client.consultas[iBack + 1].sql === "RELEASE SAVEPOINT fila_pull", "y el savepoint se libera");
+  assert.ok(!client.consultas.some((c) => c.sql.includes("INSERT INTO lealtad_saldos")), "sin saldo para un destino que no se aplicó");
+});
+
+test("lealtad N1: teléfono y RFC se devuelven por separado y, si no vuelve alguno, se anota la huella actual", async () => {
+  const X = "d3d3d3d3-0000-0000-0000-000000000003";
+  const { client, pool } = clienteFalso();
+  const query = client.query.bind(client);
+  client.query = async (sql, params = []) => {
+    if (sql.includes("SELECT id, telefono, rfc FROM clientes")) return { rows: [{ id: X, telefono: "A", rfc: "R" }] };
+    if (sql.includes('INSERT INTO public."clientes"')) { await query(sql, params); throw new Error("choque con L"); }
+    if (/UPDATE clientes SET "telefono" = \$2/.test(sql)) throw new Error("choque con W");
+    return query(sql, params);
+  };
+  const lineas = [];
+  await pullSnapshot(pool, { clientes: [{ id: X, tenant_id: TEN, nombre: "X", telefono: "D", rfc: "R2", deleted_at: null }] }, (m) => lineas.push(m));
+  assert.ok(client.consultas.some((c) => /UPDATE clientes SET "rfc" = \$2/.test(c.sql)), "el RFC se devolvió aunque el teléfono no pudo");
+  assert.ok(lineas.some((l) => l.includes("no se pudo devolver telefono")), "una línea dice cuál llave no volvió");
+  assert.ok(client.consultas.some((c) => c.sql.includes("INSERT INTO _vim_clientes_ok") && c.sql.includes("DO UPDATE") && c.params.length === 1 && c.params[0] === X), "huella actual anotada");
+});
+
+test("lealtad N4: solo se sueltan las llaves que cambian", async () => {
+  const X = "d4d4d4d4-0000-0000-0000-000000000004";
+  const { client, pool } = clienteFalso();
+  const query = client.query.bind(client);
+  client.query = async (sql, params = []) => {
+    if (sql.includes("SELECT id, telefono, rfc FROM clientes")) return { rows: [{ id: X, telefono: "A", rfc: "R" }] };
+    return query(sql, params);
+  };
+  await pullSnapshot(pool, { clientes: [{ id: X, tenant_id: TEN, nombre: "X", telefono: "A", rfc: "R", deleted_at: null }] });
+  assert.ok(!client.consultas.some((c) => /SET "(telefono|rfc)" = NULL/.test(c.sql)), "mismos valores: nada que soltar");
 });

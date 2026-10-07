@@ -31,6 +31,7 @@ DECLARE
   v_t1 uuid; v_t2 uuid; v_t3 uuid; v_t4 uuid; v_item uuid; v_dev uuid; v_cfdi uuid;
   v_mesa uuid; v_rep uuid; v_cliente uuid; v_conexion uuid; v_kg uuid; v_insumo uuid; v_prov uuid;
   v_suc_b uuid; v_caja_b uuid; v_turno_b uuid; v_tb uuid;
+  v_lprem uuid; v_litem uuid; v_lcanje uuid := gen_random_uuid(); v_lj jsonb; v_lver integer; v_cli_vecino uuid;
   v_antes jsonb; v_despues jsonb; v_previa jsonb; v_res jsonb; r jsonb; v_arch tenants_eliminados%ROWTYPE;
   v_n bigint; v_msg text; v_tabla record; v_quedan text; v_bitacora bigint;
 BEGIN
@@ -183,6 +184,29 @@ BEGIN
   UPDATE productos SET en_menu_general = false
    WHERE id = (SELECT id FROM productos WHERE tenant_id = v_tenant AND deleted_at IS NULL ORDER BY id LIMIT 1);
 
+  -- Lealtad (0156): el negocio tiene add-on, programa, premio, saldo, movimientos, un alias de cliente
+  -- y una cuenta ABIERTA (la de la mesa) con un premio de producto vivo en un renglón. Borrar ese
+  -- renglón o su cuenta dispara el trigger que devuelve los puntos al libro; no puede dejar una fila
+  -- suelta del negocio ni frenar la eliminación. El vecino también tiene programa y saldo: no se toca.
+  PERFORM set_config('request.jwt.claims', json_build_object('sub', v_maria::text, 'tenant_id', v_tenant::text)::text, true);
+  INSERT INTO tenant_addons(tenant_id, addon_id, fecha_inicio, activo, precio_mensual_mxn)
+  SELECT v_tenant, id, '2026-01-31', true, 100 FROM addons WHERE codigo = 'LEALTAD'
+  ON CONFLICT DO NOTHING;
+  INSERT INTO lealtad_programa(tenant_id, mecanica) VALUES (v_tenant, 'SELLOS') RETURNING version INTO v_lver;
+  INSERT INTO configuracion_tenant(tenant_id, modulo_lealtad_activo) VALUES (v_tenant, true)
+  ON CONFLICT (tenant_id) DO UPDATE SET modulo_lealtad_activo = true;
+  INSERT INTO lealtad_premios(tenant_id, producto_id, costo) VALUES (v_tenant, v_prod, 6) RETURNING id INTO v_lprem;
+  PERFORM lealtad_registrar_movimiento(NULL, v_tenant, v_cliente, 'AJUSTE', 20, v_lver, p_motivo => 'saldo de prueba');
+  INSERT INTO clientes_alias(alias_id, cliente_id, tenant_id) VALUES (gen_random_uuid(), v_cliente, v_tenant);
+  v_litem := agregar_item_a_ticket(v_t3, v_prod, 1, NULL, '[]'::jsonb, 'smk-elim-3-lea');
+  v_lj := lealtad_canjear(v_lcanje, v_tenant, v_cliente, NULL, NULL, v_lprem, v_t3, v_suc, v_caja, v_maria);
+  IF NOT (v_lj->>'ok')::boolean THEN RAISE EXCEPTION 'el canje de lealtad del fixture no se autorizó: %', v_lj; END IF;
+  PERFORM lealtad_asentar_canje(v_lj || jsonb_build_object('tenant_id', v_tenant, 'ticket_id', v_t3, 'ticket_item_id', v_litem));
+  IF NOT EXISTS (SELECT 1 FROM ticket_canjes_lealtad WHERE id = v_lcanje AND NOT revertido) THEN RAISE EXCEPTION 'el premio del fixture no quedó vivo'; END IF;
+  SELECT id INTO v_cli_vecino FROM clientes WHERE tenant_id = v_vecino LIMIT 1;
+  INSERT INTO lealtad_programa(tenant_id, mecanica, porcentaje) VALUES (v_vecino, 'PUNTOS_DINERO', 5);
+  INSERT INTO lealtad_saldos(cliente_id, tenant_id, saldo, programa_version) VALUES (v_cli_vecino, v_vecino, 40, 1);
+
   PERFORM set_config('request.jwt.claims', '', true);
 
   -- Que el fixture sea de verdad "realista": estas tablas tienen que traer filas.
@@ -194,7 +218,8 @@ BEGIN
       'clientes', 'direcciones_cliente', 'mesas', 'tickets_mesas', 'repartidores', 'delivery_asignaciones',
       'delivery_conexiones', 'delivery_pedidos', 'insumos', 'insumo_stock_sucursal', 'movimientos_inventario',
       'proveedores', 'compras', 'compra_lineas', 'tenant_addons', 'suscripciones', 'pagos_suscripcion',
-      'tickets_cfdi', 'menus', 'menu_productos', 'productos_sucursal']) AS t
+      'tickets_cfdi', 'menus', 'menu_productos', 'productos_sucursal',
+      'lealtad_programa', 'lealtad_premios', 'lealtad_movimientos', 'lealtad_saldos', 'ticket_canjes_lealtad', 'clientes_alias']) AS t
   LOOP
     IF NOT v_antes ? v_tabla.t THEN RAISE EXCEPTION 'el fixture no dejó filas en %', v_tabla.t; END IF;
   END LOOP;

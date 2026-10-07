@@ -51,7 +51,19 @@ insert into _secdef_solo_service (fn, motivo) values
   ('_retirar_extras_sin_limite', 'cierra extras contratados de cualquier negocio (0147)'),
   ('_cajas_excedente',           'cuenta las cajas abiertas de cualquier negocio (0147)'),
   ('_inventario_apagar_si_no_permitido', 'apaga el descuento de inventario de cualquier negocio (0148)'),
-  ('inventario_respetar_uso_previo', 'concede el módulo de inventario por excepción a negocios enteros (0148)');
+  ('inventario_respetar_uso_previo', 'concede el módulo de inventario por excepción a negocios enteros (0148)'),
+  ('lealtad_registrar_movimiento',  'escribe el libro y el saldo de lealtad de cualquier cliente (0156)'),
+  ('lealtad_acumular_por_ticket',   'otorga puntos; solo la dispara el trigger de tickets (0156)'),
+  ('lealtad_revertir_ganado_ticket','quita puntos; solo la disparan los triggers (0156)'),
+  ('lealtad_saldo',                 'lee el saldo de cualquier cliente de cualquier negocio (0156)'),
+  ('lealtad_canjear',               'descuenta saldo de lealtad; solo la Edge Function lealtad-canje (0156)'),
+  ('lealtad_canje_datos',           'lee un canje de cualquier negocio (0156)'),
+  ('lealtad_asentar_canje',         'pega un descuento a un ticket; solo el puente o la Edge Function (0156)'),
+  ('lealtad_revertir_canje_ticket', 'devuelve saldo; el POS usa quitar_canje_lealtad (0156)'),
+  ('lealtad_revertir_canje',        'devuelve saldo sin ticket; solo la red de seguridad (0156)'),
+  ('lealtad_resolver_cliente',      'busca clientes por teléfono sin RLS (0156)'),
+  ('lealtad_proceso_diario',        'vence saldos y revierte canjes de todos los negocios (0156)'),
+  ('lealtad_vence_el',              'lee los meses de vencimiento de cualquier negocio; solo la llaman funciones definer (0156)');
 
 -- #2 — CRÍTICA: ninguna de ellas es ejecutable por `authenticated`.
 select is_empty($$

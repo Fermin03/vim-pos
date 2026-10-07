@@ -68,7 +68,7 @@ export const MAX_MOVIMIENTOS_POR_PUSH = 500;
 export const MAX_CLIENTES_POR_PUSH = 500;
 
 /** Huella de un cliente o una dirección: la fila completa, igual que la de los turnos y las zonas. */
-const HUELLA_FILA = "md5(to_jsonb(x)::text)";
+export const HUELLA_FILA = "md5(to_jsonb(x)::text)";
 
 /**
  * Cuántos días hacia atrás se vuelve a mirar una venta ya subida por si cambió en la caja.
@@ -106,6 +106,13 @@ export const HUELLA_TICKET = `md5(to_jsonb(x)::text
   || COALESCE((SELECT string_agg(md5(to_jsonb(h)::text), '' ORDER BY h.id) FROM cancelaciones_ticket h WHERE h.ticket_id = x.id), '')
   || COALESCE((SELECT string_agg(md5(to_jsonb(h)::text), '' ORDER BY h.id) FROM devoluciones h WHERE h.ticket_original_id = x.id), '')
   || COALESCE((SELECT string_agg(md5(to_jsonb(h)::text), '' ORDER BY h.id) FROM delivery_asignaciones h WHERE h.ticket_id = x.id), '')
+  -- 0156: el canje de lealtad del ticket, solo si hay (COALESCE a ''): esta cláusula, por sí sola, no
+  -- mueve la huella de los tickets sin canje. Lo que SÍ la mueve, una vez, es la columna nueva
+  -- tickets.lealtad_mxn (0156), que entra en to_jsonb(x) de TODOS los tickets: al actualizar, los
+  -- 60 días de ventas vuelven a subir una sola vez. Es inofensivo: la caja reenvía su propia verdad,
+  -- nadie edita tickets en el panel y la nube conserva lo suyo (guarda de FACTURADO, 0122). A
+  -- diferencia de los clientes, aquí NO se re-anotan las huellas (ver reanotarHuellasClientes0156UnaVez).
+  || COALESCE((SELECT string_agg(md5(to_jsonb(h)::text), '' ORDER BY h.id) FROM ticket_canjes_lealtad h WHERE h.ticket_id = x.id), '')
   || (SELECT count(*)::text FROM comanda_impresiones h WHERE h.ticket_id = x.id)
   -- 0126: las reimpresiones del ticket, solo si hay. Sin ellas la huella queda idéntica a la de
   -- antes, y actualizar no re-sube 60 días de ventas.
@@ -197,6 +204,12 @@ async function asegurarTabla(pool) {
   // caja es de origen local y el primer push tiene que subirlo. Esa es la recuperación del padrón.
   await pool.query("CREATE TABLE IF NOT EXISTS _vim_clientes_ok (cliente_id uuid PRIMARY KEY, huella text NOT NULL, subido_at timestamptz DEFAULT now())");
   await pool.query("CREATE TABLE IF NOT EXISTS _vim_direcciones_ok (direccion_id uuid PRIMARY KEY, huella text NOT NULL, subido_at timestamptz DEFAULT now())");
+
+  // Movimientos de lealtad (0156, ADR 0030): la caja los genera al cobrar, cancelar o quitar un
+  // canje y nunca los baja del pull. Se marcan por id en cuanto la nube confirma; la nube es
+  // idempotente por id. La copia local de un CANJE autorizado por la nube la marca el puente del
+  // gateway al asentarla (lealtad-puente.mjs): la nube ya lo tiene y no debe contar como pendiente.
+  await pool.query("CREATE TABLE IF NOT EXISTS _vim_lealtad_mov_ok (movimiento_id uuid PRIMARY KEY, subido_at timestamptz DEFAULT now())");
 
   await rescatarCortesUnaVez(pool);
 }
@@ -446,6 +459,74 @@ export async function sembrarZonasUnaVez(db, log = () => {}) {
   }
 }
 
+/**
+ * Re-anota en `_vim_clientes_ok` la huella de los clientes que la 0156 dejó "cambiados" sin que nadie
+ * los tocara. UNA sola vez por caja, EN EL ARRANQUE (`startLocalBackend`, runtime.mjs, junto a las
+ * siembras de arriba y antes del primer sync).
+ *
+ * EL PROBLEMA. La 0156 añade `clientes.codigo_publico`. La libreta guarda `md5(to_jsonb(x)::text)` de
+ * cada cliente (HUELLA_FILA) y esa fila ahora trae una llave más: la huella de TODOS los clientes ya
+ * anotados deja de coincidir. Consecuencias en cadena, en el primer ciclo tras actualizar y para todo
+ * negocio, use lealtad o no: (1) el pull los toma a todos por "edición local pendiente" y no aplica la
+ * copia de la nube; (2) el push re-sube el padrón entero y el aplicador de la nube pisa todas las
+ * columnas con la copia vieja de la caja: se revierten las ediciones hechas en el panel y los clientes
+ * dados de baja allí reviven.
+ *
+ * EL ARREGLO. Un cliente cuya huella guardada es igual a la de su fila SIN `codigo_publico` no cambió:
+ * solo cambió la forma de la fila. Se le anota la huella de ahora. (`to_jsonb(x) - 'codigo_publico'`
+ * reproduce el texto de antes al byte: jsonb ordena sus llaves por longitud y luego por bytes, no por
+ * el orden de las columnas; lo comprueba `verify-lealtad-pull.mjs`.) Uno cuya huella no coincide con
+ * ninguna de las dos SÍ se editó en la caja sin subir: se queda pendiente, y es lo correcto.
+ *
+ * Es idempotente aunque se repita (una huella ya re-anotada no coincide con la de "sin la columna").
+ * A diferencia de las siembras de arriba, el marcador se escribe DESPUÉS de lograrlo: aquí un fallo
+ * a medias no pierde nada (re-anotar es seguro de repetir), y marcarlo antes dejaría sin arreglar a
+ * una caja cuyo UPDATE falló. Un fallo no tumba el arranque: la caja nunca deja de cobrar por una
+ * libreta de sincronización. Sin libreta (instalación nueva) no hay nada que re-anotar y queda hecho;
+ * sin la columna (migración fallida) no se marca, para que corra cuando exista.
+ *
+ * Los tickets tienen el mismo efecto (`tickets.lealtad_mxn`) y ese se acepta: ver HUELLA_TICKET.
+ */
+export async function reanotarHuellasClientes0156UnaVez(db, log = () => {}) {
+  await db.query(
+    "CREATE TABLE IF NOT EXISTS _vim_migraciones_sync (clave text PRIMARY KEY, aplicada_at timestamptz DEFAULT now())",
+  );
+  const { rowCount: yaCorrio } = await db.query(
+    "SELECT 1 FROM _vim_migraciones_sync WHERE clave = 'reanotar_huellas_clientes_0156'",
+  );
+  if (yaCorrio) return 0;
+  try {
+    const { rows: [estado] } = await db.query(
+      `SELECT to_regclass('public._vim_clientes_ok') IS NOT NULL AS libreta,
+              EXISTS (SELECT 1 FROM information_schema.columns
+                       WHERE table_schema = 'public' AND table_name = 'clientes' AND column_name = 'codigo_publico') AS columna`,
+    );
+    if (!estado.columna) {
+      log("re-anotar huellas de clientes: clientes aún no tiene codigo_publico; se reintenta en el próximo arranque");
+      return 0;
+    }
+    let n = 0;
+    if (estado.libreta) {
+      ({ rowCount: n } = await db.query(
+        `UPDATE _vim_clientes_ok o SET huella = ${HUELLA_FILA}
+           FROM clientes x
+          WHERE x.id = o.cliente_id AND o.huella = md5((to_jsonb(x) - 'codigo_publico')::text)`,
+      ));
+    }
+    await db.query(
+      "INSERT INTO _vim_migraciones_sync(clave) VALUES ('reanotar_huellas_clientes_0156') ON CONFLICT DO NOTHING",
+    );
+    if (n > 0) log(`huellas de ${n} cliente(s) re-anotadas tras la 0156 (no cambiaron: no se re-suben)`);
+    return n;
+  } catch (e) {
+    const aviso = `no se pudieron re-anotar las huellas de clientes (${e.message}). La caja abre igual;`
+      + " se reintenta en el próximo arranque.";
+    log(`⚠ ${aviso}`);
+    console.error("· [sync]", aviso);
+    return 0;
+  }
+}
+
 /** Parte una lista en trozos de a lo más `tamano`. */
 export function trocear(lista, tamano) {
   const trozos = [];
@@ -486,6 +567,11 @@ export async function listarPendientes(pool) {
          FROM movimientos_inventario m
          LEFT JOIN _vim_mov_ok ok ON ok.movimiento_id = m.id
         WHERE ok.movimiento_id IS NULL) AS movimientos,
+      -- Movimientos de lealtad aún no confirmados por la nube, en orden de fecha.
+      (SELECT array_agg(m.id ORDER BY m.fecha)
+         FROM lealtad_movimientos m
+         LEFT JOIN _vim_lealtad_mov_ok ok ON ok.movimiento_id = m.id
+        WHERE ok.movimiento_id IS NULL) AS lealtad,
       -- Repartidores dados de alta en la caja aún no confirmados por la nube (ver _vim_repartidores_ok
       -- en asegurarTabla). Sin esto, un alta a media jornada sin ventas ni turnos ni movimientos de
       -- por medio no hace pasar la guarda de pushToCloud y se queda atorada en silencio.
@@ -511,6 +597,7 @@ export async function listarPendientes(pool) {
     movimientoIds: rows[0].movimientos ?? [], repartidorIds: rows[0].repartidores ?? [],
     zonaIds: rows[0].zonas ?? [],
     clienteIds: rows[0].clientes ?? [], direccionIds: rows[0].direcciones ?? [],
+    lealtadIds: rows[0].lealtad ?? [],
   };
 }
 
@@ -543,7 +630,7 @@ export async function listarPendientes(pool) {
  * `movimientos_caja` sigue a los mismos turnos y no solo a los de las ventas: un turno con puras
  * entradas y salidas de efectivo, sin vender nada, tampoco subía jamás.
  */
-export async function construirSnapshotPush(pool, { ticketIds = null, turnoIds = null, movimientoIds = null, clienteIds = null, direccionIds = null, conMesas = true } = {}) {
+export async function construirSnapshotPush(pool, { ticketIds = null, turnoIds = null, movimientoIds = null, clienteIds = null, direccionIds = null, conMesas = true, lealtadIds = null } = {}) {
   await asegurarTabla(pool);
   const { rows } = await pool.query(`
     WITH tk AS (
@@ -594,6 +681,7 @@ export async function construirSnapshotPush(pool, { ticketIds = null, turnoIds =
       (SELECT jsonb_agg(jsonb_build_object('id', id, 'estado', estado)) FROM ms) AS mesas,
       (SELECT jsonb_agg(jsonb_build_object('id', id, 'huella', huella)) FROM tn) AS turnos,
       (SELECT array_agg(id) FROM movimientos_inventario x WHERE ($4::uuid[] IS NOT NULL AND x.id = ANY($4::uuid[])) OR ($4::uuid[] IS NULL AND $2::uuid[] IS NULL AND x.id NOT IN (SELECT movimiento_id FROM _vim_mov_ok))) AS movimientos,
+      (SELECT array_agg(id) FROM lealtad_movimientos x WHERE ($8::uuid[] IS NOT NULL AND x.id = ANY($8::uuid[])) OR ($8::uuid[] IS NULL AND $2::uuid[] IS NULL AND x.id NOT IN (SELECT movimiento_id FROM _vim_lealtad_mov_ok))) AS lealtad,
       (SELECT array_agg(id) FROM repartidores x WHERE x.id NOT IN (SELECT repartidor_id FROM _vim_repartidores_ok)) AS repartidores,
       -- Con la huella que se manda: si la zona cambia mientras viaja, la anotada no coincide y
       -- vuelve a subir en el siguiente ciclo.
@@ -621,6 +709,8 @@ export async function construirSnapshotPush(pool, { ticketIds = null, turnoIds =
         -- reimpresiones salían vacíos en el panel, y las cancelaciones se quedaban en la caja.
         'ticket_descuentos_manuales',   (SELECT jsonb_agg(to_jsonb(x)) FROM ticket_descuentos_manuales x WHERE x.ticket_id IN (SELECT id FROM tk)),
         'ticket_promociones_aplicadas', (SELECT jsonb_agg(to_jsonb(x)) FROM ticket_promociones_aplicadas x WHERE x.ticket_id IN (SELECT id FROM tk)),
+        -- El canje de lealtad viaja SIEMPRE con su ticket: la nube lo concilia contra la libreta al llegar.
+        'ticket_canjes_lealtad',        (SELECT jsonb_agg(to_jsonb(x)) FROM ticket_canjes_lealtad x WHERE x.ticket_id IN (SELECT id FROM tk)),
         'comanda_impresiones',          (SELECT jsonb_agg(to_jsonb(x)) FROM comanda_impresiones x WHERE x.ticket_id IN (SELECT id FROM tk)),
         'ticket_reimpresiones',         (SELECT jsonb_agg(to_jsonb(x)) FROM ticket_reimpresiones x WHERE x.ticket_id IN (SELECT id FROM tk)),
         'devoluciones',                 (SELECT jsonb_agg(to_jsonb(x)) FROM devoluciones x WHERE x.ticket_original_id IN (SELECT id FROM tk)),
@@ -658,15 +748,22 @@ export async function construirSnapshotPush(pool, { ticketIds = null, turnoIds =
         'movimientos_inventario',    (SELECT jsonb_agg(to_jsonb(x) - 'costo_total_mxn' ORDER BY x.fecha) FROM movimientos_inventario x
                                         WHERE ($4::uuid[] IS NOT NULL AND x.id = ANY($4::uuid[]))
                                            OR ($4::uuid[] IS NULL AND $2::uuid[] IS NULL
-                                               AND x.id NOT IN (SELECT movimiento_id FROM _vim_mov_ok)))
+                                               AND x.id NOT IN (SELECT movimiento_id FROM _vim_mov_ok))),
+
+        -- Lealtad (ADR 0030): con lista, exactamente esos; sin lista (modo completo), los pendientes.
+        'lealtad_movimientos',       (SELECT jsonb_agg(to_jsonb(x) ORDER BY x.fecha) FROM lealtad_movimientos x
+                                        WHERE ($8::uuid[] IS NOT NULL AND x.id = ANY($8::uuid[]))
+                                           OR ($8::uuid[] IS NULL AND $2::uuid[] IS NULL
+                                               AND x.id NOT IN (SELECT movimiento_id FROM _vim_lealtad_mov_ok)))
       )) AS snapshot
-  `, [TERMINALES, ticketIds, turnoIds, movimientoIds, clienteIds, direccionIds, conMesas]);
+  `, [TERMINALES, ticketIds, turnoIds, movimientoIds, clienteIds, direccionIds, conMesas, lealtadIds]);
   return {
     snapshot: rows[0].snapshot ?? {}, ids: rows[0].ids ?? [], turnos: rows[0].turnos ?? [],
     tickets: rows[0].tickets_huella ?? [], mesas: rows[0].mesas ?? [],
     movimientos: rows[0].movimientos ?? [], repartidores: rows[0].repartidores ?? [],
     zonas: rows[0].zonas ?? [],
     clientes: rows[0].clientes ?? [], direcciones: rows[0].direcciones ?? [],
+    lealtad: rows[0].lealtad ?? [],
   };
 }
 
@@ -709,6 +806,19 @@ export async function marcarMovimientosPushed(pool, ids) {
   if (!ids?.length) return;
   await pool.query(
     "INSERT INTO _vim_mov_ok(movimiento_id) SELECT unnest($1::uuid[]) ON CONFLICT (movimiento_id) DO NOTHING", [ids]);
+}
+
+/**
+ * Marca movimientos de lealtad confirmados por la nube.
+ *
+ * Crea la libreta ella misma: la llama también el gateway (al asentar un canje que la nube ya
+ * tiene) y puede hacerlo antes de que haya corrido ningún push, que es quien normalmente la crea.
+ */
+export async function marcarLealtadSubidos(pool, ids) {
+  if (!ids?.length) return;
+  await pool.query("CREATE TABLE IF NOT EXISTS _vim_lealtad_mov_ok (movimiento_id uuid PRIMARY KEY, subido_at timestamptz DEFAULT now())");
+  await pool.query(
+    "INSERT INTO _vim_lealtad_mov_ok(movimiento_id) SELECT unnest($1::uuid[]) ON CONFLICT (movimiento_id) DO NOTHING", [ids]);
 }
 
 /** Marca los repartidores que la nube ya aplicó: no vuelven a subir nunca. */
@@ -804,8 +914,8 @@ function rechazadosPorTicket(errores, snapshot) {
       // La bitácora de impresiones no invalida la venta, y una mesa no cuelga de ninguna: retener
       // el ticket por esto lo dejaría reintentándose para siempre. La mesa se reintenta sola.
       continue;
-    } else if (["ticket_items", "pagos", "ticket_descuentos_manuales", "ticket_promociones_aplicadas", "cancelaciones_ticket"].includes(e.tabla)) {
-      // El ticket llegó incompleto: no se da por subido y se reintenta con todo lo suyo.
+    } else if (["ticket_items", "pagos", "ticket_descuentos_manuales", "ticket_promociones_aplicadas", "cancelaciones_ticket", "ticket_canjes_lealtad"].includes(e.tabla)) {
+      // El ticket llegó incompleto (sin su canje de lealtad el total no cuadra en la nube): no se da por subido y se reintenta con todo lo suyo.
       const fila = (snapshot[e.tabla] ?? []).find((x) => x.id === e.id);
       if (fila?.ticket_id) fuera.add(fila.ticket_id);
     } else if (e.tabla === "devoluciones") {
@@ -817,6 +927,14 @@ function rechazadosPorTicket(errores, snapshot) {
       if (dev?.ticket_original_id) fuera.add(dev.ticket_original_id);
     } else if (e.tabla === "movimientos_inventario") {
       // Un movimiento rechazado se reintenta solo (ver movimientosRechazados); no invalida la venta.
+      continue;
+    } else if (e.tabla === "lealtad_movimientos") {
+      // Se reintenta solo (no se marca en _vim_lealtad_mov_ok); no invalida la venta.
+      continue;
+    } else if (e.tabla === "clientes_alias") {
+      // Aviso de la nube: una fusión de clientes que allá falló. No corresponde a ninguna fila que
+      // la caja mandara, así que no hay nada que reintentar; sin esta rama caería en el `else` y su
+      // id se contaría como ticket rechazado.
       continue;
     } else {
       fuera.add(e.id); // tickets, turnos y movimientos_caja: el id ya es el que importa
@@ -863,9 +981,9 @@ function filasRechazadas(errores, tabla) {
  * reintentando lo mismo). Partir a la mitad en vez de recalcular un tamaño "correcto" converge
  * en pocas vueltas y no necesita saber cuál es el límite del otro lado.
  */
-async function enviarLote(pool, { cloudUrl, anonKey, deviceToken }, { ticketIds, turnoIds, movimientoIds = [], clienteIds = [], direccionIds = [], conMesas = false, maxBytes }, log) {
-  const { snapshot, ids, tickets, turnos, movimientos, repartidores, zonas, clientes, direcciones, mesas } =
-    await construirSnapshotPush(pool, { ticketIds, turnoIds, movimientoIds, clienteIds, direccionIds, conMesas });
+async function enviarLote(pool, { cloudUrl, anonKey, deviceToken }, { ticketIds, turnoIds, movimientoIds = [], clienteIds = [], direccionIds = [], lealtadIds = [], conMesas = false, maxBytes }, log) {
+  const { snapshot, ids, tickets, turnos, movimientos, repartidores, zonas, clientes, direcciones, mesas, lealtad } =
+    await construirSnapshotPush(pool, { ticketIds, turnoIds, movimientoIds, clienteIds, direccionIds, conMesas, lealtadIds });
   const cuerpo = JSON.stringify({ snapshot });
   const bytes = Buffer.byteLength(cuerpo);
 
@@ -883,7 +1001,7 @@ async function enviarLote(pool, { cloudUrl, anonKey, deviceToken }, { ticketIds,
     // Los movimientos se parten a la mitad en ambas: no tienen FK que los arrastre solos.
     // Los clientes, igual que los turnos forzados, con la primera mitad (su techo por corrida ya
     // los mantiene muy por debajo del límite de bytes).
-    const a = await enviarLote(pool, { cloudUrl, anonKey, deviceToken }, { ticketIds: ticketIds.slice(0, mitadT), turnoIds, movimientoIds: movimientoIds.slice(0, mitadM), clienteIds, direccionIds, conMesas, maxBytes }, log);
+    const a = await enviarLote(pool, { cloudUrl, anonKey, deviceToken }, { ticketIds: ticketIds.slice(0, mitadT), turnoIds, movimientoIds: movimientoIds.slice(0, mitadM), clienteIds, direccionIds, lealtadIds, conMesas, maxBytes }, log);
     const b = await enviarLote(pool, { cloudUrl, anonKey, deviceToken }, { ticketIds: ticketIds.slice(mitadT), turnoIds: [], movimientoIds: movimientoIds.slice(mitadM), maxBytes }, log);
     return { subidos: a.subidos + b.subidos, turnos: a.turnos + b.turnos, movimientos: a.movimientos + b.movimientos, rechazados: a.rechazados + b.rechazados };
   };
@@ -921,6 +1039,14 @@ async function enviarLote(pool, { cloudUrl, anonKey, deviceToken }, { ticketIds,
   const cliFuera = filasRechazadas(errores, "clientes");
   const dirFuera = filasRechazadas(errores, "direcciones_cliente");
   await marcarClientesSubidos(pool, clientes.filter((c) => !cliFuera.has(c.id)), direcciones.filter((d) => !dirFuera.has(d.id)));
+  const leaFuera = filasRechazadas(errores, "lealtad_movimientos");
+  // Una nube sin la 0156 devuelve la tabla en `_ignoradas` y NO guarda los movimientos: marcarlos como
+  // subidos los perdería. Se dejan pendientes y se reintentan cuando la nube los acepte.
+  if (lealtad.length && (respuesta?.resultado?._ignoradas ?? []).includes("lealtad_movimientos")) {
+    log(`la nube ignoró lealtad_movimientos (aún sin la migración 0156): ${lealtad.length} movimiento(s) se reintentarán`);
+  } else {
+    await marcarLealtadSubidos(pool, lealtad.filter((id) => !leaFuera.has(id)));
+  }
   if (errores.length) {
     const muestra = errores.slice(0, 3).map((e) => `${e.tabla}/${String(e.id).slice(0, 8)}: ${e.error}`).join(" · ");
     log(`la nube rechazó ${errores.length} fila(s), se reintentarán: ${muestra}`);
@@ -957,6 +1083,8 @@ export async function pushToCloud(pool, opts, log = () => {}, cfg = {}) {
   if (movimientoIdsTodos.length > movimientoIds.length) {
     log(`${movimientoIdsTodos.length - movimientoIds.length} movimiento(s) de inventario se posponen al siguiente ciclo (techo ${maxMovimientos} por corrida)`);
   }
+  // Mismo techo que inventario; el resto sube en el siguiente ciclo, en orden de fecha.
+  const lealtadIds = pendientes.lealtadIds.slice(0, maxMovimientos);
   // Un cierre de turno SIN ventas nuevas también es algo que subir. Cuando esta condición solo
   // miraba los tickets, el cierre se quedaba en la caja y la nube nunca se enteraba. Lo mismo pasa
   // con un movimiento de inventario suelto (ADR 0013), con un repartidor dado de alta a media
@@ -968,7 +1096,7 @@ export async function pushToCloud(pool, opts, log = () => {}, cfg = {}) {
   // Lo mismo con un cliente registrado sin que la venta se haya cobrado todavía.
   // Y con una mesa que se liberó sin que se cobrara nada (una cuenta vacía cancelada, 0104).
   if (!ids.length && !turnosCambiados.length && !movimientoIds.length && !repartidorIds.length && !zonaIds.length
-      && !clienteIds.length && !direccionIds.length && !mesaIds.length) { log("nada pendiente por subir"); return { subidos: 0, turnos: 0, movimientos: 0, rechazados: 0, lotes: 0 }; }
+      && !clienteIds.length && !direccionIds.length && !mesaIds.length && !lealtadIds.length) { log("nada pendiente por subir"); return { subidos: 0, turnos: 0, movimientos: 0, rechazados: 0, lotes: 0 }; }
 
   const parte = [
     ids.length ? `${ids.length} venta${ids.length === 1 ? "" : "s"}` : null,
@@ -978,6 +1106,7 @@ export async function pushToCloud(pool, opts, log = () => {}, cfg = {}) {
     zonaIds.length ? `${zonaIds.length} zona(s) de envío` : null,
     clienteIds.length ? `${clienteIds.length} cliente(s)` : null,
     direccionIds.length ? `${direccionIds.length} dirección(es) de cliente` : null,
+    lealtadIds.length ? `${lealtadIds.length} movimiento(s) de lealtad` : null,
     mesaIds.length ? `el estado de ${mesaIds.length} mesa(s)` : null,
   ].filter(Boolean).join(" y ");
 
@@ -1000,7 +1129,7 @@ export async function pushToCloud(pool, opts, log = () => {}, cfg = {}) {
     const dirIds = n === 0 ? direccionIds : [];
     n++;
     try {
-      const r = await enviarLote(pool, opts, { ticketIds: lote, turnoIds, movimientoIds: movIds, clienteIds: cliIds, direccionIds: dirIds, conMesas: n === 1, maxBytes }, log);
+      const r = await enviarLote(pool, opts, { ticketIds: lote, turnoIds, movimientoIds: movIds, clienteIds: cliIds, direccionIds: dirIds, lealtadIds: n === 1 ? lealtadIds : [], conMesas: n === 1, maxBytes }, log);
       subidos += r.subidos;
       turnos += r.turnos;
       movimientos += r.movimientos;
