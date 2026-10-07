@@ -130,6 +130,17 @@ export function datosLealtadFiables(r: { movimientos: { error: unknown }; saldo:
   return !r.movimientos.error && !r.saldo.error;
 }
 
+/**
+ * ¿La lealtad está encendida? PURA, con pruebas. Se decide por el interruptor del dueño
+ * (`configuracion_tenant.modulo_lealtad_activo`) y NO por `modulos_efectivos`: en la caja instalada
+ * los permisos que concede VIM (`tenant_addons`) no bajan, así que ahí `modulos_efectivos` contesta
+ * siempre «lealtad: false» y el pie no salía nunca (0.5.0, visto en la prueba de la caja real). El
+ * interruptor sí baja, y la base no deja encenderlo sin el permiso (0156), así que vale en los dos lados.
+ */
+export function lealtadEncendida(r: { data: unknown; error: unknown }): boolean {
+  return !r.error && (r.data as { modulo_lealtad_activo?: unknown } | null)?.modulo_lealtad_activo === true;
+}
+
 async function leerLealtadDelTicket(
   sb: ReturnType<typeof employeeClient>,
   token: string,
@@ -137,9 +148,8 @@ async function leerLealtadDelTicket(
 ): Promise<LealtadImpresion | null> {
   if (!t.clienteId) return null;
   try {
-    const { data: mod, error: errMod } = await sb.rpc("modulos_efectivos", { p_tenant: t.tenantId });
-    if (errMod) return null;
-    if ((mod as { efectivos?: Record<string, boolean> } | null)?.efectivos?.lealtad !== true) return null;
+    const conf = await sb.from("configuracion_tenant").select("modulo_lealtad_activo").eq("tenant_id", t.tenantId).maybeSingle();
+    if (!lealtadEncendida(conf)) return null;
     const programa = await leerPrograma(token);
     if (!programa) return null;
     const [movs, saldo, cli] = await Promise.all([
