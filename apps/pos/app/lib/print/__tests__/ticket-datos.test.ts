@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { foldearHijosEnPadre, SELECCION_TICKET_ITEMS_IMPRESION, urlAutofactura, resumenLealtadTicket, datosLealtadFiables } from "../ticket-datos";
+import { foldearHijosEnPadre, SELECCION_TICKET_ITEMS_IMPRESION, urlAutofactura, resumenLealtadTicket, datosLealtadFiables, lealtadEncendida } from "../ticket-datos";
 import type { LineaImpresion } from "../tipos";
 
 /** Fixture mínima: solo llena lo que cada caso necesita, el resto son valores neutros. */
@@ -185,5 +185,22 @@ describe("datosLealtadFiables — con una lectura fallida no hay pie", () => {
   });
   it("ambas bien: es fiable", () => {
     expect(datosLealtadFiables({ movimientos: ok, saldo: ok })).toBe(true);
+  });
+});
+
+// La caja instalada no recibe los permisos que concede VIM (`tenant_addons` no baja), así que ahí
+// `modulos_efectivos` contesta siempre «lealtad: false» y el pie no salía nunca. El interruptor del
+// dueño sí baja, y la base no deja encenderlo sin el permiso: es la señal válida en nube y en caja.
+describe("lealtadEncendida — se decide por el interruptor del dueño", () => {
+  it("encendido: sí", () => {
+    expect(lealtadEncendida({ data: { modulo_lealtad_activo: true }, error: null })).toBe(true);
+  });
+  it("apagado, sin fila o con un valor que no es true: no", () => {
+    expect(lealtadEncendida({ data: { modulo_lealtad_activo: false }, error: null })).toBe(false);
+    expect(lealtadEncendida({ data: null, error: null })).toBe(false);
+    expect(lealtadEncendida({ data: { modulo_lealtad_activo: "true" }, error: null })).toBe(false);
+  });
+  it("si la lectura falló, no (el ticket sale sin pie antes que con un saldo dudoso)", () => {
+    expect(lealtadEncendida({ data: { modulo_lealtad_activo: true }, error: { message: "sin red" } })).toBe(false);
   });
 });

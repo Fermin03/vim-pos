@@ -225,8 +225,8 @@ export default function ProgramaLealtadPage() {
             </section>
 
             <p className="mt-5 max-w-[720px] rounded-lg border border-line bg-surface px-4 py-3 text-13 leading-relaxed text-ink-2">
-              Tus cajas necesitan la versión 0.5.0 o una posterior para mostrar la lealtad. Un cambio que hagas aquí llega a cada
-              caja en cerca de un minuto. Canjear necesita internet; ganar puntos, no.
+              Tus cajas necesitan la versión 0.5.0 o una posterior para mostrar la lealtad. El programa y los premios llegan a cada
+              caja en cerca de un minuto; encender o apagar puede tardar hasta 10 minutos. Canjear necesita internet; ganar puntos, no.
             </p>
           </>
         )}

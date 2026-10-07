@@ -57,7 +57,7 @@ El orden importa: **base y funciones primero, mezclar después, instalador al fi
 - [ ] `npm run verify:lealtad-canje` y `npm run verify:lealtad-pull` en verde en la máquina que empaqueta.
 - [ ] El `.exe` pesa ~155 MB o más (uno de ~134 MB salió sin dependencias: no se publica).
 - [ ] Instalar en **VIM Pruebas** y recorrer, con internet:
-  - [ ] Guardar un programa de sellos en el admin, un premio, y encenderlo. En un minuto la caja lo muestra.
+  - [ ] Guardar un programa de sellos en el admin, un premio, y encenderlo. El programa y el premio llegan a la caja en un minuto; que la caja lo MUESTRE (saldo, «Canjear puntos», pie del ticket) puede tardar hasta 10 minutos, porque el encendido viaja con el reporte periódico de la caja.
   - [ ] Venta con cliente → el ticket dice lo que ganó. El saldo aparece en Clientes del admin.
   - [ ] Canjear el premio → sale en $0.00, llega a cocina. Cobrar. El corte separa «Lealtad».
   - [ ] Ese ticket en el portal de autofactura → dice que no se factura por separado.
@@ -101,7 +101,7 @@ El orden importa: **base y funciones primero, mezclar después, instalador al fi
 ## Si algo sale mal
 
 - La lealtad se apaga sin desinstalar nada: quitar el extra LEALTAD al negocio desde el panel
-  (o que el dueño apague el interruptor). Las cajas dejan de mostrarla en un minuto; los saldos se conservan.
+  (o que el dueño apague el interruptor). Las cajas dejan de mostrarla en un máximo de 10 minutos; los saldos se conservan.
 - Las migraciones no se revierten: solo añaden. Con el programa apagado, `recalcular_totales_ticket`
   y `reporte_x` se comportan como antes.
 - El instalador se retira volviendo a publicar `latest.json` con la 0.4.110.
