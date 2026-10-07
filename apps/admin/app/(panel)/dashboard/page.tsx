@@ -335,8 +335,7 @@ export default function DashboardPage() {
   // esto sigue diciendo —correctamente— la fecha de ayer.
   // `diaCorto` de @vim/fecha: la fecha se toma tal cual, sin pasar por `new Date(iso)` (medianoche
   // UTC, que en México ya es el día anterior).
-  const fmtDia = diaCorto;
-  const fechaCorta = data ? fmtDia(data.dia) : "—";
+  const fechaCorta = data ? diaCorto(data.dia) : "—";
   const ultimaVenta = data?.ultimoDiaConVentas ?? null;
 
   return (

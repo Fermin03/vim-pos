@@ -25,7 +25,6 @@ export const ICONOS: Record<string, string> = {
   cake: "M4 21h16M5 21v-7a3 3 0 0 1 3-3h8a3 3 0 0 1 3 3v7M12 8V4M9 6h6",
   tag: "M3 7v5l9 9 5-5-9-9H3zM7 7h.01",
 };
-export const ICONO_DEFAULT = "tag";
 
 export const categoriaSchema = z.object({
   nombre: z.string().trim().min(1, "El nombre es obligatorio").max(40, "Máximo 40 caracteres"),
@@ -132,11 +131,6 @@ export async function reordenarCategorias(lista: { id: string; orden_visualizaci
     const { error } = await supabase.from("categorias").update({ orden_visualizacion: i + 1 }).eq("id", c.id);
     if (error) throw new Error(error.message);
   }
-}
-
-export async function toggleActiva(id: string, activa: boolean): Promise<void> {
-  const { error } = await supabase.from("categorias").update({ activa }).eq("id", id);
-  if (error) throw new Error(error.message);
 }
 
 /** Soft delete (set deleted_at). El POS y la lista filtran deleted_at IS NULL. */

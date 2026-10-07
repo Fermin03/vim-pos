@@ -390,13 +390,6 @@ export async function borrarCsd(): Promise<void> {
   await llamarCargarCsd({ accion: "borrar" });
 }
 
-/** Días que le quedan al sello. Negativo = ya venció. */
-export function diasParaVencer(vigenciaHasta: string, hoy = new Date()): number {
-  const fin = new Date(`${vigenciaHasta}T00:00:00Z`).getTime();
-  const dia = new Date(`${hoy.toISOString().slice(0, 10)}T00:00:00Z`).getTime();
-  return Math.round((fin - dia) / 86_400_000);
-}
-
 // ── Sucursales (P-165/166) ───────────────────────────────────────────────────
 export const sucursalSchema = z.object({
   codigo: z.string().trim().min(1, "Obligatorio").max(10).regex(/^[A-Z0-9]+$/, "Solo mayúsculas y números"),
@@ -439,30 +432,6 @@ export async function listarSucursales(): Promise<Sucursal[]> {
     nCajas: f.cajas?.[0]?.count ?? 0,
     nAreas: f.areas_cocina?.[0]?.count ?? 0,
   }));
-}
-
-export async function obtenerSucursal(id: string): Promise<Sucursal | null> {
-  const { data, error } = await supabase
-    .from("sucursales")
-    .select("id, codigo, nombre, direccion_calle, ciudad, estado_geo, telefono, activa, cajas(count), areas_cocina(count)")
-    .eq("id", id)
-    .is("deleted_at", null)
-    .maybeSingle();
-  if (error) throw new Error(error.message);
-  if (!data) return null;
-  const f = data as unknown as FilaSuc;
-  return {
-    id: f.id,
-    codigo: f.codigo,
-    nombre: f.nombre,
-    direccion_calle: f.direccion_calle ?? "",
-    ciudad: f.ciudad ?? "",
-    estado_geo: f.estado_geo ?? "",
-    telefono: f.telefono ?? "",
-    activa: f.activa,
-    nCajas: f.cajas?.[0]?.count ?? 0,
-    nAreas: f.areas_cocina?.[0]?.count ?? 0,
-  };
 }
 
 /** Devuelve el id de la sucursal nueva (la primera caja la crea al vuelo; ver ModalCaja). */
