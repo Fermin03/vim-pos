@@ -146,6 +146,7 @@ En **Contrato**. Lo que se activa aquí se suma al total que ve el dueño en Pla
 |---|---|---|
 | **Facturación electrónica** (CFDI) | $349/mes en Esencial; incluida en Negocio y Cadena | Los folios se compran aparte por paquete (Ficha → Facturación). Activarlo solo le da permiso: el sello lo sube él (sección 6). |
 | **Apps de delivery** (Uber Eats) | $100/mes en Esencial; incluido desde Negocio | Después de activarlo, el dueño lo enciende y conecta su tienda en **Configuración → Integraciones**. Ver `delivery-uber-sandbox.md`. |
+| **Programa de lealtad** | $100/mes en Esencial; incluido desde Negocio | Ver «Lealtad» abajo: concederlo no lo enciende. |
 | **Sucursal adicional** | $599/mes por cada sucursal adicional | En **Extras**. Cada una es una sucursal más. |
 | **Caja adicional** | $249/mes por cada caja nueva que abra | En **Extras**. Es **una caja**, en la sucursal que sea — no una por sucursal. En Cadena no aplica: sus cajas ya son sin límite. |
 
@@ -167,6 +168,25 @@ cajas en total (la tercera, en la sucursal que quiera); la cuarta se rechaza has
 - [ ] **Inventario, recetas y mermas** vienen desde **Negocio**. En Esencial el dueño ve la
       sección con una explicación y un botón para escribirte. Si se lo quieres dar de cortesía:
       **Contrato → Módulos que puede usar → Recetas e inventario → Permitir** (con motivo).
+
+### Lealtad
+
+- En Negocio, Cadena y los planes por giro (`FT`, `QS`, `CB`, `FS`, `DK`, `ENT`) viene concedida
+  con el plan. En Esencial se concede desde el panel (ficha del cliente → Extras → Programa de
+  lealtad, $100 al mes).
+- Concederla no la enciende: el dueño entra a **Lealtad** en su panel, guarda su programa y lo
+  enciende ahí mismo. Sin programa guardado el interruptor no se deja encender.
+- Las cajas necesitan la 0.5.0 o posterior. Una caja más vieja sigue vendiendo, pero no muestra la
+  lealtad ni otorga puntos.
+- Para que una venta sume, la cuenta debe llevar un cliente con teléfono.
+- Si el cliente pregunta por facturas: una cuenta con un premio de regalo no se factura por
+  separado; entra en la factura global. El canje de puntos por dinero se factura normal.
+- Dar de baja el extra apaga el programa en sus cajas; los saldos se conservan.
+- Un plan fuera de esa lista (uno personalizado) no la incluye: la paga aparte, a $100, igual que
+  Esencial. La base y el panel usan la misma lista, así que el precio que el panel pre-llena es el
+  correcto; si se la quieres regalar, cambia el precio a $0 antes de guardar.
+- Si un cliente que la pagaba aparte sube a un plan que la incluye, pasa sola a $0 y su programa
+  sigue encendido.
 
 ---
 

@@ -2,8 +2,11 @@
 // prueba en __tests__/lealtad-reglas.test.ts. Lo que lee o escribe está en lealtad.ts; el canje
 // paso a paso, en lealtad-canje.ts.
 import { redondearCentavos } from "./dinero";
+import { cantidad, puntosPorCompra, unidad, type Mecanica } from "@vim/db/lealtad";
 
-export type Mecanica = "PUNTOS_DINERO" | "SELLOS" | "PUNTOS_PREMIOS";
+// La regla de puntos vive en @vim/db/lealtad (la comparte el admin). Se reexporta porque es parte de
+// la interfaz de este módulo desde el plan 1B.
+export { cantidad, puntosPorCompra, unidad, type Mecanica };
 
 /** La fila de `lealtad_programa` que le sirve al POS. */
 export type Programa = {
@@ -18,32 +21,6 @@ export type Programa = {
 /** Un premio del catálogo (`lealtad_premios` + el nombre de su producto). */
 export type Premio = { id: string; productoId: string; nombre: string; costo: number };
 
-/**
- * Cuánto gana una compra. ESPEJO de `lealtad_puntos_por_compra` (supabase/migrations/0156_lealtad.sql):
- * si cambias una, cambia la otra, y sus casos de prueba son los mismos. La de SQL es la que escribe
- * el movimiento; esta solo anuncia en pantalla lo que va a pasar.
- *
- * Se calcula en centavos enteros: `0.3 / 0.1` en coma flotante da 2.9999… y perdería un punto que
- * Postgres (numeric) sí da.
- */
-export function puntosPorCompra(
-  p: Pick<Programa, "mecanica" | "porcentaje" | "pesosPorPunto" | "compraMinima">,
-  base: number,
-): number {
-  if (!Number.isFinite(base) || base <= 0 || base < (p.compraMinima ?? 0)) return 0;
-  const baseCent = Math.round(base * 100);
-  if (p.mecanica === "SELLOS") return 1;
-  if (p.mecanica === "PUNTOS_DINERO") {
-    const pctCent = Math.round((p.porcentaje ?? 0) * 100);
-    return Math.floor((baseCent * pctCent) / 1_000_000);
-  }
-  if (p.mecanica === "PUNTOS_PREMIOS") {
-    const porPuntoCent = Math.round((p.pesosPorPunto ?? 0) * 100);
-    return porPuntoCent > 0 ? Math.floor(baseCent / porPuntoCent) : 0;
-  }
-  return 0;
-}
-
 /** Lo que se paga por comida: el total sin el envío. Es la base de ganar y el techo de canjear. */
 export function baseDeLealtad(total: number, envioMxn: number): number {
   return Math.max(0, redondearCentavos(total - Math.max(0, envioMxn)));
@@ -52,16 +29,6 @@ export function baseDeLealtad(total: number, envioMxn: number): number {
 /** Máximo de puntos-dinero que caben en la cuenta: 1 punto = $1, en pesos cerrados. */
 export function maximoCanjeDinero(saldo: number, total: number, envioMxn: number): number {
   return Math.max(0, Math.min(Math.floor(saldo), Math.floor(baseDeLealtad(total, envioMxn))));
-}
-
-export function unidad(mecanica: Mecanica, n: number): string {
-  if (mecanica === "SELLOS") return n === 1 ? "sello" : "sellos";
-  return n === 1 ? "punto" : "puntos";
-}
-
-/** "120 puntos", "1 sello". */
-export function cantidad(mecanica: Mecanica, n: number): string {
-  return `${n} ${unidad(mecanica, n)}`;
 }
 
 /** "2027-04-05" → "05/04/2027". Se parte el texto: pasar por `Date` movería el día según la zona. */

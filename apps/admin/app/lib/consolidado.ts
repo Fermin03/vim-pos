@@ -16,6 +16,8 @@ export type FilaConsolidado = {
   ticketPromedio: number;
   propinas: number;
   descuentos: number;
+  /** Lo descontado por canjes de lealtad (0159); va aparte de los descuentos manuales. */
+  lealtad: number;
   devoluciones: number;
   /** Participación de la sucursal en la venta total del rango (0..100). */
   participacionPct: number;
@@ -28,7 +30,7 @@ export type Consolidado = {
 
 /** Agrega filas (sucursal/día) en un comparativo por sucursal + fila total. Puro, testeable. */
 export function consolidarFilas(
-  filas: { sucursal_id: string; tickets_completados: number; tickets_cancelados: number; total_neto_mxn: number; propinas_capturadas_mxn: number; descuentos_manuales_mxn: number; devoluciones_mxn: number }[],
+  filas: { sucursal_id: string; tickets_completados: number; tickets_cancelados: number; total_neto_mxn: number; propinas_capturadas_mxn: number; descuentos_manuales_mxn: number; devoluciones_mxn: number; lealtad_mxn?: number }[],
   nombres: Map<string, string>,
 ): Consolidado {
   const por = new Map<string, FilaConsolidado>();
@@ -36,13 +38,14 @@ export function consolidarFilas(
     const k = f.sucursal_id;
     const cur = por.get(k) ?? {
       sucursalId: k, sucursal: nombres.get(k) ?? "Sucursal", tickets: 0, cancelados: 0,
-      venta: 0, ticketPromedio: 0, propinas: 0, descuentos: 0, devoluciones: 0, participacionPct: 0,
+      venta: 0, ticketPromedio: 0, propinas: 0, descuentos: 0, lealtad: 0, devoluciones: 0, participacionPct: 0,
     };
     cur.tickets += num(f.tickets_completados);
     cur.cancelados += num(f.tickets_cancelados);
     cur.venta += num(f.total_neto_mxn);
     cur.propinas += num(f.propinas_capturadas_mxn);
     cur.descuentos += num(f.descuentos_manuales_mxn);
+    cur.lealtad += num(f.lealtad_mxn);
     cur.devoluciones += num(f.devoluciones_mxn);
     por.set(k, cur);
   }
@@ -64,6 +67,7 @@ export function consolidarFilas(
       ticketPromedio: tickets > 0 ? Math.round((ventaTotal / tickets) * 100) / 100 : 0,
       propinas: lista.reduce((a, s) => a + s.propinas, 0),
       descuentos: lista.reduce((a, s) => a + s.descuentos, 0),
+      lealtad: lista.reduce((a, s) => a + s.lealtad, 0),
       devoluciones: lista.reduce((a, s) => a + s.devoluciones, 0),
     },
   };
@@ -78,7 +82,7 @@ export async function leerConsolidadoPorSucursal(desde: string, hasta: string, a
     leerTodas((a, b) =>
       supabase
         .from("vw_estado_resultados_dia")
-        .select("sucursal_id, tickets_completados, tickets_cancelados, total_neto_mxn, propinas_capturadas_mxn, descuentos_manuales_mxn, devoluciones_mxn")
+        .select("sucursal_id, tickets_completados, tickets_cancelados, total_neto_mxn, propinas_capturadas_mxn, descuentos_manuales_mxn, devoluciones_mxn, lealtad_mxn")
         .gte("dia_contable", desde)
         .lte("dia_contable", hasta)
         .order("dia_contable")

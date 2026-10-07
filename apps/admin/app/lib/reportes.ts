@@ -46,6 +46,8 @@ export type ResumenDia = {
   totalNeto: number;
   ticketPromedio: number;
   descuentos: number;
+  /** Lo descontado por canjes de lealtad (0159); va aparte de los descuentos manuales. */
+  lealtad: number;
   propinas: number;
   devoluciones: number;
   paraLlevar: number;
@@ -154,6 +156,7 @@ function sumarDia(filas: Record<string, unknown>[], dia: string): ResumenDia {
     totalNeto,
     ticketPromedio: completados > 0 ? Math.round((totalNeto / completados) * 100) / 100 : 0,
     descuentos: filas.reduce((a, f) => a + num(f.descuentos_manuales_mxn), 0),
+    lealtad: filas.reduce((a, f) => a + num(f.lealtad_mxn), 0),
     propinas: filas.reduce((a, f) => a + num(f.propinas_capturadas_mxn), 0),
     devoluciones: filas.reduce((a, f) => a + num(f.devoluciones_mxn), 0),
     paraLlevar: filas.reduce((a, f) => a + num(f.tickets_para_llevar), 0),
@@ -219,7 +222,7 @@ export async function leerDashboard(diaElegido?: string, sucursalId: string | nu
   const { data: er, error: e1 } = await supabase
     .from("vw_estado_resultados_dia")
     .select(
-      "dia_contable, tickets_completados, tickets_cancelados, total_neto_mxn, descuentos_manuales_mxn, propinas_capturadas_mxn, devoluciones_mxn, tickets_para_llevar, tickets_comer_aqui, tickets_delivery_propio, tickets_apps",
+      "dia_contable, tickets_completados, tickets_cancelados, total_neto_mxn, descuentos_manuales_mxn, propinas_capturadas_mxn, devoluciones_mxn, tickets_para_llevar, tickets_comer_aqui, tickets_delivery_propio, tickets_apps, lealtad_mxn",
     )
     .gte("dia_contable", desde)
     .lte("dia_contable", hasta)

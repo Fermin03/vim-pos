@@ -6,6 +6,24 @@
 
 ## Octubre de 2026
 
+13 de octubre Caja · 0.5.0
+
+### Programa de lealtad
+
+#### Nuevo
+
+- **Programa de lealtad.** Tus clientes ganan algo cada vez que compran y lo usan en su siguiente visita. Lo encuentras en el panel, en **Lealtad**.
+- Tú eliges cómo ganan: puntos que valen dinero, sellos por visita o puntos que se cambian por premios de tu carta.
+- En la caja, al asignar un cliente a la cuenta se ve cuánto tiene y cuánto va a ganar; el botón **Canjear puntos** aplica el descuento o agrega el premio.
+- El ticket le dice al cliente cuánto ganó y cuánto lleva, y el corte separa lo que se descontó por lealtad.
+- En **Lealtad → Movimientos** ves cuánto has repartido, cuánto se ha canjeado y quién hizo cada canje.
+
+#### A tener en cuenta
+
+- Canjear necesita internet; ganar puntos, no.
+- Una cuenta que lleva un premio de regalo no se factura por separado: entra en tu factura global.
+- En el plan Esencial es un extra; en Negocio y en Cadena ya va incluido.
+
 4 y 5 de octubre Panel de administración
 
 ### Menús del catálogo

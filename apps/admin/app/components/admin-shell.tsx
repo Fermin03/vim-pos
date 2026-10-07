@@ -53,6 +53,7 @@ const NAV: Seccion[] = [
       { label: "Promociones", href: "/promociones", icon: I.catalogo },
       { label: "Inventario", href: "/inventario", icon: I.inventario },
       { label: "Clientes", href: "/clientes", icon: I.clientes },
+      { label: "Lealtad", href: "/lealtad", icon: I.clientes },
       { label: "Reservaciones", href: "/reservaciones", icon: I.clientes },
       { label: "Conciliación apps", href: "/conciliacion", icon: I.reportes },
     ],

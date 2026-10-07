@@ -31,6 +31,9 @@ export type ResumenCliente = {
   compras: number;
   gastoTotal: number;
   ultimaVisita: string | null;
+  /** Saldo de lealtad del programa vigente (0159). 0 si no tiene o si el programa cambió. */
+  lealtadSaldo: number;
+  lealtadVenceEl: string | null;
 };
 
 export type ClienteConResumen = Cliente & ResumenCliente;
@@ -61,7 +64,7 @@ export async function listarClientesPagina(args: {
   let q = supabase
     .from("vw_clientes_lista")
     .select(
-      "id, nombre, apellido_paterno, telefono, email, rfc, razon_social, codigo_postal_fiscal, tipo_fiscal, notas_internas, estado, compras, gasto_total_mxn, ultima_visita",
+      "id, nombre, apellido_paterno, telefono, email, rfc, razon_social, codigo_postal_fiscal, tipo_fiscal, notas_internas, estado, compras, gasto_total_mxn, ultima_visita, lealtad_saldo, lealtad_vence_el",
       { count: "exact" },
     )
     .eq("tenant_id", tid);
@@ -89,6 +92,8 @@ export async function listarClientesPagina(args: {
     compras: Number(c.compras ?? 0),
     gastoTotal: Number(c.gasto_total_mxn ?? 0),
     ultimaVisita: c.ultima_visita ? String(c.ultima_visita) : null,
+    lealtadSaldo: Number(c.lealtad_saldo ?? 0) || 0,
+    lealtadVenceEl: (c.lealtad_vence_el as string | null) ?? null,
   }));
   return { filas, total: count ?? filas.length };
 }

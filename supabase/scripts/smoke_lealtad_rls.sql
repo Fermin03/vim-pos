@@ -49,11 +49,14 @@ BEGIN
   v_b := (modulos_efectivos(v_t) -> 'efectivos' ->> 'lealtad')::boolean;
   IF v_b IS DISTINCT FROM false THEN RAISE EXCEPTION '3: lealtad debía nacer apagada, vino %', v_b; END IF;
 
-  -- 3b) El add-on existe en el catálogo pero nace INACTIVO: /platform lista los activos con un botón
-  -- de activar, y sin pantallas (plan 1C) no debe estar a un clic.
+  -- 3b) El add-on existe en el catálogo. Nació INACTIVO en la 0156 (sin pantallas no debía estar a
+  -- un clic en /platform); la 0159 (plan 1C) lo enciende porque ya hay sección /lealtad. $100 en Esencial.
   IF NOT EXISTS (SELECT 1 FROM addons WHERE codigo = 'LEALTAD') THEN RAISE EXCEPTION '3b: no existe el add-on LEALTAD'; END IF;
-  IF (SELECT activo FROM addons WHERE codigo = 'LEALTAD') IS DISTINCT FROM false THEN
-    RAISE EXCEPTION '3b: el add-on LEALTAD debía nacer inactivo en el catálogo';
+  IF (SELECT activo FROM addons WHERE codigo = 'LEALTAD') IS DISTINCT FROM true THEN
+    RAISE EXCEPTION '3b: el add-on LEALTAD debía quedar activo en el catálogo tras la 0159';
+  END IF;
+  IF (SELECT precio_mensual_mxn FROM addons WHERE codigo = 'LEALTAD') IS DISTINCT FROM 100 THEN
+    RAISE EXCEPTION '3b: el add-on LEALTAD debía costar 100';
   END IF;
 
   -- Como el cajero.

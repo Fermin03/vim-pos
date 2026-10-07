@@ -1,7 +1,8 @@
 // Vista previa de un cambio de plan (0141, ADR 0021).
 //
 // ESPEJO de `cambiar_plan_tenant()` + `_sincronizar_addons_del_plan()` en
-// supabase/migrations/0141_cobro_promocion_prueba_plan.sql. La base es la que decide; esto solo le
+// supabase/migrations/0141_cobro_promocion_prueba_plan.sql (`_sincronizar_addons_del_plan` se redefinió en la 0159 para
+// incluir LEALTAD). La base es la que decide; esto solo le
 // enseña al operador, ANTES de confirmar, lo que la base va a hacer: folios del mes, add-ons que
 // entran o salen y el precio del cobro. Si cambias la regla allá, cámbiala aquí.
 import { EXTRAS, precioVigente, promocionVigente, type CodigoExtra } from "@vim/db/cobro";
@@ -10,6 +11,7 @@ import { EXTRAS, precioVigente, promocionVigente, type CodigoExtra } from "@vim/
 export const ADDONS_DEL_PLAN = [
   { codigo: "CFDI", bandera: "cfdi_incluido" },
   { codigo: "DELIVERY", bandera: "delivery_incluido" },
+  { codigo: "LEALTAD", bandera: "lealtad_incluido" },
 ] as const;
 
 export type PlanParaCambio = {

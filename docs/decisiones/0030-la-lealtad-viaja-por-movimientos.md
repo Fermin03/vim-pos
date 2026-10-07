@@ -203,17 +203,16 @@ Sigue abierto:
   cuenta el carrito pierde al cliente de domicilio.
 - **El anuncio «gana X» no descuenta las compras revertidas del día** al calcular el tope; es un
   texto, quien otorga los puntos es la base.
-- El admin no debe ofrecer combos como premio (el alta no lo impide; solo falla al canjear).
-- `_sincronizar_addons_del_plan` y su espejo en TS.
-- Los reportes del admin que leen los descuentos del ticket.
+- ~~El admin no debe ofrecer combos como premio~~ **Hecho (plan 1C):** el alta de premios del admin (`/lealtad`, pestaña Premios) no lista combos.
+- ~~`_sincronizar_addons_del_plan` y su espejo en TS~~ **Hecho (0159 y plan 1C):** la base concede la lealtad a los planes que la incluyen; su espejo en TS es `ADDONS_DEL_PLAN`, en `apps/platform/app/lib/cambio-plan.ts`.
+- ~~Los reportes del admin que leen los descuentos del ticket~~ **Hecho (0159 y plan 1C):** las vistas de reportes traen `lealtad_mxn` y el panel del día y el consolidado lo separan de las promociones.
 
 ## Límites conocidos
 
-- La Edge Function `lealtad-canje` y el manejador del gateway **no se han ejecutado de punta a
-  punta**: solo se probaron sus módulos de lógica. Las pruebas pgTAP y el horario de `pg_cron` tampoco
-  se han corrido. Solo pgTAP corre en el CI, al abrir el PR; la Edge Function, el manejador del gateway y la
-  programación diaria se ejercitan por primera vez al desplegar y en la prueba manual de la entrega,
-  antes de usarlos con un negocio real.
+- El manejador del gateway y el puente de la caja ya corren de punta a punta en
+  `npm run verify:lealtad-canje` (con una nube de mentira). **La Edge Function `lealtad-canje`
+  desplegada, el horario de `pg_cron` y pgTAP siguen sin ejecutarse fuera del CI**: se ejercitan en
+  la prueba de VIM Pruebas de la lista de salida (`docs/operacion/salida-lealtad-0.5.0.md`).
 - Dos casos de concurrencia no tienen prueba porque piden dos transacciones reales: un reintento
   simultáneo del mismo canje, y dos cuentas disputándose un mismo canje.
 - Un token de dispositivo robado puede atribuir canjes a cualquier empleado activo de ese negocio.
@@ -221,6 +220,24 @@ Sigue abierto:
   un ticket de ese mismo cliente; Postgres aborta uno de los dos lados. Ocurre una vez por
   duplicado.
 - Los tipos generados (`packages/db/src/database.types.ts`) no se regeneraron en esta entrega; quedan
-  pendientes para el pull request (`pnpm db:types` desde un entorno limpio).
+  pendientes (`pnpm db:types` desde un entorno limpio): sigue sin poder correrse en local, también tras el plan 1C.
+
+## Admin (plan 1C)
+
+- **`/lealtad` tiene tres pestañas:** Programa, Premios y Movimientos. Aparece siempre en el menú; sin el extra muestra una tarjeta que explica cómo pedirlo.
+- **Se guía por `permitidos`** (el POS, por `efectivos`) y el interruptor vive ahí. Configura un dueño o un administrador; la frontera real es la base (`es_admin_del_tenant`).
+- **La regla de puntos es un solo archivo**, `@vim/db/lealtad`, que usan la caja y el admin: el ejemplo en vivo del admin no puede discrepar de lo que la caja otorga.
+- **Las lecturas** son `vw_lealtad_movimientos`, `lealtad_resumen` y `lealtad_control`, todas `security_invoker`: respetan RLS del negocio. Las cifras salen de la 0159.
+- **Facturas (decisión del 6 de octubre):** el premio sale en $0, no admite factura individual y sí entra en la global; `timbrar-cfdi` falla cerrado ante una cuenta con premio. Un canje revertido después del pago sigue contando como premio para efectos de factura (`ticket_lleva_premio`).
+- **El admin no ofrece combos como premio**, y los reportes separan `lealtad_mxn` de las promociones.
+- **La 0159 también redefine** `_sincronizar_addons_del_plan`: concede el extra a los planes que lo incluyen (Negocio, Cadena y los planes por giro) y lo retira al bajar a uno que no; el interruptor sigue siendo del dueño. A diferencia de la 0141, cuando un negocio que lo pagaba aparte sube a un plan que lo incluye, primero queda activa la fila incluida y después se cierra la pagada: al revés, el trigger que apaga el interruptor al retirar el extra apagaba el programa de quien solo estaba subiendo de plan.
+
+### Límites conocidos del admin
+
+- Los planes que traen la lealtad sin cargo son una lista explícita de códigos —`NEGOCIO`, `CADENA`, `FT`, `QS`, `CB`, `FS`, `DK`, `ENT`— y es la misma en la base (`lealtad_incluido`, 0156) y en el panel de VIM (`PLANES_QUE_LO_INCLUYEN`, `apps/platform/app/lib/addons.ts`). Esencial y cualquier plan fuera de esa lista (uno personalizado o uno nuevo) la pagan aparte, a $100, tanto en el cambio de plan como en el alta manual. Incluirla en un plan nuevo es un gesto deliberado en los dos sitios.
+- El relleno de la 0159 concede el extra solo a negocios con suscripción ACTIVA: a uno con la suscripción pausada o sin fila se le concede a mano (lista de salida, §1).
+- Las cifras de Lealtad → Movimientos (repartido, canjeado, saldo vivo) cuentan solo la forma de ganar vigente; el libro de abajo muestra todos los movimientos, también los de una forma anterior. Tras cambiar de forma de ganar no cuadran entre sí, a propósito.
+- El bloqueo «no cambiar al cliente con un canje a medias» vive en el almacenamiento local de esa caja: desde otra terminal no se ve.
+- Los reportes del admin piden `lealtad_mxn`: la 0159 debe estar en producción **antes** de mezclar. Sin ella, el panel del día y el consolidado fallan.
 
 Diseño completo: `docs/superpowers/specs/2026-10-05-lealtad-design.md`.

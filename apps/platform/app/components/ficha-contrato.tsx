@@ -22,6 +22,7 @@ const btnFantasma = "btn h-9 rounded border border-line-strong px-3 text-13 font
  */
 const CONSECUENCIA_BAJA: Record<string, string> = {
   DELIVERY: "Se pausan sus tiendas en Uber Eats y la caja deja de recibir pedidos de apps.",
+  LEALTAD: "Se apaga su programa de lealtad: sus clientes dejan de ganar y de canjear. Los saldos se conservan por si lo retoma.",
   CFDI: "Deja de poder facturar: se apagan la sección de facturas del admin, el QR del ticket y el portal de autofactura.",
 };
 
@@ -407,7 +408,7 @@ export function FichaContrato({ d, planes, accion, busy, accesoDueno }: { d: Det
                     <li key={`c-${c}`}>Gana <b className="text-ink">{nombreAddon(c)}</b>, incluido a $0{vista.dejaDePagar.some((x) => x.codigo === c) ? ` (deja de pagar ${fmtMxn(vista.dejaDePagar.find((x) => x.codigo === c)?.precio ?? 0)} aparte)` : ""}.</li>
                   ))}
                   {vista.retira.map((c) => (
-                    <li key={`r-${c}`} className="text-danger">Pierde <b>{nombreAddon(c)}</b>: lo tenía por el plan.{c === "DELIVERY" ? " Se pausan sus tiendas en Uber Eats." : ""}</li>
+                    <li key={`r-${c}`} className="text-danger">Pierde <b>{nombreAddon(c)}</b>: lo tenía por el plan.{c === "DELIVERY" ? " Se pausan sus tiendas en Uber Eats." : c === "LEALTAD" ? " Se apaga su programa de lealtad; los saldos se conservan." : ""}</li>
                   ))}
                   {vista.retiraExtras.map((x) => (
                     <li key={`x-${x.codigo}`} className="text-danger">

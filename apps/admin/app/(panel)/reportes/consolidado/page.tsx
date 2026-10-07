@@ -28,6 +28,7 @@ export default function ConsolidadoPage() {
     { id: "promedio", titulo: "Ticket promedio", tipo: "mxn", valor: (f) => f.ticketPromedio, total: () => t?.ticketPromedio ?? 0, enfasis: "suave" },
     { id: "propinas", titulo: "Propinas", tipo: "mxn", valor: (f) => f.propinas, total: "suma", enfasis: "suave" },
     { id: "descuentos", titulo: "Descuentos", tipo: "mxn", valor: (f) => f.descuentos, total: "suma", enfasis: "suave" },
+    { id: "lealtad", titulo: "Lealtad", tipo: "mxn", valor: (f) => f.lealtad, total: "suma", enfasis: "suave" },
     { id: "devoluciones", titulo: "Devoluciones", tipo: "mxn", valor: (f) => f.devoluciones, total: "suma", enfasis: "suave" },
     { id: "pct", titulo: "% de la venta", tipo: "pct", valor: (f) => f.participacionPct, total: () => 100, celda: (f) => <Barra pct={f.participacionPct} /> },
   ];

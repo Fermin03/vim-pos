@@ -95,7 +95,7 @@ import { registrarImpresionComanda, registrarReimpresionTicket, type OrigenReimp
 import { ModalReimprimirComanda } from "./modal-reimprimir-comanda";
 import { baseDeLealtad, franjaLealtad, type Programa } from "../lib/lealtad-reglas";
 import { comprasQueSumanHoy, leerCanjeDelTicket, leerPrograma, leerSaldoLocal, type CanjeVivo, type SaldoCliente } from "../lib/lealtad";
-import { almacenLocal, borrarPendiente, leerPendiente } from "../lib/lealtad-canje";
+import { almacenLocal, borrarPendiente, leerPendiente, motivoNoCambiarCliente } from "../lib/lealtad-canje";
 import { revisarLealtadAntesDeCobrar } from "../lib/lealtad-cobro";
 import { ModalCanjeLealtad } from "./modal-canje-lealtad";
 
@@ -1017,10 +1017,13 @@ export function HomePos({
    * Si falla, lanza: el modal muestra el error y no se cierra.
    */
   const onAsignarClienteCuenta = useCallback(async (c: ClienteCuenta | null) => {
+    // Lealtad: con un canje a medias el cliente no se mueve (el modal muestra el porqué y no se cierra).
+    const motivo = motivoNoCambiarCliente(almacenLocal(), ticketBd?.ticketId ?? null, carrito.clienteCuenta?.clienteId ?? null, c?.clienteId ?? null);
+    if (motivo) throw new Error(motivo);
     if (ticketBd) await asignarClienteTicket(token, ticketBd.ticketId, c?.clienteId ?? null);
     dispatch({ tipo: "cliente_cuenta", cliente: c });
     setClienteCuentaAbierto(false);
-  }, [ticketBd, token]);
+  }, [ticketBd, token, carrito.clienteCuenta?.clienteId]);
 
   /** Persiste el ticket si aún no existe; abre el modal de descuento sobre ese ticket. */
   const onAplicarDescuento = useCallback(async () => {

@@ -12,6 +12,7 @@ DECLARE
   v_maria  uuid := '99999999-0000-0000-0000-000000000001';
   v_turno  uuid; v_prod uuid; v_cli uuid; v_cfdi uuid;
   v_premio uuid; v_solo uuid; v_dinero uuid; v_item uuid; v_item2 uuid;
+  v_abierta uuid; v_item3 uuid;
   v_pagado uuid; v_auth uuid; v_dev uuid; v_global uuid;
   v_hoy    date := (now() AT TIME ZONE 'America/Mexico_City')::date;
   v_fallo  boolean;
@@ -144,9 +145,27 @@ BEGIN
   -- Y la global puede amparar a la cuenta con premio.
   INSERT INTO cfdi_global_tickets (cfdi_id, ticket_id, tenant_id) VALUES (v_global, v_premio, v_tenant);
 
-  -- 5) Un canje revertido ya no cuenta como premio.
+  -- 5) Un premio revertido DESPUÉS de cobrar sigue siendo un premio: los totales de una cuenta
+  --    cerrada no se recalculan, así que su renglón sigue en $0 (0159).
   UPDATE ticket_canjes_lealtad SET revertido = true, revertido_at = now() WHERE ticket_id = v_premio;
-  IF ticket_lleva_premio(v_premio) THEN RAISE EXCEPTION 'un premio revertido sigue bloqueando la factura'; END IF;
+  IF (SELECT total_item_mxn FROM ticket_items WHERE id = v_item) <> 0 THEN
+    RAISE EXCEPTION 'el smoke supone que una cuenta cobrada no se recalcula al revertir su canje';
+  END IF;
+  IF NOT ticket_lleva_premio(v_premio) THEN
+    RAISE EXCEPTION 'un premio revertido tras el pago dejó de bloquear la factura (su renglón sigue en $0)';
+  END IF;
+
+  -- 6) En cambio, quitar el premio de una cuenta ABIERTA sí lo libera: ahí el renglón vuelve a su precio.
+  v_abierta := abrir_ticket(v_suc, v_caja, v_turno, 'PARA_LLEVAR'::modo_servicio, v_cli, NULL, 'smoke-lfac-d', v_maria);
+  v_item3 := agregar_item_a_ticket(v_abierta, v_prod, 1, NULL, '[]'::jsonb, 'smoke-lfac-d1');
+  INSERT INTO ticket_canjes_lealtad (id, tenant_id, ticket_id, cliente_id, ticket_item_id, puntos, monto_descontado_mxn)
+  VALUES (gen_random_uuid(), v_tenant, v_abierta, v_cli, v_item3, 6, 120);
+  IF NOT ticket_lleva_premio(v_abierta) THEN RAISE EXCEPTION 'el premio vivo de la cuenta abierta no se reconoce'; END IF;
+  UPDATE ticket_canjes_lealtad SET revertido = true, revertido_at = now() WHERE ticket_id = v_abierta;
+  IF (SELECT total_item_mxn FROM ticket_items WHERE id = v_item3) <> 120 THEN
+    RAISE EXCEPTION 'al quitar el premio de una cuenta abierta el renglón debió volver a $120';
+  END IF;
+  IF ticket_lleva_premio(v_abierta) THEN RAISE EXCEPTION 'un premio quitado de una cuenta abierta sigue contando'; END IF;
 
   RAISE NOTICE 'SMOKE LEALTAD FACTURA OK';
 END $$;

@@ -221,3 +221,14 @@ export async function avanzarCanje(ops: OpsCanje, almacen: Almacen, inicial: Pen
     mensaje: `La nube ya descontó ${cuanto} y esta cuenta no los aceptó. ${mensajeErrorLealtad(a.error)} Vuelven solos al cliente en un máximo de 48 horas; desde la caja no se pueden devolver antes. Cobra la cuenta sin el canje.${renglonSeQueda}`,
   };
 }
+
+/**
+ * Con un canje a medias (la nube ya descontó; la cuenta aún no lo tiene) no se quita ni se cambia
+ * al cliente: el canje es de ESE cliente y al retomarlo en una cuenta de otro fallaría, dejando sus
+ * puntos descontados hasta la reversa automática. Devuelve el texto para el cajero, o null si se puede.
+ */
+export function motivoNoCambiarCliente(a: Almacen, ticketId: string | null, actualId: string | null, nuevoId: string | null): string | null {
+  if (!ticketId || actualId === nuevoId) return null;
+  if (!leerPendiente(a, ticketId)) return null;
+  return "Esta cuenta tiene un canje de puntos a medias. Termínalo o descártalo en «Canjear puntos» antes de cambiar al cliente.";
+}

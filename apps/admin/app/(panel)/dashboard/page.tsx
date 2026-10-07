@@ -168,8 +168,8 @@ function GraficaPorHora({ datos }: { datos: { hora: number; total: number }[] })
  * panel no lo decía aunque la base ya lo tenía: turnos cerrados, diferencia de efectivo,
  * cancelaciones y descuentos.
  */
-function FranjaCaja({ caja, cancelados, descuentos, devoluciones }: {
-  caja: ResumenCaja; cancelados: number; descuentos: number; devoluciones: number;
+function FranjaCaja({ caja, cancelados, descuentos, lealtad, devoluciones }: {
+  caja: ResumenCaja; cancelados: number; descuentos: number; lealtad: number; devoluciones: number;
 }) {
   const total = caja.cerrados + caja.abiertos;
   let tono: "ok" | "falta" | "sobra" | "neutro";
@@ -232,6 +232,12 @@ function FranjaCaja({ caja, cancelados, descuentos, devoluciones }: {
           <dt className="text-ink-2">Descuentos</dt>
           <dd className="font-display text-16 font-semibold tabular-nums">{fmt(descuentos)}</dd>
         </div>
+        {lealtad > 0 && (
+          <div>
+            <dt className="text-ink-2">Lealtad</dt>
+            <dd className="font-display text-16 font-semibold tabular-nums">{fmt(lealtad)}</dd>
+          </div>
+        )}
         <div>
           <dt className="text-ink-2">Devoluciones</dt>
           <dd className="font-display text-16 font-semibold tabular-nums">{fmt(devoluciones)}</dd>
@@ -458,6 +464,7 @@ export default function DashboardPage() {
               caja={data!.caja}
               cancelados={hoy.ticketsCancelados}
               descuentos={hoy.descuentos}
+              lealtad={hoy.lealtad}
               devoluciones={hoy.devoluciones}
             />
 

@@ -32,7 +32,7 @@ select isnt((select codigo_publico from clientes where id = :'cli'), null, 'todo
 select is((select (modulos_efectivos(:'t') -> 'efectivos' ->> 'lealtad')::boolean), false, 'lealtad nace apagada');
 
 -- 3b) El add-on existe en el catálogo y nace INACTIVO: se enciende en el plan 1C, con las pantallas.
-select is((select activo from addons where codigo = 'LEALTAD'), false, 'el add-on LEALTAD existe y nace inactivo en el catálogo');
+select is((select activo from addons where codigo = 'LEALTAD'), true, 'el add-on LEALTAD está activo en el catálogo (0159)');
 
 -- Como el cajero.
 set local role authenticated;
@@ -78,7 +78,8 @@ select throws_ok(
 -- 13-14) Con add-on y programa, sí enciende, y queda efectivo.
 reset role;
 insert into tenant_addons (tenant_id, addon_id, fecha_inicio, activo, precio_mensual_mxn)
-select :'t', id, (now() at time zone 'America/Mexico_City')::date, true, 100 from addons where codigo = 'LEALTAD';
+select :'t', id, (now() at time zone 'America/Mexico_City')::date, true, 100 from addons where codigo = 'LEALTAD'
+on conflict on constraint addon_unico_activo do update set activo = true;
 set local role authenticated;
 select set_config('request.jwt.claims', json_build_object('sub', :'dueno', 'role', 'authenticated', 'tenant_id', :'t')::text, true);
 select lives_ok(

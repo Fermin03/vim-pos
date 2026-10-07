@@ -192,6 +192,14 @@ El envío se cobra según la zona del cliente. Cada sucursal define las suyas y 
 
 Cada pedido entra como un ticket y su comanda sale a cocina. Incluido desde Negocio; en Esencial, $100 al mes ([precios](https://vimpos.com.mx/precios)). La tableta de Uber se queda en tu local, y DiDi y Rappi aún no están conectados.
 
+_Lealtad_
+
+## Que tus clientes vuelvan, con puntos o sellos
+
+**Programa de lealtad.** Puntos que valen dinero, sellos por visita o puntos por premios: tú eliges. El cliente gana al pagar y canjea en su siguiente visita, en cualquiera de tus sucursales. Todo canje queda registrado con quién lo hizo.
+
+Incluido desde Negocio; en Esencial, $100 al mes ([precios](https://vimpos.com.mx/precios)).
+
 _Si ya usas otro_
 
 ## Tu menú se pega y ya

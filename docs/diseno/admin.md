@@ -66,6 +66,13 @@ combo?" que la caja le hace al cliente cuando el cajero agrega suelto un product
 de un combo. Vive aquí, no en Configuración, porque solo afecta a los combos — mismo criterio que
 el switch de descuento de inventario, que vive en Inventario y no en Configuración.
 
+**Lealtad.** La sección aparece siempre en el menú. Sin el programa contratado ocupa la pantalla una
+tarjeta que dice qué es y un botón que abre WhatsApp con el mensaje escrito (misma regla que
+Inventario). Con él, el interruptor vive en la pestaña Programa, no en Configuración. Apagarlo y
+cambiar la forma de ganar pasan por `DialogoPeligro` y dicen la consecuencia: al apagar, los saldos
+se conservan; al cambiar de forma, quedan en cero y se dice a cuántos clientes afecta. El ejemplo
+de la pestaña Programa se calcula con la misma regla que usa la caja (`@vim/db/lealtad`).
+
 ## Inventario desde el plan Negocio (0148, ADR 0025)
 
 Un negocio cuyo plan no incluye inventario **sigue viendo** Inventario en el menú y Recetas en

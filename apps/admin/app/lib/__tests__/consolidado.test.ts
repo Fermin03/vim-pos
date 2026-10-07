@@ -8,8 +8,8 @@ const nombres = new Map([
 
 // Dos días de s1 + un día de s2 (filas de vw_estado_resultados_dia)
 const filas = [
-  { sucursal_id: "s1", tickets_completados: 10, tickets_cancelados: 1, total_neto_mxn: 1000, propinas_capturadas_mxn: 50, descuentos_manuales_mxn: 20, devoluciones_mxn: 0 },
-  { sucursal_id: "s1", tickets_completados: 20, tickets_cancelados: 0, total_neto_mxn: 2000, propinas_capturadas_mxn: 100, descuentos_manuales_mxn: 0, devoluciones_mxn: 30 },
+  { sucursal_id: "s1", tickets_completados: 10, tickets_cancelados: 1, total_neto_mxn: 1000, propinas_capturadas_mxn: 50, descuentos_manuales_mxn: 20, devoluciones_mxn: 0, lealtad_mxn: 30 },
+  { sucursal_id: "s1", tickets_completados: 20, tickets_cancelados: 0, total_neto_mxn: 2000, propinas_capturadas_mxn: 100, descuentos_manuales_mxn: 0, devoluciones_mxn: 30, lealtad_mxn: 20 },
   { sucursal_id: "s2", tickets_completados: 10, tickets_cancelados: 2, total_neto_mxn: 1000, propinas_capturadas_mxn: 25, descuentos_manuales_mxn: 10, devoluciones_mxn: 0 },
 ];
 
@@ -20,6 +20,12 @@ describe("B5 Enterprise — consolidado por sucursal", () => {
     expect(c.filas.map((f) => f.sucursal)).toEqual(["León Centro", "León Norte"]);
     expect(c.filas[0]).toMatchObject({ tickets: 30, cancelados: 1, venta: 3000, propinas: 150, devoluciones: 30 });
     expect(c.filas[1]).toMatchObject({ tickets: 10, venta: 1000 });
+  });
+
+  it("suma la lealtad por sucursal, y una fila sin ese dato cuenta cero", () => {
+    expect(c.filas[0]!.lealtad).toBe(50); // 30 + 20 de la misma sucursal
+    expect(c.filas[1]!.lealtad).toBe(0); // s2 no trae lealtad_mxn
+    expect(c.total.lealtad).toBe(50);
   });
 
   it("calcula ticket promedio y participación por sucursal", () => {

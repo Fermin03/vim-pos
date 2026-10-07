@@ -17,6 +17,13 @@ describe("puedeVer", () => {
     expect(puedeVer(CAJERO, "/usuarios")).toBe(false);
   });
 
+  it("la lealtad la configura dueño o administrador; un supervisor no la ve", () => {
+    expect(puedeVer(5, "/lealtad")).toBe(true);
+    expect(puedeVer(4, "/lealtad/premios")).toBe(true);
+    expect(puedeVer(3, "/lealtad")).toBe(false);
+    expect(puedeVer(3, "/lealtad/movimientos")).toBe(false);
+  });
+
   it("pero el cajero sí ve el panel", () => {
     expect(puedeVer(CAJERO, "/dashboard")).toBe(true);
   });

@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import {
-  avanzarCanje, borrarPendiente, guardarPendiente, leerPendiente, nuevoCanjeDinero, nuevoCanjePremio,
+  avanzarCanje, borrarPendiente, guardarPendiente, leerPendiente, motivoNoCambiarCliente, nuevoCanjeDinero, nuevoCanjePremio,
   type Almacen, type OpsCanje, type Pendiente,
 } from "../lealtad-canje";
 
@@ -251,5 +251,29 @@ describe("el canje pendiente guardado", () => {
     expect(dinero.canjeId).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i);
     expect(dinero).toMatchObject({ paso: "CANJEAR", premio: null, puntos: 50 });
     expect(premio).toMatchObject({ paso: "CANJEAR", puntos: 6, premio: { id: "pr-1", productoId: "p-1", nombre: "Hamburguesa", ticketItemId: null } });
+  });
+});
+
+describe("cambiar al cliente con un canje a medias", () => {
+  it("sin canje a medias, se puede poner, cambiar o quitar al cliente", () => {
+    expect(motivoNoCambiarCliente(alm, "tk-1", "cli-1", null)).toBeNull();
+    expect(motivoNoCambiarCliente(alm, "tk-1", "cli-1", "cli-2")).toBeNull();
+    expect(motivoNoCambiarCliente(alm, null, null, "cli-2")).toBeNull();
+  });
+
+  it("con un canje a medias no deja quitarlo ni cambiarlo, y dice qué hacer", () => {
+    guardarPendiente(alm, dinero);
+    expect(motivoNoCambiarCliente(alm, "tk-1", "cli-1", null)).toMatch(/canje/i);
+    expect(motivoNoCambiarCliente(alm, "tk-1", "cli-1", "cli-2")).toMatch(/Canjear puntos/);
+  });
+
+  it("volver a elegir al mismo cliente no estorba (se usa para corregir su nombre)", () => {
+    guardarPendiente(alm, dinero);
+    expect(motivoNoCambiarCliente(alm, "tk-1", "cli-1", "cli-1")).toBeNull();
+  });
+
+  it("un canje a medias de OTRA cuenta no bloquea esta", () => {
+    guardarPendiente(alm, dinero);
+    expect(motivoNoCambiarCliente(alm, "tk-2", "cli-1", null)).toBeNull();
   });
 });
