@@ -183,7 +183,7 @@ export async function avanzarCanje(ops: OpsCanje, almacen: Almacen, inicial: Pen
       if (esFalloAmbiguo(r.error)) {
         return {
           estado: "A_MEDIAS", pendiente: p,
-          mensaje: `No se pudo confirmar el canje con la nube. ${mensajeErrorLealtad(r.error)} Toca Reintentar.${p.premio ? ` Mientras tanto, ${p.premio.nombre} está en la cuenta a su precio.` : ""}`,
+          mensaje: `No se pudo confirmar el canje con la nube. ${mensajeErrorLealtad(r.error)} Puede que la nube ya haya descontado ${cuanto}: no cobres sin resolverlo. Toca Reintentar.${p.premio ? ` Mientras tanto, ${p.premio.nombre} está en la cuenta a su precio.` : ""}`,
         };
       }
       // Rechazo de negocio: no se descontó nada. El renglón del premio sobra; se intenta cancelar.

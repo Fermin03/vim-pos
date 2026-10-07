@@ -164,6 +164,41 @@ describe("canje de premio", () => {
   });
 });
 
+describe("las garantías del orden", () => {
+  it("se anota antes de llamar: al canjear y al asentar el pendiente ya está guardado con su paso", async () => {
+    const visto: { canjear?: Pendiente | null; asentar?: Pendiente | null } = {};
+    const t = ops({
+      canjear: () => {
+        visto.canjear = leerPendiente(alm, "tk-1");
+        return { ok: true, canje_id: dinero.canjeId, puntos: 50, monto_mxn: 50, premio_id: null, producto_id: null, saldo: 0, repetido: false };
+      },
+      asentar: () => {
+        visto.asentar = leerPendiente(alm, "tk-1");
+        return { ok: true, canje_id: dinero.canjeId };
+      },
+    });
+    expect(await avanzarCanje(t.o, alm, dinero)).toEqual({ estado: "APLICADO" });
+    expect(visto.canjear).toMatchObject({ canjeId: dinero.canjeId, paso: "CANJEAR", puntos: 50 });
+    expect(visto.asentar).toMatchObject({ canjeId: dinero.canjeId, paso: "ASENTAR", puntos: 50 });
+  });
+
+  it("sin red al canjear, el aviso dice que los puntos pudieron descontarse y que no se cobre así", async () => {
+    const t = ops({ canjear: () => ({ ok: false, error: "SIN_RED" }) });
+    const r = await avanzarCanje(t.o, alm, dinero);
+    expect(r.estado === "A_MEDIAS" && r.mensaje).toMatch(/Puede que la nube ya haya descontado 50 puntos: no cobres sin resolverlo/);
+  });
+
+  it("reanudar un PREMIO desde ASENTAR solo asienta, sobre su renglón: ni agrega ni vuelve a canjear", async () => {
+    const guardado: Pendiente = { ...premio, paso: "ASENTAR", premio: premio.premio && { ...premio.premio, ticketItemId: "it-77" } };
+    guardarPendiente(alm, guardado);
+    const t = ops();
+    expect(await avanzarCanje(t.o, alm, guardado)).toEqual({ estado: "APLICADO" });
+    expect(t.nombres()).toEqual(["asentar"]);
+    expect(t.llamadas[0][1]).toEqual({ canjeId: premio.canjeId, ticketId: "tk-1", ticketItemId: "it-77" });
+    expect(leerPendiente(alm, "tk-1")).toBeNull();
+  });
+});
+
 describe("un canje a medias no se pisa", () => {
   it("un canje nuevo en la misma cuenta no toca al pendiente ni llama a nadie", async () => {
     guardarPendiente(alm, { ...dinero, paso: "ASENTAR" });
