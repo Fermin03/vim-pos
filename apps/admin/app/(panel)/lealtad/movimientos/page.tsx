@@ -35,6 +35,7 @@ export default function MovimientosLealtadPage() {
   const [vigilancia, setVigilancia] = useState<ControlLealtad | null>(null);
   const [libro, setLibro] = useState<Libro | null>(null);
   const [cargandoLibro, setCargandoLibro] = useState(true);
+  const [cargandoCifras, setCargandoCifras] = useState(true);
   // Un error por consulta: que una salga bien no borra el aviso de la otra. Si una recarga falla
   // se queda lo que ya se mostraba (nunca un «Sin movimientos» falso) y se dice que es lo anterior.
   const [errorCifras, setErrorCifras] = useState<string | null>(null);
@@ -42,6 +43,9 @@ export default function MovimientosLealtadPage() {
   // Solo la respuesta de la última consulta pinta: una vieja que tarda más no pisa a la nueva.
   const consultaCifras = useRef(0);
   const consultaLibro = useRef(0);
+  /** El libro que se ve ahora, para que el catch de una página que falla lea su página sin depender de él. */
+  const libroVisto = useRef<Libro | null>(null);
+  libroVisto.current = libro;
 
   useEffect(() => {
     listarSucursalesOpciones().then(setSucursales).catch(() => setSucursales([]));
@@ -51,9 +55,11 @@ export default function MovimientosLealtadPage() {
   // Cifras y control: dependen del rango y la sucursal, no de la página ni del tipo.
   useEffect(() => {
     const n = ++consultaCifras.current;
+    setCargandoCifras(true);
     Promise.all([leerResumen(filtros.desde, filtros.hasta, filtros.sucursalId), leerControl(filtros.desde, filtros.hasta)])
       .then(([r, c]) => { if (n === consultaCifras.current) { setResumen(r); setVigilancia(c); setErrorCifras(null); } })
-      .catch((e) => { if (n === consultaCifras.current) setErrorCifras(mensajeLealtad(e, "No se pudieron leer las cifras")); });
+      .catch((e) => { if (n === consultaCifras.current) setErrorCifras(mensajeLealtad(e, "No se pudieron leer las cifras")); })
+      .finally(() => { if (n === consultaCifras.current) setCargandoCifras(false); });
   }, [filtros.desde, filtros.hasta, filtros.sucursalId]);
 
   useEffect(() => {
@@ -61,7 +67,14 @@ export default function MovimientosLealtadPage() {
     setCargandoLibro(true);
     listarMovimientos({ ...filtros, pagina })
       .then((r) => { if (n === consultaLibro.current) { setLibro({ ...r, pagina }); setErrorLibro(null); } })
-      .catch((e) => { if (n === consultaLibro.current) setErrorLibro(mensajeLealtad(e, "No se pudieron leer los movimientos")); })
+      .catch((e) => {
+        if (n !== consultaLibro.current) return;
+        setErrorLibro(mensajeLealtad(e, "No se pudieron leer los movimientos"));
+        // Que el botón y el contador sigan en la página de las filas que se ven. El efecto depende de
+        // `pagina`, así que el cambio lo reejecuta una vez, pero la consulta que lanza es la de esa
+        // página ya leída y sale bien o termina en este mismo catch con `pagina` igual: no hay bucle.
+        setPagina((p) => (libroVisto.current && libroVisto.current.pagina !== p ? libroVisto.current.pagina : p));
+      })
       .finally(() => { if (n === consultaLibro.current) setCargandoLibro(false); });
   }, [filtros, pagina]);
 
@@ -116,7 +129,7 @@ export default function MovimientosLealtadPage() {
           </p>
         )}
 
-        <dl className="mb-6 grid grid-cols-2 gap-3 lg:grid-cols-4">
+        <dl className={`mb-6 grid grid-cols-2 gap-3 transition-opacity lg:grid-cols-4${cargandoCifras ? " opacity-60" : ""}`} aria-busy={cargandoCifras}>
           {[
             { t: "Repartido en el periodo", v: resumen ? puntos(resumen.emitido) : "…", pie: "Lo que ganaron tus clientes" },
             { t: "Canjeado en el periodo", v: resumen ? puntos(resumen.canjeado) : "…", pie: mecanica === "PUNTOS_DINERO" && resumen ? `${fmtMxn(resumen.canjeado)} en descuentos` : "Lo que ya usaron" },

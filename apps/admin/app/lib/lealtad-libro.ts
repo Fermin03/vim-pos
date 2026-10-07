@@ -97,13 +97,14 @@ export async function listarMovimientos(a: {
     .lt("fecha", `${sumarDias(a.hasta, 1)}T00:00:00-06:00`);
   if (a.sucursalId) q = q.eq("sucursal_id", a.sucursalId);
   if (a.tipo !== "TODOS") q = q.eq("tipo", a.tipo);
-  const texto = a.busqueda.trim().replace(/[%,()]+/g, " ");
-  if (texto.trim()) {
-    const digitos = a.busqueda.replace(/\D/g, "");
-    const partes = [`cliente_nombre.ilike.%${texto}%`];
-    if (digitos.length >= 3) partes.push(`cliente_telefono.ilike.%${digitos}%`);
-    q = q.or(partes.join(","));
-  }
+  // Dentro de `.or(...)` de PostgREST rompen la coma, los paréntesis, las comillas y la diagonal
+  // inversa (citado), y en ilike los comodines `%`, `*` y `_`: cada racha se vuelve un espacio.
+  const texto = a.busqueda.replace(/[%,()"\\*_]+/g, " ").trim();
+  const digitos = a.busqueda.replace(/\D/g, "");
+  const partes: string[] = [];
+  if (texto) partes.push(`cliente_nombre.ilike.%${texto}%`);
+  if (digitos.length >= 3) partes.push(`cliente_telefono.ilike.%${digitos}%`);
+  if (partes.length) q = q.or(partes.join(","));
   const desde = (Math.max(1, a.pagina) - 1) * MOVS_POR_PAGINA;
   const { data, error, count } = await q
     .order("fecha", { ascending: false })

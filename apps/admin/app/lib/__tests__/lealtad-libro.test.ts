@@ -92,7 +92,26 @@ describe("el libro", () => {
 
   it("los caracteres que rompen el .or() no llegan a la consulta", async () => {
     await listarMovimientos({ desde: "2026-10-01", hasta: "2026-10-06", sucursalId: null, tipo: "TODOS", busqueda: "a,b(c)%", pagina: 1 });
-    expect(con("or")).toEqual([["cliente_nombre.ilike.%a b c %"]]);
+    expect(con("or")).toEqual([["cliente_nombre.ilike.%a b c%"]]);
+  });
+
+  it("comillas, diagonal inversa y comodines tampoco llegan: cada racha es un espacio y se recorta", async () => {
+    await listarMovimientos({ desde: "2026-10-01", hasta: "2026-10-06", sucursalId: null, tipo: "TODOS", busqueda: 'O"B\\x*_y', pagina: 1 });
+    expect(con("or")).toEqual([["cliente_nombre.ilike.%O B x y%"]]);
+    doble.llamadas.length = 0;
+    await listarMovimientos({ desde: "2026-10-01", hasta: "2026-10-06", sucursalId: null, tipo: "TODOS", busqueda: 'O"Brien', pagina: 1 });
+    expect(con("or")).toEqual([["cliente_nombre.ilike.%O Brien%"]]);
+  });
+
+  it("si al limpiar no queda texto no hay filtro por nombre, pero el teléfono sí cuenta con 3+ dígitos", async () => {
+    await listarMovimientos({ desde: "2026-10-01", hasta: "2026-10-06", sucursalId: null, tipo: "TODOS", busqueda: '"*_"', pagina: 1 });
+    expect(con("or")).toEqual([]);
+    doble.llamadas.length = 0;
+    await listarMovimientos({ desde: "2026-10-01", hasta: "2026-10-06", sucursalId: null, tipo: "TODOS", busqueda: '"477_123"', pagina: 1 });
+    expect(con("or")).toEqual([["cliente_nombre.ilike.%477 123%,cliente_telefono.ilike.%477123%"]]);
+    doble.llamadas.length = 0;
+    await listarMovimientos({ desde: "2026-10-01", hasta: "2026-10-06", sucursalId: null, tipo: "TODOS", busqueda: '*"*123"', pagina: 1 });
+    expect(con("or")).toEqual([["cliente_nombre.ilike.%123%,cliente_telefono.ilike.%123%"]]);
   });
 
   it("el historial de un cliente son sus últimos 30 movimientos", async () => {
