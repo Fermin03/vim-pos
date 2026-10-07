@@ -10,35 +10,33 @@
 
 export const BASE = 'https://vimpos.com.mx';
 
+// `archivo` y `markdown` salen de la ruta: '/' es `index`, y el resto, la ruta sin la diagonal.
+const conArchivos = (p) => {
+  const base = p.ruta === '/' ? 'index' : p.ruta.slice(1);
+  return { ...p, archivo: `${base}.html`, markdown: `${base}.md` };
+};
+
 export const PAGINAS = [
   {
     ruta: '/',
-    archivo: 'index.html',
-    markdown: 'index.md',
     nombre: 'Inicio',
     resumen: 'Qué es VIM POS, para quién es y qué lo distingue: el sistema completo vive en la caja del local, no en internet.',
     enSitemap: true,
   },
   {
     ruta: '/funciones',
-    archivo: 'funciones.html',
-    markdown: 'funciones.md',
     nombre: 'Funciones',
     resumen: 'Qué hace el sistema, módulo por módulo: caja, cocina, mesas, inventario, reportes y conciliación de apps de reparto. Con los límites conocidos escritos.',
     enSitemap: true,
   },
   {
     ruta: '/sin-internet',
-    archivo: 'sin-internet.html',
-    markdown: 'sin-internet.md',
     nombre: 'Sin internet',
     resumen: 'Qué pasa en la caja cuando se cae la señal y qué pasa cuando vuelve. La respuesta técnica a «¿de verdad funciona sin conexión?».',
     enSitemap: true,
   },
   {
     ruta: '/facturacion-cfdi',
-    archivo: 'facturacion-cfdi.html',
-    markdown: 'facturacion-cfdi.md',
     nombre: 'Facturación CFDI',
     resumen:
       'Cómo factura un restaurante con VIM POS: autofactura por QR desde el ticket, factura global del periodo (la emite el dueño con un botón desde el panel), y el plazo para facturar lo decide el negocio. Disponible a través de un proveedor autorizado por el SAT; el negocio carga su sello digital y cada plan trae folios al mes.',
@@ -46,16 +44,12 @@ export const PAGINAS = [
   },
   {
     ruta: '/precios',
-    archivo: 'precios.html',
-    markdown: 'precios.md',
     nombre: 'Precios',
     resumen: 'Los tres planes con su precio en pesos, la tabla comparativa, los extras y los paquetes de folios de factura.',
     enSitemap: true,
   },
   {
     ruta: '/novedades',
-    archivo: 'novedades.html',
-    markdown: 'novedades.md',
     nombre: 'Novedades',
     resumen: 'Qué cambió en VIM POS y cuándo: funciones nuevas, mejoras y correcciones de la caja y del panel, por fecha y por versión.',
     // Lleva `noindex`: es para clientes, no para buscadores.
@@ -63,16 +57,12 @@ export const PAGINAS = [
   },
   {
     ruta: '/demo',
-    archivo: 'demo.html',
-    markdown: 'demo.md',
     nombre: 'Pide una demo',
     resumen: 'Cómo se agenda una demostración y qué pasa después de enviar el formulario.',
     enSitemap: true,
   },
   {
     ruta: '/cuanto-cuesta-un-sistema-para-restaurante',
-    archivo: 'cuanto-cuesta-un-sistema-para-restaurante.html',
-    markdown: 'cuanto-cuesta-un-sistema-para-restaurante.md',
     nombre: 'Cuánto cuesta',
     resumen:
       'Los tres modelos con los que cobra un sistema para restaurante —licencia fija, gratuito con planes de pago, y porcentaje de cada venta—, la aritmética para comparar cada uno contra la venta real del negocio, y cuándo cada modelo deja de convenir. No nombra marcas: compara modelos.',
@@ -80,8 +70,6 @@ export const PAGINAS = [
   },
   {
     ruta: '/como-elegir-sistema-restaurante',
-    archivo: 'como-elegir-sistema-restaurante.html',
-    markdown: 'como-elegir-sistema-restaurante.md',
     nombre: 'Cómo elegir sistema',
     resumen:
       'Guía de compra: nueve preguntas que hacerle a cualquier software para restaurantes antes de firmar —internet, precio de frente, comisiones, datos, facturación, implementación, permanencia, soporte y equipo— y en qué casos VIM POS no es la respuesta.',
@@ -89,8 +77,6 @@ export const PAGINAS = [
   },
   {
     ruta: '/factura-global-restaurantes',
-    archivo: 'factura-global-restaurantes.html',
-    markdown: 'factura-global-restaurantes.md',
     nombre: 'Factura global',
     resumen:
       'Guía fiscal: qué es la factura global, cada cuándo se emite, qué datos lleva en CFDI 4.0 (RFC genérico, uso S01, periodo) y los errores más comunes en un restaurante. No es asesoría fiscal.',
@@ -98,24 +84,18 @@ export const PAGINAS = [
   },
   {
     ruta: '/punto-de-venta-hamburgueserias',
-    archivo: 'punto-de-venta-hamburgueserias.html',
-    markdown: 'punto-de-venta-hamburgueserias.md',
     nombre: 'Hamburgueserías',
     resumen: 'VIM POS para una hamburguesería: término obligatorio, extras con precio, combos, para llevar y a domicilio, cocina por estación e inventario por receta.',
     enSitemap: true,
   },
   {
     ruta: '/punto-de-venta-restaurantes-leon',
-    archivo: 'punto-de-venta-restaurantes-leon.html',
-    markdown: 'punto-de-venta-restaurantes-leon.md',
     nombre: 'León, Guanajuato',
     resumen: 'VIM POS para restaurantes de León, Guanajuato, donde se hace el producto: en la zona, la demostración puede ser en el local.',
     enSitemap: true,
   },
   {
     ruta: '/nosotros',
-    archivo: 'nosotros.html',
-    markdown: 'nosotros.md',
     nombre: 'Nosotros',
     resumen: 'Quién construye VIM POS, desde dónde, por qué existe y en qué punto está el producto hoy.',
     alias: ['/about'],
@@ -123,8 +103,6 @@ export const PAGINAS = [
   },
   {
     ruta: '/contacto',
-    archivo: 'contacto.html',
-    markdown: 'contacto.md',
     nombre: 'Contacto',
     resumen: 'Cómo contactar a VIM POS: WhatsApp, correo, domicilio fiscal, horario y en cuánto contestamos.',
     alias: ['/contact'],
@@ -132,8 +110,6 @@ export const PAGINAS = [
   },
   {
     ruta: '/aviso-privacidad',
-    archivo: 'aviso-privacidad.html',
-    markdown: 'aviso-privacidad.md',
     nombre: 'Aviso de privacidad',
     resumen: 'Qué datos se recaban, para qué, cuánto se guardan y cómo ejercer los derechos ARCO.',
     alias: ['/privacy'],
@@ -142,27 +118,23 @@ export const PAGINAS = [
   },
   {
     ruta: '/terminos',
-    archivo: 'terminos.html',
-    markdown: 'terminos.md',
     nombre: 'Términos del servicio',
     resumen: 'Qué se contrata, qué no incluye, cómo se cobra y cómo se cancela.',
     alias: ['/terms'],
     opcional: true,
     enSitemap: true,
   },
-];
+].map(conArchivos);
 
 // El 404 no es una ruta del sitio: es la respuesta a las rutas que no existen.
 // Tiene gemelo en Markdown porque un agente que se pierde merece un mapa, no
 // una página de error pensada para un navegador.
-export const PAGINA_404 = {
+export const PAGINA_404 = conArchivos({
   ruta: '/404',
-  archivo: '404.html',
-  markdown: '404.md',
   nombre: 'Página no encontrada',
   resumen: 'La ruta pedida no existe. Aquí está el mapa del sitio.',
   enSitemap: false,
-};
+});
 
 export const TODAS = [...PAGINAS, PAGINA_404];
 
