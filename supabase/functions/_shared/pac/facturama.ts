@@ -1,6 +1,6 @@
 // Adaptador de Facturama, modalidad API Multiemisor — VERIFICADO contra su sandbox el 24-ago-2026.
 //
-// A diferencia del adaptador de Facturapi, este SÍ usa el emisor que recibe: Facturama Multiemisor
+// Usa el emisor que recibe: Facturama Multiemisor
 // lleva el RFC del emisor en el payload y busca su sello (CSD) por ese RFC. Ahí está toda la razón
 // de haberlo elegido — con una sola credencial de nuestra cuenta se timbra a nombre de cualquier
 // cliente, sin custodiar una llave por negocio.
