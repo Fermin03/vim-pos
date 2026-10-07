@@ -49,3 +49,20 @@ describe("cocina y el renglón de envío (M2)", () => {
     expect(await enviarACocina("tk", "t1")).toEqual([]);
   });
 });
+
+describe("resumirPropinas", () => {
+  it("suma propinas y ventas del turno sin arrastrar decimales", async () => {
+    const { resumirPropinas } = await import("../mesero");
+    const r = resumirPropinas([
+      { total_mxn: "110.10", propina_mxn: "11.01" },
+      { total_mxn: 55.2, propina_mxn: 0 },
+      { total_mxn: "99.90", propina_mxn: "9.99" },
+    ]);
+    expect(r).toEqual({ totalMxn: 21, totalVendidoMxn: 265.2, ticketsConPropina: 2, promedioMxn: 88.4 });
+  });
+
+  it("sin cuentas cobradas todo queda en cero (no divide entre cero)", async () => {
+    const { resumirPropinas } = await import("../mesero");
+    expect(resumirPropinas([])).toEqual({ totalMxn: 0, totalVendidoMxn: 0, ticketsConPropina: 0, promedioMxn: 0 });
+  });
+});

@@ -68,7 +68,7 @@ export function PantallaMonitorVentas({
 
   return (
     <main className="flex h-screen flex-col bg-bg">
-      <header className="flex h-[68px] flex-shrink-0 items-center justify-between border-b border-line px-3">
+      <header className="flex h-[68px] flex-shrink-0 items-center justify-between gap-3 border-b border-line px-3">
         <BotonVolver onClick={onSalir} />
         <div className="mr-auto">
           <h1 className="font-display text-20 font-semibold tracking-tight">Monitor de ventas</h1>

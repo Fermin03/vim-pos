@@ -1,9 +1,13 @@
 "use client";
 import { useEffect, useState } from "react";
 import { type Empleado } from "../lib/supabase";
-import { AbrirTurno } from "./abrir-turno";
+import { ModalAbrirTurno } from "./abrir-turno";
 import { HomePos } from "./home-pos";
+import { MenuGeneral } from "./menu-general";
+import { ModalCambiarPin } from "./modal-cambiar-pin";
+import { ModalConfigImpresora } from "./modal-config-impresora";
 import { PantallaInicio } from "./pantalla-inicio";
+import { useEscape } from "../lib/use-escape";
 import { leerCaja, turnoAbiertoDeCaja, type DatosCaja, type Turno } from "../lib/turno";
 
 
@@ -32,6 +36,13 @@ export function PantallaTurno({
   const [error, setError] = useState<string | null>(null);
   /** El formulario de apertura solo se muestra cuando el cajero lo pide desde el inicio. */
   const [abriendoTurno, setAbriendoTurno] = useState(false);
+  // Sin turno el menú también abre (ver el return de `turno === null`). Con turno, el menú y sus
+  // modales los lleva HomePos.
+  const [menuAbierto, setMenuAbierto] = useState(false);
+  const [cambiarPinAbierto, setCambiarPinAbierto] = useState(false);
+  const [impresoraAbierta, setImpresoraAbierta] = useState(false);
+  // Los modales cierran con su propio Escape; el menú es una capa a pantalla completa sin él.
+  useEscape(menuAbierto && turno === null ? () => setMenuAbierto(false) : null);
 
   useEffect(() => {
     let activo = true;
@@ -73,22 +84,24 @@ export function PantallaTurno({
   // el botón. Entrar con un formulario de fondo de caja encima era una interrupción que nadie
   // pidió — a veces solo se entra a consultar algo o a cambiar de cajero.
   if (turno === null) {
-    if (!abriendoTurno) {
-      /* EL MENÚ RESPONDE SIEMPRE.
-       *
-       * Antes, sin turno, los ocho accesos llevaban a `noop`: el cajero tocaba
-       * "Comedor" y no pasaba nada. Un botón que no reacciona se lee como que el
-       * sistema se colgó, y el aviso de "abre el turno" quedaba abajo, fuera de
-       * donde estaba mirando.
-       *
-       * No es que faltara cablearlos: vender sin turno es IMPOSIBLE, y no por una
-       * decisión de pantalla — `tickets.turno_id` es NOT NULL, así que un ticket sin
-       * turno no existe en la base. Lo que se puede arreglar es la reacción: tocar
-       * cualquiera de ellos lleva a abrir el turno, que es exactamente el paso que
-       * falta para hacer lo que el cajero acaba de pedir.
-       */
-      const abrir = () => setAbriendoTurno(true);
-      return (
+    /* SIN TURNO SOLO SE BLOQUEA VENDER.
+     *
+     * Vender sin turno es imposible, y no por una decisión de pantalla: `tickets.turno_id` es
+     * NOT NULL, un ticket sin turno no existe en la base. Así que los accesos de venta (y los que
+     * leen un turno: retiros, monitor, cuentas) no entran — pero RESPONDEN: tocarlos abre el
+     * modal de apertura, que es justo el paso que falta para lo que el cajero acaba de pedir. Un
+     * botón que no reacciona se lee como que el sistema se colgó.
+     *
+     * Todo lo demás sigue disponible. El menú abre su versión sin turno (cambiar de cajero,
+     * bloquear, el PIN, las impresoras, actualizar, ayuda) en vez de mandar a elegir cajero, que
+     * era lo que hacía el botón «Menú» aquí.
+     *
+     * El inicio queda SIEMPRE de fondo y la apertura va encima como modal: entrar con un
+     * formulario a pantalla completa era una interrupción que nadie pidió.
+     */
+    const abrir = () => setAbriendoTurno(true);
+    return (
+      <>
         <PantallaInicio
           caja={caja}
           turno={null}
@@ -106,23 +119,35 @@ export function PantallaTurno({
           onMovimientoCaja={abrir}
           onAbrirTurno={abrir}
           onCerrarTurno={abrir}
-          onMenu={onCambiarCajero}
+          onMenu={() => setMenuAbierto(true)}
         />
-      );
-    }
-    return (
-      <AbrirTurno
-        empleado={empleado}
-        token={token}
-        cajaId={cajaId}
-        cajaNumero={caja.numero}
-        cajaLabel={caja.nombre}
-        sucursalLabel={caja.sucursalNombre}
-        negocioLabel={caja.negocioNombre}
-        vertical={caja.vertical}
-        onTurnoAbierto={(t) => { setAbriendoTurno(false); setTurno(t); }}
-        onVolver={() => setAbriendoTurno(false)}
-      />
+        {menuAbierto && (
+          <MenuGeneral
+            onCerrar={() => setMenuAbierto(false)}
+            onCambiarCajero={onCambiarCajero}
+            onBloquear={onBloquear}
+            onCambiarPin={() => setCambiarPinAbierto(true)}
+            onImpresora={() => setImpresoraAbierta(true)}
+            ayuda={{ negocio: caja.negocioNombre, sucursal: caja.sucursalNombre, caja: caja.nombre, cajero: empleado.nombre }}
+          />
+        )}
+        {cambiarPinAbierto && (
+          <ModalCambiarPin token={token} onListo={() => setCambiarPinAbierto(false)} onCerrar={() => setCambiarPinAbierto(false)} />
+        )}
+        {impresoraAbierta && (
+          <ModalConfigImpresora token={token} sucursalId={caja.sucursal_id} onCerrar={() => setImpresoraAbierta(false)} />
+        )}
+        {abriendoTurno && (
+          <ModalAbrirTurno
+            token={token}
+            cajaId={cajaId}
+            cajaNumero={caja.numero}
+            vertical={caja.vertical}
+            onTurnoAbierto={(t) => { setAbriendoTurno(false); setTurno(t); }}
+            onCerrar={() => setAbriendoTurno(false)}
+          />
+        )}
+      </>
     );
   }
 

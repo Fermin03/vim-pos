@@ -370,11 +370,6 @@ export function PantallaInicio({
             La cocina y las demás pantallas conectadas a esta computadora dejarán de funcionar
             hasta que la vuelvas a abrir.
           </p>
-          {!sinTurno && (
-            <p className="mt-2 text-14 font-semibold leading-snug text-ink-2">
-              Además, la caja tiene un turno abierto. Se queda abierto y podrás retomarlo al volver.
-            </p>
-          )}
           <p className="mt-2 text-13 leading-snug text-ink-3">
             Antes de cerrar se guarda un respaldo. No se pierde ninguna venta.
           </p>

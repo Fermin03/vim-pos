@@ -77,23 +77,45 @@ export type MisPropinas = {
   totalVendidoMxn: number;
 };
 
-/** Propinas que el mesero generó hoy (vw_ventas_por_mesero, día contable actual). Solo lectura. */
-export async function misPropinas(token: string, meseroId: string): Promise<MisPropinas> {
-  const { data, error } = await employeeClient(token)
-    .from("vw_ventas_por_mesero")
-    .select("tickets_atendidos, total_vendido_mxn, propinas_capturadas_mxn, ticket_promedio_mxn")
-    .eq("mesero_id", meseroId)
-    .order("dia_contable", { ascending: false })
-    .limit(1)
-    .maybeSingle();
-  if (error) throw new Error(error.message);
-  const r = (data ?? {}) as { total_vendido_mxn?: number; propinas_capturadas_mxn?: number; ticket_promedio_mxn?: number };
-  const total = Number(r.propinas_capturadas_mxn ?? 0);
-  const vendido = Number(r.total_vendido_mxn ?? 0);
+type TicketDelTurno = { total_mxn: number | string | null; propina_mxn: number | string | null };
+
+/** Suma las cuentas cobradas de un empleado. Puro, en centavos para no arrastrar decimales. */
+export function resumirPropinas(tickets: TicketDelTurno[]): MisPropinas {
+  let propinas = 0, vendido = 0, conPropina = 0;
+  for (const t of tickets) {
+    const p = Math.round(Number(t.propina_mxn ?? 0) * 100);
+    propinas += p;
+    vendido += Math.round(Number(t.total_mxn ?? 0) * 100);
+    if (p > 0) conPropina += 1;
+  }
   return {
-    totalMxn: total,
-    totalVendidoMxn: vendido,
-    ticketsConPropina: total > 0 ? 1 : 0, // la vista agrega por día; conteo fino se hace en cierre
-    promedioMxn: Number(r.ticket_promedio_mxn ?? 0),
+    totalMxn: propinas / 100,
+    totalVendidoMxn: vendido / 100,
+    ticketsConPropina: conPropina,
+    promedioMxn: tickets.length > 0 ? Math.round(vendido / tickets.length) / 100 : 0,
   };
+}
+
+/**
+ * Propinas que el empleado generó en ESTE turno. Solo lectura.
+ *
+ * Antes leía `vw_ventas_por_mesero` y tomaba el renglón más reciente, con dos consecuencias:
+ *  - la vista solo cuenta tickets con `mesero_id`, que nada más se llena al abrir una cuenta de
+ *    mesa. Las propinas de Para llevar, Pick-up y Domicilio no existían para esta pantalla: en un
+ *    negocio de mostrador siempre decía $0.00;
+ *  - sin ventas hoy, el renglón más reciente era el de otro día, bajo el rótulo "hoy".
+ *
+ * Ahora se leen las cuentas cobradas del turno abierto que son de este empleado: las que atendió
+ * como mesero y, si la cuenta no tiene mesero, las que él abrió.
+ */
+export async function misPropinas(token: string, empleadoId: string, turnoId: string): Promise<MisPropinas> {
+  const { data, error } = await employeeClient(token)
+    .from("tickets")
+    .select("total_mxn, propina_mxn")
+    .eq("turno_id", turnoId)
+    .in("estado_fiscal", ["PAGADO", "FACTURADO"])
+    .is("deleted_at", null)
+    .or(`mesero_id.eq.${empleadoId},and(mesero_id.is.null,usuario_apertura_id.eq.${empleadoId})`);
+  if (error) throw new Error(error.message);
+  return resumirPropinas((data ?? []) as TicketDelTurno[]);
 }
