@@ -1976,6 +1976,15 @@ export function HomePos({
           error={esperaError}
         />
       )}
+      {/* «Cambiar mi PIN» y «Mis propinas» se abren desde el menú, que vive en el INICIO. Estaban
+          pintados solo en la pantalla de captura: tocarlos en el menú no mostraba nada, y el modal
+          aparecía solo al entrar después a tomar una orden. */}
+      {cambiarPinAbierto && (
+        <ModalCambiarPin token={token} onListo={() => setCambiarPinAbierto(false)} onCerrar={() => setCambiarPinAbierto(false)} />
+      )}
+      {misPropinasAbierto && (
+        <ModalMisPropinas token={token} meseroId={empleado.id} meseroNombre={empleado.nombre} turnoId={turno.id} onCerrar={() => setMisPropinasAbierto(false)} />
+      )}
       {abrirCajaAbierto && (
         <ModalAbrirCaja
           token={token}
@@ -2387,12 +2396,6 @@ export function HomePos({
           onListo={(n) => { dispatch({ tipo: "nombre_cuenta", nombre: n }); setNombreCuentaAbierto(false); }}
           onOmitir={() => setNombreCuentaAbierto(false)}
         />
-      )}
-      {cambiarPinAbierto && (
-        <ModalCambiarPin token={token} onListo={() => setCambiarPinAbierto(false)} onCerrar={() => setCambiarPinAbierto(false)} />
-      )}
-      {misPropinasAbierto && (
-        <ModalMisPropinas token={token} meseroId={empleado.id} meseroNombre={empleado.nombre} onCerrar={() => setMisPropinasAbierto(false)} />
       )}
 
       {/* Avisos de la captura (setError). Este renglón se perdió el 17 ago 2026 al sacar el

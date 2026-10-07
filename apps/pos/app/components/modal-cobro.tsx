@@ -55,17 +55,6 @@ function IcoTransferencia({ cls }: { cls?: string }) {
   );
 }
 
-function IcoApp({ cls }: { cls?: string }) {
-  return (
-    <svg className={cls} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
-      <rect x="3" y="3" width="7" height="7" rx="1"/>
-      <rect x="14" y="3" width="7" height="7" rx="1"/>
-      <rect x="3" y="14" width="7" height="7" rx="1"/>
-      <path d="M14 14h3v3M21 21v.01M21 14v.01M17 21v.01"/>
-    </svg>
-  );
-}
-
 function IcoDividido({ cls }: { cls?: string }) {
   return (
     <svg className={cls} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
@@ -172,14 +161,6 @@ const METODOS: MetodoConfig[] = [
     icoFn: IcoTransferencia,
     icoBg: "#E2F0F1",
     icoColor: "#1F7A82",
-  },
-  {
-    valor: "APP_OTRO",
-    etiqueta: "App externa",
-    sub: "Rappi · Uber · DiDi — la app cobra al cliente",
-    icoFn: IcoApp,
-    icoBg: "#EAF0F8",
-    icoColor: "#2C5AA0",
   },
 ];
 

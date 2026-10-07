@@ -69,7 +69,7 @@ export function PantallaDevoluciones({
 
   return (
     <div className="flex h-screen flex-col">
-      <header className="flex flex-shrink-0 items-center justify-between border-b border-line bg-surface px-3 py-3.5">
+      <header className="flex flex-shrink-0 items-center justify-between gap-3 border-b border-line bg-surface px-3 py-3.5">
         <BotonVolver onClick={onSalir} />
         <div className="mr-auto flex items-center gap-3">
           <LogoVim className="h-8 w-8" />

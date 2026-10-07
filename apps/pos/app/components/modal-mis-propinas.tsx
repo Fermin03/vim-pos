@@ -4,13 +4,13 @@ import { Modal } from "@vim/ui/styles";
 import { fmtMxn } from "../lib/turno";
 import { misPropinas, type MisPropinas } from "../lib/mesero";
 
-export function ModalMisPropinas({ token, meseroId, meseroNombre, onCerrar }: { token: string; meseroId: string; meseroNombre: string; onCerrar: () => void }) {
+export function ModalMisPropinas({ token, meseroId, meseroNombre, turnoId, onCerrar }: { token: string; meseroId: string; meseroNombre: string; turnoId: string; onCerrar: () => void }) {
   const [datos, setDatos] = useState<MisPropinas | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    misPropinas(token, meseroId).then(setDatos).catch((e) => setError(e instanceof Error ? e.message : "Error"));
-  }, [token, meseroId]);
+    misPropinas(token, meseroId, turnoId).then(setDatos).catch((e) => setError(e instanceof Error ? e.message : "Error"));
+  }, [token, meseroId, turnoId]);
 
   return (
     <Modal open onClose={onCerrar} title="Mis propinas" hideTitle
@@ -18,7 +18,7 @@ export function ModalMisPropinas({ token, meseroId, meseroNombre, onCerrar }: { 
       <div className="mb-4 flex items-start justify-between">
         <div>
           <h2 className="font-display text-xl font-semibold tracking-tight">Mis propinas</h2>
-          <p className="text-13 text-ink-3">{meseroNombre} · Turno de hoy</p>
+          <p className="text-13 text-ink-3">{meseroNombre} · Este turno</p>
         </div>
         <span className="rounded-full bg-sel px-2.5 py-1 text-11 font-semibold text-ink-3">Solo lectura</span>
       </div>
@@ -30,13 +30,13 @@ export function ModalMisPropinas({ token, meseroId, meseroNombre, onCerrar }: { 
       ) : (
         <>
           <div className="rounded-xl border border-line bg-[#EAF3FB] px-5 py-6 text-center">
-            <div className="text-13 font-medium uppercase tracking-wide text-ink-3">Propinas acumuladas hoy</div>
+            <div className="text-13 font-medium uppercase tracking-wide text-ink-3">Propinas de este turno</div>
             <div className="mt-1 font-display text-40 font-bold tabular-nums text-accent">{fmtMxn(datos.totalMxn)}</div>
           </div>
           <div className="mt-3 grid grid-cols-2 gap-3">
             <div className="rounded-lg border border-line bg-surface px-4 py-3 text-center">
               <div className="font-display text-20 font-bold tabular-nums">{fmtMxn(datos.totalVendidoMxn)}</div>
-              <div className="mt-0.5 text-12 text-ink-3">Vendido hoy</div>
+              <div className="mt-0.5 text-12 text-ink-3">Vendido en el turno</div>
             </div>
             <div className="rounded-lg border border-line bg-surface px-4 py-3 text-center">
               <div className="font-display text-20 font-bold tabular-nums">{fmtMxn(datos.promedioMxn)}</div>

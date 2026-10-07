@@ -38,9 +38,10 @@ function IconoDeposito() {
  * motivos frecuentes a un toque. Ver `lib/movimientos.ts` para por qué el enum de la BD no
  * cambia y cómo mapea cada botón.
  *
- * Del mockup se porta lo que le falta al cajero para decidir sin salir de aquí: cuánto efectivo
- * hay ahora, cuánto va a quedar, y el aviso cuando el retiro deja la caja por debajo del fondo
- * con el que abrió. Antes se capturaba a ciegas y el descuadre aparecía hasta el corte.
+ * El modal NO enseña cuánto efectivo hay en la caja ni cuánto va a quedar (lo pidió Fermín el
+ * 7 oct 2026): es el mismo dato que el corte ciego le esconde al cajero, y aquí quedaba a la
+ * vista a un toque del inicio. El saldo se sigue leyendo, pero solo para rechazar un retiro mayor
+ * que lo que hay — y el rechazo tampoco dice la cifra.
  */
 export function ModalMovimientoCaja({
   token,
@@ -65,8 +66,8 @@ export function ModalMovimientoCaja({
   const [error, setError] = useState<string | null>(null);
   const [procesando, setProcesando] = useState(false);
   const [pidiendoPin, setPidiendoPin] = useState(false);
-  /** Efectivo en caja ahora mismo. `null` mientras carga: nunca se inventa un número. */
-  const [caja_, setCaja_] = useState<{ efectivo: number; fondo: number } | null>(null);
+  /** Efectivo en caja ahora mismo. No se pinta: solo sirve para rechazar un retiro mayor. */
+  const [efectivoEnCaja, setEfectivoEnCaja] = useState<number | null>(null);
 
   const def: DefMovimiento = TIPOS_MOVIMIENTO.find((t) => t.codigo === tipo) ?? TIPOS_MOVIMIENTO[0]!;
   const monto = Number(montoStr || 0);
@@ -75,18 +76,16 @@ export function ModalMovimientoCaja({
   const motivo = (esOtro ? motivoLibre : motivoElegido).trim();
 
   // El mismo dato que ve el corte X: se lee una vez al abrir. Si falla, la pantalla sigue
-  // funcionando sin el bloque de saldos — capturar el movimiento importa más que mostrarlo.
+  // funcionando sin esa validación — capturar el movimiento importa más.
   useEffect(() => {
     let vivo = true;
     leerReporteX(token, turno.id)
-      .then((x) => vivo && setCaja_({ efectivo: x.efectivoEsperado, fondo: x.fondoApertura }))
+      .then((x) => vivo && setEfectivoEnCaja(x.efectivoEsperado))
       .catch(() => {});
     return () => { vivo = false; };
   }, [token, turno.id]);
 
-  const saldoDespues = caja_ ? caja_.efectivo + def.signo * monto : null;
-  const dejaEnRojo = saldoDespues !== null && saldoDespues < 0;
-  const bajoFondo = saldoDespues !== null && caja_ !== null && !dejaEnRojo && saldoDespues < caja_.fondo;
+  const dejaEnRojo = efectivoEnCaja !== null && efectivoEnCaja + def.signo * monto < 0;
 
   function cambiarTipo(t: DefMovimiento) {
     setTipo(t.codigo);
@@ -215,14 +214,6 @@ export function ModalMovimientoCaja({
       </div>
 
       <div className="px-5 py-4">
-        {/* Efectivo actual — el dato con el que el cajero decide cuánto puede sacar. */}
-        <div className="mb-4 flex items-center justify-between rounded-lg border border-line bg-sel px-3.5 py-3">
-          <span className="text-13 font-medium text-ink-2">Efectivo actual en caja</span>
-          <span className="font-display text-20 font-bold tabular-nums">
-            {caja_ ? fmtMxn(caja_.efectivo) : "—"}
-          </span>
-        </div>
-
         {/* Tipo: dos, y cada uno dice qué le pasa al efectivo. */}
         <div className={etiqueta}>Tipo de movimiento</div>
         <div className="mb-4 grid grid-cols-2 gap-2">
@@ -317,44 +308,6 @@ export function ModalMovimientoCaja({
           onChange={(e) => setDescripcion(e.target.value)}
           placeholder="Folio de la ficha, beneficiario, a quién se entregó…"
         />
-
-        {/* Saldo después — con el aviso del mockup cuando el retiro deja la caja bajo el fondo. */}
-        {caja_ && monto > 0 && (
-          <div
-            className={[
-              "mb-4 rounded-lg border px-3.5 py-3",
-              dejaEnRojo
-                ? "border-danger/30 bg-danger-soft"
-                : bajoFondo
-                  ? "border-warning/30 bg-warning-soft"
-                  : "border-line bg-sel",
-            ].join(" ")}
-          >
-            <div className="flex items-center justify-between">
-              <span className="text-13 font-medium text-ink-2">
-                {sale ? "Saldo después del retiro" : "Saldo después del depósito"}
-              </span>
-              <span
-                className={[
-                  "font-display text-20 font-bold tabular-nums",
-                  dejaEnRojo ? "text-danger" : bajoFondo ? "text-warning" : "text-ink",
-                ].join(" ")}
-              >
-                {fmtMxn(saldoDespues ?? 0)}
-              </span>
-            </div>
-            {dejaEnRojo && (
-              <p className="mt-1 text-12 font-medium leading-snug text-danger" role="alert">
-                No hay tanto efectivo en la caja: solo puedes retirar hasta {fmtMxn(caja_.efectivo)}.
-              </p>
-            )}
-            {bajoFondo && (
-              <p className="mt-1 text-12 font-medium leading-snug text-warning">
-                Queda por debajo del fondo con el que abrió la caja ({fmtMxn(caja_.fondo)}).
-              </p>
-            )}
-          </div>
-        )}
 
         <div className="mb-4"><AvisoAutorizacion propia={tienePermiso} /></div>
 
