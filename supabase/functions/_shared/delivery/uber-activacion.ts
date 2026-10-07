@@ -1,19 +1,6 @@
 // Lógica pura de la activación de tiendas de Uber (spec F1b). Sin I/O: se prueba con node --test.
 // Doc: docs/integraciones/delivery/03-uber-eats-resumen.md §3-4.
 
-const AUTH = { sandbox: "https://sandbox-login.uber.com", produccion: "https://auth.uber.com" } as const;
-
-/** URL a la que se manda al dueño para que autorice a VIM (grant authorization_code, scope eats.pos_provisioning). */
-export function urlAutorizacionUber(cfg: { entorno: "sandbox" | "produccion"; clientId: string; redirectUri: string; state: string }): string {
-  const u = new URL("/oauth/v2/authorize", AUTH[cfg.entorno]);
-  u.searchParams.set("client_id", cfg.clientId);
-  u.searchParams.set("response_type", "code");
-  u.searchParams.set("redirect_uri", cfg.redirectUri);
-  u.searchParams.set("scope", "eats.pos_provisioning");
-  u.searchParams.set("state", cfg.state);
-  return u.toString();
-}
-
 export type TiendaUber = { id: string; nombre: string; direccion: string; ciudad: string };
 
 type Dict = Record<string, unknown>;
