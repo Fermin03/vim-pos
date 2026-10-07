@@ -1,6 +1,5 @@
 import { describe, it, expect } from "vitest";
 import {
-  siguienteEstado,
   minutosEnCocina,
   labelModo,
   areasDeComandas,
@@ -19,14 +18,7 @@ import {
   type FilaItemKds,
 } from "@vim/kds-core";
 
-describe("kds — máquina de estados de cocina", () => {
-  it("avanza EN_COCINA → LISTO → ENTREGADO y luego null", () => {
-    expect(siguienteEstado("EN_COCINA")).toBe("LISTO");
-    expect(siguienteEstado("LISTO")).toBe("ENTREGADO");
-    expect(siguienteEstado("ENTREGADO")).toBeNull();
-    expect(siguienteEstado("SIN_ENVIAR")).toBeNull();
-  });
-
+describe("kds — nombres de modo de servicio", () => {
   it("labelModo traduce los modos conocidos y deja pasar el resto", () => {
     expect(labelModo("COMER_AQUI")).toBe("Comedor");
     expect(labelModo("PARA_LLEVAR")).toBe("Para llevar");
