@@ -34,7 +34,7 @@ El día contable no es el día natural. Cuando un reporte usa día contable, lo 
 
 ## Gráficas
 
-Usan la **paleta funcional** del núcleo (`cat-*`), nunca el azul de marca: el azul significa "esta
+Usan la **paleta funcional** del núcleo (seis colores, en `nucleo.md`), nunca el azul de marca: el azul significa "esta
 es la acción", y una barra no es una acción. Una serie, un color, estable entre pantallas.
 
 ## Acciones peligrosas
