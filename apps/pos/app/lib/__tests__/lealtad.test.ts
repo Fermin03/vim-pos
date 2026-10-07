@@ -31,7 +31,6 @@ vi.mock("../supabase", () => ({
       rpcs.push({ nombre, args });
       if (nombre === "quitar_canje_lealtad") {
         for (const c of tablas.ticket_canjes_lealtad ?? []) if (c.ticket_id === args.p_ticket_id) c.revertido = true;
-        for (const t of tablas.tickets ?? []) if (t.id === args.p_ticket_id) { t.total_mxn = "80"; t.lealtad_mxn = "0"; }
         return { data: 1, error: null };
       }
       if (nombre === "agregar_item_a_ticket") return { data: "item-nuevo", error: null };
@@ -44,14 +43,8 @@ vi.mock("../supabase", () => ({
 
 import {
   agregarRenglonPremio, asentar, canjear, comprasQueSumanHoy, consultarSaldo, leerCanjeDelTicket, leerClienteLealtad,
-  leerPremios, leerPrograma, leerSaldoLocal, quitarCanje, quitarCanjeSiQuedoRecortado,
+  leerPremios, leerPrograma, leerSaldoLocal, quitarCanje,
 } from "../lealtad";
-import type { TotalesTicket } from "../cobro";
-
-const TICKET_FILA = {
-  id: "tk-1", subtotal_mxn: "68.97", iva_mxn: "11.03", descuentos_manuales_mxn: "0", promociones_mxn: "0", lealtad_mxn: "30",
-  total_mxn: "50", monto_pagado_mxn: "0", cambio_mxn: "0", monto_pendiente_mxn: "50", estado_fiscal: "ABIERTO", folio_completo: "KC-1",
-};
 
 beforeEach(() => {
   rpcs.length = 0;
@@ -191,37 +184,5 @@ describe("llamadas a lealtad-canje", () => {
     expect(await consultarSaldo("tk", { clienteId: "c-1", telefono: null })).toEqual({ ok: false, error: "RESPUESTA_INVALIDA" });
     vi.stubGlobal("fetch", vi.fn(async () => new Response("<html>", { status: 200 })));
     expect(await consultarSaldo("tk", { clienteId: "c-1", telefono: null })).toEqual({ ok: false, error: "RESPUESTA_INVALIDA" });
-  });
-});
-
-describe("canje de dinero recortado antes de cobrar", () => {
-  const totales: TotalesTicket = {
-    ticketId: "tk-1", subtotal: 68.97, iva: 11.03, descuentos: 0, promociones: 0, lealtad: 30, total: 50,
-    montoPagado: 0, cambio: 0, pendiente: 50, estadoFiscal: "ABIERTO", folio: "KC-1",
-  };
-
-  beforeEach(() => { tablas.tickets = [{ ...TICKET_FILA }]; });
-
-  it("si la cuenta ya no aguanta el canje completo, lo quita, relee el total y avisa", async () => {
-    tablas.ticket_canjes_lealtad = [{ id: "cj-1", ticket_id: "tk-1", puntos: 50, monto_descontado_mxn: "50", premio_id: null, ticket_item_id: null, revertido: false }];
-    const r = await quitarCanjeSiQuedoRecortado("tk", totales, "PUNTOS_DINERO");
-    expect(rpcs.map((x) => x.nombre)).toEqual(["quitar_canje_lealtad"]);
-    expect(r.totales.total).toBe(80);
-    expect(r.totales.lealtad).toBe(0);
-    expect(r.aviso).toMatch(/50 puntos/);
-    expect(r.aviso).toMatch(/volvieron/);
-  });
-
-  it("un canje que entra completo no se toca", async () => {
-    tablas.ticket_canjes_lealtad = [{ id: "cj-1", ticket_id: "tk-1", puntos: 30, monto_descontado_mxn: "30", premio_id: null, ticket_item_id: null, revertido: false }];
-    const r = await quitarCanjeSiQuedoRecortado("tk", totales, "PUNTOS_DINERO");
-    expect(rpcs).toEqual([]);
-    expect(r).toEqual({ totales, aviso: null });
-  });
-
-  it("sin canje no hace nada", async () => {
-    tablas.ticket_canjes_lealtad = [];
-    expect(await quitarCanjeSiQuedoRecortado("tk", { ...totales, lealtad: 0 }, "PUNTOS_DINERO")).toMatchObject({ aviso: null });
-    expect(rpcs).toEqual([]);
   });
 });

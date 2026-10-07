@@ -6,8 +6,7 @@
 // El canje va por la Edge Function `lealtad-canje`, igual desde el POS web que desde la caja: en la
 // caja el gateway local la atiende y la reenvía a la nube (desktop/src/lealtad-puente.mjs).
 import { employeeClient, encabezadosFuncion, urlFuncion } from "./supabase";
-import { leerTotales, type TotalesTicket } from "./cobro";
-import { canjeRecortado, cantidad, inicioDelDiaMexico, type Mecanica, type Premio, type Programa } from "./lealtad-reglas";
+import { inicioDelDiaMexico, type Mecanica, type Premio, type Programa } from "./lealtad-reglas";
 
 const num = (v: unknown): number => Number(v ?? 0);
 
@@ -205,23 +204,4 @@ export function asentar(
   return llamar<{ canje_id: string }>(token, sinVacios({
     accion: "asentar", canje_id: a.canjeId, ticket_id: a.ticketId, ticket_item_id: a.ticketItemId,
   }));
-}
-
-/**
- * Antes de cobrar: si la cuenta bajó por debajo de un canje de dinero (se canceló un platillo), la
- * base recorta el descuento pero el cliente ya pagó todos sus puntos. Se quita el canje completo
- * —los puntos vuelven— y se avisa, para que quien cobra lo vuelva a poner por lo que sí cabe.
- */
-export async function quitarCanjeSiQuedoRecortado(
-  token: string,
-  totales: TotalesTicket,
-  mecanica: Mecanica,
-): Promise<{ totales: TotalesTicket; aviso: string | null }> {
-  const canje = await leerCanjeDelTicket(token, totales.ticketId);
-  if (!canje || !canjeRecortado(canje, totales.lealtad)) return { totales, aviso: null };
-  await quitarCanje(token, totales.ticketId);
-  return {
-    totales: await leerTotales(token, totales.ticketId),
-    aviso: `Se quitó el canje de ${cantidad(mecanica, canje.puntos)} porque la cuenta bajó a menos de eso. Los puntos volvieron al cliente. Si los quiere usar, vuelve a canjear.`,
-  };
 }
