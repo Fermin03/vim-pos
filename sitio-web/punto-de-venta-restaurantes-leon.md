@@ -1,6 +1,6 @@
 # Punto de venta para restaurantes en León, Guanajuato
 
-> VIM POS se hace en León. Si tu restaurante está en la zona, la demo es en tu mostrador y con tu menú. Precio publicado desde $699 al mes.
+> VIM POS se hace en León. Si tu restaurante está en la zona, la demo es en tu mostrador y con tu menú. Desde $699 al mes más IVA, sin letra chica.
 
 **VIM POS** · punto de venta para restaurantes en México · versión en HTML: https://vimpos.com.mx/punto-de-venta-restaurantes-leon
 
@@ -44,7 +44,7 @@ El sistema vive en la computadora de tu caja. Si se va la señal, sigues cobrand
 
 Tu cliente escanea el ticket y se factura solo; la factura global sale con un botón. [Facturación CFDI 4.0](https://vimpos.com.mx/facturacion-cfdi).
 
-### Precio publicado
+### Precio de frente
 
 Desde $699 al mes más IVA, sin pago inicial ni contrato forzoso. [Los tres planes](https://vimpos.com.mx/precios).
 

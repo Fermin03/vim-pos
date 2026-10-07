@@ -15,7 +15,7 @@
 - [ ] Nombre, **correo** (ahí llega su acceso) y WhatsApp del dueño.
 - [ ] Si va a **facturar** y si quiere **Uber Eats** en la caja.
 - [ ] Qué equipo tiene: computadora con **Windows 10 u 11** e impresora de tickets **de red**
-      (Ethernet o Wi-Fi). **Las impresoras USB no funcionan.** Si no tiene, que la compre antes del
+      (Ethernet o Wi-Fi) **o de USB** (funcionan las dos; la de USB se instala primero en Windows). Si no tiene, que la compre antes del
       día de arranque: es lo que más se compra mal.
 
 Si llegó por el formulario de demo, está en **Panel de VIM → Prospectos**. Muévelo de estado
