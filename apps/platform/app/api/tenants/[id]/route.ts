@@ -4,7 +4,7 @@ import { hoyMx, sumarMeses } from "@vim/fecha";
 import { MODULOS } from "@vim/db/modulos";
 import { esExtra, EXTRAS_MAXIMO } from "@vim/db/cobro";
 import { fechaBloqueo, mensajeBloqueoPorDefecto } from "../../../lib/bloqueo";
-import { decidirAltaAddon, precioAltaDelivery, type FilaAddon } from "../../../lib/addons";
+import { decidirAltaAddon, precioAltaAddon, type FilaAddon } from "../../../lib/addons";
 import { precioValido } from "../../../lib/precio";
 import { fechaValida, leerPromocion } from "../../../lib/promocion";
 import { accesoDeDueno, type UsuarioAuth } from "../../../lib/acceso-dueno";
@@ -310,10 +310,10 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
     // un precio explícito en el cuerpo (cortesía, promoción) sigue ganando, por eso se comprueba
     // primero. Misma forma de leer el plan que usa `plan:planes(...)` en el GET de esta ruta.
     let precioLista = Number(addon.precio_mensual_mxn);
-    if (codigo === "DELIVERY") {
+    {
       const { data: tRaw } = await sb.from("tenants").select("plan:planes(codigo)").eq("id", id).maybeSingle();
       const planCodigo = (tRaw as { plan?: { codigo?: string } } | null)?.plan?.codigo ?? "";
-      precioLista = precioAltaDelivery(planCodigo, precioLista);
+      precioLista = precioAltaAddon(codigo, planCodigo, precioLista);
     }
     // Un precio explícito se valida (hallazgo E-3): antes un negativo reventaba el CHECK de la base
     // con un 500, y "abc" o "" se guardaban como NaN o como un $0 que nadie decidió.

@@ -13,8 +13,12 @@
 // arreglar esto sería mover el suelo. Lo que se arregla es la lectura del caso — un alta el mismo
 // día de la baja no es una fila nueva, es **deshacer** la de hoy.
 
+/** Add-ons que van incluidos sin cargo desde el plan Negocio; en Esencial se contratan aparte. */
+const INCLUIDOS_DESDE_NEGOCIO = new Set(["DELIVERY", "LEALTAD"]);
+
 /**
- * Precio con el que el panel pre-llena el alta del add-on de delivery, según el plan del cliente.
+ * Precio con el que el panel pre-llena el alta de un add-on que el plan puede incluir (delivery y
+ * lealtad), según el plan del cliente. Cualquier otro add-on entra a su precio de lista.
  *
  * **Solo Esencial lo paga.** Cualquier otro plan lo lleva incluido sin cargo. Al principio (spec
  * §4) la regla nombraba Negocio y Cadena, y los planes viejos por vertical —`FT`, `QS`, `CB`, `FS`,
@@ -29,7 +33,8 @@
  * @param planCodigo  Código del plan del tenant, o vacío si no tiene.
  * @param precioLista `addons.precio_mensual_mxn` de la fila del add-on.
  */
-export function precioAltaDelivery(planCodigo: string | undefined, precioLista: number): number {
+export function precioAltaAddon(codigo: string, planCodigo: string | undefined, precioLista: number): number {
+  if (!INCLUIDOS_DESDE_NEGOCIO.has(codigo)) return precioLista;
   return PLANES_QUE_LO_INCLUYEN.has(planCodigo ?? "") ? 0 : precioLista;
 }
 

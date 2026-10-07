@@ -150,6 +150,24 @@ describe("vistaPreviaCambioPlan (espejo de cambiar_plan_tenant)", () => {
   it("sin cobro vigente no hay precio que cambiar", () => {
     expect(vistaPreviaCambioPlan({ nuevo: NEGOCIO, foliosAntes: null, addons: [], suscripcion: null, hoy: "2026-11-15" }).precio).toBeNull();
   });
+  it("la lealtad también entra y sale con el plan", () => {
+    const esencial = { ...ESENCIAL, features_incluidos: { ...ESENCIAL.features_incluidos, lealtad_incluido: false } };
+    const negocio = { ...NEGOCIO, features_incluidos: { ...NEGOCIO.features_incluidos, lealtad_incluido: true } };
+    const sube = vistaPreviaCambioPlan({
+      nuevo: negocio, foliosAntes: 10,
+      addons: [{ codigo: "LEALTAD", activo: true, precio: 100, incluidoEnPlan: false }],
+      suscripcion: { precio_mensual_mxn: 699, precio_promocional_mxn: null, promocion_hasta: null, promocion_nombre: null }, hoy: "2026-11-15",
+    });
+    expect(sube.concede).toContain("LEALTAD");
+    expect(sube.dejaDePagar).toContainEqual({ codigo: "LEALTAD", precio: 100 });
+
+    const baja = vistaPreviaCambioPlan({
+      nuevo: esencial, foliosAntes: 20,
+      addons: [{ codigo: "LEALTAD", activo: true, precio: 0, incluidoEnPlan: true }],
+      suscripcion: { precio_mensual_mxn: 999, precio_promocional_mxn: null, promocion_hasta: null, promocion_nombre: null }, hoy: "2026-11-15",
+    });
+    expect(baja.retira).toContain("LEALTAD");
+  });
 });
 
 describe("montoPeriodos", () => {
