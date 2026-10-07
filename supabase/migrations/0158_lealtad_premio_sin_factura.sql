@@ -13,10 +13,12 @@
 
 -- ¿La cuenta lleva un premio de producto vivo? SECURITY INVOKER a propósito: un empleado solo ve
 -- los canjes de su negocio (RLS de 0156) y las funciones definer que la llaman ven todo.
+-- El search_path va fijo aunque no sea definer: que nadie le cambie de tabla con su sesión.
 CREATE OR REPLACE FUNCTION ticket_lleva_premio(p_ticket_id uuid)
 RETURNS boolean
 LANGUAGE sql
 STABLE
+SET search_path = public, pg_temp
 AS $$
   SELECT EXISTS (
     SELECT 1 FROM ticket_canjes_lealtad
@@ -30,13 +32,17 @@ GRANT EXECUTE ON FUNCTION ticket_lleva_premio(uuid) TO authenticated, service_ro
 -- El candado. Los dos caminos de la factura individual —el portal (autofacturar) y el admin
 -- (cfdi_crear_borrador)— terminan en este INSERT. Las globales no tienen ticket_id y pasan; las
 -- notas de crédito (EGRESO) también.
+--
+-- El mensaje NO promete que la venta «queda amparada en la factura global»: la cuenta que es solo
+-- el premio (total $0) queda fuera de la global también (ver tickets_de_periodo_global, abajo).
 CREATE OR REPLACE FUNCTION trg_cfdi_sin_premio()
 RETURNS trigger
 LANGUAGE plpgsql
+SET search_path = public, pg_temp
 AS $$
 BEGIN
   IF NEW.tipo_comprobante = 'INGRESO' AND NEW.ticket_id IS NOT NULL AND ticket_lleva_premio(NEW.ticket_id) THEN
-    RAISE EXCEPTION 'Esta venta incluye un premio de lealtad y no se factura de forma individual. Queda amparada en la factura global.'
+    RAISE EXCEPTION 'Esta venta incluye un premio de lealtad y no se factura de forma individual.'
       USING ERRCODE = '22023';
   END IF;
   RETURN NEW;
