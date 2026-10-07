@@ -422,6 +422,14 @@ El envío se cobra según la zona del cliente. Cada sucursal define las suyas y 
 
 Cada pedido entra como un ticket y su comanda sale a cocina. Incluido desde Negocio; en Esencial, $100 al mes ([precios](https://vimpos.com.mx/precios)). La tableta de Uber se queda en tu local, y DiDi y Rappi aún no están conectados.
 
+_Lealtad_
+
+## Que tus clientes vuelvan, con puntos o sellos
+
+**Programa de lealtad.** Puntos que valen dinero, sellos por visita o puntos por premios: tú eliges. El cliente gana al pagar y canjea en su siguiente visita, en cualquiera de tus sucursales. Todo canje queda registrado con quién lo hizo.
+
+Incluido desde Negocio; en Esencial, $100 al mes ([precios](https://vimpos.com.mx/precios)).
+
 _Si ya usas otro_
 
 ## Tu menú se pega y ya
@@ -806,6 +814,7 @@ _Comparación de los tres planes de VIM POS._
 | Facturación electrónica | $349 al mes aparte | Incluida | Incluida |
 | Folios de factura al mes | 10, con el extra de facturación | 20 | 40 |
 | Pedidos de Uber Eats en la caja | $100 al mes aparte | Incluido | Incluido |
+| Programa de lealtad | $100 al mes aparte | Incluido | Incluido |
 | Quién carga tu menú | Tú, con nuestra guía | Nosotros | Nosotros |
 | Capacitación | Guía paso a paso en el panel | 3 horas con tu equipo | 3 horas con tu equipo |
 | Soporte | WhatsApp y correo | WhatsApp y correo | WhatsApp y correo |
@@ -891,6 +900,12 @@ $100
 
 Al mes, más IVA, y **solo si estás en Esencial**: en Negocio y en Cadena ya va incluido. Cada pedido de Uber Eats entra a tu caja como un ticket y su comanda sale a cocina, sin volver a teclearlo.
 
+### Programa de lealtad
+
+$100
+
+Al mes, más IVA, y **solo si estás en Esencial**: en Negocio y en Cadena ya va incluido. Tus clientes ganan puntos o sellos al comprar y los canjean en su siguiente visita.
+
 _Facturación_
 
 ## Tus clientes se facturan solos, desde el ticket
@@ -972,6 +987,24 @@ Dinos cuántas cajas y cuántas sucursales tienes y te decimos el plan en el mis
 **VIM POS** · punto de venta para restaurantes en México · versión en HTML: https://vimpos.com.mx/novedades
 
 ## Octubre de 2026
+
+13 de octubre Caja · 0.5.0
+
+### Programa de lealtad
+
+#### Nuevo
+
+- **Programa de lealtad.** Tus clientes ganan algo cada vez que compran y lo usan en su siguiente visita. Lo encuentras en el panel, en **Lealtad**.
+- Tú eliges cómo ganan: puntos que valen dinero, sellos por visita o puntos que se cambian por premios de tu carta.
+- En la caja, al asignar un cliente a la cuenta se ve cuánto tiene y cuánto va a ganar; el botón **Canjear puntos** aplica el descuento o agrega el premio.
+- El ticket le dice al cliente cuánto ganó y cuánto lleva, y el corte separa lo que se descontó por lealtad.
+- En **Lealtad → Movimientos** ves cuánto has repartido, cuánto se ha canjeado y quién hizo cada canje.
+
+#### A tener en cuenta
+
+- Canjear necesita internet; ganar puntos, no.
+- Una cuenta que lleva un premio de regalo no se factura por separado: entra en tu factura global.
+- En el plan Esencial es un extra; en Negocio y en Cadena ya va incluido.
 
 4 y 5 de octubre Panel de administración
 

@@ -106,6 +106,7 @@ _Comparación de los tres planes de VIM POS._
 | Facturación electrónica | $349 al mes aparte | Incluida | Incluida |
 | Folios de factura al mes | 10, con el extra de facturación | 20 | 40 |
 | Pedidos de Uber Eats en la caja | $100 al mes aparte | Incluido | Incluido |
+| Programa de lealtad | $100 al mes aparte | Incluido | Incluido |
 | Quién carga tu menú | Tú, con nuestra guía | Nosotros | Nosotros |
 | Capacitación | Guía paso a paso en el panel | 3 horas con tu equipo | 3 horas con tu equipo |
 | Soporte | WhatsApp y correo | WhatsApp y correo | WhatsApp y correo |
@@ -190,6 +191,12 @@ Al mes, más IVA, y **solo si estás en Esencial**: en Negocio y en Cadena ya va
 $100
 
 Al mes, más IVA, y **solo si estás en Esencial**: en Negocio y en Cadena ya va incluido. Cada pedido de Uber Eats entra a tu caja como un ticket y su comanda sale a cocina, sin volver a teclearlo.
+
+### Programa de lealtad
+
+$100
+
+Al mes, más IVA, y **solo si estás en Esencial**: en Negocio y en Cadena ya va incluido. Tus clientes ganan puntos o sellos al comprar y los canjean en su siguiente visita.
 
 _Facturación_
 
