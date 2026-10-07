@@ -97,6 +97,19 @@ describe("asignar el cliente a una cuenta abierta", () => {
       { id: "abierta", estado_fiscal: "ABIERTO", cliente_id: null },
       { id: "pagada", estado_fiscal: "PAGADO", cliente_id: null },
     ];
+    tablas.ticket_canjes_lealtad = [];
+  });
+
+  it("con un canje de lealtad aplicado no cambia al cliente: pide quitar el canje primero", async () => {
+    tablas.ticket_canjes_lealtad = [{ id: "cj-1", ticket_id: "abierta", revertido: false }];
+    await expect(asignarClienteTicket("tk", "abierta", "c2")).rejects.toThrow(/Quita el canje/);
+    expect(tablas.tickets[0].cliente_id).toBeNull();
+  });
+
+  it("un canje ya quitado (revertido) no estorba", async () => {
+    tablas.ticket_canjes_lealtad = [{ id: "cj-1", ticket_id: "abierta", revertido: true }];
+    await asignarClienteTicket("tk", "abierta", "c2");
+    expect(tablas.tickets[0].cliente_id).toBe("c2");
   });
 
   it("pone y quita el cliente de una cuenta abierta", async () => {

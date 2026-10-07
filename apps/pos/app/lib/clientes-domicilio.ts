@@ -1,6 +1,7 @@
 "use client";
 import { employeeClient } from "./supabase";
 import type { ZonaEnvio } from "./zonas-envio";
+import { normalizarTelefono } from "./telefono";
 
 // CRM ligero para domicilios desde el POS. Busca por teléfono/nombre y registra
 // cliente + direcciones (un cliente puede tener varias: Casa, Oficina, etc.).
@@ -80,16 +81,28 @@ export function conDireccion(c: ClienteDomicilio, dir: DireccionCliente): Client
   return { ...c, direccionId: dir.id, direccionPreview: `${dir.etiqueta} · ${dir.preview}`, zona: dir.zona };
 }
 
+/**
+ * Filtro `.or()` de la búsqueda de domicilio. Busca el texto tal cual (hay teléfonos viejos guardados
+ * con espacios) y, si el texto trae un número con formato, también solo sus dígitos (así se guardan
+ * desde la lealtad). Pura, con pruebas.
+ */
+export function filtroBusquedaDomicilio(q: string): string {
+  const esc = q.trim().replace(/[%,()]/g, " ");
+  const partes = [`telefono.ilike.%${esc}%`, `nombre.ilike.%${esc}%`];
+  const digitos = normalizarTelefono(q);
+  if (digitos.length >= 2 && digitos !== esc) partes.push(`telefono.ilike.%${digitos}%`);
+  return partes.join(",");
+}
+
 /** Busca clientes del tenant por teléfono o nombre (mínimo 2 caracteres), con TODAS sus direcciones. */
 export async function buscarClientesDomicilio(token: string, q: string): Promise<ClienteDomicilio[]> {
   const term = q.trim();
   if (term.length < 2) return [];
   const sb = employeeClient(token);
-  const esc = term.replace(/[%,()]/g, " ");
   const { data, error } = await sb
     .from("clientes")
     .select("id, nombre, apellido_paterno, telefono, direcciones:direcciones_cliente(id, etiqueta, calle, numero_exterior, colonia, referencias, zona:zonas_envio(id, nombre, costo_mxn))")
-    .or(`telefono.ilike.%${esc}%,nombre.ilike.%${esc}%`)
+    .or(filtroBusquedaDomicilio(term))
     .is("deleted_at", null)
     .limit(8);
   if (error) throw new Error(error.message);
@@ -163,9 +176,27 @@ export async function registrarClienteDomicilio(
   input: { nombre: string; telefono: string; tenantId: string; sucursalId: string; dir: DireccionInput },
 ): Promise<ClienteDomicilio> {
   const sb = employeeClient(token);
+  // Solo dígitos, igual que clientes-cuenta.ts: la lealtad identifica al cliente por su teléfono y lo
+  // compara por dígitos. El mismo número escrito de dos formas serían dos clientes con dos saldos.
+  const telefono = normalizarTelefono(input.telefono) || null;
+  if (telefono) {
+    const { data: previo, error: e0 } = await sb
+      .from("clientes")
+      .select("id, nombre, apellido_paterno")
+      .eq("telefono", telefono)
+      .is("deleted_at", null)
+      .limit(1)
+      .maybeSingle();
+    if (e0) throw new Error(e0.message);
+    if (previo) {
+      const p = previo as { nombre: string; apellido_paterno: string | null };
+      const quien = [p.nombre, p.apellido_paterno].filter(Boolean).join(" ").trim();
+      throw new Error(`Ese teléfono ya es de ${quien}. Búscalo por su teléfono y elígelo de la lista.`);
+    }
+  }
   const { data: cli, error: e1 } = await sb
     .from("clientes")
-    .insert({ tenant_id: input.tenantId, nombre: input.nombre.trim(), telefono: input.telefono.trim() || null })
+    .insert({ tenant_id: input.tenantId, nombre: input.nombre.trim(), telefono })
     .select("id")
     .single();
   if (e1) throw new Error(e1.message);
@@ -176,7 +207,7 @@ export async function registrarClienteDomicilio(
   return {
     clienteId,
     nombre: input.nombre.trim(),
-    telefono: input.telefono.trim() || null,
+    telefono,
     direccionId: dir.id,
     direccionPreview: `${dir.etiqueta} · ${dir.preview}`,
     zona: dir.zona,

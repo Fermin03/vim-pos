@@ -2,10 +2,16 @@
 import { employeeClient } from "../supabase";
 import { etiquetaModo } from "@vim/db/modos-servicio";
 import { etiquetaMetodoPago } from "@vim/db/metodos-pago";
-import type { DatosEntrega, DatosTicketImpresion, LineaImpresion, PagoImpresion } from "./tipos";
+import { leerPrograma } from "../lealtad";
+import { puntosPorCompra, type Programa } from "../lealtad-reglas";
+import type { DatosEntrega, DatosTicketImpresion, LealtadImpresion, LineaImpresion, PagoImpresion } from "./tipos";
 
 
-type Ctx = { token: string; cajeroNombre: string; cajaNombre: string };
+type Ctx = {
+  token: string; cajeroNombre: string; cajaNombre: string;
+  /** false = no leer la lealtad (comandas: cuatro consultas que cocina no necesita en hora pico). */
+  conLealtad?: boolean;
+};
 
 /**
  * Proyección de `ticket_items` que pide `leerTicketParaImpresion`, como constante y no como texto
@@ -68,13 +74,101 @@ export function urlAutofactura(codigoNegocio: string | null, folio: string | nul
   return `https://factura.vimpos.com.mx/${encodeURIComponent(codigoNegocio ?? "negocio")}?${q.toString()}`;
 }
 
+type MovimientoLealtad = { tipo: string; puntos: number; saldo_visto: number | null; programa_version: number; fecha: string };
+type SaldoLealtad = { saldo: number; vence_el: string | null; programa_version: number };
+
+/**
+ * Arma el pie de lealtad del ticket. PURA, con pruebas.
+ *
+ * En una cuenta COBRADA el saldo es el que quedó anotado en su último movimiento (`saldo_visto`): así
+ * una reimpresión de la semana que viene dice lo mismo que el papel que se llevó el cliente. En una
+ * cuenta sin cobrar es el saldo de hoy, y `porGanar` anuncia lo que sumará al pagar.
+ */
+export function resumenLealtadTicket(e: {
+  programa: Programa;
+  /** Los movimientos de ESTE ticket. */
+  movimientos: MovimientoLealtad[];
+  saldo: SaldoLealtad | null;
+  clienteNombre: string | null;
+  cobrada: boolean;
+  /** Lo que se paga por comida: el total sin los cargos (envío). */
+  baseComida: number;
+  /** Pedido de una app de delivery: no gana. */
+  esApp: boolean;
+}): LealtadImpresion {
+  const v = e.programa.version;
+  const propios = e.movimientos.filter((m) => Number(m.programa_version) === v);
+  const ganado = Math.max(0, propios
+    .filter((m) => m.tipo === "GANADO" || m.tipo === "REVERSA_GANADO")
+    .reduce((s, m) => s + Number(m.puntos), 0));
+  const enOrden = [...propios].sort((a, b) => new Date(a.fecha).getTime() - new Date(b.fecha).getTime());
+  const ultimo = enOrden.length > 0 ? enOrden[enOrden.length - 1] : null;
+  const vigente = e.saldo && Number(e.saldo.programa_version) === v ? e.saldo : null;
+  const saldo = e.cobrada && ultimo?.saldo_visto != null ? Number(ultimo.saldo_visto) : Number(vigente?.saldo ?? 0);
+  const pila = (e.clienteNombre ?? "").trim().split(/\s+/)[0] ?? "";
+  return {
+    cliente: pila || null,
+    unidad: e.programa.mecanica === "SELLOS" ? "sellos" : "puntos",
+    ganado,
+    porGanar: !e.cobrada && !e.esApp ? puntosPorCompra(e.programa, e.baseComida) : 0,
+    saldo,
+    venceEl: vigente?.vence_el ?? null,
+  };
+}
+
+/**
+ * Lee lo que el pie de lealtad necesita. Nunca lanza: si algo falla, el ticket sale sin pie. Un
+ * ticket que no se imprime por culpa de la lealtad es peor que uno sin saldo.
+ */
+/**
+ * ¿Se puede imprimir el pie con lo que se leyó? PURA, con pruebas. Supabase-js no lanza cuando una
+ * lectura falla: devuelve `{ data: null, error }`. Sin movimientos o sin saldo el pie diría un saldo
+ * falso ("0 puntos", o el de hoy en vez del del papel original), así que se omite. El nombre del
+ * cliente es adorno: si esa lectura falla, el pie sale sin él.
+ */
+export function datosLealtadFiables(r: { movimientos: { error: unknown }; saldo: { error: unknown } }): boolean {
+  return !r.movimientos.error && !r.saldo.error;
+}
+
+async function leerLealtadDelTicket(
+  sb: ReturnType<typeof employeeClient>,
+  token: string,
+  t: { id: string; tenantId: string; clienteId: string | null; cobrada: boolean; esApp: boolean; baseComida: number },
+): Promise<LealtadImpresion | null> {
+  if (!t.clienteId) return null;
+  try {
+    const { data: mod, error: errMod } = await sb.rpc("modulos_efectivos", { p_tenant: t.tenantId });
+    if (errMod) return null;
+    if ((mod as { efectivos?: Record<string, boolean> } | null)?.efectivos?.lealtad !== true) return null;
+    const programa = await leerPrograma(token);
+    if (!programa) return null;
+    const [movs, saldo, cli] = await Promise.all([
+      sb.from("lealtad_movimientos").select("tipo, puntos, saldo_visto, programa_version, fecha").eq("ticket_id", t.id),
+      sb.from("lealtad_saldos").select("saldo, vence_el, programa_version").eq("cliente_id", t.clienteId).maybeSingle(),
+      sb.from("clientes").select("nombre").eq("id", t.clienteId).maybeSingle(),
+    ]);
+    if (!datosLealtadFiables({ movimientos: movs, saldo })) return null;
+    return resumenLealtadTicket({
+      programa,
+      movimientos: (movs.data ?? []) as MovimientoLealtad[],
+      saldo: (saldo.data ?? null) as SaldoLealtad | null,
+      clienteNombre: ((cli.data ?? null) as { nombre: string } | null)?.nombre ?? null,
+      cobrada: t.cobrada,
+      baseComida: t.baseComida,
+      esApp: t.esApp,
+    });
+  } catch {
+    return null;
+  }
+}
+
 /** Lee el ticket persistido y arma los datos planos para impresión (bajo RLS del empleado). */
 export async function leerTicketParaImpresion(ticketId: string, ctx: Ctx): Promise<DatosTicketImpresion> {
   const sb = employeeClient(ctx.token);
 
   const { data: t, error: e1 } = await sb
     .from("tickets")
-    .select("folio_completo, modo_servicio, cliente_id, direccion_entrega_id, nombre_cliente, subtotal_mxn, descuentos_manuales_mxn, iva_mxn, total_mxn, propina_mxn, fecha_pago, created_at, sucursal_id, tenant_id")
+    .select("folio_completo, modo_servicio, cliente_id, direccion_entrega_id, nombre_cliente, subtotal_mxn, descuentos_manuales_mxn, iva_mxn, total_mxn, propina_mxn, fecha_pago, created_at, sucursal_id, tenant_id, lealtad_mxn, estado_fiscal")
     .eq("id", ticketId)
     .single();
   if (e1 || !t) throw new Error(e1?.message ?? "Ticket no encontrado");
@@ -189,12 +283,38 @@ export async function leerTicketParaImpresion(ticketId: string, ctx: Ctx): Promi
     }
   }
 
+  // Lealtad (0158): una cuenta con un premio de producto no admite factura individual, así que su
+  // ticket no invita a pedirla. Si la consulta falla, el QR sale como siempre: el portal lo dirá.
+  let conPremio = false;
+  if (qrActivo) {
+    try {
+      const { data } = await sb.rpc("ticket_lleva_premio", { p_ticket_id: ticketId });
+      conPremio = data === true;
+    } catch {
+      conPremio = false;
+    }
+  }
+
   const { data: ten } = await sb
     .from("tenants")
     .select("codigo, nombre_comercial, razon_social, rfc, logo_url")
     .eq("id", tk.tenant_id as string)
     .single();
   const tn = (ten ?? {}) as Record<string, string | null>;
+
+  // Lealtad: lo ganado, el saldo y el vencimiento. Base = lo pagado por comida (total sin cargos).
+  const cargos = lineas.filter((l) => l.cargoTipo).reduce((s, l) => s + l.totalMxn, 0);
+  const estado = (tk.estado_fiscal as string) ?? "";
+  const lealtad = ctx.conLealtad === false
+    ? null
+    : await leerLealtadDelTicket(sb, ctx.token, {
+        id: ticketId,
+        tenantId: tk.tenant_id as string,
+        clienteId: (tk.cliente_id as string | null) ?? null,
+        cobrada: estado === "PAGADO" || estado === "FACTURADO",
+        esApp: ((tk.modo_servicio as string) ?? "").startsWith("APP_"),
+        baseComida: Math.max(0, Math.round((Number(tk.total_mxn) - cargos) * 100) / 100),
+      });
 
   return {
     negocio: { nombre: tn.nombre_comercial ?? "Negocio", razonSocial: tn.razon_social ?? null, rfc: tn.rfc ?? null, logoUrl: tn.logo_url ?? null },
@@ -213,12 +333,14 @@ export async function leerTicketParaImpresion(ticketId: string, ctx: Ctx): Promi
     totales: {
       subtotal: Number(tk.subtotal_mxn), descuentos: Number(tk.descuentos_manuales_mxn),
       iva: Number(tk.iva_mxn), total: Number(tk.total_mxn), propina: Number(tk.propina_mxn),
+      lealtad: Number(tk.lealtad_mxn ?? 0),
     },
     pagos: pagosImp,
     // Dominio .com.mx: el que VIM tiene registrado. Antes decía `factura.vimpos.mx`, sin el
     // `.com`, que es de alguien más — cada ticket impreso habría mandado a los clientes del
     // restaurante a una dirección ajena en cuanto se encendiera el QR.
-    qrUrl: qrActivo ? urlAutofactura(tn.codigo ?? null, (tk.folio_completo as string | null) ?? null, tokenQr) : null,
+    qrUrl: qrActivo && !conPremio ? urlAutofactura(tn.codigo ?? null, (tk.folio_completo as string | null) ?? null, tokenQr) : null,
+    lealtad,
     ancho: 80,
   };
 }

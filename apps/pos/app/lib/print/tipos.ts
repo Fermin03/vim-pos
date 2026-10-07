@@ -67,6 +67,20 @@ export type DatosEntrega = {
   repartidor: string | null;
 };
 
+/** Pie de lealtad del ticket (ADR 0030). */
+export type LealtadImpresion = {
+  /** Solo el nombre de pila: el ticket se queda sobre la mesa. */
+  cliente: string | null;
+  unidad: "puntos" | "sellos";
+  /** Lo que esta cuenta le sumó, neto de devoluciones. 0 = no sumó (o todavía no se cobra). */
+  ganado: number;
+  /** Lo que sumará al pagar. Solo en una cuenta sin cobrar; no descuenta el tope diario. */
+  porGanar: number;
+  saldo: number | null;
+  /** "AAAA-MM-DD". */
+  venceEl: string | null;
+};
+
 export type DatosTicketImpresion = {
   negocio: { nombre: string; razonSocial: string | null; rfc: string | null; logoUrl: string | null };
   sucursal: { nombre: string; direccion: string | null; telefono: string | null };
@@ -83,9 +97,12 @@ export type DatosTicketImpresion = {
   /** Datos del cliente para el repartidor. Solo se llena en DOMICILIO; null en el resto. */
   entrega: DatosEntrega | null;
   lineas: LineaImpresion[];
-  totales: { subtotal: number; descuentos: number; iva: number; total: number; propina: number };
+  /** `lealtad` = lo descontado por canje (tickets.lealtad_mxn). Opcional: no todos los que arman estos datos lo conocen. */
+  totales: { subtotal: number; descuentos: number; iva: number; total: number; propina: number; lealtad?: number };
   pagos: PagoImpresion[];
   /** Portal de autofacturación. null = el negocio lo tiene apagado y el ticket no lo imprime. */
   qrUrl: string | null;
+  /** Pie de lealtad. null o ausente = sin cliente, módulo apagado o no se pudo leer: el ticket sale sin él. */
+  lealtad?: LealtadImpresion | null;
   ancho: 58 | 80;
 };

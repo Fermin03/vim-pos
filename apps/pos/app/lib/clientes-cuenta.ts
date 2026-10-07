@@ -1,6 +1,7 @@
 "use client";
 import { employeeClient } from "./supabase";
 import { agregarDireccionCliente, type DireccionInput } from "./clientes-domicilio";
+import { normalizarTelefono } from "./telefono";
 
 // Cliente registrado de una cuenta de Comedor, Para llevar o Pick-up. Es opcional: una cuenta sin
 // cliente se vende igual que siempre. Sirve para que las compras le cuenten al cliente (panel de
@@ -28,9 +29,8 @@ export type DatosRegistro = {
  * El mismo teléfono escrito de dos formas ("477 123 4567" y "4771234567") no debe dar dos clientes:
  * el índice único es por texto exacto. Se guarda solo con dígitos.
  */
-export function normalizarTelefono(t: string): string {
-  return t.replace(/\D/g, "");
-}
+// Se reexporta: es parte de la interfaz de este módulo desde antes de que existiera telefono.ts.
+export { normalizarTelefono };
 
 /** Nombre y teléfono obligatorios (10 dígitos); correo opcional pero válido. `null` si está bien. */
 export function validarRegistro(d: DatosRegistro): string | null {
@@ -150,7 +150,19 @@ export async function registrarClienteCuenta(
  * subió así a la nube y no se reescribe desde la caja.
  */
 export async function asignarClienteTicket(token: string, ticketId: string, clienteId: string | null): Promise<void> {
-  const { data, error } = await employeeClient(token)
+  const sb = employeeClient(token);
+  // Con un canje de lealtad aplicado el cliente no se cambia: el descuento salió del saldo de ESE
+  // cliente. Si la lectura falla no se bloquea nada: una cuenta no se queda sin cliente por la lealtad.
+  const { data: canje, error: e0 } = await sb
+    .from("ticket_canjes_lealtad")
+    .select("id")
+    .eq("ticket_id", ticketId)
+    .eq("revertido", false)
+    .limit(1)
+    .maybeSingle();
+  if (!e0 && canje) throw new Error("Esta cuenta tiene un canje de lealtad. Quita el canje antes de cambiar al cliente.");
+
+  const { data, error } = await sb
     .from("tickets")
     .update({ cliente_id: clienteId })
     .eq("id", ticketId)

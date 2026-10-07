@@ -80,6 +80,7 @@ export function PantallaCuentasModo({
   onImprimirTicket,
   onComandaCancelacion,
   extraPorCuenta,
+  onCanjear,
 }: {
   token: string;
   caja: DatosCaja;
@@ -104,6 +105,8 @@ export function PantallaCuentasModo({
   onComandaCancelacion: (ticketId: string, lineas: LineaCancelada[]) => Promise<void>;
   /** Acciones propias del modo (p. ej. "Marcar salida" en domicilio). */
   extraPorCuenta?: (c: CuentaAbierta, recargar: () => void) => React.ReactNode;
+  /** Lealtad (ADR 0030): abre el canje de esa cuenta. Sin la prop (módulo apagado) no hay botón. */
+  onCanjear?: (c: CuentaAbierta) => void;
 }) {
   const copia = COPIA[modo];
   const esComedor = modo === "COMER_AQUI";
@@ -388,6 +391,9 @@ export function PantallaCuentasModo({
                 <div className="mt-2.5 flex flex-wrap items-center gap-1.5">
                 <Accion label="Agregar producto" onClick={() => onAgregarProductos(sel.ticketId)} />
                 <Accion label={hayDescuento ? "Descuento aplicado" : "Descuento"} onClick={() => setDescontando(true)} inactivo={hayDescuento} />
+                {onCanjear && sel.clienteId && (
+                  <Accion label={(totales?.lealtad ?? 0) > 0 ? "Canje aplicado" : "Canjear puntos"} onClick={() => onCanjear(sel)} />
+                )}
                 <Accion label={yaSeImprimio ? "Reimprimir" : "Imprimir ticket"} onClick={() => (yaSeImprimio ? setPidiendoPinReimpresion(true) : imprimir(sel.ticketId))} ocupado={imprimiendo} />
                 {extraPorCuenta?.(sel, recargar)}
                 {/* Un solo botón de peligro, para que la fila quepa en la caja de 1024×768.
@@ -474,6 +480,11 @@ export function PantallaCuentasModo({
                   {hayDescuento && (
                     <div className="mt-0.5 flex justify-between text-13 font-medium text-danger">
                       <span>Descuento</span><span className="tabular-nums">−{fmtMxn(totales.descuentos)}</span>
+                    </div>
+                  )}
+                  {totales.lealtad > 0 && (
+                    <div className="mt-0.5 flex justify-between text-13 font-medium text-success">
+                      <span>Lealtad</span><span className="tabular-nums">−{fmtMxn(totales.lealtad)}</span>
                     </div>
                   )}
                   <div className="mt-1.5 flex items-baseline justify-between">

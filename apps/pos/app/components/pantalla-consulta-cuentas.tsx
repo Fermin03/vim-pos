@@ -251,6 +251,7 @@ export function PantallaConsultaCuentas({
                 <div className="rounded-lg border border-line p-3.5">
                   <Row k="Subtotal" v={detalle.totales.subtotal} />
                   {detalle.totales.descuentos > 0 && <Row k="Descuento" v={-detalle.totales.descuentos} />}
+                  {(detalle.totales.lealtad ?? 0) > 0 && <Row k="Lealtad" v={-(detalle.totales.lealtad ?? 0)} />}
                   <Row k="IVA" v={detalle.totales.iva} />
                   {detalle.totales.propina > 0 && <Row k="Propina" v={detalle.totales.propina} />}
                   <div className="mt-1.5 flex items-center justify-between border-t border-line pt-2">

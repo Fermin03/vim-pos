@@ -325,6 +325,7 @@ export function PantallaCierre({
       ventaNeta: Number(tk.total_neto_mxn ?? 0),
       iva: Number(tk.iva_neto_mxn ?? 0),
       descuentos: Number(tk.descuentos_manuales_mxn ?? 0),
+      lealtad: Number(tk.lealtad_mxn ?? 0),
       propinaTotal: Number(tk.propina_total_mxn ?? 0),
       // Estadísticas
       ticketsPagados,

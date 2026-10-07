@@ -14,6 +14,8 @@ export type ReporteXResumen = {
   ventaNeta: number;
   iva: number;
   descuentos: number;
+  /** Lo descontado por canjes de lealtad en las cuentas cobradas del turno (0157). */
+  lealtad: number;
   propinaTotal: number;
   devoluciones: number;
   pagosPorMetodo: PagoMetodo[];
@@ -36,6 +38,7 @@ export async function leerReporteX(token: string, turnoId: string): Promise<Repo
     ventaNeta: num(tk.total_neto_mxn),
     iva: num(tk.iva_neto_mxn),
     descuentos: num(tk.descuentos_manuales_mxn),
+    lealtad: num(tk.lealtad_mxn),
     propinaTotal: num(tk.propina_total_mxn),
     devoluciones: num(dev.total_mxn),
     pagosPorMetodo: pagos.map((p) => ({

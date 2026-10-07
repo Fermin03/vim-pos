@@ -95,4 +95,15 @@ describe("construirReporteZJob", () => {
     const job = construirReporteZJob(sinDevs);
     expect(job.bloques.find((b) => b.t === "texto" && b.valor === "DEVOLUCIONES")).toBeUndefined();
   });
+
+  it("con canjes de lealtad en el turno, el corte los lista aparte de los descuentos", () => {
+    const job = construirReporteZJob({ ...D, lealtad: 240 });
+    const i = job.bloques.findIndex((b) => b.t === "fila" && b.izq === "-DESCUENTOS :");
+    expect(job.bloques[i + 1]).toEqual({ t: "fila", izq: "-LEALTAD    :", der: "$240.00" });
+  });
+
+  it("sin canjes (o en un corte anterior a la lealtad) el corte sale igual que siempre", () => {
+    expect(construirReporteZJob(D).bloques.find((b) => b.t === "fila" && b.izq.startsWith("-LEALTAD"))).toBeUndefined();
+    expect(construirReporteZJob({ ...D, lealtad: 0 }).bloques.find((b) => b.t === "fila" && b.izq.startsWith("-LEALTAD"))).toBeUndefined();
+  });
 });

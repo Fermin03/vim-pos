@@ -218,6 +218,21 @@ Deno.serve(async (req) => {
     }, 404);
   }
 
+  // Lealtad (0158): una cuenta con un premio de producto no se factura individual. Se dice aquí,
+  // con su razón, en vez de dejar que el candado de la base conteste un error genérico al timbrar.
+  // Recuperar o reenviar una factura que ya existe no pasa por aquí.
+  if (body.accion !== "recuperar" && body.accion !== "enviar") {
+    const { data: conPremio } = await sb.rpc("ticket_lleva_premio", { p_ticket_id: ticket.id });
+    if (conPremio === true) {
+      return json({
+        estado: "CON_PREMIO",
+        mensaje: "Esta compra incluye un premio de lealtad y no se puede facturar de forma individual.",
+        negocio: tenant.nombre_comercial,
+        logo: tenant.logo_png_url,
+      }, 409);
+    }
+  }
+
   const { data: puede } = await sb.rpc("ticket_autofacturable", { p_ticket_id: ticket.id });
 
   // ── Buscar ──────────────────────────────────────────────────────────────────────────────────

@@ -168,6 +168,26 @@ Deno.serve(async (req) => {
   const ticketId = (cfdi as { ticket_id?: string }).ticket_id;
   if (!ticketId) return json({ error: "CFDI_SIN_TICKET" }, 409);
 
+  // Lealtad (0158, ADR 0030): una cuenta con un premio de producto no se factura individual.
+  //
+  // El candado de la base (`trg_tickets_cfdi_sin_premio`) solo actúa al CREAR el borrador. Un
+  // borrador viejo —de una cuenta que después se reabrió y recibió un premio, o uno que se quedó
+  // en ERROR_TIMBRADO— llegaría hasta el PAC con un renglón en cero. Por eso se vuelve a preguntar
+  // aquí, antes de leer los renglones y de gastar un folio. Las notas de crédito (EGRESO) pasan.
+  //
+  // Con service_role, como las demás lecturas privilegiadas: el tenant ya se validó arriba. Si la
+  // consulta falla (la 0158 todavía no está aplicada: sin ella no existen ni esta función ni el
+  // candado), se sigue de largo igual que `autofacturar`. Ojo: los premios existen desde la 0156,
+  // así que en esa ventana una cuenta con premio no tiene quien la frene; por eso la 0158 va antes
+  // de encender premios.
+  if (String(c.tipo_comprobante) === "INGRESO") {
+    const { data: llevaPremio, error: pErr } = await admin.rpc("ticket_lleva_premio", { p_ticket_id: ticketId });
+    if (pErr) console.warn(`[lealtad] no se pudo revisar el premio del ticket ${ticketId}: ${pErr.message}`);
+    if (llevaPremio === true) {
+      return json({ error: "CON_PREMIO", detalle: "Esta venta incluye un premio de lealtad y no se factura de forma individual." }, 409);
+    }
+  }
+
   const { data: filas, error: iErr } = await sb
     .from("ticket_items")
     .select(

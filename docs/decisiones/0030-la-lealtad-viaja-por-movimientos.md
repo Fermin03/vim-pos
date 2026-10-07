@@ -144,26 +144,68 @@ ADR 0013.
 - **Si la lealtad falla, no se ve.** Como los triggers atrapan el error para no tumbar la venta, un
   fallo significa que el cliente no gana y nadie lo ve en pantalla; queda solo un aviso en el log.
 
-## Lo que queda para los planes 1B y 1C
+## Lo que cerró el plan 1B y lo que queda para 1C
 
-- **Compuerta de Facturama (1B):** un renglón premiado sale al CFDI con descuento igual a su importe
-  y base de traslado en cero, y el SAT puede rechazarlo. No se habilita canjear premios de producto
-  hasta timbrar en el sandbox de Facturama un concepto así; si se ignora, esas cuentas no se podrían
-  facturar.
-- El POS debe persistir la cuenta antes de canjear y mandar el id del ticket en `canjear` y en
-  `asentar`.
-- Qué ve el cajero cuando el canje quedó autorizado pero no se pudo asentar en local (o el módulo se
-  apagó entre una cosa y otra): los puntos quedan gastados hasta la red de 48 horas y desde la caja
-  no hay acción para deshacerlo.
-- Quitar el canje de dinero cuando la comida viva baja por debajo de lo canjeado: hoy `lealtad_mxn`
-  se recorta pero el canje sigue costando todos sus puntos.
-- Normalizar el teléfono al capturarlo. El índice único sigue sobre el texto tal cual, así que
-  pueden existir dos clientes escritos con distinto formato.
-- «Editar renglón» (0119) cancela el renglón viejo: sobre un renglón premiado quita el premio y
-  devuelve los puntos sin avisar.
+Cerrado en 1B (POS):
+
+- **La cuenta se guarda antes de canjear** y el id del ticket viaja en `canjear` y en `asentar`.
+- **El canje avanza por pasos y se reanuda** (`apps/pos/app/lib/lealtad-canje.ts`): el id nace en la
+  caja, cada avance se guarda por cuenta en `localStorage`, y reintentar no descuenta dos veces. El
+  premio entra primero como renglón; después la nube descuenta; al final se asienta.
+- **Un canje nuevo no pisa a otro que quedó a medias** en la misma cuenta: `avanzarCanje` se niega a empezar si hay otro pendiente guardado.
+- **Canje autorizado que la cuenta rechaza:** el POS lo dice con todas sus letras —los puntos
+  vuelven solos en un máximo de 48 horas y desde la caja no se pueden devolver antes— y deja cobrar
+  sin el canje.
+- **Canje de dinero recortado:** antes de cobrar, si la cuenta bajó por debajo de lo canjeado, el
+  POS quita el canje completo (los puntos vuelven) y avisa.
+- **Antes de cobrar** corre una sola revisión (`revisarLealtadAntesDeCobrar`, en `apps/pos/app/lib/lealtad-cobro.ts`) siempre que el módulo está activo, igual en la captura que en la lista de cuentas. Decide con los totales recién leídos de la base, no con los de la pantalla; si quita un canje, avisa y no abre el cobro.
+- **No se cobra una cuenta con un canje a medias**: la revisión antes de cobrar lo avisa («Hay un canje a medias») y no abre el cobro ni el cajón; se termina con Reintentar o se descarta desde Lealtad. Al cobrar una cuenta se limpia su pendiente guardado.
+- **Una respuesta 2xx sin `ok: true`** de `lealtad-canje` se trata como ambigua (`RESPUESTA_INVALIDA`), no como rechazo: el canje queda a medias y se reintenta, en vez de darse por «no descontado».
+- **Un renglón premiado no se edita** desde el POS; para cambiarlo se quita el canje. Cancelarlo sí
+  se puede: la base devuelve los puntos.
+- **Con un canje aplicado no se cambia al cliente** de la cuenta.
+- **El teléfono se guarda en dígitos** también al registrar un cliente de domicilio. El índice único
+  sigue sobre el texto: los clientes capturados antes con formato siguen así.
+- **Consumidores de solo lectura:** totales del POS, lista y consulta de cuentas, ticket impreso
+  (canje en los totales y pie con lo ganado, el saldo y el vencimiento) y corte X/Z (`reporte_x`,
+  migración 0157).
+- **Si una lectura de lealtad falla al imprimir, el ticket sale sin pie**, nunca con un saldo en cero que no es verdad.
+- **La compuerta de Facturama ya no existe** (decisión de Fermín, 6 oct 2026, migración 0158): el
+  producto de regalo sale en $0.00 y **una cuenta con premio no admite factura individual**, ni en
+  el portal ni en el admin (candado `trg_tickets_cfdi_sin_premio`); su ticket no imprime el QR de
+  factura. **Sí entra en la factura global**, que arma un concepto por ticket y no por producto, y
+  así lo que el cliente pagó queda amparado. La cuenta que es solo el premio ($0) queda fuera de la
+  global. El canje de puntos por dinero se factura como siempre. Conviene que el contador del
+  negocio lo confirme antes de encender premios en un negocio que factura mucho.
+- **`timbrar-cfdi` revisa el premio antes de timbrar**: el candado de la 0158 solo actúa al crear el borrador, así que un borrador viejo de una cuenta que después recibió un premio podía llegar al PAC. Ahora la función pregunta `ticket_lleva_premio` antes de leer los renglones y de gastar folio, y contesta 409 `CON_PREMIO`.
+
+Sigue abierto:
+
+- **Un canje revertido en una cuenta ya cobrada** (lo puede hacer la conciliación de 48 h) deja de contar como premio para la factura, aunque su renglón siga en $0. **Condición para encender premios (1C):** que `ticket_lleva_premio` siga contando un premio revertido DESPUÉS del pago.
+- **El canje a medias se guarda por dispositivo** (`localStorage`): otra caja no lo ve, y desde ella esa cuenta se cobra sin aviso.
+- **El botón Canjear de la franja se apaga con el saldo LOCAL**, que en una caja puede ir atrasado respecto a la nube (puntos ganados en otra sucursal que el pull aún no baja).
+- **La reimpresión de una cuenta cobrada que no tuvo movimientos propios** (no alcanzó la compra mínima, tope del día, pedido de app) muestra el saldo de hoy, no el del papel original; y en la caja «Tu saldo» es la copia local, que puede no ser la de la nube.
+- **Al imprimir, `modulos_efectivos` y `ticket_lleva_premio` se consultan aunque el negocio nunca encienda la lealtad**: una o dos lecturas por ticket.
+- **Tras canjear desde la lista de cuentas, la lista se recarga y pierde la cuenta seleccionada.**
+- **Orden de salida:** la 0156 es prerrequisito DURO del POS web. Sin ella toda cuenta falla al leer `tickets.lealtad_mxn`. Antes de desplegar el POS hay que verificarla (`select lealtad_mxn from tickets limit 1`). El plan 1C debe repetir ese cuidado en el orden hub → cajas.
+- **No hay ESLint configurado en `apps/pos`**: las dependencias de los hooks nuevos se revisaron a mano.
+- **La interfaz no se ha visto funcionar**: no hay pruebas de componentes y la prueba manual de la Tarea 12 del plan 1B está pendiente.
+- **Una cuenta con productos de varias tasas de IVA y un premio** puede dejar en cero, dentro de la
+  global, el grupo de una tasa (cuando el premio es el único producto de esa tasa en la cuenta).
+  Hoy casi todo el catálogo va al 16 %; si un negocio mezcla tasas y regala productos, hay que
+  revisarlo antes de encenderle los premios.
+- **La factura global con cuentas premiadas no se ha timbrado nunca**: el razonamiento sale del
+  código, no de una prueba contra el PAC. La primera global de un negocio con premios hay que mirarla.
+- **El premio entra sin modificadores** (el producto base, una pieza). Un producto que exige elegir
+  algo —el término de la carne— llega a cocina sin esa elección. Elegir modificadores del premio, y
+  decidir si un premio con extras caros sale gratis completo, es decisión de producto.
+- **En Domicilio no se canjea desde la captura**, solo desde la lista de Domicilio: al releer la
+  cuenta el carrito pierde al cliente de domicilio.
+- **El anuncio «gana X» no descuenta las compras revertidas del día** al calcular el tope; es un
+  texto, quien otorga los puntos es la base.
 - El admin no debe ofrecer combos como premio (el alta no lo impide; solo falla al canjear).
-- `_sincronizar_addons_del_plan` y su espejo en TS (ver arriba, punto 11).
-- Los consumidores de solo lectura de los descuentos del ticket: corte, ticket impreso y reportes.
+- `_sincronizar_addons_del_plan` y su espejo en TS.
+- Los reportes del admin que leen los descuentos del ticket.
 
 ## Límites conocidos
 

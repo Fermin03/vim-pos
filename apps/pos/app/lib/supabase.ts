@@ -190,6 +190,20 @@ export function employeeClient(token: string): SupabaseClient {
   });
 }
 
+/**
+ * URL de una Edge Function con la URL de RUNTIME. En una segunda caja de la red local
+ * `window.__VIM_SUPABASE_URL` apunta al hub; la URL del build (`process.env`) apuntaría a esta
+ * misma máquina, que no tiene gateway. Las funciones nuevas se llaman con esto.
+ */
+export function urlFuncion(nombre: string): string {
+  return `${URL}/functions/v1/${nombre}`;
+}
+
+/** Encabezados para llamar una Edge Function como el empleado que tiene la sesión. */
+export function encabezadosFuncion(token: string): Record<string, string> {
+  return { apikey: ANON, Authorization: `Bearer ${token}`, "Content-Type": "application/json" };
+}
+
 /** C2 — el propio cajero cambia su PIN (verifica el actual). Errores: PIN_ACTUAL_INCORRECTO, PIN_INVALIDO, PIN_IGUAL. */
 export async function cambiarPinPropio(token: string, pinActual: string, pinNuevo: string): Promise<void> {
   const { error } = await employeeClient(token).rpc("cambiar_pin_propio", { p_pin_actual: pinActual, p_pin_nuevo: pinNuevo });

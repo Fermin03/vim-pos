@@ -5,6 +5,7 @@ import { etiquetaModo } from "@vim/db/modos-servicio";
 import { calcularTotalesDisplay, totalLinea } from "../lib/carrito";
 import { setPreciosVisibles, usePreciosVisibles } from "../lib/precios-visibles";
 import { fmtMxn } from "../lib/turno";
+import type { FranjaLealtad } from "../lib/lealtad-reglas";
 import { RenglonItem } from "./renglon-item";
 
 /* ── helpers ─────────────────────────────────────────────────── */
@@ -74,6 +75,9 @@ export function SidebarTicket({
   descuentoMxn = 0,
   totalConDescuento,
   promocionMxn = 0,
+  lealtad = null,
+  lealtadMxn = 0,
+  premioClientId = null,
   bloqueado = false,
   procesando,
   onEditar,
@@ -134,6 +138,14 @@ export function SidebarTicket({
   /** Rebajado por promociones del negocio. Renglón propio: si se sumara al descuento, el
    *  cliente vería bajar el total sin que nada en pantalla diga por qué. */
   promocionMxn?: number;
+  /** Canje de lealtad ya aplicado en BD (autoritativo). 0 = sin canje. */
+  lealtadMxn?: number;
+  /** Renglón que es un premio de lealtad: se muestra en $0.00, que es lo que el cliente paga por
+   *  él (el descuento va en el renglón «Lealtad» de los totales). null = no hay premio. */
+  premioClientId?: string | null;
+  /** Lealtad del cliente de la cuenta (ADR 0030). null = módulo apagado, sin programa o cuenta sin
+   *  cliente: no se pinta nada. Sin `onAbrir` la franja informa, pero no canjea. */
+  lealtad?: { nombre: string; franja: FranjaLealtad; onAbrir?: () => void } | null;
   /** El ticket ya está comprometido en BD: bloquea edición del carrito para evitar desincronización. */
   bloqueado?: boolean;
   procesando: boolean;
@@ -146,6 +158,7 @@ export function SidebarTicket({
   const [notaOrdenAbierta, setNotaOrdenAbierta] = useState(false);
   const hayDescuento = descuentoMxn > 0;
   const hayPromocion = promocionMxn > 0;
+  const hayLealtad = lealtadMxn > 0;
   const totalFinal = totalConDescuento ?? totales.total;
   /**
    * Cuenta que NO se cobra aquí: Pick-up y Domicilio mandan a cocina y se cobran después,
@@ -313,7 +326,7 @@ export function SidebarTicket({
                     nombre={l.producto.nombre}
                     modificadores={l.modificadores.map((m) => m.opcionNombre)}
                     notaCocina={l.notaCocina}
-                    totalMxn={totalLinea(l)}
+                    totalMxn={l.clientId === premioClientId ? 0 : totalLinea(l)}
                     hijos={l.combo?.componentes.map((c) => ({
                       slot: c.grupoNombre,
                       nombre: c.producto.nombre,
@@ -412,6 +425,26 @@ export function SidebarTicket({
           cajero necesita ver. Subtotal/IVA son informativos → tipografía menor y filas apretadas;
           el TOTAL sigue siendo el número dominante. */}
       <div className="flex-shrink-0 border-t border-line bg-sel px-4 pb-2.5 pt-3">
+        {lealtad && (
+          <div className="mb-2 flex items-center gap-2 border-b border-line pb-2">
+            <div className="min-w-0 flex-1">
+              <div className="truncate text-13 font-semibold text-ink">
+                {lealtad.nombre} <span className="font-medium tabular-nums text-ink-2">· {lealtad.franja.saldoTexto}</span>
+              </div>
+              {lealtad.franja.detalle && <div className="truncate text-12 text-ink-2">{lealtad.franja.detalle}</div>}
+            </div>
+            {lealtad.onAbrir && (
+              <button
+                type="button"
+                disabled={!lealtad.franja.puedeAbrir || procesando}
+                onClick={lealtad.onAbrir}
+                className={`${BOTON_RENGLON} border border-line-strong bg-surface text-ink hover:border-ink disabled:cursor-default disabled:opacity-[.45] disabled:hover:border-line-strong disabled:active:scale-100`}
+              >
+                {lealtad.franja.boton}
+              </button>
+            )}
+          </div>
+        )}
         {/* Renglón de envío: tocable SIEMPRE, también con el ticket ya persistido — un domicilio
             se manda a cocina (y por tanto se persiste) antes de cobrarse, así que apagar esto al
             bloquear dejaría la función muerta justo cuando más se necesita. El caller reescribe
@@ -438,6 +471,12 @@ export function SidebarTicket({
           <div className="mb-1 flex justify-between text-13 font-medium text-success">
             <span>Promoción</span>
             <span className="tabular-nums">−{fmtMxn(promocionMxn)}</span>
+          </div>
+        )}
+        {hayLealtad && (
+          <div className="mb-1 flex justify-between text-13 font-medium text-success">
+            <span>Lealtad</span>
+            <span className="tabular-nums">−{fmtMxn(lealtadMxn)}</span>
           </div>
         )}
         {hayDescuento && (
