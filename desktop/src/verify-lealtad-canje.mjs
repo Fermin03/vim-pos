@@ -2,7 +2,7 @@
 // → nube → asiento en el Postgres local. Las pruebas unitarias del puente usan un pool falso; aquí
 // corren el gateway de verdad, la sesión de un cajero, las migraciones 0156–0159 y la función
 // lealtad_asentar_canje. La nube es un servidor local que contesta como la Edge Function.
-// Datos temporales y puertos propios (54396/54395/54372/54373): no toca la caja instalada.
+// Datos temporales y puertos propios (54384/54383/54372/54373): no toca la caja instalada ni choca con los smokes.
 // Uso: node src/verify-lealtad-canje.mjs
 import http from "node:http";
 import { mkdtempSync, rmSync } from "node:fs";
@@ -59,7 +59,7 @@ function levantarNube() {
 try {
   nube = await levantarNube();
   backend = await startBackend({
-    dataRoot: dir, pgPort: 54396, restPort: 54395, gatewayPort: GW_PORT, host: "127.0.0.1", log: () => {},
+    dataRoot: dir, pgPort: 54384, restPort: 54383, gatewayPort: GW_PORT, host: "127.0.0.1", log: () => {},
     nube: async () => ({ cloudUrl: `http://127.0.0.1:${NUBE_PORT}`, anonKey: "anon-de-prueba", deviceToken: "token-del-dispositivo" }),
   });
   console.log("· backend temporal y nube de mentira arriba");
@@ -188,7 +188,7 @@ try {
   console.error("\n❌ FALLÓ:", e.message);
   process.exitCode = 1;
 } finally {
-  if (backend) await backend.stop();
-  if (nube) await new Promise((ok) => nube.close(ok));
+  try { if (backend) await backend.stop(); } catch { /* que un fallo al parar no deje la nube ni el pgdata sin limpiar */ }
+  try { if (nube) await new Promise((ok) => nube.close(ok)); } catch { /* idem */ }
   try { rmSync(dir, { recursive: true, force: true }); } catch { /* Windows suelta el pgdata tarde */ }
 }
