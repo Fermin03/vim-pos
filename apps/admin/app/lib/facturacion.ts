@@ -2,6 +2,7 @@
 import { z } from "zod";
 import { hoyMx } from "@vim/fecha";
 import { leerSesion, supabase } from "./supabase";
+import { tenantId } from "./tenant";
 
 // Facturación de tickets (doc 13 §CFDI). El backend completo existía (cfdi_crear_borrador,
 // timbrar-cfdi, tickets_cfdi con RLS); esta lib es el punto de
@@ -185,12 +186,6 @@ export async function facturarTicket(ticketId: string, receptor: ReceptorInput):
     return { ok: false, cfdiId: id, error: data.mensaje ?? data.detalle ?? data.error ?? `HTTP ${res.status}` };
   }
   return { ok: true, cfdiId: id, uuidFiscal: data.uuid_fiscal, serie: data.serie ?? null, folioFiscal: data.folio_fiscal ?? null };
-}
-
-async function tenantId(): Promise<string> {
-  const s = await leerSesion();
-  if (!s?.tenantId) throw new Error("Sesión sin tenant");
-  return s.tenantId;
 }
 
 // ── Factura global (fase 6) ──────────────────────────────────────────────────

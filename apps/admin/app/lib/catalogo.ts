@@ -1,6 +1,7 @@
 "use client";
 import { z } from "zod";
-import { supabase, leerSesion } from "./supabase";
+import { supabase } from "./supabase";
+import { tenantId } from "./tenant";
 
 // Paleta funcional de categorías (del design system; NUNCA el naranja de marca).
 export const COLORES: { hex: string; bg: string }[] = [
@@ -69,12 +70,6 @@ export async function listarCategorias(): Promise<Categoria[]> {
     activa: f.activa,
     nProductos: f.productos?.[0]?.count ?? 0,
   }));
-}
-
-async function tenantId(): Promise<string> {
-  const s = await leerSesion();
-  if (!s?.tenantId) throw new Error("Sesión sin tenant");
-  return s.tenantId;
 }
 
 export async function crearCategoria(input: CategoriaInput): Promise<void> {

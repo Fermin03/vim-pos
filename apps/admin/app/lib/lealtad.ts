@@ -7,13 +7,8 @@
 // manual están en lealtad-libro.ts.
 import { z } from "zod";
 import { cantidad, puntosPorCompra, type Mecanica } from "@vim/db/lealtad";
-import { supabase, leerSesion } from "./supabase";
-
-async function tenantId(): Promise<string> {
-  const s = await leerSesion();
-  if (!s?.tenantId) throw new Error("Sesión sin tenant");
-  return s.tenantId;
-}
+import { supabase } from "./supabase";
+import { tenantId } from "./tenant";
 
 const SOLO_ADMIN = "Solo el dueño o un administrador puede cambiar la lealtad.";
 

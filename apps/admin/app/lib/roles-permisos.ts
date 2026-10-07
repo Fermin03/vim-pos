@@ -1,5 +1,6 @@
 "use client";
-import { supabase, leerSesion } from "./supabase";
+import { supabase } from "./supabase";
+import { tenantId } from "./tenant";
 
 // Fase 5 · roles delegados (doc 09 §7). D71: override RESTRICTIVO por tenant (solo quitar
 // permisos a roles del sistema). D72: rol PERSONALIZADO = permisos explícitos por usuario.
@@ -15,12 +16,6 @@ export type MatrizPermisos = {
   /** rol_id → set de permiso_id QUITADOS por este tenant (D71). */
   quitados: Map<string, Set<string>>;
 };
-
-async function tenantId(): Promise<string> {
-  const s = await leerSesion();
-  if (!s?.tenantId) throw new Error("Sesión sin tenant");
-  return s.tenantId;
-}
 
 export async function leerMatriz(): Promise<MatrizPermisos> {
   const [{ data: roles, error: e1 }, { data: permisos, error: e2 }, { data: rp, error: e3 }, { data: ov, error: e4 }] =

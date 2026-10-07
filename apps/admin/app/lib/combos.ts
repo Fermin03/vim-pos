@@ -1,6 +1,7 @@
 "use client";
 import { z } from "zod";
-import { supabase, leerSesion } from "./supabase";
+import { supabase } from "./supabase";
+import { tenantId } from "./tenant";
 import type { EstadoProducto } from "./catalogo";
 import { estadoGeneral } from "./menu-sucursal";
 import type { FilaDeMenu } from "./menus";
@@ -13,11 +14,6 @@ export const MODO_PRECIO = {
 } as const;
 export type ModoPrecio = keyof typeof MODO_PRECIO;
 
-async function tenantId(): Promise<string> {
-  const s = await leerSesion();
-  if (!s?.tenantId) throw new Error("Sesión sin tenant");
-  return s.tenantId;
-}
 const r2 = (n: number): number => Math.round(n * 100) / 100;
 
 // ── Combos (productos con es_combo) ──────────────────────────────────────────

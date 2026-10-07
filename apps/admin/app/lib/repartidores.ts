@@ -1,6 +1,7 @@
 "use client";
 import { z } from "zod";
-import { supabase, leerSesion } from "./supabase";
+import { supabase } from "./supabase";
+import { tenantId } from "./tenant";
 
 /**
  * Catálogo de repartidores del negocio.
@@ -12,12 +13,6 @@ import { supabase, leerSesion } from "./supabase";
  * Sin política DELETE en la tabla: la baja es lógica (`deleted_at`), porque los pedidos ya
  * repartidos siguen apuntando a la fila.
  */
-
-async function tenantId(): Promise<string> {
-  const s = await leerSesion();
-  if (!s?.tenantId) throw new Error("Sesión sin tenant");
-  return s.tenantId;
-}
 
 const S = (v: unknown) => (v == null ? "" : String(v));
 

@@ -1,16 +1,11 @@
 "use client";
 import { z } from "zod";
-import { supabase, leerSesion } from "./supabase";
+import { supabase } from "./supabase";
+import { tenantId } from "./tenant";
 
 // BUG C — Editor de mesas. La pantalla de Mesas del POS dirige aquí ("el dueño las da de alta
 // en el admin"), pero no existía. Tabla `mesas` (RLS mesas_select/insert/update por tenant).
 // Sin política DELETE -> baja lógica vía update deleted_at.
-
-async function tenantId(): Promise<string> {
-  const s = await leerSesion();
-  if (!s?.tenantId) throw new Error("Sesión sin tenant");
-  return s.tenantId;
-}
 
 const S = (v: unknown) => (v == null ? "" : String(v));
 const N = (v: unknown) => Number(v ?? 0);

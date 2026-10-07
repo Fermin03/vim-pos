@@ -1,14 +1,10 @@
 "use client";
 import { z } from "zod";
-import { supabase, leerSesion } from "./supabase";
+import { supabase } from "./supabase";
+import { tenantId } from "./tenant";
 
 // Catálogo de proveedores (ADR 0012). Tabla proveedores con RLS por tenant y baja lógica.
 
-async function tenantId(): Promise<string> {
-  const s = await leerSesion();
-  if (!s?.tenantId) throw new Error("Sesión sin tenant");
-  return s.tenantId;
-}
 const S = (v: unknown) => (v == null ? "" : String(v));
 const opc = (v: unknown) => (v == null || v === "" ? null : String(v));
 

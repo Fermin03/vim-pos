@@ -1,11 +1,6 @@
 "use client";
-import { supabase, leerSesion } from "./supabase";
-
-async function tenantId(): Promise<string> {
-  const s = await leerSesion();
-  if (!s?.tenantId) throw new Error("Sesión sin tenant");
-  return s.tenantId;
-}
+import { supabase } from "./supabase";
+import { tenantId } from "./tenant";
 
 /**
  * Módulos del cliente, en sus DOS capas (ADR 0014).

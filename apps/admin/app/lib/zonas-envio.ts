@@ -1,6 +1,7 @@
 "use client";
 import { z } from "zod";
-import { supabase, leerSesion } from "./supabase";
+import { supabase } from "./supabase";
+import { tenantId } from "./tenant";
 
 /**
  * Zonas de envío por sucursal (0116_zonas_envio): a qué colonias reparte cada sucursal y cuánto
@@ -11,12 +12,6 @@ import { supabase, leerSesion } from "./supabase";
  * aquí no se usa: tickets y direcciones de cliente apuntan a la zona, así que la baja es lógica
  * (`deleted_at`) para no romper esas referencias ni el historial.
  */
-
-async function tenantId(): Promise<string> {
-  const s = await leerSesion();
-  if (!s?.tenantId) throw new Error("Sesión sin tenant");
-  return s.tenantId;
-}
 
 const S = (v: unknown) => (v == null ? "" : String(v));
 

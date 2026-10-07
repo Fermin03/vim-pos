@@ -1,6 +1,7 @@
 "use client";
 import { z } from "zod";
-import { supabase, leerSesion } from "./supabase";
+import { supabase } from "./supabase";
+import { tenantId } from "./tenant";
 
 /**
  * Estaciones de preparación: dónde se prepara cada cosa y, por lo tanto, dónde se imprime su
@@ -13,12 +14,6 @@ import { supabase, leerSesion } from "./supabase";
  * cada caja —una segunda caja del mismo negocio tiene otras IPs— y se elige en el POS, en
  * Configurar impresoras y pantallas.
  */
-
-async function tenantId(): Promise<string> {
-  const s = await leerSesion();
-  if (!s?.tenantId) throw new Error("Sesión sin tenant");
-  return s.tenantId;
-}
 
 const S = (v: unknown) => (v == null ? "" : String(v));
 

@@ -1,17 +1,12 @@
 "use client";
-import { supabase, leerSesion } from "./supabase";
+import { supabase } from "./supabase";
+import { tenantId } from "./tenant";
 
 // Fase 5 · franquicias: agrupan sucursales del tenant para el reporteo central.
 // El scope del franquiciatario se da con usuarios_acceso por sucursal (D68).
 
 export type Franquicia = { id: string; nombre: string; notas: string | null; activa: boolean; nSucursales: number };
 export type SucursalFranquicia = { id: string; nombre: string; franquiciaId: string | null };
-
-async function tenantId(): Promise<string> {
-  const s = await leerSesion();
-  if (!s?.tenantId) throw new Error("Sesión sin tenant");
-  return s.tenantId;
-}
 
 export async function listarFranquicias(): Promise<Franquicia[]> {
   const { data, error } = await supabase

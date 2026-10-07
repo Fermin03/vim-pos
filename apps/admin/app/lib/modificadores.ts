@@ -1,6 +1,7 @@
 "use client";
 import { z } from "zod";
-import { supabase, leerSesion } from "./supabase";
+import { supabase } from "./supabase";
+import { tenantId } from "./tenant";
 
 export const TIPO_SELECCION = {
   UNICA_OBLIGATORIA: "Elige una (obligatorio)",
@@ -19,12 +20,6 @@ export const NATURALEZA = {
   NEUTRO: "Variante · sabor, tamaño, tipo",
 } as const;
 export type Naturaleza = keyof typeof NATURALEZA;
-
-async function tenantId(): Promise<string> {
-  const s = await leerSesion();
-  if (!s?.tenantId) throw new Error("Sesión sin tenant");
-  return s.tenantId;
-}
 
 // ── Grupos ───────────────────────────────────────────────────────────────────
 export const grupoSchema = z

@@ -1,12 +1,7 @@
 "use client";
 import { z } from "zod";
-import { supabase, leerSesion } from "./supabase";
-
-async function tenantId(): Promise<string> {
-  const s = await leerSesion();
-  if (!s?.tenantId) throw new Error("Sesión sin tenant");
-  return s.tenantId;
-}
+import { supabase } from "./supabase";
+import { tenantId } from "./tenant";
 
 // ── Credenciales de dispositivo de una caja (provisionar-dispositivo) ─────────
 const SB_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!;
