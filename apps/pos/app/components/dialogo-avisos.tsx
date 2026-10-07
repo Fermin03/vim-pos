@@ -1,5 +1,6 @@
 "use client";
 import { useState } from "react";
+import { useEscape } from "../lib/use-escape";
 import { marcarAvisoVisto, type Aviso, type NivelAviso } from "../lib/directivas";
 
 /** Colores por nivel. `danger` es lo que impide o rompe algo; `warning`, lo que hay que atender. */
@@ -22,6 +23,9 @@ export function DialogoAvisos({ avisos, onCerrar }: { avisos: Aviso[]; onCerrar:
   const [i, setI] = useState(0);
   const [pasando, setPasando] = useState(false);
   const aviso = avisos[i];
+  // Escape hace lo mismo que el botón «Cerrar». Un aviso que pide confirmación no: ese se
+  // contesta con «Entendido», no se quita por reflejo.
+  useEscape(aviso && !aviso.requiere_confirmacion ? () => void siguiente() : null);
   if (!aviso) return null;
 
   const e = ESTILO[aviso.nivel];

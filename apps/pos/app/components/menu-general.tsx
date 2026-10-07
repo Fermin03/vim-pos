@@ -82,11 +82,9 @@ export function MenuGeneral({
     else setAvisoUpd(r.error);
   }, [onCerrar]);
 
-  useEffect(() => {
-    const onEsc = (e: KeyboardEvent) => { if (e.key === "Escape") onCerrar(); };
-    window.addEventListener("keydown", onEsc);
-    return () => window.removeEventListener("keydown", onEsc);
-  }, [onCerrar]);
+  // Escape lo cierra home-pos (capa `menuGeneralAbierto` de su lista). Aquí había un listener
+  // propio que no miraba si la tecla ya estaba atendida: cerraba el menú también cuando Escape
+  // era para un modal abierto encima.
 
   /** Cierra el menú y ejecuta la acción: ninguna opción debe dejar el menú encima. */
   const con = (fn: () => void) => () => { onCerrar(); fn(); };

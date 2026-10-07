@@ -1,6 +1,7 @@
 "use client";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { BotonVolver } from "./boton-volver";
+import { useEscape } from "../lib/use-escape";
 import { Button, DialogoPeligro, LogoVim } from "@vim/ui/styles";
 import { type DatosCaja, type Turno, fmtMxn } from "../lib/turno";
 import { type Empleado } from "../lib/supabase";
@@ -42,6 +43,8 @@ export function PantallaDevoluciones({
   const [error, setError] = useState<string | null>(null);
   const [sel, setSel] = useState<VentaTurno | null>(null);
   const [reciboDev, setReciboDev] = useState<DatosDevolucion | null>(null);
+  // El recibo de la devolución va encima de la lista: Escape lo cierra a él antes de salir.
+  useEscape(reciboDev ? () => setReciboDev(null) : onSalir);
   const montado = useRef(true);
 
   const recargar = useCallback(async () => {

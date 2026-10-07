@@ -1,5 +1,7 @@
 "use client";
-import { useCallback, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
+import { capaVisible } from "../lib/escape";
+import { useEscape } from "../lib/use-escape";
 import { CatalogoProductos } from "./catalogo-productos";
 import { ModalCombo } from "./modal-combo";
 import { ModalModificadores } from "./modal-modificadores";
@@ -175,6 +177,23 @@ export function ModalAgregarProductos({
   }, [guardar, onEnviarCocina, ticketId, onCerrar]);
 
   const hayLineas = lineas.length > 0;
+
+  /* Escape: primero lo que esté encima (modificadores, combo); sin nada abierto es «Volver», que
+     descarta la tanda igual que el botón. Mientras se guarda no hace nada. `onCerrar` va por ref
+     porque llega como función nueva en cada render del padre: si entrara a las dependencias, esta
+     pantalla se volvería a registrar en la pila a cada rato. */
+  const cerrarRef = useRef(onCerrar);
+  cerrarRef.current = onCerrar;
+  const alEscapar = useMemo(
+    () => capaVisible([
+      [ocupado, () => {}],
+      [modGrupos != null, () => setModGrupos(null)],
+      [comboAbierto != null, () => setComboAbierto(null)],
+      [true, () => cerrarRef.current(false)],
+    ]),
+    [ocupado, modGrupos, comboAbierto],
+  );
+  useEscape(alEscapar);
 
   return (
     <div className="fixed inset-0 z-50 flex flex-col bg-bg" role="dialog" aria-modal="true" aria-label="Agregar productos">

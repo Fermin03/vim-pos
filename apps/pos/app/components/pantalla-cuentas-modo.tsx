@@ -4,7 +4,7 @@ import { BotonVolver } from "./boton-volver";
 import { RenglonItem } from "./renglon-item";
 import { Button, DialogoPeligro, LogoVim, Modal } from "@vim/ui/styles";
 import { fmtMxn, type DatosCaja, type Turno } from "../lib/turno";
-import { borrarCuentaVacia, leerEntregaCuenta, listarCuentasAbiertas, leerRenglonesCuenta, marcarTicketImpreso, minutosAbierta, type CuentaAbierta, type RenglonCuenta } from "../lib/cuentas-abiertas";
+import { borrarCuentaVacia, leerEntregaCuenta, listarCuentasAbiertas, leerRenglonesCuenta, marcarTicketImpreso, minutosAbierta, reabrirCuentaImpresa, type CuentaAbierta, type RenglonCuenta } from "../lib/cuentas-abiertas";
 import { leerTotales, type TotalesTicket } from "../lib/cobro";
 import { leerDeliveries } from "../lib/delivery";
 import { ModalCancelarItem } from "./modal-cancelar-item";
@@ -121,6 +121,7 @@ export function PantallaCuentasModo({
   const [ahora, setAhora] = useState(() => new Date());
   const [imprimiendo, setImprimiendo] = useState(false);
   const [pidiendoPinReimpresion, setPidiendoPinReimpresion] = useState(false);
+  const [pidiendoPinReabrir, setPidiendoPinReabrir] = useState(false);
   const [cancelando, setCancelando] = useState<RenglonCuenta | null>(null);
   // Impresiones hechas en esta sesión: la primera es libre, de ahí en adelante pide PIN.
   const [yaImpresas, setYaImpresas] = useState<Set<string>>(new Set());
@@ -210,11 +211,12 @@ export function PantallaCuentasModo({
       [cancelandoCuenta, () => setCancelandoCuenta(false)],
       [descontando, () => setDescontando(false)],
       [pidiendoPinReimpresion, () => setPidiendoPinReimpresion(false)],
+      [pidiendoPinReabrir, () => setPidiendoPinReabrir(false)],
       [selId != null, () => setSelId(null)],
       [true, onSalir],
     ];
     return capaVisible(capas);
-  }, [clienteDe, eligiendoCancelacion, cancelandoItems, borrandoCuenta, cancelandoCuenta, descontando, pidiendoPinReimpresion, selId, onSalir]);
+  }, [clienteDe, eligiendoCancelacion, cancelandoItems, borrandoCuenta, cancelandoCuenta, descontando, pidiendoPinReimpresion, pidiendoPinReabrir, selId, onSalir]);
   useEscape(alEscapar);
 
   const vacia = detalle === null ? null : detalle.length === 0;
@@ -230,24 +232,22 @@ export function PantallaCuentasModo({
       // cajero que imprimía nunca pasaba por el modal. Desde la 0114 lo que saca un pedido a la
       // calle es asignarle repartidor, y nada más.
       //
-      // Pero el sello SÍ hay que dejarlo: sin persistirlo, `impresaAt` nunca se actualiza y el
-      // respaldo cross-sesión/cross-caja de "ya se imprimió" (lo que exige PIN en la siguiente
-      // impresión) se pierde al recargar. Solo domicilio, como antes — en Pick-up/Comedor este
-      // sellado nunca existió y esta entrega no les toca el comportamiento. Best-effort: el
-      // ticket ya salió de la impresora, así que un fallo aquí no debe molestar al cajero.
-      if (modo === "DELIVERY_PROPIO") {
-        try {
-          await marcarTicketImpreso(token, ticketId);
-        } catch {
-          /* la marca local (yaImpresas) ya cubre esta sesión */
-        }
+      // Pero el sello SÍ hay que dejarlo, y en los tres modos: de él cuelgan el PIN de la
+      // siguiente impresión y el candado de la cuenta (impresa = no se le agrega ni se le quita
+      // nada hasta reabrirla). Sin persistirlo, el candado se soltaría al recargar la lista o al
+      // abrir la cuenta en otra caja. Best-effort: el ticket ya salió de la impresora, así que un
+      // fallo aquí no debe molestar al cajero.
+      try {
+        await marcarTicketImpreso(token, ticketId);
+      } catch {
+        /* la marca local (yaImpresas) ya cubre esta sesión */
       }
     } catch (e) {
       setError(e instanceof Error ? e.message : "No se pudo imprimir");
     } finally {
       setImprimiendo(false);
     }
-  }, [onImprimirTicket, modo, token]);
+  }, [onImprimirTicket, token]);
 
   return (
     <main className="flex h-screen flex-col bg-bg">
@@ -390,11 +390,15 @@ export function PantallaCuentasModo({
                   </div>
                 </div>
                 <div className="mt-2.5 flex flex-wrap items-center gap-1.5">
-                <Accion label="Agregar producto" onClick={() => onAgregarProductos(sel.ticketId)} />
-                <Accion label={hayDescuento ? "Descuento aplicado" : "Descuento"} onClick={() => setDescontando(true)} inactivo={hayDescuento} />
+                {/* Ticket impreso = cuenta cerrada a cambios: lo que el cliente tiene en la mano es
+                    lo que se le cobra. Agregar, descontar, canjear y cancelar quedan apagados hasta
+                    «Reabrir cuenta», que pide PIN de supervisor. Cobrar y reimprimir siguen. */}
+                <Accion label="Agregar producto" onClick={() => onAgregarProductos(sel.ticketId)} inactivo={yaSeImprimio} />
+                <Accion label={hayDescuento ? "Descuento aplicado" : "Descuento"} onClick={() => setDescontando(true)} inactivo={hayDescuento || yaSeImprimio} />
                 {onCanjear && sel.clienteId && (
-                  <Accion label={(totales?.lealtad ?? 0) > 0 ? "Canje aplicado" : "Canjear puntos"} onClick={() => onCanjear(sel)} />
+                  <Accion label={(totales?.lealtad ?? 0) > 0 ? "Canje aplicado" : "Canjear puntos"} onClick={() => onCanjear(sel)} inactivo={yaSeImprimio} />
                 )}
+                {yaSeImprimio && <Accion label="Reabrir cuenta" onClick={() => setPidiendoPinReabrir(true)} />}
                 <Accion label={yaSeImprimio ? "Reimprimir" : "Imprimir ticket"} onClick={() => (yaSeImprimio ? setPidiendoPinReimpresion(true) : imprimir(sel.ticketId))} ocupado={imprimiendo} />
                 {extraPorCuenta?.(sel, recargar)}
                 {/* Un solo botón de peligro, para que la fila quepa en la caja de 1024×768.
@@ -405,7 +409,7 @@ export function PantallaCuentasModo({
                 {vacia === true ? (
                   <Accion label="Borrar cuenta" onClick={() => setBorrandoCuenta(true)} ocupado={borrando} textoOcupado="Borrando…" peligro />
                 ) : (
-                  <Accion label="Cancelar…" onClick={() => setEligiendoCancelacion(true)} inactivo={vacia === null} peligro />
+                  <Accion label="Cancelar…" onClick={() => setEligiendoCancelacion(true)} inactivo={vacia === null || yaSeImprimio} peligro />
                 )}
                 {/* Cobrar, la acción principal, al final de la fila y pegado a la derecha. */}
                 <span className="ml-auto">
@@ -460,7 +464,9 @@ export function PantallaCuentasModo({
                         type="button"
                         onClick={() => setCancelando(it)}
                         title="Eliminar producto"
-                        className="flex-shrink-0 rounded px-2 py-1 text-13 font-semibold text-ink-3 transition hover:bg-hover hover:text-danger"
+                        // Con el ticket impreso no se quita nada hasta reabrir la cuenta.
+                        disabled={yaSeImprimio}
+                        className="flex-shrink-0 rounded px-2 py-1 text-13 font-semibold text-ink-3 transition hover:bg-hover hover:text-danger disabled:cursor-default disabled:opacity-45 disabled:hover:bg-transparent disabled:hover:text-ink-3"
                       >
                         Eliminar
                       </button>
@@ -636,6 +642,32 @@ export function PantallaCuentasModo({
           motivo="Reimpresión de ticket"
           onAutorizado={(a) => { setPidiendoPinReimpresion(false); imprimir(sel.ticketId, { autorizacionPinId: a.autorizacionPinId }); }}
           onCancelar={() => setPidiendoPinReimpresion(false)}
+        />
+      )}
+      {pidiendoPinReabrir && sel && (
+        <ModalAutorizacionPin
+          token={token}
+          accion="reabrir_cuenta_impresa"
+          permisoCodigo={PERMISO_REIMPRIMIR}
+          descripcion={`Reabrir la cuenta de ${sel.cliente ?? sel.folio ?? "la cuenta"} · ${fmtMxn(sel.total)}`}
+          ejecutaNombre={empleado.nombre}
+          monto={sel.total}
+          entidadTipo="ticket"
+          entidadId={sel.ticketId}
+          cajaId={turno.caja_id}
+          turnoId={turno.id}
+          motivo="Reabrir cuenta con ticket impreso"
+          onAutorizado={async (a) => {
+            setPidiendoPinReabrir(false);
+            try {
+              await reabrirCuentaImpresa(token, sel.ticketId, a.autorizacionPinId);
+              setYaImpresas((s) => { const n = new Set(s); n.delete(sel.ticketId); return n; });
+              await recargar();
+            } catch (e) {
+              setError(e instanceof Error ? e.message : "No se pudo reabrir la cuenta");
+            }
+          }}
+          onCancelar={() => setPidiendoPinReabrir(false)}
         />
       )}
       {clienteDe && (

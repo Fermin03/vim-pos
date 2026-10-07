@@ -42,4 +42,33 @@ describe("Modal y Escape", () => {
     await act(async () => raiz.unmount());
     contenedor.remove();
   });
+
+  it("con dos modales abiertos, Escape cierra solo el de encima", async () => {
+    // Los dos escuchan en `document`: sin un orden, una tecla cerraba el modal de arriba y
+    // también el que tenía debajo (p. ej. el PIN de supervisor sobre el diálogo que lo pidió).
+    const cerrarAbajo = vi.fn();
+    const cerrarArriba = vi.fn();
+    const contenedor = document.createElement("div");
+    document.body.appendChild(contenedor);
+    const raiz = createRoot(contenedor);
+    const arbol = (conArriba: boolean) => createElement("div", null,
+      createElement(Modal, { open: true, onClose: cerrarAbajo, title: "Abajo", children: createElement("input") }),
+      createElement(Modal, { open: conArriba, onClose: cerrarArriba, title: "Arriba", children: createElement("input") }),
+    );
+    await act(async () => { raiz.render(arbol(false)); });
+    await act(async () => { raiz.render(arbol(true)); });
+
+    const escape = () => new KeyboardEvent("keydown", { key: "Escape", bubbles: true, cancelable: true });
+    await act(async () => { document.dispatchEvent(escape()); });
+    expect(cerrarArriba).toHaveBeenCalledTimes(1);
+    expect(cerrarAbajo).not.toHaveBeenCalled();
+
+    // Cerrado el de arriba, la tecla vuelve a ser del de abajo.
+    await act(async () => { raiz.render(arbol(false)); });
+    await act(async () => { document.dispatchEvent(escape()); });
+    expect(cerrarAbajo).toHaveBeenCalledTimes(1);
+
+    await act(async () => raiz.unmount());
+    contenedor.remove();
+  });
 });

@@ -2,6 +2,7 @@
 import { LogoVim } from "@vim/ui/styles";
 import { useCallback, useEffect, useState } from "react";
 import { BotonVolver } from "./boton-volver";
+import { useEscape } from "../lib/use-escape";
 import { fmtMxn, type DatosCaja, type Turno } from "../lib/turno";
 import { type Empleado } from "../lib/supabase";
 import { listarCuentas, labelModoCuenta, type CuentaCerrada, type FiltroCuentas } from "../lib/consulta-cuentas";
@@ -55,6 +56,8 @@ export function PantallaConsultaCuentas({
   const [cancelando, setCancelando] = useState<CuentaCerrada | null>(null);
   const [cambiandoPago, setCambiandoPago] = useState<CuentaCerrada | null>(null);
   const [reabriendo, setReabriendo] = useState<CuentaCerrada | null>(null);
+  // Los modales de esta pantalla cierran con su propio Escape; sin ninguno abierto, es «Volver».
+  useEscape(onSalir);
 
   const cuentaSel = cuentas?.find((c) => c.ticketId === sel) ?? null;
   // Método actual: el detalle trae la etiqueta legible ("Efectivo"); la mapeo de vuelta al código

@@ -15,6 +15,9 @@ export interface ModalProps {
   backdropClassName?: string;
 }
 
+/** Modales abiertos, en orden de apertura: el último es el que está encima. */
+const abiertos: object[] = [];
+
 /** Modal accesible: role=dialog, aria-modal, Esc cierra, foco atrapado.
  *
  * EL FOCO SOLO SE COLOCA AL ABRIR — Y ESO COSTÓ UN BUG FEO
@@ -74,8 +77,16 @@ export function Modal({
     const campo = els.find((e) => /^(INPUT|TEXTAREA|SELECT)$/.test(e.tagName));
     (campo ?? els[0])?.focus();
 
+    const turno = {};
+    abiertos.push(turno);
+
     const onKey = (e: KeyboardEvent) => {
+      // Con dos modales abiertos (uno encima de otro) solo responde el de arriba: los dos escuchan
+      // en `document`, y sin esto una sola tecla cerraba ambos.
+      if (abiertos.at(-1) !== turno) return;
       if (e.key === "Escape") {
+        // Alguien más arriba ya la atendió (un listener en fase de captura).
+        if (e.defaultPrevented) return;
         /* Marcar la tecla como atendida NO es opcional. El POS tiene su propia pila de Escape
            en `window` (apps/pos/app/lib/use-escape.ts) que ignora las teclas ya atendidas. Sin
            esto, React aplica el cierre antes de que la tecla llegue a `window`; la pila ya no ve
@@ -101,6 +112,8 @@ export function Modal({
     document.addEventListener("keydown", onKey);
     return () => {
       document.removeEventListener("keydown", onKey);
+      const i = abiertos.indexOf(turno);
+      if (i >= 0) abiertos.splice(i, 1);
       // Solo al cerrar de verdad: devuelve el foco a lo que lo tenía antes.
       prevFocus?.focus();
     };
