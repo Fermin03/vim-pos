@@ -378,6 +378,14 @@ export function HomePos({
     return () => { vivo = false; };
   }, [lealtadActiva, ticketBdId, lealtadTicket, token, canjeVersion]);
 
+  // El canje a medias de esta cuenta, guardado en este dispositivo (lectura síncrona de
+  // localStorage). `canjeVersion` no se usa dentro: está en las dependencias para releer cada vez
+  // que termina un intento de canje, también cuando el modal solo se cierra.
+  const canjePendiente = useMemo(
+    () => (lealtadActiva && ticketBdId ? leerPendiente(almacenLocal(), ticketBdId) : null),
+    [lealtadActiva, ticketBdId, canjeVersion],
+  );
+
   const envioCarrito = carrito.envio?.costoMxn ?? 0;
   const franja = lealtadActiva && programa && clienteLealtad
     ? franjaLealtad({
@@ -386,6 +394,7 @@ export function HomePos({
         comprasHoy,
         base: baseDeLealtad(totalAutoritativo ?? calcularTotalesDisplay(carrito.lineas, 16, envioCarrito).total, envioCarrito),
         canje: canjeVivo,
+        pendiente: canjePendiente,
         online,
       })
     : null;
@@ -1611,7 +1620,9 @@ export function HomePos({
         }
         setCuentasVersion((v) => v + 1);
       }}
-      onCerrar={() => setCanjeDe(null)}
+      // Un canje que queda a medias termina con el modal cerrado, sin pasar por `onCambio`: se
+      // sube la versión también aquí para que la franja relea el pendiente.
+      onCerrar={() => { setCanjeDe(null); setCanjeVersion((v) => v + 1); }}
     />
   );
 

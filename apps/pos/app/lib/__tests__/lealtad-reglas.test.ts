@@ -115,6 +115,22 @@ describe("franja de lealtad de la cuenta", () => {
     expect(franjaLealtad({ ...base, comprasHoy: 3 }).detalle).toBe("Hoy ya no suma: tope de 3 compras al día");
   });
 
+  it("con un canje a medias se puede abrir siempre, con saldo en cero y sin conexión: hay que poder resolverlo", () => {
+    expect(franjaLealtad({ ...base, saldo: 0, online: false, pendiente: { puntos: 120 } })).toEqual({
+      saldoTexto: "0 puntos", detalle: "Canje a medias: 120 puntos", boton: "Ver canje", puedeAbrir: true,
+    });
+  });
+
+  it("si además hay un canje aplicado, manda el aplicado", () => {
+    expect(franjaLealtad({ ...base, canje: { puntos: 50 }, pendiente: { puntos: 120 } })).toEqual({
+      saldoTexto: "120 puntos", detalle: "Canje aplicado: 50 puntos", boton: "Ver canje", puedeAbrir: true,
+    });
+  });
+
+  it("sin canje a medias (null) nada cambia", () => {
+    expect(franjaLealtad({ ...base, saldo: 0, pendiente: null }).puedeAbrir).toBe(false);
+  });
+
   it("con tope de una compra al día lo dice en singular", () => {
     const uno = { ...base, programa: P({ porcentaje: 5, topeComprasDia: 1 }), comprasHoy: 1 };
     expect(franjaLealtad(uno).detalle).toBe("Hoy ya no suma: tope de 1 compra al día");

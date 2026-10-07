@@ -103,11 +103,17 @@ export function franjaLealtad(e: {
   comprasHoy: number;
   base: number;
   canje: { puntos: number } | null;
+  /** Un canje que quedó a medias en este dispositivo (ver lealtad-canje.ts). */
+  pendiente?: { puntos: number } | null;
   online: boolean;
 }): FranjaLealtad {
   const m = e.programa.mecanica;
   const saldoTexto = cantidad(m, Math.max(0, e.saldo));
   if (e.canje) return { saldoTexto, detalle: `Canje aplicado: ${cantidad(m, e.canje.puntos)}`, boton: "Ver canje", puedeAbrir: true };
+  // Un canje a medias SIEMPRE deja abrir Lealtad, sin conexión y con saldo en cero: el cobro se
+  // niega mientras exista, y si el botón se apagara (el cliente canjeó todo su saldo y la nube ya lo
+  // descontó) la cuenta no se podría ni resolver ni cobrar.
+  if (e.pendiente) return { saldoTexto, detalle: `Canje a medias: ${cantidad(m, e.pendiente.puntos)}`, boton: "Ver canje", puedeAbrir: true };
   if (!e.online) return { saldoTexto, detalle: "Canje no disponible sin conexión", boton: "Canjear", puedeAbrir: false };
   const tope = e.programa.topeComprasDia;
   const gana = puntosPorCompra(e.programa, e.base);
