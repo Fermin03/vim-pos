@@ -2,5 +2,5 @@
   "name": "@vim/config",
   "version": "0.0.0",
   "private": true,
-  "files": ["tailwind-preset.js", "tsconfig.base.json"]
+  "files": ["tailwind-preset.js", "tsconfig.base.json", "cabeceras-seguridad.mjs"]
 }
