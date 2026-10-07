@@ -3696,6 +3696,10 @@ Con el camino elegido, concede el add-on a mano al negocio de pruebas (`tenant_a
 | 16 | Cobras e imprimes | La hamburguesa de premio sale en $0.00; el ticket **no** trae el QR de factura |
 | 17 | Intentas facturar ese folio en el portal de autofactura y desde el admin | Portal: «Esta compra incluye un premio de lealtad y no se puede facturar de forma individual.» Admin: el mismo motivo |
 | 18 | Cobras una cuenta con canje de puntos por dinero | Su ticket sí trae el QR y se factura normal |
+| 19 | Dejas un canje a medias (corta la red justo al canjear y cierra el modal) y tocas Cobrar, en la captura y desde la lista | Aviso «Hay un canje a medias»; el cobro no abre ni se abre el cajón. Tras Reintentar o descartar en Lealtad, cobra normal |
+| 20 | Canjeas desde un segundo dispositivo sobre la misma mesa y cobras en el primero, sin recargar | Cobra con el total correcto (el de la base, con el canje) y NO quita el canje |
+| 21 | Venta rápida de Para llevar (sin mesa): con cliente asignado, canjeas un premio desde la captura | El carrito se reconstruye con el premio dentro; la cuenta sigue siendo la misma |
+| 22 | Canjeas un premio desde la lista de cuentas | Cocina recibe la comanda del producto de premio |
 
 Anota cada desviación. Lo que no coincida se arregla antes de pedir revisión.
 

@@ -158,7 +158,9 @@ Cerrado en 1B (POS):
   sin el canje.
 - **Canje de dinero recortado:** antes de cobrar, si la cuenta bajó por debajo de lo canjeado, el
   POS quita el canje completo (los puntos vuelven) y avisa.
-- **Antes de cobrar** la revisión del canje recortado corre siempre que el módulo está activo, en la captura y en la lista de cuentas; si quita un canje, avisa y no abre el cobro.
+- **Antes de cobrar** corre una sola revisión (`revisarLealtadAntesDeCobrar`, en `apps/pos/app/lib/lealtad-cobro.ts`) siempre que el módulo está activo, igual en la captura que en la lista de cuentas. Decide con los totales recién leídos de la base, no con los de la pantalla; si quita un canje, avisa y no abre el cobro.
+- **No se cobra una cuenta con un canje a medias**: la revisión antes de cobrar lo avisa («Hay un canje a medias») y no abre el cobro ni el cajón; se termina con Reintentar o se descarta desde Lealtad. Al cobrar una cuenta se limpia su pendiente guardado.
+- **Una respuesta 2xx sin `ok: true`** de `lealtad-canje` se trata como ambigua (`RESPUESTA_INVALIDA`), no como rechazo: el canje queda a medias y se reintenta, en vez de darse por «no descontado».
 - **Un renglón premiado no se edita** desde el POS; para cambiarlo se quita el canje. Cancelarlo sí
   se puede: la base devuelve los puntos.
 - **Con un canje aplicado no se cambia al cliente** de la cuenta.
@@ -175,11 +177,17 @@ Cerrado en 1B (POS):
   así lo que el cliente pagó queda amparado. La cuenta que es solo el premio ($0) queda fuera de la
   global. El canje de puntos por dinero se factura como siempre. Conviene que el contador del
   negocio lo confirme antes de encender premios en un negocio que factura mucho.
+- **`timbrar-cfdi` revisa el premio antes de timbrar**: el candado de la 0158 solo actúa al crear el borrador, así que un borrador viejo de una cuenta que después recibió un premio podía llegar al PAC. Ahora la función pregunta `ticket_lleva_premio` antes de leer los renglones y de gastar folio, y contesta 409 `CON_PREMIO`.
 
 Sigue abierto:
 
-- **`timbrar-cfdi` no mira el premio**: acepta un borrador viejo por su id. Si una cuenta con un intento fallido de factura se reabre, gana un premio y se vuelve a cobrar, ese borrador viejo podría timbrarse. El candado de la 0158 solo actúa al crear el borrador.
-- **Un canje revertido en una cuenta ya cobrada** (lo puede hacer la conciliación de 48 h) deja de contar como premio para la factura, aunque su renglón siga en $0.
+- **Un canje revertido en una cuenta ya cobrada** (lo puede hacer la conciliación de 48 h) deja de contar como premio para la factura, aunque su renglón siga en $0. **Condición para encender premios (1C):** que `ticket_lleva_premio` siga contando un premio revertido DESPUÉS del pago.
+- **El canje a medias se guarda por dispositivo** (`localStorage`): otra caja no lo ve, y desde ella esa cuenta se cobra sin aviso.
+- **El botón Canjear de la franja se apaga con el saldo LOCAL**, que en una caja puede ir atrasado respecto a la nube (puntos ganados en otra sucursal que el pull aún no baja).
+- **La reimpresión de una cuenta cobrada que no tuvo movimientos propios** (no alcanzó la compra mínima, tope del día, pedido de app) muestra el saldo de hoy, no el del papel original; y en la caja «Tu saldo» es la copia local, que puede no ser la de la nube.
+- **Al imprimir, `modulos_efectivos` y `ticket_lleva_premio` se consultan aunque el negocio nunca encienda la lealtad**: una o dos lecturas por ticket.
+- **Tras canjear desde la lista de cuentas, la lista se recarga y pierde la cuenta seleccionada.**
+- **Orden de salida:** la 0156 es prerrequisito DURO del POS web. Sin ella toda cuenta falla al leer `tickets.lealtad_mxn`. Antes de desplegar el POS hay que verificarla (`select lealtad_mxn from tickets limit 1`). El plan 1C debe repetir ese cuidado en el orden hub → cajas.
 - **No hay ESLint configurado en `apps/pos`**: las dependencias de los hooks nuevos se revisaron a mano.
 - **La interfaz no se ha visto funcionar**: no hay pruebas de componentes y la prueba manual de la Tarea 12 del plan 1B está pendiente.
 - **Una cuenta con productos de varias tasas de IVA y un premio** puede dejar en cero, dentro de la
