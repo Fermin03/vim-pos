@@ -261,7 +261,7 @@ END $$;
 --    que se salta RLS por completo), puede crear y leer SU zona de envío; la de otro negocio no
 --    se ve (cero filas, no error). Esto es justo lo que protege el alta de zonas_envio desde la
 --    caja (Tarea 6): un GRANT o una política rotos aquí truenan en producción y ningún smoke que
---    corra como postgres los vería. Patrón: supabase/scripts/rls_venta.sql.
+--    corra como postgres los vería. Patrón: supabase/scripts/smoke_rls_venta.sql.
 DO $$
 DECLARE
   v_ajeno      uuid := '99999999-0000-0000-0000-0000000000ff';
