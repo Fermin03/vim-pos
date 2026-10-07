@@ -39,9 +39,11 @@ export function precioAltaAddon(codigo: string, planCodigo: string | undefined, 
 }
 
 /**
- * Los planes que traen delivery sin cargo. Es una lista explícita y no un "todos menos Esencial"
- * para que un plan nuevo no se regale solo: darlo de alta aquí es un gesto deliberado de dos
- * segundos, y mientras tanto el panel cobra, que es el lado recuperable del error.
+ * Los planes que traen sin cargo los add-ons de `INCLUIDOS_DESDE_NEGOCIO` (delivery y lealtad): los
+ * mismos códigos que la base marca con `delivery_incluido` (0141) y `lealtad_incluido` (0156). Es
+ * una lista explícita y no un "todos menos Esencial" para que un plan nuevo no se regale solo:
+ * darlo de alta aquí es un gesto deliberado de dos segundos, y mientras tanto el panel cobra, que
+ * es el lado recuperable del error.
  */
 const PLANES_QUE_LO_INCLUYEN = new Set(["NEGOCIO", "CADENA", "FT", "QS", "CB", "FS", "DK", "ENT"]);
 

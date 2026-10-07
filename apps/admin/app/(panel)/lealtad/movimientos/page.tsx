@@ -19,8 +19,8 @@ const fmtFecha = (iso: string) =>
   new Date(iso).toLocaleString("es-MX", { timeZone: "America/Mexico_City", day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" });
 
 type Filtros = { desde: string; hasta: string; sucursalId: string | null; tipo: TipoMov | "TODOS"; busqueda: string };
-/** Lo que se ve en la tabla: las filas y la página a la que pertenecen (no la que se pidió después). */
-type Libro = { filas: MovimientoLibro[]; total: number; pagina: number };
+/** Lo que se ve en la tabla: las filas, y la página y los filtros con que se leyeron (no los que se pidieron después). */
+type Libro = { filas: MovimientoLibro[]; total: number; pagina: number; filtros: Filtros };
 
 export default function MovimientosLealtadPage() {
   const inicial = rangoPorDefecto();
@@ -66,21 +66,26 @@ export default function MovimientosLealtadPage() {
     const n = ++consultaLibro.current;
     setCargandoLibro(true);
     listarMovimientos({ ...filtros, pagina })
-      .then((r) => { if (n === consultaLibro.current) { setLibro({ ...r, pagina }); setErrorLibro(null); } })
+      .then((r) => { if (n === consultaLibro.current) { setLibro({ ...r, pagina, filtros }); setErrorLibro(null); } })
       .catch((e) => {
         if (n !== consultaLibro.current) return;
         setErrorLibro(mensajeLealtad(e, "No se pudieron leer los movimientos"));
         // Que el botón y el contador sigan en la página de las filas que se ven. El efecto depende de
         // `pagina`, así que el cambio lo reejecuta una vez, pero la consulta que lanza es la de esa
         // página ya leída y sale bien o termina en este mismo catch con `pagina` igual: no hay bucle.
-        setPagina((p) => (libroVisto.current && libroVisto.current.pagina !== p ? libroVisto.current.pagina : p));
+        // Solo si lo que se ve se leyó con ESTOS filtros (el mismo objeto): tras un «Aplicar» que falla,
+        // regresar a la página N relanzaría la consulta con los filtros nuevos en una página que nadie pidió.
+        const visto = libroVisto.current;
+        if (visto && visto.filtros === filtros) setPagina((p) => (visto.pagina !== p ? visto.pagina : p));
       })
       .finally(() => { if (n === consultaLibro.current) setCargandoLibro(false); });
   }, [filtros, pagina]);
 
   const hoy = hoyMexico();
   const errorRango = errorDeRango(borrador.desde, borrador.hasta, hoy);
-  const aplicar = () => { if (!errorRango) { setPagina(1); setFiltros(borrador); } };
+  // Copia nueva en cada «Aplicar»: con la misma referencia React no relanza el efecto y, tras un
+  // fallo, volver a pulsar con los mismos filtros no reintentaba.
+  const aplicar = () => { if (!errorRango) { setPagina(1); setFiltros({ ...borrador }); } };
   const paginas = libro ? Math.max(1, Math.ceil(libro.total / MOVS_POR_PAGINA)) : 1;
   const puntos = (n: number) => cantidad(mecanica, n);
 

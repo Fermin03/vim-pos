@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Button, DialogoPeligro, Modal } from "@vim/ui/styles";
 import { cantidad, type Mecanica } from "@vim/db/lealtad";
 import { PageBody, PageHeader } from "../../../components/page-header";
@@ -30,13 +30,23 @@ export default function PremiosLealtadPage() {
   const [error, setError] = useState<string | null>(null);
   /** Mensaje si no se pudo leer el programa (distinto de «todavía no hay programa»). */
   const [falloPrograma, setFalloPrograma] = useState<string | null>(null);
+  /** Mensaje si la lista de premios no se ha podido leer NI UNA vez (distinto de «no hay premios»). */
+  const [falloPremios, setFalloPremios] = useState<string | null>(null);
+  const premiosLeidos = useRef(false);
+  /** Sube con cada «Reintentar» para volver a leer. */
+  const [intento, setIntento] = useState(0);
 
   async function recargar() {
     try {
       setPremios(await listarPremios());
+      premiosLeidos.current = true;
+      setFalloPremios(null);
     } catch (e) {
-      setError(mensajeLealtad(e, "No se pudieron leer los premios"));
-      setPremios((prev) => prev ?? []);
+      const mensaje = mensajeLealtad(e, "No se pudieron leer los premios");
+      // Si ya había una lista, se queda la anterior con el aviso arriba. Si nunca se leyó, `premios`
+      // sigue en null: pintar «Aún no hay premios» sería afirmar algo que no se sabe.
+      if (premiosLeidos.current) setError(mensaje);
+      else setFalloPremios(mensaje);
     }
   }
 
@@ -50,7 +60,14 @@ export default function PremiosLealtadPage() {
       });
     void recargar();
     return () => { vivo = false; };
-  }, []);
+  }, [intento]);
+
+  function reintentar() {
+    setFalloPremios(null);
+    setFalloPrograma(null);
+    setMecanica(undefined);
+    setIntento((n) => n + 1);
+  }
 
   async function nuevo() {
     if (ocupado !== null) return;
@@ -121,14 +138,20 @@ export default function PremiosLealtadPage() {
       <PageHeader
         titulo="Lealtad"
         subtitulo="Lo que tus clientes se pueden llevar."
-        right={conPremios ? <Button onClick={() => void nuevo()} disabled={ocupado !== null}>Nuevo premio</Button> : undefined}
+        right={conPremios && !falloPremios ? <Button onClick={() => void nuevo()} disabled={ocupado !== null}>Nuevo premio</Button> : undefined}
       />
       <PageBody>
         <LealtadPestanas />
 
         {error && !editando && !borrar && <p className="mb-4 text-sm font-medium text-danger" role="alert">{error}</p>}
         {falloPrograma && <p className="mb-4 text-sm font-medium text-danger" role="alert">{falloPrograma}</p>}
-        {(premios === null || mecanica === undefined) && <p className="text-sm text-ink-3">Cargando…</p>}
+        {falloPremios && (
+          <div className="mb-4" role="alert">
+            <p className="text-sm font-medium text-danger">{falloPremios}</p>
+            <button type="button" className={`${accion} mt-3`} onClick={reintentar}>Reintentar</button>
+          </div>
+        )}
+        {((premios === null && !falloPremios) || mecanica === undefined) && <p className="text-sm text-ink-3">Cargando…</p>}
 
         {mecanica === null && !falloPrograma && premios !== null && (
           <p className="max-w-[640px] rounded-lg border border-line bg-surface px-4 py-3 text-14 text-ink-2">

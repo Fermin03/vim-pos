@@ -33,6 +33,10 @@ export default function ProgramaLealtadPage() {
   /** Cambiar de mecánica borraría el saldo de estos clientes: se pide confirmación. */
   const [reinicio, setReinicio] = useState<number | null>(null);
   const [apagando, setApagando] = useState(false);
+  /** No se pudo leer el programa: no se pinta el formulario (guardarlo de fábrica pisaría el real). */
+  const [falloLectura, setFalloLectura] = useState<string | null>(null);
+  /** Sube con cada «Reintentar» para volver a leer. */
+  const [intento, setIntento] = useState(0);
 
   // El programa y el interruptor se leen de la base cada vez que se entra: el shell solo lee los
   // módulos una vez por sesión y el valor se desfasaría al volver de otra pestaña. El layout ya
@@ -46,9 +50,17 @@ export default function ProgramaLealtadPage() {
         setEncendido(enc);
         if (p) { setForm(formDePrograma(p)); setMecanicaGuardada(p.mecanica); }
       })
-      .catch((e) => { if (vivo) { setExiste(false); setError(mensajeLealtad(e, "No se pudo leer el programa")); } });
+      // Un fallo de lectura NO es «todavía no hay programa»: con `existe = false` saldría el formulario
+      // de fábrica habilitado y un Guardar sobrescribiría el programa real del negocio.
+      .catch((e) => { if (vivo) setFalloLectura(mensajeLealtad(e, "No se pudo leer el programa")); });
     return () => { vivo = false; };
-  }, []);
+  }, [intento]);
+
+  function reintentarLectura() {
+    setFalloLectura(null);
+    setExiste(undefined);
+    setIntento((n) => n + 1);
+  }
 
   const set = <K extends keyof FormPrograma>(k: K, v: FormPrograma[K]) => { setForm((f) => ({ ...f, [k]: v })); setError(null); setOk(null); };
   const ejemplo = ejemploPrograma(form);
@@ -98,7 +110,16 @@ export default function ProgramaLealtadPage() {
         {error && reinicio === null && <p className="mb-4 text-sm font-medium text-danger" role="alert">{error}</p>}
         {ok && <p className="mb-4 text-sm font-medium text-success" role="status">{ok}</p>}
 
-        {existe === undefined ? (
+        {falloLectura ? (
+          <div className="max-w-[720px] rounded-lg border border-line bg-surface p-5" role="alert">
+            <p className="text-sm font-medium text-danger">{falloLectura}</p>
+            <p className="mt-1 text-13 text-ink-2">Tu programa sigue como estaba. Revisa tu conexión y vuelve a intentar.</p>
+            <button type="button" onClick={reintentarLectura}
+              className="mt-4 h-9 rounded border border-line-strong px-3 text-13 font-semibold text-ink-2 transition hover:border-ink hover:text-ink">
+              Reintentar
+            </button>
+          </div>
+        ) : existe === undefined ? (
           <p className="text-sm text-ink-3">Cargando…</p>
         ) : (
           <>
