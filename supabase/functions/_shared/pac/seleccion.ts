@@ -6,7 +6,7 @@
 //   2. Es una decisión, no un mecanismo. Merece leerse sola.
 
 /** `NINGUNO` = no hay PAC real configurado y el mock no está permitido. */
-export type EleccionPac = "FACTURAMA" | "FACTURAPI" | "MOCK" | "NINGUNO";
+export type EleccionPac = "FACTURAMA" | "MOCK" | "NINGUNO";
 
 /** Código con el que "no hay PAC" viaja hasta quien llamó, para marcar el CFDI en ERROR. */
 export const PAC_NO_CONFIGURADO = "PAC_NO_CONFIGURADO";
@@ -14,10 +14,9 @@ export const PAC_NO_CONFIGURADO = "PAC_NO_CONFIGURADO";
 /**
  * Recibe un lector de variables en vez de leer `Deno.env`, para poder probarlo.
  *
- * EL ORDEN IMPORTA. Facturama va primero porque es el único que sirve multi-tenant: lleva el
- * emisor en el payload, así que una sola credencial timbra a nombre de cualquier cliente.
- * Facturapi deduce el emisor de su llave, de modo que con una llave global TODO saldría con
- * nuestro RFC y no con el del restaurante — por eso es respaldo y nunca principal.
+ * FACTURAMA ES EL ÚNICO PAC REAL. Sirve multi-tenant: lleva el emisor en el payload, así que una
+ * sola credencial timbra a nombre de cualquier cliente. Una `FACTURAPI_API_KEY` ya no cuenta:
+ * Facturapi deduce el emisor de su llave, y con una llave global todo saldría con nuestro RFC.
  *
  * Y EL MOCK SE PIDE. Antes era el último de la lista y entraba solo cuando faltaban credenciales.
  * El mock simula un timbrado exitoso: el CFDI quedaba TIMBRADO, se consumía un folio y el cliente
@@ -28,9 +27,6 @@ export function elegirPac(env: (clave: string) => string | undefined): EleccionP
   const usuario = (env("FACTURAMA_API_USER") ?? "").trim();
   const password = (env("FACTURAMA_API_PASSWORD") ?? "").trim();
   if (usuario && password) return "FACTURAMA";
-
-  const key = (env("FACTURAPI_API_KEY") ?? "").trim();
-  if (key) return "FACTURAPI";
 
   if ((env("PAC_PERMITIR_MOCK") ?? "").trim() === "1") return "MOCK";
 

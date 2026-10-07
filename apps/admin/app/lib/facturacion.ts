@@ -4,7 +4,7 @@ import { hoyMx } from "@vim/fecha";
 import { leerSesion, supabase } from "./supabase";
 
 // Facturación de tickets (doc 13 §CFDI). El backend completo existía (cfdi_crear_borrador,
-// timbrar-cfdi con failover multi-PAC, tickets_cfdi con RLS); esta lib es el punto de
+// timbrar-cfdi, tickets_cfdi con RLS); esta lib es el punto de
 // entrada de UI que faltaba: buscar ticket PAGADO → capturar receptor → borrador → timbrar.
 
 const SB_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!;
@@ -171,7 +171,7 @@ export async function facturarTicket(ticketId: string, receptor: ReceptorInput):
   if (eB) return { ok: false, cfdiId: null, error: eB.message };
   const id = String(cfdiId);
 
-  // Timbrar vía Edge Function (failover multi-PAC server-side).
+  // Timbrar vía Edge Function (el PAC se llama server-side).
   const res = await fetch(`${SB_URL}/functions/v1/timbrar-cfdi`, {
     method: "POST",
     headers: { apikey: SB_ANON, Authorization: `Bearer ${token}`, "Content-Type": "application/json" },

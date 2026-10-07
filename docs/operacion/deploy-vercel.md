@@ -37,7 +37,7 @@ vercel deploy --prod --yes
   `VIM_DELIVERY_INTERNO_SECRET` (autentica el aviso a `delivery-uber-conexion` cuando platform
   pausa Uber al retirarle el add-on de delivery a un tenant; tiene que coincidir con el secreto del
   mismo nombre puesto en Supabase).
-- **Edge Functions** (Supabase, no Vercel): `VIM_CORS_ORIGINS`, `FACTURAPI_API_KEY`, etc.
+- **Edge Functions** (Supabase, no Vercel): `VIM_CORS_ORIGINS`, `FACTURAMA_API_USER`, etc.
 
 ## Auto-deploy en cada commit
 Conectar cada proyecto al repo de GitHub (Settings → Git) con Root Directory ya seteado →

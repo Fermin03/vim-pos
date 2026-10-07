@@ -1,14 +1,12 @@
-// F8 / Fase 4 — Selector de PAC con REDUNDANCIA (multi-PAC).
+// F8 — Selector de PAC.
 //
-// PAC principal, en orden: Facturama si hay credenciales (el PAC elegido del proyecto), Facturapi
-// si hay API key, y mock si no hay nada.
+// Hay UN PAC real: Facturama. Es el único que sirve para multi-tenant: lleva el emisor en el
+// payload, así que una sola credencial timbra a nombre de cualquier cliente.
 //
-// Facturama va primero porque es el único que sirve para multi-tenant: lleva el emisor en el
-// payload, así que una sola credencial timbra a nombre de cualquier cliente. Facturapi deduce el
-// emisor de la llave, de modo que con una llave global TODO saldría con nuestro RFC — se conserva
-// como respaldo, no como principal.
-//
-// PAC de respaldo (opcional): env PAC_RESPALDO = "mock" | "facturapi" | "facturama".
+// No hay PAC de respaldo. Lo hubo en papel —Facturapi, nunca probado contra el servicio—, pero
+// Facturapi deduce el emisor de su llave: con una llave global TODO saldría con nuestro RFC y no
+// con el del restaurante. Un respaldo que factura a nombre de otro es peor que no tenerlo, y en
+// producción nunca estuvo configurado. Se retiró; ver `docs/decisiones/0031-...`.
 //
 // EL MOCK NO SE USA SOLO. HAY QUE PEDIRLO: env PAC_PERMITIR_MOCK = "1".
 //
@@ -21,15 +19,8 @@
 // Ahora, sin credenciales y sin permiso explícito, no se timbra: se devuelve un error normal, el
 // CFDI se marca ERROR y alguien se entera. Un despliegue al que le falta un secret falla ruidoso
 // en vez de emitir facturas falsas. Ver `docs/decisiones/0009-...`.
-//
-// Política de failover (conservadora, anti doble-timbrado):
-//   • Solo se intenta el respaldo si el principal FALLA EN TRANSPORTE (excepción/red).
-//   • Si el principal responde ok:false (rechazo de validación del SAT/PAC), NO hay
-//     failover: los mismos datos fallarían igual y reintentar en otro PAC arriesga
-//     duplicar el comprobante.
 import type { PacAdapter, PacTimbradoRequest, PacTimbradoResult } from "./tipos.ts";
 import { MockPac } from "./mock.ts";
-import { FacturapiPac } from "./facturapi.ts";
 import { FacturamaPac } from "./facturama.ts";
 
 /* La decisión de qué PAC toca vive en `seleccion.ts`: no importa nada, así que se puede probar
@@ -62,24 +53,6 @@ export function obtenerFacturama(): FacturamaPac | null {
   return c ? new FacturamaPac(c.usuario, c.password, c.base) : null;
 }
 
-function construir(nombre: string | undefined): PacAdapter | null {
-  switch ((nombre ?? "").toLowerCase()) {
-    case "facturama": {
-      const c = credencialesFacturama();
-      return c ? new FacturamaPac(c.usuario, c.password, c.base) : null;
-    }
-    case "facturapi": {
-      const key = Deno.env.get("FACTURAPI_API_KEY");
-      return key && key.length > 0 ? new FacturapiPac(key) : null;
-    }
-    case "mock":
-      // También aquí: `PAC_RESPALDO=mock` no basta para colar el mock en producción.
-      return elegir((k) => Deno.env.get(k)) === "MOCK" ? new MockPac() : null;
-    default:
-      return null;
-  }
-}
-
 /** El PAC que toca, o `null` si no hay ninguno utilizable (ver `elegirPac`). */
 export function obtenerPac(): PacAdapter | null {
   switch (elegir((k) => Deno.env.get(k))) {
@@ -87,8 +60,6 @@ export function obtenerPac(): PacAdapter | null {
       const c = credencialesFacturama()!;
       return new FacturamaPac(c.usuario, c.password, c.base);
     }
-    case "FACTURAPI":
-      return new FacturapiPac(Deno.env.get("FACTURAPI_API_KEY")!);
     case "MOCK":
       return new MockPac();
     case "NINGUNO":
@@ -96,15 +67,14 @@ export function obtenerPac(): PacAdapter | null {
   }
 }
 
-export function obtenerPacRespaldo(principal: PacAdapter): PacAdapter | null {
-  const respaldo = construir(Deno.env.get("PAC_RESPALDO"));
-  if (!respaldo || respaldo.nombre === principal.nombre) return null;
-  return respaldo;
-}
-
 export type ResultadoTimbradoMulti = PacTimbradoResult & { pacUsado: string; failover: boolean };
 
-/** Timbra con el principal; si falla EN TRANSPORTE y hay respaldo configurado, reintenta con él. */
+/**
+ * Timbra con el PAC que toca. Si el PAC falla en transporte, la excepción sube a quien llamó.
+ *
+ * El nombre y el campo `failover` (ya siempre `false`) se conservan porque los tres handlers de
+ * timbrado los leen y los registran; no hay un segundo PAC al que conmutar.
+ */
 export async function timbrarConFailover(req: PacTimbradoRequest): Promise<ResultadoTimbradoMulti> {
   const principal = obtenerPac();
 
@@ -123,15 +93,8 @@ export async function timbrarConFailover(req: PacTimbradoRequest): Promise<Resul
     };
   }
 
-  try {
-    const r = await principal.timbrar(req);
-    return { ...r, pacUsado: principal.nombre, failover: false };
-  } catch (e) {
-    const respaldo = obtenerPacRespaldo(principal);
-    if (!respaldo) throw e;
-    const r = await respaldo.timbrar(req);
-    return { ...r, pacUsado: respaldo.nombre, failover: true };
-  }
+  const r = await principal.timbrar(req);
+  return { ...r, pacUsado: principal.nombre, failover: false };
 }
 
 export type { PacAdapter, PacTimbradoRequest, PacTimbradoResult } from "./tipos.ts";
