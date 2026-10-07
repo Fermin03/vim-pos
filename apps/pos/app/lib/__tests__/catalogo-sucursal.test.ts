@@ -5,7 +5,7 @@ import { aplicarSucursal, menuVisible, type FilaProductoSucursal } from "../cata
 // Mismos casos que 0036_menu_por_sucursal.test.sql y que menu-uber.test.ts: la regla vive en tres lugares.
 const prod = (id: string, precio: number, categoria_id: string, extra: Partial<Producto> = {}): Producto => ({
   id, nombre: id, descripcion: null, precio_base_mxn: precio, categoria_id, agotado: false, esCombo: false, seVendeAqui: true,
-  sku: null, tasaIva: 16, ivaIncluido: true, claveSat: null, unidadSat: null, categoriaNombre: null, ...extra,
+  ...extra,
 });
 const fila = (producto_id: string, extra: Partial<FilaProductoSucursal> = {}): FilaProductoSucursal => ({
   producto_id, disponible: true, precio_mxn: null, agotado_manual: false, agotado_automatico: false, ...extra,
