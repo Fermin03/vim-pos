@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { cadenciaEspejo, cursorPedido, respuestaSinModulo, unirPedidos, REPOSO_MS, NORMAL_MS, RAPIDA_MS } from "./espejo.ts";
+import { alcanceEspejo, cadenciaEspejo, cursorPedido, respuestaSinModulo, unirPedidos, REPOSO_MS, NORMAL_MS, RAPIDA_MS } from "./espejo.ts";
 
 test("sin conexiones, la caja sondea en reposo: este cliente no vende por apps", () => {
   assert.equal(cadenciaEspejo({ conexiones: [], pedidosVivos: [] }), REPOSO_MS);
@@ -95,4 +95,48 @@ test("sin módulo: respuesta vacía y a reposo", () => {
   assert.equal(r.siguiente_en_ms, REPOSO_MS);
   assert.equal(r.caja_id, "caja-1");
   assert.equal(r.sucursal_id, "suc-1");
+});
+
+// ── Tienda en línea (0161 §6) ────────────────────────────────────────────────
+
+test("con la tienda viva y sin conexiones de apps, ritmo normal: la ventana de 90 s de caja lista lo necesita", () => {
+  assert.equal(cadenciaEspejo({ conexiones: [], pedidosVivos: [], tienda: true }), NORMAL_MS);
+});
+
+test("la tienda apagada no saca a la caja del reposo", () => {
+  assert.equal(cadenciaEspejo({ conexiones: [], pedidosVivos: [], tienda: false }), REPOSO_MS);
+});
+
+test("un pedido RECIBIDO manda sobre la tienda: ritmo rápido", () => {
+  assert.equal(cadenciaEspejo({ conexiones: [], pedidosVivos: [{ estado: "RECIBIDO" }], tienda: true }), RAPIDA_MS);
+});
+
+test("alcance: solo apps, como hasta hoy", () => {
+  assert.deepEqual(alcanceEspejo({ efectivos: { delivery_apps: true }, cuerpo: {} }),
+    { conApps: true, conTienda: false, canales: ["APP"], turnoAbierto: false });
+});
+
+test("alcance: una caja que no declara entender la tienda no recibe sus pedidos aunque el módulo esté encendido", () => {
+  assert.deepEqual(alcanceEspejo({ efectivos: { delivery_apps: true, tienda: true }, cuerpo: {} }),
+    { conApps: true, conTienda: false, canales: ["APP"], turnoAbierto: false });
+});
+
+test("alcance: caja nueva con tienda y apps recibe los dos canales", () => {
+  assert.deepEqual(alcanceEspejo({ efectivos: { delivery_apps: true, tienda: true }, cuerpo: { tienda: true, turno_abierto: true } }),
+    { conApps: true, conTienda: true, canales: ["APP", "TIENDA"], turnoAbierto: true });
+});
+
+test("alcance: tienda sin apps", () => {
+  assert.deepEqual(alcanceEspejo({ efectivos: { tienda: true }, cuerpo: { tienda: true } }),
+    { conApps: false, conTienda: true, canales: ["TIENDA"], turnoAbierto: false });
+});
+
+test("alcance: la caja dice que entiende la tienda pero el negocio no la tiene", () => {
+  assert.deepEqual(alcanceEspejo({ efectivos: {}, cuerpo: { tienda: true, turno_abierto: true } }),
+    { conApps: false, conTienda: false, canales: [], turnoAbierto: true });
+});
+
+test("alcance: solo un true estricto cuenta; un cuerpo raro no abre nada", () => {
+  assert.deepEqual(alcanceEspejo({ efectivos: { tienda: true }, cuerpo: { tienda: "true", turno_abierto: 1 } }),
+    { conApps: false, conTienda: false, canales: [], turnoAbierto: false });
 });
