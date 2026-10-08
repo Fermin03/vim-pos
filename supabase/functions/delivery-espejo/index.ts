@@ -9,7 +9,8 @@
 //     pedidos corriendo — así se cambia el ritmo de la flota sin publicar un instalador;
 //   · el agente manda `desde` y solo recibe lo que cambió después de ese instante;
 //   · la consulta perdió el `OR` que la obligaba a recorrer la tabla entera. Son tres filtros
-//     simples, cada uno con su índice (migración 0110).
+//     simples, cada uno con su índice (migración 0110). Desde la tienda en línea (0161) hay hasta
+//     cuatro consultas por sondeo: la cuarta, la de `tienda_sucursales`, solo si la caja declara la tienda.
 import { clienteAdmin, servir } from "../_shared/http.ts";
 import { bearerDe, claimsDe } from "../_shared/identidad.ts";
 import { registrarError } from "../_shared/errores.ts";
@@ -57,16 +58,22 @@ servir(async (req, json) => {
   // Latido y verificación de la caja en un solo viaje: si no vuelve fila, la caja no existe, no es
   // de este tenant o está desactivada. Con esto el webhook sabe que hay una caja instalada viva.
   const { data: cajaData } = await admin.from("cajas")
-    // El turno abierto se sella junto al latido: la tienda en línea solo recibe pedidos con las
-    // dos cosas frescas (sucursal_recibe_pedidos, mig. 0161). Una caja que no manda el dato queda en false.
-    .update({ espejo_apps_at: new Date().toISOString(), espejo_turno_abierto: cuerpo.turno_abierto === true })
+    // Una caja que no declara la tienda manda el mismo UPDATE de siempre: así esta función no
+    // depende de la migración 0161 para las cajas que hoy están en servicio (si el despliegue
+    // llegara antes, un UPDATE con la columna nueva fallaría y toda caja recibiría CAJA_NO_EXISTE).
+    // La que sí la declara sella el turno abierto junto al latido, que es lo que lee
+    // sucursal_recibe_pedidos (mig. 0161): la tienda solo recibe pedidos con las dos cosas frescas.
+    .update({
+      espejo_apps_at: new Date().toISOString(),
+      ...(cuerpo.tienda === true && { espejo_turno_abierto: cuerpo.turno_abierto === true }),
+    })
     .eq("id", cajaId).eq("tenant_id", tenantId).eq("activa", true).is("deleted_at", null)
     .select("id, sucursal_id").maybeSingle();
   const caja = cajaData as { id: string; sucursal_id: string } | null;
   if (!caja) return json({ error: "CAJA_NO_EXISTE" }, 403);
 
   // Guard del módulo: el dueño tiene que haberlo encendido, no solo que VIM se lo haya concedido
-  // (por eso se lee `efectivos`, no `permitidos`). Va aquí, ANTES de las tres consultas de abajo,
+  // (por eso se lee `efectivos`, no `permitidos`). Va aquí, ANTES de las consultas de abajo,
   // para que una caja que todavía no se enteró de que perdió el módulo —o que nunca se
   // actualice— deje de costarle a la base ni una lectura en cuanto se apague el módulo, sin
   // publicar un instalador (una caja rota no se auto-actualiza y el parque no se mueve en bloque).
