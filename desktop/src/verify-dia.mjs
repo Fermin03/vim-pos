@@ -2,6 +2,7 @@
 // device sign-in → pin-login → abrir turno → venta → reporte X → arqueo → reporte Z → CERRADO.
 // Prueba que abrir/cerrar turno y el corte de caja funcionan 100% offline por el gateway.
 import { startBackend } from "./backend.mjs";
+import { entrarComoCajero } from "./verify-sesion.mjs";
 
 const GW_PORT = 54350;
 const GW = `http://localhost:${GW_PORT}`;
@@ -28,14 +29,9 @@ try {
   backend = await startBackend({ gatewayPort: GW_PORT, log: () => {} });
 
   // 1) Auth device + empleado (por el gateway)
-  const dev = await api("POST", `/auth/v1/token?grant_type=password`, "x", { email: DEVICE_EMAIL, password: DEVICE_PASS });
-  const dtok = dev.access_token;
-  const tenant = dev.user.app_metadata.tenant_id;
-  const cajero = (await api("GET", `/rest/v1/usuarios_acceso?select=usuario_id,rol:roles(codigo)&activo=eq.true`, dtok)).find((a) => a.rol?.codigo === "CAJERO").usuario_id;
-  const emp = await api("POST", `/functions/v1/pin-login`, dtok, { usuario_id: cajero, pin: "1234", caja_id: CAJA });
-  const tok = emp.access_token;
+  const { tenant, cajeroId: cajero, token: tok, nombre } = await entrarComoCajero(GW, { email: DEVICE_EMAIL, password: DEVICE_PASS, caja: CAJA });
   const suc = (await api("GET", `/rest/v1/cajas?id=eq.${CAJA}&select=sucursal_id,numero`, tok))[0];
-  console.log(`· login device + cajero "${emp.usuario.nombre}"`);
+  console.log(`· login device + cajero "${nombre}"`);
 
   // Cerrar turnos abiertos previos (por conexión directa, con fecha_cierre) para partir limpio.
   await backend.pool.query("UPDATE turnos SET estado='CERRADO', fecha_cierre=now() WHERE caja_id=$1 AND estado='ABIERTO'", [CAJA]);
