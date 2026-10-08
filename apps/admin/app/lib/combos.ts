@@ -1,6 +1,7 @@
 "use client";
 import { z } from "zod";
-import { supabase, leerSesion } from "./supabase";
+import { supabase } from "./supabase";
+import { borrarSuave, tenantId } from "./datos";
 import type { EstadoProducto } from "./catalogo";
 import { estadoGeneral } from "./menu-sucursal";
 import type { FilaDeMenu } from "./menus";
@@ -13,11 +14,6 @@ export const MODO_PRECIO = {
 } as const;
 export type ModoPrecio = keyof typeof MODO_PRECIO;
 
-async function tenantId(): Promise<string> {
-  const s = await leerSesion();
-  if (!s?.tenantId) throw new Error("Sesión sin tenant");
-  return s.tenantId;
-}
 const r2 = (n: number): number => Math.round(n * 100) / 100;
 
 // ── Combos (productos con es_combo) ──────────────────────────────────────────
@@ -164,10 +160,7 @@ export async function reordenarSlots(ids: string[]): Promise<void> {
   }
 }
 
-export async function eliminarSlot(id: string): Promise<void> {
-  const { error } = await supabase.from("combo_grupos").update({ deleted_at: new Date().toISOString() }).eq("id", id);
-  if (error) throw new Error(error.message);
-}
+export const eliminarSlot = (id: string): Promise<void> => borrarSuave("combo_grupos", id);
 
 // ── Opciones ─────────────────────────────────────────────────────────────────
 export const opcionSchema = z.object({
@@ -215,10 +208,7 @@ export async function guardarOpcion(slotId: string, productoId: string, input: O
   if (error) throw new Error(error.message);
 }
 
-export async function eliminarOpcion(id: string): Promise<void> {
-  const { error } = await supabase.from("combo_opciones").update({ deleted_at: new Date().toISOString() }).eq("id", id);
-  if (error) throw new Error(error.message);
-}
+export const eliminarOpcion = (id: string): Promise<void> => borrarSuave("combo_opciones", id);
 
 // ── Precio (misma fórmula que apps/pos/app/lib/combos.ts: prueba de paridad) ─
 export type SlotConOpciones = {

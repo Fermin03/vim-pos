@@ -1,6 +1,7 @@
 "use client";
 import { z } from "zod";
-import { supabase, leerSesion } from "./supabase";
+import { supabase } from "./supabase";
+import { borrarSuave, tenantId } from "./datos";
 
 // Paleta funcional de categorías (del design system; NUNCA el naranja de marca).
 export const COLORES: { hex: string; bg: string }[] = [
@@ -71,12 +72,6 @@ export async function listarCategorias(): Promise<Categoria[]> {
   }));
 }
 
-async function tenantId(): Promise<string> {
-  const s = await leerSesion();
-  if (!s?.tenantId) throw new Error("Sesión sin tenant");
-  return s.tenantId;
-}
-
 export async function crearCategoria(input: CategoriaInput): Promise<void> {
   const datos = categoriaSchema.parse(input);
   const tid = await tenantId();
@@ -134,13 +129,7 @@ export async function reordenarCategorias(lista: { id: string; orden_visualizaci
 }
 
 /** Soft delete (set deleted_at). El POS y la lista filtran deleted_at IS NULL. */
-export async function eliminarCategoria(id: string): Promise<void> {
-  const { error } = await supabase
-    .from("categorias")
-    .update({ deleted_at: new Date().toISOString() })
-    .eq("id", id);
-  if (error) throw new Error(error.message);
-}
+export const eliminarCategoria = (id: string): Promise<void> => borrarSuave("categorias", id);
 
 // ── Categorías (versión simple para selects) ─────────────────────────────────
 export type CategoriaOpcion = { id: string; nombre: string };
@@ -357,13 +346,7 @@ export async function actualizarProducto(id: string, input: ProductoInput): Prom
   if (error) throw new Error(error.message);
 }
 
-export async function eliminarProducto(id: string): Promise<void> {
-  const { error } = await supabase
-    .from("productos")
-    .update({ deleted_at: new Date().toISOString() })
-    .eq("id", id);
-  if (error) throw new Error(error.message);
-}
+export const eliminarProducto = (id: string): Promise<void> => borrarSuave("productos", id);
 
 export function precioMxn(n: number): string {
   return n.toLocaleString("es-MX", { style: "currency", currency: "MXN" });

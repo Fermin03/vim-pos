@@ -1,15 +1,11 @@
 "use client";
-import { supabase, leerSesion } from "./supabase";
+import { supabase } from "./supabase";
+import { tenantId } from "./datos";
 import { convertirCantidad, type Conversion, type UnidadDetalle } from "./recetas";
 
 // Compras a proveedores (ADR 0012, spec 2026-09-03 §4.1, §4.2, §7.3). La parte pura (resolver
 // líneas y totales) se prueba con vitest; el resto son llamadas a los RPC y a las tablas.
 
-async function tenantId(): Promise<string> {
-  const s = await leerSesion();
-  if (!s?.tenantId) throw new Error("Sesión sin tenant");
-  return s.tenantId;
-}
 const num = (v: unknown) => Number(v ?? 0);
 const S = (v: unknown) => (v == null ? "" : String(v));
 const opc = (v: unknown) => (v == null || v === "" ? null : String(v));

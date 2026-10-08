@@ -1,6 +1,7 @@
 "use client";
 import { z } from "zod";
-import { supabase, leerSesion } from "./supabase";
+import { supabase } from "./supabase";
+import { borrarSuave, tenantId } from "./datos";
 
 /**
  * Zonas de envío por sucursal (0116_zonas_envio): a qué colonias reparte cada sucursal y cuánto
@@ -11,12 +12,6 @@ import { supabase, leerSesion } from "./supabase";
  * aquí no se usa: tickets y direcciones de cliente apuntan a la zona, así que la baja es lógica
  * (`deleted_at`) para no romper esas referencias ni el historial.
  */
-
-async function tenantId(): Promise<string> {
-  const s = await leerSesion();
-  if (!s?.tenantId) throw new Error("Sesión sin tenant");
-  return s.tenantId;
-}
 
 const S = (v: unknown) => (v == null ? "" : String(v));
 
@@ -89,13 +84,7 @@ export async function setActivaZona(id: string, activa: boolean): Promise<void> 
 }
 
 /** Baja lógica: tickets y direcciones de cliente siguen apuntando a la zona. */
-export async function eliminarZona(id: string): Promise<void> {
-  const { error } = await supabase
-    .from("zonas_envio")
-    .update({ deleted_at: new Date().toISOString(), activa: false })
-    .eq("id", id);
-  if (error) throw new Error(error.message);
-}
+export const eliminarZona = (id: string): Promise<void> => borrarSuave("zonas_envio", id, { activa: false });
 
 /** El choque del índice único llega como jerga de Postgres; aquí se dice lo que pasó. */
 function traducir(mensaje: string): string {
