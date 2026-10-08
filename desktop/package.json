@@ -43,7 +43,7 @@
     "pg": "^8.23.1"
   },
   "devDependencies": {
-    "electron": "^43.7.7",
+    "electron": "^44.5.1",
     "electron-builder": "^26.15.3"
   },
   "build": {
