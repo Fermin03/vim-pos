@@ -13,7 +13,7 @@ import {
 } from "../lib/descuento";
 import { autorizacionPropia, type Autorizacion, type PayloadAutorizacion } from "../lib/autorizacion";
 import { ModalAutorizacionPin } from "./modal-autorizacion-pin";
-import { AvisoAutorizacion } from "./motivo-y-autorizacion";
+import { AvisoAutorizacion, etiquetaMotivo, MotivoChips } from "./motivo-y-autorizacion";
 
 // Descuento por ítem (F6.5): el cajero ajusta UN ítem del ticket persistido. Override de precio
 // requiere un permiso más alto. Roles con permiso de descuento/override por defecto (§2.2).
@@ -63,10 +63,7 @@ export function ModalDescuentoItem({
   const nuevoTotal = Math.max(0, Math.round((totalItem - descuento) * 100) / 100);
   const tienePermiso = ROLES_DESCUENTO.includes(empleado.rol);
 
-  function labelMotivo(): string {
-    if (motivo === "OTRO") return motivoTexto.trim() || "Otro";
-    return MOTIVOS.find((m) => m.codigo === motivo)?.label ?? motivo;
-  }
+  const labelMotivo = () => etiquetaMotivo(MOTIVOS, motivo, motivoTexto);
 
   function payload(): PayloadAutorizacion {
     return {
@@ -176,19 +173,9 @@ export function ModalDescuentoItem({
         </div>
       )}
 
-      <div className="mb-1.5 text-13 font-medium text-ink-2">Motivo</div>
-      <div className="mb-3 flex flex-wrap gap-2">
-        {MOTIVOS.map((m) => (
-          <button key={m.codigo} type="button" onClick={() => setMotivo(m.codigo)}
-            className={["rounded-full border px-3 py-1.5 text-13 font-semibold transition", motivo === m.codigo ? "border-ink bg-ink text-white" : "border-line-strong text-ink-2 hover:border-ink"].join(" ")}>
-            {m.label}
-          </button>
-        ))}
+      <div className="mb-3">
+        <MotivoChips opciones={MOTIVOS} valor={motivo} onCambiar={setMotivo} texto={motivoTexto} onTexto={setMotivoTexto} />
       </div>
-      {motivo === "OTRO" && (
-        <input className={`${input} mb-3`} value={motivoTexto} maxLength={200}
-          onChange={(e) => setMotivoTexto(e.target.value)} placeholder="Describe el motivo" />
-      )}
 
       <div className="mb-4"><AvisoAutorizacion propia={tienePermiso} /></div>
 

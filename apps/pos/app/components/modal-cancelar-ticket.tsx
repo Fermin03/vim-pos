@@ -5,7 +5,7 @@ import { type Empleado } from "../lib/supabase";
 import { cancelarTicket, MOTIVOS_TICKET, type MotivoTicket } from "../lib/cancelacion";
 import { autorizacionPropia, type Autorizacion, type PayloadAutorizacion } from "../lib/autorizacion";
 import { ModalAutorizacionPin } from "./modal-autorizacion-pin";
-import { AvisoAutorizacion, MotivoChips } from "./motivo-y-autorizacion";
+import { AvisoAutorizacion, MotivoChips, etiquetaMotivo } from "./motivo-y-autorizacion";
 import { fmtMxn } from "../lib/turno";
 
 /** Roles con `venta.cancelar_abierta` por defecto (matriz §2.2). */
@@ -52,10 +52,7 @@ export function ModalCancelarTicket({
 
   const tienePermisoRol = rolesPermiso.includes(empleado.rol);
 
-  function labelMotivo(): string {
-    if (motivo === "OTRO") return motivoTexto.trim() || "Otro";
-    return MOTIVOS_TICKET.find((m) => m.codigo === motivo)?.label ?? motivo;
-  }
+  const labelMotivo = () => etiquetaMotivo(MOTIVOS_TICKET, motivo, motivoTexto);
 
   function payload(): PayloadAutorizacion {
     return {
