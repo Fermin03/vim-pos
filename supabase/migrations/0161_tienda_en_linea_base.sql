@@ -353,3 +353,135 @@ $$;
 
 REVOKE ALL ON FUNCTION crear_ticket_desde_app(uuid) FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION crear_ticket_desde_app(uuid) TO service_role;
+
+-- ── §3 crear_ticket_desde_tienda ─────────────────────────────────────────────
+-- Hermana de crear_ticket_desde_app. Tres diferencias que importan:
+--   · el ticket lleva CLIENTE (resuelto por teléfono, la identidad del sistema: ADR 0030),
+--     y en domicilio su dirección y su renglón de envío;
+--   · NO se aplica ningún pago: la tienda cobra al recibir, y el cobro lo hace el cajero;
+--   · el total del ticket tiene que ser el que se le cotizó al cliente, o no hay ticket.
+-- Existe en la nube (POS web) y en la caja (agente de espejo), como la de apps.
+CREATE OR REPLACE FUNCTION crear_ticket_desde_tienda(p_pedido_id uuid)
+RETURNS uuid
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, auth, pg_temp
+AS $$
+DECLARE
+  v_pedido      delivery_pedidos%ROWTYPE;
+  v_turno       record;
+  v_ticket_id   uuid;
+  v_cliente_id  uuid;
+  v_bloqueado   boolean;
+  v_dir_id      uuid;
+  v_total       numeric(12,2);
+  v_claims_prev text;
+  v_pago        text;
+BEGIN
+  SELECT * INTO v_pedido FROM delivery_pedidos WHERE id = p_pedido_id FOR UPDATE;
+  IF NOT FOUND THEN RAISE EXCEPTION 'PEDIDO_NO_EXISTE: %', p_pedido_id; END IF;
+  IF v_pedido.ticket_id IS NOT NULL THEN RETURN v_pedido.ticket_id; END IF;   -- idempotente
+  IF v_pedido.canal <> 'TIENDA' THEN RAISE EXCEPTION 'PEDIDO_NO_ES_DE_TIENDA: canal %', v_pedido.canal; END IF;
+  IF v_pedido.estado NOT IN ('RECIBIDO', 'ERROR', 'ACEPTADO') THEN
+    RAISE EXCEPTION 'PEDIDO_NO_ACEPTABLE: estado %', v_pedido.estado;
+  END IF;
+
+  SELECT t.id, t.caja_id, t.usuario_apertura_id INTO v_turno
+  FROM turnos t
+  WHERE t.sucursal_id = v_pedido.sucursal_id AND t.estado = 'ABIERTO'
+  ORDER BY t.fecha_apertura DESC LIMIT 1;
+  IF NOT FOUND THEN RAISE EXCEPTION 'SIN_TURNO_ABIERTO: sucursal %', v_pedido.sucursal_id; END IF;
+
+  -- El cliente: por teléfono (comparado por dígitos), o se crea.
+  v_cliente_id := lealtad_resolver_cliente(v_pedido.tenant_id, NULL, v_pedido.cliente_telefono);
+  IF v_cliente_id IS NULL THEN
+    INSERT INTO clientes (tenant_id, nombre, telefono, email, created_by)
+    VALUES (v_pedido.tenant_id, LEFT(COALESCE(NULLIF(btrim(v_pedido.cliente_nombre), ''), 'Cliente de la tienda'), 200),
+            LEFT(regexp_replace(v_pedido.cliente_telefono, '\D', '', 'g'), 20),
+            v_pedido.cliente_email, v_turno.usuario_apertura_id)
+    RETURNING id INTO v_cliente_id;
+  ELSE
+    SELECT estado = 'BLOQUEADO' INTO v_bloqueado FROM clientes WHERE id = v_cliente_id;
+    IF v_bloqueado THEN RAISE EXCEPTION 'CLIENTE_BLOQUEADO: %', v_cliente_id; END IF;
+  END IF;
+
+  -- Actuar como el usuario del turno (auth.uid() en las RPCs de venta), igual que la de apps.
+  v_claims_prev := current_setting('request.jwt.claims', true);
+  PERFORM set_config('request.jwt.claims',
+    json_build_object('sub', v_turno.usuario_apertura_id::text,
+                      'tenant_id', v_pedido.tenant_id::text,
+                      'role', 'authenticated')::text,
+    true);
+
+  v_ticket_id := abrir_ticket(v_pedido.sucursal_id, v_turno.caja_id, v_turno.id, v_pedido.app,
+                              v_cliente_id, NULL,
+                              'tienda:' || v_pedido.id_externo,
+                              v_turno.usuario_apertura_id);
+
+  -- La tienda solo vende productos del catálogo: no hay producto genérico.
+  PERFORM _delivery_items_a_ticket(v_ticket_id, v_pedido.items, NULL);
+
+  IF v_pedido.app = 'DELIVERY_PROPIO' THEN
+    -- La dirección del pedido se guarda en el cliente; si ya tenía esa misma, se reutiliza.
+    SELECT d.id INTO v_dir_id FROM direcciones_cliente d
+     WHERE d.cliente_id = v_cliente_id AND d.activa
+       AND lower(btrim(d.calle)) = lower(btrim(v_pedido.direccion->>'calle'))
+       AND lower(btrim(d.numero_exterior)) = lower(btrim(v_pedido.direccion->>'numero_exterior'))
+       AND d.codigo_postal = v_pedido.direccion->>'codigo_postal'
+     ORDER BY d.created_at LIMIT 1;
+    IF v_dir_id IS NULL THEN
+      INSERT INTO direcciones_cliente (tenant_id, cliente_id, etiqueta, calle, numero_exterior, numero_interior,
+        colonia, codigo_postal, ciudad, estado_geo, referencias, zona_envio_id, created_by)
+      VALUES (v_pedido.tenant_id, v_cliente_id, 'Tienda en línea',
+        LEFT(v_pedido.direccion->>'calle', 255), LEFT(v_pedido.direccion->>'numero_exterior', 20),
+        NULLIF(LEFT(v_pedido.direccion->>'numero_interior', 20), ''),
+        LEFT(v_pedido.direccion->>'colonia', 150), LEFT(v_pedido.direccion->>'codigo_postal', 5),
+        LEFT(v_pedido.direccion->>'ciudad', 100), LEFT(v_pedido.direccion->>'estado', 50),
+        NULLIF(v_pedido.direccion->>'referencias', ''), v_pedido.zona_envio_id, v_turno.usuario_apertura_id)
+      RETURNING id INTO v_dir_id;
+    END IF;
+    UPDATE tickets SET direccion_entrega_id = v_dir_id WHERE id = v_ticket_id;
+
+    -- fijar_envio_ticket valida que la zona sea de la sucursal y crea el renglón al precio de HOY.
+    -- Lo cotizado manda: si hay renglón, se pisa con el envío del pedido, como los precios de arriba.
+    PERFORM fijar_envio_ticket(v_ticket_id, v_pedido.zona_envio_id);
+    UPDATE ticket_items SET precio_unitario_snapshot = v_pedido.envio_mxn
+     WHERE ticket_id = v_ticket_id AND cargo_tipo = 'ENVIO' AND cancelado = false;
+  END IF;
+
+  PERFORM recalcular_totales_ticket(v_ticket_id);
+
+  v_pago := CASE v_pedido.pago_al_recibir
+              WHEN 'EFECTIVO' THEN 'Efectivo' || COALESCE(', paga con $' || to_char(v_pedido.paga_con_mxn, 'FM999999990.00'), '')
+              WHEN 'TARJETA'  THEN 'Tarjeta al recibir'
+            END;
+  UPDATE tickets
+  SET folio_externo_app = v_pedido.id_externo,
+      origen_creacion   = 'API_EXTERNA',
+      nombre_cliente    = LEFT(v_pedido.cliente_nombre, 100),
+      nota_general      = NULLIF(concat_ws(' · ', v_pago, NULLIF(v_pedido.nota_cliente, '')), '')
+  WHERE id = v_ticket_id;
+
+  -- Lo que se le cotizó al cliente es lo que se le va a cobrar, o no hay ticket. El RAISE revierte
+  -- todo lo anterior: no queda ticket a medias.
+  SELECT total_mxn INTO v_total FROM tickets WHERE id = v_ticket_id;
+  IF v_total IS DISTINCT FROM v_pedido.total_cliente_mxn THEN
+    RAISE EXCEPTION 'TOTAL_NO_COINCIDE: ticket % vs pedido %', v_total, v_pedido.total_cliente_mxn;
+  END IF;
+
+  -- SIN aplicar_pago: la tienda cobra al recibir.
+  UPDATE tickets SET estado_cocina = 'EN_COCINA' WHERE id = v_ticket_id AND estado_cocina = 'SIN_ENVIAR';
+
+  UPDATE delivery_pedidos
+  SET ticket_id = v_ticket_id, estado = 'ACEPTADO',
+      aceptado_at = COALESCE(aceptado_at, now()), ultimo_error = NULL
+  WHERE id = p_pedido_id;
+
+  PERFORM set_config('request.jwt.claims', v_claims_prev, true);
+  RETURN v_ticket_id;
+END;
+$$;
+REVOKE ALL ON FUNCTION crear_ticket_desde_tienda(uuid) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION crear_ticket_desde_tienda(uuid) TO service_role;
+COMMENT ON FUNCTION crear_ticket_desde_tienda(uuid) IS
+  'Convierte un pedido de la tienda en línea en ticket ABIERTO y sin pago, con cliente por teléfono, dirección y envío. Idempotente.';
