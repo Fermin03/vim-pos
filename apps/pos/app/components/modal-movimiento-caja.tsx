@@ -164,16 +164,9 @@ export function ModalMovimientoCaja({
     return (
       <ModalAutorizacionPin
         token={token}
-        accion={payload().accion}
-        permisoCodigo={def.permiso}
+        payload={payload()}
         descripcion={`${def.label} · ${fmtMxn(monto)} · ${motivo}`}
         ejecutaNombre={empleado.nombre}
-        monto={monto}
-        entidadTipo="movimiento_caja"
-        entidadId={null}
-        cajaId={turno.caja_id}
-        turnoId={turno.id}
-        motivo={motivo}
         onAutorizado={(a) => ejecutarConAutorizacion(a)}
         onCancelar={() => setPidiendoPin(false)}
       />

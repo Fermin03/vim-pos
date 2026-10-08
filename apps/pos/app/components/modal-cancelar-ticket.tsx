@@ -118,16 +118,9 @@ export function ModalCancelarTicket({
     return (
       <ModalAutorizacionPin
         token={token}
-        accion="cancelar_ticket"
-        permisoCodigo={permisoCancelar}
+        payload={payload()}
         descripcion={`Cancelar folio ${folio ?? ""} · ${fmtMxn(totalActual)} · ${labelMotivo()}`}
         ejecutaNombre={empleado.nombre}
-        monto={totalActual}
-        entidadTipo="ticket"
-        entidadId={ticketId}
-        cajaId={cajaId}
-        turnoId={turnoId}
-        motivo={labelMotivo()}
         onAutorizado={(a) => ejecutarConAutorizacion(a)}
         onCancelar={() => setPidiendoPin(false)}
       />

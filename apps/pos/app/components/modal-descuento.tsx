@@ -190,16 +190,9 @@ export function ModalDescuento({
     return (
       <ModalAutorizacionPin
         token={token}
-        accion={tipo === "CORTESIA_TOTAL" ? "cortesia_total" : "descuento_manual"}
-        permisoCodigo={permisoDescuento(tipo)}
+        payload={payload()}
         descripcion={`Descuento de ${fmtMxn(descuento)} · ${labelMotivo()}`}
         ejecutaNombre={empleado.nombre}
-        monto={descuento}
-        entidadTipo="ticket"
-        entidadId={ticketId}
-        cajaId={cajaId}
-        turnoId={turnoId}
-        motivo={labelMotivo()}
         onAutorizado={ejecutarConAutorizacion}
         onCancelar={() => setPidiendoPin(false)}
       />

@@ -254,16 +254,9 @@ function ModalDevolucion({
     return (
       <ModalAutorizacionPin
         token={token}
-        accion="devolucion"
-        permisoCodigo="venta.devolucion"
+        payload={{ accion: "devolucion", permisoCodigo: "venta.devolucion", entidadTipo: "ticket", entidadId: venta.ticketId, monto: venta.total, motivo: labelMotivo(), cajaId: turno.caja_id, turnoId: turno.id }}
         descripcion={`Devolución de ${venta.folio} · ${labelMotivo()}`}
         ejecutaNombre={empleado.nombre}
-        monto={venta.total}
-        entidadTipo="ticket"
-        entidadId={venta.ticketId}
-        cajaId={turno.caja_id}
-        turnoId={turno.id}
-        motivo={labelMotivo()}
         onAutorizado={(a) => ejecutar(a)}
         onCancelar={() => setPidiendoPin(false)}
       />

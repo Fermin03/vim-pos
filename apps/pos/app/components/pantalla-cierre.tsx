@@ -566,16 +566,9 @@ export function PantallaCierre({
       {pidiendoPinGenerar && (
         <ModalAutorizacionPin
           token={token}
-          accion="recontar_arqueo"
-          permisoCodigo="turno.recontar_arqueo"
+          payload={{ ...payloadRecuento(), monto: null }}
           descripcion={`Contar de nuevo el arqueo del turno ${turno.codigo_turno}`}
           ejecutaNombre={empleado.nombre}
-          monto={null}
-          entidadTipo="turno"
-          entidadId={turno.id}
-          cajaId={turno.caja_id}
-          turnoId={turno.id}
-          motivo="Volver a contar el arqueo"
           onAutorizado={(a) => { setPidiendoPinGenerar(false); void generarCorte(a.autorizacionPinId); }}
           onCancelar={() => setPidiendoPinGenerar(false)}
         />
@@ -583,16 +576,9 @@ export function PantallaCierre({
       {pidiendoPinRecuento && (
         <ModalAutorizacionPin
           token={token}
-          accion="recontar_arqueo"
-          permisoCodigo="turno.recontar_arqueo"
+          payload={payloadRecuento()}
           descripcion={`Volver a contar el arqueo del turno ${turno.codigo_turno}`}
           ejecutaNombre={empleado.nombre}
-          monto={corte?.diferenciaTotal ?? null}
-          entidadTipo="turno"
-          entidadId={turno.id}
-          cajaId={turno.caja_id}
-          turnoId={turno.id}
-          motivo="Volver a contar el arqueo"
           onAutorizado={volverAContar}
           onCancelar={() => setPidiendoPinRecuento(false)}
         />
@@ -600,16 +586,9 @@ export function PantallaCierre({
       {pidiendoPin && (
         <ModalAutorizacionPin
           token={token}
-          accion="cerrar_turno"
-          permisoCodigo="turno.cerrar_propio"
+          payload={payloadCierre()}
           descripcion={`Cerrar el turno ${turno.codigo_turno}`}
           ejecutaNombre={empleado.nombre}
-          monto={null}
-          entidadTipo="turno"
-          entidadId={turno.id}
-          cajaId={turno.caja_id}
-          turnoId={turno.id}
-          motivo="Cierre de turno"
           onAutorizado={ejecutarCierre}
           onCancelar={() => setPidiendoPin(false)}
         />

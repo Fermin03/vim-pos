@@ -129,16 +129,9 @@ export function ModalDescuentoItem({
     return (
       <ModalAutorizacionPin
         token={token}
-        accion={payload().accion}
-        permisoCodigo={permisoDescuento(tipo)}
+        payload={payload()}
         descripcion={`${tipo === "OVERRIDE_PRECIO" ? "Precio fijo" : "Descuento"} en ${productoNombre} · ${labelMotivo()}`}
         ejecutaNombre={empleado.nombre}
-        monto={descuento}
-        entidadTipo="ticket_item"
-        entidadId={ticketItemId}
-        cajaId={cajaId}
-        turnoId={turnoId}
-        motivo={labelMotivo()}
         onAutorizado={(a) => ejecutar(a)}
         onCancelar={() => setPidiendoPin(false)}
       />

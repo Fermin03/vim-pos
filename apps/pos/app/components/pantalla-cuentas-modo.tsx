@@ -630,16 +630,9 @@ export function PantallaCuentasModo({
       {pidiendoPinReimpresion && sel && (
         <ModalAutorizacionPin
           token={token}
-          accion="reimprimir_ticket"
-          permisoCodigo={PERMISO_REIMPRIMIR}
+          payload={{ accion: "reimprimir_ticket", permisoCodigo: PERMISO_REIMPRIMIR, entidadTipo: "ticket", entidadId: sel.ticketId, monto: sel.total, motivo: "Reimpresión de ticket", cajaId: turno.caja_id, turnoId: turno.id }}
           descripcion={`Reimprimir el ticket de ${sel.cliente ?? sel.folio ?? "la cuenta"} · ${fmtMxn(sel.total)}`}
           ejecutaNombre={empleado.nombre}
-          monto={sel.total}
-          entidadTipo="ticket"
-          entidadId={sel.ticketId}
-          cajaId={turno.caja_id}
-          turnoId={turno.id}
-          motivo="Reimpresión de ticket"
           onAutorizado={(a) => { setPidiendoPinReimpresion(false); imprimir(sel.ticketId, { autorizacionPinId: a.autorizacionPinId }); }}
           onCancelar={() => setPidiendoPinReimpresion(false)}
         />
@@ -647,16 +640,9 @@ export function PantallaCuentasModo({
       {pidiendoPinReabrir && sel && (
         <ModalAutorizacionPin
           token={token}
-          accion="reabrir_cuenta_impresa"
-          permisoCodigo={PERMISO_REIMPRIMIR}
+          payload={{ accion: "reabrir_cuenta_impresa", permisoCodigo: PERMISO_REIMPRIMIR, entidadTipo: "ticket", entidadId: sel.ticketId, monto: sel.total, motivo: "Reabrir cuenta con ticket impreso", cajaId: turno.caja_id, turnoId: turno.id }}
           descripcion={`Reabrir la cuenta de ${sel.cliente ?? sel.folio ?? "la cuenta"} · ${fmtMxn(sel.total)}`}
           ejecutaNombre={empleado.nombre}
-          monto={sel.total}
-          entidadTipo="ticket"
-          entidadId={sel.ticketId}
-          cajaId={turno.caja_id}
-          turnoId={turno.id}
-          motivo="Reabrir cuenta con ticket impreso"
           onAutorizado={async (a) => {
             setPidiendoPinReabrir(false);
             try {

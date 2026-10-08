@@ -153,16 +153,9 @@ export function SelectorZona({
       {pinAbierto && repreciando && (
         <ModalAutorizacionPin
           token={token}
-          accion="editar_zona_envio"
-          permisoCodigo="descuento.override_precio"
+          payload={{ accion: "editar_zona_envio", permisoCodigo: "descuento.override_precio", entidadTipo: "zona_envio", entidadId: repreciando.zona.id, monto: costoNuevo, motivo: `Cambio de costo de la zona ${repreciando.zona.nombre}: de ${fmtMxn(repreciando.zona.costoMxn)} a ${fmtMxn(costoNuevo)}`, cajaId, turnoId }}
           descripcion={`Cambiar el costo de ${repreciando.zona.nombre} de ${fmtMxn(repreciando.zona.costoMxn)} a ${fmtMxn(costoNuevo)}`}
           ejecutaNombre={empleadoNombre}
-          monto={costoNuevo}
-          entidadTipo="zona_envio"
-          entidadId={repreciando.zona.id}
-          motivo={`Cambio de costo de la zona ${repreciando.zona.nombre}: de ${fmtMxn(repreciando.zona.costoMxn)} a ${fmtMxn(costoNuevo)}`}
-          cajaId={cajaId}
-          turnoId={turnoId}
           onAutorizado={(a) => void aplicarNuevoCosto(a)}
           onCancelar={() => setPinAbierto(false)}
         />

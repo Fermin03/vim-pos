@@ -1,7 +1,7 @@
 "use client";
 import { useState } from "react";
 import { Button, Modal, PinKeypad } from "@vim/ui/styles";
-import { autorizarConPin, type Autorizacion } from "../lib/autorizacion";
+import { autorizarConPin, type Autorizacion, type PayloadAutorizacion } from "../lib/autorizacion";
 
 /**
  * Componente reutilizable de autorización por PIN de supervisor (mockup P-080).
@@ -10,33 +10,19 @@ import { autorizarConPin, type Autorizacion } from "../lib/autorizacion";
  */
 export function ModalAutorizacionPin({
   token,
-  accion,
-  permisoCodigo,
+  payload,
   descripcion,
   ejecutaNombre,
-  monto,
-  entidadTipo,
-  entidadId,
-  cajaId,
-  turnoId,
-  motivo,
   quienAutoriza,
   capa,
   onAutorizado,
   onCancelar,
 }: {
   token: string;
-  accion: string;
-  permisoCodigo: string;
+  /** Lo que se autoriza. `turnoId` es null fuera de un turno (p. ej. desvincular desde la pantalla de acceso). */
+  payload: PayloadAutorizacion;
   descripcion: string;
   ejecutaNombre: string;
-  monto: number | null;
-  entidadTipo: string;
-  entidadId: string | null;
-  cajaId: string;
-  /** null fuera de un turno (p. ej. desvincular desde la pantalla de acceso). */
-  turnoId: string | null;
-  motivo: string;
   /** Quién puede autorizar, cuando no es "un supervisor o admin" (p. ej. un permiso solo de dueño/admin). */
   quienAutoriza?: string;
   /** Capa extra (p. ej. "z-[70]") cuando se abre encima de algo que ya está sobre z-50, como el recibo. */
@@ -61,16 +47,7 @@ export function ModalAutorizacionPin({
     setBusy(true);
     setError(null);
     try {
-      const a = await autorizarConPin(token, pin, {
-        accion,
-        permisoCodigo,
-        entidadTipo,
-        entidadId,
-        monto,
-        motivo,
-        cajaId,
-        turnoId,
-      });
+      const a = await autorizarConPin(token, pin, payload);
       setStatus("ok");
       setTimeout(() => onAutorizado(a), 600);
     } catch (e) {
