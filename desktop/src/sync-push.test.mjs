@@ -823,6 +823,61 @@ describe("ventas que cambian después de subir, y el piso de las mesas (Postgres
   });
 });
 
+// ── El arranque sobrevive a un PostgREST que muere al nacer (Postgres real) ───────────────────
+//
+// Cinco veces en el log de una caja (ago–oct 2026): Postgres arranca, PostgREST escribe «Starting»
+// y «API server listening» y deja de existir, sin error. La caja sondeaba 60 s a un proceso muerto,
+// decía «PostgREST no respondió» y se cerraba; abrirla otra vez siempre funcionó. Aquí "algo de
+// fuera" lo mata una vez, igual, y el arranque tiene que darse cuenta y levantarlo solo.
+// La política (cuándo se reintenta y cuándo no) está en arranque-reintentos.test.mjs con dobles;
+// esto prueba el cableado de verdad.
+//
+// Vive en ESTE archivo aunque no sea del push: cada arranque barre los postgres.exe de la
+// instalación por carpeta (`matarPostgresDeEstaInstalacion`), así que dos archivos de pruebas con
+// Postgres real corriendo a la vez se matan la base entre sí. Aquí van todas, y en fila.
+test("si PostgREST muere al arrancar, el backend lo nota en el acto y se levanta solo al segundo intento", {
+  skip: SOLO_WINDOWS,
+  timeout: 180_000,
+}, async () => {
+  const { existsSync, readFileSync } = await import("node:fs");
+  const dataRoot = mkdtempSync(path.join(tmpdir(), "vim-arranque-"));
+  const pidfile = path.join(dataRoot, "bin", ".pids.json");
+  const opciones = (log) => ({ dataRoot, pgPort: 54381, restPort: 54382, log });
+  let backend = null;
+  let vigia = null;
+  try {
+    // Una caja ya instalada: la base existe y se cerró bien.
+    await (await startLocalBackend(opciones(() => {}))).stop();
+
+    // El agente externo: en cuanto aparece un PostgREST nuevo en el pidfile, lo mata. Una vez.
+    let muertes = 0;
+    vigia = setInterval(() => {
+      if (muertes > 0 || !existsSync(pidfile)) return;
+      try {
+        const [, rest] = JSON.parse(readFileSync(pidfile, "utf8")).pids;
+        process.kill(rest, "SIGKILL");
+        muertes++;
+      } catch { /* todavía no está, o ya no */ }
+    }, 20);
+
+    const lineas = [];
+    const t0 = Date.now();
+    backend = await startLocalBackend(opciones((m) => lineas.push(m)));
+    const segundos = (Date.now() - t0) / 1000;
+
+    assert.equal(muertes, 1, "la falla se inyectó");
+    assert.ok(lineas.some((l) => l.includes("intento 1/3") && l.includes("se cerró solo")), `el log dice cómo murió:\n${lineas.join("\n")}`);
+    assert.ok(lineas.some((l) => l.includes("arrancó al intento 2")), "y que el segundo intento abrió");
+    assert.ok(segundos < 50, `sin esperar el minuto del readiness (tardó ${segundos.toFixed(1)} s)`);
+    assert.equal((await fetch("http://127.0.0.1:54382/")).status, 200, "PostgREST contesta");
+    assert.equal((await backend.pool.query("SELECT 1 AS uno")).rows[0].uno, 1, "y Postgres también");
+  } finally {
+    if (vigia) clearInterval(vigia);
+    if (backend) await backend.stop();
+    rmSync(dataRoot, { recursive: true, force: true });
+  }
+});
+
 // ── Lealtad (0156, ADR 0030): movimientos y canjes viajan en el push ──────────────────────────
 
 test("lealtad: el canje entra en la huella del ticket sin mover la de los tickets que no tienen", () => {

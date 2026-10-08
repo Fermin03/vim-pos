@@ -3,7 +3,7 @@
 // + PostgREST como sidecar. Es el mismo stack validado en la Fase 0, ahora como módulo
 // reusable que arranca el proceso main de Electron (o el verify headless).
 import EmbeddedPostgres from "embedded-postgres";
-import { arrancarConReintentos, crearCapturaDeLog } from "./arranque-reintentos.mjs";
+import { arrancarConReintentos, crearCapturaDeLog, esperarPostgrest, reintentarBackend } from "./arranque-reintentos.mjs";
 import { reanotarHuellasClientes0156UnaVez, sembrarRepartidoresUnaVez, sembrarZonasUnaVez } from "./sync-push.mjs";
 import { blindarTablasInternas, repararRevokesUnaVez } from "./privilegios.mjs";
 import { conTope } from "./tope.mjs";
@@ -22,8 +22,6 @@ const SEED = path.join(repoRoot, "supabase", "seed.sql");
 const SHIM = path.join(root, "sql", "00-compat-shim.sql");
 const PG_BIN = path.join(root, "node_modules", "@embedded-postgres", "windows-x64", "native", "bin");
 const PIDFILE = path.join(root, "bin", ".pids.json");
-
-const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 
 /**
  * El instalador PUEDE salir sin PostgREST: `bin/postgrest.exe` está en .gitignore y electron-builder
@@ -306,7 +304,17 @@ export async function conectarSuperusuario(crearCliente, password, log = () => {
 }
 
 /** Arranca el backend local y devuelve puertos + pool + stop(). Idempotente entre arranques. */
-export async function startLocalBackend(opts = {}) {
+/**
+ * Levanta el backend local (Postgres + PostgREST). Si PostgREST muere o no contesta al arrancar,
+ * lo vuelve a intentar entero, que es lo que antes hacía el cajero abriendo la app otra vez
+ * (ver `esperarPostgrest`). Lo usan el arranque, el watchdog y el respaldo.
+ */
+export function startLocalBackend(opts = {}) {
+  const log = opts.log ?? (() => {});
+  return reintentarBackend(() => arrancarUnaVez(opts), { log: (m) => log(`arranque: ${m}`) });
+}
+
+async function arrancarUnaVez(opts) {
   // Empaquetado (Electron): recursos read-only en resDir (extraResources) y datos escribibles en
   // dataRoot (userData). Dev: todo bajo el repo (comportamiento original). Rutas resueltas aquí.
   const resDir = opts.resDir ?? null;      // null = dev
@@ -545,6 +553,10 @@ export async function startLocalBackend(opts = {}) {
   // oyente tumba el proceso sin dejar rastro. Se registra y se corta el readiness abajo.
   let falloSpawn = null;
   rest.on("error", (e) => { falloSpawn = explicarFalloDeSpawn(e, postgrestExe); log(falloSpawn); });
+  // Cómo terminó, si termina. Sin este oyente el readiness sondeaba 60 s a un proceso que ya no
+  // existía y el error no decía con qué código había muerto.
+  let salidaRest = null;
+  rest.on("exit", (code, signal) => { salidaRest = { code, signal }; });
 
   // Registrar los PIDs YA, ANTES del readiness. Si el arranque falla aquí (readiness expira),
   // el postgrest recién lanzado queda rastreado en el pidfile → el próximo arranque lo mata en
@@ -552,20 +564,44 @@ export async function startLocalBackend(opts = {}) {
   // hace fallar TODOS los reintentos siguientes (el nuevo postgrest no puede enlazar el puerto).
   try { writeFileSync(pidfile, JSON.stringify({ pids: [pgPid, rest.pid].filter(Boolean), at: Date.now() })); } catch { /* */ }
 
-  let ready = false;
-  for (let i = 0; i < 120; i++) { // hasta ~60s: bajo carga, el schema cache tarda en cargar
-    if (falloSpawn) break; // el proceso no existe: no hay nada que esperar
-    // 127.0.0.1 (no 'localhost'): PostgREST escucha 0.0.0.0 (IPv4); en el Electron empaquetado
+  /** Detiene Postgres y dice si de verdad quedó detenido. Lo usan la parada y un arranque fallido. */
+  const pararPostgres = () => detenerPostgres({
+    pid: pgPid,
+    detener: () => database.stop(),
+    barrer: () => {
+      matarPostgresDeEstaInstalacion(pgBin, (m) => log(`limpieza: ${m}`));
+      matarQuienOcupaElPuerto(pgPort, (m) => log(`limpieza: ${m}`));
+    },
+    desarmar: () => { database.process = undefined; },
+    log,
+  });
+
+  const listo = await esperarPostgrest({
+    // 127.0.0.1 (no 'localhost'): PostgREST escucha solo en IPv4; en el Electron empaquetado
     // 'localhost' resuelve a ::1 (IPv6) primero → nunca conectaría.
-    try { if ((await fetch(`http://127.0.0.1:${restPort}/`)).ok) { ready = true; break; } } catch { /* aún no */ }
-    await wait(500);
-  }
-  if (!ready) {
+    sondear: () => fetch(`http://127.0.0.1:${restPort}/`),
+    // Un spawn fallido no llegó a ser proceso: tampoco hay nada que esperar.
+    salida: () => salidaRest ?? (falloSpawn ? { code: null, signal: null } : null),
+    baseViva: () => !pgPid || procesoVivo(pgPid),
+  }); // hasta ~60 s por intento: bajo carga, el schema cache tarda en cargar
+  if (!listo.listo) {
     try { rest.kill(); } catch { /* */ } // no dejarlo colgado como huérfano ocupando restPort
     if (falloSpawn) throw new Error(`${falloSpawn}. Reinstala VIM POS.`);
     let tail = "";
     try { tail = readFileSync(logPath, "utf8").split("\n").slice(-6).join("\n"); } catch { /* */ }
-    throw new Error(`PostgREST no respondió.\n${tail}`);
+    // Postgres se detiene AQUÍ y no al salir de la app: si se va a reintentar, el siguiente intento
+    // tiene que encontrar el pgdata libre; y si no, que no quede un Postgres sin dueño.
+    const pgSeguiaVivo = !pgPid || procesoVivo(pgPid);
+    if (await pararPostgres()) { try { rmSync(pidfile, { force: true }); } catch { /* */ } }
+    const partes = [`PostgREST no respondió: ${listo.detalle}.`];
+    if (!pgSeguiaVivo) partes.push(`Postgres ya no estaba vivo; lo último que escribió:\n${capturaPg.texto()}`);
+    if (tail.trim()) partes.push(`Lo último de PostgREST:\n${tail.trim()}`);
+    const error = new Error(partes.join("\n"));
+    // Si algo murió o PostgREST nunca contestó, volver a arrancar lo ha arreglado siempre. Si
+    // los dos viven y PostgREST contesta pero no carga el esquema, el problema está en la base y
+    // repetir solo alarga la espera.
+    error.reintentable = listo.motivo !== "sin-esquema" || !pgSeguiaVivo;
+    throw error;
   }
   log(`PostgREST en localhost:${restPort}`);
 
@@ -580,16 +616,7 @@ export async function startLocalBackend(opts = {}) {
     try { rest.kill(); } catch { /* */ }
     // pool.end() espera a que se devuelvan las conexiones prestadas: una consulta atorada lo retiene.
     try { await conTope(pool.end(), 5000, () => log("parada: el pool local no cerró a tiempo; se sigue")); } catch { /* */ }
-    const postgresDetenido = await detenerPostgres({
-      pid: pgPid,
-      detener: () => database.stop(),
-      barrer: () => {
-        matarPostgresDeEstaInstalacion(pgBin, (m) => log(`limpieza: ${m}`));
-        matarQuienOcupaElPuerto(pgPort, (m) => log(`limpieza: ${m}`));
-      },
-      desarmar: () => { database.process = undefined; },
-      log,
-    });
+    const postgresDetenido = await pararPostgres();
     // Cierre limpio → sin huérfanos que limpiar. Si no lo fue, el pidfile se queda: el próximo
     // arranque repite la limpieza con él.
     if (postgresDetenido) { try { rmSync(pidfile, { force: true }); } catch { /* */ } }

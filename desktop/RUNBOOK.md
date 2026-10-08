@@ -364,6 +364,31 @@ escribe Postgres, reintenta hasta 3 veces con 3 s y limpieza entre intentos
 (`arranque: Postgres no arrancó (intento 1/3): el puerto de Postgres sigue ocupado…`). Si a un
 cliente le vuelve a pasar, pedir `%APPDATA%\vim-pos-desktop\vim-pos.log` y buscar `arranque:`.
 
+### El otro "no abre a la primera": PostgREST que muere al nacer
+
+Síntoma (cinco veces en el log de una caja, ago–oct 2026, 5 de 120 arranques): Postgres arranca
+bien, `postgrest.log` se queda en dos líneas («Starting PostgREST», «API server listening») y a los
+60 s el arranque muere con `Boot falló: PostgREST no respondió`. Al abrir la app otra vez, funciona.
+
+Lo que se sabe: el proceso de PostgREST deja de existir menos de un segundo después de arrancar,
+sin escribir error y sin que Windows ni el antivirus registren nada. **No se sabe qué lo termina.**
+Lo que se descartó midiendo: que estuviera vivo pero lento (entonces registra cada sondeo con 503),
+que la base lo rechazara (escribe el error antes de salir) y el `done is not a function` que aparece
+cerca en el log (es ruido del gancho de salida de embedded-postgres al cerrarse cualquier instancia).
+
+Desde esta versión el arranque ya no espera a ciegas: nota en el acto que PostgREST (o Postgres) se
+cerró, lo anota y vuelve a levantar el backend entero, hasta 3 intentos — lo que antes hacía el
+cajero a mano. Queda en el log así, y **ese renglón es el dato que faltaba** para saber la causa:
+
+```
+arranque: el backend no arrancó (intento 1/3), se vuelve a intentar: PostgREST no respondió:
+PostgREST se cerró solo (código 1) tras ECONNREFUSED ×1. ⏎ Lo último de PostgREST: ⏎ …
+```
+
+Si vuelve a pasar, buscar `se vuelve a intentar` en el log y mirar el código de salida y lo último
+que escribió PostgREST. Solo NO se reintenta cuando Postgres y PostgREST viven y PostgREST contesta
+503 el minuto entero: ahí el problema está en la base y repetir solo alarga la espera.
+
 ## Endurecimiento de la auditoría integral (30/09/2026)
 
 - **Privilegios de la BD local.** El arranque ya NO hace `GRANT … ON ALL TABLES` (deshacía los
