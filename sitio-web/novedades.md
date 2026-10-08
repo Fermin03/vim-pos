@@ -6,6 +6,19 @@
 
 ## Octubre de 2026
 
+8 de octubre Caja · 0.7.0
+
+### El corte Z con arqueo de efectivo
+
+#### Nuevo
+
+- **El corte Z incluye el arqueo de efectivo:** lo esperado, lo que contaste y la diferencia. Lo ves al cerrar turno, en **Menú → Cerrar turno**.
+- Si repartes propinas, el corte dice cuánto le tocó a cada persona.
+
+#### Correcciones
+
+- A veces la caja no abría al primer intento y había que abrirla otra vez; ya abre sola.
+
 7 de octubre Caja · 0.6.0
 
 ### Cuentas impresas, tecla Escape y apertura de turno
