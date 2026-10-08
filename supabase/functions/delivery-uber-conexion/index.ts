@@ -3,46 +3,22 @@
 // se listan sus tiendas y se activa la integración con integrator_store_id = uuid de la sucursal.
 // Solo Dueño/Administrador (jerarquía >= 4); todo filtra por el tenant del JWT — salvo el camino
 // interno de "pausar" (Task 6, ver `INTERNO` más abajo), que usa `x-vim-interno` en vez de JWT.
-import { createClient } from "jsr:@supabase/supabase-js@2";
-import { corsHeaders } from "../_shared/cors.ts";
+import { clienteAdmin, servir } from "../_shared/http.ts";
 import { registrarError } from "../_shared/errores.ts";
-import { tenantDelToken } from "../_shared/identidad.ts";
+import { bearerDe, tenantDelToken } from "../_shared/identidad.ts";
 import {
   aplicarSucursalCarta, armarCombosCarta, armarGruposModificadorCarta, construirMenuUber, type CategoriaCarta,
   type FilaSucursalCarta, type ProductoCarta,
 } from "../_shared/delivery/menu-uber.ts";
-import { crearClienteUber } from "../_shared/delivery/uber.ts";
+import { clienteUberDeApp, ENTORNO } from "../_shared/delivery/cliente-uber.ts";
 import { cuerpoPosData, normalizarTiendasUber, transicionConexion, type EstadoConexion } from "../_shared/delivery/uber-activacion.ts";
 import { cambiarPrepTienda, consultarEstadoTienda, type ConexionTienda } from "../_shared/delivery/tienda-uber-acciones.ts";
 import type { DbMinima } from "../_shared/delivery/procesar-uber.ts";
 import { accionInternaPermitida, secretoInternoValido } from "../_shared/delivery/interno.ts";
 
-const admin = createClient(
-  Deno.env.get("SUPABASE_URL")!,
-  Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
-  { auth: { persistSession: false } },
-);
-const ENTORNO = (Deno.env.get("UBER_ENTORNO") ?? "sandbox") === "produccion" ? "produccion" : "sandbox";
+const admin = clienteAdmin();
 const REDIRECT_URI = Deno.env.get("UBER_REDIRECT_URI") ?? "";
-const uber = crearClienteUber({
-  entorno: ENTORNO,
-  clientId: Deno.env.get("UBER_CLIENT_ID") ?? "",
-  clientSecret: Deno.env.get("UBER_CLIENT_SECRET") ?? "",
-  tokenCache: {
-    leer: async () => {
-      const { data } = await admin.from("delivery_credenciales_app").select("access_token, vence_at")
-        .eq("app", "APP_UBEREATS").eq("entorno", ENTORNO).maybeSingle();
-      const f = data as { access_token: string; vence_at: string } | null;
-      return f && new Date(f.vence_at) > new Date() ? f.access_token : null;
-    },
-    guardar: async (token, venceAt) => {
-      await admin.from("delivery_credenciales_app").upsert({
-        app: "APP_UBEREATS", entorno: ENTORNO, access_token: token,
-        vence_at: venceAt.toISOString(), updated_at: new Date().toISOString(),
-      });
-    },
-  },
-});
+const uber = clienteUberDeApp(admin);
 
 type Cuerpo = {
   accion?: string; code?: string; tienda_id?: string; sucursal_id?: string; conexion_id?: string;
@@ -73,13 +49,7 @@ const ESTADOS_CONECTADA = ["ACTIVA", "PAUSADA", "ERROR"];
 // cabecera es la valla de la función, no la del gateway.
 const INTERNO = Deno.env.get("VIM_DELIVERY_INTERNO_SECRET") ?? "";
 
-Deno.serve(async (req) => {
-  const cors = corsHeaders(req);
-  const json = (body: unknown, status = 200) =>
-    new Response(JSON.stringify(body), { status, headers: { ...cors, "Content-Type": "application/json" } });
-  if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
-  if (req.method !== "POST") return json({ error: "METHOD_NOT_ALLOWED" }, 405);
-
+servir(async (req, json) => {
   // Puerta interna (Task 6): si trae `x-vim-interno`, tiene que coincidir con el secreto — si no
   // coincide, 401 `INTERNO_INVALIDO` explícito. Sin este chequeo, un secreto mal puesto en Vercel
   // o en Supabase caía en silencio al flujo de JWT (que tampoco tiene) y salía como `NO_AUTH`,
@@ -96,7 +66,7 @@ Deno.serve(async (req) => {
   let usuarioId: string | null;
   if (!esInterno) {
     // 1) JWT del admin → tenant y jerarquía del rol.
-    const token = (req.headers.get("authorization") ?? "").replace(/^Bearer\s+/i, "");
+    const token = bearerDe(req);
     if (!token) return json({ error: "NO_AUTH" }, 401);
     const { data: userResp, error: userErr } = await admin.auth.getUser(token);
     if (userErr || !userResp?.user) return json({ error: "AUTH_INVALIDA" }, 401);

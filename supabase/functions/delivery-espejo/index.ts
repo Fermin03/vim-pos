@@ -10,25 +10,15 @@
 //   · el agente manda `desde` y solo recibe lo que cambió después de ese instante;
 //   · la consulta perdió el `OR` que la obligaba a recorrer la tabla entera. Son tres filtros
 //     simples, cada uno con su índice (migración 0110).
-import { createClient } from "jsr:@supabase/supabase-js@2";
-import { corsHeaders } from "../_shared/cors.ts";
+import { clienteAdmin, servir } from "../_shared/http.ts";
+import { bearerDe, claimsDe } from "../_shared/identidad.ts";
 import { registrarError } from "../_shared/errores.ts";
 import { cajaIdDeEmail } from "../_shared/latido.ts";
 import { cadenciaEspejo, cursorPedido, respuestaSinModulo, TOPE_PEDIDOS, unirPedidos } from "../_shared/delivery/espejo.ts";
 
-const admin = createClient(
-  Deno.env.get("SUPABASE_URL")!,
-  Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
-  { auth: { persistSession: false } },
-);
+const admin = clienteAdmin();
 
-// POR QUÉ SIGUE AQUÍ getUser. El 9 sep 2026 se intentó verificar la firma del token en local para
-// ahorrarse este viaje a GoTrue. No se puede: este proyecto está migrado a CLAVES DE FIRMA
-// ASIMÉTRICAS —su JWKS publica una ES256— así que los tokens que emite GoTrue NO van firmados con
-// el JWT secret HS256. Que `pin-login` acuñe tokens HS256 y el RLS los acepte no significa que los
-// emitidos sean HS256: aceptar no es emitir. Una verificación local solo de HS256 rechazaría todos
-// los tokens de dispositivo reales. Si algún día se quiere el ahorro, hay que verificar ES256
-// contra el JWKS (cacheando las claves) y dejar HS256 solo para lo de pin-login.
+// getUser sigue aquí a propósito: el porqué está en sync-pull.
 
 /** Los cuatro estados del índice parcial `idx_delivery_pedidos_sucursal_activos` (0090). */
 const ESTADOS_ACTIVOS = ["RECIBIDO", "ACEPTADO", "EN_PREPARACION", "LISTO"];
@@ -37,22 +27,8 @@ const COLS_CONEXION = "id, tenant_id, sucursal_id, marca_virtual_id, app, estado
 // set_updated_at lo pisaría con el reloj local si se guardara).
 const COLS_PEDIDO = "id, tenant_id, sucursal_id, conexion_id, app, id_externo, folio_corto, estado, estado_app, tipo_entrega, programado_para, vence_aceptacion, cliente_nombre, cliente_telefono, cliente_telefono_pin, direccion_texto, nota_cliente, items, items_sin_mapear, subtotal_mxn, descuento_app_mxn, descuento_tienda_mxn, envio_mxn, propina_mxn, total_cliente_mxn, total_restaurante_mxn, efectivo_a_cobrar_mxn, ticket_id, repartidor_nombre, repartidor_telefono, repartidor_estado, recibido_at, aceptado_at, listo_at, entregado_at, cancelado_at, motivo_cancelacion, cancelado_por, ultimo_error, created_at, gestion, gestion_caja_id, updated_at";
 
-/** Lee los claims de un JWT cuya firma YA validó getUser (no re-verifica). */
-function claimsDe(token: string): Record<string, unknown> {
-  try {
-    const p = token.split(".")[1] ?? "";
-    return JSON.parse(atob(p.replace(/-/g, "+").replace(/_/g, "/")));
-  } catch { return {}; }
-}
-
-Deno.serve(async (req) => {
-  const cors = corsHeaders(req);
-  const json = (body: unknown, status = 200) =>
-    new Response(JSON.stringify(body), { status, headers: { ...cors, "Content-Type": "application/json" } });
-  if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
-  if (req.method !== "POST") return json({ error: "METHOD_NOT_ALLOWED" }, 405);
-
-  const token = (req.headers.get("authorization") ?? "").replace(/^Bearer\s+/i, "");
+servir(async (req, json) => {
+  const token = bearerDe(req);
   if (!token) return json({ error: "NO_AUTH" }, 401);
   const { data: userResp, error: userErr } = await admin.auth.getUser(token);
   // El detalle va al log de la caja; sin él el 6 sep 2026 no se pudo saber por qué la caja de

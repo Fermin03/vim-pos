@@ -67,15 +67,13 @@ export function obtenerPac(): PacAdapter | null {
   }
 }
 
-export type ResultadoTimbradoMulti = PacTimbradoResult & { pacUsado: string; failover: boolean };
+export type ResultadoTimbradoMulti = PacTimbradoResult & { pacUsado: string };
 
 /**
- * Timbra con el PAC que toca. Si el PAC falla en transporte, la excepción sube a quien llamó.
- *
- * El nombre y el campo `failover` (ya siempre `false`) se conservan porque los tres handlers de
- * timbrado los leen y los registran; no hay un segundo PAC al que conmutar.
+ * Timbra con el PAC que toca. Si el PAC falla en transporte, la excepción sube a quien llamó:
+ * no hay un segundo PAC al que conmutar (ADR 0031).
  */
-export async function timbrarConFailover(req: PacTimbradoRequest): Promise<ResultadoTimbradoMulti> {
+export async function timbrar(req: PacTimbradoRequest): Promise<ResultadoTimbradoMulti> {
   const principal = obtenerPac();
 
   /* Sin PAC no se inventa un timbrado: se devuelve un error con la misma forma que un rechazo del
@@ -89,12 +87,11 @@ export async function timbrarConFailover(req: PacTimbradoRequest): Promise<Resul
         "No hay PAC de timbrado configurado en este entorno. No se emitió ningún comprobante.",
       responsePayload: { pac: "NINGUNO", motivo: "faltan credenciales del PAC" },
       pacUsado: "NINGUNO",
-      failover: false,
     };
   }
 
   const r = await principal.timbrar(req);
-  return { ...r, pacUsado: principal.nombre, failover: false };
+  return { ...r, pacUsado: principal.nombre };
 }
 
 export type { PacAdapter, PacTimbradoRequest, PacTimbradoResult } from "./tipos.ts";
