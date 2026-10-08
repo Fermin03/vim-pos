@@ -5,12 +5,13 @@ import assert from "node:assert/strict";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { startUiServer } from "./ui-server.mjs";
+import { puertoLibre } from "./puerto-libre.mjs";
 
 const UI_DIR = path.join(path.dirname(fileURLToPath(import.meta.url)), "..", "pos-ui");
 const ESTADO = { disponible: true, modo: "auto", displayId: null, abierta: true, monitores: [] };
 
 async function conServidor(opts, fn) {
-  const port = 54950 + Math.floor(Math.random() * 40);
+  const port = await puertoLibre();
   const server = await startUiServer(UI_DIR, port, 54350, "127.0.0.1", opts);
   const base = `http://127.0.0.1:${port}/__pantalla-cliente`;
   const origen = { Origin: `http://127.0.0.1:${port}` };

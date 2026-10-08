@@ -4,11 +4,12 @@ import assert from "node:assert/strict";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { startUiServer } from "./ui-server.mjs";
+import { puertoLibre } from "./puerto-libre.mjs";
 
 const UI_DIR = path.join(path.dirname(fileURLToPath(import.meta.url)), "..", "pos-ui");
 
 async function conServidor(opts, fn) {
-  const port = 54960 + Math.floor(Math.random() * 30);
+  const port = await puertoLibre();
   const server = await startUiServer(UI_DIR, port, 54350, "127.0.0.1", opts);
   try { await fn(`http://127.0.0.1:${port}`); } finally { await new Promise((r) => server.close(r)); }
 }
