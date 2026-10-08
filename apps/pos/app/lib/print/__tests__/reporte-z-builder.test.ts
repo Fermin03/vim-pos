@@ -106,4 +106,37 @@ describe("construirReporteZJob", () => {
     expect(construirReporteZJob(D).bloques.find((b) => b.t === "fila" && b.izq.startsWith("-LEALTAD"))).toBeUndefined();
     expect(construirReporteZJob({ ...D, lealtad: 0 }).bloques.find((b) => b.t === "fila" && b.izq.startsWith("-LEALTAD"))).toBeUndefined();
   });
+
+  // El conteo es ciego: este papel es donde se ve qué esperaba el sistema en el cajón.
+  it("el arqueo de efectivo dice esperado, declarado y diferencia, después de la declaración", () => {
+    const job = construirReporteZJob({ ...D, efectivoEsperado: 795, efectivoDeclarado: 860, diferenciaEfectivo: 65, diferenciaTotal: 65 });
+    const i = job.bloques.findIndex((b) => b.t === "texto" && b.valor === "ARQUEO DE EFECTIVO");
+    expect(i).toBeGreaterThan(job.bloques.findIndex((b) => b.t === "fila" && b.izq === "SOBRANTE(+) O FALTANTE(-):"));
+    expect(job.bloques.slice(i + 1, i + 4)).toEqual([
+      { t: "fila", izq: "ESPERADO:", der: "$795.00" },
+      { t: "fila", izq: "DECLARADO:", der: "$860.00" },
+      { t: "fila", izq: "DIFERENCIA:", der: "+$65.00", bold: true },
+    ]);
+  });
+
+  it("un faltante de efectivo sale con su signo, y si cuadra, en ceros", () => {
+    const falta = construirReporteZJob({ ...D, efectivoDeclarado: 11180, diferenciaEfectivo: -50 });
+    expect(falta.bloques).toContainEqual({ t: "fila", izq: "DIFERENCIA:", der: "-$50.00", bold: true });
+    expect(construirReporteZJob(D).bloques).toContainEqual({ t: "fila", izq: "DIFERENCIA:", der: "$0.00", bold: true });
+  });
+
+  it("el reparto de propinas lista a cada quien bajo la forma de pago de la propina", () => {
+    const job = construirReporteZJob({ ...D, propinasDistribuidas: [{ nombre: "María G.", monto: 600 }, { nombre: "Diego R.", monto: 300 }] });
+    const i = job.bloques.findIndex((b) => b.t === "texto" && b.valor === "PROPINAS REPARTIDAS");
+    expect(job.bloques[i - 1]).toEqual({ t: "fila", izq: "TOTAL FORMAS PAGO PROPINA", der: "$900.00", bold: true });
+    expect(job.bloques.slice(i + 1, i + 3)).toEqual([
+      { t: "fila", izq: "María G.:", der: "$600.00" },
+      { t: "fila", izq: "Diego R.:", der: "$300.00" },
+    ]);
+  });
+
+  it("sin reparto de propinas no sale el título solo", () => {
+    const job = construirReporteZJob({ ...D, propinasDistribuidas: [] });
+    expect(job.bloques.find((b) => b.t === "texto" && b.valor === "PROPINAS REPARTIDAS")).toBeUndefined();
+  });
 });

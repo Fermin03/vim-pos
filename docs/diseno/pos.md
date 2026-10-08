@@ -187,6 +187,21 @@ costo dentro de un hijo (p. ej. "Extra queso") sí se imprime con su importe, po
 más, y la nota de cocina de ESE hijo también sale ahí, un nivel más adentro que la del renglón
 normal, para que quien lo recibe sepa qué llevaba ese componente y no solo la cocina.
 
+### El corte de turno: se cuenta a ciegas y el papel dice el resultado
+
+El arqueo solo pide lo contado; lo que el sistema esperaba no se ve hasta generar el corte (0127).
+Por eso el **corte Z** es donde queda escrito:
+
+- **Arqueo de efectivo**, después de la declaración del cajero: *esperado*, *declarado* y
+  *diferencia*, siempre con signo. En pantalla el faltante va en rojo y el sobrante en ámbar; en el
+  papel no hay color, así que el signo es lo que manda.
+- **Propinas repartidas**, bajo la forma de pago de la propina: un renglón por persona con su nombre.
+  Solo sale si el turno repartió algo (el reparto va por mesero); nunca un título sin renglones ni
+  un identificador en lugar del nombre.
+
+La vista en pantalla (`recibo-z.tsx`) y el papel (`reporte-z-builder.ts`) llevan las mismas
+secciones en el mismo orden: lo que se cambia en uno se cambia en el otro.
+
 ## Lo que NO se hereda de otras apps
 
 - **La densidad del admin.** Aquí el scroll es tiempo frente a un cliente, pero apretar de más
