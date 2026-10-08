@@ -3,13 +3,14 @@
 
 // Verificación de que el PUSH se parte en lotes y no se atora con un pendiente grande.
 //
-// Vive sin Postgres a propósito, igual que verify-sync-ciclo: lo que hay que probar aquí es la
+// Vive sin Postgres a propósito, igual que sync-ciclo.test.mjs: lo que hay que probar aquí es la
 // POLÍTICA (cuántas ventas por petición, qué pasa si un lote falla a la mitad, qué se marca como
 // subido), y eso no necesita una base de datos — necesita poder provocar 450 ventas pendientes y
 // una nube que falle cuando yo quiera, dos cosas que con el Postgres embebido son lentas y
 // difíciles de montar. El SQL nuevo lo cubre `npm run verify:push` contra la base real.
 //
-// Correr:  npm run verify:push-lotes
+// Corre con el resto: `node --test src/*.test.mjs`.
+import { test as prueba } from "node:test";
 import http from "node:http";
 import { Buffer } from "node:buffer";
 import { pushToCloud, trocear } from "./sync-push.mjs";
@@ -181,9 +182,6 @@ function afirmarLoteCoherente(snapshot, i) {
 // Pruebas
 // ─────────────────────────────────────────────────────────────────────────────
 
-const pruebas = [];
-const prueba = (nombre, fn) => pruebas.push({ nombre, fn });
-
 prueba("450 ventas pendientes se parten en lotes de 100 y llegan todas una sola vez", async () => {
   const pool = crearPoolFalso({ nTickets: 450 });
   const { servidor, recibidas } = crearNubeFalsa();
@@ -316,24 +314,3 @@ prueba("trocear reparte sin perder ni repetir", async () => {
   afirmar(trocear([1, 2, 3], 10).length === 1, "menos elementos que el tamaño son 1 trozo");
   afirmar(trocear([1, 2, 3, 4], 2).flat().join() === "1,2,3,4", "trocear no altera el orden ni el contenido");
 });
-
-// ─────────────────────────────────────────────────────────────────────────────
-
-let fallidas = 0;
-for (const { nombre, fn } of pruebas) {
-  try {
-    await fn();
-    console.log(`  ✓ ${nombre}`);
-  } catch (e) {
-    fallidas++;
-    console.log(`  ✗ ${nombre}\n      ${e.message}`);
-  }
-}
-
-if (fallidas) {
-  console.error(`\n❌ PUSH POR LOTES: ${fallidas} de ${pruebas.length} pruebas fallaron.`);
-  process.exitCode = 1;
-} else {
-  console.log(`\n✅ PUSH POR LOTES OK — ${pruebas.length}/${pruebas.length}. Un pendiente grande sube a pedazos,`);
-  console.log("   cada lote lleva sus turnos, y un fallo a media lista conserva lo que ya se subió.");
-}

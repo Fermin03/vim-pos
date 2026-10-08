@@ -208,7 +208,7 @@ sin necesitar certificado de firma. La integridad está garantizada por el hash 
 los datos (`pgdata` en `userData`/`VIM_DATA_DIR`) se conservan al actualizar, y las **migraciones de
 BD nuevas se aplican solas** al arrancar. Al arrancar (caja y cocina) revisa el feed; si hay update:
 notificación + (en la caja) ítem en la bandeja "⬇ Actualización vX — instalar". Verificado headless
-(`npm run verify:updater`): detección de versión + descarga con SHA-512 + rechazo de descarga corrupta.
+(`src/updater.test.mjs`, corre en el CI): detección de versión + descarga con SHA-512 + rechazo de descarga corrupta.
 
 **Publicar una versión nueva:**
 

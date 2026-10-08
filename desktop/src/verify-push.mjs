@@ -68,7 +68,7 @@ try {
 
   // 3.bis) El armado POR LOTE contra el esquema real.
   //
-  // El pool falso de verify-push-lotes prueba la política (cuántos, qué se marca, qué pasa si
+  // El pool falso de sync-push-lotes.test.mjs prueba la política (cuántos, qué se marca, qué pasa si
   // uno falla), pero no puede probar el SQL. Esto sí: que pedir un subconjunto de ids devuelva
   // EXACTAMENTE ese subconjunto, que cada lote arrastre los turnos que sus tickets referencian
   // —sin eso la FK los rechaza en la nube— y que juntando los lotes no falte ni sobre una venta.
@@ -153,7 +153,7 @@ try {
   // 6) La guarda de pushToCloud también sabe de repartidores (fix round 1): sin ventas, sin turno
   // cambiado y sin movimiento pendiente, un alta suelta NO debe leerse como "nada pendiente".
   // listarPendientes es el dato que esa guarda consulta; probarlo aquí, contra el esquema real,
-  // complementa a verify-push-lotes (que prueba la guarda en sí con un pool falso).
+  // complementa a sync-push-lotes.test.mjs (que prueba la guarda en sí con un pool falso).
   {
     const antesPend = await listarPendientes(pool);
     await pool.query(
