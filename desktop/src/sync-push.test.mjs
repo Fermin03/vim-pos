@@ -782,6 +782,45 @@ describe("ventas que cambian después de subir, y el piso de las mesas (Postgres
     const { rows: [n] } = await db.query("SELECT estado::text FROM mesas WHERE id = $1", [nueva.id]);
     assert.equal(n?.estado, "RESERVADA", "una mesa que no existía entra completa");
   });
+
+  // El caso del piloto. Los turnos solo viajaban arrastrados por una venta pendiente; como el
+  // cierre ocurre DESPUÉS de la última venta, el turno se quedaba ABIERTO en la nube para siempre
+  // y el siguiente de esa caja chocaba contra `idx_turno_unico_activo_por_caja`, tumbando el push
+  // entero: 27 ventas retenidas y 16 reintentos. Vivía en verify-cierre-turno.mjs con un esquema
+  // armado a mano, que se quedaba atrás cada vez que el push aprendía una tabla; aquí corre
+  // contra las migraciones de verdad.
+  test("el cierre de un turno viaja aunque no haya ventas nuevas, y solo una vez", async () => {
+    await subir(); // lo que hubiera pendiente, turno incluido, ya está en la nube
+    assert.ok(!(await pend()).turnosCambiados.includes(turno), "subido y sin cambios, no está pendiente");
+
+    await enReplica("UPDATE turnos SET estado = 'CERRADO', fecha_cierre = now(), efectivo_contado_mxn = 1500 WHERE id = $1", [turno]);
+    assert.ok((await pend()).turnosCambiados.includes(turno), "cerrarlo lo deja pendiente");
+
+    const [snap] = await subir();
+    const viajo = (snap?.turnos ?? []).find((t) => t.id === turno);
+    assert.equal(viajo?.estado, "CERRADO", "el cierre SÍ viaja");
+    assert.equal(Number(viajo?.efectivo_contado_mxn), 1500, "con el efectivo contado");
+    assert.equal((snap?.tickets ?? []).length, 0, "sin ninguna venta de por medio");
+    assert.ok(!(await pend()).turnosCambiados.includes(turno), "ya enviado, deja de repetirse");
+  });
+
+  test("un turno sin ventas viaja con sus movimientos de caja, y cualquier cambio suyo vuelve a viajar", async () => {
+    await enReplica("UPDATE turnos SET estado = 'CERRADO', fecha_cierre = now() WHERE caja_id = $1 AND estado = 'ABIERTO'", [CAJA]);
+    const { rows: [{ id: nuevo }] } = await enReplica(
+      `INSERT INTO turnos (tenant_id, sucursal_id, caja_id, codigo_turno, dia_contable, usuario_apertura_id, fondo_inicial_mxn, fondo_modo)
+       VALUES ($1, $2, $3, 'PRUEBA-PC-2', CURRENT_DATE, $4, 0, 'TOTAL') RETURNING id`, [TENANT, SUC, CAJA, MARIA]);
+    await enReplica(
+      `INSERT INTO movimientos_caja (tenant_id, sucursal_id, caja_id, turno_id, folio, tipo, monto_mxn, dia_contable, usuario_solicitante_id, motivo)
+       VALUES ($1, $2, $3, $4, 'SAN-PRUEBA-1', 'SANGRIA', 300, CURRENT_DATE, $5, 'Prueba')`, [TENANT, SUC, CAJA, nuevo, MARIA]);
+
+    const [snap] = await subir();
+    assert.ok((snap?.turnos ?? []).some((t) => t.id === nuevo), "manda el turno");
+    assert.equal((snap?.movimientos_caja ?? []).filter((m) => m.turno_id === nuevo).length, 1, "y su movimiento de caja");
+    assert.ok(!(await pend()).turnosCambiados.includes(nuevo), "confirmado, no se repite");
+
+    await enReplica("UPDATE turnos SET efectivo_contado_mxn = 999 WHERE id = $1", [nuevo]);
+    assert.ok((await pend()).turnosCambiados.includes(nuevo), "la huella es de la fila completa: cualquier cambio lo detecta");
+  });
 });
 
 // ── Lealtad (0156, ADR 0030): movimientos y canjes viajan en el push ──────────────────────────
