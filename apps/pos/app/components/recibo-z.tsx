@@ -1,5 +1,6 @@
 "use client";
 import type { DatosReporteZ } from "../lib/print/reporte-z-builder";
+import { PaperEdge } from "./recibo-ticket";
 
 /**
  * Reporte Z (corte de caja) — estilo "Soft Restaurant" (operativo, lo que
@@ -248,24 +249,6 @@ function DividerSolid() {
 
 function DividerDashed() {
   return <hr className="my-2.5 border-0 border-t border-dashed border-[#B0B0B0]" />;
-}
-
-function PaperEdge({ top }: { top?: boolean }) {
-  return (
-    <div
-      aria-hidden
-      className="absolute left-0 right-0 h-2"
-      style={{
-        top: top ? "-8px" : undefined,
-        bottom: !top ? "-8px" : undefined,
-        transform: top ? undefined : "rotate(180deg)",
-        backgroundImage:
-          "linear-gradient(45deg, transparent 33.3%, #fff 33.3%, #fff 66.6%, transparent 66.6%), linear-gradient(-45deg, transparent 33.3%, #fff 33.3%, #fff 66.6%, transparent 66.6%)",
-        backgroundSize: "12px 16px",
-        backgroundRepeat: "repeat-x",
-      }}
-    />
-  );
 }
 
 // ── helpers ───────────────────────────────────────────────────────────────

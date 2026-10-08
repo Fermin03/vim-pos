@@ -18,7 +18,7 @@ import {
 } from "../lib/devoluciones";
 import { autorizacionPropia, type Autorizacion } from "../lib/autorizacion";
 import { ModalAutorizacionPin } from "./modal-autorizacion-pin";
-import { AvisoAutorizacion, MotivoChips } from "./motivo-y-autorizacion";
+import { AvisoAutorizacion, MotivoChips, etiquetaMotivo } from "./motivo-y-autorizacion";
 import { leerTicketParaImpresion } from "../lib/print/ticket-datos";
 import { obtenerImpresora } from "../lib/print/adapter";
 import { construirDevolucionJob, type DatosDevolucion } from "../lib/print/devolucion-builder";
@@ -172,10 +172,7 @@ function ModalDevolucion({
     leerItemsVenta(token, venta.ticketId).then(setItems).catch(() => setError("No se pudieron leer los ítems"));
   }, [token, venta.ticketId]);
 
-  function labelMotivo(): string {
-    if (motivo === "OTRO") return motivoTexto.trim() || "Otro";
-    return MOTIVOS_DEV.find((m) => m.codigo === motivo)?.label ?? motivo;
-  }
+  const labelMotivo = () => etiquetaMotivo(MOTIVOS_DEV, motivo, motivoTexto);
 
   async function ejecutar(a: Autorizacion) {
     if (!items) return;
@@ -254,16 +251,9 @@ function ModalDevolucion({
     return (
       <ModalAutorizacionPin
         token={token}
-        accion="devolucion"
-        permisoCodigo="venta.devolucion"
+        payload={{ accion: "devolucion", permisoCodigo: "venta.devolucion", entidadTipo: "ticket", entidadId: venta.ticketId, monto: venta.total, motivo: labelMotivo(), cajaId: turno.caja_id, turnoId: turno.id }}
         descripcion={`Devolución de ${venta.folio} · ${labelMotivo()}`}
         ejecutaNombre={empleado.nombre}
-        monto={venta.total}
-        entidadTipo="ticket"
-        entidadId={venta.ticketId}
-        cajaId={turno.caja_id}
-        turnoId={turno.id}
-        motivo={labelMotivo()}
         onAutorizado={(a) => ejecutar(a)}
         onCancelar={() => setPidiendoPin(false)}
       />

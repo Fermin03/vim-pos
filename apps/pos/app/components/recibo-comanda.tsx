@@ -1,5 +1,6 @@
 "use client";
 import type { DatosComanda } from "../lib/print/comanda-builder";
+import { PaperEdge } from "./recibo-ticket";
 
 /**
  * Render fiel de la comanda de cocina P-223 desde los datos crudos.
@@ -104,23 +105,5 @@ function ModRender({ texto }: { texto: string }) {
     <span className="font-sans text-[14px] font-semibold">
       <span className="font-extrabold">+ </span>{t}
     </span>
-  );
-}
-
-function PaperEdge({ top }: { top?: boolean }) {
-  return (
-    <div
-      aria-hidden
-      className="absolute left-0 right-0 h-2"
-      style={{
-        top: top ? "-8px" : undefined,
-        bottom: !top ? "-8px" : undefined,
-        transform: top ? undefined : "rotate(180deg)",
-        backgroundImage:
-          "linear-gradient(45deg, transparent 33.3%, #fff 33.3%, #fff 66.6%, transparent 66.6%), linear-gradient(-45deg, transparent 33.3%, #fff 33.3%, #fff 66.6%, transparent 66.6%)",
-        backgroundSize: "12px 16px",
-        backgroundRepeat: "repeat-x",
-      }}
-    />
   );
 }

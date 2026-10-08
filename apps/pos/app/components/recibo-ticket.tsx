@@ -217,7 +217,7 @@ function ReciboPapel({ children }: { children: React.ReactNode }) {
 }
 
 /** Borde dentado de papel térmico (P-222/P-223). */
-function PaperEdge({ top }: { top?: boolean }) {
+export function PaperEdge({ top }: { top?: boolean }) {
   return (
     <div
       aria-hidden

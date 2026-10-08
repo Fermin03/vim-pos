@@ -52,16 +52,9 @@ export function ModalAbrirCaja({
     return (
       <ModalAutorizacionPin
         token={token}
-        accion="abrir_cajon"
-        permisoCodigo={PERMISO}
+        payload={{ accion: "abrir_cajon", permisoCodigo: PERMISO, entidadTipo: "caja", entidadId: cajaId, monto: null, motivo: "Apertura manual del cajón", cajaId, turnoId }}
         descripcion="Abrir cajón de dinero"
         ejecutaNombre={empleado.nombre}
-        monto={null}
-        entidadTipo="caja"
-        entidadId={cajaId}
-        cajaId={cajaId}
-        turnoId={turnoId}
-        motivo="Apertura manual del cajón"
         onAutorizado={onAutorizado}
         onCancelar={onCerrar}
       />

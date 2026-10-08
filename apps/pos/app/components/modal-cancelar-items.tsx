@@ -5,7 +5,7 @@ import { type Empleado } from "../lib/supabase";
 import { cancelarItem, MOTIVOS_CANCELACION, type MotivoCancelacion } from "../lib/cancelacion";
 import { autorizacionPropia, type Autorizacion, type PayloadAutorizacion } from "../lib/autorizacion";
 import { ModalAutorizacionPin } from "./modal-autorizacion-pin";
-import { AvisoAutorizacion, MotivoChips } from "./motivo-y-autorizacion";
+import { AvisoAutorizacion, MotivoChips, etiquetaMotivo } from "./motivo-y-autorizacion";
 import { fmtMxn } from "../lib/turno";
 import { useEscape } from "../lib/use-escape";
 
@@ -91,10 +91,7 @@ export function ModalCancelarItems({
       return n;
     });
 
-  function labelMotivo(): string {
-    if (motivo === "OTRO") return motivoTexto.trim() || "Otro";
-    return MOTIVOS_CANCELACION.find((m) => m.codigo === motivo)?.label ?? motivo;
-  }
+  const labelMotivo = () => etiquetaMotivo(MOTIVOS_CANCELACION, motivo, motivoTexto);
 
   function payload(): PayloadAutorizacion {
     return {
@@ -172,16 +169,9 @@ export function ModalCancelarItems({
     return (
       <ModalAutorizacionPin
         token={token}
-        accion="cancelar_item"
-        permisoCodigo="venta.cancelar_abierta"
+        payload={payload()}
         descripcion={`Cancelar ${seleccionados.length} producto(s) · ${fmtMxn(montoTotal)} · ${labelMotivo()}`}
         ejecutaNombre={empleado.nombre}
-        monto={montoTotal}
-        entidadTipo="ticket"
-        entidadId={ticketId}
-        cajaId={cajaId}
-        turnoId={turnoId}
-        motivo={labelMotivo()}
         onAutorizado={(a) => ejecutar(a)}
         onCancelar={() => setPidiendoPin(false)}
       />

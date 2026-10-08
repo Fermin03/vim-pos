@@ -213,8 +213,8 @@ export function ModalConfigImpresora({ token, sucursalId, onCerrar }: { token: s
         {/* Qué imprime cada estación */}
         <div className="rounded border border-line p-3">
           <p className="mb-2 text-13 font-semibold text-ink-2">¿Qué imprime cada estación?</p>
-          <AsignacionRow label="Tickets y cortes (caja)" destino="CAJA" valor={cfg.asignacion.CAJA} onCambiar={(e) => asignar("CAJA", e)} />
-          <AsignacionRow label="Comandas (cocina)" destino="COCINA" valor={cfg.asignacion.COCINA} onCambiar={(e) => asignar("COCINA", e)} />
+          <AreaRow label="Tickets y cortes (caja)" valor={cfg.asignacion.CAJA} onCambiar={(e) => asignar("CAJA", e)} />
+          <AreaRow label="Comandas (cocina)" valor={cfg.asignacion.COCINA} onCambiar={(e) => asignar("COCINA", e)} />
           {cfg.asignacion.CAJA === cfg.asignacion.COCINA && (
             <p className="mt-2 text-12 text-ink-3">Con la misma estación para ambos, la comanda no se manda sola al cobrar (evita duplicar en el mismo papel); se imprime solo si la pides manualmente.</p>
           )}
@@ -252,23 +252,8 @@ export function ModalConfigImpresora({ token, sucursalId, onCerrar }: { token: s
   );
 }
 
-/** Misma fila que AsignacionRow pero para un área de preparación (la clave es su id, no un destino). */
+/** A qué impresora va algo: un destino (caja, cocina) o un área de preparación. */
 function AreaRow({ label, valor, onCambiar }: { label: string; valor: IdEstacion; onCambiar: (e: IdEstacion) => void }) {
-  return (
-    <div className="mb-1.5 flex items-center justify-between gap-2 last:mb-0">
-      <span className="text-13 text-ink-2">{label}</span>
-      <div className="flex gap-1">
-        {ESTACIONES.map((e) => (
-          <button key={e} type="button" onClick={() => onCambiar(e)} className={["rounded border px-2 py-1 text-12 font-semibold transition", valor === e ? "border-ink bg-ink text-white" : "border-line-strong text-ink-2 hover:border-ink"].join(" ")}>
-            {NOMBRE_ESTACION[e]}
-          </button>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function AsignacionRow({ label, valor, onCambiar }: { label: string; destino: Destino; valor: IdEstacion; onCambiar: (e: IdEstacion) => void }) {
   return (
     <div className="mb-1.5 flex items-center justify-between gap-2 last:mb-0">
       <span className="text-13 text-ink-2">{label}</span>

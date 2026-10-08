@@ -105,6 +105,18 @@ const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
 /** Pantalla desde la que se entró a capturar; a esa regresa el botón "Volver". */
 type Origen = "inicio" | "mesas" | "pickup" | "domicilio";
 
+/** Lo que la comanda toma tal cual del ticket; cada uso le suma lo suyo (agregado, cancelación). */
+const comandaDe = (datos: DatosTicketImpresion, lineas: DatosComanda["lineas"]): DatosComanda => ({
+  folio: datos.meta.folio,
+  modoServicio: datos.meta.modoServicio,
+  cajero: datos.meta.cajero,
+  caja: datos.meta.caja,
+  fechaIso: datos.meta.fechaIso,
+  cliente: datos.entrega?.cliente ?? datos.meta.nombreCliente ?? null,
+  lineas,
+  ancho: 80,
+});
+
 export function HomePos({
   empleado,
   caja,
@@ -253,6 +265,19 @@ export function HomePos({
    */
   const ticketClientIdRef = useRef<string | null>(null);
   const idTicketDelCarrito = (): string => (ticketClientIdRef.current ??= nuevoClientId());
+  /** Guarda el carrito como ticket (abrir, renglones y envío). Reintentable: lleva el mismo id local. */
+  const persistirCarrito = () =>
+    persistirTicket(
+      { token, sucursalId: caja.sucursal_id, cajaId: turno.caja_id, turnoId: turno.id },
+      carrito.modoServicio,
+      carrito.lineas,
+      idTicketDelCarrito(),
+      clienteIdParaTicket(carrito),
+      carrito.clienteDomicilio?.direccionId ?? null,
+      carrito.notaOrden ?? null,
+      carrito.nombreCuenta ?? null,
+      carrito.envio?.zonaId ?? null,
+    );
   /**
    * El `ticketBd` adoptado tras un `ErrorTicketParcial` que NO es de envío: el ticket existe pero le
    * falta algo (un renglón, la nota…). Mientras sea `true` el carrito sigue bloqueado —para que el
@@ -869,17 +894,7 @@ export function HomePos({
       // Si lo recién enviado no tiene nada para cocina (p. ej. solo cargos), no hay comanda: un
       // papel vacío rotulado AGREGADO hace que la cocina busque un pedido que no existe.
       if (lineas.length === 0) return;
-      const dc: DatosComanda = {
-        folio: datos.meta.folio,
-        modoServicio: datos.meta.modoServicio,
-        cajero: datos.meta.cajero,
-        caja: datos.meta.caja,
-        fechaIso: datos.meta.fechaIso,
-        cliente: datos.entrega?.cliente ?? datos.meta.nombreCliente ?? null,
-        esAgregado,
-        lineas,
-        ancho: 80,
-      };
+      const dc: DatosComanda = { ...comandaDe(datos, lineas), esAgregado };
       const fallidas = await imprimirComandaPorAreas(dc, lineas, { ticketId, evento: "IMPRESION_INICIAL" });
       // El pedido YA está en cocina (KDS): un fallo de papel no debe deshacer nada ni bloquear.
       // Pero tampoco se calla: si nadie avisa, la cocina se queda sin comanda y nadie se entera.
@@ -907,17 +922,8 @@ export function HomePos({
       const datos = await leerTicketParaImpresion(ticketId, {
         token, cajeroNombre: empleado.nombre, cajaNombre: caja.nombre, conLealtad: false,
       });
-      const dc: DatosComanda = {
-        folio: datos.meta.folio,
-        modoServicio: datos.meta.modoServicio,
-        cajero: datos.meta.cajero,
-        caja: datos.meta.caja,
-        fechaIso: new Date().toISOString(), // la hora de la CANCELACIÓN, no la de la orden
-        cliente: datos.entrega?.cliente ?? datos.meta.nombreCliente ?? null,
-        esCancelacion: true,
-        lineas,
-        ancho: 80,
-      };
+      // La hora es la de la CANCELACIÓN, no la de la orden.
+      const dc: DatosComanda = { ...comandaDe(datos, lineas), fechaIso: new Date().toISOString(), esCancelacion: true };
       // El aviso va a la MISMA estación donde salió el original: si una bebida se preparó en la
       // barra y la cancelación se imprime en cocina, la barra la sigue preparando.
       const areas = await leerAreasDeItems(token, lineas.map((l) => l.ticketItemId));
@@ -1007,17 +1013,7 @@ export function HomePos({
     try {
       let bd = ticketBd;
       if (!bd || ticketIncompleto) {
-        bd = await persistirTicket(
-          { token, sucursalId: caja.sucursal_id, cajaId: turno.caja_id, turnoId: turno.id },
-          carrito.modoServicio,
-          carrito.lineas,
-          idTicketDelCarrito(),
-          clienteIdParaTicket(carrito),
-          carrito.clienteDomicilio?.direccionId ?? null,
-          carrito.notaOrden ?? null,
-          carrito.nombreCuenta ?? null,
-          carrito.envio?.zonaId ?? null,
-        );
+        bd = await persistirCarrito();
         setTicketBd(bd);
         setTicketIncompleto(false);
       }
@@ -1042,17 +1038,7 @@ export function HomePos({
     try {
       let bd = ticketBd;
       if (!bd || ticketIncompleto) {
-        bd = await persistirTicket(
-          { token, sucursalId: caja.sucursal_id, cajaId: turno.caja_id, turnoId: turno.id },
-          carrito.modoServicio,
-          carrito.lineas,
-          idTicketDelCarrito(),
-          clienteIdParaTicket(carrito),
-          carrito.clienteDomicilio?.direccionId ?? null,
-          carrito.notaOrden ?? null,
-          carrito.nombreCuenta ?? null,
-          carrito.envio?.zonaId ?? null,
-        );
+        bd = await persistirCarrito();
         setTicketBd(bd);
         setTicketIncompleto(false);
       }
@@ -1128,17 +1114,7 @@ export function HomePos({
     setProcesandoCobro(true);
     setError(null);
     try {
-      const totales = await persistirTicket(
-        { token, sucursalId: caja.sucursal_id, cajaId: turno.caja_id, turnoId: turno.id },
-        carrito.modoServicio,
-        carrito.lineas,
-        idTicketDelCarrito(),
-        clienteIdParaTicket(carrito),
-        carrito.clienteDomicilio?.direccionId ?? null,
-        carrito.notaOrden ?? null,
-        carrito.nombreCuenta ?? null,
-        carrito.envio?.zonaId ?? null,
-      );
+      const totales = await persistirCarrito();
       /* EL TICKET YA EXISTE, CON FOLIO. La pantalla tiene que saberlo desde este instante.
 
          Antes solo se guardaba en `totalesCobro` (para el modal), y `ticketBd` se quedaba en
@@ -1209,17 +1185,7 @@ export function HomePos({
     try {
       let bd = ticketBd;
       if (!bd || ticketIncompleto) {
-        bd = await persistirTicket(
-          { token, sucursalId: caja.sucursal_id, cajaId: turno.caja_id, turnoId: turno.id },
-          carrito.modoServicio,
-          carrito.lineas,
-          idTicketDelCarrito(),
-          clienteIdParaTicket(carrito),
-          carrito.clienteDomicilio?.direccionId ?? null,
-          carrito.notaOrden ?? null,
-          carrito.nombreCuenta ?? null,
-          carrito.envio?.zonaId ?? null,
-        );
+        bd = await persistirCarrito();
       }
       await ponerTicketEnEspera(token, bd.ticketId, etiqueta);
       // La caja queda libre para la siguiente venta; el pedido vive en BD.
@@ -1246,17 +1212,7 @@ export function HomePos({
     try {
       let bd = ticketBd;
       if (!bd || ticketIncompleto) {
-        bd = await persistirTicket(
-          { token, sucursalId: caja.sucursal_id, cajaId: turno.caja_id, turnoId: turno.id },
-          carrito.modoServicio,
-          carrito.lineas,
-          idTicketDelCarrito(),
-          clienteIdParaTicket(carrito),
-          carrito.clienteDomicilio?.direccionId ?? null,
-          carrito.notaOrden ?? null,
-          carrito.nombreCuenta ?? null,
-          carrito.envio?.zonaId ?? null,
-        );
+        bd = await persistirCarrito();
         // Desde aquí el ticket es real. Si lo de abajo falla —la impresora, la red— el error se
         // muestra y el cajero sigue en la pantalla; sin esto la pantalla no sabía que el ticket
         // existía y "Volver" lo abandonaba sin preguntar.
@@ -1295,16 +1251,7 @@ export function HomePos({
       const datos = await leerTicketParaImpresion(ticketId, { token, cajeroNombre: empleado.nombre, cajaNombre: caja.nombre, conLealtad: false });
       const lineas = lineasParaComanda(datos.lineas);
       if (lineas.length === 0) return;
-      const dc: DatosComanda = {
-        folio: datos.meta.folio,
-        modoServicio: datos.meta.modoServicio,
-        cajero: datos.meta.cajero,
-        caja: datos.meta.caja,
-        fechaIso: datos.meta.fechaIso,
-        cliente: datos.entrega?.cliente ?? datos.meta.nombreCliente ?? null,
-        lineas,
-        ancho: 80,
-      };
+      const dc = comandaDe(datos, lineas);
       const fallidas = await imprimirComandaPorAreas(dc, lineas, { ticketId, evento: "REIMPRESION_CAJERO", razon: motivo, autorizacionPinId });
       if (fallidas.length > 0) setError(`No se pudo reimprimir la comanda de ${fallidas.join(" y ")}.`);
     } catch {
@@ -1961,6 +1908,22 @@ export function HomePos({
     return <PantallaKds token={token} caja={caja} onSalir={() => setEnKds(false)} />;
   }
 
+  // Retiro / depósito: se abre igual desde la pantalla de inicio que desde la de venta.
+  const modalMovimiento = movimientoAbierto && (
+    <ModalMovimientoCaja
+      token={token}
+      empleado={empleado}
+      caja={caja}
+      turno={turno}
+      onRegistrado={(m) => {
+        setMovimientoAbierto(false);
+        setMovimientoToast({ folio: m.folio, etiqueta: m.etiqueta, monto: m.monto });
+        setTimeout(() => setMovimientoToast(null), 4000);
+      }}
+      onCerrar={() => setMovimientoAbierto(false)}
+    />
+  );
+
   // Pantalla de inicio: punto de entrada del turno. Desde aquí se elige modo u operación.
   if (enInicio) {
     return (
@@ -1996,20 +1959,7 @@ export function HomePos({
           onMenu={() => setMenuGeneralAbierto(true)}
           online={online}
         />
-        {movimientoAbierto && (
-          <ModalMovimientoCaja
-            token={token}
-            empleado={empleado}
-            caja={caja}
-            turno={turno}
-            onRegistrado={(m) => {
-              setMovimientoAbierto(false);
-              setMovimientoToast({ folio: m.folio, etiqueta: m.etiqueta, monto: m.monto });
-              setTimeout(() => setMovimientoToast(null), 4000);
-            }}
-            onCerrar={() => setMovimientoAbierto(false)}
-          />
-        )}
+        {modalMovimiento}
         {menuGeneralAbierto && (
           <MenuGeneral
             onCorteX={() => { setEnInicio(false); setEnMonitor(true); }}
@@ -2493,20 +2443,7 @@ export function HomePos({
           onCerrar={() => setDescuentoAbierto(false)}
         />
       )}
-      {movimientoAbierto && (
-        <ModalMovimientoCaja
-          token={token}
-          empleado={empleado}
-          caja={caja}
-          turno={turno}
-          onRegistrado={(m) => {
-            setMovimientoAbierto(false);
-            setMovimientoToast({ folio: m.folio, etiqueta: m.etiqueta, monto: m.monto });
-            setTimeout(() => setMovimientoToast(null), 4000);
-          }}
-          onCerrar={() => setMovimientoAbierto(false)}
-        />
-      )}
+      {modalMovimiento}
       {movimientoToast && (
         <div className="fixed left-1/2 top-20 z-[80] -translate-x-1/2 rounded-lg bg-ink px-5 py-3 text-14 font-medium text-white shadow-xl">
           <span className="font-semibold">{movimientoToast.folio}</span> · {movimientoToast.etiqueta} · {fmtMxn(movimientoToast.monto)} registrado
