@@ -109,13 +109,8 @@ export async function reabrirCuentaImpresa(token: string, ticketId: string, auto
   if (error) throw new Error(error.message);
 }
 
-/** Minutos desde que se abrió la cuenta (para la lista). Puro. */
-export function minutosAbierta(desdeIso: string | null, ahora: Date = new Date()): number {
-  if (!desdeIso) return 0;
-  const d = new Date(desdeIso).getTime();
-  if (Number.isNaN(d)) return 0;
-  return Math.max(0, Math.floor((ahora.getTime() - d) / 60000));
-}
+/** Minutos desde que se abrió la cuenta (para la lista): la misma cuenta que una en espera. */
+export { minutosEnEspera as minutosAbierta } from "./espera";
 
 /** Renglón de una cuenta con TODO lo que el cajero necesita ver antes de cobrar. */
 export type RenglonCuenta = {

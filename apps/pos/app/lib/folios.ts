@@ -1,5 +1,6 @@
 "use client";
 import { deviceClient } from "./supabase";
+import { esEscritorio } from "./actualizacion";
 
 /**
  * Folios de facturación que le quedan al negocio.
@@ -32,9 +33,6 @@ export type LecturaFolios =
   | { estado: "ok"; saldo: SaldoFolios }
   | { estado: "sin-conexion" }
   | { estado: "no-aplica" };
-
-const esEscritorio = (): boolean =>
-  typeof window !== "undefined" && (window as unknown as { __VIM_DESKTOP?: boolean }).__VIM_DESKTOP === true;
 
 export async function leerFolios(): Promise<LecturaFolios> {
   return esEscritorio() ? await desdeEscritorio() : await desdeNube();

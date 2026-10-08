@@ -163,13 +163,9 @@ export async function pinLogin(
 ): Promise<PinLoginResult> {
   const { data: sess } = await deviceClient.auth.getSession();
   const deviceToken = sess.session?.access_token ?? ANON;
-  const res = await fetch(`${URL}/functions/v1/pin-login`, {
+  const res = await fetch(urlFuncion("pin-login"), {
     method: "POST",
-    headers: {
-      apikey: ANON,
-      Authorization: `Bearer ${deviceToken}`,
-      "Content-Type": "application/json",
-    },
+    headers: encabezadosFuncion(deviceToken),
     body: JSON.stringify({ usuario_id: usuarioId, pin, caja_id: cajaId }),
   });
   const data = await res.json().catch(() => ({}));
