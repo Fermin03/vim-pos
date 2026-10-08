@@ -1,6 +1,6 @@
 "use client";
 import { supabase } from "./supabase";
-import { tenantId } from "./tenant";
+import { tenantId } from "./datos";
 
 /**
  * Módulos del cliente, en sus DOS capas (ADR 0014).

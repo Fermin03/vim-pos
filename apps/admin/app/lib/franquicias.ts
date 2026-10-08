@@ -1,6 +1,6 @@
 "use client";
 import { supabase } from "./supabase";
-import { tenantId } from "./tenant";
+import { tenantId } from "./datos";
 
 // Fase 5 · franquicias: agrupan sucursales del tenant para el reporteo central.
 // El scope del franquiciatario se da con usuarios_acceso por sucursal (D68).

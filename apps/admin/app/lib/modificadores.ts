@@ -1,7 +1,7 @@
 "use client";
 import { z } from "zod";
 import { supabase } from "./supabase";
-import { tenantId } from "./tenant";
+import { borrarSuave, tenantId } from "./datos";
 
 export const TIPO_SELECCION = {
   UNICA_OBLIGATORIA: "Elige una (obligatorio)",
@@ -146,13 +146,7 @@ export async function actualizarGrupo(id: string, input: GrupoInput): Promise<vo
   if (error) throw new Error(error.message);
 }
 
-export async function eliminarGrupo(id: string): Promise<void> {
-  const { error } = await supabase
-    .from("grupos_modificadores")
-    .update({ deleted_at: new Date().toISOString() })
-    .eq("id", id);
-  if (error) throw new Error(error.message);
-}
+export const eliminarGrupo = (id: string): Promise<void> => borrarSuave("grupos_modificadores", id);
 
 // ── Opciones ─────────────────────────────────────────────────────────────────
 export const opcionSchema = z.object({
@@ -229,13 +223,7 @@ async function limpiarDefault(grupoId: string, exceptoId?: string): Promise<void
   await q;
 }
 
-export async function eliminarOpcion(id: string): Promise<void> {
-  const { error } = await supabase
-    .from("opciones_modificador")
-    .update({ deleted_at: new Date().toISOString() })
-    .eq("id", id);
-  if (error) throw new Error(error.message);
-}
+export const eliminarOpcion = (id: string): Promise<void> => borrarSuave("opciones_modificador", id);
 
 export function precioExtra(n: number): string {
   if (n === 0) return "—";

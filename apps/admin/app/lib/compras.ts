@@ -1,6 +1,6 @@
 "use client";
 import { supabase } from "./supabase";
-import { tenantId } from "./tenant";
+import { tenantId } from "./datos";
 import { convertirCantidad, type Conversion, type UnidadDetalle } from "./recetas";
 
 // Compras a proveedores (ADR 0012, spec 2026-09-03 §4.1, §4.2, §7.3). La parte pura (resolver

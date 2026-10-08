@@ -8,7 +8,7 @@
 import { z } from "zod";
 import { cantidad, puntosPorCompra, type Mecanica } from "@vim/db/lealtad";
 import { supabase } from "./supabase";
-import { tenantId } from "./tenant";
+import { tenantId } from "./datos";
 
 const SOLO_ADMIN = "Solo el dueño o un administrador puede cambiar la lealtad.";
 

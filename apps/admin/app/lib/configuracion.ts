@@ -1,7 +1,7 @@
 "use client";
 import { z } from "zod";
 import { supabase } from "./supabase";
-import { tenantId } from "./tenant";
+import { borrarSuave, tenantId } from "./datos";
 
 // ── Credenciales de dispositivo de una caja (provisionar-dispositivo) ─────────
 const SB_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!;
@@ -221,13 +221,7 @@ export async function actualizarMarca(id: string, input: MarcaInput): Promise<vo
   if (error) throw new Error(error.message);
 }
 
-export async function eliminarMarca(id: string): Promise<void> {
-  const { error } = await supabase
-    .from("marcas_virtuales")
-    .update({ deleted_at: new Date().toISOString() })
-    .eq("id", id);
-  if (error) throw new Error(error.message);
-}
+export const eliminarMarca = (id: string): Promise<void> => borrarSuave("marcas_virtuales", id);
 
 // ── CFDI / PAC emisor (P-018) ────────────────────────────────────────────────
 // FACTURAMA va primero porque es el PAC del producto (migración 0080). Los demás quedan por
@@ -464,13 +458,7 @@ export async function actualizarSucursal(id: string, input: SucursalInput): Prom
   if (error) throw new Error(error.message);
 }
 
-export async function eliminarSucursal(id: string): Promise<void> {
-  const { error } = await supabase
-    .from("sucursales")
-    .update({ deleted_at: new Date().toISOString() })
-    .eq("id", id);
-  if (error) throw new Error(error.message);
-}
+export const eliminarSucursal = (id: string): Promise<void> => borrarSuave("sucursales", id);
 
 // ── Cajas (P-167/168) ─────────────────────────────────────────────────────────
 export const cajaSchema = z.object({
@@ -545,13 +533,7 @@ export async function actualizarCaja(id: string, input: CajaInput): Promise<void
   if (error) throw new Error(error.message);
 }
 
-export async function eliminarCaja(id: string): Promise<void> {
-  const { error } = await supabase
-    .from("cajas")
-    .update({ deleted_at: new Date().toISOString() })
-    .eq("id", id);
-  if (error) throw new Error(error.message);
-}
+export const eliminarCaja = (id: string): Promise<void> => borrarSuave("cajas", id);
 
 // ── Propinas (P-173) ──────────────────────────────────────────────────────────
 export const propinasSchema = z.object({

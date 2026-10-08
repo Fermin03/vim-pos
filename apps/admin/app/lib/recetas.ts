@@ -1,6 +1,6 @@
 "use client";
 import { supabase } from "./supabase";
-import { tenantId } from "./tenant";
+import { tenantId } from "./datos";
 
 // Recetas con costeo (ADR 0012, spec 2026-09-03 §4.3 y §6). La cantidad operativa de un
 // componente va SIEMPRE en la unidad del insumo; aquí se convierte lo que el cocinero captura.

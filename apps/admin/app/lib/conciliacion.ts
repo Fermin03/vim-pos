@@ -2,7 +2,7 @@
 import { etiquetaApp } from "@vim/db/metodos-pago";
 import { z } from "zod";
 import { supabase } from "./supabase";
-import { tenantId } from "./tenant";
+import { tenantId } from "./datos";
 import { conciliarItems, resumenConciliacion, type LiqItem, type TicketPos } from "./conciliacion-match";
 
 const N = (v: unknown): number => Number(v ?? 0);

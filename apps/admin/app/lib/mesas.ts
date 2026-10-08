@@ -1,7 +1,7 @@
 "use client";
 import { z } from "zod";
 import { supabase } from "./supabase";
-import { tenantId } from "./tenant";
+import { borrarSuave, tenantId } from "./datos";
 
 // BUG C — Editor de mesas. La pantalla de Mesas del POS dirige aquí ("el dueño las da de alta
 // en el admin"), pero no existía. Tabla `mesas` (RLS mesas_select/insert/update por tenant).
@@ -100,7 +100,4 @@ export async function actualizarMesa(id: string, input: MesaInput): Promise<void
   if (error) throw new Error(error.message);
 }
 
-export async function eliminarMesa(id: string): Promise<void> {
-  const { error } = await supabase.from("mesas").update({ deleted_at: new Date().toISOString(), activa: false }).eq("id", id);
-  if (error) throw new Error(error.message);
-}
+export const eliminarMesa = (id: string): Promise<void> => borrarSuave("mesas", id, { activa: false });

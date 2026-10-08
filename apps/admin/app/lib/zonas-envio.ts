@@ -1,7 +1,7 @@
 "use client";
 import { z } from "zod";
 import { supabase } from "./supabase";
-import { tenantId } from "./tenant";
+import { borrarSuave, tenantId } from "./datos";
 
 /**
  * Zonas de envío por sucursal (0116_zonas_envio): a qué colonias reparte cada sucursal y cuánto
@@ -84,13 +84,7 @@ export async function setActivaZona(id: string, activa: boolean): Promise<void> 
 }
 
 /** Baja lógica: tickets y direcciones de cliente siguen apuntando a la zona. */
-export async function eliminarZona(id: string): Promise<void> {
-  const { error } = await supabase
-    .from("zonas_envio")
-    .update({ deleted_at: new Date().toISOString(), activa: false })
-    .eq("id", id);
-  if (error) throw new Error(error.message);
-}
+export const eliminarZona = (id: string): Promise<void> => borrarSuave("zonas_envio", id, { activa: false });
 
 /** El choque del índice único llega como jerga de Postgres; aquí se dice lo que pasó. */
 function traducir(mensaje: string): string {

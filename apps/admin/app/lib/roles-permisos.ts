@@ -1,6 +1,6 @@
 "use client";
 import { supabase } from "./supabase";
-import { tenantId } from "./tenant";
+import { tenantId } from "./datos";
 
 // Fase 5 · roles delegados (doc 09 §7). D71: override RESTRICTIVO por tenant (solo quitar
 // permisos a roles del sistema). D72: rol PERSONALIZADO = permisos explícitos por usuario.

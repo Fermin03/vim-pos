@@ -1,7 +1,7 @@
 "use client";
 import { z } from "zod";
 import { supabase } from "./supabase";
-import { tenantId } from "./tenant";
+import { borrarSuave, tenantId } from "./datos";
 
 // T3 — Promociones. Tabla promociones (RLS promociones_tenant FOR ALL). Alcance este slice:
 // tipos simples (PORCENTAJE, MONTO_FIJO, PRECIO_ESPECIAL, CORTESIA_TOTAL) a nivel TICKET_COMPLETO,
@@ -104,7 +104,4 @@ export async function cambiarEstadoPromo(id: string, estado: EstadoPromo): Promi
   if (error) throw new Error(error.message);
 }
 
-export async function eliminarPromo(id: string): Promise<void> {
-  const { error } = await supabase.from("promociones").update({ deleted_at: new Date().toISOString() }).eq("id", id);
-  if (error) throw new Error(error.message);
-}
+export const eliminarPromo = (id: string): Promise<void> => borrarSuave("promociones", id);

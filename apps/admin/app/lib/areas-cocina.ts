@@ -1,7 +1,7 @@
 "use client";
 import { z } from "zod";
 import { supabase } from "./supabase";
-import { tenantId } from "./tenant";
+import { tenantId } from "./datos";
 
 /**
  * Estaciones de preparación: dónde se prepara cada cosa y, por lo tanto, dónde se imprime su

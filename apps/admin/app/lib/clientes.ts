@@ -1,7 +1,7 @@
 "use client";
 import { z } from "zod";
 import { supabase } from "./supabase";
-import { tenantId } from "./tenant";
+import { borrarSuave, tenantId } from "./datos";
 import { CLIENTES_POR_PAGINA, filtroBusqueda, rangoPagina, ticketPromedio } from "./clientes-paginacion";
 
 // Tier1 — Clientes / CRM. Tabla `clientes` (RLS clientes_tenant FOR ALL). Datos fiscales para
@@ -152,7 +152,4 @@ export async function cambiarEstadoCliente(
   if (error) throw new Error(error.message);
 }
 
-export async function eliminarCliente(id: string): Promise<void> {
-  const { error } = await supabase.from("clientes").update({ deleted_at: new Date().toISOString() }).eq("id", id);
-  if (error) throw new Error(error.message);
-}
+export const eliminarCliente = (id: string): Promise<void> => borrarSuave("clientes", id);
