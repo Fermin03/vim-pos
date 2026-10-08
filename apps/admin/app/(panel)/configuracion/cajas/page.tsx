@@ -166,7 +166,7 @@ export default function CajasPage() {
                           <td className="px-4 py-3 text-15 font-semibold">{c.nombre}</td>
                           <td className="px-4 py-3">
                             {c.bloqueada ? (
-                              <span className="inline-flex items-center gap-1.5 rounded-full bg-[#FBF1EF] px-[11px] py-1 text-13 font-semibold text-danger">
+                              <span className="inline-flex items-center gap-1.5 rounded-full bg-danger-soft px-[11px] py-1 text-13 font-semibold text-danger">
                                 <span className="h-1.5 w-1.5 rounded-full bg-danger" />Bloqueada
                               </span>
                             ) : (

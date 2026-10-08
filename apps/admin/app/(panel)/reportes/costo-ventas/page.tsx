@@ -15,6 +15,7 @@ import {
   type AgruparPor,
   type FilaCosto,
 } from "../../../lib/reportes-inventario";
+import { Segmentos } from "../../../components/controles";
 
 const mxn = (n: number) => formatear(n, "mxn");
 const pct = (n: number) => formatear(n, "pct");
@@ -160,19 +161,14 @@ export default function CostoVentasPage() {
 
   const filtrosUi = (
     <div className="flex w-full flex-col gap-2 lg:w-auto lg:flex-row lg:items-start">
-      <div role="group" aria-label="Agrupar por" className="inline-flex gap-0.5 self-start rounded border border-line bg-hover p-[3px]">
-        {(["producto", "categoria"] as const).map((a) => (
-          <button
-            key={a}
-            type="button"
-            aria-pressed={agrupar === a}
-            onClick={() => setAgrupar(a)}
-            className={`min-h-[40px] whitespace-nowrap rounded-[4px] px-3 text-13 font-semibold transition-colors ${agrupar === a ? "bg-surface text-ink shadow-sm" : "text-ink-2 hover:text-ink"}`}
-          >
-            {a === "producto" ? "Por producto" : "Por categoría"}
-          </button>
-        ))}
-      </div>
+      <Segmentos
+        grande
+        className="self-start"
+        etiqueta="Agrupar por"
+        opciones={[{ v: "producto", l: "Por producto" }, { v: "categoria", l: "Por categoría" }]}
+        valor={agrupar}
+        onCambiar={setAgrupar}
+      />
     </div>
   );
 

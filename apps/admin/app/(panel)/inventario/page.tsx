@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Button, useConfirmar } from "@vim/ui/styles";
+import { Button, Modal, useConfirmar } from "@vim/ui/styles";
 import { PageBody, PageHeader } from "../../components/page-header";
 import {
   activarModuloInventario,
@@ -24,9 +24,9 @@ import {
 } from "../../lib/inventario";
 import { listarRecetasResumen } from "../../lib/recetas";
 import { mensajeError } from "../../lib/errores";
+import { input, label } from "../../components/campos";
+import { AccionFila, Segmentos } from "../../components/controles";
 
-const input = "h-11 w-full rounded border border-line-strong px-3 text-sm outline-none focus:border-ink focus:shadow-[0_0_0_3px_rgba(22,22,26,.06)]";
-const label = "mb-1.5 block text-13 font-medium text-ink-2";
 const fmt = (n: number) => new Intl.NumberFormat("es-MX", { style: "currency", currency: "MXN" }).format(n);
 
 type FormDatos = { nombre: string; unidad_medida_id: string; categoria: (typeof CATEGORIAS_INSUMO)[number]; costo: string; stockMin: string };
@@ -44,7 +44,7 @@ function estadoDe(i: Insumo): EstadoStock {
 
 const BADGE: Record<EstadoStock, { texto: string; clase: string }> = {
   AGOTADO: { texto: "Agotado", clase: "bg-danger-soft text-danger" },
-  BAJO: { texto: "Stock bajo", clase: "bg-[#FDF3E2] text-warning" },
+  BAJO: { texto: "Stock bajo", clase: "bg-warning-soft text-warning" },
   EN_NIVEL: { texto: "En nivel", clase: "bg-success-soft text-success" },
 };
 
@@ -276,18 +276,7 @@ export default function InventarioPage() {
           <div className="overflow-hidden rounded-lg border border-line bg-surface">
             {/* Filtros por estado + búsqueda */}
             <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line px-4 py-3">
-              <div className="scroll-x-limpio inline-flex max-w-full gap-0.5 overflow-x-auto rounded border border-line bg-hover p-[3px] lg:max-w-none lg:overflow-x-visible">
-                {TABS.map((t) => (
-                  <button
-                    key={t.v}
-                    type="button"
-                    onClick={() => { setFiltro(t.v); setPagina(1); }}
-                    className={["flex-shrink-0 whitespace-nowrap rounded-[4px] px-3 py-[11px] text-13 font-semibold transition lg:py-1.5", filtro === t.v ? "bg-surface text-ink shadow-sm" : "text-ink-2 hover:text-ink"].join(" ")}
-                  >
-                    {t.l}
-                  </button>
-                ))}
-              </div>
+              <Segmentos etiqueta="Qué insumos ver" opciones={TABS} valor={filtro} onCambiar={(v) => { setFiltro(v); setPagina(1); }} />
               <input
                 className="h-9 w-full rounded border sm:w-[220px] border-line-strong px-3 text-13 outline-none focus:border-ink"
                 value={busqueda}
@@ -328,9 +317,9 @@ export default function InventarioPage() {
                         </td>
                         <td className="px-4 py-2.5 text-right tabular-nums text-ink-2">{fmt(i.costoUnitario)}</td>
                         <td className="px-4 py-2.5 text-right whitespace-nowrap">
-                          <button type="button" onClick={() => setMoviendo(i)} className="text-13 font-semibold text-ink-2 hover:text-ink">Movimiento</button>
-                          <button type="button" onClick={() => editar(i)} className="ml-3 text-13 font-semibold text-ink-3 hover:text-ink">Editar</button>
-                          <button type="button" onClick={() => borrar(i)} className="ml-3 text-13 font-semibold text-ink-3 hover:text-danger">Eliminar</button>
+                          <AccionFila onClick={() => setMoviendo(i)}>Movimiento</AccionFila>
+                          <AccionFila className="ml-3" onClick={() => editar(i)}>Editar</AccionFila>
+                          <AccionFila peligro className="ml-3" onClick={() => borrar(i)}>Eliminar</AccionFila>
                         </td>
                       </tr>
                     );
@@ -468,57 +457,55 @@ function ModalMovimiento({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/30 p-4">
-      <div role="dialog" aria-modal="true" aria-label="Movimiento de inventario" className="w-full max-w-[420px] rounded-lg border border-line bg-surface p-6 shadow-[0_18px_44px_rgba(22,22,26,.18)]">
-        <div className="mb-4">
-          <h2 className="font-display text-xl font-semibold tracking-tight">Movimiento de inventario</h2>
-          <p className="mt-0.5 text-13 text-ink-3">{insumo.nombre} · stock {insumo.stockActual} {insumo.unidadSimbolo}</p>
-        </div>
+    <Modal open hideTitle onClose={onCerrar} title="Movimiento de inventario" className="w-full max-w-[420px] rounded-lg border border-line bg-surface p-6 shadow-[0_18px_44px_rgba(22,22,26,.18)]">
+      <div className="mb-4">
+        <p aria-hidden="true" className="font-display text-xl font-semibold tracking-tight">Movimiento de inventario</p>
+        <p className="mt-0.5 text-13 text-ink-3">{insumo.nombre} · stock {insumo.stockActual} {insumo.unidadSimbolo}</p>
+      </div>
 
-        <div className="mb-3 inline-flex w-full gap-0.5 rounded border border-line bg-hover p-[3px]">
-          {TIPOS_MOV.map((t) => (
-            <button key={t.v} type="button" onClick={() => setTipo(t.v)}
-              className={["flex-1 rounded-[4px] px-2 py-2 text-12 font-semibold transition", tipo === t.v ? "bg-surface text-ink shadow-sm" : "text-ink-2 hover:text-ink"].join(" ")}>
-              {t.l}
-            </button>
-          ))}
-        </div>
-        <p className="mb-3 text-12 text-ink-3">Las entradas por compra se registran en Compras.</p>
+      <div className="mb-3 inline-flex w-full gap-0.5 rounded border border-line bg-hover p-[3px]">
+        {TIPOS_MOV.map((t) => (
+          <button key={t.v} type="button" onClick={() => setTipo(t.v)}
+            className={["flex-1 rounded-[4px] px-2 py-2 text-12 font-semibold transition", tipo === t.v ? "bg-surface text-ink shadow-sm" : "text-ink-2 hover:text-ink"].join(" ")}>
+            {t.l}
+          </button>
+        ))}
+      </div>
+      <p className="mb-3 text-12 text-ink-3">Las entradas por compra se registran en Compras.</p>
 
-        {sucursales.length > 1 && (
-          <div className="mb-3">
-            <label className={label} htmlFor="m-suc">Sucursal</label>
-            <select id="m-suc" className={input} value={sucursalId} onChange={(e) => setSucursalId(e.target.value)}>
-              {sucursales.map((s) => <option key={s.id} value={s.id}>{s.nombre}</option>)}
-            </select>
+      {sucursales.length > 1 && (
+        <div className="mb-3">
+          <label className={label} htmlFor="m-suc">Sucursal</label>
+          <select id="m-suc" className={input} value={sucursalId} onChange={(e) => setSucursalId(e.target.value)}>
+            {sucursales.map((s) => <option key={s.id} value={s.id}>{s.nombre}</option>)}
+          </select>
+        </div>
+      )}
+
+      <div className="mb-3 grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <div>
+          <label className={label} htmlFor="m-cant">Cantidad ({insumo.unidadSimbolo})</label>
+          <input id="m-cant" className={input} value={cantidad} inputMode="decimal" autoFocus onChange={(e) => setCantidad(e.target.value.replace(/[^0-9.]/g, ""))} placeholder="0" />
+        </div>
+        {tipo === "AJUSTE_POSITIVO" && (
+          <div>
+            <label className={label} htmlFor="m-costo">Costo unitario · opcional</label>
+            <input id="m-costo" className={input} value={costo} inputMode="decimal" onChange={(e) => setCosto(e.target.value.replace(/[^0-9.]/g, ""))} placeholder="0.00" />
           </div>
         )}
-
-        <div className="mb-3 grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <div>
-            <label className={label} htmlFor="m-cant">Cantidad ({insumo.unidadSimbolo})</label>
-            <input id="m-cant" className={input} value={cantidad} inputMode="decimal" autoFocus onChange={(e) => setCantidad(e.target.value.replace(/[^0-9.]/g, ""))} placeholder="0" />
-          </div>
-          {tipo === "AJUSTE_POSITIVO" && (
-            <div>
-              <label className={label} htmlFor="m-costo">Costo unitario · opcional</label>
-              <input id="m-costo" className={input} value={costo} inputMode="decimal" onChange={(e) => setCosto(e.target.value.replace(/[^0-9.]/g, ""))} placeholder="0.00" />
-            </div>
-          )}
-        </div>
-
-        <div className="mb-4">
-          <label className={label} htmlFor="m-mot">Motivo · opcional</label>
-          <input id="m-mot" className={input} value={motivo} maxLength={150} onChange={(e) => setMotivo(e.target.value)} placeholder="Ej. compra del día, producto echado a perder" />
-        </div>
-
-        {error && <p className="mb-3 text-sm font-medium text-danger" role="alert">{error}</p>}
-
-        <div className="flex items-center justify-end gap-2">
-          <Button variant="ghost" onClick={onCerrar} disabled={procesando}>Cancelar</Button>
-          <Button onClick={confirmar} disabled={procesando}>{procesando ? "Registrando…" : "Registrar"}</Button>
-        </div>
       </div>
-    </div>
+
+      <div className="mb-4">
+        <label className={label} htmlFor="m-mot">Motivo · opcional</label>
+        <input id="m-mot" className={input} value={motivo} maxLength={150} onChange={(e) => setMotivo(e.target.value)} placeholder="Ej. compra del día, producto echado a perder" />
+      </div>
+
+      {error && <p className="mb-3 text-sm font-medium text-danger" role="alert">{error}</p>}
+
+      <div className="flex items-center justify-end gap-2">
+        <Button variant="ghost" onClick={onCerrar} disabled={procesando}>Cancelar</Button>
+        <Button onClick={confirmar} disabled={procesando}>{procesando ? "Registrando…" : "Registrar"}</Button>
+      </div>
+    </Modal>
   );
 }

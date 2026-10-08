@@ -19,7 +19,7 @@ function estadoDe(r: RecetaResumen): Estado {
 }
 const BADGE: Record<Estado, { texto: string; clase: string }> = {
   CON: { texto: "Con receta", clase: "bg-success-soft text-success" },
-  PAUSADA: { texto: "Receta pausada", clase: "bg-[#FDF3E2] text-warning" },
+  PAUSADA: { texto: "Receta pausada", clase: "bg-warning-soft text-warning" },
   SIN: { texto: "Sin receta", clase: "bg-hover text-ink-3" },
 };
 

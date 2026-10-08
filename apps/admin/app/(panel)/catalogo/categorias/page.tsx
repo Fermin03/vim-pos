@@ -26,6 +26,7 @@ import {
   type FilaDeMenu,
   type MenuId,
 } from "../../../lib/menus";
+import { Segmentos } from "../../../components/controles";
 
 type Filtro = "all" | "on" | "off";
 
@@ -254,21 +255,12 @@ export default function CategoriasPage() {
               className="h-10 w-full rounded border border-line-strong pl-[38px] pr-3 text-sm outline-none focus:border-ink"
             />
           </div>
-          <div className="scroll-x-limpio inline-flex max-w-full gap-0.5 overflow-x-auto rounded border border-line bg-hover p-[3px] lg:max-w-none lg:overflow-x-visible">
-            {(["all", "on", "off"] as Filtro[]).map((f) => (
-              <button
-                key={f}
-                type="button"
-                onClick={() => setFiltro(f)}
-                className={[
-                  "flex-shrink-0 whitespace-nowrap rounded-[4px] px-3 py-2.5 text-13 font-semibold transition lg:py-[7px]",
-                  filtro === f ? "bg-surface text-ink shadow-sm" : "text-ink-2 hover:text-ink",
-                ].join(" ")}
-              >
-                {f === "all" ? "Todas" : f === "on" ? "Activas" : "Inactivas"}
-              </button>
-            ))}
-          </div>
+          <Segmentos
+            etiqueta="Qué categorías ver"
+            opciones={[{ v: "all", l: "Todas" }, { v: "on", l: "Activas" }, { v: "off", l: "Inactivas" }]}
+            valor={filtro}
+            onCambiar={setFiltro}
+          />
         </div>
 
         {modoMenu && (
