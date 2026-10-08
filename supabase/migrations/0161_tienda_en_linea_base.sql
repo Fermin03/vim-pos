@@ -485,3 +485,165 @@ REVOKE ALL ON FUNCTION crear_ticket_desde_tienda(uuid) FROM PUBLIC, anon, authen
 GRANT EXECUTE ON FUNCTION crear_ticket_desde_tienda(uuid) TO service_role;
 COMMENT ON FUNCTION crear_ticket_desde_tienda(uuid) IS
   'Convierte un pedido de la tienda en línea en ticket ABIERTO y sin pago, con cliente por teléfono, dirección y envío. Idempotente.';
+
+-- ── §4 Configuración, cuentas de clientes y fotos ────────────────────────────
+
+-- El interruptor del dueño, hermano de modulo_delivery_activo (0113) y modulo_lealtad_activo (0156).
+ALTER TABLE configuracion_tenant
+  ADD COLUMN IF NOT EXISTS modulo_tienda_activo boolean NOT NULL DEFAULT false;
+COMMENT ON COLUMN configuracion_tenant.modulo_tienda_activo IS
+  'Interruptor del dueño para la tienda en línea. VIM concede el complemento TIENDA; el dueño la enciende.';
+
+CREATE TABLE IF NOT EXISTS tienda_config (
+  tenant_id          uuid PRIMARY KEY REFERENCES tenants(id) ON DELETE CASCADE,
+  -- La dirección pública: pedidos.vimpos.com.mx/<slug>. Las reservadas son rutas de la aplicación.
+  slug               text NOT NULL UNIQUE
+                     CHECK (slug ~ '^[a-z0-9][a-z0-9-]{1,38}[a-z0-9]$'
+                            AND slug NOT IN ('api', 'admin', 'pedido', 'cuenta', 'privacidad', 'terminos', 'static', 'assets')),
+  color              text NOT NULL DEFAULT '#111111' CHECK (color ~ '^#[0-9a-fA-F]{6}$'),
+  descripcion        varchar(200) NULL,
+  aceptacion         text NOT NULL DEFAULT 'MANUAL' CHECK (aceptacion IN ('MANUAL', 'AUTO')),
+  minutos_aceptacion integer NOT NULL DEFAULT 5 CHECK (minutos_aceptacion BETWEEN 3 AND 15),
+  pago_efectivo      boolean NOT NULL DEFAULT true,
+  pago_tarjeta       boolean NOT NULL DEFAULT false,
+  created_at         timestamptz NOT NULL DEFAULT now(),
+  updated_at         timestamptz NOT NULL DEFAULT now(),
+  CONSTRAINT tienda_config_algun_pago CHECK (pago_efectivo OR pago_tarjeta)
+);
+COMMENT ON TABLE tienda_config IS 'Tienda en línea de un negocio: dirección, apariencia, aceptación y formas de pago al recibir.';
+
+CREATE TABLE IF NOT EXISTS tienda_sucursales (
+  sucursal_id uuid PRIMARY KEY REFERENCES sucursales(id) ON DELETE CASCADE,
+  tenant_id   uuid NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+  participa   boolean NOT NULL DEFAULT false,
+  recoger     boolean NOT NULL DEFAULT true,
+  domicilio   boolean NOT NULL DEFAULT false,
+  -- Un rango por día: {"1": ["13:00","22:00"], …}; 1 = lunes … 7 = domingo. Día ausente = cerrado.
+  -- Cierre menor que apertura = cierra pasada la medianoche. Hora de México.
+  horario     jsonb NOT NULL DEFAULT '{}'::jsonb CHECK (jsonb_typeof(horario) = 'object'),
+  pausa_hasta timestamptz NULL,
+  created_at  timestamptz NOT NULL DEFAULT now(),
+  updated_at  timestamptz NOT NULL DEFAULT now()
+);
+COMMENT ON TABLE tienda_sucursales IS 'Qué sucursales venden en la tienda en línea, cómo y a qué horas. pausa_hasta la pone el cajero.';
+CREATE INDEX IF NOT EXISTS idx_tienda_sucursales_tenant ON tienda_sucursales (tenant_id);
+
+-- Lee cualquier empleado del negocio; escriben dueño y administradores. Molde de anuncios_pantalla (0150).
+DO $$
+DECLARE t text;
+BEGIN
+  FOREACH t IN ARRAY ARRAY['tienda_config', 'tienda_sucursales'] LOOP
+    EXECUTE format('ALTER TABLE %I ENABLE ROW LEVEL SECURITY', t);
+    EXECUTE format('GRANT SELECT, INSERT, UPDATE, DELETE ON %I TO authenticated, service_role', t);
+    EXECUTE format('DROP POLICY IF EXISTS %I ON %I', t || '_select', t);
+    EXECUTE format('CREATE POLICY %I ON %I FOR SELECT USING (tenant_id = current_tenant_id())', t || '_select', t);
+    EXECUTE format('DROP POLICY IF EXISTS %I ON %I', t || '_insert', t);
+    EXECUTE format('CREATE POLICY %I ON %I FOR INSERT WITH CHECK (tenant_id = current_tenant_id() AND es_admin_del_tenant(tenant_id))', t || '_insert', t);
+    EXECUTE format('DROP POLICY IF EXISTS %I ON %I', t || '_update', t);
+    EXECUTE format('CREATE POLICY %I ON %I FOR UPDATE USING (tenant_id = current_tenant_id() AND es_admin_del_tenant(tenant_id)) WITH CHECK (tenant_id = current_tenant_id() AND es_admin_del_tenant(tenant_id))', t || '_update', t);
+    EXECUTE format('DROP POLICY IF EXISTS %I ON %I', t || '_delete', t);
+    EXECUTE format('CREATE POLICY %I ON %I FOR DELETE USING (tenant_id = current_tenant_id() AND es_admin_del_tenant(tenant_id))', t || '_delete', t);
+    EXECUTE format('DROP TRIGGER IF EXISTS %I ON %I', 'trg_' || t || '_updated_at', t);
+    EXECUTE format('CREATE TRIGGER %I BEFORE UPDATE ON %I FOR EACH ROW EXECUTE FUNCTION set_updated_at()', 'trg_' || t || '_updated_at', t);
+  END LOOP;
+END $$;
+
+-- Las cuentas de los CLIENTES de la tienda. No viven en Supabase Auth a propósito: ahí el correo es
+-- único en toda la plataforma (el choque que ya se conoce con los empleados) y el público quedaría
+-- en el mismo rol `authenticated` que el personal. Aquí el correo es único POR NEGOCIO.
+-- Cerradas a todo rol salvo service_role: solo las toca la Edge Function `tienda`.
+CREATE TABLE IF NOT EXISTS tienda_cuentas (
+  id                   uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  tenant_id            uuid NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+  email                citext NOT NULL,
+  password_hash        text NOT NULL,
+  nombre               varchar(100) NOT NULL,
+  apellido             varchar(100) NULL,
+  telefono             varchar(20) NOT NULL,
+  fecha_nacimiento     date NULL,
+  acepto_privacidad_at timestamptz NULL,
+  intentos_fallidos    integer NOT NULL DEFAULT 0,
+  bloqueada_hasta      timestamptz NULL,
+  created_at           timestamptz NOT NULL DEFAULT now(),
+  updated_at           timestamptz NOT NULL DEFAULT now(),
+  deleted_at           timestamptz NULL
+);
+CREATE UNIQUE INDEX IF NOT EXISTS tienda_cuentas_email_uq ON tienda_cuentas (tenant_id, email) WHERE deleted_at IS NULL;
+
+CREATE TABLE IF NOT EXISTS tienda_sesiones (
+  token_hash text PRIMARY KEY,                      -- SHA-256 del token; el token solo vive en la cookie
+  cuenta_id  uuid NOT NULL REFERENCES tienda_cuentas(id) ON DELETE CASCADE,
+  tenant_id  uuid NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+  expira_at  timestamptz NOT NULL,
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_tienda_sesiones_cuenta ON tienda_sesiones (cuenta_id);
+
+CREATE TABLE IF NOT EXISTS tienda_recuperaciones (
+  token_hash text PRIMARY KEY,
+  cuenta_id  uuid NOT NULL REFERENCES tienda_cuentas(id) ON DELETE CASCADE,
+  tenant_id  uuid NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+  expira_at  timestamptz NOT NULL,
+  usada_at   timestamptz NULL,
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS tienda_direcciones (
+  id              uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  cuenta_id       uuid NOT NULL REFERENCES tienda_cuentas(id) ON DELETE CASCADE,
+  tenant_id       uuid NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+  etiqueta        varchar(50) NOT NULL DEFAULT 'Casa',
+  calle           varchar(255) NOT NULL,
+  numero_exterior varchar(20) NOT NULL,
+  numero_interior varchar(20) NULL,
+  colonia         varchar(150) NOT NULL,
+  codigo_postal   varchar(5) NOT NULL,
+  ciudad          varchar(100) NOT NULL,
+  estado          varchar(50) NOT NULL,
+  referencias     text NULL,
+  zona_envio_id   uuid NULL REFERENCES zonas_envio(id) ON DELETE SET NULL,
+  created_at      timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_tienda_direcciones_cuenta ON tienda_direcciones (cuenta_id);
+
+DO $$
+DECLARE t text;
+BEGIN
+  FOREACH t IN ARRAY ARRAY['tienda_cuentas', 'tienda_sesiones', 'tienda_recuperaciones', 'tienda_direcciones'] LOOP
+    EXECUTE format('ALTER TABLE %I ENABLE ROW LEVEL SECURITY', t);
+    EXECUTE format('ALTER TABLE %I FORCE ROW LEVEL SECURITY', t);
+    EXECUTE format('REVOKE ALL ON %I FROM PUBLIC, anon, authenticated', t);
+    EXECUTE format('GRANT SELECT, INSERT, UPDATE, DELETE ON %I TO service_role', t);
+  END LOOP;
+END $$;
+
+-- Fotos de productos: molde del almacén `anuncios` (0150). Público para leer —es el menú de una
+-- tienda pública—; escribe solo el dueño o el admin, dentro de la carpeta de su negocio. En el
+-- Postgres embebido de la caja no hay storage.buckets: los bloques se omiten.
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'storage' AND table_name = 'buckets') THEN
+    INSERT INTO storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+    VALUES ('productos', 'productos', true, 1048576, ARRAY['image/jpeg', 'image/png', 'image/webp'])
+    ON CONFLICT (id) DO NOTHING;
+
+    DROP POLICY IF EXISTS "productos_read_own_tenant" ON storage.objects;
+    CREATE POLICY "productos_read_own_tenant" ON storage.objects
+      FOR SELECT TO authenticated
+      USING (bucket_id = 'productos' AND (storage.foldername(name))[1] = current_tenant_id()::text);
+
+    DROP POLICY IF EXISTS "productos_write_own_tenant" ON storage.objects;
+    CREATE POLICY "productos_write_own_tenant" ON storage.objects
+      FOR INSERT TO authenticated
+      WITH CHECK (bucket_id = 'productos'
+        AND (storage.foldername(name))[1] = current_tenant_id()::text
+        AND es_admin_del_tenant(current_tenant_id()));
+
+    DROP POLICY IF EXISTS "productos_delete_own_tenant" ON storage.objects;
+    CREATE POLICY "productos_delete_own_tenant" ON storage.objects
+      FOR DELETE TO authenticated
+      USING (bucket_id = 'productos'
+        AND (storage.foldername(name))[1] = current_tenant_id()::text
+        AND es_admin_del_tenant(current_tenant_id()));
+  END IF;
+END $$;

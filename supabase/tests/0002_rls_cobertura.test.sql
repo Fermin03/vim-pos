@@ -29,7 +29,11 @@ insert into _rls_exentas (tabla) values
   ('delivery_autorizaciones'),  -- Token OAuth del dueño para activar tiendas; solo la Edge Function (mig. 0092, spec F1b).
   ('tenant_limites'),           -- Excepciones de límites que VIM pone al cliente; solo el panel de plataforma (mig. 0103, ADR 0014).
   ('avisos_plataforma'),        -- Avisos que VIM manda a las cajas; llegan por las directivas del latido, no por RLS (mig. 0106, ADR 0014).
-  ('avisos_lecturas');          -- Acuses de esos avisos; los escriben caja_latido y marcar_aviso_visto, ambas definer (mig. 0106).
+  ('avisos_lecturas'),          -- Acuses de esos avisos; los escriben caja_latido y marcar_aviso_visto, ambas definer (mig. 0106).
+  ('tienda_cuentas'),           -- Cuentas de los clientes de la tienda en línea; solo la Edge Function `tienda` (mig. 0161).
+  ('tienda_sesiones'),          -- Sesiones de esas cuentas, guardadas como huella (mig. 0161).
+  ('tienda_recuperaciones'),    -- Enlaces de recuperación de contraseña, de un solo uso (mig. 0161).
+  ('tienda_direcciones');       -- Direcciones guardadas por el cliente de la tienda (mig. 0161).
 
 -- #2 — CRÍTICA: ninguna tabla con tenant_id tiene RLS deshabilitado.
 select is_empty($$
