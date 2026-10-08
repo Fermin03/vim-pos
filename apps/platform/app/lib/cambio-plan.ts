@@ -12,6 +12,7 @@ export const ADDONS_DEL_PLAN = [
   { codigo: "CFDI", bandera: "cfdi_incluido" },
   { codigo: "DELIVERY", bandera: "delivery_incluido" },
   { codigo: "LEALTAD", bandera: "lealtad_incluido" },
+  { codigo: "TIENDA", bandera: "tienda_incluida" },
 ] as const;
 
 export type PlanParaCambio = {

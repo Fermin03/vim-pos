@@ -647,3 +647,202 @@ BEGIN
         AND es_admin_del_tenant(current_tenant_id()));
   END IF;
 END $$;
+
+-- ── §5 Complemento, plan y módulo ────────────────────────────────────────────
+-- Molde de 0113 (delivery) y 0156 (lealtad): VIM concede el complemento, el dueño enciende.
+-- Nace INACTIVO: el panel de VIM lista todo complemento activo con un botón de activar y todavía
+-- no hay pantallas detrás. Se activa, y se concede a quien ya está en Negocio o Cadena, en la
+-- migración de salida (entrega 7), igual que hizo lealtad en 0159.
+INSERT INTO addons (codigo, nombre, descripcion, precio_mensual_mxn, features_activadas, activo, orden_visualizacion)
+VALUES (
+  'TIENDA',
+  'Tienda en línea',
+  'Tus clientes piden desde su teléfono, para recoger o a domicilio, y el pedido cae en la caja. '
+    || 'Sin comisión por pedido. Incluida sin cargo desde el plan Negocio; en Esencial se contrata aparte.',
+  100.00,
+  jsonb_build_object('tienda', true),
+  false,
+  30
+)
+ON CONFLICT (codigo) DO NOTHING;
+
+UPDATE planes
+   SET features_incluidos = COALESCE(features_incluidos, '{}'::jsonb) || jsonb_build_object('tienda_incluida', codigo <> 'ESENCIAL'),
+       updated_at = now()
+ WHERE codigo IN ('ESENCIAL', 'NEGOCIO', 'CADENA', 'FT', 'QS', 'CB', 'FS', 'DK', 'ENT');
+
+-- El cambio de plan también concede y retira la tienda. Cuerpo copiado ÍNTEGRO de
+-- 0159_lealtad_admin.sql (única definición vigente); el único cambio es la pareja nueva en la lista.
+-- Su espejo en TS es ADDONS_DEL_PLAN (apps/platform/app/lib/cambio-plan.ts): si cambias uno, cambia el otro.
+CREATE OR REPLACE FUNCTION public._sincronizar_addons_del_plan(p_tenant uuid, p_plan uuid, p_retirar boolean DEFAULT true)
+RETURNS jsonb
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = ''
+AS $$
+DECLARE
+  v_hoy      date := (now() AT TIME ZONE 'America/Mexico_City')::date;
+  v_feat     jsonb;
+  v_plan_nom text;
+  v_nota     text;
+  v_addon    uuid;
+  v_fila     public.tenant_addons%ROWTYPE;
+  v_n        int;
+  r          record;
+  v_conc     text[] := '{}';
+  v_ret      text[] := '{}';
+BEGIN
+  SELECT COALESCE(features_incluidos, '{}'::jsonb), nombre INTO v_feat, v_plan_nom FROM public.planes WHERE id = p_plan;
+  v_nota := 'Incluido en el plan ' || COALESCE(v_plan_nom, '');
+
+  FOR r IN SELECT * FROM (VALUES ('CFDI', 'cfdi_incluido'), ('DELIVERY', 'delivery_incluido'), ('LEALTAD', 'lealtad_incluido'), ('TIENDA', 'tienda_incluida')) AS x(codigo, bandera) LOOP
+    SELECT id INTO v_addon FROM public.addons WHERE codigo = r.codigo;
+    CONTINUE WHEN v_addon IS NULL;
+
+    IF COALESCE((v_feat->>r.bandera)::boolean, false) THEN
+      SELECT * INTO v_fila FROM public.tenant_addons
+       WHERE tenant_id = p_tenant AND addon_id = v_addon AND activo
+       ORDER BY fecha_inicio DESC LIMIT 1
+       FOR UPDATE;
+
+      IF FOUND AND v_fila.incluido_en_plan AND v_fila.precio_mensual_mxn = 0 THEN
+        CONTINUE;                                            -- ya lo tiene incluido
+      ELSIF FOUND AND v_fila.fecha_inicio = v_hoy THEN
+        -- Se dio de alta hoy (pagado): se corrige en su lugar, no cabe otra fila con la misma fecha.
+        UPDATE public.tenant_addons
+           SET precio_mensual_mxn = 0, incluido_en_plan = true, notas = v_nota, updated_at = now()
+         WHERE id = v_fila.id;
+      ELSE
+        -- ¿Una baja de HOY? Se reactiva esa fila: un INSERT chocaría con addon_unico_activo.
+        UPDATE public.tenant_addons
+           SET activo = true, fecha_fin = NULL, precio_mensual_mxn = 0, incluido_en_plan = true, notas = v_nota, updated_at = now()
+         WHERE tenant_id = p_tenant AND addon_id = v_addon AND fecha_inicio = v_hoy AND NOT activo;
+        GET DIAGNOSTICS v_n = ROW_COUNT;
+        IF v_n = 0 THEN
+          INSERT INTO public.tenant_addons (tenant_id, addon_id, fecha_inicio, activo, precio_mensual_mxn, notas, incluido_en_plan)
+          VALUES (p_tenant, v_addon, v_hoy, true, 0, v_nota, true);
+        END IF;
+        IF v_fila.id IS NOT NULL THEN
+          -- Lo pagaba aparte: esa fila se cierra hoy (la historia de lo que pagó se queda) y ya entró
+          -- la nueva a $0. Cobrarle aparte lo que su plan ya incluye sería cobrarlo dos veces.
+          -- DIFERENCIA CON 0141: allá la pagada se cerraba ANTES de dejar activa la incluida. Para CFDI
+          -- y DELIVERY el orden da igual, pero al cerrar una fila de LEALTAD se dispara
+          -- trg_tenant_addons_apaga_lealtad (0156), que si en ese instante no ve ninguna fila vigente
+          -- apaga el interruptor del dueño: quien subía de plan perdía su programa encendido. Con la
+          -- incluida ya activa el trigger la ve y no apaga nada. Las dos filas no chocan con
+          -- addon_unico_activo: a esta rama solo llega una pagada con fecha_inicio distinta de hoy.
+          -- (Se pregunta por v_fila.id y no por FOUND, que el UPDATE y el INSERT de arriba ya pisaron.)
+          UPDATE public.tenant_addons
+             SET activo = false, fecha_fin = v_hoy, updated_at = now(),
+                 notas = concat_ws(' · ', notas, 'Pasa a incluido en el plan ' || COALESCE(v_plan_nom, ''))
+           WHERE id = v_fila.id;
+        END IF;
+      END IF;
+      v_conc := v_conc || r.codigo;
+
+    ELSIF p_retirar THEN
+      -- Solo lo que dio el plan. Lo que paga aparte o se le regaló por cortesía no se toca.
+      UPDATE public.tenant_addons
+         SET activo = false, fecha_fin = v_hoy, updated_at = now()
+       WHERE tenant_id = p_tenant AND addon_id = v_addon AND activo AND incluido_en_plan;
+      GET DIAGNOSTICS v_n = ROW_COUNT;
+      IF v_n > 0 THEN v_ret := v_ret || r.codigo; END IF;
+    END IF;
+  END LOOP;
+
+  RETURN jsonb_build_object('concedidos', to_jsonb(v_conc), 'retirados', to_jsonb(v_ret));
+END;
+$$;
+REVOKE ALL ON FUNCTION public._sincronizar_addons_del_plan(uuid, uuid, boolean) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public._sincronizar_addons_del_plan(uuid, uuid, boolean) TO service_role;
+COMMENT ON FUNCTION public._sincronizar_addons_del_plan(uuid, uuid, boolean) IS
+  'Interna (0141, 0159, 0161): concede a $0 los add-ons que el plan incluye (CFDI, DELIVERY, LEALTAD, TIENDA) y, si p_retirar, quita los que se dieron por el plan anterior. Respeta addon_unico_activo reactivando la fila del día.';
+
+-- Lectura única de módulos: se añade 'tienda'. Cuerpo copiado ÍNTEGRO de 0156_lealtad.sql; solo se
+-- añaden v_tie y el bloque de la tienda. resolver_directivas no se toca: copia `efectivos` entero.
+CREATE OR REPLACE FUNCTION modulos_efectivos(p_tenant uuid)
+RETURNS jsonb
+LANGUAGE plpgsql
+STABLE
+SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
+DECLARE
+  v_plan       jsonb;
+  v_inv        boolean;
+  v_del        boolean;
+  v_lea        boolean;
+  v_tie        boolean;
+  v_permitidos jsonb := '{}'::jsonb;
+  v_efectivos  jsonb := '{}'::jsonb;
+  v_codigo     text;
+  v_perm       boolean;
+  v_enc        boolean;
+  v_flag       boolean;
+BEGIN
+  IF p_tenant IS NULL THEN RETURN NULL; END IF;
+  -- Un usuario autenticado solo puede preguntar por su propio tenant. Se decide por el ROL del
+  -- JWT y no por la ausencia del claim: el hook de acceso (0006) emite tokens SIN tenant_id a
+  -- empleados dados de baja, y un token así seguiría siendo `authenticated`. Sin JWT (sesión
+  -- directa a la base: pruebas, semillas) o con service_role, pasa.
+  IF auth.jwt() IS NOT NULL
+     AND (auth.jwt() ->> 'role') IS DISTINCT FROM 'service_role'
+     AND current_tenant_id() IS DISTINCT FROM p_tenant THEN
+    RETURN NULL;
+  END IF;
+
+  SELECT COALESCE(p.features_incluidos->'modulos', '{}'::jsonb)
+    INTO v_plan
+    FROM tenants t LEFT JOIN planes p ON p.id = t.plan_actual_id
+   WHERE t.id = p_tenant;
+  IF NOT FOUND THEN RETURN NULL; END IF;
+
+  SELECT COALESCE(c.modulo_inventario_activo, false) INTO v_inv
+    FROM configuracion_tenant c WHERE c.tenant_id = p_tenant;
+
+  FOREACH v_codigo IN ARRAY ARRAY['kds', 'recetas', 'reservaciones', 'promociones'] LOOP
+    v_flag := NULL;
+    SELECT f.activado INTO v_flag
+      FROM tenant_feature_flags f
+     WHERE f.tenant_id = p_tenant AND f.flag_codigo = v_codigo
+       AND f.fecha_inicio <= now() AND (f.fecha_fin IS NULL OR f.fecha_fin > now());
+    v_perm := COALESCE(v_flag, (v_plan->>v_codigo)::boolean, false);
+    v_enc  := CASE v_codigo WHEN 'recetas' THEN COALESCE(v_inv, false) ELSE true END;
+    v_permitidos := v_permitidos || jsonb_build_object(v_codigo, v_perm);
+    v_efectivos  := v_efectivos  || jsonb_build_object(v_codigo, (v_perm AND v_enc));
+  END LOOP;
+
+  v_perm := tenant_addon_activo(p_tenant, 'CFDI');
+  v_permitidos := v_permitidos || jsonb_build_object('cfdi', v_perm);
+  v_efectivos  := v_efectivos  || jsonb_build_object('cfdi', v_perm);
+
+  SELECT COALESCE(c.modulo_delivery_activo, false) INTO v_del
+    FROM configuracion_tenant c WHERE c.tenant_id = p_tenant;
+
+  -- Delivery es el único módulo con las DOS capas a la vez: add-on de pago (como el CFDI) e
+  -- interruptor del dueño (como recetas). El add-on dice si puede; el interruptor, si quiere.
+  v_perm := tenant_addon_activo(p_tenant, 'DELIVERY');
+  v_permitidos := v_permitidos || jsonb_build_object('delivery_apps', v_perm);
+  v_efectivos  := v_efectivos  || jsonb_build_object('delivery_apps', (v_perm AND COALESCE(v_del, false)));
+
+  -- Lealtad: mismas dos capas que delivery. El add-on dice si puede; el interruptor, si quiere.
+  SELECT COALESCE(c.modulo_lealtad_activo, false) INTO v_lea
+    FROM configuracion_tenant c WHERE c.tenant_id = p_tenant;
+  v_perm := tenant_addon_activo(p_tenant, 'LEALTAD');
+  v_permitidos := v_permitidos || jsonb_build_object('lealtad', v_perm);
+  v_efectivos  := v_efectivos  || jsonb_build_object('lealtad', (v_perm AND COALESCE(v_lea, false)));
+
+  -- Tienda en línea: mismas dos capas que delivery y lealtad.
+  SELECT COALESCE(c.modulo_tienda_activo, false) INTO v_tie
+    FROM configuracion_tenant c WHERE c.tenant_id = p_tenant;
+  v_perm := tenant_addon_activo(p_tenant, 'TIENDA');
+  v_permitidos := v_permitidos || jsonb_build_object('tienda', v_perm);
+  v_efectivos  := v_efectivos  || jsonb_build_object('tienda', (v_perm AND COALESCE(v_tie, false)));
+
+  RETURN jsonb_build_object('permitidos', v_permitidos, 'efectivos', v_efectivos);
+END;
+$$;
+COMMENT ON FUNCTION modulos_efectivos(uuid) IS
+  'Módulos por cliente: permitidos (plan + flags) y efectivos (AND encendido por el dueño). Única lectura autorizada (ADR 0014).';
+REVOKE EXECUTE ON FUNCTION modulos_efectivos(uuid) FROM public, anon;
+GRANT EXECUTE ON FUNCTION modulos_efectivos(uuid) TO authenticated, service_role;
