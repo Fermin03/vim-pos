@@ -317,7 +317,7 @@ test("las zonas pendientes son las que la nube aún no confirmó", async () => {
 
 // Ronda de arreglos 1/5: las tres pruebas de arriba solo llaman a `sembrarZonasUnaVez` o a
 // `listarPendientes`, así que nunca ejercitan el camino de PUSH real: el destructuring de `zonas`
-// en `enviarLote`, `marcarZonasSubidas`, `zonasRechazadas` ni la rama `zonas_envio` de
+// en `enviarLote`, `marcarZonasSubidas`, `filasRechazadas` ni la rama `zonas_envio` de
 // `rechazadosPorTicket` tenían ninguna prueba que los pasara. Gemelas exactas de las pruebas de
 // repartidores de arriba ("un repartidor que la nube RECHAZA…" y "un alta hecha SIN CONEXIÓN…"),
 // que sí pasan por `pushToCloud`.

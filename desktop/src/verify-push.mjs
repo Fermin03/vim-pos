@@ -46,7 +46,7 @@ try {
   if (movimientoIds.length) {
     if (!snapshot.movimientos_inventario?.length) throw new Error("el snapshot no incluye movimientos_inventario");
     if ((res.movimientos_inventario ?? 0) !== 0) throw new Error("la RPC aplicó sobre la propia caja movimientos que ya existían: debía ser 0 (idempotencia por id)");
-    // Espejo de producción (movimientosRechazados en sync-push.mjs): solo se marcan los que la
+    // Espejo de producción (filasRechazadas en sync-push.mjs): solo se marcan los que la
     // nube NO reportó en _errores. Marcar un id rechazado como subido lo perdería para siempre.
     const rechazados = new Set((res._errores ?? []).filter((e) => e?.tabla === "movimientos_inventario" && e.id).map((e) => e.id));
     await marcarMovimientosPushed(pool, movimientoIds.filter((id) => !rechazados.has(id)));
