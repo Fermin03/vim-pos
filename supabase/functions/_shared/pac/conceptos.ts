@@ -39,6 +39,29 @@ export type LineaTicket = {
   totalItemMxn: number;
 };
 
+/** Una fila de `ticket_items`, tal como la devuelve PostgREST, a `LineaTicket`. */
+export function filaALinea(f: Record<string, unknown>): LineaTicket {
+  const num = (v: unknown) => Number(v ?? 0);
+  return {
+    id: String(f.id),
+    parentId: (f.parent_item_id as string) ?? null,
+    comboRol: (f.combo_rol as "PADRE" | "HIJO" | null) ?? null,
+    cargoTipo: (f.cargo_tipo as string | null) ?? null,
+    descripcion: String(f.producto_nombre_snapshot),
+    cantidad: num(f.cantidad),
+    claveSat: (f.clave_sat_snapshot as string) ?? null,
+    unidadSat: (f.unidad_sat_snapshot as string) ?? null,
+    tasaIva: num(f.tasa_iva_snapshot),
+    ivaIncluidoEnPrecio: Boolean(f.iva_incluido_en_precio_snapshot),
+    subtotalBrutoMxn: num(f.subtotal_bruto_mxn),
+    montoModificadoresMxn: num(f.monto_modificadores_mxn),
+    descuentoItemMxn: num(f.descuento_item_mxn),
+    promocionItemMxn: num(f.promocion_item_mxn),
+    ivaItemMxn: num(f.iva_item_mxn),
+    totalItemMxn: num(f.total_item_mxn),
+  };
+}
+
 /** Un concepto listo para el CFDI. Los importes ya son pesos exactos (múltiplos de un centavo). */
 export type ConceptoCfdi = {
   claveProdServ: string;

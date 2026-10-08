@@ -29,13 +29,13 @@
 // (se valida abajo contra `periodo_global_de`) y (3) cada periodo se timbra una vez (candado).
 //
 // Local: supabase functions serve timbrar-global --env-file supabase/functions/.env
-import { createClient } from "jsr:@supabase/supabase-js@2";
-import { corsHeaders } from "../_shared/cors.ts";
-import { timbrarConFailover, obtenerFacturama } from "../_shared/pac/index.ts";
+import { clienteAdmin, clienteDe, servir } from "../_shared/http.ts";
+import { bearerDe } from "../_shared/identidad.ts";
+import { timbrar, obtenerFacturama } from "../_shared/pac/index.ts";
 import { COLUMNAS_NEGOCIO, negocioPuedeTimbrar, NEGOCIO_DADO_DE_BAJA } from "../_shared/pac/negocio.ts";
 import { archivarCfdi, subidorSupabase } from "../_shared/pac/archivo.ts";
 import { resolverEmisorVerificado } from "../_shared/pac/emisor.ts";
-import { armarConceptosGlobal, ConceptosIncoherentes, type LineaTicket, type TicketDelPeriodo } from "../_shared/pac/conceptos.ts";
+import { armarConceptosGlobal, ConceptosIncoherentes, filaALinea, type LineaTicket, type TicketDelPeriodo } from "../_shared/pac/conceptos.ts";
 
 const ROLES_FACTURA = ["DUENO", "ADMIN"];
 
@@ -47,21 +47,11 @@ const RECEPTOR_PUBLICO = {
   regimenFiscal: "616",
 };
 
-Deno.serve(async (req) => {
-  const cors = corsHeaders(req);
-  const json = (body: unknown, status = 200) =>
-    new Response(JSON.stringify(body), { status, headers: { ...cors, "Content-Type": "application/json" } });
-
-  if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
-  if (req.method !== "POST") return json({ error: "METHOD_NOT_ALLOWED" }, 405);
-
-  const token = (req.headers.get("authorization") ?? "").replace(/^Bearer\s+/i, "");
+servir(async (req, json) => {
+  const token = bearerDe(req);
   if (!token) return json({ error: "NO_AUTH" }, 401);
 
-  const sb = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_ANON_KEY")!, {
-    auth: { persistSession: false },
-    global: { headers: { Authorization: `Bearer ${token}` } },
-  });
+  const sb = clienteDe(token);
 
   const { data: u, error: uErr } = await sb.auth.getUser(token);
   if (uErr || !u?.user) return json({ error: "AUTH_INVALIDA" }, 401);
@@ -85,7 +75,7 @@ Deno.serve(async (req) => {
   if (!roles.some((r) => ROLES_FACTURA.includes(r))) {
     return json({ error: "SIN_PERMISO", detalle: "Solo DUEÑO/ADMIN pueden emitir la factura global" }, 403);
   }
-  const admin = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!, { auth: { persistSession: false } });
+  const admin = clienteAdmin();
   // Sin el add-on CFDI no se timbra (C1-5).
   // Con service_role: `tenant_addon_activo` no es ejecutable por usuarios desde la 0132 (era un
   // oráculo). El tenant ya se validó arriba contra el rol del llamante.
@@ -237,24 +227,7 @@ Deno.serve(async (req) => {
     for (const f of (itemsRaw ?? []) as unknown as Record<string, unknown>[]) {
       const id = String(f.ticket_id);
       const lista = porTicket.get(id) ?? [];
-      lista.push({
-        id: String(f.id),
-        parentId: (f.parent_item_id as string) ?? null,
-        comboRol: (f.combo_rol as "PADRE" | "HIJO" | null) ?? null,
-        cargoTipo: (f.cargo_tipo as string | null) ?? null,
-        descripcion: String(f.producto_nombre_snapshot),
-        cantidad: Number(f.cantidad ?? 0),
-        claveSat: (f.clave_sat_snapshot as string) ?? null,
-        unidadSat: (f.unidad_sat_snapshot as string) ?? null,
-        tasaIva: Number(f.tasa_iva_snapshot ?? 0),
-        ivaIncluidoEnPrecio: Boolean(f.iva_incluido_en_precio_snapshot),
-        subtotalBrutoMxn: Number(f.subtotal_bruto_mxn ?? 0),
-        montoModificadoresMxn: Number(f.monto_modificadores_mxn ?? 0),
-        descuentoItemMxn: Number(f.descuento_item_mxn ?? 0),
-        promocionItemMxn: Number(f.promocion_item_mxn ?? 0),
-        ivaItemMxn: Number(f.iva_item_mxn ?? 0),
-        totalItemMxn: Number(f.total_item_mxn ?? 0),
-      });
+      lista.push(filaALinea(f));
       porTicket.set(id, lista);
     }
 
@@ -318,7 +291,7 @@ Deno.serve(async (req) => {
     }
 
     // ── Timbrado ──────────────────────────────────────────────────────────────────────────────
-    const res = await timbrarConFailover({
+    const res = await timbrar({
       cfdiId,
       tipoComprobante: "INGRESO",
       emisor: {

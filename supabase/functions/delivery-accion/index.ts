@@ -1,39 +1,17 @@
 // Acciones del cajero sobre un pedido de app (ADR 0011). El POS nunca habla con Uber: manda la
 // acción aquí con su JWT de empleado; se valida que el pedido sea de SU tenant y se llama a la app.
-import { createClient } from "jsr:@supabase/supabase-js@2";
-import { corsHeaders } from "../_shared/cors.ts";
+import { clienteAdmin, servir } from "../_shared/http.ts";
 import { registrarError } from "../_shared/errores.ts";
-import { claimsDe, tenantDeClaims } from "../_shared/identidad.ts";
-import { crearClienteUber, motivoRechazoUber, segundosAReadyTime, type MotivoRechazo } from "../_shared/delivery/uber.ts";
+import { cajaIdDeEmail } from "../_shared/dispositivo.ts";
+import { bearerDe, claimsDe, tenantDeClaims } from "../_shared/identidad.ts";
+import { clienteUberDeApp, ENTORNO } from "../_shared/delivery/cliente-uber.ts";
+import { motivoRechazoUber, segundosAReadyTime, type MotivoRechazo } from "../_shared/delivery/uber.ts";
 import { cambiarPrepTienda, consultarEstadoTienda, pausarTienda, reanudarTienda, type ConexionTienda } from "../_shared/delivery/tienda-uber-acciones.ts";
 import { ACCIONES_TIENDA, accionExigeModulo, moduloDeliveryActivo } from "../_shared/delivery/modulo.ts";
 import type { DbMinima } from "../_shared/delivery/procesar-uber.ts";
 
-const admin = createClient(
-  Deno.env.get("SUPABASE_URL")!,
-  Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
-  { auth: { persistSession: false } },
-);
-const ENTORNO = (Deno.env.get("UBER_ENTORNO") ?? "sandbox") === "produccion" ? "produccion" : "sandbox";
-const uber = crearClienteUber({
-  entorno: ENTORNO,
-  clientId: Deno.env.get("UBER_CLIENT_ID") ?? "",
-  clientSecret: Deno.env.get("UBER_CLIENT_SECRET") ?? "",
-  tokenCache: {
-    leer: async () => {
-      const { data } = await admin.from("delivery_credenciales_app").select("access_token, vence_at")
-        .eq("app", "APP_UBEREATS").eq("entorno", ENTORNO).maybeSingle();
-      const f = data as { access_token: string; vence_at: string } | null;
-      return f && new Date(f.vence_at) > new Date() ? f.access_token : null;
-    },
-    guardar: async (token, venceAt) => {
-      await admin.from("delivery_credenciales_app").upsert({
-        app: "APP_UBEREATS", entorno: ENTORNO, access_token: token,
-        vence_at: venceAt.toISOString(), updated_at: new Date().toISOString(),
-      });
-    },
-  },
-});
+const admin = clienteAdmin();
+const uber = clienteUberDeApp(admin);
 
 type Cuerpo = {
   pedido_id?: string; accion?: string; motivo?: string; detalle?: string; tiempo_prep_min?: number;
@@ -45,23 +23,12 @@ type Pedido = {
   id: string; tenant_id: string; sucursal_id: string; app: string; id_externo: string; estado: string; folio_corto: string | null;
   conexion_id: string; gestion: "NUBE" | "ESCRITORIO"; gestion_caja_id: string | null;
 };
-/** El id de caja de un dispositivo viene en su correo: caja-<uuid>@dispositivos.<dominio>. */
-function cajaDesdeCorreo(email: string | undefined): string | null {
-  const m = /^caja-([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})@/i.exec(email ?? "");
-  return m ? m[1].toLowerCase() : null;
-}
 const MOTIVOS: MotivoRechazo[] = ["AGOTADO", "CERRADO", "SATURADO", "POS_OFFLINE", "OTRO"];
 const msg = (e: unknown) => (e instanceof Error ? e.message : String(e));
 
-Deno.serve(async (req) => {
-  const cors = corsHeaders(req);
-  const json = (body: unknown, status = 200) =>
-    new Response(JSON.stringify(body), { status, headers: { ...cors, "Content-Type": "application/json" } });
-  if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
-  if (req.method !== "POST") return json({ error: "METHOD_NOT_ALLOWED" }, 405);
-
+servir(async (req, json) => {
   // 1) JWT del cajero → su tenant (mismo patrón que enviar-push).
-  const token = (req.headers.get("authorization") ?? "").replace(/^Bearer\s+/i, "");
+  const token = bearerDe(req);
   if (!token) return json({ error: "NO_AUTH" }, 401);
   const { data: userResp, error: userErr } = await admin.auth.getUser(token);
   if (userErr || !userResp?.user) return json({ error: "AUTH_INVALIDA" }, 401);
@@ -78,7 +45,7 @@ Deno.serve(async (req) => {
   const esDispositivo = claims.tipo_identidad === "DISPOSITIVO";
   let cajaDispositivo: { id: string; sucursal_id: string } | null = null;
   if (esDispositivo) {
-    const cid = cajaDesdeCorreo(userResp.user.email);
+    const cid = cajaIdDeEmail(userResp.user.email);
     if (cid) {
       const { data: c } = await admin.from("cajas").select("id, sucursal_id").eq("id", cid).eq("tenant_id", tenantId).maybeSingle();
       cajaDispositivo = (c as { id: string; sucursal_id: string } | null) ?? null;

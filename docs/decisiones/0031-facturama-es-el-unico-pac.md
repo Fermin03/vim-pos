@@ -38,7 +38,7 @@ justo cuando el principal ya es el mock).
 - El comportamiento en producción no cambia: ya timbraba solo con Facturama.
 - El enum `cfdi_proveedor_pac` de la base conserva `FACTURAPI` y los demás valores. No hay
   migración, y los smokes que usan ese valor siguen igual.
-- `timbrarConFailover` conserva su nombre y devuelve `failover: false`, porque los tres handlers de
-  timbrado lo leen y lo registran. Se renombra cuando esos handlers se toquen.
+- `timbrarConFailover` pasó a llamarse `timbrar` y dejó de devolver `failover` (7 oct 2026, cuando se
+  tocaron los tres handlers de timbrado): era siempre `false` y nadie lo leía.
 - Si algún día hace falta un segundo PAC, tiene que ser **multi-emisor** (el emisor en el payload,
   como Facturama) y llevar su propio ADR. La interfaz `PacAdapter` sigue ahí para eso.

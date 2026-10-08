@@ -31,11 +31,10 @@
 // edita: con el RFC de otro cliente de VIM, el portal timbraba con el sello de ese otro cliente.
 //
 // Local: supabase functions serve autofacturar --env-file supabase/functions/.env
-import { createClient } from "jsr:@supabase/supabase-js@2";
-import { corsHeaders } from "../_shared/cors.ts";
-import { timbrarConFailover, obtenerFacturama, PAC_NO_CONFIGURADO } from "../_shared/pac/index.ts";
+import { clienteAdmin, servir } from "../_shared/http.ts";
+import { timbrar, obtenerFacturama, PAC_NO_CONFIGURADO } from "../_shared/pac/index.ts";
 import { COLUMNAS_NEGOCIO, negocioPuedeTimbrar, NEGOCIO_DADO_DE_BAJA } from "../_shared/pac/negocio.ts";
-import { armarConceptos, ConceptosIncoherentes, type LineaTicket } from "../_shared/pac/conceptos.ts";
+import { armarConceptos, ConceptosIncoherentes, filaALinea, type LineaTicket } from "../_shared/pac/conceptos.ts";
 import { archivarCfdi, bytesABase64, objetoArchivoCfdi, subidorSupabase } from "../_shared/pac/archivo.ts";
 import { aCentavos, accesoAlTicket, normalizarToken } from "../_shared/pac/acceso-ticket.ts";
 import { resolverEmisorVerificado } from "../_shared/pac/emisor.ts";
@@ -66,17 +65,8 @@ const CUPO_NEGOCIO = { ventanaSeg: 60 * 60, max: 300 };
 
 const CORREO_VALIDO = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-Deno.serve(async (req) => {
-  const cors = corsHeaders(req);
-  const json = (body: unknown, status = 200) =>
-    new Response(JSON.stringify(body), { status, headers: { ...cors, "Content-Type": "application/json" } });
-
-  if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
-  if (req.method !== "POST") return json({ error: "METHOD_NOT_ALLOWED" }, 405);
-
-  const sb = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!, {
-    auth: { persistSession: false },
-  });
+servir(async (req, json) => {
+  const sb = clienteAdmin();
   const demasiados = () =>
     json({ error: "DEMASIADOS_INTENTOS", mensaje: "Demasiados intentos. Espera unos minutos." }, 429);
 
@@ -346,24 +336,7 @@ Deno.serve(async (req) => {
     .order("orden_visualizacion");
   if (iErr) return json({ estado: "ERROR", mensaje: "No se pudo leer el ticket." }, 500);
 
-  const lineas: LineaTicket[] = ((itemsRaw ?? []) as unknown as Record<string, unknown>[]).map((f) => ({
-    id: String(f.id),
-    parentId: (f.parent_item_id as string) ?? null,
-    comboRol: (f.combo_rol as "PADRE" | "HIJO" | null) ?? null,
-    cargoTipo: (f.cargo_tipo as string | null) ?? null,
-    descripcion: String(f.producto_nombre_snapshot),
-    cantidad: Number(f.cantidad ?? 0),
-    claveSat: (f.clave_sat_snapshot as string) ?? null,
-    unidadSat: (f.unidad_sat_snapshot as string) ?? null,
-    tasaIva: Number(f.tasa_iva_snapshot ?? 0),
-    ivaIncluidoEnPrecio: Boolean(f.iva_incluido_en_precio_snapshot),
-    subtotalBrutoMxn: Number(f.subtotal_bruto_mxn ?? 0),
-    montoModificadoresMxn: Number(f.monto_modificadores_mxn ?? 0),
-    descuentoItemMxn: Number(f.descuento_item_mxn ?? 0),
-    promocionItemMxn: Number(f.promocion_item_mxn ?? 0),
-    ivaItemMxn: Number(f.iva_item_mxn ?? 0),
-    totalItemMxn: Number(f.total_item_mxn ?? 0),
-  }));
+  const lineas: LineaTicket[] = ((itemsRaw ?? []) as unknown as Record<string, unknown>[]).map(filaALinea);
 
   let armado;
   try {
@@ -427,7 +400,7 @@ Deno.serve(async (req) => {
     return negocioDeBaja();
   }
 
-  const res = await timbrarConFailover({
+  const res = await timbrar({
     cfdiId,
     tipoComprobante: "INGRESO",
     emisor: {

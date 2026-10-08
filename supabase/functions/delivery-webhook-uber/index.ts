@@ -1,19 +1,13 @@
 // Webhook público de Uber Eats (ADR 0011). Sin JWT: la autenticidad la da X-Uber-Signature
 // (HMAC-SHA256 del cuerpo con el client secret). Responde 200 rápido; el trabajo pesado va después
 // con EdgeRuntime.waitUntil para no pasarnos del tiempo de Uber y evitar reintentos duplicados.
-import { createClient } from "jsr:@supabase/supabase-js@2";
+import { clienteAdmin } from "../_shared/http.ts";
 import { hmacSha256Hex, igualesEnTiempoConstante } from "../_shared/delivery/firma.ts";
-import { crearClienteUber } from "../_shared/delivery/uber.ts";
+import { clienteUberDeApp, ENTORNO } from "../_shared/delivery/cliente-uber.ts";
 import { procesarNotificacionUber, type DbMinima } from "../_shared/delivery/procesar-uber.ts";
 import { consumirCupo, leerCuerpoAcotado } from "../_shared/limite.ts";
 
-const admin = createClient(
-  Deno.env.get("SUPABASE_URL")!,
-  Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
-  { auth: { persistSession: false } },
-);
-const ENTORNO = (Deno.env.get("UBER_ENTORNO") ?? "sandbox") === "produccion" ? "produccion" : "sandbox";
-const CLIENT_ID = Deno.env.get("UBER_CLIENT_ID") ?? "";
+const admin = clienteAdmin();
 const CLIENT_SECRET = Deno.env.get("UBER_CLIENT_SECRET") ?? "";
 // El dashboard nuevo de Uber ("Basic HMAC") pide una Signing Key propia para firmar los webhooks;
 // la guía vieja firmaba con el client secret. Se aceptan ambas (y una llave secundaria para rotar).
@@ -26,23 +20,7 @@ const MAX_BODY = 256 * 1024;
 // Cuántas peticiones con firma inválida se asientan por hora (C2-4). Más allá solo va al log.
 const MAX_REGISTROS_FIRMA_INVALIDA = 60;
 
-const uber = crearClienteUber({
-  entorno: ENTORNO, clientId: CLIENT_ID, clientSecret: CLIENT_SECRET,
-  tokenCache: {
-    leer: async () => {
-      const { data } = await admin.from("delivery_credenciales_app").select("access_token, vence_at")
-        .eq("app", "APP_UBEREATS").eq("entorno", ENTORNO).maybeSingle();
-      const f = data as { access_token: string; vence_at: string } | null;
-      return f && new Date(f.vence_at) > new Date() ? f.access_token : null;
-    },
-    guardar: async (token, venceAt) => {
-      await admin.from("delivery_credenciales_app").upsert({
-        app: "APP_UBEREATS", entorno: ENTORNO, access_token: token,
-        vence_at: venceAt.toISOString(), updated_at: new Date().toISOString(),
-      });
-    },
-  },
-});
+const uber = clienteUberDeApp(admin);
 
 type EventoUber = { event_id?: string; event_type?: string; meta?: { user_id?: string; resource_id?: string } };
 
