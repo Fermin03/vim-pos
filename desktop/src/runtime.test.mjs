@@ -45,3 +45,21 @@ test("explicarFalloDeSpawn: EACCES/EPERM apunta a permisos o antivirus, y cualqu
   const otro = explicarFalloDeSpawn({ code: "EBUSY", message: "spawn x EBUSY" }, "x");
   assert.match(otro, /EBUSY/);
 });
+
+// En Windows un segundo servidor puede enlazar un puerto que ya tiene dueño (Warp pone
+// SO_REUSEADDR) y no recibe nada: las peticiones se las queda el primero. Por eso el arranque
+// pregunta antes si el puerto de PostgREST está tomado.
+test("puertoOcupado: sí cuando alguien escucha ahí, no cuando está libre", async () => {
+  const { puertoLibre, puertoOcupado } = await import("./puerto-libre.mjs");
+  const net = await import("node:net");
+  const puerto = await puertoLibre();
+  assert.equal(await puertoOcupado(puerto), false);
+  const servidor = net.createServer();
+  await new Promise((r) => servidor.listen(puerto, "127.0.0.1", r));
+  try {
+    assert.equal(await puertoOcupado(puerto), true);
+  } finally {
+    await new Promise((r) => servidor.close(r));
+  }
+  assert.equal(await puertoOcupado(puerto), false, "y lo suelta: preguntar no deja el puerto tomado");
+});
