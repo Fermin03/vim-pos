@@ -13,7 +13,7 @@ import { fileURLToPath } from "node:url";
 import { startBackend } from "./backend.mjs";
 import { startUiServer } from "./ui-server.mjs";
 import { pullFromCloud } from "./sync-pull.mjs";
-import { loginDispositivoNube } from "./dispositivo.mjs";
+import { cajaIdDeEmail, loginDispositivoNube } from "./dispositivo.mjs";
 import { pushToCloud } from "./sync-push.mjs";
 import { respaldar, respaldarAsync, hacerSitio } from "./backup.mjs";
 import { crearGatewayDeEspera } from "./gateway.mjs";
@@ -22,13 +22,12 @@ import { crearWatchdog } from "./watchdog.mjs";
 import { conTope } from "./tope.mjs";
 import { crearCicloSync, OMITIDO } from "./sync-ciclo.mjs";
 import { crearSondeoCatalogo } from "./sondeo-catalogo.mjs";
-import { crearAlmacenDirectivas, estadoDeVersion } from "./directivas.mjs";
+import { crearAlmacenDirectivas, debeSondearApps, estadoDeVersion } from "./directivas.mjs";
 import { pantallaDeLaCaja } from "./pantalla.mjs";
 import { crearPantallaCliente } from "./pantalla-cliente.mjs";
 import { sincronizarAnuncios, listarAnuncios, rutaDeAnuncio } from "./anuncios.mjs";
 import { crearCoordinadorDePasadas } from "./pasada-unica.mjs";
 import { crearEspejo } from "./delivery-espejo.mjs";
-import { debeSondearApps } from "./delivery-espejo-modulo.mjs";
 import { registrarErrorLocal, subirErrores } from "./sync-errores.mjs";
 import { buscarActualizacion, descargarInstalador, nombreInstaladorTemporal } from "./updater.mjs";
 import { poolVigente } from "./pool-vigente.mjs";
@@ -1090,11 +1089,7 @@ async function tokenDeNubeCacheado({ forzar = false } = {}) {
   return opts;
 }
 /** La caja de este dispositivo viene en su correo: caja-<uuid>@dispositivos.<dominio>. */
-function cajaDeEstaCaja() {
-  const email = leerNube()?.email ?? "";
-  const m = /^caja-([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})@/i.exec(email);
-  return m ? m[1].toLowerCase() : null;
-}
+const cajaDeEstaCaja = () => cajaIdDeEmail(leerNube()?.email);
 let espejo = null;
 // D6: el espejo vive más que un backend (el perro guardián y "Respaldar ahora" lo reinician y el
 // pool viejo queda cerrado). Se le da un pool que resuelve SIEMPRE el del backend vigente.

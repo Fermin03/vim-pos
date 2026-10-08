@@ -14,7 +14,7 @@
 // sin libreta, el cajero daba de alta a un repartidor y la siembra del primer sync lo marcaba como
 // subido. Por eso las pruebas de orden imitan ese calendario: arranque → alta local → push.
 //
-// Vive sin base de datos a propósito (igual que verify-push-lotes): lo que se prueba es la
+// Vive sin base de datos a propósito (igual que sync-push-lotes.test.mjs): lo que se prueba es la
 // política, y provocar un rechazo de la nube a voluntad con el Postgres embebido es lento y
 // difícil de montar. El SQL real lo cubre `npm run verify:push`.
 import { test } from "node:test";
@@ -317,7 +317,7 @@ test("las zonas pendientes son las que la nube aún no confirmó", async () => {
 
 // Ronda de arreglos 1/5: las tres pruebas de arriba solo llaman a `sembrarZonasUnaVez` o a
 // `listarPendientes`, así que nunca ejercitan el camino de PUSH real: el destructuring de `zonas`
-// en `enviarLote`, `marcarZonasSubidas`, `zonasRechazadas` ni la rama `zonas_envio` de
+// en `enviarLote`, `marcarZonasSubidas`, `filasRechazadas` ni la rama `zonas_envio` de
 // `rechazadosPorTicket` tenían ninguna prueba que los pasara. Gemelas exactas de las pruebas de
 // repartidores de arriba ("un repartidor que la nube RECHAZA…" y "un alta hecha SIN CONEXIÓN…"),
 // que sí pasan por `pushToCloud`.
