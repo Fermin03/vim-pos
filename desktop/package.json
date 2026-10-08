@@ -55,6 +55,8 @@
     },
     "files": [
       "src/**/*",
+      "!src/**/*.test.mjs",
+      "!src/verify-*.mjs",
       "package.json"
     ],
     "asar": false,
