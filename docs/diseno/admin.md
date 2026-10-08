@@ -214,6 +214,23 @@ sucursales, o algún menú propio; con una sola sucursal, el Catálogo se ve com
   44 px en táctil y 40 en escritorio, y `aria-disabled` mientras guarda para no perder el foco.
 - **Aviso de cajas viejas** (anteriores a la 0.4.110): se conserva; una caja así no respeta ningún menú.
 
+## Piezas que se repiten en el panel
+
+Viven en `apps/admin/app/components` y se usan en vez de volver a escribir el marcado:
+
+- **`Segmentos`** (`controles.tsx`) — el control segmentado de los filtros de lista ("Todos · Activos ·
+  Inactivos") y de "Agrupar por" en los reportes (`grande`, de 40 px, para ir junto al rango de fechas).
+  Es un grupo con nombre y cada opción dice si está elegida (`aria-pressed`).
+- **`AccionFila`** (`controles.tsx`) — las acciones de texto al final de una fila (Editar, Pausar,
+  Eliminar). La que destruye lleva `peligro` y va **en rojo en reposo**, no solo al pasar el mouse.
+- **`label` e `input`** (`campos.ts`) — la etiqueta y el campo de formulario estándar. Un campo con
+  otra altura o tamaño de letra declara el suyo en su archivo.
+- **`PedirModulo`** (`pedir-modulo.tsx`) — la tarjeta de una sección que el plan no incluye
+  (Inventario, Lealtad): qué es, qué trae y un solo botón que abre WhatsApp.
+- Los diálogos son siempre `Modal` de `@vim/ui`: cierra con Escape y lleva el foco al primer campo.
+- Los fondos de las etiquetas de estado salen de los tokens (`bg-danger-soft`, `bg-warning-soft`,
+  `bg-info-soft`, `bg-hover`), no de un hexadecimal.
+
 ## Lo que NO se hereda del POS
 
 - Los objetivos de 44–56px. Con mouse, 36–40px es lo correcto; 44 se ve infantil.

@@ -1,15 +1,14 @@
 "use client";
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Button, useConfirmar } from "@vim/ui/styles";
+import { Button, Modal, useConfirmar } from "@vim/ui/styles";
 import { PageBody, PageHeader, TablaScroll } from "../../../components/page-header";
 import {
   actualizarProveedor, crearProveedor, eliminarProveedor, listarProveedores, proveedorSchema, type Proveedor,
 } from "../../../lib/proveedores";
 import { mensajeError } from "../../../lib/errores";
-
-const input = "h-11 w-full rounded border border-line-strong px-3 text-sm outline-none focus:border-ink focus:shadow-[0_0_0_3px_rgba(22,22,26,.06)]";
-const label = "mb-1.5 block text-13 font-medium text-ink-2";
+import { input, label } from "../../../components/campos";
+import { AccionFila } from "../../../components/controles";
 
 type Form = { nombre: string; rfc: string; telefono: string; email: string; notas: string };
 const VACIO: Form = { nombre: "", rfc: "", telefono: "", email: "", notas: "" };
@@ -91,8 +90,8 @@ export default function ProveedoresPage() {
                     <td className="pr-3 text-ink-2">{p.telefono ?? "—"}</td>
                     <td className="pr-3 text-right tabular-nums">{p.compras}</td>
                     <td className="text-right">
-                      <button className="mr-3 text-sm text-ink-2 hover:text-ink" onClick={() => { setError(null); setEditando({ id: p.id, datos: { nombre: p.nombre, rfc: p.rfc ?? "", telefono: p.telefono ?? "", email: p.email ?? "", notas: p.notas ?? "" } }); }}>Editar</button>
-                      <button className="text-sm text-danger" onClick={() => borrar(p)}>Dar de baja</button>
+                      <AccionFila className="mr-3" onClick={() => { setError(null); setEditando({ id: p.id, datos: { nombre: p.nombre, rfc: p.rfc ?? "", telefono: p.telefono ?? "", email: p.email ?? "", notas: p.notas ?? "" } }); }}>Editar</AccionFila>
+                      <AccionFila peligro onClick={() => borrar(p)}>Dar de baja</AccionFila>
                     </td>
                   </tr>
                 ))}
@@ -103,25 +102,22 @@ export default function ProveedoresPage() {
         )}
 
         {editando && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/30 p-4">
-            <div role="dialog" aria-modal="true" aria-label={editando.id ? "Editar proveedor" : "Nuevo proveedor"} className="w-full max-w-md rounded-lg bg-surface p-5 shadow-xl">
-              <h2 className="mb-4 font-display text-lg font-bold">{editando.id ? "Editar proveedor" : "Nuevo proveedor"}</h2>
-              <div className="grid gap-3">
-                <div><label className={label} htmlFor="p-nombre">Nombre</label><input id="p-nombre" className={input} value={editando.datos.nombre} onChange={(e) => set("nombre", e.target.value)} /></div>
-                <div><label className={label} htmlFor="p-rfc">RFC (opcional)</label><input id="p-rfc" className={`${input} uppercase`} value={editando.datos.rfc} onChange={(e) => set("rfc", e.target.value.toUpperCase())} maxLength={13} /></div>
-                <div className="grid grid-cols-2 gap-3">
-                  <div><label className={label} htmlFor="p-tel">Teléfono</label><input id="p-tel" className={input} value={editando.datos.telefono} onChange={(e) => set("telefono", e.target.value)} /></div>
-                  <div><label className={label} htmlFor="p-email">Correo</label><input id="p-email" className={input} value={editando.datos.email} onChange={(e) => set("email", e.target.value)} /></div>
-                </div>
-                <div><label className={label} htmlFor="p-notas">Notas</label><textarea id="p-notas" className="min-h-[60px] w-full rounded border border-line-strong p-2 text-sm" value={editando.datos.notas} onChange={(e) => set("notas", e.target.value)} /></div>
-                {error && <p role="alert" className="text-sm font-medium text-danger">{error}</p>}
+          <Modal open onClose={() => setEditando(null)} title={editando.id ? "Editar proveedor" : "Nuevo proveedor"} className="w-full max-w-md rounded-lg bg-surface p-5 shadow-xl">
+            <div className="grid gap-3">
+              <div><label className={label} htmlFor="p-nombre">Nombre</label><input id="p-nombre" className={input} value={editando.datos.nombre} onChange={(e) => set("nombre", e.target.value)} /></div>
+              <div><label className={label} htmlFor="p-rfc">RFC (opcional)</label><input id="p-rfc" className={`${input} uppercase`} value={editando.datos.rfc} onChange={(e) => set("rfc", e.target.value.toUpperCase())} maxLength={13} /></div>
+              <div className="grid grid-cols-2 gap-3">
+                <div><label className={label} htmlFor="p-tel">Teléfono</label><input id="p-tel" className={input} value={editando.datos.telefono} onChange={(e) => set("telefono", e.target.value)} /></div>
+                <div><label className={label} htmlFor="p-email">Correo</label><input id="p-email" className={input} value={editando.datos.email} onChange={(e) => set("email", e.target.value)} /></div>
               </div>
-              <div className="mt-5 flex justify-end gap-2">
-                <Button variant="ghost" onClick={() => setEditando(null)} disabled={guardando}>Cancelar</Button>
-                <Button onClick={guardar} disabled={guardando}>{guardando ? "Guardando…" : "Guardar"}</Button>
-              </div>
+              <div><label className={label} htmlFor="p-notas">Notas</label><textarea id="p-notas" className="min-h-[60px] w-full rounded border border-line-strong p-2 text-sm" value={editando.datos.notas} onChange={(e) => set("notas", e.target.value)} /></div>
+              {error && <p role="alert" className="text-sm font-medium text-danger">{error}</p>}
             </div>
-          </div>
+            <div className="mt-5 flex justify-end gap-2">
+              <Button variant="ghost" onClick={() => setEditando(null)} disabled={guardando}>Cancelar</Button>
+              <Button onClick={guardar} disabled={guardando}>{guardando ? "Guardando…" : "Guardar"}</Button>
+            </div>
+          </Modal>
         )}
       </PageBody>
     </>

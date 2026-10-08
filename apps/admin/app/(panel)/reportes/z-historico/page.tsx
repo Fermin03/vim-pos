@@ -4,6 +4,7 @@ import { Nota, ReporteMarco, useConsulta, useRangoReporte, type Cifra } from "..
 import { useSucursalReporte } from "../../../components/selector-sucursal";
 import { leerZHistorico, type FilaZHistorico } from "../../../lib/reportes";
 import { formatear, type Columna } from "../../../lib/reporte-tabla";
+import { Segmentos } from "../../../components/controles";
 
 const cuadra = (n: number) => Math.abs(n) < 0.01;
 // Faltante en rojo (es dinero que no está); sobrante en ámbar (hay que revisar, no se perdió nada).
@@ -66,22 +67,13 @@ export default function CortesDeTurnoPage() {
   ];
 
   const filtro = (
-    <div role="group" aria-label="Qué cortes mostrar" className="inline-flex gap-0.5 rounded border border-line bg-hover p-[3px]">
-      {[
-        { v: false, l: "Todos" },
-        { v: true, l: "Con diferencia" },
-      ].map((t) => (
-        <button
-          key={t.l}
-          type="button"
-          aria-pressed={soloDiferencia === t.v}
-          onClick={() => setSoloDiferencia(t.v)}
-          className={`min-h-[40px] whitespace-nowrap rounded-[4px] px-3 text-13 font-semibold transition-colors ${soloDiferencia === t.v ? "bg-surface text-ink shadow-sm" : "text-ink-2 hover:text-ink"}`}
-        >
-          {t.l}
-        </button>
-      ))}
-    </div>
+    <Segmentos
+      grande
+      etiqueta="Qué cortes mostrar"
+      opciones={[{ v: false, l: "Todos" }, { v: true, l: "Con diferencia" }]}
+      valor={soloDiferencia}
+      onCambiar={setSoloDiferencia}
+    />
   );
 
   return (

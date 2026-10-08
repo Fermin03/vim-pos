@@ -32,10 +32,8 @@ import {
 import { guardarFilaDeMenu, hrefConMenu, leerFilaDeMenu } from "../lib/menus";
 import { useMenuCatalogo } from "./selector-menu";
 import type { Caja } from "../lib/configuracion";
+import { input, label } from "./campos";
 
-const input =
-  "h-11 w-full rounded border border-line-strong px-3 text-sm outline-none focus:border-ink focus:shadow-[0_0_0_3px_rgba(22,22,26,.06)]";
-const label = "mb-1.5 block text-13 font-medium text-ink-2";
 const ayuda = "mt-1 text-13 text-ink-2";
 
 /**

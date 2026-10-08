@@ -9,9 +9,7 @@ import {
 } from "../../../lib/areas-cocina";
 import { listarSucursalesMesas, type Sucursal } from "../../../lib/mesas";
 import { mensajeError } from "../../../lib/errores";
-
-const input = "h-11 w-full rounded border border-line-strong px-3 text-sm outline-none focus:border-ink focus:shadow-[0_0_0_3px_rgba(22,22,26,.06)]";
-const label = "mb-1.5 block text-13 font-medium text-ink-2";
+import { input, label } from "../../../components/campos";
 
 type FormDatos = { sucursal_id: string; nombre: string; tipo: string };
 
