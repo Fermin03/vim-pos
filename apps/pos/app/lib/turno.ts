@@ -1,5 +1,7 @@
 "use client";
 import { employeeClient } from "./supabase";
+import { subDeToken } from "./autorizacion";
+import { hoyLocal } from "./reservaciones";
 
 export type Turno = {
   id: string;
@@ -71,15 +73,6 @@ export async function leerCaja(token: string, cajaId: string): Promise<DatosCaja
   };
 }
 
-/** Día contable hoy. Simplificación: usa el día local del navegador. El backend
- *  refinará el cómputo con la hora de cierre del tenant cuando se migre a RPC. */
-function diaContableHoy(): string {
-  const d = new Date();
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
-  return `${y}-${m}-${day}`;
-}
 
 /** Próximo correlativo del día para la caja (contar turnos abiertos del día). */
 async function siguienteCorrelativoDelDia(token: string, cajaId: string, dia: string): Promise<number> {
@@ -131,7 +124,9 @@ export async function abrirTurno(token: string, input: AbrirTurnoInput): Promise
   const caja = await leerCaja(token, input.cajaId);
   const tenant_id = caja.tenant_id;
   const sucursal_id = caja.sucursal_id;
-  const dia = diaContableHoy();
+  // Día contable. Simplificación: el día local de la caja; el backend refinará el cómputo con la
+  // hora de cierre del tenant cuando se migre a RPC.
+  const dia = hoyLocal();
   const correlativo = await siguienteCorrelativoDelDia(token, input.cajaId, dia);
   const codigo = `${dia}-C${String(input.cajaNumero).padStart(2, "0")}-${String(correlativo).padStart(2, "0")}`;
 
@@ -161,16 +156,6 @@ export async function abrirTurno(token: string, input: AbrirTurnoInput): Promise
   return { ...data, fondo_inicial_mxn: Number(data.fondo_inicial_mxn) } as Turno;
 }
 
-function subDeToken(token: string): string {
-  try {
-    const payload = token.split(".")[1];
-    if (!payload) throw new Error();
-    const claims = JSON.parse(atob(payload.replace(/-/g, "+").replace(/_/g, "/")));
-    return claims.sub as string;
-  } catch {
-    throw new Error("TOKEN_INVALIDO");
-  }
-}
 
 export function fmtMxn(n: number): string {
   return n.toLocaleString("es-MX", { style: "currency", currency: "MXN" });

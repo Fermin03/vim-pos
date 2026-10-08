@@ -2,10 +2,8 @@
 import { etiquetaApp as etiquetaAppCompartida } from "@vim/db/metodos-pago";
 // Pedidos que llegan de las apps de delivery (ADR 0011). Lectura bajo RLS (delivery_pedidos) y
 // acciones vía la edge function delivery-accion: el POS nunca habla con Uber/DiDi/Rappi.
-import { employeeClient } from "./supabase";
+import { employeeClient, encabezadosFuncion, urlFuncion } from "./supabase";
 
-const URL = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const ANON = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
 
 export type PedidoAppEstado =
   | "RECIBIDO" | "ACEPTADO" | "RECHAZADO" | "EN_PREPARACION" | "LISTO" | "ENTREGADO" | "CANCELADO" | "EXPIRADO" | "ERROR";
@@ -97,9 +95,9 @@ export async function accionPedidoApp(
   args: { pedidoId: string; accion: "aceptar" | "rechazar" | "listo"; motivo?: string; detalle?: string; tiempoPrepMin?: number },
 ): Promise<{ ok: true; ticketId?: string } | { ok: false; error: string; detalle?: string }> {
   try {
-    const r = await fetch(`${URL}/functions/v1/delivery-accion`, {
+    const r = await fetch(urlFuncion("delivery-accion"), {
       method: "POST",
-      headers: { apikey: ANON, Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+      headers: encabezadosFuncion(token),
       body: JSON.stringify({
         pedido_id: args.pedidoId, accion: args.accion, motivo: args.motivo, detalle: args.detalle, tiempo_prep_min: args.tiempoPrepMin,
       }),
@@ -179,9 +177,9 @@ type RespTienda = { ok?: boolean; tienda?: EstadoTiendaApp; tiempo_prep_min?: nu
 
 async function llamarAccion(token: string, cuerpo: Record<string, unknown>): Promise<RespTienda & { status: number }> {
   try {
-    const r = await fetch(`${URL}/functions/v1/delivery-accion`, {
+    const r = await fetch(urlFuncion("delivery-accion"), {
       method: "POST",
-      headers: { apikey: ANON, Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+      headers: encabezadosFuncion(token),
       body: JSON.stringify(cuerpo),
     });
     const j = (await r.json().catch(() => ({}))) as RespTienda;

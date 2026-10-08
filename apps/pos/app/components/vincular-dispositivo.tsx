@@ -3,7 +3,8 @@ import { useState } from "react";
 import { Button } from "@vim/ui/styles";
 import { deviceSignIn } from "../lib/supabase";
 import { guardarIdent, leerIdent, CREDS_DEV_FIXTURE } from "../lib/device-creds";
-import { darDeAltaDesdeNube, esEscritorio } from "../lib/alta-nube";
+import { darDeAltaDesdeNube } from "../lib/alta-nube";
+import { esEscritorio } from "../lib/actualizacion";
 import { BrandMark } from "./topbar-pos";
 
 /**
