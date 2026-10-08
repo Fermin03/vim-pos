@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { crearAlmacenDirectivas, estadoDeVersion, normalizar, DIRECTIVAS_VACIAS } from "./directivas.mjs";
+import { crearAlmacenDirectivas, estadoDeVersion, normalizar, debeSondearApps, DIRECTIVAS_VACIAS } from "./directivas.mjs";
 
 /** fs falso en memoria: la prueba no toca disco. */
 function fsFalso(inicial = null) {
@@ -212,4 +212,18 @@ test("una directiva sin soporte no borra el último soporte bueno", () => {
   assert.equal(a.leer().directivas.soporte.whatsapp, "5214771234567");
   a.guardar({ soporte: { whatsapp: "525665083346" } });   // y uno nuevo sí lo reemplaza
   assert.equal(a.leer().directivas.soporte.whatsapp, "525665083346");
+});
+
+test("el espejo de apps solo arranca con el módulo encendido", () => {
+  assert.equal(debeSondearApps({ modulos: { delivery_apps: true } }), true);
+  assert.equal(debeSondearApps({ modulos: { delivery_apps: false } }), false);
+  assert.equal(debeSondearApps({ modulos: {} }), false);
+});
+
+test("sin directivas todavía, el espejo de apps NO arranca", () => {
+  // Arrancar por defecto contradiría el propósito: la caja de un cliente sin delivery sondearía
+  // hasta el primer latido, que puede tardar 10 minutos o no llegar nunca si no hay nube.
+  assert.equal(debeSondearApps(null), false);
+  assert.equal(debeSondearApps(undefined), false);
+  assert.equal(debeSondearApps(DIRECTIVAS_VACIAS), false);
 });
