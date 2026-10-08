@@ -12,7 +12,7 @@ DECLARE
   v_prod uuid; v_zona uuid; v_turno uuid;
   v_dom uuid; v_rec uuid; v_bloq uuid; v_mal uuid; v_app uuid; v_conexion uuid;
   v_ticket uuid; v_ticket2 uuid; v_cli uuid; v_cli2 uuid;
-  v_estado text; v_cocina text; v_modo text; v_nota text; v_total numeric; v_n int;
+  v_estado text; v_cocina text; v_modo text; v_nota text; v_total numeric; v_n int; v_n0 int;
   v_dir jsonb := '{"calle":"Av. Siempre Viva","numero_exterior":"742","colonia":"Centro","codigo_postal":"37000","ciudad":"León","estado":"Guanajuato","referencias":"portón verde"}'::jsonb;
 BEGIN
   PERFORM set_config('request.jwt.claims', NULL, true);
@@ -43,6 +43,11 @@ BEGIN
     IF SQLERRM NOT LIKE '%SIN_TURNO_ABIERTO%' THEN RAISE; END IF;
   END;
   IF (SELECT estado FROM delivery_pedidos WHERE id = v_dom) <> 'RECIBIDO' THEN RAISE EXCEPTION '1: el pedido cambió de estado sin turno'; END IF;
+  -- ticket_id y estado se escriben al final: no prueban nada. Lo que prueba es que no hay ticket ni cliente.
+  SELECT count(*) INTO v_n FROM tickets WHERE tenant_id = v_tenant AND client_id_local = 'tienda:tienda-tk-dom';
+  IF v_n <> 0 THEN RAISE EXCEPTION '1: el intento sin turno dejó % ticket(s)', v_n; END IF;
+  SELECT count(*) INTO v_n FROM clientes WHERE tenant_id = v_tenant AND regexp_replace(telefono, '\D', '', 'g') = '4771112233';
+  IF v_n <> 0 THEN RAISE EXCEPTION '1: el intento sin turno creó % cliente(s)', v_n; END IF;
 
   -- OJO: dia_contable en hora de México, no CURRENT_DATE (UTC en el CI).
   INSERT INTO turnos(tenant_id, sucursal_id, caja_id, codigo_turno, dia_contable, usuario_apertura_id, fondo_inicial_mxn, fondo_modo)
@@ -113,6 +118,8 @@ BEGIN
   EXCEPTION WHEN OTHERS THEN
     IF SQLERRM NOT LIKE '%CLIENTE_BLOQUEADO%' THEN RAISE; END IF;
   END;
+  SELECT count(*) INTO v_n FROM tickets WHERE tenant_id = v_tenant AND client_id_local = 'tienda:tienda-tk-bloq';
+  IF v_n <> 0 THEN RAISE EXCEPTION '6: el cliente bloqueado dejó % ticket(s)', v_n; END IF;
   UPDATE clientes SET estado = 'ACTIVO' WHERE id = v_cli;
 
   -- 7) El total del ticket no coincide con lo cotizado: aborta y no deja ticket.
@@ -123,6 +130,7 @@ BEGIN
     jsonb_build_array(jsonb_build_object('producto_id', v_prod, 'cantidad', 1, 'precio_unitario_mxn', 150.00, 'modificadores', '[]'::jsonb)),
     '{}'::jsonb, 999.00, now() + interval '5 minutes')
   RETURNING id INTO v_mal;
+  SELECT count(*) INTO v_n0 FROM tickets WHERE tenant_id = v_tenant;
   BEGIN
     PERFORM crear_ticket_desde_tienda(v_mal);
     RAISE EXCEPTION '7: aceptó un total que no coincide';
@@ -130,6 +138,11 @@ BEGIN
     IF SQLERRM NOT LIKE '%TOTAL_NO_COINCIDE%' THEN RAISE; END IF;
   END;
   IF (SELECT ticket_id FROM delivery_pedidos WHERE id = v_mal) IS NOT NULL THEN RAISE EXCEPTION '7: quedó un ticket a medias'; END IF;
+  -- ticket_id se escribe al final, así que arriba no prueba el rollback: esto sí (el ticket se abrió antes del RAISE).
+  SELECT count(*) INTO v_n FROM tickets WHERE tenant_id = v_tenant AND client_id_local = 'tienda:tienda-tk-mal';
+  IF v_n <> 0 THEN RAISE EXCEPTION '7: sobrevivió % ticket(s) del pedido rechazado', v_n; END IF;
+  SELECT count(*) INTO v_n FROM tickets WHERE tenant_id = v_tenant;
+  IF v_n <> v_n0 THEN RAISE EXCEPTION '7: el total de tickets pasó de % a %', v_n0, v_n; END IF;
 
   -- 8) Cada función se niega al pedido del otro canal.
   INSERT INTO delivery_conexiones (tenant_id, sucursal_id, app, estado, tienda_id_externo)
