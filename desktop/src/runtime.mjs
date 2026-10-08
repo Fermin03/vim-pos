@@ -7,6 +7,7 @@ import { arrancarConReintentos, crearCapturaDeLog, esperarPostgrest, reintentarB
 import { reanotarHuellasClientes0156UnaVez, sembrarRepartidoresUnaVez, sembrarZonasUnaVez } from "./sync-push.mjs";
 import { blindarTablasInternas, repararRevokesUnaVez } from "./privilegios.mjs";
 import { conTope } from "./tope.mjs";
+import { puertoLibre, puertoOcupado } from "./puerto-libre.mjs";
 import pg from "pg";
 import { spawn, execFileSync } from "node:child_process";
 import { randomBytes } from "node:crypto";
@@ -331,7 +332,7 @@ async function arrancarUnaVez(opts) {
 
   const dataDir = opts.dataDir ?? path.join(dataRoot, "pgdata");
   const pgPort = opts.pgPort ?? 54329;
-  const restPort = opts.restPort ?? 54331;
+  let restPort = opts.restPort ?? 54331; // el de siempre; cambia si ya tiene dueño (ver el paso 6)
   const secret = opts.jwtSecret ?? secretoDeInstalacion(dataRoot);
   // El fixture de desarrollo (Knock-Out Burger de demo) SOLO va en dev. En una instalación real
   // sembrarlo hacía dos daños: metía datos de demostración en la caja del cliente, y —peor— el
@@ -525,6 +526,15 @@ async function arrancarUnaVez(opts) {
   await db.end();
 
   // 6) PostgREST como sidecar (con libpq.dll del propio Postgres embebido).
+  // En Windows un segundo servidor enlaza sin error un puerto que ya tiene dueño (Warp pone
+  // SO_REUSEADDR) y no recibe nada: las peticiones se las queda el primero. Si en el puerto de
+  // siempre ya escucha alguien —un PostgREST viejo que no murió, u otro programa— se usa uno
+  // libre. Es un puerto interno: solo lo usa el gateway, que lo toma de lo que devuelve esta función.
+  if (await puertoOcupado(restPort)) {
+    const ocupado = restPort;
+    restPort = await puertoLibre();
+    log(`el puerto ${ocupado} de PostgREST ya está ocupado: se usa el ${restPort}`);
+  }
   mkdirSync(path.dirname(confPath), { recursive: true }); // dataRoot/bin (userData en empaquetado)
   writeFileSync(confPath, [
     // 127.0.0.1 (no 'localhost'): bajo Electron, la resolución de 'localhost' del proceso hijo

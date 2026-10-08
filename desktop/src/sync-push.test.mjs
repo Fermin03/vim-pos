@@ -878,6 +878,49 @@ test("si PostgREST muere al arrancar, el backend lo nota en el acto y se levanta
   }
 });
 
+// Un PostgREST viejo que sigue escuchando (quedó vivo de una sesión anterior, o es de otra copia de
+// la app). En Windows el nuevo enlaza el MISMO puerto sin error —Warp pone SO_REUSEADDR— y no
+// recibe nada: las peticiones se las queda el viejo, que contesta 503 porque su base ya no existe.
+// La caja esperaba el minuto y no abría. Ahora, si el puerto tiene dueño, PostgREST usa otro.
+test("si el puerto de PostgREST ya tiene dueño, el backend arranca en otro en vez de quedarse sin respuesta", {
+  skip: SOLO_WINDOWS,
+  timeout: 180_000,
+}, async () => {
+  const { spawn } = await import("node:child_process");
+  const { writeFileSync, mkdirSync } = await import("node:fs");
+  const { fileURLToPath } = await import("node:url");
+  const desktop = path.join(path.dirname(fileURLToPath(import.meta.url)), "..");
+  const dataRoot = mkdtempSync(path.join(tmpdir(), "vim-puerto-"));
+  const PUERTO = 54382;
+  let viejo = null, backend = null;
+  try {
+    // El viejo: un PostgREST de verdad en ese puerto, apuntando a una base que no existe.
+    mkdirSync(path.join(dataRoot, "viejo"), { recursive: true });
+    const conf = path.join(dataRoot, "viejo", "postgrest.conf");
+    writeFileSync(conf, [
+      `db-uri = "postgres://authenticator:x@127.0.0.1:1/vimpos"`, `db-schemas = "public"`, `db-anon-role = "anon"`,
+      `jwt-secret = "${"s".repeat(43)}"`, `server-port = ${PUERTO}`, `server-host = "127.0.0.1"`, "",
+    ].join("\n"));
+    const pgBin = path.join(desktop, "node_modules", "@embedded-postgres", "windows-x64", "native", "bin");
+    viejo = spawn(path.join(desktop, "bin", "postgrest.exe"), [conf], {
+      stdio: "ignore", env: { ...process.env, PATH: `${pgBin}${path.delimiter}${process.env.PATH}` },
+    });
+    for (let i = 0; i < 40; i++) { // hasta que escuche
+      try { await fetch(`http://127.0.0.1:${PUERTO}/`); break; } catch { await new Promise((r) => setTimeout(r, 250)); }
+    }
+
+    const lineas = [];
+    backend = await startLocalBackend({ dataRoot, pgPort: 54381, restPort: PUERTO, log: (m) => lineas.push(m) });
+    assert.notEqual(backend.restPort, PUERTO, "no se queda en el puerto que ya tenía dueño");
+    assert.equal((await fetch(`http://127.0.0.1:${backend.restPort}/`)).status, 200, "y en el suyo contesta");
+    assert.ok(lineas.some((l) => l.includes(String(PUERTO)) && l.includes("ocupado")), `el log lo dice: ${lineas.join(" · ")}`);
+  } finally {
+    if (backend) await backend.stop();
+    try { viejo?.kill(); } catch { /* */ }
+    rmSync(dataRoot, { recursive: true, force: true });
+  }
+});
+
 // ── Lealtad (0156, ADR 0030): movimientos y canjes viajan en el push ──────────────────────────
 
 test("lealtad: el canje entra en la huella del ticket sin mover la de los tickets que no tienen", () => {

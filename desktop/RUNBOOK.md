@@ -389,6 +389,13 @@ Si vuelve a pasar, buscar `se vuelve a intentar` en el log y mirar el código de
 que escribió PostgREST. Solo NO se reintenta cuando Postgres y PostgREST viven y PostgREST contesta
 503 el minuto entero: ahí el problema está en la base y repetir solo alarga la espera.
 
+**El puerto de PostgREST con dueño.** En Windows un segundo PostgREST enlaza sin error un puerto
+donde ya escucha otro (Warp pone `SO_REUSEADDR`) y no recibe nada: las peticiones se las queda el
+primero, que contesta 503 si su base ya no existe. Pasa con un PostgREST que quedó vivo de una
+sesión anterior o de otra copia de la app. El arranque ahora pregunta antes (`puertoOcupado`) y, si
+el 54331 tiene dueño, usa un puerto libre: es interno, solo lo usa el gateway. En el log:
+`el puerto 54331 de PostgREST ya está ocupado: se usa el <N>`.
+
 ## Endurecimiento de la auditoría integral (30/09/2026)
 
 - **Privilegios de la BD local.** El arranque ya NO hace `GRANT … ON ALL TABLES` (deshacía los

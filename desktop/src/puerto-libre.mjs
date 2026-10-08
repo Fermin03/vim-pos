@@ -1,4 +1,7 @@
-// Solo para las pruebas: un puerto que el sistema acaba de dar por libre.
+// Puertos: uno que el sistema acaba de dar por libre, y saber si otro ya tiene dueño.
+//
+// `puertoLibre` nació para las pruebas; el arranque de la caja lo usa junto con `puertoOcupado`
+// para no poner a PostgREST en un puerto donde ya escucha alguien (ver runtime.mjs).
 //
 // `startUiServer` necesita saber su puerto ANTES de escuchar (lo usa para comprobar el Origin de
 // las peticiones que escriben), así que no se le puede pasar 0 como a los demás servidores de
@@ -22,5 +25,18 @@ export function puertoLibre(host = "127.0.0.1") {
       const { port } = s.address();
       s.close(() => resolve(port));
     });
+  });
+}
+
+/**
+ * ¿Hay alguien escuchando ya en ese puerto? Se pregunta intentando enlazarlo: un enlace normal
+ * falla aunque el otro proceso haya puesto SO_REUSEADDR (medido con PostgREST en Windows).
+ * Hay que preguntar por la MISMA dirección: en Windows 0.0.0.0 y 127.0.0.1 conviven sin error.
+ */
+export function puertoOcupado(puerto, host = "127.0.0.1") {
+  return new Promise((resolve) => {
+    const s = net.createServer();
+    s.once("error", () => resolve(true));
+    s.listen(puerto, host, () => s.close(() => resolve(false)));
   });
 }
