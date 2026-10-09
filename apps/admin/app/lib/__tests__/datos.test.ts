@@ -66,10 +66,13 @@ describe("tenantId", () => {
     expect(await tenantId()).toBe("t1");
   });
 
-  it("sin sesión o sin tenant, lanza", async () => {
+  it("sin sesión o sin negocio en la sesión, lanza con palabras del dueño", async () => {
+    const VENCIDA = "Tu sesión expiró. Vuelve a iniciar sesión.";
     doble.sesion = null;
-    await expect(tenantId()).rejects.toThrow("Sesión sin tenant");
+    await expect(tenantId()).rejects.toThrow(VENCIDA);
     doble.sesion = {};
-    await expect(tenantId()).rejects.toThrow("Sesión sin tenant");
+    await expect(tenantId()).rejects.toThrow(VENCIDA);
+    // Ese texto llega a la pantalla por `mensajeError`: nunca una palabra interna.
+    expect(await tenantId().catch((e: Error) => e.message)).not.toMatch(/tenant/i);
   });
 });
