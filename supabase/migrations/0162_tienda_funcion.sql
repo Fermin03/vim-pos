@@ -328,3 +328,273 @@ END;
 $$;
 REVOKE ALL ON FUNCTION tienda_menu(uuid, uuid) FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION tienda_menu(uuid, uuid) TO service_role;
+
+-- ── §3 La cotización ─────────────────────────────────────────────────────────
+-- Dos promesas. Una: lo que se cotiza es EXACTAMENTE lo que el menú ofrece; por eso no se le vuelve
+-- a preguntar al catálogo qué se vende: el carrito se valida contra el propio JSON de tienda_menu.
+-- Dos: el total es, al centavo, el que dará recalcular_totales_ticket (0156) cuando
+-- crear_ticket_desde_tienda (0161) arme el ticket con estos renglones; si no coincide, ese pedido
+-- no se puede aceptar (TOTAL_NO_COINCIDE).
+
+-- Un entero JSON entre p_min y p_max, o NULL. Vale `2`; no valen `2.0`, `"2"`, `1.5` ni null:
+-- _delivery_items_a_ticket (0161) lee la cantidad de un modificador con ::int, y '2.0' ahí revienta.
+CREATE OR REPLACE FUNCTION _tienda_entero(p_valor jsonb, p_min integer, p_max integer)
+RETURNS integer
+LANGUAGE plpgsql IMMUTABLE SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
+DECLARE
+  v_n integer;
+BEGIN
+  IF jsonb_typeof(p_valor) = 'number' AND p_valor::text ~ '^[0-9]{1,6}$' THEN
+    v_n := p_valor::text::integer;
+    IF v_n BETWEEN p_min AND p_max THEN RETURN v_n; END IF;
+  END IF;
+  RETURN NULL;
+END;
+$$;
+REVOKE ALL ON FUNCTION _tienda_entero(jsonb, integer, integer) FROM PUBLIC, anon, authenticated;
+
+-- Lo que cobra el ticket por un renglón de importe neto p_neto: el IVA es el del producto y solo
+-- se suma si va por fuera, redondeado POR RENGLÓN (recalcular_totales_ticket, 0156:714-721).
+CREATE OR REPLACE FUNCTION _tienda_con_iva(p_neto numeric, p_producto uuid, p_tenant uuid)
+RETURNS numeric
+LANGUAGE sql STABLE SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
+  SELECT p_neto + CASE WHEN p.iva_incluido_en_precio THEN 0 ELSE ROUND(p_neto * p.tasa_iva / 100, 2) END
+    FROM productos p
+   WHERE p.id = p_producto AND p.tenant_id = p_tenant;
+$$;
+REVOKE ALL ON FUNCTION _tienda_con_iva(numeric, uuid, uuid) FROM PUBLIC, anon, authenticated;
+
+-- Valida lo elegido (p_mods: [{opcion_id, cantidad}]) contra los grupos que el menú ofrece para ese
+-- producto (p_grupos, la salida de _tienda_grupos_de) y devuelve {normalizados, monto}; NULL si no
+-- es válido. El código de error lo pone quien llama: no es el mismo en un producto que en un hijo
+-- de combo. p_cantidad es la del renglón que los lleva (en un hijo: elección × combos), porque el
+-- ticket cobra precio_extra × cantidad del modificador × cantidad del renglón (0161:262-275, 294-298).
+-- Una opción inactiva, negativa, de otro negocio o de un grupo que no es del producto no está en
+-- p_grupos, así que cae por «no ofrecida».
+CREATE OR REPLACE FUNCTION _tienda_modificadores(p_grupos jsonb, p_mods jsonb, p_cantidad integer)
+RETURNS jsonb
+LANGUAGE plpgsql IMMUTABLE SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
+DECLARE
+  v_mods  jsonb := COALESCE(NULLIF(p_mods, 'null'::jsonb), '[]'::jsonb);
+  v_ok    boolean;
+  v_norm  jsonb;
+  v_monto numeric(12,2);
+BEGIN
+  IF jsonb_typeof(v_mods) <> 'array' THEN RETURN NULL; END IF;
+
+  WITH elegidas AS (
+    SELECT e.ord, lower(e.m ->> 'opcion_id') AS opcion_id, _tienda_entero(e.m -> 'cantidad', 1, 10) AS cantidad
+      FROM jsonb_array_elements(v_mods) WITH ORDINALITY AS e(m, ord)
+  ),
+  ofrecidas AS (
+    SELECT g ->> 'id' AS grupo_id, o ->> 'id' AS opcion_id, o ->> 'nombre' AS nombre,
+           o ->> 'precio_extra_mxn' AS precio, (o ->> 'agotada')::boolean AS agotada
+      FROM jsonb_array_elements(p_grupos) g, jsonb_array_elements(g -> 'opciones') o
+  ),
+  pares AS (
+    SELECT e.ord, e.opcion_id, e.cantidad, f.grupo_id, f.nombre, f.precio, f.agotada
+      FROM elegidas e LEFT JOIN ofrecidas f USING (opcion_id)
+  )
+  SELECT
+    -- Todas ofrecidas, ninguna agotada, cantidades de 1 a 10 y ninguna repetida…
+    NOT EXISTS (SELECT 1 FROM pares WHERE grupo_id IS NULL OR agotada OR cantidad IS NULL)
+    AND (SELECT count(*) = count(DISTINCT opcion_id) FROM pares)
+    -- …y cada grupo, con su mínimo y su máximo (ya normalizados por tipo; máximo null = sin tope).
+    AND NOT EXISTS (
+      SELECT 1 FROM jsonb_array_elements(p_grupos) g
+       CROSS JOIN LATERAL (SELECT COALESCE(sum(p.cantidad), 0) AS n FROM pares p WHERE p.grupo_id = g ->> 'id') s
+       WHERE s.n < (g ->> 'minimo')::integer OR s.n > (g ->> 'maximo')::integer),
+    COALESCE((SELECT jsonb_agg(jsonb_build_object(
+                       'opcion_modificador_id', opcion_id,
+                       'grupo_id', NULL,           -- solo una elección de slot lleva grupo_id (0161:184-196)
+                       'nombre_app', nombre,
+                       'cantidad', cantidad,
+                       'precio_extra_mxn', precio) ORDER BY ord)
+                FROM pares), '[]'::jsonb),
+    COALESCE((SELECT sum(ROUND(precio::numeric * cantidad * p_cantidad, 2)) FROM pares), 0)
+  INTO v_ok, v_norm, v_monto;
+
+  IF v_ok IS NOT TRUE THEN RETURN NULL; END IF;
+  RETURN jsonb_build_object('normalizados', v_norm, 'monto', v_monto);
+END;
+$$;
+REVOKE ALL ON FUNCTION _tienda_modificadores(jsonb, jsonb, integer) FROM PUBLIC, anon, authenticated;
+
+-- La cotización de un carrito. NO mira si la tienda está abierta (eso es de tienda_crear_pedido):
+-- cotizar con la tienda cerrada sirve para enseñar el carrito.
+-- Devuelve {items, renglones, subtotal_mxn, envio_mxn, envio_total_mxn, total_mxn}:
+--   · items: los renglones normalizados, tal cual los consume _delivery_items_a_ticket (0161);
+--   · renglones: lo mismo, para enseñárselo al cliente;
+--   · envio_mxn: el costo de la zona, como se guarda en delivery_pedidos.envio_mxn (sin el IVA que
+--     el ticket le sume); envio_total_mxn: lo que el envío le cuesta al cliente;
+--   · total_mxn = subtotal_mxn + envio_total_mxn = lo que dará tickets.total_mxn.
+-- Por cada renglón del ticket (producto, padre de combo, cada hijo, envío):
+--   neto  = cantidad × precio + Σ precio_extra × cantidad del modificador × cantidad del renglón
+--   total = neto, más ROUND(neto × tasa / 100, 2) si el IVA va por fuera.
+-- ponytail: arma el menú entero de la sucursal en cada cotización (una consulta por producto
+-- visible). Sobra para cartas de cientos de productos; si un día pesa, sacar de tienda_menu una
+-- función «un producto como lo enseña el menú» y usarla aquí y allá.
+CREATE OR REPLACE FUNCTION tienda_cotizar(p_tenant uuid, p_sucursal uuid, p_modo text, p_zona uuid, p_items jsonb)
+RETURNS jsonb
+LANGUAGE plpgsql STABLE SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
+DECLARE
+  c_uuid       CONSTANT text := '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$';
+  v_menu       jsonb;
+  v_r          jsonb;            -- un renglón del carrito
+  v_pid        text;
+  v_p          jsonb;            -- su producto, como lo enseña el menú
+  v_cant       integer;
+  v_precio     numeric(12,2);    -- precio unitario del renglón (en un combo: base + elecciones)
+  v_total      numeric(12,2);    -- lo que el ticket cobrará por el renglón (un combo: padre + hijos)
+  v_mods       jsonb;            -- sus modificadores normalizados (en un combo: las elecciones)
+  v_m          jsonb;
+  v_comps      jsonb;
+  v_comp       jsonb;
+  v_slot       jsonb;
+  v_op         jsonb;
+  v_n          integer;
+  v_items      jsonb := '[]'::jsonb;
+  v_renglones  jsonb := '[]'::jsonb;
+  v_subtotal   numeric(12,2) := 0;
+  v_envio      numeric(12,2) := 0;
+  v_envio_tot  numeric(12,2) := 0;
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM sucursales s WHERE s.id = p_sucursal AND s.tenant_id = p_tenant) THEN
+    RAISE EXCEPTION 'SUCURSAL_DE_OTRO_NEGOCIO: la sucursal % no es de este negocio', p_sucursal;
+  END IF;
+
+  IF p_modo = 'DOMICILIO' THEN
+    SELECT z.costo_mxn INTO v_envio
+      FROM zonas_envio z
+     WHERE z.id = p_zona AND z.tenant_id = p_tenant AND z.sucursal_id = p_sucursal
+       AND z.activa AND z.deleted_at IS NULL;
+    IF NOT FOUND THEN RAISE EXCEPTION 'ZONA_INVALIDA: a domicilio hace falta una zona activa de esta sucursal'; END IF;
+  ELSIF p_modo = 'RECOGER' THEN
+    IF p_zona IS NOT NULL THEN RAISE EXCEPTION 'ZONA_INVALIDA: al recoger no hay zona de envío'; END IF;
+  ELSE
+    RAISE EXCEPTION 'MODO_INVALIDO: el modo es RECOGER o DOMICILIO';
+  END IF;
+
+  -- jsonb_array_length revienta con lo que no es arreglo: el CASE lo deja en NULL.
+  IF COALESCE(jsonb_array_length(CASE WHEN jsonb_typeof(p_items) = 'array' THEN p_items END), 0) NOT BETWEEN 1 AND 40 THEN
+    RAISE EXCEPTION 'CARRITO_INVALIDO: el carrito es un arreglo de 1 a 40 renglones';
+  END IF;
+
+  v_menu := tienda_menu(p_tenant, p_sucursal);
+
+  FOR v_r IN SELECT e.r FROM jsonb_array_elements(p_items) WITH ORDINALITY AS e(r, ord) ORDER BY e.ord LOOP
+    v_pid  := lower(v_r ->> 'producto_id');
+    v_cant := _tienda_entero(v_r -> 'cantidad', 1, 50);
+    IF jsonb_typeof(v_r) IS DISTINCT FROM 'object' OR jsonb_typeof(v_r -> 'producto_id') IS DISTINCT FROM 'string'
+       OR v_pid !~ c_uuid OR v_cant IS NULL THEN
+      RAISE EXCEPTION 'CARRITO_INVALIDO: cada renglón lleva producto_id y una cantidad entera de 1 a 50';
+    END IF;
+
+    -- Que esté en el menú y no agotado ES la regla de qué se vende (tienda_menu, reglas 1, 2, 6 y 8).
+    v_p := jsonb_path_query_first(v_menu, '$.categorias[*].productos[*] ? (@.id == $id)', jsonb_build_object('id', v_pid));
+    IF v_p IS NULL OR (v_p ->> 'agotado')::boolean THEN
+      RAISE EXCEPTION 'PRODUCTO_NO_DISPONIBLE: %', v_pid;
+    END IF;
+    v_precio := (v_p ->> 'precio_mxn')::numeric;
+
+    IF NOT (v_p ->> 'es_combo')::boolean THEN
+      IF COALESCE(v_r -> 'componentes', '[]'::jsonb) NOT IN ('[]'::jsonb, 'null'::jsonb) THEN
+        RAISE EXCEPTION 'CARRITO_INVALIDO: solo un combo lleva componentes';
+      END IF;
+      v_m := _tienda_modificadores(v_p -> 'grupos', v_r -> 'modificadores', v_cant);
+      IF v_m IS NULL THEN RAISE EXCEPTION 'MODIFICADORES_INVALIDOS: %', v_pid; END IF;
+      v_mods  := v_m -> 'normalizados';
+      v_total := _tienda_con_iva(ROUND(v_cant * v_precio, 2) + (v_m ->> 'monto')::numeric, v_pid::uuid, p_tenant);
+    ELSE
+      -- Un combo: el padre cobra base + elecciones (con el IVA del combo); cada hijo va a precio 0
+      -- y solo cobra sus propios modificadores (con el IVA del hijo). Anexo §4.
+      v_comps := COALESCE(NULLIF(v_r -> 'componentes', 'null'::jsonb), '[]'::jsonb);
+      IF COALESCE(v_r -> 'modificadores', '[]'::jsonb) NOT IN ('[]'::jsonb, 'null'::jsonb)
+         OR jsonb_typeof(v_comps) <> 'array' THEN
+        RAISE EXCEPTION 'COMBO_INVALIDO: %', v_pid;
+      END IF;
+      v_mods  := '[]'::jsonb;
+      v_total := 0;
+      FOR v_comp IN SELECT e.c FROM jsonb_array_elements(v_comps) WITH ORDINALITY AS e(c, ord) ORDER BY e.ord LOOP
+        v_slot := jsonb_path_query_first(v_p, '$.slots[*] ? (@.id == $id)',
+                                         jsonb_build_object('id', lower(v_comp ->> 'grupo_id')));
+        v_op   := jsonb_path_query_first(v_slot, '$.opciones[*] ? (@.producto_id == $id)',
+                                         jsonb_build_object('id', lower(v_comp ->> 'producto_id')));
+        v_n    := _tienda_entero(v_comp -> 'cantidad', 1, 999);   -- el tope de verdad es el máximo del slot
+        IF v_op IS NULL OR (v_op ->> 'agotado')::boolean OR v_n IS NULL THEN
+          RAISE EXCEPTION 'COMBO_INVALIDO: %', v_pid;
+        END IF;
+        v_m := _tienda_modificadores(v_op -> 'grupos', v_comp -> 'modificadores', v_n * v_cant);
+        IF v_m IS NULL THEN RAISE EXCEPTION 'COMBO_INVALIDO: %', v_pid; END IF;
+
+        v_precio := v_precio + (v_op ->> 'precio_extra_mxn')::numeric * v_n;
+        v_total  := v_total + _tienda_con_iva((v_m ->> 'monto')::numeric, (v_op ->> 'producto_id')::uuid, p_tenant);
+        v_mods   := v_mods || jsonb_build_object(
+          'opcion_modificador_id', v_op ->> 'producto_id',   -- el PRODUCTO elegido (0161:218-234)
+          'grupo_id', v_slot ->> 'id',
+          'nombre_app', v_op ->> 'nombre',
+          'cantidad', v_n,                                     -- por unidad de combo
+          'precio_extra_mxn', v_op ->> 'precio_extra_mxn',
+          'modificadores', v_m -> 'normalizados');
+      END LOOP;
+      -- El mismo producto dos veces no se admite: el ticket empareja los modificadores de un hijo
+      -- por producto y no sabría a cuál van (0161, COMBO_ELECCION_AMBIGUA). Y cada slot, con su
+      -- mínimo y su máximo.
+      IF (SELECT count(*) <> count(DISTINCT m ->> 'opcion_modificador_id') FROM jsonb_array_elements(v_mods) m)
+         OR EXISTS (
+           SELECT 1 FROM jsonb_array_elements(v_p -> 'slots') s
+            CROSS JOIN LATERAL (SELECT COALESCE(sum((m ->> 'cantidad')::integer), 0) AS n
+                                  FROM jsonb_array_elements(v_mods) m
+                                 WHERE m ->> 'grupo_id' = s ->> 'id') x
+            WHERE x.n NOT BETWEEN (s ->> 'minimo')::integer AND (s ->> 'maximo')::integer) THEN
+        RAISE EXCEPTION 'COMBO_INVALIDO: %', v_pid;
+      END IF;
+      v_total := v_total + _tienda_con_iva(ROUND(v_cant * v_precio, 2), v_pid::uuid, p_tenant);
+    END IF;
+
+    -- Una elección de slot puede restar (precio_delta_mxn no tiene CHECK), pero el renglón no puede
+    -- quedar en negativo: ticket_items.precio_unitario_snapshot tiene CHECK >= 0.
+    IF v_precio < 0 THEN RAISE EXCEPTION 'PRECIO_INVALIDO: un precio unitario quedó en negativo'; END IF;
+
+    v_items := v_items || jsonb_build_object(
+      'producto_id', v_pid,
+      'nombre_app', v_p ->> 'nombre',
+      'cantidad', v_cant,
+      'precio_unitario_mxn', v_p ->> 'precio_mxn',   -- en un combo, la base: las elecciones suman aparte
+      'nota', CASE WHEN jsonb_typeof(v_r -> 'nota') = 'string' THEN NULLIF(left(btrim(v_r ->> 'nota'), 200), '') END,
+      'alergenos', '[]'::jsonb,
+      'alergia_nota', NULL,
+      'modificadores', v_mods);
+    v_renglones := v_renglones || jsonb_build_object(
+      'nombre', v_p ->> 'nombre',
+      'cantidad', v_cant,
+      'detalle', (SELECT string_agg(m ->> 'nombre_app', ', ') FROM jsonb_array_elements(v_mods) m),
+      'total_mxn', to_char(v_total, 'FM999999990.00'));
+    v_subtotal := v_subtotal + v_total;
+  END LOOP;
+
+  -- El envío es un renglón más del ticket, de cantidad 1, con el IVA del PRIMER renglón del
+  -- carrito (fijar_envio_ticket, 0116:193-205). Una zona de $0 no deja renglón.
+  IF v_envio > 0 THEN
+    v_envio_tot := _tienda_con_iva(v_envio, lower(p_items -> 0 ->> 'producto_id')::uuid, p_tenant);
+  END IF;
+
+  RETURN jsonb_build_object(
+    'items', v_items,
+    'renglones', v_renglones,
+    'subtotal_mxn', to_char(v_subtotal, 'FM999999990.00'),
+    'envio_mxn', to_char(v_envio, 'FM999999990.00'),
+    'envio_total_mxn', to_char(v_envio_tot, 'FM999999990.00'),
+    'total_mxn', to_char(v_subtotal + v_envio_tot, 'FM999999990.00'));
+END;
+$$;
+REVOKE ALL ON FUNCTION tienda_cotizar(uuid, uuid, text, uuid, jsonb) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION tienda_cotizar(uuid, uuid, text, uuid, jsonb) TO service_role;
