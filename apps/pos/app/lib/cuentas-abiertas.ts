@@ -23,6 +23,7 @@ export type CuentaAbierta = {
   cliente: string | null;         // nombre del cliente registrado o, si no hay, el nombre suelto (Pick-up)
   clienteId: string | null;       // cliente registrado de la cuenta (null = sin cliente)
   mesa: string | null;            // número de mesa (comedor), desde tickets_mesas
+  notaGeneral: string | null;     // nota de toda la cuenta; en un pedido de la tienda: forma de pago y nota del cliente
 };
 
 /** Nombre completo del cliente embebido (`cliente:clientes(nombre, apellido_paterno)`), o null. */
@@ -53,7 +54,7 @@ export async function listarCuentasAbiertas(
     // (`mesa_id` y `mesa_anterior_id`, esta última para transferencias). Sin la pista,
     // PostgREST no sabe cuál seguir y rechaza la consulta entera con "more than one
     // relationship was found" — dejando sin lista a los TRES modos, no solo a comedor.
-    .select("id, folio_completo, total_mxn, monto_pendiente_mxn, fecha_apertura, estado_cocina, ticket_impreso_at, nombre_cliente, cliente_id, cliente:clientes(nombre, apellido_paterno), tickets_mesas(fecha_liberacion, mesas!mesa_id(numero)), ticket_items(cantidad, cancelado)")
+    .select("id, folio_completo, total_mxn, monto_pendiente_mxn, fecha_apertura, estado_cocina, ticket_impreso_at, nombre_cliente, nota_general, cliente_id, cliente:clientes(nombre, apellido_paterno), tickets_mesas(fecha_liberacion, mesas!mesa_id(numero)), ticket_items(cantidad, cancelado)")
     .eq("sucursal_id", sucursalId)
     .in("modo_servicio", modos)
     .is("deleted_at", null)
@@ -78,6 +79,7 @@ export async function listarCuentasAbiertas(
     // Solo la asignación viva: una mesa liberada (cuenta transferida) no debe seguir rotulando.
     mesa: (((t.tickets_mesas as { fecha_liberacion: string | null; mesas: { numero: string } | null }[] | null) ?? [])
       .find((m) => m.fecha_liberacion === null)?.mesas?.numero) ?? null,
+    notaGeneral: (t.nota_general as string | null) ?? null,
   }));
 }
 

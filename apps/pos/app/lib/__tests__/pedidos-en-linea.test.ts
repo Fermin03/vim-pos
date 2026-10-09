@@ -100,8 +100,14 @@ describe("etiquetaEstadoEnLinea", () => {
   it("pausa con hora de México (20:30 UTC = 2:30 p. m.)", () => {
     expect(etiquetaEstadoEnLinea(e({ motivo: "EN_PAUSA", pausaHasta: "2026-10-09T20:30:00Z" }), ahora))
       .toEqual({ texto: "Tienda: en pausa hasta las 2:30 p. m.", tono: "aviso" });
-    expect(etiquetaEstadoEnLinea(e({ motivo: "EN_PAUSA", pausaHasta: "2026-10-09T14:05:00Z" }), ahora).texto)
+    expect(etiquetaEstadoEnLinea(e({ motivo: "EN_PAUSA", pausaHasta: "2026-10-09T14:05:00Z" }), new Date("2026-10-09T13:00:00Z")).texto)
       .toBe("Tienda: en pausa hasta las 8:05 a. m.");
+  });
+  it("una pausa cuya hora ya pasó no promete una hora vencida", () => {
+    // El estado se leyó antes de que venciera; la siguiente lectura trae el motivo real.
+    expect(etiquetaEstadoEnLinea(e({ motivo: "EN_PAUSA", pausaHasta: "2026-10-09T14:05:00Z" }), ahora))
+      .toEqual({ texto: "Tienda: en pausa", tono: "aviso" });
+    expect(etiquetaEstadoEnLinea(e({ motivo: "EN_PAUSA", pausaHasta: "2026-10-09T18:00:00Z" }), ahora).texto).toBe("Tienda: en pausa");
   });
   it("pausa indefinida o sin hora", () => {
     expect(etiquetaEstadoEnLinea(e({ motivo: "EN_PAUSA", pausaHasta: "2999-12-31T00:00:00Z" }), ahora).texto).toBe("Tienda: en pausa");
@@ -150,6 +156,12 @@ describe("llamadas a delivery-accion", () => {
     vi.stubGlobal("fetch", vi.fn(async () => { throw new Error("net"); }));
     await expect(leerEstadoEnLinea("tok", "s1")).rejects.toThrow("SIN_RED");
   });
+  it("una respuesta 2xx sin `participa` es un error, no una tienda apagada", async () => {
+    vi.stubGlobal("fetch", resp(200, {}));
+    await expect(leerEstadoEnLinea("tok", "s1")).rejects.toThrow("RESPUESTA_INVALIDA");
+    vi.stubGlobal("fetch", resp(200, { participa: "si" }));
+    await expect(pausarEnLinea("tok", "s1", "30m")).rejects.toThrow("RESPUESTA_INVALIDA");
+  });
   it("pausar y reanudar mandan su acción", async () => {
     const f = resp(200, { ...estadoNube, motivo: "EN_PAUSA", pausa_hasta: "2026-10-09T20:30:00Z" }); vi.stubGlobal("fetch", f);
     expect((await pausarEnLinea("tok", "s1", "30m")).motivo).toBe("EN_PAUSA");
@@ -167,5 +179,10 @@ describe("llamadas a delivery-accion", () => {
     expect(JSON.parse((f.mock.calls[0] as unknown as [string, RequestInit])[1].body as string)).toEqual({ accion: "enlinea_presente", sucursal_id: "s1" });
     vi.stubGlobal("fetch", vi.fn(async () => { throw new Error("net"); }));
     await expect(avisarPresente("tok", "s1")).resolves.toBeUndefined();
+  });
+  it("avisarPresente manda la caja del turno cuando se conoce", async () => {
+    const f = resp(200, { ok: true, sellado: true }); vi.stubGlobal("fetch", f);
+    await avisarPresente("tok", "s1", "c1");
+    expect(JSON.parse((f.mock.calls[0] as unknown as [string, RequestInit])[1].body as string)).toEqual({ accion: "enlinea_presente", sucursal_id: "s1", caja_id: "c1" });
   });
 });

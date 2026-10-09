@@ -69,7 +69,9 @@ async function llamar(token: string, cuerpo: Record<string, unknown>): Promise<{
 
 function comoEstado({ status, j }: { status: number; j: RespEstado }): EstadoEnLinea {
   if (status < 200 || status >= 300 || j.error) throw new ErrorEnLinea(j.error ?? `HTTP_${status}`, j.causa);
-  return { participa: !!j.participa, aceptacion: j.aceptacion === "AUTO" ? "AUTO" : "MANUAL", pausaHasta: j.pausa_hasta ?? null, motivo: j.motivo ?? null };
+  // Una respuesta que no dice si la tienda participa no es "apagada": es una respuesta rota.
+  if (typeof j.participa !== "boolean") throw new ErrorEnLinea("RESPUESTA_INVALIDA");
+  return { participa: j.participa, aceptacion: j.aceptacion === "AUTO" ? "AUTO" : "MANUAL", pausaHasta: j.pausa_hasta ?? null, motivo: j.motivo ?? null };
 }
 
 /** null = esta sucursal no tiene tienda (o el negocio no tiene el módulo). */
@@ -84,9 +86,12 @@ export async function pausarEnLinea(token: string, sucursalId: string, duracion:
 export async function reanudarEnLinea(token: string, sucursalId: string): Promise<EstadoEnLinea> {
   return comoEstado(await llamar(token, { accion: "enlinea_reanudar", sucursal_id: sucursalId }));
 }
-/** Avisa a la nube que hay un POS web con turno abierto. Nunca lanza: es un latido, si falla se repite. */
-export async function avisarPresente(token: string, sucursalId: string): Promise<void> {
-  await llamar(token, { accion: "enlinea_presente", sucursal_id: sucursalId });
+/**
+ * Avisa a la nube que hay un POS web con turno abierto. Con `cajaId` (la caja de ese turno) la nube
+ * sella solo esa caja. Nunca lanza: es un latido, si falla se repite.
+ */
+export async function avisarPresente(token: string, sucursalId: string, cajaId?: string): Promise<void> {
+  await llamar(token, { accion: "enlinea_presente", sucursal_id: sucursalId, ...(cajaId ? { caja_id: cajaId } : {}) });
 }
 
 /** "2:30 p. m." en hora de México. */
@@ -98,12 +103,14 @@ function horaMx(iso: string): string | null {
   return `${v("hour")}:${v("minute")} ${v("dayPeriod").toUpperCase() === "AM" ? "a. m." : "p. m."}`;
 }
 
-export function etiquetaEstadoEnLinea(e: EstadoEnLinea, _ahora: Date): { texto: string; tono: "ok" | "aviso" } {
+export function etiquetaEstadoEnLinea(e: EstadoEnLinea, ahora: Date): { texto: string; tono: "ok" | "aviso" } {
   switch (e.motivo) {
     case null: return { texto: "Tienda: recibiendo pedidos", tono: "ok" };
     case "EN_PAUSA": {
-      const indefinida = !e.pausaHasta || new Date(e.pausaHasta).getUTCFullYear() >= 2999;
-      const h = indefinida || !e.pausaHasta ? null : horaMx(e.pausaHasta);
+      // Sin hora si es indefinida o si la hora ya pasó (el estado se leyó antes de que venciera):
+      // prometer "hasta las 8:05" a las 9 es mentirle al cajero; la siguiente lectura lo corrige.
+      const hasta = e.pausaHasta ? new Date(e.pausaHasta) : null;
+      const h = !hasta || hasta.getUTCFullYear() >= 2999 || hasta.getTime() <= ahora.getTime() ? null : horaMx(e.pausaHasta!);
       return { texto: h ? `Tienda: en pausa hasta las ${h}` : "Tienda: en pausa", tono: "aviso" };
     }
     case "FUERA_DE_HORARIO": return { texto: "Tienda: fuera de horario", tono: "aviso" };

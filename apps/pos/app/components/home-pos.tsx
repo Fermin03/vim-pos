@@ -57,7 +57,9 @@ import { PantallaReservaciones } from "./pantalla-reservaciones";
 import { PantallaConsultaCuentas } from "./pantalla-consulta-cuentas";
 import { PantallaDevoluciones } from "./pantalla-devoluciones";
 import { PantallaPedidosApps } from "./pantalla-pedidos-apps";
-import { hayExpiradosSinVer, leerExpiradosHoy, leerPedidosApps } from "../lib/pedidos-apps";
+import { accionPedidoApp, hayExpiradosSinVer, leerExpiradosHoy, leerPedidosApps } from "../lib/pedidos-apps";
+import { aceptablesSolos, avisarPresente, comandasPendientes, debeSonar, leerEstadoEnLinea } from "../lib/pedidos-en-linea";
+import { esEscritorio } from "../lib/actualizacion";
 import { useAcceso } from "./banda-acceso";
 import { ModalCancelarItem } from "./modal-cancelar-item";
 import { ModalDescuentoItem } from "./modal-descuento-item";
@@ -101,6 +103,13 @@ const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
 
 
 
+
+/**
+ * Pedidos de la tienda cuyas comandas ya se mandaron a imprimir desde este dispositivo. Vive fuera
+ * del componente a propósito: si la impresora falló, el sello de la base no se pone, y un `useRef`
+ * se vaciaría al cambiar de cajero o bloquear — la comanda saldría sola otra vez, quizá duplicada.
+ */
+const comandasEnLineaIntentadas = new Set<string>();
 
 /** Pantalla desde la que se entró a capturar; a esa regresa el botón "Volver". */
 type Origen = "inicio" | "mesas" | "pickup" | "domicilio";
@@ -180,6 +189,16 @@ export function HomePos({
   // vez de abrir una consulta nueva solo para saber si el módulo está prendido.
   const { modulos } = useAcceso();
   const hayDelivery = modulos?.delivery_apps === true;
+  // Tienda en línea propia: comparte pantalla, sondeo y timbre con las apps («Pedidos en línea»).
+  const hayTienda = modulos?.tienda === true;
+  const hayEnLinea = hayDelivery || hayTienda;
+  const ultimoTimbre = useRef<number | null>(null);
+  const hayPorAceptar = useRef(false);
+  const aceptadosSolos = useRef(new Set<string>());
+  /** Cómo acepta la tienda (solo se lee en el POS web; en la caja instalada acepta su agente). */
+  const aceptacionEnLinea = useRef<"MANUAL" | "AUTO" | null>(null);
+  /** Relee ya los pedidos en línea (tras aceptar en la pantalla, para que la comanda no espere al sondeo). */
+  const releerEnLinea = useRef<() => void>(() => {});
   // Lealtad (ADR 0030). Todo lo de abajo queda apagado si el módulo no está efectivo.
   const lealtadActiva = modulos?.lealtad === true;
   const [programa, setPrograma] = useState<Programa | null>(null);
@@ -879,8 +898,9 @@ export function HomePos({
     return fallidas;
   }, [token]);
 
-  const imprimirComandaCocina = useCallback(async (ticketId: string, soloItems: string[], esAgregado: boolean) => {
-    if (soloItems.length === 0) return; // nada nuevo que mandar: no se gasta papel
+  /** `soloItems = null` manda TODAS las líneas del ticket (un pedido de la tienda recién aceptado). */
+  const imprimirComandaCocina = useCallback(async (ticketId: string, soloItems: string[] | null, esAgregado: boolean) => {
+    if (soloItems?.length === 0) return; // nada nuevo que mandar: no se gasta papel
     try {
       const datos = await leerTicketParaImpresion(ticketId, {
         token, cajeroNombre: empleado.nombre, cajaNombre: caja.nombre, conLealtad: false,
@@ -889,7 +909,7 @@ export function HomePos({
       // envía completo. Si solo llegó el id del padre (o el de un hijo suelto), se completa con
       // `parentId` para que `lineasParaComanda` vea al padre Y a todos sus hijos juntos —si falta
       // alguno, ese renglón se queda sin "Combo #n" y sin el contexto del padre.
-      const seleccion = datos.lineas.filter((l) => soloItems.includes(l.id) || (l.parentId != null && soloItems.includes(l.parentId)));
+      const seleccion = soloItems === null ? datos.lineas : datos.lineas.filter((l) => soloItems.includes(l.id) || (l.parentId != null && soloItems.includes(l.parentId)));
       const lineas = lineasParaComanda(seleccion);
       // Si lo recién enviado no tiene nada para cocina (p. ej. solo cargos), no hay comanda: un
       // papel vacío rotulado AGREGADO hace que la cocina busque un pedido que no existe.
@@ -905,6 +925,9 @@ export function HomePos({
       setError("El pedido se envió a cocina, pero no se pudo imprimir la comanda.");
     }
   }, [token, empleado.nombre, caja.nombre, imprimirComandaPorAreas]);
+  // El sondeo de pedidos en línea la llama desde un intervalo: por ref, para no re-suscribirlo.
+  const imprimirComandaRef = useRef(imprimirComandaCocina);
+  imprimirComandaRef.current = imprimirComandaCocina;
 
   /**
    * Avisa a cocina de productos CANCELADOS.
@@ -1359,37 +1382,59 @@ export function HomePos({
 
   // ADR 0011 — pedidos de apps: se consultan SIEMPRE (no solo en el inicio) porque un pedido de
   // Uber tiene minutos para aceptarse y el cajero puede estar en medio de una venta. Una consulta
-  // ligera cada 10 s; el sonido suena una vez por pedido nuevo pendiente.
+  // ligera cada 10 s. El timbre suena al llegar un pedido y se repite cada 20 s mientras quede
+  // alguno por aceptar (`debeSonar`); un reloj de 1 s lo evalúa entre lecturas.
+  // Tienda en línea: el mismo sondeo manda a imprimir las comandas de lo aceptado cuyo ticket es de
+  // esta caja, y en el POS web acepta solo lo que la tienda tenga en automático.
   // Add-on de delivery: sin el módulo encendido, ni se sondea. Es la misma carga que la caja de
   // escritorio deja de meterle a la nube con su espejo cuando el módulo está apagado.
   useEffect(() => {
-    if (!hayDelivery) {
+    if (!hayEnLinea) {
       // No basta con no pintar la pantalla: si el cajero estaba parado en Pedidos de apps cuando
       // VIM apagó el módulo, `enPedidosApps` se queda en `true` (solo `volverAlInicio` lo baja, y
       // eso exige un toque del cajero). Si el módulo se reenciende después, sin que el cajero
-      // navegue, el render seguiría evaluando `enPedidosApps && hayDelivery` como cierto y la app
+      // navegue, el render seguiría evaluando `enPedidosApps && hayEnLinea` como cierto y la app
       // saltaría sola de vuelta a esa pantalla, quizás encima de una venta en curso.
       setEnPedidosApps(false);
       return;
     }
     let vivo = true;
+    const timbrar = (hayNuevo: boolean) => {
+      const ahora = Date.now();
+      if (!debeSonar({ hayNuevoPorAceptar: hayNuevo, hayPorAceptar: hayPorAceptar.current, ultimoTimbre: ultimoTimbre.current, ahora })) return;
+      ultimoTimbre.current = ahora;
+      try { void new Audio("/sonidos/pedido-app.wav").play().catch(() => {}); } catch { /* sin audio: el badge basta */ }
+    };
     const cargar = () => {
       leerPedidosApps(token, caja.sucursal_id)
         .then((ps) => {
           if (!vivo) return;
           const pendientes = ps.filter((p) => p.estado === "RECIBIDO" || p.estado === "ERROR");
           setNPedidosApps(pendientes.length);
+          hayPorAceptar.current = ps.some((p) => p.estado === "RECIBIDO");
+
+          // Comandas de la tienda: se marcan como intentadas ANTES de imprimir (si la impresora
+          // falla sale el aviso y el cajero reimprime desde la cuenta; no se reintenta sola) y van
+          // en serie, un ticket tras otro. La base sella `comanda_impresa_at` al primer papel que sale.
+          const comandas = comandasPendientes(ps, turno.caja_id, comandasEnLineaIntentadas);
+          comandas.forEach((c) => comandasEnLineaIntentadas.add(c.pedidoId));
+          void (async () => { for (const c of comandas) await imprimirComandaRef.current(c.ticketId, null, false); })();
+
+          // POS web con la tienda en automático: acepta él (decisión 4), una vez por pedido.
+          for (const id of aceptablesSolos(ps, { esEscritorio: esEscritorio(), aceptacion: aceptacionEnLinea.current, hayTurno: true }, aceptadosSolos.current)) {
+            aceptadosSolos.current.add(id);
+            void accionPedidoApp(token, { pedidoId: id, accion: "aceptar" }).then(() => { if (vivo) cargar(); });
+          }
+
           const vistos = idsAppsVistos.current;
-          if (vistos === null) {
-            // Primera carga: lo que ya estaba no suena, solo lo que llegue a partir de ahora.
-            idsAppsVistos.current = new Set(ps.map((p) => p.id));
-            return;
-          }
-          const nuevos = ps.filter((p) => !vistos.has(p.id));
-          ps.forEach((p) => vistos.add(p.id));
-          if (nuevos.length > 0) {
-            try { void new Audio("/sonidos/pedido-app.wav").play().catch(() => {}); } catch { /* sin audio: el badge basta */ }
-          }
+          // Primera carga: lo que ya estaba no cuenta como recién llegado (si sigue por aceptar,
+          // el timbre suena igual: nadie lo ha atendido).
+          const nuevos = vistos === null ? [] : ps.filter((p) => !vistos.has(p.id));
+          if (vistos === null) idsAppsVistos.current = new Set(ps.map((p) => p.id));
+          else ps.forEach((p) => vistos.add(p.id));
+          // De una app, cualquier pedido nuevo suena, como siempre. De la tienda, el que llega por
+          // aceptar o recién aceptado solo; uno que entra ya cancelado o vencido no es para timbrar.
+          timbrar(nuevos.some((p) => p.canal === "APP" || p.estado === "RECIBIDO" || p.estado === "ACEPTADO"));
         })
         .catch(() => { /* informativo: sin red la caja sigue vendiendo */ });
       leerExpiradosHoy(token, caja.sucursal_id)
@@ -1397,9 +1442,28 @@ export function HomePos({
         .catch(() => { /* informativo */ });
     };
     cargar();
+    releerEnLinea.current = cargar;
     const id = setInterval(cargar, 10000);
+    const reloj = setInterval(() => timbrar(false), 1000);
+    return () => { vivo = false; clearInterval(id); clearInterval(reloj); releerEnLinea.current = () => {}; };
+  }, [hayEnLinea, token, caja.sucursal_id, turno.caja_id]);
+
+  // Tienda en línea, solo POS web (en la caja instalada lo hace su agente): cada 30 s avisa a la
+  // nube que aquí hay un turno abierto —sin eso la tienda no recibe pedidos— y lee cómo acepta.
+  // HomePos solo existe con turno abierto; al cerrarlo se desmonta y el aviso deja de salir.
+  useEffect(() => {
+    if (!hayTienda || esEscritorio()) { aceptacionEnLinea.current = null; return; }
+    let vivo = true;
+    const latir = () => {
+      void avisarPresente(token, caja.sucursal_id, turno.caja_id);
+      leerEstadoEnLinea(token, caja.sucursal_id)
+        .then((e) => { if (vivo) aceptacionEnLinea.current = e?.aceptacion ?? null; })
+        .catch(() => { /* se queda con lo último que supo; se repite en 30 s */ });
+    };
+    latir();
+    const id = setInterval(latir, 30000);
     return () => { vivo = false; clearInterval(id); };
-  }, [hayDelivery, token, caja.sucursal_id]);
+  }, [hayTienda, token, caja.sucursal_id, turno.caja_id]);
 
   /** Cierra la confirmación/recibo y deja la caja lista para la siguiente venta. */
   const nuevoTicket = useCallback(() => {
@@ -1940,7 +2004,7 @@ export function HomePos({
           expiradosApps={expiradosApps}
           // Sin el módulo, `onPedidosApps` queda undefined: PantallaInicio no pinta ni el atajo
           // ni el aviso de vencidos (ambos son condicionales a que venga la función).
-          onPedidosApps={hayDelivery ? () => { setEnInicio(false); setEnPedidosApps(true); } : undefined}
+          onPedidosApps={hayEnLinea ? () => { setEnInicio(false); setEnPedidosApps(true); } : undefined}
           onComedor={() => { setEnInicio(false); setEnMesas(true); }}
           onPickup={() => { setEnInicio(false); setEnPickup(true); }}
           onDomicilio={() => { setEnInicio(false); setEnDelivery(true); }}
@@ -2157,11 +2221,11 @@ export function HomePos({
     return <PantallaDevoluciones token={token} caja={caja} turno={turno} empleado={empleado} onSalir={volverAlInicio} />;
   }
 
-  // `hayDelivery` manda incluso sobre el estado de navegación: si el módulo se apagó mientras el
+  // `hayEnLinea` manda incluso sobre el estado de navegación: si el módulo se apagó mientras el
   // cajero estaba parado en esta pantalla (el latido llega cada 10 min, `useAcceso` relee cada
   // minuto), no se vuelve a montar y cae al POS normal.
-  if (enPedidosApps && hayDelivery) {
-    return <PantallaPedidosApps token={token} caja={caja} onSalir={volverAlInicio} />;
+  if (enPedidosApps && hayEnLinea) {
+    return <PantallaPedidosApps token={token} caja={caja} hayApps={hayDelivery} hayTienda={hayTienda} onCambio={() => releerEnLinea.current()} onSalir={volverAlInicio} />;
   }
 
   return (

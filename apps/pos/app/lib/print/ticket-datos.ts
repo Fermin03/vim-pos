@@ -178,7 +178,7 @@ export async function leerTicketParaImpresion(ticketId: string, ctx: Ctx): Promi
 
   const { data: t, error: e1 } = await sb
     .from("tickets")
-    .select("folio_completo, modo_servicio, cliente_id, direccion_entrega_id, nombre_cliente, subtotal_mxn, descuentos_manuales_mxn, iva_mxn, total_mxn, propina_mxn, fecha_pago, created_at, sucursal_id, tenant_id, lealtad_mxn, estado_fiscal")
+    .select("folio_completo, modo_servicio, cliente_id, direccion_entrega_id, nombre_cliente, nota_general, subtotal_mxn, descuentos_manuales_mxn, iva_mxn, total_mxn, propina_mxn, fecha_pago, created_at, sucursal_id, tenant_id, lealtad_mxn, estado_fiscal")
     .eq("id", ticketId)
     .single();
   if (e1 || !t) throw new Error(e1?.message ?? "Ticket no encontrado");
@@ -339,6 +339,9 @@ export async function leerTicketParaImpresion(ticketId: string, ctx: Ctx): Promi
       nombreCliente: (tk.nombre_cliente as string) ?? null,
     },
     entrega,
+    // Solo Pick-up y Domicilio: ahí la nota es del pedido (forma de pago, lo que escribió el
+    // cliente). En comedor y para llevar es un recado a cocina y el ticket del cliente no cambia.
+    notaPedido: tk.modo_servicio === "DRIVE_THRU" || tk.modo_servicio === "DELIVERY_PROPIO" ? ((tk.nota_general as string | null) ?? null) : null,
     lineas: lineasConCombo,
     totales: {
       subtotal: Number(tk.subtotal_mxn), descuentos: Number(tk.descuentos_manuales_mxn),
