@@ -33,13 +33,15 @@ const CONEXION_VIVA = new Set(["ACTIVA", "PENDIENTE"]);
 export function cadenciaEspejo(
   { conexiones = [], pedidosVivos = [], tienda = false }: {
     conexiones?: { estado?: string | null }[];
-    pedidosVivos?: { estado?: string | null; canal?: string | null }[];
+    pedidosVivos?: { estado?: string | null; canal?: string | null; gestion?: string | null }[];
     tienda?: boolean;
   },
 ): number {
-  // Un pedido vivo de la TIENDA acelera en cualquier estado, no solo por aceptar: su cliente mira
-  // el seguimiento y «listo» o «entregado» le tienen que llegar en segundos. Los de APP, como siempre.
-  if (pedidosVivos.some((p) => p.estado === "RECIBIDO" || p.canal === "TIENDA")) return RAPIDA_MS;
+  // Un pedido vivo de la TIENDA que atiende la caja (gestión ESCRITORIO) acelera en cualquier
+  // estado, no solo por aceptar: su cliente mira el seguimiento y «listo» o «entregado» le tienen
+  // que llegar en segundos. Los de gestión NUBE no: nadie escribe su estado de vuelta, se quedan
+  // en ACEPTADO para siempre y dejarían a la caja sondeando cada 10 s sin fin. Los de APP, como siempre.
+  if (pedidosVivos.some((p) => p.estado === "RECIBIDO" || (p.canal === "TIENDA" && p.gestion === "ESCRITORIO"))) return RAPIDA_MS;
   if (tienda || conexiones.some((c) => CONEXION_VIVA.has(String(c.estado ?? "")))) return NORMAL_MS;
   return REPOSO_MS;
 }

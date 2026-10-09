@@ -73,6 +73,10 @@ test("lo que no se arregla reintentando cancela el pedido, con su código", () =
     ["SUCURSAL_DE_OTRO_NEGOCIO: sucursal 5f0c…", "SUCURSAL_DE_OTRO_NEGOCIO"],
     ["Producto 7d1e… no existe o está eliminado", "PRODUCTO_NO_EXISTE"],
     ['El combo "Combo 1" no está disponible', "PRODUCTO_NO_DISPONIBLE"],
+    // Textos reales de 0116:170, 0152:336 y 0152:455.
+    ["Zona de envío 5f0c1b9e-0000-4000-8000-000000000001 no existe, está inactiva o no es de esta sucursal", "ZONA_NO_DISPONIBLE"],
+    ["Opción de modificador 5f0c1b9e-0000-4000-8000-000000000002 no existe", "OPCION_NO_EXISTE"],
+    ['El producto "Papas chicas" no se vende en esta sucursal', "PRODUCTO_NO_DISPONIBLE"],
   ];
   for (const [mensaje, codigo] of casos) {
     assert.deepEqual(fallaDeTicket(mensaje), { reintentable: false, codigo }, mensaje);

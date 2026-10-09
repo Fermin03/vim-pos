@@ -34,9 +34,15 @@ const NO_REINTENTABLES: [texto: string, codigo: string][] = [
     "TOTAL_NO_COINCIDE", "ENVIO_NO_COINCIDE", "DIRECCION_INVALIDA", "CLIENTE_BLOQUEADO", "PRODUCTO_DE_OTRO_NEGOCIO",
     "OPCION_DE_OTRO_NEGOCIO", "ITEM_SIN_MAPEAR", "COMBO_ELECCION_SIN_MAPEAR", "COMBO_ELECCION_AMBIGUA", "SUCURSAL_DE_OTRO_NEGOCIO",
   ].map((c): [string, string] => [c, c]),
-  // Estos dos los lanza agregar_item sin código (0152): se reconocen por el texto.
+  // Estos los lanzan agregar_item y fijar_envio_ticket sin código: se reconocen por el texto.
+  // «Opción de modificador % no existe» va DESPUÉS de «no existe o está eliminado» y no choca: no
+  // trae «o está eliminado».
   ["no existe o está eliminado", "PRODUCTO_NO_EXISTE"],
   ["no está disponible", "PRODUCTO_NO_DISPONIBLE"],
+  ["no se vende en esta sucursal", "PRODUCTO_NO_DISPONIBLE"],
+  // fijar_envio_ticket (0116): la zona del pedido se borró, se apagó o ya no es de la sucursal.
+  ["Zona de envío", "ZONA_NO_DISPONIBLE"],
+  ["Opción de modificador", "OPCION_NO_EXISTE"],
 ];
 
 /**

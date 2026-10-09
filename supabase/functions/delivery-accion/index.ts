@@ -22,6 +22,8 @@ type Cuerpo = {
   pedido_id?: string; accion?: string; motivo?: string; detalle?: string; tiempo_prep_min?: number;
   // Acciones de tienda (spec A6): por sucursal, no por pedido.
   sucursal_id?: string; duracion?: string; minutos?: number; forzar?: boolean;
+  // `enlinea_presente`: la caja del turno del POS web que avisa (opcional).
+  caja_id?: string;
   // Acción `estado` (la caja reporta en qué va un pedido de la tienda en línea).
   estado?: string;
 };
@@ -149,8 +151,12 @@ servir(async (req, json) => {
         // Decisión 4: sin caja instalada, quien da fe de que hay quien cocine es el POS web con turno
         // abierto. Se sella la misma marca que sella el espejo de la caja (la lee
         // sucursal_recibe_pedidos), y solo si de verdad hay un turno abierto en la nube.
-        const turnos = exigir(await admin.from("turnos").select("caja_id")
-          .eq("tenant_id", tenantId).eq("sucursal_id", sucursalId).eq("estado", "ABIERTO")) as { caja_id: string }[] | null;
+        // Si el POS dice cuál es la caja de SU turno, solo se sella esa (y solo si de verdad tiene
+        // turno abierto aquí): así el turno viejo de una caja instalada apagada no abre la tienda.
+        if (body.caja_id !== undefined && (typeof body.caja_id !== "string" || !UUID.test(body.caja_id))) return json({ error: "FALTAN_CAMPOS" }, 400);
+        const abiertos = admin.from("turnos").select("caja_id")
+          .eq("tenant_id", tenantId).eq("sucursal_id", sucursalId).eq("estado", "ABIERTO");
+        const turnos = exigir(await (body.caja_id ? abiertos.eq("caja_id", body.caja_id) : abiertos)) as { caja_id: string }[] | null;
         const cajas = [...new Set((turnos ?? []).map((t) => t.caja_id))];
         if (cajas.length === 0) return json({ ok: true, sellado: false });
         const selladas = exigir(await admin.from("cajas").update({ espejo_turno_abierto_at: new Date().toISOString() })
@@ -206,6 +212,19 @@ servir(async (req, json) => {
 
   // Pedido de la tienda en línea PROPIA. Aquí no existe Uber: nada de `uber.*` ni de
   // `registrarSalida` (delivery_eventos es la bitácora de lo que se le manda a una app).
+  // Aceptar y rechazar escriben SOLO si el pedido sigue por aceptar: entre la lectura de arriba y
+  // este update el cron pudo vencerlo, u otra pantalla (o el agente de la caja) atenderlo. Hace lo
+  // que delivery_pedido_transicion (0091) para esos estados, más el sello de aceptado_at, pero con
+  // el estado en el WHERE. false = ya no estaba por aceptar y no se tocó nada.
+  const moverPorAceptar = async (cambio: Record<string, string>): Promise<boolean> => {
+    const filas = exigir(await admin.from("delivery_pedidos").update(cambio)
+      .eq("id", pedido.id).eq("tenant_id", tenantId).eq("canal", "TIENDA").in("estado", ["RECIBIDO", "ERROR"])
+      .select("id")) as unknown[] | null;
+    return (filas?.length ?? 0) > 0;
+  };
+  const rechazarPorAceptar = (motivo: string) =>
+    moverPorAceptar({ estado: "RECHAZADO", cancelado_at: new Date().toISOString(), motivo_cancelacion: motivo });
+
   const accionDeTienda = async (): Promise<Response> => {
     // La caja instalada solo atiende pedidos de su sucursal.
     if (esDispositivo && cajaDispositivo?.sucursal_id !== pedido.sucursal_id) return json({ error: "PEDIDO_NO_EXISTE" }, 404);
@@ -216,27 +235,30 @@ servir(async (req, json) => {
           // El ticket lo crea la caja instalada (su agente ve el ACEPTADO en el siguiente sondeo).
           const r = await reclamarParaCaja();   // no hace nada si quien acepta es un empleado
           if (r) return r;
-          exigir(await admin.rpc("delivery_pedido_transicion", { p_pedido_id: pedido.id, p_estado: "ACEPTADO", p_detalle: null }));
-          // delivery_pedido_transicion no sella la hora de aceptación, y el seguimiento del cliente la usa.
-          exigir(await admin.from("delivery_pedidos").update({ aceptado_at: new Date().toISOString() })
-            .eq("id", pedido.id).eq("tenant_id", tenantId).is("aceptado_at", null));
+          if (!(await moverPorAceptar({ estado: "ACEPTADO", aceptado_at: new Date().toISOString() }))) return json({ error: "ACCION_INVALIDA" }, 409);
           return json({ ok: true });
         }
+        // Gestión NUBE: el ticket se crea aquí, sobre el turno de la nube. Una caja instalada no lo
+        // vería nunca en su base, así que no es ella quien lo acepta.
+        if (esDispositivo) return json({ error: "ACCION_INVALIDA", estado: pedido.estado }, 409);
         const { data: ticketId, error: errRpc } = await admin.rpc("crear_ticket_desde_tienda", { p_pedido_id: pedido.id });
         if (!errRpc) return json({ ok: true, ticket_id: ticketId });
+        // Venció o lo atendieron justo antes: no es un fallo, es que ya no está por aceptar.
+        if ((errRpc.message ?? "").includes("PEDIDO_NO_ACEPTABLE")) return json({ error: "ACCION_INVALIDA" }, 409);
         const falla = fallaDeTicket(errRpc.message ?? "", errRpc.code);
         registrarError("delivery-accion", falla.codigo, errRpc.message);
         // Sin turno, o algo que no conocemos: el pedido se queda como está y se puede reintentar.
         if (falla.reintentable) return json({ error: falla.codigo }, 409);
         // Decisión 3: lo que reintentar no arregla (el total o la zona cambiaron, un producto ya no
         // existe) cancela el pedido para que el cliente lo sepa ya, no cuando se venza.
-        exigir(await admin.rpc("delivery_pedido_transicion", { p_pedido_id: pedido.id, p_estado: "RECHAZADO", p_detalle: "OTRO" }));
+        // (Si entretanto otro ya lo terminó, no se toca; para quien intentó aceptarlo da igual: ya no hay pedido.)
+        await rechazarPorAceptar("OTRO");
         return json({ error: "PEDIDO_CANCELADO", causa: falla.codigo }, 409);
       }
       case "rechazar": {
         if (!["RECIBIDO", "ERROR"].includes(pedido.estado)) return json({ error: "ACCION_INVALIDA", estado: pedido.estado }, 409);
         // Solo el código, de lista cerrada: el cliente lo ve en su seguimiento. `body.detalle` se ignora.
-        exigir(await admin.rpc("delivery_pedido_transicion", { p_pedido_id: pedido.id, p_estado: "RECHAZADO", p_detalle: motivoDeTienda(body.motivo) }));
+        if (!(await rechazarPorAceptar(motivoDeTienda(body.motivo)))) return json({ error: "ACCION_INVALIDA" }, 409);
         return json({ ok: true });
       }
       case "estado": {

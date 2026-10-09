@@ -116,8 +116,16 @@ test("un pedido RECIBIDO manda sobre la tienda: ritmo rápido", () => {
 
 test("un pedido de la TIENDA ya aceptado mantiene el ritmo rápido", () => {
   for (const estado of ["ACEPTADO", "EN_PREPARACION", "LISTO"]) {
-    assert.equal(cadenciaEspejo({ conexiones: [], pedidosVivos: [{ estado, canal: "TIENDA" }], tienda: true }), RAPIDA_MS, estado);
+    assert.equal(cadenciaEspejo({ conexiones: [], pedidosVivos: [{ estado, canal: "TIENDA", gestion: "ESCRITORIO" }], tienda: true }), RAPIDA_MS, estado);
   }
+});
+
+test("un pedido de la TIENDA de gestión NUBE ya aceptado NO acelera: nunca sale de ACEPTADO y dejaría a la caja a 10 s para siempre", () => {
+  for (const estado of ["ACEPTADO", "EN_PREPARACION", "LISTO"]) {
+    assert.equal(cadenciaEspejo({ conexiones: [], pedidosVivos: [{ estado, canal: "TIENDA", gestion: "NUBE" }], tienda: true }), NORMAL_MS, estado);
+  }
+  // Por aceptar sí, como cualquier RECIBIDO.
+  assert.equal(cadenciaEspejo({ conexiones: [], pedidosVivos: [{ estado: "RECIBIDO", canal: "TIENDA", gestion: "NUBE" }], tienda: true }), RAPIDA_MS);
 });
 
 test("un pedido de APP ya aceptado sigue como hoy: ritmo normal, con o sin la columna canal", () => {
