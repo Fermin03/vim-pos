@@ -6,7 +6,7 @@ import { useId } from "react";
 import { cn } from "@vim/ui/styles";
 import type { Modo, Sucursal } from "../lib/contrato";
 import { formatoMxn } from "../lib/dinero";
-import { modosDe } from "../lib/pantalla";
+import { modosDe, rangoDeEnvio } from "../lib/pantalla";
 
 const NOMBRE: Record<Modo, string> = { RECOGER: "Para recoger", DOMICILIO: "A domicilio" };
 
@@ -17,6 +17,7 @@ export function Entrega({ sucursal, modo, zonaId, alCambiarModo, alCambiarZona }
   const modos = modosDe(sucursal);
   if (modos.length === 0) return null;
   const zona = sucursal.zonas.find((z) => z.id === zonaId);
+  const rango = rangoDeEnvio(sucursal.zonas);
   return (
     <div className="flex flex-col gap-3">
       {modos.length === 1 ? (
@@ -49,6 +50,7 @@ export function Entrega({ sucursal, modo, zonaId, alCambiarModo, alCambiarZona }
             <option value="">Elige tu zona</option>
             {sucursal.zonas.map((z) => <option key={z.id} value={z.id}>{z.nombre}: envío {formatoMxn(z.costo_mxn)}</option>)}
           </select>
+          {rango && <span className="text-13 text-ink-3">{rango}</span>}
         </label>
       )}
     </div>
