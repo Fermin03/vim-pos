@@ -25,7 +25,7 @@ export default async function MarcoDelNegocio({ children, params }: { children: 
                 {Array.from(negocio.nombre.trim())[0]?.toUpperCase() ?? ""}
               </span>
             )}
-            <span className="min-w-0 font-display text-24 font-semibold leading-tight">{negocio.nombre}</span>
+            <span className="min-w-0 font-display text-24 font-semibold leading-tight [overflow-wrap:anywhere]">{negocio.nombre}</span>
           </Link>
         </header>
       )}

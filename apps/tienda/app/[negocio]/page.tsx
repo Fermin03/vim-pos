@@ -63,7 +63,7 @@ export default async function PaginaDelNegocio({ params, searchParams }: Props) 
             const modos = modosDe(x), cerrada = modos.every((m) => motivoDeCierre(x, m) !== null);
             return (
               <li key={x.id}>
-                <Link href={`/${negocio.slug}?s=${x.id}`} className="flex min-h-14 flex-col gap-1 py-4 hover:bg-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-ink">
+                <Link href={`/${negocio.slug}?s=${x.id}`} className="flex min-h-14 flex-col gap-1 py-4 [overflow-wrap:anywhere] hover:bg-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-ink">
                   <span className="text-16 font-semibold">{x.nombre}</span>
                   {x.direccion && <span className="text-14 text-ink-2">{x.direccion}</span>}
                   <span className="text-14 text-ink-2">{cerrada ? textoCerrada(motivoDeCierre(x, modos[0] ?? "RECOGER") ?? "", x.horario, ahora) : "Abierto"}</span>

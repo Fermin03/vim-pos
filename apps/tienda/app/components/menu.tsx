@@ -7,7 +7,7 @@ import type { Menu, Producto } from "../lib/contrato";
 import { formatoMxn } from "../lib/dinero";
 import { urlDeFoto } from "../lib/imagen";
 import { categoriaActiva } from "../lib/pantalla";
-import { FOCO } from "./piezas";
+import { FOCO, PARTE } from "./piezas";
 
 /** Una foto que, si no carga, desaparece en vez de dejar el icono de imagen rota. */
 export function Foto({ src, alt, lado, className }: { src: string; alt: string; lado: [number, number]; className?: string }) {
@@ -27,7 +27,7 @@ function Tarjeta({ producto, enPedido, alElegir }: { producto: Producto; enPedid
         // Safari no enfoca un botón al tocarlo: sin esto, al cerrar la hoja el foco no tendría a dónde volver.
         onClick={(e) => { e.currentTarget.focus(); alElegir(producto); }}
         className={cn("flex w-full items-start gap-3 px-4 py-4 text-left transition-colors duration-150 hover:bg-hover active:bg-hover disabled:pointer-events-none", FOCO, "focus-visible:-outline-offset-2")}>
-        <span className={cn("flex min-w-0 flex-1 flex-col gap-1", producto.agotado && "opacity-50")}>
+        <span className={cn("flex min-w-0 flex-1 flex-col gap-1", PARTE, producto.agotado && "opacity-50")}>
           <span className="text-16 font-semibold leading-snug text-ink">{producto.nombre}</span>
           {producto.descripcion && <span className="line-clamp-2 text-14 leading-snug text-ink-2">{producto.descripcion}</span>}
           <span className="mt-1 flex flex-wrap items-center gap-2">
@@ -100,7 +100,7 @@ export function MenuDeLaTienda({ menu, enPedido, alElegir }: {
       )}
       {categorias.map((c) => (
         <section key={c.id} id={`cat-${c.id}`} aria-labelledby={`cat-t-${c.id}`} className="scroll-mt-12">
-          <h2 id={`cat-t-${c.id}`} className="px-4 pb-1 pt-6 font-display text-20 font-semibold">{c.nombre}</h2>
+          <h2 id={`cat-t-${c.id}`} className={cn("px-4 pb-1 pt-6 font-display text-20 font-semibold", PARTE)}>{c.nombre}</h2>
           <ul className="divide-y divide-line">
             {c.productos.map((p) => <Tarjeta key={p.id} producto={p} enPedido={enPedido.get(p.id) ?? 0} alElegir={alElegir} />)}
           </ul>

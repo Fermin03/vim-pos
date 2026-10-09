@@ -20,8 +20,15 @@ body {
    El navegador pone el foco atrapado, Escape, el regreso del foco y la capa superior. Aquí solo va
    cómo se ve: hoja pegada abajo en el teléfono, diálogo centrado desde 640 px.
    La entrada usa @starting-style y la salida `allow-discrete`; un navegador que no los conozca la
-   abre y la cierra sin animación, que también está bien. Sale más rápido de lo que entra. */
+   abre y la cierra sin animación, que también está bien. Sale más rápido de lo que entra.
+   Los @starting-style van SIEMPRE sueltos, nunca dentro de un @media: desde dónde entra cada cosa
+   lo dicen las variables --hoja-desde, --hoja-opacidad-desde y --aparece-desde, que sí cambian por
+   ancho y por movimiento reducido. Así ningún minificador tiene que entender un @starting-style
+   anidado. Y van AL FINAL del archivo: un @starting-style compite en la cascada como cualquier
+   regla, y un `.hoja[open] { opacity: 1 }` escrito después le ganaría (la hoja entraría sin fundido). */
 .hoja {
+  --hoja-desde: translateY(100%);
+  --hoja-opacidad-desde: 1;
   position: fixed;
   inset: auto 0 0 0;
   margin: 0 auto;
@@ -47,9 +54,6 @@ body {
   transition-duration: 300ms;
   transition-timing-function: cubic-bezier(0.32, 0.72, 0, 1);
 }
-@starting-style {
-  .hoja[open] { transform: translateY(100%); }
-}
 /* El velo va literal (es --ink): ::backdrop no hereda variables en navegadores de hace dos años. */
 .hoja::backdrop {
   background: rgb(22 22 26 / 0);
@@ -58,11 +62,10 @@ body {
   transition-behavior: allow-discrete;
 }
 .hoja[open]::backdrop { background: rgb(22 22 26 / 0.45); }
-@starting-style {
-  .hoja[open]::backdrop { background: rgb(22 22 26 / 0); }
-}
 @media (min-width: 640px) {
   .hoja {
+    --hoja-desde: translateY(8px) scale(0.98);
+    --hoja-opacidad-desde: 0;
     inset: 0;
     margin: auto;
     max-height: min(88dvh, 46rem);
@@ -71,29 +74,26 @@ body {
     transform: translateY(8px) scale(0.98);
   }
   .hoja[open] { opacity: 1; transition-duration: 200ms; transition-timing-function: var(--ease-out); }
-  @starting-style {
-    .hoja[open] { opacity: 0; transform: translateY(8px) scale(0.98); }
-  }
 }
 /* Con una hoja abierta, el menú de atrás no se desplaza. */
 html:has(dialog.hoja[open]) { overflow: hidden; }
 
 /* La barra del carrito aparece una vez, cuando entra el primer producto. */
 .aparece { transition: opacity 200ms ease, transform 200ms var(--ease-out); }
-@starting-style {
-  .aparece { opacity: 0; transform: translateY(8px); }
-}
 
 @media (prefers-reduced-motion: no-preference) {
   html { scroll-behavior: smooth; }
 }
 /* Movimiento reducido: sin desplazamiento; se conserva el fundido, que dice qué apareció. */
 @media (prefers-reduced-motion: reduce) {
-  .hoja, .hoja[open] { transform: none; opacity: 0; transition-duration: 150ms; transition-timing-function: ease; }
+  .hoja, .hoja[open] { --hoja-desde: none; --hoja-opacidad-desde: 0; transform: none; opacity: 0; transition-duration: 150ms; transition-timing-function: ease; }
   .hoja[open] { opacity: 1; }
-  .aparece { transition: opacity 150ms ease; }
-  @starting-style {
-    .hoja[open] { transform: none; opacity: 0; }
-    .aparece { transform: none; }
-  }
+  .aparece { --aparece-desde: none; transition: opacity 150ms ease; }
+}
+
+/* ── Desde dónde entra cada cosa. SIEMPRE al final (ver la nota de la hoja, arriba). ────────────── */
+@starting-style {
+  .hoja[open] { transform: var(--hoja-desde); opacity: var(--hoja-opacidad-desde); }
+  .hoja[open]::backdrop { background: rgb(22 22 26 / 0); }
+  .aparece { opacity: 0; transform: var(--aparece-desde, translateY(8px)); }
 }

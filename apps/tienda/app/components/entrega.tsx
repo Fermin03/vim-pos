@@ -39,7 +39,7 @@ export function Entrega({ sucursal, modo, zonaId, alCambiarModo, alCambiarZona }
         </fieldset>
       )}
       {modo === "DOMICILIO" && sucursal.zonas.length === 1 && zona && (
-        <p className="text-15 text-ink-2">Envío a {zona.nombre}: <span className="font-semibold tabular-nums text-ink">{formatoMxn(zona.costo_mxn)}</span></p>
+        <p className="text-15 text-ink-2 [overflow-wrap:anywhere]">Envío a {zona.nombre}: <span className="font-semibold tabular-nums text-ink">{formatoMxn(zona.costo_mxn)}</span></p>
       )}
       {modo === "DOMICILIO" && sucursal.zonas.length > 1 && (
         <label className="flex flex-col gap-1">

@@ -13,7 +13,7 @@ import { cotizarConEspera, motivoDeCierre } from "../lib/pantalla";
 import { textoCerrada, textoDeError } from "../lib/textos";
 import { Entrega } from "./entrega";
 import { CUERPO, PIE } from "./hoja";
-import { Cantidad, PRINCIPAL } from "./piezas";
+import { Cantidad, PARTE, PRINCIPAL } from "./piezas";
 
 export type Cotizado = {
   /** El resultado de cotizar EXACTAMENTE el carrito de ahora; null mientras no llega o si no toca cotizar. */
@@ -42,7 +42,7 @@ function Elecciones({ r }: { r: RenglonCarrito }) {
   const mods = (m: { nombre: string }[]) => m.map((x) => x.nombre).join(", ");
   if (r.modificadores.length + r.componentes.length === 0 && !r.nota) return null;
   return (
-    <ul className="mt-1 flex flex-col gap-0.5 text-14 leading-snug text-ink-2">
+    <ul className={cn("mt-1 flex flex-col gap-0.5 text-14 leading-snug text-ink-2", PARTE)}>
       {r.modificadores.length > 0 && <li>{mods(r.modificadores)}</li>}
       {r.componentes.map((c) => <li key={`${c.grupoId}:${c.productoId}`}>{c.nombre}{c.modificadores.length > 0 && ` (${mods(c.modificadores)})`}</li>)}
       {r.nota && <li>Nota: {r.nota}</li>}
@@ -114,7 +114,7 @@ export function VistaDelCarrito({
             return (
               <li key={r.id} className="py-4">
                 <div className="flex items-baseline justify-between gap-3">
-                  <span className="min-w-0 text-16 font-semibold leading-snug">{r.nombre}</span>
+                  <span className={cn("min-w-0 text-16 font-semibold leading-snug", PARTE)}>{r.nombre}</span>
                   <span className={cn("flex-shrink-0 font-display text-15 font-semibold tabular-nums transition-opacity duration-150", !porRenglon && "opacity-50")}>
                     {porRenglon ? formatoMxn(porRenglon[i]!.total_mxn) : centavos === null ? "" : formato(centavos)}
                   </span>

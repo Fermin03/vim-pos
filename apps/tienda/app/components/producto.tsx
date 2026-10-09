@@ -15,7 +15,7 @@ import { alternar } from "../lib/pantalla";
 import { reglaDeGrupo } from "../lib/textos";
 import { CUERPO, PIE } from "./hoja";
 import { Foto } from "./menu";
-import { Cantidad, PRINCIPAL } from "./piezas";
+import { Cantidad, PARTE, PRINCIPAL } from "./piezas";
 
 type Opcion = { id: string; nombre: string; extra: string; agotada: boolean; /** Por qué no se puede elegir. */ bloqueo?: string; debajo?: ReactNode };
 
@@ -32,7 +32,7 @@ function Opciones({ ancla, nombre, minimo, maximo, opciones, elegidas, alTocar, 
       {/* Un <legend> no se deja acomodar con flex en todos los navegadores: el reparto va adentro. */}
       <legend className="w-full p-0">
         <span className="flex items-baseline justify-between gap-3">
-          <span className="font-display text-16 font-semibold">{nombre}</span>
+          <span className={cn("min-w-0 font-display text-16 font-semibold", PARTE)}>{nombre}</span>
           <span className="flex-shrink-0 text-13 font-normal text-ink-2">{reglaDeGrupo(minimo, maximo)}</span>
         </span>
       </legend>
@@ -47,7 +47,7 @@ function Opciones({ ancla, nombre, minimo, maximo, opciones, elegidas, alTocar, 
               <label className={cn("flex min-h-12 items-center gap-3 py-2", fuera ? "text-ink-3" : "cursor-pointer")}>
                 <input type={unica ? "radio" : "checkbox"} name={unica ? nombreDeRadio : undefined} checked={marcada} disabled={fuera}
                   onChange={() => alTocar(o.id)} className="h-5 w-5 flex-shrink-0 accent-ink" />
-                <span className="min-w-0 flex-1 text-16 leading-snug">
+                <span className={cn("min-w-0 flex-1 text-16 leading-snug", PARTE)}>
                   {o.nombre}
                   {(o.agotada || o.bloqueo) && <span className="block text-13">{o.agotada ? "Agotado" : o.bloqueo}</span>}
                 </span>
@@ -106,7 +106,7 @@ export function ProductoPorAgregar({ producto, alAgregar }: {
         {foto && <Foto src={foto} alt={`Foto de ${producto.nombre}`} lado={[512, 320]} className="aspect-[8/5] h-auto w-full" />}
         <div className="px-4 pb-4">
           <div className="border-b border-line py-4">
-            {producto.descripcion && <p className="text-15 leading-relaxed text-ink-2">{producto.descripcion}</p>}
+            {producto.descripcion && <p className={cn("text-15 leading-relaxed text-ink-2", PARTE)}>{producto.descripcion}</p>}
             <p className={cn("font-display text-18 font-semibold tabular-nums", producto.descripcion && "mt-2")}>{formatoMxn(producto.precio_final_mxn)}</p>
           </div>
           <div className="divide-y divide-line">

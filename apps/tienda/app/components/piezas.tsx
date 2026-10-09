@@ -13,6 +13,12 @@ export const PRINCIPAL =
   "disabled:pointer-events-none disabled:opacity-50 aria-disabled:opacity-50 " +
   "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink";
 
+/**
+ * Para lo que escribió el negocio o el cliente (nombres, descripciones, notas, direcciones): una
+ * palabra larguísima se parte en vez de ensanchar la pantalla.
+ */
+export const PARTE = "[overflow-wrap:anywhere]";
+
 /** El foco por teclado de todo lo demás que se toca. */
 export const FOCO = "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink";
 
