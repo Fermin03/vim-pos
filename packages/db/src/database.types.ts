@@ -11915,6 +11915,22 @@ export type Database = {
         }
         Returns: Json
       }
+      _tienda_con_iva: {
+        Args: { p_neto: number; p_producto: string; p_tenant: string }
+        Returns: number
+      }
+      _tienda_entero: {
+        Args: { p_max: number; p_min: number; p_valor: Json }
+        Returns: number
+      }
+      _tienda_grupos_de: {
+        Args: { p_producto: string; p_tenant: string }
+        Returns: Json
+      }
+      _tienda_modificadores: {
+        Args: { p_cantidad: number; p_grupos: Json; p_mods: Json }
+        Returns: Json
+      }
       _venta_con_descuento_pendiente: {
         Args: { p_ticket_id: string }
         Returns: boolean
@@ -13081,6 +13097,54 @@ export type Database = {
           ticket_id: string
           total_mxn: number
         }[]
+      }
+      tienda_cotizar: {
+        Args: {
+          p_items: Json
+          p_modo: string
+          p_sucursal: string
+          p_tenant: string
+          p_zona: string
+        }
+        Returns: Json
+      }
+      tienda_crear_pedido: {
+        Args: {
+          p_cliente: Json
+          p_cuenta?: string
+          p_direccion: Json
+          p_items: Json
+          p_modo: string
+          p_nota: string
+          p_paga_con: number
+          p_pago: string
+          p_seguimiento_hash: string
+          p_sucursal: string
+          p_tenant: string
+          p_total_esperado?: number
+          p_zona: string
+        }
+        Returns: Json
+      }
+      tienda_estado_sucursal: {
+        Args: { p_ahora?: string; p_modo: string; p_sucursal: string }
+        Returns: string
+      }
+      tienda_horario_abierto: {
+        Args: { p_ahora: string; p_horario: Json; p_tz: string }
+        Returns: boolean
+      }
+      tienda_menu: {
+        Args: { p_sucursal: string; p_tenant: string }
+        Returns: Json
+      }
+      tienda_negocio: {
+        Args: { p_ahora?: string; p_slug: string }
+        Returns: Json
+      }
+      tienda_seguimiento: {
+        Args: { p_seguimiento_hash: string; p_tenant: string }
+        Returns: Json
       }
       top_meseros: {
         Args: {
