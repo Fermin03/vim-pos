@@ -3,7 +3,7 @@
 import { describe, expect, it, vi } from "vitest";
 import type { Resultado } from "../api";
 import { cotizacionDe, pedidoDe, type Cotizacion, type PedidoCreado } from "../contrato";
-import { desenlaceDelError, enviarPedido, unaALaVez, type ContextoDeEnvio } from "../envio";
+import { candadoDeEnvio, desenlaceDelError, enviarPedido, type ContextoDeEnvio } from "../envio";
 import { CODIGOS_DE_ERROR } from "../textos";
 import { CODIGO, ID, cotizacionCruda, pedidoCrudo } from "./datos";
 
@@ -102,24 +102,119 @@ describe("enviarPedido", () => {
   });
 });
 
-describe("unaALaVez", () => {
-  it("el segundo toque, con el primero en vuelo, no hace nada; al terminar se puede otra vez", async () => {
-    let soltar: (v: string) => void = () => {};
-    const f = vi.fn(() => new Promise<string>((ok) => { soltar = ok; }));
-    const una = unaALaVez(f);
-    const primero = una();
-    expect(await una()).toBeNull();
-    expect(f).toHaveBeenCalledTimes(1);
-    soltar("listo");
-    expect(await primero).toBe("listo");
-    void una();
-    expect(f).toHaveBeenCalledTimes(2);
+describe("enviarPedido nunca lanza", () => {
+  it("si cotizar truena, no se pidió nada: un aviso que se puede reintentar", async () => {
+    const pedir = vi.fn(async () => creado);
+    const r = await enviarPedido({ cotizar: async () => { throw new Error("x"); }, pedir, totalVisto: "305.00" }, c);
+    expect(r).toMatchObject({ pidio: false, desenlace: { tipo: "aviso", sigue: "reintentar" } });
+    expect(pedir).not.toHaveBeenCalled();
   });
-  it("si falla, el candado se suelta", async () => {
-    const f = vi.fn(async () => { throw new Error("x"); });
-    const una = unaALaVez(f);
-    await expect(una()).rejects.toThrow("x");
-    await expect(una()).rejects.toThrow("x");
-    expect(f).toHaveBeenCalledTimes(2);
+  it("si pedir truena, el pedido PUDO haber entrado: llamar antes, y el antirobot se da por gastado", async () => {
+    const r = await enviarPedido({ cotizar: async () => cotizada, pedir: async () => { throw new Error("x"); }, totalVisto: "305.00" }, c);
+    expect(r).toMatchObject({ pidio: true, desenlace: { tipo: "aviso", sigue: "llamar-antes" } });
+  });
+});
+
+describe("candadoDeEnvio: un solo envío en vuelo, viva o no la pantalla que lo lanzó", () => {
+  /** Un envío que termina cuando la prueba quiere. */
+  const pendiente = () => {
+    let soltar: (v: string) => void = () => {}, fallar: (e: Error) => void = () => {};
+    const envio = vi.fn(() => new Promise<string>((ok, mal) => { soltar = ok; fallar = mal; }));
+    return { envio, soltar: (v: string) => soltar(v), fallar: (e: Error) => fallar(e) };
+  };
+  const unTick = () => new Promise((ok) => setTimeout(ok, 0));
+
+  it("el segundo toque, con el primero en vuelo, no envía; al terminar se puede otra vez", async () => {
+    const candado = candadoDeEnvio<string>(), a = pendiente(), b = pendiente();
+    expect(candado.ocupado()).toBe(false);
+    expect(candado.lanzar(a.envio)).toBe(true);
+    expect(candado.ocupado()).toBe(true);
+    expect(candado.lanzar(b.envio)).toBe(false);
+    expect(b.envio).not.toHaveBeenCalled();
+    a.soltar("listo");
+    await unTick();
+    expect(candado.ocupado()).toBe(false);
+    expect(candado.lanzar(b.envio)).toBe(true);
+    expect(b.envio).toHaveBeenCalledTimes(1);
+  });
+  it("otra pantalla (la de «Tus datos» vuelta a montar) NO puede enviar mientras el primero sigue en vuelo", async () => {
+    const candado = candadoDeEnvio<string>(), a = pendiente(), b = pendiente();
+    const primera = vi.fn(), segunda = vi.fn();
+    const baja = candado.recibir(primera);
+    candado.lanzar(a.envio);
+    baja();                                    // la pantalla que lanzó se desmonta
+    candado.recibir(segunda);                  // y se monta otra
+    expect(candado.ocupado()).toBe(true);      // que nace sabiendo que hay un envío en vuelo
+    expect(candado.lanzar(b.envio)).toBe(false);
+    a.soltar("SIN_CONFIRMAR");
+    await unTick();
+    expect(primera).not.toHaveBeenCalled();
+    expect(segunda).toHaveBeenCalledWith("SIN_CONFIRMAR");   // el resultado llega a la que está viva
+  });
+  it("si no hay pantalla cuando termina, el resultado se guarda y se entrega a la siguiente, una sola vez", async () => {
+    const candado = candadoDeEnvio<string>(), a = pendiente();
+    const baja = candado.recibir(vi.fn());
+    candado.lanzar(a.envio);
+    baja();
+    a.soltar("SIN_CONFIRMAR");
+    await unTick();
+    expect(candado.ocupado()).toBe(false);
+    const siguiente = vi.fn(), otra = vi.fn();
+    candado.recibir(siguiente)();
+    expect(siguiente).toHaveBeenCalledTimes(1);
+    expect(siguiente).toHaveBeenCalledWith("SIN_CONFIRMAR");
+    candado.recibir(otra);
+    expect(otra).not.toHaveBeenCalled();
+  });
+  it("darse de baja no quita a la pantalla que llegó después", async () => {
+    const candado = candadoDeEnvio<string>(), a = pendiente();
+    const vieja = vi.fn(), nueva = vi.fn();
+    const bajaDeLaVieja = candado.recibir(vieja);
+    candado.recibir(nueva);
+    bajaDeLaVieja();
+    candado.lanzar(a.envio);
+    a.soltar("listo");
+    await unTick();
+    expect(nueva).toHaveBeenCalledWith("listo");
+  });
+  it("el candado se suelta SIEMPRE: si el envío lanza y si la pantalla lanza al recibir", async () => {
+    const ruido = vi.spyOn(console, "error").mockImplementation(() => {});
+    try {
+      const candado = candadoDeEnvio<string>(), a = pendiente(), b = pendiente();
+      candado.lanzar(a.envio);
+      a.fallar(new Error("x"));
+      await unTick();
+      expect(candado.ocupado()).toBe(false);
+      candado.recibir(() => { throw new Error("la pantalla"); });
+      candado.lanzar(b.envio);
+      b.soltar("listo");
+      await unTick();
+      expect(candado.ocupado()).toBe(false);
+      expect(candado.lanzar(async () => "otro")).toBe(true);
+    } finally {
+      ruido.mockRestore();
+    }
+  });
+  it("avisa a quien mira cada vez que se ocupa o se libera (la tienda no deja cerrar la hoja mientras)", async () => {
+    const candado = candadoDeEnvio<string>(), a = pendiente();
+    const visto: boolean[] = [];
+    const dejarDeMirar = candado.suscribir(() => visto.push(candado.ocupado()));
+    candado.lanzar(a.envio);
+    a.soltar("listo");
+    await unTick();
+    expect(visto).toEqual([true, false]);
+    dejarDeMirar();
+    candado.lanzar(async () => "otro");
+    expect(visto).toHaveLength(2);
+  });
+  it("la pantalla recibe el resultado ANTES de que el candado se libere (no hay un instante con el botón vivo)", async () => {
+    const candado = candadoDeEnvio<string>(), a = pendiente();
+    const orden: string[] = [];
+    candado.recibir(() => orden.push(`resultado:${candado.ocupado()}`));
+    candado.suscribir(() => orden.push(`candado:${candado.ocupado()}`));
+    candado.lanzar(a.envio);
+    a.soltar("listo");
+    await unTick();
+    expect(orden).toEqual(["candado:true", "resultado:true", "candado:false"]);
   });
 });

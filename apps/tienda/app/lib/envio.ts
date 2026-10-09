@@ -66,23 +66,74 @@ export async function enviarPedido(d: {
   pedir: (totalEsperado: string) => Promise<Resultado<PedidoCreado>>;
   /** El total del botón que tocó (o el que confirmó tras un cambio). null = no vio ninguno. */
   totalVisto: string | null;
-}, c: ContextoDeEnvio): Promise<{ desenlace: Desenlace; pidio: boolean }> {
-  const cot = await d.cotizar();
-  if (!cot.ok) return { desenlace: desenlaceDelError(cot, c), pidio: false };
-  if (cot.datos.total_mxn !== d.totalVisto) return { desenlace: { tipo: "total", total: cot.datos.total_mxn }, pidio: false };
-  const r = await d.pedir(cot.datos.total_mxn);
-  return { desenlace: r.ok ? { tipo: "hecho", codigo: r.datos.codigo } : desenlaceDelError(r, c), pidio: true };
+}, c: ContextoDeEnvio): Promise<ResultadoDeEnvio> {
+  // Nunca lanza: quien espera el resultado siempre recibe qué decirle al cliente. `cotizar` y `pedir`
+  // tampoco deberían lanzar; si un día lo hacen, antes de pedir no se creó nada y, pidiendo, no se
+  // sabe: se trata como «no supimos si entró».
+  let pidio = false;
+  try {
+    const cot = await d.cotizar();
+    if (!cot.ok) return { desenlace: desenlaceDelError(cot, c), pidio };
+    if (cot.datos.total_mxn !== d.totalVisto) return { desenlace: { tipo: "total", total: cot.datos.total_mxn }, pidio };
+    pidio = true;
+    const r = await d.pedir(cot.datos.total_mxn);
+    return { desenlace: r.ok ? { tipo: "hecho", codigo: r.datos.codigo } : desenlaceDelError(r, c), pidio };
+  } catch {
+    return { desenlace: desenlaceDelError({ error: pidio ? "SIN_CONFIRMAR" : "ERROR_INTERNO", detalle: null }, c), pidio };
+  }
 }
 
+export type ResultadoDeEnvio = { desenlace: Desenlace; pidio: boolean };
+
 /**
- * Doble toque imposible: mientras una llamada está en vuelo, las demás no hacen nada (devuelven
- * null). Es un candado síncrono: el estado de React llega un render tarde para esto.
+ * El candado del envío. Vive FUERA de la pantalla (uno por página): un candado dentro del componente
+ * se perdía si «Tus datos» se desmontaba a medio envío, y al volver a entrar se podía mandar el
+ * mismo pedido otra vez con el primero todavía en vuelo.
+ *  · `lanzar` es síncrono: el segundo toque (o la segunda pantalla) recibe `false` y no envía. El
+ *    estado de React llega un render tarde para esto.
+ *  · El resultado se entrega a la pantalla que esté viva (`recibir`); si no hay ninguna, se guarda
+ *    para la siguiente. Un «no pudimos confirmar tu pedido» nunca se queda sin decir.
+ *  · Se libera siempre, también si el envío o la pantalla lanzan, y DESPUÉS de entregar el resultado:
+ *    no hay un instante con el botón vivo y el aviso sin pintar.
+ * ponytail: un resultado guardado no sabe de qué negocio era; si un día se pudiera cambiar de
+ * negocio sin recargar con un envío en vuelo, etiquetarlo.
  */
-export function unaALaVez<A extends unknown[], R>(f: (...a: A) => Promise<R>): (...a: A) => Promise<R | null> {
-  let enVuelo = false;
-  return async (...a) => {
-    if (enVuelo) return null;
-    enVuelo = true;
-    try { return await f(...a); } finally { enVuelo = false; }
+export function candadoDeEnvio<R>() {
+  let enVuelo = false, guardado: { r: R } | null = null, pantalla: ((r: R) => void) | null = null;
+  const atentos = new Set<() => void>();
+  const cambiar = (v: boolean) => { enVuelo = v; for (const a of atentos) a(); };
+  return {
+    ocupado: (): boolean => enVuelo,
+    /** Avisa cada vez que se ocupa o se libera. Devuelve cómo dejar de mirar. */
+    suscribir(atento: () => void): () => void {
+      atentos.add(atento);
+      return () => { atentos.delete(atento); };
+    },
+    /** Arranca el envío si no hay otro en vuelo. `false` = ya había uno: este no se manda. */
+    lanzar(envio: () => Promise<R>): boolean {
+      if (enVuelo) return false;
+      cambiar(true);
+      void (async () => {
+        try {
+          const r = await envio();
+          if (pantalla) pantalla(r);
+          else guardado = { r };
+        } catch (e) {
+          console.error("[tienda] el envío terminó sin resultado", e);
+        } finally {
+          cambiar(false);
+        }
+      })();
+      return true;
+    },
+    /** La pantalla viva se apunta: recibe lo que quedó guardado y lo que venga. Devuelve cómo darse de baja. */
+    recibir(p: (r: R) => void): () => void {
+      pantalla = p;
+      if (guardado) { const { r } = guardado; guardado = null; p(r); }
+      return () => { if (pantalla === p) pantalla = null; };
+    },
   };
 }
+
+/** El de la página: lo comparten «Tus datos» (que envía) y la tienda (que no deja salir mientras). */
+export const envioDeLaPagina = candadoDeEnvio<ResultadoDeEnvio>();

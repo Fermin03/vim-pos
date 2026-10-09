@@ -2,7 +2,7 @@
 // «Tus datos»: quién recibe, a dónde, cómo paga, y enviar. Vive dentro de la hoja del carrito.
 // Aquí solo se pinta: las reglas de los campos están en lib/cliente.ts y qué hacer con cada respuesta
 // de la función, en lib/envio.ts.
-import { useEffect, useId, useRef, useState, type InputHTMLAttributes } from "react";
+import { useEffect, useId, useRef, useState, useSyncExternalStore, type InputHTMLAttributes } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Aviso, Captcha, SITE_KEY_TURNSTILE, botonClases, cn } from "@vim/ui/styles";
@@ -14,11 +14,11 @@ import {
 } from "../lib/cliente";
 import type { Cotizacion, ErrorDeTienda, Negocio, Pago, Sucursal } from "../lib/contrato";
 import { aCentavos, formatoMxn } from "../lib/dinero";
-import { enviarPedido, unaALaVez, type Desenlace } from "../lib/envio";
+import { enviarPedido, envioDeLaPagina, type Desenlace, type ResultadoDeEnvio } from "../lib/envio";
 import { enlaceTel, formatoTelefono } from "../lib/telefono";
 import { textoDeError } from "../lib/textos";
 import { CUERPO, PIE } from "./hoja";
-import { FOCO, PRINCIPAL } from "./piezas";
+import { FOCO, PARTE, PRINCIPAL } from "./piezas";
 
 export type PropsDelPasoDeDatos = {
   negocio: Negocio; sucursal: Sucursal; carrito: Carrito;
@@ -28,6 +28,8 @@ export type PropsDelPasoDeDatos = {
   cotizacion: Cotizacion | null;
   /** De vuelta al carrito. */
   alVolver: () => void;
+  /** El total ya no es el que traía el carrito: que lo cotice otra vez, para no enseñar el viejo al volver. */
+  alCambiarElTotal: () => void;
   /** Un rechazo que señala un renglón: lo marca y regresa al carrito. */
   alErrorDeCarrito: (e: ErrorDeTienda) => void;
   /** El pedido entró: vacía el carrito (y lo guarda vacío). Después se navega al seguimiento. */
@@ -53,7 +55,7 @@ function CampoDeTexto({ id, etiqueta, opcional, ayuda, error, multilinea, alCamb
     <div className={cn("flex min-w-0 flex-col gap-1", className)}>
       <label htmlFor={id} className="flex items-baseline justify-between gap-2 text-14 font-medium text-ink">
         {etiqueta}
-        {opcional && <span className="text-13 font-normal text-ink-2">Opcional</span>}
+        {opcional && <span className="flex-shrink-0 whitespace-nowrap text-13 font-normal text-ink-2">Opcional</span>}
       </label>
       {multilinea ? (
         <textarea id={id} rows={2} value={resto.value} maxLength={resto.maxLength} autoComplete={resto.autoComplete}
@@ -76,11 +78,17 @@ function CampoDeTexto({ id, etiqueta, opcional, ayuda, error, multilinea, alCamb
  */
 let borrador: Formulario | null = null;
 
+/**
+ * ¿Hay un pedido enviándose? Lo dice el candado de la página, no esta pantalla: así lo saben también
+ * la tienda (que mientras no deja cerrar la hoja) y un «Tus datos» recién montado.
+ */
+export const useEnviando = (): boolean => useSyncExternalStore(envioDeLaPagina.suscribir, envioDeLaPagina.ocupado, () => false);
+
 const IconoAtras = () => (
   <svg viewBox="0 0 24 24" className="h-5 w-5" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><path d="M15 6l-6 6 6 6" /></svg>
 );
 
-export function PasoDeDatos({ negocio, sucursal, carrito, nota, cotizacion, alVolver, alErrorDeCarrito, alPedidoHecho }: PropsDelPasoDeDatos) {
+export function PasoDeDatos({ negocio, sucursal, carrito, nota, cotizacion, alVolver, alCambiarElTotal, alErrorDeCarrito, alPedidoHecho }: PropsDelPasoDeDatos) {
   const router = useRouter();
   const id = useId();
   const formas = formasDePago(negocio);
@@ -89,8 +97,10 @@ export function PasoDeDatos({ negocio, sucursal, carrito, nota, cotizacion, alVo
   const tel = enlaceTel(sucursal.telefono);
 
   const [f, setF] = useState<Formulario>(borrador ?? FORMULARIO_VACIO);
-  const hecho = useRef(false);
-  useEffect(() => { borrador = hecho.current ? null : f; }, [f]);
+  /** El pedido entró: la pantalla se queda en «Enviando…» hasta que llega la página del pedido. */
+  const [hecho, setHecho] = useState(false);
+  useEffect(() => { borrador = hecho ? null : f; }, [f, hecho]);
+  const enviando = useEnviando();
   const [recordado, setRecordado] = useState(false);
   const [tocados, setTocados] = useState<ReadonlySet<Campo>>(new Set());
   const [pago, setPago] = useState<Pago | null>(formas[0] ?? null);
@@ -101,12 +111,12 @@ export function PasoDeDatos({ negocio, sucursal, carrito, nota, cotizacion, alVo
   const [totalVisto, setTotalVisto] = useState(cotizacion?.total_mxn ?? null);
   /** Un total distinto, a la espera de que lo confirme. */
   const [totalNuevo, setTotalNuevo] = useState<string | null>(null);
-  const [fase, setFase] = useState<"quieto" | "robot" | "enviando">("quieto");
+  /** Esperando la comprobación del antirobot para enviar. */
+  const [robot, setRobot] = useState(false);
   const [token, setToken] = useState("");
   const [reinicio, setReinicio] = useState(0);
   const tokenAhora = useRef(token);
   tokenAhora.current = token;
-  const una = useRef(unaALaVez((envio: () => Promise<void>) => envio())).current;
   const titulo = useRef<HTMLHeadingElement>(null);
 
   // Lo recordado se lee después de hidratar: el servidor no lo tiene.
@@ -130,63 +140,79 @@ export function PasoDeDatos({ negocio, sucursal, carrito, nota, cotizacion, alVo
       alSalir={() => setTocados((t) => new Set(t).add(c))} {...extra} />
   );
 
-  const mandar = (total: string | null) => void una(async () => {
+  /**
+   * Arranca el envío. Corre en el candado de la página, no en esta pantalla: si otra ya está
+   * enviando, este no sale; y lo que no puede perderse (el pedido entró) no depende de que esta
+   * pantalla siga montada cuando llegue la respuesta.
+   */
+  const mandar = (total: string | null) => {
     if (!pago) return;
-    setFase("enviando");
-    const cuerpo = aCuerpo(carrito);
-    const { desenlace, pidio } = await enviarPedido({
-      cotizar: () => cotizar(negocio.slug, cuerpo),
-      pedir: (totalEsperado) => pedir(negocio.slug, {
-        ...cuerpo, ...datosDelPedido(f, { modo: carrito.modo, pago }), nota: nota || null,
-        captcha: tokenAhora.current, total_esperado: totalEsperado,
-      }),
-      totalVisto: total,
-    }, { telefono: sucursal.telefono, horario: sucursal.horario });
+    const cuerpo = aCuerpo(carrito), datos = f, modo = carrito.modo;
+    envioDeLaPagina.lanzar(async () => {
+      const r = await enviarPedido({
+        cotizar: () => cotizar(negocio.slug, cuerpo),
+        pedir: (totalEsperado) => pedir(negocio.slug, {
+          ...cuerpo, ...datosDelPedido(datos, { modo, pago }), nota: nota || null,
+          captcha: tokenAhora.current, total_esperado: totalEsperado,
+        }),
+        totalVisto: total,
+      }, { telefono: sucursal.telefono, horario: sucursal.horario });
+      if (r.desenlace.tipo === "hecho") {
+        guardarCliente(datos, modo);
+        borrador = null;
+        alPedidoHecho();
+        router.replace(`/${negocio.slug}/pedido/${r.desenlace.codigo}`);
+      }
+      return r;
+    });
+  };
+
+  /** Lo que esta pantalla hace con el resultado de un envío (el suyo o uno que la alcanzó al montarse). */
+  const alResultado = useRef<(r: ResultadoDeEnvio) => void>(() => {});
+  alResultado.current = ({ desenlace, pidio }) => {
     // El token del antirobot sirve una vez: si se usó, se pide otro para el siguiente intento.
     if (pidio) { setToken(""); setReinicio((n) => n + 1); }
-    if (desenlace.tipo === "hecho") {
-      guardarCliente(f, carrito.modo);
-      hecho.current = true;
-      borrador = null;
-      alPedidoHecho();
-      router.replace(`/${negocio.slug}/pedido/${desenlace.codigo}`);
-      return;   // se queda «Enviando…» hasta que llega la página del pedido
-    }
-    setFase("quieto");
-    if (desenlace.tipo === "carrito") alErrorDeCarrito(desenlace.error);
-    else if (desenlace.tipo === "total") setTotalNuevo(desenlace.total);
+    if (desenlace.tipo === "hecho") setHecho(true);
+    else if (desenlace.tipo === "carrito") alErrorDeCarrito(desenlace.error);
+    else if (desenlace.tipo === "total") { setTotalNuevo(desenlace.total); alCambiarElTotal(); }
     else if (desenlace.tipo === "campo") {
       setRechazo({ [desenlace.campo]: desenlace.texto });
       enfocar(desenlace.campo === "pago" && pago === "EFECTIVO" && f.pagaCon.trim() ? "pagaCon" : desenlace.campo);
     } else setAviso(desenlace);
-  });
+  };
+  useEffect(() => envioDeLaPagina.recibir((r) => alResultado.current(r)), []);
+
+  const ocupado = robot || enviando || hecho;
 
   /** El toque en «Enviar» (o en «Confirmar», con el total nuevo). */
   const intentar = (total: string | null) => {
-    if (fase !== "quieto" || !pago) return;
+    // El candado se pregunta en el acto: el estado de React llega un render tarde para un doble toque.
+    if (ocupado || envioDeLaPagina.ocupado() || !pago) return;
     const conError = CAMPOS.find((c) => erroresDe(f, { ...contexto, total: aCentavos(total ?? "") })[c]);
     if (conError) { setTocados(new Set(CAMPOS)); enfocar(conError); return; }
     setAviso(null); setRechazo({}); setTotalNuevo(null); setTotalVisto(total);
     // Si el antirobot aún no entrega su comprobación, el botón no se queda muerto: lo dice y espera.
-    if (SITE_KEY_TURNSTILE && !token) setFase("robot");
+    if (SITE_KEY_TURNSTILE && !token) setRobot(true);
     else mandar(total);
   };
 
   useEffect(() => {
-    if (fase !== "robot") return;
-    if (token) { mandar(totalVisto); return; }
+    if (!robot) return;
+    if (token) { setRobot(false); mandar(totalVisto); return; }
     const reloj = setTimeout(() => {
-      setFase("quieto");
+      setRobot(false);
       const t = textoDeError("CAPTCHA_INVALIDO");
       setAviso({ tipo: "aviso", tono: "danger", texto: `${t.texto} ${t.hacer}`, sigue: "reintentar" });
     }, ESPERA_DEL_ANTIROBOT_MS);
     return () => clearTimeout(reloj);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- solo reacciona a la espera y a la llegada del token
-  }, [fase, token]);
+  }, [robot, token]);
 
-  const ocupado = fase !== "quieto";
+  // Enter en un campo solo envía cuando lo que se ofrece es enviar. Con «llama antes» o «vuelve a tu
+  // pedido» en pantalla, Enter no manda nada: el reintento es un botón aparte, a propósito.
+  const seOfreceEnviar = !!totalNuevo || !aviso || aviso.sigue === "reintentar";
   const total = totalNuevo ?? totalVisto;
-  const estado = fase === "enviando" ? "Enviando tu pedido…" : fase === "robot" ? "Comprobando que no eres un robot…" : "";
+  const estado = enviando || hecho ? "Enviando tu pedido…" : robot ? "Comprobando que no eres un robot…" : "";
   const botonDeEnviar = (etiqueta: string, importe: string | null) => (
     <button type="submit" disabled={ocupado || formas.length === 0} aria-busy={ocupado}
       className={cn(PRINCIPAL, "h-14 w-full px-5 text-16", ocupado ? "justify-center" : "justify-between")}>
@@ -195,10 +221,10 @@ export function PasoDeDatos({ negocio, sucursal, carrito, nota, cotizacion, alVo
   );
 
   return (
-    <form noValidate className="flex min-h-0 flex-1 flex-col" onSubmit={(e) => { e.preventDefault(); intentar(total); }}>
+    <form noValidate className="flex min-h-0 flex-1 flex-col" onSubmit={(e) => { e.preventDefault(); if (seOfreceEnviar) intentar(total); }}>
       <div className={CUERPO}>
         <div className="px-4 pt-1">
-          <button type="button" onClick={alVolver} className={cn("-ml-2 inline-flex h-11 items-center gap-1 rounded px-2 text-15 font-medium text-ink-2 hover:bg-hover hover:text-ink", FOCO)}>
+          <button type="button" onClick={alVolver} disabled={enviando || hecho} className={cn("-ml-2 inline-flex h-11 items-center gap-1 rounded px-2 text-15 font-medium text-ink-2 hover:bg-hover hover:text-ink disabled:pointer-events-none disabled:opacity-40", FOCO)}>
             <IconoAtras />Tu pedido
           </button>
         </div>
@@ -215,12 +241,12 @@ export function PasoDeDatos({ negocio, sucursal, carrito, nota, cotizacion, alVo
             <>
               <div>
                 <h3 className={TITULO}>¿A dónde lo llevamos?</h3>
-                {zona && <p className="mt-1 text-14 text-ink-2">Zona de entrega: {zona.nombre}</p>}
+                {zona && <p className={cn("mt-1 text-14 text-ink-2", PARTE)}>Zona de entrega: {zona.nombre}</p>}
               </div>
               {campo("calle", "Calle", { autoComplete: "address-line1" })}
               <div className="grid grid-cols-2 gap-3">
-                {campo("numeroExterior", "Número exterior")}
-                {campo("numeroInterior", "Número interior", { opcional: true })}
+                {campo("numeroExterior", "Núm. exterior")}
+                {campo("numeroInterior", "Núm. interior", { opcional: true })}
               </div>
               {campo("colonia", "Colonia", { autoComplete: "address-level3" })}
               <div className="grid grid-cols-[8rem_1fr] gap-3">
@@ -231,7 +257,7 @@ export function PasoDeDatos({ negocio, sucursal, carrito, nota, cotizacion, alVo
               {campo("referencias", "Referencias", { multilinea: true, opcional: true, ayuda: "Entre qué calles, color de la casa, con quién dejarlo." })}
             </>
           ) : (
-            <div>
+            <div className={PARTE}>
               <h3 className={TITULO}>Recoges en {sucursal.nombre}</h3>
               {sucursal.direccion && <p className="mt-1 text-15 text-ink-2">{sucursal.direccion}</p>}
             </div>
@@ -297,7 +323,7 @@ export function PasoDeDatos({ negocio, sucursal, carrito, nota, cotizacion, alVo
                   : sucursal.telefono && <p className="text-16 font-semibold">{sucursal.telefono}</p>}
                 {aviso.sigue === "llamar-antes"
                   // Reintentar aquí es a propósito y con el riesgo dicho: el pedido pudo haber entrado.
-                  ? <button type="submit" disabled={ocupado} className={GHOST}>{ocupado ? estado : "Ya llamé y no les llegó: enviar otra vez"}</button>
+                  ? <button type="button" onClick={() => intentar(total)} disabled={ocupado} className={GHOST}>Ya llamé y no les llegó: enviar otra vez</button>
                   : <button type="button" onClick={alVolver} className={GHOST}>Volver a tu pedido</button>}
               </>
             ) : aviso?.sigue === "volver" ? (

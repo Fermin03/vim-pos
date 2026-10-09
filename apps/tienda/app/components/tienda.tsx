@@ -18,15 +18,18 @@ import { semanaLegible, type Momento } from "../lib/horario";
 import { carritoPara, motivoDeCierre, renglonesDelError } from "../lib/pantalla";
 import { enlaceTel, formatoTelefono } from "../lib/telefono";
 import { textoCerrada } from "../lib/textos";
+import { envioDeLaPagina } from "../lib/envio";
 import { VistaDelCarrito, useCotizacion } from "./carrito";
-import { PasoDeDatos } from "./datos";
+import { PasoDeDatos, useEnviando } from "./datos";
 import { Entrega } from "./entrega";
 import { CUERPO, Hoja, PIE } from "./hoja";
 import { MenuDeLaTienda } from "./menu";
-import { FOCO, PRINCIPAL } from "./piezas";
+import { FOCO, PARTE, PRINCIPAL } from "./piezas";
 import { ProductoPorAgregar } from "./producto";
 
 type ErrorDeTienda = { error: string; detalle: string | null };
+/** Cada cuánto se le vuelve a preguntar al servidor si la tienda está abierta, con la pestaña a la vista. */
+const REFRESCO_MS = 60_000;
 
 function Encabezado({ negocio, sucursal, carrito, ahora, alCambiarSucursal, children }: {
   negocio: Negocio; sucursal: Sucursal; carrito: Carrito; ahora: Momento; alCambiarSucursal: (id: string) => void; children: React.ReactNode;
@@ -36,7 +39,7 @@ function Encabezado({ negocio, sucursal, carrito, ahora, alCambiarSucursal, chil
   return (
     <section aria-label="La tienda" className="flex flex-col gap-4 px-4 pb-5">
       <h1 className="sr-only">Menú de {negocio.nombre}</h1>
-      {negocio.descripcion && <p className="text-15 leading-relaxed text-ink-2">{negocio.descripcion}</p>}
+      {negocio.descripcion && <p className={cn("text-15 leading-relaxed text-ink-2", PARTE)}>{negocio.descripcion}</p>}
       {negocio.sucursales.length > 1 && (
         <label className="flex flex-col gap-1">
           <span className="text-14 font-medium text-ink-2">Sucursal</span>
@@ -52,7 +55,7 @@ function Encabezado({ negocio, sucursal, carrito, ahora, alCambiarSucursal, chil
           <span aria-hidden="true" className={cn("mt-2 h-2 w-2 flex-shrink-0 rounded-full", motivo ? "border-2 border-ink-3" : "bg-success")} />
           {motivo ? textoCerrada(motivo, sucursal.horario, ahora) : "Abierto"}
         </p>
-        {sucursal.direccion && <p className="pl-4 text-ink-2">{sucursal.direccion}</p>}
+        {sucursal.direccion && <p className={cn("pl-4 text-ink-2", PARTE)}>{sucursal.direccion}</p>}
         {sucursal.telefono && (
           <p className="pl-4">
             {tel
@@ -92,11 +95,30 @@ export function Tienda({ negocio, sucursal, menu, ahora }: {
   /** Un pedido empezado en OTRA sucursal: hay que decidir antes de tocar lo guardado. */
   const [ajeno, setAjeno] = useState<Carrito | null>(null);
   const [paso, setPaso] = useState<"menu" | "carrito" | "datos">("menu");
+  /** Cambiar de paso por un toque del cliente: con un pedido enviándose no se mueve nada. Se pregunta al candado en el acto, no al estado. */
+  const pasar = (p: typeof paso) => { if (!envioDeLaPagina.ocupado()) setPaso(p); };
   const [producto, setProducto] = useState<{ p: Producto; turno: number } | null>(null);
   const [verProducto, setVerProducto] = useState(false);
   const [nota, setNota] = useState("");
   const [errorDeEnvio, setErrorDeEnvio] = useState<ErrorDeTienda | null>(null);
   const sinCambios = useRef<Carrito | null>(null);
+  /** Hay un pedido enviándose: mientras, no se sale de la hoja (salir dejaba mandarlo dos veces). */
+  const enviando = useEnviando();
+
+  // «Abierto» / «Cerrado ahora» son del momento en que el servidor pintó. Quien espera con la pestaña
+  // abierta a que abran lo vería cerrado para siempre: se vuelve a pedir la página cada minuto y al
+  // volver a la pestaña. `router.refresh()` conserva esta tienda montada (carrito, hojas, lo escrito)
+  // mientras el servidor responda bien; si falla, la página pasa a «No pudimos cargar…» y lo que no
+  // está guardado se pierde. Por eso no se refresca a medio envío, ni llenando «Tus datos», ni
+  // eligiendo un producto: ahí no hay nada que ganar y sí algo que perder.
+  const quieta = useRef(true);
+  quieta.current = paso !== "datos" && !verProducto;
+  useEffect(() => {
+    const refrescar = () => { if (!document.hidden && quieta.current && !envioDeLaPagina.ocupado()) router.refresh(); };
+    const reloj = setInterval(refrescar, REFRESCO_MS);
+    document.addEventListener("visibilitychange", refrescar);
+    return () => { clearInterval(reloj); document.removeEventListener("visibilitychange", refrescar); };
+  }, [router]);
 
   useEffect(() => {
     const leido = leerCarrito(negocio.slug);
@@ -106,7 +128,10 @@ export function Tienda({ negocio, sucursal, menu, ahora }: {
     sinCambios.current = inicial;
     setAjeno(deOtra ? leido : null);
     setCarrito(inicial);
-  }, [negocio, sucursal]);
+    // Solo al llegar a esta sucursal. `negocio` y `sucursal` son objetos nuevos en cada refresco de la
+    // página: releer ahí pisaría el carrito en memoria (y lo vaciaría si el teléfono no deja guardar).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [negocio.slug, sucursal.id]);
 
   // Se guarda con cada cambio. No al cargar (visitar no renueva las 24 h del carrito) ni mientras
   // no se decida qué hacer con el pedido de la otra sucursal.
@@ -158,7 +183,7 @@ export function Tienda({ negocio, sucursal, menu, ahora }: {
 
       {guardado && piezas > 0 && (
         <div className="aparece pointer-events-none fixed inset-x-0 bottom-0 z-20 px-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
-          <button type="button" onClick={(e) => { e.currentTarget.focus(); setPaso("carrito"); }}
+          <button type="button" onClick={(e) => { e.currentTarget.focus(); pasar("carrito"); }}
             aria-label={`Ver pedido: ${piezas} ${piezas === 1 ? "producto" : "productos"}, ${formato(estimarTotal(carrito, menu))}`}
             className={cn(PRINCIPAL, "pointer-events-auto mx-auto flex h-14 w-full max-w-xl justify-between px-5 text-16 shadow-lg")}>
             <span className="flex items-center gap-3">
@@ -175,11 +200,13 @@ export function Tienda({ negocio, sucursal, menu, ahora }: {
         {producto && <ProductoPorAgregar key={producto.turno} producto={producto.p} alAgregar={alAgregar} />}
       </Hoja>
 
-      <Hoja abierta={paso !== "menu" && !ajeno} alCerrar={() => setPaso("menu")} titulo={paso === "datos" ? "Tus datos" : "Tu pedido"}>
+      <Hoja abierta={paso !== "menu" && !ajeno} fija={enviando} alCerrar={() => pasar("menu")} titulo={paso === "datos" ? "Tus datos" : "Tu pedido"}>
         {paso === "datos" ? (
           <PasoDeDatos negocio={negocio} sucursal={sucursal} carrito={carrito} nota={nota.trim()}
             cotizacion={cotizado.resultado?.ok ? cotizado.resultado.datos : null}
-            alVolver={() => setPaso("carrito")}
+            alVolver={() => pasar("carrito")}
+            alCambiarElTotal={cotizado.reintentar}
+            // Llega con el resultado del envío, antes de que el candado se suelte: por eso no pasa por `pasar`.
             alErrorDeCarrito={(e) => { setErrorDeEnvio(e); setPaso("carrito"); }}
             alPedidoHecho={() => { setNota(""); cambiar(vaciar); }} />
         ) : (
@@ -187,7 +214,7 @@ export function Tienda({ negocio, sucursal, menu, ahora }: {
             nota={nota} alCambiarNota={setNota}
             alCambiarCantidad={(id, n) => cambiar((c) => cambiarCantidad(c, id, n))} alQuitar={(id) => cambiar((c) => quitar(c, id))}
             alCambiarModo={(modo) => cambiar((c) => ({ ...c, modo }))} alCambiarZona={(zonaId) => cambiar((c) => ({ ...c, zonaId }))}
-            alContinuar={() => setPaso("datos")} alCerrar={() => setPaso("menu")} />
+            alContinuar={() => pasar("datos")} alCerrar={() => pasar("menu")} />
         )}
       </Hoja>
 
@@ -197,7 +224,7 @@ export function Tienda({ negocio, sucursal, menu, ahora }: {
         {otra && ajeno && (
           <>
             <div className={cn(CUERPO, "px-4 py-5")}>
-              <p className="text-16 leading-relaxed">
+              <p className={cn("text-16 leading-relaxed", PARTE)}>
                 Empezaste un pedido en <strong>{otra.nombre}</strong> ({contarPiezas(ajeno)} {contarPiezas(ajeno) === 1 ? "producto" : "productos"}).
                 Un pedido es de una sola sucursal: si empiezas uno en <strong>{sucursal.nombre}</strong>, el otro se borra.
               </p>
