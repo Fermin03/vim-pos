@@ -10,7 +10,7 @@
 BEGIN;
 DO $$
 DECLARE
-  c_firma  CONSTANT text := 'tienda_crear_pedido(uuid, uuid, text, uuid, jsonb, jsonb, jsonb, text, numeric, text, text, uuid)';
+  c_firma  CONSTANT text := 'tienda_crear_pedido(uuid, uuid, text, uuid, jsonb, jsonb, jsonb, text, numeric, text, text, uuid, numeric)';
   v_t      uuid := '99999999-0000-0000-0000-0000000000aa';
   v_suc    uuid := '99999999-0000-0000-0000-0000000000bb';
   v_maria  uuid := '99999999-0000-0000-0000-000000000001';
@@ -419,6 +419,59 @@ BEGIN
     IF SQLERRM NOT LIKE '%idx_delivery_pedidos_seguimiento%' THEN RAISE; END IF;
   END;
 
+  -- F4) El pedido se crea al total que el cliente vio (paga al recibir). Con el total esperado
+  --     correcto entra: recoger 120.00, y a domicilio 120 + 35 de envío.
+  v_r := tienda_crear_pedido(v_t, v_suc, 'RECOGER', NULL, v_uno, '{"nombre":"Ana","telefono":"4775550920"}', NULL, 'EFECTIVO', NULL, NULL,
+           md5('f4a') || md5('f4b'), p_total_esperado => 120.00);
+  IF v_r ->> 'total_mxn' IS DISTINCT FROM '120.00' THEN RAISE EXCEPTION 'F4: con el total esperado correcto debía entrar: %', v_r; END IF;
+  v_r := tienda_crear_pedido(v_t, v_suc, 'DOMICILIO', v_z35, v_uno, '{"nombre":"Ana","telefono":"4775550921"}', v_dir, 'TARJETA', NULL, NULL,
+           md5('f4c') || md5('f4d'), NULL, 155);
+  IF v_r ->> 'total_mxn' IS DISTINCT FROM '155.00' THEN RAISE EXCEPTION 'F4: a domicilio, con 155 esperado debía entrar: %', v_r; END IF;
+
+  SELECT count(*) INTO v_n0 FROM delivery_pedidos;
+  -- Con otro total: TOTAL_CAMBIO con el total de verdad (dos decimales), y nada más.
+  FOR r IN SELECT * FROM (VALUES (119.99::numeric), (120.01), (0), (155), ('NaN')) AS x(esperado) LOOP
+    v_err := NULL;
+    BEGIN
+      PERFORM tienda_crear_pedido(v_t, v_suc, 'RECOGER', NULL, v_uno, '{"nombre":"Ana","telefono":"4775550923"}', NULL, 'EFECTIVO', NULL, NULL,
+                md5('f4e') || md5('f4f'), p_total_esperado => r.esperado);
+    EXCEPTION WHEN OTHERS THEN v_err := SQLERRM;
+    END;
+    IF v_err IS DISTINCT FROM 'TOTAL_CAMBIO: 120.00' THEN
+      RAISE EXCEPTION 'F4: esperando % debía dar «TOTAL_CAMBIO: 120.00», dio %', r.esperado, COALESCE(v_err, 'un pedido');
+    END IF;
+  END LOOP;
+  -- El precio cambia entre la cotización y el pedido: el total viejo ya no vale…
+  v_q := tienda_cotizar(v_t, v_suc, 'RECOGER', NULL, v_uno);
+  IF v_q ->> 'total_mxn' IS DISTINCT FROM '120.00' THEN RAISE EXCEPTION 'F4 (fixture): la cotización debía dar 120.00: %', v_q; END IF;
+  UPDATE productos SET precio_base_mxn = 125.50 WHERE id = v_p120;
+  v_err := NULL;
+  BEGIN
+    PERFORM tienda_crear_pedido(v_t, v_suc, 'RECOGER', NULL, v_uno, '{"nombre":"Ana","telefono":"4775550923"}', NULL, 'EFECTIVO', NULL, NULL,
+              md5('f4e') || md5('f4f'), p_total_esperado => (v_q ->> 'total_mxn')::numeric);
+  EXCEPTION WHEN OTHERS THEN v_err := SQLERRM;
+  END;
+  IF v_err IS DISTINCT FROM 'TOTAL_CAMBIO: 125.50' THEN RAISE EXCEPTION 'F4: tras subir el precio, el total viejo debía dar «TOTAL_CAMBIO: 125.50», dio %', COALESCE(v_err, 'un pedido'); END IF;
+  -- …y lo mismo si lo que cambia es el costo de la zona (120 + 40).
+  UPDATE productos SET precio_base_mxn = 120 WHERE id = v_p120;
+  UPDATE zonas_envio SET costo_mxn = 40 WHERE id = v_z35;
+  v_err := NULL;
+  BEGIN
+    PERFORM tienda_crear_pedido(v_t, v_suc, 'DOMICILIO', v_z35, v_uno, '{"nombre":"Ana","telefono":"4775550923"}', v_dir, 'EFECTIVO', NULL, NULL,
+              md5('f4e') || md5('f4f'), p_total_esperado => 155);
+  EXCEPTION WHEN OTHERS THEN v_err := SQLERRM;
+  END;
+  IF v_err IS DISTINCT FROM 'TOTAL_CAMBIO: 160.00' THEN RAISE EXCEPTION 'F4: tras subir el envío, el total viejo debía dar «TOTAL_CAMBIO: 160.00», dio %', COALESCE(v_err, 'un pedido'); END IF;
+  UPDATE zonas_envio SET costo_mxn = 35 WHERE id = v_z35;
+  -- Ningún TOTAL_CAMBIO dejó fila.
+  IF (SELECT count(*) FROM delivery_pedidos) <> v_n0 THEN
+    RAISE EXCEPTION 'F4: los TOTAL_CAMBIO dejaron % fila(s)', (SELECT count(*) FROM delivery_pedidos) - v_n0;
+  END IF;
+  -- Con el total nuevo, el mismo pedido entra.
+  v_r := tienda_crear_pedido(v_t, v_suc, 'RECOGER', NULL, v_uno, '{"nombre":"Ana","telefono":"4775550923"}', NULL, 'EFECTIVO', NULL, NULL,
+           md5('f4e') || md5('f4f'), p_total_esperado => 120);
+  IF v_r ->> 'total_mxn' IS DISTINCT FROM '120.00' THEN RAISE EXCEPTION 'F4: con el total vigente debía entrar: %', v_r; END IF;
+
   -- 14) Con 3 pedidos vivos de un teléfono, el cuarto no entra…
   FOR v_i IN 1..3 LOOP
     v_r := tienda_crear_pedido(v_t, v_suc, 'RECOGER', NULL, v_uno, '{"nombre":"Ana","telefono":"4775550914"}', NULL, 'EFECTIVO', NULL, NULL, md5('14a' || v_i) || md5('14b' || v_i));
@@ -450,6 +503,11 @@ BEGIN
   v_r := tienda_crear_pedido(v_t, v_suc, 'RECOGER', NULL, v_uno, '{"nombre":"Ana","telefono":"4775550915"}', NULL, 'EFECTIVO', NULL, NULL, md5('14e') || md5('14f'));
   IF v_r ->> 'total_mxn' IS DISTINCT FROM '120.00' THEN RAISE EXCEPTION 'E14: los pedidos de otro negocio no cuentan para el tope: %', v_r; END IF;
 
+  -- Una sola firma: con dos, PostgREST no sabría a cuál llamar.
+  IF (SELECT count(*) FROM pg_proc WHERE proname = 'tienda_crear_pedido' AND pronamespace = 'public'::regnamespace) <> 1 THEN
+    RAISE EXCEPTION 'F4: debe existir exactamente una función tienda_crear_pedido, hay %',
+      (SELECT count(*) FROM pg_proc WHERE proname = 'tienda_crear_pedido' AND pronamespace = 'public'::regnamespace);
+  END IF;
   -- Permisos: solo service_role.
   IF NOT has_function_privilege('service_role', c_firma, 'EXECUTE') THEN RAISE EXCEPTION 'permisos: service_role debe poder ejecutar tienda_crear_pedido'; END IF;
   IF has_function_privilege('anon', c_firma, 'EXECUTE') OR has_function_privilege('authenticated', c_firma, 'EXECUTE') THEN

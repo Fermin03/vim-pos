@@ -610,6 +610,9 @@ GRANT EXECUTE ON FUNCTION tienda_cotizar(uuid, uuid, text, uuid, jsonb) TO servi
 -- la que no se puede saltar. Los importes y los renglones NO son los del cliente: son los de
 -- tienda_cotizar. Lo que crear_ticket_desde_tienda (0161) exige después de la fila, se cumple aquí.
 -- Devuelve {pedido_id, folio_corto, total_mxn, vence_aceptacion}.
+-- p_total_esperado: el total que el cliente vio al cotizar. Paga al recibir, así que no se le
+-- compromete a otro: si un precio o el costo de la zona cambiaron entretanto, TOTAL_CAMBIO con el
+-- total de ahora y no se crea nada. NULL = no se compara.
 CREATE OR REPLACE FUNCTION tienda_crear_pedido(
   p_tenant uuid, p_sucursal uuid, p_modo text, p_zona uuid, p_items jsonb,
   p_cliente jsonb,          -- {nombre, telefono (10 dígitos), email | null}
@@ -618,7 +621,8 @@ CREATE OR REPLACE FUNCTION tienda_crear_pedido(
   p_paga_con numeric,       -- NULL salvo EFECTIVO
   p_nota text,
   p_seguimiento_hash text,  -- SHA-256 en hex del código que solo conoce el cliente
-  p_cuenta uuid DEFAULT NULL)
+  p_cuenta uuid DEFAULT NULL,
+  p_total_esperado numeric DEFAULT NULL)
 RETURNS jsonb
 LANGUAGE plpgsql SECURITY DEFINER
 SET search_path = public, pg_temp
@@ -675,6 +679,9 @@ BEGIN
   --    pasan tal cual.
   v_q     := tienda_cotizar(p_tenant, p_sucursal, p_modo, p_zona, p_items);
   v_total := (v_q ->> 'total_mxn')::numeric;
+  IF p_total_esperado IS NOT NULL AND p_total_esperado IS DISTINCT FROM v_total THEN
+    RAISE EXCEPTION 'TOTAL_CAMBIO: %', v_q ->> 'total_mxn';   -- el total de ahora, con dos decimales
+  END IF;
 
   -- 7) «Paga con»: solo en efectivo, y entre el total y el total + 5000 (el tope también deja
   --    fuera NaN e infinito, que para numeric son mayores que todo).
@@ -745,8 +752,8 @@ BEGIN
     'vence_aceptacion', v_ped.vence_aceptacion);
 END;
 $$;
-REVOKE ALL ON FUNCTION tienda_crear_pedido(uuid, uuid, text, uuid, jsonb, jsonb, jsonb, text, numeric, text, text, uuid) FROM PUBLIC, anon, authenticated;
-GRANT EXECUTE ON FUNCTION tienda_crear_pedido(uuid, uuid, text, uuid, jsonb, jsonb, jsonb, text, numeric, text, text, uuid) TO service_role;
+REVOKE ALL ON FUNCTION tienda_crear_pedido(uuid, uuid, text, uuid, jsonb, jsonb, jsonb, text, numeric, text, text, uuid, numeric) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION tienda_crear_pedido(uuid, uuid, text, uuid, jsonb, jsonb, jsonb, text, numeric, text, text, uuid, numeric) TO service_role;
 
 -- ── §5 Seguimiento ───────────────────────────────────────────────────────────
 -- Lo que ve el cliente con su enlace. La huella es la única llave: quien la tiene ve ESE pedido y
