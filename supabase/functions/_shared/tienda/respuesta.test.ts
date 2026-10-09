@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { claveDeIp, cotizacionPublica, cuposDe, ipDeConfianza, leerNegocio, leerPedido, respuestaDeCaptcha, respuestaDeRpc } from "./respuesta.ts";
+import { claveDeIp, cotizacionPublica, cuposDe, esTopeDeEntradas, ipDeConfianza, leerNegocio, leerPedido, respuestaDeCaptcha, respuestaDeRpc, yaExistia } from "./respuesta.ts";
 
 const PROD = "11111111-2222-3333-4444-555555555555";
 const SUC = "99999999-0000-0000-0000-0000000000bb";
@@ -35,9 +35,14 @@ test("cupos: el seguimiento tiene su bolsa (90 cada 600 s): su sondeo no le quit
   assert.equal(cuposDe("seguimiento", "2806:2f0:9000:ab:1111:2222:3333:4444", "knockout").antes[0]!.clave, "tienda:sigue:ip:2806:2f0:9000:ab::/64");
 });
 // Entrega 7: el cupo por IP de `pedir` es por restaurante (8 por hora); antes era 5 compartido.
-test("cupos: pedir gasta 8 por IP y restaurante antes del antirobot y 60 por negocio solo después; cierra si el control falla", () => {
+// Auditoría (B1): delante va uno SOLO por IP (40 por hora). El slug llega aquí sin validar: sin ese
+// tope, cada slug inventado le estrenaba un contador a la misma red.
+test("cupos: pedir gasta 40 por IP y 8 por IP y restaurante antes del antirobot, y 60 por negocio solo después; cierra si el control falla", () => {
   assert.deepEqual(cuposDe("pedir", "desconocida", "knockout"), {
-    antes: [{ clave: "tienda:pide:ip:desconocida:knockout", ventanaSeg: 3600, max: 8 }],
+    antes: [
+      { clave: "tienda:pide:ip:desconocida", ventanaSeg: 3600, max: 40 },
+      { clave: "tienda:pide:ip:desconocida:knockout", ventanaSeg: 3600, max: 8 },
+    ],
     despuesDelCaptcha: [{ clave: "tienda:pide:negocio:knockout", ventanaSeg: 3600, max: 60 }],
     alFallar: "cerrar",
   });
@@ -46,13 +51,28 @@ test("cupos: el cupo del negocio nunca va antes del antirobot", () => {
   const { antes } = cuposDe("pedir", "1.2.3.4", "knockout");
   assert.equal(antes.some((c) => c.clave.includes("negocio")), false);
 });
-test("cupos: lo que una red pide en un restaurante no le quita cupo en otro", () => {
-  assert.notEqual(cuposDe("pedir", "1.2.3.4", "knockout").antes[0]!.clave, cuposDe("pedir", "1.2.3.4", "crazy-burgers").antes[0]!.clave);
+test("cupos: el tope solo por IP de pedir no depende del slug; el de IP y restaurante sí", () => {
+  const a = cuposDe("pedir", "1.2.3.4", "knockout").antes, b = cuposDe("pedir", "1.2.3.4", "slug-inventado-7").antes;
+  assert.equal(a[0]!.clave, "tienda:pide:ip:1.2.3.4");
+  assert.equal(b[0]!.clave, a[0]!.clave);
+  // Lo que una red pide en un restaurante no le quita cupo en otro.
+  assert.notEqual(a[1]!.clave, b[1]!.clave);
 });
 test("cupos: con IPv6 la clave es el /64, en leer y en pedir", () => {
   const ip = "2806:2f0:9000:ab:1111:2222:3333:4444";
   assert.equal(cuposDe("menu", ip, "knockout").antes[0]!.clave, "tienda:lee:ip:2806:2f0:9000:ab::/64");
-  assert.equal(cuposDe("pedir", ip, "knockout").antes[0]!.clave, "tienda:pide:ip:2806:2f0:9000:ab::/64:knockout");
+  assert.deepEqual(cuposDe("pedir", ip, "knockout").antes.map((c) => c.clave),
+    ["tienda:pide:ip:2806:2f0:9000:ab::/64", "tienda:pide:ip:2806:2f0:9000:ab::/64:knockout"]);
+});
+// Auditoría (B4): cuál de los cupos de `entrar` es el del restaurante, para dejarlo en el log al agotarse.
+test("cupos: el tope de entradas del restaurante se reconoce por su clave, y el de la IP no", () => {
+  const [porIp, porNegocio] = cuposDe("entrar", "1.2.3.4", "knockout").antes;
+  assert.equal(esTopeDeEntradas(porNegocio!.clave), true);
+  assert.equal(esTopeDeEntradas(porIp!.clave), false);
+  for (const accion of ["pedir", "menu", "cuenta"] as const) {
+    const c = cuposDe(accion, "1.2.3.4", "knockout");
+    assert.equal([...c.antes, ...c.despuesDelCaptcha].some((x) => esTopeDeEntradas(x.clave)), false, accion);
+  }
 });
 
 // ── La clave del cupo por IP: IPv4 completa, IPv6 por su /64 ────────────────────────────────────
@@ -187,6 +207,16 @@ test("rpc: un importe no vale como detalle de los otros códigos", () => {
 test("pedido: de lo que devuelve el alta salen folio, total y vencimiento; el id interno no", () => {
   const alta = { pedido_id: "id-interno", folio_corto: "TAB12C", total_mxn: "120.00", vence_aceptacion: "2026-10-08T20:07:00+00:00", otra: 1 };
   assert.deepEqual(leerPedido(alta), { folio_corto: "TAB12C", total_mxn: "120.00", vence_aceptacion: "2026-10-08T20:07:00+00:00" });
+});
+// Auditoría (B3): la base dice si el pedido ya existía (un reintento); es para no repetir el correo,
+// y no le sale al cliente.
+test("pedido: ya_existia se lee aparte y nunca sale en lo que se le responde al cliente", () => {
+  const alta = { pedido_id: "id-interno", folio_corto: "TAB12C", total_mxn: "120.00", vence_aceptacion: "2026-10-08T20:07:00+00:00", ya_existia: true };
+  assert.deepEqual(leerPedido(alta), { folio_corto: "TAB12C", total_mxn: "120.00", vence_aceptacion: "2026-10-08T20:07:00+00:00" });
+  assert.equal(yaExistia(alta), true);
+  for (const x of [{ ...alta, ya_existia: false }, { ...alta, ya_existia: "true" }, { ...alta, ya_existia: 1 }, { folio_corto: "TAB12C" }, null, undefined, "true", [true]]) {
+    assert.equal(yaExistia(x), false, JSON.stringify(x));
+  }
 });
 test("pedido: NULL o una forma inesperada es null, no una excepción", () => {
   const bueno = { folio_corto: "TAB12C", total_mxn: "120.00", vence_aceptacion: "2026-10-08T20:07:00+00:00" };

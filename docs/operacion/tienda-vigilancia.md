@@ -46,10 +46,12 @@ Cada mañana, cinco minutos:
 
 Una vez en la semana: consultas 7 (cajas viejas en negocios con tienda), 9 (cuentas) y 10 (que los
 procesos automáticos corren). Y los registros de la función `tienda` en Supabase (Edge Functions →
-tienda → Logs), buscando estas tres frases:
+tienda → Logs), buscando estas cuatro frases:
 
 - `CUPO_NEGOCIO_AGOTADO` — un restaurante llegó a su tope de pedidos por hora (60). O le va muy
   bien, o alguien lo está llenando de pedidos falsos.
+- `CUPO_ENTRADAS_AGOTADO` — un restaurante llegó a su tope de entradas a cuentas (300 en 10
+  minutos): alguien está probando contraseñas contra sus clientes.
 - `sin correo de` — falta un secreto del correo: los clientes no reciben el enlace de su pedido ni
   el de recuperar contraseña, y la pantalla no avisa.
 - `IP_CLIENTE_DESCONOCIDA` — la tienda no está pasando la dirección del visitante; los topes dejan
@@ -309,6 +311,7 @@ SELECT x.tope,
     SELECT l.clave, l.usos, l.expira_en,
            CASE
              WHEN l.clave LIKE 'tienda:pide:negocio:%'  THEN 'pedidos por restaurante'
+             WHEN l.clave ~ '^tienda:pide:ip:([0-9.]+|.*/64|desconocida)$' THEN 'pedidos por red, entre todos los restaurantes'
              WHEN l.clave LIKE 'tienda:pide:ip:%'       THEN 'pedidos por red'
              WHEN l.clave LIKE 'tienda:entra:negocio:%' THEN 'entradas por restaurante'
              WHEN l.clave LIKE 'tienda:entra:ip:%'      THEN 'entradas por red'
@@ -318,6 +321,7 @@ SELECT x.tope,
            END AS tope,
            CASE
              WHEN l.clave LIKE 'tienda:pide:negocio:%'  THEN 60
+             WHEN l.clave ~ '^tienda:pide:ip:([0-9.]+|.*/64|desconocida)$' THEN 40
              WHEN l.clave LIKE 'tienda:pide:ip:%'       THEN 8
              WHEN l.clave LIKE 'tienda:entra:negocio:%' THEN 300
              WHEN l.clave LIKE 'tienda:entra:ip:%'      THEN 10
@@ -337,10 +341,15 @@ Cómo leerla:
 - **`pedidos por restaurante`** (60 por hora): el restaurante dejó de recibir pedidos hasta que se
   libere. Es lo más serio de la lista; también sale `CUPO_NEGOCIO_AGOTADO` en los registros.
 - **`entradas por restaurante`** (300 cada 10 minutos): alguien está probando contraseñas contra las
-  cuentas de ese restaurante. Avisar a Claude.
+  cuentas de ese restaurante, y mientras tanto ninguno de sus clientes puede entrar a su cuenta
+  (pedir como invitado sigue funcionando). Avisar a Claude. También sale `CUPO_ENTRADAS_AGOTADO` en
+  los registros.
 - **`pedidos por red`** (8 por hora) o **`entradas por red`** (10 cada 10 minutos): una red llegó a
   su tope. Una o dos filas son normales (una oficina, una red de celular). Muchas redes distintas a
   la vez contra el mismo restaurante, no.
+- **`pedidos por red, entre todos los restaurantes`** (40 por hora): una sola red intentó pedir 40
+  veces en una hora, sumando todos los restaurantes. No es un cliente: es un programa. Si se repite,
+  avisar a Claude.
 - Los números de esta consulta son los topes vigentes al escribirla; si se cambian en la función
   `tienda`, hay que cambiarlos aquí.
 

@@ -79,8 +79,14 @@ export function cuposDe(accion: Peticion["accion"], ip: string, negocio: string,
   switch (accion) {
     case "seguimiento": return porIp("sigue", 600, 90, "abrir");
     case "negocio": case "menu": case "cotizar": return porIp("lee", 600, 120, "abrir");
+    // Auditoría (B1): el slug llega aquí sin validar (el negocio se busca después), así que el cupo
+    // por IP y restaurante solo no basta: cada slug inventado estrenaría un contador. Delante va uno
+    // solo por IP, holgado (5 restaurantes a tope desde una misma red de celular).
     case "pedir": return {
-      antes: [{ clave: `tienda:pide:ip:${quien}:${negocio}`, ventanaSeg: 3600, max: 8 }],
+      antes: [
+        { clave: `tienda:pide:ip:${quien}`, ventanaSeg: 3600, max: 40 },
+        { clave: `tienda:pide:ip:${quien}:${negocio}`, ventanaSeg: 3600, max: 8 },
+      ],
       despuesDelCaptcha: [{ clave: `tienda:pide:negocio:${negocio}`, ventanaSeg: 3600, max: 60 }],
       alFallar: "cerrar",
     };
@@ -99,6 +105,9 @@ export function cuposDe(accion: Peticion["accion"], ip: string, negocio: string,
       return porIp("cuenta", 600, 60, "cerrar");
   }
 }
+
+/** ¿Esta clave es el tope de entradas de un restaurante (el segundo cupo de `entrar`)? Para el log. */
+export const esTopeDeEntradas = (clave: string): boolean => clave.startsWith("tienda:entra:negocio:");
 
 /**
  * El antirobot no pasó. Sin configurar es un fallo NUESTRO (503, como signup-tenant): decirle
@@ -181,6 +190,12 @@ export function leerPedido(x: unknown): Pedido | null {
       || typeof vence_aceptacion !== "string" || !vence_aceptacion) return null;
   return { folio_corto, total_mxn, vence_aceptacion };
 }
+
+/**
+ * ¿`tienda_crear_pedido` devolvió un pedido que ya existía (un reintento con la misma `clave`)?
+ * Solo sirve para no repetir el correo de confirmación; `leerPedido` no lo deja salir al cliente.
+ */
+export const yaExistia = (x: unknown): boolean => objeto(x) && x.ya_existia === true;
 
 /** La cotización sin `items`: los renglones normalizados son la forma interna del ticket. */
 export function cotizacionPublica(x: unknown): Record<string, unknown> | null {

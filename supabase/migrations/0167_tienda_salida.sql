@@ -158,10 +158,13 @@ COMMENT ON FUNCTION public.tienda_encender_complemento() IS
   'El encendido de la tienda en línea (0167): activa el complemento TIENDA en el catálogo y lo concede a $0 a los negocios ACTIVO, TRIAL o INTERNO cuyo plan lo incluye. Idempotente; no enciende la tienda de nadie. Se ejecuta a mano, una vez, con visto bueno. Solo service_role.';
 
 -- ── §2 `pedir` sin duplicados ────────────────────────────────────────────────
--- Cuerpo copiado ÍNTEGRO de 0162_tienda_funcion.sql §4. Cambian tres cosas, las tres con p_clave:
+-- Cuerpo copiado ÍNTEGRO de 0162_tienda_funcion.sql §4. Cambian cuatro cosas, las cuatro por p_clave:
 --   · el parámetro nuevo, al final (se llama por nombre; los demás conservan orden y nombre);
 --   · el paso 0: con p_clave, si el negocio ya tiene un pedido con esa huella, se devuelve ese
 --     —las mismas cuatro claves que al crearlo— sin crear ni validar nada;
+--   · la respuesta gana `ya_existia`: false si esta llamada creó el pedido, true si devolvió uno
+--     que ya estaba. La función `tienda` lo usa para no repetir el correo de confirmación, y no se
+--     lo enseña al cliente;
 --   · el INSERT atrapa la violación de unicidad y, con p_clave, devuelve el que ganó.
 -- Con p_clave la función `tienda` DERIVA el código de seguimiento de la llave del intento de compra
 -- (HMAC del slug y la llave), así que un reintento trae la misma huella y el índice único de
@@ -207,7 +210,7 @@ BEGIN
     PERFORM pg_advisory_xact_lock(hashtextextended('tienda_clave:' || COALESCE(p_seguimiento_hash, ''), 0));
     SELECT jsonb_build_object('pedido_id', d.id, 'folio_corto', d.folio_corto,
                               'total_mxn', to_char(d.total_cliente_mxn, 'FM999999990.00'),
-                              'vence_aceptacion', d.vence_aceptacion)
+                              'vence_aceptacion', d.vence_aceptacion, 'ya_existia', true)
       INTO v_ya FROM delivery_pedidos d
      WHERE d.seguimiento_hash = p_seguimiento_hash AND d.tenant_id = p_tenant AND d.canal = 'TIENDA';
     IF v_ya IS NOT NULL THEN RETURN v_ya; END IF;
@@ -336,7 +339,7 @@ BEGIN
     IF p_clave IS NOT NULL THEN
       SELECT jsonb_build_object('pedido_id', d.id, 'folio_corto', d.folio_corto,
                                 'total_mxn', to_char(d.total_cliente_mxn, 'FM999999990.00'),
-                                'vence_aceptacion', d.vence_aceptacion)
+                                'vence_aceptacion', d.vence_aceptacion, 'ya_existia', true)
         INTO v_ya FROM delivery_pedidos d
        WHERE d.seguimiento_hash = p_seguimiento_hash AND d.tenant_id = p_tenant AND d.canal = 'TIENDA';
       IF v_ya IS NOT NULL THEN RETURN v_ya; END IF;
@@ -348,7 +351,8 @@ BEGIN
     'pedido_id', v_ped.id,
     'folio_corto', v_ped.folio_corto,
     'total_mxn', v_q ->> 'total_mxn',
-    'vence_aceptacion', v_ped.vence_aceptacion);
+    'vence_aceptacion', v_ped.vence_aceptacion,
+    'ya_existia', false);
 END;
 $$;
 REVOKE ALL ON FUNCTION tienda_crear_pedido(uuid, uuid, text, uuid, jsonb, jsonb, jsonb, text, numeric, text, text, uuid, numeric, text) FROM PUBLIC, anon, authenticated;

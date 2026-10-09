@@ -174,10 +174,12 @@ BEGIN
              v_c ->> 'pago', (v_c ->> 'paga_con')::numeric, v_nota, v_hash,
              CASE WHEN v_n = 1 THEN v_cuenta END);
 
-    -- 12 del contrato) Lo que devuelve: cuatro claves, el total como texto.
-    IF NOT (v_r ?& ARRAY['pedido_id', 'folio_corto', 'total_mxn', 'vence_aceptacion'])
-       OR (SELECT count(*) FROM jsonb_object_keys(v_r)) <> 4 OR jsonb_typeof(v_r -> 'total_mxn') <> 'string' THEN
-      RAISE EXCEPTION '%: debe devolver exactamente pedido_id, folio_corto, total_mxn (texto) y vence_aceptacion: %', v_n, v_r;
+    -- 12 del contrato) Lo que devuelve: cuatro claves, el total como texto; y desde la 0167,
+    --    ya_existia (false: sin clave siempre se crea).
+    IF NOT (v_r ?& ARRAY['pedido_id', 'folio_corto', 'total_mxn', 'vence_aceptacion', 'ya_existia'])
+       OR (SELECT count(*) FROM jsonb_object_keys(v_r)) <> 5 OR jsonb_typeof(v_r -> 'total_mxn') <> 'string'
+       OR v_r -> 'ya_existia' <> 'false'::jsonb THEN
+      RAISE EXCEPTION '%: debe devolver exactamente pedido_id, folio_corto, total_mxn (texto), vence_aceptacion y ya_existia = false: %', v_n, v_r;
     END IF;
     IF v_r ->> 'total_mxn' IS DISTINCT FROM v_c ->> 'tot' THEN
       RAISE EXCEPTION '%: total devuelto % (esperaba %) — cotización: %', v_n, v_r ->> 'total_mxn', v_c ->> 'tot', v_q;

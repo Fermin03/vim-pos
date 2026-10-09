@@ -158,7 +158,10 @@ Los pedidos con `canal = 'TIENDA'` no pasan por Uber: `delivery-accion` los atie
 - Por sucursal (`sucursal_id`), sin `pedido_id`: `enlinea_estado` → `{participa, aceptacion,
   pausa_hasta, motivo}`; `enlinea_pausar` (`duracion`: `30m` | `1h` | `indefinida`; otra →
   `DURACION_INVALIDA`); `enlinea_reanudar`; `enlinea_presente` (solo empleado: el POS web con turno
-  avisa, opcionalmente con su `caja_id`, y sella `cajas.espejo_turno_abierto_at`). Errores:
+  avisa, opcionalmente con su `caja_id`, y sella `cajas.espejo_turno_abierto_at`; si en la sucursal
+  late una caja instalada y ninguna de las que laten es 0.8.0 o posterior, NO sella y responde
+  `{ok: true, sellado: false, motivo: "CAJA_SIN_ACTUALIZAR"}`: los pedidos irían a una caja que no
+  los entiende). Errores:
   `SIN_MODULO_TIENDA` 403 (no usa el módulo de apps), `SUCURSAL_SIN_TIENDA` 404, `SOLO_EMPLEADO` 403.
 - `delivery-espejo`: la caja manda `tienda: true` y `turno_abierto`; la respuesta añade
   `tienda: {participa, aceptacion, pausa_hasta}` (o `null` sin módulo). Una caja anterior no manda
@@ -247,7 +250,7 @@ fecha_nacimiento }`; nunca sale el id de la cuenta ni el `tenant_id`.
 |---|---|---|
 | `negocio`, `menu`, `cotizar` | 120 / 10 min por IP (`tienda:lee:ip`) | deja pasar |
 | `seguimiento` | 90 / 10 min por IP (`tienda:sigue:ip`) | deja pasar |
-| `pedir` | 8 / h por IP **y restaurante** (`tienda:pide:ip:<ip>:<slug>`; hasta la entrega 7 eran 5 / h compartidos entre restaurantes); tras el antirobot, 60 / h por negocio (`tienda:pide:negocio:<slug>`) | cierra |
+| `pedir` | 40 / h solo por IP (`tienda:pide:ip:<ip>`: el slug llega sin validar y sin este tope cada slug inventado estrenaba contador) y, después, 8 / h por IP **y restaurante** (`tienda:pide:ip:<ip>:<slug>`; hasta la entrega 7 eran 5 / h compartidos entre restaurantes); tras el antirobot, 60 / h por negocio (`tienda:pide:negocio:<slug>`) | cierra |
 | `entrar` | 10 / 10 min por IP (`tienda:entra:ip`) y, después, 300 / 10 min por restaurante (`tienda:entra:negocio:<slug>`, entrega 7) | cierra |
 | `registrar` | 5 / h por IP (`tienda:registra:ip`); tras el antirobot, 3 / h por huella de negocio+correo (`tienda:registra:correo`) | cierra |
 | `recuperar_pedir` | 3 / h por IP (`tienda:recupera:ip`); tras el antirobot, 3 / h por huella de negocio+correo (`tienda:recupera:correo`) | cierra |

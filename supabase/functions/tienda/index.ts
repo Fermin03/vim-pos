@@ -66,7 +66,7 @@
 // TURNSTILE_HOSTNAMES (tiene que incluir el dominio de la tienda), CAPTCHA_OPCIONAL (solo local),
 // VIM_SMTP_*.
 import { clienteAdmin } from "../_shared/http.ts";
-import { consumirCupos, leerCuerpoAcotado, type ResultadoCupo } from "../_shared/limite.ts";
+import { consumirCupo, consumirCupos, leerCuerpoAcotado, type ResultadoCupo } from "../_shared/limite.ts";
 import { secretoInternoValido } from "../_shared/delivery/interno.ts";
 import { type AccionCaptcha, hostnamesPermitidos, verificarTurnstile } from "../_shared/turnstile.ts";
 import { enSegundoPlano, enviarCorreo } from "../_shared/correo.ts";
@@ -76,7 +76,7 @@ import { codigoDeClave, huellaDe, nuevoCodigo } from "../_shared/tienda/seguimie
 import { correoDePedido } from "../_shared/tienda/correo-pedido.ts";
 import { correoDeBienvenida, correoDeRecuperacion, correoYaTienesCuenta } from "../_shared/tienda/correo-cuenta.ts";
 import { CABECERA_SESION, cuentaDe, direccionesPublicas, leerRegistro, leerSesion, pedidosPublicos, type Sesion } from "../_shared/tienda/cuenta.ts";
-import { cotizacionPublica, type Cupos, cuposDe, ipDeConfianza, leerNegocio, leerPedido, type Negocio, respuestaDeCaptcha, respuestaDeRpc } from "../_shared/tienda/respuesta.ts";
+import { cotizacionPublica, type Cupos, cuposDe, esTopeDeEntradas, ipDeConfianza, leerNegocio, leerPedido, type Negocio, respuestaDeCaptcha, respuestaDeRpc, yaExistia } from "../_shared/tienda/respuesta.ts";
 
 const MAX_CUERPO = 32_768;
 
@@ -335,8 +335,15 @@ async function atender(req: Request): Promise<Response> {
   // El correo no va en claro a la tabla de cupos: su huella, atada al negocio.
   const conCorreo = p.accion === "registrar" || p.accion === "recuperar_pedir";
   const cupos = cuposDe(p.accion, ip, p.negocio, conCorreo ? await huellaDe(`${p.negocio}:${p.email}`) : undefined);
-  const cupoIp = await consumirCupos(admin, cupos.antes, cupos.alFallar);
-  if (!cupoIp.permitido) return sinCupo(cupoIp);
+  // De uno en uno y en orden (lo mismo que `consumirCupos`), para saber CUÁL no dejó pasar: que se
+  // agote el tope de entradas de un restaurante es un ataque o un fallo, y se deja en el log. Solo
+  // el slug, que no es dato personal.
+  for (const cupo of cupos.antes) {
+    const r = await consumirCupo(admin, cupo, cupos.alFallar);
+    if (r.permitido) continue;
+    if (r.motivo === "AGOTADO" && esTopeDeEntradas(cupo.clave)) registrarError("tienda", "CUPO_ENTRADAS_AGOTADO", p.negocio);
+    return sinCupo(r);
+  }
 
   // ── 3) El negocio, por su slug ──────────────────────────────────────────────────────────────
   // No existe, está de baja o bloqueado, o no tiene el módulo: la misma respuesta en los tres.
@@ -430,9 +437,10 @@ async function atender(req: Request): Promise<Response> {
   }
 
   // El correo de confirmación: después de responder, y pase lo que pase el pedido ya está creado.
-  // ponytail: un reintento con la misma `clave` lo manda otra vez (mismo pedido, mismo enlace): la
-  // base no dice si el pedido ya existía. Si molestara, que `tienda_crear_pedido` lo devuelva y se salte aquí.
-  const email = p.cliente.email;
+  // Un reintento con la misma `clave` no lo repite (auditoría, B3): el pedido ya existía y su correo
+  // salió con el primer envío; mandarlo otra vez —a la dirección que traiga el reintento, que puede
+  // ser otra— sería correo nuestro en el buzón de quien no pidió nada.
+  const email = yaExistia(alta.data) ? null : p.cliente.email;
   const base = (Deno.env.get("VIM_TIENDA_URL") ?? "").replace(/\/+$/, "");
   const modo = p.modo, slug = p.negocio;
   if (email && base && Deno.env.get("VIM_SMTP_HOST")) {

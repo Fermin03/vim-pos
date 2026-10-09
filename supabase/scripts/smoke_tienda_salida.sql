@@ -76,6 +76,8 @@ BEGIN
   IF NOT (v_r1 ?& ARRAY['pedido_id', 'folio_corto', 'total_mxn', 'vence_aceptacion']) OR v_r1 ->> 'total_mxn' <> '120.00' THEN
     RAISE EXCEPTION 'A1: respuesta inesperada: %', v_r1;
   END IF;
+  -- Y dice que lo acaba de crear (un booleano de JSON, no texto): con eso la función manda el correo.
+  IF v_r1 -> 'ya_existia' IS DISTINCT FROM 'false'::jsonb THEN RAISE EXCEPTION 'A1: un pedido nuevo debía traer ya_existia = false: %', v_r1; END IF;
 
   -- A2) La misma clave otra vez → el MISMO pedido, letra por letra, y una sola fila. Sin volver a
   --     validar: la tienda ya cerró, el precio cambió, el total que manda no es, y el carrito y
@@ -86,14 +88,16 @@ BEGIN
   v_r2 := tienda_crear_pedido(p_tenant => v_t, p_sucursal => v_suc, p_modo => 'RECOGER', p_zona => NULL, p_items => '[]',
             p_cliente => '{}', p_direccion => NULL, p_pago => 'EFECTIVO', p_paga_con => NULL, p_nota => NULL,
             p_seguimiento_hash => v_h1, p_total_esperado => 1.00, p_clave => 'AAAAAAAAAAAAAAAAAAAAAA');
-  IF v_r2 IS DISTINCT FROM v_r1 THEN RAISE EXCEPTION 'A2: el reintento devolvió otra cosa: % (era %)', v_r2, v_r1; END IF;
+  -- …salvo ya_existia, que ahora es true: la función no repite el correo de confirmación.
+  IF v_r2 - 'ya_existia' IS DISTINCT FROM v_r1 - 'ya_existia' THEN RAISE EXCEPTION 'A2: el reintento devolvió otra cosa: % (era %)', v_r2, v_r1; END IF;
+  IF v_r2 -> 'ya_existia' IS DISTINCT FROM 'true'::jsonb THEN RAISE EXCEPTION 'A2: el reintento debía traer ya_existia = true: %', v_r2; END IF;
   IF (SELECT count(*) FROM delivery_pedidos WHERE seguimiento_hash = v_h1) <> 1 THEN RAISE EXCEPTION 'A2: el reintento creó otra fila'; END IF;
   -- Sigue devolviéndolo cuando el pedido ya avanzó (el cliente reintenta tarde).
   UPDATE delivery_pedidos SET estado = 'ENTREGADO' WHERE id = (v_r1 ->> 'pedido_id')::uuid;
   v_r2 := tienda_crear_pedido(p_tenant => v_t, p_sucursal => v_suc, p_modo => 'RECOGER', p_zona => NULL, p_items => v_uno,
             p_cliente => v_cli, p_direccion => NULL, p_pago => 'EFECTIVO', p_paga_con => NULL, p_nota => NULL,
             p_seguimiento_hash => v_h1, p_clave => 'AAAAAAAAAAAAAAAAAAAAAA');
-  IF v_r2 IS DISTINCT FROM v_r1 THEN RAISE EXCEPTION 'A2: sobre un pedido entregado el reintento devolvió %', v_r2; END IF;
+  IF v_r2 IS DISTINCT FROM v_r1 || '{"ya_existia": true}' THEN RAISE EXCEPTION 'A2: sobre un pedido entregado el reintento devolvió %', v_r2; END IF;
   UPDATE tienda_sucursales SET participa = true WHERE sucursal_id = v_suc;
   UPDATE productos SET precio_base_mxn = 120 WHERE id = v_prod;
 
@@ -101,7 +105,7 @@ BEGIN
   v_r2 := tienda_crear_pedido(p_tenant => v_t, p_sucursal => v_suc, p_modo => 'RECOGER', p_zona => NULL, p_items => v_uno,
             p_cliente => v_cli, p_direccion => NULL, p_pago => 'EFECTIVO', p_paga_con => NULL, p_nota => NULL,
             p_seguimiento_hash => v_h2, p_clave => 'BBBBBBBBBBBBBBBBBBBBBB');
-  IF v_r2 ->> 'pedido_id' = v_r1 ->> 'pedido_id' OR (SELECT count(*) FROM delivery_pedidos WHERE seguimiento_hash IN (v_h1, v_h2)) <> 2 THEN
+  IF v_r2 ->> 'pedido_id' = v_r1 ->> 'pedido_id' OR v_r2 -> 'ya_existia' IS DISTINCT FROM 'false'::jsonb OR (SELECT count(*) FROM delivery_pedidos WHERE seguimiento_hash IN (v_h1, v_h2)) <> 2 THEN
     RAISE EXCEPTION 'A3: otra clave debía crear otro pedido: %', v_r2;
   END IF;
 
@@ -150,7 +154,7 @@ BEGIN
   v_r2 := tienda_crear_pedido(p_tenant => v_t, p_sucursal => v_suc, p_modo => 'RECOGER', p_zona => NULL, p_items => v_uno,
             p_cliente => '{"nombre":"Tope","telefono":"4775550672"}', p_direccion => NULL, p_pago => 'EFECTIVO', p_paga_con => NULL, p_nota => NULL,
             p_seguimiento_hash => md5('tope3') || md5('tope-b3'), p_clave => 'tope3');
-  IF v_r2 IS DISTINCT FROM v_r THEN RAISE EXCEPTION 'A7: el reintento del tercer pedido devolvió %', v_r2; END IF;
+  IF v_r2 IS DISTINCT FROM v_r || '{"ya_existia": true}' THEN RAISE EXCEPTION 'A7: el reintento del tercer pedido devolvió %', v_r2; END IF;
   v_err := NULL;
   BEGIN
     PERFORM tienda_crear_pedido(p_tenant => v_t, p_sucursal => v_suc, p_modo => 'RECOGER', p_zona => NULL, p_items => v_uno,
