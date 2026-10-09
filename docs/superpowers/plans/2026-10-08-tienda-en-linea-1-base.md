@@ -993,6 +993,8 @@ git commit -m "feat(tienda): configuración por negocio y sucursal, cuentas de c
 
 ### Task 5: complemento, plan y módulo
 
+> **Corregido tras la revisión final:** los pasos de esta tarea que añaden `('TIENDA','tienda_incluida')` a `_sincronizar_addons_del_plan` (Step 4) y a `ADDONS_DEL_PLAN` (Step 7), y el paso 6 del smoke que lo comprobaba, **se retiraron**. Esa pareja corre en cada alta de negocio y cada cambio de plan, así que habría concedido el complemento desde el primer día. Entra en la entrega 7, como hizo lealtad (0156 → 0159).
+
 **Files:**
 - Modify: `supabase/migrations/0161_tienda_en_linea_base.sql` (añadir §5)
 - Modify: `packages/db/src/modulos.ts`
@@ -1663,4 +1665,27 @@ Con el CI del PR en verde y el Step 6 hecho, mezclar con squash. Después de mez
 
 `crear_ticket_desde_tienda` convierte en ticket un pedido que **ya está** en `delivery_pedidos`: no es la frontera con el público. La frontera es la función `tienda` (entrega 2), y **tiene que validar todo antes de insertar el pedido**. Lo que la base comprueba al crear el ticket es la última red, no la primera: un pedido que se rechaza ahí ya se le había confirmado al cliente.
 
-Qué es «todo» lo fijó la revisión final de esta entrega. La lista vive en su informe y no se copia aquí, para que no haya dos versiones: `.superpowers/sdd/2026-10-08-tienda-en-linea-1-base/final-fix-brief.md` (qué se arregló y por qué) y `final-fix-report.md` (cómo quedó). El plan de la entrega 2 empieza por leerlos.
+Qué es «todo» lo fijó la revisión final de esta entrega. Antes de insertar, la función `tienda` debe:
+
+1. **Negocio y sucursal.** Resolver el negocio solo desde la dirección de la tienda, y comprobar que `sucursales.tenant_id` y `tienda_sucursales.tenant_id` son ese mismo.
+2. **Tienda abierta.** Módulo efectivo, `participa`, modo habilitado (`recoger`/`domicilio`), horario en hora de México, `pausa_hasta` vencida y `sucursal_recibe_pedidos` en verdadero. Un `horario` mal formado cuenta como cerrado.
+3. **Renglones.** Al menos uno y con tope de cantidad de renglones. Cada `producto_id` es del negocio, no está borrado, se vende y no está agotado en esa sucursal. `cantidad` entera, positiva y con tope.
+4. **Modificadores.** Cada opción es del negocio y de un grupo ligado a ese producto, dentro de sus mínimos y máximos, con `cantidad` entera ≥ 1. Nunca mandar una opción sin id.
+5. **Combos.** La forma normalizada exacta: `grupo_id` = slot, `opcion_modificador_id` = producto elegido, `precio_extra_mxn`, `modificadores` anidados. Nunca repetir la misma elección con modificadores anidados (`COMBO_ELECCION_AMBIGUA`).
+6. **Precios.** Recalcular en el servidor cada `precio_unitario_mxn` y `precio_extra_mxn` con `precio_producto_en_sucursal`. Nunca copiarlos del cliente; siempre presentes y ≥ 0.
+7. **Total.** Calcular `total_cliente_mxn` con la misma aritmética que `recalcular_totales_ticket`: redondeo por renglón, IVA sumado cuando no va incluido en el precio, extras de combo sumados al padre. Si no coincide al centavo, el pedido no se podrá aceptar (`TOTAL_NO_COINCIDE`).
+8. **Domicilio.** `zona_envio_id` obligatoria, de esa sucursal y activa; `envio_mxn` = el costo de la zona en ese momento, nunca NULL ni negativo; `direccion` con todas sus claves, código postal de 5 dígitos y longitudes acotadas. Para recoger: sin zona y `envio_mxn = 0`.
+9. **Teléfono.** Normalizar a 10 dígitos nacionales (quitar +52/521) y rechazar lo demás. Un teléfono vacío crea un cliente por pedido; otro formato duplica a la persona.
+10. **Identidad sin verificar.** El ticket se pega al cliente que ya tenga ese teléfono y le añade una dirección. No revelar si el teléfono existe o está bloqueado.
+11. **Texto libre.** `cliente_nombre`, `cliente_email` (formato), `nota_cliente`, `nota` de renglón y `referencias`: longitud acotada y sin caracteres de control.
+12. **Pago.** `pago_al_recibir` obligatorio y habilitado en `tienda_config`; `paga_con_mxn` solo con EFECTIVO y ≥ total.
+13. **Identificadores.** `id_externo` aleatorio seguro, de 57 caracteres como máximo (`'tienda:' || id_externo` entra en un `varchar(64)`) y único en toda la plataforma (la unicidad es `(app, id_externo)`, sin negocio). Código de seguimiento de 128 bits o más, guardado solo como SHA-256. `tienda_cuenta_id` solo desde la sesión y del mismo negocio.
+14. **Estado de la fila.** `canal='TIENDA'`, `estado='RECIBIDO'`, `conexion_id` NULL, `app` y `tipo_entrega` coherentes, `vence_aceptacion` puesto. Nada sensible en `payload_raw` (sesión, token antirobot, IP).
+15. **Límites.** Tres pedidos vivos por teléfono como máximo y los cupos del diseño (§10), negando cuando el control de cupos no responde.
+
+Pendientes que esta entrega deja anotados para las siguientes:
+
+- **Entrega 3:** ampliar la lista de direcciones reservadas (`vim`, `vimpos`, `soporte`, `login`, `pago`) y validar la forma del `horario` al guardarlo.
+- **Entrega 4:** la caja manda `tienda: true` y `turno_abierto` en **cada** sondeo (la marca de turno solo se sella con los dos). Quien llame a `crear_ticket_desde_tienda` trata una violación de unicidad del cliente como reintentable. Si el cajero vuelve a elegir la zona en un ticket de la tienda, `fijar_envio_ticket` repone el envío al precio de hoy, no al cotizado.
+- **Entrega 6:** amarrar `tienda_sesiones`, `tienda_recuperaciones` y `tienda_direcciones` al negocio de su cuenta con una llave compuesta; disparador de `updated_at` en `tienda_cuentas`.
+- **Entrega 7:** pareja `('TIENDA','tienda_incluida')` en `_sincronizar_addons_del_plan` y en `ADDONS_DEL_PLAN`, concesión a quien ya está en Negocio o Cadena y activación del complemento; la retención debe blanquear también `nota_cliente` y las notas de renglón.
