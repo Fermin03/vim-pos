@@ -311,4 +311,14 @@ describe("guardado en el teléfono", () => {
     expect(leerCarrito("knockout", roto, AHORA)).toBeNull();
     expect(() => guardarCarrito("knockout", c, roto, AHORA)).not.toThrow();
   });
+  it("con el almacenamiento BLOQUEADO (tocar `localStorage` ya lanza), leer da null y guardar no truena", () => {
+    // Firefox con las cookies bloqueadas, Chrome con «no permitir que los sitios guarden datos».
+    Object.defineProperty(globalThis, "localStorage", { configurable: true, get() { throw new DOMException("denegado", "SecurityError"); } });
+    try {
+      expect(leerCarrito("knockout")).toBeNull();
+      expect(() => guardarCarrito("knockout", c)).not.toThrow();
+    } finally {
+      Reflect.deleteProperty(globalThis, "localStorage");
+    }
+  });
 });

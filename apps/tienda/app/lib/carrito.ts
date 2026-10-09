@@ -266,8 +266,16 @@ export function aCuerpo(carrito: Carrito): CuerpoCarrito {
 }
 
 // ── En el teléfono ───────────────────────────────────────────────────────────────────────────────
-type Almacen = Pick<Storage, "getItem" | "setItem" | "removeItem">;
-const almacenDelNavegador = (): Almacen | null => (typeof localStorage === "undefined" ? null : localStorage);
+export type Almacen = Pick<Storage, "getItem" | "setItem" | "removeItem">;
+/**
+ * El almacén del navegador, o null si no hay o no se puede tocar. Con el almacenamiento bloqueado
+ * (Firefox sin cookies, Chrome con «no permitir que los sitios guarden datos») el solo hecho de
+ * nombrar `localStorage` lanza; `typeof` no protege de eso. Sin almacén la tienda sigue: todo vive
+ * en memoria mientras la página esté abierta.
+ */
+export const almacenDelNavegador = (): Almacen | null => {
+  try { return typeof localStorage === "undefined" ? null : localStorage; } catch { return null; }
+};
 
 export const claveDeCarrito = (slug: string): string => `vim.tienda.${slug}.carrito`;
 

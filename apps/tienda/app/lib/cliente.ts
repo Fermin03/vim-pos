@@ -2,6 +2,7 @@
 // §1.9, para decir el error en el campo y no después de enviar), cómo se vuelve el cuerpo de `pedir`
 // y lo que se recuerda en su teléfono para la próxima vez. Puro: la pantalla solo pinta.
 import type { DireccionDePedido } from "./api";
+import { almacenDelNavegador, type Almacen } from "./carrito";
 import type { Modo, Negocio, Pago } from "./contrato";
 import { aTexto, formato, leerImporte } from "./dinero";
 import { normalizarTelefono } from "./telefono";
@@ -105,9 +106,6 @@ export function datosDelPedido(f: Formulario, c: { modo: Modo; pago: Pago }): Da
 // Nombre, teléfono, correo y la última dirección. NUNCA el código de seguimiento, la nota, la forma
 // de pago ni con cuánto pagó. Es de todas las tiendas (la clave no lleva el negocio): el cliente es
 // el mismo en cualquiera.
-type Almacen = Pick<Storage, "getItem" | "setItem" | "removeItem">;
-const almacenDelNavegador = (): Almacen | null => (typeof localStorage === "undefined" ? null : localStorage);
-
 export const CLAVE_DEL_CLIENTE = "vim.tienda.cliente";
 const RECORDADOS = ["nombre", "telefono", "email", ...DE_DIRECCION] as const satisfies readonly Campo[];
 

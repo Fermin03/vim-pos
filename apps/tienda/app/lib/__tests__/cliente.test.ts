@@ -148,4 +148,13 @@ describe("lo que se recuerda en el teléfono", () => {
     expect(() => { guardarCliente(lleno, "DOMICILIO", roto); olvidarCliente(roto); guardarCliente(lleno, "RECOGER", null); }).not.toThrow();
     expect(leerCliente(null)).toBeNull();
   });
+  it("con el almacenamiento BLOQUEADO (tocar `localStorage` ya lanza), nada truena", () => {
+    Object.defineProperty(globalThis, "localStorage", { configurable: true, get() { throw new DOMException("denegado", "SecurityError"); } });
+    try {
+      expect(leerCliente()).toBeNull();
+      expect(() => { guardarCliente(lleno, "DOMICILIO"); guardarCliente(lleno, "RECOGER"); olvidarCliente(); }).not.toThrow();
+    } finally {
+      Reflect.deleteProperty(globalThis, "localStorage");
+    }
+  });
 });
