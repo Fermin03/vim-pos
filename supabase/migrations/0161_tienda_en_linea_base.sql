@@ -512,8 +512,13 @@ CREATE TABLE IF NOT EXISTS tienda_config (
 );
 COMMENT ON TABLE tienda_config IS 'Tienda en línea de un negocio: dirección, apariencia, aceptación y formas de pago al recibir.';
 
+-- La fila se amarra a la sucursal Y a su negocio. Con una FK solo a sucursales(id), un admin del
+-- negocio A podía insertar (sucursal de B, tenant_id = A): la política solo mira tenant_id, la PK es
+-- sucursal_id, y B ya no podría crear ni ver su fila. La FK compuesta necesita este índice único.
+CREATE UNIQUE INDEX IF NOT EXISTS sucursales_id_tenant_uq ON sucursales (id, tenant_id);
+
 CREATE TABLE IF NOT EXISTS tienda_sucursales (
-  sucursal_id uuid PRIMARY KEY REFERENCES sucursales(id) ON DELETE CASCADE,
+  sucursal_id uuid PRIMARY KEY,
   tenant_id   uuid NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
   participa   boolean NOT NULL DEFAULT false,
   recoger     boolean NOT NULL DEFAULT true,
@@ -523,7 +528,9 @@ CREATE TABLE IF NOT EXISTS tienda_sucursales (
   horario     jsonb NOT NULL DEFAULT '{}'::jsonb CHECK (jsonb_typeof(horario) = 'object'),
   pausa_hasta timestamptz NULL,
   created_at  timestamptz NOT NULL DEFAULT now(),
-  updated_at  timestamptz NOT NULL DEFAULT now()
+  updated_at  timestamptz NOT NULL DEFAULT now(),
+  CONSTRAINT tienda_sucursales_sucursal_del_negocio
+    FOREIGN KEY (sucursal_id, tenant_id) REFERENCES sucursales (id, tenant_id) ON DELETE CASCADE
 );
 COMMENT ON TABLE tienda_sucursales IS 'Qué sucursales venden en la tienda en línea, cómo y a qué horas. pausa_hasta la pone el cajero.';
 CREATE INDEX IF NOT EXISTS idx_tienda_sucursales_tenant ON tienda_sucursales (tenant_id);
@@ -534,6 +541,8 @@ DECLARE t text;
 BEGIN
   FOREACH t IN ARRAY ARRAY['tienda_config', 'tienda_sucursales'] LOOP
     EXECUTE format('ALTER TABLE %I ENABLE ROW LEVEL SECURITY', t);
+    -- Ninguna tabla nueva para anon: en la nube, los privilegios por omisión del proyecto se la darían.
+    EXECUTE format('REVOKE ALL ON %I FROM PUBLIC, anon', t);
     EXECUTE format('GRANT SELECT, INSERT, UPDATE, DELETE ON %I TO authenticated, service_role', t);
     EXECUTE format('DROP POLICY IF EXISTS %I ON %I', t || '_select', t);
     EXECUTE format('CREATE POLICY %I ON %I FOR SELECT USING (tenant_id = current_tenant_id())', t || '_select', t);
