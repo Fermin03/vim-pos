@@ -3,7 +3,7 @@
 // un combo) con la regla dicha en palabras, cantidad, nota y «Agregar». Las reglas no viven aquí:
 // `validarSeleccion` dice qué falta y `alternar` qué pasa al tocar una opción.
 import { useId, useState, type ReactNode } from "react";
-import { cn } from "@vim/ui/styles";
+import { StatusChip, cn } from "@vim/ui/styles";
 import {
   TOPES, estimarSeleccion, modificadoresIniciales, seleccionInicial, validarSeleccion,
   type ComponenteElegido, type ModificadorElegido, type Seleccion,
@@ -28,30 +28,33 @@ function Opciones({ ancla, nombre, minimo, maximo, opciones, elegidas, alTocar, 
   const unica = minimo === 1 && maximo === 1;
   const lleno = maximo !== null && maximo > 1 && opciones.filter((o) => elegidas.has(o.id)).length >= maximo;
   return (
-    <fieldset id={ancla} role={unica ? "radiogroup" : "group"} className="min-w-0 scroll-mt-4 py-4">
-      {/* Un <legend> no se deja acomodar con flex en todos los navegadores: el reparto va adentro. */}
-      <legend className="w-full p-0">
-        <span className="flex items-baseline justify-between gap-3">
-          <span className={cn("min-w-0 font-display text-16 font-semibold", PARTE)}>{nombre}</span>
-          <span className="flex-shrink-0 text-13 font-normal text-ink-2">{reglaDeGrupo(minimo, maximo)}</span>
+    <fieldset id={ancla} role={unica ? "radiogroup" : "group"} className="min-w-0 scroll-mt-4 pb-2">
+      {/* Un <legend> no se deja acomodar con flex en todos los navegadores: el reparto va adentro. Y el
+          aire de arriba va en él: el relleno de un <fieldset> cae DEBAJO de su leyenda, no encima. */}
+      <legend className="w-full p-0 pt-4">
+        <span className="flex items-center justify-between gap-3">
+          <span className={cn("min-w-0 font-display text-16 font-semibold leading-snug", PARTE)}>{nombre}</span>
+          {/* La regla, en la etiqueta de estado de la casa; en rojo cuando ya se quiso agregar sin cumplirla. */}
+          <StatusChip tone={falta ? "danger" : "neutral"} className="flex-shrink-0">{reglaDeGrupo(minimo, maximo)}</StatusChip>
         </span>
       </legend>
       {falta && <p className="mt-1 text-14 font-medium text-danger">{falta}</p>}
-      <ul className="mt-1 divide-y divide-line">
+      {/* Sin líneas entre opciones: las separa el aire. El renglón entero se toca y responde. */}
+      <ul className="mt-1">
         {opciones.map((o) => {
           const marcada = elegidas.has(o.id);
           const fuera = o.agotada || !!o.bloqueo || (lleno && !marcada);
           const extra = aCentavos(o.extra) ?? 0;
           return (
             <li key={o.id}>
-              <label className={cn("flex min-h-12 items-center gap-3 py-2", fuera ? "text-ink-3" : "cursor-pointer")}>
+              <label className={cn("-mx-4 flex min-h-12 items-center gap-3 px-4 py-2 transition-colors duration-150", fuera ? "text-ink-3" : "cursor-pointer active:bg-hover active:duration-0")}>
                 <input type={unica ? "radio" : "checkbox"} name={unica ? nombreDeRadio : undefined} checked={marcada} disabled={fuera}
-                  onChange={() => alTocar(o.id)} className="h-5 w-5 flex-shrink-0 accent-ink" />
+                  onChange={() => alTocar(o.id)} className="h-6 w-6 flex-shrink-0 accent-ink" />
                 <span className={cn("min-w-0 flex-1 text-16 leading-snug", PARTE)}>
                   {o.nombre}
                   {(o.agotada || o.bloqueo) && <span className="block text-13">{o.agotada ? "Agotado" : o.bloqueo}</span>}
                 </span>
-                {extra > 0 && <span className="flex-shrink-0 text-14 tabular-nums text-ink-2">+{formato(extra)}</span>}
+                {extra > 0 && <span className="flex-shrink-0 font-display text-14 tabular-nums text-ink-2">+{formato(extra)}</span>}
               </label>
               {marcada && o.debajo}
             </li>
@@ -105,9 +108,9 @@ export function ProductoPorAgregar({ producto, alAgregar }: {
       <div className={CUERPO}>
         {foto && <Foto src={foto} alt={`Foto de ${producto.nombre}`} lado={[512, 320]} className="aspect-[8/5] h-auto w-full" />}
         <div className="px-4 pb-4">
-          <div className="border-b border-line py-4">
+          <div className="border-b border-line pb-4 pt-3">
             {producto.descripcion && <p className={cn("text-15 leading-relaxed text-ink-2", PARTE)}>{producto.descripcion}</p>}
-            <p className={cn("font-display text-18 font-semibold tabular-nums", producto.descripcion && "mt-2")}>{formatoMxn(producto.precio_final_mxn)}</p>
+            <p className={cn("font-display text-20 font-semibold tabular-nums", producto.descripcion && "mt-2")}>{formatoMxn(producto.precio_final_mxn)}</p>
           </div>
           <div className="divide-y divide-line">
             {producto.grupos.map((g) => (
@@ -128,7 +131,7 @@ export function ProductoPorAgregar({ producto, alAgregar }: {
                       // El mismo producto no puede ir dos veces en un combo, ni en partes distintas.
                       bloqueo: enOtro.has(o.producto_id) ? "Ya lo elegiste en otra parte del combo" : undefined,
                       debajo: elegido && o.grupos.length > 0 && (
-                        <div className="mb-2 ml-8 border-l-2 border-line pl-4">
+                        <div className="mb-2 ml-3 border-l-2 border-line pl-4">
                           {o.grupos.map((g) => (
                             <Opciones key={g.id} ancla={`${ancla}${g.id}`} nombre={g.nombre} minimo={g.minimo} maximo={g.maximo} opciones={deGrupo(g)}
                               elegidas={new Set(elegido.modificadores.map((m) => m.opcionId))} falta={faltaEn(g.id)}
@@ -142,9 +145,9 @@ export function ProductoPorAgregar({ producto, alAgregar }: {
               );
             })}
             <div className="py-4">
-              <label htmlFor={idNota} className="flex items-baseline justify-between gap-3">
-                <span className="font-display text-16 font-semibold">¿Algo que debamos saber?</span>
-                <span className="text-13 text-ink-2">Opcional</span>
+              <label htmlFor={idNota} className="flex items-center justify-between gap-3">
+                <span className="font-display text-16 font-semibold leading-snug">¿Algo que debamos saber?</span>
+                <StatusChip className="flex-shrink-0">Opcional</StatusChip>
               </label>
               <textarea id={idNota} value={nota} onChange={(e) => setNota(e.target.value)} maxLength={TOPES.nota} rows={2}
                 placeholder="Sin cebolla, salsa aparte…"
@@ -158,7 +161,7 @@ export function ProductoPorAgregar({ producto, alAgregar }: {
           {lleno ? `Tu pedido ya tiene ${TOPES.renglones} productos distintos. Quita alguno para agregar este.` : faltas[0]?.texto ?? ""}
         </p>
         <div className="flex items-center gap-3">
-          <Cantidad valor={cantidad} max={TOPES.porRenglon} de={producto.nombre} alCambiar={setCantidad} />
+          <Cantidad grande valor={cantidad} max={TOPES.porRenglon} de={producto.nombre} alCambiar={setCantidad} />
           <button type="button" onClick={agregar} aria-disabled={faltas.length > 0 || undefined} className={cn(PRINCIPAL, "h-14 min-w-0 flex-1 justify-between px-5 text-16")}>
             <span>Agregar</span>
             <span className="tabular-nums">{formato(estimarSeleccion(producto, s, cantidad))}</span>

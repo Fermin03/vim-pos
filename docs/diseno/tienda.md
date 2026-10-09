@@ -48,7 +48,7 @@ Pensada para 360–430 px; en escritorio es la misma columna, centrada (`max-w-2
 - La acción principal siempre abajo, al alcance del pulgar: la barra del carrito o el pie de la hoja,
   con el margen del área segura.
 - Selectores nativos (`<select>`, radios, casillas): en un teléfono, el control del sistema es el
-  mejor control.
+  mejor control. Radios y casillas miden 24 px, en `ink`, y su renglón entero (48 px) se toca.
 
 ## Piezas
 
@@ -68,17 +68,65 @@ Pensada para 360–430 px; en escritorio es la misma columna, centrada (`max-w-2
 | Acceso | `components/acceso.tsx` | Entrar, crear cuenta y recuperar la contraseña. Una página cada una (`[negocio]/entrar`, `registro`, `recuperar`) |
 | Mi cuenta | `components/cuenta.tsx` | Pedidos, datos, direcciones, contraseña y sesión, y eliminar la cuenta (`[negocio]/cuenta`) |
 
-**El menú es una carta, no una rejilla de tarjetas.** Renglones separados por una línea: nombre,
-descripción en dos líneas como máximo y precio a la izquierda; la foto (96 px) a la derecha, si hay.
-Sin foto, el texto ocupa todo el ancho: no hay marco vacío ni icono de imagen rota (una foto que no
-carga se quita sola). Sin sombras ni cajas.
+**El menú es una carta, no una rejilla de tarjetas.** Renglones separados por una línea metida al
+margen del texto (lo que responde al toque sí llega a las orillas): nombre (`text-16`, semibold),
+descripción en dos líneas como máximo (`text-14`, `ink-2`) y precio (`font-display`, `text-16`,
+`tabular-nums`) a la izquierda. A la derecha, **siempre un «+»** (32 px, borde `line-strong`, radio
+base): es la seña de que el renglón se toca, no un segundo botón. Con foto (96 px, `rounded-lg`) el
+«+» va en su esquina; **sin foto ocupa su lugar**, así el renglón se ve intencional y no hay marco
+vacío ni icono de imagen rota (una foto que no carga se quita sola). Sin sombras ni cajas. Lo agotado
+lleva la etiqueta «Agotado» (`StatusChip`) en vez del «+».
+
+**El encabezado** va de lo que más importa a lo que menos: descripción; el estado —abierta es la
+etiqueta «Abierto» (`StatusChip` verde con punto) y el horario de hoy; cerrada es el mismo aviso
+`warning` que frena el carrito, con cuándo abre—; la dirección; y dos botones secundarios (`ghost`):
+«Llamar al …» y «Horario», que despliega la semana. Abajo, cómo se recibe.
+
+**La barra de categorías** es pegajosa. Solo la categoría activa va rellena (`ink`); las demás son
+texto: seis pastillas grises seguidas pesaban más que el menú. La línea de abajo aparece solo cuando
+la barra está pegada.
 
 **La hoja** es un `<dialog>` nativo: el navegador atrapa el foco, cierra con Escape y lo devuelve a
 lo que la abrió. Se cierra también tocando afuera, con la ✕ o arrastrando la cabecera hacia abajo.
 Al abrir, el foco cae en «Cerrar», no en un campo: el teclado no debe taparle el producto a nadie.
-Entra en 300 ms y sale en 180; con movimiento reducido solo funde.
+El título admite dos líneas (un nombre largo no se corta) y la línea bajo la cabecera aparece solo
+cuando el cuerpo pasa por debajo. En el pie, la cantidad mide lo mismo que la acción dominante (56 px).
 
-**Las opciones** dicen su regla en palabras junto al nombre del grupo: «Elige 1», «Opcional»,
+### La regla de altura de la hoja (y por qué)
+
+**La hoja mide lo que mide su contenido, hasta su tope** (92 % del alto visible en el teléfono); al
+llegar al tope el cuerpo se desplaza y el pie —con la acción principal— se queda fijo y a la vista.
+Una hoja corta («Borrar dirección») es corta; no se estira.
+
+Se arma siempre con las tres clases de `components/hoja.tsx`: `COLUMNA` (la envoltura, o el `<form>`
+que la sustituye), `CUERPO` y `PIE`. Tres reglas que no se negocian:
+
+1. **Nunca `flex-1` (ni alturas en porcentaje) entre la hoja y su cuerpo.** `flex-1` es
+   `flex: 1 1 0%`, y Safari resuelve ese `0%` como cero: en octubre de 2026 la hoja salía en el
+   iPhone midiendo solo su cabecera, sin cuerpo ni botón. Chrome lo perdona y por eso no se vio en
+   escritorio. Va `flex-initial` (`0 1 auto`) con `min-h-0`: se encoge, no crece, y no hay porcentaje
+   que un navegador pueda leer distinto.
+2. **`.hoja` lleva `height: auto`**, no el `fit-content` que el navegador le pone a un `<dialog>`
+   (es lo que hace que WebKit crea que la altura ya se conoce). Por eso en escritorio se centra con
+   `translate`, no con `inset: 0; margin: auto`.
+3. **El tope es `dvh`**, con `vh` de respaldo: `vh` cuenta la barra del navegador aunque esté visible.
+
+**En el teléfono, además:**
+
+- El pie respeta la franja de inicio (`env(safe-area-inset-bottom)`); para que ese valor exista la
+  página declara `viewport-fit=cover`, y `body` devuelve el margen lateral con el teléfono acostado.
+- **El teclado no tapa el botón.** iOS no encoge la página al abrir el teclado: mientras hay una hoja
+  abierta, esta se sube lo que el teclado ocupa y se limita a lo que queda visible
+  (`visualViewport`), y el campo con foco se trae a la vista. En Android la página se encoge sola
+  (`interactive-widget=resizes-content`).
+- Con una hoja abierta el menú de atrás no se desplaza (`overflow: hidden` en la raíz, que Safari
+  respeta desde iOS 16) ni se arrastra al llegar al final del cuerpo (`overscroll-behavior`).
+- **El anillo de foco de «Cerrar» solo se ve con teclado.** El foco inicial sigue cayendo ahí, pero
+  Safari pinta el anillo en cualquier foco puesto por código; la hoja lo esconde cuando se abrió con
+  el dedo y lo devuelve en cuanto se usa una tecla.
+
+**Las opciones** dicen su regla en palabras junto al nombre del grupo, en una etiqueta (`StatusChip`;
+en rojo si ya se quiso agregar sin cumplirla): «Elige 1», «Opcional»,
 «Opcional · hasta 3», «Elige de 1 a 2». «Elige 1» son radios; lo demás, casillas, y al llegar al
 máximo las que faltan se apagan. Un extra enseña su precio (`+$17.40`); lo agotado se queda en la
 lista, apagado y con la palabra «Agotado».
@@ -219,6 +267,52 @@ Una página para mirar de reojo varias veces: **el estado es lo más grande de l
   un aviso (`warning`) «Sin conexión. Reintentando…» **sin borrar lo último que se supo**.
 - **El código del pedido nunca se escribe en la pantalla**, ni en el título de la pestaña: lo que
   se enseña es el folio. «Copiar enlace» toma la dirección de la barra.
+
+## Movimiento
+
+Las curvas y los tiempos son los del núcleo (`--ease-out`, 150–250 ms); la tienda no tiene curvas
+propias. Solo se mueven `transform` y `opacity`, y con movimiento reducido se quita el
+desplazamiento y queda el fundido.
+
+| Qué | Cómo | Por qué se anima |
+|---|---|---|
+| Todo lo que se toca | `active:scale-[.97]` en botones; fondo `hover` **sin transición al presionar** y 150 ms al soltar en renglones | Respuesta al toque. Es lo único que se «anima» en lo que se usa cada visita |
+| Abrir la hoja | Sube en 250 ms (el tope de la escala: recorre casi toda la pantalla) | Dice de dónde sale y a dónde vuelve |
+| Cerrar la hoja | Baja en 180 ms, más rápido de lo que entra | Regla del núcleo: la salida no estorba |
+| Arrastrar la hoja | Sigue al dedo desde donde se tomó; hacia arriba cede cada vez menos; al soltar decide el impulso (un tirón corto la cierra) y sale a la velocidad del dedo | Un gesto que no sigue al dedo se siente roto |
+| Barra «Ver pedido» | Aparece una vez (fundido + 8 px); la cuenta de piezas hace `vim-pop` con cada producto que entra | Es la confirmación de «Agregar» |
+| Cambio de estado del pedido | El título entra con `vim-fade`; el paso en curso late despacio (1.8 s) | La página se mira de reojo: se nota que cambió y que sigue viva |
+
+**No se anima:** el chip de categoría al desplazarse (solo cambia de color), el precio del botón al
+marcar opciones, la cantidad, ni la entrada de los renglones del menú. Se ven decenas de veces por visita.
+
+Mientras algo carga (el pedido, la cuenta) va el texto de siempre y, debajo, barras del color de las
+líneas del tamaño de lo que viene (`Esqueleto`), quietas, como el esqueleto de la caja.
+
+## En qué se apoya (y dónde el sistema no alcanzó)
+
+| Decisión | Regla, token o componente |
+|---|---|
+| Etiquetas «Abierto», «Agotado», «Elige 1», «Opcional», estado de un pedido | `StatusChip` de `@vim/ui` y sus tonos |
+| Tienda cerrada, errores, lo guardado | `Aviso` de `@vim/ui` |
+| «Llamar», «Horario», «Pedir de nuevo», «Volver» | `botonClases({ variant: "ghost" })`, `h-11` |
+| Acción principal | `PRINCIPAL` a `h-14`, una por pantalla (núcleo §1 y §4) |
+| La cuenta y el resumen del pedido | La tarjeta de resumen del portal de factura: `rounded-lg border border-line`, fondo `sel` |
+| Títulos | `font-display` + `tracking-tight`, como en factura y el POS; tamaños de la escala |
+| Radios | 6 px en controles, 8 px en fotos, hoja y tarjetas; redondo solo en chips e indicadores |
+| Velo de la hoja | `ink` al 40 %, el del `Modal` |
+
+Donde el sistema no decía nada y se decidió aquí:
+
+- **Una hoja inferior.** El núcleo solo tiene el `Modal` centrado. La hoja usa su radio (`--r-lg`), su
+  velo y la curva `--ease-out`, a 250 ms.
+- **El latido del paso en curso** es la única animación en bucle del producto. Usa `ink` y
+  `--ease-out`; con movimiento reducido no existe.
+- **El «+» del renglón** es un patrón nuevo, armado con el borde y el radio de un botón `ghost`.
+- **El «N en tu pedido»** va en `accent-soft` con forma de chip: el `StatusChip` no tiene un tono del
+  color del negocio.
+- **Sombras:** el núcleo no define ninguna. Se quedan las dos que ya había (`shadow-lg` en la barra
+  flotante, `shadow-sm` en el selector de entrega), las mismas clases que usan el POS y el panel.
 
 ## Precios
 

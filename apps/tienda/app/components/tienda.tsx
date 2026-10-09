@@ -5,9 +5,9 @@
 //
 // El paso «Tus datos / enviar» (components/datos.tsx) se pinta dentro de la hoja del carrito cuando
 // `paso === "datos"`; lo que necesita de aquí es `PropsDelPasoDeDatos`.
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Aviso, botonClases, cn } from "@vim/ui/styles";
+import { Aviso, StatusChip, botonClases, cn } from "@vim/ui/styles";
 import { leerCuenta } from "../lib/api";
 import {
   aCuerpo, agregar, cambiarCantidad, contarPiezas, estimarTotal, guardarCarrito, leerCarrito, quitar, revalidar, vaciar,
@@ -26,7 +26,7 @@ import { PasoDeDatos, useEnviando } from "./datos";
 import { Entrega } from "./entrega";
 import { CUERPO, Hoja, PIE } from "./hoja";
 import { MenuDeLaTienda } from "./menu";
-import { FOCO, PARTE, PRINCIPAL } from "./piezas";
+import { IconoAbajo, PARTE, PRINCIPAL } from "./piezas";
 import { ProductoPorAgregar } from "./producto";
 
 type ErrorDeTienda = { error: string; detalle: string | null };
@@ -36,10 +36,15 @@ const REFRESCO_MS = 60_000;
 function Encabezado({ negocio, sucursal, carrito, ahora, alCambiarSucursal, children }: {
   negocio: Negocio; sucursal: Sucursal; carrito: Carrito; ahora: Momento; alCambiarSucursal: (id: string) => void; children: React.ReactNode;
 }) {
+  const [verHorario, setVerHorario] = useState(false);
+  const idHorario = useId();
   const motivo = motivoDeCierre(sucursal, carrito.modo);
   const tel = enlaceTel(sucursal.telefono);
+  const semana = semanaLegible(sucursal.horario);
+  const hoy = semana.find((d) => d.dia === ahora.dia)?.texto;
+  const SECUNDARIO = cn(botonClases({ variant: "ghost" }), "min-w-0");
   return (
-    <section aria-label="La tienda" className="flex flex-col gap-4 px-4 pb-5">
+    <section aria-label="La tienda" className="flex flex-col gap-4 px-4 pb-4">
       <h1 className="sr-only">Menú de {negocio.nombre}</h1>
       {negocio.descripcion && <p className={cn("text-15 leading-relaxed text-ink-2", PARTE)}>{negocio.descripcion}</p>}
       {negocio.sucursales.length > 1 && (
@@ -51,33 +56,39 @@ function Encabezado({ negocio, sucursal, carrito, ahora, alCambiarSucursal, chil
           </select>
         </label>
       )}
-      <div className="flex flex-col gap-1 text-15">
-        {/* El estado no depende solo del color: lo dice el texto; el punto solo acompaña. */}
-        <p aria-live="polite" className="flex items-start gap-2 font-semibold">
-          <span aria-hidden="true" className={cn("mt-2 h-2 w-2 flex-shrink-0 rounded-full", motivo ? "border-2 border-ink-3" : "bg-success")} />
-          {motivo ? textoCerrada(motivo, sucursal.horario, ahora) : "Abierto"}
-        </p>
-        {sucursal.direccion && <p className={cn("pl-4 text-ink-2", PARTE)}>{sucursal.direccion}</p>}
-        {sucursal.telefono && (
-          <p className="pl-4">
-            {tel
-              ? <a href={tel} className={cn("inline-flex min-h-11 items-center font-medium text-ink underline underline-offset-4", FOCO)}>Llamar al {formatoTelefono(sucursal.telefono)}</a>
-              : <span className="text-ink-2">{sucursal.telefono}</span>}
-          </p>
-        )}
-        <details className="pl-4">
-          <summary className={cn("inline-flex min-h-11 cursor-pointer items-center font-medium text-ink underline underline-offset-4", FOCO)}>Horario de la semana</summary>
-          <table className="mb-2 w-full max-w-xs text-14">
-            <tbody>
-              {semanaLegible(sucursal.horario).map((d) => (
-                <tr key={d.dia} className={cn(d.dia === ahora.dia ? "font-semibold text-ink" : "text-ink-2")}>
-                  <th scope="row" className="py-1 pr-4 text-left [font-weight:inherit]">{d.nombre}{d.dia === ahora.dia && " (hoy)"}</th>
-                  <td className="py-1 tabular-nums">{d.texto}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </details>
+      <div className="flex flex-col gap-2 text-15">
+        {/* El estado no depende solo del color: lo dice el texto. Abierta es una etiqueta y el horario
+            de hoy; cerrada es un aviso con cuándo abre, el mismo que frena el carrito. */}
+        <div aria-live="polite">
+          {motivo
+            ? <Aviso tono="warning" className="!text-14">{textoCerrada(motivo, sucursal.horario, ahora)}</Aviso>
+            : (
+              <p className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                <StatusChip tone="success" punto>Abierto</StatusChip>
+                {hoy && hoy !== "Cerrado" && <span className="tabular-nums text-ink-2">Hoy, {hoy}</span>}
+              </p>
+            )}
+        </div>
+        {sucursal.direccion && <p className={cn("leading-snug text-ink-2", PARTE)}>{sucursal.direccion}</p>}
+        <div className="flex flex-wrap gap-2 pt-1">
+          {tel && <a href={tel} className={SECUNDARIO}>Llamar al {formatoTelefono(sucursal.telefono ?? "")}</a>}
+          <button type="button" aria-expanded={verHorario} aria-controls={idHorario} onClick={() => setVerHorario((v) => !v)} className={SECUNDARIO}>
+            Horario
+            <IconoAbajo className={cn("transition-transform duration-150 ease-vim", verHorario && "rotate-180")} />
+          </button>
+        </div>
+        {sucursal.telefono && !tel && <p className="text-ink-2">Teléfono: {sucursal.telefono}</p>}
+        <table id={idHorario} hidden={!verHorario} className="w-full max-w-xs text-14">
+          <caption className="sr-only">Horario de la semana</caption>
+          <tbody>
+            {semana.map((d) => (
+              <tr key={d.dia} className={cn(d.dia === ahora.dia ? "font-semibold text-ink" : "text-ink-2")}>
+                <th scope="row" className="py-1 pr-4 text-left [font-weight:inherit]">{d.nombre}{d.dia === ahora.dia && " (hoy)"}</th>
+                <td className="py-1 tabular-nums">{d.texto}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
       </div>
       {children}
     </section>
@@ -219,7 +230,8 @@ export function Tienda({ negocio, sucursal, menu, ahora, conSesion }: {
             className={cn(PRINCIPAL, "pointer-events-auto mx-auto flex h-14 w-full max-w-xl justify-between px-5 text-16 shadow-lg")}>
             <span className="flex items-center gap-3">
               Ver pedido
-              <span className="flex h-6 min-w-6 items-center justify-center rounded-full bg-sobre-accent/15 px-2 text-13 tabular-nums">{piezas}</span>
+              {/* La cuenta de piezas brinca una vez con cada producto que entra: es la confirmación de «Agregar». */}
+              <span key={piezas} className="flex h-6 min-w-6 animate-vim-pop items-center justify-center rounded-full bg-sobre-accent/15 px-2 text-13 tabular-nums">{piezas}</span>
             </span>
             <span className="tabular-nums">{formato(estimarTotal(carrito, menu))}</span>
           </button>
