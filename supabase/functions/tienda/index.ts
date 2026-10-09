@@ -23,7 +23,8 @@
 //   · En una respuesta: `tenant_id`, los `items` normalizados de la cotización, el texto de un
 //     error de la base, el secreto. Las reglas de qué sale están en _shared/tienda/respuesta.ts,
 //     que sí se prueba; este archivo no (Deno.serve y la base).
-//   · En el log: el cuerpo, el código de seguimiento, el secreto, el token del captcha.
+//   · En el log: el cuerpo, el código de seguimiento, el secreto, el token del captcha. (El slug
+//     del negocio sí puede ir: no es dato personal.)
 //   · El código de seguimiento existe en la respuesta de `pedir` y en el correo. En la base, su huella.
 //
 // El negocio sale SIEMPRE del slug (`tienda_negocio`), nunca de un id que mande quien llama, y toda
@@ -33,7 +34,7 @@
 // TURNSTILE_HOSTNAMES (tiene que incluir el dominio de la tienda), CAPTCHA_OPCIONAL (solo local),
 // VIM_SMTP_*.
 import { clienteAdmin } from "../_shared/http.ts";
-import { consumirCupos, leerCuerpoAcotado } from "../_shared/limite.ts";
+import { consumirCupos, leerCuerpoAcotado, type ResultadoCupo } from "../_shared/limite.ts";
 import { secretoInternoValido } from "../_shared/delivery/interno.ts";
 import { hostnamesPermitidos, verificarTurnstile } from "../_shared/turnstile.ts";
 import { enSegundoPlano, enviarCorreo } from "../_shared/correo.ts";
@@ -41,7 +42,7 @@ import { registrarError } from "../_shared/errores.ts";
 import { leerCuerpo } from "../_shared/tienda/validar.ts";
 import { huellaDe, nuevoCodigo } from "../_shared/tienda/seguimiento.ts";
 import { correoDePedido } from "../_shared/tienda/correo-pedido.ts";
-import { cotizacionPublica, cuposDe, ipDeConfianza, leerNegocio, respuestaDeRpc } from "../_shared/tienda/respuesta.ts";
+import { cotizacionPublica, cuposDe, ipDeConfianza, leerNegocio, respuestaDeCaptcha, respuestaDeRpc } from "../_shared/tienda/respuesta.ts";
 
 const MAX_CUERPO = 32_768;
 
@@ -59,6 +60,10 @@ function rechazo(rpc: string, error: { message: string }): Response {
   if (r.status === 503) registrarError("tienda", rpc, error);
   return json(r.body, r.status);
 }
+
+/** Un cupo que no dejó pasar: agotado → 429; el control no respondió (solo cierra en `pedir`) → 503. */
+const sinCupo = (c: ResultadoCupo): Response =>
+  c.motivo === "BD_NO_RESPONDE" ? json({ error: "SERVICIO_NO_DISPONIBLE" }, 503) : json({ error: "DEMASIADOS_INTENTOS" }, 429);
 
 async function atender(req: Request): Promise<Response> {
   // ── 1) Método, secreto y cuerpo ─────────────────────────────────────────────────────────────
@@ -79,16 +84,14 @@ async function atender(req: Request): Promise<Response> {
   if (!leido.ok) return json({ error: leido.error }, 400);
   const p = leido.valor;
 
-  // ── 2) Cupo de la acción ────────────────────────────────────────────────────────────────────
+  // ── 2) Cupo por IP (IPv6: por su /64) ───────────────────────────────────────────────────────
   const admin = clienteAdmin();
   const ip = ipDeConfianza(req.headers.get("x-tienda-ip"));
-  const { cupos, alFallar } = cuposDe(p.accion, ip, p.negocio);
-  const cupo = await consumirCupos(admin, cupos, alFallar);
-  if (!cupo.permitido) {
-    return cupo.motivo === "BD_NO_RESPONDE"
-      ? json({ error: "SERVICIO_NO_DISPONIBLE" }, 503)
-      : json({ error: "DEMASIADOS_INTENTOS" }, 429);
-  }
+  // Sin IP, todos los que piden comparten un contador de 5 por hora: que quede en el log.
+  if (p.accion === "pedir" && ip === "desconocida") registrarError("tienda", "IP_CLIENTE_DESCONOCIDA", p.negocio);
+  const cupos = cuposDe(p.accion, ip, p.negocio);
+  const cupoIp = await consumirCupos(admin, cupos.antes, cupos.alFallar);
+  if (!cupoIp.permitido) return sinCupo(cupoIp);
 
   // ── 3) El negocio, por su slug ──────────────────────────────────────────────────────────────
   // No existe, está de baja o bloqueado, o no tiene el módulo: la misma respuesta en los tres.
@@ -127,8 +130,9 @@ async function atender(req: Request): Promise<Response> {
   }
 
   // ── pedir ───────────────────────────────────────────────────────────────────────────────────
+  // Orden: cupo por IP (arriba) → negocio y sucursal → antirobot → cupo del negocio → alta.
   // Mismas variables y el mismo «opcional solo en local» que signup-tenant. Fail-closed: sin
-  // TURNSTILE_SECRET_KEY (y sin CAPTCHA_OPCIONAL=1) no se crea ningún pedido.
+  // TURNSTILE_SECRET_KEY (y sin CAPTCHA_OPCIONAL=1) no se crea ningún pedido (503).
   const captcha = await verificarTurnstile({
     secreto: Deno.env.get("TURNSTILE_SECRET_KEY"),
     opcional: Deno.env.get("CAPTCHA_OPCIONAL") === "1",
@@ -142,9 +146,18 @@ async function atender(req: Request): Promise<Response> {
     (captcha.motivo === "NO_CONFIGURADO" ? console.error : console.warn)(
       `[tienda] captcha no pasó: ${captcha.motivo} ${captcha.codigos?.join(",") ?? ""}`,
     );
-    return json({ error: "CAPTCHA_INVALIDO" }, 403);
+    const r = respuestaDeCaptcha(captcha.motivo);   // sin configurar → 503; lo demás → 403
+    return json(r.body, r.status);
   }
   if (captcha.omitido) console.warn("[tienda] CAPTCHA_OPCIONAL=1 y sin TURNSTILE_SECRET_KEY: captcha NO verificado (solo local).");
+
+  // El cupo del negocio se gasta solo DESPUÉS del antirobot: sin un token válido nadie le agota la
+  // tienda a un restaurante. El slug no es dato personal.
+  const cupoNegocio = await consumirCupos(admin, cupos.despuesDelCaptcha, cupos.alFallar);
+  if (!cupoNegocio.permitido) {
+    if (cupoNegocio.motivo === "AGOTADO") registrarError("tienda", "CUPO_NEGOCIO_AGOTADO", p.negocio);
+    return sinCupo(cupoNegocio);
+  }
 
   // El código solo lo tendrá el cliente (esta respuesta y su correo). A la base va la huella.
   const codigo = nuevoCodigo();

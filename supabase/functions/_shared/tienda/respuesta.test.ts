@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { cotizacionPublica, cuposDe, ipDeConfianza, leerNegocio, respuestaDeRpc } from "./respuesta.ts";
+import { claveDeIp, cotizacionPublica, cuposDe, ipDeConfianza, leerNegocio, respuestaDeCaptcha, respuestaDeRpc } from "./respuesta.ts";
 
 const PROD = "11111111-2222-3333-4444-555555555555";
 const SUC = "99999999-0000-0000-0000-0000000000bb";
@@ -17,22 +17,67 @@ test("ip: ausente, vacía, basura o gigante es «desconocida»", () => {
 });
 
 // ── Los cupos de cada acción (diseño §10) ───────────────────────────────────────────────────────
-test("cupos: leer es 120 cada 600 s por IP y deja pasar si el control falla", () => {
+test("cupos: leer es 120 cada 600 s por IP, sin nada después del antirobot, y deja pasar si el control falla", () => {
   for (const accion of ["negocio", "menu", "cotizar", "seguimiento"] as const) {
     assert.deepEqual(cuposDe(accion, "1.2.3.4", "knockout"), {
-      cupos: [{ clave: "tienda:lee:ip:1.2.3.4", ventanaSeg: 600, max: 120 }],
+      antes: [{ clave: "tienda:lee:ip:1.2.3.4", ventanaSeg: 600, max: 120 }],
+      despuesDelCaptcha: [],
       alFallar: "abrir",
     });
   }
 });
-test("cupos: pedir es 5 por IP y 60 por negocio cada hora, y cierra si el control falla", () => {
+test("cupos: pedir gasta 5 por IP antes del antirobot y 60 por negocio solo después; cierra si el control falla", () => {
   assert.deepEqual(cuposDe("pedir", "desconocida", "knockout"), {
-    cupos: [
-      { clave: "tienda:pide:ip:desconocida", ventanaSeg: 3600, max: 5 },
-      { clave: "tienda:pide:negocio:knockout", ventanaSeg: 3600, max: 60 },
-    ],
+    antes: [{ clave: "tienda:pide:ip:desconocida", ventanaSeg: 3600, max: 5 }],
+    despuesDelCaptcha: [{ clave: "tienda:pide:negocio:knockout", ventanaSeg: 3600, max: 60 }],
     alFallar: "cerrar",
   });
+});
+test("cupos: el cupo del negocio nunca va antes del antirobot", () => {
+  const { antes } = cuposDe("pedir", "1.2.3.4", "knockout");
+  assert.equal(antes.some((c) => c.clave.includes("negocio")), false);
+});
+test("cupos: con IPv6 la clave es el /64, en leer y en pedir", () => {
+  const ip = "2806:2f0:9000:ab:1111:2222:3333:4444";
+  assert.equal(cuposDe("menu", ip, "knockout").antes[0]!.clave, "tienda:lee:ip:2806:2f0:9000:ab::/64");
+  assert.equal(cuposDe("pedir", ip, "knockout").antes[0]!.clave, "tienda:pide:ip:2806:2f0:9000:ab::/64");
+});
+
+// ── La clave del cupo por IP: IPv4 completa, IPv6 por su /64 ────────────────────────────────────
+test("clave de ip: una IPv4 va completa", () => {
+  assert.equal(claveDeIp("187.190.1.20"), "187.190.1.20");
+});
+test("clave de ip: una IPv6 completa se queda en sus cuatro primeros grupos", () => {
+  assert.equal(claveDeIp("2806:02F0:9000:00ab:1111:2222:3333:4444"), "2806:2f0:9000:ab::/64");
+});
+test("clave de ip: una IPv6 abreviada con :: se expande antes de cortar", () => {
+  assert.equal(claveDeIp("2806:2f0:9000::1"), "2806:2f0:9000:0::/64");
+  assert.equal(claveDeIp("2806:2f0::"), "2806:2f0:0:0::/64");
+  assert.equal(claveDeIp("::1"), "0:0:0:0::/64");
+  assert.equal(claveDeIp("2806:2f0:9000:ab::"), "2806:2f0:9000:ab::/64");
+});
+test("clave de ip: dos direcciones del mismo /64 dan la misma clave; de otro /64, otra", () => {
+  assert.equal(claveDeIp("2806:2f0:9000:ab::1"), claveDeIp("2806:2f0:9000:ab:ffff:ffff:ffff:ffff"));
+  assert.notEqual(claveDeIp("2806:2f0:9000:ab::1"), claveDeIp("2806:2f0:9000:ac::1"));
+});
+test("clave de ip: una IPv4 mapeada se trata como IPv4", () => {
+  assert.equal(claveDeIp("::ffff:1.2.3.4"), "1.2.3.4");
+  assert.equal(claveDeIp("::FFFF:1.2.3.4"), "1.2.3.4");
+  assert.equal(claveDeIp("::ffff:1.2.3.4"), claveDeIp("1.2.3.4"));
+});
+test("clave de ip: basura da «desconocida»", () => {
+  for (const v of ["", "desconocida", "no-es-ip", "999.1.1.1", ":", ":::", "1:2:3", "1:2:3:4:5:6:7:8:9", "1::2::3",
+                   "g::1", "12345::1", "1:2:3:4:5:6:7::8", "::ffff:999.1.1.1", "1.2.3.4:80", "fe80::1%eth0"]) {
+    assert.equal(claveDeIp(v), "desconocida", JSON.stringify(v));
+  }
+});
+
+// ── El antirobot que no pasó ────────────────────────────────────────────────────────────────────
+test("captcha: sin configurar es 503 (fallo nuestro); cualquier otro motivo es 403", () => {
+  assert.deepEqual(respuestaDeCaptcha("NO_CONFIGURADO"), { status: 503, body: { error: "SERVICIO_NO_DISPONIBLE" } });
+  for (const motivo of ["SIN_TOKEN", "RECHAZADO", "SIN_RESPUESTA", "HOSTNAME", "ACCION"] as const) {
+    assert.deepEqual(respuestaDeCaptcha(motivo), { status: 403, body: { error: "CAPTCHA_INVALIDO" } }, motivo);
+  }
 });
 
 // ── El error de una RPC → respuesta ─────────────────────────────────────────────────────────────

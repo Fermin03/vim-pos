@@ -17,18 +17,57 @@ export function ipDeConfianza(cabecera: string | null): string {
   return pareceIp(v) ? v : "desconocida";
 }
 
-/** Los cupos de una acción (diseño §10). Pedir crea filas: si el control no responde, se cierra. */
-export function cuposDe(accion: Peticion["accion"], ip: string, negocio: string): { cupos: Cupo[]; alFallar: "abrir" | "cerrar" } {
+/**
+ * Lo que identifica a un cliente en el cupo por IP. IPv4, completa. IPv6, su /64 (los cuatro
+ * primeros grupos tras expandir `::`): un solo cliente recibe un /64 entero, así que contar por
+ * dirección le daría 2^64 cupos. `::ffff:a.b.c.d` es una IPv4. Lo que no se entiende, "desconocida".
+ * ponytail: una IPv4 mapeada escrita en hexadecimal (`::ffff:102:304`) cae en el /64 `0:0:0:0`,
+ * compartido; si un proxy la mandara así, convertirla aquí.
+ */
+export function claveDeIp(ip: string): string {
+  const v = ip.trim().toLowerCase();
+  const mapeada = /^::ffff:(\d{1,3}(?:\.\d{1,3}){3})$/.exec(v);
+  if (mapeada) return claveDeIp(mapeada[1]!);
+  if (!v.includes(":")) return pareceIp(v) ? v : "desconocida";
+  const mitades = v.split("::");
+  if (mitades.length > 2) return "desconocida";
+  const izq = mitades[0] ? mitades[0].split(":") : [];
+  const der = mitades[1] ? mitades[1].split(":") : [];
+  const faltan = 8 - izq.length - der.length;
+  if (mitades.length === 2 ? faltan < 1 : faltan !== 0) return "desconocida";
+  const grupos = [...izq, ...Array<string>(faltan).fill("0"), ...der];
+  if (!grupos.every((g) => /^[0-9a-f]{1,4}$/.test(g))) return "desconocida";
+  return `${grupos.slice(0, 4).map((g) => parseInt(g, 16).toString(16)).join(":")}::/64`;
+}
+
+/**
+ * Los cupos de una acción (diseño §10). Pedir crea filas: si el control no responde, se cierra.
+ * En `pedir` van en dos tiempos: el de la IP antes del antirobot y el del negocio solo DESPUÉS de
+ * pasarlo. Si los dos se gastaran al entrar, 60 peticiones basura por hora (sin token) dejarían a
+ * un restaurante sin tienda.
+ */
+export function cuposDe(accion: Peticion["accion"], ip: string, negocio: string): { antes: Cupo[]; despuesDelCaptcha: Cupo[]; alFallar: "abrir" | "cerrar" } {
+  const quien = claveDeIp(ip);
   if (accion !== "pedir") {
-    return { cupos: [{ clave: `tienda:lee:ip:${ip}`, ventanaSeg: 600, max: 120 }], alFallar: "abrir" };
+    return { antes: [{ clave: `tienda:lee:ip:${quien}`, ventanaSeg: 600, max: 120 }], despuesDelCaptcha: [], alFallar: "abrir" };
   }
   return {
-    cupos: [
-      { clave: `tienda:pide:ip:${ip}`, ventanaSeg: 3600, max: 5 },
-      { clave: `tienda:pide:negocio:${negocio}`, ventanaSeg: 3600, max: 60 },
-    ],
+    antes: [{ clave: `tienda:pide:ip:${quien}`, ventanaSeg: 3600, max: 5 }],
+    despuesDelCaptcha: [{ clave: `tienda:pide:negocio:${negocio}`, ventanaSeg: 3600, max: 60 }],
     alFallar: "cerrar",
   };
+}
+
+/**
+ * El antirobot no pasó. Sin configurar es un fallo NUESTRO (503, como signup-tenant): decirle
+ * «captcha inválido» a todos los clientes escondería que la tienda entera no puede recibir pedidos.
+ */
+export function respuestaDeCaptcha(motivo: string):
+  | { status: 503; body: { error: "SERVICIO_NO_DISPONIBLE" } }
+  | { status: 403; body: { error: "CAPTCHA_INVALIDO" } } {
+  return motivo === "NO_CONFIGURADO"
+    ? { status: 503, body: { error: "SERVICIO_NO_DISPONIBLE" } }
+    : { status: 403, body: { error: "CAPTCHA_INVALIDO" } };
 }
 
 // Las funciones SQL (0162) rechazan con `RAISE EXCEPTION 'CODIGO: detalle'`, y PostgREST lo entrega
