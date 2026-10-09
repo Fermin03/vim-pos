@@ -33,7 +33,7 @@ DECLARE
   v_casos jsonb; v_c jsonb; v_q jsonb; v_qs jsonb := '{}'::jsonb; v_tks jsonb := '{}'::jsonb;
   v_i jsonb; v_m jsonb; v_menu jsonb;
   v_ped uuid; v_ticket uuid; v_total numeric; v_n int; v_n2 int; v_err text; r record;
-  v_cuarenta jsonb; v_41 jsonb;
+  v_cuarenta jsonb; v_41 jsonb; v_nota text; v_gr jsonb;
 BEGIN
   PERFORM set_config('request.jwt.claims', NULL, true);
 
@@ -411,6 +411,39 @@ BEGIN
     RAISE EXCEPTION '15: una nota vacía o que no es texto va en null: %', v_q -> 'items';
   END IF;
   IF v_q ->> 'total_mxn' IS DISTINCT FROM '355.00' THEN RAISE EXCEPTION '14: total % (esperaba 135 + 160 + 30 + 30 = 355.00)', v_q ->> 'total_mxn'; END IF;
+
+  -- F3) La nota es texto del público: los caracteres de control (un salto de línea, un ESC de
+  -- terminal, un tabulador) se vuelven espacio ANTES de recortar a 200. Solo controles = sin nota.
+  v_q := tienda_cotizar(v_t, v_suc, 'RECOGER', NULL, jsonb_build_array(
+    jsonb_build_object('producto_id', v_papas, 'cantidad', 1,
+      'nota', chr(27) || '[31msin' || chr(10) || 'sal' || chr(9) || chr(13) || repeat('x', 250)),
+    jsonb_build_object('producto_id', v_papas, 'cantidad', 1, 'nota', chr(10) || chr(27) || ' ' || chr(7))));
+  v_nota := v_q -> 'items' -> 0 ->> 'nota';
+  IF (position(chr(10) in v_nota) = 0 AND position(chr(27) in v_nota) = 0 AND v_nota !~ '[[:cntrl:]]') IS NOT TRUE THEN
+    RAISE EXCEPTION 'F3: la nota del renglón conserva caracteres de control: %', to_jsonb(v_nota);
+  END IF;
+  IF v_nota IS DISTINCT FROM left('[31msin sal  ' || repeat('x', 250), 200) THEN
+    RAISE EXCEPTION 'F3: la nota debía quedar con espacios donde había controles y en 200 caracteres: %', to_jsonb(v_nota);
+  END IF;
+  IF jsonb_typeof(v_q -> 'items' -> 1 -> 'nota') IS DISTINCT FROM 'null' THEN
+    RAISE EXCEPTION 'F3: una nota de solo caracteres de control va en null: %', v_q -> 'items' -> 1 -> 'nota';
+  END IF;
+
+  -- F7) Del lado seguro: una opción a la que le falta la clave `agotada` NO se puede vender. (El menú
+  -- siempre la pone; esto es por si un día deja de hacerlo.) Con `agotada: false` la misma entrada vale.
+  v_gr := jsonb_build_array(jsonb_build_object('id', v_g2, 'minimo', 0, 'maximo', NULL, 'opciones',
+            jsonb_build_array(jsonb_build_object('id', v_o15, 'nombre', 'Extra queso', 'precio_extra_mxn', '15.00'))));
+  v_m := format('[{"opcion_id":"%s","cantidad":1}]', v_o15)::jsonb;
+  IF _tienda_modificadores(jsonb_set(v_gr, '{0,opciones,0,agotada}', 'false'), v_m, 1)
+     IS DISTINCT FROM jsonb_build_object('normalizados', jsonb_build_array(jsonb_build_object(
+       'opcion_modificador_id', v_o15, 'grupo_id', NULL, 'nombre_app', 'Extra queso', 'cantidad', 1, 'precio_extra_mxn', '15.00')), 'monto', 15.00) THEN
+    RAISE EXCEPTION 'F7 (control): con agotada = false la opción debía valer: %', _tienda_modificadores(jsonb_set(v_gr, '{0,opciones,0,agotada}', 'false'), v_m, 1);
+  END IF;
+  IF _tienda_modificadores(jsonb_set(v_gr, '{0,opciones,0,agotada}', 'true'), v_m, 1) IS NOT NULL THEN RAISE EXCEPTION 'F7 (control): una opción agotada no vale'; END IF;
+  IF _tienda_modificadores(v_gr, v_m, 1) IS NOT NULL THEN
+    RAISE EXCEPTION 'F7: una opción sin la clave `agotada` se dio por vendible: %', _tienda_modificadores(v_gr, v_m, 1);
+  END IF;
+  IF _tienda_modificadores(jsonb_set(v_gr, '{0,opciones,0,agotada}', 'null'), v_m, 1) IS NOT NULL THEN RAISE EXCEPTION 'F7: una opción con `agotada` en null se dio por vendible'; END IF;
 
   -- Los topes sí entran: 40 renglones y cantidad 50; un extra en cantidad 10.
   SELECT jsonb_agg(jsonb_build_object('producto_id', v_p120, 'cantidad', 1)) INTO v_cuarenta FROM generate_series(1, 40);

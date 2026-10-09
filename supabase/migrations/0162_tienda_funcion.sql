@@ -402,8 +402,9 @@ BEGIN
       FROM elegidas e LEFT JOIN ofrecidas f USING (opcion_id)
   )
   SELECT
-    -- Todas ofrecidas, ninguna agotada, cantidades de 1 a 10 y ninguna repetida…
-    NOT EXISTS (SELECT 1 FROM pares WHERE grupo_id IS NULL OR agotada OR cantidad IS NULL)
+    -- Todas ofrecidas, ninguna agotada, cantidades de 1 a 10 y ninguna repetida… «IS NOT FALSE»:
+    -- una opción sin la clave `agotada` no se puede vender (del lado seguro).
+    NOT EXISTS (SELECT 1 FROM pares WHERE grupo_id IS NULL OR agotada IS NOT FALSE OR cantidad IS NULL)
     AND (SELECT count(*) = count(DISTINCT opcion_id) FROM pares)
     -- …y cada grupo, con su mínimo y su máximo (ya normalizados por tipo; máximo null = sin tope).
     AND NOT EXISTS (
@@ -500,7 +501,8 @@ BEGIN
 
     -- Que esté en el menú y no agotado ES la regla de qué se vende (tienda_menu, reglas 1, 2, 6 y 8).
     v_p := jsonb_path_query_first(v_menu, '$.categorias[*].productos[*] ? (@.id == $id)', jsonb_build_object('id', v_pid));
-    IF v_p IS NULL OR (v_p ->> 'agotado')::boolean THEN
+    -- «IS NOT FALSE»: sin la clave `agotado` tampoco se vende.
+    IF v_p IS NULL OR (v_p ->> 'agotado')::boolean IS NOT FALSE THEN
       RAISE EXCEPTION 'PRODUCTO_NO_DISPONIBLE: %', v_pid;
     END IF;
     v_precio := (v_p ->> 'precio_mxn')::numeric;
@@ -529,7 +531,7 @@ BEGIN
         v_op   := jsonb_path_query_first(v_slot, '$.opciones[*] ? (@.producto_id == $id)',
                                          jsonb_build_object('id', lower(v_comp ->> 'producto_id')));
         v_n    := _tienda_entero(v_comp -> 'cantidad', 1, 999);   -- el tope de verdad es el máximo del slot
-        IF v_op IS NULL OR (v_op ->> 'agotado')::boolean OR v_n IS NULL THEN
+        IF v_op IS NULL OR (v_op ->> 'agotado')::boolean IS NOT FALSE OR v_n IS NULL THEN
           RAISE EXCEPTION 'COMBO_INVALIDO: %', v_pid;
         END IF;
         v_m := _tienda_modificadores(v_op -> 'grupos', v_comp -> 'modificadores', v_n * v_cant);
@@ -569,7 +571,10 @@ BEGIN
       'nombre_app', v_p ->> 'nombre',
       'cantidad', v_cant,
       'precio_unitario_mxn', v_p ->> 'precio_mxn',   -- en un combo, la base: las elecciones suman aparte
-      'nota', CASE WHEN jsonb_typeof(v_r -> 'nota') = 'string' THEN NULLIF(left(btrim(v_r ->> 'nota'), 200), '') END,
+      -- Texto del público, última red (la función `tienda` ya lo limpia): los caracteres de control
+      -- se vuelven espacio antes de recortar. Va a la comanda y al ticket impreso.
+      'nota', CASE WHEN jsonb_typeof(v_r -> 'nota') = 'string'
+                   THEN NULLIF(left(btrim(regexp_replace(v_r ->> 'nota', '[[:cntrl:]]', ' ', 'g')), 200), '') END,
       'alergenos', '[]'::jsonb,
       'alergia_nota', NULL,
       'modificadores', v_mods);
