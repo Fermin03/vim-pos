@@ -70,6 +70,12 @@ describe("api del navegador", () => {
     responder = () => new Response("<html>504</html>", { status: 504 });
     expect(await pedir("knockout", pedido)).toEqual(SIN_CONFIRMAR);
     expect(llamadas).toHaveLength(4);                             // una llamada por intento, ni una más
+    // Lo que el servidor de la tienda manda cuando la función o su gateway dieron un 500, 502, 504…
+    // (llamarTienda, servidor.test.ts): mismo caso, el worker pudo morir con el pedido ya creado.
+    // Para cotizar y seguimiento no cambia nada: sigue siendo «servicio no disponible».
+    responder = () => json({ error: "SERVICIO_NO_DISPONIBLE", detalle: "SIN_RESPUESTA" }, 503);
+    expect(await cotizar("knockout", carrito)).toEqual({ ok: false, error: "SERVICIO_NO_DISPONIBLE", detalle: "SIN_RESPUESTA" });
+    expect(llamadas).toHaveLength(5);
     // Un 503 «de verdad» (la función contestó que no pudo) sí deja volver a intentar.
     responder = () => json({ error: "SERVICIO_NO_DISPONIBLE" }, 503);
     expect(await pedir("knockout", pedido)).toEqual({ ok: false, error: "SERVICIO_NO_DISPONIBLE", detalle: null });

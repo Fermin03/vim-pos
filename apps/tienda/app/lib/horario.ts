@@ -50,11 +50,12 @@ export function hora12(hhmm: string): string {
 
 const nombreDe = (dia: Dia): string => DIAS.find((d) => d.dia === dia)!.nombre;
 
-/** «Abre hoy a las 1:00 p. m.» / «Abre el lunes a las 1:00 p. m.»; null si no abre ningún día. */
+/** «Abre hoy a las 6:00 p. m.» / «Abre el lunes a la 1:00 p. m.» (la una va en singular); null si no abre ningún día. */
 export function textoApertura(h: Horario, m: Momento = momentoMx()): string | null {
   const p = proximaApertura(h, m);
   if (!p) return null;
-  return `Abre ${p.enDias === 0 ? "hoy" : `el ${nombreDe(p.dia).toLowerCase()}`} a las ${hora12(p.hora)}`;
+  const articulo = /^(01|13):/.test(p.hora) ? "a la" : "a las";
+  return `Abre ${p.enDias === 0 ? "hoy" : `el ${nombreDe(p.dia).toLowerCase()}`} ${articulo} ${hora12(p.hora)}`;
 }
 
 /** Los siete días, de lunes a domingo, con su horario en palabras. */

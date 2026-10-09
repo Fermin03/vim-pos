@@ -50,6 +50,23 @@ describe("dinero", () => {
     expect(leerImporte("200.00")).toBe(20000);
     for (const malo of ["", "abc", "12.345", "-5", "1.2.3", "1e3"]) expect(leerImporte(malo), malo).toBeNull();
   });
+  it("la coma: decimal con una o dos cifras detrás, de miles con tres exactas", () => {
+    // Coma decimal (como escribe mucha gente «cien cincuenta»): antes se leía como $1,005.
+    expect(leerImporte("100,5")).toBe(10050);
+    expect(leerImporte("100,50")).toBe(10050);
+    expect(leerImporte("0,5")).toBe(50);
+    expect(leerImporte("1234,5")).toBe(123450);
+    // Coma de miles: grupos de tres exactos, con o sin centavos tras el punto.
+    expect(leerImporte("1,234")).toBe(123400);
+    expect(leerImporte("1,234.5")).toBe(123450);
+    expect(leerImporte("1,234.50")).toBe(123450);
+    expect(leerImporte("12,345,678")).toBe(1234567800);
+    expect(leerImporte("100,500")).toBe(10050000);
+    // Ni una cosa ni la otra: no se adivina.
+    for (const malo of ["1,2345", "1,23,456", "1234,567", ",5", "5,", "1,,234", "1,234,5", "1,5.5", "100,5.0", "1.234,5", "0100,500.123"]) {
+      expect(leerImporte(malo), malo).toBeNull();
+    }
+  });
 });
 
 describe("horario", () => {
@@ -100,9 +117,21 @@ describe("horario", () => {
     expect(textoApertura({}, m("1", "10:00"))).toBeNull();
   });
   it("el texto: «hoy» o el día", () => {
-    expect(textoApertura(semana, m("1", "10:00"))).toBe("Abre hoy a las 1:00 p. m.");
     expect(textoApertura(semana, m("1", "22:30"))).toBe("Abre el viernes a las 6:00 p. m.");
-    expect(textoApertura(semana, m("7", "10:00"))).toBe("Abre el lunes a las 1:00 p. m.");
+    expect(textoApertura(semana, m("5", "10:00"))).toBe("Abre hoy a las 6:00 p. m.");
+  });
+  it("la una va en singular: «a la 1:00», de la tarde o de la madrugada; las demás, «a las»", () => {
+    expect(textoApertura(semana, m("1", "10:00"))).toBe("Abre hoy a la 1:00 p. m.");
+    expect(textoApertura(semana, m("7", "10:00"))).toBe("Abre el lunes a la 1:00 p. m.");
+    const abre = (hora: string) => textoApertura({ "1": [hora, "23:00"] }, m("1", "00:00"));
+    expect(abre("01:00")).toBe("Abre hoy a la 1:00 a. m.");
+    expect(abre("01:30")).toBe("Abre hoy a la 1:30 a. m.");
+    expect(abre("13:45")).toBe("Abre hoy a la 1:45 p. m.");
+    expect(abre("10:00")).toBe("Abre hoy a las 10:00 a. m.");
+    expect(abre("11:00")).toBe("Abre hoy a las 11:00 a. m.");
+    expect(abre("12:00")).toBe("Abre hoy a las 12:00 p. m.");
+    expect(abre("14:00")).toBe("Abre hoy a las 2:00 p. m.");
+    expect(abre("21:00")).toBe("Abre hoy a las 9:00 p. m.");
   });
   it("la hora en 12 horas", () => {
     expect(hora12("00:00")).toBe("12:00 a. m.");
@@ -245,8 +274,8 @@ describe("textos", () => {
   it("tienda cerrada, por motivo", () => {
     const horario: Horario = { "1": ["13:00", "22:00"] };
     const lunesTemprano = { dia: "1", hora: "10:00" } as const, martes = { dia: "2", hora: "10:00" } as const;
-    expect(textoCerrada("FUERA_DE_HORARIO", horario, lunesTemprano)).toBe("Cerrado ahora. Abre hoy a las 1:00 p. m.");
-    expect(textoCerrada("FUERA_DE_HORARIO", horario, martes)).toBe("Cerrado ahora. Abre el lunes a las 1:00 p. m.");
+    expect(textoCerrada("FUERA_DE_HORARIO", horario, lunesTemprano)).toBe("Cerrado ahora. Abre hoy a la 1:00 p. m.");
+    expect(textoCerrada("FUERA_DE_HORARIO", horario, martes)).toBe("Cerrado ahora. Abre el lunes a la 1:00 p. m.");
     expect(textoCerrada("FUERA_DE_HORARIO", {}, martes)).toBe("Cerrado ahora.");
     expect(textoCerrada("EN_PAUSA", horario, martes)).toBe("No estamos tomando pedidos en este momento. Vuelve a intentar en unos minutos.");
     expect(textoCerrada("CAJA_NO_LISTA", horario, martes)).toBe("Aún no abrimos. Vuelve a intentar en unos minutos.");

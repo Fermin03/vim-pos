@@ -102,20 +102,36 @@ describe("llamarTienda", () => {
     }
     expect(console.error).not.toHaveBeenCalled();
   });
-  it("un 401 (secreto mal puesto), un 500 o un 405 salen como 503 y quedan en el registro sin el cuerpo", async () => {
-    for (const estado of [401, 500, 405, 302, 502]) {
+  it("un 401 (secreto mal puesto) y cualquier 3xx/4xx inesperado salen como 503 a secas: ahí no se creó nada", async () => {
+    for (const estado of [401, 405, 302, 418, 499]) {
       responder = () => json({ error: "NO_AUTORIZADO", pista: "dato-interno" }, estado);
       expect(await llamarTienda({ accion: "pedir", cliente: { telefono: "4771234567" } }, "1.1.1.1"), String(estado))
         .toEqual({ estado: 503, json: { error: "SERVICIO_NO_DISPONIBLE" } });
+    }
+  });
+  it("un 5xx que no es el 503 de la función (500, 502, 504, 546) sale como «sin respuesta»: el pedido pudo haber entrado", async () => {
+    for (const estado of [500, 501, 502, 504, 546, 599]) {
+      responder = () => json({ error: "ERROR_INTERNO" }, estado);
+      expect(await llamarTienda({ accion: "pedir" }, "1.1.1.1"), String(estado))
+        .toEqual({ estado: 503, json: { error: "SERVICIO_NO_DISPONIBLE", detalle: "SIN_RESPUESTA" } });
+    }
+    // El 503 de la propia función contestó a propósito: pasa tal cual, sin el detalle.
+    responder = () => json({ error: "SERVICIO_NO_DISPONIBLE" }, 503);
+    expect(await llamarTienda({ accion: "pedir" }, "1.1.1.1")).toEqual({ estado: 503, json: { error: "SERVICIO_NO_DISPONIBLE" } });
+  });
+  it("lo inesperado queda en el registro, sin el cuerpo", async () => {
+    for (const estado of [401, 500, 405, 302, 502]) {
+      responder = () => json({ error: "NO_AUTORIZADO", pista: "dato-interno" }, estado);
+      await llamarTienda({ accion: "pedir", cliente: { telefono: "4771234567" } }, "1.1.1.1");
     }
     const registrado = JSON.stringify(vi.mocked(console.error).mock.calls);
     expect(vi.mocked(console.error).mock.calls).toHaveLength(5);
     expect(registrado).toContain("401");
     expect(registrado).not.toMatch(/4771234567|dato-interno|secreto-de-prueba/);
   });
-  it("una respuesta que no es JSON es servicio no disponible", async () => {
+  it("una respuesta que no es JSON tampoco dice qué pasó: «sin respuesta»", async () => {
     responder = () => new Response("<html>gateway</html>", { status: 200 });
-    expect(await llamarTienda({}, "1.1.1.1")).toEqual({ estado: 503, json: { error: "SERVICIO_NO_DISPONIBLE" } });
+    expect(await llamarTienda({}, "1.1.1.1")).toEqual({ estado: 503, json: { error: "SERVICIO_NO_DISPONIBLE", detalle: "SIN_RESPUESTA" } });
   });
   it("si la función no contesta (red o tiempo límite) dice que se quedó sin respuesta: el pedido pudo haber entrado", async () => {
     responder = () => { throw new DOMException("The operation timed out.", "TimeoutError"); };
@@ -250,6 +266,41 @@ describe("POST /api/tienda", () => {
     expect((await pedir({ ...seguimiento, relleno: "ñ".repeat(12_000) })).status).toBe(200);
     expect((await pedir({ ...seguimiento, relleno: "ñ".repeat(20_000) })).status).toBe(413);
     expect(llamadas).toHaveLength(1);
+  });
+  it("sin Content-Length (o con uno falso) deja de leer en cuanto pasa de 32 KB", async () => {
+    const trozo = new TextEncoder().encode("x".repeat(8 * 1024));
+    const flujo = (leidos: { n: number }, total: number) => new ReadableStream<Uint8Array>({
+      pull(c) { if (leidos.n >= total) return c.close(); leidos.n++; c.enqueue(trozo); },
+    }, { highWaterMark: 0 });
+    const conFlujo = (leidos: { n: number }, total: number, cabeceras: Record<string, string> = {}) =>
+      POST(new Request("https://pedidos.vimpos.com.mx/api/tienda", {
+        method: "POST", headers: { host: "pedidos.vimpos.com.mx", ...cabeceras }, body: flujo(leidos, total), duplex: "half",
+      } as RequestInit));
+    // 1 000 trozos de 8 KB (8 MB): se corta al quinto, el primero que pasa del tope.
+    const leidos = { n: 0 };
+    const r = await conFlujo(leidos, 1000);
+    expect(r.status).toBe(413);
+    expect(await r.json()).toEqual({ error: "CUERPO_DEMASIADO_GRANDE" });
+    expect(leidos.n).toBeLessThanOrEqual(6);
+    // Un Content-Length que miente por lo bajo no lo salva…
+    const mentira = { n: 0 };
+    expect((await conFlujo(mentira, 1000, { "content-length": "10" })).status).toBe(413);
+    expect(mentira.n).toBeLessThanOrEqual(6);
+    // …y uno que excede se rechaza sin leer nada.
+    const sinLeer = { n: 0 };
+    expect((await conFlujo(sinLeer, 1, { "content-length": "40000" })).status).toBe(413);
+    expect(sinLeer.n).toBe(0);
+    expect(llamadas).toHaveLength(0);
+  });
+  it("un cuerpo que llega en varios trozos se lee completo (también con un carácter partido entre dos)", async () => {
+    const bytes = new TextEncoder().encode(JSON.stringify({ accion: "seguimiento", negocio: "knockout", codigo: CODIGO, nota: "ñandú" }));
+    const corte = bytes.indexOf(0xc3) + 1;   // a media «ñ»
+    const r = await POST(new Request("https://pedidos.vimpos.com.mx/api/tienda", {
+      method: "POST", headers: { host: "pedidos.vimpos.com.mx" }, duplex: "half",
+      body: new ReadableStream<Uint8Array>({ start(c) { c.enqueue(bytes.slice(0, corte)); c.enqueue(bytes.slice(corte)); c.close(); } }),
+    } as RequestInit));
+    expect(r.status).toBe(200);
+    expect(cuerpoEnviado()).toEqual({ accion: "seguimiento", negocio: "knockout", codigo: CODIGO });
   });
   it("lo que no es un objeto JSON, 400", async () => {
     for (const malo of ["{no es json", "[]", "null", "\"hola\"", ""]) {

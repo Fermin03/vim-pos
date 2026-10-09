@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import {
   TOPES, aCuerpo, agregar, cambiarCantidad, carritoNuevo, claveDeCarrito, contarPiezas, estimarSeleccion,
   estimarTotal, guardarCarrito, leerCarrito, quitar, revalidar, seleccionInicial, vaciar, validarSeleccion,
@@ -162,6 +162,20 @@ describe("el carrito", () => {
     expect(quitar(c, r).renglones.map((x) => x.id)).toEqual([h]);
     expect(contarPiezas(c)).toBe(8);
     expect(vaciar(c)).toMatchObject({ sucursalId: ID.sucursal, modo: "RECOGER", renglones: [] });
+  });
+  it("sin crypto.randomUUID (página servida por http en la red local) también se puede agregar", () => {
+    for (const cripto of [{}, undefined]) {
+      vi.stubGlobal("crypto", cripto);
+      try {
+        let c = vacio();
+        for (let i = 0; i < 30; i++) c = agregar(c, refresco, sel(), 1, `nota ${i}`);
+        expect(c.renglones).toHaveLength(30);
+        expect(new Set(c.renglones.map((r) => r.id)).size).toBe(30);
+        expect(cambiarCantidad(c, c.renglones[7]!.id, 4).renglones.map((r) => r.cantidad).filter((n) => n === 4)).toHaveLength(1);
+      } finally {
+        vi.unstubAllGlobals();
+      }
+    }
   });
   it("no cambia el carrito que recibe", () => {
     const c = conHamburguesa();

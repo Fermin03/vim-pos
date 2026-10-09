@@ -12,6 +12,8 @@ import { ipDe } from "./ip";
 export type RespuestaDeTienda = { estado: number; json: unknown };
 
 const NO_DISPONIBLE = { error: "SERVICIO_NO_DISPONIBLE" } as const;
+/** No se supo qué pasó del otro lado: en `pedir`, el pedido PUDO haber entrado. */
+const SIN_RESPUESTA = { ...NO_DISPONIBLE, detalle: "SIN_RESPUESTA" } as const;
 /** Lo que la función contesta a propósito (anexo §1.3). Cualquier otro estado es un fallo nuestro. */
 const ESTADOS_CONOCIDOS = new Set([200, 400, 403, 404, 409, 413, 429, 503]);
 const LIMITE_MS = 10_000;
@@ -19,11 +21,13 @@ const LIMITE_MS = 10_000;
 /**
  * Llama a la función con el secreto y la IP real del cliente. Nunca lanza.
  *  · 200 y los rechazos conocidos (400, 403, 404, 409, 413, 429, 503) salen con su estado y su JSON.
- *  · Cualquier otro estado —un 401 es el secreto mal puesto— sale como 503 y queda en el registro
- *    del servidor SIN el cuerpo (trae datos del cliente y códigos de seguimiento).
+ *  · Cualquier otro estado sale como 503 y queda en el registro del servidor SIN el cuerpo (trae
+ *    datos del cliente y códigos de seguimiento). Un 401 es el secreto mal puesto.
  *  · Sin secreto o sin URL: 503 sin llamar.
- *  · Si la función no contesta (red o 10 s): 503 con `detalle: "SIN_RESPUESTA"`. En `pedir` eso
- *    significa que el pedido PUDO haber entrado: quien llama no debe reintentar solo.
+ *  · 503 con `detalle: "SIN_RESPUESTA"` cuando no se supo qué pasó del otro lado: la función no
+ *    contestó (red o 10 s), contestó un 5xx que no es suyo (500, 502, 504, 546: el worker pudo morir
+ *    a medias) o un cuerpo que no es JSON. En `pedir` eso significa que el pedido PUDO haber
+ *    entrado: quien llama no debe reintentar solo. Un 4xx inesperado no lo lleva: ahí no se creó nada.
  */
 export async function llamarTienda(cuerpo: unknown, ip: string): Promise<RespuestaDeTienda> {
   const secreto = (process.env.VIM_TIENDA_SECRET ?? "").trim();
@@ -43,17 +47,17 @@ export async function llamarTienda(cuerpo: unknown, ip: string): Promise<Respues
     });
   } catch (e) {
     console.error(`[tienda] la función no contestó: ${e instanceof Error ? e.name : "error"}`);
-    return { estado: 503, json: { ...NO_DISPONIBLE, detalle: "SIN_RESPUESTA" } };
+    return { estado: 503, json: SIN_RESPUESTA };
   }
   if (!ESTADOS_CONOCIDOS.has(r.status)) {
     console.error(`[tienda] la función respondió ${r.status}${r.status === 401 ? " (revisa VIM_TIENDA_SECRET)" : ""}`);
-    return { estado: 503, json: NO_DISPONIBLE };
+    return { estado: 503, json: r.status >= 500 ? SIN_RESPUESTA : NO_DISPONIBLE };
   }
   try {
     return { estado: r.status, json: await r.json() };
   } catch {
     console.error(`[tienda] la función respondió ${r.status} sin JSON`);
-    return { estado: 503, json: NO_DISPONIBLE };
+    return { estado: 503, json: SIN_RESPUESTA };
   }
 }
 

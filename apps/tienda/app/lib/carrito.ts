@@ -162,6 +162,14 @@ export function contarPiezas(carrito: Carrito): number {
 }
 
 // ── Operaciones ──────────────────────────────────────────────────────────────────────────────────
+let consecutivo = 0;
+/**
+ * El id local de un renglón (solo para React y para cambiar o quitar). `crypto.randomUUID` no existe
+ * fuera de HTTPS o localhost —probando desde el teléfono contra http://192.168.x.x—, y sin respaldo
+ * «Agregar» reventaría ahí. No es un secreto: basta con que no se repita en el carrito.
+ */
+const idDeRenglon = (): string =>
+  (crypto as Partial<Crypto> | undefined)?.randomUUID?.() ?? `r-${Date.now().toString(36)}-${(consecutivo++).toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
 const acotar = (n: number, max: number): number => Math.min(max, Math.max(1, Math.trunc(n) || 1));
 const firmaMods = (m: ModificadorElegido[]): string => m.map((x) => `${x.opcionId}×${x.cantidad}`).sort().join(",");
 /** Dos renglones con la misma firma son el mismo pedido y se suman. El orden de elección no cuenta. */
@@ -179,7 +187,7 @@ export function agregar(carrito: Carrito, producto: Producto, s: Seleccion, cant
   const conNombre = (grupos: Grupo[], m: ModificadorElegido[]): ModificadorGuardado[] => m.map((e) =>
     ({ opcionId: e.opcionId, nombre: grupos.flatMap((g) => g.opciones).find((o) => o.id === e.opcionId)!.nombre, cantidad: e.cantidad }));
   const nuevo: RenglonCarrito = {
-    id: crypto.randomUUID(), productoId: producto.id, nombre: producto.nombre, cantidad: acotar(cantidad, TOPES.porRenglon),
+    id: idDeRenglon(), productoId: producto.id, nombre: producto.nombre, cantidad: acotar(cantidad, TOPES.porRenglon),
     nota: Array.from(nota.trim()).slice(0, TOPES.nota).join("").trim(),
     modificadores: conNombre(producto.grupos, s.modificadores),
     componentes: s.componentes.map((c) => {

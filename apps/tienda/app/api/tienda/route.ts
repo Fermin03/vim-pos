@@ -35,6 +35,28 @@ function item(x: unknown): unknown {
   return i;
 }
 
+/**
+ * El cuerpo como texto, o null si pesa más de 32 KB. Nunca se lee de más: si `Content-Length` ya lo
+ * dice, ni se empieza; y como puede faltar (envío por trozos) o mentir, se lee por fragmentos y se
+ * corta en el primero que pasa del tope. Sin esto, `req.text()` cargaría en memoria lo que mandaran.
+ */
+async function leerCuerpoAcotado(req: Request): Promise<string | null> {
+  if (Number(req.headers.get("content-length") ?? 0) > MAX_CUERPO) return null;
+  if (!req.body) return "";
+  const lector = req.body.getReader(), texto = new TextDecoder();
+  let crudo = "", bytes = 0;
+  for (;;) {
+    const { done, value } = await lector.read();
+    if (done) return crudo + texto.decode();
+    bytes += value.byteLength;
+    if (bytes > MAX_CUERPO) {
+      await lector.cancel().catch(() => {});
+      return null;
+    }
+    crudo += texto.decode(value, { stream: true });   // `stream`: un carácter puede venir partido entre dos trozos
+  }
+}
+
 const DE_CARRITO = ["accion", "negocio", "sucursal_id", "modo", "zona_id", "items"] as const;
 const DE_PEDIDO = [...DE_CARRITO, "cliente", "direccion", "pago", "paga_con", "nota", "captcha", "total_esperado"] as const;
 
@@ -49,9 +71,8 @@ export async function POST(req: Request): Promise<Response> {
     if (host !== propio) return rechazo("ORIGEN_NO_PERMITIDO", 403);
   }
 
-  if (Number(req.headers.get("content-length") ?? 0) > MAX_CUERPO) return rechazo("CUERPO_DEMASIADO_GRANDE", 413);
-  const crudo = await req.text();
-  if (new TextEncoder().encode(crudo).length > MAX_CUERPO) return rechazo("CUERPO_DEMASIADO_GRANDE", 413);
+  const crudo = await leerCuerpoAcotado(req);
+  if (crudo === null) return rechazo("CUERPO_DEMASIADO_GRANDE", 413);
 
   let cuerpo: unknown;
   try { cuerpo = JSON.parse(crudo); } catch { return rechazo("CUERPO_INVALIDO"); }
