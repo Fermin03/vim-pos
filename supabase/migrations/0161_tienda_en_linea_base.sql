@@ -81,9 +81,17 @@ REVOKE ALL ON FUNCTION delivery_anonimizar_pedidos_viejos(integer) FROM PUBLIC, 
 GRANT EXECUTE ON FUNCTION delivery_anonimizar_pedidos_viejos(integer) TO service_role;
 
 -- ── §2 El bucle de renglones, compartido ─────────────────────────────────────
--- Extraído SIN CAMBIOS de crear_ticket_desde_app (0112): la tienda manda los renglones con la
--- misma forma (producto_id, cantidad, precio_unitario_mxn, nota, modificadores) y necesita
--- exactamente las mismas reglas de combos. Dos copias de este bucle se desincronizarían.
+-- Extraído de crear_ticket_desde_app (0112): la tienda manda los renglones con la misma forma
+-- (producto_id, cantidad, precio_unitario_mxn, nota, modificadores) y necesita exactamente las
+-- mismas reglas de combos. Dos copias de este bucle se desincronizarían.
+--
+-- UN añadido respecto a 0112, al principio del cuerpo del bucle: la guarda de negocio
+-- (PRODUCTO_DE_OTRO_NEGOCIO / OPCION_DE_OTRO_NEGOCIO). Los ids de un pedido de la tienda nacen en
+-- un carrito anónimo y esta función es definer, así que la RLS en la que confiaba
+-- agregar_item_a_ticket no aplica. El resto del bucle es el de 0112 sin tocar.
+--
+-- Interna: solo la llaman las dos funciones definer de abajo. Ningún rol de la API la ejecuta,
+-- tampoco service_role (en la nube, los privilegios por omisión del proyecto se lo darían).
 CREATE OR REPLACE FUNCTION _delivery_items_a_ticket(p_ticket_id uuid, p_items jsonb, p_generico_id uuid)
 RETURNS boolean
 LANGUAGE plpgsql
@@ -103,8 +111,37 @@ DECLARE
   v_componentes jsonb;
   v_extras      numeric(12,2);
   v_comp        jsonb;
+  v_tenant      uuid;
 BEGIN
+  SELECT tenant_id INTO v_tenant FROM tickets WHERE id = p_ticket_id;
+
   FOR v_item IN SELECT * FROM jsonb_array_elements(p_items) LOOP
+    -- Guarda de negocio (0161): ningún id del renglón puede ser de otro negocio. Los de un pedido de
+    -- la tienda nacen en un carrito anónimo, y agregar_item_a_ticket (0152) busca producto y opción
+    -- solo por id: confía en una RLS que aquí, llamada desde una función definer, no aplica.
+    IF EXISTS (SELECT 1 FROM productos p
+                WHERE p.id = COALESCE(NULLIF(v_item->>'producto_id', '')::uuid, p_generico_id)
+                  AND p.tenant_id IS DISTINCT FROM v_tenant) THEN
+      RAISE EXCEPTION 'PRODUCTO_DE_OTRO_NEGOCIO: %', COALESCE(NULLIF(v_item->>'producto_id', ''), p_generico_id::text);
+    END IF;
+    -- Las opciones, en los dos niveles: las de un producto normal y las de segundo nivel de un combo.
+    -- Una elección de slot trae en opcion_modificador_id un PRODUCTO: no está en opciones_modificador,
+    -- así que aquí no cuenta, y su negocio lo valida agregar_combo_a_ticket (0111).
+    IF EXISTS (
+      SELECT 1
+        FROM jsonb_array_elements(COALESCE(v_item->'modificadores', '[]'::jsonb)) m
+       CROSS JOIN LATERAL (
+              SELECT m->>'opcion_modificador_id' AS opcion_id
+              UNION ALL
+              SELECT s->>'opcion_modificador_id'
+                FROM jsonb_array_elements(CASE WHEN jsonb_typeof(m->'modificadores') = 'array'
+                                               THEN m->'modificadores' ELSE '[]'::jsonb END) s) x
+        JOIN opciones_modificador o ON o.id = NULLIF(x.opcion_id, '')::uuid
+       WHERE o.tenant_id IS DISTINCT FROM v_tenant
+    ) THEN
+      RAISE EXCEPTION 'OPCION_DE_OTRO_NEGOCIO: el renglón % trae una opción de modificador de otro negocio', v_item->>'producto_id';
+    END IF;
+
     v_producto_id := NULLIF(v_item->>'producto_id', '')::uuid;
     IF v_producto_id IS NULL THEN
       IF p_generico_id IS NULL THEN
@@ -265,8 +302,7 @@ BEGIN
   RETURN v_hay_alergia;
 END;
 $$;
-REVOKE ALL ON FUNCTION _delivery_items_a_ticket(uuid, jsonb, uuid) FROM PUBLIC, anon, authenticated;
-GRANT EXECUTE ON FUNCTION _delivery_items_a_ticket(uuid, jsonb, uuid) TO service_role;
+REVOKE ALL ON FUNCTION _delivery_items_a_ticket(uuid, jsonb, uuid) FROM PUBLIC, anon, authenticated, service_role;
 
 -- crear_ticket_desde_app: cuerpo de 0112_combos_uber.sql. Dos cambios: el bucle de renglones vive
 -- ahora en _delivery_items_a_ticket, y se niega a procesar un pedido que no sea de una app.
@@ -386,9 +422,15 @@ BEGIN
     RAISE EXCEPTION 'PEDIDO_NO_ACEPTABLE: estado %', v_pedido.estado;
   END IF;
 
+  -- La fila del pedido no es de fiar: nada la obliga a que su sucursal sea de su negocio, y esta
+  -- función es definer. Sin esto, el ticket se abriría en el turno de otro negocio.
+  IF NOT EXISTS (SELECT 1 FROM sucursales s WHERE s.id = v_pedido.sucursal_id AND s.tenant_id = v_pedido.tenant_id) THEN
+    RAISE EXCEPTION 'SUCURSAL_DE_OTRO_NEGOCIO: sucursal %', v_pedido.sucursal_id;
+  END IF;
+
   SELECT t.id, t.caja_id, t.usuario_apertura_id INTO v_turno
   FROM turnos t
-  WHERE t.sucursal_id = v_pedido.sucursal_id AND t.estado = 'ABIERTO'
+  WHERE t.sucursal_id = v_pedido.sucursal_id AND t.tenant_id = v_pedido.tenant_id AND t.estado = 'ABIERTO'
   ORDER BY t.fecha_apertura DESC LIMIT 1;
   IF NOT FOUND THEN RAISE EXCEPTION 'SIN_TURNO_ABIERTO: sucursal %', v_pedido.sucursal_id; END IF;
 
@@ -422,11 +464,23 @@ BEGIN
   PERFORM _delivery_items_a_ticket(v_ticket_id, v_pedido.items, NULL);
 
   IF v_pedido.app = 'DELIVERY_PROPIO' THEN
-    -- La dirección del pedido se guarda en el cliente; si ya tenía esa misma, se reutiliza.
+    -- A domicilio hace falta a dónde y por cuál zona: se dice claro en vez de reventar más abajo
+    -- con un NOT NULL de direcciones_cliente. Una dirección NULL cae aquí también (NULL->>k es NULL).
+    IF v_pedido.zona_envio_id IS NULL OR EXISTS (
+         SELECT 1 FROM unnest(ARRAY['calle', 'numero_exterior', 'colonia', 'codigo_postal', 'ciudad', 'estado']) k
+          WHERE NULLIF(btrim(v_pedido.direccion->>k), '') IS NULL) THEN
+      RAISE EXCEPTION 'DIRECCION_INVALIDA: pedido % a domicilio sin zona de envío o con la dirección incompleta', p_pedido_id;
+    END IF;
+
+    -- La dirección del pedido se guarda en el cliente; si ya tenía esa misma, se reutiliza. «La
+    -- misma» incluye interior y colonia: «Av. X 100 int 7» no es «Av. X 100 int 3», y reutilizarla
+    -- mandaría el pedido al departamento equivocado.
     SELECT d.id INTO v_dir_id FROM direcciones_cliente d
-     WHERE d.cliente_id = v_cliente_id AND d.activa
+     WHERE d.cliente_id = v_cliente_id AND d.activa AND d.deleted_at IS NULL
        AND lower(btrim(d.calle)) = lower(btrim(v_pedido.direccion->>'calle'))
        AND lower(btrim(d.numero_exterior)) = lower(btrim(v_pedido.direccion->>'numero_exterior'))
+       AND lower(btrim(COALESCE(d.numero_interior, ''))) = lower(btrim(COALESCE(v_pedido.direccion->>'numero_interior', '')))
+       AND lower(btrim(d.colonia)) = lower(btrim(v_pedido.direccion->>'colonia'))
        AND d.codigo_postal = v_pedido.direccion->>'codigo_postal'
      ORDER BY d.created_at LIMIT 1;
     IF v_dir_id IS NULL THEN
@@ -443,10 +497,20 @@ BEGIN
     UPDATE tickets SET direccion_entrega_id = v_dir_id WHERE id = v_ticket_id;
 
     -- fijar_envio_ticket valida que la zona sea de la sucursal y crea el renglón al precio de HOY.
-    -- Lo cotizado manda: si hay renglón, se pisa con el envío del pedido, como los precios de arriba.
+    -- Lo cotizado manda, como en los precios de arriba, y sin casos a medias:
     PERFORM fijar_envio_ticket(v_ticket_id, v_pedido.zona_envio_id);
-    UPDATE ticket_items SET precio_unitario_snapshot = v_pedido.envio_mxn
-     WHERE ticket_id = v_ticket_id AND cargo_tipo = 'ENVIO' AND cancelado = false;
+    IF COALESCE(v_pedido.envio_mxn, 0) = 0 THEN
+      -- Se cotizó gratis: fuera el renglón si la zona hoy cobra. Se BORRA, como hace
+      -- fijar_envio_ticket con una zona de $0: un concepto de $0 no timbra (0116).
+      DELETE FROM ticket_items WHERE ticket_id = v_ticket_id AND cargo_tipo = 'ENVIO' AND cancelado = false;
+    ELSE
+      UPDATE ticket_items SET precio_unitario_snapshot = v_pedido.envio_mxn
+       WHERE ticket_id = v_ticket_id AND cargo_tipo = 'ENVIO' AND cancelado = false;
+      -- Sin renglón que repreciar, la zona hoy es gratis: lo que se le cotizó ya no existe.
+      IF NOT FOUND THEN
+        RAISE EXCEPTION 'ENVIO_NO_COINCIDE: se cotizó un envío de % y la zona % hoy no cobra', v_pedido.envio_mxn, v_pedido.zona_envio_id;
+      END IF;
+    END IF;
   END IF;
 
   PERFORM recalcular_totales_ticket(v_ticket_id);
