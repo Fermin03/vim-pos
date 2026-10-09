@@ -106,6 +106,50 @@ Las que conviene tener presentes, dichas sin adornos:
   `email_verificado_at` ya existe y se sella al usar un enlace de recuperación.
 - **Ligar la cuenta a la lealtad.** La cuenta guarda el teléfono en 10 dígitos, la misma forma por
   la que lealtad reconoce a un cliente (ADR 0030); falta conectarlas.
-- **Idempotencia de `pedir`.** Un pedido reenviado tras una respuesta perdida puede crear dos. Hoy
-  la pantalla lo evita no reintentando sola y mandando a llamar al restaurante.
-- **Antirobot o tope global en `entrar`**, si la carga de bcrypt lo pide.
+- ~~**Idempotencia de `pedir`.**~~ Cerrado en la entrega 7; ver abajo.
+- **Antirobot en `entrar`**, si la carga de bcrypt lo pide. El tope por negocio ya existe (abajo).
+
+## Qué cambió con la salida (entrega 7, migración 0167 · 9 de octubre de 2026)
+
+Nada de lo de arriba se revierte. Esto es lo que se añadió o se cerró:
+
+- **`pedir` ya no duplica.** El navegador genera una clave por intento de compra y la manda con el
+  pedido; la conserva mientras reintente ese mismo pedido y la cambia si el carrito o los datos
+  cambian. La función deriva de ella el código de seguimiento (HMAC con el secreto de la tienda
+  sobre negocio y clave), así que el mismo intento da siempre la misma huella, y
+  `tienda_crear_pedido` devuelve el pedido que ya existe con esa huella en lugar de crear otro
+  (también si dos envíos llegan a la vez: el índice único que ya tenía `seguimiento_hash` hace de
+  candado). La clave no se guarda en ningún lado. Por eso «No pudimos confirmar tu pedido» ahora
+  ofrece **Reintentar** en vez de mandar a llamar. Sin clave, todo funciona como antes.
+  **El pendiente de idempotencia queda cerrado.**
+- **La caja avisa «ya lo tengo».** `tienda_reportar_estado` acepta `EN_PREPARACION` (solo desde
+  `ACEPTADO`) y el agente de la caja lo reporta al crear la cuenta local del pedido. Un pedido de
+  gestión `ESCRITORIO` que sigue en `ACEPTADO` a los 15 minutos es uno que ninguna caja tomó, y
+  `delivery_marcar_expirados` lo cancela (motivo `OTRO`, por el restaurante). Antes se quedaba «en
+  preparación» para siempre. Consecuencia que hay que respetar al desplegar: la 0167 y la función
+  `delivery-accion` nueva van juntas y antes del instalador 0.8.0; con la migración sola, una caja
+  no podría avisar y sus pedidos se cancelarían.
+- **La retención cumple lo que el aviso promete.** A los 30 días se borran también la nota del
+  pedido y la de cada producto de los pedidos de la tienda, y se alcanzan los que se quedaron en
+  `ACEPTADO` o `EN_PREPARACION`. `tienda_cuenta_id` se conserva: es lo que alimenta «Mis pedidos» y
+  se anula al eliminar la cuenta. La misma pasada diaria barre sesiones y enlaces de recuperación
+  vencidos. Lo que **no** cambia: el ticket del restaurante conserva el nombre y la nota (es su
+  registro de venta), y el cliente y su dirección siguen en la lista de clientes del negocio.
+- **`entrar` tiene tope por negocio** (300 cada 10 minutos, además de los 10 por IP): un ataque de
+  contraseñas repartido entre muchas redes ya no puede cargar sin límite la base de las cajas. La
+  tercera consecuencia de arriba queda acotada, no eliminada: sigue sin antirobot.
+- **El tope de pedidos por red es por restaurante** (8 por hora por red y negocio; antes 5 por hora
+  compartidos entre todos). Las redes de celular comparten dirección, y lo que alguien hizo en un
+  restaurante dejaba sin pedir al cliente de otro.
+- **El complemento se enciende con una función, no con la migración.** `tienda_encender_complemento()`
+  activa `TIENDA` en el catálogo y lo concede a quien su plan lo incluye; nadie la llama al aplicar
+  la 0167. La sincronización de planes conoce la pareja de la tienda pero la ignora mientras el
+  complemento esté inactivo. Es distinto de como salió lealtad (0159 activó y concedió al
+  aplicarse) y es a propósito: mezclar y encender son dos decisiones. La lista para encender está
+  en [`../operacion/tienda-encendido.md`](../operacion/tienda-encendido.md).
+
+Sigue pendiente, sin cambios: verificar el correo (la primera consecuencia sigue en pie), ligar la
+cuenta a la lealtad y el antirobot en `entrar`. Y dos cosas que salieron al escribir los textos
+legales ([`../legal/LEEME.md`](../legal/LEEME.md)): no se guarda la fecha en que el comensal aceptó
+el aviso de privacidad (`acepto_privacidad_at` existe y nadie la escribe), y «eliminar» un cliente
+en el admin del restaurante es una baja lógica, no un borrado.
