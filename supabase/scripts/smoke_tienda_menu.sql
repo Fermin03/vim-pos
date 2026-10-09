@@ -18,6 +18,8 @@ DECLARE
   v_ref uuid; v_agua uuid; v_jugo uuid; v_te uuid; v_combo_beb uuid;      -- la categoría del slot
   v_g1 uuid; v_g2 uuid; v_g_inactivo uuid; v_o15 uuid; v_oneg uuid; v_o_inactiva uuid;
   v_s_beb uuid; v_s_aco uuid; v_s_inactivo uuid;
+  -- Aislamiento por tablas de liga (F5): filas de OTRO negocio colgadas de algo nuestro.
+  v_x_beb uuid; v_liga uuid; v_x_co uuid; v_x_g uuid; v_x_og uuid; v_x_o uuid; v_x_s uuid; v_x_cat_p uuid;
   v_j jsonb; v_c jsonb; v_p jsonb; v_g jsonb; v_s jsonb; v_o jsonb;
   v_ids text[]; v_pos_menu int; v_pos_beb int; v_n int;
   -- Detectores del caso 12: un número en una clave que no es minimo/maximo, y un importe que no es texto.
@@ -108,8 +110,60 @@ BEGIN
   INSERT INTO combo_opciones (tenant_id, grupo_id, producto_id, precio_delta_mxn, orden_visualizacion) VALUES (v_t, v_s_aco, v_ps, 0, 1);
   INSERT INTO combo_opciones (tenant_id, grupo_id, producto_id, precio_delta_mxn, orden_visualizacion, activa) VALUES (v_t, v_s_aco, v_b, 0, 3, false);
 
+  -- ── Aislamiento por tablas de liga ────────────────────────────────────────
+  -- Todo esto es de OTRO negocio y cuelga de algo nuestro. A cada fila la deja fuera una
+  -- comprobación de tenant distinta de §2: si se quita, su id o su nombre aparece en el JSON.
+  -- a) Un producto ajeno en la categoría del slot por categoría (p.tenant_id, en `vendibles`).
+  INSERT INTO productos (tenant_id, categoria_id, nombre, precio_base_mxn, orden_visualizacion)
+  VALUES (v_otro, v_cat_beb, 'AJENO-BEBIDA-DEL-SLOT', 1, 0) RETURNING id INTO v_x_beb;
+  -- b) Una fila combo_opciones ajena en un slot nuestro (co.tenant_id, en `slots`). Apunta a un
+  --    producto nuestro que el menú no enseña por su cuenta (su categoría está inactiva): solo esa
+  --    fila podría sacarlo.
+  INSERT INTO productos (tenant_id, categoria_id, nombre, precio_base_mxn)
+  VALUES (v_t, v_cat_in, 'SOLO-POR-LIGA-AJENA', 10) RETURNING id INTO v_liga;
+  INSERT INTO combo_opciones (tenant_id, grupo_id, producto_id, precio_delta_mxn, orden_visualizacion)
+  VALUES (v_otro, v_s_aco, v_liga, 7, 9) RETURNING id INTO v_x_co;
+  -- c) Un grupo de modificadores ajeno (con su opción) ligado a un producto nuestro (g.tenant_id).
+  INSERT INTO grupos_modificadores (tenant_id, nombre, tipo_seleccion) VALUES (v_otro, 'AJENO-GRUPO', 'MULTIPLE_OPCIONAL') RETURNING id INTO v_x_g;
+  INSERT INTO opciones_modificador (tenant_id, grupo_id, nombre, precio_extra_mxn) VALUES (v_otro, v_x_g, 'AJENA-OPCION-DE-GRUPO-AJENO', 1) RETURNING id INTO v_x_og;
+  INSERT INTO productos_grupos_modificadores (tenant_id, producto_id, grupo_id, orden_visualizacion) VALUES (v_t, v_a, v_x_g, 4);
+  -- d) Una opción ajena dentro de un grupo nuestro (o.tenant_id).
+  INSERT INTO opciones_modificador (tenant_id, grupo_id, nombre, precio_extra_mxn, orden_visualizacion) VALUES (v_otro, v_g2, 'AJENA-OPCION-EN-GRUPO-NUESTRO', 1, 9) RETURNING id INTO v_x_o;
+  -- De más (misma familia): e) una liga ajena que le cuelga un grupo nuestro a B, que no tiene
+  -- ninguno (pg.tenant_id); f) un slot ajeno en nuestro combo (cg.tenant_id); g) un producto
+  -- nuestro en una categoría ajena (cat.tenant_id).
+  INSERT INTO productos_grupos_modificadores (tenant_id, producto_id, grupo_id, orden_visualizacion) VALUES (v_otro, v_b, v_g2, 1);
+  INSERT INTO combo_grupos (tenant_id, combo_producto_id, nombre, orden_visualizacion, modo_precio, minimo_selecciones)
+  VALUES (v_otro, v_combo, 'AJENO-SLOT', 0, 'DELTA', 0) RETURNING id INTO v_x_s;
+  INSERT INTO productos (tenant_id, categoria_id, nombre, precio_base_mxn)
+  VALUES (v_t, v_cat_o, 'NUESTRO-EN-CATEGORIA-AJENA', 10) RETURNING id INTO v_x_cat_p;
+
   -- ── El menú ───────────────────────────────────────────────────────────────
   v_j := tienda_menu(v_t, v_suc);
+
+  -- 0) Nada de lo ajeno aparece en ningún lugar del JSON: ni su id ni su nombre. Va antes que todo
+  -- lo demás para que, si una comprobación de tenant se pierde, el rojo diga cuál. «IS NOT FALSE»:
+  -- un id en NULL (un RETURNING que no devolvió) no puede dar el caso por bueno.
+  FOR r IN SELECT * FROM (VALUES
+    ('a: producto ajeno en la categoría del slot',  v_x_beb::text),   ('a: su nombre', 'AJENO-BEBIDA-DEL-SLOT'),
+    ('b: producto que solo liga una opción de slot ajena', v_liga::text), ('b: su nombre', 'SOLO-POR-LIGA-AJENA'),
+    ('b: la fila combo_opciones ajena', v_x_co::text),
+    ('c: grupo de modificadores ajeno', v_x_g::text),                  ('c: su nombre', 'AJENO-GRUPO'),
+    ('c: la opción del grupo ajeno', v_x_og::text),                    ('c: su nombre', 'AJENA-OPCION-DE-GRUPO-AJENO'),
+    ('d: opción ajena en un grupo nuestro', v_x_o::text),              ('d: su nombre', 'AJENA-OPCION-EN-GRUPO-NUESTRO'),
+    ('f: slot ajeno en nuestro combo', v_x_s::text),                   ('f: su nombre', 'AJENO-SLOT'),
+    ('g: categoría ajena', v_cat_o::text),                             ('g: su nombre', 'Del otro'),
+    ('g: producto nuestro en una categoría ajena', v_x_cat_p::text),   ('g: su nombre', 'NUESTRO-EN-CATEGORIA-AJENA')
+  ) AS x(que, texto) LOOP
+    IF (v_j::text LIKE '%' || r.texto || '%') IS NOT FALSE THEN
+      RAISE EXCEPTION '0 aislamiento (%): «%» aparece en el menú (o es NULL)', r.que, COALESCE(r.texto, 'NULL');
+    END IF;
+  END LOOP;
+  -- e) B sigue sin grupos: la liga ajena no le cuelga el grupo de extras.
+  IF jsonb_path_query_first(v_j, '$.categorias[*].productos[*] ? (@.id == $id)', jsonb_build_object('id', v_b)) -> 'grupos'
+     IS DISTINCT FROM '[]'::jsonb THEN
+    RAISE EXCEPTION '0 aislamiento (e: liga ajena): B no tiene grupos propios y salió con alguno';
+  END IF;
 
   -- 1) La categoría activa con sus productos visibles, en orden; la inactiva no sale.
   v_c := jsonb_path_query_first(v_j, '$.categorias[*] ? (@.id == $id)', jsonb_build_object('id', v_cat));
