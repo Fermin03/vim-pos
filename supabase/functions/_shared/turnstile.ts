@@ -15,7 +15,7 @@
 export const TURNSTILE_VERIFICAR = "https://challenges.cloudflare.com/turnstile/v0/siteverify";
 export const HOSTNAMES_POR_DEFECTO = ["admin.vimpos.com.mx"];
 
-export type AccionCaptcha = "registro" | "reenvio";
+export type AccionCaptcha = "registro" | "reenvio" | "tienda_pedido";
 
 export type ResultadoCaptcha =
   | { ok: true; omitido: boolean }
