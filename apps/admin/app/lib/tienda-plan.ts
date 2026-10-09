@@ -12,6 +12,15 @@ export function estadoTienda(m: ModulosLeidos | "error" | null): EstadoTienda {
   return m.permitidos.tienda === true ? "permitida" : "sin_contratar";
 }
 
+/**
+ * La foto del producto solo le sirve a quien tiene la tienda: sin el complemento concedido, la ficha
+ * de producto queda como siempre. Mientras los módulos cargan o si no se pudieron leer, tampoco se
+ * ofrece (al revés que `estadoTienda`: aquí lo prudente es no enseñar nada de más).
+ */
+export function ofreceFotoDeProducto(m: ModulosLeidos | "error" | null): boolean {
+  return m !== null && m !== "error" && m.permitidos.tienda === true;
+}
+
 /** Lo que la tienda hace, para la tarjeta de quien todavía no la tiene. */
 export const TIENDA_INCLUYE: { titulo: string; detalle: string }[] = [
   { titulo: "Tu menú, siempre al día", detalle: "El mismo que vendes en caja, con sus precios y lo agotado." },
@@ -20,7 +29,20 @@ export const TIENDA_INCLUYE: { titulo: string; detalle: string }[] = [
   { titulo: "Sin comisión", detalle: "Una cuota fija, no un porcentaje de cada venta." },
 ];
 
+/**
+ * El cierre y el botón de la invitación. Hoy el complemento todavía no se puede conceder y la tienda
+ * pública no existe, así que la invitación no promete activarla: pide que le avisen.
+ *
+ * ENTREGA 7 (salida a clientes): vuelven los textos de contratación —
+ *   cierre «Escríbenos y la activamos.» · botón «Quiero mi tienda en línea» ·
+ *   mensaje de WhatsApp «Quiero activar la tienda en línea.»
+ */
+export const TIENDA_INVITACION = {
+  cierre: "Estamos por lanzarla. Escríbenos y te avisamos en cuanto esté lista.",
+  boton: "Avísenme cuando esté lista",
+} as const;
+
 /** El mensaje de WhatsApp ya escrito: quién es, de qué negocio y qué quiere. */
 export function mensajeQuieroTienda(d: { usuario?: string | null; negocio?: string | null; codigo?: string | null }): string {
-  return mensajeAyudaAdmin(d).replace(/Necesito ayuda con VIM POS\.$/, "Quiero activar la tienda en línea.");
+  return mensajeAyudaAdmin(d).replace(/Necesito ayuda con VIM POS\.$/, "Quiero la tienda en línea. Avísenme cuando esté lista.");
 }
