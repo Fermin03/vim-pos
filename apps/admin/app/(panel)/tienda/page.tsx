@@ -25,14 +25,14 @@ export default function TiendaPage() {
 
   return (
     <>
-      <PageHeader titulo="Tienda en línea" subtitulo="Vende desde el teléfono de tus clientes." />
+      <PageHeader titulo="Tienda en línea" subtitulo="Recibe los pedidos de tus clientes en tu caja." />
       <PageBody>
         {t.falloLectura ? (
           <div className="max-w-[720px] rounded-lg border border-line bg-surface p-5" role="alert">
             <p className="text-sm font-medium text-danger">{t.falloLectura}</p>
             <p className="mt-1 text-13 text-ink-2">Tu tienda sigue como estaba. Revisa tu conexión y vuelve a intentar.</p>
             <button type="button" onClick={t.reintentar}
-              className="mt-4 h-11 rounded border border-line-strong px-3 text-13 font-semibold text-ink-2 transition-colors hover:border-ink hover:text-ink active:scale-[.97]">
+              className="mt-4 h-11 rounded border border-line-strong px-3 text-13 font-semibold text-ink-2 transition-colors hover:border-ink hover:text-ink active:scale-[.97] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink">
               Reintentar
             </button>
           </div>

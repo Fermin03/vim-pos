@@ -49,6 +49,9 @@ export function TiendaPedidos({
   // No se pueden desmarcar las dos: la única marcada queda fija.
   const soloEfectivo = valores.pagoEfectivo && !valores.pagoTarjeta;
   const soloTarjeta = valores.pagoTarjeta && !valores.pagoEfectivo;
+  // Sin dirección guardada no hay fila: lo que se eligiera aquí no se guardaría con «Tu tienda»
+  // (la fila nace con lo guardado) y la pantalla enseñaría algo que la base no tiene.
+  const quieto = soloLectura || !hayDireccion;
 
   return (
     <Tarjeta titulo="Pedidos">
@@ -60,7 +63,7 @@ export function TiendaPedidos({
             opciones={ACEPTACION}
             valor={valores.aceptacion}
             onCambiar={(v) => onCambio({ aceptacion: v })}
-            deshabilitado={soloLectura}
+            deshabilitado={quieto}
           />
           <p className={ayuda} aria-live="polite">
             {valores.aceptacion === "MANUAL"
@@ -79,7 +82,7 @@ export function TiendaPedidos({
               autoComplete="off"
               maxLength={2}
               value={valores.minutos}
-              disabled={soloLectura}
+              disabled={quieto}
               aria-invalid={minutosMal ? true : undefined}
               aria-describedby={minutosMal ? "tie-minutos-error tie-minutos-ayuda" : "tie-minutos-ayuda"}
               onBlur={() => setMinutosVisto(true)}
@@ -99,7 +102,7 @@ export function TiendaPedidos({
               type="checkbox"
               className="h-5 w-5 flex-shrink-0 accent-ink"
               checked={valores.pagoEfectivo}
-              disabled={soloLectura || soloEfectivo}
+              disabled={quieto || soloEfectivo}
               onChange={(e) => onCambio({ pagoEfectivo: e.target.checked })}
             />
             Efectivo
@@ -109,7 +112,7 @@ export function TiendaPedidos({
               type="checkbox"
               className="h-5 w-5 flex-shrink-0 accent-ink"
               checked={valores.pagoTarjeta}
-              disabled={soloLectura || soloTarjeta}
+              disabled={quieto || soloTarjeta}
               onChange={(e) => onCambio({ pagoTarjeta: e.target.checked })}
             />
             Tarjeta (con terminal al entregar)

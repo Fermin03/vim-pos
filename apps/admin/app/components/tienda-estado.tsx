@@ -39,7 +39,8 @@ export function TiendaEstado({
       <Interruptor
         etiqueta="Tienda en línea"
         encendido={encendida}
-        deshabilitado={ocupado || soloLectura || !enPlan || faltaAlgo}
+        ocupado={ocupado}
+        deshabilitado={soloLectura || !enPlan || faltaAlgo}
         onCambiar={onCambiar}
         descripcion={
           <>
@@ -54,8 +55,9 @@ export function TiendaEstado({
         <p className="mt-4 text-13 font-medium text-success">Todo listo para recibir pedidos.</p>
       ) : (
         <ul aria-label="Pendientes de tu tienda" className="mt-4 flex flex-col gap-2">
-          {revision.map((r) => (
-            <li key={r.texto}>
+          {/* Por índice: dos sucursales con el mismo nombre dan el mismo texto. La lista se recalcula entera. */}
+          {revision.map((r, i) => (
+            <li key={i}>
               <Aviso tono={r.nivel === "bloquea" ? "warning" : "info"}>
                 {r.texto}
                 {r.enlace && (

@@ -8,6 +8,11 @@ import { cn } from "@vim/ui/styles";
  * Sale del que Lealtad dibuja a mano. La etiqueta es un <label> de verdad —tocarla también cambia el
  * interruptor— y la descripción se le anuncia al lector de pantalla junto con el estado.
  * La pista mide 24 px; el `before` estira la zona de toque a 44 sin agrandar el dibujo.
+ *
+ * `deshabilitado` = no se puede cambiar (falta algo, solo lectura): `disabled` de verdad.
+ * `ocupado` = se está guardando: se ve igual de atenuado y no responde, pero SIN `disabled`, porque
+ * un botón deshabilitado suelta el foco del teclado y lo manda al inicio de la página (igual que
+ * en campo-imagen.tsx). Se anuncia con `aria-disabled`.
  */
 export function Interruptor({
   encendido,
@@ -15,6 +20,7 @@ export function Interruptor({
   etiqueta,
   descripcion,
   deshabilitado = false,
+  ocupado = false,
   nombreAccesible,
 }: {
   encendido: boolean;
@@ -23,6 +29,8 @@ export function Interruptor({
   /** El estado en palabras, debajo de la etiqueta. */
   descripcion?: ReactNode;
   deshabilitado?: boolean;
+  /** Algo se está guardando: no responde, pero conserva el foco. */
+  ocupado?: boolean;
   /** Cuando hay varios con la misma etiqueta: el nombre que oye el lector de pantalla. */
   nombreAccesible?: string;
 }) {
@@ -37,11 +45,13 @@ export function Interruptor({
         aria-label={nombreAccesible}
         aria-describedby={descripcion ? `${id}-d` : undefined}
         disabled={deshabilitado}
-        onClick={() => onCambiar(!encendido)}
+        aria-disabled={ocupado || undefined}
+        onClick={() => { if (!ocupado) onCambiar(!encendido); }}
         className={cn(
           "relative mt-0.5 h-6 w-11 flex-shrink-0 rounded-full transition-colors duration-150 disabled:opacity-50",
           "before:absolute before:-inset-2.5 before:content-['']",
           "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink",
+          ocupado && "opacity-50",
           encendido ? "bg-accent" : "bg-line-strong",
         )}
       >
