@@ -274,7 +274,7 @@ describe("ponerFotoProducto", () => {
 
   it("si la fila no entra, se borra la recién subida y la anterior sigue en su lugar", async () => {
     doble.escrituraError = { message: "Tu rol no puede modificar el catálogo (productos).", code: "42501" };
-    await expect(ponerFotoProducto("p1", jpg(), BASE + VIEJA)).rejects.toThrow("Tu rol no puede modificar el catálogo");
+    await expect(ponerFotoProducto("p1", jpg(), BASE + VIEJA)).rejects.toThrow(SOLO_ADMIN);
     expect(doble.quitadas).toEqual([doble.subidas[0]!.ruta]);
     expect(doble.quitadas).not.toContain(VIEJA);
   });
@@ -323,7 +323,7 @@ describe("quitarFotoProducto", () => {
     await expect(quitarFotoProducto("p1", BASE + VIEJA)).rejects.toThrow(SOLO_ADMIN);
     doble.sinFilas = false;
     doble.escrituraError = { message: "permission denied for table productos" };
-    await expect(quitarFotoProducto("p1", BASE + VIEJA)).rejects.toThrow("permission denied for table productos");
+    await expect(quitarFotoProducto("p1", BASE + VIEJA)).rejects.toThrow(SOLO_ADMIN);
     expect(doble.quitadas).toEqual([]);
   });
   it("una foto externa se quita del producto sin pedirle nada al almacén", async () => {
@@ -354,7 +354,7 @@ describe("ponerLogoTienda", () => {
     doble.sinFilas = false;
     doble.quitadas = [];
     doble.escrituraError = { message: 'new row for relation "tienda_config" violates check constraint "tienda_config_logo_ruta_check"' };
-    await expect(ponerLogoTienda(jpg(), VIEJA)).rejects.toThrow("No se pudo guardar el logo");
+    await expect(ponerLogoTienda(jpg(), VIEJA)).rejects.toThrow(/^No se pudo guardar el logo\.$/);
     expect(doble.quitadas).toEqual([doble.subidas[1]!.ruta]);
   });
   it("sin internet al escribir la fila, el dueño ve el mismo aviso de conexión que con la foto", async () => {
@@ -384,6 +384,69 @@ describe("ponerLogoTienda", () => {
     doble.removeLanza = true;
     await expect(ponerLogoTienda(jpg(), VIEJA)).resolves.toMatch(RUTA_NUEVA);
     expect(aviso).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("lo que no se reconoce nunca llega crudo al dueño", () => {
+  const SUBIR = "No se pudo subir la imagen. Inténtalo de nuevo.";
+  const QUITAR = "No se pudo quitar la imagen. Inténtalo de nuevo.";
+  /** Lo que acaba pintando la pantalla: el error pasado por `mensajeError`, como hacen la página y la ficha. */
+  const enPantalla = async (p: Promise<unknown>): Promise<string> =>
+    mensajeError(await p.then(() => new Error("no falló"), (e: unknown) => e), "texto de quien llama");
+  const enConsola = () => aviso.mock.calls.flat().map(String).join(" ");
+
+  it.each(["database error, code: 42P10", "Bucket not found"])("una subida que falla con «%s»: frase genérica, y el crudo a la consola", async (crudo) => {
+    doble.subidaError = { message: crudo };
+    expect(await enPantalla(subirImagen(jpg()))).toBe(SUBIR);
+    expect(await enPantalla(ponerFotoProducto("p1", jpg(), BASE + VIEJA))).toBe(SUBIR);
+    expect(await enPantalla(ponerLogoTienda(jpg(), VIEJA))).toBe(SUBIR);
+    expect(enConsola()).toContain(crudo);
+    expect(doble.escrituras).toEqual([]);
+    expect(doble.quitadas).toEqual([]);
+  });
+
+  it("si la reducción falla por algo que no se conoce, tampoco sale crudo", async () => {
+    doble.reescalar = async () => { throw new Error("SecurityError: The canvas has been tainted"); };
+    expect(await enPantalla(subirImagen(jpg()))).toBe(SUBIR);
+    expect(enConsola()).toContain("tainted");
+    expect(doble.pasos).toEqual([]);
+  });
+
+  it("la escritura de la fila con un mensaje desconocido: «No se pudo guardar…», nunca el texto de la base", async () => {
+    const crudo = 'record "new" has no field "imagen_url"';
+    doble.escrituraError = { message: crudo, code: "42703" };
+    expect(await enPantalla(ponerFotoProducto("p1", jpg(), BASE + VIEJA))).toBe("No se pudo guardar la foto.");
+    expect(await enPantalla(ponerLogoTienda(jpg(), VIEJA))).toBe("No se pudo guardar el logo.");
+    expect(enConsola()).toContain(crudo);
+    // La recién subida se limpia en los dos casos; la anterior sigue.
+    expect(doble.quitadas).toEqual(doble.subidas.map((s) => s.ruta));
+  });
+
+  it("al quitar, un error desconocido de la fila dice que no se pudo quitar y no toca el archivo", async () => {
+    const crudo = "database error, code: 42P10";
+    doble.escrituraError = { message: crudo };
+    expect(await enPantalla(quitarFotoProducto("p1", BASE + VIEJA))).toBe(QUITAR);
+    expect(await enPantalla(quitarLogoTienda(VIEJA))).toBe(QUITAR);
+    expect(enConsola()).toContain(crudo);
+    expect(doble.quitadas).toEqual([]);
+  });
+
+  it("sin internet o con la sesión vencida, en la subida y en la fila, sale la frase de siempre", async () => {
+    const CONEXION = "No hay conexión con el servidor. Revisa tu internet e inténtalo de nuevo.";
+    const VENCIDA = "Tu sesión expiró. Vuelve a iniciar sesión.";
+    doble.subidaError = { message: "TypeError: Failed to fetch" };
+    expect(await enPantalla(ponerFotoProducto("p1", jpg(), null))).toBe(CONEXION);
+    doble.subidaError = { message: "jwt expired" };
+    expect(await enPantalla(ponerLogoTienda(jpg(), null))).toBe(VENCIDA);
+    doble.subidaError = null;
+    doble.escrituraError = { message: "JWT expired", code: "PGRST301" };
+    expect(await enPantalla(ponerFotoProducto("p1", jpg(), null))).toBe(VENCIDA);
+    expect(await enPantalla(quitarLogoTienda(VIEJA))).toBe(VENCIDA);
+  });
+
+  it("la guarda del catálogo (42501) se dice como en el resto de la tienda", async () => {
+    doble.escrituraError = { message: "cualquier cosa", code: "42501" };
+    expect(await enPantalla(ponerFotoProducto("p1", jpg(), null))).toBe(SOLO_ADMIN);
   });
 });
 
