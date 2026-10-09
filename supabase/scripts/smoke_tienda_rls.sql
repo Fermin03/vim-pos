@@ -25,7 +25,7 @@ BEGIN
 
   -- 1) El mismo correo existe en dos negocios; repetido en el mismo, no.
   BEGIN
-    INSERT INTO tienda_cuentas (tenant_id, email, password_hash, nombre, telefono) VALUES (v_t, 'ANA@example.com', 'x', 'Ana', '1');
+    INSERT INTO tienda_cuentas (tenant_id, email, password_hash, nombre, telefono) VALUES (v_t, 'ANA@example.com', 'x', 'Ana', '4771112233');
     RAISE EXCEPTION '1: se repitió un correo dentro del mismo negocio';
   EXCEPTION WHEN unique_violation THEN NULL;
   END;

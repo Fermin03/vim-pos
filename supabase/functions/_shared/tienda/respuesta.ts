@@ -49,19 +49,42 @@ export function claveDeIp(ip: string): string {
  * minutos por pestaña) y, compartiendo la de leer, dos pedidos vivos desde la misma red dejaban sin
  * menú ni cotización a los demás de esa red. 90 = una pestaña holgada; con dos, la segunda va lenta.
  */
-export function cuposDe(accion: Peticion["accion"], ip: string, negocio: string): { antes: Cupo[]; despuesDelCaptcha: Cupo[]; alFallar: "abrir" | "cerrar" } {
+export type Cupos = { antes: Cupo[]; despuesDelCaptcha: Cupo[]; alFallar: "abrir" | "cerrar" };
+
+/**
+ * Cuentas (entrega 6): cada acción con su rama, y un `switch` sin `default` para que una acción
+ * nueva no compile hasta que alguien decida su cupo (antes caía sola en la bolsa de lecturas, que
+ * abre si el control falla).
+ *   · `entrar`, `registrar`, `recuperar_*` escriben (sesiones, cuentas, enlaces, correos): cierran.
+ *   · En `registrar` y `recuperar_pedir` hay además un cupo por DESTINATARIO (3 por hora): las dos
+ *     mandan un correo a una dirección que nadie ha verificado, y sin él cada intento repetido es
+ *     otro correo nuestro en el buzón de un tercero. Va DESPUÉS del antirobot, como el del negocio en
+ *     `pedir`: gastado al entrar, tres peticiones sin token dejarían a cualquiera sin poder
+ *     registrarse o recuperar su cuenta durante una hora. `huellaCorreo` es la huella de
+ *     negocio+correo (64 hex), nunca el correo: la clave se guarda en la tabla de cupos. Cada acción
+ *     tiene su bolsa: agotar una no cierra la otra.
+ *   · «Mi cuenta» tiene su bolsa. Leer y salir dejan pasar si el control falla (si la base no
+ *     responde, la RPC tampoco); lo que cambia algo, cierra.
+ */
+export function cuposDe(accion: Peticion["accion"], ip: string, negocio: string, huellaCorreo?: string): Cupos {
   const quien = claveDeIp(ip);
-  if (accion === "seguimiento") {
-    return { antes: [{ clave: `tienda:sigue:ip:${quien}`, ventanaSeg: 600, max: 90 }], despuesDelCaptcha: [], alFallar: "abrir" };
+  const porIp = (bolsa: string, ventanaSeg: number, max: number, alFallar: Cupos["alFallar"], despuesDelCaptcha: Cupo[] = []): Cupos =>
+    ({ antes: [{ clave: `tienda:${bolsa}:ip:${quien}`, ventanaSeg, max }], despuesDelCaptcha, alFallar });
+  switch (accion) {
+    case "seguimiento": return porIp("sigue", 600, 90, "abrir");
+    case "negocio": case "menu": case "cotizar": return porIp("lee", 600, 120, "abrir");
+    case "pedir": return porIp("pide", 3600, 5, "cerrar", [{ clave: `tienda:pide:negocio:${negocio}`, ventanaSeg: 3600, max: 60 }]);
+    case "entrar": return porIp("entra", 600, 10, "cerrar");
+    case "registrar": case "recuperar_pedir": {
+      if (!/^[0-9a-f]{64}$/.test(huellaCorreo ?? "")) throw new Error(`cuposDe: ${accion} necesita la huella del correo`);
+      const bolsa = accion === "registrar" ? "registra" : "recupera";
+      return porIp(bolsa, 3600, accion === "registrar" ? 5 : 3, "cerrar", [{ clave: `tienda:${bolsa}:correo:${huellaCorreo}`, ventanaSeg: 3600, max: 3 }]);
+    }
+    case "recuperar_aplicar": return porIp("aplica", 3600, 10, "cerrar");
+    case "cuenta": case "mis_pedidos": case "salir": return porIp("cuenta", 600, 60, "abrir");
+    case "cuenta_guardar": case "cuenta_password": case "direccion_guardar": case "direccion_borrar": case "eliminar_cuenta":
+      return porIp("cuenta", 600, 60, "cerrar");
   }
-  if (accion !== "pedir") {
-    return { antes: [{ clave: `tienda:lee:ip:${quien}`, ventanaSeg: 600, max: 120 }], despuesDelCaptcha: [], alFallar: "abrir" };
-  }
-  return {
-    antes: [{ clave: `tienda:pide:ip:${quien}`, ventanaSeg: 3600, max: 5 }],
-    despuesDelCaptcha: [{ clave: `tienda:pide:negocio:${negocio}`, ventanaSeg: 3600, max: 60 }],
-    alFallar: "cerrar",
-  };
 }
 
 /**
@@ -92,6 +115,7 @@ const CON_DETALLE = new Map<string, RegExp>([
 ]);
 
 export type RespuestaRpc =
+  | { status: 400; body: { error: "CUENTA_INVALIDA_DATOS" } }
   | { status: 409; body: { error: string; detalle?: string } }
   | { status: 503; body: { error: "SERVICIO_NO_DISPONIBLE" } };
 
@@ -100,6 +124,9 @@ export function respuestaDeRpc(mensaje: unknown): RespuestaRpc {
   const m = typeof mensaje === "string" ? CODIGO.exec(mensaje) : null;
   if (!m) return { status: 503, body: { error: "SERVICIO_NO_DISPONIBLE" } };
   const codigo = m[1]!, detalle = m[2] ?? "";
+  // Datos de una cuenta que la base no acepta: es la misma respuesta que da la forma (400), no un
+  // rechazo de negocio. Los demás códigos se quedan en 409, como siempre.
+  if (codigo === "CUENTA_INVALIDA_DATOS") return { status: 400, body: { error: codigo } };
   return CON_DETALLE.get(codigo)?.test(detalle)
     ? { status: 409, body: { error: codigo, detalle } }
     : { status: 409, body: { error: codigo } };

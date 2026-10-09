@@ -9937,6 +9937,7 @@ export type Database = {
           created_at: string
           deleted_at: string | null
           email: string
+          email_verificado_at: string | null
           fecha_nacimiento: string | null
           id: string
           intentos_fallidos: number
@@ -9953,6 +9954,7 @@ export type Database = {
           created_at?: string
           deleted_at?: string | null
           email: string
+          email_verificado_at?: string | null
           fecha_nacimiento?: string | null
           id?: string
           intentos_fallidos?: number
@@ -9969,6 +9971,7 @@ export type Database = {
           created_at?: string
           deleted_at?: string | null
           email?: string
+          email_verificado_at?: string | null
           fecha_nacimiento?: string | null
           id?: string
           intentos_fallidos?: number
@@ -10039,11 +10042,11 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "tienda_direcciones_cuenta_id_fkey"
-            columns: ["cuenta_id"]
+            foreignKeyName: "tienda_direcciones_cuenta_del_negocio"
+            columns: ["cuenta_id", "tenant_id"]
             isOneToOne: false
             referencedRelation: "tienda_cuentas"
-            referencedColumns: ["id"]
+            referencedColumns: ["id", "tenant_id"]
           },
           {
             foreignKeyName: "tienda_direcciones_tenant_id_fkey"
@@ -10088,11 +10091,11 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "tienda_recuperaciones_cuenta_id_fkey"
-            columns: ["cuenta_id"]
+            foreignKeyName: "tienda_recuperaciones_cuenta_del_negocio"
+            columns: ["cuenta_id", "tenant_id"]
             isOneToOne: false
             referencedRelation: "tienda_cuentas"
-            referencedColumns: ["id"]
+            referencedColumns: ["id", "tenant_id"]
           },
           {
             foreignKeyName: "tienda_recuperaciones_tenant_id_fkey"
@@ -10110,6 +10113,7 @@ export type Database = {
           expira_at: string
           tenant_id: string
           token_hash: string
+          ultimo_uso_at: string
         }
         Insert: {
           created_at?: string
@@ -10117,6 +10121,7 @@ export type Database = {
           expira_at: string
           tenant_id: string
           token_hash: string
+          ultimo_uso_at?: string
         }
         Update: {
           created_at?: string
@@ -10124,14 +10129,15 @@ export type Database = {
           expira_at?: string
           tenant_id?: string
           token_hash?: string
+          ultimo_uso_at?: string
         }
         Relationships: [
           {
-            foreignKeyName: "tienda_sesiones_cuenta_id_fkey"
-            columns: ["cuenta_id"]
+            foreignKeyName: "tienda_sesiones_cuenta_del_negocio"
+            columns: ["cuenta_id", "tenant_id"]
             isOneToOne: false
             referencedRelation: "tienda_cuentas"
-            referencedColumns: ["id"]
+            referencedColumns: ["id", "tenant_id"]
           },
           {
             foreignKeyName: "tienda_sesiones_tenant_id_fkey"
@@ -11918,13 +11924,42 @@ export type Database = {
         }
         Returns: Json
       }
+      _tienda_abrir_sesion: {
+        Args: {
+          p_ahora: string
+          p_cuenta: string
+          p_sesion_hash: string
+          p_tenant: string
+        }
+        Returns: undefined
+      }
       _tienda_con_iva: {
         Args: { p_neto: number; p_producto: string; p_tenant: string }
         Returns: number
       }
+      _tienda_cuenta_publica: {
+        Args: {
+          p_cuenta: Database["public"]["Tables"]["tienda_cuentas"]["Row"]
+        }
+        Returns: Json
+      }
+      _tienda_direcciones: {
+        Args: { p_cuenta: string; p_tenant: string }
+        Returns: Json
+      }
       _tienda_entero: {
         Args: { p_max: number; p_min: number; p_valor: Json }
         Returns: number
+      }
+      _tienda_estado_publico: {
+        Args: { p_app: string; p_estado: string }
+        Returns: string
+      }
+      _tienda_estado_real: {
+        Args: {
+          p_pedido: Database["public"]["Tables"]["delivery_pedidos"]["Row"]
+        }
+        Returns: string
       }
       _tienda_grupos_de: {
         Args: { p_producto: string; p_tenant: string }
@@ -11934,6 +11969,17 @@ export type Database = {
         Args: { p_cantidad: number; p_grupos: Json; p_mods: Json }
         Returns: Json
       }
+      _tienda_password_ok: {
+        Args: {
+          p_ahora: string
+          p_cuenta: string
+          p_password: string
+          p_tenant: string
+        }
+        Returns: boolean
+      }
+      _tienda_renglones: { Args: { p_items: Json }; Returns: Json }
+      _tienda_telefono: { Args: { p_telefono: string }; Returns: string }
       _venta_con_descuento_pendiente: {
         Args: { p_ticket_id: string }
         Returns: boolean
@@ -13134,6 +13180,75 @@ export type Database = {
         }
         Returns: Json
       }
+      tienda_cuenta_eliminar: {
+        Args: { p_cuenta: string; p_password: string; p_tenant: string }
+        Returns: boolean
+      }
+      tienda_cuenta_entrar: {
+        Args: {
+          p_ahora?: string
+          p_email: string
+          p_password: string
+          p_sesion_hash: string
+          p_tenant: string
+        }
+        Returns: Json
+      }
+      tienda_cuenta_guardar: {
+        Args: {
+          p_apellido: string
+          p_cuenta: string
+          p_fecha_nacimiento: string
+          p_nombre: string
+          p_telefono: string
+          p_tenant: string
+        }
+        Returns: Json
+      }
+      tienda_cuenta_leer: {
+        Args: { p_cuenta: string; p_tenant: string }
+        Returns: Json
+      }
+      tienda_cuenta_password: {
+        Args: {
+          p_actual: string
+          p_cuenta: string
+          p_nueva: string
+          p_sesion_hash: string
+          p_tenant: string
+        }
+        Returns: boolean
+      }
+      tienda_cuenta_registrar: {
+        Args: {
+          p_apellido: string
+          p_email: string
+          p_nombre: string
+          p_password: string
+          p_sesion_hash: string
+          p_telefono: string
+          p_tenant: string
+        }
+        Returns: Json
+      }
+      tienda_cuenta_salir: {
+        Args: { p_sesion_hash: string; p_tenant: string }
+        Returns: undefined
+      }
+      tienda_direccion_borrar: {
+        Args: { p_cuenta: string; p_id: string; p_tenant: string }
+        Returns: Json
+      }
+      tienda_direccion_guardar: {
+        Args: {
+          p_cuenta: string
+          p_direccion: Json
+          p_etiqueta: string
+          p_id: string
+          p_tenant: string
+        }
+        Returns: Json
+      }
       tienda_estado_sucursal: {
         Args: { p_ahora?: string; p_modo: string; p_sucursal: string }
         Returns: string
@@ -13146,8 +13261,31 @@ export type Database = {
         Args: { p_sucursal: string; p_tenant: string }
         Returns: Json
       }
+      tienda_mis_pedidos: {
+        Args: { p_cuenta: string; p_tenant: string }
+        Returns: Json
+      }
       tienda_negocio: {
         Args: { p_ahora?: string; p_slug: string }
+        Returns: Json
+      }
+      tienda_recuperar_aplicar: {
+        Args: {
+          p_ahora?: string
+          p_password: string
+          p_sesion_hash: string
+          p_tenant: string
+          p_token_hash: string
+        }
+        Returns: Json
+      }
+      tienda_recuperar_pedir: {
+        Args: {
+          p_ahora?: string
+          p_email: string
+          p_tenant: string
+          p_token_hash: string
+        }
         Returns: Json
       }
       tienda_reportar_estado: {
@@ -13162,6 +13300,10 @@ export type Database = {
       tienda_seguimiento: {
         Args: { p_seguimiento_hash: string; p_tenant: string }
         Returns: Json
+      }
+      tienda_sesion_cuenta: {
+        Args: { p_ahora?: string; p_sesion_hash: string; p_tenant: string }
+        Returns: string
       }
       tienda_sincronizar_estados_nube: { Args: never; Returns: number }
       top_meseros: {

@@ -22,6 +22,20 @@ export const PARTE = "[overflow-wrap:anywhere]";
 /** El foco por teclado de todo lo demás que se toca. */
 export const FOCO = "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink";
 
+/** Una página que no se pudo pintar: qué pasó, qué hacer y, si sirve, volver a pedirla. */
+export function Fallo({ titulo, hacer, reintentar }: { titulo: string; hacer: string; reintentar?: string }) {
+  return (
+    <main className="px-6 py-16 text-center">
+      <h1 className="font-display text-20 font-semibold">{titulo}</h1>
+      <p className="mt-2 text-16 text-ink-2">{hacer}</p>
+      {reintentar && (
+        // Un enlace normal, no <Link>: tiene que volver a pedir la página entera al servidor.
+        <a href={reintentar} className="mt-6 inline-flex h-12 items-center rounded border border-line-strong px-5 font-display text-15 font-semibold text-ink hover:bg-hover">Volver a intentar</a>
+      )}
+    </main>
+  );
+}
+
 const trazo = { fill: "none", stroke: "currentColor", strokeWidth: 2, strokeLinecap: "round", strokeLinejoin: "round" } as const;
 export const IconoCerrar = () => <svg viewBox="0 0 24 24" className="h-5 w-5" aria-hidden="true" {...trazo}><path d="M6 6l12 12M18 6L6 18" /></svg>;
 const IconoMenos = () => <svg viewBox="0 0 24 24" className="h-5 w-5" aria-hidden="true" {...trazo}><path d="M5 12h14" /></svg>;

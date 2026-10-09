@@ -63,7 +63,10 @@ Pensada para 360–430 px; en escritorio es la misma columna, centrada (`max-w-2
 | Carrito | `components/carrito.tsx` | Renglones, nota para el restaurante y la cuenta |
 | Tus datos | `components/datos.tsx` | Quién recibe, a dónde, cómo paga y «Enviar pedido». Va dentro de la hoja del carrito |
 | Seguimiento | `components/seguimiento.tsx` | El estado en grande, el recorrido, el restaurante, el resumen y «Copiar enlace» |
-| Privacidad | `[negocio]/privacidad/page.tsx` | El aviso (provisional, marcado como tal). Se enlaza desde «Tus datos» y desde el pie |
+| Privacidad | `[negocio]/privacidad/page.tsx` | El aviso (provisional, marcado como tal). Se enlaza desde «Tus datos», desde «Crear cuenta» y desde el pie |
+| Campos | `components/campo.tsx` | El campo de texto y el de contraseña de TODOS los formularios, y cómo se comportan (`useCampos`, `useAccion`) |
+| Acceso | `components/acceso.tsx` | Entrar, crear cuenta y recuperar la contraseña. Una página cada una (`[negocio]/entrar`, `registro`, `recuperar`) |
+| Mi cuenta | `components/cuenta.tsx` | Pedidos, datos, direcciones, contraseña y sesión, y eliminar la cuenta (`[negocio]/cuenta`) |
 
 **El menú es una carta, no una rejilla de tarjetas.** Renglones separados por una línea: nombre,
 descripción en dos líneas como máximo y precio a la izquierda; la foto (96 px) a la derecha, si hay.
@@ -117,8 +120,79 @@ el pulgar, y cada caso deja a la vista solo lo que sí sirve:
 | El total cambió | Aviso (`warning`) con el total nuevo, «Confirmar y enviar» con ese total y «Volver a tu pedido» |
 | No se supo si el pedido entró | Aviso (`danger`), **«Llamar al …» como acción principal** y, en secundario, «Ya llamé y no les llegó: enviar otra vez». Nunca se reintenta solo |
 | Por aquí no se va a poder | Aviso, «Llamar al …» y «Volver a tu pedido» |
+| La sesión de su cuenta terminó | Aviso (`warning`) «Tu sesión terminó. Entra otra vez o envía tu pedido como invitado.», **«Enviar como invitado»** con el total y, en secundario, «Entrar otra vez». Nunca se manda solo como invitado |
 | Se arregla en el carrito (la zona, un producto) | Aviso y «Volver a tu pedido»; si es un producto, regresa solo y lo marca |
 | Es de un campo o del pago | El texto junto al campo, con el foco ahí |
+
+## Cuentas
+
+La cuenta es opcional y nunca estorba: se puede pedir sin ella de principio a fin. Es de la tienda
+de **ese** restaurante (entrar en una no abre sesión en otra).
+
+**Dónde aparece.** En el marco, arriba a la derecha, un enlace de texto en `ink`: «Entrar» o
+«Mi cuenta» (44 px de alto, nunca del color del negocio: no compite con la acción principal). Y en
+«Tus datos», solo para quien no tiene sesión, una franja tenue (`bg-hover`) antes del primer campo:
+«¿Ya tienes cuenta? **Entrar** **Crear cuenta**». Quien sale a entrar vuelve al menú de su sucursal
+y su pedido lo espera (vive en el teléfono).
+
+**Entrar, crear cuenta y recuperar** son páginas, no hojas: se llega a ellas por un enlace (también
+el del correo) y se vuelve a donde se iba (`?volver=`, que solo admite rutas de ese negocio).
+
+- Título (`text-24`), una línea que dice para qué sirve, el formulario y **un** botón principal de
+  ancho completo justo debajo del último campo (con el teclado abierto es lo que queda a la vista).
+  Debajo, los enlaces a las otras dos pantallas y «Seguir sin cuenta», en texto.
+- Al llegar, el foco va al título: el teclado no se abre solo y un lector de pantalla oye dónde está.
+- **Contraseña:** el campo trae «Mostrar» / «Ocultar» escrito (no un ojo), dentro del campo y de
+  44 px. Al elegir una nueva, la ayuda dice la única regla («Mínimo 8 caracteres.») y cambia a
+  «Bien: tiene 8 caracteres o más.» al cumplirla. No hay medidor de fuerza.
+- **Entrar** tiene un solo error para todo, encima del botón: no dice si falló el correo o la
+  contraseña.
+- **La pantalla nunca dice con palabras si un correo ya tiene cuenta.** Crear una con un correo ya
+  usado termina en «Revisa tu correo para continuar»; recuperar siempre termina en «Si hay una
+  cuenta con ese correo, te mandamos un enlace.». Entrar y recuperar no dejan averiguarlo; crear
+  cuenta sí (un alta nueva entra de una vez, una repetida no): está aceptado y explicado en el
+  ADR 0032.
+- El enlace de recuperación trae su llave tras `#`, que no viaja al servidor: la pantalla la lee al
+  cargar y la saca de la barra. Hasta saber si hay enlace no pinta ni «pedir enlace» ni «contraseña
+  nueva» (un instante en blanco, sin salto de una a otra). Un enlace vencido o ya usado no es un
+  error en rojo: es una pantalla que lo explica y ofrece «Pedir otro enlace».
+- Entrar y salir recargan la página completa: así el marco cambia «Entrar» por «Mi cuenta».
+
+**Mi cuenta** es una página para leer; **cada cambio se hace en una hoja**, con su botón principal
+en el pie. Así la página no tiene acción principal propia y ningún formulario abre el teclado sin
+que se pida. De arriba abajo, por lo que más se usa:
+
+1. **Mis pedidos** — por pedido: el estado (en negritas; «Cancelado» en `danger`) y el total a la
+   derecha, una línea con folio, fecha y modo, lo que se pidió y «Pedir de nuevo» (secundario). El
+   estado es el del momento de abrir la página: no se actualiza solo ni enlaza al seguimiento (ese
+   enlace solo lo tiene quien hizo el pedido). Un pedido de hace más de 30 días ya no trae con qué
+   repetirlo: no lleva botón.
+2. **Tus datos** — nombre, teléfono y cumpleaños si lo dio; «Editar» a la derecha del título. El
+   correo se ve pero no se cambia.
+3. **Direcciones** — nombre de la dirección en negritas y la dirección en una línea; «Editar» y
+   «Borrar» (en `danger`) como enlaces de texto. Con 5, «Agregar dirección» se cambia por el texto
+   del tope.
+4. **Contraseña y sesión** — «Cambiar contraseña» y «Cerrar sesión», secundarios.
+5. **Eliminar cuenta** — al final y separada: dice qué se borra y qué conserva el restaurante. Su
+   hoja pide la contraseña y una casilla «Entiendo que esto no se puede deshacer».
+
+Lo que no tiene vuelta (borrar una dirección, eliminar la cuenta) sigue al núcleo: **«Volver»
+primero y el verbo en rojo** (`danger`), con la consecuencia escrita arriba.
+
+Lo que se hizo («Guardamos tus datos.») se dice en un aviso `success` arriba de la página, que se
+cierra con su ×. Si la sesión terminó, no hay aviso: se va a «Entrar» y de ahí se vuelve.
+
+**«Pedir de nuevo»** lleva al menú de la sucursal del pedido con el carrito ya armado y abierto. Lo
+que ya no está en el menú no entra, y se dice arriba del carrito en un aviso `warning` que se cierra
+(«Ya no se puede pedir: Papas.»). Reemplaza al pedido que hubiera a medias; si nada del pedido
+anterior se puede pedir, no se toca.
+
+**«Tus datos» con sesión.** Nombre, teléfono y correo llegan llenos desde la cuenta (se pueden
+cambiar para ese pedido; la cuenta no cambia). A domicilio, las direcciones guardadas son radios
+(nombre en negritas, dirección debajo) y la última opción es «Otra dirección», que es la única que
+abre los campos. Bajo ellos, la casilla «Guardar esta dirección en mi cuenta» y, al marcarla, con
+qué nombre. No aparece «Olvidar mis datos»: con sesión el teléfono no guarda nada; en su lugar dice
+«Este pedido queda en tu cuenta».
 
 ## Seguimiento
 
@@ -166,6 +240,15 @@ De comensal, sin palabras de la caja ni códigos. Todos salen de `app/lib/textos
 | Estados del pedido | «En proceso», «En preparación», «En camino», «Listo para recoger», «Entregado», «Cancelado» (con su línea de apoyo; `textoDeEstado`) |
 | Enlace que no lleva a un pedido | «No encontramos este pedido.» · «El enlace puede estar vencido o mal copiado…» |
 | Bajo el seguimiento | «Guarda este enlace para volver a ver tu pedido.» · «Copiar enlace» → «Enlace copiado.» |
+| Entrar con datos que no son | «El correo o la contraseña no coinciden. Revisa que estén bien escritos y vuelve a intentar.» |
+| Cuenta creada con un correo ya usado | «Revisa tu correo para continuar» (sin decir por qué) |
+| Se pidió recuperar | «Si hay una cuenta con ese correo, te mandamos un enlace. Revisa también tu correo no deseado.» |
+| Enlace de recuperación vencido o usado | «Este enlace ya no sirve» · «Pedir otro enlace» |
+| Demasiados intentos en una pantalla de cuenta | «Demasiados intentos. Espera unos minutos y vuelve a intentar.» (sin «llama al restaurante», que es del pedido) |
+| La contraseña actual no es (cambiarla, eliminar la cuenta) | «La contraseña actual no coincide.», junto al campo |
+| Tope de direcciones | «Ya tienes 5 direcciones guardadas. Borra una para guardar otra.» |
+| Eliminar la cuenta | «Se borra tu cuenta, tus direcciones guardadas y el acceso a tu historial. {Restaurante} conserva en su sistema los pedidos que ya le hiciste.» |
+| Sin pedidos en la cuenta | «Todavía no tienes pedidos con esta cuenta. Aquí aparecen los que hagas con tu sesión abierta.» · «Ver el menú» |
 
 Un botón dice lo que hace y lleva su importe a la derecha: «Agregar   $139.20», «Continuar   $278.40».
 
@@ -190,6 +273,11 @@ Un botón dice lo que hace y lleva su importe a la derecha: «Agregar   $139.20�
 | **Tienda abierta / cerrada** | Se vuelve a preguntar sola cada minuto con la pestaña a la vista y al volver a ella (no mientras se llena «Tus datos» ni con un producto abierto) |
 | **Pedido no encontrado** | Título, qué pudo pasar y «Ver el menú» |
 | **Página que no existe** | «No encontramos esta página» y qué hacer, sin la marca de ningún negocio |
+| **Mi cuenta cargando** | «Mi cuenta» y «Cargando tu cuenta…». Si no carga, el aviso (`danger`) y «Volver a intentar»; si solo fallan los pedidos, la cuenta se ve y esa sección ofrece reintentar |
+| **«Mi cuenta» sin sesión** | No se pinta: lleva a «Entrar» y, al entrar, de vuelta |
+| **«Entrar» o «Crear cuenta» con sesión** | No se pintan: llevan a donde se iba |
+| **Enviando un formulario de cuenta** | El botón se apaga y dice qué hace («Entrando…», «Guardando…»); un segundo toque no hace nada |
+| **«Tus datos» con la cuenta aún sin llegar** | El formulario de siempre, vacío; al llegar la cuenta se llena solo lo que siga vacío |
 
 ## Accesibilidad
 
@@ -204,6 +292,11 @@ Un botón dice lo que hace y lleva su importe a la derecha: «Agregar   $139.20�
 - En el seguimiento, el estado y su línea de apoyo viven en una región `aria-live="polite"`: el
   cambio se anuncia sin robar el foco. El paso actual lleva `aria-current="step"`.
 - Fotos con `alt` («Foto de …»), tamaño reservado y carga diferida.
+- En las pantallas de cuenta cada campo dice qué es al navegador (`email`, `current-password`,
+  `new-password`, `given-name`, `family-name`, `tel-national`, `bday`): el gestor de contraseñas
+  ofrece guardar y rellenar. «Mostrar» es un botón con nombre («Mostrar contraseña») y `aria-pressed`.
+- El error de entrar y lo que rechaza el servidor son `role="alert"`; lo que se guardó y lo que pasa
+  mientras se envía se anuncia con `aria-live` sin mover el foco.
 
 ## Lo que NO se hereda
 

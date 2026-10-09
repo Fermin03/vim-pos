@@ -251,7 +251,7 @@ describe("POST /api/tienda", () => {
     expect([...h.keys()].sort()).toEqual(["content-type", "x-tienda-ip", "x-vim-tienda"]);
   });
   it("solo las acciones del navegador", async () => {
-    for (const accion of ["negocio", "menu", "registrar", "", null, 5]) {
+    for (const accion of ["negocio", "menu", "direcciones", "", null, 5]) {
       const r = await pedir({ ...seguimiento, accion });
       expect(r.status, String(accion)).toBe(400);
       expect(await r.json()).toEqual({ error: "ACCION_INVALIDA" });

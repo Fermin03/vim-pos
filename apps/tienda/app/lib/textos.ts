@@ -93,6 +93,12 @@ const ERRORES: Record<string, TextoDeError> = {
   CAPTCHA_INVALIDO: { texto: "No pudimos comprobar que eres una persona.", hacer: "Vuelve a intentar; si sigue pasando, recarga la página." },
   DEMASIADOS_INTENTOS: { texto: "Hiciste demasiados intentos seguidos.", hacer: "Espera unos minutos antes de volver a intentar, o llama al restaurante." },
   NO_SE_PUDO_CREAR: { texto: "No pudimos tomar tu pedido.", hacer: "Llama al restaurante para hacer tu pedido." },
+  // Cuentas (entrega 6). «No coinciden» no dice cuál de los dos falló, ni si el correo tiene cuenta.
+  CREDENCIALES_INVALIDAS: { texto: "El correo o la contraseña no coinciden.", hacer: "Revisa que estén bien escritos y vuelve a intentar." },
+  SESION_INVALIDA: { texto: "Tu sesión terminó.", hacer: "Entra otra vez." },
+  ENLACE_INVALIDO: { texto: "Este enlace ya no sirve.", hacer: "Pide uno nuevo." },
+  DIRECCIONES_LLENAS: { texto: "Ya tienes 5 direcciones guardadas.", hacer: "Borra una para guardar otra." },
+  CUENTA_INVALIDA_DATOS: { texto: "Revisa tus datos.", hacer: "Alguno no se pudo leer: corrígelo y vuelve a intentar." },
 };
 
 /** Todos los códigos con texto propio: los de la función (HTTP y SQL) y los de la tienda. */

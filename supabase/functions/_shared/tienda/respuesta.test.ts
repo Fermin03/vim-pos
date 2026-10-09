@@ -192,3 +192,65 @@ test("pedido: NULL o una forma inesperada es null, no una excepción", () => {
     assert.equal(leerPedido(x), null, JSON.stringify(x));
   }
 });
+
+// ════ Entrega 6: cuentas ════════════════════════════════════════════════════════════════════════
+const H = "a".repeat(64);
+test("cupos: entrar es 10 cada 10 min por IP y cierra", () => {
+  assert.deepEqual(cuposDe("entrar", "1.2.3.4", "knockout"), {
+    antes: [{ clave: "tienda:entra:ip:1.2.3.4", ventanaSeg: 600, max: 10 }], despuesDelCaptcha: [], alFallar: "cerrar",
+  });
+});
+test("cupos: registrar es 5 por hora por IP y, pasado el antirobot, 3 por hora por huella de correo+negocio; cierra", () => {
+  assert.deepEqual(cuposDe("registrar", "1.2.3.4", "knockout", H), {
+    antes: [{ clave: "tienda:registra:ip:1.2.3.4", ventanaSeg: 3600, max: 5 }],
+    despuesDelCaptcha: [{ clave: `tienda:registra:correo:${H}`, ventanaSeg: 3600, max: 3 }], alFallar: "cerrar",
+  });
+});
+test("cupos: pedir recuperación es 3 por hora por IP y, pasado el antirobot, 3 por hora por huella de correo+negocio; cierra", () => {
+  assert.deepEqual(cuposDe("recuperar_pedir", "1.2.3.4", "knockout", H), {
+    antes: [{ clave: "tienda:recupera:ip:1.2.3.4", ventanaSeg: 3600, max: 3 }],
+    despuesDelCaptcha: [{ clave: `tienda:recupera:correo:${H}`, ventanaSeg: 3600, max: 3 }],
+    alFallar: "cerrar",
+  });
+});
+test("cupos: registrar o pedir recuperación sin la huella del correo es un error de quien llama, no un cupo de menos", () => {
+  for (const accion of ["recuperar_pedir", "registrar"] as const) {
+    assert.throws(() => cuposDe(accion, "1.2.3.4", "knockout"), accion);
+    assert.throws(() => cuposDe(accion, "1.2.3.4", "knockout", "ana@example.com"), "un correo en claro no es una huella");
+  }
+});
+test("cupos: el tope por correo de registrar y el de recuperar son bolsas distintas", () => {
+  assert.notEqual(cuposDe("registrar", "1.2.3.4", "knockout", H).despuesDelCaptcha[0]!.clave, cuposDe("recuperar_pedir", "1.2.3.4", "knockout", H).despuesDelCaptcha[0]!.clave);
+});
+test("cupos: aplicar la recuperación es 10 por hora por IP y cierra", () => {
+  assert.deepEqual(cuposDe("recuperar_aplicar", "1.2.3.4", "knockout"), {
+    antes: [{ clave: "tienda:aplica:ip:1.2.3.4", ventanaSeg: 3600, max: 10 }], despuesDelCaptcha: [], alFallar: "cerrar",
+  });
+});
+test("cupos: «Mi cuenta» tiene su bolsa (60 cada 10 min); leer y salir dejan pasar, cambiar cierra", () => {
+  const bolsa = [{ clave: "tienda:cuenta:ip:1.2.3.4", ventanaSeg: 600, max: 60 }];
+  for (const accion of ["cuenta", "mis_pedidos", "salir"] as const) {
+    assert.deepEqual(cuposDe(accion, "1.2.3.4", "knockout"), { antes: bolsa, despuesDelCaptcha: [], alFallar: "abrir" }, accion);
+  }
+  for (const accion of ["cuenta_guardar", "cuenta_password", "direccion_guardar", "direccion_borrar", "eliminar_cuenta"] as const) {
+    assert.deepEqual(cuposDe(accion, "1.2.3.4", "knockout"), { antes: bolsa, despuesDelCaptcha: [], alFallar: "cerrar" }, accion);
+  }
+});
+test("cupos: ninguna acción de cuenta cae en la bolsa de lecturas, y con IPv6 la clave es el /64", () => {
+  for (const accion of ["registrar", "entrar", "salir", "recuperar_pedir", "recuperar_aplicar", "cuenta", "cuenta_guardar",
+                        "cuenta_password", "direccion_guardar", "direccion_borrar", "mis_pedidos", "eliminar_cuenta"] as const) {
+    const { antes } = cuposDe(accion, "2806:2f0:9000:ab:1111:2222:3333:4444", "knockout", H);
+    assert.equal(antes.length, 1, accion);
+    assert.doesNotMatch(antes[0]!.clave, /:lee:|:pide:|:sigue:/, accion);
+    assert.match(antes[0]!.clave, /:ip:2806:2f0:9000:ab::\/64$/, accion);
+  }
+});
+
+test("rpc: datos de cuenta que la base rechaza son 400, sin su detalle; direcciones llenas, 409", () => {
+  assert.deepEqual(respuestaDeRpc("CUENTA_INVALIDA_DATOS: el teléfono no tiene 10 dígitos"), { status: 400, body: { error: "CUENTA_INVALIDA_DATOS" } });
+  assert.deepEqual(respuestaDeRpc("CUENTA_INVALIDA_DATOS"), { status: 400, body: { error: "CUENTA_INVALIDA_DATOS" } });
+  assert.deepEqual(respuestaDeRpc("DIRECCIONES_LLENAS: ya hay 5"), { status: 409, body: { error: "DIRECCIONES_LLENAS" } });
+  // Los que ya existían no cambian de estado: `pedir` los sigue recibiendo como 409.
+  assert.deepEqual(respuestaDeRpc("DIRECCION_INVALIDA: al recoger no hay dirección"), { status: 409, body: { error: "DIRECCION_INVALIDA" } });
+  assert.deepEqual(respuestaDeRpc("CUENTA_INVALIDA: la cuenta no existe en este negocio"), { status: 409, body: { error: "CUENTA_INVALIDA" } });
+});

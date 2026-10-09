@@ -2,21 +2,27 @@
 // «Tus datos»: quién recibe, a dónde, cómo paga, y enviar. Vive dentro de la hoja del carrito.
 // Aquí solo se pinta: las reglas de los campos están en lib/cliente.ts y qué hacer con cada respuesta
 // de la función, en lib/envio.ts.
-import { useEffect, useId, useRef, useState, useSyncExternalStore, type InputHTMLAttributes } from "react";
+//
+// Con una cuenta abierta (entrega 6) los datos salen de ella —nombre, teléfono, correo y sus
+// direcciones guardadas— y NADA se lee ni se escribe en el teléfono (`vim.tienda.cliente`): eso es
+// del invitado. Lo prellenado se puede cambiar para este pedido sin tocar la cuenta.
+import { useEffect, useId, useRef, useState, useSyncExternalStore } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Aviso, Captcha, SITE_KEY_TURNSTILE, botonClases, cn } from "@vim/ui/styles";
-import { cotizar, pedir } from "../lib/api";
+import { cotizar, guardarDireccion, pedir } from "../lib/api";
 import { aCuerpo, type Carrito } from "../lib/carrito";
 import {
-  CAMPOS, FORMULARIO_VACIO, LIMITES, datosDelPedido, erroresDe, formasDePago, guardarCliente, leerCliente, olvidarCliente,
+  CAMPOS, DE_DIRECCION, FORMULARIO_VACIO, LIMITES, datosDelPedido, erroresDe, formasDePago, guardarCliente, leerCliente, olvidarCliente,
   type Campo, type Formulario,
 } from "../lib/cliente";
-import type { Cotizacion, ErrorDeTienda, Negocio, Pago, Sucursal } from "../lib/contrato";
+import type { Cotizacion, DireccionGuardada, ErrorDeTienda, MiCuenta, Negocio, Pago, Sucursal } from "../lib/contrato";
+import { LIMITES_DE_CUENTA, direccionEnUnaLinea, enlaceDeAcceso, formularioDeDireccion, paraTusDatos } from "../lib/cuenta";
 import { aCentavos, formatoMxn } from "../lib/dinero";
 import { enviarPedido, envioDeLaPagina, type Desenlace, type ResultadoDeEnvio } from "../lib/envio";
 import { enlaceTel, formatoTelefono } from "../lib/telefono";
 import { textoDeError } from "../lib/textos";
+import { CampoDeTexto } from "./campo";
 import { CUERPO, PIE } from "./hoja";
 import { FOCO, PARTE, PRINCIPAL } from "./piezas";
 
@@ -34,49 +40,44 @@ export type PropsDelPasoDeDatos = {
   alErrorDeCarrito: (e: ErrorDeTienda) => void;
   /** El pedido entró: vacía el carrito (y lo guarda vacío). Después se navega al seguimiento. */
   alPedidoHecho: () => void;
+  /** Hay una cuenta abierta: el pedido queda ligado a ella y el teléfono no recuerda nada. */
+  conSesion: boolean;
+  /** La cuenta y sus direcciones, cuando ya llegaron (la pide la tienda al cargar). null = sin sesión, o todavía no. */
+  cuenta: MiCuenta | null;
+  /** La función dijo que la sesión ya no vale (el servidor ya borró la cookie): desde ahora es un invitado. */
+  alTerminarLaSesion: () => void;
+  /** A dónde vuelve quien sale a entrar o a crear su cuenta: el menú de esta sucursal. El carrito lo espera en el teléfono. */
+  deVuelta: string;
 };
 
 type AvisoDeEnvio = Extract<Desenlace, { tipo: "aviso" }>;
 /** Si el antirobot no entrega su comprobación en este tiempo, se deja de esperar y se dice. */
 const ESPERA_DEL_ANTIROBOT_MS = 20_000;
 
-const CAJA = "block w-full rounded border bg-surface px-3 text-16 text-ink placeholder:text-ink-3 focus:border-ink focus:outline-none focus:ring-1 focus:ring-ink";
 const TITULO = "font-display text-16 font-semibold";
 const GHOST = cn(botonClases({ variant: "ghost" }), "h-12 w-full");
+const DE_TEXTO = cn("inline-flex min-h-11 items-center font-medium text-ink underline underline-offset-4", FOCO);
 
-/** Un campo: etiqueta visible, ayuda, y el error junto a él (enlazado para quien no ve la pantalla). */
-function CampoDeTexto({ id, etiqueta, opcional, ayuda, error, multilinea, alCambiar, alSalir, className, ...resto }: {
-  id: string; etiqueta: string; opcional?: boolean; ayuda?: string; error?: string; multilinea?: boolean;
-  alCambiar: (v: string) => void; alSalir: () => void;
-} & Omit<InputHTMLAttributes<HTMLInputElement>, "id" | "onChange" | "onBlur">) {
-  const describe = [ayuda && `${id}-ayuda`, error && `${id}-error`].filter(Boolean).join(" ") || undefined;
-  const borde = error ? "border-danger" : "border-line-strong";
-  return (
-    <div className={cn("flex min-w-0 flex-col gap-1", className)}>
-      <label htmlFor={id} className="flex items-baseline justify-between gap-2 text-14 font-medium text-ink">
-        {etiqueta}
-        {opcional && <span className="flex-shrink-0 whitespace-nowrap text-13 font-normal text-ink-2">Opcional</span>}
-      </label>
-      {multilinea ? (
-        <textarea id={id} rows={2} value={resto.value} maxLength={resto.maxLength} autoComplete={resto.autoComplete}
-          aria-invalid={!!error} aria-describedby={describe}
-          onChange={(e) => alCambiar(e.target.value)} onBlur={alSalir} className={cn(CAJA, borde, "resize-none py-2")} />
-      ) : (
-        <input id={id} type="text" {...resto} aria-invalid={!!error} aria-describedby={describe}
-          onChange={(e) => alCambiar(e.target.value)} onBlur={alSalir} className={cn(CAJA, borde, "h-12")} />
-      )}
-      {ayuda && !error && <p id={`${id}-ayuda`} className="text-13 text-ink-2">{ayuda}</p>}
-      {error && <p id={`${id}-error`} className="text-14 font-medium text-danger">{error}</p>}
-    </div>
-  );
-}
+/** «Otra dirección»: la que se escribe a mano, en vez de una guardada en la cuenta. */
+const OTRA = "otra";
+const TOPE_DE_DIRECCIONES = 5;
+const esDeDireccion = (c: string): boolean => (DE_DIRECCION as readonly string[]).includes(c);
+/** Los campos de dirección de «Tus datos» con lo de una guardada (su etiqueta no es de este formulario). */
+const camposDe = (d: DireccionGuardada): Partial<Formulario> => {
+  const { etiqueta: _etiqueta, ...campos } = formularioDeDireccion(d);
+  return campos;
+};
+const SIN_DIRECCION: Partial<Formulario> = Object.fromEntries(DE_DIRECCION.map((c) => [c, ""]));
+/** De `nuevo`, solo lo que en `a` está vacío: lo prellenado nunca pisa lo que el cliente ya escribió. */
+const soloVacios = (a: Formulario, nuevo: Partial<Formulario>): Partial<Formulario> =>
+  Object.fromEntries(Object.entries(nuevo).filter(([c]) => !a[c as Campo].trim()));
 
 /**
- * Lo que el cliente lleva escrito, mientras la página siga abierta: volver al carrito a cambiar algo
- * no debe costarle escribir su dirección otra vez. Solo en memoria; al teléfono llega únicamente lo
- * de un pedido que sí entró (`guardarCliente`).
+ * Lo que el cliente lleva escrito (y qué dirección eligió), mientras la página siga abierta: volver
+ * al carrito a cambiar algo no debe costarle escribir su dirección otra vez. Solo en memoria; al
+ * teléfono llega únicamente lo de un pedido de invitado que sí entró (`guardarCliente`).
  */
-let borrador: Formulario | null = null;
+let borrador: { f: Formulario; direccion: string } | null = null;
 
 /**
  * ¿Hay un pedido enviándose? Lo dice el candado de la página, no esta pantalla: así lo saben también
@@ -88,7 +89,10 @@ const IconoAtras = () => (
   <svg viewBox="0 0 24 24" className="h-5 w-5" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><path d="M15 6l-6 6 6 6" /></svg>
 );
 
-export function PasoDeDatos({ negocio, sucursal, carrito, nota, cotizacion, alVolver, alCambiarElTotal, alErrorDeCarrito, alPedidoHecho }: PropsDelPasoDeDatos) {
+export function PasoDeDatos({
+  negocio, sucursal, carrito, nota, cotizacion, alVolver, alCambiarElTotal, alErrorDeCarrito, alPedidoHecho,
+  conSesion, cuenta, alTerminarLaSesion, deVuelta,
+}: PropsDelPasoDeDatos) {
   const router = useRouter();
   const id = useId();
   const formas = formasDePago(negocio);
@@ -96,11 +100,18 @@ export function PasoDeDatos({ negocio, sucursal, carrito, nota, cotizacion, alVo
   const zona = sucursal.zonas.find((z) => z.id === carrito.zonaId);
   const tel = enlaceTel(sucursal.telefono);
 
-  const [f, setF] = useState<Formulario>(borrador ?? FORMULARIO_VACIO);
+  const [f, setF] = useState<Formulario>(borrador?.f ?? FORMULARIO_VACIO);
+  /** La dirección elegida: el id de una guardada, `OTRA`, o "" mientras no se sabe si hay guardadas. */
+  const [direccion, setDireccion] = useState(borrador?.direccion ?? "");
+  /** «Guardar esta dirección en mi cuenta», y con qué nombre. */
+  const [guardar, setGuardar] = useState(false);
+  const [etiqueta, setEtiqueta] = useState("Casa");
   /** El pedido entró: la pantalla se queda en «Enviando…» hasta que llega la página del pedido. */
   const [hecho, setHecho] = useState(false);
-  useEffect(() => { borrador = hecho ? null : f; }, [f, hecho]);
+  useEffect(() => { borrador = hecho ? null : { f, direccion }; }, [f, direccion, hecho]);
   const enviando = useEnviando();
+  const guardadas = cuenta?.direcciones ?? [];
+  const elegida = guardadas.find((d) => d.id === direccion);
   const [recordado, setRecordado] = useState(false);
   const [tocados, setTocados] = useState<ReadonlySet<Campo>>(new Set());
   const [pago, setPago] = useState<Pago | null>(formas[0] ?? null);
@@ -119,19 +130,45 @@ export function PasoDeDatos({ negocio, sucursal, carrito, nota, cotizacion, alVo
   tokenAhora.current = token;
   const titulo = useRef<HTMLHeadingElement>(null);
 
-  // Lo recordado se lee después de hidratar: el servidor no lo tiene.
+  // El foco va al título, no a un campo: el teclado no debe taparle la pantalla a nadie.
+  useEffect(() => { titulo.current?.focus(); }, []);
+
+  // Sin sesión: lo recordado en el teléfono (se lee después de hidratar: el servidor no lo tiene).
+  // Con sesión no se toca. Si la sesión termina a medio pedido, desde ahí es un invitado más.
   useEffect(() => {
+    if (conSesion) return;
     const leido = leerCliente();
-    // Lo recordado rellena solo lo que está vacío: nunca pisa lo que ya escribió en esta visita.
-    if (leido) { setF((a) => ({ ...a, ...Object.fromEntries(Object.entries(leido).filter(([c]) => !a[c as Campo].trim())) })); setRecordado(true); }
-    // El foco va al título, no a un campo: el teclado no debe taparle la pantalla a nadie.
-    titulo.current?.focus();
-  }, []);
+    if (leido) { setF((a) => ({ ...a, ...soloVacios(a, leido) })); setRecordado(true); }
+  }, [conSesion]);
+
+  // Con sesión: nombre, teléfono y correo de la cuenta y, a domicilio, su primera dirección guardada.
+  // Si ya había escrito una dirección (o ya eligió), se respeta.
+  useEffect(() => {
+    if (!cuenta) return;
+    const primera = cuenta.direcciones[0];
+    const usarPrimera = !!primera && direccion === "" && !f.calle.trim();
+    if (direccion === "") setDireccion(usarPrimera ? primera.id : OTRA);
+    setF((a) => ({ ...a, ...soloVacios(a, paraTusDatos(cuenta.cuenta)), ...(usarPrimera && camposDe(primera)) }));
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- solo cuando llega (o cambia) la cuenta
+  }, [cuenta]);
+
+  const elegirDireccion = (cual: string) => {
+    const d = guardadas.find((x) => x.id === cual);
+    setDireccion(d ? d.id : OTRA);
+    // Una guardada llena los campos (que quedan ocultos); «Otra» los deja en blanco para escribir.
+    setF((a) => ({ ...a, ...(d ? camposDe(d) : SIN_DIRECCION) }));
+    setTocados((t) => new Set([...t].filter((c) => !esDeDireccion(c))));
+    setRechazo((r) => ({ ...r, calle: undefined }));
+  };
 
   const contexto = { modo: carrito.modo, pago, total: aCentavos(totalNuevo ?? totalVisto ?? "") };
   const errores = erroresDe(f, contexto);
   const errorDe = (campo: Campo) => rechazo[campo] ?? (tocados.has(campo) ? errores[campo] : undefined);
-  const enfocar = (campo: Campo | "pago") => setTimeout(() => document.getElementById(`${id}-${campo}`)?.focus(), 0);
+  const enfocar = (campo: Campo | "pago") => {
+    // Un error en una dirección guardada no se puede señalar en campos ocultos: se abren, con lo que traía.
+    if (esDeDireccion(campo)) setDireccion(OTRA);
+    setTimeout(() => document.getElementById(`${id}-${campo}`)?.focus(), 0);
+  };
 
   const campo = (c: Campo, etiqueta: string, extra: Partial<Parameters<typeof CampoDeTexto>[0]> = {}) => (
     <CampoDeTexto id={`${id}-${c}`} etiqueta={etiqueta} value={f[c]} error={errorDe(c)}
@@ -147,18 +184,24 @@ export function PasoDeDatos({ negocio, sucursal, carrito, nota, cotizacion, alVo
    */
   const mandar = (total: string | null) => {
     if (!pago) return;
-    const cuerpo = aCuerpo(carrito), datos = f, modo = carrito.modo;
+    const cuerpo = aCuerpo(carrito), datos = f, modo = carrito.modo, delPedido = datosDelPedido(datos, { modo, pago });
+    // La dirección nueva que pidió guardar en su cuenta (solo con sesión, a domicilio y escrita a mano).
+    const porGuardar = conSesion && guardar && !elegida && delPedido.direccion
+      ? { ...delPedido.direccion, id: null, etiqueta: etiqueta.trim() || "Casa" } : null;
     envioDeLaPagina.lanzar(async () => {
       const r = await enviarPedido({
         cotizar: () => cotizar(negocio.slug, cuerpo),
         pedir: (totalEsperado) => pedir(negocio.slug, {
-          ...cuerpo, ...datosDelPedido(datos, { modo, pago }), nota: nota || null,
+          ...cuerpo, ...delPedido, nota: nota || null,
           captcha: tokenAhora.current, total_esperado: totalEsperado,
         }),
         totalVisto: total,
       }, { telefono: sucursal.telefono, horario: sucursal.horario });
       if (r.desenlace.tipo === "hecho") {
-        guardarCliente(datos, modo);
+        // Con sesión el teléfono no recuerda nada: los datos viven en la cuenta. Guardar la dirección
+        // va aparte y sin esperar: si falla, el pedido ya entró y no se le estorba (la agrega en «Mi cuenta»).
+        if (!conSesion) guardarCliente(datos, modo);
+        else if (porGuardar) void guardarDireccion(negocio.slug, porGuardar);
         borrador = null;
         alPedidoHecho();
         router.replace(`/${negocio.slug}/pedido/${r.desenlace.codigo}`);
@@ -178,7 +221,12 @@ export function PasoDeDatos({ negocio, sucursal, carrito, nota, cotizacion, alVo
     else if (desenlace.tipo === "campo") {
       setRechazo({ [desenlace.campo]: desenlace.texto });
       enfocar(desenlace.campo === "pago" && pago === "EFECTIVO" && f.pagaCon.trim() ? "pagaCon" : desenlace.campo);
-    } else setAviso(desenlace);
+    } else {
+      // La sesión terminó: desde aquí es un invitado (el servidor ya borró la cookie). Él decide si
+      // entra otra vez o manda el pedido así; no se reenvía solo.
+      if (desenlace.sigue === "sesion") alTerminarLaSesion();
+      setAviso(desenlace);
+    }
   };
   useEffect(() => envioDeLaPagina.recibir((r) => alResultado.current(r)), []);
 
@@ -210,7 +258,7 @@ export function PasoDeDatos({ negocio, sucursal, carrito, nota, cotizacion, alVo
 
   // Enter en un campo solo envía cuando lo que se ofrece es enviar. Con «llama antes» o «vuelve a tu
   // pedido» en pantalla, Enter no manda nada: el reintento es un botón aparte, a propósito.
-  const seOfreceEnviar = !!totalNuevo || !aviso || aviso.sigue === "reintentar";
+  const seOfreceEnviar = !!totalNuevo || !aviso || aviso.sigue === "reintentar" || aviso.sigue === "sesion";
   const total = totalNuevo ?? totalVisto;
   const estado = enviando || hecho ? "Enviando tu pedido…" : robot ? "Comprobando que no eres un robot…" : "";
   const botonDeEnviar = (etiqueta: string, importe: string | null) => (
@@ -229,6 +277,16 @@ export function PasoDeDatos({ negocio, sucursal, carrito, nota, cotizacion, alVo
           </button>
         </div>
 
+        {/* Para quien ya tiene cuenta (o la quiere): una franja que no estorba al invitado. El carrito
+            vive en el teléfono, así que lo espera a la vuelta. Mientras se envía no se sale de aquí. */}
+        {!conSesion && (
+          <p className={cn("mx-4 mt-1 flex flex-wrap items-center gap-x-4 rounded bg-hover px-3 text-14 text-ink-2", ocupado && "pointer-events-none opacity-40")}>
+            ¿Ya tienes cuenta?
+            <Link href={enlaceDeAcceso(negocio.slug, "entrar", deVuelta)} className={DE_TEXTO}>Entrar</Link>
+            <Link href={enlaceDeAcceso(negocio.slug, "registro", deVuelta)} className={DE_TEXTO}>Crear cuenta</Link>
+          </p>
+        )}
+
         <section className="flex flex-col gap-4 px-4 pb-5 pt-2">
           <h3 ref={titulo} tabIndex={-1} className={cn(TITULO, "outline-none")}>¿Quién recibe?</h3>
           {campo("nombre", "Nombre", { autoComplete: "name", autoCapitalize: "words" })}
@@ -243,18 +301,53 @@ export function PasoDeDatos({ negocio, sucursal, carrito, nota, cotizacion, alVo
                 <h3 className={TITULO}>¿A dónde lo llevamos?</h3>
                 {zona && <p className={cn("mt-1 text-14 text-ink-2", PARTE)}>Zona de entrega: {zona.nombre}</p>}
               </div>
-              {campo("calle", "Calle", { autoComplete: "address-line1" })}
-              <div className="grid grid-cols-2 gap-3">
-                {campo("numeroExterior", "Núm. exterior")}
-                {campo("numeroInterior", "Núm. interior", { opcional: true })}
-              </div>
-              {campo("colonia", "Colonia", { autoComplete: "address-level3" })}
-              <div className="grid grid-cols-[8rem_1fr] gap-3">
-                {campo("codigoPostal", "Código postal", { inputMode: "numeric", autoComplete: "postal-code" })}
-                {campo("ciudad", "Ciudad", { autoComplete: "address-level2" })}
-              </div>
-              {campo("estado", "Estado", { autoComplete: "address-level1" })}
-              {campo("referencias", "Referencias", { multilinea: true, opcional: true, ayuda: "Entre qué calles, color de la casa, con quién dejarlo." })}
+              {/* Con direcciones guardadas se elige una; los campos solo aparecen para «Otra dirección». */}
+              {guardadas.length > 0 && (
+                <ul role="radiogroup" aria-label="Tus direcciones guardadas" className="divide-y divide-line border-y border-line">
+                  {[...guardadas, null].map((d) => (
+                    <li key={d?.id ?? OTRA}>
+                      <label className="flex min-h-12 cursor-pointer items-center gap-3 py-2 text-16">
+                        <input type="radio" name={`${id}-direccion`} checked={d ? elegida?.id === d.id : !elegida} onChange={() => elegirDireccion(d?.id ?? OTRA)} className="h-5 w-5 flex-shrink-0 accent-ink" />
+                        {d ? (
+                          <span className={cn("min-w-0", PARTE)}>
+                            <span className="block font-medium">{d.etiqueta}</span>
+                            <span className="block text-14 text-ink-2">{direccionEnUnaLinea(d)}</span>
+                          </span>
+                        ) : "Otra dirección"}
+                      </label>
+                    </li>
+                  ))}
+                </ul>
+              )}
+              {!elegida && (
+                <>
+                  {campo("calle", "Calle", { autoComplete: "address-line1" })}
+                  <div className="grid grid-cols-2 gap-3">
+                    {campo("numeroExterior", "Núm. exterior")}
+                    {campo("numeroInterior", "Núm. interior", { opcional: true })}
+                  </div>
+                  {campo("colonia", "Colonia", { autoComplete: "address-level3" })}
+                  <div className="grid grid-cols-[8rem_1fr] gap-3">
+                    {campo("codigoPostal", "Código postal", { inputMode: "numeric", autoComplete: "postal-code" })}
+                    {campo("ciudad", "Ciudad", { autoComplete: "address-level2" })}
+                  </div>
+                  {campo("estado", "Estado", { autoComplete: "address-level1" })}
+                  {campo("referencias", "Referencias", { multilinea: true, opcional: true, ayuda: "Entre qué calles, color de la casa, con quién dejarlo." })}
+                  {/* Solo con la cuenta ya leída y con lugar: son hasta 5. Se guarda cuando el pedido entra. */}
+                  {cuenta && guardadas.length < TOPE_DE_DIRECCIONES && (
+                    <div className="flex flex-col gap-3">
+                      <label className="flex min-h-12 cursor-pointer items-center gap-3 text-16">
+                        <input type="checkbox" checked={guardar} onChange={(e) => setGuardar(e.target.checked)} className="h-5 w-5 flex-shrink-0 accent-ink" />
+                        Guardar esta dirección en mi cuenta
+                      </label>
+                      {guardar && (
+                        <CampoDeTexto id={`${id}-etiqueta`} etiqueta="Nombre para guardarla" value={etiqueta} maxLength={LIMITES_DE_CUENTA.etiqueta} autoComplete="off"
+                          ayuda="Para reconocerla la próxima vez: Casa, Oficina…" alCambiar={setEtiqueta} alSalir={() => {}} />
+                      )}
+                    </div>
+                  )}
+                </>
+              )}
             </>
           ) : (
             <div className={PARTE}>
@@ -292,7 +385,12 @@ export function PasoDeDatos({ negocio, sucursal, carrito, nota, cotizacion, alVo
             Al enviar aceptas que el restaurante use estos datos para tu pedido.{" "}
             <Link href={`/${negocio.slug}/privacidad`} target="_blank" rel="noopener" className={cn("font-medium text-ink underline underline-offset-4", FOCO)}>Aviso de privacidad</Link>.
           </p>
-          {recordado && (
+          {conSesion && (
+            <p className={PARTE}>
+              Este pedido queda en tu cuenta{cuenta ? ` (${cuenta.cuenta.email})` : ""}. Lo que cambies aquí vale solo para este pedido.
+            </p>
+          )}
+          {recordado && !conSesion && (
             <p>
               Llenamos tus datos con los de tu último pedido, guardados en este teléfono.{" "}
               <button type="button" className={cn("font-medium text-ink underline underline-offset-4", FOCO)}
@@ -328,6 +426,13 @@ export function PasoDeDatos({ negocio, sucursal, carrito, nota, cotizacion, alVo
               </>
             ) : aviso?.sigue === "volver" ? (
               <button type="button" onClick={alVolver} className={cn(PRINCIPAL, "h-14 w-full px-5 text-16")}>Volver a tu pedido</button>
+            ) : aviso?.sigue === "sesion" ? (
+              // Dos salidas, y ninguna se toma sola: mandarlo ya como invitado (con un antirobot nuevo;
+              // el anterior se gastó) o entrar otra vez. El carrito y lo escrito siguen aquí.
+              <>
+                {botonDeEnviar("Enviar como invitado", total)}
+                {!ocupado && <Link href={enlaceDeAcceso(negocio.slug, "entrar", deVuelta)} className={GHOST}>Entrar otra vez</Link>}
+              </>
             ) : botonDeEnviar("Enviar pedido", total)}
           </>
         )}

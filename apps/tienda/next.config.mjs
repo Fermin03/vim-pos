@@ -29,6 +29,14 @@ const nextConfig = {
           { key: "X-Robots-Tag", value: "noindex, nofollow" },
         ],
       },
+      // Las pantallas de cuenta no son contenido para buscadores.
+      {
+        source: "/:negocio/:pantalla(entrar|registro|recuperar|cuenta)/:path*",
+        headers: [{ key: "X-Robots-Tag", value: "noindex, nofollow" }],
+      },
+      // El token de recuperación va en el fragmento (`#t=`), que no viaja en el Referer ni llega al
+      // servidor; esto es el cinturón por si un día alguien lo pone en la consulta.
+      { source: "/:negocio/recuperar/:path*", headers: [{ key: "Referrer-Policy", value: "no-referrer" }] },
     ];
   },
 };

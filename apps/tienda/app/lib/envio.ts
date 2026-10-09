@@ -25,9 +25,11 @@ export type Desenlace =
      *  · `reintentar`  — el botón de enviar sigue ahí;
      *  · `volver`      — se arregla en el carrito (zona, modo, productos);
      *  · `llamar`      — por aquí no se va a poder: llamar al restaurante;
-     *  · `llamar-antes`— el pedido PUDO haber entrado: primero llamar; reintentar solo si lo pide a propósito.
+     *  · `llamar-antes`— el pedido PUDO haber entrado: primero llamar; reintentar solo si lo pide a propósito;
+     *  · `sesion`      — la sesión de su cuenta terminó (el servidor ya borró la cookie): entrar otra
+     *                    vez, o enviar el pedido como invitado. No se creó nada.
      */
-    sigue: "reintentar" | "volver" | "llamar" | "llamar-antes";
+    sigue: "reintentar" | "volver" | "llamar" | "llamar-antes" | "sesion";
   };
 
 export type ContextoDeEnvio = { telefono: string | null; horario: Horario; ahora?: Momento };
@@ -46,6 +48,8 @@ export function desenlaceDelError(e: ErrorDeTienda, c: ContextoDeEnvio): Desenla
   const campo = DE_CAMPO[e.error];
   if (campo) return { tipo: "campo", campo, texto };
   if (e.error === "TIENDA_CERRADA") return { tipo: "aviso", tono: "warning", texto: textoCerrada(e.detalle ?? "", c.horario, c.ahora), sigue: "reintentar" };
+  // No se degrada a invitado en silencio: el pedido no quedaría en su cuenta, y eso lo decide él.
+  if (e.error === "SESION_INVALIDA") return { tipo: "aviso", tono: "warning", texto: "Tu sesión terminó. Entra otra vez o envía tu pedido como invitado.", sigue: "sesion" };
   if (e.error === "SIN_CONFIRMAR") {
     const tel = c.telefono ? `: ${formatoTelefono(c.telefono)}` : "";
     return { tipo: "aviso", tono: "danger", texto: `No pudimos confirmar tu pedido. Antes de volver a intentarlo, llama al restaurante${tel}.`, sigue: "llamar-antes" };

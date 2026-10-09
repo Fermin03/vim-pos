@@ -54,6 +54,12 @@ describe("desenlaceDelError", () => {
   it("NO_SE_PUDO_CREAR: llamar al restaurante, con su teléfono", () => {
     expect(desenlaceDelError(e("NO_SE_PUDO_CREAR"), c)).toEqual({ tipo: "aviso", tono: "danger", sigue: "llamar", texto: "No pudimos tomar tu pedido. Llama al restaurante: 477 123 4567." });
   });
+  it("SESION_INVALIDA al pedir: aviso propio con dos salidas (entrar otra vez o enviar como invitado), nunca un reintento ciego", () => {
+    expect(desenlaceDelError(e("SESION_INVALIDA"), c)).toEqual({
+      tipo: "aviso", tono: "warning", sigue: "sesion",
+      texto: "Tu sesión terminó. Entra otra vez o envía tu pedido como invitado.",
+    });
+  });
   it("ningún código conocido se queda sin texto ni enseña el código", () => {
     for (const codigo of CODIGOS_DE_ERROR) {
       const d = desenlaceDelError(e(codigo), c);
@@ -99,6 +105,10 @@ describe("enviarPedido", () => {
     expect(pedir).toHaveBeenCalledTimes(1);
     const cambio = await enviarPedido({ cotizar: async () => cotizada, pedir: async () => fallo("TOTAL_CAMBIO", "310.00"), totalVisto: "305.00" }, c);
     expect(cambio).toEqual({ desenlace: { tipo: "total", total: "310.00" }, pidio: true });
+    // La sesión se acabó: el antirobot se gastó (hay que pedir otro token) y no se reenvía solo como invitado.
+    const sinSesion = vi.fn(async () => fallo("SESION_INVALIDA"));
+    expect(await enviarPedido({ cotizar: async () => cotizada, pedir: sinSesion, totalVisto: "305.00" }, c)).toMatchObject({ pidio: true, desenlace: { tipo: "aviso", sigue: "sesion" } });
+    expect(sinSesion).toHaveBeenCalledTimes(1);
   });
 });
 

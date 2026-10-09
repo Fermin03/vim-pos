@@ -2,8 +2,8 @@
 import { useEffect, useRef } from "react";
 
 /**
- * Captcha Cloudflare Turnstile: el registro público del admin (0142, ADR 0022) y el envío de un
- * pedido en la tienda en línea. Es UN solo widget de Cloudflare para las dos apps: las funciones
+ * Captcha Cloudflare Turnstile: el registro público del admin (0142, ADR 0022) y, en la tienda en
+ * línea, el envío de un pedido, el registro de una cuenta y el pedir recuperar la contraseña. Es UN solo widget de Cloudflare para las dos apps: las funciones
  * comparten `TURNSTILE_SECRET_KEY`.
  *
  * Sin `NEXT_PUBLIC_TURNSTILE_SITE_KEY` no pinta nada y no carga ningún script: el formulario manda
@@ -43,7 +43,7 @@ function cargarScript(): Promise<void> {
   return cargando;
 }
 
-export type AccionCaptcha = "registro" | "reenvio" | "tienda_pedido";
+export type AccionCaptcha = "registro" | "reenvio" | "tienda_pedido" | "tienda_registro" | "tienda_recuperar";
 
 /**
  * `accion` viaja dentro del token y la función la comprueba: un token resuelto para reenviar el

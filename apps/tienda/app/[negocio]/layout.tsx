@@ -7,16 +7,20 @@ import { LogoVim } from "@vim/ui/styles";
 import { variablesDeColor } from "../lib/color";
 import { urlDeLogo } from "../lib/imagen";
 import { negocioDeLaPeticion } from "../lib/servidor/funcion";
+import { haySesion } from "../lib/servidor/sesion";
 
 export default async function MarcoDelNegocio({ children, params }: { children: React.ReactNode; params: Promise<{ negocio: string }> }) {
   const leido = await negocioDeLaPeticion((await params).negocio);
   const negocio = leido.estado === "ok" ? leido.datos : null;
   const logo = negocio && urlDeLogo(negocio.logo_ruta);
+  // Leer la cookie no toca la caché de datos del negocio ni del menú (esa lectura nunca lleva sesión);
+  // la página ya era dinámica: `negocioDeLaPeticion` lee las cabeceras para la IP.
+  const conSesion = !!negocio && await haySesion(negocio.slug);
   return (
     <div style={negocio ? (variablesDeColor(negocio.color) as CSSProperties) : undefined} className="mx-auto flex min-h-full max-w-2xl flex-col">
       {negocio && (
-        <header className="px-4 pb-4 pt-5">
-          <Link href={`/${negocio.slug}`} className="inline-flex max-w-full items-center gap-3 rounded focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-ink">
+        <header className="flex items-center justify-between gap-3 px-4 pb-4 pt-5">
+          <Link href={`/${negocio.slug}`} className="inline-flex min-w-0 items-center gap-3 rounded focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-ink">
             {logo ? (
               // Sin `loading="lazy"`: es lo primero que se ve. El tamaño va reservado para que nada brinque.
               <img src={logo} alt={`Logo de ${negocio.nombre}`} width={56} height={56} decoding="async" className="h-14 w-14 flex-shrink-0 rounded-lg bg-hover object-contain" />
@@ -26,6 +30,12 @@ export default async function MarcoDelNegocio({ children, params }: { children: 
               </span>
             )}
             <span className="min-w-0 font-display text-24 font-semibold leading-tight [overflow-wrap:anywhere]">{negocio.nombre}</span>
+          </Link>
+          {/* Discreto y en `ink`: la marca es la del negocio y la acción principal está en la página.
+              Solo mira si hay cookie; si la sesión ya venció, «Mi cuenta» lo descubre y manda a entrar. */}
+          <Link href={`/${negocio.slug}/${conSesion ? "cuenta" : "entrar"}`}
+            className="inline-flex min-h-11 flex-shrink-0 items-center whitespace-nowrap rounded text-14 font-medium text-ink underline underline-offset-4 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink">
+            {conSesion ? "Mi cuenta" : "Entrar"}
           </Link>
         </header>
       )}

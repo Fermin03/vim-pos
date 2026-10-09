@@ -21,6 +21,8 @@ const LIMITE_MS = 10_000;
 
 /**
  * Llama a la función con el secreto y la IP real del cliente. Nunca lanza.
+ *  · `sesion` (el token de la cookie del negocio; lo pone SOLO la ruta /api/tienda) viaja en
+ *    `x-tienda-sesion`. Las lecturas con caché de abajo nunca la llevan: son del negocio, no del visitante.
  *  · 200 y los rechazos conocidos (400, 403, 404, 409, 413, 429, 503) salen con su estado y su JSON.
  *  · Cualquier otro estado sale como 503 y queda en el registro del servidor SIN el cuerpo (trae
  *    datos del cliente y códigos de seguimiento). Un 401 es el secreto mal puesto.
@@ -30,7 +32,7 @@ const LIMITE_MS = 10_000;
  *    a medias) o un cuerpo que no es JSON. En `pedir` eso significa que el pedido PUDO haber
  *    entrado: quien llama no debe reintentar solo. Un 4xx inesperado no lo lleva: ahí no se creó nada.
  */
-export async function llamarTienda(cuerpo: unknown, ip: string): Promise<RespuestaDeTienda> {
+export async function llamarTienda(cuerpo: unknown, ip: string, sesion?: string | null): Promise<RespuestaDeTienda> {
   const secreto = (process.env.VIM_TIENDA_SECRET ?? "").trim();
   const base = (process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || "").trim().replace(/\/+$/, "");
   if (!secreto || !base) {
@@ -41,7 +43,7 @@ export async function llamarTienda(cuerpo: unknown, ip: string): Promise<Respues
   try {
     r = await fetch(`${base}/functions/v1/tienda`, {
       method: "POST",
-      headers: { "content-type": "application/json", "x-vim-tienda": secreto, "x-tienda-ip": ip },
+      headers: { "content-type": "application/json", "x-vim-tienda": secreto, "x-tienda-ip": ip, ...(sesion ? { "x-tienda-sesion": sesion } : {}) },
       body: JSON.stringify(cuerpo),
       cache: "no-store",
       signal: AbortSignal.timeout(LIMITE_MS),

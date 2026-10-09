@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { esUuid, leerCuerpo, normalizarTelefono, textoLimpio, tieneNul } from "./validar.ts";
+import { esUuid, leerCuerpo, leerFecha, normalizarTelefono, textoLimpio, tieneNul } from "./validar.ts";
 
 const SUC = "99999999-0000-0000-0000-0000000000bb";
 
@@ -237,4 +237,142 @@ test("cuerpo: un total_esperado que no es un importe es PAGO_INVALIDO", () => {
   for (const total_esperado of ["mucho", -1, "-1.00", "1e3", 12.345, "12.345", NaN, Infinity, "1,250.00", {}, [], true, 1000000]) {
     assert.deepEqual(leerCuerpo({ ...pedir, total_esperado }), { ok: false, error: "PAGO_INVALIDO" }, JSON.stringify(total_esperado));
   }
+});
+
+// ════ Entrega 6: acciones de cuenta ═════════════════════════════════════════════════════════════
+const N = { negocio: "knockout" };
+const TOKEN = "Ab3_-".repeat(4) + "Zz";
+const ID = "11111111-2222-3333-4444-555555555555";
+const invalido = { ok: false, error: "CUENTA_INVALIDA_DATOS" };
+const registrar = { accion: "registrar", ...N, nombre: " Ana ", apellido: " López ", email: " ANA@Example.com ",
+                    telefono: "(477) 111 2233", password: "  secreta 1  ", captcha: "tok" };
+
+test("cuenta: las acciones sin cuerpo propio solo llevan acción y negocio", () => {
+  for (const accion of ["salir", "cuenta", "mis_pedidos"]) {
+    assert.deepEqual(leerCuerpo({ accion, ...N, p_cuenta: ID, tenant_id: ID, sesion: TOKEN }), { ok: true, valor: { accion, negocio: "knockout" } });
+  }
+});
+test("cuenta: toda acción exige un slug de negocio", () => {
+  for (const accion of ["registrar", "entrar", "salir", "recuperar_pedir", "recuperar_aplicar", "cuenta", "cuenta_guardar",
+                        "cuenta_password", "direccion_guardar", "direccion_borrar", "mis_pedidos", "eliminar_cuenta"]) {
+    assert.deepEqual(leerCuerpo({ accion }), { ok: false, error: "NEGOCIO_INVALIDO" }, accion);
+  }
+});
+
+test("registrar: normaliza nombre, apellido, correo y teléfono; la contraseña va TAL CUAL; lo desconocido se ignora", () => {
+  assert.deepEqual(leerCuerpo({ ...registrar, p_cuenta: ID, tenant_id: ID, fecha_nacimiento: "1990-01-01" }), { ok: true, valor: {
+    accion: "registrar", negocio: "knockout", nombre: "Ana", apellido: "López", email: "ana@example.com",
+    telefono: "4771112233", password: "  secreta 1  ", captcha: "tok",
+  } });
+});
+test("registrar: la contraseña lleva al menos 8 caracteres y como mucho 72 BYTES, sin recortar ni normalizar", () => {
+  const con = (password: unknown) => leerCuerpo({ ...registrar, password });
+  assert.equal(con("12345678").ok, true);
+  assert.equal(con("a".repeat(72)).ok, true);
+  assert.equal(con("        ").ok, true, "ocho espacios son ocho caracteres");
+  assert.equal(con("ñ".repeat(8)).ok, true);
+  assert.equal(con("😀".repeat(8)).ok, true, "el mínimo se cuenta en caracteres, no en unidades UTF-16");
+  // bcrypt solo mira 72 bytes: lo que pasa de ahí sin pasar de 72 caracteres tampoco entra.
+  assert.equal(con("ñ".repeat(36)).ok, true, "36 ñ son 72 bytes");
+  assert.equal(con("😀".repeat(18)).ok, true, "18 emojis son 72 bytes");
+  for (const larga of ["ñ".repeat(37), "😀".repeat(19), "a".repeat(71) + "ñ", "😀".repeat(72)]) assert.deepEqual(con(larga), invalido, `${Array.from(larga).length} caracteres`);
+  const nfd = "contraseña";
+  const r = con(nfd);
+  assert.equal(r.ok && r.valor.accion === "registrar" && r.valor.password === nfd, true, "no se normaliza");
+  for (const mala of ["1234567", "a".repeat(73), "", null, undefined, 12345678, ["12345678"]]) assert.deepEqual(con(mala), invalido, JSON.stringify(mala));
+});
+test("registrar: nombre y apellido obligatorios y recortados a 100; correo y teléfono como en pedir", () => {
+  const con = (cambio: object) => leerCuerpo({ ...registrar, ...cambio });
+  const largo = con({ nombre: "a".repeat(150), apellido: "b".repeat(150) });
+  assert.equal(largo.ok && largo.valor.accion === "registrar" && largo.valor.nombre.length === 100 && largo.valor.apellido.length === 100, true);
+  for (const cambio of [{ nombre: "  " }, { nombre: null }, { apellido: "" }, { apellido: 5 }, { telefono: "123" }, { telefono: null },
+                        { email: "sin-arroba" }, { email: "" }, { email: null }, { email: `${"a".repeat(250)}@b.mx` }, { email: "a@b.mx\r\nBcc: x@y.mx" }, { email: "añ@b.mx" }]) {
+    assert.deepEqual(con(cambio), invalido, JSON.stringify(cambio));
+  }
+});
+test("registrar: el captcha ausente o gigante es null (lo rechaza el antirobot, no la forma)", () => {
+  for (const captcha of [undefined, null, 5, "x".repeat(4097)]) {
+    const r = leerCuerpo({ ...registrar, captcha });
+    assert.equal(r.ok && r.valor.accion === "registrar" && r.valor.captcha === null, true);
+  }
+});
+
+test("entrar: correo normalizado; la contraseña a comprobar va de 1 a 72, tal cual", () => {
+  assert.deepEqual(leerCuerpo({ accion: "entrar", ...N, email: " ANA@Example.com", password: " x " }),
+    { ok: true, valor: { accion: "entrar", negocio: "knockout", email: "ana@example.com", password: " x " } });
+  assert.equal(leerCuerpo({ accion: "entrar", ...N, email: "a@b.mx", password: "a".repeat(72) }).ok, true);
+  for (const cambio of [{ password: "" }, { password: "a".repeat(73) }, { password: "ñ".repeat(37) }, { password: null }, { password: 5 }, { email: "x" }, { email: null }]) {
+    assert.deepEqual(leerCuerpo({ accion: "entrar", ...N, email: "a@b.mx", password: "secreta12", ...cambio }), invalido, JSON.stringify(cambio));
+  }
+});
+
+test("recuperar_pedir: correo y captcha", () => {
+  assert.deepEqual(leerCuerpo({ accion: "recuperar_pedir", ...N, email: "ANA@example.com", captcha: "tok", nombre: "x" }),
+    { ok: true, valor: { accion: "recuperar_pedir", negocio: "knockout", email: "ana@example.com", captcha: "tok" } });
+  assert.deepEqual(leerCuerpo({ accion: "recuperar_pedir", ...N, email: "no", captcha: "tok" }), invalido);
+});
+test("recuperar_aplicar: el token tiene forma de código (si no, ENLACE_INVALIDO) y la contraseña nueva 8–72", () => {
+  assert.deepEqual(leerCuerpo({ accion: "recuperar_aplicar", ...N, token: TOKEN, password: "nueva clave" }),
+    { ok: true, valor: { accion: "recuperar_aplicar", negocio: "knockout", token: TOKEN, password: "nueva clave" } });
+  for (const token of ["corto", TOKEN + "x", null, undefined, 5]) {
+    assert.deepEqual(leerCuerpo({ accion: "recuperar_aplicar", ...N, token, password: "nueva clave" }), { ok: false, error: "ENLACE_INVALIDO" });
+  }
+  for (const password of ["corta", "ñ".repeat(37)]) assert.deepEqual(leerCuerpo({ accion: "recuperar_aplicar", ...N, token: TOKEN, password }), invalido);
+});
+
+test("cuenta_guardar: nombre, apellido, teléfono y fecha de nacimiento (o null)", () => {
+  const base = { accion: "cuenta_guardar", ...N, nombre: " Ana ", apellido: "López", telefono: "+52 477 111 2233" };
+  assert.deepEqual(leerCuerpo({ ...base, fecha_nacimiento: "1990-05-17", email: "otro@x.mx", password: "x" }), { ok: true, valor: {
+    accion: "cuenta_guardar", negocio: "knockout", nombre: "Ana", apellido: "López", telefono: "4771112233", fecha_nacimiento: "1990-05-17",
+  } });
+  for (const vacia of [null, undefined, ""]) {
+    const r = leerCuerpo({ ...base, fecha_nacimiento: vacia });
+    assert.equal(r.ok && r.valor.accion === "cuenta_guardar" && r.valor.fecha_nacimiento === null, true);
+  }
+  for (const cambio of [{ nombre: "" }, { apellido: null }, { telefono: "1" }, { fecha_nacimiento: "17/05/1990" }, { fecha_nacimiento: "1990-02-30" },
+                        { fecha_nacimiento: "1899-12-31" }, { fecha_nacimiento: "2999-01-01" }, { fecha_nacimiento: 19900517 }]) {
+    assert.deepEqual(leerCuerpo({ ...base, ...cambio }), invalido, JSON.stringify(cambio));
+  }
+});
+test("fecha: válida, pasada y desde 1900; vacía es null; lo demás undefined", () => {
+  const hoy = new Date("2026-10-09T18:00:00Z");
+  assert.equal(leerFecha("2000-02-29", hoy), "2000-02-29");
+  assert.equal(leerFecha("1900-01-01", hoy), "1900-01-01");
+  assert.equal(leerFecha("2026-10-08", hoy), "2026-10-08");
+  for (const v of [null, undefined, ""]) assert.equal(leerFecha(v, hoy), null);
+  for (const v of ["2026-10-09", "2026-10-10", "2001-02-29", "1990-13-01", "1990-00-10", "1990-1-1", " 1990-01-01", "1990-01-01T00:00:00Z", "0000-01-01", 5, {}]) {
+    assert.equal(leerFecha(v, hoy), undefined, JSON.stringify(v));
+  }
+});
+
+test("cuenta_password: la actual 1–72 y la nueva 8–72, las dos tal cual", () => {
+  assert.deepEqual(leerCuerpo({ accion: "cuenta_password", ...N, actual: " vieja", nueva: "nueva clave " }),
+    { ok: true, valor: { accion: "cuenta_password", negocio: "knockout", actual: " vieja", nueva: "nueva clave " } });
+  for (const cambio of [{ actual: "" }, { actual: null }, { actual: "ñ".repeat(37) }, { nueva: "corta" }, { nueva: "a".repeat(73) }, { nueva: "ñ".repeat(37) }]) {
+    assert.deepEqual(leerCuerpo({ accion: "cuenta_password", ...N, actual: "vieja", nueva: "nueva clave", ...cambio }), invalido, JSON.stringify(cambio));
+  }
+});
+test("eliminar_cuenta: pide la contraseña", () => {
+  assert.deepEqual(leerCuerpo({ accion: "eliminar_cuenta", ...N, password: "x y" }), { ok: true, valor: { accion: "eliminar_cuenta", negocio: "knockout", password: "x y" } });
+  assert.deepEqual(leerCuerpo({ accion: "eliminar_cuenta", ...N }), invalido);
+});
+
+const dir = { calle: " Av. Siempre Viva ", numero_exterior: "742", colonia: "Centro", codigo_postal: "37000", ciudad: "León", estado: "Guanajuato" };
+const dirLimpia = { calle: "Av. Siempre Viva", numero_exterior: "742", numero_interior: null, colonia: "Centro", codigo_postal: "37000",
+                    ciudad: "León", estado: "Guanajuato", referencias: null };
+test("direccion_guardar: id uuid o null, etiqueta a 40, y la dirección con las reglas de pedir (suelta o bajo `direccion`)", () => {
+  assert.deepEqual(leerCuerpo({ accion: "direccion_guardar", ...N, id: null, etiqueta: " Casa ", ...dir, cuenta_id: ID, tenant_id: ID }),
+    { ok: true, valor: { accion: "direccion_guardar", negocio: "knockout", id: null, etiqueta: "Casa", direccion: dirLimpia } });
+  assert.deepEqual(leerCuerpo({ accion: "direccion_guardar", ...N, id: ID, etiqueta: "e".repeat(60), direccion: dir }),
+    { ok: true, valor: { accion: "direccion_guardar", negocio: "knockout", id: ID, etiqueta: "e".repeat(40), direccion: dirLimpia } });
+  const sinEtiqueta = leerCuerpo({ accion: "direccion_guardar", ...N, ...dir });
+  assert.equal(sinEtiqueta.ok && sinEtiqueta.valor.accion === "direccion_guardar" && sinEtiqueta.valor.etiqueta === null && sinEtiqueta.valor.id === null, true);
+});
+test("direccion_guardar y direccion_borrar: lo que no cuadra es DIRECCION_INVALIDA", () => {
+  const mala = { ok: false, error: "DIRECCION_INVALIDA" };
+  assert.deepEqual(leerCuerpo({ accion: "direccion_guardar", ...N, id: "x", ...dir }), mala);
+  assert.deepEqual(leerCuerpo({ accion: "direccion_guardar", ...N, ...dir, codigo_postal: "3700" }), mala);
+  assert.deepEqual(leerCuerpo({ accion: "direccion_guardar", ...N }), mala);
+  assert.deepEqual(leerCuerpo({ accion: "direccion_borrar", ...N, id: ID }), { ok: true, valor: { accion: "direccion_borrar", negocio: "knockout", id: ID } });
+  for (const id of [null, undefined, "x", 5]) assert.deepEqual(leerCuerpo({ accion: "direccion_borrar", ...N, id }), mala);
 });
