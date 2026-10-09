@@ -36,6 +36,7 @@ DECLARE
   v_tel text; v_hash text; v_nota text; v_email text; v_dom boolean;
   v_ticket uuid; v_total numeric; v_n int; v_n0 bigint; v_err text; v_err13 text; v_i int;
   v_ids uuid[] := '{}';
+  v_tks uuid[] := '{}';
   r record;
 BEGIN
   PERFORM set_config('request.jwt.claims', NULL, true);
@@ -554,6 +555,65 @@ BEGIN
     FROM generate_series(1, 3) g;
   v_r := tienda_crear_pedido(v_t, v_suc, 'RECOGER', NULL, v_uno, '{"nombre":"Ana","telefono":"4775550915"}', NULL, 'EFECTIVO', NULL, NULL, md5('14e') || md5('14f'));
   IF v_r ->> 'total_mxn' IS DISTINCT FROM '120.00' THEN RAISE EXCEPTION 'E14: los pedidos de otro negocio no cuentan para el tope: %', v_r; END IF;
+
+  -- F1) El límite decae. Con gestión NUBE nada mueve `estado` más allá de ACEPTADO (el seguimiento lo
+  --     deriva del ticket al leer): sin esto, tras tres pedidos aceptados ese teléfono no vuelve a pedir.
+  -- a) Tres pedidos aceptados, cada uno con su ticket en la nube. Con el ticket abierto, cuentan…
+  v_ids := '{}';
+  FOR v_i IN 1..3 LOOP
+    v_r := tienda_crear_pedido(v_t, v_suc, 'RECOGER', NULL, v_uno, '{"nombre":"Ana","telefono":"4775550916"}', NULL, 'EFECTIVO', NULL, NULL, md5('f1a' || v_i) || md5('f1b' || v_i));
+    v_ids := v_ids || (v_r ->> 'pedido_id')::uuid;
+    v_tks := v_tks || crear_ticket_desde_tienda((v_r ->> 'pedido_id')::uuid);
+  END LOOP;
+  v_err := NULL;
+  BEGIN
+    PERFORM tienda_crear_pedido(v_t, v_suc, 'RECOGER', NULL, v_uno, '{"nombre":"Ana","telefono":"4775550916"}', NULL, 'EFECTIVO', NULL, NULL, md5('f1c') || md5('f1d'));
+  EXCEPTION WHEN OTHERS THEN v_err := SQLERRM;
+  END;
+  IF v_err IS DISTINCT FROM v_err13 THEN RAISE EXCEPTION 'F1a (control): tres aceptados con el ticket abierto: esperaba NO_SE_PUDO_CREAR, dio %', COALESCE(v_err, 'un pedido'); END IF;
+  -- …y con el ticket cobrado, facturado o cancelado, no: `estado` sigue en ACEPTADO en los tres.
+  UPDATE tickets SET estado_fiscal = 'PAGADO' WHERE id IN (v_tks[1], v_tks[2]);
+  UPDATE tickets SET estado_fiscal = 'FACTURADO' WHERE id = v_tks[2];
+  UPDATE tickets SET estado_fiscal = 'CANCELADO' WHERE id = v_tks[3];
+  IF (SELECT count(*) FROM delivery_pedidos WHERE id = ANY (v_ids) AND estado = 'ACEPTADO' AND gestion = 'NUBE') <> 3 THEN
+    RAISE EXCEPTION 'F1a (fixture): los tres pedidos debían seguir ACEPTADO y con gestión NUBE';
+  END IF;
+  -- Caben TRES nuevos: si uno solo de los tres estados terminales siguiera contando, el tercero no entraría.
+  FOR v_i IN 1..3 LOOP
+    BEGIN
+      v_r := tienda_crear_pedido(v_t, v_suc, 'RECOGER', NULL, v_uno, '{"nombre":"Ana","telefono":"4775550916"}', NULL, 'EFECTIVO', NULL, NULL, md5('f1e' || v_i) || md5('f1f' || v_i));
+    EXCEPTION WHEN OTHERS THEN
+      RAISE EXCEPTION 'F1a: con los tres tickets cobrado, facturado y cancelado, el pedido nuevo % de 3 debía entrar: %', v_i, SQLERRM;
+    END;
+  END LOOP;
+  -- Y el tope sigue ahí para los que sí están vivos: tres recientes sin ticket terminal.
+  v_err := NULL;
+  BEGIN
+    PERFORM tienda_crear_pedido(v_t, v_suc, 'RECOGER', NULL, v_uno, '{"nombre":"Ana","telefono":"4775550916"}', NULL, 'EFECTIVO', NULL, NULL, md5('f1g') || md5('f1h'));
+  EXCEPTION WHEN OTHERS THEN v_err := SQLERRM;
+  END;
+  IF v_err IS DISTINCT FROM v_err13 THEN RAISE EXCEPTION 'F1a: con tres vivos recientes sin ticket terminal esperaba NO_SE_PUDO_CREAR, dio %', COALESCE(v_err, 'un pedido'); END IF;
+
+  -- b) Tres pedidos vivos sin ticket: a las 5 h 59 min todavía cuentan; a las 7 horas, ya no.
+  v_ids := '{}';
+  FOR v_i IN 1..3 LOOP
+    v_r := tienda_crear_pedido(v_t, v_suc, 'RECOGER', NULL, v_uno, '{"nombre":"Ana","telefono":"4775550917"}', NULL, 'EFECTIVO', NULL, NULL, md5('f1i' || v_i) || md5('f1j' || v_i));
+    v_ids := v_ids || (v_r ->> 'pedido_id')::uuid;
+  END LOOP;
+  UPDATE delivery_pedidos SET recibido_at = now() - interval '5 hours 59 minutes' WHERE id = ANY (v_ids);
+  v_err := NULL;
+  BEGIN
+    PERFORM tienda_crear_pedido(v_t, v_suc, 'RECOGER', NULL, v_uno, '{"nombre":"Ana","telefono":"4775550917"}', NULL, 'EFECTIVO', NULL, NULL, md5('f1k') || md5('f1l'));
+  EXCEPTION WHEN OTHERS THEN v_err := SQLERRM;
+  END;
+  IF v_err IS DISTINCT FROM v_err13 THEN RAISE EXCEPTION 'F1b (control): tres vivos de hace 5 h 59 min: esperaba NO_SE_PUDO_CREAR, dio %', COALESCE(v_err, 'un pedido'); END IF;
+  UPDATE delivery_pedidos SET recibido_at = now() - interval '7 hours' WHERE id = ANY (v_ids);
+  BEGIN
+    v_r := tienda_crear_pedido(v_t, v_suc, 'RECOGER', NULL, v_uno, '{"nombre":"Ana","telefono":"4775550917"}', NULL, 'EFECTIVO', NULL, NULL, md5('f1k') || md5('f1l'));
+  EXCEPTION WHEN OTHERS THEN
+    RAISE EXCEPTION 'F1b: con los tres pedidos vivos recibidos hace 7 horas, el cuarto debía entrar: %', SQLERRM;
+  END;
+  IF (SELECT count(*) FROM delivery_pedidos WHERE id = ANY (v_ids) AND estado = 'RECIBIDO') <> 3 THEN RAISE EXCEPTION 'F1b (fixture): los tres viejos debían seguir en RECIBIDO'; END IF;
 
   -- Una sola firma: con dos, PostgREST no sabría a cuál llamar.
   IF (SELECT count(*) FROM pg_proc WHERE proname = 'tienda_crear_pedido' AND pronamespace = 'public'::regnamespace) <> 1 THEN

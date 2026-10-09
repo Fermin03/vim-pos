@@ -710,6 +710,10 @@ BEGIN
   --    preguntar por un teléfono sin llegar a crear nada. Quien llega hasta aquí, o crea un pedido o
   --    recibe este error. El candado hace de uno en uno las altas de un mismo teléfono: sin él,
   --    varias simultáneas contarían lo mismo y pasarían todas el tope.
+  --    «Vivo» tiene que decaer solo: con gestión NUBE nada mueve `estado` más allá de ACEPTADO (el
+  --    seguimiento lo deriva del ticket al leer, §5), así que sin esto tres pedidos aceptados
+  --    dejarían ese teléfono sin poder pedir para siempre. No cuenta el pedido de hace más de 6
+  --    horas ni el que ya tiene en la nube un ticket cobrado, facturado o cancelado.
   -- ponytail: el conteo no tiene índice propio; recorre los pedidos vivos (índice parcial de 0090),
   -- que son pocos. Si un día pesa, un índice parcial por (tenant_id, cliente_telefono).
   PERFORM pg_advisory_xact_lock(hashtextextended('tienda_pedido:' || p_tenant || ':' || v_tel, 0));
@@ -717,7 +721,11 @@ BEGIN
               WHERE c.id = lealtad_resolver_cliente(p_tenant, NULL, v_tel) AND c.estado = 'BLOQUEADO')
      OR (SELECT count(*) FROM delivery_pedidos d
           WHERE d.tenant_id = p_tenant AND d.canal = 'TIENDA' AND d.cliente_telefono = v_tel
-            AND d.estado IN ('RECIBIDO', 'ACEPTADO', 'EN_PREPARACION', 'LISTO')) > 2 THEN
+            AND d.estado IN ('RECIBIDO', 'ACEPTADO', 'EN_PREPARACION', 'LISTO')
+            AND d.recibido_at > now() - interval '6 hours'
+            AND NOT EXISTS (SELECT 1 FROM tickets t
+                             WHERE t.id = d.ticket_id AND t.tenant_id = p_tenant
+                               AND t.estado_fiscal IN ('PAGADO', 'FACTURADO', 'CANCELADO'))) > 2 THEN
     RAISE EXCEPTION 'NO_SE_PUDO_CREAR: no se pudo crear el pedido';
   END IF;
 
