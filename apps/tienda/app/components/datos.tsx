@@ -19,7 +19,7 @@ import {
 import type { Cotizacion, DireccionGuardada, ErrorDeTienda, MiCuenta, Negocio, Pago, Sucursal } from "../lib/contrato";
 import { LIMITES_DE_CUENTA, direccionEnUnaLinea, enlaceDeAcceso, formularioDeDireccion, paraTusDatos } from "../lib/cuenta";
 import { aCentavos, formatoMxn } from "../lib/dinero";
-import { enviarPedido, envioDeLaPagina, type Desenlace, type ResultadoDeEnvio } from "../lib/envio";
+import { enviarPedido, envioDeLaPagina, intentoDeLaPagina, type Desenlace, type ResultadoDeEnvio } from "../lib/envio";
 import { enlaceTel, formatoTelefono } from "../lib/telefono";
 import { textoDeError } from "../lib/textos";
 import { CampoDeTexto } from "./campo";
@@ -188,16 +188,17 @@ export function PasoDeDatos({
     // La dirección nueva que pidió guardar en su cuenta (solo con sesión, a domicilio y escrita a mano).
     const porGuardar = conSesion && guardar && !elegida && delPedido.direccion
       ? { ...delPedido.direccion, id: null, etiqueta: etiqueta.trim() || "Casa" } : null;
+    const elPedido = { ...cuerpo, ...delPedido, nota: nota || null };
+    // La misma clave mientras se reintente ESTE pedido; otra si algo de él cambió.
+    const clave = intentoDeLaPagina.para({ negocio: negocio.slug, ...elPedido });
     envioDeLaPagina.lanzar(async () => {
       const r = await enviarPedido({
         cotizar: () => cotizar(negocio.slug, cuerpo),
-        pedir: (totalEsperado) => pedir(negocio.slug, {
-          ...cuerpo, ...delPedido, nota: nota || null,
-          captcha: tokenAhora.current, total_esperado: totalEsperado,
-        }),
+        pedir: (totalEsperado) => pedir(negocio.slug, { ...elPedido, clave, captcha: tokenAhora.current, total_esperado: totalEsperado }),
         totalVisto: total,
       }, { telefono: sucursal.telefono, horario: sucursal.horario });
       if (r.desenlace.tipo === "hecho") {
+        intentoDeLaPagina.cerrar();
         // Con sesión el teléfono no recuerda nada: los datos viven en la cuenta. Guardar la dirección
         // va aparte y sin esperar: si falla, el pedido ya entró y no se le estorba (la agrega en «Mi cuenta»).
         if (!conSesion) guardarCliente(datos, modo);
@@ -256,9 +257,9 @@ export function PasoDeDatos({
     // eslint-disable-next-line react-hooks/exhaustive-deps -- solo reacciona a la espera y a la llegada del token
   }, [robot, token]);
 
-  // Enter en un campo solo envía cuando lo que se ofrece es enviar. Con «llama antes» o «vuelve a tu
-  // pedido» en pantalla, Enter no manda nada: el reintento es un botón aparte, a propósito.
-  const seOfreceEnviar = !!totalNuevo || !aviso || aviso.sigue === "reintentar" || aviso.sigue === "sesion";
+  // Enter en un campo solo envía cuando lo que se ofrece es enviar. Con «llama al restaurante» o
+  // «vuelve a tu pedido» en pantalla, Enter no manda nada.
+  const seOfreceEnviar = !!totalNuevo || !aviso || aviso.sigue === "reintentar" || aviso.sigue === "reintentar-seguro" || aviso.sigue === "sesion";
   const total = totalNuevo ?? totalVisto;
   const estado = enviando || hecho ? "Enviando tu pedido…" : robot ? "Comprobando que no eres un robot…" : "";
   const botonDeEnviar = (etiqueta: string, importe: string | null) => (
@@ -414,15 +415,21 @@ export function PasoDeDatos({
         ) : (
           <>
             {aviso && <Aviso tono={aviso.tono} role="alert" className="!text-14">{aviso.texto}</Aviso>}
-            {aviso && (aviso.sigue === "llamar" || aviso.sigue === "llamar-antes") ? (
+            {aviso?.sigue === "llamar" ? (
               <>
                 {tel
                   ? <a href={tel} className={cn(PRINCIPAL, "h-14 w-full px-5 text-16")}>Llamar al {formatoTelefono(sucursal.telefono ?? "")}</a>
                   : sucursal.telefono && <p className="text-16 font-semibold">{sucursal.telefono}</p>}
-                {aviso.sigue === "llamar-antes"
-                  // Reintentar aquí es a propósito y con el riesgo dicho: el pedido pudo haber entrado.
-                  ? <button type="button" onClick={() => intentar(total)} disabled={ocupado} className={GHOST}>Ya llamé y no les llegó: enviar otra vez</button>
-                  : <button type="button" onClick={alVolver} className={GHOST}>Volver a tu pedido</button>}
+                <button type="button" onClick={alVolver} className={GHOST}>Volver a tu pedido</button>
+              </>
+            ) : aviso?.sigue === "reintentar-seguro" ? (
+              // No se supo si entró. Reintentar va con la misma clave (y un antirobot nuevo): si ya
+              // había entrado, el servidor devuelve ese pedido y lo lleva a su seguimiento.
+              <>
+                {botonDeEnviar("Reintentar", total)}
+                {!ocupado && (tel
+                  ? <a href={tel} className={GHOST}>Llamar al restaurante</a>
+                  : sucursal.telefono && <p className="text-center text-14 text-ink-2">Restaurante: {sucursal.telefono}</p>)}
               </>
             ) : aviso?.sigue === "volver" ? (
               <button type="button" onClick={alVolver} className={cn(PRINCIPAL, "h-14 w-full px-5 text-16")}>Volver a tu pedido</button>

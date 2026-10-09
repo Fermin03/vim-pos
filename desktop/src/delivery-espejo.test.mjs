@@ -480,7 +480,8 @@ test("reporte: el ticket impreso, asignado, cobrado o cancelado se le dice a la 
 });
 
 test("reporte: sin nada nuevo que decir no se llama a la nube", async () => {
-  for (const extra of [{}, { estado: "LISTO", ticket_impreso_at: "2026-10-09T10:00:00Z" }, { estado: "EN_PREPARACION" }]) {
+  // (Entrega 7: un ACEPTADO con ticket abierto YA tiene algo que decir —«ya lo tengo»—; salió de esta lista.)
+  for (const extra of [{ estado: "LISTO", ticket_impreso_at: "2026-10-09T10:00:00Z" }, { estado: "EN_PREPARACION" }]) {
     const pool = poolFalso({ reporte: [filaReporte(extra)] });
     const nube = nubeFalsa({ pedidos: [] });
     await agenteCon(pool, nube).tick();
@@ -643,4 +644,68 @@ test("reporte: tope de 48 horas, y una excepción ahí no le mete backoff al son
   assert.ok(logs.some((m) => /1 tickets creados · 1 aceptados/.test(m)), "y el pedido de Uber de esa vuelta se atendió");
   const q = pool.sql.find((x) => x.texto.startsWith("SELECT p.id, p.folio_corto, p.estado"));
   assert.match(q.texto, /p\.recibido_at > now\(\) - interval '48 hours'/);
+});
+
+// ── «Ya lo tengo» (entrega 7) ────────────────────────────────────────────────
+test("ya lo tengo: con el ticket creado y el pedido en ACEPTADO se reporta EN_PREPARACION, una vez", async () => {
+  const fila = filaReporte();
+  const pool = poolFalso({ reporte: [fila] });
+  const nube = nubeFalsa({ pedidos: [] });
+  const agente = agenteCon(pool, nube);
+  await agente.tick();
+  assert.deepEqual(acciones(nube), [{ accion: "estado", pedido_id: "t1", estado: "EN_PREPARACION" }]);
+  assert.deepEqual(estadosLocales(pool), [["t1", "EN_PREPARACION"]]);
+  assert.deepEqual(avisosAlCajero(pool), []);
+  fila.estado = "EN_PREPARACION";   // lo que quedó guardado en la base local
+  await agente.tick();
+  assert.equal(acciones(nube).length, 1, "ya está dicho: no se repite");
+});
+
+test("ya lo tengo: en la misma vuelta en que se crea el ticket de un pedido que aceptó el cajero", async () => {
+  const pool = poolFalso({ reporte: [filaReporte()] });
+  const nube = nubeFalsa({ pedidos: [pedidoT({ estado: "ACEPTADO" })], tienda: MANUAL });
+  await agenteCon(pool, nube).tick();
+  assert.deepEqual(acciones(nube), [{ accion: "reclamar", pedido_id: "t1" }, { accion: "estado", pedido_id: "t1", estado: "EN_PREPARACION" }]);
+  const orden = pool.sql.map((q) => q.texto);
+  assert.ok(orden.findIndex((t) => t.startsWith("SELECT crear_ticket_desde_tienda")) < orden.findIndex((t) => t.startsWith("SELECT p.id, p.folio_corto, p.estado")), "primero el ticket, luego el aviso");
+});
+
+test("ya lo tengo: si la nube responde un estado posterior, se guarda ese", async () => {
+  const pool = poolFalso({ reporte: [filaReporte()] });
+  const nube = nubeFalsa({ pedidos: [], alReportar: () => [200, { ok: true, estado: "LISTO" }] });
+  await agenteCon(pool, nube).tick();
+  assert.deepEqual(estadosLocales(pool), [["t1", "LISTO"]]);
+  assert.deepEqual(avisosAlCajero(pool), []);
+});
+
+test("ya lo tengo: si la nube ya lo había cancelado, el cajero lee que cancele el ticket", async () => {
+  const pool = poolFalso({ reporte: [filaReporte()] });
+  const nube = nubeFalsa({ pedidos: [], alReportar: () => [200, { ok: true, estado: "CANCELADO" }] });
+  await agenteCon(pool, nube).tick();
+  assert.deepEqual(estadosLocales(pool), [["t1", "CANCELADO"]]);
+  assert.deepEqual(avisosAlCajero(pool), [["t1", "El pedido en línea se canceló: cancela el ticket en caja"]]);
+  // Si quien canceló fue esta caja (el ticket ya está cancelado), no hay nada que avisarle.
+  const propio = poolFalso({ reporte: [filaReporte({ ticket_estado: "CANCELADO" })] });
+  await agenteCon(propio, nubeFalsa({ pedidos: [] })).tick();
+  assert.deepEqual(avisosAlCajero(propio), []);
+});
+
+test("ya lo tengo: una nube vieja que responde ESTADO_INVALIDO no se martillea; al imprimir sí se reporta LISTO", async () => {
+  const fila = filaReporte();
+  const pool = poolFalso({ reporte: [fila] });
+  const nube = nubeFalsa({ pedidos: [], siguienteEnMs: 300_000, alReportar: (b) => (b.estado === "EN_PREPARACION" ? [400, { error: "ESTADO_INVALIDO" }] : [200, { ok: true, estado: b.estado }]) });
+  let reloj = 1_000_000;
+  const tiempos = relojFalso();
+  const agente = agenteCon(pool, nube, { ahora: () => reloj, aleatorio: centro, ...tiempos });
+  await agente.vuelta(); await agente.tick(); await agente.tick();
+  assert.equal(acciones(nube).length, 1, "una sola llamada en tres vueltas");
+  assert.deepEqual(estadosLocales(pool), []);
+  assert.equal(agente.estado().pendiente, false);
+  assert.equal(tiempos.esperas.at(-1), 300_000, "la caja no se queda sondeando con prisa");
+  reloj += 5 * 60_000 + 1;
+  await agente.tick();
+  assert.equal(acciones(nube).length, 2, "pasados 5 minutos lo intenta otra vez");
+  fila.ticket_impreso_at = "2026-10-09T10:00:00Z";
+  await agente.tick();
+  assert.deepEqual(acciones(nube).map((b) => b.estado), ["EN_PREPARACION", "EN_PREPARACION", "LISTO"]);
 });

@@ -468,14 +468,24 @@ y el mismo sondeo que Uber; la rama se decide siempre por `canal`, nunca por `ap
   justo antes), queda en el pedido el aviso «El pedido en línea se canceló: cancela el ticket en caja».
 - **Qué estados reporta y de dónde los saca.** El cajero no marca nada. En cada vuelta, para los
   pedidos `TIENDA` de gestión `ESCRITORIO` con ticket local en `ACEPTADO / EN_PREPARACION / LISTO` (con tope de 48 h desde
-  `recibido_at`), se mira el **ticket local** (`estadoAReportar`), de arriba abajo:
+  `recibido_at`), se mira el **ticket local** y el estado local del pedido (`estadoAReportar`), de arriba abajo:
 
   | Ticket local | Se reporta (`delivery-accion` → `estado`) |
   |---|---|
   | `estado_fiscal = CANCELADO` | `CANCELADO` |
   | `PAGADO` o `FACTURADO` | `ENTREGADO` |
   | `ticket_impreso_at` no nulo, o con repartidor asignado (`delivery_asignaciones`) | `LISTO` |
+  | abierto, sin imprimir y sin repartidor, con el pedido local todavía en `ACEPTADO` | `EN_PREPARACION` (el «ya lo tengo», desde la 0.8.0) |
   | cualquier otro | nada |
+
+  **«Ya lo tengo».** `EN_PREPARACION` le dice a la nube que la caja ya creó la cuenta del pedido.
+  Sale en la misma vuelta en que se crea el ticket si el pedido ya venía `ACEPTADO` (lo aceptó el
+  cajero); si lo aceptó la caja sola, en la vuelta siguiente, cuando el sondeo trae el `ACEPTADO`.
+  Sin ese aviso la nube cancela el pedido a los **15 minutos** de aceptado (caja apagada o sin
+  turno). Si al reportar cualquier estado de un ticket abierto la nube contesta `CANCELADO`, queda
+  en el pedido el aviso «El pedido en línea se canceló: cancela el ticket en caja». Una nube
+  anterior a la 0167 contesta `ESTADO_INVALIDO` (400): cae en la regla de los 5 minutos de abajo, y
+  al imprimir o cobrar se reporta `LISTO` / `ENTREGADO` como siempre.
 
   La nube (`tienda_reportar_estado`, 0164) solo **avanza** estados y contesta en cuál quedó el
   pedido; eso es lo que la caja guarda. Si no coincide con lo reportado (p. ej. reportó `LISTO` y
@@ -523,6 +533,7 @@ y el mismo sondeo que Uber; la rama se decide siempre por `canal`, nunca por `ap
   | `pedido T101: la nube ya lo había cerrado y aquí ya tiene ticket…` | Se rechazó o venció justo antes de crear el ticket. El cajero ve el aviso de cancelar. |
   | `pedido T101: no se pudo reportar LISTO (…); se reintenta` | La nube respondió ≥ 500 o 401. |
   | `pedido T101: la nube no tomó el estado LISTO (quedó RECIBIDO); se reintenta en 5 min` | Contestó y no lo tomó. Mira el estado del pedido en la nube. |
+  | `pedido T101: la nube no tomó el estado EN_PREPARACION (ESTADO_INVALIDO); se reintenta en 5 min` | La nube todavía no conoce el «ya lo tengo» (funciones sin desplegar). No estorba al resto. |
   | `reporte de estados de la tienda falló: …` | Error local al leer el reporte; no cuenta como sondeo fallido de Uber. |
   | `pedido T101: RECLAMADO_POR_OTRA_CAJA (no es de esta caja)` | Otra caja de la sucursal lo tomó; no es un error. |
   | `espejo HTTP 403 CAJA_NO_EXISTE` | Caja desactivada o ya no es de ese negocio. |

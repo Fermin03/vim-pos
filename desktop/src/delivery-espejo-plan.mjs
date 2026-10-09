@@ -113,11 +113,14 @@ export function planificarEspejo({ conexiones = [], pedidos = [], localPedidos =
  * (diseño §8). De arriba hacia abajo; `null` = todavía no hay nada que decir.
  * El cajero no marca nada: imprimir el ticket o asignar repartidor es «listo», cobrar es
  * «entregado», cancelar es «cancelado».
+ * Y «ya lo tengo» (entrega 7): el ticket existe y sigue abierto, y el pedido local (`estado`) sigue
+ * en ACEPTADO → «en preparación». Sin ese aviso la nube cancela el pedido a los 15 minutos.
  */
-export function estadoAReportar({ ticket_estado, ticket_impreso_at, asignado } = {}) {
+export function estadoAReportar({ ticket_estado, ticket_impreso_at, asignado, estado } = {}) {
   if (ticket_estado === "CANCELADO") return "CANCELADO";
   if (ticket_estado === "PAGADO" || ticket_estado === "FACTURADO") return "ENTREGADO";
   if (ticket_impreso_at || asignado === true) return "LISTO";
+  if (estado === "ACEPTADO") return "EN_PREPARACION";
   return null;
 }
 

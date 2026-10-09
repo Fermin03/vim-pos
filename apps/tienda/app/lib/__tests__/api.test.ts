@@ -10,7 +10,7 @@ const json = (cuerpo: unknown, status = 200) => new Response(JSON.stringify(cuer
 const carrito = { sucursal_id: ID.sucursal, modo: "RECOGER" as const, zona_id: null, items: [{ producto_id: ID.refresco, cantidad: 1, modificadores: [] }] };
 const pedido: CuerpoPedido = {
   ...carrito, cliente: { nombre: "Ana", telefono: "4771234567", email: null }, direccion: null,
-  pago: "EFECTIVO", paga_con: null, nota: null, captcha: "token", total_esperado: "30.00",
+  pago: "EFECTIVO", paga_con: null, nota: null, captcha: "token", total_esperado: "30.00", clave: CODIGO,
 };
 
 beforeEach(() => {

@@ -1,12 +1,12 @@
 // «Enviar»: qué hace la pantalla con cada respuesta. Antes de pedir se cotiza OTRA vez (no vale la
 // cotización de hace minutos) y ese total viaja como `total_esperado`. El pedido nunca se reintenta
-// solo (decisión 8): si no se supo si entró, se le dice al cliente que llame antes de insistir.
+// solo, pero reintentarlo a mano es seguro (entrega 7): cada intento de compra lleva una `clave` y,
+// si el pedido ya había entrado, el servidor devuelve ese mismo en vez de crear otro.
 import type { Resultado } from "./api";
 import type { Campo } from "./cliente";
 import type { Cotizacion, ErrorDeTienda, PedidoCreado } from "./contrato";
 import type { Horario } from "@vim/fecha";
 import type { Momento } from "./horario";
-import { formatoTelefono } from "./telefono";
 import { textoCerrada, textoDeError } from "./textos";
 
 export type Desenlace =
@@ -25,11 +25,12 @@ export type Desenlace =
      *  · `reintentar`  — el botón de enviar sigue ahí;
      *  · `volver`      — se arregla en el carrito (zona, modo, productos);
      *  · `llamar`      — por aquí no se va a poder: llamar al restaurante;
-     *  · `llamar-antes`— el pedido PUDO haber entrado: primero llamar; reintentar solo si lo pide a propósito;
+     *  · `reintentar-seguro` — el pedido PUDO haber entrado: «Reintentar» (misma clave: no se duplica)
+     *                    y, en secundario, llamar al restaurante;
      *  · `sesion`      — la sesión de su cuenta terminó (el servidor ya borró la cookie): entrar otra
      *                    vez, o enviar el pedido como invitado. No se creó nada.
      */
-    sigue: "reintentar" | "volver" | "llamar" | "llamar-antes" | "sesion";
+    sigue: "reintentar" | "volver" | "llamar" | "reintentar-seguro" | "sesion";
   };
 
 export type ContextoDeEnvio = { telefono: string | null; horario: Horario; ahora?: Momento };
@@ -50,10 +51,7 @@ export function desenlaceDelError(e: ErrorDeTienda, c: ContextoDeEnvio): Desenla
   if (e.error === "TIENDA_CERRADA") return { tipo: "aviso", tono: "warning", texto: textoCerrada(e.detalle ?? "", c.horario, c.ahora), sigue: "reintentar" };
   // No se degrada a invitado en silencio: el pedido no quedaría en su cuenta, y eso lo decide él.
   if (e.error === "SESION_INVALIDA") return { tipo: "aviso", tono: "warning", texto: "Tu sesión terminó. Entra otra vez o envía tu pedido como invitado.", sigue: "sesion" };
-  if (e.error === "SIN_CONFIRMAR") {
-    const tel = c.telefono ? `: ${formatoTelefono(c.telefono)}` : "";
-    return { tipo: "aviso", tono: "danger", texto: `No pudimos confirmar tu pedido. Antes de volver a intentarlo, llama al restaurante${tel}.`, sigue: "llamar-antes" };
-  }
+  if (e.error === "SIN_CONFIRMAR") return { tipo: "aviso", tono: "warning", texto, sigue: "reintentar-seguro" };
   return {
     tipo: "aviso", tono: "danger", texto,
     sigue: SOLO_LLAMAR.has(e.error) ? "llamar" : DEL_CARRITO.has(e.error) || DE_RENGLON.has(e.error) ? "volver" : "reintentar",
@@ -141,3 +139,37 @@ export function candadoDeEnvio<R>() {
 
 /** El de la página: lo comparten «Tus datos» (que envía) y la tienda (que no deja salir mientras). */
 export const envioDeLaPagina = candadoDeEnvio<ResultadoDeEnvio>();
+
+/** Una clave de intento: 16 bytes al azar en base64url, 22 caracteres (la forma de `FORMA_CODIGO`). */
+export function claveNueva(): string {
+  const b = new Uint8Array(16);
+  // ponytail: sin `crypto` (ningún navegador vigente) vale `Math.random`: la clave solo evita el
+  // duplicado; el código de seguimiento lo deriva el servidor con su secreto.
+  if (globalThis.crypto?.getRandomValues) globalThis.crypto.getRandomValues(b);
+  else for (let i = 0; i < b.length; i++) b[i] = Math.floor(Math.random() * 256);
+  return btoa(String.fromCharCode(...b)).replace(/\+/g, "-").replace(/\//g, "_").slice(0, 22);
+}
+
+/**
+ * La clave del intento de compra: la MISMA mientras se reintente el mismo pedido sin saber si entró
+ * (así el servidor devuelve el que ya existe en vez de crear otro), y una nueva en cuanto el pedido
+ * es otro —cambió el carrito, el modo o la zona, los datos de entrega, el pago o la nota— o el
+ * anterior ya entró (`cerrar`). «El mismo pedido» se decide por contenido: lo que se manda en
+ * `pedir`, sin el antirobot ni el total esperado, que cambian en cada intento.
+ * Vive en memoria, junto al candado: recargar la página empieza un intento nuevo.
+ */
+export function intentoDeCompra(nueva: () => string = claveNueva) {
+  let actual: { de: string; clave: string } | null = null;
+  return {
+    para(pedido: unknown): string {
+      const de = JSON.stringify(pedido);
+      if (actual?.de !== de) actual = { de, clave: nueva() };
+      return actual.clave;
+    },
+    /** El pedido entró: el siguiente, aunque sea idéntico, es otro. */
+    cerrar(): void { actual = null; },
+  };
+}
+
+/** El de la página. */
+export const intentoDeLaPagina = intentoDeCompra();

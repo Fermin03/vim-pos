@@ -315,7 +315,7 @@ describe("textos", () => {
     expect(textoDeError("NO_SE_PUDO_CREAR").hacer).toBe("Llama al restaurante para hacer tu pedido.");
     expect(textoDeError("TOTAL_CAMBIO", { detalle: "310.00" }).texto).toBe("El total de tu pedido cambió: ahora es $310.00.");
     expect(textoDeError("TOTAL_CAMBIO").texto).toBe("El total de tu pedido cambió.");
-    expect(textoDeError("SIN_CONFIRMAR", { telefono: "4771234567" }).hacer).toContain("Antes de volver a intentar");
+    expect(textoDeError("SIN_CONFIRMAR", { telefono: "4771234567" }).hacer).toBe("Vuelve a intentarlo: si ya había entrado, no se duplica.");
     expect(textoDeError("TIENDA_CERRADA", { detalle: "EN_PAUSA" }).texto).toBe("No estamos tomando pedidos en este momento.");
   });
   it("la regla de un grupo, en palabras", () => {

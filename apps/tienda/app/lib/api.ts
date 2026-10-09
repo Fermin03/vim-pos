@@ -10,7 +10,7 @@ import type { CuerpoCarrito } from "./carrito";
 /**
  * `error` es un código de la función (anexo §1.3) o uno de la tienda:
  *  · `SIN_CONEXION`  — no hubo respuesta (sin red o tardó demasiado). Se puede reintentar.
- *  · `SIN_CONFIRMAR` — solo en `pedir`: no se supo si el pedido entró. NO reintentar solo.
+ *  · `SIN_CONFIRMAR` — solo en `pedir`: no se supo si el pedido entró. Reintentar con la MISMA `clave` es seguro.
  *  · `CANCELADA`     — quien llamó abortó con su `signal`. No se enseña nada.
  */
 export type Resultado<T> = { ok: true; datos: T } | { ok: false; error: string; detalle: string | null };
@@ -32,6 +32,8 @@ export type CuerpoPedido = CuerpoCarrito & {
   captcha: string;
   /** El `total_mxn` de la cotización que vio el cliente: si ya no es ese, responde `TOTAL_CAMBIO`. */
   total_esperado: string | null;
+  /** La del intento de compra (`intentoDeCompra`): reenviar con la misma devuelve el pedido que ya entró, no crea otro. */
+  clave: string;
 };
 
 const LIMITE_MS = 20_000;   // el servidor corta a los 10 s; esto es por si la red del teléfono se cuelga
@@ -77,9 +79,9 @@ export function seguimiento(negocio: string, codigo: string, signal?: AbortSigna
 }
 
 /**
- * Manda el pedido. UNA llamada, sin reintentos: la función no evita el doble pedido. Si no se supo
- * qué pasó (sin red, tiempo de espera, respuesta ilegible) responde `SIN_CONFIRMAR`: hay que decirle
- * al cliente que revise con el restaurante antes de volver a intentar.
+ * Manda el pedido. UNA llamada, sin reintentos automáticos. Si no se supo qué pasó (sin red, tiempo
+ * de espera, respuesta ilegible) responde `SIN_CONFIRMAR`: el cliente puede reintentar, y con la
+ * misma `clave` la función devuelve el pedido que ya había entrado en vez de crear otro.
  * Con `ok`, el pedido existe aunque `folio_corto`, `total_mxn` y `vence_aceptacion` vengan en null.
  */
 export async function pedir(negocio: string, pedido: CuerpoPedido): Promise<Resultado<PedidoCreado>> {

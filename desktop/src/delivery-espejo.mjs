@@ -10,7 +10,8 @@
 // Tienda en línea (entrega 4, canal TIENDA): viaja por el mismo sondeo. La caja declara
 // `tienda: true` y si hay turno abierto; el ticket se crea con crear_ticket_desde_tienda (nunca con
 // la de apps, ni al revés); y en cada vuelta le reporta a la nube en qué va cada pedido mirando su
-// ticket local (impreso o con repartidor → listo; cobrado → entregado; cancelado → cancelado).
+// ticket local (recién creado → en preparación, el «ya lo tengo»; impreso o con repartidor → listo;
+// cobrado → entregado; cancelado → cancelado).
 import {
   planificarEspejo, cursorDe, estadoAReportar, fallaDeTicket, fallaConGracia, avisoDeFalla, AVISO_TIENDA_CERRADO,
   COLUMNAS_PEDIDO, COLUMNAS_CONEXION,
@@ -299,6 +300,11 @@ export function crearEspejo({
           if (rep.ok && typeof rep.body?.estado === "string") {
             quedo = rep.body.estado;
             await pool.query(`UPDATE delivery_pedidos SET estado = $2 WHERE id = $1`, [f.id, quedo]);
+            // La nube ya lo había cancelado (p. ej. pasó 15 min sin el «ya lo tengo») y aquí el ticket
+            // sigue abierto: el cajero lo lee YA, igual que cuando el cierre llega por el sondeo.
+            if (quedo === "CANCELADO" && reportar !== "CANCELADO" && reportar !== "ENTREGADO") {
+              await pool.query(`UPDATE delivery_pedidos SET ultimo_error = $2 WHERE id = $1`, [f.id, AVISO_TIENDA_CERRADO]);
+            }
           }
           if (quedo === reportar) { sinEfecto.delete(f.id); continue; }
           const porque = rep.ok ? `quedó ${quedo}` : rep.body?.error ?? rep.status;
