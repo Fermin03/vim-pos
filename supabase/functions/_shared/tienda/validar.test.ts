@@ -101,3 +101,58 @@ test("cuerpo: seguimiento exige un código con forma de código", () => {
   assert.equal(leerCuerpo({ accion: "seguimiento", negocio: "knockout", codigo: "A".repeat(22) }).ok, true);
   assert.deepEqual(leerCuerpo({ accion: "seguimiento", negocio: "knockout", codigo: "corto" }), { ok: false, error: "CODIGO_INVALIDO" });
 });
+
+// ---- Ronda 1 de revisión: lo que NO debe pasar ----
+
+test("teléfono: las letras no son adorno; números triviales o con lada imposible se rechazan", () => {
+  for (const t of ["abc4771112233", "0000000000", "1234567890", "477-111-2233x"]) assert.equal(normalizarTelefono(t), null);
+  assert.equal(normalizarTelefono("477.111.2233"), "4771112233");
+});
+test("texto: solo caracteres invisibles es null", () => {
+  assert.equal(textoLimpio("\u200B\u200C\u200D\u2060\uFEFF", 10), null);
+  assert.equal(textoLimpio("\u0085\u2028\u2029", 10), null);
+});
+test("texto: caracteres bidi, de ancho cero y C1 se quitan", () => {
+  const r = textoLimpio("Ana\u202EodnuM\u2066x\u2069\u200Bz\u0085w", 50);
+  assert.ok(r !== null && !/[\u202A-\u202E\u2066-\u2069\u200B\u0085]/.test(r), String(r));
+});
+test("texto: un separador invisible entre palabras no las pega", () => {
+  assert.equal(textoLimpio("Ana\u2028María", 50), "Ana María");
+});
+test("texto: se corta por carácter, no deja medio emoji ni pasa medio emoji de la entrada", () => {
+  const r = textoLimpio("abc😀def", 4);
+  assert.equal(r, "abc😀");
+  assert.equal(r!.isWellFormed(), true);
+  const c = textoLimpio("abcde😀", 5);
+  assert.equal(c, "abcde");
+  assert.equal(textoLimpio("ab\uD800cd", 10)!.isWellFormed(), true);
+  assert.equal(textoLimpio("\uD800", 10), null);
+});
+
+const comoPedido = (cliente: object) => leerCuerpo({ ...pedir, cliente: { nombre: "Ana", telefono: "4771112233", ...cliente } });
+test("cuerpo: el correo es ASCII y sin caracteres peligrosos", () => {
+  for (const email of ["a\u0000b@x.com", "a,b@x.com", "a<b@x.com", "ñandú@x.com", "a@x.c", "a@@x.com", "a b@x.com", "a@x.com;b@y.com", '"a"@x.com', "a\u200B@x.com", "a@x_y.com"]) {
+    assert.deepEqual(comoPedido({ email }), { ok: false, error: "CLIENTE_INVALIDO" }, JSON.stringify(email));
+  }
+  const r = comoPedido({ email: "Ana+tienda@mail.sub.example.com" });
+  assert.equal(r.ok, true);
+  if (r.ok && r.valor.accion === "pedir") assert.equal(r.valor.cliente.email, "ana+tienda@mail.sub.example.com");
+});
+test("cuerpo: un correo vacío es un correo ausente", () => {
+  const r = comoPedido({ email: "  " });
+  assert.equal(r.ok, true);
+  if (r.ok && r.valor.accion === "pedir") assert.equal(r.valor.cliente.email, null);
+});
+test("cuerpo: pago con tarjeta sin paga_con pasa; importes raros no", () => {
+  const t = leerCuerpo({ ...pedir, pago: "TARJETA", paga_con: null });
+  assert.equal(t.ok, true);
+  if (t.ok && t.valor.accion === "pedir") { assert.equal(t.valor.pago, "TARJETA"); assert.equal(t.valor.paga_con, null); }
+  for (const paga_con of ["1e3", "Infinity", 12.345, "12.345", NaN, Infinity, " "]) {
+    assert.deepEqual(leerCuerpo({ ...pedir, paga_con }), { ok: false, error: "PAGO_INVALIDO" }, String(paga_con));
+  }
+  const cero = leerCuerpo({ ...pedir, paga_con: -0 });
+  assert.equal(cero.ok, true);
+  if (cero.ok && cero.valor.accion === "pedir") assert.equal(cero.valor.paga_con, "0.00");
+  const dec = leerCuerpo({ ...pedir, paga_con: 12.5 });
+  if (dec.ok && dec.valor.accion === "pedir") assert.equal(dec.valor.paga_con, "12.50");
+});

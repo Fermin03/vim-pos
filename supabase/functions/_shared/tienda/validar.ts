@@ -22,7 +22,8 @@ export type Peticion =
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const SLUG = /^[a-z0-9][a-z0-9-]{1,38}[a-z0-9]$/;
-const CORREO = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+// Solo ASCII: el correo acaba en cabeceras SMTP y en la base; nada de invisibles, comas ni comillas.
+const CORREO = /^[A-Za-z0-9._%+-]+@[A-Za-z0-9-]+(\.[A-Za-z0-9-]+)*\.[A-Za-z]{2,}$/;
 const MAX_RENGLONES = 40;
 
 const mal = (error: string): { ok: false; error: string } => ({ ok: false, error });
@@ -32,21 +33,25 @@ export function esUuid(x: unknown): x is string {
   return typeof x === "string" && UUID.test(x);
 }
 
-/** Diez dígitos nacionales, o null. Quita adornos y el prefijo de México (52, o 521 de celular). */
+/** Diez dígitos nacionales, o null. Quita adornos (espacios y `()+-.`) y el prefijo de México (52, o
+ *  521 de celular). Una letra no es adorno, y la lada nacional no empieza en 0 ni en 1. */
 export function normalizarTelefono(x: unknown): string | null {
-  if (typeof x !== "string") return null;
+  if (typeof x !== "string" || !/^[\d\s()+.-]+$/.test(x)) return null;
   let d = x.replace(/\D/g, "");
   if (d.length === 13 && d.startsWith("521")) d = d.slice(3);
   else if (d.length === 12 && d.startsWith("52")) d = d.slice(2);
-  return d.length === 10 ? d : null;
+  return /^[2-9]\d{9}$/.test(d) ? d : null;
 }
 
-/** Texto de una sola línea, sin caracteres de control, recortado a `max`. Vacío = null. */
+/** Texto de una sola línea recortado a `max` CARACTERES (no unidades UTF-16: no parte un emoji).
+ *  Los controles (Cc, incluidos los C1) y los separadores de línea/párrafo se vuelven espacio; los de
+ *  formato (Cf: ancho cero, bidi, BOM) y los sustitutos sueltos se quitan. Sin nada visible = null. */
 export function textoLimpio(x: unknown, max: number): string | null {
   if (typeof x !== "string") return null;
-  // deno-lint-ignore no-control-regex
-  const t = x.replace(/[\u0000-\u001f\u007f]/g, " ").replace(/\s+/g, " ").trim().slice(0, max).trim();
-  return t === "" ? null : t;
+  const t = x.replace(/[\p{Cc}\p{Zl}\p{Zp}]/gu, " ").replace(/[\p{Cf}\p{Cs}]/gu, "")
+    .replace(/\s+/g, " ").trim();
+  const corto = Array.from(t).slice(0, max).join("").trim();
+  return /[\p{L}\p{N}\p{P}\p{S}]/u.test(corto) ? corto : null;
 }
 
 function leerDireccion(x: unknown): Direccion | null {
@@ -59,12 +64,14 @@ function leerDireccion(x: unknown): Direccion | null {
            codigo_postal, ciudad, estado, referencias: textoLimpio(x.referencias, 300) };
 }
 
-/** Importe como texto con dos decimales, o undefined si no es un importe válido. null/ausente = null. */
+/** Importe como texto con dos decimales, o undefined si no es un importe válido. null/ausente = null.
+ *  Un número se juzga por su texto: más de dos decimales (o notación científica) se rechaza, no se redondea. */
 function leerImporte(x: unknown): string | null | undefined {
   if (x === null || x === undefined || x === "") return null;
-  const n = typeof x === "number" ? x : typeof x === "string" && /^\d+(\.\d{1,2})?$/.test(x.trim()) ? Number(x) : NaN;
-  if (!Number.isFinite(n) || n < 0 || n > 999999) return undefined;
-  return n.toFixed(2);
+  const s = typeof x === "number" ? String(x) : typeof x === "string" ? x.trim() : "";
+  if (!/^\d+(\.\d{1,2})?$/.test(s)) return undefined;
+  const n = Number(s);
+  return n > 999999 ? undefined : n.toFixed(2);
 }
 
 export function leerCuerpo(x: unknown): Resultado<Peticion> {
@@ -99,7 +106,8 @@ export function leerCuerpo(x: unknown): Resultado<Peticion> {
   const nombre = textoLimpio(x.cliente.nombre, 100);
   const telefono = normalizarTelefono(x.cliente.telefono);
   const emailCrudo = x.cliente.email ?? null;
-  const email = emailCrudo === null ? null : typeof emailCrudo === "string" ? emailCrudo.trim().toLowerCase() : "";
+  // Un campo opcional del formulario que llega vacío es un correo ausente, no un error.
+  const email = emailCrudo === null ? null : typeof emailCrudo === "string" ? (emailCrudo.trim().toLowerCase() || null) : "";
   if (!nombre || !telefono || (email !== null && (email.length > 254 || !CORREO.test(email)))) return mal("CLIENTE_INVALIDO");
 
   let direccion: Direccion | null = null;
