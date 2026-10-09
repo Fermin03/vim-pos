@@ -33,11 +33,13 @@ const CONEXION_VIVA = new Set(["ACTIVA", "PENDIENTE"]);
 export function cadenciaEspejo(
   { conexiones = [], pedidosVivos = [], tienda = false }: {
     conexiones?: { estado?: string | null }[];
-    pedidosVivos?: { estado?: string | null }[];
+    pedidosVivos?: { estado?: string | null; canal?: string | null }[];
     tienda?: boolean;
   },
 ): number {
-  if (pedidosVivos.some((p) => p.estado === "RECIBIDO")) return RAPIDA_MS;
+  // Un pedido vivo de la TIENDA acelera en cualquier estado, no solo por aceptar: su cliente mira
+  // el seguimiento y «listo» o «entregado» le tienen que llegar en segundos. Los de APP, como siempre.
+  if (pedidosVivos.some((p) => p.estado === "RECIBIDO" || p.canal === "TIENDA")) return RAPIDA_MS;
   if (tienda || conexiones.some((c) => CONEXION_VIVA.has(String(c.estado ?? "")))) return NORMAL_MS;
   return REPOSO_MS;
 }

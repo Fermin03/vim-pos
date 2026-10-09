@@ -1,5 +1,9 @@
 // Acciones del cajero sobre un pedido de app (ADR 0011). El POS nunca habla con Uber: manda la
 // acción aquí con su JWT de empleado; se valida que el pedido sea de SU tenant y se llama a la app.
+//
+// Desde la entrega 4 de la tienda en línea atiende también los pedidos de la tienda PROPIA (canal
+// TIENDA) y su pausa (acciones `enlinea_*`). Esas ramas se deciden por `canal === "TIENDA"`, nunca
+// llaman a Uber ni escriben delivery_eventos; el camino de Uber (canal APP) queda como estaba.
 import { clienteAdmin, servir } from "../_shared/http.ts";
 import { registrarError } from "../_shared/errores.ts";
 import { cajaIdDeEmail } from "../_shared/dispositivo.ts";
@@ -8,6 +12,7 @@ import { clienteUberDeApp, ENTORNO } from "../_shared/delivery/cliente-uber.ts";
 import { motivoRechazoUber, segundosAReadyTime, type MotivoRechazo } from "../_shared/delivery/uber.ts";
 import { cambiarPrepTienda, consultarEstadoTienda, pausarTienda, reanudarTienda, type ConexionTienda } from "../_shared/delivery/tienda-uber-acciones.ts";
 import { ACCIONES_TIENDA, accionExigeModulo, moduloDeliveryActivo } from "../_shared/delivery/modulo.ts";
+import { ACCIONES_ENLINEA, fallaDeTicket, moduloTiendaActivo, motivoDeTienda, pausaHasta } from "../_shared/delivery/enlinea.ts";
 import type { DbMinima } from "../_shared/delivery/procesar-uber.ts";
 
 const admin = clienteAdmin();
@@ -17,14 +22,24 @@ type Cuerpo = {
   pedido_id?: string; accion?: string; motivo?: string; detalle?: string; tiempo_prep_min?: number;
   // Acciones de tienda (spec A6): por sucursal, no por pedido.
   sucursal_id?: string; duracion?: string; minutos?: number; forzar?: boolean;
+  // Acción `estado` (la caja reporta en qué va un pedido de la tienda en línea).
+  estado?: string;
 };
 const ESTADOS_CONECTADA = ["ACTIVA", "PAUSADA", "ERROR"];
 type Pedido = {
   id: string; tenant_id: string; sucursal_id: string; app: string; id_externo: string; estado: string; folio_corto: string | null;
-  conexion_id: string; gestion: "NUBE" | "ESCRITORIO"; gestion_caja_id: string | null;
+  // En un pedido de la tienda en línea (canal TIENDA) no hay conexión de app.
+  canal: string; conexion_id: string | null; gestion: "NUBE" | "ESCRITORIO"; gestion_caja_id: string | null;
 };
 const MOTIVOS: MotivoRechazo[] = ["AGOTADO", "CERRADO", "SATURADO", "POS_OFFLINE", "OTRO"];
+const ESTADOS_REPORTABLES = ["LISTO", "ENTREGADO", "CANCELADO"];
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const msg = (e: unknown) => (e instanceof Error ? e.message : String(e));
+/** Un error de la base en una rama de la tienda no se calla: sube al `catch`, que lo registra y responde INTERNO. */
+const exigir = <T>(r: { data: T; error: { message: string } | null }): T => {
+  if (r.error) throw new Error(r.error.message);
+  return r.data;
+};
 
 servir(async (req, json) => {
   // 1) JWT del cajero → su tenant (mismo patrón que enviar-push).
@@ -101,13 +116,76 @@ servir(async (req, json) => {
     }
   }
 
+  // Tienda en línea PROPIA, por sucursal: cómo está, pausarla, reanudarla y el latido del POS web.
+  // Van antes de exigir `pedido_id`. El negocio sale de la sesión; la sucursal viene del cuerpo y
+  // solo vale si su fila de `tienda_sucursales` es de ESE negocio (la FK compuesta de la 0161
+  // garantiza que entonces la sucursal también lo es).
+  if ((ACCIONES_ENLINEA as readonly string[]).includes(body.accion)) {
+    try {
+      if (body.accion === "enlinea_presente" && esDispositivo) return json({ error: "SOLO_EMPLEADO" }, 403);
+      const sucursalId = body.sucursal_id;
+      if (typeof sucursalId !== "string" || !UUID.test(sucursalId)) return json({ error: "FALTAN_CAMPOS" }, 400);
+      const { data: mod } = await admin.rpc("modulos_efectivos", { p_tenant: tenantId });
+      if (!moduloTiendaActivo(mod)) return json({ error: "SIN_MODULO_TIENDA" }, 403);
+      // La caja instalada solo opina de SU sucursal; de otra se le contesta como si no hubiera tienda.
+      if (esDispositivo && cajaDispositivo?.sucursal_id !== sucursalId) return json({ error: "SUCURSAL_SIN_TIENDA" }, 404);
+
+      let hasta: string | null = null;
+      if (body.accion === "enlinea_pausar") {
+        hasta = pausaHasta(body.duracion, new Date());
+        if (!hasta) return json({ error: "DURACION_INVALIDA" }, 400);
+      }
+      const COLS = "participa, pausa_hasta";
+      const escribe = body.accion === "enlinea_pausar" || body.accion === "enlinea_reanudar";
+      // Pausar y reanudar escriben y leen en un viaje; sin fila no se toca nada.
+      const fila = exigir(escribe
+        ? await admin.from("tienda_sucursales").update({ pausa_hasta: hasta })
+            .eq("tenant_id", tenantId).eq("sucursal_id", sucursalId).select(COLS).maybeSingle()
+        : await admin.from("tienda_sucursales").select(COLS)
+            .eq("tenant_id", tenantId).eq("sucursal_id", sucursalId).maybeSingle()) as { participa: boolean; pausa_hasta: string | null } | null;
+      if (!fila) return json({ error: "SUCURSAL_SIN_TIENDA" }, 404);
+
+      if (body.accion === "enlinea_presente") {
+        // Decisión 4: sin caja instalada, quien da fe de que hay quien cocine es el POS web con turno
+        // abierto. Se sella la misma marca que sella el espejo de la caja (la lee
+        // sucursal_recibe_pedidos), y solo si de verdad hay un turno abierto en la nube.
+        const turnos = exigir(await admin.from("turnos").select("caja_id")
+          .eq("tenant_id", tenantId).eq("sucursal_id", sucursalId).eq("estado", "ABIERTO")) as { caja_id: string }[] | null;
+        const cajas = [...new Set((turnos ?? []).map((t) => t.caja_id))];
+        if (cajas.length === 0) return json({ ok: true, sellado: false });
+        const selladas = exigir(await admin.from("cajas").update({ espejo_turno_abierto_at: new Date().toISOString() })
+          .eq("tenant_id", tenantId).eq("sucursal_id", sucursalId).in("id", cajas).select("id")) as unknown[] | null;
+        return json({ ok: true, sellado: (selladas ?? []).length > 0 });
+      }
+
+      const cfg = exigir(await admin.from("tienda_config").select("aceptacion").eq("tenant_id", tenantId).maybeSingle()) as { aceptacion?: string } | null;
+      // null = recibe pedidos. Se pregunta por «recoger»; una sucursal que solo reparte se mira por
+      // «domicilio», para no enseñarla apagada mientras vende.
+      let motivo = exigir(await admin.rpc("tienda_estado_sucursal", { p_sucursal: sucursalId, p_modo: "RECOGER" })) as string | null;
+      if (motivo === "MODO_NO_DISPONIBLE") {
+        motivo = exigir(await admin.rpc("tienda_estado_sucursal", { p_sucursal: sucursalId, p_modo: "DOMICILIO" })) as string | null;
+      }
+      return json({
+        participa: fila.participa === true,
+        aceptacion: cfg?.aceptacion === "AUTO" ? "AUTO" : "MANUAL",
+        pausa_hasta: fila.pausa_hasta ?? null,
+        motivo: motivo ?? null,
+      });
+    } catch (e) {
+      registrarError("delivery-accion", "INTERNO", msg(e));
+      return json({ error: "INTERNO" }, 500);
+    }
+  }
+
   if (!body.pedido_id) return json({ error: "FALTAN_CAMPOS" }, 400);
 
   const { data: pData } = await admin.from("delivery_pedidos")
-    .select("id, tenant_id, sucursal_id, app, id_externo, estado, folio_corto, conexion_id, gestion, gestion_caja_id").eq("id", body.pedido_id).maybeSingle();
+    .select("id, tenant_id, sucursal_id, app, canal, id_externo, estado, folio_corto, conexion_id, gestion, gestion_caja_id").eq("id", body.pedido_id).maybeSingle();
   const pedido = pData as Pedido | null;
   if (!pedido || pedido.tenant_id !== tenantId) return json({ error: "PEDIDO_NO_EXISTE" }, 404);
-  if (pedido.app !== "APP_UBEREATS") return json({ error: "APP_NO_SOPORTADA" }, 400);
+  const esDeTienda = pedido.canal === "TIENDA";
+  // Fuera de la tienda propia, la única app que se sabe atender es Uber.
+  if (!esDeTienda && pedido.app !== "APP_UBEREATS") return json({ error: "APP_NO_SOPORTADA" }, 400);
 
   const registrarSalida = async (tipo: string, ok: boolean, detalle: unknown) => {
     await admin.from("delivery_eventos").insert({
@@ -126,7 +204,60 @@ servir(async (req, json) => {
     return null;
   };
 
+  // Pedido de la tienda en línea PROPIA. Aquí no existe Uber: nada de `uber.*` ni de
+  // `registrarSalida` (delivery_eventos es la bitácora de lo que se le manda a una app).
+  const accionDeTienda = async (): Promise<Response> => {
+    // La caja instalada solo atiende pedidos de su sucursal.
+    if (esDispositivo && cajaDispositivo?.sucursal_id !== pedido.sucursal_id) return json({ error: "PEDIDO_NO_EXISTE" }, 404);
+    switch (body.accion) {
+      case "aceptar": {
+        if (!["RECIBIDO", "ERROR"].includes(pedido.estado)) return json({ error: "ACCION_INVALIDA", estado: pedido.estado }, 409);
+        if (pedido.gestion === "ESCRITORIO") {
+          // El ticket lo crea la caja instalada (su agente ve el ACEPTADO en el siguiente sondeo).
+          const r = await reclamarParaCaja();   // no hace nada si quien acepta es un empleado
+          if (r) return r;
+          exigir(await admin.rpc("delivery_pedido_transicion", { p_pedido_id: pedido.id, p_estado: "ACEPTADO", p_detalle: null }));
+          // delivery_pedido_transicion no sella la hora de aceptación, y el seguimiento del cliente la usa.
+          exigir(await admin.from("delivery_pedidos").update({ aceptado_at: new Date().toISOString() })
+            .eq("id", pedido.id).eq("tenant_id", tenantId).is("aceptado_at", null));
+          return json({ ok: true });
+        }
+        const { data: ticketId, error: errRpc } = await admin.rpc("crear_ticket_desde_tienda", { p_pedido_id: pedido.id });
+        if (!errRpc) return json({ ok: true, ticket_id: ticketId });
+        const falla = fallaDeTicket(errRpc.message ?? "", errRpc.code);
+        registrarError("delivery-accion", falla.codigo, errRpc.message);
+        // Sin turno, o algo que no conocemos: el pedido se queda como está y se puede reintentar.
+        if (falla.reintentable) return json({ error: falla.codigo }, 409);
+        // Decisión 3: lo que reintentar no arregla (el total o la zona cambiaron, un producto ya no
+        // existe) cancela el pedido para que el cliente lo sepa ya, no cuando se venza.
+        exigir(await admin.rpc("delivery_pedido_transicion", { p_pedido_id: pedido.id, p_estado: "RECHAZADO", p_detalle: "OTRO" }));
+        return json({ error: "PEDIDO_CANCELADO", causa: falla.codigo }, 409);
+      }
+      case "rechazar": {
+        if (!["RECIBIDO", "ERROR"].includes(pedido.estado)) return json({ error: "ACCION_INVALIDA", estado: pedido.estado }, 409);
+        // Solo el código, de lista cerrada: el cliente lo ve en su seguimiento. `body.detalle` se ignora.
+        exigir(await admin.rpc("delivery_pedido_transicion", { p_pedido_id: pedido.id, p_estado: "RECHAZADO", p_detalle: motivoDeTienda(body.motivo) }));
+        return json({ ok: true });
+      }
+      case "estado": {
+        // La caja instalada cuenta en qué va el pedido mirando su ticket local. Solo ella lo sabe.
+        if (!esDispositivo || !cajaDispositivo) return json({ error: "SOLO_DISPOSITIVO" }, 403);
+        if (!ESTADOS_REPORTABLES.includes(String(body.estado))) return json({ error: "ESTADO_INVALIDO" }, 400);
+        const estado = exigir(await admin.rpc("tienda_reportar_estado", {
+          p_tenant: tenantId, p_pedido: pedido.id, p_estado: body.estado, p_motivo: motivoDeTienda(body.motivo),
+        }));
+        return json({ ok: true, estado });
+      }
+      default:
+        // `listo` incluido (decisión 2): en la tienda el estado sale de lo que el cajero ya hace
+        // —imprimir, asignar repartidor, cobrar— y lo reporta la caja con `estado`.
+        return json({ error: "ACCION_INVALIDA" }, 400);
+    }
+  };
+
   try {
+    // `reclamar` no distingue canal ni toca a Uber: sirve tal cual para los dos.
+    if (esDeTienda && body.accion !== "reclamar") return await accionDeTienda();
     switch (body.accion) {
       case "reclamar": {
         if (!esDispositivo || !cajaDispositivo) return json({ error: "SOLO_DISPOSITIVO" }, 403);
