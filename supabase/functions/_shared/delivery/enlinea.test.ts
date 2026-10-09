@@ -77,6 +77,13 @@ test("lo que no se arregla reintentando cancela el pedido, con su código", () =
     ["Zona de envío 5f0c1b9e-0000-4000-8000-000000000001 no existe, está inactiva o no es de esta sucursal", "ZONA_NO_DISPONIBLE"],
     ["Opción de modificador 5f0c1b9e-0000-4000-8000-000000000002 no existe", "OPCION_NO_EXISTE"],
     ['El producto "Papas chicas" no se vende en esta sucursal', "PRODUCTO_NO_DISPONIBLE"],
+    // Textos reales de 0152:457, :416, :449, :432, :464 y :470.
+    ['El producto "Papas chicas" está agotado o pausado', "PRODUCTO_NO_DISPONIBLE"],
+    ["El producto 5f0c1b9e-0000-4000-8000-000000000003 no es un combo de este negocio", "PRODUCTO_NO_DISPONIBLE"],
+    ["El producto 5f0c1b9e-0000-4000-8000-000000000004 no es válido como componente", "PRODUCTO_NO_DISPONIBLE"],
+    ['El slot "Bebida" requiere entre 1 y 1 selecciones (recibió 0)', "PRODUCTO_NO_DISPONIBLE"],
+    ['El producto "Malteada" está excluido del slot "Bebida"', "PRODUCTO_NO_DISPONIBLE"],
+    ['El producto "Malteada" no es opción del slot "Bebida"', "PRODUCTO_NO_DISPONIBLE"],
   ];
   for (const [mensaje, codigo] of casos) {
     assert.deepEqual(fallaDeTicket(mensaje), { reintentable: false, codigo }, mensaje);
@@ -88,7 +95,8 @@ test("un código que cancela manda aunque el error traiga otro código de Postgr
 });
 
 test("cualquier otro fallo se reintenta: no se le cancela un pedido a nadie por un error que no conocemos", () => {
-  for (const m of ["canceling statement due to statement timeout", "PEDIDO_NO_ACEPTABLE: estado EXPIRADO", "", "fetch failed"]) {
+  // El de 0008:1468 se parece a «no está disponible» pero es de turno: se arregla abriendo uno.
+  for (const m of ["Turno 5f0c1b9e-0000-4000-8000-000000000005 no está abierto o no corresponde a la sucursal/caja indicada", "canceling statement due to statement timeout", "PEDIDO_NO_ACEPTABLE: estado EXPIRADO", "", "fetch failed"]) {
     assert.deepEqual(fallaDeTicket(m), { reintentable: true, codigo: "RPC_ERROR" }, m);
   }
   assert.deepEqual(fallaDeTicket("deadlock detected", "40P01"), { reintentable: true, codigo: "RPC_ERROR" });
