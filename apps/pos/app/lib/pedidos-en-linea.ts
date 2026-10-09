@@ -1,6 +1,6 @@
 // Pedidos de la tienda en línea (canal TIENDA de delivery_pedidos): etiquetas, timbre, comandas, aceptación
 // automática y la pausa de la tienda. Lógica pura salvo las cuatro llamadas a delivery-accion.
-import { etiquetaApp, type PedidoApp } from "./pedidos-apps";
+import { etiquetaApp, type AppTienda, type PedidoApp, type PedidoAppEstado } from "./pedidos-apps";
 import { encabezadosFuncion, urlFuncion } from "./supabase";
 
 export function etiquetaOrigen(p: PedidoApp): string {
@@ -25,6 +25,9 @@ export function debeSonar(d: { hayNuevoPorAceptar: boolean; hayPorAceptar: boole
   return d.hayPorAceptar && (d.ultimoTimbre === null || d.ahora - d.ultimoTimbre >= TIMBRE_CADA_MS);
 }
 
+/** Lo reclamó otra caja instalada: aquí ni timbra ni se puede aceptar. */
+const deOtraCaja = (p: PedidoApp, cajaId: string): boolean => !!p.gestionCajaId && p.gestionCajaId !== cajaId;
+
 /**
  * Hasta cuándo debe sonar el timbre en ESTE dispositivo: el vencimiento más lejano entre los pedidos
  * por aceptar que puede atender (los que no reclamó otra caja). null = nada que timbrar. Con esto el
@@ -32,7 +35,7 @@ export function debeSonar(d: { hayNuevoPorAceptar: boolean; hayPorAceptar: boole
  * (caja sin internet: quien vence el pedido es la nube).
  */
 export function timbrarHasta(pedidos: PedidoApp[], cajaId: string): number | null {
-  const mios = pedidos.filter((p) => p.estado === "RECIBIDO" && (!p.gestionCajaId || p.gestionCajaId === cajaId));
+  const mios = pedidos.filter((p) => p.estado === "RECIBIDO" && !deOtraCaja(p, cajaId));
   return mios.length ? Math.max(...mios.map((p) => (p.venceAceptacion ? Date.parse(p.venceAceptacion) : Infinity))) : null;
 }
 
@@ -75,6 +78,110 @@ export function aceptablesSolos(
   return pedidos
     .filter((p) => p.canal === "TIENDA" && p.estado === "RECIBIDO" && p.gestion === "NUBE" && !yaIntentados.has(p.id))
     .map((p) => p.id);
+}
+
+// ── Cada pedido de la tienda en su canal (Pick-up / Domicilio) y el aviso grande ──
+
+/** Quién mira: la caja del turno, si es la caja instalada, y la hora (ms). */
+export type Atencion = { cajaId: string; enEscritorio: boolean; ahora: number };
+
+/** Pedido de la tienda que espera respuesta. ERROR cuenta: se puede volver a intentar o rechazar. */
+const esperaRespuesta = (p: PedidoApp): boolean => p.canal === "TIENDA" && (p.estado === "RECIBIDO" || p.estado === "ERROR");
+
+/** Por qué este dispositivo no puede aceptar ni rechazar un pedido que espera respuesta; null = sí puede. */
+export function porQueNoSeAtiende(p: PedidoApp, d: Atencion): string | null {
+  if (soloInformativo(p, d.enEscritorio)) return "Se atiende desde el POS web.";
+  if (deOtraCaja(p, d.cajaId)) return mensajeErrorEnLinea("RECLAMADO_POR_OTRA_CAJA");
+  if (p.estado === "RECIBIDO" && p.venceAceptacion && Date.parse(p.venceAceptacion) <= d.ahora) return "Se venció sin aceptar.";
+  return null;
+}
+
+/** Si ESTE dispositivo puede aceptarlo o rechazarlo ahora. Sin esto, el pedido se ve pero no ofrece botones. */
+export function puedeAtender(p: PedidoApp, d: Atencion): boolean {
+  return esperaRespuesta(p) && porQueNoSeAtiende(p, d) === null;
+}
+
+/**
+ * Lo que se aceptó o rechazó en ESTE dispositivo se ve así desde ya. La caja instalada lee su copia
+ * local, que tarda unos segundos en traer el cambio de la nube: sin esto el pedido seguiría
+ * ofreciendo «Aceptar» y timbrando. En cuanto la base dice otra cosa, manda la base.
+ */
+export function conAtendidos(pedidos: PedidoApp[], hechos: ReadonlyMap<string, "aceptar" | "rechazar">): PedidoApp[] {
+  return pedidos.map((p) => {
+    const hecho = esperaRespuesta(p) ? hechos.get(p.id) : undefined;
+    return hecho ? { ...p, estado: hecho === "aceptar" ? "ACEPTADO" as const : "RECHAZADO" as const } : p;
+  });
+}
+
+/** La cuenta (ticket) de un pedido de la tienda ya aceptado y todavía vivo; null si no la tiene. */
+export function cuentaDe(p: PedidoApp): string | null {
+  return p.canal === "TIENDA" && CON_COMANDA.has(p.estado) ? p.ticketId : null;
+}
+
+/** Lo que se cerró solo en un canal (se venció, o la caja lo canceló y dejó dicho por qué), para decirlo ahí. */
+export function avisosDeCanal(pedidos: PedidoApp[], modo: AppTienda): { id: string; texto: string }[] {
+  return pedidos.flatMap((p) => {
+    if (p.canal !== "TIENDA" || p.app !== modo) return [];
+    const dicho = avisoDeTienda(p);
+    if (dicho) return [{ id: p.id, texto: `${p.folioCorto ? `Pedido ${p.folioCorto}` : "Un pedido"}: ${dicho}` }];
+    return p.estado === "EXPIRADO" ? [{ id: p.id, texto: `${p.folioCorto ? `El pedido ${p.folioCorto}` : "Un pedido"} se venció sin aceptar.` }] : [];
+  });
+}
+
+const porLlegada = (a: PedidoApp, b: PedidoApp): number => a.recibidoAt.localeCompare(b.recibidoAt);
+
+/** Lo que espera respuesta en un canal, del más antiguo al más nuevo. Incluye lo que aquí solo se puede ver. */
+export function porAceptarDeCanal(pedidos: PedidoApp[], modo: AppTienda): PedidoApp[] {
+  return pedidos.filter((p) => esperaRespuesta(p) && p.app === modo).sort(porLlegada);
+}
+
+/** Contadores del inicio: la tienda suma a su canal; «Pedidos en línea» cuenta solo lo que se atiende ahí (las apps). */
+export function contarPorAceptar(pedidos: PedidoApp[], d: Atencion): { pickup: number; domicilio: number; apps: number } {
+  const mios = pedidos.filter((p) => puedeAtender(p, d));
+  return {
+    pickup: mios.filter((p) => p.app === "DRIVE_THRU").length,
+    domicilio: mios.filter((p) => p.app === "DELIVERY_PROPIO").length,
+    apps: pedidos.filter((p) => p.canal === "APP" && (p.estado === "RECIBIDO" || p.estado === "ERROR")).length,
+  };
+}
+
+/**
+ * La fila del aviso grande: pedidos nuevos de la tienda que este dispositivo puede atender, del más
+ * antiguo al más nuevo, sin los que el cajero ya cerró. Un pedido sale de la fila solo cuando deja
+ * de estar por aceptar. Con aceptación automática en el POS web no entra: se acepta solo enseguida
+ * (misma regla que `aceptablesSolos`).
+ */
+export function colaDeAvisos(pedidos: PedidoApp[], d: Atencion & { aceptacion: "MANUAL" | "AUTO" | null }, cerrados: ReadonlySet<string>): PedidoApp[] {
+  const seAceptaSolo = (p: PedidoApp) => !d.enEscritorio && d.aceptacion === "AUTO" && p.gestion === "NUBE";
+  return pedidos.filter((p) => p.estado === "RECIBIDO" && puedeAtender(p, d) && !seAceptaSolo(p) && !cerrados.has(p.id)).sort(porLlegada);
+}
+
+/**
+ * Pedidos de la tienda que acaban de quedar aceptados: llegaron ya aceptados (aceptación automática)
+ * o estaban por aceptar. `antes` = el estado de cada pedido en la lectura anterior; null en la primera.
+ */
+export function recienAceptados(antes: ReadonlyMap<string, PedidoAppEstado> | null, pedidos: PedidoApp[]): PedidoApp[] {
+  if (!antes) return [];
+  return pedidos.filter((p) => p.canal === "TIENDA" && p.estado === "ACEPTADO" && (antes.get(p.id) ?? "RECIBIDO") === "RECIBIDO");
+}
+
+/** «Pedido nuevo en Pick-up · T1234»: el aviso breve cuando un pedido entra a su canal. */
+export function textoPedidoEnCanal(p: PedidoApp): string {
+  return `Pedido nuevo en ${p.app === "DELIVERY_PROPIO" ? "Domicilio" : "Pick-up"}${p.folioCorto ? ` · ${p.folioCorto}` : ""}`;
+}
+
+/** Margen antes de avisar que falta la comanda: la automática sale en el siguiente sondeo (10 s) y
+ *  el sello de la base llega un poco después del papel. Sin él, el aviso parpadearía en cada pedido. */
+export const MARGEN_COMANDA_MS = 20_000;
+/**
+ * Los pedidos (ids) cuya comanda lleva más del margen sin salir. `desde` guarda cuándo se vio cada
+ * uno sin comanda por primera vez y se pone al día aquí mismo, en cada lectura.
+ */
+export function sinComanda(desde: Map<string, number>, pedidos: PedidoApp[], ahora: number, enEscritorio: boolean): Set<string> {
+  const faltan = new Set(pedidos.filter((p) => faltaComanda(p) && !soloInformativo(p, enEscritorio)).map((p) => p.id));
+  for (const id of desde.keys()) if (!faltan.has(id)) desde.delete(id);
+  for (const id of faltan) if (!desde.has(id)) desde.set(id, ahora);
+  return new Set([...faltan].filter((id) => ahora - desde.get(id)! > MARGEN_COMANDA_MS));
 }
 
 // ── Estado y pausa de la tienda, vía delivery-accion ──
