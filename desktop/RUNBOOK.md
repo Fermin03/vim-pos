@@ -554,8 +554,8 @@ y el mismo sondeo que Uber; la rama se decide siempre por `canal`, nunca por `ap
 
   Para ver el pedido: `delivery_pedidos` (`estado`, `ultimo_error`, `ticket_id`) en la base de la
   caja y en la nube; el seguimiento del cliente lee `tienda_seguimiento`.
-- **La comanda y el timbre, en el POS de la caja.** La comanda sale sola una vez; si no salió, la
-  tarjeta del pedido avisa «La comanda no se imprimió» y ofrece **Imprimir comanda** (no se
+- **La comanda y el timbre, en el POS de la caja.** La comanda sale sola una vez; si no salió, el
+  detalle de esa cuenta en Pick-up o Domicilio avisa «La comanda no se imprimió» y ofrece **Imprimir comanda** (no se
   reintenta sola). El timbre solo suena por pedidos que esta caja puede aceptar: no por los que
   tomó otra caja (`gestion_caja_id` ajeno) ni pasada su `vence_aceptacion`, aunque la copia local
   siga en `RECIBIDO` por falta de internet. La nota del pedido (pantalla, ticket y comanda) sale solo
