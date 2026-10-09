@@ -145,7 +145,8 @@ El detalle solo sale para los cinco primeros y solo si cumple su forma (`respues
 
 | Acción | Clave | Tope | Si el control falla |
 |---|---|---|---|
-| `negocio`, `menu`, `cotizar`, `seguimiento` | `tienda:lee:ip:<ip>` | 120 cada 600 s | deja pasar (`"abrir"`) |
+| `negocio`, `menu`, `cotizar` | `tienda:lee:ip:<ip>` | 120 cada 600 s | deja pasar (`"abrir"`) |
+| `seguimiento` | `tienda:sigue:ip:<ip>` | 90 cada 600 s | deja pasar (`"abrir"`) |
 | `pedir`, antes del antirobot | `tienda:pide:ip:<ip>` | 5 cada 3600 s | niega (`"cerrar"`) → 503 |
 | `pedir`, después del antirobot | `tienda:pide:negocio:<slug>` | 60 cada 3600 s | niega → 503 |
 
@@ -154,8 +155,14 @@ El detalle solo sale para los cinco primeros y solo si cumple su forma (`respues
 - El cupo por IP de `pedir` se gasta **en cada intento**, también los que fallan después (captcha,
   `TOTAL_CAMBIO`, validación SQL): se consume en `F/tienda/index.ts:94-96`, antes de todo lo demás.
   El cupo de 5/h «se comparte entre negocios y cuentan los intentos fallidos» (`P2:1355`).
-- El cupo de lecturas es por IP y **no** por negocio: un sondeo de seguimiento cada 10 s gasta 60 de
-  las 120 lecturas de 10 min, y las operadoras móviles comparten IPv4 (`P2:1344`).
+- El cupo de lecturas es por IP y **no** por negocio, y las operadoras móviles comparten IPv4
+  (`P2:1344`).
+- **Nota (tanda final de la entrega 5):** el seguimiento tenía la misma bolsa que las demás lecturas;
+  un sondeo cada 10 s gasta 60 lecturas en 10 min, así que dos pedidos vivos desde la misma red la
+  llenaban y el 429 le caía también a quien quería ver el menú o cotizar. Desde entonces
+  `seguimiento` gasta de `tienda:sigue:ip:<ip>` (90 cada 600 s) y no toca `tienda:lee`. El sondeo de
+  la app sigue a 10 s. **Hay que redesplegar la función `tienda`** para que rija. Los números de
+  línea de `respuesta.ts` citados arriba se movieron.
 - Además, en SQL: **3 pedidos vivos por teléfono** por negocio. «Vivo» = estado `RECIBIDO`,
   `ACEPTADO`, `EN_PREPARACION` o `LISTO`, de las últimas 6 horas y sin ticket ya cobrado/facturado/
   cancelado en la nube (`0162:719-730`). Responde `NO_SE_PUDO_CREAR`.

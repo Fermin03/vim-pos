@@ -45,9 +45,15 @@ export function claveDeIp(ip: string): string {
  * En `pedir` van en dos tiempos: el de la IP antes del antirobot y el del negocio solo DESPUÉS de
  * pasarlo. Si los dos se gastaran al entrar, 60 peticiones basura por hora (sin token) dejarían a
  * un restaurante sin tienda.
+ * El seguimiento lleva su propia bolsa: la página del pedido pregunta cada 10 s (60 lecturas en 10
+ * minutos por pestaña) y, compartiendo la de leer, dos pedidos vivos desde la misma red dejaban sin
+ * menú ni cotización a los demás de esa red. 90 = una pestaña holgada; con dos, la segunda va lenta.
  */
 export function cuposDe(accion: Peticion["accion"], ip: string, negocio: string): { antes: Cupo[]; despuesDelCaptcha: Cupo[]; alFallar: "abrir" | "cerrar" } {
   const quien = claveDeIp(ip);
+  if (accion === "seguimiento") {
+    return { antes: [{ clave: `tienda:sigue:ip:${quien}`, ventanaSeg: 600, max: 90 }], despuesDelCaptcha: [], alFallar: "abrir" };
+  }
   if (accion !== "pedir") {
     return { antes: [{ clave: `tienda:lee:ip:${quien}`, ventanaSeg: 600, max: 120 }], despuesDelCaptcha: [], alFallar: "abrir" };
   }
