@@ -3,7 +3,7 @@ import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import {
   BASE_TIENDA, DIAS, DIRECCIONES_RESERVADAS, copiarATodos, cruzaMedianoche, errorDeDireccion,
-  errorDeHorario, leerHorario, mensajeTienda, puedeEncender, revisar, sugerirDireccion,
+  errorDeHorario, errorDeSucursal, erroresPorDia, hayCambiosDeSucursal, leerHorario, mensajeTienda, puedeEncender, revisar, sugerirDireccion,
   type Horario, type SucursalTienda,
 } from "../tienda-reglas";
 
@@ -161,5 +161,44 @@ describe("mensajeTienda", () => {
     expect(caso("algo raro")).toBe("por defecto");
     expect(mensajeTienda(null, "por defecto")).toBe("por defecto");
     expect(mensajeTienda(undefined, "x")).toBe("x");
+  });
+});
+
+describe("borrador de una sucursal", () => {
+  const guardada = { participa: true, recoger: true, domicilio: false, horario: { "1": ["13:00", "22:00"] } as Horario };
+  it("sin cambios: igual aunque el horario sea otro objeto o venga en otro orden", () => {
+    expect(hayCambiosDeSucursal({ ...guardada, horario: { "1": ["13:00", "22:00"] } }, guardada)).toBe(false);
+    const a: Horario = { "2": ["09:00", "10:00"], "1": ["13:00", "22:00"] };
+    const b: Horario = { "1": ["13:00", "22:00"], "2": ["09:00", "10:00"] };
+    expect(hayCambiosDeSucursal({ ...guardada, horario: a }, { ...guardada, horario: b })).toBe(false);
+  });
+  it("ignora lo que no es del borrador (nombre, zonas)", () => {
+    const s: SucursalTienda = { id: "s1", nombre: "Centro", telefono: "", activa: true, zonasActivas: 3, ...guardada };
+    expect(hayCambiosDeSucursal(guardada, s)).toBe(false);
+  });
+  it("cambia con cada casilla", () => {
+    expect(hayCambiosDeSucursal({ ...guardada, participa: false }, guardada)).toBe(true);
+    expect(hayCambiosDeSucursal({ ...guardada, recoger: false }, guardada)).toBe(true);
+    expect(hayCambiosDeSucursal({ ...guardada, domicilio: true }, guardada)).toBe(true);
+  });
+  it("cambia con el horario: una hora, un día de más, un día de menos", () => {
+    expect(hayCambiosDeSucursal({ ...guardada, horario: { "1": ["13:00", "23:00"] } }, guardada)).toBe(true);
+    expect(hayCambiosDeSucursal({ ...guardada, horario: { "1": ["13:00", "22:00"], "2": ["13:00", "22:00"] } }, guardada)).toBe(true);
+    expect(hayCambiosDeSucursal({ ...guardada, horario: {} }, guardada)).toBe(true);
+  });
+  it("errorDeSucursal: si participa necesita recoger o domicilio", () => {
+    expect(errorDeSucursal({ ...guardada, recoger: false, domicilio: false })).toBe("Elige si ofrece recoger, domicilio o ambos.");
+    expect(errorDeSucursal(guardada)).toBeNull();
+    expect(errorDeSucursal({ ...guardada, recoger: false, domicilio: true })).toBeNull();
+  });
+  it("errorDeSucursal: si no participa no se le exige nada", () => {
+    expect(errorDeSucursal({ participa: false, recoger: false, domicilio: false, horario: {} })).toBeNull();
+  });
+  it("erroresPorDia: el error de cada renglón, con el texto de errorDeHorario", () => {
+    expect(erroresPorDia({ "1": ["13:00", "22:00"] })).toEqual({});
+    expect(erroresPorDia({ "1": ["", "22:00"], "2": ["13:00", "22:00"], "7": ["13:00", ""] })).toEqual({
+      "1": "Lunes: escribe las horas como 09:00 o 22:30.",
+      "7": "Domingo: escribe las horas como 09:00 o 22:30.",
+    });
   });
 });

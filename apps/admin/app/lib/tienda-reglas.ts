@@ -77,6 +77,32 @@ export type SucursalTienda = {
   id: string; nombre: string; telefono: string; activa: boolean;
   participa: boolean; recoger: boolean; domicilio: boolean; horario: Horario; zonasActivas: number;
 };
+
+/** Lo que el dueño edita de una sucursal en la tarjeta, antes de guardarlo. */
+export type BorradorSucursal = Pick<SucursalTienda, "participa" | "recoger" | "domicilio" | "horario">;
+
+/** ¿La tarjeta tiene algo distinto de lo guardado? El horario se compara por día, no por objeto. */
+export function hayCambiosDeSucursal(b: BorradorSucursal, guardada: BorradorSucursal): boolean {
+  return b.participa !== guardada.participa || b.recoger !== guardada.recoger || b.domicilio !== guardada.domicilio
+    || DIAS.some(({ dia }) => b.horario[dia]?.join() !== guardada.horario[dia]?.join());
+}
+
+/** null = se puede guardar. Las horas mal escritas las dice `erroresPorDia`, junto a su renglón. */
+export function errorDeSucursal(b: BorradorSucursal): string | null {
+  return b.participa && !b.recoger && !b.domicilio ? "Elige si ofrece recoger, domicilio o ambos." : null;
+}
+
+/** El error de `errorDeHorario` repartido por día, para pintarlo junto a su renglón. */
+export function erroresPorDia(h: Horario): Partial<Record<Dia, string>> {
+  const r: Partial<Record<Dia, string>> = {};
+  for (const { dia } of DIAS) {
+    const rango = h[dia];
+    const e = rango ? errorDeHorario({ [dia]: rango }) : null;
+    if (e) r[dia] = e;
+  }
+  return r;
+}
+
 export type Revision = { nivel: "bloquea" | "advierte"; texto: string; enlace?: { href: string; etiqueta: string } };
 
 /** Lo que falta para poder encender. Sin bloqueos = se puede encender. */

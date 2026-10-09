@@ -4,15 +4,17 @@ import { leerNegocio } from "../../lib/configuracion";
 import { mensajeError } from "../../lib/errores";
 import { leerModulos } from "../../lib/modulos";
 import {
-  contarPendientesDeCatalogo, encenderTienda, guardarConfigTienda, leerConfigTienda, leerSucursalesTienda, leerTiendaEncendida,
+  contarPendientesDeCatalogo, encenderTienda, guardarConfigTienda, leerConfigTienda, guardarSucursalTienda, leerSucursalesTienda, leerTiendaEncendida,
   type ConfigTienda, type DatosConfigTienda,
 } from "../../lib/tienda";
-import { revisar, sugerirDireccion, type Revision, type SucursalTienda } from "../../lib/tienda-reglas";
+import { revisar, sugerirDireccion, type BorradorSucursal, type Revision, type SucursalTienda } from "../../lib/tienda-reglas";
 import type { DatosTienda } from "../../components/tienda-datos";
 import type { MensajeTienda } from "../../components/tienda-mensaje";
 import type { PedidosTienda } from "../../components/tienda-pedidos";
 
-export type Bloque = "estado" | "datos" | "pedidos";
+/** Cada sucursal es su propio bloque: su mensaje y su «Guardando…» salen en su tarjeta. */
+export type Bloque = "estado" | "datos" | "pedidos" | `sucursal:${string}`;
+const deSucursal = (id: string): Bloque => `sucursal:${id}`;
 type Formulario = DatosTienda & PedidosTienda;
 
 /** Lo que hay en la base. `config` null = el dueño todavía no elige dirección. */
@@ -102,9 +104,13 @@ export function useTienda() {
     }
   }, []);
 
-  /** Una escritura. Con `enDialogo`, el error se pinta dentro del diálogo abierto y no detrás de él. */
-  async function escribir(bloque: Bloque, accion: () => Promise<void>, fallo: string, exito: string | null, enDialogo: boolean) {
-    if (enCurso.current) return;
+  /**
+   * Una escritura. Con `enDialogo`, el error se pinta dentro del diálogo abierto y no detrás de él.
+   * Devuelve true solo si se guardó Y se volvió a leer: lo que se ve ya es lo guardado.
+   */
+  async function escribir(bloque: Bloque, accion: () => Promise<void>, fallo: string, exito: string | null, enDialogo: boolean): Promise<boolean> {
+    if (enCurso.current) return false;
+    let listo = false;
     enCurso.current = true;
     setOcupado(bloque);
     setMensaje(null);
@@ -112,7 +118,8 @@ export function useTienda() {
     try {
       await accion();
       setDialogo(null);
-      if ((await releer()) && exito) setMensaje({ bloque, tipo: "ok", texto: exito });
+      listo = await releer();
+      if (listo && exito) setMensaje({ bloque, tipo: "ok", texto: exito });
     } catch (e) {
       const texto = mensajeError(e, fallo);
       if (enDialogo) setErrorDialogo(texto);
@@ -120,6 +127,7 @@ export function useTienda() {
     }
     setOcupado(null);
     enCurso.current = false;
+    return listo;
   }
 
   function cambiar(cambio: Partial<Formulario>) {
@@ -159,6 +167,11 @@ export function useTienda() {
     );
   }
 
+  /** Pasa por la misma guarda que todo lo demás; al releer se recalcula la lista de revisión. */
+  function guardarSucursal(id: string, datos: BorradorSucursal): Promise<boolean> {
+    return escribir(deSucursal(id), () => guardarSucursalTienda(id, datos), "No se pudo guardar la sucursal", "Cambios guardados.", false);
+  }
+
   /** Encender no pide confirmación; apagar sí. */
   function cambiarEncendido(encender: boolean) {
     if (!encender) { setErrorDialogo(null); setDialogo("apagar"); return; }
@@ -178,7 +191,10 @@ export function useTienda() {
     /** Lo que se le dice al dueño: el interruptor Y el complemento vigente. */
     encendida: leido !== null && leido.interruptor && leido.enPlan,
     mensajeDe: (b: Bloque): MensajeTienda | null => (mensaje?.bloque === b ? mensaje : null),
-    reintentar, releer, cambiar, guardarDatos, guardarPedidos, cambiarEncendido,
+    mensajeDeSucursal: (id: string): MensajeTienda | null => (mensaje?.bloque === deSucursal(id) ? mensaje : null),
+    /** El id de la sucursal que se está guardando, si es una sucursal lo que se guarda. */
+    sucursalGuardando: leido?.sucursales.find((s) => ocupado === deSucursal(s.id))?.id ?? null,
+    reintentar, releer, cambiar, guardarDatos, guardarPedidos, guardarSucursal, cambiarEncendido,
     confirmarDireccion: () => enviarDatos(true),
     confirmarApagar: () => void escribir("estado", () => encenderTienda(false), "No se pudo cambiar", null, true),
     cerrarDialogo: () => setDialogo(null),
