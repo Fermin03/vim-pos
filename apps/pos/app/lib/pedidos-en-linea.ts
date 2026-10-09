@@ -25,7 +25,28 @@ export function debeSonar(d: { hayNuevoPorAceptar: boolean; hayPorAceptar: boole
   return d.hayPorAceptar && (d.ultimoTimbre === null || d.ahora - d.ultimoTimbre >= TIMBRE_CADA_MS);
 }
 
+/**
+ * Hasta cuándo debe sonar el timbre en ESTE dispositivo: el vencimiento más lejano entre los pedidos
+ * por aceptar que puede atender (los que no reclamó otra caja). null = nada que timbrar. Con esto el
+ * timbre nunca dura más que la ventana de aceptación, aunque la copia local se quede en RECIBIDO
+ * (caja sin internet: quien vence el pedido es la nube).
+ */
+export function timbrarHasta(pedidos: PedidoApp[], cajaId: string): number | null {
+  const mios = pedidos.filter((p) => p.estado === "RECIBIDO" && (!p.gestionCajaId || p.gestionCajaId === cajaId));
+  return mios.length ? Math.max(...mios.map((p) => (p.venceAceptacion ? Date.parse(p.venceAceptacion) : Infinity))) : null;
+}
+
+/** Lo que la caja le dejó dicho al cajero en un pedido cerrado; nunca un código interno. */
+export function avisoDeTienda(p: PedidoApp): string | null {
+  const cerrado = p.estado === "CANCELADO" || p.estado === "RECHAZADO" || p.estado === "EXPIRADO";
+  return p.canal === "TIENDA" && cerrado && p.ultimoError && !/^[A-Z0-9_]+$/.test(p.ultimoError) ? p.ultimoError : null;
+}
+
 const CON_COMANDA = new Set(["ACEPTADO", "EN_PREPARACION", "LISTO"]);
+/** Pedido de la tienda aceptado cuyo ticket no tiene comanda impresa, sea de la caja que sea. */
+export function faltaComanda(p: PedidoApp): boolean {
+  return p.canal === "TIENDA" && CON_COMANDA.has(p.estado) && !!p.ticketId && !p.comandaImpresa;
+}
 /** Qué pedidos de la tienda necesitan que ESTE dispositivo imprima sus comandas. */
 export function comandasPendientes(pedidos: PedidoApp[], cajaDelTurnoId: string, yaIntentadas: ReadonlySet<string>): { pedidoId: string; ticketId: string }[] {
   return pedidos.flatMap((p) =>

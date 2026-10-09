@@ -96,8 +96,8 @@ export type DatosTicketImpresion = {
   };
   /** Datos del cliente para el repartidor. Solo se llena en DOMICILIO; null en el resto. */
   entrega: DatosEntrega | null;
-  /** Nota de toda la cuenta (`tickets.nota_general`): en un pedido de la tienda trae la forma de pago
-   *  y lo que escribió el cliente. Solo se llena en Pick-up y Domicilio; ausente = no se imprime. */
+  /** Nota de un pedido de la tienda en línea (forma de pago y lo que escribió el cliente). Solo se
+   *  llena en tickets nacidos de la tienda (`notaPedidoDe`); ausente = no se imprime. */
   notaPedido?: string | null;
   lineas: LineaImpresion[];
   /** `lealtad` = lo descontado por canje (tickets.lealtad_mxn). Opcional: no todos los que arman estos datos lo conocen. */

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { foldearHijosEnPadre, SELECCION_TICKET_ITEMS_IMPRESION, urlAutofactura, resumenLealtadTicket, datosLealtadFiables, lealtadEncendida } from "../ticket-datos";
+import { foldearHijosEnPadre, SELECCION_TICKET_ITEMS_IMPRESION, urlAutofactura, resumenLealtadTicket, datosLealtadFiables, lealtadEncendida, notaPedidoDe } from "../ticket-datos";
 import type { LineaImpresion } from "../tipos";
 
 /** Fixture mínima: solo llena lo que cada caso necesita, el resto son valores neutros. */
@@ -202,5 +202,27 @@ describe("lealtadEncendida — se decide por el interruptor del dueño", () => {
   });
   it("si la lectura falló, no (el ticket sale sin pie antes que con un saldo dudoso)", () => {
     expect(lealtadEncendida({ data: { modulo_lealtad_activo: true }, error: { message: "sin red" } })).toBe(false);
+  });
+});
+
+describe("notaPedidoDe — la nota en papel es solo de los pedidos de la tienda", () => {
+  const nota = "Efectivo, paga con $500.00 · Sin cebolla";
+  it("ticket nacido de la tienda, para recoger o a domicilio", () => {
+    expect(notaPedidoDe("DRIVE_THRU", "API_EXTERNA", nota)).toBe(nota);
+    expect(notaPedidoDe("DELIVERY_PROPIO", "API_EXTERNA", nota)).toBe(nota);
+  });
+  it("una nota de cocina tecleada en la caja no sale, aunque sea Pick-up o Domicilio", () => {
+    expect(notaPedidoDe("DRIVE_THRU", "POS_ONLINE", nota)).toBeNull();
+    expect(notaPedidoDe("DELIVERY_PROPIO", "POS_ONLINE", nota)).toBeNull();
+    expect(notaPedidoDe("DRIVE_THRU", null, nota)).toBeNull();
+  });
+  it("un pedido de Uber (también API_EXTERNA) y el comedor, tampoco", () => {
+    expect(notaPedidoDe("APP_UBEREATS", "API_EXTERNA", nota)).toBeNull();
+    expect(notaPedidoDe("MESA", "POS_ONLINE", nota)).toBeNull();
+    expect(notaPedidoDe("PARA_LLEVAR", "API_EXTERNA", nota)).toBeNull();
+  });
+  it("sin nota, nada", () => {
+    expect(notaPedidoDe("DRIVE_THRU", "API_EXTERNA", null)).toBeNull();
+    expect(notaPedidoDe("DRIVE_THRU", "API_EXTERNA", "   ")).toBeNull();
   });
 });

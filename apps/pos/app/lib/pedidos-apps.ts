@@ -34,6 +34,8 @@ export type PedidoApp = {
   direccion: { texto: string; referencias: string | null } | null;
   pago: { forma: "EFECTIVO" | "TARJETA"; pagaCon: number | null } | null;
   envio: number | null; gestion: "NUBE" | "ESCRITORIO" | null;
+  /** Caja instalada que reclamó el pedido (null = nadie; lo puede atender cualquiera). */
+  gestionCajaId: string | null;
   ticketCajaId: string | null; comandaImpresa: boolean;
 };
 
@@ -44,7 +46,7 @@ export async function leerPedidosApps(token: string, sucursalId: string): Promis
   const desde = new Date(Date.now() - 30 * 60_000).toISOString();
   const { data, error } = await employeeClient(token)
     .from("delivery_pedidos")
-    .select("id, app, id_externo, folio_corto, estado, tipo_entrega, cliente_nombre, nota_cliente, items, total_cliente_mxn, vence_aceptacion, recibido_at, ticket_id, ultimo_error, canal, cliente_telefono, direccion, pago_al_recibir, paga_con_mxn, envio_mxn, subtotal_mxn, gestion, ticket:tickets(folio_completo, caja_id, comanda_impresa_at)")
+    .select("id, app, id_externo, folio_corto, estado, tipo_entrega, cliente_nombre, nota_cliente, items, total_cliente_mxn, vence_aceptacion, recibido_at, ticket_id, ultimo_error, canal, cliente_telefono, direccion, pago_al_recibir, paga_con_mxn, envio_mxn, subtotal_mxn, gestion, gestion_caja_id, ticket:tickets(folio_completo, caja_id, comanda_impresa_at)")
     .eq("sucursal_id", sucursalId)
     .or(`estado.in.(${ACTIVOS.join(",")}),recibido_at.gte.${desde}`)
     .order("recibido_at", { ascending: false })
@@ -90,6 +92,7 @@ export function pedidoDesdeFila(r: Record<string, unknown>): PedidoApp {
     pago: forma ? { forma, pagaCon: r.paga_con_mxn == null ? null : Number(r.paga_con_mxn) } : null,
     envio: r.envio_mxn == null ? null : Number(r.envio_mxn),
     gestion: r.gestion === "NUBE" || r.gestion === "ESCRITORIO" ? r.gestion : null,
+    gestionCajaId: (r.gestion_caja_id as string | null) ?? null,
     ticketCajaId: ticket?.caja_id ?? null,
     comandaImpresa: !!ticket?.comanda_impresa_at,
   };

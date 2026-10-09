@@ -12,14 +12,18 @@ import {
   reanudarTiendaUber, segundosRestantes, type DuracionPausa, type EstadoTiendaApp, type PedidoApp, type PedidoAppItem,
 } from "../lib/pedidos-apps";
 import {
-  ErrorEnLinea, etiquetaEntrega, etiquetaEstadoEnLinea, etiquetaOrigen, etiquetaPago, leerEstadoEnLinea, mensajeErrorEnLinea,
-  pausarEnLinea, reanudarEnLinea, type EstadoEnLinea,
+  avisoDeTienda, ErrorEnLinea, etiquetaEntrega, etiquetaEstadoEnLinea, etiquetaOrigen, etiquetaPago, faltaComanda, leerEstadoEnLinea,
+  mensajeErrorEnLinea, pausarEnLinea, reanudarEnLinea, type EstadoEnLinea,
 } from "../lib/pedidos-en-linea";
+import { esEscritorio } from "../lib/actualizacion";
 import { BotonVolver } from "./boton-volver";
 import { useEscape } from "../lib/use-escape";
 
 const REFRESCO_MS = 10_000;
 const REFRESCO_TIENDA_MS = 60_000;
+/** Margen antes de avisar que falta la comanda: la automática sale en el siguiente sondeo (10 s) y
+ *  el sello de la base llega un poco después del papel. Sin él, el aviso parpadearía en cada pedido. */
+const MARGEN_COMANDA_MS = 20_000;
 type MotivoRechazo = "AGOTADO" | "CERRADO" | "SATURADO" | "OTRO";
 const MOTIVOS: { codigo: MotivoRechazo; label: string }[] = [
   { codigo: "AGOTADO", label: "Producto agotado" },
@@ -74,10 +78,15 @@ function ListaItems({ items }: { items: PedidoAppItem[] }) {
 
 /** Cuerpo de la tarjeta de un pedido de la tienda propia. Sin «Marcar listo» (decisión 2): el
  *  estado avanza solo cuando el cajero imprime, asigna repartidor o cobra desde la cuenta. */
-function CuerpoTienda({ p, seg, urgente }: { p: PedidoApp; seg: number | null; urgente: boolean }) {
+function CuerpoTienda({ p, seg, urgente, sinComanda, ocupado, onImprimirComanda }: {
+  p: PedidoApp; seg: number | null; urgente: boolean;
+  /** Aceptado, con ticket, y la comanda lleva rato sin salir. */
+  sinComanda: boolean; ocupado: boolean; onImprimirComanda: () => void;
+}) {
   const aDomicilio = p.app === "DELIVERY_PROPIO";
   const aceptado = p.estado === "ACEPTADO" || p.estado === "EN_PREPARACION" || p.estado === "LISTO";
   const pago = etiquetaPago(p);
+  const aviso = avisoDeTienda(p);
   return (
     <>
       <div className="flex items-center justify-between">
@@ -94,14 +103,26 @@ function CuerpoTienda({ p, seg, urgente }: { p: PedidoApp; seg: number | null; u
           </span>
         )}
       </div>
-      {aceptado && (
+      {aceptado && p.ticketId && (
         <p className="rounded bg-sel px-2 py-1.5 text-13 text-ink-2">Cóbralo desde {aDomicilio ? "Domicilio" : "Pick-up"}.</p>
       )}
+      {sinComanda && (
+        <div role="alert" className="flex flex-wrap items-center gap-2 rounded border border-danger bg-danger-soft px-2 py-1.5">
+          <p className="flex-1 text-13 font-semibold text-danger">La comanda no se imprimió. Revisa la impresora.</p>
+          <button type="button" disabled={ocupado} onClick={onImprimirComanda}
+            className="h-11 rounded border border-danger bg-surface px-3 text-14 font-semibold text-danger transition active:scale-[.97] disabled:opacity-50">
+            Imprimir comanda
+          </button>
+        </div>
+      )}
+      {aviso && <p className="text-13 font-semibold text-danger">{aviso}</p>}
       {(p.clienteNombre || p.clienteTelefono) && (
         <p className="flex flex-wrap items-baseline gap-x-3 text-14 text-ink">
           {p.clienteNombre && <span className="font-semibold">{p.clienteNombre}</span>}
-          {p.clienteTelefono && (
-            <a href={`tel:${p.clienteTelefono}`} className="font-semibold text-info underline-offset-2 hover:underline">{p.clienteTelefono}</a>
+          {/* Dentro de la caja instalada un enlace `tel:` no abre nada: va como texto. */}
+          {p.clienteTelefono && (esEscritorio()
+            ? <span className="font-semibold tabular-nums">{p.clienteTelefono}</span>
+            : <a href={`tel:${p.clienteTelefono}`} className="inline-flex min-h-11 items-center font-semibold tabular-nums text-info underline-offset-2 hover:underline">{p.clienteTelefono}</a>
           )}
         </p>
       )}
@@ -115,7 +136,7 @@ function CuerpoTienda({ p, seg, urgente }: { p: PedidoApp; seg: number | null; u
       {p.notaCliente && <p className="text-13 italic text-ink-2">“{p.notaCliente}”</p>}
       <dl className="mt-auto border-t border-line pt-2 text-13 text-ink-2">
         {p.envio !== null && p.envio > 0 && (
-          <div className="flex justify-between"><dt>Envío</dt><dd className="tabular-nums">{fmtMxn(p.envio)}</dd></div>
+          <div className="flex justify-between"><dt>Envío</dt><dd className="font-display font-bold tabular-nums text-ink">{fmtMxn(p.envio)}</dd></div>
         )}
         {p.totalCliente !== null && (
           <div className="flex items-baseline justify-between text-ink">
@@ -129,7 +150,7 @@ function CuerpoTienda({ p, seg, urgente }: { p: PedidoApp; seg: number | null; u
   );
 }
 
-export function PantallaPedidosApps({ token, caja, hayApps, hayTienda, onCambio, onSalir }: {
+export function PantallaPedidosApps({ token, caja, hayApps, hayTienda, onCambio, onImprimirComanda, onSalir }: {
   token: string; caja: DatosCaja;
   /** Módulo de apps de delivery encendido: pinta la barra de Uber. */
   hayApps: boolean;
@@ -137,6 +158,8 @@ export function PantallaPedidosApps({ token, caja, hayApps, hayTienda, onCambio,
   hayTienda: boolean;
   /** Se aceptó o rechazó algo: quien sondea desde fuera (timbre, comandas) relee ya. */
   onCambio?: () => void;
+  /** Imprime desde este dispositivo la comanda completa del pedido; dice si salió el papel. */
+  onImprimirComanda: (p: PedidoApp) => Promise<boolean>;
   onSalir: () => void;
 }) {
   const [pedidos, setPedidos] = useState<PedidoApp[] | null>(null);
@@ -158,6 +181,8 @@ export function PantallaPedidosApps({ token, caja, hayApps, hayTienda, onCambio,
   // Los dos diálogos (motivo del rechazo, pausar la tienda) se cierran antes de salir.
   useEscape(rechazando ? () => setRechazando(null) : menuPausa ? () => setMenuPausa(null) : onSalir);
   const montado = useRef(true);
+  /** Desde cuándo se ve cada pedido aceptado sin comanda (para el margen del aviso). */
+  const sinComandaDesde = useRef(new Map<string, number>());
 
   const recargarTienda = useCallback(async (forzar = false) => {
     const r = await leerTiendaUber(token, caja.sucursal_id, forzar);
@@ -233,6 +258,10 @@ export function PantallaPedidosApps({ token, caja, hayApps, hayTienda, onCambio,
   const recargar = useCallback(async () => {
     try {
       const lista = ordenarPedidos(await leerPedidosApps(token, caja.sucursal_id));
+      const desde = sinComandaDesde.current;
+      const faltan = new Set(lista.filter(faltaComanda).map((p) => p.id));
+      for (const id of desde.keys()) if (!faltan.has(id)) desde.delete(id);
+      for (const id of faltan) if (!desde.has(id)) desde.set(id, Date.now());
       if (montado.current) setPedidos(lista);
     } catch (e) {
       if (montado.current) setError(e instanceof Error ? e.message : "No se pudieron leer los pedidos");
@@ -259,6 +288,17 @@ export function PantallaPedidosApps({ token, caja, hayApps, hayTienda, onCambio,
     // Con éxito o con error se relee: el pedido pudo cambiar por su cuenta (venció, lo tomó otra caja).
     await recargar();
     onCambio?.();
+  };
+
+  const imprimirComanda = async (p: PedidoApp) => {
+    setOcupado(p.id); setError(null);
+    const salio = await onImprimirComanda(p);
+    if (!montado.current) return;
+    setOcupado(null);
+    // Con papel, el sello de la base tarda un instante: el margen empieza de nuevo para no avisar en falso.
+    if (salio) sinComandaDesde.current.set(p.id, Date.now());
+    else setError("No se pudo imprimir la comanda. Revisa la impresora e inténtalo de nuevo.");
+    await recargar();
   };
 
   const pendientes = useMemo(() => (pedidos ?? []).filter((p) => p.estado === "RECIBIDO" || p.estado === "ERROR"), [pedidos]);
@@ -351,7 +391,10 @@ export function PantallaPedidosApps({ token, caja, hayApps, hayTienda, onCambio,
                 {alergia && (
                   <p className="rounded bg-danger px-2 py-1 text-13 font-bold uppercase tracking-wide text-white">⚠ Pedido con alergia: revisa cada ítem</p>
                 )}
-                {deTienda ? <CuerpoTienda p={p} seg={seg} urgente={urgente} /> : (
+                {deTienda ? (
+                  <CuerpoTienda p={p} seg={seg} urgente={urgente} ocupado={ocupado === p.id} onImprimirComanda={() => imprimirComanda(p)}
+                    sinComanda={faltaComanda(p) && ahora.getTime() - (sinComandaDesde.current.get(p.id) ?? Infinity) > MARGEN_COMANDA_MS} />
+                ) : (
                   <>
                     <div className="flex items-center justify-between">
                       <span className="text-13 font-semibold uppercase tracking-wide text-ink-2">{etiquetaApp(p.app)}</span>

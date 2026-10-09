@@ -172,13 +172,24 @@ async function leerLealtadDelTicket(
   }
 }
 
+/**
+ * La nota que va en PAPEL (ticket del cliente y comanda): solo la de un pedido de la tienda en línea,
+ * que trae la forma de pago y lo que escribió el cliente. `nota_general` es también el recado a
+ * cocina que teclea el cajero, y ese no se le imprime al cliente. Un ticket de la tienda nace
+ * `API_EXTERNA` en Pick-up o Domicilio; los de las apps también son `API_EXTERNA`, pero en modo `APP_*`.
+ */
+export function notaPedidoDe(modo: string | null, origen: string | null, nota: string | null): string | null {
+  const deTienda = origen === "API_EXTERNA" && (modo === "DRIVE_THRU" || modo === "DELIVERY_PROPIO");
+  return deTienda && nota?.trim() ? nota.trim() : null;
+}
+
 /** Lee el ticket persistido y arma los datos planos para impresión (bajo RLS del empleado). */
 export async function leerTicketParaImpresion(ticketId: string, ctx: Ctx): Promise<DatosTicketImpresion> {
   const sb = employeeClient(ctx.token);
 
   const { data: t, error: e1 } = await sb
     .from("tickets")
-    .select("folio_completo, modo_servicio, cliente_id, direccion_entrega_id, nombre_cliente, nota_general, subtotal_mxn, descuentos_manuales_mxn, iva_mxn, total_mxn, propina_mxn, fecha_pago, created_at, sucursal_id, tenant_id, lealtad_mxn, estado_fiscal")
+    .select("folio_completo, modo_servicio, cliente_id, direccion_entrega_id, nombre_cliente, nota_general, origen_creacion, subtotal_mxn, descuentos_manuales_mxn, iva_mxn, total_mxn, propina_mxn, fecha_pago, created_at, sucursal_id, tenant_id, lealtad_mxn, estado_fiscal")
     .eq("id", ticketId)
     .single();
   if (e1 || !t) throw new Error(e1?.message ?? "Ticket no encontrado");
@@ -339,9 +350,7 @@ export async function leerTicketParaImpresion(ticketId: string, ctx: Ctx): Promi
       nombreCliente: (tk.nombre_cliente as string) ?? null,
     },
     entrega,
-    // Solo Pick-up y Domicilio: ahí la nota es del pedido (forma de pago, lo que escribió el
-    // cliente). En comedor y para llevar es un recado a cocina y el ticket del cliente no cambia.
-    notaPedido: tk.modo_servicio === "DRIVE_THRU" || tk.modo_servicio === "DELIVERY_PROPIO" ? ((tk.nota_general as string | null) ?? null) : null,
+    notaPedido: notaPedidoDe(tk.modo_servicio as string | null, tk.origen_creacion as string | null, tk.nota_general as string | null),
     lineas: lineasConCombo,
     totales: {
       subtotal: Number(tk.subtotal_mxn), descuentos: Number(tk.descuentos_manuales_mxn),

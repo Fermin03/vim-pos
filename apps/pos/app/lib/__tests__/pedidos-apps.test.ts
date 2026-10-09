@@ -8,7 +8,7 @@ const base = (extra: Partial<PedidoApp>): PedidoApp => ({
   id: "x", app: "APP_UBEREATS", idExterno: "e", folioCorto: null, estado: "RECIBIDO", tipoEntrega: null, clienteNombre: null,
   notaCliente: null, items: [], totalCliente: null, venceAceptacion: null, recibidoAt: "2026-09-02T10:00:00Z", ticketId: null,
   ticketFolio: null, ultimoError: null, canal: "APP", clienteTelefono: null, direccion: null, pago: null, envio: null,
-  gestion: null, ticketCajaId: null, comandaImpresa: false, ...extra,
+  gestion: null, gestionCajaId: null, ticketCajaId: null, comandaImpresa: false, ...extra,
 });
 const item = (extra: Partial<PedidoAppItem>): PedidoAppItem => ({
   nombreApp: "Hamburguesa", cantidad: 1, precioUnitario: 100, nota: null, mapeado: true, alergenos: [], alergiaNota: null, modificadores: [], ...extra,

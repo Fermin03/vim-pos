@@ -2,7 +2,7 @@ import { describe, it, expect, vi, afterEach } from "vitest";
 import type { PedidoApp } from "../pedidos-apps";
 import {
   etiquetaOrigen, etiquetaPago, etiquetaEntrega, debeSonar, TIMBRE_CADA_MS, comandasPendientes, aceptablesSolos,
-  etiquetaEstadoEnLinea, mensajeErrorEnLinea, leerEstadoEnLinea, pausarEnLinea, reanudarEnLinea, avisarPresente,
+  etiquetaEstadoEnLinea, mensajeErrorEnLinea, avisoDeTienda, timbrarHasta, faltaComanda, leerEstadoEnLinea, pausarEnLinea, reanudarEnLinea, avisarPresente,
   type EstadoEnLinea,
 } from "../pedidos-en-linea";
 
@@ -16,7 +16,7 @@ const ped = (extra: Partial<PedidoApp> = {}): PedidoApp => ({
   id: "p1", app: "DRIVE_THRU", canal: "TIENDA", idExterno: "e", folioCorto: null, estado: "RECIBIDO", tipoEntrega: null,
   clienteNombre: "Ana", clienteTelefono: "4771112233", notaCliente: null, items: [], totalCliente: 100, venceAceptacion: null,
   recibidoAt: "2026-10-09T10:00:00Z", ticketId: null, ticketFolio: null, ultimoError: null, direccion: null, pago: null,
-  envio: null, gestion: "NUBE", ticketCajaId: null, comandaImpresa: false, ...extra,
+  envio: null, gestion: "NUBE", gestionCajaId: null, ticketCajaId: null, comandaImpresa: false, ...extra,
 });
 const uber = (extra: Partial<PedidoApp> = {}) => ped({ app: "APP_UBEREATS", canal: "APP", gestion: null, ...extra });
 
@@ -184,5 +184,62 @@ describe("llamadas a delivery-accion", () => {
     const f = resp(200, { ok: true, sellado: true }); vi.stubGlobal("fetch", f);
     await avisarPresente("tok", "s1", "c1");
     expect(JSON.parse((f.mock.calls[0] as unknown as [string, RequestInit])[1].body as string)).toEqual({ accion: "enlinea_presente", sucursal_id: "s1", caja_id: "c1" });
+  });
+});
+
+describe("timbrarHasta", () => {
+  const vence = "2026-10-09T18:05:00Z";
+  it("sin pedidos por aceptar no hay timbre", () => {
+    expect(timbrarHasta([], "c1")).toBeNull();
+    expect(timbrarHasta([ped({ estado: "ACEPTADO" }), ped({ estado: "ERROR" }), ped({ estado: "EXPIRADO" })], "c1")).toBeNull();
+  });
+  it("suena hasta que venza el último pedido por aceptar, de cualquier canal", () => {
+    expect(timbrarHasta([ped({ venceAceptacion: vence })], "c1")).toBe(Date.parse(vence));
+    expect(timbrarHasta([ped({ venceAceptacion: vence }), uber({ id: "u", venceAceptacion: "2026-10-09T18:09:00Z" })], "c1")).toBe(Date.parse("2026-10-09T18:09:00Z"));
+  });
+  it("un pedido sin hora de vencimiento suena mientras siga por aceptar", () => {
+    expect(timbrarHasta([ped()], "c1")).toBe(Infinity);
+  });
+  it("un pedido que ya tomó otra caja no suena aquí; el de esta caja sí", () => {
+    expect(timbrarHasta([ped({ venceAceptacion: vence, gestionCajaId: "c2" })], "c1")).toBeNull();
+    expect(timbrarHasta([ped({ venceAceptacion: vence, gestionCajaId: "c1" })], "c1")).toBe(Date.parse(vence));
+  });
+  it("con debeSonar: uno cuya hora de aceptar ya pasó no hace sonar (copia local pegada sin internet)", () => {
+    const hasta = timbrarHasta([ped({ venceAceptacion: vence })], "c1")!;
+    const sonar = (ahora: number) => debeSonar({ hayNuevoPorAceptar: false, hayPorAceptar: ahora < hasta, ultimoTimbre: null, ahora });
+    expect(sonar(Date.parse(vence) - 1)).toBe(true);
+    expect(sonar(Date.parse(vence))).toBe(false);
+  });
+});
+
+describe("avisoDeTienda", () => {
+  const texto = "El pedido en línea se canceló: cancela el ticket en caja";
+  it("muestra lo que la caja dejó dicho en un pedido cerrado", () => {
+    for (const estado of ["CANCELADO", "RECHAZADO", "EXPIRADO"] as const) {
+      expect(avisoDeTienda(ped({ estado, ultimoError: texto }))).toBe(texto);
+    }
+  });
+  it("nunca un código interno, ni en un pedido vivo, ni de una app, ni vacío", () => {
+    expect(avisoDeTienda(ped({ estado: "CANCELADO", ultimoError: "SIN_TURNO_ABIERTO" }))).toBeNull();
+    expect(avisoDeTienda(ped({ estado: "CANCELADO", ultimoError: "HTTP_500" }))).toBeNull();
+    expect(avisoDeTienda(ped({ estado: "RECIBIDO", ultimoError: texto }))).toBeNull();
+    expect(avisoDeTienda(ped({ estado: "ACEPTADO", ultimoError: texto }))).toBeNull();
+    expect(avisoDeTienda(uber({ estado: "CANCELADO", ultimoError: texto }))).toBeNull();
+    expect(avisoDeTienda(ped({ estado: "CANCELADO", ultimoError: null }))).toBeNull();
+  });
+});
+
+describe("faltaComanda", () => {
+  const ok = ped({ estado: "ACEPTADO", ticketId: "t1" });
+  it("pedido de la tienda aceptado, con ticket y sin comanda impresa — sea de la caja que sea", () => {
+    expect(faltaComanda(ok)).toBe(true);
+    expect(faltaComanda({ ...ok, estado: "LISTO", ticketCajaId: "otra" })).toBe(true);
+  });
+  it("no si ya se imprimió, no hay ticket, no está aceptado o es de una app", () => {
+    expect(faltaComanda({ ...ok, comandaImpresa: true })).toBe(false);
+    expect(faltaComanda({ ...ok, ticketId: null })).toBe(false);
+    expect(faltaComanda({ ...ok, estado: "RECIBIDO" })).toBe(false);
+    expect(faltaComanda({ ...ok, estado: "ENTREGADO" })).toBe(false);
+    expect(faltaComanda({ ...ok, canal: "APP" })).toBe(false);
   });
 });
