@@ -13164,6 +13164,7 @@ export type Database = {
       }
       tienda_crear_pedido: {
         Args: {
+          p_clave?: string
           p_cliente: Json
           p_cuenta?: string
           p_direccion: Json
@@ -13249,6 +13250,7 @@ export type Database = {
         }
         Returns: Json
       }
+      tienda_encender_complemento: { Args: never; Returns: Json }
       tienda_estado_sucursal: {
         Args: { p_ahora?: string; p_modo: string; p_sucursal: string }
         Returns: string
