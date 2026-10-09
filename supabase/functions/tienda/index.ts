@@ -39,7 +39,7 @@ import { secretoInternoValido } from "../_shared/delivery/interno.ts";
 import { hostnamesPermitidos, verificarTurnstile } from "../_shared/turnstile.ts";
 import { enSegundoPlano, enviarCorreo } from "../_shared/correo.ts";
 import { registrarError } from "../_shared/errores.ts";
-import { leerCuerpo } from "../_shared/tienda/validar.ts";
+import { leerCuerpo, tieneNul } from "../_shared/tienda/validar.ts";
 import { huellaDe, nuevoCodigo } from "../_shared/tienda/seguimiento.ts";
 import { correoDePedido } from "../_shared/tienda/correo-pedido.ts";
 import { cotizacionPublica, cuposDe, ipDeConfianza, leerNegocio, respuestaDeCaptcha, respuestaDeRpc } from "../_shared/tienda/respuesta.ts";
@@ -74,6 +74,8 @@ async function atender(req: Request): Promise<Response> {
 
   const crudo = await leerCuerpoAcotado(req, MAX_CUERPO);
   if (crudo === null) return json({ error: "CUERPO_DEMASIADO_GRANDE" }, 413);
+  // Un NUL (literal o escapado) no cabe en un jsonb de Postgres: fuera antes de tocar la base.
+  if (tieneNul(crudo)) return json({ error: "CUERPO_INVALIDO" }, 400);
   let cuerpo: unknown;
   try {
     cuerpo = JSON.parse(crudo);

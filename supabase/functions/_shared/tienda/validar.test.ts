@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { esUuid, leerCuerpo, normalizarTelefono, textoLimpio } from "./validar.ts";
+import { esUuid, leerCuerpo, normalizarTelefono, textoLimpio, tieneNul } from "./validar.ts";
 
 const SUC = "99999999-0000-0000-0000-0000000000bb";
 
@@ -155,4 +155,63 @@ test("cuerpo: pago con tarjeta sin paga_con pasa; importes raros no", () => {
   if (cero.ok && cero.valor.accion === "pedir") assert.equal(cero.valor.paga_con, "0.00");
   const dec = leerCuerpo({ ...pedir, paga_con: 12.5 });
   if (dec.ok && dec.valor.accion === "pedir") assert.equal(dec.valor.paga_con, "12.50");
+});
+
+// ---- Revisión final: la nota del renglón también es texto del público, y el NUL no llega a la base ----
+
+const cotizar = { accion: "cotizar", negocio: "knockout", sucursal_id: SUC, modo: "RECOGER", items: [{}] };
+const itemsDe = (cuerpo: object): unknown[] => {
+  const r = leerCuerpo(cuerpo);
+  assert.equal(r.ok, true, JSON.stringify(r));
+  if (!r.ok || (r.valor.accion !== "cotizar" && r.valor.accion !== "pedir")) throw new Error("no es un carrito");
+  return r.valor.items;
+};
+test("renglones: un elemento que no es objeto es CARRITO_INVALIDO, en cotizar y en pedir", () => {
+  for (const base of [cotizar, pedir]) {
+    for (const malo of ["x", 1, null, true, [], [{}]]) {
+      assert.deepEqual(leerCuerpo({ ...base, items: [{ producto_id: "p", cantidad: 1 }, malo] }), { ok: false, error: "CARRITO_INVALIDO" }, JSON.stringify(malo));
+    }
+  }
+});
+test("renglones: la nota sale limpia (sin bidi ni saltos de línea) y recortada a 200", () => {
+  for (const base of [cotizar, pedir]) {
+    const [a, b] = itemsDe({ ...base, items: [
+      { producto_id: "p", cantidad: 1, nota: "  sin\ncebolla \u202Eatodot\u202C\u0007 " },
+      { producto_id: "p", cantidad: 1, nota: "x".repeat(250) },
+    ] }) as { nota: string }[];
+    assert.equal(a!.nota, "sin cebolla atodot");
+    assert.equal(b!.nota, "x".repeat(200));
+  }
+});
+test("renglones: una nota vacía, invisible o que no es texto se quita del renglón", () => {
+  for (const nota of ["", "   ", "\u200B\u202E", 7, null, { a: 1 }]) {
+    assert.deepEqual(itemsDe({ ...cotizar, items: [{ producto_id: "p", cantidad: 1, nota }] }), [{ producto_id: "p", cantidad: 1 }], JSON.stringify(nota));
+  }
+});
+test("renglones: los demás campos pasan intactos (lo demás lo valida SQL)", () => {
+  const renglon = {
+    producto_id: "NO-ES-UUID", cantidad: "2", otra: { x: [1, null] },
+    modificadores: [{ opcion_id: "o", cantidad: 1.5, nota: "esta no se toca\n" }],
+    componentes: [{ grupo_id: "g", producto_id: "p", cantidad: 1 }],
+  };
+  assert.deepEqual(itemsDe({ ...cotizar, items: [renglon, {}] }), [renglon, {}]);
+  assert.deepEqual(itemsDe({ ...pedir, items: [{ ...renglon, nota: " ok " }] }), [{ ...renglon, nota: "ok" }]);
+});
+// String.raw: lo que hay entre las comillas invertidas es, letra por letra, el cuerpo que llega.
+const NUL = String.fromCharCode(0);
+test("cuerpo crudo: un NUL, literal o como escape, se detecta en cualquier parte del JSON", () => {
+  assert.equal(tieneNul(`{"a":"x${NUL}y"}`), true);                              // el carácter NUL
+  assert.equal(tieneNul(String.raw`{"a":"x\u0000y"}`), true);                    // el escape, en un valor
+  assert.equal(tieneNul(String.raw`{"x\u0000":1}`), true);                       // el escape, en una clave
+  assert.equal(tieneNul(String.raw`{"items":[{"producto_id":"\u0000"}]}`), true);
+  assert.equal(tieneNul(String.raw`{"a":"x\\\u0000"}`), true);                   // barra escapada + escape de NUL
+  assert.equal(tieneNul(JSON.stringify({ a: `x${NUL}y` })), true);               // como lo serializa un cliente
+});
+test("cuerpo crudo: sin NUL pasa, también la barra escapada seguida de u0000 y otros escapes", () => {
+  assert.equal(tieneNul(""), false);
+  assert.equal(tieneNul(String.raw`{"a":"hola\ná \u0001 Ā"}`), false);
+  assert.equal(tieneNul(String.raw`{"a":"\\u0000"}`), false);      // barra + «u0000»: seis caracteres visibles, no un NUL
+  assert.equal(tieneNul(String.raw`{"a":"\\\\u0000"}`), false);    // dos barras escapadas
+  assert.equal(tieneNul(JSON.stringify({ a: String.raw`\u0000` })), false);
+  assert.equal(tieneNul(JSON.stringify(pedir)), false);
 });

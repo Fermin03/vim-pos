@@ -74,6 +74,13 @@ function leerImporte(x: unknown): string | null | undefined {
   return n > 999999 ? undefined : n.toFixed(2);
 }
 
+/** ¿El cuerpo CRUDO trae un NUL, literal o como escape `\u0000` (número impar de barras delante)?
+ *  Postgres no admite U+0000 en un jsonb ni en un texto: sin esta guarda, cada petición así sería un
+ *  503 con su línea de log. Se mira el texto y no el JSON ya leído para cubrir también las claves. */
+export function tieneNul(crudo: string): boolean {
+  return crudo.includes("\u0000") || /(?<!\\)(?:\\\\)*\\u0000/.test(crudo);
+}
+
 export function leerCuerpo(x: unknown): Resultado<Peticion> {
   if (!objeto(x)) return mal("CUERPO_INVALIDO");
   const accion = x.accion;
@@ -97,8 +104,13 @@ export function leerCuerpo(x: unknown): Resultado<Peticion> {
   const zonaCruda = x.zona_id ?? null;
   if (zonaCruda !== null && !esUuid(zonaCruda)) return mal("ZONA_INVALIDA");
   const zona_id = zonaCruda as string | null;
-  if (!Array.isArray(x.items) || x.items.length === 0 || x.items.length > MAX_RENGLONES) return mal("CARRITO_INVALIDO");
-  const items: unknown[] = x.items;
+  if (!Array.isArray(x.items) || x.items.length === 0 || x.items.length > MAX_RENGLONES || !x.items.every(objeto)) return mal("CARRITO_INVALIDO");
+  // La nota de cada renglón es texto libre del público, como el nombre o la dirección: sale limpia
+  // y acotada, o no sale. Del resto del renglón aquí no se mira nada: lo valida SQL contra el menú.
+  const items: unknown[] = x.items.map(({ nota, ...resto }) => {
+    const limpia = textoLimpio(nota, 200);
+    return limpia === null ? resto : { ...resto, nota: limpia };
+  });
   if (accion === "cotizar") return { ok: true, valor: { accion, negocio, sucursal_id, modo, zona_id, items } };
 
   // pedir
