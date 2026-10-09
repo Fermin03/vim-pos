@@ -26,16 +26,63 @@ const CONEXION_VIVA = new Set(["ACTIVA", "PENDIENTE"]);
  *                     COMPLETOS, nunca desde el delta — si el ritmo se calculara con las filas
  *                     que cambiaron, un pedido RECIBIDO que lleva 20 s quieto dejaría de contar
  *                     y la caja frenaría justo mientras corre su ventana de aceptación.
+ * @param tienda       La sucursal vende en la tienda en línea y esta caja la entiende. Sin una
+ *                     conexión de app nada más la sacaría del reposo, y con sondeos cada 300 s la
+ *                     señal de caja lista (ventana de 90 s) no se cumpliría nunca.
  */
 export function cadenciaEspejo(
-  { conexiones = [], pedidosVivos = [] }: {
+  { conexiones = [], pedidosVivos = [], tienda = false }: {
     conexiones?: { estado?: string | null }[];
     pedidosVivos?: { estado?: string | null }[];
+    tienda?: boolean;
   },
 ): number {
   if (pedidosVivos.some((p) => p.estado === "RECIBIDO")) return RAPIDA_MS;
-  if (conexiones.some((c) => CONEXION_VIVA.has(String(c.estado ?? "")))) return NORMAL_MS;
+  if (tienda || conexiones.some((c) => CONEXION_VIVA.has(String(c.estado ?? "")))) return NORMAL_MS;
   return REPOSO_MS;
+}
+
+/**
+ * Qué le toca a esta caja en este sondeo.
+ *
+ * `conTienda` exige las dos cosas: que el negocio tenga la tienda encendida Y que la caja diga que
+ * la entiende (`tienda: true` en el cuerpo, que solo mandan las cajas desde la 0.8.0). Sin lo
+ * segundo, una caja vieja recibiría pedidos con `conexion_id` nulo que su tabla local rechaza, y
+ * el espejo entero —pedidos de Uber incluidos— fallaría en cada vuelta.
+ *
+ * Solo un `true` estricto cuenta: nada del cuerpo se da por bueno sin mirarlo.
+ */
+export function alcanceEspejo(
+  { efectivos, cuerpo }: {
+    efectivos: Record<string, unknown>;
+    cuerpo: { tienda?: unknown; turno_abierto?: unknown };
+  },
+): { conApps: boolean; conTienda: boolean; canales: ("APP" | "TIENDA")[]; turnoAbierto: boolean } {
+  const conApps = efectivos.delivery_apps === true;
+  const conTienda = efectivos.tienda === true && cuerpo.tienda === true;
+  const canales: ("APP" | "TIENDA")[] = [];
+  if (conApps) canales.push("APP");
+  if (conTienda) canales.push("TIENDA");
+  return { conApps, conTienda, canales, turnoAbierto: cuerpo.turno_abierto === true };
+}
+
+/**
+ * Lo que el sondeo escribe en `cajas`: siempre el latido y, solo si la caja declara la tienda Y
+ * reporta turno abierto, la marca `espejo_turno_abierto_at` que lee `sucursal_recibe_pedidos`
+ * (mig. 0161 §6).
+ *
+ * Es una marca de tiempo para que falle cerrada: quien deja de afirmar el turno no escribe nada y
+ * la marca envejece sola. Y una caja que no declara la tienda manda el UPDATE de siempre, así que
+ * las que hoy están en servicio no dependen de que la columna exista.
+ */
+export function selloLatido(
+  cuerpo: { tienda?: unknown; turno_abierto?: unknown },
+  ahora: string,
+): Record<string, string> {
+  return {
+    espejo_apps_at: ahora,
+    ...(cuerpo.tienda === true && cuerpo.turno_abierto === true && { espejo_turno_abierto_at: ahora }),
+  };
 }
 
 /** Tope de filas por respuesta: una ráfaga rara no debe convertirse en un paquete enorme. */

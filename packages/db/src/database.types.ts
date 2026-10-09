@@ -7,6 +7,11 @@ export type Json =
   | Json[]
 
 export type Database = {
+  // Allows to automatically instantiate createClient with right options
+  // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
+  __InternalSupabase: {
+    PostgrestVersion: "14.5"
+  }
   graphql_public: {
     Tables: {
       [_ in never]: never
@@ -806,6 +811,7 @@ export type Database = {
           deleted_at: string | null
           descripcion: string | null
           espejo_apps_at: string | null
+          espejo_turno_abierto_at: string | null
           id: string
           identificador_dispositivo: string | null
           impresora_config: Json | null
@@ -833,6 +839,7 @@ export type Database = {
           deleted_at?: string | null
           descripcion?: string | null
           espejo_apps_at?: string | null
+          espejo_turno_abierto_at?: string | null
           id?: string
           identificador_dispositivo?: string | null
           impresora_config?: Json | null
@@ -860,6 +867,7 @@ export type Database = {
           deleted_at?: string | null
           descripcion?: string | null
           espejo_apps_at?: string | null
+          espejo_turno_abierto_at?: string | null
           id?: string
           identificador_dispositivo?: string | null
           impresora_config?: Json | null
@@ -1482,6 +1490,7 @@ export type Database = {
           bloqueado_por: string | null
           codigo_cliente: string | null
           codigo_postal_fiscal: string | null
+          codigo_publico: string
           created_at: string
           created_by: string | null
           deleted_at: string | null
@@ -1512,6 +1521,7 @@ export type Database = {
           bloqueado_por?: string | null
           codigo_cliente?: string | null
           codigo_postal_fiscal?: string | null
+          codigo_publico?: string
           created_at?: string
           created_by?: string | null
           deleted_at?: string | null
@@ -1542,6 +1552,7 @@ export type Database = {
           bloqueado_por?: string | null
           codigo_cliente?: string | null
           codigo_postal_fiscal?: string | null
+          codigo_publico?: string
           created_at?: string
           created_by?: string | null
           deleted_at?: string | null
@@ -1569,6 +1580,56 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "clientes_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      clientes_alias: {
+        Row: {
+          alias_id: string
+          cliente_id: string
+          created_at: string
+          tenant_id: string
+        }
+        Insert: {
+          alias_id: string
+          cliente_id: string
+          created_at?: string
+          tenant_id: string
+        }
+        Update: {
+          alias_id?: string
+          cliente_id?: string
+          created_at?: string
+          tenant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "clientes_alias_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "clientes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "clientes_alias_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "vw_clientes_lista"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "clientes_alias_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "vw_clientes_resumen"
+            referencedColumns: ["cliente_id"]
+          },
+          {
+            foreignKeyName: "clientes_alias_tenant_id_fkey"
             columns: ["tenant_id"]
             isOneToOne: false
             referencedRelation: "tenants"
@@ -2112,6 +2173,8 @@ export type Database = {
           modulo_delivery_propio_activo: boolean
           modulo_display_cliente_activo: boolean
           modulo_inventario_activo: boolean
+          modulo_lealtad_activo: boolean
+          modulo_tienda_activo: boolean
           mostrar_nota_producto_ticket: boolean
           mostrar_qr_factura_ticket: boolean
           pac_credenciales_encrypted: string | null
@@ -2153,6 +2216,8 @@ export type Database = {
           modulo_delivery_propio_activo?: boolean
           modulo_display_cliente_activo?: boolean
           modulo_inventario_activo?: boolean
+          modulo_lealtad_activo?: boolean
+          modulo_tienda_activo?: boolean
           mostrar_nota_producto_ticket?: boolean
           mostrar_qr_factura_ticket?: boolean
           pac_credenciales_encrypted?: string | null
@@ -2194,6 +2259,8 @@ export type Database = {
           modulo_delivery_propio_activo?: boolean
           modulo_display_cliente_activo?: boolean
           modulo_inventario_activo?: boolean
+          modulo_lealtad_activo?: boolean
+          modulo_tienda_activo?: boolean
           mostrar_nota_producto_ticket?: boolean
           mostrar_qr_factura_ticket?: boolean
           pac_credenciales_encrypted?: string | null
@@ -3131,15 +3198,18 @@ export type Database = {
         Row: {
           aceptado_at: string | null
           app: Database["public"]["Enums"]["modo_servicio"]
+          canal: string
           cancelado_at: string | null
           cancelado_por: string | null
+          cliente_email: string | null
           cliente_nombre: string | null
           cliente_telefono: string | null
           cliente_telefono_pin: string | null
-          conexion_id: string
+          conexion_id: string | null
           created_at: string
           descuento_app_mxn: number | null
           descuento_tienda_mxn: number | null
+          direccion: Json | null
           direccion_texto: string | null
           efectivo_a_cobrar_mxn: number
           entregado_at: string | null
@@ -3156,6 +3226,8 @@ export type Database = {
           listo_at: string | null
           motivo_cancelacion: string | null
           nota_cliente: string | null
+          paga_con_mxn: number | null
+          pago_al_recibir: string | null
           payload_raw: Json
           programado_para: string | null
           propina_mxn: number | null
@@ -3163,29 +3235,35 @@ export type Database = {
           repartidor_estado: string | null
           repartidor_nombre: string | null
           repartidor_telefono: string | null
+          seguimiento_hash: string | null
           subtotal_mxn: number | null
           sucursal_id: string
           tenant_id: string
           ticket_id: string | null
+          tienda_cuenta_id: string | null
           tipo_entrega: string | null
           total_cliente_mxn: number | null
           total_restaurante_mxn: number | null
           ultimo_error: string | null
           updated_at: string
           vence_aceptacion: string | null
+          zona_envio_id: string | null
         }
         Insert: {
           aceptado_at?: string | null
           app: Database["public"]["Enums"]["modo_servicio"]
+          canal?: string
           cancelado_at?: string | null
           cancelado_por?: string | null
+          cliente_email?: string | null
           cliente_nombre?: string | null
           cliente_telefono?: string | null
           cliente_telefono_pin?: string | null
-          conexion_id: string
+          conexion_id?: string | null
           created_at?: string
           descuento_app_mxn?: number | null
           descuento_tienda_mxn?: number | null
+          direccion?: Json | null
           direccion_texto?: string | null
           efectivo_a_cobrar_mxn?: number
           entregado_at?: string | null
@@ -3202,6 +3280,8 @@ export type Database = {
           listo_at?: string | null
           motivo_cancelacion?: string | null
           nota_cliente?: string | null
+          paga_con_mxn?: number | null
+          pago_al_recibir?: string | null
           payload_raw?: Json
           programado_para?: string | null
           propina_mxn?: number | null
@@ -3209,29 +3289,35 @@ export type Database = {
           repartidor_estado?: string | null
           repartidor_nombre?: string | null
           repartidor_telefono?: string | null
+          seguimiento_hash?: string | null
           subtotal_mxn?: number | null
           sucursal_id: string
           tenant_id: string
           ticket_id?: string | null
+          tienda_cuenta_id?: string | null
           tipo_entrega?: string | null
           total_cliente_mxn?: number | null
           total_restaurante_mxn?: number | null
           ultimo_error?: string | null
           updated_at?: string
           vence_aceptacion?: string | null
+          zona_envio_id?: string | null
         }
         Update: {
           aceptado_at?: string | null
           app?: Database["public"]["Enums"]["modo_servicio"]
+          canal?: string
           cancelado_at?: string | null
           cancelado_por?: string | null
+          cliente_email?: string | null
           cliente_nombre?: string | null
           cliente_telefono?: string | null
           cliente_telefono_pin?: string | null
-          conexion_id?: string
+          conexion_id?: string | null
           created_at?: string
           descuento_app_mxn?: number | null
           descuento_tienda_mxn?: number | null
+          direccion?: Json | null
           direccion_texto?: string | null
           efectivo_a_cobrar_mxn?: number
           entregado_at?: string | null
@@ -3248,6 +3334,8 @@ export type Database = {
           listo_at?: string | null
           motivo_cancelacion?: string | null
           nota_cliente?: string | null
+          paga_con_mxn?: number | null
+          pago_al_recibir?: string | null
           payload_raw?: Json
           programado_para?: string | null
           propina_mxn?: number | null
@@ -3255,16 +3343,19 @@ export type Database = {
           repartidor_estado?: string | null
           repartidor_nombre?: string | null
           repartidor_telefono?: string | null
+          seguimiento_hash?: string | null
           subtotal_mxn?: number | null
           sucursal_id?: string
           tenant_id?: string
           ticket_id?: string | null
+          tienda_cuenta_id?: string | null
           tipo_entrega?: string | null
           total_cliente_mxn?: number | null
           total_restaurante_mxn?: number | null
           ultimo_error?: string | null
           updated_at?: string
           vence_aceptacion?: string | null
+          zona_envio_id?: string | null
         }
         Relationships: [
           {
@@ -4317,6 +4408,255 @@ export type Database = {
             columns: ["unidad_medida_id"]
             isOneToOne: false
             referencedRelation: "unidades_medida"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      lealtad_movimientos: {
+        Row: {
+          caja_id: string | null
+          canje_movimiento_id: string | null
+          cliente_id: string
+          created_at: string
+          fecha: string
+          id: string
+          monto_mxn: number | null
+          motivo: string | null
+          premio_id: string | null
+          programa_version: number
+          puntos: number
+          saldo_visto: number | null
+          sucursal_id: string | null
+          tenant_id: string
+          ticket_id: string | null
+          tipo: Database["public"]["Enums"]["lealtad_movimiento_tipo"]
+          usuario_id: string | null
+        }
+        Insert: {
+          caja_id?: string | null
+          canje_movimiento_id?: string | null
+          cliente_id: string
+          created_at?: string
+          fecha?: string
+          id?: string
+          monto_mxn?: number | null
+          motivo?: string | null
+          premio_id?: string | null
+          programa_version: number
+          puntos: number
+          saldo_visto?: number | null
+          sucursal_id?: string | null
+          tenant_id: string
+          ticket_id?: string | null
+          tipo: Database["public"]["Enums"]["lealtad_movimiento_tipo"]
+          usuario_id?: string | null
+        }
+        Update: {
+          caja_id?: string | null
+          canje_movimiento_id?: string | null
+          cliente_id?: string
+          created_at?: string
+          fecha?: string
+          id?: string
+          monto_mxn?: number | null
+          motivo?: string | null
+          premio_id?: string | null
+          programa_version?: number
+          puntos?: number
+          saldo_visto?: number | null
+          sucursal_id?: string | null
+          tenant_id?: string
+          ticket_id?: string | null
+          tipo?: Database["public"]["Enums"]["lealtad_movimiento_tipo"]
+          usuario_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lealtad_movimientos_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "clientes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lealtad_movimientos_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "vw_clientes_lista"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lealtad_movimientos_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "vw_clientes_resumen"
+            referencedColumns: ["cliente_id"]
+          },
+          {
+            foreignKeyName: "lealtad_movimientos_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      lealtad_premios: {
+        Row: {
+          activo: boolean
+          costo: number
+          created_at: string
+          deleted_at: string | null
+          id: string
+          producto_id: string
+          tenant_id: string
+          updated_at: string
+        }
+        Insert: {
+          activo?: boolean
+          costo: number
+          created_at?: string
+          deleted_at?: string | null
+          id?: string
+          producto_id: string
+          tenant_id: string
+          updated_at?: string
+        }
+        Update: {
+          activo?: boolean
+          costo?: number
+          created_at?: string
+          deleted_at?: string | null
+          id?: string
+          producto_id?: string
+          tenant_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lealtad_premios_producto_id_fkey"
+            columns: ["producto_id"]
+            isOneToOne: false
+            referencedRelation: "productos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lealtad_premios_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      lealtad_programa: {
+        Row: {
+          compra_minima_mxn: number
+          created_at: string
+          encendido_desde: string | null
+          id: string
+          mecanica: Database["public"]["Enums"]["lealtad_mecanica"]
+          pesos_por_punto: number | null
+          porcentaje: number | null
+          tenant_id: string
+          tope_compras_dia: number
+          updated_at: string
+          vencimiento_meses: number | null
+          version: number
+        }
+        Insert: {
+          compra_minima_mxn?: number
+          created_at?: string
+          encendido_desde?: string | null
+          id?: string
+          mecanica: Database["public"]["Enums"]["lealtad_mecanica"]
+          pesos_por_punto?: number | null
+          porcentaje?: number | null
+          tenant_id: string
+          tope_compras_dia?: number
+          updated_at?: string
+          vencimiento_meses?: number | null
+          version?: number
+        }
+        Update: {
+          compra_minima_mxn?: number
+          created_at?: string
+          encendido_desde?: string | null
+          id?: string
+          mecanica?: Database["public"]["Enums"]["lealtad_mecanica"]
+          pesos_por_punto?: number | null
+          porcentaje?: number | null
+          tenant_id?: string
+          tope_compras_dia?: number
+          updated_at?: string
+          vencimiento_meses?: number | null
+          version?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lealtad_programa_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: true
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      lealtad_saldos: {
+        Row: {
+          cliente_id: string
+          programa_version: number
+          saldo: number
+          tenant_id: string
+          ultima_actividad: string | null
+          updated_at: string
+          vence_el: string | null
+        }
+        Insert: {
+          cliente_id: string
+          programa_version?: number
+          saldo?: number
+          tenant_id: string
+          ultima_actividad?: string | null
+          updated_at?: string
+          vence_el?: string | null
+        }
+        Update: {
+          cliente_id?: string
+          programa_version?: number
+          saldo?: number
+          tenant_id?: string
+          ultima_actividad?: string | null
+          updated_at?: string
+          vence_el?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lealtad_saldos_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: true
+            referencedRelation: "clientes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lealtad_saldos_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: true
+            referencedRelation: "vw_clientes_lista"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lealtad_saldos_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: true
+            referencedRelation: "vw_clientes_resumen"
+            referencedColumns: ["cliente_id"]
+          },
+          {
+            foreignKeyName: "lealtad_saldos_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
             referencedColumns: ["id"]
           },
         ]
@@ -8204,6 +8544,108 @@ export type Database = {
         }
         Relationships: []
       }
+      ticket_canjes_lealtad: {
+        Row: {
+          cliente_id: string
+          created_at: string
+          created_by: string | null
+          id: string
+          monto_descontado_mxn: number
+          premio_id: string | null
+          puntos: number
+          revertido: boolean
+          revertido_at: string | null
+          tenant_id: string
+          ticket_id: string
+          ticket_item_id: string | null
+        }
+        Insert: {
+          cliente_id: string
+          created_at?: string
+          created_by?: string | null
+          id: string
+          monto_descontado_mxn: number
+          premio_id?: string | null
+          puntos: number
+          revertido?: boolean
+          revertido_at?: string | null
+          tenant_id: string
+          ticket_id: string
+          ticket_item_id?: string | null
+        }
+        Update: {
+          cliente_id?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          monto_descontado_mxn?: number
+          premio_id?: string | null
+          puntos?: number
+          revertido?: boolean
+          revertido_at?: string | null
+          tenant_id?: string
+          ticket_id?: string
+          ticket_item_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ticket_canjes_lealtad_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "clientes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ticket_canjes_lealtad_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "vw_clientes_lista"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ticket_canjes_lealtad_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "vw_clientes_resumen"
+            referencedColumns: ["cliente_id"]
+          },
+          {
+            foreignKeyName: "ticket_canjes_lealtad_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ticket_canjes_lealtad_ticket_id_fkey"
+            columns: ["ticket_id"]
+            isOneToOne: false
+            referencedRelation: "tickets"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ticket_canjes_lealtad_ticket_id_fkey"
+            columns: ["ticket_id"]
+            isOneToOne: false
+            referencedRelation: "vw_cumplimiento_tiempos_cocina"
+            referencedColumns: ["ticket_id"]
+          },
+          {
+            foreignKeyName: "ticket_canjes_lealtad_ticket_id_fkey"
+            columns: ["ticket_id"]
+            isOneToOne: false
+            referencedRelation: "vw_ventas_apps_externas"
+            referencedColumns: ["ticket_id"]
+          },
+          {
+            foreignKeyName: "ticket_canjes_lealtad_ticket_item_id_fkey"
+            columns: ["ticket_item_id"]
+            isOneToOne: false
+            referencedRelation: "ticket_items"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       ticket_descuentos_manuales: {
         Row: {
           aplicado_at: string
@@ -8884,6 +9326,7 @@ export type Database = {
           folio_externo_app: string | null
           id: string
           iva_mxn: number
+          lealtad_mxn: number
           marca_virtual_id: string | null
           mesero_id: string | null
           modo_servicio: Database["public"]["Enums"]["modo_servicio"]
@@ -8942,6 +9385,7 @@ export type Database = {
           folio_externo_app?: string | null
           id?: string
           iva_mxn?: number
+          lealtad_mxn?: number
           marca_virtual_id?: string | null
           mesero_id?: string | null
           modo_servicio: Database["public"]["Enums"]["modo_servicio"]
@@ -9000,6 +9444,7 @@ export type Database = {
           folio_externo_app?: string | null
           id?: string
           iva_mxn?: number
+          lealtad_mxn?: number
           marca_virtual_id?: string | null
           mesero_id?: string | null
           modo_servicio?: Database["public"]["Enums"]["modo_servicio"]
@@ -9430,6 +9875,317 @@ export type Database = {
             columns: ["transferencia_autorizacion_pin_id"]
             isOneToOne: false
             referencedRelation: "autorizaciones_pin"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      tienda_config: {
+        Row: {
+          aceptacion: string
+          color: string
+          created_at: string
+          descripcion: string | null
+          minutos_aceptacion: number
+          pago_efectivo: boolean
+          pago_tarjeta: boolean
+          slug: string
+          tenant_id: string
+          updated_at: string
+        }
+        Insert: {
+          aceptacion?: string
+          color?: string
+          created_at?: string
+          descripcion?: string | null
+          minutos_aceptacion?: number
+          pago_efectivo?: boolean
+          pago_tarjeta?: boolean
+          slug: string
+          tenant_id: string
+          updated_at?: string
+        }
+        Update: {
+          aceptacion?: string
+          color?: string
+          created_at?: string
+          descripcion?: string | null
+          minutos_aceptacion?: number
+          pago_efectivo?: boolean
+          pago_tarjeta?: boolean
+          slug?: string
+          tenant_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tienda_config_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: true
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      tienda_cuentas: {
+        Row: {
+          acepto_privacidad_at: string | null
+          apellido: string | null
+          bloqueada_hasta: string | null
+          created_at: string
+          deleted_at: string | null
+          email: string
+          fecha_nacimiento: string | null
+          id: string
+          intentos_fallidos: number
+          nombre: string
+          password_hash: string
+          telefono: string
+          tenant_id: string
+          updated_at: string
+        }
+        Insert: {
+          acepto_privacidad_at?: string | null
+          apellido?: string | null
+          bloqueada_hasta?: string | null
+          created_at?: string
+          deleted_at?: string | null
+          email: string
+          fecha_nacimiento?: string | null
+          id?: string
+          intentos_fallidos?: number
+          nombre: string
+          password_hash: string
+          telefono: string
+          tenant_id: string
+          updated_at?: string
+        }
+        Update: {
+          acepto_privacidad_at?: string | null
+          apellido?: string | null
+          bloqueada_hasta?: string | null
+          created_at?: string
+          deleted_at?: string | null
+          email?: string
+          fecha_nacimiento?: string | null
+          id?: string
+          intentos_fallidos?: number
+          nombre?: string
+          password_hash?: string
+          telefono?: string
+          tenant_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tienda_cuentas_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      tienda_direcciones: {
+        Row: {
+          calle: string
+          ciudad: string
+          codigo_postal: string
+          colonia: string
+          created_at: string
+          cuenta_id: string
+          estado: string
+          etiqueta: string
+          id: string
+          numero_exterior: string
+          numero_interior: string | null
+          referencias: string | null
+          tenant_id: string
+          zona_envio_id: string | null
+        }
+        Insert: {
+          calle: string
+          ciudad: string
+          codigo_postal: string
+          colonia: string
+          created_at?: string
+          cuenta_id: string
+          estado: string
+          etiqueta?: string
+          id?: string
+          numero_exterior: string
+          numero_interior?: string | null
+          referencias?: string | null
+          tenant_id: string
+          zona_envio_id?: string | null
+        }
+        Update: {
+          calle?: string
+          ciudad?: string
+          codigo_postal?: string
+          colonia?: string
+          created_at?: string
+          cuenta_id?: string
+          estado?: string
+          etiqueta?: string
+          id?: string
+          numero_exterior?: string
+          numero_interior?: string | null
+          referencias?: string | null
+          tenant_id?: string
+          zona_envio_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tienda_direcciones_cuenta_id_fkey"
+            columns: ["cuenta_id"]
+            isOneToOne: false
+            referencedRelation: "tienda_cuentas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tienda_direcciones_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tienda_direcciones_zona_envio_id_fkey"
+            columns: ["zona_envio_id"]
+            isOneToOne: false
+            referencedRelation: "zonas_envio"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      tienda_recuperaciones: {
+        Row: {
+          created_at: string
+          cuenta_id: string
+          expira_at: string
+          tenant_id: string
+          token_hash: string
+          usada_at: string | null
+        }
+        Insert: {
+          created_at?: string
+          cuenta_id: string
+          expira_at: string
+          tenant_id: string
+          token_hash: string
+          usada_at?: string | null
+        }
+        Update: {
+          created_at?: string
+          cuenta_id?: string
+          expira_at?: string
+          tenant_id?: string
+          token_hash?: string
+          usada_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tienda_recuperaciones_cuenta_id_fkey"
+            columns: ["cuenta_id"]
+            isOneToOne: false
+            referencedRelation: "tienda_cuentas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tienda_recuperaciones_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      tienda_sesiones: {
+        Row: {
+          created_at: string
+          cuenta_id: string
+          expira_at: string
+          tenant_id: string
+          token_hash: string
+        }
+        Insert: {
+          created_at?: string
+          cuenta_id: string
+          expira_at: string
+          tenant_id: string
+          token_hash: string
+        }
+        Update: {
+          created_at?: string
+          cuenta_id?: string
+          expira_at?: string
+          tenant_id?: string
+          token_hash?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tienda_sesiones_cuenta_id_fkey"
+            columns: ["cuenta_id"]
+            isOneToOne: false
+            referencedRelation: "tienda_cuentas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tienda_sesiones_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      tienda_sucursales: {
+        Row: {
+          created_at: string
+          domicilio: boolean
+          horario: Json
+          participa: boolean
+          pausa_hasta: string | null
+          recoger: boolean
+          sucursal_id: string
+          tenant_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          domicilio?: boolean
+          horario?: Json
+          participa?: boolean
+          pausa_hasta?: string | null
+          recoger?: boolean
+          sucursal_id: string
+          tenant_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          domicilio?: boolean
+          horario?: Json
+          participa?: boolean
+          pausa_hasta?: string | null
+          recoger?: boolean
+          sucursal_id?: string
+          tenant_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tienda_sucursales_sucursal_del_negocio"
+            columns: ["sucursal_id", "tenant_id"]
+            isOneToOne: false
+            referencedRelation: "sucursales"
+            referencedColumns: ["id", "tenant_id"]
+          },
+          {
+            foreignKeyName: "tienda_sucursales_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
             referencedColumns: ["id"]
           },
         ]
@@ -9944,6 +10700,8 @@ export type Database = {
           estado: Database["public"]["Enums"]["cliente_estado"] | null
           gasto_total_mxn: number | null
           id: string | null
+          lealtad_saldo: number | null
+          lealtad_vence_el: string | null
           nombre: string | null
           notas_internas: string | null
           razon_social: string | null
@@ -10300,6 +11058,7 @@ export type Database = {
           devoluciones_mxn: number | null
           dia_contable: string | null
           iva_neto_mxn: number | null
+          lealtad_mxn: number | null
           promociones_mxn: number | null
           propinas_capturadas_mxn: number | null
           subtotal_neto_mxn: number | null
@@ -10325,6 +11084,58 @@ export type Database = {
           },
           {
             foreignKeyName: "tickets_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      vw_lealtad_movimientos: {
+        Row: {
+          cliente_id: string | null
+          cliente_nombre: string | null
+          cliente_telefono: string | null
+          fecha: string | null
+          id: string | null
+          monto_mxn: number | null
+          motivo: string | null
+          programa_version: number | null
+          puntos: number | null
+          saldo_visto: number | null
+          sucursal_id: string | null
+          sucursal_nombre: string | null
+          tenant_id: string | null
+          ticket_folio: string | null
+          ticket_id: string | null
+          tipo: Database["public"]["Enums"]["lealtad_movimiento_tipo"] | null
+          usuario_id: string | null
+          usuario_nombre: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lealtad_movimientos_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "clientes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lealtad_movimientos_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "vw_clientes_lista"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lealtad_movimientos_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "vw_clientes_resumen"
+            referencedColumns: ["cliente_id"]
+          },
+          {
+            foreignKeyName: "lealtad_movimientos_tenant_id_fkey"
             columns: ["tenant_id"]
             isOneToOne: false
             referencedRelation: "tenants"
@@ -10879,6 +11690,7 @@ export type Database = {
           descuentos_manuales_mxn: number | null
           dia_contable: string | null
           iva_neto_mxn: number | null
+          lealtad_mxn: number | null
           marca_color: string | null
           marca_nombre: string | null
           marca_virtual_id: string | null
@@ -11019,6 +11831,10 @@ export type Database = {
         Returns: number
       }
       _cupo_ventana: { Args: { p_ventana: string }; Returns: string }
+      _delivery_items_a_ticket: {
+        Args: { p_generico_id: string; p_items: Json; p_ticket_id: string }
+        Returns: boolean
+      }
       _eliminando_tenant: { Args: { p_tenant: string }; Returns: boolean }
       _eliminar_tenant_archivos: {
         Args: { p_tenant_id: string }
@@ -11111,12 +11927,28 @@ export type Database = {
         Args: { p_rows: Json; p_tenant: string }
         Returns: Json
       }
+      _vim_aplicar_movimientos_lealtad: {
+        Args: { p_rows: Json; p_tenant: string }
+        Returns: Json
+      }
       _vim_apply_rows: {
         Args: { p_rows: Json; p_tabla: string; p_tenant: string }
         Returns: number
       }
       _vim_apply_rows_detalle: {
         Args: { p_rows: Json; p_tabla: string; p_tenant: string }
+        Returns: Json
+      }
+      _vim_compat_0156: {
+        Args: { p_snapshot: Json; p_tenant: string }
+        Returns: Json
+      }
+      _vim_conciliar_canjes: {
+        Args: { p_rows: Json; p_tenant: string }
+        Returns: Json
+      }
+      _vim_fusionar_clientes: {
+        Args: { p_snapshot: Json; p_tenant: string }
         Returns: Json
       }
       _vim_hmac_sha256: {
@@ -11654,6 +12486,10 @@ export type Database = {
         Returns: string
       }
       crear_ticket_desde_app: { Args: { p_pedido_id: string }; Returns: string }
+      crear_ticket_desde_tienda: {
+        Args: { p_pedido_id: string }
+        Returns: string
+      }
       cupo_agotado: {
         Args: { p_clave: string; p_max: number; p_ventana: string }
         Returns: boolean
@@ -11819,6 +12655,112 @@ export type Database = {
         Args: { p_fecha: string; p_sucursal_id: string }
         Returns: Json
       }
+      lealtad_acumular_por_ticket: {
+        Args: { p_ticket_id: string }
+        Returns: number
+      }
+      lealtad_ajustar_saldo: {
+        Args: { p_cliente_id: string; p_motivo: string; p_puntos: number }
+        Returns: number
+      }
+      lealtad_asentar_canje: { Args: { p: Json }; Returns: string }
+      lealtad_canje_datos: {
+        Args: { p_canje_id: string; p_tenant: string }
+        Returns: Json
+      }
+      lealtad_canjear: {
+        Args: {
+          p_caja_id: string
+          p_canje_id: string
+          p_cliente_id: string
+          p_premio_id: string
+          p_puntos: number
+          p_sucursal_id: string
+          p_telefono: string
+          p_tenant: string
+          p_ticket_id: string
+          p_usuario_id: string
+        }
+        Returns: Json
+      }
+      lealtad_control: {
+        Args: { p_desde: string; p_hasta: string }
+        Returns: Json
+      }
+      lealtad_guardar_programa: {
+        Args: {
+          p_compra_minima_mxn: number
+          p_confirmar_reinicio?: boolean
+          p_mecanica: Database["public"]["Enums"]["lealtad_mecanica"]
+          p_pesos_por_punto: number
+          p_porcentaje: number
+          p_tope_compras_dia: number
+          p_vencimiento_meses: number
+        }
+        Returns: Json
+      }
+      lealtad_motivo_red_48h: { Args: never; Returns: string }
+      lealtad_neto_ganado: { Args: { p_ticket: string }; Returns: number }
+      lealtad_proceso_diario: { Args: { p_ahora?: string }; Returns: Json }
+      lealtad_puntos_por_compra: {
+        Args: {
+          p_base: number
+          p_compra_minima: number
+          p_mecanica: Database["public"]["Enums"]["lealtad_mecanica"]
+          p_pesos_por_punto: number
+          p_porcentaje: number
+        }
+        Returns: number
+      }
+      lealtad_registrar_movimiento: {
+        Args: {
+          p_caja?: string
+          p_canje_mov?: string
+          p_cliente: string
+          p_fecha?: string
+          p_id: string
+          p_monto?: number
+          p_motivo?: string
+          p_premio?: string
+          p_puntos: number
+          p_saldo_visto?: number
+          p_sucursal?: string
+          p_tenant: string
+          p_ticket?: string
+          p_tipo: Database["public"]["Enums"]["lealtad_movimiento_tipo"]
+          p_usuario?: string
+          p_version: number
+        }
+        Returns: boolean
+      }
+      lealtad_resolver_cliente: {
+        Args: { p_cliente_id: string; p_telefono: string; p_tenant: string }
+        Returns: string
+      }
+      lealtad_resumen: {
+        Args: { p_desde: string; p_hasta: string; p_sucursal?: string }
+        Returns: Json
+      }
+      lealtad_revertir_canje: {
+        Args: { p_canje_id: string; p_motivo: string; p_tenant: string }
+        Returns: boolean
+      }
+      lealtad_revertir_canje_ticket: {
+        Args: { p_motivo: string; p_ticket_id: string }
+        Returns: number
+      }
+      lealtad_revertir_ganado_ticket: {
+        Args: { p_fraccion?: number; p_ticket_id: string }
+        Returns: number
+      }
+      lealtad_saldo: {
+        Args: { p_cliente_id: string; p_telefono: string; p_tenant: string }
+        Returns: Json
+      }
+      lealtad_vence_el: {
+        Args: { p_tenant: string; p_ultima: string }
+        Returns: string
+      }
       liberar_bienvenida: { Args: { p_tenant_id: string }; Returns: undefined }
       limites_efectivos: { Args: { p_tenant: string }; Returns: Json }
       liquidar_delivery: {
@@ -11922,6 +12864,11 @@ export type Database = {
       puede_administrar_permisos_de_usuario: {
         Args: { p_tenant_id: string; p_usuario_id: string }
         Returns: boolean
+      }
+      quitar_canje_lealtad: { Args: { p_ticket_id: string }; Returns: number }
+      reabrir_cuenta_impresa: {
+        Args: { p_autorizacion_pin_id: string; p_ticket_id: string }
+        Returns: undefined
       }
       reabrir_ticket_pagado: {
         Args: {
@@ -12080,6 +13027,10 @@ export type Database = {
         Args: { p_segundos?: number; p_sucursal: string }
         Returns: boolean
       }
+      sucursal_recibe_pedidos: {
+        Args: { p_segundos?: number; p_sucursal: string }
+        Returns: boolean
+      }
       sync_aplicar_operacion: {
         Args: {
           p_client_id_local: string
@@ -12122,6 +13073,7 @@ export type Database = {
         Returns: boolean
       }
       ticket_autofacturable: { Args: { p_ticket_id: string }; Returns: boolean }
+      ticket_lleva_premio: { Args: { p_ticket_id: string }; Returns: boolean }
       tickets_de_periodo_global: {
         Args: { p_desde: string; p_hasta: string; p_tenant_id: string }
         Returns: {
@@ -12346,6 +13298,14 @@ export type Database = {
         | "LIMPIEZA"
         | "OTROS"
       insumo_estado: "ACTIVO" | "PAUSADO"
+      lealtad_mecanica: "PUNTOS_DINERO" | "SELLOS" | "PUNTOS_PREMIOS"
+      lealtad_movimiento_tipo:
+        | "GANADO"
+        | "CANJE"
+        | "REVERSA_GANADO"
+        | "REVERSA_CANJE"
+        | "AJUSTE"
+        | "VENCIMIENTO"
       mesa_estado:
         | "LIBRE"
         | "OCUPADA"
@@ -12780,6 +13740,15 @@ export const Constants = {
         "OTROS",
       ],
       insumo_estado: ["ACTIVO", "PAUSADO"],
+      lealtad_mecanica: ["PUNTOS_DINERO", "SELLOS", "PUNTOS_PREMIOS"],
+      lealtad_movimiento_tipo: [
+        "GANADO",
+        "CANJE",
+        "REVERSA_GANADO",
+        "REVERSA_CANJE",
+        "AJUSTE",
+        "VENCIMIENTO",
+      ],
       mesa_estado: [
         "LIBRE",
         "OCUPADA",
@@ -12952,4 +13921,3 @@ export const Constants = {
     },
   },
 } as const
-
