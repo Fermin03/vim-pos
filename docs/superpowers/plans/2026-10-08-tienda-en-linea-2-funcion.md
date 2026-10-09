@@ -1345,8 +1345,10 @@ Lo que la revisión final de esta entrega dejó anotado para las que vienen.
   - Dejar el enlace de seguimiento fuera de analítica y de cabeceras `Referer`.
   - Un reintento tras un tiempo de espera crea un segundo pedido (considerar derivar el código de seguimiento de una llave por compra).
   - `renglones.detalle` no trae cantidades.
+  - Añadir `pedidos.vimpos.com.mx` a `TURNSTILE_HOSTNAMES` (añadir, no reemplazar) y al widget de Cloudflare: sin eso todo `pedir` responde 403.
+  - Si `pedir` responde 200 con `codigo` pero con `folio_corto`, `total_mxn` y `vence_aceptacion` en `null`, el pedido SÍ existe (la base respondió con una forma inesperada): llevar al cliente al seguimiento con ese código, no reintentar.
 - **Entrega 7 (salida):**
-  - Añadir `pedidos.vimpos.com.mx` a `TURNSTILE_HOSTNAMES` (añadir, no reemplazar) y al widget de Cloudflare.
+  - Confirmar que `pedidos.vimpos.com.mx` sigue en `TURNSTILE_HOSTNAMES` y en el widget de Cloudflare (se añade en la entrega 5; añadir, no reemplazar).
   - Confirmar que `CAPTCHA_OPCIONAL` no está puesto en producción.
   - La retención debe blanquear también `nota_cliente` y las notas de renglón, y cubrir filas atascadas en `ACEPTADO`.
   - El aviso de privacidad debe decir que un pedido anónimo crea un cliente y una dirección permanentes en el negocio.
