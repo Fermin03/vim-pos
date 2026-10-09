@@ -778,6 +778,7 @@ GRANT EXECUTE ON FUNCTION tienda_crear_pedido(uuid, uuid, text, uuid, jsonb, jso
 -- `<CODIGO>: <texto libre del cajero>` (delivery-accion), y el texto puede traer nombres o teléfonos.
 -- Al público solo llega el código, y solo si es de la lista cerrada (AGOTADO, CERRADO, SATURADO,
 -- OTRO); cualquier otra cosa, o nada, es OTRO. Nunca NULL ni texto libre en un pedido cancelado.
+-- Un pedido en ERROR no está cancelado (se puede reintentar): sale EN_PROCESO, sin motivo.
 CREATE OR REPLACE FUNCTION tienda_seguimiento(p_tenant uuid, p_seguimiento_hash text)
 RETURNS jsonb
 LANGUAGE plpgsql STABLE SECURITY DEFINER
@@ -814,7 +815,9 @@ BEGIN
     'folio_corto', v_p.folio_corto,
     'modo', CASE v_p.app WHEN 'DELIVERY_PROPIO' THEN 'DOMICILIO' ELSE 'RECOGER' END,
     'estado', CASE
-      WHEN v_estado = 'RECIBIDO' THEN 'EN_PROCESO'
+      -- ERROR no es un final: para 0161 es reintentable. A quien todavía puede recibir su pedido no
+      -- se le dice «cancelado»; se ve como recién recibido y sin motivo.
+      WHEN v_estado IN ('RECIBIDO', 'ERROR') THEN 'EN_PROCESO'
       WHEN v_estado IN ('ACEPTADO', 'EN_PREPARACION') THEN 'EN_PREPARACION'
       WHEN v_estado = 'LISTO' AND v_p.app = 'DELIVERY_PROPIO' THEN 'EN_CAMINO'
       WHEN v_estado = 'LISTO' THEN 'LISTO_PARA_RECOGER'
@@ -822,7 +825,7 @@ BEGIN
       ELSE 'CANCELADO' END,
     'motivo', CASE
       WHEN v_estado = 'EXPIRADO' THEN 'SIN_RESPUESTA'
-      WHEN v_estado IN ('RECHAZADO', 'CANCELADO', 'ERROR') THEN
+      WHEN v_estado IN ('RECHAZADO', 'CANCELADO') THEN
         CASE WHEN upper(btrim(split_part(v_p.motivo_cancelacion, ':', 1))) IN ('AGOTADO', 'CERRADO', 'SATURADO', 'OTRO')
              THEN upper(btrim(split_part(v_p.motivo_cancelacion, ':', 1)))
              ELSE 'OTRO' END

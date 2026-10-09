@@ -84,7 +84,11 @@ BEGIN
     ('8 CANCELADO con código de la lista', 'RECOGER', 'CANCELADO',     'CERRADO',                       'CANCELADO',          'CERRADO'),
     ('8 CANCELADO con motivo vacío',    'RECOGER',   'CANCELADO',      '',                              'CANCELADO',          'OTRO'),
     ('8 CANCELADO con un código fuera de la lista', 'RECOGER', 'CANCELADO', 'CLIENTE_DESISTIO',          'CANCELADO',          'OTRO'),
-    ('8 ERROR sin motivo',              'RECOGER',   'ERROR',          NULL,                            'CANCELADO',          'OTRO'),
+    -- ERROR no es «cancelado»: para 0161 es reintentable, y a quien todavía puede recibir su pedido
+    -- no se le dice que se canceló. Se ve como en proceso y sin motivo, traiga lo que traiga.
+    ('8 ERROR sin motivo',              'RECOGER',   'ERROR',          NULL,                            'EN_PROCESO',         NULL),
+    ('8 ERROR con un código de la lista', 'RECOGER', 'ERROR',          'AGOTADO',                       'EN_PROCESO',         NULL),
+    ('8 ERROR a domicilio, con el texto del fallo', 'DOMICILIO', 'ERROR', 'TOTAL_NO_COINCIDE: texto libre del fallo', 'EN_PROCESO', NULL),
     ('M RECHAZADO AGOTADO con texto libre y un teléfono', 'RECOGER', 'RECHAZADO', 'AGOTADO: llamó el dueño 4771112233', 'CANCELADO', 'AGOTADO'),
     ('M RECHAZADO con texto libre sin código', 'RECOGER', 'RECHAZADO', 'texto libre cualquiera',          'CANCELADO',          'OTRO'),
     ('M RECHAZADO en minúsculas',       'RECOGER',   'RECHAZADO',      'saturado',                      'CANCELADO',          'SATURADO'),
@@ -115,7 +119,7 @@ BEGIN
     END IF;
     IF v_s ->> 'modo' IS DISTINCT FROM r.modo THEN RAISE EXCEPTION '%: modo % (esperaba %)', r.caso, v_s ->> 'modo', r.modo; END IF;
   END LOOP;
-  IF v_n <> 24 THEN RAISE EXCEPTION '1–8: se probaron % de 24', v_n; END IF;
+  IF v_n <> 26 THEN RAISE EXCEPTION '1–8: se probaron % de 26', v_n; END IF;
 
   -- ── 9–13) Con un ticket de verdad en la nube ──────────────────────────────
   -- 9) Impreso: de ACEPTADO (EN_PREPARACION) a EN_CAMINO / LISTO_PARA_RECOGER, sin que `estado` cambie.
