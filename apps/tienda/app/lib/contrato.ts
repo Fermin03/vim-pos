@@ -5,6 +5,7 @@
 // no disponible». Nunca se pinta un menú a medias ni un precio que no se pudo leer. Los lectores
 // copian solo los campos que conocen: lo que la función añada mañana no llega a la pantalla solo.
 import { leerHorario, type Horario } from "@vim/fecha";
+import type { ItemDeCuerpo } from "./carrito";
 
 export type Modo = "RECOGER" | "DOMICILIO";
 export type Pago = "EFECTIVO" | "TARJETA";
@@ -73,6 +74,22 @@ export type Seguimiento = {
   renglones: { nombre: string; cantidad: number; detalle: string | null }[];
   subtotal_mxn: string; envio_total_mxn: string; total_mxn: string; pago: Pago;
   recibido_at: string; sucursal: { nombre: string; telefono: string | null };
+};
+
+// ── Cuentas (entrega 6). Nunca sale el id de la cuenta ni el del negocio. ───────────────────────
+export type Cuenta = { nombre: string; apellido: string | null; email: string; /** 10 dígitos. */ telefono: string; /** `YYYY-MM-DD`. */ fecha_nacimiento: string | null };
+export type DireccionGuardada = {
+  id: string; etiqueta: string; calle: string; numero_exterior: string; numero_interior: string | null; colonia: string;
+  codigo_postal: string; ciudad: string; estado: string; referencias: string | null;
+};
+export type MiCuenta = { cuenta: Cuenta; direcciones: DireccionGuardada[] };
+/** `cuenta: null` = el correo ya tenía cuenta: no hay sesión (decisión 4: no se dice que ya existía). */
+export type Registro = { cuenta: Cuenta | null };
+export type PedidoDeCuenta = {
+  folio_corto: string; recibido_at: string; modo: Modo; estado: EstadoDePedido; total_mxn: string;
+  renglones: { nombre: string; cantidad: number; detalle: string | null }[];
+  /** Lo que se pidió, con la forma del carrito, para «pedir de nuevo». null = ya no se puede (pedido anonimizado, o no se pudo leer). */
+  items: ItemDeCuerpo[] | null;
 };
 
 export type ErrorDeTienda = { error: string; detalle: string | null };
@@ -215,3 +232,60 @@ export function errorDe(x: unknown, porDefecto = "SERVICIO_NO_DISPONIBLE"): Erro
   if (typeof o.error !== "string" || !/^[A-Z][A-Z0-9]*(_[A-Z0-9]+)+$/.test(o.error) || o.error.length > 64) return { error: porDefecto, detalle: null };
   return { error: o.error, detalle: typeof o.detalle === "string" && /^[A-Za-z0-9_.-]{1,64}$/.test(o.detalle) ? o.detalle : null };
 }
+
+// ── Cuentas ──────────────────────────────────────────────────────────────────────────────────────
+function cuenta(x: unknown): Cuenta {
+  const c = obj(x);
+  return {
+    nombre: txt(c.nombre), apellido: txtONull(c.apellido), email: txt(c.email), telefono: txt(c.telefono),
+    fecha_nacimiento: c.fecha_nacimiento === null || c.fecha_nacimiento === undefined ? null : con(/^\d{4}-\d{2}-\d{2}$/)(c.fecha_nacimiento),
+  };
+}
+const direcciones = (x: unknown): DireccionGuardada[] => lista(obj(x).direcciones, (y) => {
+  const d = obj(y);
+  return {
+    id: uuid(d.id), etiqueta: txt(d.etiqueta), calle: txt(d.calle), numero_exterior: txt(d.numero_exterior),
+    numero_interior: txtONull(d.numero_interior), colonia: txt(d.colonia), codigo_postal: txt(d.codigo_postal),
+    ciudad: txt(d.ciudad), estado: txt(d.estado), referencias: txtONull(d.referencias),
+  };
+});
+
+const cantidad = (x: unknown): number => (entero(x) >= 1 ? (x as number) : mal());
+const modificadores = (x: unknown) => lista(x, (y) => {
+  const m = obj(y);
+  return { opcion_id: uuid(m.opcion_id), cantidad: cantidad(m.cantidad) };
+});
+/** Los `items` de un pedido con la forma EXACTA del carrito (`ItemDeCuerpo`), o null. Solo las claves conocidas. */
+const itemsDe = lector((x): ItemDeCuerpo[] => lista(x, (y) => {
+  const i = obj(y);
+  return {
+    producto_id: uuid(i.producto_id), cantidad: cantidad(i.cantidad),
+    ...(i.nota !== undefined && i.nota !== null && { nota: txt(i.nota) }),
+    ...(i.modificadores !== undefined && { modificadores: modificadores(i.modificadores) }),
+    ...(i.componentes !== undefined && { componentes: lista(i.componentes, (z) => {
+      const c = obj(z);
+      return { grupo_id: uuid(c.grupo_id), producto_id: uuid(c.producto_id), cantidad: cantidad(c.cantidad), modificadores: modificadores(c.modificadores ?? []) };
+    }) }),
+  };
+}));
+
+/** `{ ok: true }`: salir, pedir recuperación, cambiar contraseña, eliminar la cuenta. */
+export const okDe = lector((x): true => (obj(x).ok === true ? true : mal()));
+/** `registrar`: con la cuenta (alta, sesión abierta) o sin ella (el correo ya tenía cuenta). */
+export const registroDe = lector((x): Registro => {
+  const r = obj(x);
+  if (r.ok !== true) mal();
+  return { cuenta: r.cuenta === undefined || r.cuenta === null ? null : cuenta(r.cuenta) };
+});
+/** `entrar`, `recuperar_aplicar`, `cuenta_guardar`: sin cuenta no hay respuesta válida. */
+export const cuentaDe = lector((x): Cuenta => cuenta(obj(x).cuenta));
+export const miCuentaDe = lector((x): MiCuenta => ({ cuenta: cuenta(obj(x).cuenta), direcciones: direcciones(x) }));
+export const direccionesDe = lector(direcciones);
+/** Unos `items` ilegibles no tumban la lista: ese pedido se ve, pero no se puede «pedir de nuevo». */
+export const pedidosDe = lector((x): PedidoDeCuenta[] => lista(obj(x).pedidos, (y) => {
+  const p = obj(y);
+  return {
+    folio_corto: txt(p.folio_corto), recibido_at: txt(p.recibido_at), modo: uno(p.modo, MODOS), estado: uno(p.estado, ESTADOS_DE_PEDIDO),
+    total_mxn: importe(p.total_mxn), renglones: lista(p.renglones, renglon), items: itemsDe(p.items),
+  };
+}));

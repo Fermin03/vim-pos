@@ -1,7 +1,10 @@
 // El cliente del NAVEGADOR: todo lo que una pantalla le pide al servidor pasa por `POST /api/tienda`.
 // Nunca lanza: cada llamada devuelve `ok` con los datos ya validados, o `error` con un código (para
 // `textoDeError`) y su detalle. Un 200 que no tiene la forma del contrato es un error, no datos.
-import { cotizacionDe, errorDe, pedidoDe, seguimientoDe, type Cotizacion, type Pago, type PedidoCreado, type Seguimiento } from "./contrato";
+import {
+  cotizacionDe, cuentaDe, direccionesDe, errorDe, miCuentaDe, okDe, pedidoDe, pedidosDe, registroDe, seguimientoDe,
+  type Cotizacion, type Cuenta, type DireccionGuardada, type MiCuenta, type Pago, type PedidoCreado, type PedidoDeCuenta, type Registro, type Seguimiento,
+} from "./contrato";
 import type { CuerpoCarrito } from "./carrito";
 
 /**
@@ -44,6 +47,7 @@ async function llamar<T>(cuerpo: unknown, lector: (x: unknown) => T | null, sinR
     if (signal?.aborted) return fallo("CANCELADA");
     const r = await fetch("/api/tienda", {
       method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(cuerpo), signal: corte.signal,
+      credentials: "same-origin",   // la cookie de sesión (HttpOnly) viaja sola; este código nunca la ve
     });
     const json: unknown = await r.json().catch(() => null);
     if (r.status !== 200) {
@@ -83,3 +87,42 @@ export async function pedir(negocio: string, pedido: CuerpoPedido): Promise<Resu
   // El servidor de la tienda no alcanzó a oír a la función: el pedido pudo haber entrado.
   return !r.ok && r.error === "SERVICIO_NO_DISPONIBLE" && r.detalle === "SIN_RESPUESTA" ? fallo("SIN_CONFIRMAR") : r;
 }
+
+// ── Cuentas ──────────────────────────────────────────────────────────────────────────────────────
+// La sesión es una cookie HttpOnly que pone y borra el servidor de la tienda: aquí no hay token.
+// Los errores propios: `CREDENCIALES_INVALIDAS`, `SESION_INVALIDA` (la cookie ya se borró: mandar a
+// «Entrar»), `ENLACE_INVALIDO`, `CUENTA_INVALIDA_DATOS`, `DIRECCION_INVALIDA`, `DIRECCIONES_LLENAS`,
+// `CAPTCHA_INVALIDO`, `DEMASIADOS_INTENTOS`. Los textos: `textoDeCuenta` (cuenta.ts).
+// Las contraseñas van TAL CUAL se escribieron: nunca se recortan.
+const deCuenta = <T>(accion: string, negocio: string, datos: object, lector: (x: unknown) => T | null, signal?: AbortSignal): Promise<Resultado<T>> =>
+  llamar({ accion, negocio, ...datos }, lector, LECTURA, signal);
+
+export type DatosDeRegistro = { nombre: string; apellido: string; email: string; telefono: string; password: string };
+export type DatosDeCuenta = { nombre: string; apellido: string; telefono: string; /** `YYYY-MM-DD` o null. */ fecha_nacimiento: string | null };
+/** `id: null` = dirección nueva. Los demás campos son los de la dirección de `pedir`. */
+export type DireccionPorGuardar = DireccionDePedido & { id: string | null; etiqueta: string };
+
+/**
+ * Crea la cuenta y deja la sesión abierta. `cuenta: null` = el correo ya tenía cuenta: NO hay sesión
+ * y a ese correo le llega un aviso. La pantalla dice «Revisa tu correo para continuar», sin más.
+ * `captcha`: acción `tienda_registro`; sirve una vez.
+ */
+export const registrar = (negocio: string, d: DatosDeRegistro & { captcha: string }): Promise<Resultado<Registro>> => deCuenta("registrar", negocio, d, registroDe);
+export const entrar = (negocio: string, email: string, password: string): Promise<Resultado<Cuenta>> => deCuenta("entrar", negocio, { email, password }, cuentaDe);
+/** Cierra la sesión de este navegador. La cookie se borra aunque la llamada falle. */
+export const salir = (negocio: string): Promise<Resultado<true>> => deCuenta("salir", negocio, {}, okDe);
+/** Siempre `ok`, exista o no la cuenta. `captcha`: acción `tienda_recuperar`. */
+export const recuperarPedir = (negocio: string, email: string, captcha: string): Promise<Resultado<true>> => deCuenta("recuperar_pedir", negocio, { email, captcha }, okDe);
+/** `token` = el `?t=` del enlace del correo. Con `ok` la sesión queda abierta. */
+export const recuperarAplicar = (negocio: string, token: string, password: string): Promise<Resultado<Cuenta>> => deCuenta("recuperar_aplicar", negocio, { token, password }, cuentaDe);
+export const leerCuenta = (negocio: string, signal?: AbortSignal): Promise<Resultado<MiCuenta>> => deCuenta("cuenta", negocio, {}, miCuentaDe, signal);
+export const guardarCuenta = (negocio: string, d: DatosDeCuenta): Promise<Resultado<Cuenta>> => deCuenta("cuenta_guardar", negocio, d, cuentaDe);
+/** Cierra las demás sesiones; la de este navegador sigue. `CREDENCIALES_INVALIDAS` = la actual no es. */
+export const cambiarPassword = (negocio: string, actual: string, nueva: string): Promise<Resultado<true>> => deCuenta("cuenta_password", negocio, { actual, nueva }, okDe);
+/** Devuelve la lista completa ya actualizada. */
+export const guardarDireccion = (negocio: string, d: DireccionPorGuardar): Promise<Resultado<DireccionGuardada[]>> => deCuenta("direccion_guardar", negocio, d, direccionesDe);
+export const borrarDireccion = (negocio: string, id: string): Promise<Resultado<DireccionGuardada[]>> => deCuenta("direccion_borrar", negocio, { id }, direccionesDe);
+/** Los últimos 20 pedidos hechos con esta cuenta. */
+export const misPedidos = (negocio: string, signal?: AbortSignal): Promise<Resultado<PedidoDeCuenta[]>> => deCuenta("mis_pedidos", negocio, {}, pedidosDe, signal);
+/** Con `ok` la cuenta ya no existe y la cookie se borró. `CREDENCIALES_INVALIDAS` = la contraseña no es. */
+export const eliminarCuenta = (negocio: string, password: string): Promise<Resultado<true>> => deCuenta("eliminar_cuenta", negocio, { password }, okDe);

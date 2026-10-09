@@ -140,7 +140,7 @@ export function estimarSeleccion(producto: Producto, s: Seleccion, cantidad: num
   return pieza * cantidad;
 }
 
-const productoDe = (menu: Menu, id: string): Producto | undefined => {
+export const productoDe = (menu: Menu, id: string): Producto | undefined => {
   for (const c of menu.categorias) for (const p of c.productos) if (p.id === id) return p;
   return undefined;
 };
