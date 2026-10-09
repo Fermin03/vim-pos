@@ -1,5 +1,6 @@
 // Lógica pura de la página de la tienda (el estado vive en `(panel)/tienda/use-tienda.ts`).
 import type { BloqueConfig, ConfigTienda, DatosConfigTienda } from "./tienda";
+import type { ComboNoComprable } from "./tienda-combos";
 import type { BorradorSucursal, SucursalTienda } from "./tienda-reglas";
 
 /** Lo que hay en la base. `config` null = el dueño todavía no elige dirección. */
@@ -10,6 +11,8 @@ export type Leido = {
   interruptor: boolean;
   enPlan: boolean;
   pendientes: { sinFoto: number; sinDescripcion: number; enCategoriaInactiva: number };
+  /** Vacío si no hay ninguno o si la revisión falló: un aviso de más no debe romper la página. */
+  combosNoComprables: ComboNoComprable[];
 };
 
 /** Una escritura que la base ya aceptó, con lo que se le mandó. */
